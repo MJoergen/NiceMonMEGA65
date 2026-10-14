@@ -1,0 +1,3 @@
+[submodule "nice_cpu"]
+	path = nice_cpu
+	url = https://github.com/MJoergen/nice_cpu.git
