@@ -29,10 +29,11 @@ CI (`.github/workflows/ci.yml`) runs `make -C sim test` and `make lint`.
 ## Architecture
 
 `src/nicemon.vhd` is the whole system and the file to read first; its header
-holds the address map. The core (`nice_cpu/hdl/src/multicycle.vhd`) has an
-instruction bus on port A of the RAM and a data bus on port B, which it
-shares with the CLI (`cmd.vhd`, a second Wishbone master). Everything at
-`0xFFFFFF00`–`FF` is the I/O page: the console, the read counter, nice_cpu's
+holds the address map. The core (`nice_cpu/hdl/src/multicycle.vhd`) has a
+64-bit instruction bus on port A of the RAM, which reads an aligned pair of
+words (the RAM, ROM, and screen keep even and odd words in two banks), and
+a 32-bit data bus on port B, which it shares with the CLI (`cmd.vhd`, a
+second Wishbone master). Everything at `0xFFFFFF00`–`FF` is the I/O page: the console, the read counter, nice_cpu's
 math unit, performance counters and timer, the screen's registers, and the
 CLI-only registers (`E0`–`EF` the core's registers, `F0` control, `F1` halt
 reason). Words of that page that are not registers are memory, as in the

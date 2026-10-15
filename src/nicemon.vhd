@@ -5,8 +5,9 @@
 --
 -- THEORY OF OPERATION
 -- The core (nice_cpu/hdl/src/multicycle.vhd) has an instruction bus and a
--- data bus, both pipelined Wishbone. The instruction bus reads port A of the
--- memory. The data bus shares port B with the CLI, which is a second
+-- data bus, both pipelined Wishbone. The instruction bus is 64 bits wide: it
+-- reads an aligned pair of words from port A of the memory, the word at the
+-- lower address in bits 31..0. The data bus shares port B with the CLI, which is a second
 -- Wishbone master (src/cmd.vhd from cmod-s7). The CLI takes the lines
 -- "R <ADDR>" and "W <ADDR> <DATA>", with 8 hex digits for each number, and
 -- answers with the word read, or "OK".
@@ -284,8 +285,9 @@ architecture synthesis of nicemon is
    signal ibus_cyc  : std_logic;
    signal ibus_stb  : std_logic;
    signal ibus_ack  : std_logic := '0';
-   signal ibus_addr : std_logic_vector(31 downto 0);
-   signal ibus_data : std_logic_vector(31 downto 0);
+   signal ibus_addr : std_logic_vector(30 downto 0);   -- the pair address
+   signal ibus_word : std_logic_vector(31 downto 0);   -- its first word
+   signal ibus_data : std_logic_vector(63 downto 0);
    signal ibus_io   : std_logic := '0';
    signal ibus_scr  : std_logic := '0';
    signal ibus_rom  : std_logic := '0';
@@ -351,9 +353,9 @@ architecture synthesis of nicemon is
    signal irq_ready  : std_logic;
    signal irq_vector : std_logic_vector(7 downto 0);
 
-   -- Memory port B, and the source of the read data of the last request
-   signal ram_a_addr  : std_logic_vector(G_RAM_ADDR_BITS - 1 downto 0);
-   signal ram_a_data  : std_logic_vector(31 downto 0);
+   -- Memory ports A and B, and the source of the read data of the last request
+   signal ram_a_addr  : std_logic_vector(G_RAM_ADDR_BITS - 2 downto 0);
+   signal ram_a_data  : std_logic_vector(63 downto 0);
    signal ram_b_addr  : std_logic_vector(G_RAM_ADDR_BITS - 1 downto 0);
    signal ram_b_we    : std_logic;
    signal ram_b_wdata : std_logic_vector(31 downto 0);
@@ -364,11 +366,11 @@ architecture synthesis of nicemon is
    signal rd_rx       : std_logic := '0';
 
    -- The ROM, read at the addresses of the memory ports
-   signal rom_a_data : std_logic_vector(31 downto 0);
+   signal rom_a_data : std_logic_vector(63 downto 0);
    signal rom_b_data : std_logic_vector(31 downto 0);
 
    -- The screen memory, like the main memory
-   signal scr_a_data  : std_logic_vector(31 downto 0);
+   signal scr_a_data  : std_logic_vector(63 downto 0);
    signal scr_b_addr  : std_logic_vector(C_SCR_BITS - 1 downto 0);
    signal scr_b_we    : std_logic;
    signal scr_b_rdata : std_logic_vector(31 downto 0);
@@ -475,18 +477,21 @@ begin
 
 
    ---------------------------------------------------------------------------
-   -- Instruction bus: memory port A. It never stalls.
+   -- Instruction bus: memory port A. It never stalls. A pair lies wholly in
+   -- the RAM, the ROM, the screen, or the I/O page, so the address of its
+   -- first word decides where it is read.
    ---------------------------------------------------------------------------
 
-   ram_a_addr <= ibus_addr(G_RAM_ADDR_BITS - 1 downto 0);
+   ibus_word  <= ibus_addr & '0';
+   ram_a_addr <= ibus_addr(G_RAM_ADDR_BITS - 2 downto 0);
 
    p_ibus : process (clk_i)
    begin
       if rising_edge(clk_i) then
          ibus_ack <= ibus_cyc and ibus_stb;
-         ibus_io  <= and(ibus_addr(31 downto 8));
-         ibus_scr <= '1' when ibus_addr(31 downto C_SCR_BITS) = C_SCR_BASE else '0';
-         ibus_rom <= '1' when rom_hidden = '0' and in_rom(ibus_addr) else '0';
+         ibus_io  <= and(ibus_word(31 downto 8));
+         ibus_scr <= '1' when ibus_word(31 downto C_SCR_BITS) = C_SCR_BASE else '0';
+         ibus_rom <= '1' when rom_hidden = '0' and in_rom(ibus_word) else '0';
          if cpu_rst = '1' then
             ibus_ack <= '0';
          end if;
@@ -918,7 +923,7 @@ begin
          )
          port map (
             clk_i    => clk_i,
-            a_addr_i => ram_a_addr(G_ROM_ADDR_BITS - 1 downto 0),
+            a_addr_i => ram_a_addr(G_ROM_ADDR_BITS - 2 downto 0),
             a_data_o => rom_a_data,
             b_addr_i => ram_b_addr(G_ROM_ADDR_BITS - 1 downto 0),
             b_data_o => rom_b_data
@@ -952,7 +957,7 @@ begin
       )
       port map (
          clk_i     => clk_i,
-         a_addr_i  => ibus_addr(C_SCR_BITS - 1 downto 0),
+         a_addr_i  => ibus_addr(C_SCR_BITS - 2 downto 0),
          a_data_o  => scr_a_data,
          b_addr_i  => scr_b_addr,
          b_we_i    => scr_b_we,
