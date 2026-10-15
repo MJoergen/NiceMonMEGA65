@@ -377,10 +377,10 @@ begin
 
       report "tb_nicemon: the keyboard";
       command("W FFFFFFF0 00000001", "OK");
-      kbd_send("R FFFFFFF0" & C_CR);
+      kbd_send("r fffffff0" & C_CR);
       expect("00000001" & C_CRLF);
       load(G_FIFO_FILE, first_v);
-      kbd_send("W FFFFFFF0 00000000" & C_CR);
+      kbd_send("w fffffff0 00000000" & C_CR);
       expect("OK" & C_CRLF);
       kbd_send("0123456789abcdefXYZ.");
       expect("0123456789abcdefXYZ.");

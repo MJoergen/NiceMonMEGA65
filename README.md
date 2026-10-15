@@ -70,7 +70,8 @@ the C examples, `make r3` and `make r6` build the bitstreams, and
 
 Connect a terminal to the MEGA65's debug UART at 115200 baud, 8-N-1. After
 reset the command line interpreter prints `NICE` and takes two commands, with
-8 hex digits for each number. End each line with CR alone.
+8 hex digits for each number. Commands and hex digits may be upper or lower
+case. End each line with CR alone.
 
 | Command | What it does |
 |---|---|
@@ -108,9 +109,8 @@ answers come out on the UART. The keys give ASCII, as a terminal sends it:
 | SHIFT with `0`, `=`, `:`, `;` | `{`, `}`, `[`, `]` |
 
 A held key repeats after half a second, 20 times a second. The function
-keys, HELP, CLR/HOME, and the modifiers give nothing. The command line
-takes only capital `R` and `W`. The keyboard's drive LED is green while the
-core runs, like the user LED.
+keys, HELP, CLR/HOME, and the modifiers give nothing. The keyboard's drive
+LED is green while the core runs, like the user LED.
 
 ### Running a program
 

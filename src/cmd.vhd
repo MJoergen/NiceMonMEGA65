@@ -1,7 +1,7 @@
 -- Copied from https://github.com/MJoergen/cmod-s7 (src/cmd.vhd, commit d3d544d), MIT License.
 -- Changed: the banner is "NICE", not "WBUS". A pulse on halt_i prints
--- CR LF "HALT" CR LF, before the next command is taken. The layout and names
--- follow CODING_STYLE.md.
+-- CR LF "HALT" CR LF, before the next command is taken. The commands may be
+-- lower case. The layout and names follow CODING_STYLE.md.
 --
 -- ----------------------------------------------------------------------------
 -- Description: Simple command line interpreter
@@ -9,6 +9,7 @@
 -- W <ADDR> <DATA>
 -- R <ADDR>
 -- Both <ADDR> and <DATA> must be 32-bit numbers written in hex (i.e. 8 characters).
+-- The command letter and the hex digits may be upper or lower case.
 --
 -- The output is a Wishbone Master interface 32-bit (Revision B.4)
 -- https://cdn.opencores.org/downloads/wbspec_b4.pdf
@@ -136,6 +137,13 @@ begin
          return ret_v;
       end function slv2asc;
 
+      -- The command letter and the space after it, with the letter in upper
+      -- case, so that "r " is "R " and "w " is "W ".
+      pure function cmd2upper(arg : std_logic_vector(15 downto 0)) return std_logic_vector is
+      begin
+         return arg and X"DFFF";
+      end function cmd2upper;
+
    begin
       if rising_edge(clk_i) then
          wbus_stb_o <= '0';
@@ -164,13 +172,13 @@ begin
                      halt_pend         <= '0';
                   end if;
                elsif rx_buffer_valid_i = '1' and rx_buffer_ready_o = '1' then
-                  if rx_buffer_data_i(8 * 10 - 1 downto 8 * 10 - 16) = X"5220" and rx_buffer_size_i = 10 then    -- 'R'
+                  if cmd2upper(rx_buffer_data_i(8 * 10 - 1 downto 8 * 10 - 16)) = X"5220" and rx_buffer_size_i = 10 then    -- 'R' or 'r'
                      wbus_addr_o <= asc2slv(rx_buffer_data_i(63 downto 0))(G_ADDR_SIZE - 1 downto 0);
                      wbus_cyc_o  <= '1';
                      wbus_stb_o  <= '1';
                      wbus_we_o   <= '0';
                      state       <= BUSY_ST;
-                  elsif rx_buffer_data_i(8 * 19 - 1 downto 8 * 19 - 16) = X"5720" and rx_buffer_size_i = 19 then -- 'W'
+                  elsif cmd2upper(rx_buffer_data_i(8 * 19 - 1 downto 8 * 19 - 16)) = X"5720" and rx_buffer_size_i = 19 then -- 'W' or 'w'
                      wbus_addr_o  <= asc2slv(rx_buffer_data_i(8 * 17 - 1 downto 8 * 17 - 64))(G_ADDR_SIZE - 1 downto 0);
                      wbus_wrdat_o <= asc2slv(rx_buffer_data_i(63 downto 0));
                      wbus_cyc_o   <= '1';
