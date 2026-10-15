@@ -3,6 +3,14 @@
 ## The board clock, 100 MHz. Vivado derives the 50 MHz MMCM clock from it.
 create_clock -period 10.000 -name sys_clk [get_ports {clk_i}]
 
+## The video clocks come from an MMCM of their own (video_clk.vhd). The only
+## thing that crosses between them and the system clock is the copy of the
+## screen in src/video/text.vhd: a block RAM, written on the system clock and
+## read on the VGA clock, so there is no path between the clocks to time.
+set_clock_groups -asynchronous \
+   -group [get_clocks -of_objects [get_pins i_mega65/i_clk_rst/i_mmcm/CLKOUT0]] \
+   -group [get_clocks -of_objects [get_pins {i_mega65/i_video_clk/i_mmcm/CLKOUT0 i_mega65/i_video_clk/i_mmcm/CLKOUT1}]]
+
 ## The UART, the LED, and the reset button are slow, and synchronised or
 ## registered in the design.
 set_false_path -from [get_ports {uart_rxd_i}]

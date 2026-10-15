@@ -13,6 +13,8 @@ interpreter on the UART like the one in
 |---|---|
 | [nice_cpu/](https://github.com/MJoergen/nice_cpu) | The NICE CPU, its assembler, and its emulator, as a git submodule. |
 | [src/](src/) | The synthesisable VHDL, shared by both boards. `nicemon.vhd` is the system: the NICE core, the memory, the UART, and the command line interpreter. `uart_serdes.vhd` (with fixes to its receiver, and break detection), `line_buffer.vhd` and `cmd.vhd` are copied from cmod-s7; `cmd.vhd` prints `NICE` instead of `WBUS` at reset, and `HALT` when the core halts. `kbd_m65.vhd` drives the MEGA65 keyboard, and `kbd_ascii.vhd` turns its keys into ASCII. |
+| [src/video/](src/video/) | The text display: `text.vhd` shows the screen at `0xFFFF0000` as 80×25 characters on a video output. `pix.vhd` and `video_pkg.vhd` are from [MandelbrotMEGA65](https://github.com/MJoergen/MandelbrotMEGA65), and `font_pkg.vhd` is the [Spleen](https://github.com/fcambus/spleen) 16×32 font, made by `font/gen_font_pkg.py`. |
+| [font/](font/) | The script that makes `src/video/font_pkg.vhd` from Spleen, and Spleen's license (BSD 2-Clause). |
 | [sim/](sim/) | The GHDL testbenches. |
 | [synth/](synth/README.md) | The Vivado builds for the R3 and R6 boards. |
 | [monitor/](monitor/README.md) | The monitor, in NICE assembly. |
@@ -39,7 +41,7 @@ difference is the memory: 64K words, not 2³².
 | Performance counters, `0xFFFFFF10`–`1F` | One cycle per step, from the start | nice_cpu's `perf.vhd`, counting clock cycles at 50 MHz, from the start of the core | Instructions yes; cycles count real clocks |
 | Instruction fetches from `0xFFFFFF00`–`FF` | Read 0 | Read 0 | Yes |
 | Memory | All 2³² words, 0 at the start | 64K words, repeated through the address space; the stack at `0xFFFFFF00` lands in the top. `load.py` and `run.py` clear it to 0 before they load | No: a program, its data, and its stack must fit in 64K words |
-| Screen, `0xFFFF0000`–`07CF` | 80×25 words of memory, printed by `--screen` | 2048 words of memory of their own, read with `R`; nothing displays them | Yes, but not displayed |
+| Screen, `0xFFFF0000`–`07CF` | 80×25 words of memory, printed by `--screen` | 2048 words of memory of their own, read with `R`, and shown on VGA and HDMI | Yes |
 | Read counter, `0xFFFFFF01` | Counts the data reads since the last write | The same; a read by the command line does not count, as `--dump` does not | Yes |
 | The rest of `0xFFFFFF02`–`FF` | Ordinary memory for data | Memory, in the top 256 words of the RAM | Yes |
 | Interrupts | Only from `--irq` and `--nmi` | None raised | Yes: no device raises them in either |
@@ -190,7 +192,7 @@ the UART, and `nice_cycles` and `nice_instructions` for the performance
 counters, as `examples/primes.c` uses them. It also declares `nice_peek`
 and `nice_poke`, which read and write any NICE address, such as the math
 unit's. `nice_screen_put` and `nice_screen_clear` write the screen at
-`0xFFFF0000`, which nothing displays here, but `R` reads it.
+`0xFFFF0000`, which the VGA and HDMI outputs show.
 
 The translated code and the runtime routines multiply and divide with the
 math unit, so the program is joined with `muldiv_mpu.nasm`. A system
@@ -202,6 +204,30 @@ must fit below the stack in the 64K words of memory. With `printf` and `scanf`, 
 prime example ends at word `0x6C90`. The translator's README,
 `nice_cpu/translator/README.md`, has the same steps for Zig and Rust.
 
+### The screen
+
+The screen at `0xFFFF0000` is shown on the VGA connector and on the HDMI
+connector, at 1280×1024 and 60 Hz, as 80 columns and 25 rows of
+characters of 16×32 pixels, in the middle of the picture. Word `80 * row +
+column` is one character: its code, ISO 8859-1, in bits 7..0, and its
+colour above. The colour is two 8-bit colours, RGB with 3, 3, and 2 bits:
+the background in bits 31..24 and the foreground in bits 23..16. Bits 15..8
+are not used. A word with 0 in bits 31..16 is white on black, so plain
+characters are readable. The screen is 0 at power-up, which shows as black,
+and `nice_screen_clear` fills it with blanks.
+
+The colour format is a guess. nice_cpu says only that the colour is above
+bit 7, and its one example, the 2004 program
+`nice_cpu/assembler/test/print.nasm`, writes `0xC80FF000` and calls it "blue
+on orange", which this format shows: `0xC8` is orange and `0x0F` is blue.
+
+From the command line, `W FFFF0000 00000041` puts an `A` in the top left
+corner, white on black, and `W FFFF0001 E0FF0042` a white `B` on red next to
+it.
+
+The video output comes from MandelbrotMEGA65, which uses the same mode on
+the MEGA65. The HDMI output is DVI, without sound.
+
 ### Address map
 
 The command line and the core's data accesses see the same addresses.
@@ -209,7 +235,7 @@ The command line and the core's data accesses see the same addresses.
 | Address | What it is |
 |---|---|
 | `0x00000000`–`0xFFFFFFFF` | Memory, where no register below is: 64K words of block RAM, repeated through the address space. So the runtime's stack below `0xFFFFFF00` lands in the top of it, and so do the words of `0xFFFFFF00`–`FF` that are not registers. |
-| `0xFFFF0000`–`0xFFFF07FF` | The screen: 2048 words of memory of their own, the emulator's 80×25 screen and a little more. Nothing displays it, but `R` reads it. |
+| `0xFFFF0000`–`0xFFFF07FF` | The screen: 2048 words of memory of their own, the emulator's 80×25 screen and a little more. The first 2000 are shown on VGA and HDMI (see [The screen](#the-screen)), and `R` reads them. |
 | `0xFFFFFF00` | The console of ISA.md §8.3. A write sends bits 7..0 to the UART. A read takes the oldest byte received from the UART or the keyboard, and returns it in bits 7..0 with bit 8 set, or 0 when no byte has arrived. A break on the UART ends the input: once the bytes before it are read, a read returns `0x200` (bit 9), as at the end of the emulator's input, until the core is started again. |
 | `0xFFFFFF01` | The emulator's read counter. A read by the core returns the number of its reads since the last write, and a write sets that number. A read with `R` does not count. It is 0 when the core starts. |
 | `0xFFFFFF10`–`0xFFFFFF1F` | The performance counters of ISA.md §8.5: cycles and instructions, 64 bits each. |
@@ -283,6 +309,9 @@ You need GHDL (tested with 4.1.0) and Python 3.
   there, so that the test of a full FIFO is short.
 - `sim/tb_kbd.vhd` tests the keyboard driver and its ASCII, with a model of
   the keyboard.
+- `sim/tb_text.vhd` fills the screen of the text display and checks every
+  pixel of one 1280×1024 frame, and the sync pulses. It takes about a
+  minute and a half.
 - `make test` also checks that GHDL can synthesise the system and the
   keyboard.
 - `make lint` checks the VHDL against [CODING_STYLE.md](CODING_STYLE.md)

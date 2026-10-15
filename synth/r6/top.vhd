@@ -1,5 +1,10 @@
 -- The top level for the MEGA65 R6 board. The reset button is wired to the
--- FPGA, so it resets the system.
+-- FPGA, so it resets the system. This module also drives the pins of the
+-- video that the R3 does not have, as MandelbrotMEGA65's mega65_r6.vhd does:
+-- * The video DAC has a power save input. It is switched off.
+-- * The HDMI outputs can be 50 ohm terminated (HIZ_EN low), and the level
+--   shifter (U10 = PTN3363) has an active low output enable. Both are
+--   switched on.
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -13,7 +18,26 @@ entity top is
       kb_io0_o       : out std_logic;
       kb_io1_o       : out std_logic;
       kb_io2_i       : in  std_logic;
-      led_o          : out std_logic
+      led_o          : out std_logic;
+
+      -- VGA via the video DAC
+      vga_red_o      : out std_logic_vector(7 downto 0);
+      vga_green_o    : out std_logic_vector(7 downto 0);
+      vga_blue_o     : out std_logic_vector(7 downto 0);
+      vga_hs_o       : out std_logic;
+      vga_vs_o       : out std_logic;
+      vdac_clk_o     : out std_logic;
+      vdac_sync_n_o  : out std_logic;
+      vdac_blank_n_o : out std_logic;
+      vdac_psave_n_o : out std_logic;
+
+      -- HDMI
+      tmds_data_p_o  : out std_logic_vector(2 downto 0);
+      tmds_data_n_o  : out std_logic_vector(2 downto 0);
+      tmds_clk_p_o   : out std_logic;
+      tmds_clk_n_o   : out std_logic;
+      hdmi_hiz_en_o  : out std_logic;
+      hdmi_ls_oe_n_o : out std_logic
    );
 end entity top;
 
@@ -30,7 +54,23 @@ begin
          kb_io0_o       => kb_io0_o,
          kb_io1_o       => kb_io1_o,
          kb_io2_i       => kb_io2_i,
-         led_o          => led_o
+         led_o          => led_o,
+         vga_red_o      => vga_red_o,
+         vga_green_o    => vga_green_o,
+         vga_blue_o     => vga_blue_o,
+         vga_hs_o       => vga_hs_o,
+         vga_vs_o       => vga_vs_o,
+         vdac_clk_o     => vdac_clk_o,
+         vdac_sync_n_o  => vdac_sync_n_o,
+         vdac_blank_n_o => vdac_blank_n_o,
+         tmds_data_p_o  => tmds_data_p_o,
+         tmds_data_n_o  => tmds_data_n_o,
+         tmds_clk_p_o   => tmds_clk_p_o,
+         tmds_clk_n_o   => tmds_clk_n_o
       ); -- i_mega65
+
+   vdac_psave_n_o <= '1';  -- Power on
+   hdmi_hiz_en_o  <= '0';  -- The HDMI outputs are 50 ohm terminated
+   hdmi_ls_oe_n_o <= '0';  -- Enable the HDMI level shifter
 
 end architecture synthesis;

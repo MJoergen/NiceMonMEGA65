@@ -11,8 +11,16 @@ on the same pins. They differ in the reset button:
 
 [common/](common/) holds what the boards share: the clock and reset (an MMCM
 makes the 50 MHz system clock), the UART synchroniser, the keyboard (on the
-same three pins on both boards; the MAX10 of the R3 is not involved), and the
-constraints for timing and configuration. The pins come from MiSTer2MEGA65.
+same three pins on both boards; the MAX10 of the R3 is not involved), the
+video output, and the constraints for timing and configuration. The pins
+come from MiSTer2MEGA65, and those of the video from MandelbrotMEGA65.
+
+The screen is shown on the VGA connector, through the video DAC, and on the
+HDMI connector, at 1280×1024 and 60 Hz (see the main README). A second MMCM
+(`common/video_clk.vhd`) makes the 108 MHz pixel clock and the 540 MHz clock
+of the HDMI serialisers. The boards differ in the pins around the video,
+which their `top.vhd` drive: the R6 has a power save input on the DAC, and
+its HDMI level shifter is a PTN3363, where the R3 has a TPD12S016.
 
 To build, with Vivado installed in `/opt/Xilinx/2025.1/Vivado` (or set
 `VIVADO_DIR`):
@@ -30,3 +38,8 @@ The user LED is on while the core runs.
 [MEGA65 core](https://github.com/MEGA65/mega65-core) by Paul
 Gardner-Stephen, via C64MEGA65. It is GPL v3, unlike the rest of this
 repository.
+
+`common/hdmi/` is the HDMI output of MandelbrotMEGA65 (`src/hdmi/`, commit
+a3fafd4), copied unchanged: The Tyto Project by Adam Barnes, via C64MEGA65,
+LGPL v3. `common/mega65.vhd` drives it, the video DAC, and the clocks as
+MandelbrotMEGA65's `mega65.vhd` does.

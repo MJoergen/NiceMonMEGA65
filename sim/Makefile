@@ -9,6 +9,8 @@
 #                         its keyboard input. It also runs reserved.nasm
 #                         of the emulator's tests.
 #             tb_kbd      the keyboard driver and its ASCII mapping.
+#             tb_text     the text display: one frame of 1280x1024, every
+#                         pixel checked.
 #             It also checks that GHDL can synthesise the system.
 # make clean  removes build/.
 
@@ -23,8 +25,9 @@ GHDLFLAGS = --std=08 --workdir=.
 NICE_SOURCES = $(NICE)/hdl/src/trace_pkg.vhd $(NICE)/hdl/src/multicycle.vhd $(NICE)/hdl/src/mpu.vhd \
                $(NICE)/hdl/src/perf.vhd $(NICE)/hdl/sim/wb_mem.vhd
 SRC_SOURCES  = ../src/uart_serdes.vhd ../src/line_buffer.vhd ../src/cmd.vhd ../src/ram.vhd ../src/nicemon.vhd \
-               ../src/kbd_m65.vhd ../src/kbd_ascii.vhd
-SOURCES      = $(SRC_SOURCES) tb_hello.vhd tb_nicemon.vhd tb_kbd.vhd
+               ../src/kbd_m65.vhd ../src/kbd_ascii.vhd \
+               ../src/video/video_pkg.vhd ../src/video/font_pkg.vhd ../src/video/pix.vhd ../src/video/text.vhd
+SOURCES      = $(SRC_SOURCES) tb_hello.vhd tb_nicemon.vhd tb_kbd.vhd tb_text.vhd
 
 .PHONY: test analyse synth clean
 
@@ -39,6 +42,8 @@ test: analyse synth $(BUILD)/hello.bin $(BUILD)/echo.bin $(BUILD)/fifo.bin $(BUI
 	  echo "PASS tb_nicemon" || (echo "FAIL tb_nicemon"; cat $(BUILD)/tb_nicemon.log; exit 1)
 	@(cd $(BUILD) && $(GHDL) --elab-run $(GHDLFLAGS) tb_kbd > tb_kbd.log 2>&1) && \
 	  echo "PASS tb_kbd" || (echo "FAIL tb_kbd"; cat $(BUILD)/tb_kbd.log; exit 1)
+	@(cd $(BUILD) && $(GHDL) --elab-run $(GHDLFLAGS) tb_text > tb_text.log 2>&1) && \
+	  echo "PASS tb_text" || (echo "FAIL tb_text"; cat $(BUILD)/tb_text.log; exit 1)
 
 # Checks that GHDL can synthesise the system and the keyboard, as nice_cpu
 # does for its core.

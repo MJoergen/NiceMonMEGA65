@@ -22,8 +22,9 @@
 --                          registers.
 --   0xFFFF0000-0xFFFF07FF  The screen: 2048 words of memory of their own, so
 --                          that the emulator's 80x25 screen, the first 2000,
---                          does not land on word 0. Nothing displays it, but
---                          the CLI can read it.
+--                          does not land on word 0. Every write to it is also
+--                          given out on scr_*_o, for a display that keeps a
+--                          copy (src/video/text.vhd).
 --   0xFFFFFF00             The console of ISA.md §8.3. A write sends bits
 --                          7..0 to the UART. It waits while the previous
 --                          byte is still waiting to be sent. A read by the
@@ -125,7 +126,12 @@ entity nicemon is
       kbd_ready_o : out std_logic;
       kbd_data_i  : in  std_logic_vector(7 downto 0) := X"00";
       -- '1' while the core runs and owns the UART input
-      running_o   : out std_logic
+      running_o   : out std_logic;
+      -- The writes to the screen, by the core or the CLI: the word's offset
+      -- from 0xFFFF0000, and the word written
+      scr_we_o    : out std_logic;
+      scr_addr_o  : out std_logic_vector(10 downto 0);
+      scr_data_o  : out std_logic_vector(31 downto 0)
    );
 end entity nicemon;
 
@@ -725,7 +731,12 @@ begin
 
    -- The screen, at 0xFFFF0000. It is memory, as in the emulator, so the CLI
    -- can read what a program wrote there. Without it the address would
-   -- land at word 0 of the main memory.
+   -- land at word 0 of the main memory. A display keeps its own copy, from
+   -- the writes given out here.
+   scr_we_o   <= scr_b_we;
+   scr_addr_o <= scr_b_addr;
+   scr_data_o <= ram_b_wdata;
+
    i_scr : entity work.ram
       generic map (
          G_ADDR_BITS => C_SCR_BITS

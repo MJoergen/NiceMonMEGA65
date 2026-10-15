@@ -22,6 +22,16 @@ SRC += ../../src/nicemon.vhd
 SRC += ../../src/kbd_m65.vhd
 SRC += ../../src/kbd_ascii.vhd
 SRC += ../common/clk_rst.vhd
+SRC += ../../src/video/video_pkg.vhd
+SRC += ../../src/video/font_pkg.vhd
+SRC += ../../src/video/pix.vhd
+SRC += ../../src/video/text.vhd
+SRC += ../common/hdmi/types_pkg.vhd
+SRC += ../common/hdmi/sync_reg.vhd
+SRC += ../common/hdmi/hdmi_tx_encoder.vhd
+SRC += ../common/hdmi/vga_to_hdmi.vhd
+SRC += ../common/hdmi/serialiser_10to1_selectio.vhd
+SRC += ../common/video_clk.vhd
 SRC += ../common/mega65.vhd
 SRC += $(BOARD_SRC)
 
