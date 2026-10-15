@@ -15,14 +15,17 @@ Usage: tools/run.py [--port /dev/ttyUSB1] [--baud 115200] [-i FILE]
                     [-d ADDR:N]... [-s] [--timeout SEC] FILE.bin
 
 The input is stdin, or the file of -i. Each byte goes to the UART as soon
-as it is read, and the core's input FIFO holds 16 bytes, so a program must
-read its input about as fast as it arrives, or bytes are lost. Unlike the
-emulator's, the input never ends: a read returns no byte, never 0x200.
-Input that the program has not read when it halts is dropped, as by the
-emulator.
+as it is read, and the core's input FIFO holds 2048 bytes, so a program
+must not fall more than that behind its input, or bytes are lost. At the
+end of the input, a break on the UART ends the core's input too, so a read
+returns 0x200, as in the emulator. Input that the program has not read when
+it halts is dropped, as by the emulator.
 
 The steps are the core's instruction counter, which the emulator's step
-count equals, as no interrupts are raised. The memory has 64K words,
+count equals, as no interrupts are raised. But the emulator waits for each
+input byte, and the core does not: while no byte has arrived, a read
+returns 0. So a program that waits for input in a loop runs more steps
+here. The memory has 64K words,
 repeated through the address space, so a dump beyond them reads the same
 words again. --timeout gives up after SEC seconds, with exit status 3, and
 leaves the core running. Only the Python standard library is used.
@@ -32,6 +35,7 @@ import argparse
 import os
 import select
 import sys
+import termios
 import time
 
 from load import (HALT_MESSAGE, drain, fail, load_words, open_port, read_bin,
@@ -95,6 +99,9 @@ def run(fd: int, infd: int, timeout: float) -> None:
                 os.write(fd, data)
                 sent = True
             else:
+                # The end of the input: a break, after the bytes before it.
+                termios.tcdrain(fd)
+                termios.tcsendbreak(fd, 0)
                 infd = -1
         if fd in ready:
             held += os.read(fd, 4096)

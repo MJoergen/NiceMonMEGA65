@@ -35,6 +35,11 @@
 --    held.
 -- 11. Load G_RESERVED_FILE, and run it. It halts on a reserved control
 --    word, which the halt reason shows, after the steps of niceemu.
+-- 12. Load G_EOF_FILE, and run it. It echoes its input until the input ends,
+--    which a break on the UART does, and halts with 0x200 in R1. A break
+--    while the CLI has the UART is ignored.
+--
+-- The core's input FIFO has 16 bytes here, so that step 6 is short.
 --
 -- The UART runs at a tenth of the clock rate, so that the test is fast.
 
@@ -52,7 +57,8 @@ entity tb_nicemon is
       G_FIFO_FILE    : string;
       G_DEVICES_FILE : string;
       G_EMU_FILE     : string;
-      G_RESERVED_FILE : string
+      G_RESERVED_FILE : string;
+      G_EOF_FILE      : string
    );
 end entity tb_nicemon;
 
@@ -92,7 +98,8 @@ begin
       generic map (
          G_CLOCK_HZ      => C_CLOCK_HZ,
          G_UART_BAUDRATE => C_BAUDRATE,
-         G_RAM_ADDR_BITS => 12
+         G_RAM_ADDR_BITS => 12,
+         G_RX_FIFO_BITS  => 4
       )
       port map (
          clk_i      => clk,
@@ -140,6 +147,15 @@ begin
          wait for C_BIT_TIME;
          uart_rx <= '1';
       end procedure send_byte;
+
+      -- A break: the line is low for longer than a frame.
+      procedure send_break is
+      begin
+         uart_rx <= '0';
+         wait for 12 * C_BIT_TIME;
+         uart_rx <= '1';
+         wait for C_BIT_TIME;
+      end procedure send_break;
 
       procedure send(s : string) is
       begin
@@ -320,6 +336,18 @@ begin
       command("R FFFFFF12", "00000006");     -- 6 steps
       command("R FFFFFFE1", "00000001");     -- R1
       command("R FFFFFFEF", "00000007");     -- R15
+
+      report "tb_nicemon: load " & G_EOF_FILE;
+      command("W FFFFFFF0 00000005", "OK");
+      load(G_EOF_FILE, first_v);
+      command("W FFFFFFF0 00000000", "OK");
+      send("ab");
+      expect("ab");
+      send_break;
+      expect(C_HALT);
+      command("R FFFFFFE1", "00000200");     -- R1, the end of the input
+      send_break;                            -- the CLI's, so ignored
+      command("R FFFFFFF0", "00000002");
 
       report "tb_nicemon: PASS";
       stop(0);

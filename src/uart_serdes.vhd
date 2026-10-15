@@ -3,6 +3,7 @@
 -- they came out wrong, and passed on frames with a bad Stop bit. It now takes
 -- all ten bits and checks the Start and Stop bits, and starts a frame on a
 -- falling edge only. A bit now takes G_DIVISOR clock cycles, not G_DIVISOR + 1.
+-- Added here: rx_break_o pulses for a break, a frame whose ten bits are all 0.
 --
 library ieee;
   use ieee.std_logic_1164.all;
@@ -26,6 +27,8 @@ entity uart_serdes is
     rx_valid_o : out   std_logic;
     rx_ready_i : in    std_logic;
     rx_data_o  : out   std_logic_vector(7 downto 0);
+    -- A pulse for a break: a frame of ten 0 bits, the Stop bit included
+    rx_break_o : out   std_logic;
     -- UART serial interface
     uart_tx_o  : out   std_logic;
     uart_rx_i  : in    std_logic
@@ -102,7 +105,8 @@ begin
   rx_proc : process (clk_i)
   begin
     if rising_edge(clk_i) then
-      rx_prev <= uart_rx_i;
+      rx_prev    <= uart_rx_i;
+      rx_break_o <= '0';
       if rx_ready_i = '1' then
         rx_valid_o <= '0';
       end if;
@@ -132,6 +136,9 @@ begin
               rx_data_o  <= rx_data(9 downto 2);
               rx_valid_o <= '1';
             end if;
+            if or(rx_data(10 downto 1)) = '0' then
+              rx_break_o <= '1';
+            end if;
             rx_state <= IDLE_ST;
           end if;
 
@@ -139,6 +146,7 @@ begin
 
       if rst_i = '1' then
         rx_valid_o <= '0';
+        rx_break_o <= '0';
         rx_state   <= IDLE_ST;
       end if;
     end if;

@@ -29,10 +29,14 @@
 --                          takes the oldest received byte, and returns it in
 --                          bits 7..0 with bit 8 set, or 0 when no byte has
 --                          arrived. The core's input waits in a FIFO of
---                          C_RX_FIFO_LEN bytes, and a byte that arrives when
---                          it is full is lost. The input never ends, so bit
---                          9 is never set. A read by the CLI returns 0 and
---                          takes nothing.
+--                          2^G_RX_FIFO_BITS bytes, in block RAM, and a byte
+--                          that arrives when it is full is lost. A break on
+--                          the UART, a frame of ten 0 bits, ends the input,
+--                          as the end of the emulator's input does: once the
+--                          FIFO is empty, a read returns 0x200 (bit 9), and
+--                          bytes after the break are dropped. A break while
+--                          the CLI has the UART is ignored. A read by the
+--                          CLI returns 0 and takes nothing.
 --   0xFFFFFF01             The read counter of the emulator: a read by the
 --                          core returns the number of its reads since the
 --                          last write, and a write sets that number. A read
@@ -100,6 +104,8 @@ entity nicemon is
       G_CLOCK_HZ         : natural;
       G_UART_BAUDRATE    : natural := 115_200;
       G_RAM_ADDR_BITS    : natural := 16;
+      -- The core's input FIFO has 2^G_RX_FIFO_BITS bytes.
+      G_RX_FIFO_BITS     : natural := 11;
       G_INIT_FILE        : string  := "";
       G_CPU_RUN_AT_RESET : boolean := false
    );
@@ -118,7 +124,7 @@ architecture synthesis of nicemon is
    constant C_BUFFER_LEN : natural := 20;
    -- The received bytes for the core. A power of two, so that the pointers
    -- wrap.
-   constant C_RX_FIFO_BITS : natural := 4;
+   constant C_RX_FIFO_BITS : natural := G_RX_FIFO_BITS;
    constant C_RX_FIFO_LEN  : natural := 2 ** C_RX_FIFO_BITS;
 
    constant C_UART_DATA  : std_logic_vector(31 downto 0) := X"FFFFFF00";
@@ -241,6 +247,7 @@ architecture synthesis of nicemon is
    signal ram_b_rdata : std_logic_vector(31 downto 0);
    signal rd_ram      : std_logic := '0';
    signal rd_scr      : std_logic := '0';
+   signal rd_rx       : std_logic := '0';
 
    -- The screen memory, like the main memory
    signal scr_a_data  : std_logic_vector(31 downto 0);
@@ -255,6 +262,7 @@ architecture synthesis of nicemon is
    signal ser_rx_valid : std_logic;
    signal ser_rx_ready : std_logic;
    signal ser_rx_data  : std_logic_vector(7 downto 0);
+   signal ser_rx_break : std_logic;
    signal ser_tx_valid : std_logic;
    signal ser_tx_ready : std_logic;
    signal ser_tx_data  : std_logic_vector(7 downto 0);
@@ -269,11 +277,19 @@ architecture synthesis of nicemon is
    signal cpu_tx_ready : std_logic;
    signal cpu_tx_data  : std_logic_vector(7 downto 0);
    -- The FIFO holds the bytes from rx_rd to rx_wr. Each pointer has one bit
-   -- more than an index, so that a full FIFO differs from an empty one.
+   -- more than an index, so that a full FIFO differs from an empty one. It
+   -- is block RAM, read in every cycle at rx_rd into rx_q, so rx_q holds
+   -- the oldest byte in the cycle after a read of the console is served.
+   -- No byte is written to the word at rx_rd while the FIFO holds a byte:
+   -- it is written when the FIFO is empty, and not when it is full.
    type t_rx_fifo is array (0 to C_RX_FIFO_LEN - 1) of std_logic_vector(7 downto 0);
    signal rx_fifo : t_rx_fifo;
+   signal rx_we   : std_logic;
+   signal rx_q    : std_logic_vector(7 downto 0);
    signal rx_wr   : std_logic_vector(C_RX_FIFO_BITS downto 0) := (others => '0');
    signal rx_rd   : std_logic_vector(C_RX_FIFO_BITS downto 0) := (others => '0');
+   -- The core's input has ended with a break.
+   signal rx_eof  : std_logic := '0';
 
    signal rx_buffer_ready : std_logic;
    signal rx_buffer_valid : std_logic;
@@ -405,6 +421,7 @@ begin
 
    dbus_rdata <= ram_b_rdata when rd_ram = '1' else
                  scr_b_rdata when rd_scr = '1' else
+                 X"00000" & "0001" & rx_q when rd_rx = '1' else
                  rd_io;
 
    cpu_tx_ready <= ser_tx_ready and not lb_tx_valid;
@@ -419,6 +436,7 @@ begin
       begin
          rd_ram <= '0';
          rd_scr <= '0';
+         rd_rx  <= '0';
          rd_io  <= (others => '0');
          if not is_io(addr, cli) then
             -- Memory: port B is driven combinationally above.
@@ -454,9 +472,11 @@ begin
             null;
          elsif addr = C_UART_DATA and we = '0' and not cli then
             if rx_rd /= rx_wr then
-               rd_io(8)          <= '1';
-               rd_io(7 downto 0) <= rx_fifo(to_integer(rx_rd(C_RX_FIFO_BITS - 1 downto 0)));
-               rx_rd             <= rx_rd + 1;
+               -- The byte comes from rx_q in the next cycle.
+               rd_rx <= '1';
+               rx_rd <= rx_rd + 1;
+            elsif rx_eof = '1' then
+               rd_io(9) <= '1';
             end if;
          elsif addr = C_READ_COUNT then
             -- As in the emulator: a write sets the count, and a read by the
@@ -532,6 +552,7 @@ begin
             if mpu_ack = '1' or perf_ack = '1' then
                rd_ram   <= '0';
                rd_scr   <= '0';
+               rd_rx    <= '0';
                if mpu_ack = '1' then
                   rd_io <= mpu_data;
                else
@@ -565,11 +586,11 @@ begin
             serve(false, dbus_addr, dbus_we, dbus_wdata);
          end if;
 
-         -- A byte for the core goes into its FIFO, unless the FIFO is full.
-         if ser_rx_valid = '1' and uart_owner_cpu = '1' and
-            rx_wr - rx_rd /= C_RX_FIFO_LEN then
-            rx_fifo(to_integer(rx_wr(C_RX_FIFO_BITS - 1 downto 0))) <= ser_rx_data;
+         if rx_we = '1' then
             rx_wr <= rx_wr + 1;
+         end if;
+         if ser_rx_break = '1' and uart_owner_cpu = '1' then
+            rx_eof <= '1';
          end if;
 
          if cli_cyc = '1' and cli_stb = '1' then
@@ -588,6 +609,7 @@ begin
             read_count   <= (others => '0');
             rx_wr        <= (others => '0');
             rx_rd        <= (others => '0');
+            rx_eof       <= '0';
             if not dev_cli then
                dev_drop <= '1';
             end if;
@@ -607,6 +629,22 @@ begin
          end if;
       end if;
    end process p_dbus;
+
+   -- A byte for the core goes into its FIFO, unless the FIFO is full or the
+   -- input has ended.
+   rx_we <= '1' when ser_rx_valid = '1' and uart_owner_cpu = '1' and rx_eof = '0' and
+                     rx_wr - rx_rd /= C_RX_FIFO_LEN else '0';
+
+   p_rx_fifo : process (clk_i)
+   begin
+      if rising_edge(clk_i) then
+         if rx_we = '1' then
+            rx_fifo(to_integer(rx_wr(C_RX_FIFO_BITS - 1 downto 0))) <= ser_rx_data;
+         end if;
+         rx_q <= rx_fifo(to_integer(rx_rd(C_RX_FIFO_BITS - 1 downto 0)));
+      end if;
+   end process p_rx_fifo;
+
 
    ---------------------------------------------------------------------------
    -- The math unit (ISA.md §8.4) and the performance counters (§8.5) from
@@ -703,6 +741,7 @@ begin
          rx_valid_o => ser_rx_valid,
          rx_ready_i => ser_rx_ready,
          rx_data_o  => ser_rx_data,
+         rx_break_o => ser_rx_break,
          uart_tx_o  => uart_txd_o,
          uart_rx_i  => uart_rxd_i
       ); -- i_uart_serdes

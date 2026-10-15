@@ -5,7 +5,9 @@ Programs the FPGA with m65 and checks the banner, then drives the command
 line: it loads and runs sim/echo.nasm, holds and restarts the core, clears
 the memory, reads back what sim/emu.nasm leaves after its halt, and runs the
 C example examples/build/primes.bin. Last, it runs programs with
-tools/run.py and with niceemu, and compares their output and exit status.
+tools/run.py and with niceemu, and compares their output and exit status,
+with sim/eof.nasm also the end of the input and an input file of 1536
+bytes.
 Build the bitstream and the example first, and niceemu
 (make -C nice_cpu/emulator build), or that comparison is skipped.
 
@@ -19,6 +21,7 @@ library is used, and m65 from mega65-tools when the FPGA is programmed.
 
 import argparse
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -169,21 +172,30 @@ def test_primes(fd: int, primes: str) -> None:
 
 
 def test_run(port: str, baud: int,
-             programs: list[tuple[str, list[str]]]) -> None:
+             programs: list[tuple[str, list[str], bool]]) -> None:
     """Runs each program with run.py and with niceemu, which must print the
-    same and exit with the same status. The port must be closed meanwhile."""
+    same and exit with the same status. A program is (path, options,
+    polls): when polls is true, the program waits for input in a loop, which
+    takes more steps on the board, where a read returns 0 until a byte
+    arrives, so the step counts are not compared. The port must be closed
+    meanwhile."""
     if not os.path.exists(NICEEMU):
         print(f"  {NICEEMU} is missing; the comparison with the emulator "
               "is skipped")
         return
-    for path, options in programs:
-        name = " ".join([os.path.basename(path)] + options)
+    for path, options, polls in programs:
+        name = " ".join([os.path.basename(path)] +
+                        [os.path.basename(o) for o in options])
         emu = subprocess.run([NICEEMU] + options + [path],
                              stdin=subprocess.DEVNULL, capture_output=True)
         board = subprocess.run([sys.executable, f"{REPO}/tools/run.py",
                                 "--port", port, "--baud", str(baud),
                                 "--timeout", "10"] + options + [path],
                                stdin=subprocess.DEVNULL, capture_output=True)
+        if polls:
+            for r in (emu, board):
+                r.stdout = re.sub(rb"after \d+ steps", b"after N steps",
+                                  r.stdout)
         same = (emu.stdout == board.stdout and
                 emu.returncode == board.returncode)
         check(f"run.py {name} as niceemu", same,
@@ -213,6 +225,12 @@ def main() -> None:
         hello = assemble(f"{REPO}/nice_cpu/doc/intro/examples/hello.nasm", tmp)
         reserved = assemble(f"{REPO}/nice_cpu/emulator/test/reserved.nasm",
                             tmp)
+        eof = assemble(f"{REPO}/sim/eof.nasm", tmp)
+        # Every byte value, and far more input than the core's old 16-byte
+        # FIFO held
+        text = os.path.join(tmp, "input.bin")
+        with open(text, "wb") as f:
+            f.write(bytes(range(256)) * 6)
 
         fd = open_port(args.port, args.baud)
         if not args.no_program:
@@ -225,9 +243,11 @@ def main() -> None:
         test_primes(fd, primes)
         os.close(fd)
         test_run(args.port, args.baud, [
-            (hello, []),
-            (emu, ["-d", "0x110:2", "-d", "0xFFFFFF00:4", "-s"]),
-            (reserved, []),
+            (hello, [], False),
+            (emu, ["-d", "0x110:2", "-d", "0xFFFFFF00:4", "-s"], False),
+            (reserved, [], False),
+            (eof, [], True),               # no input: it ends at once
+            (eof, ["-i", text], True),
         ])
 
     passed = sum(results)
