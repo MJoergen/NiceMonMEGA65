@@ -57,6 +57,11 @@ or, in an existing clone:
 
     git submodule update --init
 
+`make` in the top directory lists the targets: `make test` runs the
+simulation tests, `make examples` builds the C examples, `make r3` and
+`make r6` build the bitstreams, and `make load FILE=prog.bin` loads a
+program into the MEGA65 and starts it.
+
 ## Using it
 
 Connect a terminal to the MEGA65's debug UART at 115200 baud, 8-N-1. After
