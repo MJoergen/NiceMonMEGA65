@@ -17,6 +17,10 @@ set_property -dict {PACKAGE_PIN C13  IOSTANDARD LVCMOS33} [get_ports {kb_io2_i}]
 set_false_path -to   [get_ports {kb_io0_o kb_io1_o}]
 set_false_path -from [get_ports {kb_io2_i}]
 
+## The registers on the slow pins live in the I/O tiles, so that their
+## timing does not depend on placement.
+set_property IOB TRUE [get_ports {kb_io0_o kb_io1_o kb_io2_i uart_txd_o uart_rxd_i led_o}]
+
 ## Configuration from the board's quad SPI flash
 set_property CONFIG_VOLTAGE                  3.3   [current_design]
 set_property CFGBVS                          VCCO  [current_design]

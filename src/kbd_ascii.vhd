@@ -14,13 +14,14 @@
 -- The byte of a key is in the table below. SHIFT (either) or CAPS LOCK gives
 -- the capital letters; SHIFT also gives the symbols above the digits and
 -- others, as on the key caps where they are ASCII. CTRL with a key from @ to
--- _ or ` to DEL gives the control code, so CTRL-C is 0x03. Keys without an
--- ASCII meaning give nothing. Where the key caps have no ASCII symbol:
+-- _ or ` to DEL gives the control code, so CTRL-C is 0x03; CTRL-@ would be
+-- NUL, which means no byte, so it gives nothing. Keys without an ASCII
+-- meaning give nothing. Where the key caps have no ASCII symbol:
 --   £ is \, and SHIFT-£ is |      (\ is the PETSCII code of £)
 --   ↑ is ^, and SHIFT-↑ is ~      (as in PETSCII)
 --   ← is _, and SHIFT-← is `      (as in PETSCII)
 --   SHIFT-0 is {, and SHIFT-= is }, SHIFT-: is [, and SHIFT-; is ]
---   INST/DEL is DEL (0x7F), RUN/STOP is CTRL-C (0x03)
+--   INST/DEL is DEL (0x7F), also with SHIFT, RUN/STOP is CTRL-C (0x03)
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -89,7 +90,7 @@ architecture synthesis of kbd_ascii is
       others => X"00");
 
    constant C_SHIFTED : t_table := (
-       1 => X"0D",       2 => C_LEFT,      7 => C_UP,
+       0 => X"7F",       1 => X"0D",       2 => C_LEFT,      7 => C_UP,
        8 => chr('#'),    9 => chr('W'),   10 => chr('A'),   11 => chr('$'),
       12 => chr('Z'),   13 => chr('S'),   14 => chr('E'),   16 => chr('%'),
       17 => chr('R'),   18 => chr('D'),   19 => chr('&'),   20 => chr('C'),

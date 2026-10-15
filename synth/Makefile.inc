@@ -49,4 +49,4 @@ build/$(TOP).tcl: Makefile ../Makefile.inc
 
 .PHONY: clean
 clean:
-	rm -rf build .Xil .cache vivado*.log vivado*.jou
+	rm -rf build .Xil .cache vivado*.log vivado*.jou clockInfo.txt

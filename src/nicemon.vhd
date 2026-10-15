@@ -70,13 +70,13 @@
 -- CLI. The keyboard's bytes join the UART's: they go the same way, and
 -- nothing after the merge tells them apart. A received UART byte goes first.
 -- Unlike a UART byte, a keyboard byte is not lost when the core's FIFO is
--- full: it waits until there is room. So the CLI loads a program with W commands, starts it with
--- "W FFFFFFF0 00000000", and gets the UART back when the program halts. A
--- command line should end with CR alone: a LF after the CR of the line that
--- starts the core reaches the program. The CLI's output goes out before the
--- core's, so its "OK" comes first. When the core halts, and its last byte
--- has gone, the CLI prints CR LF "HALT" CR LF, so that the host knows that
--- the UART is the CLI's again.
+-- full: it waits until there is room. So the CLI loads a program with W
+-- commands, starts it with "W FFFFFFF0 00000000", and gets the UART back
+-- when the program halts. A command line should end with CR alone: a LF
+-- after the CR of the line that starts the core reaches the program. The
+-- CLI's output goes out before the core's, so its "OK" comes first. When the
+-- core halts, and its last byte has gone, the CLI prints CR LF "HALT" CR LF,
+-- so that the host knows that the UART is the CLI's again.
 --
 -- The core starts as the emulator does: the read counter, the math unit,
 -- and the performance counters are reset each time the control bit goes

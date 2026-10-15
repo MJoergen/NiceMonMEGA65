@@ -24,7 +24,7 @@
 -- 0 and 1 arrive too late.
 --
 -- matrix_o has bit n set while key n is pressed. It changes once in each
--- frame, after phase 79, so about every 0.9 ms.
+-- frame, after phase 79, so about every 0.45 ms.
 --
 -- The LED colours are 24 bits of RGB each. The keyboard takes each LED's
 -- colour twice, for its left and right halves, in the order BGR.
@@ -71,6 +71,8 @@ architecture synthesis of kbd_m65 is
 
    -- The input, synchronised
    signal data_in : std_logic_vector(1 downto 0) := "11";
+   attribute async_reg : string;
+   attribute async_reg of data_in : signal is "TRUE";
 
    -- The bits from the keyboard in this frame, low while a key is pressed
    signal keys_n : std_logic_vector(C_NUM_KEYS - 1 downto 0) := (others => '1');

@@ -29,6 +29,8 @@ architecture synthesis of mega65 is
    signal clk     : std_logic;
    signal rst     : std_logic;
    signal rxd     : std_logic_vector(1 downto 0) := "11";
+   attribute async_reg : string;
+   attribute async_reg of rxd : signal is "TRUE";
    signal txd     : std_logic;
    signal running : std_logic;
 
@@ -60,7 +62,7 @@ begin
    p_io : process (clk)
    begin
       if rising_edge(clk) then
-         rxd        <= rxd(0) & uart_rxd_i;
+         rxd     <= rxd(0) & uart_rxd_i;
          txd_reg <= txd;
          led_reg <= running;
       end if;
@@ -69,7 +71,7 @@ begin
    uart_txd_o <= txd_reg;
    led_o      <= led_reg;
 
-   drive_rgb <= C_GREEN when led_reg = '1' else X"000000";
+   drive_rgb <= C_GREEN when running = '1' else X"000000";
 
    i_kbd_m65 : entity work.kbd_m65
       generic map (
