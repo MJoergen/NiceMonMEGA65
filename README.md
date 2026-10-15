@@ -12,19 +12,22 @@ interpreter on the UART like the one in
 | Path | What it is |
 |---|---|
 | [nice_cpu/](https://github.com/MJoergen/nice_cpu) | The NICE CPU, its assembler, and its emulator, as a git submodule. |
-| [src/](src/) | The synthesisable VHDL, shared by both boards. `nicemon.vhd` is the system: the NICE core, the memory, the UART, and the command line interpreter. `uart_serdes.vhd` (with fixes to its receiver), `line_buffer.vhd` and `cmd.vhd` are copied from cmod-s7; `cmd.vhd` prints `NICE` instead of `WBUS` at reset. |
+| [src/](src/) | The synthesisable VHDL, shared by both boards. `nicemon.vhd` is the system: the NICE core, the memory, the UART, and the command line interpreter. `uart_serdes.vhd` (with fixes to its receiver), `line_buffer.vhd` and `cmd.vhd` are copied from cmod-s7; `cmd.vhd` prints `NICE` instead of `WBUS` at reset, and `HALT` when the core halts. |
 | [sim/](sim/) | The GHDL testbenches. |
 | [synth/](synth/README.md) | The Vivado builds for the R3 and R6 boards. |
 | [monitor/](monitor/README.md) | The monitor, in NICE assembly. |
 | [examples/](examples/) | Example C programs, and the Makefile that builds them for the MEGA65. |
-| [tools/](tools/) | `load.py`, which loads a program into the MEGA65 through the UART, and `hwtest.py`, which tests the system on the board. |
+| [tools/](tools/) | `load.py`, which loads a program into the MEGA65 through the UART, `run.py`, which runs a program on the MEGA65 as `niceemu` runs it, and `hwtest.py`, which tests the system on the board. |
 
 ## Compared with the emulator
 
 The goal is a MEGA65 that runs NICE programs as `niceemu`, the emulator in
 `nice_cpu/emulator`, runs them. **It is close, but not there yet.** The
 core, the address map, and the devices behave as in the emulator, and the
-command line reads back what the emulator prints after a halt. The main
+command line reads back what the emulator prints after a halt.
+`tools/run.py` runs a program on the board and prints what `niceemu` prints
+for it, so the two can be compared (see
+[Comparing with the emulator](#comparing-with-the-emulator)). The main
 difference is the memory: 64K words, not 2³².
 
 | Feature | Emulator | MEGA65 | Same? |
@@ -33,19 +36,20 @@ difference is the memory: 64K words, not 2³².
 | Console output, `0xFFFFFF00` | stdout | UART | Yes |
 | Console input, `0xFFFFFF00` | stdin, with bit 8 set; `0x200` at the end | UART, with bit 8 set, through a 16-byte FIFO; never ends | Yes, but bytes beyond 16 unread ones are lost, and `0x200` never comes |
 | Math unit, `0xFFFFFF20`–`3F` | Computed on read | nice_cpu's `mpu.vhd`, which stalls the read until the result is ready | Yes |
-| Performance counters, `0xFFFFFF10`–`1F` | One cycle per step | nice_cpu's `perf.vhd`, counting clock cycles at 50 MHz | Instructions yes; cycles count real clocks |
+| Performance counters, `0xFFFFFF10`–`1F` | One cycle per step, from the start | nice_cpu's `perf.vhd`, counting clock cycles at 50 MHz, from the start of the core | Instructions yes; cycles count real clocks |
 | Instruction fetches from `0xFFFFFF00`–`FF` | Read 0 | Read 0 | Yes |
-| Memory | All 2³² words | 64K words, repeated through the address space; the stack at `0xFFFFFF00` lands in the top | No: a program, its data, and its stack must fit in 64K words |
+| Memory | All 2³² words, 0 at the start | 64K words, repeated through the address space; the stack at `0xFFFFFF00` lands in the top. `load.py` and `run.py` clear it to 0 before they load | No: a program, its data, and its stack must fit in 64K words |
 | Screen, `0xFFFF0000`–`07CF` | 80×25 words of memory, printed by `--screen` | 2048 words of memory of their own, read with `R`; nothing displays them | Yes, but not displayed |
 | Read counter, `0xFFFFFF01` | Counts the data reads since the last write | The same; a read by the command line does not count, as `--dump` does not | Yes |
 | The rest of `0xFFFFFF02`–`FF` | Ordinary memory for data | Memory, in the top 256 words of the RAM | Yes |
 | Interrupts | Only from `--irq` and `--nmi` | None raised | Yes: no device raises them in either |
-| After `HALT` | Prints the registers and exits with a status | The command line gets the UART back; `R FFFFFFE0` to `R FFFFFFEF` read R0–R15, and `R` reads memory | Yes, by hand; there is no exit status |
-| `--dump` | Option | `R` | Yes, by hand |
+| After a halt | Prints why, the steps, and the registers, and exits with a status | The command line gets the UART back and prints `HALT`; `R FFFFFFF1` reads why, the instruction counter the steps, `R FFFFFFE0` to `R FFFFFFEF` R0–R15, and `R` memory. `run.py` prints them as the emulator does, with its exit status | Yes |
+| `--dump`, `--screen`, `--input` | Options | The same options of `run.py` | Yes |
 | `--trace`, `--max-steps`, `--irq`, `--nmi` | Options | Not available | No |
 
-So a program that fits in 64K words runs the same. The C example
-`examples/primes.c` is one.
+So a program that fits in 64K words, and reads its input about as fast as
+it arrives, runs the same. The C example `examples/primes.c` is one, except
+for the cycles that it prints.
 
 ## Getting started
 
@@ -81,12 +85,15 @@ memory, then start the core:
 While the core runs, the UART belongs to it. When it halts, the UART goes
 back to the command line. `W FFFFFFF0 00000001` holds the core in reset
 again, and `R FFFFFFF0` reads bit 0 (held) and bit 1 (halted).
+`W FFFFFFF0 00000005` clears the memory to 0 and holds the core; it answers
+`OK` when the memory is clear. When a program halts, the command line
+prints `HALT` on a line of its own, and `R FFFFFFF1` reads why it halted.
 
 ### Running a program
 
 A program is assembled with the assembler of the nice_cpu submodule, and
-loaded with `tools/load.py`, which writes each word with a `W` command and
-then starts the core. For example, with `sim/echo.nasm`, which echoes what you
+loaded with `tools/load.py`, which clears the memory, writes each word with
+a `W` command, and then starts the core. For example, with `sim/echo.nasm`, which echoes what you
 type until a `.`:
 
     python3 nice_cpu/assembler/niceasm.py -o echo.bin sim/echo.nasm
@@ -97,7 +104,8 @@ type until a `.`:
 If yours is another, give it with `--port`, and to picocom.
 `load.py` needs only Python 3, on Linux or macOS, and the port must not be
 open in a terminal while it runs. Type in the terminal and the program echoes
-it. When you type `.`, it halts, and the command line takes the UART again.
+it. When you type `.`, it halts, the command line takes the UART again,
+and it prints `HALT`.
 
 The `.bin` file has one line per word, the address and the word in hex, so
 `load.py` turns `00000001 ffffff00` into `W 00000001 FFFFFF00`. You can also
@@ -184,16 +192,43 @@ The command line and the core's data accesses see the same addresses.
 | `0xFFFFFF10`–`0xFFFFFF1F` | The performance counters of ISA.md §8.5: cycles and instructions, 64 bits each. |
 | `0xFFFFFF20`–`0xFFFFFF3F` | The math unit of ISA.md §8.4: 32-bit multiply and divide, and 64-bit divide. |
 | `0xFFFFFFE0`–`0xFFFFFFEF` | For the command line only: R0–R15 of the core, read only. After a halt they hold what the emulator prints. |
-| `0xFFFFFFF0` | Control, for the command line only. Bit 0 holds the core in reset. Bit 1 reads the core's halted flag. |
+| `0xFFFFFFF0` | Control, for the command line only. Bit 0 holds the core in reset. Bit 1 reads the core's halted flag. A write with bit 2 set first clears the memory and the screen to 0, with the core held, and answers `OK` when it is done; then bit 0 takes effect. |
+| `0xFFFFFFF1` | For the command line only, read only: why the core halted. 0 while it has not, 1 for `HALT`, 2 for a reserved control word, 3 for `INT` inside an interrupt routine, and 4 for `RTI` outside one. |
 
 Instruction fetches from `0xFFFFFF00`–`0xFFFFFFFF` read 0, as ISA.md §8.3
 requires. The input waits for the core in a FIFO of 16 bytes, and a byte
 that arrives when it is full is lost.
 The performance counters and the math unit are nice_cpu's own,
 `nice_cpu/hdl/src/perf.vhd` and `mpu.vhd`, the same as in the emulator.
-They are reset with the system, not when the command line holds the core,
-so the counters keep counting from power-up: a program measures an interval
-as the difference of two readings.
+They are reset with the system, and each time the core starts, as the
+emulator's are when it starts. So after a halt the instruction counter
+holds the steps that the emulator prints, as no interrupts are raised.
+They are not reset while the command line holds the core, so `R` reads
+them after a halt.
+
+## Comparing with the emulator
+
+`tools/run.py` loads a program into cleared memory, starts it, sends it its
+input, and copies its output to stdout. When the program halts, it prints
+what `niceemu` prints: why and after how many steps the program halted,
+and the registers, and it exits with the same status, 0 after `HALT` and 2
+after any other halt. It takes niceemu's `-i`, `-d`, and `-s` options, so
+the output of the two can be compared:
+
+    nice_cpu/emulator/zig-out/bin/niceemu -d 0x110:2 -s prog.bin > emu.txt
+    tools/run.py -d 0x110:2 -s prog.bin > board.txt
+    diff emu.txt board.txt
+
+Its input is stdin, or the file of `-i`. Each byte goes to the UART when it
+is read, and a byte that arrives when the core's 16-byte FIFO is full is
+lost, so a long input file must be read about as fast as it arrives. The
+input never ends: unlike the emulator's, a read never returns `0x200`.
+`--timeout SEC` gives up after SEC seconds, with exit status 3, as
+`niceemu -n` does at its step limit, but leaves the core running.
+
+The step count is the core's instruction counter. The memory is 64K
+words, repeated through the address space, so `-d` beyond them shows the
+same words again.
 
 ## Running the tests
 
@@ -209,7 +244,10 @@ You need GHDL (tested with 4.1.0) and Python 3.
   math unit from the command line, and runs `sim/devices.nasm`, which uses
   the math unit and the performance counters. `sim/fifo.nasm` checks the
   input FIFO, and `sim/emu.nasm` the screen, the read counter, memory in
-  the I/O range, and the registers after a halt.
+  the I/O range, and the registers after a halt. It also checks the halt
+  message, the halt reason and the step count, which must equal niceemu's,
+  clearing the memory, and `reserved.nasm` of the emulator's tests, which
+  halts on a reserved control word.
 - `make test` also checks that GHDL can synthesise the system.
 
 For the boards, see [synth/](synth/README.md).
@@ -219,8 +257,11 @@ For the boards, see [synth/](synth/README.md).
 `tools/hwtest.py` tests the system on the board itself. It programs the
 FPGA with `m65 -q` from mega65-tools and checks the `NICE` banner. Then it
 uses the command line: it runs `sim/echo.nasm`, holds and restarts the core,
-reads back what `sim/emu.nasm` leaves after its halt, and runs
-`examples/build/primes.bin`. Build the bitstream first, then:
+clears the memory, reads back what `sim/emu.nasm` leaves after its halt,
+and runs `examples/build/primes.bin`. Last, it runs three programs with
+`run.py` and with `niceemu`, whose output and exit status must be the same.
+That needs niceemu, built with `make -C nice_cpu/emulator build`; without it
+the comparison is skipped. Build the bitstream first, then:
 
     make hwtest
 

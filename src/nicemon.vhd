@@ -47,7 +47,16 @@
 --                          emulator prints them.
 --   0xFFFFFFF0             Control, for the CLI only. Bit 0 holds the core
 --                          in reset while it is 1. A read returns bit 0, and
---                          the core's halted flag in bit 1.
+--                          the core's halted flag in bit 1. A write with bit
+--                          2 set first clears the memory, the screen
+--                          included, to 0, as the emulator's memory is at
+--                          the start, with the core held. Its OK comes when
+--                          the memory is clear, and then bit 0 takes effect.
+--   0xFFFFFFF1             For the CLI only, read only: why the core halted,
+--                          as the emulator's "Halted (...)" line says. 0
+--                          while it has not halted, 1 for HALT, 2 for a
+--                          reserved control word, 3 for INT inside an
+--                          interrupt routine, and 4 for RTI outside one.
 -- Instruction fetches from 0xFFFFFF00-0xFFFFFFFF read 0 (ISA.md §8.3).
 --
 -- The core runs when the control bit is 0. While it runs and has not halted,
@@ -56,7 +65,14 @@
 -- "W FFFFFFF0 00000000", and gets the UART back when the program halts. A
 -- command line should end with CR alone: a LF after the CR of the line that
 -- starts the core reaches the program. The CLI's output goes out before the
--- core's, so its "OK" comes first.
+-- core's, so its "OK" comes first. When the core halts, and its last byte
+-- has gone, the CLI prints CR LF "HALT" CR LF, so that the host knows that
+-- the UART is the CLI's again.
+--
+-- The core starts as the emulator does: the read counter, the math unit,
+-- and the performance counters are reset each time the control bit goes
+-- to 0. So, after a halt, the instruction counter holds the number of steps
+-- that the emulator prints, as no interrupt is raised.
 --
 -- The data bus of the core is stalled while a CLI request waits, and while a
 -- write to the UART waits. The CLI pulses STB for one cycle and does not
@@ -108,6 +124,7 @@ architecture synthesis of nicemon is
    constant C_UART_DATA  : std_logic_vector(31 downto 0) := X"FFFFFF00";
    constant C_READ_COUNT : std_logic_vector(31 downto 0) := X"FFFFFF01";
    constant C_CONTROL    : std_logic_vector(31 downto 0) := X"FFFFFFF0";
+   constant C_HALT_WHY   : std_logic_vector(31 downto 0) := X"FFFFFFF1";
    -- The core's registers, for the CLI: 0xFFFFFFE0-EF
    constant C_REGS_BASE  : std_logic_vector(31 downto 4) := X"FFFFFFE";
    -- The screen: 0xFFFF0000-07FF, of which the emulator's screen is the
@@ -130,7 +147,7 @@ architecture synthesis of nicemon is
       end if;
       return addr(7 downto 1) = "0000000" or                -- console, read counter
              addr(7 downto 4) = X"1" or addr(7 downto 5) = "001" or -- perf, MPU
-             (cli and (addr(7 downto 4) = X"E" or addr(7 downto 0) = X"F0"));
+             (cli and (addr(7 downto 4) = X"E" or addr(7 downto 1) = "1111000"));
    end function is_io;
 
    -- Core
@@ -139,6 +156,20 @@ architecture synthesis of nicemon is
    signal cpu_halted : std_logic;
    signal cpu_instret : std_logic;
    signal cpu_retire  : t_retire;
+   -- The hold bit in the cycle before, for a pulse when the core starts,
+   -- which resets the math unit and the performance counters
+   signal cpu_hold_d  : std_logic := '1';
+   signal dev_rst     : std_logic;
+   -- A halt waits in halt_wait until the core's last byte has gone, and
+   -- then halt_note tells the CLI.
+   signal cpu_halted_d : std_logic := '0';
+   signal halt_wait    : std_logic := '0';
+   signal halt_note    : std_logic := '0';
+
+   -- Clearing the memory: the address, and the hold bit after it
+   signal clearing : std_logic := '0';
+   signal clr_addr : std_logic_vector(G_RAM_ADDR_BITS - 1 downto 0);
+   signal clr_hold : std_logic;
 
    -- The number of the core's data reads of 0xFFFFFF01 since it was written
    signal read_count : std_logic_vector(31 downto 0) := (others => '0');
@@ -255,6 +286,11 @@ architecture synthesis of nicemon is
 
 begin
 
+   -- The screen is cleared with the low bits of the memory's address.
+   assert G_RAM_ADDR_BITS >= C_SCR_BITS
+      report "nicemon: the memory must be at least as large as the screen"
+      severity failure;
+
    ---------------------------------------------------------------------------
    -- The core
    ---------------------------------------------------------------------------
@@ -322,23 +358,30 @@ begin
    ---------------------------------------------------------------------------
 
    -- The core's request is taken in a cycle with no stall.
-   dbus_stall <= cli_pend or tx_wait or dev_busy;
+   dbus_stall <= cli_pend or tx_wait or dev_busy or clearing;
 
-   ram_b_addr  <= cli_p_addr(G_RAM_ADDR_BITS - 1 downto 0) when cli_pend = '1' else
+   ram_b_addr  <= clr_addr when clearing = '1' else
+                  cli_p_addr(G_RAM_ADDR_BITS - 1 downto 0) when cli_pend = '1' else
                   dbus_addr(G_RAM_ADDR_BITS - 1 downto 0);
-   ram_b_wdata <= cli_p_wdata when cli_pend = '1' else dbus_wdata;
-   scr_b_addr  <= cli_p_addr(C_SCR_BITS - 1 downto 0) when cli_pend = '1' else
+   ram_b_wdata <= (others => '0') when clearing = '1' else
+                  cli_p_wdata when cli_pend = '1' else
+                  dbus_wdata;
+   scr_b_addr  <= clr_addr(C_SCR_BITS - 1 downto 0) when clearing = '1' else
+                  cli_p_addr(C_SCR_BITS - 1 downto 0) when cli_pend = '1' else
                   dbus_addr(C_SCR_BITS - 1 downto 0);
 
    -- A write to memory is served in the cycle that the CLI's or the core's
-   -- request is taken. It goes to the screen or to the main memory.
+   -- request is taken. It goes to the screen or to the main memory. While
+   -- the memory is cleared, both are written.
    p_mem_we : process (all)
       variable we_v   : std_logic;
       variable addr_v : std_logic_vector(31 downto 0);
    begin
       we_v   := '0';
       addr_v := dbus_addr;
-      if dev_busy = '0' and cli_pend = '1' then
+      if clearing = '1' then
+         null;
+      elsif dev_busy = '0' and cli_pend = '1' then
          addr_v := cli_p_addr;
          if not is_io(cli_p_addr, true) then
             we_v := cli_p_we;
@@ -348,7 +391,10 @@ begin
             we_v := dbus_we;
          end if;
       end if;
-      if addr_v(31 downto C_SCR_BITS) = C_SCR_BASE then
+      if clearing = '1' then
+         ram_b_we <= '1';
+         scr_b_we <= '1';
+      elsif addr_v(31 downto C_SCR_BITS) = C_SCR_BASE then
          ram_b_we <= '0';
          scr_b_we <= we_v;
       else
@@ -429,11 +475,24 @@ begin
                rd_io <= cpu_retire.regs(to_integer(addr(3 downto 0)));
             end if;
          elsif addr = C_CONTROL and cli then
-            if we = '1' then
+            if we = '1' and wdata(2) = '1' then
+               -- Clear the memory with the core held. The request is
+               -- acknowledged when the memory is clear.
+               clearing <= '1';
+               clr_addr <= (others => '0');
+               clr_hold <= wdata(0);
+               cpu_hold <= '1';
+               return;
+            elsif we = '1' then
                cpu_hold <= wdata(0);
             else
                rd_io(0) <= cpu_hold;
                rd_io(1) <= cpu_halted;
+            end if;
+         elsif addr = C_HALT_WHY and cli then
+            -- The core keeps the reason until it is reset.
+            if we = '0' then
+               rd_io(2 downto 0) <= to_slv(t_halt'pos(cpu_retire.halt), 3);
             end if;
          end if;
          if cli then
@@ -445,11 +504,25 @@ begin
 
    begin
       if rising_edge(clk_i) then
-         dbus_ack <= '0';
-         cli_ack  <= '0';
+         dbus_ack     <= '0';
+         cli_ack      <= '0';
+         halt_note    <= '0';
+         cpu_hold_d   <= cpu_hold;
+         cpu_halted_d <= cpu_halted;
 
          if cpu_tx_valid = '1' and cpu_tx_ready = '1' then
             cpu_tx_valid <= '0';
+         end if;
+
+         -- The CLI is told of a halt once the core's last byte has gone to
+         -- the UART.
+         if cpu_halted = '1' and cpu_halted_d = '0' then
+            halt_wait <= '1';
+         end if;
+         if halt_wait = '1' and tx_wait = '0' and
+            (cpu_tx_valid = '0' or cpu_tx_ready = '1') then
+            halt_wait <= '0';
+            halt_note <= '1';
          end if;
 
          if dev_busy = '1' then
@@ -470,6 +543,13 @@ begin
                elsif dev_drop = '0' then
                   dbus_ack <= '1';
                end if;
+            end if;
+         elsif clearing = '1' then
+            clr_addr <= clr_addr + 1;
+            if and(clr_addr) = '1' then
+               clearing <= '0';
+               cpu_hold <= clr_hold;
+               cli_ack  <= '1';
             end if;
          elsif cli_pend = '1' then
             serve(true, cli_p_addr, cli_p_we, cli_p_wdata);
@@ -504,6 +584,7 @@ begin
          if cpu_rst = '1' then
             dbus_ack     <= '0';
             tx_wait      <= '0';
+            halt_wait    <= '0';
             read_count   <= (others => '0');
             rx_wr        <= (others => '0');
             rx_rd        <= (others => '0');
@@ -516,6 +597,7 @@ begin
             dev_busy     <= '0';
             dev_stb      <= '0';
             cli_pend     <= '0';
+            clearing     <= '0';
             cpu_tx_valid <= '0';
             if G_CPU_RUN_AT_RESET then
                cpu_hold <= '0';
@@ -528,9 +610,12 @@ begin
 
    ---------------------------------------------------------------------------
    -- The math unit (ISA.md §8.4) and the performance counters (§8.5) from
-   -- nice_cpu. They are reset with the system, not when the CLI holds the
-   -- core, so that the CLI can read them while the core is held.
+   -- nice_cpu. They are reset with the system, and when the core starts, as
+   -- the emulator's are when it starts. They are not reset while the CLI
+   -- holds the core, so that the CLI can read them after a halt.
    ---------------------------------------------------------------------------
+
+   dev_rst <= rst_i or (cpu_hold_d and not cpu_hold);
 
    mpu_cyc   <= dev_busy and dev_mpu;
    mpu_stb   <= dev_stb and dev_mpu;
@@ -541,7 +626,7 @@ begin
    i_mpu : entity work.mpu
       port map (
          clk_i      => clk_i,
-         rst_i      => rst_i,
+         rst_i      => dev_rst,
          wb_cyc_i   => mpu_cyc,
          wb_stb_i   => mpu_stb,
          wb_stall_o => mpu_stall,
@@ -555,7 +640,7 @@ begin
    i_perf : entity work.perf
       port map (
          clk_i      => clk_i,
-         rst_i      => rst_i,
+         rst_i      => dev_rst,
          instret_i  => cpu_instret,
          wb_cyc_i   => perf_cyc,
          wb_stb_i   => perf_stb,
@@ -668,6 +753,7 @@ begin
          tx_buffer_valid_o => tx_buffer_valid,
          tx_buffer_size_o  => tx_buffer_size,
          tx_buffer_data_o  => tx_buffer_data,
+         halt_i            => halt_note,
          wbus_addr_o       => cli_addr,
          wbus_wrdat_o      => cli_wdata,
          wbus_we_o         => cli_we,

@@ -2,9 +2,12 @@
 """Test the system on the MEGA65 board through its debug UART.
 
 Programs the FPGA with m65 and checks the banner, then drives the command
-line: it loads and runs sim/echo.nasm, holds and restarts the core, reads
-back what sim/emu.nasm leaves after its halt, and runs the C example
-examples/build/primes.bin. Build the bitstream and the example first.
+line: it loads and runs sim/echo.nasm, holds and restarts the core, clears
+the memory, reads back what sim/emu.nasm leaves after its halt, and runs the
+C example examples/build/primes.bin. Last, it runs programs with
+tools/run.py and with niceemu, and compares their output and exit status.
+Build the bitstream and the example first, and niceemu
+(make -C nice_cpu/emulator build), or that comparison is skipped.
 
 Usage: tools/hwtest.py [--port /dev/ttyUSB1] [--bit synth/r6/build/top.bit]
                        [--no-program]
@@ -21,10 +24,12 @@ import sys
 import tempfile
 import time
 
-from load import open_port
+from load import (HALT_MESSAGE, drain, load_words, open_port, read_bin,
+                  read_until, start)
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONTROL = "FFFFFFF0"
+NICEEMU = f"{REPO}/nice_cpu/emulator/zig-out/bin/niceemu"
 
 results: list[bool] = []
 
@@ -34,26 +39,6 @@ def check(name: str, ok: bool, detail: str = "") -> None:
     print(f"[{'PASS' if ok else 'FAIL'}] {name} {detail}", flush=True)
 
 
-def drain(fd: int, quiet: float = 0.5) -> bytes:
-    """Reads until nothing has arrived for quiet seconds."""
-    buf = b""
-    end = time.monotonic() + quiet
-    while time.monotonic() < end:
-        data = os.read(fd, 4096)
-        if data:
-            buf += data
-            end = time.monotonic() + quiet
-    return buf
-
-
-def read_until(fd: int, tail: bytes, timeout: float = 2.0) -> bytes:
-    buf = b""
-    end = time.monotonic() + timeout
-    while not buf.endswith(tail) and time.monotonic() < end:
-        buf += os.read(fd, 1)
-    return buf
-
-
 def cmd(fd: int, line: str, quiet: float = 0.5) -> str:
     """Sends one command line and returns all that it answers."""
     os.write(fd, line.encode("ascii") + b"\r")
@@ -61,27 +46,11 @@ def cmd(fd: int, line: str, quiet: float = 0.5) -> str:
 
 
 def load(fd: int, path: str) -> int:
-    """Holds the core, writes the words of a .bin file, and starts the core.
-    The writes go in chunks without waiting for each OK, for speed."""
-    words = [line.split() for line in open(path) if line.strip()]
-    if cmd(fd, f"W {CONTROL} 00000001") != "OK":
-        sys.exit("hwtest.py: the command line does not answer")
-    chunk = 64
-    for i in range(0, len(words), chunk):
-        part = words[i:i + chunk]
-        os.write(fd, b"".join(f"W {a.upper()} {d.upper()}\r".encode()
-                              for a, d in part))
-        got = b""
-        end = time.monotonic() + 5
-        while got.count(b"OK") < len(part) and time.monotonic() < end:
-            got += os.read(fd, 4096)
-        if got.count(b"OK") != len(part):
-            sys.exit(f"hwtest.py: loading {path} failed at word {i}: "
-                     f"{got[-200:]!r}")
-    # The program may print as soon as it starts, so read only up to the OK.
-    os.write(fd, f"W {CONTROL} 00000000\r".encode())
-    if not read_until(fd, b"OK\r\n").endswith(b"OK\r\n"):
-        sys.exit("hwtest.py: the core did not start")
+    """Clears the memory, writes the words of a .bin file, and starts the
+    core."""
+    words = read_bin(path)
+    load_words(fd, words)
+    start(fd)
     return len(words)
 
 
@@ -129,7 +98,8 @@ def test_echo(fd: int, echo: str) -> None:
     check("UART belongs to the running core", got == b"R 00000000\r", repr(got))
     os.write(fd, b".")
     got = drain(fd)
-    check("echo halts on '.'", got == b".", repr(got))
+    check("echo halts on '.', with the halt message", got == b"." + HALT_MESSAGE,
+          repr(got))
     ctl = cmd(fd, f"R {CONTROL}")
     check("halted flag", ctl == "00000002", ctl)
     check("command line back after halt", cmd(fd, "W 00000100 12345678") == "OK"
@@ -143,15 +113,28 @@ def test_reset(fd: int, echo: str) -> None:
     load(fd, echo)
     os.write(fd, b"again.")
     got = drain(fd)
-    check("core runs again after reset", got == b"again.", repr(got))
+    check("core runs again after reset", got == b"again." + HALT_MESSAGE,
+          repr(got))
+
+
+def test_clear(fd: int) -> None:
+    check("W before the clear", cmd(fd, "W 00000100 DEADBEEF") == "OK")
+    check("clear the memory", cmd(fd, f"W {CONTROL} 00000005") == "OK")
+    ctl = cmd(fd, f"R {CONTROL}")
+    check("held after the clear", ctl == "00000001", ctl)
+    got = cmd(fd, "R 00000100")
+    check("memory cleared", got == "00000000", got)
 
 
 def test_readback(fd: int, emu: str) -> None:
     load(fd, emu)
-    time.sleep(0.2)
+    halt = read_until(fd, HALT_MESSAGE)
+    check("halt message", halt == HALT_MESSAGE, repr(halt))
     ctl = cmd(fd, f"R {CONTROL}")
     check("emu.nasm halted", ctl == "00000002", ctl)
     expected = {
+        "FFFFFFF1": "00000001",  # halted by HALT
+        "FFFFFF12": "0000000C",  # 12 steps, as niceemu says
         "FFFF0000": "00000041",  # the screen, column 0 of row 0
         "FFFF07CF": "00000042",  # the screen, column 79 of row 24
         "FFFFFF02": "00001234",  # memory in the I/O range
@@ -179,9 +162,34 @@ def test_primes(fd: int, primes: str) -> None:
         check(f"primes up to {limit}",
               f"Primes up to {limit}: {count}" in out, repr(out))
     os.write(fd, b"0\r")
-    drain(fd, 1.0)
+    end = drain(fd, 1.0)
+    check("primes halt message", end.endswith(HALT_MESSAGE), repr(end))
     ctl = cmd(fd, f"R {CONTROL}")
     check("primes halts on 0", ctl == "00000002", ctl)
+
+
+def test_run(port: str, baud: int,
+             programs: list[tuple[str, list[str]]]) -> None:
+    """Runs each program with run.py and with niceemu, which must print the
+    same and exit with the same status. The port must be closed meanwhile."""
+    if not os.path.exists(NICEEMU):
+        print(f"  {NICEEMU} is missing; the comparison with the emulator "
+              "is skipped")
+        return
+    for path, options in programs:
+        name = " ".join([os.path.basename(path)] + options)
+        emu = subprocess.run([NICEEMU] + options + [path],
+                             stdin=subprocess.DEVNULL, capture_output=True)
+        board = subprocess.run([sys.executable, f"{REPO}/tools/run.py",
+                                "--port", port, "--baud", str(baud),
+                                "--timeout", "10"] + options + [path],
+                               stdin=subprocess.DEVNULL, capture_output=True)
+        same = (emu.stdout == board.stdout and
+                emu.returncode == board.returncode)
+        check(f"run.py {name} as niceemu", same,
+              "" if same else f"\n  niceemu (exit {emu.returncode}): "
+              f"{emu.stdout!r}\n  run.py (exit {board.returncode}): "
+              f"{board.stdout!r} {board.stderr!r}")
 
 
 def main() -> None:
@@ -202,6 +210,9 @@ def main() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         echo = assemble(f"{REPO}/sim/echo.nasm", tmp)
         emu = assemble(f"{REPO}/sim/emu.nasm", tmp)
+        hello = assemble(f"{REPO}/nice_cpu/doc/intro/examples/hello.nasm", tmp)
+        reserved = assemble(f"{REPO}/nice_cpu/emulator/test/reserved.nasm",
+                            tmp)
 
         fd = open_port(args.port, args.baud)
         if not args.no_program:
@@ -209,9 +220,15 @@ def main() -> None:
         test_command_line(fd)
         test_echo(fd, echo)
         test_reset(fd, echo)
+        test_clear(fd)
         test_readback(fd, emu)
         test_primes(fd, primes)
         os.close(fd)
+        test_run(args.port, args.baud, [
+            (hello, []),
+            (emu, ["-d", "0x110:2", "-d", "0xFFFFFF00:4", "-s"]),
+            (reserved, []),
+        ])
 
     passed = sum(results)
     print(f"\n{passed}/{len(results)} passed")

@@ -10,7 +10,10 @@
 -- 2. Load G_HELLO_FILE with W commands, and read its first word back.
 -- 3. The control register: the core is held in reset.
 -- 4. Start the core. It prints "Hello, NICE!" and halts, and the CLI gets
---    the UART back: the control register shows the halted flag.
+--    the UART back and prints the halt message: the control register shows
+--    the halted flag, the halt reason is HALT, and the instruction counter
+--    holds the steps that niceemu prints for the program. Each program
+--    after it ends with the halt message too.
 -- 5. Hold the core, load G_ECHO_FILE, and start it. It echoes the bytes it
 --    receives until a '.', which checks the UART input of the core: every
 --    byte from 0x80 to 0xFF, and a byte with a bad stop bit, which must be
@@ -26,7 +29,12 @@
 -- 9. Hold the core, load G_EMU_FILE, and run it. It writes the screen,
 --    memory in the I/O range, and the read counter, and sets R5. The CLI
 --    reads them back, and the registers, with the values that
---    "niceemu -d" prints for the same program.
+--    "niceemu -d" prints for the same program. The math unit was reset
+--    when the core started.
+-- 10. Clear the memory: what the programs left is gone, and the core is
+--    held.
+-- 11. Load G_RESERVED_FILE, and run it. It halts on a reserved control
+--    word, which the halt reason shows, after the steps of niceemu.
 --
 -- The UART runs at a tenth of the clock rate, so that the test is fast.
 
@@ -43,7 +51,8 @@ entity tb_nicemon is
       G_ECHO_FILE    : string;
       G_FIFO_FILE    : string;
       G_DEVICES_FILE : string;
-      G_EMU_FILE     : string
+      G_EMU_FILE     : string;
+      G_RESERVED_FILE : string
    );
 end entity tb_nicemon;
 
@@ -58,6 +67,8 @@ architecture simulation of tb_nicemon is
    constant C_CR   : character := character'val(13);
    constant C_LF   : character := character'val(10);
    constant C_CRLF : string    := C_CR & C_LF;
+   -- What the CLI prints when the core halts
+   constant C_HALT : string    := C_CRLF & "HALT" & C_CRLF;
 
    signal clk     : std_logic;
    signal rst     : std_logic;
@@ -214,8 +225,11 @@ begin
 
       report "tb_nicemon: run";
       command("W FFFFFFF0 00000000", "OK");
-      expect("Hello, NICE!" & C_LF);
+      expect("Hello, NICE!" & C_LF & C_HALT);
       command("R FFFFFFF0", "00000002");
+      command("R FFFFFFF1", "00000001");     -- halted by HALT
+      command("R FFFFFF12", "00000038");     -- 56 steps, as niceemu says
+      command("R FFFFFF13", "00000000");
 
       report "tb_nicemon: load " & G_ECHO_FILE;
       command("W FFFFFFF0 00000001", "OK");
@@ -237,7 +251,7 @@ begin
       send_byte('x', '0');
       wait for C_BIT_TIME;
       send("cd.");
-      expect("cd.");
+      expect("cd." & C_HALT);
       command("R FFFFFFF0", "00000002");
 
       report "tb_nicemon: load " & G_FIFO_FILE;
@@ -247,7 +261,7 @@ begin
       send("0123456789abcdefX");
       expect("0123456789abcdef");
       send(".");
-      expect(".");
+      expect("." & C_HALT);
       command("R FFFFFFF0", "00000002");
 
       report "tb_nicemon: the math unit from the CLI";
@@ -260,7 +274,7 @@ begin
       command("W FFFFFFF0 00000001", "OK");
       load(G_DEVICES_FILE, first_v);
       command("W FFFFFFF0 00000000", "OK");
-      -- The program takes far less time than one command.
+      expect(C_HALT);
       command("R FFFFFFF0", "00000002");
       command("R 00000100", "0000008E");     -- 1000 / 7 = 142
       command("R 00000101", "00000006");     -- 1000 % 7 = 6
@@ -272,7 +286,10 @@ begin
       command("W FFFFFFF0 00000001", "OK");
       load(G_EMU_FILE, first_v);
       command("W FFFFFFF0 00000000", "OK");
+      expect(C_HALT);
       command("R FFFFFFF0", "00000002");
+      command("R FFFFFF12", "0000000C");     -- 12 steps
+      command("R FFFFFF20", "00000000");     -- the math unit's A, reset
       command("R FFFF0000", "00000041");     -- the screen
       command("R FFFF07CF", "00000042");
       command("R 00000000", first_v);        -- not overwritten by the screen
@@ -285,6 +302,24 @@ begin
       command("R FFFFFFE5", "0000CAFE");     -- R5
       command("R FFFFFFEE", "01000000");     -- R14, the status register
       command("R FFFFFFEF", "0000001B");     -- R15, after the HALT
+
+      report "tb_nicemon: clear the memory";
+      command("W FFFFFFF0 00000005", "OK");
+      command("R FFFFFFF0", "00000001");     -- held, not halted
+      command("R 00000000", "00000000");
+      command("R 00000110", "00000000");
+      command("R FFFF0000", "00000000");     -- the screen
+      command("R FFFF07CF", "00000000");
+      command("R FFFFFF02", "00000000");     -- the top of the memory
+
+      report "tb_nicemon: load " & G_RESERVED_FILE;
+      load(G_RESERVED_FILE, first_v);
+      command("W FFFFFFF0 00000000", "OK");
+      expect(C_HALT);
+      command("R FFFFFFF1", "00000002");     -- a reserved control word
+      command("R FFFFFF12", "00000006");     -- 6 steps
+      command("R FFFFFFE1", "00000001");     -- R1
+      command("R FFFFFFEF", "00000007");     -- R15
 
       report "tb_nicemon: PASS";
       stop(0);

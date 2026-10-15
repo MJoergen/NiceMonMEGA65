@@ -1,5 +1,6 @@
 -- Copied from https://github.com/MJoergen/cmod-s7 (src/cmd.vhd, commit d3d544d), MIT License.
--- Changed: the banner is "NICE", not "WBUS".
+-- Changed: the banner is "NICE", not "WBUS". A pulse on halt_i prints
+-- CR LF "HALT" CR LF, before the next command is taken.
 --
 -- ----------------------------------------------------------------------------
 -- Description: Simple command line interpreter
@@ -34,6 +35,9 @@ entity cmd is
     tx_buffer_valid_o : out   std_logic;
     tx_buffer_size_o  : out   natural range 0 to G_BUFFER_LEN;
     tx_buffer_data_o  : out   std_logic_vector(8 * G_BUFFER_LEN - 1 downto 0);
+
+    -- A pulse prints the halt message
+    halt_i            : in    std_logic;
 
     -- Wishbone bus Master interface
     wbus_addr_o       : out   std_logic_vector(G_ADDR_SIZE - 1 downto 0); -- lower address bits
@@ -78,12 +82,19 @@ architecture synthesis of cmd is
   constant C_OK_DATA : std_logic_vector(8 * G_BUFFER_LEN - 1 downto 0)    := str2slv(C_OK_STR, G_BUFFER_LEN);
   constant C_OK_SIZE : natural                                            := C_OK_STR'length;
 
+  constant C_HALT_STR  : string                                           := C_CRLF & "HALT" & C_CRLF;
+  constant C_HALT_DATA : std_logic_vector(8 * G_BUFFER_LEN - 1 downto 0)  := str2slv(C_HALT_STR, G_BUFFER_LEN);
+  constant C_HALT_SIZE : natural                                          := C_HALT_STR'length;
+
+  -- A halt message waits here until the line buffer is free
+  signal   halt_pend : std_logic                                          := '0';
+
   type     state_type is (START_ST, IDLE_ST, BUSY_ST);
   signal   state : state_type                                             := START_ST;
 
 begin
 
-  rx_buffer_ready_o <= '1' when state = IDLE_ST and tx_buffer_valid_o = '0' else
+  rx_buffer_ready_o <= '1' when state = IDLE_ST and tx_buffer_valid_o = '0' and halt_pend = '0' else
                        '0';
 
   fsm_proc : process (clk_i)
@@ -158,7 +169,14 @@ begin
           state             <= IDLE_ST;
 
         when IDLE_ST =>
-          if rx_buffer_valid_i = '1' and rx_buffer_ready_o = '1' then
+          if halt_pend = '1' then
+            if tx_buffer_valid_o = '0' then
+              tx_buffer_size_o  <= C_HALT_SIZE;
+              tx_buffer_data_o  <= C_HALT_DATA;
+              tx_buffer_valid_o <= '1';
+              halt_pend         <= '0';
+            end if;
+          elsif rx_buffer_valid_i = '1' and rx_buffer_ready_o = '1' then
             if rx_buffer_data_i(8 * 10 - 1 downto 8 * 10 - 16) = X"5220" and rx_buffer_size_i = 10 then           -- 'R'
               wbus_addr_o <= asc2slv(rx_buffer_data_i(63 downto 0))(G_ADDR_SIZE - 1 downto 0);
               wbus_cyc_o  <= '1';
@@ -198,7 +216,12 @@ begin
 
       end case;
 
+      if halt_i = '1' then
+        halt_pend <= '1';
+      end if;
+
       if rst_i = '1' then
+        halt_pend         <= '0';
         tx_buffer_valid_o <= '0';
         wbus_cyc_o        <= '0';
         wbus_stb_o        <= '0';
