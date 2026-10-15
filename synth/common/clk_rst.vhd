@@ -33,6 +33,9 @@ architecture synthesis of clk_rst is
 
 begin
 
+   -- The Xilinx primitives are components of unisim.vcomponents, and their
+   -- generics and ports are named in upper case, as in Xilinx's documentation.
+-- vsg_off
    i_mmcm : MMCME2_BASE
       generic map (
          CLKIN1_PERIOD    => 10.0,  -- 100 MHz
@@ -61,6 +64,7 @@ begin
          I => clk_mmcm,
          O => clk_o
       ); -- i_bufg_clk
+-- vsg_on
 
    p_rst : process (clk_o, locked)
    begin

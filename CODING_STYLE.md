@@ -1,0 +1,106 @@
+# VHDL coding style
+
+The VHDL in `src/`, `sim/`, and `synth/` follows the style of
+[nice_cpu](https://github.com/MJoergen/nice_cpu/blob/main/hdl/CODING_STYLE.md),
+which is that of
+[qnice_cpu](https://github.com/MJoergen/qnice_cpu/blob/main/CODING_STYLE.md)
+in short form. `make lint` checks what it can with
+[vsg](https://vhdl-style-guide.readthedocs.io/) and [vsg.yml](vsg.yml).
+
+`synth/r3/max10.vhd` is a third-party file, copied unchanged (see
+[synth/README.md](synth/README.md)), so it keeps its own style and is not
+linted. The files copied from cmod-s7 are kept in this style, and their
+headers say so.
+
+All code is VHDL-2008, analysed with plain `ghdl --std=08` (no `-frelaxed`).
+
+## Files
+
+- One design unit per file, named after it.
+- The file starts with a header comment, then `library ieee;`. The `use`
+  clauses are indented 3 spaces, with a blank line between libraries.
+- A longer header uses these headings, in this order: a summary, `THEORY OF
+  OPERATION`, `INTERFACE CONTRACTS -- these are requirements on the
+  environment:` with items `a)`, `b)`, and `c)`, and `RESET`.
+- The architecture is `synthesis`, or `simulation` for a unit that only
+  simulates (`sim/`).
+- Closing keywords are written in full: `end entity perf;`,
+  `end architecture synthesis;`, and `end process p_bus;`.
+
+## Names
+
+| Kind | Convention | Example |
+|---|---|---|
+| Entity, signal, variable | `lower_snake_case` | `wb_mem`, `take_nmi` |
+| Port | ends in `_i` or `_o` | `wb_stall_o` |
+| Generic | `G_UPPER_SNAKE` | `G_STALL` |
+| Constant | `C_UPPER_SNAKE` | `C_REGS_RESET` |
+| Enumeration literal | `UPPER_SNAKE` | `HALT_NONE` |
+| State of a state machine | `UPPER_SNAKE` + `_ST` | `FETCH_ST` |
+| Type | `t_` prefix | `t_retire` |
+| Process, instance, generate | `p_`, `i_`, `gen_` prefix | `p_fsm`, `i_mpu` |
+
+- `clk_i` and `rst_i` come first in a port list.
+- Optional suffixes: `_r` for a register and `_v` for a variable.
+- An instance of one entity is labelled `i_<entity>`.
+
+## Layout
+
+- Indent 3 spaces. No tabs and no trailing spaces.
+- Keep lines under 100 columns where it reads well. vsg only warns.
+- Within a group of declarations, separated by blank lines or comments,
+  align the colons. Port clauses and port maps align as a whole. Write the
+  modes `in ` and `out`.
+- Align trailing comments on a run of lines into one column.
+- Put spaces around operators: `C_LEN * 4 - 1`, `addr + 1`.
+- Write bit-string literals in upper case: `X"1FFF"`.
+- In an architecture body, two blank lines separate each process and
+  instance from its neighbours, but one follows `begin`. Elsewhere, one
+  blank line separates ideas, where the author sees fit.
+- A case alternative with one short statement may sit on the line of its
+  `when`, so that the case reads as a table. Align the `=>` of such a table.
+- An instance ends with its label: `); -- i_mpu`.
+
+## Idioms
+
+- Instantiate entities directly: `i_mpu : entity work.mpu`. No components,
+  except for the Xilinx primitives of `unisim.vcomponents`, whose generics
+  and ports keep Xilinx's upper-case names.
+- Write `process (clk_i)` without `is`, and `if x = '1' then` without
+  parentheses. Compare `std_logic` explicitly; do not write `if x then`.
+- Reset is synchronous and active high. It is the last `if` inside
+  `if rising_edge(clk_i) then`, so it overrides the rest.
+- Use `numeric_std_unsigned` for arithmetic on `std_logic_vector`. Import
+  `numeric_std` only where `signed` or `unsigned` is needed.
+- Subprogram headers are compact: `function f(a : t;` with the other
+  parameters aligned under `a`.
+- `report` and `severity` go on lines of their own, indented under the
+  `assert` or `report`. A message starts with the unit's name, as in
+  `"tb_mpu: ..."`.
+- No shared variables.
+
+## Comments
+
+- Full sentences. Comment why, not what.
+- Use ` -- ` as a dash in prose.
+- Open items go in an issue, not in comments.
+
+## Exceptions
+
+A construct that breaks a vsg rule on purpose, such as a table, is wrapped
+in markers at column 0, after a comment that says why:
+
+```vhdl
+   -- The Xilinx primitives are components of unisim.vcomponents, and their
+   -- generics and ports are named in upper case, as in Xilinx's documentation.
+-- vsg_off
+   i_mmcm : MMCME2_BASE
+   ...
+-- vsg_on
+```
+
+Name the rules after `vsg_off` when only a few apply, as in
+`-- vsg_off sequential_007`.
+
+Change [vsg.yml](vsg.yml) only for a rule that holds for the whole
+repository, and state that rule here first.

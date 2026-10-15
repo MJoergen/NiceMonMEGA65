@@ -3,154 +3,156 @@
 -- they came out wrong, and passed on frames with a bad Stop bit. It now takes
 -- all ten bits and checks the Start and Stop bits, and starts a frame on a
 -- falling edge only. A bit now takes G_DIVISOR clock cycles, not G_DIVISOR + 1.
+-- The layout and names follow CODING_STYLE.md.
 -- Added here: rx_break_o pulses for a break, a frame whose ten bits are all 0.
 --
+
 library ieee;
-  use ieee.std_logic_1164.all;
-  use ieee.numeric_std.all;
+   use ieee.std_logic_1164.all;
+   use ieee.numeric_std.all;
 
 -- This provides a byte-level interface to UART serial interface.
 -- Protocol is 8-N-1, i.e. one start bit, 8 data bits, no parity, and one stop bit.
 -- Data is transferred LSB first.
 
 entity uart_serdes is
-  generic (
-    G_DIVISOR : natural
-  );
-  port (
-    clk_i      : in    std_logic;
-    rst_i      : in    std_logic;
-    -- Byte level interface
-    tx_valid_i : in    std_logic;
-    tx_ready_o : out   std_logic;
-    tx_data_i  : in    std_logic_vector(7 downto 0);
-    rx_valid_o : out   std_logic;
-    rx_ready_i : in    std_logic;
-    rx_data_o  : out   std_logic_vector(7 downto 0);
-    -- A pulse for a break: a frame of ten 0 bits, the Stop bit included
-    rx_break_o : out   std_logic;
-    -- UART serial interface
-    uart_tx_o  : out   std_logic;
-    uart_rx_i  : in    std_logic
-  );
+   generic (
+      G_DIVISOR : natural
+   );
+   port (
+      clk_i      : in  std_logic;
+      rst_i      : in  std_logic;
+      -- Byte level interface
+      tx_valid_i : in  std_logic;
+      tx_ready_o : out std_logic;
+      tx_data_i  : in  std_logic_vector(7 downto 0);
+      rx_valid_o : out std_logic;
+      rx_ready_i : in  std_logic;
+      rx_data_o  : out std_logic_vector(7 downto 0);
+      -- A pulse for a break: a frame of ten 0 bits, the Stop bit included
+      rx_break_o : out std_logic;
+      -- UART serial interface
+      uart_tx_o  : out std_logic;
+      uart_rx_i  : in  std_logic
+   );
 end entity uart_serdes;
 
 architecture synthesis of uart_serdes is
 
-  type   state_type is (
-    IDLE_ST,
-    BUSY_ST
-  );
+   type t_state is (
+      IDLE_ST,
+      BUSY_ST
+   );
 
-  signal tx_data    : std_logic_vector(9 downto 0) := (others => '1');
-  signal tx_state   : state_type                   := IDLE_ST;
-  signal tx_counter : natural range 0 to G_DIVISOR;
+   signal tx_data    : std_logic_vector(9 downto 0) := (others => '1');
+   signal tx_state   : t_state                      := IDLE_ST;
+   signal tx_counter : natural range 0 to G_DIVISOR;
 
-  signal rx_data    : std_logic_vector(10 downto 0);
-  signal rx_state   : state_type                   := IDLE_ST;
-  signal rx_counter : natural range 0 to G_DIVISOR;
-  signal rx_prev    : std_logic                    := '1';
+   signal rx_data    : std_logic_vector(10 downto 0);
+   signal rx_state   : t_state                      := IDLE_ST;
+   signal rx_counter : natural range 0 to G_DIVISOR;
+   signal rx_prev    : std_logic                    := '1';
 
 begin
 
-  --------------------------------------------
-  -- Handler UART Transmission
-  --------------------------------------------
+   --------------------------------------------
+   -- Handler UART Transmission
+   --------------------------------------------
 
-  tx_ready_o <= '1' when tx_state = IDLE_ST else
-                '0';
+   tx_ready_o <= '1' when tx_state = IDLE_ST else
+                 '0';
 
-  uart_tx_o  <= tx_data(0);
+   uart_tx_o <= tx_data(0);
 
-  tx_proc : process (clk_i)
-  begin
-    if rising_edge(clk_i) then
+   p_tx : process (clk_i)
+   begin
+      if rising_edge(clk_i) then
 
-      case tx_state is
+         case tx_state is
 
-        when IDLE_ST =>
-          if tx_valid_i = '1' then
-            tx_data    <= "1" & tx_data_i & "0"; -- Stop + Data + Start
-            tx_counter <= G_DIVISOR - 1;
-            tx_state   <= BUSY_ST;
-          end if;
+            when IDLE_ST =>
+               if tx_valid_i = '1' then
+                  tx_data    <= "1" & tx_data_i & "0"; -- Stop + Data + Start
+                  tx_counter <= G_DIVISOR - 1;
+                  tx_state   <= BUSY_ST;
+               end if;
 
-        when BUSY_ST =>
-          if tx_counter > 0 then
-            tx_counter <= tx_counter - 1;
-          else
-            if or (tx_data(9 downto 1)) = '1' then
-              tx_counter <= G_DIVISOR - 1;
-              tx_data    <= "0" & tx_data(9 downto 1);
-            else
-              tx_data(0) <= '1';
-              tx_state   <= IDLE_ST;
-            end if;
-          end if;
+            when BUSY_ST =>
+               if tx_counter > 0 then
+                  tx_counter <= tx_counter - 1;
+               else
+                  if or (tx_data(9 downto 1)) = '1' then
+                     tx_counter <= G_DIVISOR - 1;
+                     tx_data    <= "0" & tx_data(9 downto 1);
+                  else
+                     tx_data(0) <= '1';
+                     tx_state   <= IDLE_ST;
+                  end if;
+               end if;
 
-      end case;
+         end case;
 
-      if rst_i = '1' then
-        tx_data(0) <= '1';
-        tx_state   <= IDLE_ST;
+         if rst_i = '1' then
+            tx_data(0) <= '1';
+            tx_state   <= IDLE_ST;
+         end if;
       end if;
-    end if;
-  end process tx_proc;
+   end process p_tx;
 
 
-  --------------------------------------------
-  -- Handler UART Reception
-  --------------------------------------------
+   --------------------------------------------
+   -- Handler UART Reception
+   --------------------------------------------
 
-  rx_proc : process (clk_i)
-  begin
-    if rising_edge(clk_i) then
-      rx_prev    <= uart_rx_i;
-      rx_break_o <= '0';
-      if rx_ready_i = '1' then
-        rx_valid_o <= '0';
+   p_rx : process (clk_i)
+   begin
+      if rising_edge(clk_i) then
+         rx_prev    <= uart_rx_i;
+         rx_break_o <= '0';
+         if rx_ready_i = '1' then
+            rx_valid_o <= '0';
+         end if;
+
+         case rx_state is
+
+            when IDLE_ST =>
+               -- A falling edge, so that a Stop bit that was low is not taken as a Start bit.
+               if rx_prev = '1' and uart_rx_i = '0' then
+                  rx_data     <= (others => '1');
+                  rx_data(10) <= '0';          -- Marker: reaches bit 0 after ten samples
+                  rx_counter  <= G_DIVISOR / 2;
+                  rx_state    <= BUSY_ST;
+               end if;
+
+            when BUSY_ST =>
+               if rx_counter > 0 then
+                  rx_counter <= rx_counter - 1;
+               else
+                  rx_counter <= G_DIVISOR - 1;
+                  rx_data    <= uart_rx_i & rx_data(10 downto 1);
+               end if;
+
+               if rx_data(0) = '0' then
+                  -- Start + 8 data + Stop sampled. Only forward if Start and Stop are correct.
+                  if rx_data(1) = '0' and rx_data(10) = '1' then
+                     rx_data_o  <= rx_data(9 downto 2);
+                     rx_valid_o <= '1';
+                  end if;
+                  if or(rx_data(10 downto 1)) = '0' then
+                     rx_break_o <= '1';
+                  end if;
+                  rx_state <= IDLE_ST;
+               end if;
+
+         end case;
+
+         if rst_i = '1' then
+            rx_valid_o <= '0';
+            rx_break_o <= '0';
+            rx_state   <= IDLE_ST;
+         end if;
       end if;
-
-      case rx_state is
-
-        when IDLE_ST =>
-          -- A falling edge, so that a Stop bit that was low is not taken as a Start bit.
-          if rx_prev = '1' and uart_rx_i = '0' then
-            rx_data     <= (others => '1');
-            rx_data(10) <= '0';          -- Marker: reaches bit 0 after ten samples
-            rx_counter  <= G_DIVISOR / 2;
-            rx_state    <= BUSY_ST;
-          end if;
-
-        when BUSY_ST =>
-          if rx_counter > 0 then
-            rx_counter <= rx_counter - 1;
-          else
-            rx_counter <= G_DIVISOR - 1;
-            rx_data    <= uart_rx_i & rx_data(10 downto 1);
-          end if;
-
-          if rx_data(0) = '0' then
-            -- Start + 8 data + Stop sampled. Only forward if Start and Stop are correct.
-            if rx_data(1) = '0' and rx_data(10) = '1' then
-              rx_data_o  <= rx_data(9 downto 2);
-              rx_valid_o <= '1';
-            end if;
-            if or(rx_data(10 downto 1)) = '0' then
-              rx_break_o <= '1';
-            end if;
-            rx_state <= IDLE_ST;
-          end if;
-
-      end case;
-
-      if rst_i = '1' then
-        rx_valid_o <= '0';
-        rx_break_o <= '0';
-        rx_state   <= IDLE_ST;
-      end if;
-    end if;
-  end process rx_proc;
+   end process p_rx;
 
 end architecture synthesis;
 

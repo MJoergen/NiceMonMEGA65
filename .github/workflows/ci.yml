@@ -16,3 +16,14 @@ jobs:
           python-version: "3.x"
       - run: sudo apt-get update && sudo apt-get install -y ghdl
       - run: make -C sim test
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      # The style of CODING_STYLE.md, as far as vsg can check it.
+      - run: pip install vsg==3.35.0
+      - run: make lint

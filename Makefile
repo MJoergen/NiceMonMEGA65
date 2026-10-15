@@ -4,11 +4,12 @@
 PYTHON ?= python3
 PORT   ?= /dev/ttyUSB1
 
-.PHONY: help test examples r3 r6 load run hwtest clean
+.PHONY: help test lint examples r3 r6 load run hwtest clean
 
 help:
 	@echo "Targets:"
 	@echo "  make test       run the GHDL simulation tests (needs GHDL)"
+	@echo "  make lint       check the VHDL against CODING_STYLE.md (needs vsg)"
 	@echo "  make examples   build the C examples to examples/build/*.bin (needs clang)"
 	@echo "  make r3         build the bitstream for the MEGA65 R3 (needs Vivado)"
 	@echo "  make r6         build the bitstream for the MEGA65 R6 (needs Vivado)"
@@ -22,6 +23,14 @@ help:
 
 test:
 	$(MAKE) -C sim test
+
+# The VHDL of this repository, but not the nice_cpu submodule, which has its
+# own, nor the third-party max10.vhd.
+VSG         ?= vsg
+VHDL_SOURCES = $(filter-out synth/r3/max10.vhd,$(wildcard src/*.vhd sim/*.vhd synth/*/*.vhd))
+
+lint:
+	$(VSG) -c vsg.yml -of syntastic -f $(VHDL_SOURCES)
 
 examples:
 	$(MAKE) -C examples

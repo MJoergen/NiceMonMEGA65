@@ -52,11 +52,11 @@ library ieee;
 
 entity tb_nicemon is
    generic (
-      G_HELLO_FILE   : string;
-      G_ECHO_FILE    : string;
-      G_FIFO_FILE    : string;
-      G_DEVICES_FILE : string;
-      G_EMU_FILE     : string;
+      G_HELLO_FILE    : string;
+      G_ECHO_FILE     : string;
+      G_FIFO_FILE     : string;
+      G_DEVICES_FILE  : string;
+      G_EMU_FILE      : string;
       G_RESERVED_FILE : string;
       G_EOF_FILE      : string
    );
@@ -68,7 +68,7 @@ architecture simulation of tb_nicemon is
    constant C_BAUDRATE : natural := 10_000_000;
    constant C_BIT_TIME : time    := (C_CLOCK_HZ / C_BAUDRATE) * 10 ns;
    -- Longer than the slowest answer
-   constant C_TIMEOUT  : time    := 1 ms;
+   constant C_TIMEOUT : time    := 1 ms;
 
    constant C_CR   : character := character'val(13);
    constant C_LF   : character := character'val(10);

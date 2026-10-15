@@ -148,7 +148,8 @@ begin
 
          cycles_v := cycles_v + 1;
          if cycles_v = G_TIMEOUT then
-            report "tb_hello: timeout, the core did not halt" severity failure;
+            report "tb_hello: timeout, the core did not halt"
+               severity failure;
          end if;
       end if;
    end process p_console;

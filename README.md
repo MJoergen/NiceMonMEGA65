@@ -62,7 +62,7 @@ or, in an existing clone:
     git submodule update --init
 
 `make` in the top directory lists the targets: `make test` runs the
-simulation tests, `make examples` builds the C examples, `make r3` and
+simulation tests, `make lint` checks the VHDL style, `make examples` builds the C examples, `make r3` and
 `make r6` build the bitstreams, and `make load FILE=prog.bin` loads a
 program into the MEGA65 and starts it.
 
@@ -257,6 +257,8 @@ You need GHDL (tested with 4.1.0) and Python 3.
   input until a break ends it. The input FIFO has 16 bytes there, so that
   the test of a full FIFO is short.
 - `make test` also checks that GHDL can synthesise the system.
+- `make lint` checks the VHDL against [CODING_STYLE.md](CODING_STYLE.md)
+  with vsg.
 
 For the boards, see [synth/](synth/README.md).
 

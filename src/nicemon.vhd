@@ -110,12 +110,12 @@ entity nicemon is
       G_CPU_RUN_AT_RESET : boolean := false
    );
    port (
-      clk_i       : in  std_logic;
-      rst_i       : in  std_logic;
-      uart_rxd_i  : in  std_logic;
-      uart_txd_o  : out std_logic;
+      clk_i      : in  std_logic;
+      rst_i      : in  std_logic;
+      uart_rxd_i : in  std_logic;
+      uart_txd_o : out std_logic;
       -- '1' while the core runs and owns the UART input
-      running_o   : out std_logic
+      running_o  : out std_logic
    );
 end entity nicemon;
 
@@ -132,14 +132,14 @@ architecture synthesis of nicemon is
    constant C_CONTROL    : std_logic_vector(31 downto 0) := X"FFFFFFF0";
    constant C_HALT_WHY   : std_logic_vector(31 downto 0) := X"FFFFFFF1";
    -- The core's registers, for the CLI: 0xFFFFFFE0-EF
-   constant C_REGS_BASE  : std_logic_vector(31 downto 4) := X"FFFFFFE";
+   constant C_REGS_BASE : std_logic_vector(31 downto 4) := X"FFFFFFE";
    -- The screen: 0xFFFF0000-07FF, of which the emulator's screen is the
    -- first 2000 words
-   constant C_SCR_BITS   : natural := 11;
-   constant C_SCR_BASE   : std_logic_vector(31 downto C_SCR_BITS) := X"FFFF" & "00000";
+   constant C_SCR_BITS : natural := 11;
+   constant C_SCR_BASE : std_logic_vector(31 downto C_SCR_BITS) := X"FFFF" & "00000";
 
    -- The devices of nice_cpu/hdl/src, by the address bits above their offset
-   constant C_PERF_BASE : std_logic_vector(31 downto 4) := X"FFFFFF1"; -- 0xFFFFFF10-1F
+   constant C_PERF_BASE : std_logic_vector(31 downto 4) := X"FFFFFF1";        -- 0xFFFFFF10-1F
    constant C_MPU_BASE  : std_logic_vector(31 downto 5) := X"FFFFFF" & "001"; -- 0xFFFFFF20-3F
 
    -- Whether an address is an I/O register, not memory, for the core or, with
@@ -151,21 +151,21 @@ architecture synthesis of nicemon is
       if and(addr(31 downto 8)) = '0' then
          return false;
       end if;
-      return addr(7 downto 1) = "0000000" or                -- console, read counter
+      return addr(7 downto 1) = "0000000" or                        -- console, read counter
              addr(7 downto 4) = X"1" or addr(7 downto 5) = "001" or -- perf, MPU
              (cli and (addr(7 downto 4) = X"E" or addr(7 downto 1) = "1111000"));
    end function is_io;
 
    -- Core
-   signal cpu_rst    : std_logic;
-   signal cpu_hold   : std_logic;
-   signal cpu_halted : std_logic;
+   signal cpu_rst     : std_logic;
+   signal cpu_hold    : std_logic;
+   signal cpu_halted  : std_logic;
    signal cpu_instret : std_logic;
    signal cpu_retire  : t_retire;
    -- The hold bit in the cycle before, for a pulse when the core starts,
    -- which resets the math unit and the performance counters
-   signal cpu_hold_d  : std_logic := '1';
-   signal dev_rst     : std_logic;
+   signal cpu_hold_d : std_logic := '1';
+   signal dev_rst    : std_logic;
    -- A halt waits in halt_wait until the core's last byte has gone, and
    -- then halt_note tells the CLI.
    signal cpu_halted_d : std_logic := '0';
@@ -227,11 +227,11 @@ architecture synthesis of nicemon is
    signal dev_wdata : std_logic_vector(31 downto 0);
    signal dev_stall : std_logic;
 
-   signal mpu_cyc   : std_logic;
-   signal mpu_stb   : std_logic;
-   signal mpu_stall : std_logic;
-   signal mpu_ack   : std_logic;
-   signal mpu_data  : std_logic_vector(31 downto 0);
+   signal mpu_cyc    : std_logic;
+   signal mpu_stb    : std_logic;
+   signal mpu_stall  : std_logic;
+   signal mpu_ack    : std_logic;
+   signal mpu_data   : std_logic_vector(31 downto 0);
    signal perf_cyc   : std_logic;
    signal perf_stb   : std_logic;
    signal perf_stall : std_logic;
@@ -283,13 +283,14 @@ architecture synthesis of nicemon is
    -- No byte is written to the word at rx_rd while the FIFO holds a byte:
    -- it is written when the FIFO is empty, and not when it is full.
    type t_rx_fifo is array (0 to C_RX_FIFO_LEN - 1) of std_logic_vector(7 downto 0);
+
    signal rx_fifo : t_rx_fifo;
    signal rx_we   : std_logic;
    signal rx_q    : std_logic_vector(7 downto 0);
    signal rx_wr   : std_logic_vector(C_RX_FIFO_BITS downto 0) := (others => '0');
    signal rx_rd   : std_logic_vector(C_RX_FIFO_BITS downto 0) := (others => '0');
    -- The core's input has ended with a break.
-   signal rx_eof  : std_logic := '0';
+   signal rx_eof : std_logic := '0';
 
    signal rx_buffer_ready : std_logic;
    signal rx_buffer_valid : std_logic;
@@ -633,7 +634,8 @@ begin
    -- A byte for the core goes into its FIFO, unless the FIFO is full or the
    -- input has ended.
    rx_we <= '1' when ser_rx_valid = '1' and uart_owner_cpu = '1' and rx_eof = '0' and
-                     rx_wr - rx_rd /= C_RX_FIFO_LEN else '0';
+                     rx_wr - rx_rd /= C_RX_FIFO_LEN else
+            '0';
 
    p_rx_fifo : process (clk_i)
    begin

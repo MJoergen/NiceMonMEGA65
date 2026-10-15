@@ -15,6 +15,7 @@ entity top is
 end entity top;
 
 architecture synthesis of top is
+
 begin
 
    i_mega65 : entity work.mega65
