@@ -11,7 +11,9 @@
 #             tb_kbd      the keyboard driver and its ASCII mapping.
 #             tb_text     the text display: one frame of 1280x1024, every
 #                         pixel checked.
-#             It also checks that GHDL can synthesise the system.
+#             It also checks that GHDL can synthesise the system, the
+#             keyboard, and the text display (through text_synth.vhd, in
+#             the boards' mode).
 # make clean  removes build/.
 
 GHDL   ?= ghdl
@@ -26,8 +28,8 @@ NICE_SOURCES = $(NICE)/hdl/src/trace_pkg.vhd $(NICE)/hdl/src/multicycle.vhd $(NI
                $(NICE)/hdl/src/perf.vhd $(NICE)/hdl/sim/wb_mem.vhd
 SRC_SOURCES  = ../src/uart_serdes.vhd ../src/line_buffer.vhd ../src/cmd.vhd ../src/ram.vhd ../src/nicemon.vhd \
                ../src/kbd_m65.vhd ../src/kbd_ascii.vhd \
-               ../src/video/video_pkg.vhd ../src/video/font_pkg.vhd ../src/video/pix.vhd ../src/video/text.vhd
-SOURCES      = $(SRC_SOURCES) tb_hello.vhd tb_nicemon.vhd tb_kbd.vhd tb_text.vhd
+               ../src/video/video_pkg.vhd ../src/video/font_pkg.vhd ../src/video/pix.vhd ../src/video/scr_ram.vhd ../src/video/text.vhd
+SOURCES      = $(SRC_SOURCES) text_synth.vhd tb_hello.vhd tb_nicemon.vhd tb_kbd.vhd tb_text.vhd
 
 .PHONY: test analyse synth clean
 
@@ -46,12 +48,14 @@ test: analyse synth $(BUILD)/hello.bin $(BUILD)/echo.bin $(BUILD)/fifo.bin $(BUI
 	  echo "PASS tb_text" || (echo "FAIL tb_text"; cat $(BUILD)/tb_text.log; exit 1)
 
 # Checks that GHDL can synthesise the system and the keyboard, as nice_cpu
-# does for its core.
+# does for its core, and the text display.
 synth: analyse
 	@for e in nicemon kbd_m65 kbd_ascii; do \
 	  (cd $(BUILD) && $(GHDL) --synth $(GHDLFLAGS) -gG_CLOCK_HZ=50000000 $$e > $${e}_synth.vhd 2> $${e}_synth.log) && \
 	  echo "PASS synth $$e" || (echo "FAIL synth $$e"; cat $(BUILD)/$${e}_synth.log; exit 1) || exit 1; \
 	done
+	@(cd $(BUILD) && $(GHDL) --synth $(GHDLFLAGS) text_synth > text_synth.vhd 2> text_synth.log) && \
+	  echo "PASS synth text" || (echo "FAIL synth text"; cat $(BUILD)/text_synth.log; exit 1)
 
 analyse: | $(BUILD)
 	@cd $(BUILD) && $(GHDL) -a $(GHDLFLAGS) $(addprefix ../,$(NICE_SOURCES) $(SOURCES))

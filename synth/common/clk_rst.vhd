@@ -4,6 +4,8 @@
 -- and for 2^20 cycles (21 ms) after both. So the UART output is idle for that
 -- long before the CLI sends its banner, and a terminal that saw the pin
 -- change during configuration has time to find the start of a character.
+-- The MMCM's locked output and the button are synchronised to clk_o by two
+-- registers each, as in MandelbrotMEGA65's clk_rst.vhd.
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -28,8 +30,14 @@ architecture synthesis of clk_rst is
    signal clk_mmcm  : std_logic;
    signal locked    : std_logic;
 
+   signal locked_sync : std_logic_vector(1 downto 0) := "00";
    signal button_sync : std_logic_vector(1 downto 0) := "11";
    signal counter     : std_logic_vector(19 downto 0) := (others => '1');
+
+   -- The registers of the synchronisers
+   attribute async_reg : string;
+   attribute async_reg of locked_sync : signal is "true";
+   attribute async_reg of button_sync : signal is "true";
 
 begin
 
@@ -66,14 +74,12 @@ begin
       ); -- i_bufg_clk
 -- vsg_on
 
-   p_rst : process (clk_o, locked)
+   p_rst : process (clk_o)
    begin
-      if locked = '0' then
-         button_sync <= "11";
-         counter     <= (others => '1');
-      elsif rising_edge(clk_o) then
+      if rising_edge(clk_o) then
+         locked_sync <= locked_sync(0) & locked;
          button_sync <= button_sync(0) & reset_button_i;
-         if button_sync(1) = '1' then
+         if locked_sync(1) = '0' or button_sync(1) = '1' then
             counter <= (others => '1');
          elsif counter /= 0 then
             counter <= counter - 1;

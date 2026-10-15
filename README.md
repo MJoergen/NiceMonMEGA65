@@ -311,9 +311,9 @@ You need GHDL (tested with 4.1.0) and Python 3.
   the keyboard.
 - `sim/tb_text.vhd` fills the screen of the text display and checks every
   pixel of one 1280×1024 frame, and the sync pulses. It takes about a
-  minute and a half.
-- `make test` also checks that GHDL can synthesise the system and the
-  keyboard.
+  minute.
+- `make test` also checks that GHDL can synthesise the system, the
+  keyboard, and the text display.
 - `make lint` checks the VHDL against [CODING_STYLE.md](CODING_STYLE.md)
   with vsg.
 

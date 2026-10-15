@@ -11,7 +11,9 @@
 --
 -- RESET
 -- vga_rst_o is held while the MMCM is not locked, and for 8 cycles after.
--- The reset button does not reset the video.
+-- The MMCM's locked output is synchronised to vga_clk by two registers, as
+-- in MandelbrotMEGA65's clk_rst.vhd. The reset button does not reset the
+-- video.
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -37,7 +39,12 @@ architecture synthesis of video_clk is
    signal vga_clk   : std_logic;
    signal locked    : std_logic;
 
-   signal rst_delay : std_logic_vector(7 downto 0) := (others => '1');
+   signal locked_sync : std_logic_vector(1 downto 0) := "00";
+   signal rst_delay   : std_logic_vector(7 downto 0) := (others => '1');
+
+   -- The registers of the synchroniser
+   attribute async_reg : string;
+   attribute async_reg of locked_sync : signal is "true";
 
 begin
 
@@ -82,12 +89,14 @@ begin
       ); -- i_bufg_tmds
 -- vsg_on
 
-   p_rst : process (vga_clk, locked)
+   p_rst : process (vga_clk)
    begin
-      if locked = '0' then
-         rst_delay <= (others => '1');
-      elsif rising_edge(vga_clk) then
-         rst_delay <= rst_delay(6 downto 0) & '0';
+      if rising_edge(vga_clk) then
+         locked_sync <= locked_sync(0) & locked;
+         rst_delay   <= rst_delay(6 downto 0) & '0';
+         if locked_sync(1) = '0' then
+            rst_delay <= (others => '1');
+         end if;
       end if;
    end process p_rst;
 

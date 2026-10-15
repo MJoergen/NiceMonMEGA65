@@ -92,7 +92,6 @@ def main():
     print('      others => (others => \'0\'));')
     print('')
     print('end package font_pkg;')
-    print('')
 
 
 if __name__ == '__main__':

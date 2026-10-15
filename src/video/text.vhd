@@ -6,9 +6,10 @@
 -- the first 2000 are the emulator's 80x25 characters, row by row. Each word
 -- is a character in bits 7..0 and its colour above (nice_cpu's ISA.md §9.3,
 -- nice_screen_put). This module keeps a copy of the screen in a memory of its
--- own, with a write port in the system clock domain, which takes every write
--- to the screen (scr_*_i), and a read port in the VGA clock domain. So the
--- copy is the only crossing of the clock domains, and the block RAM makes it.
+-- own (scr_ram.vhd), with a write port in the system clock domain, which
+-- takes every write to the screen (scr_*_i), and a read port in the VGA clock
+-- domain. So the copy is the only crossing of the clock domains, and the block
+-- RAM makes it.
 --
 -- The characters are 16x32 pixels, from the Spleen font (font_pkg.vhd), with
 -- the 256 codes of ISO 8859-1. So the text is 1280x800 pixels, in the middle
@@ -84,14 +85,6 @@ architecture synthesis of text is
    constant C_DEFAULT_FG : std_logic_vector(7 downto 0) := X"FF";
    constant C_DEFAULT_BG : std_logic_vector(7 downto 0) := X"00";
 
-   type t_scr is array (0 to 2047) of std_logic_vector(31 downto 0);
-   signal scr : t_scr := (others => (others => '0'));
-
-   -- The copy of the screen must be block RAM, whose ports are clocked by
-   -- their own clocks: distributed RAM would read it on the write clock.
-   attribute ram_style : string;
-   attribute ram_style of scr : signal is "block";
-
    -- Stage 0
    signal pix_x    : std_logic_vector(10 downto 0);
    signal pix_y    : std_logic_vector(10 downto 0);
@@ -112,7 +105,7 @@ architecture synthesis of text is
    signal vs_2     : std_logic := not G_MODE.sync_active;
    signal vis_2    : std_logic := '0';
    signal text_2   : std_logic := '0';
-   signal word_2   : std_logic_vector(31 downto 0) := (others => '0');
+   signal word_2   : std_logic_vector(31 downto 0);
    signal line_2   : std_logic_vector(4 downto 0) := (others => '0');
    signal col_2    : std_logic_vector(3 downto 0) := (others => '0');
 
@@ -141,18 +134,20 @@ begin
 
 
    ---------------------------------------------------------------------------
-   -- The copy of the screen. Port A writes in the system clock domain, and
-   -- port B reads in the VGA clock domain.
+   -- The copy of the screen. It is written in the system clock domain, and
+   -- read in the VGA clock domain, for stage 2 of the pipeline.
    ---------------------------------------------------------------------------
 
-   p_scr_write : process (clk_i)
-   begin
-      if rising_edge(clk_i) then
-         if scr_we_i = '1' then
-            scr(to_integer(scr_addr_i)) <= scr_data_i;
-         end if;
-      end if;
-   end process p_scr_write;
+   i_scr_ram : entity work.scr_ram
+      port map (
+         wr_clk_i  => clk_i,
+         wr_we_i   => scr_we_i,
+         wr_addr_i => scr_addr_i,
+         wr_data_i => scr_data_i,
+         rd_clk_i  => vga_clk_i,
+         rd_addr_i => addr_1,
+         rd_data_o => word_2
+      ); -- i_scr_ram
 
 
    ---------------------------------------------------------------------------
@@ -195,8 +190,7 @@ begin
          line_1 <= y_v(4 downto 0);
          col_1  <= x_v(3 downto 0);
 
-         -- Stage 2
-         word_2 <= scr(to_integer(addr_1));
+         -- Stage 2. word_2 is read by i_scr_ram.
          hs_2   <= hs_1;
          vs_2   <= vs_1;
          vis_2  <= vis_1;

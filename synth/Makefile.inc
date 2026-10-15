@@ -25,6 +25,7 @@ SRC += ../common/clk_rst.vhd
 SRC += ../../src/video/video_pkg.vhd
 SRC += ../../src/video/font_pkg.vhd
 SRC += ../../src/video/pix.vhd
+SRC += ../../src/video/scr_ram.vhd
 SRC += ../../src/video/text.vhd
 SRC += ../common/hdmi/types_pkg.vhd
 SRC += ../common/hdmi/sync_reg.vhd
