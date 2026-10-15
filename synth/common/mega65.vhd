@@ -109,8 +109,9 @@ architecture synthesis of mega65 is
    -- The TMDS symbols of the three HDMI data channels
    signal hdmi_tmds : slv_9_0_t(0 to 2);
 
-   -- The registers of the outputs to the DAC, in the IOBs. keep stops
-   -- synthesis from merging equal colour registers.
+   -- The registers of the outputs to the DAC, in the IOBs (IOB TRUE on their
+   -- ports, in common.xdc). keep stops synthesis from merging equal colour
+   -- registers, which could then not all be in the IOBs.
    signal vdac_red_r   : std_logic_vector(7 downto 0);
    signal vdac_green_r : std_logic_vector(7 downto 0);
    signal vdac_blue_r  : std_logic_vector(7 downto 0);
@@ -121,13 +122,6 @@ architecture synthesis of mega65 is
    attribute keep of vdac_red_r   : signal is "true";
    attribute keep of vdac_green_r : signal is "true";
    attribute keep of vdac_blue_r  : signal is "true";
-
-   attribute iob : string;
-   attribute iob of vdac_red_r   : signal is "true";
-   attribute iob of vdac_green_r : signal is "true";
-   attribute iob of vdac_blue_r  : signal is "true";
-   attribute iob of vdac_hs_r    : signal is "true";
-   attribute iob of vdac_vs_r    : signal is "true";
 
 begin
 
