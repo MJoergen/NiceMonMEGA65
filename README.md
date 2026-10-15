@@ -62,9 +62,9 @@ or, in an existing clone:
     git submodule update --init
 
 `make` in the top directory lists the targets: `make test` runs the
-simulation tests, `make lint` checks the VHDL style, `make examples` builds the C examples, `make r3` and
-`make r6` build the bitstreams, and `make load FILE=prog.bin` loads a
-program into the MEGA65 and starts it.
+simulation tests, `make lint` checks the VHDL style, `make examples` builds
+the C examples, `make r3` and `make r6` build the bitstreams, and
+`make load FILE=prog.bin` loads a program into the MEGA65 and starts it.
 
 ## Using it
 
