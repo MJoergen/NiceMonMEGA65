@@ -12,7 +12,7 @@ interpreter on the UART like the one in
 | Path | What it is |
 |---|---|
 | [nice_cpu/](https://github.com/MJoergen/nice_cpu) | The NICE CPU, its assembler, and its emulator, as a git submodule. |
-| [src/](src/) | The synthesisable VHDL, shared by both boards. `nicemon.vhd` is the system: the NICE core, the memory, the UART, and the command line interpreter. `uart_serdes.vhd`, `line_buffer.vhd` and `cmd.vhd` are copied from cmod-s7; `cmd.vhd` prints `NICE` instead of `WBUS` at reset. |
+| [src/](src/) | The synthesisable VHDL, shared by both boards. `nicemon.vhd` is the system: the NICE core, the memory, the UART, and the command line interpreter. `uart_serdes.vhd` (with fixes to its receiver), `line_buffer.vhd` and `cmd.vhd` are copied from cmod-s7; `cmd.vhd` prints `NICE` instead of `WBUS` at reset. |
 | [sim/](sim/) | The GHDL testbenches. |
 | [synth/](synth/README.md) | The Vivado builds for the R3 and R6 boards. |
 | [monitor/](monitor/README.md) | The monitor, in NICE assembly. |

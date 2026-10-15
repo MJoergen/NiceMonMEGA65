@@ -12,7 +12,9 @@
 -- 4. Start the core. It prints "Hello, NICE!" and halts, and the CLI gets
 --    the UART back: the control register shows the halted flag.
 -- 5. Hold the core, load G_ECHO_FILE, and start it. It echoes the bytes it
---    receives until a '.', which checks the UART input of the core.
+--    receives until a '.', which checks the UART input of the core: every
+--    byte from 0x80 to 0xFF, and a byte with a bad stop bit, which must be
+--    dropped without losing the bytes after it.
 -- 6. Hold the core, load G_FIFO_FILE, and start it. It waits before it
 --    echoes, so the 17 bytes sent meanwhile pile up in the core's input
 --    FIFO. The FIFO keeps the first 16 and loses the 17th, so a '.' sent
@@ -49,9 +51,7 @@ architecture simulation of tb_nicemon is
 
    constant C_CLOCK_HZ : natural := 100_000_000;
    constant C_BAUDRATE : natural := 10_000_000;
-   -- uart_serdes counts G_DIVISOR down to 0, so a bit takes G_DIVISOR + 1
-   -- clock cycles.
-   constant C_BIT_TIME : time    := (C_CLOCK_HZ / C_BAUDRATE + 1) * 10 ns;
+   constant C_BIT_TIME : time    := (C_CLOCK_HZ / C_BAUDRATE) * 10 ns;
    -- Longer than the slowest answer
    constant C_TIMEOUT  : time    := 1 ms;
 
@@ -114,19 +114,26 @@ begin
    p_main : process
       variable pos_v : natural := 0;
 
-      procedure send(s : string) is
+      -- Sends one byte, with the stop bit given.
+      procedure send_byte(c : character; stop_bit : std_logic := '1') is
          variable byte_v : std_logic_vector(7 downto 0);
       begin
+         byte_v  := to_slv(character'pos(c), 8);
+         uart_rx <= '0';
+         wait for C_BIT_TIME;
+         for b in 0 to 7 loop
+            uart_rx <= byte_v(b);
+            wait for C_BIT_TIME;
+         end loop;
+         uart_rx <= stop_bit;
+         wait for C_BIT_TIME;
+         uart_rx <= '1';
+      end procedure send_byte;
+
+      procedure send(s : string) is
+      begin
          for i in s'range loop
-            byte_v  := to_slv(character'pos(s(i)), 8);
-            uart_rx <= '0';
-            wait for C_BIT_TIME;
-            for b in 0 to 7 loop
-               uart_rx <= byte_v(b);
-               wait for C_BIT_TIME;
-            end loop;
-            uart_rx <= '1';
-            wait for C_BIT_TIME;
+            send_byte(s(i));
          end loop;
       end procedure send;
 
@@ -186,6 +193,7 @@ begin
       end procedure load;
 
       variable first_v : string(1 to 8);
+      variable high_v  : string(1 to 128);
 
    begin
       rst <= '1';
@@ -216,8 +224,20 @@ begin
       assert running = '1'
          report "tb_nicemon: the core does not run"
          severity failure;
-      send("ab.");
-      expect("ab.");
+      send("ab");
+      expect("ab");
+      -- Bytes with bit 7 set
+      for i in high_v'range loop
+         high_v(i) := character'val(127 + i);
+      end loop;
+      send(high_v);
+      expect(high_v);
+      -- A byte with a bad stop bit is dropped, and the bytes right after it
+      -- arrive.
+      send_byte('x', '0');
+      wait for C_BIT_TIME;
+      send("cd.");
+      expect("cd.");
       command("R FFFFFFF0", "00000002");
 
       report "tb_nicemon: load " & G_FIFO_FILE;

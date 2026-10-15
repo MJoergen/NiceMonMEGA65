@@ -1,4 +1,8 @@
--- Copied unchanged from https://github.com/MJoergen/cmod-s7 (src/uart_serdes.vhd, commit d3d544d), MIT License.
+-- Copied from https://github.com/MJoergen/cmod-s7 (src/uart_serdes.vhd, commit d3d544d), MIT License.
+-- Changed here: the receiver forwarded bytes with bit 7 set one bit early, so
+-- they came out wrong, and passed on frames with a bad Stop bit. It now takes
+-- all ten bits and checks the Start and Stop bits, and starts a frame on a
+-- falling edge only. A bit now takes G_DIVISOR clock cycles, not G_DIVISOR + 1.
 --
 library ieee;
   use ieee.std_logic_1164.all;
@@ -39,9 +43,10 @@ architecture synthesis of uart_serdes is
   signal tx_state   : state_type                   := IDLE_ST;
   signal tx_counter : natural range 0 to G_DIVISOR;
 
-  signal rx_data    : std_logic_vector(9 downto 0);
+  signal rx_data    : std_logic_vector(10 downto 0);
   signal rx_state   : state_type                   := IDLE_ST;
   signal rx_counter : natural range 0 to G_DIVISOR;
+  signal rx_prev    : std_logic                    := '1';
 
 begin
 
@@ -63,7 +68,7 @@ begin
         when IDLE_ST =>
           if tx_valid_i = '1' then
             tx_data    <= "1" & tx_data_i & "0"; -- Stop + Data + Start
-            tx_counter <= G_DIVISOR;
+            tx_counter <= G_DIVISOR - 1;
             tx_state   <= BUSY_ST;
           end if;
 
@@ -72,7 +77,7 @@ begin
             tx_counter <= tx_counter - 1;
           else
             if or (tx_data(9 downto 1)) = '1' then
-              tx_counter <= G_DIVISOR;
+              tx_counter <= G_DIVISOR - 1;
               tx_data    <= "0" & tx_data(9 downto 1);
             else
               tx_data(0) <= '1';
@@ -97,6 +102,7 @@ begin
   rx_proc : process (clk_i)
   begin
     if rising_edge(clk_i) then
+      rx_prev <= uart_rx_i;
       if rx_ready_i = '1' then
         rx_valid_o <= '0';
       end if;
@@ -104,26 +110,29 @@ begin
       case rx_state is
 
         when IDLE_ST =>
-          if uart_rx_i = '0' then
-            rx_data    <= (others => '1');
-            rx_data(9) <= uart_rx_i;
-            rx_counter <= G_DIVISOR / 2;
-            rx_state   <= BUSY_ST;
+          -- A falling edge, so that a Stop bit that was low is not taken as a Start bit.
+          if rx_prev = '1' and uart_rx_i = '0' then
+            rx_data     <= (others => '1');
+            rx_data(10) <= '0';          -- Marker: reaches bit 0 after ten samples
+            rx_counter  <= G_DIVISOR / 2;
+            rx_state    <= BUSY_ST;
           end if;
 
         when BUSY_ST =>
           if rx_counter > 0 then
             rx_counter <= rx_counter - 1;
           else
-            rx_counter <= G_DIVISOR;
-            rx_data    <= uart_rx_i & rx_data(9 downto 1);
+            rx_counter <= G_DIVISOR - 1;
+            rx_data    <= uart_rx_i & rx_data(10 downto 1);
           end if;
 
-          if rx_data(0) = '0' and rx_data(9) = '1' then
-            -- Only forward if Stop bit is correct.
-            rx_data_o  <= rx_data(8 downto 1);
-            rx_valid_o <= '1';
-            rx_state   <= IDLE_ST;
+          if rx_data(0) = '0' then
+            -- Start + 8 data + Stop sampled. Only forward if Start and Stop are correct.
+            if rx_data(1) = '0' and rx_data(10) = '1' then
+              rx_data_o  <= rx_data(9 downto 2);
+              rx_valid_o <= '1';
+            end if;
+            rx_state <= IDLE_ST;
           end if;
 
       end case;
