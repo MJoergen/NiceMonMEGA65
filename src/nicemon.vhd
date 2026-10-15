@@ -95,6 +95,7 @@
 library ieee;
    use ieee.std_logic_1164.all;
    use ieee.numeric_std_unsigned.all;
+   use ieee.numeric_std.all;
 
 library work;
    use work.trace_pkg.all;
@@ -513,7 +514,7 @@ begin
          elsif addr = C_HALT_WHY and cli then
             -- The core keeps the reason until it is reset.
             if we = '0' then
-               rd_io(2 downto 0) <= to_slv(t_halt'pos(cpu_retire.halt), 3);
+               rd_io(2 downto 0) <= std_logic_vector(to_unsigned(t_halt'pos(cpu_retire.halt), 3));
             end if;
          end if;
          if cli then
