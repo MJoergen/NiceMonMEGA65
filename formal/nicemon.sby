@@ -1,0 +1,42 @@
+# The whole system (formal_nicemon.vhd), with the checks of nicemon.vhd. It
+# is too large for k-induction, so "run" and "cli" check every cycle up to
+# their depth: "run" with the core running from reset, "cli" with the CLI
+# in charge first. "cover" reaches each cover statement.
+
+[tasks]
+run
+cli
+cover
+
+[options]
+run: mode bmc
+run: depth 30
+cli: mode bmc
+cli: depth 40
+cover: mode cover
+cover: depth 40
+
+[engines]
+smtbmc yices
+
+[script]
+plugin -i ghdl
+run: ghdl --std=08 -fpsl -gG_CPU_RUN_AT_RESET=true trace_pkg.vhd multicycle.vhd mpu.vhd perf.vhd timer.vhd uart_serdes.vhd line_buffer.vhd cmd.vhd rx_fifo.vhd ram.vhd rom.vhd nicemon.vhd formal_nicemon.vhd -e formal_nicemon
+cli: ghdl --std=08 -fpsl -gG_CPU_RUN_AT_RESET=false trace_pkg.vhd multicycle.vhd mpu.vhd perf.vhd timer.vhd uart_serdes.vhd line_buffer.vhd cmd.vhd rx_fifo.vhd ram.vhd rom.vhd nicemon.vhd formal_nicemon.vhd -e formal_nicemon
+cover: ghdl --std=08 -fpsl -gG_CPU_RUN_AT_RESET=true trace_pkg.vhd multicycle.vhd mpu.vhd perf.vhd timer.vhd uart_serdes.vhd line_buffer.vhd cmd.vhd rx_fifo.vhd ram.vhd rom.vhd nicemon.vhd formal_nicemon.vhd -e formal_nicemon
+prep -top formal_nicemon
+
+[files]
+../nice_cpu/hdl/src/trace_pkg.vhd
+../nice_cpu/hdl/src/multicycle.vhd
+../nice_cpu/hdl/src/mpu.vhd
+../nice_cpu/hdl/src/perf.vhd
+../nice_cpu/hdl/src/timer.vhd
+../src/uart_serdes.vhd
+../src/line_buffer.vhd
+../src/cmd.vhd
+../src/rx_fifo.vhd
+../src/ram.vhd
+../src/rom.vhd
+../src/nicemon.vhd
+formal_nicemon.vhd

@@ -1,0 +1,25 @@
+# The core's input FIFO, src/rx_fifo.vhd (formal_rx_fifo.vhd). "prove"
+# proves the assertions for every cycle by k-induction, and "cover" reaches
+# each cover statement.
+
+[tasks]
+prove
+cover
+
+[options]
+prove: mode prove
+prove: depth 20
+cover: mode cover
+cover: depth 40
+
+[engines]
+smtbmc yices
+
+[script]
+plugin -i ghdl
+ghdl --std=08 -fpsl rx_fifo.vhd formal_rx_fifo.vhd -e formal_rx_fifo
+prep -top formal_rx_fifo
+
+[files]
+../src/rx_fifo.vhd
+formal_rx_fifo.vhd
