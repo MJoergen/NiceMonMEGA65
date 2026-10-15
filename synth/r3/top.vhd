@@ -19,6 +19,9 @@ entity top is
 
       uart_rxd_i         : in  std_logic;
       uart_txd_o         : out std_logic;
+      kb_io0_o           : out std_logic;
+      kb_io1_o           : out std_logic;
+      kb_io2_i           : in  std_logic;
       led_o              : out std_logic
    );
 end entity top;
@@ -52,6 +55,9 @@ begin
          reset_button_i => not reset_button_n,
          uart_rxd_i     => uart_rxd_i,
          uart_txd_o     => uart_txd_o,
+         kb_io0_o       => kb_io0_o,
+         kb_io1_o       => kb_io1_o,
+         kb_io2_i       => kb_io2_i,
          led_o          => led_o
       ); -- i_mega65
 

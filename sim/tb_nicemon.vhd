@@ -38,6 +38,10 @@
 -- 12. Load G_EOF_FILE, and run it. It echoes its input until the input ends,
 --    which a break on the UART does, and halts with 0x200 in R1. A break
 --    while the CLI has the UART is ignored.
+-- 13. The keyboard input, a stream of bytes as kbd_ascii.vhd sends them: a
+--    command for the CLI, typed on the keyboard, and G_FIFO_FILE again,
+--    with more bytes typed than its FIFO holds. None is lost, for the
+--    keyboard waits.
 --
 -- The core's input FIFO has 16 bytes here, so that step 6 is short.
 --
@@ -82,6 +86,10 @@ architecture simulation of tb_nicemon is
    signal uart_tx : std_logic;
    signal running : std_logic;
 
+   signal kbd_valid : std_logic := '0';
+   signal kbd_ready : std_logic;
+   signal kbd_data  : std_logic_vector(7 downto 0) := X"00";
+
    signal rx_str : string(1 to 4096);
    signal rx_len : natural := 0;
 
@@ -102,11 +110,14 @@ begin
          G_RX_FIFO_BITS  => 4
       )
       port map (
-         clk_i      => clk,
-         rst_i      => rst,
-         uart_rxd_i => uart_rx,
-         uart_txd_o => uart_tx,
-         running_o  => running
+         clk_i       => clk,
+         rst_i       => rst,
+         uart_rxd_i  => uart_rx,
+         uart_txd_o  => uart_tx,
+         kbd_valid_i => kbd_valid,
+         kbd_ready_o => kbd_ready,
+         kbd_data_i  => kbd_data,
+         running_o   => running
       ); -- i_nicemon
 
 
@@ -163,6 +174,21 @@ begin
             send_byte(s(i));
          end loop;
       end procedure send;
+
+      -- Types s on the keyboard: each byte waits until it is taken.
+      procedure kbd_send(s : string) is
+      begin
+         for i in s'range loop
+            wait until rising_edge(clk);
+            kbd_data  <= to_slv(character'pos(s(i)), 8);
+            kbd_valid <= '1';
+            loop
+               wait until rising_edge(clk);
+               exit when kbd_ready = '1';
+            end loop;
+            kbd_valid <= '0';
+         end loop;
+      end procedure kbd_send;
 
       -- The next characters of the UART output must be s.
       procedure expect(s : string) is
@@ -347,6 +373,18 @@ begin
       expect(C_HALT);
       command("R FFFFFFE1", "00000200");     -- R1, the end of the input
       send_break;                            -- the CLI's, so ignored
+      command("R FFFFFFF0", "00000002");
+
+      report "tb_nicemon: the keyboard";
+      command("W FFFFFFF0 00000001", "OK");
+      kbd_send("R FFFFFFF0" & C_CR);
+      expect("00000001" & C_CRLF);
+      load(G_FIFO_FILE, first_v);
+      kbd_send("W FFFFFFF0 00000000" & C_CR);
+      expect("OK" & C_CRLF);
+      kbd_send("0123456789abcdefXYZ.");
+      expect("0123456789abcdefXYZ.");
+      expect(C_HALT);
       command("R FFFFFFF0", "00000002");
 
       report "tb_nicemon: PASS";

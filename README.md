@@ -12,7 +12,7 @@ interpreter on the UART like the one in
 | Path | What it is |
 |---|---|
 | [nice_cpu/](https://github.com/MJoergen/nice_cpu) | The NICE CPU, its assembler, and its emulator, as a git submodule. |
-| [src/](src/) | The synthesisable VHDL, shared by both boards. `nicemon.vhd` is the system: the NICE core, the memory, the UART, and the command line interpreter. `uart_serdes.vhd` (with fixes to its receiver, and break detection), `line_buffer.vhd` and `cmd.vhd` are copied from cmod-s7; `cmd.vhd` prints `NICE` instead of `WBUS` at reset, and `HALT` when the core halts. |
+| [src/](src/) | The synthesisable VHDL, shared by both boards. `nicemon.vhd` is the system: the NICE core, the memory, the UART, and the command line interpreter. `uart_serdes.vhd` (with fixes to its receiver, and break detection), `line_buffer.vhd` and `cmd.vhd` are copied from cmod-s7; `cmd.vhd` prints `NICE` instead of `WBUS` at reset, and `HALT` when the core halts. `kbd_m65.vhd` drives the MEGA65 keyboard, and `kbd_ascii.vhd` turns its keys into ASCII. |
 | [sim/](sim/) | The GHDL testbenches. |
 | [synth/](synth/README.md) | The Vivado builds for the R3 and R6 boards. |
 | [monitor/](monitor/README.md) | The monitor, in NICE assembly. |
@@ -34,7 +34,7 @@ difference is the memory: 64K words, not 2³².
 |---|---|---|---|
 | Instruction set | ISA.md | nice_cpu's `multicycle.vhd`, which nice_cpu's tests compare with the emulator | Yes |
 | Console output, `0xFFFFFF00` | stdout | UART | Yes |
-| Console input, `0xFFFFFF00` | stdin, with bit 8 set; `0x200` at the end. A read waits for the next byte | UART, with bit 8 set, through a 2048-byte FIFO; `0x200` after a break. A read returns 0 while no byte has arrived | Yes, but bytes beyond 2048 unread ones are lost, and a program that waits for input in a loop runs more steps |
+| Console input, `0xFFFFFF00` | stdin, with bit 8 set; `0x200` at the end. A read waits for the next byte | UART and the MEGA65 keyboard, with bit 8 set, through a 2048-byte FIFO; `0x200` after a UART break. A read returns 0 while no byte has arrived | Yes, but UART bytes beyond 2048 unread ones are lost, and a program that waits for input in a loop runs more steps |
 | Math unit, `0xFFFFFF20`–`3F` | Computed on read | nice_cpu's `mpu.vhd`, which stalls the read until the result is ready | Yes |
 | Performance counters, `0xFFFFFF10`–`1F` | One cycle per step, from the start | nice_cpu's `perf.vhd`, counting clock cycles at 50 MHz, from the start of the core | Instructions yes; cycles count real clocks |
 | Instruction fetches from `0xFFFFFF00`–`FF` | Read 0 | Read 0 | Yes |
@@ -88,6 +88,29 @@ again, and `R FFFFFFF0` reads bit 0 (held) and bit 1 (halted).
 `W FFFFFFF0 00000005` clears the memory to 0 and holds the core; it answers
 `OK` when the memory is clear. When a program halts, the command line
 prints `HALT` on a line of its own, and `R FFFFFFF1` reads why it halted.
+
+### The keyboard
+
+The MEGA65's own keyboard types into the same input as the UART: what you
+type goes to the command line, or to the program while it runs, and its
+answers come out on the UART. The keys give ASCII, as a terminal sends it:
+
+| Key | Byte |
+|---|---|
+| Letters, digits, symbols | Their ASCII; SHIFT or CAPS LOCK for capitals |
+| RETURN | CR |
+| INST/DEL | DEL (`0x7F`) |
+| RUN/STOP | CTRL-C (`0x03`) |
+| ESC, TAB | ESC, TAB |
+| Cursor keys | `ESC [ A` to `ESC [ D`, as ANSI terminals send them |
+| CTRL with a letter | Its control code |
+| £, ↑, ← | `\`, `^`, `_` (`\|`, `~`, `` ` `` with SHIFT) |
+| SHIFT with `0`, `=`, `:`, `;` | `{`, `}`, `[`, `]` |
+
+A held key repeats after half a second, 20 times a second. The function
+keys, HELP, CLR/HOME, and the modifiers give nothing. The command line
+takes only capital `R` and `W`. The keyboard's drive LED is green while the
+core runs, like the user LED.
 
 ### Running a program
 
@@ -187,7 +210,7 @@ The command line and the core's data accesses see the same addresses.
 |---|---|
 | `0x00000000`–`0xFFFFFFFF` | Memory, where no register below is: 64K words of block RAM, repeated through the address space. So the runtime's stack below `0xFFFFFF00` lands in the top of it, and so do the words of `0xFFFFFF00`–`FF` that are not registers. |
 | `0xFFFF0000`–`0xFFFF07FF` | The screen: 2048 words of memory of their own, the emulator's 80×25 screen and a little more. Nothing displays it, but `R` reads it. |
-| `0xFFFFFF00` | The UART, as the console of ISA.md §8.3. A write sends bits 7..0. A read takes the oldest received byte and returns it in bits 7..0 with bit 8 set, or 0 when no byte has arrived. A break on the UART ends the input: once the bytes before it are read, a read returns `0x200` (bit 9), as at the end of the emulator's input, until the core is started again. |
+| `0xFFFFFF00` | The console of ISA.md §8.3. A write sends bits 7..0 to the UART. A read takes the oldest byte received from the UART or the keyboard, and returns it in bits 7..0 with bit 8 set, or 0 when no byte has arrived. A break on the UART ends the input: once the bytes before it are read, a read returns `0x200` (bit 9), as at the end of the emulator's input, until the core is started again. |
 | `0xFFFFFF01` | The emulator's read counter. A read by the core returns the number of its reads since the last write, and a write sets that number. A read with `R` does not count. It is 0 when the core starts. |
 | `0xFFFFFF10`–`0xFFFFFF1F` | The performance counters of ISA.md §8.5: cycles and instructions, 64 bits each. |
 | `0xFFFFFF20`–`0xFFFFFF3F` | The math unit of ISA.md §8.4: 32-bit multiply and divide, and 64-bit divide. |
@@ -197,9 +220,10 @@ The command line and the core's data accesses see the same addresses.
 
 Instruction fetches from `0xFFFFFF00`–`0xFFFFFFFF` read 0, as ISA.md §8.3
 requires. The input waits for the core in a FIFO of 2048 bytes, in block
-RAM, and a byte that arrives when it is full is lost, as is a byte after a
-break. A break while the command line has the UART is ignored. To end a
-program's input from a terminal, send a break: in picocom, `Ctrl-A Ctrl-\`.
+RAM. A UART byte that arrives when it is full is lost, as is a byte after a
+break; a keyboard byte waits until there is room. A break while the command
+line has the UART is ignored. To end a program's input from a terminal,
+send a break: in picocom, `Ctrl-A Ctrl-\`.
 The performance counters and the math unit are nice_cpu's own,
 `nice_cpu/hdl/src/perf.vhd` and `mpu.vhd`, the same as in the emulator.
 They are reset with the system, and each time the core starts, as the
@@ -254,9 +278,13 @@ You need GHDL (tested with 4.1.0) and Python 3.
   message, the halt reason and the step count, which must equal niceemu's,
   clearing the memory, `reserved.nasm` of the emulator's tests, which
   halts on a reserved control word, and `sim/eof.nasm`, which echoes its
-  input until a break ends it. The input FIFO has 16 bytes there, so that
-  the test of a full FIFO is short.
-- `make test` also checks that GHDL can synthesise the system.
+  input until a break ends it. Last it types a command and input for
+  `sim/fifo.nasm` on the keyboard input. The input FIFO has 16 bytes
+  there, so that the test of a full FIFO is short.
+- `sim/tb_kbd.vhd` tests the keyboard driver and its ASCII, with a model of
+  the keyboard.
+- `make test` also checks that GHDL can synthesise the system and the
+  keyboard.
 - `make lint` checks the VHDL against [CODING_STYLE.md](CODING_STYLE.md)
   with vsg.
 

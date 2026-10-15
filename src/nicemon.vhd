@@ -1,6 +1,7 @@
 -- The NiceMon system: the NICE core, its memory and I/O, and the command line
 -- interpreter (CLI) on the UART. It is the same for every board. The board's
--- top level gives it a clock, a reset, and the UART pins.
+-- top level gives it a clock, a reset, the UART pins, and optionally a
+-- keyboard: a stream of bytes that is input like the UART's.
 --
 -- THEORY OF OPERATION
 -- The core (nice_cpu/hdl/src/multicycle.vhd) has an instruction bus and a
@@ -23,20 +24,21 @@
 --                          that the emulator's 80x25 screen, the first 2000,
 --                          does not land on word 0. Nothing displays it, but
 --                          the CLI can read it.
---   0xFFFFFF00             The UART, as the console of ISA.md §8.3. A write
---                          sends bits 7..0. It waits while the previous byte
---                          is still waiting to be sent. A read by the core
---                          takes the oldest received byte, and returns it in
---                          bits 7..0 with bit 8 set, or 0 when no byte has
---                          arrived. The core's input waits in a FIFO of
---                          2^G_RX_FIFO_BITS bytes, in block RAM, and a byte
---                          that arrives when it is full is lost. A break on
---                          the UART, a frame of ten 0 bits, ends the input,
---                          as the end of the emulator's input does: once the
---                          FIFO is empty, a read returns 0x200 (bit 9), and
---                          bytes after the break are dropped. A break while
---                          the CLI has the UART is ignored. A read by the
---                          CLI returns 0 and takes nothing.
+--   0xFFFFFF00             The console of ISA.md §8.3. A write sends bits
+--                          7..0 to the UART. It waits while the previous
+--                          byte is still waiting to be sent. A read by the
+--                          core takes the oldest byte received from the UART
+--                          or the keyboard, and returns it in bits 7..0 with
+--                          bit 8 set, or 0 when no byte has arrived. The
+--                          core's input waits in a FIFO of 2^G_RX_FIFO_BITS
+--                          bytes, in block RAM, and a UART byte that arrives
+--                          when it is full is lost. A break on the UART, a
+--                          frame of ten 0 bits, ends the input, as the end
+--                          of the emulator's input does: once the FIFO is
+--                          empty, a read returns 0x200 (bit 9), and bytes
+--                          after the break are dropped. A break while the
+--                          CLI has the UART is ignored. A read by the CLI
+--                          returns 0 and takes nothing.
 --   0xFFFFFF01             The read counter of the emulator: a read by the
 --                          core returns the number of its reads since the
 --                          last write, and a write sets that number. A read
@@ -65,7 +67,10 @@
 --
 -- The core runs when the control bit is 0. While it runs and has not halted,
 -- the UART input goes to the core, at 0xFFFFFF00. Otherwise it goes to the
--- CLI. So the CLI loads a program with W commands, starts it with
+-- CLI. The keyboard's bytes join the UART's: they go the same way, and
+-- nothing after the merge tells them apart. A received UART byte goes first.
+-- Unlike a UART byte, a keyboard byte is not lost when the core's FIFO is
+-- full: it waits until there is room. So the CLI loads a program with W commands, starts it with
 -- "W FFFFFFF0 00000000", and gets the UART back when the program halts. A
 -- command line should end with CR alone: a LF after the CR of the line that
 -- starts the core reaches the program. The CLI's output goes out before the
@@ -111,12 +116,16 @@ entity nicemon is
       G_CPU_RUN_AT_RESET : boolean := false
    );
    port (
-      clk_i      : in  std_logic;
-      rst_i      : in  std_logic;
-      uart_rxd_i : in  std_logic;
-      uart_txd_o : out std_logic;
+      clk_i       : in  std_logic;
+      rst_i       : in  std_logic;
+      uart_rxd_i  : in  std_logic;
+      uart_txd_o  : out std_logic;
+      -- The keyboard's bytes, input like the UART's
+      kbd_valid_i : in  std_logic := '0';
+      kbd_ready_o : out std_logic;
+      kbd_data_i  : in  std_logic_vector(7 downto 0) := X"00";
       -- '1' while the core runs and owns the UART input
-      running_o  : out std_logic
+      running_o   : out std_logic
    );
 end entity nicemon;
 
@@ -267,6 +276,12 @@ architecture synthesis of nicemon is
    signal ser_tx_valid : std_logic;
    signal ser_tx_ready : std_logic;
    signal ser_tx_data  : std_logic_vector(7 downto 0);
+
+   -- The input, from the UART or the keyboard
+   signal kbd_take : std_logic;
+   signal in_valid : std_logic;
+   signal in_data  : std_logic_vector(7 downto 0);
+   signal rx_full  : std_logic;
 
    signal lb_rx_valid : std_logic;
    signal lb_rx_ready : std_logic;
@@ -634,15 +649,15 @@ begin
 
    -- A byte for the core goes into its FIFO, unless the FIFO is full or the
    -- input has ended.
-   rx_we <= '1' when ser_rx_valid = '1' and uart_owner_cpu = '1' and rx_eof = '0' and
-                     rx_wr - rx_rd /= C_RX_FIFO_LEN else
+   rx_we <= '1' when in_valid = '1' and uart_owner_cpu = '1' and rx_eof = '0' and
+                     rx_full = '0' else
             '0';
 
    p_rx_fifo : process (clk_i)
    begin
       if rising_edge(clk_i) then
          if rx_we = '1' then
-            rx_fifo(to_integer(rx_wr(C_RX_FIFO_BITS - 1 downto 0))) <= ser_rx_data;
+            rx_fifo(to_integer(rx_wr(C_RX_FIFO_BITS - 1 downto 0))) <= in_data;
          end if;
          rx_q <= rx_fifo(to_integer(rx_rd(C_RX_FIFO_BITS - 1 downto 0)));
       end if;
@@ -753,7 +768,16 @@ begin
    ser_tx_data  <= lb_tx_data when lb_tx_valid = '1' else cpu_tx_data;
    lb_tx_ready  <= ser_tx_ready;
 
-   lb_rx_valid  <= ser_rx_valid and not uart_owner_cpu;
+   -- The input: a UART byte, or else a keyboard byte, which is taken only
+   -- when it has room.
+   rx_full  <= '1' when rx_wr - rx_rd = C_RX_FIFO_LEN else '0';
+   kbd_take <= kbd_valid_i and not ser_rx_valid and
+               ((uart_owner_cpu and not rx_full) or (not uart_owner_cpu and lb_rx_ready));
+   in_valid <= ser_rx_valid or kbd_take;
+   in_data  <= ser_rx_data when ser_rx_valid = '1' else kbd_data_i;
+
+   kbd_ready_o  <= kbd_take;
+   lb_rx_valid  <= in_valid and not uart_owner_cpu;
    ser_rx_ready <= '1' when uart_owner_cpu = '1' else lb_rx_ready;
 
    i_line_buffer : entity work.line_buffer
@@ -765,7 +789,7 @@ begin
          rst_i             => rst_i,
          rx_ready_o        => lb_rx_ready,
          rx_valid_i        => lb_rx_valid,
-         rx_data_i         => ser_rx_data,
+         rx_data_i         => in_data,
          tx_ready_i        => lb_tx_ready,
          tx_valid_o        => lb_tx_valid,
          tx_data_o         => lb_tx_data,

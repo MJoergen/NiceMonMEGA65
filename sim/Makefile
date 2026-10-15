@@ -5,8 +5,10 @@
 #             and runs them:
 #             tb_hello    the core alone. The console output must equal
 #                         hello.expected.
-#             tb_nicemon  the whole system, driven through its UART. It
-#                         also runs reserved.nasm of the emulator's tests.
+#             tb_nicemon  the whole system, driven through its UART and
+#                         its keyboard input. It also runs reserved.nasm
+#                         of the emulator's tests.
+#             tb_kbd      the keyboard driver and its ASCII mapping.
 #             It also checks that GHDL can synthesise the system.
 # make clean  removes build/.
 
@@ -20,8 +22,9 @@ GHDLFLAGS = --std=08 --workdir=.
 
 NICE_SOURCES = $(NICE)/hdl/src/trace_pkg.vhd $(NICE)/hdl/src/multicycle.vhd $(NICE)/hdl/src/mpu.vhd \
                $(NICE)/hdl/src/perf.vhd $(NICE)/hdl/sim/wb_mem.vhd
-SRC_SOURCES  = ../src/uart_serdes.vhd ../src/line_buffer.vhd ../src/cmd.vhd ../src/ram.vhd ../src/nicemon.vhd
-SOURCES      = $(SRC_SOURCES) tb_hello.vhd tb_nicemon.vhd
+SRC_SOURCES  = ../src/uart_serdes.vhd ../src/line_buffer.vhd ../src/cmd.vhd ../src/ram.vhd ../src/nicemon.vhd \
+               ../src/kbd_m65.vhd ../src/kbd_ascii.vhd
+SOURCES      = $(SRC_SOURCES) tb_hello.vhd tb_nicemon.vhd tb_kbd.vhd
 
 .PHONY: test analyse synth clean
 
@@ -34,11 +37,16 @@ test: analyse synth $(BUILD)/hello.bin $(BUILD)/echo.bin $(BUILD)/fifo.bin $(BUI
 	@(cd $(BUILD) && $(GHDL) --elab-run $(GHDLFLAGS) tb_nicemon \
 	  -gG_HELLO_FILE=hello.bin -gG_ECHO_FILE=echo.bin -gG_FIFO_FILE=fifo.bin -gG_DEVICES_FILE=devices.bin -gG_EMU_FILE=emu.bin -gG_RESERVED_FILE=reserved.bin -gG_EOF_FILE=eof.bin > tb_nicemon.log 2>&1) && \
 	  echo "PASS tb_nicemon" || (echo "FAIL tb_nicemon"; cat $(BUILD)/tb_nicemon.log; exit 1)
+	@(cd $(BUILD) && $(GHDL) --elab-run $(GHDLFLAGS) tb_kbd > tb_kbd.log 2>&1) && \
+	  echo "PASS tb_kbd" || (echo "FAIL tb_kbd"; cat $(BUILD)/tb_kbd.log; exit 1)
 
-# Checks that GHDL can synthesise the system, as nice_cpu does for its core.
+# Checks that GHDL can synthesise the system and the keyboard, as nice_cpu
+# does for its core.
 synth: analyse
-	@(cd $(BUILD) && $(GHDL) --synth $(GHDLFLAGS) -gG_CLOCK_HZ=50000000 nicemon > nicemon_synth.vhd 2> nicemon_synth.log) && \
-	  echo "PASS synth nicemon" || (echo "FAIL synth nicemon"; cat $(BUILD)/nicemon_synth.log; exit 1)
+	@for e in nicemon kbd_m65 kbd_ascii; do \
+	  (cd $(BUILD) && $(GHDL) --synth $(GHDLFLAGS) -gG_CLOCK_HZ=50000000 $$e > $${e}_synth.vhd 2> $${e}_synth.log) && \
+	  echo "PASS synth $$e" || (echo "FAIL synth $$e"; cat $(BUILD)/$${e}_synth.log; exit 1) || exit 1; \
+	done
 
 analyse: | $(BUILD)
 	@cd $(BUILD) && $(GHDL) -a $(GHDLFLAGS) $(addprefix ../,$(NICE_SOURCES) $(SOURCES))

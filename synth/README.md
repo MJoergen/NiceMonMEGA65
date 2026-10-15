@@ -10,7 +10,8 @@ on the same pins. They differ in the reset button:
 | [r6/](r6/) | MEGA65 R6 | The reset button, wired to the FPGA. |
 
 [common/](common/) holds what the boards share: the clock and reset (an MMCM
-makes the 50 MHz system clock), the UART synchroniser, and the constraints
+makes the 50 MHz system clock), the UART synchroniser, the keyboard (on the
+same three pins on both boards; the MAX10 of the R3 is not involved), and the constraints
 for timing and configuration. The pins come from MiSTer2MEGA65.
 
 To build, with Vivado installed in `/opt/Xilinx/2025.1/Vivado` (or set
