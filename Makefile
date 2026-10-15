@@ -4,7 +4,7 @@
 PYTHON ?= python3
 PORT   ?= /dev/ttyUSB1
 
-.PHONY: help test examples r3 r6 load clean
+.PHONY: help test examples r3 r6 load hwtest clean
 
 help:
 	@echo "Targets:"
@@ -14,6 +14,8 @@ help:
 	@echo "  make r6         build the bitstream for the MEGA65 R6 (needs Vivado)"
 	@echo "  make load FILE=prog.bin [PORT=/dev/ttyUSB1]"
 	@echo "                  load a program into the MEGA65 and start it"
+	@echo "  make hwtest [BIT=synth/r6/build/top.bit] [PORT=/dev/ttyUSB1]"
+	@echo "                  program the MEGA65 and test it (needs m65)"
 	@echo "  make clean      remove the build output"
 
 test:
@@ -31,6 +33,11 @@ r6:
 load:
 	@test -n "$(FILE)" || (echo "Give the program with FILE=prog.bin"; exit 1)
 	$(PYTHON) tools/load.py --port $(PORT) $(FILE)
+
+BIT ?= synth/r6/build/top.bit
+
+hwtest: examples
+	$(PYTHON) tools/hwtest.py --port $(PORT) --bit $(BIT)
 
 clean:
 	$(MAKE) -C sim clean

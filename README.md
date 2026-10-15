@@ -17,7 +17,7 @@ interpreter on the UART like the one in
 | [synth/](synth/README.md) | The Vivado builds for the R3 and R6 boards. |
 | [monitor/](monitor/README.md) | The monitor, in NICE assembly. |
 | [examples/](examples/) | Example C programs, and the Makefile that builds them for the MEGA65. |
-| [tools/](tools/) | `load.py`, which loads a program into the MEGA65 through the UART. |
+| [tools/](tools/) | `load.py`, which loads a program into the MEGA65 through the UART, and `hwtest.py`, which tests the system on the board. |
 
 ## Compared with the emulator
 
@@ -213,3 +213,18 @@ You need GHDL (tested with 4.1.0) and Python 3.
 - `make test` also checks that GHDL can synthesise the system.
 
 For the boards, see [synth/](synth/README.md).
+
+## Testing the board
+
+`tools/hwtest.py` tests the system on the board itself. It programs the
+FPGA with `m65 -q` from mega65-tools and checks the `NICE` banner. Then it
+uses the command line: it runs `sim/echo.nasm`, holds and restarts the core,
+reads back what `sim/emu.nasm` leaves after its halt, and runs
+`examples/build/primes.bin`. Build the bitstream first, then:
+
+    make hwtest
+
+For the R3, give `BIT=synth/r3/build/top.bit`. A board that is already
+programmed can be tested with `tools/hwtest.py --no-program`, which skips
+the banner. The reset button is not tested: press it with a terminal open,
+and `NICE` is printed again.
