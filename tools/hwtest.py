@@ -114,6 +114,15 @@ def test_echo(fd: int, echo: str) -> None:
     os.write(fd, b"Hello, MEGA65!")
     got = drain(fd)
     check("echo while running", got == b"Hello, MEGA65!", repr(got))
+    # Bytes with bit 7 set. The core echoes far faster than they arrive, so
+    # its input FIFO does not fill up.
+    high = bytes(range(0x80, 0x100))
+    os.write(fd, high)
+    got = drain(fd)
+    bad = [f"{s:02X}->{g:02X}" for s, g in zip(high, got) if s != g]
+    check("echo of bytes 0x80 to 0xFF", got == high,
+          f"{len(got)} of {len(high)} bytes back, {len(bad)} wrong: "
+          f"{' '.join(bad[:8])}" if got != high else "")
     # While the core runs, a command is echoed and not answered.
     os.write(fd, b"R 00000000\r")
     got = drain(fd)
