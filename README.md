@@ -347,3 +347,11 @@ For the R3, give `BIT=synth/r3/build/top.bit`. A board that is already
 programmed can be tested with `tools/hwtest.py --no-program`, which skips
 the banner. The reset button is not tested: press it with a terminal open,
 and `NICE` is printed again.
+
+## License
+
+MIT, see [LICENSE](LICENSE), like the files copied from cmod-s7 and
+MandelbrotMEGA65. The exceptions are the third-party files named in
+[synth/README.md](synth/README.md): `synth/r3/max10.vhd` is GPL v3, and the
+HDMI output in `synth/common/hdmi/` is LGPL v3. The Spleen font in
+`src/video/font_pkg.vhd` is BSD 2-Clause, see `font/LICENSE.spleen`.
