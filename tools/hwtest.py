@@ -26,7 +26,7 @@ from load import open_port
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONTROL = "FFFFFFF0"
 
-results = []
+results: list[bool] = []
 
 
 def check(name: str, ok: bool, detail: str = "") -> None:
