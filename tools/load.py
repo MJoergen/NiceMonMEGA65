@@ -67,12 +67,12 @@ def main() -> None:
     parser.add_argument("file")
     args = parser.parse_args()
 
-    words = []
+    words: list[tuple[int, int]] = []
     with open(args.file) as f:
         for line in f:
             if line.strip():
-                addr, data = line.split()
-                words.append((int(addr, 16), int(data, 16)))
+                a, d = line.split()
+                words.append((int(a, 16), int(d, 16)))
 
     fd = open_port(args.port, args.baud)
     write(fd, CONTROL, 1)
