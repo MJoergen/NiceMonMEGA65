@@ -86,7 +86,7 @@ architecture synthesis of mega65 is
    signal txd_reg : std_logic := '1';
    signal led_reg : std_logic := '0';
 
-   constant C_VIDEO : video_mode_t := C_VIDEO_1280X1024;
+   constant C_VIDEO : t_video_mode := C_VIDEO_1280X1024;
 
    -- The writes to the screen, in the system clock domain
    signal scr_we   : std_logic;

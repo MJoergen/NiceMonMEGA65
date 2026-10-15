@@ -25,9 +25,11 @@ test:
 	$(MAKE) -C sim test
 
 # The VHDL of this repository, but not the nice_cpu submodule, which has its
-# own, nor the third-party max10.vhd.
+# own, nor the third-party files that keep their own style (CODING_STYLE.md):
+# synth/r3/max10.vhd and synth/common/hdmi/.
 VSG         ?= vsg
-VHDL_SOURCES = $(filter-out synth/r3/max10.vhd,$(wildcard src/*.vhd sim/*.vhd synth/*/*.vhd))
+VHDL_SOURCES = $(filter-out synth/r3/max10.vhd,$(wildcard src/*.vhd src/video/*.vhd sim/*.vhd \
+                                                          synth/common/*.vhd synth/r3/*.vhd synth/r6/*.vhd))
 
 lint:
 	$(VSG) -c vsg.yml -of syntastic -f $(VHDL_SOURCES)

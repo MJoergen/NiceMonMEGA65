@@ -1,7 +1,8 @@
 -- Copied from MandelbrotMEGA65
 -- (https://github.com/MJoergen/MandelbrotMEGA65, src/vga/video_pkg.vhd, commit
 -- a3fafd4), MIT License. Changed: the read latencies of the display memory of
--- MandelbrotMEGA65 are left out.
+-- MandelbrotMEGA65 are left out, and the layout and names follow
+-- CODING_STYLE.md.
 --
 -- This package defines the VGA video modes, i.e. the screen resolution and the
 -- timing of the VGA output signals. The board selects a video mode in its top
@@ -16,51 +17,55 @@
 -- that order, and the same for each frame.
 
 library ieee;
-use ieee.std_logic_1164.all;
+   use ieee.std_logic_1164.all;
 
 package video_pkg is
 
-   type video_mode_t is record
-      h_visible   : natural;
-      h_front     : natural;
-      h_sync      : natural;
-      h_back      : natural;
-      v_visible   : natural;
-      v_front     : natural;
-      v_sync      : natural;
-      v_back      : natural;
+   type t_video_mode is record
+      h_visible : natural;
+      h_front   : natural;
+      h_sync    : natural;
+      h_back    : natural;
+      v_visible : natural;
+      v_front   : natural;
+      v_sync    : natural;
+      v_back    : natural;
       -- The level of both sync signals during the sync pulse, i.e. '0' for
       -- negative polarity
       sync_active : std_logic;
-   end record video_mode_t;
+   end record t_video_mode;
 
+   -- Each mode is a table: the horizontal timing on one line, and the
+   -- vertical on the next.
+-- vsg_off constant_400
    -- 640x480 @ 60 Hz, pixel clock 25.175 MHz (page 17). It works fine with
    -- 25 MHz.
-   constant C_VIDEO_640X480 : video_mode_t := (
-      h_visible => 640, h_front => 16, h_sync =>  96, h_back => 48,
-      v_visible => 480, v_front => 10, v_sync =>   2, v_back => 33,
+   constant C_VIDEO_640X480 : t_video_mode := (
+      h_visible => 640, h_front => 16, h_sync => 96, h_back => 48,
+      v_visible => 480, v_front => 10, v_sync => 2, v_back => 33,
       sync_active => '0');
 
    -- 1280x1024 @ 60 Hz, pixel clock 108 MHz
-   constant C_VIDEO_1280X1024 : video_mode_t := (
+   constant C_VIDEO_1280X1024 : t_video_mode := (
       h_visible => 1280, h_front => 48, h_sync => 112, h_back => 248,
-      v_visible => 1024, v_front =>  1, v_sync =>   3, v_back =>  38,
+      v_visible => 1024, v_front => 1, v_sync => 3, v_back => 38,
       sync_active => '1');
+-- vsg_on constant_400
 
    -- The total number of pixels in a line, and of lines in a frame
-   function h_total (mode : video_mode_t) return natural;
-   function v_total (mode : video_mode_t) return natural;
+   function h_total(mode : t_video_mode) return natural;
+   function v_total(mode : t_video_mode) return natural;
 
 end package video_pkg;
 
 package body video_pkg is
 
-   function h_total (mode : video_mode_t) return natural is
+   function h_total(mode : t_video_mode) return natural is
    begin
       return mode.h_visible + mode.h_front + mode.h_sync + mode.h_back;
    end function h_total;
 
-   function v_total (mode : video_mode_t) return natural is
+   function v_total(mode : t_video_mode) return natural is
    begin
       return mode.v_visible + mode.v_front + mode.v_sync + mode.v_back;
    end function v_total;

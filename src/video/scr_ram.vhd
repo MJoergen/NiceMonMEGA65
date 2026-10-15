@@ -39,6 +39,7 @@ end entity scr_ram;
 architecture synthesis of scr_ram is
 
    type t_mem is array (0 to 2047) of std_logic_vector(31 downto 0);
+
    signal mem : t_mem := (others => (others => '0'));
 
    attribute ram_style : string;

@@ -89,6 +89,9 @@ def main():
                 continue
             picture = ''.join('#' if value >> (WIDTH-1-i) & 1 else '.' for i in range(WIDTH))
             print('      %4d => "%s",  -- %s' % (HEIGHT*c + r, format(value, '0%db' % WIDTH), picture))
+    # The comment keeps "others" out of the last glyph's group, so that the
+    # "=>" of each group line up, as vsg requires.
+    print('      -- The rest is blank')
     print('      others => (others => \'0\'));')
     print('')
     print('end package font_pkg;')

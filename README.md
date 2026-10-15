@@ -66,8 +66,11 @@ or, in an existing clone:
 
 `make` in the top directory lists the targets: `make test` runs the
 simulation tests, `make lint` checks the VHDL style, `make examples` builds
-the C examples, `make r3` and `make r6` build the bitstreams, and
-`make load FILE=prog.bin` loads a program into the MEGA65 and starts it.
+the C examples, `make r3` and `make r6` build the bitstreams,
+`make load FILE=prog.bin` loads a program into the MEGA65 and starts it,
+`make run FILE=prog.bin` runs one as `niceemu` runs it (see
+[Comparing with the emulator](#comparing-with-the-emulator)), and
+`make hwtest` tests the board (see [Testing the board](#testing-the-board)).
 
 ## Using it
 
@@ -239,7 +242,7 @@ The command line and the core's data accesses see the same addresses.
 | `0xFFFF0000`–`0xFFFF07FF` | The screen: 2048 words of memory of their own, the emulator's 80×25 screen and a little more. The first 2000 are shown on VGA and HDMI (see [The screen](#the-screen)), and `R` reads them. |
 | `0xFFFFFF00` | The console of ISA.md §8.3. A write sends bits 7..0 to the UART. A read takes the oldest byte received from the UART or the keyboard, and returns it in bits 7..0 with bit 8 set, or 0 when no byte has arrived. A break on the UART ends the input: once the bytes before it are read, a read returns `0x200` (bit 9), as at the end of the emulator's input, until the core is started again. |
 | `0xFFFFFF01` | The emulator's read counter. A read by the core returns the number of its reads since the last write, and a write sets that number. A read with `R` does not count. It is 0 when the core starts. |
-| `0xFFFFFF10`–`0xFFFFFF1F` | The performance counters of ISA.md §8.5: cycles and instructions, 64 bits each. |
+| `0xFFFFFF10`–`0xFFFFFF1F` | The performance counters of ISA.md §8.5: cycles and instructions, 64 bits each. `R` reads them as the core does: `R FFFFFF12` takes the snapshot that `R FFFFFF13` returns, where `--dump` takes none. |
 | `0xFFFFFF20`–`0xFFFFFF3F` | The math unit of ISA.md §8.4: 32-bit multiply and divide, and 64-bit divide. |
 | `0xFFFFFF40`–`0xFFFFFF4F` | The timer of ISA.md §8.6: it raises IRQ every P clock cycles, through the vector it is given. |
 | `0xFFFFFFE0`–`0xFFFFFFEF` | For the command line only: R0–R15 of the core, read only. After a halt they hold what the emulator prints. |
@@ -300,18 +303,19 @@ You need GHDL (tested with 4.1.0) and Python 3.
 - `sim/tb_hello.vhd` runs a "Hello" program on the NICE core from the
   submodule, and checks its console output.
 - `sim/tb_nicemon.vhd` drives the whole system through its UART. It loads
-  the "Hello" program with the command line, runs it, and then loads and
-  runs `sim/echo.nasm`, which echoes what it receives. Last it uses the
+  the "Hello" program with the command line and runs it, and checks the
+  halt message, the halt reason, and the step count, which must equal
+  niceemu's. Then it loads and runs `sim/echo.nasm`, which echoes what it
+  receives, and `sim/fifo.nasm`, which checks the input FIFO; the FIFO has
+  16 bytes there, so that the test of a full FIFO is short. It uses the
   math unit from the command line, and runs `sim/devices.nasm`, which uses
-  the math unit, the performance counters, and the timer's interrupts. `sim/fifo.nasm` checks the
-  input FIFO, and `sim/emu.nasm` the screen, the read counter, memory in
-  the I/O range, and the registers after a halt. It also checks the halt
-  message, the halt reason and the step count, which must equal niceemu's,
-  clearing the memory, `reserved.nasm` of the emulator's tests, which
-  halts on a reserved control word, and `sim/eof.nasm`, which echoes its
-  input until a break ends it. Last it types a command and input for
-  `sim/fifo.nasm` on the keyboard input. The input FIFO has 16 bytes
-  there, so that the test of a full FIFO is short.
+  the math unit, the performance counters, and the timer's interrupts, and
+  `sim/emu.nasm`, which checks the screen, the read counter, memory in the
+  I/O range, and the registers after a halt. It clears the memory, and runs
+  `reserved.nasm` of the emulator's tests, which halts on a reserved
+  control word, and `sim/eof.nasm`, which echoes its input until a break
+  ends it. Last it types a command and input for `sim/fifo.nasm` on the
+  keyboard input.
 - `sim/tb_kbd.vhd` tests the keyboard driver and its ASCII, with a model of
   the keyboard.
 - `sim/tb_text.vhd` fills the screen of the text display and checks every

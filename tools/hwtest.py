@@ -11,8 +11,8 @@ bytes.
 Build the bitstream and the example first, and niceemu
 (make -C nice_cpu/emulator build), or that comparison is skipped.
 
-Usage: tools/hwtest.py [--port /dev/ttyUSB1] [--bit synth/r6/build/top.bit]
-                       [--no-program]
+Usage: tools/hwtest.py [--port /dev/ttyUSB1] [--baud 115200]
+                       [--bit synth/r6/build/top.bit] [--no-program]
 
 --no-program skips m65 and the banner check, for a board that is already
 programmed and whose core is held or has halted. Only the Python standard
@@ -226,8 +226,8 @@ def main() -> None:
         reserved = assemble(f"{REPO}/nice_cpu/emulator/test/reserved.nasm",
                             tmp)
         eof = assemble(f"{REPO}/sim/eof.nasm", tmp)
-        # Every byte value, and far more input than the core's old 16-byte
-        # FIFO held
+        # Every byte value, six times over: 1536 bytes, far more than the
+        # 16-byte FIFO of the testbench holds
         text = os.path.join(tmp, "input.bin")
         with open(text, "wb") as f:
             f.write(bytes(range(256)) * 6)

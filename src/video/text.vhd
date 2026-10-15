@@ -47,7 +47,7 @@ library work;
 
 entity text is
    generic (
-      G_MODE : video_mode_t
+      G_MODE : t_video_mode
    );
    port (
       -- The writes to the screen, in the system clock domain
@@ -86,38 +86,38 @@ architecture synthesis of text is
    constant C_DEFAULT_BG : std_logic_vector(7 downto 0) := X"00";
 
    -- Stage 0
-   signal pix_x    : std_logic_vector(10 downto 0);
-   signal pix_y    : std_logic_vector(10 downto 0);
+   signal pix_x : std_logic_vector(10 downto 0);
+   signal pix_y : std_logic_vector(10 downto 0);
 
    -- Stage 1. text_1 is '1' when the pixel is in the text, addr_1 is the
    -- address of its character, and line_1 and col_1 are its row and column in
    -- the glyph.
-   signal hs_1     : std_logic := not G_MODE.sync_active;
-   signal vs_1     : std_logic := not G_MODE.sync_active;
-   signal vis_1    : std_logic := '0';
-   signal text_1   : std_logic := '0';
-   signal addr_1   : std_logic_vector(10 downto 0) := (others => '0');
-   signal line_1   : std_logic_vector(4 downto 0) := (others => '0');
-   signal col_1    : std_logic_vector(3 downto 0) := (others => '0');
+   signal hs_1   : std_logic := not G_MODE.sync_active;
+   signal vs_1   : std_logic := not G_MODE.sync_active;
+   signal vis_1  : std_logic := '0';
+   signal text_1 : std_logic := '0';
+   signal addr_1 : std_logic_vector(10 downto 0) := (others => '0');
+   signal line_1 : std_logic_vector(4 downto 0) := (others => '0');
+   signal col_1  : std_logic_vector(3 downto 0) := (others => '0');
 
    -- Stage 2
-   signal hs_2     : std_logic := not G_MODE.sync_active;
-   signal vs_2     : std_logic := not G_MODE.sync_active;
-   signal vis_2    : std_logic := '0';
-   signal text_2   : std_logic := '0';
-   signal word_2   : std_logic_vector(31 downto 0);
-   signal line_2   : std_logic_vector(4 downto 0) := (others => '0');
-   signal col_2    : std_logic_vector(3 downto 0) := (others => '0');
+   signal hs_2   : std_logic := not G_MODE.sync_active;
+   signal vs_2   : std_logic := not G_MODE.sync_active;
+   signal vis_2  : std_logic := '0';
+   signal text_2 : std_logic := '0';
+   signal word_2 : std_logic_vector(31 downto 0);
+   signal line_2 : std_logic_vector(4 downto 0) := (others => '0');
+   signal col_2  : std_logic_vector(3 downto 0) := (others => '0');
 
    -- Stage 3
-   signal hs_3     : std_logic := not G_MODE.sync_active;
-   signal vs_3     : std_logic := not G_MODE.sync_active;
-   signal vis_3    : std_logic := '0';
-   signal text_3   : std_logic := '0';
-   signal glyph_3  : std_logic_vector(C_CHAR_WIDTH - 1 downto 0) := (others => '0');
-   signal fg_3     : std_logic_vector(7 downto 0) := (others => '0');
-   signal bg_3     : std_logic_vector(7 downto 0) := (others => '0');
-   signal col_3    : std_logic_vector(3 downto 0) := (others => '0');
+   signal hs_3    : std_logic := not G_MODE.sync_active;
+   signal vs_3    : std_logic := not G_MODE.sync_active;
+   signal vis_3   : std_logic := '0';
+   signal text_3  : std_logic := '0';
+   signal glyph_3 : std_logic_vector(C_CHAR_WIDTH - 1 downto 0) := (others => '0');
+   signal fg_3    : std_logic_vector(7 downto 0) := (others => '0');
+   signal bg_3    : std_logic_vector(7 downto 0) := (others => '0');
+   signal col_3   : std_logic_vector(3 downto 0) := (others => '0');
 
    -- Stage 4
    signal hs_4     : std_logic := not G_MODE.sync_active;
@@ -182,8 +182,11 @@ begin
             vs_1 <= G_MODE.sync_active;
          end if;
          vis_1 <= '1' when pix_x < G_MODE.h_visible and pix_y < G_MODE.v_visible else '0';
-         text_1 <= '1' when pix_x >= C_X0 and pix_x < C_X0 + C_COLS * C_CHAR_WIDTH and
-                            pix_y >= C_Y0 and pix_y < C_Y0 + C_ROWS * C_CHAR_HEIGHT else '0';
+         text_1 <= '0';
+         if pix_x >= C_X0 and pix_x < C_X0 + C_COLS * C_CHAR_WIDTH and
+            pix_y >= C_Y0 and pix_y < C_Y0 + C_ROWS * C_CHAR_HEIGHT then
+            text_1 <= '1';
+         end if;
          -- row * 80 = row * 64 + row * 16
          row_v  := y_v(9 downto 5);
          addr_1 <= (row_v & "000000") + ("00" & row_v & "0000") + ("0000" & x_v(10 downto 4));

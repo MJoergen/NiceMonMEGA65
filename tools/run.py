@@ -26,10 +26,10 @@ count equals, unless the program starts the timer, which counts clock
 cycles here and steps in the emulator. But the emulator waits for each
 input byte, and the core does not: while no byte has arrived, a read
 returns 0. So a program that waits for input in a loop runs more steps
-here. The memory has 64K words,
-repeated through the address space, so a dump beyond them reads the same
-words again. --timeout gives up after SEC seconds, with exit status 3, and
-leaves the core running. Only the Python standard library is used.
+here. The memory has 64K words, repeated through the address space, so a
+dump beyond them reads the same words again. --timeout gives up after SEC
+seconds, with exit status 3, and leaves the core running. Only the Python
+standard library is used.
 """
 
 import argparse

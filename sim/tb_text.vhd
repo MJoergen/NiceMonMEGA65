@@ -30,7 +30,7 @@ end entity tb_text;
 
 architecture simulation of tb_text is
 
-   constant C_MODE : video_mode_t := C_VIDEO_1280X1024;
+   constant C_MODE : t_video_mode := C_VIDEO_1280X1024;
 
    type t_scr is array (0 to 2047) of std_logic_vector(31 downto 0);
 

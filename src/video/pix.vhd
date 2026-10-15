@@ -1,19 +1,21 @@
--- Copied unchanged from MandelbrotMEGA65
+-- Copied from MandelbrotMEGA65
 -- (https://github.com/MJoergen/MandelbrotMEGA65, src/vga/pix.vhd, commit
--- a3fafd4), MIT License.
+-- a3fafd4), MIT License. Changed: the layout and names follow
+-- CODING_STYLE.md.
 --
 -- This module generates the pixel coordinates for the video mode G_MODE (see
 -- video_pkg.vhd). The pixel (0, 0) is the top left pixel of the visible area.
 
 library ieee;
-use ieee.std_logic_1164.all;
-use ieee.numeric_std_unsigned.all;
+   use ieee.std_logic_1164.all;
+   use ieee.numeric_std_unsigned.all;
 
-use work.video_pkg.all;
+library work;
+   use work.video_pkg.all;
 
 entity pix is
    generic (
-      G_MODE : video_mode_t
+      G_MODE : t_video_mode
    );
    port (
       clk_i   : in  std_logic;
@@ -24,7 +26,7 @@ entity pix is
    );
 end entity pix;
 
-architecture structural of pix is
+architecture synthesis of pix is
 
    constant C_H_TOTAL : natural := h_total(G_MODE);
    constant C_V_TOTAL : natural := v_total(G_MODE);
@@ -35,9 +37,10 @@ architecture structural of pix is
 
 begin
 
-   assert C_H_TOTAL <= 2**11 and C_V_TOTAL <= 2**11
+   assert C_H_TOTAL <= 2 ** 11 and C_V_TOTAL <= 2 ** 11
       report "The pixel counters only support up to 2048 pixels and lines"
       severity failure;
+
 
    --------------------------------------------------
    -- Generate horizontal and vertical pixel counters
@@ -46,7 +49,7 @@ begin
    p_pix_x : process (clk_i)
    begin
       if rising_edge(clk_i) then
-         if pix_x = C_H_TOTAL-1 then
+         if pix_x = C_H_TOTAL - 1 then
             pix_x <= (others => '0');
          else
             pix_x <= pix_x + 1;
@@ -54,11 +57,12 @@ begin
       end if;
    end process p_pix_x;
 
+
    p_pix_y : process (clk_i)
    begin
       if rising_edge(clk_i) then
-         if pix_x = C_H_TOTAL-1 then
-            if pix_y = C_V_TOTAL-1 then
+         if pix_x = C_H_TOTAL - 1 then
+            if pix_y = C_V_TOTAL - 1 then
                pix_y <= (others => '0');
             else
                pix_y <= pix_y + 1;
@@ -75,4 +79,4 @@ begin
    pix_x_o <= pix_x;
    pix_y_o <= pix_y;
 
-end architecture structural;
+end architecture synthesis;

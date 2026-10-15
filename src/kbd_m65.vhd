@@ -18,10 +18,12 @@
 --   next frame.
 -- The bits from the keyboard are the key numbers of matrix_o. Keys 0 to 71
 -- are the matrix of the C64 keyboard. 72 to 78 have lines of their own: CAPS
--- LOCK (set while it is locked), the cursor up and left keys, RESTORE, and
--- copies of INST/DEL and RETURN, which also come as keys 0 and 1. As in
+-- LOCK (set while it is locked), the cursor up and left keys, RESTORE,
+-- copies of INST/DEL and RETURN, which also come as keys 0 and 1, and the
+-- line that mega65-core's driver calls fastkey. Bit 79 is not a key. As in
 -- MiSTer2MEGA65, keys 0 and 1 are taken from those copies, for the bits at
--- 0 and 1 arrive too late.
+-- 0 and 1 arrive too late. The bits from 82 on are the date and commit of
+-- the keyboard's firmware, which this driver does not take.
 --
 -- matrix_o has bit n set while key n is pressed. It changes once in each
 -- frame, after phase 79, so about every 0.45 ms.
