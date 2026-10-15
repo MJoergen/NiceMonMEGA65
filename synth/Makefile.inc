@@ -14,6 +14,7 @@ SRC  = $(NICE)/hdl/src/trace_pkg.vhd
 SRC += $(NICE)/hdl/src/multicycle.vhd
 SRC += $(NICE)/hdl/src/mpu.vhd
 SRC += $(NICE)/hdl/src/perf.vhd
+SRC += $(NICE)/hdl/src/timer.vhd
 SRC += ../../src/uart_serdes.vhd
 SRC += ../../src/line_buffer.vhd
 SRC += ../../src/cmd.vhd

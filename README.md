@@ -39,12 +39,13 @@ difference is the memory: 64K words, not 2³².
 | Console input, `0xFFFFFF00` | stdin, with bit 8 set; `0x200` at the end. A read waits for the next byte | UART and the MEGA65 keyboard, with bit 8 set, through a 2048-byte FIFO; `0x200` after a UART break. A read returns 0 while no byte has arrived | Yes, but UART bytes beyond 2048 unread ones are lost, and a program that waits for input in a loop runs more steps |
 | Math unit, `0xFFFFFF20`–`3F` | Computed on read | nice_cpu's `mpu.vhd`, which stalls the read until the result is ready | Yes |
 | Performance counters, `0xFFFFFF10`–`1F` | One cycle per step, from the start | nice_cpu's `perf.vhd`, counting clock cycles at 50 MHz, from the start of the core | Instructions yes; cycles count real clocks |
+| Timer, `0xFFFFFF40`–`4F` | Raises IRQ every P steps | nice_cpu's `timer.vhd`, raising IRQ every P clock cycles at 50 MHz | Yes, but the period counts real clocks, so the interrupts come at other steps |
 | Instruction fetches from `0xFFFFFF00`–`FF` | Read 0 | Read 0 | Yes |
 | Memory | All 2³² words, 0 at the start | 64K words, repeated through the address space; the stack at `0xFFFFFF00` lands in the top. `load.py` and `run.py` clear it to 0 before they load | No: a program, its data, and its stack must fit in 64K words |
 | Screen, `0xFFFF0000`–`07CF` | 80×25 words of memory, printed by `--screen` | 2048 words of memory of their own, read with `R`, and shown on VGA and HDMI | Yes |
 | Read counter, `0xFFFFFF01` | Counts the data reads since the last write | The same; a read by the command line does not count, as `--dump` does not | Yes |
 | The rest of `0xFFFFFF02`–`FF` | Ordinary memory for data | Memory, in the top 256 words of the RAM | Yes |
-| Interrupts | Only from `--irq` and `--nmi` | None raised | Yes: no device raises them in either |
+| Interrupts | From the timer, `--irq`, and `--nmi` | From the timer, on IRQ | Yes, for the timer's |
 | After a halt | Prints why, the steps, and the registers, and exits with a status | The command line gets the UART back and prints `HALT`; `R FFFFFFF1` reads why, the instruction counter the steps, `R FFFFFFE0` to `R FFFFFFEF` R0–R15, and `R` memory. `run.py` prints them as the emulator does, with its exit status | Yes |
 | `--dump`, `--screen`, `--input` | Options | The same options of `run.py` | Yes |
 | `--trace`, `--max-steps`, `--irq`, `--nmi` | Options | Not available | No |
@@ -240,6 +241,7 @@ The command line and the core's data accesses see the same addresses.
 | `0xFFFFFF01` | The emulator's read counter. A read by the core returns the number of its reads since the last write, and a write sets that number. A read with `R` does not count. It is 0 when the core starts. |
 | `0xFFFFFF10`–`0xFFFFFF1F` | The performance counters of ISA.md §8.5: cycles and instructions, 64 bits each. |
 | `0xFFFFFF20`–`0xFFFFFF3F` | The math unit of ISA.md §8.4: 32-bit multiply and divide, and 64-bit divide. |
+| `0xFFFFFF40`–`0xFFFFFF4F` | The timer of ISA.md §8.6: it raises IRQ every P clock cycles, through the vector it is given. |
 | `0xFFFFFFE0`–`0xFFFFFFEF` | For the command line only: R0–R15 of the core, read only. After a halt they hold what the emulator prints. |
 | `0xFFFFFFF0` | Control, for the command line only. Bit 0 holds the core in reset. Bit 1 reads the core's halted flag. A write with bit 2 set first clears the memory and the screen to 0, with the core held, and answers `OK` when it is done; then bit 0 takes effect. |
 | `0xFFFFFFF1` | For the command line only, read only: why the core halted. 0 while it has not, 1 for `HALT`, 2 for a reserved control word, 3 for `INT` inside an interrupt routine, and 4 for `RTI` outside one. |
@@ -250,13 +252,16 @@ RAM. A UART byte that arrives when it is full is lost, as is a byte after a
 break; a keyboard byte waits until there is room. A break while the command
 line has the UART is ignored. To end a program's input from a terminal,
 send a break: in picocom, `Ctrl-A Ctrl-\`.
-The performance counters and the math unit are nice_cpu's own,
-`nice_cpu/hdl/src/perf.vhd` and `mpu.vhd`, the same as in the emulator.
-They are reset with the system, and each time the core starts, as the
-emulator's are when it starts. So after a halt the instruction counter
-holds the steps that the emulator prints, as no interrupts are raised.
-They are not reset while the command line holds the core, so `R` reads
-them after a halt.
+The performance counters, the math unit, and the timer are nice_cpu's own,
+`nice_cpu/hdl/src/perf.vhd`, `mpu.vhd`, and `timer.vhd`, the same as in the
+emulator. They are reset with the system, and each time the core starts, as
+the emulator's are when it starts. So after a halt the instruction counter
+holds the steps that the emulator prints, unless the program starts the
+timer. The timer counts clock cycles, at 50 MHz, where the emulator counts
+steps, so its interrupts come at other steps, and the step counts differ.
+Its request goes straight to the core's IRQ, for it is the only device that
+raises one. They are not reset while the command line holds the core, so
+`R` reads them after a halt.
 
 ## Comparing with the emulator
 
@@ -298,7 +303,7 @@ You need GHDL (tested with 4.1.0) and Python 3.
   the "Hello" program with the command line, runs it, and then loads and
   runs `sim/echo.nasm`, which echoes what it receives. Last it uses the
   math unit from the command line, and runs `sim/devices.nasm`, which uses
-  the math unit and the performance counters. `sim/fifo.nasm` checks the
+  the math unit, the performance counters, and the timer's interrupts. `sim/fifo.nasm` checks the
   input FIFO, and `sim/emu.nasm` the screen, the read counter, memory in
   the I/O range, and the registers after a halt. It also checks the halt
   message, the halt reason and the step count, which must equal niceemu's,

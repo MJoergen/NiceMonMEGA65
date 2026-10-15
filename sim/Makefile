@@ -25,7 +25,7 @@ BUILD   = build
 GHDLFLAGS = --std=08 --workdir=.
 
 NICE_SOURCES = $(NICE)/hdl/src/trace_pkg.vhd $(NICE)/hdl/src/multicycle.vhd $(NICE)/hdl/src/mpu.vhd \
-               $(NICE)/hdl/src/perf.vhd $(NICE)/hdl/sim/wb_mem.vhd
+               $(NICE)/hdl/src/perf.vhd $(NICE)/hdl/src/timer.vhd $(NICE)/hdl/sim/wb_mem.vhd
 SRC_SOURCES  = ../src/uart_serdes.vhd ../src/line_buffer.vhd ../src/cmd.vhd ../src/ram.vhd ../src/nicemon.vhd \
                ../src/kbd_m65.vhd ../src/kbd_ascii.vhd \
                ../src/video/video_pkg.vhd ../src/video/font_pkg.vhd ../src/video/pix.vhd ../src/video/scr_ram.vhd ../src/video/text.vhd

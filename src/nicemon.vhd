@@ -49,6 +49,9 @@
 --                          (nice_cpu/hdl/src/perf.vhd).
 --   0xFFFFFF20-0xFFFFFF3F  The math unit of ISA.md §8.4
 --                          (nice_cpu/hdl/src/mpu.vhd).
+--   0xFFFFFF40-0xFFFFFF4F  The timer of ISA.md §8.6
+--                          (nice_cpu/hdl/src/timer.vhd). It counts clock
+--                          cycles, and its request goes to the core's IRQ.
 --   0xFFFFFFE0-0xFFFFFFEF  For the CLI only: R0-R15 of the core, read only,
 --                          so that they can be read after HALT, as the
 --                          emulator prints them.
@@ -80,18 +83,19 @@
 -- so that the host knows that the UART is the CLI's again.
 --
 -- The core starts as the emulator does: the read counter, the math unit,
--- and the performance counters are reset each time the control bit goes
--- to 0. So, after a halt, the instruction counter holds the number of steps
--- that the emulator prints, as no interrupt is raised.
+-- the performance counters, and the timer are reset each time the control
+-- bit goes to 0. So, after a halt, the instruction counter holds the number
+-- of steps that the emulator prints, unless the program starts the timer,
+-- whose interrupts come after clock cycles here, not after steps.
 --
 -- The data bus of the core is stalled while a CLI request waits, and while a
 -- write to the UART waits. The CLI pulses STB for one cycle and does not
 -- wait for STALL, so its request is latched and served in the next free
 -- cycle. Every request is acknowledged in the cycle after it is served,
--- except one for the MPU or the performance counters. That one is latched
--- and passed to the device, which may stall it (the MPU does while it
--- computes), and it is acknowledged in the cycle after the device's
--- acknowledge. The data bus is stalled meanwhile.
+-- except one for the MPU, the performance counters, or the timer. That one
+-- is latched and passed to the device, which may stall it (the MPU does
+-- while it computes), and it is acknowledged in the cycle after the
+-- device's acknowledge. The data bus is stalled meanwhile.
 --
 -- RESET
 -- Synchronous. After reset the control bit is 1 when G_CPU_RUN_AT_RESET is
@@ -155,8 +159,9 @@ architecture synthesis of nicemon is
    constant C_SCR_BASE : std_logic_vector(31 downto C_SCR_BITS) := X"FFFF" & "00000";
 
    -- The devices of nice_cpu/hdl/src, by the address bits above their offset
-   constant C_PERF_BASE : std_logic_vector(31 downto 4) := X"FFFFFF1";        -- 0xFFFFFF10-1F
-   constant C_MPU_BASE  : std_logic_vector(31 downto 5) := X"FFFFFF" & "001"; -- 0xFFFFFF20-3F
+   constant C_PERF_BASE  : std_logic_vector(31 downto 4) := X"FFFFFF1";        -- 0xFFFFFF10-1F
+   constant C_MPU_BASE   : std_logic_vector(31 downto 5) := X"FFFFFF" & "001"; -- 0xFFFFFF20-3F
+   constant C_TIMER_BASE : std_logic_vector(31 downto 4) := X"FFFFFF4";        -- 0xFFFFFF40-4F
 
    -- Whether an address is an I/O register, not memory, for the core or, with
    -- cli, for the CLI. The words of 0xFFFFFF00-FF that are not registers
@@ -169,8 +174,12 @@ architecture synthesis of nicemon is
       end if;
       return addr(7 downto 1) = "0000000" or                        -- console, read counter
              addr(7 downto 4) = X"1" or addr(7 downto 5) = "001" or -- perf, MPU
+             addr(7 downto 4) = X"4" or                             -- timer
              (cli and (addr(7 downto 4) = X"E" or addr(7 downto 1) = "1111000"));
    end function is_io;
+
+   -- The devices of nice_cpu/hdl/src behind the latch of the data bus
+   type t_dev is (DEV_PERF, DEV_MPU, DEV_TIMER);
 
    -- Core
    signal cpu_rst     : std_logic;
@@ -179,7 +188,7 @@ architecture synthesis of nicemon is
    signal cpu_instret : std_logic;
    signal cpu_retire  : t_retire;
    -- The hold bit in the cycle before, for a pulse when the core starts,
-   -- which resets the math unit and the performance counters
+   -- which resets the math unit, the performance counters, and the timer
    signal cpu_hold_d : std_logic := '1';
    signal dev_rst    : std_logic;
    -- A halt waits in halt_wait until the core's last byte has gone, and
@@ -231,11 +240,12 @@ architecture synthesis of nicemon is
    signal tx_wait      : std_logic := '0';
    signal tx_wait_data : std_logic_vector(7 downto 0);
 
-   -- A request for the MPU or the performance counters. It is latched, and
-   -- the device's port is driven from the latch until the device acknowledges.
+   -- A request for the MPU, the performance counters, or the timer. It is
+   -- latched, and the device's port is driven from the latch until the
+   -- device acknowledges.
    signal dev_busy  : std_logic := '0';
    signal dev_stb   : std_logic := '0';
-   signal dev_mpu   : std_logic;           -- '1' for the MPU, '0' for perf
+   signal dev_sel   : t_dev;               -- the device
    signal dev_cli   : boolean;             -- the request is the CLI's
    signal dev_drop  : std_logic;           -- the core was reset meanwhile
    signal dev_addr  : std_logic_vector(4 downto 0);
@@ -243,16 +253,26 @@ architecture synthesis of nicemon is
    signal dev_wdata : std_logic_vector(31 downto 0);
    signal dev_stall : std_logic;
 
-   signal mpu_cyc    : std_logic;
-   signal mpu_stb    : std_logic;
-   signal mpu_stall  : std_logic;
-   signal mpu_ack    : std_logic;
-   signal mpu_data   : std_logic_vector(31 downto 0);
-   signal perf_cyc   : std_logic;
-   signal perf_stb   : std_logic;
-   signal perf_stall : std_logic;
-   signal perf_ack   : std_logic;
-   signal perf_data  : std_logic_vector(31 downto 0);
+   signal mpu_cyc     : std_logic;
+   signal mpu_stb     : std_logic;
+   signal mpu_stall   : std_logic;
+   signal mpu_ack     : std_logic;
+   signal mpu_data    : std_logic_vector(31 downto 0);
+   signal perf_cyc    : std_logic;
+   signal perf_stb    : std_logic;
+   signal perf_stall  : std_logic;
+   signal perf_ack    : std_logic;
+   signal perf_data   : std_logic_vector(31 downto 0);
+   signal timer_cyc   : std_logic;
+   signal timer_stb   : std_logic;
+   signal timer_stall : std_logic;
+   signal timer_ack   : std_logic;
+   signal timer_data  : std_logic_vector(31 downto 0);
+
+   -- The timer's interrupt request, on the core's IRQ port
+   signal irq_valid  : std_logic;
+   signal irq_ready  : std_logic;
+   signal irq_vector : std_logic_vector(7 downto 0);
 
    -- Memory port B, and the source of the read data of the last request
    signal ram_a_addr  : std_logic_vector(G_RAM_ADDR_BITS - 1 downto 0);
@@ -357,9 +377,9 @@ begin
          nmi_valid_i  => '0',
          nmi_ready_o  => open,
          nmi_vector_i => X"00",
-         irq_valid_i  => '0',
-         irq_ready_o  => open,
-         irq_vector_i => X"00",
+         irq_valid_i  => irq_valid,
+         irq_ready_o  => irq_ready,
+         irq_vector_i => irq_vector,
          halted_o     => cpu_halted,
          instret_o    => cpu_instret,
          retire_o     => cpu_retire
@@ -468,12 +488,19 @@ begin
             else
                rd_ram <= '1';
             end if;
-         elsif addr(31 downto 5) = C_MPU_BASE or addr(31 downto 4) = C_PERF_BASE then
+         elsif addr(31 downto 5) = C_MPU_BASE or addr(31 downto 4) = C_PERF_BASE or
+               addr(31 downto 4) = C_TIMER_BASE then
             -- A device: its port is driven from the latch, and the request
             -- is acknowledged when the device acknowledges it.
             dev_busy  <= '1';
             dev_stb   <= '1';
-            dev_mpu   <= addr(5);
+            if addr(31 downto 5) = C_MPU_BASE then
+               dev_sel <= DEV_MPU;
+            elsif addr(31 downto 4) = C_PERF_BASE then
+               dev_sel <= DEV_PERF;
+            else
+               dev_sel <= DEV_TIMER;
+            end if;
             dev_cli   <= cli;
             dev_drop  <= '0';
             dev_addr  <= addr(4 downto 0);
@@ -572,14 +599,16 @@ begin
             if dev_stb = '1' and dev_stall = '0' then
                dev_stb <= '0';
             end if;
-            if mpu_ack = '1' or perf_ack = '1' then
+            if mpu_ack = '1' or perf_ack = '1' or timer_ack = '1' then
                rd_ram   <= '0';
                rd_scr   <= '0';
                rd_rx    <= '0';
                if mpu_ack = '1' then
                   rd_io <= mpu_data;
-               else
+               elsif perf_ack = '1' then
                   rd_io <= perf_data;
+               else
+                  rd_io <= timer_data;
                end if;
                dev_busy <= '0';
                if dev_cli then
@@ -671,19 +700,25 @@ begin
 
 
    ---------------------------------------------------------------------------
-   -- The math unit (ISA.md §8.4) and the performance counters (§8.5) from
-   -- nice_cpu. They are reset with the system, and when the core starts, as
-   -- the emulator's are when it starts. They are not reset while the CLI
-   -- holds the core, so that the CLI can read them after a halt.
+   -- The math unit (ISA.md §8.4), the performance counters (§8.5), and the
+   -- timer (§8.6) from nice_cpu. They are reset with the system, and when
+   -- the core starts, as the emulator's are when it starts. They are not
+   -- reset while the CLI holds the core, so that the CLI can read them after
+   -- a halt. The timer counts clock cycles, and it is the only device that
+   -- raises an interrupt, so its request goes straight to the core's IRQ.
    ---------------------------------------------------------------------------
 
    dev_rst <= rst_i or (cpu_hold_d and not cpu_hold);
 
-   mpu_cyc   <= dev_busy and dev_mpu;
-   mpu_stb   <= dev_stb and dev_mpu;
-   perf_cyc  <= dev_busy and not dev_mpu;
-   perf_stb  <= dev_stb and not dev_mpu;
-   dev_stall <= mpu_stall when dev_mpu = '1' else perf_stall;
+   mpu_cyc   <= dev_busy when dev_sel = DEV_MPU else '0';
+   mpu_stb   <= dev_stb when dev_sel = DEV_MPU else '0';
+   perf_cyc  <= dev_busy when dev_sel = DEV_PERF else '0';
+   perf_stb  <= dev_stb when dev_sel = DEV_PERF else '0';
+   timer_cyc <= dev_busy when dev_sel = DEV_TIMER else '0';
+   timer_stb <= dev_stb when dev_sel = DEV_TIMER else '0';
+   dev_stall <= mpu_stall when dev_sel = DEV_MPU else
+                perf_stall when dev_sel = DEV_PERF else
+                timer_stall;
 
    i_mpu : entity work.mpu
       port map (
@@ -713,6 +748,25 @@ begin
          wb_data_i  => dev_wdata,
          wb_data_o  => perf_data
       ); -- i_perf
+
+
+   i_timer : entity work.timer
+      port map (
+         clk_i        => clk_i,
+         rst_i        => dev_rst,
+         tick_i       => '1',
+         wb_cyc_i     => timer_cyc,
+         wb_stb_i     => timer_stb,
+         wb_stall_o   => timer_stall,
+         wb_ack_o     => timer_ack,
+         wb_we_i      => dev_we,
+         wb_addr_i    => dev_addr(3 downto 0),
+         wb_data_i    => dev_wdata,
+         wb_data_o    => timer_data,
+         irq_valid_o  => irq_valid,
+         irq_ready_i  => irq_ready,
+         irq_vector_o => irq_vector
+      ); -- i_timer
 
    i_ram : entity work.ram
       generic map (

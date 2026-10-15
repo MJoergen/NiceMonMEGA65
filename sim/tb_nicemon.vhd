@@ -23,9 +23,10 @@
 --    FIFO. The FIFO keeps the first 16 and loses the 17th, so a '.' sent
 --    after them is echoed right after the 16th.
 -- 7. Use the math unit from the CLI.
--- 8. Hold the core, load G_DEVICES_FILE, and run it. It uses the math unit
---    and the performance counters, and leaves the results in memory, which
---    the CLI reads back after the core has halted.
+-- 8. Hold the core, load G_DEVICES_FILE, and run it. It uses the math unit,
+--    the performance counters, and the timer, whose interrupts it counts,
+--    and leaves the results in memory, which the CLI reads back after the
+--    core has halted. The CLI reads and writes the timer too.
 -- 9. Hold the core, load G_EMU_FILE, and run it. It writes the screen,
 --    memory in the I/O range, and the read counter, and sets R5. The CLI
 --    reads them back, and the registers, with the values that
@@ -323,6 +324,12 @@ begin
       command("R 00000102", "FFFFFF72");     -- -1000 / 7 = -142
       command("R 00000103", "FFFFE4A8");     -- -1000 * 7 = -7000
       command("R 00000104", "00000001");     -- instructions between two reads
+      command("R 00000105", "00000003");     -- interrupts of the timer taken
+      command("R FFFFFF40", "00000000");     -- the timer: stopped,
+      command("R FFFFFF41", "00000000");
+      command("R FFFFFF42", "000000F0");     -- with its vector
+      command("W FFFFFF42 00000123", "OK");  -- the CLI writes the timer
+      command("R FFFFFF42", "00000023");     -- bits 7..0 only
 
       report "tb_nicemon: load " & G_EMU_FILE;
       command("W FFFFFFF0 00000001", "OK");

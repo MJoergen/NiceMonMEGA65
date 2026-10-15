@@ -22,7 +22,8 @@ returns 0x200, as in the emulator. Input that the program has not read when
 it halts is dropped, as by the emulator.
 
 The steps are the core's instruction counter, which the emulator's step
-count equals, as no interrupts are raised. But the emulator waits for each
+count equals, unless the program starts the timer, which counts clock
+cycles here and steps in the emulator. But the emulator waits for each
 input byte, and the core does not: while no byte has arrived, a read
 returns 0. So a program that waits for input in a loop runs more steps
 here. The memory has 64K words,
