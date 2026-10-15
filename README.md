@@ -2,10 +2,11 @@
 The NICE CPU with a monitor, on the MEGA65
 
 This project runs the [NICE CPU](https://github.com/MJoergen/nice_cpu) on the
-MEGA65 board (R3 and R6), with a monitor like the one in
-[QNICE-FPGA](https://github.com/sy2002/QNICE-FPGA) and a command line
-interpreter on the UART like the one in
-[cmod-s7](https://github.com/MJoergen/cmod-s7).
+MEGA65 board (R3 and R6), with a command line interpreter on the UART like
+the one in [cmod-s7](https://github.com/MJoergen/cmod-s7). A monitor like
+the one in [QNICE-FPGA](https://github.com/sy2002/QNICE-FPGA) is planned and
+not written yet (see [monitor/](monitor/README.md)). Until then, programs
+are loaded through the command line.
 
 ## Contents
 
@@ -17,7 +18,7 @@ interpreter on the UART like the one in
 | [font/](font/) | The script that makes `src/video/font_pkg.vhd` from Spleen, and Spleen's license (BSD 2-Clause). |
 | [sim/](sim/) | The GHDL testbenches. |
 | [synth/](synth/README.md) | The Vivado builds for the R3 and R6 boards. |
-| [monitor/](monitor/README.md) | The monitor, in NICE assembly. |
+| [monitor/](monitor/README.md) | The monitor, in NICE assembly: planned, not written yet. |
 | [examples/](examples/) | Example C programs, and the Makefile that builds them for the MEGA65. |
 | [tools/](tools/) | `load.py`, which loads a program into the MEGA65 through the UART, `run.py`, which runs a program on the MEGA65 as `niceemu` runs it, and `hwtest.py`, which tests the system on the board. |
 
