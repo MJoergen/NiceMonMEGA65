@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
 """Test the system on the MEGA65 board through its debug UART.
 
-Programs the FPGA with m65 and checks the banner, then drives the command
-line: it loads and runs sim/echo.nasm, holds and restarts the core, clears
-the memory, reads back what sim/emu.nasm leaves after its halt, and runs the
-C example examples/build/primes.bin. Last, it runs programs with
-tools/run.py and with niceemu, and compares their output and exit status,
-with sim/eof.nasm also the end of the input and an input file of 1536
-bytes.
+Programs the FPGA with m65 and checks the banner, and the ROM when the
+bitstream has one, then drives the command line with the ROM hidden: it
+loads and runs sim/echo.nasm, holds and restarts the core, clears
+the memory, reads back what sim/emu.nasm leaves after its halt, writes and
+reads the screen's registers, and runs the C example
+examples/build/primes.bin. Last, it runs programs with tools/run.py and
+with niceemu, and compares their output and exit status, with sim/eof.nasm
+also the end of the input and an input file of 1536 bytes. The programs
+run with the ROM hidden, so the RAM is at 0; a bitstream with a ROM must
+have halted its core, as a ROM with sim/rom.nasm does, for the command
+line to answer.
 Build the bitstream and the example first, and niceemu
 (make -C nice_cpu/emulator build), or that comparison is skipped.
 
@@ -72,10 +76,22 @@ def test_banner(fd: int, bit: str) -> None:
     out = drain(fd, 1.0)
     check("banner after configuration", b"NICE" in out, repr(out))
     ctl = cmd(fd, f"R {CONTROL}")
-    check("core held at power-up", ctl == "00000001", ctl)
+    # Without a ROM the core is held and the ROM bit reads 1; with one the
+    # core has booted from it and must have halted.
+    check("core held at power-up, or halted after booting from the ROM",
+          ctl in ("00000009", "00000002"),
+          f"{ctl}: {'held, no ROM' if ctl == '00000009' else 'halted, ROM shown' if ctl == '00000002' else 'unexpected'}")
+    if ctl == "00000002":
+        # The ROM is shown: its first word is the program's, and a write to
+        # it is dropped.
+        first = cmd(fd, "R 00000000")
+        check("ROM at address 0", first not in ("", "00000000"), first)
+        check("write to the ROM dropped", cmd(fd, "W 00000000 12345678") == "OK"
+              and cmd(fd, "R 00000000") == first)
 
 
 def test_command_line(fd: int) -> None:
+    check("hide the ROM", cmd(fd, f"W {CONTROL} 00000009") == "OK")
     check("R reads 8 hex digits", len(cmd(fd, "R 00000000")) == 8)
     check("W then R", cmd(fd, "W 00000100 DEADBEEF") == "OK"
           and cmd(fd, "R 00000100") == "DEADBEEF")
@@ -104,15 +120,15 @@ def test_echo(fd: int, echo: str) -> None:
     check("echo halts on '.', with the halt message", got == b"." + HALT_MESSAGE,
           repr(got))
     ctl = cmd(fd, f"R {CONTROL}")
-    check("halted flag", ctl == "00000002", ctl)
+    check("halted flag", ctl == "0000000A", ctl)
     check("command line back after halt", cmd(fd, "W 00000100 12345678") == "OK"
           and cmd(fd, "R 00000100") == "12345678")
 
 
 def test_reset(fd: int, echo: str) -> None:
-    check("hold the core", cmd(fd, f"W {CONTROL} 00000001") == "OK")
+    check("hold the core", cmd(fd, f"W {CONTROL} 00000009") == "OK")
     ctl = cmd(fd, f"R {CONTROL}")
-    check("held, halted flag cleared", ctl == "00000001", ctl)
+    check("held, halted flag cleared", ctl == "00000009", ctl)
     load(fd, echo)
     os.write(fd, b"again.")
     got = drain(fd)
@@ -122,9 +138,9 @@ def test_reset(fd: int, echo: str) -> None:
 
 def test_clear(fd: int) -> None:
     check("W before the clear", cmd(fd, "W 00000100 DEADBEEF") == "OK")
-    check("clear the memory", cmd(fd, f"W {CONTROL} 00000005") == "OK")
+    check("clear the memory", cmd(fd, f"W {CONTROL} 0000000D") == "OK")
     ctl = cmd(fd, f"R {CONTROL}")
-    check("held after the clear", ctl == "00000001", ctl)
+    check("held after the clear", ctl == "00000009", ctl)
     got = cmd(fd, "R 00000100")
     check("memory cleared", got == "00000000", got)
 
@@ -134,7 +150,7 @@ def test_readback(fd: int, emu: str) -> None:
     halt = read_until(fd, HALT_MESSAGE)
     check("halt message", halt == HALT_MESSAGE, repr(halt))
     ctl = cmd(fd, f"R {CONTROL}")
-    check("emu.nasm halted", ctl == "00000002", ctl)
+    check("emu.nasm halted", ctl == "0000000A", ctl)
     expected = {
         "FFFFFFF1": "00000001",  # halted by HALT
         "FFFFFF12": "0000000C",  # 12 steps, as niceemu says
@@ -153,6 +169,19 @@ def test_readback(fd: int, emu: str) -> None:
     print("  R0-R15:", " ".join(regs))
 
 
+def test_screen_registers(fd: int) -> None:
+    """Writes the screen's registers and reads them back. On the display the
+    cursor shows at the bottom right, and the screen is scrolled one row."""
+    for addr, value in [("FFFFFF50", "00000460"), ("FFFFFF51", "0000004F"),
+                        ("FFFFFF52", "00000018"), ("FFFFFF55", "00000050")]:
+        check(f"W {addr}", cmd(fd, f"W {addr} {value}") == "OK")
+        got = cmd(fd, f"R {addr}")
+        check(f"readback {addr}", got == value, f"got {got}, want {value}")
+    got = cmd(fd, "R FFFFFF53")
+    check("FFFFFF53 is not a register", got == "00000000", got)
+    check("the display offset off again", cmd(fd, "W FFFFFF55 00000000") == "OK")
+
+
 def test_primes(fd: int, primes: str) -> None:
     start = time.monotonic()
     n = load(fd, primes)
@@ -168,7 +197,7 @@ def test_primes(fd: int, primes: str) -> None:
     end = drain(fd, 1.0)
     check("primes halt message", end.endswith(HALT_MESSAGE), repr(end))
     ctl = cmd(fd, f"R {CONTROL}")
-    check("primes halts on 0", ctl == "00000002", ctl)
+    check("primes halts on 0", ctl == "0000000A", ctl)
 
 
 def test_run(port: str, baud: int,
@@ -240,6 +269,7 @@ def main() -> None:
         test_reset(fd, echo)
         test_clear(fd)
         test_readback(fd, emu)
+        test_screen_registers(fd)
         test_primes(fd, primes)
         os.close(fd)
         test_run(args.port, args.baud, [

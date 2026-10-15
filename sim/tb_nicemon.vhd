@@ -6,7 +6,14 @@
 -- p_main sends lines to the UART with send(), and checks the UART output
 -- with expect(). p_uart_rx decodes the UART output into rx_str. The steps:
 --
--- 1. The CLI's banner after reset.
+-- 1. The CLI's banner after reset, and the ROM, which holds G_ROM_FILE: the
+--    core boots from it at reset, prints its greeting, and halts. Its stack
+--    is in the RAM, at the top of the memory, for a push to the ROM is lost.
+--    The ROM is at 0, read only, with the RAM above it; bit 3 of the
+--    control register hides it, and shows it again; and the core boots from
+--    it again when it is started with the ROM shown. From then on the ROM
+--    is hidden, as the tools hide it, so the RAM is at 0 as in the
+--    emulator.
 -- 2. Load G_HELLO_FILE with W commands, and read its first word back.
 -- 3. The control register: the core is held in reset.
 -- 4. Start the core. It prints "Hello, NICE!" and halts, and the CLI gets
@@ -31,7 +38,8 @@
 --    memory in the I/O range, and the read counter, and sets R5. The CLI
 --    reads them back, and the registers, with the values that
 --    "niceemu -d" prints for the same program. The math unit was reset
---    when the core started.
+--    when the core started. The CLI writes and reads the screen's
+--    registers, which go out to the display.
 -- 10. Clear the memory: what the programs left is gone, and the core is
 --    held.
 -- 11. Load G_RESERVED_FILE, and run it. It halts on a reserved control
@@ -44,7 +52,8 @@
 --    with more bytes typed than its FIFO holds. None is lost, for the
 --    keyboard waits.
 --
--- The core's input FIFO has 16 bytes here, so that step 6 is short.
+-- The core's input FIFO has 16 bytes here, so that step 6 is short, and the
+-- RAM, the ROM, and the screen are small, so that the clearing is.
 --
 -- The UART runs at a tenth of the clock rate, so that the test is fast.
 
@@ -58,6 +67,7 @@ library ieee;
 entity tb_nicemon is
    generic (
       G_HELLO_FILE    : string;
+      G_ROM_FILE      : string;
       G_ECHO_FILE     : string;
       G_FIFO_FILE     : string;
       G_DEVICES_FILE  : string;
@@ -91,6 +101,12 @@ architecture simulation of tb_nicemon is
    signal kbd_ready : std_logic;
    signal kbd_data  : std_logic_vector(7 downto 0) := X"00";
 
+   signal scr_ctl_we   : std_logic;
+   signal scr_cur_x    : std_logic_vector(6 downto 0);
+   signal scr_cur_y    : std_logic_vector(4 downto 0);
+   signal scr_cur_mode : std_logic_vector(2 downto 0);
+   signal scr_offs     : std_logic_vector(10 downto 0);
+
    signal rx_str : string(1 to 4096);
    signal rx_len : natural := 0;
 
@@ -105,20 +121,32 @@ begin
 
    i_nicemon : entity work.nicemon
       generic map (
-         G_CLOCK_HZ      => C_CLOCK_HZ,
-         G_UART_BAUDRATE => C_BAUDRATE,
-         G_RAM_ADDR_BITS => 12,
-         G_RX_FIFO_BITS  => 4
+         G_CLOCK_HZ         => C_CLOCK_HZ,
+         G_UART_BAUDRATE    => C_BAUDRATE,
+         G_RAM_ADDR_BITS    => 12,
+         G_SCR_ADDR_BITS    => 11,
+         G_RX_FIFO_BITS     => 4,
+         G_ROM_FILE         => G_ROM_FILE,
+         G_ROM_ADDR_BITS    => 11,
+         G_CPU_RUN_AT_RESET => true
       )
       port map (
-         clk_i       => clk,
-         rst_i       => rst,
-         uart_rxd_i  => uart_rx,
-         uart_txd_o  => uart_tx,
-         kbd_valid_i => kbd_valid,
-         kbd_ready_o => kbd_ready,
-         kbd_data_i  => kbd_data,
-         running_o   => running
+         clk_i          => clk,
+         rst_i          => rst,
+         uart_rxd_i     => uart_rx,
+         uart_txd_o     => uart_tx,
+         kbd_valid_i    => kbd_valid,
+         kbd_ready_o    => kbd_ready,
+         kbd_data_i     => kbd_data,
+         running_o      => running,
+         scr_we_o       => open,
+         scr_addr_o     => open,
+         scr_data_o     => open,
+         scr_ctl_we_o   => scr_ctl_we,
+         scr_cur_x_o    => scr_cur_x,
+         scr_cur_y_o    => scr_cur_y,
+         scr_cur_mode_o => scr_cur_mode,
+         scr_offs_o     => scr_offs
       ); -- i_nicemon
 
 
@@ -246,6 +274,17 @@ begin
          file_close(f);
       end procedure load;
 
+      -- The first word of the .bin file, as the R command prints it
+      impure function first_word(name : string) return string is
+         file     f : text;
+         variable l : line;
+      begin
+         file_open(f, name, read_mode);
+         readline(f, l);
+         file_close(f);
+         return upper(l.all(10 to 17));
+      end function first_word;
+
       variable first_v : string(1 to 8);
       variable high_v  : string(1 to 128);
 
@@ -255,29 +294,50 @@ begin
       wait until rising_edge(clk);
       rst <= '0';
 
-      report "tb_nicemon: banner";
+      report "tb_nicemon: banner, and the ROM";
       expect(C_CRLF & "NICE" & C_CRLF & C_CRLF);
+      expect("Hello from the ROM!" & C_LF & C_HALT);
+      first_v := first_word(G_ROM_FILE);
+      command("R FFFFFFF0", "00000002");     -- halted, the ROM shown
+      command("R 00000000", first_v);        -- the ROM
+      command("W 00000000 12345678", "OK");  -- dropped
+      command("R 00000000", first_v);
+      command("R 00000800", "00000000");     -- the RAM above the ROM
+      command("W 00000800 12345678", "OK");
+      command("R 00000800", "12345678");
+      command("W FFFFFFF0 00000009", "OK");  -- hold the core, and hide the ROM
+      command("R FFFFFFF0", "00000009");
+      command("R 00000000", "00000000");     -- the RAM under the ROM
+      command("W 00000000 ABCD1234", "OK");
+      command("R 00000000", "ABCD1234");
+      command("W FFFFFFF0 00000001", "OK");  -- the ROM shown again
+      command("R 00000000", first_v);
+      command("W FFFFFFF0 00000000", "OK");  -- the core boots from it again
+      expect("Hello from the ROM!" & C_LF & C_HALT);
+      command("R FFFFFFF0", "00000002");
+      command("W FFFFFFF0 00000009", "OK");  -- hidden from here on
+      command("R 00000000", "ABCD1234");
 
       report "tb_nicemon: load " & G_HELLO_FILE;
       load(G_HELLO_FILE, first_v);
       command("R 00000000", first_v);
-      command("R FFFFFFF0", "00000001");
+      command("R FFFFFFF0", "00000009");
       assert running = '0'
          report "tb_nicemon: the core runs while it is held"
          severity failure;
 
       report "tb_nicemon: run";
-      command("W FFFFFFF0 00000000", "OK");
+      command("W FFFFFFF0 00000008", "OK");
       expect("Hello, NICE!" & C_LF & C_HALT);
-      command("R FFFFFFF0", "00000002");
+      command("R FFFFFFF0", "0000000A");
       command("R FFFFFFF1", "00000001");     -- halted by HALT
       command("R FFFFFF12", "00000038");     -- 56 steps, as niceemu says
       command("R FFFFFF13", "00000000");
 
       report "tb_nicemon: load " & G_ECHO_FILE;
-      command("W FFFFFFF0 00000001", "OK");
+      command("W FFFFFFF0 00000009", "OK");
       load(G_ECHO_FILE, first_v);
-      command("W FFFFFFF0 00000000", "OK");
+      command("W FFFFFFF0 00000008", "OK");
       assert running = '1'
          report "tb_nicemon: the core does not run"
          severity failure;
@@ -295,17 +355,17 @@ begin
       wait for C_BIT_TIME;
       send("cd.");
       expect("cd." & C_HALT);
-      command("R FFFFFFF0", "00000002");
+      command("R FFFFFFF0", "0000000A");
 
       report "tb_nicemon: load " & G_FIFO_FILE;
-      command("W FFFFFFF0 00000001", "OK");
+      command("W FFFFFFF0 00000009", "OK");
       load(G_FIFO_FILE, first_v);
-      command("W FFFFFFF0 00000000", "OK");
+      command("W FFFFFFF0 00000008", "OK");
       send("0123456789abcdefX");
       expect("0123456789abcdef");
       send(".");
       expect("." & C_HALT);
-      command("R FFFFFFF0", "00000002");
+      command("R FFFFFFF0", "0000000A");
 
       report "tb_nicemon: the math unit from the CLI";
       command("W FFFFFF20 000003E8", "OK");  -- A = 1000
@@ -314,11 +374,11 @@ begin
       command("R FFFFFF24", "00001B58");     -- A * B = 7000
 
       report "tb_nicemon: load " & G_DEVICES_FILE;
-      command("W FFFFFFF0 00000001", "OK");
+      command("W FFFFFFF0 00000009", "OK");
       load(G_DEVICES_FILE, first_v);
-      command("W FFFFFFF0 00000000", "OK");
+      command("W FFFFFFF0 00000008", "OK");
       expect(C_HALT);
-      command("R FFFFFFF0", "00000002");
+      command("R FFFFFFF0", "0000000A");
       command("R 00000100", "0000008E");     -- 1000 / 7 = 142
       command("R 00000101", "00000006");     -- 1000 % 7 = 6
       command("R 00000102", "FFFFFF72");     -- -1000 / 7 = -142
@@ -332,11 +392,11 @@ begin
       command("R FFFFFF42", "00000023");     -- bits 7..0 only
 
       report "tb_nicemon: load " & G_EMU_FILE;
-      command("W FFFFFFF0 00000001", "OK");
+      command("W FFFFFFF0 00000009", "OK");
       load(G_EMU_FILE, first_v);
-      command("W FFFFFFF0 00000000", "OK");
+      command("W FFFFFFF0 00000008", "OK");
       expect(C_HALT);
-      command("R FFFFFFF0", "00000002");
+      command("R FFFFFFF0", "0000000A");
       command("R FFFFFF12", "0000000C");     -- 12 steps
       command("R FFFFFF20", "00000000");     -- the math unit's A, reset
       command("R FFFF0000", "00000041");     -- the screen
@@ -352,9 +412,34 @@ begin
       command("R FFFFFFEE", "01000000");     -- R14, the status register
       command("R FFFFFFEF", "0000001B");     -- R15, after the HALT
 
+      report "tb_nicemon: the screen's registers";
+      command("W FFFFFF50 000000E0", "OK");  -- the cursor shown, blinking
+      command("W FFFFFF51 0000004F", "OK");  -- column 79
+      command("W FFFFFF52 00000018", "OK");  -- row 24
+      command("W FFFFFF55 00000050", "OK");  -- the display offset, one row
+      command("R FFFFFF50", "000000E0");
+      command("R FFFFFF51", "0000004F");
+      command("R FFFFFF52", "00000018");
+      command("R FFFFFF55", "00000050");
+      command("W FFFFFF53 00000001", "OK");  -- not a register
+      command("R FFFFFF53", "00000000");
+      command("R FFFFFF5F", "00000000");
+      assert scr_cur_x = to_slv(79, 7) and scr_cur_y = to_slv(24, 5) and scr_cur_mode = "011"
+         report "tb_nicemon: the cursor's registers do not go out"
+         severity failure;
+      assert scr_offs = 0
+         report "tb_nicemon: the display offset goes out while not enabled"
+         severity failure;
+      command("W FFFFFF50 00000C50", "OK");  -- the offset enabled, a small cursor
+      command("R FFFFFF50", "00000C50");
+      assert scr_offs = 80 and scr_cur_mode = "101"
+         report "tb_nicemon: the display offset does not go out"
+         severity failure;
+      command("W FFFFFF50 00000000", "OK");
+
       report "tb_nicemon: clear the memory";
-      command("W FFFFFFF0 00000005", "OK");
-      command("R FFFFFFF0", "00000001");     -- held, not halted
+      command("W FFFFFFF0 0000000D", "OK");
+      command("R FFFFFFF0", "00000009");     -- held, not halted
       command("R 00000000", "00000000");
       command("R 00000110", "00000000");
       command("R FFFF0000", "00000000");     -- the screen
@@ -363,7 +448,7 @@ begin
 
       report "tb_nicemon: load " & G_RESERVED_FILE;
       load(G_RESERVED_FILE, first_v);
-      command("W FFFFFFF0 00000000", "OK");
+      command("W FFFFFFF0 00000008", "OK");
       expect(C_HALT);
       command("R FFFFFFF1", "00000002");     -- a reserved control word
       command("R FFFFFF12", "00000006");     -- 6 steps
@@ -371,28 +456,28 @@ begin
       command("R FFFFFFEF", "00000007");     -- R15
 
       report "tb_nicemon: load " & G_EOF_FILE;
-      command("W FFFFFFF0 00000005", "OK");
+      command("W FFFFFFF0 0000000D", "OK");
       load(G_EOF_FILE, first_v);
-      command("W FFFFFFF0 00000000", "OK");
+      command("W FFFFFFF0 00000008", "OK");
       send("ab");
       expect("ab");
       send_break;
       expect(C_HALT);
       command("R FFFFFFE1", "00000200");     -- R1, the end of the input
       send_break;                            -- the CLI's, so ignored
-      command("R FFFFFFF0", "00000002");
+      command("R FFFFFFF0", "0000000A");
 
       report "tb_nicemon: the keyboard";
-      command("W FFFFFFF0 00000001", "OK");
+      command("W FFFFFFF0 00000009", "OK");
       kbd_send("r fffffff0" & C_CR);
-      expect("00000001" & C_CRLF);
+      expect("00000009" & C_CRLF);
       load(G_FIFO_FILE, first_v);
-      kbd_send("w fffffff0 00000000" & C_CR);
+      kbd_send("w fffffff0 00000008" & C_CR);
       expect("OK" & C_CRLF);
       kbd_send("0123456789abcdefXYZ.");
       expect("0123456789abcdefXYZ.");
       expect(C_HALT);
-      command("R FFFFFFF0", "00000002");
+      command("R FFFFFFF0", "0000000A");
 
       report "tb_nicemon: PASS";
       stop(0);

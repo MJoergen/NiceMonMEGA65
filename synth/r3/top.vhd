@@ -14,6 +14,10 @@ library ieee;
    use ieee.std_logic_1164.all;
 
 entity top is
+   generic (
+      -- The ROM with the monitor, or "" for a build without one (mega65.vhd)
+      G_ROM_FILE : string := ""
+   );
    port (
       clk_i              : in  std_logic; -- 100 MHz
 
@@ -73,6 +77,9 @@ begin
       ); -- i_max10
 
    i_mega65 : entity work.mega65
+      generic map (
+         G_ROM_FILE => G_ROM_FILE
+      )
       port map (
          clk_i          => clk_i,
          reset_button_i => not reset_button_n,

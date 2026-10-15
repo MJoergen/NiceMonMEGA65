@@ -1,13 +1,22 @@
 # The Vivado build, in non-project mode, shared by the boards. A board's
 # Makefile sets BOARD_SRC and BOARD_XDC, and includes this file.
 #
-# make        builds build/top.bit
-# make clean  removes the build
+# make                builds build/top.bit, whose core waits for the
+#                     command line
+# make ROM=file.bin   builds it with the ROM: the core boots from file.bin,
+#                     the monitor, at reset (G_ROM_FILE of top.vhd)
+# make clean          removes the build
 
 VIVADO_DIR ?= /opt/Xilinx/2025.1/Vivado
 
 PART = xc7a200tfbg484-2
 TOP  = top
+
+ROM ?=
+ifneq ($(ROM),)
+ROM_ABS  = $(abspath $(ROM))
+GENERICS = -generic G_ROM_FILE=$(ROM_ABS)
+endif
 
 NICE = ../../nice_cpu
 SRC  = $(NICE)/hdl/src/trace_pkg.vhd
@@ -19,6 +28,7 @@ SRC += ../../src/uart_serdes.vhd
 SRC += ../../src/line_buffer.vhd
 SRC += ../../src/cmd.vhd
 SRC += ../../src/ram.vhd
+SRC += ../../src/rom.vhd
 SRC += ../../src/nicemon.vhd
 SRC += ../../src/kbd_m65.vhd
 SRC += ../../src/kbd_ascii.vhd
@@ -39,16 +49,16 @@ SRC += $(BOARD_SRC)
 
 XDC = ../common/common.xdc $(BOARD_XDC)
 
-build/$(TOP).bit: build/$(TOP).tcl $(SRC) $(XDC)
+build/$(TOP).bit: build/$(TOP).tcl $(SRC) $(XDC) $(ROM_ABS)
 	bash -c "source $(VIVADO_DIR)/settings64.sh ; vivado -mode tcl -source $< -log build/vivado.log -journal build/vivado.jou"
 
-build/$(TOP).tcl: Makefile ../Makefile.inc
-	mkdir -p build
+# The script is remade when the Makefiles or the ROM option change.
+build/$(TOP).tcl: Makefile ../Makefile.inc build/rom.conf
 	echo "# A tcl script for Vivado, made by make" > $@
 	echo "read_vhdl -vhdl2008 { $(SRC) }" >> $@
 	echo "read_xdc { $(XDC) }" >> $@
 	echo "set_property PART $(PART) [current_project]" >> $@
-	echo "synth_design -top $(TOP)" >> $@
+	echo "synth_design -top $(TOP) $(GENERICS)" >> $@
 	echo "opt_design" >> $@
 	echo "place_design" >> $@
 	echo "phys_opt_design" >> $@
@@ -59,6 +69,16 @@ build/$(TOP).tcl: Makefile ../Makefile.inc
 	echo "write_bitstream -force build/$(TOP).bit" >> $@
 	echo "exit" >> $@
 
-.PHONY: clean
+# The ROM option, written only when it changes, so that the script is not
+# remade for nothing.
+build/rom.conf: FORCE | build
+	@echo "$(ROM_ABS)" | cmp -s - $@ || echo "$(ROM_ABS)" > $@
+
+build:
+	mkdir -p build
+
+.PHONY: clean FORCE
+FORCE:
+
 clean:
 	rm -rf build .Xil clockInfo.txt

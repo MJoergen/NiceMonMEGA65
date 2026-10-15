@@ -12,8 +12,13 @@ entity text_synth is
    port (
       clk_i       : in  std_logic;
       scr_we_i    : in  std_logic;
-      scr_addr_i  : in  std_logic_vector(10 downto 0);
+      scr_addr_i  : in  std_logic_vector(14 downto 0);
       scr_data_i  : in  std_logic_vector(31 downto 0);
+      ctl_we_i    : in  std_logic;
+      cur_x_i     : in  std_logic_vector(6 downto 0);
+      cur_y_i     : in  std_logic_vector(4 downto 0);
+      cur_mode_i  : in  std_logic_vector(2 downto 0);
+      offs_i      : in  std_logic_vector(14 downto 0);
       vga_clk_i   : in  std_logic;
       vga_hs_o    : out std_logic;
       vga_vs_o    : out std_logic;
@@ -30,13 +35,19 @@ begin
 
    i_text : entity work.text
       generic map (
-         G_MODE => C_VIDEO_1280X1024
+         G_MODE          => C_VIDEO_1280X1024,
+         G_SCR_ADDR_BITS => 15
       )
       port map (
          clk_i       => clk_i,
          scr_we_i    => scr_we_i,
          scr_addr_i  => scr_addr_i,
          scr_data_i  => scr_data_i,
+         ctl_we_i    => ctl_we_i,
+         cur_x_i     => cur_x_i,
+         cur_y_i     => cur_y_i,
+         cur_mode_i  => cur_mode_i,
+         offs_i      => offs_i,
          vga_clk_i   => vga_clk_i,
          vga_hs_o    => vga_hs_o,
          vga_vs_o    => vga_vs_o,

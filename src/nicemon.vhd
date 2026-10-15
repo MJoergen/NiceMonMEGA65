@@ -20,11 +20,21 @@
 --                          0xFFFFFF00 lands in the top of the memory, and so
 --                          do the words of 0xFFFFFF00-FF that are not
 --                          registers.
---   0xFFFF0000-0xFFFF07FF  The screen: 2048 words of memory of their own, so
---                          that the emulator's 80x25 screen, the first 2000,
---                          does not land on word 0. Every write to it is also
---                          given out on scr_*_o, for a display that keeps a
---                          copy (src/video/text.vhd).
+--   0x00000000-0x00007FFF  The ROM, 2^G_ROM_ADDR_BITS words from G_ROM_FILE
+--                          (src/rom.vhd), with the monitor, which the core
+--                          boots from, as QNICE-FPGA's is at 0x0000-0x7FFF.
+--                          It is in front of the RAM, and repeats with it. A
+--                          write to it is dropped. Bit 3 of the control
+--                          register hides it, so that the RAM is at 0 as in
+--                          the emulator, and a build without G_ROM_FILE has
+--                          no ROM.
+--   0xFFFF0000-0xFFFF7FFF  The screen: 2^G_SCR_ADDR_BITS words of memory of
+--                          their own, so that the emulator's 80x25 screen,
+--                          the first 2000, does not land on word 0. The rest
+--                          is for scrolling, through the display offset
+--                          below. Every write to it is also given out on
+--                          scr_*_o, for a display that keeps a copy
+--                          (src/video/text.vhd).
 --   0xFFFFFF00             The console of ISA.md §8.3. A write sends bits
 --                          7..0 to the UART. It waits while the previous
 --                          byte is still waiting to be sent. A read by the
@@ -52,16 +62,33 @@
 --   0xFFFFFF40-0xFFFFFF4F  The timer of ISA.md §8.6
 --                          (nice_cpu/hdl/src/timer.vhd). It counts clock
 --                          cycles, and its request goes to the core's IRQ.
+--   0xFFFFFF50-0xFFFFFF5F  The screen's registers, numbered as QNICE-FPGA's
+--                          VGA registers at 0xFF30, for the display: 50 is
+--                          the state, with bit 6 showing the cursor, bit 5
+--                          making it blink, bit 4 making it small, and bit
+--                          10 enabling the display offset; 51 and 52 are
+--                          the cursor's column and row; and 55 is the
+--                          display offset, in words: the display shows the
+--                          2000 words from it, so adding 80 scrolls a line.
+--                          Bits 11..4 of the state are kept and read back;
+--                          the other bits, and the words 53, 54, and 56-5F,
+--                          read 0 and take no write. The registers go out on
+--                          scr_cur_*_o and scr_offs_o, with scr_ctl_we_o
+--                          for a cycle when one is written.
 --   0xFFFFFFE0-0xFFFFFFEF  For the CLI only: R0-R15 of the core, read only,
 --                          so that they can be read after HALT, as the
 --                          emulator prints them.
 --   0xFFFFFFF0             Control, for the CLI only. Bit 0 holds the core
 --                          in reset while it is 1. A read returns bit 0, and
 --                          the core's halted flag in bit 1. A write with bit
---                          2 set first clears the memory, the screen
---                          included, to 0, as the emulator's memory is at
---                          the start, with the core held. Its OK comes when
---                          the memory is clear, and then bit 0 takes effect.
+--                          2 set first clears the RAM, the screen included,
+--                          to 0, as the emulator's memory is at the start,
+--                          with the core held. Its OK comes when the memory
+--                          is clear, and then bits 0 and 3 take effect. Bit
+--                          3 hides the ROM: while it is 1 the RAM is at 0,
+--                          as in the emulator, and the ROM is not reachable.
+--                          In a build without a ROM it reads 1 and cannot
+--                          be cleared.
 --   0xFFFFFFF1             For the CLI only, read only: why the core halted,
 --                          as the emulator's "Halted (...)" line says. 0
 --                          while it has not halted, 1 for HALT, 2 for a
@@ -99,7 +126,8 @@
 --
 -- RESET
 -- Synchronous. After reset the control bit is 1 when G_CPU_RUN_AT_RESET is
--- false, so the core waits for the CLI, and 0 otherwise. Memory is not
+-- false, so the core waits for the CLI, and 0 otherwise, so the core boots
+-- from the ROM, which reset shows. Memory and the screen's registers are not
 -- changed.
 
 library ieee;
@@ -115,27 +143,41 @@ entity nicemon is
       G_CLOCK_HZ         : natural;
       G_UART_BAUDRATE    : natural := 115_200;
       G_RAM_ADDR_BITS    : natural := 16;
+      -- The screen has 2^G_SCR_ADDR_BITS words.
+      G_SCR_ADDR_BITS    : natural := 15;
       -- The core's input FIFO has 2^G_RX_FIFO_BITS bytes.
       G_RX_FIFO_BITS     : natural := 11;
-      G_INIT_FILE        : string  := "";
+      -- The ROM: 2^G_ROM_ADDR_BITS words from the .bin file G_ROM_FILE, or
+      -- none when the file name is empty
+      G_ROM_FILE         : string  := "";
+      G_ROM_ADDR_BITS    : natural := 15;
       G_CPU_RUN_AT_RESET : boolean := false
    );
    port (
-      clk_i       : in  std_logic;
-      rst_i       : in  std_logic;
-      uart_rxd_i  : in  std_logic;
-      uart_txd_o  : out std_logic;
+      clk_i          : in  std_logic;
+      rst_i          : in  std_logic;
+      uart_rxd_i     : in  std_logic;
+      uart_txd_o     : out std_logic;
       -- The keyboard's bytes, input like the UART's
-      kbd_valid_i : in  std_logic := '0';
-      kbd_ready_o : out std_logic;
-      kbd_data_i  : in  std_logic_vector(7 downto 0) := X"00";
+      kbd_valid_i    : in  std_logic := '0';
+      kbd_ready_o    : out std_logic;
+      kbd_data_i     : in  std_logic_vector(7 downto 0) := X"00";
       -- '1' while the core runs and owns the UART input
-      running_o   : out std_logic;
+      running_o      : out std_logic;
       -- The writes to the screen, by the core or the CLI: the word's offset
       -- from 0xFFFF0000, and the word written
-      scr_we_o    : out std_logic;
-      scr_addr_o  : out std_logic_vector(10 downto 0);
-      scr_data_o  : out std_logic_vector(31 downto 0)
+      scr_we_o       : out std_logic;
+      scr_addr_o     : out std_logic_vector(G_SCR_ADDR_BITS - 1 downto 0);
+      scr_data_o     : out std_logic_vector(31 downto 0);
+      -- The screen's registers: the cursor's column, row, and mode (bit 0
+      -- shown, bit 1 blinking, bit 2 small), and the display offset, which
+      -- is 0 while bit 10 of the state is 0. scr_ctl_we_o is '1' for a
+      -- cycle when a register is written.
+      scr_ctl_we_o   : out std_logic;
+      scr_cur_x_o    : out std_logic_vector(6 downto 0);
+      scr_cur_y_o    : out std_logic_vector(4 downto 0);
+      scr_cur_mode_o : out std_logic_vector(2 downto 0);
+      scr_offs_o     : out std_logic_vector(G_SCR_ADDR_BITS - 1 downto 0)
    );
 end entity nicemon;
 
@@ -153,15 +195,31 @@ architecture synthesis of nicemon is
    constant C_HALT_WHY   : std_logic_vector(31 downto 0) := X"FFFFFFF1";
    -- The core's registers, for the CLI: 0xFFFFFFE0-EF
    constant C_REGS_BASE : std_logic_vector(31 downto 4) := X"FFFFFFE";
-   -- The screen: 0xFFFF0000-07FF, of which the emulator's screen is the
-   -- first 2000 words
-   constant C_SCR_BITS : natural := 11;
-   constant C_SCR_BASE : std_logic_vector(31 downto C_SCR_BITS) := X"FFFF" & "00000";
+   -- The screen: 0xFFFF0000 and the 2^G_SCR_ADDR_BITS words from it, of
+   -- which the emulator's screen is the first 2000
+   constant C_SCR_BITS : natural := G_SCR_ADDR_BITS;
+   constant C_SCR_BASE : std_logic_vector(31 downto C_SCR_BITS) := (31 downto 16 => '1', others => '0');
+   -- The screen's registers: 0xFFFFFF50-5F
+   constant C_SCR_REGS_BASE : std_logic_vector(31 downto 4) := X"FFFFFF5";
 
    -- The devices of nice_cpu/hdl/src, by the address bits above their offset
    constant C_PERF_BASE  : std_logic_vector(31 downto 4) := X"FFFFFF1";        -- 0xFFFFFF10-1F
    constant C_MPU_BASE   : std_logic_vector(31 downto 5) := X"FFFFFF" & "001"; -- 0xFFFFFF20-3F
    constant C_TIMER_BASE : std_logic_vector(31 downto 4) := X"FFFFFF4";        -- 0xFFFFFF40-4F
+
+   -- '1' in a build without a ROM, where the RAM is always at 0
+   function no_rom return std_logic is
+   begin
+      if G_ROM_FILE = "" then
+         return '1';
+      end if;
+      return '0';
+   end function no_rom;
+
+   constant C_NO_ROM : std_logic := no_rom;
+
+   -- The clearing counts through the larger of the RAM and the screen.
+   constant C_CLR_BITS : natural := maximum(G_RAM_ADDR_BITS, C_SCR_BITS);
 
    -- Whether an address is an I/O register, not memory, for the core or, with
    -- cli, for the CLI. The words of 0xFFFFFF00-FF that are not registers
@@ -174,9 +232,16 @@ architecture synthesis of nicemon is
       end if;
       return addr(7 downto 1) = "0000000" or                        -- console, read counter
              addr(7 downto 4) = X"1" or addr(7 downto 5) = "001" or -- perf, MPU
-             addr(7 downto 4) = X"4" or                             -- timer
+             addr(7 downto 4) = X"4" or addr(7 downto 4) = X"5" or  -- timer, screen registers
              (cli and (addr(7 downto 4) = X"E" or addr(7 downto 1) = "1111000"));
    end function is_io;
+
+   -- Whether a memory address is in the ROM's range, which repeats with the
+   -- RAM's
+   function in_rom(addr : std_logic_vector(31 downto 0)) return boolean is
+   begin
+      return or(addr(G_RAM_ADDR_BITS - 1 downto G_ROM_ADDR_BITS)) = '0';
+   end function in_rom;
 
    -- The devices of nice_cpu/hdl/src behind the latch of the data bus
    type t_dev is (DEV_PERF, DEV_MPU, DEV_TIMER);
@@ -199,8 +264,19 @@ architecture synthesis of nicemon is
 
    -- Clearing the memory: the address, and the hold bit after it
    signal clearing : std_logic := '0';
-   signal clr_addr : std_logic_vector(G_RAM_ADDR_BITS - 1 downto 0);
+   signal clr_addr : std_logic_vector(C_CLR_BITS - 1 downto 0);
    signal clr_hold : std_logic;
+
+   -- Bit 3 of the control register: the ROM is hidden, and the RAM is at 0
+   signal rom_hidden : std_logic := C_NO_ROM;
+
+   -- The screen's registers: the state's bits 11..4, the cursor's column
+   -- and row, and the display offset
+   signal scr_state  : std_logic_vector(11 downto 4) := (others => '0');
+   signal scr_cur_x  : std_logic_vector(6 downto 0) := (others => '0');
+   signal scr_cur_y  : std_logic_vector(4 downto 0) := (others => '0');
+   signal scr_offs   : std_logic_vector(C_SCR_BITS - 1 downto 0) := (others => '0');
+   signal scr_ctl_we : std_logic := '0';
 
    -- The number of the core's data reads of 0xFFFFFF01 since it was written
    signal read_count : std_logic_vector(31 downto 0) := (others => '0');
@@ -212,6 +288,7 @@ architecture synthesis of nicemon is
    signal ibus_data : std_logic_vector(31 downto 0);
    signal ibus_io   : std_logic := '0';
    signal ibus_scr  : std_logic := '0';
+   signal ibus_rom  : std_logic := '0';
 
    signal dbus_cyc   : std_logic;
    signal dbus_stb   : std_logic;
@@ -282,8 +359,13 @@ architecture synthesis of nicemon is
    signal ram_b_wdata : std_logic_vector(31 downto 0);
    signal ram_b_rdata : std_logic_vector(31 downto 0);
    signal rd_ram      : std_logic := '0';
+   signal rd_rom      : std_logic := '0';
    signal rd_scr      : std_logic := '0';
    signal rd_rx       : std_logic := '0';
+
+   -- The ROM, read at the addresses of the memory ports
+   signal rom_a_data : std_logic_vector(31 downto 0);
+   signal rom_b_data : std_logic_vector(31 downto 0);
 
    -- The screen memory, like the main memory
    signal scr_a_data  : std_logic_vector(31 downto 0);
@@ -345,9 +427,12 @@ architecture synthesis of nicemon is
 
 begin
 
-   -- The screen is cleared with the low bits of the memory's address.
-   assert G_RAM_ADDR_BITS >= C_SCR_BITS
-      report "nicemon: the memory must be at least as large as the screen"
+   assert C_SCR_BITS >= 11 and C_SCR_BITS <= 16
+      report "nicemon: the screen must hold its 2000 words, below the I/O registers"
+      severity failure;
+
+   assert G_ROM_ADDR_BITS < G_RAM_ADDR_BITS
+      report "nicemon: the ROM must leave room for RAM above it"
       severity failure;
 
    ---------------------------------------------------------------------------
@@ -401,6 +486,7 @@ begin
          ibus_ack <= ibus_cyc and ibus_stb;
          ibus_io  <= and(ibus_addr(31 downto 8));
          ibus_scr <= '1' when ibus_addr(31 downto C_SCR_BITS) = C_SCR_BASE else '0';
+         ibus_rom <= '1' when rom_hidden = '0' and in_rom(ibus_addr) else '0';
          if cpu_rst = '1' then
             ibus_ack <= '0';
          end if;
@@ -409,6 +495,7 @@ begin
 
    ibus_data <= (others => '0') when ibus_io = '1' else
                 scr_a_data when ibus_scr = '1' else
+                rom_a_data when ibus_rom = '1' else
                 ram_a_data;
 
 
@@ -419,7 +506,7 @@ begin
    -- The core's request is taken in a cycle with no stall.
    dbus_stall <= cli_pend or tx_wait or dev_busy or clearing;
 
-   ram_b_addr  <= clr_addr when clearing = '1' else
+   ram_b_addr  <= clr_addr(G_RAM_ADDR_BITS - 1 downto 0) when clearing = '1' else
                   cli_p_addr(G_RAM_ADDR_BITS - 1 downto 0) when cli_pend = '1' else
                   dbus_addr(G_RAM_ADDR_BITS - 1 downto 0);
    ram_b_wdata <= (others => '0') when clearing = '1' else
@@ -430,8 +517,9 @@ begin
                   dbus_addr(C_SCR_BITS - 1 downto 0);
 
    -- A write to memory is served in the cycle that the CLI's or the core's
-   -- request is taken. It goes to the screen or to the main memory. While
-   -- the memory is cleared, both are written.
+   -- request is taken. It goes to the screen or to the main memory, unless
+   -- it is to the ROM, where it is dropped. While the memory is cleared,
+   -- both are written, the RAM under the ROM included.
    p_mem_we : process (all)
       variable we_v   : std_logic;
       variable addr_v : std_logic_vector(31 downto 0);
@@ -456,6 +544,9 @@ begin
       elsif addr_v(31 downto C_SCR_BITS) = C_SCR_BASE then
          ram_b_we <= '0';
          scr_b_we <= we_v;
+      elsif rom_hidden = '0' and in_rom(addr_v) then
+         ram_b_we <= '0';
+         scr_b_we <= '0';
       else
          ram_b_we <= we_v;
          scr_b_we <= '0';
@@ -463,6 +554,7 @@ begin
    end process p_mem_we;
 
    dbus_rdata <= ram_b_rdata when rd_ram = '1' else
+                 rom_b_data when rd_rom = '1' else
                  scr_b_rdata when rd_scr = '1' else
                  X"00000" & "0001" & rx_q when rd_rx = '1' else
                  rd_io;
@@ -478,6 +570,7 @@ begin
                       wdata : std_logic_vector(31 downto 0)) is
       begin
          rd_ram <= '0';
+         rd_rom <= '0';
          rd_scr <= '0';
          rd_rx  <= '0';
          rd_io  <= (others => '0');
@@ -485,6 +578,8 @@ begin
             -- Memory: port B is driven combinationally above.
             if addr(31 downto C_SCR_BITS) = C_SCR_BASE then
                rd_scr <= '1';
+            elsif rom_hidden = '0' and in_rom(addr) then
+               rd_rom <= '1';
             else
                rd_ram <= '1';
             end if;
@@ -540,6 +635,30 @@ begin
                   read_count <= read_count + 1;
                end if;
             end if;
+         elsif addr(31 downto 4) = C_SCR_REGS_BASE then
+            -- The screen's registers. A write is told to the display.
+            if we = '1' then
+               scr_ctl_we <= '1';
+
+               case addr(3 downto 0) is
+                  when X"0"   => scr_state <= wdata(11 downto 4);
+                  when X"1"   => scr_cur_x <= wdata(6 downto 0);
+                  when X"2"   => scr_cur_y <= wdata(4 downto 0);
+                  when X"5"   => scr_offs  <= wdata(C_SCR_BITS - 1 downto 0);
+                  when others => null;
+               end case;
+
+            else
+
+               case addr(3 downto 0) is
+                  when X"0"   => rd_io(11 downto 4) <= scr_state;
+                  when X"1"   => rd_io(6 downto 0) <= scr_cur_x;
+                  when X"2"   => rd_io(4 downto 0) <= scr_cur_y;
+                  when X"5"   => rd_io(C_SCR_BITS - 1 downto 0) <= scr_offs;
+                  when others => null;
+               end case;
+
+            end if;
          elsif addr(31 downto 4) = C_REGS_BASE and cli then
             if we = '0' then
                rd_io <= cpu_retire.regs(to_integer(addr(3 downto 0)));
@@ -548,16 +667,19 @@ begin
             if we = '1' and wdata(2) = '1' then
                -- Clear the memory with the core held. The request is
                -- acknowledged when the memory is clear.
-               clearing <= '1';
-               clr_addr <= (others => '0');
-               clr_hold <= wdata(0);
-               cpu_hold <= '1';
+               clearing   <= '1';
+               clr_addr   <= (others => '0');
+               clr_hold   <= wdata(0);
+               cpu_hold   <= '1';
+               rom_hidden <= wdata(3) or C_NO_ROM;
                return;
             elsif we = '1' then
-               cpu_hold <= wdata(0);
+               cpu_hold   <= wdata(0);
+               rom_hidden <= wdata(3) or C_NO_ROM;
             else
                rd_io(0) <= cpu_hold;
                rd_io(1) <= cpu_halted;
+               rd_io(3) <= rom_hidden;
             end if;
          elsif addr = C_HALT_WHY and cli then
             -- The core keeps the reason until it is reset.
@@ -577,6 +699,7 @@ begin
          dbus_ack     <= '0';
          cli_ack      <= '0';
          halt_note    <= '0';
+         scr_ctl_we   <= '0';
          cpu_hold_d   <= cpu_hold;
          cpu_halted_d <= cpu_halted;
 
@@ -601,6 +724,7 @@ begin
             end if;
             if mpu_ack = '1' or perf_ack = '1' or timer_ack = '1' then
                rd_ram   <= '0';
+               rd_rom   <= '0';
                rd_scr   <= '0';
                rd_rx    <= '0';
                if mpu_ack = '1' then
@@ -673,6 +797,7 @@ begin
             cli_pend     <= '0';
             clearing     <= '0';
             cpu_tx_valid <= '0';
+            rom_hidden   <= C_NO_ROM;
             if G_CPU_RUN_AT_RESET then
                cpu_hold <= '0';
             else
@@ -770,8 +895,7 @@ begin
 
    i_ram : entity work.ram
       generic map (
-         G_ADDR_BITS => G_RAM_ADDR_BITS,
-         G_INIT_FILE => G_INIT_FILE
+         G_ADDR_BITS => G_RAM_ADDR_BITS
       )
       port map (
          clk_i     => clk_i,
@@ -783,13 +907,44 @@ begin
          b_rdata_o => ram_b_rdata
       ); -- i_ram
 
+   gen_rom : if G_ROM_FILE /= "" generate
+
+      -- The ROM, read at the addresses of both memory ports. Its words are
+      -- taken instead of the RAM's while it is not hidden.
+      i_rom : entity work.rom
+         generic map (
+            G_ADDR_BITS => G_ROM_ADDR_BITS,
+            G_INIT_FILE => G_ROM_FILE
+         )
+         port map (
+            clk_i    => clk_i,
+            a_addr_i => ram_a_addr(G_ROM_ADDR_BITS - 1 downto 0),
+            a_data_o => rom_a_data,
+            b_addr_i => ram_b_addr(G_ROM_ADDR_BITS - 1 downto 0),
+            b_data_o => rom_b_data
+         ); -- i_rom
+
+   end generate gen_rom;
+
+   gen_no_rom : if G_ROM_FILE = "" generate
+
+      rom_a_data <= (others => '0');
+      rom_b_data <= (others => '0');
+
+   end generate gen_no_rom;
+
    -- The screen, at 0xFFFF0000. It is memory, as in the emulator, so the CLI
    -- can read what a program wrote there. Without it the address would
    -- land at word 0 of the main memory. A display keeps its own copy, from
-   -- the writes given out here.
-   scr_we_o   <= scr_b_we;
-   scr_addr_o <= scr_b_addr;
-   scr_data_o <= ram_b_wdata;
+   -- the writes given out here, and shows it as the registers say.
+   scr_we_o       <= scr_b_we;
+   scr_addr_o     <= scr_b_addr;
+   scr_data_o     <= ram_b_wdata;
+   scr_ctl_we_o   <= scr_ctl_we;
+   scr_cur_x_o    <= scr_cur_x;
+   scr_cur_y_o    <= scr_cur_y;
+   scr_cur_mode_o <= scr_state(4) & scr_state(5) & scr_state(6);
+   scr_offs_o     <= scr_offs when scr_state(10) = '1' else (others => '0');
 
    i_scr : entity work.ram
       generic map (

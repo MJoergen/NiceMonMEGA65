@@ -11,8 +11,11 @@ help:
 	@echo "  make test       run the GHDL simulation tests (needs GHDL)"
 	@echo "  make lint       check the VHDL against CODING_STYLE.md (needs vsg)"
 	@echo "  make examples   build the C examples to examples/build/*.bin (needs clang)"
-	@echo "  make r3         build the bitstream for the MEGA65 R3 (needs Vivado)"
-	@echo "  make r6         build the bitstream for the MEGA65 R6 (needs Vivado)"
+	@echo "  make r3 [ROM=monitor.bin]"
+	@echo "                  build the bitstream for the MEGA65 R3 (needs Vivado)"
+	@echo "  make r6 [ROM=monitor.bin]"
+	@echo "                  build the bitstream for the MEGA65 R6; with ROM, the"
+	@echo "                  core boots from the .bin file at reset"
 	@echo "  make load FILE=prog.bin [PORT=/dev/ttyUSB1]"
 	@echo "                  load a program into the MEGA65 and start it"
 	@echo "  make run FILE=prog.bin [PORT=/dev/ttyUSB1]"
@@ -37,11 +40,13 @@ lint:
 examples:
 	$(MAKE) -C examples
 
+# The ROM's path is made absolute here, for the board's Makefile runs in
+# its own directory.
 r3:
-	$(MAKE) -C synth/r3
+	$(MAKE) -C synth/r3 ROM=$(if $(ROM),$(abspath $(ROM)))
 
 r6:
-	$(MAKE) -C synth/r6
+	$(MAKE) -C synth/r6 ROM=$(if $(ROM),$(abspath $(ROM)))
 
 load:
 	@test -n "$(FILE)" || (echo "Give the program with FILE=prog.bin"; exit 1)

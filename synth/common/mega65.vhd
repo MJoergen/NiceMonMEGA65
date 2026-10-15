@@ -30,7 +30,9 @@ library work;
 
 entity mega65 is
    generic (
-      G_INIT_FILE : string := ""
+      -- The ROM with the monitor, a .bin file, or "" for a build without a
+      -- ROM, whose core waits for the command line (see src/nicemon.vhd)
+      G_ROM_FILE : string := ""
    );
    port (
       clk_i          : in  std_logic; -- 100 MHz
@@ -88,10 +90,18 @@ architecture synthesis of mega65 is
 
    constant C_VIDEO : t_video_mode := C_VIDEO_1280X1024;
 
-   -- The writes to the screen, in the system clock domain
-   signal scr_we   : std_logic;
-   signal scr_addr : std_logic_vector(10 downto 0);
-   signal scr_data : std_logic_vector(31 downto 0);
+   -- The screen's size, and the writes to it and its registers, in the
+   -- system clock domain
+   constant C_SCR_ADDR_BITS : natural := 15;
+
+   signal scr_we       : std_logic;
+   signal scr_addr     : std_logic_vector(C_SCR_ADDR_BITS - 1 downto 0);
+   signal scr_data     : std_logic_vector(31 downto 0);
+   signal scr_ctl_we   : std_logic;
+   signal scr_cur_x    : std_logic_vector(6 downto 0);
+   signal scr_cur_y    : std_logic_vector(4 downto 0);
+   signal scr_cur_mode : std_logic_vector(2 downto 0);
+   signal scr_offs     : std_logic_vector(C_SCR_ADDR_BITS - 1 downto 0);
 
    signal vga_clk   : std_logic;
    signal vga_rst   : std_logic;
@@ -176,25 +186,35 @@ begin
          data_o       => kbd_data
       ); -- i_kbd_ascii
 
+   -- With a ROM the core boots from it at reset; without one it waits for
+   -- the command line.
    i_nicemon : entity work.nicemon
       generic map (
-         G_CLOCK_HZ      => C_CLOCK_HZ,
-         G_UART_BAUDRATE => 115_200,
-         G_RAM_ADDR_BITS => 16,
-         G_INIT_FILE     => G_INIT_FILE
+         G_CLOCK_HZ         => C_CLOCK_HZ,
+         G_UART_BAUDRATE    => 115_200,
+         G_RAM_ADDR_BITS    => 16,
+         G_SCR_ADDR_BITS    => C_SCR_ADDR_BITS,
+         G_ROM_FILE         => G_ROM_FILE,
+         G_ROM_ADDR_BITS    => 15,
+         G_CPU_RUN_AT_RESET => G_ROM_FILE /= ""
       )
       port map (
-         clk_i       => clk,
-         rst_i       => rst,
-         uart_rxd_i  => rxd(1),
-         uart_txd_o  => txd,
-         kbd_valid_i => kbd_valid,
-         kbd_ready_o => kbd_ready,
-         kbd_data_i  => kbd_data,
-         running_o   => running,
-         scr_we_o    => scr_we,
-         scr_addr_o  => scr_addr,
-         scr_data_o  => scr_data
+         clk_i          => clk,
+         rst_i          => rst,
+         uart_rxd_i     => rxd(1),
+         uart_txd_o     => txd,
+         kbd_valid_i    => kbd_valid,
+         kbd_ready_o    => kbd_ready,
+         kbd_data_i     => kbd_data,
+         running_o      => running,
+         scr_we_o       => scr_we,
+         scr_addr_o     => scr_addr,
+         scr_data_o     => scr_data,
+         scr_ctl_we_o   => scr_ctl_we,
+         scr_cur_x_o    => scr_cur_x,
+         scr_cur_y_o    => scr_cur_y,
+         scr_cur_mode_o => scr_cur_mode,
+         scr_offs_o     => scr_offs
       ); -- i_nicemon
 
 
@@ -212,13 +232,19 @@ begin
 
    i_text : entity work.text
       generic map (
-         G_MODE => C_VIDEO
+         G_MODE          => C_VIDEO,
+         G_SCR_ADDR_BITS => C_SCR_ADDR_BITS
       )
       port map (
          clk_i       => clk,
          scr_we_i    => scr_we,
          scr_addr_i  => scr_addr,
          scr_data_i  => scr_data,
+         ctl_we_i    => scr_ctl_we,
+         cur_x_i     => scr_cur_x,
+         cur_y_i     => scr_cur_y,
+         cur_mode_i  => scr_cur_mode,
+         offs_i      => scr_offs,
          vga_clk_i   => vga_clk,
          vga_hs_o    => vga_hs,
          vga_vs_o    => vga_vs,

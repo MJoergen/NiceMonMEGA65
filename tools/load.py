@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """Load a .bin file into the MEGA65 through the command line interpreter.
 
-The core is held in reset and the memory cleared to 0, as the emulator's is
-at the start. Then each word of the file is written with a W command, and
-the core is started unless --no-run is given.
+The core is held in reset, the ROM with the monitor, if the bitstream has
+one, is hidden, so that the RAM is at 0, and the memory is cleared to 0, as
+the emulator's is at the start. Then each word of the file is written with
+a W command, and the core is started unless --no-run is given. The ROM
+stays hidden until the reset button is pressed, which boots the monitor
+again.
 
 Usage: tools/load.py [--port /dev/ttyUSB1] [--baud 115200] [--no-run] FILE.bin
 
@@ -20,9 +23,11 @@ import time
 from typing import NoReturn
 
 CONTROL = 0xFFFFFFF0
-# Control bits: hold the core in reset, and clear the memory first.
+# Control bits: hold the core in reset, clear the memory first, and hide the
+# ROM, so that the RAM is at 0.
 HOLD = 1
 CLEAR = 4
+RAM = 8
 # What the command line prints when the core halts
 HALT_MESSAGE = b"\r\nHALT\r\n"
 
@@ -132,8 +137,9 @@ def read_words(fd: int, addrs: list[int]) -> list[int]:
 
 
 def load_words(fd: int, words: list[tuple[int, int]]) -> None:
-    """Holds the core, clears the memory, and writes the words."""
-    write(fd, CONTROL, HOLD | CLEAR)
+    """Holds the core, hides the ROM, clears the memory, and writes the
+    words."""
+    write(fd, CONTROL, HOLD | CLEAR | RAM)
     answers = pipelined(fd, [f"W {a:08X} {d:08X}" for a, d in words])
     for (addr, _), answer in zip(words, answers):
         if answer != "OK":
@@ -141,10 +147,10 @@ def load_words(fd: int, words: list[tuple[int, int]]) -> None:
 
 
 def start(fd: int) -> None:
-    """Starts the core. The program may print as soon as it starts, so this
-    reads only up to the OK."""
+    """Starts the core, with the ROM hidden. The program may print as soon as
+    it starts, so this reads only up to the OK."""
     termios.tcflush(fd, termios.TCIFLUSH)
-    os.write(fd, f"W {CONTROL:08X} 00000000\r".encode())
+    os.write(fd, f"W {CONTROL:08X} {RAM:08X}\r".encode())
     if not read_until(fd, b"OK\r\n").endswith(b"OK\r\n"):
         fail("the core did not start")
 
