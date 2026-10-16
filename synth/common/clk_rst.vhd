@@ -1,7 +1,7 @@
 -- The clock and reset of the MEGA65 boards. The board's 100 MHz clock drives
--- an MMCM that makes the 50 MHz system clock. The reset is held while the
+-- an MMCM that makes the 100 MHz system clock. The reset is held while the
 -- MMCM is not locked, and while the reset button (active high) is pressed,
--- and for 2^20 cycles (21 ms) after both. So the UART output is idle for that
+-- and for 2^20 cycles (10 ms) after both. So the UART output is idle for that
 -- long before the CLI sends its banner, and a terminal that saw the pin
 -- change during configuration has time to find the start of a character.
 -- The MMCM's locked output and the button are synchronised to clk_o by two
@@ -18,7 +18,7 @@ entity clk_rst is
    port (
       sys_clk_i      : in  std_logic; -- 100 MHz
       reset_button_i : in  std_logic; -- active high, asynchronous
-      clk_o          : out std_logic; -- 50 MHz
+      clk_o          : out std_logic; -- 100 MHz
       rst_o          : out std_logic  -- synchronous to clk_o
    );
 end entity clk_rst;
@@ -33,6 +33,7 @@ architecture synthesis of clk_rst is
    signal locked_sync : std_logic_vector(1 downto 0) := "00";
    signal button_sync : std_logic_vector(1 downto 0) := "11";
    signal counter     : std_logic_vector(19 downto 0) := (others => '1');
+   signal rst         : std_logic := '1';
 
    -- The registers of the synchronisers
    attribute async_reg : string;
@@ -49,7 +50,7 @@ begin
          CLKIN1_PERIOD    => 10.0,  -- 100 MHz
          DIVCLK_DIVIDE    => 1,
          CLKFBOUT_MULT_F  => 10.0,  -- VCO at 1000 MHz
-         CLKOUT0_DIVIDE_F => 20.0   -- 50 MHz
+         CLKOUT0_DIVIDE_F => 10.0   -- 100 MHz
       )
       port map (
          CLKIN1   => sys_clk_i,
@@ -84,9 +85,12 @@ begin
          elsif counter /= 0 then
             counter <= counter - 1;
          end if;
+
+         -- A register, as the reset reaches most of the design
+         rst <= '1' when counter /= 0 else '0';
       end if;
    end process p_rst;
 
-   rst_o <= '1' when counter /= 0 else '0';
+   rst_o <= rst;
 
 end architecture synthesis;

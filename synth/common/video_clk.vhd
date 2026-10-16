@@ -6,7 +6,7 @@
 --   vga_clk   1080 MHz / 10 = 108 MHz, the pixel clock
 --   tmds_clk  1080 MHz / 2 = 540 MHz, five times the pixel clock, for the
 --             HDMI serialisers, which send ten bits per pixel on both edges
--- The video has its own MMCM so that the system clock stays at 50 MHz,
+-- The video has its own MMCM so that the system clock stays at 100 MHz,
 -- which 1080 MHz does not divide to.
 --
 -- RESET
