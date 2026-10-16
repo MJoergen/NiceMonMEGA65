@@ -15,10 +15,11 @@ written, programs are loaded through the command line.
 | Path | What it is |
 |---|---|
 | [nice_cpu/](https://github.com/MJoergen/nice_cpu) | The NICE CPU, its assembler, and its emulator, as a git submodule. |
-| [src/](src/) | The synthesisable VHDL, shared by both boards. `nicemon.vhd` is the system: the NICE core, the memory (`ram.vhd` and `rom.vhd`), the UART, and the command line interpreter. `uart_serdes.vhd` (with fixes to its receiver, and break detection), `line_buffer.vhd` and `cmd.vhd` are copied from cmod-s7; `cmd.vhd` prints `NICE` instead of `WBUS` at reset, and `HALT` when the core halts. `kbd_m65.vhd` drives the MEGA65 keyboard, and `kbd_ascii.vhd` turns its keys into ASCII. |
+| [src/](src/) | The synthesisable VHDL, shared by both boards. `nicemon.vhd` is the system: the NICE core, the memory (`ram.vhd` and `rom.vhd`), the UART, the core's input FIFO (`rx_fifo.vhd`), and the command line interpreter. `uart_serdes.vhd` (with fixes to its receiver, and break detection), `line_buffer.vhd` and `cmd.vhd` are copied from cmod-s7; `cmd.vhd` prints `NICE` instead of `WBUS` at reset, and `HALT` when the core halts. `kbd_m65.vhd` drives the MEGA65 keyboard, and `kbd_ascii.vhd` turns its keys into ASCII. |
 | [src/video/](src/video/) | The text display: `text.vhd` shows the screen at `0xFFFF0000` as 80×25 characters on a video output, with a cursor and a display offset for scrolling. `pix.vhd` and `video_pkg.vhd` are from [MandelbrotMEGA65](https://github.com/MJoergen/MandelbrotMEGA65), and `font_pkg.vhd` is the [Spleen](https://github.com/fcambus/spleen) 16×32 font, made by `font/gen_font_pkg.py`. |
 | [font/](font/) | The script that makes `src/video/font_pkg.vhd` from Spleen, and Spleen's license (BSD 2-Clause). |
 | [sim/](sim/) | The GHDL testbenches. |
+| [formal/](formal/) | The formal checks, for SymbiYosys. |
 | [synth/](synth/README.md) | The Vivado builds for the R3 and R6 boards. |
 | [monitor/](monitor/README.md) | The monitor, in NICE assembly: planned, not written yet. Its README has the decisions it will follow, QNICE-FPGA's. |
 | [examples/](examples/) | Example C programs, and the Makefile that builds them for the MEGA65. |
@@ -68,7 +69,8 @@ or, in an existing clone:
     git submodule update --init
 
 `make` in the top directory lists the targets: `make test` runs the
-simulation tests, `make lint` checks the VHDL style, `make examples` builds
+simulation tests, `make formal` runs the formal checks (see
+[The formal checks](#the-formal-checks)), `make lint` checks the VHDL style, `make examples` builds
 the C examples, `make r3` and `make r6` build the bitstreams, with
 `ROM=file.bin` one whose core boots from the file (see
 [The ROM](#the-rom)),
@@ -389,6 +391,42 @@ You need GHDL (tested with 4.1.0) and Python 3.
   with vsg.
 
 For the boards, see [synth/](synth/README.md).
+
+## The formal checks
+
+`make formal` runs the SymbiYosys jobs in `formal/`, and CI runs it too.
+It needs the tools of nice_cpu's formal checks: Yosys with the GHDL plugin,
+SymbiYosys, and the Yices 2 solver. It is tested with the packages `yosys`,
+`yosys-plugin-ghdl`, and `ghdl-gcc` of Ubuntu 24.04 (Yosys 0.33 and GHDL
+4.1.0), SymbiYosys at its tag `yosys-0.33`, and Yices 2.6.4, as CI installs
+them. Every input of each job is free, so the solver tries every input at
+every time, not only the ones a testbench sends.
+
+- `cli.sby` checks the command line interpreter, `line_buffer.vhd` and
+  `cmd.vhd` together (`formal_cli.vhd`). It proves, for every cycle, that
+  each of their valid/ready ports holds its data until it is taken, that a
+  line and a message are never empty, that the bus request is one STB
+  pulse after a line is taken, with CYC held until the ACK, and that each
+  line gets one answer before the next line is taken.
+- `rx_fifo.sby` proves the core's input FIFO, `src/rx_fifo.vhd`, with 4
+  bytes: the bytes come out in the order they went in, a byte is lost only
+  when the FIFO is full or the input has ended, no byte is written to the
+  word being read, and the end of the input stays until reset.
+- `nicemon.sby` checks the whole system, with 16 words of RAM whose
+  contents are free, so that the solver runs every program. It is too
+  large to prove, so it checks every cycle up to a depth: 30 cycles with
+  the core running from reset, and 40 with the command line first, which
+  is enough to type a command. It checks that the core's two buses get an
+  ACK only for a request that waits, which is what nice_cpu's proof of the
+  core assumes of them, that the command line's latched request is not
+  overwritten and gets one ACK, that the devices answer only the latched
+  request, and what a read of the console returns. Its tasks take 5 to 11
+  minutes each; `make -j4 formal` runs all the tasks side by side, as CI
+  does.
+
+The checks in `cmd.vhd`, `line_buffer.vhd`, `rx_fifo.vhd`, and
+`nicemon.vhd` are in `G_FORMAL` blocks, which are off in simulation and
+synthesis.
 
 ## Testing the board
 

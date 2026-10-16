@@ -1,5 +1,6 @@
 -- Copied from https://github.com/MJoergen/cmod-s7 (src/line_buffer.vhd, commit d3d544d), MIT License.
--- Changed: the layout and names follow CODING_STYLE.md.
+-- Changed: the layout and names follow CODING_STYLE.md. With G_FORMAL, it
+-- states the invariants that formal/formal_cli.vhd needs.
 --
 -- ----------------------------------------------------------------------------
 -- Description: Serial to Parallel and back.
@@ -11,7 +12,9 @@ library ieee;
 
 entity line_buffer is
    generic (
-      G_BUFFER_LEN : natural
+      G_BUFFER_LEN : natural;
+      -- The invariants for formal/cli.sby
+      G_FORMAL     : boolean := false
    );
    port (
       clk_i             : in  std_logic;
@@ -143,6 +146,28 @@ begin
          end if;
       end if;
    end process p_tx;
+
+
+   gen_formal : if G_FORMAL generate
+   begin
+      -- A line is offered exactly in PROCESSING_ST, and is not empty, and a
+      -- byte is sent only in SENDING_ST. The sizes are in their ranges. Without this the k-induction of
+      -- formal/cli.sby starts from states that reset never leads to.
+
+      -- psl default clock is rising_edge(clk_i);
+
+      -- psl f_rx_valid : assert always
+      --    rst_i = '0' -> (rx_buffer_valid_o = '1') = (rx_state = PROCESSING_ST);
+      -- psl f_rx_size : assert always
+      --    rst_i = '0' and rx_state = PROCESSING_ST -> rx_buffer_size_o /= 0;
+      -- psl f_rx_range : assert always rst_i = '0' -> rx_buffer_size_o <= G_BUFFER_LEN;
+      -- psl f_rx_room : assert always
+      --    rst_i = '0' and rx_state = RECEIVING_ST -> rx_buffer_size_o < G_BUFFER_LEN;
+      -- psl f_tx_range : assert always
+      --    rst_i = '0' and tx_state = SENDING_ST -> tx_buffer_size < G_BUFFER_LEN;
+      -- psl f_tx_valid : assert always
+      --    rst_i = '0' and tx_valid_o = '1' -> tx_state = SENDING_ST;
+   end generate gen_formal;
 
 end architecture synthesis;
 

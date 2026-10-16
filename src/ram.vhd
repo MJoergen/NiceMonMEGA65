@@ -17,7 +17,9 @@
 -- The memory is loaded at configuration time from G_INIT_FILE, a .bin file
 -- (ISA.md §10.4): one line per word, an 8-digit hex address, a space, and the
 -- 8-digit hex word. With G_INIT_FILE = "" the memory starts as zeros. Vivado
--- reads the file during synthesis.
+-- reads the file during synthesis. With G_FORMAL, it starts as 'X' instead,
+-- so that the solver of formal/nicemon.sby picks its contents: every
+-- program.
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -28,7 +30,9 @@ library ieee;
 entity ram is
    generic (
       G_ADDR_BITS : natural;
-      G_INIT_FILE : string := ""
+      G_INIT_FILE : string  := "";
+      -- Any contents at the start, for formal/nicemon.sby
+      G_FORMAL    : boolean := false
    );
    port (
       clk_i     : in  std_logic;
@@ -56,6 +60,9 @@ architecture synthesis of ram is
       variable data_v : std_logic_vector(31 downto 0);
       variable mem_v  : t_mem := (others => (others => '0'));
    begin
+      if G_FORMAL then
+         return (others => (others => 'X'));
+      end if;
       if name /= "" then
          file_open(f, name, read_mode);
          while not endfile(f) loop
