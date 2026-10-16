@@ -28,15 +28,15 @@ To build, with Vivado installed in `/opt/Xilinx/2025.1/Vivado` (or set
     make -C synth/r6
 
 The bitstream is `synth/r6/build/top.bit`, with timing and utilisation
-reports next to it. Its core waits for the command line. With
+reports next to it. Its core waits for the debug link to start it. With
 
-    make -C synth/r6 ROM=/path/to/monitor.bin
+    make -C synth/r6 ROM=/path/to/program.bin
 
 the core boots at reset from a ROM of 32K words at address 0 with the words
 of the `.bin` file (`src/rom.vhd`, through `G_ROM_FILE` of `top.vhd`), as
 the main README describes under "The ROM". Vivado reads the file during
 synthesis, so the bitstream is rebuilt when it changes. `make r6
-ROM=monitor.bin` in the top directory does the same with a path relative
+ROM=program.bin` in the top directory does the same with a path relative
 to it.
 
 The user LED is on while the core runs.

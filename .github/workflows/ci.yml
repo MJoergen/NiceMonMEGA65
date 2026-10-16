@@ -16,6 +16,7 @@ jobs:
           python-version: "3.x"
       - run: sudo apt-get update && sudo apt-get install -y ghdl
       - run: make -C sim test
+      - run: python3 tools/test_nicedis.py
 
   lint:
     runs-on: ubuntu-latest
