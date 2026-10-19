@@ -7,7 +7,7 @@
 -- The screen is the 2^G_SCR_ADDR_BITS words at 0xFFFF0000 (src/nicemon.vhd),
 -- 32768 on the boards, of which the first 2000 are the emulator's 80x25
 -- characters, row by row. Each word is a character in bits 7..0 and its
--- colour above (nice_cpu's ISA.md §9.3, nice_screen_put). This module keeps
+-- colour above (nice_cpu's runtime/ABI.md, nice_screen_put). This module keeps
 -- a copy of the screen in a memory of its own (scr_ram.vhd), with a write
 -- port in the system clock domain, which takes every write to the screen
 -- (scr_*_i), and a read port in the VGA clock domain. So the copy is a

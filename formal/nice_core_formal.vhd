@@ -18,15 +18,15 @@
 -- The step report, retire_o, and instret_o are free; the halt reason is one
 -- of the values of t_halt.
 --
--- Two assumptions go further than nice_cpu's checks. They were proved for
--- every cycle with the same assertions added to a copy of nice_cpu's
--- formal/: in multicycle.sby, and for the pipelined core in pipe_dbus.sby
--- and pipe_fetch.sby, whose stop_i is the halt of pipeline.vhd.
--- - CYC stays high in the cycle after a request is accepted.
---   wb_master_check.vhd counts the request only from that cycle, so it
---   would allow a core to drop CYC then, and the system's registered ACK
---   would come with CYC low.
--- - From the second cycle of a halt on, the core makes no new fetch. In
+-- Two of the assumptions matter most here, and nice_cpu proves both for
+-- every cycle: in multicycle.sby, and for the pipelined core in
+-- pipe_dbus.sby and pipe_fetch.sby, whose stop_i is the halt of
+-- pipeline.vhd.
+-- - CYC stays high in the cycle after a request is accepted
+--   (f_cyc_accept of wb_master_check.vhd). Otherwise the system's
+--   registered ACK would come with CYC low.
+-- - From the second cycle of a halt on, the core makes no new fetch
+--   (f_stop of pipe_fetch.vhd, f_halt_idle of formal_multicycle.vhd). In
 --   the first, the pipelined core may still have one on the bus. This
 --   holds for an instruction bus that never stalls, as nicemon.vhd's.
 --   Without it, the CLI could hold the core while a fetch waits, and the

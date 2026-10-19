@@ -1,5 +1,5 @@
-; Uses the math unit (ISA.md §8.4), the performance counters (§8.5), and
-; the timer (§8.6), and leaves the results in memory at RESULT, where
+; Uses the math unit (SYSTEM.md §2), the performance counters (§3), and
+; the timer (§4), and leaves the results in memory at RESULT, where
 ; tb_nicemon reads them with the CLI.
 ;
 ; The timer raises IRQ through vector 0xF0 every 200 cycles, and the

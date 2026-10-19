@@ -207,7 +207,7 @@ The C library has `printf`, `scanf`, `puts`, `putchar`, `getchar`, the
 string functions, `malloc`, and more. `putchar` and `getchar` use the UART
 at `0xFFFFFF00`. `getchar` waits for a byte, and returns `EOF` once a
 break on the UART has ended the input. `nice.h` declares the device routines of
-ISA.md §9.3: `nice_putc`, `nice_getc`, `nice_pollc`, and `nice_print` for
+nice_cpu's runtime/ABI.md: `nice_putc`, `nice_getc`, `nice_pollc`, and `nice_print` for
 the UART, and `nice_cycles` and `nice_instructions` for the performance
 counters, as `examples/primes.c` uses them. It also declares `nice_peek`
 and `nice_poke`, which read and write any NICE address, such as the math
@@ -302,11 +302,11 @@ The command line and the core's data accesses see the same addresses.
 | `0x00000000`–`0xFFFFFFFF` | Memory, where no register below is: 64K words of block RAM, repeated through the address space. So the runtime's stack below `0xFFFFFF00` lands in the top of it, and so do the words of `0xFFFFFF00`–`FF` that are not registers. |
 | `0x00000000`–`0x00007FFF` | The ROM, in a bitstream built with one, in front of the RAM and repeating with it (see [The ROM](#the-rom)). Bit 3 of the control register hides it. |
 | `0xFFFF0000`–`0xFFFF7FFF` | The screen: 32768 words of memory of their own, the emulator's 80×25 screen and room for scrolling. The 2000 words from the display offset are shown on VGA and HDMI (see [The screen](#the-screen)), and `R` reads them all. |
-| `0xFFFFFF00` | The console of ISA.md §8.3. A write sends bits 7..0 to the UART. A read takes the oldest byte received from the UART or the keyboard, and returns it in bits 7..0 with bit 8 set, or 0 when no byte has arrived. A break on the UART ends the input: once the bytes before it are read, a read returns `0x200` (bit 9), as at the end of the emulator's input, until the core is started again. |
+| `0xFFFFFF00` | The console of SYSTEM.md §1. A write sends bits 7..0 to the UART. A read takes the oldest byte received from the UART or the keyboard, and returns it in bits 7..0 with bit 8 set, or 0 when no byte has arrived. A break on the UART ends the input: once the bytes before it are read, a read returns `0x200` (bit 9), as at the end of the emulator's input, until the core is started again. |
 | `0xFFFFFF01` | The emulator's read counter. A read by the core returns the number of its reads since the last write, and a write sets that number. A read with `R` does not count. It is 0 when the core starts. |
-| `0xFFFFFF10`–`0xFFFFFF1F` | The performance counters of ISA.md §8.5: cycles and instructions, 64 bits each. `R` reads them as the core does: `R FFFFFF12` takes the snapshot that `R FFFFFF13` returns, where `--dump` takes none. |
-| `0xFFFFFF20`–`0xFFFFFF3F` | The math unit of ISA.md §8.4: 32-bit multiply and divide, and 64-bit divide. |
-| `0xFFFFFF40`–`0xFFFFFF4F` | The timer of ISA.md §8.6: it raises IRQ every P clock cycles, through the vector it is given. |
+| `0xFFFFFF10`–`0xFFFFFF1F` | The performance counters of SYSTEM.md §3: cycles and instructions, 64 bits each. `R` reads them as the core does: `R FFFFFF12` takes the snapshot that `R FFFFFF13` returns, where `--dump` takes none. |
+| `0xFFFFFF20`–`0xFFFFFF3F` | The math unit of SYSTEM.md §2: 32-bit multiply and divide, and 64-bit divide. |
+| `0xFFFFFF40`–`0xFFFFFF4F` | The timer of SYSTEM.md §4: it raises IRQ every P clock cycles, through the vector it is given. |
 | `0xFFFFFF50`–`0xFFFFFF5F` | The screen's registers: the cursor and the display offset (see [The screen](#the-screen)). |
 | `0xFFFFFFE0`–`0xFFFFFFEF` | For the command line only: R0–R15 of the core, read only. After a halt they hold what the emulator prints. |
 | `0xFFFFFFF0` | Control, for the command line only. Bit 0 holds the core in reset. Bit 1 reads the core's halted flag. A write with bit 2 set first clears the RAM and the screen to 0, with the core held, and answers `OK` when it is done; then bits 0 and 3 take effect. Bit 3 hides the ROM, so that the RAM is at 0; reset clears it in a bitstream with a ROM, and in one without it reads 1. |

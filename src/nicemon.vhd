@@ -36,7 +36,7 @@
 --                          below. Every write to it is also given out on
 --                          scr_*_o, for a display that keeps a copy
 --                          (src/video/text.vhd).
---   0xFFFFFF00             The console of ISA.md §8.3. A write sends bits
+--   0xFFFFFF00             The console of SYSTEM.md §1. A write sends bits
 --                          7..0 to the UART. It waits while the previous
 --                          byte is still waiting to be sent. A read by the
 --                          core takes the oldest byte received from the UART
@@ -56,11 +56,11 @@
 --                          last write, and a write sets that number. A read
 --                          by the CLI does not count. It is 0 when the core
 --                          starts.
---   0xFFFFFF10-0xFFFFFF1F  The performance counters of ISA.md §8.5
+--   0xFFFFFF10-0xFFFFFF1F  The performance counters of SYSTEM.md §3
 --                          (nice_cpu/hdl/src/perf.vhd).
---   0xFFFFFF20-0xFFFFFF3F  The math unit of ISA.md §8.4
+--   0xFFFFFF20-0xFFFFFF3F  The math unit of SYSTEM.md §2
 --                          (nice_cpu/hdl/src/mpu.vhd).
---   0xFFFFFF40-0xFFFFFF4F  The timer of ISA.md §8.6
+--   0xFFFFFF40-0xFFFFFF4F  The timer of SYSTEM.md §4
 --                          (nice_cpu/hdl/src/timer.vhd). It counts clock
 --                          cycles, and its request goes to the core's IRQ.
 --   0xFFFFFF50-0xFFFFFF5F  The screen's registers, numbered as QNICE-FPGA's
@@ -837,8 +837,8 @@ begin
 
 
    ---------------------------------------------------------------------------
-   -- The math unit (ISA.md §8.4), the performance counters (§8.5), and the
-   -- timer (§8.6) from nice_cpu. They are reset with the system, and when
+   -- The math unit (SYSTEM.md §2), the performance counters (§3), and the
+   -- timer (§4) from nice_cpu. They are reset with the system, and when
    -- the core starts, as the emulator's are when it starts. They are not
    -- reset while the CLI holds the core, so that the CLI can read them after
    -- a halt. The timer counts clock cycles, and it is the only device that

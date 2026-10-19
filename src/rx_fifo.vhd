@@ -1,5 +1,5 @@
 -- The core's input FIFO: the bytes that the UART and the keyboard send to the
--- console of ISA.md §8.3, 2^G_ADDR_BITS of them, in block RAM, and the end
+-- console of SYSTEM.md §1, 2^G_ADDR_BITS of them, in block RAM, and the end
 -- of the input.
 --
 -- THEORY OF OPERATION

@@ -1,6 +1,6 @@
 ; The program of the ROM in the tests: it prints a greeting and halts, like
 ; hello.nasm of nice_cpu. Its stack is at the top of the memory, as the
-; runtime's is (ISA.md §9.3), which is RAM. hello.nasm's stack at 0x1000 is
+; runtime's is (start.nasm), which is RAM. hello.nasm's stack at 0x1000 is
 ; in the ROM on the board, where a push is dropped and the return address
 ; reads back as 0, so that program restarts forever.
 SP      .EQU    R13
