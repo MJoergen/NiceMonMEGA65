@@ -4,7 +4,7 @@
 -- keyboard: a stream of bytes that is input like the UART's.
 --
 -- THEORY OF OPERATION
--- The core (nice_cpu/hdl/src/multicycle.vhd) has an instruction bus and a
+-- The core (nice_cpu/hdl/src/pipeline.vhd) has an instruction bus and a
 -- data bus, both pipelined Wishbone. The instruction bus is 64 bits wide: it
 -- reads an aligned pair of words from port A of the memory, the word at the
 -- lower address in bits 31..0. The data bus shares port B with the CLI, which is a second
@@ -262,6 +262,9 @@ architecture synthesis of nicemon is
    signal cpu_halted_d : std_logic := '0';
    signal halt_wait    : std_logic := '0';
    signal halt_note    : std_logic := '0';
+   -- The pipelined core reports the reason in the cycle the step retires,
+   -- so it is kept here until the core is reset.
+   signal halt_why : t_halt := HALT_NONE;
 
    -- Clearing the memory: the address, and the hold bit after it
    signal clearing : std_logic := '0';
@@ -443,7 +446,7 @@ begin
 
    cpu_rst <= rst_i or cpu_hold;
 
-   i_multicycle : entity work.multicycle
+   i_pipeline : entity work.pipeline
       port map (
          clk_i        => clk_i,
          rst_i        => cpu_rst,
@@ -470,7 +473,7 @@ begin
          halted_o     => cpu_halted,
          instret_o    => cpu_instret,
          retire_o     => cpu_retire
-      ); -- i_multicycle
+      ); -- i_pipeline
 
    uart_owner_cpu <= not cpu_hold and not cpu_halted;
    running_o      <= uart_owner_cpu;
@@ -687,9 +690,9 @@ begin
                rd_io(3) <= rom_hidden;
             end if;
          elsif addr = C_HALT_WHY and cli then
-            -- The core keeps the reason until it is reset.
+            -- The reason is kept until the core is reset.
             if we = '0' then
-               rd_io(2 downto 0) <= std_logic_vector(to_unsigned(t_halt'pos(cpu_retire.halt), 3));
+               rd_io(2 downto 0) <= std_logic_vector(to_unsigned(t_halt'pos(halt_why), 3));
             end if;
          end if;
          if cli then
@@ -707,6 +710,12 @@ begin
          scr_ctl_we   <= '0';
          cpu_hold_d   <= cpu_hold;
          cpu_halted_d <= cpu_halted;
+
+         if cpu_rst = '1' then
+            halt_why <= HALT_NONE;
+         elsif cpu_retire.halt /= HALT_NONE then
+            halt_why <= cpu_retire.halt;
+         end if;
 
          if cpu_tx_valid = '1' and cpu_tx_ready = '1' then
             cpu_tx_valid <= '0';

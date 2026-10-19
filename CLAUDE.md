@@ -29,7 +29,7 @@ CI (`.github/workflows/ci.yml`) runs `make -C sim test` and `make lint`.
 ## Architecture
 
 `src/nicemon.vhd` is the whole system and the file to read first; its header
-holds the address map. The core (`nice_cpu/hdl/src/multicycle.vhd`) has a
+holds the address map. The core (`nice_cpu/hdl/src/pipeline.vhd`) has a
 64-bit instruction bus on port A of the RAM, which reads an aligned pair of
 words (the RAM, ROM, and screen keep even and odd words in two banks), and
 a 32-bit data bus on port B, which it shares with the CLI (`cmd.vhd`, a

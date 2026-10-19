@@ -19,11 +19,19 @@ GENERICS = -generic G_ROM_FILE=$(ROM_ABS)
 endif
 
 NICE = ../../nice_cpu
-SRC  = $(NICE)/hdl/src/trace_pkg.vhd
-SRC += $(NICE)/hdl/src/multicycle.vhd
+SRC  = $(NICE)/hdl/src/nice_pkg.vhd
+SRC += $(NICE)/hdl/src/trace_pkg.vhd
+SRC += $(NICE)/hdl/src/pipe_pkg.vhd
+SRC += $(NICE)/hdl/src/pipe_fetch.vhd
+SRC += $(NICE)/hdl/src/pipe_decode.vhd
+SRC += $(NICE)/hdl/src/pipe_prepare.vhd
+SRC += $(NICE)/hdl/src/pipe_dbus.vhd
+SRC += $(NICE)/hdl/src/pipe_write.vhd
+SRC += $(NICE)/hdl/src/pipeline.vhd
 SRC += $(NICE)/hdl/src/mpu.vhd
 SRC += $(NICE)/hdl/src/perf.vhd
 SRC += $(NICE)/hdl/src/timer.vhd
+SRC += $(NICE)/hdl/src/wb_dmux.vhd
 SRC += ../../src/uart_serdes.vhd
 SRC += ../../src/line_buffer.vhd
 SRC += ../../src/cmd.vhd

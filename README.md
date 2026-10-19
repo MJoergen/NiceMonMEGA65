@@ -37,7 +37,7 @@ difference is the memory: 64K words, not 2³².
 
 | Feature | Emulator | MEGA65 | Same? |
 |---|---|---|---|
-| Instruction set | ISA.md | nice_cpu's `multicycle.vhd`, which nice_cpu's tests compare with the emulator | Yes |
+| Instruction set | ISA.md | nice_cpu's `pipeline.vhd`, which nice_cpu's tests compare with the emulator | Yes |
 | Console output, `0xFFFFFF00` | stdout | UART | Yes |
 | Console input, `0xFFFFFF00` | stdin, with bit 8 set; `0x200` at the end. A read waits for the next byte | UART and the MEGA65 keyboard, with bit 8 set, through a 2048-byte FIFO; `0x200` after a UART break. A read returns 0 while no byte has arrived | Yes, but UART bytes beyond 2048 unread ones are lost, and a program that waits for input in a loop runs more steps |
 | Math unit, `0xFFFFFF20`–`3F` | Computed on read | nice_cpu's `mpu.vhd`, which stalls the read until the result is ready | Yes |

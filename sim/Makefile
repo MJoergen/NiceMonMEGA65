@@ -24,8 +24,20 @@ BUILD   = build
 # GHDL runs in $(BUILD), so paths given to it start with ../.
 GHDLFLAGS = --std=08 --workdir=.
 
-NICE_SOURCES = $(NICE)/hdl/src/trace_pkg.vhd $(NICE)/hdl/src/multicycle.vhd $(NICE)/hdl/src/mpu.vhd \
-               $(NICE)/hdl/src/perf.vhd $(NICE)/hdl/src/timer.vhd $(NICE)/hdl/sim/wb_mem.vhd
+NICE_SOURCES = $(NICE)/hdl/src/nice_pkg.vhd \
+               $(NICE)/hdl/src/trace_pkg.vhd \
+               $(NICE)/hdl/src/pipe_pkg.vhd \
+               $(NICE)/hdl/src/pipe_fetch.vhd \
+               $(NICE)/hdl/src/pipe_decode.vhd \
+               $(NICE)/hdl/src/pipe_prepare.vhd \
+               $(NICE)/hdl/src/pipe_dbus.vhd \
+               $(NICE)/hdl/src/pipe_write.vhd \
+               $(NICE)/hdl/src/pipeline.vhd \
+               $(NICE)/hdl/src/mpu.vhd \
+               $(NICE)/hdl/src/perf.vhd \
+               $(NICE)/hdl/src/timer.vhd \
+               $(NICE)/hdl/src/wb_dmux.vhd \
+               $(NICE)/hdl/sim/wb_mem.vhd
 SRC_SOURCES  = ../src/uart_serdes.vhd ../src/line_buffer.vhd ../src/cmd.vhd ../src/ram.vhd ../src/rom.vhd \
                ../src/nicemon.vhd \
                ../src/kbd_m65.vhd ../src/kbd_ascii.vhd \
