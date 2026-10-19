@@ -33,7 +33,7 @@ REPO     = ..
 include ../core.mk
 NICE_SIM = $(NICE_DIR)/hdl/sim/wb_mem.vhd
 
-SRC_SOURCES  = ../src/uart_serdes.vhd ../src/line_buffer.vhd ../src/cmd.vhd ../src/ram.vhd ../src/rom.vhd \
+SRC_SOURCES  = ../src/uart_serdes.vhd ../src/line_buffer.vhd ../src/cmd.vhd ../src/rx_fifo.vhd ../src/ram.vhd ../src/rom.vhd \
                ../src/nicemon.vhd \
                ../src/kbd_m65.vhd ../src/kbd_ascii.vhd \
                ../src/video/video_pkg.vhd ../src/video/font_pkg.vhd ../src/video/pix.vhd ../src/video/scr_ram.vhd ../src/video/text.vhd

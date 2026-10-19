@@ -152,7 +152,9 @@ entity nicemon is
       -- none when the file name is empty
       G_ROM_FILE         : string  := "";
       G_ROM_ADDR_BITS    : natural := 15;
-      G_CPU_RUN_AT_RESET : boolean := false
+      G_CPU_RUN_AT_RESET : boolean := false;
+      -- The checks of formal/nicemon.sby, and a RAM with any contents
+      G_FORMAL           : boolean := false
    );
    port (
       clk_i          : in  std_logic;
@@ -188,7 +190,6 @@ architecture synthesis of nicemon is
    -- The received bytes for the core. A power of two, so that the pointers
    -- wrap.
    constant C_RX_FIFO_BITS : natural := G_RX_FIFO_BITS;
-   constant C_RX_FIFO_LEN  : natural := 2 ** C_RX_FIFO_BITS;
 
    constant C_UART_DATA  : std_logic_vector(31 downto 0) := X"FFFFFF00";
    constant C_READ_COUNT : std_logic_vector(31 downto 0) := X"FFFFFF01";
@@ -405,21 +406,15 @@ architecture synthesis of nicemon is
    signal cpu_tx_valid : std_logic := '0';
    signal cpu_tx_ready : std_logic;
    signal cpu_tx_data  : std_logic_vector(7 downto 0);
-   -- The FIFO holds the bytes from rx_rd to rx_wr. Each pointer has one bit
-   -- more than an index, so that a full FIFO differs from an empty one. It
-   -- is block RAM, read in every cycle at rx_rd into rx_q, so rx_q holds
-   -- the oldest byte in the cycle after a read of the console is served.
-   -- No byte is written to the word at rx_rd while the FIFO holds a byte:
-   -- it is written when the FIFO is empty, and not when it is full.
-   type t_rx_fifo is array (0 to C_RX_FIFO_LEN - 1) of std_logic_vector(7 downto 0);
-
-   signal rx_fifo : t_rx_fifo;
-   signal rx_we   : std_logic;
-   signal rx_q    : std_logic_vector(7 downto 0);
-   signal rx_wr   : std_logic_vector(C_RX_FIFO_BITS downto 0) := (others => '0');
-   signal rx_rd   : std_logic_vector(C_RX_FIFO_BITS downto 0) := (others => '0');
+   -- The core's input FIFO (src/rx_fifo.vhd). rx_q holds the oldest byte in
+   -- the cycle after a read of the console takes it.
+   signal rx_wr_en : std_logic;
+   signal rx_end   : std_logic;
+   signal rx_take  : std_logic;
+   signal rx_empty : std_logic;
+   signal rx_q     : std_logic_vector(7 downto 0);
    -- The core's input has ended with a break.
-   signal rx_eof : std_logic := '0';
+   signal rx_eof : std_logic;
 
    signal rx_buffer_ready : std_logic;
    signal rx_buffer_valid : std_logic;
@@ -624,10 +619,10 @@ begin
             -- The UART belongs to the CLI then, so the byte is dropped.
             null;
          elsif addr = C_UART_DATA and we = '0' and not cli then
-            if rx_rd /= rx_wr then
-               -- The byte comes from rx_q in the next cycle.
+            if rx_empty = '0' then
+               -- rx_take takes the byte, and it comes from rx_q in the next
+               -- cycle.
                rd_rx <= '1';
-               rx_rd <= rx_rd + 1;
             elsif rx_eof = '1' then
                rd_io(9) <= '1';
             end if;
@@ -776,13 +771,6 @@ begin
             serve(false, dbus_addr, dbus_we, dbus_wdata);
          end if;
 
-         if rx_we = '1' then
-            rx_wr <= rx_wr + 1;
-         end if;
-         if ser_rx_break = '1' and uart_owner_cpu = '1' then
-            rx_eof <= '1';
-         end if;
-
          if cli_cyc = '1' and cli_stb = '1' then
             cli_pend    <= '1';
             cli_p_addr  <= cli_addr;
@@ -797,9 +785,6 @@ begin
             tx_wait      <= '0';
             halt_wait    <= '0';
             read_count   <= (others => '0');
-            rx_wr        <= (others => '0');
-            rx_rd        <= (others => '0');
-            rx_eof       <= '0';
             if not dev_cli then
                dev_drop <= '1';
             end if;
@@ -809,6 +794,7 @@ begin
             dev_busy     <= '0';
             dev_stb      <= '0';
             cli_pend     <= '0';
+            cli_ack      <= '0';
             clearing     <= '0';
             cpu_tx_valid <= '0';
             rom_hidden   <= C_NO_ROM;
@@ -821,21 +807,33 @@ begin
       end if;
    end process p_dbus;
 
-   -- A byte for the core goes into its FIFO, unless the FIFO is full or the
-   -- input has ended.
-   rx_we <= '1' when in_valid = '1' and uart_owner_cpu = '1' and rx_eof = '0' and
-                     rx_full = '0' else
-            '0';
+   -- A byte for the core goes into its FIFO, which drops it when it is full
+   -- or the input has ended. A read of the console by the core takes the
+   -- oldest byte, in the cycle that serves it: the cycle that accepts the
+   -- request. A request of the core in reset is dropped, and so is a byte
+   -- received before, so that a program starts with no input.
+   rx_wr_en <= in_valid and uart_owner_cpu;
+   rx_end   <= ser_rx_break and uart_owner_cpu;
+   rx_take  <= '1' when dbus_cyc = '1' and dbus_stb = '1' and dbus_stall = '0' and
+                        dbus_addr = C_UART_DATA and dbus_we = '0' else
+               '0';
 
-   p_rx_fifo : process (clk_i)
-   begin
-      if rising_edge(clk_i) then
-         if rx_we = '1' then
-            rx_fifo(to_integer(rx_wr(C_RX_FIFO_BITS - 1 downto 0))) <= in_data;
-         end if;
-         rx_q <= rx_fifo(to_integer(rx_rd(C_RX_FIFO_BITS - 1 downto 0)));
-      end if;
-   end process p_rx_fifo;
+   i_rx_fifo : entity work.rx_fifo
+      generic map (
+         G_ADDR_BITS => C_RX_FIFO_BITS
+      )
+      port map (
+         clk_i     => clk_i,
+         rst_i     => cpu_rst,
+         wr_en_i   => rx_wr_en,
+         wr_data_i => in_data,
+         full_o    => rx_full,
+         end_i     => rx_end,
+         ended_o   => rx_eof,
+         rd_en_i   => rx_take,
+         empty_o   => rx_empty,
+         rd_data_o => rx_q
+      ); -- i_rx_fifo
 
 
    ---------------------------------------------------------------------------
@@ -909,7 +907,8 @@ begin
 
    i_ram : entity work.ram
       generic map (
-         G_ADDR_BITS => G_RAM_ADDR_BITS
+         G_ADDR_BITS => G_RAM_ADDR_BITS,
+         G_FORMAL    => G_FORMAL
       )
       port map (
          clk_i     => clk_i,
@@ -1004,7 +1003,6 @@ begin
 
    -- The input: a UART byte, or else a keyboard byte, which is taken only
    -- when it has room.
-   rx_full  <= '1' when rx_wr - rx_rd = C_RX_FIFO_LEN else '0';
    kbd_take <= kbd_valid_i and not ser_rx_valid and
                ((uart_owner_cpu and not rx_full) or (not uart_owner_cpu and lb_rx_ready));
    in_valid <= ser_rx_valid or kbd_take;
@@ -1062,5 +1060,94 @@ begin
          wbus_rddat_i      => dbus_rdata,
          wbus_ack_i        => cli_ack
       ); -- i_cmd
+
+
+   ---------------------------------------------------------------------------
+   -- The checks of formal/nicemon.sby. The core's two buses are pipelined
+   -- Wishbone, and nice_cpu's formal checks prove either core right for
+   -- any slave that sends ACK only while CYC is high, and only for a
+   -- request that waits. These check that this system is such a slave, the
+   -- CLI's request latch and the devices' included, and that the CLI's
+   -- port gets one ACK for each request, as formal/formal_cli.vhd assumes.
+   -- A request of the core waits from the cycle that accepts it until its
+   -- ACK, or until the core is reset, which drops it. The pipelined core
+   -- has several requests waiting on a bus, so f_ibus_wait and f_dbus_wait
+   -- count them.
+   ---------------------------------------------------------------------------
+
+   gen_formal : if G_FORMAL generate
+      signal f_ibus_wait : natural range 0 to 15 := 0;
+      signal f_dbus_wait : natural range 0 to 15 := 0;
+      signal f_cli_wait  : std_logic := '0';
+      signal f_rx_byte   : std_logic;
+      signal f_rx_end    : std_logic;
+   begin
+
+      p_wait : process (clk_i)
+      begin
+         if rising_edge(clk_i) then
+            if ibus_cyc = '1' and ibus_stb = '1' and ibus_ack = '0' then
+               f_ibus_wait <= f_ibus_wait + 1;
+            elsif (ibus_cyc = '0' or ibus_stb = '0') and ibus_ack = '1' then
+               f_ibus_wait <= f_ibus_wait - 1;
+            end if;
+            if dbus_cyc = '1' and dbus_stb = '1' and dbus_stall = '0' and dbus_ack = '0' then
+               f_dbus_wait <= f_dbus_wait + 1;
+            elsif (dbus_cyc = '0' or dbus_stb = '0' or dbus_stall = '1') and dbus_ack = '1' then
+               f_dbus_wait <= f_dbus_wait - 1;
+            end if;
+            if cli_cyc = '1' and cli_stb = '1' then
+               f_cli_wait <= '1';
+            elsif cli_ack = '1' then
+               f_cli_wait <= '0';
+            end if;
+
+            if cpu_rst = '1' then
+               f_ibus_wait <= 0;
+               f_dbus_wait <= 0;
+            end if;
+            if rst_i = '1' then
+               f_cli_wait <= '0';
+            end if;
+         end if;
+      end process p_wait;
+
+      -- A read of the console by the core takes a byte, or finds the FIFO
+      -- empty after the end of the input
+      f_rx_byte <= rx_take and not rx_empty;
+      f_rx_end  <= rx_take and rx_empty and rx_eof;
+
+      -- psl default clock is rising_edge(clk_i);
+
+      -- The core's buses
+      -- psl f_ibus_ack : assert always
+      --    rst_i = '0' and ibus_ack = '1' -> ibus_cyc = '1' and f_ibus_wait /= 0;
+      -- psl f_dbus_ack : assert always
+      --    rst_i = '0' and dbus_ack = '1' -> dbus_cyc = '1' and f_dbus_wait /= 0;
+
+      -- The CLI's port, and its latch
+      -- psl f_cli_ack : assert always rst_i = '0' and cli_ack = '1' -> f_cli_wait = '1';
+      -- psl f_cli_latch : assert always
+      --    rst_i = '0' and cli_stb = '1' -> cli_pend = '0' and f_cli_wait = '0';
+
+      -- The devices answer only the latched request
+      -- psl f_dev_ack : assert always
+      --    rst_i = '0' and (mpu_ack = '1' or perf_ack = '1' or timer_ack = '1') ->
+      --    dev_busy = '1';
+
+      -- The console's answer: a byte with bit 8, 0x200 at the end, or 0
+      -- psl f_console : assert always
+      --    {rx_take and not rst_i} |=>
+      --    {rst_i = '1' or cpu_rst = '1' or
+      --     (dbus_ack = '1' and dbus_rdata(31 downto 10) = 0 and
+      --      dbus_rdata(8) = prev(f_rx_byte) and dbus_rdata(9) = prev(f_rx_end))};
+
+      -- psl c_console : cover {f_rx_byte and not rst_i};
+      -- psl c_console_end : cover {f_rx_end and not rst_i};
+      -- psl c_tx_wait : cover {tx_wait and not rst_i};
+      -- psl c_dev_core : cover {dev_busy and not rst_i and not cpu_rst; dbus_ack};
+      -- psl c_cli : cover {cli_ack and not rst_i};
+      -- psl c_halt : cover {halt_note and not rst_i};
+   end generate gen_formal;
 
 end architecture synthesis;

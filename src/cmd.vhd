@@ -1,7 +1,8 @@
 -- Copied from https://github.com/MJoergen/cmod-s7 (src/cmd.vhd, commit d3d544d), MIT License.
 -- Changed: the banner is "NICE", not "WBUS". A pulse on halt_i prints
 -- CR LF "HALT" CR LF, before the next command is taken. The commands may be
--- lower case. The layout and names follow CODING_STYLE.md.
+-- lower case. The layout and names follow CODING_STYLE.md. With G_FORMAL,
+-- it states the invariants that formal/formal_cli.vhd needs.
 --
 -- ----------------------------------------------------------------------------
 -- Description: Simple command line interpreter
@@ -22,7 +23,9 @@ library ieee;
 entity cmd is
    generic (
       G_ADDR_SIZE  : natural;
-      G_BUFFER_LEN : natural
+      G_BUFFER_LEN : natural;
+      -- The invariants for formal/cli.sby
+      G_FORMAL     : boolean := false
    );
    port (
       clk_i             : in  std_logic;
@@ -225,6 +228,25 @@ begin
          end if;
       end if;
    end process p_fsm;
+
+
+   gen_formal : if G_FORMAL generate
+   begin
+      -- The state has one of its three values. A bus cycle is open exactly
+      -- in BUSY_ST, and no message waits then, nor right after reset. Without this the k-induction of
+      -- formal/cli.sby starts from states that reset never leads to, such as
+      -- a message waiting in BUSY_ST, which the answer would overwrite.
+
+      -- psl default clock is rising_edge(clk_i);
+
+      -- psl f_state : assert always rst_i = '0' -> state <= BUSY_ST;
+      -- psl f_busy_cyc : assert always
+      --    rst_i = '0' -> (wbus_cyc_o = '1') = (state = BUSY_ST);
+      -- psl f_busy_tx : assert always
+      --    rst_i = '0' and state = BUSY_ST -> tx_buffer_valid_o = '0';
+      -- psl f_start_tx : assert always
+      --    rst_i = '0' and state = START_ST -> tx_buffer_valid_o = '0';
+   end generate gen_formal;
 
 end architecture synthesis;
 

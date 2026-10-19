@@ -27,6 +27,7 @@ SRC  = $(NICE_SOURCES)
 SRC += ../../src/uart_serdes.vhd
 SRC += ../../src/line_buffer.vhd
 SRC += ../../src/cmd.vhd
+SRC += ../../src/rx_fifo.vhd
 SRC += ../../src/ram.vhd
 SRC += ../../src/rom.vhd
 SRC += ../../src/nicemon.vhd
