@@ -15,29 +15,24 @@
 #             keyboard, and the text display (through text_synth.vhd, in
 #             the boards' mode).
 # make clean  removes build/.
+#
+# NICE=pipeline (the default) or NICE=multi picks the core, and the files
+# are built in build/$(NICE).
 
 GHDL   ?= ghdl
 PYTHON ?= python3
-NICE    = ../nice_cpu
-ASM     = $(PYTHON) $(NICE)/assembler/niceasm.py
-BUILD   = build
-# GHDL runs in $(BUILD), so paths given to it start with ../.
+NICE_DIR = ../nice_cpu
+ASM     = $(PYTHON) $(NICE_DIR)/assembler/niceasm.py
+BUILD   = build/$(NICE)
+# GHDL runs in $(BUILD), so paths given to it start with ../../.
 GHDLFLAGS = --std=08 --workdir=.
 
-NICE_SOURCES = $(NICE)/hdl/src/nice_pkg.vhd \
-               $(NICE)/hdl/src/trace_pkg.vhd \
-               $(NICE)/hdl/src/pipe_pkg.vhd \
-               $(NICE)/hdl/src/pipe_fetch.vhd \
-               $(NICE)/hdl/src/pipe_decode.vhd \
-               $(NICE)/hdl/src/pipe_prepare.vhd \
-               $(NICE)/hdl/src/pipe_dbus.vhd \
-               $(NICE)/hdl/src/pipe_write.vhd \
-               $(NICE)/hdl/src/pipeline.vhd \
-               $(NICE)/hdl/src/mpu.vhd \
-               $(NICE)/hdl/src/perf.vhd \
-               $(NICE)/hdl/src/timer.vhd \
-               $(NICE)/hdl/src/wb_dmux.vhd \
-               $(NICE)/hdl/sim/wb_mem.vhd
+# NICE_SOURCES, the core and what it needs from nice_cpu, as NICE selects
+NICE_HDL = $(NICE_DIR)/hdl/src
+REPO     = ..
+include ../core.mk
+NICE_SIM = $(NICE_DIR)/hdl/sim/wb_mem.vhd
+
 SRC_SOURCES  = ../src/uart_serdes.vhd ../src/line_buffer.vhd ../src/cmd.vhd ../src/ram.vhd ../src/rom.vhd \
                ../src/nicemon.vhd \
                ../src/kbd_m65.vhd ../src/kbd_ascii.vhd \
@@ -76,9 +71,9 @@ synth: analyse $(BUILD)/rom.bin
 	  echo "PASS synth text" || (echo "FAIL synth text"; cat $(BUILD)/text_synth.log; exit 1)
 
 analyse: | $(BUILD)
-	@cd $(BUILD) && $(GHDL) -a $(GHDLFLAGS) $(addprefix ../,$(NICE_SOURCES) $(SOURCES))
+	@cd $(BUILD) && $(GHDL) -a $(GHDLFLAGS) $(addprefix ../../,$(NICE_SOURCES) $(NICE_SIM) $(SOURCES))
 
-$(BUILD)/hello.bin: $(NICE)/doc/intro/examples/hello.nasm | $(BUILD)
+$(BUILD)/hello.bin: $(NICE_DIR)/doc/intro/examples/hello.nasm | $(BUILD)
 	@$(ASM) -o $@ $<
 
 $(BUILD)/rom.bin: rom.nasm | $(BUILD)
@@ -93,7 +88,7 @@ $(BUILD)/fifo.bin: fifo.nasm | $(BUILD)
 $(BUILD)/emu.bin: emu.nasm | $(BUILD)
 	@$(ASM) -o $@ $<
 
-$(BUILD)/reserved.bin: $(NICE)/emulator/test/reserved.nasm | $(BUILD)
+$(BUILD)/reserved.bin: $(NICE_DIR)/emulator/test/reserved.nasm | $(BUILD)
 	@$(ASM) -o $@ $<
 
 $(BUILD)/eof.bin: eof.nasm | $(BUILD)

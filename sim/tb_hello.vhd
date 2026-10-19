@@ -68,7 +68,7 @@ begin
    end process p_rst;
 
 
-   i_pipeline : entity work.pipeline
+   i_core : entity work.nice_core
       port map (
          clk_i        => clk,
          rst_i        => rst,
@@ -94,7 +94,7 @@ begin
          irq_vector_i => X"00",
          halted_o     => halted,
          retire_o     => open
-      ); -- i_pipeline
+      ); -- i_core
 
 
    i_wb_mem : entity work.wb_mem

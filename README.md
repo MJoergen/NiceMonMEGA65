@@ -37,7 +37,7 @@ difference is the memory: 64K words, not 2³².
 
 | Feature | Emulator | MEGA65 | Same? |
 |---|---|---|---|
-| Instruction set | ISA.md | nice_cpu's `pipeline.vhd`, which nice_cpu's tests compare with the emulator | Yes |
+| Instruction set | ISA.md | nice_cpu's `pipeline.vhd` (or `multicycle.vhd` with `NICE=multi`), which nice_cpu's tests compare with the emulator | Yes |
 | Console output, `0xFFFFFF00` | stdout | UART | Yes |
 | Console input, `0xFFFFFF00` | stdin, with bit 8 set; `0x200` at the end. A read waits for the next byte | UART and the MEGA65 keyboard, with bit 8 set, through a 2048-byte FIFO; `0x200` after a UART break. A read returns 0 while no byte has arrived | Yes, but UART bytes beyond 2048 unread ones are lost, and a program that waits for input in a loop runs more steps |
 | Math unit, `0xFFFFFF20`–`3F` | Computed on read | nice_cpu's `mpu.vhd`, which stalls the read until the result is ready | Yes |
@@ -76,6 +76,13 @@ the C examples, `make r3` and `make r6` build the bitstreams, with
 `make run FILE=prog.bin` runs one as `niceemu` runs it (see
 [Comparing with the emulator](#comparing-with-the-emulator)), and
 `make hwtest` tests the board (see [Testing the board](#testing-the-board)).
+
+`make test`, `make r3`, and `make r6` use nice_cpu's pipelined core. Add
+`NICE=multi` to use its multi-cycle core instead (`NICE=pipeline` is the
+default). The simulation of each core is built in `sim/build/pipeline` or
+`sim/build/multi`, and both cores run the same tests. The bitstream goes to
+`top.bit` in either case, so build one core at a time. The system clock is
+set for the pipelined core, so the multi-cycle core has room to spare.
 
 ## Using it
 
@@ -411,7 +418,7 @@ programmed can be tested with `tools/hwtest.py --no-program`, which skips
 the banner. The reset button is not tested: press it with a terminal open,
 and `NICE` is printed again. A bitstream with a ROM can be tested when the
 program in the ROM halts, as `sim/rom.nasm` does (`make r6
-ROM=sim/build/rom.bin`, after `make test` has assembled it): the test hides
+ROM=sim/build/pipeline/rom.bin`, after `make test` has assembled it): the test hides
 the ROM, as `load.py` does, and runs the programs from the RAM.
 
 ## License

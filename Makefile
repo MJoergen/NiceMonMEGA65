@@ -1,6 +1,9 @@
 # The top-level Makefile. It runs the Makefiles of the subdirectories.
 # "make" lists the targets.
 
+# The core: pipeline (the default) or multi, for test, r3, and r6 (core.mk)
+NICE   ?= pipeline
+export NICE
 PYTHON ?= python3
 PORT   ?= /dev/ttyUSB1
 
@@ -22,6 +25,8 @@ help:
 	@echo "                  run a program on the MEGA65, and print what niceemu prints"
 	@echo "  make hwtest [BIT=synth/r6/build/top.bit] [PORT=/dev/ttyUSB1]"
 	@echo "                  program the MEGA65 and test it (needs m65)"
+	@echo "  NICE=pipeline|multi  with test, r3, or r6 picks nice_cpu's pipelined"
+	@echo "                  core (the default) or its multi-cycle core"
 	@echo "  make clean      remove the build output"
 
 test:
@@ -31,7 +36,7 @@ test:
 # own, nor the third-party files that keep their own style (CODING_STYLE.md):
 # synth/r3/max10.vhd and synth/common/hdmi/.
 VSG         ?= vsg
-VHDL_SOURCES = $(filter-out synth/r3/max10.vhd,$(wildcard src/*.vhd src/video/*.vhd sim/*.vhd \
+VHDL_SOURCES = $(filter-out synth/r3/max10.vhd,$(wildcard src/*.vhd src/core/*.vhd src/video/*.vhd sim/*.vhd \
                                                           synth/common/*.vhd synth/r3/*.vhd synth/r6/*.vhd))
 
 lint:

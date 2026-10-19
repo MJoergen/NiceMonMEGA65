@@ -7,7 +7,7 @@ NiceMonMEGA65 runs the NICE CPU (the `nice_cpu` git submodule) on the MEGA65 R3 
 ## Commands
 
     make                  # lists the targets
-    make test             # GHDL: synth checks, tb_hello, tb_nicemon, tb_kbd, tb_text (~3 min)
+    make test             # (NICE=multi for the multi-cycle core) GHDL: synth checks, tb_hello, tb_nicemon, tb_kbd, tb_text (~3 min)
     make lint             # vsg against CODING_STYLE.md; line-length warnings are tolerated
     make examples         # C examples -> examples/build/*.bin (clang wasm32, lld, llvm)
     make r6 [ROM=f.bin]   # Vivado bitstream, synth/r6/build/top.bit; make r3 likewise
@@ -15,7 +15,7 @@ NiceMonMEGA65 runs the NICE CPU (the `nice_cpu` git submodule) on the MEGA65 R3 
     make run FILE=p.bin   # run it and print what niceemu prints, for diffing
     make hwtest           # program the FPGA with m65 and test the board (needs the board)
 
-One testbench: `make -C sim analyse` then, in `sim/build`,
+One testbench: `make -C sim analyse` then, in `sim/build/pipeline`,
 `ghdl --elab-run --std=08 --workdir=. tb_kbd`; `tb_nicemon` and `tb_hello` take
 `-gG_*_FILE=` generics as `sim/Makefile` shows. `tb_text` with
 `-gG_PPM_FILE=frame.ppm` writes the frame as a picture. Test programs are
@@ -29,7 +29,7 @@ CI (`.github/workflows/ci.yml`) runs `make -C sim test` and `make lint`.
 ## Architecture
 
 `src/nicemon.vhd` is the whole system and the file to read first; its header
-holds the address map. The core (`nice_cpu/hdl/src/pipeline.vhd`) has a
+holds the address map. The core (`nice_cpu/hdl/src/pipeline.vhd`, or `multicycle.vhd` with `NICE=multi`; `core.mk` picks the sources, and `src/nice_core.vhd` with one architecture from `src/core/` is the entity `nicemon.vhd` instantiates) has a
 64-bit instruction bus on port A of the RAM, which reads an aligned pair of
 words (the RAM, ROM, and screen keep even and odd words in two banks), and
 a 32-bit data bus on port B, which it shares with the CLI (`cmd.vhd`, a

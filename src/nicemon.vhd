@@ -446,7 +446,7 @@ begin
 
    cpu_rst <= rst_i or cpu_hold;
 
-   i_pipeline : entity work.pipeline
+   i_core : entity work.nice_core
       port map (
          clk_i        => clk_i,
          rst_i        => cpu_rst,
@@ -473,7 +473,7 @@ begin
          halted_o     => cpu_halted,
          instret_o    => cpu_instret,
          retire_o     => cpu_retire
-      ); -- i_pipeline
+      ); -- i_core
 
    uart_owner_cpu <= not cpu_hold and not cpu_halted;
    running_o      <= uart_owner_cpu;
