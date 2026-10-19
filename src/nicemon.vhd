@@ -56,13 +56,13 @@
 --                          last write, and a write sets that number. A read
 --                          by the CLI does not count. It is 0 when the core
 --                          starts.
---   0xFFFFFF10-0xFFFFFF1F  The performance counters of SYSTEM.md §3
---                          (nice_cpu/hdl/src/perf.vhd).
---   0xFFFFFF20-0xFFFFFF3F  The math unit of SYSTEM.md §2
---                          (nice_cpu/hdl/src/mpu.vhd).
---   0xFFFFFF40-0xFFFFFF4F  The timer of SYSTEM.md §4
+--   0xFFFFFF10-0xFFFFFF1F  The timer of SYSTEM.md §4
 --                          (nice_cpu/hdl/src/timer.vhd). It counts clock
 --                          cycles, and its request goes to the core's IRQ.
+--   0xFFFFFF20-0xFFFFFF3F  The math unit of SYSTEM.md §2
+--                          (nice_cpu/hdl/src/mpu.vhd).
+--   0xFFFFFF40-0xFFFFFF4F  The performance counters of SYSTEM.md §3
+--                          (nice_cpu/hdl/src/perf.vhd).
 --   0xFFFFFF50-0xFFFFFF5F  The screen's registers, numbered as QNICE-FPGA's
 --                          VGA registers at 0xFF30, for the display: 50 is
 --                          the state, with bit 6 showing the cursor, bit 5
@@ -205,9 +205,9 @@ architecture synthesis of nicemon is
    constant C_SCR_REGS_BASE : std_logic_vector(31 downto 4) := X"FFFFFF5";
 
    -- The devices of nice_cpu/hdl/src, by the address bits above their offset
-   constant C_PERF_BASE  : std_logic_vector(31 downto 4) := X"FFFFFF1";        -- 0xFFFFFF10-1F
+   constant C_TIMER_BASE : std_logic_vector(31 downto 4) := X"FFFFFF1";        -- 0xFFFFFF10-1F
    constant C_MPU_BASE   : std_logic_vector(31 downto 5) := X"FFFFFF" & "001"; -- 0xFFFFFF20-3F
-   constant C_TIMER_BASE : std_logic_vector(31 downto 4) := X"FFFFFF4";        -- 0xFFFFFF40-4F
+   constant C_PERF_BASE  : std_logic_vector(31 downto 4) := X"FFFFFF4";        -- 0xFFFFFF40-4F
 
    -- '1' in a build without a ROM, where the RAM is always at 0
    function no_rom return std_logic is

@@ -153,7 +153,7 @@ def test_readback(fd: int, emu: str) -> None:
     check("emu.nasm halted", ctl == "0000000A", ctl)
     expected = {
         "FFFFFFF1": "00000001",  # halted by HALT
-        "FFFFFF12": "0000000C",  # 12 steps, as niceemu says
+        "FFFFFF42": "0000000C",  # 12 steps, as niceemu says
         "FFFF0000": "00000041",  # the screen, column 0 of row 0
         "FFFF07CF": "00000042",  # the screen, column 79 of row 24
         "FFFFFF02": "00001234",  # memory in the I/O range

@@ -43,8 +43,8 @@ from load import (HALT_MESSAGE, drain, fail, load_words, open_port, read_bin,
                   read_words, start)
 
 HALT_WHY = 0xFFFFFFF1
-INSTR_LO = 0xFFFFFF12
-INSTR_HI = 0xFFFFFF13
+INSTR_LO = 0xFFFFFF42
+INSTR_HI = 0xFFFFFF43
 REGS = 0xFFFFFFE0
 SCREEN = 0xFFFF0000
 SCREEN_WIDTH = 80

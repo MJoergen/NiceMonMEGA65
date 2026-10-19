@@ -331,8 +331,8 @@ begin
       expect("Hello, NICE!" & C_LF & C_HALT);
       command("R FFFFFFF0", "0000000A");
       command("R FFFFFFF1", "00000001");     -- halted by HALT
-      command("R FFFFFF12", "00000038");     -- 56 steps, as niceemu says
-      command("R FFFFFF13", "00000000");
+      command("R FFFFFF42", "00000038");     -- 56 steps, as niceemu says
+      command("R FFFFFF43", "00000000");
 
       report "tb_nicemon: load " & G_ECHO_FILE;
       command("W FFFFFFF0 00000009", "OK");
@@ -385,11 +385,11 @@ begin
       command("R 00000103", "FFFFE4A8");     -- -1000 * 7 = -7000
       command("R 00000104", "00000001");     -- instructions between two reads
       command("R 00000105", "00000003");     -- interrupts of the timer taken
-      command("R FFFFFF40", "00000000");     -- the timer: stopped,
-      command("R FFFFFF41", "00000000");
-      command("R FFFFFF42", "000000F0");     -- with its vector
-      command("W FFFFFF42 00000123", "OK");  -- the CLI writes the timer
-      command("R FFFFFF42", "00000023");     -- bits 7..0 only
+      command("R FFFFFF10", "00000000");     -- the timer: stopped,
+      command("R FFFFFF11", "00000000");
+      command("R FFFFFF12", "000000F0");     -- with its vector
+      command("W FFFFFF12 00000123", "OK");  -- the CLI writes the timer
+      command("R FFFFFF12", "00000023");     -- bits 7..0 only
 
       report "tb_nicemon: load " & G_EMU_FILE;
       command("W FFFFFFF0 00000009", "OK");
@@ -397,7 +397,7 @@ begin
       command("W FFFFFFF0 00000008", "OK");
       expect(C_HALT);
       command("R FFFFFFF0", "0000000A");
-      command("R FFFFFF12", "0000000C");     -- 12 steps
+      command("R FFFFFF42", "0000000C");     -- 12 steps
       command("R FFFFFF20", "00000000");     -- the math unit's A, reset
       command("R FFFF0000", "00000041");     -- the screen
       command("R FFFF07CF", "00000042");
@@ -451,7 +451,7 @@ begin
       command("W FFFFFFF0 00000008", "OK");
       expect(C_HALT);
       command("R FFFFFFF1", "00000002");     -- a reserved control word
-      command("R FFFFFF12", "00000006");     -- 6 steps
+      command("R FFFFFF42", "00000006");     -- 6 steps
       command("R FFFFFFE1", "00000001");     -- R1
       command("R FFFFFFEF", "00000007");     -- R15
 
