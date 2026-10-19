@@ -1,7 +1,8 @@
 -- The clock and reset of the MEGA65 boards. The board's 100 MHz clock drives
--- an MMCM that makes the 100 MHz system clock. The reset is held while the
--- MMCM is not locked, and while the reset button (active high) is pressed,
--- and for 2^20 cycles (10 ms) after both. So the UART output is idle for that
+-- an MMCM that makes the 33.3 MHz system clock, slow enough for the
+-- pipelined core, whose longest path takes about 25.5 ns. The reset is held
+-- while the MMCM is not locked, and while the reset button (active high) is
+-- pressed, and for 2^20 cycles (31 ms) after both. So the UART output is idle for that
 -- long before the CLI sends its banner, and a terminal that saw the pin
 -- change during configuration has time to find the start of a character.
 -- The MMCM's locked output and the button are synchronised to clk_o by two
@@ -18,7 +19,7 @@ entity clk_rst is
    port (
       sys_clk_i      : in  std_logic; -- 100 MHz
       reset_button_i : in  std_logic; -- active high, asynchronous
-      clk_o          : out std_logic; -- 100 MHz
+      clk_o          : out std_logic; -- 33.3 MHz
       rst_o          : out std_logic  -- synchronous to clk_o
    );
 end entity clk_rst;
@@ -50,7 +51,7 @@ begin
          CLKIN1_PERIOD    => 10.0,  -- 100 MHz
          DIVCLK_DIVIDE    => 1,
          CLKFBOUT_MULT_F  => 10.0,  -- VCO at 1000 MHz
-         CLKOUT0_DIVIDE_F => 10.0   -- 100 MHz
+         CLKOUT0_DIVIDE_F => 30.0   -- 33.3 MHz
       )
       port map (
          CLKIN1   => sys_clk_i,

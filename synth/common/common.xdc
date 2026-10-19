@@ -1,6 +1,6 @@
 ## Constraints shared by the MEGA65 boards.
 
-## The board clock, 100 MHz. Vivado derives the 100 MHz MMCM clock from it.
+## The board clock, 100 MHz. Vivado derives the 33.3 MHz MMCM clock from it.
 create_clock -period 10.000 -name sys_clk [get_ports {clk_i}]
 
 ## The video clocks come from an MMCM of their own (video_clk.vhd). What

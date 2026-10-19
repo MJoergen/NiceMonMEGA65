@@ -64,7 +64,7 @@ end entity mega65;
 
 architecture synthesis of mega65 is
 
-   constant C_CLOCK_HZ : natural := 100_000_000;
+   constant C_CLOCK_HZ : natural := 33_333_333;
 
    signal clk     : std_logic;
    signal rst     : std_logic;
