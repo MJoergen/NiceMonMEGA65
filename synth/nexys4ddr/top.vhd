@@ -10,7 +10,8 @@
 --   its copy in text.vhd it takes 16 block RAMs, and the RAM and the ROM,
 --   the same as on the MEGA65, take 96.
 -- * Its FPGA is speed grade -1, where the MEGA65's is -2, so the system
---   clock is 80 MHz, not 100 MHz.
+--   clock is 75 MHz, not 100 MHz. At 80 MHz the pipelined core misses
+--   timing by 0.2 ns.
 -- * The VGA output is a resistor DAC with 4 bits per colour, and no HDMI.
 --   The screen's colours have 3 bits or fewer per colour (text.vhd), so the
 --   top 4 bits of each lose nothing. The colour and sync outputs are
@@ -48,7 +49,7 @@ end entity top;
 
 architecture synthesis of top is
 
-   constant C_CLOCK_HZ : natural      := 80_000_000;
+   constant C_CLOCK_HZ : natural      := 75_000_000;
    constant C_VIDEO    : t_video_mode := C_VIDEO_1280X1024;
 
    signal clk     : std_logic;
@@ -81,7 +82,8 @@ begin
 
    i_clk_rst : entity work.clk_rst
       generic map (
-         G_DIVIDE => 12.5
+         G_MULTIPLY => 9.0,
+         G_DIVIDE   => 12.0
       )
       port map (
          sys_clk_i      => clk_i,

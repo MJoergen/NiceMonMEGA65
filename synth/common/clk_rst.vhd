@@ -1,6 +1,8 @@
 -- The clock and reset of the boards. The board's 100 MHz clock drives an MMCM
--- that makes the system clock, 1000 MHz / G_DIVIDE: 100 MHz on the MEGA65,
--- and 80 MHz on the Nexys4DDR, whose FPGA is a slower speed grade. The
+-- whose VCO runs at 100 MHz * G_MULTIPLY, and which makes the system clock,
+-- the VCO's frequency / G_DIVIDE: 1000 MHz / 10 = 100 MHz on the MEGA65, and
+-- 900 MHz / 12 = 75 MHz on the Nexys4DDR, whose FPGA is a slower speed
+-- grade. The
 -- pipelined core meets 100 MHz on the MEGA65 with little to spare, so
 -- recheck the timing after a change to nice_cpu.
 -- The reset is held while the MMCM is not locked, and while the reset
@@ -20,12 +22,13 @@ library unisim;
 
 entity clk_rst is
    generic (
-      G_DIVIDE : real := 10.0
+      G_MULTIPLY : real := 10.0;
+      G_DIVIDE   : real := 10.0
    );
    port (
       sys_clk_i      : in  std_logic; -- 100 MHz
       reset_button_i : in  std_logic; -- active high, asynchronous
-      clk_o          : out std_logic; -- 1000 MHz / G_DIVIDE
+      clk_o          : out std_logic; -- 100 MHz * G_MULTIPLY / G_DIVIDE
       rst_o          : out std_logic  -- synchronous to clk_o
    );
 end entity clk_rst;
@@ -56,7 +59,7 @@ begin
       generic map (
          CLKIN1_PERIOD    => 10.0,  -- 100 MHz
          DIVCLK_DIVIDE    => 1,
-         CLKFBOUT_MULT_F  => 10.0,  -- VCO at 1000 MHz
+         CLKFBOUT_MULT_F  => G_MULTIPLY,
          CLKOUT0_DIVIDE_F => G_DIVIDE
       )
       port map (
