@@ -10,7 +10,7 @@ on the same pins. They differ in the reset button:
 | [r6/](r6/) | MEGA65 R6 | The reset button, wired to the FPGA. |
 
 [common/](common/) holds what the boards share: the clock and reset (an MMCM
-makes the 33.3 MHz system clock), the UART synchroniser, the keyboard (on the
+makes the 66.7 MHz system clock), the UART synchroniser, the keyboard (on the
 same three pins on both boards; the MAX10 of the R3 is not involved), the
 video output, and the constraints for timing and configuration. The pins
 come from MiSTer2MEGA65, and those of the video from MandelbrotMEGA65.
