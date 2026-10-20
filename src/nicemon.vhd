@@ -254,6 +254,12 @@ architecture synthesis of nicemon is
    signal cpu_halted  : std_logic;
    signal cpu_instret : std_logic;
    signal cpu_retire  : t_retire;
+   -- The registers the last step left, a cycle late, for the CLI. The
+   -- core reports them in the cycle the step retires, at the end of its
+   -- longest paths, so the read of E0-EF takes them from here. The CLI
+   -- reads them only while the core is held or halted, when they do not
+   -- change.
+   signal cpu_regs : t_regs := C_REGS_RESET;
    -- The hold bit in the cycle before, for a pulse when the core starts,
    -- which resets the math unit, the performance counters, and the timer
    signal cpu_hold_d : std_logic := '1';
@@ -664,7 +670,7 @@ begin
             end if;
          elsif addr(31 downto 4) = C_REGS_BASE and cli then
             if we = '0' then
-               rd_io <= cpu_retire.regs(to_integer(addr(3 downto 0)));
+               rd_io <= cpu_regs(to_integer(addr(3 downto 0)));
             end if;
          elsif addr = C_CONTROL and cli then
             if we = '1' and wdata(2) = '1' then
@@ -705,6 +711,7 @@ begin
          scr_ctl_we   <= '0';
          cpu_hold_d   <= cpu_hold;
          cpu_halted_d <= cpu_halted;
+         cpu_regs     <= cpu_retire.regs;
 
          if cpu_rst = '1' then
             halt_why <= HALT_NONE;
@@ -949,10 +956,18 @@ begin
    -- The screen, at 0xFFFF0000. It is memory, as in the emulator, so the CLI
    -- can read what a program wrote there. Without it the address would
    -- land at word 0 of the main memory. A display keeps its own copy, from
-   -- the writes given out here, and shows it as the registers say.
-   scr_we_o       <= scr_b_we;
-   scr_addr_o     <= scr_b_addr;
-   scr_data_o     <= ram_b_wdata;
+   -- the writes given out here, a cycle late, and shows it as the registers
+   -- say. The register keeps the core's store paths short, for the display
+   -- lies far from the core on the FPGA.
+   p_scr_out : process (clk_i)
+   begin
+      if rising_edge(clk_i) then
+         scr_we_o   <= scr_b_we;
+         scr_addr_o <= scr_b_addr;
+         scr_data_o <= ram_b_wdata;
+      end if;
+   end process p_scr_out;
+
    scr_ctl_we_o   <= scr_ctl_we;
    scr_cur_x_o    <= scr_cur_x;
    scr_cur_y_o    <= scr_cur_y;
