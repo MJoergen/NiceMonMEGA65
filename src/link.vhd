@@ -415,9 +415,30 @@ begin
       signal f_con_ff : std_logic := '0';
       signal f_ntc    : std_logic := '0';
       signal f_ans    : std_logic := '0';
+      -- The invariants of f_ranges and f_tx_state, as signals, for the
+      -- GHDL plugin of Yosys 0.33 cannot synthesize them as PSL.
+      signal f_in_range : std_logic;
+      signal f_tx_ok    : std_logic;
    begin
 
       f_tx <= ser_tx_valid_o and ser_tx_ready_i;
+
+      f_in_range <= '1' when (state = IDLE_ST or idle <= C_TIMEOUT) and
+                             (state /= HDR_ST or cnt <= 5) and
+                             ((state /= WR_DATA_ST and state /= RD_SEND_ST) or cnt <= 3) and
+                             (state = IDLE_ST or state = ESC_ST or state = HDR_ST or
+                              state = WR_DATA_ST or state = RD_SEND_ST or cnt = 0) and
+                             (ntc_busy = '0' or ntc_pos <= 2) else
+                    '0';
+
+      f_tx_ok <= '1' when f_con_ff = con_esc and (con_esc = '0' or ntc_busy = '0') and
+                          (con_esc = '0' or (con_tx_valid_i = '1' and con_tx_data_i = C_ESC)) and
+                          (f_ntc = '1') = (ntc_busy = '1' and ntc_pos = 1) and
+                          (ntc_busy = '0' or ntc_pos /= 0) and
+                          (ntc_busy = '0' or ntc_tag = C_TAG_B or ntc_tag = C_TAG_H) and
+                          (f_ans = '0' or (state = ANS_TAG_ST and ans_open = '1' and
+                                           ntc_busy = '0' and con_esc = '0')) else
+                 '0';
 
       p_follow : process (clk_i)
       begin
@@ -450,21 +471,8 @@ begin
       --    state = IDLE_ST or state = ESC_ST or state = HDR_ST or state = ANS_ESC_ST or
       --    state = ANS_TAG_ST or state = RD_REQ_ST or state = RD_WAIT_ST or
       --    state = RD_SEND_ST or state = WR_DATA_ST or state = WR_WAIT_ST;
-      -- psl f_ranges : assert always rst_i = '0' ->
-      --    (state = IDLE_ST or idle <= C_TIMEOUT) and
-      --    (state /= HDR_ST or cnt <= 5) and
-      --    ((state /= WR_DATA_ST and state /= RD_SEND_ST) or cnt <= 3) and
-      --    (state = IDLE_ST or state = ESC_ST or state = HDR_ST or state = WR_DATA_ST or
-      --     state = RD_SEND_ST or cnt = 0) and
-      --    (ntc_busy = '0' or ntc_pos <= 2);
-      -- psl f_tx_state : assert always rst_i = '0' ->
-      --    f_con_ff = con_esc and (con_esc = '0' or ntc_busy = '0') and
-      --    (con_esc = '0' or (con_tx_valid_i = '1' and con_tx_data_i = C_ESC)) and
-      --    (f_ntc = '1') = (ntc_busy = '1' and ntc_pos = 1) and
-      --    (ntc_busy = '0' or ntc_pos /= 0) and
-      --    (ntc_busy = '0' or ntc_tag = C_TAG_B or ntc_tag = C_TAG_H) and
-      --    (f_ans = '0' or (state = ANS_TAG_ST and ans_open = '1' and ntc_busy = '0' and
-      --                     con_esc = '0'));
+      -- psl f_ranges : assert always rst_i = '0' -> f_in_range = '1';
+      -- psl f_tx_state : assert always rst_i = '0' -> f_tx_ok = '1';
       -- psl f_cyc_state : assert always rst_i = '0' ->
       --    (wb_cyc_o = '1') = (state = RD_WAIT_ST or state = WR_WAIT_ST) and
       --    f_wait = (wb_cyc_o and not wb_stb_o);

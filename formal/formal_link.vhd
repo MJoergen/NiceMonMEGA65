@@ -49,6 +49,10 @@ architecture synthesis of formal_link is
    -- A request waits for its ACK.
    signal waits : std_logic := '0';
 
+   -- The console byte that waited in the cycle before
+   signal held      : std_logic := '0';
+   signal held_data : std_logic_vector(7 downto 0);
+
 begin
 
    p_waits : process (clk_i)
@@ -65,14 +69,24 @@ begin
       end if;
    end process p_waits;
 
+   p_held : process (clk_i)
+   begin
+      if rising_edge(clk_i) then
+         held      <= con_tx_valid_i and not con_tx_ready and not rst_i;
+         held_data <= con_tx_data_i;
+      end if;
+   end process p_held;
+
    -- psl default clock is rising_edge(clk_i);
    -- psl f_initial_reset : assume rst_i;
    -- psl f_ack : assume always wb_ack_i -> waits;
    -- waits is what link.vhd's f_wait is, for the induction
    -- psl f_waits : assert always rst_i = '0' -> waits = (wb_cyc and not wb_stb);
+   -- A console byte that waits stays until it is taken. This is a plain
+   -- implication on the registers of p_held, for an assumption with |=>
+   -- does not constrain the last step of the induction in Yosys 0.33.
    -- psl f_con_hold : assume always
-   --    {con_tx_valid_i and not con_tx_ready and not rst_i} |=>
-   --    {rst_i = '1' or (con_tx_valid_i = '1' and stable(con_tx_data_i))};
+   --    held = '1' -> rst_i = '1' or (con_tx_valid_i = '1' and con_tx_data_i = held_data);
 
 
    i_link : entity work.link
