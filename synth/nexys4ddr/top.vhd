@@ -1,7 +1,10 @@
 -- The top level for the Digilent Nexys4DDR board (also sold as the Nexys
 -- A7-100T). It has the clock and reset (clk_rst.vhd), the system
--- (src/system.vhd), and the VGA output. The UART is the board's USB-UART,
--- and LED0 is on while the core runs. The board's keyboard input, LEDs,
+-- (src/system.vhd), the keyboard, and the VGA output. The UART is the
+-- board's USB-UART, and LED0 is on while the core runs. A USB keyboard in
+-- the board's USB HID port types into the same input as the UART: the
+-- board's PIC24 turns it into PS/2, which kbd_ps2.vhd receives and
+-- kbd_ps2_ascii.vhd turns into ASCII. The board's other LEDs, its
 -- seven-segment display, buttons, and switches are not used (see TODO.md).
 --
 -- The board differs from the MEGA65 in three ways that matter here:
@@ -39,6 +42,10 @@ entity top is
       uart_txd_o  : out std_logic;
       led_o       : out std_logic; -- on while the core runs
 
+      -- The keyboard, as PS/2 from the PIC24
+      ps2_clk_i   : in  std_logic;
+      ps2_data_i  : in  std_logic;
+
       -- VGA, 4 bits per colour
       vga_red_o   : out std_logic_vector(3 downto 0);
       vga_green_o : out std_logic_vector(3 downto 0);
@@ -57,6 +64,12 @@ architecture synthesis of top is
    signal rst     : std_logic;
    signal running : std_logic;
    signal led_reg : std_logic := '0';
+
+   signal ps2_valid : std_logic;
+   signal ps2_code  : std_logic_vector(7 downto 0);
+   signal kbd_valid : std_logic;
+   signal kbd_ready : std_logic;
+   signal kbd_data  : std_logic_vector(7 downto 0);
 
    signal vga_clk   : std_logic;
    signal vga_hs    : std_logic;
@@ -115,8 +128,32 @@ begin
       ); -- i_video_clk
 
 
-   -- There is no keyboard, so nothing is typed into the console but the
-   -- UART.
+   i_kbd_ps2 : entity work.kbd_ps2
+      generic map (
+         G_CLOCK_HZ => C_CLOCK_HZ
+      )
+      port map (
+         clk_i        => clk,
+         rst_i        => rst,
+         ps2_clk_i    => ps2_clk_i,
+         ps2_data_i   => ps2_data_i,
+         data_valid_o => ps2_valid,
+         data_o       => ps2_code
+      ); -- i_kbd_ps2
+
+
+   i_kbd_ps2_ascii : entity work.kbd_ps2_ascii
+      port map (
+         clk_i        => clk,
+         rst_i        => rst,
+         code_valid_i => ps2_valid,
+         code_i       => ps2_code,
+         data_valid_o => kbd_valid,
+         data_ready_i => kbd_ready,
+         data_o       => kbd_data
+      ); -- i_kbd_ps2_ascii
+
+
    i_system : entity work.system
       generic map (
          G_CLOCK_HZ      => C_CLOCK_HZ,
@@ -129,9 +166,9 @@ begin
          rst_i       => rst,
          uart_rxd_i  => uart_rxd_i,
          uart_txd_o  => uart_txd_o,
-         kbd_valid_i => '0',
-         kbd_ready_o => open,
-         kbd_data_i  => X"00",
+         kbd_valid_i => kbd_valid,
+         kbd_ready_o => kbd_ready,
+         kbd_data_i  => kbd_data,
          running_o   => running,
          vga_clk_i   => vga_clk,
          vga_hs_o    => vga_hs,

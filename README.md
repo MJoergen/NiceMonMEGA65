@@ -11,15 +11,15 @@ cursor and scrolling, laid out as QNICE-FPGA's. Until the monitor is
 written, programs are loaded through the command line.
 
 The MEGA65 is the main board. The system also builds for the Digilent
-Nexys4DDR, with the UART for input and output and VGA for the screen (see
-[synth/](synth/README.md#the-nexys4ddr)).
+Nexys4DDR, with the UART and a USB keyboard for input, the UART for output,
+and VGA for the screen (see [synth/](synth/README.md#the-nexys4ddr)).
 
 ## Contents
 
 | Path | What it is |
 |---|---|
 | [nice_cpu/](https://github.com/MJoergen/nice_cpu) | The NICE CPU, its assembler, its emulator, and `nicewasm`, a [translator](https://github.com/MJoergen/nice_cpu/tree/main/translator) from WebAssembly to NICE assembly, as a git submodule. |
-| [src/](src/) | The synthesisable VHDL, shared by both boards. `nicemon.vhd` is the system: the NICE core, the memory (`ram.vhd` and `rom.vhd`), the UART, the core's input FIFO (`rx_fifo.vhd`), and the command line interpreter. `uart_serdes.vhd` (with fixes to its receiver, and break detection), `line_buffer.vhd` and `cmd.vhd` are copied from cmod-s7; `cmd.vhd` prints `NICE` instead of `WBUS` at reset, and `HALT` when the core halts. `kbd_m65.vhd` drives the MEGA65 keyboard, and `kbd_ascii.vhd` turns its keys into ASCII. `system.vhd` is what every board has: the system, the text display of its screen, and the UART's pins. |
+| [src/](src/) | The synthesisable VHDL, shared by both boards. `nicemon.vhd` is the system: the NICE core, the memory (`ram.vhd` and `rom.vhd`), the UART, the core's input FIFO (`rx_fifo.vhd`), and the command line interpreter. `uart_serdes.vhd` (with fixes to its receiver, and break detection), `line_buffer.vhd` and `cmd.vhd` are copied from cmod-s7; `cmd.vhd` prints `NICE` instead of `WBUS` at reset, and `HALT` when the core halts. `kbd_m65.vhd` drives the MEGA65 keyboard, and `kbd_ascii.vhd` turns its keys into ASCII. `kbd_ps2.vhd` receives a PS/2 keyboard, the Nexys4DDR's, and `kbd_ps2_ascii.vhd` turns its scan codes into ASCII. `system.vhd` is what every board has: the system, the text display of its screen, and the UART's pins. |
 | [src/video/](src/video/) | The text display: `text.vhd` shows the screen at `0xFFFF0000` as 80×25 characters on a video output, with a cursor and a display offset for scrolling. `pix.vhd` and `video_pkg.vhd` are from [MandelbrotMEGA65](https://github.com/MJoergen/MandelbrotMEGA65), and `font_pkg.vhd` is the [Spleen](https://github.com/fcambus/spleen) 16×32 font, made by `font/gen_font_pkg.py`. |
 | [font/](font/) | The script that makes `src/video/font_pkg.vhd` from Spleen, and Spleen's license (BSD 2-Clause). |
 | [sim/](sim/) | The GHDL testbenches. |
@@ -45,7 +45,7 @@ difference is the memory: 64K words, not 2³².
 |---|---|---|---|
 | Instruction set | ISA.md | nice_cpu's `pipeline.vhd` (or `multicycle.vhd` with `NICE=multi`), which nice_cpu's tests compare with the emulator | Yes |
 | Console output, `0xFFFFFF00` | stdout | UART | Yes |
-| Console input, `0xFFFFFF00` | stdin, with bit 8 set; `0x200` at the end. A read waits for the next byte | UART and the MEGA65 keyboard, with bit 8 set, through a 2048-byte FIFO; `0x200` after a UART break. A read returns 0 while no byte has arrived | Yes, but UART bytes beyond 2048 unread ones are lost, and a program that waits for input in a loop runs more steps |
+| Console input, `0xFFFFFF00` | stdin, with bit 8 set; `0x200` at the end. A read waits for the next byte | UART and the keyboard, with bit 8 set, through a 2048-byte FIFO; `0x200` after a UART break. A read returns 0 while no byte has arrived | Yes, but UART bytes beyond 2048 unread ones are lost, and a program that waits for input in a loop runs more steps |
 | Math unit, `0xFFFFFF20`–`3F` | Computed on read | nice_cpu's `mpu.vhd`, which stalls the read until the result is ready | Yes |
 | Performance counters, `0xFFFFFF40`–`4F` | One cycle per step, from the start | nice_cpu's `perf.vhd`, counting clock cycles at 100 MHz (90 MHz on the Nexys4DDR), from the start of the core | Instructions yes; cycles count real clocks |
 | Timer, `0xFFFFFF10`–`1F` | Raises IRQ every P steps | nice_cpu's `timer.vhd`, raising IRQ every P clock cycles at 100 MHz (90 MHz on the Nexys4DDR) | Yes, but the period counts real clocks, so the interrupts come at other steps |
@@ -140,6 +140,14 @@ answers come out on the UART. The keys give ASCII, as a terminal sends it:
 A held key repeats after half a second, 20 times a second. The function
 keys, HELP, CLR/HOME, and the modifiers give nothing. The keyboard's drive
 LED is green while the core runs, like the user LED.
+
+On the Nexys4DDR, a USB keyboard in the board's USB HID port types into the
+same input (the board's PIC24 turns it into PS/2). Its keys give the same
+bytes, for a US layout: Enter is CR, Backspace and Delete are DEL, the
+cursor keys are `ESC [ A` to `ESC [ D`, and CTRL with a letter is its
+control code. The keypad gives its digits and symbols, whatever Num Lock
+is. A held key repeats as the keyboard repeats it. The keyboard's LEDs are
+not set, so the CAPS LOCK LED does not show whether CAPS LOCK is on.
 
 ### Running a program
 
@@ -417,12 +425,14 @@ You need GHDL (tested with 4.1.0) and Python 3.
   keyboard input.
 - `sim/tb_kbd.vhd` tests the keyboard driver and its ASCII, with a model of
   the keyboard.
+- `sim/tb_ps2.vhd` tests the PS/2 receiver and its ASCII, with a model of a
+  PS/2 keyboard, and checks that bad and broken frames are dropped.
 - `sim/tb_text.vhd` fills the screen of the text display and checks every
   pixel of one 1280×1024 frame, and the sync pulses; then it scrolls the
   display one row, shows the cursor, and checks the first four rows of the
   next frame. It takes under a minute, the longest of the tests.
 - `make test` also checks that GHDL can synthesise the system, with
-  `sim/rom.nasm` as its ROM and without a ROM, the keyboard, the text
+  `sim/rom.nasm` as its ROM and without a ROM, the keyboards, the text
   display, and `src/system.vhd` with the screen of the Nexys4DDR.
 - `make -j test` runs all these side by side, in the time of `tb_text`.
   Each is also a target of `sim/Makefile`, so `make -C sim tb_kbd` runs one.

@@ -2,7 +2,7 @@
 
 NiceMonMEGA65 runs the NICE CPU (the `nice_cpu` submodule) on the MEGA65 R3
 and R6 boards, the main target; the Digilent Nexys4DDR also builds, with
-UART and VGA only. It has a command line interpreter (CLI) on the debug
+UART, VGA, and a PS/2 keyboard. It has a command line interpreter (CLI) on the debug
 UART, a text display on VGA and HDMI, a ROM at address 0 for a QMON-like
 monitor that is planned but not written (`monitor/README.md`), and host
 tools that load and run programs. The goal is that a program runs on the
@@ -15,7 +15,7 @@ header is the authoritative address map.
 ## Commands
 
     make                  # lists the targets
-    make -j test          # GHDL: synth checks, tb_hello, tb_nicemon, tb_kbd, tb_text (NICE=multi for the multi-cycle core)
+    make -j test          # GHDL: synth checks, tb_hello, tb_nicemon, tb_kbd, tb_ps2, tb_text (NICE=multi for the multi-cycle core)
     make -j formal        # SymbiYosys jobs in formal/ (see the last pitfall below before running it in parallel)
     make lint             # vsg against CODING_STYLE.md; line-length warnings are tolerated
     make examples         # C examples -> examples/build/*.bin (clang wasm32, lld, llvm)
@@ -25,7 +25,7 @@ header is the authoritative address map.
     make hwtest           # check the FPGA, program it with openFPGALoader, and test the board
 
 One testbench: `make -C sim tb_kbd` (likewise `tb_hello`, `tb_nicemon`,
-`tb_text`, `synth-nicemon`, ...). By hand: `make -C sim analyse` then, in
+`tb_ps2`, `tb_text`, `synth-nicemon`, ...). By hand: `make -C sim analyse` then, in
 `sim/build/pipeline`, `ghdl --elab-run --std=08 --workdir=. tb_kbd`;
 `tb_nicemon` and `tb_hello` take `-gG_*_FILE=` generics as `sim/Makefile`
 shows, and `tb_text` with `-gG_PPM_FILE=frame.ppm` writes the frame as a

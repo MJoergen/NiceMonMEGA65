@@ -46,9 +46,13 @@ where the R3 has a TPD12S016.
 
 `nexys4ddr/top.vhd` is the whole top level, and `nexys4ddr.xdc` has its
 pins, from Digilent's master XDC. The console is the board's USB-UART, the
-screen is on its VGA connector, and LED0 is on while the core runs. There
-is no keyboard, and the board's other LEDs, its buttons, its switches, and
-its seven-segment display are not used yet (see [TODO.md](../TODO.md)). The
+screen is on its VGA connector, and LED0 is on while the core runs. A USB
+keyboard in the USB HID port types into the console too: the board's PIC24
+turns it into PS/2, which `src/kbd_ps2.vhd` receives and
+`src/kbd_ps2_ascii.vhd` turns into ASCII. The receiver only listens, so
+the keyboard's LEDs are not set. The board's other LEDs, its buttons, its
+switches, and its seven-segment display are not used yet (see
+[TODO.md](../TODO.md)). The
 CPU RESET button resets the system. The board differs from the MEGA65 in
 three ways:
 
