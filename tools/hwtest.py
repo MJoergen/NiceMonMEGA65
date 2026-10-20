@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 """Test the system on the MEGA65 or Nexys4DDR board through its debug UART.
 
-Programs the FPGA with m65, or with openFPGALoader for the Nexys4DDR, and
-checks the banner, and the ROM when the
-bitstream has one, then drives the command line with the ROM hidden: it
+First it finds the JTAG cable on the same USB device as the serial port,
+reads the FPGA's IDCODE through it, and stops unless the FPGA is the part
+the bitstream was built for. It then programs the FPGA through that cable
+alone, so with several boards attached it programs the board whose UART it
+tests. openFPGALoader does both, for the MEGA65 and the Nexys4DDR alike.
+It checks the banner, and the ROM when the bitstream has one, then drives
+the command line with the ROM hidden: it
 loads and runs sim/echo.nasm, holds and restarts the core, clears
 the memory, reads back what sim/emu.nasm leaves after its halt, writes and
 reads the screen's registers, and runs the C example
@@ -18,12 +22,11 @@ Build the bitstream and the example first, and niceemu
 
 Usage: tools/hwtest.py [--port /dev/ttyUSB1] [--baud 115200]
                        [--bit synth/r6/build/top.bit]
-                       [--programmer m65|openfpgaloader] [--no-program]
+                       [--no-program]
 
 --no-program skips programming and the banner check, for a board that is
 already programmed and whose core is held or has halted. Only the Python
-standard library is used, and m65 from mega65-tools or openFPGALoader when
-the FPGA is programmed.
+standard library is used, and openFPGALoader when the FPGA is programmed.
 """
 
 import argparse
@@ -71,18 +74,77 @@ def assemble(src: str, out_dir: str) -> str:
     return out
 
 
-# The command that programs the FPGA with a bitstream, for each programmer
-PROGRAMMERS = {
-    "m65": ["m65", "-q"],
-    "openfpgaloader": ["openFPGALoader", "-b", "nexys_a7_100"],
-}
+# The openFPGALoader cables to try: ft2232 for the MEGA65's JTAG adapter,
+# digilent for the Nexys4DDR. Each answers on its own board only.
+CABLES = ["ft2232", "digilent"]
 
 
-def test_banner(fd: int, bit: str, programmer: str) -> None:
-    r = subprocess.run(PROGRAMMERS[programmer] + [bit], capture_output=True,
-                       text=True)
+def bit_part(bit: str) -> str:
+    """Returns the part a bitstream was built for, as its header names it
+    (7a200tfbg484, say): fields of a letter, a 16-bit length, and the text,
+    after a fixed preamble of 13 bytes."""
+    with open(bit, "rb") as f:
+        head = f.read(256)
+    i = 13
+    while i + 3 <= len(head):
+        key = head[i]
+        n = int.from_bytes(head[i + 1:i + 3], "big")
+        if key == ord("b"):
+            return head[i + 3:i + 3 + n].rstrip(b"\0").decode()
+        if key not in b"acd":
+            break
+        i += 3 + n
+    sys.exit(f"hwtest.py: {bit} has no part in its header")
+
+
+def usb_serial(port: str) -> str:
+    """Returns the serial number of the USB device that a serial port is an
+    interface of: the board's FTDI chip, whose other interface is JTAG."""
+    tty = os.path.basename(os.path.realpath(port))
+    path = os.path.realpath(f"/sys/class/tty/{tty}/device")
+    while path != "/":
+        if os.path.exists(f"{path}/serial"):
+            with open(f"{path}/serial") as f:
+                return f.read().strip()
+        path = os.path.dirname(path)
+    sys.exit(f"hwtest.py: no USB serial number found for {port}")
+
+
+def fpga_model(serial: str) -> tuple[str, str]:
+    """Reads the IDCODE through the JTAG cable with that serial number and
+    returns the cable that answered and the model openFPGALoader names for
+    the FPGA (xc7a200, say)."""
+    for cable in CABLES:
+        r = subprocess.run(["openFPGALoader", "-c", cable, "--ftdi-serial",
+                            serial, "--detect"], capture_output=True,
+                           text=True, timeout=30)
+        m = re.search(r"model\s+(\S+)", r.stdout + r.stderr)
+        if m:
+            return cable, m.group(1)
+    sys.exit(f"hwtest.py: no FPGA answers on the JTAG cable {serial}")
+
+
+def check_board(port: str, bit: str) -> list[str]:
+    """Stops unless the FPGA on the board of the serial port is the part of
+    the bitstream, and returns the openFPGALoader options that select its
+    JTAG cable."""
+    part = bit_part(bit)
+    serial = usb_serial(port)
+    cable, model = fpga_model(serial)
+    ok = f"xc{part}".startswith(model)
+    print(f"[{'PASS' if ok else 'FAIL'}] FPGA {model} on {port} (JTAG "
+          f"{serial}), bitstream for {part}", flush=True)
+    if not ok:
+        sys.exit(f"hwtest.py: {bit} is for {part}, but the FPGA on {port} is "
+                 f"{model}; give the --port of the board it is for")
+    return ["-c", cable, "--ftdi-serial", serial]
+
+
+def test_banner(fd: int, bit: str, cable: list[str]) -> None:
+    r = subprocess.run(["openFPGALoader"] + cable + [bit],
+                       capture_output=True, text=True)
     if r.returncode != 0:
-        sys.exit(f"hwtest.py: {programmer} failed:\n{r.stdout}{r.stderr}")
+        sys.exit(f"hwtest.py: openFPGALoader failed:\n{r.stdout}{r.stderr}")
     time.sleep(1.0)
     out = drain(fd, 1.0)
     check("banner after configuration", b"NICE" in out, repr(out))
@@ -249,10 +311,6 @@ def main() -> None:
     parser.add_argument("--port", default="/dev/ttyUSB1")
     parser.add_argument("--baud", type=int, default=115200)
     parser.add_argument("--bit", default=f"{REPO}/synth/r6/build/top.bit")
-    parser.add_argument("--programmer", choices=sorted(PROGRAMMERS),
-                        default="m65",
-                        help="m65 for the MEGA65, openfpgaloader for the "
-                        "Nexys4DDR")
     parser.add_argument("--no-program", action="store_true",
                         help="do not program the FPGA, and skip the banner")
     args = parser.parse_args()
@@ -276,9 +334,11 @@ def main() -> None:
         with open(text, "wb") as f:
             f.write(bytes(range(256)) * 6)
 
+        # Before the port is opened, as openFPGALoader takes the FTDI chip
+        cable = [] if args.no_program else check_board(args.port, args.bit)
         fd = open_port(args.port, args.baud)
         if not args.no_program:
-            test_banner(fd, args.bit, args.programmer)
+            test_banner(fd, args.bit, cable)
         test_command_line(fd)
         test_echo(fd, echo)
         test_reset(fd, echo)

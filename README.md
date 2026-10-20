@@ -447,10 +447,15 @@ synthesis.
 
 ## Testing the board
 
-`tools/hwtest.py` tests the system on the board itself. It programs the
-FPGA with `m65 -q` from mega65-tools and checks the `NICE` banner, and the
-ROM when the bitstream has one. Then it hides the ROM and
-uses the command line: it runs `sim/echo.nasm`, holds and restarts the core,
+`tools/hwtest.py` tests the system on the board itself. First it finds the
+board from its UART: the JTAG cable on the same USB device as the port. It
+reads the FPGA's IDCODE through that cable with
+[openFPGALoader](https://github.com/trabucayre/openFPGALoader), and stops
+unless the FPGA is the part the bitstream was built for. So with a MEGA65
+and a Nexys4DDR both attached, it never programs the wrong one. It
+programs the FPGA through that cable alone, with openFPGALoader too, on
+every board, and checks the `NICE` banner, and the ROM when the bitstream
+has one. Then it hides the ROM and uses the command line: it runs `sim/echo.nasm`, holds and restarts the core,
 clears the memory, reads back what `sim/emu.nasm` leaves after its halt,
 writes and reads the screen's registers, and runs
 `examples/build/primes.bin`. Last, it runs programs with `run.py`
@@ -466,10 +471,11 @@ It prints one line for each check, and last how many passed.
 On the R6 with the pipelined core, all 50 pass.
 
 For the R3, give `BIT=synth/r3/build/top.bit`. For the Nexys4DDR, give
-`BIT=synth/nexys4ddr/build/top.bit PROGRAMMER=openfpgaloader`, which
-programs it with [openFPGALoader](https://github.com/trabucayre/openFPGALoader);
-its UART is usually `/dev/ttyUSB1` too. A board that is already
-programmed can be tested with `tools/hwtest.py --no-program`, which skips
+`BIT=synth/nexys4ddr/build/top.bit`. Its UART is usually `/dev/ttyUSB1` too.
+With both boards attached, the `ttyUSB` numbers depend on the order they
+were plugged in, so name the port by the cable's serial number, as in
+`PORT=/dev/serial/by-id/usb-Digilent_Digilent_USB_Device_<serial>-if01-port0`.
+A board that is already programmed can be tested with `tools/hwtest.py --no-program`, which skips
 the banner. The reset button is not tested: press it with a terminal open,
 and `NICE` is printed again. A bitstream with a ROM can be tested when the
 program in the ROM halts, as `sim/rom.nasm` does (`make r6

@@ -14,7 +14,7 @@ NiceMonMEGA65 runs the NICE CPU (the `nice_cpu` git submodule) on the MEGA65 R3 
     make r6 [ROM=f.bin]   # Vivado bitstream, synth/r6/build/top.bit; make r3 and make nexys4ddr likewise
     make load FILE=p.bin  # load and start a program on the board (debug UART, /dev/ttyUSB1)
     make run FILE=p.bin   # run it and print what niceemu prints, for diffing
-    make hwtest           # program the FPGA with m65 and test the board (needs the board)
+    make hwtest           # check the FPGA, program it with openFPGALoader, and test the board
 
 One testbench: `make -C sim tb_kbd` (likewise `tb_hello`, `tb_nicemon`,
 `tb_text`, `synth-nicemon`, ...). By hand: `make -C sim analyse` then, in

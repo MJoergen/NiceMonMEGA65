@@ -29,9 +29,9 @@ help:
 	@echo "  make run FILE=prog.bin [PORT=/dev/ttyUSB1]"
 	@echo "                  run a program on the MEGA65, and print what niceemu prints"
 	@echo "  make hwtest [BIT=synth/r6/build/top.bit] [PORT=/dev/ttyUSB1]"
-	@echo "                  program the MEGA65 and test it (needs m65)"
-	@echo "  make hwtest BIT=synth/nexys4ddr/build/top.bit PROGRAMMER=openfpgaloader"
-	@echo "                  program the Nexys4DDR and test it (needs openFPGALoader)"
+	@echo "                  check that the board of PORT has the FPGA of BIT, program"
+	@echo "                  it, and test it (needs openFPGALoader); for the Nexys4DDR,"
+	@echo "                  give BIT=synth/nexys4ddr/build/top.bit"
 	@echo "  NICE=pipeline|multi  with test or a board's target picks nice_cpu's"
 	@echo "                  pipelined core (the default) or its multi-cycle core"
 	@echo "  make clean      remove the build output"
@@ -88,11 +88,10 @@ run:
 	@test -n "$(FILE)" || (echo "Give the program with FILE=prog.bin"; exit 1)
 	$(PYTHON) tools/run.py --port $(PORT) $(FILE)
 
-BIT        ?= synth/r6/build/top.bit
-PROGRAMMER ?= m65
+BIT ?= synth/r6/build/top.bit
 
 hwtest: examples
-	$(PYTHON) tools/hwtest.py --port $(PORT) --bit $(BIT) --programmer $(PROGRAMMER)
+	$(PYTHON) tools/hwtest.py --port $(PORT) --bit $(BIT)
 
 clean:
 	rm -rf formal/build

@@ -84,7 +84,11 @@ to it.
 
 The user LED is on while the core runs. The Nexys4DDR is programmed with
 `openFPGALoader -b nexys_a7_100 synth/nexys4ddr/build/top.bit`, or with
-Vivado's hardware manager.
+Vivado's hardware manager. With a MEGA65 also attached, openFPGALoader
+takes the first cable it finds, which may be the MEGA65's. Add
+`--ftdi-serial` with the Nexys4DDR's serial number, which
+`openFPGALoader --scan-usb` lists, or use `make hwtest`, which checks the
+FPGA first.
 
 `r3/max10.vhd` drives the link to the MAX10. It is copied unchanged from
 [MandelbrotMEGA65](https://github.com/MJoergen/MandelbrotMEGA65)
