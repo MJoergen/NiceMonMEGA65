@@ -184,10 +184,11 @@ not echo what you type, so the number shows only after you press Enter:
 
     Count the primes up to (0 to stop): 1000
     Primes up to 1000: 168
-    51413 instructions in 117778 cycles
+    36731 instructions in 55087 cycles
 
 The second line comes from the performance counters, and the numbers are
-from the board, where the 117778 cycles at 33.3 MHz take about 3.5 ms.
+from the board with the pipelined core, where the 55087 cycles at 33.3 MHz
+take about 1.7 ms.
 
 You need clang with the wasm32 target, `wasm-ld` and `llvm-ar` (on Debian
 and Ubuntu, the `clang`, `lld` and `llvm` packages). The steps that the
@@ -453,6 +454,9 @@ That needs niceemu, built with `make -C nice_cpu/emulator build`; without it
 the comparison is skipped. Build the bitstream first, then:
 
     make hwtest
+
+It prints one line for each check, and last how many passed.
+On the R6 with the pipelined core, all 50 pass.
 
 For the R3, give `BIT=synth/r3/build/top.bit`. A board that is already
 programmed can be tested with `tools/hwtest.py --no-program`, which skips
