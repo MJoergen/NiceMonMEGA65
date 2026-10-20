@@ -138,7 +138,7 @@ A session with `sim/debug.nasm`, a loop that counts in R1:
     nice> go
 
     [breakpoint 0]
-    00000004  001c0080 00000100                   MOVE @0x100, R1
+    00000004  0000b800 00000101                   MOVE R2, @0x101
     nice> regs
     R0  00000000  R1  00000001  R2  00000000  R3  00000000
     R4  00000000  R5  00000000  R6  00000000  R7  00000000
@@ -158,7 +158,9 @@ While the program runs, what you type goes to it, and what it prints shows.
 `tools/nicemon.py p.bin` loads the program first.
 
 A breakpoint stops the core before an instruction at its address runs. A
-watchpoint stops it after a step that reads or writes its address. A step
+watchpoint stops it after a step that reads or writes its address, or, on
+the pipelined core, after the next one, if that one has already issued a
+data read of its own. A step
 is an instruction, or the entry into an interrupt. While the core is
 paused, the cycle counter and the timer go on counting, and the timer's
 interrupt waits. The trace keeps the last 1024 steps, from the start of

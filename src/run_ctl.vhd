@@ -3,27 +3,43 @@
 -- registers are the link's at 0xFFFFFFF2-FF (PROTOCOL.md).
 --
 -- THEORY OF OPERATION
--- The core reports each step on retire_i. After a step, and after reset, the
--- next request on the instruction bus is the fetch of the next instruction
--- word, so at_boundary is set then, and cleared when a fetch is taken. To
--- pause, freeze_o stalls that fetch, so the core waits in its fetch state
--- with every step before it complete, and R15 is the address of the next
--- instruction. freeze_o goes straight to the stall of the instruction bus,
--- in the cycle that the fetch is requested, for a breakpoint is found only
--- by comparing R15 with its address in that cycle.
+-- The core has a pause input, pause_o here, and pauses before its next
+-- step while it is '1', with every step before complete and R15 the
+-- address of the next instruction (nice_cpu's src/pipeline.vhd and
+-- src/multicycle.vhd). It reports that on core_paused_i. When pause_o is
+-- '0' again, the core runs at least one step before it pauses again. So
+-- go_on, which lowers pause_o for one cycle while the core is paused,
+-- lets it run one step, or more if nothing asks for a pause by then.
 --
--- A pause waits in pause_req, with its reason, until the next fetch. Before
--- that, the core could enter an interrupt instead of fetching, so irq_mask_o
--- holds off the interrupt request while a pause waits or the core is
--- paused. The core takes the request only in its boundary state, and the
--- device holds it, so it is taken later. A watchpoint sees the data bus
--- request of the core with its address, and asks for a pause after the
--- step. The step counter asks for one when it counts down to 0.
+-- Each time the core has paused, and the link has not paused it, run_ctl
+-- decides what next: a pause that waits in pause_req, with its reason,
+-- pauses it for the link, and so does a breakpoint at pc, the address of
+-- the next instruction, which run_ctl takes from each step's report. Else
+-- it releases the core. pause_o is '1' while the link has paused the core,
+-- while a pause waits, while steps are counted, while pc is at a
+-- breakpoint, and while a breakpoint is near. A watchpoint sees the data
+-- bus request of the core with its address, and asks for a pause after the
+-- step. The step counter asks for one when it counts down to 0, and since
+-- the core pauses after each step meanwhile, no step runs beyond it.
+--
+-- A breakpoint is near once the core has fetched the pair of words that
+-- holds its address since the core last went on. The pipelined core fetches
+-- ahead, and may issue the data read of an instruction while the one
+-- before it runs, after which it cannot pause before it. So it must pause
+-- before it reaches the breakpoint's instruction, which is fetched a few
+-- cycles before that read at the earliest. The multi-cycle core fetches
+-- an instruction only after its boundary, so for it pc, compared after
+-- each report, stops it in time. If the core pauses with pc elsewhere, it
+-- is released, and pauses again while the breakpoint is near, until pc
+-- reaches it or the fetches pass it by.
 --
 -- Going on from a pause sets skip_bp, so that the breakpoint that may have
--- stopped the core does not stop it at the same fetch again. Reset of the
--- core ends a pause, but not a waiting pause request, so that a pause
--- requested while the core is held stops it before its first instruction.
+-- stopped the core does not stop it at the same instruction again. Reset
+-- of the core ends a pause, but not a waiting pause request, so that a
+-- pause requested while the core is held stops it before its first
+-- instruction. irq_mask_o holds off the interrupt request while a pause
+-- waits or the link has paused the core, as the protocol promises; the
+-- device holds the request, so it is taken later.
 --
 -- A halt is a stop too. stopped_o is '1' while the core is paused or
 -- halted, and reason_o is why it last stopped: the codes of the "h" notice
@@ -61,32 +77,34 @@ entity run_ctl is
       G_RAM_ADDR_BITS : natural := 16
    );
    port (
-      clk_i       : in  std_logic;
-      rst_i       : in  std_logic;
-      -- The core: its reset, its halted flag, and its steps
-      cpu_rst_i   : in  std_logic;
-      halted_i    : in  std_logic;
-      retire_i    : in  t_retire;
+      clk_i         : in  std_logic;
+      rst_i         : in  std_logic;
+      -- The core: its reset, its halted and paused flags, and its steps
+      cpu_rst_i     : in  std_logic;
+      halted_i      : in  std_logic;
+      core_paused_i : in  std_logic;
+      retire_i      : in  t_retire;
       -- The core's requests
-      ibus_cyc_i  : in  std_logic;
-      ibus_stb_i  : in  std_logic;
-      dbus_cyc_i  : in  std_logic;
-      dbus_stb_i  : in  std_logic;
-      dbus_we_i   : in  std_logic;
-      dbus_addr_i : in  std_logic_vector(31 downto 0);
-      -- Stall the instruction fetch, and hold off the interrupt request
-      freeze_o    : out std_logic;
-      irq_mask_o  : out std_logic;
+      ibus_cyc_i    : in  std_logic;
+      ibus_stb_i    : in  std_logic;
+      ibus_addr_i   : in  std_logic_vector(30 downto 0);
+      dbus_cyc_i    : in  std_logic;
+      dbus_stb_i    : in  std_logic;
+      dbus_we_i     : in  std_logic;
+      dbus_addr_i   : in  std_logic_vector(31 downto 0);
+      -- Pause the core, and hold off the interrupt request
+      pause_o       : out std_logic;
+      irq_mask_o    : out std_logic;
       -- The core is paused, or paused or halted, and why it last stopped
-      paused_o    : out std_logic;
-      stopped_o   : out std_logic;
-      reason_o    : out std_logic_vector(7 downto 0);
+      paused_o      : out std_logic;
+      stopped_o     : out std_logic;
+      reason_o      : out std_logic_vector(7 downto 0);
       -- The registers at 0xFFFFFFF2-FF
-      reg_addr_i  : in  std_logic_vector(3 downto 0);
-      reg_we_i    : in  std_logic;
-      reg_re_i    : in  std_logic;
-      reg_wdata_i : in  std_logic_vector(31 downto 0);
-      reg_rdata_o : out std_logic_vector(31 downto 0)
+      reg_addr_i    : in  std_logic_vector(3 downto 0);
+      reg_we_i      : in  std_logic;
+      reg_re_i      : in  std_logic;
+      reg_wdata_i   : in  std_logic_vector(31 downto 0);
+      reg_rdata_o   : out std_logic_vector(31 downto 0)
    );
 end entity run_ctl;
 
@@ -109,22 +127,24 @@ architecture synthesis of run_ctl is
    signal bp_addr : t_addrs := (others => (others => '0'));
    signal bp_kind : t_kinds := (others => (others => '0'));
 
-   signal at_boundary : std_logic := '1';
-   signal paused      : std_logic := '0';
-   signal pause_req   : std_logic := '0';
-   signal req_why     : std_logic_vector(7 downto 0);
-   signal skip_bp     : std_logic := '0';
-   signal steps_left  : std_logic_vector(31 downto 0) := (others => '0');
-   signal reason      : std_logic_vector(7 downto 0) := (others => '0');
-   signal halt_seen   : std_logic := '0';
-   signal cpu_rst_d   : std_logic := '1';
+   signal paused     : std_logic := '0';
+   signal pause_req  : std_logic := '0';
+   signal req_why    : std_logic_vector(7 downto 0);
+   signal skip_bp    : std_logic := '0';
+   signal go_on      : std_logic := '0';
+   signal near       : std_logic := '0';
+   signal pc         : std_logic_vector(31 downto 0) := (others => '0');
+   signal steps_left : std_logic_vector(31 downto 0) := (others => '0');
+   signal reason     : std_logic_vector(7 downto 0) := (others => '0');
+   signal halt_seen  : std_logic := '0';
+   signal cpu_rst_d  : std_logic := '1';
 
-   -- The fetch of the next instruction is requested.
-   signal fetch : std_logic;
-   -- A breakpoint is at that instruction, the first one that is
+   -- A breakpoint is at pc, the first one that is, and its pair is fetched.
    signal bp_hit   : std_logic;
    signal bp_which : natural range 0 to C_BREAKPOINTS - 1;
-   signal freeze   : std_logic;
+   signal bp_fetch : std_logic;
+   -- The core has paused, and run_ctl decides what next.
+   signal decide : std_logic;
 
    -- The trace: per step the instruction word in bits 31..0, its address in
    -- 63..32, and the flags of PROTOCOL.md: bits 3..0 of the flags word in
@@ -143,22 +163,27 @@ architecture synthesis of run_ctl is
 
 begin
 
-   fetch <= at_boundary and ibus_cyc_i and ibus_stb_i;
-
-   p_bp_hit : process (all)
+   p_bp : process (all)
    begin
       bp_hit   <= '0';
       bp_which <= 0;
+      bp_fetch <= '0';
       for k in C_BREAKPOINTS - 1 downto 0 loop
-         if bp_kind(k)(0) = '1' and retire_i.regs(15) = bp_addr(k) then
-            bp_hit   <= fetch and not skip_bp;
-            bp_which <= k;
+         if bp_kind(k)(0) = '1' then
+            if pc = bp_addr(k) then
+               bp_hit   <= not skip_bp;
+               bp_which <= k;
+            end if;
+            if ibus_cyc_i = '1' and ibus_stb_i = '1' and ibus_addr_i = bp_addr(k)(31 downto 1) then
+               bp_fetch <= '1';
+            end if;
          end if;
       end loop;
-   end process p_bp_hit;
+   end process p_bp;
 
-   freeze     <= at_boundary and (paused or pause_req or bp_hit);
-   freeze_o   <= freeze;
+   decide <= core_paused_i and not paused and not go_on;
+
+   pause_o    <= not go_on and (paused or pause_req or near or bp_hit or or(steps_left));
    irq_mask_o <= paused or pause_req;
    paused_o   <= paused;
    stopped_o  <= paused or halted_i;
@@ -168,9 +193,10 @@ begin
    begin
       if rising_edge(clk_i) then
          cpu_rst_d <= cpu_rst_i;
+         go_on     <= '0';
 
          if retire_i.valid = '1' then
-            at_boundary <= '1';
+            pc <= retire_i.regs(15);
             if steps_left /= 0 then
                steps_left <= steps_left - 1;
                if steps_left = 1 then
@@ -178,9 +204,10 @@ begin
                   req_why   <= C_WHY_STEPS;
                end if;
             end if;
-         elsif fetch = '1' and freeze = '0' then
-            at_boundary <= '0';
-            skip_bp     <= '0';
+         end if;
+
+         if bp_fetch = '1' then
+            near <= '1';
          end if;
 
          -- A watchpoint: a pause after this step
@@ -196,15 +223,21 @@ begin
             end if;
          end loop;
 
-         -- The pause happens at the fetch.
-         if fetch = '1' and paused = '0' and (pause_req = '1' or bp_hit = '1') then
-            paused     <= '1';
-            pause_req  <= '0';
-            steps_left <= (others => '0');
-            if pause_req = '1' then
-               reason <= req_why;
+         -- The core has paused: a pause for the link, or go on.
+         if decide = '1' then
+            if pause_req = '1' or bp_hit = '1' then
+               paused     <= '1';
+               pause_req  <= '0';
+               steps_left <= (others => '0');
+               if pause_req = '1' then
+                  reason <= req_why;
+               else
+                  reason <= C_WHY_BREAK & std_logic_vector(to_unsigned(bp_which, 4));
+               end if;
             else
-               reason <= C_WHY_BREAK & std_logic_vector(to_unsigned(bp_which, 4));
+               go_on <= '1';
+               near    <= '0';
+               skip_bp <= '0';
             end if;
          end if;
 
@@ -254,10 +287,12 @@ begin
          end if;
 
          if cpu_rst_i = '1' then
-            at_boundary <= '1';
-            paused      <= '0';
-            skip_bp     <= '0';
-            halt_seen   <= '0';
+            pc        <= (others => '0');
+            paused    <= '0';
+            go_on   <= '0';
+            near      <= '0';
+            skip_bp   <= '0';
+            halt_seen <= '0';
          end if;
 
          if rst_i = '1' then

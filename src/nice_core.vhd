@@ -40,6 +40,8 @@ entity nice_core is
       irq_ready_o  : out std_logic;
       irq_vector_i : in  std_logic_vector(7 downto 0);
 
+      pause_i      : in  std_logic;
+      paused_o     : out std_logic;
       halted_o     : out std_logic;
       instret_o    : out std_logic;
       retire_o     : out t_retire

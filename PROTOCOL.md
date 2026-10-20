@@ -92,7 +92,7 @@ link, and memory for the core.
 
 ## Run control
 
-The core pauses between two steps, before it fetches the next instruction.
+The core pauses between two steps, before it begins the next instruction.
 A step is one instruction, or the entry into an interrupt, as in the
 emulator. While a pause waits to happen, the core takes no interrupt, so
 it pauses before the next instruction. While the core is paused, the
@@ -108,6 +108,8 @@ cycle counter and the timer go on counting.
 - A breakpoint stops the core before an instruction at its address. A
   watchpoint stops it after the step that read or wrote its address
   through the data bus. Instruction fetches are not reads in this sense.
+  The pipelined core may run one more instruction first, if that one has
+  already issued a data read of its own.
 - The halted flag and the paused flag are never both 1.
 
 Each stop sends one `h` notice. The core's registers can then be read at

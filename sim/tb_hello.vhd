@@ -92,6 +92,8 @@ begin
          irq_valid_i  => '0',
          irq_ready_o  => open,
          irq_vector_i => X"00",
+         pause_i      => '0',
+         paused_o     => open,
          halted_o     => halted,
          retire_o     => open
       ); -- i_core

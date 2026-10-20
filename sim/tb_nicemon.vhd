@@ -634,31 +634,40 @@ begin
       command("W FFFFFFFD 00000004");
       command("W FFFFFFF2 00000002");
       expect_stop(16#31#);                   -- after the write
-      command("R FFFFFFEF", "00000006");
+      command("R FFFFFFEF", "00000008");
       command("R 00000100", "00000003");
       command("W FFFFFFFD 00000000");
       command("W FFFFFFFA 00000101");        -- watchpoint 2 for a read of WATCH
       command("W FFFFFFFE 00000002");
       command("W FFFFFFF2 00000002");
       expect_stop(16#22#);
-      command("R FFFFFFEF", "00000008");
+      command("R FFFFFFEF", "00000006");
       command("W FFFFFFFE 00000000");
-      -- The trace: steps 0 to 11 ran at 0, 2, 4, 6, 8, 2, 4, 6, 8, 2, 4, 6.
-      command("R FFFFFFF4", "0000000C");
-      command("W FFFFFFF4 0000000A");        -- from step 10
+      -- The trace: steps 0 to 14 ran at 0, 2, 4, 6, 8, 2, 4, 6, 8, 2, 4, 6, 8, 2, 4.
+      command("R FFFFFFF4", "0000000F");
+      command("W FFFFFFF4 0000000B");        -- from step 11, the write
       send(C_ESC & "P" & hdr(X"FFFFFFF5", 6));
-      expect(C_ESC & "r" & le(X"00000004") & le(first_word_at(G_DEBUG_FILE, 4)) & le(X"00000008") &
-             le(X"00000006") & le(first_word_at(G_DEBUG_FILE, 6)) & le(X"00000000"));
+      expect(C_ESC & "r" & le(X"00000006") & le(first_word_at(G_DEBUG_FILE, 6)) & le(X"00000008") &
+             le(X"00000008") & le(first_word_at(G_DEBUG_FILE, 8)) & le(X"00000000"));
       command("W FFFFFFF4 00000000");        -- the oldest
       send(C_ESC & "P" & hdr(X"FFFFFFF5", 3));
       expect(C_ESC & "r" & le(X"00000000") & le(first_word_at(G_DEBUG_FILE, 0)) & le(X"00000000"));
+      -- A breakpoint at an instruction with a data read, which the pipelined
+      -- core must not have begun
+      command("W FFFFFFFB 00000004");        -- breakpoint 3 at the read of WATCH
+      command("W FFFFFFFF 00000001");
+      command("W FFFFFFF2 00000002");
+      expect_stop(16#13#);
+      command("R FFFFFFEF", "00000004");
+      command("R FFFFFFE1", "00000005");
+      command("W FFFFFFFF 00000000");
       -- A pause of the running core
       command("W FFFFFFF2 00000002");
       expect_nothing;
       assert running = '1'
          report "tb_nicemon: the core does not run"
          severity failure;
-      command("R FFFFFFF2", "00002200");     -- running, the last stop's reason
+      command("R FFFFFFF2", "00001300");     -- running, the last stop's reason
       command("W FFFFFFF2 00000001");
       expect_stop(16#01#);
       command("R FFFFFFF2", "00000101");

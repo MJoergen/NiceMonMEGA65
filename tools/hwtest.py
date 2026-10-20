@@ -194,7 +194,7 @@ def test_screen_registers(link: nl.Link) -> None:
 
 def test_run_control(link: nl.Link, debug: str) -> None:
     """sim/debug.nasm: a loop of the instructions at 2, 4, 6, and 8, which
-    counts in R1, writes COUNT at 0x100, and reads WATCH at 0x101."""
+    counts in R1, reads WATCH at 0x101, and writes COUNT at 0x100."""
     link.load(nl.read_bin(debug))
     link.start(paused=True)
     stop_is(link, 0x01, "paused before the first instruction")
@@ -213,10 +213,10 @@ def test_run_control(link: nl.Link, debug: str) -> None:
     link.set_breakpoint(1, 0x100, nl.WRITE)
     link.go()
     stop_is(link, 0x31, "watchpoint 1 for a write")
-    check("after the write", link.read1(nl.REGS + 15) == 6)
+    check("after the write", link.read1(nl.REGS + 15) == 8)
     link.set_breakpoint(1, 0, 0)
     steps = link.trace()
-    check("the trace", [a for a, _, _ in steps] == [0, 2, 4, 6, 8, 2, 4, 6, 8, 2, 4],
+    check("the trace", [a for a, _, _ in steps] == [0, 2, 4, 6, 8, 2, 4, 6, 8, 2, 4, 6],
           " ".join(f"{a:x}" for a, _, _ in steps))
     link.go()
     time.sleep(0.2)

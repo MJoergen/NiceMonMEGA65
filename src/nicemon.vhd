@@ -108,8 +108,8 @@
 -- is not lost when the core's FIFO is full: it waits until there is room.
 -- Console bytes that arrive while the core is held are dropped.
 --
--- run_ctl.vhd pauses the core between two steps by stalling its next
--- instruction fetch, and holds off the timer's interrupt request meanwhile.
+-- run_ctl.vhd pauses the core between two steps with the core's pause
+-- input, and holds off the timer's interrupt request meanwhile.
 -- When the core stops, by a pause or a halt, and its last console byte has
 -- gone to the link, the link sends a stop notice, so the host knows that
 -- the program's output is complete.
@@ -278,7 +278,8 @@ architecture synthesis of nicemon is
    signal stopped     : std_logic;
    signal paused      : std_logic;
    signal stop_reason : std_logic_vector(7 downto 0);
-   signal freeze      : std_logic;
+   signal cpu_pause   : std_logic;
+   signal cpu_paused  : std_logic;
    signal irq_mask    : std_logic;
    signal dbg_we      : std_logic := '0';
    signal dbg_re      : std_logic := '0';
@@ -456,7 +457,7 @@ begin
          rst_i        => cpu_rst,
          ibus_cyc_o   => ibus_cyc,
          ibus_stb_o   => ibus_stb,
-         ibus_stall_i => freeze,
+         ibus_stall_i => '0',
          ibus_ack_i   => ibus_ack,
          ibus_addr_o  => ibus_addr,
          ibus_data_i  => ibus_data,
@@ -474,6 +475,8 @@ begin
          irq_valid_i  => cpu_irq,
          irq_ready_o  => irq_ready,
          irq_vector_i => irq_vector,
+         pause_i      => cpu_pause,
+         paused_o     => cpu_paused,
          halted_o     => cpu_halted,
          instret_o    => cpu_instret,
          retire_o     => cpu_retire
@@ -488,33 +491,34 @@ begin
          G_RAM_ADDR_BITS => G_RAM_ADDR_BITS
       )
       port map (
-         clk_i       => clk_i,
-         rst_i       => rst_i,
-         cpu_rst_i   => cpu_rst,
-         halted_i    => cpu_halted,
-         retire_i    => cpu_retire,
-         ibus_cyc_i  => ibus_cyc,
-         ibus_stb_i  => ibus_stb,
-         dbus_cyc_i  => dbus_cyc,
-         dbus_stb_i  => dbus_stb,
-         dbus_we_i   => dbus_we,
-         dbus_addr_i => dbus_addr,
-         freeze_o    => freeze,
-         irq_mask_o  => irq_mask,
-         paused_o    => paused,
-         stopped_o   => stopped,
-         reason_o    => stop_reason,
-         reg_addr_i  => dbg_addr,
-         reg_we_i    => dbg_we,
-         reg_re_i    => dbg_re,
-         reg_wdata_i => dbg_wdata,
-         reg_rdata_o => dbg_rdata
+         clk_i         => clk_i,
+         rst_i         => rst_i,
+         cpu_rst_i     => cpu_rst,
+         halted_i      => cpu_halted,
+         core_paused_i => cpu_paused,
+         retire_i      => cpu_retire,
+         ibus_cyc_i    => ibus_cyc,
+         ibus_stb_i    => ibus_stb,
+         ibus_addr_i   => ibus_addr,
+         dbus_cyc_i    => dbus_cyc,
+         dbus_stb_i    => dbus_stb,
+         dbus_we_i     => dbus_we,
+         dbus_addr_i   => dbus_addr,
+         pause_o       => cpu_pause,
+         irq_mask_o    => irq_mask,
+         paused_o      => paused,
+         stopped_o     => stopped,
+         reason_o      => stop_reason,
+         reg_addr_i    => dbg_addr,
+         reg_we_i      => dbg_we,
+         reg_re_i      => dbg_re,
+         reg_wdata_i   => dbg_wdata,
+         reg_rdata_o   => dbg_rdata
       ); -- i_run_ctl
 
 
    ---------------------------------------------------------------------------
-   -- Instruction bus: memory port A. It stalls only while run_ctl.vhd
-   -- pauses the core, with freeze. A pair lies wholly in
+   -- Instruction bus: memory port A. It never stalls. A pair lies wholly in
    -- the RAM, the ROM, the screen, or the I/O page, so the address of its
    -- first word decides where it is read.
    ---------------------------------------------------------------------------
@@ -525,7 +529,7 @@ begin
    p_ibus : process (clk_i)
    begin
       if rising_edge(clk_i) then
-         ibus_ack <= ibus_cyc and ibus_stb and not freeze;
+         ibus_ack <= ibus_cyc and ibus_stb;
          ibus_io  <= and(ibus_word(31 downto 8));
          ibus_scr <= '1' when ibus_word(31 downto C_SCR_BITS) = C_SCR_BASE else '0';
          ibus_rom <= '1' when rom_hidden = '0' and in_rom(ibus_word) else '0';
@@ -1097,9 +1101,9 @@ begin
    -- cycles of UART bytes, far more than the depth that the job can reach,
    -- so the link is checked on its own, in formal/link.sby. A request
    -- of the core waits from the cycle that accepts it until its ACK, or
-   -- until the core is reset, which drops it. A fetch is not accepted while
-   -- run_ctl.vhd freezes the instruction bus. The pipelined core has several
-   -- requests waiting on a bus, so f_ibus_wait and f_dbus_wait count them.
+   -- until the core is reset, which drops it. The instruction bus never
+   -- stalls. The pipelined core has several requests waiting on a bus, so
+   -- f_ibus_wait and f_dbus_wait count them.
    ---------------------------------------------------------------------------
 
    gen_formal : if G_FORMAL generate
@@ -1112,9 +1116,9 @@ begin
       p_wait : process (clk_i)
       begin
          if rising_edge(clk_i) then
-            if ibus_cyc = '1' and ibus_stb = '1' and freeze = '0' and ibus_ack = '0' then
+            if ibus_cyc = '1' and ibus_stb = '1' and ibus_ack = '0' then
                f_ibus_wait <= f_ibus_wait + 1;
-            elsif (ibus_cyc = '0' or ibus_stb = '0' or freeze = '1') and ibus_ack = '1' then
+            elsif (ibus_cyc = '0' or ibus_stb = '0') and ibus_ack = '1' then
                f_ibus_wait <= f_ibus_wait - 1;
             end if;
             if dbus_cyc = '1' and dbus_stb = '1' and dbus_stall = '0' and dbus_ack = '0' then

@@ -62,9 +62,11 @@ and hide; `0x8` to run). A program in the ROM must keep its stack above
 The UART carries the core's console and the link's packets at once: `0xFF`
 starts a packet, and `0xFF 0xFF` is the console byte `0xFF`. When the core
 halts or pauses, the link sends a stop notice after its last console byte,
-and the tools wait for that. `run_ctl.vhd` pauses the core by stalling its
-next instruction fetch (`freeze` on `ibus_stall_i`), and masks the IRQ
-meanwhile. The keyboard (`kbd_m65.vhd`, `kbd_ascii.vhd`) feeds the same input
+and the tools wait for that. `run_ctl.vhd` pauses the core with the
+`pause_i` port that both of nice_cpu's cores have, and masks the IRQ
+meanwhile. The pipelined core fetches ahead, so a breakpoint pauses it as
+soon as the breakpoint's pair is fetched, and run_ctl lets it go on until
+R15 is at the breakpoint. The keyboard (`kbd_m65.vhd`, `kbd_ascii.vhd`) feeds the same input
 path as the UART. The math unit, counters, and timer are reset each time the
 core starts, so step counts match the emulator's.
 

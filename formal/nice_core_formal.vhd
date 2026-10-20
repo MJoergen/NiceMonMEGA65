@@ -15,8 +15,8 @@
 -- - READY of an interrupt port only for a request, and not in reset.
 -- - halted_o is low after reset, and once high, stays high until reset,
 --   which both cores do by their state machines.
--- The step report, retire_o, and instret_o are free; the halt reason is one
--- of the values of t_halt.
+-- The step report, retire_o, instret_o, and paused_o are free; the halt
+-- reason is one of the values of t_halt.
 --
 -- Two of the assumptions matter most here, and nice_cpu proves both for
 -- every cycle: in multicycle.sby, and for the pipelined core in
@@ -28,11 +28,10 @@
 -- - From the second cycle of a halt on, the core makes no new fetch
 --   (f_stop of pipe_fetch.vhd, f_halt_idle of formal_multicycle.vhd). In
 --   the first, the pipelined core may still have one on the bus. nice_cpu
---   proves this for an instruction bus that never stalls. nicemon.vhd's
---   stalls only while run_ctl.vhd freezes it, and a fetch frozen in a halt
---   would stay on the bus, so the solver does not try that case. Without
---   the assumption, the link could hold the core while a fetch waits, and
---   the fetch's ACK would come with CYC low.
+--   proves this for an instruction bus that never stalls, and
+--   nicemon.vhd's never does. Without the assumption, the link could hold
+--   the core while a fetch waits, and the fetch's ACK would come with CYC
+--   low.
 --
 -- RESET
 -- rst_i is the core's reset. A request waits no longer after it.
@@ -56,6 +55,7 @@ architecture formal of nice_core is
    signal nmi_ready : std_logic;
    signal irq_ready : std_logic;
    signal halted    : std_logic;
+   signal paused    : std_logic;
    signal instret   : std_logic;
    signal retire    : t_retire;
    signal halt_code : std_logic_vector(2 downto 0);
@@ -72,6 +72,7 @@ architecture formal of nice_core is
    attribute anyseq of nmi_ready : signal is true;
    attribute anyseq of irq_ready : signal is true;
    attribute anyseq of halted    : signal is true;
+   attribute anyseq of paused    : signal is true;
    attribute anyseq of instret   : signal is true;
    attribute anyseq of retire    : signal is true;
    attribute anyseq of halt_code : signal is true;
@@ -97,6 +98,7 @@ begin
    nmi_ready_o <= nmi_ready;
    irq_ready_o <= irq_ready;
    halted_o    <= halted;
+   paused_o    <= paused;
    instret_o   <= instret;
 
    p_retire : process (all)

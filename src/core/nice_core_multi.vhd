@@ -28,6 +28,8 @@ begin
          irq_valid_i  => irq_valid_i,
          irq_ready_o  => irq_ready_o,
          irq_vector_i => irq_vector_i,
+         pause_i      => pause_i,
+         paused_o     => paused_o,
          halted_o     => halted_o,
          instret_o    => instret_o,
          retire_o     => retire_o
