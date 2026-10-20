@@ -25,8 +25,8 @@ REPO     = ../..
 include ../../core.mk
 SRC  = $(NICE_SOURCES)
 SRC += ../../src/uart_serdes.vhd
-SRC += ../../src/line_buffer.vhd
-SRC += ../../src/cmd.vhd
+SRC += ../../src/link.vhd
+SRC += ../../src/run_ctl.vhd
 SRC += ../../src/rx_fifo.vhd
 SRC += ../../src/ram.vhd
 SRC += ../../src/rom.vhd

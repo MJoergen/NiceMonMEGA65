@@ -7,39 +7,46 @@ export NICE
 PYTHON ?= python3
 PORT   ?= /dev/ttyUSB1
 
-.PHONY: help test formal lint examples r3 r6 load run hwtest clean
+.PHONY: help test formal lint examples r3 r6 mon load run hwtest cosim clean
 
 help:
 	@echo "Targets:"
-	@echo "  make test       run the GHDL simulation tests (needs GHDL)"
+	@echo "  make test       run the GHDL simulation tests (needs GHDL), and the"
+	@echo "                  disassembler's test"
 	@echo "  make [-j4] formal"
 	@echo "                  run the formal checks (needs Yosys, its GHDL plugin,"
 	@echo "                  SymbiYosys, and Yices)"
 	@echo "  make lint       check the VHDL against CODING_STYLE.md (needs vsg)"
 	@echo "  make examples   build the C examples to examples/build/*.bin (needs clang)"
-	@echo "  make r3 [ROM=monitor.bin]"
+	@echo "  make r3 [ROM=prog.bin]"
 	@echo "                  build the bitstream for the MEGA65 R3 (needs Vivado)"
-	@echo "  make r6 [ROM=monitor.bin]"
+	@echo "  make r6 [ROM=prog.bin]"
 	@echo "                  build the bitstream for the MEGA65 R6; with ROM, the"
 	@echo "                  core boots from the .bin file at reset"
+	@echo "  make mon [FILE=prog.bin] [PORT=/dev/ttyUSB1]"
+	@echo "                  start the monitor, tools/nicemon.py, on the MEGA65"
 	@echo "  make load FILE=prog.bin [PORT=/dev/ttyUSB1]"
 	@echo "                  load a program into the MEGA65 and start it"
 	@echo "  make run FILE=prog.bin [PORT=/dev/ttyUSB1]"
 	@echo "                  run a program on the MEGA65, and print what niceemu prints"
 	@echo "  make hwtest [BIT=synth/r6/build/top.bit] [PORT=/dev/ttyUSB1]"
 	@echo "                  program the MEGA65 and test it (needs m65)"
-	@echo "  NICE=pipeline|multi  with test, r3, or r6 picks nice_cpu's pipelined"
-	@echo "                  core (the default) or its multi-cycle core"
+	@echo "  make cosim [ROM=prog.bin]"
+	@echo "                  run the system in GHDL on sim/build/nicemon.pty, for"
+	@echo "                  the tools with --port sim/build/nicemon.pty --wait 1000"
+	@echo "  NICE=pipeline|multi  with test, cosim, r3, or r6 picks nice_cpu's"
+	@echo "                  pipelined core (the default) or its multi-cycle core"
 	@echo "  make clean      remove the build output"
 
 test:
 	$(MAKE) -C sim test
+	$(PYTHON) tools/test_nicedis.py
 
 # The formal checks of formal/: each task of each .sby file must pass, as
 # a target of its own, so that "make -j4 formal" runs them side by side. The
 # work directories go in formal/build.
 SBY ?= sby
-FORMAL_TASKS = cli-prove cli-cover rx_fifo-prove rx_fifo-cover nicemon-run nicemon-cli nicemon-cover
+FORMAL_TASKS = link-prove link-cover rx_fifo-prove rx_fifo-cover nicemon-run nicemon-cover
 
 formal: $(addprefix formal-,$(FORMAL_TASKS))
 
@@ -55,7 +62,7 @@ formal-%:
 # own, nor the third-party files that keep their own style (CODING_STYLE.md):
 # synth/r3/max10.vhd and synth/common/hdmi/.
 VSG         ?= vsg
-VHDL_SOURCES = $(filter-out synth/r3/max10.vhd,$(wildcard src/*.vhd src/core/*.vhd src/video/*.vhd sim/*.vhd formal/*.vhd \
+VHDL_SOURCES = $(filter-out synth/r3/max10.vhd,$(wildcard src/*.vhd src/core/*.vhd src/video/*.vhd sim/*.vhd sim/cosim/*.vhd formal/*.vhd \
                                                           synth/common/*.vhd synth/r3/*.vhd synth/r6/*.vhd))
 
 lint:
@@ -71,6 +78,12 @@ r3:
 
 r6:
 	$(MAKE) -C synth/r6 ROM=$(if $(ROM),$(abspath $(ROM)))
+
+mon:
+	$(PYTHON) tools/nicemon.py --port $(PORT) $(FILE)
+
+cosim:
+	$(MAKE) -C sim cosim ROM=$(if $(ROM),$(abspath $(ROM)))
 
 load:
 	@test -n "$(FILE)" || (echo "Give the program with FILE=prog.bin"; exit 1)

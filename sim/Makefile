@@ -33,22 +33,22 @@ REPO     = ..
 include ../core.mk
 NICE_SIM = $(NICE_DIR)/hdl/sim/wb_mem.vhd
 
-SRC_SOURCES  = ../src/uart_serdes.vhd ../src/line_buffer.vhd ../src/cmd.vhd ../src/rx_fifo.vhd ../src/ram.vhd ../src/rom.vhd \
+SRC_SOURCES  = ../src/uart_serdes.vhd ../src/link.vhd ../src/run_ctl.vhd ../src/rx_fifo.vhd ../src/ram.vhd ../src/rom.vhd \
                ../src/nicemon.vhd \
                ../src/kbd_m65.vhd ../src/kbd_ascii.vhd \
                ../src/video/video_pkg.vhd ../src/video/font_pkg.vhd ../src/video/pix.vhd ../src/video/scr_ram.vhd ../src/video/text.vhd
 SOURCES      = $(SRC_SOURCES) text_synth.vhd tb_hello.vhd tb_nicemon.vhd tb_kbd.vhd tb_text.vhd
 
-.PHONY: test analyse synth clean
+.PHONY: test analyse synth cosim clean
 
-test: analyse synth $(BUILD)/hello.bin $(BUILD)/rom.bin $(BUILD)/echo.bin $(BUILD)/fifo.bin $(BUILD)/devices.bin $(BUILD)/emu.bin $(BUILD)/reserved.bin $(BUILD)/eof.bin
+test: analyse synth $(BUILD)/hello.bin $(BUILD)/rom.bin $(BUILD)/echo.bin $(BUILD)/fifo.bin $(BUILD)/devices.bin $(BUILD)/emu.bin $(BUILD)/reserved.bin $(BUILD)/eof.bin $(BUILD)/debug.bin
 	@(cd $(BUILD) && $(GHDL) --elab-run $(GHDLFLAGS) tb_hello \
 	  -gG_BIN_FILE=hello.bin -gG_OUT_FILE=hello.out > tb_hello.log 2>&1) || \
 	  (echo "FAIL tb_hello"; cat $(BUILD)/tb_hello.log; exit 1)
 	@if cmp -s hello.expected $(BUILD)/hello.out; then echo "PASS tb_hello"; \
 	else echo "FAIL tb_hello"; diff hello.expected $(BUILD)/hello.out; exit 1; fi
 	@(cd $(BUILD) && $(GHDL) --elab-run $(GHDLFLAGS) tb_nicemon \
-	  -gG_HELLO_FILE=hello.bin -gG_ROM_FILE=rom.bin -gG_ECHO_FILE=echo.bin -gG_FIFO_FILE=fifo.bin -gG_DEVICES_FILE=devices.bin -gG_EMU_FILE=emu.bin -gG_RESERVED_FILE=reserved.bin -gG_EOF_FILE=eof.bin > tb_nicemon.log 2>&1) && \
+	  -gG_HELLO_FILE=hello.bin -gG_ROM_FILE=rom.bin -gG_ECHO_FILE=echo.bin -gG_FIFO_FILE=fifo.bin -gG_DEVICES_FILE=devices.bin -gG_EMU_FILE=emu.bin -gG_RESERVED_FILE=reserved.bin -gG_EOF_FILE=eof.bin -gG_DEBUG_FILE=debug.bin > tb_nicemon.log 2>&1) && \
 	  echo "PASS tb_nicemon" || (echo "FAIL tb_nicemon"; cat $(BUILD)/tb_nicemon.log; exit 1)
 	@(cd $(BUILD) && $(GHDL) --elab-run $(GHDLFLAGS) tb_kbd > tb_kbd.log 2>&1) && \
 	  echo "PASS tb_kbd" || (echo "FAIL tb_kbd"; cat $(BUILD)/tb_kbd.log; exit 1)
@@ -97,8 +97,21 @@ $(BUILD)/eof.bin: eof.nasm | $(BUILD)
 $(BUILD)/devices.bin: devices.nasm | $(BUILD)
 	@$(ASM) -o $@ $<
 
+$(BUILD)/debug.bin: debug.nasm | $(BUILD)
+	@$(ASM) -o $@ $<
+
 $(BUILD):
 	@mkdir -p $@
 
 clean:
-	rm -rf $(BUILD)
+	rm -rf $(BUILD) build/nicemon.pty
+
+# The system on a pseudo-terminal, for the tools: make cosim, then, in
+# another shell, tools/nicemon.py --port sim/build/nicemon.pty. ROM=f.bin
+# gives it a ROM. The pseudo-terminal is made in $(BUILD), and
+# build/nicemon.pty links to it, whichever core is built.
+cosim: analyse
+	@gcc -shared -fPIC -o $(BUILD)/libpty.so cosim/pty.c
+	@ln -sfn $(NICE)/nicemon.pty build/nicemon.pty
+	@cd $(BUILD) && $(GHDL) -a $(GHDLFLAGS) ../../cosim/tb_cosim.vhd && \
+	  $(GHDL) --elab-run $(GHDLFLAGS) tb_cosim $(if $(ROM),-gG_ROM_FILE=$(abspath $(ROM)))

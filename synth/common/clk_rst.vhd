@@ -3,7 +3,7 @@
 -- pipelined core, whose longest path takes about 25.5 ns. The reset is held
 -- while the MMCM is not locked, and while the reset button (active high) is
 -- pressed, and for 2^20 cycles (31 ms) after both. So the UART output is idle for that
--- long before the CLI sends its banner, and a terminal that saw the pin
+-- long before the link sends its reset notice, and a terminal that saw the pin
 -- change during configuration has time to find the start of a character.
 -- The MMCM's locked output and the button are synchronised to clk_o by two
 -- registers each, as in MandelbrotMEGA65's clk_rst.vhd.

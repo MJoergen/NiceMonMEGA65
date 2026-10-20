@@ -191,7 +191,7 @@ begin
    i_nicemon : entity work.nicemon
       generic map (
          G_CLOCK_HZ         => C_CLOCK_HZ,
-         G_UART_BAUDRATE    => 115_200,
+         G_UART_BAUDRATE    => 2_000_000,
          G_RAM_ADDR_BITS    => 16,
          G_SCR_ADDR_BITS    => C_SCR_ADDR_BITS,
          G_ROM_FILE         => G_ROM_FILE,

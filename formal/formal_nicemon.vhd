@@ -1,15 +1,16 @@
 -- The whole system, nicemon.vhd, with its checks (G_FORMAL), for
 -- SymbiYosys. Every input is free, and so is the core, nice_core_formal.vhd,
--- so the solver makes every request that a core may make, sends every byte
--- on the UART and the keyboard at any time, and types every command line.
--- The sizes are small: 16 words of RAM, no ROM, a FIFO of 4 bytes, and a
--- UART bit of 2 cycles.
+-- so the solver makes every request that a core may make, and sends every
+-- byte on the UART and the keyboard at any time. The sizes are small: 16
+-- words of RAM, no ROM, a FIFO of 4 bytes, a trace of 4 steps, and a UART
+-- bit of 2 cycles. The clock rate only sets the link's timeout, the clock
+-- divided by 100: 40 cycles, longer than the 20 of a byte. A request of
+-- the link takes more cycles than the job reaches, so formal/link.sby
+-- checks the link on its own.
 --
 -- THEORY OF OPERATION
--- With G_CPU_RUN_AT_RESET the core runs the program in the RAM from reset,
--- and the CLI waits until it halts. Without it the core is held, and the
--- CLI has the input, so the solver types commands that read and write
--- memory and devices, and that start the core. The checks themselves are in
+-- With G_CPU_RUN_AT_RESET the core runs the program in the RAM from reset.
+-- Without it the core is held until the debug link starts it. The checks themselves are in
 -- nicemon.vhd, where they see its signals.
 --
 -- RESET
@@ -53,12 +54,13 @@ begin
 
    i_nicemon : entity work.nicemon
       generic map (
-         G_CLOCK_HZ         => 2,
-         G_UART_BAUDRATE    => 1,
+         G_CLOCK_HZ         => 4000,
+         G_UART_BAUDRATE    => 2000,
          G_RAM_ADDR_BITS    => 4,
          G_SCR_ADDR_BITS    => 11,
          G_RX_FIFO_BITS     => 2,
          G_ROM_ADDR_BITS    => 2,
+         G_TRACE_BITS       => 2,
          G_CPU_RUN_AT_RESET => G_CPU_RUN_AT_RESET,
          G_FORMAL           => true
       )

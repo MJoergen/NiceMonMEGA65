@@ -27,10 +27,12 @@
 --   registered ACK would come with CYC low.
 -- - From the second cycle of a halt on, the core makes no new fetch
 --   (f_stop of pipe_fetch.vhd, f_halt_idle of formal_multicycle.vhd). In
---   the first, the pipelined core may still have one on the bus. This
---   holds for an instruction bus that never stalls, as nicemon.vhd's.
---   Without it, the CLI could hold the core while a fetch waits, and the
---   fetch's ACK would come with CYC low.
+--   the first, the pipelined core may still have one on the bus. nice_cpu
+--   proves this for an instruction bus that never stalls. nicemon.vhd's
+--   stalls only while run_ctl.vhd freezes it, and a fetch frozen in a halt
+--   would stay on the bus, so the solver does not try that case. Without
+--   the assumption, the link could hold the core while a fetch waits, and
+--   the fetch's ACK would come with CYC low.
 --
 -- RESET
 -- rst_i is the core's reset. A request waits no longer after it.

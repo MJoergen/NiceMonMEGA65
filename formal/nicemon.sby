@@ -1,21 +1,19 @@
 # The whole system (formal_nicemon.vhd), with the checks of nicemon.vhd. It
-# is too large for k-induction, so "run" and "cli" check every cycle up to
-# their depth: "run" with the core running from reset, "cli" with the CLI
-# in charge first. "cover" reaches each cover statement.
+# is too large for k-induction, so "run" checks every cycle up to its depth,
+# with the core running from reset. "cover" reaches each cover statement. A
+# request of the debug link needs more cycles than either reaches, so
+# link.sby checks the link on its own.
 # The core is nice_core_formal.vhd, a free core that does anything either
 # of nice_cpu's cores may do on its ports, so the system is checked against
 # both, and the solver spends nothing on a real core's state.
 
 [tasks]
 run
-cli
 cover
 
 [options]
 run: mode bmc
 run: depth 30
-cli: mode bmc
-cli: depth 40
 cover: mode cover
 cover: depth 40
 
@@ -24,9 +22,8 @@ smtbmc yices
 
 [script]
 plugin -i ghdl
-run: ghdl --std=08 -fpsl -gG_CPU_RUN_AT_RESET=true trace_pkg.vhd mpu.vhd perf.vhd timer.vhd nice_core.vhd nice_core_formal.vhd uart_serdes.vhd line_buffer.vhd cmd.vhd rx_fifo.vhd ram.vhd rom.vhd nicemon.vhd formal_nicemon.vhd -e formal_nicemon
-cli: ghdl --std=08 -fpsl -gG_CPU_RUN_AT_RESET=false trace_pkg.vhd mpu.vhd perf.vhd timer.vhd nice_core.vhd nice_core_formal.vhd uart_serdes.vhd line_buffer.vhd cmd.vhd rx_fifo.vhd ram.vhd rom.vhd nicemon.vhd formal_nicemon.vhd -e formal_nicemon
-cover: ghdl --std=08 -fpsl -gG_CPU_RUN_AT_RESET=true trace_pkg.vhd mpu.vhd perf.vhd timer.vhd nice_core.vhd nice_core_formal.vhd uart_serdes.vhd line_buffer.vhd cmd.vhd rx_fifo.vhd ram.vhd rom.vhd nicemon.vhd formal_nicemon.vhd -e formal_nicemon
+run: ghdl --std=08 -fpsl -gG_CPU_RUN_AT_RESET=true trace_pkg.vhd mpu.vhd perf.vhd timer.vhd nice_core.vhd nice_core_formal.vhd uart_serdes.vhd link.vhd run_ctl.vhd rx_fifo.vhd ram.vhd rom.vhd nicemon.vhd formal_nicemon.vhd -e formal_nicemon
+cover: ghdl --std=08 -fpsl -gG_CPU_RUN_AT_RESET=true trace_pkg.vhd mpu.vhd perf.vhd timer.vhd nice_core.vhd nice_core_formal.vhd uart_serdes.vhd link.vhd run_ctl.vhd rx_fifo.vhd ram.vhd rom.vhd nicemon.vhd formal_nicemon.vhd -e formal_nicemon
 prep -top formal_nicemon
 
 [files]
@@ -36,8 +33,8 @@ prep -top formal_nicemon
 ../nice_cpu/hdl/src/timer.vhd
 ../src/nice_core.vhd
 ../src/uart_serdes.vhd
-../src/line_buffer.vhd
-../src/cmd.vhd
+../src/link.vhd
+../src/run_ctl.vhd
 ../src/rx_fifo.vhd
 ../src/ram.vhd
 ../src/rom.vhd

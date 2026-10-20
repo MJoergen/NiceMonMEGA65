@@ -2,35 +2,37 @@
 The NICE CPU with a monitor, on the MEGA65
 
 This project runs the [NICE CPU](https://github.com/MJoergen/nice_cpu) on the
-MEGA65 board (R3 and R6), with a command line interpreter on the UART like
-the one in [cmod-s7](https://github.com/MJoergen/cmod-s7). A monitor like
-the one in [QNICE-FPGA](https://github.com/sy2002/QNICE-FPGA) is planned and
-not written yet (see [monitor/](monitor/README.md)). The hardware for it is
-there: a ROM at address 0, which the core boots from, and a screen with a
-cursor and scrolling, laid out as QNICE-FPGA's. Until the monitor is
-written, programs are loaded through the command line.
+MEGA65 board (R3 and R6). The monitor is on the host: the board has a small
+debug link on its UART, a binary protocol ([PROTOCOL.md](PROTOCOL.md)) that
+reads and writes memory, pauses, steps, and stops the core at breakpoints
+and watchpoints, and keeps a trace of its last steps. `tools/nicemon.py`
+speaks it, and gives a command prompt with hex dumps and a disassembler.
+The program's console shares the UART with the link, so a program can be
+inspected while it runs. The board also has a ROM at address 0, which the
+core boots from, and a screen with a cursor and scrolling, laid out as
+QNICE-FPGA's.
 
 ## Contents
 
 | Path | What it is |
 |---|---|
 | [nice_cpu/](https://github.com/MJoergen/nice_cpu) | The NICE CPU, its assembler, its emulator, and `nicewasm`, a [translator](https://github.com/MJoergen/nice_cpu/tree/main/translator) from WebAssembly to NICE assembly, as a git submodule. |
-| [src/](src/) | The synthesisable VHDL, shared by both boards. `nicemon.vhd` is the system: the NICE core, the memory (`ram.vhd` and `rom.vhd`), the UART, the core's input FIFO (`rx_fifo.vhd`), and the command line interpreter. `uart_serdes.vhd` (with fixes to its receiver, and break detection), `line_buffer.vhd` and `cmd.vhd` are copied from cmod-s7; `cmd.vhd` prints `NICE` instead of `WBUS` at reset, and `HALT` when the core halts. `kbd_m65.vhd` drives the MEGA65 keyboard, and `kbd_ascii.vhd` turns its keys into ASCII. |
+| [src/](src/) | The synthesisable VHDL, shared by both boards. `nicemon.vhd` is the system: the NICE core, the memory (`ram.vhd` and `rom.vhd`), the UART, the core's input FIFO (`rx_fifo.vhd`), and the debug link. `link.vhd` speaks the protocol of [PROTOCOL.md](PROTOCOL.md), and `run_ctl.vhd` pauses and steps the core, has the breakpoints, and keeps the trace. `uart_serdes.vhd` is copied from [cmod-s7](https://github.com/MJoergen/cmod-s7), with fixes to its receiver, and break detection. `kbd_m65.vhd` drives the MEGA65 keyboard, and `kbd_ascii.vhd` turns its keys into ASCII. |
 | [src/video/](src/video/) | The text display: `text.vhd` shows the screen at `0xFFFF0000` as 80×25 characters on a video output, with a cursor and a display offset for scrolling. `pix.vhd` and `video_pkg.vhd` are from [MandelbrotMEGA65](https://github.com/MJoergen/MandelbrotMEGA65), and `font_pkg.vhd` is the [Spleen](https://github.com/fcambus/spleen) 16×32 font, made by `font/gen_font_pkg.py`. |
 | [font/](font/) | The script that makes `src/video/font_pkg.vhd` from Spleen, and Spleen's license (BSD 2-Clause). |
-| [sim/](sim/) | The GHDL testbenches. |
+| [sim/](sim/) | The GHDL testbenches, and `cosim/`, which puts the simulated system on a pseudo-terminal for the tools. |
 | [formal/](formal/) | The formal checks, for SymbiYosys. |
 | [synth/](synth/README.md) | The Vivado builds for the R3 and R6 boards. |
-| [monitor/](monitor/README.md) | The monitor, in NICE assembly: planned, not written yet. Its README has the decisions it will follow, QNICE-FPGA's. |
+| [monitor/](monitor/README.md) | A note on where the monitor went: to the host, in `tools/nicemon.py`. |
 | [examples/](examples/) | Example C programs, and the Makefile that builds them for the MEGA65. |
-| [tools/](tools/) | `load.py`, which loads a program into the MEGA65 through the UART, `run.py`, which runs a program on the MEGA65 as `niceemu` runs it, and `hwtest.py`, which tests the system on the board. |
+| [tools/](tools/) | `nicemon.py`, the monitor; `nicelink.py`, the host side of the debug link, which the others use; `nicedis.py`, the disassembler; `load.py`, which loads a program into the MEGA65; `run.py`, which runs a program on the MEGA65 as `niceemu` runs it; and `hwtest.py`, which tests the system on the board. |
 
 ## Compared with the emulator
 
 The goal is a MEGA65 that runs NICE programs as `niceemu`, the emulator in
 `nice_cpu/emulator`, runs them. **It is close, but not there yet.** The
 core, the address map, and the devices behave as in the emulator, and the
-command line reads back what the emulator prints after a halt.
+debug link reads back what the emulator prints after a halt.
 `tools/run.py` runs a program on the board and prints what `niceemu` prints
 for it, so the two can be compared (see
 [Comparing with the emulator](#comparing-with-the-emulator)). The main
@@ -46,13 +48,15 @@ difference is the memory: 64K words, not 2³².
 | Timer, `0xFFFFFF10`–`1F` | Raises IRQ every P steps | nice_cpu's `timer.vhd`, raising IRQ every P clock cycles at 33.3 MHz | Yes, but the period counts real clocks, so the interrupts come at other steps |
 | Instruction fetches from `0xFFFFFF00`–`FF` | Read 0 | Read 0 | Yes |
 | Memory | All 2³² words, 0 at the start | 64K words, repeated through the address space; the stack at `0xFFFFFF00` lands in the top. `load.py` and `run.py` hide the ROM, if the bitstream has one, and clear the RAM to 0 before they load | No: a program, its data, and its stack must fit in 64K words |
-| Screen, `0xFFFF0000`–`07CF` | 80×25 words of memory, printed by `--screen` | 32768 words of memory of their own, read with `R`; the first 2000 are shown on VGA and HDMI, unless the display offset is set | Yes |
-| Read counter, `0xFFFFFF01` | Counts the data reads since the last write | The same; a read by the command line does not count, as `--dump` does not | Yes |
+| Screen, `0xFFFF0000`–`07CF` | 80×25 words of memory, printed by `--screen` | 32768 words of memory of their own, read through the link; the first 2000 are shown on VGA and HDMI, unless the display offset is set | Yes |
+| Read counter, `0xFFFFFF01` | Counts the data reads since the last write | The same; a read by the link does not count, as `--dump` does not | Yes |
 | The rest of `0xFFFFFF02`–`FF` | Ordinary memory for data | Memory, in the top 256 words of the RAM, except `0xFFFFFF50`–`5F`, the screen's registers | Yes, but for the screen's registers |
 | Interrupts | From the timer, `--irq`, and `--nmi` | From the timer, on IRQ | Yes, for the timer's |
-| After a halt | Prints why, the steps, and the registers, and exits with a status | The command line gets the UART back and prints `HALT`; `R FFFFFFF1` reads why, the instruction counter the steps, `R FFFFFFE0` to `R FFFFFFEF` R0–R15, and `R` memory. `run.py` prints them as the emulator does, with its exit status | Yes |
+| After a halt | Prints why, the steps, and the registers, and exits with a status | The link sends a stop notice after the program's last output; `0xFFFFFFF1` reads why, the instruction counter the steps, and `0xFFFFFFE0`–`EF` R0–R15. `run.py` prints them as the emulator does, with its exit status | Yes |
 | `--dump`, `--screen`, `--input` | Options | The same options of `run.py` | Yes |
-| `--trace`, `--max-steps`, `--irq`, `--nmi` | Options | Not available | No |
+| `--trace` | Prints every step | The last 1024 steps are kept on the board; `nicemon.py`'s `trace` disassembles them | Partly: the last steps, without the registers |
+| `--max-steps` | Stops after N steps | The step register of the link stops the core after N steps; `nicemon.py`'s `step N` | Yes, but it pauses, and does not halt |
+| `--irq`, `--nmi` | Options | Not available | No |
 
 So a program that fits in 64K words, and does not fall more than 2048
 bytes behind its input, prints the same. The C example `examples/primes.c`
@@ -74,10 +78,13 @@ simulation tests, `make formal` runs the formal checks (see
 the C examples, `make r3` and `make r6` build the bitstreams, with
 `ROM=file.bin` one whose core boots from the file (see
 [The ROM](#the-rom)),
+`make mon [FILE=prog.bin]` starts the monitor, `tools/nicemon.py`,
 `make load FILE=prog.bin` loads a program into the MEGA65 and starts it,
 `make run FILE=prog.bin` runs one as `niceemu` runs it (see
 [Comparing with the emulator](#comparing-with-the-emulator)), and
-`make hwtest` tests the board (see [Testing the board](#testing-the-board)).
+`make hwtest` tests the board (see [Testing the board](#testing-the-board)),
+and `make cosim` puts the simulation on a pseudo-terminal, so that the
+tools work without a board (see [Without a board](#without-a-board)).
 
 `make test`, `make r3`, and `make r6` use nice_cpu's pipelined core. Add
 `NICE=multi` to use its multi-cycle core instead (`NICE=pipeline` is the
@@ -88,36 +95,85 @@ set for the pipelined core, so the multi-cycle core has room to spare.
 
 ## Using it
 
-Connect a terminal to the MEGA65's debug UART at 115200 baud, 8-N-1. After
-reset the command line interpreter prints `NICE` and takes two commands, with
-8 hex digits for each number. Commands and hex digits may be upper or lower
-case. End each line with CR alone.
+The debug UART of the MEGA65 runs at 2,000,000 baud, 8-N-1. It carries the
+debug link and the console of the program at the same time. The monitor
+speaks the link:
+
+    tools/nicemon.py
+
+It uses the serial device `/dev/ttyUSB1`, the MEGA65's debug UART; give
+another with `--port`. It needs only Python 3, on Linux or macOS. At the
+prompt, `help` lists the commands. Addresses and words are hex, with or
+without `0x`, and counts are decimal.
 
 | Command | What it does |
 |---|---|
-| `R <ADDR>` | Reads a word, and prints it. |
-| `W <ADDR> <DATA>` | Writes a word, and prints `OK`. |
+| `load FILE.bin` | Holds the core, hides the ROM, clears the memory, and writes the program. |
+| `run [FILE.bin]` | Starts the program, after loading it if given, and is its console. |
+| `start` | Starts the held core paused, before its first instruction. |
+| `go`, `c` | Lets a paused core go on, and is its console. |
+| `pause` | Pauses the running core. Ctrl-C does it too, while the monitor is the console. |
+| `step [N]`, `s` | Runs N steps, 1 by default, and shows the next instruction. |
+| `regs`, `r` | Prints R0–R15, the flags, and whether the core runs. |
+| `m [ADDR] [N]` | Prints N words from ADDR, with their low bytes as text. |
+| `set ADDR WORD...` | Writes the words from ADDR. |
+| `d [ADDR] [N]` | Disassembles N instructions from ADDR, or from the next instruction of the core. |
+| `b [ADDR [exec\|read\|write\|rw]]` | Sets a breakpoint or a watchpoint, of four, or lists them. |
+| `bd [K]` | Deletes breakpoint K, or all of them. |
+| `trace [N]` | Disassembles the last N steps of the core. |
+| `screen` | Prints the 80×25 characters of the screen. |
+| `reset` | Holds the core in reset. |
+| `info`, `quit` | What the board says about itself; leave. |
 
-The core is held in reset at power-up. To run a program, write its words to
-memory, then start the core:
+A session with `sim/debug.nasm`, a loop that counts in R1:
 
-    W FFFFFFF0 00000000
+    nice> load sim/build/debug.bin
+    loaded 10 words in 2.76 s
+    nice> start
 
-While the core runs, the UART belongs to it. When it halts, the UART goes
-back to the command line. `W FFFFFFF0 00000001` holds the core in reset
-again, and `R FFFFFFF0` reads bit 0 (held) and bit 1 (halted).
-`W FFFFFFF0 00000005` clears the memory to 0 and holds the core; it answers
-`OK` when the memory is clear. When a program halts, the command line
-prints `HALT` on a line of its own, and `R FFFFFFF1` reads why it halted.
-Bit 3 of the control register hides the ROM, so that the RAM is at address
-0 (see [The ROM](#the-rom)); in a bitstream without a ROM it reads 1, and
-`load.py` sets it, so the commands above work on both.
+    [paused]
+    00000000  00005800 00000000                   MOVE R1, 0
+    nice> b 4
+    0: 00000004
+    nice> go
+
+    [breakpoint 0]
+    00000004  001c0080 00000100                   MOVE @0x100, R1
+    nice> regs
+    R0  00000000  R1  00000001  R2  00000000  R3  00000000
+    R4  00000000  R5  00000000  R6  00000000  R7  00000000
+    R8  00000000  R9  00000000  R10 00000000  R11 00000000
+    R12 00000000  R13 00000000  R14 01000000  R15 00000004
+    flags -------1  paused
+    nice> trace 3
+    00000000  00005800  MOVE R1, 0
+    00000002  006040b0  ADD R1, R1, 1
+
+The session is from the simulation (see [Without a board](#without-a-board)),
+which is why the load is slow: most of the time is the clearing of the
+memory. The trace has only the two steps that ran.
+
+While the program runs, what you type goes to it, and what it prints shows.
+`-c "load p.bin; run"` runs the commands given in the shell and exits, and
+`tools/nicemon.py p.bin` loads the program first.
+
+A breakpoint stops the core before an instruction at its address runs. A
+watchpoint stops it after a step that reads or writes its address. A step
+is an instruction, or the entry into an interrupt. While the core is
+paused, the cycle counter and the timer go on counting, and the timer's
+interrupt waits. The trace keeps the last 1024 steps, from the start of
+the core.
+
+A terminal on the UART, such as picocom, shows the program's output, and
+what you type goes to the program. The byte `0xFF` is the link's escape
+byte, so a program's `0xFF` arrives as two, and a `0xFF` for it must be
+typed twice.
 
 ### The keyboard
 
-The MEGA65's own keyboard types into the same input as the UART: what you
-type goes to the command line, or to the program while it runs, and its
-answers come out on the UART. The keys give ASCII, as a terminal sends it:
+The MEGA65's own keyboard types into the same input as the console bytes of
+the UART: what you type goes to the program, and is dropped while the core
+is held. The keys give ASCII, as a terminal sends it:
 
 | Key | Byte |
 |---|---|
@@ -138,29 +194,24 @@ LED is green while the core runs, like the user LED.
 ### Running a program
 
 A program is assembled with the assembler of the nice_cpu submodule, and
-loaded with `tools/load.py`, which hides the ROM if there is one, clears the
-memory, writes each word with a `W` command, and then starts the core. For
-example, with `sim/echo.nasm`, which echoes what you type until a `.`:
+loaded and started with the monitor, or with `tools/load.py`, which hides
+the ROM if there is one, clears the memory, writes the words, and starts
+the core. For example, with `sim/echo.nasm`, which echoes what you type
+until a `.`:
 
     python3 nice_cpu/assembler/niceasm.py -o echo.bin sim/echo.nasm
+    tools/nicemon.py -c "run echo.bin"
+
+or
+
     tools/load.py echo.bin
-    picocom -b 115200 /dev/ttyUSB1
+    picocom -b 2000000 /dev/ttyUSB1
 
-`load.py` uses the serial device `/dev/ttyUSB1`, the MEGA65's debug UART.
-If yours is another, give it with `--port`, and to picocom.
-`load.py` needs only Python 3, on Linux or macOS, and the port must not be
-open in a terminal while it runs. Type in the terminal and the program echoes
-it. When you type `.`, it halts, the command line takes the UART again,
-and it prints `HALT`.
-
-The `.bin` file has one line per word, the address and the word in hex, so
-`load.py` turns `00000001 ffffff00` into `W 00000001 FFFFFF00`. You can also
-type these commands by hand. `load.py --no-run` loads the program and leaves
-the core held, so you can check memory with `R` before you start it.
-
-`load.py` talks to the command line, so it works only while the core is held
-or has halted. While a program runs, the UART belongs to it: wait for it to
-halt, or press the reset button.
+Type, and the program echoes it. When you type `.`, it halts. The `.bin`
+file has one line per word, the address and the word in hex.
+`load.py --no-run` loads the program and leaves the core held. Both tools
+talk to the board while a program runs, so neither needs it to halt first.
+The port must not be open in a terminal while they run.
 
 ### Running a C program
 
@@ -173,10 +224,9 @@ assembles it together with the start-up code and the runtime library.
 
     make -C examples
 
-That builds `examples/build/primes.bin`. Load it and open a terminal:
+That builds `examples/build/primes.bin`. Run it in the monitor:
 
-    tools/load.py examples/build/primes.bin
-    picocom -b 115200 /dev/ttyUSB1
+    tools/nicemon.py -c "run examples/build/primes.bin"
 
 The program asks for a limit, reads it with `scanf`, and counts the primes
 up to it. It asks again until you enter 0, and then halts. The program does
@@ -262,9 +312,8 @@ bit 7, and its one example, the 2004 program
 `nice_cpu/assembler/test/print.nasm`, writes `0xC80FF000` and calls it "blue
 on orange", which this format shows: `0xC8` is orange and `0x0F` is blue.
 
-From the command line, `W FFFF0000 00000041` puts an `A` in the top left
-corner, white on black, and `W FFFF0001 E0FF0042` a white `B` on red next to
-it.
+In the monitor, `set FFFF0000 41` puts an `A` in the top left corner,
+white on black, and `set FFFF0001 E0FF0042` a white `B` on red next to it.
 
 The video output comes from MandelbrotMEGA65, which uses the same mode on
 the MEGA65. The HDMI output is DVI, without sound.
@@ -273,10 +322,9 @@ the MEGA65. The HDMI output is DVI, without sound.
 
 A bitstream built with `make r6 ROM=file.bin` (or `make r3 ...`) has a ROM
 of 32K words at `0x0000`–`0x7FFF`, in front of the RAM, with the words of the
-`.bin` file, and its core boots from it at reset instead of waiting for the
-command line. That is the layout of QNICE-FPGA, whose monitor is in ROM at
-`0x0000`–`0x7FFF` and whose programs load at `0x8000`, and it is where the
-monitor will go. The file is read by Vivado, so the ROM changes only with a
+`.bin` file, and its core boots from it at reset instead of waiting to be
+started. That is the layout of QNICE-FPGA, whose monitor is in ROM at
+`0x0000`–`0x7FFF` and whose programs load at `0x8000`. The file is read by Vivado, so the ROM changes only with a
 new bitstream, and a word beyond the ROM fails the build. A write to the
 ROM is dropped, and the clear command does not touch it. So a program in
 the ROM must keep its stack and its variables in the RAM, at `0x8000` or
@@ -285,40 +333,37 @@ stack at the top of the memory, as the runtime has. With a stack in the
 ROM, as `hello.nasm` of nice_cpu has at `0x1000`, a pushed return address
 is lost and reads back as 0, and the program starts over, forever.
 
-While the core runs from the ROM, the UART belongs to it, so the command
-line answers only after the core halts. Then bit 3 of the control register
-hides the ROM: `W FFFFFFF0 00000009` holds the core with the ROM hidden, and
-the RAM is at address 0, as in the emulator, so a program loads and runs as
-without a ROM, with `W FFFFFFF0 00000008` to start it. `load.py` does this.
-`W FFFFFFF0 00000001` and then `W FFFFFFF0 00000000` show the ROM again and
-boot from it, as the reset button does. The RAM under the ROM keeps its
-words meanwhile.
+Bit 3 of the control register hides the ROM: writing `0x9` to `0xFFFFFFF0`
+holds the core with the ROM hidden, and the RAM is at address 0, as in the
+emulator, so a program loads and runs as without a ROM, with `0x8` to start
+it. The tools do this. `0x1` and then `0x0` show the ROM again and boot from
+it, as the reset button does. The RAM under the ROM keeps its words
+meanwhile.
 
 ### Address map
 
-The command line and the core's data accesses see the same addresses.
+The debug link and the core's data accesses see the same addresses, but
+for the link's registers at `0xFFFFFFE0`–`FF`.
 
 | Address | What it is |
 |---|---|
 | `0x00000000`–`0xFFFFFFFF` | Memory, where no register below is: 64K words of block RAM, repeated through the address space. So the runtime's stack below `0xFFFFFF00` lands in the top of it, and so do the words of `0xFFFFFF00`–`FF` that are not registers. |
 | `0x00000000`–`0x00007FFF` | The ROM, in a bitstream built with one, in front of the RAM and repeating with it (see [The ROM](#the-rom)). Bit 3 of the control register hides it. |
-| `0xFFFF0000`–`0xFFFF7FFF` | The screen: 32768 words of memory of their own, the emulator's 80×25 screen and room for scrolling. The 2000 words from the display offset are shown on VGA and HDMI (see [The screen](#the-screen)), and `R` reads them all. |
+| `0xFFFF0000`–`0xFFFF7FFF` | The screen: 32768 words of memory of their own, the emulator's 80×25 screen and room for scrolling. The 2000 words from the display offset are shown on VGA and HDMI (see [The screen](#the-screen)), and the link reads them all. |
 | `0xFFFFFF00` | The console of SYSTEM.md §1. A write sends bits 7..0 to the UART. A read takes the oldest byte received from the UART or the keyboard, and returns it in bits 7..0 with bit 8 set, or 0 when no byte has arrived. A break on the UART ends the input: once the bytes before it are read, a read returns `0x200` (bit 9), as at the end of the emulator's input, until the core is started again. |
-| `0xFFFFFF01` | The emulator's read counter. A read by the core returns the number of its reads since the last write, and a write sets that number. A read with `R` does not count. It is 0 when the core starts. |
+| `0xFFFFFF01` | The emulator's read counter. A read by the core returns the number of its reads since the last write, and a write sets that number. A read by the link does not count. It is 0 when the core starts. |
 | `0xFFFFFF10`–`0xFFFFFF1F` | The timer of SYSTEM.md §4: it raises IRQ every P clock cycles, through the vector it is given. |
 | `0xFFFFFF20`–`0xFFFFFF3F` | The math unit of SYSTEM.md §2: 32-bit multiply and divide, and 64-bit divide. |
-| `0xFFFFFF40`–`0xFFFFFF4F` | The performance counters of SYSTEM.md §3: cycles and instructions, 64 bits each. `R` reads them as the core does: `R FFFFFF42` takes the snapshot that `R FFFFFF43` returns, where `--dump` takes none. |
+| `0xFFFFFF40`–`0xFFFFFF4F` | The performance counters of SYSTEM.md §3: cycles and instructions, 64 bits each. The link reads them as the core does: a read of `0xFFFFFF42` takes the snapshot that `0xFFFFFF43` returns, where `--dump` takes none. |
 | `0xFFFFFF50`–`0xFFFFFF5F` | The screen's registers: the cursor and the display offset (see [The screen](#the-screen)). |
-| `0xFFFFFFE0`–`0xFFFFFFEF` | For the command line only: R0–R15 of the core, read only. After a halt they hold what the emulator prints. |
-| `0xFFFFFFF0` | Control, for the command line only. Bit 0 holds the core in reset. Bit 1 reads the core's halted flag. A write with bit 2 set first clears the RAM and the screen to 0, with the core held, and answers `OK` when it is done; then bits 0 and 3 take effect. Bit 3 hides the ROM, so that the RAM is at 0; reset clears it in a bitstream with a ROM, and in one without it reads 1. |
-| `0xFFFFFFF1` | For the command line only, read only: why the core halted. 0 while it has not, 1 for `HALT`, 2 for a reserved control word, 3 for `INT` inside an interrupt routine, and 4 for `RTI` outside one. |
+| `0xFFFFFFE0`–`0xFFFFFFFF` | For the debug link only: R0–R15 of the core, the control register, the halt reason, and the run control, the trace, and the breakpoints (see [PROTOCOL.md](PROTOCOL.md#the-address-space)). For the core, these words are memory. |
 
 Instruction fetches from `0xFFFFFF00`–`0xFFFFFFFF` read 0, as ISA.md §8.3
 requires. The input waits for the core in a FIFO of 2048 bytes, in block
 RAM. A UART byte that arrives when it is full is lost, as is a byte after a
-break; a keyboard byte waits until there is room. A break while the command
-line has the UART is ignored. To end a program's input from a terminal,
-send a break: in picocom, `Ctrl-A Ctrl-\`.
+break; a keyboard byte waits until there is room. A break while the core is
+held is ignored. To end a program's input from a terminal, send a break: in
+picocom, `Ctrl-A Ctrl-\`.
 The performance counters, the math unit, and the timer are nice_cpu's own,
 `nice_cpu/hdl/src/perf.vhd`, `mpu.vhd`, and `timer.vhd`, the same as in the
 emulator. They are reset with the system, and each time the core starts, as
@@ -327,8 +372,8 @@ holds the steps that the emulator prints, unless the program starts the
 timer. The timer counts clock cycles, at 33.3 MHz, where the emulator counts
 steps, so its interrupts come at other steps, and the step counts differ.
 Its request goes straight to the core's IRQ, for it is the only device that
-raises one. They are not reset while the command line holds the core, so
-`R` reads them after a halt.
+raises one. They are not reset while the core is held, so the link reads
+them after a halt.
 
 ## Comparing with the emulator
 
@@ -344,8 +389,9 @@ the output of the two can be compared:
     diff emu.txt board.txt
 
 Its input is stdin, or the file of `-i`. Each byte goes to the UART when it
-is read, and a byte that arrives when the core's 2048-byte FIFO is full is
-lost, so a program must not fall more than 2048 bytes behind its input. At
+is read, at up to 200,000 bytes a second, and a byte that arrives when the
+core's 2048-byte FIFO is full is lost, so a program must not fall more than
+2048 bytes behind its input. At
 the end of the input, `run.py` sends a break, so that a read returns
 `0x200`, as in the emulator. On a terminal, Ctrl-D ends the input.
 `--timeout SEC` gives up after SEC seconds, with exit status 3, as
@@ -362,29 +408,33 @@ same words again.
 
 You need GHDL (tested with 4.1.0) and Python 3.
 
-    make -C sim test
+    make test
 
 - `sim/tb_hello.vhd` runs a "Hello" program on the NICE core from the
   submodule, and checks its console output.
-- `sim/tb_nicemon.vhd` drives the whole system through its UART, with
-  `sim/rom.nasm`, a greeting, as the ROM: the core boots from it at reset,
-  the ROM is read only with the RAM above it, and bit 3 of the control
-  register hides it and shows it again. With the ROM hidden, it loads the
-  "Hello" program
-  with the command line and runs it, and checks the
-  halt message, the halt reason, and the step count, which must equal
-  niceemu's. Then it loads and runs `sim/echo.nasm`, which echoes what it
-  receives, and `sim/fifo.nasm`, which checks the input FIFO; the FIFO has
-  16 bytes there, so that the test of a full FIFO is short. It uses the
-  math unit from the command line, and runs `sim/devices.nasm`, which uses
-  the math unit, the performance counters, and the timer's interrupts, and
-  `sim/emu.nasm`, which checks the screen, the read counter, memory in the
-  I/O range, and the registers after a halt, and writes and reads the
-  screen's registers. It clears the memory, and runs
+- `sim/tb_nicemon.vhd` drives the whole system through its UART, with the
+  debug link, and with `sim/rom.nasm`, a greeting, as the ROM: the core
+  boots from it at reset, the ROM is read only with the RAM above it, and
+  bit 3 of the control register hides it and shows it again. With the ROM
+  hidden, it loads the "Hello" program and runs it, and checks the stop
+  notice, the halt reason, and the step count, which must equal niceemu's.
+  Then it loads and runs `sim/echo.nasm`, which echoes what it receives,
+  `0xFF` escaped, and `sim/fifo.nasm`, which checks the input FIFO; the
+  FIFO has 16 bytes there, so that the test of a full FIFO is short. It
+  uses the math unit through the link, and runs `sim/devices.nasm`, which
+  uses the math unit, the performance counters, and the timer's
+  interrupts, and `sim/emu.nasm`, which checks the screen, the read
+  counter, memory in the I/O range, and the registers after a halt, and
+  writes and reads the screen's registers. It clears the memory, and runs
   `reserved.nasm` of the emulator's tests, which halts on a reserved
   control word, and `sim/eof.nasm`, which echoes its input until a break
-  ends it. Last it types a command and input for `sim/fifo.nasm` on the
-  keyboard input.
+  ends it. It types input for `sim/fifo.nasm` on the keyboard input. Then
+  it checks the requests of the link: several words, none, `P`, an unknown
+  tag, and a request that stops in the middle. Last it pauses, steps, and
+  stops `sim/debug.nasm` at a breakpoint and two watchpoints, and reads its
+  trace.
+- `tools/test_nicedis.py` assembles the programs of nice_cpu, disassembles
+  them, and assembles them again, which must give the same words.
 - `sim/tb_kbd.vhd` tests the keyboard driver and its ASCII, with a model of
   the keyboard.
 - `sim/tb_text.vhd` fills the screen of the text display and checks every
@@ -409,12 +459,13 @@ SymbiYosys, and the Yices 2 solver. It is tested with the packages `yosys`,
 them. Every input of each job is free, so the solver tries every input at
 every time, not only the ones a testbench sends.
 
-- `cli.sby` checks the command line interpreter, `line_buffer.vhd` and
-  `cmd.vhd` together (`formal_cli.vhd`). It proves, for every cycle, that
-  each of their valid/ready ports holds its data until it is taken, that a
-  line and a message are never empty, that the bus request is one STB
-  pulse after a line is taken, with CYC held until the ACK, and that each
-  line gets one answer before the next line is taken.
+- `link.sby` proves the debug link, `src/link.vhd`, for every cycle, with
+  each UART byte given in one cycle (`formal_link.vhd`). Its Wishbone
+  request is one STB pulse, with CYC held until the ACK, and no new request
+  while one waits. A byte outside a packet is the next console byte. The
+  bytes to the UART keep each packet together: the second ESC of a console
+  byte `0xFF`, the tag of a notice, and the tag of an answer follow their
+  first ESC. A stop is kept until its notice is sent.
 - `rx_fifo.sby` proves the core's input FIFO, `src/rx_fifo.vhd`, with 4
   bytes: the bytes come out in the order they went in, a byte is lost only
   when the FIFO is full or the input has ended, no byte is written to the
@@ -424,47 +475,63 @@ every time, not only the ones a testbench sends.
   that either of nice_cpu's cores may do on its ports, as nice_cpu's own
   formal checks state it, so the system is checked against both cores,
   and the solver spends no time on a real core. The job is too large to
-  prove, so it checks every cycle up to a depth: 30 cycles with the core
-  running from reset, and 40 with the command line first, which is enough
-  to type a command. It checks that the core's two buses get an ACK only
-  for a request that waits, which is what nice_cpu's proofs of the cores
-  assume of them, that the command line's latched request is not
-  overwritten and gets one ACK, that the devices answer only the latched
-  request, and what a read of the console returns. Its tasks take up to 3
+  prove, so it checks every cycle up to a depth of 30 cycles, with the
+  core running from reset. It checks that the core's two buses get an ACK
+  only for a request that waits, which is what nice_cpu's proofs of the
+  cores assume of them, that the devices answer only the latched request,
+  and what a read of the console returns. A request of the debug link
+  takes some 160 cycles of UART bytes, more than this job can reach, which
+  is why `link.sby` checks the link on its own. Its tasks take up to 3
   minutes each; `make -j4 formal` runs all the tasks side by side, as CI
   does.
 
-The checks in `cmd.vhd`, `line_buffer.vhd`, `rx_fifo.vhd`, and
-`nicemon.vhd` are in `G_FORMAL` blocks, which are off in simulation and
-synthesis.
+The checks in `link.vhd`, `rx_fifo.vhd`, and `nicemon.vhd` are in
+`G_FORMAL` blocks, which are off in simulation and synthesis.
 
 ## Testing the board
 
 `tools/hwtest.py` tests the system on the board itself. It programs the
-FPGA with `m65 -q` from mega65-tools and checks the `NICE` banner, and the
-ROM when the bitstream has one. Then it hides the ROM and
-uses the command line: it runs `sim/echo.nasm`, holds and restarts the core,
-clears the memory, reads back what `sim/emu.nasm` leaves after its halt,
-writes and reads the screen's registers, and runs
-`examples/build/primes.bin`. Last, it runs programs with `run.py`
-and with `niceemu`, whose output and exit status must be the same: among
-them `sim/eof.nasm`, with no input and with 1536 bytes of input, which
-checks the larger FIFO and the end of the input.
-That needs niceemu, built with `make -C nice_cpu/emulator build`; without it
-the comparison is skipped. Build the bitstream first, then:
+FPGA with `m65 -q` from mega65-tools and checks the reset notice of the
+link, and the ROM when the bitstream has one. Then it hides the ROM and
+uses the link: it reads and writes memory, runs `sim/echo.nasm`, and reads
+memory while it runs, holds and restarts the core, clears the memory, reads
+back what `sim/emu.nasm` leaves after its halt, writes and reads the
+screen's registers, pauses, steps, and stops `sim/debug.nasm`, and runs
+`examples/build/primes.bin`. Last, it runs programs with `run.py` and with
+`niceemu`, whose output and exit status must be the same: among them
+`sim/eof.nasm`, with no input and with 1536 bytes of input, every byte value
+six times, which checks the larger FIFO, the escaped `0xFF`, and the end of
+the input. That needs niceemu, built with `make -C nice_cpu/emulator
+build`; without it the comparison is skipped. Build the bitstream first,
+then:
 
     make hwtest
 
 It prints one line for each check, and last how many passed.
-On the R6 with the pipelined core, all 50 pass.
 
 For the R3, give `BIT=synth/r3/build/top.bit`. A board that is already
 programmed can be tested with `tools/hwtest.py --no-program`, which skips
-the banner. The reset button is not tested: press it with a terminal open,
-and `NICE` is printed again. A bitstream with a ROM can be tested when the
-program in the ROM halts, as `sim/rom.nasm` does (`make r6
-ROM=sim/build/pipeline/rom.bin`, after `make test` has assembled it): the test hides
-the ROM, as `load.py` does, and runs the programs from the RAM.
+the reset notice. The reset button is not tested. A bitstream with a ROM
+can be tested when the program in the ROM halts, as `sim/rom.nasm` does
+(`make r6 ROM=sim/build/pipeline/rom.bin`, after `make test` has assembled
+it): the test hides the ROM, as `load.py` does, and runs the programs from
+the RAM.
+
+## Without a board
+
+`make cosim` runs the system in GHDL with its UART on a pseudo-terminal,
+`sim/build/nicemon.pty`, until it is stopped with Ctrl-C. The tools talk to
+it as to the board, but it is some ten thousand times slower, so give them
+`--wait 1000`:
+
+    make cosim &
+    tools/nicemon.py --port sim/build/nicemon.pty --wait 1000
+
+A request of a few words takes a fraction of a second, and clearing the
+memory a few seconds. `ROM=file.bin` gives the simulation a ROM, and
+`NICE=multi` the multi-cycle core. A pseudo-terminal cannot send a break,
+so the end of `run.py`'s input does not reach the program. It needs gcc as
+well as GHDL.
 
 ## License
 
