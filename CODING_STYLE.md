@@ -7,7 +7,7 @@ which is that of
 in short form. `make lint` checks what it can with
 [vsg](https://vhdl-style-guide.readthedocs.io/) and [vsg.yml](vsg.yml).
 
-`synth/r3/max10.vhd` and the HDMI output in `synth/common/hdmi/` are
+`synth/r3/max10.vhd` and the HDMI output in `synth/mega65/hdmi/` are
 third-party files, copied unchanged (see [synth/README.md](synth/README.md)),
 so they keep their own style and are not linted. The files copied from
 cmod-s7 and MandelbrotMEGA65 are kept in this style, and their headers say

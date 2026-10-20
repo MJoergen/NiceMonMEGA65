@@ -10,20 +10,25 @@ there: a ROM at address 0, which the core boots from, and a screen with a
 cursor and scrolling, laid out as QNICE-FPGA's. Until the monitor is
 written, programs are loaded through the command line.
 
+The MEGA65 is the main board. The system also builds for the Digilent
+Nexys4DDR, with the UART for input and output and VGA for the screen (see
+[synth/](synth/README.md#the-nexys4ddr)).
+
 ## Contents
 
 | Path | What it is |
 |---|---|
 | [nice_cpu/](https://github.com/MJoergen/nice_cpu) | The NICE CPU, its assembler, its emulator, and `nicewasm`, a [translator](https://github.com/MJoergen/nice_cpu/tree/main/translator) from WebAssembly to NICE assembly, as a git submodule. |
-| [src/](src/) | The synthesisable VHDL, shared by both boards. `nicemon.vhd` is the system: the NICE core, the memory (`ram.vhd` and `rom.vhd`), the UART, the core's input FIFO (`rx_fifo.vhd`), and the command line interpreter. `uart_serdes.vhd` (with fixes to its receiver, and break detection), `line_buffer.vhd` and `cmd.vhd` are copied from cmod-s7; `cmd.vhd` prints `NICE` instead of `WBUS` at reset, and `HALT` when the core halts. `kbd_m65.vhd` drives the MEGA65 keyboard, and `kbd_ascii.vhd` turns its keys into ASCII. |
+| [src/](src/) | The synthesisable VHDL, shared by both boards. `nicemon.vhd` is the system: the NICE core, the memory (`ram.vhd` and `rom.vhd`), the UART, the core's input FIFO (`rx_fifo.vhd`), and the command line interpreter. `uart_serdes.vhd` (with fixes to its receiver, and break detection), `line_buffer.vhd` and `cmd.vhd` are copied from cmod-s7; `cmd.vhd` prints `NICE` instead of `WBUS` at reset, and `HALT` when the core halts. `kbd_m65.vhd` drives the MEGA65 keyboard, and `kbd_ascii.vhd` turns its keys into ASCII. `system.vhd` is what every board has: the system, the text display of its screen, and the UART's pins. |
 | [src/video/](src/video/) | The text display: `text.vhd` shows the screen at `0xFFFF0000` as 80×25 characters on a video output, with a cursor and a display offset for scrolling. `pix.vhd` and `video_pkg.vhd` are from [MandelbrotMEGA65](https://github.com/MJoergen/MandelbrotMEGA65), and `font_pkg.vhd` is the [Spleen](https://github.com/fcambus/spleen) 16×32 font, made by `font/gen_font_pkg.py`. |
 | [font/](font/) | The script that makes `src/video/font_pkg.vhd` from Spleen, and Spleen's license (BSD 2-Clause). |
 | [sim/](sim/) | The GHDL testbenches. |
 | [formal/](formal/) | The formal checks, for SymbiYosys. |
-| [synth/](synth/README.md) | The Vivado builds for the R3 and R6 boards. |
+| [synth/](synth/README.md) | The Vivado builds for the MEGA65 R3 and R6 boards, and the Nexys4DDR. |
 | [monitor/](monitor/README.md) | The monitor, in NICE assembly: planned, not written yet. Its README has the decisions it will follow, QNICE-FPGA's. |
 | [examples/](examples/) | Example C programs, and the Makefile that builds them for the MEGA65. |
 | [tools/](tools/) | `load.py`, which loads a program into the MEGA65 through the UART, `run.py`, which runs a program on the MEGA65 as `niceemu` runs it, and `hwtest.py`, which tests the system on the board. |
+| [TODO.md](TODO.md) | Work that is planned but not started. |
 
 ## Compared with the emulator
 
@@ -42,11 +47,11 @@ difference is the memory: 64K words, not 2³².
 | Console output, `0xFFFFFF00` | stdout | UART | Yes |
 | Console input, `0xFFFFFF00` | stdin, with bit 8 set; `0x200` at the end. A read waits for the next byte | UART and the MEGA65 keyboard, with bit 8 set, through a 2048-byte FIFO; `0x200` after a UART break. A read returns 0 while no byte has arrived | Yes, but UART bytes beyond 2048 unread ones are lost, and a program that waits for input in a loop runs more steps |
 | Math unit, `0xFFFFFF20`–`3F` | Computed on read | nice_cpu's `mpu.vhd`, which stalls the read until the result is ready | Yes |
-| Performance counters, `0xFFFFFF40`–`4F` | One cycle per step, from the start | nice_cpu's `perf.vhd`, counting clock cycles at 100 MHz, from the start of the core | Instructions yes; cycles count real clocks |
-| Timer, `0xFFFFFF10`–`1F` | Raises IRQ every P steps | nice_cpu's `timer.vhd`, raising IRQ every P clock cycles at 100 MHz | Yes, but the period counts real clocks, so the interrupts come at other steps |
+| Performance counters, `0xFFFFFF40`–`4F` | One cycle per step, from the start | nice_cpu's `perf.vhd`, counting clock cycles at 100 MHz (80 MHz on the Nexys4DDR), from the start of the core | Instructions yes; cycles count real clocks |
+| Timer, `0xFFFFFF10`–`1F` | Raises IRQ every P steps | nice_cpu's `timer.vhd`, raising IRQ every P clock cycles at 100 MHz (80 MHz on the Nexys4DDR) | Yes, but the period counts real clocks, so the interrupts come at other steps |
 | Instruction fetches from `0xFFFFFF00`–`FF` | Read 0 | Read 0 | Yes |
 | Memory | All 2³² words, 0 at the start | 64K words, repeated through the address space; the stack at `0xFFFFFF00` lands in the top. `load.py` and `run.py` hide the ROM, if the bitstream has one, and clear the RAM to 0 before they load | No: a program, its data, and its stack must fit in 64K words |
-| Screen, `0xFFFF0000`–`07CF` | 80×25 words of memory, printed by `--screen` | 32768 words of memory of their own, read with `R`; the first 2000 are shown on VGA and HDMI, unless the display offset is set | Yes |
+| Screen, `0xFFFF0000`–`07CF` | 80×25 words of memory, printed by `--screen` | 32768 words of memory of their own (8192 on the Nexys4DDR), read with `R`; the first 2000 are shown on VGA and HDMI, unless the display offset is set | Yes |
 | Read counter, `0xFFFFFF01` | Counts the data reads since the last write | The same; a read by the command line does not count, as `--dump` does not | Yes |
 | The rest of `0xFFFFFF02`–`FF` | Ordinary memory for data | Memory, in the top 256 words of the RAM, except `0xFFFFFF50`–`5F`, the screen's registers | Yes, but for the screen's registers |
 | Interrupts | From the timer, `--irq`, and `--nmi` | From the timer, on IRQ | Yes, for the timer's |
@@ -71,7 +76,7 @@ or, in an existing clone:
 `make` in the top directory lists the targets: `make test` runs the
 simulation tests, `make formal` runs the formal checks (see
 [The formal checks](#the-formal-checks)), `make lint` checks the VHDL style, `make examples` builds
-the C examples, `make r3` and `make r6` build the bitstreams, with
+the C examples, `make r3`, `make r6`, and `make nexys4ddr` build the bitstreams, with
 `ROM=file.bin` one whose core boots from the file (see
 [The ROM](#the-rom)),
 `make load FILE=prog.bin` loads a program into the MEGA65 and starts it,
@@ -79,7 +84,7 @@ the C examples, `make r3` and `make r6` build the bitstreams, with
 [Comparing with the emulator](#comparing-with-the-emulator)), and
 `make hwtest` tests the board (see [Testing the board](#testing-the-board)).
 
-`make test`, `make r3`, and `make r6` use nice_cpu's pipelined core. Add
+`make test` and the boards' targets use nice_cpu's pipelined core. Add
 `NICE=multi` to use its multi-cycle core instead (`NICE=pipeline` is the
 default). The simulation of each core is built in `sim/build/pipeline` or
 `sim/build/multi`, and both cores run the same tests. The bitstream goes to
@@ -392,8 +397,8 @@ You need GHDL (tested with 4.1.0) and Python 3.
   display one row, shows the cursor, and checks the first four rows of the
   next frame. It takes under a minute, the longest of the tests.
 - `make test` also checks that GHDL can synthesise the system, with
-  `sim/rom.nasm` as its ROM and without a ROM, the keyboard, and the text
-  display.
+  `sim/rom.nasm` as its ROM and without a ROM, the keyboard, the text
+  display, and `src/system.vhd` with the screen of the Nexys4DDR.
 - `make -j test` runs all these side by side, in the time of `tb_text`.
   Each is also a target of `sim/Makefile`, so `make -C sim tb_kbd` runs one.
 - `make lint` checks the VHDL against [CODING_STYLE.md](CODING_STYLE.md)
@@ -460,7 +465,10 @@ the comparison is skipped. Build the bitstream first, then:
 It prints one line for each check, and last how many passed.
 On the R6 with the pipelined core, all 50 pass.
 
-For the R3, give `BIT=synth/r3/build/top.bit`. A board that is already
+For the R3, give `BIT=synth/r3/build/top.bit`. For the Nexys4DDR, give
+`BIT=synth/nexys4ddr/build/top.bit PROGRAMMER=openfpgaloader`, which
+programs it with [openFPGALoader](https://github.com/trabucayre/openFPGALoader);
+its UART is usually `/dev/ttyUSB1` too. A board that is already
 programmed can be tested with `tools/hwtest.py --no-program`, which skips
 the banner. The reset button is not tested: press it with a terminal open,
 and `NICE` is printed again. A bitstream with a ROM can be tested when the
@@ -473,5 +481,5 @@ the ROM, as `load.py` does, and runs the programs from the RAM.
 MIT, see [LICENSE](LICENSE), like the files copied from cmod-s7 and
 MandelbrotMEGA65. The exceptions are the third-party files named in
 [synth/README.md](synth/README.md): `synth/r3/max10.vhd` is GPL v3, and the
-HDMI output in `synth/common/hdmi/` is LGPL v3. The Spleen font in
+HDMI output in `synth/mega65/hdmi/` is LGPL v3. The Spleen font in
 `src/video/font_pkg.vhd` is BSD 2-Clause, see `font/LICENSE.spleen`.

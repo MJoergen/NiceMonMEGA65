@@ -9,7 +9,7 @@ set_property -dict {PACKAGE_PIN U22  IOSTANDARD LVCMOS33} [get_ports {led_o}];  
 set_false_path -from [get_ports {reset_button_i}]
 
 ## The button is registered in clk_rst.vhd. Its register lives in the I/O
-## tile, like those of the other slow pins (common.xdc).
+## tile, like those of the other slow pins (mega65.xdc).
 set_property IOB TRUE [get_ports {reset_button_i}]
 
 ## The video DAC (U3 = ADV7125BCPZ170) and the HDMI output, as in

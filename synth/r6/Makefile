@@ -1,4 +1,6 @@
-BOARD_SRC = top.vhd
-BOARD_XDC = r6.xdc
+include ../mega65/mega65.mk
+
+BOARD_SRC = $(MEGA65_SRC) top.vhd
+BOARD_XDC = $(MEGA65_XDC) r6.xdc
 
 include ../Makefile.inc

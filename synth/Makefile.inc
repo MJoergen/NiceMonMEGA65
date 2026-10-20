@@ -1,5 +1,6 @@
 # The Vivado build, in non-project mode, shared by the boards. A board's
-# Makefile sets BOARD_SRC and BOARD_XDC, and includes this file.
+# Makefile sets PART, BOARD_SRC, and BOARD_XDC, and includes this file;
+# BOARD_SRC has the board's own sources, with top.vhd last.
 #
 # make                builds build/top.bit, whose core waits for the
 #                     command line
@@ -11,8 +12,7 @@
 
 VIVADO_DIR ?= /opt/Xilinx/2025.1/Vivado
 
-PART = xc7a200tfbg484-2
-TOP  = top
+TOP = top
 
 ROM ?=
 ifneq ($(ROM),)
@@ -31,30 +31,23 @@ SRC += ../../src/rx_fifo.vhd
 SRC += ../../src/ram.vhd
 SRC += ../../src/rom.vhd
 SRC += ../../src/nicemon.vhd
-SRC += ../../src/kbd_m65.vhd
-SRC += ../../src/kbd_ascii.vhd
-SRC += ../common/clk_rst.vhd
 SRC += ../../src/video/video_pkg.vhd
 SRC += ../../src/video/font_pkg.vhd
 SRC += ../../src/video/pix.vhd
 SRC += ../../src/video/scr_ram.vhd
 SRC += ../../src/video/text.vhd
-SRC += ../common/hdmi/types_pkg.vhd
-SRC += ../common/hdmi/sync_reg.vhd
-SRC += ../common/hdmi/hdmi_tx_encoder.vhd
-SRC += ../common/hdmi/vga_to_hdmi.vhd
-SRC += ../common/hdmi/serialiser_10to1_selectio.vhd
+SRC += ../../src/system.vhd
+SRC += ../common/clk_rst.vhd
 SRC += ../common/video_clk.vhd
-SRC += ../common/mega65.vhd
 SRC += $(BOARD_SRC)
 
-XDC = ../common/common.xdc $(BOARD_XDC)
+XDC = $(BOARD_XDC)
 
 build/$(TOP).bit: build/$(TOP).tcl $(SRC) $(XDC) $(ROM_ABS)
 	bash -c "source $(VIVADO_DIR)/settings64.sh ; vivado -mode tcl -source $< -log build/vivado.log -journal build/vivado.jou"
 
 # The script is remade when the Makefiles or the ROM or NICE option change.
-build/$(TOP).tcl: Makefile ../Makefile.inc build/rom.conf
+build/$(TOP).tcl: $(MAKEFILE_LIST) build/rom.conf
 	echo "# A tcl script for Vivado, made by make" > $@
 	echo "read_vhdl -vhdl2008 { $(SRC) }" >> $@
 	echo "read_xdc { $(XDC) }" >> $@

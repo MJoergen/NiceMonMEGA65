@@ -1,13 +1,14 @@
--- The clocks of the video output of the MEGA65 boards. A second MMCM, apart
+-- The clocks of the video output of the boards. A second MMCM, apart
 -- from the one of the system clock (clk_rst.vhd), makes them from the
 -- board's 100 MHz clock, as MandelbrotMEGA65's clk_rst.vhd does:
 --   VCO       100 MHz / 5 * 54 = 1080 MHz, the only VCO frequency that
 --             gives the 108 MHz of 1280x1024 @ 60 Hz exactly
 --   vga_clk   1080 MHz / 10 = 108 MHz, the pixel clock
 --   tmds_clk  1080 MHz / 2 = 540 MHz, five times the pixel clock, for the
---             HDMI serialisers, which send ten bits per pixel on both edges
--- The video has its own MMCM so that the system clock stays at 100 MHz,
--- which 1080 MHz does not divide to.
+--             HDMI serialisers of the MEGA65, which send ten bits per pixel
+--             on both edges. The Nexys4DDR has no HDMI, and leaves it open.
+-- The video has its own MMCM so that the system clock stays at 100 MHz (or
+-- 80 MHz), which 1080 MHz does not divide to.
 --
 -- RESET
 -- vga_rst_o is held while the MMCM is not locked, and for 8 cycles after.

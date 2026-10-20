@@ -1,6 +1,7 @@
 -- The part of the top level that is the same on all MEGA65 boards: the clock
--- and reset, the UART pins, the keyboard, the NiceMon system, and the video
--- output of its screen. The keyboard types into the same input as the UART.
+-- and reset, the keyboard, the system (src/system.vhd: the NiceMon system and
+-- the text display of its screen, with the UART), and the video outputs. The
+-- keyboard types into the same input as the UART.
 -- Its power LED is green, and its drive LED is green while the core runs,
 -- like the user LED.
 --
@@ -68,10 +69,6 @@ architecture synthesis of mega65 is
 
    signal clk     : std_logic;
    signal rst     : std_logic;
-   signal rxd     : std_logic_vector(1 downto 0) := "11";
-   attribute async_reg : string;
-   attribute async_reg of rxd : signal is "TRUE";
-   signal txd     : std_logic;
    signal running : std_logic;
 
    constant C_GREEN : std_logic_vector(23 downto 0) := X"00FF00";
@@ -82,26 +79,9 @@ architecture synthesis of mega65 is
    signal kbd_data   : std_logic_vector(7 downto 0);
    signal drive_rgb  : std_logic_vector(23 downto 0);
 
-   -- The output registers start at the idle level of their pins. A flip-flop
-   -- with no initial value configures as 0, which would hold the UART output
-   -- low, a break, until the MMCM locks and the clock runs.
-   signal txd_reg : std_logic := '1';
    signal led_reg : std_logic := '0';
 
    constant C_VIDEO : t_video_mode := C_VIDEO_1280X1024;
-
-   -- The screen's size, and the writes to it and its registers, in the
-   -- system clock domain
-   constant C_SCR_ADDR_BITS : natural := 15;
-
-   signal scr_we       : std_logic;
-   signal scr_addr     : std_logic_vector(C_SCR_ADDR_BITS - 1 downto 0);
-   signal scr_data     : std_logic_vector(31 downto 0);
-   signal scr_ctl_we   : std_logic;
-   signal scr_cur_x    : std_logic_vector(6 downto 0);
-   signal scr_cur_y    : std_logic_vector(4 downto 0);
-   signal scr_cur_mode : std_logic_vector(2 downto 0);
-   signal scr_offs     : std_logic_vector(C_SCR_ADDR_BITS - 1 downto 0);
 
    signal vga_clk   : std_logic;
    signal vga_rst   : std_logic;
@@ -120,7 +100,7 @@ architecture synthesis of mega65 is
    signal hdmi_tmds : slv_9_0_t(0 to 2);
 
    -- The registers of the outputs to the DAC, in the IOBs (IOB TRUE on their
-   -- ports, in common.xdc). keep stops synthesis from merging equal colour
+   -- ports, in mega65.xdc). keep stops synthesis from merging equal colour
    -- registers, which could then not all be in the IOBs.
    signal vdac_red_r   : std_logic_vector(7 downto 0);
    signal vdac_green_r : std_logic_vector(7 downto 0);
@@ -143,18 +123,14 @@ begin
          rst_o          => rst
       ); -- i_clk_rst
 
-   -- Synchronise the UART input, and register the outputs.
-   p_io : process (clk)
+   p_led : process (clk)
    begin
       if rising_edge(clk) then
-         rxd     <= rxd(0) & uart_rxd_i;
-         txd_reg <= txd;
          led_reg <= running;
       end if;
-   end process p_io;
+   end process p_led;
 
-   uart_txd_o <= txd_reg;
-   led_o      <= led_reg;
+   led_o <= led_reg;
 
    drive_rgb <= C_GREEN when running = '1' else X"000000";
 
@@ -186,41 +162,6 @@ begin
          data_o       => kbd_data
       ); -- i_kbd_ascii
 
-   -- With a ROM the core boots from it at reset; without one it waits for
-   -- the command line.
-   i_nicemon : entity work.nicemon
-      generic map (
-         G_CLOCK_HZ         => C_CLOCK_HZ,
-         G_UART_BAUDRATE    => 115_200,
-         G_RAM_ADDR_BITS    => 16,
-         G_SCR_ADDR_BITS    => C_SCR_ADDR_BITS,
-         G_ROM_FILE         => G_ROM_FILE,
-         G_ROM_ADDR_BITS    => 15,
-         G_CPU_RUN_AT_RESET => G_ROM_FILE /= ""
-      )
-      port map (
-         clk_i          => clk,
-         rst_i          => rst,
-         uart_rxd_i     => rxd(1),
-         uart_txd_o     => txd,
-         kbd_valid_i    => kbd_valid,
-         kbd_ready_o    => kbd_ready,
-         kbd_data_i     => kbd_data,
-         running_o      => running,
-         scr_we_o       => scr_we,
-         scr_addr_o     => scr_addr,
-         scr_data_o     => scr_data,
-         scr_ctl_we_o   => scr_ctl_we,
-         scr_cur_x_o    => scr_cur_x,
-         scr_cur_y_o    => scr_cur_y,
-         scr_cur_mode_o => scr_cur_mode,
-         scr_offs_o     => scr_offs
-      ); -- i_nicemon
-
-
-   ---------------------------------------------------------------------------
-   -- The video: the screen as text
-   ---------------------------------------------------------------------------
 
    i_video_clk : entity work.video_clk
       port map (
@@ -230,21 +171,23 @@ begin
          tmds_clk_o => tmds_clk
       ); -- i_video_clk
 
-   i_text : entity work.text
+
+   i_system : entity work.system
       generic map (
-         G_MODE          => C_VIDEO,
-         G_SCR_ADDR_BITS => C_SCR_ADDR_BITS
+         G_CLOCK_HZ      => C_CLOCK_HZ,
+         G_ROM_FILE      => G_ROM_FILE,
+         G_SCR_ADDR_BITS => 15,
+         G_VIDEO         => C_VIDEO
       )
       port map (
          clk_i       => clk,
-         scr_we_i    => scr_we,
-         scr_addr_i  => scr_addr,
-         scr_data_i  => scr_data,
-         ctl_we_i    => scr_ctl_we,
-         cur_x_i     => scr_cur_x,
-         cur_y_i     => scr_cur_y,
-         cur_mode_i  => scr_cur_mode,
-         offs_i      => scr_offs,
+         rst_i       => rst,
+         uart_rxd_i  => uart_rxd_i,
+         uart_txd_o  => uart_txd_o,
+         kbd_valid_i => kbd_valid,
+         kbd_ready_o => kbd_ready,
+         kbd_data_i  => kbd_data,
+         running_o   => running,
          vga_clk_i   => vga_clk,
          vga_hs_o    => vga_hs,
          vga_vs_o    => vga_vs,
@@ -252,7 +195,7 @@ begin
          vga_red_o   => vga_red,
          vga_green_o => vga_green,
          vga_blue_o  => vga_blue
-      ); -- i_text
+      ); -- i_system
 
 
    ---------------------------------------------------------------------------

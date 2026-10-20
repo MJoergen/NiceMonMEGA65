@@ -1,11 +1,13 @@
--- The clock and reset of the MEGA65 boards. The board's 100 MHz clock drives
--- an MMCM that makes the 100 MHz system clock. The pipelined core meets it
--- with little to spare, so recheck the timing after a change to nice_cpu.
+-- The clock and reset of the boards. The board's 100 MHz clock drives an MMCM
+-- that makes the system clock, 1000 MHz / G_DIVIDE: 100 MHz on the MEGA65,
+-- and 80 MHz on the Nexys4DDR, whose FPGA is a slower speed grade. The
+-- pipelined core meets 100 MHz on the MEGA65 with little to spare, so
+-- recheck the timing after a change to nice_cpu.
 -- The reset is held while the MMCM is not locked, and while the reset
--- button (active high) is pressed, and for 2^20 cycles (10 ms) after both.
--- So the UART output is idle for that long before the CLI sends its banner,
--- and a terminal that saw the pin change during configuration has time to
--- find the start of a character.
+-- button (active high) is pressed, and for 2^20 cycles (10 ms at 100 MHz)
+-- after both. So the UART output is idle for that long before the CLI sends
+-- its banner, and a terminal that saw the pin change during configuration
+-- has time to find the start of a character.
 -- The MMCM's locked output and the button are synchronised to clk_o by two
 -- registers each, as in MandelbrotMEGA65's clk_rst.vhd.
 
@@ -17,10 +19,13 @@ library unisim;
    use unisim.vcomponents.all;
 
 entity clk_rst is
+   generic (
+      G_DIVIDE : real := 10.0
+   );
    port (
       sys_clk_i      : in  std_logic; -- 100 MHz
       reset_button_i : in  std_logic; -- active high, asynchronous
-      clk_o          : out std_logic; -- 100 MHz
+      clk_o          : out std_logic; -- 1000 MHz / G_DIVIDE
       rst_o          : out std_logic  -- synchronous to clk_o
    );
 end entity clk_rst;
@@ -52,7 +57,7 @@ begin
          CLKIN1_PERIOD    => 10.0,  -- 100 MHz
          DIVCLK_DIVIDE    => 1,
          CLKFBOUT_MULT_F  => 10.0,  -- VCO at 1000 MHz
-         CLKOUT0_DIVIDE_F => 10.0   -- 100 MHz
+         CLKOUT0_DIVIDE_F => G_DIVIDE
       )
       port map (
          CLKIN1   => sys_clk_i,

@@ -7,7 +7,7 @@ export NICE
 PYTHON ?= python3
 PORT   ?= /dev/ttyUSB1
 
-.PHONY: help test formal lint examples r3 r6 load run hwtest clean
+.PHONY: help test formal lint examples r3 r6 nexys4ddr load run hwtest clean
 
 help:
 	@echo "Targets:"
@@ -22,14 +22,18 @@ help:
 	@echo "  make r6 [ROM=monitor.bin]"
 	@echo "                  build the bitstream for the MEGA65 R6; with ROM, the"
 	@echo "                  core boots from the .bin file at reset"
+	@echo "  make nexys4ddr [ROM=monitor.bin]"
+	@echo "                  build the bitstream for the Digilent Nexys4DDR"
 	@echo "  make load FILE=prog.bin [PORT=/dev/ttyUSB1]"
 	@echo "                  load a program into the MEGA65 and start it"
 	@echo "  make run FILE=prog.bin [PORT=/dev/ttyUSB1]"
 	@echo "                  run a program on the MEGA65, and print what niceemu prints"
 	@echo "  make hwtest [BIT=synth/r6/build/top.bit] [PORT=/dev/ttyUSB1]"
 	@echo "                  program the MEGA65 and test it (needs m65)"
-	@echo "  NICE=pipeline|multi  with test, r3, or r6 picks nice_cpu's pipelined"
-	@echo "                  core (the default) or its multi-cycle core"
+	@echo "  make hwtest BIT=synth/nexys4ddr/build/top.bit PROGRAMMER=openfpgaloader"
+	@echo "                  program the Nexys4DDR and test it (needs openFPGALoader)"
+	@echo "  NICE=pipeline|multi  with test or a board's target picks nice_cpu's"
+	@echo "                  pipelined core (the default) or its multi-cycle core"
 	@echo "  make clean      remove the build output"
 
 test:
@@ -53,10 +57,11 @@ formal-%:
 
 # The VHDL of this repository, but not the nice_cpu submodule, which has its
 # own, nor the third-party files that keep their own style (CODING_STYLE.md):
-# synth/r3/max10.vhd and synth/common/hdmi/.
+# synth/r3/max10.vhd and synth/mega65/hdmi/.
 VSG         ?= vsg
 VHDL_SOURCES = $(filter-out synth/r3/max10.vhd,$(wildcard src/*.vhd src/core/*.vhd src/video/*.vhd sim/*.vhd formal/*.vhd \
-                                                          synth/common/*.vhd synth/r3/*.vhd synth/r6/*.vhd))
+                                                          synth/common/*.vhd synth/mega65/*.vhd synth/r3/*.vhd synth/r6/*.vhd \
+                                                          synth/nexys4ddr/*.vhd))
 
 lint:
 	$(VSG) -c vsg.yml -of syntastic -f $(VHDL_SOURCES)
@@ -72,6 +77,9 @@ r3:
 r6:
 	$(MAKE) -C synth/r6 ROM=$(if $(ROM),$(abspath $(ROM)))
 
+nexys4ddr:
+	$(MAKE) -C synth/nexys4ddr ROM=$(if $(ROM),$(abspath $(ROM)))
+
 load:
 	@test -n "$(FILE)" || (echo "Give the program with FILE=prog.bin"; exit 1)
 	$(PYTHON) tools/load.py --port $(PORT) $(FILE)
@@ -80,10 +88,11 @@ run:
 	@test -n "$(FILE)" || (echo "Give the program with FILE=prog.bin"; exit 1)
 	$(PYTHON) tools/run.py --port $(PORT) $(FILE)
 
-BIT ?= synth/r6/build/top.bit
+BIT        ?= synth/r6/build/top.bit
+PROGRAMMER ?= m65
 
 hwtest: examples
-	$(PYTHON) tools/hwtest.py --port $(PORT) --bit $(BIT)
+	$(PYTHON) tools/hwtest.py --port $(PORT) --bit $(BIT) --programmer $(PROGRAMMER)
 
 clean:
 	rm -rf formal/build
@@ -91,3 +100,4 @@ clean:
 	$(MAKE) -C examples clean
 	$(MAKE) -C synth/r3 clean
 	$(MAKE) -C synth/r6 clean
+	$(MAKE) -C synth/nexys4ddr clean

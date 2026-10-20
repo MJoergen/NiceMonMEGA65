@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-NiceMonMEGA65 runs the NICE CPU (the `nice_cpu` git submodule) on the MEGA65 R3 and R6 boards, with a command line interpreter (CLI) on the debug UART, a text display on VGA and HDMI, and room for a QMON-like monitor that is planned but not written (see `monitor/README.md` for its decisions, which follow QNICE-FPGA as closely as the ISA allows). The goal is that a program runs on the board exactly as `niceemu`, the emulator in `nice_cpu/emulator`, runs it; the README's table "Compared with the emulator" lists the known differences.
+NiceMonMEGA65 runs the NICE CPU (the `nice_cpu` git submodule) on the MEGA65 R3 and R6 boards (the main target; the Digilent Nexys4DDR also builds, with UART and VGA only), with a command line interpreter (CLI) on the debug UART, a text display on VGA and HDMI, and room for a QMON-like monitor that is planned but not written (see `monitor/README.md` for its decisions, which follow QNICE-FPGA as closely as the ISA allows). The goal is that a program runs on the board exactly as `niceemu`, the emulator in `nice_cpu/emulator`, runs it; the README's table "Compared with the emulator" lists the known differences.
 
 ## Commands
 
@@ -11,7 +11,7 @@ NiceMonMEGA65 runs the NICE CPU (the `nice_cpu` git submodule) on the MEGA65 R3 
     make -j formal        # SymbiYosys jobs in formal/, side by side (~2 min with -j)
     make lint             # vsg against CODING_STYLE.md; line-length warnings are tolerated
     make examples         # C examples -> examples/build/*.bin (clang wasm32, lld, llvm)
-    make r6 [ROM=f.bin]   # Vivado bitstream, synth/r6/build/top.bit; make r3 likewise
+    make r6 [ROM=f.bin]   # Vivado bitstream, synth/r6/build/top.bit; make r3 and make nexys4ddr likewise
     make load FILE=p.bin  # load and start a program on the board (debug UART, /dev/ttyUSB1)
     make run FILE=p.bin   # run it and print what niceemu prints, for diffing
     make hwtest           # program the FPGA with m65 and test the board (needs the board)
@@ -60,20 +60,25 @@ for that. The keyboard (`kbd_m65.vhd`, `kbd_ascii.vhd`) feeds the same input
 path as the UART. The math unit, counters, and timer are reset each time the
 core starts, so step counts match the emulator's.
 
-The screen is 32K words at `0xFFFF0000`, memory of its own in `nicemon.vhd`,
+The screen is 32K words (8K on the Nexys4DDR) at `0xFFFF0000`, memory of its own in `nicemon.vhd`,
 and every write is also sent to `src/video/text.vhd`, which keeps a copy in
 `scr_ram.vhd` (a dual-clock block RAM) and shows 80x25 characters from the
 display offset with a hardware cursor; the registers at `0xFFFFFF50`–`55` are
 numbered as QNICE's VGA registers and cross to the pixel clock through a
-handshake inside `text.vhd`. `synth/common/mega65.vhd` is the shared board
-level (clocks, keyboard, video DAC, HDMI); `synth/r3/top.vhd` and
-`synth/r6/top.vhd` only differ in pins and the reset path.
+handshake inside `text.vhd`. `src/system.vhd` (nicemon, text, UART pins)
+is what every board has; `synth/common/` has the 7-series clocks
+(`clk_rst.vhd` with the system clock's divider as a generic, `video_clk.vhd`).
+`synth/mega65/mega65.vhd` is the shared MEGA65 level (keyboard, video DAC,
+HDMI); `synth/r3/top.vhd` and `synth/r6/top.vhd` only differ in pins and the
+reset path. `synth/nexys4ddr/top.vhd` is that board's whole top level
+(80 MHz for its -1 part, 12-bit VGA, no keyboard). Each board's Makefile
+sets `PART`, `BOARD_SRC`, and `BOARD_XDC` for `synth/Makefile.inc`.
 
 ## Conventions and pitfalls
 
 - VHDL follows `CODING_STYLE.md` (3-space indent, `_i`/`_o` ports, `C_`/`G_`
   names, `synthesis`/`simulation` architectures, long headers with THEORY OF
-  OPERATION and RESET). `synth/r3/max10.vhd` and `synth/common/hdmi/` are
+  OPERATION and RESET). `synth/r3/max10.vhd` and `synth/mega65/hdmi/` are
   third-party, unlinted, and copied unchanged.
 - A dual-clock memory must be an entity of its own, or Vivado makes LUTRAM of
   it; grep the Vivado log for `Synth 8-6849` after changing one.

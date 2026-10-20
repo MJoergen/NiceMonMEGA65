@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Test the system on the MEGA65 board through its debug UART.
+"""Test the system on the MEGA65 or Nexys4DDR board through its debug UART.
 
-Programs the FPGA with m65 and checks the banner, and the ROM when the
+Programs the FPGA with m65, or with openFPGALoader for the Nexys4DDR, and
+checks the banner, and the ROM when the
 bitstream has one, then drives the command line with the ROM hidden: it
 loads and runs sim/echo.nasm, holds and restarts the core, clears
 the memory, reads back what sim/emu.nasm leaves after its halt, writes and
@@ -16,11 +17,13 @@ Build the bitstream and the example first, and niceemu
 (make -C nice_cpu/emulator build), or that comparison is skipped.
 
 Usage: tools/hwtest.py [--port /dev/ttyUSB1] [--baud 115200]
-                       [--bit synth/r6/build/top.bit] [--no-program]
+                       [--bit synth/r6/build/top.bit]
+                       [--programmer m65|openfpgaloader] [--no-program]
 
---no-program skips m65 and the banner check, for a board that is already
-programmed and whose core is held or has halted. Only the Python standard
-library is used, and m65 from mega65-tools when the FPGA is programmed.
+--no-program skips programming and the banner check, for a board that is
+already programmed and whose core is held or has halted. Only the Python
+standard library is used, and m65 from mega65-tools or openFPGALoader when
+the FPGA is programmed.
 """
 
 import argparse
@@ -68,10 +71,18 @@ def assemble(src: str, out_dir: str) -> str:
     return out
 
 
-def test_banner(fd: int, bit: str) -> None:
-    r = subprocess.run(["m65", "-q", bit], capture_output=True, text=True)
+# The command that programs the FPGA with a bitstream, for each programmer
+PROGRAMMERS = {
+    "m65": ["m65", "-q"],
+    "openfpgaloader": ["openFPGALoader", "-b", "nexys_a7_100"],
+}
+
+
+def test_banner(fd: int, bit: str, programmer: str) -> None:
+    r = subprocess.run(PROGRAMMERS[programmer] + [bit], capture_output=True,
+                       text=True)
     if r.returncode != 0:
-        sys.exit(f"hwtest.py: m65 failed:\n{r.stdout}{r.stderr}")
+        sys.exit(f"hwtest.py: {programmer} failed:\n{r.stdout}{r.stderr}")
     time.sleep(1.0)
     out = drain(fd, 1.0)
     check("banner after configuration", b"NICE" in out, repr(out))
@@ -238,6 +249,10 @@ def main() -> None:
     parser.add_argument("--port", default="/dev/ttyUSB1")
     parser.add_argument("--baud", type=int, default=115200)
     parser.add_argument("--bit", default=f"{REPO}/synth/r6/build/top.bit")
+    parser.add_argument("--programmer", choices=sorted(PROGRAMMERS),
+                        default="m65",
+                        help="m65 for the MEGA65, openfpgaloader for the "
+                        "Nexys4DDR")
     parser.add_argument("--no-program", action="store_true",
                         help="do not program the FPGA, and skip the banner")
     args = parser.parse_args()
@@ -263,7 +278,7 @@ def main() -> None:
 
         fd = open_port(args.port, args.baud)
         if not args.no_program:
-            test_banner(fd, args.bit)
+            test_banner(fd, args.bit, args.programmer)
         test_command_line(fd)
         test_echo(fd, echo)
         test_reset(fd, echo)

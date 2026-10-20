@@ -6,8 +6,8 @@
 --
 -- This package defines the VGA video modes, i.e. the screen resolution and the
 -- timing of the VGA output signals. The board selects a video mode in its top
--- level module (synth/common/mega65.vhd), together with the matching VGA clock
--- (see synth/common/video_clk.vhd).
+-- level module (synth/mega65/mega65.vhd and synth/nexys4ddr/top.vhd),
+-- together with the matching VGA clock (see synth/common/video_clk.vhd).
 --
 -- The timing is from the "VESA MONITOR TIMING STANDARD" (DMT), version 1.0
 -- revision 11:
