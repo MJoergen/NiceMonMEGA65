@@ -7,14 +7,16 @@
 -- of the screen, which must not show at a display offset of 0. It keeps a
 -- model of the screen.
 --
--- p_check waits for the writes, then checks one whole frame in the VGA clock
+-- The VGA clock starts when p_write is done, so the first frame shows all
+-- the writes. p_check checks that whole frame in the VGA clock
 -- domain: the number of visible pixels in each line and of visible lines,
 -- the widths of the sync pulses, and the colour of every visible pixel, as
 -- the model and the font (font_pkg.vhd) give it. With G_PPM_FILE it also
--- writes the frame as a PPM picture. Then it sets the display offset to one
--- row and puts the cursor on row 3, and checks the first four rows of text
--- of the next frame: they show the words from 80, and the cursor swaps the
--- colours of its character.
+-- writes the frame as a PPM picture. Then, in the vertical blanking after
+-- that frame, it sets the display offset to one row and puts the cursor on
+-- row 3, and checks the first four rows of text of the next frame: they show
+-- the words from 80, and the cursor swaps the colours of its character. It
+-- stops there, for each frame takes about half a minute to simulate.
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -111,8 +113,10 @@ architecture simulation of tb_text is
 
 begin
 
-   clk     <= not clk after 10 ns when running;       -- 50 MHz
-   vga_clk <= not vga_clk after 4.63 ns when running; -- 108 MHz
+   clk <= not clk after 10 ns when running; -- 50 MHz
+   -- The VGA clock starts when the screen is written, so that the first
+   -- frame, which starts at the first visible pixel, shows it all.
+   vga_clk <= not vga_clk after 4.63 ns when running and written; -- 108 MHz
 
    i_text : entity work.text
       generic map (
@@ -182,10 +186,10 @@ begin
       variable l      : line;
       variable errors : natural := 0;
 
-      -- Checks the first n_lines lines of the next frame, with the display
-      -- offset disp and, when cursor is true, the cursor at (cx, cy), and
-      -- the sync pulses of a whole frame. The picture goes to the PPM file
-      -- when ppm_out is true.
+      -- Checks the first n_lines lines of the frame that starts now, with the display offset disp and, when
+      -- cursor is true, the cursor at (cx, cy). With all the visible lines
+      -- it also checks the vertical sync pulse after them, and returns at
+      -- its end. The picture goes to the PPM file when ppm_out is true.
       procedure check_frame(n_lines : natural;
                             disp    : natural;
                             cursor  : boolean;
@@ -196,10 +200,6 @@ begin
          variable hs_len : natural;
          variable vs_len : natural;
       begin
-         -- Start at the end of a vertical sync pulse, so that the frame
-         -- after it is checked whole.
-         wait until rising_edge(vga_clk) and vs = C_MODE.sync_active;
-         wait until rising_edge(vga_clk) and vs /= C_MODE.sync_active;
          y := 0;
          loop
             -- One line: the visible pixels, then the blanking
@@ -238,21 +238,23 @@ begin
                report "The horizontal sync pulse is " & integer'image(hs_len) & " pixels"
                severity failure;
             y := y + 1;
-            exit when y = C_MODE.v_visible;
+            exit when y = n_lines;
          end loop;
 
          -- The vertical sync pulse, in lines, after the visible lines
-         wait until rising_edge(vga_clk) and vs = C_MODE.sync_active;
-         vs_len := 0;
-         while vs = C_MODE.sync_active loop
-            if hs = C_MODE.sync_active then
-               vs_len := vs_len + 1;
-            end if;
-            wait until rising_edge(vga_clk);
-         end loop;
-         assert vs_len = C_MODE.v_sync * C_MODE.h_sync
-            report "The vertical sync pulse is " & integer'image(vs_len) & " horizontal sync pixels"
-            severity failure;
+         if n_lines = C_MODE.v_visible then
+            wait until rising_edge(vga_clk) and vs = C_MODE.sync_active;
+            vs_len := 0;
+            while vs = C_MODE.sync_active loop
+               if hs = C_MODE.sync_active then
+                  vs_len := vs_len + 1;
+               end if;
+               wait until rising_edge(vga_clk);
+            end loop;
+            assert vs_len = C_MODE.v_sync * C_MODE.h_sync
+               report "The vertical sync pulse is " & integer'image(vs_len) & " horizontal sync pixels"
+               severity failure;
+         end if;
 
          assert errors = 0
             report integer'image(errors) & " pixels are wrong"
@@ -273,7 +275,9 @@ begin
          file_close(ppm);
       end if;
 
-      -- The registers: scrolled one row, with the cursor shown on row 3
+      -- The registers: scrolled one row, with the cursor shown on row 3.
+      -- They cross to the VGA clock in a few cycles, well within the back
+      -- porch of 38 lines, so the next frame shows them.
       wait until rising_edge(clk);
       offs     <= to_slv(80, C_SCR_BITS);
       cur_x    <= to_slv(5, 7);

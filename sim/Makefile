@@ -13,7 +13,9 @@
 #                         pixel checked.
 #             It also checks that GHDL can synthesise the system, the
 #             keyboard, and the text display (through text_synth.vhd, in
-#             the boards' mode).
+#             the boards' mode). With -j these all run side by side, and
+#             the test takes as long as tb_text alone. Each one is also a
+#             target: make tb_kbd runs just that one.
 # make clean  removes build/.
 #
 # NICE=pipeline (the default) or NICE=multi picks the core, and the files
@@ -39,34 +41,50 @@ SRC_SOURCES  = ../src/uart_serdes.vhd ../src/line_buffer.vhd ../src/cmd.vhd ../s
                ../src/video/video_pkg.vhd ../src/video/font_pkg.vhd ../src/video/pix.vhd ../src/video/scr_ram.vhd ../src/video/text.vhd
 SOURCES      = $(SRC_SOURCES) text_synth.vhd tb_hello.vhd tb_nicemon.vhd tb_kbd.vhd tb_text.vhd
 
-.PHONY: test analyse synth clean
+.PHONY: test analyse synth clean tb_hello tb_nicemon tb_kbd tb_text \
+        synth-nicemon synth-nicemon-norom synth-kbd_m65 synth-kbd_ascii synth-text
 
-test: analyse synth $(BUILD)/hello.bin $(BUILD)/rom.bin $(BUILD)/echo.bin $(BUILD)/fifo.bin $(BUILD)/devices.bin $(BUILD)/emu.bin $(BUILD)/reserved.bin $(BUILD)/eof.bin
+# Each testbench and each synthesis check is a target of its own, so that
+# "make -j test" runs them side by side. They share the work library of
+# $(BUILD), which "analyse" writes first and they only read.
+test: synth tb_hello tb_nicemon tb_kbd tb_text
+
+BINS = hello rom echo fifo devices emu reserved eof
+
+tb_hello: analyse $(BUILD)/hello.bin
 	@(cd $(BUILD) && $(GHDL) --elab-run $(GHDLFLAGS) tb_hello \
 	  -gG_BIN_FILE=hello.bin -gG_OUT_FILE=hello.out > tb_hello.log 2>&1) || \
 	  (echo "FAIL tb_hello"; cat $(BUILD)/tb_hello.log; exit 1)
 	@if cmp -s hello.expected $(BUILD)/hello.out; then echo "PASS tb_hello"; \
 	else echo "FAIL tb_hello"; diff hello.expected $(BUILD)/hello.out; exit 1; fi
+
+tb_nicemon: analyse $(addprefix $(BUILD)/,$(addsuffix .bin,$(BINS)))
 	@(cd $(BUILD) && $(GHDL) --elab-run $(GHDLFLAGS) tb_nicemon \
 	  -gG_HELLO_FILE=hello.bin -gG_ROM_FILE=rom.bin -gG_ECHO_FILE=echo.bin -gG_FIFO_FILE=fifo.bin -gG_DEVICES_FILE=devices.bin -gG_EMU_FILE=emu.bin -gG_RESERVED_FILE=reserved.bin -gG_EOF_FILE=eof.bin > tb_nicemon.log 2>&1) && \
 	  echo "PASS tb_nicemon" || (echo "FAIL tb_nicemon"; cat $(BUILD)/tb_nicemon.log; exit 1)
-	@(cd $(BUILD) && $(GHDL) --elab-run $(GHDLFLAGS) tb_kbd > tb_kbd.log 2>&1) && \
-	  echo "PASS tb_kbd" || (echo "FAIL tb_kbd"; cat $(BUILD)/tb_kbd.log; exit 1)
-	@(cd $(BUILD) && $(GHDL) --elab-run $(GHDLFLAGS) tb_text > tb_text.log 2>&1) && \
-	  echo "PASS tb_text" || (echo "FAIL tb_text"; cat $(BUILD)/tb_text.log; exit 1)
+
+tb_kbd tb_text: analyse
+	@(cd $(BUILD) && $(GHDL) --elab-run $(GHDLFLAGS) $@ > $@.log 2>&1) && \
+	  echo "PASS $@" || (echo "FAIL $@"; cat $(BUILD)/$@.log; exit 1)
 
 # Checks that GHDL can synthesise the system, with rom.bin as its ROM and
 # without a ROM, and the keyboard, as nice_cpu does for its core, and the
 # text display.
-synth: analyse $(BUILD)/rom.bin
+synth: synth-nicemon synth-nicemon-norom synth-kbd_m65 synth-kbd_ascii synth-text
+
+synth-nicemon: analyse $(BUILD)/rom.bin
 	@(cd $(BUILD) && $(GHDL) --synth $(GHDLFLAGS) -gG_CLOCK_HZ=50000000 -gG_ROM_FILE=rom.bin nicemon > nicemon_synth.vhd 2> nicemon_synth.log) && \
 	  echo "PASS synth nicemon" || (echo "FAIL synth nicemon"; cat $(BUILD)/nicemon_synth.log; exit 1)
+
+synth-nicemon-norom: analyse
 	@(cd $(BUILD) && $(GHDL) --synth $(GHDLFLAGS) -gG_CLOCK_HZ=50000000 nicemon > nicemon_norom_synth.vhd 2> nicemon_norom_synth.log) && \
 	  echo "PASS synth nicemon without a ROM" || (echo "FAIL synth nicemon without a ROM"; cat $(BUILD)/nicemon_norom_synth.log; exit 1)
-	@for e in kbd_m65 kbd_ascii; do \
-	  (cd $(BUILD) && $(GHDL) --synth $(GHDLFLAGS) -gG_CLOCK_HZ=50000000 $$e > $${e}_synth.vhd 2> $${e}_synth.log) && \
-	  echo "PASS synth $$e" || (echo "FAIL synth $$e"; cat $(BUILD)/$${e}_synth.log; exit 1) || exit 1; \
-	done
+
+synth-kbd_m65 synth-kbd_ascii: synth-%: analyse
+	@(cd $(BUILD) && $(GHDL) --synth $(GHDLFLAGS) -gG_CLOCK_HZ=50000000 $* > $*_synth.vhd 2> $*_synth.log) && \
+	  echo "PASS synth $*" || (echo "FAIL synth $*"; cat $(BUILD)/$*_synth.log; exit 1)
+
+synth-text: analyse
 	@(cd $(BUILD) && $(GHDL) --synth $(GHDLFLAGS) text_synth > text_synth.vhd 2> text_synth.log) && \
 	  echo "PASS synth text" || (echo "FAIL synth text"; cat $(BUILD)/text_synth.log; exit 1)
 

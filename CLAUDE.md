@@ -7,8 +7,8 @@ NiceMonMEGA65 runs the NICE CPU (the `nice_cpu` git submodule) on the MEGA65 R3 
 ## Commands
 
     make                  # lists the targets
-    make test             # (NICE=multi for the multi-cycle core) GHDL: synth checks, tb_hello, tb_nicemon, tb_kbd, tb_text (~3 min)
-    make -j4 formal       # SymbiYosys jobs in formal/ (~4 min with -j4)
+    make -j test          # (NICE=multi for the multi-cycle core) GHDL: synth checks, tb_hello, tb_nicemon, tb_kbd, tb_text (~80 s with -j)
+    make -j formal        # SymbiYosys jobs in formal/, side by side (~2 min with -j)
     make lint             # vsg against CODING_STYLE.md; line-length warnings are tolerated
     make examples         # C examples -> examples/build/*.bin (clang wasm32, lld, llvm)
     make r6 [ROM=f.bin]   # Vivado bitstream, synth/r6/build/top.bit; make r3 likewise
@@ -16,16 +16,17 @@ NiceMonMEGA65 runs the NICE CPU (the `nice_cpu` git submodule) on the MEGA65 R3 
     make run FILE=p.bin   # run it and print what niceemu prints, for diffing
     make hwtest           # program the FPGA with m65 and test the board (needs the board)
 
-One testbench: `make -C sim analyse` then, in `sim/build/pipeline`,
-`ghdl --elab-run --std=08 --workdir=. tb_kbd`; `tb_nicemon` and `tb_hello` take
-`-gG_*_FILE=` generics as `sim/Makefile` shows. `tb_text` with
+One testbench: `make -C sim tb_kbd` (likewise `tb_hello`, `tb_nicemon`,
+`tb_text`, `synth-nicemon`, ...). By hand: `make -C sim analyse` then, in
+`sim/build/pipeline`, `ghdl --elab-run --std=08 --workdir=. tb_kbd`;
+`tb_nicemon` and `tb_hello` take `-gG_*_FILE=` generics as `sim/Makefile` shows. `tb_text` with
 `-gG_PPM_FILE=frame.ppm` writes the frame as a picture. Test programs are
 assembled with `python3 nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and
 run in the emulator with `nice_cpu/emulator/zig-out/bin/niceemu x.bin`
 (build it with `make -C nice_cpu/emulator build`). The submodule has its own
 CLAUDE.md, tests, and `doc/ISA.md`, which is authoritative for the CPU.
 
-CI (`.github/workflows/ci.yml`) runs `make -C sim test`, `make -j4 formal`,
+CI (`.github/workflows/ci.yml`) runs `make -C sim -j4 test`, `make -j4 formal`,
 and `make lint`. The formal checks live in `G_FORMAL` blocks of `cmd.vhd`,
 `line_buffer.vhd`, `rx_fifo.vhd`, and `nicemon.vhd`, with wrappers in
 `formal/`; a change to those files should keep `make formal` passing.

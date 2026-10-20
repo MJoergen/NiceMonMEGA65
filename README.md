@@ -390,10 +390,12 @@ You need GHDL (tested with 4.1.0) and Python 3.
 - `sim/tb_text.vhd` fills the screen of the text display and checks every
   pixel of one 1280×1024 frame, and the sync pulses; then it scrolls the
   display one row, shows the cursor, and checks the first four rows of the
-  next frame. It takes about two minutes.
+  next frame. It takes under a minute, the longest of the tests.
 - `make test` also checks that GHDL can synthesise the system, with
   `sim/rom.nasm` as its ROM and without a ROM, the keyboard, and the text
   display.
+- `make -j test` runs all these side by side, in the time of `tb_text`.
+  Each is also a target of `sim/Makefile`, so `make -C sim tb_kbd` runs one.
 - `make lint` checks the VHDL against [CODING_STYLE.md](CODING_STYLE.md)
   with vsg.
 
@@ -431,8 +433,8 @@ every time, not only the ones a testbench sends.
   assume of them, that the command line's latched request is not
   overwritten and gets one ACK, that the devices answer only the latched
   request, and what a read of the console returns. Its tasks take up to 3
-  minutes each; `make -j4 formal` runs all the tasks side by side, as CI
-  does.
+  minutes each; `make -j formal` runs all the tasks side by side. CI runs
+  `make -j4 formal` on its four processors.
 
 The checks in `cmd.vhd`, `line_buffer.vhd`, `rx_fifo.vhd`, and
 `nicemon.vhd` are in `G_FORMAL` blocks, which are off in simulation and
