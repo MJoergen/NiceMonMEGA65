@@ -8,7 +8,7 @@
 --             HDMI serialisers of the MEGA65, which send ten bits per pixel
 --             on both edges. The Nexys4DDR has no HDMI, and leaves it open.
 -- The video has its own MMCM so that the system clock stays at 100 MHz (or
--- 75 MHz), which 1080 MHz does not divide to.
+-- 83.3 MHz), which 1080 MHz does not divide to.
 --
 -- RESET
 -- vga_rst_o is held while the MMCM is not locked, and for 8 cycles after.

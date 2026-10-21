@@ -9,6 +9,11 @@
 # make NICE=multi   builds it with nice_cpu's multi-cycle core instead of the
 #                     pipelined one, which is the default (core.mk)
 # make clean          removes the build
+#
+# The pipelined core leaves little slack, so every step runs with a
+# directive for timing, and phys_opt_design runs again after routing. With
+# the default directives the R6 missed 100 MHz by 0.7 ns, and with these it
+# meets it by 0.25 ns (nice_cpu issue 34).
 
 VIVADO_DIR ?= /opt/Xilinx/2025.1/Vivado
 
@@ -52,11 +57,12 @@ build/$(TOP).tcl: $(MAKEFILE_LIST) build/rom.conf
 	echo "read_vhdl -vhdl2008 { $(SRC) }" >> $@
 	echo "read_xdc { $(XDC) }" >> $@
 	echo "set_property PART $(PART) [current_project]" >> $@
-	echo "synth_design -top $(TOP) $(GENERICS)" >> $@
-	echo "opt_design" >> $@
-	echo "place_design" >> $@
-	echo "phys_opt_design" >> $@
-	echo "route_design" >> $@
+	echo "synth_design -top $(TOP) $(GENERICS) -directive PerformanceOptimized -retiming" >> $@
+	echo "opt_design -directive Explore" >> $@
+	echo "place_design -directive ExtraTimingOpt" >> $@
+	echo "phys_opt_design -directive AggressiveExplore" >> $@
+	echo "route_design -directive AggressiveExplore" >> $@
+	echo "phys_opt_design -directive AggressiveExplore" >> $@
 	echo "report_timing_summary -file build/timing.rpt" >> $@
 	echo "report_utilization -file build/utilization.rpt" >> $@
 	echo "write_checkpoint -force build/$(TOP).dcp" >> $@

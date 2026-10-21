@@ -71,7 +71,7 @@ is what every board has; `synth/common/` has the 7-series clocks
 `synth/mega65/mega65.vhd` is the shared MEGA65 level (keyboard, video DAC,
 HDMI); `synth/r3/top.vhd` and `synth/r6/top.vhd` only differ in pins and the
 reset path. `synth/nexys4ddr/top.vhd` is that board's whole top level
-(75 MHz for its -1 part, 12-bit VGA, no keyboard). Each board's Makefile
+(83.3 MHz for its -1 part, 12-bit VGA, no keyboard). Each board's Makefile
 sets `PART`, `BOARD_SRC`, and `BOARD_XDC` for `synth/Makefile.inc`.
 
 ## Conventions and pitfalls

@@ -1,10 +1,9 @@
 -- The clock and reset of the boards. The board's 100 MHz clock drives an MMCM
 -- whose VCO runs at 100 MHz * G_MULTIPLY, and which makes the system clock,
 -- the VCO's frequency / G_DIVIDE: 1000 MHz / 10 = 100 MHz on the MEGA65, and
--- 900 MHz / 12 = 75 MHz on the Nexys4DDR, whose FPGA is a slower speed
--- grade. The
--- pipelined core meets 100 MHz on the MEGA65 with little to spare, so
--- recheck the timing after a change to nice_cpu.
+-- 1000 MHz / 12 = 83.3 MHz on the Nexys4DDR, whose FPGA is a slower speed
+-- grade. The pipelined core meets 100 MHz on the MEGA65 with little to
+-- spare, so recheck the timing after a change to nice_cpu.
 -- The reset is held while the MMCM is not locked, and while the reset
 -- button (active high) is pressed, and for 2^20 cycles (10 ms at 100 MHz)
 -- after both. So the UART output is idle for that long before the CLI sends

@@ -57,8 +57,8 @@ three ways:
   the screen is 8K words, not 32K, so that it and its copy in `text.vhd`
   take 16. That is still more than three screens of 80×25 for scrolling.
 - Its FPGA is speed grade -1, where the MEGA65's is -2, so the system clock
-  is 75 MHz, not 100 MHz; at 80 MHz the pipelined core misses timing by
-  0.2 ns. The UART runs at 115200 baud as on the MEGA65.
+  is 83.3 MHz, not 100 MHz; at 90 MHz the pipelined core meets timing by
+  only a few picoseconds. The UART runs at 115200 baud as on the MEGA65.
 - Its VGA output has 4 bits per colour, from resistors, and there is no
   HDMI. The screen's colours have 3 bits or fewer per colour, so they show
   as on the MEGA65.
