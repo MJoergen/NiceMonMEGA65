@@ -189,11 +189,11 @@ not echo what you type, so the number shows only after you press Enter:
 
     Count the primes up to (0 to stop): 1000
     Primes up to 1000: 168
-    36731 instructions in 57664 cycles
+    36731 instructions in 57152 cycles
 
 The second line comes from the performance counters, and the numbers are
-from the board with the pipelined core, where the 57664 cycles at 100 MHz
-take about 0.58 ms.
+from the board with the pipelined core, where the 57152 cycles at 100 MHz
+take about 0.57 ms.
 
 `make -C examples` also builds `examples/build/bench.bin` from nice_cpu's
 benchmark, `nice_cpu/bench/bench.c`. It runs six phases, each a known
@@ -209,17 +209,16 @@ for the core (`bench/README.md`, at nice_cpu 4bbbb81):
 
 | Phase | Instructions | Cycles on the board | In nice_cpu's testbench |
 |---|---|---|---|
-| `rng64` | 52768 | 96400 | 83076 |
-| `crc32` | 65816 | 85120 | 85108 |
-| `bst` | 310469 | 418105 | 412973 |
-| `heapsort` | 307416 | 388868 | 386464 |
-| `vm` | 840049 | 1226174 | 1220162 |
-| `strings` | 104562 | 166707 | 164125 |
-| total | 1681080 | 2381374 | 2351908 |
+| `rng64` | 52768 | 83076 | 83076 |
+| `crc32` | 65816 | 85108 | 85108 |
+| `bst` | 310469 | 411949 | 412973 |
+| `heapsort` | 307416 | 386464 | 386464 |
+| `vm` | 840049 | 1220162 | 1220162 |
+| `strings` | 104562 | 163560 | 164125 |
+| total | 1681080 | 2350319 | 2351908 |
 
-The board takes 1.3% more cycles in all, and 16% more in `rng64`, which
-uses the math unit in the I/O page most. At 100 MHz the benchmark runs
-for about 24 ms.
+The board takes the same cycles, or a few less in `bst` and `strings`,
+and at 100 MHz the benchmark runs for about 24 ms.
 
 You need clang with the wasm32 target, `wasm-ld` and `llvm-ar` (on Debian
 and Ubuntu, the `clang`, `lld` and `llvm` packages). The steps that the
@@ -462,10 +461,11 @@ every time, not only the ones a testbench sends.
   to type a command. It checks that the core's two buses get an ACK only
   for a request that waits, which is what nice_cpu's proofs of the cores
   assume of them, that the command line's latched request is not
-  overwritten and gets one ACK, that the devices answer only the latched
-  request, and what a read of the console returns. Its tasks take up to 3
-  minutes each; `make -j formal` runs all the tasks side by side. CI runs
-  `make -j4 formal` on its four processors.
+  overwritten and gets one ACK, that the devices answer only that request
+  or one of the core, which gets one ACK at a time, and what a read of the
+  console returns. Its tasks take up to 3 minutes each; `make -j formal`
+  runs all the tasks side by side. CI runs `make -j4 formal` on its four
+  processors.
 
 The checks in `cmd.vhd`, `line_buffer.vhd`, `rx_fifo.vhd`, and
 `nicemon.vhd` are in `G_FORMAL` blocks, which are off in simulation and

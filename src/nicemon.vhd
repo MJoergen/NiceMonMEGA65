@@ -119,11 +119,17 @@
 -- The data bus of the core is stalled while a CLI request waits, and while a
 -- write to the UART waits. The CLI pulses STB for one cycle and does not
 -- wait for STALL, so its request is latched and served in the next free
--- cycle. Every request is acknowledged in the cycle after it is served,
--- except one for the MPU, the performance counters, or the timer. That one
--- is latched and passed to the device, which may stall it (the MPU does
--- while it computes), and it is acknowledged in the cycle after the
--- device's acknowledge. The data bus is stalled meanwhile.
+-- cycle. Every request is acknowledged in the cycle after it is served.
+-- A request of the core for the MPU, the performance counters, or the
+-- timer goes to the device in the cycle it is taken, as one for memory
+-- does, and the device acknowledges it. Each device acknowledges in the
+-- cycle after it takes a request, except the MPU, which takes a read of a
+-- result that it computes and then stalls until it acknowledges it. The
+-- core is stalled meanwhile too, so its requests are acknowledged in their
+-- order. A CLI request for a device is latched and passed to the device,
+-- and it is acknowledged in the cycle after the device's acknowledge. The
+-- core is stalled meanwhile, and the CLI waits for any acknowledge that a
+-- device owes the core.
 --
 -- RESET
 -- Synchronous. After reset the control bit is 1 when G_CPU_RUN_AT_RESET is
@@ -245,8 +251,15 @@ architecture synthesis of nicemon is
       return or(addr(G_RAM_ADDR_BITS - 1 downto G_ROM_ADDR_BITS)) = '0';
    end function in_rom;
 
-   -- The devices of nice_cpu/hdl/src behind the latch of the data bus
+   -- The devices of nice_cpu/hdl/src
    type t_dev is (DEV_PERF, DEV_MPU, DEV_TIMER);
+
+   -- Whether an address is one of a device's
+   function is_dev(addr : std_logic_vector(31 downto 0)) return boolean is
+   begin
+      return addr(31 downto 5) = C_MPU_BASE or addr(31 downto 4) = C_PERF_BASE or
+             addr(31 downto 4) = C_TIMER_BASE;
+   end function is_dev;
 
    -- Core
    signal cpu_rst     : std_logic;
@@ -305,11 +318,13 @@ architecture synthesis of nicemon is
    signal dbus_cyc   : std_logic;
    signal dbus_stb   : std_logic;
    signal dbus_stall : std_logic;
-   signal dbus_ack   : std_logic := '0';
+   signal dbus_ack   : std_logic;
    signal dbus_we    : std_logic;
    signal dbus_addr  : std_logic_vector(31 downto 0);
    signal dbus_wdata : std_logic_vector(31 downto 0);
    signal dbus_rdata : std_logic_vector(31 downto 0);
+   -- The acknowledge of a core request served here, not by a device
+   signal srv_ack : std_logic := '0';
 
    -- CLI
    signal cli_addr  : std_logic_vector(31 downto 0);
@@ -329,18 +344,28 @@ architecture synthesis of nicemon is
    signal tx_wait      : std_logic := '0';
    signal tx_wait_data : std_logic_vector(7 downto 0);
 
-   -- A request for the MPU, the performance counters, or the timer. It is
-   -- latched, and the device's port is driven from the latch until the
+   -- A CLI request for the MPU, the performance counters, or the timer. It
+   -- is latched, and the device's port is driven from the latch until the
    -- device acknowledges.
    signal dev_busy  : std_logic := '0';
    signal dev_stb   : std_logic := '0';
    signal dev_sel   : t_dev;               -- the device
-   signal dev_cli   : boolean;             -- the request is the CLI's
-   signal dev_drop  : std_logic;           -- the core was reset meanwhile
    signal dev_addr  : std_logic_vector(4 downto 0);
    signal dev_we    : std_logic;
    signal dev_wdata : std_logic_vector(31 downto 0);
    signal dev_stall : std_logic;
+   signal dev_ack   : std_logic;           -- any device's
+
+   -- A request of the core for a device, taken in this cycle, and whether
+   -- a device owes the core an acknowledge
+   signal core_dev  : std_logic;
+   signal core_owed : std_logic := '0';
+
+   -- The devices' ports: the CLI's latch while it is busy, else the core
+   signal io_cyc   : std_logic;
+   signal io_we    : std_logic;
+   signal io_addr  : std_logic_vector(4 downto 0);
+   signal io_wdata : std_logic_vector(31 downto 0);
 
    signal mpu_cyc     : std_logic;
    signal mpu_stb     : std_logic;
@@ -374,6 +399,9 @@ architecture synthesis of nicemon is
    signal rd_rom      : std_logic := '0';
    signal rd_scr      : std_logic := '0';
    signal rd_rx       : std_logic := '0';
+   signal rd_mpu      : std_logic := '0';
+   signal rd_perf     : std_logic := '0';
+   signal rd_timer    : std_logic := '0';
 
    -- The ROM, read at the addresses of the memory ports
    signal rom_a_data : std_logic_vector(63 downto 0);
@@ -512,8 +540,13 @@ begin
    -- Data bus and CLI: memory port B and the I/O registers
    ---------------------------------------------------------------------------
 
-   -- The core's request is taken in a cycle with no stall.
-   dbus_stall <= cli_pend or tx_wait or dev_busy or clearing;
+   -- The core's request is taken in a cycle with no stall. The MPU's stall
+   -- holds the core while it computes a result that the core reads.
+   dbus_stall <= cli_pend or tx_wait or dev_busy or clearing or mpu_stall;
+   dbus_ack   <= srv_ack or (core_owed and dev_ack);
+   core_dev   <= '1' when dbus_cyc = '1' and dbus_stb = '1' and dbus_stall = '0' and
+                          is_dev(dbus_addr) else
+                 '0';
 
    ram_b_addr  <= clr_addr(G_RAM_ADDR_BITS - 1 downto 0) when clearing = '1' else
                   cli_p_addr(G_RAM_ADDR_BITS - 1 downto 0) when cli_pend = '1' else
@@ -566,6 +599,9 @@ begin
                  rom_b_data when rd_rom = '1' else
                  scr_b_rdata when rd_scr = '1' else
                  X"00000" & "0001" & rx_q when rd_rx = '1' else
+                 mpu_data when rd_mpu = '1' else
+                 perf_data when rd_perf = '1' else
+                 timer_data when rd_timer = '1' else
                  rd_io;
 
    cpu_tx_ready <= ser_tx_ready and not lb_tx_valid;
@@ -581,8 +617,11 @@ begin
          rd_ram <= '0';
          rd_rom <= '0';
          rd_scr <= '0';
-         rd_rx  <= '0';
-         rd_io  <= (others => '0');
+         rd_rx    <= '0';
+         rd_mpu   <= '0';
+         rd_perf  <= '0';
+         rd_timer <= '0';
+         rd_io    <= (others => '0');
          if not is_io(addr, cli) then
             -- Memory: port B is driven combinationally above.
             if addr(31 downto C_SCR_BITS) = C_SCR_BASE then
@@ -592,12 +631,22 @@ begin
             else
                rd_ram <= '1';
             end if;
-         elsif addr(31 downto 5) = C_MPU_BASE or addr(31 downto 4) = C_PERF_BASE or
-               addr(31 downto 4) = C_TIMER_BASE then
-            -- A device: its port is driven from the latch, and the request
-            -- is acknowledged when the device acknowledges it.
-            dev_busy  <= '1';
-            dev_stb   <= '1';
+         elsif is_dev(addr) and not cli then
+            -- A device has taken the core's request, and it acknowledges
+            -- it, with the data that rd_mpu, rd_perf, or rd_timer selects.
+            if addr(31 downto 5) = C_MPU_BASE then
+               rd_mpu <= '1';
+            elsif addr(31 downto 4) = C_PERF_BASE then
+               rd_perf <= '1';
+            else
+               rd_timer <= '1';
+            end if;
+            return;
+         elsif is_dev(addr) then
+            -- The CLI's: the device's port is driven from the latch, and the
+            -- request is acknowledged when the device acknowledges it.
+            dev_busy <= '1';
+            dev_stb  <= '1';
             if addr(31 downto 5) = C_MPU_BASE then
                dev_sel <= DEV_MPU;
             elsif addr(31 downto 4) = C_PERF_BASE then
@@ -605,8 +654,6 @@ begin
             else
                dev_sel <= DEV_TIMER;
             end if;
-            dev_cli   <= cli;
-            dev_drop  <= '0';
             dev_addr  <= addr(4 downto 0);
             dev_we    <= we;
             dev_wdata <= wdata;
@@ -699,13 +746,13 @@ begin
          if cli then
             cli_ack <= '1';
          else
-            dbus_ack <= '1';
+            srv_ack <= '1';
          end if;
       end procedure serve;
 
    begin
       if rising_edge(clk_i) then
-         dbus_ack     <= '0';
+         srv_ack      <= '0';
          cli_ack      <= '0';
          halt_note    <= '0';
          scr_ctl_we   <= '0';
@@ -738,11 +785,14 @@ begin
             if dev_stb = '1' and dev_stall = '0' then
                dev_stb <= '0';
             end if;
-            if mpu_ack = '1' or perf_ack = '1' or timer_ack = '1' then
+            if dev_ack = '1' then
                rd_ram   <= '0';
                rd_rom   <= '0';
                rd_scr   <= '0';
                rd_rx    <= '0';
+               rd_mpu   <= '0';
+               rd_perf  <= '0';
+               rd_timer <= '0';
                if mpu_ack = '1' then
                   rd_io <= mpu_data;
                elsif perf_ack = '1' then
@@ -751,11 +801,7 @@ begin
                   rd_io <= timer_data;
                end if;
                dev_busy <= '0';
-               if dev_cli then
-                  cli_ack <= '1';
-               elsif dev_drop = '0' then
-                  dbus_ack <= '1';
-               end if;
+               cli_ack  <= '1';
             end if;
          elsif clearing = '1' then
             clr_addr <= clr_addr + 1;
@@ -764,7 +810,9 @@ begin
                cpu_hold <= clr_hold;
                cli_ack  <= '1';
             end if;
-         elsif cli_pend = '1' then
+         elsif cli_pend = '1' and core_owed = '0' and mpu_stall = '0' then
+            -- The CLI waits for any acknowledge that a device owes the core,
+            -- or would owe it had the core not been reset meanwhile.
             serve(true, cli_p_addr, cli_p_we, cli_p_wdata);
             cli_pend <= '0';
          elsif tx_wait = '1' then
@@ -772,10 +820,18 @@ begin
                cpu_tx_data  <= tx_wait_data;
                cpu_tx_valid <= '1';
                tx_wait      <= '0';
-               dbus_ack     <= '1';
+               srv_ack      <= '1';
             end if;
-         elsif dbus_cyc = '1' and dbus_stb = '1' then
+         elsif dbus_cyc = '1' and dbus_stb = '1' and dbus_stall = '0' then
             serve(false, dbus_addr, dbus_we, dbus_wdata);
+         end if;
+
+         -- Each device acknowledges in the cycle after it takes a request,
+         -- or stalls the core until it does, so at most one is owed.
+         if core_dev = '1' then
+            core_owed <= '1';
+         elsif dev_ack = '1' then
+            core_owed <= '0';
          end if;
 
          if cli_cyc = '1' and cli_stb = '1' then
@@ -788,13 +844,11 @@ begin
          -- A request of the core in reset is dropped, and so is a byte
          -- received before, so that a program starts with no input.
          if cpu_rst = '1' then
-            dbus_ack     <= '0';
+            srv_ack      <= '0';
+            core_owed    <= '0';
             tx_wait      <= '0';
             halt_wait    <= '0';
             read_count   <= (others => '0');
-            if not dev_cli then
-               dev_drop <= '1';
-            end if;
          end if;
 
          if rst_i = '1' then
@@ -854,15 +908,29 @@ begin
 
    dev_rst <= rst_i or (cpu_hold_d and not cpu_hold);
 
-   mpu_cyc   <= dev_busy when dev_sel = DEV_MPU else '0';
-   mpu_stb   <= dev_stb when dev_sel = DEV_MPU else '0';
-   perf_cyc  <= dev_busy when dev_sel = DEV_PERF else '0';
-   perf_stb  <= dev_stb when dev_sel = DEV_PERF else '0';
-   timer_cyc <= dev_busy when dev_sel = DEV_TIMER else '0';
-   timer_stb <= dev_stb when dev_sel = DEV_TIMER else '0';
+   -- The CLI's latched request while it is busy, else the core's request,
+   -- which goes to a device only in the cycle that takes it
+   io_cyc   <= '1' when dev_busy = '1' else dbus_cyc;
+   io_we    <= dev_we when dev_busy = '1' else dbus_we;
+   io_addr  <= dev_addr when dev_busy = '1' else dbus_addr(4 downto 0);
+   io_wdata <= dev_wdata when dev_busy = '1' else dbus_wdata;
+
+   mpu_cyc   <= io_cyc;
+   perf_cyc  <= io_cyc;
+   timer_cyc <= io_cyc;
+   mpu_stb   <= dev_stb when dev_busy = '1' and dev_sel = DEV_MPU else
+                core_dev when dbus_addr(31 downto 5) = C_MPU_BASE else
+                '0';
+   perf_stb  <= dev_stb when dev_busy = '1' and dev_sel = DEV_PERF else
+                core_dev when dbus_addr(31 downto 4) = C_PERF_BASE else
+                '0';
+   timer_stb <= dev_stb when dev_busy = '1' and dev_sel = DEV_TIMER else
+                core_dev when dbus_addr(31 downto 4) = C_TIMER_BASE else
+                '0';
    dev_stall <= mpu_stall when dev_sel = DEV_MPU else
                 perf_stall when dev_sel = DEV_PERF else
                 timer_stall;
+   dev_ack   <= mpu_ack or perf_ack or timer_ack;
 
    i_mpu : entity work.mpu
       port map (
@@ -872,9 +940,9 @@ begin
          wb_stb_i   => mpu_stb,
          wb_stall_o => mpu_stall,
          wb_ack_o   => mpu_ack,
-         wb_we_i    => dev_we,
-         wb_addr_i  => dev_addr,
-         wb_data_i  => dev_wdata,
+         wb_we_i    => io_we,
+         wb_addr_i  => io_addr,
+         wb_data_i  => io_wdata,
          wb_data_o  => mpu_data
       ); -- i_mpu
 
@@ -887,9 +955,9 @@ begin
          wb_stb_i   => perf_stb,
          wb_stall_o => perf_stall,
          wb_ack_o   => perf_ack,
-         wb_we_i    => dev_we,
-         wb_addr_i  => dev_addr(3 downto 0),
-         wb_data_i  => dev_wdata,
+         wb_we_i    => io_we,
+         wb_addr_i  => io_addr(3 downto 0),
+         wb_data_i  => io_wdata,
          wb_data_o  => perf_data
       ); -- i_perf
 
@@ -903,9 +971,9 @@ begin
          wb_stb_i     => timer_stb,
          wb_stall_o   => timer_stall,
          wb_ack_o     => timer_ack,
-         wb_we_i      => dev_we,
-         wb_addr_i    => dev_addr(3 downto 0),
-         wb_data_i    => dev_wdata,
+         wb_we_i      => io_we,
+         wb_addr_i    => io_addr(3 downto 0),
+         wb_data_i    => io_wdata,
          wb_data_o    => timer_data,
          irq_valid_o  => irq_valid,
          irq_ready_i  => irq_ready,
@@ -1096,6 +1164,7 @@ begin
       signal f_cli_wait  : std_logic := '0';
       signal f_rx_byte   : std_logic;
       signal f_rx_end    : std_logic;
+      signal f_cpu_rst_d : std_logic := '1';
    begin
 
       p_wait : process (clk_i)
@@ -1124,6 +1193,7 @@ begin
             if rst_i = '1' then
                f_cli_wait <= '0';
             end if;
+            f_cpu_rst_d <= cpu_rst;
          end if;
       end process p_wait;
 
@@ -1145,10 +1215,14 @@ begin
       -- psl f_cli_latch : assert always
       --    rst_i = '0' and cli_stb = '1' -> cli_pend = '0' and f_cli_wait = '0';
 
-      -- The devices answer only the latched request
+      -- The devices answer the CLI's latched request, or a request of the
+      -- core, which is dropped if the core has been reset. The core gets one
+      -- acknowledge at a time.
       -- psl f_dev_ack : assert always
-      --    rst_i = '0' and (mpu_ack = '1' or perf_ack = '1' or timer_ack = '1') ->
-      --    dev_busy = '1';
+      --    rst_i = '0' and dev_ack = '1' ->
+      --    dev_busy = '1' or core_owed = '1' or cpu_rst = '1' or f_cpu_rst_d = '1';
+      -- psl f_one_ack : assert always
+      --    rst_i = '0' -> not (srv_ack = '1' and core_owed = '1' and dev_ack = '1');
 
       -- The console's answer: a byte with bit 8, 0x200 at the end, or 0
       -- psl f_console : assert always
@@ -1160,7 +1234,8 @@ begin
       -- psl c_console : cover {f_rx_byte and not rst_i};
       -- psl c_console_end : cover {f_rx_end and not rst_i};
       -- psl c_tx_wait : cover {tx_wait and not rst_i};
-      -- psl c_dev_core : cover {dev_busy and not rst_i and not cpu_rst; dbus_ack};
+      -- psl c_dev_core : cover {core_dev and not rst_i and not cpu_rst; dbus_ack};
+      -- psl c_dev_cli : cover {dev_busy and not rst_i; cli_ack};
       -- psl c_cli : cover {cli_ack and not rst_i};
       -- psl c_halt : cover {halt_note and not rst_i};
    end generate gen_formal;
