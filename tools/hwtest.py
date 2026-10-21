@@ -13,11 +13,12 @@ the memory, reads back what sim/emu.nasm leaves after its halt, writes and
 reads the screen's registers, and runs the C example
 examples/build/primes.bin. Last, it runs programs with tools/run.py and
 with niceemu, and compares their output and exit status, with sim/eof.nasm
-also the end of the input and an input file of 1536 bytes. The programs
+also the end of the input and an input file of 1536 bytes, and with
+nice_cpu's benchmark, examples/build/bench.bin, all but its cycles. The programs
 run with the ROM hidden, so the RAM is at 0; a bitstream with a ROM must
 have halted its core, as a ROM with sim/rom.nasm does, for the command
 line to answer.
-Build the bitstream and the example first, and niceemu
+Build the bitstream and the examples first, and niceemu
 (make -C nice_cpu/emulator build), or that comparison is skipped.
 
 Usage: tools/hwtest.py [--port /dev/ttyUSB1] [--baud 115200]
@@ -306,6 +307,37 @@ def test_run(port: str, baud: int,
               f"{board.stdout!r} {board.stderr!r}")
 
 
+def test_bench(port: str, baud: int, bench: str) -> None:
+    """Runs nice_cpu's benchmark with run.py and with niceemu, which must
+    print the same and exit with the same status, but for the cycles, which
+    the board counts in clock cycles. So the steps differ too, since
+    printing other numbers takes other steps. The board's table is printed.
+    The port must be closed meanwhile."""
+    if not os.path.exists(NICEEMU):
+        print(f"  {NICEEMU} is missing; the benchmark is skipped")
+        return
+    emu = subprocess.run([NICEEMU, bench], stdin=subprocess.DEVNULL,
+                         capture_output=True)
+    board = subprocess.run([sys.executable, f"{REPO}/tools/run.py",
+                            "--port", port, "--baud", str(baud),
+                            "--timeout", "10", bench],
+                           stdin=subprocess.DEVNULL, capture_output=True)
+    for line in board.stdout.decode(errors="replace").splitlines():
+        if line.startswith("Halted"):
+            break
+        print(f"  {line}")
+    # A line of a phase, or the total: its name, instructions, and cycles
+    phase = re.compile(rb"^(\S+ +\d+) +\d+", re.MULTILINE)
+    for r in (emu, board):
+        r.stdout = phase.sub(rb"\1 N", r.stdout)
+        r.stdout = re.sub(rb"after \d+ steps", b"after N steps", r.stdout)
+    same = emu.stdout == board.stdout and emu.returncode == board.returncode
+    check("bench.bin as niceemu, but for the cycles", same,
+          "" if same else f"\n  niceemu (exit {emu.returncode}): "
+          f"{emu.stdout!r}\n  run.py (exit {board.returncode}): "
+          f"{board.stdout!r} {board.stderr!r}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--port", default="/dev/ttyUSB1")
@@ -316,8 +348,10 @@ def main() -> None:
     args = parser.parse_args()
 
     primes = f"{REPO}/examples/build/primes.bin"
-    if not os.path.exists(primes):
-        sys.exit(f"hwtest.py: {primes} is missing; run 'make examples'")
+    bench = f"{REPO}/examples/build/bench.bin"
+    for path in (primes, bench):
+        if not os.path.exists(path):
+            sys.exit(f"hwtest.py: {path} is missing; run 'make examples'")
     if not args.no_program and not os.path.exists(args.bit):
         sys.exit(f"hwtest.py: {args.bit} is missing; build it, or give --bit")
 
@@ -354,6 +388,7 @@ def main() -> None:
             (eof, [], True),               # no input: it ends at once
             (eof, ["-i", text], True),
         ])
+        test_bench(args.port, args.baud, bench)
 
     passed = sum(results)
     print(f"\n{passed}/{len(results)} passed")

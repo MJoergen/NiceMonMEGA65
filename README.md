@@ -195,6 +195,32 @@ The second line comes from the performance counters, and the numbers are
 from the board with the pipelined core, where the 57664 cycles at 100 MHz
 take about 0.58 ms.
 
+`make -C examples` also builds `examples/build/bench.bin` from nice_cpu's
+benchmark, `nice_cpu/bench/bench.c`. It runs six phases, each a known
+kernel, and prints the instructions and cycles of each, its result, and
+whether that is the expected one. It reads no input, so `tools/run.py`
+runs it:
+
+    tools/run.py examples/build/bench.bin
+
+The instructions are the same as on the emulator. The cycles are from the
+board with the pipelined core, beside those of nice_cpu's own testbench
+for the core (`bench/README.md`, at nice_cpu 4bbbb81):
+
+| Phase | Instructions | Cycles on the board | In nice_cpu's testbench |
+|---|---|---|---|
+| `rng64` | 52768 | 96400 | 83076 |
+| `crc32` | 65816 | 85120 | 85108 |
+| `bst` | 310469 | 418105 | 412973 |
+| `heapsort` | 307416 | 388868 | 386464 |
+| `vm` | 840049 | 1226174 | 1220162 |
+| `strings` | 104562 | 166707 | 164125 |
+| total | 1681080 | 2381374 | 2351908 |
+
+The board takes 1.3% more cycles in all, and 16% more in `rng64`, which
+uses the math unit in the I/O page most. At 100 MHz the benchmark runs
+for about 24 ms.
+
 You need clang with the wasm32 target, `wasm-ld` and `llvm-ar` (on Debian
 and Ubuntu, the `clang`, `lld` and `llvm` packages). The steps that the
 Makefile runs are those of `nice_cpu/runtime/README.md`:
@@ -461,14 +487,15 @@ writes and reads the screen's registers, and runs
 `examples/build/primes.bin`. Last, it runs programs with `run.py`
 and with `niceemu`, whose output and exit status must be the same: among
 them `sim/eof.nasm`, with no input and with 1536 bytes of input, which
-checks the larger FIFO and the end of the input.
+checks the larger FIFO and the end of the input, and
+`examples/build/bench.bin`, but for its cycles, whose table it prints.
 That needs niceemu, built with `make -C nice_cpu/emulator build`; without it
 the comparison is skipped. Build the bitstream first, then:
 
     make hwtest
 
 It prints one line for each check, and last how many passed.
-On the R6 and the Nexys4DDR with the pipelined core, all 50 pass.
+On the R6 and the Nexys4DDR with the pipelined core, all 51 pass.
 
 For the R3, give `BIT=synth/r3/build/top.bit`. For the Nexys4DDR, give
 `BIT=synth/nexys4ddr/build/top.bit`. Its UART is usually `/dev/ttyUSB1` too.

@@ -9,7 +9,8 @@
 # MEGA65's memory. The translated code and the runtime use the math unit,
 # so muldiv_mpu.nasm is joined in.
 #
-# make          builds build/primes.bin
+# make          builds build/primes.bin, and build/bench.bin from nice_cpu's
+#               benchmark, bench/bench.c, which tools/hwtest.py runs
 # make clean    removes build/
 #
 # Needs clang with the wasm32 target, wasm-ld and llvm-ar (the lld and llvm
@@ -28,7 +29,7 @@ LDFLAGS = -nostdlib -Wl,--no-entry -Wl,--export=main \
 
 RUNTIME = $(NICE)/runtime/lib.nasm $(NICE)/runtime/muldiv_mpu.nasm
 
-PROGRAMS = primes
+PROGRAMS = primes bench
 
 all: $(PROGRAMS:%=$(BUILD)/%.bin)
 
@@ -37,6 +38,9 @@ $(LIBC)/libc.a: FORCE
 	$(MAKE) -C $(LIBC) libc.a
 
 $(BUILD)/%.wasm: %.c $(LIBC)/libc.a | $(BUILD)
+	$(CLANG) $(CFLAGS) $(LDFLAGS) -o $@ $< $(LIBC)/libc.a
+
+$(BUILD)/bench.wasm: $(NICE)/bench/bench.c $(LIBC)/libc.a | $(BUILD)
 	$(CLANG) $(CFLAGS) $(LDFLAGS) -o $@ $< $(LIBC)/libc.a
 
 $(BUILD)/%.nasm: $(BUILD)/%.wasm
