@@ -30,6 +30,7 @@ begin
          irq_vector_i => irq_vector_i,
          halted_o     => halted_o,
          instret_o    => instret_o,
+         regs_o       => regs_o,
          retire_o     => retire_o
       ); -- i_core
 

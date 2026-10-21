@@ -267,12 +267,10 @@ architecture synthesis of nicemon is
    signal cpu_halted  : std_logic;
    signal cpu_instret : std_logic;
    signal cpu_retire  : t_retire;
-   -- The registers the last step left, a cycle late, for the CLI. The
-   -- core reports them in the cycle the step retires, at the end of its
-   -- longest paths, so the read of E0-EF takes them from here. The CLI
-   -- reads them only while the core is held or halted, when they do not
-   -- change.
-   signal cpu_regs : t_regs := C_REGS_RESET;
+   -- The core's registers, for the CLI's read of E0-EF. The CLI reads them
+   -- only while the core is held or halted, when they hold the registers
+   -- after the last step and do not change.
+   signal cpu_regs : t_regs;
    -- The hold bit in the cycle before, for a pulse when the core starts,
    -- which resets the math unit, the performance counters, and the timer
    signal cpu_hold_d : std_logic := '1';
@@ -501,6 +499,7 @@ begin
          irq_vector_i => irq_vector,
          halted_o     => cpu_halted,
          instret_o    => cpu_instret,
+         regs_o       => cpu_regs,
          retire_o     => cpu_retire
       ); -- i_core
 
@@ -758,7 +757,6 @@ begin
          scr_ctl_we   <= '0';
          cpu_hold_d   <= cpu_hold;
          cpu_halted_d <= cpu_halted;
-         cpu_regs     <= cpu_retire.regs;
 
          if cpu_rst = '1' then
             halt_why <= HALT_NONE;

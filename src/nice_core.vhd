@@ -42,6 +42,10 @@ entity nice_core is
 
       halted_o     : out std_logic;
       instret_o    : out std_logic;
+      -- R0-R15 from the core's registers: in the cycle after a step is
+      -- reported on retire_o, those of that report
+      regs_o       : out t_regs;
+      -- One report per step, for simulation
       retire_o     : out t_retire
    );
 end entity nice_core;
