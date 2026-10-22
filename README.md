@@ -47,8 +47,8 @@ difference is the memory: 64K words, not 2³².
 | Console output, `0xFFFFFF00` | stdout | UART | Yes |
 | Console input, `0xFFFFFF00` | stdin, with bit 8 set; `0x200` at the end. A read waits for the next byte | UART and the MEGA65 keyboard, with bit 8 set, through a 2048-byte FIFO; `0x200` after a UART break. A read returns 0 while no byte has arrived | Yes, but UART bytes beyond 2048 unread ones are lost, and a program that waits for input in a loop runs more steps |
 | Math unit, `0xFFFFFF20`–`3F` | Computed on read | nice_cpu's `mpu.vhd`, which stalls the read until the result is ready | Yes |
-| Performance counters, `0xFFFFFF40`–`4F` | One cycle per step, from the start | nice_cpu's `perf.vhd`, counting clock cycles at 100 MHz (83.3 MHz on the Nexys4DDR), from the start of the core | Instructions yes; cycles count real clocks |
-| Timer, `0xFFFFFF10`–`1F` | Raises IRQ every P steps | nice_cpu's `timer.vhd`, raising IRQ every P clock cycles at 100 MHz (83.3 MHz on the Nexys4DDR) | Yes, but the period counts real clocks, so the interrupts come at other steps |
+| Performance counters, `0xFFFFFF40`–`4F` | One cycle per step, from the start | nice_cpu's `perf.vhd`, counting clock cycles at 100 MHz (90 MHz on the Nexys4DDR), from the start of the core | Instructions yes; cycles count real clocks |
+| Timer, `0xFFFFFF10`–`1F` | Raises IRQ every P steps | nice_cpu's `timer.vhd`, raising IRQ every P clock cycles at 100 MHz (90 MHz on the Nexys4DDR) | Yes, but the period counts real clocks, so the interrupts come at other steps |
 | Instruction fetches from `0xFFFFFF00`–`FF` | Read 0 | Read 0 | Yes |
 | Memory | All 2³² words, 0 at the start | 64K words, repeated through the address space; the stack at `0xFFFFFF00` lands in the top. `load.py` and `run.py` hide the ROM, if the bitstream has one, and clear the RAM to 0 before they load | No: a program, its data, and its stack must fit in 64K words |
 | Screen, `0xFFFF0000`–`07CF` | 80×25 words of memory, printed by `--screen` | 32768 words of memory of their own (8192 on the Nexys4DDR), read with `R`; the first 2000 are shown on VGA and HDMI, unless the display offset is set | Yes |
@@ -189,11 +189,11 @@ not echo what you type, so the number shows only after you press Enter:
 
     Count the primes up to (0 to stop): 1000
     Primes up to 1000: 168
-    36731 instructions in 57152 cycles
+    36731 instructions in 58157 cycles
 
 The second line comes from the performance counters, and the numbers are
-from the board with the pipelined core, where the 57152 cycles at 100 MHz
-take about 0.57 ms.
+from the board with the pipelined core, where the 58157 cycles at 100 MHz
+take about 0.58 ms.
 
 `make -C examples` also builds `examples/build/bench.bin` from nice_cpu's
 benchmark, `nice_cpu/bench/bench.c`. It runs six phases, each a known
@@ -205,17 +205,17 @@ runs it:
 
 The instructions are the same as on the emulator. The cycles are from the
 board with the pipelined core, beside those of nice_cpu's own testbench
-for the core (`bench/README.md`, at nice_cpu bb8fdb6):
+for the core (`bench/README.md`, at nice_cpu 1a41b0c):
 
 | Phase | Instructions | Cycles on the board | In nice_cpu's testbench |
 |---|---|---|---|
-| `rng64` | 52768 | 83076 | 83076 |
-| `crc32` | 65816 | 83061 | 83061 |
-| `bst` | 310469 | 411949 | 412973 |
-| `heapsort` | 307416 | 385784 | 385784 |
-| `vm` | 840049 | 1220162 | 1220162 |
-| `strings` | 104562 | 163560 | 164125 |
-| total | 1681080 | 2347592 | 2349181 |
+| `rng64` | 52768 | 83082 | 83082 |
+| `crc32` | 65816 | 83067 | 83067 |
+| `bst` | 310469 | 415028 | 416052 |
+| `heapsort` | 307416 | 387338 | 387338 |
+| `vm` | 840049 | 1248168 | 1248168 |
+| `strings` | 104562 | 166363 | 166928 |
+| total | 1681080 | 2383046 | 2384635 |
 
 The board takes the same cycles, or a few less in `bst` and `strings`,
 and at 100 MHz the benchmark runs for about 24 ms.
