@@ -25,7 +25,7 @@ header is the authoritative address map.
     make hwtest           # check the FPGA, program it with openFPGALoader, and test the board
 
 One testbench: `make -C sim tb_kbd` (likewise `tb_hello`, `tb_nicemon`,
-`tb_ps2`, `tb_text`, `synth-nicemon`, ...). By hand: `make -C sim analyse` then, in
+`tb_ps2`, `tb_text`, `synth-nicemon`, ...). By hand: `make -C sim analyze` then, in
 `sim/build/pipeline`, `ghdl --elab-run --std=08 --workdir=. tb_kbd`;
 `tb_nicemon` and `tb_hello` take `-gG_*_FILE=` generics as `sim/Makefile`
 shows, and `tb_text` with `-gG_PPM_FILE=frame.ppm` writes the frame as a
@@ -57,17 +57,21 @@ and `make lint`.
 
 ## Rules and pitfalls
 
-- Behaviour starts in nice_cpu: `doc/ISA.md` for the CPU, `doc/SYSTEM.md`
+- Behavior starts in nice_cpu: `doc/ISA.md` for the CPU, `doc/SYSTEM.md`
   for the devices, the emulator for the rest. This repository follows them,
   never the reverse. The submodule has its own `CLAUDE.md` and tests.
 - After a submodule bump: `make -C nice_cpu/emulator build` (the tools and
   `hwtest` use `nice_cpu/emulator/zig-out/bin/niceemu`, and a stale binary
-  checks old behaviour), `make -j test`, a look at the "Compared with the
+  checks old behavior), `make -j test`, a look at the "Compared with the
   emulator" table, and a new bitstream, as the core's timing margin at
   100 MHz is small.
 - A bitstream with a ROM boots from it. The tools hide it with bit 3 of the
   control register (`W FFFFFFF0 0000000D` to hold, clear, and hide, then
   `00000008` to run), so a program loads at 0 as in the emulator.
+- American spelling everywhere, in comments, documentation, and identifiers
+  (color, analyze, synchronize, behavior). The third-party files that are
+  copied unchanged keep theirs, and so do the names they define, such as
+  the entity `serialiser_10to1_selectio`.
 - Every README is kept in step with the code it describes, in plain short
   sentences with the Oxford comma. Commit subjects are a short sentence;
   the body says what was wrong and what changed.

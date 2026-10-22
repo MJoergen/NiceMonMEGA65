@@ -9,7 +9,7 @@
 -- after both. So the UART output is idle for that long before the CLI sends
 -- its banner, and a terminal that saw the pin change during configuration
 -- has time to find the start of a character.
--- The MMCM's locked output and the button are synchronised to clk_o by two
+-- The MMCM's locked output and the button are synchronized to clk_o by two
 -- registers each, as in MandelbrotMEGA65's clk_rst.vhd.
 
 library ieee;
@@ -44,7 +44,7 @@ architecture synthesis of clk_rst is
    signal counter     : std_logic_vector(19 downto 0) := (others => '1');
    signal rst         : std_logic := '1';
 
-   -- The registers of the synchronisers
+   -- The registers of the synchronizers
    attribute async_reg : string;
    attribute async_reg of locked_sync : signal is "true";
    attribute async_reg of button_sync : signal is "true";

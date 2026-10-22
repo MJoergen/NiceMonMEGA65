@@ -3,7 +3,7 @@
 -- board, which sends it to the FPGA over a serial link. max10.vhd drives the
 -- link, clocked by the 100 MHz board clock. Its reset output is low (active)
 -- only once the button has been pressed for 256 clock cycles. clk_rst.vhd
--- synchronises it, so the button resets the system as on the R6.
+-- synchronizes it, so the button resets the system as on the R6.
 --
 -- The HDMI level shifter (U10 = TPD12S016) differs from the R6's: the +5V
 -- supply of the HDMI connector (CT_HPD) and the output enable of the level

@@ -34,12 +34,12 @@ set_clock_groups -asynchronous \
    -group [get_clocks -of_objects [get_pins i_clk_rst/i_mmcm/CLKOUT0]] \
    -group [get_clocks -of_objects [get_pins i_video_clk/i_mmcm/CLKOUT0]]
 
-## The colour and sync outputs are registered in the IOBs (p_vga in
+## The color and sync outputs are registered in the IOBs (p_vga in
 ## top.vhd), so they all change at the same time.
 set_property IOB TRUE [get_ports {vga_red_o[*] vga_green_o[*] vga_blue_o[*] vga_hs_o vga_vs_o}]
 
 ## The UART, the LED, the keyboard, and the reset button are slow, and
-## synchronised or registered in the design. The registers of the UART, the
+## synchronized or registered in the design. The registers of the UART, the
 ## LED, and the keyboard are in the I/O tiles, so that their timing does not
 ## depend on placement; that of the button is not, as the button is inverted
 ## first.

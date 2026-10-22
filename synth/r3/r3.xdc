@@ -15,7 +15,7 @@ set_property -dict {PACKAGE_PIN M13  IOSTANDARD LVCMOS33} [get_ports {max10_tx_i
 set_false_path -from [get_ports {max10_tx_i}]
 
 ## The reset from the MAX10 is a register clocked by the board clock. It is
-## synchronised to the system clock in clk_rst.vhd, so its paths are not
+## synchronized to the system clock in clk_rst.vhd, so its paths are not
 ## timed.
 set_false_path -from [get_cells i_max10/reset_button_reg]
 

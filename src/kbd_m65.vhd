@@ -2,14 +2,14 @@
 -- which scans the keys and drives the two LEDs. This driver talks to it over
 -- three pins, the same on the R3 and the R6 boards: a clock and a data line
 -- to the keyboard, and a data line from it. It reports which keys are
--- pressed, and sets the colour of the LEDs. It is written after
+-- pressed, and sets the color of the LEDs. It is written after
 -- mega65kbd_to_matrix.vhdl of MiSTer2MEGA65, by Paul Gardner-Stephen and
 -- sy2002, with the same timing on the pins.
 --
 -- THEORY OF OPERATION
 -- The clock to the keyboard runs at 312.5 kHz. A frame is 141 of its
 -- periods, numbered by phase:
--- * In phases 0 to 126 the driver sends the LED colours, one bit in each
+-- * In phases 0 to 126 the driver sends the LED colors, one bit in each
 --   period, and the keyboard sends the state of one key in each period, low
 --   when the key is pressed. The bit from the keyboard is sampled just before
 --   the rising edge of the clock, and the bit to it changes after the falling
@@ -28,8 +28,8 @@
 -- matrix_o has bit n set while key n is pressed. It changes once in each
 -- frame, after phase 79, so about every 0.45 ms.
 --
--- The LED colours are 24 bits of RGB each. The keyboard takes each LED's
--- colour twice, for its left and right halves, in the order BGR.
+-- The LED colors are 24 bits of RGB each. The keyboard takes each LED's
+-- color twice, for its left and right halves, in the order BGR.
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -46,7 +46,7 @@ entity kbd_m65 is
       -- Bit n is set while key n is pressed
       matrix_o    : out std_logic_vector(79 downto 0);
 
-      -- RGB colours of the LEDs, 0 for off
+      -- RGB colors of the LEDs, 0 for off
       power_rgb_i : in  std_logic_vector(23 downto 0);
       drive_rgb_i : in  std_logic_vector(23 downto 0);
 
@@ -71,7 +71,7 @@ architecture synthesis of kbd_m65 is
    signal sync    : std_logic := '0';
    signal phase   : natural range 0 to C_LAST_PHASE := 0;
 
-   -- The input, synchronised
+   -- The input, synchronized
    signal data_in : std_logic_vector(1 downto 0) := "11";
    attribute async_reg : string;
    attribute async_reg of data_in : signal is "TRUE";

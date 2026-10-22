@@ -47,7 +47,7 @@ as the NICE CPU allows.
   `0xFFFFFF00`. A read returns 0 while no byte has arrived, so the monitor
   polls, which works in the emulator too, where a read waits.
 - The screen is memory at `0xFFFF0000`, one word per character with its
-  colour, so the VGA library writes the words directly where QMON writes a
+  color, so the VGA library writes the words directly where QMON writes a
   register. The hardware has what QMON's VGA library needs for the rest: a
   cursor, and a display offset over 32768 words for scrolling back, in
   registers numbered as QNICE-FPGA's VGA registers (`0xFFFFFF80` for

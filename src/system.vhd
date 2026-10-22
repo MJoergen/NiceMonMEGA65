@@ -1,15 +1,15 @@
 -- The part of every board's top level that does not depend on the board: the
 -- NiceMon system (nicemon.vhd) and the text display of its screen
--- (video/text.vhd), with the UART pins synchronised and registered. The
+-- (video/text.vhd), with the UART pins synchronized and registered. The
 -- board level makes the clocks and resets, drives the keyboard, if the board
 -- has one, and turns the video output into the board's VGA or HDMI signals.
 --
 -- THEORY OF OPERATION
--- The UART input passes through two registers, a synchroniser, and the UART
+-- The UART input passes through two registers, a synchronizer, and the UART
 -- output through one, so that it changes only on the clock edge. The video
--- output is that of text.vhd, in the VGA clock domain: 8 bits per colour,
+-- output is that of text.vhd, in the VGA clock domain: 8 bits per color,
 -- the two sync signals with the polarity of G_VIDEO, and vga_de_o, which is
--- '1' in the visible area. A board with fewer bits per colour takes the top
+-- '1' in the visible area. A board with fewer bits per color takes the top
 -- ones. The keyboard input is a stream of ASCII bytes, as kbd_ascii.vhd
 -- sends them; a board without a keyboard holds kbd_valid_i at '0'.
 --
@@ -84,7 +84,7 @@ architecture synthesis of system is
 
 begin
 
-   -- Synchronise the UART input, and register the output.
+   -- Synchronize the UART input, and register the output.
    p_uart : process (clk_i)
    begin
       if rising_edge(clk_i) then

@@ -5,14 +5,14 @@
 --             gives the 108 MHz of 1280x1024 @ 60 Hz exactly
 --   vga_clk   1080 MHz / 10 = 108 MHz, the pixel clock
 --   tmds_clk  1080 MHz / 2 = 540 MHz, five times the pixel clock, for the
---             HDMI serialisers of the MEGA65, which send ten bits per pixel
+--             HDMI serializers of the MEGA65, which send ten bits per pixel
 --             on both edges. The Nexys4DDR has no HDMI, and leaves it open.
 -- The video has its own MMCM so that the system clock stays at 100 MHz on
 -- the MEGA65, which 1080 MHz does not divide to.
 --
 -- RESET
 -- vga_rst_o is held while the MMCM is not locked, and for 8 cycles after.
--- The MMCM's locked output is synchronised to vga_clk by two registers, as
+-- The MMCM's locked output is synchronized to vga_clk by two registers, as
 -- in MandelbrotMEGA65's clk_rst.vhd. The reset button does not reset the
 -- video.
 
@@ -43,7 +43,7 @@ architecture synthesis of video_clk is
    signal locked_sync : std_logic_vector(1 downto 0) := "00";
    signal rst_delay   : std_logic_vector(7 downto 0) := (others => '1');
 
-   -- The registers of the synchroniser
+   -- The registers of the synchronizer
    attribute async_reg : string;
    attribute async_reg of locked_sync : signal is "true";
 

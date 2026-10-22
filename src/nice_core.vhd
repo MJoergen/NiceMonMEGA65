@@ -2,7 +2,7 @@
 -- ports are those of nice_cpu's pipeline and multicycle, and the
 -- architecture comes from one of the files in src/core/, which the build
 -- picks with NICE=pipeline or NICE=multi (core.mk). So only that core is
--- analysed, and no generic has to reach it from the top level.
+-- analyzed, and no generic has to reach it from the top level.
 
 library ieee;
    use ieee.std_logic_1164.all;

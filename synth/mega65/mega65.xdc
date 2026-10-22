@@ -13,20 +13,20 @@ set_clock_groups -asynchronous \
    -group [get_clocks -of_objects [get_pins i_mega65/i_clk_rst/i_mmcm/CLKOUT0]] \
    -group [get_clocks -of_objects [get_pins {i_mega65/i_video_clk/i_mmcm/CLKOUT0 i_mega65/i_video_clk/i_mmcm/CLKOUT1}]]
 
-## The colour and sync outputs to the video DAC are registered in the IOBs
+## The color and sync outputs to the video DAC are registered in the IOBs
 ## (p_vdac in mega65.vhd), so they all change at the same time, half a VGA
 ## clock cycle before the DAC samples them. The HDMI outputs are OSERDES and
 ## the DAC clock an ODDR, which are in the IOBs anyway.
 set_property IOB TRUE [get_ports {vga_red_o[*] vga_green_o[*] vga_blue_o[*] vga_hs_o vga_vs_o}]
 
-## The UART, the LED, and the reset button are slow, and synchronised or
+## The UART, the LED, and the reset button are slow, and synchronized or
 ## registered in the design.
 set_false_path -from [get_ports {uart_rxd_i}]
 set_false_path -to   [get_ports {uart_txd_o}]
 set_false_path -to   [get_ports {led_o}]
 
 ## The keyboard, on the same pins on all boards (M2M/MEGA65-R3.xdc and
-## MEGA65-R6.xdc). Its clock is 312.5 kHz, and its input is synchronised.
+## MEGA65-R6.xdc). Its clock is 312.5 kHz, and its input is synchronized.
 set_property -dict {PACKAGE_PIN A14  IOSTANDARD LVCMOS33} [get_ports {kb_io0_o}];  # KB_IO1
 set_property -dict {PACKAGE_PIN A13  IOSTANDARD LVCMOS33} [get_ports {kb_io1_o}];  # KB_IO2
 set_property -dict {PACKAGE_PIN C13  IOSTANDARD LVCMOS33} [get_ports {kb_io2_i}];  # KB_IO3

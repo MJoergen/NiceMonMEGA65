@@ -2,20 +2,20 @@
 --
 -- THEORY OF OPERATION
 -- p_write fills the screen through the write port, in the system clock
--- domain: a line of text in white on black, a line in the colour of
--- print.nasm, the 256 codes in many colours, and the 48 words after the 2000
+-- domain: a line of text in white on black, a line in the color of
+-- print.nasm, the 256 codes in many colors, and the 48 words after the 2000
 -- of the screen, which must not show at a display offset of 0. It keeps a
 -- model of the screen.
 --
 -- The VGA clock starts when p_write is done, so the first frame shows all
 -- the writes. p_check checks that whole frame in the VGA clock
 -- domain: the number of visible pixels in each line and of visible lines,
--- the widths of the sync pulses, and the colour of every visible pixel, as
+-- the widths of the sync pulses, and the color of every visible pixel, as
 -- the model and the font (font_pkg.vhd) give it. With G_PPM_FILE it also
 -- writes the frame as a PPM picture. Then, in the vertical blanking after
 -- that frame, it sets the display offset to one row and puts the cursor on
 -- row 3, and checks the first four rows of text of the next frame: they show
--- the words from 80, and the cursor swaps the colours of its character. It
+-- the words from 80, and the cursor swaps the colors of its character. It
 -- stops there, for each frame takes about half a minute to simulate.
 
 library ieee;
@@ -64,7 +64,7 @@ architecture simulation of tb_text is
    signal green : std_logic_vector(7 downto 0);
    signal blue  : std_logic_vector(7 downto 0);
 
-   -- The colour (RGB, 8 bits each) that the pixel (x, y) of the visible area
+   -- The color (RGB, 8 bits each) that the pixel (x, y) of the visible area
    -- must have, with the display offset disp and, when cursor is true, the
    -- cursor at (cx, cy)
    function expected(scr    : t_scr;
@@ -148,14 +148,14 @@ begin
          scr_we <= '0';
       end procedure put;
 
-      procedure print(addr : natural; s : string; colour : std_logic_vector(23 downto 0)) is
+      procedure print(addr : natural; s : string; color : std_logic_vector(23 downto 0)) is
       begin
          for i in s'range loop
-            put(addr + i - s'low, colour & to_slv(character'pos(s(i)), 8));
+            put(addr + i - s'low, color & to_slv(character'pos(s(i)), 8));
          end loop;
       end procedure print;
 
-      variable colour_v : std_logic_vector(23 downto 0);
+      variable color_v : std_logic_vector(23 downto 0);
    begin
       wait until rising_edge(clk);
       print(0, "NiceMon on the MEGA65: 80x25 characters, white on black.", X"000FFF");
@@ -163,10 +163,10 @@ begin
       -- The last column of a row, and the last word of the screen
       print(80 + 79, "!", X"000E00");
       print(1999, "#", X"031C00");
-      -- The 256 codes, from row 4, in colours from the code and the row
+      -- The 256 codes, from row 4, in colors from the code and the row
       for i in 0 to 20 * 80 - 1 loop
-         colour_v := to_slv((i * 40503) mod 2 ** 24, 24);
-         put(4 * 80 + i, colour_v & to_slv(i mod 256, 8));
+         color_v := to_slv((i * 40503) mod 2 ** 24, 24);
+         put(4 * 80 + i, color_v & to_slv(i mod 256, 8));
       end loop;
       -- Words beyond the screen
       for i in 2000 to 2047 loop

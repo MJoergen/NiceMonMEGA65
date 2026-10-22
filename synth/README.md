@@ -14,7 +14,7 @@ text display of its screen, with the UART's pins. [common/](common/) holds
 the rest that every board shares, as all have a 100 MHz clock and a 7-series
 FPGA: the clock and reset (`clk_rst.vhd`, an MMCM that makes the system
 clock), and the video clocks (`video_clk.vhd`, a second MMCM that makes the
-108 MHz pixel clock and the 540 MHz clock of the HDMI serialisers).
+108 MHz pixel clock and the 540 MHz clock of the HDMI serializers).
 [Makefile.inc](Makefile.inc) is the build; each board's `Makefile` gives it
 the part, the board's sources, and its constraints.
 
@@ -65,8 +65,8 @@ three ways:
 - Its FPGA is speed grade -1, where the MEGA65's is -2, so the system clock
   is 90 MHz, not 100 MHz; at 100 MHz the pipelined core misses timing by a
   few tenths of a nanosecond or less, as placement varies. The UART runs at 115200 baud as on the MEGA65.
-- Its VGA output has 4 bits per colour, from resistors, and there is no
-  HDMI. The screen's colours have 4 bits per colour, so they show
+- Its VGA output has 4 bits per color, from resistors, and there is no
+  HDMI. The screen's colors have 4 bits per color, so they show
   as on the MEGA65.
 
 ## Building
@@ -77,7 +77,7 @@ To build, with Vivado installed in `/opt/Xilinx/2025.1/Vivado` (or set
     make -C synth/r6
 
 or `make r6` in the top directory, and likewise for `r3` and `nexys4ddr`.
-The bitstream is `synth/r6/build/top.bit`, with timing and utilisation
+The bitstream is `synth/r6/build/top.bit`, with timing and utilization
 reports next to it. Its core waits for the command line. With
 
     make -C synth/r6 ROM=/path/to/monitor.bin
@@ -128,9 +128,9 @@ build ran while the machine was busy with other work, so its times are much
 longer than the earlier 5:24. The times vary from build to build: one R6 pipelined build spent 9:36 in synthesis, with the same result,
 and took 12:49 in all.
 
-The utilisation is from `build/utilization.rpt`, and the split by module
+The utilization is from `build/utilization.rpt`, and the split by module
 from `report_utilization -hierarchical` on `build/top.dcp`. These are the
-numbers without `ROM=`, at commit cb95968 with the colour format of the
+numbers without `ROM=`, at commit cb95968 with the color format of the
 screen, in LUTs and flip-flops. The Nexys4DDR pipelined column is from the
 build at 0267298, which adds the PS/2 keyboard:
 
@@ -183,5 +183,5 @@ The block RAMs, of 36 Kbit, are these:
 | Total with the ROM, pipelined | 164.5 | 116.5 |
 
 The copy of the screen keeps all 32 bits, as the display reads the
-character and both 12-bit colours, so it takes as many block RAMs as the
+character and both 12-bit colors, so it takes as many block RAMs as the
 screen. The multi-cycle core adds half of one more, its RAMB18.

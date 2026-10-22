@@ -23,7 +23,7 @@ and VGA for the screen (see [synth/](synth/README.md#the-nexys4ddr)).
 | [src/core/](src/core/) | `nice_core_pipeline.vhd` and `nice_core_multi.vhd`, the two architectures of `nice_core`. `src/nice_core.vhd` is the entity that wraps whichever of nice_cpu's cores `core.mk` selects with `NICE=pipeline` (the default) or `NICE=multi`. |
 | [src/video/](src/video/) | The text display: `text.vhd` shows the screen at `0xFFFF0000` as 80×25 characters on a video output, with a cursor and a display offset for scrolling. `pix.vhd` and `video_pkg.vhd` are from [MandelbrotMEGA65](https://github.com/MJoergen/MandelbrotMEGA65), and `scr_ram.vhd` is the screen's dual-clock memory, and `font_pkg.vhd` is the [Spleen](https://github.com/fcambus/spleen) 16×32 font, made by `font/gen_font_pkg.py`. |
 | [font/](font/) | The script that makes `src/video/font_pkg.vhd` from Spleen, and Spleen's license (BSD 2-Clause). |
-| [sim/](sim/) | The GHDL testbenches. `text_synth.vhd` is the wrapper with which GHDL checks that the display synthesises. |
+| [sim/](sim/) | The GHDL testbenches. `text_synth.vhd` is the wrapper with which GHDL checks that the display synthesizes. |
 | [formal/](formal/) | The formal checks, for SymbiYosys. |
 | [synth/](synth/README.md) | The Vivado builds for the MEGA65 R3 and R6 boards, and the Nexys4DDR. |
 | [monitor/](monitor/README.md) | The monitor, in NICE assembly: planned, not written yet. Its README has the decisions it will follow, QNICE-FPGA's. |
@@ -281,7 +281,7 @@ The screen at `0xFFFF0000` is shown on the VGA connector and on the HDMI
 connector, at 1280×1024 and 60 Hz, as 80 columns and 25 rows of
 characters of 16×32 pixels, in the middle of the picture. Word `80 * row +
 column` is one character: its code, ISO 8859-1, in bits 7..0, and its
-colour above. The colour is two 12-bit colours, red, green, and blue with 4
+color above. The color is two 12-bit colors, red, green, and blue with 4
 bits each, as in nice_cpu's `doc/SYSTEM.md` §1: the background in bits
 31..20 and the foreground in bits 19..8. A component `n` gives the byte
 `n × 0x11`, so `0xF` is full intensity and `0x0` is none. The foreground is
@@ -294,7 +294,7 @@ The screen's memory is 32768 words, `0xFFFF0000`–`0xFFFF7FFF`, of which the
 display shows 2000 from the display offset, so a program scrolls by adding
 80 to the offset and writing the next row after the rows shown, and scrolls
 back by taking 80 away, as the QNICE monitor does. The offset wraps at the
-end of the memory. The display also has a cursor, which swaps the colours
+end of the memory. The display also has a cursor, which swaps the colors
 of its character. The registers are numbered as the VGA registers of
 QNICE-FPGA, at `0xFF30` there:
 
@@ -442,7 +442,7 @@ You need GHDL (tested with 4.1.0) and Python 3.
   pixel of one 1280×1024 frame, and the sync pulses; then it scrolls the
   display one row, shows the cursor, and checks the first four rows of the
   next frame. It takes under a minute, the longest of the tests.
-- `make test` also checks that GHDL can synthesise the system, with
+- `make test` also checks that GHDL can synthesize the system, with
   `sim/rom.nasm` as its ROM and without a ROM, the keyboards, the text
   display, and `src/system.vhd` with the screen of the Nexys4DDR.
 - `make -j test` runs all these side by side, in the time of `tb_text`.

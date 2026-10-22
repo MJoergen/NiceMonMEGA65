@@ -16,9 +16,9 @@
 --   clock is 90 MHz, not 100 MHz. At 100 MHz the pipelined core misses
 --   timing by a few tenths of a nanosecond or less, which placement
 --   changes from run to run.
--- * The VGA output is a resistor DAC with 4 bits per colour, and no HDMI.
---   The screen's colours have 4 bits per colour (text.vhd), so the
---   top 4 bits of each lose nothing. The colour and sync outputs are
+-- * The VGA output is a resistor DAC with 4 bits per color, and no HDMI.
+--   The screen's colors have 4 bits per color (text.vhd), so the
+--   top 4 bits of each lose nothing. The color and sync outputs are
 --   registered in the IOBs (nexys4ddr.xdc), so they all change at the same
 --   time.
 -- The reset button, CPU_RESETN, is active low.
@@ -46,7 +46,7 @@ entity top is
       ps2_clk_i   : in  std_logic;
       ps2_data_i  : in  std_logic;
 
-      -- VGA, 4 bits per colour
+      -- VGA, 4 bits per color
       vga_red_o   : out std_logic_vector(3 downto 0);
       vga_green_o : out std_logic_vector(3 downto 0);
       vga_blue_o  : out std_logic_vector(3 downto 0);
@@ -79,7 +79,7 @@ architecture synthesis of top is
    signal vga_blue  : std_logic_vector(7 downto 0);
 
    -- The registers of the VGA outputs, in the IOBs (IOB TRUE on their ports,
-   -- in nexys4ddr.xdc). keep stops synthesis from merging equal colour
+   -- in nexys4ddr.xdc). keep stops synthesis from merging equal color
    -- registers, which could then not all be in the IOBs.
    signal vga_red_r   : std_logic_vector(3 downto 0);
    signal vga_green_r : std_logic_vector(3 downto 0);

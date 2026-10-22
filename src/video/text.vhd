@@ -7,7 +7,7 @@
 -- The screen is the 2^G_SCR_ADDR_BITS words at 0xFFFF0000 (src/nicemon.vhd),
 -- 32768 on the boards, of which the first 2000 are the emulator's 80x25
 -- characters, row by row. Each word is a character in bits 7..0 and its
--- colour above (nice_cpu's runtime/ABI.md, nice_screen_put). This module keeps
+-- color above (nice_cpu's runtime/ABI.md, nice_screen_put). This module keeps
 -- a copy of the screen in a memory of its own (scr_ram.vhd), with a write
 -- port in the system clock domain, which takes every write to the screen
 -- (scr_*_i), and a read port in the VGA clock domain. So the copy is a
@@ -19,7 +19,7 @@
 -- at column cur_x_i and row cur_y_i of the display, and cur_mode_i says how
 -- it is shown: bit 0 shows it, bit 1 makes it blink, about twice a second,
 -- and bit 2 makes it small, the bottom 4 lines of the character, where it is
--- otherwise the whole character. The cursor swaps the colours of its
+-- otherwise the whole character. The cursor swaps the colors of its
 -- character. These values are the screen's registers of nicemon.vhd, in the
 -- system clock domain, and ctl_we_i is '1' for a cycle when one of them is
 -- written. They cross to the VGA clock domain through a handshake: the
@@ -30,8 +30,8 @@
 --
 -- The characters are 16x32 pixels, from the Spleen font (font_pkg.vhd), with
 -- the 256 codes of ISO 8859-1. So the text is 1280x800 pixels, in the middle
--- of the visible area, which is black around it. The colour of a word is
--- two colours of 12 bits, red, green, and blue with 4 bits each: the
+-- of the visible area, which is black around it. The color of a word is
+-- two colors of 12 bits, red, green, and blue with 4 bits each: the
 -- background in bits 31..20, and the foreground in bits 19..8 (nice_cpu's
 -- doc/SYSTEM.md §1). Each 4-bit component n becomes the byte n * 0x11, so 0xF
 -- is full intensity and 0x0 is none. The foreground is not inverted, as it is
@@ -42,12 +42,12 @@
 --   1: the position in the text, the address of the character, with the
 --      display offset, and whether it is the cursor's
 --   2: the word of the character, read from the copy of the screen
---   3: the row of the glyph, read from the font, and the colours, swapped
+--   3: the row of the glyph, read from the font, and the colors, swapped
 --      for the cursor
---   4: the colour of the pixel, and the outputs
+--   4: the color of the pixel, and the outputs
 -- The sync signals and the visible area go through the same stages, so the
 -- outputs all belong to the same pixel. The outputs are registers, with
--- the colour 0 outside the visible area.
+-- the color 0 outside the visible area.
 --
 -- RESET
 -- None. The copy of the screen starts as zeros, as the screen does, the
@@ -168,10 +168,10 @@ architecture synthesis of text is
    signal col_3   : std_logic_vector(3 downto 0) := (others => '0');
 
    -- Stage 4
-   signal hs_4     : std_logic := not G_MODE.sync_active;
-   signal vs_4     : std_logic := not G_MODE.sync_active;
-   signal de_4     : std_logic := '0';
-   signal colour_4 : std_logic_vector(11 downto 0) := (others => '0');
+   signal hs_4    : std_logic := not G_MODE.sync_active;
+   signal vs_4    : std_logic := not G_MODE.sync_active;
+   signal de_4    : std_logic := '0';
+   signal color_4 : std_logic_vector(11 downto 0) := (others => '0');
 
 begin
 
@@ -315,7 +315,7 @@ begin
          line_2 <= line_1;
          col_2  <= col_1;
 
-         -- Stage 3. The cursor swaps the colours of its character.
+         -- Stage 3. The cursor swaps the colors of its character.
          glyph_3 <= C_FONT(to_integer(word_2(7 downto 0) & line_2));
          fg_v := word_2(19 downto 8);
          bg_v := word_2(31 downto 20);
@@ -343,12 +343,12 @@ begin
          col_3  <= col_2;
 
          -- Stage 4. The leftmost pixel of the glyph is its bit 15.
-         colour_4 <= (others => '0');
+         color_4 <= (others => '0');
          if text_3 = '1' then
             if glyph_3(C_CHAR_WIDTH - 1 - to_integer(col_3)) = '1' then
-               colour_4 <= fg_3;
+               color_4 <= fg_3;
             else
-               colour_4 <= bg_3;
+               color_4 <= bg_3;
             end if;
          end if;
          de_4 <= vis_3;
@@ -362,8 +362,8 @@ begin
    vga_hs_o    <= hs_4;
    vga_vs_o    <= vs_4;
    vga_de_o    <= de_4;
-   vga_red_o   <= colour_4(11 downto 8) & colour_4(11 downto 8);
-   vga_green_o <= colour_4(7 downto 4) & colour_4(7 downto 4);
-   vga_blue_o  <= colour_4(3 downto 0) & colour_4(3 downto 0);
+   vga_red_o   <= color_4(11 downto 8) & color_4(11 downto 8);
+   vga_green_o <= color_4(7 downto 4) & color_4(7 downto 4);
+   vga_blue_o  <= color_4(3 downto 0) & color_4(3 downto 0);
 
 end architecture synthesis;

@@ -17,7 +17,7 @@ paths:
   Nexys4DDR's -1 part; a nice_cpu change can take that margin away. The
   worst paths are usually in nice_cpu's WRITE and FETCH stages, so a fix
   belongs there, not here.
-- `synth/README.md` records the build times, the utilisation, and the slack
+- `synth/README.md` records the build times, the utilization, and the slack
   of each board; update it with a build that changes them.
 - A dual-clock memory must be an entity of its own (`src/video/scr_ram.vhd`
   is the model); grep `build/vivado.log` for `Synth 8-6849` after changing

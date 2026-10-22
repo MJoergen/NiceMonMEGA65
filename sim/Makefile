@@ -1,6 +1,6 @@
 # Simulation of NiceMonMEGA65 with GHDL.
 #
-# make test   assembles the test programs, analyses the NICE core from the
+# make test   assembles the test programs, analyzes the NICE core from the
 #             nice_cpu submodule, the sources in ../src, and the testbenches,
 #             and runs them:
 #             tb_hello    the core alone. The console output must equal
@@ -12,7 +12,7 @@
 #             tb_ps2      the PS/2 keyboard receiver and its ASCII mapping.
 #             tb_text     the text display: one frame of 1280x1024, every
 #                         pixel checked.
-#             It also checks that GHDL can synthesise the system, the
+#             It also checks that GHDL can synthesize the system, the
 #             keyboards, the text display (through text_synth.vhd, in
 #             the boards' mode), and system.vhd as the Nexys4DDR has it.
 #             With -j these all run side by side, and the test takes as
@@ -45,65 +45,65 @@ SRC_SOURCES  = ../src/uart_serdes.vhd ../src/line_buffer.vhd ../src/cmd.vhd ../s
                ../src/system.vhd
 SOURCES      = $(SRC_SOURCES) text_synth.vhd tb_hello.vhd tb_nicemon.vhd tb_kbd.vhd tb_ps2.vhd tb_text.vhd
 
-.PHONY: test analyse synth clean tb_hello tb_nicemon tb_kbd tb_ps2 tb_text \
+.PHONY: test analyze synth clean tb_hello tb_nicemon tb_kbd tb_ps2 tb_text \
         synth-nicemon synth-nicemon-norom synth-kbd_m65 synth-kbd_ascii synth-kbd_ps2 \
         synth-kbd_ps2_ascii synth-text \
         synth-system
 
 # Each testbench and each synthesis check is a target of its own, so that
 # "make -j test" runs them side by side. They share the work library of
-# $(BUILD), which "analyse" writes first and they only read.
+# $(BUILD), which "analyze" writes first and they only read.
 test: synth tb_hello tb_nicemon tb_kbd tb_ps2 tb_text
 
 BINS = hello rom echo fifo devices emu reserved eof
 
-tb_hello: analyse $(BUILD)/hello.bin
+tb_hello: analyze $(BUILD)/hello.bin
 	@(cd $(BUILD) && $(GHDL) --elab-run $(GHDLFLAGS) tb_hello \
 	  -gG_BIN_FILE=hello.bin -gG_OUT_FILE=hello.out > tb_hello.log 2>&1) || \
 	  (echo "FAIL tb_hello"; cat $(BUILD)/tb_hello.log; exit 1)
 	@if cmp -s hello.expected $(BUILD)/hello.out; then echo "PASS tb_hello"; \
 	else echo "FAIL tb_hello"; diff hello.expected $(BUILD)/hello.out; exit 1; fi
 
-tb_nicemon: analyse $(addprefix $(BUILD)/,$(addsuffix .bin,$(BINS)))
+tb_nicemon: analyze $(addprefix $(BUILD)/,$(addsuffix .bin,$(BINS)))
 	@(cd $(BUILD) && $(GHDL) --elab-run $(GHDLFLAGS) tb_nicemon \
 	  -gG_HELLO_FILE=hello.bin -gG_ROM_FILE=rom.bin -gG_ECHO_FILE=echo.bin -gG_FIFO_FILE=fifo.bin -gG_DEVICES_FILE=devices.bin -gG_EMU_FILE=emu.bin -gG_RESERVED_FILE=reserved.bin -gG_EOF_FILE=eof.bin > tb_nicemon.log 2>&1) && \
 	  echo "PASS tb_nicemon" || (echo "FAIL tb_nicemon"; cat $(BUILD)/tb_nicemon.log; exit 1)
 
-tb_kbd tb_ps2 tb_text: analyse
+tb_kbd tb_ps2 tb_text: analyze
 	@(cd $(BUILD) && $(GHDL) --elab-run $(GHDLFLAGS) $@ > $@.log 2>&1) && \
 	  echo "PASS $@" || (echo "FAIL $@"; cat $(BUILD)/$@.log; exit 1)
 
-# Checks that GHDL can synthesise the system, with rom.bin as its ROM and
+# Checks that GHDL can synthesize the system, with rom.bin as its ROM and
 # without a ROM, and the keyboards, as nice_cpu does for its core, the text
 # display, and system.vhd with the screen of the Nexys4DDR.
 synth: synth-nicemon synth-nicemon-norom synth-kbd_m65 synth-kbd_ascii synth-kbd_ps2 synth-kbd_ps2_ascii \
        synth-text synth-system
 
-synth-nicemon: analyse $(BUILD)/rom.bin
+synth-nicemon: analyze $(BUILD)/rom.bin
 	@(cd $(BUILD) && $(GHDL) --synth $(GHDLFLAGS) -gG_CLOCK_HZ=50000000 -gG_ROM_FILE=rom.bin nicemon > nicemon_synth.vhd 2> nicemon_synth.log) && \
 	  echo "PASS synth nicemon" || (echo "FAIL synth nicemon"; cat $(BUILD)/nicemon_synth.log; exit 1)
 
-synth-nicemon-norom: analyse
+synth-nicemon-norom: analyze
 	@(cd $(BUILD) && $(GHDL) --synth $(GHDLFLAGS) -gG_CLOCK_HZ=50000000 nicemon > nicemon_norom_synth.vhd 2> nicemon_norom_synth.log) && \
 	  echo "PASS synth nicemon without a ROM" || (echo "FAIL synth nicemon without a ROM"; cat $(BUILD)/nicemon_norom_synth.log; exit 1)
 
-synth-kbd_m65 synth-kbd_ascii synth-kbd_ps2: synth-%: analyse
+synth-kbd_m65 synth-kbd_ascii synth-kbd_ps2: synth-%: analyze
 	@(cd $(BUILD) && $(GHDL) --synth $(GHDLFLAGS) -gG_CLOCK_HZ=50000000 $* > $*_synth.vhd 2> $*_synth.log) && \
 	  echo "PASS synth $*" || (echo "FAIL synth $*"; cat $(BUILD)/$*_synth.log; exit 1)
 
-synth-kbd_ps2_ascii: analyse
+synth-kbd_ps2_ascii: analyze
 	@(cd $(BUILD) && $(GHDL) --synth $(GHDLFLAGS) kbd_ps2_ascii > kbd_ps2_ascii_synth.vhd 2> kbd_ps2_ascii_synth.log) && \
 	  echo "PASS synth kbd_ps2_ascii" || (echo "FAIL synth kbd_ps2_ascii"; cat $(BUILD)/kbd_ps2_ascii_synth.log; exit 1)
 
-synth-text: analyse
+synth-text: analyze
 	@(cd $(BUILD) && $(GHDL) --synth $(GHDLFLAGS) text_synth > text_synth.vhd 2> text_synth.log) && \
 	  echo "PASS synth text" || (echo "FAIL synth text"; cat $(BUILD)/text_synth.log; exit 1)
 
-synth-system: analyse
+synth-system: analyze
 	@(cd $(BUILD) && $(GHDL) --synth $(GHDLFLAGS) -gG_CLOCK_HZ=80000000 -gG_SCR_ADDR_BITS=13 system > system_synth.vhd 2> system_synth.log) && \
 	  echo "PASS synth system" || (echo "FAIL synth system"; cat $(BUILD)/system_synth.log; exit 1)
 
-analyse: | $(BUILD)
+analyze: | $(BUILD)
 	@cd $(BUILD) && $(GHDL) -a $(GHDLFLAGS) $(addprefix ../../,$(NICE_SOURCES) $(NICE_SIM) $(SOURCES))
 
 $(BUILD)/hello.bin: $(NICE_DIR)/doc/intro/examples/hello.nasm $(ASM_PY) | $(BUILD)

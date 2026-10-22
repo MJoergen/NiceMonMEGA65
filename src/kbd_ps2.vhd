@@ -11,7 +11,7 @@
 -- bits of the byte, LSB first, an odd parity bit, and a stop bit (1). The
 -- receiver takes a bit at each falling edge of the clock.
 --
--- Both lines are synchronised, and the clock is filtered: it counts as low
+-- Both lines are synchronized, and the clock is filtered: it counts as low
 -- or high only once it has been so for 1 us, so that a glitch or a slow
 -- edge does not count as an edge. A frame whose start, parity, or stop bit
 -- is wrong is dropped. If the clock stops for 200 us within a frame, the
@@ -52,7 +52,7 @@ architecture synthesis of kbd_ps2 is
    constant C_FILTER  : natural := G_CLOCK_HZ / 1_000_000 + 1;
    constant C_TIMEOUT : natural := G_CLOCK_HZ / 5_000;
 
-   -- The pins, synchronised
+   -- The pins, synchronized
    signal clk_sync  : std_logic_vector(1 downto 0) := "11";
    signal data_sync : std_logic_vector(1 downto 0) := "11";
    attribute async_reg : string;

@@ -8,15 +8,15 @@
 -- The screen is shown as 80x25 characters (src/video/text.vhd) at 1280x1024
 -- @ 60 Hz, on the VGA connector and on the HDMI connector. The video, the
 -- video DAC, and the HDMI output are as in MandelbrotMEGA65's mega65.vhd:
--- * The VGA output goes through a video DAC with 8 bits per colour. The DAC
+-- * The VGA output goes through a video DAC with 8 bits per color. The DAC
 --   samples on the rising edge of its clock, which is the VGA clock
---   inverted, so in the middle of each pixel. The colour and the sync
+--   inverted, so in the middle of each pixel. The color and the sync
 --   signals are registered in the IOBs, so they all change at the same time,
 --   half a clock cycle (4.6 ns) before the DAC samples them.
 -- * The HDMI output is in DVI mode (no audio and no InfoFrames), because
 --   1280x1024 is not a CEA-861 video mode. vga_to_hdmi.vhd (in hdmi/, from
 --   The Tyto Project) encodes the picture to TMDS symbols, and the
---   serialisers send them with the TMDS clock (540 MHz, on both edges).
+--   serializers send them with the TMDS clock (540 MHz, on both edges).
 -- The clocks of the video come from their own MMCM (video_clk.vhd).
 
 library ieee;
@@ -100,7 +100,7 @@ architecture synthesis of mega65 is
    signal hdmi_tmds : slv_9_0_t(0 to 2);
 
    -- The registers of the outputs to the DAC, in the IOBs (IOB TRUE on their
-   -- ports, in mega65.xdc). keep stops synthesis from merging equal colour
+   -- ports, in mega65.xdc). keep stops synthesis from merging equal color
    -- registers, which could then not all be in the IOBs.
    signal vdac_red_r   : std_logic_vector(7 downto 0);
    signal vdac_green_r : std_logic_vector(7 downto 0);
@@ -241,7 +241,7 @@ begin
 -- vsg_on
 
    vdac_sync_n_o  <= '0';  -- No sync on green
-   vdac_blank_n_o <= '1';  -- The colour is black outside the visible area
+   vdac_blank_n_o <= '1';  -- The color is black outside the visible area
 
 
    ---------------------------------------------------------------------------
