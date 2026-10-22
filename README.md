@@ -20,15 +20,20 @@ and VGA for the screen (see [synth/](synth/README.md#the-nexys4ddr)).
 |---|---|
 | [nice_cpu/](https://github.com/MJoergen/nice_cpu) | The NICE CPU, its assembler, its emulator, and `nicewasm`, a [translator](https://github.com/MJoergen/nice_cpu/tree/main/translator) from WebAssembly to NICE assembly, as a git submodule. |
 | [src/](src/) | The synthesisable VHDL, shared by both boards. `nicemon.vhd` is the system: the NICE core, the memory (`ram.vhd` and `rom.vhd`), the UART, the core's input FIFO (`rx_fifo.vhd`), and the command line interpreter. `uart_serdes.vhd` (with fixes to its receiver, and break detection), `line_buffer.vhd` and `cmd.vhd` are copied from cmod-s7; `cmd.vhd` prints `NICE` instead of `WBUS` at reset, and `HALT` when the core halts. `kbd_m65.vhd` drives the MEGA65 keyboard, and `kbd_ascii.vhd` turns its keys into ASCII. `kbd_ps2.vhd` receives a PS/2 keyboard, the Nexys4DDR's, and `kbd_ps2_ascii.vhd` turns its scan codes into ASCII. `system.vhd` is what every board has: the system, the text display of its screen, and the UART's pins. |
-| [src/video/](src/video/) | The text display: `text.vhd` shows the screen at `0xFFFF0000` as 80×25 characters on a video output, with a cursor and a display offset for scrolling. `pix.vhd` and `video_pkg.vhd` are from [MandelbrotMEGA65](https://github.com/MJoergen/MandelbrotMEGA65), and `font_pkg.vhd` is the [Spleen](https://github.com/fcambus/spleen) 16×32 font, made by `font/gen_font_pkg.py`. |
+| [src/core/](src/core/) | `nice_core_pipeline.vhd` and `nice_core_multi.vhd`, the two architectures of `nice_core`. `src/nice_core.vhd` is the entity that wraps whichever of nice_cpu's cores `core.mk` selects with `NICE=pipeline` (the default) or `NICE=multi`. |
+| [src/video/](src/video/) | The text display: `text.vhd` shows the screen at `0xFFFF0000` as 80×25 characters on a video output, with a cursor and a display offset for scrolling. `pix.vhd` and `video_pkg.vhd` are from [MandelbrotMEGA65](https://github.com/MJoergen/MandelbrotMEGA65), and `scr_ram.vhd` is the screen's dual-clock memory, and `font_pkg.vhd` is the [Spleen](https://github.com/fcambus/spleen) 16×32 font, made by `font/gen_font_pkg.py`. |
 | [font/](font/) | The script that makes `src/video/font_pkg.vhd` from Spleen, and Spleen's license (BSD 2-Clause). |
-| [sim/](sim/) | The GHDL testbenches. |
+| [sim/](sim/) | The GHDL testbenches. `text_synth.vhd` is the wrapper with which GHDL checks that the display synthesises. |
 | [formal/](formal/) | The formal checks, for SymbiYosys. |
 | [synth/](synth/README.md) | The Vivado builds for the MEGA65 R3 and R6 boards, and the Nexys4DDR. |
 | [monitor/](monitor/README.md) | The monitor, in NICE assembly: planned, not written yet. Its README has the decisions it will follow, QNICE-FPGA's. |
 | [examples/](examples/) | Example C programs, and the Makefile that builds them for the MEGA65. |
-| [tools/](tools/) | `load.py`, which loads a program into the MEGA65 through the UART, `run.py`, which runs a program on the MEGA65 as `niceemu` runs it, and `hwtest.py`, which tests the system on the board. |
+| [tools/](tools/) | `load.py`, which loads a program into the MEGA65 or Nexys4DDR through the UART, `run.py`, which runs a program on the board as `niceemu` runs it, and `hwtest.py`, which tests the system on the board. |
 | [TODO.md](TODO.md) | Work that is planned but not started. |
+| [core.mk](core.mk) | Picks the source files of the core, from `NICE`, for the Makefiles of `sim/` and `synth/`. |
+| [vsg.yml](vsg.yml) | The configuration of `make lint`, which checks the VHDL against [CODING_STYLE.md](CODING_STYLE.md). |
+| [CLAUDE.md](CLAUDE.md) | Instructions for Claude Code: the commands, the layout, and the pitfalls. |
+| [.github/workflows/ci.yml](.github/workflows/ci.yml) | The CI: `make test`, `make formal`, and `make lint`. |
 
 ## Compared with the emulator
 
@@ -80,10 +85,16 @@ simulation tests, `make formal` runs the formal checks (see
 the C examples, `make r3`, `make r6`, and `make nexys4ddr` build the bitstreams, with
 `ROM=file.bin` one whose core boots from the file (see
 [The ROM](#the-rom)),
-`make load FILE=prog.bin` loads a program into the MEGA65 and starts it,
+`make load FILE=prog.bin` loads a program into the board and starts it,
 `make run FILE=prog.bin` runs one as `niceemu` runs it (see
 [Comparing with the emulator](#comparing-with-the-emulator)), and
 `make hwtest` tests the board (see [Testing the board](#testing-the-board)).
+`make load` and `make run` use the serial device `PORT=/dev/ttyUSB1` by
+default, and pass `ARGS=` on to the tool, for example `ARGS=--no-run` or
+`ARGS="-i in.txt -d 0:10 -s --timeout 5"`. The bitstream targets take
+`FLOW=default` or `FLOW=timing`, the directives of Vivado's steps (see
+[synth/](synth/README.md)). `make hwtest` rebuilds `niceemu` first, if its
+sources have changed.
 
 `make test` and the boards' targets use nice_cpu's pipelined core. Add
 `NICE=multi` to use its multi-cycle core instead (`NICE=pipeline` is the

@@ -27,6 +27,7 @@ GHDL   ?= ghdl
 PYTHON ?= python3
 NICE_DIR = ../nice_cpu
 ASM     = $(PYTHON) $(NICE_DIR)/assembler/niceasm.py
+ASM_PY  = $(wildcard $(NICE_DIR)/assembler/*.py)
 BUILD   = build/$(NICE)
 # GHDL runs in $(BUILD), so paths given to it start with ../../.
 GHDLFLAGS = --std=08 --workdir=.
@@ -105,32 +106,32 @@ synth-system: analyse
 analyse: | $(BUILD)
 	@cd $(BUILD) && $(GHDL) -a $(GHDLFLAGS) $(addprefix ../../,$(NICE_SOURCES) $(NICE_SIM) $(SOURCES))
 
-$(BUILD)/hello.bin: $(NICE_DIR)/doc/intro/examples/hello.nasm | $(BUILD)
+$(BUILD)/hello.bin: $(NICE_DIR)/doc/intro/examples/hello.nasm $(ASM_PY) | $(BUILD)
 	@$(ASM) -o $@ $<
 
-$(BUILD)/rom.bin: rom.nasm | $(BUILD)
+$(BUILD)/rom.bin: rom.nasm $(ASM_PY) | $(BUILD)
 	@$(ASM) -o $@ $<
 
-$(BUILD)/echo.bin: echo.nasm | $(BUILD)
+$(BUILD)/echo.bin: echo.nasm $(ASM_PY) | $(BUILD)
 	@$(ASM) -o $@ $<
 
-$(BUILD)/fifo.bin: fifo.nasm | $(BUILD)
+$(BUILD)/fifo.bin: fifo.nasm $(ASM_PY) | $(BUILD)
 	@$(ASM) -o $@ $<
 
-$(BUILD)/emu.bin: emu.nasm | $(BUILD)
+$(BUILD)/emu.bin: emu.nasm $(ASM_PY) | $(BUILD)
 	@$(ASM) -o $@ $<
 
-$(BUILD)/reserved.bin: $(NICE_DIR)/emulator/test/reserved.nasm | $(BUILD)
+$(BUILD)/reserved.bin: $(NICE_DIR)/emulator/test/reserved.nasm $(ASM_PY) | $(BUILD)
 	@$(ASM) -o $@ $<
 
-$(BUILD)/eof.bin: eof.nasm | $(BUILD)
+$(BUILD)/eof.bin: eof.nasm $(ASM_PY) | $(BUILD)
 	@$(ASM) -o $@ $<
 
-$(BUILD)/devices.bin: devices.nasm | $(BUILD)
+$(BUILD)/devices.bin: devices.nasm $(ASM_PY) | $(BUILD)
 	@$(ASM) -o $@ $<
 
 $(BUILD):
 	@mkdir -p $@
 
 clean:
-	rm -rf $(BUILD)
+	rm -rf build
