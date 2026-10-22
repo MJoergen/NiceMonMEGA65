@@ -55,7 +55,9 @@ three ways:
 - Its FPGA has 135 block RAMs of 36 Kbit, where the MEGA65's has 365. The
   RAM and the ROM are the same as on the MEGA65, and take 96 of them, but
   the screen is 8K words, not 32K, so that it and its copy in `text.vhd`
-  take 16. That is still more than three screens of 80×25 for scrolling.
+  take 14, not 56. With the font and the UART's FIFO, that is 114.5 with
+  the ROM. 8K words are still more than three screens of 80×25 for
+  scrolling.
 - Its FPGA is speed grade -1, where the MEGA65's is -2, so the system clock
   is 90 MHz, not 100 MHz; at 100 MHz the pipelined core misses timing by a
   few tenths of a nanosecond or less, as placement varies. The UART runs at 115200 baud as on the MEGA65.
@@ -102,3 +104,63 @@ repository.
 a3fafd4), copied unchanged: The Tyto Project by Adam Barnes, via C64MEGA65,
 LGPL v3. `mega65/mega65.vhd` drives it, the video DAC, and the clocks as
 MandelbrotMEGA65's `mega65.vhd` does.
+
+## Build times and size
+
+A build takes four to eight minutes on an Intel Core i9-10850K (10 cores,
+20 threads) with Vivado 2025.1. These are the times of the last builds, in
+minutes and seconds, without `ROM=`:
+
+| Build | Synthesis | Placement | Routing | Bitstream | Total |
+|---|---|---|---|---|---|
+| R6, pipelined | 2:14 | 0:40 | 1:09 | 0:33 | 4:52 |
+| R6, `NICE=multi` | 1:28 | 0:34 | 0:59 | 0:33 | 3:54 |
+| Nexys4DDR, pipelined | 2:03 | 0:35 | 0:44 | 0:32 | 4:06 |
+| Nexys4DDR, `NICE=multi` | 1:09 | 0:32 | 5:31 | 0:28 | 7:49 |
+
+The R3 takes the same as the R6. The Nexys4DDR builds with `FLOW=timing`.
+Its routing time varies most: an earlier pipelined build routed in 1:32,
+and the time with `NICE=multi` is from one build only.
+
+The utilisation is from `build/utilization.rpt`, and the split by module
+from `report_utilization -hierarchical` on `build/top.dcp`. These are the
+numbers without `ROM=`, at commit 671172e, in LUTs and flip-flops:
+
+| Part of the design | R6, pipelined | R6, multi | Nexys4DDR, pipelined | Nexys4DDR, multi |
+|---|---|---|---|---|
+| The core (`nice_core`) | 6985 / 3002 | 4581 / 1044 | 7071 / 2943 | 4562 / 985 |
+| The math unit (`mpu`) | 2178 / 874 | 2167 / 874 | 2112 / 874 | 2200 / 876 |
+| The rest: the CLI, UART, RAM, counters, timer, and glue | 761 / 1123 | 767 / 1123 | 736 / 1107 | 709 / 1109 |
+| The text display (`text.vhd`) | 105 / 153 | 105 / 153 | 103 / 144 | 99 / 144 |
+| The keyboard | 596 / 585 | 596 / 585 | – | – |
+| The HDMI output | 522 / 1199 | 522 / 1199 | – | – |
+| Total | 11147 / 6936 | 8738 / 4978 | 10022 / 5068 | 7570 / 3114 |
+| Total, of the FPGA | 8.3 % / 2.6 % | 6.5 % / 1.9 % | 15.8 % / 4.0 % | 11.9 % / 2.5 % |
+
+The pipelined core is about 5 % of the LUTs of the R6's FPGA, and 11 % of
+the Nexys4DDR's. The multi-cycle core has two thirds of its LUTs and a third
+of its flip-flops: 3.4 % and 7.2 %. Both keep their registers in
+flip-flops, and use no DSP. The pipelined core uses no block RAM. The
+multi-cycle core uses one RAMB18, which Vivado infers for `src2_count`,
+the register of the shift count. The math unit has the 4 DSPs of the design. Both cores meet the
+clock: the R6 by 0.24 ns (pipelined) and 0.26 ns (multi) at 100 MHz, the
+Nexys4DDR by 0.17 ns and 0.16 ns at 90 MHz. The R3 is within about 2 % of
+the R6.
+
+The block RAMs, of 36 Kbit, are these:
+
+| Memory | MEGA65 | Nexys4DDR |
+|---|---|---|
+| The RAM (`i_ram`), 64K words | 64 | 64 |
+| The ROM (`i_rom`), 32K words, with `ROM=` only | 32 | 32 |
+| The screen (`i_scr` in `nicemon.vhd`), 32K or 8K words | 32 | 8 |
+| Its copy in `text.vhd` (`scr_ram.vhd`) | 24 | 6 |
+| The font in `text.vhd` | 4 | 4 |
+| The UART's input FIFO (`rx_fifo.vhd`), one RAMB18 | 0.5 | 0.5 |
+| Total without the ROM, pipelined | 124.5 of 365 | 82.5 of 135 |
+| Total with the ROM, pipelined | 156.5 | 114.5 |
+
+The copy of the screen keeps only the 24 bits that the display reads (bits
+7–0, the character, and 31–16, the colours), so Vivado leaves out the rest,
+and it takes three quarters of the screen's block RAMs. The multi-cycle
+core adds half of one more, its RAMB18.
