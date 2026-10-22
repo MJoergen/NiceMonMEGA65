@@ -205,17 +205,17 @@ runs it:
 
 The instructions are the same as on the emulator. The cycles are from the
 board with the pipelined core, beside those of nice_cpu's own testbench
-for the core (`bench/README.md`, at nice_cpu 4bbbb81):
+for the core (`bench/README.md`, at nice_cpu bb8fdb6):
 
 | Phase | Instructions | Cycles on the board | In nice_cpu's testbench |
 |---|---|---|---|
 | `rng64` | 52768 | 83076 | 83076 |
-| `crc32` | 65816 | 85108 | 85108 |
+| `crc32` | 65816 | 83061 | 83061 |
 | `bst` | 310469 | 411949 | 412973 |
-| `heapsort` | 307416 | 386464 | 386464 |
+| `heapsort` | 307416 | 385784 | 385784 |
 | `vm` | 840049 | 1220162 | 1220162 |
 | `strings` | 104562 | 163560 | 164125 |
-| total | 1681080 | 2350319 | 2351908 |
+| total | 1681080 | 2347592 | 2349181 |
 
 The board takes the same cycles, or a few less in `bst` and `strings`,
 and at 100 MHz the benchmark runs for about 24 ms.
