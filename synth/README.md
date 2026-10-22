@@ -141,17 +141,26 @@ numbers without `ROM=`, at commit cb95968 with the colour format of the screen, 
 
 The pipelined core is about 5 % of the LUTs of the R6's FPGA, and 11 % of
 the Nexys4DDR's. The multi-cycle core has two thirds of its LUTs, 3.4 % and
-7.3 %. On the R6 it has a third of the flip-flops too; on the Nexys4DDR it
-has 4071, more than the pipelined core's 2950, where an earlier build had
-985; the cause is not known. The `fetch_stats` of the pipelined core (the
-fetch statistics in the main README's address map) has over a thousand
-flip-flops, and the multi-cycle core's has few. The pipelined core uses no block RAM. The
-multi-cycle core uses one RAMB18, which Vivado infers for `src2_count`, the
-register of the shift count. The math unit has the 4 DSPs of the design. All
-builds meet the clock, with these worst setup slacks: the R6 0.23 ns
-(pipelined) and 0.52 ns (multi) at 100 MHz, the R3 0.21 ns (pipelined), the
-Nexys4DDR 0.33 ns and 0.19 ns at 90 MHz. The R3 is within about 1 % of the
-R6.
+7.3 %. On the R6 it has a third of the flip-flops too. On the Nexys4DDR it
+has 4071, more than the pipelined core's 2950, where the build at 671172e
+had 985. The cause is the retiming of `FLOW=timing` (`synth_design
+-retiming`): it moved registers backwards 597 times and added 6791, mostly
+copies of the core's register file and state, so the design has twice the
+flip-flops (6319 against 3114). The build at 671172e did not retime this
+way, and the one at cb95968, which maps `fetch_stats` and the wider device
+address, did; the multi-cycle core itself is the same in both. With
+`FLOW=default` the build has 3202 flip-flops but misses 90 MHz by 0.37 ns,
+so the copies buy timing. With the retiming it meets 90 MHz by 0.19 ns, and
+the Nexys4DDR has room for the flip-flops.
+
+The `fetch_stats` of the pipelined core (the fetch statistics in the main
+README's address map) has over a thousand flip-flops, and the multi-cycle
+core's has few. The pipelined core uses no block RAM. The multi-cycle core
+uses one RAMB18, which Vivado infers for `src2_count`, the register of the
+shift count. The math unit has the 4 DSPs of the design. All builds meet the
+clock, with these worst setup slacks: the R6 0.23 ns (pipelined) and 0.52 ns
+(multi) at 100 MHz, the R3 0.21 ns (pipelined), the Nexys4DDR 0.33 ns and
+0.19 ns at 90 MHz. The R3 is within about 1 % of the R6.
 
 The block RAMs, of 36 Kbit, are these:
 
