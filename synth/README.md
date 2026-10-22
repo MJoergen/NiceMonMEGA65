@@ -119,34 +119,37 @@ minutes and seconds, without `ROM=`:
 |---|---|---|---|---|---|
 | R6, pipelined | 3:14 | 0:39 | 2:45 | 0:50 | 7:54 |
 | R6, `NICE=multi` | 1:29 | 0:28 | 1:06 | 0:32 | 3:55 |
-| Nexys4DDR, pipelined | 3:08 | 0:30 | 0:52 | 0:35 | 5:24 |
+| Nexys4DDR, pipelined | 6:46 | 3:46 | 2:53 | 0:52 | 14:17 |
 | Nexys4DDR, `NICE=multi` | 1:53 | 0:31 | 1:15 | 0:28 | 4:18 |
 | R3, pipelined | 3:11 | 0:36 | 1:08 | 0:35 | 5:49 |
 
-The Nexys4DDR builds with `FLOW=timing`. The times vary from build to
-build: one R6 pipelined build spent 9:36 in synthesis, with the same result,
+The Nexys4DDR builds with `FLOW=timing`. The last Nexys4DDR pipelined
+build ran while the machine was busy with other work, so its times are much
+longer than the earlier 5:24. The times vary from build to build: one R6 pipelined build spent 9:36 in synthesis, with the same result,
 and took 12:49 in all.
 
 The utilisation is from `build/utilization.rpt`, and the split by module
 from `report_utilization -hierarchical` on `build/top.dcp`. These are the
-numbers without `ROM=`, at commit cb95968 with the colour format of the screen, in LUTs and flip-flops:
+numbers without `ROM=`, at commit cb95968 with the colour format of the
+screen, in LUTs and flip-flops. The Nexys4DDR pipelined column is from the
+build at 0267298, which adds the PS/2 keyboard:
 
 | Part of the design | R6, pipelined | R6, multi | Nexys4DDR, pipelined | Nexys4DDR, multi |
 |---|---|---|---|---|
-| The core (`nice_core`) | 6861 / 3006 | 4605 / 1050 | 6897 / 2950 | 4636 / 4071 |
-| The math unit (`mpu`) | 2282 / 875 | 2172 / 874 | 2249 / 875 | 2166 / 874 |
+| The core (`nice_core`) | 6861 / 3006 | 4605 / 1050 | 6914 / 2949 | 4636 / 4071 |
+| The math unit (`mpu`) | 2282 / 875 | 2172 / 874 | 2250 / 875 | 2166 / 874 |
 | The fetch statistics (`fetch_stats`) | 744 / 1329 | 44 / 99 | 738 / 1329 | 44 / 99 |
-| The rest: the CLI, UART, RAM, counters, timer, and glue | 707 / 1154 | 795 / 1156 | 653 / 1116 | 740 / 1119 |
+| The rest: the CLI, UART, RAM, counters, timer, and glue | 707 / 1154 | 795 / 1156 | 678 / 1142 | 740 / 1119 |
 | The text display (`text.vhd`) | 123 / 180 | 123 / 180 | 121 / 156 | 121 / 156 |
-| The keyboard | 588 / 585 | 596 / 585 | – | – |
+| The keyboard | 588 / 585 | 596 / 585 | 109 / 48 | – |
 | The HDMI output | 574 / 1207 | 574 / 1207 | – | – |
-| Total | 11879 / 8336 | 8909 / 5151 | 10658 / 6426 | 7707 / 6319 |
-| Total, of the FPGA | 8.9 % / 3.1 % | 6.7 % / 1.9 % | 16.8 % / 5.1 % | 12.2 % / 5.0 % |
+| Total | 11879 / 8336 | 8909 / 5151 | 10799 / 6499 | 7707 / 6319 |
+| Total, of the FPGA | 8.9 % / 3.1 % | 6.7 % / 1.9 % | 17.0 % / 5.1 % | 12.2 % / 5.0 % |
 
 The pipelined core is about 5 % of the LUTs of the R6's FPGA, and 11 % of
 the Nexys4DDR's. The multi-cycle core has two thirds of its LUTs, 3.4 % and
 7.3 %. On the R6 it has a third of the flip-flops too. On the Nexys4DDR it
-has 4071, more than the pipelined core's 2950, where the build at 671172e
+has 4071, more than the pipelined core's 2949, where the build at 671172e
 had 985. The cause is the retiming of `FLOW=timing` (`synth_design
 -retiming`): it moved registers backwards 597 times and added 6791, mostly
 copies of the core's register file and state, so the design has twice the
@@ -163,7 +166,7 @@ core's has few. The pipelined core uses no block RAM. The multi-cycle core
 uses one RAMB18, which Vivado infers for `src2_count`, the register of the
 shift count. The math unit has the 4 DSPs of the design. All builds meet the
 clock, with these worst setup slacks: the R6 0.23 ns (pipelined) and 0.52 ns
-(multi) at 100 MHz, the R3 0.21 ns (pipelined), the Nexys4DDR 0.33 ns and
+(multi) at 100 MHz, the R3 0.21 ns (pipelined), the Nexys4DDR 0.32 ns and
 0.19 ns at 90 MHz. The R3 is within about 1 % of the R6.
 
 The block RAMs, of 36 Kbit, are these:
