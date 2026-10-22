@@ -42,7 +42,10 @@ int main(void)
     for (;;) {
         int limit;
         printf("Count the primes up to (0 to stop): ");
-        if (scanf("%d", &limit) != 1) {
+        int n = scanf("%d", &limit);
+        if (n == EOF)
+            return 0;
+        if (n != 1) {
             skip_line();
             printf("\r\nThat is not a number.\r\n");
             continue;

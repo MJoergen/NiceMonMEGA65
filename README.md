@@ -19,7 +19,7 @@ and VGA for the screen (see [synth/](synth/README.md#the-nexys4ddr)).
 | Path | What it is |
 |---|---|
 | [nice_cpu/](https://github.com/MJoergen/nice_cpu) | The NICE CPU, its assembler, its emulator, and `nicewasm`, a [translator](https://github.com/MJoergen/nice_cpu/tree/main/translator) from WebAssembly to NICE assembly, as a git submodule. |
-| [src/](src/) | The synthesisable VHDL, shared by both boards. `nicemon.vhd` is the system: the NICE core, the memory (`ram.vhd` and `rom.vhd`), the UART, the core's input FIFO (`rx_fifo.vhd`), and the command line interpreter. `uart_serdes.vhd` (with fixes to its receiver, and break detection), `line_buffer.vhd` and `cmd.vhd` are copied from cmod-s7; `cmd.vhd` prints `NICE` instead of `WBUS` at reset, and `HALT` when the core halts. `kbd_m65.vhd` drives the MEGA65 keyboard, and `kbd_ascii.vhd` turns its keys into ASCII. `kbd_ps2.vhd` receives a PS/2 keyboard, the Nexys4DDR's, and `kbd_ps2_ascii.vhd` turns its scan codes into ASCII. `system.vhd` is what every board has: the system, the text display of its screen, and the UART's pins. |
+| [src/](src/) | The synthesisable VHDL, shared by both boards. `nicemon.vhd` is the system: the NICE core, the memory (`ram.vhd` and `rom.vhd`), the UART, the core's input FIFO (`rx_fifo.vhd`), and the command line interpreter. `uart_serdes.vhd` (with fixes to its receiver, and break detection), `line_buffer.vhd`, and `cmd.vhd` are copied from cmod-s7; `cmd.vhd` prints `NICE` instead of `WBUS` at reset, and `HALT` when the core halts. `kbd_m65.vhd` drives the MEGA65 keyboard, and `kbd_ascii.vhd` turns its keys into ASCII. `kbd_ps2.vhd` receives the PS/2 keyboard of the Nexys4DDR, and `kbd_ps2_ascii.vhd` turns its scan codes into ASCII. `system.vhd` is what every board has: the system, the text display of its screen, and the UART's pins. |
 | [src/core/](src/core/) | `nice_core_pipeline.vhd` and `nice_core_multi.vhd`, the two architectures of `nice_core`. `src/nice_core.vhd` is the entity that wraps whichever of nice_cpu's cores `core.mk` selects with `NICE=pipeline` (the default) or `NICE=multi`. |
 | [src/video/](src/video/) | The text display: `text.vhd` shows the screen at `0xFFFF0000` as 80×25 characters on a video output, with a cursor and a display offset for scrolling. `pix.vhd` and `video_pkg.vhd` are from [MandelbrotMEGA65](https://github.com/MJoergen/MandelbrotMEGA65), and `scr_ram.vhd` is the screen's dual-clock memory, and `font_pkg.vhd` is the [Spleen](https://github.com/fcambus/spleen) 16×32 font, made by `font/gen_font_pkg.py`. |
 | [font/](font/) | The script that makes `src/video/font_pkg.vhd` from Spleen, and Spleen's license (BSD 2-Clause). |
@@ -240,7 +240,7 @@ for the core (`bench/README.md`, at nice_cpu 1a41b0c):
 The board takes the same cycles, or a few less in `bst` and `strings`,
 and at 100 MHz the benchmark runs for about 24 ms.
 
-You need clang with the wasm32 target, `wasm-ld` and `llvm-ar` (on Debian
+You need clang with the wasm32 target, `wasm-ld`, and `llvm-ar` (on Debian
 and Ubuntu, the `clang`, `lld` and `llvm` packages). The steps that the
 Makefile runs are those of `nice_cpu/runtime/README.md`:
 
@@ -272,7 +272,7 @@ without the math unit would translate with `nicewasm --no-mpu` and use
 
 The linear memory is one page, 16384 words, and the program and its memory
 must fit below the stack in the 64K words of memory. With `printf` and `scanf`, the
-prime example ends at word `0x6C90`. The translator's README,
+prime example ends at word `0x6172`. The translator's README,
 `nice_cpu/translator/README.md`, has the same steps for Zig and Rust.
 
 ### The screen
@@ -537,3 +537,7 @@ MandelbrotMEGA65. The exceptions are the third-party files named in
 [synth/README.md](synth/README.md): `synth/r3/max10.vhd` is GPL v3, and the
 HDMI output in `synth/mega65/hdmi/` is LGPL v3. The Spleen font in
 `src/video/font_pkg.vhd` is BSD 2-Clause, see `font/LICENSE.spleen`.
+`synth/r3/max10.vhd` has no license header of its own, so its GPL v3 rests on
+its origin in the MEGA65 core. `src/kbd_m65.vhd` is written after the GPL v3
+driver of MiSTer2MEGA65, with the same timing on the pins but none of its
+code, and is MIT like the rest of `src/`.

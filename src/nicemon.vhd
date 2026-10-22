@@ -479,7 +479,7 @@ architecture synthesis of nicemon is
 
 begin
 
-   assert C_SCR_BITS >= 11 and C_SCR_BITS <= 16
+   assert C_SCR_BITS >= 11 and C_SCR_BITS <= 15
       report "nicemon: the screen must hold its 2000 words, below the I/O registers"
       severity failure;
 
