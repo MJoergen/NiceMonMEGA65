@@ -1,6 +1,6 @@
 -- A smoke test of the NICE core from the nice_cpu submodule. It runs a
--- program on the multi-cycle core and writes the console output to a file,
--- which the Makefile compares with the expected output.
+-- program on nice_core, the pipelined core by default, and writes the console
+-- output to a file, which the Makefile compares with the expected output.
 --
 -- THEORY OF OPERATION
 -- The core runs on the simulation memory of nice_cpu (hdl/sim/wb_mem.vhd),

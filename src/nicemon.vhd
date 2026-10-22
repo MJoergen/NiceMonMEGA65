@@ -4,7 +4,7 @@
 -- keyboard: a stream of bytes that is input like the UART's.
 --
 -- THEORY OF OPERATION
--- The core (nice_cpu/hdl/src/pipeline.vhd) has an instruction bus and a
+-- The core (src/nice_core.vhd, wrapping one of nice_cpu's cores) has an instruction bus and a
 -- data bus, both pipelined Wishbone. The instruction bus is 64 bits wide: it
 -- reads an aligned pair of words from port A of the memory, the word at the
 -- lower address in bits 31..0. The data bus shares port B with the CLI, which is a second
@@ -84,13 +84,14 @@
 --                          so that they can be read after HALT, as the
 --                          emulator prints them.
 --   0xFFFFFFF0             Control, for the CLI only. Bit 0 holds the core
---                          in reset while it is 1. A read returns bit 0, and
---                          the core's halted flag in bit 1. A write with bit
---                          2 set first clears the RAM, the screen included,
---                          to 0, as the emulator's memory is at the start,
---                          with the core held. Its OK comes when the memory
---                          is clear, and then bits 0 and 3 take effect. Bit
---                          3 hides the ROM: while it is 1 the RAM is at 0,
+--                          in reset while it is 1. A read returns bit 0, the
+--                          core's halted flag in bit 1, and bit 3. A write
+--                          with bit 2 set first clears the RAM, the screen
+--                          included, to 0, as the emulator's memory is at
+--                          the start, with the core held. Bit 3 takes effect
+--                          when the clear starts, and bit 0 when it ends,
+--                          with the OK, when the memory is clear. Bit 3
+--                          hides the ROM: while it is 1 the RAM is at 0,
 --                          as in the emulator, and the ROM is not reachable.
 --                          In a build without a ROM it reads 1 and cannot
 --                          be cleared.
@@ -109,7 +110,9 @@
 -- full: it waits until there is room. So the CLI loads a program with W
 -- commands, starts it with "W FFFFFFF0 00000000", and gets the UART back
 -- when the program halts. A command line should end with CR alone: a LF
--- after the CR of the line that starts the core reaches the program. The
+-- after the CR of the line that starts the core reaches the program, except
+-- for "00000004", which clears and starts: the UART stays with the CLI for
+-- the whole clear. The
 -- CLI's output goes out before the core's, so its "OK" comes first. When the
 -- core halts, and its last byte has gone, the CLI prints CR LF "HALT" CR LF,
 -- so that the host knows that the UART is the CLI's again.

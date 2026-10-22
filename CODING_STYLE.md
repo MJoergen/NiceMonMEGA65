@@ -1,6 +1,6 @@
 # VHDL coding style
 
-The VHDL in `src/`, `sim/`, and `synth/` follows the style of
+The VHDL in `src/`, `sim/`, `synth/`, and `formal/` follows the style of
 [nice_cpu](https://github.com/MJoergen/nice_cpu/blob/main/hdl/CODING_STYLE.md),
 which is that of
 [qnice_cpu](https://github.com/MJoergen/qnice_cpu/blob/main/CODING_STYLE.md)

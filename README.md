@@ -57,7 +57,7 @@ difference is the memory: 64K words, not 2³².
 | Fetch statistics, `0xFFFFFF50`–`7F` | Read 0, and a write is ignored | nice_cpu's `fetch_stats.vhd` (MICROARCH.md §8.1), which counts what FETCH and DECODE of the pipelined core do; with `NICE=multi` the words read 0 | Yes, but they count only on the board |
 | Instruction fetches from `0xFFFFFF00`–`FF` | Read 0 | Read 0 | Yes |
 | Memory | All 2³² words, 0 at the start | 64K words, repeated through the address space; the stack at `0xFFFFFF00` lands in the top. `load.py` and `run.py` hide the ROM, if the bitstream has one, and clear the RAM to 0 before they load | No: a program, its data, and its stack must fit in 64K words |
-| Screen, `0xFFFF0000`–`07CF` | 80×25 words of memory, printed by `--screen` | 32768 words of memory of their own (8192 on the Nexys4DDR), read with `R`; the first 2000 are shown on VGA and HDMI, unless the display offset is set | Yes |
+| Screen, `0xFFFF0000`–`07CF` | 80×25 words of memory, printed by `--screen` | 32768 words of memory of their own (8192 on the Nexys4DDR), read with `R`; the first 2000 are shown on VGA and HDMI (VGA only on the Nexys4DDR), unless the display offset is set | Yes |
 | Read counter, `0xFFFFFF01` | Counts the data reads since the last write | The same; a read by the command line does not count, as `--dump` does not | Yes |
 | The rest of `0xFFFFFF02`–`FF` | Ordinary memory for data | Memory, in the top 256 words of the RAM, except `0xFFFFFF80`–`8F`, the screen's registers | Yes, but for the screen's registers |
 | Interrupts | From the timer, `--irq`, and `--nmi` | From the timer, on IRQ | Yes, for the timer's |
@@ -120,15 +120,26 @@ memory, then start the core:
 
     W FFFFFFF0 00000000
 
+That is for a bitstream without a ROM. In one with a ROM, hold the core and
+hide the ROM first, so that the RAM is at 0, and start it with bit 3 kept:
+
+    W FFFFFFF0 0000000D
+    W FFFFFFF0 00000008
+
+`0D` holds the core, clears the memory, and hides the ROM, and `08` starts it
+(see [The ROM](#the-rom)). A start without bit 3 shows the ROM again, which
+boots instead of your program. After a `HALT` the core is no longer held, so
+hold it again, with `W FFFFFFF0 00000009` or `00000001`, before a start.
+
 While the core runs, the UART belongs to it. When it halts, the UART goes
 back to the command line. `W FFFFFFF0 00000001` holds the core in reset
-again, and `R FFFFFFF0` reads bit 0 (held) and bit 1 (halted).
-`W FFFFFFF0 00000005` clears the memory to 0 and holds the core; it answers
+again, and `R FFFFFFF0` reads bit 0 (held), bit 1 (halted), and bit 3 (ROM
+hidden). `W FFFFFFF0 00000005` clears the memory to 0 and holds the core; it answers
 `OK` when the memory is clear. When a program halts, the command line
 prints `HALT` on a line of its own, and `R FFFFFFF1` reads why it halted.
 Bit 3 of the control register hides the ROM, so that the RAM is at address
 0 (see [The ROM](#the-rom)); in a bitstream without a ROM it reads 1, and
-`load.py` sets it, so the commands above work on both.
+`load.py` sets it, so it works on both.
 
 ### The keyboard
 
@@ -172,7 +183,8 @@ example, with `sim/echo.nasm`, which echoes what you type until a `.`:
     picocom -b 115200 /dev/ttyUSB1
 
 `load.py` uses the serial device `/dev/ttyUSB1`, the MEGA65's debug UART.
-If yours is another, give it with `--port`, and to picocom.
+If yours is another, give it with `--port`, and to picocom. On macOS, use
+the `/dev/cu.*` device, as a `/dev/tty.*` device blocks on open.
 `load.py` needs only Python 3, on Linux or macOS, and the port must not be
 open in a terminal while it runs. Type in the terminal and the program echoes
 it. When you type `.`, it halts, the command line takes the UART again,
@@ -263,7 +275,8 @@ the UART, and `nice_cycles` and `nice_instructions` for the performance
 counters, as `examples/primes.c` uses them. It also declares `nice_peek`
 and `nice_poke`, which read and write any NICE address, such as the math
 unit's. `nice_screen_put` and `nice_screen_clear` write the screen at
-`0xFFFF0000`, which the VGA and HDMI outputs show.
+`0xFFFF0000`, which the VGA and HDMI outputs show (VGA only on the
+Nexys4DDR).
 
 The translated code and the runtime routines multiply and divide with the
 math unit, so the program is joined with `muldiv_mpu.nasm`. A system
@@ -290,7 +303,8 @@ such as `0x41`, is black on black, and `0x000FFF41` is a white `A` on
 black. The screen is 0 at power-up, which shows as black, and
 `nice_screen_clear` fills it with blanks.
 
-The screen's memory is 32768 words, `0xFFFF0000`–`0xFFFF7FFF`, of which the
+The screen's memory is 32768 words, `0xFFFF0000`–`0xFFFF7FFF` (8192 words,
+`0xFFFF0000`–`0xFFFF1FFF`, on the Nexys4DDR), of which the
 display shows 2000 from the display offset, so a program scrolls by adding
 80 to the offset and writing the next row after the rows shown, and scrolls
 back by taking 80 away, as the QNICE monitor does. The offset wraps at the
@@ -303,7 +317,7 @@ QNICE-FPGA, at `0xFF30` there:
 | `0xFFFFFF80` | State. Bit 6 shows the cursor, bit 5 makes it blink, about twice a second, bit 4 makes it small, the bottom 4 lines of the character, and bit 10 enables the display offset. Bits 11..4 are kept and read back; the rest read 0. |
 | `0xFFFFFF81` | The cursor's column, 0 to 79. |
 | `0xFFFFFF82` | The cursor's row, 0 to 24. |
-| `0xFFFFFF85` | The display offset, in words, 0 to 32767. It takes effect when bit 10 of the state is set. |
+| `0xFFFFFF85` | The display offset, in words, 0 to 32767 (8191 on the Nexys4DDR). It takes effect when bit 10 of the state is set. |
 
 The words `0xFFFFFF83`, `84`, and `86`–`8F` read 0 and take no write. In
 the emulator these addresses are memory, so a program that writes them
@@ -350,7 +364,7 @@ The command line and the core's data accesses see the same addresses.
 |---|---|
 | `0x00000000`–`0xFFFFFFFF` | Memory, where no register below is: 64K words of block RAM, repeated through the address space. So the runtime's stack below `0xFFFFFF00` lands in the top of it, and so do the words of `0xFFFFFF00`–`FF` that are not registers. |
 | `0x00000000`–`0x00007FFF` | The ROM, in a bitstream built with one, in front of the RAM and repeating with it (see [The ROM](#the-rom)). Bit 3 of the control register hides it. |
-| `0xFFFF0000`–`0xFFFF7FFF` | The screen: 32768 words of memory of their own, the emulator's 80×25 screen and room for scrolling. The 2000 words from the display offset are shown on VGA and HDMI (see [The screen](#the-screen)), and `R` reads them all. |
+| `0xFFFF0000`–`0xFFFF7FFF` | The screen: 32768 words of memory of their own, the emulator's 80×25 screen and room for scrolling. The 2000 words from the display offset are shown on VGA and HDMI, or VGA only on the Nexys4DDR (see [The screen](#the-screen)), and `R` reads them all. |
 | `0xFFFFFF00` | The console of SYSTEM.md §1. A write sends bits 7..0 to the UART. A read takes the oldest byte received from the UART or the keyboard, and returns it in bits 7..0 with bit 8 set, or 0 when no byte has arrived. A break on the UART ends the input: once the bytes before it are read, a read returns `0x200` (bit 9), as at the end of the emulator's input, until the core is started again. |
 | `0xFFFFFF01` | The emulator's read counter. A read by the core returns the number of its reads since the last write, and a write sets that number. A read with `R` does not count. It is 0 when the core starts. |
 | `0xFFFFFF10`–`0xFFFFFF1F` | The timer of SYSTEM.md §4: it raises IRQ every P clock cycles, through the vector it is given. |
@@ -373,7 +387,7 @@ The performance counters, the math unit, and the timer are nice_cpu's own,
 emulator. They are reset with the system, and each time the core starts, as
 the emulator's are when it starts. So after a halt the instruction counter
 holds the steps that the emulator prints, unless the program starts the
-timer. The timer counts clock cycles, at 100 MHz, where the emulator counts
+timer. The timer counts clock cycles, at 100 MHz (90 MHz on the Nexys4DDR), where the emulator counts
 steps, so its interrupts come at other steps, and the step counts differ.
 Its request goes straight to the core's IRQ, for it is the only device that
 raises one. They are not reset while the command line holds the core, so

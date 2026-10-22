@@ -5,7 +5,8 @@
 --
 -- THEORY OF OPERATION
 -- The screen is the 2^G_SCR_ADDR_BITS words at 0xFFFF0000 (src/nicemon.vhd),
--- 32768 on the boards, of which the first 2000 are the emulator's 80x25
+-- 32768 on the MEGA65 boards and 8192 on the Nexys4DDR, of which the first
+-- 2000 are the emulator's 80x25
 -- characters, row by row. Each word is a character in bits 7..0 and its
 -- color above (nice_cpu's runtime/ABI.md, nice_screen_put). This module keeps
 -- a copy of the screen in a memory of its own (scr_ram.vhd), with a write

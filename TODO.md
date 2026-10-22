@@ -19,3 +19,10 @@ Each needs a place in the address map that does not clash with the
 emulator's devices, and a line in the README's "Compared with the emulator"
 table, as the emulator has none of them. The keyboard's LEDs could be set
 too, CAPS LOCK's above all, by sending the PS/2 command ED to the keyboard.
+
+## The monitor
+
+The monitor in NICE assembly, a port of QMON, is not written yet; the
+decisions it follows are in [monitor/README.md](monitor/README.md). It also
+needs a start-up variant in nice_cpu, `start*.nasm` with the origin
+`0x8000`, the monitor's stack, and a return instead of a halt.
