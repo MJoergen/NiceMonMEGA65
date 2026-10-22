@@ -63,16 +63,20 @@
 --                          (nice_cpu/hdl/src/mpu.vhd).
 --   0xFFFFFF40-0xFFFFFF4F  The performance counters of SYSTEM.md §3
 --                          (nice_cpu/hdl/src/perf.vhd).
---   0xFFFFFF50-0xFFFFFF5F  The screen's registers, numbered as QNICE-FPGA's
---                          VGA registers at 0xFF30, for the display: 50 is
+--   0xFFFFFF50-0xFFFFFF7F  The fetch statistics of MICROARCH.md §8.1
+--                          (nice_cpu/hdl/src/fetch_stats.vhd), part of the
+--                          performance counters of SYSTEM.md §3. The
+--                          multi-cycle core reports nothing to them.
+--   0xFFFFFF80-0xFFFFFF8F  The screen's registers, numbered as QNICE-FPGA's
+--                          VGA registers at 0xFF30, for the display: 80 is
 --                          the state, with bit 6 showing the cursor, bit 5
 --                          making it blink, bit 4 making it small, and bit
---                          10 enabling the display offset; 51 and 52 are
---                          the cursor's column and row; and 55 is the
+--                          10 enabling the display offset; 81 and 82 are
+--                          the cursor's column and row; and 85 is the
 --                          display offset, in words: the display shows the
 --                          2000 words from it, so adding 80 scrolls a line.
 --                          Bits 11..4 of the state are kept and read back;
---                          the other bits, and the words 53, 54, and 56-5F,
+--                          the other bits, and the words 83, 84, and 86-8F,
 --                          read 0 and take no write. The registers go out on
 --                          scr_cur_*_o and scr_offs_o, with scr_ctl_we_o
 --                          for a cycle when one is written.
@@ -144,6 +148,7 @@ library ieee;
 
 library work;
    use work.trace_pkg.all;
+   use work.pipe_pkg.all;
 
 entity nicemon is
    generic (
@@ -207,13 +212,14 @@ architecture synthesis of nicemon is
    -- which the emulator's screen is the first 2000
    constant C_SCR_BITS : natural := G_SCR_ADDR_BITS;
    constant C_SCR_BASE : std_logic_vector(31 downto C_SCR_BITS) := (31 downto 16 => '1', others => '0');
-   -- The screen's registers: 0xFFFFFF50-5F
-   constant C_SCR_REGS_BASE : std_logic_vector(31 downto 4) := X"FFFFFF5";
+   -- The screen's registers: 0xFFFFFF80-8F
+   constant C_SCR_REGS_BASE : std_logic_vector(31 downto 4) := X"FFFFFF8";
 
    -- The devices of nice_cpu/hdl/src, by the address bits above their offset
    constant C_TIMER_BASE : std_logic_vector(31 downto 4) := X"FFFFFF1";        -- 0xFFFFFF10-1F
    constant C_MPU_BASE   : std_logic_vector(31 downto 5) := X"FFFFFF" & "001"; -- 0xFFFFFF20-3F
    constant C_PERF_BASE  : std_logic_vector(31 downto 4) := X"FFFFFF4";        -- 0xFFFFFF40-4F
+   constant C_FS_BASE    : std_logic_vector(31 downto 6) := X"FFFFFF" & "01";  -- 0xFFFFFF40-7F, less the above
 
    -- '1' in a build without a ROM, where the RAM is always at 0
    function no_rom return std_logic is
@@ -239,8 +245,8 @@ architecture synthesis of nicemon is
          return false;
       end if;
       return addr(7 downto 1) = "0000000" or                        -- console, read counter
-             addr(7 downto 4) = X"1" or addr(7 downto 5) = "001" or -- perf, MPU
-             addr(7 downto 4) = X"4" or addr(7 downto 4) = X"5" or  -- timer, screen registers
+             addr(7 downto 4) = X"1" or addr(7 downto 5) = "001" or -- timer, MPU
+             addr(7 downto 6) = "01" or addr(7 downto 4) = X"8" or  -- perf, fetch statistics, screen registers
              (cli and (addr(7 downto 4) = X"E" or addr(7 downto 1) = "1111000"));
    end function is_io;
 
@@ -252,13 +258,20 @@ architecture synthesis of nicemon is
    end function in_rom;
 
    -- The devices of nice_cpu/hdl/src
-   type t_dev is (DEV_PERF, DEV_MPU, DEV_TIMER);
+   type t_dev is (DEV_PERF, DEV_MPU, DEV_TIMER, DEV_FS);
+
+   -- Whether an address is one of the fetch statistics', which are the
+   -- words of 0xFFFFFF40-7F that the performance counters do not take
+   function is_fs(addr : std_logic_vector(31 downto 0)) return boolean is
+   begin
+      return addr(31 downto 6) = C_FS_BASE and addr(5 downto 4) /= "00";
+   end function is_fs;
 
    -- Whether an address is one of a device's
    function is_dev(addr : std_logic_vector(31 downto 0)) return boolean is
    begin
       return addr(31 downto 5) = C_MPU_BASE or addr(31 downto 4) = C_PERF_BASE or
-             addr(31 downto 4) = C_TIMER_BASE;
+             addr(31 downto 4) = C_TIMER_BASE or is_fs(addr);
    end function is_dev;
 
    -- Core
@@ -267,6 +280,7 @@ architecture synthesis of nicemon is
    signal cpu_halted  : std_logic;
    signal cpu_instret : std_logic;
    signal cpu_retire  : t_retire;
+   signal cpu_stats   : t_fetch_events;
    -- The core's registers, for the CLI's read of E0-EF. The CLI reads them
    -- only while the core is held or halted, when they hold the registers
    -- after the last step and do not change.
@@ -348,7 +362,7 @@ architecture synthesis of nicemon is
    signal dev_busy  : std_logic := '0';
    signal dev_stb   : std_logic := '0';
    signal dev_sel   : t_dev;               -- the device
-   signal dev_addr  : std_logic_vector(4 downto 0);
+   signal dev_addr  : std_logic_vector(5 downto 0);
    signal dev_we    : std_logic;
    signal dev_wdata : std_logic_vector(31 downto 0);
    signal dev_stall : std_logic;
@@ -362,7 +376,7 @@ architecture synthesis of nicemon is
    -- The devices' ports: the CLI's latch while it is busy, else the core
    signal io_cyc   : std_logic;
    signal io_we    : std_logic;
-   signal io_addr  : std_logic_vector(4 downto 0);
+   signal io_addr  : std_logic_vector(5 downto 0);
    signal io_wdata : std_logic_vector(31 downto 0);
 
    signal mpu_cyc     : std_logic;
@@ -375,6 +389,11 @@ architecture synthesis of nicemon is
    signal perf_stall  : std_logic;
    signal perf_ack    : std_logic;
    signal perf_data   : std_logic_vector(31 downto 0);
+   signal fs_cyc      : std_logic;
+   signal fs_stb      : std_logic;
+   signal fs_stall    : std_logic;
+   signal fs_ack      : std_logic;
+   signal fs_data     : std_logic_vector(31 downto 0);
    signal timer_cyc   : std_logic;
    signal timer_stb   : std_logic;
    signal timer_stall : std_logic;
@@ -399,6 +418,7 @@ architecture synthesis of nicemon is
    signal rd_rx       : std_logic := '0';
    signal rd_mpu      : std_logic := '0';
    signal rd_perf     : std_logic := '0';
+   signal rd_fs       : std_logic := '0';
    signal rd_timer    : std_logic := '0';
 
    -- The ROM, read at the addresses of the memory ports
@@ -500,7 +520,8 @@ begin
          halted_o     => cpu_halted,
          instret_o    => cpu_instret,
          regs_o       => cpu_regs,
-         retire_o     => cpu_retire
+         retire_o     => cpu_retire,
+         stats_o      => cpu_stats
       ); -- i_core
 
    uart_owner_cpu <= not cpu_hold and not cpu_halted;
@@ -600,6 +621,7 @@ begin
                  X"00000" & "0001" & rx_q when rd_rx = '1' else
                  mpu_data when rd_mpu = '1' else
                  perf_data when rd_perf = '1' else
+                 fs_data when rd_fs = '1' else
                  timer_data when rd_timer = '1' else
                  rd_io;
 
@@ -619,6 +641,7 @@ begin
          rd_rx    <= '0';
          rd_mpu   <= '0';
          rd_perf  <= '0';
+         rd_fs    <= '0';
          rd_timer <= '0';
          rd_io    <= (others => '0');
          if not is_io(addr, cli) then
@@ -632,11 +655,13 @@ begin
             end if;
          elsif is_dev(addr) and not cli then
             -- A device has taken the core's request, and it acknowledges
-            -- it, with the data that rd_mpu, rd_perf, or rd_timer selects.
+            -- it, with the data that rd_mpu, rd_perf, rd_fs, or rd_timer selects.
             if addr(31 downto 5) = C_MPU_BASE then
                rd_mpu <= '1';
             elsif addr(31 downto 4) = C_PERF_BASE then
                rd_perf <= '1';
+            elsif is_fs(addr) then
+               rd_fs <= '1';
             else
                rd_timer <= '1';
             end if;
@@ -650,10 +675,12 @@ begin
                dev_sel <= DEV_MPU;
             elsif addr(31 downto 4) = C_PERF_BASE then
                dev_sel <= DEV_PERF;
+            elsif is_fs(addr) then
+               dev_sel <= DEV_FS;
             else
                dev_sel <= DEV_TIMER;
             end if;
-            dev_addr  <= addr(4 downto 0);
+            dev_addr  <= addr(5 downto 0);
             dev_we    <= we;
             dev_wdata <= wdata;
             return;
@@ -790,11 +817,14 @@ begin
                rd_rx    <= '0';
                rd_mpu   <= '0';
                rd_perf  <= '0';
+               rd_fs    <= '0';
                rd_timer <= '0';
                if mpu_ack = '1' then
                   rd_io <= mpu_data;
                elsif perf_ack = '1' then
                   rd_io <= perf_data;
+               elsif fs_ack = '1' then
+                  rd_io <= fs_data;
                else
                   rd_io <= timer_data;
                end if;
@@ -910,11 +940,12 @@ begin
    -- which goes to a device only in the cycle that takes it
    io_cyc   <= '1' when dev_busy = '1' else dbus_cyc;
    io_we    <= dev_we when dev_busy = '1' else dbus_we;
-   io_addr  <= dev_addr when dev_busy = '1' else dbus_addr(4 downto 0);
+   io_addr  <= dev_addr when dev_busy = '1' else dbus_addr(5 downto 0);
    io_wdata <= dev_wdata when dev_busy = '1' else dbus_wdata;
 
    mpu_cyc   <= io_cyc;
    perf_cyc  <= io_cyc;
+   fs_cyc    <= io_cyc;
    timer_cyc <= io_cyc;
    mpu_stb   <= dev_stb when dev_busy = '1' and dev_sel = DEV_MPU else
                 core_dev when dbus_addr(31 downto 5) = C_MPU_BASE else
@@ -922,13 +953,17 @@ begin
    perf_stb  <= dev_stb when dev_busy = '1' and dev_sel = DEV_PERF else
                 core_dev when dbus_addr(31 downto 4) = C_PERF_BASE else
                 '0';
+   fs_stb    <= dev_stb when dev_busy = '1' and dev_sel = DEV_FS else
+                core_dev when is_fs(dbus_addr) else
+                '0';
    timer_stb <= dev_stb when dev_busy = '1' and dev_sel = DEV_TIMER else
                 core_dev when dbus_addr(31 downto 4) = C_TIMER_BASE else
                 '0';
    dev_stall <= mpu_stall when dev_sel = DEV_MPU else
                 perf_stall when dev_sel = DEV_PERF else
+                fs_stall when dev_sel = DEV_FS else
                 timer_stall;
-   dev_ack   <= mpu_ack or perf_ack or timer_ack;
+   dev_ack   <= mpu_ack or perf_ack or fs_ack or timer_ack;
 
    i_mpu : entity work.mpu
       port map (
@@ -939,7 +974,7 @@ begin
          wb_stall_o => mpu_stall,
          wb_ack_o   => mpu_ack,
          wb_we_i    => io_we,
-         wb_addr_i  => io_addr,
+         wb_addr_i  => io_addr(4 downto 0),
          wb_data_i  => io_wdata,
          wb_data_o  => mpu_data
       ); -- i_mpu
@@ -958,6 +993,21 @@ begin
          wb_data_i  => io_wdata,
          wb_data_o  => perf_data
       ); -- i_perf
+
+   i_fetch_stats : entity work.fetch_stats
+      port map (
+         clk_i      => clk_i,
+         rst_i      => dev_rst,
+         events_i   => cpu_stats,
+         wb_cyc_i   => fs_cyc,
+         wb_stb_i   => fs_stb,
+         wb_stall_o => fs_stall,
+         wb_ack_o   => fs_ack,
+         wb_we_i    => io_we,
+         wb_addr_i  => io_addr,
+         wb_data_i  => io_wdata,
+         wb_data_o  => fs_data
+      ); -- i_fetch_stats
 
 
    i_timer : entity work.timer

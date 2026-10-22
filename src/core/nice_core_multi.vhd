@@ -34,4 +34,6 @@ begin
          retire_o     => retire_o
       ); -- i_core
 
+   stats_o <= C_FETCH_EVENTS_NONE;
+
 end architecture multicycle;

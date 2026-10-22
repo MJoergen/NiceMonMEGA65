@@ -15,7 +15,7 @@
 -- - READY of an interrupt port only for a request, and not in reset.
 -- - halted_o is low after reset, and once high, stays high until reset,
 --   which both cores do by their state machines.
--- The step report, retire_o, regs_o, and instret_o are free; the halt reason is one
+-- The step report, retire_o, regs_o, instret_o, and stats_o are free; the halt reason is one
 -- of the values of t_halt.
 --
 -- Two of the assumptions matter most here, and nice_cpu proves both for
@@ -56,6 +56,7 @@ architecture formal of nice_core is
    signal halted    : std_logic;
    signal instret   : std_logic;
    signal retire    : t_retire;
+   signal stats     : t_fetch_events;
    signal regs      : t_regs;
    signal halt_code : std_logic_vector(2 downto 0);
 
@@ -99,6 +100,7 @@ begin
    halted_o    <= halted;
    instret_o   <= instret;
    regs_o      <= regs;
+   stats_o     <= stats;
 
    p_retire : process (all)
    begin

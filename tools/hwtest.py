@@ -246,14 +246,25 @@ def test_readback(fd: int, emu: str) -> None:
 def test_screen_registers(fd: int) -> None:
     """Writes the screen's registers and reads them back. On the display the
     cursor shows at the bottom right, and the screen is scrolled one row."""
-    for addr, value in [("FFFFFF50", "00000460"), ("FFFFFF51", "0000004F"),
-                        ("FFFFFF52", "00000018"), ("FFFFFF55", "00000050")]:
+    for addr, value in [("FFFFFF80", "00000460"), ("FFFFFF81", "0000004F"),
+                        ("FFFFFF82", "00000018"), ("FFFFFF85", "00000050")]:
         check(f"W {addr}", cmd(fd, f"W {addr} {value}") == "OK")
         got = cmd(fd, f"R {addr}")
         check(f"readback {addr}", got == value, f"got {got}, want {value}")
-    got = cmd(fd, "R FFFFFF53")
-    check("FFFFFF53 is not a register", got == "00000000", got)
-    check("the display offset off again", cmd(fd, "W FFFFFF55 00000000") == "OK")
+    got = cmd(fd, "R FFFFFF83")
+    check("FFFFFF83 is not a register", got == "00000000", got)
+    check("the display offset off again", cmd(fd, "W FFFFFF85 00000000") == "OK")
+
+
+def test_fetch_statistics(fd: int) -> None:
+    """Checks the control word of the fetch statistics at FFFFFF50 and that
+    FFFFFF5D, a word they leave at 0, reads 0."""
+    check("FS_CTRL runs", cmd(fd, "R FFFFFF50") == "00000001")
+    check("FS_CTRL stops", cmd(fd, "W FFFFFF50 00000000") == "OK" and
+          cmd(fd, "R FFFFFF50") == "00000000")
+    check("FS_CTRL clears and runs", cmd(fd, "W FFFFFF50 00000003") == "OK" and
+          cmd(fd, "R FFFFFF50") == "00000001")
+    check("FFFFFF5D reads 0", cmd(fd, "R FFFFFF5D") == "00000000")
 
 
 def test_primes(fd: int, primes: str) -> None:
@@ -379,6 +390,7 @@ def main() -> None:
         test_clear(fd)
         test_readback(fd, emu)
         test_screen_registers(fd)
+        test_fetch_statistics(fd)
         test_primes(fd, primes)
         os.close(fd)
         test_run(args.port, args.baud, [

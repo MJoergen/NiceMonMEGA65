@@ -413,29 +413,34 @@ begin
       command("R FFFFFFEF", "0000001B");     -- R15, after the HALT
 
       report "tb_nicemon: the screen's registers";
-      command("W FFFFFF50 000000E0", "OK");  -- the cursor shown, blinking
-      command("W FFFFFF51 0000004F", "OK");  -- column 79
-      command("W FFFFFF52 00000018", "OK");  -- row 24
-      command("W FFFFFF55 00000050", "OK");  -- the display offset, one row
-      command("R FFFFFF50", "000000E0");
-      command("R FFFFFF51", "0000004F");
-      command("R FFFFFF52", "00000018");
-      command("R FFFFFF55", "00000050");
-      command("W FFFFFF53 00000001", "OK");  -- not a register
-      command("R FFFFFF53", "00000000");
-      command("R FFFFFF5F", "00000000");
+      command("R FFFFFF50", "00000001");     -- the fetch statistics run
+      command("W FFFFFF50 00000000", "OK");  -- stop them
+      command("R FFFFFF50", "00000000");
+      command("W FFFFFF50 00000003", "OK");  -- run, and clear
+      command("R FFFFFF50", "00000001");
+      command("W FFFFFF80 000000E0", "OK");  -- the cursor shown, blinking
+      command("W FFFFFF81 0000004F", "OK");  -- column 79
+      command("W FFFFFF82 00000018", "OK");  -- row 24
+      command("W FFFFFF85 00000050", "OK");  -- the display offset, one row
+      command("R FFFFFF80", "000000E0");
+      command("R FFFFFF81", "0000004F");
+      command("R FFFFFF82", "00000018");
+      command("R FFFFFF85", "00000050");
+      command("W FFFFFF83 00000001", "OK");  -- not a register
+      command("R FFFFFF83", "00000000");
+      command("R FFFFFF8F", "00000000");
       assert scr_cur_x = to_slv(79, 7) and scr_cur_y = to_slv(24, 5) and scr_cur_mode = "011"
          report "tb_nicemon: the cursor's registers do not go out"
          severity failure;
       assert scr_offs = 0
          report "tb_nicemon: the display offset goes out while not enabled"
          severity failure;
-      command("W FFFFFF50 00000C50", "OK");  -- the offset enabled, a small cursor
-      command("R FFFFFF50", "00000C50");
+      command("W FFFFFF80 00000C50", "OK");  -- the offset enabled, a small cursor
+      command("R FFFFFF80", "00000C50");
       assert scr_offs = 80 and scr_cur_mode = "101"
          report "tb_nicemon: the display offset does not go out"
          severity failure;
-      command("W FFFFFF50 00000000", "OK");
+      command("W FFFFFF80 00000000", "OK");
 
       report "tb_nicemon: clear the memory";
       command("W FFFFFFF0 0000000D", "OK");

@@ -50,7 +50,7 @@ as the NICE CPU allows.
   colour, so the VGA library writes the words directly where QMON writes a
   register. The hardware has what QMON's VGA library needs for the rest: a
   cursor, and a display offset over 32768 words for scrolling back, in
-  registers numbered as QNICE-FPGA's VGA registers (`0xFFFFFF50` for
+  registers numbered as QNICE-FPGA's VGA registers (`0xFFFFFF80` for
   `0xFF30`, and so on; see "The screen" in the main README). The screen is
   cleared by a loop over its words.
 

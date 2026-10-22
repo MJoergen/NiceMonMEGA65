@@ -32,7 +32,7 @@ begin
          instret_o    => instret_o,
          regs_o       => regs_o,
          retire_o     => retire_o,
-         stats_o      => open
+         stats_o      => stats_o
       ); -- i_core
 
 end architecture pipeline;

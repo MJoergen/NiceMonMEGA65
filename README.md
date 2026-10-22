@@ -49,11 +49,12 @@ difference is the memory: 64K words, not 2³².
 | Math unit, `0xFFFFFF20`–`3F` | Computed on read | nice_cpu's `mpu.vhd`, which stalls the read until the result is ready | Yes |
 | Performance counters, `0xFFFFFF40`–`4F` | One cycle per step, from the start | nice_cpu's `perf.vhd`, counting clock cycles at 100 MHz (90 MHz on the Nexys4DDR), from the start of the core | Instructions yes; cycles count real clocks |
 | Timer, `0xFFFFFF10`–`1F` | Raises IRQ every P steps | nice_cpu's `timer.vhd`, raising IRQ every P clock cycles at 100 MHz (90 MHz on the Nexys4DDR) | Yes, but the period counts real clocks, so the interrupts come at other steps |
+| Fetch statistics, `0xFFFFFF50`–`7F` | Read 0, and a write is ignored | nice_cpu's `fetch_stats.vhd` (MICROARCH.md §8.1), which counts what FETCH and DECODE of the pipelined core do; with `NICE=multi` the words read 0 | Yes, but they count only on the board |
 | Instruction fetches from `0xFFFFFF00`–`FF` | Read 0 | Read 0 | Yes |
 | Memory | All 2³² words, 0 at the start | 64K words, repeated through the address space; the stack at `0xFFFFFF00` lands in the top. `load.py` and `run.py` hide the ROM, if the bitstream has one, and clear the RAM to 0 before they load | No: a program, its data, and its stack must fit in 64K words |
 | Screen, `0xFFFF0000`–`07CF` | 80×25 words of memory, printed by `--screen` | 32768 words of memory of their own (8192 on the Nexys4DDR), read with `R`; the first 2000 are shown on VGA and HDMI, unless the display offset is set | Yes |
 | Read counter, `0xFFFFFF01` | Counts the data reads since the last write | The same; a read by the command line does not count, as `--dump` does not | Yes |
-| The rest of `0xFFFFFF02`–`FF` | Ordinary memory for data | Memory, in the top 256 words of the RAM, except `0xFFFFFF50`–`5F`, the screen's registers | Yes, but for the screen's registers |
+| The rest of `0xFFFFFF02`–`FF` | Ordinary memory for data | Memory, in the top 256 words of the RAM, except `0xFFFFFF80`–`8F`, the screen's registers | Yes, but for the screen's registers |
 | Interrupts | From the timer, `--irq`, and `--nmi` | From the timer, on IRQ | Yes, for the timer's |
 | After a halt | Prints why, the steps, and the registers, and exits with a status | The command line gets the UART back and prints `HALT`; `R FFFFFFF1` reads why, the instruction counter the steps, `R FFFFFFE0` to `R FFFFFFEF` R0–R15, and `R` memory. `run.py` prints them as the emulator does, with its exit status | Yes |
 | `--dump`, `--screen`, `--input` | Options | The same options of `run.py` | Yes |
@@ -277,12 +278,12 @@ QNICE-FPGA, at `0xFF30` there:
 
 | Address | Register |
 |---|---|
-| `0xFFFFFF50` | State. Bit 6 shows the cursor, bit 5 makes it blink, about twice a second, bit 4 makes it small, the bottom 4 lines of the character, and bit 10 enables the display offset. Bits 11..4 are kept and read back; the rest read 0. |
-| `0xFFFFFF51` | The cursor's column, 0 to 79. |
-| `0xFFFFFF52` | The cursor's row, 0 to 24. |
-| `0xFFFFFF55` | The display offset, in words, 0 to 32767. It takes effect when bit 10 of the state is set. |
+| `0xFFFFFF80` | State. Bit 6 shows the cursor, bit 5 makes it blink, about twice a second, bit 4 makes it small, the bottom 4 lines of the character, and bit 10 enables the display offset. Bits 11..4 are kept and read back; the rest read 0. |
+| `0xFFFFFF81` | The cursor's column, 0 to 79. |
+| `0xFFFFFF82` | The cursor's row, 0 to 24. |
+| `0xFFFFFF85` | The display offset, in words, 0 to 32767. It takes effect when bit 10 of the state is set. |
 
-The words `0xFFFFFF53`, `54`, and `56`–`5F` read 0 and take no write. In
+The words `0xFFFFFF83`, `84`, and `86`–`8F` read 0 and take no write. In
 the emulator these addresses are memory, so a program that writes them
 runs there too, without scrolling. After reset the offset is 0 and the
 cursor is off.
@@ -338,7 +339,8 @@ The command line and the core's data accesses see the same addresses.
 | `0xFFFFFF10`–`0xFFFFFF1F` | The timer of SYSTEM.md §4: it raises IRQ every P clock cycles, through the vector it is given. |
 | `0xFFFFFF20`–`0xFFFFFF3F` | The math unit of SYSTEM.md §2: 32-bit multiply and divide, and 64-bit divide. |
 | `0xFFFFFF40`–`0xFFFFFF4F` | The performance counters of SYSTEM.md §3: cycles and instructions, 64 bits each. `R` reads them as the core does: `R FFFFFF42` takes the snapshot that `R FFFFFF43` returns, where `--dump` takes none. |
-| `0xFFFFFF50`–`0xFFFFFF5F` | The screen's registers: the cursor and the display offset (see [The screen](#the-screen)). |
+| `0xFFFFFF50`–`0xFFFFFF7F` | The fetch statistics of MICROARCH.md §8.1, the rest of the performance counters: counters of what FETCH and DECODE do, for judging the size of FETCH's buffer. They count from the start of the core. |
+| `0xFFFFFF80`–`0xFFFFFF8F` | The screen's registers: the cursor and the display offset (see [The screen](#the-screen)). |
 | `0xFFFFFFE0`–`0xFFFFFFEF` | For the command line only: R0–R15 of the core, read only. After a halt they hold what the emulator prints. |
 | `0xFFFFFFF0` | Control, for the command line only. Bit 0 holds the core in reset. Bit 1 reads the core's halted flag. A write with bit 2 set first clears the RAM and the screen to 0, with the core held, and answers `OK` when it is done; then bits 0 and 3 take effect. Bit 3 hides the ROM, so that the RAM is at 0; reset clears it in a bitstream with a ROM, and in one without it reads 1. |
 | `0xFFFFFFF1` | For the command line only, read only: why the core halted. 0 while it has not, 1 for `HALT`, 2 for a reserved control word, 3 for `INT` inside an interrupt routine, and 4 for `RTI` outside one. |

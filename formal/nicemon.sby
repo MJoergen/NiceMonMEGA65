@@ -24,16 +24,19 @@ smtbmc yices
 
 [script]
 plugin -i ghdl
-run: ghdl --std=08 -fpsl -gG_CPU_RUN_AT_RESET=true trace_pkg.vhd mpu.vhd perf.vhd timer.vhd nice_core.vhd nice_core_formal.vhd uart_serdes.vhd line_buffer.vhd cmd.vhd rx_fifo.vhd ram.vhd rom.vhd nicemon.vhd formal_nicemon.vhd -e formal_nicemon
-cli: ghdl --std=08 -fpsl -gG_CPU_RUN_AT_RESET=false trace_pkg.vhd mpu.vhd perf.vhd timer.vhd nice_core.vhd nice_core_formal.vhd uart_serdes.vhd line_buffer.vhd cmd.vhd rx_fifo.vhd ram.vhd rom.vhd nicemon.vhd formal_nicemon.vhd -e formal_nicemon
-cover: ghdl --std=08 -fpsl -gG_CPU_RUN_AT_RESET=true trace_pkg.vhd mpu.vhd perf.vhd timer.vhd nice_core.vhd nice_core_formal.vhd uart_serdes.vhd line_buffer.vhd cmd.vhd rx_fifo.vhd ram.vhd rom.vhd nicemon.vhd formal_nicemon.vhd -e formal_nicemon
+run: ghdl --std=08 -fpsl -gG_CPU_RUN_AT_RESET=true nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd perf.vhd timer.vhd fetch_stats.vhd nice_core.vhd nice_core_formal.vhd uart_serdes.vhd line_buffer.vhd cmd.vhd rx_fifo.vhd ram.vhd rom.vhd nicemon.vhd formal_nicemon.vhd -e formal_nicemon
+cli: ghdl --std=08 -fpsl -gG_CPU_RUN_AT_RESET=false nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd perf.vhd timer.vhd fetch_stats.vhd nice_core.vhd nice_core_formal.vhd uart_serdes.vhd line_buffer.vhd cmd.vhd rx_fifo.vhd ram.vhd rom.vhd nicemon.vhd formal_nicemon.vhd -e formal_nicemon
+cover: ghdl --std=08 -fpsl -gG_CPU_RUN_AT_RESET=true nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd perf.vhd timer.vhd fetch_stats.vhd nice_core.vhd nice_core_formal.vhd uart_serdes.vhd line_buffer.vhd cmd.vhd rx_fifo.vhd ram.vhd rom.vhd nicemon.vhd formal_nicemon.vhd -e formal_nicemon
 prep -top formal_nicemon
 
 [files]
+../nice_cpu/hdl/src/nice_pkg.vhd
 ../nice_cpu/hdl/src/trace_pkg.vhd
+../nice_cpu/hdl/src/pipe_pkg.vhd
 ../nice_cpu/hdl/src/mpu.vhd
 ../nice_cpu/hdl/src/perf.vhd
 ../nice_cpu/hdl/src/timer.vhd
+../nice_cpu/hdl/src/fetch_stats.vhd
 ../src/nice_core.vhd
 ../src/uart_serdes.vhd
 ../src/line_buffer.vhd

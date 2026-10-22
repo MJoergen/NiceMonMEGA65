@@ -8,6 +8,7 @@ library ieee;
    use ieee.std_logic_1164.all;
 
    use work.trace_pkg.all;
+   use work.pipe_pkg.all;
 
 entity nice_core is
    port (
@@ -46,6 +47,9 @@ entity nice_core is
       -- reported on retire_o, those of that report
       regs_o       : out t_regs;
       -- One report per step, for simulation
-      retire_o     : out t_retire
+      retire_o     : out t_retire;
+      -- What FETCH and DECODE do in each cycle, for the fetch statistics.
+      -- The multi-cycle core reports none.
+      stats_o      : out t_fetch_events
    );
 end entity nice_core;
