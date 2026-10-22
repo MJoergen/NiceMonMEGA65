@@ -3,5 +3,6 @@ PART = xc7a100tcsg324-1
 
 BOARD_SRC = top.vhd
 BOARD_XDC = nexys4ddr.xdc
+FLOW      = timing
 
 include ../Makefile.inc
