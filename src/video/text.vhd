@@ -31,16 +31,12 @@
 -- The characters are 16x32 pixels, from the Spleen font (font_pkg.vhd), with
 -- the 256 codes of ISO 8859-1. So the text is 1280x800 pixels, in the middle
 -- of the visible area, which is black around it. The colour of a word is
--- two colours of 8 bits, RGB with 3, 3, and 2 bits: the background in bits
--- 31..24, and the foreground in bits 23..16. Bits 15..8 are not used. A word
--- with 0 in bits 31..16 is white on black, so a program that writes only
--- characters gets readable text.
---
--- The format of the colour is not written down in nice_cpu, which says only
--- that the colour is above bit 7. It is a guess from the 2004 program
--- nice_cpu/assembler/test/print.nasm, which writes its text with 0xC80FF000
--- and calls it "blue on orange": 0xC8 is orange (red 6/7, green 2/7, blue
--- 0), and 0x0F is blue (red 0, green 3/7, blue 3/3).
+-- two colours of 12 bits, red, green, and blue with 4 bits each: the
+-- background in bits 31..20, and the foreground in bits 19..8 (nice_cpu's
+-- doc/SYSTEM.md §1). Each 4-bit component n becomes the byte n * 0x11, so 0xF
+-- is full intensity and 0x0 is none. The foreground is not inverted, as it is
+-- in the 2004 IDE, so a word with only a character, such as 0x41, is black on
+-- black.
 --
 -- The pixel counters (pix.vhd) give the pixel of stage 0. The pipeline:
 --   1: the position in the text, the address of the character, with the
@@ -110,10 +106,6 @@ architecture synthesis of text is
    constant C_HS_START : natural := G_MODE.h_visible + G_MODE.h_front;
    constant C_VS_START : natural := G_MODE.v_visible + G_MODE.v_front;
 
-   -- The colours, RGB 3-3-2, of a word whose colour is 0
-   constant C_DEFAULT_FG : std_logic_vector(7 downto 0) := X"FF";
-   constant C_DEFAULT_BG : std_logic_vector(7 downto 0) := X"00";
-
    -- The screen's registers, held for the handshake, in the system clock
    -- domain. ctl_dirty is '1' while a write waits for the handshake.
    signal ctl_dirty  : std_logic := '0';
@@ -171,15 +163,15 @@ architecture synthesis of text is
    signal vis_3   : std_logic := '0';
    signal text_3  : std_logic := '0';
    signal glyph_3 : std_logic_vector(C_CHAR_WIDTH - 1 downto 0) := (others => '0');
-   signal fg_3    : std_logic_vector(7 downto 0) := (others => '0');
-   signal bg_3    : std_logic_vector(7 downto 0) := (others => '0');
+   signal fg_3    : std_logic_vector(11 downto 0) := (others => '0');
+   signal bg_3    : std_logic_vector(11 downto 0) := (others => '0');
    signal col_3   : std_logic_vector(3 downto 0) := (others => '0');
 
    -- Stage 4
    signal hs_4     : std_logic := not G_MODE.sync_active;
    signal vs_4     : std_logic := not G_MODE.sync_active;
    signal de_4     : std_logic := '0';
-   signal colour_4 : std_logic_vector(7 downto 0) := (others => '0');
+   signal colour_4 : std_logic_vector(11 downto 0) := (others => '0');
 
 begin
 
@@ -277,8 +269,8 @@ begin
       variable row_v  : std_logic_vector(4 downto 0);
       variable col_v  : std_logic_vector(6 downto 0);
       variable addr_v : std_logic_vector(10 downto 0);
-      variable fg_v   : std_logic_vector(7 downto 0);
-      variable bg_v   : std_logic_vector(7 downto 0);
+      variable fg_v   : std_logic_vector(11 downto 0);
+      variable bg_v   : std_logic_vector(11 downto 0);
       variable show_v : std_logic;
    begin
       if rising_edge(vga_clk_i) then
@@ -325,13 +317,8 @@ begin
 
          -- Stage 3. The cursor swaps the colours of its character.
          glyph_3 <= C_FONT(to_integer(word_2(7 downto 0) & line_2));
-         if word_2(31 downto 16) = 0 then
-            fg_v := C_DEFAULT_FG;
-            bg_v := C_DEFAULT_BG;
-         else
-            fg_v := word_2(23 downto 16);
-            bg_v := word_2(31 downto 24);
-         end if;
+         fg_v := word_2(19 downto 8);
+         bg_v := word_2(31 downto 20);
          show_v := '0';
          if cur_2 = '1' and cur_mode_vga(0) = '1' then
             show_v := '1';
@@ -370,14 +357,13 @@ begin
       end if;
    end process p_pipeline;
 
-   -- Each colour is expanded to 8 bits by repeating its bits, so that the full
-   -- range is used ("111" is 0xFF), as in MandelbrotMEGA65.
+   -- Each component is expanded to 8 bits by repeating its 4 bits, so that the
+   -- full range is used (0xF is 0xFF).
    vga_hs_o    <= hs_4;
    vga_vs_o    <= vs_4;
    vga_de_o    <= de_4;
-   vga_red_o   <= colour_4(7 downto 5) & colour_4(7 downto 5) & colour_4(7 downto 6);
-   vga_green_o <= colour_4(4 downto 2) & colour_4(4 downto 2) & colour_4(4 downto 3);
-   vga_blue_o  <= colour_4(1 downto 0) & colour_4(1 downto 0) & colour_4(1 downto 0) &
-                  colour_4(1 downto 0);
+   vga_red_o   <= colour_4(11 downto 8) & colour_4(11 downto 8);
+   vga_green_o <= colour_4(7 downto 4) & colour_4(7 downto 4);
+   vga_blue_o  <= colour_4(3 downto 0) & colour_4(3 downto 0);
 
 end architecture synthesis;

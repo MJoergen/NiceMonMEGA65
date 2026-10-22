@@ -2,7 +2,7 @@
 --
 -- THEORY OF OPERATION
 -- p_write fills the screen through the write port, in the system clock
--- domain: a line of text in the default colours, a line in the colour of
+-- domain: a line of text in white on black, a line in the colour of
 -- print.nasm, the 256 codes in many colours, and the 48 words after the 2000
 -- of the screen, which must not show at a display offset of 0. It keeps a
 -- model of the screen.
@@ -78,9 +78,9 @@ architecture simulation of tb_text is
       variable col   : natural;
       variable word  : std_logic_vector(31 downto 0);
       variable glyph : std_logic_vector(15 downto 0);
-      variable fg    : std_logic_vector(7 downto 0);
-      variable bg    : std_logic_vector(7 downto 0);
-      variable c     : std_logic_vector(7 downto 0);
+      variable fg    : std_logic_vector(11 downto 0);
+      variable bg    : std_logic_vector(11 downto 0);
+      variable c     : std_logic_vector(11 downto 0);
    begin
       if x < C_X0 or x >= C_X0 + 1280 or y < C_Y0 or y >= C_Y0 + 800 then
          return X"000000";
@@ -89,12 +89,8 @@ architecture simulation of tb_text is
       col   := (x - C_X0) / 16;
       word  := scr((disp + row * 80 + col) mod 2 ** C_SCR_BITS);
       glyph := C_FONT(to_integer(word(7 downto 0)) * 32 + (y - C_Y0) mod 32);
-      fg    := word(23 downto 16);
-      bg    := word(31 downto 24);
-      if word(31 downto 16) = 0 then
-         fg := X"FF";
-         bg := X"00";
-      end if;
+      fg    := word(19 downto 8);
+      bg    := word(31 downto 20);
       if cursor and row = cy and col = cx then
          c  := fg;
          fg := bg;
@@ -105,10 +101,9 @@ architecture simulation of tb_text is
       else
          c := bg;
       end if;
-      -- RGB 3-3-2, with each colour's bits repeated to 8 bits
-      return c(7 downto 5) & c(7 downto 5) & c(7 downto 6) &
-             c(4 downto 2) & c(4 downto 2) & c(4 downto 3) &
-             c(1 downto 0) & c(1 downto 0) & c(1 downto 0) & c(1 downto 0);
+      -- Each 4-bit component n is the byte n * 0x11
+      return c(11 downto 8) & c(11 downto 8) & c(7 downto 4) & c(7 downto 4) &
+             c(3 downto 0) & c(3 downto 0);
    end function expected;
 
 begin
@@ -163,10 +158,10 @@ begin
       variable colour_v : std_logic_vector(23 downto 0);
    begin
       wait until rising_edge(clk);
-      print(0, "NiceMon on the MEGA65: 80x25 characters, white on black.", X"000000");
-      print(80, "Blue on orange, as in print.nasm", X"C80FF0");
+      print(0, "NiceMon on the MEGA65: 80x25 characters, white on black.", X"000FFF");
+      print(80, "Blue on orange, as in print.nasm", X"F8000F");
       -- The last column of a row, and the last word of the screen
-      print(80 + 79, "!", X"00E000");
+      print(80 + 79, "!", X"000E00");
       print(1999, "#", X"031C00");
       -- The 256 codes, from row 4, in colours from the code and the row
       for i in 0 to 20 * 80 - 1 loop

@@ -7,14 +7,14 @@
 -- The board differs from the MEGA65 in three ways that matter here:
 -- * Its FPGA, an XC7A100T, has 135 block RAMs of 36 Kbit, where the MEGA65's
 --   has 365. So the screen is 8K words (G_SCR_ADDR_BITS = 13), not 32K: with
---   its copy in text.vhd it takes 14 block RAMs, and the RAM and the ROM,
+--   its copy in text.vhd it takes 16 block RAMs, and the RAM and the ROM,
 --   the same as on the MEGA65, take 96.
 -- * Its FPGA is speed grade -1, where the MEGA65's is -2, so the system
 --   clock is 90 MHz, not 100 MHz. At 100 MHz the pipelined core misses
 --   timing by a few tenths of a nanosecond or less, which placement
 --   changes from run to run.
 -- * The VGA output is a resistor DAC with 4 bits per colour, and no HDMI.
---   The screen's colours have 3 bits or fewer per colour (text.vhd), so the
+--   The screen's colours have 4 bits per colour (text.vhd), so the
 --   top 4 bits of each lose nothing. The colour and sync outputs are
 --   registered in the IOBs (nexys4ddr.xdc), so they all change at the same
 --   time.

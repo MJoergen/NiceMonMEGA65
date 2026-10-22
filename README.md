@@ -262,11 +262,14 @@ The screen at `0xFFFF0000` is shown on the VGA connector and on the HDMI
 connector, at 1280×1024 and 60 Hz, as 80 columns and 25 rows of
 characters of 16×32 pixels, in the middle of the picture. Word `80 * row +
 column` is one character: its code, ISO 8859-1, in bits 7..0, and its
-colour above. The colour is two 8-bit colours, RGB with 3, 3, and 2 bits:
-the background in bits 31..24 and the foreground in bits 23..16. Bits 15..8
-are not used. A word with 0 in bits 31..16 is white on black, so plain
-characters are readable. The screen is 0 at power-up, which shows as black,
-and `nice_screen_clear` fills it with blanks.
+colour above. The colour is two 12-bit colours, red, green, and blue with 4
+bits each, as in nice_cpu's `doc/SYSTEM.md` §1: the background in bits
+31..20 and the foreground in bits 19..8. A component `n` gives the byte
+`n × 0x11`, so `0xF` is full intensity and `0x0` is none. The foreground is
+not inverted, as it is in the 2004 IDE. So a word with only a character,
+such as `0x41`, is black on black, and `0x000FFF41` is a white `A` on
+black. The screen is 0 at power-up, which shows as black, and
+`nice_screen_clear` fills it with blanks.
 
 The screen's memory is 32768 words, `0xFFFF0000`–`0xFFFF7FFF`, of which the
 display shows 2000 from the display offset, so a program scrolls by adding
@@ -288,13 +291,8 @@ the emulator these addresses are memory, so a program that writes them
 runs there too, without scrolling. After reset the offset is 0 and the
 cursor is off.
 
-The colour format is a guess. nice_cpu says only that the colour is above
-bit 7, and its one example, the 2004 program
-`nice_cpu/assembler/test/print.nasm`, writes `0xC80FF000` and calls it "blue
-on orange", which this format shows: `0xC8` is orange and `0x0F` is blue.
-
-From the command line, `W FFFF0000 00000041` puts an `A` in the top left
-corner, white on black, and `W FFFF0001 E0FF0042` a white `B` on red next to
+From the command line, `W FFFF0000 000FFF41` puts an `A` in the top left
+corner, white on black, and `W FFFF0001 F00FFF42` a white `B` on red next to
 it.
 
 The video output comes from MandelbrotMEGA65, which uses the same mode on

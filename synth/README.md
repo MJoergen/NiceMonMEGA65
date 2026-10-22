@@ -55,14 +55,14 @@ three ways:
 - Its FPGA has 135 block RAMs of 36 Kbit, where the MEGA65's has 365. The
   RAM and the ROM are the same as on the MEGA65, and take 96 of them, but
   the screen is 8K words, not 32K, so that it and its copy in `text.vhd`
-  take 14, not 56. With the font and the UART's FIFO, that is 114.5 with
+  take 16, not 64. With the font and the UART's FIFO, that is 116.5 with
   the ROM. 8K words are still more than three screens of 80×25 for
   scrolling.
 - Its FPGA is speed grade -1, where the MEGA65's is -2, so the system clock
   is 90 MHz, not 100 MHz; at 100 MHz the pipelined core misses timing by a
   few tenths of a nanosecond or less, as placement varies. The UART runs at 115200 baud as on the MEGA65.
 - Its VGA output has 4 bits per colour, from resistors, and there is no
-  HDMI. The screen's colours have 3 bits or fewer per colour, so they show
+  HDMI. The screen's colours have 4 bits per colour, so they show
   as on the MEGA65.
 
 ## Building
@@ -113,39 +113,45 @@ minutes and seconds, without `ROM=`:
 
 | Build | Synthesis | Placement | Routing | Bitstream | Total |
 |---|---|---|---|---|---|
-| R6, pipelined | 2:14 | 0:40 | 1:09 | 0:33 | 4:52 |
-| R6, `NICE=multi` | 1:28 | 0:34 | 0:59 | 0:33 | 3:54 |
-| Nexys4DDR, pipelined | 2:03 | 0:35 | 0:44 | 0:32 | 4:06 |
-| Nexys4DDR, `NICE=multi` | 1:09 | 0:32 | 5:31 | 0:28 | 7:49 |
+| R6, pipelined | 3:14 | 0:39 | 2:45 | 0:50 | 7:54 |
+| R6, `NICE=multi` | 1:29 | 0:28 | 1:06 | 0:32 | 3:55 |
+| Nexys4DDR, pipelined | 3:08 | 0:30 | 0:52 | 0:35 | 5:24 |
+| Nexys4DDR, `NICE=multi` | 1:53 | 0:31 | 1:15 | 0:28 | 4:18 |
+| R3, pipelined | 3:11 | 0:36 | 1:08 | 0:35 | 5:49 |
 
-The R3 takes the same as the R6. The Nexys4DDR builds with `FLOW=timing`.
-Its routing time varies most: an earlier pipelined build routed in 1:32,
-and the time with `NICE=multi` is from one build only.
+The Nexys4DDR builds with `FLOW=timing`. The times vary from build to
+build: one R6 pipelined build spent 9:36 in synthesis, with the same result,
+and took 12:49 in all.
 
 The utilisation is from `build/utilization.rpt`, and the split by module
 from `report_utilization -hierarchical` on `build/top.dcp`. These are the
-numbers without `ROM=`, at commit 671172e, in LUTs and flip-flops:
+numbers without `ROM=`, at commit cb95968 with the colour format of the screen, in LUTs and flip-flops:
 
 | Part of the design | R6, pipelined | R6, multi | Nexys4DDR, pipelined | Nexys4DDR, multi |
 |---|---|---|---|---|
-| The core (`nice_core`) | 6985 / 3002 | 4581 / 1044 | 7071 / 2943 | 4562 / 985 |
-| The math unit (`mpu`) | 2178 / 874 | 2167 / 874 | 2112 / 874 | 2200 / 876 |
-| The rest: the CLI, UART, RAM, counters, timer, and glue | 761 / 1123 | 767 / 1123 | 736 / 1107 | 709 / 1109 |
-| The text display (`text.vhd`) | 105 / 153 | 105 / 153 | 103 / 144 | 99 / 144 |
-| The keyboard | 596 / 585 | 596 / 585 | – | – |
-| The HDMI output | 522 / 1199 | 522 / 1199 | – | – |
-| Total | 11147 / 6936 | 8738 / 4978 | 10022 / 5068 | 7570 / 3114 |
-| Total, of the FPGA | 8.3 % / 2.6 % | 6.5 % / 1.9 % | 15.8 % / 4.0 % | 11.9 % / 2.5 % |
+| The core (`nice_core`) | 6861 / 3006 | 4605 / 1050 | 6897 / 2950 | 4636 / 4071 |
+| The math unit (`mpu`) | 2282 / 875 | 2172 / 874 | 2249 / 875 | 2166 / 874 |
+| The fetch statistics (`fetch_stats`) | 744 / 1329 | 44 / 99 | 738 / 1329 | 44 / 99 |
+| The rest: the CLI, UART, RAM, counters, timer, and glue | 707 / 1154 | 795 / 1156 | 653 / 1116 | 740 / 1119 |
+| The text display (`text.vhd`) | 123 / 180 | 123 / 180 | 121 / 156 | 121 / 156 |
+| The keyboard | 588 / 585 | 596 / 585 | – | – |
+| The HDMI output | 574 / 1207 | 574 / 1207 | – | – |
+| Total | 11879 / 8336 | 8909 / 5151 | 10658 / 6426 | 7707 / 6319 |
+| Total, of the FPGA | 8.9 % / 3.1 % | 6.7 % / 1.9 % | 16.8 % / 5.1 % | 12.2 % / 5.0 % |
 
 The pipelined core is about 5 % of the LUTs of the R6's FPGA, and 11 % of
-the Nexys4DDR's. The multi-cycle core has two thirds of its LUTs and a third
-of its flip-flops: 3.4 % and 7.2 %. Both keep their registers in
-flip-flops, and use no DSP. The pipelined core uses no block RAM. The
-multi-cycle core uses one RAMB18, which Vivado infers for `src2_count`,
-the register of the shift count. The math unit has the 4 DSPs of the design. Both cores meet the
-clock: the R6 by 0.24 ns (pipelined) and 0.26 ns (multi) at 100 MHz, the
-Nexys4DDR by 0.17 ns and 0.16 ns at 90 MHz. The R3 is within about 2 % of
-the R6.
+the Nexys4DDR's. The multi-cycle core has two thirds of its LUTs, 3.4 % and
+7.3 %. On the R6 it has a third of the flip-flops too; on the Nexys4DDR it
+has 4071, more than the pipelined core's 2950, where an earlier build had
+985; the cause is not known. The `fetch_stats` of the pipelined core (the
+fetch statistics in the main README's address map) has over a thousand
+flip-flops, and the multi-cycle core's has few. The pipelined core uses no block RAM. The
+multi-cycle core uses one RAMB18, which Vivado infers for `src2_count`, the
+register of the shift count. The math unit has the 4 DSPs of the design. All
+builds meet the clock, with these worst setup slacks: the R6 0.23 ns
+(pipelined) and 0.52 ns (multi) at 100 MHz, the R3 0.21 ns (pipelined), the
+Nexys4DDR 0.33 ns and 0.19 ns at 90 MHz. The R3 is within about 1 % of the
+R6.
 
 The block RAMs, of 36 Kbit, are these:
 
@@ -154,13 +160,12 @@ The block RAMs, of 36 Kbit, are these:
 | The RAM (`i_ram`), 64K words | 64 | 64 |
 | The ROM (`i_rom`), 32K words, with `ROM=` only | 32 | 32 |
 | The screen (`i_scr` in `nicemon.vhd`), 32K or 8K words | 32 | 8 |
-| Its copy in `text.vhd` (`scr_ram.vhd`) | 24 | 6 |
+| Its copy in `text.vhd` (`scr_ram.vhd`) | 32 | 8 |
 | The font in `text.vhd` | 4 | 4 |
 | The UART's input FIFO (`rx_fifo.vhd`), one RAMB18 | 0.5 | 0.5 |
-| Total without the ROM, pipelined | 124.5 of 365 | 82.5 of 135 |
-| Total with the ROM, pipelined | 156.5 | 114.5 |
+| Total without the ROM, pipelined | 132.5 of 365 | 84.5 of 135 |
+| Total with the ROM, pipelined | 164.5 | 116.5 |
 
-The copy of the screen keeps only the 24 bits that the display reads (bits
-7–0, the character, and 31–16, the colours), so Vivado leaves out the rest,
-and it takes three quarters of the screen's block RAMs. The multi-cycle
-core adds half of one more, its RAMB18.
+The copy of the screen keeps all 32 bits, as the display reads the
+character and both 12-bit colours, so it takes as many block RAMs as the
+screen. The multi-cycle core adds half of one more, its RAMB18.
