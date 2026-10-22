@@ -79,7 +79,8 @@
 --                          the other bits, and the words 83, 84, and 86-8F,
 --                          read 0 and take no write. The registers go out on
 --                          scr_cur_*_o and scr_offs_o, with scr_ctl_we_o
---                          for a cycle when one is written.
+--                          for a cycle when one is written, and when they
+--                          are cleared by reset or by the clear of the memory.
 --   0xFFFFFFE0-0xFFFFFFEF  For the CLI only: R0-R15 of the core, read only,
 --                          so that they can be read after HALT, as the
 --                          emulator prints them.
@@ -141,8 +142,8 @@
 -- RESET
 -- Synchronous. After reset the control bit is 1 when G_CPU_RUN_AT_RESET is
 -- false, so the core waits for the CLI, and 0 otherwise, so the core boots
--- from the ROM, which reset shows. Memory and the screen's registers are not
--- changed.
+-- from the ROM, which reset shows. The screen's registers are cleared, as
+-- they are by the clear of the memory; the memory is not changed.
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -373,6 +374,7 @@ architecture synthesis of nicemon is
 
    -- A request of the core for a device, taken in this cycle, and whether
    -- a device owes the core an acknowledge
+   signal core_take : std_logic;
    signal core_dev  : std_logic;
    signal core_owed : std_logic := '0';
 
@@ -567,9 +569,13 @@ begin
    -- holds the core while it computes a result that the core reads.
    dbus_stall <= cli_pend or tx_wait or dev_busy or clearing or mpu_stall;
    dbus_ack   <= srv_ack or (core_owed and dev_ack);
-   core_dev   <= '1' when dbus_cyc = '1' and dbus_stb = '1' and dbus_stall = '0' and
-                          is_dev(dbus_addr) else
-                 '0';
+
+   -- A request of the core in reset is dropped: it is not taken, whatever it
+   -- is, though the core's registered request may still show in the first
+   -- cycle of a hold.
+   core_take <= dbus_cyc and dbus_stb and not dbus_stall and not cpu_rst;
+   core_dev  <= '1' when core_take = '1' and is_dev(dbus_addr) else
+                '0';
 
    ram_b_addr  <= clr_addr(G_RAM_ADDR_BITS - 1 downto 0) when clearing = '1' else
                   cli_p_addr(G_RAM_ADDR_BITS - 1 downto 0) when cli_pend = '1' else
@@ -582,7 +588,7 @@ begin
                   dbus_addr(C_SCR_BITS - 1 downto 0);
 
    -- A write to memory is served in the cycle that the CLI's or the core's
-   -- request is taken. It goes to the screen or to the main memory, unless
+   -- request is taken, and in no other cycle. It goes to the screen or to the main memory, unless
    -- it is to the ROM, where it is dropped. While the memory is cleared,
    -- both are written, the RAM under the ROM included.
    p_mem_we : process (all)
@@ -593,12 +599,12 @@ begin
       addr_v := dbus_addr;
       if clearing = '1' then
          null;
-      elsif dev_busy = '0' and cli_pend = '1' then
+      elsif dev_busy = '0' and cli_pend = '1' and core_owed = '0' and mpu_stall = '0' then
          addr_v := cli_p_addr;
          if not is_io(cli_p_addr, true) then
             we_v := cli_p_we;
          end if;
-      elsif dev_busy = '0' and tx_wait = '0' and dbus_cyc = '1' and dbus_stb = '1' then
+      elsif core_take = '1' then
          if not is_io(dbus_addr, false) then
             we_v := dbus_we;
          end if;
@@ -753,6 +759,11 @@ begin
                -- Clear the memory with the core held. The request is
                -- acknowledged when the memory is clear.
                clearing   <= '1';
+               scr_state  <= (others => '0');
+               scr_cur_x  <= (others => '0');
+               scr_cur_y  <= (others => '0');
+               scr_offs   <= (others => '0');
+               scr_ctl_we <= '1';
                clr_addr   <= (others => '0');
                clr_hold   <= wdata(0);
                cpu_hold   <= '1';
@@ -853,7 +864,7 @@ begin
                tx_wait      <= '0';
                srv_ack      <= '1';
             end if;
-         elsif dbus_cyc = '1' and dbus_stb = '1' and dbus_stall = '0' then
+         elsif core_take = '1' then
             serve(false, dbus_addr, dbus_we, dbus_wdata);
          end if;
 
@@ -890,6 +901,11 @@ begin
             clearing     <= '0';
             cpu_tx_valid <= '0';
             rom_hidden   <= C_NO_ROM;
+            scr_state    <= (others => '0');
+            scr_cur_x    <= (others => '0');
+            scr_cur_y    <= (others => '0');
+            scr_offs     <= (others => '0');
+            scr_ctl_we   <= '1';
             if G_CPU_RUN_AT_RESET then
                cpu_hold <= '0';
             else
@@ -906,7 +922,7 @@ begin
    -- received before, so that a program starts with no input.
    rx_wr_en <= in_valid and uart_owner_cpu;
    rx_end   <= ser_rx_break and uart_owner_cpu;
-   rx_take  <= '1' when dbus_cyc = '1' and dbus_stb = '1' and dbus_stall = '0' and
+   rx_take  <= '1' when core_take = '1' and
                         dbus_addr = C_UART_DATA and dbus_we = '0' else
                '0';
 

@@ -321,8 +321,9 @@ QNICE-FPGA, at `0xFF30` there:
 
 The words `0xFFFFFF83`, `84`, and `86`–`8F` read 0 and take no write. In
 the emulator these addresses are memory, so a program that writes them
-runs there too, without scrolling. After reset the offset is 0 and the
-cursor is off.
+runs there too, without scrolling. Reset, and the clear of the memory
+(`W FFFFFFF0 00000004` and its variants, as `load.py` and `run.py` send),
+set the offset to 0 and turn the cursor off, as at the start of the emulator.
 
 From the command line, `W FFFF0000 000FFF41` puts an `A` in the top left
 corner, white on black, and `W FFFF0001 F00FFF42` a white `B` on red next to

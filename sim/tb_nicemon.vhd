@@ -450,6 +450,12 @@ begin
       command("R FFFF0000", "00000000");     -- the screen
       command("R FFFF07CF", "00000000");
       command("R FFFFFF02", "00000000");     -- the top of the memory
+      command("R FFFFFF81", "00000000");     -- the screen's registers, as at the start
+      command("R FFFFFF82", "00000000");
+      command("R FFFFFF85", "00000000");
+      assert scr_cur_x = 0 and scr_cur_y = 0
+         report "tb_nicemon: the clear does not reset the cursor"
+         severity failure;
 
       report "tb_nicemon: load " & G_RESERVED_FILE;
       load(G_RESERVED_FILE, first_v);
