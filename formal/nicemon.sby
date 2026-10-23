@@ -5,6 +5,9 @@
 # The core is nice_core_formal.vhd, a free core that does anything either
 # of nice_cpu's cores may do on its ports, so the system is checked against
 # both, and the solver spends nothing on a real core's state.
+# The CLI gets the UART only while the core is held or halted, and a halted
+# core makes no new fetch, so no CLI request meets a running core or an
+# outstanding fetch. The depths therefore need no shorter banner.
 
 [tasks]
 run
