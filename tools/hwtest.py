@@ -9,8 +9,9 @@ tests. openFPGALoader does both, for the MEGA65 and the Nexys4DDR alike.
 It checks the banner, and the ROM when the bitstream has one, then drives
 the command line with the ROM hidden: it
 loads and runs sim/echo.nasm, holds and restarts the core, clears
-the memory, reads back what sim/emu.nasm leaves after its halt, writes and
-reads the screen's registers, and runs the C example
+the memory, reads back what sim/emu.nasm leaves after its halt, checks that
+the cycle counter and the timer stop there, writes and reads the screen's
+registers, and runs the C example
 examples/build/primes.bin. Last, it runs programs with tools/run.py and
 with niceemu, and compares their output and exit status, with sim/eof.nasm
 also the end of the input and an input file of 1536 bytes, with
@@ -289,6 +290,19 @@ def test_readback(fd: int, emu: str) -> None:
     print("  R0-R15:", " ".join(regs))
 
 
+def test_counters_stop(fd: int) -> None:
+    """After a halt the cycle counter and the timer's COUNT do not change."""
+    first = cmd(fd, "R FFFFFF40")
+    time.sleep(0.5)
+    check("cycle counter stops at a halt", cmd(fd, "R FFFFFF40") == first,
+          first)
+    check("W TIMER_PERIOD", cmd(fd, "W FFFFFF10 00FFFFFF") == "OK")
+    count = cmd(fd, "R FFFFFF11")
+    time.sleep(0.5)
+    check("timer COUNT stops at a halt",
+          count != "00000000" and cmd(fd, "R FFFFFF11") == count, count)
+
+
 def test_screen_registers(fd: int) -> None:
     """Writes the screen's registers and reads them back. On the display the
     cursor shows at the bottom right, and the screen is scrolled one row."""
@@ -445,6 +459,7 @@ def main() -> None:
                 test_reset(fd, echo)
                 test_clear(fd)
                 test_readback(fd, emu)
+                test_counters_stop(fd)
                 test_screen_registers(fd)
                 test_fetch_statistics(fd)
                 test_primes(fd, primes)
