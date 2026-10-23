@@ -19,6 +19,10 @@ set_false_path -from [get_ports {max10_tx_i}]
 ## timed.
 set_false_path -from [get_cells i_max10/reset_button_reg]
 
+## The outputs to the MAX10 are plain registers in max10.vhd, so they are
+## placed in the I/O tiles.
+set_property IOB TRUE [get_ports {max10_clkandsync_o max10_rx_o}]
+
 ## The timing of the link to the MAX10 is fragile, so the link is placed close
 ## to its pins, as in the C64MEGA65 core (MEGA65-R3.xdc).
 create_pblock pblock_max10

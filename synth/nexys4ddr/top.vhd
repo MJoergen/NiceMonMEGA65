@@ -96,12 +96,13 @@ begin
 
    i_clk_rst : entity work.clk_rst
       generic map (
-         G_MULTIPLY => 9.0,
-         G_DIVIDE   => 10.0
+         G_MULTIPLY     => 9.0,
+         G_DIVIDE       => 10.0,
+         G_BUTTON_LEVEL => '0'
       )
       port map (
          sys_clk_i      => clk_i,
-         reset_button_i => not reset_n_i,
+         reset_button_i => reset_n_i,
          clk_o          => clk,
          rst_o          => rst
       ); -- i_clk_rst

@@ -49,7 +49,7 @@ set_property IOB TRUE [get_ports {vga_red_o[*] vga_green_o[*] vga_blue_o[*] vga_
 ## first.
 set_false_path -from [get_ports {uart_rxd_i reset_n_i ps2_clk_i ps2_data_i}]
 set_false_path -to   [get_ports {uart_txd_o led_o}]
-set_property IOB TRUE [get_ports {uart_txd_o uart_rxd_i led_o ps2_clk_i ps2_data_i}]
+set_property IOB TRUE [get_ports {uart_txd_o uart_rxd_i reset_n_i led_o ps2_clk_i ps2_data_i}]
 
 ## Configuration from the board's quad SPI flash
 set_property CONFIG_VOLTAGE                3.3   [current_design]

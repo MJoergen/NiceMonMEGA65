@@ -5,12 +5,14 @@
 -- grade. The pipelined core meets 100 MHz on the MEGA65 with little to
 -- spare, so recheck the timing after a change to nice_cpu.
 -- The reset is held while the MMCM is not locked, and while the reset
--- button (active high) is pressed, and for 2^20 cycles (10 ms at 100 MHz)
--- after both. So the UART output is idle for that long before the CLI sends
+-- button is pressed (G_BUTTON_LEVEL is its level then), and for 2^20 cycles
+-- (10 ms at 100 MHz) after both. So the UART output is idle for that long before the CLI sends
 -- its banner, and a terminal that saw the pin change during configuration
 -- has time to find the start of a character.
 -- The MMCM's locked output and the button are synchronized to clk_o by two
--- registers each, as in MandelbrotMEGA65's clk_rst.vhd.
+-- registers each, as in MandelbrotMEGA65's clk_rst.vhd. The button is not
+-- inverted before the first register, so that it can be an IOB flop whatever
+-- its polarity.
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -21,12 +23,13 @@ library unisim;
 
 entity clk_rst is
    generic (
-      G_MULTIPLY : real := 10.0;
-      G_DIVIDE   : real := 10.0
+      G_MULTIPLY     : real      := 10.0;
+      G_DIVIDE       : real      := 10.0;
+      G_BUTTON_LEVEL : std_logic := '1' -- level of reset_button_i when pressed
    );
    port (
       sys_clk_i      : in  std_logic; -- 100 MHz
-      reset_button_i : in  std_logic; -- active high, asynchronous
+      reset_button_i : in  std_logic; -- asynchronous
       clk_o          : out std_logic; -- 100 MHz * G_MULTIPLY / G_DIVIDE
       rst_o          : out std_logic  -- synchronous to clk_o
    );
@@ -40,7 +43,7 @@ architecture synthesis of clk_rst is
    signal locked    : std_logic;
 
    signal locked_sync : std_logic_vector(1 downto 0) := "00";
-   signal button_sync : std_logic_vector(1 downto 0) := "11";
+   signal button_sync : std_logic_vector(1 downto 0) := (others => G_BUTTON_LEVEL);
    signal counter     : std_logic_vector(19 downto 0) := (others => '1');
    signal rst         : std_logic := '1';
 
@@ -89,7 +92,7 @@ begin
       if rising_edge(clk_o) then
          locked_sync <= locked_sync(0) & locked;
          button_sync <= button_sync(0) & reset_button_i;
-         if locked_sync(1) = '0' or button_sync(1) = '1' then
+         if locked_sync(1) = '0' or button_sync(1) = G_BUTTON_LEVEL then
             counter <= (others => '1');
          elsif counter /= 0 then
             counter <= counter - 1;

@@ -169,8 +169,11 @@ clock, with these worst setup slacks: the R6 0.52 ns (multi) at 100 MHz, the
 R3 0.21 ns (pipelined), the Nexys4DDR 0.19 ns (multi) at 90 MHz. The
 pipelined core's slacks are from the builds at 929534c, which gates the
 core's requests with `core_take`: the R6 0.11 ns and the Nexys4DDR 0.02 ns
-(0.23 ns and 0.32 ns before). The R3 is within about 1 % of the R6, from an
-earlier build.
+(0.23 ns and 0.32 ns before). The R3 (0.22 ns) and the Nexys4DDR (0.05 ns)
+were rebuilt after the reset button and the MAX10 pins went into the IOBs;
+the Nexys4DDR's worst path is in the core's WRITE stage, which that change
+does not touch, so the 0.03 ns it gained over the earlier build is most likely
+placement noise.
 
 The block RAMs, of 36 Kbit, are these:
 
