@@ -255,6 +255,16 @@ def test_clear(fd: int) -> None:
     check("memory cleared", got == "00000000", got)
 
 
+def steps(path: str) -> str:
+    """The steps niceemu counts for the program, as the R command prints."""
+    r = subprocess.run([NICEEMU, path], stdin=subprocess.DEVNULL,
+                       capture_output=True, check=True)
+    m = re.search(rb" after (\d+) steps", r.stdout)
+    if not m:
+        raise SystemExit(f"hwtest: no step count in niceemu's output for {path}")
+    return f"{int(m.group(1)):08X}"
+
+
 def test_readback(fd: int, emu: str) -> None:
     load(fd, emu)
     halt = read_until(fd, HALT_MESSAGE)
@@ -263,7 +273,7 @@ def test_readback(fd: int, emu: str) -> None:
     check("emu.nasm halted", ctl == "0000000A", ctl)
     expected = {
         "FFFFFFF1": "00000001",  # halted by HALT
-        "FFFFFF42": "0000000C",  # 12 steps, as niceemu says
+        "FFFFFF42": steps(emu),  # as niceemu says
         "FFFF0000": "00000041",  # the screen, column 0 of row 0
         "FFFF07CF": "00000042",  # the screen, column 79 of row 24
         "FFFFFF02": "00001234",  # memory in the I/O range

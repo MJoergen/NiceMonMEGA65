@@ -19,7 +19,7 @@
 -- 4. Start the core. It prints "Hello, NICE!" and halts, and the CLI gets
 --    the UART back and prints the halt message: the control register shows
 --    the halted flag, the halt reason is HALT, and the instruction counter
---    holds the steps that niceemu prints for the program. Each program
+--    holds the steps that niceemu prints for the program (G_*_STEPS). Each program
 --    after it ends with the halt message too.
 -- 5. Hold the core, load G_ECHO_FILE, and start it. It echoes the bytes it
 --    receives until a '.', which checks the UART input of the core: every
@@ -66,14 +66,18 @@ library ieee;
 
 entity tb_nicemon is
    generic (
-      G_HELLO_FILE    : string;
-      G_ROM_FILE      : string;
-      G_ECHO_FILE     : string;
-      G_FIFO_FILE     : string;
-      G_DEVICES_FILE  : string;
-      G_EMU_FILE      : string;
-      G_RESERVED_FILE : string;
-      G_EOF_FILE      : string
+      G_HELLO_FILE     : string;
+      G_ROM_FILE       : string;
+      G_ECHO_FILE      : string;
+      G_FIFO_FILE      : string;
+      G_DEVICES_FILE   : string;
+      G_EMU_FILE       : string;
+      G_RESERVED_FILE  : string;
+      G_EOF_FILE       : string;
+      -- The steps that niceemu counts for hello, emu, and reserved
+      G_HELLO_STEPS    : natural;
+      G_EMU_STEPS      : natural;
+      G_RESERVED_STEPS : natural
    );
 end entity tb_nicemon;
 
@@ -263,7 +267,10 @@ begin
          file_open(f, name, read_mode);
          while not endfile(f) loop
             readline(f, l);
-            if l'length = 17 then
+            if l'length > 0 then
+               assert l'length = 17
+                  report "tb_nicemon: " & name & " has a line that is not 'address word': '" & l.all & "'"
+                  severity failure;
                if first_v then
                   first   := upper(l.all(10 to 17));
                   first_v := false;
@@ -272,7 +279,16 @@ begin
             end if;
          end loop;
          file_close(f);
+         assert not first_v
+            report "tb_nicemon: " & name & " has no words"
+            severity failure;
       end procedure load;
+
+      -- A step count, as the R command prints it
+      function steps(n : natural) return string is
+      begin
+         return to_hstring(to_stdlogicvector(n, 32));
+      end function steps;
 
       -- The first word of the .bin file, as the R command prints it
       impure function first_word(name : string) return string is
@@ -331,7 +347,7 @@ begin
       expect("Hello, NICE!" & C_LF & C_HALT);
       command("R FFFFFFF0", "0000000A");
       command("R FFFFFFF1", "00000001");     -- halted by HALT
-      command("R FFFFFF42", "00000038");     -- 56 steps, as niceemu says
+      command("R FFFFFF42", steps(G_HELLO_STEPS));
       command("R FFFFFF43", "00000000");
 
       report "tb_nicemon: load " & G_ECHO_FILE;
@@ -397,7 +413,7 @@ begin
       command("W FFFFFFF0 00000008", "OK");
       expect(C_HALT);
       command("R FFFFFFF0", "0000000A");
-      command("R FFFFFF42", "0000000C");     -- 12 steps
+      command("R FFFFFF42", steps(G_EMU_STEPS));
       command("R FFFFFF20", "00000000");     -- the math unit's A, reset
       command("R FFFF0000", "00000041");     -- the screen
       command("R FFFF07CF", "00000042");
@@ -462,7 +478,7 @@ begin
       command("W FFFFFFF0 00000008", "OK");
       expect(C_HALT);
       command("R FFFFFFF1", "00000002");     -- a reserved control word
-      command("R FFFFFF42", "00000006");     -- 6 steps
+      command("R FFFFFF42", steps(G_RESERVED_STEPS));
       command("R FFFFFFE1", "00000001");     -- R1
       command("R FFFFFFEF", "00000007");     -- R15
 

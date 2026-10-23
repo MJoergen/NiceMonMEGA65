@@ -45,7 +45,7 @@ SRC_SOURCES  = ../src/uart_serdes.vhd ../src/line_buffer.vhd ../src/cmd.vhd ../s
                ../src/system.vhd
 SOURCES      = $(SRC_SOURCES) text_synth.vhd tb_hello.vhd tb_nicemon.vhd tb_kbd.vhd tb_ps2.vhd tb_text.vhd
 
-.PHONY: test analyze synth clean tb_hello tb_nicemon tb_kbd tb_ps2 tb_text \
+.PHONY: test check-steps analyze synth clean tb_hello tb_nicemon tb_kbd tb_ps2 tb_text \
         synth-nicemon synth-nicemon-norom synth-kbd_m65 synth-kbd_ascii synth-kbd_ps2 \
         synth-kbd_ps2_ascii synth-text \
         synth-system
@@ -53,7 +53,23 @@ SOURCES      = $(SRC_SOURCES) text_synth.vhd tb_hello.vhd tb_nicemon.vhd tb_kbd.
 # Each testbench and each synthesis check is a target of its own, so that
 # "make -j test" runs them side by side. They share the work library of
 # $(BUILD), which "analyze" writes first and they only read.
-test: synth tb_hello tb_nicemon tb_kbd tb_ps2 tb_text
+test: synth tb_hello tb_nicemon tb_kbd tb_ps2 tb_text check-steps
+
+check-steps: $(addprefix $(BUILD)/,hello.bin emu.bin reserved.bin)
+	@if [ ! -x $(EMU) ]; then echo "SKIP check-steps: $(EMU) is not built"; exit 0; fi; \
+	for p in hello:$(STEPS_HELLO) emu:$(STEPS_EMU) reserved:$(STEPS_RESERVED); do \
+	  n=$${p%%:*}; want=$${p##*:}; \
+	  got=$$($(EMU) $(BUILD)/$$n.bin </dev/null | sed -n 's/.* after \([0-9]*\) steps.*/\1/p'); \
+	  [ "$$got" = "$$want" ] || { echo "FAIL check-steps: niceemu runs $$n in $$got steps, STEPS_$$n is $$want"; exit 1; }; \
+	done; echo "PASS check-steps"
+
+# The steps niceemu counts for the programs whose instruction counter
+# tb_nicemon checks. CI has no niceemu, so they are kept here, and
+# "make check-steps" compares them with a niceemu that is built.
+STEPS_HELLO    = 56
+STEPS_EMU      = 12
+STEPS_RESERVED = 6
+EMU            = $(NICE_DIR)/emulator/zig-out/bin/niceemu
 
 BINS = hello rom echo fifo devices emu reserved eof
 
@@ -66,7 +82,8 @@ tb_hello: analyze $(BUILD)/hello.bin
 
 tb_nicemon: analyze $(addprefix $(BUILD)/,$(addsuffix .bin,$(BINS)))
 	@(cd $(BUILD) && $(GHDL) --elab-run $(GHDLFLAGS) tb_nicemon \
-	  -gG_HELLO_FILE=hello.bin -gG_ROM_FILE=rom.bin -gG_ECHO_FILE=echo.bin -gG_FIFO_FILE=fifo.bin -gG_DEVICES_FILE=devices.bin -gG_EMU_FILE=emu.bin -gG_RESERVED_FILE=reserved.bin -gG_EOF_FILE=eof.bin > tb_nicemon.log 2>&1) && \
+	  -gG_HELLO_FILE=hello.bin -gG_ROM_FILE=rom.bin -gG_ECHO_FILE=echo.bin -gG_FIFO_FILE=fifo.bin -gG_DEVICES_FILE=devices.bin -gG_EMU_FILE=emu.bin -gG_RESERVED_FILE=reserved.bin -gG_EOF_FILE=eof.bin \
+	  -gG_HELLO_STEPS=$(STEPS_HELLO) -gG_EMU_STEPS=$(STEPS_EMU) -gG_RESERVED_STEPS=$(STEPS_RESERVED) > tb_nicemon.log 2>&1) && \
 	  echo "PASS tb_nicemon" || (echo "FAIL tb_nicemon"; cat $(BUILD)/tb_nicemon.log; exit 1)
 
 tb_kbd tb_ps2 tb_text: analyze
