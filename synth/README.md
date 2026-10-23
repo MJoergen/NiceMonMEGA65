@@ -130,23 +130,23 @@ and took 12:49 in all.
 
 The utilization is from `build/utilization.rpt`, and the split by module
 from `report_utilization -hierarchical` on `build/top.dcp`. These are the
-numbers without `ROM=`, at commit cb95968 with the color format of the
-screen, in LUTs and flip-flops. The Nexys4DDR pipelined column is from the
-build at 0267298, which adds the PS/2 keyboard:
+numbers without `ROM=`, in LUTs and flip-flops. The pipelined columns are
+from the builds of 2026-10-23 at nice_cpu 4cd869e, and the multi-cycle
+columns are from the build at cb95968:
 
 | Part of the design | R6, pipelined | R6, multi | Nexys4DDR, pipelined | Nexys4DDR, multi |
 |---|---|---|---|---|
-| The core (`nice_core`) | 6861 / 3006 | 4605 / 1050 | 6914 / 2949 | 4636 / 4071 |
-| The math unit (`mpu`) | 2282 / 875 | 2172 / 874 | 2250 / 875 | 2166 / 874 |
-| The fetch statistics (`fetch_stats`) | 744 / 1329 | 44 / 99 | 738 / 1329 | 44 / 99 |
-| The rest: the CLI, UART, RAM, counters, timer, and glue | 707 / 1154 | 795 / 1156 | 678 / 1142 | 740 / 1119 |
+| The core (`nice_core`) | 7353 / 3009 | 4605 / 1050 | 7358 / 2952 | 4636 / 4071 |
+| The math unit (`mpu`) | 2164 / 874 | 2172 / 874 | 2176 / 874 | 2166 / 874 |
+| The fetch statistics (`fetch_stats`) | 730 / 1329 | 44 / 99 | 731 / 1329 | 44 / 99 |
+| The rest: the CLI, UART, RAM, counters, timer, and glue | 683 / 1118 | 795 / 1156 | 699 / 1092 | 740 / 1119 |
 | The text display (`text.vhd`) | 123 / 180 | 123 / 180 | 121 / 156 | 121 / 156 |
-| The keyboard | 588 / 585 | 596 / 585 | 109 / 48 | – |
-| The HDMI output | 574 / 1207 | 574 / 1207 | – | – |
-| Total | 11879 / 8336 | 8909 / 5151 | 10799 / 6499 | 7707 / 6319 |
-| Total, of the FPGA | 8.9 % / 3.1 % | 6.7 % / 1.9 % | 17.0 % / 5.1 % | 12.2 % / 5.0 % |
+| The keyboard | 592 / 577 | 596 / 585 | 106 / 48 | – |
+| The HDMI output | 575 / 1207 | 574 / 1207 | – | – |
+| Total | 12302 / 8329 | 8909 / 5151 | 11228 / 6501 | 7707 / 6319 |
+| Total, of the FPGA | 9.2 % / 3.1 % | 6.7 % / 1.9 % | 17.7 % / 5.1 % | 12.2 % / 5.0 % |
 
-The pipelined core is about 5 % of the LUTs of the R6's FPGA, and 11 % of
+The pipelined core is about 5.5 % of the LUTs of the R6's FPGA, and 11.6 % of
 the Nexys4DDR's. The multi-cycle core has two thirds of its LUTs, 3.4 % and
 7.3 %. On the R6 it has a third of the flip-flops too. On the Nexys4DDR it
 has 4071, more than the pipelined core's 2949, where the build at 671172e
@@ -167,6 +167,12 @@ uses one RAMB18, which Vivado infers for `src2_count`, the register of the
 shift count. The math unit has the 4 DSPs of the design. All builds meet the
 clock, with these worst setup slacks: the R6 0.52 ns (multi) at 100 MHz, the
 R3 0.21 ns (pipelined), the Nexys4DDR 0.19 ns (multi) at 90 MHz. The
+pipelined builds of 2026-10-23 at nice_cpu 4cd869e have 0.174 ns on the R6
+(default flow, 100 MHz) and 0.043 ns on the Nexys4DDR (timing flow, 90 MHz),
+with hold slacks of 0.041 ns and 0.030 ns. Their block RAM is 132.5 tiles
+on the R6 (36 %) and 84.5 on the Nexys4DDR (63 %), and both use 4 DSPs.
+This nice_cpu update changed no core RTL, only its formal checks and
+documentation, so the figures are those of the same logic. The
 pipelined core's slacks are from the builds at 929534c, which gates the
 core's requests with `core_take`: the R6 0.11 ns and the Nexys4DDR 0.02 ns
 (0.23 ns and 0.32 ns before). The R3 (0.22 ns) and the Nexys4DDR (0.05 ns)
