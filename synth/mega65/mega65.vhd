@@ -93,9 +93,6 @@ architecture synthesis of mega65 is
    signal vga_green : std_logic_vector(7 downto 0);
    signal vga_blue  : std_logic_vector(7 downto 0);
 
-   -- The sync signals, active high, for vga_to_hdmi
-   signal hdmi_hs : std_logic;
-   signal hdmi_vs : std_logic;
    -- The TMDS symbols of the three HDMI data channels
    signal hdmi_tmds : slv_9_0_t(0 to 2);
 
@@ -248,11 +245,9 @@ begin
    -- HDMI, in DVI mode
    ---------------------------------------------------------------------------
 
-   hdmi_hs <= vga_hs xnor C_VIDEO.sync_active;
-   hdmi_vs <= vga_vs xnor C_VIDEO.sync_active;
-
    -- vic is 0, as 1280x1024 is not a CEA-861 video mode, and aspect is "00",
-   -- no data.
+   -- no data. vga_hs and vga_vs already have the output polarity, so the
+   -- polarity inputs are tied to '1', which passes them through unchanged.
    i_vga_to_hdmi : entity work.vga_to_hdmi
       port map (
          select_44100 => '0',
@@ -260,12 +255,12 @@ begin
          vic          => X"00",
          aspect       => "00",
          pix_rep      => '0',
-         vs_pol       => C_VIDEO.sync_active,
-         hs_pol       => C_VIDEO.sync_active,
+         vs_pol       => '1',
+         hs_pol       => '1',
          vga_rst      => vga_rst,
          vga_clk      => vga_clk,
-         vga_vs       => hdmi_vs,
-         vga_hs       => hdmi_hs,
+         vga_vs       => vga_vs,
+         vga_hs       => vga_hs,
          vga_de       => vga_de,
          vga_r        => vga_red,
          vga_g        => vga_green,
