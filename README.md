@@ -1,4 +1,7 @@
 # NiceMonMEGA65
+
+[![CI](https://github.com/MJoergen/NiceMonMEGA65/actions/workflows/ci.yml/badge.svg)](https://github.com/MJoergen/NiceMonMEGA65/actions/workflows/ci.yml)
+
 The NICE CPU with a monitor, on the MEGA65
 
 This project runs the [NICE CPU](https://github.com/MJoergen/nice_cpu) on the
