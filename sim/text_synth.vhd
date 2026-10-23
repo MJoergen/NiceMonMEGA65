@@ -1,6 +1,7 @@
 -- A wrapper of the text display (src/video/text.vhd) in the video mode of
 -- the boards, for the GHDL synthesis check of the Makefile: GHDL cannot take
--- the record generic G_MODE on the command line.
+-- the record generic G_MODE on the command line. The Makefile sets
+-- G_SCR_ADDR_BITS to 15 (the MEGA65) and to 13 (the Nexys4DDR).
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -9,16 +10,19 @@ library work;
    use work.video_pkg.all;
 
 entity text_synth is
+   generic (
+      G_SCR_ADDR_BITS : natural := 15
+   );
    port (
       clk_i       : in  std_logic;
       scr_we_i    : in  std_logic;
-      scr_addr_i  : in  std_logic_vector(14 downto 0);
+      scr_addr_i  : in  std_logic_vector(G_SCR_ADDR_BITS - 1 downto 0);
       scr_data_i  : in  std_logic_vector(31 downto 0);
       ctl_we_i    : in  std_logic;
       cur_x_i     : in  std_logic_vector(6 downto 0);
       cur_y_i     : in  std_logic_vector(4 downto 0);
       cur_mode_i  : in  std_logic_vector(2 downto 0);
-      offs_i      : in  std_logic_vector(14 downto 0);
+      offs_i      : in  std_logic_vector(G_SCR_ADDR_BITS - 1 downto 0);
       vga_clk_i   : in  std_logic;
       vga_hs_o    : out std_logic;
       vga_vs_o    : out std_logic;
@@ -36,7 +40,7 @@ begin
    i_text : entity work.text
       generic map (
          G_MODE          => C_VIDEO_1280X1024,
-         G_SCR_ADDR_BITS => 15
+         G_SCR_ADDR_BITS => G_SCR_ADDR_BITS
       )
       port map (
          clk_i       => clk_i,

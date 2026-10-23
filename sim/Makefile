@@ -14,7 +14,7 @@
 #                         pixel checked.
 #             It also checks that GHDL can synthesize the system, the
 #             keyboards, the text display (through text_synth.vhd, in
-#             the boards' mode), and system.vhd as the Nexys4DDR has it.
+#             the boards' mode, with 15 and 13 screen address bits), and system.vhd as the Nexys4DDR has it.
 #             With -j these all run side by side, and the test takes as
 #             long as tb_text alone. Each one is also a target: make
 #             tb_kbd runs just that one.
@@ -113,8 +113,11 @@ synth-kbd_ps2_ascii: analyze
 	  echo "PASS synth kbd_ps2_ascii" || (echo "FAIL synth kbd_ps2_ascii"; cat $(BUILD)/kbd_ps2_ascii_synth.log; exit 1)
 
 synth-text: analyze
-	@(cd $(BUILD) && $(GHDL) --synth $(GHDLFLAGS) text_synth > text_synth.vhd 2> text_synth.log) && \
-	  echo "PASS synth text" || (echo "FAIL synth text"; cat $(BUILD)/text_synth.log; exit 1)
+	@for b in 15 13; do \
+	  (cd $(BUILD) && $(GHDL) --synth $(GHDLFLAGS) -gG_SCR_ADDR_BITS=$$b text_synth > text_synth_$$b.vhd 2> text_synth_$$b.log) && \
+	    echo "PASS synth text ($$b screen address bits)" || \
+	    (echo "FAIL synth text ($$b screen address bits)"; cat $(BUILD)/text_synth_$$b.log; exit 1) || exit 1; \
+	done
 
 synth-system: analyze
 	@(cd $(BUILD) && $(GHDL) --synth $(GHDLFLAGS) -gG_CLOCK_HZ=80000000 -gG_SCR_ADDR_BITS=13 system > system_synth.vhd 2> system_synth.log) && \
