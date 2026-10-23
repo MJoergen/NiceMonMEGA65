@@ -556,7 +556,12 @@ the comparison is skipped. Build the bitstream first, then:
 
     make hwtest
 
-It prints one line for each check, and last how many passed.
+It prints one line for each check, and last how many passed. A check that
+leaves a program running stops the run, as every later check would fail. Even
+then the script halts the program and holds the core with the ROM hidden, and
+prints how many passed, so a following `--no-program` run can start. Programming
+the FPGA needs Linux, as the JTAG cable is found through `/sys`; with
+`--no-program` the script runs wherever `load.py` does.
 On the R6 and the Nexys4DDR with the pipelined core, all 51 pass.
 
 For the R3, give `BIT=synth/r3/build/top.bit`. For the Nexys4DDR, give

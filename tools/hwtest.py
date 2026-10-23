@@ -29,6 +29,14 @@ Usage: tools/hwtest.py [--port /dev/ttyUSB1] [--baud 115200]
 --no-program skips programming and the banner check, for a board that is
 already programmed and whose core is held or has halted. Only the Python
 standard library is used, and openFPGALoader when the FPGA is programmed.
+Programming needs Linux, as the JTAG cable is found through /sys; with
+--no-program the script runs wherever load.py does.
+
+A check that leaves a program running stops the run, as every later check
+would fail. Whatever happens, the script ends by halting a program that is
+still running and holding the core with the ROM hidden, so a following
+--no-program run starts from the state it expects, and it prints the
+summary.
 """
 
 import argparse
@@ -37,6 +45,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import termios
 import time
 
 from load import (HALT_MESSAGE, drain, load_words, open_port, read_bin,
@@ -49,9 +58,34 @@ NICEEMU = f"{REPO}/nice_cpu/emulator/zig-out/bin/niceemu"
 results: list[bool] = []
 
 
-def check(name: str, ok: bool, detail: str = "") -> None:
+def check(name: str, ok: bool, detail: str = "") -> bool:
     results.append(ok)
     print(f"[{'PASS' if ok else 'FAIL'}] {name} {detail}", flush=True)
+    return ok
+
+
+def require(name: str, ok: bool, detail: str = "") -> None:
+    """Like check, but stops the run when it fails: the board is then in a
+    state in which every later check would fail too."""
+    if not check(name, ok, detail):
+        sys.exit(f"hwtest.py: stopped, as '{name}' failed")
+
+
+def cleanup(port: str, baud: int) -> None:
+    """Halts a program that may still be running and holds the core with the
+    ROM hidden, as --no-program expects. The echo program halts on '.', and
+    primes.bin on 0 after a prompt. Nothing here may fail the script."""
+    try:
+        fd = open_port(port, baud)
+        try:
+            os.write(fd, b"\r.\r0\r")
+            drain(fd, 0.5)
+            cmd(fd, f"W {CONTROL} 00000009")
+        finally:
+            os.close(fd)
+    except (OSError, termios.error, SystemExit):
+        print("  could not hold the core; press the reset button before a "
+              "run with --no-program", flush=True)
 
 
 def cmd(fd: int, line: str, quiet: float = 0.5) -> str:
@@ -101,7 +135,8 @@ def bit_part(bit: str) -> str:
 
 def usb_serial(port: str) -> str:
     """Returns the serial number of the USB device that a serial port is an
-    interface of: the board's FTDI chip, whose other interface is JTAG."""
+    interface of: the board's FTDI chip, whose other interface is JTAG. It
+    reads /sys, so this works on Linux only."""
     tty = os.path.basename(os.path.realpath(port))
     path = os.path.realpath(f"/sys/class/tty/{tty}/device")
     while path != "/":
@@ -166,7 +201,7 @@ def test_banner(fd: int, bit: str, cable: list[str]) -> None:
 
 
 def test_command_line(fd: int) -> None:
-    check("hide the ROM", cmd(fd, f"W {CONTROL} 00000009") == "OK")
+    require("hide the ROM", cmd(fd, f"W {CONTROL} 00000009") == "OK")
     check("R reads 8 hex digits", len(cmd(fd, "R 00000000")) == 8)
     check("W then R", cmd(fd, "W 00000100 DEADBEEF") == "OK"
           and cmd(fd, "R 00000100") == "DEADBEEF")
@@ -192,8 +227,8 @@ def test_echo(fd: int, echo: str) -> None:
     check("UART belongs to the running core", got == b"R 00000000\r", repr(got))
     os.write(fd, b".")
     got = drain(fd)
-    check("echo halts on '.', with the halt message", got == b"." + HALT_MESSAGE,
-          repr(got))
+    require("echo halts on '.', with the halt message",
+            got == b"." + HALT_MESSAGE, repr(got))
     ctl = cmd(fd, f"R {CONTROL}")
     check("halted flag", ctl == "0000000A", ctl)
     check("command line back after halt", cmd(fd, "W 00000100 12345678") == "OK"
@@ -207,8 +242,8 @@ def test_reset(fd: int, echo: str) -> None:
     load(fd, echo)
     os.write(fd, b"again.")
     got = drain(fd)
-    check("core runs again after reset", got == b"again." + HALT_MESSAGE,
-          repr(got))
+    require("core runs again after reset", got == b"again." + HALT_MESSAGE,
+            repr(got))
 
 
 def test_clear(fd: int) -> None:
@@ -223,7 +258,7 @@ def test_clear(fd: int) -> None:
 def test_readback(fd: int, emu: str) -> None:
     load(fd, emu)
     halt = read_until(fd, HALT_MESSAGE)
-    check("halt message", halt == HALT_MESSAGE, repr(halt))
+    require("halt message", halt == HALT_MESSAGE, repr(halt))
     ctl = cmd(fd, f"R {CONTROL}")
     check("emu.nasm halted", ctl == "0000000A", ctl)
     expected = {
@@ -281,7 +316,7 @@ def test_primes(fd: int, primes: str) -> None:
               f"Primes up to {limit}: {count}" in out, repr(out))
     os.write(fd, b"0\r")
     end = drain(fd, 1.0)
-    check("primes halt message", end.endswith(HALT_MESSAGE), repr(end))
+    require("primes halt message", end.endswith(HALT_MESSAGE), repr(end))
     ctl = cmd(fd, f"R {CONTROL}")
     check("primes halts on 0", ctl == "0000000A", ctl)
 
@@ -381,29 +416,49 @@ def main() -> None:
         with open(text, "wb") as f:
             f.write(bytes(range(256)) * 6)
 
-        # Before the port is opened, as openFPGALoader takes the FTDI chip
-        cable = [] if args.no_program else check_board(args.port, args.bit)
-        fd = open_port(args.port, args.baud)
-        if not args.no_program:
-            test_banner(fd, args.bit, cable)
-        test_command_line(fd)
-        test_echo(fd, echo)
-        test_reset(fd, echo)
-        test_clear(fd)
-        test_readback(fd, emu)
-        test_screen_registers(fd)
-        test_fetch_statistics(fd)
-        test_primes(fd, primes)
-        os.close(fd)
-        test_run(args.port, args.baud, [
-            (hello, [], False),
-            (emu, ["-d", "0x110:2", "-d", "0xFFFFFF00:4", "-s"], False),
-            (reserved, [], False),
-            (eof, [], True),               # no input: it ends at once
-            (eof, ["-i", text], True),
-            (halttext, [], False),         # prints the halt message itself
-        ])
-        test_bench(args.port, args.baud, bench)
+        opened = False
+        try:
+            # Before the port is opened, as openFPGALoader takes the FTDI chip
+            cable = []
+            if not args.no_program:
+                if not sys.platform.startswith("linux"):
+                    sys.exit("hwtest.py: programming needs Linux; program "
+                             "the FPGA yourself and give --no-program")
+                cable = check_board(args.port, args.bit)
+            fd = open_port(args.port, args.baud)
+            opened = True
+            try:
+                if not args.no_program:
+                    test_banner(fd, args.bit, cable)
+                test_command_line(fd)
+                test_echo(fd, echo)
+                test_reset(fd, echo)
+                test_clear(fd)
+                test_readback(fd, emu)
+                test_screen_registers(fd)
+                test_fetch_statistics(fd)
+                test_primes(fd, primes)
+            finally:
+                os.close(fd)
+            test_run(args.port, args.baud, [
+                (hello, [], False),
+                (emu, ["-d", "0x110:2", "-d", "0xFFFFFF00:4", "-s"], False),
+                (reserved, [], False),
+                (eof, [], True),               # no input: it ends at once
+                (eof, ["-i", text], True),
+                (halttext, [], False),         # prints the halt message itself
+            ])
+            test_bench(args.port, args.baud, bench)
+        except SystemExit as e:
+            # load.fail() and require() exit with a message; keep going to
+            # the cleanup and the summary
+            if e.code not in (0, None):
+                print(e.code, file=sys.stderr, flush=True)
+                if all(results):  # else a failed check is already counted
+                    results.append(False)
+        finally:
+            if opened:
+                cleanup(args.port, args.baud)
 
     passed = sum(results)
     print(f"\n{passed}/{len(results)} passed")
