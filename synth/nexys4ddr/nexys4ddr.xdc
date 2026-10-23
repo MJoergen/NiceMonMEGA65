@@ -5,7 +5,6 @@ set_property -dict {PACKAGE_PIN E3   IOSTANDARD LVCMOS33} [get_ports {clk_i}];  
 set_property -dict {PACKAGE_PIN C12  IOSTANDARD LVCMOS33} [get_ports {reset_n_i}];  # CPU_RESETN
 set_property -dict {PACKAGE_PIN C4   IOSTANDARD LVCMOS33} [get_ports {uart_rxd_i}]; # UART_TXD_IN
 set_property -dict {PACKAGE_PIN D4   IOSTANDARD LVCMOS33} [get_ports {uart_txd_o}]; # UART_RXD_OUT
-set_property -dict {PACKAGE_PIN H17  IOSTANDARD LVCMOS33} [get_ports {led_o}];      # LED[0]
 set_property -dict {PACKAGE_PIN F4   IOSTANDARD LVCMOS33 PULLUP TRUE} [get_ports {ps2_clk_i}];  # PS2_CLK
 set_property -dict {PACKAGE_PIN B2   IOSTANDARD LVCMOS33 PULLUP TRUE} [get_ports {ps2_data_i}]; # PS2_DATA
 
@@ -23,6 +22,68 @@ set_property -dict {PACKAGE_PIN D7   IOSTANDARD LVCMOS33} [get_ports {vga_blue_o
 set_property -dict {PACKAGE_PIN D8   IOSTANDARD LVCMOS33} [get_ports {vga_blue_o[3]}];  # VGA_B[3]
 set_property -dict {PACKAGE_PIN B11  IOSTANDARD LVCMOS33} [get_ports {vga_hs_o}];       # VGA_HS
 set_property -dict {PACKAGE_PIN B12  IOSTANDARD LVCMOS33} [get_ports {vga_vs_o}];       # VGA_VS
+
+## The LEDs, the RGB LEDs, the seven-segment display, the buttons, and
+## the switches
+set_property -dict {PACKAGE_PIN H17  IOSTANDARD LVCMOS33} [get_ports {led_o[0]}];  # LED[0]
+set_property -dict {PACKAGE_PIN K15  IOSTANDARD LVCMOS33} [get_ports {led_o[1]}];  # LED[1]
+set_property -dict {PACKAGE_PIN J13  IOSTANDARD LVCMOS33} [get_ports {led_o[2]}];  # LED[2]
+set_property -dict {PACKAGE_PIN N14  IOSTANDARD LVCMOS33} [get_ports {led_o[3]}];  # LED[3]
+set_property -dict {PACKAGE_PIN R18  IOSTANDARD LVCMOS33} [get_ports {led_o[4]}];  # LED[4]
+set_property -dict {PACKAGE_PIN V17  IOSTANDARD LVCMOS33} [get_ports {led_o[5]}];  # LED[5]
+set_property -dict {PACKAGE_PIN U17  IOSTANDARD LVCMOS33} [get_ports {led_o[6]}];  # LED[6]
+set_property -dict {PACKAGE_PIN U16  IOSTANDARD LVCMOS33} [get_ports {led_o[7]}];  # LED[7]
+set_property -dict {PACKAGE_PIN V16  IOSTANDARD LVCMOS33} [get_ports {led_o[8]}];  # LED[8]
+set_property -dict {PACKAGE_PIN T15  IOSTANDARD LVCMOS33} [get_ports {led_o[9]}];  # LED[9]
+set_property -dict {PACKAGE_PIN U14  IOSTANDARD LVCMOS33} [get_ports {led_o[10]}];  # LED[10]
+set_property -dict {PACKAGE_PIN T16  IOSTANDARD LVCMOS33} [get_ports {led_o[11]}];  # LED[11]
+set_property -dict {PACKAGE_PIN V15  IOSTANDARD LVCMOS33} [get_ports {led_o[12]}];  # LED[12]
+set_property -dict {PACKAGE_PIN V14  IOSTANDARD LVCMOS33} [get_ports {led_o[13]}];  # LED[13]
+set_property -dict {PACKAGE_PIN V12  IOSTANDARD LVCMOS33} [get_ports {led_o[14]}];  # LED[14]
+set_property -dict {PACKAGE_PIN V11  IOSTANDARD LVCMOS33} [get_ports {led_o[15]}];  # LED[15]
+set_property -dict {PACKAGE_PIN R12  IOSTANDARD LVCMOS33} [get_ports {rgb0_o[0]}];  # LED16_B
+set_property -dict {PACKAGE_PIN M16  IOSTANDARD LVCMOS33} [get_ports {rgb0_o[1]}];  # LED16_G
+set_property -dict {PACKAGE_PIN N15  IOSTANDARD LVCMOS33} [get_ports {rgb0_o[2]}];  # LED16_R
+set_property -dict {PACKAGE_PIN G14  IOSTANDARD LVCMOS33} [get_ports {rgb1_o[0]}];  # LED17_B
+set_property -dict {PACKAGE_PIN R11  IOSTANDARD LVCMOS33} [get_ports {rgb1_o[1]}];  # LED17_G
+set_property -dict {PACKAGE_PIN N16  IOSTANDARD LVCMOS33} [get_ports {rgb1_o[2]}];  # LED17_R
+set_property -dict {PACKAGE_PIN T10  IOSTANDARD LVCMOS33} [get_ports {seg_ca_o[0]}];  # CA
+set_property -dict {PACKAGE_PIN R10  IOSTANDARD LVCMOS33} [get_ports {seg_ca_o[1]}];  # CB
+set_property -dict {PACKAGE_PIN K16  IOSTANDARD LVCMOS33} [get_ports {seg_ca_o[2]}];  # CC
+set_property -dict {PACKAGE_PIN K13  IOSTANDARD LVCMOS33} [get_ports {seg_ca_o[3]}];  # CD
+set_property -dict {PACKAGE_PIN P15  IOSTANDARD LVCMOS33} [get_ports {seg_ca_o[4]}];  # CE
+set_property -dict {PACKAGE_PIN T11  IOSTANDARD LVCMOS33} [get_ports {seg_ca_o[5]}];  # CF
+set_property -dict {PACKAGE_PIN L18  IOSTANDARD LVCMOS33} [get_ports {seg_ca_o[6]}];  # CG
+set_property -dict {PACKAGE_PIN H15  IOSTANDARD LVCMOS33} [get_ports {seg_ca_o[7]}];  # DP
+set_property -dict {PACKAGE_PIN J17  IOSTANDARD LVCMOS33} [get_ports {seg_an_o[0]}];  # AN[0]
+set_property -dict {PACKAGE_PIN J18  IOSTANDARD LVCMOS33} [get_ports {seg_an_o[1]}];  # AN[1]
+set_property -dict {PACKAGE_PIN T9   IOSTANDARD LVCMOS33} [get_ports {seg_an_o[2]}];  # AN[2]
+set_property -dict {PACKAGE_PIN J14  IOSTANDARD LVCMOS33} [get_ports {seg_an_o[3]}];  # AN[3]
+set_property -dict {PACKAGE_PIN P14  IOSTANDARD LVCMOS33} [get_ports {seg_an_o[4]}];  # AN[4]
+set_property -dict {PACKAGE_PIN T14  IOSTANDARD LVCMOS33} [get_ports {seg_an_o[5]}];  # AN[5]
+set_property -dict {PACKAGE_PIN K2   IOSTANDARD LVCMOS33} [get_ports {seg_an_o[6]}];  # AN[6]
+set_property -dict {PACKAGE_PIN U13  IOSTANDARD LVCMOS33} [get_ports {seg_an_o[7]}];  # AN[7]
+set_property -dict {PACKAGE_PIN N17  IOSTANDARD LVCMOS33} [get_ports {btn_i[0]}];  # BTNC
+set_property -dict {PACKAGE_PIN M18  IOSTANDARD LVCMOS33} [get_ports {btn_i[1]}];  # BTNU
+set_property -dict {PACKAGE_PIN P17  IOSTANDARD LVCMOS33} [get_ports {btn_i[2]}];  # BTNL
+set_property -dict {PACKAGE_PIN M17  IOSTANDARD LVCMOS33} [get_ports {btn_i[3]}];  # BTNR
+set_property -dict {PACKAGE_PIN P18  IOSTANDARD LVCMOS33} [get_ports {btn_i[4]}];  # BTND
+set_property -dict {PACKAGE_PIN J15  IOSTANDARD LVCMOS33} [get_ports {sw_i[0]}];  # SW[0]
+set_property -dict {PACKAGE_PIN L16  IOSTANDARD LVCMOS33} [get_ports {sw_i[1]}];  # SW[1]
+set_property -dict {PACKAGE_PIN M13  IOSTANDARD LVCMOS33} [get_ports {sw_i[2]}];  # SW[2]
+set_property -dict {PACKAGE_PIN R15  IOSTANDARD LVCMOS33} [get_ports {sw_i[3]}];  # SW[3]
+set_property -dict {PACKAGE_PIN R17  IOSTANDARD LVCMOS33} [get_ports {sw_i[4]}];  # SW[4]
+set_property -dict {PACKAGE_PIN T18  IOSTANDARD LVCMOS33} [get_ports {sw_i[5]}];  # SW[5]
+set_property -dict {PACKAGE_PIN U18  IOSTANDARD LVCMOS33} [get_ports {sw_i[6]}];  # SW[6]
+set_property -dict {PACKAGE_PIN R13  IOSTANDARD LVCMOS33} [get_ports {sw_i[7]}];  # SW[7]
+set_property -dict {PACKAGE_PIN T8   IOSTANDARD LVCMOS33} [get_ports {sw_i[8]}];  # SW[8]
+set_property -dict {PACKAGE_PIN U8   IOSTANDARD LVCMOS33} [get_ports {sw_i[9]}];  # SW[9]
+set_property -dict {PACKAGE_PIN R16  IOSTANDARD LVCMOS33} [get_ports {sw_i[10]}];  # SW[10]
+set_property -dict {PACKAGE_PIN T13  IOSTANDARD LVCMOS33} [get_ports {sw_i[11]}];  # SW[11]
+set_property -dict {PACKAGE_PIN H6   IOSTANDARD LVCMOS33} [get_ports {sw_i[12]}];  # SW[12]
+set_property -dict {PACKAGE_PIN U12  IOSTANDARD LVCMOS33} [get_ports {sw_i[13]}];  # SW[13]
+set_property -dict {PACKAGE_PIN U11  IOSTANDARD LVCMOS33} [get_ports {sw_i[14]}];  # SW[14]
+set_property -dict {PACKAGE_PIN V10  IOSTANDARD LVCMOS33} [get_ports {sw_i[15]}];  # SW[15]
 
 ## The board clock, 100 MHz. Vivado derives the MMCM clocks from it.
 create_clock -period 10.000 -name sys_clk [get_ports {clk_i}]
@@ -42,14 +103,16 @@ set_max_delay -datapath_only \
 ## top.vhd), so they all change at the same time.
 set_property IOB TRUE [get_ports {vga_red_o[*] vga_green_o[*] vga_blue_o[*] vga_hs_o vga_vs_o}]
 
-## The UART, the LED, the keyboard, and the reset button are slow, and
-## synchronized or registered in the design. The registers of the UART, the
-## LED, and the keyboard are in the I/O tiles, so that their timing does not
-## depend on placement; that of the button is not, as the button is inverted
-## first.
-set_false_path -from [get_ports {uart_rxd_i reset_n_i ps2_clk_i ps2_data_i}]
-set_false_path -to   [get_ports {uart_txd_o led_o}]
-set_property IOB TRUE [get_ports {uart_txd_o uart_rxd_i reset_n_i led_o ps2_clk_i ps2_data_i}]
+## The UART, the LEDs, the display, the keyboard, the buttons, the switches,
+## and the reset button are slow, and synchronized or registered in the
+## design. The registers of the UART, the LEDs, the RGB LEDs, the display,
+## the keyboard, the buttons, and the switches are in the I/O tiles, so that
+## their timing does not depend on placement; that of the reset button is
+## not, as the button is inverted first.
+set_false_path -from [get_ports {uart_rxd_i reset_n_i ps2_clk_i ps2_data_i btn_i[*] sw_i[*]}]
+set_false_path -to   [get_ports {uart_txd_o led_o[*] rgb0_o[*] rgb1_o[*] seg_an_o[*] seg_ca_o[*]}]
+set_property IOB TRUE [get_ports {uart_txd_o uart_rxd_i reset_n_i led_o[*] ps2_clk_i ps2_data_i}]
+set_property IOB TRUE [get_ports {rgb0_o[*] rgb1_o[*] seg_an_o[*] seg_ca_o[*] btn_i[*] sw_i[*]}]
 
 ## Configuration from the board's quad SPI flash
 set_property CONFIG_VOLTAGE                3.3   [current_design]

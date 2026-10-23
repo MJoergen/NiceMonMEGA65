@@ -11,7 +11,9 @@ the command line with the ROM hidden: it
 loads and runs sim/echo.nasm, holds and restarts the core, clears
 the memory, reads back what sim/emu.nasm leaves after its halt, checks that
 the cycle counter and the timer stop there, writes and reads the screen's
-registers, and runs the C example
+registers, writes and reads the board's devices (on the Nexys4DDR the LEDs,
+RGB LEDs, and seven-segment display, and the buttons and switches, which
+only a read can check; on the MEGA65 the block reads 0), and runs the C example
 examples/build/primes.bin. Last, it runs programs with tools/run.py and
 with niceemu, and compares their output and exit status, with sim/eof.nasm
 also the end of the input and an input file of 1536 bytes, with
@@ -25,7 +27,11 @@ Build the bitstream and the examples first, and niceemu
 
 Usage: tools/hwtest.py [--port /dev/ttyUSB1] [--baud 115200]
                        [--bit synth/r6/build/top.bit]
-                       [--no-program]
+                       [--board mega65|nexys4ddr] [--no-program]
+
+--board says which board it is, for the check of the board's devices. By
+default the name of the --bit file tells: a path with nexys4ddr in it is the
+Nexys4DDR, any other is a MEGA65.
 
 --no-program skips programming and the banner check, for a board that is
 already programmed and whose core is held or has halted. Only the Python
@@ -316,6 +322,47 @@ def test_screen_registers(fd: int) -> None:
     check("the display offset off again", cmd(fd, "W FFFFFF85 00000000") == "OK")
 
 
+def test_board_devices(fd: int, board: str) -> None:
+    """On the Nexys4DDR, writes the LEDs, the RGB LEDs, and the display's
+    segments at FFFFFF90-94 and reads them back. The LEDs, the RGB LEDs, and
+    the display show the patterns until the check clears them. The buttons and switches at FFFFFF95-96 take no write and read
+    nothing above their bits, whatever their state. On the MEGA65 the block
+    reads 0 and takes no write."""
+    if board == "mega65":
+        for addr in ("FFFFFF90", "FFFFFF93", "FFFFFF95", "FFFFFF96"):
+            check(f"W {addr} is dropped",
+                  cmd(fd, f"W {addr} FFFFFFFF") == "OK" and
+                  cmd(fd, f"R {addr}") == "00000000")
+        return
+    for addr, value, want in [("FFFFFF90", "0000A5C3", "0000A5C3"),
+                              ("FFFFFF91", "00000121", "00000121"),
+                              ("FFFFFF92", "00000102", "00000102"),
+                              ("FFFFFF93", "4F5B063F", "4F5B063F"),
+                              ("FFFFFF94", "077D6D66", "077D6D66")]:
+        check(f"W {addr}", cmd(fd, f"W {addr} {value}") == "OK")
+        got = cmd(fd, f"R {addr}")
+        check(f"readback {addr}", got == want, f"got {got}, want {want}")
+    check("W FFFFFF91 drops the bits above the levels",
+          cmd(fd, "W FFFFFF91 FFFFF121") == "OK" and
+          cmd(fd, "R FFFFFF91") == "00000121")
+    buttons = cmd(fd, "R FFFFFF95")
+    switches = cmd(fd, "R FFFFFF96")
+    check("buttons read in bits 4..0", int(buttons, 16) < 0x20, buttons)
+    check("switches read in bits 15..0", int(switches, 16) < 0x10000, switches)
+    check("W FFFFFF95 and FFFFFF96 are dropped",
+          cmd(fd, "W FFFFFF95 FFFFFFFF") == "OK" and
+          cmd(fd, "W FFFFFF96 FFFFFFFF") == "OK" and
+          cmd(fd, "R FFFFFF95") == buttons and
+          cmd(fd, "R FFFFFF96") == switches)
+    check("FFFFFF97 is not a register",
+          cmd(fd, "W FFFFFF97 FFFFFFFF") == "OK" and
+          cmd(fd, "R FFFFFF97") == "00000000")
+    # Leave the devices dark
+    for addr in ("FFFFFF90", "FFFFFF91", "FFFFFF92", "FFFFFF93", "FFFFFF94"):
+        check(f"W {addr} clears", cmd(fd, f"W {addr} 00000000") == "OK" and
+              cmd(fd, f"R {addr}") == "00000000")
+
+
 def test_fetch_statistics(fd: int) -> None:
     """Checks the control word of the fetch statistics at FFFFFF50 and that
     FFFFFF5D, a word they leave at 0, reads 0."""
@@ -414,10 +461,14 @@ def main() -> None:
     parser.add_argument("--port", default="/dev/ttyUSB1")
     parser.add_argument("--baud", type=int, default=115200)
     parser.add_argument("--bit", default=f"{REPO}/synth/r6/build/top.bit")
+    parser.add_argument("--board", choices=["mega65", "nexys4ddr"],
+                        help="default: nexys4ddr if --bit has it in its path")
     parser.add_argument("--no-program", action="store_true",
                         help="do not program the FPGA, and skip the banner")
     args = parser.parse_args()
 
+    board = args.board or ("nexys4ddr" if "nexys4ddr" in args.bit
+                           else "mega65")
     primes = f"{REPO}/examples/build/primes.bin"
     bench = f"{REPO}/examples/build/bench.bin"
     for path in (primes, bench):
@@ -461,6 +512,7 @@ def main() -> None:
                 test_readback(fd, emu)
                 test_counters_stop(fd)
                 test_screen_registers(fd)
+                test_board_devices(fd, board)
                 test_fetch_statistics(fd)
                 test_primes(fd, primes)
             finally:

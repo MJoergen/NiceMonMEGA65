@@ -40,6 +40,9 @@
 --    "niceemu -d" prints for the same program. The math unit was reset
 --    when the core started. The CLI writes and reads the screen's
 --    registers, which go out to the display.
+--    It writes and reads the board's registers (LEDs, RGB levels, display
+--    segments), which go out, and reads the buttons and switches; the
+--    read-only words and those that are not registers take no write.
 -- 10. Clear the memory: what the programs left is gone, and the core is
 --    held.
 -- 11. Load G_RESERVED_FILE, and run it. It halts on a reserved control
@@ -111,6 +114,13 @@ architecture simulation of tb_nicemon is
    signal scr_cur_mode : std_logic_vector(2 downto 0);
    signal scr_offs     : std_logic_vector(10 downto 0);
 
+   signal brd_led  : std_logic_vector(15 downto 0);
+   signal brd_rgb0 : std_logic_vector(11 downto 0);
+   signal brd_rgb1 : std_logic_vector(11 downto 0);
+   signal brd_seg  : std_logic_vector(63 downto 0);
+   signal brd_btn  : std_logic_vector(4 downto 0)  := "00000";
+   signal brd_sw   : std_logic_vector(15 downto 0) := X"0000";
+
    signal rx_str : string(1 to 4096);
    signal rx_len : natural := 0;
 
@@ -132,7 +142,8 @@ begin
          G_RX_FIFO_BITS     => 4,
          G_ROM_FILE         => G_ROM_FILE,
          G_ROM_ADDR_BITS    => 11,
-         G_CPU_RUN_AT_RESET => true
+         G_CPU_RUN_AT_RESET => true,
+         G_BOARD_IO         => true
       )
       port map (
          clk_i          => clk,
@@ -150,7 +161,13 @@ begin
          scr_cur_x_o    => scr_cur_x,
          scr_cur_y_o    => scr_cur_y,
          scr_cur_mode_o => scr_cur_mode,
-         scr_offs_o     => scr_offs
+         scr_offs_o     => scr_offs,
+         brd_led_o      => brd_led,
+         brd_rgb0_o     => brd_rgb0,
+         brd_rgb1_o     => brd_rgb1,
+         brd_seg_o      => brd_seg,
+         brd_btn_i      => brd_btn,
+         brd_sw_i       => brd_sw
       ); -- i_nicemon
 
 
@@ -458,6 +475,42 @@ begin
          severity failure;
       command("W FFFFFF80 00000000", "OK");
 
+      report "tb_nicemon: the board's devices";
+      command("R FFFFFF90", "00000000");     -- all clear after reset
+      command("W FFFFFF90 0000A5C3", "OK");
+      command("W FFFFFF91 00000123", "OK");
+      command("W FFFFFF92 00000FED", "OK");
+      command("W FFFFFF93 76543210", "OK");
+      command("W FFFFFF94 FEDCBA98", "OK");
+      command("R FFFFFF90", "0000A5C3");
+      command("R FFFFFF91", "00000123");
+      command("R FFFFFF92", "00000FED");
+      command("R FFFFFF93", "76543210");
+      command("R FFFFFF94", "FEDCBA98");
+      assert brd_led = X"A5C3" and brd_rgb0 = X"123" and brd_rgb1 = X"FED" and
+             brd_seg = X"FEDCBA9876543210"
+         report "tb_nicemon: the board's registers do not go out"
+         severity failure;
+      command("W FFFFFF91 0000FFFF", "OK");  -- bits above the levels are dropped
+      command("R FFFFFF91", "00000FFF");
+      brd_btn <= "10110";
+      brd_sw  <= X"8001";
+      wait for 100 ns;
+      command("R FFFFFF95", "00000016");
+      command("R FFFFFF96", "00008001");
+      command("W FFFFFF95 0000001F", "OK");  -- read only
+      command("W FFFFFF96 0000FFFF", "OK");
+      command("R FFFFFF95", "00000016");
+      command("R FFFFFF96", "00008001");
+      command("W FFFFFF97 00000007", "OK");  -- not registers
+      command("R FFFFFF97", "00000000");
+      command("W FFFFFF9F 00000001", "OK");
+      command("R FFFFFF9F", "00000000");
+      command("R FFFFFF90", "0000A5C3");     -- the other words took no write
+      brd_btn <= "00000";
+      brd_sw  <= X"0000";
+      wait for 100 ns;
+
       report "tb_nicemon: clear the memory";
       command("W FFFFFFF0 0000000D", "OK");
       command("R FFFFFFF0", "00000009");     -- held, not halted
@@ -472,6 +525,7 @@ begin
       assert scr_cur_x = 0 and scr_cur_y = 0
          report "tb_nicemon: the clear does not reset the cursor"
          severity failure;
+      command("R FFFFFF93", "76543210");     -- the board's registers are kept
 
       report "tb_nicemon: load " & G_RESERVED_FILE;
       load(G_RESERVED_FILE, first_v);

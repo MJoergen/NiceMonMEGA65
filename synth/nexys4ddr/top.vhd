@@ -1,11 +1,15 @@
 -- The top level for the Digilent Nexys4DDR board (also sold as the Nexys
 -- A7-100T). It has the clock and reset (clk_rst.vhd), the system
 -- (src/system.vhd), the keyboard, and the VGA output. The UART is the
--- board's USB-UART, and LED0 is on while the core runs. A USB keyboard in
+-- board's USB-UART, and LED0 is on while the core runs, or while the program
+-- sets it. A USB keyboard in
 -- the board's USB HID port types into the same input as the UART: the
 -- board's PIC24 turns it into PS/2, which kbd_ps2.vhd receives and
--- kbd_ps2_ascii.vhd turns into ASCII. The board's other LEDs, its
--- seven-segment display, buttons, and switches are not used (see TODO.md).
+-- kbd_ps2_ascii.vhd turns into ASCII. The board's 16 LEDs, two RGB LEDs,
+-- seven-segment display, five buttons, and 16 switches are registers of
+-- the system, in 0xFFFFFF90-96 (src/nicemon.vhd). The RGB LEDs are driven
+-- by rgb_pwm.vhd, and the display by seg7.vhd. The buttons and the
+-- switches are slow, and synchronized in the system.
 --
 -- The board differs from the MEGA65 in three ways that matter here:
 -- * Its FPGA, an XC7A100T, has 135 block RAMs of 36 Kbit, where the MEGA65's
@@ -40,7 +44,20 @@ entity top is
       reset_n_i   : in  std_logic; -- active low
       uart_rxd_i  : in  std_logic;
       uart_txd_o  : out std_logic;
-      led_o       : out std_logic; -- on while the core runs
+      -- LED0 is on while the core runs
+      led_o       : out std_logic_vector(15 downto 0);
+
+      -- The RGB LEDs: bit 2 red, bit 1 green, bit 0 blue
+      rgb0_o      : out std_logic_vector(2 downto 0);
+      rgb1_o      : out std_logic_vector(2 downto 0);
+
+      -- The seven-segment display, active low
+      seg_an_o    : out std_logic_vector(7 downto 0);
+      seg_ca_o    : out std_logic_vector(7 downto 0);
+
+      -- Center, up, left, right, and down, and the switches
+      btn_i       : in  std_logic_vector(4 downto 0);
+      sw_i        : in  std_logic_vector(15 downto 0);
 
       -- The keyboard, as PS/2 from the PIC24
       ps2_clk_i   : in  std_logic;
@@ -63,7 +80,12 @@ architecture synthesis of top is
    signal clk     : std_logic;
    signal rst     : std_logic;
    signal running : std_logic;
-   signal led_reg : std_logic := '0';
+   signal led_reg : std_logic_vector(15 downto 0) := (others => '0');
+
+   signal brd_led  : std_logic_vector(15 downto 0);
+   signal brd_rgb0 : std_logic_vector(11 downto 0);
+   signal brd_rgb1 : std_logic_vector(11 downto 0);
+   signal brd_seg  : std_logic_vector(63 downto 0);
 
    signal ps2_valid : std_logic;
    signal ps2_code  : std_logic_vector(7 downto 0);
@@ -111,11 +133,44 @@ begin
    p_led : process (clk)
    begin
       if rising_edge(clk) then
-         led_reg <= running;
+         led_reg    <= brd_led;
+         led_reg(0) <= running or brd_led(0);
       end if;
    end process p_led;
 
    led_o <= led_reg;
+
+
+   i_rgb_pwm0 : entity work.rgb_pwm
+      port map (
+         clk_i   => clk,
+         red_i   => brd_rgb0(11 downto 8),
+         green_i => brd_rgb0(7 downto 4),
+         blue_i  => brd_rgb0(3 downto 0),
+         rgb_o   => rgb0_o
+      ); -- i_rgb_pwm0
+
+
+   i_rgb_pwm1 : entity work.rgb_pwm
+      port map (
+         clk_i   => clk,
+         red_i   => brd_rgb1(11 downto 8),
+         green_i => brd_rgb1(7 downto 4),
+         blue_i  => brd_rgb1(3 downto 0),
+         rgb_o   => rgb1_o
+      ); -- i_rgb_pwm1
+
+
+   i_seg7 : entity work.seg7
+      generic map (
+         G_CLOCK_HZ => C_CLOCK_HZ
+      )
+      port map (
+         clk_i => clk,
+         seg_i => brd_seg,
+         an_o  => seg_an_o,
+         ca_o  => seg_ca_o
+      ); -- i_seg7
 
 
    -- The video has no reset (text.vhd), and the TMDS clock is for HDMI,
@@ -160,7 +215,8 @@ begin
          G_CLOCK_HZ      => C_CLOCK_HZ,
          G_ROM_FILE      => G_ROM_FILE,
          G_SCR_ADDR_BITS => 13,
-         G_VIDEO         => C_VIDEO
+         G_VIDEO         => C_VIDEO,
+         G_BOARD_IO      => true
       )
       port map (
          clk_i       => clk,
@@ -171,6 +227,12 @@ begin
          kbd_ready_o => kbd_ready,
          kbd_data_i  => kbd_data,
          running_o   => running,
+         brd_led_o   => brd_led,
+         brd_rgb0_o  => brd_rgb0,
+         brd_rgb1_o  => brd_rgb1,
+         brd_seg_o   => brd_seg,
+         brd_btn_i   => btn_i,
+         brd_sw_i    => sw_i,
          vga_clk_i   => vga_clk,
          vga_hs_o    => vga_hs,
          vga_vs_o    => vga_vs,

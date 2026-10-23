@@ -11,7 +11,10 @@
 -- the two sync signals with the polarity of G_VIDEO, and vga_de_o, which is
 -- '1' in the visible area. A board with fewer bits per color takes the top
 -- ones. The keyboard input is a stream of ASCII bytes, as kbd_ascii.vhd
--- sends them; a board without a keyboard holds kbd_valid_i at '0'.
+-- sends them; a board without a keyboard holds kbd_valid_i at '0'. A board
+-- with LEDs, a seven-segment display, buttons, and switches sets G_BOARD_IO
+-- and connects the brd_* ports (nicemon.vhd has their registers); the other
+-- boards leave them open.
 --
 -- With a ROM the core boots from it at reset; without one it waits for the
 -- command line (nicemon.vhd).
@@ -37,7 +40,8 @@ entity system is
       G_ROM_FILE      : string       := "";
       -- The screen has 2^G_SCR_ADDR_BITS words, 32K on the MEGA65.
       G_SCR_ADDR_BITS : natural      := 15;
-      G_VIDEO         : t_video_mode := C_VIDEO_1280X1024
+      G_VIDEO         : t_video_mode := C_VIDEO_1280X1024;
+      G_BOARD_IO      : boolean      := false
    );
    port (
       clk_i       : in  std_logic;
@@ -48,6 +52,14 @@ entity system is
       kbd_ready_o : out std_logic;
       kbd_data_i  : in  std_logic_vector(7 downto 0);
       running_o   : out std_logic;
+
+      -- The board's devices, in the system clock domain (G_BOARD_IO)
+      brd_led_o   : out std_logic_vector(15 downto 0);
+      brd_rgb0_o  : out std_logic_vector(11 downto 0);
+      brd_rgb1_o  : out std_logic_vector(11 downto 0);
+      brd_seg_o   : out std_logic_vector(63 downto 0);
+      brd_btn_i   : in  std_logic_vector(4 downto 0)  := (others => '0');
+      brd_sw_i    : in  std_logic_vector(15 downto 0) := (others => '0');
 
       -- The video, in the VGA clock domain
       vga_clk_i   : in  std_logic;
@@ -104,7 +116,8 @@ begin
          G_SCR_ADDR_BITS    => G_SCR_ADDR_BITS,
          G_ROM_FILE         => G_ROM_FILE,
          G_ROM_ADDR_BITS    => 15,
-         G_CPU_RUN_AT_RESET => G_ROM_FILE /= ""
+         G_CPU_RUN_AT_RESET => G_ROM_FILE /= "",
+         G_BOARD_IO         => G_BOARD_IO
       )
       port map (
          clk_i          => clk_i,
@@ -122,7 +135,13 @@ begin
          scr_cur_x_o    => scr_cur_x,
          scr_cur_y_o    => scr_cur_y,
          scr_cur_mode_o => scr_cur_mode,
-         scr_offs_o     => scr_offs
+         scr_offs_o     => scr_offs,
+         brd_led_o      => brd_led_o,
+         brd_rgb0_o     => brd_rgb0_o,
+         brd_rgb1_o     => brd_rgb1_o,
+         brd_seg_o      => brd_seg_o,
+         brd_btn_i      => brd_btn_i,
+         brd_sw_i       => brd_sw_i
       ); -- i_nicemon
 
 

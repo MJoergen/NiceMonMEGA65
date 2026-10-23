@@ -81,6 +81,22 @@
 --                          scr_cur_*_o and scr_offs_o, with scr_ctl_we_o
 --                          for a cycle when one is written, and when they
 --                          are cleared by reset or by the clear of the memory.
+--   0xFFFFFF90-0xFFFFFF9F  The board's devices, with G_BOARD_IO (the
+--                          Nexys4DDR). Without it, and in the words that
+--                          are not registers, a read returns 0 and a write
+--                          is dropped. Reset clears the writable ones; a
+--                          start of the core does not.
+--     90  The 16 LEDs, bit n for LED n. Read and write.
+--     91  RGB LED 0: bits 11..8 red, 7..4 green, 3..0 blue, each a level
+--         of 0 to 15. Read and write.
+--     92  RGB LED 1, as 91.
+--     93  The segments of digits 3..0 of the seven-segment display, a byte
+--         each, digit 0 in bits 7..0: bit 0 is segment A, up to bit 6 for
+--         G, and bit 7 is the decimal point; 1 lights it. Read and write.
+--     94  The segments of digits 7..4, as 93, digit 4 in bits 7..0.
+--     95  The five buttons, bit 0 for the center one, then up, left, right,
+--         and down. Read only, synchronized to the clock.
+--     96  The 16 switches, bit n for switch n. Read only, synchronized.
 --   0xFFFFFFE0-0xFFFFFFEF  For the CLI only: R0-R15 of the core, read only,
 --                          so that they can be read after HALT, as the
 --                          emulator prints them.
@@ -170,6 +186,9 @@ entity nicemon is
       G_ROM_FILE         : string  := "";
       G_ROM_ADDR_BITS    : natural := 15;
       G_CPU_RUN_AT_RESET : boolean := false;
+      -- The board has LEDs, a seven-segment display, buttons, and switches
+      -- in 0xFFFFFF90-9F
+      G_BOARD_IO         : boolean := false;
       -- The checks of formal/nicemon.sby, and a RAM with any contents
       G_FORMAL           : boolean := false
    );
@@ -197,7 +216,16 @@ entity nicemon is
       scr_cur_x_o    : out std_logic_vector(6 downto 0);
       scr_cur_y_o    : out std_logic_vector(4 downto 0);
       scr_cur_mode_o : out std_logic_vector(2 downto 0);
-      scr_offs_o     : out std_logic_vector(G_SCR_ADDR_BITS - 1 downto 0)
+      scr_offs_o     : out std_logic_vector(G_SCR_ADDR_BITS - 1 downto 0);
+      -- The board's devices (G_BOARD_IO): the LEDs, the two RGB LEDs'
+      -- levels, the display's segments, and the buttons and switches, which
+      -- are synchronized here. Without G_BOARD_IO the outputs are 0.
+      brd_led_o      : out std_logic_vector(15 downto 0);
+      brd_rgb0_o     : out std_logic_vector(11 downto 0);
+      brd_rgb1_o     : out std_logic_vector(11 downto 0);
+      brd_seg_o      : out std_logic_vector(63 downto 0);
+      brd_btn_i      : in  std_logic_vector(4 downto 0)  := (others => '0');
+      brd_sw_i       : in  std_logic_vector(15 downto 0) := (others => '0')
    );
 end entity nicemon;
 
@@ -220,6 +248,9 @@ architecture synthesis of nicemon is
    constant C_SCR_BASE : std_logic_vector(31 downto C_SCR_BITS) := (31 downto 16 => '1', others => '0');
    -- The screen's registers: 0xFFFFFF80-8F
    constant C_SCR_REGS_BASE : std_logic_vector(31 downto 4) := X"FFFFFF8";
+
+   -- The board's devices: 0xFFFFFF90-9F
+   constant C_BRD_BASE : std_logic_vector(31 downto 4) := X"FFFFFF9";
 
    -- The devices of nice_cpu/hdl/src, by the address bits above their offset
    constant C_TIMER_BASE : std_logic_vector(31 downto 4) := X"FFFFFF1";        -- 0xFFFFFF10-1F
@@ -253,6 +284,7 @@ architecture synthesis of nicemon is
       return addr(7 downto 1) = "0000000" or                        -- console, read counter
              addr(7 downto 4) = X"1" or addr(7 downto 5) = "001" or -- timer, MPU
              addr(7 downto 6) = "01" or addr(7 downto 4) = X"8" or  -- perf, fetch statistics, screen registers
+             addr(7 downto 4) = X"9" or                             -- the board's devices
              (cli and (addr(7 downto 4) = X"E" or addr(7 downto 1) = "1111000"));
    end function is_io;
 
@@ -319,6 +351,21 @@ architecture synthesis of nicemon is
    signal scr_cur_y  : std_logic_vector(4 downto 0) := (others => '0');
    signal scr_offs   : std_logic_vector(C_SCR_BITS - 1 downto 0) := (others => '0');
    signal scr_ctl_we : std_logic := '0';
+
+   -- The board's devices. The buttons and the switches are synchronized.
+   signal brd_led  : std_logic_vector(15 downto 0) := (others => '0');
+   signal brd_rgb0 : std_logic_vector(11 downto 0) := (others => '0');
+   signal brd_rgb1 : std_logic_vector(11 downto 0) := (others => '0');
+   signal brd_seg  : std_logic_vector(63 downto 0) := (others => '0');
+   signal brd_btn  : std_logic_vector(4 downto 0)  := (others => '0');
+   signal brd_sw   : std_logic_vector(15 downto 0) := (others => '0');
+   signal btn_sync : std_logic_vector(4 downto 0)  := (others => '0');
+   signal sw_sync  : std_logic_vector(15 downto 0) := (others => '0');
+   attribute async_reg : string;
+   attribute async_reg of btn_sync : signal is "TRUE";
+   attribute async_reg of sw_sync  : signal is "TRUE";
+   attribute async_reg of brd_btn  : signal is "TRUE";
+   attribute async_reg of brd_sw   : signal is "TRUE";
 
    -- The number of the core's data reads of 0xFFFFFF01 since it was written
    signal read_count : std_logic_vector(31 downto 0) := (others => '0');
@@ -752,6 +799,34 @@ begin
                end case;
 
             end if;
+         elsif addr(31 downto 4) = C_BRD_BASE then
+            -- The board's devices. Without them, and in the words that are
+            -- not registers, a read is 0 and a write is dropped.
+            if we = '1' and G_BOARD_IO then
+
+               case addr(3 downto 0) is
+                  when X"0"   => brd_led              <= wdata(15 downto 0);
+                  when X"1"   => brd_rgb0             <= wdata(11 downto 0);
+                  when X"2"   => brd_rgb1             <= wdata(11 downto 0);
+                  when X"3"   => brd_seg(31 downto 0)  <= wdata;
+                  when X"4"   => brd_seg(63 downto 32) <= wdata;
+                  when others => null;
+               end case;
+
+            elsif G_BOARD_IO then
+
+               case addr(3 downto 0) is
+                  when X"0"   => rd_io(15 downto 0) <= brd_led;
+                  when X"1"   => rd_io(11 downto 0) <= brd_rgb0;
+                  when X"2"   => rd_io(11 downto 0) <= brd_rgb1;
+                  when X"3"   => rd_io                <= brd_seg(31 downto 0);
+                  when X"4"   => rd_io                <= brd_seg(63 downto 32);
+                  when X"5"   => rd_io(4 downto 0)  <= brd_btn;
+                  when X"6"   => rd_io(15 downto 0) <= brd_sw;
+                  when others => null;
+               end case;
+
+            end if;
          elsif addr(31 downto 4) = C_REGS_BASE and cli then
             if we = '0' then
                rd_io <= cpu_regs(to_integer(addr(3 downto 0)));
@@ -908,6 +983,10 @@ begin
             scr_cur_y    <= (others => '0');
             scr_offs     <= (others => '0');
             scr_ctl_we   <= '1';
+            brd_led      <= (others => '0');
+            brd_rgb0     <= (others => '0');
+            brd_rgb1     <= (others => '0');
+            brd_seg      <= (others => '0');
             if G_CPU_RUN_AT_RESET then
                cpu_hold <= '0';
             else
@@ -1105,6 +1184,22 @@ begin
          scr_data_o <= ram_b_wdata;
       end if;
    end process p_scr_out;
+
+   -- The buttons and the switches pass through two registers.
+   p_brd_in : process (clk_i)
+   begin
+      if rising_edge(clk_i) then
+         btn_sync <= brd_btn_i;
+         brd_btn  <= btn_sync;
+         sw_sync  <= brd_sw_i;
+         brd_sw   <= sw_sync;
+      end if;
+   end process p_brd_in;
+
+   brd_led_o  <= brd_led;
+   brd_rgb0_o <= brd_rgb0;
+   brd_rgb1_o <= brd_rgb1;
+   brd_seg_o  <= brd_seg;
 
    scr_ctl_we_o   <= scr_ctl_we;
    scr_cur_x_o    <= scr_cur_x;

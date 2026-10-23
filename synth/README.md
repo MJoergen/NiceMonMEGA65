@@ -46,14 +46,17 @@ where the R3 has a TPD12S016.
 
 `nexys4ddr/top.vhd` is the whole top level, and `nexys4ddr.xdc` has its
 pins, from Digilent's master XDC. The console is the board's USB-UART, the
-screen is on its VGA connector, and LED0 is on while the core runs. A USB
+screen is on its VGA connector, and LED0 is on while the core runs, or
+while the program sets it. A USB
 keyboard in the USB HID port types into the console too: the board's PIC24
 turns it into PS/2, which `src/kbd_ps2.vhd` receives and
 `src/kbd_ps2_ascii.vhd` turns into ASCII. The receiver only listens, so
-the keyboard's LEDs are not set. The board's other LEDs, its buttons, its
-switches, and its seven-segment display are not used yet (see
-[TODO.md](../TODO.md)). The
-CPU RESET button resets the system. The board differs from the MEGA65 in
+the keyboard's LEDs are not set. The board's 16 LEDs, two RGB LEDs,
+seven-segment display, five buttons, and 16 switches are registers in
+`0xFFFFFF90`–`96` (see the main README, "The Nexys4DDR's devices").
+`src/seg7.vhd` scans the display, and `src/rgb_pwm.vhd` dims the RGB LEDs
+with 16 levels; both drive registered outputs in the IOBs. The CPU RESET
+button resets the system. The board differs from the MEGA65 in
 three ways:
 
 - Its FPGA has 135 block RAMs of 36 Kbit, where the MEGA65's has 365. The
@@ -132,7 +135,9 @@ The utilization is from `build/utilization.rpt`, and the split by module
 from `report_utilization -hierarchical` on `build/top.dcp`. These are the
 numbers without `ROM=`, in LUTs and flip-flops. The pipelined columns are
 from the builds of 2026-10-23 at nice_cpu 4cd869e, and the multi-cycle
-columns are from the build at cb95968:
+columns are from the build at cb95968. The two pipelined totals are from
+the builds with the Nexys4DDR's devices (below); the rows above them are
+from before, so they do not add up to the totals:
 
 | Part of the design | R6, pipelined | R6, multi | Nexys4DDR, pipelined | Nexys4DDR, multi |
 |---|---|---|---|---|
@@ -143,8 +148,8 @@ columns are from the build at cb95968:
 | The text display (`text.vhd`) | 123 / 180 | 123 / 180 | 121 / 156 | 121 / 156 |
 | The keyboard | 592 / 577 | 596 / 585 | 106 / 48 | – |
 | The HDMI output | 575 / 1207 | 574 / 1207 | – | – |
-| Total | 12302 / 8329 | 8909 / 5151 | 11228 / 6501 | 7707 / 6319 |
-| Total, of the FPGA | 9.2 % / 3.1 % | 6.7 % / 1.9 % | 17.7 % / 5.1 % | 12.2 % / 5.0 % |
+| Total | 12272 / 8330 | 8909 / 5151 | 11167 / 6651 | 7707 / 6319 |
+| Total, of the FPGA | 9.2 % / 3.1 % | 6.7 % / 1.9 % | 17.6 % / 5.2 % | 12.2 % / 5.0 % |
 
 The pipelined core is about 5.5 % of the LUTs of the R6's FPGA, and 11.6 % of
 the Nexys4DDR's. The multi-cycle core has two thirds of its LUTs, 3.4 % and
@@ -171,7 +176,10 @@ pipelined builds of 2026-10-23 at nice_cpu 4cd869e have 0.174 ns on the R6
 (default flow, 100 MHz) and 0.043 ns on the Nexys4DDR (timing flow, 90 MHz),
 with hold slacks of 0.041 ns and 0.030 ns. Their block RAM is 132.5 tiles
 on the R6 (36 %) and 84.5 on the Nexys4DDR (63 %), and both use 4 DSPs.
-This nice_cpu update changed no core RTL, only its formal checks and
+The builds that added the Nexys4DDR's devices at `0xFFFFFF90`–`96` have 0.149 ns
+on the R6 and 0.203 ns on the Nexys4DDR, with hold slacks of 0.069 ns and
+0.043 ns. The slacks change from build to build with placement, not with the
+logic. This nice_cpu update changed no core RTL, only its formal checks and
 documentation, so the figures are those of the same logic. The
 pipelined core's slacks are from the builds at 929534c, which gates the
 core's requests with `core_take`: the R6 0.11 ns and the Nexys4DDR 0.02 ns

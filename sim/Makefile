@@ -12,9 +12,10 @@
 #             tb_ps2      the PS/2 keyboard receiver and its ASCII mapping.
 #             tb_text     the text display: one frame of 1280x1024, every
 #                         pixel checked.
+#             tb_board_io the Nexys4DDR's display and RGB LED drivers.
 #             It also checks that GHDL can synthesize the system, the
 #             keyboards, the text display (through text_synth.vhd, in
-#             the boards' mode, with 15 and 13 screen address bits), and system.vhd as the Nexys4DDR has it.
+#             the boards' mode, with 15 and 13 screen address bits), and system.vhd as the Nexys4DDR has it, and the display and RGB LED drivers.
 #             With -j these all run side by side, and the test takes as
 #             long as tb_text alone. Each one is also a target: make
 #             tb_kbd runs just that one.
@@ -40,20 +41,20 @@ NICE_SIM = $(NICE_DIR)/hdl/sim/wb_mem.vhd
 
 SRC_SOURCES  = ../src/uart_serdes.vhd ../src/line_buffer.vhd ../src/cmd.vhd ../src/rx_fifo.vhd ../src/ram.vhd ../src/rom.vhd \
                ../src/nicemon.vhd \
-               ../src/kbd_m65.vhd ../src/kbd_ascii.vhd ../src/kbd_ps2.vhd ../src/kbd_ps2_ascii.vhd \
+               ../src/kbd_m65.vhd ../src/kbd_ascii.vhd ../src/kbd_ps2.vhd ../src/kbd_ps2_ascii.vhd ../src/seg7.vhd ../src/rgb_pwm.vhd \
                ../src/video/video_pkg.vhd ../src/video/font_pkg.vhd ../src/video/pix.vhd ../src/video/scr_ram.vhd ../src/video/text.vhd \
                ../src/system.vhd
-SOURCES      = $(SRC_SOURCES) text_synth.vhd tb_hello.vhd tb_nicemon.vhd tb_kbd.vhd tb_ps2.vhd tb_text.vhd
+SOURCES      = $(SRC_SOURCES) text_synth.vhd tb_hello.vhd tb_nicemon.vhd tb_kbd.vhd tb_ps2.vhd tb_text.vhd tb_board_io.vhd
 
-.PHONY: test check-steps analyze synth clean tb_hello tb_nicemon tb_kbd tb_ps2 tb_text \
+.PHONY: test check-steps analyze synth clean tb_hello tb_nicemon tb_kbd tb_ps2 tb_text tb_board_io \
         synth-nicemon synth-nicemon-norom synth-kbd_m65 synth-kbd_ascii synth-kbd_ps2 \
         synth-kbd_ps2_ascii synth-text \
-        synth-system
+        synth-system synth-seg7 synth-rgb_pwm
 
 # Each testbench and each synthesis check is a target of its own, so that
 # "make -j test" runs them side by side. They share the work library of
 # $(BUILD), which "analyze" writes first and they only read.
-test: synth tb_hello tb_nicemon tb_kbd tb_ps2 tb_text check-steps
+test: synth tb_hello tb_nicemon tb_kbd tb_ps2 tb_text tb_board_io check-steps
 
 check-steps: $(addprefix $(BUILD)/,hello.bin emu.bin reserved.bin)
 	@if [ ! -x $(EMU) ]; then echo "SKIP check-steps: $(EMU) is not built"; exit 0; fi; \
@@ -86,7 +87,7 @@ tb_nicemon: analyze $(addprefix $(BUILD)/,$(addsuffix .bin,$(BINS)))
 	  -gG_HELLO_STEPS=$(STEPS_HELLO) -gG_EMU_STEPS=$(STEPS_EMU) -gG_RESERVED_STEPS=$(STEPS_RESERVED) > tb_nicemon.log 2>&1) && \
 	  echo "PASS tb_nicemon" || (echo "FAIL tb_nicemon"; cat $(BUILD)/tb_nicemon.log; exit 1)
 
-tb_kbd tb_ps2 tb_text: analyze
+tb_kbd tb_ps2 tb_text tb_board_io: analyze
 	@(cd $(BUILD) && $(GHDL) --elab-run $(GHDLFLAGS) $@ > $@.log 2>&1) && \
 	  echo "PASS $@" || (echo "FAIL $@"; cat $(BUILD)/$@.log; exit 1)
 
@@ -94,7 +95,7 @@ tb_kbd tb_ps2 tb_text: analyze
 # without a ROM, and the keyboards, as nice_cpu does for its core, the text
 # display, and system.vhd with the screen of the Nexys4DDR.
 synth: synth-nicemon synth-nicemon-norom synth-kbd_m65 synth-kbd_ascii synth-kbd_ps2 synth-kbd_ps2_ascii \
-       synth-text synth-system
+       synth-text synth-system synth-seg7 synth-rgb_pwm
 
 synth-nicemon: analyze $(BUILD)/rom.bin
 	@(cd $(BUILD) && $(GHDL) --synth $(GHDLFLAGS) -gG_CLOCK_HZ=50000000 -gG_ROM_FILE=rom.bin nicemon > nicemon_synth.vhd 2> nicemon_synth.log) && \
@@ -108,6 +109,14 @@ synth-kbd_m65 synth-kbd_ascii synth-kbd_ps2: synth-%: analyze
 	@(cd $(BUILD) && $(GHDL) --synth $(GHDLFLAGS) -gG_CLOCK_HZ=50000000 $* > $*_synth.vhd 2> $*_synth.log) && \
 	  echo "PASS synth $*" || (echo "FAIL synth $*"; cat $(BUILD)/$*_synth.log; exit 1)
 
+synth-seg7: analyze
+	@(cd $(BUILD) && $(GHDL) --synth $(GHDLFLAGS) -gG_CLOCK_HZ=90000000 seg7 > seg7_synth.vhd 2> seg7_synth.log) && \
+	  echo "PASS synth seg7" || (echo "FAIL synth seg7"; cat $(BUILD)/seg7_synth.log; exit 1)
+
+synth-rgb_pwm: analyze
+	@(cd $(BUILD) && $(GHDL) --synth $(GHDLFLAGS) rgb_pwm > rgb_pwm_synth.vhd 2> rgb_pwm_synth.log) && \
+	  echo "PASS synth rgb_pwm" || (echo "FAIL synth rgb_pwm"; cat $(BUILD)/rgb_pwm_synth.log; exit 1)
+
 synth-kbd_ps2_ascii: analyze
 	@(cd $(BUILD) && $(GHDL) --synth $(GHDLFLAGS) kbd_ps2_ascii > kbd_ps2_ascii_synth.vhd 2> kbd_ps2_ascii_synth.log) && \
 	  echo "PASS synth kbd_ps2_ascii" || (echo "FAIL synth kbd_ps2_ascii"; cat $(BUILD)/kbd_ps2_ascii_synth.log; exit 1)
@@ -120,7 +129,7 @@ synth-text: analyze
 	done
 
 synth-system: analyze
-	@(cd $(BUILD) && $(GHDL) --synth $(GHDLFLAGS) -gG_CLOCK_HZ=80000000 -gG_SCR_ADDR_BITS=13 system > system_synth.vhd 2> system_synth.log) && \
+	@(cd $(BUILD) && $(GHDL) --synth $(GHDLFLAGS) -gG_CLOCK_HZ=80000000 -gG_SCR_ADDR_BITS=13 -gG_BOARD_IO=true system > system_synth.vhd 2> system_synth.log) && \
 	  echo "PASS synth system" || (echo "FAIL synth system"; cat $(BUILD)/system_synth.log; exit 1)
 
 analyze: | $(BUILD)

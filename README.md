@@ -15,14 +15,16 @@ written, programs are loaded through the command line.
 
 The MEGA65 is the main board. The system also builds for the Digilent
 Nexys4DDR, with the UART and a USB keyboard for input, the UART for output,
-and VGA for the screen (see [synth/](synth/README.md#the-nexys4ddr)).
+and VGA for the screen, and with its LEDs, seven-segment display, buttons,
+and switches as registers (see [synth/](synth/README.md#the-nexys4ddr) and
+[The Nexys4DDR's devices](#the-nexys4ddrs-devices)).
 
 ## Contents
 
 | Path | What it is |
 |---|---|
 | [nice_cpu/](https://github.com/MJoergen/nice_cpu) | The NICE CPU, its assembler, its emulator, and `nicewasm`, a [translator](https://github.com/MJoergen/nice_cpu/tree/main/translator) from WebAssembly to NICE assembly, as a git submodule. |
-| [src/](src/) | The synthesisable VHDL, shared by both boards. `nicemon.vhd` is the system: the NICE core, the memory (`ram.vhd` and `rom.vhd`), the UART, the core's input FIFO (`rx_fifo.vhd`), and the command line interpreter. `uart_serdes.vhd` (with fixes to its receiver, and break detection), `line_buffer.vhd`, and `cmd.vhd` are copied from cmod-s7; `cmd.vhd` prints `NICE` instead of `WBUS` at reset, and `HALT` when the core halts. `kbd_m65.vhd` drives the MEGA65 keyboard, and `kbd_ascii.vhd` turns its keys into ASCII. `kbd_ps2.vhd` receives the PS/2 keyboard of the Nexys4DDR, and `kbd_ps2_ascii.vhd` turns its scan codes into ASCII. `system.vhd` is what every board has: the system, the text display of its screen, and the UART's pins. |
+| [src/](src/) | The synthesisable VHDL, shared by both boards. `nicemon.vhd` is the system: the NICE core, the memory (`ram.vhd` and `rom.vhd`), the UART, the core's input FIFO (`rx_fifo.vhd`), and the command line interpreter. `uart_serdes.vhd` (with fixes to its receiver, and break detection), `line_buffer.vhd`, and `cmd.vhd` are copied from cmod-s7; `cmd.vhd` prints `NICE` instead of `WBUS` at reset, and `HALT` when the core halts. `kbd_m65.vhd` drives the MEGA65 keyboard, and `kbd_ascii.vhd` turns its keys into ASCII. `kbd_ps2.vhd` receives the PS/2 keyboard of the Nexys4DDR, and `kbd_ps2_ascii.vhd` turns its scan codes into ASCII. `seg7.vhd` scans the Nexys4DDR's seven-segment display, and `rgb_pwm.vhd` dims its RGB LEDs. `system.vhd` is what every board has: the system, the text display of its screen, and the UART's pins. |
 | [src/core/](src/core/) | `nice_core_pipeline.vhd` and `nice_core_multi.vhd`, the two architectures of `nice_core`. `src/nice_core.vhd` is the entity that wraps whichever of nice_cpu's cores `core.mk` selects with `NICE=pipeline` (the default) or `NICE=multi`. |
 | [src/video/](src/video/) | The text display: `text.vhd` shows the screen at `0xFFFF0000` as 80×25 characters on a video output, with a cursor and a display offset for scrolling. `pix.vhd` and `video_pkg.vhd` are from [MandelbrotMEGA65](https://github.com/MJoergen/MandelbrotMEGA65). `scr_ram.vhd` is the screen's dual-clock memory. `font_pkg.vhd` is the [Spleen](https://github.com/fcambus/spleen) 16×32 font, made by `font/gen_font_pkg.py`. |
 | [font/](font/) | The script that makes `src/video/font_pkg.vhd` from Spleen, and Spleen's license (BSD 2-Clause). |
@@ -349,6 +351,37 @@ without a ROM, with `W FFFFFFF0 00000008` to start it. `load.py` does this.
 boot from it, as the reset button does. The RAM under the ROM keeps its
 words meanwhile.
 
+### The Nexys4DDR's devices
+
+The Nexys4DDR's LEDs, seven-segment display, buttons, and switches are
+registers in `0xFFFFFF90`–`96`, for the core and the command line alike.
+Only the Nexys4DDR has them: on the MEGA65 the whole block reads 0 and
+takes no write, as it does in the emulator. Reset clears the registers
+that can be written, and a start of the core does not, so a program's
+display stays after it halts.
+
+| Address | Access | What it is |
+|---|---|---|
+| `0xFFFFFF90` | Read, write | The 16 LEDs, bit n for LED n. LED0 is also on while the core runs. |
+| `0xFFFFFF91` | Read, write | RGB LED 0: bits 11..8 red, 7..4 green, 3..0 blue, each a level from 0 (dark) to 15. Bits 31..12 read 0 and are dropped. |
+| `0xFFFFFF92` | Read, write | RGB LED 1, in the same way. |
+| `0xFFFFFF93` | Read, write | The segments of digits 3..0, a byte each, digit 0 (the rightmost) in bits 7..0. |
+| `0xFFFFFF94` | Read, write | The segments of digits 7..4, in the same way, digit 4 in bits 7..0. |
+| `0xFFFFFF95` | Read only | The five buttons: bit 0 the center one, then up, left, right, and down (bits 1 to 4). 1 when pressed. |
+| `0xFFFFFF96` | Read only | The 16 switches, bit n for switch n. 1 when the switch is up. |
+
+The seven-segment display takes the segments as raw bits, so a program
+brings its own font. In each byte, bit 0 is segment A, bit 1 B, and so on
+up to bit 6 for G, and bit 7 is the decimal point; a 1 lights it, and a
+byte of 0 leaves the digit dark. `W FFFFFF93 0000006D` lights segments A, C,
+D, and F, which shows a 5 on digit 0. The display is scanned at about
+1 kHz per digit, so the digits look steady. The RGB LEDs are very bright at
+full level; 1 to 3 is a comfortable range. The buttons and the switches are
+synchronized to the clock but not debounced. The CPU RESET button is not a
+register: it resets the system. The words `0xFFFFFF97`–`9F` read 0 and take
+no write; the keyboard's LEDs may come to `0xFFFFFF97` (see
+[TODO.md](TODO.md)).
+
 ### Address map
 
 The command line and the core's data accesses see the same addresses.
@@ -365,6 +398,7 @@ The command line and the core's data accesses see the same addresses.
 | `0xFFFFFF40`–`0xFFFFFF4F` | The performance counters of SYSTEM.md §3: cycles and instructions, 64 bits each. `R` reads them as the core does: `R FFFFFF42` takes the snapshot that `R FFFFFF43` returns, where `--dump` takes none. |
 | `0xFFFFFF50`–`0xFFFFFF7F` | The fetch statistics of MICROARCH.md §8.1, the rest of the performance counters: counters of what FETCH and DECODE do, for judging the size of FETCH's buffer. They count from the start of the core. |
 | `0xFFFFFF80`–`0xFFFFFF8F` | The screen's registers: the cursor and the display offset (see [The screen](#the-screen)). |
+| `0xFFFFFF90`–`0xFFFFFF9F` | The Nexys4DDR's LEDs, seven-segment display, buttons, and switches (see [The Nexys4DDR's devices](#the-nexys4ddrs-devices)). On the MEGA65 they read 0 and take no write. |
 | `0xFFFFFFE0`–`0xFFFFFFEF` | For the command line only: R0–R15 of the core, read only. After a halt they hold what the emulator prints. |
 | `0xFFFFFFF0` | Control, for the command line only. Bit 0 holds the core in reset. Bit 1 reads the core's halted flag. A write with bit 2 set first clears the RAM and the screen to 0, with the core held, and answers `OK` when it is done; then bits 0 and 3 take effect. Bit 3 hides the ROM, so that the RAM is at 0; reset clears it in a bitstream with a ROM, and in one without it reads 1. |
 | `0xFFFFFFF1` | For the command line only, read only: why the core halted. 0 while it has not, 1 for `HALT`, 2 for a reserved control word, 3 for `INT` inside an interrupt routine, and 4 for `RTI` outside one. |
@@ -475,7 +509,10 @@ You need GHDL (tested with 4.1.0) and Python 3.
   next frame. It takes under a minute, the longest of the tests.
 - `make test` also checks that GHDL can synthesize the system, with
   `sim/rom.nasm` as its ROM and without a ROM, the keyboards, the text
-  display, and `src/system.vhd` with the screen of the Nexys4DDR.
+  display, and `src/system.vhd` with the screen and the devices of the
+  Nexys4DDR, and the drivers of its display and RGB LEDs.
+- `sim/tb_board_io.vhd` tests those drivers: every digit of the display lit
+  in turn with its own segments, and the duty of an RGB output at its level.
 - `make -j test` runs all these side by side, in the time of `tb_text`.
   Each is also a target of `sim/Makefile`, so `make -C sim tb_kbd` runs one.
 - `make lint` checks the VHDL against [CODING_STYLE.md](CODING_STYLE.md)
@@ -557,7 +594,8 @@ then the script halts the program and holds the core with the ROM hidden, and
 prints how many passed, so a following `--no-program` run can start. Programming
 the FPGA needs Linux, as the JTAG cable is found through `/sys`; with
 `--no-program` the script runs wherever `load.py` does.
-On the R6 and the Nexys4DDR with the pipelined core, all 59 pass.
+With the pipelined core, all 63 pass on the R6, and all 79 on the Nexys4DDR,
+which has more checks for its LEDs, display, buttons, and switches.
 
 For the R3, give `BIT=synth/r3/build/top.bit`. For the Nexys4DDR, give
 `BIT=synth/nexys4ddr/build/top.bit`. Its UART is usually `/dev/ttyUSB1` too.
