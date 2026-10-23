@@ -228,7 +228,7 @@ runs it:
 
 The instructions are the same as on the emulator. The cycles are from the
 board with the pipelined core, beside those of nice_cpu's own testbench
-for the core (`bench/README.md`, at nice_cpu 1a41b0c):
+for the core (`bench/README.md`, at nice_cpu 4cd869e):
 
 | Phase | Instructions | Cycles on the board | In nice_cpu's testbench |
 |---|---|---|---|
@@ -240,8 +240,8 @@ for the core (`bench/README.md`, at nice_cpu 1a41b0c):
 | `strings` | 104562 | 166363 | 166928 |
 | total | 1681080 | 2383046 | 2384635 |
 
-The board takes the same cycles, or a few less in `bst` and `strings`,
-and at 100 MHz the benchmark runs for about 24 ms.
+The board takes the same cycles, or fewer in `bst` (1024 fewer) and
+`strings` (565 fewer), and at 100 MHz the benchmark runs for about 24 ms.
 
 You need clang with the wasm32 target, `wasm-ld`, and `llvm-ar` (on Debian
 and Ubuntu, the `clang`, `lld`, and `llvm` packages). The steps that the
