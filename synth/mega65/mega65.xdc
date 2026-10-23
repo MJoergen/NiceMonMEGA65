@@ -7,11 +7,18 @@ create_clock -period 10.000 -name sys_clk [get_ports {clk_i}]
 ## crosses between them and the system clock is the copy of the screen in
 ## src/video/scr_ram.vhd, a block RAM written on the system clock and read on
 ## the VGA clock, and the screen's registers, through a handshake in
-## src/video/text.vhd, whose values are held while they cross. So there is no
-## path between the clocks to time.
-set_clock_groups -asynchronous \
-   -group [get_clocks -of_objects [get_pins i_mega65/i_clk_rst/i_mmcm/CLKOUT0]] \
-   -group [get_clocks -of_objects [get_pins {i_mega65/i_video_clk/i_mmcm/CLKOUT0 i_mega65/i_video_clk/i_mmcm/CLKOUT1}]]
+## src/video/text.vhd, whose values are held while they cross. The handshake
+## is correct by design, but its multi-bit data paths (cur_x_r, cur_y_r,
+## cur_mode_r, offs_r to the *_vga registers) would show a slow route only as
+## a wrong offset for one frame. So the relation between the clocks is
+## ignored, and each path only has to be shorter than 10 ns, in both
+## directions.
+set_max_delay -datapath_only \
+   -from [get_clocks -of_objects [get_pins i_mega65/i_clk_rst/i_mmcm/CLKOUT0]] \
+   -to   [get_clocks -of_objects [get_pins {i_mega65/i_video_clk/i_mmcm/CLKOUT0 i_mega65/i_video_clk/i_mmcm/CLKOUT1}]] 10.000
+set_max_delay -datapath_only \
+   -from [get_clocks -of_objects [get_pins {i_mega65/i_video_clk/i_mmcm/CLKOUT0 i_mega65/i_video_clk/i_mmcm/CLKOUT1}]] \
+   -to   [get_clocks -of_objects [get_pins i_mega65/i_clk_rst/i_mmcm/CLKOUT0]] 10.000
 
 ## The color and sync outputs to the video DAC are registered in the IOBs
 ## (p_vdac in mega65.vhd), so they all change at the same time, half a VGA
