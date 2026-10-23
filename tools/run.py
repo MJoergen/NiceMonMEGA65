@@ -12,7 +12,7 @@ after any other halt. So the output of the two can be compared:
     diff <(niceemu -i in.txt prog.bin) <(tools/run.py -i in.txt prog.bin)
 
 Usage: tools/run.py [--port /dev/ttyUSB1] [--baud 115200] [-i FILE]
-                    [-d ADDR:N]... [-s] [--timeout SEC] FILE.bin
+                    [-d ADDR:N]... [-s] [-2004] [--timeout SEC] FILE.bin
 
 The input is stdin, or the file of -i. Each byte goes to the UART as soon
 as it is read, and the core's input FIFO holds 2048 bytes, so a program
@@ -28,8 +28,13 @@ input byte, and the core does not: while no byte has arrived, a read
 returns 0. So a program that waits for input in a loop runs more steps
 here. The memory has 64K words, repeated through the address space, so a
 dump beyond them reads the same words again. --timeout gives up after SEC
-seconds, with exit status 3, and leaves the core running. Only the Python
-standard library is used.
+seconds (60 by default), prints a line for the time limit, and exits with
+status 3, as niceemu does after its step limit. It prints no registers and
+no --dump or --screen output, and the core still runs, for the command line
+cannot answer until the core halts or the board is reset. -2004 and
+--no-cycle-counter are accepted and ignored: the screen is printed as the
+80x25 characters in any case, and the cycle counter always runs. Only the
+Python standard library is used.
 """
 
 import argparse
@@ -98,9 +103,9 @@ def dump_address(addr: int) -> int:
     return addr
 
 
-def run(fd: int, infd: int, timeout: float) -> None:
+def run(fd: int, infd: int, timeout: float) -> bool:
     """Copies the input to the UART and the UART to stdout until the halt
-    message, which is not copied."""
+    message, which is not copied. Returns False if the time is up first."""
     out = sys.stdout.buffer
     held = b""      # output that may be the start of the halt message
     end = time.monotonic() + timeout if timeout else None
@@ -111,9 +116,7 @@ def run(fd: int, infd: int, timeout: float) -> None:
         if left is not None and left <= 0:
             out.write(held)
             out.flush()
-            print(f"run.py: no halt after {timeout} s; the core still runs",
-                  file=sys.stderr)
-            sys.exit(3)
+            return False
         ready, _, _ = select.select(wait, [], [], left)
         if infd in ready:
             data = os.read(infd, 256)
@@ -144,21 +147,13 @@ def run(fd: int, infd: int, timeout: float) -> None:
         time.sleep(0.05)
         os.write(fd, b"\r")
         drain(fd, 0.2)
+    return True
 
 
-def report(fd: int, dumps: list[tuple[int, int]], screen: bool) -> int:
-    """Prints what niceemu prints after a halt, and returns its exit
-    status. The low word of the instruction counter is read before the high
-    word, which is the snapshot that the read of the low word takes."""
-    why, lo, hi, *regs = read_words(fd, [HALT_WHY, INSTR_LO, INSTR_HI] +
-                                    [REGS + i for i in range(16)])
-    if why not in REASONS:
-        fail(f"the core has not halted (reason {why})")
-    lines = [f"Halted ({REASONS[why]}) after {hi << 32 | lo} steps, "
-             f"PC={regs[15]:08x}"]
-    for row in range(4):
-        lines.append(" ".join(f"R{i:<2} {regs[i]:08x}"
-                              for i in range(4 * row, 4 * row + 4)))
+def dump_lines(fd: int, dumps: list[tuple[int, int]],
+               screen: bool) -> list[str]:
+    """The --dump and --screen output."""
+    lines = []
     for addr, n in dumps:
         words = read_words(fd, [dump_address((addr + i) & 0xFFFFFFFF)
                                 for i in range(n)])
@@ -176,8 +171,37 @@ def report(fd: int, dumps: list[tuple[int, int]], screen: bool) -> int:
             rows.pop()
         lines.append("Screen:")
         lines += [f"|{row}" for row in rows]
-    print("\n".join(lines), flush=True)
+    return lines
+
+
+def report(fd: int, dumps: list[tuple[int, int]], screen: bool) -> int:
+    """Prints what niceemu prints after a halt, and returns its exit
+    status. The dumps are read before the instruction counter, as niceemu
+    prints them after its report, so that a dump of the counter's high word
+    shows the snapshot that the program left, as niceemu's does. The low word
+    is read before the high word, which is the snapshot that the read of the
+    low word takes."""
+    why, *regs = read_words(fd, [HALT_WHY] + [REGS + i for i in range(16)])
+    if why not in REASONS:
+        fail(f"the core has not halted (reason {why})")
+    extra = dump_lines(fd, dumps, screen)
+    lo, hi = read_words(fd, [INSTR_LO, INSTR_HI])
+    lines = [f"Halted ({REASONS[why]}) after {hi << 32 | lo} steps, "
+             f"PC={regs[15]:08x}"]
+    for row in range(4):
+        lines.append(" ".join(f"R{i:<2} {regs[i]:08x}"
+                              for i in range(4 * row, 4 * row + 4)))
+    print("\n".join(lines + extra), flush=True)
     return 0 if why == 1 else 2
+
+
+def report_timeout(timeout: float) -> int:
+    """Prints the time limit, and returns niceemu's exit status for the step
+    limit. The core still runs, and the command line cannot answer."""
+    print(f"Stopped at the time limit after {timeout:g} s", flush=True)
+    print("run.py: the core still runs; reset the board to use the command "
+          "line again", file=sys.stderr)
+    return 3
 
 
 def main() -> None:
@@ -191,8 +215,15 @@ def main() -> None:
                         help="after halting, print N memory words from ADDR")
     parser.add_argument("-s", "--screen", action="store_true",
                         help="after halting, print the 80x25 character screen")
-    parser.add_argument("--timeout", type=float, default=0,
-                        help="give up after SEC seconds, with exit status 3")
+    parser.add_argument("-2004", dest="ide2004", action="store_true",
+                        help="accepted and ignored, as the screen is the "
+                        "same here")
+    parser.add_argument("--no-cycle-counter", action="store_true",
+                        help="accepted and ignored: the cycle counter always "
+                        "runs")
+    parser.add_argument("--timeout", type=float, default=60,
+                        help="give up after SEC seconds, with exit status 3 "
+                        "(default 60, 0 for none)")
     parser.add_argument("file")
     args = parser.parse_args()
 
@@ -202,11 +233,14 @@ def main() -> None:
     load_words(fd, words)
     start(fd)
     try:
-        run(fd, infd, args.timeout)
+        halted = run(fd, infd, args.timeout)
     except KeyboardInterrupt:
         print("\nrun.py: interrupted; the core still runs", file=sys.stderr)
         sys.exit(130)
-    status = report(fd, args.dump, args.screen)
+    if halted:
+        status = report(fd, args.dump, args.screen)
+    else:
+        status = report_timeout(args.timeout)
     os.close(fd)
     sys.exit(status)
 

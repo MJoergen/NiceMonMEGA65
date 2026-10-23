@@ -63,7 +63,9 @@ difference is the memory: 64K words, not 2³².
 | Interrupts | From the timer, `--irq`, and `--nmi` | From the timer, on IRQ | Yes, for the timer's |
 | After a halt | Prints why, the steps, and the registers, and exits with a status | The command line gets the UART back and prints `HALT`; `R FFFFFFF1` reads why, the instruction counter the steps, `R FFFFFFE0` to `R FFFFFFEF` R0–R15, and `R` memory. `run.py` prints them as the emulator does, with its exit status | Yes |
 | `--dump`, `--screen`, `--input` | Options | The same options of `run.py` | Yes |
-| `--trace`, `--max-steps`, `--irq`, `--nmi` | Options | Not available | No |
+| `--max-steps` | Stops after N steps, prints the registers, exits with 3 | `--timeout SEC` of `run.py` stops after SEC seconds, with no registers and no dumps, and leaves the core running (see [Comparing with the emulator](#comparing-with-the-emulator)) | No |
+| `-2004`, `--no-cycle-counter` | Options | Accepted by `run.py` and ignored | Yes |
+| `--trace`, `--irq`, `--nmi` | Options | Not available | No |
 
 So a program that fits in 64K words, and does not fall more than 2048
 bytes behind its input, prints the same. The C example `examples/primes.c`
@@ -425,8 +427,13 @@ is read, and a byte that arrives when the core's 2048-byte FIFO is full is
 lost, so a program must not fall more than 2048 bytes behind its input. At
 the end of the input, `run.py` sends a break, so that a read returns
 `0x200`, as in the emulator. On a terminal, Ctrl-D ends the input.
-`--timeout SEC` gives up after SEC seconds, with exit status 3, as
-`niceemu -n` does at its step limit, but leaves the core running.
+`--timeout SEC` gives up after SEC seconds (60 by default, 0 for no limit),
+prints "Stopped at the time limit", and exits with status 3, as `niceemu -n`
+does at its step limit. But the core still runs, and the command line cannot
+answer until the board is reset, so there are no registers, no step count,
+and no `--dump` or `--screen` output, which `niceemu -n` prints. `niceemu -n`
+defaults to 100M steps, and `run.py` to 60 seconds. `run.py` accepts `-2004`
+and `--no-cycle-counter` and ignores them.
 
 The step count is the core's instruction counter. A read of the console
 in the emulator waits for the next byte, but on the board it returns 0
