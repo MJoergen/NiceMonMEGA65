@@ -122,7 +122,9 @@
 -- the performance counters, and the timer are reset each time the control
 -- bit goes to 0. So, after a halt, the instruction counter holds the number
 -- of steps that the emulator prints, unless the program starts the timer,
--- whose interrupts come after clock cycles here, not after steps.
+-- whose interrupts come after clock cycles here, not after steps. The cycle
+-- counter and the timer's counter run only while the core runs, so they
+-- stop at a halt, as the emulator's do.
 --
 -- The data bus of the core is stalled while a CLI request waits, and while a
 -- write to the UART waits. The CLI pulses STB for one cycle and does not
@@ -949,7 +951,7 @@ begin
    -- timer (§4) from nice_cpu. They are reset with the system, and when
    -- the core starts, as the emulator's are when it starts. They are not
    -- reset while the CLI holds the core, so that the CLI can read them after
-   -- a halt. The timer counts clock cycles, and it is the only device that
+   -- a halt. The timer counts clock cycles while the core runs, and it is the only device that
    -- raises an interrupt, so its request goes straight to the core's IRQ.
    ---------------------------------------------------------------------------
 
@@ -1002,6 +1004,7 @@ begin
       port map (
          clk_i      => clk_i,
          rst_i      => dev_rst,
+         run_i      => uart_owner_cpu,
          instret_i  => cpu_instret,
          wb_cyc_i   => perf_cyc,
          wb_stb_i   => perf_stb,
@@ -1033,7 +1036,7 @@ begin
       port map (
          clk_i        => clk_i,
          rst_i        => dev_rst,
-         tick_i       => '1',
+         tick_i       => uart_owner_cpu,
          wb_cyc_i     => timer_cyc,
          wb_stb_i     => timer_stb,
          wb_stall_o   => timer_stall,
