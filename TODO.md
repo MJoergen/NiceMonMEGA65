@@ -16,8 +16,7 @@ could become I/O devices of the system, as registers in the I/O page:
 - The 16 switches.
 
 Each needs a place in the address map that does not clash with the
-emulator's devices, and a line in the README's "Compared with the emulator"
-table, as the emulator has none of them. The keyboard's LEDs could be set
+emulator's devices, and a line in the table of `EMULATOR.md`, as the emulator has none of them. The keyboard's LEDs could be set
 too, CAPS LOCK's above all, by sending the PS/2 command ED to the keyboard.
 
 ## The monitor

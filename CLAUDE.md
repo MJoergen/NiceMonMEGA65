@@ -7,8 +7,8 @@ UART, a text display on VGA and HDMI, a ROM at address 0 for a QMON-like
 monitor that is planned but not written (`monitor/README.md`), and host
 tools that load and run programs. The goal is that a program runs on the
 board exactly as `niceemu`, the emulator in `nice_cpu/emulator`, runs it.
-`README.md` is the user documentation: its table "Compared with the
-emulator" lists the known differences, and "Address map" the registers.
+`README.md` is the user documentation, with "Address map" for the registers;
+`EMULATOR.md` lists the known differences from the emulator.
 `src/nicemon.vhd` is the whole system and the file to read first; its
 header is the authoritative address map.
 

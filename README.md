@@ -29,6 +29,7 @@ and VGA for the screen (see [synth/](synth/README.md#the-nexys4ddr)).
 | [monitor/](monitor/README.md) | The monitor, in NICE assembly: planned, not written yet. Its README has the decisions it will follow, QNICE-FPGA's. |
 | [examples/](examples/) | Example C programs, and the Makefile that builds them for the MEGA65. |
 | [tools/](tools/) | `load.py`, which loads a program into the MEGA65 or Nexys4DDR through the UART, `run.py`, which runs a program on the board as `niceemu` runs it, and `hwtest.py`, which tests the system on the board. |
+| [EMULATOR.md](EMULATOR.md) | The table of the known differences from the emulator. |
 | [TODO.md](TODO.md) | Work that is planned but not started. |
 | [core.mk](core.mk) | Picks the source files of the core, from `NICE`, for the Makefiles of `sim/` and `synth/`. |
 | [vsg.yml](vsg.yml) | The configuration of `make lint`, which checks the VHDL against [CODING_STYLE.md](CODING_STYLE.md). |
@@ -38,46 +39,11 @@ and VGA for the screen (see [synth/](synth/README.md#the-nexys4ddr)).
 ## Compared with the emulator
 
 The goal is a MEGA65 that runs NICE programs as `niceemu`, the emulator in
-`nice_cpu/emulator`, runs them. **It is close, but not there yet.** The
-core, the address map, and the devices behave as in the emulator, and the
-command line reads back what the emulator prints after a halt.
-`tools/run.py` runs a program on the board and prints what `niceemu` prints
-for it, so the two can be compared (see
-[Comparing with the emulator](#comparing-with-the-emulator)). The main
-difference is the memory: 64K words, not 2³².
-
-nice_cpu's [SYSTEM.md §5](nice_cpu/doc/SYSTEM.md#5-systems-built-on-the-fpga-core)
-lists what a board built on the FPGA core may do differently from the
-emulator: the reserved words, the screen, the console input, the input FIFO,
-the ROM, and the aliasing. The rows below that it covers are marked
-"(SYSTEM.md §5)".
-
-| Feature | Emulator | MEGA65 | Same? |
-|---|---|---|---|
-| Instruction set | ISA.md | nice_cpu's `pipeline.vhd` (or `multicycle.vhd` with `NICE=multi`), which nice_cpu's tests compare with the emulator | Yes |
-| Console output, `0xFFFFFF00` | stdout | UART | Yes, but a write stalls the core while the previous byte is still going out, about 8.7k cycles at 115200 baud |
-| Console input, `0xFFFFFF00` (SYSTEM.md §5) | stdin, with bit 8 set; `0x200` at the end. A read waits for the next byte | UART and the keyboard, with bit 8 set, through a 2048-byte FIFO; `0x200` after a UART break. A read returns 0 while no byte has arrived | Yes, but input that arrives before the program starts is dropped, as the FIFO is in reset while the core is held, UART bytes beyond 2048 unread ones are lost, and a program that waits for input in a loop runs more steps |
-| Math unit, `0xFFFFFF20`–`3F` | Computed on read | nice_cpu's `mpu.vhd`, which stalls the read until the result is ready | Yes |
-| Performance counters, `0xFFFFFF40`–`4F` | One cycle per step, from the start | nice_cpu's `perf.vhd`, counting clock cycles at 100 MHz (90 MHz on the Nexys4DDR), from the start of the core until it halts | Instructions yes; cycles count real clocks, and stop at a halt |
-| Timer, `0xFFFFFF10`–`1F` | Raises IRQ every P steps | nice_cpu's `timer.vhd`, raising IRQ every P clock cycles at 100 MHz (90 MHz on the Nexys4DDR) while the core runs | Yes, but the period counts real clocks, so the interrupts come at other steps |
-| Fetch statistics, `0xFFFFFF50`–`7F` | Read 0, and a write is ignored | nice_cpu's `fetch_stats.vhd` (MICROARCH.md §8.1), which counts what FETCH and DECODE of the pipelined core do; with `NICE=multi` the words read 0 | Yes, but they count only on the board |
-| Instruction fetches from `0xFFFFFF00`–`FF` | Read 0 | Read 0 | Yes |
-| Memory (SYSTEM.md §5) | All 2³² words, 0 at the start | 64K words, repeated through the address space, so `0xFFFFFF02`–`FF` are the RAM words `0x0000FF02`–`FFFF`, and `0xFFFF8000`–`FEFF` the words `0x8000`–`FEFF`; the stack at `0xFFFFFF00` lands in the top. `load.py` and `run.py` hide the ROM, if the bitstream has one, and clear the RAM to 0 before they load | No: a program, its data, and its stack must fit in 64K words |
-| Screen, `0xFFFF0000`–`07CF` (SYSTEM.md §5) | 80×25 words of memory, printed by `--screen` | 32768 words of memory of their own (8192 on the Nexys4DDR), read with `R`; the first 2000 are shown on VGA and HDMI (VGA only on the Nexys4DDR), unless the display offset is set | Yes |
-| Read counter, `0xFFFFFF01` | Counts the data reads since the last write | The same; a read by the command line does not count, as `--dump` does not | Yes |
-| The rest of `0xFFFFFF02`–`FF` (SYSTEM.md §5) | Ordinary memory for data | Memory, in the top 256 words of the RAM, except `0xFFFFFF80`–`8F`, the screen's registers | Yes, but for the screen's registers |
-| Interrupts | From the timer, `--irq`, and `--nmi` | From the timer, on IRQ | Yes, for the timer's |
-| After a halt | Prints why, the steps, and the registers, and exits with a status | The command line gets the UART back and prints `HALT`; `R FFFFFFF1` reads why, the instruction counter the steps, `R FFFFFFE0` to `R FFFFFFEF` R0–R15, and `R` memory. `run.py` prints them as the emulator does, with its exit status | Yes, but there is no `Pending:` line, as the command line cannot read whether a timer request is pending |
-| `--dump`, `--screen`, `--input` | Options | The same options of `run.py` | Yes, but `-d` shows other values for the cycle counter, the timer's COUNT, and the fetch statistics, as they count real clocks, and it reads at most 65536 words |
-| `--max-steps` | Stops after N steps, prints the registers, exits with 3 | `--timeout SEC` of `run.py` stops after SEC seconds, with no registers and no dumps, and leaves the core running (see [Comparing with the emulator](#comparing-with-the-emulator)) | No |
-| `-2004`, `--no-cycle-counter` | Options | Accepted by `run.py` and ignored | Yes |
-| `--trace`, `--irq`, `--nmi` | Options | Not available | No |
-| `--color`, `--invert-fg`, `--no-timer-irq` | Options | Not available | No |
-| `-h` | Prints the usage | `run.py` prints its own | Yes |
-
-So a program that fits in 64K words, and does not fall more than 2048
-bytes behind its input, prints the same. The C example `examples/primes.c`
-is one, except for the cycles that it prints.
+`nice_cpu/emulator`, runs them. It is close, but not there yet. The main
+difference is the memory: 64K words, not 2³². [EMULATOR.md](EMULATOR.md)
+has the table of the known differences. `tools/run.py` runs a program on
+the board and prints what `niceemu` prints for it (see
+[Comparing with the emulator](#comparing-with-the-emulator)).
 
 ## Getting started
 
@@ -148,8 +114,8 @@ hold it again, with `W FFFFFFF0 00000009` or `00000001`, before a start.
 While the core runs, the UART belongs to it. When it halts, the UART goes
 back to the command line. `W FFFFFFF0 00000001` holds the core in reset
 again, and `R FFFFFFF0` reads bit 0 (held), bit 1 (halted), and bit 3 (ROM
-hidden). `W FFFFFFF0 00000005` clears the memory to 0 and holds the core; it answers
-`OK` when the memory is clear. When a program halts, the command line
+hidden). `W FFFFFFF0 00000005` clears the memory to 0 and holds the core;
+it answers `OK` when the memory is clear. When a program halts, the command line
 prints `HALT` on a line of its own, and `R FFFFFFF1` reads why it halted.
 Bit 3 of the control register hides the ROM, so that the RAM is at address
 0 (see [The ROM](#the-rom)); in a bitstream without a ROM it reads 1, and
@@ -280,24 +246,25 @@ Makefile runs are those of `nice_cpu/runtime/README.md`:
 
     make -C nice_cpu/runtime/libc libc.a
     clang --target=wasm32 -mbulk-memory -O2 -ffreestanding -nostdlibinc \
-        -isystem nice_cpu/runtime/libc/include -nostdlib -Wl,--no-entry -Wl,--export=main \
-        -Wl,--stack-first -Wl,-z,stack-size=4096 -Wl,--initial-memory=65536 \
+        -isystem nice_cpu/runtime/libc/include -nostdlib \
+        -Wl,--no-entry -Wl,--export=main -Wl,--stack-first \
+        -Wl,-z,stack-size=4096 -Wl,--initial-memory=65536 \
         -o primes.wasm examples/primes.c nice_cpu/runtime/libc/libc.a
     nice_cpu/translator/nicewasm.py -o primes.nasm primes.wasm
     cat nice_cpu/runtime/start_wasm.nasm primes.nasm nice_cpu/runtime/lib.nasm \
         nice_cpu/runtime/muldiv_mpu.nasm > primes_full.nasm
     nice_cpu/assembler/niceasm.py -o primes.bin primes_full.nasm
 
-The C library has `printf`, `scanf`, `puts`, `putchar`, `getchar`, the
-string functions, `malloc`, and more. `putchar` and `getchar` use the UART
-at `0xFFFFFF00`. `getchar` waits for a byte, and returns `EOF` once a
-break on the UART has ended the input. `nice.h` declares the device routines of
-nice_cpu's runtime/ABI.md: `nice_putc`, `nice_getc`, `nice_pollc`, and `nice_print` for
-the UART, and `nice_cycles` and `nice_instructions` for the performance
-counters, as `examples/primes.c` uses them. It also declares `nice_peek`
-and `nice_poke`, which read and write any NICE address, such as the math
-unit's. `nice_screen_put` and `nice_screen_clear` write the screen at
-`0xFFFF0000`, which the VGA and HDMI outputs show (VGA only on the
+The C library has `printf`, `scanf`, `puts`, `putchar`, `getchar`, the string
+functions, `malloc`, and more. `putchar` and `getchar` use the UART at
+`0xFFFFFF00`. `getchar` waits for a byte, and returns `EOF` once a break on
+the UART has ended the input. `nice.h` declares the device routines of
+nice_cpu's runtime/ABI.md: `nice_putc`, `nice_getc`, `nice_pollc`, and
+`nice_print` for the UART, and `nice_cycles` and `nice_instructions` for the
+performance counters, as `examples/primes.c` uses them. It also declares
+`nice_peek` and `nice_poke`, which read and write any NICE address, such as
+the math unit's. `nice_screen_put` and `nice_screen_clear` write the screen
+at `0xFFFF0000`, which the VGA and HDMI outputs show (VGA only on the
 Nexys4DDR).
 
 The translated code and the runtime routines multiply and divide with the
@@ -306,8 +273,8 @@ without the math unit would translate with `nicewasm --no-mpu` and use
 `muldiv_soft.nasm` instead.
 
 The linear memory is one page, 16384 words, and the program and its memory
-must fit below the stack in the 64K words of memory. With `printf` and `scanf`, the
-prime example ends at word `0x6172`. The translator's README,
+must fit below the stack in the 64K words of memory. With `printf` and
+`scanf`, the prime example ends at word `0x6172`. The translator's README,
 `nice_cpu/translator/README.md`, has the same steps for Zig and Rust.
 
 ### The screen
@@ -438,10 +405,11 @@ for the command line shows its own registers there.
 
 Its input is stdin, or the file of `-i`. It goes to the UART in chunks of 16
 bytes, each sent before the next is read, so that little of it is on its way
-when the core halts and reaches the command line as a command. A byte that arrives when the core's 2048-byte FIFO is full is
-lost, so a program must not fall more than 2048 bytes behind its input. At
-the end of the input, `run.py` sends a break, so that a read returns
-`0x200`, as in the emulator. On a terminal, Ctrl-D ends the input.
+when the core halts and reaches the command line as a command. A byte that
+arrives when the core's 2048-byte FIFO is full is lost, so a program must
+not fall more than 2048 bytes behind its input. At the end of the input,
+`run.py` sends a break, so that a read returns `0x200`, as in the emulator.
+On a terminal, Ctrl-D ends the input.
 The command line prints `HALT` between CR LF pairs, and a program can print
 the same bytes. So `run.py` holds back output that may be their start for
 at most 20 ms, and takes them for a halt only when nothing follows for
@@ -563,20 +531,20 @@ synthesis.
 board from its UART: the JTAG cable on the same USB device as the port. It
 reads the FPGA's IDCODE through that cable with
 [openFPGALoader](https://github.com/trabucayre/openFPGALoader), and stops
-unless the FPGA is the part the bitstream was built for. So with a MEGA65
-and a Nexys4DDR both attached, it never programs the wrong one. It
-programs the FPGA through that cable alone, with openFPGALoader too, on
-every board, and checks the `NICE` banner, and the ROM when the bitstream
-has one. Then it hides the ROM and uses the command line: it runs `sim/echo.nasm`, holds and restarts the core,
-clears the memory, reads back what `sim/emu.nasm` leaves after its halt,
-writes and reads the screen's registers, and runs
-`examples/build/primes.bin`. Last, it runs programs with `run.py`
-and with `niceemu`, whose output and exit status must be the same: among
-them `sim/eof.nasm`, with no input and with 1536 bytes of input, which
-checks the larger FIFO and the end of the input, and
-`examples/build/bench.bin`, but for its cycles, whose table it prints.
-That needs niceemu, built with `make -C nice_cpu/emulator build`; without it
-the comparison is skipped. Build the bitstream first, then:
+unless the FPGA is the part the bitstream was built for. So with a MEGA65 and
+a Nexys4DDR both attached, it never programs the wrong one. It programs the
+FPGA through that cable alone, with openFPGALoader too, on every board, and
+checks the `NICE` banner, and the ROM when the bitstream has one. Then it
+hides the ROM and uses the command line: it runs `sim/echo.nasm`, holds and
+restarts the core, clears the memory, reads back what `sim/emu.nasm` leaves
+after its halt, writes and reads the screen's registers, and runs
+`examples/build/primes.bin`. Last, it runs programs with `run.py` and with
+`niceemu`, whose output and exit status must be the same: among them
+`sim/eof.nasm`, with no input and with 1536 bytes of input, which checks the
+larger FIFO and the end of the input, and `examples/build/bench.bin`, but for
+its cycles, whose table it prints. That needs niceemu, built with `make -C
+nice_cpu/emulator build`; without it the comparison is skipped. Build the
+bitstream first, then:
 
     make hwtest
 
@@ -590,15 +558,16 @@ On the R6 and the Nexys4DDR with the pipelined core, all 51 pass.
 
 For the R3, give `BIT=synth/r3/build/top.bit`. For the Nexys4DDR, give
 `BIT=synth/nexys4ddr/build/top.bit`. Its UART is usually `/dev/ttyUSB1` too.
-With both boards attached, the `ttyUSB` numbers depend on the order they
-were plugged in, so name the port by the cable's serial number, as in
+With both boards attached, the `ttyUSB` numbers depend on the order they were
+plugged in, so name the port by the cable's serial number, as in
 `PORT=/dev/serial/by-id/usb-Digilent_Digilent_USB_Device_<serial>-if01-port0`.
-A board that is already programmed can be tested with `tools/hwtest.py --no-program`, which skips
-the banner. The reset button is not tested: press it with a terminal open,
-and `NICE` is printed again. A bitstream with a ROM can be tested when the
-program in the ROM halts, as `sim/rom.nasm` does (`make r6
-ROM=sim/build/pipeline/rom.bin`, after `make test` has assembled it): the test hides
-the ROM, as `load.py` does, and runs the programs from the RAM.
+A board that is already programmed can be tested with `tools/hwtest.py
+--no-program`, which skips the banner. The reset button is not tested: press
+it with a terminal open, and `NICE` is printed again. A bitstream with a ROM
+can be tested when the program in the ROM halts, as `sim/rom.nasm` does
+(`make r6 ROM=sim/build/pipeline/rom.bin`, after `make test` has assembled
+it): the test hides the ROM, as `load.py` does, and runs the programs from
+the RAM.
 
 ## License
 
