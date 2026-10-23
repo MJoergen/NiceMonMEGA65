@@ -46,20 +46,26 @@ for it, so the two can be compared (see
 [Comparing with the emulator](#comparing-with-the-emulator)). The main
 difference is the memory: 64K words, not 2³².
 
+nice_cpu's [SYSTEM.md §5](nice_cpu/doc/SYSTEM.md#5-systems-built-on-the-fpga-core)
+lists what a board built on the FPGA core may do differently from the
+emulator: the reserved words, the screen, the console input, the input FIFO,
+the ROM, and the aliasing. The rows below that it covers are marked
+"(SYSTEM.md §5)".
+
 | Feature | Emulator | MEGA65 | Same? |
 |---|---|---|---|
 | Instruction set | ISA.md | nice_cpu's `pipeline.vhd` (or `multicycle.vhd` with `NICE=multi`), which nice_cpu's tests compare with the emulator | Yes |
 | Console output, `0xFFFFFF00` | stdout | UART | Yes |
-| Console input, `0xFFFFFF00` | stdin, with bit 8 set; `0x200` at the end. A read waits for the next byte | UART and the keyboard, with bit 8 set, through a 2048-byte FIFO; `0x200` after a UART break. A read returns 0 while no byte has arrived | Yes, but UART bytes beyond 2048 unread ones are lost, and a program that waits for input in a loop runs more steps |
+| Console input, `0xFFFFFF00` (SYSTEM.md §5) | stdin, with bit 8 set; `0x200` at the end. A read waits for the next byte | UART and the keyboard, with bit 8 set, through a 2048-byte FIFO; `0x200` after a UART break. A read returns 0 while no byte has arrived | Yes, but UART bytes beyond 2048 unread ones are lost, and a program that waits for input in a loop runs more steps |
 | Math unit, `0xFFFFFF20`–`3F` | Computed on read | nice_cpu's `mpu.vhd`, which stalls the read until the result is ready | Yes |
 | Performance counters, `0xFFFFFF40`–`4F` | One cycle per step, from the start | nice_cpu's `perf.vhd`, counting clock cycles at 100 MHz (90 MHz on the Nexys4DDR), from the start of the core | Instructions yes; cycles count real clocks |
 | Timer, `0xFFFFFF10`–`1F` | Raises IRQ every P steps | nice_cpu's `timer.vhd`, raising IRQ every P clock cycles at 100 MHz (90 MHz on the Nexys4DDR) | Yes, but the period counts real clocks, so the interrupts come at other steps |
 | Fetch statistics, `0xFFFFFF50`–`7F` | Read 0, and a write is ignored | nice_cpu's `fetch_stats.vhd` (MICROARCH.md §8.1), which counts what FETCH and DECODE of the pipelined core do; with `NICE=multi` the words read 0 | Yes, but they count only on the board |
 | Instruction fetches from `0xFFFFFF00`–`FF` | Read 0 | Read 0 | Yes |
-| Memory | All 2³² words, 0 at the start | 64K words, repeated through the address space; the stack at `0xFFFFFF00` lands in the top. `load.py` and `run.py` hide the ROM, if the bitstream has one, and clear the RAM to 0 before they load | No: a program, its data, and its stack must fit in 64K words |
-| Screen, `0xFFFF0000`–`07CF` | 80×25 words of memory, printed by `--screen` | 32768 words of memory of their own (8192 on the Nexys4DDR), read with `R`; the first 2000 are shown on VGA and HDMI (VGA only on the Nexys4DDR), unless the display offset is set | Yes |
+| Memory (SYSTEM.md §5) | All 2³² words, 0 at the start | 64K words, repeated through the address space; the stack at `0xFFFFFF00` lands in the top. `load.py` and `run.py` hide the ROM, if the bitstream has one, and clear the RAM to 0 before they load | No: a program, its data, and its stack must fit in 64K words |
+| Screen, `0xFFFF0000`–`07CF` (SYSTEM.md §5) | 80×25 words of memory, printed by `--screen` | 32768 words of memory of their own (8192 on the Nexys4DDR), read with `R`; the first 2000 are shown on VGA and HDMI (VGA only on the Nexys4DDR), unless the display offset is set | Yes |
 | Read counter, `0xFFFFFF01` | Counts the data reads since the last write | The same; a read by the command line does not count, as `--dump` does not | Yes |
-| The rest of `0xFFFFFF02`–`FF` | Ordinary memory for data | Memory, in the top 256 words of the RAM, except `0xFFFFFF80`–`8F`, the screen's registers | Yes, but for the screen's registers |
+| The rest of `0xFFFFFF02`–`FF` (SYSTEM.md §5) | Ordinary memory for data | Memory, in the top 256 words of the RAM, except `0xFFFFFF80`–`8F`, the screen's registers | Yes, but for the screen's registers |
 | Interrupts | From the timer, `--irq`, and `--nmi` | From the timer, on IRQ | Yes, for the timer's |
 | After a halt | Prints why, the steps, and the registers, and exits with a status | The command line gets the UART back and prints `HALT`; `R FFFFFFF1` reads why, the instruction counter the steps, `R FFFFFFE0` to `R FFFFFFEF` R0–R15, and `R` memory. `run.py` prints them as the emulator does, with its exit status | Yes |
 | `--dump`, `--screen`, `--input` | Options | The same options of `run.py` | Yes |
