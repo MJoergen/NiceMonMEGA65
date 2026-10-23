@@ -21,7 +21,7 @@ and VGA for the screen (see [synth/](synth/README.md#the-nexys4ddr)).
 | [nice_cpu/](https://github.com/MJoergen/nice_cpu) | The NICE CPU, its assembler, its emulator, and `nicewasm`, a [translator](https://github.com/MJoergen/nice_cpu/tree/main/translator) from WebAssembly to NICE assembly, as a git submodule. |
 | [src/](src/) | The synthesisable VHDL, shared by both boards. `nicemon.vhd` is the system: the NICE core, the memory (`ram.vhd` and `rom.vhd`), the UART, the core's input FIFO (`rx_fifo.vhd`), and the command line interpreter. `uart_serdes.vhd` (with fixes to its receiver, and break detection), `line_buffer.vhd`, and `cmd.vhd` are copied from cmod-s7; `cmd.vhd` prints `NICE` instead of `WBUS` at reset, and `HALT` when the core halts. `kbd_m65.vhd` drives the MEGA65 keyboard, and `kbd_ascii.vhd` turns its keys into ASCII. `kbd_ps2.vhd` receives the PS/2 keyboard of the Nexys4DDR, and `kbd_ps2_ascii.vhd` turns its scan codes into ASCII. `system.vhd` is what every board has: the system, the text display of its screen, and the UART's pins. |
 | [src/core/](src/core/) | `nice_core_pipeline.vhd` and `nice_core_multi.vhd`, the two architectures of `nice_core`. `src/nice_core.vhd` is the entity that wraps whichever of nice_cpu's cores `core.mk` selects with `NICE=pipeline` (the default) or `NICE=multi`. |
-| [src/video/](src/video/) | The text display: `text.vhd` shows the screen at `0xFFFF0000` as 80×25 characters on a video output, with a cursor and a display offset for scrolling. `pix.vhd` and `video_pkg.vhd` are from [MandelbrotMEGA65](https://github.com/MJoergen/MandelbrotMEGA65), and `scr_ram.vhd` is the screen's dual-clock memory, and `font_pkg.vhd` is the [Spleen](https://github.com/fcambus/spleen) 16×32 font, made by `font/gen_font_pkg.py`. |
+| [src/video/](src/video/) | The text display: `text.vhd` shows the screen at `0xFFFF0000` as 80×25 characters on a video output, with a cursor and a display offset for scrolling. `pix.vhd` and `video_pkg.vhd` are from [MandelbrotMEGA65](https://github.com/MJoergen/MandelbrotMEGA65). `scr_ram.vhd` is the screen's dual-clock memory. `font_pkg.vhd` is the [Spleen](https://github.com/fcambus/spleen) 16×32 font, made by `font/gen_font_pkg.py`. |
 | [font/](font/) | The script that makes `src/video/font_pkg.vhd` from Spleen, and Spleen's license (BSD 2-Clause). |
 | [sim/](sim/) | The GHDL testbenches. `text_synth.vhd` is the wrapper with which GHDL checks that the display synthesizes. |
 | [formal/](formal/) | The formal checks, for SymbiYosys. |
@@ -81,16 +81,20 @@ or, in an existing clone:
 
     git submodule update --init
 
-`make` in the top directory lists the targets: `make test` runs the
-simulation tests, `make formal` runs the formal checks (see
-[The formal checks](#the-formal-checks)), `make lint` checks the VHDL style, `make examples` builds
-the C examples, `make r3`, `make r6`, and `make nexys4ddr` build the bitstreams, with
-`ROM=file.bin` one whose core boots from the file (see
-[The ROM](#the-rom)),
-`make load FILE=prog.bin` loads a program into the board and starts it,
-`make run FILE=prog.bin` runs one as `niceemu` runs it (see
-[Comparing with the emulator](#comparing-with-the-emulator)), and
-`make hwtest` tests the board (see [Testing the board](#testing-the-board)).
+`make` in the top directory lists the targets:
+
+- `make test` runs the simulation tests.
+- `make formal` runs the formal checks (see
+  [The formal checks](#the-formal-checks)).
+- `make lint` checks the VHDL style.
+- `make examples` builds the C examples.
+- `make r3`, `make r6`, and `make nexys4ddr` build the bitstreams. With
+  `ROM=file.bin`, the core boots from the file (see [The ROM](#the-rom)).
+- `make load FILE=prog.bin` loads a program into the board and starts it.
+- `make run FILE=prog.bin` runs one as `niceemu` runs it (see
+  [Comparing with the emulator](#comparing-with-the-emulator)).
+- `make hwtest` tests the board (see [Testing the board](#testing-the-board)).
+
 `make load` and `make run` use the serial device `PORT=/dev/ttyUSB1` by
 default, and pass `ARGS=` on to the tool, for example `ARGS=--no-run` or
 `ARGS="-i in.txt -d 0:10 -s --timeout 5"`. The bitstream targets take
@@ -263,7 +267,7 @@ The board takes the same cycles, or a few less in `bst` and `strings`,
 and at 100 MHz the benchmark runs for about 24 ms.
 
 You need clang with the wasm32 target, `wasm-ld`, and `llvm-ar` (on Debian
-and Ubuntu, the `clang`, `lld` and `llvm` packages). The steps that the
+and Ubuntu, the `clang`, `lld`, and `llvm` packages). The steps that the
 Makefile runs are those of `nice_cpu/runtime/README.md`:
 
     make -C nice_cpu/runtime/libc libc.a
@@ -460,21 +464,24 @@ You need GHDL (tested with 4.1.0) and Python 3.
   `sim/rom.nasm`, a greeting, as the ROM: the core boots from it at reset,
   the ROM is read only with the RAM above it, and bit 3 of the control
   register hides it and shows it again. With the ROM hidden, it loads the
-  "Hello" program
-  with the command line and runs it, and checks the
-  halt message, the halt reason, and the step count, which must equal
-  niceemu's. Then it loads and runs `sim/echo.nasm`, which echoes what it
-  receives, and `sim/fifo.nasm`, which checks the input FIFO; the FIFO has
-  16 bytes there, so that the test of a full FIFO is short. It uses the
-  math unit from the command line, and runs `sim/devices.nasm`, which uses
-  the math unit, the performance counters, and the timer's interrupts, and
-  `sim/emu.nasm`, which checks the screen, the read counter, memory in the
-  I/O range, and the registers after a halt, and writes and reads the
-  screen's registers. It clears the memory, and runs
-  `reserved.nasm` of the emulator's tests, which halts on a reserved
-  control word, and `sim/eof.nasm`, which echoes its input until a break
-  ends it. Last it types a command and input for `sim/fifo.nasm` on the
-  keyboard input.
+  "Hello" program with the command line and runs it. It checks the halt
+  message, the halt reason, and the step count, which must equal
+  niceemu's. Then it loads and runs these programs:
+  - `sim/echo.nasm` echoes what it receives.
+  - `sim/fifo.nasm` checks the input FIFO, which has 16 bytes there, so
+    that the test of a full FIFO is short.
+  - `sim/devices.nasm` uses the math unit, the performance counters, and
+    the timer's interrupts. The testbench also uses the math unit from the
+    command line.
+  - `sim/emu.nasm` checks the screen, the read counter, memory in the I/O
+    range, and the registers after a halt, and writes and reads the
+    screen's registers.
+  - `reserved.nasm` of the emulator's tests halts on a reserved control
+    word, after the testbench has cleared the memory.
+  - `sim/eof.nasm` echoes its input until a break ends it.
+
+  Last it types a command and input for `sim/fifo.nasm` on the keyboard
+  input.
 - `sim/tb_kbd.vhd` tests the keyboard driver and its ASCII, with a model of
   the keyboard.
 - `sim/tb_ps2.vhd` tests the PS/2 receiver and its ASCII, with a model of a
@@ -505,10 +512,11 @@ every time, not only the ones a testbench sends.
 
 - `cli.sby` checks the command line interpreter, `line_buffer.vhd` and
   `cmd.vhd` together (`formal_cli.vhd`). It proves, for every cycle, that
-  each of their valid/ready ports holds its data until it is taken, that a
-  line and a message are never empty, that the bus request is one STB
-  pulse after a line is taken, with CYC held until the ACK, and that each
-  line gets one answer before the next line is taken.
+  each of their valid/ready ports holds its data until it is taken. It
+  proves that a line and a message are never empty. It proves that the bus
+  request is one STB pulse after a line is taken, with CYC held until the
+  ACK. And it proves that each line gets one answer before the next line
+  is taken.
 - `rx_fifo.sby` proves the core's input FIFO, `src/rx_fifo.vhd`, with 4
   bytes: the bytes come out in the order they went in, a byte is lost only
   when the FIFO is full or the input has ended, no byte is written to the
@@ -520,12 +528,16 @@ every time, not only the ones a testbench sends.
   and the solver spends no time on a real core. The job is too large to
   prove, so it checks every cycle up to a depth: 30 cycles with the core
   running from reset, and 40 with the command line first, which is enough
-  to type a command. It checks that the core's two buses get an ACK only
-  for a request that waits, which is what nice_cpu's proofs of the cores
-  assume of them, that the command line's latched request is not
-  overwritten and gets one ACK, that the devices answer only that request
-  or one of the core, which gets one ACK at a time, and what a read of the
-  console returns. Its tasks take up to 3 minutes each; `make -j formal`
+  to type a command. It checks these properties:
+  - The core's two buses get an ACK only for a request that waits, which
+    is what nice_cpu's proofs of the cores assume of them.
+  - The command line's latched request is not overwritten and gets one
+    ACK.
+  - The devices answer only that request or one of the core, which gets
+    one ACK at a time.
+  - What a read of the console returns.
+
+  Its tasks take up to 3 minutes each; `make -j formal`
   runs all the tasks side by side. CI runs `make -j4 formal` on its four
   processors.
 
