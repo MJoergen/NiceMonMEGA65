@@ -422,11 +422,17 @@ underscore, but N is at most 65536 words. The words at `0xFFFFFFE0` to
 `0xFFFFFFF1` are read through their RAM alias `0x0000FFE0` to `0x0000FFF1`,
 for the command line shows its own registers there.
 
-Its input is stdin, or the file of `-i`. Each byte goes to the UART when it
-is read, and a byte that arrives when the core's 2048-byte FIFO is full is
+Its input is stdin, or the file of `-i`. It goes to the UART in chunks of 16
+bytes, each sent before the next is read, so that little of it is on its way
+when the core halts and reaches the command line as a command. A byte that arrives when the core's 2048-byte FIFO is full is
 lost, so a program must not fall more than 2048 bytes behind its input. At
 the end of the input, `run.py` sends a break, so that a read returns
 `0x200`, as in the emulator. On a terminal, Ctrl-D ends the input.
+The command line prints `HALT` between CR LF pairs, and a program can print
+the same bytes. So `run.py` holds back output that may be their start for
+at most 20 ms, and takes them for a halt only when nothing follows for
+100 ms. A program that prints them and then waits longer is taken for halted,
+and `run.py` fails with "the core has not halted".
 `--timeout SEC` gives up after SEC seconds (60 by default, 0 for no limit),
 prints "Stopped at the time limit", and exits with status 3, as `niceemu -n`
 does at its step limit. But the core still runs, and the command line cannot

@@ -14,12 +14,19 @@ after any other halt. So the output of the two can be compared:
 Usage: tools/run.py [--port /dev/ttyUSB1] [--baud 115200] [-i FILE]
                     [-d ADDR:N]... [-s] [-2004] [--timeout SEC] FILE.bin
 
-The input is stdin, or the file of -i. Each byte goes to the UART as soon
-as it is read, and the core's input FIFO holds 2048 bytes, so a program
+The input is stdin, or the file of -i. The bytes go to the UART in chunks
+of 16, each sent before the next is read, so that little input is on its
+way when the core halts, and the core's input FIFO holds 2048 bytes, so a program
 must not fall more than that behind its input, or bytes are lost. At the
 end of the input, a break on the UART ends the core's input too, so a read
 returns 0x200, as in the emulator. Input that the program has not read when
 it halts is dropped, as by the emulator.
+
+The halt message is the same bytes that a program can print. Output that may
+be its start is held back for at most 20 ms, and the message counts as a halt
+only when nothing follows it for 100 ms. So a program that prints it and
+then keeps running is copied, but one that prints it and then waits longer
+than that is taken for halted, and the report then says the core has not.
 
 The steps are the core's instruction counter, which the emulator's step
 count equals, unless the program starts the timer, which counts clock
@@ -54,6 +61,9 @@ REGS = 0xFFFFFFE0
 CLI_ONLY_FIRST = 0xFFFFFFE0
 CLI_ONLY_LAST = 0xFFFFFFF1
 MAX_DUMP = 0x10000
+INPUT_CHUNK = 16    # bytes of input sent before the next are read
+HELD_QUIET = 0.02   # seconds without output that end a held start
+HALT_QUIET = 0.1    # seconds without output after the halt message
 SCREEN = 0xFFFF0000
 SCREEN_WIDTH = 80
 SCREEN_HEIGHT = 25
@@ -105,24 +115,52 @@ def dump_address(addr: int) -> int:
 
 def run(fd: int, infd: int, timeout: float) -> bool:
     """Copies the input to the UART and the UART to stdout until the halt
-    message, which is not copied. Returns False if the time is up first."""
+    message, which is not copied. Returns False if the time is up first.
+
+    The halt message is the bytes that the command line prints, and a program
+    can print them too. So the bytes that may be the start of the message, or
+    the message itself, are held back only while the board is busy: a pause of
+    HELD_QUIET ends the wait for the rest of a start, and the message counts
+    as a halt only if nothing follows it for HALT_QUIET. The input goes out
+    in chunks, each sent before the next is read, so that little of it is
+    outstanding at the halt, where it would reach the command line."""
     out = sys.stdout.buffer
     held = b""      # output that may be the start of the halt message
+    pending = b""   # input that is read and not yet sent
     end = time.monotonic() + timeout if timeout else None
     sent = False
-    while True:
-        wait = [fd] + ([infd] if infd >= 0 else [])
+    halted = False
+    while not halted:
+        if pending:
+            os.write(fd, pending[:INPUT_CHUNK])
+            termios.tcdrain(fd)
+            pending = pending[INPUT_CHUNK:]
+            sent = True
+        wait = [fd] + ([infd] if infd >= 0 and not pending else [])
         left = end - time.monotonic() if end else None
         if left is not None and left <= 0:
             out.write(held)
             out.flush()
             return False
-        ready, _, _ = select.select(wait, [], [], left)
+        quiet = HALT_QUIET if held == HALT_MESSAGE else HELD_QUIET
+        wake = quiet if held else None
+        if left is not None and (wake is None or left < wake):
+            wake = left
+        if pending:
+            wake = 0
+        ready, _, _ = select.select(wait, [], [], wake)
+        if not ready and held and not pending and wake == quiet:
+            if held == HALT_MESSAGE:
+                halted = True
+            else:
+                out.write(held)
+                out.flush()
+                held = b""
+            continue
         if infd in ready:
             data = os.read(infd, 256)
             if data:
-                os.write(fd, data)
-                sent = True
+                pending = data
             else:
                 # The end of the input: a break, after the bytes before it.
                 termios.tcdrain(fd)
@@ -130,17 +168,23 @@ def run(fd: int, infd: int, timeout: float) -> bool:
                 infd = -1
         if fd in ready:
             held += os.read(fd, 4096)
-            i = held.find(HALT_MESSAGE)
-            if i >= 0:
-                out.write(held[:i])
-                out.flush()
-                break
-            # Keep back only what may be the start of the halt message.
-            keep = next((k for k in range(len(HALT_MESSAGE) - 1, 0, -1)
-                         if held.endswith(HALT_MESSAGE[:k])), 0)
-            out.write(held[:len(held) - keep])
+            while (i := held.find(HALT_MESSAGE)) >= 0:
+                if i + len(HALT_MESSAGE) == len(held):
+                    break
+                # Something follows it, so it was the program's output.
+                j = i + len(HALT_MESSAGE)
+                out.write(held[:j])
+                held = held[j:]
+            if held.endswith(HALT_MESSAGE):
+                out.write(held[:-len(HALT_MESSAGE)])
+                held = HALT_MESSAGE
+            else:
+                # Keep back only what may be the start of the halt message.
+                keep = next((k for k in range(len(HALT_MESSAGE) - 1, 0, -1)
+                             if held.endswith(HALT_MESSAGE[:k])), 0)
+                out.write(held[:len(held) - keep])
+                held = held[len(held) - keep:]
             out.flush()
-            held = held[len(held) - keep:]
     if sent:
         # Input sent after the halt reached the command line. A CR ends what
         # it has of a line, and the answer is dropped.

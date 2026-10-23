@@ -13,7 +13,8 @@ the memory, reads back what sim/emu.nasm leaves after its halt, writes and
 reads the screen's registers, and runs the C example
 examples/build/primes.bin. Last, it runs programs with tools/run.py and
 with niceemu, and compares their output and exit status, with sim/eof.nasm
-also the end of the input and an input file of 1536 bytes, and with
+also the end of the input and an input file of 1536 bytes, with
+sim/halttext.nasm a program that prints the halt message itself, and with
 nice_cpu's benchmark, examples/build/bench.bin, all but its cycles. The programs
 run with the ROM hidden, so the RAM is at 0; a bitstream with a ROM must
 have halted its core, as a ROM with sim/rom.nasm does, for the command
@@ -373,6 +374,7 @@ def main() -> None:
         reserved = assemble(f"{REPO}/nice_cpu/emulator/test/reserved.nasm",
                             tmp)
         eof = assemble(f"{REPO}/sim/eof.nasm", tmp)
+        halttext = assemble(f"{REPO}/sim/halttext.nasm", tmp)
         # Every byte value, six times over: 1536 bytes, far more than the
         # 16-byte FIFO of the testbench holds
         text = os.path.join(tmp, "input.bin")
@@ -399,6 +401,7 @@ def main() -> None:
             (reserved, [], False),
             (eof, [], True),               # no input: it ends at once
             (eof, ["-i", text], True),
+            (halttext, [], False),         # prints the halt message itself
         ])
         test_bench(args.port, args.baud, bench)
 
