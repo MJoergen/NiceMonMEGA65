@@ -55,23 +55,25 @@ the ROM, and the aliasing. The rows below that it covers are marked
 | Feature | Emulator | MEGA65 | Same? |
 |---|---|---|---|
 | Instruction set | ISA.md | nice_cpu's `pipeline.vhd` (or `multicycle.vhd` with `NICE=multi`), which nice_cpu's tests compare with the emulator | Yes |
-| Console output, `0xFFFFFF00` | stdout | UART | Yes |
-| Console input, `0xFFFFFF00` (SYSTEM.md §5) | stdin, with bit 8 set; `0x200` at the end. A read waits for the next byte | UART and the keyboard, with bit 8 set, through a 2048-byte FIFO; `0x200` after a UART break. A read returns 0 while no byte has arrived | Yes, but UART bytes beyond 2048 unread ones are lost, and a program that waits for input in a loop runs more steps |
+| Console output, `0xFFFFFF00` | stdout | UART | Yes, but a write stalls the core while the previous byte is still going out, about 8.7k cycles at 115200 baud |
+| Console input, `0xFFFFFF00` (SYSTEM.md §5) | stdin, with bit 8 set; `0x200` at the end. A read waits for the next byte | UART and the keyboard, with bit 8 set, through a 2048-byte FIFO; `0x200` after a UART break. A read returns 0 while no byte has arrived | Yes, but input that arrives before the program starts is dropped, as the FIFO is in reset while the core is held, UART bytes beyond 2048 unread ones are lost, and a program that waits for input in a loop runs more steps |
 | Math unit, `0xFFFFFF20`–`3F` | Computed on read | nice_cpu's `mpu.vhd`, which stalls the read until the result is ready | Yes |
 | Performance counters, `0xFFFFFF40`–`4F` | One cycle per step, from the start | nice_cpu's `perf.vhd`, counting clock cycles at 100 MHz (90 MHz on the Nexys4DDR), from the start of the core until it halts | Instructions yes; cycles count real clocks, and stop at a halt |
 | Timer, `0xFFFFFF10`–`1F` | Raises IRQ every P steps | nice_cpu's `timer.vhd`, raising IRQ every P clock cycles at 100 MHz (90 MHz on the Nexys4DDR) while the core runs | Yes, but the period counts real clocks, so the interrupts come at other steps |
 | Fetch statistics, `0xFFFFFF50`–`7F` | Read 0, and a write is ignored | nice_cpu's `fetch_stats.vhd` (MICROARCH.md §8.1), which counts what FETCH and DECODE of the pipelined core do; with `NICE=multi` the words read 0 | Yes, but they count only on the board |
 | Instruction fetches from `0xFFFFFF00`–`FF` | Read 0 | Read 0 | Yes |
-| Memory (SYSTEM.md §5) | All 2³² words, 0 at the start | 64K words, repeated through the address space; the stack at `0xFFFFFF00` lands in the top. `load.py` and `run.py` hide the ROM, if the bitstream has one, and clear the RAM to 0 before they load | No: a program, its data, and its stack must fit in 64K words |
+| Memory (SYSTEM.md §5) | All 2³² words, 0 at the start | 64K words, repeated through the address space, so `0xFFFFFF02`–`FF` are the RAM words `0x0000FF02`–`FFFF`, and `0xFFFF8000`–`FEFF` the words `0x8000`–`FEFF`; the stack at `0xFFFFFF00` lands in the top. `load.py` and `run.py` hide the ROM, if the bitstream has one, and clear the RAM to 0 before they load | No: a program, its data, and its stack must fit in 64K words |
 | Screen, `0xFFFF0000`–`07CF` (SYSTEM.md §5) | 80×25 words of memory, printed by `--screen` | 32768 words of memory of their own (8192 on the Nexys4DDR), read with `R`; the first 2000 are shown on VGA and HDMI (VGA only on the Nexys4DDR), unless the display offset is set | Yes |
 | Read counter, `0xFFFFFF01` | Counts the data reads since the last write | The same; a read by the command line does not count, as `--dump` does not | Yes |
 | The rest of `0xFFFFFF02`–`FF` (SYSTEM.md §5) | Ordinary memory for data | Memory, in the top 256 words of the RAM, except `0xFFFFFF80`–`8F`, the screen's registers | Yes, but for the screen's registers |
 | Interrupts | From the timer, `--irq`, and `--nmi` | From the timer, on IRQ | Yes, for the timer's |
-| After a halt | Prints why, the steps, and the registers, and exits with a status | The command line gets the UART back and prints `HALT`; `R FFFFFFF1` reads why, the instruction counter the steps, `R FFFFFFE0` to `R FFFFFFEF` R0–R15, and `R` memory. `run.py` prints them as the emulator does, with its exit status | Yes |
-| `--dump`, `--screen`, `--input` | Options | The same options of `run.py` | Yes |
+| After a halt | Prints why, the steps, and the registers, and exits with a status | The command line gets the UART back and prints `HALT`; `R FFFFFFF1` reads why, the instruction counter the steps, `R FFFFFFE0` to `R FFFFFFEF` R0–R15, and `R` memory. `run.py` prints them as the emulator does, with its exit status | Yes, but there is no `Pending:` line, as the command line cannot read whether a timer request is pending |
+| `--dump`, `--screen`, `--input` | Options | The same options of `run.py` | Yes, but `-d` shows other values for the cycle counter, the timer's COUNT, and the fetch statistics, as they count real clocks, and it reads at most 65536 words |
 | `--max-steps` | Stops after N steps, prints the registers, exits with 3 | `--timeout SEC` of `run.py` stops after SEC seconds, with no registers and no dumps, and leaves the core running (see [Comparing with the emulator](#comparing-with-the-emulator)) | No |
 | `-2004`, `--no-cycle-counter` | Options | Accepted by `run.py` and ignored | Yes |
 | `--trace`, `--irq`, `--nmi` | Options | Not available | No |
+| `--color`, `--invert-fg`, `--no-timer-irq` | Options | Not available | No |
+| `-h` | Prints the usage | `run.py` prints its own | Yes |
 
 So a program that fits in 64K words, and does not fall more than 2048
 bytes behind its input, prints the same. The C example `examples/primes.c`
@@ -453,7 +455,9 @@ and no `--dump` or `--screen` output, which `niceemu -n` prints. `niceemu -n`
 defaults to 100M steps, and `run.py` to 60 seconds. `run.py` accepts `-2004`
 and `--no-cycle-counter` and ignores them.
 
-The step count is the core's instruction counter. A read of the console
+The step count is the core's instruction counter. The emulator's steps
+include interrupt entries, and the instruction counter does not, so a
+program with interrupts has more steps in the emulator. A read of the console
 in the emulator waits for the next byte, but on the board it returns 0
 while no byte has arrived. So a program that waits for input in a loop runs
 more steps on the board, and its step count differs. The memory is 64K
