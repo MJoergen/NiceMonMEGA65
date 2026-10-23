@@ -165,9 +165,12 @@ README's address map) has over a thousand flip-flops, and the multi-cycle
 core's has few. The pipelined core uses no block RAM. The multi-cycle core
 uses one RAMB18, which Vivado infers for `src2_count`, the register of the
 shift count. The math unit has the 4 DSPs of the design. All builds meet the
-clock, with these worst setup slacks: the R6 0.23 ns (pipelined) and 0.52 ns
-(multi) at 100 MHz, the R3 0.21 ns (pipelined), the Nexys4DDR 0.32 ns and
-0.19 ns at 90 MHz. The R3 is within about 1 % of the R6.
+clock, with these worst setup slacks: the R6 0.52 ns (multi) at 100 MHz, the
+R3 0.21 ns (pipelined), the Nexys4DDR 0.19 ns (multi) at 90 MHz. The
+pipelined core's slacks are from the builds at 929534c, which gates the
+core's requests with `core_take`: the R6 0.11 ns and the Nexys4DDR 0.02 ns
+(0.23 ns and 0.32 ns before). The R3 is within about 1 % of the R6, from an
+earlier build.
 
 The block RAMs, of 36 Kbit, are these:
 

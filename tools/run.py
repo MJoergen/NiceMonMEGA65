@@ -46,6 +46,9 @@ HALT_WHY = 0xFFFFFFF1
 INSTR_LO = 0xFFFFFF42
 INSTR_HI = 0xFFFFFF43
 REGS = 0xFFFFFFE0
+CLI_ONLY_FIRST = 0xFFFFFFE0
+CLI_ONLY_LAST = 0xFFFFFFF1
+MAX_DUMP = 0x10000
 SCREEN = 0xFFFF0000
 SCREEN_WIDTH = 80
 SCREEN_HEIGHT = 25
@@ -61,20 +64,38 @@ REASONS = {
 
 
 def number(text: str) -> int:
-    """A number of an option, decimal or hex after 0x, as niceemu takes."""
-    if text[:2] in ("0x", "0X"):
-        return int(text[2:], 16)
-    if not text.isdigit():
-        raise ValueError(text)
-    return int(text)
+    """A number of an option, decimal or hex after 0x, as niceemu takes it:
+    digits only, no sign or underscore, and at most 32 bits."""
+    hexadecimal = text[:2] in ("0x", "0X")
+    digits = text[2:] if hexadecimal else text
+    allowed = "0123456789abcdefABCDEF" if hexadecimal else "0123456789"
+    if not digits or not all(c in allowed for c in digits):
+        raise ValueError(f"bad number '{text}'")
+    value = int(digits, 16 if hexadecimal else 10)
+    if value > 0xFFFFFFFF:
+        raise ValueError(f"'{text}' is larger than {0xFFFFFFFF}")
+    return value
 
 
 def dump_option(text: str) -> tuple[int, int]:
     try:
         addr, n = text.split(":")
-        return number(addr) & 0xFFFFFFFF, number(n)
-    except ValueError:
-        raise argparse.ArgumentTypeError(f"'{text}' is not ADDR:N")
+        addr, n = number(addr), number(n)
+    except ValueError as e:
+        raise argparse.ArgumentTypeError(f"'{text}': {e}, want ADDR:N")
+    if n > MAX_DUMP:
+        raise argparse.ArgumentTypeError(
+            f"'{text}': N is larger than {MAX_DUMP}, the words of the RAM")
+    return addr, n
+
+
+def dump_address(addr: int) -> int:
+    """The address to read a dumped word at. The command line sees R0-R15, the
+    control register, and the halt reason at 0xFFFFFFE0-F1, where the core and
+    niceemu see memory, and that memory is the RAM word at 0x0000FFE0-F1."""
+    if CLI_ONLY_FIRST <= addr <= CLI_ONLY_LAST:
+        return addr & 0xFFFF
+    return addr
 
 
 def run(fd: int, infd: int, timeout: float) -> None:
@@ -139,7 +160,8 @@ def report(fd: int, dumps: list[tuple[int, int]], screen: bool) -> int:
         lines.append(" ".join(f"R{i:<2} {regs[i]:08x}"
                               for i in range(4 * row, 4 * row + 4)))
     for addr, n in dumps:
-        words = read_words(fd, [(addr + i) & 0xFFFFFFFF for i in range(n)])
+        words = read_words(fd, [dump_address((addr + i) & 0xFFFFFFFF)
+                                for i in range(n)])
         for i in range(0, n, 8):
             lines.append(f"{(addr + i) & 0xFFFFFFFF:08x}:" +
                          "".join(f" {w:08x}" for w in words[i:i + 8]))

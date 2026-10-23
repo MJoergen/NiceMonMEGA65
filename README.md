@@ -195,6 +195,14 @@ The `.bin` file has one line per word, the address and the word in hex, so
 type these commands by hand. `load.py --no-run` loads the program and leaves
 the core held, so you can check memory with `R` before you start it.
 
+`load.py` takes the lines that `niceemu` takes: two fields of 1 to 8 hex
+digits, with no `0x`, sign, or underscore, no repeated address, and at least
+one word. It also rejects a word where the board has no memory of its own:
+the RAM is the words `0` to `0xFFFF`, and the screen is at `0xFFFF0000`. Any
+other address would land on a RAM word, or on a register of the I/O page,
+where the emulator has a word of its own, so the program would run
+differently.
+
 `load.py` talks to the command line, so it works only while the core is held
 or has halted. While a program runs, the UART belongs to it: wait for it to
 halt, or press the reset button.
@@ -406,6 +414,11 @@ the output of the two can be compared:
     nice_cpu/emulator/zig-out/bin/niceemu -d 0x110:2 -s prog.bin > emu.txt
     tools/run.py -d 0x110:2 -s prog.bin > board.txt
     diff emu.txt board.txt
+
+`-d ADDR:N` takes numbers as `niceemu` does, up to 32 bits, with no sign or
+underscore, but N is at most 65536 words. The words at `0xFFFFFFE0` to
+`0xFFFFFFF1` are read through their RAM alias `0x0000FFE0` to `0x0000FFF1`,
+for the command line shows its own registers there.
 
 Its input is stdin, or the file of `-i`. Each byte goes to the UART when it
 is read, and a byte that arrives when the core's 2048-byte FIFO is full is

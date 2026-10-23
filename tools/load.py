@@ -96,14 +96,52 @@ def write(fd: int, addr: int, data: int) -> None:
         fail(f"'{line}' answered '{answer}'")
 
 
+# The words that the board has: the RAM, which is 64K words from 0, and the
+# screen. Any other address would alias a word of the RAM, mod 64K, or reach a
+# register of the I/O page, where the emulator has memory of its own.
+RAM_WORDS = 0x10000
+SCREEN_BASE = 0xFFFF0000
+SCREEN_WORDS = 0x8000
+
+
+def hex_field(path: str, line_no: int, text: str) -> int:
+    """A field of a .bin file: 1 to 8 hex digits, as niceemu takes them."""
+    if not text or not all(c in "0123456789abcdefABCDEF" for c in text):
+        fail(f"{path}:{line_no}: '{text}' is not a hex number")
+    if len(text) > 8:
+        fail(f"{path}:{line_no}: '{text}' has more than 8 hex digits")
+    return int(text, 16)
+
+
 def read_bin(path: str) -> list[tuple[int, int]]:
-    """The words of a .bin file, as (address, word)."""
+    """The words of a .bin file, as (address, word). It takes the lines that
+    niceemu takes, and rejects an address that the board has no memory at."""
     words: list[tuple[int, int]] = []
+    seen: dict[int, int] = {}
     with open(path) as f:
-        for line in f:
-            if line.strip():
-                a, d = line.split()
-                words.append((int(a, 16), int(d, 16)))
+        for line_no, line in enumerate(f, 1):
+            fields = line.strip(" \t\r\n").split()
+            if not fields:
+                continue
+            if len(fields) < 2:
+                fail(f"{path}:{line_no}: expected 'address word', "
+                     f"found only '{fields[0]}'")
+            if len(fields) > 2:
+                fail(f"{path}:{line_no}: unexpected '{fields[2]}' after the word")
+            addr = hex_field(path, line_no, fields[0])
+            word = hex_field(path, line_no, fields[1])
+            if addr in seen:
+                fail(f"{path}:{line_no}: address {addr:08x} is already "
+                     f"loaded by line {seen[addr]}")
+            if not (addr < RAM_WORDS
+                    or SCREEN_BASE <= addr < SCREEN_BASE + SCREEN_WORDS):
+                fail(f"{path}:{line_no}: address {addr:08x} is not in the RAM "
+                     f"(0 to {RAM_WORDS - 1:x}) or the screen, so the board "
+                     f"cannot load it as the emulator does")
+            seen[addr] = line_no
+            words.append((addr, word))
+    if not words:
+        fail(f"{path}: no words to load")
     return words
 
 
