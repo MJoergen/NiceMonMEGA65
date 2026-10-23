@@ -213,6 +213,10 @@ begin
       lift(58);
       tap(63);                       -- RUN/STOP
       expect(character'val(3) & character'val(3));
+      press(58);
+      tap(0);                        -- INST/DEL stays DEL
+      lift(58);
+      expect("" & character'val(127));
 
       report "tb_kbd: the cursor keys";
       tap(73);                       -- up

@@ -14,8 +14,8 @@
 -- The byte of a key is in the table below. SHIFT (either) or CAPS LOCK gives
 -- the capital letters; SHIFT also gives the symbols above the digits and
 -- others, as on the key caps where they are ASCII. CTRL with a key from @ to
--- _ or ` to DEL gives the control code, so CTRL-C is 0x03; CTRL-@ would be
--- NUL, which means no byte, so it gives nothing. Keys without an ASCII
+-- _ or ` to ~ gives the control code, so CTRL-C is 0x03; CTRL-@ would be
+-- NUL, which means no byte, so it gives nothing. DEL stays DEL with CTRL. Keys without an ASCII
 -- meaning give nothing. Where the key caps have no ASCII symbol:
 --   £ is \, and SHIFT-£ is |      (\ is the PETSCII code of £)
 --   ↑ is ^, and SHIFT-↑ is ~      (as in PETSCII)
@@ -120,7 +120,8 @@ architecture synthesis of kbd_ascii is
             res_v(5) := '0';
          end if;
       end if;
-      if keys(C_CTRL) = '1' and res_v(7 downto 6) /= "00" and res_v(7) = '0' then
+      if keys(C_CTRL) = '1' and res_v(7 downto 6) /= "00" and res_v(7) = '0' and
+         res_v /= X"7F" then
          res_v(7 downto 5) := "000";
       end if;
       return res_v;

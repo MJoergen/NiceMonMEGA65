@@ -157,7 +157,7 @@ answers come out on the UART. The keys give ASCII, as a terminal sends it:
 |---|---|
 | Letters, digits, symbols | Their ASCII; SHIFT or CAPS LOCK for capitals |
 | RETURN | CR |
-| INST/DEL | DEL (`0x7F`), also with SHIFT |
+| INST/DEL | DEL (`0x7F`), also with SHIFT or CTRL |
 | RUN/STOP | CTRL-C (`0x03`) |
 | ESC, TAB | ESC, TAB |
 | Cursor keys | `ESC [ A` to `ESC [ D`, as ANSI terminals send them |
