@@ -54,8 +54,9 @@
 --    when the core started. The link's reads of the console and the read
 --    counter return 0, and its writes to them are dropped: G_COUNT_FILE,
 --    run next, reads the count that G_EMU_FILE left, as a start keeps it.
---    The link writes and reads the screen's registers, which go out to the
---    display.
+--    The fetch statistics still run, but stopped at the halt: two reads of
+--    FS_CYCLES are equal. The link writes and reads the screen's
+--    registers, which go out to the display.
 --    It writes and reads the board's registers (LEDs, RGB levels, display
 --    segments), which go out, and reads the buttons and switches; the
 --    read-only words and those that are not registers take no write.
@@ -710,6 +711,9 @@ begin
 
       report "tb_nicemon: the screen's registers";
       check("FFFFFF50", "00000001");         -- the fetch statistics run
+      read_word("FFFFFF51", fs_v);           -- but not after the halt
+      wait for 1 us;
+      check("FFFFFF51", to_hstring(fs_v));
       wr("FFFFFF50", "00000000");            -- stop them
       check("FFFFFF50", "00000000");
       wr("FFFFFF50", "00000003");            -- run, and clear

@@ -1053,6 +1053,7 @@ begin
       port map (
          clk_i      => clk_i,
          rst_i      => dev_rst,
+         run_i      => cpu_running,
          events_i   => cpu_stats,
          wb_cyc_i   => fs_cyc,
          wb_stb_i   => fs_stb,
