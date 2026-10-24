@@ -42,9 +42,11 @@ dump beyond them reads the same words again. --timeout gives up after SEC
 seconds (60 by default), prints a line for the time limit, and exits with
 status 3, as niceemu does after its step limit. It prints no registers and
 no --dump or --screen output, and the core still runs, for the command line
-cannot answer until the core halts or the board is reset. -2004 and
---no-cycle-counter are accepted and ignored: the screen is printed as the
-80x25 characters in any case, and the cycle counter always runs.
+cannot answer until the core halts or the board is reset. -2004 prints
+the screen from 0x400, as niceemu does, which is plain memory here, not the
+screen that the board shows. --no-cycle-counter is accepted and ignored, as
+the cycle counter always runs. The input file, the .bin file, and the
+serial device are checked before the core is touched.
 --symbols FILE reads the labels that niceasm.py --symbols writes, and after
 a halt other than HALT prints where the program was, "At label+0x1f", and
 after a halt at ___wasm_trap, the default wasm trap handler, the trap's
@@ -58,6 +60,7 @@ import bisect
 import os
 import re
 import select
+import stat
 import sys
 import termios
 import time
@@ -80,6 +83,7 @@ ANSWER = re.compile(rb"(?:WHAT\?|OK|[0-9A-F]{8})\r\n")
 ANSWER_START = re.compile(
     rb"W(?:H(?:A(?:T(?:\?\r?)?)?)?)?|O(?:K\r?)?|[0-9A-F]{0,8}|[0-9A-F]{8}\r")
 SCREEN = 0xFFFF0000
+SCREEN_2004 = 0x400  # where niceemu -2004 has the screen, as the 2004 IDE
 SCREEN_WIDTH = 80
 SCREEN_HEIGHT = 25
 
@@ -314,9 +318,9 @@ def run(fd: int, infd: int, timeout: float) -> bool:
     return True
 
 
-def dump_lines(fd: int, dumps: list[tuple[int, int]],
-               screen: bool) -> list[str]:
-    """The --dump and --screen output."""
+def dump_lines(fd: int, dumps: list[tuple[int, int]], screen: bool,
+               screen_base: int) -> list[str]:
+    """The --dump and --screen output, with the screen at screen_base."""
     lines = []
     for addr, n in dumps:
         words = read_words(fd, [dump_address((addr + i) & 0xFFFFFFFF)
@@ -325,7 +329,7 @@ def dump_lines(fd: int, dumps: list[tuple[int, int]],
             lines.append(f"{(addr + i) & 0xFFFFFFFF:08x}:" +
                          "".join(f" {w:08x}" for w in words[i:i + 8]))
     if screen:
-        words = read_words(fd, [SCREEN + i
+        words = read_words(fd, [screen_base + i
                                 for i in range(SCREEN_WIDTH * SCREEN_HEIGHT)])
         chars = "".join(chr(w & 0xFF) if 0x20 < w & 0xFF < 0x7F else " "
                         for w in words)
@@ -339,22 +343,22 @@ def dump_lines(fd: int, dumps: list[tuple[int, int]],
 
 
 def report(fd: int, dumps: list[tuple[int, int]], screen: bool,
-           symbols: Symbols | None) -> int:
+           screen_base: int, symbols: Symbols | None) -> int:
     """Prints what niceemu prints after a halt, and returns its exit
     status. The dumps are read before the instruction counter, as niceemu
     prints them after its report, so that a dump of the counter's high word
     shows the snapshot that the program left, as niceemu's does. The low word
     is read before the high word, which is the snapshot that the read of the
     low word takes. With symbols, a halt other than HALT names where the
-    program was."""
+    program was, if the file has any labels, as niceemu does."""
     why, *regs = read_words(fd, [HALT_WHY] + [REGS + i for i in range(16)])
     if why not in REASONS:
         fail(f"the core has not halted (reason {why})")
-    extra = dump_lines(fd, dumps, screen)
+    extra = dump_lines(fd, dumps, screen, screen_base)
     lo, hi = read_words(fd, [INSTR_LO, INSTR_HI])
     lines = [f"Halted ({REASONS[why]}) after {hi << 32 | lo} steps, "
              f"PC={regs[15]:08x}"]
-    if symbols is not None and why != 1:
+    if symbols is not None and symbols.addrs and why != 1:
         lines += where_lines(symbols, regs)
     for row in range(4):
         lines.append(" ".join(f"R{i:<2} {regs[i]:08x}"
@@ -373,6 +377,18 @@ def report_timeout(timeout: float) -> int:
     return 3
 
 
+def open_input(path: str) -> int:
+    """Opens the input file, or exits with a message as niceemu does. A
+    directory opens, but every read of it fails."""
+    try:
+        infd = os.open(path, os.O_RDONLY)
+    except OSError as e:
+        fail(f"cannot read {path}: {e.strerror}")
+    if stat.S_ISDIR(os.fstat(infd).st_mode):
+        fail(f"cannot read {path}: it is a directory")
+    return infd
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--port", default="/dev/ttyUSB1")
@@ -385,8 +401,8 @@ def main() -> None:
     parser.add_argument("-s", "--screen", action="store_true",
                         help="after halting, print the 80x25 character screen")
     parser.add_argument("-2004", dest="ide2004", action="store_true",
-                        help="accepted and ignored, as the screen is the "
-                        "same here")
+                        help="print the screen from 0x400, as niceemu -2004 "
+                        "does")
     parser.add_argument("--no-cycle-counter", action="store_true",
                         help="accepted and ignored: the cycle counter always "
                         "runs")
@@ -402,7 +418,7 @@ def main() -> None:
 
     words = read_bin(args.file)
     symbols = Symbols(args.symbols) if args.symbols else None
-    infd = 0 if args.input == "-" else os.open(args.input, os.O_RDONLY)
+    infd = 0 if args.input == "-" else open_input(args.input)
     fd = open_port(args.port, args.baud)
     load_words(fd, words)
     start(fd)
@@ -412,7 +428,8 @@ def main() -> None:
         print("\nrun.py: interrupted; the core still runs", file=sys.stderr)
         sys.exit(130)
     if halted:
-        status = report(fd, args.dump, args.screen, symbols)
+        status = report(fd, args.dump, args.screen,
+                        SCREEN_2004 if args.ide2004 else SCREEN, symbols)
     else:
         status = report_timeout(args.timeout)
     os.close(fd)

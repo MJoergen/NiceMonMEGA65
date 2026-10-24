@@ -38,9 +38,18 @@ def fail(message: str) -> NoReturn:
 
 
 def open_port(name: str, baud: int) -> int:
-    fd = os.open(name, os.O_RDWR | os.O_NOCTTY)
-    attr = termios.tcgetattr(fd)
-    speed = getattr(termios, f"B{baud}")
+    """Opens the serial device, or exits with a message."""
+    speed = getattr(termios, f"B{baud}", None)
+    if speed is None:
+        fail(f"{baud} is not a baud rate of the serial device")
+    try:
+        fd = os.open(name, os.O_RDWR | os.O_NOCTTY)
+    except OSError as e:
+        fail(f"cannot open {name}: {e.strerror}")
+    try:
+        attr = termios.tcgetattr(fd)
+    except termios.error:
+        fail(f"{name} is not a serial device")
     # Raw 8-N-1, no flow control.
     attr[0] = 0                                                # iflag
     attr[1] = 0                                                # oflag
@@ -119,29 +128,35 @@ def read_bin(path: str) -> list[tuple[int, int]]:
     niceemu takes, and rejects an address that the board has no memory at."""
     words: list[tuple[int, int]] = []
     seen: dict[int, int] = {}
-    with open(path) as f:
-        for line_no, line in enumerate(f, 1):
-            fields = line.strip(" \t\r\n").split()
-            if not fields:
-                continue
-            if len(fields) < 2:
-                fail(f"{path}:{line_no}: expected 'address word', "
-                     f"found only '{fields[0]}'")
-            if len(fields) > 2:
-                fail(f"{path}:{line_no}: unexpected '{fields[2]}' after the word")
-            addr = hex_field(path, line_no, fields[0])
-            word = hex_field(path, line_no, fields[1])
-            if addr in seen:
-                fail(f"{path}:{line_no}: address {addr:08x} is already "
-                     f"loaded by line {seen[addr]}")
-            if not (addr < RAM_WORDS
-                    or SCREEN_BASE <= addr < SCREEN_BASE + SCREEN_WORDS):
-                fail(f"{path}:{line_no}: address {addr:08x} is not in the RAM "
-                     f"(0 to {RAM_WORDS - 1:x}) or the screen ({SCREEN_BASE:x} "
-                     f"to {SCREEN_BASE + SCREEN_WORDS - 1:x}), so the board "
-                     f"cannot load it as the emulator does")
-            seen[addr] = line_no
-            words.append((addr, word))
+    try:
+        with open(path) as f:
+            lines = f.readlines()
+    except OSError as e:
+        fail(f"cannot read {path}: {e.strerror}")
+    except UnicodeDecodeError:
+        fail(f"{path} is not a text file")
+    for line_no, line in enumerate(lines, 1):
+        fields = line.strip(" \t\r\n").split()
+        if not fields:
+            continue
+        if len(fields) < 2:
+            fail(f"{path}:{line_no}: expected 'address word', "
+                 f"found only '{fields[0]}'")
+        if len(fields) > 2:
+            fail(f"{path}:{line_no}: unexpected '{fields[2]}' after the word")
+        addr = hex_field(path, line_no, fields[0])
+        word = hex_field(path, line_no, fields[1])
+        if addr in seen:
+            fail(f"{path}:{line_no}: address {addr:08x} is already "
+                 f"loaded by line {seen[addr]}")
+        if not (addr < RAM_WORDS
+                or SCREEN_BASE <= addr < SCREEN_BASE + SCREEN_WORDS):
+            fail(f"{path}:{line_no}: address {addr:08x} is not in the RAM "
+                 f"(0 to {RAM_WORDS - 1:x}) or the screen ({SCREEN_BASE:x} "
+                 f"to {SCREEN_BASE + SCREEN_WORDS - 1:x}), so the board "
+                 f"cannot load it as the emulator does")
+        seen[addr] = line_no
+        words.append((addr, word))
     if not words:
         fail(f"{path}: no words to load")
     return words

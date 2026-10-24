@@ -462,12 +462,18 @@ does at its step limit. But the core still runs, and the command line cannot
 answer until the board is reset, so there are no registers, no step count,
 and no `--dump` or `--screen` output, which `niceemu -n` prints. `niceemu` has
 no step limit unless `-n` gives one, and `run.py` gives up after 60 seconds.
-`run.py` accepts `-2004` and `--no-cycle-counter` and ignores them.
+`-2004` prints the screen from `0x400`, as `niceemu -2004` does. That is
+plain RAM on the board, not the screen that the display shows.
+`run.py` accepts `--no-cycle-counter` and ignores it, as the cycle counter
+always runs.
 `--symbols FILE` reads the labels that `niceasm.py --symbols` writes, and
 after a halt other than `HALT` prints where the program was, `At
-label+0x1f`, and after a halt at `___wasm_trap`, the default wasm trap
+label+0x1f`, if the file has any labels, and after a halt at `___wasm_trap`, the default wasm trap
 handler, the trap's code and location from R1 and R2, as `niceemu` does. At
 the time limit it prints no location, as there are no registers.
+A missing or unreadable input file, `.bin` file, or serial device stops
+`run.py` with a message before it touches the core, and so does an input
+file that is a directory.
 
 The step count is the core's instruction counter. The emulator's steps
 include interrupt entries, and the instruction counter does not, so a

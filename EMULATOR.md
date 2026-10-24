@@ -34,7 +34,8 @@ the ROM, and the aliasing. The rows below that it covers are marked
 | After a halt | Prints why, the steps, and the registers, and exits with a status | The command line gets the UART back and prints `HALT`; `R FFFFFFF1` reads why, the instruction counter the steps, `R FFFFFFE0` to `R FFFFFFEF` R0–R15, and `R` memory. `run.py` prints them as the emulator does, with its exit status | Yes, but there is no `Pending:` line, as the command line cannot read whether a timer request is pending |
 | `--dump`, `--screen`, `--input` | Options | The same options of `run.py` | Yes, but `-d` shows other values for the cycle counter, the timer's COUNT, and the fetch statistics, as they count real clocks, and it reads at most 65536 words |
 | `--max-steps` | Stops after N steps, prints the registers, exits with 3; there is no limit without it | `--timeout SEC` of `run.py` stops after SEC seconds, with no registers and no dumps, and leaves the core running (see [Comparing with the emulator](README.md#comparing-with-the-emulator)) | No |
-| `-2004`, `--no-cycle-counter` | Options | Accepted by `run.py` and ignored | Yes |
+| `-2004` | Puts the screen at `0x400`, for `--screen` | `run.py -2004 -s` prints the screen from `0x400`, which is plain RAM; the display shows `0xFFFF0000` | Yes |
+| `--no-cycle-counter` | Option | Accepted by `run.py` and ignored | Yes |
 | `--symbols` | Names where a halt other than `HALT` happened, a wasm trap, and where the step limit stopped the program | The same option of `run.py`, from R15, R1, and R2 after a halt; at the time limit there are no registers, so no location | Yes, but for the time limit |
 | `--trace`, `--irq`, `--nmi` | Options | Not available | No |
 | `--color`, `--invert-fg`, `--no-timer-irq` | Options | Not available | No |
