@@ -120,41 +120,41 @@ minutes and seconds, without `ROM=`:
 
 | Build | Synthesis | Placement | Routing | Bitstream | Total |
 |---|---|---|---|---|---|
-| R6, pipelined | 3:14 | 0:39 | 2:45 | 0:50 | 7:54 |
+| R6, pipelined | 3:06 | 0:42 | 1:19 | 0:34 | 6:05 |
 | R6, `NICE=multi` | 1:29 | 0:28 | 1:06 | 0:32 | 3:55 |
-| Nexys4DDR, pipelined | 6:46 | 3:46 | 2:53 | 0:52 | 14:17 |
+| Nexys4DDR, pipelined | 3:06 | 0:55 | 1:03 | 0:29 | 5:49 |
 | Nexys4DDR, `NICE=multi` | 1:53 | 0:31 | 1:15 | 0:28 | 4:18 |
-| R3, pipelined | 3:11 | 0:36 | 1:08 | 0:35 | 5:49 |
+| R3, pipelined | 3:10 | 0:46 | 1:10 | 0:36 | 6:05 |
 
-The Nexys4DDR builds with `FLOW=timing`. The last Nexys4DDR pipelined
-build ran while the machine was busy with other work, so its times are much
-longer than the earlier 5:24. The times vary from build to build: one R6 pipelined build spent 9:36 in synthesis, with the same result,
-and took 12:49 in all.
+The Nexys4DDR builds with `FLOW=timing`. The three pipelined builds, of
+2026-10-24, ran at the same time, with the simulation tests beside them.
+The times vary from build to build: one R6 pipelined build spent 9:36 in
+synthesis, with the same result, and took 12:49 in all, and a Nexys4DDR
+build on a busy machine took 14:17.
 
 The utilization is from `build/utilization.rpt`, and the split by module
 from `report_utilization -hierarchical` on `build/top.dcp`. These are the
 numbers without `ROM=`, in LUTs and flip-flops. The pipelined columns are
-from the builds of 2026-10-23 at nice_cpu 4cd869e, and the multi-cycle
-columns are from the build at cb95968. The two pipelined totals are from
-the builds with the Nexys4DDR's devices (below); the rows above them are
-from before, so they do not add up to the totals:
+from the builds of 2026-10-24 at nice_cpu 2f67a50, and the multi-cycle
+columns are from the build at cb95968, which had neither the Nexys4DDR's
+devices (below) nor the microsecond counter:
 
 | Part of the design | R6, pipelined | R6, multi | Nexys4DDR, pipelined | Nexys4DDR, multi |
 |---|---|---|---|---|
-| The core (`nice_core`) | 7353 / 3009 | 4605 / 1050 | 7358 / 2952 | 4636 / 4071 |
-| The math unit (`mpu`) | 2164 / 874 | 2172 / 874 | 2176 / 874 | 2166 / 874 |
-| The fetch statistics (`fetch_stats`) | 730 / 1329 | 44 / 99 | 731 / 1329 | 44 / 99 |
-| The rest: the CLI, UART, RAM, counters, timer, and glue | 683 / 1118 | 795 / 1156 | 699 / 1092 | 740 / 1119 |
+| The core (`nice_core`) | 7168 / 3007 | 4605 / 1050 | 7011 / 2948 | 4636 / 4071 |
+| The math unit (`mpu`) | 2214 / 874 | 2172 / 874 | 2245 / 874 | 2166 / 874 |
+| The fetch statistics (`fetch_stats`) | 733 / 1329 | 44 / 99 | 739 / 1329 | 44 / 99 |
+| The rest: the CLI, UART, RAM, counters, timer, the Nexys4DDR's devices, and glue | 711 / 1270 | 795 / 1156 | 1022 / 1413 | 740 / 1119 |
 | The text display (`text.vhd`) | 123 / 180 | 123 / 180 | 121 / 156 | 121 / 156 |
-| The keyboard | 592 / 577 | 596 / 585 | 106 / 48 | – |
+| The keyboard | 590 / 577 | 596 / 585 | 104 / 48 | – |
 | The HDMI output | 575 / 1207 | 574 / 1207 | – | – |
-| Total | 12272 / 8330 | 8909 / 5151 | 11167 / 6651 | 7707 / 6319 |
-| Total, of the FPGA | 9.2 % / 3.1 % | 6.7 % / 1.9 % | 17.6 % / 5.2 % | 12.2 % / 5.0 % |
+| Total | 12114 / 8444 | 8909 / 5151 | 11242 / 6768 | 7707 / 6319 |
+| Total, of the FPGA | 9.1 % / 3.2 % | 6.7 % / 1.9 % | 17.7 % / 5.3 % | 12.2 % / 5.0 % |
 
-The pipelined core is about 5.5 % of the LUTs of the R6's FPGA, and 11.6 % of
+The pipelined core is about 5.4 % of the LUTs of the R6's FPGA, and 11.1 % of
 the Nexys4DDR's. The multi-cycle core has two thirds of its LUTs, 3.4 % and
 7.3 %. On the R6 it has a third of the flip-flops too. On the Nexys4DDR it
-has 4071, more than the pipelined core's 2949, where the build at 671172e
+has 4071, more than the pipelined core's 2948, where the build at 671172e
 had 985. The cause is the retiming of `FLOW=timing` (`synth_design
 -retiming`): it moved registers backwards 597 times and added 6791, mostly
 copies of the core's register file and state, so the design has twice the
@@ -171,16 +171,18 @@ core's has few. The pipelined core uses no block RAM. The multi-cycle core
 uses one RAMB18, which Vivado infers for `src2_count`, the register of the
 shift count. The math unit has the 4 DSPs of the design. All builds meet the
 clock, with these worst setup slacks: the R6 0.52 ns (multi) at 100 MHz, the
-R3 0.21 ns (pipelined), the Nexys4DDR 0.19 ns (multi) at 90 MHz. The
-pipelined builds of 2026-10-23 at nice_cpu 4cd869e have 0.174 ns on the R6
-(default flow, 100 MHz) and 0.043 ns on the Nexys4DDR (timing flow, 90 MHz),
-with hold slacks of 0.041 ns and 0.030 ns. Their block RAM is 132.5 tiles
-on the R6 (36 %) and 84.5 on the Nexys4DDR (63 %), and both use 4 DSPs.
-The builds that added the Nexys4DDR's devices at `0xFFFFFF90`–`96` have 0.149 ns
-on the R6 and 0.203 ns on the Nexys4DDR, with hold slacks of 0.069 ns and
-0.043 ns. The slacks change from build to build with placement, not with the
-logic. This nice_cpu update changed no core RTL, only its formal checks and
-documentation, so the figures are those of the same logic. The
+R3 0.17 ns (pipelined), the Nexys4DDR 0.19 ns (multi) at 90 MHz. The
+pipelined builds of 2026-10-24 at nice_cpu 2f67a50 have 0.414 ns on the R6
+(default flow, 100 MHz), 0.173 ns on the R3, and 0.022 ns on the Nexys4DDR
+(timing flow, 90 MHz), with hold slacks of 0.061 ns, 0.065 ns, and
+0.020 ns. Their block RAM is 132.5 tiles on the R6 and the R3 (36 %) and
+84.5 on the Nexys4DDR (63 %), and all use 4 DSPs. That nice_cpu update
+added the microsecond counter to `perf`, about 150 flip-flops in the rest,
+off the core's paths; the builds before it, of 2026-10-23 at 4cd869e, had
+0.174 ns on the R6 and 0.043 ns on the Nexys4DDR, and the builds that added
+the Nexys4DDR's devices at `0xFFFFFF90`–`96` had 0.149 ns and 0.203 ns, with
+hold slacks of 0.069 ns and 0.043 ns. The slacks change from build to build
+with placement, not with the logic. The
 pipelined core's slacks are from the builds at 929534c, which gates the
 core's requests with `core_take`: the R6 0.11 ns and the Nexys4DDR 0.02 ns
 (0.23 ns and 0.32 ns before). The R3 (0.22 ns) and the Nexys4DDR (0.05 ns)

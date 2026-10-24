@@ -12,7 +12,8 @@ after any other halt. So the output of the two can be compared:
     diff <(niceemu -i in.txt prog.bin) <(tools/run.py -i in.txt prog.bin)
 
 Usage: tools/run.py [--port /dev/ttyUSB1] [--baud 115200] [-i FILE]
-                    [-d ADDR:N]... [-s] [-2004] [--timeout SEC] FILE.bin
+                    [-d ADDR:N]... [-s] [-2004] [--symbols FILE]
+                    [--timeout SEC] FILE.bin
 
 The input is stdin, or the file of -i. The bytes go to the UART in chunks
 of 16, each sent before the next is read, so that little input is on its
@@ -40,11 +41,17 @@ status 3, as niceemu does after its step limit. It prints no registers and
 no --dump or --screen output, and the core still runs, for the command line
 cannot answer until the core halts or the board is reset. -2004 and
 --no-cycle-counter are accepted and ignored: the screen is printed as the
-80x25 characters in any case, and the cycle counter always runs. Only the
-Python standard library is used.
+80x25 characters in any case, and the cycle counter always runs.
+--symbols FILE reads the labels that niceasm.py --symbols writes, and after
+a halt other than HALT prints where the program was, "At label+0x1f", and
+after a halt at ___wasm_trap, the default wasm trap handler, the trap's
+code from R1 and its location from R2, as niceemu does. At the time limit
+there are no registers, so no location, where niceemu prints one at its
+step limit. Only the Python standard library is used.
 """
 
 import argparse
+import bisect
 import os
 import select
 import sys
@@ -76,6 +83,88 @@ REASONS = {
     3: "INT inside an interrupt routine",
     4: "RTI outside an interrupt routine",
 }
+
+# The default wasm trap handler, and the meaning of a trap's code in R1
+# (nice_cpu/translator/WASM.md), as niceemu prints it
+TRAP_HANDLER = "___wasm_trap"
+TRAP_NAMES = {
+    1: "unreachable",
+    2: "memory access out of bounds",
+    3: "division by zero",
+    4: "integer overflow",
+    5: "float to integer conversion",
+    6: "call_indirect: bad index",
+    7: "call_indirect: type mismatch",
+}
+
+
+class Symbols:
+    """The labels of a file that niceasm.py --symbols writes, lines of
+    "address name", for naming an address as niceemu does."""
+
+    def __init__(self, path: str) -> None:
+        try:
+            with open(path) as f:
+                text = f.read()
+        except OSError as e:
+            fail(f"cannot read {path}: {e.strerror}")
+        symbols = []
+        for line_no, line in enumerate(text.splitlines(), 1):
+            fields = line.split()
+            if not fields:
+                continue
+            where = f"{path}:{line_no}"
+            if len(fields) == 1:
+                fail(f"{where}: expected 'address name', found only "
+                     f"'{fields[0]}'")
+            if len(fields) > 2:
+                fail(f"{where}: unexpected '{fields[2]}' after the name")
+            addr, name = fields
+            if not all(c in "0123456789abcdefABCDEF" for c in addr):
+                fail(f"{where}: '{addr}' is not a hex number")
+            if len(addr) > 8:
+                fail(f"{where}: '{addr}' has more than 8 hex digits")
+            symbols.append((int(addr, 16), name))
+        # A stable sort keeps the file's order of the labels at one address
+        symbols.sort(key=lambda s: s[0])
+        self.addrs = [a for a, _ in symbols]
+        self.names = [n for _, n in symbols]
+
+    def before(self, addr: int) -> int | None:
+        """The index of the label at or before addr, the first in the file
+        of those at one address, or None when addr is before them all."""
+        i = bisect.bisect_right(self.addrs, addr)
+        if i == 0:
+            return None
+        i -= 1
+        while i > 0 and self.addrs[i - 1] == self.addrs[i]:
+            i -= 1
+        return i
+
+    def location(self, addr: int) -> str:
+        """addr as niceemu prints it: the label at it, "label+0x1f" after
+        one, or eight hex digits when no label is at or before it."""
+        i = self.before(addr)
+        if i is None:
+            return f"{addr:08x}"
+        if addr == self.addrs[i]:
+            return self.names[i]
+        return f"{self.names[i]}+0x{addr - self.addrs[i]:x}"
+
+
+def where_lines(symbols: Symbols, regs: list[int]) -> list[str]:
+    """What --symbols adds after a halt other than HALT: where the program
+    was, the halting instruction at PC-1, and after a halt at the default
+    wasm trap handler, the trap's code from R1 and its location from R2."""
+    pc = (regs[15] - 1) & 0xFFFFFFFF
+    lines = [f"At {symbols.location(pc)}"]
+    i = symbols.before(pc)
+    if (i is not None and symbols.addrs[i] == pc and
+            symbols.names[i] == TRAP_HANDLER):
+        code = regs[1]
+        lines.append(f"Trap {code} ({TRAP_NAMES.get(code, 'unknown code')}) "
+                     f"at {symbols.location(regs[2])}")
+    return lines
 
 
 def number(text: str) -> int:
@@ -218,13 +307,15 @@ def dump_lines(fd: int, dumps: list[tuple[int, int]],
     return lines
 
 
-def report(fd: int, dumps: list[tuple[int, int]], screen: bool) -> int:
+def report(fd: int, dumps: list[tuple[int, int]], screen: bool,
+           symbols: Symbols | None) -> int:
     """Prints what niceemu prints after a halt, and returns its exit
     status. The dumps are read before the instruction counter, as niceemu
     prints them after its report, so that a dump of the counter's high word
     shows the snapshot that the program left, as niceemu's does. The low word
     is read before the high word, which is the snapshot that the read of the
-    low word takes."""
+    low word takes. With symbols, a halt other than HALT names where the
+    program was."""
     why, *regs = read_words(fd, [HALT_WHY] + [REGS + i for i in range(16)])
     if why not in REASONS:
         fail(f"the core has not halted (reason {why})")
@@ -232,6 +323,8 @@ def report(fd: int, dumps: list[tuple[int, int]], screen: bool) -> int:
     lo, hi = read_words(fd, [INSTR_LO, INSTR_HI])
     lines = [f"Halted ({REASONS[why]}) after {hi << 32 | lo} steps, "
              f"PC={regs[15]:08x}"]
+    if symbols is not None and why != 1:
+        lines += where_lines(symbols, regs)
     for row in range(4):
         lines.append(" ".join(f"R{i:<2} {regs[i]:08x}"
                               for i in range(4 * row, 4 * row + 4)))
@@ -241,7 +334,8 @@ def report(fd: int, dumps: list[tuple[int, int]], screen: bool) -> int:
 
 def report_timeout(timeout: float) -> int:
     """Prints the time limit, and returns niceemu's exit status for the step
-    limit. The core still runs, and the command line cannot answer."""
+    limit. The core still runs, and the command line cannot answer, so there
+    is no location for --symbols either."""
     print(f"Stopped at the time limit after {timeout:g} s", flush=True)
     print("run.py: the core still runs; reset the board to use the command "
           "line again", file=sys.stderr)
@@ -265,6 +359,10 @@ def main() -> None:
     parser.add_argument("--no-cycle-counter", action="store_true",
                         help="accepted and ignored: the cycle counter always "
                         "runs")
+    parser.add_argument("--symbols", metavar="FILE",
+                        help="read the labels of niceasm.py --symbols from "
+                        "FILE, and name where a halt other than HALT, and a "
+                        "wasm trap, happened")
     parser.add_argument("--timeout", type=float, default=60,
                         help="give up after SEC seconds, with exit status 3 "
                         "(default 60, 0 for none)")
@@ -272,6 +370,7 @@ def main() -> None:
     args = parser.parse_args()
 
     words = read_bin(args.file)
+    symbols = Symbols(args.symbols) if args.symbols else None
     infd = 0 if args.input == "-" else os.open(args.input, os.O_RDONLY)
     fd = open_port(args.port, args.baud)
     load_words(fd, words)
@@ -282,7 +381,7 @@ def main() -> None:
         print("\nrun.py: interrupted; the core still runs", file=sys.stderr)
         sys.exit(130)
     if halted:
-        status = report(fd, args.dump, args.screen)
+        status = report(fd, args.dump, args.screen, symbols)
     else:
         status = report_timeout(args.timeout)
     os.close(fd)

@@ -19,7 +19,9 @@
 -- 4. Start the core. It prints "Hello, NICE!" and halts, and the CLI gets
 --    the UART back and prints the halt message: the control register shows
 --    the halted flag, the halt reason is HALT, and the instruction counter
---    holds the steps that niceemu prints for the program (G_*_STEPS). Each program
+--    holds the steps that niceemu prints for the program (G_*_STEPS). The
+--    microsecond counter holds the cycle counter's count over the cycles
+--    per microsecond, as the two stop in the same cycle. Each program
 --    after it ends with the halt message too.
 -- 5. Hold the core, load G_ECHO_FILE, and start it. It echoes the bytes it
 --    receives until a '.', which checks the UART input of the core: every
@@ -191,7 +193,9 @@ begin
 
 
    p_main : process
-      variable pos_v : natural := 0;
+      variable pos_v    : natural := 0;
+      variable cycles_v : std_logic_vector(31 downto 0);
+      variable micros_v : std_logic_vector(31 downto 0);
 
       -- Sends one byte, with the stop bit given.
       procedure send_byte(c : character; stop_bit : std_logic := '1') is
@@ -262,6 +266,24 @@ begin
          send(cmd & C_CR);
          expect(answer & C_CRLF);
       end procedure command;
+
+      -- Sends an R command, and returns the word that the CLI prints.
+      procedure read_word(addr : string; word : out std_logic_vector(31 downto 0)) is
+         variable l_v : line;
+      begin
+         send("R " & addr & C_CR);
+         if rx_len < pos_v + 8 then
+            wait until rx_len >= pos_v + 8 for C_TIMEOUT;
+         end if;
+         assert rx_len >= pos_v + 8
+            report "tb_nicemon: timeout, waiting for the answer to R " & addr
+            severity failure;
+         l_v := new string'(rx_str(pos_v + 1 to pos_v + 8));
+         hread(l_v, word);
+         deallocate(l_v);
+         pos_v := pos_v + 8;
+         expect(C_CRLF);
+      end procedure read_word;
 
       function upper(s : string) return string is
          variable res_v : string(1 to s'length) := s;
@@ -366,6 +388,16 @@ begin
       command("R FFFFFFF1", "00000001");     -- halted by HALT
       command("R FFFFFF42", steps(G_HELLO_STEPS));
       command("R FFFFFF43", "00000000");
+      -- The microsecond counter stopped with the cycle counter, so it holds
+      -- the cycles over the cycles per microsecond
+      read_word("FFFFFF40", cycles_v);
+      read_word("FFFFFF44", micros_v);
+      report "tb_nicemon: " & to_hstring(micros_v) & " microseconds after " &
+             to_hstring(cycles_v) & " cycles";
+      assert to_integer(micros_v) = to_integer(cycles_v) / (C_CLOCK_HZ / 1_000_000)
+         report "tb_nicemon: the microsecond counter does not match the cycle counter at " &
+                natural'image(C_CLOCK_HZ) & " Hz"
+         severity failure;
 
       report "tb_nicemon: load " & G_ECHO_FILE;
       command("W FFFFFFF0 00000009", "OK");

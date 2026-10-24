@@ -14,10 +14,12 @@ the cycle counter and the timer stop there, writes and reads the screen's
 registers, writes and reads the board's devices (on the Nexys4DDR the LEDs,
 RGB LEDs, and seven-segment display, and the buttons and switches, which
 only a read can check; on the MEGA65 the block reads 0), and runs the C example
-examples/build/primes.bin. Last, it runs programs with tools/run.py and
+examples/build/primes.bin, after whose halt the microsecond counter must hold
+the cycle counter's count over the clock in MHz. Last, it runs programs with tools/run.py and
 with niceemu, and compares their output and exit status, with sim/eof.nasm
 also the end of the input and an input file of 1536 bytes, with
-sim/halttext.nasm a program that prints the halt message itself, and with
+sim/halttext.nasm a program that prints the halt message itself, with the
+emulator's trapsym.nasm and its label file for --symbols, and with
 nice_cpu's benchmark, examples/build/bench.bin, all but its cycles. The programs
 run with the ROM hidden, so the RAM is at 0; a bitstream with a ROM must
 have halted its core, as a ROM with sim/rom.nasm does, for the command
@@ -61,6 +63,8 @@ from load import (HALT_MESSAGE, drain, load_words, open_port, read_bin,
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONTROL = "FFFFFFF0"
 NICEEMU = f"{REPO}/nice_cpu/emulator/zig-out/bin/niceemu"
+# The clock of each board, which sets the rate of the microsecond counter
+CLOCK_HZ = {"mega65": 100_000_000, "nexys4ddr": 90_000_000}
 
 results: list[bool] = []
 
@@ -374,7 +378,15 @@ def test_fetch_statistics(fd: int) -> None:
     check("FFFFFF5D reads 0", cmd(fd, "R FFFFFF5D") == "00000000")
 
 
-def test_primes(fd: int, primes: str) -> None:
+def counter(fd: int, lo: str, hi: str) -> int:
+    """A 64-bit performance counter: the read of its low word takes the
+    snapshot that its high word returns."""
+    low = cmd(fd, f"R {lo}")
+    high = cmd(fd, f"R {hi}")
+    return int(high, 16) << 32 | int(low, 16)
+
+
+def test_primes(fd: int, primes: str, board: str) -> None:
     start = time.monotonic()
     n = load(fd, primes)
     print(f"  loaded {n} words in {time.monotonic() - start:.1f} s")
@@ -390,6 +402,13 @@ def test_primes(fd: int, primes: str) -> None:
     require("primes halt message", end.endswith(HALT_MESSAGE), repr(end))
     ctl = cmd(fd, f"R {CONTROL}")
     check("primes halts on 0", ctl == "0000000A", ctl)
+    # The core ran for seconds, so the counters are far from 0. Both stopped
+    # at the halt, so the microseconds are the cycles over the clock in MHz.
+    cycles = counter(fd, "FFFFFF40", "FFFFFF41")
+    micros = counter(fd, "FFFFFF44", "FFFFFF45")
+    mhz = CLOCK_HZ[board] // 1_000_000
+    check(f"microsecond counter is the cycles over {mhz}",
+          micros == cycles // mhz, f"{micros} of {cycles} cycles")
 
 
 def test_run(port: str, baud: int,
@@ -485,6 +504,7 @@ def main() -> None:
                             tmp)
         eof = assemble(f"{REPO}/sim/eof.nasm", tmp)
         halttext = assemble(f"{REPO}/sim/halttext.nasm", tmp)
+        trapsym = assemble(f"{REPO}/nice_cpu/emulator/test/trapsym.nasm", tmp)
         # Every byte value, six times over: 1536 bytes, far more than the
         # 16-byte FIFO of the testbench holds
         text = os.path.join(tmp, "input.bin")
@@ -514,7 +534,7 @@ def main() -> None:
                 test_screen_registers(fd)
                 test_board_devices(fd, board)
                 test_fetch_statistics(fd)
-                test_primes(fd, primes)
+                test_primes(fd, primes, board)
             finally:
                 os.close(fd)
             test_run(args.port, args.baud, [
@@ -524,6 +544,8 @@ def main() -> None:
                 (eof, [], True),               # no input: it ends at once
                 (eof, ["-i", text], True),
                 (halttext, [], False),         # prints the halt message itself
+                (trapsym, ["--symbols",        # names the halt and the trap
+                           f"{REPO}/nice_cpu/emulator/test/trapsym.sym"], False),
             ])
             test_bench(args.port, args.baud, bench)
         except SystemExit as e:

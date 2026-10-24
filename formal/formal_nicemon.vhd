@@ -3,7 +3,9 @@
 -- so the solver makes every request that a core may make, sends every byte
 -- on the UART and the keyboard at any time, and types every command line.
 -- The sizes are small: 16 words of RAM, no ROM, a FIFO of 4 bytes, and a
--- UART bit of 2 cycles.
+-- UART bit of 2 cycles, from a clock of 2 MHz and a baud rate of 1 MHz. The
+-- clock is not 2 Hz, as nice_cpu's perf wants 1 MHz or more for its
+-- microsecond counter.
 --
 -- THEORY OF OPERATION
 -- With G_CPU_RUN_AT_RESET the core runs the program in the RAM from reset,
@@ -53,8 +55,8 @@ begin
 
    i_nicemon : entity work.nicemon
       generic map (
-         G_CLOCK_HZ         => 2,
-         G_UART_BAUDRATE    => 1,
+         G_CLOCK_HZ         => 2_000_000,
+         G_UART_BAUDRATE    => 1_000_000,
          G_RAM_ADDR_BITS    => 4,
          G_SCR_ADDR_BITS    => 11,
          G_RX_FIFO_BITS     => 2,

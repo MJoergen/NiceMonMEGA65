@@ -395,7 +395,7 @@ The command line and the core's data accesses see the same addresses.
 | `0xFFFFFF01` | The emulator's read counter. A read by the core returns the number of its reads since the last write, and a write sets that number. A read with `R` does not count. It is 0 when the core starts. |
 | `0xFFFFFF10`–`0xFFFFFF1F` | The timer of SYSTEM.md §4: it raises IRQ every P clock cycles, through the vector it is given. |
 | `0xFFFFFF20`–`0xFFFFFF3F` | The math unit of SYSTEM.md §2: 32-bit multiply and divide, and 64-bit divide. |
-| `0xFFFFFF40`–`0xFFFFFF4F` | The performance counters of SYSTEM.md §3: cycles and instructions, 64 bits each. `R` reads them as the core does: `R FFFFFF42` takes the snapshot that `R FFFFFF43` returns, where `--dump` takes none. |
+| `0xFFFFFF40`–`0xFFFFFF4F` | The performance counters of SYSTEM.md §3: cycles, instructions, and microseconds, 64 bits each. The microseconds come from the clock, 100 MHz on the MEGA65 and 90 MHz on the Nexys4DDR, so they are real time, where the emulator counts one per step. `R` reads them as the core does: `R FFFFFF42` takes the snapshot that `R FFFFFF43` returns, where `--dump` takes none. |
 | `0xFFFFFF50`–`0xFFFFFF7F` | The fetch statistics of MICROARCH.md §8.1, the rest of the performance counters: counters of what FETCH and DECODE do, for judging the size of FETCH's buffer. They count from the start of the core. |
 | `0xFFFFFF80`–`0xFFFFFF8F` | The screen's registers: the cursor and the display offset (see [The screen](#the-screen)). |
 | `0xFFFFFF90`–`0xFFFFFF9F` | The Nexys4DDR's LEDs, seven-segment display, buttons, and switches (see [The Nexys4DDR's devices](#the-nexys4ddrs-devices)). On the MEGA65 they read 0 and take no write. |
@@ -428,8 +428,8 @@ raises one. They are not reset while the command line holds the core, so
 input, and copies its output to stdout. When the program halts, it prints
 what `niceemu` prints: why and after how many steps the program halted,
 and the registers, and it exits with the same status, 0 after `HALT` and 2
-after any other halt. It takes niceemu's `-i`, `-d`, and `-s` options, so
-the output of the two can be compared:
+after any other halt. It takes niceemu's `-i`, `-d`, `-s`, and `--symbols`
+options, so the output of the two can be compared:
 
     nice_cpu/emulator/zig-out/bin/niceemu -d 0x110:2 -s prog.bin > emu.txt
     tools/run.py -d 0x110:2 -s prog.bin > board.txt
@@ -456,9 +456,14 @@ and `run.py` fails with "the core has not halted".
 prints "Stopped at the time limit", and exits with status 3, as `niceemu -n`
 does at its step limit. But the core still runs, and the command line cannot
 answer until the board is reset, so there are no registers, no step count,
-and no `--dump` or `--screen` output, which `niceemu -n` prints. `niceemu -n`
-defaults to 100M steps, and `run.py` to 60 seconds. `run.py` accepts `-2004`
-and `--no-cycle-counter` and ignores them.
+and no `--dump` or `--screen` output, which `niceemu -n` prints. `niceemu` has
+no step limit unless `-n` gives one, and `run.py` gives up after 60 seconds.
+`run.py` accepts `-2004` and `--no-cycle-counter` and ignores them.
+`--symbols FILE` reads the labels that `niceasm.py --symbols` writes, and
+after a halt other than `HALT` prints where the program was, `At
+label+0x1f`, and after a halt at `___wasm_trap`, the default wasm trap
+handler, the trap's code and location from R1 and R2, as `niceemu` does. At
+the time limit it prints no location, as there are no registers.
 
 The step count is the core's instruction counter. The emulator's steps
 include interrupt entries, and the instruction counter does not, so a
@@ -581,8 +586,9 @@ after its halt, writes and reads the screen's registers, and runs
 `examples/build/primes.bin`. Last, it runs programs with `run.py` and with
 `niceemu`, whose output and exit status must be the same: among them
 `sim/eof.nasm`, with no input and with 1536 bytes of input, which checks the
-larger FIFO and the end of the input, and `examples/build/bench.bin`, but for
-its cycles, whose table it prints. That needs niceemu, built with `make -C
+larger FIFO and the end of the input, the emulator's `trapsym.nasm` with
+`--symbols`, and `examples/build/bench.bin`, but for its cycles, whose table
+it prints. That needs niceemu, built with `make -C
 nice_cpu/emulator build`; without it the comparison is skipped. Build the
 bitstream first, then:
 
@@ -594,7 +600,7 @@ then the script halts the program and holds the core with the ROM hidden, and
 prints how many passed, so a following `--no-program` run can start. Programming
 the FPGA needs Linux, as the JTAG cable is found through `/sys`; with
 `--no-program` the script runs wherever `load.py` does.
-With the pipelined core, all 63 pass on the R6, and all 79 on the Nexys4DDR,
+With the pipelined core, all 65 pass on the R6, and all 81 on the Nexys4DDR,
 which has more checks for its LEDs, display, buttons, and switches.
 
 For the R3, give `BIT=synth/r3/build/top.bit`. For the Nexys4DDR, give

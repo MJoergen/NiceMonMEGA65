@@ -62,7 +62,9 @@
 --   0xFFFFFF20-0xFFFFFF3F  The math unit of SYSTEM.md §2
 --                          (nice_cpu/hdl/src/mpu.vhd).
 --   0xFFFFFF40-0xFFFFFF4F  The performance counters of SYSTEM.md §3
---                          (nice_cpu/hdl/src/perf.vhd).
+--                          (nice_cpu/hdl/src/perf.vhd): cycles,
+--                          instructions, and microseconds, the last
+--                          derived from G_CLOCK_HZ.
 --   0xFFFFFF50-0xFFFFFF7F  The fetch statistics of MICROARCH.md §8.1
 --                          (nice_cpu/hdl/src/fetch_stats.vhd), part of the
 --                          performance counters of SYSTEM.md §3. The
@@ -1080,6 +1082,9 @@ begin
       ); -- i_mpu
 
    i_perf : entity work.perf
+      generic map (
+         G_CLK_HZ => G_CLOCK_HZ
+      )
       port map (
          clk_i      => clk_i,
          rst_i      => dev_rst,
