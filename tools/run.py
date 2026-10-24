@@ -66,7 +66,7 @@ import termios
 import time
 
 from load import (HALT_MESSAGE, drain, fail, load_words, open_port, read_bin,
-                  read_words, start)
+                  read_lines, read_words, start)
 
 HALT_WHY = 0xFFFFFFF1
 INSTR_LO = 0xFFFFFF42
@@ -115,16 +115,8 @@ class Symbols:
     "address name", for naming an address as niceemu does."""
 
     def __init__(self, path: str) -> None:
-        try:
-            with open(path) as f:
-                text = f.read()
-        except OSError as e:
-            fail(f"cannot read {path}: {e.strerror}")
         symbols = []
-        for line_no, line in enumerate(text.splitlines(), 1):
-            fields = line.split()
-            if not fields:
-                continue
+        for line_no, fields in read_lines(path):
             where = f"{path}:{line_no}"
             if len(fields) == 1:
                 fail(f"{where}: expected 'address name', found only "

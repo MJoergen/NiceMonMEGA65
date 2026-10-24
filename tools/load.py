@@ -123,22 +123,31 @@ def hex_field(path: str, line_no: int, text: str) -> int:
     return int(text, 16)
 
 
+def read_lines(path: str) -> list[tuple[int, list[str]]]:
+    """The lines of a .bin or .sym file that are not blank, as (line number,
+    fields), split as niceemu splits them: lines at LF only, with blanks,
+    tabs, and CRs stripped, and fields at blanks and tabs only. A byte that
+    is not ASCII stays in its field as an escape, which no field takes."""
+    try:
+        with open(path, "rb") as f:
+            data = f.read()
+    except OSError as e:
+        fail(f"cannot read {path}: {e.strerror}")
+    lines = []
+    for line_no, raw in enumerate(data.split(b"\n"), 1):
+        line = raw.strip(b" \t\r").decode("ascii", "backslashreplace")
+        fields = [f for f in line.replace("\t", " ").split(" ") if f]
+        if fields:
+            lines.append((line_no, fields))
+    return lines
+
+
 def read_bin(path: str) -> list[tuple[int, int]]:
     """The words of a .bin file, as (address, word). It takes the lines that
     niceemu takes, and rejects an address that the board has no memory at."""
     words: list[tuple[int, int]] = []
     seen: dict[int, int] = {}
-    try:
-        with open(path) as f:
-            lines = f.readlines()
-    except OSError as e:
-        fail(f"cannot read {path}: {e.strerror}")
-    except UnicodeDecodeError:
-        fail(f"{path} is not a text file")
-    for line_no, line in enumerate(lines, 1):
-        fields = line.strip(" \t\r\n").split()
-        if not fields:
-            continue
+    for line_no, fields in read_lines(path):
         if len(fields) < 2:
             fail(f"{path}:{line_no}: expected 'address word', "
                  f"found only '{fields[0]}'")

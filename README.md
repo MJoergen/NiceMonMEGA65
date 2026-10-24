@@ -182,7 +182,8 @@ the core held, so you can check memory with `R` before you start it.
 
 `load.py` takes the lines that `niceemu` takes: two fields of 1 to 8 hex
 digits, with no `0x`, sign, or underscore, no repeated address, and at least
-one word. It also rejects a word where the board has no memory of its own:
+one word. As in `niceemu`, only LF ends a line, only blanks and tabs part the
+fields, and a CR at the end of a line is ignored. It also rejects a word where the board has no memory of its own:
 the RAM is the words `0` to `0xFFFF`, and the screen is the words
 `0xFFFF0000` to `0xFFFF1FFF`, the 8192 that both boards have. Any other
 address would land on a RAM word, or on a register of the I/O page, where
