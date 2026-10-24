@@ -19,7 +19,7 @@
 -- it.
 --
 -- data_valid_o is '1' for one clock cycle with each byte. There is no ready:
--- a byte comes at most every 0.6 ms, and the next one must take it before.
+-- a frame is 11 bits, so a byte comes at most every 0.66 ms, and the next one must take it before.
 --
 -- RESET
 -- Synchronous to clk_i, by rst_i. It drops the frame that is being received.

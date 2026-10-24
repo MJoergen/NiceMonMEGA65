@@ -105,10 +105,9 @@ set_property IOB TRUE [get_ports {vga_red_o[*] vga_green_o[*] vga_blue_o[*] vga_
 
 ## The UART, the LEDs, the display, the keyboard, the buttons, the switches,
 ## and the reset button are slow, and synchronized or registered in the
-## design. The registers of the UART, the LEDs, the RGB LEDs, the display,
-## the keyboard, the buttons, and the switches are in the I/O tiles, so that
-## their timing does not depend on placement; that of the reset button is
-## not, as the button is inverted first.
+## design. Their first registers are in the I/O tiles, so that their timing
+## does not depend on placement. The reset button is not inverted before its
+## first register (synth/common/clk_rst.vhd), so that register is one too.
 set_false_path -from [get_ports {uart_rxd_i reset_n_i ps2_clk_i ps2_data_i btn_i[*] sw_i[*]}]
 set_false_path -to   [get_ports {uart_txd_o led_o[*] rgb0_o[*] rgb1_o[*] seg_an_o[*] seg_ca_o[*]}]
 set_property IOB TRUE [get_ports {uart_txd_o uart_rxd_i reset_n_i led_o[*] ps2_clk_i ps2_data_i}]

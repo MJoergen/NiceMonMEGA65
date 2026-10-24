@@ -152,13 +152,13 @@
 -- write to the UART waits. The CLI pulses STB for one cycle and does not
 -- wait for STALL, so its request is latched and served in the next free
 -- cycle. Every request is acknowledged in the cycle after it is served.
--- A request of the core for the MPU, the performance counters, or the
--- timer goes to the device in the cycle it is taken, as one for memory
--- does, and the device acknowledges it. Each device acknowledges in the
--- cycle after it takes a request, except the MPU, which takes a read of a
--- result that it computes and then stalls until it acknowledges it. The
--- core is stalled meanwhile too, so its requests are acknowledged in their
--- order. A CLI request for a device is latched and passed to the device,
+-- A request of the core for the MPU, the performance counters, the fetch
+-- statistics, or the timer goes to the device in the cycle it is taken, as
+-- one for memory does, and the device acknowledges it. Each device
+-- acknowledges in the cycle after it takes a request, except the MPU, which
+-- takes a read of a result that it computes and then stalls until it
+-- acknowledges it. The core is stalled meanwhile too, so its requests are
+-- acknowledged in their order. A CLI request for a device is latched and passed to the device,
 -- and it is acknowledged in the cycle after the device's acknowledge. The
 -- core is stalled meanwhile, and the CLI waits for any acknowledge that a
 -- device owes the core.
@@ -166,8 +166,11 @@
 -- RESET
 -- Synchronous. After reset the control bit is 1 when G_CPU_RUN_AT_RESET is
 -- false, so the core waits for the CLI, and 0 otherwise, so the core boots
--- from the ROM, which reset shows. The screen's registers are cleared, as
--- they are by the clear of the memory; the memory is not changed.
+-- from the ROM, which reset shows: rom_hidden is cleared, or stays 1 in a
+-- build without a ROM. The screen's registers are cleared, as they are by
+-- the clear of the memory, and so are the board's writable registers (LEDs,
+-- RGB levels, and display segments), which the clear keeps. The memory is
+-- not changed.
 
 library ieee;
    use ieee.std_logic_1164.all;

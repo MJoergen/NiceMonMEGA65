@@ -114,7 +114,7 @@ MandelbrotMEGA65's `mega65.vhd` does.
 
 ## Build times and size
 
-A build takes four to eight minutes on an Intel Core i9-10850K (10 cores,
+A build takes four to six minutes on an Intel Core i9-10850K (10 cores,
 20 threads) with Vivado 2025.1. These are the times of the last builds, in
 minutes and seconds, without `ROM=`:
 
@@ -136,7 +136,8 @@ The utilization is from `build/utilization.rpt`, and the split by module
 from `report_utilization -hierarchical` on `build/top.dcp`. These are the
 numbers without `ROM=`, in LUTs and flip-flops. The pipelined columns are
 from the builds of 2026-10-24 at nice_cpu 2f67a50, and the multi-cycle
-columns are from the build at cb95968, which had neither the Nexys4DDR's
+columns are from the builds of 2026-10-22 at this repository's cb95968,
+which had neither the Nexys4DDR's
 devices (below) nor the microsecond counter:
 
 | Part of the design | R6, pipelined | R6, multi | Nexys4DDR, pipelined | Nexys4DDR, multi |
@@ -154,8 +155,8 @@ devices (below) nor the microsecond counter:
 The pipelined core is about 5.4 % of the LUTs of the R6's FPGA, and 11.1 % of
 the Nexys4DDR's. The multi-cycle core has two thirds of its LUTs, 3.4 % and
 7.3 %. On the R6 it has a third of the flip-flops too. On the Nexys4DDR it
-has 4071, more than the pipelined core's 2948, where the build at 671172e
-had 985. The cause is the retiming of `FLOW=timing` (`synth_design
+has 4071, more than the pipelined core's 2948, where the build at this
+repository's 671172e had 985. The cause is the retiming of `FLOW=timing` (`synth_design
 -retiming`): it moved registers backwards 597 times and added 6791, mostly
 copies of the core's register file and state, so the design has twice the
 flip-flops (6319 against 3114). The build at 671172e did not retime this
@@ -170,26 +171,25 @@ README's address map) has over a thousand flip-flops, and the multi-cycle
 core's has few. The pipelined core uses no block RAM. The multi-cycle core
 uses one RAMB18, which Vivado infers for `src2_count`, the register of the
 shift count. The math unit has the 4 DSPs of the design. All builds meet the
-clock, with these worst setup slacks: the R6 0.52 ns (multi) at 100 MHz, the
-R3 0.17 ns (pipelined), the Nexys4DDR 0.19 ns (multi) at 90 MHz. The
-pipelined builds of 2026-10-24 at nice_cpu 2f67a50 have 0.414 ns on the R6
-(default flow, 100 MHz), 0.173 ns on the R3, and 0.022 ns on the Nexys4DDR
-(timing flow, 90 MHz), with hold slacks of 0.061 ns, 0.065 ns, and
-0.020 ns. Their block RAM is 132.5 tiles on the R6 and the R3 (36 %) and
-84.5 on the Nexys4DDR (63 %), and all use 4 DSPs. That nice_cpu update
-added the microsecond counter to `perf`, about 150 flip-flops in the rest,
-off the core's paths; the builds before it, of 2026-10-23 at 4cd869e, had
-0.174 ns on the R6 and 0.043 ns on the Nexys4DDR, and the builds that added
-the Nexys4DDR's devices at `0xFFFFFF90`–`96` had 0.149 ns and 0.203 ns, with
-hold slacks of 0.069 ns and 0.043 ns. The slacks change from build to build
-with placement, not with the logic. The
-pipelined core's slacks are from the builds at 929534c, which gates the
-core's requests with `core_take`: the R6 0.11 ns and the Nexys4DDR 0.02 ns
-(0.23 ns and 0.32 ns before). The R3 (0.22 ns) and the Nexys4DDR (0.05 ns)
-were rebuilt after the reset button and the MAX10 pins went into the IOBs;
-the Nexys4DDR's worst path is in the core's WRITE stage, which that change
-does not touch, so the 0.03 ns it gained over the earlier build is most likely
-placement noise.
+clock. These are the worst setup and hold slacks of the builds of the
+tables above:
+
+| Build | Clock | Setup | Hold |
+|---|---|---|---|
+| R6, pipelined | 100 MHz | 0.414 ns | 0.061 ns |
+| R6, `NICE=multi` | 100 MHz | 0.52 ns | – |
+| R3, pipelined | 100 MHz | 0.173 ns | 0.065 ns |
+| Nexys4DDR, pipelined | 90 MHz | 0.022 ns | 0.020 ns |
+| Nexys4DDR, `NICE=multi` | 90 MHz | 0.19 ns | – |
+
+The pipelined builds are those of 2026-10-24 at nice_cpu 2f67a50, and the
+multi-cycle ones those at this repository's cb95968, whose hold slacks were
+not recorded. The pipelined builds' block RAM is 132.5 tiles on the R6 and
+the R3 (36 %) and 84.5 on the Nexys4DDR (63 %). The slacks change from
+build to build with placement more than with the logic: the builds just
+before nice_cpu 2f67a50, without its microsecond counter, had 0.174 ns on
+the R6 and 0.043 ns on the Nexys4DDR. The worst paths are
+usually in the core's WRITE and FETCH stages.
 
 The block RAMs, of 36 Kbit, are these:
 
