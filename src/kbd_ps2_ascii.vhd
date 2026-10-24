@@ -15,11 +15,11 @@
 -- and without SHIFT, and a few lines for those with E0. SHIFT (either) gives
 -- the upper symbols of the keys; CAPS LOCK, which each press switches on or
 -- off, gives the capital letters without SHIFT. CTRL (either) with a key
--- from @ to _ or ` to DEL gives the control code, so CTRL-C is 0x03; CTRL-@
+-- from @ to _ or ` to ~ gives the control code, so CTRL-C is 0x03; CTRL-@
 -- would be NUL, which means no byte, so it gives nothing. Backspace and
--- Delete give DEL (0x7F), as INST/DEL does on the MEGA65. The keypad gives
--- its digits and symbols, whatever Num Lock is, and its Enter gives CR.
--- Other keys give nothing.
+-- Delete give DEL (0x7F), also with SHIFT or CTRL, as INST/DEL does on the
+-- MEGA65. The keypad gives its digits and symbols, whatever Num Lock is,
+-- and its Enter gives CR. Other keys give nothing.
 --
 -- The bytes of a key wait in out_bytes until data_ready_i takes them. A key
 -- that comes while they wait gives nothing, but the modifiers still change.
@@ -202,7 +202,8 @@ begin
                      byte_v(5) := '0';
                   end if;
                end if;
-               if ctrl /= "00" and byte_v(7 downto 6) /= "00" and byte_v(7) = '0' then
+               if ctrl /= "00" and byte_v(7 downto 6) /= "00" and byte_v(7) = '0' and
+                  byte_v /= X"7F" then
                   byte_v(7 downto 5) := "000";
                end if;
 

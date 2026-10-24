@@ -201,6 +201,13 @@ begin
       tap(X"21");
       expect(character'val(3) & character'val(19) & "c");
 
+      report "tb_ps2: CTRL with Backspace and Delete keeps DEL";
+      press(X"14");
+      tap(X"66");                    -- Backspace
+      tap(X"71", true);              -- Delete
+      lift(X"14");
+      expect(C_DEL & C_DEL);
+
       report "tb_ps2: the cursor keys, Delete, and the keypad";
       tap(X"75", true);              -- up
       tap(X"72", true);              -- down
