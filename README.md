@@ -614,15 +614,17 @@ larger FIFO and the end of the input, the intro's `hello.nasm` with 100
 lines of input that it halts without reading, the emulator's `trapsym.nasm` with
 `--symbols`, and `examples/build/bench.bin`, but for its cycles, whose table
 it prints. That needs niceemu, built with `make -C
-nice_cpu/emulator build`; without it the comparison is skipped. Build the
-bitstream first, then:
+nice_cpu/emulator build`. Without it, the checks that need it are skipped,
+and the last line names them after a `SKIPPED`. Build the bitstream first,
+then:
 
     make hwtest
 
 It prints one line for each check, and last how many passed. A check that
 leaves a program running stops the run, as every later check would fail. Even
 then the script halts the program and holds the core with the ROM hidden, and
-prints how many passed, so a following `--no-program` run can start. Programming
+prints how many passed, so a following `--no-program` run can start. If the
+command line does not answer then, it says so: press the reset button. Programming
 the FPGA needs Linux, as the JTAG cable is found through `/sys`; with
 `--no-program` the script runs wherever `load.py` does.
 With the pipelined core, all 65 pass on the R6, and all 81 on the Nexys4DDR,

@@ -26,7 +26,9 @@ run with the ROM hidden, so the RAM is at 0; a bitstream with a ROM must
 have halted its core, as a ROM with sim/rom.nasm does, for the command
 line to answer.
 Build the bitstream and the examples first, and niceemu
-(make -C nice_cpu/emulator build), or that comparison is skipped.
+(make -C nice_cpu/emulator build), or the checks that need it are skipped,
+and the summary names them after a SKIPPED. The cleanup at the end holds the
+core, and says so if the command line did not answer.
 
 Usage: tools/hwtest.py [--port /dev/ttyUSB1] [--baud 115200]
                        [--bit synth/r6/build/top.bit]
@@ -68,6 +70,8 @@ NICEEMU = f"{REPO}/nice_cpu/emulator/zig-out/bin/niceemu"
 CLOCK_HZ = {"mega65": 100_000_000, "nexys4ddr": 90_000_000}
 
 results: list[bool] = []
+# The checks that could not run, which the summary names
+skipped: list[str] = []
 
 
 def check(name: str, ok: bool, detail: str = "") -> bool:
@@ -86,16 +90,20 @@ def require(name: str, ok: bool, detail: str = "") -> None:
 def cleanup(port: str, baud: int) -> None:
     """Halts a program that may still be running and holds the core with the
     ROM hidden, as --no-program expects. The echo program halts on '.', and
-    primes.bin on 0 after a prompt. Nothing here may fail the script."""
+    primes.bin on 0 after a prompt. A program that still runs takes the
+    command as input, and the CLI does not answer it. Nothing here may fail
+    the script."""
     try:
         fd = open_port(port, baud)
         try:
             os.write(fd, b"\r.\r0\r")
             drain(fd, 0.5)
-            cmd(fd, f"W {CONTROL} 00000009")
+            held = cmd(fd, f"W {CONTROL} 00000009") == "OK"
         finally:
             os.close(fd)
     except (OSError, termios.error, SystemExit):
+        held = False
+    if not held:
         print("  could not hold the core; press the reset button before a "
               "run with --no-program", flush=True)
 
@@ -285,7 +293,6 @@ def test_readback(fd: int, emu: str) -> None:
     check("emu.nasm halted", ctl == "0000000A", ctl)
     expected = {
         "FFFFFFF1": "00000001",  # halted by HALT
-        "FFFFFF42": steps(emu),  # as niceemu says
         "FFFF0000": "00000041",  # the screen, column 0 of row 0
         "FFFF07CF": "00000042",  # the screen, column 79 of row 24
         "FFFFFF02": "00001234",  # memory in the I/O range
@@ -294,6 +301,10 @@ def test_readback(fd: int, emu: str) -> None:
         "FFFFFF01": "00000003",
         "FFFFFFE5": "0000CAFE",  # R5
     }
+    if os.path.exists(NICEEMU):
+        expected["FFFFFF42"] = steps(emu)  # as niceemu says
+    else:
+        skipped.append("readback FFFFFF42")
     for addr, want in expected.items():
         got = cmd(fd, f"R {addr}")
         check(f"readback {addr}", got == want, f"got {got}, want {want}")
@@ -423,6 +434,7 @@ def test_run(port: str, baud: int,
     if not os.path.exists(NICEEMU):
         print(f"  {NICEEMU} is missing; the comparison with the emulator "
               "is skipped")
+        skipped.append("run.py as niceemu")
         return
     for path, options, polls in programs:
         name = " ".join([os.path.basename(path)] +
@@ -453,6 +465,7 @@ def test_bench(port: str, baud: int, bench: str) -> None:
     The port must be closed meanwhile."""
     if not os.path.exists(NICEEMU):
         print(f"  {NICEEMU} is missing; the benchmark is skipped")
+        skipped.append("bench.bin as niceemu")
         return
     emu = subprocess.run([NICEEMU, bench], stdin=subprocess.DEVNULL,
                          capture_output=True)
@@ -567,6 +580,8 @@ def main() -> None:
 
     passed = sum(results)
     print(f"\n{passed}/{len(results)} passed")
+    if skipped:
+        print(f"SKIPPED, as {NICEEMU} is missing: {', '.join(skipped)}")
     sys.exit(0 if passed == len(results) else 1)
 
 
