@@ -9,10 +9,11 @@ unless --no-run is given. The ROM stays hidden until the reset button is
 pressed, which boots the monitor again.
 
 Usage: tools/load.py [--port /dev/ttyUSB1] [--baud 115200] [--tcp PORT]
-                     [--no-run] FILE.bin
+                     [--cosim PORT] [--no-run] FILE.bin
 
 --port names the serial device of the board's debug UART, /dev/ttyUSB1 by
-default. --tcp PORT talks to "niceemu --link PORT" instead. Only the Python
+default. --tcp PORT talks to "niceemu --link PORT" instead, and --cosim
+PORT to the simulated system of "make -C sim cosim". Only the Python
 standard library is used, so this runs on Linux and macOS. tools/run.py and
 tools/hwtest.py use the functions here, and tools/nicelink.py has the link.
 """

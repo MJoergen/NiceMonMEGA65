@@ -22,6 +22,11 @@
 #             With -j these all run side by side, and the test takes as
 #             long as tb_text alone. Each one is also a target: make
 #             tb_kbd runs just that one.
+# make cosim  runs the system with its debug UART on a TCP port of
+#             127.0.0.1, cosim/tb_cosim.vhd, until it is stopped, for the
+#             tools: tools/run.py --cosim N. It prints "cosim: port N".
+#             COSIM_PORT=N picks the port, any free one by default, and
+#             ROM=f.bin gives the system a ROM.
 # make clean  removes build/.
 #
 # NICE=pipeline (the default) or NICE=multi picks the core, and the files
@@ -49,7 +54,7 @@ SRC_SOURCES  = ../src/uart_serdes.vhd ../src/rx_fifo.vhd ../src/ram.vhd ../src/r
                ../src/system.vhd
 SOURCES      = $(SRC_SOURCES) text_synth.vhd tb_hello.vhd tb_nicemon.vhd tb_kbd.vhd tb_ps2.vhd tb_ps2_nicemon.vhd tb_text.vhd tb_board_io.vhd
 
-.PHONY: test check-steps analyze synth clean tb_hello tb_nicemon tb_kbd tb_ps2 tb_ps2_nicemon tb_text tb_board_io \
+.PHONY: test cosim check-steps analyze synth clean tb_hello tb_nicemon tb_kbd tb_ps2 tb_ps2_nicemon tb_text tb_board_io \
         synth-nicemon synth-nicemon-norom synth-kbd_m65 synth-kbd_ascii synth-kbd_ps2 \
         synth-kbd_ps2_ascii synth-text \
         synth-system synth-seg7 synth-rgb_pwm
@@ -143,6 +148,13 @@ synth-text: analyze
 synth-system: analyze
 	@(cd $(BUILD) && $(GHDL) --synth $(GHDLFLAGS) -gG_CLOCK_HZ=90000000 -gG_SCR_ADDR_BITS=13 -gG_BOARD_IO=true system > system_synth.vhd 2> system_synth.log) && \
 	  echo "PASS synth system" || (echo "FAIL synth system"; cat $(BUILD)/system_synth.log; exit 1)
+
+COSIM_PORT ?= 0
+
+cosim: analyze
+	@gcc -shared -fPIC -Wall -o $(BUILD)/libcosim.so cosim/cosim.c
+	@cd $(BUILD) && $(GHDL) -a $(GHDLFLAGS) ../../cosim/tb_cosim.vhd && \
+	  $(GHDL) --elab-run $(GHDLFLAGS) tb_cosim -gG_PORT=$(COSIM_PORT) $(if $(ROM),-gG_ROM_FILE=$(abspath $(ROM)))
 
 analyze: | $(BUILD)
 	@cd $(BUILD) && $(GHDL) -a $(GHDLFLAGS) $(addprefix ../../,$(NICE_SOURCES) $(NICE_SIM) $(SOURCES))

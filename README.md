@@ -34,14 +34,14 @@ and switches as registers (see [synth/](synth/README.md#the-nexys4ddr) and
 | [synth/](synth/README.md) | The Vivado builds for the MEGA65 R3 and R6 boards, and the Nexys4DDR. |
 | [monitor/](monitor/README.md) | The monitor, in NICE assembly: planned, not written yet. Its README has the decisions it will follow, QNICE-FPGA's. |
 | [examples/](examples/) | Example C programs, and the Makefile that builds them for the MEGA65. |
-| [tools/](tools/) | `nicelink.py`, the debug link over the board's UART or over TCP to `niceemu --link`, and the tools that use it: `load.py`, which loads a program into the MEGA65 or Nexys4DDR, `run.py`, which runs a program on the board as `niceemu` runs it, `hwtest.py`, which tests the system on the board, and `linktest.py`, which checks `run.py` on `niceemu --link`. |
+| [tools/](tools/) | `nicelink.py`, the debug link over the board's UART, over TCP to `niceemu --link`, or over TCP to the simulated system of `make cosim`, and the tools that use it: `load.py`, which loads a program into the MEGA65 or Nexys4DDR, `run.py`, which runs a program on the board as `niceemu` runs it, `hwtest.py`, which tests the system on the board, `linktest.py`, which checks `run.py` on `niceemu --link`, and `cosimtest.py`, which checks `run.py` on the simulated system. |
 | [EMULATOR.md](EMULATOR.md) | The table of the known differences from the emulator. |
 | [TODO.md](TODO.md) | Work that is planned but not started. |
 | [core.mk](core.mk) | Picks the source files of the core, from `NICE`, for the Makefiles of `sim/` and `synth/`. |
 | [.claude/rules/synth.md](.claude/rules/synth.md) | Notes for Claude Code on the Vivado builds: where Vivado is, how to build, and what to check after a build. |
 | [vsg.yml](vsg.yml) | The configuration of `make lint`, which checks the VHDL against [CODING_STYLE.md](CODING_STYLE.md). |
 | [CLAUDE.md](CLAUDE.md) | Instructions for Claude Code: the commands, the layout, and the pitfalls. |
-| [.github/workflows/ci.yml](.github/workflows/ci.yml) | The CI: `make test` on both cores, with niceemu built for its step counts, `make examples`, `make linktest`, `make formal`, and `make lint`. It cannot run `make hwtest` or build a bitstream. |
+| [.github/workflows/ci.yml](.github/workflows/ci.yml) | The CI: `make test` and `make cosimtest` on both cores, with niceemu built for its step counts, `make examples`, `make linktest`, `make formal`, and `make lint`. It cannot run `make hwtest` or build a bitstream. |
 
 ## Compared with the emulator
 
@@ -77,11 +77,15 @@ or, in an existing clone:
 - `make hwtest` tests the board (see [Testing the board](#testing-the-board)).
 - `make linktest` checks the tools on `niceemu --link`, without a board
   (see [Comparing with the emulator](#comparing-with-the-emulator)).
+- `make cosim` runs the system in GHDL for the tools, and `make cosimtest`
+  checks the tools and the RTL on it, without a board (see
+  [The simulated board](#the-simulated-board)).
 
 `make load` and `make run` use the serial device `PORT=/dev/ttyUSB1` by
 default, and pass `ARGS=` on to the tool, for example `ARGS=--no-run` or
 `ARGS="-i in.txt -d 0:10 -s --timeout 5"`. `ARGS="--tcp 4000"` drives
-`niceemu --link 4000` instead of the board. The bitstream targets take
+`niceemu --link 4000` instead of the board, and `ARGS="--cosim 4000"` the
+simulated system of `make cosim COSIM_PORT=4000`. The bitstream targets take
 `FLOW=default` or `FLOW=timing`, the directives of Vivado's steps (see
 [synth/](synth/README.md)). `make hwtest` rebuilds `niceemu` first, if its
 sources have changed.
@@ -180,7 +184,7 @@ it. When you type `.`, it halts, and the board sends its halt notice.
 The `.bin` file has one line per word, the address and the word in hex.
 `load.py --no-run` loads the program and leaves the core held.
 `load.py --tcp PORT` loads it into `niceemu --link PORT` instead of the
-board.
+board, and `load.py --cosim PORT` into the simulated system of `make cosim`.
 
 `load.py` takes the lines that `niceemu` takes: two fields of 1 to 8 hex
 digits, with no `0x`, sign, or underscore, no repeated address, and at least
@@ -492,6 +496,8 @@ cannot reach `0xFFFFFFE0`–`FF`, which are the emulator's memory.
 `make linktest` does this for the programs that `make hwtest` compares, and
 nice_cpu's benchmark, with `tools/linktest.py`, and CI runs it. It runs
 hwtest's checks of bad packets on `niceemu --link` first.
+`--cosim PORT` runs the program on the simulated system of `make cosim`
+(see [The simulated board](#the-simulated-board)).
 `-2004` prints the screen from `0x400`, as `niceemu -2004` does. That is
 plain RAM on the board, not the screen that the display shows.
 `run.py` accepts `--no-cycle-counter` and ignores it, as the cycle counter
@@ -520,7 +526,7 @@ same words again.
 
 ## Running the tests
 
-You need GHDL (tested with 4.1.0) and Python 3.
+You need GHDL (tested with 4.1.0) and Python 3, and gcc for `make cosim`.
 
     make -C sim test
 
@@ -593,6 +599,41 @@ You need GHDL (tested with 4.1.0) and Python 3.
   with vsg.
 
 For the boards, see [synth/](synth/README.md).
+
+### The simulated board
+
+`make cosim` runs the system in GHDL, with its debug UART on a TCP port of
+127.0.0.1, until you stop it with Ctrl-C. The tools reach it with
+`--cosim PORT` as they reach the board, so they drive the RTL without a
+board:
+
+    make cosim COSIM_PORT=4000 &
+    tools/run.py --cosim 4000 prog.bin
+
+It prints `cosim: port N`, and without `COSIM_PORT` it takes any free
+port. `ROM=file.bin` gives it a ROM, and `NICE=multi` the multi-cycle core.
+It has the board's memory, screen, and input buffer, a clock of 10 MHz,
+and its UART runs at 1 Mbaud. `sim/cosim/cosim.c` serves the port, and
+`sim/cosim/tb_cosim.vhd` drives the UART.
+
+The connection is the UART line, as a USB serial adapter is. It sends no
+`b` notice, and a new connection resets nothing. A half-close or a close
+of the connection is a break, which ends the program's input. One host is
+served at a time. Another host waits until the first has half-closed or
+closed.
+
+The simulation is far slower than real time, about 250 bytes a second on
+the UART. A short request takes a fraction of a second, a clear of the
+memory about 4 s, and a load of 1000 words about 40 s. So `nicelink.py`
+waits longer for an answer there: 20 s, and 20 ms more for each byte of
+the request. Only small programs are practical.
+
+`make cosimtest` starts `make cosim` on a free port. It runs hwtest's
+checks of bad packets on it, but for the gap of 300 ms, which is far
+shorter in simulated time. Then it runs the programs that `make hwtest`
+compares, with `run.py --cosim` and with `niceemu`, whose output and exit
+status must be the same. It leaves out nice_cpu's benchmark, which would
+take too long. It takes about 4 minutes, and CI runs it on both cores.
 
 ## The formal checks
 

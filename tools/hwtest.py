@@ -68,6 +68,12 @@ CLOCK_HZ = {"mega65": 100_000_000, "nexys4ddr": 90_000_000}
 
 T = TypeVar("T")
 
+# How long console() and answers() wait for the next byte, and run.py's
+# --timeout in test_run. tools/cosimtest.py makes them longer for the
+# simulation, which runs far slower than real time.
+QUIET = 0.5
+RUN_TIMEOUT = 10.0
+
 results: list[bool] = []
 # The checks that could not run, which the summary names
 skipped: list[str] = []
@@ -121,8 +127,11 @@ def ctl(link: Link) -> str:
     return f"{rd(link, CONTROL):08X}"
 
 
-def console(link: Link, quiet: float = 0.5) -> bytes:
-    """The console bytes that arrive until none has for quiet seconds."""
+def console(link: Link, quiet: float | None = None) -> bytes:
+    """The console bytes that arrive until none has for quiet seconds,
+    QUIET by default."""
+    if quiet is None:
+        quiet = QUIET
     end = time.monotonic() + quiet
     while time.monotonic() < end:
         if link.poll(end - time.monotonic()):
@@ -258,7 +267,7 @@ def test_link(link: Link) -> None:
     check("W and R of 600 words", link.read(0x200, 600) == words)
 
 
-def answers(link: Link, quiet: float = 0.5) -> list[tuple[str, str]]:
+def answers(link: Link, quiet: float | None = None) -> list[tuple[str, str]]:
     """The answers that arrive until no byte has for quiet seconds."""
     console(link, quiet)
     return link.take_answers()
@@ -287,13 +296,15 @@ def corrupt_first(link: Link, call: Callable[[], T]) -> tuple[T, int]:
         del link.transport.write
 
 
-def test_framing(link: Link) -> None:
+def test_framing(link: Link, gap: bool = True) -> None:
     """Bad packets (DEBUG.md §5), with the core held: one with a bad
     checksum, one cut short by an ESC, and one with a gap of more than
     100 ms between two bytes are dropped with no answer, and nicelink's
     retry of a request whose first copy was dropped gets its answer. A good
     packet with an unknown tag gets e01, and one with a bad payload e03.
-    The same checks run on niceemu --link, in tools/linktest.py."""
+    The same checks run on niceemu --link, in tools/linktest.py, and on the
+    simulation, in tools/cosimtest.py, without the gap (gap false): a gap
+    in real time is far shorter in simulated time."""
     require("W of the word for the framing checks",
             wr(link, 0x100, 0x0BADC0DE))
     an = f"{0x100:08X}0001"
@@ -308,11 +319,12 @@ def test_framing(link: Link) -> None:
     got = answers(link)
     check("R cut short by an ESC is dropped, and the next one answered",
           got == [answer], repr(got))
-    link.transport.write(good[:8])
-    time.sleep(0.3)
-    link.transport.write(good[8:])
-    got = answers(link)
-    check("R with a gap of 300 ms gets no answer", got == [], repr(got))
+    if gap:
+        link.transport.write(good[:8])
+        time.sleep(0.3)
+        link.transport.write(good[8:])
+        got = answers(link)
+        check("R with a gap of 300 ms gets no answer", got == [], repr(got))
     link.transport.write(packet("Q", an))
     got = answers(link)
     check("unknown tag gets e01", got == [("e", f"{ord('Q'):02X}01")],
@@ -586,8 +598,8 @@ def test_run(link_args: list[str],
         emu = subprocess.run([NICEEMU] + options + [path],
                              stdin=subprocess.DEVNULL, capture_output=True)
         board = subprocess.run([sys.executable, f"{REPO}/tools/run.py"] +
-                               link_args + ["--timeout", "10"] + options +
-                               [path],
+                               link_args + ["--timeout", f"{RUN_TIMEOUT:g}"] +
+                               options + [path],
                                stdin=subprocess.DEVNULL, capture_output=True)
         if polls:
             for r in (emu, board):

@@ -9,7 +9,7 @@ PORT   ?= /dev/ttyUSB1
 ARGS   ?=
 EMU     = nice_cpu/emulator/zig-out/bin/niceemu
 
-.PHONY: help test formal lint examples r3 r6 nexys4ddr load run hwtest linktest clean
+.PHONY: help test formal lint examples r3 r6 nexys4ddr load run hwtest linktest cosim cosimtest clean
 
 # Every target but these needs the nice_cpu submodule
 ifeq ($(wildcard nice_cpu/hdl/src/nice_pkg.vhd),)
@@ -44,9 +44,14 @@ help:
 	@echo "                  give BIT=synth/nexys4ddr/build/top.bit"
 	@echo "  make linktest   compare run.py on niceemu --link with niceemu, without"
 	@echo "                  a board"
+	@echo "  make cosim [COSIM_PORT=4000] [ROM=monitor.bin]"
+	@echo "                  run the system in GHDL with its debug UART on a TCP port,"
+	@echo "                  for the tools' --cosim PORT, until it is stopped"
+	@echo "  make cosimtest  compare run.py on the simulated system with niceemu,"
+	@echo "                  without a board (minutes)"
 	@echo "  FLOW=default|timing  with a board's target picks Vivado's directives"
 	@echo "                  (synth/Makefile.inc)"
-	@echo "  NICE=pipeline|multi  with test or a board's target picks nice_cpu's"
+	@echo "  NICE=pipeline|multi  with test, cosim, or a board's target picks nice_cpu's"
 	@echo "                  pipelined core (the default) or its multi-cycle core"
 	@echo "  make clean      remove the build output"
 
@@ -75,7 +80,7 @@ formal-%:
 # own, nor the third-party files that keep their own style (CODING_STYLE.md):
 # synth/r3/max10.vhd and synth/mega65/hdmi/.
 VSG         ?= vsg
-VHDL_SOURCES = $(filter-out synth/r3/max10.vhd,$(wildcard src/*.vhd src/core/*.vhd src/video/*.vhd sim/*.vhd formal/*.vhd \
+VHDL_SOURCES = $(filter-out synth/r3/max10.vhd,$(wildcard src/*.vhd src/core/*.vhd src/video/*.vhd sim/*.vhd sim/cosim/*.vhd formal/*.vhd \
                                                           synth/common/*.vhd synth/mega65/*.vhd synth/r3/*.vhd synth/r6/*.vhd \
                                                           synth/nexys4ddr/*.vhd))
 
@@ -118,6 +123,15 @@ hwtest: examples $(EMU)
 # runs the benchmark only when make examples has built it.
 linktest: $(EMU)
 	$(PYTHON) tools/linktest.py
+
+# The system in GHDL, its debug UART on a TCP port of 127.0.0.1, for the
+# tools' --cosim (sim/Makefile)
+cosim:
+	$(MAKE) -C sim cosim
+
+# The comparison of hwtest on the simulated system, which needs no board
+cosimtest: $(EMU)
+	$(PYTHON) tools/cosimtest.py
 
 clean:
 	rm -rf formal/build

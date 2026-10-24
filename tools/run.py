@@ -12,11 +12,13 @@ HALT and 2 after any other halt. So the output of the two can be compared:
     diff <(niceemu -i in.txt prog.bin) <(tools/run.py -i in.txt prog.bin)
 
 Usage: tools/run.py [--port /dev/ttyUSB1] [--baud 115200] [--tcp PORT]
-                    [-i FILE] [-d ADDR:N]... [-s] [-2004] [--symbols FILE]
+                    [--cosim PORT] [-i FILE] [-d ADDR:N]... [-s] [-2004] [--symbols FILE]
                     [--timeout SEC] FILE.bin
 
 --tcp PORT runs the program on "niceemu --link PORT" instead of the board,
-which checks this script and the link against the emulator.
+which checks this script and the link against the emulator. --cosim
+PORT runs it on the simulated system of "make -C sim cosim", which checks
+the RTL too.
 
 The input is stdin, or the file of -i. It goes out as fast as the program's
 input buffer takes it: before each part, the free-space register says how

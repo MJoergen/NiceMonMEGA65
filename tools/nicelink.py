@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 """The debug link of nice_cpu/doc/DEBUG.md, for the host tools.
 
-A Link talks to the board over its debug UART, or to niceemu --link over
-TCP on 127.0.0.1. It splits what arrives into console bytes, with ESC ESC
+A Link talks to the board over its debug UART, to niceemu --link over
+TCP on 127.0.0.1, or to the simulated system of make -C sim cosim, whose
+UART is on a TCP port of 127.0.0.1 too. It splits what arrives into console bytes, with ESC ESC
 as 0xFF, and packets, which it checks: the answers go to the request that
 waits for them, and the notices are counted, b and o, or kept, h with its
 reason. A packet with a bad checksum is dropped, as DEBUG.md §5 says.
 
 A request waits ANSWER_WAIT for the first byte of its answer, and as long
-as the bytes of a packet keep coming. Without an answer, a read or a write
+as the bytes of a packet keep coming. The simulation runs far slower than
+real time, so there it waits COSIM_WAIT, and COSIM_BYTE more for each byte
+of the request. Without an answer, a read or a write
 of memory is sent again, up to TRIES times, as both may be repeated. A
 write of the control register is not sent again blindly (DEBUG.md §3): the
 register is read back, and the write is sent again only if it did not take
@@ -18,7 +21,8 @@ packets of at most MAX_WORDS.
 
 Console bytes to the program are paced by the free-space register, so that
 none is lost in its input buffer. The end of the input is a break on the
-UART, and a half-close of the TCP connection.
+UART, and a half-close of the TCP connection, which the simulation turns
+into a break.
 
 Only the Python standard library is used, so this runs on Linux and macOS.
 """
@@ -53,6 +57,11 @@ RAM = 8
 # Longer than the 100 ms of DEBUG.md §5, for the latency of a USB serial
 # adapter and of the operating system
 ANSWER_WAIT = 0.3
+# The simulation takes about 4 ms of real time for each byte on its UART,
+# and clears the memory, 98K words at a word a cycle, in about 4 s. These
+# leave room for a slower computer.
+COSIM_WAIT = 20.0
+COSIM_BYTE = 0.02
 TRIES = 3
 MAX_WORDS = 256
 
@@ -87,7 +96,14 @@ def packet(tag: str, payload: str) -> bytes:
 
 
 class Transport:
-    """A byte stream to the system."""
+    """A byte stream to the system. board is whether the system is the
+    board's RTL, simulated or not, and not the emulator."""
+
+    board = False
+
+    def answer_wait(self, sent: int) -> float:
+        """How long a request of sent bytes waits for its answer to start."""
+        return ANSWER_WAIT
 
     def fileno(self) -> int:
         raise NotImplementedError
@@ -112,6 +128,8 @@ class Serial(Transport):
     which may still be sending them, and a break sent then cuts the last
     of them off. So this keeps the time at which the bytes written are out
     on the line, at 10 bits a byte, and end_input() waits for it."""
+
+    board = True
 
     def __init__(self, name: str, baud: int) -> None:
         speed = getattr(termios, f"B{baud}", None)
@@ -172,6 +190,9 @@ class Tcp(Transport):
     first connection comes before what it sends on the second, so the first
     is read to its end first."""
 
+    # Who serves the port, for the messages
+    peer = "niceemu"
+
     def __init__(self, port: int) -> None:
         self.port = port
         self.sock: socket.socket | None = self._connect()
@@ -201,8 +222,8 @@ class Tcp(Transport):
                 return sock
             sock.close()
             time.sleep(0.02)
-        raise LinkError("niceemu does not take a new connection after the "
-                        "end of the input")
+        raise LinkError(f"{self.peer} does not take a new connection after "
+                        f"the end of the input")
 
     def fileno(self) -> int:
         sock = self.old or self.sock
@@ -235,8 +256,8 @@ class Tcp(Transport):
                 self.old.close()
                 self.old = None
                 return b""
-            raise LinkError("niceemu closed the connection; another host "
-                            "may be connected")
+            raise LinkError(f"{self.peer} closed the connection; another "
+                            f"host may be connected")
         return data
 
     def end_input(self) -> None:
@@ -249,6 +270,24 @@ class Tcp(Transport):
         for sock in (self.old, self.sock):
             if sock is not None:
                 sock.close()
+
+
+class Cosim(Tcp):
+    """The simulated system of make -C sim cosim, its UART on a port of
+    127.0.0.1 (sim/cosim/cosim.c). The connection is the line, as a USB
+    serial adapter is: it sends no b notice, and resets nothing. A
+    half-close is a break. The simulation takes a new connection once the
+    old one has half-closed, and then closes the old one, so the new one is
+    taken as it is."""
+
+    board = True
+    peer = "the simulation"
+
+    def _reconnect(self) -> socket.socket:
+        return self._connect()
+
+    def answer_wait(self, sent: int) -> float:
+        return COSIM_WAIT + sent * COSIM_BYTE
 
 
 class Link:
@@ -271,8 +310,9 @@ class Link:
 
     @property
     def board(self) -> bool:
-        """Whether this is the board, not the emulator."""
-        return isinstance(self.transport, Serial)
+        """Whether this is the board, or its simulation, not the
+        emulator."""
+        return self.transport.board
 
     def fileno(self) -> int:
         return self.transport.fileno()
@@ -362,8 +402,10 @@ class Link:
         "" when none came. An answer whose tag and A and N do not match
         is a late one, and is skipped. An error answer raises LinkError."""
         self._answers.clear()
-        self.transport.write(packet(tag, payload))
-        end = time.monotonic() + ANSWER_WAIT
+        data = packet(tag, payload)
+        self.transport.write(data)
+        wait = self.transport.answer_wait(len(data))
+        end = time.monotonic() + wait
         while True:
             while self._answers:
                 t, p = self._answers.popleft()
@@ -379,7 +421,7 @@ class Link:
                 return ""
             if self.poll(end - now) and self.in_packet():
                 # The bytes of a packet keep coming.
-                end = time.monotonic() + ANSWER_WAIT
+                end = time.monotonic() + wait
 
     def _read_once(self, addr: int, n: int) -> list[int] | None:
         an = f"{addr:08X}{n:04X}"
@@ -485,7 +527,8 @@ def read_words(link: Link, addrs: list[int]) -> list[int]:
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
     """The options that pick the link: --port and --baud for the board's
-    debug UART, or --tcp for niceemu --link."""
+    debug UART, --tcp for niceemu --link, or --cosim for make -C sim
+    cosim."""
     parser.add_argument("--port", default="/dev/ttyUSB1",
                         help="the serial device of the board's debug UART "
                         "(default /dev/ttyUSB1)")
@@ -493,10 +536,15 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--tcp", type=int, metavar="PORT",
                         help="talk to niceemu --link PORT on 127.0.0.1, not "
                         "to the board")
+    parser.add_argument("--cosim", type=int, metavar="PORT",
+                        help="talk to the simulated system of make -C sim "
+                        "cosim on port PORT of 127.0.0.1, not to the board")
 
 
 def open_link(args: argparse.Namespace) -> Link:
     """The link that the options of add_arguments pick."""
+    if getattr(args, "cosim", None) is not None:
+        return Link(Cosim(args.cosim))
     if args.tcp is not None:
         link = Link(Tcp(args.tcp))
         # niceemu sends b to each host that connects (DEBUG.md §7).

@@ -27,6 +27,8 @@ jobs:
       - run: make -C nice_cpu/emulator build
       - run: sudo apt-get update && sudo apt-get install -y ghdl
       - run: make -C sim -j4 test NICE=${{ matrix.nice }}
+      # The tools on the simulated system, compared with niceemu
+      - run: make cosimtest NICE=${{ matrix.nice }}
 
   # The C examples, so that a nice_cpu bump that breaks examples/Makefile
   # shows here, not first in make hwtest. Then the host tools on niceemu

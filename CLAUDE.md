@@ -26,6 +26,8 @@ header is the authoritative address map.
     make run FILE=p.bin   # run it and print what niceemu prints, for diffing
     make hwtest           # check the FPGA, program it with openFPGALoader, and test the board
     make linktest         # run.py --tcp on niceemu --link against plain niceemu, no board
+    make cosim            # the RTL in GHDL, its debug UART on TCP, for the tools' --cosim PORT
+    make cosimtest        # run.py --cosim on make cosim against plain niceemu, no board (minutes)
 
 One testbench: `make -C sim tb_kbd` (likewise `tb_hello`, `tb_nicemon`,
 `tb_ps2`, `tb_text`, `tb_board_io`, `synth-nicemon`, ...). `make -C sim
@@ -38,8 +40,8 @@ picture. Test programs are assembled with `python3
 nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
 `nice_cpu/emulator/zig-out/bin/niceemu x.bin`. CI
 (`.github/workflows/ci.yml`, on Ubuntu 24.04) builds niceemu and runs
-`make -C sim -j4 test` on both cores, `make examples` and `make linktest`,
-`make -j4 formal`, and `make lint`.
+`make -C sim -j4 test` and `make cosimtest` on both cores, `make examples`
+and `make linktest`, `make -j4 formal`, and `make lint`.
 
 ## Layout
 
@@ -59,11 +61,13 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   `mega65/` what the R3 and R6 share (keyboard, DAC, HDMI), `r3/`, `r6/`,
   and `nexys4ddr/` the boards. See `synth/README.md`, and
   `.claude/rules/synth.md` when working there.
-- `sim/`: the GHDL testbenches and their `.nasm` programs. `formal/`: the
+- `sim/`: the GHDL testbenches and their `.nasm` programs; `sim/cosim/` is
+  the system with its UART on TCP (`tb_cosim.vhd`, `cosim.c`). `formal/`: the
   SymbiYosys wrappers; the checks themselves are `G_FORMAL` blocks in the
-  sources. `tools/`: `nicelink.py` (the link, on the UART or over TCP to
-  `niceemu --link`), `load.py`, `run.py`, `hwtest.py`, `linktest.py`. `examples/`: C
-  programs built through nice_cpu's wasm translator.
+  sources. `tools/`: `nicelink.py` (the link, on the UART, or over TCP to
+  `niceemu --link` or `make cosim`), `load.py`, `run.py`, `hwtest.py`,
+  `linktest.py`, `cosimtest.py`. `examples/`: C programs built through
+  nice_cpu's wasm translator.
 
 ## Rules and pitfalls
 
@@ -85,6 +89,10 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
 - The tools take `--tcp PORT` for `niceemu --link PORT` (PORT 0 prints the
   port it picked on stderr). `make linktest` runs `run.py --tcp` against
   plain `niceemu`, which checks the tools without a board.
+- The tools take `--cosim PORT` for `make cosim`, the RTL in GHDL at
+  about 250 UART bytes a second. That connection is a UART line: no `b`
+  notice, and a half-close is a break. hwtest.py's `QUIET` and
+  `RUN_TIMEOUT` and nicelink's `COSIM_WAIT` are the waits it needs.
 - American spelling everywhere, in comments, documentation, and identifiers
   (color, analyze, synchronize, behavior). The third-party files that are
   copied unchanged keep theirs, and so do the names they define, such as
