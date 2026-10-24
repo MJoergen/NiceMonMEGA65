@@ -14,7 +14,7 @@
 # assumptions are the contracts of debug_link.vhd, which nice_cpu proves
 # in nice_cpu/hdl/formal/debug_link.sby.
 # The link uses the bus only while the core is held or halted, and a
-# halted core makes no new fetch, so no link request meets a running core
+# halted core has no bus cycle open, so no link request meets a running core
 # or an outstanding fetch.
 
 [tasks]

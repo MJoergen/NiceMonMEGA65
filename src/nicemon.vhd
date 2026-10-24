@@ -305,8 +305,8 @@ architecture synthesis of nicemon is
    signal cpu_rst     : std_logic;
    signal cpu_hold    : std_logic;
    signal cpu_halted  : std_logic;
+   signal cpu_why     : t_halt;
    signal cpu_instret : std_logic;
-   signal cpu_retire  : t_retire;
    signal cpu_stats   : t_fetch_events;
    -- The core's registers, for the link, which keeps them at a halt, and
    -- the same as one vector, R(n) in bits 32 * n + 31 .. 32 * n
@@ -318,9 +318,7 @@ architecture synthesis of nicemon is
    -- which resets the math unit, the performance counters, and the timer
    signal cpu_hold_d : std_logic := '1';
    signal dev_rst    : std_logic;
-   -- The pipelined core reports the reason in the cycle the step retires,
-   -- so it is kept here until the core is reset.
-   signal halt_why    : t_halt := HALT_NONE;
+   -- The halt reason, the code of nice_cpu's DEBUG.md §6
    signal halt_reason : std_logic_vector(2 downto 0);
 
    -- Clearing the memory: the address, and a pulse for the link when it is
@@ -533,33 +531,36 @@ begin
 
    i_core : entity work.nice_core
       port map (
-         clk_i        => clk_i,
-         rst_i        => cpu_rst,
-         ibus_cyc_o   => ibus_cyc,
-         ibus_stb_o   => ibus_stb,
-         ibus_stall_i => '0',
-         ibus_ack_i   => core_iack,
-         ibus_addr_o  => ibus_addr,
-         ibus_data_i  => ibus_data,
-         dbus_cyc_o   => dbus_cyc,
-         dbus_stb_o   => dbus_stb,
-         dbus_stall_i => dbus_stall,
-         dbus_ack_i   => dbus_ack,
-         dbus_we_o    => dbus_we,
-         dbus_addr_o  => dbus_addr,
-         dbus_data_o  => dbus_wdata,
-         dbus_data_i  => dbus_rdata,
-         nmi_valid_i  => '0',
-         nmi_ready_o  => open,
-         nmi_vector_i => X"00",
-         irq_valid_i  => irq_valid,
-         irq_ready_o  => irq_ready,
-         irq_vector_i => irq_vector,
-         halted_o     => cpu_halted,
-         instret_o    => cpu_instret,
-         regs_o       => cpu_regs,
-         retire_o     => cpu_retire,
-         stats_o      => cpu_stats
+         clk_i         => clk_i,
+         rst_i         => cpu_rst,
+         ibus_cyc_o    => ibus_cyc,
+         ibus_stb_o    => ibus_stb,
+         ibus_stall_i  => '0',
+         ibus_ack_i    => core_iack,
+         ibus_addr_o   => ibus_addr,
+         ibus_data_i   => ibus_data,
+         dbus_cyc_o    => dbus_cyc,
+         dbus_stb_o    => dbus_stb,
+         dbus_stall_i  => dbus_stall,
+         dbus_ack_i    => dbus_ack,
+         dbus_we_o     => dbus_we,
+         dbus_addr_o   => dbus_addr,
+         dbus_data_o   => dbus_wdata,
+         dbus_data_i   => dbus_rdata,
+         nmi_valid_i   => '0',
+         nmi_ready_o   => open,
+         nmi_vector_i  => X"00",
+         irq_valid_i   => irq_valid,
+         irq_ready_o   => irq_ready,
+         irq_vector_i  => irq_vector,
+         pause_i       => '0',
+         paused_o      => open,
+         halted_o      => cpu_halted,
+         halt_reason_o => cpu_why,
+         instret_o     => cpu_instret,
+         regs_o        => cpu_regs,
+         retire_o      => open,
+         stats_o       => cpu_stats
       ); -- i_core
 
    cpu_running <= not cpu_hold and not cpu_halted;
@@ -569,7 +570,7 @@ begin
       cpu_regs_flat(32 * n + 31 downto 32 * n) <= cpu_regs(n);
    end generate gen_regs;
 
-   halt_reason <= std_logic_vector(to_unsigned(t_halt'pos(halt_why), 3));
+   halt_reason <= halt_code(cpu_why);
 
 
    ---------------------------------------------------------------------------
@@ -843,12 +844,6 @@ begin
          clr_done   <= '0';
          scr_ctl_we <= '0';
          cpu_hold_d <= cpu_hold;
-
-         if cpu_rst = '1' then
-            halt_why <= HALT_NONE;
-         elsif cpu_retire.halt /= HALT_NONE then
-            halt_why <= cpu_retire.halt;
-         end if;
 
          if cpu_tx_valid = '1' and cpu_tx_ready = '1' then
             cpu_tx_valid <= '0';

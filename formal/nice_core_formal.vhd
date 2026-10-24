@@ -14,9 +14,12 @@
 --   drops CYC and STB.
 -- - READY of an interrupt port only for a request, and not in reset.
 -- - halted_o is low after reset, and once high, stays high until reset,
---   which both cores do by their state machines.
--- The step report, retire_o, regs_o, instret_o, and stats_o are free; the halt reason is one
--- of the values of t_halt.
+--   which both cores do by their state machines. It is high only while no
+--   bus cycle is open, and halt_reason_o is HALT_NONE while it is low and
+--   holds its value while it is high.
+-- - paused_o is high only while no bus cycle is open, and only in the
+--   cycle after one with pause_i high.
+-- The step report, retire_o, regs_o, instret_o, and stats_o are free.
 --
 -- Two of the assumptions matter most here, and nice_cpu proves both for
 -- every cycle: in multicycle.sby, and for the pipelined core in
@@ -25,13 +28,12 @@
 -- - CYC stays high in the cycle after a request is accepted
 --   (f_cyc_accept of wb_master_check.vhd). Otherwise the system's
 --   registered ACK would come with CYC low.
--- - From the second cycle of a halt on, the core makes no new fetch
---   (f_stop of pipe_fetch.vhd, f_halt_idle of formal_multicycle.vhd). In
---   the first, the pipelined core may still have one on the bus. This
---   holds for an instruction bus that never stalls, as nicemon.vhd's.
---   So the link's accesses, which start once the core has halted, meet no
---   fetch. A hold of a running core resets it with a fetch in flight, whose
---   ACK nicemon.vhd drops, as it comes with CYC low.
+-- - While halted_o is high, no bus cycle is open, and none opens until
+--   reset (the quiet state of formal_pipeline.vhd and
+--   formal_multicycle.vhd). So the link's accesses, which start once the
+--   core has halted, meet no request of the core and no ACK owed to it. A
+--   hold of a running core resets it with a fetch in flight, whose ACK
+--   nicemon.vhd drops, as it comes with CYC low.
 --
 -- RESET
 -- rst_i is the core's reset. A request waits no longer after it.
@@ -54,12 +56,13 @@ architecture formal of nice_core is
    signal dbus_data : std_logic_vector(31 downto 0);
    signal nmi_ready : std_logic;
    signal irq_ready : std_logic;
+   signal paused    : std_logic;
    signal halted    : std_logic;
+   signal reason    : std_logic_vector(2 downto 0);
    signal instret   : std_logic;
    signal retire    : t_retire;
    signal stats     : t_fetch_events;
    signal regs      : t_regs;
-   signal halt_code : std_logic_vector(2 downto 0);
 
    attribute anyseq : boolean;
    attribute anyseq of ibus_cyc  : signal is true;
@@ -72,12 +75,13 @@ architecture formal of nice_core is
    attribute anyseq of dbus_data : signal is true;
    attribute anyseq of nmi_ready : signal is true;
    attribute anyseq of irq_ready : signal is true;
+   attribute anyseq of paused    : signal is true;
    attribute anyseq of halted    : signal is true;
+   attribute anyseq of reason    : signal is true;
    attribute anyseq of instret   : signal is true;
    attribute anyseq of retire    : signal is true;
    attribute anyseq of stats     : signal is true;
    attribute anyseq of regs      : signal is true;
-   attribute anyseq of halt_code : signal is true;
 
    -- The requests that wait for their ACK on each bus
    signal ibus_wait   : natural range 0 to C_IBUS_MAX + 1 := 0;
@@ -99,23 +103,23 @@ begin
    dbus_data_o <= dbus_data;
    nmi_ready_o <= nmi_ready;
    irq_ready_o <= irq_ready;
+   paused_o    <= paused;
    halted_o    <= halted;
+   retire_o    <= retire;
    instret_o   <= instret;
    regs_o      <= regs;
    stats_o     <= stats;
 
-   p_retire : process (all)
+   p_reason : process (all)
    begin
-      retire_o <= retire;
-
-      case halt_code is
-         when "000"  => retire_o.halt <= HALT_NONE;
-         when "001"  => retire_o.halt <= HALT_HALT;
-         when "010"  => retire_o.halt <= HALT_RESERVED;
-         when "011"  => retire_o.halt <= HALT_NESTED_INT;
-         when others => retire_o.halt <= HALT_RTI_OUTSIDE_ISR;
+      case reason is
+         when "000"  => halt_reason_o <= HALT_NONE;
+         when "001"  => halt_reason_o <= HALT_HALT;
+         when "010"  => halt_reason_o <= HALT_RESERVED;
+         when "011"  => halt_reason_o <= HALT_NESTED_INT;
+         when others => halt_reason_o <= HALT_RTI_OUTSIDE_ISR;
       end case;
-   end process p_retire;
+   end process p_reason;
 
    ibus_accept <= ibus_cyc and ibus_stb and not ibus_stall_i;
    dbus_accept <= dbus_cyc and dbus_stb and not dbus_stall_i;
@@ -186,7 +190,13 @@ begin
    -- The halt
    -- psl f_halt_reset : assume always {rst_i} |=> {not halted};
    -- psl f_halt_hold : assume always {halted and not rst_i} |=> {halted or rst_i};
-   -- psl f_halt_idle : assume always
-   --    {halted and not rst_i; halted and not rst_i} |-> {not ibus_stb};
+   -- psl f_halt_idle : assume always halted -> not ibus_cyc and not dbus_cyc;
+   -- psl f_halt_none : assume always not halted -> reason = "000";
+   -- psl f_halt_stable : assume always
+   --    {halted and not rst_i} |=> {rst_i = '1' or stable(reason)};
+
+   -- The pause
+   -- psl f_pause_idle : assume always paused -> not ibus_cyc and not dbus_cyc;
+   -- psl f_pause_req : assume always {not pause_i} |=> {not paused};
 
 end architecture formal;
