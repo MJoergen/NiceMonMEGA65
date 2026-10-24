@@ -262,17 +262,32 @@ Makefile runs are those of `nice_cpu/runtime/README.md`:
         nice_cpu/runtime/muldiv_mpu.nasm > primes_full.nasm
     nice_cpu/assembler/niceasm.py -o primes.bin primes_full.nasm
 
-The C library has `printf`, `scanf`, `puts`, `putchar`, `getchar`, the string
-functions, `malloc`, and more. `putchar` and `getchar` use the UART at
-`0xFFFFFF00`. `getchar` waits for a byte, and returns `EOF` once a break on
-the UART has ended the input. `nice.h` declares the device routines of
-nice_cpu's runtime/ABI.md: `nice_putc`, `nice_getc`, `nice_pollc`, and
-`nice_print` for the UART, and `nice_cycles` and `nice_instructions` for the
-performance counters, as `examples/primes.c` uses them. It also declares
-`nice_peek` and `nice_poke`, which read and write any NICE address, such as
-the math unit's. `nice_screen_put` and `nice_screen_clear` write the screen
-at `0xFFFF0000`, which the VGA and HDMI outputs show (VGA only on the
-Nexys4DDR).
+With plain `start_wasm.nasm`, a wasm trap, such as an access outside the
+linear memory, halts the core without a word, and only `run.py --symbols`
+shows the trap. `nice_cpu/translator/nicebuild.py -o primes.bin
+examples/primes.c` does all of these steps in one command, and by default
+it joins the trap report instead: `start_wasm_trap.nasm` at the start and
+`trapmsg.nasm` at the end. Then a trap prints a line such as `trap 2: out
+of bounds memory access at 00003dc9` before the core halts. The Makefile
+keeps the plain start, so that `bench.bin` is laid out as in nice_cpu's
+testbench, and its cycles compare with those above.
+
+The C library has `printf`, `scanf`, `puts`, `putchar`, `getchar`, the
+`FILE` functions on `stdin`, `stdout`, and `stderr`, which are all the
+console, the string functions, `malloc`, `rand`, `exit`, `assert`, and more.
+`putchar` and `getchar` use the UART at `0xFFFFFF00`. `getchar` waits for a
+byte, and returns `EOF` once a break on the UART has ended the input.
+`nice.h` declares the device routines of nice_cpu's runtime/ABI.md:
+`nice_putc`, `nice_getc`, `nice_pollc`, and `nice_print` for the UART, and
+`nice_cycles`, `nice_instructions`, and `nice_micros` for the performance
+counters. `examples/primes.c` uses the first two. It also declares `nice_peek`
+and `nice_poke`, which read and write any NICE address, such as the math
+unit's. `nice_screen_put` and `nice_screen_clear` write the screen at
+`0xFFFF0000`, which the VGA and HDMI outputs show (VGA only on the
+Nexys4DDR). `time.h` has `clock()`, which counts microseconds from the
+counter at `0xFFFFFF44`. On the board they are real time, at the clock's
+rate; in the emulator a microsecond is a step. There is no calendar, so
+`time()` returns -1.
 
 The translated code and the runtime routines multiply and divide with the
 math unit, so the program is joined with `muldiv_mpu.nasm`. A system
