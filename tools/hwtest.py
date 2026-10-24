@@ -457,14 +457,44 @@ def test_primes(link: Link, primes: str, board: str) -> None:
           micros == cycles // mhz, f"{micros} of {cycles} cycles")
 
 
-def test_run(port: str, baud: int,
+def comparisons(tmp: str) -> list[tuple[str, list[str], bool]]:
+    """The programs that test_run compares, assembled into tmp, with their
+    options and input files."""
+    emu = assemble(f"{REPO}/sim/emu.nasm", tmp)
+    hello = assemble(f"{REPO}/nice_cpu/doc/intro/examples/hello.nasm", tmp)
+    reserved = assemble(f"{REPO}/nice_cpu/emulator/test/reserved.nasm", tmp)
+    eof = assemble(f"{REPO}/sim/eof.nasm", tmp)
+    trapsym = assemble(f"{REPO}/nice_cpu/emulator/test/trapsym.nasm", tmp)
+    # Every byte value, six times over: 1536 bytes, far more than the
+    # 16-byte FIFO of the testbench holds
+    text = os.path.join(tmp, "input.bin")
+    with open(text, "wb") as f:
+        f.write(bytes(range(256)) * 6)
+    # 100 lines for hello.nasm, which halts without reading them
+    lines = os.path.join(tmp, "lines.txt")
+    with open(lines, "w") as f:
+        f.writelines(f"line {i}\n" for i in range(100))
+    return [
+        (hello, [], False),
+        (hello, ["-i", lines], False),  # halts with unread input
+        # Not 0xFFFFFF00-01, which the link reads as 0 (DEBUG.md §3)
+        (emu, ["-d", "0x110:2", "-d", "0xFFFFFF02:2", "-s"], False),
+        (reserved, [], False),
+        (eof, [], True),               # no input: it ends at once
+        (eof, ["-i", text], True),
+        (trapsym, ["--symbols",        # names the halt and the trap
+                   f"{REPO}/nice_cpu/emulator/test/trapsym.sym"], False),
+    ]
+
+
+def test_run(link_args: list[str],
              programs: list[tuple[str, list[str], bool]]) -> None:
     """Runs each program with run.py and with niceemu, which must print the
-    same and exit with the same status. A program is (path, options,
-    polls): when polls is true, the program waits for input in a loop, which
-    takes more steps on the board, where a read returns 0 until a byte
-    arrives, so the step counts are not compared. The port must be closed
-    meanwhile."""
+    same and exit with the same status. link_args are run.py's options for
+    the link. A program is (path, options, polls): when polls is true, the
+    program waits for input in a loop, which takes more steps on the board,
+    where a read returns 0 until a byte arrives, so the step counts are not
+    compared. The port must be closed meanwhile."""
     if not os.path.exists(NICEEMU):
         print(f"  {NICEEMU} is missing; the comparison with the emulator "
               "is skipped")
@@ -475,9 +505,9 @@ def test_run(port: str, baud: int,
                         [os.path.basename(o) for o in options])
         emu = subprocess.run([NICEEMU] + options + [path],
                              stdin=subprocess.DEVNULL, capture_output=True)
-        board = subprocess.run([sys.executable, f"{REPO}/tools/run.py",
-                                "--port", port, "--baud", str(baud),
-                                "--timeout", "10"] + options + [path],
+        board = subprocess.run([sys.executable, f"{REPO}/tools/run.py"] +
+                               link_args + ["--timeout", "10"] + options +
+                               [path],
                                stdin=subprocess.DEVNULL, capture_output=True)
         if polls:
             for r in (emu, board):
@@ -491,21 +521,21 @@ def test_run(port: str, baud: int,
               f"{board.stdout!r} {board.stderr!r}")
 
 
-def test_bench(port: str, baud: int, bench: str) -> None:
+def test_bench(link_args: list[str], bench: str) -> None:
     """Runs nice_cpu's benchmark with run.py and with niceemu, which must
     print the same and exit with the same status, but for the cycles, which
     the board counts in clock cycles. So the steps differ too, since
     printing other numbers takes other steps. The board's table is printed.
-    The port must be closed meanwhile."""
+    link_args are run.py's options for the link. The port must be closed
+    meanwhile."""
     if not os.path.exists(NICEEMU):
         print(f"  {NICEEMU} is missing; the benchmark is skipped")
         skipped.append("bench.bin as niceemu")
         return
     emu = subprocess.run([NICEEMU, bench], stdin=subprocess.DEVNULL,
                          capture_output=True)
-    board = subprocess.run([sys.executable, f"{REPO}/tools/run.py",
-                            "--port", port, "--baud", str(baud),
-                            "--timeout", "10", bench],
+    board = subprocess.run([sys.executable, f"{REPO}/tools/run.py"] +
+                           link_args + ["--timeout", "10", bench],
                            stdin=subprocess.DEVNULL, capture_output=True)
     for line in board.stdout.decode(errors="replace").splitlines():
         if line.startswith("Halted"):
@@ -547,20 +577,6 @@ def main() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         echo = assemble(f"{REPO}/sim/echo.nasm", tmp)
         emu = assemble(f"{REPO}/sim/emu.nasm", tmp)
-        hello = assemble(f"{REPO}/nice_cpu/doc/intro/examples/hello.nasm", tmp)
-        reserved = assemble(f"{REPO}/nice_cpu/emulator/test/reserved.nasm",
-                            tmp)
-        eof = assemble(f"{REPO}/sim/eof.nasm", tmp)
-        trapsym = assemble(f"{REPO}/nice_cpu/emulator/test/trapsym.nasm", tmp)
-        # Every byte value, six times over: 1536 bytes, far more than the
-        # 16-byte FIFO of the testbench holds
-        text = os.path.join(tmp, "input.bin")
-        with open(text, "wb") as f:
-            f.write(bytes(range(256)) * 6)
-        # 100 lines for hello.nasm, which halts without reading them
-        lines = os.path.join(tmp, "lines.txt")
-        with open(lines, "w") as f:
-            f.writelines(f"line {i}\n" for i in range(100))
 
         opened = False
         try:
@@ -588,18 +604,9 @@ def main() -> None:
                 test_primes(link, primes, board)
             finally:
                 link.close()
-            test_run(args.port, args.baud, [
-                (hello, [], False),
-                (hello, ["-i", lines], False),  # halts with unread input
-                # Not 0xFFFFFF00-01, which the link reads as 0 (DEBUG.md §3)
-                (emu, ["-d", "0x110:2", "-d", "0xFFFFFF02:2", "-s"], False),
-                (reserved, [], False),
-                (eof, [], True),               # no input: it ends at once
-                (eof, ["-i", text], True),
-                (trapsym, ["--symbols",        # names the halt and the trap
-                           f"{REPO}/nice_cpu/emulator/test/trapsym.sym"], False),
-            ])
-            test_bench(args.port, args.baud, bench)
+            serial = ["--port", args.port, "--baud", str(args.baud)]
+            test_run(serial, comparisons(tmp))
+            test_bench(serial, bench)
         except LinkError as e:
             print(f"hwtest.py: {e}", file=sys.stderr, flush=True)
             results.append(False)

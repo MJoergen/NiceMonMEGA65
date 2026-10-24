@@ -34,14 +34,14 @@ and switches as registers (see [synth/](synth/README.md#the-nexys4ddr) and
 | [synth/](synth/README.md) | The Vivado builds for the MEGA65 R3 and R6 boards, and the Nexys4DDR. |
 | [monitor/](monitor/README.md) | The monitor, in NICE assembly: planned, not written yet. Its README has the decisions it will follow, QNICE-FPGA's. |
 | [examples/](examples/) | Example C programs, and the Makefile that builds them for the MEGA65. |
-| [tools/](tools/) | `nicelink.py`, the debug link over the board's UART or over TCP to `niceemu --link`, and the tools that use it: `load.py`, which loads a program into the MEGA65 or Nexys4DDR, `run.py`, which runs a program on the board as `niceemu` runs it, and `hwtest.py`, which tests the system on the board. |
+| [tools/](tools/) | `nicelink.py`, the debug link over the board's UART or over TCP to `niceemu --link`, and the tools that use it: `load.py`, which loads a program into the MEGA65 or Nexys4DDR, `run.py`, which runs a program on the board as `niceemu` runs it, `hwtest.py`, which tests the system on the board, and `linktest.py`, which checks `run.py` on `niceemu --link`. |
 | [EMULATOR.md](EMULATOR.md) | The table of the known differences from the emulator. |
 | [TODO.md](TODO.md) | Work that is planned but not started. |
 | [core.mk](core.mk) | Picks the source files of the core, from `NICE`, for the Makefiles of `sim/` and `synth/`. |
 | [.claude/rules/synth.md](.claude/rules/synth.md) | Notes for Claude Code on the Vivado builds: where Vivado is, how to build, and what to check after a build. |
 | [vsg.yml](vsg.yml) | The configuration of `make lint`, which checks the VHDL against [CODING_STYLE.md](CODING_STYLE.md). |
 | [CLAUDE.md](CLAUDE.md) | Instructions for Claude Code: the commands, the layout, and the pitfalls. |
-| [.github/workflows/ci.yml](.github/workflows/ci.yml) | The CI: `make test` on both cores, with niceemu built for its step counts, `make examples`, `make formal`, and `make lint`. It cannot run `make hwtest` or build a bitstream. |
+| [.github/workflows/ci.yml](.github/workflows/ci.yml) | The CI: `make test` on both cores, with niceemu built for its step counts, `make examples`, `make linktest`, `make formal`, and `make lint`. It cannot run `make hwtest` or build a bitstream. |
 
 ## Compared with the emulator
 
@@ -75,6 +75,8 @@ or, in an existing clone:
 - `make run FILE=prog.bin` runs one as `niceemu` runs it (see
   [Comparing with the emulator](#comparing-with-the-emulator)).
 - `make hwtest` tests the board (see [Testing the board](#testing-the-board)).
+- `make linktest` checks the tools on `niceemu --link`, without a board
+  (see [Comparing with the emulator](#comparing-with-the-emulator)).
 
 `make load` and `make run` use the serial device `PORT=/dev/ttyUSB1` by
 default, and pass `ARGS=` on to the tool, for example `ARGS=--no-run` or
@@ -483,6 +485,8 @@ board, which checks `run.py` and the link against the plain emulator:
 
 With `--tcp`, the end of the input half-closes the connection, and `-d`
 cannot reach `0xFFFFFFE0`–`FF`, which are the emulator's memory.
+`make linktest` does this for the programs that `make hwtest` compares, and
+nice_cpu's benchmark, with `tools/linktest.py`, and CI runs it.
 `-2004` prints the screen from `0x400`, as `niceemu -2004` does. That is
 plain RAM on the board, not the screen that the display shows.
 `run.py` accepts `--no-cycle-counter` and ignores it, as the cycle counter
@@ -657,8 +661,9 @@ the run. Even then the script holds the core with the ROM hidden, and
 prints how many passed. If the link does not answer then, it says so:
 press the reset button. Programming the FPGA needs Linux, as the JTAG
 cable is found through `/sys`; with `--no-program` the script runs wherever
-`load.py` does. The Nexys4DDR has more checks, for its LEDs, display,
-buttons, and switches.
+`load.py` does. With the pipelined core, all 69 pass on the R6, and all 85
+on the Nexys4DDR, which has more checks, for its LEDs, display, buttons,
+and switches.
 
 For the R3, give `BIT=synth/r3/build/top.bit`. For the Nexys4DDR, give
 `BIT=synth/nexys4ddr/build/top.bit`. Its UART is usually `/dev/ttyUSB1` too.

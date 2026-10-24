@@ -25,6 +25,7 @@ header is the authoritative address map.
     make load FILE=p.bin  # load and start a program on the board (debug UART, PORT=/dev/ttyUSB1)
     make run FILE=p.bin   # run it and print what niceemu prints, for diffing
     make hwtest           # check the FPGA, program it with openFPGALoader, and test the board
+    make linktest         # run.py --tcp on niceemu --link against plain niceemu, no board
 
 One testbench: `make -C sim tb_kbd` (likewise `tb_hello`, `tb_nicemon`,
 `tb_ps2`, `tb_text`, `tb_board_io`, `synth-nicemon`, ...). `make -C sim
@@ -37,8 +38,8 @@ picture. Test programs are assembled with `python3
 nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
 `nice_cpu/emulator/zig-out/bin/niceemu x.bin`. CI
 (`.github/workflows/ci.yml`, on Ubuntu 24.04) builds niceemu and runs
-`make -C sim -j4 test` on both cores, `make examples`, `make -j4 formal`,
-and `make lint`.
+`make -C sim -j4 test` on both cores, `make examples` and `make linktest`,
+`make -j4 formal`, and `make lint`.
 
 ## Layout
 
@@ -61,7 +62,7 @@ and `make lint`.
 - `sim/`: the GHDL testbenches and their `.nasm` programs. `formal/`: the
   SymbiYosys wrappers; the checks themselves are `G_FORMAL` blocks in the
   sources. `tools/`: `nicelink.py` (the link, on the UART or over TCP to
-  `niceemu --link`), `load.py`, `run.py`, `hwtest.py`. `examples/`: C
+  `niceemu --link`), `load.py`, `run.py`, `hwtest.py`, `linktest.py`. `examples/`: C
   programs built through nice_cpu's wasm translator.
 
 ## Rules and pitfalls
@@ -82,8 +83,8 @@ and `make lint`.
   `FFFFFFE0`–`FF`, and the link reads the console and the read counter as
   0. A hold leaves R0–R15 undefined.
 - The tools take `--tcp PORT` for `niceemu --link PORT` (PORT 0 prints the
-  port it picked on stderr). `run.py --tcp` against plain `niceemu` checks
-  the tools without a board.
+  port it picked on stderr). `make linktest` runs `run.py --tcp` against
+  plain `niceemu`, which checks the tools without a board.
 - American spelling everywhere, in comments, documentation, and identifiers
   (color, analyze, synchronize, behavior). The third-party files that are
   copied unchanged keep theirs, and so do the names they define, such as

@@ -176,17 +176,20 @@ core's has few. The pipelined core uses no block RAM. The multi-cycle core
 uses one RAMB18, which Vivado infers for `src2_count`, the register of the
 shift count. The math unit has the 4 DSPs of the design. All builds meet the
 clock. These are the worst setup and hold slacks of the builds of the
-tables above:
+tables above, and of the Nexys4DDR with the debug link:
 
 | Build | Clock | Setup | Hold |
 |---|---|---|---|
-| R6, pipelined | 100 MHz | 0.414 ns | 0.061 ns |
+| R6, pipelined, with the debug link | 100 MHz | 0.192 ns | 0.019 ns |
+| R6, pipelined, with the command line | 100 MHz | 0.414 ns | 0.061 ns |
 | R6, `NICE=multi` | 100 MHz | 0.52 ns | – |
-| R3, pipelined | 100 MHz | 0.173 ns | 0.065 ns |
-| Nexys4DDR, pipelined | 90 MHz | 0.022 ns | 0.020 ns |
+| R3, pipelined, with the command line | 100 MHz | 0.173 ns | 0.065 ns |
+| Nexys4DDR, pipelined, with the debug link | 90 MHz | 0.159 ns | 0.042 ns |
+| Nexys4DDR, pipelined, with the command line | 90 MHz | 0.022 ns | 0.020 ns |
 | Nexys4DDR, `NICE=multi` | 90 MHz | 0.19 ns | – |
 
-The pipelined builds are those of 2026-10-24 at nice_cpu 2f67a50, and the
+The builds with the debug link are those of 2026-10-24 at nice_cpu a21d8b6,
+the other pipelined builds those of 2026-10-24 at nice_cpu 2f67a50, and the
 multi-cycle ones those at this repository's cb95968, whose hold slacks were
 not recorded. The pipelined builds' block RAM is 132.5 tiles on the R6 and
 the R3 (36 %) and 84.5 on the Nexys4DDR (63 %). The slacks change from

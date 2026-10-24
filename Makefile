@@ -9,7 +9,7 @@ PORT   ?= /dev/ttyUSB1
 ARGS   ?=
 EMU     = nice_cpu/emulator/zig-out/bin/niceemu
 
-.PHONY: help test formal lint examples r3 r6 nexys4ddr load run hwtest clean
+.PHONY: help test formal lint examples r3 r6 nexys4ddr load run hwtest linktest clean
 
 # Every target but these needs the nice_cpu submodule
 ifeq ($(wildcard nice_cpu/hdl/src/nice_pkg.vhd),)
@@ -42,6 +42,8 @@ help:
 	@echo "                  check that the board of PORT has the FPGA of BIT, program"
 	@echo "                  it, and test it (needs openFPGALoader); for the Nexys4DDR,"
 	@echo "                  give BIT=synth/nexys4ddr/build/top.bit"
+	@echo "  make linktest   compare run.py on niceemu --link with niceemu, without"
+	@echo "                  a board"
 	@echo "  FLOW=default|timing  with a board's target picks Vivado's directives"
 	@echo "                  (synth/Makefile.inc)"
 	@echo "  NICE=pipeline|multi  with test or a board's target picks nice_cpu's"
@@ -110,6 +112,11 @@ $(EMU): $(shell find nice_cpu/emulator/src nice_cpu/emulator/build.zig -type f 2
 
 hwtest: examples $(EMU)
 	$(PYTHON) tools/hwtest.py --port $(PORT) --bit $(BIT)
+
+# The comparison of hwtest on niceemu --link, which needs no board; it
+# runs the benchmark only when make examples has built it.
+linktest: $(EMU)
+	$(PYTHON) tools/linktest.py
 
 clean:
 	rm -rf formal/build
