@@ -348,6 +348,13 @@ class Link:
         self.console.clear()
         return data
 
+    def take_answers(self) -> list[tuple[str, str]]:
+        """The answers that have arrived with no request waiting for them,
+        as (tag, payload), for a test that sends its own packets."""
+        answers = list(self._answers)
+        self._answers.clear()
+        return answers
+
     # Requests
 
     def _request(self, tag: str, payload: str, match: str) -> str:

@@ -486,7 +486,8 @@ board, which checks `run.py` and the link against the plain emulator:
 With `--tcp`, the end of the input half-closes the connection, and `-d`
 cannot reach `0xFFFFFFE0`–`FF`, which are the emulator's memory.
 `make linktest` does this for the programs that `make hwtest` compares, and
-nice_cpu's benchmark, with `tools/linktest.py`, and CI runs it.
+nice_cpu's benchmark, with `tools/linktest.py`, and CI runs it. It runs
+hwtest's checks of bad packets on `niceemu --link` first.
 `-2004` prints the screen from `0x400`, as `niceemu -2004` does. That is
 plain RAM on the board, not the screen that the display shows.
 `run.py` accepts `--no-cycle-counter` and ignores it, as the cycle counter
@@ -647,7 +648,10 @@ unless the FPGA is the part the bitstream was built for. So with a MEGA65 and
 a Nexys4DDR both attached, it never programs the wrong one. It programs the
 FPGA through that cable alone, with openFPGALoader too, on every board, and
 checks the link's `b` notice, and the ROM when the bitstream has one. Then
-it hides the ROM and uses the link: it writes and reads memory, runs
+it hides the ROM and uses the link: it writes and reads memory, checks
+that the link drops a packet with a bad checksum, one cut short by an ESC,
+and one with a gap of 300 ms, that `nicelink.py` sends a dropped `R` or `W`
+again, and that an unknown tag gets `e01` and a bad payload `e03`, runs
 `sim/echo.nasm`, checks that the link reaches only its debug registers
 while the core runs, holds and restarts the core, clears the memory, reads back what `sim/emu.nasm` leaves
 after its halt, writes and reads the screen's registers, and runs
@@ -670,7 +674,7 @@ the run. Even then the script holds the core with the ROM hidden, and
 prints how many passed. If the link does not answer then, it says so:
 press the reset button. Programming the FPGA needs Linux, as the JTAG
 cable is found through `/sys`; with `--no-program` the script runs wherever
-`load.py` does. With the pipelined core, all 69 pass on the R6, and all 85
+`load.py` does. With the pipelined core, all 78 pass on the R6, and all 94
 on the Nexys4DDR, which has more checks, for its LEDs, display, buttons,
 and switches.
 

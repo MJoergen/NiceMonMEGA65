@@ -8,7 +8,8 @@ alone, so with several boards attached it programs the board whose UART it
 tests. openFPGALoader does both, for the MEGA65 and the Nexys4DDR alike.
 It checks the link's b notice, and the ROM when the bitstream has one, then
 drives the debug link (nice_cpu/doc/DEBUG.md) with the ROM hidden: it
-loads and runs sim/echo.nasm, checks that the link reaches only its debug
+checks that bad packets are dropped and that nicelink sends a dropped
+request again, loads and runs sim/echo.nasm, checks that the link reaches only its debug
 registers while it runs, holds and restarts the core, clears
 the memory, reads back what sim/emu.nasm leaves after its halt, checks that
 the cycle counter and the timer stop there, writes and reads the screen's
@@ -54,15 +55,18 @@ import subprocess
 import sys
 import tempfile
 import time
+from typing import Callable, TypeVar
 
 from load import load_words, read_bin, start
 from nicelink import (CONTROL, FREE, HOLD, RAM, VERSION, Link, LinkError,
-                      Serial)
+                      Serial, packet)
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NICEEMU = f"{REPO}/nice_cpu/emulator/zig-out/bin/niceemu"
 # The clock of each board, which sets the rate of the microsecond counter
 CLOCK_HZ = {"mega65": 100_000_000, "nexys4ddr": 90_000_000}
+
+T = TypeVar("T")
 
 results: list[bool] = []
 # The checks that could not run, which the summary names
@@ -252,6 +256,82 @@ def test_link(link: Link) -> None:
     words = list(range(0x1000, 0x1000 + 600))
     link.write(0x200, words)
     check("W and R of 600 words", link.read(0x200, 600) == words)
+
+
+def answers(link: Link, quiet: float = 0.5) -> list[tuple[str, str]]:
+    """The answers that arrive until no byte has for quiet seconds."""
+    console(link, quiet)
+    return link.take_answers()
+
+
+def bad_checksum(data: bytes) -> bytes:
+    """The packet with another last digit of its checksum."""
+    return data[:-1] + (b"0" if data[-1:] != b"0" else b"1")
+
+
+def corrupt_first(link: Link, call: Callable[[], T]) -> tuple[T, int]:
+    """Runs call with the checksum of the first packet that it sends made
+    bad, so the system drops it and nicelink must send it again. Returns
+    what call returns and the number of writes to the transport."""
+    write = link.transport.write
+    sent: list[bytes] = []
+
+    def corrupt(data: bytes) -> None:
+        sent.append(data)
+        write(bad_checksum(data) if len(sent) == 1 else data)
+
+    link.transport.write = corrupt  # type: ignore[method-assign]
+    try:
+        return call(), len(sent)
+    finally:
+        del link.transport.write
+
+
+def test_framing(link: Link) -> None:
+    """Bad packets (DEBUG.md §5), with the core held: one with a bad
+    checksum, one cut short by an ESC, and one with a gap of more than
+    100 ms between two bytes are dropped with no answer, and nicelink's
+    retry of a request whose first copy was dropped gets its answer. A good
+    packet with an unknown tag gets e01, and one with a bad payload e03.
+    The same checks run on niceemu --link, in tools/linktest.py."""
+    require("W of the word for the framing checks",
+            wr(link, 0x100, 0x0BADC0DE))
+    an = f"{0x100:08X}0001"
+    good = packet("R", an)
+    answer = ("r", f"{an}0BADC0DE")
+    link.take_answers()
+    link.transport.write(bad_checksum(good))
+    got = answers(link)
+    check("R with a bad checksum gets no answer", got == [], repr(got))
+    # The ESC of the whole request cuts the first copy short.
+    link.transport.write(good[:8] + good)
+    got = answers(link)
+    check("R cut short by an ESC is dropped, and the next one answered",
+          got == [answer], repr(got))
+    link.transport.write(good[:8])
+    time.sleep(0.3)
+    link.transport.write(good[8:])
+    got = answers(link)
+    check("R with a gap of 300 ms gets no answer", got == [], repr(got))
+    link.transport.write(packet("Q", an))
+    got = answers(link)
+    check("unknown tag gets e01", got == [("e", f"{ord('Q'):02X}01")],
+          repr(got))
+    link.transport.write(packet("R", "0100"))
+    got = answers(link)
+    check("bad payload gets e03", got == [("e", f"{ord('R'):02X}03")],
+          repr(got))
+    word, writes = corrupt_first(link, lambda: rd(link, 0x100))
+    check("R sent again after a bad checksum", word == 0x0BADC0DE and
+          writes == 2, f"{word:08X} after {writes} copies")
+    words = [0x13579BDF, 0x2468ACE0]
+    _, writes = corrupt_first(link, lambda: link.write(0x100, words))
+    got_words = link.read(0x100, 2)
+    check("W sent again after a bad checksum", got_words == words and
+          writes == 2, f"{' '.join(f'{w:08X}' for w in got_words)} after "
+          f"{writes} copies")
+    check("a good R after the bad packets",
+          rd(link, 0x101) == 0x2468ACE0)
 
 
 def test_echo(link: Link, echo: str) -> None:
@@ -593,6 +673,7 @@ def main() -> None:
                 if not args.no_program:
                     test_boot(link, args.bit, cable)
                 test_link(link)
+                test_framing(link)
                 test_echo(link, echo)
                 test_reset(link, echo)
                 test_clear(link)

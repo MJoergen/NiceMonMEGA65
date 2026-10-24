@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Compare tools/run.py on niceemu --link with niceemu, without a board.
 
-It starts "niceemu --link 0", which picks a free port, and runs the
-programs of hwtest.py's comparison, and nice_cpu's benchmark when
+It starts "niceemu --link 0", which picks a free port, runs hwtest.py's
+checks of bad packets on it, and runs the programs of hwtest.py's
+comparison, and nice_cpu's benchmark when
 examples/build/bench.bin is built, with run.py --tcp on that port and with
 niceemu alone. Each must print the same and exit with the same status. So
 it checks run.py, nicelink.py, and the link of the emulator, as CI does.
@@ -15,10 +16,13 @@ import os
 import re
 import subprocess
 import sys
+import argparse
 import tempfile
 
 import hwtest
-from hwtest import NICEEMU, REPO, comparisons, results, test_bench, test_run
+from hwtest import (NICEEMU, REPO, comparisons, results, test_bench,
+                    test_framing, test_run)
+from nicelink import HOLD, RAM, open_link
 
 
 def main() -> None:
@@ -39,6 +43,14 @@ def main() -> None:
         # that the pipe never fills.
         drain = subprocess.Popen(["cat"], stdin=emu.stderr,
                                  stdout=subprocess.DEVNULL)
+        # niceemu takes one host at a time, so the link is closed before
+        # run.py connects.
+        link = open_link(argparse.Namespace(tcp=int(m.group(1))))
+        try:
+            link.control(HOLD | RAM)
+            test_framing(link)
+        finally:
+            link.close()
         with tempfile.TemporaryDirectory() as tmp:
             test_run(tcp, comparisons(tmp))
         bench = f"{REPO}/examples/build/bench.bin"
