@@ -1,56 +1,49 @@
 #!/usr/bin/env python3
-"""Run a program on the MEGA65 as niceemu runs it on the emulator.
+"""Run a program on the board as niceemu runs it on the emulator.
 
-The program is loaded into cleared memory with the command line, and
-started. Its input is sent to the UART, and its output copied to stdout.
-When it halts, the command line takes the UART again and prints a halt
-message, and this prints what niceemu prints after a halt: why and after
-how many steps the program halted, the registers, and the --dump and
---screen output. The exit status is that of niceemu, 0 after HALT and 2
-after any other halt. So the output of the two can be compared:
+The program is loaded into cleared memory over the debug link
+(nice_cpu/doc/DEBUG.md), and started. Its input is sent as console bytes,
+and its output copied to stdout. When it halts, the link's halt notice
+comes after its last byte, and this prints what niceemu prints after a
+halt: why and after how many steps the program halted, the registers, and
+the --dump and --screen output. The exit status is that of niceemu, 0 after
+HALT and 2 after any other halt. So the output of the two can be compared:
 
     diff <(niceemu -i in.txt prog.bin) <(tools/run.py -i in.txt prog.bin)
 
-Usage: tools/run.py [--port /dev/ttyUSB1] [--baud 115200] [-i FILE]
-                    [-d ADDR:N]... [-s] [-2004] [--symbols FILE]
+Usage: tools/run.py [--port /dev/ttyUSB1] [--baud 115200] [--tcp PORT]
+                    [-i FILE] [-d ADDR:N]... [-s] [-2004] [--symbols FILE]
                     [--timeout SEC] FILE.bin
 
-The input is stdin, or the file of -i. The bytes go to the UART in chunks
-of 16, each sent before the next is read, so that little input is on its
-way when the core halts, and the core's input FIFO holds 2048 bytes, so a program
-must not fall more than that behind its input, or bytes are lost. At the
-end of the input, a break on the UART ends the core's input too, so a read
-returns 0x200, as in the emulator. Input that the program has not read when
-it halts is dropped, as by the emulator: no more is sent once the halt
-message arrives, and the command line's answers to the lines that reached
-it after the halt, WHAT? for most, are dropped.
+--tcp PORT runs the program on "niceemu --link PORT" instead of the board,
+which checks this script and the link against the emulator.
 
-The halt message is the same bytes that a program can print. Output that may
-be its start is held back for at most 20 ms, and the message counts as a halt
-only when nothing but such answers follows it for 100 ms. So a program that
-prints it and then keeps running is copied, but one that prints it and then
-waits longer than that is taken for halted, and the report then says the
-core has not.
+The input is stdin, or the file of -i. It goes out as fast as the program's
+input buffer takes it: before each part, the free-space register says how
+many bytes it has room for, so none is lost. At the end of the input, a
+break on the UART, or a half-close of the TCP connection, ends the
+program's input too, so a read returns 0x200, as in the emulator. Input
+that the program has not read when it halts is dropped, as by the emulator.
 
 The steps are the core's instruction counter, which the emulator's step
 count equals, unless the program starts the timer, which counts clock
-cycles here and steps in the emulator. But the emulator waits for each
-input byte, and the core does not: while no byte has arrived, a read
+cycles on the board and steps in the emulator. But the emulator waits for
+each input byte, and the board does not: while no byte has arrived, a read
 returns 0. So a program that waits for input in a loop runs more steps
-here. The memory has 64K words, repeated through the address space, so a
+there. The memory has 64K words, repeated through the address space, so a
 dump beyond them reads the same words again. --timeout gives up after SEC
-seconds (60 by default), prints a line for the time limit, and exits with
-status 3, as niceemu does after its step limit. It prints no registers and
-no --dump or --screen output, and the core still runs, for the command line
-cannot answer until the core halts or the board is reset. -2004 prints
-the screen from 0x400, as niceemu does, which is plain memory here, not the
-screen that the board shows. --no-cycle-counter is accepted and ignored, as
-the cycle counter always runs. The input file, the .bin file, and the
-serial device are checked before the core is touched. Options are taken
-as niceemu takes them, each on its own with its value as the next argument,
-and a usage error exits 1, as there. When stdout closes early, this exits
-quietly with status 141, as niceemu does. The .sym file is split into lines
-and fields as niceemu splits it.
+seconds (60 by default): it holds the core, prints a line for the time
+limit and the --dump and --screen output, and exits with status 3, as
+niceemu does after its step limit. It prints no registers, as a hold
+leaves them undefined (DEBUG.md §6). -2004 prints the screen from 0x400, as
+niceemu does, which is plain memory on the board, not the screen that the
+board shows. --no-cycle-counter is accepted and ignored, as the cycle
+counter always runs. The input file, the .bin file, and the link are
+checked before the core is started. Options are taken as niceemu takes
+them, each on its own with its value as the next argument, and a usage
+error exits 1, as there. When stdout closes early, this exits quietly with
+status 141, as niceemu does. The .sym file is split into lines and fields as
+niceemu splits it. An interrupt holds the core.
 --symbols FILE reads the labels that niceasm.py --symbols writes, and after
 a halt other than HALT prints where the program was, "At label+0x1f", and
 after a halt at ___wasm_trap, the default wasm trap handler, the trap's
@@ -62,38 +55,27 @@ step limit. Only the Python standard library is used.
 import argparse
 import bisect
 import os
-import re
 import select
 import stat
 import sys
-import termios
 import time
 from typing import NoReturn
 
-from load import (HALT_MESSAGE, drain, fail, load_words, open_port, read_bin,
-                  read_lines, read_words, start)
+from load import load_words, read_bin, read_lines, start
+from nicelink import (DEBUG_FIRST, HALT_REASON, HOLD, RAM, REGS, Link,
+                      LinkError, add_arguments, fail, open_link, read_words)
 
-HALT_WHY = 0xFFFFFFF1
 INSTR_LO = 0xFFFFFF42
 INSTR_HI = 0xFFFFFF43
-REGS = 0xFFFFFFE0
-CLI_ONLY_FIRST = 0xFFFFFFE0
-CLI_ONLY_LAST = 0xFFFFFFF1
 MAX_DUMP = 0x10000
-INPUT_CHUNK = 16    # bytes of input sent before the next are read
-HELD_QUIET = 0.02   # seconds without output that end a held start
-HALT_QUIET = 0.1    # seconds without output after the halt message
-# The command line's answer to a line, and what may be the start of one
-ANSWER = re.compile(rb"(?:WHAT\?|OK|[0-9A-F]{8})\r\n")
-ANSWER_START = re.compile(
-    rb"W(?:H(?:A(?:T(?:\?\r?)?)?)?)?|O(?:K\r?)?|[0-9A-F]{0,8}|[0-9A-F]{8}\r")
+INPUT_CHUNK = 256   # the most bytes of input sent at once
 SCREEN = 0xFFFF0000
 SCREEN_2004 = 0x400  # where niceemu -2004 has the screen, as the 2004 IDE
 SCREEN_WIDTH = 80
 SCREEN_HEIGHT = 25
 
-# The halt reasons that the control register at 0xFFFFFFF1 returns, as the
-# emulator describes them
+# The halt reasons of the register at 0xFFFFFFF1, as the emulator describes
+# them
 REASONS = {
     1: "HALT",
     2: "reserved control instruction",
@@ -204,132 +186,68 @@ def dump_option(text: str) -> tuple[int, int]:
     return addr, n
 
 
-def dump_address(addr: int) -> int:
-    """The address to read a dumped word at. The command line sees R0-R15, the
-    control register, and the halt reason at 0xFFFFFFE0-F1, where the core and
-    niceemu see memory, and that memory is the RAM word at 0x0000FFE0-F1."""
-    if CLI_ONLY_FIRST <= addr <= CLI_ONLY_LAST:
+def dump_address(link: Link, addr: int) -> int:
+    """The address to read a dumped word at. The link sees its debug
+    registers at 0xFFFFFFE0-FF, where the core and niceemu see memory. On
+    the board that memory is the RAM word at 0x0000FFE0-FF, which the link
+    reads instead. The emulator's memory there is out of the link's reach."""
+    if addr >= DEBUG_FIRST:
+        if not link.board:
+            fail(f"the link cannot read {addr:08x} of the emulator's memory, "
+                 f"where it has its debug registers")
         return addr & 0xFFFF
     return addr
 
 
-def answers(tail: bytes, whole: bool = False) -> bool:
-    """Whether tail may be the command line's answers to input that reached
-    it after the halt, WHAT?, OK, or a word, and the start of one more
-    unless whole."""
-    pos = 0
-    while m := ANSWER.match(tail, pos):
-        pos = m.end()
-    if whole:
-        return pos == len(tail)
-    return ANSWER_START.fullmatch(tail, pos) is not None
-
-
-def hold_back(held: bytes, sent: bool) -> tuple[bytes, bytes]:
-    """Splits the output into what is copied now and what is held back: the
-    halt message, with the command line's answers after it when input was
-    sent, or what may be the start of the message."""
-    copy = b""
-    while (i := held.find(HALT_MESSAGE)) >= 0:
-        tail = held[i + len(HALT_MESSAGE):]
-        if not tail or (sent and answers(tail)):
-            return copy + held[:i], held[i:]
-        # Something else follows it, so it was the program's output.
-        j = i + len(HALT_MESSAGE)
-        copy += held[:j]
-        held = held[j:]
-    keep = next((k for k in range(len(HALT_MESSAGE) - 1, 0, -1)
-                 if held.endswith(HALT_MESSAGE[:k])), 0)
-    return copy + held[:len(held) - keep], held[len(held) - keep:]
-
-
-def run(fd: int, infd: int, timeout: float) -> bool:
-    """Copies the input to the UART and the UART to stdout until the halt
-    message, which is not copied. Returns False if the time is up first.
-
-    The halt message is the bytes that the command line prints, and a program
-    can print them too. So the bytes that may be the start of the message, or
-    the message itself, are held back only while the board is busy: HELD_QUIET
-    without a byte ends the wait for the rest of a start, and the message
-    counts as a halt only if nothing but the command line's answers follows
-    it for HALT_QUIET. No input is sent while the message is held, but the
-    input that went out after the halt and before the message arrived reached
-    the command line, which answers each line of it. The input goes out in
-    chunks, each sent before the next is read, so that little of it is
-    outstanding at the halt."""
+def run(link: Link, infd: int, timeout: float) -> bool:
+    """Copies the input to the program and its output to stdout until it
+    halts. Returns False if the time is up first."""
     out = sys.stdout.buffer
-    held = b""      # output that may be the start of the halt message
     pending = b""   # input that is read and not yet sent
     end = time.monotonic() + timeout if timeout else None
-    last = time.monotonic()     # when the last byte arrived
-    sent = False
     while True:
-        message = held.startswith(HALT_MESSAGE)
-        if pending and not message:
-            os.write(fd, pending[:INPUT_CHUNK])
-            termios.tcdrain(fd)
-            pending = pending[INPUT_CHUNK:]
-            sent = True
+        out.write(link.take_console())
+        out.flush()
+        if link.halts:
+            return True
         now = time.monotonic()
         if end is not None and now >= end:
-            out.write(held)
-            out.flush()
             return False
-        wake = None
-        if held:
-            quiet = last + (HALT_QUIET if message else HELD_QUIET) - now
-            if quiet <= 0:
-                if message and answers(held[len(HALT_MESSAGE):], True):
-                    break
-                # The program's output after all
-                out.write(held)
-                out.flush()
-                held = b""
-                continue
-            wake = quiet
-        if end is not None and (wake is None or end - now < wake):
-            wake = end - now
-        if pending and not message:
-            wake = 0
-        reading = infd >= 0 and not pending and not message
-        ready, _, _ = select.select([fd] + ([infd] if reading else []),
+        if pending:
+            n = min(len(pending), INPUT_CHUNK, link.free())
+            if n:
+                link.send_console(pending[:n], paced=False)
+                pending = pending[n:]
+            else:
+                link.poll(0.01)
+            continue
+        wake = 0.5 if end is None else min(0.5, end - now)
+        reading = infd >= 0
+        ready, _, _ = select.select([link.fileno()] + ([infd] if reading else []),
                                     [], [], wake)
         if infd in ready:
-            data = os.read(infd, 256)
+            data = os.read(infd, 4096)
             if data:
                 pending = data
             else:
-                # The end of the input: a break, after the bytes before it.
-                termios.tcdrain(fd)
-                termios.tcsendbreak(fd, 0)
+                link.end_input()
                 infd = -1
-        if fd in ready:
-            last = time.monotonic()
-            copy, held = hold_back(held + os.read(fd, 4096), sent)
-            out.write(copy)
-            out.flush()
-    if sent:
-        # Input sent after the halt reached the command line. A CR ends what
-        # it has of a line, and the answer is dropped.
-        time.sleep(0.05)
-        os.write(fd, b"\r")
-        drain(fd, 0.2)
-    return True
+        if link.fileno() in ready:
+            link.poll()
 
 
-def dump_lines(fd: int, dumps: list[tuple[int, int]], screen: bool,
+def dump_lines(link: Link, dumps: list[tuple[int, int]], screen: bool,
                screen_base: int) -> list[str]:
     """The --dump and --screen output, with the screen at screen_base."""
     lines = []
     for addr, n in dumps:
-        words = read_words(fd, [dump_address((addr + i) & 0xFFFFFFFF)
-                                for i in range(n)])
+        words = read_words(link, [dump_address(link, (addr + i) & 0xFFFFFFFF)
+                                  for i in range(n)])
         for i in range(0, n, 8):
             lines.append(f"{(addr + i) & 0xFFFFFFFF:08x}:" +
                          "".join(f" {w:08x}" for w in words[i:i + 8]))
     if screen:
-        words = read_words(fd, [screen_base + i
-                                for i in range(SCREEN_WIDTH * SCREEN_HEIGHT)])
+        words = link.read(screen_base, SCREEN_WIDTH * SCREEN_HEIGHT)
         chars = "".join(chr(w & 0xFF) if 0x20 < w & 0xFF < 0x7F else " "
                         for w in words)
         rows = [chars[y * SCREEN_WIDTH:(y + 1) * SCREEN_WIDTH].rstrip()
@@ -341,20 +259,22 @@ def dump_lines(fd: int, dumps: list[tuple[int, int]], screen: bool,
     return lines
 
 
-def report(fd: int, dumps: list[tuple[int, int]], screen: bool,
+def report(link: Link, dumps: list[tuple[int, int]], screen: bool,
            screen_base: int, symbols: Symbols | None) -> int:
     """Prints what niceemu prints after a halt, and returns its exit
     status. The dumps are read before the instruction counter, as niceemu
     prints them after its report, so that a dump of the counter's high word
     shows the snapshot that the program left, as niceemu's does. The low word
-    is read before the high word, which is the snapshot that the read of the
-    low word takes. With symbols, a halt other than HALT names where the
-    program was, if the file has any labels, as niceemu does."""
-    why, *regs = read_words(fd, [HALT_WHY] + [REGS + i for i in range(16)])
+    is read before the high word, which on the board is the snapshot that
+    the read of the low word takes. With symbols, a halt other than HALT
+    names where the program was, if the file has any labels, as niceemu
+    does."""
+    why = link.read_word(HALT_REASON)
+    regs = link.read(REGS, 16)
     if why not in REASONS:
         fail(f"the core has not halted (reason {why})")
-    extra = dump_lines(fd, dumps, screen, screen_base)
-    lo, hi = read_words(fd, [INSTR_LO, INSTR_HI])
+    extra = dump_lines(link, dumps, screen, screen_base)
+    lo, hi = link.read(INSTR_LO, 2)
     lines = [f"Halted ({REASONS[why]}) after {hi << 32 | lo} steps, "
              f"PC={regs[15]:08x}"]
     if symbols is not None and symbols.addrs and why != 1:
@@ -366,13 +286,18 @@ def report(fd: int, dumps: list[tuple[int, int]], screen: bool,
     return 0 if why == 1 else 2
 
 
-def report_timeout(timeout: float) -> int:
-    """Prints the time limit, and returns niceemu's exit status for the step
-    limit. The core still runs, and the command line cannot answer, so there
-    is no location for --symbols either."""
-    print(f"Stopped at the time limit after {timeout:g} s", flush=True)
-    print("run.py: the core still runs; reset the board to use the command "
-          "line again", file=sys.stderr)
+def report_timeout(link: Link, timeout: float, dumps: list[tuple[int, int]],
+                   screen: bool, screen_base: int) -> int:
+    """Holds the core, prints the time limit and the dumps, and returns
+    niceemu's exit status for the step limit. A hold leaves the registers
+    undefined, so there are none, and no location for --symbols either."""
+    link.control(HOLD | RAM)
+    out = link.take_console()
+    sys.stdout.buffer.write(out)
+    lines = [f"Stopped at the time limit after {timeout:g} s"]
+    lines += dump_lines(link, dumps, screen, screen_base)
+    print("\n".join(lines), flush=True)
+    print("run.py: the core is held", file=sys.stderr)
     return 3
 
 
@@ -420,8 +345,7 @@ class Parser(argparse.ArgumentParser):
 
 def main() -> None:
     parser = Parser(description=__doc__.splitlines()[0])
-    parser.add_argument("--port", default="/dev/ttyUSB1")
-    parser.add_argument("--baud", type=int, default=115200)
+    add_arguments(parser)
     parser.add_argument("-i", "--input", default="-",
                         help="read the console's input from FILE, not stdin")
     parser.add_argument("-d", "--dump", type=dump_option, action="append",
@@ -448,20 +372,28 @@ def main() -> None:
     words = read_bin(args.file)
     symbols = Symbols(args.symbols) if args.symbols else None
     infd = 0 if args.input == "-" else open_input(args.input)
-    fd = open_port(args.port, args.baud)
-    load_words(fd, words)
-    start(fd)
+    screen_base = SCREEN_2004 if args.ide2004 else SCREEN
+    link = open_link(args)
     try:
-        halted = run(fd, infd, args.timeout)
-    except KeyboardInterrupt:
-        print("\nrun.py: interrupted; the core still runs", file=sys.stderr)
-        sys.exit(130)
-    if halted:
-        status = report(fd, args.dump, args.screen,
-                        SCREEN_2004 if args.ide2004 else SCREEN, symbols)
-    else:
-        status = report_timeout(args.timeout)
-    os.close(fd)
+        load_words(link, words)
+        start(link)
+        try:
+            halted = run(link, infd, args.timeout)
+        except KeyboardInterrupt:
+            link.control(HOLD | RAM)
+            print("\nrun.py: interrupted; the core is held", file=sys.stderr)
+            sys.exit(130)
+        if halted:
+            status = report(link, args.dump, args.screen, screen_base, symbols)
+        else:
+            status = report_timeout(link, args.timeout, args.dump, args.screen,
+                                    screen_base)
+        if link.overflows:
+            print(f"run.py: the program's input buffer overflowed "
+                  f"{link.overflows} times", file=sys.stderr)
+    except LinkError as e:
+        fail(str(e))
+    link.close()
     sys.exit(status)
 
 
