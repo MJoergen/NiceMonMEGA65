@@ -107,7 +107,11 @@ class Transport:
 
 
 class Serial(Transport):
-    """The board's debug UART, raw 8-N-1 with no flow control."""
+    """The board's debug UART, raw 8-N-1 with no flow control. tcdrain()
+    returns when the driver has handed the bytes to the USB serial chip,
+    which may still be sending them, and a break sent then cuts the last
+    of them off. So this keeps the time at which the bytes written are out
+    on the line, at 10 bits a byte, and end_input() waits for it."""
 
     def __init__(self, name: str, baud: int) -> None:
         speed = getattr(termios, f"B{baud}", None)
@@ -131,11 +135,15 @@ class Serial(Transport):
         attr[6][termios.VTIME] = 0
         termios.tcsetattr(self.fd, termios.TCSANOW, attr)
         termios.tcflush(self.fd, termios.TCIOFLUSH)
+        self.byte_time = 10 / baud
+        self.sent_by = time.monotonic()
 
     def fileno(self) -> int:
         return self.fd
 
     def write(self, data: bytes) -> None:
+        self.sent_by = (max(self.sent_by, time.monotonic()) +
+                        len(data) * self.byte_time)
         while data:
             n = os.write(self.fd, data)
             data = data[n:]
@@ -145,8 +153,9 @@ class Serial(Transport):
 
     def end_input(self) -> None:
         # A break: the line low for longer than a frame, after the bytes
-        # before it
+        # before it, with 20 ms more for the latency of USB
         termios.tcdrain(self.fd)
+        time.sleep(max(self.sent_by - time.monotonic(), 0) + 0.02)
         termios.tcsendbreak(self.fd, 0)
 
     def close(self) -> None:
