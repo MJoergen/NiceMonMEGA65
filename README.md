@@ -183,10 +183,11 @@ the core held, so you can check memory with `R` before you start it.
 `load.py` takes the lines that `niceemu` takes: two fields of 1 to 8 hex
 digits, with no `0x`, sign, or underscore, no repeated address, and at least
 one word. It also rejects a word where the board has no memory of its own:
-the RAM is the words `0` to `0xFFFF`, and the screen is at `0xFFFF0000`. Any
-other address would land on a RAM word, or on a register of the I/O page,
-where the emulator has a word of its own, so the program would run
-differently.
+the RAM is the words `0` to `0xFFFF`, and the screen is the words
+`0xFFFF0000` to `0xFFFF1FFF`, the 8192 that both boards have. Any other
+address would land on a RAM word, or on a register of the I/O page, where
+the emulator has a word of its own, so the program would run differently.
+A program can still write the rest of the MEGA65's screen when it runs.
 
 `load.py` talks to the command line, so it works only while the core is held
 or has halted. While a program runs, the UART belongs to it: wait for it to

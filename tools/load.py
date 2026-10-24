@@ -97,11 +97,12 @@ def write(fd: int, addr: int, data: int) -> None:
 
 
 # The words that the board has: the RAM, which is 64K words from 0, and the
-# screen. Any other address would alias a word of the RAM, mod 64K, or reach a
-# register of the I/O page, where the emulator has memory of its own.
+# screen, of which both boards have the first 8K (the MEGA65 has 32K). Any
+# other address would alias a word of the RAM, mod 64K, or reach a register
+# of the I/O page, where the emulator has memory of its own.
 RAM_WORDS = 0x10000
 SCREEN_BASE = 0xFFFF0000
-SCREEN_WORDS = 0x8000
+SCREEN_WORDS = 0x2000
 
 
 def hex_field(path: str, line_no: int, text: str) -> int:
@@ -136,7 +137,8 @@ def read_bin(path: str) -> list[tuple[int, int]]:
             if not (addr < RAM_WORDS
                     or SCREEN_BASE <= addr < SCREEN_BASE + SCREEN_WORDS):
                 fail(f"{path}:{line_no}: address {addr:08x} is not in the RAM "
-                     f"(0 to {RAM_WORDS - 1:x}) or the screen, so the board "
+                     f"(0 to {RAM_WORDS - 1:x}) or the screen ({SCREEN_BASE:x} "
+                     f"to {SCREEN_BASE + SCREEN_WORDS - 1:x}), so the board "
                      f"cannot load it as the emulator does")
             seen[addr] = line_no
             words.append((addr, word))
