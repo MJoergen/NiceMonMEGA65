@@ -21,13 +21,16 @@ way when the core halts, and the core's input FIFO holds 2048 bytes, so a progra
 must not fall more than that behind its input, or bytes are lost. At the
 end of the input, a break on the UART ends the core's input too, so a read
 returns 0x200, as in the emulator. Input that the program has not read when
-it halts is dropped, as by the emulator.
+it halts is dropped, as by the emulator: no more is sent once the halt
+message arrives, and the command line's answers to the lines that reached
+it after the halt, WHAT? for most, are dropped.
 
 The halt message is the same bytes that a program can print. Output that may
 be its start is held back for at most 20 ms, and the message counts as a halt
-only when nothing follows it for 100 ms. So a program that prints it and
-then keeps running is copied, but one that prints it and then waits longer
-than that is taken for halted, and the report then says the core has not.
+only when nothing but such answers follows it for 100 ms. So a program that
+prints it and then keeps running is copied, but one that prints it and then
+waits longer than that is taken for halted, and the report then says the
+core has not.
 
 The steps are the core's instruction counter, which the emulator's step
 count equals, unless the program starts the timer, which counts clock
@@ -53,6 +56,7 @@ step limit. Only the Python standard library is used.
 import argparse
 import bisect
 import os
+import re
 import select
 import sys
 import termios
@@ -71,6 +75,10 @@ MAX_DUMP = 0x10000
 INPUT_CHUNK = 16    # bytes of input sent before the next are read
 HELD_QUIET = 0.02   # seconds without output that end a held start
 HALT_QUIET = 0.1    # seconds without output after the halt message
+# The command line's answer to a line, and what may be the start of one
+ANSWER = re.compile(rb"(?:WHAT\?|OK|[0-9A-F]{8})\r\n")
+ANSWER_START = re.compile(
+    rb"W(?:H(?:A(?:T(?:\?\r?)?)?)?)?|O(?:K\r?)?|[0-9A-F]{0,8}|[0-9A-F]{8}\r")
 SCREEN = 0xFFFF0000
 SCREEN_WIDTH = 80
 SCREEN_HEIGHT = 25
@@ -202,50 +210,87 @@ def dump_address(addr: int) -> int:
     return addr
 
 
+def answers(tail: bytes, whole: bool = False) -> bool:
+    """Whether tail may be the command line's answers to input that reached
+    it after the halt, WHAT?, OK, or a word, and the start of one more
+    unless whole."""
+    pos = 0
+    while m := ANSWER.match(tail, pos):
+        pos = m.end()
+    if whole:
+        return pos == len(tail)
+    return ANSWER_START.fullmatch(tail, pos) is not None
+
+
+def hold_back(held: bytes, sent: bool) -> tuple[bytes, bytes]:
+    """Splits the output into what is copied now and what is held back: the
+    halt message, with the command line's answers after it when input was
+    sent, or what may be the start of the message."""
+    copy = b""
+    while (i := held.find(HALT_MESSAGE)) >= 0:
+        tail = held[i + len(HALT_MESSAGE):]
+        if not tail or (sent and answers(tail)):
+            return copy + held[:i], held[i:]
+        # Something else follows it, so it was the program's output.
+        j = i + len(HALT_MESSAGE)
+        copy += held[:j]
+        held = held[j:]
+    keep = next((k for k in range(len(HALT_MESSAGE) - 1, 0, -1)
+                 if held.endswith(HALT_MESSAGE[:k])), 0)
+    return copy + held[:len(held) - keep], held[len(held) - keep:]
+
+
 def run(fd: int, infd: int, timeout: float) -> bool:
     """Copies the input to the UART and the UART to stdout until the halt
     message, which is not copied. Returns False if the time is up first.
 
     The halt message is the bytes that the command line prints, and a program
     can print them too. So the bytes that may be the start of the message, or
-    the message itself, are held back only while the board is busy: a pause of
-    HELD_QUIET ends the wait for the rest of a start, and the message counts
-    as a halt only if nothing follows it for HALT_QUIET. The input goes out
-    in chunks, each sent before the next is read, so that little of it is
-    outstanding at the halt, where it would reach the command line."""
+    the message itself, are held back only while the board is busy: HELD_QUIET
+    without a byte ends the wait for the rest of a start, and the message
+    counts as a halt only if nothing but the command line's answers follows
+    it for HALT_QUIET. No input is sent while the message is held, but the
+    input that went out after the halt and before the message arrived reached
+    the command line, which answers each line of it. The input goes out in
+    chunks, each sent before the next is read, so that little of it is
+    outstanding at the halt."""
     out = sys.stdout.buffer
     held = b""      # output that may be the start of the halt message
     pending = b""   # input that is read and not yet sent
     end = time.monotonic() + timeout if timeout else None
+    last = time.monotonic()     # when the last byte arrived
     sent = False
-    halted = False
-    while not halted:
-        if pending:
+    while True:
+        message = held.startswith(HALT_MESSAGE)
+        if pending and not message:
             os.write(fd, pending[:INPUT_CHUNK])
             termios.tcdrain(fd)
             pending = pending[INPUT_CHUNK:]
             sent = True
-        wait = [fd] + ([infd] if infd >= 0 and not pending else [])
-        left = end - time.monotonic() if end else None
-        if left is not None and left <= 0:
+        now = time.monotonic()
+        if end is not None and now >= end:
             out.write(held)
             out.flush()
             return False
-        quiet = HALT_QUIET if held == HALT_MESSAGE else HELD_QUIET
-        wake = quiet if held else None
-        if left is not None and (wake is None or left < wake):
-            wake = left
-        if pending:
-            wake = 0
-        ready, _, _ = select.select(wait, [], [], wake)
-        if not ready and held and not pending and wake == quiet:
-            if held == HALT_MESSAGE:
-                halted = True
-            else:
+        wake = None
+        if held:
+            quiet = last + (HALT_QUIET if message else HELD_QUIET) - now
+            if quiet <= 0:
+                if message and answers(held[len(HALT_MESSAGE):], True):
+                    break
+                # The program's output after all
                 out.write(held)
                 out.flush()
                 held = b""
-            continue
+                continue
+            wake = quiet
+        if end is not None and (wake is None or end - now < wake):
+            wake = end - now
+        if pending and not message:
+            wake = 0
+        reading = infd >= 0 and not pending and not message
+        ready, _, _ = select.select([fd] + ([infd] if reading else []),
+                                    [], [], wake)
         if infd in ready:
             data = os.read(infd, 256)
             if data:
@@ -256,23 +301,9 @@ def run(fd: int, infd: int, timeout: float) -> bool:
                 termios.tcsendbreak(fd, 0)
                 infd = -1
         if fd in ready:
-            held += os.read(fd, 4096)
-            while (i := held.find(HALT_MESSAGE)) >= 0:
-                if i + len(HALT_MESSAGE) == len(held):
-                    break
-                # Something follows it, so it was the program's output.
-                j = i + len(HALT_MESSAGE)
-                out.write(held[:j])
-                held = held[j:]
-            if held.endswith(HALT_MESSAGE):
-                out.write(held[:-len(HALT_MESSAGE)])
-                held = HALT_MESSAGE
-            else:
-                # Keep back only what may be the start of the halt message.
-                keep = next((k for k in range(len(HALT_MESSAGE) - 1, 0, -1)
-                             if held.endswith(HALT_MESSAGE[:k])), 0)
-                out.write(held[:len(held) - keep])
-                held = held[len(held) - keep:]
+            last = time.monotonic()
+            copy, held = hold_back(held + os.read(fd, 4096), sent)
+            out.write(copy)
             out.flush()
     if sent:
         # Input sent after the halt reached the command line. A CR ends what

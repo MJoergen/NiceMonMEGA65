@@ -17,7 +17,8 @@ only a read can check; on the MEGA65 the block reads 0), and runs the C example
 examples/build/primes.bin, after whose halt the microsecond counter must hold
 the cycle counter's count over the clock in MHz. Last, it runs programs with tools/run.py and
 with niceemu, and compares their output and exit status, with sim/eof.nasm
-also the end of the input and an input file of 1536 bytes, with
+also the end of the input and an input file of 1536 bytes, with a program
+that halts at once although 100 lines of input wait for it, with
 sim/halttext.nasm a program that prints the halt message itself, with the
 emulator's trapsym.nasm and its label file for --symbols, and with
 nice_cpu's benchmark, examples/build/bench.bin, all but its cycles. The programs
@@ -510,6 +511,10 @@ def main() -> None:
         text = os.path.join(tmp, "input.bin")
         with open(text, "wb") as f:
             f.write(bytes(range(256)) * 6)
+        # 100 lines for hello.nasm, which halts without reading them
+        lines = os.path.join(tmp, "lines.txt")
+        with open(lines, "w") as f:
+            f.writelines(f"line {i}\n" for i in range(100))
 
         opened = False
         try:
@@ -539,6 +544,7 @@ def main() -> None:
                 os.close(fd)
             test_run(args.port, args.baud, [
                 (hello, [], False),
+                (hello, ["-i", lines], False),  # halts with unread input
                 (emu, ["-d", "0x110:2", "-d", "0xFFFFFF00:4", "-s"], False),
                 (reserved, [], False),
                 (eof, [], True),               # no input: it ends at once

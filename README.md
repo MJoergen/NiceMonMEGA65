@@ -442,15 +442,18 @@ for the command line shows its own registers there.
 
 Its input is stdin, or the file of `-i`. It goes to the UART in chunks of 16
 bytes, each sent before the next is read, so that little of it is on its way
-when the core halts and reaches the command line as a command. A byte that
+when the core halts and reaches the command line as a command. No more is
+sent once the halt message arrives, and the command line's answers to the
+lines that reached it, `WHAT?` for most, are dropped. So input that the
+program has not read when it halts is dropped, as by the emulator. A byte that
 arrives when the core's 2048-byte FIFO is full is lost, so a program must
 not fall more than 2048 bytes behind its input. At the end of the input,
 `run.py` sends a break, so that a read returns `0x200`, as in the emulator.
 On a terminal, Ctrl-D ends the input.
 The command line prints `HALT` between CR LF pairs, and a program can print
 the same bytes. So `run.py` holds back output that may be their start for
-at most 20 ms, and takes them for a halt only when nothing follows for
-100 ms. A program that prints them and then waits longer is taken for halted,
+at most 20 ms, and takes them for a halt only when nothing but such answers
+follows for 100 ms. A program that prints them and then waits longer is taken for halted,
 and `run.py` fails with "the core has not halted".
 `--timeout SEC` gives up after SEC seconds (60 by default, 0 for no limit),
 prints "Stopped at the time limit", and exits with status 3, as `niceemu -n`
@@ -586,7 +589,8 @@ after its halt, writes and reads the screen's registers, and runs
 `examples/build/primes.bin`. Last, it runs programs with `run.py` and with
 `niceemu`, whose output and exit status must be the same: among them
 `sim/eof.nasm`, with no input and with 1536 bytes of input, which checks the
-larger FIFO and the end of the input, the emulator's `trapsym.nasm` with
+larger FIFO and the end of the input, the intro's `hello.nasm` with 100
+lines of input that it halts without reading, the emulator's `trapsym.nasm` with
 `--symbols`, and `examples/build/bench.bin`, but for its cycles, whose table
 it prints. That needs niceemu, built with `make -C
 nice_cpu/emulator build`; without it the comparison is skipped. Build the
