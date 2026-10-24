@@ -358,7 +358,7 @@ words meanwhile.
 The Nexys4DDR's LEDs, seven-segment display, buttons, and switches are
 registers in `0xFFFFFF90`–`96`, for the core and the command line alike.
 Only the Nexys4DDR has them: on the MEGA65 the whole block reads 0 and
-takes no write, as it does in the emulator. Reset clears the registers
+takes no write, where the emulator has memory there. Reset clears the registers
 that can be written, and a start of the core does not, so a program's
 display stays after it halts.
 
