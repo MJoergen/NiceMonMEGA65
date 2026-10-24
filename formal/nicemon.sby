@@ -1,7 +1,10 @@
 # The whole system (formal_nicemon.vhd), with the checks of nicemon.vhd. It
 # is too large for k-induction, so "run" and "link" check every cycle up to
 # their depth: "run" with the core running from reset, "link" with the core
-# held first, for the link. "cover" reaches each cover statement.
+# held first, for the link. "cover" reaches each cover statement. These
+# three have no ROM and no board registers. "rom" and "rom_cover" are "run"
+# and "cover" with both: a ROM of 4 words, rom.bin, and the Nexys4DDR's
+# registers at 0xFFFFFF90-9F.
 # The core is nice_core_formal.vhd, a free core that does anything either
 # of nice_cpu's cores may do on its ports, so the system is checked against
 # both, and the solver spends nothing on a real core's state. The debug
@@ -16,6 +19,8 @@
 run
 link
 cover
+rom
+rom_cover
 
 [options]
 run: mode bmc
@@ -24,6 +29,10 @@ link: mode bmc
 link: depth 40
 cover: mode cover
 cover: depth 40
+rom: mode bmc
+rom: depth 30
+rom_cover: mode cover
+rom_cover: depth 40
 
 [engines]
 smtbmc yices
@@ -33,6 +42,8 @@ plugin -i ghdl
 run: ghdl --std=08 -fpsl -gG_CPU_RUN_AT_RESET=true nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd perf.vhd timer.vhd fetch_stats.vhd nice_core.vhd nice_core_formal.vhd uart_serdes.vhd debug_link.vhd debug_link_formal.vhd rx_fifo.vhd ram.vhd rom.vhd nicemon.vhd formal_nicemon.vhd -e formal_nicemon
 link: ghdl --std=08 -fpsl -gG_CPU_RUN_AT_RESET=false nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd perf.vhd timer.vhd fetch_stats.vhd nice_core.vhd nice_core_formal.vhd uart_serdes.vhd debug_link.vhd debug_link_formal.vhd rx_fifo.vhd ram.vhd rom.vhd nicemon.vhd formal_nicemon.vhd -e formal_nicemon
 cover: ghdl --std=08 -fpsl -gG_CPU_RUN_AT_RESET=true nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd perf.vhd timer.vhd fetch_stats.vhd nice_core.vhd nice_core_formal.vhd uart_serdes.vhd debug_link.vhd debug_link_formal.vhd rx_fifo.vhd ram.vhd rom.vhd nicemon.vhd formal_nicemon.vhd -e formal_nicemon
+rom: ghdl --std=08 -fpsl -gG_CPU_RUN_AT_RESET=true -gG_ROM_FILE=rom.bin -gG_BOARD_IO=true nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd perf.vhd timer.vhd fetch_stats.vhd nice_core.vhd nice_core_formal.vhd uart_serdes.vhd debug_link.vhd debug_link_formal.vhd rx_fifo.vhd ram.vhd rom.vhd nicemon.vhd formal_nicemon.vhd -e formal_nicemon
+rom_cover: ghdl --std=08 -fpsl -gG_CPU_RUN_AT_RESET=true -gG_ROM_FILE=rom.bin -gG_BOARD_IO=true nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd perf.vhd timer.vhd fetch_stats.vhd nice_core.vhd nice_core_formal.vhd uart_serdes.vhd debug_link.vhd debug_link_formal.vhd rx_fifo.vhd ram.vhd rom.vhd nicemon.vhd formal_nicemon.vhd -e formal_nicemon
 prep -top formal_nicemon
 
 [files]
@@ -53,3 +64,4 @@ prep -top formal_nicemon
 nice_core_formal.vhd
 debug_link_formal.vhd
 formal_nicemon.vhd
+rom.bin

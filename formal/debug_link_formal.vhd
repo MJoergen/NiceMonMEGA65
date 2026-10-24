@@ -24,7 +24,8 @@
 --
 -- RESET
 -- rst_i is the system's reset. After it, CYC, STB, and clear_o are low,
--- and hold_o is G_BOOT_HELD.
+-- hold_o is G_BOOT_HELD, and rom_hide_o shows the ROM, or is 1 without
+-- G_HAS_ROM.
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -123,7 +124,9 @@ begin
    -- psl f_cyc_end : assume always {wb_ack_i and not rst_i} |=> {not wb_stb};
    -- psl f_owns : assume always wb_cyc -> (hold or halted_i) and not clear;
    -- psl f_reset : assume always
-   --    {rst_i} |=> {wb_cyc = '0' and wb_stb = '0' and clear = '0' and hold = boot_held};
+   --    {rst_i} |=>
+   --    {wb_cyc = '0' and wb_stb = '0' and clear = '0' and hold = boot_held and
+   --     rom_hide = not has_rom};
 
    -- The control register
    -- psl f_hold : assume always

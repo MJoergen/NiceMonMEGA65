@@ -597,7 +597,7 @@ every time, not only the ones a testbench sends.
   bytes: the bytes come out in the order they went in, a byte is lost only
   when the FIFO is full or the input has ended, no byte is written to the
   word being read, and the end of the input stays until reset.
-- `nicemon.sby` checks the whole system, with 16 words of RAM, no ROM, and
+- `nicemon.sby` checks the whole system, with 16 words of RAM and
   a free core, `formal/nice_core_formal.vhd`. The free core does anything
   that either of nice_cpu's cores may do on its ports, as nice_cpu's own
   formal checks state it, so the system is checked against both cores,
@@ -606,8 +606,10 @@ every time, not only the ones a testbench sends.
   `debug_link.vhd` may do on its ports, as the header of that file
   promises, and makes a request in any cycle. The job is too large to
   prove, so it checks every cycle up to a depth: 30 cycles with the core
-  running from reset, and 40 with the core held for the link first. It
-  checks these properties:
+  running from reset, and 40 with the core held for the link first. These
+  have no ROM and no board registers. The `rom` and `rom_cover` tasks are
+  `run` and `cover` with both: a ROM of 4 words, `formal/rom.bin`, and the Nexys4DDR's
+  registers at `0xFFFFFF90`–`9F`. It checks these properties:
   - The core's two buses get an ACK only for a request that waits, which
     is what nice_cpu's proofs of the cores assume of them, also when the
     link holds a running core.
@@ -619,8 +621,14 @@ every time, not only the ones a testbench sends.
   - The devices answer only the link's request or one of the core, which
     gets one ACK at a time.
   - What a read of the console returns.
+  - A read of the ROM returns its word, and only the clear writes the RAM
+    under the ROM while the ROM is shown.
+  - The board's registers change only on a write to their own word, and a
+    read of `0xFFFFFF90`–`9F` returns the register, or 0 for a word that
+    is not one.
 
-  The `link` task takes about 14 minutes, and the others a few each;
+  The `link` and `rom` tasks take about 14 minutes each, and the others a
+  few each;
   `make -j formal`
   runs all the tasks side by side. CI runs `make -j4 formal` on its four
   processors.
