@@ -401,7 +401,9 @@ no write; the keyboard's LEDs may come to `0xFFFFFF97` (see
 
 ### Address map
 
-The command line and the core's data accesses see the same addresses.
+The command line and the core's data accesses see the same addresses,
+apart from the command line's own registers at `0xFFFFFFE0`–`F1`, where the
+core has memory.
 
 | Address | What it is |
 |---|---|
@@ -412,7 +414,7 @@ The command line and the core's data accesses see the same addresses.
 | `0xFFFFFF01` | The emulator's read counter. A read by the core returns the number of its reads since the last write, and a write sets that number. A read with `R` does not count. It is 0 when the core starts. |
 | `0xFFFFFF10`–`0xFFFFFF1F` | The timer of SYSTEM.md §4: it raises IRQ every P clock cycles, through the vector it is given. |
 | `0xFFFFFF20`–`0xFFFFFF3F` | The math unit of SYSTEM.md §2: 32-bit multiply and divide, and 64-bit divide. |
-| `0xFFFFFF40`–`0xFFFFFF4F` | The performance counters of SYSTEM.md §3: cycles, instructions, and microseconds, 64 bits each. The microseconds come from the clock, 100 MHz on the MEGA65 and 90 MHz on the Nexys4DDR, so they are real time, where the emulator counts one per step. `R` reads them as the core does: `R FFFFFF42` takes the snapshot that `R FFFFFF43` returns, where `--dump` takes none. |
+| `0xFFFFFF40`–`0xFFFFFF4F` | The performance counters of SYSTEM.md §3: cycles, instructions, and microseconds, 64 bits each. The microseconds come from the clock, 100 MHz on the MEGA65 and 90 MHz on the Nexys4DDR, so they are real time, where the emulator counts one per step. `R` reads them as the core does: `R FFFFFF42` takes the snapshot that `R FFFFFF43` returns, where `--dump` takes none. The words `0xFFFFFF46`–`4F` read 0 and take no write. |
 | `0xFFFFFF50`–`0xFFFFFF7F` | The fetch statistics of MICROARCH.md §8.1, the rest of the performance counters: counters of what FETCH and DECODE do, for judging the size of FETCH's buffer. A start of the core clears them, and they then count every clock, also while the core is held and after it halts, until a write of 0 to `FS_CTRL` stops them. |
 | `0xFFFFFF80`–`0xFFFFFF8F` | The screen's registers: the cursor and the display offset (see [The screen](#the-screen)). |
 | `0xFFFFFF90`–`0xFFFFFF9F` | The Nexys4DDR's LEDs, seven-segment display, buttons, and switches (see [The Nexys4DDR's devices](#the-nexys4ddrs-devices)). On the MEGA65 they read 0 and take no write. |
@@ -427,15 +429,16 @@ break; a keyboard byte waits until there is room. A break while the command
 line has the UART is ignored. To end a program's input from a terminal,
 send a break: in picocom, `Ctrl-A Ctrl-\`.
 The performance counters, the math unit, and the timer are nice_cpu's own,
-`nice_cpu/hdl/src/perf.vhd`, `mpu.vhd`, and `timer.vhd`, the same as in the
-emulator. They are reset with the system, and each time the core starts, as
+`nice_cpu/hdl/src/perf.vhd`, `mpu.vhd`, and `timer.vhd`, and behave as the
+emulator's. The fetch statistics are nice_cpu's `fetch_stats.vhd`, which
+the emulator does not have. They are reset with the system, and each time the core starts, as
 the emulator's are when it starts. So after a halt the instruction counter
 holds the steps that the emulator prints, unless the program starts the
 timer. The timer counts clock cycles, at 100 MHz (90 MHz on the Nexys4DDR),
 where the emulator counts steps, so its interrupts come at other steps, and
 the step counts differ. The cycle counter and the timer's counter run only
 while the core runs, so they stop at a halt, as the emulator's do.
-Its request goes straight to the core's IRQ, for it is the only device that
+The timer's request goes straight to the core's IRQ, for it is the only device that
 raises one. They are not reset while the command line holds the core, so
 `R` reads them after a halt.
 

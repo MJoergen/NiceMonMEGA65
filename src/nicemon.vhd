@@ -68,7 +68,8 @@
 --   0xFFFFFF50-0xFFFFFF7F  The fetch statistics of MICROARCH.md §8.1
 --                          (nice_cpu/hdl/src/fetch_stats.vhd), part of the
 --                          performance counters of SYSTEM.md §3. The
---                          multi-cycle core reports nothing to them.
+--                          multi-cycle core reports no events to them, so
+--                          only FS_CYCLES and FS_HIST[0] count.
 --   0xFFFFFF80-0xFFFFFF8F  The screen's registers, numbered as QNICE-FPGA's
 --                          VGA registers at 0xFF30, for the display: 80 is
 --                          the state, with bit 6 showing the cursor, bit 5
