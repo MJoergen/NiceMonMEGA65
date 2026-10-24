@@ -32,7 +32,8 @@ shows, and `tb_text` with `-gG_PPM_FILE=frame.ppm` writes the frame as a
 picture. Test programs are assembled with `python3
 nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
 `nice_cpu/emulator/zig-out/bin/niceemu x.bin`. CI
-(`.github/workflows/ci.yml`) runs `make -C sim -j4 test`, `make -j4 formal`,
+(`.github/workflows/ci.yml`, on Ubuntu 24.04) builds niceemu and runs
+`make -C sim -j4 test` on both cores, `make examples`, `make -j4 formal`,
 and `make lint`.
 
 ## Layout

@@ -39,7 +39,7 @@ and switches as registers (see [synth/](synth/README.md#the-nexys4ddr) and
 | [core.mk](core.mk) | Picks the source files of the core, from `NICE`, for the Makefiles of `sim/` and `synth/`. |
 | [vsg.yml](vsg.yml) | The configuration of `make lint`, which checks the VHDL against [CODING_STYLE.md](CODING_STYLE.md). |
 | [CLAUDE.md](CLAUDE.md) | Instructions for Claude Code: the commands, the layout, and the pitfalls. |
-| [.github/workflows/ci.yml](.github/workflows/ci.yml) | The CI: `make test`, `make formal`, and `make lint`. |
+| [.github/workflows/ci.yml](.github/workflows/ci.yml) | The CI: `make test` on both cores, with niceemu built for its step counts, `make examples`, `make formal`, and `make lint`. It cannot run `make hwtest` or build a bitstream. |
 
 ## Compared with the emulator
 

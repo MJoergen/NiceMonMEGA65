@@ -65,8 +65,9 @@ check-steps: $(addprefix $(BUILD)/,hello.bin emu.bin reserved.bin)
 	done; echo "PASS check-steps"
 
 # The steps niceemu counts for the programs whose instruction counter
-# tb_nicemon checks. CI has no niceemu, so they are kept here, and
-# "make check-steps" compares them with a niceemu that is built.
+# tb_nicemon checks. They are kept here, so that the tests run without
+# niceemu, and "make check-steps" compares them with a niceemu that is
+# built, as CI builds it.
 STEPS_HELLO    = 56
 STEPS_EMU      = 12
 STEPS_RESERVED = 6

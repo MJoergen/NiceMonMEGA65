@@ -5,8 +5,14 @@ on:
   pull_request:
 
 jobs:
+  # The GHDL tests on both cores. Ubuntu 24.04 has GHDL 4.1.0, the version
+  # of README.md. niceemu is built so that check-steps compares the step
+  # counts that tb_nicemon checks with the emulator.
   sim:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        nice: [pipeline, multi]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -14,11 +20,30 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.x"
+      # Zig 0.15 is the only version that nice_cpu supports.
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: 0.15.2
+      - run: make -C nice_cpu/emulator build
       - run: sudo apt-get update && sudo apt-get install -y ghdl
-      - run: make -C sim -j4 test
+      - run: make -C sim -j4 test NICE=${{ matrix.nice }}
+
+  # The C examples, so that a nice_cpu bump that breaks examples/Makefile
+  # shows here, not first in make hwtest.
+  examples:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - run: sudo apt-get update && sudo apt-get install -y clang lld llvm
+      - run: make examples
 
   lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
