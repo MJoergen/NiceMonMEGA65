@@ -142,7 +142,10 @@
 -- of steps that the emulator prints, unless the program starts the timer,
 -- whose interrupts come after clock cycles here, not after steps. The cycle
 -- counter and the timer's counter run only while the core runs, so they
--- stop at a halt, as the emulator's do.
+-- stop at a halt, as the emulator's do. The fetch statistics are cleared
+-- at the start too, but they have no input for whether the core runs: they
+-- count every clock, also while the core is held and after it halts, until
+-- FS_CTRL is written 0 (MJoergen/nice_cpu#42 is to give them that input).
 --
 -- The data bus of the core is stalled while a CLI request waits, and while a
 -- write to the UART waits. The CLI pulses STB for one cycle and does not
