@@ -21,7 +21,9 @@
 --    the halted flag, the halt reason is HALT, and the instruction counter
 --    holds the steps that niceemu prints for the program (G_*_STEPS). The
 --    microsecond counter holds the cycle counter's count over the cycles
---    per microsecond, as the two stop in the same cycle. Each program
+--    per microsecond, as the two stop in the same cycle, and its high word
+--    is 0. The clock is 90 MHz, so the check fails if G_CLOCK_HZ does not
+--    reach perf.vhd, whose default is 100 MHz. Each program
 --    after it ends with the halt message too.
 -- 5. Hold the core, load G_ECHO_FILE, and start it. It echoes the bytes it
 --    receives until a '.', which checks the UART input of the core: every
@@ -45,6 +47,13 @@
 --    It writes and reads the board's registers (LEDs, RGB levels, display
 --    segments), which go out, and reads the buttons and switches; the
 --    read-only words and those that are not registers take no write.
+--    Then G_COUNTERS_FILE reads through the core's data bus what the CLI
+--    reads elsewhere: the fetch statistics, which the start cleared and the
+--    program stops, so FS_CYCLES is small, the FS_HIST words sum to it, and
+--    with the multi-cycle core FS_HIST[0] is all of it; the microsecond
+--    counter, right after the cycle counter; the LEDs, which it writes; and
+--    the buttons and switches. The start kept the screen's and the board's
+--    registers.
 -- 10. Clear the memory: what the programs left is gone, and the core is
 --    held.
 -- 11. Load G_RESERVED_FILE, and run it. It halts on a reserved control
@@ -56,11 +65,16 @@
 --    command for the CLI, typed on the keyboard, and G_FIFO_FILE again,
 --    with more bytes typed than its FIFO holds. None is lost, for the
 --    keyboard waits.
+-- 14. A reset while G_ECHO_FILE runs: the CLI prints its banner, the core
+--    boots from the ROM again, and the screen's and the board's registers
+--    are cleared.
 --
 -- The core's input FIFO has 16 bytes here, so that step 6 is short, and the
 -- RAM, the ROM, and the screen are small, so that the clearing is.
 --
 -- The UART runs at a tenth of the clock rate, so that the test is fast.
+-- G_NICE says which core runs, for the check that only the multi-cycle core
+-- passes.
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -79,6 +93,9 @@ entity tb_nicemon is
       G_EMU_FILE       : string;
       G_RESERVED_FILE  : string;
       G_EOF_FILE       : string;
+      G_COUNTERS_FILE  : string;
+      -- The core, pipeline or multi, as NICE selects it
+      G_NICE           : string;
       -- The steps that niceemu counts for hello, emu, and reserved
       G_HELLO_STEPS    : natural;
       G_EMU_STEPS      : natural;
@@ -88,9 +105,12 @@ end entity tb_nicemon;
 
 architecture simulation of tb_nicemon is
 
-   constant C_CLOCK_HZ : natural := 100_000_000;
-   constant C_BAUDRATE : natural := 10_000_000;
-   constant C_BIT_TIME : time    := (C_CLOCK_HZ / C_BAUDRATE) * 10 ns;
+   -- The Nexys4DDR's clock, not the default of perf.vhd, so that the
+   -- microsecond counter shows that G_CLOCK_HZ reaches it
+   constant C_CLOCK_HZ : natural := 90_000_000;
+   constant C_PERIOD   : time    := 1 sec / C_CLOCK_HZ;
+   constant C_BAUDRATE : natural := 9_000_000;
+   constant C_BIT_TIME : time    := (C_CLOCK_HZ / C_BAUDRATE) * C_PERIOD;
    -- Longer than the slowest answer
    constant C_TIMEOUT : time    := 1 ms;
 
@@ -130,8 +150,8 @@ begin
 
    p_clk : process
    begin
-      clk <= '1', '0' after 5 ns;
-      wait for 10 ns;
+      clk <= '1', '0' after C_PERIOD / 2;
+      wait for C_PERIOD;
    end process p_clk;
 
 
@@ -196,6 +216,8 @@ begin
       variable pos_v    : natural := 0;
       variable cycles_v : std_logic_vector(31 downto 0);
       variable micros_v : std_logic_vector(31 downto 0);
+      variable word_v   : std_logic_vector(31 downto 0);
+      variable fs_v     : std_logic_vector(31 downto 0);
 
       -- Sends one byte, with the stop bit given.
       procedure send_byte(c : character; stop_bit : std_logic := '1') is
@@ -392,6 +414,7 @@ begin
       -- the cycles over the cycles per microsecond
       read_word("FFFFFF40", cycles_v);
       read_word("FFFFFF44", micros_v);
+      command("R FFFFFF45", "00000000");     -- the microseconds' high word
       report "tb_nicemon: " & to_hstring(micros_v) & " microseconds after " &
              to_hstring(cycles_v) & " cycles";
       assert to_integer(micros_v) = to_integer(cycles_v) / (C_CLOCK_HZ / 1_000_000)
@@ -543,6 +566,55 @@ begin
       brd_sw  <= X"0000";
       wait for 100 ns;
 
+      report "tb_nicemon: load " & G_COUNTERS_FILE;
+      command("W FFFFFFF0 00000009", "OK");
+      load(G_COUNTERS_FILE, first_v);
+      command("W FFFFFF81 00000021", "OK");  -- the cursor's column
+      brd_btn <= "01001";
+      brd_sw  <= X"1234";
+      wait for 100 ns;
+      command("W FFFFFFF0 00000008", "OK");
+      expect(C_HALT);
+      command("R FFFFFFF0", "0000000A");
+      -- The start cleared the fetch statistics, which counted since the
+      -- CLI cleared them, and the program stopped them
+      read_word("00000100", fs_v);
+      report "tb_nicemon: " & to_hstring(fs_v) & " cycles of fetch statistics";
+      assert fs_v /= 0 and fs_v < 64
+         report "tb_nicemon: the start does not clear the fetch statistics, or they do not count"
+         severity failure;
+      -- The FS_HIST words sum to FS_CYCLES, which stays stopped
+      command("R 00000102", to_hstring(fs_v));
+      command("R FFFFFF51", to_hstring(fs_v));
+      -- The multi-cycle core has no word in the buffer in any cycle
+      if G_NICE = "multi" then
+         command("R 00000101", to_hstring(fs_v));
+      end if;
+      command("R 00000103", "00000000");     -- FS_CTRL, stopped
+      -- The microseconds, read right after the cycles
+      read_word("00000104", cycles_v);
+      read_word("00000105", micros_v);
+      report "tb_nicemon: " & to_hstring(micros_v) & " microseconds after " &
+             to_hstring(cycles_v) & " cycles, read by the core";
+      assert micros_v /= 0 and
+             (to_integer(micros_v) = to_integer(cycles_v) / (C_CLOCK_HZ / 1_000_000) or
+              to_integer(micros_v) = to_integer(cycles_v) / (C_CLOCK_HZ / 1_000_000) + 1)
+         report "tb_nicemon: the core reads a microsecond counter that does not match the cycle counter"
+         severity failure;
+      command("R 00000106", "00000000");     -- TIME_HI
+      command("R 00000107", "00005A5A");     -- the LEDs, written by the core
+      assert brd_led = X"5A5A"
+         report "tb_nicemon: the core's write to the LEDs does not go out"
+         severity failure;
+      command("R 00000108", "00000009");     -- the buttons
+      command("R 00000109", "00001234");     -- the switches
+      -- A start does not clear the screen's and the board's registers
+      command("R FFFFFF81", "00000021");
+      command("R FFFFFF94", "FEDCBA98");
+      brd_btn <= "00000";
+      brd_sw  <= X"0000";
+      wait for 100 ns;
+
       report "tb_nicemon: clear the memory";
       command("W FFFFFFF0 0000000D", "OK");
       command("R FFFFFFF0", "00000009");     -- held, not halted
@@ -591,6 +663,32 @@ begin
       expect("0123456789abcdefXYZ.");
       expect(C_HALT);
       command("R FFFFFFF0", "0000000A");
+
+      report "tb_nicemon: a reset while the core runs";
+      command("W FFFFFF81 00000021", "OK");
+      command("W FFFFFF85 00000050", "OK");
+      command("W FFFFFF90 0000A5C3", "OK");
+      command("W FFFFFFF0 00000009", "OK");
+      load(G_ECHO_FILE, first_v);
+      command("W FFFFFFF0 00000008", "OK");
+      send("ab");
+      expect("ab");
+      wait until rising_edge(clk);
+      rst <= '1';
+      wait for 100 ns;
+      wait until rising_edge(clk);
+      rst <= '0';
+      -- The core boots from the ROM again
+      expect(C_CRLF & "NICE" & C_CRLF & C_CRLF);
+      expect("Hello from the ROM!" & C_LF & C_HALT);
+      command("R FFFFFFF0", "00000002");
+      command("R FFFFFF81", "00000000");     -- the screen's registers
+      command("R FFFFFF85", "00000000");
+      command("R FFFFFF90", "00000000");     -- the board's registers
+      command("R FFFFFF94", "00000000");
+      assert scr_cur_x = 0 and scr_offs = 0 and brd_led = 0 and brd_seg = 0
+         report "tb_nicemon: the reset does not clear the screen's and the board's registers"
+         severity failure;
 
       report "tb_nicemon: PASS";
       stop(0);

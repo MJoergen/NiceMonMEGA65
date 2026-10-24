@@ -503,7 +503,8 @@ You need GHDL (tested with 4.1.0) and Python 3.
   register hides it and shows it again. With the ROM hidden, it loads the
   "Hello" program with the command line and runs it. It checks the halt
   message, the halt reason, and the step count, which must equal
-  niceemu's. Then it loads and runs these programs:
+  niceemu's, and that the microsecond counter matches the cycle counter at
+  its clock of 90 MHz. Then it loads and runs these programs:
   - `sim/echo.nasm` echoes what it receives.
   - `sim/fifo.nasm` checks the input FIFO, which has 16 bytes there, so
     that the test of a full FIFO is short.
@@ -515,10 +516,18 @@ You need GHDL (tested with 4.1.0) and Python 3.
     screen's registers.
   - `reserved.nasm` of the emulator's tests halts on a reserved control
     word, after the testbench has cleared the memory.
+  - `sim/counters.nasm` reads the fetch statistics, the microsecond
+    counter, and the board's registers through the core's data bus. A start
+    clears the fetch statistics, and with the multi-cycle core every cycle
+    counts as one with no word in the buffer.
   - `sim/eof.nasm` echoes its input until a break ends it.
 
-  Last it types a command and input for `sim/fifo.nasm` on the keyboard
-  input.
+  Between the programs, the testbench writes and reads the board's
+  registers, and checks that a clear of the memory and a start keep them.
+  Then it types a command and input for `sim/fifo.nasm` on the keyboard
+  input. Last it resets the system while a program runs, and checks that
+  the core boots from the ROM again and that the screen's and the board's
+  registers are cleared.
 - `sim/tb_kbd.vhd` tests the keyboard driver and its ASCII, with a model of
   the keyboard.
 - `sim/tb_ps2.vhd` tests the PS/2 receiver and its ASCII, with a model of a

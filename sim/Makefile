@@ -72,7 +72,7 @@ STEPS_EMU      = 12
 STEPS_RESERVED = 6
 EMU            = $(NICE_DIR)/emulator/zig-out/bin/niceemu
 
-BINS = hello rom echo fifo devices emu reserved eof
+BINS = hello rom echo fifo devices emu reserved eof counters
 
 tb_hello: analyze $(BUILD)/hello.bin
 	@(cd $(BUILD) && $(GHDL) --elab-run $(GHDLFLAGS) tb_hello \
@@ -83,7 +83,7 @@ tb_hello: analyze $(BUILD)/hello.bin
 
 tb_nicemon: analyze $(addprefix $(BUILD)/,$(addsuffix .bin,$(BINS)))
 	@(cd $(BUILD) && $(GHDL) --elab-run $(GHDLFLAGS) tb_nicemon \
-	  -gG_HELLO_FILE=hello.bin -gG_ROM_FILE=rom.bin -gG_ECHO_FILE=echo.bin -gG_FIFO_FILE=fifo.bin -gG_DEVICES_FILE=devices.bin -gG_EMU_FILE=emu.bin -gG_RESERVED_FILE=reserved.bin -gG_EOF_FILE=eof.bin \
+	  -gG_HELLO_FILE=hello.bin -gG_ROM_FILE=rom.bin -gG_ECHO_FILE=echo.bin -gG_FIFO_FILE=fifo.bin -gG_DEVICES_FILE=devices.bin -gG_EMU_FILE=emu.bin -gG_RESERVED_FILE=reserved.bin -gG_EOF_FILE=eof.bin -gG_COUNTERS_FILE=counters.bin -gG_NICE=$(NICE) \
 	  -gG_HELLO_STEPS=$(STEPS_HELLO) -gG_EMU_STEPS=$(STEPS_EMU) -gG_RESERVED_STEPS=$(STEPS_RESERVED) > tb_nicemon.log 2>&1) && \
 	  echo "PASS tb_nicemon" || (echo "FAIL tb_nicemon"; cat $(BUILD)/tb_nicemon.log; exit 1)
 
@@ -160,6 +160,9 @@ $(BUILD)/devices.bin: devices.nasm $(ASM_PY) | $(BUILD)
 	@$(ASM) -o $@ $<
 
 $(BUILD):
+$(BUILD)/counters.bin: counters.nasm $(ASM_PY) | $(BUILD)
+	@$(ASM) -o $@ $<
+
 	@mkdir -p $@
 
 clean:
