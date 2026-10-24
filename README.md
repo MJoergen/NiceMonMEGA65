@@ -474,7 +474,11 @@ handler, the trap's code and location from R1 and R2, as `niceemu` does. At
 the time limit it prints no location, as there are no registers.
 A missing or unreadable input file, `.bin` file, or serial device stops
 `run.py` with a message before it touches the core, and so does an input
-file that is a directory.
+file that is a directory. A usage error, such as an unknown option, exits
+with status 1, as in `niceemu`. Each option must stand alone, with its value
+as the next argument, so `--sym`, `--dump=1:2`, `-d1:2`, and `-sd` are
+errors in both. When stdout closes early, as with `run.py ... | head`,
+`run.py` exits quietly with status 141, as `niceemu` does.
 
 The step count is the core's instruction counter. The emulator's steps
 include interrupt entries, and the instruction counter does not, so a

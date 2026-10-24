@@ -46,7 +46,11 @@ cannot answer until the core halts or the board is reset. -2004 prints
 the screen from 0x400, as niceemu does, which is plain memory here, not the
 screen that the board shows. --no-cycle-counter is accepted and ignored, as
 the cycle counter always runs. The input file, the .bin file, and the
-serial device are checked before the core is touched.
+serial device are checked before the core is touched. Options are taken
+as niceemu takes them, each on its own with its value as the next argument,
+and a usage error exits 1, as there. When stdout closes early, this exits
+quietly with status 141, as niceemu does. The .sym file is split into lines
+and fields as niceemu splits it.
 --symbols FILE reads the labels that niceasm.py --symbols writes, and after
 a halt other than HALT prints where the program was, "At label+0x1f", and
 after a halt at ___wasm_trap, the default wasm trap handler, the trap's
@@ -64,6 +68,7 @@ import stat
 import sys
 import termios
 import time
+from typing import NoReturn
 
 from load import (HALT_MESSAGE, drain, fail, load_words, open_port, read_bin,
                   read_lines, read_words, start)
@@ -186,6 +191,8 @@ def number(text: str) -> int:
 
 
 def dump_option(text: str) -> tuple[int, int]:
+    if text.count(":") != 1:
+        raise argparse.ArgumentTypeError(f"want ADDR:N, not '{text}'")
     try:
         addr, n = text.split(":")
         addr, n = number(addr), number(n)
@@ -381,8 +388,38 @@ def open_input(path: str) -> int:
     return infd
 
 
+class Parser(argparse.ArgumentParser):
+    """An argument parser that takes options as niceemu does: each one
+    whole and on its own, with its value as the next argument, and a usage
+    error exits 1, niceemu's status for one, not 2, its status for a halt
+    other than HALT."""
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__(allow_abbrev=False, **kwargs)
+
+    def error(self, message: str) -> NoReturn:
+        self.print_usage(sys.stderr)
+        self.exit(1, f"{self.prog}: error: {message}\n")
+
+    def parse_args(self, args=None, namespace=None):
+        args = sys.argv[1:] if args is None else args
+        options = {s: a.nargs != 0 for a in self._actions
+                   for s in a.option_strings}
+        i = 0
+        while i < len(args):
+            arg = args[i]
+            if arg in options:
+                i += 2 if options[arg] else 1
+                continue
+            # Not "--dump=1:2", "-d1:2", "-sd", or "--", as argparse takes
+            if len(arg) > 1 and arg.startswith("-"):
+                self.error(f"unknown option '{arg}'")
+            i += 1
+        return super().parse_args(args, namespace)
+
+
 def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = Parser(description=__doc__.splitlines()[0])
     parser.add_argument("--port", default="/dev/ttyUSB1")
     parser.add_argument("--baud", type=int, default=115200)
     parser.add_argument("-i", "--input", default="-",
@@ -429,4 +466,11 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except BrokenPipeError:
+        # stdout closed early, as by "run.py ... | head": exit quietly with
+        # the status of SIGPIPE, as niceemu does, and keep Python from
+        # writing to the pipe again at exit
+        os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+        sys.exit(141)
