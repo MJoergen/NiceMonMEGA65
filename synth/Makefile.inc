@@ -68,17 +68,22 @@ SRC += $(BOARD_SRC)
 
 XDC = $(BOARD_XDC)
 
+# Batch mode exits nonzero on an error in the script, where Tcl mode drops to
+# a prompt that reads EOF and exits 0. The old bitstream is removed first, so
+# that a failed build leaves none behind.
 build/$(TOP).bit: build/$(TOP).tcl $(SRC) $(XDC) $(ROM_ABS)
-	bash -c "source $(VIVADO_DIR)/settings64.sh ; vivado -mode tcl -source $< -log build/vivado.log -journal build/vivado.jou"
+	rm -f $@
+	bash -c "source $(VIVADO_DIR)/settings64.sh ; vivado -mode batch -source $< -log build/vivado.log -journal build/vivado.jou"
 
 # The script is remade when the Makefiles or the ROM, NICE, or FLOW option
-# change.
+# change. synth_design ignores VHDL assertions without -assert, such as the
+# check in src/rom.vhd for a word beyond the ROM.
 build/$(TOP).tcl: $(MAKEFILE_LIST) build/rom.conf
 	echo "# A tcl script for Vivado, made by make" > $@
 	echo "read_vhdl -vhdl2008 { $(SRC) }" >> $@
 	echo "read_xdc { $(XDC) }" >> $@
 	echo "set_property PART $(PART) [current_project]" >> $@
-	echo "synth_design -top $(TOP) $(GENERICS) $(SYNTH_OPTS)" >> $@
+	echo "synth_design -top $(TOP) -assert $(GENERICS) $(SYNTH_OPTS)" >> $@
 	echo "opt_design $(OPT_OPTS)" >> $@
 	echo "place_design $(PLACE_OPTS)" >> $@
 	echo "phys_opt_design $(PHYS_OPTS)" >> $@
