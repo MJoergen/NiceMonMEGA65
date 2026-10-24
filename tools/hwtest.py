@@ -29,7 +29,7 @@ Build the bitstream and the examples first, and niceemu
 and the summary names them after a SKIPPED. The cleanup at the end holds the
 core, and says so if the link did not answer.
 
-Usage: tools/hwtest.py [--port /dev/ttyUSB1] [--baud 115200]
+Usage: tools/hwtest.py [--port /dev/ttyUSB1] [--baud 2000000]
                        [--bit synth/r6/build/top.bit]
                        [--board mega65|nexys4ddr] [--no-program]
 
@@ -648,7 +648,7 @@ def test_bench(link_args: list[str], bench: str) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--port", default="/dev/ttyUSB1")
-    parser.add_argument("--baud", type=int, default=115200)
+    parser.add_argument("--baud", type=int, default=2000000)
     parser.add_argument("--bit", default=f"{REPO}/synth/r6/build/top.bit")
     parser.add_argument("--board", choices=["mega65", "nexys4ddr"],
                         help="default: nexys4ddr if --bit has it in its path")

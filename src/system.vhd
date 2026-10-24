@@ -6,7 +6,11 @@
 --
 -- THEORY OF OPERATION
 -- The UART input passes through two registers, a synchronizer, and the UART
--- output through one, so that it changes only on the clock edge. The video
+-- output through one, so that it changes only on the clock edge. The UART
+-- runs at 2 Mbaud, a bit of 50 cycles at 100 MHz and of 45 at 90 MHz, the
+-- clocks of the MEGA65 and the Nexys4DDR. The FT2232H on the other end of
+-- both makes it exactly too, from its 12 MHz. Loading a program takes far
+-- less time than at 115200 baud, as every word is 8 hex digits. The video
 -- output is that of text.vhd, in the VGA clock domain: 8 bits per color,
 -- the two sync signals with the polarity of G_VIDEO, and vga_de_o, which is
 -- '1' in the visible area. A board with fewer bits per color takes the top
@@ -111,7 +115,7 @@ begin
    i_nicemon : entity work.nicemon
       generic map (
          G_CLOCK_HZ         => G_CLOCK_HZ,
-         G_UART_BAUDRATE    => 115_200,
+         G_UART_BAUDRATE    => 2_000_000,
          G_RAM_ADDR_BITS    => 16,
          G_SCR_ADDR_BITS    => G_SCR_ADDR_BITS,
          G_ROM_FILE         => G_ROM_FILE,

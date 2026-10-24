@@ -11,7 +11,7 @@ HALT and 2 after any other halt. So the output of the two can be compared:
 
     diff <(niceemu -i in.txt prog.bin) <(tools/run.py -i in.txt prog.bin)
 
-Usage: tools/run.py [--port /dev/ttyUSB1] [--baud 115200] [--tcp PORT]
+Usage: tools/run.py [--port /dev/ttyUSB1] [--baud 2000000] [--tcp PORT]
                     [--cosim PORT] [-i FILE] [-d ADDR:N]... [-s] [-2004] [--symbols FILE]
                     [--timeout SEC] FILE.bin
 

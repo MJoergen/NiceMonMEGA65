@@ -20,7 +20,7 @@ the ROM, and the aliasing. The rows below that it covers are marked
 | Feature | Emulator | MEGA65 | Same? |
 |---|---|---|---|
 | Instruction set | ISA.md | nice_cpu's `pipeline.vhd` (or `multicycle.vhd` with `NICE=multi`), which nice_cpu's tests compare with the emulator | Yes |
-| Console output, `0xFFFFFF00` | stdout | UART | Yes, but a write stalls the core while the previous byte is still going out, about 8.7k cycles at 115200 baud |
+| Console output, `0xFFFFFF00` | stdout | UART | Yes, but a write stalls the core while the previous byte is still going out, about 500 cycles at 2 Mbaud and 100 MHz |
 | Console input, `0xFFFFFF00` (SYSTEM.md §5) | stdin, with bit 8 set; `0x200` at the end. A read waits for the next byte | UART and the keyboard, with bit 8 set, through a 2048-byte FIFO; `0x200` after a UART break. A read returns 0 while no byte has arrived | Yes, but UART bytes beyond 2048 unread ones are lost, with the link's `o` notice, where `run.py` paces its input so that none is, and a program that waits for input in a loop runs more steps. Input that arrives while the core is held or has halted is dropped, as by `niceemu --link` |
 | Math unit, `0xFFFFFF20`–`3F` | Computed on read | nice_cpu's `mpu.vhd`, which stalls the read until the result is ready | Yes |
 | Performance counters, `0xFFFFFF40`–`4F` | One cycle and one microsecond per step, from the start | nice_cpu's `perf.vhd`, counting clock cycles and microseconds at 100 MHz (90 MHz on the Nexys4DDR), from the start of the core until it halts. A read of a low word by the link takes the snapshot, as one by the core does | Instructions yes; cycles and microseconds count real time, and stop at a halt. `niceemu --link` takes no snapshot at a read by the link, and DEBUG.md §3 allows both |

@@ -532,7 +532,7 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--port", default="/dev/ttyUSB1",
                         help="the serial device of the board's debug UART "
                         "(default /dev/ttyUSB1)")
-    parser.add_argument("--baud", type=int, default=115200)
+    parser.add_argument("--baud", type=int, default=2000000)
     parser.add_argument("--tcp", type=int, metavar="PORT",
                         help="talk to niceemu --link PORT on 127.0.0.1, not "
                         "to the board")

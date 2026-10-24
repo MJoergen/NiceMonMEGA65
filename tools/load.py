@@ -8,7 +8,7 @@ W packets of the debug link (nice_cpu/doc/DEBUG.md), and the core is started
 unless --no-run is given. The ROM stays hidden until the reset button is
 pressed, which boots the monitor again.
 
-Usage: tools/load.py [--port /dev/ttyUSB1] [--baud 115200] [--tcp PORT]
+Usage: tools/load.py [--port /dev/ttyUSB1] [--baud 2000000] [--tcp PORT]
                      [--cosim PORT] [--no-run] FILE.bin
 
 --port names the serial device of the board's debug UART, /dev/ttyUSB1 by

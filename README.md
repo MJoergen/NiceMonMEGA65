@@ -99,7 +99,7 @@ set for the pipelined core, so the multi-cycle core has room to spare.
 
 ## Using it
 
-The MEGA65's debug UART runs at 115200 baud, 8-N-1, and carries the debug
+The MEGA65's debug UART runs at 2 Mbaud (2000000), 8-N-1, and carries the debug
 link of nice_cpu's [doc/DEBUG.md](nice_cpu/doc/DEBUG.md). It passes the
 program's console bytes both ways, and between them it carries packets,
 which start with the byte `0xFF`. A console byte `0xFF` is sent as two. With
@@ -109,6 +109,8 @@ notice at reset (`b01`), when the core halts (`h` and the reason), and when
 an input byte is lost (`o`). The tools in `tools/` are such a host, and
 `niceemu --link` serves the same link, so the tools drive the emulator as
 they drive the board.
+The tools use 2 Mbaud too. A bitstream built before the rate went up runs
+at 115200 baud, and the tools need `--baud 115200` for it.
 
 The core is held in reset at power-up. A host loads a program with two
 writes to the control register at `0xFFFFFFF0` around the writes of its
@@ -172,7 +174,7 @@ example, with `sim/echo.nasm`, which echoes what you type until a `.`:
 
     python3 nice_cpu/assembler/niceasm.py -o echo.bin sim/echo.nasm
     tools/load.py echo.bin
-    picocom -b 115200 /dev/ttyUSB1
+    picocom -b 2000000 /dev/ttyUSB1
 
 `load.py` uses the serial device `/dev/ttyUSB1`, the MEGA65's debug UART.
 If yours is another, give it with `--port`, and to picocom. On macOS, use
@@ -212,7 +214,7 @@ assembles it together with the start-up code and the runtime library.
 That builds `examples/build/primes.bin`. Load it and open a terminal:
 
     tools/load.py examples/build/primes.bin
-    picocom -b 115200 /dev/ttyUSB1
+    picocom -b 2000000 /dev/ttyUSB1
 
 The program asks for a limit, reads it with `scanf`, and counts the primes
 up to it. It asks again until you enter 0, and then halts. The program does

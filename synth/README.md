@@ -67,7 +67,7 @@ three ways:
   scrolling.
 - Its FPGA is speed grade -1, where the MEGA65's is -2, so the system clock
   is 90 MHz, not 100 MHz; at 100 MHz the pipelined core misses timing by a
-  few tenths of a nanosecond or less, as placement varies. The UART runs at 115200 baud as on the MEGA65.
+  few tenths of a nanosecond or less, as placement varies. The UART runs at 2 Mbaud as on the MEGA65.
 - Its VGA output has 4 bits per color, from resistors, and there is no
   HDMI. The screen's colors have 4 bits per color, so they show
   as on the MEGA65.
@@ -180,15 +180,16 @@ tables above, and of the Nexys4DDR with the debug link:
 
 | Build | Clock | Setup | Hold |
 |---|---|---|---|
-| R6, pipelined, with the debug link | 100 MHz | 0.115 ns | 0.050 ns |
+| R6, pipelined, with the debug link | 100 MHz | 0.360 ns | 0.017 ns |
 | R6, pipelined, with the command line | 100 MHz | 0.414 ns | 0.061 ns |
 | R6, `NICE=multi` | 100 MHz | 0.52 ns | – |
 | R3, pipelined, with the command line | 100 MHz | 0.173 ns | 0.065 ns |
-| Nexys4DDR, pipelined, with the debug link | 90 MHz | 0.123 ns | 0.037 ns |
+| Nexys4DDR, pipelined, with the debug link | 90 MHz | 0.135 ns | 0.039 ns |
 | Nexys4DDR, pipelined, with the command line | 90 MHz | 0.022 ns | 0.020 ns |
 | Nexys4DDR, `NICE=multi` | 90 MHz | 0.19 ns | – |
 
-The builds with the debug link are those of 2026-10-24 at nice_cpu decab5f,
+The builds with the debug link are those of 2026-10-24 at nice_cpu decab5f
+with the UART at 2 Mbaud,
 the other pipelined builds those of 2026-10-24 at nice_cpu 2f67a50, and the
 multi-cycle ones those at this repository's cb95968, whose hold slacks were
 not recorded. The pipelined builds' block RAM is 132.5 tiles on the R6 and
