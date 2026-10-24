@@ -11,6 +11,8 @@
 #                         also runs reserved.nasm of the emulator's tests.
 #             tb_kbd      the keyboard driver and its ASCII mapping.
 #             tb_ps2      the PS/2 keyboard receiver and its ASCII mapping.
+#             tb_ps2_nicemon  the PS/2 keyboard into the system, as the
+#                         Nexys4DDR has it, with fifo.nasm and switch.nasm.
 #             tb_text     the text display: one frame of 1280x1024, every
 #                         pixel checked.
 #             tb_board_io the Nexys4DDR's display and RGB LED drivers.
@@ -45,9 +47,9 @@ SRC_SOURCES  = ../src/uart_serdes.vhd ../src/rx_fifo.vhd ../src/ram.vhd ../src/r
                ../src/kbd_m65.vhd ../src/kbd_ascii.vhd ../src/kbd_ps2.vhd ../src/kbd_ps2_ascii.vhd ../src/seg7.vhd ../src/rgb_pwm.vhd \
                ../src/video/video_pkg.vhd ../src/video/font_pkg.vhd ../src/video/pix.vhd ../src/video/scr_ram.vhd ../src/video/text.vhd \
                ../src/system.vhd
-SOURCES      = $(SRC_SOURCES) text_synth.vhd tb_hello.vhd tb_nicemon.vhd tb_kbd.vhd tb_ps2.vhd tb_text.vhd tb_board_io.vhd
+SOURCES      = $(SRC_SOURCES) text_synth.vhd tb_hello.vhd tb_nicemon.vhd tb_kbd.vhd tb_ps2.vhd tb_ps2_nicemon.vhd tb_text.vhd tb_board_io.vhd
 
-.PHONY: test check-steps analyze synth clean tb_hello tb_nicemon tb_kbd tb_ps2 tb_text tb_board_io \
+.PHONY: test check-steps analyze synth clean tb_hello tb_nicemon tb_kbd tb_ps2 tb_ps2_nicemon tb_text tb_board_io \
         synth-nicemon synth-nicemon-norom synth-kbd_m65 synth-kbd_ascii synth-kbd_ps2 \
         synth-kbd_ps2_ascii synth-text \
         synth-system synth-seg7 synth-rgb_pwm
@@ -55,7 +57,7 @@ SOURCES      = $(SRC_SOURCES) text_synth.vhd tb_hello.vhd tb_nicemon.vhd tb_kbd.
 # Each testbench and each synthesis check is a target of its own, so that
 # "make -j test" runs them side by side. They share the work library of
 # $(BUILD), which "analyze" writes first and they only read.
-test: synth tb_hello tb_nicemon tb_kbd tb_ps2 tb_text tb_board_io check-steps
+test: synth tb_hello tb_nicemon tb_kbd tb_ps2 tb_ps2_nicemon tb_text tb_board_io check-steps
 
 check-steps: $(addprefix $(BUILD)/,hello.bin emu.bin reserved.bin)
 	@if [ ! -x $(EMU) ]; then echo "SKIP check-steps: $(EMU) is not built"; exit 0; fi; \
@@ -88,6 +90,14 @@ tb_nicemon: analyze $(addprefix $(BUILD)/,$(addsuffix .bin,$(BINS)))
 	  -gG_HELLO_FILE=hello.bin -gG_ROM_FILE=rom.bin -gG_ECHO_FILE=echo.bin -gG_FIFO_FILE=fifo.bin -gG_DEVICES_FILE=devices.bin -gG_EMU_FILE=emu.bin -gG_COUNT_FILE=count.bin -gG_RESERVED_FILE=reserved.bin -gG_EOF_FILE=eof.bin -gG_COUNTERS_FILE=counters.bin -gG_NICE=$(NICE) \
 	  -gG_HELLO_STEPS=$(STEPS_HELLO) -gG_EMU_STEPS=$(STEPS_EMU) -gG_RESERVED_STEPS=$(STEPS_RESERVED) > tb_nicemon.log 2>&1) && \
 	  echo "PASS tb_nicemon" || (echo "FAIL tb_nicemon"; cat $(BUILD)/tb_nicemon.log; exit 1)
+
+# The core is held from reset and never boots from a ROM there, so its data
+# address is undefined until its first access, and the memory warns of it
+# in every cycle before; --ieee-asserts=disable keeps that out of the log.
+tb_ps2_nicemon: analyze $(BUILD)/fifo.bin $(BUILD)/switch.bin
+	@(cd $(BUILD) && $(GHDL) --elab-run $(GHDLFLAGS) tb_ps2_nicemon \
+	  -gG_FIFO_FILE=fifo.bin -gG_SWITCH_FILE=switch.bin --ieee-asserts=disable > tb_ps2_nicemon.log 2>&1) && \
+	  echo "PASS tb_ps2_nicemon" || (echo "FAIL tb_ps2_nicemon"; cat $(BUILD)/tb_ps2_nicemon.log; exit 1)
 
 tb_kbd tb_ps2 tb_text tb_board_io: analyze
 	@(cd $(BUILD) && $(GHDL) --elab-run $(GHDLFLAGS) $@ > $@.log 2>&1) && \
@@ -165,6 +175,9 @@ $(BUILD)/devices.bin: devices.nasm $(ASM_PY) | $(BUILD)
 	@$(ASM) -o $@ $<
 
 $(BUILD)/counters.bin: counters.nasm $(ASM_PY) | $(BUILD)
+	@$(ASM) -o $@ $<
+
+$(BUILD)/switch.bin: switch.nasm $(ASM_PY) | $(BUILD)
 	@$(ASM) -o $@ $<
 
 $(BUILD):

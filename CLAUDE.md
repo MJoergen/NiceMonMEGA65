@@ -17,7 +17,7 @@ header is the authoritative address map.
 ## Commands
 
     make                  # lists the targets
-    make -j test          # GHDL: synth checks, tb_hello, tb_nicemon, tb_kbd, tb_ps2, tb_text, tb_board_io, check-steps (NICE=multi for the multi-cycle core)
+    make -j test          # GHDL: synth checks, tb_hello, tb_nicemon, tb_kbd, tb_ps2, tb_ps2_nicemon, tb_text, tb_board_io, check-steps (NICE=multi for the multi-cycle core)
     make -j formal        # SymbiYosys jobs in formal/, each task in a work directory of its own
     make lint             # vsg against CODING_STYLE.md; line-length warnings are tolerated
     make examples         # C examples -> examples/build/*.bin (clang wasm32, lld, llvm)

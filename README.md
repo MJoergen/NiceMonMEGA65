@@ -153,7 +153,10 @@ bytes, for a US layout: Enter is CR, Backspace and Delete are DEL, the
 cursor keys are `ESC [ A` to `ESC [ D`, and CTRL with a letter is its
 control code. The keypad gives its digits and symbols, whatever Num Lock
 is. A held key repeats as the keyboard repeats it. The keyboard's LEDs are
-not set, so the CAPS LOCK LED does not show whether CAPS LOCK is on.
+not set, so the CAPS LOCK LED does not show whether CAPS LOCK is on. A PS/2
+keyboard can't wait, so keys typed while the core's input is full are
+lost: the bytes of one key wait until there is room, and the keys typed
+meanwhile give nothing. The MEGA65's keyboard loses no key.
 
 ### Running a program
 
@@ -426,7 +429,8 @@ requires. The input waits for the core in a FIFO of 2048 bytes, in block
 RAM. A UART byte that arrives when it is full is lost, and the link sends
 its `o` notice; a byte after a break is lost too, until a start clears the
 end of the input. A keyboard byte waits until the FIFO has room for two, so
-that a UART byte still finds room. While the core is held or has halted,
+that a UART byte still finds room; on the Nexys4DDR, keys typed meanwhile
+are lost (see "The keyboard"). While the core is held or has halted,
 the bytes of the UART and the keyboard are dropped. To end a program's
 input from a terminal, send a break: in picocom, `Ctrl-A Ctrl-\`.
 The performance counters, the math unit, and the timer are nice_cpu's own,
@@ -563,6 +567,12 @@ You need GHDL (tested with 4.1.0) and Python 3.
   the keyboard.
 - `sim/tb_ps2.vhd` tests the PS/2 receiver and its ASCII, with a model of a
   PS/2 keyboard, and checks that bad and broken frames are dropped.
+- `sim/tb_ps2_nicemon.vhd` types on that model into the system, wired as
+  the Nexys4DDR wires it. Keys typed while the core is held are dropped,
+  `sim/fifo.nasm` echoes the keys typed, and `sim/switch.nasm`, which reads
+  no input until switch 0 is on, lets the UART fill the core's input. Then
+  one key waits, the keys typed after it are lost, and the keyboard works
+  again once the program reads.
 - `sim/tb_text.vhd` fills the screen of the text display and checks every
   pixel of one 1280×1024 frame, and the sync pulses; then it scrolls the
   display one row, shows the cursor, and checks the first four rows of the
