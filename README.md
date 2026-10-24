@@ -215,10 +215,10 @@ not echo what you type, so the number shows only after you press Enter:
 
     Count the primes up to (0 to stop): 1000
     Primes up to 1000: 168
-    36731 instructions in 58157 cycles
+    36731 instructions in 58159 cycles
 
 The second line comes from the performance counters, and the numbers are
-from the board with the pipelined core, where the 58157 cycles at 100 MHz
+from the board with the pipelined core, where the 58159 cycles at 100 MHz
 take about 0.58 ms.
 
 `make -C examples` also builds `examples/build/bench.bin` from nice_cpu's
@@ -231,7 +231,7 @@ runs it:
 
 The instructions are the same as on the emulator. The cycles are from the
 board with the pipelined core, beside those of nice_cpu's own testbench
-for the core (`bench/README.md`, at nice_cpu 4cd869e):
+for the core (`bench/README.md`, with the core at nice_cpu 1a41b0c):
 
 | Phase | Instructions | Cycles on the board | In nice_cpu's testbench |
 |---|---|---|---|
@@ -240,11 +240,11 @@ for the core (`bench/README.md`, at nice_cpu 4cd869e):
 | `bst` | 310469 | 415028 | 416052 |
 | `heapsort` | 307416 | 387338 | 387338 |
 | `vm` | 840049 | 1248168 | 1248168 |
-| `strings` | 104562 | 166363 | 166928 |
-| total | 1681080 | 2383046 | 2384635 |
+| `strings` | 104562 | 166928 | 166928 |
+| total | 1681080 | 2383611 | 2384635 |
 
-The board takes the same cycles, or fewer in `bst` (1024 fewer) and
-`strings` (565 fewer), and at 100 MHz the benchmark runs for about 24 ms.
+The board takes the same cycles, or 1024 fewer in `bst`, and at 100 MHz
+the benchmark runs for about 24 ms.
 
 You need clang with the wasm32 target, `wasm-ld`, and `llvm-ar` (on Debian
 and Ubuntu, the `clang`, `lld`, and `llvm` packages). The steps that the
@@ -280,7 +280,7 @@ without the math unit would translate with `nicewasm --no-mpu` and use
 
 The linear memory is one page, 16384 words, and the program and its memory
 must fit below the stack in the 64K words of memory. With `printf` and
-`scanf`, the prime example ends at word `0x6172`. The translator's README,
+`scanf`, the prime example ends at word `0x634F`. The translator's README,
 `nice_cpu/translator/README.md`, has the same steps for Zig and Rust.
 
 ### The screen
