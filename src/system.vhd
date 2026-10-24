@@ -16,8 +16,8 @@
 -- and connects the brd_* ports (nicemon.vhd has their registers); the other
 -- boards leave them open.
 --
--- With a ROM the core boots from it at reset; without one it waits for the
--- command line (nicemon.vhd).
+-- With a ROM the core boots from it at reset; without one it waits, held,
+-- for a host on the debug link (nicemon.vhd).
 --
 -- INTERFACE CONTRACTS -- these are requirements on the environment:
 -- a) vga_clk_i is the pixel clock of G_VIDEO.

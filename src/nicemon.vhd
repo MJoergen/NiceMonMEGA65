@@ -1,19 +1,19 @@
--- The NiceMon system: the NICE core, its memory and I/O, and the command line
--- interpreter (CLI) on the UART. It is the same for every board. The board's
--- top level gives it a clock, a reset, the UART pins, and optionally a
--- keyboard: a stream of bytes that is input like the UART's.
+-- The NiceMon system: the NICE core, its memory and I/O, and the debug link
+-- of nice_cpu/doc/DEBUG.md on the UART. It is the same for every board. The
+-- board's top level gives it a clock, a reset, the UART pins, and optionally
+-- a keyboard: a stream of bytes that is input like the UART's.
 --
 -- THEORY OF OPERATION
 -- The core (src/nice_core.vhd, wrapping one of nice_cpu's cores) has an instruction bus and a
 -- data bus, both pipelined Wishbone. The instruction bus is 64 bits wide: it
 -- reads an aligned pair of words from port A of the memory, the word at the
--- lower address in bits 31..0. The data bus shares port B with the CLI, which is a second
--- Wishbone master (src/cmd.vhd from cmod-s7). The CLI takes the lines
--- "R <ADDR>" and "W <ADDR> <DATA>", with 8 hex digits for each number, and
--- answers with the word read, or "OK".
+-- lower address in bits 31..0. The data bus shares port B with the debug
+-- link (nice_cpu/hdl/src/debug_link.vhd), a second Wishbone master. The link
+-- shares the UART with the console: through it a host reads and writes the
+-- memory, loads and starts a program, and learns when it halts.
 --
 -- Address map, as in the emulator (nice_cpu/emulator/README.md), and the
--- same for the CLI and the core's data bus apart from the CLI's own
+-- same for the link and the core's data bus apart from the link's own
 -- registers at the end:
 --   0x00000000-0xFFFFFFFF  Memory, where no register below is. It has
 --                          2^G_RAM_ADDR_BITS words and repeats through the
@@ -25,10 +25,10 @@
 --                          (src/rom.vhd), with the monitor, which the core
 --                          boots from, as QNICE-FPGA's is at 0x0000-0x7FFF.
 --                          It is in front of the RAM, and repeats with it. A
---                          write to it is dropped. Bit 3 of the control
---                          register hides it, so that the RAM is at 0 as in
---                          the emulator, and a build without G_ROM_FILE has
---                          no ROM.
+--                          write to it is dropped. Bit 3 of the link's
+--                          control register hides it, so that the RAM is at
+--                          0 as in the emulator, and a build without
+--                          G_ROM_FILE has no ROM.
 --   0xFFFF0000-0xFFFF7FFF  The screen: 2^G_SCR_ADDR_BITS words of memory of
 --                          their own, so that the emulator's 80x25 screen,
 --                          the first 2000, does not land on word 0. The rest
@@ -44,18 +44,20 @@
 --                          bit 8 set, or 0 when no byte has arrived. The
 --                          core's input waits in a FIFO of 2^G_RX_FIFO_BITS
 --                          bytes, in block RAM, and a UART byte that arrives
---                          when it is full is lost. A break on the UART, a
---                          frame of ten 0 bits, ends the input, as the end
---                          of the emulator's input does: once the FIFO is
+--                          when it is full is lost, and the link sends `o`.
+--                          A break on the UART, a frame of ten 0 bits, ends
+--                          the input until the next start, as the end of
+--                          the emulator's input does: once the FIFO is
 --                          empty, a read returns 0x200 (bit 9), and bytes
---                          after the break are dropped. A break while the
---                          CLI has the UART is ignored. A read by the CLI
---                          returns 0 and takes nothing.
+--                          after the break are dropped. A read by the link
+--                          returns 0 and takes nothing, and a write by the
+--                          link is dropped.
 --   0xFFFFFF01             The read counter of the emulator: a read by the
 --                          core returns the number of its reads since the
 --                          last write, and a write sets that number. A read
---                          by the CLI does not count. It is 0 when the core
---                          starts.
+--                          by the link returns 0 and does not count, and a
+--                          write by the link is dropped. It is 0 after
+--                          reset, and a start keeps it (SYSTEM.md §1).
 --   0xFFFFFF10-0xFFFFFF1F  The timer of SYSTEM.md §4
 --                          (nice_cpu/hdl/src/timer.vhd). It counts clock
 --                          cycles, and its request goes to the core's IRQ.
@@ -100,46 +102,35 @@
 --     95  The five buttons, bit 0 for the center one, then up, left, right,
 --         and down. Read only, synchronized to the clock.
 --     96  The 16 switches, bit n for switch n. Read only, synchronized.
---   0xFFFFFFE0-0xFFFFFFEF  For the CLI only: R0-R15 of the core, read only,
---                          so that they can be read after HALT, as the
---                          emulator prints them.
---   0xFFFFFFF0             Control, for the CLI only. Bit 0 holds the core
---                          in reset while it is 1. A read returns bit 0, the
---                          core's halted flag in bit 1, and bit 3. A write
---                          with bit 2 set first clears the RAM, the screen
---                          included, to 0, as the emulator's memory is at
---                          the start, with the core held. Bit 3 takes effect
---                          when the clear starts, and bit 0 when it ends,
---                          with the OK, when the memory is clear. Bit 3
---                          hides the ROM: while it is 1 the RAM is at 0,
---                          as in the emulator, and the ROM is not reachable.
---                          In a build without a ROM it reads 1 and cannot
---                          be cleared.
---   0xFFFFFFF1             For the CLI only, read only: why the core halted,
---                          as the emulator's "Halted (...)" line says. 0
---                          while it has not halted, 1 for HALT, 2 for a
---                          reserved control word, 3 for INT inside an
---                          interrupt routine, and 4 for RTI outside one.
+--   0xFFFFFFE0-0xFFFFFFFF  The debug registers of DEBUG.md §6, for the link
+--                          only, which debug_link holds: R0-R15 of the core
+--                          after a halt, the control register, the halt
+--                          reason (1 to 4 here), the version, and the free
+--                          space of the core's input FIFO. Bit 0 of the
+--                          control register holds the core in reset, bit 2
+--                          clears the RAM, the RAM under the ROM and the
+--                          screen included, to 0, as the emulator's memory
+--                          is at the start, and bit 3 hides the ROM; in a
+--                          build without a ROM it reads 1. The core's data
+--                          accesses to these words go to the memory.
 -- Instruction fetches from 0xFFFFFF00-0xFFFFFFFF read 0 (ISA.md §8.3).
 --
--- The core runs when the control bit is 0. While it runs and has not halted,
--- the UART input goes to the core, at 0xFFFFFF00. Otherwise it goes to the
--- CLI. The keyboard's bytes join the UART's: they go the same way, and
--- nothing after the merge tells them apart. A received UART byte goes first.
+-- The core runs while bit 0 of the control register is 0 and it has not
+-- halted. Then the link reaches only its debug registers, and the core owns
+-- port B. While the core is held or halted, the link owns port B, and the
+-- core's data bus is stalled. A host loads a program with W packets and
+-- starts it by writing 0 to bit 0, and the link sends `h` when it halts,
+-- after the core's last console byte. Console bytes from the host reach the
+-- core's FIFO only while it runs (DEBUG.md §1), and so do the keyboard's:
+-- while the core is held or halted, a keyboard byte is taken and dropped.
 -- Unlike a UART byte, a keyboard byte is not lost when the core's FIFO is
--- full: it waits until there is room. So the CLI loads a program with W
--- commands, starts it with "W FFFFFFF0 00000000", and gets the UART back
--- when the program halts. A command line should end with CR alone: a LF
--- after the CR of the line that starts the core reaches the program, except
--- for "00000004", which clears and starts: the UART stays with the CLI for
--- the whole clear. The
--- CLI's output goes out before the core's, so its "OK" comes first. When the
--- core halts, and its last byte has gone, the CLI prints CR LF "HALT" CR LF,
--- so that the host knows that the UART is the CLI's again.
+-- full: it waits until there is room. It is written only while the FIFO has
+-- room for two bytes, and not in a cycle with a byte from the link, so a
+-- byte that the link's free-space register allowed always finds room.
 --
--- The core starts as the emulator does: the read counter, the math unit,
--- the performance counters, and the timer are reset each time the control
--- bit goes to 0. So, after a halt, the instruction counter holds the number
+-- The core starts as the emulator does: the math unit, the performance
+-- counters, and the timer are reset each time bit 0 of the control
+-- register goes to 0. So, after a halt, the instruction counter holds the number
 -- of steps that the emulator prints, unless the program starts the timer,
 -- whose interrupts come after clock cycles here, not after steps. The cycle
 -- counter and the timer's counter run only while the core runs, so they
@@ -147,30 +138,38 @@
 -- at the start too, but they have no input for whether the core runs: they
 -- count every clock, also while the core is held and after it halts, until
 -- FS_CTRL is written 0 (MJoergen/nice_cpu#42 is to give them that input).
+-- A read of CYCLE_LO, INSTR_LO, or TIME_LO by the link takes a snapshot, as
+-- one by the core does, though DEBUG.md §3 says it takes none
+-- (MJoergen/nice_cpu#41). Only the host can see it: the link reads the
+-- counters only while the core is held or halted, and a start resets them.
 --
--- The data bus of the core is stalled while a CLI request waits, and while a
--- write to the UART waits. The CLI pulses STB for one cycle and does not
--- wait for STALL, so its request is latched and served in the next free
--- cycle. Every request is acknowledged in the cycle after it is served.
+-- The data bus of the core is stalled while the link owns port B, and while a
+-- write to the UART waits. A request of the link is stalled until no device
+-- is busy or owes the core an acknowledge, and the MPU does not stall, and
+-- is then served. Every request is acknowledged in the cycle after it is served.
 -- A request of the core for the MPU, the performance counters, the fetch
 -- statistics, or the timer goes to the device in the cycle it is taken, as
 -- one for memory does, and the device acknowledges it. Each device
 -- acknowledges in the cycle after it takes a request, except the MPU, which
 -- takes a read of a result that it computes and then stalls until it
 -- acknowledges it. The core is stalled meanwhile too, so its requests are
--- acknowledged in their order. A CLI request for a device is latched and passed to the device,
--- and it is acknowledged in the cycle after the device's acknowledge. The
--- core is stalled meanwhile, and the CLI waits for any acknowledge that a
--- device owes the core.
+-- acknowledged in their order. A link request for a device is latched and
+-- passed to the device, and it is acknowledged in the cycle after the
+-- device's acknowledge.
+--
+-- A clear of the memory, which the link asks for with clear_o, writes 0 to
+-- one word of the RAM and one of the screen in each cycle, 2^C_CLR_BITS
+-- cycles in all, 0.66 ms at 100 MHz, and clears the screen's registers.
+-- The link holds the core meanwhile, and makes no access.
 --
 -- RESET
--- Synchronous. After reset the control bit is 1 when G_CPU_RUN_AT_RESET is
--- false, so the core waits for the CLI, and 0 otherwise, so the core boots
--- from the ROM, which reset shows: rom_hidden is cleared, or stays 1 in a
--- build without a ROM. The screen's registers are cleared, as they are by
--- the clear of the memory, and so are the board's writable registers (LEDs,
--- RGB levels, and display segments), which the clear keeps. The memory is
--- not changed.
+-- Synchronous. After reset bit 0 of the control register is 1 when
+-- G_CPU_RUN_AT_RESET is false, so the core waits for the host, and 0
+-- otherwise, so the core boots from the ROM, which reset shows: rom_hidden is
+-- cleared, or stays 1 in a build without a ROM. The link sends `b01`. The
+-- screen's registers, the read counter, and the board's writable registers
+-- (LEDs, RGB levels, and display segments), which the clear keeps, are
+-- cleared. The memory is not changed.
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -210,9 +209,9 @@ entity nicemon is
       kbd_valid_i    : in  std_logic := '0';
       kbd_ready_o    : out std_logic;
       kbd_data_i     : in  std_logic_vector(7 downto 0) := X"00";
-      -- '1' while the core runs and owns the UART input
+      -- '1' while the core runs: not held, and not halted
       running_o      : out std_logic;
-      -- The writes to the screen, by the core or the CLI: the word's offset
+      -- The writes to the screen, by the core or the link: the word's offset
       -- from 0xFFFF0000, and the word written
       scr_we_o       : out std_logic;
       scr_addr_o     : out std_logic_vector(G_SCR_ADDR_BITS - 1 downto 0);
@@ -240,17 +239,12 @@ end entity nicemon;
 
 architecture synthesis of nicemon is
 
-   constant C_BUFFER_LEN : natural := 20;
    -- The received bytes for the core. A power of two, so that the pointers
    -- wrap.
    constant C_RX_FIFO_BITS : natural := G_RX_FIFO_BITS;
 
    constant C_UART_DATA  : std_logic_vector(31 downto 0) := X"FFFFFF00";
    constant C_READ_COUNT : std_logic_vector(31 downto 0) := X"FFFFFF01";
-   constant C_CONTROL    : std_logic_vector(31 downto 0) := X"FFFFFFF0";
-   constant C_HALT_WHY   : std_logic_vector(31 downto 0) := X"FFFFFFF1";
-   -- The core's registers, for the CLI: 0xFFFFFFE0-EF
-   constant C_REGS_BASE : std_logic_vector(31 downto 4) := X"FFFFFFE";
    -- The screen: 0xFFFF0000 and the 2^G_SCR_ADDR_BITS words from it, of
    -- which the emulator's screen is the first 2000
    constant C_SCR_BITS : natural := G_SCR_ADDR_BITS;
@@ -267,25 +261,14 @@ architecture synthesis of nicemon is
    constant C_PERF_BASE  : std_logic_vector(31 downto 4) := X"FFFFFF4";        -- 0xFFFFFF40-4F
    constant C_FS_BASE    : std_logic_vector(31 downto 6) := X"FFFFFF" & "01";  -- 0xFFFFFF40-7F, less the above
 
-   -- '1' in a build without a ROM, where the RAM is always at 0
-   function no_rom return std_logic is
-   begin
-      if G_ROM_FILE = "" then
-         return '1';
-      end if;
-      return '0';
-   end function no_rom;
-
-   constant C_NO_ROM : std_logic := no_rom;
-
    -- The clearing counts through the larger of the RAM and the screen.
    constant C_CLR_BITS : natural := maximum(G_RAM_ADDR_BITS, C_SCR_BITS);
 
-   -- Whether an address is an I/O register, not memory, for the core or, with
-   -- cli, for the CLI. The words of 0xFFFFFF00-FF that are not registers
-   -- are memory, as in the emulator. They land in the top 256 words of the
-   -- RAM, which nothing else reaches.
-   function is_io(addr : std_logic_vector(31 downto 0); cli : boolean) return boolean is
+   -- Whether an address is an I/O register, not memory. The words of
+   -- 0xFFFFFF00-FF that are not registers are memory, as in the emulator.
+   -- They land in the top 256 words of the RAM, which nothing else reaches.
+   -- The link never puts its debug registers, 0xFFFFFFE0-FF, on the bus.
+   function is_io(addr : std_logic_vector(31 downto 0)) return boolean is
    begin
       if and(addr(31 downto 8)) = '0' then
          return false;
@@ -293,8 +276,7 @@ architecture synthesis of nicemon is
       return addr(7 downto 1) = "0000000" or                        -- console, read counter
              addr(7 downto 4) = X"1" or addr(7 downto 5) = "001" or -- timer, MPU
              addr(7 downto 6) = "01" or addr(7 downto 4) = X"8" or  -- perf, fetch statistics, screen registers
-             addr(7 downto 4) = X"9" or                             -- the board's devices
-             (cli and (addr(7 downto 4) = X"E" or addr(7 downto 1) = "1111000"));
+             addr(7 downto 4) = X"9";                               -- the board's devices
    end function is_io;
 
    -- Whether a memory address is in the ROM's range, which repeats with the
@@ -328,30 +310,31 @@ architecture synthesis of nicemon is
    signal cpu_instret : std_logic;
    signal cpu_retire  : t_retire;
    signal cpu_stats   : t_fetch_events;
-   -- The core's registers, for the CLI's read of E0-EF. The CLI reads them
-   -- only while the core is held or halted, when they hold the registers
-   -- after the last step and do not change.
-   signal cpu_regs : t_regs;
+   -- The core's registers, for the link, which keeps them at a halt, and
+   -- the same as one vector, R(n) in bits 32 * n + 31 .. 32 * n
+   signal cpu_regs      : t_regs;
+   signal cpu_regs_flat : std_logic_vector(511 downto 0);
+   -- '1' while the core runs: not held, and not halted
+   signal cpu_running : std_logic;
    -- The hold bit in the cycle before, for a pulse when the core starts,
    -- which resets the math unit, the performance counters, and the timer
    signal cpu_hold_d : std_logic := '1';
    signal dev_rst    : std_logic;
-   -- A halt waits in halt_wait until the core's last byte has gone, and
-   -- then halt_note tells the CLI.
-   signal cpu_halted_d : std_logic := '0';
-   signal halt_wait    : std_logic := '0';
-   signal halt_note    : std_logic := '0';
    -- The pipelined core reports the reason in the cycle the step retires,
    -- so it is kept here until the core is reset.
-   signal halt_why : t_halt := HALT_NONE;
+   signal halt_why    : t_halt := HALT_NONE;
+   signal halt_reason : std_logic_vector(2 downto 0);
 
-   -- Clearing the memory: the address, and the hold bit after it
+   -- Clearing the memory: the address, and a pulse for the link when it is
+   -- done
    signal clearing : std_logic := '0';
    signal clr_addr : std_logic_vector(C_CLR_BITS - 1 downto 0);
-   signal clr_hold : std_logic;
+   signal clr_done : std_logic := '0';
+   -- The link's request for a clear, high until clr_done
+   signal link_clear : std_logic;
 
    -- Bit 3 of the control register: the ROM is hidden, and the RAM is at 0
-   signal rom_hidden : std_logic := C_NO_ROM;
+   signal rom_hidden : std_logic;
 
    -- The screen's registers: the state's bits 11..4, the cursor's column
    -- and row, and the display offset
@@ -382,6 +365,7 @@ architecture synthesis of nicemon is
    signal ibus_cyc  : std_logic;
    signal ibus_stb  : std_logic;
    signal ibus_ack  : std_logic := '0';
+   signal core_iack : std_logic;
    signal ibus_addr : std_logic_vector(30 downto 0);   -- the pair address
    signal ibus_word : std_logic_vector(31 downto 0);   -- its first word
    signal ibus_data : std_logic_vector(63 downto 0);
@@ -400,25 +384,23 @@ architecture synthesis of nicemon is
    -- The acknowledge of a core request served here, not by a device
    signal srv_ack : std_logic := '0';
 
-   -- CLI
-   signal cli_addr  : std_logic_vector(31 downto 0);
-   signal cli_wdata : std_logic_vector(31 downto 0);
-   signal cli_we    : std_logic;
-   signal cli_cyc   : std_logic;
-   signal cli_stb   : std_logic;
-   signal cli_ack   : std_logic := '0';
-
-   -- The CLI request, latched until it is served
-   signal cli_pend    : std_logic := '0';
-   signal cli_p_addr  : std_logic_vector(31 downto 0);
-   signal cli_p_wdata : std_logic_vector(31 downto 0);
-   signal cli_p_we    : std_logic;
+   -- The link's Wishbone master. It owns port B while the core is held or
+   -- halted, and its request is taken in a cycle with no stall.
+   signal link_cyc   : std_logic;
+   signal link_stb   : std_logic;
+   signal link_stall : std_logic;
+   signal link_ack   : std_logic := '0';
+   signal link_we    : std_logic;
+   signal link_addr  : std_logic_vector(31 downto 0);
+   signal link_wdata : std_logic_vector(31 downto 0);
+   signal link_owns  : std_logic;
+   signal link_take  : std_logic;
 
    -- A core write to the UART that waits for the byte before it to go
    signal tx_wait      : std_logic := '0';
    signal tx_wait_data : std_logic_vector(7 downto 0);
 
-   -- A CLI request for the MPU, the performance counters, or the timer. It
+   -- A link request for the MPU, the performance counters, or the timer. It
    -- is latched, and the device's port is driven from the latch until the
    -- device acknowledges.
    signal dev_busy  : std_logic := '0';
@@ -436,7 +418,7 @@ architecture synthesis of nicemon is
    signal core_dev  : std_logic;
    signal core_owed : std_logic := '0';
 
-   -- The devices' ports: the CLI's latch while it is busy, else the core
+   -- The devices' ports: the link's latch while it is busy, else the core
    signal io_cyc   : std_logic;
    signal io_we    : std_logic;
    signal io_addr  : std_logic_vector(5 downto 0);
@@ -496,8 +478,6 @@ architecture synthesis of nicemon is
    signal rd_io       : std_logic_vector(31 downto 0);
 
    -- UART
-   signal uart_owner_cpu : std_logic;
-
    signal ser_rx_valid : std_logic;
    signal ser_rx_ready : std_logic;
    signal ser_rx_data  : std_logic_vector(7 downto 0);
@@ -506,18 +486,17 @@ architecture synthesis of nicemon is
    signal ser_tx_ready : std_logic;
    signal ser_tx_data  : std_logic_vector(7 downto 0);
 
-   -- The input, from the UART or the keyboard
-   signal kbd_take : std_logic;
-   signal in_valid : std_logic;
-   signal in_data  : std_logic_vector(7 downto 0);
-   signal rx_full  : std_logic;
+   -- The input: a console byte from the link, or a keyboard byte
+   signal link_in_valid : std_logic;
+   signal link_in_data  : std_logic_vector(7 downto 0);
+   signal kbd_room      : std_logic;
+   signal kbd_take      : std_logic;
+   signal in_valid      : std_logic;
+   signal in_data       : std_logic_vector(7 downto 0);
+   -- The end of the input, from a break until the next start
+   signal link_eoi : std_logic;
 
-   signal lb_rx_valid : std_logic;
-   signal lb_rx_ready : std_logic;
-   signal lb_tx_valid : std_logic;
-   signal lb_tx_ready : std_logic;
-   signal lb_tx_data  : std_logic_vector(7 downto 0);
-
+   -- The core's console output, to the link
    signal cpu_tx_valid : std_logic := '0';
    signal cpu_tx_ready : std_logic;
    signal cpu_tx_data  : std_logic_vector(7 downto 0);
@@ -530,15 +509,9 @@ architecture synthesis of nicemon is
    signal rx_q     : std_logic_vector(7 downto 0);
    -- The core's input has ended with a break.
    signal rx_eof : std_logic;
-
-   signal rx_buffer_ready : std_logic;
-   signal rx_buffer_valid : std_logic;
-   signal rx_buffer_size  : natural range 0 to C_BUFFER_LEN;
-   signal rx_buffer_data  : std_logic_vector(8 * C_BUFFER_LEN - 1 downto 0);
-   signal tx_buffer_ready : std_logic;
-   signal tx_buffer_valid : std_logic;
-   signal tx_buffer_size  : natural range 0 to C_BUFFER_LEN;
-   signal tx_buffer_data  : std_logic_vector(8 * C_BUFFER_LEN - 1 downto 0);
+   -- The free bytes of the FIFO
+   signal rx_free : std_logic_vector(C_RX_FIFO_BITS downto 0);
+   signal free    : std_logic_vector(15 downto 0);
 
 begin
 
@@ -548,6 +521,10 @@ begin
 
    assert G_ROM_ADDR_BITS < G_RAM_ADDR_BITS
       report "nicemon: the ROM must leave room for RAM above it"
+      severity failure;
+
+   assert G_RX_FIFO_BITS <= 15
+      report "nicemon: the free space of the input FIFO must fit in 16 bits"
       severity failure;
 
    ---------------------------------------------------------------------------
@@ -563,7 +540,7 @@ begin
          ibus_cyc_o   => ibus_cyc,
          ibus_stb_o   => ibus_stb,
          ibus_stall_i => '0',
-         ibus_ack_i   => ibus_ack,
+         ibus_ack_i   => core_iack,
          ibus_addr_o  => ibus_addr,
          ibus_data_i  => ibus_data,
          dbus_cyc_o   => dbus_cyc,
@@ -587,8 +564,14 @@ begin
          stats_o      => cpu_stats
       ); -- i_core
 
-   uart_owner_cpu <= not cpu_hold and not cpu_halted;
-   running_o      <= uart_owner_cpu;
+   cpu_running <= not cpu_hold and not cpu_halted;
+   running_o   <= cpu_running;
+
+   gen_regs : for n in 0 to 15 generate
+      cpu_regs_flat(32 * n + 31 downto 32 * n) <= cpu_regs(n);
+   end generate gen_regs;
+
+   halt_reason <= std_logic_vector(to_unsigned(t_halt'pos(halt_why), 3));
 
 
    ---------------------------------------------------------------------------
@@ -613,6 +596,10 @@ begin
       end if;
    end process p_ibus;
 
+   -- A hold resets the core with requests in flight. Their ACKs come while
+   -- CYC is low, and are dropped, as Wishbone ignores them.
+   core_iack <= ibus_ack and ibus_cyc;
+
    ibus_data <= (others => '0') when ibus_io = '1' else
                 scr_a_data when ibus_scr = '1' else
                 rom_a_data when ibus_rom = '1' else
@@ -620,13 +607,20 @@ begin
 
 
    ---------------------------------------------------------------------------
-   -- Data bus and CLI: memory port B and the I/O registers
+   -- Data bus and link: memory port B and the I/O registers
    ---------------------------------------------------------------------------
 
    -- The core's request is taken in a cycle with no stall. The MPU's stall
    -- holds the core while it computes a result that the core reads.
-   dbus_stall <= cli_pend or tx_wait or dev_busy or clearing or mpu_stall;
-   dbus_ack   <= srv_ack or (core_owed and dev_ack);
+   dbus_stall <= link_owns or tx_wait or dev_busy or clearing or mpu_stall;
+   dbus_ack   <= (srv_ack or (core_owed and dev_ack)) and dbus_cyc;
+
+   -- The link owns port B while the core is held or halted. Its request
+   -- waits while a device is busy, owes the core an acknowledge, or the MPU
+   -- stalls, and is then taken.
+   link_owns  <= cpu_hold or cpu_halted;
+   link_stall <= not link_owns or dev_busy or core_owed or mpu_stall or clearing;
+   link_take  <= link_cyc and link_stb and not link_stall;
 
    -- A request of the core in reset is dropped: it is not taken, whatever it
    -- is, though the core's registered request may still show in the first
@@ -636,16 +630,16 @@ begin
                 '0';
 
    ram_b_addr  <= clr_addr(G_RAM_ADDR_BITS - 1 downto 0) when clearing = '1' else
-                  cli_p_addr(G_RAM_ADDR_BITS - 1 downto 0) when cli_pend = '1' else
+                  link_addr(G_RAM_ADDR_BITS - 1 downto 0) when link_owns = '1' else
                   dbus_addr(G_RAM_ADDR_BITS - 1 downto 0);
    ram_b_wdata <= (others => '0') when clearing = '1' else
-                  cli_p_wdata when cli_pend = '1' else
+                  link_wdata when link_owns = '1' else
                   dbus_wdata;
    scr_b_addr  <= clr_addr(C_SCR_BITS - 1 downto 0) when clearing = '1' else
-                  cli_p_addr(C_SCR_BITS - 1 downto 0) when cli_pend = '1' else
+                  link_addr(C_SCR_BITS - 1 downto 0) when link_owns = '1' else
                   dbus_addr(C_SCR_BITS - 1 downto 0);
 
-   -- A write to memory is served in the cycle that the CLI's or the core's
+   -- A write to memory is served in the cycle that the link's or the core's
    -- request is taken, and in no other cycle. It goes to the screen or to the main memory, unless
    -- it is to the ROM, where it is dropped. While the memory is cleared,
    -- both are written, the RAM under the ROM included.
@@ -657,13 +651,13 @@ begin
       addr_v := dbus_addr;
       if clearing = '1' then
          null;
-      elsif dev_busy = '0' and cli_pend = '1' and core_owed = '0' and mpu_stall = '0' then
-         addr_v := cli_p_addr;
-         if not is_io(cli_p_addr, true) then
-            we_v := cli_p_we;
+      elsif link_take = '1' then
+         addr_v := link_addr;
+         if not is_io(link_addr) then
+            we_v := link_we;
          end if;
       elsif core_take = '1' then
-         if not is_io(dbus_addr, false) then
+         if not is_io(dbus_addr) then
             we_v := dbus_we;
          end if;
       end if;
@@ -692,12 +686,10 @@ begin
                  timer_data when rd_timer = '1' else
                  rd_io;
 
-   cpu_tx_ready <= ser_tx_ready and not lb_tx_valid;
-
    p_dbus : process (clk_i)
 
-      -- Serve one request. cli is true for the CLI's.
-      procedure serve(cli   : boolean;
+      -- Serve one request. link is true for the link's.
+      procedure serve(link  : boolean;
                       addr  : std_logic_vector(31 downto 0);
                       we    : std_logic;
                       wdata : std_logic_vector(31 downto 0)) is
@@ -711,7 +703,7 @@ begin
          rd_fs    <= '0';
          rd_timer <= '0';
          rd_io    <= (others => '0');
-         if not is_io(addr, cli) then
+         if not is_io(addr) then
             -- Memory: port B is driven combinationally above.
             if addr(31 downto C_SCR_BITS) = C_SCR_BASE then
                rd_scr <= '1';
@@ -720,7 +712,7 @@ begin
             else
                rd_ram <= '1';
             end if;
-         elsif is_dev(addr) and not cli then
+         elsif is_dev(addr) and not link then
             -- A device has taken the core's request, and it acknowledges
             -- it, with the data that rd_mpu, rd_perf, rd_fs, or rd_timer selects.
             if addr(31 downto 5) = C_MPU_BASE then
@@ -734,7 +726,7 @@ begin
             end if;
             return;
          elsif is_dev(addr) then
-            -- The CLI's: the device's port is driven from the latch, and the
+            -- The link's: the device's port is driven from the latch, and the
             -- request is acknowledged when the device acknowledges it.
             dev_busy <= '1';
             dev_stb  <= '1';
@@ -751,7 +743,7 @@ begin
             dev_we    <= we;
             dev_wdata <= wdata;
             return;
-         elsif addr = C_UART_DATA and we = '1' and not cli then
+         elsif addr = C_UART_DATA and we = '1' and not link then
             if cpu_tx_valid = '1' and cpu_tx_ready = '0' then
                -- The byte before still waits. The core may drop its request
                -- once it is taken, so the byte is kept until it can go.
@@ -761,10 +753,11 @@ begin
             end if;
             cpu_tx_data  <= wdata(7 downto 0);
             cpu_tx_valid <= '1';
-         elsif addr = C_UART_DATA and we = '1' and cli then
-            -- The UART belongs to the CLI then, so the byte is dropped.
+         elsif addr = C_UART_DATA and link then
+            -- A link read returns 0 and takes no byte, and a write is
+            -- dropped (DEBUG.md §3).
             null;
-         elsif addr = C_UART_DATA and we = '0' and not cli then
+         elsif addr = C_UART_DATA and we = '0' then
             if rx_empty = '0' then
                -- rx_take takes the byte, and it comes from rx_q in the next
                -- cycle.
@@ -772,17 +765,18 @@ begin
             elsif rx_eof = '1' then
                rd_io(9) <= '1';
             end if;
+         elsif addr = C_READ_COUNT and link then
+            -- A link read returns 0 and does not count, and a write is
+            -- dropped (DEBUG.md §3).
+            null;
          elsif addr = C_READ_COUNT then
-            -- As in the emulator: a write sets the count, and a read by the
-            -- core returns it and counts. A read by the CLI only returns it,
-            -- as the emulator's --dump does.
+            -- As in the emulator: a write sets the count, and a read
+            -- returns it and counts.
             if we = '1' then
                read_count <= wdata;
             else
-               rd_io <= read_count;
-               if not cli then
-                  read_count <= read_count + 1;
-               end if;
+               rd_io      <= read_count;
+               read_count <= read_count + 1;
             end if;
          elsif addr(31 downto 4) = C_SCR_REGS_BASE then
             -- The screen's registers. A write is told to the display.
@@ -836,41 +830,9 @@ begin
                end case;
 
             end if;
-         elsif addr(31 downto 4) = C_REGS_BASE and cli then
-            if we = '0' then
-               rd_io <= cpu_regs(to_integer(addr(3 downto 0)));
-            end if;
-         elsif addr = C_CONTROL and cli then
-            if we = '1' and wdata(2) = '1' then
-               -- Clear the memory with the core held. The request is
-               -- acknowledged when the memory is clear.
-               clearing   <= '1';
-               scr_state  <= (others => '0');
-               scr_cur_x  <= (others => '0');
-               scr_cur_y  <= (others => '0');
-               scr_offs   <= (others => '0');
-               scr_ctl_we <= '1';
-               clr_addr   <= (others => '0');
-               clr_hold   <= wdata(0);
-               cpu_hold   <= '1';
-               rom_hidden <= wdata(3) or C_NO_ROM;
-               return;
-            elsif we = '1' then
-               cpu_hold   <= wdata(0);
-               rom_hidden <= wdata(3) or C_NO_ROM;
-            else
-               rd_io(0) <= cpu_hold;
-               rd_io(1) <= cpu_halted;
-               rd_io(3) <= rom_hidden;
-            end if;
-         elsif addr = C_HALT_WHY and cli then
-            -- The reason is kept until the core is reset.
-            if we = '0' then
-               rd_io(2 downto 0) <= std_logic_vector(to_unsigned(t_halt'pos(halt_why), 3));
-            end if;
          end if;
-         if cli then
-            cli_ack <= '1';
+         if link then
+            link_ack <= '1';
          else
             srv_ack <= '1';
          end if;
@@ -878,12 +840,11 @@ begin
 
    begin
       if rising_edge(clk_i) then
-         srv_ack      <= '0';
-         cli_ack      <= '0';
-         halt_note    <= '0';
-         scr_ctl_we   <= '0';
-         cpu_hold_d   <= cpu_hold;
-         cpu_halted_d <= cpu_halted;
+         srv_ack    <= '0';
+         link_ack   <= '0';
+         clr_done   <= '0';
+         scr_ctl_we <= '0';
+         cpu_hold_d <= cpu_hold;
 
          if cpu_rst = '1' then
             halt_why <= HALT_NONE;
@@ -893,17 +854,6 @@ begin
 
          if cpu_tx_valid = '1' and cpu_tx_ready = '1' then
             cpu_tx_valid <= '0';
-         end if;
-
-         -- The CLI is told of a halt once the core's last byte has gone to
-         -- the UART.
-         if cpu_halted = '1' and cpu_halted_d = '0' then
-            halt_wait <= '1';
-         end if;
-         if halt_wait = '1' and tx_wait = '0' and
-            (cpu_tx_valid = '0' or cpu_tx_ready = '1') then
-            halt_wait <= '0';
-            halt_note <= '1';
          end if;
 
          if dev_busy = '1' then
@@ -929,20 +879,26 @@ begin
                   rd_io <= timer_data;
                end if;
                dev_busy <= '0';
-               cli_ack  <= '1';
+               link_ack <= '1';
             end if;
          elsif clearing = '1' then
             clr_addr <= clr_addr + 1;
             if and(clr_addr) = '1' then
                clearing <= '0';
-               cpu_hold <= clr_hold;
-               cli_ack  <= '1';
+               clr_done <= '1';
             end if;
-         elsif cli_pend = '1' and core_owed = '0' and mpu_stall = '0' then
-            -- The CLI waits for any acknowledge that a device owes the core,
-            -- or would owe it had the core not been reset meanwhile.
-            serve(true, cli_p_addr, cli_p_we, cli_p_wdata);
-            cli_pend <= '0';
+         elsif link_clear = '1' and clr_done = '0' then
+            -- The link asks for a clear, with the core held: first the
+            -- screen's registers, then every word of the memory.
+            clearing   <= '1';
+            clr_addr   <= (others => '0');
+            scr_state  <= (others => '0');
+            scr_cur_x  <= (others => '0');
+            scr_cur_y  <= (others => '0');
+            scr_offs   <= (others => '0');
+            scr_ctl_we <= '1';
+         elsif link_take = '1' then
+            serve(true, link_addr, link_we, link_wdata);
          elsif tx_wait = '1' then
             if cpu_tx_valid = '0' or cpu_tx_ready = '1' then
                cpu_tx_data  <= tx_wait_data;
@@ -962,31 +918,21 @@ begin
             core_owed <= '0';
          end if;
 
-         if cli_cyc = '1' and cli_stb = '1' then
-            cli_pend    <= '1';
-            cli_p_addr  <= cli_addr;
-            cli_p_wdata <= cli_wdata;
-            cli_p_we    <= cli_we;
-         end if;
-
-         -- A request of the core in reset is dropped, and so is a byte
-         -- received before, so that a program starts with no input.
+         -- A request of the core in reset is dropped.
          if cpu_rst = '1' then
-            srv_ack      <= '0';
-            core_owed    <= '0';
-            tx_wait      <= '0';
-            halt_wait    <= '0';
-            read_count   <= (others => '0');
+            srv_ack   <= '0';
+            core_owed <= '0';
+            tx_wait   <= '0';
          end if;
 
          if rst_i = '1' then
             dev_busy     <= '0';
             dev_stb      <= '0';
-            cli_pend     <= '0';
-            cli_ack      <= '0';
+            link_ack     <= '0';
             clearing     <= '0';
+            clr_done     <= '0';
             cpu_tx_valid <= '0';
-            rom_hidden   <= C_NO_ROM;
+            read_count   <= (others => '0');
             scr_state    <= (others => '0');
             scr_cur_x    <= (others => '0');
             scr_cur_y    <= (others => '0');
@@ -996,22 +942,17 @@ begin
             brd_rgb0     <= (others => '0');
             brd_rgb1     <= (others => '0');
             brd_seg      <= (others => '0');
-            if G_CPU_RUN_AT_RESET then
-               cpu_hold <= '0';
-            else
-               cpu_hold <= '1';
-            end if;
          end if;
       end if;
    end process p_dbus;
 
-   -- A byte for the core goes into its FIFO, which drops it when it is full
-   -- or the input has ended. A read of the console by the core takes the
-   -- oldest byte, in the cycle that serves it: the cycle that accepts the
-   -- request. A request of the core in reset is dropped, and so is a byte
-   -- received before, so that a program starts with no input.
-   rx_wr_en <= in_valid and uart_owner_cpu;
-   rx_end   <= ser_rx_break and uart_owner_cpu;
+   -- A byte for the core goes into its FIFO while the core runs. The FIFO
+   -- drops it when it is full or the input has ended. A read of the console
+   -- by the core takes the oldest byte, in the cycle that serves it: the
+   -- cycle that accepts the request. The FIFO is in reset while the core is
+   -- held, so a program starts with no input.
+   rx_wr_en <= in_valid and cpu_running;
+   rx_end   <= link_eoi;
    rx_take  <= '1' when core_take = '1' and
                         dbus_addr = C_UART_DATA and dbus_we = '0' else
                '0';
@@ -1025,7 +966,8 @@ begin
          rst_i     => cpu_rst,
          wr_en_i   => rx_wr_en,
          wr_data_i => in_data,
-         full_o    => rx_full,
+         full_o    => open,
+         free_o    => rx_free,
          end_i     => rx_end,
          ended_o   => rx_eof,
          rd_en_i   => rx_take,
@@ -1038,14 +980,14 @@ begin
    -- The math unit (SYSTEM.md §2), the performance counters (§3), and the
    -- timer (§4) from nice_cpu. They are reset with the system, and when
    -- the core starts, as the emulator's are when it starts. They are not
-   -- reset while the CLI holds the core, so that the CLI can read them after
-   -- a halt. The timer counts clock cycles while the core runs, and it is the only device that
+   -- reset while the core is held, so that the link can read them after a
+   -- halt. The timer counts clock cycles while the core runs, and it is the only device that
    -- raises an interrupt, so its request goes straight to the core's IRQ.
    ---------------------------------------------------------------------------
 
    dev_rst <= rst_i or (cpu_hold_d and not cpu_hold);
 
-   -- The CLI's latched request while it is busy, else the core's request,
+   -- The link's latched request while it is busy, else the core's request,
    -- which goes to a device only in the cycle that takes it
    io_cyc   <= '1' when dev_busy = '1' else dbus_cyc;
    io_we    <= dev_we when dev_busy = '1' else dbus_we;
@@ -1095,7 +1037,7 @@ begin
       port map (
          clk_i      => clk_i,
          rst_i      => dev_rst,
-         run_i      => uart_owner_cpu,
+         run_i      => cpu_running,
          instret_i  => cpu_instret,
          wb_cyc_i   => perf_cyc,
          wb_stb_i   => perf_stb,
@@ -1127,7 +1069,7 @@ begin
       port map (
          clk_i        => clk_i,
          rst_i        => dev_rst,
-         tick_i       => uart_owner_cpu,
+         tick_i       => cpu_running,
          wb_cyc_i     => timer_cyc,
          wb_stb_i     => timer_stb,
          wb_stall_o   => timer_stall,
@@ -1182,7 +1124,7 @@ begin
 
    end generate gen_no_rom;
 
-   -- The screen, at 0xFFFF0000. It is memory, as in the emulator, so the CLI
+   -- The screen, at 0xFFFF0000. It is memory, as in the emulator, so the link
    -- can read what a program wrote there. Without it the address would
    -- land at word 0 of the main memory. A display keeps its own copy, from
    -- the writes given out here, a cycle late, and shows it as the registers
@@ -1235,8 +1177,9 @@ begin
 
 
    ---------------------------------------------------------------------------
-   -- UART: the CLI's line buffer has the output first. The input goes to the
-   -- core while it runs, and to the CLI otherwise.
+   -- UART and the debug link (DEBUG.md). The link sends the answers, the
+   -- notices, and the core's console bytes, and passes the host's console
+   -- bytes to the core's input while it runs.
    ---------------------------------------------------------------------------
 
    i_uart_serdes : entity work.uart_serdes
@@ -1257,99 +1200,95 @@ begin
          uart_rx_i  => uart_rxd_i
       ); -- i_uart_serdes
 
-   ser_tx_valid <= lb_tx_valid or cpu_tx_valid;
-   ser_tx_data  <= lb_tx_data when lb_tx_valid = '1' else cpu_tx_data;
-   lb_tx_ready  <= ser_tx_ready;
+   free <= (15 downto C_RX_FIFO_BITS + 1 => '0') & rx_free;
 
-   -- The input: a UART byte, or else a keyboard byte, which is taken only
-   -- when it has room.
-   kbd_take <= kbd_valid_i and not ser_rx_valid and
-               ((uart_owner_cpu and not rx_full) or (not uart_owner_cpu and lb_rx_ready));
-   in_valid <= ser_rx_valid or kbd_take;
-   in_data  <= ser_rx_data when ser_rx_valid = '1' else kbd_data_i;
-
-   kbd_ready_o  <= kbd_take;
-   lb_rx_valid  <= in_valid and not uart_owner_cpu;
-   ser_rx_ready <= '1' when uart_owner_cpu = '1' else lb_rx_ready;
-
-   i_line_buffer : entity work.line_buffer
+   i_debug_link : entity work.debug_link
       generic map (
-         G_BUFFER_LEN => C_BUFFER_LEN
+         G_TIMEOUT   => G_CLOCK_HZ / 10,
+         G_HAS_ROM   => G_ROM_FILE /= "",
+         G_BOOT_HELD => not G_CPU_RUN_AT_RESET
       )
       port map (
-         clk_i             => clk_i,
-         rst_i             => rst_i,
-         rx_ready_o        => lb_rx_ready,
-         rx_valid_i        => lb_rx_valid,
-         rx_data_i         => in_data,
-         tx_ready_i        => lb_tx_ready,
-         tx_valid_o        => lb_tx_valid,
-         tx_data_o         => lb_tx_data,
-         rx_buffer_ready_i => rx_buffer_ready,
-         rx_buffer_valid_o => rx_buffer_valid,
-         rx_buffer_size_o  => rx_buffer_size,
-         rx_buffer_data_o  => rx_buffer_data,
-         tx_buffer_ready_o => tx_buffer_ready,
-         tx_buffer_valid_i => tx_buffer_valid,
-         tx_buffer_size_i  => tx_buffer_size,
-         tx_buffer_data_i  => tx_buffer_data
-      ); -- i_line_buffer
+         clk_i          => clk_i,
+         rst_i          => rst_i,
+         rx_valid_i     => ser_rx_valid,
+         rx_ready_o     => ser_rx_ready,
+         rx_data_i      => ser_rx_data,
+         rx_break_i     => ser_rx_break,
+         tx_valid_o     => ser_tx_valid,
+         tx_ready_i     => ser_tx_ready,
+         tx_data_o      => ser_tx_data,
+         con_valid_i    => cpu_tx_valid,
+         con_ready_o    => cpu_tx_ready,
+         con_data_i     => cpu_tx_data,
+         con_in_valid_o => link_in_valid,
+         con_in_data_o  => link_in_data,
+         free_i         => free,
+         eoi_o          => link_eoi,
+         hold_o         => cpu_hold,
+         rom_hide_o     => rom_hidden,
+         clear_o        => link_clear,
+         clear_done_i   => clr_done,
+         halted_i       => cpu_halted,
+         halt_reason_i  => halt_reason,
+         regs_i         => cpu_regs_flat,
+         wb_cyc_o       => link_cyc,
+         wb_stb_o       => link_stb,
+         wb_stall_i     => link_stall,
+         wb_ack_i       => link_ack,
+         wb_we_o        => link_we,
+         wb_addr_o      => link_addr,
+         wb_data_o      => link_wdata,
+         wb_data_i      => dbus_rdata
+      ); -- i_debug_link
 
-   i_cmd : entity work.cmd
-      generic map (
-         G_ADDR_SIZE  => 32,
-         G_BUFFER_LEN => C_BUFFER_LEN
-      )
-      port map (
-         clk_i             => clk_i,
-         rst_i             => rst_i,
-         rx_buffer_ready_o => rx_buffer_ready,
-         rx_buffer_valid_i => rx_buffer_valid,
-         rx_buffer_size_i  => rx_buffer_size,
-         rx_buffer_data_i  => rx_buffer_data,
-         tx_buffer_ready_i => tx_buffer_ready,
-         tx_buffer_valid_o => tx_buffer_valid,
-         tx_buffer_size_o  => tx_buffer_size,
-         tx_buffer_data_o  => tx_buffer_data,
-         halt_i            => halt_note,
-         wbus_addr_o       => cli_addr,
-         wbus_wrdat_o      => cli_wdata,
-         wbus_we_o         => cli_we,
-         wbus_cyc_o        => cli_cyc,
-         wbus_stb_o        => cli_stb,
-         wbus_rddat_i      => dbus_rdata,
-         wbus_ack_i        => cli_ack
-      ); -- i_cmd
+   -- The input: a console byte from the link, or else a keyboard byte. While
+   -- the core runs, a keyboard byte waits until the FIFO has room for two,
+   -- so that a byte from the link, which the link sends only when the free
+   -- space was not 0 a cycle earlier, finds room. Otherwise it is taken and
+   -- dropped: while the core is held or halted, or after the end of the
+   -- input.
+   kbd_room <= '1' when rx_free >= 2 else
+               '0';
+   kbd_take <= kbd_valid_i and not link_in_valid and
+               (not cpu_running or rx_eof or kbd_room);
+   in_valid <= link_in_valid or kbd_take;
+   in_data  <= link_in_data when link_in_valid = '1' else kbd_data_i;
+
+   kbd_ready_o <= kbd_take;
 
 
    ---------------------------------------------------------------------------
    -- The checks of formal/nicemon.sby. The core's two buses are pipelined
    -- Wishbone, and nice_cpu's formal checks prove either core right for
    -- any slave that sends ACK only while CYC is high, and only for a
-   -- request that waits. These check that this system is such a slave, the
-   -- CLI's request latch and the devices' included, and that the CLI's
-   -- port gets one ACK for each request, as formal/formal_cli.vhd assumes.
+   -- request that waits. These check that this system is such a slave for
+   -- the core and for the link, the devices included, that the link is
+   -- served only while it owns port B, and that its reads and writes of the
+   -- console and the read counter have no side effect (DEBUG.md §3).
    -- A request of the core waits from the cycle that accepts it until its
    -- ACK, or until the core is reset, which drops it. The pipelined core
    -- has several requests waiting on a bus, so f_ibus_wait and f_dbus_wait
-   -- count them.
+   -- count them. The link has one request at a time.
    ---------------------------------------------------------------------------
 
    gen_formal : if G_FORMAL generate
       signal f_ibus_wait : natural range 0 to 15 := 0;
       signal f_dbus_wait : natural range 0 to 15 := 0;
-      signal f_cli_wait  : std_logic := '0';
+      signal f_link_wait : std_logic := '0';
       signal f_rx_byte   : std_logic;
       signal f_rx_end    : std_logic;
       signal f_cpu_rst_d : std_logic := '1';
+      -- A link access of the console or the read counter
+      signal f_link_con : std_logic;
    begin
 
       p_wait : process (clk_i)
       begin
          if rising_edge(clk_i) then
-            if ibus_cyc = '1' and ibus_stb = '1' and ibus_ack = '0' then
+            if ibus_cyc = '1' and ibus_stb = '1' and core_iack = '0' then
                f_ibus_wait <= f_ibus_wait + 1;
-            elsif (ibus_cyc = '0' or ibus_stb = '0') and ibus_ack = '1' then
+            elsif (ibus_cyc = '0' or ibus_stb = '0') and core_iack = '1' then
                f_ibus_wait <= f_ibus_wait - 1;
             end if;
             if dbus_cyc = '1' and dbus_stb = '1' and dbus_stall = '0' and dbus_ack = '0' then
@@ -1357,10 +1296,10 @@ begin
             elsif (dbus_cyc = '0' or dbus_stb = '0' or dbus_stall = '1') and dbus_ack = '1' then
                f_dbus_wait <= f_dbus_wait - 1;
             end if;
-            if cli_cyc = '1' and cli_stb = '1' then
-               f_cli_wait <= '1';
-            elsif cli_ack = '1' then
-               f_cli_wait <= '0';
+            if link_take = '1' then
+               f_link_wait <= '1';
+            elsif link_ack = '1' then
+               f_link_wait <= '0';
             end if;
 
             if cpu_rst = '1' then
@@ -1368,7 +1307,7 @@ begin
                f_dbus_wait <= 0;
             end if;
             if rst_i = '1' then
-               f_cli_wait <= '0';
+               f_link_wait <= '0';
             end if;
             f_cpu_rst_d <= cpu_rst;
          end if;
@@ -1379,20 +1318,40 @@ begin
       f_rx_byte <= rx_take and not rx_empty;
       f_rx_end  <= rx_take and rx_empty and rx_eof;
 
+      f_link_con <= '1' when link_take = '1' and
+                             (link_addr = C_UART_DATA or link_addr = C_READ_COUNT) else
+                    '0';
+
       -- psl default clock is rising_edge(clk_i);
 
       -- The core's buses
       -- psl f_ibus_ack : assert always
-      --    rst_i = '0' and ibus_ack = '1' -> ibus_cyc = '1' and f_ibus_wait /= 0;
+      --    rst_i = '0' and core_iack = '1' -> ibus_cyc = '1' and f_ibus_wait /= 0;
       -- psl f_dbus_ack : assert always
       --    rst_i = '0' and dbus_ack = '1' -> dbus_cyc = '1' and f_dbus_wait /= 0;
 
-      -- The CLI's port, and its latch
-      -- psl f_cli_ack : assert always rst_i = '0' and cli_ack = '1' -> f_cli_wait = '1';
-      -- psl f_cli_latch : assert always
-      --    rst_i = '0' and cli_stb = '1' -> cli_pend = '0' and f_cli_wait = '0';
+      -- The link's port: one ACK for each request, while CYC is high, and a
+      -- request only while the link owns port B and makes no clear
+      -- psl f_link_ack : assert always
+      --    rst_i = '0' and link_ack = '1' -> link_cyc = '1' and f_link_wait = '1';
+      -- psl f_link_take : assert always
+      --    link_take = '1' -> link_owns = '1' and core_take = '0' and clearing = '0';
+      -- psl f_link_one : assert always
+      --    rst_i = '0' and link_take = '1' -> f_link_wait = '0';
 
-      -- The devices answer the CLI's latched request, or a request of the
+      -- The link's read of the console or the read counter returns 0, and
+      -- neither its read nor its write changes the input, the output, or
+      -- the count.
+      -- psl f_link_con_read : assert always
+      --    {f_link_con and not link_we and not rst_i} |=>
+      --    {rst_i = '1' or (link_ack = '1' and dbus_rdata = 0)};
+      -- psl f_link_con_side : assert always
+      --    {f_link_con and not rst_i} |=>
+      --    {rst_i = '1' or (stable(read_count) and stable(cpu_tx_data) and
+      --                     stable(rx_empty))};
+      -- psl f_link_con_take : assert always f_link_con = '1' -> rx_take = '0';
+
+      -- The devices answer the link's latched request, or a request of the
       -- core, which is dropped if the core has been reset. The core gets one
       -- acknowledge at a time.
       -- psl f_dev_ack : assert always
@@ -1400,6 +1359,9 @@ begin
       --    dev_busy = '1' or core_owed = '1' or cpu_rst = '1' or f_cpu_rst_d = '1';
       -- psl f_one_ack : assert always
       --    rst_i = '0' -> not (srv_ack = '1' and core_owed = '1' and dev_ack = '1');
+
+      -- The clear: the link hears that it is done only while it asks.
+      -- psl f_clr_done : assert always rst_i = '0' and clr_done = '1' -> link_clear = '1';
 
       -- The console's answer: a byte with bit 8, 0x200 at the end, or 0
       -- psl f_console : assert always
@@ -1412,9 +1374,10 @@ begin
       -- psl c_console_end : cover {f_rx_end and not rst_i};
       -- psl c_tx_wait : cover {tx_wait and not rst_i};
       -- psl c_dev_core : cover {core_dev and not rst_i and not cpu_rst; dbus_ack};
-      -- psl c_dev_cli : cover {dev_busy and not rst_i; cli_ack};
-      -- psl c_cli : cover {cli_ack and not rst_i};
-      -- psl c_halt : cover {halt_note and not rst_i};
+      -- psl c_dev_link : cover {dev_busy and not rst_i; link_ack};
+      -- psl c_link_mem : cover {link_take and not link_we and not rst_i; link_ack};
+      -- psl c_link_con : cover {f_link_con and not rst_i};
+      -- psl c_clear : cover {clearing and not rst_i};
    end generate gen_formal;
 
 end architecture synthesis;

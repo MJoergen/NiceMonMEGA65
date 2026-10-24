@@ -1,6 +1,6 @@
 ; Uses the math unit (SYSTEM.md §2), the performance counters (§3), and
 ; the timer (§4), and leaves the results in memory at RESULT, where
-; tb_nicemon reads them with the CLI.
+; tb_nicemon reads them over the debug link.
 ;
 ; The timer raises IRQ through vector 0xF0 every 200 cycles, and the
 ; interrupt routine counts the requests in R6. The program waits for three,

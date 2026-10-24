@@ -45,6 +45,7 @@ begin
          wr_en_i   => wr_en_i,
          wr_data_i => wr_data_i,
          full_o    => full,
+         free_o    => open,
          end_i     => end_i,
          ended_o   => ended,
          rd_en_i   => rd_en_i,

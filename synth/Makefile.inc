@@ -3,8 +3,8 @@
 # BOARD_SRC has the board's own sources, with top.vhd last. It may set FLOW
 # too.
 #
-# make                builds build/top.bit, whose core waits for the
-#                     command line
+# make                builds build/top.bit, whose core waits, held, for
+#                     the debug link
 # make ROM=file.bin   builds it with the ROM: the core boots from file.bin,
 #                     the monitor, at reset (G_ROM_FILE of top.vhd)
 # make NICE=multi     builds it with nice_cpu's multi-cycle core instead of
@@ -50,8 +50,6 @@ REPO     = ../..
 include ../../core.mk
 SRC  = $(NICE_SOURCES)
 SRC += ../../src/uart_serdes.vhd
-SRC += ../../src/line_buffer.vhd
-SRC += ../../src/cmd.vhd
 SRC += ../../src/rx_fifo.vhd
 SRC += ../../src/ram.vhd
 SRC += ../../src/rom.vhd

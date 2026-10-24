@@ -32,7 +32,7 @@ library work;
 entity mega65 is
    generic (
       -- The ROM with the monitor, a .bin file, or "" for a build without a
-      -- ROM, whose core waits for the command line (see src/nicemon.vhd)
+      -- ROM, whose core waits for the debug link (see src/nicemon.vhd)
       G_ROM_FILE : string := ""
    );
    port (

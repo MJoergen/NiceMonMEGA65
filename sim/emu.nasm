@@ -1,6 +1,6 @@
 ; Uses what the system has in common with the emulator: the screen, memory
 ; in the I/O range, the read counter, and the registers after HALT. The
-; testbench reads the results back with the command line.
+; testbench reads the results back over the debug link.
 SCREEN  .EQU    0xFFFF0000
 COUNTER .EQU    0xFFFFFF01
         MOVE    @SCREEN, 0x41           ; 'A' at column 0 of row 0

@@ -1,7 +1,8 @@
 -- The whole system, nicemon.vhd, with its checks (G_FORMAL), for
--- SymbiYosys. Every input is free, and so is the core, nice_core_formal.vhd,
--- so the solver makes every request that a core may make, sends every byte
--- on the UART and the keyboard at any time, and types every command line.
+-- SymbiYosys. Every input is free, and so are the core, nice_core_formal.vhd,
+-- and the debug link, debug_link_formal.vhd, so the solver makes every
+-- request that a core or the link may make, and sends every byte on the
+-- UART and the keyboard at any time.
 -- The sizes are small: 16 words of RAM, no ROM, a FIFO of 4 bytes, and a
 -- UART bit of 2 cycles, from a clock of 2 MHz and a baud rate of 1 MHz. The
 -- clock is not 2 Hz, as nice_cpu's perf wants 1 MHz or more for its
@@ -9,9 +10,9 @@
 --
 -- THEORY OF OPERATION
 -- With G_CPU_RUN_AT_RESET the core runs the program in the RAM from reset,
--- and the CLI waits until it halts. Without it the core is held, and the
--- CLI has the input, so the solver types commands that read and write
--- memory and devices, and that start the core. The checks themselves are in
+-- and the link may hold it at any time. Without it the core is held, and
+-- the link owns the bus, so the solver makes requests that read and write
+-- memory and devices, and starts the core. The checks themselves are in
 -- nicemon.vhd, where they see its signals.
 --
 -- RESET

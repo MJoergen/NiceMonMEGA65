@@ -5,7 +5,8 @@
 #             and runs them:
 #             tb_hello    the core alone. The console output must equal
 #                         hello.expected.
-#             tb_nicemon  the whole system, driven through its UART and
+#             tb_nicemon  the whole system, driven through its UART, as a
+#                         host on the debug link would drive it, and
 #                         its keyboard input, with rom.nasm as its ROM. It
 #                         also runs reserved.nasm of the emulator's tests.
 #             tb_kbd      the keyboard driver and its ASCII mapping.
@@ -39,7 +40,7 @@ REPO     = ..
 include ../core.mk
 NICE_SIM = $(NICE_DIR)/hdl/sim/wb_mem.vhd
 
-SRC_SOURCES  = ../src/uart_serdes.vhd ../src/line_buffer.vhd ../src/cmd.vhd ../src/rx_fifo.vhd ../src/ram.vhd ../src/rom.vhd \
+SRC_SOURCES  = ../src/uart_serdes.vhd ../src/rx_fifo.vhd ../src/ram.vhd ../src/rom.vhd \
                ../src/nicemon.vhd \
                ../src/kbd_m65.vhd ../src/kbd_ascii.vhd ../src/kbd_ps2.vhd ../src/kbd_ps2_ascii.vhd ../src/seg7.vhd ../src/rgb_pwm.vhd \
                ../src/video/video_pkg.vhd ../src/video/font_pkg.vhd ../src/video/pix.vhd ../src/video/scr_ram.vhd ../src/video/text.vhd \
@@ -73,7 +74,7 @@ STEPS_EMU      = 12
 STEPS_RESERVED = 6
 EMU            = $(NICE_DIR)/emulator/zig-out/bin/niceemu
 
-BINS = hello rom echo fifo devices emu reserved eof counters
+BINS = hello rom echo fifo devices emu count reserved eof counters
 
 tb_hello: analyze $(BUILD)/hello.bin
 	@(cd $(BUILD) && $(GHDL) --elab-run $(GHDLFLAGS) tb_hello \
@@ -84,7 +85,7 @@ tb_hello: analyze $(BUILD)/hello.bin
 
 tb_nicemon: analyze $(addprefix $(BUILD)/,$(addsuffix .bin,$(BINS)))
 	@(cd $(BUILD) && $(GHDL) --elab-run $(GHDLFLAGS) tb_nicemon \
-	  -gG_HELLO_FILE=hello.bin -gG_ROM_FILE=rom.bin -gG_ECHO_FILE=echo.bin -gG_FIFO_FILE=fifo.bin -gG_DEVICES_FILE=devices.bin -gG_EMU_FILE=emu.bin -gG_RESERVED_FILE=reserved.bin -gG_EOF_FILE=eof.bin -gG_COUNTERS_FILE=counters.bin -gG_NICE=$(NICE) \
+	  -gG_HELLO_FILE=hello.bin -gG_ROM_FILE=rom.bin -gG_ECHO_FILE=echo.bin -gG_FIFO_FILE=fifo.bin -gG_DEVICES_FILE=devices.bin -gG_EMU_FILE=emu.bin -gG_COUNT_FILE=count.bin -gG_RESERVED_FILE=reserved.bin -gG_EOF_FILE=eof.bin -gG_COUNTERS_FILE=counters.bin -gG_NICE=$(NICE) \
 	  -gG_HELLO_STEPS=$(STEPS_HELLO) -gG_EMU_STEPS=$(STEPS_EMU) -gG_RESERVED_STEPS=$(STEPS_RESERVED) > tb_nicemon.log 2>&1) && \
 	  echo "PASS tb_nicemon" || (echo "FAIL tb_nicemon"; cat $(BUILD)/tb_nicemon.log; exit 1)
 
@@ -149,6 +150,9 @@ $(BUILD)/fifo.bin: fifo.nasm $(ASM_PY) | $(BUILD)
 	@$(ASM) -o $@ $<
 
 $(BUILD)/emu.bin: emu.nasm $(ASM_PY) | $(BUILD)
+	@$(ASM) -o $@ $<
+
+$(BUILD)/count.bin: count.nasm $(ASM_PY) | $(BUILD)
 	@$(ASM) -o $@ $<
 
 $(BUILD)/reserved.bin: $(NICE_DIR)/emulator/test/reserved.nasm $(ASM_PY) | $(BUILD)

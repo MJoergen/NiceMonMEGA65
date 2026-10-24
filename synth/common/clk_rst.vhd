@@ -6,8 +6,8 @@
 -- spare, so recheck the timing after a change to nice_cpu.
 -- The reset is held while the MMCM is not locked, and while the reset
 -- button is pressed (G_BUTTON_LEVEL is its level then), and for 2^20 cycles
--- (10 ms at 100 MHz) after both. So the UART output is idle for that long before the CLI sends
--- its banner, and a terminal that saw the pin change during configuration
+-- (10 ms at 100 MHz) after both. So the UART output is idle for that long before the link sends
+-- its `b01`, and a terminal that saw the pin change during configuration
 -- has time to find the start of a character.
 -- The MMCM's locked output and the button are synchronized to clk_o by two
 -- registers each, as in MandelbrotMEGA65's clk_rst.vhd. The button is not

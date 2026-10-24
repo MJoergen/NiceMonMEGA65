@@ -29,8 +29,9 @@
 --   (f_stop of pipe_fetch.vhd, f_halt_idle of formal_multicycle.vhd). In
 --   the first, the pipelined core may still have one on the bus. This
 --   holds for an instruction bus that never stalls, as nicemon.vhd's.
---   Without it, the CLI could hold the core while a fetch waits, and the
---   fetch's ACK would come with CYC low.
+--   So the link's accesses, which start once the core has halted, meet no
+--   fetch. A hold of a running core resets it with a fetch in flight, whose
+--   ACK nicemon.vhd drops, as it comes with CYC low.
 --
 -- RESET
 -- rst_i is the core's reset. A request waits no longer after it.

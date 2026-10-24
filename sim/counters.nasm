@@ -1,7 +1,7 @@
 ; Reads through the core's data bus what the other programs leave to the
-; command line: the fetch statistics (MICROARCH.md §8.1), the microsecond
+; debug link: the fetch statistics (MICROARCH.md §8.1), the microsecond
 ; counter of SYSTEM.md §3, and the board's registers. It leaves the results
-; in memory at RESULT, where tb_nicemon reads them with the CLI.
+; in memory at RESULT, where tb_nicemon reads them over the link.
 ;
 ; A start of the core clears the fetch statistics, and the program stops
 ; them first, so FS_CYCLES holds the few cycles before the stop, and the

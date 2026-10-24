@@ -9,6 +9,9 @@
 -- input has ended; then it is lost. end_i ends the input, and ended_o stays
 -- high until reset.
 --
+-- free_o is the number of bytes that the FIFO can take now, from 0 to
+-- 2^G_ADDR_BITS, in the cycle after a write or a read changes it.
+--
 -- rd_en_i takes the oldest byte, and is ignored when the FIFO is empty. The
 -- memory is read in every cycle at rd into rd_data_o, so rd_data_o holds the
 -- byte taken in the cycle after rd_en_i. No byte is written to the word at rd
@@ -44,6 +47,7 @@ entity rx_fifo is
       wr_en_i   : in  std_logic;
       wr_data_i : in  std_logic_vector(7 downto 0);
       full_o    : out std_logic;
+      free_o    : out std_logic_vector(G_ADDR_BITS downto 0);
 
       -- The input ends
       end_i     : in  std_logic;
@@ -80,6 +84,7 @@ begin
    we      <= wr_en_i and not full and not ended;
    re      <= rd_en_i and not empty;
    full_o  <= full;
+   free_o  <= C_LEN - (wr - rd);
    empty_o <= empty;
    ended_o <= ended;
 

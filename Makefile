@@ -56,7 +56,7 @@ test:
 # task has a work directory of its own in formal/build, for a recent SymbiYosys
 # keeps a status database in each one.
 SBY ?= sby
-FORMAL_TASKS = cli-prove cli-cover rx_fifo-prove rx_fifo-cover nicemon-run nicemon-cli nicemon-cover
+FORMAL_TASKS = rx_fifo-prove rx_fifo-cover nicemon-run nicemon-link nicemon-cover
 
 formal: $(addprefix formal-,$(FORMAL_TASKS))
 
