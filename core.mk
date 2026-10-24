@@ -10,6 +10,12 @@
 
 NICE ?= pipeline
 
+ifeq ($(wildcard $(NICE_HDL)/nice_pkg.vhd),)
+ifneq ($(filter-out clean,$(or $(MAKECMDGOALS),all)),)
+$(error $(NICE_HDL) is missing; run "git submodule update --init")
+endif
+endif
+
 NICE_COMMON = $(NICE_HDL)/nice_pkg.vhd $(NICE_HDL)/trace_pkg.vhd $(NICE_HDL)/pipe_pkg.vhd
 
 ifeq ($(NICE),pipeline)
@@ -22,5 +28,5 @@ $(error NICE must be pipeline or multi, not "$(NICE)")
 endif
 
 NICE_SOURCES = $(NICE_COMMON) $(NICE_CORE) \
-               $(addprefix $(NICE_HDL)/,mpu.vhd perf.vhd timer.vhd fetch_stats.vhd wb_dmux.vhd) \
+               $(addprefix $(NICE_HDL)/,mpu.vhd perf.vhd timer.vhd fetch_stats.vhd) \
                $(REPO)/src/nice_core.vhd $(REPO)/src/core/nice_core_$(NICE).vhd

@@ -74,6 +74,7 @@ architecture formal of nice_core is
    attribute anyseq of halted    : signal is true;
    attribute anyseq of instret   : signal is true;
    attribute anyseq of retire    : signal is true;
+   attribute anyseq of stats     : signal is true;
    attribute anyseq of regs      : signal is true;
    attribute anyseq of halt_code : signal is true;
 

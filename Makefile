@@ -11,6 +11,13 @@ EMU     = nice_cpu/emulator/zig-out/bin/niceemu
 
 .PHONY: help test formal lint examples r3 r6 nexys4ddr load run hwtest clean
 
+# Every target but these needs the nice_cpu submodule
+ifeq ($(wildcard nice_cpu/hdl/src/nice_pkg.vhd),)
+ifneq ($(filter-out help lint clean,$(or $(MAKECMDGOALS),help)),)
+$(error nice_cpu is not checked out; run "git submodule update --init")
+endif
+endif
+
 help:
 	@echo "Targets:"
 	@echo "  make test       run the GHDL simulation tests (needs GHDL)"
@@ -58,8 +65,8 @@ formal-%:
 	@job=$(word 1,$(subst -, ,$*)); task=$(word 2,$(subst -, ,$*)); \
 	cd formal && $(SBY) -f -d build/$${job}_$$task $$job.sby $$task > build/$${job}_$$task.log 2>&1; \
 	if [ $$? -eq 0 ]; then echo "PASS formal $$job $$task"; else echo "FAIL formal $$job $$task"; \
-	  grep -aE "Assert failed|Unreached|ERROR|summary: +(failed|counterexample|unreached)" \
-	    build/$${job}_$$task.log; exit 1; fi
+	  grep -aE "Assert failed|Unreached|ERROR|DONE \((FAIL|UNKNOWN|ERROR)|summary: +(failed|counterexample|unreached)" \
+	    build/$${job}_$$task.log || tail -n 5 build/$${job}_$$task.log; exit 1; fi
 
 # The VHDL of this repository, but not the nice_cpu submodule, which has its
 # own, nor the third-party files that keep their own style (CODING_STYLE.md):

@@ -130,7 +130,7 @@ synth-text: analyze
 	done
 
 synth-system: analyze
-	@(cd $(BUILD) && $(GHDL) --synth $(GHDLFLAGS) -gG_CLOCK_HZ=80000000 -gG_SCR_ADDR_BITS=13 -gG_BOARD_IO=true system > system_synth.vhd 2> system_synth.log) && \
+	@(cd $(BUILD) && $(GHDL) --synth $(GHDLFLAGS) -gG_CLOCK_HZ=90000000 -gG_SCR_ADDR_BITS=13 -gG_BOARD_IO=true system > system_synth.vhd 2> system_synth.log) && \
 	  echo "PASS synth system" || (echo "FAIL synth system"; cat $(BUILD)/system_synth.log; exit 1)
 
 analyze: | $(BUILD)
@@ -160,10 +160,10 @@ $(BUILD)/eof.bin: eof.nasm $(ASM_PY) | $(BUILD)
 $(BUILD)/devices.bin: devices.nasm $(ASM_PY) | $(BUILD)
 	@$(ASM) -o $@ $<
 
-$(BUILD):
 $(BUILD)/counters.bin: counters.nasm $(ASM_PY) | $(BUILD)
 	@$(ASM) -o $@ $<
 
+$(BUILD):
 	@mkdir -p $@
 
 clean:
