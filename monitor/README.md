@@ -22,11 +22,11 @@ as the NICE CPU allows.
   so the monitor is developed in the emulator, `niceemu`, which runs it
   like any program, with its keystrokes in an input file; the board is for
   checking.
-- The command line interpreter stays. While the monitor runs, the UART is
-  its, so the command line answers only after the core halts, which QMON's
-  `C H` command does. Then `load.py` and `run.py` hide the ROM, so that a
-  program at address 0 runs as in the emulator, and the reset button boots
-  the monitor again.
+- The debug link stays. While the monitor runs, the link reaches only its
+  debug registers, and a host holds the core to reach the rest, as
+  `load.py` and `run.py` do. They hide the ROM too, so that a program at
+  address 0 runs as in the emulator, and the reset button boots the monitor
+  again.
 
 ## Programs
 

@@ -3,8 +3,9 @@
 NiceMonMEGA65 runs the NICE CPU (the `nice_cpu` submodule) on the MEGA65 R3
 and R6 boards, the main target; the Digilent Nexys4DDR also builds, with
 UART, VGA, a PS/2 keyboard, and its LEDs, seven-segment display, buttons,
-and switches as registers. It has a command line interpreter (CLI) on the debug
-UART, a text display on VGA and HDMI, a ROM at address 0 for a QMON-like
+and switches as registers. It has nice_cpu's debug link
+(`nice_cpu/doc/DEBUG.md`, `hdl/src/debug_link.vhd`) on the debug UART, a
+text display on VGA and HDMI, a ROM at address 0 for a QMON-like
 monitor that is planned but not written (`monitor/README.md`), and host
 tools that load and run programs. The goal is that a program runs on the
 board exactly as `niceemu`, the emulator in `nice_cpu/emulator`, runs it.
@@ -42,7 +43,7 @@ and `make lint`.
 ## Layout
 
 - `src/`: the system (`nicemon.vhd`), its memory (`ram.vhd`, `rom.vhd`),
-  the CLI (`cmd.vhd`, `line_buffer.vhd`, `uart_serdes.vhd`, from cmod-s7),
+  the UART (`uart_serdes.vhd`, from cmod-s7), which carries the link,
   the core's input FIFO (`rx_fifo.vhd`), the keyboards (`kbd_m65.vhd` and
   `kbd_ascii.vhd` for the MEGA65, `kbd_ps2.vhd` and `kbd_ps2_ascii.vhd` for
   the Nexys4DDR's PS/2), the Nexys4DDR's display and RGB LED drivers
@@ -59,7 +60,8 @@ and `make lint`.
   `.claude/rules/synth.md` when working there.
 - `sim/`: the GHDL testbenches and their `.nasm` programs. `formal/`: the
   SymbiYosys wrappers; the checks themselves are `G_FORMAL` blocks in the
-  sources. `tools/`: `load.py`, `run.py`, `hwtest.py`. `examples/`: C
+  sources. `tools/`: `nicelink.py` (the link, on the UART or over TCP to
+  `niceemu --link`), `load.py`, `run.py`, `hwtest.py`. `examples/`: C
   programs built through nice_cpu's wasm translator.
 
 ## Rules and pitfalls
@@ -73,8 +75,15 @@ and `make lint`.
   emulator" table, and a new bitstream, as the core's timing margin at
   100 MHz is small.
 - A bitstream with a ROM boots from it. The tools hide it with bit 3 of the
-  control register (`W FFFFFFF0 0000000D` to hold, clear, and hide, then
-  `00000008` to run), so a program loads at 0 as in the emulator.
+  control register (a link write of `0000000D` to `FFFFFFF0` to hold,
+  clear, and hide, then `00000008` to run), so a program loads at 0 as in
+  the emulator.
+- While the core runs, the link reaches only its debug registers at
+  `FFFFFFE0`–`FF`, and the link reads the console and the read counter as
+  0. A hold leaves R0–R15 undefined.
+- The tools take `--tcp PORT` for `niceemu --link PORT` (PORT 0 prints the
+  port it picked on stderr). `run.py --tcp` against plain `niceemu` checks
+  the tools without a board.
 - American spelling everywhere, in comments, documentation, and identifiers
   (color, analyze, synchronize, behavior). The third-party files that are
   copied unchanged keep theirs, and so do the names they define, such as

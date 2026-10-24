@@ -5,8 +5,9 @@
 #   NICE=pipeline   nice_cpu's pipelined core (the default)
 #   NICE=multi      nice_cpu's multi-cycle core
 #
-# NICE_SOURCES lists what to analyze, in order, including src/nice_core.vhd
-# and the architecture of it that picks the core.
+# NICE_SOURCES lists what to analyze, in order: the core, nice_cpu's devices
+# and its debug link, src/nice_core.vhd, and the architecture of it that
+# picks the core.
 
 NICE ?= pipeline
 

@@ -81,7 +81,8 @@ To build, with Vivado installed in `/opt/Xilinx/2025.1/Vivado` (or set
 
 or `make r6` in the top directory, and likewise for `r3` and `nexys4ddr`.
 The bitstream is `synth/r6/build/top.bit`, with timing and utilization
-reports next to it. Its core waits for the command line. With
+reports next to it. Its core waits, held, for a host on the debug link.
+With
 
     make -C synth/r6 ROM=/path/to/monitor.bin
 
@@ -134,25 +135,28 @@ build on a busy machine took 14:17.
 
 The utilization is from `build/utilization.rpt`, and the split by module
 from `report_utilization -hierarchical` on `build/top.dcp`. These are the
-numbers without `ROM=`, in LUTs and flip-flops. The pipelined columns are
-from the builds of 2026-10-24 at nice_cpu 2f67a50, and the multi-cycle
-columns are from the builds of 2026-10-22 at this repository's cb95968,
-which had neither the Nexys4DDR's
-devices (below) nor the microsecond counter:
+numbers without `ROM=`, in LUTs and flip-flops. The R6 pipelined column is
+from the build of 2026-10-24 at nice_cpu a21d8b6, with the debug link. The
+Nexys4DDR pipelined column is from the build of 2026-10-24 at nice_cpu
+2f67a50, and the multi-cycle columns are from the builds of 2026-10-22 at
+this repository's cb95968, which had neither the Nexys4DDR's devices
+(below) nor the microsecond counter. These three had the command line in
+place of the link, counted in the rest:
 
 | Part of the design | R6, pipelined | R6, multi | Nexys4DDR, pipelined | Nexys4DDR, multi |
 |---|---|---|---|---|
-| The core (`nice_core`) | 7168 / 3007 | 4605 / 1050 | 7011 / 2948 | 4636 / 4071 |
-| The math unit (`mpu`) | 2214 / 874 | 2172 / 874 | 2245 / 874 | 2166 / 874 |
-| The fetch statistics (`fetch_stats`) | 733 / 1329 | 44 / 99 | 739 / 1329 | 44 / 99 |
-| The rest: the CLI, UART, RAM, counters, timer, the Nexys4DDR's devices, and glue | 711 / 1270 | 795 / 1156 | 1022 / 1413 | 740 / 1119 |
+| The core (`nice_core`) | 6899 / 2948 | 4605 / 1050 | 7011 / 2948 | 4636 / 4071 |
+| The math unit (`mpu`) | 2099 / 874 | 2172 / 874 | 2245 / 874 | 2166 / 874 |
+| The fetch statistics (`fetch_stats`) | 742 / 1329 | 44 / 99 | 739 / 1329 | 44 / 99 |
+| The debug link (`debug_link`) | 780 / 937 | – | – | – |
+| The rest: the UART, RAM, counters, timer, the Nexys4DDR's devices, and glue | 518 / 849 | 795 / 1156 | 1022 / 1413 | 740 / 1119 |
 | The text display (`text.vhd`) | 123 / 180 | 123 / 180 | 121 / 156 | 121 / 156 |
-| The keyboard | 590 / 577 | 596 / 585 | 104 / 48 | – |
-| The HDMI output | 575 / 1207 | 574 / 1207 | – | – |
-| Total | 12114 / 8444 | 8909 / 5151 | 11242 / 6768 | 7707 / 6319 |
-| Total, of the FPGA | 9.1 % / 3.2 % | 6.7 % / 1.9 % | 17.7 % / 5.3 % | 12.2 % / 5.0 % |
+| The keyboard | 579 / 577 | 596 / 585 | 104 / 48 | – |
+| The HDMI output | 600 / 1207 | 574 / 1207 | – | – |
+| Total | 12340 / 8901 | 8909 / 5151 | 11242 / 6768 | 7707 / 6319 |
+| Total, of the FPGA | 9.2 % / 3.3 % | 6.7 % / 1.9 % | 17.7 % / 5.3 % | 12.2 % / 5.0 % |
 
-The pipelined core is about 5.4 % of the LUTs of the R6's FPGA, and 11.1 % of
+The pipelined core is about 5.1 % of the LUTs of the R6's FPGA, and 11.1 % of
 the Nexys4DDR's. The multi-cycle core has two thirds of its LUTs, 3.4 % and
 7.3 %. On the R6 it has a third of the flip-flops too. On the Nexys4DDR it
 has 4071, more than the pipelined core's 2948, where the build at this
