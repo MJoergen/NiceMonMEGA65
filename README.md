@@ -349,11 +349,11 @@ a host. That is the layout of QNICE-FPGA, whose monitor is in ROM at
 `0x0000`–`0x7FFF` and whose programs load at `0x8000`, and it is where the
 monitor will go. The file is read by Vivado, so the ROM changes only with a
 new bitstream, and a word beyond the ROM fails the build. A write to the
-ROM is dropped, and the clear command does not touch it. So a program in
-the ROM must keep its stack and its variables in the RAM, at `0x8000` or
-above: `sim/rom.nasm`, the greeting that the tests use as the ROM, has its
-stack at the top of the memory, as the runtime has. With a stack in the
-ROM, as `hello.nasm` of nice_cpu has at `0x1000`, a pushed return address
+ROM is dropped, and a clear (bit 2 of the control register) does not
+touch it. So a program in the ROM must keep its stack and its variables
+in the RAM, at `0x8000` or above: `sim/rom.nasm`, the greeting that the
+tests use as the ROM, has its stack at the top of the memory, as the
+runtime has. With a stack in the ROM, as `hello.nasm` of nice_cpu has at `0x1000`, a pushed return address
 is lost and reads back as 0, and the program starts over, forever.
 
 While the core runs from the ROM, the link reaches only its debug
@@ -411,7 +411,7 @@ effect and does not write (DEBUG.md §3).
 | `0xFFFFFF01` | The emulator's read counter. A read by the core returns the number of its reads since the last write, and a write sets that number. It is 0 after reset, and a start keeps it, as in the emulator. |
 | `0xFFFFFF10`–`0xFFFFFF1F` | The timer of SYSTEM.md §4: it raises IRQ every P clock cycles, through the vector it is given. |
 | `0xFFFFFF20`–`0xFFFFFF3F` | The math unit of SYSTEM.md §2: 32-bit multiply and divide, and 64-bit divide. |
-| `0xFFFFFF40`–`0xFFFFFF4F` | The performance counters of SYSTEM.md §3: cycles, instructions, and microseconds, 64 bits each. The microseconds come from the clock, 100 MHz on the MEGA65 and 90 MHz on the Nexys4DDR, so they are real time, where the emulator counts one per step. The link reads them as the core does: a read of a low word takes the snapshot that the high word returns, where `niceemu --link` takes none ([nice_cpu#41](https://github.com/MJoergen/nice_cpu/issues/41)). The words `0xFFFFFF46`–`4F` read 0 and take no write. |
+| `0xFFFFFF40`–`0xFFFFFF4F` | The performance counters of SYSTEM.md §3: cycles, instructions, and microseconds, 64 bits each. The microseconds come from the clock, 100 MHz on the MEGA65 and 90 MHz on the Nexys4DDR, so they are real time, where the emulator counts one per step. The link reads them as the core does: a read of a low word takes the snapshot that the high word returns, where `niceemu --link` takes none. DEBUG.md §3 allows both. The words `0xFFFFFF46`–`4F` read 0 and take no write. |
 | `0xFFFFFF50`–`0xFFFFFF7F` | The fetch statistics of MICROARCH.md §8.1, the rest of the performance counters: counters of what FETCH and DECODE do, for judging the size of FETCH's buffer. A start of the core clears them, and they then count each clock while the core runs, until a write of 0 to `FS_CTRL` stops them. They stop while the core is held and after it halts. |
 | `0xFFFFFF80`–`0xFFFFFF8F` | The screen's registers: the cursor and the display offset (see [The screen](#the-screen)). |
 | `0xFFFFFF90`–`0xFFFFFF9F` | The Nexys4DDR's LEDs, seven-segment display, buttons, and switches (see [The Nexys4DDR's devices](#the-nexys4ddrs-devices)). On the MEGA65 they read 0 and take no write. |
@@ -604,7 +604,8 @@ every time, not only the ones a testbench sends.
   and the solver spends no time on a real core. The debug link is free
   too, `formal/debug_link_formal.vhd`: it does anything that nice_cpu's
   `debug_link.vhd` may do on its ports, as the header of that file
-  promises, and makes a request in any cycle. The job is too large to
+  promises and nice_cpu's `hdl/formal/debug_link.sby` proves, and makes a
+  request in any cycle. The job is too large to
   prove, so it checks every cycle up to a depth: 30 cycles with the core
   running from reset, and 40 with the core held for the link first. These
   have no ROM and no board registers. The `rom` and `rom_cover` tasks are

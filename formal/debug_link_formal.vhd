@@ -1,7 +1,8 @@
 -- debug_link for formal/nicemon.sby: a free debug link that may do anything
 -- that nice_cpu's hdl/src/debug_link.vhd may do on its ports. The checks of
--- nicemon.vhd are about the system around the link, which nice_cpu tests on
--- its own (MJoergen/nice_cpu#44 is to prove it), and a real link needs
+-- nicemon.vhd are about the system around the link, which nice_cpu proves
+-- on its own (nice_cpu/hdl/formal/debug_link.sby proves the contracts in
+-- the header of debug_link.vhd that this file assumes), and a real link needs
 -- hundreds of cycles of UART bytes for one request, far beyond the depth of
 -- the checks. A free one makes a request in any cycle.
 --

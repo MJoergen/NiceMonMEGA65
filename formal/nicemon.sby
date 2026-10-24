@@ -10,7 +10,9 @@
 # both, and the solver spends nothing on a real core's state. The debug
 # link is debug_link_formal.vhd, a free link that does anything that
 # nice_cpu's debug_link.vhd may do, so it makes a request in any cycle,
-# where a real one needs hundreds of cycles of UART bytes for one.
+# where a real one needs hundreds of cycles of UART bytes for one. Its
+# assumptions are the contracts of debug_link.vhd, which nice_cpu proves
+# in nice_cpu/hdl/formal/debug_link.sby.
 # The link uses the bus only while the core is held or halted, and a
 # halted core makes no new fetch, so no link request meets a running core
 # or an outstanding fetch.

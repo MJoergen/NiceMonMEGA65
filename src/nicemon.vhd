@@ -135,13 +135,11 @@
 -- whose interrupts come after clock cycles here, not after steps. The cycle
 -- counter and the timer's counter run only while the core runs, so they
 -- stop at a halt, as the emulator's do. The fetch statistics are cleared
--- at the start too, but they have no input for whether the core runs: they
--- count every clock, also while the core is held and after it halts, until
--- FS_CTRL is written 0 (MJoergen/nice_cpu#42 is to give them that input).
+-- at the start too, and count only while the core runs, as the counters do.
 -- A read of CYCLE_LO, INSTR_LO, or TIME_LO by the link takes a snapshot, as
--- one by the core does, though DEBUG.md §3 says it takes none
--- (MJoergen/nice_cpu#41). Only the host can see it: the link reads the
--- counters only while the core is held or halted, and a start resets them.
+-- one by the core does, where niceemu takes none; DEBUG.md §3 allows both.
+-- Only the host can see it: the link reads the counters only while the
+-- core is held or halted, and a start resets them.
 --
 -- The data bus of the core is stalled while the link owns port B, and while a
 -- write to the UART waits. A request of the link is stalled until no device
