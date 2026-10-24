@@ -24,7 +24,7 @@ and switches as registers (see [synth/](synth/README.md#the-nexys4ddr) and
 | Path | What it is |
 |---|---|
 | [nice_cpu/](https://github.com/MJoergen/nice_cpu) | The NICE CPU, its assembler, its emulator, and `nicewasm`, a [translator](https://github.com/MJoergen/nice_cpu/tree/main/translator) from WebAssembly to NICE assembly, as a git submodule. |
-| [src/](src/) | The synthesisable VHDL, shared by both boards. `nicemon.vhd` is the system: the NICE core, the memory (`ram.vhd` and `rom.vhd`), the UART, the core's input FIFO (`rx_fifo.vhd`), and the command line interpreter. `uart_serdes.vhd` (with fixes to its receiver, and break detection), `line_buffer.vhd`, and `cmd.vhd` are copied from cmod-s7; `cmd.vhd` prints `NICE` instead of `WBUS` at reset, and `HALT` when the core halts. `kbd_m65.vhd` drives the MEGA65 keyboard, and `kbd_ascii.vhd` turns its keys into ASCII. `kbd_ps2.vhd` receives the PS/2 keyboard of the Nexys4DDR, and `kbd_ps2_ascii.vhd` turns its scan codes into ASCII. `seg7.vhd` scans the Nexys4DDR's seven-segment display, and `rgb_pwm.vhd` dims its RGB LEDs. `system.vhd` is what every board has: the system, the text display of its screen, and the UART's pins. |
+| [src/](src/) | The synthesizable VHDL, shared by both boards. `nicemon.vhd` is the system: the NICE core, the memory (`ram.vhd` and `rom.vhd`), the UART, the core's input FIFO (`rx_fifo.vhd`), and the command line interpreter. `uart_serdes.vhd` (with fixes to its receiver, and break detection), `line_buffer.vhd`, and `cmd.vhd` are copied from cmod-s7; `cmd.vhd` prints `NICE` instead of `WBUS` at reset, and `HALT` when the core halts. `kbd_m65.vhd` drives the MEGA65 keyboard, and `kbd_ascii.vhd` turns its keys into ASCII. `kbd_ps2.vhd` receives the PS/2 keyboard of the Nexys4DDR, and `kbd_ps2_ascii.vhd` turns its scan codes into ASCII. `seg7.vhd` scans the Nexys4DDR's seven-segment display, and `rgb_pwm.vhd` dims its RGB LEDs. `system.vhd` is what every board has: the system, the text display of its screen, and the UART's pins. |
 | [src/core/](src/core/) | `nice_core_pipeline.vhd` and `nice_core_multi.vhd`, the two architectures of `nice_core`. `src/nice_core.vhd` is the entity that wraps whichever of nice_cpu's cores `core.mk` selects with `NICE=pipeline` (the default) or `NICE=multi`. |
 | [src/video/](src/video/) | The text display: `text.vhd` shows the screen at `0xFFFF0000` as 80×25 characters on a video output, with a cursor and a display offset for scrolling. `pix.vhd` and `video_pkg.vhd` are from [MandelbrotMEGA65](https://github.com/MJoergen/MandelbrotMEGA65). `scr_ram.vhd` is the screen's dual-clock memory. `font_pkg.vhd` is the [Spleen](https://github.com/fcambus/spleen) 16×32 font, made by `font/gen_font_pkg.py`. |
 | [font/](font/) | The script that makes `src/video/font_pkg.vhd` from Spleen, and Spleen's license (BSD 2-Clause). |
@@ -37,6 +37,7 @@ and switches as registers (see [synth/](synth/README.md#the-nexys4ddr) and
 | [EMULATOR.md](EMULATOR.md) | The table of the known differences from the emulator. |
 | [TODO.md](TODO.md) | Work that is planned but not started. |
 | [core.mk](core.mk) | Picks the source files of the core, from `NICE`, for the Makefiles of `sim/` and `synth/`. |
+| [.claude/rules/synth.md](.claude/rules/synth.md) | Notes for Claude Code on the Vivado builds: where Vivado is, how to build, and what to check after a build. |
 | [vsg.yml](vsg.yml) | The configuration of `make lint`, which checks the VHDL against [CODING_STYLE.md](CODING_STYLE.md). |
 | [CLAUDE.md](CLAUDE.md) | Instructions for Claude Code: the commands, the layout, and the pitfalls. |
 | [.github/workflows/ci.yml](.github/workflows/ci.yml) | The CI: `make test` on both cores, with niceemu built for its step counts, `make examples`, `make formal`, and `make lint`. It cannot run `make hwtest` or build a bitstream. |
@@ -476,7 +477,7 @@ at most 20 ms, and takes them for a halt only when nothing but such answers
 follows for 100 ms. A program that prints them and then waits longer is taken for halted,
 and `run.py` fails with "the core has not halted".
 `--timeout SEC` gives up after SEC seconds (60 by default, 0 for no limit),
-prints "Stopped at the time limit", and exits with status 3, as `niceemu -n`
+prints "Stopped at the time limit after SEC s", and exits with status 3, as `niceemu -n`
 does at its step limit. But the core still runs, and the command line cannot
 answer until the board is reset, so there are no registers, no step count,
 and no `--dump` or `--screen` output, which `niceemu -n` prints. `niceemu` has
@@ -554,12 +555,16 @@ You need GHDL (tested with 4.1.0) and Python 3.
   pixel of one 1280×1024 frame, and the sync pulses; then it scrolls the
   display one row, shows the cursor, and checks the first four rows of the
   next frame. It takes under a minute, the longest of the tests.
+- `sim/tb_board_io.vhd` tests the Nexys4DDR's drivers of its seven-segment
+  display and RGB LEDs: every digit of the display lit in turn with its own
+  segments, and the duty of an RGB output at its level.
 - `make test` also checks that GHDL can synthesize the system, with
   `sim/rom.nasm` as its ROM and without a ROM, the keyboards, the text
   display, and `src/system.vhd` with the screen and the devices of the
   Nexys4DDR, and the drivers of its display and RGB LEDs.
-- `sim/tb_board_io.vhd` tests those drivers: every digit of the display lit
-  in turn with its own segments, and the duty of an RGB output at its level.
+- `make -C sim check-steps`, part of `make test`, compares the step counts
+  that `tb_nicemon` checks with those of niceemu. It is skipped when niceemu
+  is not built.
 - `make -j test` runs all these side by side, in the time of `tb_text`.
   Each is also a target of `sim/Makefile`, so `make -C sim tb_kbd` runs one.
 - `make lint` checks the VHDL against [CODING_STYLE.md](CODING_STYLE.md)
@@ -629,7 +634,8 @@ after its halt, writes and reads the screen's registers, and runs
 `niceemu`, whose output and exit status must be the same: among them
 `sim/eof.nasm`, with no input and with 1536 bytes of input, which checks the
 larger FIFO and the end of the input, the intro's `hello.nasm` with 100
-lines of input that it halts without reading, the emulator's `trapsym.nasm` with
+lines of input that it halts without reading, `sim/halttext.nasm`, which
+prints the halt message of the command line itself, the emulator's `trapsym.nasm` with
 `--symbols`, and `examples/build/bench.bin`, but for its cycles, whose table
 it prints. That needs niceemu, built with `make -C
 nice_cpu/emulator build`. Without it, the checks that need it are skipped,
