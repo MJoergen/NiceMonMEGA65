@@ -302,6 +302,21 @@ architecture synthesis of nicemon is
       return or(addr(G_RAM_ADDR_BITS - 1 downto G_ROM_ADDR_BITS)) = '0';
    end function in_rom;
 
+   -- The memory that a memory address lands in: the screen, the ROM while
+   -- it is shown, or else the RAM
+   type t_mem is (MEM_RAM, MEM_ROM, MEM_SCR);
+
+   function mem_of(addr       : std_logic_vector(31 downto 0);
+                   rom_hidden : std_logic) return t_mem is
+   begin
+      if addr(31 downto C_SCR_BITS) = C_SCR_BASE then
+         return MEM_SCR;
+      elsif rom_hidden = '0' and in_rom(addr) then
+         return MEM_ROM;
+      end if;
+      return MEM_RAM;
+   end function mem_of;
+
    -- The devices of nice_cpu/hdl/src
    type t_dev is (DEV_PERF, DEV_MPU, DEV_TIMER, DEV_FS);
 
@@ -318,6 +333,23 @@ architecture synthesis of nicemon is
       return addr(31 downto 5) = C_MPU_BASE or addr(31 downto 4) = C_PERF_BASE or
              addr(31 downto 4) = C_TIMER_BASE or is_fs(addr);
    end function is_dev;
+
+   -- The device of an address that is_dev accepts
+   function dev_of(addr : std_logic_vector(31 downto 0)) return t_dev is
+   begin
+      if addr(31 downto 5) = C_MPU_BASE then
+         return DEV_MPU;
+      elsif addr(31 downto 4) = C_PERF_BASE then
+         return DEV_PERF;
+      elsif is_fs(addr) then
+         return DEV_FS;
+      end if;
+      return DEV_TIMER;
+   end function dev_of;
+
+   -- The source of the read data of the last request served: a memory, the
+   -- console's FIFO, a device, or else rd_io
+   type t_src is (SRC_IO, SRC_RAM, SRC_ROM, SRC_SCR, SRC_RX, SRC_MPU, SRC_PERF, SRC_FS, SRC_TIMER);
 
    -- Core
    signal cpu_rst    : std_logic;
@@ -394,8 +426,7 @@ architecture synthesis of nicemon is
    signal ibus_word : std_logic_vector(31 downto 0);   -- its first word
    signal ibus_data : std_logic_vector(63 downto 0);
    signal ibus_io   : std_logic := '0';
-   signal ibus_scr  : std_logic := '0';
-   signal ibus_rom  : std_logic := '0';
+   signal ibus_mem  : t_mem     := MEM_RAM;
 
    signal dbus_cyc   : std_logic;
    signal dbus_stb   : std_logic;
@@ -440,6 +471,7 @@ architecture synthesis of nicemon is
    -- a device owes the core an acknowledge
    signal core_take : std_logic;
    signal core_dev  : std_logic;
+   signal core_sel  : t_dev;               -- the device
    signal core_owed : std_logic := '0';
 
    -- The devices' ports: the link's latch while it is busy, else the core
@@ -481,14 +513,7 @@ architecture synthesis of nicemon is
    signal ram_b_we    : std_logic;
    signal ram_b_wdata : std_logic_vector(31 downto 0);
    signal ram_b_rdata : std_logic_vector(31 downto 0);
-   signal rd_ram      : std_logic := '0';
-   signal rd_rom      : std_logic := '0';
-   signal rd_scr      : std_logic := '0';
-   signal rd_rx       : std_logic := '0';
-   signal rd_mpu      : std_logic := '0';
-   signal rd_perf     : std_logic := '0';
-   signal rd_fs       : std_logic := '0';
-   signal rd_timer    : std_logic := '0';
+   signal rd_src      : t_src := SRC_IO;
 
    -- The ROM, read at the addresses of the memory ports
    signal rom_a_data : std_logic_vector(63 downto 0);
@@ -621,8 +646,7 @@ begin
       if rising_edge(clk_i) then
          ibus_ack <= ibus_cyc and ibus_stb;
          ibus_io  <= and(ibus_word(31 downto 8));
-         ibus_scr <= '1' when ibus_word(31 downto C_SCR_BITS) = C_SCR_BASE else '0';
-         ibus_rom <= '1' when rom_hidden = '0' and in_rom(ibus_word) else '0';
+         ibus_mem <= mem_of(ibus_word, rom_hidden);
          if cpu_rst = '1' then
             ibus_ack <= '0';
          end if;
@@ -634,8 +658,8 @@ begin
    core_iack <= ibus_ack and ibus_cyc;
 
    ibus_data <= (others => '0') when ibus_io = '1' else
-                scr_a_data when ibus_scr = '1' else
-                rom_a_data when ibus_rom = '1' else
+                scr_a_data when ibus_mem = MEM_SCR else
+                rom_a_data when ibus_mem = MEM_ROM else
                 ram_a_data;
 
 
@@ -661,6 +685,7 @@ begin
    core_take <= dbus_cyc and dbus_stb and not dbus_stall and not cpu_rst;
    core_dev  <= '1' when core_take = '1' and is_dev(dbus_addr) else
                 '0';
+   core_sel  <= dev_of(dbus_addr);
 
    ram_b_addr  <= clr_addr(G_RAM_ADDR_BITS - 1 downto 0) when clearing = '1' else
                   link_addr(G_RAM_ADDR_BITS - 1 downto 0) when link_owns = '1' else
@@ -694,29 +719,30 @@ begin
             we_v := dbus_we;
          end if;
       end if;
+      ram_b_we <= '0';
+      scr_b_we <= '0';
       if clearing = '1' then
          ram_b_we <= '1';
          scr_b_we <= '1';
-      elsif addr_v(31 downto C_SCR_BITS) = C_SCR_BASE then
-         ram_b_we <= '0';
-         scr_b_we <= we_v;
-      elsif rom_hidden = '0' and in_rom(addr_v) then
-         ram_b_we <= '0';
-         scr_b_we <= '0';
       else
-         ram_b_we <= we_v;
-         scr_b_we <= '0';
+
+         case mem_of(addr_v, rom_hidden) is
+            when MEM_SCR => scr_b_we <= we_v;
+            when MEM_ROM => null;
+            when MEM_RAM => ram_b_we <= we_v;
+         end case;
+
       end if;
    end process p_mem_we;
 
-   dbus_rdata <= ram_b_rdata when rd_ram = '1' else
-                 rom_b_data when rd_rom = '1' else
-                 scr_b_rdata when rd_scr = '1' else
-                 X"00000" & "0001" & rx_q when rd_rx = '1' else
-                 mpu_data when rd_mpu = '1' else
-                 perf_data when rd_perf = '1' else
-                 fs_data when rd_fs = '1' else
-                 timer_data when rd_timer = '1' else
+   dbus_rdata <= ram_b_rdata when rd_src = SRC_RAM else
+                 rom_b_data when rd_src = SRC_ROM else
+                 scr_b_rdata when rd_src = SRC_SCR else
+                 X"00000" & "0001" & rx_q when rd_src = SRC_RX else
+                 mpu_data when rd_src = SRC_MPU else
+                 perf_data when rd_src = SRC_PERF else
+                 fs_data when rd_src = SRC_FS else
+                 timer_data when rd_src = SRC_TIMER else
                  rd_io;
 
    p_dbus : process (clk_i)
@@ -727,51 +753,35 @@ begin
                       we    : std_logic;
                       wdata : std_logic_vector(31 downto 0)) is
       begin
-         rd_ram <= '0';
-         rd_rom <= '0';
-         rd_scr <= '0';
-         rd_rx    <= '0';
-         rd_mpu   <= '0';
-         rd_perf  <= '0';
-         rd_fs    <= '0';
-         rd_timer <= '0';
-         rd_io    <= (others => '0');
+         rd_src <= SRC_IO;
+         rd_io  <= (others => '0');
          if not is_io(addr) then
             -- Memory: port B is driven combinationally above.
-            if addr(31 downto C_SCR_BITS) = C_SCR_BASE then
-               rd_scr <= '1';
-            elsif rom_hidden = '0' and in_rom(addr) then
-               rd_rom <= '1';
-            else
-               rd_ram <= '1';
-            end if;
+
+            case mem_of(addr, rom_hidden) is
+               when MEM_SCR => rd_src <= SRC_SCR;
+               when MEM_ROM => rd_src <= SRC_ROM;
+               when MEM_RAM => rd_src <= SRC_RAM;
+            end case;
+
          elsif is_dev(addr) and not link then
             -- A device has taken the core's request, and it acknowledges
-            -- it, with the data that rd_mpu, rd_perf, rd_fs, or rd_timer selects.
-            if addr(31 downto 5) = C_MPU_BASE then
-               rd_mpu <= '1';
-            elsif addr(31 downto 4) = C_PERF_BASE then
-               rd_perf <= '1';
-            elsif is_fs(addr) then
-               rd_fs <= '1';
-            else
-               rd_timer <= '1';
-            end if;
+            -- it, with the data that rd_src selects.
+
+            case dev_of(addr) is
+               when DEV_MPU   => rd_src <= SRC_MPU;
+               when DEV_PERF  => rd_src <= SRC_PERF;
+               when DEV_FS    => rd_src <= SRC_FS;
+               when DEV_TIMER => rd_src <= SRC_TIMER;
+            end case;
+
             return;
          elsif is_dev(addr) then
             -- The link's: the device's port is driven from the latch, and the
             -- request is acknowledged when the device acknowledges it.
-            dev_busy <= '1';
-            dev_stb  <= '1';
-            if addr(31 downto 5) = C_MPU_BASE then
-               dev_sel <= DEV_MPU;
-            elsif addr(31 downto 4) = C_PERF_BASE then
-               dev_sel <= DEV_PERF;
-            elsif is_fs(addr) then
-               dev_sel <= DEV_FS;
-            else
-               dev_sel <= DEV_TIMER;
-            end if;
+            dev_busy  <= '1';
+            dev_stb   <= '1';
+            dev_sel   <= dev_of(addr);
             dev_addr  <= addr(5 downto 0);
             dev_we    <= we;
             dev_wdata <= wdata;
@@ -794,7 +804,7 @@ begin
             if rx_empty = '0' then
                -- rx_take takes the byte, and it comes from rx_q in the next
                -- cycle.
-               rd_rx <= '1';
+               rd_src <= SRC_RX;
             elsif rx_eof = '1' then
                rd_io(9) <= '1';
             end if;
@@ -888,14 +898,7 @@ begin
                dev_stb <= '0';
             end if;
             if dev_ack = '1' then
-               rd_ram   <= '0';
-               rd_rom   <= '0';
-               rd_scr   <= '0';
-               rd_rx    <= '0';
-               rd_mpu   <= '0';
-               rd_perf  <= '0';
-               rd_fs    <= '0';
-               rd_timer <= '0';
+               rd_src <= SRC_IO;
                if mpu_ack = '1' then
                   rd_io <= mpu_data;
                elsif perf_ack = '1' then
@@ -1027,16 +1030,16 @@ begin
    fs_cyc    <= io_cyc;
    timer_cyc <= io_cyc;
    mpu_stb   <= dev_stb when dev_busy = '1' and dev_sel = DEV_MPU else
-                core_dev when dbus_addr(31 downto 5) = C_MPU_BASE else
+                core_dev when core_sel = DEV_MPU else
                 '0';
    perf_stb  <= dev_stb when dev_busy = '1' and dev_sel = DEV_PERF else
-                core_dev when dbus_addr(31 downto 4) = C_PERF_BASE else
+                core_dev when core_sel = DEV_PERF else
                 '0';
    fs_stb    <= dev_stb when dev_busy = '1' and dev_sel = DEV_FS else
-                core_dev when is_fs(dbus_addr) else
+                core_dev when core_sel = DEV_FS else
                 '0';
    timer_stb <= dev_stb when dev_busy = '1' and dev_sel = DEV_TIMER else
-                core_dev when dbus_addr(31 downto 4) = C_TIMER_BASE else
+                core_dev when core_sel = DEV_TIMER else
                 '0';
    dev_stall <= mpu_stall when dev_sel = DEV_MPU else
                 perf_stall when dev_sel = DEV_PERF else
@@ -1386,12 +1389,10 @@ begin
                  dbus_wdata;
 
       f_rom   <= '1' when f_take = '1' and not is_io(f_addr) and
-                          f_addr(31 downto C_SCR_BITS) /= C_SCR_BASE and
-                          in_rom(f_addr) and rom_hidden = '0' else
+                          mem_of(f_addr, rom_hidden) = MEM_ROM else
                  '0';
       f_unrom <= '1' when f_take = '1' and not is_io(f_addr) and
-                          f_addr(31 downto C_SCR_BITS) /= C_SCR_BASE and
-                          in_rom(f_addr) and rom_hidden = '1' else
+                          mem_of(f_addr, '0') = MEM_ROM and rom_hidden = '1' else
                  '0';
 
       f_brd      <= '1' when f_take = '1' and f_addr(31 downto 4) = C_BRD_BASE else
@@ -1520,7 +1521,7 @@ begin
          -- psl f_rom_read : assert always
          --    {f_rom and not f_we and not rst_i} |=>
          --    {rst_i = '1' or ((link_ack or srv_ack) = '1' and dbus_rdata = rom_b_data)};
-         -- psl c_rom_fetch : cover {ibus_rom and ibus_ack and not rst_i};
+         -- psl c_rom_fetch : cover {ibus_mem = MEM_ROM and ibus_ack = '1' and rst_i = '0'};
          -- psl c_rom_core : cover {f_rom and core_take and not f_we and not rst_i; srv_ack};
          -- psl c_rom_link : cover {f_rom and link_take and not f_we and not rst_i; link_ack};
          -- psl c_rom_write : cover {f_rom and f_we and not rst_i};
