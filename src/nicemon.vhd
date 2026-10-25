@@ -474,6 +474,12 @@ architecture synthesis of nicemon is
    signal core_sel  : t_dev;               -- the device
    signal core_owed : std_logic := '0';
 
+   -- The request served in this cycle: the link's, or else the core's
+   signal bus_take  : std_logic;
+   signal bus_addr  : std_logic_vector(31 downto 0);
+   signal bus_we    : std_logic;
+   signal bus_wdata : std_logic_vector(31 downto 0);
+
    -- The devices' ports: the link's latch while it is busy, else the core
    signal io_cyc   : std_logic;
    signal io_we    : std_logic;
@@ -687,6 +693,16 @@ begin
                 '0';
    core_sel  <= dev_of(dbus_addr);
 
+   -- The link's and the core's requests are never taken in the same cycle
+   -- (f_link_take), nor while the memory is cleared.
+   bus_take  <= link_take or core_take;
+   bus_addr  <= link_addr when link_take = '1' else
+                dbus_addr;
+   bus_we    <= link_we when link_take = '1' else
+                dbus_we;
+   bus_wdata <= link_wdata when link_take = '1' else
+                dbus_wdata;
+
    ram_b_addr  <= clr_addr(G_RAM_ADDR_BITS - 1 downto 0) when clearing = '1' else
                   link_addr(G_RAM_ADDR_BITS - 1 downto 0) when link_owns = '1' else
                   dbus_addr(G_RAM_ADDR_BITS - 1 downto 0);
@@ -698,26 +714,16 @@ begin
                   dbus_addr(C_SCR_BITS - 1 downto 0);
 
    -- A write to memory is served in the cycle that the link's or the core's
-   -- request is taken, and in no other cycle. It goes to the screen or to the main memory, unless
-   -- it is to the ROM, where it is dropped. While the memory is cleared,
-   -- both are written, the RAM under the ROM included.
+   -- request is taken, and in no other cycle. It goes to the screen or to
+   -- the main memory, unless it is to the ROM, where it is dropped. While
+   -- the memory is cleared, both are written, the RAM under the ROM
+   -- included.
    p_mem_we : process (all)
-      variable we_v   : std_logic;
-      variable addr_v : std_logic_vector(31 downto 0);
+      variable we_v : std_logic;
    begin
-      we_v   := '0';
-      addr_v := dbus_addr;
-      if clearing = '1' then
-         null;
-      elsif link_take = '1' then
-         addr_v := link_addr;
-         if not is_io(link_addr) then
-            we_v := link_we;
-         end if;
-      elsif core_take = '1' then
-         if not is_io(dbus_addr) then
-            we_v := dbus_we;
-         end if;
+      we_v := '0';
+      if bus_take = '1' and not is_io(bus_addr) then
+         we_v := bus_we;
       end if;
       ram_b_we <= '0';
       scr_b_we <= '0';
@@ -726,7 +732,7 @@ begin
          scr_b_we <= '1';
       else
 
-         case mem_of(addr_v, rom_hidden) is
+         case mem_of(bus_addr, rom_hidden) is
             when MEM_SCR => scr_b_we <= we_v;
             when MEM_ROM => null;
             when MEM_RAM => ram_b_we <= we_v;
@@ -1323,11 +1329,6 @@ begin
       signal f_cpu_rst_d : std_logic := '1';
       -- A link access of the console or the read counter
       signal f_link_con : std_logic;
-      -- The request served: the link's, or else the core's
-      signal f_take  : std_logic;
-      signal f_addr  : std_logic_vector(31 downto 0);
-      signal f_we    : std_logic;
-      signal f_wdata : std_logic_vector(31 downto 0);
       -- An access of the memory under the ROM, with the ROM shown or hidden
       signal f_rom   : std_logic;
       signal f_unrom : std_logic;
@@ -1378,24 +1379,14 @@ begin
                              (link_addr = C_UART_DATA or link_addr = C_READ_COUNT) else
                     '0';
 
-      -- A link request is served before the core's, and they never come in
-      -- the same cycle (f_link_take).
-      f_take  <= link_take or core_take;
-      f_addr  <= link_addr when link_take = '1' else
-                 dbus_addr;
-      f_we    <= link_we when link_take = '1' else
-                 dbus_we;
-      f_wdata <= link_wdata when link_take = '1' else
-                 dbus_wdata;
-
-      f_rom   <= '1' when f_take = '1' and not is_io(f_addr) and
-                          mem_of(f_addr, rom_hidden) = MEM_ROM else
+      f_rom   <= '1' when bus_take = '1' and not is_io(bus_addr) and
+                          mem_of(bus_addr, rom_hidden) = MEM_ROM else
                  '0';
-      f_unrom <= '1' when f_take = '1' and not is_io(f_addr) and
-                          mem_of(f_addr, '0') = MEM_ROM and rom_hidden = '1' else
+      f_unrom <= '1' when bus_take = '1' and not is_io(bus_addr) and
+                          mem_of(bus_addr, '0') = MEM_ROM and rom_hidden = '1' else
                  '0';
 
-      f_brd      <= '1' when f_take = '1' and f_addr(31 downto 4) = C_BRD_BASE else
+      f_brd      <= '1' when bus_take = '1' and bus_addr(31 downto 4) = C_BRD_BASE else
                     '0';
       f_brd_regs <= brd_led & brd_rgb0 & brd_rgb1 & brd_seg;
 
@@ -1411,20 +1402,20 @@ begin
          seg_v    := brd_seg;
          f_brd_rd <= (others => '0');
          if f_brd = '1' and G_BOARD_IO then
-            if f_we = '1' then
+            if bus_we = '1' then
 
-               case f_addr(3 downto 0) is
-                  when X"0"   => led_v  := f_wdata(15 downto 0);
-                  when X"1"   => rgb0_v := f_wdata(11 downto 0);
-                  when X"2"   => rgb1_v := f_wdata(11 downto 0);
-                  when X"3"   => seg_v(31 downto 0)  := f_wdata;
-                  when X"4"   => seg_v(63 downto 32) := f_wdata;
+               case bus_addr(3 downto 0) is
+                  when X"0"   => led_v  := bus_wdata(15 downto 0);
+                  when X"1"   => rgb0_v := bus_wdata(11 downto 0);
+                  when X"2"   => rgb1_v := bus_wdata(11 downto 0);
+                  when X"3"   => seg_v(31 downto 0)  := bus_wdata;
+                  when X"4"   => seg_v(63 downto 32) := bus_wdata;
                   when others => null;
                end case;
 
             else
 
-               case f_addr(3 downto 0) is
+               case bus_addr(3 downto 0) is
                   when X"0"   => f_brd_rd(15 downto 0) <= brd_led;
                   when X"1"   => f_brd_rd(11 downto 0) <= brd_rgb0;
                   when X"2"   => f_brd_rd(11 downto 0) <= brd_rgb1;
@@ -1500,7 +1491,7 @@ begin
       -- psl f_brd_we : assert always
       --    {not rst_i} |=> {rst_i = '1' or f_brd_regs = prev(f_brd_next)};
       -- psl f_brd_read : assert always
-      --    {f_brd and not f_we and not rst_i} |=>
+      --    {f_brd and not bus_we and not rst_i} |=>
       --    {rst_i = '1' or ((link_ack or srv_ack) = '1' and dbus_rdata = prev(f_brd_rd))};
 
       -- psl c_console : cover {f_rx_byte and not rst_i};
@@ -1519,23 +1510,23 @@ begin
          -- The ROM: a read returns its word. The covers here and in
          -- gen_formal_brd are unreachable without the ROM or the registers.
          -- psl f_rom_read : assert always
-         --    {f_rom and not f_we and not rst_i} |=>
+         --    {f_rom and not bus_we and not rst_i} |=>
          --    {rst_i = '1' or ((link_ack or srv_ack) = '1' and dbus_rdata = rom_b_data)};
          -- psl c_rom_fetch : cover {ibus_mem = MEM_ROM and ibus_ack = '1' and rst_i = '0'};
-         -- psl c_rom_core : cover {f_rom and core_take and not f_we and not rst_i; srv_ack};
-         -- psl c_rom_link : cover {f_rom and link_take and not f_we and not rst_i; link_ack};
-         -- psl c_rom_write : cover {f_rom and f_we and not rst_i};
+         -- psl c_rom_core : cover {f_rom and core_take and not bus_we and not rst_i; srv_ack};
+         -- psl c_rom_link : cover {f_rom and link_take and not bus_we and not rst_i; link_ack};
+         -- psl c_rom_write : cover {f_rom and bus_we and not rst_i};
          -- psl c_rom_hidden : cover {f_unrom and not rst_i};
          -- psl c_rom_show : cover {rom_hidden and not rst_i; not rom_hidden and not rst_i};
       end generate gen_formal_rom;
 
       gen_formal_brd : if G_BOARD_IO generate
       begin
-         -- psl c_brd_core : cover {f_brd and core_take and f_we and not rst_i};
-         -- psl c_brd_link : cover {f_brd and link_take and not f_we and not rst_i; link_ack};
-         -- psl c_brd_btn : cover {f_brd = '1' and f_we = '0' and f_addr(3 downto 0) = X"5" and
+         -- psl c_brd_core : cover {f_brd and core_take and bus_we and not rst_i};
+         -- psl c_brd_link : cover {f_brd and link_take and not bus_we and not rst_i; link_ack};
+         -- psl c_brd_btn : cover {f_brd = '1' and bus_we = '0' and bus_addr(3 downto 0) = X"5" and
          --                        brd_btn /= "00000" and rst_i = '0'};
-         -- psl c_brd_none : cover {f_brd = '1' and f_addr(3 downto 0) = X"F" and rst_i = '0'};
+         -- psl c_brd_none : cover {f_brd = '1' and bus_addr(3 downto 0) = X"F" and rst_i = '0'};
       end generate gen_formal_brd;
 
    end generate gen_formal;
