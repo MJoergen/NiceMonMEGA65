@@ -58,6 +58,7 @@
 --                          by the link returns 0 and does not count, and a
 --                          write by the link is dropped. It is 0 after
 --                          reset, and a start keeps it (SYSTEM.md §1).
+--   0xFFFFFF10-0xFFFFFF7F  The devices of nice_cpu (src/devices.vhd):
 --   0xFFFFFF10-0xFFFFFF1F  The timer of SYSTEM.md §4
 --                          (nice_cpu/hdl/src/timer.vhd). It counts clock
 --                          cycles, and its request goes to the core's IRQ.
@@ -162,14 +163,12 @@
 -- is busy or owes the core an acknowledge, and the MPU does not stall, and
 -- is then served. Every request is acknowledged in the cycle after it is served.
 -- A request of the core for the MPU, the performance counters, the fetch
--- statistics, or the timer goes to the device in the cycle it is taken, as
--- one for memory does, and the device acknowledges it. Each device
--- acknowledges in the cycle after it takes a request, except the MPU, which
--- takes a read of a result that it computes and then stalls until it
--- acknowledges it. The core is stalled meanwhile too, so its requests are
--- acknowledged in their order. A link request for a device is latched and
--- passed to the device, and it is acknowledged in the cycle after the
--- device's acknowledge.
+-- statistics, or the timer goes to src/devices.vhd in the cycle it is
+-- taken, as one for memory does, and the device acknowledges it. The MPU
+-- may stall until it does, which stalls the core and the link too, so the
+-- core's requests are acknowledged in their order. A link request for a
+-- device is latched there and passed to the device, and it is
+-- acknowledged in the cycle after the device's acknowledge.
 --
 -- A clear of the memory, which the link asks for with clear_o, writes 0 to
 -- one word of the RAM and one of the screen in each cycle, 2^C_CLR_BITS
@@ -318,9 +317,6 @@ architecture synthesis of nicemon is
       return MEM_RAM;
    end function mem_of;
 
-   -- The devices of nice_cpu/hdl/src
-   type t_dev is (DEV_PERF, DEV_MPU, DEV_TIMER, DEV_FS);
-
    -- Whether an address is one of the fetch statistics', which are the
    -- words of 0xFFFFFF40-7F that the performance counters do not take
    function is_fs(addr : std_logic_vector(31 downto 0)) return boolean is
@@ -335,22 +331,9 @@ architecture synthesis of nicemon is
              addr(31 downto 4) = C_TIMER_BASE or is_fs(addr);
    end function is_dev;
 
-   -- The device of an address that is_dev accepts
-   function dev_of(addr : std_logic_vector(31 downto 0)) return t_dev is
-   begin
-      if addr(31 downto 5) = C_MPU_BASE then
-         return DEV_MPU;
-      elsif addr(31 downto 4) = C_PERF_BASE then
-         return DEV_PERF;
-      elsif is_fs(addr) then
-         return DEV_FS;
-      end if;
-      return DEV_TIMER;
-   end function dev_of;
-
    -- The source of the read data of the last request served: a memory, the
-   -- console's FIFO, a device, or else rd_io
-   type t_src is (SRC_IO, SRC_RAM, SRC_ROM, SRC_SCR, SRC_RX, SRC_MPU, SRC_PERF, SRC_FS, SRC_TIMER);
+   -- console's FIFO, the device that acknowledges the core, or else rd_io
+   type t_src is (SRC_IO, SRC_RAM, SRC_ROM, SRC_SCR, SRC_RX, SRC_DEV);
 
    -- Core
    signal cpu_rst    : std_logic;
@@ -375,10 +358,6 @@ architecture synthesis of nicemon is
    -- '1' while the core runs: started, and not paused. The counters, the
    -- timer, and the fetch statistics count only then.
    signal cpu_running : std_logic;
-   -- The hold bit in the cycle before, for a pulse when the core starts,
-   -- which resets the math unit, the performance counters, and the timer
-   signal cpu_hold_d : std_logic := '1';
-   signal dev_rst    : std_logic;
    -- The halt reason, the code of nice_cpu's DEBUG.md §6
    signal halt_reason : std_logic_vector(2 downto 0);
 
@@ -445,57 +424,26 @@ architecture synthesis of nicemon is
    signal tx_wait      : std_logic := '0';
    signal tx_wait_data : std_logic_vector(7 downto 0);
 
-   -- A link request for the MPU, the performance counters, or the timer. It
-   -- is latched, and the device's port is driven from the latch until the
-   -- device acknowledges.
-   signal dev_busy  : std_logic := '0';
-   signal dev_stb   : std_logic := '0';
-   signal dev_sel   : t_dev;               -- the device
-   signal dev_addr  : std_logic_vector(5 downto 0);
-   signal dev_we    : std_logic;
-   signal dev_wdata : std_logic_vector(31 downto 0);
-   signal dev_stall : std_logic;
-   signal dev_ack   : std_logic;           -- any device's
-
-   -- A request of the core for a device, taken in this cycle, and whether
-   -- a device owes the core an acknowledge
-   signal core_take : std_logic;
-   signal core_dev  : std_logic;
-   signal core_sel  : t_dev;               -- the device
-   signal core_owed : std_logic := '0';
+   -- The devices (src/devices.vhd): the core's request for one, taken in
+   -- this cycle, and the link's, their acknowledges, and the word of the
+   -- device that acknowledges. The link's request waits while dev_busy is
+   -- high, a device owes the core an acknowledge while core_owed is high,
+   -- and dev_stall is the MPU's stall.
+   signal core_take    : std_logic;
+   signal core_dev     : std_logic;
+   signal link_dev     : std_logic;
+   signal dev_core_ack : std_logic;
+   signal dev_link_ack : std_logic;
+   signal dev_rdata    : std_logic_vector(31 downto 0);
+   signal dev_busy     : std_logic;
+   signal core_owed    : std_logic;
+   signal dev_stall    : std_logic;
 
    -- The request served in this cycle: the link's, or else the core's
    signal bus_take  : std_logic;
    signal bus_addr  : std_logic_vector(31 downto 0);
    signal bus_we    : std_logic;
    signal bus_wdata : std_logic_vector(31 downto 0);
-
-   -- The devices' ports: the link's latch while it is busy, else the core
-   signal io_cyc   : std_logic;
-   signal io_we    : std_logic;
-   signal io_addr  : std_logic_vector(5 downto 0);
-   signal io_wdata : std_logic_vector(31 downto 0);
-
-   signal mpu_cyc     : std_logic;
-   signal mpu_stb     : std_logic;
-   signal mpu_stall   : std_logic;
-   signal mpu_ack     : std_logic;
-   signal mpu_data    : std_logic_vector(31 downto 0);
-   signal perf_cyc    : std_logic;
-   signal perf_stb    : std_logic;
-   signal perf_stall  : std_logic;
-   signal perf_ack    : std_logic;
-   signal perf_data   : std_logic_vector(31 downto 0);
-   signal fs_cyc      : std_logic;
-   signal fs_stb      : std_logic;
-   signal fs_stall    : std_logic;
-   signal fs_ack      : std_logic;
-   signal fs_data     : std_logic_vector(31 downto 0);
-   signal timer_cyc   : std_logic;
-   signal timer_stb   : std_logic;
-   signal timer_stall : std_logic;
-   signal timer_ack   : std_logic;
-   signal timer_data  : std_logic_vector(31 downto 0);
 
    -- The timer's interrupt request, on the core's IRQ port
    signal irq_valid  : std_logic;
@@ -665,14 +613,14 @@ begin
 
    -- The core's request is taken in a cycle with no stall. The MPU's stall
    -- holds the core while it computes a result that the core reads.
-   dbus_stall <= link_owns or tx_wait or dev_busy or clearing or mpu_stall;
-   dbus_ack   <= (srv_ack or (core_owed and dev_ack)) and dbus_cyc;
+   dbus_stall <= link_owns or tx_wait or dev_busy or clearing or dev_stall;
+   dbus_ack   <= (srv_ack or dev_core_ack) and dbus_cyc;
 
    -- The link owns port B while the core is held, halted, or paused. Its
    -- request waits while a device is busy, owes the core an acknowledge, or
    -- the MPU stalls, and is then taken.
    link_owns  <= cpu_hold or cpu_halted or cpu_paused;
-   link_stall <= not link_owns or dev_busy or core_owed or mpu_stall or clearing;
+   link_stall <= not link_owns or dev_busy or core_owed or dev_stall or clearing;
    link_take  <= link_cyc and link_stb and not link_stall;
 
    -- A request of the core in reset is dropped: it is not taken, whatever it
@@ -681,7 +629,8 @@ begin
    core_take <= dbus_cyc and dbus_stb and not dbus_stall and not cpu_rst;
    core_dev  <= '1' when core_take = '1' and is_dev(dbus_addr) else
                 '0';
-   core_sel  <= dev_of(dbus_addr);
+   link_dev  <= '1' when link_take = '1' and is_dev(link_addr) else
+                '0';
 
    -- The link's and the core's requests are never taken in the same cycle
    -- (f_link_take), nor while the memory is cleared.
@@ -735,10 +684,7 @@ begin
                  rom_b_data when rd_src = SRC_ROM else
                  scr_b_rdata when rd_src = SRC_SCR else
                  X"00000" & "0001" & rx_q when rd_src = SRC_RX else
-                 mpu_data when rd_src = SRC_MPU else
-                 perf_data when rd_src = SRC_PERF else
-                 fs_data when rd_src = SRC_FS else
-                 timer_data when rd_src = SRC_TIMER else
+                 dev_rdata when rd_src = SRC_DEV else
                  rd_io;
 
    p_dbus : process (clk_i)
@@ -761,26 +707,13 @@ begin
             end case;
 
          elsif is_dev(addr) and not link then
-            -- A device has taken the core's request, and it acknowledges
-            -- it, with the data that rd_src selects.
-
-            case dev_of(addr) is
-               when DEV_MPU   => rd_src <= SRC_MPU;
-               when DEV_PERF  => rd_src <= SRC_PERF;
-               when DEV_FS    => rd_src <= SRC_FS;
-               when DEV_TIMER => rd_src <= SRC_TIMER;
-            end case;
-
+            -- A device has taken the core's request (core_dev), and it
+            -- acknowledges it, with its word.
+            rd_src <= SRC_DEV;
             return;
          elsif is_dev(addr) then
-            -- The link's: the device's port is driven from the latch, and the
-            -- request is acknowledged when the device acknowledges it.
-            dev_busy  <= '1';
-            dev_stb   <= '1';
-            dev_sel   <= dev_of(addr);
-            dev_addr  <= addr(5 downto 0);
-            dev_we    <= we;
-            dev_wdata <= wdata;
+            -- The devices have latched the link's request (link_dev), which
+            -- is acknowledged when the device acknowledges it.
             return;
          elsif addr = C_UART_DATA and we = '1' and not link then
             if cpu_tx_valid = '1' and cpu_tx_ready = '0' then
@@ -840,28 +773,15 @@ begin
          srv_ack    <= '0';
          link_ack   <= '0';
          clr_done   <= '0';
-         cpu_hold_d <= cpu_hold;
 
          if cpu_tx_valid = '1' and cpu_tx_ready = '1' then
             cpu_tx_valid <= '0';
          end if;
 
          if dev_busy = '1' then
-            if dev_stb = '1' and dev_stall = '0' then
-               dev_stb <= '0';
-            end if;
-            if dev_ack = '1' then
-               rd_src <= SRC_IO;
-               if mpu_ack = '1' then
-                  rd_io <= mpu_data;
-               elsif perf_ack = '1' then
-                  rd_io <= perf_data;
-               elsif fs_ack = '1' then
-                  rd_io <= fs_data;
-               else
-                  rd_io <= timer_data;
-               end if;
-               dev_busy <= '0';
+            if dev_link_ack = '1' then
+               rd_src   <= SRC_IO;
+               rd_io    <= dev_rdata;
                link_ack <= '1';
             end if;
          elsif clearing = '1' then
@@ -888,24 +808,13 @@ begin
             serve(false, dbus_addr, dbus_we, dbus_wdata);
          end if;
 
-         -- Each device acknowledges in the cycle after it takes a request,
-         -- or stalls the core until it does, so at most one is owed.
-         if core_dev = '1' then
-            core_owed <= '1';
-         elsif dev_ack = '1' then
-            core_owed <= '0';
-         end if;
-
          -- A request of the core in reset is dropped.
          if cpu_rst = '1' then
-            srv_ack   <= '0';
-            core_owed <= '0';
-            tx_wait   <= '0';
+            srv_ack <= '0';
+            tx_wait <= '0';
          end if;
 
          if rst_i = '1' then
-            dev_busy     <= '0';
-            dev_stb      <= '0';
             link_ack     <= '0';
             clearing     <= '0';
             clr_done     <= '0';
@@ -947,112 +856,43 @@ begin
 
 
    ---------------------------------------------------------------------------
-   -- The math unit (SYSTEM.md §2), the performance counters (§3), and the
-   -- timer (§4) from nice_cpu. They are reset with the system, and when
-   -- the core starts, as the emulator's are when it starts. They are not
-   -- reset while the core is held, so that the link can read them after a
-   -- halt. The timer counts clock cycles while the core runs, and it is the only device that
-   -- raises an interrupt, so its request goes straight to the core's IRQ.
+   -- The math unit (SYSTEM.md §2), the performance counters (§3), the
+   -- fetch statistics, and the timer (§4) from nice_cpu, in
+   -- src/devices.vhd. They are reset with the system, and when the core
+   -- starts, as the emulator's are when it starts. The timer's request goes
+   -- straight to the core's IRQ.
    ---------------------------------------------------------------------------
 
-   dev_rst <= rst_i or (cpu_hold_d and not cpu_hold);
-
-   -- The link's latched request while it is busy, else the core's request,
-   -- which goes to a device only in the cycle that takes it
-   io_cyc   <= '1' when dev_busy = '1' else dbus_cyc;
-   io_we    <= dev_we when dev_busy = '1' else dbus_we;
-   io_addr  <= dev_addr when dev_busy = '1' else dbus_addr(5 downto 0);
-   io_wdata <= dev_wdata when dev_busy = '1' else dbus_wdata;
-
-   mpu_cyc   <= io_cyc;
-   perf_cyc  <= io_cyc;
-   fs_cyc    <= io_cyc;
-   timer_cyc <= io_cyc;
-   mpu_stb   <= dev_stb when dev_busy = '1' and dev_sel = DEV_MPU else
-                core_dev when core_sel = DEV_MPU else
-                '0';
-   perf_stb  <= dev_stb when dev_busy = '1' and dev_sel = DEV_PERF else
-                core_dev when core_sel = DEV_PERF else
-                '0';
-   fs_stb    <= dev_stb when dev_busy = '1' and dev_sel = DEV_FS else
-                core_dev when core_sel = DEV_FS else
-                '0';
-   timer_stb <= dev_stb when dev_busy = '1' and dev_sel = DEV_TIMER else
-                core_dev when core_sel = DEV_TIMER else
-                '0';
-   dev_stall <= mpu_stall when dev_sel = DEV_MPU else
-                perf_stall when dev_sel = DEV_PERF else
-                fs_stall when dev_sel = DEV_FS else
-                timer_stall;
-   dev_ack   <= mpu_ack or perf_ack or fs_ack or timer_ack;
-
-   i_mpu : entity work.mpu
-      port map (
-         clk_i      => clk_i,
-         rst_i      => dev_rst,
-         wb_cyc_i   => mpu_cyc,
-         wb_stb_i   => mpu_stb,
-         wb_stall_o => mpu_stall,
-         wb_ack_o   => mpu_ack,
-         wb_we_i    => io_we,
-         wb_addr_i  => io_addr(4 downto 0),
-         wb_data_i  => io_wdata,
-         wb_data_o  => mpu_data
-      ); -- i_mpu
-
-   i_perf : entity work.perf
+   i_devices : entity work.devices
       generic map (
-         G_CLK_HZ => G_CLOCK_HZ
+         G_CLOCK_HZ => G_CLOCK_HZ
       )
       port map (
-         clk_i      => clk_i,
-         rst_i      => dev_rst,
-         run_i      => cpu_running,
-         instret_i  => cpu_instret,
-         wb_cyc_i   => perf_cyc,
-         wb_stb_i   => perf_stb,
-         wb_stall_o => perf_stall,
-         wb_ack_o   => perf_ack,
-         wb_we_i    => io_we,
-         wb_addr_i  => io_addr(3 downto 0),
-         wb_data_i  => io_wdata,
-         wb_data_o  => perf_data
-      ); -- i_perf
-
-   i_fetch_stats : entity work.fetch_stats
-      port map (
-         clk_i      => clk_i,
-         rst_i      => dev_rst,
-         run_i      => cpu_running,
-         events_i   => cpu_stats,
-         wb_cyc_i   => fs_cyc,
-         wb_stb_i   => fs_stb,
-         wb_stall_o => fs_stall,
-         wb_ack_o   => fs_ack,
-         wb_we_i    => io_we,
-         wb_addr_i  => io_addr,
-         wb_data_i  => io_wdata,
-         wb_data_o  => fs_data
-      ); -- i_fetch_stats
-
-
-   i_timer : entity work.timer
-      port map (
          clk_i        => clk_i,
-         rst_i        => dev_rst,
-         tick_i       => cpu_running,
-         wb_cyc_i     => timer_cyc,
-         wb_stb_i     => timer_stb,
-         wb_stall_o   => timer_stall,
-         wb_ack_o     => timer_ack,
-         wb_we_i      => io_we,
-         wb_addr_i    => io_addr(3 downto 0),
-         wb_data_i    => io_wdata,
-         wb_data_o    => timer_data,
+         rst_i        => rst_i,
+         hold_i       => cpu_hold,
+         run_i        => cpu_running,
+         instret_i    => cpu_instret,
+         events_i     => cpu_stats,
+         core_cyc_i   => dbus_cyc,
+         core_stb_i   => core_dev,
+         core_we_i    => dbus_we,
+         core_addr_i  => dbus_addr(7 downto 0),
+         core_wdata_i => dbus_wdata,
+         core_ack_o   => dev_core_ack,
+         link_stb_i   => link_dev,
+         link_we_i    => link_we,
+         link_addr_i  => link_addr(7 downto 0),
+         link_wdata_i => link_wdata,
+         link_ack_o   => dev_link_ack,
+         rdata_o      => dev_rdata,
+         busy_o       => dev_busy,
+         owed_o       => core_owed,
+         stall_o      => dev_stall,
          irq_valid_o  => irq_valid,
          irq_ready_i  => irq_ready,
          irq_vector_o => irq_vector
-      ); -- i_timer
+      ); -- i_devices
 
    i_ram : entity work.ram
       generic map (
@@ -1290,7 +1130,6 @@ begin
       signal f_link_wait : std_logic := '0';
       signal f_rx_byte   : std_logic;
       signal f_rx_end    : std_logic;
-      signal f_cpu_rst_d : std_logic := '1';
       -- A link access of the console or the read counter
       signal f_link_con : std_logic;
       -- An access of the memory under the ROM, with the ROM shown or hidden
@@ -1324,7 +1163,6 @@ begin
             if rst_i = '1' then
                f_link_wait <= '0';
             end if;
-            f_cpu_rst_d <= cpu_rst;
          end if;
       end process p_wait;
 
@@ -1374,14 +1212,11 @@ begin
       --                     (stable(rx_empty) or prev(rx_wr_en) = '1'))};
       -- psl f_link_con_take : assert always f_link_con = '1' -> rx_take = '0';
 
-      -- The devices answer the link's latched request, or a request of the
-      -- core, which is dropped if the core has been reset. The core gets one
-      -- acknowledge at a time.
-      -- psl f_dev_ack : assert always
-      --    rst_i = '0' and dev_ack = '1' ->
-      --    dev_busy = '1' or core_owed = '1' or cpu_rst = '1' or f_cpu_rst_d = '1';
+      -- The core gets one acknowledge at a time, from here or from a
+      -- device, whose own checks, in formal/devices.sby, prove that each
+      -- answers a request.
       -- psl f_one_ack : assert always
-      --    rst_i = '0' -> not (srv_ack = '1' and core_owed = '1' and dev_ack = '1');
+      --    rst_i = '0' -> not (srv_ack = '1' and dev_core_ack = '1');
 
       -- The clear: the link hears that it is done only while it asks.
       -- psl f_clr_done : assert always rst_i = '0' and clr_done = '1' -> link_clear = '1';

@@ -1,0 +1,33 @@
+# The devices of nice_cpu/hdl/src, src/devices.vhd (formal_devices.vhd),
+# with the real devices, whose own proofs are in nice_cpu/hdl/formal.
+# "prove" proves the assertions for every cycle by k-induction, and
+# "cover" reaches each cover statement.
+
+[tasks]
+prove
+cover
+
+[options]
+prove: mode prove
+prove: depth 4
+cover: mode cover
+cover: depth 16
+
+[engines]
+smtbmc yices
+
+[script]
+plugin -i ghdl
+ghdl --std=08 -fpsl nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd perf.vhd timer.vhd fetch_stats.vhd devices.vhd formal_devices.vhd -e formal_devices
+prep -top formal_devices
+
+[files]
+../nice_cpu/hdl/src/nice_pkg.vhd
+../nice_cpu/hdl/src/trace_pkg.vhd
+../nice_cpu/hdl/src/pipe_pkg.vhd
+../nice_cpu/hdl/src/mpu.vhd
+../nice_cpu/hdl/src/perf.vhd
+../nice_cpu/hdl/src/timer.vhd
+../nice_cpu/hdl/src/fetch_stats.vhd
+../src/devices.vhd
+formal_devices.vhd
