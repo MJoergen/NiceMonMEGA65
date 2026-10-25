@@ -48,7 +48,8 @@ and `make linktest`, `make -j4 formal`, and `make lint`.
 - `src/`: the system (`nicemon.vhd`), its memory (`ram.vhd`, `rom.vhd`),
   the UART (`uart_serdes.vhd`, from cmod-s7), which carries the link,
   the core's input FIFO (`rx_fifo.vhd`), the board's registers at
-  `FFFFFF90`–`9F` (`board_io.vhd`), the keyboards (`kbd_m65.vhd` and
+  `FFFFFF90`–`9F` (`board_io.vhd`) and the screen's at `FFFFFF80`–`8F`
+  (`scr_regs.vhd`), the keyboards (`kbd_m65.vhd` and
   `kbd_ascii.vhd` for the MEGA65, `kbd_ps2.vhd` and `kbd_ps2_ascii.vhd` for
   the Nexys4DDR's PS/2), the Nexys4DDR's display and RGB LED drivers
   (`seg7.vhd`, `rgb_pwm.vhd`), and `system.vhd`, which every board

@@ -25,7 +25,7 @@ and switches as registers (see [synth/](synth/README.md#the-nexys4ddr) and
 | Path | What it is |
 |---|---|
 | [nice_cpu/](https://github.com/MJoergen/nice_cpu) | The NICE CPU, its assembler, its emulator, and `nicewasm`, a [translator](https://github.com/MJoergen/nice_cpu/tree/main/translator) from WebAssembly to NICE assembly, as a git submodule. |
-| [src/](src/) | The synthesizable VHDL, shared by both boards. `nicemon.vhd` is the system: the NICE core, the memory (`ram.vhd` and `rom.vhd`), the UART, the core's input FIFO (`rx_fifo.vhd`), the board's registers at `0xFFFFFF90`–`9F` (`board_io.vhd`), and the debug link, nice_cpu's `hdl/src/debug_link.vhd`. `uart_serdes.vhd` is copied from [cmod-s7](https://github.com/MJoergen/cmod-s7), with fixes to its receiver, and break detection. `kbd_m65.vhd` drives the MEGA65 keyboard, and `kbd_ascii.vhd` turns its keys into ASCII. `kbd_ps2.vhd` receives the PS/2 keyboard of the Nexys4DDR, and `kbd_ps2_ascii.vhd` turns its scan codes into ASCII. `seg7.vhd` scans the Nexys4DDR's seven-segment display, and `rgb_pwm.vhd` dims its RGB LEDs. `system.vhd` is what every board has: the system, the text display of its screen, and the UART's pins. |
+| [src/](src/) | The synthesizable VHDL, shared by both boards. `nicemon.vhd` is the system: the NICE core, the memory (`ram.vhd` and `rom.vhd`), the UART, the core's input FIFO (`rx_fifo.vhd`), the screen's registers at `0xFFFFFF80`–`8F` (`scr_regs.vhd`), the board's registers at `0xFFFFFF90`–`9F` (`board_io.vhd`), and the debug link, nice_cpu's `hdl/src/debug_link.vhd`. `uart_serdes.vhd` is copied from [cmod-s7](https://github.com/MJoergen/cmod-s7), with fixes to its receiver, and break detection. `kbd_m65.vhd` drives the MEGA65 keyboard, and `kbd_ascii.vhd` turns its keys into ASCII. `kbd_ps2.vhd` receives the PS/2 keyboard of the Nexys4DDR, and `kbd_ps2_ascii.vhd` turns its scan codes into ASCII. `seg7.vhd` scans the Nexys4DDR's seven-segment display, and `rgb_pwm.vhd` dims its RGB LEDs. `system.vhd` is what every board has: the system, the text display of its screen, and the UART's pins. |
 | [src/core/](src/core/) | `nice_core_pipeline.vhd` and `nice_core_multi.vhd`, the two architectures of `nice_core`. `src/nice_core.vhd` is the entity that wraps whichever of nice_cpu's cores `core.mk` selects with `NICE=pipeline` (the default) or `NICE=multi`. |
 | [src/video/](src/video/) | The text display: `text.vhd` shows the screen at `0xFFFF0000` as 80×25 characters on a video output, with a cursor and a display offset for scrolling. `pix.vhd` and `video_pkg.vhd` are from [MandelbrotMEGA65](https://github.com/MJoergen/MandelbrotMEGA65). `scr_ram.vhd` is the screen's dual-clock memory. `font_pkg.vhd` is the [Spleen](https://github.com/fcambus/spleen) 16×32 font, made by `font/gen_font_pkg.py`. |
 | [font/](font/) | The script that makes `src/video/font_pkg.vhd` from Spleen, and Spleen's license (BSD 2-Clause). |
@@ -691,6 +691,11 @@ every time, not only the ones a testbench sends.
   register of its word, nothing else changes one but reset, each word
   reads its register, or 0, and the buttons reach their register two
   cycles after their pins. Without the registers, every word reads 0.
+- `scr_regs.sby` proves the screen's registers at `0xFFFFFF80`–`8F`,
+  `src/scr_regs.vhd`: a write sets the register of its word, nothing else
+  changes one but a clear or reset, each word reads its register, or 0,
+  the display hears of each write, clear, and reset, and the display
+  offset goes out only while bit 10 of the state enables it.
 - `nicemon.sby` checks the whole system, with 16 words of RAM and
   a free core, `formal/nice_core_formal.vhd`. The free core does anything
   that either of nice_cpu's cores may do on its ports, as nice_cpu's own
@@ -712,13 +717,14 @@ every time, not only the ones a testbench sends.
     halted, and each gets one ACK.
   - A link access to the console or the read counter returns 0 and changes
     nothing.
-  - A clear of the memory is answered once.
+  - A clear of the memory is answered once, and meets no request.
   - The devices answer only the link's request or one of the core, which
     gets one ACK at a time.
   - What a read of the console returns.
   - A read of the ROM returns its word, and only the clear writes the RAM
     under the ROM while the ROM is shown.
-  - A read of `0xFFFFFF90`–`9F` returns the word of `board_io.vhd`.
+  - A read of `0xFFFFFF90`–`9F` returns the word of `board_io.vhd`, and
+    one of `0xFFFFFF80`–`8F` that of `scr_regs.vhd`.
 
   The `link` and `rom` tasks take about 14 minutes each, and the others a
   few each;
@@ -726,7 +732,7 @@ every time, not only the ones a testbench sends.
   runs all the tasks side by side. CI runs `make -j4 formal` on its four
   processors.
 
-The checks in `rx_fifo.vhd`, `board_io.vhd`, and `nicemon.vhd` are in `G_FORMAL` blocks, which are off in simulation and
+The checks in `rx_fifo.vhd`, `board_io.vhd`, `scr_regs.vhd`, and `nicemon.vhd` are in `G_FORMAL` blocks, which are off in simulation and
 synthesis.
 
 ## Testing the board

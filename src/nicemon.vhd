@@ -72,14 +72,15 @@
 --                          performance counters of SYSTEM.md §3. The
 --                          multi-cycle core reports no events to them, so
 --                          only FS_CYCLES and FS_HIST[0] count.
---   0xFFFFFF80-0xFFFFFF8F  The screen's registers, numbered as QNICE-FPGA's
---                          VGA registers at 0xFF30, for the display: 80 is
---                          the state, with bit 6 showing the cursor, bit 5
---                          making it blink, bit 4 making it small, and bit
---                          10 enabling the display offset; 81 and 82 are
---                          the cursor's column and row; and 85 is the
---                          display offset, in words: the display shows the
---                          2000 words from it, so adding 80 scrolls a line.
+--   0xFFFFFF80-0xFFFFFF8F  The screen's registers (src/scr_regs.vhd),
+--                          numbered as QNICE-FPGA's VGA registers at
+--                          0xFF30, for the display: 80 is the state, with
+--                          bit 6 showing the cursor, bit 5 making it blink,
+--                          bit 4 making it small, and bit 10 enabling the
+--                          display offset; 81 and 82 are the cursor's
+--                          column and row; and 85 is the display offset, in
+--                          words: the display shows the 2000 words from it,
+--                          so adding 80 scrolls a line.
 --                          Bits 11..4 of the state are kept and read back;
 --                          the other bits, and the words 83, 84, and 86-8F,
 --                          read 0 and take no write. The registers go out on
@@ -386,19 +387,18 @@ architecture synthesis of nicemon is
    signal clearing : std_logic := '0';
    signal clr_addr : std_logic_vector(C_CLR_BITS - 1 downto 0);
    signal clr_done : std_logic := '0';
-   -- The link's request for a clear, high until clr_done
+   -- The link's request for a clear, high until clr_done, and the cycle
+   -- that starts the clear
    signal link_clear : std_logic;
+   signal clr_start  : std_logic;
 
    -- Bit 3 of the control register: the ROM is hidden, and the RAM is at 0
    signal rom_hidden : std_logic;
 
-   -- The screen's registers: the state's bits 11..4, the cursor's column
-   -- and row, and the display offset
-   signal scr_state  : std_logic_vector(11 downto 4) := (others => '0');
-   signal scr_cur_x  : std_logic_vector(6 downto 0) := (others => '0');
-   signal scr_cur_y  : std_logic_vector(4 downto 0) := (others => '0');
-   signal scr_offs   : std_logic_vector(C_SCR_BITS - 1 downto 0) := (others => '0');
-   signal scr_ctl_we : std_logic := '0';
+   -- The screen's registers (src/scr_regs.vhd): the request served, when
+   -- it is to 0xFFFFFF80-8F, and the word it reads
+   signal sreg_stb   : std_logic;
+   signal sreg_rdata : std_logic_vector(31 downto 0);
 
    -- The board's devices (src/board_io.vhd): the request served, when it is
    -- to 0xFFFFFF90-9F, and the word it reads
@@ -818,28 +818,9 @@ begin
                read_count <= read_count + 1;
             end if;
          elsif addr(31 downto 4) = C_SCR_REGS_BASE then
-            -- The screen's registers. A write is told to the display.
-            if we = '1' then
-               scr_ctl_we <= '1';
-
-               case addr(3 downto 0) is
-                  when X"0"   => scr_state <= wdata(11 downto 4);
-                  when X"1"   => scr_cur_x <= wdata(6 downto 0);
-                  when X"2"   => scr_cur_y <= wdata(4 downto 0);
-                  when X"5"   => scr_offs  <= wdata(C_SCR_BITS - 1 downto 0);
-                  when others => null;
-               end case;
-
-            else
-
-               case addr(3 downto 0) is
-                  when X"0"   => rd_io(11 downto 4) <= scr_state;
-                  when X"1"   => rd_io(6 downto 0) <= scr_cur_x;
-                  when X"2"   => rd_io(4 downto 0) <= scr_cur_y;
-                  when X"5"   => rd_io(C_SCR_BITS - 1 downto 0) <= scr_offs;
-                  when others => null;
-               end case;
-
+            -- The screen's registers, which take a write themselves (sreg_stb)
+            if we = '0' then
+               rd_io <= sreg_rdata;
             end if;
          elsif addr(31 downto 4) = C_BRD_BASE then
             -- The board's devices, which take a write themselves (brd_stb)
@@ -859,7 +840,6 @@ begin
          srv_ack    <= '0';
          link_ack   <= '0';
          clr_done   <= '0';
-         scr_ctl_we <= '0';
          cpu_hold_d <= cpu_hold;
 
          if cpu_tx_valid = '1' and cpu_tx_ready = '1' then
@@ -890,16 +870,11 @@ begin
                clearing <= '0';
                clr_done <= '1';
             end if;
-         elsif link_clear = '1' and clr_done = '0' then
-            -- The link asks for a clear, with the core held: first the
-            -- screen's registers, then every word of the memory.
-            clearing   <= '1';
-            clr_addr   <= (others => '0');
-            scr_state  <= (others => '0');
-            scr_cur_x  <= (others => '0');
-            scr_cur_y  <= (others => '0');
-            scr_offs   <= (others => '0');
-            scr_ctl_we <= '1';
+         elsif clr_start = '1' then
+            -- The link asks for a clear, with the core held: the screen's
+            -- registers now (clr_start), then every word of the memory.
+            clearing <= '1';
+            clr_addr <= (others => '0');
          elsif link_take = '1' then
             serve(true, link_addr, link_we, link_wdata);
          elsif tx_wait = '1' then
@@ -936,11 +911,6 @@ begin
             clr_done     <= '0';
             cpu_tx_valid <= '0';
             read_count   <= (others => '0');
-            scr_state    <= (others => '0');
-            scr_cur_x    <= (others => '0');
-            scr_cur_y    <= (others => '0');
-            scr_offs     <= (others => '0');
-            scr_ctl_we   <= '1';
          end if;
       end if;
    end process p_dbus;
@@ -1164,11 +1134,34 @@ begin
          sw_i    => brd_sw_i
       ); -- i_board_io
 
-   scr_ctl_we_o   <= scr_ctl_we;
-   scr_cur_x_o    <= scr_cur_x;
-   scr_cur_y_o    <= scr_cur_y;
-   scr_cur_mode_o <= scr_state(4) & scr_state(5) & scr_state(6);
-   scr_offs_o     <= scr_offs when scr_state(10) = '1' else (others => '0');
+   -- The screen's registers, which take the request served, when it is
+   -- theirs, and are cleared at the start of a clear of the memory. The
+   -- link makes no request while it asks for a clear (contract f of
+   -- debug_link.vhd), and the core is held, so a clear never meets a
+   -- request (f_clr_alone).
+   sreg_stb  <= '1' when bus_take = '1' and bus_addr(31 downto 4) = C_SCR_REGS_BASE else
+                '0';
+   clr_start <= link_clear and not clr_done and not clearing and not dev_busy;
+
+   i_scr_regs : entity work.scr_regs
+      generic map (
+         G_SCR_ADDR_BITS => C_SCR_BITS
+      )
+      port map (
+         clk_i      => clk_i,
+         rst_i      => rst_i,
+         clear_i    => clr_start,
+         stb_i      => sreg_stb,
+         we_i       => bus_we,
+         addr_i     => bus_addr(3 downto 0),
+         wdata_i    => bus_wdata,
+         rdata_o    => sreg_rdata,
+         ctl_we_o   => scr_ctl_we_o,
+         cur_x_o    => scr_cur_x_o,
+         cur_y_o    => scr_cur_y_o,
+         cur_mode_o => scr_cur_mode_o,
+         offs_o     => scr_offs_o
+      ); -- i_scr_regs
 
    i_scr : entity work.ram
       generic map (
@@ -1282,8 +1275,9 @@ begin
    -- console and the read counter have no side effect (DEBUG.md §3).
    -- With a ROM, a read of it returns the ROM's word, and a write to it
    -- leaves the RAM under it, while the ROM is shown. A read of
-   -- 0xFFFFFF90-9F returns the word of src/board_io.vhd, whose own checks,
-   -- in formal/board_io.sby, prove that word and its registers right.
+   -- 0xFFFFFF80-8F or 0xFFFFFF90-9F returns the word of src/scr_regs.vhd
+   -- or src/board_io.vhd, whose own checks, in formal/scr_regs.sby and
+   -- formal/board_io.sby, prove those words and their registers right.
    -- A request of the core waits from the cycle that accepts it until its
    -- ACK, or until the core is reset, which drops it. The pipelined core
    -- has several requests waiting on a bus, so f_ibus_wait and f_dbus_wait
@@ -1391,6 +1385,7 @@ begin
 
       -- The clear: the link hears that it is done only while it asks.
       -- psl f_clr_done : assert always rst_i = '0' and clr_done = '1' -> link_clear = '1';
+      -- psl f_clr_alone : assert always clr_start = '1' -> bus_take = '0';
 
       -- The console's answer: a byte with bit 8, 0x200 at the end, or 0
       -- psl f_console : assert always
@@ -1405,8 +1400,12 @@ begin
       --    rst_i = '0' and clearing = '0' and ram_b_we = '1' ->
       --    rom_hidden = '1' or or(ram_b_addr(G_RAM_ADDR_BITS - 1 downto G_ROM_ADDR_BITS)) = '1';
 
-      -- A read of 0xFFFFFF90-9F returns the board's word, which
-      -- formal/board_io.sby proves right.
+      -- A read of 0xFFFFFF80-8F or 0xFFFFFF90-9F returns the word of the
+      -- screen's or the board's registers, which formal/scr_regs.sby and
+      -- formal/board_io.sby prove right.
+      -- psl f_sreg_read : assert always
+      --    {sreg_stb and not bus_we and not rst_i} |=>
+      --    {rst_i = '1' or ((link_ack or srv_ack) = '1' and dbus_rdata = prev(sreg_rdata))};
       -- psl f_brd_read : assert always
       --    {brd_stb and not bus_we and not rst_i} |=>
       --    {rst_i = '1' or ((link_ack or srv_ack) = '1' and dbus_rdata = prev(brd_rdata))};

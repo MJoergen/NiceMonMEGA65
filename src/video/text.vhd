@@ -21,7 +21,7 @@
 -- it is shown: bit 0 shows it, bit 1 makes it blink, about twice a second,
 -- and bit 2 makes it small, the bottom 4 lines of the character, where it is
 -- otherwise the whole character. The cursor swaps the colors of its
--- character. These values are the screen's registers of nicemon.vhd, in the
+-- character. These values are the screen's registers of scr_regs.vhd, in the
 -- system clock domain, and ctl_we_i is '1' for a cycle when one of them is
 -- written. They cross to the VGA clock domain through a handshake: the
 -- values are held while a request goes to the VGA clock, which takes them
