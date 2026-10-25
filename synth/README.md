@@ -183,6 +183,7 @@ tables above, and of the Nexys4DDR with the debug link:
 | R6, pipelined, with the debug link | 100 MHz | 0.595 ns | 0.065 ns |
 | R6, pipelined, with the command line | 100 MHz | 0.414 ns | 0.061 ns |
 | R6, `NICE=multi` | 100 MHz | 0.52 ns | – |
+| R3, pipelined, with the debug link | 100 MHz | 0.172 ns | 0.073 ns |
 | R3, pipelined, with the command line | 100 MHz | 0.173 ns | 0.065 ns |
 | Nexys4DDR, pipelined, with the debug link | 90 MHz | 0.111 ns | 0.035 ns |
 | Nexys4DDR, pipelined, with the command line | 90 MHz | 0.022 ns | 0.020 ns |
@@ -190,7 +191,10 @@ tables above, and of the Nexys4DDR with the debug link:
 
 The builds with the debug link are those of 2026-10-27 at nice_cpu
 RC06, with the pause, the step, and the four breakpoints of link
-version 4 and the UART at 2 Mbaud,
+version 4 and the UART at 2 Mbaud, except the R3 one, which is that of
+2026-10-25 at nice_cpu 62f2da2 with the pause of link version 2 (12507
+LUTs and 9044 flip-flops, 9.3 % and 3.4 % of the FPGA, and 7:33 in
+routing),
 the other pipelined builds those of 2026-10-24 at nice_cpu 2f67a50, and the
 multi-cycle ones those at this repository's cb95968, whose hold slacks were
 not recorded. The pipelined builds' block RAM is 132.5 tiles on the R6 and
