@@ -1,0 +1,37 @@
+# The memory of the system, src/mem.vhd (formal_mem.vhd), with a RAM of 16
+# words, a ROM of 4, rom.bin, and a screen of 8. "prove" proves the
+# assertions of mem.vhd for every cycle by k-induction. "model" proves, with
+# PDR, that the words read are those of a model of one word of the RAM, one
+# of the screen, and the ROM, through writes and clears. "cover" reaches
+# each cover statement.
+
+[tasks]
+prove
+model
+cover
+
+[options]
+prove: mode prove
+prove: depth 4
+model: mode prove
+cover: mode cover
+cover: depth 24
+
+[engines]
+prove: smtbmc yices
+model: abc pdr
+cover: smtbmc yices
+
+[script]
+plugin -i ghdl
+prove: ghdl --std=08 -fpsl ram.vhd rom.vhd mem.vhd formal_mem.vhd -e formal_mem
+model: ghdl --std=08 -fpsl -gG_MODEL=true ram.vhd rom.vhd mem.vhd formal_mem.vhd -e formal_mem
+cover: ghdl --std=08 -fpsl -gG_MODEL=true ram.vhd rom.vhd mem.vhd formal_mem.vhd -e formal_mem
+prep -top formal_mem
+
+[files]
+../src/ram.vhd
+../src/rom.vhd
+../src/mem.vhd
+formal_mem.vhd
+rom.bin

@@ -210,7 +210,7 @@ The block RAMs, of 36 Kbit, are these:
 |---|---|---|
 | The RAM (`i_ram`), 64K words | 64 | 64 |
 | The ROM (`i_rom`), 32K words, with `ROM=` only | 32 | 32 |
-| The screen (`i_scr` in `nicemon.vhd`), 32K or 8K words | 32 | 8 |
+| The screen (`i_scr` in `mem.vhd`), 32K or 8K words | 32 | 8 |
 | Its copy in `text.vhd` (`scr_ram.vhd`) | 32 | 8 |
 | The font in `text.vhd` | 4 | 4 |
 | The UART's input FIFO (`rx_fifo.vhd`), one RAMB18 | 0.5 | 0.5 |

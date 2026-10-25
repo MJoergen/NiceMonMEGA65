@@ -45,8 +45,9 @@ and `make linktest`, `make -j4 formal`, and `make lint`.
 
 ## Layout
 
-- `src/`: the system (`nicemon.vhd`), its memory (`ram.vhd`, `rom.vhd`),
-  the UART (`uart_serdes.vhd`, from cmod-s7), which carries the link,
+- `src/`: the system (`nicemon.vhd`), its memory (`mem.vhd`, with
+  `ram.vhd` and `rom.vhd`), the UART (`uart_serdes.vhd`, from cmod-s7),
+  which carries the link,
   the core's input FIFO (`rx_fifo.vhd`), nice_cpu's devices at
   `FFFFFF10`–`7F` (`devices.vhd`), the board's registers at
   `FFFFFF90`–`9F` (`board_io.vhd`) and the screen's at `FFFFFF80`–`8F`

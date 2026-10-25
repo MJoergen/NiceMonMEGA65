@@ -56,6 +56,7 @@ SRC += ../../src/rom.vhd
 SRC += ../../src/board_io.vhd
 SRC += ../../src/scr_regs.vhd
 SRC += ../../src/devices.vhd
+SRC += ../../src/mem.vhd
 SRC += ../../src/nicemon.vhd
 SRC += ../../src/video/video_pkg.vhd
 SRC += ../../src/video/font_pkg.vhd

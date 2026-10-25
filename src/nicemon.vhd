@@ -4,10 +4,11 @@
 -- a keyboard: a stream of bytes that is input like the UART's.
 --
 -- THEORY OF OPERATION
--- The core (src/nice_core.vhd, wrapping one of nice_cpu's cores) has an instruction bus and a
--- data bus, both pipelined Wishbone. The instruction bus is 64 bits wide: it
--- reads an aligned pair of words from port A of the memory, the word at the
--- lower address in bits 31..0. The data bus shares port B with the debug
+-- The core (src/nice_core.vhd, wrapping one of nice_cpu's cores) has an
+-- instruction bus and a data bus, both pipelined Wishbone. The instruction
+-- bus is 64 bits wide: it reads an aligned pair of words from port A of the
+-- memory (src/mem.vhd), the word at the lower address in bits 31..0. The
+-- data bus shares port B of the memory and the I/O registers with the debug
 -- link (nice_cpu/hdl/src/debug_link.vhd), a second Wishbone master. The link
 -- shares the UART with the console: through it a host reads and writes the
 -- memory, loads and starts a program, and learns when it halts.
@@ -15,12 +16,12 @@
 -- Address map, as in the emulator (nice_cpu/emulator/README.md), and the
 -- same for the link and the core's data bus apart from the link's own
 -- registers at the end:
---   0x00000000-0xFFFFFFFF  Memory, where no register below is. It has
---                          2^G_RAM_ADDR_BITS words and repeats through the
---                          address space, so the runtime's stack below
---                          0xFFFFFF00 lands in the top of the memory, and so
---                          do the words of 0xFFFFFF00-FF that are not
---                          registers.
+--   0x00000000-0xFFFFFFFF  Memory (src/mem.vhd), where no register below
+--                          is. It has 2^G_RAM_ADDR_BITS words and repeats
+--                          through the address space, so the runtime's
+--                          stack below 0xFFFFFF00 lands in the top of the
+--                          memory, and so do the words of 0xFFFFFF00-FF
+--                          that are not registers.
 --   0x00000000-0x00007FFF  The ROM, 2^G_ROM_ADDR_BITS words from G_ROM_FILE
 --                          (src/rom.vhd), with the monitor, which the core
 --                          boots from, as QNICE-FPGA's is at 0x0000-0x7FFF.
@@ -171,8 +172,9 @@
 -- acknowledged in the cycle after the device's acknowledge.
 --
 -- A clear of the memory, which the link asks for with clear_o, writes 0 to
--- one word of the RAM and one of the screen in each cycle, 2^C_CLR_BITS
--- cycles in all, 0.66 ms at 100 MHz, and clears the screen's registers.
+-- one word of the RAM and one of the screen in each cycle, in src/mem.vhd,
+-- 2^16 cycles in all on the boards, 0.66 ms at 100 MHz, and clears the
+-- screen's registers.
 -- The link holds the core meanwhile, and makes no access.
 --
 -- RESET
@@ -264,7 +266,6 @@ architecture synthesis of nicemon is
    -- The screen: 0xFFFF0000 and the 2^G_SCR_ADDR_BITS words from it, of
    -- which the emulator's screen is the first 2000
    constant C_SCR_BITS : natural := G_SCR_ADDR_BITS;
-   constant C_SCR_BASE : std_logic_vector(31 downto C_SCR_BITS) := (31 downto 16 => '1', others => '0');
    -- The screen's registers: 0xFFFFFF80-8F
    constant C_SCR_REGS_BASE : std_logic_vector(31 downto 4) := X"FFFFFF8";
 
@@ -276,9 +277,6 @@ architecture synthesis of nicemon is
    constant C_MPU_BASE   : std_logic_vector(31 downto 5) := X"FFFFFF" & "001"; -- 0xFFFFFF20-3F
    constant C_PERF_BASE  : std_logic_vector(31 downto 4) := X"FFFFFF4";        -- 0xFFFFFF40-4F
    constant C_FS_BASE    : std_logic_vector(31 downto 6) := X"FFFFFF" & "01";  -- 0xFFFFFF40-7F, less the above
-
-   -- The clearing counts through the larger of the RAM and the screen.
-   constant C_CLR_BITS : natural := maximum(G_RAM_ADDR_BITS, C_SCR_BITS);
 
    -- Whether an address is an I/O register, not memory. The words of
    -- 0xFFFFFF00-FF that are not registers are memory, as in the emulator.
@@ -295,28 +293,6 @@ architecture synthesis of nicemon is
              addr(7 downto 4) = X"9";                               -- the board's devices
    end function is_io;
 
-   -- Whether a memory address is in the ROM's range, which repeats with the
-   -- RAM's
-   function in_rom(addr : std_logic_vector(31 downto 0)) return boolean is
-   begin
-      return or(addr(G_RAM_ADDR_BITS - 1 downto G_ROM_ADDR_BITS)) = '0';
-   end function in_rom;
-
-   -- The memory that a memory address lands in: the screen, the ROM while
-   -- it is shown, or else the RAM
-   type t_mem is (MEM_RAM, MEM_ROM, MEM_SCR);
-
-   function mem_of(addr       : std_logic_vector(31 downto 0);
-                   rom_hidden : std_logic) return t_mem is
-   begin
-      if addr(31 downto C_SCR_BITS) = C_SCR_BASE then
-         return MEM_SCR;
-      elsif rom_hidden = '0' and in_rom(addr) then
-         return MEM_ROM;
-      end if;
-      return MEM_RAM;
-   end function mem_of;
-
    -- Whether an address is one of the fetch statistics', which are the
    -- words of 0xFFFFFF40-7F that the performance counters do not take
    function is_fs(addr : std_logic_vector(31 downto 0)) return boolean is
@@ -331,9 +307,9 @@ architecture synthesis of nicemon is
              addr(31 downto 4) = C_TIMER_BASE or is_fs(addr);
    end function is_dev;
 
-   -- The source of the read data of the last request served: a memory, the
-   -- console's FIFO, the device that acknowledges the core, or else rd_io
-   type t_src is (SRC_IO, SRC_RAM, SRC_ROM, SRC_SCR, SRC_RX, SRC_DEV);
+   -- The source of the read data of the last request served: the memory,
+   -- the console's FIFO, the device that acknowledges the core, or else rd_io
+   type t_src is (SRC_IO, SRC_MEM, SRC_RX, SRC_DEV);
 
    -- Core
    signal cpu_rst    : std_logic;
@@ -361,11 +337,10 @@ architecture synthesis of nicemon is
    -- The halt reason, the code of nice_cpu's DEBUG.md §6
    signal halt_reason : std_logic_vector(2 downto 0);
 
-   -- Clearing the memory: the address, and a pulse for the link when it is
-   -- done
-   signal clearing : std_logic := '0';
-   signal clr_addr : std_logic_vector(C_CLR_BITS - 1 downto 0);
-   signal clr_done : std_logic := '0';
+   -- Clearing the memory (src/mem.vhd), and a pulse for the link when it
+   -- is done
+   signal clearing : std_logic;
+   signal clr_done : std_logic;
    -- The link's request for a clear, high until clr_done, and the cycle
    -- that starts the clear
    signal link_clear : std_logic;
@@ -389,13 +364,9 @@ architecture synthesis of nicemon is
 
    signal ibus_cyc  : std_logic;
    signal ibus_stb  : std_logic;
-   signal ibus_ack  : std_logic := '0';
    signal core_iack : std_logic;
    signal ibus_addr : std_logic_vector(30 downto 0);   -- the pair address
-   signal ibus_word : std_logic_vector(31 downto 0);   -- its first word
    signal ibus_data : std_logic_vector(63 downto 0);
-   signal ibus_io   : std_logic := '0';
-   signal ibus_mem  : t_mem     := MEM_RAM;
 
    signal dbus_cyc   : std_logic;
    signal dbus_stb   : std_logic;
@@ -439,7 +410,8 @@ architecture synthesis of nicemon is
    signal core_owed    : std_logic;
    signal dev_stall    : std_logic;
 
-   -- The request served in this cycle: the link's, or else the core's
+   -- The request served in this cycle: the link's while it owns port B, or
+   -- else the core's
    signal bus_take  : std_logic;
    signal bus_addr  : std_logic_vector(31 downto 0);
    signal bus_we    : std_logic;
@@ -450,25 +422,15 @@ architecture synthesis of nicemon is
    signal irq_ready  : std_logic;
    signal irq_vector : std_logic_vector(7 downto 0);
 
-   -- Memory ports A and B, and the source of the read data of the last request
-   signal ram_a_addr  : std_logic_vector(G_RAM_ADDR_BITS - 2 downto 0);
-   signal ram_a_data  : std_logic_vector(63 downto 0);
-   signal ram_b_addr  : std_logic_vector(G_RAM_ADDR_BITS - 1 downto 0);
-   signal ram_b_we    : std_logic;
-   signal ram_b_wdata : std_logic_vector(31 downto 0);
-   signal ram_b_rdata : std_logic_vector(31 downto 0);
-   signal rd_src      : t_src := SRC_IO;
+   -- The memory (src/mem.vhd): the request served, when it is to memory,
+   -- and the word it reads
+   signal mem_stb   : std_logic;
+   signal mem_rdata : std_logic_vector(31 downto 0);
 
-   -- The ROM, read at the addresses of the memory ports
-   signal rom_a_data : std_logic_vector(63 downto 0);
-   signal rom_b_data : std_logic_vector(31 downto 0);
-
-   -- The screen memory, like the main memory
-   signal scr_a_data  : std_logic_vector(63 downto 0);
-   signal scr_b_addr  : std_logic_vector(C_SCR_BITS - 1 downto 0);
-   signal scr_b_we    : std_logic;
-   signal scr_b_rdata : std_logic_vector(31 downto 0);
-   signal rd_io       : std_logic_vector(31 downto 0);
+   -- The source of the read data of the last request, and the word of an
+   -- I/O register
+   signal rd_src : t_src := SRC_IO;
+   signal rd_io  : std_logic_vector(31 downto 0);
 
    -- UART
    signal ser_rx_valid : std_logic;
@@ -510,10 +472,6 @@ begin
 
    assert C_SCR_BITS >= 11 and C_SCR_BITS <= 15
       report "nicemon: the screen must hold its 2000 words, below the I/O registers"
-      severity failure;
-
-   assert G_ROM_ADDR_BITS < G_RAM_ADDR_BITS
-      report "nicemon: the ROM must leave room for RAM above it"
       severity failure;
 
    assert G_RX_FIFO_BITS <= 15
@@ -577,37 +535,6 @@ begin
 
 
    ---------------------------------------------------------------------------
-   -- Instruction bus: memory port A. It never stalls. A pair lies wholly in
-   -- the RAM, the ROM, the screen, or the I/O page, so the address of its
-   -- first word decides where it is read.
-   ---------------------------------------------------------------------------
-
-   ibus_word  <= ibus_addr & '0';
-   ram_a_addr <= ibus_addr(G_RAM_ADDR_BITS - 2 downto 0);
-
-   p_ibus : process (clk_i)
-   begin
-      if rising_edge(clk_i) then
-         ibus_ack <= ibus_cyc and ibus_stb;
-         ibus_io  <= and(ibus_word(31 downto 8));
-         ibus_mem <= mem_of(ibus_word, rom_hidden);
-         if cpu_rst = '1' then
-            ibus_ack <= '0';
-         end if;
-      end if;
-   end process p_ibus;
-
-   -- A hold resets the core with requests in flight. Their ACKs come while
-   -- CYC is low, and are dropped, as Wishbone ignores them.
-   core_iack <= ibus_ack and ibus_cyc;
-
-   ibus_data <= (others => '0') when ibus_io = '1' else
-                scr_a_data when ibus_mem = MEM_SCR else
-                rom_a_data when ibus_mem = MEM_ROM else
-                ram_a_data;
-
-
-   ---------------------------------------------------------------------------
    -- Data bus and link: memory port B and the I/O registers
    ---------------------------------------------------------------------------
 
@@ -633,56 +560,20 @@ begin
                 '0';
 
    -- The link's and the core's requests are never taken in the same cycle
-   -- (f_link_take), nor while the memory is cleared.
+   -- (f_link_take), nor while the memory is cleared. The address is the
+   -- link's while it owns port B, when the core's request is stalled, so it
+   -- does not wait for the stall, and the memory's address does not either.
    bus_take  <= link_take or core_take;
-   bus_addr  <= link_addr when link_take = '1' else
+   bus_addr  <= link_addr when link_owns = '1' else
                 dbus_addr;
-   bus_we    <= link_we when link_take = '1' else
+   bus_we    <= link_we when link_owns = '1' else
                 dbus_we;
-   bus_wdata <= link_wdata when link_take = '1' else
+   bus_wdata <= link_wdata when link_owns = '1' else
                 dbus_wdata;
+   mem_stb   <= '1' when bus_take = '1' and not is_io(bus_addr) else
+                '0';
 
-   ram_b_addr  <= clr_addr(G_RAM_ADDR_BITS - 1 downto 0) when clearing = '1' else
-                  link_addr(G_RAM_ADDR_BITS - 1 downto 0) when link_owns = '1' else
-                  dbus_addr(G_RAM_ADDR_BITS - 1 downto 0);
-   ram_b_wdata <= (others => '0') when clearing = '1' else
-                  link_wdata when link_owns = '1' else
-                  dbus_wdata;
-   scr_b_addr  <= clr_addr(C_SCR_BITS - 1 downto 0) when clearing = '1' else
-                  link_addr(C_SCR_BITS - 1 downto 0) when link_owns = '1' else
-                  dbus_addr(C_SCR_BITS - 1 downto 0);
-
-   -- A write to memory is served in the cycle that the link's or the core's
-   -- request is taken, and in no other cycle. It goes to the screen or to
-   -- the main memory, unless it is to the ROM, where it is dropped. While
-   -- the memory is cleared, both are written, the RAM under the ROM
-   -- included.
-   p_mem_we : process (all)
-      variable we_v : std_logic;
-   begin
-      we_v := '0';
-      if bus_take = '1' and not is_io(bus_addr) then
-         we_v := bus_we;
-      end if;
-      ram_b_we <= '0';
-      scr_b_we <= '0';
-      if clearing = '1' then
-         ram_b_we <= '1';
-         scr_b_we <= '1';
-      else
-
-         case mem_of(bus_addr, rom_hidden) is
-            when MEM_SCR => scr_b_we <= we_v;
-            when MEM_ROM => null;
-            when MEM_RAM => ram_b_we <= we_v;
-         end case;
-
-      end if;
-   end process p_mem_we;
-
-   dbus_rdata <= ram_b_rdata when rd_src = SRC_RAM else
-                 rom_b_data when rd_src = SRC_ROM else
-                 scr_b_rdata when rd_src = SRC_SCR else
+   dbus_rdata <= mem_rdata when rd_src = SRC_MEM else
                  X"00000" & "0001" & rx_q when rd_src = SRC_RX else
                  dev_rdata when rd_src = SRC_DEV else
                  rd_io;
@@ -698,14 +589,9 @@ begin
          rd_src <= SRC_IO;
          rd_io  <= (others => '0');
          if not is_io(addr) then
-            -- Memory: port B is driven combinationally above.
-
-            case mem_of(addr, rom_hidden) is
-               when MEM_SCR => rd_src <= SRC_SCR;
-               when MEM_ROM => rd_src <= SRC_ROM;
-               when MEM_RAM => rd_src <= SRC_RAM;
-            end case;
-
+            -- The memory has taken the request (mem_stb), and returns its
+            -- word in the next cycle.
+            rd_src <= SRC_MEM;
          elsif is_dev(addr) and not link then
             -- A device has taken the core's request (core_dev), and it
             -- acknowledges it, with its word.
@@ -770,9 +656,8 @@ begin
 
    begin
       if rising_edge(clk_i) then
-         srv_ack    <= '0';
-         link_ack   <= '0';
-         clr_done   <= '0';
+         srv_ack  <= '0';
+         link_ack <= '0';
 
          if cpu_tx_valid = '1' and cpu_tx_ready = '1' then
             cpu_tx_valid <= '0';
@@ -784,17 +669,11 @@ begin
                rd_io    <= dev_rdata;
                link_ack <= '1';
             end if;
-         elsif clearing = '1' then
-            clr_addr <= clr_addr + 1;
-            if and(clr_addr) = '1' then
-               clearing <= '0';
-               clr_done <= '1';
-            end if;
-         elsif clr_start = '1' then
+         elsif clearing = '1' or clr_start = '1' then
             -- The link asks for a clear, with the core held: the screen's
-            -- registers now (clr_start), then every word of the memory.
-            clearing <= '1';
-            clr_addr <= (others => '0');
+            -- registers now (clr_start), then every word of the memory,
+            -- which src/mem.vhd writes meanwhile.
+            null;
          elsif link_take = '1' then
             serve(true, link_addr, link_we, link_wdata);
          elsif tx_wait = '1' then
@@ -816,8 +695,6 @@ begin
 
          if rst_i = '1' then
             link_ack     <= '0';
-            clearing     <= '0';
-            clr_done     <= '0';
             cpu_tx_valid <= '0';
             read_count   <= (others => '0');
          end if;
@@ -894,61 +771,39 @@ begin
          irq_vector_o => irq_vector
       ); -- i_devices
 
-   i_ram : entity work.ram
+   -- The memory: the RAM, the ROM, and the screen, on the instruction bus
+   -- and on port B, and the clear. A display keeps its own copy of the
+   -- screen, from the writes given out on scr_*_o.
+   i_mem : entity work.mem
       generic map (
-         G_ADDR_BITS => G_RAM_ADDR_BITS,
-         G_FORMAL    => G_FORMAL
+         G_RAM_ADDR_BITS => G_RAM_ADDR_BITS,
+         G_SCR_ADDR_BITS => C_SCR_BITS,
+         G_ROM_FILE      => G_ROM_FILE,
+         G_ROM_ADDR_BITS => G_ROM_ADDR_BITS,
+         G_RAM_ANY       => G_FORMAL
       )
       port map (
-         clk_i     => clk_i,
-         a_addr_i  => ram_a_addr,
-         a_data_o  => ram_a_data,
-         b_addr_i  => ram_b_addr,
-         b_we_i    => ram_b_we,
-         b_wdata_i => ram_b_wdata,
-         b_rdata_o => ram_b_rdata
-      ); -- i_ram
-
-   gen_rom : if G_ROM_FILE /= "" generate
-
-      -- The ROM, read at the addresses of both memory ports. Its words are
-      -- taken instead of the RAM's while it is not hidden.
-      i_rom : entity work.rom
-         generic map (
-            G_ADDR_BITS => G_ROM_ADDR_BITS,
-            G_INIT_FILE => G_ROM_FILE
-         )
-         port map (
-            clk_i    => clk_i,
-            a_addr_i => ram_a_addr(G_ROM_ADDR_BITS - 2 downto 0),
-            a_data_o => rom_a_data,
-            b_addr_i => ram_b_addr(G_ROM_ADDR_BITS - 1 downto 0),
-            b_data_o => rom_b_data
-         ); -- i_rom
-
-   end generate gen_rom;
-
-   gen_no_rom : if G_ROM_FILE = "" generate
-
-      rom_a_data <= (others => '0');
-      rom_b_data <= (others => '0');
-
-   end generate gen_no_rom;
-
-   -- The screen, at 0xFFFF0000. It is memory, as in the emulator, so the link
-   -- can read what a program wrote there. Without it the address would
-   -- land at word 0 of the main memory. A display keeps its own copy, from
-   -- the writes given out here, a cycle late, and shows it as the registers
-   -- say. The register keeps the core's store paths short, for the display
-   -- lies far from the core on the FPGA.
-   p_scr_out : process (clk_i)
-   begin
-      if rising_edge(clk_i) then
-         scr_we_o   <= scr_b_we;
-         scr_addr_o <= scr_b_addr;
-         scr_data_o <= ram_b_wdata;
-      end if;
-   end process p_scr_out;
+         clk_i        => clk_i,
+         rst_i        => rst_i,
+         rom_hidden_i => rom_hidden,
+         core_rst_i   => cpu_rst,
+         ibus_cyc_i   => ibus_cyc,
+         ibus_stb_i   => ibus_stb,
+         ibus_addr_i  => ibus_addr,
+         ibus_ack_o   => core_iack,
+         ibus_data_o  => ibus_data,
+         stb_i        => mem_stb,
+         we_i         => bus_we,
+         addr_i       => bus_addr,
+         wdata_i      => bus_wdata,
+         rdata_o      => mem_rdata,
+         clear_i      => clr_start,
+         clearing_o   => clearing,
+         clear_done_o => clr_done,
+         scr_we_o     => scr_we_o,
+         scr_addr_o   => scr_addr_o,
+         scr_data_o   => scr_data_o
+      ); -- i_mem
 
    -- The board's devices, which take the request served, when it is theirs
    brd_stb <= '1' when bus_take = '1' and bus_addr(31 downto 4) = C_BRD_BASE else
@@ -1002,20 +857,6 @@ begin
          cur_mode_o => scr_cur_mode_o,
          offs_o     => scr_offs_o
       ); -- i_scr_regs
-
-   i_scr : entity work.ram
-      generic map (
-         G_ADDR_BITS => C_SCR_BITS
-      )
-      port map (
-         clk_i     => clk_i,
-         a_addr_i  => ibus_addr(C_SCR_BITS - 2 downto 0),
-         a_data_o  => scr_a_data,
-         b_addr_i  => scr_b_addr,
-         b_we_i    => scr_b_we,
-         b_wdata_i => ram_b_wdata,
-         b_rdata_o => scr_b_rdata
-      ); -- i_scr
 
 
    ---------------------------------------------------------------------------
@@ -1113,11 +954,10 @@ begin
    -- the core and for the link, the devices included, that the link is
    -- served only while it owns port B, and that its reads and writes of the
    -- console and the read counter have no side effect (DEBUG.md §3).
-   -- With a ROM, a read of it returns the ROM's word, and a write to it
-   -- leaves the RAM under it, while the ROM is shown. A read of
-   -- 0xFFFFFF80-8F or 0xFFFFFF90-9F returns the word of src/scr_regs.vhd
-   -- or src/board_io.vhd, whose own checks, in formal/scr_regs.sby and
-   -- formal/board_io.sby, prove those words and their registers right.
+   -- A read of memory, 0xFFFFFF80-8F, or 0xFFFFFF90-9F returns the word of
+   -- src/mem.vhd, src/scr_regs.vhd, or src/board_io.vhd, whose own checks,
+   -- in formal/mem.sby, formal/scr_regs.sby, and formal/board_io.sby,
+   -- prove those words right.
    -- A request of the core waits from the cycle that accepts it until its
    -- ACK, or until the core is reset, which drops it. The pipelined core
    -- has several requests waiting on a bus, so f_ibus_wait and f_dbus_wait
@@ -1132,9 +972,6 @@ begin
       signal f_rx_end    : std_logic;
       -- A link access of the console or the read counter
       signal f_link_con : std_logic;
-      -- An access of the memory under the ROM, with the ROM shown or hidden
-      signal f_rom   : std_logic;
-      signal f_unrom : std_logic;
    begin
 
       p_wait : process (clk_i)
@@ -1175,13 +1012,6 @@ begin
                              (link_addr = C_UART_DATA or link_addr = C_READ_COUNT) else
                     '0';
 
-      f_rom   <= '1' when bus_take = '1' and not is_io(bus_addr) and
-                          mem_of(bus_addr, rom_hidden) = MEM_ROM else
-                 '0';
-      f_unrom <= '1' when bus_take = '1' and not is_io(bus_addr) and
-                          mem_of(bus_addr, '0') = MEM_ROM and rom_hidden = '1' else
-                 '0';
-
       -- psl default clock is rising_edge(clk_i);
 
       -- The core's buses
@@ -1198,6 +1028,11 @@ begin
       --    link_take = '1' -> link_owns = '1' and core_take = '0' and clearing = '0';
       -- psl f_link_one : assert always
       --    rst_i = '0' and link_take = '1' -> f_link_wait = '0';
+
+      -- The request served is that of the master that owns port B, whose
+      -- address bus_addr and the memory take.
+      -- psl f_bus_owner : assert always
+      --    bus_take = '1' -> (link_take = '1') = (link_owns = '1');
 
       -- The link's read of the console or the read counter returns 0, and
       -- neither its read nor its write changes the input, the output, or
@@ -1229,15 +1064,13 @@ begin
       --     (dbus_ack = '1' and dbus_rdata(31 downto 10) = 0 and
       --      dbus_rdata(8) = prev(f_rx_byte) and dbus_rdata(9) = prev(f_rx_end))};
 
-      -- The ROM: nothing writes the RAM under it but the clear. Without a
-      -- ROM, rom_hidden is 1.
-      -- psl f_rom_we : assert always
-      --    rst_i = '0' and clearing = '0' and ram_b_we = '1' ->
-      --    rom_hidden = '1' or or(ram_b_addr(G_RAM_ADDR_BITS - 1 downto G_ROM_ADDR_BITS)) = '1';
-
-      -- A read of 0xFFFFFF80-8F or 0xFFFFFF90-9F returns the word of the
-      -- screen's or the board's registers, which formal/scr_regs.sby and
-      -- formal/board_io.sby prove right.
+      -- A read of memory, 0xFFFFFF80-8F, or 0xFFFFFF90-9F returns the word
+      -- of the memory, the screen's registers, or the board's, which
+      -- formal/mem.sby, formal/scr_regs.sby, and formal/board_io.sby prove
+      -- right. The memory's word comes in the cycle after the request.
+      -- psl f_mem_read : assert always
+      --    {mem_stb and not bus_we and not rst_i} |=>
+      --    {rst_i = '1' or ((link_ack or srv_ack) = '1' and dbus_rdata = mem_rdata)};
       -- psl f_sreg_read : assert always
       --    {sreg_stb and not bus_we and not rst_i} |=>
       --    {rst_i = '1' or ((link_ack or srv_ack) = '1' and dbus_rdata = prev(sreg_rdata))};
@@ -1250,6 +1083,7 @@ begin
       -- psl c_tx_wait : cover {tx_wait and not rst_i};
       -- psl c_dev_core : cover {core_dev and not rst_i and not cpu_rst; dbus_ack};
       -- psl c_dev_link : cover {dev_busy and not rst_i; link_ack};
+      -- psl c_core_mem : cover {mem_stb and core_take and not bus_we and not rst_i; srv_ack};
       -- psl c_link_mem : cover {link_take and not link_we and not rst_i; link_ack};
       -- psl c_link_con : cover {f_link_con and not rst_i};
       -- psl c_link_paused : cover
@@ -1258,16 +1092,8 @@ begin
 
       gen_formal_rom : if G_ROM_FILE /= "" generate
       begin
-         -- The ROM: a read returns its word. The covers here and in
-         -- gen_formal_brd are unreachable without the ROM or the registers.
-         -- psl f_rom_read : assert always
-         --    {f_rom and not bus_we and not rst_i} |=>
-         --    {rst_i = '1' or ((link_ack or srv_ack) = '1' and dbus_rdata = rom_b_data)};
-         -- psl c_rom_fetch : cover {ibus_mem = MEM_ROM and ibus_ack = '1' and rst_i = '0'};
-         -- psl c_rom_core : cover {f_rom and core_take and not bus_we and not rst_i; srv_ack};
-         -- psl c_rom_link : cover {f_rom and link_take and not bus_we and not rst_i; link_ack};
-         -- psl c_rom_write : cover {f_rom and bus_we and not rst_i};
-         -- psl c_rom_hidden : cover {f_unrom and not rst_i};
+         -- The link shows the ROM. The covers here and in gen_formal_brd
+         -- are unreachable without the ROM or the registers.
          -- psl c_rom_show : cover {rom_hidden and not rst_i; not rom_hidden and not rst_i};
       end generate gen_formal_rom;
 
