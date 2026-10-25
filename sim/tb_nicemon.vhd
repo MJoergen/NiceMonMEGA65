@@ -13,14 +13,14 @@
 -- first. A program that halts quickly may send its `h` before the `k` of
 -- the write that started it; wr() keeps it for expect_halt(). The steps:
 --
--- 1. The link's `b01` after reset, and the ROM, which holds G_ROM_FILE: the
+-- 1. The link's `b02` after reset, and the ROM, which holds G_ROM_FILE: the
 --    core boots from it at reset, prints its greeting, and halts. Its stack
 --    is in the RAM, at the top of the memory, for a push to the ROM is lost.
 --    The ROM is at 0, read only, with the RAM above it; bit 3 of the
 --    control register hides it, and shows it again; and the core boots from
 --    it again when it is started with the ROM shown. From then on the ROM
 --    is hidden, as the tools hide it, so the RAM is at 0 as in the
---    emulator. The version register reads 1, and the free space 16, the
+--    emulator. The version register reads 2, and the free space 16, the
 --    whole FIFO.
 -- 2. Load G_HELLO_FILE with W packets, and read its first word back.
 -- 3. The control register: the core is held in reset.
@@ -37,7 +37,11 @@
 --    from 0x80 to 0xFF, 0xFF as ESC ESC, and a byte with a bad stop bit,
 --    which must be dropped without losing the bytes after it. While it
 --    runs, the link reads its debug registers, and a read of memory gets
---    `e02`.
+--    `e02`. Then a pause: the link sends `p`, before or after the `k` of
+--    its write. While the core is paused, bit 4 of the control register
+--    reads 1, the link reads the memory and R15, which points into the
+--    program, the cycle counter and the running output stop, and a console
+--    byte waits in the FIFO. When the core goes on, it echoes the byte.
 -- 6. Hold the core, load G_FIFO_FILE, and start it. It waits before it
 --    echoes, so the 17 bytes sent meanwhile pile up in the core's input
 --    FIFO. The FIFO keeps the first 16, and the link drops the 17th and
@@ -78,7 +82,7 @@
 --    bytes typed while the core is held are dropped, and G_FIFO_FILE again,
 --    with more bytes typed than its FIFO holds. None is lost, for the
 --    keyboard waits.
--- 14. A reset while G_ECHO_FILE runs: the link sends `b01`, the core boots
+-- 14. A reset while G_ECHO_FILE runs: the link sends `b02`, the core boots
 --    from the ROM again, and the screen's and the board's registers are
 --    cleared.
 --
@@ -420,6 +424,24 @@ begin
          deallocate(p_v);
       end procedure expect_answer;
 
+      -- Writes the control register with a pause, and checks the answer and
+      -- the `p` notice, which come in either order.
+      procedure wr_pause(data : string) is
+         variable a_v : line;
+         variable b_v : line;
+      begin
+         send(C_ESC & pkt('W', "FFFFFFF00001" & data));
+         next_pkt(a_v, "the answer to the pause");
+         next_pkt(b_v, "the p notice");
+         assert (a_v.all = pkt('k', "FFFFFFF00001") and b_v.all = "p#70") or
+                (b_v.all = pkt('k', "FFFFFFF00001") and a_v.all = "p#70")
+            report "tb_nicemon: expected the k and the p of a pause, got " &
+                   a_v.all & " and " & b_v.all
+            severity failure;
+         deallocate(a_v);
+         deallocate(b_v);
+      end procedure wr_pause;
+
       -- The halt notice, with its reason in two hex digits
       procedure expect_halt(reason : string) is
       begin
@@ -543,20 +565,20 @@ begin
              pkt('k', "000001000002") = "k000001000002#AE" and
              pkt('R', "000001000001") = "R000001000001#94" and
              pkt('r', "00000100000111223344") = "r00000100000111223344#48" and
-             pkt('b', "01") = "b01#C3" and pkt('h', "01") = "h01#C9" and
+             pkt('b', "02") = "b02#C4" and pkt('h', "01") = "h01#C9" and
              pkt('e', "5202") = "e5202#2E" and
              pkt('W', "FFFFFFF0000100000009") = "WFFFFFFF0000100000009#BB" and
              pkt('k', "FFFFFFF00001") = "kFFFFFFF00001#46"
          report "tb_nicemon: pkt() does not give the packets of DEBUG.md §8"
          severity failure;
 
-      report "tb_nicemon: b01, and the ROM";
-      expect_pkt("b01#C3");
+      report "tb_nicemon: b02, and the ROM";
+      expect_pkt("b02#C4");
       expect_con("Hello from the ROM!" & C_LF);
       expect_halt("01");
       first_v := first_word(G_ROM_FILE);
       check("FFFFFFF0", "00000002");         -- halted, the ROM shown
-      check("FFFFFFF2", "00000001");         -- the version
+      check("FFFFFFF2", "00000002");         -- the version
       check("FFFFFFF3", "00000010");         -- the free space: 16 bytes
       check("00000000", first_v);            -- the ROM
       wr("00000000", "12345678");            -- dropped
@@ -622,6 +644,28 @@ begin
       expect_answer("e5202#2E");
       send(C_ESC & pkt('W', "00000100000100000000"));
       expect_answer(pkt('e', "5702"));
+      -- A pause, which gives the link the memory and R0-R15
+      wr_pause("00000018");
+      check("FFFFFFF0", "00000018");
+      assert running = '0'
+         report "tb_nicemon: the core runs while it is paused"
+         severity failure;
+      check("00000000", first_v);
+      read_word("FFFFFFEF", cycles_v);
+      assert cycles_v < X"00000020"
+         report "tb_nicemon: R15 is " & to_hstring(cycles_v) & " while paused"
+         severity failure;
+      read_word("FFFFFF40", cycles_v);
+      check("FFFFFF40", to_hstring(cycles_v));
+      send_con("y");
+      wait for 40 * C_BIT_TIME;
+      assert con_len = con_pos_v
+         report "tb_nicemon: the core echoed while it was paused"
+         severity failure;
+      check("FFFFFFF3", "0000000F");
+      wr("FFFFFFF0", "00000008");
+      expect_con("y");
+      check("FFFFFFF0", "00000008");
       -- Bytes with bit 7 set, and 0xFF as ESC ESC both ways
       for i in high_v'range loop
          high_v(i) := character'val(127 + i);
@@ -890,7 +934,7 @@ begin
       wait until rising_edge(clk);
       rst <= '0';
       -- The core boots from the ROM again
-      expect_pkt("b01#C3");
+      expect_pkt("b02#C4");
       expect_con("Hello from the ROM!" & C_LF);
       expect_halt("01");
       check("FFFFFFF0", "00000002");

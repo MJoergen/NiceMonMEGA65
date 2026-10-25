@@ -18,7 +18,8 @@
 --   bus cycle is open, and halt_reason_o is HALT_NONE while it is low and
 --   holds its value while it is high.
 -- - paused_o is high only while no bus cycle is open, and only in the
---   cycle after one with pause_i high.
+--   cycle after one with pause_i high. It is low after reset, and once high,
+--   stays high while pause_i is high, until reset.
 -- The step report, retire_o, regs_o, instret_o, and stats_o are free.
 --
 -- Two of the assumptions matter most here, and nice_cpu proves both for
@@ -198,5 +199,8 @@ begin
    -- The pause
    -- psl f_pause_idle : assume always paused -> not ibus_cyc and not dbus_cyc;
    -- psl f_pause_req : assume always {not pause_i} |=> {not paused};
+   -- psl f_pause_reset : assume always {rst_i} |=> {not paused};
+   -- psl f_pause_hold : assume always
+   --    {paused and pause_i and not rst_i} |=> {paused or rst_i};
 
 end architecture formal;

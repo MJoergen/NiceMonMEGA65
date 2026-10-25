@@ -5,8 +5,8 @@ A Link talks to the board over its debug UART, to niceemu --link over
 TCP on 127.0.0.1, or to the simulated system of make -C sim cosim, whose
 UART is on a TCP port of 127.0.0.1 too. It splits what arrives into console bytes, with ESC ESC
 as 0xFF, and packets, which it checks: the answers go to the request that
-waits for them, and the notices are counted, b and o, or kept, h with its
-reason. A packet with a bad checksum is dropped, as DEBUG.md §5 says.
+waits for them, and the notices are counted, b, o, and p, or kept, h with
+its reason. A packet with a bad checksum is dropped, as DEBUG.md §5 says.
 
 A request waits ANSWER_WAIT for the first byte of its answer, and as long
 as the bytes of a packet keep coming. The simulation runs far slower than
@@ -48,11 +48,12 @@ FREE = 0xFFFFFFF3
 DEBUG_FIRST = 0xFFFFFFE0
 
 # Control bits: hold the core in reset, halted (read only), clear the memory
-# first, and hide the ROM, so that the RAM is at 0
+# first, hide the ROM, so that the RAM is at 0, and pause (version 2)
 HOLD = 1
 HALTED = 2
 CLEAR = 4
 RAM = 8
+PAUSE = 16
 
 # Longer than the 100 ms of DEBUG.md §5, for the latency of a USB serial
 # adapter and of the operating system
@@ -300,6 +301,7 @@ class Link:
         self.halts: list[int] = []
         self.boots = 0
         self.overflows = 0
+        self.pauses = 0
         self.bad = 0
         self._answers: deque[tuple[str, str]] = deque()
         # The state of the receiver: 0 console bytes, 1 after ESC, 2 in a
@@ -365,6 +367,8 @@ class Link:
             self.halts.append(int(payload, 16))
         elif tag == "o":
             self.overflows += 1
+        elif tag == "p":
+            self.pauses += 1
         else:
             self._answers.append((tag, payload.upper()))
 

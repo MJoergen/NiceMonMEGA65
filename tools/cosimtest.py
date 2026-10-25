@@ -4,7 +4,7 @@ board.
 
 It starts "make -C sim cosim", the RTL in GHDL with its debug UART on a
 free port of 127.0.0.1, runs hwtest.py's checks of bad packets on it, but
-for the gap of 300 ms, and runs the programs of hwtest.py's comparison with
+for the gap of 300 ms, and its checks of the pause, and runs the programs of hwtest.py's comparison with
 run.py --cosim on that port and with niceemu alone. Each must print the
 same and exit with the same status. So it checks the RTL, nicelink.py, and
 run.py as hwtest.py does on the board. The simulation runs far slower than
@@ -24,7 +24,8 @@ import sys
 import tempfile
 
 import hwtest
-from hwtest import NICEEMU, REPO, comparisons, results, test_framing, test_run
+from hwtest import (NICEEMU, REPO, assemble, comparisons, results,
+                    test_framing, test_pause, test_run)
 from nicelink import HOLD, RAM, open_link
 
 
@@ -62,6 +63,7 @@ def main() -> None:
             try:
                 link.control(HOLD | RAM)
                 test_framing(link, gap=False)
+                test_pause(link, assemble(f"{REPO}/sim/pause.nasm", tmp))
             finally:
                 link.close()
             test_run(["--cosim", port], comparisons(tmp))

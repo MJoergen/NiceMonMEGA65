@@ -85,7 +85,9 @@ and `make linktest`, `make -j4 formal`, and `make lint`.
   the emulator.
 - While the core runs, the link reaches only its debug registers at
   `FFFFFFE0`–`FF`, and the link reads the console and the read counter as
-  0. A hold leaves R0–R15 undefined.
+  0. A hold of a running core leaves R0–R15 undefined. Bit 4 pauses the
+  core (link version 2): the link sends `p`, and reaches everything while
+  paused, with R0–R15 defined and the counters stopped.
 - The tools take `--tcp PORT` for `niceemu --link PORT` (PORT 0 prints the
   port it picked on stderr). `make linktest` runs `run.py --tcp` against
   plain `niceemu`, which checks the tools without a board.

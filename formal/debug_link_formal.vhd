@@ -11,10 +11,11 @@
 -- to what the header of debug_link.vhd promises:
 -- - The Wishbone master: STB only while CYC, a stalled request is held,
 --   CYC stays high until the ACK, one request at a time, and reset drops
---   CYC and STB. It works only while hold_o or halted_i is high, and not
---   while clear_o is high (contracts a and f).
--- - hold_o and rom_hide_o change only while CYC is low, as the link
---   writes them with an access of its own, which uses no bus. Without
+--   CYC and STB. It works only while hold_o or halted_i is high, or while
+--   pause_o is high and paused_i was high in the cycle before, the link's
+--   own flag of a pause, and not while clear_o is high (contracts a and f).
+-- - hold_o, rom_hide_o, and pause_o change only while CYC is low, as the
+--   link writes them with an access of its own, which uses no bus. Without
 --   G_HAS_ROM, rom_hide_o is 1.
 -- - A clear: clear_o holds the processor, stays high until clear_done_i,
 --   and falls after it (contract f).
@@ -24,7 +25,7 @@
 -- The other outputs are free.
 --
 -- RESET
--- rst_i is the system's reset. After it, CYC, STB, and clear_o are low,
+-- rst_i is the system's reset. After it, CYC, STB, clear_o, and pause_o are low,
 -- hold_o is G_BOOT_HELD, and rom_hide_o shows the ROM, or is 1 without
 -- G_HAS_ROM.
 
@@ -43,6 +44,7 @@ architecture formal of debug_link is
    signal hold         : std_logic;
    signal rom_hide     : std_logic;
    signal clear        : std_logic;
+   signal pause        : std_logic;
    signal wb_cyc       : std_logic;
    signal wb_stb       : std_logic;
    signal wb_we        : std_logic;
@@ -60,6 +62,7 @@ architecture formal of debug_link is
    attribute anyseq of hold         : signal is true;
    attribute anyseq of rom_hide     : signal is true;
    attribute anyseq of clear        : signal is true;
+   attribute anyseq of pause        : signal is true;
    attribute anyseq of wb_cyc       : signal is true;
    attribute anyseq of wb_stb       : signal is true;
    attribute anyseq of wb_we        : signal is true;
@@ -71,6 +74,8 @@ architecture formal of debug_link is
    signal wb_wait   : std_logic := '0';
    signal boot_held : std_logic;
    signal has_rom   : std_logic;
+   -- paused_i in the cycle before, while not held, as the link keeps it
+   signal paused_r : std_logic := '0';
 
 begin
 
@@ -84,6 +89,7 @@ begin
    hold_o         <= hold;
    rom_hide_o     <= rom_hide;
    clear_o        <= clear;
+   pause_o        <= pause;
    wb_cyc_o       <= wb_cyc;
    wb_stb_o       <= wb_stb;
    wb_we_o        <= wb_we;
@@ -105,8 +111,10 @@ begin
          elsif wb_ack_i = '1' then
             wb_wait <= '0';
          end if;
+         paused_r <= paused_i and not hold;
          if rst_i = '1' then
-            wb_wait <= '0';
+            wb_wait  <= '0';
+            paused_r <= '0';
          end if;
       end if;
    end process p_wait;
@@ -123,16 +131,17 @@ begin
    --    {(wb_accept or wb_wait) and not wb_ack_i and not rst_i} |=> {wb_cyc or rst_i};
    -- psl f_one : assume always wb_wait -> not wb_stb;
    -- psl f_cyc_end : assume always {wb_ack_i and not rst_i} |=> {not wb_stb};
-   -- psl f_owns : assume always wb_cyc -> (hold or halted_i) and not clear;
+   -- psl f_owns : assume always
+   --    wb_cyc -> (hold or halted_i or (pause and paused_r)) and not clear;
    -- psl f_reset : assume always
    --    {rst_i} |=>
-   --    {wb_cyc = '0' and wb_stb = '0' and clear = '0' and hold = boot_held and
-   --     rom_hide = not has_rom};
+   --    {wb_cyc = '0' and wb_stb = '0' and clear = '0' and pause = '0' and
+   --     hold = boot_held and rom_hide = not has_rom};
 
    -- The control register
    -- psl f_hold : assume always
    --    {not rst_i} |=>
-   --    {rst_i = '1' or (stable(hold) and stable(rom_hide)) or
+   --    {rst_i = '1' or (stable(hold) and stable(rom_hide) and stable(pause)) or
    --     (wb_cyc = '0' and prev(wb_cyc) = '0')};
    -- psl f_rom : assume always has_rom = '0' -> rom_hide = '1';
 

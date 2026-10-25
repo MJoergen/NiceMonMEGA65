@@ -10,7 +10,9 @@ It checks the link's b notice, and the ROM when the bitstream has one, then
 drives the debug link (nice_cpu/doc/DEBUG.md) with the ROM hidden: it
 checks that bad packets are dropped and that nicelink sends a dropped
 request again, loads and runs sim/echo.nasm, checks that the link reaches only its debug
-registers while it runs, holds and restarts the core, clears
+registers while it runs, holds and restarts the core, pauses
+sim/pause.nasm and checks the registers, the memory, the counters, and the
+input while paused, going on, a hold, and a start paused, clears
 the memory, reads back what sim/emu.nasm leaves after its halt, checks that
 the cycle counter and the timer stop there, writes and reads the screen's
 registers, writes and reads the board's devices (on the Nexys4DDR the LEDs,
@@ -58,8 +60,8 @@ import time
 from typing import Callable, TypeVar
 
 from load import load_words, read_bin, start
-from nicelink import (CONTROL, FREE, HOLD, RAM, VERSION, Link, LinkError,
-                      Serial, packet)
+from nicelink import (CONTROL, FREE, HOLD, PAUSE, RAM, REGS, VERSION, Link,
+                      LinkError, Serial, packet)
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NICEEMU = f"{REPO}/nice_cpu/emulator/zig-out/bin/niceemu"
@@ -259,7 +261,7 @@ def test_boot(link: Link, bit: str, cable: list[str]) -> None:
 def test_link(link: Link) -> None:
     link.control(HOLD | RAM)
     require("hide the ROM", ctl(link) in ("00000009", "0000000B"), ctl(link))
-    check("version 1", rd(link, VERSION) == 1)
+    check("version 2", rd(link, VERSION) == 2)
     check("W then R", wr(link, 0x100, 0xDEADBEEF) and
           rd(link, 0x100) == 0xDEADBEEF)
     words = list(range(0x1000, 0x1000 + 600))
@@ -441,6 +443,62 @@ def test_readback(link: Link, emu: str) -> None:
               f"got {got:08X}, want {want:08X}")
     regs = link.read(0xFFFFFFE0, 16)
     print("  R0-R15:", " ".join(f"{r:08X}" for r in regs))
+
+
+def wait_pause(link: Link, before: int) -> bool:
+    """Whether a p notice has come after the first before of them."""
+    end = time.monotonic() + 4 * QUIET
+    while link.pauses == before and time.monotonic() < end:
+        link.poll(end - time.monotonic())
+    return link.pauses > before
+
+
+def test_pause(link: Link, prog: str) -> None:
+    """The pause of DEBUG.md §6 on sim/pause.nasm, which counts in R1 and
+    stores each count at 0x100: the p notice, bit 4, R0-R15 and the memory
+    while paused, the cycle counter stopped, a console byte kept in the
+    input buffer, going on, a hold that keeps the registers, and a start
+    paused before the first instruction."""
+    load(link, prog)
+    n = link.pauses
+    link.control(PAUSE | RAM)
+    require("pause sends p", wait_pause(link, n))
+    check("pause sets bit 4", ctl(link) == "00000018", ctl(link))
+    r1, r15 = rd(link, REGS + 1), rd(link, REGS + 15)
+    stored = rd(link, 0x100)
+    check("R1 and memory agree while paused", r1 - stored in (0, 1),
+          f"R1 {r1:08X}, 0x100 {stored:08X}")
+    check("R15 at an instruction while paused", r15 in (2, 4, 6),
+          f"{r15:08X}")
+    cycles = rd(link, 0xFFFFFF40)
+    time.sleep(0.2)
+    check("paused core does not run",
+          rd(link, REGS + 1) == r1 and rd(link, 0x100) == stored)
+    check("cycle counter stops while paused", rd(link, 0xFFFFFF40) == cycles,
+          f"{cycles:08X}")
+    free = link.free()
+    link.send_console(b"x", paced=False)
+    time.sleep(0.1)
+    check("console byte kept while paused", link.free() == free - 1,
+          f"{free} before, {link.free()} after")
+    link.control(RAM)
+    check("go on clears bit 4", ctl(link) == "00000008", ctl(link))
+    n = link.pauses
+    link.control(PAUSE | RAM)
+    require("pause again sends p", wait_pause(link, n))
+    later = rd(link, REGS + 1)
+    check("count goes on after the pause", later > r1,
+          f"{r1:08X}, then {later:08X}")
+    link.control(HOLD | RAM)
+    check("hold ends the pause", ctl(link) == "00000009", ctl(link))
+    check("hold keeps R1 of the pause", rd(link, REGS + 1) == later)
+    n = link.pauses
+    link.control(HOLD | PAUSE | RAM)
+    link.control(PAUSE | RAM)
+    require("start paused sends p", wait_pause(link, n))
+    check("start paused stops at address 0", rd(link, REGS + 15) == 0,
+          f"{rd(link, REGS + 15):08X}")
+    link.control(HOLD | RAM)
 
 
 def test_counters_stop(link: Link) -> None:
@@ -668,6 +726,7 @@ def main() -> None:
 
     with tempfile.TemporaryDirectory() as tmp:
         echo = assemble(f"{REPO}/sim/echo.nasm", tmp)
+        pause = assemble(f"{REPO}/sim/pause.nasm", tmp)
         emu = assemble(f"{REPO}/sim/emu.nasm", tmp)
 
         opened = False
@@ -688,6 +747,7 @@ def main() -> None:
                 test_framing(link)
                 test_echo(link, echo)
                 test_reset(link, echo)
+                test_pause(link, pause)
                 test_clear(link)
                 test_readback(link, emu)
                 test_counters_stop(link)

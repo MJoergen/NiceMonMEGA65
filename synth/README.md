@@ -180,16 +180,16 @@ tables above, and of the Nexys4DDR with the debug link:
 
 | Build | Clock | Setup | Hold |
 |---|---|---|---|
-| R6, pipelined, with the debug link | 100 MHz | 0.401 ns | 0.071 ns |
+| R6, pipelined, with the debug link | 100 MHz | 0.371 ns | 0.052 ns |
 | R6, pipelined, with the command line | 100 MHz | 0.414 ns | 0.061 ns |
 | R6, `NICE=multi` | 100 MHz | 0.52 ns | – |
 | R3, pipelined, with the command line | 100 MHz | 0.173 ns | 0.065 ns |
-| Nexys4DDR, pipelined, with the debug link | 90 MHz | 0.161 ns | 0.032 ns |
+| Nexys4DDR, pipelined, with the debug link | 90 MHz | 0.042 ns | 0.027 ns |
 | Nexys4DDR, pipelined, with the command line | 90 MHz | 0.022 ns | 0.020 ns |
 | Nexys4DDR, `NICE=multi` | 90 MHz | 0.19 ns | – |
 
-The builds with the debug link are those of 2026-10-24 at nice_cpu 3209fbb
-with the UART at 2 Mbaud,
+The builds with the debug link are those of 2026-10-25 at nice_cpu 62f2da2,
+with the pause of link version 2 and the UART at 2 Mbaud,
 the other pipelined builds those of 2026-10-24 at nice_cpu 2f67a50, and the
 multi-cycle ones those at this repository's cb95968, whose hold slacks were
 not recorded. The pipelined builds' block RAM is 132.5 tiles on the R6 and

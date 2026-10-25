@@ -104,25 +104,30 @@
 --     96  The 16 switches, bit n for switch n. Read only, synchronized.
 --   0xFFFFFFE0-0xFFFFFFFF  The debug registers of DEBUG.md §6, for the link
 --                          only, which debug_link holds: R0-R15 of the core
---                          after a halt, the control register, the halt
---                          reason (1 to 4 here), the version, and the free
---                          space of the core's input FIFO. Bit 0 of the
---                          control register holds the core in reset, bit 2
---                          clears the RAM, the RAM under the ROM and the
---                          screen included, to 0, as the emulator's memory
---                          is at the start, and bit 3 hides the ROM; in a
---                          build without a ROM it reads 1. The core's data
+--                          after a halt or at a pause, the control
+--                          register, the halt reason (1 to 4 here), the
+--                          version, 2, and the free space of the core's
+--                          input FIFO. Bit 0 of the control register holds
+--                          the core in reset, bit 2 clears the RAM, the RAM
+--                          under the ROM and the screen included, to 0, as
+--                          the emulator's memory is at the start, bit 3
+--                          hides the ROM; in a build without a ROM it reads
+--                          1, and bit 4 pauses the core. The core's data
 --                          accesses to these words go to the memory.
 -- Instruction fetches from 0xFFFFFF00-0xFFFFFFFF read 0 (ISA.md §8.3).
 --
--- The core runs while bit 0 of the control register is 0 and it has not
--- halted. Then the link reaches only its debug registers, and the core owns
--- port B. While the core is held or halted, the link owns port B, and the
--- core's data bus is stalled. A host loads a program with W packets and
--- starts it by writing 0 to bit 0, and the link sends `h` when it halts,
--- after the core's last console byte. Console bytes from the host reach the
--- core's FIFO only while it runs (DEBUG.md §1), and so do the keyboard's:
--- while the core is held or halted, a keyboard byte is taken and dropped.
+-- The core runs while bit 0 of the control register is 0, it has not
+-- halted, and it is not paused. Then the link reaches only its debug
+-- registers, and the core owns port B. While the core is held, halted, or
+-- paused, the link owns port B, and the core's data bus is stalled. A host
+-- loads a program with W packets and starts it by writing 0 to bit 0, and
+-- the link sends `h` when it halts, after the core's last console byte.
+-- Bit 4 of the control register drives the core's pause_i, and the link
+-- sends `p` when the core has paused at a step boundary, with no bus cycle
+-- open (nice_cpu's MICROARCH.md §6.1). A write of 0 to bit 4 makes it go
+-- on. Console bytes from the host reach the core's FIFO only while it runs
+-- or is paused (DEBUG.md §1), and so do the keyboard's: while the core is
+-- held or halted, a keyboard byte is taken and dropped.
 -- Unlike a UART byte, a keyboard byte is not lost when the core's FIFO is
 -- full: it waits until there is room. It is written only while the FIFO has
 -- room for two bytes, and not in a cycle with a byte from the link, so a
@@ -134,12 +139,14 @@
 -- of steps that the emulator prints, unless the program starts the timer,
 -- whose interrupts come after clock cycles here, not after steps. The cycle
 -- counter and the timer's counter run only while the core runs, so they
--- stop at a halt, as the emulator's do. The fetch statistics are cleared
--- at the start too, and count only while the core runs, as the counters do.
--- A read of CYCLE_LO, INSTR_LO, or TIME_LO by the link takes a snapshot, as
--- one by the core does, where niceemu takes none; DEBUG.md §3 allows both.
--- Only the host can see it: the link reads the counters only while the
--- core is held or halted, and a start resets them.
+-- stop at a halt and while the core is paused, as the emulator's do. The
+-- fetch statistics are cleared at the start too, and count only while the
+-- core runs, as the counters do. A read of CYCLE_LO, INSTR_LO, or TIME_LO
+-- by the link takes a snapshot, as one by the core does, where niceemu
+-- takes none; DEBUG.md §3 allows both while the core is held or halted, and
+-- a start resets them. A link read takes one while the core is paused
+-- too, so it replaces the snapshot of the program's last read of a low
+-- word, which DEBUG.md §3 says it should not.
 --
 -- The data bus of the core is stalled while the link owns port B, and while a
 -- write to the UART waits. A request of the link is stalled until no device
@@ -164,7 +171,7 @@
 -- Synchronous. After reset bit 0 of the control register is 1 when
 -- G_CPU_RUN_AT_RESET is false, so the core waits for the host, and 0
 -- otherwise, so the core boots from the ROM, which reset shows: rom_hidden is
--- cleared, or stays 1 in a build without a ROM. The link sends `b01`. The
+-- cleared, or stays 1 in a build without a ROM. The link sends `b02`. The
 -- screen's registers, the read counter, and the board's writable registers
 -- (LEDs, RGB levels, and display segments), which the clear keeps, are
 -- cleared. The memory is not changed.
@@ -207,7 +214,7 @@ entity nicemon is
       kbd_valid_i    : in  std_logic := '0';
       kbd_ready_o    : out std_logic;
       kbd_data_i     : in  std_logic_vector(7 downto 0) := X"00";
-      -- '1' while the core runs: not held, and not halted
+      -- '1' while the core runs: not held, halted, or paused
       running_o      : out std_logic;
       -- The writes to the screen, by the core or the link: the word's offset
       -- from 0xFFFF0000, and the word written
@@ -302,17 +309,24 @@ architecture synthesis of nicemon is
    end function is_dev;
 
    -- Core
-   signal cpu_rst     : std_logic;
-   signal cpu_hold    : std_logic;
-   signal cpu_halted  : std_logic;
-   signal cpu_why     : t_halt;
+   signal cpu_rst    : std_logic;
+   signal cpu_hold   : std_logic;
+   signal cpu_halted : std_logic;
+   signal cpu_why    : t_halt;
+   -- The link's request of a pause, and the core's pause
+   signal cpu_pause   : std_logic;
+   signal cpu_paused  : std_logic;
    signal cpu_instret : std_logic;
    signal cpu_stats   : t_fetch_events;
    -- The core's registers, for the link, which keeps them at a halt, and
    -- the same as one vector, R(n) in bits 32 * n + 31 .. 32 * n
    signal cpu_regs      : t_regs;
    signal cpu_regs_flat : std_logic_vector(511 downto 0);
-   -- '1' while the core runs: not held, and not halted
+   -- '1' while the core is started and has not halted: it runs or is
+   -- paused, and takes input
+   signal cpu_started : std_logic;
+   -- '1' while the core runs: started, and not paused. The counters, the
+   -- timer, and the fetch statistics count only then.
    signal cpu_running : std_logic;
    -- The hold bit in the cycle before, for a pulse when the core starts,
    -- which resets the math unit, the performance counters, and the timer
@@ -380,8 +394,8 @@ architecture synthesis of nicemon is
    -- The acknowledge of a core request served here, not by a device
    signal srv_ack : std_logic := '0';
 
-   -- The link's Wishbone master. It owns port B while the core is held or
-   -- halted, and its request is taken in a cycle with no stall.
+   -- The link's Wishbone master. It owns port B while the core is held,
+   -- halted, or paused, and its request is taken in a cycle with no stall.
    signal link_cyc   : std_logic;
    signal link_stb   : std_logic;
    signal link_stall : std_logic;
@@ -553,8 +567,8 @@ begin
          irq_valid_i   => irq_valid,
          irq_ready_o   => irq_ready,
          irq_vector_i  => irq_vector,
-         pause_i       => '0',
-         paused_o      => open,
+         pause_i       => cpu_pause,
+         paused_o      => cpu_paused,
          halted_o      => cpu_halted,
          halt_reason_o => cpu_why,
          instret_o     => cpu_instret,
@@ -563,7 +577,8 @@ begin
          stats_o       => cpu_stats
       ); -- i_core
 
-   cpu_running <= not cpu_hold and not cpu_halted;
+   cpu_started <= not cpu_hold and not cpu_halted;
+   cpu_running <= cpu_started and not cpu_paused;
    running_o   <= cpu_running;
 
    gen_regs : for n in 0 to 15 generate
@@ -614,10 +629,10 @@ begin
    dbus_stall <= link_owns or tx_wait or dev_busy or clearing or mpu_stall;
    dbus_ack   <= (srv_ack or (core_owed and dev_ack)) and dbus_cyc;
 
-   -- The link owns port B while the core is held or halted. Its request
-   -- waits while a device is busy, owes the core an acknowledge, or the MPU
-   -- stalls, and is then taken.
-   link_owns  <= cpu_hold or cpu_halted;
+   -- The link owns port B while the core is held, halted, or paused. Its
+   -- request waits while a device is busy, owes the core an acknowledge, or
+   -- the MPU stalls, and is then taken.
+   link_owns  <= cpu_hold or cpu_halted or cpu_paused;
    link_stall <= not link_owns or dev_busy or core_owed or mpu_stall or clearing;
    link_take  <= link_cyc and link_stb and not link_stall;
 
@@ -939,12 +954,13 @@ begin
       end if;
    end process p_dbus;
 
-   -- A byte for the core goes into its FIFO while the core runs. The FIFO
+   -- A byte for the core goes into its FIFO while the core runs or is
+   -- paused. The FIFO
    -- drops it when it is full or the input has ended. A read of the console
    -- by the core takes the oldest byte, in the cycle that serves it: the
    -- cycle that accepts the request. The FIFO is in reset while the core is
    -- held, so a program starts with no input.
-   rx_wr_en <= in_valid and cpu_running;
+   rx_wr_en <= in_valid and cpu_started;
    rx_end   <= link_eoi;
    rx_take  <= '1' when core_take = '1' and
                         dbus_addr = C_UART_DATA and dbus_we = '0' else
@@ -1225,6 +1241,8 @@ begin
          clear_done_i   => clr_done,
          halted_i       => cpu_halted,
          halt_reason_i  => halt_reason,
+         pause_o        => cpu_pause,
+         paused_i       => cpu_paused,
          regs_i         => cpu_regs_flat,
          wb_cyc_o       => link_cyc,
          wb_stb_o       => link_stb,
@@ -1237,15 +1255,15 @@ begin
       ); -- i_debug_link
 
    -- The input: a console byte from the link, or else a keyboard byte. While
-   -- the core runs, a keyboard byte waits until the FIFO has room for two,
-   -- so that a byte from the link, which the link sends only when the free
-   -- space was not 0 a cycle earlier, finds room. Otherwise it is taken and
-   -- dropped: while the core is held or halted, or after the end of the
-   -- input.
+   -- the core runs or is paused, a keyboard byte waits until the FIFO has
+   -- room for two, so that a byte from the link, which the link sends only
+   -- when the free space was not 0 a cycle earlier, finds room. Otherwise it
+   -- is taken and dropped: while the core is held or halted, or after the
+   -- end of the input.
    kbd_room <= '1' when rx_free >= 2 else
                '0';
    kbd_take <= kbd_valid_i and not link_in_valid and
-               (not cpu_running or rx_eof or kbd_room);
+               (not cpu_started or rx_eof or kbd_room);
    in_valid <= link_in_valid or kbd_take;
    in_data  <= link_in_data when link_in_valid = '1' else kbd_data_i;
 
@@ -1418,14 +1436,15 @@ begin
 
       -- The link's read of the console or the read counter returns 0, and
       -- neither its read nor its write changes the input, the output, or
-      -- the count.
+      -- the count. While the core is paused, a byte may come into the FIFO
+      -- in the same cycle, which is not the link's doing.
       -- psl f_link_con_read : assert always
       --    {f_link_con and not link_we and not rst_i} |=>
       --    {rst_i = '1' or (link_ack = '1' and dbus_rdata = 0)};
       -- psl f_link_con_side : assert always
       --    {f_link_con and not rst_i} |=>
       --    {rst_i = '1' or (stable(read_count) and stable(cpu_tx_data) and
-      --                     stable(rx_empty))};
+      --                     (stable(rx_empty) or prev(rx_wr_en) = '1'))};
       -- psl f_link_con_take : assert always f_link_con = '1' -> rx_take = '0';
 
       -- The devices answer the link's latched request, or a request of the
@@ -1468,6 +1487,8 @@ begin
       -- psl c_dev_link : cover {dev_busy and not rst_i; link_ack};
       -- psl c_link_mem : cover {link_take and not link_we and not rst_i; link_ack};
       -- psl c_link_con : cover {f_link_con and not rst_i};
+      -- psl c_link_paused : cover
+      --    {link_take and cpu_paused and not cpu_hold and not cpu_halted and not rst_i; link_ack};
       -- psl c_clear : cover {clearing and not rst_i};
 
       gen_formal_rom : if G_ROM_FILE /= "" generate
