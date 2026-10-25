@@ -53,6 +53,7 @@ SRC += ../../src/uart_serdes.vhd
 SRC += ../../src/rx_fifo.vhd
 SRC += ../../src/ram.vhd
 SRC += ../../src/rom.vhd
+SRC += ../../src/board_io.vhd
 SRC += ../../src/nicemon.vhd
 SRC += ../../src/video/video_pkg.vhd
 SRC += ../../src/video/font_pkg.vhd

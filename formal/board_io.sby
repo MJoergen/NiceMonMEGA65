@@ -1,0 +1,31 @@
+# The board's devices, src/board_io.vhd (formal_board_io.vhd). "prove"
+# proves the assertions for every cycle by k-induction, with the registers
+# of G_BOARD_IO, and "none" without them. "cover" reaches each cover
+# statement.
+
+[tasks]
+prove
+none
+cover
+
+[options]
+prove: mode prove
+prove: depth 4
+none: mode prove
+none: depth 4
+cover: mode cover
+cover: depth 10
+
+[engines]
+smtbmc yices
+
+[script]
+plugin -i ghdl
+prove: ghdl --std=08 -fpsl -gG_BOARD_IO=true board_io.vhd formal_board_io.vhd -e formal_board_io
+none: ghdl --std=08 -fpsl -gG_BOARD_IO=false board_io.vhd formal_board_io.vhd -e formal_board_io
+cover: ghdl --std=08 -fpsl -gG_BOARD_IO=true board_io.vhd formal_board_io.vhd -e formal_board_io
+prep -top formal_board_io
+
+[files]
+../src/board_io.vhd
+formal_board_io.vhd

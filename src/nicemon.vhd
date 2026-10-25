@@ -86,11 +86,11 @@
 --                          scr_cur_*_o and scr_offs_o, with scr_ctl_we_o
 --                          for a cycle when one is written, and when they
 --                          are cleared by reset or by the clear of the memory.
---   0xFFFFFF90-0xFFFFFF9F  The board's devices, with G_BOARD_IO (the
---                          Nexys4DDR). Without it, and in the words that
---                          are not registers, a read returns 0 and a write
---                          is dropped. Reset clears the writable ones; a
---                          start of the core does not.
+--   0xFFFFFF90-0xFFFFFF9F  The board's devices (src/board_io.vhd), with
+--                          G_BOARD_IO (the Nexys4DDR). Without it, and in
+--                          the words that are not registers, a read returns
+--                          0 and a write is dropped. Reset clears the
+--                          writable ones; a start of the core does not.
 --     90  The 16 LEDs, bit n for LED n. Read and write.
 --     91  RGB LED 0: bits 11..8 red, 7..4 green, 3..0 blue, each a level
 --         of 0 to 15. Read and write.
@@ -400,20 +400,10 @@ architecture synthesis of nicemon is
    signal scr_offs   : std_logic_vector(C_SCR_BITS - 1 downto 0) := (others => '0');
    signal scr_ctl_we : std_logic := '0';
 
-   -- The board's devices. The buttons and the switches are synchronized.
-   signal brd_led  : std_logic_vector(15 downto 0) := (others => '0');
-   signal brd_rgb0 : std_logic_vector(11 downto 0) := (others => '0');
-   signal brd_rgb1 : std_logic_vector(11 downto 0) := (others => '0');
-   signal brd_seg  : std_logic_vector(63 downto 0) := (others => '0');
-   signal brd_btn  : std_logic_vector(4 downto 0)  := (others => '0');
-   signal brd_sw   : std_logic_vector(15 downto 0) := (others => '0');
-   signal btn_sync : std_logic_vector(4 downto 0)  := (others => '0');
-   signal sw_sync  : std_logic_vector(15 downto 0) := (others => '0');
-   attribute async_reg : string;
-   attribute async_reg of btn_sync : signal is "TRUE";
-   attribute async_reg of sw_sync  : signal is "TRUE";
-   attribute async_reg of brd_btn  : signal is "TRUE";
-   attribute async_reg of brd_sw   : signal is "TRUE";
+   -- The board's devices (src/board_io.vhd): the request served, when it is
+   -- to 0xFFFFFF90-9F, and the word it reads
+   signal brd_stb   : std_logic;
+   signal brd_rdata : std_logic_vector(31 downto 0);
 
    -- The number of the core's data reads of 0xFFFFFF01 since it was written
    signal read_count : std_logic_vector(31 downto 0) := (others => '0');
@@ -852,32 +842,9 @@ begin
 
             end if;
          elsif addr(31 downto 4) = C_BRD_BASE then
-            -- The board's devices. Without them, and in the words that are
-            -- not registers, a read is 0 and a write is dropped.
-            if we = '1' and G_BOARD_IO then
-
-               case addr(3 downto 0) is
-                  when X"0"   => brd_led              <= wdata(15 downto 0);
-                  when X"1"   => brd_rgb0             <= wdata(11 downto 0);
-                  when X"2"   => brd_rgb1             <= wdata(11 downto 0);
-                  when X"3"   => brd_seg(31 downto 0)  <= wdata;
-                  when X"4"   => brd_seg(63 downto 32) <= wdata;
-                  when others => null;
-               end case;
-
-            elsif G_BOARD_IO then
-
-               case addr(3 downto 0) is
-                  when X"0"   => rd_io(15 downto 0) <= brd_led;
-                  when X"1"   => rd_io(11 downto 0) <= brd_rgb0;
-                  when X"2"   => rd_io(11 downto 0) <= brd_rgb1;
-                  when X"3"   => rd_io                <= brd_seg(31 downto 0);
-                  when X"4"   => rd_io                <= brd_seg(63 downto 32);
-                  when X"5"   => rd_io(4 downto 0)  <= brd_btn;
-                  when X"6"   => rd_io(15 downto 0) <= brd_sw;
-                  when others => null;
-               end case;
-
+            -- The board's devices, which take a write themselves (brd_stb)
+            if we = '0' then
+               rd_io <= brd_rdata;
             end if;
          end if;
          if link then
@@ -974,10 +941,6 @@ begin
             scr_cur_y    <= (others => '0');
             scr_offs     <= (others => '0');
             scr_ctl_we   <= '1';
-            brd_led      <= (others => '0');
-            brd_rgb0     <= (others => '0');
-            brd_rgb1     <= (others => '0');
-            brd_seg      <= (others => '0');
          end if;
       end if;
    end process p_dbus;
@@ -1177,21 +1140,29 @@ begin
       end if;
    end process p_scr_out;
 
-   -- The buttons and the switches pass through two registers.
-   p_brd_in : process (clk_i)
-   begin
-      if rising_edge(clk_i) then
-         btn_sync <= brd_btn_i;
-         brd_btn  <= btn_sync;
-         sw_sync  <= brd_sw_i;
-         brd_sw   <= sw_sync;
-      end if;
-   end process p_brd_in;
+   -- The board's devices, which take the request served, when it is theirs
+   brd_stb <= '1' when bus_take = '1' and bus_addr(31 downto 4) = C_BRD_BASE else
+              '0';
 
-   brd_led_o  <= brd_led;
-   brd_rgb0_o <= brd_rgb0;
-   brd_rgb1_o <= brd_rgb1;
-   brd_seg_o  <= brd_seg;
+   i_board_io : entity work.board_io
+      generic map (
+         G_BOARD_IO => G_BOARD_IO
+      )
+      port map (
+         clk_i   => clk_i,
+         rst_i   => rst_i,
+         stb_i   => brd_stb,
+         we_i    => bus_we,
+         addr_i  => bus_addr(3 downto 0),
+         wdata_i => bus_wdata,
+         rdata_o => brd_rdata,
+         led_o   => brd_led_o,
+         rgb0_o  => brd_rgb0_o,
+         rgb1_o  => brd_rgb1_o,
+         seg_o   => brd_seg_o,
+         btn_i   => brd_btn_i,
+         sw_i    => brd_sw_i
+      ); -- i_board_io
 
    scr_ctl_we_o   <= scr_ctl_we;
    scr_cur_x_o    <= scr_cur_x;
@@ -1310,10 +1281,9 @@ begin
    -- served only while it owns port B, and that its reads and writes of the
    -- console and the read counter have no side effect (DEBUG.md §3).
    -- With a ROM, a read of it returns the ROM's word, and a write to it
-   -- leaves the RAM under it, while the ROM is shown. The board's registers
-   -- take the writes to their words and return their values, and the other
-   -- words of 0xFFFFFF90-9F, or all of them without G_BOARD_IO, read 0 and
-   -- change nothing.
+   -- leaves the RAM under it, while the ROM is shown. A read of
+   -- 0xFFFFFF90-9F returns the word of src/board_io.vhd, whose own checks,
+   -- in formal/board_io.sby, prove that word and its registers right.
    -- A request of the core waits from the cycle that accepts it until its
    -- ACK, or until the core is reset, which drops it. The pipelined core
    -- has several requests waiting on a bus, so f_ibus_wait and f_dbus_wait
@@ -1332,12 +1302,6 @@ begin
       -- An access of the memory under the ROM, with the ROM shown or hidden
       signal f_rom   : std_logic;
       signal f_unrom : std_logic;
-      -- An access of 0xFFFFFF90-9F, the board's writable registers, their
-      -- values after the access, and the word that it reads
-      signal f_brd      : std_logic;
-      signal f_brd_regs : std_logic_vector(103 downto 0);
-      signal f_brd_next : std_logic_vector(103 downto 0);
-      signal f_brd_rd   : std_logic_vector(31 downto 0);
    begin
 
       p_wait : process (clk_i)
@@ -1385,51 +1349,6 @@ begin
       f_unrom <= '1' when bus_take = '1' and not is_io(bus_addr) and
                           mem_of(bus_addr, '0') = MEM_ROM and rom_hidden = '1' else
                  '0';
-
-      f_brd      <= '1' when bus_take = '1' and bus_addr(31 downto 4) = C_BRD_BASE else
-                    '0';
-      f_brd_regs <= brd_led & brd_rgb0 & brd_rgb1 & brd_seg;
-
-      p_brd : process (all)
-         variable led_v  : std_logic_vector(15 downto 0);
-         variable rgb0_v : std_logic_vector(11 downto 0);
-         variable rgb1_v : std_logic_vector(11 downto 0);
-         variable seg_v  : std_logic_vector(63 downto 0);
-      begin
-         led_v    := brd_led;
-         rgb0_v   := brd_rgb0;
-         rgb1_v   := brd_rgb1;
-         seg_v    := brd_seg;
-         f_brd_rd <= (others => '0');
-         if f_brd = '1' and G_BOARD_IO then
-            if bus_we = '1' then
-
-               case bus_addr(3 downto 0) is
-                  when X"0"   => led_v  := bus_wdata(15 downto 0);
-                  when X"1"   => rgb0_v := bus_wdata(11 downto 0);
-                  when X"2"   => rgb1_v := bus_wdata(11 downto 0);
-                  when X"3"   => seg_v(31 downto 0)  := bus_wdata;
-                  when X"4"   => seg_v(63 downto 32) := bus_wdata;
-                  when others => null;
-               end case;
-
-            else
-
-               case bus_addr(3 downto 0) is
-                  when X"0"   => f_brd_rd(15 downto 0) <= brd_led;
-                  when X"1"   => f_brd_rd(11 downto 0) <= brd_rgb0;
-                  when X"2"   => f_brd_rd(11 downto 0) <= brd_rgb1;
-                  when X"3"   => f_brd_rd <= brd_seg(31 downto 0);
-                  when X"4"   => f_brd_rd <= brd_seg(63 downto 32);
-                  when X"5"   => f_brd_rd(4 downto 0)  <= brd_btn;
-                  when X"6"   => f_brd_rd(15 downto 0) <= brd_sw;
-                  when others => null;
-               end case;
-
-            end if;
-         end if;
-         f_brd_next <= led_v & rgb0_v & rgb1_v & seg_v;
-      end process p_brd;
 
       -- psl default clock is rising_edge(clk_i);
 
@@ -1486,13 +1405,11 @@ begin
       --    rst_i = '0' and clearing = '0' and ram_b_we = '1' ->
       --    rom_hidden = '1' or or(ram_b_addr(G_RAM_ADDR_BITS - 1 downto G_ROM_ADDR_BITS)) = '1';
 
-      -- The board's registers change only on a write to theirs, and a read
-      -- of 0xFFFFFF90-9F returns the register, or 0.
-      -- psl f_brd_we : assert always
-      --    {not rst_i} |=> {rst_i = '1' or f_brd_regs = prev(f_brd_next)};
+      -- A read of 0xFFFFFF90-9F returns the board's word, which
+      -- formal/board_io.sby proves right.
       -- psl f_brd_read : assert always
-      --    {f_brd and not bus_we and not rst_i} |=>
-      --    {rst_i = '1' or ((link_ack or srv_ack) = '1' and dbus_rdata = prev(f_brd_rd))};
+      --    {brd_stb and not bus_we and not rst_i} |=>
+      --    {rst_i = '1' or ((link_ack or srv_ack) = '1' and dbus_rdata = prev(brd_rdata))};
 
       -- psl c_console : cover {f_rx_byte and not rst_i};
       -- psl c_console_end : cover {f_rx_end and not rst_i};
@@ -1522,11 +1439,11 @@ begin
 
       gen_formal_brd : if G_BOARD_IO generate
       begin
-         -- psl c_brd_core : cover {f_brd and core_take and bus_we and not rst_i};
-         -- psl c_brd_link : cover {f_brd and link_take and not bus_we and not rst_i; link_ack};
-         -- psl c_brd_btn : cover {f_brd = '1' and bus_we = '0' and bus_addr(3 downto 0) = X"5" and
-         --                        brd_btn /= "00000" and rst_i = '0'};
-         -- psl c_brd_none : cover {f_brd = '1' and bus_addr(3 downto 0) = X"F" and rst_i = '0'};
+         -- psl c_brd_core : cover {brd_stb and core_take and bus_we and not rst_i};
+         -- psl c_brd_link : cover {brd_stb and link_take and not bus_we and not rst_i; link_ack};
+         -- psl c_brd_btn : cover {brd_stb = '1' and bus_we = '0' and bus_addr(3 downto 0) = X"5" and
+         --                        brd_rdata /= 0 and rst_i = '0'};
+         -- psl c_brd_none : cover {brd_stb = '1' and bus_addr(3 downto 0) = X"F" and rst_i = '0'};
       end generate gen_formal_brd;
 
    end generate gen_formal;

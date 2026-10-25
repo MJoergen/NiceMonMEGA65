@@ -17,7 +17,7 @@
 -- ones. The keyboard input is a stream of ASCII bytes, as kbd_ascii.vhd
 -- sends them; a board without a keyboard holds kbd_valid_i at '0'. A board
 -- with LEDs, a seven-segment display, buttons, and switches sets G_BOARD_IO
--- and connects the brd_* ports (nicemon.vhd has their registers); the other
+-- and connects the brd_* ports (board_io.vhd has their registers); the other
 -- boards leave them open.
 --
 -- With a ROM the core boots from it at reset; without one it waits, held,

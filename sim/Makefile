@@ -48,7 +48,7 @@ include ../core.mk
 NICE_SIM = $(NICE_DIR)/hdl/sim/wb_mem.vhd
 
 SRC_SOURCES  = ../src/uart_serdes.vhd ../src/rx_fifo.vhd ../src/ram.vhd ../src/rom.vhd \
-               ../src/nicemon.vhd \
+               ../src/board_io.vhd ../src/nicemon.vhd \
                ../src/kbd_m65.vhd ../src/kbd_ascii.vhd ../src/kbd_ps2.vhd ../src/kbd_ps2_ascii.vhd ../src/seg7.vhd ../src/rgb_pwm.vhd \
                ../src/video/video_pkg.vhd ../src/video/font_pkg.vhd ../src/video/pix.vhd ../src/video/scr_ram.vhd ../src/video/text.vhd \
                ../src/system.vhd
