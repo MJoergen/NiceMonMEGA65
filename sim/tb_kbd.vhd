@@ -1,12 +1,12 @@
 -- Tests the keyboard: the driver (src/kbd_m65.vhd) and the ASCII mapping
--- (src/kbd_ascii.vhd), with a model of the keyboard's own FPGA.
+-- (src/kbd_m65_ascii.vhd), with a model of the keyboard's own FPGA.
 --
 -- THEORY OF OPERATION
 -- p_keyboard models the keyboard. It finds the sync pulse, a clock that
 -- stays high for longer than a period, and then sends the state of key k
 -- after the k-th falling edge of the clock, low while the key is pressed.
 -- Keys 76 and 77 are copies of keys 0 and 1, as on the real keyboard.
--- p_main presses and releases keys, and checks the bytes that kbd_ascii sends.
+-- p_main presses and releases keys, and checks the bytes that kbd_m65_ascii sends.
 -- p_rx takes the bytes. The modules get a slow G_CLOCK_HZ, so that the test
 -- is fast: half a period of the keyboard clock is 10 cycles, and the keys are
 -- sampled every 31250 cycles.
@@ -25,7 +25,7 @@ architecture simulation of tb_kbd is
    constant C_CLOCK_HZ : natural := 6_250_000;
    -- Clock cycles in half a period of the keyboard clock
    constant C_HALF : natural := C_CLOCK_HZ / 625_000;
-   -- The sample period of kbd_ascii, and the repeat
+   -- The sample period of kbd_m65_ascii, and the repeat
    constant C_SAMPLE : time    := (C_CLOCK_HZ / 200) * 10 ns;
    constant C_DELAY  : time    := 100 * C_SAMPLE;
    constant C_RATE   : time    := 10 * C_SAMPLE;
@@ -76,7 +76,7 @@ begin
          kb_data_i   => kb_in
       ); -- i_kbd_m65
 
-   i_kbd_ascii : entity work.kbd_ascii
+   i_kbd_m65_ascii : entity work.kbd_m65_ascii
       generic map (
          G_CLOCK_HZ => C_CLOCK_HZ
       )
@@ -87,7 +87,7 @@ begin
          data_valid_o => valid,
          data_ready_i => ready,
          data_o       => data
-      ); -- i_kbd_ascii
+      ); -- i_kbd_m65_ascii
 
 
    p_keyboard : process

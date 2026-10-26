@@ -6,7 +6,7 @@
 PART = xc7a200tfbg484-2
 
 MEGA65_SRC  = ../../src/kbd_m65.vhd
-MEGA65_SRC += ../../src/kbd_ascii.vhd
+MEGA65_SRC += ../../src/kbd_m65_ascii.vhd
 MEGA65_SRC += ../mega65/hdmi/types_pkg.vhd
 MEGA65_SRC += ../mega65/hdmi/sync_reg.vhd
 MEGA65_SRC += ../mega65/hdmi/hdmi_tx_encoder.vhd

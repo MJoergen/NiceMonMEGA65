@@ -14,7 +14,7 @@
 -- output is that of text.vhd, in the VGA clock domain: 8 bits per color,
 -- the two sync signals with the polarity of G_VIDEO, and vga_de_o, which is
 -- '1' in the visible area. A board with fewer bits per color takes the top
--- ones. The keyboard input is a stream of ASCII bytes, as kbd_ascii.vhd
+-- ones. The keyboard input is a stream of ASCII bytes, as kbd_m65_ascii.vhd
 -- sends them; a board without a keyboard holds kbd_valid_i at '0'. A board
 -- with LEDs, a seven-segment display, buttons, and switches sets G_BOARD_IO
 -- and connects the brd_* ports (board_io.vhd has their registers); the other

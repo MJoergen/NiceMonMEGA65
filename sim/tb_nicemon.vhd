@@ -84,7 +84,7 @@
 -- 13. Load G_EOF_FILE, and run it. It echoes its input until the input ends,
 --    which a break on the UART does, and halts with 0x200 in R1. Console
 --    bytes sent after the halt are dropped.
--- 14. The keyboard input, a stream of bytes as kbd_ascii.vhd sends them:
+-- 14. The keyboard input, a stream of bytes as kbd_m65_ascii.vhd sends them:
 --    bytes typed while the core is held are dropped, and G_FIFO_FILE again,
 --    with more bytes typed than its FIFO holds. None is lost, for the
 --    keyboard waits.

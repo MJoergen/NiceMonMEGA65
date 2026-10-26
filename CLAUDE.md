@@ -52,7 +52,7 @@ and `make linktest`, `make -j4 formal`, and `make lint`.
   `FFFFFF10`–`7F` (`devices.vhd`), the board's registers at
   `FFFFFF90`–`9F` (`board_io.vhd`) and the screen's at `FFFFFF80`–`8F`
   (`scr_regs.vhd`), the keyboards (`kbd_m65.vhd` and
-  `kbd_ascii.vhd` for the MEGA65, `kbd_ps2.vhd` and `kbd_ps2_ascii.vhd` for
+  `kbd_m65_ascii.vhd` for the MEGA65, `kbd_ps2.vhd` and `kbd_ps2_ascii.vhd` for
   the Nexys4DDR's PS/2), the Nexys4DDR's display and RGB LED drivers
   (`seg7.vhd`, `rgb_pwm.vhd`), and `system.vhd`, which every board
   instantiates.

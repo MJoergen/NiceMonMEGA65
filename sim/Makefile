@@ -49,13 +49,13 @@ NICE_SIM = $(NICE_DIR)/hdl/sim/wb_mem.vhd
 
 SRC_SOURCES  = ../src/uart_serdes.vhd ../src/rx_fifo.vhd ../src/ram.vhd ../src/rom.vhd \
                ../src/board_io.vhd ../src/scr_regs.vhd ../src/devices.vhd ../src/mem.vhd ../src/nicemon.vhd \
-               ../src/kbd_m65.vhd ../src/kbd_ascii.vhd ../src/kbd_ps2.vhd ../src/kbd_ps2_ascii.vhd ../src/seg7.vhd ../src/rgb_pwm.vhd \
+               ../src/kbd_m65.vhd ../src/kbd_m65_ascii.vhd ../src/kbd_ps2.vhd ../src/kbd_ps2_ascii.vhd ../src/seg7.vhd ../src/rgb_pwm.vhd \
                ../src/video/video_pkg.vhd ../src/video/font_pkg.vhd ../src/video/pix.vhd ../src/video/scr_ram.vhd ../src/video/text.vhd \
                ../src/system.vhd
 SOURCES      = $(SRC_SOURCES) text_synth.vhd tb_hello.vhd tb_nicemon.vhd tb_kbd.vhd tb_ps2.vhd tb_ps2_nicemon.vhd tb_text.vhd tb_board_io.vhd
 
 .PHONY: test cosim check-steps analyze synth clean tb_hello tb_nicemon tb_kbd tb_ps2 tb_ps2_nicemon tb_text tb_board_io \
-        synth-nicemon synth-nicemon-norom synth-kbd_m65 synth-kbd_ascii synth-kbd_ps2 \
+        synth-nicemon synth-nicemon-norom synth-kbd_m65 synth-kbd_m65_ascii synth-kbd_ps2 \
         synth-kbd_ps2_ascii synth-text \
         synth-system synth-seg7 synth-rgb_pwm
 
@@ -111,7 +111,7 @@ tb_kbd tb_ps2 tb_text tb_board_io: analyze
 # Checks that GHDL can synthesize the system, with rom.bin as its ROM and
 # without a ROM, and the keyboards, as nice_cpu does for its core, the text
 # display, and system.vhd with the screen of the Nexys4DDR.
-synth: synth-nicemon synth-nicemon-norom synth-kbd_m65 synth-kbd_ascii synth-kbd_ps2 synth-kbd_ps2_ascii \
+synth: synth-nicemon synth-nicemon-norom synth-kbd_m65 synth-kbd_m65_ascii synth-kbd_ps2 synth-kbd_ps2_ascii \
        synth-text synth-system synth-seg7 synth-rgb_pwm
 
 synth-nicemon: analyze $(BUILD)/rom.bin
@@ -122,7 +122,7 @@ synth-nicemon-norom: analyze
 	@(cd $(BUILD) && $(GHDL) --synth $(GHDLFLAGS) -gG_CLOCK_HZ=50000000 nicemon > nicemon_norom_synth.vhd 2> nicemon_norom_synth.log) && \
 	  echo "PASS synth nicemon without a ROM" || (echo "FAIL synth nicemon without a ROM"; cat $(BUILD)/nicemon_norom_synth.log; exit 1)
 
-synth-kbd_m65 synth-kbd_ascii synth-kbd_ps2: synth-%: analyze
+synth-kbd_m65 synth-kbd_m65_ascii synth-kbd_ps2: synth-%: analyze
 	@(cd $(BUILD) && $(GHDL) --synth $(GHDLFLAGS) -gG_CLOCK_HZ=50000000 $* > $*_synth.vhd 2> $*_synth.log) && \
 	  echo "PASS synth $*" || (echo "FAIL synth $*"; cat $(BUILD)/$*_synth.log; exit 1)
 

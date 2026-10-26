@@ -146,7 +146,7 @@ begin
          kb_data_i   => kb_io2_i
       ); -- i_kbd_m65
 
-   i_kbd_ascii : entity work.kbd_ascii
+   i_kbd_m65_ascii : entity work.kbd_m65_ascii
       generic map (
          G_CLOCK_HZ => C_CLOCK_HZ
       )
@@ -157,7 +157,7 @@ begin
          data_valid_o => kbd_valid,
          data_ready_i => kbd_ready,
          data_o       => kbd_data
-      ); -- i_kbd_ascii
+      ); -- i_kbd_m65_ascii
 
 
    i_video_clk : entity work.video_clk

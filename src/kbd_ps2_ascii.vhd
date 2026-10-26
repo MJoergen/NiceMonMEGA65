@@ -1,5 +1,5 @@
 -- Turns the scan codes of a PS/2 keyboard (kbd_ps2.vhd) into a stream of
--- ASCII bytes, as kbd_ascii.vhd does for the MEGA65 keyboard: one byte for a
+-- ASCII bytes, as kbd_m65_ascii.vhd does for the MEGA65 keyboard: one byte for a
 -- key, CR for Enter, and the ANSI sequences ESC [ A to ESC [ D for the
 -- cursor keys. The layout is US English.
 --

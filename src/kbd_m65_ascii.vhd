@@ -27,7 +27,7 @@ library ieee;
    use ieee.std_logic_1164.all;
    use ieee.numeric_std_unsigned.all;
 
-entity kbd_ascii is
+entity kbd_m65_ascii is
    generic (
       G_CLOCK_HZ : natural
    );
@@ -39,9 +39,9 @@ entity kbd_ascii is
       data_ready_i : in  std_logic;
       data_o       : out std_logic_vector(7 downto 0)
    );
-end entity kbd_ascii;
+end entity kbd_m65_ascii;
 
-architecture synthesis of kbd_ascii is
+architecture synthesis of kbd_m65_ascii is
 
    constant C_NUM_KEYS : natural := 80;
 
