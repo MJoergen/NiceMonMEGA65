@@ -17,9 +17,12 @@
 --   which both cores do by their state machines. It is high only while no
 --   bus cycle is open, and halt_reason_o is HALT_NONE while it is low and
 --   holds its value while it is high.
--- - paused_o is high only while no bus cycle is open, and only in the
---   cycle after one with pause_i high. It is low after reset, and once high,
---   stays high while pause_i is high, until reset.
+-- - paused_o is high only while no bus cycle is open, and low after reset.
+--   It is high only in the cycle after one with pause_i high, but for a
+--   pause of the core's own at a breakpoint (DEBUG.md §6), which may rise
+--   while a breakpoint was enabled the cycle before, and lasts until
+--   pause_i has been high (the cores' contract f). Once high, it stays
+--   high while pause_i is high, until reset.
 -- The step report, retire_o, regs_o, instret_o, and stats_o are free.
 --
 -- Two of the assumptions matter most here, and nice_cpu proves both for
@@ -64,6 +67,18 @@ architecture formal of nice_core is
    signal retire    : t_retire;
    signal stats     : t_fetch_events;
    signal regs      : t_regs;
+
+   -- The pause of the core's own, as formal_debug_link.vhd has it: whether
+   -- a breakpoint is enabled, paused_o and pause_i the cycle before, and
+   -- whether a pause of the core's own still waits for pause_i. The
+   -- assumptions are plain Booleans on the *_d signals, as there.
+   signal brk_any  : std_logic;
+   signal paused_d : std_logic := '0';
+   signal pause_d  : std_logic := '0';
+   signal own_wait : std_logic;
+   signal wait_r   : std_logic := '0';
+   signal keep_d   : std_logic := '0';
+   signal allow_d  : std_logic := '0';
 
    attribute anyseq : boolean;
    attribute anyseq of ibus_cyc  : signal is true;
@@ -157,6 +172,22 @@ begin
       end if;
    end process p_wait;
 
+   brk_any  <= '1' when G_BREAKS > 0 and
+                        brk_en_i(G_BREAKS - 1 downto 0) /= (G_BREAKS - 1 downto 0 => '0') else
+               '0';
+   own_wait <= not pause_i and (wait_r or (paused and not paused_d and not pause_d));
+
+   p_pause : process (clk_i)
+   begin
+      if rising_edge(clk_i) then
+         paused_d <= paused and not rst_i;
+         pause_d  <= pause_i and not rst_i;
+         wait_r   <= own_wait and not rst_i;
+         keep_d   <= paused and (pause_i or own_wait) and not rst_i;
+         allow_d  <= (pause_i or own_wait or (brk_any and not paused)) and not rst_i;
+      end if;
+   end process p_pause;
+
    -- psl default clock is rising_edge(clk_i);
 
    -- The instruction bus
@@ -198,9 +229,8 @@ begin
 
    -- The pause
    -- psl f_pause_idle : assume always paused -> not ibus_cyc and not dbus_cyc;
-   -- psl f_pause_req : assume always {not pause_i} |=> {not paused};
+   -- psl f_pause_req : assume always paused -> allow_d;
    -- psl f_pause_reset : assume always {rst_i} |=> {not paused};
-   -- psl f_pause_hold : assume always
-   --    {paused and pause_i and not rst_i} |=> {paused or rst_i};
+   -- psl f_pause_hold : assume always keep_d = '1' and rst_i = '0' -> paused = '1';
 
 end architecture formal;

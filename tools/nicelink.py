@@ -6,7 +6,8 @@ TCP on 127.0.0.1, or to the simulated system of make -C sim cosim, whose
 UART is on a TCP port of 127.0.0.1 too. It splits what arrives into console bytes, with ESC ESC
 as 0xFF, and packets, which it checks: the answers go to the request that
 waits for them, and the notices are counted, b, o, and p, or kept, h with
-its reason. A packet with a bad checksum is dropped, as DEBUG.md §5 says.
+its reason and x with its breakpoint's number. An x is a pause too, so it
+counts as one (DEBUG.md §4). A packet with a bad checksum is dropped, as DEBUG.md §5 says.
 
 A request waits ANSWER_WAIT for the first byte of its answer, and as long
 as the bytes of a packet keep coming. The simulation runs far slower than
@@ -45,6 +46,12 @@ CONTROL = 0xFFFFFFF0
 HALT_REASON = 0xFFFFFFF1
 VERSION = 0xFFFFFFF2
 FREE = 0xFFFFFFF3
+# The breakpoints (version 4): the enable bits, their number, the stop
+# register, and the address of breakpoint 0, then 1 to 7
+BRK_EN = 0xFFFFFFF4
+BRK_COUNT = 0xFFFFFFF5
+STOP = 0xFFFFFFF6
+BRK_ADDR = 0xFFFFFFF8
 DEBUG_FIRST = 0xFFFFFFE0
 
 # Control bits: hold the core in reset, halted (read only), clear the memory
@@ -304,6 +311,7 @@ class Link:
         self.boots = 0
         self.overflows = 0
         self.pauses = 0
+        self.breaks: list[int] = []
         self.bad = 0
         self._answers: deque[tuple[str, str]] = deque()
         # The state of the receiver: 0 console bytes, 1 after ESC, 2 in a
@@ -371,6 +379,9 @@ class Link:
             self.overflows += 1
         elif tag == "p":
             self.pauses += 1
+        elif tag == "x":
+            self.pauses += 1
+            self.breaks.append(int(payload, 16))
         else:
             self._answers.append((tag, payload.upper()))
 
@@ -494,10 +505,11 @@ class Link:
     def step(self, value: int = PAUSE | RAM,
              timeout: float | None = None) -> int | None:
         """Runs one step of a paused core (DEBUG.md §6, version 3): writes
-        value with STEP to the control register, and waits for the p or h
-        that ends the step. Returns None when the core paused again, and the
+        value with STEP to the control register, and waits for the p, x, or
+        h that ends the step. Returns None when the core paused again, with
+        the x's number in breaks if it stopped at a breakpoint, and the
         halt reason when the step halted it. The write is not sent again
-        blindly, as control() says, and the p or h tells that the step ran
+        blindly, as control() says, and the notice tells that the step ran
         even when its k was lost. Raises LinkError when neither came within
         timeout seconds, by default the wait for an answer."""
         if timeout is None:
@@ -507,11 +519,23 @@ class Link:
         end = time.monotonic() + timeout
         while self.pauses == pauses and len(self.halts) == halts:
             if time.monotonic() >= end:
-                raise LinkError("no p or h after a step")
+                raise LinkError("no p, x, or h after a step")
             self.poll(end - time.monotonic())
         if len(self.halts) > halts:
             return self.halts[-1]
         return None
+
+    def set_breaks(self, addrs: list[int | None]) -> None:
+        """Sets the breakpoints (DEBUG.md §6, version 4): breakpoint i at
+        addrs[i], or disabled where it is None, and those past the list
+        disabled. The addresses are written before the enable bits, so no
+        breakpoint is enabled at an old address."""
+        en = 0
+        for i, addr in enumerate(addrs):
+            if addr is not None:
+                self.write(BRK_ADDR + i, [addr])
+                en |= 1 << i
+        self.write(BRK_EN, [en])
 
     def free(self) -> int:
         """The free space of the program's input buffer."""

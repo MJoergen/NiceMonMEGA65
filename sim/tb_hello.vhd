@@ -94,6 +94,8 @@ begin
          irq_vector_i  => X"00",
          pause_i       => '0',
          paused_o      => open,
+         brk_addr_i    => (others => (others => '0')),
+         brk_en_i      => (others => '0'),
          halted_o      => halted,
          halt_reason_o => open,
          regs_o        => open,

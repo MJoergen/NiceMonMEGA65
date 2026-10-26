@@ -88,7 +88,10 @@ and `make linktest`, `make -j4 formal`, and `make lint`.
   0. A hold of a running core leaves R0–R15 undefined. Bit 4 pauses the
   core (link version 2): the link sends `p`, and reaches everything while
   paused, with R0–R15 defined and the counters stopped. Bits 4 and 5 step
-  a paused core (version 3): one step, then `p` again, or `h`.
+  a paused core (version 3): one step, then `p` again, or `h`. Version 4
+  has `G_BREAKS` breakpoints, 4 on every board, at `FFFFFFF4`–`FF`: the
+  core pauses on its own before one, and the link sends `x` instead of
+  `p`.
 - The tools take `--tcp PORT` for `niceemu --link PORT` (PORT 0 prints the
   port it picked on stderr). `make linktest` runs `run.py --tcp` against
   plain `niceemu`, which checks the tools without a board.

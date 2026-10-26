@@ -22,7 +22,8 @@
 -- - con_in_valid_o comes only when free_i was not 0 in the cycle before
 --   (contract d).
 -- - tx_valid_o stays high with its byte until tx_ready_i takes it.
--- The other outputs are free.
+-- The other outputs are free, the breakpoints brk_addr_o and brk_en_o
+-- too, so the core may pause on its own whenever one is enabled.
 --
 -- RESET
 -- rst_i is the system's reset. After it, CYC, STB, clear_o, and pause_o are low,
@@ -50,6 +51,8 @@ architecture formal of debug_link is
    signal wb_we        : std_logic;
    signal wb_addr      : std_logic_vector(31 downto 0);
    signal wb_data      : std_logic_vector(31 downto 0);
+   signal brk_addr     : t_brk_addrs;
+   signal brk_en       : std_logic_vector(C_BREAKS_MAX - 1 downto 0);
 
    attribute anyseq : boolean;
    attribute anyseq of rx_ready     : signal is true;
@@ -68,6 +71,8 @@ architecture formal of debug_link is
    attribute anyseq of wb_we        : signal is true;
    attribute anyseq of wb_addr      : signal is true;
    attribute anyseq of wb_data      : signal is true;
+   attribute anyseq of brk_addr     : signal is true;
+   attribute anyseq of brk_en       : signal is true;
 
    -- The request that waits for its ACK
    signal wb_accept : std_logic;
@@ -95,6 +100,8 @@ begin
    wb_we_o        <= wb_we;
    wb_addr_o      <= wb_addr;
    wb_data_o      <= wb_data;
+   brk_addr_o     <= brk_addr;
+   brk_en_o       <= brk_en;
 
    boot_held <= '1' when G_BOOT_HELD else
                 '0';

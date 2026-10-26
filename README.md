@@ -141,6 +141,16 @@ link reaches only its debug registers, and the counters and the timer run.
 `0x00000018`, with the core held, starts it paused at address 0, so a host
 can step a program from its first instruction.
 
+With link version 4, the board has four breakpoints. A host writes an
+address to `0xFFFFFFF8`–`FB` and sets its bit in `0xFFFFFFF4`. The core
+then pauses before the instruction at that address, and the link sends
+`x` with the breakpoint's number, such as `x00#D8`, instead of `p`. After
+`x` the core is paused as after `p`, and `0xFFFFFFF6` tells which
+breakpoint it stopped at. A go on runs that instruction, and does not stop
+at it again. A step or a pause that ends at a breakpoint sends `x` too. The
+breakpoints take a write at any time, and a reset clears them.
+`tools/load.py` and `tools/run.py` disable them before they load a program.
+
 A terminal on the UART shows what the program prints, and what you type
 goes to the program while it runs. Bytes typed while it is paused wait for
 it, and bytes typed while the core is held or has halted are dropped. The notices show up in the terminal too, as a few
@@ -443,8 +453,13 @@ effect and does not write (DEBUG.md §3).
 | `0xFFFFFFE0`–`0xFFFFFFEF` | The debug registers of DEBUG.md §6, for the link only, here and below: R0–R15 of the core, read only. After a halt they hold what the emulator prints. While the core is paused they hold its registers, with R15 the address of the next instruction, and a hold of the paused core keeps them. A hold of a running core leaves them undefined. |
 | `0xFFFFFFF0` | Control. Bit 0 holds the core in reset. Bit 1, read only, is 1 after a halt, and stays 1 while the core is held, until the next start. A write with bit 2 set first clears the RAM and the screen to 0, with the core held, and is answered when the memory is clear, after 0.66 ms at 100 MHz. Bit 3 takes effect when the clear starts, and bit 0 when it ends. Bit 3 hides the ROM, so that the RAM is at 0; reset clears it in a bitstream with a ROM, and in one without it reads 1. A write of 1 to bit 4 pauses the core at the next step boundary, and the link sends `p`; bit 4 reads 1 while the core is paused, and a write of 0 makes it go on. A start with bit 4 set pauses before the first instruction. A write with bits 4 and 5 set to a paused core runs one step, and the link sends `p` again, or `h`; bit 5 reads 0. |
 | `0xFFFFFFF1` | Read only: why the core halted. 0 while it has not, 1 for `HALT`, 2 for a reserved control word, 3 for `INT` inside an interrupt routine, and 4 for `RTI` outside one. |
-| `0xFFFFFFF2` | Read only: the version of the link, 3. |
+| `0xFFFFFFF2` | Read only: the version of the link, 4. |
 | `0xFFFFFFF3` | Read only: the bytes of free space in the core's input FIFO. |
+| `0xFFFFFFF4` | The enable bits of the breakpoints: bit i enables breakpoint i. Bits 4 to 31 read 0. |
+| `0xFFFFFFF5` | Read only: the number of breakpoints, 4. |
+| `0xFFFFFFF6` | Read only: the stop. From an `x` until the next go on, step, or start, bit 8 is 1 and bits 7–0 are the breakpoint's number. Otherwise 0. |
+| `0xFFFFFFF7` | Reserved: reads 0. |
+| `0xFFFFFFF8`–`0xFFFFFFFB` | The addresses of breakpoints 0 to 3. `0xFFFFFFFC`–`FF` read 0. A reset clears the breakpoints, and a hold, a start, and a clear keep them. |
 
 Instruction fetches from `0xFFFFFF00`–`0xFFFFFFFF` read 0, as ISA.md §8.3
 requires. The input waits for the core in a FIFO of 2048 bytes, in block

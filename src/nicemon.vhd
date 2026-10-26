@@ -106,8 +106,10 @@
 --                          only, which debug_link holds: R0-R15 of the core
 --                          after a halt or at a pause, the control
 --                          register, the halt reason (1 to 4 here), the
---                          version, 2, and the free space of the core's
---                          input FIFO. Bit 0 of the control register holds
+--                          version, 4, the free space of the core's input
+--                          FIFO, and the G_BREAKS breakpoints: their enable
+--                          bits, their number, the stop register, and
+--                          their addresses. Bit 0 of the control register holds
 --                          the core in reset, bit 2 clears the RAM, the RAM
 --                          under the ROM and the screen included, to 0, as
 --                          the emulator's memory is at the start, bit 3
@@ -126,7 +128,13 @@
 -- sends `p` when the core has paused at a step boundary, with no bus cycle
 -- open (nice_cpu's MICROARCH.md §6.1). A write of 0 to bit 4 makes it go
 -- on. A write with bits 4 and 5 set to a paused core is a step: the link
--- drops pause_i for one cycle, the core runs one step, and pauses again. Console bytes from the host reach the core's FIFO only while it runs
+-- drops pause_i for one cycle, the core runs one step, and pauses again.
+-- The link holds the breakpoints, and passes them to the core, which
+-- compares them and pauses on its own before the instruction at an enabled
+-- one. Then the link raises pause_i, so that the stop is a pause as any
+-- other, and sends `x` with the breakpoint's number instead of `p`. While
+-- the core waits for that, it is paused as at any other pause.
+-- Console bytes from the host reach the core's FIFO only while it runs
 -- or is paused (DEBUG.md §1), and so do the keyboard's: while the core is
 -- held or halted, a keyboard byte is taken and dropped.
 -- Unlike a UART byte, a keyboard byte is not lost when the core's FIFO is
@@ -171,7 +179,8 @@
 -- Synchronous. After reset bit 0 of the control register is 1 when
 -- G_CPU_RUN_AT_RESET is false, so the core waits for the host, and 0
 -- otherwise, so the core boots from the ROM, which reset shows: rom_hidden is
--- cleared, or stays 1 in a build without a ROM. The link sends `b03`. The
+-- cleared, or stays 1 in a build without a ROM. The link sends `b04`, and
+-- clears the breakpoints. The
 -- screen's registers, the read counter, and the board's writable registers
 -- (LEDs, RGB levels, and display segments), which the clear keeps, are
 -- cleared. The memory is not changed.
@@ -202,6 +211,8 @@ entity nicemon is
       -- The board has LEDs, a seven-segment display, buttons, and switches
       -- in 0xFFFFFF90-9F
       G_BOARD_IO         : boolean := false;
+      -- The number of breakpoints of the debug link, 0 to 8 (DEBUG.md §6)
+      G_BREAKS           : natural range 0 to C_BREAKS_MAX := 4;
       -- The checks of formal/nicemon.sby, and a RAM with any contents
       G_FORMAL           : boolean := false
    );
@@ -314,8 +325,11 @@ architecture synthesis of nicemon is
    signal cpu_halted : std_logic;
    signal cpu_why    : t_halt;
    -- The link's request of a pause, and the core's pause
-   signal cpu_pause   : std_logic;
-   signal cpu_paused  : std_logic;
+   signal cpu_pause  : std_logic;
+   signal cpu_paused : std_logic;
+   -- The breakpoints, which the link holds and the core compares
+   signal brk_addr    : t_brk_addrs;
+   signal brk_en      : std_logic_vector(C_BREAKS_MAX - 1 downto 0);
    signal cpu_instret : std_logic;
    signal cpu_stats   : t_fetch_events;
    -- The core's registers, for the link, which keeps them at a halt, and
@@ -544,6 +558,9 @@ begin
    cpu_rst <= rst_i or cpu_hold;
 
    i_core : entity work.nice_core
+      generic map (
+         G_BREAKS => G_BREAKS
+      )
       port map (
          clk_i         => clk_i,
          rst_i         => cpu_rst,
@@ -569,6 +586,8 @@ begin
          irq_vector_i  => irq_vector,
          pause_i       => cpu_pause,
          paused_o      => cpu_paused,
+         brk_addr_i    => brk_addr,
+         brk_en_i      => brk_en,
          halted_o      => cpu_halted,
          halt_reason_o => cpu_why,
          instret_o     => cpu_instret,
@@ -1216,7 +1235,8 @@ begin
       generic map (
          G_TIMEOUT   => G_CLOCK_HZ / 10,
          G_HAS_ROM   => G_ROM_FILE /= "",
-         G_BOOT_HELD => not G_CPU_RUN_AT_RESET
+         G_BOOT_HELD => not G_CPU_RUN_AT_RESET,
+         G_BREAKS    => G_BREAKS
       )
       port map (
          clk_i          => clk_i,
@@ -1244,6 +1264,8 @@ begin
          pause_o        => cpu_pause,
          paused_i       => cpu_paused,
          regs_i         => cpu_regs_flat,
+         brk_addr_o     => brk_addr,
+         brk_en_o       => brk_en,
          wb_cyc_o       => link_cyc,
          wb_stb_o       => link_stb,
          wb_stall_i     => link_stall,

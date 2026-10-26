@@ -14,7 +14,7 @@ registers while it runs, holds and restarts the core, pauses
 sim/pause.nasm and checks the registers, the memory, the counters, and the
 input while paused, going on, a hold, and a start paused, steps
 sim/step.nasm to its halt and compares the registers after each step with
-niceemu --trace, clears
+niceemu --trace, stops sim/break.nasm at breakpoints, clears
 the memory, reads back what sim/emu.nasm leaves after its halt, checks that
 the cycle counter and the timer stop there, writes and reads the screen's
 registers, writes and reads the board's devices (on the Nexys4DDR the LEDs,
@@ -62,8 +62,9 @@ import time
 from typing import Callable, TypeVar
 
 from load import load_words, read_bin, start
-from nicelink import (CONTROL, FREE, HOLD, PAUSE, RAM, REGS, STEP, VERSION,
-                      Link, LinkError, Serial, packet)
+from nicelink import (BRK_COUNT, BRK_EN, CONTROL, FREE, HOLD, PAUSE, RAM,
+                      REGS, STEP, STOP, VERSION, Link, LinkError, Serial,
+                      packet)
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NICEEMU = f"{REPO}/nice_cpu/emulator/zig-out/bin/niceemu"
@@ -168,6 +169,19 @@ def assemble(src: str, out_dir: str) -> str:
     return out
 
 
+def assemble_labels(src: str, out_dir: str) -> tuple[str, dict[str, int]]:
+    """Like assemble, and the addresses of the program's labels, from
+    niceasm.py --symbols."""
+    base = os.path.join(out_dir, os.path.basename(src).replace(".nasm", ""))
+    subprocess.run([sys.executable, f"{REPO}/nice_cpu/assembler/niceasm.py",
+                    "-o", base + ".bin", "--symbols", base + ".sym", src],
+                   check=True)
+    with open(base + ".sym") as f:
+        return base + ".bin", {
+            name: int(addr, 16)
+            for addr, name in (line.split() for line in f if line.strip())}
+
+
 # The openFPGALoader cables to try: ft2232 for the MEGA65's JTAG adapter,
 # digilent for the Nexys4DDR. Each answers on its own board only.
 CABLES = ["ft2232", "digilent"]
@@ -263,7 +277,7 @@ def test_boot(link: Link, bit: str, cable: list[str]) -> None:
 def test_link(link: Link) -> None:
     link.control(HOLD | RAM)
     require("hide the ROM", ctl(link) in ("00000009", "0000000B"), ctl(link))
-    check("version 3", rd(link, VERSION) == 3)
+    check("version 4", rd(link, VERSION) == 4)
     check("W then R", wr(link, 0x100, 0xDEADBEEF) and
           rd(link, 0x100) == 0xDEADBEEF)
     words = list(range(0x1000, 0x1000 + 600))
@@ -584,6 +598,89 @@ def test_step(link: Link, prog: str) -> None:
     link.control(HOLD | RAM)
 
 
+def wait_break(link: Link, before: int) -> int | None:
+    """The number of the x notice after the first before of them, or
+    None when none has come."""
+    end = time.monotonic() + 4 * QUIET
+    while len(link.breaks) == before and time.monotonic() < end:
+        link.poll(end - time.monotonic())
+    return link.breaks[before] if len(link.breaks) > before else None
+
+
+def test_break(link: Link, prog: str, at: dict[str, int]) -> None:
+    """The breakpoints of DEBUG.md §6 on sim/break.nasm, at its labels
+    (at): a start paused at a breakpoint, a loop that stops on each pass,
+    two breakpoints at one address, which send the lower number, one
+    disabled, a skipped instruction, a step that ends at a breakpoint, an
+    instruction with a read from memory, the second word of a two-word
+    instruction, which does not match, the first instruction of an
+    interrupt routine and the one after its RTI, and a HALT at a
+    breakpoint, which halts after a go on. Each stop sends x, never p, with
+    R15 at the breakpoint and its number in the stop register, which reads
+    0 again after the halt. A system without breakpoints passes this."""
+    count = rd(link, BRK_COUNT)
+    if count == 0:
+        check("break: the system has no breakpoints", True)
+        return
+    require("break: 4 breakpoints or more", count >= 4, str(count))
+    link.halts.clear()
+    load_words(link, read_bin(prog))
+    pauses, first = link.pauses, len(link.breaks)
+    breaks = first
+
+    def stop(name: str, label: str, number: int) -> None:
+        nonlocal breaks
+        got = wait_break(link, breaks)
+        breaks = len(link.breaks)
+        r15 = rd(link, REGS + 15)
+        stop_reg = rd(link, STOP)
+        check(f"break: {name}", got == number and r15 == at[label] and
+              stop_reg == 0x100 + number,
+              f"x {got}, R15 {r15:08X}, stop {stop_reg:08X}")
+
+    link.set_breaks([at["LOOP"], at["LOOP"], at["TWO"] + 1, at["START"]])
+    link.control(HOLD | PAUSE | RAM)
+    link.control(PAUSE | RAM)
+    stop("start paused at a breakpoint", "START", 3)
+    check("break: bit 4 reads 1", ctl(link) == "00000018", ctl(link))
+    link.control(RAM)
+    stop("the loop's first pass, the lower of two", "LOOP", 0)
+    link.control(RAM)
+    stop("the loop's second pass", "LOOP", 0)
+    link.write(BRK_EN, [0b1110])
+    link.control(RAM)
+    stop("the loop's third pass, breakpoint 0 disabled", "LOOP", 1)
+    link.set_breaks([at["SKIP"], at["READ"], at["TWO"] + 1, at["V3"]])
+    link.control(RAM)
+    stop("a skipped instruction", "SKIP", 0)
+    reason = link.step()
+    check("break: a step sends no h", reason is None, str(reason))
+    stop("a step that ends at one", "READ", 1)
+    link.control(RAM)
+    stop("an interrupt routine, past a read and a second word", "V3", 3)
+    link.set_breaks([at["AFTER"], at["DONE"]])
+    link.control(RAM)
+    stop("the instruction after RTI", "AFTER", 0)
+    link.control(RAM)
+    stop("a HALT", "DONE", 1)
+    link.control(RAM)
+    reason = wait_halt(link)
+    check("break: go on from a HALT halts", reason == 1, str(reason))
+    check("break: the stop register reads 0 after the halt",
+          rd(link, STOP) == 0, f"{rd(link, STOP):08X}")
+    check("break: no p notice",
+          link.pauses - pauses == len(link.breaks) - first,
+          f"{link.pauses - pauses} stops, {len(link.breaks) - first} x")
+    link.write(BRK_EN, [0])
+    # A hold keeps bit 1 until the next start, so start paused and hold, to
+    # leave the core held as test_pause does.
+    n = link.pauses
+    link.control(HOLD | PAUSE | RAM)
+    link.control(PAUSE | RAM)
+    wait_pause(link, n)
+    link.control(HOLD | RAM)
+
+
 def test_counters_stop(link: Link) -> None:
     """After a halt the cycle counter and the timer's COUNT do not change."""
     first = rd(link, 0xFFFFFF40)
@@ -811,6 +908,7 @@ def main() -> None:
         echo = assemble(f"{REPO}/sim/echo.nasm", tmp)
         pause = assemble(f"{REPO}/sim/pause.nasm", tmp)
         step = assemble(f"{REPO}/sim/step.nasm", tmp)
+        brk, brk_at = assemble_labels(f"{REPO}/sim/break.nasm", tmp)
         emu = assemble(f"{REPO}/sim/emu.nasm", tmp)
 
         opened = False
@@ -833,6 +931,7 @@ def main() -> None:
                 test_reset(link, echo)
                 test_pause(link, pause)
                 test_step(link, step)
+                test_break(link, brk, brk_at)
                 test_clear(link)
                 test_readback(link, emu)
                 test_counters_stop(link)

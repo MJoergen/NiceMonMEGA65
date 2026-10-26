@@ -45,7 +45,9 @@ entity system is
       -- The screen has 2^G_SCR_ADDR_BITS words, 32K on the MEGA65.
       G_SCR_ADDR_BITS : natural      := 15;
       G_VIDEO         : t_video_mode := C_VIDEO_1280X1024;
-      G_BOARD_IO      : boolean      := false
+      G_BOARD_IO      : boolean      := false;
+      -- The number of breakpoints of the debug link (DEBUG.md §6)
+      G_BREAKS        : natural      := 4
    );
    port (
       clk_i       : in  std_logic;
@@ -121,7 +123,8 @@ begin
          G_ROM_FILE         => G_ROM_FILE,
          G_ROM_ADDR_BITS    => 15,
          G_CPU_RUN_AT_RESET => G_ROM_FILE /= "",
-         G_BOARD_IO         => G_BOARD_IO
+         G_BOARD_IO         => G_BOARD_IO,
+         G_BREAKS           => G_BREAKS
       )
       port map (
          clk_i          => clk_i,

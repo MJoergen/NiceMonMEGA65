@@ -5,6 +5,9 @@ architecture pipeline of nice_core is
 begin
 
    i_core : entity work.pipeline
+      generic map (
+         G_BREAKS => G_BREAKS
+      )
       port map (
          clk_i         => clk_i,
          rst_i         => rst_i,
@@ -30,6 +33,8 @@ begin
          irq_vector_i  => irq_vector_i,
          pause_i       => pause_i,
          paused_o      => paused_o,
+         brk_addr_i    => brk_addr_i,
+         brk_en_i      => brk_en_i,
          halted_o      => halted_o,
          halt_reason_o => halt_reason_o,
          instret_o     => instret_o,

@@ -2,7 +2,8 @@
 -- ports are those of nice_cpu's pipeline and multicycle, and the
 -- architecture comes from one of the files in src/core/, which the build
 -- picks with NICE=pipeline or NICE=multi (core.mk). So only that core is
--- analyzed, and no generic has to reach it from the top level.
+-- analyzed, and no generic has to reach it from the top level. G_BREAKS
+-- is the generic of both, the number of breakpoints (DEBUG.md §6).
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -11,6 +12,9 @@ library ieee;
    use work.pipe_pkg.all;
 
 entity nice_core is
+   generic (
+      G_BREAKS : natural range 0 to C_BREAKS_MAX := 0
+   );
    port (
       clk_i         : in  std_logic;
       rst_i         : in  std_logic;
@@ -45,6 +49,11 @@ entity nice_core is
       -- MICROARCH.md §6.1)
       pause_i       : in  std_logic;
       paused_o      : out std_logic;
+      -- The breakpoints, from flip-flops: the core pauses on its own before
+      -- the instruction at an enabled one, and stays paused until pause_i
+      -- has been '1' (DEBUG.md §6, and the cores' contract f)
+      brk_addr_i    : in  t_brk_addrs;
+      brk_en_i      : in  std_logic_vector(C_BREAKS_MAX - 1 downto 0);
       -- '1' once the core has halted, and no bus cycle is open
       halted_o      : out std_logic;
       -- Why the core halted, while halted_o is '1', else HALT_NONE

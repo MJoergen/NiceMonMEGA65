@@ -3,7 +3,8 @@
 
 The core is held in reset, the ROM with the monitor, if the bitstream has
 one, is hidden, so that the RAM is at 0, and the memory is cleared to 0, as
-the emulator's is at the start. Then the words of the file are written with
+the emulator's is at the start. The breakpoints are disabled, as a
+connection to the emulator does, for the board keeps them until a reset. Then the words of the file are written with
 W packets of the debug link (nice_cpu/doc/DEBUG.md), and the core is started
 unless --no-run is given. The ROM stays hidden until the reset button is
 pressed, which boots the monitor again.
@@ -20,8 +21,8 @@ tools/hwtest.py use the functions here, and tools/nicelink.py has the link.
 
 import argparse
 
-from nicelink import (CLEAR, HOLD, RAM, Link, LinkError, add_arguments, fail,
-                      open_link)
+from nicelink import (BRK_EN, CLEAR, HOLD, RAM, Link, LinkError,
+                      add_arguments, fail, open_link)
 
 # The words that the board has: the RAM, which is 64K words from 0, and the
 # screen, of which both boards have the first 8K (the MEGA65 has 32K). Any
@@ -90,9 +91,12 @@ def read_bin(path: str) -> list[tuple[int, int]]:
 
 
 def load_words(link: Link, words: list[tuple[int, int]]) -> None:
-    """Holds the core, hides the ROM, clears the memory, and writes the
-    words, with one W for each run of consecutive addresses."""
+    """Holds the core, hides the ROM, clears the memory, disables the
+    breakpoints, and writes the words, with one W for each run of
+    consecutive addresses. A link of version 3 or older takes the write of
+    the enable bits too, as a reserved word."""
     link.control(HOLD | CLEAR | RAM)
+    link.write(BRK_EN, [0])
     words = sorted(words)
     i = 0
     while i < len(words):
