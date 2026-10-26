@@ -125,7 +125,8 @@
 -- Bit 4 of the control register drives the core's pause_i, and the link
 -- sends `p` when the core has paused at a step boundary, with no bus cycle
 -- open (nice_cpu's MICROARCH.md §6.1). A write of 0 to bit 4 makes it go
--- on. Console bytes from the host reach the core's FIFO only while it runs
+-- on. A write with bits 4 and 5 set to a paused core is a step: the link
+-- drops pause_i for one cycle, the core runs one step, and pauses again. Console bytes from the host reach the core's FIFO only while it runs
 -- or is paused (DEBUG.md §1), and so do the keyboard's: while the core is
 -- held or halted, a keyboard byte is taken and dropped.
 -- Unlike a UART byte, a keyboard byte is not lost when the core's FIFO is
@@ -139,14 +140,13 @@
 -- of steps that the emulator prints, unless the program starts the timer,
 -- whose interrupts come after clock cycles here, not after steps. The cycle
 -- counter and the timer's counter run only while the core runs, so they
--- stop at a halt and while the core is paused, as the emulator's do. The
+-- stop at a halt and while the core is paused, as the emulator's do, and
+-- run during a step. The
 -- fetch statistics are cleared at the start too, and count only while the
 -- core runs, as the counters do. A read of CYCLE_LO, INSTR_LO, or TIME_LO
 -- by the link takes a snapshot, as one by the core does, where niceemu
--- takes none; DEBUG.md §3 allows both while the core is held or halted, and
--- a start resets them. A link read takes one while the core is paused
--- too, so it replaces the snapshot of the program's last read of a low
--- word, which DEBUG.md §3 says it should not.
+-- takes none; DEBUG.md §3 allows both while the core is held, halted, or
+-- paused, and a start resets them.
 --
 -- The data bus of the core is stalled while the link owns port B, and while a
 -- write to the UART waits. A request of the link is stalled until no device
@@ -171,7 +171,7 @@
 -- Synchronous. After reset bit 0 of the control register is 1 when
 -- G_CPU_RUN_AT_RESET is false, so the core waits for the host, and 0
 -- otherwise, so the core boots from the ROM, which reset shows: rom_hidden is
--- cleared, or stays 1 in a build without a ROM. The link sends `b02`. The
+-- cleared, or stays 1 in a build without a ROM. The link sends `b03`. The
 -- screen's registers, the read counter, and the board's writable registers
 -- (LEDs, RGB levels, and display segments), which the clear keeps, are
 -- cleared. The memory is not changed.

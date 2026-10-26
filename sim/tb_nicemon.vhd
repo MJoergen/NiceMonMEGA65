@@ -13,7 +13,7 @@
 -- first. A program that halts quickly may send its `h` before the `k` of
 -- the write that started it; wr() keeps it for expect_halt(). The steps:
 --
--- 1. The link's `b02` after reset, and the ROM, which holds G_ROM_FILE: the
+-- 1. The link's `b03` after reset, and the ROM, which holds G_ROM_FILE: the
 --    core boots from it at reset, prints its greeting, and halts. Its stack
 --    is in the RAM, at the top of the memory, for a push to the ROM is lost.
 --    The ROM is at 0, read only, with the RAM above it; bit 3 of the
@@ -82,7 +82,7 @@
 --    bytes typed while the core is held are dropped, and G_FIFO_FILE again,
 --    with more bytes typed than its FIFO holds. None is lost, for the
 --    keyboard waits.
--- 14. A reset while G_ECHO_FILE runs: the link sends `b02`, the core boots
+-- 14. A reset while G_ECHO_FILE runs: the link sends `b03`, the core boots
 --    from the ROM again, and the screen's and the board's registers are
 --    cleared.
 --
@@ -565,20 +565,20 @@ begin
              pkt('k', "000001000002") = "k000001000002#AE" and
              pkt('R', "000001000001") = "R000001000001#94" and
              pkt('r', "00000100000111223344") = "r00000100000111223344#48" and
-             pkt('b', "02") = "b02#C4" and pkt('h', "01") = "h01#C9" and
+             pkt('b', "03") = "b03#C5" and pkt('h', "01") = "h01#C9" and
              pkt('e', "5202") = "e5202#2E" and
              pkt('W', "FFFFFFF0000100000009") = "WFFFFFFF0000100000009#BB" and
              pkt('k', "FFFFFFF00001") = "kFFFFFFF00001#46"
          report "tb_nicemon: pkt() does not give the packets of DEBUG.md §8"
          severity failure;
 
-      report "tb_nicemon: b02, and the ROM";
-      expect_pkt("b02#C4");
+      report "tb_nicemon: b03, and the ROM";
+      expect_pkt("b03#C5");
       expect_con("Hello from the ROM!" & C_LF);
       expect_halt("01");
       first_v := first_word(G_ROM_FILE);
       check("FFFFFFF0", "00000002");         -- halted, the ROM shown
-      check("FFFFFFF2", "00000002");         -- the version
+      check("FFFFFFF2", "00000003");         -- the version
       check("FFFFFFF3", "00000010");         -- the free space: 16 bytes
       check("00000000", first_v);            -- the ROM
       wr("00000000", "12345678");            -- dropped
@@ -934,7 +934,7 @@ begin
       wait until rising_edge(clk);
       rst <= '0';
       -- The core boots from the ROM again
-      expect_pkt("b02#C4");
+      expect_pkt("b03#C5");
       expect_con("Hello from the ROM!" & C_LF);
       expect_halt("01");
       check("FFFFFFF0", "00000002");

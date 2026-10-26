@@ -12,7 +12,9 @@ checks that bad packets are dropped and that nicelink sends a dropped
 request again, loads and runs sim/echo.nasm, checks that the link reaches only its debug
 registers while it runs, holds and restarts the core, pauses
 sim/pause.nasm and checks the registers, the memory, the counters, and the
-input while paused, going on, a hold, and a start paused, clears
+input while paused, going on, a hold, and a start paused, steps
+sim/step.nasm to its halt and compares the registers after each step with
+niceemu --trace, clears
 the memory, reads back what sim/emu.nasm leaves after its halt, checks that
 the cycle counter and the timer stop there, writes and reads the screen's
 registers, writes and reads the board's devices (on the Nexys4DDR the LEDs,
@@ -60,8 +62,8 @@ import time
 from typing import Callable, TypeVar
 
 from load import load_words, read_bin, start
-from nicelink import (CONTROL, FREE, HOLD, PAUSE, RAM, REGS, VERSION, Link,
-                      LinkError, Serial, packet)
+from nicelink import (CONTROL, FREE, HOLD, PAUSE, RAM, REGS, STEP, VERSION,
+                      Link, LinkError, Serial, packet)
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NICEEMU = f"{REPO}/nice_cpu/emulator/zig-out/bin/niceemu"
@@ -261,7 +263,7 @@ def test_boot(link: Link, bit: str, cable: list[str]) -> None:
 def test_link(link: Link) -> None:
     link.control(HOLD | RAM)
     require("hide the ROM", ctl(link) in ("00000009", "0000000B"), ctl(link))
-    check("version 2", rd(link, VERSION) == 2)
+    check("version 3", rd(link, VERSION) == 3)
     check("W then R", wr(link, 0x100, 0xDEADBEEF) and
           rd(link, 0x100) == 0xDEADBEEF)
     words = list(range(0x1000, 0x1000 + 600))
@@ -501,6 +503,87 @@ def test_pause(link: Link, prog: str) -> None:
     link.control(HOLD | RAM)
 
 
+def trace_regs(path: str) -> list[list[int]]:
+    """R0-R15 after each step of the program, from niceemu --trace, which
+    prints the registers that each step changes (nice_cpu/emulator/README.md,
+    Trace format). R15 is the address of the next step's instruction unless
+    the line gives it, and after the halt the PC of the Halted line."""
+    r = subprocess.run([NICEEMU, "--max-steps", "1000", "--trace", path],
+                       stdin=subprocess.DEVNULL, capture_output=True,
+                       check=True, text=True)
+    regs = [0] * 16
+    regs[14] = 0x01000000  # ISA.md §8.1
+    after: list[list[int]] = []
+    explicit: list[bool] = []
+    for line in r.stdout.splitlines():
+        m = re.match(r"([0-9a-f]{8}) [0-9a-f]{8}|(IRQ|NMI) [0-9a-f]{2}", line)
+        if m:
+            if m.group(1) and explicit and not explicit[-1]:
+                after[-1][15] = int(m.group(1), 16)
+            for n, v in re.findall(r"\bR(\d+)=([0-9a-f]{8})", line):
+                regs[int(n)] = int(v, 16)
+            after.append(list(regs))
+            explicit.append(" R15=" in line)
+        m = re.match(r"Halted \(.*\) after \d+ steps, PC=([0-9a-f]{8})", line)
+        if m and after:
+            after[-1][15] = int(m.group(1), 16)
+    return after
+
+
+def test_step(link: Link, prog: str) -> None:
+    """The single step of DEBUG.md §6 on sim/step.nasm: a start paused,
+    then a step at a time to its HALT, with R0-R15 after each step compared
+    with niceemu --trace, the INT and its routine included. Bit 5 reads 0,
+    the instruction counter counts the steps, and a step of a halted core
+    does nothing."""
+    if not os.path.exists(NICEEMU):
+        skipped.append("step")
+        return
+    want = trace_regs(prog)
+    link.halts.clear()
+    load_words(link, read_bin(prog))
+    n = link.pauses
+    link.control(PAUSE | RAM)
+    require("step: start paused sends p", wait_pause(link, n))
+    first = link.read(REGS, 16)
+    check("step: registers at the start", first[:14] == [0] * 14 and
+          first[14:] == [0x01000000, 0], " ".join(f"{r:08X}" for r in first))
+    wrong = []
+    reason = None
+    for i, regs in enumerate(want):
+        reason = link.step(timeout=4 * QUIET)
+        if reason is not None:
+            break
+        if i == 0:
+            check("step: bit 5 reads 0", ctl(link) == "00000018", ctl(link))
+        if i == 7:
+            got = rd(link, 0xFFFFFF42)
+            check("step: instructions counted", got == 8, f"{got:08X}")
+        got = link.read(REGS, 16)
+        if got != regs:
+            wrong.append(f"step {i + 1}: " + " ".join(
+                f"R{r}={got[r]:08X}/{regs[r]:08X}" for r in range(16)
+                if got[r] != regs[r]))
+    check("step: the registers of each step as niceemu --trace",
+          not wrong and i == len(want) - 1, "; ".join(wrong) +
+          f" ({i + 1} of {len(want)} steps)")
+    check("step: the last step halts", reason == 1, str(reason))
+    got = link.read(REGS, 16)
+    check("step: the registers after the halt", got == want[-1],
+          " ".join(f"{r:08X}" for r in got))
+    n = link.pauses
+    link.control(STEP | PAUSE | RAM)
+    check("step of a halted core does nothing",
+          not wait_pause(link, n) and ctl(link) == "0000000A", ctl(link))
+    # A hold keeps bit 1 until the next start, so start paused and hold, to
+    # leave the core held as test_pause does.
+    n = link.pauses
+    link.control(HOLD | PAUSE | RAM)
+    link.control(PAUSE | RAM)
+    wait_pause(link, n)
+    link.control(HOLD | RAM)
+
+
 def test_counters_stop(link: Link) -> None:
     """After a halt the cycle counter and the timer's COUNT do not change."""
     first = rd(link, 0xFFFFFF40)
@@ -727,6 +810,7 @@ def main() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         echo = assemble(f"{REPO}/sim/echo.nasm", tmp)
         pause = assemble(f"{REPO}/sim/pause.nasm", tmp)
+        step = assemble(f"{REPO}/sim/step.nasm", tmp)
         emu = assemble(f"{REPO}/sim/emu.nasm", tmp)
 
         opened = False
@@ -748,6 +832,7 @@ def main() -> None:
                 test_echo(link, echo)
                 test_reset(link, echo)
                 test_pause(link, pause)
+                test_step(link, step)
                 test_clear(link)
                 test_readback(link, emu)
                 test_counters_stop(link)

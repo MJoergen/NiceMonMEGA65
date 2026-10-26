@@ -133,6 +133,14 @@ the core is paused, the link reaches the whole address map, R0–R15 at
 stop. A write of `0x00000008` makes the program go on. A hold of a paused
 core keeps R0–R15 until the next start.
 
+With link version 3, a host can step a paused program. A write of
+`0x00000038` runs one step, an instruction or an interrupt entry, and the
+core pauses again: the link sends `p`, or `h` if the step halted. Bit 5
+reads 0, and does nothing unless the core is paused. During the step the
+link reaches only its debug registers, and the counters and the timer run.
+`0x00000018`, with the core held, starts it paused at address 0, so a host
+can step a program from its first instruction.
+
 A terminal on the UART shows what the program prints, and what you type
 goes to the program while it runs. Bytes typed while it is paused wait for
 it, and bytes typed while the core is held or has halted are dropped. The notices show up in the terminal too, as a few
@@ -428,14 +436,14 @@ effect and does not write (DEBUG.md §3).
 | `0xFFFFFF01` | The emulator's read counter. A read by the core returns the number of its reads since the last write, and a write sets that number. It is 0 after reset, and a start keeps it, as in the emulator. |
 | `0xFFFFFF10`–`0xFFFFFF1F` | The timer of SYSTEM.md §4: it raises IRQ every P clock cycles, through the vector it is given. |
 | `0xFFFFFF20`–`0xFFFFFF3F` | The math unit of SYSTEM.md §2: 32-bit multiply and divide, and 64-bit divide. |
-| `0xFFFFFF40`–`0xFFFFFF4F` | The performance counters of SYSTEM.md §3: cycles, instructions, and microseconds, 64 bits each. The microseconds come from the clock, 100 MHz on the MEGA65 and 90 MHz on the Nexys4DDR, so they are real time, where the emulator counts one per step. They stop while the core is paused. The link reads them as the core does: a read of a low word takes the snapshot that the high word returns, where `niceemu --link` takes none. DEBUG.md §3 allows both while the core is held or halted. A link read takes the snapshot while the core is paused too, which replaces the one of the program's last read of a low word, where DEBUG.md §3 says it should not. The words `0xFFFFFF46`–`4F` read 0 and take no write. |
+| `0xFFFFFF40`–`0xFFFFFF4F` | The performance counters of SYSTEM.md §3: cycles, instructions, and microseconds, 64 bits each. The microseconds come from the clock, 100 MHz on the MEGA65 and 90 MHz on the Nexys4DDR, so they are real time, where the emulator counts one per step. They stop while the core is paused. The link reads them as the core does: a read of a low word takes the snapshot that the high word returns, where `niceemu --link` takes none. DEBUG.md §3 allows both while the core is held, halted, or paused. The words `0xFFFFFF46`–`4F` read 0 and take no write. |
 | `0xFFFFFF50`–`0xFFFFFF7F` | The fetch statistics of MICROARCH.md §8.1, the rest of the performance counters: counters of what FETCH and DECODE do, for judging the size of FETCH's buffer. A start of the core clears them, and they then count each clock while the core runs, until a write of 0 to `FS_CTRL` stops them. They stop while the core is held and after it halts. |
 | `0xFFFFFF80`–`0xFFFFFF8F` | The screen's registers: the cursor and the display offset (see [The screen](#the-screen)). |
 | `0xFFFFFF90`–`0xFFFFFF9F` | The Nexys4DDR's LEDs, seven-segment display, buttons, and switches (see [The Nexys4DDR's devices](#the-nexys4ddrs-devices)). On the MEGA65 they read 0 and take no write. |
 | `0xFFFFFFE0`–`0xFFFFFFEF` | The debug registers of DEBUG.md §6, for the link only, here and below: R0–R15 of the core, read only. After a halt they hold what the emulator prints. While the core is paused they hold its registers, with R15 the address of the next instruction, and a hold of the paused core keeps them. A hold of a running core leaves them undefined. |
-| `0xFFFFFFF0` | Control. Bit 0 holds the core in reset. Bit 1, read only, is 1 after a halt, and stays 1 while the core is held, until the next start. A write with bit 2 set first clears the RAM and the screen to 0, with the core held, and is answered when the memory is clear, after 0.66 ms at 100 MHz. Bit 3 takes effect when the clear starts, and bit 0 when it ends. Bit 3 hides the ROM, so that the RAM is at 0; reset clears it in a bitstream with a ROM, and in one without it reads 1. A write of 1 to bit 4 pauses the core at the next step boundary, and the link sends `p`; bit 4 reads 1 while the core is paused, and a write of 0 makes it go on. A start with bit 4 set pauses before the first instruction. |
+| `0xFFFFFFF0` | Control. Bit 0 holds the core in reset. Bit 1, read only, is 1 after a halt, and stays 1 while the core is held, until the next start. A write with bit 2 set first clears the RAM and the screen to 0, with the core held, and is answered when the memory is clear, after 0.66 ms at 100 MHz. Bit 3 takes effect when the clear starts, and bit 0 when it ends. Bit 3 hides the ROM, so that the RAM is at 0; reset clears it in a bitstream with a ROM, and in one without it reads 1. A write of 1 to bit 4 pauses the core at the next step boundary, and the link sends `p`; bit 4 reads 1 while the core is paused, and a write of 0 makes it go on. A start with bit 4 set pauses before the first instruction. A write with bits 4 and 5 set to a paused core runs one step, and the link sends `p` again, or `h`; bit 5 reads 0. |
 | `0xFFFFFFF1` | Read only: why the core halted. 0 while it has not, 1 for `HALT`, 2 for a reserved control word, 3 for `INT` inside an interrupt routine, and 4 for `RTI` outside one. |
-| `0xFFFFFFF2` | Read only: the version of the link, 2. |
+| `0xFFFFFFF2` | Read only: the version of the link, 3. |
 | `0xFFFFFFF3` | Read only: the bytes of free space in the core's input FIFO. |
 
 Instruction fetches from `0xFFFFFF00`–`0xFFFFFFFF` read 0, as ISA.md §8.3
@@ -506,7 +514,8 @@ With `--tcp`, the end of the input half-closes the connection, and `-d`
 cannot reach `0xFFFFFFE0`–`FF`, which are the emulator's memory.
 `make linktest` does this for the programs that `make hwtest` compares, and
 nice_cpu's benchmark, with `tools/linktest.py`, and CI runs it. It runs
-hwtest's checks of bad packets and of the pause on `niceemu --link` first.
+hwtest's checks of bad packets, of the pause, and of the step on `niceemu --link`
+first.
 `--cosim PORT` runs the program on the simulated system of `make cosim`
 (see [The simulated board](#the-simulated-board)).
 `-2004` prints the screen from `0x400`, as `niceemu -2004` does. That is
@@ -643,7 +652,7 @@ the request. Only small programs are practical.
 
 `make cosimtest` starts `make cosim` on a free port. It runs hwtest's
 checks of bad packets on it, but for the gap of 300 ms, which is far
-shorter in simulated time, and its checks of the pause. Then it runs the programs that `make hwtest`
+shorter in simulated time, and its checks of the pause and of the step. Then it runs the programs that `make hwtest`
 compares, with `run.py --cosim` and with `niceemu`, whose output and exit
 status must be the same. It leaves out nice_cpu's benchmark, which would
 take too long. It takes about 4 minutes, and CI runs it on both cores.
@@ -720,6 +729,8 @@ again, and that an unknown tag gets `e01` and a bad payload `e03`, runs
 while the core runs, holds and restarts the core, pauses `sim/pause.nasm`
 (the `p` notice, the registers and the memory while paused, the stopped
 cycle counter, a console byte kept, going on, a hold, and a start paused),
+steps `sim/step.nasm` to its halt and compares the registers after each
+step with `niceemu --trace`,
 clears the memory, reads back what `sim/emu.nasm` leaves
 after its halt, writes and reads the screen's registers, and runs
 `examples/build/primes.bin`. Last, it runs programs with `run.py` and with

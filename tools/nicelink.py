@@ -48,12 +48,14 @@ FREE = 0xFFFFFFF3
 DEBUG_FIRST = 0xFFFFFFE0
 
 # Control bits: hold the core in reset, halted (read only), clear the memory
-# first, hide the ROM, so that the RAM is at 0, and pause (version 2)
+# first, hide the ROM, so that the RAM is at 0, pause (version 2), and step
+# a paused core (version 3)
 HOLD = 1
 HALTED = 2
 CLEAR = 4
 RAM = 8
 PAUSE = 16
+STEP = 32
 
 # Longer than the 100 ms of DEBUG.md §5, for the latency of a USB serial
 # adapter and of the operating system
@@ -488,6 +490,28 @@ class Link:
                 return
         raise LinkError(f"no answer to the write of {value:08X} to the "
                         f"control register")
+
+    def step(self, value: int = PAUSE | RAM,
+             timeout: float | None = None) -> int | None:
+        """Runs one step of a paused core (DEBUG.md §6, version 3): writes
+        value with STEP to the control register, and waits for the p or h
+        that ends the step. Returns None when the core paused again, and the
+        halt reason when the step halted it. The write is not sent again
+        blindly, as control() says, and the p or h tells that the step ran
+        even when its k was lost. Raises LinkError when neither came within
+        timeout seconds, by default the wait for an answer."""
+        if timeout is None:
+            timeout = 2 * self.transport.answer_wait(0)
+        pauses, halts = self.pauses, len(self.halts)
+        self.control(value | STEP)
+        end = time.monotonic() + timeout
+        while self.pauses == pauses and len(self.halts) == halts:
+            if time.monotonic() >= end:
+                raise LinkError("no p or h after a step")
+            self.poll(end - time.monotonic())
+        if len(self.halts) > halts:
+            return self.halts[-1]
+        return None
 
     def free(self) -> int:
         """The free space of the program's input buffer."""

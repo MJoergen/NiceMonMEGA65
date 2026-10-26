@@ -2,7 +2,7 @@
 """Compare tools/run.py on niceemu --link with niceemu, without a board.
 
 It starts "niceemu --link 0", which picks a free port, runs hwtest.py's
-checks of bad packets and of the pause on it, and runs the programs of hwtest.py's
+checks of bad packets, the pause, and the step on it, and runs the programs of hwtest.py's
 comparison, and nice_cpu's benchmark when
 examples/build/bench.bin is built, with run.py --tcp on that port and with
 niceemu alone. Each must print the same and exit with the same status. So
@@ -21,7 +21,8 @@ import tempfile
 
 import hwtest
 from hwtest import (NICEEMU, REPO, assemble, comparisons, results,
-                    test_bench, test_framing, test_pause, test_run)
+                    test_bench, test_framing, test_pause, test_run,
+                    test_step)
 from nicelink import HOLD, RAM, open_link
 
 
@@ -51,6 +52,7 @@ def main() -> None:
                 link.control(HOLD | RAM)
                 test_framing(link)
                 test_pause(link, assemble(f"{REPO}/sim/pause.nasm", tmp))
+                test_step(link, assemble(f"{REPO}/sim/step.nasm", tmp))
             finally:
                 link.close()
             test_run(tcp, comparisons(tmp))

@@ -87,7 +87,8 @@ and `make linktest`, `make -j4 formal`, and `make lint`.
   `FFFFFFE0`–`FF`, and the link reads the console and the read counter as
   0. A hold of a running core leaves R0–R15 undefined. Bit 4 pauses the
   core (link version 2): the link sends `p`, and reaches everything while
-  paused, with R0–R15 defined and the counters stopped.
+  paused, with R0–R15 defined and the counters stopped. Bits 4 and 5 step
+  a paused core (version 3): one step, then `p` again, or `h`.
 - The tools take `--tcp PORT` for `niceemu --link PORT` (PORT 0 prints the
   port it picked on stderr). `make linktest` runs `run.py --tcp` against
   plain `niceemu`, which checks the tools without a board.
