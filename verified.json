@@ -1,0 +1,37 @@
+{
+  "nice_cpu_tag": "RC06",
+  "nice_cpu_commit": "9a6263305de10b33c4ab6ec771f248f093a8ff93",
+  "repo_commit": "cce8bb9b85629976c36569bbdc87232b924a19f0",
+  "vivado": "Vivado v2025.1",
+  "board": "MEGA65 R6",
+  "part": "xc7a200tfbg484-2",
+  "clock_mhz": 100.0,
+  "flow": "default",
+  "met": true,
+  "wns_ns": 0.376,
+  "tns_ns": 0.0,
+  "whs_ns": 0.054,
+  "ths_ns": 0.0,
+  "wpws_ns": 0.259,
+  "tpws_ns": 0.0,
+  "core_in": {
+    "slack_ns": 0.917,
+    "from": "i_mega65/i_system/i_nicemon/i_mem/i_ram/mem_even_reg_0_9/CLKARDCLK",
+    "to": "i_mega65/i_system/i_nicemon/i_core/i_core/i_pipe_write/w_r_reg[regs][14][25]/D"
+  },
+  "core_out": {
+    "slack_ns": 0.456,
+    "from": "i_mega65/i_system/i_nicemon/i_core/i_core/i_pipe_prepare/rd_addr_r_reg[10]/C",
+    "to": "i_mega65/i_system/i_nicemon/i_devices/i_timer/irq_vector_o_reg[0]/CE"
+  },
+  "attempts": [
+    {
+      "flow": "default",
+      "wns_ns": 0.376,
+      "whs_ns": 0.054,
+      "wpws_ns": 0.259,
+      "met": true
+    }
+  ],
+  "date": "2026-10-27"
+}
