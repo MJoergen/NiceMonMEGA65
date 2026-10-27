@@ -32,12 +32,11 @@ and switches as registers (see [synth/](synth/README.md#the-nexys4ddr) and
 | [sim/](sim/) | The GHDL testbenches. `text_synth.vhd` is the wrapper with which GHDL checks that the display synthesizes. |
 | [formal/](formal/) | The formal checks, for SymbiYosys. |
 | [synth/](synth/README.md) | The Vivado builds for the MEGA65 R3 and R6 boards, and the Nexys4DDR. |
-| [monitor/](monitor/README.md) | The monitor, in NICE assembly: planned, not written yet. Its README has the decisions it will follow, QNICE-FPGA's. |
+| [monitor/](monitor/README.md) | The monitor, in NICE assembly: planned, not written yet ([#24](https://github.com/MJoergen/NiceMonMEGA65/issues/24)). Its README has the decisions it will follow, QNICE-FPGA's. |
 | [examples/](examples/) | Example C programs, and the Makefile that builds them for the MEGA65. |
 | [tools/](tools/) | `nicelink.py`, the debug link over the board's UART, over TCP to `niceemu --link`, or over TCP to the simulated system of `make cosim`, and the tools that use it: `load.py`, which loads a program into the MEGA65 or Nexys4DDR, `run.py`, which runs a program on the board as `niceemu` runs it, `hwtest.py`, which tests the system on the board, `bump.py`, which records the MEGA65's timing for a nice_cpu tag, `release.py`, which builds and publishes a release, `linktest.py`, which checks `run.py` on `niceemu --link`, and `cosimtest.py`, which checks `run.py` on the simulated system. |
 | [EMULATOR.md](EMULATOR.md) | The table of the known differences from the emulator. |
 | [RELEASE_NOTES.md](RELEASE_NOTES.md) | The releases, newest first, with what changed in each. [RELEASE.md](RELEASE.md) is how to make one. |
-| [TODO.md](TODO.md) | Work that is planned but not started. |
 | [core.mk](core.mk) | Picks the source files of the core, from `NICE`, for the Makefiles of `sim/` and `synth/`. |
 | [.claude/rules/synth.md](.claude/rules/synth.md) | Notes for Claude Code on the Vivado builds: where Vivado is, how to build, and what to check after a build. |
 | [vsg.yml](vsg.yml) | The configuration of `make lint`, which checks the VHDL against [CODING_STYLE.md](CODING_STYLE.md). |
@@ -436,7 +435,7 @@ full level; 1 to 3 is a comfortable range. The buttons and the switches are
 synchronized to the clock but not debounced. The CPU RESET button is not a
 register: it resets the system. The words `0xFFFFFF97`–`9F` read 0 and take
 no write; the keyboard's LEDs may come to `0xFFFFFF97` (see
-[TODO.md](TODO.md)).
+[#25](https://github.com/MJoergen/NiceMonMEGA65/issues/25)).
 
 ### Address map
 

@@ -2,7 +2,7 @@
 
 The monitor in NICE assembly, a port of the QNICE monitor (QMON) from
 [QNICE-FPGA](https://github.com/sy2002/QNICE-FPGA), is planned and not
-written yet. This directory holds only this note, which records the
+written yet ([#24](https://github.com/MJoergen/NiceMonMEGA65/issues/24)). This directory holds only this note, which records the
 decisions the monitor will follow. The rule is to stay as close to QNICE
 as the NICE CPU allows.
 
