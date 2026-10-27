@@ -104,8 +104,10 @@ and `make linktest`, `make -j4 formal`, and `make lint`.
   copied unchanged keep theirs, and so do the names they define, such as
   the entity `serialiser_10to1_selectio`.
 - Every README is kept in step with the code it describes, in plain short
-  sentences with the Oxford comma. Commit subjects are a short sentence;
-  the body says what was wrong and what changed.
+  sentences with the Oxford comma. Commit messages follow the 50/72 style:
+  the subject is a short sentence of at most 50 characters, and the
+  body, after a blank line, has lines of at most 72 characters and says
+  what was wrong and what changed.
 - VHDL follows `CODING_STYLE.md` (3-space indent, `_i`/`_o` ports, `C_`/`G_`
   names, `synthesis`/`simulation` architectures, long headers with THEORY OF
   OPERATION and RESET). `synth/r3/max10.vhd` and `synth/mega65/hdmi/` are
