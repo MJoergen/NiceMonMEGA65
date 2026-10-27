@@ -80,6 +80,7 @@ effect and does not write (DEBUG.md §3).
 | `0x00000000`–`0xFFFFFFFF` | Memory, where no register below is: 64K words of block RAM, repeated through the address space. So the runtime's stack below `0xFFFFFF00` lands in the top of it, and so do the words of `0xFFFFFF00`–`FF` that are not registers. |
 | `0x00000000`–`0x00007FFF` | The ROM, in a bitstream built with one, in front of the RAM and repeating with it (see [The ROM](#the-rom)). Bit 3 of the control register hides it. |
 | `0xFFFF0000`–`0xFFFF7FFF` | The screen: 32768 words of memory of their own, the emulator's 80×25 screen and room for scrolling. The 2000 words from the display offset are shown on VGA and HDMI, or VGA only on the Nexys4DDR (see [The screen](#the-screen)), and the link reads them all. |
+| `0xFFFF8000`–`0xFFFFFEFF` | RAM, between the screen and the I/O page: the RAM words `0x8000`–`0xFEFF`, as the 64K words repeat. On the Nexys4DDR, whose screen is 8192 words, it starts lower: `0xFFFF2000`–`0xFFFFFEFF` are the words `0x2000`–`0xFEFF`. The runtime's stack starts at `0xFFFFFF00` and grows down into it, and so does the stack of a program in the ROM, such as the demo. In the emulator it is ordinary memory. |
 | `0xFFFFFF00` | The console of SYSTEM.md §1. A write sends bits 7..0 to the UART. A read takes the oldest byte received from the UART or the keyboard, and returns it in bits 7..0 with bit 8 set, or 0 when no byte has arrived. A break on the UART ends the input: once the bytes before it are read, a read returns `0x200` (bit 9), as at the end of the emulator's input, until the core is started again. |
 | `0xFFFFFF01` | The emulator's read counter. A read by the core returns the number of its reads since the last write, and a write sets that number. It is 0 after reset, and a start keeps it, as in the emulator. |
 | `0xFFFFFF10`–`0xFFFFFF1F` | The timer of SYSTEM.md §4: it raises IRQ every P clock cycles, through the vector it is given. |
@@ -180,7 +181,8 @@ ROM is dropped, and a clear (bit 2 of the control register) does not
 touch it. So a program in the ROM must keep its stack and its variables
 in the RAM, at `0x8000` or above: `sim/rom.nasm`, the greeting that the
 tests use as the ROM, has its stack at the top of the memory, as the
-runtime has. With a stack in the ROM, as `hello.nasm` of nice_cpu has at `0x1000`, a pushed return address
+runtime has, and so has the demo that a release has in the ROM
+([demo/](demo/README.md)). With a stack in the ROM, as `hello.nasm` of nice_cpu has at `0x1000`, a pushed return address
 is lost and reads back as 0, and the program starts over, forever.
 
 While the core runs from the ROM, the link reaches only its debug

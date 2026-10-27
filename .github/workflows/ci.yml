@@ -60,6 +60,8 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y clang lld llvm
       - run: make examples
       - run: make -C nice_cpu/emulator build
+      # The demo of the ROM, on niceemu
+      - run: make -C demo test
       - run: make linktest
 
   lint:

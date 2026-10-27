@@ -1,0 +1,42 @@
+Screen:
+| NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
+|
+|  This is the demo in the ROM, which the core runs at power-up. What you type
+|  on the keyboard, or send to the debug UART, appears below the blue bar.
+|
+|  To run your own programs, connect a computer to the debug UART, at
+|  2000000 baud, and load and debug them with tools/mon.py. More is at
+|  https://github.com/MJoergen/NiceMonMEGA65
+|
+| RETURN new line   DEL delete   cursor keys move   CTRL-L clear
+|Hello, world!
+|aX      Y
+|Q1234567890123456789012345678901234567890123456789012345678901234567890123456789
+|abRde
+|x y z
+Screen:
+| NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
+|
+|  This is the demo in the ROM, which the core runs at power-up. What you type
+|  on the keyboard, or send to the debug UART, appears below the blue bar.
+|
+|  To run your own programs, connect a computer to the debug UART, at
+|  2000000 baud, and load and debug them with tools/mon.py. More is at
+|  https://github.com/MJoergen/NiceMonMEGA65
+|
+| RETURN new line   DEL delete   cursor keys move   CTRL-L clear
+|line 4
+|line 5
+|line 6
+|line 7
+|line 8
+|line 9
+|line 10
+|line 11
+|line 12
+|line 13
+|line 14
+|line 15
+|line 16
+|first   A
+|        B

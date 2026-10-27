@@ -42,9 +42,11 @@ file into a slot of the flash, and the board starts the system from that
 slot, without a JTAG cable. [RELEASE_NOTES.md](RELEASE_NOTES.md) has what
 changed in each release.
 
-The core files of a release have no ROM: the core waits, held, for a PC
-on the debug link, and the screen is black. To build a core file
-yourself, with or without a ROM, see [On its own](#on-its-own).
+The core files of a release have a demo in the ROM (see
+[On its own](#on-its-own)), so the screen shows a welcome at power-up.
+The tools of this repository load programs over the debug link as
+before. To build a core file yourself, with a ROM of your own, see
+[On its own](#on-its-own).
 
 The tools that load and debug programs are in this repository. Clone it
 with the submodule, which has the assembler, the emulator, and the C
@@ -64,7 +66,13 @@ is built with `make -C nice_cpu/emulator build`, which needs Zig (see
 
 With no serial cable, the MEGA65 runs the program in its ROM, from reset.
 The program reads the keyboard and writes the screen. Until the monitor is
-written, the ROM holds a program of your own, built into a core file of
+written, the ROM of a release holds a demo, [demo/](demo/README.md). It
+shows the version and how to go further, and below that it is a
+typewriter: what you type appears on the screen. RETURN starts a new
+line, INST/DEL deletes, the cursor keys move the cursor, and CTRL-L
+clears what you typed. The reset button starts the demo again.
+
+The ROM can also hold a program of your own, built into a core file of
 your own:
 
     make cor ROM=prog.bin
@@ -78,7 +86,7 @@ bitstream, for a JTAG cable.
 
 A write to the ROM is dropped, so a program in the ROM keeps its stack and
 its variables in the RAM, at `0x8000` or above. `sim/rom.nasm`, a
-greeting, is such a program. A C program keeps its data in its own image,
+greeting, and `demo/demo.nasm` are such programs. A C program keeps its data in its own image,
 so it does not run from the ROM. [SYSTEM.md](SYSTEM.md#the-rom) has the
 details. Try the program first in `niceemu`, or on the board with the
 serial port, as the ROM changes only with a new bitstream.

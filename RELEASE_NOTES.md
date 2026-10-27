@@ -53,6 +53,16 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 - The `.nasm` files of `sim/` are laid out in nice_cpu's columns, and
   `make test` checks the layout with nice_cpu's `nicefmt.py`.
 
+**Demo**
+
+- The bitstreams and the core files of the release have a demo in the
+  ROM (`demo/`), so a MEGA65 with no computer on its debug UART no longer
+  starts with a black screen. It shows a welcome with the version, and
+  then a typewriter: what is typed on the keyboard appears on the screen,
+  with RETURN, DEL, TAB, the cursor keys, CTRL-L to clear, and scrolling.
+  The tools hide the ROM, and load programs as before.
+- `make demo` builds it, and `make test` and CI run it in `niceemu`.
+
 **Release**
 
 - `make bump TAG=V1.0` moves nice_cpu to a tag, builds the R6 bitstream,

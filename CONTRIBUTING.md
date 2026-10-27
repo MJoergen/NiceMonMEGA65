@@ -17,6 +17,7 @@ for it need only the [README](README.md).
 | [formal/](formal/) | The formal checks, for SymbiYosys. |
 | [synth/](synth/README.md) | The Vivado builds for the MEGA65 R3 and R6 boards, and the Nexys4DDR. |
 | [monitor/](monitor/README.md) | The monitor, in NICE assembly: planned, not written yet ([#24](https://github.com/MJoergen/NiceMonMEGA65/issues/24)). Its README has the decisions it will follow, QNICE-FPGA's. |
+| [demo/](demo/README.md) | The demo in the ROM of the release, in NICE assembly: a welcome screen that turns into a typewriter. |
 | [examples/](examples/) | Example C programs, and the Makefile that builds them for the MEGA65. |
 | [tools/](tools/) | `nicelink.py`, the debug link over the board's UART, over TCP to `niceemu --link`, or over TCP to the simulated system of `make cosim`, and the tools that use it: `load.py`, which loads a program into the MEGA65 or Nexys4DDR, `run.py`, which runs a program on the board as `niceemu` runs it, `mon.py`, an interactive shell on the link, `hwtest.py`, which tests the system on the board, `bump.py`, which records the MEGA65's timing for a nice_cpu tag, `release.py`, which builds and publishes a release, `linktest.py`, which checks `run.py` on `niceemu --link`, and `cosimtest.py`, which checks `run.py` on the simulated system. |
 | [README.md](README.md) | For those who use the core files and write programs for them: on its own, and with the serial port. |
@@ -27,7 +28,7 @@ for it need only the [README](README.md).
 | [.claude/rules/synth.md](.claude/rules/synth.md) | Notes for Claude Code on the Vivado builds: where Vivado is, how to build, and what to check after a build. |
 | [vsg.yml](vsg.yml) | The configuration of `make lint`, which checks the VHDL against [CODING_STYLE.md](CODING_STYLE.md). |
 | [CLAUDE.md](CLAUDE.md) | Instructions for Claude Code: the commands, the layout, and the pitfalls. |
-| [.github/workflows/ci.yml](.github/workflows/ci.yml) | The CI: `make test` and `make cosimtest` on both cores, with niceemu built for its step counts, `make examples`, `make linktest`, `make formal`, and `make lint`. It cannot run `make hwtest` or build a bitstream. |
+| [.github/workflows/ci.yml](.github/workflows/ci.yml) | The CI: `make test` and `make cosimtest` on both cores, with niceemu built for its step counts, `make examples`, the demo's test, `make linktest`, `make formal`, and `make lint`. It cannot run `make hwtest` or build a bitstream. |
 
 ## Getting started
 
@@ -41,11 +42,14 @@ or, in an existing clone:
 
 `make` in the top directory lists the targets:
 
-- `make test` runs the simulation tests.
+- `make test` runs the simulation tests, and the demo's test in
+  `niceemu`.
 - `make formal` runs the formal checks (see
   [The formal checks](#the-formal-checks)).
 - `make lint` checks the VHDL style.
 - `make examples` builds the C examples.
+- `make demo` builds the demo of the ROM, `demo/build/demo.bin`, which
+  the release puts in the ROM of its bitstreams and core files.
 - `make r3`, `make r6`, and `make nexys4ddr` build the bitstreams. With
   `ROM=file.bin`, the core boots from the file (see [The ROM](SYSTEM.md#the-rom)).
 - `make cor` builds the MEGA65 core files for MEGAFLASH (see
@@ -308,7 +312,8 @@ after its halt, writes and reads the screen's registers, and runs
 `sim/eof.nasm`, with no input and with 1536 bytes of input, which checks the
 larger FIFO and the end of the input, the intro's `hello.nasm` with 100
 lines of input that it halts without reading, the emulator's `trapsym.nasm` with
-`--symbols`, and `examples/build/bench.bin`, but for its cycles, whose table
+`--symbols`, the demo of the ROM with a few keys and its screen, and
+`examples/build/bench.bin`, but for its cycles, whose table
 it prints. That needs niceemu, built with `make -C
 nice_cpu/emulator build`. Without it, the checks that need it are skipped,
 and the last line names them after a `SKIPPED`. Build the bitstream first,
@@ -334,9 +339,8 @@ plugged in, so name the port by the cable's serial number, as in
 A board that is already programmed can be tested with `tools/hwtest.py
 --no-program`, which skips the `b` notice. The reset button is not tested:
 press it with a terminal open, and the `b01` notice comes again. A
-bitstream with a ROM can be tested, such as one with `sim/rom.nasm`
-(`make r6 ROM=sim/build/pipeline/rom.bin`, after `make test` has assembled
-it): the test holds the core and hides the ROM, as `load.py` does, and runs
+bitstream with a ROM can be tested, such as one with the demo (`make
+demo`, then `make r6 ROM=demo/build/demo.bin`): the test holds the core and hides the ROM, as `load.py` does, and runs
 the programs from the RAM.
 
 ## The tools and niceemu

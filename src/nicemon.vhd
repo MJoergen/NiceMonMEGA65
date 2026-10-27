@@ -37,6 +37,14 @@
 --                          below. Every write to it is also given out on
 --                          scr_*_o, for a display that keeps a copy
 --                          (src/video/text.vhd).
+--   0xFFFF8000-0xFFFFFEFF  RAM, between the screen and the I/O page: with
+--                          a screen of 2^15 words and a RAM of 2^16, as on
+--                          the MEGA65, the RAM words 0x8000-0xFEFF. A
+--                          smaller screen leaves more of them: with 2^13
+--                          words, as on the Nexys4DDR, they start at
+--                          0xFFFF2000. The runtime's stack starts at
+--                          0xFFFFFF00 and grows down into them, and so does
+--                          the stack of a program in the ROM.
 --   0xFFFFFF00             The console of SYSTEM.md §1. A write sends bits
 --                          7..0 to the UART. It waits while the previous
 --                          byte is still waiting to be sent. A read by the

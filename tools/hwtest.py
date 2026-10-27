@@ -25,7 +25,8 @@ the cycle counter's count over the clock in MHz. Last, it runs programs with too
 with niceemu, and compares their output and exit status, with sim/eof.nasm
 also the end of the input and an input file of 1536 bytes, with a program
 that halts at once although 100 lines of input wait for it, with the
-emulator's trapsym.nasm and its label file for --symbols, and with
+emulator's trapsym.nasm and its label file for --symbols, with the
+demo of the ROM, demo/demo.nasm, and its screen, and with
 nice_cpu's benchmark, examples/build/bench.bin, all but its cycles. The programs
 run with the ROM hidden, so the RAM is at 0.
 Build the bitstream and the examples first, and niceemu
@@ -795,6 +796,14 @@ def comparisons(tmp: str) -> list[tuple[str, list[str], bool]]:
     reserved = assemble(f"{REPO}/nice_cpu/emulator/test/reserved.nasm", tmp)
     eof = assemble(f"{REPO}/sim/eof.nasm", tmp)
     trapsym = assemble(f"{REPO}/nice_cpu/emulator/test/trapsym.nasm", tmp)
+    # The demo of the ROM, with the version of its test, loaded at 0 as any
+    # program, and a few keys for it
+    subprocess.run(["make", "-s", "-C", f"{REPO}/demo", "build/demo_test.bin"],
+                   check=True)
+    demo = f"{REPO}/demo/build/demo_test.bin"
+    keys = os.path.join(tmp, "keys.txt")
+    with open(keys, "wb") as f:
+        f.write(b"Hello\tNICE\r\nabc\x7fd\x1b[Ae\n")
     # Every byte value, six times over: 1536 bytes, far more than the
     # 16-byte FIFO of the testbench holds
     text = os.path.join(tmp, "input.bin")
@@ -814,6 +823,7 @@ def comparisons(tmp: str) -> list[tuple[str, list[str], bool]]:
         (eof, ["-i", text], True),
         (trapsym, ["--symbols",        # names the halt and the trap
                    f"{REPO}/nice_cpu/emulator/test/trapsym.sym"], False),
+        (demo, ["-i", keys, "-s"], True),
     ]
 
 

@@ -9,7 +9,7 @@ PORT   ?= /dev/ttyUSB1
 ARGS   ?=
 EMU     = nice_cpu/emulator/zig-out/bin/niceemu
 
-.PHONY: help test formal lint examples r3 r6 nexys4ddr cor bump release load run mon hwtest linktest cosim cosimtest clean
+.PHONY: help test formal lint examples demo r3 r6 nexys4ddr cor bump release load run mon hwtest linktest cosim cosimtest clean
 
 # Every target but these needs the nice_cpu submodule
 ifeq ($(wildcard nice_cpu/hdl/src/nice_pkg.vhd),)
@@ -20,12 +20,15 @@ endif
 
 help:
 	@echo "Targets:"
-	@echo "  make test       run the GHDL simulation tests (needs GHDL)"
+	@echo "  make test       run the GHDL simulation tests (needs GHDL), and the demo's"
+	@echo "                  test in niceemu"
 	@echo "  make [-j4] formal"
 	@echo "                  run the formal checks (needs Yosys, its GHDL plugin,"
 	@echo "                  SymbiYosys, and Yices)"
 	@echo "  make lint       check the VHDL against CODING_STYLE.md (needs vsg)"
 	@echo "  make examples   build the C examples to examples/build/*.bin (needs clang)"
+	@echo "  make demo       build the demo of the ROM to demo/build/demo.bin, for"
+	@echo "                  ROM=demo/build/demo.bin"
 	@echo "  make r3 [ROM=monitor.bin]"
 	@echo "                  build the bitstream for the MEGA65 R3 (needs Vivado)"
 	@echo "  make r6 [ROM=monitor.bin]"
@@ -71,6 +74,7 @@ help:
 
 test:
 	$(MAKE) -C sim test
+	$(MAKE) -C demo test
 
 # The formal checks of formal/: each task of each .sby file must pass, as
 # a target of its own, so that "make -j4 formal" runs them side by side. Each
@@ -106,6 +110,9 @@ lint:
 
 examples:
 	$(MAKE) -C examples
+
+demo:
+	$(MAKE) -C demo
 
 # The ROM's path is made absolute here, for the board's Makefile runs in
 # its own directory.

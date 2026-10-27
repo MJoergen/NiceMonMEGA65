@@ -20,10 +20,11 @@ header is the authoritative address map.
 ## Commands
 
     make                  # lists the targets
-    make -j test          # GHDL: synth checks, tb_hello, tb_nicemon, tb_kbd, tb_ps2, tb_ps2_nicemon, tb_text, tb_board_io, check-steps, check-fmt (NICE=multi for the multi-cycle core)
+    make -j test          # GHDL: synth checks, tb_hello, tb_nicemon, tb_kbd, tb_ps2, tb_ps2_nicemon, tb_text, tb_board_io, check-steps, check-fmt (NICE=multi for the multi-cycle core); then the demo in niceemu
     make -j formal        # SymbiYosys jobs in formal/, each task in a work directory of its own
     make lint             # vsg against CODING_STYLE.md; line-length warnings are tolerated
     make examples         # C examples -> examples/build/*.bin (clang wasm32, lld, llvm)
+    make demo             # the ROM's demo -> demo/build/demo.bin; make -C demo test runs it in niceemu
     make r6 [ROM=f.bin]   # Vivado bitstream, synth/r6/build/top.bit; make r3 and make nexys4ddr likewise
     make cor [ROM=f.bin]  # MEGA65 core files for MEGAFLASH, synth/r{3,6}/build/NiceMonMEGA65-r{3,6}.cor (coretool)
     make load FILE=p.bin  # load and start a program on the board (debug UART, PORT=/dev/ttyUSB1)
@@ -47,8 +48,8 @@ picture. Test programs are assembled with `python3
 nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
 `nice_cpu/emulator/zig-out/bin/niceemu x.bin`. CI
 (`.github/workflows/ci.yml`, on Ubuntu 24.04) builds niceemu and runs
-`make -C sim -j4 test` and `make cosimtest` on both cores, `make examples`
-and `make linktest`, `make -j4 formal`, and `make lint`.
+`make -C sim -j4 test` and `make cosimtest` on both cores, `make examples`,
+`make -C demo test`, `make linktest`, `make -j4 formal`, and `make lint`.
 
 ## Layout
 
@@ -78,7 +79,9 @@ and `make linktest`, `make -j4 formal`, and `make lint`.
   sources. `tools/`: `nicelink.py` (the link, on the UART, or over TCP to
   `niceemu --link` or `make cosim`), `load.py`, `run.py`, `mon.py`, `hwtest.py`,
   `bump.py`, `release.py`, `linktest.py`, `cosimtest.py`. `examples/`: C programs built through
-  nice_cpu's wasm translator.
+  nice_cpu's wasm translator. `demo/`: the welcome screen and typewriter
+  in NICE assembly that the release puts in the ROM (`release.py`), and
+  `demo_hw.py`, which checks it in the ROM of a programmed board.
 
 ## Rules and pitfalls
 
