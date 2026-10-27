@@ -48,6 +48,11 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 - `formal/mem.sby` proves the memory by k-induction, and that a read
   returns what was written, 0 after a clear, or the ROM's word.
 
+**Tests**
+
+- The `.nasm` files of `sim/` are laid out in nice_cpu's columns, and
+  `make test` checks the layout with nice_cpu's `nicefmt.py`.
+
 **Release**
 
 - `make bump TAG=V1.0` moves nice_cpu to a tag, builds the R6 bitstream,

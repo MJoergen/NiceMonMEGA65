@@ -637,6 +637,9 @@ You need GHDL (tested with 4.1.0) and Python 3, and gcc for `make cosim`.
 - `make -C sim check-steps`, part of `make test`, compares the step counts
   that `tb_nicemon` checks with those of niceemu. It is skipped when niceemu
   is not built.
+- `make -C sim check-fmt`, part of `make test`, checks that the `.nasm`
+  files of `sim/` are laid out in nice_cpu's columns, with
+  `nice_cpu/assembler/nicefmt.py`. Its `--write` fixes a file.
 - `make -j test` runs all these side by side, in the time of `tb_text`.
   Each is also a target of `sim/Makefile`, so `make -C sim tb_kbd` runs one.
 - `make lint` checks the VHDL against [CODING_STYLE.md](CODING_STYLE.md)
