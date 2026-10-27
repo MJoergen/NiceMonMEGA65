@@ -34,7 +34,7 @@ and switches as registers (see [synth/](synth/README.md#the-nexys4ddr) and
 | [synth/](synth/README.md) | The Vivado builds for the MEGA65 R3 and R6 boards, and the Nexys4DDR. |
 | [monitor/](monitor/README.md) | The monitor, in NICE assembly: planned, not written yet ([#24](https://github.com/MJoergen/NiceMonMEGA65/issues/24)). Its README has the decisions it will follow, QNICE-FPGA's. |
 | [examples/](examples/) | Example C programs, and the Makefile that builds them for the MEGA65. |
-| [tools/](tools/) | `nicelink.py`, the debug link over the board's UART, over TCP to `niceemu --link`, or over TCP to the simulated system of `make cosim`, and the tools that use it: `load.py`, which loads a program into the MEGA65 or Nexys4DDR, `run.py`, which runs a program on the board as `niceemu` runs it, `hwtest.py`, which tests the system on the board, `bump.py`, which records the MEGA65's timing for a nice_cpu tag, `release.py`, which builds and publishes a release, `linktest.py`, which checks `run.py` on `niceemu --link`, and `cosimtest.py`, which checks `run.py` on the simulated system. |
+| [tools/](tools/) | `nicelink.py`, the debug link over the board's UART, over TCP to `niceemu --link`, or over TCP to the simulated system of `make cosim`, and the tools that use it: `load.py`, which loads a program into the MEGA65 or Nexys4DDR, `run.py`, which runs a program on the board as `niceemu` runs it, `mon.py`, an interactive shell on the link, `hwtest.py`, which tests the system on the board, `bump.py`, which records the MEGA65's timing for a nice_cpu tag, `release.py`, which builds and publishes a release, `linktest.py`, which checks `run.py` on `niceemu --link`, and `cosimtest.py`, which checks `run.py` on the simulated system. |
 | [EMULATOR.md](EMULATOR.md) | The table of the known differences from the emulator. |
 | [RELEASE_NOTES.md](RELEASE_NOTES.md) | The releases, newest first, with what changed in each. [RELEASE.md](RELEASE.md) is how to make one. |
 | [core.mk](core.mk) | Picks the source files of the core, from `NICE`, for the Makefiles of `sim/` and `synth/`. |
@@ -76,6 +76,8 @@ or, in an existing clone:
 - `make load FILE=prog.bin` loads a program into the board and starts it.
 - `make run FILE=prog.bin` runs one as `niceemu` runs it (see
   [Comparing with the emulator](#comparing-with-the-emulator)).
+- `make mon` opens an interactive shell on the link (see
+  [The link by hand](#the-link-by-hand)).
 - `make hwtest` tests the board (see [Testing the board](#testing-the-board)).
 - `make bump TAG=V1.0` moves nice_cpu to a tag and records the MEGA65's
   timing (see [The timing badge](#the-timing-badge)).
@@ -88,7 +90,7 @@ or, in an existing clone:
   checks the tools and the RTL on it, without a board (see
   [The simulated board](#the-simulated-board)).
 
-`make load` and `make run` use the serial device `PORT=/dev/ttyUSB1` by
+`make load`, `make run`, and `make mon` use the serial device `PORT=/dev/ttyUSB1` by
 default, and pass `ARGS=` on to the tool, for example `ARGS=--no-run` or
 `ARGS="-i in.txt -d 0:10 -s --timeout 5"`. `ARGS="--tcp 4000"` drives
 `niceemu --link 4000` instead of the board, and `ARGS="--cosim 4000"` the
@@ -232,6 +234,117 @@ the emulator has a word of its own, so the program would run differently.
 A program can still write the rest of the MEGA65's screen when it runs.
 
 `load.py` holds the core first, so it also works while a program runs.
+
+### The link by hand
+
+`tools/mon.py` is an interactive shell on the link, so that you need not
+type packets in a terminal. It takes `--port`, `--tcp`, and `--cosim` as
+`load.py` does, and a `.bin` file to load, with the core held:
+
+    tools/mon.py echo.bin
+
+Its commands are short, and `help` lists them. Numbers are hex.
+
+- `load FILE` loads a program as `load.py --no-run` does.
+- `go` starts a held core, or goes on from a pause. `run` starts the
+  program at 0 again, and `hold` holds the core.
+- `pause` pauses the core, and `step N` runs N steps of a paused core.
+  An empty line steps again.
+- `b ADDR` sets a breakpoint, `b` lists them, and `bd N` or `bd all`
+  disables them.
+- `regs` shows R0 to R15, and `status` the state of the core.
+- `r ADDR N` reads N words, and `w ADDR WORD...` writes them. `ctl VALUE`
+  writes the control register.
+- `send TEXT` sends text to the program, with escapes such as `\n`, and
+  `eof` ends its input.
+- `console` passes the terminal through to the program, until Ctrl-].
+
+The program's output and the link's notices, such as `[paused, PC=...]`
+and `[halted: HALT, PC=...]`, are shown as they arrive. `quit` leaves the
+core as it is. In `niceemu`, a pause or a breakpoint takes effect only
+after the next byte while the program waits for one.
+
+#### A worked example
+
+This session ran on the MEGA65 R6, with `sim/echo.nasm`. These are its
+instructions and their addresses:
+
+    0  LOOP  MOVE    R1, @CONSOLE      ; bit 8 set when a byte has arrived
+    2        AND[M]  R2, R1, 0x100
+    4    ?Z  MOVE    PC, LOOP          ; nothing yet
+    6        AND     R1, R1, 0xFF
+    8        MOVE    @CONSOLE, R1      ; echo the byte
+    A        SUB[M]  R2, R1, 0x2E      ; a '.'?
+    C   ?!Z  MOVE    PC, LOOP
+    E        HALT
+
+Assemble it, and start `mon.py` with it. The core is held, with the
+program in memory:
+
+    $ python3 nice_cpu/assembler/niceasm.py -o echo.bin sim/echo.nasm
+    $ tools/mon.py echo.bin
+    loaded 15 words; the core is held
+    'help' lists the commands, and 'q' quits.
+    mon> status
+    held, ROM hidden, control 00000009, link version 4, input free 2048
+    mon> r 0 f
+    00000000: 00007800 ffffff00 03a080b0 00000100 3003d800 00000000 01a040b0 000000ff
+    00000008: 001c0080 ffffff00 022080b0 0000002e b003d800 00000000 0c000000
+
+Start the program, and pause it. It waits for input, so it is in its
+loop. Z, bit 27 of R14, is set, as no byte has arrived:
+
+    mon> go
+    mon> pause
+    [paused, PC=00000000]
+    mon> regs
+    R0  00000000 R1  00000000 R2  00000000 R3  00000000
+    R4  00000000 R5  00000000 R6  00000000 R7  00000000
+    R8  00000000 R9  00000000 R10 00000000 R11 00000000
+    R12 00000000 R13 00000000 R14 09000000 R15 00000000
+    mon> s 3
+    PC=00000002
+    PC=00000004
+    PC=00000000
+
+Set a breakpoint at 6, which the program reaches only when a byte has
+arrived, and go on. Send it an `A`, and it stops. R1 holds the console's
+read: bit 8 set, and `0x41`, the `A`:
+
+    mon> b 6
+    0: 00000006
+    mon> g
+    mon> send A
+    [breakpoint 0, PC=00000006]
+    mon> regs
+    R0  00000000 R1  00000141 R2  00000100 R3  00000000
+    R4  00000000 R5  00000000 R6  00000000 R7  00000000
+    R8  00000000 R9  00000000 R10 00000000 R11 00000000
+    R12 00000000 R13 00000000 R14 01000000 R15 00000006
+    mon> s
+    PC=00000008
+    mon>
+    A
+    PC=0000000a
+    mon>
+    PC=0000000c
+
+Each empty line runs one more step. The step at 8 echoes the `A`. Then
+disable the breakpoint, go on, and type to the program in the console,
+until Ctrl-]. A `.` ends it:
+
+    mon> bd all
+    mon> g
+    mon> c
+    console; Ctrl-] returns to the prompt
+    Hello
+    mon> send .
+    .
+    [halted: HALT, PC=0000000f]
+    mon> status
+    halted: HALT, ROM hidden, control 0000000a, link version 4, input free 2048
+    PC=0000000f
+    mon> q
 
 ### Running a C program
 

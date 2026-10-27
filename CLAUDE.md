@@ -25,6 +25,7 @@ header is the authoritative address map.
     make cor [ROM=f.bin]  # MEGA65 core files for MEGAFLASH, synth/r{3,6}/build/NiceMonMEGA65-r{3,6}.cor (coretool)
     make load FILE=p.bin  # load and start a program on the board (debug UART, PORT=/dev/ttyUSB1)
     make run FILE=p.bin   # run it and print what niceemu prints, for diffing
+    make mon [FILE=p.bin] # interactive shell on the link: memory, pause, step, breakpoints
     make bump TAG=V1.0    # nice_cpu to the tag, R6 bitstream, badge-mega65.json and verified.json, committed (--push with ARGS)
     make release TAG=V1.0 # after the bump: gates, three bitstreams, two .cor, hwtest, staged; ARGS=--publish tags and releases (RELEASE.md); TAG=V1.0.1 keeps nice_cpu at V1.0
     make hwtest           # check the FPGA, program it with openFPGALoader, and test the board
@@ -72,7 +73,7 @@ and `make linktest`, `make -j4 formal`, and `make lint`.
   the system with its UART on TCP (`tb_cosim.vhd`, `cosim.c`). `formal/`: the
   SymbiYosys wrappers; the checks themselves are `G_FORMAL` blocks in the
   sources. `tools/`: `nicelink.py` (the link, on the UART, or over TCP to
-  `niceemu --link` or `make cosim`), `load.py`, `run.py`, `hwtest.py`,
+  `niceemu --link` or `make cosim`), `load.py`, `run.py`, `mon.py`, `hwtest.py`,
   `bump.py`, `release.py`, `linktest.py`, `cosimtest.py`. `examples/`: C programs built through
   nice_cpu's wasm translator.
 

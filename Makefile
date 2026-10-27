@@ -9,7 +9,7 @@ PORT   ?= /dev/ttyUSB1
 ARGS   ?=
 EMU     = nice_cpu/emulator/zig-out/bin/niceemu
 
-.PHONY: help test formal lint examples r3 r6 nexys4ddr cor bump release load run hwtest linktest cosim cosimtest clean
+.PHONY: help test formal lint examples r3 r6 nexys4ddr cor bump release load run mon hwtest linktest cosim cosimtest clean
 
 # Every target but these needs the nice_cpu submodule
 ifeq ($(wildcard nice_cpu/hdl/src/nice_pkg.vhd),)
@@ -49,6 +49,9 @@ help:
 	@echo "                  start it"
 	@echo "  make run FILE=prog.bin [PORT=/dev/ttyUSB1] [ARGS='-i in.txt -d 0:10 -s --timeout 5']"
 	@echo "                  run a program on the board, and print what niceemu prints"
+	@echo "  make mon [FILE=prog.bin] [PORT=/dev/ttyUSB1]"
+	@echo "                  an interactive shell on the debug link: read and write"
+	@echo "                  memory, pause, step, breakpoints, and the console"
 	@echo "  make hwtest [BIT=synth/r6/build/top.bit] [PORT=/dev/ttyUSB1]"
 	@echo "                  check that the board of PORT has the FPGA of BIT, program"
 	@echo "                  it, and test it (needs openFPGALoader); for the Nexys4DDR,"
@@ -137,6 +140,9 @@ load:
 run:
 	@test -n "$(FILE)" || (echo "Give the program with FILE=prog.bin"; exit 1)
 	$(PYTHON) tools/run.py --port $(PORT) $(ARGS) $(FILE)
+
+mon:
+	$(PYTHON) tools/mon.py --port $(PORT) $(ARGS) $(FILE)
 
 BIT ?= synth/r6/build/top.bit
 
