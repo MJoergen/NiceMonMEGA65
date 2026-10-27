@@ -1,7 +1,7 @@
 {
-  "nice_cpu_tag": "RC06",
-  "nice_cpu_commit": "9a6263305de10b33c4ab6ec771f248f093a8ff93",
-  "repo_commit": "cce8bb9b85629976c36569bbdc87232b924a19f0",
+  "nice_cpu_tag": "V1.0",
+  "nice_cpu_commit": "526c9547d22a240ec2087bd2c6b1b863adaa9e33",
+  "repo_commit": "8b8705a4d6eb1a0639188b1a3cc3c7eb70a6219d",
   "vivado": "Vivado v2025.1",
   "board": "MEGA65 R6",
   "part": "xc7a200tfbg484-2",
