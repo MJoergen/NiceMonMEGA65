@@ -22,9 +22,11 @@ header is the authoritative address map.
     make lint             # vsg against CODING_STYLE.md; line-length warnings are tolerated
     make examples         # C examples -> examples/build/*.bin (clang wasm32, lld, llvm)
     make r6 [ROM=f.bin]   # Vivado bitstream, synth/r6/build/top.bit; make r3 and make nexys4ddr likewise
+    make cor [ROM=f.bin]  # MEGA65 core files for MEGAFLASH, synth/r{3,6}/build/NiceMonMEGA65-r{3,6}.cor (coretool)
     make load FILE=p.bin  # load and start a program on the board (debug UART, PORT=/dev/ttyUSB1)
     make run FILE=p.bin   # run it and print what niceemu prints, for diffing
     make bump TAG=RCnn    # nice_cpu to the tag, R6 bitstream, badge-mega65.json and verified.json, committed (--push with ARGS)
+    make release TAG=RCnn # after the bump: gates, three bitstreams, two .cor, hwtest, staged; ARGS=--publish tags and releases (RELEASE.md)
     make hwtest           # check the FPGA, program it with openFPGALoader, and test the board
     make linktest         # run.py --tcp on niceemu --link against plain niceemu, no board
     make cosim            # the RTL in GHDL, its debug UART on TCP, for the tools' --cosim PORT
@@ -71,7 +73,7 @@ and `make linktest`, `make -j4 formal`, and `make lint`.
   SymbiYosys wrappers; the checks themselves are `G_FORMAL` blocks in the
   sources. `tools/`: `nicelink.py` (the link, on the UART, or over TCP to
   `niceemu --link` or `make cosim`), `load.py`, `run.py`, `hwtest.py`,
-  `linktest.py`, `cosimtest.py`. `examples/`: C programs built through
+  `bump.py`, `release.py`, `linktest.py`, `cosimtest.py`. `examples/`: C programs built through
   nice_cpu's wasm translator.
 
 ## Rules and pitfalls

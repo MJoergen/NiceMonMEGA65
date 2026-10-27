@@ -9,7 +9,7 @@ PORT   ?= /dev/ttyUSB1
 ARGS   ?=
 EMU     = nice_cpu/emulator/zig-out/bin/niceemu
 
-.PHONY: help test formal lint examples r3 r6 nexys4ddr bump load run hwtest linktest cosim cosimtest clean
+.PHONY: help test formal lint examples r3 r6 nexys4ddr cor bump release load run hwtest linktest cosim cosimtest clean
 
 # Every target but these needs the nice_cpu submodule
 ifeq ($(wildcard nice_cpu/hdl/src/nice_pkg.vhd),)
@@ -33,9 +33,16 @@ help:
 	@echo "                  core boots from the .bin file at reset"
 	@echo "  make nexys4ddr [ROM=monitor.bin]"
 	@echo "                  build the bitstream for the Digilent Nexys4DDR"
+	@echo "  make cor [ROM=monitor.bin]"
+	@echo "                  build the MEGA65 core files, synth/r3/build/NiceMonMEGA65-r3.cor"
+	@echo "                  and synth/r6/build/NiceMonMEGA65-r6.cor, for MEGAFLASH"
+	@echo "                  (needs Vivado and coretool, from mega65-tools)"
 	@echo "  make bump TAG=RCnn [ARGS=--push]"
 	@echo "                  move nice_cpu to the tag, build the R6 bitstream, and commit"
 	@echo "                  badge-mega65.json and verified.json (needs Vivado)"
+	@echo "  make release TAG=RCnn [PORT=/dev/ttyUSB1] [ARGS=--publish]"
+	@echo "                  build, test, and stage a release in build/release; with"
+	@echo "                  --publish, tag it and create the GitHub Release (RELEASE.md)"
 	@echo "  make load FILE=prog.bin [PORT=/dev/ttyUSB1] [ARGS=--no-run]"
 	@echo "                  load a program into the board (MEGA65 or Nexys4DDR) and"
 	@echo "                  start it"
@@ -107,10 +114,20 @@ r6:
 nexys4ddr:
 	$(MAKE) -C synth/nexys4ddr ROM=$(if $(ROM),$(abspath $(ROM)))
 
+# The core files of the MEGA65 boards, from their bitstreams (synth/Makefile.inc)
+cor:
+	$(MAKE) -C synth/r3 cor ROM=$(if $(ROM),$(abspath $(ROM)))
+	$(MAKE) -C synth/r6 cor ROM=$(if $(ROM),$(abspath $(ROM)))
+
 # nice_cpu's badge of timing met on the MEGA65 (tools/bump.py)
 bump:
 	@test -n "$(TAG)" || (echo "Give the nice_cpu tag with TAG=RCnn"; exit 1)
 	$(PYTHON) tools/bump.py $(ARGS) $(TAG)
+
+# A release after a bump: staged first, then published (RELEASE.md)
+release:
+	@test -n "$(TAG)" || (echo "Give the nice_cpu tag with TAG=RCnn"; exit 1)
+	$(PYTHON) tools/release.py --port $(PORT) $(ARGS) $(TAG)
 
 load:
 	@test -n "$(FILE)" || (echo "Give the program with FILE=prog.bin"; exit 1)
@@ -145,7 +162,7 @@ cosimtest: $(EMU)
 	$(PYTHON) tools/cosimtest.py
 
 clean:
-	rm -rf formal/build
+	rm -rf formal/build build/release
 	$(MAKE) -C sim clean
 	$(MAKE) -C examples clean
 	$(MAKE) -C synth/r3 clean

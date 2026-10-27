@@ -93,6 +93,18 @@ synthesis, so the bitstream is rebuilt when it changes. `make r6
 ROM=monitor.bin` in the top directory does the same with a path relative
 to it.
 
+`make -C synth/r6 cor`, or `make cor` in the top directory for both
+revisions, makes the core file `synth/r6/build/NiceMonMEGA65-r6.cor`
+from the bitstream, which it builds first if needed. MEGAFLASH writes a
+core file into a slot of the MEGA65's flash (hold No Scroll at power on),
+and the board then starts the system without a JTAG cable. MEGAFLASH shows
+the name `NiceMon` and the version, the commit (`git describe --always
+--dirty`); set `COR_NAME` or `COR_VERSION` to change them. A core file
+holds its board revision, so flash the R3's on an R3 and the R6's on an
+R6. It needs `coretool`, the Python script `src/tools/coretool` of
+[mega65-tools](https://github.com/MEGA65/mega65-tools), on the `PATH` or
+in `CORETOOL`.
+
 The user LED is on while the core runs. The Nexys4DDR is programmed with
 `openFPGALoader -b nexys_a7_100 synth/nexys4ddr/build/top.bit`, or with
 Vivado's hardware manager. With a MEGA65 also attached, openFPGALoader

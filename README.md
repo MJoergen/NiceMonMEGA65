@@ -34,7 +34,7 @@ and switches as registers (see [synth/](synth/README.md#the-nexys4ddr) and
 | [synth/](synth/README.md) | The Vivado builds for the MEGA65 R3 and R6 boards, and the Nexys4DDR. |
 | [monitor/](monitor/README.md) | The monitor, in NICE assembly: planned, not written yet. Its README has the decisions it will follow, QNICE-FPGA's. |
 | [examples/](examples/) | Example C programs, and the Makefile that builds them for the MEGA65. |
-| [tools/](tools/) | `nicelink.py`, the debug link over the board's UART, over TCP to `niceemu --link`, or over TCP to the simulated system of `make cosim`, and the tools that use it: `load.py`, which loads a program into the MEGA65 or Nexys4DDR, `run.py`, which runs a program on the board as `niceemu` runs it, `hwtest.py`, which tests the system on the board, `bump.py`, which records the MEGA65's timing for a nice_cpu tag, `linktest.py`, which checks `run.py` on `niceemu --link`, and `cosimtest.py`, which checks `run.py` on the simulated system. |
+| [tools/](tools/) | `nicelink.py`, the debug link over the board's UART, over TCP to `niceemu --link`, or over TCP to the simulated system of `make cosim`, and the tools that use it: `load.py`, which loads a program into the MEGA65 or Nexys4DDR, `run.py`, which runs a program on the board as `niceemu` runs it, `hwtest.py`, which tests the system on the board, `bump.py`, which records the MEGA65's timing for a nice_cpu tag, `release.py`, which builds and publishes a release, `linktest.py`, which checks `run.py` on `niceemu --link`, and `cosimtest.py`, which checks `run.py` on the simulated system. |
 | [EMULATOR.md](EMULATOR.md) | The table of the known differences from the emulator. |
 | [TODO.md](TODO.md) | Work that is planned but not started. |
 | [core.mk](core.mk) | Picks the source files of the core, from `NICE`, for the Makefiles of `sim/` and `synth/`. |
@@ -71,12 +71,16 @@ or, in an existing clone:
 - `make examples` builds the C examples.
 - `make r3`, `make r6`, and `make nexys4ddr` build the bitstreams. With
   `ROM=file.bin`, the core boots from the file (see [The ROM](#the-rom)).
+- `make cor` builds the MEGA65 core files for MEGAFLASH (see
+  [synth/README.md](synth/README.md)).
 - `make load FILE=prog.bin` loads a program into the board and starts it.
 - `make run FILE=prog.bin` runs one as `niceemu` runs it (see
   [Comparing with the emulator](#comparing-with-the-emulator)).
 - `make hwtest` tests the board (see [Testing the board](#testing-the-board)).
 - `make bump TAG=RCnn` moves nice_cpu to a tag and records the MEGA65's
   timing (see [The timing badge](#the-timing-badge)).
+- `make release TAG=RCnn` builds, tests, and publishes a release (see
+  [RELEASE.md](RELEASE.md)).
 - `make linktest` checks the tools on `niceemu --link`, without a board
   (see [Comparing with the emulator](#comparing-with-the-emulator)).
 - `make cosim` runs the system in GHDL for the tools, and `make cosimtest`

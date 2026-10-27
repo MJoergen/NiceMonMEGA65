@@ -128,3 +128,26 @@ FORCE:
 
 clean:
 	rm -rf build .Xil clockInfo.txt
+
+# The core file of a MEGA65 board, for a slot of its flash, which MEGAFLASH
+# writes (hold No Scroll at power on), so that the board starts the system
+# without a JTAG cable. The board's Makefile sets COR_TARGET, coretool's
+# name for the board revision: mega65r3 or mega65r6, for the core file of
+# one revision must not go on the other. coretool is the Python script
+# src/tools/coretool of mega65-tools (https://github.com/MEGA65/mega65-tools);
+# set CORETOOL if it is not on the PATH. MEGAFLASH shows COR_NAME and
+# COR_VERSION, at most 31 characters each; the version is the commit, and
+# tools/release.py gives the tag.
+ifneq ($(COR_TARGET),)
+CORETOOL    ?= coretool
+COR_NAME    ?= NiceMon
+COR_VERSION ?= $(shell git describe --always --dirty 2>/dev/null)
+COR          = build/NiceMonMEGA65-$(subst mega65,,$(COR_TARGET)).cor
+
+.PHONY: cor
+cor: $(COR)
+
+$(COR): build/$(TOP).bit
+	$(CORETOOL) --quiet --force --build $@ --bit $< --target $(COR_TARGET) \
+	   --bit-name "$(COR_NAME)" --bit-version "$(COR_VERSION)"
+endif
