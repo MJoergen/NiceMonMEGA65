@@ -9,7 +9,7 @@ PORT   ?= /dev/ttyUSB1
 ARGS   ?=
 EMU     = nice_cpu/emulator/zig-out/bin/niceemu
 
-.PHONY: help test formal lint examples r3 r6 nexys4ddr load run hwtest linktest cosim cosimtest clean
+.PHONY: help test formal lint examples r3 r6 nexys4ddr bump load run hwtest linktest cosim cosimtest clean
 
 # Every target but these needs the nice_cpu submodule
 ifeq ($(wildcard nice_cpu/hdl/src/nice_pkg.vhd),)
@@ -33,6 +33,9 @@ help:
 	@echo "                  core boots from the .bin file at reset"
 	@echo "  make nexys4ddr [ROM=monitor.bin]"
 	@echo "                  build the bitstream for the Digilent Nexys4DDR"
+	@echo "  make bump TAG=RCnn [ARGS=--push]"
+	@echo "                  move nice_cpu to the tag, build the R6 bitstream, and commit"
+	@echo "                  badge-mega65.json and verified.json (needs Vivado)"
 	@echo "  make load FILE=prog.bin [PORT=/dev/ttyUSB1] [ARGS=--no-run]"
 	@echo "                  load a program into the board (MEGA65 or Nexys4DDR) and"
 	@echo "                  start it"
@@ -103,6 +106,11 @@ r6:
 
 nexys4ddr:
 	$(MAKE) -C synth/nexys4ddr ROM=$(if $(ROM),$(abspath $(ROM)))
+
+# nice_cpu's badge of timing met on the MEGA65 (tools/bump.py)
+bump:
+	@test -n "$(TAG)" || (echo "Give the nice_cpu tag with TAG=RCnn"; exit 1)
+	$(PYTHON) tools/bump.py $(ARGS) $(TAG)
 
 load:
 	@test -n "$(FILE)" || (echo "Give the program with FILE=prog.bin"; exit 1)

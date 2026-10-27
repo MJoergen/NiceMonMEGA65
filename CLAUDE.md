@@ -24,6 +24,7 @@ header is the authoritative address map.
     make r6 [ROM=f.bin]   # Vivado bitstream, synth/r6/build/top.bit; make r3 and make nexys4ddr likewise
     make load FILE=p.bin  # load and start a program on the board (debug UART, PORT=/dev/ttyUSB1)
     make run FILE=p.bin   # run it and print what niceemu prints, for diffing
+    make bump TAG=RCnn    # nice_cpu to the tag, R6 bitstream, badge-mega65.json and verified.json, committed (--push with ARGS)
     make hwtest           # check the FPGA, program it with openFPGALoader, and test the board
     make linktest         # run.py --tcp on niceemu --link against plain niceemu, no board
     make cosim            # the RTL in GHDL, its debug UART on TCP, for the tools' --cosim PORT

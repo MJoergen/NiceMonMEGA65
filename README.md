@@ -34,7 +34,7 @@ and switches as registers (see [synth/](synth/README.md#the-nexys4ddr) and
 | [synth/](synth/README.md) | The Vivado builds for the MEGA65 R3 and R6 boards, and the Nexys4DDR. |
 | [monitor/](monitor/README.md) | The monitor, in NICE assembly: planned, not written yet. Its README has the decisions it will follow, QNICE-FPGA's. |
 | [examples/](examples/) | Example C programs, and the Makefile that builds them for the MEGA65. |
-| [tools/](tools/) | `nicelink.py`, the debug link over the board's UART, over TCP to `niceemu --link`, or over TCP to the simulated system of `make cosim`, and the tools that use it: `load.py`, which loads a program into the MEGA65 or Nexys4DDR, `run.py`, which runs a program on the board as `niceemu` runs it, `hwtest.py`, which tests the system on the board, `linktest.py`, which checks `run.py` on `niceemu --link`, and `cosimtest.py`, which checks `run.py` on the simulated system. |
+| [tools/](tools/) | `nicelink.py`, the debug link over the board's UART, over TCP to `niceemu --link`, or over TCP to the simulated system of `make cosim`, and the tools that use it: `load.py`, which loads a program into the MEGA65 or Nexys4DDR, `run.py`, which runs a program on the board as `niceemu` runs it, `hwtest.py`, which tests the system on the board, `bump.py`, which records the MEGA65's timing for a nice_cpu tag, `linktest.py`, which checks `run.py` on `niceemu --link`, and `cosimtest.py`, which checks `run.py` on the simulated system. |
 | [EMULATOR.md](EMULATOR.md) | The table of the known differences from the emulator. |
 | [TODO.md](TODO.md) | Work that is planned but not started. |
 | [core.mk](core.mk) | Picks the source files of the core, from `NICE`, for the Makefiles of `sim/` and `synth/`. |
@@ -75,6 +75,8 @@ or, in an existing clone:
 - `make run FILE=prog.bin` runs one as `niceemu` runs it (see
   [Comparing with the emulator](#comparing-with-the-emulator)).
 - `make hwtest` tests the board (see [Testing the board](#testing-the-board)).
+- `make bump TAG=RCnn` moves nice_cpu to a tag and records the MEGA65's
+  timing (see [The timing badge](#the-timing-badge)).
 - `make linktest` checks the tools on `niceemu --link`, without a board
   (see [Comparing with the emulator](#comparing-with-the-emulator)).
 - `make cosim` runs the system in GHDL for the tools, and `make cosimtest`
@@ -806,6 +808,32 @@ bitstream with a ROM can be tested, such as one with `sim/rom.nasm`
 (`make r6 ROM=sim/build/pipeline/rom.bin`, after `make test` has assembled
 it): the test holds the core and hides the ROM, as `load.py` does, and runs
 the programs from the RAM.
+
+## The timing badge
+
+nice_cpu shows a badge of whether its core meets 100 MHz on the MEGA65,
+and this repository is the proof. `make bump TAG=RCnn`, which runs
+`tools/bump.py`, checks that the tree is clean and on `main`, moves the
+`nice_cpu` submodule to the tag, builds `niceemu`, runs `make test`, and
+builds the R6 bitstream with Vivado's default directives. If that misses
+timing, it builds again with `FLOW=timing`, and the badge says so.
+
+It writes two files at the top level and commits them, after a commit of
+the submodule bump. `badge-mega65.json` is the badge in the shields.io
+endpoint format: `RC8 met` in green, `RC8 met (timing flow)`, or `RC8
+failed (WNS -0.12 ns)` in red. `verified.json` is the full record: the
+nice_cpu tag and commit, the Vivado version, WNS, TNS, and the hold and
+pulse width slacks, the worst paths into and out of the core, the clock,
+the board, the flow, and the date. The paths into and out of the core
+come from `build/core_in.rpt` and `build/core_out.rpt`, which every build
+writes, and nice_cpu sets its budget for the core's ports from them.
+
+A timing miss is a result, and the red badge is committed. A failed build
+or test is not: the submodule goes back to where it was, and nothing is
+written. The script pushes only with `ARGS=--push`, for a push publishes
+the badge. `tools/bump.py RCnn --reports synth/r6/build` prints the two
+files for the reports of an earlier build, and changes nothing. Vivado
+does not run in CI, so neither does this.
 
 ## License
 
