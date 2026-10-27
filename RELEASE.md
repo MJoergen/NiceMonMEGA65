@@ -39,8 +39,9 @@ and keep their names.
     files for MEGAFLASH, with the version `V1.0`.
   - `examples-V1.0.zip`, the C examples as `.bin` files.
   - `verified.json`, the MEGA65 R6's timing record from `make bump`.
-- The release notes: the nice_cpu commit, each board's clock, flow, and
-  WNS, and the Vivado version.
+- The release notes: the tag's section of
+  [RELEASE_NOTES.md](RELEASE_NOTES.md), then the nice_cpu commit, each
+  board's clock, flow, and WNS, the Vivado version, and the files.
 
 ## What must pass
 
@@ -49,6 +50,8 @@ and keep their names.
   tag, and says met. The default flow or `FLOW=timing` is fine.
 - The submodule is at that nice_cpu tag.
 - A point release, such as `V1.0.1`, comes after the release `V1.0` here.
+- `RELEASE_NOTES.md` has a section for the tag, whose heading has the
+  date: `## V1.0 (2026-11-02)`.
 - All three bitstreams meet timing.
 - `make hwtest` passes on a MEGA65 R6.
 
@@ -61,9 +64,14 @@ and keep their names.
    If the badge is red, stop here. The red badge is pushed as a result,
    but there is no release.
 
-2. Wait for CI to pass on the pushed commit.
+2. Write the tag's section of `RELEASE_NOTES.md`: what a user of the
+   bitstreams, the boards, or the tools can see changed since the release
+   before, with upgrade notes first. Date its heading, then commit and
+   push.
 
-3. Connect a MEGA65 R6, then build, test, and stage the release:
+3. Wait for CI to pass on the pushed commit.
+
+4. Connect a MEGA65 R6, then build, test, and stage the release:
 
        make release TAG=V1.0 [PORT=/dev/ttyUSB1]
 
@@ -72,21 +80,23 @@ and keep their names.
    files with `coretool`, runs `make hwtest` on the R6, and puts the files
    in `build/release/V1.0/`. It takes as long as three Vivado builds.
 
-4. Look at `build/release/V1.0/notes.md`, and edit it if something is
-   worth saying, such as a new feature or a known problem.
+5. Look at `build/release/V1.0/notes.md`. A change to the section goes
+   into `RELEASE_NOTES.md`, which means a new commit, so steps 3 and 4 again.
+   Only a note for this release alone, such as a known problem of the
+   build, goes into `notes.md` itself.
 
-5. Publish:
+6. Publish:
 
        make release TAG=V1.0 ARGS=--publish
 
-   This builds nothing. It checks that `main` has not moved since step 3,
+   This builds nothing. It checks that `main` has not moved since step 4,
    makes the tag, pushes it, and creates the GitHub Release from the staged
-   files. If `main` has moved, do step 3 again.
+   files. If `main` has moved, do step 4 again.
 
 ## A release that keeps the submodule
 
 A change here alone, after the release `V1.0`, is released as `V1.0.1`:
-steps 2 to 5 with `TAG=V1.0.1`, without a bump. It builds and checks the
+steps 2 to 6 with `TAG=V1.0.1`, without a bump. It builds and checks the
 three bitstreams as a bump's release does, for a change here can cost
 timing, and the R6 must meet timing with the flow of `verified.json`.
 `verified.json` and the badge stay as the bump left them, for they are
@@ -95,9 +105,9 @@ The core files have the version `V1.0.1`, which MEGAFLASH shows.
 
 ## When something goes wrong
 
-- A failed check in step 3 changes nothing. Fix the cause, and run step 3
+- A failed check in step 4 changes nothing. Fix the cause, and run step 4
   again.
-- If step 5 fails after the tag is pushed, create the release by hand:
+- If step 6 fails after the tag is pushed, create the release by hand:
 
       gh release create V1.0 --verify-tag --title V1.0 \
          --notes-file build/release/V1.0/notes.md build/release/V1.0/*.bit \

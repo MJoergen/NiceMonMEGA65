@@ -12,7 +12,8 @@ has two steps, so that what is published can be looked at first.
 
 The first step, tools/release.py V1.0, changes nothing in git. In this order
 it checks that the tree is clean, is on main, and is pushed, that the tag is
-not taken here, that a point release's Vmajor.minor is, that verified.json
+not taken here, that a point release's Vmajor.minor is, that RELEASE_NOTES.md has a
+dated section for the tag, that verified.json
 is for the nice_cpu tag and the submodule's commit and says met, that the
 submodule is at that tag, and that CI passed for the commit. It then builds the examples
 and the bitstreams of the R6, the R3, and the Nexys4DDR, without a ROM and
@@ -22,7 +23,9 @@ meet timing. It makes the core files of the R3 and the R6, with the tag as
 their version, which MEGAFLASH shows. Last it runs make hwtest on the R6 bitstream, so a MEGA65 R6
 must be on PORT. It copies the bitstreams, the core files, a zip of the examples, and
 verified.json to build/release/V1.0, with notes.md, the release notes, and
-release.json, the commit they were built from.
+release.json, the commit they were built from. The notes start with the
+tag's section of RELEASE_NOTES.md, whose heading must have the date,
+"## V1.0 (2026-11-02)", and add each board's timing and the files.
 
 The second step, tools/release.py V1.0 --publish, builds nothing. It checks
 that HEAD is still the commit of release.json, makes the annotated tag,
@@ -38,6 +41,7 @@ Needs Vivado, coretool (mega65-tools), openFPGALoader, gh (logged in), and what 
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -48,6 +52,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STAGE = os.path.join(REPO, "build", "release")
 STAMP = "release.json"
 NOTES = "notes.md"
+RELEASE_NOTES = "RELEASE_NOTES.md"
 
 # The boards, in the order they are built; the R6 is the one tested
 BOARDS = (
@@ -121,6 +126,22 @@ def check_verified(tag, nice):
     return v
 
 
+def section(tag):
+    """The body of the tag's section of RELEASE_NOTES.md, which must be dated."""
+    with open(os.path.join(REPO, RELEASE_NOTES)) as f:
+        text = f.read()
+    m = re.search(r"^## %s \((.*?)\)\n(.*?)(?=^## |\Z)" % re.escape(tag), text, re.M | re.S)
+    if not m:
+        raise Failed("%s has no section ## %s (YYYY-MM-DD)" % (RELEASE_NOTES, tag))
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", m.group(1)):
+        raise Failed("the heading of %s in %s says (%s), not the date of the release"
+                     % (tag, RELEASE_NOTES, m.group(1)))
+    body = m.group(2).strip()
+    if not body:
+        raise Failed("the section %s of %s is empty" % (tag, RELEASE_NOTES))
+    return body
+
+
 def check_ci(commit):
     out = run(["gh", "run", "list", "--workflow", "ci.yml", "--commit", commit,
                "--json", "status,conclusion"], capture=True)
@@ -142,8 +163,12 @@ def build(board, flows):
     raise Failed("%s misses timing (WNS %.3f ns with FLOW=%s)" % (board, r["wns_ns"], flow))
 
 
-def notes(tag, v, results):
+def notes(tag, v, results, body):
     lines = [
+        body,
+        "",
+        "## Builds",
+        "",
         "NiceMonMEGA65 %s with nice_cpu %s (%s)." % (tag, v["nice_cpu_tag"], v["nice_cpu_commit"][:7]),
         "",
         "| Board | Clock | Flow | WNS |",
@@ -156,6 +181,8 @@ def notes(tag, v, results):
     lines += [
         "",
         "Built with %s, tested on the MEGA65 R6 with `make hwtest`." % v["vivado"],
+        "",
+        "## Files",
         "",
         "`nicemon-%s-r3.cor` and `nicemon-%s-r6.cor` are the core files," % (tag, tag),
         "for a slot of the MEGA65's flash with MEGAFLASH; each is for its",
@@ -179,6 +206,7 @@ def stage(tag):
     head = check_pushed()
     check_tag_free(tag)
     check_base(tag, nice)
+    body = section(tag)
     v = check_verified(tag, nice)
     check_ci(head)
 
@@ -192,10 +220,10 @@ def stage(tag):
     for board in COR_BOARDS:
         run(["make", "-C", os.path.join("synth", board), "cor", "NICE=pipeline",
              "FLOW=" + results[board]["flow"], "ROM=", "COR_VERSION=" + tag])
-    return v, head, results
+    return v, head, results, body
 
 
-def write_stage(tag, v, head, results):
+def write_stage(tag, v, head, results, body):
     out = os.path.join(STAGE, tag)
     shutil.rmtree(out, ignore_errors=True)
     os.makedirs(out)
@@ -215,7 +243,7 @@ def write_stage(tag, v, head, results):
     shutil.copy(os.path.join(REPO, VERIFIED), out)
     files.append(VERIFIED)
     with open(os.path.join(out, NOTES), "w") as f:
-        f.write(notes(tag, v, results))
+        f.write(notes(tag, v, results, body))
     with open(os.path.join(out, STAMP), "w") as f:
         json.dump({"tag": tag, "repo_commit": head, "nice_cpu_tag": v["nice_cpu_tag"],
                    "nice_cpu_commit": v["nice_cpu_commit"], "files": files}, f, indent=2)
@@ -259,9 +287,9 @@ def main():
             publish(tag)
             print("release: %s is published" % tag)
             return
-        v, head, results = stage(tag)
+        v, head, results, body = stage(tag)
         run(["make", "hwtest", "BIT=synth/r6/build/top.bit", "PORT=" + args.port])
-        out = write_stage(tag, v, head, results)
+        out = write_stage(tag, v, head, results, body)
     except Failed as e:
         sys.exit("release: %s" % e)
     print("release: %s is staged in %s" % (tag, os.path.relpath(out, REPO)))

@@ -85,6 +85,7 @@ and `make linktest`, `make -j4 formal`, and `make lint`.
   `V1.0`, and `V1.0.1`, `V1.0.2`, and so on are releases that keep the
   submodule. The submodule pins only nice_cpu tags. `RC02` and `RC04` to
   `RC06` came before. CI takes its Zig version from nice_cpu's own CI.
+  A release's notes start with its dated section of `RELEASE_NOTES.md`.
 - After a submodule bump: `make -C nice_cpu/emulator build` (the tools and
   `hwtest` use `nice_cpu/emulator/zig-out/bin/niceemu`, and a stale binary
   checks old behavior), `make -j test`, a look at the "Compared with the

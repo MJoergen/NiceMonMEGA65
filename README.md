@@ -36,6 +36,7 @@ and switches as registers (see [synth/](synth/README.md#the-nexys4ddr) and
 | [examples/](examples/) | Example C programs, and the Makefile that builds them for the MEGA65. |
 | [tools/](tools/) | `nicelink.py`, the debug link over the board's UART, over TCP to `niceemu --link`, or over TCP to the simulated system of `make cosim`, and the tools that use it: `load.py`, which loads a program into the MEGA65 or Nexys4DDR, `run.py`, which runs a program on the board as `niceemu` runs it, `hwtest.py`, which tests the system on the board, `bump.py`, which records the MEGA65's timing for a nice_cpu tag, `release.py`, which builds and publishes a release, `linktest.py`, which checks `run.py` on `niceemu --link`, and `cosimtest.py`, which checks `run.py` on the simulated system. |
 | [EMULATOR.md](EMULATOR.md) | The table of the known differences from the emulator. |
+| [RELEASE_NOTES.md](RELEASE_NOTES.md) | The releases, newest first, with what changed in each. [RELEASE.md](RELEASE.md) is how to make one. |
 | [TODO.md](TODO.md) | Work that is planned but not started. |
 | [core.mk](core.mk) | Picks the source files of the core, from `NICE`, for the Makefiles of `sim/` and `synth/`. |
 | [.claude/rules/synth.md](.claude/rules/synth.md) | Notes for Claude Code on the Vivado builds: where Vivado is, how to build, and what to check after a build. |
