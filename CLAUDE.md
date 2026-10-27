@@ -25,8 +25,8 @@ header is the authoritative address map.
     make cor [ROM=f.bin]  # MEGA65 core files for MEGAFLASH, synth/r{3,6}/build/NiceMonMEGA65-r{3,6}.cor (coretool)
     make load FILE=p.bin  # load and start a program on the board (debug UART, PORT=/dev/ttyUSB1)
     make run FILE=p.bin   # run it and print what niceemu prints, for diffing
-    make bump TAG=RCnn    # nice_cpu to the tag, R6 bitstream, badge-mega65.json and verified.json, committed (--push with ARGS)
-    make release TAG=RCnn # after the bump: gates, three bitstreams, two .cor, hwtest, staged; ARGS=--publish tags and releases (RELEASE.md)
+    make bump TAG=V1.0    # nice_cpu to the tag, R6 bitstream, badge-mega65.json and verified.json, committed (--push with ARGS)
+    make release TAG=V1.0 # after the bump: gates, three bitstreams, two .cor, hwtest, staged; ARGS=--publish tags and releases (RELEASE.md); TAG=V1.0.1 keeps nice_cpu at V1.0
     make hwtest           # check the FPGA, program it with openFPGALoader, and test the board
     make linktest         # run.py --tcp on niceemu --link against plain niceemu, no board
     make cosim            # the RTL in GHDL, its debug UART on TCP, for the tools' --cosim PORT
@@ -81,6 +81,10 @@ and `make linktest`, `make -j4 formal`, and `make lint`.
 - Behavior starts in nice_cpu: `doc/ISA.md` for the CPU, `doc/SYSTEM.md`
   for the devices, the emulator for the rest. This repository follows them,
   never the reverse. The submodule has its own `CLAUDE.md` and tests.
+- Tags follow nice_cpu's (RELEASE.md): `V1.0` here pins nice_cpu's
+  `V1.0`, and `V1.0.1`, `V1.0.2`, and so on are releases that keep the
+  submodule. The submodule pins only nice_cpu tags. `RC02` and `RC04` to
+  `RC06` came before. CI takes its Zig version from nice_cpu's own CI.
 - After a submodule bump: `make -C nice_cpu/emulator build` (the tools and
   `hwtest` use `nice_cpu/emulator/zig-out/bin/niceemu`, and a stale binary
   checks old behavior), `make -j test`, a look at the "Compared with the

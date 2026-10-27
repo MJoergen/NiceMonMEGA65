@@ -1,30 +1,36 @@
 #!/usr/bin/env python3
-"""Build, test, and publish a release: a tag RCnn after nice_cpu's tag RCnn.
+"""Build, test, and publish a release: a tag V1.0 after nice_cpu's tag V1.0.
 
-A release follows make bump (tools/bump.py), which moves nice_cpu to the tag
-and records the MEGA65's timing in verified.json. It has two steps, so that
-what is published can be looked at first (RELEASE.md).
+A release Vmajor.minor follows make bump (tools/bump.py), which moves
+nice_cpu to the tag of the same name and records the MEGA65's timing in
+verified.json. A release Vmajor.minor.patch keeps the submodule at the
+nice_cpu tag Vmajor.minor, and follows the release Vmajor.minor here; it
+leaves verified.json and the badge as the bump left them, for they are
+nice_cpu's claim, and its notes give its own timing. So the first two numbers
+of a tag here always name the nice_cpu tag it pins (RELEASE.md). A release
+has two steps, so that what is published can be looked at first.
 
-The first step, tools/release.py RCnn, changes nothing in git. In this order
+The first step, tools/release.py V1.0, changes nothing in git. In this order
 it checks that the tree is clean, is on main, and is pushed, that the tag is
-not taken here, that verified.json is for the tag and the submodule's commit
-and says met, and that CI passed for the commit. It then builds the examples
+not taken here, that a point release's Vmajor.minor is, that verified.json
+is for the nice_cpu tag and the submodule's commit and says met, that the
+submodule is at that tag, and that CI passed for the commit. It then builds the examples
 and the bitstreams of the R6, the R3, and the Nexys4DDR, without a ROM and
 from nothing. The R6 uses the flow of verified.json; the others try the
 default directives first and then FLOW=timing, as bump.py does. Each must
 meet timing. It makes the core files of the R3 and the R6, with the tag as
 their version, which MEGAFLASH shows. Last it runs make hwtest on the R6 bitstream, so a MEGA65 R6
 must be on PORT. It copies the bitstreams, the core files, a zip of the examples, and
-verified.json to build/release/RCnn, with notes.md, the release notes, and
+verified.json to build/release/V1.0, with notes.md, the release notes, and
 release.json, the commit they were built from.
 
-The second step, tools/release.py RCnn --publish, builds nothing. It checks
+The second step, tools/release.py V1.0 --publish, builds nothing. It checks
 that HEAD is still the commit of release.json, makes the annotated tag,
 pushes it, and creates the GitHub Release with gh, from the files of
-build/release/RCnn.
+build/release/V1.0.
 
-Usage: tools/release.py RCnn [--port /dev/ttyUSB1]
-       tools/release.py RCnn --publish
+Usage: tools/release.py Vmajor.minor[.patch] [--port /dev/ttyUSB1]
+       tools/release.py Vmajor.minor[.patch] --publish
 
 Needs Vivado, coretool (mega65-tools), openFPGALoader, gh (logged in), and what make test needs.
 """
@@ -36,7 +42,7 @@ import shutil
 import subprocess
 import sys
 
-from bump import FLOWS, VERIFIED, Failed, badge, read_reports, run, check_tree
+from bump import FLOWS, TAG, VERIFIED, Failed, badge, read_reports, run, check_tree, tag_commit
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STAGE = os.path.join(REPO, "build", "release")
@@ -66,6 +72,26 @@ def check_pushed():
     return head
 
 
+def nice_tag(tag):
+    """The nice_cpu tag that a tag here pins: its first two numbers."""
+    m = TAG.match(tag)
+    if not m:
+        raise Failed("%s is not Vmajor.minor or Vmajor.minor.patch, such as V1.0 or V1.0.1" % tag)
+    return m.group(1)
+
+
+def tag_exists(tag):
+    return bool(run(["git", "tag", "--list", tag], capture=True)
+                or run(["git", "ls-remote", "--tags", "origin", "refs/tags/" + tag], capture=True))
+
+
+def check_base(tag, nice):
+    """A point release follows the release of its nice_cpu tag here."""
+    if tag != nice and not tag_exists(nice):
+        raise Failed("%s keeps the submodule at %s, but there is no release %s here; "
+                     "run make bump TAG=%s and release it first" % (tag, nice, nice, nice))
+
+
 def check_tag_free(tag):
     if run(["git", "tag", "--list", tag], capture=True):
         raise Failed("the tag %s exists here" % tag)
@@ -73,19 +99,25 @@ def check_tag_free(tag):
         raise Failed("the tag %s exists on origin" % tag)
 
 
-def check_verified(tag):
-    """verified.json must be for the tag and the submodule, and met; returns it."""
+def check_verified(tag, nice):
+    """verified.json must be for the nice_cpu tag, which the submodule must
+    be at, and met; returns it."""
     with open(os.path.join(REPO, VERIFIED)) as f:
         v = json.load(f)
-    if v["nice_cpu_tag"] != tag:
-        raise Failed("%s is for %s, not %s; run make bump TAG=%s"
-                     % (VERIFIED, v["nice_cpu_tag"], tag, tag))
+    if v["nice_cpu_tag"] != nice:
+        if tag == nice:
+            raise Failed("%s is for %s, not %s; run make bump TAG=%s"
+                         % (VERIFIED, v["nice_cpu_tag"], nice, nice))
+        raise Failed("%s is for nice_cpu %s, but %s must keep it at %s"
+                     % (VERIFIED, v["nice_cpu_tag"], tag, nice))
     sub = run(["git", "rev-parse", "HEAD:nice_cpu"], capture=True)
     if v["nice_cpu_commit"] != sub:
         raise Failed("%s is for nice_cpu %s, but the submodule is at %s"
                      % (VERIFIED, v["nice_cpu_commit"][:7], sub[:7]))
+    if tag_commit(nice) != sub:
+        raise Failed("the submodule is at %s, not at nice_cpu's tag %s" % (sub[:7], nice))
     if not v["met"]:
-        raise Failed("%s says %s missed timing; there is no release" % (VERIFIED, tag))
+        raise Failed("%s says %s missed timing; there is no release" % (VERIFIED, nice))
     return v
 
 
@@ -112,7 +144,7 @@ def build(board, flows):
 
 def notes(tag, v, results):
     lines = [
-        "NiceMonMEGA65 with nice_cpu %s (%s)." % (tag, v["nice_cpu_commit"][:7]),
+        "NiceMonMEGA65 %s with nice_cpu %s (%s)." % (tag, v["nice_cpu_tag"], v["nice_cpu_commit"][:7]),
         "",
         "| Board | Clock | Flow | WNS |",
         "|---|---|---|---|",
@@ -142,10 +174,12 @@ def notes(tag, v, results):
 
 
 def stage(tag):
-    v = check_verified(tag)
+    nice = nice_tag(tag)
     check_tree()
     head = check_pushed()
     check_tag_free(tag)
+    check_base(tag, nice)
+    v = check_verified(tag, nice)
     check_ci(head)
 
     run(["make", "-C", "nice_cpu/emulator", "build"])
@@ -183,13 +217,14 @@ def write_stage(tag, v, head, results):
     with open(os.path.join(out, NOTES), "w") as f:
         f.write(notes(tag, v, results))
     with open(os.path.join(out, STAMP), "w") as f:
-        json.dump({"tag": tag, "repo_commit": head, "nice_cpu_commit": v["nice_cpu_commit"],
-                   "files": files}, f, indent=2)
+        json.dump({"tag": tag, "repo_commit": head, "nice_cpu_tag": v["nice_cpu_tag"],
+                   "nice_cpu_commit": v["nice_cpu_commit"], "files": files}, f, indent=2)
         f.write("\n")
     return out
 
 
 def publish(tag):
+    nice_tag(tag)
     out = os.path.join(STAGE, tag)
     try:
         with open(os.path.join(out, STAMP)) as f:
@@ -202,7 +237,7 @@ def publish(tag):
         raise Failed("HEAD is %s, but %s was built from %s; stage it again"
                      % (head[:7], tag, s["repo_commit"][:7]))
     check_tag_free(tag)
-    msg = "%s: NiceMonMEGA65 with nice_cpu %s (%s)" % (tag, tag, s["nice_cpu_commit"][:7])
+    msg = "%s: NiceMonMEGA65 with nice_cpu %s (%s)" % (tag, s["nice_cpu_tag"], s["nice_cpu_commit"][:7])
     run(["git", "tag", "-a", tag, "-m", msg])
     run(["git", "push", "origin", "refs/tags/" + tag])
     run(["gh", "release", "create", tag, "--verify-tag", "--title", tag,
@@ -212,7 +247,7 @@ def publish(tag):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("tag", help="the nice_cpu tag, such as RC07")
+    ap.add_argument("tag", help="the tag, such as V1.0, or V1.0.1 to keep the submodule")
     ap.add_argument("--port", default="/dev/ttyUSB1", help="the R6's serial port, for hwtest")
     ap.add_argument("--publish", action="store_true",
                     help="tag, push, and create the GitHub Release from what is staged")

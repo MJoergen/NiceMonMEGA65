@@ -5,8 +5,8 @@ nice_cpu shows a badge of whether its core meets 100 MHz on the MEGA65
 (nice_cpu issue 19 here). This script makes the two files it reads, at the top
 level of the repository:
 
-  badge-mega65.json  a shields.io endpoint: "RC8 met" in green, or
-                     "RC8 failed (WNS -0.12 ns)" in red
+  badge-mega65.json  a shields.io endpoint: "V1.0 met" in green, or
+                     "V1.0 failed (WNS -0.12 ns)" in red
   verified.json      the nice_cpu tag and commit, the Vivado version, WNS, TNS,
                      the hold and pulse width slacks, the worst paths into and
                      out of the core, the clock, the board, the flow, the date,
@@ -16,7 +16,7 @@ In this order it checks that the tree is clean, is on main, and that the tag
 exists, checks out the tag in nice_cpu, builds niceemu, runs make test, and
 builds the bitstream with Vivado's default directives. If the default flow
 misses timing it builds again with FLOW=timing, the weaker claim, and the
-badge says so: "RC8 met (timing flow)". Then it makes two commits, the
+badge says so: "V1.0 met (timing flow)". Then it makes two commits, the
 submodule bump and the two files. It pushes only with --push, for a push
 publishes the badge.
 
@@ -24,8 +24,12 @@ A timing miss is a result: the red badge is written and committed. A failure
 of a build or of the tests is not: the submodule goes back to where it was,
 and nothing is written, for the badge must never claim what was not measured.
 
-Usage: tools/bump.py RCnn [--push]
-       tools/bump.py RCnn --reports synth/r6/build
+nice_cpu's tags are Vmajor.minor (V1.0, V1.1, ...; nice_cpu's
+release/RELEASE.md, "Version names"), and the submodule pins only those, so
+the tag has two numbers, never the third of a release here (RELEASE.md).
+
+Usage: tools/bump.py Vmajor.minor [--push]
+       tools/bump.py Vmajor.minor --reports synth/r6/build
            prints the files that the reports in that directory would give,
            and builds, checks out, writes, and commits nothing
 
@@ -49,6 +53,11 @@ PART = "xc7a200tfbg484-2"
 LABEL = "MEGA65 100 MHz"
 BADGE = "badge-mega65.json"
 VERIFIED = "verified.json"
+
+# A nice_cpu tag, and a tag here: the nice_cpu tag it pins, and a third
+# number for a release that keeps the submodule (RELEASE.md)
+NICE_TAG = re.compile(r"V\d+\.\d+$")
+TAG = re.compile(r"(V\d+\.\d+)(\.\d+)?$")
 
 # The flows in the order they are tried; the first is the one the badge
 # needs no note for.
@@ -192,16 +201,21 @@ def check_tree():
         raise Failed("the branch is %s, not main" % branch)
 
 
-def checkout_tag(tag):
-    """Moves nice_cpu to the tag; returns its commit."""
+def tag_commit(tag):
+    """The commit of a nice_cpu tag, after a fetch of its tags."""
     if not os.path.exists(os.path.join(NICE, ".git")):
         raise Failed("nice_cpu is not checked out; run git submodule update --init")
     run(["git", "fetch", "--tags", "--quiet"], cwd=NICE)
     try:
-        commit = run(["git", "rev-parse", "--verify", "--quiet", "refs/tags/%s^{commit}" % tag],
-                     cwd=NICE, capture=True)
+        return run(["git", "rev-parse", "--verify", "--quiet", "refs/tags/%s^{commit}" % tag],
+                   cwd=NICE, capture=True)
     except Failed:
         raise Failed("nice_cpu has no tag %s" % tag)
+
+
+def checkout_tag(tag):
+    """Moves nice_cpu to the tag; returns its commit."""
+    commit = tag_commit(tag)
     run(["git", "checkout", "--quiet", commit], cwd=NICE)
     return commit
 
@@ -231,12 +245,14 @@ def measure(tag):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("tag", help="the nice_cpu tag, such as RC8")
+    ap.add_argument("tag", help="the nice_cpu tag, such as V1.0")
     ap.add_argument("--push", action="store_true", help="push the two commits")
     ap.add_argument("--reports", metavar="DIR",
                     help="print the files for the reports in DIR; build and commit nothing")
     args = ap.parse_args()
     tag = args.tag
+    if not NICE_TAG.match(tag):
+        sys.exit("bump: %s is not a nice_cpu tag Vmajor.minor, such as V1.0" % tag)
 
     if args.reports:
         try:

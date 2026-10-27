@@ -37,11 +37,12 @@ help:
 	@echo "                  build the MEGA65 core files, synth/r3/build/NiceMonMEGA65-r3.cor"
 	@echo "                  and synth/r6/build/NiceMonMEGA65-r6.cor, for MEGAFLASH"
 	@echo "                  (needs Vivado and coretool, from mega65-tools)"
-	@echo "  make bump TAG=RCnn [ARGS=--push]"
+	@echo "  make bump TAG=V1.0 [ARGS=--push]"
 	@echo "                  move nice_cpu to the tag, build the R6 bitstream, and commit"
 	@echo "                  badge-mega65.json and verified.json (needs Vivado)"
-	@echo "  make release TAG=RCnn [PORT=/dev/ttyUSB1] [ARGS=--publish]"
-	@echo "                  build, test, and stage a release in build/release; with"
+	@echo "  make release TAG=V1.0[.1] [PORT=/dev/ttyUSB1] [ARGS=--publish]"
+	@echo "                  build, test, and stage a release in build/release (V1.0.1"
+	@echo "                  keeps nice_cpu at V1.0); with"
 	@echo "                  --publish, tag it and create the GitHub Release (RELEASE.md)"
 	@echo "  make load FILE=prog.bin [PORT=/dev/ttyUSB1] [ARGS=--no-run]"
 	@echo "                  load a program into the board (MEGA65 or Nexys4DDR) and"
@@ -121,12 +122,12 @@ cor:
 
 # nice_cpu's badge of timing met on the MEGA65 (tools/bump.py)
 bump:
-	@test -n "$(TAG)" || (echo "Give the nice_cpu tag with TAG=RCnn"; exit 1)
+	@test -n "$(TAG)" || (echo "Give the nice_cpu tag with TAG=V1.0"; exit 1)
 	$(PYTHON) tools/bump.py $(ARGS) $(TAG)
 
 # A release after a bump: staged first, then published (RELEASE.md)
 release:
-	@test -n "$(TAG)" || (echo "Give the nice_cpu tag with TAG=RCnn"; exit 1)
+	@test -n "$(TAG)" || (echo "Give the tag with TAG=V1.0, or TAG=V1.0.1 to keep nice_cpu"; exit 1)
 	$(PYTHON) tools/release.py --port $(PORT) $(ARGS) $(TAG)
 
 load:

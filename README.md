@@ -77,9 +77,10 @@ or, in an existing clone:
 - `make run FILE=prog.bin` runs one as `niceemu` runs it (see
   [Comparing with the emulator](#comparing-with-the-emulator)).
 - `make hwtest` tests the board (see [Testing the board](#testing-the-board)).
-- `make bump TAG=RCnn` moves nice_cpu to a tag and records the MEGA65's
+- `make bump TAG=V1.0` moves nice_cpu to a tag and records the MEGA65's
   timing (see [The timing badge](#the-timing-badge)).
-- `make release TAG=RCnn` builds, tests, and publishes a release (see
+- `make release TAG=V1.0` builds, tests, and publishes a release, and
+  `TAG=V1.0.1` one that keeps nice_cpu at `V1.0` (see
   [RELEASE.md](RELEASE.md)).
 - `make linktest` checks the tools on `niceemu --link`, without a board
   (see [Comparing with the emulator](#comparing-with-the-emulator)).
@@ -816,7 +817,7 @@ the programs from the RAM.
 ## The timing badge
 
 nice_cpu shows a badge of whether its core meets 100 MHz on the MEGA65,
-and this repository is the proof. `make bump TAG=RCnn`, which runs
+and this repository is the proof. `make bump TAG=V1.0`, which runs
 `tools/bump.py`, checks that the tree is clean and on `main`, moves the
 `nice_cpu` submodule to the tag, builds `niceemu`, runs `make test`, and
 builds the R6 bitstream with Vivado's default directives. If that misses
@@ -824,7 +825,7 @@ timing, it builds again with `FLOW=timing`, and the badge says so.
 
 It writes two files at the top level and commits them, after a commit of
 the submodule bump. `badge-mega65.json` is the badge in the shields.io
-endpoint format: `RC8 met` in green, `RC8 met (timing flow)`, or `RC8
+endpoint format: `V1.0 met` in green, `V1.0 met (timing flow)`, or `V1.0
 failed (WNS -0.12 ns)` in red. `verified.json` is the full record: the
 nice_cpu tag and commit, the Vivado version, WNS, TNS, and the hold and
 pulse width slacks, the worst paths into and out of the core, the clock,
@@ -835,7 +836,7 @@ writes, and nice_cpu sets its budget for the core's ports from them.
 A timing miss is a result, and the red badge is committed. A failed build
 or test is not: the submodule goes back to where it was, and nothing is
 written. The script pushes only with `ARGS=--push`, for a push publishes
-the badge. `tools/bump.py RCnn --reports synth/r6/build` prints the two
+the badge. `tools/bump.py V1.0 --reports synth/r6/build` prints the two
 files for the reports of an earlier build, and changes nothing. Vivado
 does not run in CI, so neither does this.
 

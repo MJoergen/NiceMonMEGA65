@@ -20,10 +20,16 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.x"
-      # Zig 0.15 is the only version that nice_cpu supports.
+      # The one Zig version that nice_cpu builds with, from its own CI, so
+      # that a bump of the submodule brings its Zig version along.
+      - id: zig
+        run: |
+          v=$(grep -A2 setup-zig nice_cpu/.github/workflows/ci.yml | grep -m1 -oP '^\s*version:\s*\K\S+')
+          test -n "$v"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
       - uses: mlugg/setup-zig@v2
         with:
-          version: 0.15.2
+          version: ${{ steps.zig.outputs.version }}
       - run: make -C nice_cpu/emulator build
       - run: sudo apt-get update && sudo apt-get install -y ghdl
       - run: make -C sim -j4 test NICE=${{ matrix.nice }}
@@ -42,9 +48,15 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.x"
+      # The Zig version of nice_cpu's CI, as in the sim job
+      - id: zig
+        run: |
+          v=$(grep -A2 setup-zig nice_cpu/.github/workflows/ci.yml | grep -m1 -oP '^\s*version:\s*\K\S+')
+          test -n "$v"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
       - uses: mlugg/setup-zig@v2
         with:
-          version: 0.15.2
+          version: ${{ steps.zig.outputs.version }}
       - run: sudo apt-get update && sudo apt-get install -y clang lld llvm
       - run: make examples
       - run: make -C nice_cpu/emulator build
