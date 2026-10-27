@@ -53,7 +53,7 @@ turns it into PS/2, which `src/kbd_ps2.vhd` receives and
 `src/kbd_ps2_ascii.vhd` turns into ASCII. The receiver only listens, so
 the keyboard's LEDs are not set. The board's 16 LEDs, two RGB LEDs,
 seven-segment display, five buttons, and 16 switches are registers in
-`0xFFFFFF90`–`96` (see the main README, "The Nexys4DDR's devices").
+`0xFFFFFF90`–`96` (see [SYSTEM.md](../SYSTEM.md#the-nexys4ddrs-devices)).
 `src/seg7.vhd` scans the display, and `src/rgb_pwm.vhd` dims the RGB LEDs
 with 16 levels; both drive registered outputs in the IOBs. The CPU RESET
 button resets the system. The board differs from the MEGA65 in
@@ -88,7 +88,7 @@ With
 
 the core boots at reset from a ROM of 32K words at address 0 with the words
 of the `.bin` file (`src/rom.vhd`, through `G_ROM_FILE` of `top.vhd`), as
-the main README describes under "The ROM". Vivado reads the file during
+[SYSTEM.md](../SYSTEM.md#the-rom) describes. Vivado reads the file during
 synthesis, so the bitstream is rebuilt when it changes. `make r6
 ROM=monitor.bin` in the top directory does the same with a path relative
 to it.
@@ -183,7 +183,7 @@ so the copies buy timing. With the retiming it meets 90 MHz by 0.19 ns, and
 the Nexys4DDR has room for the flip-flops.
 
 The `fetch_stats` of the pipelined core (the fetch statistics in the main
-README's address map) has over a thousand flip-flops, and the multi-cycle
+SYSTEM.md's address map) has over a thousand flip-flops, and the multi-cycle
 core's has few. The pipelined core uses no block RAM. The multi-cycle core
 uses one RAMB18, which Vivado infers for `src2_count`, the register of the
 shift count. The math unit has the 4 DSPs of the design. All builds meet the

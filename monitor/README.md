@@ -17,8 +17,8 @@ as the NICE CPU allows.
   says what happens then).
 - The bitstream is built with `make r6 ROM=monitor/monitor.bin` (or `r3`),
   which puts the assembled monitor in the ROM (see
-  [synth/](../synth/README.md) and "The ROM" in the
-  [main README](../README.md)). The ROM changes only with a new bitstream,
+  [synth/](../synth/README.md) and
+  [SYSTEM.md](../SYSTEM.md#the-rom)). The ROM changes only with a new bitstream,
   so the monitor is developed in the emulator, `niceemu`, which runs it
   like any program, with its keystrokes in an input file; the board is for
   checking.
@@ -51,7 +51,8 @@ as the NICE CPU allows.
   register. The hardware has what QMON's VGA library needs for the rest: a
   cursor, and a display offset over 32768 words for scrolling back, in
   registers numbered as QNICE-FPGA's VGA registers (`0xFFFFFF80` for
-  `0xFF30`, and so on; see "The screen" in the main README). The screen is
+  `0xFF30`, and so on; see
+  [SYSTEM.md](../SYSTEM.md#the-screen)). The screen is
   cleared by a loop over its words.
 
 ## What QMON has that this port will not

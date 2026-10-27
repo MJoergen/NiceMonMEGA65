@@ -9,8 +9,11 @@ text display on VGA and HDMI, a ROM at address 0 for a QMON-like
 monitor that is planned but not written (`monitor/README.md`), and host
 tools that load and run programs. The goal is that a program runs on the
 board exactly as `niceemu`, the emulator in `nice_cpu/emulator`, runs it.
-`README.md` is the user documentation, with "Address map" for the registers;
-`EMULATOR.md` lists the known differences from the emulator.
+`README.md` is for users of the core files: on its own, and with the
+serial port. `SYSTEM.md` has the address map, the link, the screen, the
+ROM, and the Nexys4DDR's devices; `CONTRIBUTING.md` the tests, the formal
+checks, `make hwtest`, and the badge; `EMULATOR.md` the known differences
+from the emulator.
 `src/nicemon.vhd` is the whole system and the file to read first; its
 header is the authoritative address map.
 
@@ -116,11 +119,11 @@ and `make linktest`, `make -j4 formal`, and `make lint`.
   (color, analyze, synchronize, behavior). The third-party files that are
   copied unchanged keep theirs, and so do the names they define, such as
   the entity `serialiser_10to1_selectio`.
-- Every README is kept in step with the code it describes, in plain short
-  sentences with the Oxford comma. Commit messages follow the 50/72 style:
-  the subject is a short sentence of at most 50 characters, and the
-  body, after a blank line, has lines of at most 72 characters and says
-  what was wrong and what changed.
+- Every README, `SYSTEM.md`, and `CONTRIBUTING.md` is kept in step with
+  the code it describes, in plain short sentences with the Oxford comma.
+  Commit messages follow the 50/72 style: the subject is a short sentence
+  of at most 50 characters, and the body, after a blank line, has lines
+  of at most 72 characters and says what was wrong and what changed.
 - VHDL follows `CODING_STYLE.md` (3-space indent, `_i`/`_o` ports, `C_`/`G_`
   names, `synthesis`/`simulation` architectures, long headers with THEORY OF
   OPERATION and RESET). `synth/r3/max10.vhd` and `synth/mega65/hdmi/` are
