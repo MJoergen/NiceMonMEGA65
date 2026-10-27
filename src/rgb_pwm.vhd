@@ -1,6 +1,6 @@
 -- The driver of an RGB LED: three pulse-width modulated outputs, one for
 -- each color, with 16 levels. The Nexys4DDR's RGB LEDs are too bright at full
--- duty, so a level of 1 or 2 is the usable range for a dim light.
+-- duty, so levels 1 and 2 give a dim light.
 --
 -- THEORY OF OPERATION
 -- A free-running counter of 4 bits, slowed by G_DIV, is compared with the

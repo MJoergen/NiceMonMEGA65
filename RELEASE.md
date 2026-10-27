@@ -50,7 +50,8 @@ and keep their names.
 - `verified.json` is for the nice_cpu tag, the first two numbers of the
   tag, and says met. The default flow or `FLOW=timing` is fine.
 - The submodule is at that nice_cpu tag.
-- A point release, such as `V1.0.1`, comes after the release `V1.0` here.
+- A point release, such as `V1.0.1`, needs the release `V1.0` here to
+  exist first.
 - `RELEASE_NOTES.md` has a section for the tag, whose heading has the
   date: `## V1.0 (2026-11-02)`.
 - All three bitstreams meet timing.
@@ -62,12 +63,13 @@ and keep their names.
 
        make bump TAG=V1.0 ARGS=--push
 
-   If the badge is red, stop here. The red badge is pushed as a result,
-   but there is no release.
+   If the badge is red (timing missed), stop. The red badge is still
+   pushed, as the honest result, but no release is made.
 
 2. Write the tag's section of `RELEASE_NOTES.md`: what a user of the
    bitstreams, the boards, or the tools can see changed since the release
-   before, with upgrade notes first. Date its heading, then commit and
+   before, with upgrade notes first. Replace "(not yet released)" in its
+   heading with the date, such as `## V1.0 (2026-11-02)`, then commit and
    push.
 
 3. Wait for CI to pass on the pushed commit.

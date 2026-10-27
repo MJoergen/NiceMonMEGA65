@@ -434,7 +434,7 @@ of bounds memory access at 00003dc9` before the core halts. The Makefile
 keeps the plain start, so that `bench.bin` is laid out as in nice_cpu's
 testbench, and its cycles compare with those below.
 
-`make -C examples` also builds `examples/build/bench.bin` from nice_cpu's
+`make examples` also builds `examples/build/bench.bin` from nice_cpu's
 benchmark, `nice_cpu/bench/bench.c`. It runs six phases, each a known
 kernel, and prints the instructions and cycles of each, its result, and
 whether that is the expected one. It reads no input, so `tools/run.py`

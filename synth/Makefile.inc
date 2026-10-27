@@ -15,7 +15,7 @@
 # FLOW = default, the default, runs every step with Vivado's default
 # directives, with which the MEGA65 meets 100 MHz. FLOW = timing runs every
 # step with a directive for timing, and phys_opt_design again after routing,
-# as the Nexys4DDR does: in nice_cpu issue 34 that gained its slower part
+# as synth/nexys4ddr/Makefile does: in nice_cpu issue 34 that gained its slower part
 # about 0.5 ns.
 
 VIVADO_DIR ?= /opt/Xilinx/2025.1/Vivado

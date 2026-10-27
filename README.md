@@ -156,7 +156,7 @@ runs at 115200 baud, and the tools need `--baud 115200` for it.
   [Debugging a program](#debugging-a-program)).
 
 They use `PORT=/dev/ttyUSB1` by default, and pass `ARGS=` on to the tool,
-for example `ARGS=--no-run` or `ARGS="-i in.txt -d 0:10 -s --timeout 5"`.
+for example `ARGS=--no-run` or `ARGS="-i in.txt -d 0x100:16 -s --timeout 5"`.
 `ARGS="--tcp 4000"` drives `niceemu --link 4000` instead of the board.
 
 ### Running a program
@@ -183,16 +183,21 @@ The `.bin` file has one line per word, the address and the word in hex.
 `load.py --tcp PORT` loads it into `niceemu --link PORT` instead of the
 board.
 
-`load.py` takes the lines that `niceemu` takes: two fields of 1 to 8 hex
-digits, with no `0x`, sign, or underscore, no repeated address, and at
-least one word. As in `niceemu`, only LF ends a line, only blanks and tabs
-part the fields, and a CR at the end of a line is ignored. It also rejects
-a word where the board has no memory of its own: the RAM is the words `0`
-to `0xFFFF`, and the screen is the words `0xFFFF0000` to `0xFFFF1FFF`, the
-8192 that both boards have. Any other address would land on a RAM word, or
-on a register of the I/O page, where the emulator has a word of its own,
-so the program would run differently. A program can still write the rest
-of the MEGA65's screen when it runs.
+`load.py` takes the lines that `niceemu` takes:
+
+- Each line has two fields of 1 to 8 hex digits, with no `0x`, sign, or
+  underscore.
+- No address is repeated, and there is at least one word.
+- As in `niceemu`, only LF ends a line, only blanks and tabs part the
+  fields, and a CR at the end of a line is ignored.
+- A word where the board has no memory of its own is rejected. The RAM is
+  the words `0` to `0xFFFF`, and the screen is the words `0xFFFF0000` to
+  `0xFFFF1FFF`, the 8192 that both boards have.
+
+Any other address would land on a RAM word, or on a register of the I/O
+page, where the emulator has a word of its own, so the program would run
+differently. A program can still write the rest of the MEGA65's screen
+when it runs.
 
 `load.py` holds the core first, so it also works while a program runs.
 
@@ -201,7 +206,7 @@ of the MEGA65's screen when it runs.
 Build the C examples (see [Writing programs](#writing-programs) for what
 that needs):
 
-    make -C examples
+    make examples
 
 That builds `examples/build/primes.bin` from `examples/primes.c`, which
 counts primes. Load it and open a terminal:
@@ -229,7 +234,9 @@ type packets in a terminal. It takes `--port`, `--tcp`, and `--cosim` as
 
     tools/mon.py echo.bin
 
-Its commands are short, and `help` lists them. Numbers are hex.
+Its commands are short, and `help` lists them. Numbers are hex. The
+short names are `s` for `step`, `g` for `go`, `c` for `console`, and `q`
+for `quit`.
 
 - `load FILE` loads a program as `load.py --no-run` does.
 - `go` starts a held core, or goes on from a pause. `run` starts the
@@ -278,7 +285,8 @@ program in memory:
     00000008: 001c0080 ffffff00 022080b0 0000002e b003d800 00000000 0c000000
 
 Start the program, and pause it. It waits for input, so it is in its
-loop. Z, bit 27 of R14, is set, as no byte has arrived:
+loop. Z, bit 27 of R14 (`0x08000000`), is set, as no byte has arrived.
+R14 is `0x09000000`: Z, and bit 24, which is always 1:
 
     mon> go
     mon> pause
@@ -295,7 +303,7 @@ loop. Z, bit 27 of R14, is set, as no byte has arrived:
 
 Set a breakpoint at 6, which the program reaches only when a byte has
 arrived, and go on. Send it an `A`, and it stops. R1 holds the console's
-read: bit 8 set, and `0x41`, the `A`:
+read: bit 8 set, and `0x41`, the `A`. R14 is `0x01000000`, as Z is clear:
 
     mon> b 6
     0: 00000006
@@ -473,10 +481,14 @@ must fit below the stack in the 64K words of memory. With `printf` and
 
 MIT, see [LICENSE](LICENSE), like the files copied from cmod-s7 and
 MandelbrotMEGA65. The exceptions are the third-party files named in
-[synth/README.md](synth/README.md): `synth/r3/max10.vhd` is GPL v3, and the
-HDMI output in `synth/mega65/hdmi/` is LGPL v3. The Spleen font in
-`src/video/font_pkg.vhd` is BSD 2-Clause, see `font/LICENSE.spleen`.
-`synth/r3/max10.vhd` has no license header of its own, so its GPL v3 rests on
-its origin in the MEGA65 core. `src/kbd_m65.vhd` is written after the GPL v3
-driver of MiSTer2MEGA65, with the same timing on the pins but none of its
-code, and is MIT like the rest of `src/`.
+[synth/README.md](synth/README.md):
+
+- `synth/r3/max10.vhd` is GPL v3. It has no license header of its own, so
+  this rests on its origin in the MEGA65 core.
+- The HDMI output in `synth/mega65/hdmi/` is LGPL v3.
+- The Spleen font in `src/video/font_pkg.vhd` is BSD 2-Clause, see
+  `font/LICENSE.spleen`.
+
+`src/kbd_m65.vhd` is written after the GPL v3 driver of MiSTer2MEGA65,
+with the same timing on the pins but none of its code, and is MIT like the
+rest of `src/`.

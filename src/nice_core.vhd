@@ -3,7 +3,8 @@
 -- architecture comes from one of the files in src/core/, which the build
 -- picks with NICE=pipeline or NICE=multi (core.mk). So only that core is
 -- analyzed, and no generic has to reach it from the top level. G_BREAKS
--- is the generic of both, the number of breakpoints (DEBUG.md §6).
+-- is the generic of both, the number of breakpoints (DEBUG.md §6). Its
+-- default is 0; nicemon.vhd and system.vhd default to 4, and pass it on.
 
 library ieee;
    use ieee.std_logic_1164.all;

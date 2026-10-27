@@ -1,8 +1,8 @@
 # demo
 
-The demo in the ROM of the release's core files and bitstreams, in NICE
-assembly. The core boots from it at power-up. So a MEGA65 with no computer
-on its debug UART shows that the core, the keyboard, and the screen work.
+The demo is the program in the ROM of every release, in NICE assembly.
+The core boots from it at power-up, so a MEGA65 with no computer on its
+debug UART still shows that the core, the keyboard, and the screen work.
 It stays until the monitor ([monitor/](../monitor/README.md)) takes its
 place in the ROM.
 
@@ -32,13 +32,16 @@ ISO 8859-1.
 
 A write to the ROM is dropped (see [The ROM](../SYSTEM.md#the-rom) in
 SYSTEM.md), so the demo keeps its state in registers. It writes only the
-screen, the cursor's registers, and its stack. The stack grows down from
-`0xFFFFFEFF`, where there is no register or screen, so on the board it is
-in RAM: the 64K words of RAM repeat through the address space, and
-`0xFFFFFEFF` is RAM word `0xFEFF`, far above the ROM. It scrolls by
-copying the rows, not with the display offset, so that the welcome stays,
-and so that it runs the same in `niceemu`, where the screen's registers
-are memory. It halts at the end of the input: in
+screen, the cursor's registers, and its stack.
+
+The stack grows down from `0xFFFFFEFF`, where there is no register or
+screen, so on the board it is in RAM. The 64K words of RAM repeat through
+the address space, and `0xFFFFFEFF` is RAM word `0xFEFF`, far above the
+ROM.
+
+The demo scrolls by copying the rows, not with the display offset, so
+that the welcome stays, and so that it runs the same in `niceemu`, where
+the screen's registers are memory. It halts at the end of the input: in
 `niceemu`, after its input file, and on the board, after a break on the
 UART.
 

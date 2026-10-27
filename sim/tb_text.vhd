@@ -3,7 +3,7 @@
 -- THEORY OF OPERATION
 -- p_write fills the screen through the write port, in the system clock
 -- domain: a line of text in white on black, a line in the color of
--- print.nasm, the 256 codes in many colors, and the 48 words after the 2000
+-- print.nasm (nice_cpu/assembler/test/print.nasm), the 256 codes in many colors, and the 48 words after the 2000
 -- of the screen, which must not show at a display offset of 0. It keeps a
 -- model of the screen.
 --

@@ -1,4 +1,5 @@
-; Waits about 4000 to 8000 cycles, so that the input piles up in the FIFO of the
+; Waits about 4000 to 8000 cycles (2000 passes of 2 instructions, at 1 to 2
+; cycles each), so that the input piles up in the FIFO of the
 ; UART, then echoes the bytes received, until a '.', and halts.
 PC              .EQU    R15
 CONSOLE         .EQU    0xFFFFFF00      ; a read: bit 8 set, and the byte in bits 7..0

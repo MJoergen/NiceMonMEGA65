@@ -147,7 +147,7 @@ a UART byte still finds room; on the Nexys4DDR, keys typed meanwhile are
 lost (see [The Nexys4DDR's devices](#the-nexys4ddrs-devices)). While the
 core is held or has halted, the bytes of the UART and the keyboard are
 dropped. While it is paused, they go into the FIFO. To end a program's
-input from a terminal, send a break: in picocom, `Ctrl-A Ctrl-\`.
+input from a terminal, send a break (the README says how).
 
 The performance counters, the math unit, and the timer are nice_cpu's
 own, `nice_cpu/hdl/src/perf.vhd`, `mpu.vhd`, and `timer.vhd`, and behave

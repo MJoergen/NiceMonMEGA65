@@ -5,7 +5,7 @@
 -- The display gets a different byte in each digit. Over several scans of the
 -- eight digits, the testbench checks at every clock cycle that exactly one
 -- anode is low, that the cathodes are the inverse of the byte of the digit
--- that the anode selects, and that every digit was lit. A RGB LED gets
+-- that the anode selects, and that every digit was lit. An RGB LED gets
 -- levels 0, 5, and 15, and the testbench counts the cycles that each output
 -- is high over a few periods: 0, 5/16, and 15/16 of them.
 

@@ -21,9 +21,10 @@
 -- LOCK (set while it is locked), the cursor up and left keys, RESTORE,
 -- copies of INST/DEL and RETURN, which also come as keys 0 and 1, and the
 -- line that mega65-core's driver calls fastkey. Bit 79 is not a key. As in
--- MiSTer2MEGA65, keys 0 and 1 are taken from those copies, for the bits at
--- 0 and 1 arrive too late. The bits from 82 on are the date and commit of
--- the keyboard's firmware, which this driver does not take.
+-- MiSTer2MEGA65, keys 0 and 1 are taken from those copies, because bits 0
+-- and 1 of the stream arrive too late. The driver does not take bits 80 and
+-- 81, nor those from 82 on, which are the date and commit of the keyboard's
+-- firmware.
 --
 -- matrix_o has bit n set while key n is pressed. It changes once in each
 -- frame, after phase 79, so about every 0.45 ms.

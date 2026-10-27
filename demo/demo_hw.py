@@ -5,7 +5,8 @@ It boots the core from the ROM, as the reset button does, pauses it, and
 compares the welcome and the cursor with what niceemu shows. It then types
 keys into the demo over the UART, pauses it again, and compares all 2000
 words of the screen and the cursor with what niceemu leaves for the same
-keys. It prints the screen, and leaves the demo running.
+keys. It writes the keys to demo/build/hw_keys.txt for niceemu. It prints
+the screen, and leaves the demo running.
 
 make hwtest hides the ROM and runs its programs from the RAM; this checks
 the demo where it runs on a release's board. The bitstream must have
@@ -39,6 +40,7 @@ SCR_CTL = 0xFFFFFF80
 SCR_X = 0xFFFFFF81
 SCR_Y = 0xFFFFFF82
 
+# The number of failed checks, counted by check() and the exit status
 fails = 0
 
 

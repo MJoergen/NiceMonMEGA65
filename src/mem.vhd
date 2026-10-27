@@ -55,9 +55,9 @@ entity mem is
       -- none when the file name is empty
       G_ROM_FILE      : string  := "";
       G_ROM_ADDR_BITS : natural;
-      -- A RAM with any contents at the start, for formal/nicemon.sby
+      -- Start the RAM with any contents, for formal/nicemon.sby
       G_RAM_ANY       : boolean := false;
-      -- The properties for formal/mem.sby, and a RAM with any contents
+      -- The properties for formal/mem.sby; implies G_RAM_ANY
       G_FORMAL        : boolean := false
    );
    port (

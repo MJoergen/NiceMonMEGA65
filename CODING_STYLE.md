@@ -105,4 +105,4 @@ Name the rules after `vsg_off` when only a few apply, as in
 `-- vsg_off sequential_007`.
 
 Change [vsg.yml](vsg.yml) only for a rule that holds for the whole
-repository, and state that rule here first.
+repository, and first add that rule to this file.

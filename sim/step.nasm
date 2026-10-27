@@ -12,7 +12,7 @@ SR              .EQU    R14
                 ADD[M]  R2, R1, 1       ; carry and Z, and R2 = 0
                 MOVE    @R13++, R1
         ?!Z     MOVE    R3, 0x55        ; skipped: R2 is 0
-                INT     3
+                INT     3               ; PC = mem[0x103] = V3; RTI returns here
                 MOVE    R4, 2
 LOOP            SUB[M]  R4, R4, 1
         ?!Z     MOVE    PC, LOOP
@@ -20,5 +20,5 @@ LOOP            SUB[M]  R4, R4, 1
                 HALT
 V3              MOVE    R5, 0x1234
                 RTI
-                .ORG    0x103
+                .ORG    0x103           ; vector 3 of the table at 0x100
                 .DAT    V3

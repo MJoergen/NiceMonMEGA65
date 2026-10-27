@@ -2,10 +2,9 @@
 -- A7-100T). It has the clock and reset (clk_rst.vhd), the system
 -- (src/system.vhd), the keyboard, and the VGA output. The UART is the
 -- board's USB-UART, and LED0 is on while the core runs, or while the program
--- sets it. A USB keyboard in
--- the board's USB HID port types into the same input as the UART: the
--- board's PIC24 turns it into PS/2, which kbd_ps2.vhd receives and
--- kbd_ps2_ascii.vhd turns into ASCII. The board's 16 LEDs, two RGB LEDs,
+-- sets it. A USB keyboard in the board's USB HID port types into the same
+-- input as the UART: the board's PIC24 turns it into PS/2, which
+-- kbd_ps2.vhd receives and kbd_ps2_ascii.vhd turns into ASCII. The board's 16 LEDs, two RGB LEDs,
 -- seven-segment display, five buttons, and 16 switches are registers of
 -- the system, in 0xFFFFFF90-96 (src/nicemon.vhd). The RGB LEDs are driven
 -- by rgb_pwm.vhd, and the display by seg7.vhd. The buttons and the

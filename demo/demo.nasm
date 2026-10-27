@@ -1,6 +1,8 @@
 ; The demo in the ROM of the release: a welcome screen that turns into a
 ; typewriter. It shows that the core runs, and that the keyboard and the
-; screen work, on a board with no computer on its debug UART.
+; screen work, on a board with no computer on its debug UART. Its test, in
+; demo/Makefile, runs it in niceemu and compares the screens with
+; demo/test.expected.
 ;
 ; The top ten rows say what the core is and how to go further. The rows
 ; below them take what is typed, from the keyboard or the UART: a
@@ -72,7 +74,7 @@ CR      .EQU    R8              ; 1 when the byte before was a CR
         MOVE    R4, 80
         ADD     @--SP, 2, PC
         MOVE    PC, FILL
-        MOVE    R2, SCREEN+720
+        MOVE    R2, SCREEN+720  ; R3 is still BAR+0x20: FILL leaves it
         MOVE    R4, 80
         ADD     @--SP, 2, PC
         MOVE    PC, FILL
@@ -111,6 +113,7 @@ PLAIN   SUB[M]  R0, R1, 0x20
     ?Z  MOVE    PC, BACK        ; DEL
         SUB[M]  R0, R1, 0xA0
     ?C  MOVE    PC, KEY         ; 0x80 to 0x9F have no character
+                                ; 0xA0 and above fall through to PUT
 
 ; A character at the cursor, which moves on, to the next line after the last
 ; column
@@ -125,8 +128,8 @@ PUT     ADD     @--SP, 2, PC
 CONTROL SUB[M]  R0, R1, 0x0D
     ?Z  MOVE    CR, 1
     ?Z  MOVE    PC, NEWLINE
-        SUB[M]  R0, R1, 0x0A    ; LF, but not the LF of a CR LF
-    ?Z  MOVE[M] R0, R7
+        SUB[M]  R0, R1, 0x0A    ; LF, but only if the byte before was no CR:
+    ?Z  MOVE[M] R0, R7          ; Z after 0x0A stays only if R7, the CR, is 0
     ?Z  MOVE    PC, NEWLINE
         SUB[M]  R0, R1, 0x08    ; backspace
     ?Z  MOVE    PC, BACK

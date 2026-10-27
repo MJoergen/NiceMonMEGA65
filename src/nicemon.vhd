@@ -129,7 +129,7 @@
 --                          only, which debug_link holds: R0-R15 of the core
 --                          after a halt or at a pause, the control
 --                          register, the halt reason (1 to 4 here), the
---                          version, 4, the free space of the core's input
+--                          version, 4 (DEBUG.md §6), the free space of the core's input
 --                          FIFO, and the G_BREAKS breakpoints: their enable
 --                          bits, their number, the stop register, and
 --                          their addresses. The bits of the control
@@ -241,7 +241,7 @@ entity nicemon is
       G_BOARD_IO         : boolean := false;
       -- The number of breakpoints of the debug link, 0 to 8 (DEBUG.md §6)
       G_BREAKS           : natural range 0 to C_BREAKS_MAX := 4;
-      -- The checks of formal/nicemon.sby, and a RAM with any contents
+      -- The checks of formal/nicemon.sby; implies G_RAM_ANY of mem
       G_FORMAL           : boolean := false
    );
    port (
@@ -302,7 +302,7 @@ architecture synthesis of nicemon is
    constant C_TIMER_BASE : std_logic_vector(31 downto 4) := X"FFFFFF1";        -- 0xFFFFFF10-1F
    constant C_MPU_BASE   : std_logic_vector(31 downto 5) := X"FFFFFF" & "001"; -- 0xFFFFFF20-3F
    constant C_PERF_BASE  : std_logic_vector(31 downto 4) := X"FFFFFF4";        -- 0xFFFFFF40-4F
-   constant C_FS_BASE    : std_logic_vector(31 downto 6) := X"FFFFFF" & "01";  -- 0xFFFFFF40-7F, less the above
+   constant C_FS_BASE    : std_logic_vector(31 downto 6) := X"FFFFFF" & "01";  -- 0xFFFFFF40-7F; is_fs drops 40-4F
 
    -- Whether an address is an I/O register, not memory. The words of
    -- 0xFFFFFF00-FF that are not registers are memory, as in the emulator.
@@ -315,12 +315,13 @@ architecture synthesis of nicemon is
       end if;
       return addr(7 downto 1) = "0000000" or                        -- console, read counter
              addr(7 downto 4) = X"1" or addr(7 downto 5) = "001" or -- timer, MPU
-             addr(7 downto 6) = "01" or addr(7 downto 4) = X"8" or  -- perf, fetch statistics, screen registers
+             addr(7 downto 6) = "01" or                             -- perf, fetch statistics
+             addr(7 downto 4) = X"8" or                             -- screen registers
              addr(7 downto 4) = X"9";                               -- the board's devices
    end function is_io;
 
    -- Whether an address is one of the fetch statistics', which are the
-   -- words of 0xFFFFFF40-7F that the performance counters do not take
+   -- words of 0xFFFFFF50-7F, after the performance counters at 40-4F
    function is_fs(addr : std_logic_vector(31 downto 0)) return boolean is
    begin
       return addr(31 downto 6) = C_FS_BASE and addr(5 downto 4) /= "00";

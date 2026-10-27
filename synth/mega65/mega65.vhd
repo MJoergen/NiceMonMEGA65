@@ -2,8 +2,8 @@
 -- and reset, the keyboard, the system (src/system.vhd: the NiceMon system and
 -- the text display of its screen, with the UART), and the video outputs. The
 -- keyboard types into the same input as the UART.
--- Its power LED is green, and its drive LED is green while the core runs,
--- like the user LED.
+-- The keyboard's power LED is green, and its drive LED is green while the
+-- core runs, like the user LED.
 --
 -- The screen is shown as 80x25 characters (src/video/text.vhd) at 1280x1024
 -- @ 60 Hz, on the VGA connector and on the HDMI connector. The video, the

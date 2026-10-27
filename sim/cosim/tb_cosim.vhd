@@ -15,8 +15,9 @@
 -- The clock is 10 MHz and the UART runs at 1 Mbaud, 10 cycles per bit, so
 -- that the bytes come as quickly as the UART takes them. The simulation
 -- runs far slower than real time, but the host's bytes arrive back to
--- back in simulated time, so the 100 ms of DEBUG.md §5 runs out only
--- after 100 ms of simulated time.
+-- back in simulated time. So the link's timeout of DEBUG.md §5, 100 ms
+-- between two bytes, is 100 ms of simulated time, which a slow host
+-- never reaches.
 --
 -- RESET
 -- The system is reset for the first microsecond, and its b notice goes to

@@ -42,6 +42,7 @@ begin
          retire_o      => retire_o
       ); -- i_core
 
+   -- The multi-cycle core has no fetch events to report
    stats_o <= C_FETCH_EVENTS_NONE;
 
 end architecture multicycle;

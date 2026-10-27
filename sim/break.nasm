@@ -14,10 +14,10 @@ LOOP            SUB[M]  R4, R4, 1
 SKIP    ?!Z     MOVE    R3, 0x55        ; skipped: R4 is 0
 READ            MOVE    R1, @R13
 TWO             MOVE    R5, 0x12345678
-                INT     3
+                INT     3               ; PC = mem[0x103] = V3; RTI to AFTER
 AFTER           MOVE    R6, 7
 DONE            HALT
 V3              MOVE    R7, 0x1234
                 RTI
-                .ORG    0x103
+                .ORG    0x103           ; vector 3 of the table at 0x100
                 .DAT    V3

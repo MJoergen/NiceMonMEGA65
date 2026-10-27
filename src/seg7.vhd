@@ -4,8 +4,8 @@
 --
 -- THEORY OF OPERATION
 -- The digits share the segment lines, so they are lit one at a time, each
--- for 1/8 of the time, at about 1 kHz per digit, which the eye sees as all
--- of them lit. A digit whose byte is 0 is dark.
+-- for 1/8 of the time. Each digit is refreshed about 1000 times a second,
+-- which the eye sees as all of them lit. A digit whose byte is 0 is dark.
 --
 -- seg_i holds digit 0, the rightmost, in bits 7..0, and digit 7 in bits
 -- 63..56. In a byte, bit 0 is segment A, bit 1 is B, up to bit 6 for G, and

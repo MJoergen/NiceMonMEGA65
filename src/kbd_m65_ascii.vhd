@@ -14,9 +14,10 @@
 -- The byte of a key is in the table below. SHIFT (either) or CAPS LOCK gives
 -- the capital letters; SHIFT also gives the symbols above the digits and
 -- others, as on the key caps where they are ASCII. CTRL with a key from @ to
--- _ or ` to ~ gives the control code, so CTRL-C is 0x03; CTRL-@ would be
--- NUL, which means no byte, so it gives nothing. DEL stays DEL with CTRL. Keys without an ASCII
--- meaning give nothing. Where the key caps have no ASCII symbol:
+-- _ or ` to ~ gives the control code, so CTRL-C is 0x03. CTRL-@ would be
+-- NUL, which cannot be carried (0 means no byte), so that key sends nothing.
+-- DEL stays DEL with CTRL. Keys without an ASCII meaning give nothing.
+-- Where the key caps have no ASCII symbol:
 --   £ is \, and SHIFT-£ is |      (\ is the PETSCII code of £)
 --   ↑ is ^, and SHIFT-↑ is ~      (as in PETSCII)
 --   ← is _, and SHIFT-← is `      (as in PETSCII)
