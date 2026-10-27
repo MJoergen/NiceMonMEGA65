@@ -3,6 +3,16 @@
 -- W packets, runs them on the core, and checks the console bytes and the
 -- packets that come back.
 --
+-- PASS AND FAIL
+-- Each check is an assert or a report with severity failure, which stops
+-- GHDL with a nonzero exit status. The test ends with stop(0), so only a
+-- run that passes every check exits with 0, and sim/Makefile prints PASS
+-- for that and FAIL, with the log, for anything else. The step counts that
+-- steps 4, 9, and 11 check are the generics G_HELLO_STEPS, G_EMU_STEPS,
+-- and G_RESERVED_STEPS, which sim/Makefile sets from STEPS_HELLO,
+-- STEPS_EMU, and STEPS_RESERVED. "make -C sim check-steps" runs the same
+-- programs in niceemu and compares its counts with those.
+--
 -- THEORY OF OPERATION
 -- p_main sends packets and console bytes to the UART. p_uart_rx decodes the
 -- UART output, and splits it as a host does: the console bytes go to
@@ -20,7 +30,7 @@
 --    control register hides it, and shows it again; and the core boots from
 --    it again when it is started with the ROM shown. From then on the ROM
 --    is hidden, as the tools hide it, so the RAM is at 0 as in the
---    emulator. The version register reads 2, and the free space 16, the
+--    emulator. The version register reads 4, and the free space 16, the
 --    whole FIFO.
 -- 2. Load G_HELLO_FILE with W packets, and read its first word back.
 -- 3. The control register: the core is held in reset.
@@ -51,20 +61,20 @@
 --    the performance counters, and the timer, whose interrupts it counts,
 --    and leaves the results in memory, which the link reads back after the
 --    core has halted. The link reads and writes the timer too.
--- 9. Hold the core, load G_EMU_FILE, and run it. It writes the screen,
+-- 9a. Hold the core, load G_EMU_FILE, and run it. It writes the screen,
 --    memory in the I/O range, and the read counter, and sets R5. The link
 --    reads them back, and the registers, with the values that
 --    "niceemu -d" prints for the same program. The math unit was reset
---    when the core started. The link's reads of the console and the read
---    counter return 0, and its writes to them are dropped: G_COUNT_FILE,
---    run next, reads the count that G_EMU_FILE left, as a start keeps it.
+--    when the core started.
+-- 9b. The link's reads of the console and the read counter return 0, and
+--    its writes to them are dropped: G_COUNT_FILE, run next, reads the count that G_EMU_FILE left, as a start keeps it.
 --    The fetch statistics still run, but stopped at the halt: two reads of
 --    FS_CYCLES are equal. The link writes and reads the screen's
 --    registers, which go out to the display.
 --    It writes and reads the board's registers (LEDs, RGB levels, display
 --    segments), which go out, and reads the buttons and switches; the
 --    read-only words and those that are not registers take no write.
---    Then G_COUNTERS_FILE reads through the core's data bus what the link
+-- 9c. Then G_COUNTERS_FILE reads through the core's data bus what the link
 --    reads elsewhere: the fetch statistics, which the start cleared and the
 --    program stops, so FS_CYCLES is small, the FS_HIST words sum to it, and
 --    with the multi-cycle core FS_HIST[0] is all of it; the microsecond

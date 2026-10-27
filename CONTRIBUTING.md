@@ -4,12 +4,75 @@ This is for those who change this repository: the VHDL, the tools, the
 tests, and the releases. Those who flash a core file and write programs
 for it need only the [README](README.md).
 
+## Getting started
+
+Clone with the submodule:
+
+    git clone --recurse-submodules https://github.com/MJoergen/NiceMonMEGA65.git
+
+or, in an existing clone:
+
+    git submodule update --init
+
+`make` in the top directory lists the targets:
+
+- `make test` runs the simulation tests, and the demo's test in `niceemu`.
+- `make formal` runs the formal checks (see [The formal
+  checks](#the-formal-checks)).
+- `make lint` checks the VHDL style.
+- `make examples` builds the C examples.
+- `make demo` builds the demo of the ROM, `demo/build/demo.bin`, which the
+  release puts in the ROM of its bitstreams and core files.
+- `make r3`, `make r6`, and `make nexys4ddr` build the bitstreams. With
+  `ROM=file.bin`, the core boots from the file (see [The
+  ROM](SYSTEM.md#the-rom)).
+- `make cor` builds the MEGA65 core files for MEGAFLASH (see
+  [synth/README.md](synth/README.md)).
+- `make load FILE=prog.bin` loads a program into the board and starts it.
+- `make run FILE=prog.bin` runs one as `niceemu` runs it (see [Comparing
+  with the emulator](README.md#comparing-with-the-emulator)).
+- `make mon` opens an interactive shell on the link (see [Debugging a
+  program](README.md#debugging-a-program)).
+- `make hwtest` tests the board (see [Testing the
+  board](#testing-the-board)).
+- `make bump TAG=V1.0` moves nice_cpu to a tag and records the MEGA65's
+  timing (see [The timing badge](#the-timing-badge)).
+- `make release TAG=V1.0` builds, tests, and publishes a release, and
+  `TAG=V1.0.1` one that keeps nice_cpu at `V1.0` (see
+  [RELEASE.md](RELEASE.md)).
+- `make linktest` checks the tools on `niceemu --link`, without a board
+  (see [The tools and niceemu](#the-tools-and-niceemu)).
+- `make cosim` runs the system in GHDL for the tools, and `make cosimtest`
+  checks the tools and the RTL on it, without a board (see [The simulated
+  board](#the-simulated-board)).
+
+`make load`, `make run`, and `make mon` use the serial device
+`PORT=/dev/ttyUSB1` by default, and pass `ARGS=` on to the tool, for
+example `ARGS=--no-run` or `ARGS="-i in.txt -d 0:10 -s --timeout 5"`.
+`ARGS="--tcp 4000"` drives `niceemu --link 4000` instead of the board, and
+`ARGS="--cosim 4000"` the simulated system of `make cosim COSIM_PORT=4000`.
+The bitstream targets take `FLOW=default` or `FLOW=timing`, the directives
+of Vivado's steps (see [synth/](synth/README.md)). `make hwtest` rebuilds
+`niceemu` first, if its sources have changed.
+
+`make test` and the boards' targets use nice_cpu's pipelined core. Add
+`NICE=multi` to use its multi-cycle core instead (`NICE=pipeline` is the
+default). The simulation of each core is built in `sim/build/pipeline` or
+`sim/build/multi`, and both cores run the same tests. The bitstream goes to
+`top.bit` in either case, so build one core at a time. The system clock is
+set for the pipelined core, so the multi-cycle core has room to spare.
+
+The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
+"Rules and pitfalls", and the VHDL style is in
+[CODING_STYLE.md](CODING_STYLE.md). For the boards' builds, see
+[synth/](synth/README.md).
+
 ## Contents
 
 | Path | What it is |
 |---|---|
 | [nice_cpu/](https://github.com/MJoergen/nice_cpu) | The NICE CPU, its assembler, its emulator, and `nicewasm`, a [translator](https://github.com/MJoergen/nice_cpu/tree/main/translator) from WebAssembly to NICE assembly, as a git submodule. |
-| [src/](src/) | The synthesizable VHDL, shared by both boards. `nicemon.vhd` is the system: the NICE core, the memory (`mem.vhd`, with `ram.vhd` and `rom.vhd`), the UART, the core's input FIFO (`rx_fifo.vhd`), nice_cpu's devices at `0xFFFFFF10`–`7F` (`devices.vhd`), the screen's registers at `0xFFFFFF80`–`8F` (`scr_regs.vhd`), the board's registers at `0xFFFFFF90`–`9F` (`board_io.vhd`), and the debug link, nice_cpu's `hdl/src/debug_link.vhd`. `uart_serdes.vhd` is copied from [cmod-s7](https://github.com/MJoergen/cmod-s7), with fixes to its receiver, and break detection. `kbd_m65.vhd` drives the MEGA65 keyboard, and `kbd_m65_ascii.vhd` turns its keys into ASCII. `kbd_ps2.vhd` receives the PS/2 keyboard of the Nexys4DDR, and `kbd_ps2_ascii.vhd` turns its scan codes into ASCII. `seg7.vhd` scans the Nexys4DDR's seven-segment display, and `rgb_pwm.vhd` dims its RGB LEDs. `system.vhd` is what every board has: the system, the text display of its screen, and the UART's pins. |
+| [src/](src/) | The synthesizable VHDL, shared by both boards (see [What is in src/](#what-is-in-src)). |
 | [src/core/](src/core/) | `nice_core_pipeline.vhd` and `nice_core_multi.vhd`, the two architectures of `nice_core`. `src/nice_core.vhd` is the entity that wraps whichever of nice_cpu's cores `core.mk` selects with `NICE=pipeline` (the default) or `NICE=multi`. |
 | [src/video/](src/video/) | The text display: `text.vhd` shows the screen at `0xFFFF0000` as 80×25 characters on a video output, with a cursor and a display offset for scrolling. `pix.vhd` and `video_pkg.vhd` are from [MandelbrotMEGA65](https://github.com/MJoergen/MandelbrotMEGA65). `scr_ram.vhd` is the screen's dual-clock memory. `font_pkg.vhd` is the [Spleen](https://github.com/fcambus/spleen) 16×32 font, made by `font/gen_font_pkg.py`. |
 | [font/](font/) | The script that makes `src/video/font_pkg.vhd` from Spleen, and Spleen's license (BSD 2-Clause). |
@@ -30,115 +93,49 @@ for it need only the [README](README.md).
 | [CLAUDE.md](CLAUDE.md) | Instructions for Claude Code: the commands, the layout, and the pitfalls. |
 | [.github/workflows/ci.yml](.github/workflows/ci.yml) | The CI: `make test` and `make cosimtest` on both cores, with niceemu built for its step counts, `make examples`, the demo's test, `make linktest`, `make formal`, and `make lint`. It cannot run `make hwtest` or build a bitstream. |
 
-## Getting started
+### What is in src/
 
-Clone with the submodule:
-
-    git clone --recurse-submodules https://github.com/MJoergen/NiceMonMEGA65.git
-
-or, in an existing clone:
-
-    git submodule update --init
-
-`make` in the top directory lists the targets:
-
-- `make test` runs the simulation tests, and the demo's test in
-  `niceemu`.
-- `make formal` runs the formal checks (see
-  [The formal checks](#the-formal-checks)).
-- `make lint` checks the VHDL style.
-- `make examples` builds the C examples.
-- `make demo` builds the demo of the ROM, `demo/build/demo.bin`, which
-  the release puts in the ROM of its bitstreams and core files.
-- `make r3`, `make r6`, and `make nexys4ddr` build the bitstreams. With
-  `ROM=file.bin`, the core boots from the file (see [The ROM](SYSTEM.md#the-rom)).
-- `make cor` builds the MEGA65 core files for MEGAFLASH (see
-  [synth/README.md](synth/README.md)).
-- `make load FILE=prog.bin` loads a program into the board and starts it.
-- `make run FILE=prog.bin` runs one as `niceemu` runs it (see
-  [Comparing with the emulator](README.md#comparing-with-the-emulator)).
-- `make mon` opens an interactive shell on the link (see
-  [Debugging a program](README.md#debugging-a-program)).
-- `make hwtest` tests the board (see [Testing the board](#testing-the-board)).
-- `make bump TAG=V1.0` moves nice_cpu to a tag and records the MEGA65's
-  timing (see [The timing badge](#the-timing-badge)).
-- `make release TAG=V1.0` builds, tests, and publishes a release, and
-  `TAG=V1.0.1` one that keeps nice_cpu at `V1.0` (see
-  [RELEASE.md](RELEASE.md)).
-- `make linktest` checks the tools on `niceemu --link`, without a board
-  (see [The tools and niceemu](#the-tools-and-niceemu)).
-- `make cosim` runs the system in GHDL for the tools, and `make cosimtest`
-  checks the tools and the RTL on it, without a board (see
-  [The simulated board](#the-simulated-board)).
-
-`make load`, `make run`, and `make mon` use the serial device `PORT=/dev/ttyUSB1` by
-default, and pass `ARGS=` on to the tool, for example `ARGS=--no-run` or
-`ARGS="-i in.txt -d 0:10 -s --timeout 5"`. `ARGS="--tcp 4000"` drives
-`niceemu --link 4000` instead of the board, and `ARGS="--cosim 4000"` the
-simulated system of `make cosim COSIM_PORT=4000`. The bitstream targets take
-`FLOW=default` or `FLOW=timing`, the directives of Vivado's steps (see
-[synth/](synth/README.md)). `make hwtest` rebuilds `niceemu` first, if its
-sources have changed.
-
-`make test` and the boards' targets use nice_cpu's pipelined core. Add
-`NICE=multi` to use its multi-cycle core instead (`NICE=pipeline` is the
-default). The simulation of each core is built in `sim/build/pipeline` or
-`sim/build/multi`, and both cores run the same tests. The bitstream goes to
-`top.bit` in either case, so build one core at a time. The system clock is
-set for the pipelined core, so the multi-cycle core has room to spare.
-
-The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
-"Rules and pitfalls", and the VHDL style is in
-[CODING_STYLE.md](CODING_STYLE.md). For the boards' builds, see
-[synth/](synth/README.md).
+- `nicemon.vhd` is the system: the NICE core, the memory, the UART, the
+  core's input FIFO, nice_cpu's devices, the screen's and the board's
+  registers, and the debug link.
+- `mem.vhd`, with `ram.vhd` and `rom.vhd`, is the memory.
+- `rx_fifo.vhd` is the core's input FIFO.
+- `devices.vhd` has nice_cpu's devices at `0xFFFFFF10`–`7F`.
+- `scr_regs.vhd` has the screen's registers at `0xFFFFFF80`–`8F`.
+- `board_io.vhd` has the board's registers at `0xFFFFFF90`–`9F`.
+- The debug link is nice_cpu's `hdl/src/debug_link.vhd`.
+- `uart_serdes.vhd` is copied from
+  [cmod-s7](https://github.com/MJoergen/cmod-s7), with fixes to its
+  receiver, and break detection.
+- `kbd_m65.vhd` drives the MEGA65 keyboard, and `kbd_m65_ascii.vhd` turns
+  its keys into ASCII.
+- `kbd_ps2.vhd` receives the PS/2 keyboard of the Nexys4DDR, and
+  `kbd_ps2_ascii.vhd` turns its scan codes into ASCII.
+- `seg7.vhd` scans the Nexys4DDR's seven-segment display, and
+  `rgb_pwm.vhd` dims its RGB LEDs.
+- `system.vhd` is what every board has: the system, the text display of
+  its screen, and the UART's pins.
 
 ## Running the tests
 
 You need GHDL (tested with 4.1.0) and Python 3, and gcc for `make cosim`.
 
-    make -C sim test
+    make -j test
+
+It prints a `PASS` line for each testbench, and a `FAIL` line with the log
+for one that fails. If one fails, run it alone with `make -C sim <name>`,
+such as `make -C sim tb_kbd`. `make -j test` runs all the tests side by
+side, in the time of `tb_text`, and then runs the demo in `niceemu`. `make
+-C sim test` runs them in turn. `make lint` checks the VHDL against
+[CODING_STYLE.md](CODING_STYLE.md) with vsg.
+
+The testbenches are these:
 
 - `sim/tb_hello.vhd` runs a "Hello" program on the NICE core from the
   submodule, and checks its console output.
 - `sim/tb_nicemon.vhd` drives the whole system through its UART, as a host
-  of the debug link, with `sim/rom.nasm`, a greeting, as the ROM: the core
-  boots from it at reset, the ROM is read only with the RAM above it, and
-  bit 3 of the control register hides it and shows it again. It checks its
-  checksums against the examples of DEBUG.md, and the board's `b` notice.
-  With the ROM hidden, it loads the "Hello" program over the link and runs
-  it. It checks the halt notice, the halt reason, and the step count, which
-  must equal
-  niceemu's, and that the microsecond counter matches the cycle counter at
-  its clock of 90 MHz. Then it loads and runs these programs:
-  - `sim/echo.nasm` echoes what it receives. The testbench pauses it: the
-    `p` notice, the memory, R15, and the stopped cycle counter while
-    paused, and a byte that waits until it goes on.
-  - `sim/fifo.nasm` checks the input FIFO, which has 16 bytes there, so
-    that the test of a full FIFO is short.
-  - `sim/devices.nasm` uses the math unit, the performance counters, and
-    the timer's interrupts. The testbench also uses the math unit over the
-    link.
-  - `sim/emu.nasm` checks the screen, the read counter, memory in the I/O
-    range, and the registers after a halt, and writes and reads the
-    screen's registers.
-  - `reserved.nasm` of the emulator's tests halts on a reserved control
-    word, after the testbench has cleared the memory.
-  - `sim/counters.nasm` reads the fetch statistics, the microsecond
-    counter, and the board's registers through the core's data bus. A start
-    clears the fetch statistics, and with the multi-cycle core every cycle
-    counts as one with no word in the buffer.
-  - `sim/eof.nasm` echoes its input until a break ends it.
-  - `sim/count.nasm` reads the read counter, which a start keeps.
-
-  It also checks the error answers while the core runs, the `o` notice when
-  the FIFO overflows, and that the link reads the console and the read
-  counter as 0 and does not write them. Between the programs, the
-  testbench writes and reads the board's registers, and checks that a clear
-  of the memory and a start keep them. Then it types on the keyboard input,
-  which is dropped while the core is held, and input for `sim/fifo.nasm`
-  while it runs. Last it resets the system while a program runs, and checks that
-  the core boots from the ROM again and that the screen's and the board's
-  registers are cleared.
+  of the debug link, with `sim/rom.nasm`, a greeting, as the ROM (see
+  below).
 - `sim/tb_kbd.vhd` tests the keyboard driver and its ASCII, with a model of
   the keyboard.
 - `sim/tb_ps2.vhd` tests the PS/2 receiver and its ASCII, with a model of a
@@ -166,12 +163,41 @@ You need GHDL (tested with 4.1.0) and Python 3, and gcc for `make cosim`.
 - `make -C sim check-fmt`, part of `make test`, checks that the `.nasm`
   files of `sim/` are laid out in nice_cpu's columns, with
   `nice_cpu/assembler/nicefmt.py`. Its `--write` fixes a file.
-- `make -j test` runs all these side by side, in the time of `tb_text`.
-  Each is also a target of `sim/Makefile`, so `make -C sim tb_kbd` runs one.
-- `make lint` checks the VHDL against [CODING_STYLE.md](CODING_STYLE.md)
-  with vsg.
 
-For the boards, see [synth/](synth/README.md).
+### tb_nicemon
+
+`tb_nicemon` boots the core from the ROM, and checks that the ROM is read
+only with the RAM above it, and that bit 3 of the control register hides
+it and shows it again. It checks its checksums against the examples of
+DEBUG.md, and the board's `b` notice. With the ROM hidden, it loads the
+"Hello" program over the link and runs it. It checks the halt notice, the
+halt reason, and the step count, which must equal niceemu's, and that the
+microsecond counter matches the cycle counter at its clock of 90 MHz.
+Then it loads and runs these programs:
+
+| Program | What it checks |
+|---|---|
+| `sim/echo.nasm` | Echoes what it receives. The testbench pauses it: the `p` notice, the memory, R15, and the stopped cycle counter while paused, and a byte that waits until it goes on. |
+| `sim/fifo.nasm` | The input FIFO, which has 16 bytes there, so that the test of a full FIFO is short. |
+| `sim/devices.nasm` | The math unit, the performance counters, and the timer's interrupts. The testbench also uses the math unit over the link. |
+| `sim/emu.nasm` | The screen, the read counter, memory in the I/O range, and the registers after a halt. The testbench writes and reads the screen's registers. |
+| `reserved.nasm` of the emulator's tests | A halt on a reserved control word, after the testbench has cleared the memory. |
+| `sim/counters.nasm` | The fetch statistics, the microsecond counter, and the board's registers through the core's data bus. A start clears the fetch statistics, and with the multi-cycle core every cycle counts as one with no word in the buffer. |
+| `sim/break.nasm` | The breakpoints, and the `x` notice. |
+| `sim/eof.nasm` | Echoes its input until a break ends it. |
+| `sim/count.nasm` | The read counter, which a start keeps. |
+
+It also checks the error answers while the core runs, the `o` notice when
+the FIFO overflows, and that the link reads the console and the read
+counter as 0 and does not write them. Between the programs, the testbench
+writes and reads the board's registers, and checks that a clear of the
+memory and a start keep them. Then it types on the keyboard input, which
+is dropped while the core is held, and input for `sim/fifo.nasm` while it
+runs. Last it resets the system while a program runs, and checks that the
+core boots from the ROM again and that the screen's and the board's
+registers are cleared. The header of `sim/tb_nicemon.vhd` lists the steps
+in order. `tb_nicemon` and `tb_hello` take `-gG_*_FILE=` generics, as
+`sim/Makefile` shows.
 
 ### The simulated board
 
@@ -203,10 +229,11 @@ the request. Only small programs are practical.
 
 `make cosimtest` starts `make cosim` on a free port. It runs hwtest's
 checks of bad packets on it, but for the gap of 300 ms, which is far
-shorter in simulated time, and its checks of the pause and of the step. Then it runs the programs that `make hwtest`
-compares, with `run.py --cosim` and with `niceemu`, whose output and exit
-status must be the same. It leaves out nice_cpu's benchmark, which would
-take too long. It takes about 4 minutes, and CI runs it on both cores.
+shorter in simulated time, and its checks of the pause and of the step.
+Then it runs the programs that `make hwtest` compares, with `run.py
+--cosim` and with `niceemu`, whose output and exit status must be the same.
+It leaves out nice_cpu's benchmark, which would take too long. It takes
+about 4 minutes, and CI runs it on both cores.
 
 ## The formal checks
 
@@ -259,8 +286,8 @@ every time, not only the ones a testbench sends.
   prove, so it checks every cycle up to a depth: 30 cycles with the core
   running from reset, and 40 with the core held for the link first. These
   have no ROM and no board registers. The `rom` and `rom_cover` tasks are
-  `run` and `cover` with both: a ROM of 4 words, `formal/rom.bin`, and the Nexys4DDR's
-  registers at `0xFFFFFF90`–`9F`. It checks these properties:
+  `run` and `cover` with both: a ROM of 4 words, `formal/rom.bin`, and the
+  Nexys4DDR's registers at `0xFFFFFF90`–`9F`. It checks these properties:
   - The core's two buses get an ACK only for a request that waits, which
     is what nice_cpu's proofs of the cores assume of them, also when the
     link holds a running core.
@@ -277,71 +304,91 @@ every time, not only the ones a testbench sends.
     `0xFFFFFF80`–`8F` that of `scr_regs.vhd`.
 
   The `link` and `rom` tasks take about 14 minutes each, and the others a
-  few each;
-  `make -j formal`
-  runs all the tasks side by side. CI runs `make -j4 formal` on its four
-  processors.
+  few each; `make -j formal` runs all the tasks side by side. CI runs `make -j4
+  formal` on its four processors.
 
-The checks in `rx_fifo.vhd`, `board_io.vhd`, `scr_regs.vhd`, `devices.vhd`, `mem.vhd`, and `nicemon.vhd` are in `G_FORMAL` blocks, which are off in simulation and
-synthesis.
+The checks in `rx_fifo.vhd`, `board_io.vhd`, `scr_regs.vhd`,
+`devices.vhd`, `mem.vhd`, and `nicemon.vhd` are in `G_FORMAL` blocks,
+which are off in simulation and synthesis.
 
 ## Testing the board
 
-`tools/hwtest.py` tests the system on the board itself. First it finds the
-board from its UART: the JTAG cable on the same USB device as the port. It
-reads the FPGA's IDCODE through that cable with
-[openFPGALoader](https://github.com/trabucayre/openFPGALoader), and stops
-unless the FPGA is the part the bitstream was built for. So with a MEGA65 and
-a Nexys4DDR both attached, it never programs the wrong one. It programs the
-FPGA through that cable alone, with openFPGALoader too, on every board, and
-checks the link's `b` notice, and the ROM when the bitstream has one. Then
-it hides the ROM and uses the link: it writes and reads memory, checks
-that the link drops a packet with a bad checksum, one cut short by an ESC,
-and one with a gap of 300 ms, that `nicelink.py` sends a dropped `R` or `W`
-again, and that an unknown tag gets `e01` and a bad payload `e03`, runs
-`sim/echo.nasm`, checks that the link reaches only its debug registers
-while the core runs, holds and restarts the core, pauses `sim/pause.nasm`
-(the `p` notice, the registers and the memory while paused, the stopped
-cycle counter, a console byte kept, going on, a hold, and a start paused),
-steps `sim/step.nasm` to its halt and compares the registers after each
-step with `niceemu --trace`,
-clears the memory, reads back what `sim/emu.nasm` leaves
-after its halt, writes and reads the screen's registers, and runs
-`examples/build/primes.bin`. Last, it runs programs with `run.py` and with
-`niceemu`, whose output and exit status must be the same: among them
-`sim/eof.nasm`, with no input and with 1536 bytes of input, which checks the
-larger FIFO and the end of the input, the intro's `hello.nasm` with 100
-lines of input that it halts without reading, the emulator's `trapsym.nasm` with
-`--symbols`, the demo of the ROM with a few keys and its screen, and
-`examples/build/bench.bin`, but for its cycles, whose table
-it prints. That needs niceemu, built with `make -C
-nice_cpu/emulator build`. Without it, the checks that need it are skipped,
-and the last line names them after a `SKIPPED`. Build the bitstream first,
-then:
+`tools/hwtest.py` tests the system on the board itself.
+
+### What you need
+
+- A board, attached by its USB cable, with the bitstream built for it.
+  Build that first (see [synth/](synth/README.md)).
+- [openFPGALoader](https://github.com/trabucayre/openFPGALoader), which
+  programs the FPGA through the same USB cable. Programming needs Linux,
+  as the JTAG cable is found through `/sys`; with `--no-program` the
+  script runs wherever `load.py` does.
+- niceemu, built with `make -C nice_cpu/emulator build`. Without it, the
+  checks that need it are skipped, and the last line names them after a
+  `SKIPPED`.
+
+### Running it
 
     make hwtest
 
-It prints one line for each check, and last how many passed. A check that
+First it finds the board from its UART: the JTAG cable on the same USB
+device as the port. It reads the FPGA's IDCODE through that cable, and
+stops unless the FPGA is the part the bitstream was built for. So with a
+MEGA65 and a Nexys4DDR both attached, it never programs the wrong one.
+
+For the R3, give `BIT=synth/r3/build/top.bit`. For the Nexys4DDR, give
+`BIT=synth/nexys4ddr/build/top.bit`. Its UART is usually `/dev/ttyUSB1`
+too. With both boards attached, the `ttyUSB` numbers depend on the order
+they were plugged in, so name the port by the cable's serial number, as in
+`PORT=/dev/serial/by-id/usb-Digilent_Digilent_USB_Device_<serial>-if01-port0`.
+
+A board that is already programmed can be tested with `tools/hwtest.py
+--no-program`, which skips the `b` notice. A bitstream with a ROM can be
+tested, such as one with the demo (`make demo`, then `make r6
+ROM=demo/build/demo.bin`): the test holds the core and hides the ROM, as
+`load.py` does, and runs the programs from the RAM.
+
+### What it prints
+
+It prints one line for each check, and last how many passed. With the
+pipelined core, all checks pass on both boards, and the Nexys4DDR has
+more of them, for its LEDs, display, buttons, and switches. A check that
 leaves the board in a state in which every later check would fail stops
 the run. Even then the script holds the core with the ROM hidden, and
 prints how many passed. If the link does not answer then, it says so:
-press the reset button. Programming the FPGA needs Linux, as the JTAG
-cable is found through `/sys`; with `--no-program` the script runs wherever
-`load.py` does. With the pipelined core, all 78 pass on the R6, and all 94
-on the Nexys4DDR, which has more checks, for its LEDs, display, buttons,
-and switches.
+press the reset button.
 
-For the R3, give `BIT=synth/r3/build/top.bit`. For the Nexys4DDR, give
-`BIT=synth/nexys4ddr/build/top.bit`. Its UART is usually `/dev/ttyUSB1` too.
-With both boards attached, the `ttyUSB` numbers depend on the order they were
-plugged in, so name the port by the cable's serial number, as in
-`PORT=/dev/serial/by-id/usb-Digilent_Digilent_USB_Device_<serial>-if01-port0`.
-A board that is already programmed can be tested with `tools/hwtest.py
---no-program`, which skips the `b` notice. The reset button is not tested:
-press it with a terminal open, and the `b04` notice comes again. A
-bitstream with a ROM can be tested, such as one with the demo (`make
-demo`, then `make r6 ROM=demo/build/demo.bin`): the test holds the core and hides the ROM, as `load.py` does, and runs
-the programs from the RAM.
+### What it checks
+
+It programs the FPGA through the cable alone, with openFPGALoader too, on
+every board, and checks the link's `b` notice, and the ROM when the
+bitstream has one. Then it hides the ROM and uses the link:
+
+- It writes and reads memory.
+- It checks that the link drops a packet with a bad checksum, one cut
+  short by an ESC, and one with a gap of 300 ms, that `nicelink.py` sends
+  a dropped `R` or `W` again, and that an unknown tag gets `e01` and a bad
+  payload `e03`.
+- It runs `sim/echo.nasm`, checks that the link reaches only its debug
+  registers while the core runs, and holds and restarts the core.
+- It pauses `sim/pause.nasm`: the `p` notice, the registers and the memory
+  while paused, the stopped cycle counter, a console byte kept, going on,
+  a hold, and a start paused.
+- It steps `sim/step.nasm` to its halt and compares the registers after
+  each step with `niceemu --trace`.
+- It clears the memory, reads back what `sim/emu.nasm` leaves after its
+  halt, writes and reads the screen's registers, and runs
+  `examples/build/primes.bin`.
+- Last, it runs programs with `run.py` and with `niceemu`, whose output
+  and exit status must be the same: among them `sim/eof.nasm`, with no
+  input and with 1536 bytes of input, which checks the larger FIFO and the
+  end of the input, the intro's `hello.nasm` with 100 lines of input that
+  it halts without reading, the emulator's `trapsym.nasm` with
+  `--symbols`, the demo of the ROM with a few keys and its screen, and
+  `examples/build/bench.bin`, but for its cycles, whose table it prints.
+
+The reset button is not tested: press it with a terminal open, and the
+`b04` notice comes again.
 
 ## The tools and niceemu
 
@@ -414,8 +461,9 @@ the benchmark runs for about 24 ms.
 
 ## The timing badge
 
-nice_cpu shows a badge of whether its core meets 100 MHz on the MEGA65,
-and this repository is the proof. `make bump TAG=V1.0`, which runs
+The badge claims that nice_cpu's core meets timing at 100 MHz in a MEGA65
+build, here: the R6 bitstream, built with Vivado. nice_cpu shows the
+badge, and this repository is the proof. `make bump TAG=V1.0`, which runs
 `tools/bump.py`, checks that the tree is clean and on `main`, moves the
 `nice_cpu` submodule to the tag, builds `niceemu`, runs `make test`, and
 builds the R6 bitstream with Vivado's default directives. If that misses

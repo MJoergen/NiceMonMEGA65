@@ -210,7 +210,13 @@ begin
    -- The screen's registers, from the system clock to the VGA clock. The
    -- system side holds the values and raises the request; the VGA side
    -- takes them and raises the acknowledge, which the system side waits for
-   -- before it lowers the request and takes the next write.
+   -- before it lowers the request and takes the next write. It is a
+   -- four-phase handshake: req rises, ack rises, req falls, ack falls.
+   -- While req is high, cur_x_r, cur_y_r, cur_mode_r, and offs_r do not
+   -- change, because they are loaded only when req and the acknowledge
+   -- seen by the system side are both low. So the VGA side reads them
+   -- stable, and only the two request and acknowledge bits are
+   -- synchronized.
    ---------------------------------------------------------------------------
 
    p_ctl_sys : process (clk_i)
@@ -298,6 +304,8 @@ begin
             pix_y >= C_Y0 and pix_y < C_Y0 + C_ROWS * C_CHAR_HEIGHT then
             text_1 <= '1';
          end if;
+         -- The characters are 16x32 pixels, so the row is y / 32 and the
+         -- column is x / 16.
          -- row * 80 = row * 64 + row * 16
          row_v  := y_v(9 downto 5);
          col_v  := x_v(10 downto 4);

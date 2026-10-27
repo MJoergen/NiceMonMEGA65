@@ -1,6 +1,7 @@
 # The core's input FIFO, src/rx_fifo.vhd (formal_rx_fifo.vhd). "prove"
 # proves the assertions for every cycle by k-induction, and "cover" reaches
-# each cover statement.
+# each cover statement. The depths are in cycles: 20 is the k of the
+# induction, and 40 is how far "cover" looks for each statement.
 
 [tasks]
 prove

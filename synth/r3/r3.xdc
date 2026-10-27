@@ -24,7 +24,8 @@ set_false_path -from [get_cells i_max10/reset_button_reg]
 set_property IOB TRUE [get_ports {max10_clkandsync_o max10_rx_o}]
 
 ## The timing of the link to the MAX10 is fragile, so the link is placed close
-## to its pins, as in the C64MEGA65 core (MEGA65-R3.xdc).
+## to its pins, in the region of slices X0Y150 to X7Y174, as in the
+## C64MEGA65 core (MEGA65-R3.xdc).
 create_pblock pblock_max10
 add_cells_to_pblock pblock_max10 [get_cells [list i_max10]]
 resize_pblock pblock_max10 -add {SLICE_X0Y150:SLICE_X7Y174}

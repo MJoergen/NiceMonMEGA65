@@ -283,7 +283,8 @@ def publish(tag):
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("tag", help="the tag, such as V1.0, or V1.0.1 to keep the submodule")
-    ap.add_argument("--port", default="/dev/ttyUSB1", help="the R6's serial port, for hwtest")
+    ap.add_argument("--port", default="/dev/ttyUSB1", help="the R6's serial port, passed to make hwtest "
+                    "(default %(default)s)")
     ap.add_argument("--publish", action="store_true",
                     help="tag, push, and create the GitHub Release from what is staged")
     args = ap.parse_args()

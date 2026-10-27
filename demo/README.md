@@ -35,9 +35,10 @@ SYSTEM.md), so the demo keeps its state in registers. It writes only the
 screen, the cursor's registers, and its stack. The stack grows down from
 `0xFFFFFEFF`, where there is no register or screen, so on the board it is
 in RAM: the 64K words of RAM repeat through the address space, and
-`0xFFFFFEFF` is RAM word `0xFEFF`, far above the ROM. It scrolls by copying the rows, not with the display offset,
-so that the welcome stays, and so that it runs the same in `niceemu`, where
-the screen's registers are memory. It halts at the end of the input: in
+`0xFFFFFEFF` is RAM word `0xFEFF`, far above the ROM. It scrolls by
+copying the rows, not with the display offset, so that the welcome stays,
+and so that it runs the same in `niceemu`, where the screen's registers
+are memory. It halts at the end of the input: in
 `niceemu`, after its input file, and on the board, after a break on the
 UART.
 

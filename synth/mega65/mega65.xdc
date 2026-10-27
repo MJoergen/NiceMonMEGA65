@@ -12,7 +12,8 @@ create_clock -period 10.000 -name sys_clk [get_ports {clk_i}]
 ## cur_mode_r, offs_r to the *_vga registers) would show a slow route only as
 ## a wrong offset for one frame. So the relation between the clocks is
 ## ignored, and each path only has to be shorter than 10 ns, in both
-## directions.
+## directions. That is one period of the 100 MHz system clock, and a little
+## more than one of the 108 MHz VGA clock (9.26 ns).
 set_max_delay -datapath_only \
    -from [get_clocks -of_objects [get_pins i_mega65/i_clk_rst/i_mmcm/CLKOUT0]] \
    -to   [get_clocks -of_objects [get_pins {i_mega65/i_video_clk/i_mmcm/CLKOUT0 i_mega65/i_video_clk/i_mmcm/CLKOUT1}]] 10.000
@@ -44,7 +45,9 @@ set_false_path -from [get_ports {kb_io2_i}]
 ## timing does not depend on placement.
 set_property IOB TRUE [get_ports {kb_io0_o kb_io1_o kb_io2_i uart_txd_o uart_rxd_i led_o}]
 
-## Configuration from the board's quad SPI flash
+## Configuration from the board's quad SPI flash. CONFIGRATE is the
+## configuration clock in MHz, and SPI_32BIT_ADDR makes the FPGA address the
+## flash with 32 bits, as a flash of more than 16 MB needs.
 set_property CONFIG_VOLTAGE                  3.3   [current_design]
 set_property CFGBVS                          VCCO  [current_design]
 set_property BITSTREAM.GENERAL.COMPRESS      TRUE  [current_design]

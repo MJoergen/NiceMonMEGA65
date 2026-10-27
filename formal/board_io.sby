@@ -1,7 +1,8 @@
 # The board's devices, src/board_io.vhd (formal_board_io.vhd). "prove"
 # proves the assertions for every cycle by k-induction, with the registers
 # of G_BOARD_IO, and "none" without them. "cover" reaches each cover
-# statement.
+# statement. The depths are in cycles: 4 for "prove" and "none" is the k of
+# the induction, and 10 for "cover" is how far it looks for each statement.
 
 [tasks]
 prove

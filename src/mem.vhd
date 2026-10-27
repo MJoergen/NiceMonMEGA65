@@ -97,6 +97,9 @@ architecture synthesis of mem is
 
    -- The screen: 0xFFFF0000 and the 2^G_SCR_ADDR_BITS words from it
    constant C_SCR_BITS : natural := G_SCR_ADDR_BITS;
+   -- 0xFFFF0000 without its low C_SCR_BITS bits: bits 31..16 are '1' and
+   -- the rest '0'. That holds only for C_SCR_BITS <= 16, which the assert
+   -- below checks.
    constant C_SCR_BASE : std_logic_vector(31 downto C_SCR_BITS) := (31 downto 16 => '1', others => '0');
 
    -- The clearing counts through the larger of the RAM and the screen.

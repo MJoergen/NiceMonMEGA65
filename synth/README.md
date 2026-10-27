@@ -18,60 +18,6 @@ clock), and the video clocks (`video_clk.vhd`, a second MMCM that makes the
 [Makefile.inc](Makefile.inc) is the build; each board's `Makefile` gives it
 the part, the board's sources, and its constraints.
 
-## The MEGA65
-
-The two MEGA65 boards have the debug UART on the same pins. They differ in
-the reset button:
-
-| Path | Reset |
-|---|---|
-| [r3/](r3/) | The reset button, read by the MAX10 FPGA and sent to the FPGA over a serial link. |
-| [r6/](r6/) | The reset button, wired to the FPGA. |
-
-[mega65/](mega65/) holds what the MEGA65 boards share: `mega65.vhd`, the
-top level apart from a few pins, with the system clock at 100 MHz, the
-keyboard (on the same three pins on both boards; the MAX10 of the R3 is not
-involved), and the video outputs; `mega65.xdc`, the constraints for timing,
-the keyboard, and configuration; and `mega65.mk`, the part and the sources
-for the boards' Makefiles. The pins come from MiSTer2MEGA65, and those of
-the video from MandelbrotMEGA65.
-
-The screen is shown on the VGA connector, through the video DAC, and on the
-HDMI connector, at 1280×1024 and 60 Hz (see the main README). The boards
-differ in the pins around the video, which their `top.vhd` drive: the R6
-has a power save input on the DAC, and its HDMI level shifter is a PTN3363,
-where the R3 has a TPD12S016.
-
-## The Nexys4DDR
-
-`nexys4ddr/top.vhd` is the whole top level, and `nexys4ddr.xdc` has its
-pins, from Digilent's master XDC. The console is the board's USB-UART, the
-screen is on its VGA connector, and LED0 is on while the core runs, or
-while the program sets it. A USB
-keyboard in the USB HID port types into the console too: the board's PIC24
-turns it into PS/2, which `src/kbd_ps2.vhd` receives and
-`src/kbd_ps2_ascii.vhd` turns into ASCII. The receiver only listens, so
-the keyboard's LEDs are not set. The board's 16 LEDs, two RGB LEDs,
-seven-segment display, five buttons, and 16 switches are registers in
-`0xFFFFFF90`–`96` (see [SYSTEM.md](../SYSTEM.md#the-nexys4ddrs-devices)).
-`src/seg7.vhd` scans the display, and `src/rgb_pwm.vhd` dims the RGB LEDs
-with 16 levels; both drive registered outputs in the IOBs. The CPU RESET
-button resets the system. The board differs from the MEGA65 in
-three ways:
-
-- Its FPGA has 135 block RAMs of 36 Kbit, where the MEGA65's has 365. The
-  RAM and the ROM are the same as on the MEGA65, and take 96 of them, but
-  the screen is 8K words, not 32K, so that it and its copy in `text.vhd`
-  take 16, not 64. With the font and the UART's FIFO, that is 116.5 with
-  the ROM. 8K words are still more than three screens of 80×25 for
-  scrolling.
-- Its FPGA is speed grade -1, where the MEGA65's is -2, so the system clock
-  is 90 MHz, not 100 MHz; at 100 MHz the pipelined core misses timing by a
-  few tenths of a nanosecond or less, as placement varies. The UART runs at 2 Mbaud as on the MEGA65.
-- Its VGA output has 4 bits per color, from resistors, and there is no
-  HDMI. The screen's colors have 4 bits per color, so they show
-  as on the MEGA65.
-
 ## Building
 
 To build, with Vivado installed in `/opt/Xilinx/2025.1/Vivado` (or set
@@ -113,6 +59,63 @@ takes the first cable it finds, which may be the MEGA65's. Add
 `openFPGALoader --scan-usb` lists, or use `make hwtest`, which checks the
 FPGA first.
 
+## The MEGA65
+
+The two MEGA65 boards have the debug UART on the same pins. They differ in
+the reset button:
+
+| Path | Reset |
+|---|---|
+| [r3/](r3/) | The reset button, read by the MAX10 FPGA and sent to the FPGA over a serial link. |
+| [r6/](r6/) | The reset button, wired to the FPGA. |
+
+[mega65/](mega65/) holds what the MEGA65 boards share: `mega65.vhd`, the
+top level apart from a few pins, with the system clock at 100 MHz, the
+keyboard (on the same three pins on both boards; the MAX10 of the R3 is not
+involved), and the video outputs; `mega65.xdc`, the constraints for timing,
+the keyboard, and configuration; and `mega65.mk`, the part and the sources
+for the boards' Makefiles. The pins come from MiSTer2MEGA65, and those of
+the video from MandelbrotMEGA65.
+
+The screen is shown on the VGA connector, through the video DAC, and on the
+HDMI connector, at 1280×1024 and 60 Hz (see
+[SYSTEM.md](../SYSTEM.md#the-screen)). The boards differ in the pins
+around the video, which each board's `top.vhd` drives: the R6 has a power
+save input on the DAC, and its HDMI level shifter is a PTN3363, where the
+R3 has a TPD12S016.
+
+## The Nexys4DDR
+
+`nexys4ddr/top.vhd` is the whole top level, and `nexys4ddr.xdc` has its
+pins, from Digilent's master XDC. The console is the board's USB-UART, the
+screen is on its VGA connector, and LED0 is on while the core runs, or
+while the program sets it. A USB keyboard in the USB HID port types into
+the console too: the board's PIC24 turns it into PS/2, which
+`src/kbd_ps2.vhd` receives and `src/kbd_ps2_ascii.vhd` turns into ASCII.
+The receiver only listens, so the keyboard's LEDs are not set. The board's
+16 LEDs, two RGB LEDs, seven-segment display, five buttons, and 16 switches
+are registers in `0xFFFFFF90`–`96` (see
+[SYSTEM.md](../SYSTEM.md#the-nexys4ddrs-devices)). `src/seg7.vhd` scans the
+display, and `src/rgb_pwm.vhd` dims the RGB LEDs with 16 levels; both drive
+registered outputs in the IOBs. The CPU RESET button resets the system. The
+board differs from the MEGA65 in three ways:
+
+- Its FPGA has 135 block RAMs of 36 Kbit, where the MEGA65's has 365. The
+  RAM and the ROM are the same as on the MEGA65, and take 96 of them, but
+  the screen is 8K words, not 32K, so that it and its copy in `text.vhd`
+  take 16, not 64. With the font and the UART's FIFO, that is 116.5 with
+  the ROM. 8K words are still more than three screens of 80×25 for
+  scrolling.
+- Its FPGA is speed grade -1, where the MEGA65's is -2, so the system clock
+  is 90 MHz, not 100 MHz; at 100 MHz the pipelined core misses timing by a
+  few tenths of a nanosecond or less, as placement varies. The UART runs
+  at 2 Mbaud as on the MEGA65.
+- Its VGA output has 4 bits per color, from resistors, and there is no
+  HDMI. The screen's colors have 4 bits per color, so they show
+  as on the MEGA65.
+
+## Third-party files
+
 `r3/max10.vhd` drives the link to the MAX10. It is copied unchanged from
 [MandelbrotMEGA65](https://github.com/MJoergen/MandelbrotMEGA65)
 (`src/max10/max10.vhd`, commit a3fafd4), which took it from the
@@ -121,15 +124,15 @@ Gardner-Stephen, via C64MEGA65. It is GPL v3, unlike the rest of this
 repository.
 
 `mega65/hdmi/` is the HDMI output of MandelbrotMEGA65 (`src/hdmi/`, commit
-a3fafd4), copied unchanged: The Tyto Project by Adam Barnes, via C64MEGA65,
+a3fafd4), copied unchanged: the Tyto Project by Adam Barnes, via C64MEGA65,
 LGPL v3. `mega65/mega65.vhd` drives it, the video DAC, and the clocks as
 MandelbrotMEGA65's `mega65.vhd` does.
 
 ## Build times and size
 
 A build takes four to six minutes on an Intel Core i9-10850K (10 cores,
-20 threads) with Vivado 2025.1. These are the times of the last builds, in
-minutes and seconds, without `ROM=`:
+20 threads) with Vivado 2025.1, and much longer on a busy machine. These
+are the times of the last builds, in minutes and seconds, without `ROM=`:
 
 | Build | Synthesis | Placement | Routing | Bitstream | Total |
 |---|---|---|---|---|---|
@@ -139,21 +142,16 @@ minutes and seconds, without `ROM=`:
 | Nexys4DDR, `NICE=multi` | 1:53 | 0:31 | 1:15 | 0:28 | 4:18 |
 | R3, pipelined | 3:10 | 0:46 | 1:10 | 0:36 | 6:05 |
 
-The Nexys4DDR builds with `FLOW=timing`. The three pipelined builds, of
-2026-10-24, ran at the same time, with the simulation tests beside them.
-The times vary from build to build: one R6 pipelined build spent 9:36 in
-synthesis, with the same result, and took 12:49 in all, and a Nexys4DDR
-build on a busy machine took 14:17.
+The Nexys4DDR builds with `FLOW=timing`.
+
+### Utilization
 
 The utilization is from `build/utilization.rpt`, and the split by module
 from `report_utilization -hierarchical` on `build/top.dcp`. These are the
-numbers without `ROM=`, in LUTs and flip-flops. The R6 pipelined column is
-from the build of 2026-10-24 at nice_cpu a21d8b6, with the debug link. The
-Nexys4DDR pipelined column is from the build of 2026-10-24 at nice_cpu
-2f67a50, and the multi-cycle columns are from the builds of 2026-10-22 at
-this repository's cb95968, which had neither the Nexys4DDR's devices
-(below) nor the microsecond counter. These three had the command line in
-place of the link, counted in the rest:
+numbers without `ROM=`, in LUTs and flip-flops. The pipelined columns are
+from builds with the debug link. The multi-cycle columns are older, from
+builds that had a command line in place of the link, counted in the rest,
+and neither the Nexys4DDR's devices nor the microsecond counter:
 
 | Part of the design | R6, pipelined | R6, multi | Nexys4DDR, pipelined | Nexys4DDR, multi |
 |---|---|---|---|---|
@@ -168,53 +166,47 @@ place of the link, counted in the rest:
 | Total | 12340 / 8901 | 8909 / 5151 | 11242 / 6768 | 7707 / 6319 |
 | Total, of the FPGA | 9.2 % / 3.3 % | 6.7 % / 1.9 % | 17.7 % / 5.3 % | 12.2 % / 5.0 % |
 
-The pipelined core is about 5.1 % of the LUTs of the R6's FPGA, and 11.1 % of
-the Nexys4DDR's. The multi-cycle core has two thirds of its LUTs, 3.4 % and
-7.3 %. On the R6 it has a third of the flip-flops too. On the Nexys4DDR it
-has 4071, more than the pipelined core's 2948, where the build at this
-repository's 671172e had 985. The cause is the retiming of `FLOW=timing` (`synth_design
--retiming`): it moved registers backwards 597 times and added 6791, mostly
-copies of the core's register file and state, so the design has twice the
-flip-flops (6319 against 3114). The build at 671172e did not retime this
-way, and the one at cb95968, which maps `fetch_stats` and the wider device
-address, did; the multi-cycle core itself is the same in both. With
-`FLOW=default` the build has 3202 flip-flops but misses 90 MHz by 0.37 ns,
-so the copies buy timing. With the retiming it meets 90 MHz by 0.19 ns, and
-the Nexys4DDR has room for the flip-flops.
+The R3 pipelined build, which has the pause of link version 2 only, takes
+12507 LUTs and 9044 flip-flops, 9.3 % and 3.4 % of the FPGA.
 
-The `fetch_stats` of the pipelined core (the fetch statistics in the main
-SYSTEM.md's address map) has over a thousand flip-flops, and the multi-cycle
-core's has few. The pipelined core uses no block RAM. The multi-cycle core
-uses one RAMB18, which Vivado infers for `src2_count`, the register of the
-shift count. The math unit has the 4 DSPs of the design. All builds meet the
-clock. These are the worst setup and hold slacks of the builds of the
-tables above, and of the Nexys4DDR with the debug link:
+The pipelined core is about 5.1 % of the LUTs of the R6's FPGA, and 11.1 %
+of the Nexys4DDR's. The multi-cycle core has two thirds of its LUTs, 3.4 %
+and 7.3 %. On the R6 it has a third of the flip-flops too. On the
+Nexys4DDR it has 4071, more than the pipelined core's 2948, because
+`FLOW=timing` retimes (`synth_design -retiming`): it moves registers
+backwards and adds copies of the core's register file and state, so the
+design has twice the flip-flops. With `FLOW=default` the build has 3202
+flip-flops but misses 90 MHz by 0.37 ns, so the copies buy timing. With
+the retiming it meets 90 MHz by 0.19 ns, and the Nexys4DDR has room for
+the flip-flops.
+
+The `fetch_stats` of the pipelined core (the fetch statistics in
+[SYSTEM.md](../SYSTEM.md#address-map)'s address map) has over a thousand
+flip-flops, and the multi-cycle core's has few. The pipelined core uses no
+block RAM. The multi-cycle core uses one RAMB18, which Vivado infers for
+`src2_count`, the register of the shift count. The math unit has the 4
+DSPs of the design.
+
+### Timing
+
+All builds meet the clock. These are the worst setup and hold slacks:
 
 | Build | Clock | Setup | Hold |
 |---|---|---|---|
-| R6, pipelined, with the debug link | 100 MHz | 0.595 ns | 0.065 ns |
-| R6, pipelined, with the command line | 100 MHz | 0.414 ns | 0.061 ns |
+| R6, pipelined | 100 MHz | 0.595 ns | 0.065 ns |
 | R6, `NICE=multi` | 100 MHz | 0.52 ns | – |
-| R3, pipelined, with the debug link | 100 MHz | 0.172 ns | 0.073 ns |
-| R3, pipelined, with the command line | 100 MHz | 0.173 ns | 0.065 ns |
-| Nexys4DDR, pipelined, with the debug link | 90 MHz | 0.111 ns | 0.035 ns |
-| Nexys4DDR, pipelined, with the command line | 90 MHz | 0.022 ns | 0.020 ns |
+| R3, pipelined | 100 MHz | 0.172 ns | 0.073 ns |
+| Nexys4DDR, pipelined | 90 MHz | 0.111 ns | 0.035 ns |
 | Nexys4DDR, `NICE=multi` | 90 MHz | 0.19 ns | – |
 
-The builds with the debug link are those of 2026-10-27 at nice_cpu
-RC06, with the pause, the step, and the four breakpoints of link
-version 4 and the UART at 2 Mbaud, except the R3 one, which is that of
-2026-10-25 at nice_cpu 62f2da2 with the pause of link version 2 (12507
-LUTs and 9044 flip-flops, 9.3 % and 3.4 % of the FPGA, and 7:33 in
-routing),
-the other pipelined builds those of 2026-10-24 at nice_cpu 2f67a50, and the
-multi-cycle ones those at this repository's cb95968, whose hold slacks were
-not recorded. The pipelined builds' block RAM is 132.5 tiles on the R6 and
-the R3 (36 %) and 84.5 on the Nexys4DDR (63 %). The slacks change from
-build to build with placement more than with the logic: the builds just
-before nice_cpu 2f67a50, without its microsecond counter, had 0.174 ns on
-the R6 and 0.043 ns on the Nexys4DDR. The worst paths are
-usually in the core's WRITE and FETCH stages.
+The R6 and Nexys4DDR pipelined rows are from builds at nice_cpu RC06,
+with the debug link of version 4; the R3 row and the multi-cycle rows
+are older builds, with fewer link features, and the multi-cycle hold
+slacks were not recorded. The slacks change from build to build with
+placement more than with the logic. The worst paths are usually in the
+core's WRITE and FETCH stages.
+
+### Block RAM
 
 The block RAMs, of 36 Kbit, are these:
 

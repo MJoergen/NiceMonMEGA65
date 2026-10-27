@@ -1,7 +1,8 @@
 # The devices of nice_cpu/hdl/src, src/devices.vhd (formal_devices.vhd),
 # with the real devices, whose own proofs are in nice_cpu/hdl/formal.
 # "prove" proves the assertions for every cycle by k-induction, and
-# "cover" reaches each cover statement.
+# "cover" reaches each cover statement. The depths are in cycles: 4 is the
+# k of the induction, and 16 is how far "cover" looks for each statement.
 
 [tasks]
 prove

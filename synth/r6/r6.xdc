@@ -6,6 +6,8 @@ set_property -dict {PACKAGE_PIN L14  IOSTANDARD LVCMOS33} [get_ports {uart_rxd_i
 set_property -dict {PACKAGE_PIN L13  IOSTANDARD LVCMOS33} [get_ports {uart_txd_o}];     # DBG_UART_TX
 set_property -dict {PACKAGE_PIN U22  IOSTANDARD LVCMOS33} [get_ports {led_o}];          # ULED
 
+## The button is asynchronous, and clk_rst.vhd synchronizes it to the system
+## clock with two registers, so its path is not timed.
 set_false_path -from [get_ports {reset_button_i}]
 
 ## The button is registered in clk_rst.vhd. Its register lives in the I/O

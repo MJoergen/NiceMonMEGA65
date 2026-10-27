@@ -26,18 +26,18 @@ These words are used here and in the other documents and sources:
 | Step | Bits 4 and 5 written to a paused core: it runs one instruction, or enters an interrupt, and pauses again. |
 | Notice | A packet that the board sends on its own: `b04` at reset (the link's version, 4), `h` when the core halts, `p` when it pauses, `x` when it stops at a breakpoint, and `o` when an input byte is lost. |
 
-The MEGA65's debug UART runs at 2 Mbaud (2000000), 8-N-1, and carries the debug
-link of nice_cpu's [doc/DEBUG.md](nice_cpu/doc/DEBUG.md). It passes the
-program's console bytes both ways, and between them it carries packets,
-which start with the byte `0xFF`. A console byte `0xFF` is sent as two. With
-the packets, a host reads and writes memory and the debug registers at
-`0xFFFFFFE0`–`FF` (see [Address map](#address-map)). The board sends a
-notice at reset (`b04`), when the core halts (`h` and the reason), and when
-an input byte is lost (`o`). The tools in `tools/` are such a host, and
-`niceemu --link` serves the same link, so the tools drive the emulator as
-they drive the board.
-The tools use 2 Mbaud too. A bitstream built before the rate went up runs
-at 115200 baud, and the tools need `--baud 115200` for it.
+The MEGA65's debug UART runs at 2 Mbaud (2000000), 8-N-1, and carries the
+debug link of nice_cpu's [doc/DEBUG.md](nice_cpu/doc/DEBUG.md). It passes
+the program's console bytes both ways, and between them it carries
+packets, which start with the byte `0xFF`. A console byte `0xFF` is sent
+as two. With the packets, a host reads and writes memory and the debug
+registers at `0xFFFFFFE0`–`FF` (see [Address map](#address-map)). The
+board sends a notice at reset (`b04`), when the core halts (`h` and the
+reason), and when an input byte is lost (`o`). The tools in `tools/` are
+such a host, and `niceemu --link` serves the same link, so the tools
+drive the emulator as they drive the board. The tools use 2 Mbaud too. A
+bitstream built before the rate went up runs at 115200 baud, and the
+tools need `--baud 115200` for it.
 
 The core is held in reset at power-up. A host loads a program with two
 writes to the control register at `0xFFFFFFF0` around the writes of its
@@ -137,28 +137,32 @@ The tools write these values:
 | `0x00000038` | Hide, pause, and step | Runs one step of a paused core. |
 
 Instruction fetches from `0xFFFFFF00`–`0xFFFFFFFF` read 0, as ISA.md §8.3
-requires. The input waits for the core in a FIFO of 2048 bytes, in block
-RAM. A UART byte that arrives when it is full is lost, and the link sends
-its `o` notice; a byte after a break is lost too, until a start clears the
-end of the input. A keyboard byte waits until the FIFO has room for two, so
-that a UART byte still finds room; on the Nexys4DDR, keys typed meanwhile
-are lost (see [The Nexys4DDR's devices](#the-nexys4ddrs-devices)). While the core is held or has halted,
-the bytes of the UART and the keyboard are dropped. While it is paused,
-they go into the FIFO. To end a program's
+requires.
+
+The input waits for the core in a FIFO of 2048 bytes, in block RAM. A UART
+byte that arrives when it is full is lost, and the link sends its `o`
+notice; a byte after a break is lost too, until a start clears the end of
+the input. A keyboard byte waits until the FIFO has room for two, so that
+a UART byte still finds room; on the Nexys4DDR, keys typed meanwhile are
+lost (see [The Nexys4DDR's devices](#the-nexys4ddrs-devices)). While the
+core is held or has halted, the bytes of the UART and the keyboard are
+dropped. While it is paused, they go into the FIFO. To end a program's
 input from a terminal, send a break: in picocom, `Ctrl-A Ctrl-\`.
-The performance counters, the math unit, and the timer are nice_cpu's own,
-`nice_cpu/hdl/src/perf.vhd`, `mpu.vhd`, and `timer.vhd`, and behave as the
-emulator's. The fetch statistics are nice_cpu's `fetch_stats.vhd`, which
-the emulator does not have. `src/devices.vhd` connects the four. They are reset with the system, and each time the core starts, as
-the emulator's are when it starts. So after a halt the instruction counter
+
+The performance counters, the math unit, and the timer are nice_cpu's
+own, `nice_cpu/hdl/src/perf.vhd`, `mpu.vhd`, and `timer.vhd`, and behave
+as the emulator's. The fetch statistics are nice_cpu's `fetch_stats.vhd`,
+which the emulator does not have. `src/devices.vhd` connects the four.
+They are reset with the system, and each time the core starts, as the
+emulator's are when it starts, but not while the link holds the core, so
+the link reads them after a halt. So after a halt the instruction counter
 holds the steps that the emulator prints, unless the program starts the
-timer. The timer counts clock cycles, at 100 MHz (90 MHz on the Nexys4DDR),
-where the emulator counts steps, so its interrupts come at other steps, and
-the step counts differ. The cycle counter and the timer's counter run only
-while the core runs, so they stop at a halt, as the emulator's do.
-The timer's request goes straight to the core's IRQ, for it is the only device that
-raises one. They are not reset while the link holds the core, so the link
-reads them after a halt.
+timer. The timer counts clock cycles, at 100 MHz (90 MHz on the
+Nexys4DDR), where the emulator counts steps, so its interrupts come at
+other steps, and the step counts differ. The cycle counter and the
+timer's counter run only while the core runs, so they stop at a halt, as
+the emulator's do. The timer's request goes straight to the core's IRQ,
+for it is the only device that raises one.
 
 ## The screen
 
@@ -175,9 +179,9 @@ as `0x41`, is black on black, and `0x000FFF41` is a white `A` on black. The
 screen is 0 at power-up, which shows as black, and `nice_screen_clear`
 fills it with blanks.
 
-The screen's memory is 32768 words, `0xFFFF0000`–`0xFFFF7FFF` (8192 words,
-`0xFFFF0000`–`0xFFFF1FFF`, on the Nexys4DDR), of which the
-display shows 2000 from the display offset, so a program scrolls by adding
+The screen's memory is 32768 words, `0xFFFF0000`–`0xFFFF7FFF` (8192
+words, `0xFFFF0000`–`0xFFFF1FFF`, on the Nexys4DDR), of which the display
+shows 2000 from the display offset, so a program scrolls by adding
 80 to the offset and writing the next row after the rows shown, and scrolls
 back by taking 80 away, as the QNICE monitor does. The offset wraps at the
 end of the memory. The display also has a cursor, which swaps the colors
@@ -192,10 +196,10 @@ QNICE-FPGA, at `0xFF30` there:
 | `0xFFFFFF85` | The display offset, in words, 0 to 32767 (8191 on the Nexys4DDR). It takes effect when bit 10 of the state is set. |
 
 The words `0xFFFFFF83`, `84`, and `86`–`8F` read 0 and take no write. In
-the emulator these addresses are memory, so a program that writes them
-runs there too, without scrolling. Reset, and the clear of the memory
-(bit 2 of the control register, which `load.py` and `run.py` set),
-set the offset to 0 and turn the cursor off, as at the start of the emulator.
+the emulator these addresses are memory, so a program that writes them runs
+there too, without scrolling. Reset, and the clear of the memory (bit 2 of
+the control register, which `load.py` and `run.py` set), set the offset to
+0 and turn the cursor off, as at the start of the emulator.
 
 A write of `0x000FFF41` to `0xFFFF0000` puts an `A` in the top left
 corner, white on black, and one of `0xF00FFF42` to `0xFFFF0001` a white `B`
@@ -218,16 +222,20 @@ touch it. So a program in the ROM must keep its stack and its variables
 in the RAM, at `0x8000` or above: `sim/rom.nasm`, the greeting that the
 tests use as the ROM, has its stack at the top of the memory, as the
 runtime has, and so has the demo that a release has in the ROM
-([demo/](demo/README.md)). With a stack in the ROM, as `hello.nasm` of nice_cpu has at `0x1000`, a pushed return address
-is lost and reads back as 0, and the program starts over, forever.
+([demo/](demo/README.md)). With a stack in the ROM, as `hello.nasm` of
+nice_cpu has at `0x1000`, a pushed return address is lost and reads back
+as 0, and the program starts over, forever.
+
+A C program cannot run from the ROM either: it keeps its data in its own
+image, which would be in the ROM, so its writes would be lost.
 
 While the core runs from the ROM, the link reaches only its debug
 registers. Bit 3 of the control register hides the ROM: a write of
 `0x00000009` holds the core with the ROM hidden, and the RAM is at address
 0, as in the emulator, so a program loads and runs as without a ROM, with
 `0x00000008` to start it. `load.py` does this. `0x00000001` and then
-`0x00000000` show the ROM again and boot from it, as the reset button does. The RAM under the ROM keeps its
-words meanwhile.
+`0x00000000` show the ROM again and boot from it, as the reset button
+does. The RAM under the ROM keeps its words meanwhile.
 
 ## The Nexys4DDR's devices
 
@@ -243,9 +251,9 @@ lost: the bytes of one key wait until there is room, and the keys typed
 meanwhile give nothing. The MEGA65's keyboard loses no key.
 
 The Nexys4DDR's LEDs, seven-segment display, buttons, and switches are
-registers in `0xFFFFFF90`–`96`, for the core and the link alike.
-Only the Nexys4DDR has them: on the MEGA65 the whole block reads 0 and
-takes no write, where the emulator has memory there. Reset clears the registers
+registers in `0xFFFFFF90`–`96`, for the core and the link alike. Only the
+Nexys4DDR has them: on the MEGA65 the whole block reads 0 and takes no
+write, where the emulator has memory there. Reset clears the registers
 that can be written, and a start of the core does not, so a program's
 display stays after it halts.
 
@@ -267,6 +275,6 @@ A, C, D, and F, which shows a 5 on digit 0. The display is scanned at about
 1 kHz per digit, so the digits look steady. The RGB LEDs are very bright at
 full level; 1 to 3 is a comfortable range. The buttons and the switches are
 synchronized to the clock but not debounced. The CPU RESET button is not a
-register: it resets the system. The words `0xFFFFFF97`–`9F` read 0 and take
-no write; the keyboard's LEDs may come to `0xFFFFFF97` (see
+register: it resets the system. The words `0xFFFFFF97`–`9F` read 0 and
+take no write; the keyboard's LEDs may come to `0xFFFFFF97` (see
 [#25](https://github.com/MJoergen/NiceMonMEGA65/issues/25)).

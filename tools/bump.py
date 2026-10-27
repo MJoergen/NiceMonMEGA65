@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Move nice_cpu to a tag, build the MEGA65 R6 bitstream, and record the timing.
+"""Move nice_cpu to a tag, build the R6 bitstream, and write the badge files.
 
 nice_cpu shows a badge of whether its core meets 100 MHz on the MEGA65
-(nice_cpu issue 19 here). This script makes the two files it reads, at the top
-level of the repository:
+(nice_cpu issue 19 here). This script makes the two files it reads,
+badge-mega65.json and verified.json, at the top level of the repository:
 
   badge-mega65.json  a shields.io endpoint: "V1.0 met" in green, or
                      "V1.0 failed (WNS -0.12 ns)" in red
@@ -248,7 +248,8 @@ def main():
     ap.add_argument("tag", help="the nice_cpu tag, such as V1.0")
     ap.add_argument("--push", action="store_true", help="push the two commits")
     ap.add_argument("--reports", metavar="DIR",
-                    help="print the files for the reports in DIR; build and commit nothing")
+                    help="build and commit nothing; print the badge-mega65.json and "
+                    "verified.json that the timing reports in DIR would give")
     args = ap.parse_args()
     tag = args.tag
     if not NICE_TAG.match(tag):

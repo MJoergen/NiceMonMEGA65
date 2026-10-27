@@ -2,8 +2,9 @@
 
 The monitor in NICE assembly, a port of the QNICE monitor (QMON) from
 [QNICE-FPGA](https://github.com/sy2002/QNICE-FPGA), is planned and not
-written yet ([#24](https://github.com/MJoergen/NiceMonMEGA65/issues/24)). This directory holds only this note, which records the
-decisions the monitor will follow. The rule is to stay as close to QNICE
+written yet ([#24](https://github.com/MJoergen/NiceMonMEGA65/issues/24)).
+This directory holds only this note, which records the decisions the
+monitor will follow. The rule is to stay as close to QNICE
 as the NICE CPU allows.
 
 ## Where it lives
@@ -18,8 +19,8 @@ as the NICE CPU allows.
 - The bitstream is built with `make r6 ROM=monitor/monitor.bin` (or `r3`),
   which puts the assembled monitor in the ROM (see
   [synth/](../synth/README.md) and
-  [SYSTEM.md](../SYSTEM.md#the-rom)). The ROM changes only with a new bitstream,
-  so the monitor is developed in the emulator, `niceemu`, which runs it
+  [SYSTEM.md](../SYSTEM.md#the-rom)). The ROM changes only with a new
+  bitstream, so the monitor is developed in the emulator, `niceemu`, which runs it
   like any program, with its keystrokes in an input file; the board is for
   checking.
 - The debug link stays. While the monitor runs, the link reaches only its

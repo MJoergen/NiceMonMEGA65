@@ -1,6 +1,7 @@
 # The screen's registers, src/scr_regs.vhd (formal_scr_regs.vhd). "prove"
 # proves the assertions for every cycle by k-induction, and "cover" reaches
-# each cover statement.
+# each cover statement. The depths are in cycles: 4 is the k of the
+# induction, and 10 is how far "cover" looks for each statement.
 
 [tasks]
 prove

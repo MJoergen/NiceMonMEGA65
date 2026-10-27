@@ -76,7 +76,11 @@ ANSWER_WAIT = 0.3
 # leave room for a slower computer.
 COSIM_WAIT = 20.0
 COSIM_BYTE = 0.02
+# How many times a request without an answer is sent, the first time
+# included, before the link gives up
 TRIES = 3
+# The most words in one R or W packet, about 2K bytes of payload. The
+# count is a 4-digit field (DEBUG.md §2), so the protocol allows more.
 MAX_WORDS = 256
 
 # The error codes of DEBUG.md §3
@@ -215,15 +219,19 @@ class Tcp(Transport):
 
     def _connect(self) -> socket.socket:
         try:
+            # Wait at most 5 s for the connection
             sock = socket.create_connection(("127.0.0.1", self.port), 5)
         except OSError as e:
-            fail(f"cannot connect to 127.0.0.1:{self.port}: {e.strerror}")
+            fail(f"cannot connect to 127.0.0.1:{self.port}: {e.strerror}; is "
+                 f"niceemu --link {self.port} or make cosim running?")
         sock.setblocking(False)
         return sock
 
     def _reconnect(self) -> socket.socket:
         """A new connection that niceemu has taken: one that it has sent
         something on, its b notice, which stays to be read."""
+        # Give up after 5 s; niceemu takes the new connection as soon as it
+        # has seen the half-close
         end = time.monotonic() + 5
         while time.monotonic() < end:
             sock = self._connect()
@@ -235,7 +243,7 @@ class Tcp(Transport):
             if taken:
                 return sock
             sock.close()
-            time.sleep(0.02)
+            time.sleep(0.02)   # a pause between tries
         raise LinkError(f"{self.peer} does not take a new connection after "
                         f"the end of the input")
 
@@ -588,13 +596,15 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--port", default="/dev/ttyUSB1",
                         help="the serial device of the board's debug UART "
                         "(default /dev/ttyUSB1)")
-    parser.add_argument("--baud", type=int, default=2000000)
+    parser.add_argument("--baud", type=int, default=2000000,
+                        help="the UART's baud rate (default %(default)s)")
     parser.add_argument("--tcp", type=int, metavar="PORT",
                         help="talk to niceemu --link PORT on 127.0.0.1, not "
                         "to the board")
     parser.add_argument("--cosim", type=int, metavar="PORT",
                         help="talk to the simulated system of make -C sim "
-                        "cosim on port PORT of 127.0.0.1, not to the board")
+                        "cosim on port PORT of 127.0.0.1, not to the board; "
+                        "slow, about 250 UART bytes a second")
 
 
 def open_link(args: argparse.Namespace) -> Link:
@@ -603,12 +613,15 @@ def open_link(args: argparse.Namespace) -> Link:
         return Link(Cosim(args.cosim))
     if args.tcp is not None:
         link = Link(Tcp(args.tcp))
-        # niceemu sends b to each host that connects (DEBUG.md §7).
+        # niceemu sends b to each host that connects (DEBUG.md §7). Wait
+        # 2 s for it: long enough for a busy computer, short enough to
+        # report a wrong port.
         end = time.monotonic() + 2
         while not link.boots and time.monotonic() < end:
             link.poll(end - time.monotonic())
         if not link.boots:
-            fail(f"no b notice from 127.0.0.1:{args.tcp}; is it niceemu "
-                 f"--link?")
+            fail(f"no b notice, the packet that niceemu --link sends to each "
+                 f"host that connects, from 127.0.0.1:{args.tcp}; is that "
+                 f"port served by niceemu --link, not by another program?")
         return link
     return Link(Serial(args.port, args.baud))

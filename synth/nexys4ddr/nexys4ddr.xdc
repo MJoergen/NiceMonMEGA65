@@ -91,7 +91,10 @@ create_clock -period 10.000 -name sys_clk [get_ports {clk_i}]
 ## The system clock and the video clocks cross only through the screen's
 ## copy and the handshake of src/video/text.vhd, as on the MEGA65
 ## (mega65.xdc). The relation between the clocks is ignored, and each path
-## only has to be shorter than 10 ns, in both directions.
+## only has to be shorter than 10 ns, in both directions. That is the period
+## of the 100 MHz board clock, a little less than one of the 90 MHz system
+## clock (11.1 ns), and a little more than one of the 108 MHz VGA clock
+## (9.26 ns).
 set_max_delay -datapath_only \
    -from [get_clocks -of_objects [get_pins i_clk_rst/i_mmcm/CLKOUT0]] \
    -to   [get_clocks -of_objects [get_pins i_video_clk/i_mmcm/CLKOUT0]] 10.000
@@ -110,10 +113,15 @@ set_property IOB TRUE [get_ports {vga_red_o[*] vga_green_o[*] vga_blue_o[*] vga_
 ## first register (synth/common/clk_rst.vhd), so that register is one too.
 set_false_path -from [get_ports {uart_rxd_i reset_n_i ps2_clk_i ps2_data_i btn_i[*] sw_i[*]}]
 set_false_path -to   [get_ports {uart_txd_o led_o[*] rgb0_o[*] rgb1_o[*] seg_an_o[*] seg_ca_o[*]}]
+## The first IOB group is the UART, the reset button, the LEDs, and the
+## PS/2 keyboard, and the second is the RGB LEDs, the seven-segment display,
+## the buttons, and the switches. Both are set the same way; the split is
+## only in how the lines are written.
 set_property IOB TRUE [get_ports {uart_txd_o uart_rxd_i reset_n_i led_o[*] ps2_clk_i ps2_data_i}]
 set_property IOB TRUE [get_ports {rgb0_o[*] rgb1_o[*] seg_an_o[*] seg_ca_o[*] btn_i[*] sw_i[*]}]
 
-## Configuration from the board's quad SPI flash
+## Configuration from the board's quad SPI flash. CONFIGRATE is the
+## configuration clock in MHz.
 set_property CONFIG_VOLTAGE                3.3   [current_design]
 set_property CFGBVS                        VCCO  [current_design]
 set_property BITSTREAM.GENERAL.COMPRESS    TRUE  [current_design]

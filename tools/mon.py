@@ -446,7 +446,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     add_arguments(parser)
     parser.add_argument("file", nargs="?",
-                        help="a .bin file to load, with the core held")
+                        help="a .bin file to load, with the core held: one "
+                        "'address word' hex pair per line")
     args = parser.parse_args()
 
     link = open_link(args)

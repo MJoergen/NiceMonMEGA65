@@ -16,6 +16,11 @@
 # The link uses the bus only while the core is held or halted, and a
 # halted core has no bus cycle open, so no link request meets a running core
 # or an outstanding fetch.
+# The depths are in cycles: "run" and "rom" check 30, "link" checks 40,
+# and "cover" and "rom_cover" look 40 cycles for each statement.
+# The ghdl lines differ only in generics. G_CPU_RUN_AT_RESET is true in
+# "run", "cover", "rom", and "rom_cover", and false in "link". "rom" and
+# "rom_cover" also set G_ROM_FILE=rom.bin and G_BOARD_IO=true.
 
 [tasks]
 run

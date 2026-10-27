@@ -1,56 +1,74 @@
 #!/usr/bin/env python3
 """Test the system on the MEGA65 or Nexys4DDR board through its debug UART.
 
-First it finds the JTAG cable on the same USB device as the serial port,
-reads the FPGA's IDCODE through it, and stops unless the FPGA is the part
-the bitstream was built for. It then programs the FPGA through that cable
-alone, so with several boards attached it programs the board whose UART it
-tests. openFPGALoader does both, for the MEGA65 and the Nexys4DDR alike.
-It checks the link's b notice, and the ROM when the bitstream has one, then
-drives the debug link (nice_cpu/doc/DEBUG.md) with the ROM hidden: it
-checks that bad packets are dropped and that nicelink sends a dropped
-request again, loads and runs sim/echo.nasm, checks that the link reaches only its debug
-registers while it runs, holds and restarts the core, pauses
-sim/pause.nasm and checks the registers, the memory, the counters, and the
-input while paused, going on, a hold, and a start paused, steps
-sim/step.nasm to its halt and compares the registers after each step with
-niceemu --trace, stops sim/break.nasm at breakpoints, clears
-the memory, reads back what sim/emu.nasm leaves after its halt, checks that
-the cycle counter and the timer stop there, writes and reads the screen's
-registers, writes and reads the board's devices (on the Nexys4DDR the LEDs,
-RGB LEDs, and seven-segment display, and the buttons and switches, which
-only a read can check; on the MEGA65 the block reads 0), and runs the C example
-examples/build/primes.bin, after whose halt the microsecond counter must hold
-the cycle counter's count over the clock in MHz. Last, it runs programs with tools/run.py and
-with niceemu, and compares their output and exit status, with sim/eof.nasm
-also the end of the input and an input file of 1536 bytes, with a program
-that halts at once although 100 lines of input wait for it, with the
-emulator's trapsym.nasm and its label file for --symbols, with the
-demo of the ROM, demo/demo.nasm, and its screen, and with
-nice_cpu's benchmark, examples/build/bench.bin, all but its cycles. The programs
-run with the ROM hidden, so the RAM is at 0.
-Build the bitstream and the examples first, and niceemu
-(make -C nice_cpu/emulator build), or the checks that need it are skipped,
-and the summary names them after a SKIPPED. The cleanup at the end holds the
-core, and says so if the link did not answer.
+Usage:
+    tools/hwtest.py [--port /dev/ttyUSB1] [--baud 2000000]
+                    [--bit synth/r6/build/top.bit]
+                    [--board mega65|nexys4ddr] [--no-program]
 
-Usage: tools/hwtest.py [--port /dev/ttyUSB1] [--baud 2000000]
-                       [--bit synth/r6/build/top.bit]
-                       [--board mega65|nexys4ddr] [--no-program]
+    Build the bitstream and the examples first, and niceemu
+    (make -C nice_cpu/emulator build), or the checks that need it are
+    skipped, and the summary names them after a SKIPPED.
 
---board says which board it is, for the check of the board's devices. By
-default the name of the --bit file tells: a path with nexys4ddr in it is the
-Nexys4DDR, any other is a MEGA65.
+    --board says which board it is, for the check of the board's devices.
+    By default the name of the --bit file tells: a path with nexys4ddr in
+    it is the Nexys4DDR, any other is a MEGA65.
 
---no-program skips programming and the check of the b notice, for a board
-that is already programmed. Only the Python
-standard library is used, and openFPGALoader when the FPGA is programmed.
-Programming needs Linux, as the JTAG cable is found through /sys; with
---no-program the script runs wherever load.py does.
+    --no-program skips programming and the check of the b notice, for a
+    board that is already programmed.
 
-A check that leaves the board in a state in which every later check would
-fail stops the run. Whatever happens, the script ends by holding the core
-with the ROM hidden, and it prints the summary.
+Programming:
+    It finds the JTAG cable on the same USB device as the serial port,
+    reads the FPGA's IDCODE through it, and stops unless the FPGA is the
+    part the bitstream was built for. It then programs the FPGA through
+    that cable alone, so with several boards attached it programs the
+    board whose UART it tests. openFPGALoader does both, for the MEGA65 and
+    the Nexys4DDR alike. Programming needs Linux, as the JTAG cable is
+    found through /sys; with --no-program the script runs wherever load.py
+    does.
+
+Checks, in this order:
+    - the link's b notice, and the ROM when the bitstream has one
+    Then, with the ROM hidden, the debug link (nice_cpu/doc/DEBUG.md):
+    - bad packets are dropped, and nicelink sends a dropped request again
+    - sim/echo.nasm loads and runs, and the link reaches only its debug
+      registers while it runs
+    - a hold and a restart of the core
+    - sim/pause.nasm pauses, and the registers, the memory, the counters,
+      and the input are checked while paused, after going on, after a
+      hold, and after a start paused
+    - sim/step.nasm steps to its halt, and the registers after each step
+      are compared with niceemu --trace
+    - sim/break.nasm stops at breakpoints
+    - the memory is cleared
+    - what sim/emu.nasm leaves after its halt is read back, and the cycle
+      counter and the timer stop there
+    - the screen's registers are written and read
+    - the board's devices are written and read: on the Nexys4DDR the LEDs,
+      RGB LEDs, and seven-segment display, and the buttons and switches,
+      which only a read can check; on the MEGA65 the block reads 0
+    - the C example examples/build/primes.bin runs, and after its halt the
+      microsecond counter holds the cycle counter's count over the clock
+      in MHz
+    Last, programs run with tools/run.py and with niceemu, and their
+    output and exit status are compared:
+    - sim/eof.nasm, also for the end of the input, and an input file of
+      1536 bytes
+    - a program that halts at once although 100 lines of input wait for it
+    - the emulator's trapsym.nasm and its label file, for --symbols
+    - the demo of the ROM, demo/demo.nasm, and its screen
+    - nice_cpu's benchmark, examples/build/bench.bin, all but its cycles
+    The programs run with the ROM hidden, so the RAM is at 0.
+
+Exit status:
+    0 if every check passed, else 1.
+
+Notes:
+    A check that leaves the board in a state in which every later check
+    would fail stops the run. Whatever happens, the script ends by holding
+    the core with the ROM hidden (the cleanup says so if the link did not
+    answer), and it prints the summary. Only the Python standard library
+    is used, and openFPGALoader when the FPGA is programmed.
 """
 
 import argparse
@@ -217,7 +235,8 @@ def usb_serial(port: str) -> str:
             with open(f"{path}/serial") as f:
                 return f.read().strip()
         path = os.path.dirname(path)
-    sys.exit(f"hwtest.py: no USB serial number found for {port}")
+    sys.exit(f"hwtest.py: no USB serial number found for {port}; is it "
+             f"the board's USB serial port? try --port")
 
 
 def fpga_model(serial: str) -> tuple[str, str]:
@@ -231,7 +250,8 @@ def fpga_model(serial: str) -> tuple[str, str]:
         m = re.search(r"model\s+(\S+)", r.stdout + r.stderr)
         if m:
             return cable, m.group(1)
-    sys.exit(f"hwtest.py: no FPGA answers on the JTAG cable {serial}")
+    sys.exit(f"hwtest.py: no FPGA answers on the JTAG cable {serial}; is "
+             f"the board on, and is its JTAG cable connected?")
 
 
 def check_board(port: str, bit: str) -> list[str]:
@@ -246,7 +266,8 @@ def check_board(port: str, bit: str) -> list[str]:
           f"{serial}), bitstream for {part}", flush=True)
     if not ok:
         sys.exit(f"hwtest.py: {bit} is for {part}, but the FPGA on {port} is "
-                 f"{model}; give the --port of the board it is for")
+                 f"{model}; give the --bit for this board, or the --port of "
+                 f"the board the bitstream is for")
     return ["-c", cable, "--ftdi-serial", serial]
 
 
@@ -895,9 +916,14 @@ def test_bench(link_args: list[str], bench: str) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--port", default="/dev/ttyUSB1")
-    parser.add_argument("--baud", type=int, default=2000000)
-    parser.add_argument("--bit", default=f"{REPO}/synth/r6/build/top.bit")
+    parser.add_argument("--port", default="/dev/ttyUSB1",
+                        help="the serial device of the board's debug UART "
+                        "(default %(default)s)")
+    parser.add_argument("--baud", type=int, default=2000000,
+                        help="the UART's baud rate (default %(default)s)")
+    parser.add_argument("--bit", default=f"{REPO}/synth/r6/build/top.bit",
+                        help="the bitstream to program (default "
+                        "%(default)s)")
     parser.add_argument("--board", choices=["mega65", "nexys4ddr"],
                         help="default: nexys4ddr if --bit has it in its path")
     parser.add_argument("--no-program", action="store_true",

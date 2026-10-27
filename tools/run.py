@@ -6,52 +6,76 @@ The program is loaded into cleared memory over the debug link
 and its output copied to stdout. When it halts, the link's halt notice
 comes after its last byte, and this prints what niceemu prints after a
 halt: why and after how many steps the program halted, the registers, and
-the --dump and --screen output. The exit status is that of niceemu, 0 after
-HALT and 2 after any other halt. So the output of the two can be compared:
+the --dump and --screen output. So the output of the two can be compared:
 
     diff <(niceemu -i in.txt prog.bin) <(tools/run.py -i in.txt prog.bin)
 
-Usage: tools/run.py [--port /dev/ttyUSB1] [--baud 2000000] [--tcp PORT]
-                    [--cosim PORT] [-i FILE] [-d ADDR:N]... [-s] [-2004] [--symbols FILE]
-                    [--timeout SEC] FILE.bin
+Usage:
+    tools/run.py [--port /dev/ttyUSB1] [--baud 2000000] [--tcp PORT]
+                 [--cosim PORT] [-i FILE] [-d ADDR:N]... [-s] [-2004]
+                 [--symbols FILE] [--timeout SEC] FILE.bin
 
---tcp PORT runs the program on "niceemu --link PORT" instead of the board,
-which checks this script and the link against the emulator. --cosim
-PORT runs it on the simulated system of "make -C sim cosim", which checks
-the RTL too.
+    --tcp PORT runs the program on "niceemu --link PORT" instead of the
+    board, which checks this script and the link against the emulator.
+    --cosim PORT runs it on the simulated system of "make -C sim cosim",
+    which checks the RTL too.
 
-The input is stdin, or the file of -i. It goes out as fast as the program's
-input buffer takes it: before each part, the free-space register says how
-many bytes it has room for, so none is lost. At the end of the input, a
-break on the UART, or a half-close of the TCP connection, ends the
-program's input too, so a read returns 0x200, as in the emulator. Input
-that the program has not read when it halts is dropped, as by the emulator.
+Input:
+    The input is stdin, or the file of -i. It goes out as fast as the
+    program's input buffer takes it: before each part, the free-space
+    register says how many bytes it has room for, so none is lost. At the
+    end of the input, a break on the UART, or a half-close of the TCP
+    connection, ends the program's input too, so a read returns 0x200, as
+    in the emulator. Input that the program has not read when it halts is
+    dropped, as by the emulator. The input file, the .bin file, and the
+    link are checked before the core is started.
 
-The steps are the core's instruction counter, which the emulator's step
-count equals, unless the program starts the timer, which counts clock
-cycles on the board and steps in the emulator. But the emulator waits for
-each input byte, and the board does not: while no byte has arrived, a read
-returns 0. So a program that waits for input in a loop runs more steps
-there. The memory has 64K words, repeated through the address space, so a
-dump beyond them reads the same words again. --timeout gives up after SEC
-seconds (60 by default): it holds the core, prints a line for the time
-limit and the --dump and --screen output, and exits with status 3, as
-niceemu does after its step limit. It prints no registers, as a hold
-leaves them undefined (DEBUG.md §6). -2004 prints the screen from 0x400, as
-niceemu does, which is plain memory on the board, not the screen that the
-board shows. --no-cycle-counter is accepted and ignored, as the cycle
-counter always runs. The input file, the .bin file, and the link are
-checked before the core is started. Options are taken as niceemu takes
-them, each on its own with its value as the next argument, and a usage
-error exits 1, as there. When stdout closes early, this exits quietly with
-status 141, as niceemu does. The .sym file is split into lines and fields as
-niceemu splits it. An interrupt holds the core.
---symbols FILE reads the labels that niceasm.py --symbols writes, and after
-a halt other than HALT prints where the program was, "At label+0x1f", and
-after a halt at ___wasm_trap, the default wasm trap handler, the trap's
-code from R1 and its location from R2, as niceemu does. At the time limit
-there are no registers, so no location, where niceemu prints one at its
-step limit. Only the Python standard library is used.
+Output:
+    After a halt, the lines of niceemu: the reason and the step count, the
+    registers, and the --dump and --screen output. -2004 prints the screen
+    from 0x400, as niceemu does, which is plain memory on the board, not
+    the screen that the board shows. The memory has 64K words, repeated
+    through the address space, so a dump beyond them reads the same words
+    again.
+
+    --symbols FILE reads the labels that niceasm.py --symbols writes. After
+    a halt other than HALT it prints where the program was, "At
+    label+0x1f", and after a halt at ___wasm_trap, the default wasm trap
+    handler, the trap's code from R1 and its location from R2, as niceemu
+    does. The .sym file is split into lines and fields as niceemu splits it.
+
+    --no-cycle-counter is accepted and ignored, as the cycle counter
+    always runs.
+
+Time limit:
+    --timeout gives up after SEC seconds (60 by default, 0 for none). It
+    holds the core, prints a line for the time limit and the --dump and
+    --screen output, and exits with status 3, as niceemu does after its
+    step limit. It prints no registers, as a hold leaves them undefined
+    (DEBUG.md §6), so --symbols has no location to name, where niceemu
+    prints one at its step limit.
+
+Exit status:
+    0    the program halted with HALT
+    1    a usage error, or a failure before or during the run: a file that
+         cannot be read, a link that does not answer
+    2    the program halted for another reason
+    3    the time limit ran out first; the core is held
+    130  interrupted with Ctrl-C; the core is held
+    141  stdout closed early, as by "| head" (SIGPIPE's status, as with
+         niceemu)
+    Options are taken as niceemu takes them, each on its own with its value
+    as the next argument, and a usage error exits 1, as there.
+
+Notes:
+    The steps are the core's instruction counter, which the emulator's step
+    count equals, unless the program starts the timer, which counts clock
+    cycles on the board and steps in the emulator. But the emulator waits
+    for each input byte, and the board does not: while no byte has arrived,
+    a read returns 0. So a program that waits for input in a loop runs more
+    steps there.
+
+    Only the Python standard library is used.
 """
 
 import argparse
@@ -221,8 +245,11 @@ def run(link: Link, infd: int, timeout: float) -> bool:
                 link.send_console(pending[:n], paced=False)
                 pending = pending[n:]
             else:
+                # The program's input buffer is full: wait 10 ms for
+                # it to take bytes, or for output to arrive
                 link.poll(0.01)
             continue
+        # Wake at least every 0.5 s, to see the time limit and the link
         wake = 0.5 if end is None else min(0.5, end - now)
         reading = infd >= 0
         ready, _, _ = select.select([link.fileno()] + ([infd] if reading else []),
@@ -352,12 +379,13 @@ def main() -> None:
                         help="read the console's input from FILE, not stdin")
     parser.add_argument("-d", "--dump", type=dump_option, action="append",
                         default=[], metavar="ADDR:N",
-                        help="after halting, print N memory words from ADDR")
+                        help="after halting, print N memory words from ADDR; "
+                        "decimal, or hex after 0x, up to %d words" % MAX_DUMP)
     parser.add_argument("-s", "--screen", action="store_true",
                         help="after halting, print the 80x25 character screen")
     parser.add_argument("-2004", dest="ide2004", action="store_true",
-                        help="print the screen from 0x400, as niceemu -2004 "
-                        "does")
+                        help="like niceemu -2004: the screen is at 0x400, "
+                        "plain memory on the board")
     parser.add_argument("--no-cycle-counter", action="store_true",
                         help="accepted and ignored: the cycle counter always "
                         "runs")
@@ -365,10 +393,14 @@ def main() -> None:
                         help="read the labels of niceasm.py --symbols from "
                         "FILE, and name where a halt other than HALT, and a "
                         "wasm trap, happened")
+    # 60 s is a limit so that a program that never halts does not hold the
+    # board for good; 0 turns it off
     parser.add_argument("--timeout", type=float, default=60,
+                        metavar="SEC",
                         help="give up after SEC seconds, with exit status 3 "
-                        "(default 60, 0 for none)")
-    parser.add_argument("file")
+                        "(default %(default)s, 0 for none)")
+    parser.add_argument("file",
+                        help="a .bin file: one 'address word' hex pair per line")
     args = parser.parse_args()
 
     words = read_bin(args.file)

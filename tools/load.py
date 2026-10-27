@@ -83,11 +83,13 @@ def read_bin(path: str) -> list[tuple[int, int]]:
             fail(f"{path}:{line_no}: address {addr:08x} is not in the RAM "
                  f"(0 to {RAM_WORDS - 1:x}) or the screen ({SCREEN_BASE:x} "
                  f"to {SCREEN_BASE + SCREEN_WORDS - 1:x}), so the board "
-                 f"cannot load it as the emulator does")
+                 f"cannot load it as the emulator does; move the "
+                 f"program into those ranges")
         seen[addr] = line_no
         words.append((addr, word))
     if not words:
-        fail(f"{path}: no words to load")
+        fail(f"{path}: no words to load; is it a .bin file, as niceasm.py "
+             f"writes with -o?")
     return words
 
 
@@ -119,7 +121,8 @@ def main() -> None:
     add_arguments(parser)
     parser.add_argument("--no-run", action="store_true",
                         help="leave the core held in reset after loading")
-    parser.add_argument("file")
+    parser.add_argument("file",
+                        help="a .bin file: one 'address word' hex pair per line")
     args = parser.parse_args()
 
     words = read_bin(args.file)
