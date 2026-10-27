@@ -77,6 +77,23 @@ build/$(TOP).bit: build/$(TOP).tcl $(SRC) $(XDC) $(ROM_ABS)
 	rm -f $@
 	bash -c "source $(VIVADO_DIR)/settings64.sh ; vivado -mode batch -source $< -log build/vivado.log -journal build/vivado.jou"
 
+# The worst path into the core and the worst out of it, from the register
+# of one side to the register of the other, to build/core_in.rpt and
+# build/core_out.rpt: the in-system slack that nice_cpu's budget for the
+# core's ports (make -C hdl timing) compares with. The core's cells are
+# found by name, for the design is flat; tools/bump.py reads the reports.
+# The catch keeps a failure here from stopping the build.
+define CORE_REPORTS_TCL
+if {[catch {
+   set core [get_cells -hier -filter {IS_SEQUENTIAL && NAME =~ *i_nicemon/i_core/i_core/*}]
+   set rest [get_cells -hier -filter {IS_SEQUENTIAL && NAME !~ *i_nicemon/i_core/i_core/*}]
+   report_timing -from $$rest -to $$core -max_paths 1 -file build/core_in.rpt
+   report_timing -from $$core -to $$rest -max_paths 1 -file build/core_out.rpt
+} msg]} { puts "core reports failed: $$msg" }
+endef
+export CORE_REPORTS_TCL
+CORE_REPORTS = $$CORE_REPORTS_TCL
+
 # The script is remade when the Makefiles or the ROM, NICE, or FLOW option
 # change. synth_design ignores VHDL assertions without -assert, such as the
 # check in src/rom.vhd for a word beyond the ROM.
@@ -92,6 +109,7 @@ build/$(TOP).tcl: $(MAKEFILE_LIST) build/rom.conf
 	echo "route_design $(ROUTE_OPTS)" >> $@
 	$(if $(filter timing,$(FLOW)),echo "phys_opt_design $(PHYS_OPTS)" >> $@)
 	echo "report_timing_summary -file build/timing.rpt" >> $@
+	echo "$(CORE_REPORTS)" >> $@
 	echo "report_utilization -file build/utilization.rpt" >> $@
 	echo "write_checkpoint -force build/$(TOP).dcp" >> $@
 	echo "write_bitstream -force build/$(TOP).bit" >> $@
