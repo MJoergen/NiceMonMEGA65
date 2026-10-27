@@ -3,9 +3,11 @@
 board.
 
 It starts "make -C sim cosim", the RTL in GHDL with its debug UART on a
-free port of 127.0.0.1, runs hwtest.py's checks of bad packets on it, but
-for the gap of 300 ms, its checks of the pause, the step, and the breakpoints, and runs the programs of hwtest.py's comparison with
-run.py --cosim on that port and with niceemu alone. Each must print the
+free port of 127.0.0.1. On it, it runs hwtest.py's checks of bad packets,
+except the one of a gap between two bytes, as a gap in real time is far
+shorter in simulated time, and its checks of the pause, the step, and the breakpoints. Then it runs
+the programs of hwtest.py's comparison with run.py --cosim on that port
+and with niceemu alone. Each must print the
 same and exit with the same status. So it checks the RTL, nicelink.py, and
 run.py as hwtest.py does on the board. The simulation runs far slower than
 real time, so the waits are longer, and nice_cpu's benchmark is left out.
@@ -31,6 +33,9 @@ from nicelink import HOLD, RAM, open_link
 
 
 def main() -> None:
+    argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    ).parse_args()
     if not os.path.exists(NICEEMU):
         sys.exit(f"cosimtest.py: {NICEEMU} is missing; run "
                  "'make -C nice_cpu/emulator build'")

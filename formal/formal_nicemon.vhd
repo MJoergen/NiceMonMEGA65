@@ -4,9 +4,9 @@
 -- request that a core or the link may make, and sends every byte on the
 -- UART and the keyboard at any time.
 -- The sizes are small: 16 words of RAM, a FIFO of 4 bytes, and a UART bit
--- of 2 cycles, from a clock of 2 MHz and a baud rate of 1 MHz. The
--- clock is not 2 Hz, as nice_cpu's perf wants 1 MHz or more for its
--- microsecond counter.
+-- of 2 cycles. Only the ratio matters to the UART, but nice_cpu's perf.vhd
+-- needs a clock of 1 MHz or more for its microsecond counter, so the clock
+-- is 2 MHz and the UART runs at 1 Mbaud.
 -- G_ROM_FILE gives the system a ROM of 4 words, rom.bin, or none when it
 -- is empty, and G_BOARD_IO gives it the board's registers at
 -- 0xFFFFFF90-9F, with free buttons and switches.

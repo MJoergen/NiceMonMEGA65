@@ -19,9 +19,10 @@
 --    the cursor key, and the keys typed after that.
 --
 -- The sizes are those of tb_nicemon, without the ROM. A key takes a few
--- milliseconds, so the clock is only 2 MHz, which the filter and the
--- timeout of the receiver still have their real lengths at, and the UART
--- runs at a tenth of it.
+-- milliseconds, so the clock is only 2 MHz, to keep the test short. The
+-- receiver's filter and timeout are given in time, through G_CLOCK_HZ, so
+-- they keep their real lengths at 2 MHz. The UART runs at a tenth of the
+-- clock.
 
 library ieee;
    use ieee.std_logic_1164.all;

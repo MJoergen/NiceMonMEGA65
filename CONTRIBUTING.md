@@ -338,7 +338,7 @@ plugged in, so name the port by the cable's serial number, as in
 `PORT=/dev/serial/by-id/usb-Digilent_Digilent_USB_Device_<serial>-if01-port0`.
 A board that is already programmed can be tested with `tools/hwtest.py
 --no-program`, which skips the `b` notice. The reset button is not tested:
-press it with a terminal open, and the `b01` notice comes again. A
+press it with a terminal open, and the `b04` notice comes again. A
 bitstream with a ROM can be tested, such as one with the demo (`make
 demo`, then `make r6 ROM=demo/build/demo.bin`): the test holds the core and hides the ROM, as `load.py` does, and runs
 the programs from the RAM.

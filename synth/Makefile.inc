@@ -5,8 +5,8 @@
 #
 # make                builds build/top.bit, whose core waits, held, for
 #                     the debug link
-# make ROM=file.bin   builds it with the ROM: the core boots from file.bin,
-#                     the monitor, at reset (G_ROM_FILE of top.vhd)
+# make ROM=file.bin   builds it with the ROM: the core boots from file.bin
+#                     at reset (G_ROM_FILE of top.vhd)
 # make NICE=multi     builds it with nice_cpu's multi-cycle core instead of
 #                     the pipelined one, which is the default (core.mk)
 # make FLOW=timing    builds it with directives for timing (below)

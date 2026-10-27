@@ -21,10 +21,10 @@
 --   timing by a few tenths of a nanosecond or less, which placement
 --   changes from run to run.
 -- * The VGA output is a resistor DAC with 4 bits per color, and no HDMI.
---   The screen's colors have 4 bits per color (text.vhd), so the
---   top 4 bits of each lose nothing. The color and sync outputs are
---   registered in the IOBs (nexys4ddr.xdc), so they all change at the same
---   time.
+--   The VGA outputs take the top 4 of the 8 bits of each color, which
+--   loses nothing, as the screen's colors have only 4 bits (text.vhd).
+--   The color and sync outputs are registered in the IOBs (nexys4ddr.xdc),
+--   so they all change at the same time.
 -- The reset button, CPU_RESETN, is active low.
 
 library ieee;
@@ -35,7 +35,7 @@ library work;
 
 entity top is
    generic (
-      -- The ROM with the monitor, a .bin file, or "" for a build without a
+      -- The ROM that the core boots from, a .bin file, or "" for a build without a
       -- ROM, whose core waits for the debug link (see src/nicemon.vhd)
       G_ROM_FILE : string := ""
    );

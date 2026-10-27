@@ -3,11 +3,15 @@
 
 A Link talks to the board over its debug UART, to niceemu --link over
 TCP on 127.0.0.1, or to the simulated system of make -C sim cosim, whose
-UART is on a TCP port of 127.0.0.1 too. It splits what arrives into console bytes, with ESC ESC
-as 0xFF, and packets, which it checks: the answers go to the request that
-waits for them, and the notices are counted, b, o, and p, or kept, h with
-its reason and x with its breakpoint's number. An x is a pause too, so it
-counts as one (DEBUG.md §4). A packet with a bad checksum is dropped, as DEBUG.md §5 says.
+UART is on a TCP port of 127.0.0.1 too. It splits what arrives into
+console bytes, with ESC ESC as 0xFF, and packets, which it checks. A
+packet is an answer to a request, or a notice, which the board sends on
+its own (DEBUG.md §4): b at reset, o when an input byte is lost, p at a
+pause, h at a halt, and x at a breakpoint. The answers go to the request
+that waits for them, and the notices are counted, b, o, and p, or kept,
+h with its reason and x with its breakpoint's number. An x is a pause
+too, so it counts as one. A packet with a bad checksum is dropped, as
+DEBUG.md §5 says.
 
 A request waits ANSWER_WAIT for the first byte of its answer, and as long
 as the bytes of a packet keep coming. The simulation runs far slower than

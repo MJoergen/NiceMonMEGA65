@@ -3,6 +3,18 @@
 -- board's top level gives it a clock, a reset, the UART pins, and optionally
 -- a keyboard: a stream of bytes that is input like the UART's.
 --
+-- Words used here (SYSTEM.md has them in full; DEBUG.md, ISA.md,
+-- MICROARCH.md, and SYSTEM.md with a section number are nice_cpu's, in
+-- nice_cpu/doc/):
+--   link    nice_cpu's debug link, a second bus master that a host drives
+--           with packets on the UART
+--   held    bit 0 of the link's control register is 1: the core is in reset
+--   start   bit 0 goes from 1 to 0: the devices reset, and the core runs
+--   hidden  bit 3 is 1: the ROM is out of the way, and the RAM is at 0
+--   paused  bit 4 is 1: the core stops between instructions
+--   notice  a packet the link sends on its own: b04 at reset, h at a halt,
+--           p at a pause, x at a breakpoint, and o for a lost input byte
+--
 -- THEORY OF OPERATION
 -- The core (src/nice_core.vhd, wrapping one of nice_cpu's cores) has an
 -- instruction bus and a data bus, both pipelined Wishbone. The instruction
@@ -23,8 +35,8 @@
 --                          memory, and so do the words of 0xFFFFFF00-FF
 --                          that are not registers.
 --   0x00000000-0x00007FFF  The ROM, 2^G_ROM_ADDR_BITS words from G_ROM_FILE
---                          (src/rom.vhd), with the monitor, which the core
---                          boots from, as QNICE-FPGA's is at 0x0000-0x7FFF.
+--                          (src/rom.vhd), which the core boots from, as
+--                          QNICE-FPGA's monitor is at 0x0000-0x7FFF.
 --                          It is in front of the RAM, and repeats with it. A
 --                          write to it is dropped. Bit 3 of the link's
 --                          control register hides it, so that the RAM is at
@@ -120,13 +132,19 @@
 --                          version, 4, the free space of the core's input
 --                          FIFO, and the G_BREAKS breakpoints: their enable
 --                          bits, their number, the stop register, and
---                          their addresses. Bit 0 of the control register holds
---                          the core in reset, bit 2 clears the RAM, the RAM
---                          under the ROM and the screen included, to 0, as
---                          the emulator's memory is at the start, bit 3
---                          hides the ROM; in a build without a ROM it reads
---                          1, and bit 4 pauses the core. The core's data
---                          accesses to these words go to the memory.
+--                          their addresses. The bits of the control
+--                          register:
+--                            0  hold the core in reset
+--                            1  halted, read only
+--                            2  clear the RAM, the RAM under the ROM and
+--                               the screen included, to 0, as the
+--                               emulator's memory is at the start
+--                            3  hide the ROM; reads 1 in a build without
+--                               a ROM
+--                            4  pause the core
+--                            5  step, with bit 4, a paused core
+--                          The core's data accesses to these words go to
+--                          the memory.
 -- Instruction fetches from 0xFFFFFF00-0xFFFFFFFF read 0 (ISA.md §8.3).
 --
 -- The core runs while bit 0 of the control register is 0, it has not
@@ -456,7 +474,8 @@ architecture synthesis of nicemon is
    signal kbd_take      : std_logic;
    signal in_valid      : std_logic;
    signal in_data       : std_logic_vector(7 downto 0);
-   -- The end of the input, from a break until the next start
+   -- The end of the input, a break on the UART. The link gives it to the
+   -- FIFO's end_i, which keeps it as rx_eof until the next start.
    signal link_eoi : std_logic;
 
    -- The core's console output, to the link
@@ -466,11 +485,10 @@ architecture synthesis of nicemon is
    -- The core's input FIFO (src/rx_fifo.vhd). rx_q holds the oldest byte in
    -- the cycle after a read of the console takes it.
    signal rx_wr_en : std_logic;
-   signal rx_end   : std_logic;
    signal rx_take  : std_logic;
    signal rx_empty : std_logic;
    signal rx_q     : std_logic_vector(7 downto 0);
-   -- The core's input has ended with a break.
+   -- The core's input has ended with a break (link_eoi).
    signal rx_eof : std_logic;
    -- The free bytes of the FIFO
    signal rx_free : std_logic_vector(C_RX_FIFO_BITS downto 0);
@@ -581,6 +599,8 @@ begin
    mem_stb   <= '1' when bus_take = '1' and not is_io(bus_addr) else
                 '0';
 
+   -- A console read returns the byte in bits 7..0 and bit 8 set (the header,
+   -- 0xFFFFFF00).
    dbus_rdata <= mem_rdata when rd_src = SRC_MEM else
                  X"00000" & "0001" & rx_q when rd_src = SRC_RX else
                  dev_rdata when rd_src = SRC_DEV else
@@ -716,7 +736,6 @@ begin
    -- cycle that accepts the request. The FIFO is in reset while the core is
    -- held, so a program starts with no input.
    rx_wr_en <= in_valid and cpu_started;
-   rx_end   <= link_eoi;
    rx_take  <= '1' when core_take = '1' and
                         dbus_addr = C_UART_DATA and dbus_we = '0' else
                '0';
@@ -732,7 +751,7 @@ begin
          wr_data_i => in_data,
          full_o    => open,
          free_o    => rx_free,
-         end_i     => rx_end,
+         end_i     => link_eoi,
          ended_o   => rx_eof,
          rd_en_i   => rx_take,
          empty_o   => rx_empty,

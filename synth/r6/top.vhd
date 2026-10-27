@@ -11,7 +11,7 @@ library ieee;
 
 entity top is
    generic (
-      -- The ROM with the monitor, or "" for a build without one (mega65.vhd)
+      -- The ROM that the core boots from, or "" for a build without one (mega65.vhd)
       G_ROM_FILE : string := ""
    );
    port (

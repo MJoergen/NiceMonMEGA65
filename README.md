@@ -2,14 +2,16 @@
 
 [![CI](https://github.com/MJoergen/NiceMonMEGA65/actions/workflows/ci.yml/badge.svg)](https://github.com/MJoergen/NiceMonMEGA65/actions/workflows/ci.yml)
 
-The NICE CPU with a monitor, on the MEGA65
+The NICE CPU on the MEGA65, with a debug link and a demo in its ROM
 
 This project runs the [NICE CPU](https://github.com/MJoergen/nice_cpu) on
-the MEGA65 (R3 and R6). It shows a screen of 80×25 characters on HDMI and
-VGA, and reads the MEGA65's keyboard. Its debug UART carries the program's
-console, and a debug link with which a PC loads, runs, pauses, steps, and
-inspects programs. A program runs on the board as it runs in `niceemu`, the
-emulator of nice_cpu.
+the [MEGA65](https://mega65.org/) (R3 and R6), a modern FPGA computer in
+the form of a Commodore 65. NICE is a 32-bit CPU with its own instruction
+set, assembler, C toolchain, and emulator, `niceemu`. Here it shows a
+screen of 80×25 characters on HDMI and VGA, and reads the MEGA65's
+keyboard. The debug UART carries the program's console and the debug
+link, which a PC uses to load, run, pause, step, and inspect programs. A
+program runs on the board as it runs in `niceemu`.
 
 There are two ways to use it:
 
@@ -18,35 +20,38 @@ There are two ways to use it:
 - [With the serial port](#with-the-serial-port), where a PC loads programs
   over the debug link, talks to them, and debugs them.
 
-A monitor like the one in [QNICE-FPGA](https://github.com/sy2002/QNICE-FPGA)
-is planned and not written yet (see [monitor/](monitor/README.md)). It
-will be in the ROM, and will let a MEGA65 on its own load and run
-programs too.
+A monitor like QMON, the one in
+[QNICE-FPGA](https://github.com/sy2002/QNICE-FPGA), is planned but not
+written yet (see [monitor/](monitor/README.md)). It will be in the ROM,
+and will let a MEGA65 on its own load and run programs too.
 
 This README is for those who use the core and write programs for it.
-[SYSTEM.md](SYSTEM.md) has the address map and the devices,
-[EMULATOR.md](EMULATOR.md) the differences from the emulator, and
+[SYSTEM.md](SYSTEM.md) has the address map, the devices, and the words
+used for the link, such as hold, pause, and step.
+[EMULATOR.md](EMULATOR.md) has the differences from the emulator, and
 [CONTRIBUTING.md](CONTRIBUTING.md) is for those who change this repository.
 The system also builds for the Digilent Nexys4DDR (see
 [synth/](synth/README.md#the-nexys4ddr) and
 [SYSTEM.md](SYSTEM.md#the-nexys4ddrs-devices)).
 
-## Installing the core
+## Quick start
 
-From `V1.0` on, each [release](https://github.com/MJoergen/NiceMonMEGA65/releases)
-has two core files: `nicemon-V1.0-r6.cor` for the R6, and
-`nicemon-V1.0-r3.cor` for the R3 and R3A. A core file holds its board
-revision, so use the one for your board. Copy it to the SD card, and hold
-No Scroll while you switch the MEGA65 on. MEGAFLASH then writes the core
-file into a slot of the flash, and the board starts the system from that
-slot, without a JTAG cable. [RELEASE_NOTES.md](RELEASE_NOTES.md) has what
+1. Download the core file for your board from the latest
+   [release](https://github.com/MJoergen/NiceMonMEGA65/releases):
+   `nicemon-V1.0-r6.cor` for the R6, or `nicemon-V1.0-r3.cor` for the R3
+   and R3A. A core file holds its board revision, so use the one for
+   yours.
+2. Copy it to the SD card, and hold No Scroll while you switch the MEGA65
+   on. MEGAFLASH, the MEGA65's core menu, then writes the core file into
+   a slot of the flash.
+3. The board then starts the system from that slot. The screen shows a
+   welcome, and what you type appears on it (see
+   [On its own](#on-its-own)).
+
+No JTAG cable is needed. [RELEASE_NOTES.md](RELEASE_NOTES.md) has what
 changed in each release.
 
-The core files of a release have a demo in the ROM (see
-[On its own](#on-its-own)), so the screen shows a welcome at power-up.
-The tools of this repository load programs over the debug link as
-before. To build a core file yourself, with a ROM of your own, see
-[On its own](#on-its-own).
+## Setting up the tools
 
 The tools that load and debug programs are in this repository. Clone it
 with the submodule, which has the assembler, the emulator, and the C
@@ -60,7 +65,8 @@ or, in an existing clone:
 
 The tools need only Python 3, on Linux or macOS. The emulator, `niceemu`,
 is built with `make -C nice_cpu/emulator build`, which needs Zig (see
-[nice_cpu/emulator/](nice_cpu/emulator/README.md)).
+[nice_cpu/emulator/](nice_cpu/emulator/README.md)). A terminal program
+that runs at 2 Mbaud, such as `picocom`, shows the program's console.
 
 ## On its own
 
@@ -117,17 +123,17 @@ LED is green while the core runs, like the user LED.
 ### The screen
 
 The screen at `0xFFFF0000` is shown on the VGA connector and on the HDMI
-connector, at 1280×1024 and 60 Hz, as 80 columns and 25 rows of
-characters of 16×32 pixels, in the middle of the picture. Word `80 * row +
-column` is one character: its code, ISO 8859-1, in bits 7..0, and its
-color above. The color is two 12-bit colors, red, green, and blue with 4
-bits each, as in nice_cpu's `doc/SYSTEM.md` §1: the background in bits
-31..20 and the foreground in bits 19..8. A component `n` gives the byte
-`n × 0x11`, so `0xF` is full intensity and `0x0` is none. The foreground is
-not inverted, as it is in the 2004 IDE. So a word with only a character,
-such as `0x41`, is black on black, and `0x000FFF41` is a white `A` on
-black. The screen is 0 at power-up, which shows as black, and
-`nice_screen_clear` fills it with blanks.
+connector, at 1280×1024 and 60 Hz, as 80 columns and 25 rows of characters
+of 16×32 pixels, in the middle of the picture. Word `80 * row + column` is
+one character: its code, ISO 8859-1, in bits 7..0, and its color above. The
+color is two 12-bit colors, red, green, and blue with 4 bits each, as in
+nice_cpu's `doc/SYSTEM.md` §1: the background in bits 31..20 and the
+foreground in bits 19..8. A component `n` gives the byte `n × 0x11`, so
+`0xF` is full intensity and `0x0` is none. Unlike in NICE's original IDE of
+2004, the foreground is not inverted. So a word with only a character, such
+as `0x41`, is black on black, and `0x000FFF41` is a white `A` on black. The
+screen is 0 at power-up, which shows as black, and `nice_screen_clear`
+fills it with blanks.
 
 The screen's memory has room for scrolling, and the display has a cursor,
 with registers as QNICE-FPGA's (see [SYSTEM.md](SYSTEM.md#the-screen)).
@@ -140,12 +146,12 @@ debug link of nice_cpu's [doc/DEBUG.md](nice_cpu/doc/DEBUG.md). The tools
 in `tools/` use the link, and `niceemu --link` serves the same link, so the
 tools drive the emulator as they drive the board.
 
-The tools use the serial device `/dev/ttyUSB1`, the MEGA65's debug UART.
-If yours is another, give it with `--port`, and to your terminal. On macOS,
-use the `/dev/cu.*` device, as a `/dev/tty.*` device blocks on open. The
-port must not be open in a terminal while a tool runs. A bitstream built
-before the rate went up runs at 115200 baud, and the tools need `--baud
-115200` for it.
+The tools use the serial device `/dev/ttyUSB1`, the MEGA65's debug UART. If
+yours is another, give it to the tools with `--port`, and open it in your
+terminal program. On macOS, use the `/dev/cu.*` device, as a `/dev/tty.*`
+device blocks on open. The port must not be open in a terminal while a tool
+runs. A bitstream built before the rate went up runs at 115200 baud, and
+the tools need `--baud 115200` for it.
 
 `make` has a target for each tool:
 
@@ -216,7 +222,7 @@ not echo what you type, so the number shows only after you press Enter:
     Primes up to 1000: 168
     36731 instructions in 58159 cycles
 
-The second line comes from the performance counters, and the numbers are
+The third line comes from the performance counters, and the numbers are
 from the board with the pipelined core, where the 58159 cycles at 100 MHz
 take about 0.58 ms.
 

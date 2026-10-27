@@ -35,9 +35,9 @@
 -- two colors of 12 bits, red, green, and blue with 4 bits each: the
 -- background in bits 31..20, and the foreground in bits 19..8 (nice_cpu's
 -- doc/SYSTEM.md §1). Each 4-bit component n becomes the byte n * 0x11, so 0xF
--- is full intensity and 0x0 is none. The foreground is not inverted, as it is
--- in the 2004 IDE, so a word with only a character, such as 0x41, is black on
--- black.
+-- is full intensity and 0x0 is none. Unlike in NICE's original IDE of 2004,
+-- the foreground is not inverted, so a word with only a character, such as
+-- 0x41, is black on black.
 --
 -- The pixel counters (pix.vhd) give the pixel of stage 0. The pipeline:
 --   1: the position in the text, the address of the character, with the

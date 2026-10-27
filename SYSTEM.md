@@ -7,9 +7,24 @@ the screen, the ROM, and the Nexys4DDR's devices. It follows nice_cpu's
 [doc/DEBUG.md](nice_cpu/doc/DEBUG.md) for the link.
 [EMULATOR.md](EMULATOR.md) lists where it differs from `niceemu`.
 `src/nicemon.vhd` is the system, and its header is the authoritative
-address map.
+address map. DEBUG.md, ISA.md, and MICROARCH.md are nice_cpu's, in
+`nice_cpu/doc/`, and so is the SYSTEM.md with a section number, which is
+not this file.
 
 ## The debug link
+
+These words are used here and in the other documents and sources:
+
+| Word | Meaning |
+|---|---|
+| The link | nice_cpu's debug link: packets between the console bytes on the UART, with which a host reads and writes memory and the debug registers. |
+| Hold | Bit 0 of the control register at `0xFFFFFFF0` is 1: the core is in reset, and the link reaches all of memory. The core is held at power-up. |
+| Start | Bit 0 goes from 1 to 0: the devices are reset, and the core runs from address 0. |
+| Hide | Bit 3 of the control register is 1: the ROM is out of the way, so the RAM is at 0, as in the emulator. |
+| Clear | A write with bit 2 set fills the RAM and the screen with 0. |
+| Pause | Bit 4 of the control register is 1: the core stops between two instructions, and the link reaches all of memory and the core's registers. Writing 0 to bit 4 makes the program go on. |
+| Step | Bits 4 and 5 written to a paused core: it runs one instruction, or enters an interrupt, and pauses again. |
+| Notice | A packet that the board sends on its own: `b04` at reset (the link's version, 4), `h` when the core halts, `p` when it pauses, `x` when it stops at a breakpoint, and `o` when an input byte is lost. |
 
 The MEGA65's debug UART runs at 2 Mbaud (2000000), 8-N-1, and carries the debug
 link of nice_cpu's [doc/DEBUG.md](nice_cpu/doc/DEBUG.md). It passes the
@@ -17,7 +32,7 @@ program's console bytes both ways, and between them it carries packets,
 which start with the byte `0xFF`. A console byte `0xFF` is sent as two. With
 the packets, a host reads and writes memory and the debug registers at
 `0xFFFFFFE0`–`FF` (see [Address map](#address-map)). The board sends a
-notice at reset (`b01`), when the core halts (`h` and the reason), and when
+notice at reset (`b04`), when the core halts (`h` and the reason), and when
 an input byte is lost (`o`). The tools in `tools/` are such a host, and
 `niceemu --link` serves the same link, so the tools drive the emulator as
 they drive the board.
@@ -50,23 +65,24 @@ With link version 3, a host can step a paused program. A write of
 core pauses again: the link sends `p`, or `h` if the step halted. Bit 5
 reads 0, and does nothing unless the core is paused. During the step the
 link reaches only its debug registers, and the counters and the timer run.
-`0x00000018`, with the core held, starts it paused at address 0, so a host
-can step a program from its first instruction.
+A write of `0x00000018` to a held core starts it paused at address 0, so a
+host can step a program from its first instruction.
 
 With link version 4, the board has four breakpoints. A host writes an
 address to `0xFFFFFFF8`–`FB` and sets its bit in `0xFFFFFFF4`. The core
-then pauses before the instruction at that address, and the link sends
-`x` with the breakpoint's number, such as `x00#D8`, instead of `p`. After
-`x` the core is paused as after `p`, and `0xFFFFFFF6` tells which
-breakpoint it stopped at. A go on runs that instruction, and does not stop
-at it again. A step or a pause that ends at a breakpoint sends `x` too. The
-breakpoints take a write at any time, and a reset clears them.
+then pauses before the instruction at that address, and the link sends `x`
+with the breakpoint's number, such as `x00#D8`, instead of `p`. After `x`
+the core is paused as after `p`, and `0xFFFFFFF6` tells which breakpoint it
+stopped at. When the program goes on, it runs that instruction, and does
+not stop at it again. A step or a pause that ends at a breakpoint sends `x`
+too. The breakpoints take a write at any time, and a reset clears them.
 `tools/load.py` and `tools/run.py` disable them before they load a program.
 
 A terminal on the UART shows what the program prints, and what you type
 goes to the program while it runs. Bytes typed while it is paused wait for
-it, and bytes typed while the core is held or has halted are dropped. The notices show up in the terminal too, as a few
-letters after a stray character, such as `h01#C9` after a `HALT`.
+it, and bytes typed while the core is held or has halted are dropped. The
+notices show up in the terminal too, as a few letters after a stray
+character, such as `h01#C9` after a `HALT`.
 
 ## Address map
 
@@ -81,24 +97,44 @@ effect and does not write (DEBUG.md §3).
 | `0x00000000`–`0x00007FFF` | The ROM, in a bitstream built with one, in front of the RAM and repeating with it (see [The ROM](#the-rom)). Bit 3 of the control register hides it. |
 | `0xFFFF0000`–`0xFFFF7FFF` | The screen: 32768 words of memory of their own, the emulator's 80×25 screen and room for scrolling. The 2000 words from the display offset are shown on VGA and HDMI, or VGA only on the Nexys4DDR (see [The screen](#the-screen)), and the link reads them all. |
 | `0xFFFF8000`–`0xFFFFFEFF` | RAM, between the screen and the I/O page: the RAM words `0x8000`–`0xFEFF`, as the 64K words repeat. On the Nexys4DDR, whose screen is 8192 words, it starts lower: `0xFFFF2000`–`0xFFFFFEFF` are the words `0x2000`–`0xFEFF`. The runtime's stack starts at `0xFFFFFF00` and grows down into it, and so does the stack of a program in the ROM, such as the demo. In the emulator it is ordinary memory. |
-| `0xFFFFFF00` | The console of SYSTEM.md §1. A write sends bits 7..0 to the UART. A read takes the oldest byte received from the UART or the keyboard, and returns it in bits 7..0 with bit 8 set, or 0 when no byte has arrived. A break on the UART ends the input: once the bytes before it are read, a read returns `0x200` (bit 9), as at the end of the emulator's input, until the core is started again. |
+| `0xFFFFFF00` | The console of nice_cpu's SYSTEM.md §1. A write sends bits 7..0 to the UART. A read takes the oldest byte received from the UART or the keyboard, and returns it in bits 7..0 with bit 8 set, or 0 when no byte has arrived. A break on the UART ends the input: once the bytes before it are read, a read returns `0x200` (bit 9), as at the end of the emulator's input, until the core is started again. |
 | `0xFFFFFF01` | The emulator's read counter. A read by the core returns the number of its reads since the last write, and a write sets that number. It is 0 after reset, and a start keeps it, as in the emulator. |
-| `0xFFFFFF10`–`0xFFFFFF1F` | The timer of SYSTEM.md §4: it raises IRQ every P clock cycles, through the vector it is given. |
-| `0xFFFFFF20`–`0xFFFFFF3F` | The math unit of SYSTEM.md §2: 32-bit multiply and divide, and 64-bit divide. |
-| `0xFFFFFF40`–`0xFFFFFF4F` | The performance counters of SYSTEM.md §3: cycles, instructions, and microseconds, 64 bits each. The microseconds come from the clock, 100 MHz on the MEGA65 and 90 MHz on the Nexys4DDR, so they are real time, where the emulator counts one per step. They stop while the core is paused. The link reads them as the core does: a read of a low word takes the snapshot that the high word returns, where `niceemu --link` takes none. DEBUG.md §3 allows both while the core is held, halted, or paused. The words `0xFFFFFF46`–`4F` read 0 and take no write. |
+| `0xFFFFFF10`–`0xFFFFFF1F` | The timer of nice_cpu's SYSTEM.md §4: it raises IRQ every P clock cycles, through the vector it is given. |
+| `0xFFFFFF20`–`0xFFFFFF3F` | The math unit of nice_cpu's SYSTEM.md §2: 32-bit multiply and divide, and 64-bit divide. |
+| `0xFFFFFF40`–`0xFFFFFF4F` | The performance counters of nice_cpu's SYSTEM.md §3: cycles, instructions, and microseconds, 64 bits each. The microseconds come from the clock, 100 MHz on the MEGA65 and 90 MHz on the Nexys4DDR, so they are real time, where the emulator counts one per step. They stop while the core is paused. The link reads them as the core does: a read of a low word takes the snapshot that the high word returns, where `niceemu --link` takes none. DEBUG.md §3 allows both while the core is held, halted, or paused. The words `0xFFFFFF46`–`4F` read 0 and take no write. |
 | `0xFFFFFF50`–`0xFFFFFF7F` | The fetch statistics of MICROARCH.md §8.1, the rest of the performance counters: counters of what FETCH and DECODE do, for judging the size of FETCH's buffer. A start of the core clears them, and they then count each clock while the core runs, until a write of 0 to `FS_CTRL` stops them. They stop while the core is held and after it halts. |
 | `0xFFFFFF80`–`0xFFFFFF8F` | The screen's registers: the cursor and the display offset (see [The screen](#the-screen)). |
 | `0xFFFFFF90`–`0xFFFFFF9F` | The Nexys4DDR's LEDs, seven-segment display, buttons, and switches (see [The Nexys4DDR's devices](#the-nexys4ddrs-devices)). On the MEGA65 they read 0 and take no write. |
 | `0xFFFFFFE0`–`0xFFFFFFEF` | The debug registers of DEBUG.md §6, for the link only, here and below: R0–R15 of the core, read only. After a halt they hold what the emulator prints. While the core is paused they hold its registers, with R15 the address of the next instruction, and a hold of the paused core keeps them. A hold of a running core leaves them undefined. |
-| `0xFFFFFFF0` | Control. Bit 0 holds the core in reset. Bit 1, read only, is 1 after a halt, and stays 1 while the core is held, until the next start. A write with bit 2 set first clears the RAM and the screen to 0, with the core held, and is answered when the memory is clear, after 0.66 ms at 100 MHz. Bit 3 takes effect when the clear starts, and bit 0 when it ends. Bit 3 hides the ROM, so that the RAM is at 0; reset clears it in a bitstream with a ROM, and in one without it reads 1. A write of 1 to bit 4 pauses the core at the next step boundary, and the link sends `p`; bit 4 reads 1 while the core is paused, and a write of 0 makes it go on. A start with bit 4 set pauses before the first instruction. A write with bits 4 and 5 set to a paused core runs one step, and the link sends `p` again, or `h`; bit 5 reads 0. |
+| `0xFFFFFFF0` | Control: hold, clear, hide, pause, and step (see [The control register](#the-control-register)). |
 | `0xFFFFFFF1` | Read only: why the core halted. 0 while it has not, 1 for `HALT`, 2 for a reserved control word, 3 for `INT` inside an interrupt routine, and 4 for `RTI` outside one. |
 | `0xFFFFFFF2` | Read only: the version of the link, 4. |
 | `0xFFFFFFF3` | Read only: the bytes of free space in the core's input FIFO. |
 | `0xFFFFFFF4` | The enable bits of the breakpoints: bit i enables breakpoint i. Bits 4 to 31 read 0. |
 | `0xFFFFFFF5` | Read only: the number of breakpoints, 4. |
-| `0xFFFFFFF6` | Read only: the stop. From an `x` until the next go on, step, or start, bit 8 is 1 and bits 7–0 are the breakpoint's number. Otherwise 0. |
+| `0xFFFFFFF6` | Read only: the stop. From an `x` until the program goes on, steps, or starts, bit 8 is 1 and bits 7–0 are the breakpoint's number. Otherwise 0. |
 | `0xFFFFFFF7` | Reserved: reads 0. |
 | `0xFFFFFFF8`–`0xFFFFFFFB` | The addresses of breakpoints 0 to 3. `0xFFFFFFFC`–`FF` read 0. A reset clears the breakpoints, and a hold, a start, and a clear keep them. |
+
+### The control register
+
+| Bit | Name | Meaning |
+|---|---|---|
+| 0 | Hold | 1 holds the core in reset. A write of 0 starts it. |
+| 1 | Halted | Read only. 1 after a halt, and stays 1 while the core is held, until the next start. |
+| 2 | Clear | A write with bit 2 set first clears the RAM and the screen to 0, with the core held, and is answered when the memory is clear, after 0.66 ms at 100 MHz. Bit 3 takes effect when the clear starts, and bit 0 when it ends. |
+| 3 | Hide | 1 hides the ROM, so that the RAM is at 0. Reset clears it in a bitstream with a ROM; in one without a ROM it reads 1. |
+| 4 | Pause | A write of 1 pauses the core at the next step boundary, and the link sends `p`. It reads 1 while the core is paused, and a write of 0 makes the program go on. A start with bit 4 set pauses before the first instruction. |
+| 5 | Step | A write with bits 4 and 5 set to a paused core runs one step, and the link sends `p` again, or `h`. It reads 0. |
+
+The tools write these values:
+
+| Value | Bits | Effect |
+|---|---|---|
+| `0x0000000D` | Hold, clear, and hide | Stops the core and prepares the memory for a load. |
+| `0x00000008` | Hide | Starts or continues the program, with the ROM still hidden. |
+| `0x00000018` | Hide and pause | Pauses a running core, or starts a held one paused at address 0. |
+| `0x00000038` | Hide, pause, and step | Runs one step of a paused core. |
 
 Instruction fetches from `0xFFFFFF00`–`0xFFFFFFFF` read 0, as ISA.md §8.3
 requires. The input waits for the core in a FIFO of 2048 bytes, in block
@@ -127,17 +163,17 @@ reads them after a halt.
 ## The screen
 
 The screen at `0xFFFF0000` is shown on the VGA connector and on the HDMI
-connector, at 1280×1024 and 60 Hz, as 80 columns and 25 rows of
-characters of 16×32 pixels, in the middle of the picture. Word `80 * row +
-column` is one character: its code, ISO 8859-1, in bits 7..0, and its
-color above. The color is two 12-bit colors, red, green, and blue with 4
-bits each, as in nice_cpu's `doc/SYSTEM.md` §1: the background in bits
-31..20 and the foreground in bits 19..8. A component `n` gives the byte
-`n × 0x11`, so `0xF` is full intensity and `0x0` is none. The foreground is
-not inverted, as it is in the 2004 IDE. So a word with only a character,
-such as `0x41`, is black on black, and `0x000FFF41` is a white `A` on
-black. The screen is 0 at power-up, which shows as black, and
-`nice_screen_clear` fills it with blanks.
+connector, at 1280×1024 and 60 Hz, as 80 columns and 25 rows of characters
+of 16×32 pixels, in the middle of the picture. Word `80 * row + column` is
+one character: its code, ISO 8859-1, in bits 7..0, and its color above. The
+color is two 12-bit colors, red, green, and blue with 4 bits each, as in
+nice_cpu's `doc/SYSTEM.md` §1: the background in bits 31..20 and the
+foreground in bits 19..8. A component `n` gives the byte `n × 0x11`, so
+`0xF` is full intensity and `0x0` is none. Unlike in NICE's original IDE of
+2004, the foreground is not inverted. So a word with only a character, such
+as `0x41`, is black on black, and `0x000FFF41` is a white `A` on black. The
+screen is 0 at power-up, which shows as black, and `nice_screen_clear`
+fills it with blanks.
 
 The screen's memory is 32768 words, `0xFFFF0000`–`0xFFFF7FFF` (8192 words,
 `0xFFFF0000`–`0xFFFF1FFF`, on the Nexys4DDR), of which the

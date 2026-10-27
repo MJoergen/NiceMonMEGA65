@@ -8,9 +8,10 @@
 -- The UART input passes through two registers, a synchronizer, and the UART
 -- output through one, so that it changes only on the clock edge. The UART
 -- runs at 2 Mbaud, a bit of 50 cycles at 100 MHz and of 45 at 90 MHz, the
--- clocks of the MEGA65 and the Nexys4DDR. The FT2232H on the other end of
--- both makes it exactly too, from its 12 MHz. Loading a program takes far
--- less time than at 115200 baud, as every word is 8 hex digits. The video
+-- clocks of the MEGA65 and the Nexys4DDR. The FT2232H USB chip on the
+-- other end of both boards makes exactly 2 Mbaud from its 12 MHz clock.
+-- The link sends every word as 8 hex digits, so a load at 2 Mbaud takes
+-- about a seventeenth of the time it takes at 115200 baud. The video
 -- output is that of text.vhd, in the VGA clock domain: 8 bits per color,
 -- the two sync signals with the polarity of G_VIDEO, and vga_de_o, which is
 -- '1' in the visible area. A board with fewer bits per color takes the top
@@ -40,7 +41,7 @@ library work;
 entity system is
    generic (
       G_CLOCK_HZ      : natural;
-      -- The ROM with the monitor, a .bin file, or "" for a build without one
+      -- The ROM that the core boots from, a .bin file, or "" for a build without one
       G_ROM_FILE      : string       := "";
       -- The screen has 2^G_SCR_ADDR_BITS words, 32K on the MEGA65.
       G_SCR_ADDR_BITS : natural      := 15;

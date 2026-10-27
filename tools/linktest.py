@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """Compare tools/run.py on niceemu --link with niceemu, without a board.
 
-It starts "niceemu --link 0", which picks a free port, runs hwtest.py's
-checks of bad packets, the pause, the step, and the breakpoints on it, and runs the programs of hwtest.py's
-comparison, and nice_cpu's benchmark when
-examples/build/bench.bin is built, with run.py --tcp on that port and with
-niceemu alone. Each must print the same and exit with the same status. So
-it checks run.py, nicelink.py, and the link of the emulator, as CI does.
-It prints one line for each check, and last how many passed, and exits
-with status 1 when one fails. niceemu must be built first, with
-make -C nice_cpu/emulator build. Only the Python standard library is used.
+It starts "niceemu --link 0", which picks a free port, and runs
+hwtest.py's checks of bad packets, the pause, the step, and the
+breakpoints on it. Then it runs the programs of hwtest.py's comparison,
+and nice_cpu's benchmark when examples/build/bench.bin is built, with
+run.py --tcp on that port and with niceemu alone. Each must print the
+same and exit with the same status. So it checks run.py, nicelink.py,
+and the link of the emulator, as CI does. It prints one line for each
+check, and last how many passed, and exits with status 1 when one fails.
+niceemu must be built first, with make -C nice_cpu/emulator build. Only
+the Python standard library is used.
 """
 
 import os
@@ -27,6 +28,9 @@ from nicelink import HOLD, RAM, open_link
 
 
 def main() -> None:
+    argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    ).parse_args()
     if not os.path.exists(NICEEMU):
         sys.exit(f"linktest.py: {NICEEMU} is missing; run "
                  "'make -C nice_cpu/emulator build'")

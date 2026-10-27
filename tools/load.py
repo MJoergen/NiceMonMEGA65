@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """Load a .bin file into the board, or niceemu, through the debug link.
 
-The core is held in reset, the ROM with the monitor, if the bitstream has
-one, is hidden, so that the RAM is at 0, and the memory is cleared to 0, as
-the emulator's is at the start. The breakpoints are disabled, as a
-connection to the emulator does, for the board keeps them until a reset. Then the words of the file are written with
-W packets of the debug link (nice_cpu/doc/DEBUG.md), and the core is started
-unless --no-run is given. The ROM stays hidden until the reset button is
-pressed, which boots the monitor again.
+The core is held in reset, the ROM, if the bitstream has one, is hidden,
+so that the RAM is at 0, and the memory is cleared to 0, as the
+emulator's is at the start. The breakpoints are disabled, as a
+connection to the emulator does, for the board keeps them until a reset.
+Then the words of the file are written with W packets of the debug link
+(nice_cpu/doc/DEBUG.md), and the core is started unless --no-run is
+given. The ROM stays hidden until the reset button is pressed, which
+boots the ROM's program again.
 
 Usage: tools/load.py [--port /dev/ttyUSB1] [--baud 2000000] [--tcp PORT]
                      [--cosim PORT] [--no-run] FILE.bin
