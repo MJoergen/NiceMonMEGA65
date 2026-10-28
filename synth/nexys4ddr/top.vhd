@@ -25,6 +25,9 @@
 --   The color and sync outputs are registered in the IOBs (nexys4ddr.xdc),
 --   so they all change at the same time.
 -- The reset button, CPU_RESETN, is active low.
+--
+-- The Ethernet PHY, an SMSC LAN8720A, is held in reset, with no clock and
+-- nothing to send, as it is with its pins unused, and as on the MEGA65.
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -39,35 +42,44 @@ entity top is
       G_ROM_FILE : string := ""
    );
    port (
-      clk_i       : in  std_logic; -- 100 MHz
-      reset_n_i   : in  std_logic; -- active low
-      uart_rxd_i  : in  std_logic;
-      uart_txd_o  : out std_logic;
+      clk_i        : in  std_logic; -- 100 MHz
+      reset_n_i    : in  std_logic; -- active low
+      uart_rxd_i   : in  std_logic;
+      uart_txd_o   : out std_logic;
       -- LED0 is on while the core runs
-      led_o       : out std_logic_vector(15 downto 0);
+      led_o        : out std_logic_vector(15 downto 0);
 
       -- The RGB LEDs: bit 2 red, bit 1 green, bit 0 blue
-      rgb0_o      : out std_logic_vector(2 downto 0);
-      rgb1_o      : out std_logic_vector(2 downto 0);
+      rgb0_o       : out std_logic_vector(2 downto 0);
+      rgb1_o       : out std_logic_vector(2 downto 0);
 
       -- The seven-segment display, active low
-      seg_an_o    : out std_logic_vector(7 downto 0);
-      seg_ca_o    : out std_logic_vector(7 downto 0);
+      seg_an_o     : out std_logic_vector(7 downto 0);
+      seg_ca_o     : out std_logic_vector(7 downto 0);
 
       -- Center, up, left, right, and down, and the switches
-      btn_i       : in  std_logic_vector(4 downto 0);
-      sw_i        : in  std_logic_vector(15 downto 0);
+      btn_i        : in  std_logic_vector(4 downto 0);
+      sw_i         : in  std_logic_vector(15 downto 0);
 
       -- The keyboard, as PS/2 from the PIC24
-      ps2_clk_i   : in  std_logic;
-      ps2_data_i  : in  std_logic;
+      ps2_clk_i    : in  std_logic;
+      ps2_data_i   : in  std_logic;
 
       -- VGA, 4 bits per color
-      vga_red_o   : out std_logic_vector(3 downto 0);
-      vga_green_o : out std_logic_vector(3 downto 0);
-      vga_blue_o  : out std_logic_vector(3 downto 0);
-      vga_hs_o    : out std_logic;
-      vga_vs_o    : out std_logic
+      vga_red_o    : out std_logic_vector(3 downto 0);
+      vga_green_o  : out std_logic_vector(3 downto 0);
+      vga_blue_o   : out std_logic_vector(3 downto 0);
+      vga_hs_o     : out std_logic;
+      vga_vs_o     : out std_logic;
+
+      -- Ethernet, RMII
+      eth_clk_o    : out std_logic;
+      eth_rst_n_o  : out std_logic;
+      eth_rxd_i    : in  std_logic_vector(1 downto 0);
+      eth_crs_dv_i : in  std_logic;
+      eth_rxer_i   : in  std_logic;
+      eth_txd_o    : out std_logic_vector(1 downto 0);
+      eth_tx_en_o  : out std_logic
    );
 end entity top;
 
@@ -258,5 +270,10 @@ begin
    vga_blue_o  <= vga_blue_r;
    vga_hs_o    <= vga_hs_r;
    vga_vs_o    <= vga_vs_r;
+
+   eth_clk_o   <= '0';  -- No clock
+   eth_rst_n_o <= '0';  -- Hold the PHY in reset
+   eth_txd_o   <= "00";
+   eth_tx_en_o <= '0';  -- Send nothing
 
 end architecture synthesis;

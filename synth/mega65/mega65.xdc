@@ -41,6 +41,23 @@ set_property -dict {PACKAGE_PIN C13  IOSTANDARD LVCMOS33} [get_ports {kb_io2_i}]
 set_false_path -to   [get_ports {kb_io0_o kb_io1_o}]
 set_false_path -from [get_ports {kb_io2_i}]
 
+## The Ethernet PHY (U4 = KSZ8081RNDCA), on the same pins on the R3 and R6
+## (M2M/MEGA65-R3.xdc and MEGA65-R6.xdc). It is RMII, clocked by 50 MHz from
+## the FPGA on ETH_CLK. MDC and MDIO are left out, as no PHY register needs
+## reading or writing, and so are ETH_INT and ETH_LED2. Until there is a MAC,
+## top.vhd holds the PHY in reset, so these pins are not timed yet.
+set_property -dict {PACKAGE_PIN L4   IOSTANDARD LVCMOS33} [get_ports {eth_clk_o}];    # ETH_CLK
+set_property -dict {PACKAGE_PIN K6   IOSTANDARD LVCMOS33} [get_ports {eth_rst_n_o}];  # ETH-RST
+set_property -dict {PACKAGE_PIN P4   IOSTANDARD LVCMOS33} [get_ports {eth_rxd_i[0]}]; # ETH_RX_D0
+set_property -dict {PACKAGE_PIN L1   IOSTANDARD LVCMOS33} [get_ports {eth_rxd_i[1]}]; # ETH_RX_D1
+set_property -dict {PACKAGE_PIN K4   IOSTANDARD LVCMOS33} [get_ports {eth_crs_dv_i}]; # ETH_CRS_DV
+set_property -dict {PACKAGE_PIN M6   IOSTANDARD LVCMOS33} [get_ports {eth_rxer_i}];   # ETH_RXER
+set_property -dict {PACKAGE_PIN L3   IOSTANDARD LVCMOS33} [get_ports {eth_txd_o[0]}]; # ETH_TX_D0
+set_property -dict {PACKAGE_PIN K3   IOSTANDARD LVCMOS33} [get_ports {eth_txd_o[1]}]; # ETH_TX_D1
+set_property -dict {PACKAGE_PIN J4   IOSTANDARD LVCMOS33} [get_ports {eth_tx_en_o}];  # ETH_TX_EN
+set_property -dict {SLEW SLOW DRIVE 4} [get_ports {eth_txd_o[*] eth_tx_en_o}]
+set_property -dict {SLEW FAST}         [get_ports {eth_clk_o}]
+
 ## The registers on the slow pins live in the I/O tiles, so that their
 ## timing does not depend on placement.
 set_property IOB TRUE [get_ports {kb_io0_o kb_io1_o kb_io2_i uart_txd_o uart_rxd_i led_o}]

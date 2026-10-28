@@ -9,6 +9,9 @@
 -- supply of the HDMI connector (CT_HPD) and the output enable of the level
 -- shifter (LS_OE, active high) are switched on, as in MandelbrotMEGA65's
 -- mega65_r3.vhd and the MiSTer2MEGA65 framework.
+--
+-- The Ethernet PHY (U4 = KSZ8081RNDCA) is held in reset, with no clock and
+-- nothing to send, as it is with its pins unused. The R6 does the same.
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -49,7 +52,16 @@ entity top is
       tmds_clk_p_o       : out std_logic;
       tmds_clk_n_o       : out std_logic;
       hdmi_ct_hpd_o      : out std_logic;
-      hdmi_ls_oe_o       : out std_logic
+      hdmi_ls_oe_o       : out std_logic;
+
+      -- Ethernet, RMII
+      eth_clk_o          : out std_logic;
+      eth_rst_n_o        : out std_logic;
+      eth_rxd_i          : in  std_logic_vector(1 downto 0);
+      eth_crs_dv_i       : in  std_logic;
+      eth_rxer_i         : in  std_logic;
+      eth_txd_o          : out std_logic_vector(1 downto 0);
+      eth_tx_en_o        : out std_logic
    );
 end entity top;
 
@@ -105,5 +117,10 @@ begin
 
    hdmi_ct_hpd_o <= '1';  -- Supply +5V to the HDMI connector
    hdmi_ls_oe_o  <= '1';  -- Enable the HDMI level shifter
+
+   eth_clk_o   <= '0';  -- No clock
+   eth_rst_n_o <= '0';  -- Hold the PHY in reset
+   eth_txd_o   <= "00";
+   eth_tx_en_o <= '0';  -- Send nothing
 
 end architecture synthesis;

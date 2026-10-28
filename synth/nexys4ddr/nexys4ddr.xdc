@@ -85,6 +85,21 @@ set_property -dict {PACKAGE_PIN U12  IOSTANDARD LVCMOS33} [get_ports {sw_i[13]}]
 set_property -dict {PACKAGE_PIN U11  IOSTANDARD LVCMOS33} [get_ports {sw_i[14]}];  # SW[14]
 set_property -dict {PACKAGE_PIN V10  IOSTANDARD LVCMOS33} [get_ports {sw_i[15]}];  # SW[15]
 
+## The Ethernet PHY, an SMSC LAN8720A. It is RMII, clocked by 50 MHz from
+## the FPGA on ETH_REFCLK, as on the MEGA65 (mega65.xdc). MDC and MDIO are
+## left out, as no PHY register needs reading or writing, and so is ETH_INTN.
+## Until there is a MAC, top.vhd holds the PHY in reset, so these pins are not
+## timed yet.
+set_property -dict {PACKAGE_PIN D5   IOSTANDARD LVCMOS33} [get_ports {eth_clk_o}];    # ETH_REFCLK
+set_property -dict {PACKAGE_PIN B3   IOSTANDARD LVCMOS33} [get_ports {eth_rst_n_o}];  # ETH_RSTN
+set_property -dict {PACKAGE_PIN C11  IOSTANDARD LVCMOS33} [get_ports {eth_rxd_i[0]}]; # ETH_RXD[0]
+set_property -dict {PACKAGE_PIN D10  IOSTANDARD LVCMOS33} [get_ports {eth_rxd_i[1]}]; # ETH_RXD[1]
+set_property -dict {PACKAGE_PIN D9   IOSTANDARD LVCMOS33} [get_ports {eth_crs_dv_i}]; # ETH_CRSDV
+set_property -dict {PACKAGE_PIN C10  IOSTANDARD LVCMOS33} [get_ports {eth_rxer_i}];   # ETH_RXERR
+set_property -dict {PACKAGE_PIN A10  IOSTANDARD LVCMOS33} [get_ports {eth_txd_o[0]}]; # ETH_TXD[0]
+set_property -dict {PACKAGE_PIN A8   IOSTANDARD LVCMOS33} [get_ports {eth_txd_o[1]}]; # ETH_TXD[1]
+set_property -dict {PACKAGE_PIN B9   IOSTANDARD LVCMOS33} [get_ports {eth_tx_en_o}];  # ETH_TXEN
+
 ## The board clock, 100 MHz. Vivado derives the MMCM clocks from it.
 create_clock -period 10.000 -name sys_clk [get_ports {clk_i}]
 
