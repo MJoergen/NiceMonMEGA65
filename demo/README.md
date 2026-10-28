@@ -18,6 +18,7 @@ so on, which the MEGA65 has without SHIFT.
 |---|---|
 | F1 | The typewriter, which runs at power-up |
 | F3 | The key codes |
+| F5 | The characters and the colors |
 
 The typewriter's top ten rows are the welcome: the two bars, what the
 demo is, how to load your own programs through the debug UART, and a third
@@ -49,6 +50,16 @@ most 12 bytes. A sequence from the debug UART shows as one key, and an
 ESC alone shows with the key after it. A function key with a demo starts
 that demo, so its bytes show only for a moment, or not at all. Past the
 last row, the rows scroll up by one.
+
+The characters and the colors check the font and the video output at a
+glance. On the left are the 256 characters of the font, ISO 8859-1, in 16
+rows of 16. A row's label is the code of its first character, and the
+digits above the columns add to it. On the right are ramps of seven
+colors, red, green, blue, yellow, cyan, magenta, and gray, each with the
+16 intensities `0` to `F` of 4-bit color: first as backgrounds, and then as
+foregrounds, the digits of the intensities on black. Intensity 0 is black,
+so its cell shows nothing. The keys do nothing here, except the function
+keys.
 
 ## How it works
 
@@ -84,18 +95,20 @@ UART.
 
     make -C demo                  # build/demo.bin, for the ROM
     make r6 ROM=demo/build/demo.bin
-    make -C demo test             # five runs in niceemu, compared with test.expected
+    make -C demo test             # six runs in niceemu, compared with test.expected
 
 The version in the title bar is `git describe --tags --always --dirty`, or
 `VERSION=` on the command line, which `tools/release.py` sets to the tag.
 The assembler has no include, so the Makefile joins `demo.nasm` and a line
 that defines `VERSION`. The test assembles the demo with the version `V9.9`
-into `build/demo_test.bin`, and the Makefile writes its five inputs,
-`build/test1.txt` to `build/test5.txt`, with `printf`: the first edits a
+into `build/demo_test.bin`, and the Makefile writes its six inputs,
+`build/test1.txt` to `build/test6.txt`, with `printf`: the first edits a
 few lines, the second clears them and scrolls, the third has the function
-keys, the fourth shows key codes and scrolls them, and the fifth goes from
-the key codes back to the typewriter. The five screens that `niceemu`
-prints for them are in `test.expected`, which was checked by hand.
+keys, the fourth shows key codes and scrolls them, the fifth goes from
+the key codes back to the typewriter, and the sixth shows the characters
+and the colors. `niceemu` shows no colors, so for the sixth the test also
+has the words of two rows of ramps. The six screens that `niceemu` prints,
+and those words, are in `test.expected`, which was checked by hand.
 
 The demo runs in `niceemu` like any program, at address 0. After `make -C
 demo test`, the first input shows the first screen of `test.expected`:

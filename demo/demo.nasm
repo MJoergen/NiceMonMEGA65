@@ -5,8 +5,9 @@
 ;
 ; One demo runs at a time, and a function key switches to another: the
 ; menu in the second row of the screen lists them. A switch starts the demo
-; afresh. F3 shows the bytes of each key, in hex and as characters. At
-; power-up the typewriter, F1, runs. Its top rows say what the core is
+; afresh. F3 shows the bytes of each key, in hex and as characters, and F5
+; the 256 characters of the font and ramps of colors. At power-up the
+; typewriter, F1, runs. Its top rows say what the core is
 ; and how to go further, and the rows below them take what is typed, from
 ; the keyboard or the UART: a character goes at the cursor, RETURN starts a
 ; new line, DEL (or backspace) deletes the character before the cursor, TAB
@@ -295,6 +296,70 @@ SHOWN   ADD     COL, COL, 1
         MOVE    R2, @SP++
         MOVE    PC, @SP++
 
+; The character set and the colors. On the left, the 256 characters in 16
+; rows of 16, each row labeled with the high digit of its codes, and each
+; column with the low digit. On the right, a ramp of each color of COLORS,
+; with the intensities 0 to F: as backgrounds, and below them as
+; foregrounds, the digits of the intensities on black. The keys do nothing
+; here, but the function keys.
+CHARS   MOVE    SP, 0xFFFFFF00
+        MOVE    R6, CHARS
+        ADD     @--SP, 2, PC
+        MOVE    PC, FRAME
+        MOVE    R5, C_TEXTS
+        ADD     @--SP, 2, PC
+        MOVE    PC, PRINTS
+        MOVE    R1, 0           ; the code
+        MOVE    R2, SCREEN+405  ; row 5, column 5, where code 0 goes
+CROW    SHR     R3, R1, 4       ; the label of the row: its first code
+        OR      @-3[R2], @HEXDIG[R3], LINK
+        MOVE    @-2[R2], LINK+0x30
+CCELL   OR      @R2, R1, TYPED
+        ADD     R2, R2, 2
+        ADD     R1, R1, 1
+        AND[M]  R0, R1, 0xF
+    ?!Z MOVE    PC, CCELL
+        ADD     R2, R2, 48      ; the next row, 80 - 2 * 16 words on
+        SUB[M]  R0, R1, 256
+    ?!Z MOVE    PC, CROW
+        MOVE    R2, SCREEN+444  ; row 5, column 44
+        MOVE    R7, 20          ; the background
+        ADD     @--SP, 2, PC
+        MOVE    PC, RAMPS
+        MOVE    R2, SCREEN+1164 ; row 14, column 44
+        MOVE    R7, 8           ; the foreground
+        ADD     @--SP, 2, PC
+        MOVE    PC, RAMPS
+CPOLL   ADD     @--SP, 2, PC
+        MOVE    PC, POLL
+        MOVE    PC, CPOLL
+
+; RAMPS draws a row for each color of COLORS: its letter at R2, and from
+; three columns on, 16 cells of two columns, with the intensities 0 to F of
+; the color. R7 is where the color goes in a word: 20 for the background,
+; where a cell is two blanks, or 8 for the foreground, where it is the digit
+; of the intensity on black. It changes R1 to R5, R8, and R9.
+RAMPS   MOVE    R5, COLORS
+RROW    MOVE[M] R1, @R5++       ; the letter, or 0 after the last
+    ?Z  MOVE    PC, @SP++
+        OR      @R2, R1, TEXT
+        MOVE    R3, @R5++       ; the color at intensity 1
+        MOVE    R4, 0           ; the color of the cell
+        MOVE    R8, 0           ; the intensity of the cell
+        ADD     R9, R2, 3       ; the cell
+RCELL   SHL     R1, R4, R7
+        SUB[M]  R0, R7, 20
+    ?Z  OR      @R9, R1, 0x20
+    ?Z  OR      @1[R9], R1, 0x20
+    ?!Z OR      @R9, R1, @HEXDIG[R8]
+        ADD     R9, R9, 2
+        ADD     R4, R4, R3
+        ADD     R8, R8, 1
+        SUB[M]  R0, R8, 16
+    ?!Z MOVE    PC, RCELL
+        ADD     R2, R2, 80
+        MOVE    PC, RROW
+
 ; POLL takes a key from the input, if one has arrived, and sets R1 to it: a
 ; byte, KEY_UP to KEY_LT for a cursor key, or 0 when there is none. It
 ; reads the escape sequences that xterm sends for the cursor keys and the
@@ -441,7 +506,7 @@ PRINTS  MOVE[M] R2, @R5++
         MOVE    PC, PRINTS
 
 ; The demos of the function keys F1 to F12, or 0 for none
-FKEYS   .DAT    TYPEW, 0, KCODES, 0, 0, 0, 0, 0, 0, 0, 0, 0
+FKEYS   .DAT    TYPEW, 0, KCODES, 0, CHARS, 0, 0, 0, 0, 0, 0, 0, 0, 0
 
 ; The numbers before ~ of F1 to F12. xterm sends ESC O P to ESC O S for F1
 ; to F4, and 11 to 14 are those of the VT220.
@@ -451,6 +516,7 @@ FNUMS   .DAT    11, 12, 13, 14, 15, 17, 18, 19, 20, 21, 23, 24
 ; the end
 MENU    .DAT    80, TYPEW, M_TYPEW
         .DAT    96, KCODES, M_KEYS
+        .DAT    111, CHARS, M_CHARS
         .DAT    -1
 
 ; The texts of the title bar, and of the welcome
@@ -470,6 +536,7 @@ NAME    .ASCII_L 'NiceMonMEGA65'
 CPU     .ASCII_L 'the 32-bit NICE CPU of B. Ulmann'
 M_TYPEW .ASCII_L ' F1 typewriter '
 M_KEYS  .ASCII_L ' F3 key codes '
+M_CHARS .ASCII_L ' F5 characters '
 T1      .ASCII_L 'This is the demo in the ROM, which the core runs at power-up. What you type'
 T2      .ASCII_L 'on the keyboard, or send to the debug UART, appears below the blue bar.'
 T3      .ASCII_L 'To run your own programs, connect a computer to the debug UART, at'
@@ -491,3 +558,29 @@ K3      .ASCII_L 'character, so ^[ is ESC and ^? is DEL. A function key with a d
 K_HEX   .ASCII_L 'Bytes in hex'
 K_CHARS .ASCII_L 'As characters'
 HEXDIG  .ASCII_L '0123456789ABCDEF'
+
+; The texts of F5
+C_TEXTS .DAT    242, LINK, C1
+        .DAT    284, LINK, C2
+        .DAT    325, TEXT, C_DIGIT
+        .DAT    364, TEXT, C_BACK
+        .DAT    1084, TEXT, C_FORE
+        .DAT    1762, TEXT, C_NAMES
+        .DAT    -1
+
+C1      .ASCII_L 'Characters, ISO 8859-1'
+C2      .ASCII_L 'Colors, 4 bits of red, green, blue'
+C_DIGIT .ASCII_L '0 1 2 3 4 5 6 7 8 9 A B C D E F'
+C_BACK  .ASCII_L 'Backgrounds, 0 to F'
+C_FORE  .ASCII_L 'Foregrounds, 0 to F'
+C_NAMES .ASCII_L 'R red   G green   B blue   Y yellow   C cyan   M magenta   W gray'
+
+; The colors of the ramps: the letter, and the 12-bit color at intensity 1
+COLORS  .DAT    0x52, 0x100     ; R
+        .DAT    0x47, 0x010     ; G
+        .DAT    0x42, 0x001     ; B
+        .DAT    0x59, 0x110     ; Y
+        .DAT    0x43, 0x011     ; C
+        .DAT    0x4D, 0x101     ; M
+        .DAT    0x57, 0x111     ; W
+        .DAT    0

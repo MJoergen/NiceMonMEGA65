@@ -1,6 +1,6 @@
 Screen:
 | NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
-| F1 typewriter   F3 key codes
+| F1 typewriter   F3 key codes   F5 characters
 |
 |  This is the demo in the ROM, which the core runs at power-up. What you type
 |  on the keyboard, or send to the debug UART, appears below the blue bar.
@@ -16,7 +16,7 @@ Screen:
 |x y z
 Screen:
 | NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
-| F1 typewriter   F3 key codes
+| F1 typewriter   F3 key codes   F5 characters
 |
 |  This is the demo in the ROM, which the core runs at power-up. What you type
 |  on the keyboard, or send to the debug UART, appears below the blue bar.
@@ -42,7 +42,7 @@ Screen:
 |        B
 Screen:
 | NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
-| F1 typewriter   F3 key codes
+| F1 typewriter   F3 key codes   F5 characters
 |
 |  This is the demo in the ROM, which the core runs at power-up. What you type
 |  on the keyboard, or send to the debug UART, appears below the blue bar.
@@ -54,7 +54,7 @@ Screen:
 |xQree F
 Screen:
 | NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
-| F1 typewriter   F3 key codes
+| F1 typewriter   F3 key codes   F5 characters
 |
 |  Each key that you type, or byte sequence that the debug UART sends, shows
 |  its bytes in hex and as characters. A control code shows as ^ and a
@@ -62,7 +62,7 @@ Screen:
 |
 |  Bytes in hex                            As characters
 |  1B 5B 41                                ^[ [  A
-|  1B 5B 31 35 7E                          ^[ [  1  5  ~
+|  1B 5B 32 31 7E                          ^[ [  2  1  ~
 |  1B 5B 31 3B 35 43                       ^[ [  1  ;  5  C
 |  E9
 |  80
@@ -79,7 +79,7 @@ Screen:
 |  6A                                      j
 Screen:
 | NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
-| F1 typewriter   F3 key codes
+| F1 typewriter   F3 key codes   F5 characters
 |
 |  This is the demo in the ROM, which the core runs at power-up. What you type
 |  on the keyboard, or send to the debug UART, appears below the blue bar.
@@ -89,3 +89,37 @@ Screen:
 |  https://github.com/MJoergen/NiceMonMEGA65
 | RETURN new line   DEL delete   cursor keys move   CTRL-L clear
 |back
+ffff01bc: 000ccc52 000ccc20 000ccc20 00000020 00000020 10000020 10000020 20000020
+ffff01c4: 20000020 30000020 30000020 40000020 40000020 50000020 50000020 60000020
+ffff01cc: 60000020 70000020 70000020 80000020 80000020 90000020 90000020 a0000020
+ffff01d4: a0000020 b0000020 b0000020 c0000020 c0000020 d0000020 d0000020 e0000020
+ffff01dc: e0000020 f0000020 f0000020 000ccc20
+ffff066c: 000ccc57 000ccc20 000ccc20 00000030 000ccc20 00011131 000ccc20 00022232
+ffff0674: 000ccc20 00033333 000ccc20 00044434 000ccc20 00055535 000ccc20 00066636
+ffff067c: 000ccc20 00077737 000ccc20 00088838 000ccc20 00099939 000ccc20 000aaa41
+ffff0684: 000ccc20 000bbb42 000ccc20 000ccc43 000ccc20 000ddd44 000ccc20 000eee45
+ffff068c: 000ccc20 000fff46 000ccc20 000ccc20
+Screen:
+| NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
+| F1 typewriter   F3 key codes   F5 characters
+|
+|  Characters, ISO 8859-1                    Colors, 4 bits of red, green, blue
+|     0 1 2 3 4 5 6 7 8 9 A B C D E F        Backgrounds, 0 to F
+|  00                                        R
+|  10                                        G
+|  20   ! " # $ % & ' ( ) * + , - . /        B
+|  30 0 1 2 3 4 5 6 7 8 9 : ; < = > ?        Y
+|  40 @ A B C D E F G H I J K L M N O        C
+|  50 P Q R S T U V W X Y Z [ \ ] ^ _        M
+|  60 ` a b c d e f g h i j k l m n o        W
+|  70 p q r s t u v w x y z { | } ~
+|  80                                        Foregrounds, 0 to F
+|  90                                        R  0 1 2 3 4 5 6 7 8 9 A B C D E F
+|  A0                                        G  0 1 2 3 4 5 6 7 8 9 A B C D E F
+|  B0                                        B  0 1 2 3 4 5 6 7 8 9 A B C D E F
+|  C0                                        Y  0 1 2 3 4 5 6 7 8 9 A B C D E F
+|  D0                                        C  0 1 2 3 4 5 6 7 8 9 A B C D E F
+|  E0                                        M  0 1 2 3 4 5 6 7 8 9 A B C D E F
+|  F0                                        W  0 1 2 3 4 5 6 7 8 9 A B C D E F
+|
+|  R red   G green   B blue   Y yellow   C cyan   M magenta   W gray

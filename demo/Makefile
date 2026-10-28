@@ -3,8 +3,8 @@
 #
 # make          builds build/demo.bin, with VERSION in its title bar, git
 #               describe of the tree by default; the release gives its tag
-# make test     runs the demo in niceemu five times, with the inputs below,
-#               and compares the five screens with test.expected
+# make test     runs the demo in niceemu six times, with the inputs below,
+#               and compares the six screens with test.expected
 # make clean    removes build/
 #
 # The assembler has no include, so build/version.nasm, which defines the
@@ -44,21 +44,26 @@ $(BUILD)/demo_test.bin: demo.nasm $(ASM_PY) | $(BUILD)
 # ISO 8859-1, which niceemu shows as a blank. The second clears what it
 # typed, deletes at the first column, and scrolls by three rows, the last
 # with a TAB past the last column. The third has the function keys: the
-# VT220's F1 and xterm's F1 start the typewriter afresh, F2, F5, and
+# VT220's F1 and xterm's F1 start the typewriter afresh, F2, F8, and
 # SHIFT-F6, which have no demo, do nothing, ESC ESC [ A is the cursor up,
 # ESC Q is Q, and a sequence that is no key does nothing. The fourth
 # starts the key codes, F3, and types a letter, CR, a control code, DEL, a
-# cursor key, F5, which has no demo, a cursor key with parameters, a byte
+# cursor key, F10, which has no demo, a cursor key with parameters, a byte
 # of ISO 8859-1 and one of 0x80 to 0x9F, an ESC alone, a sequence longer
 # than the 12 bytes shown, and nine letters: 20 keys, which scroll by
 # four rows. The fifth goes from the key codes back to the typewriter,
-# which shows no bytes. dash's printf, the shell of make on Ubuntu, has
-# no \x.
+# which shows no bytes. The sixth starts the characters and colors, F5,
+# where letters and F2 do nothing. niceemu shows neither the colors nor
+# the characters from 0xA0 on, so the test also has the words of two of
+# its rows: the red backgrounds, row 5, and the gray foregrounds, row 20,
+# from column 44. dash's printf, the shell of make on Ubuntu, has no \x.
 TEST1 = Hello, world!\nabc\177\177X\tY\r\n$(shell printf '0123456789%.0s' 1 2 3 4 5 6 7 8)abcde\n\
 \033[A\033[A\033[DQ\033[C\033[BR\n\033x\033[1;5Cy\200\351z\n
-TEST3 = one\033[11~two\n\033OPthree\033OQ\033[15~\033[17;2~ F\n\033\033[Ax\033Q\033[99~
-TEST4 = \033ORa\r\003\177\033[A\033[15~\033[1;5C\351\200\033x\033[1;2;3;4;5;6;7;8~bcdefghij
+TEST3 = one\033[11~two\n\033OPthree\033OQ\033[19~\033[17;2~ F\n\033\033[Ax\033Q\033[99~
+TEST4 = \033ORa\r\003\177\033[A\033[21~\033[1;5C\351\200\033x\033[1;2;3;4;5;6;7;8~bcdefghij
 TEST5 = \033ORab\033OPback
+TEST6 = \033[15~abc\033OQ
+DUMP6 = -d 0xFFFF01BC:36 -d 0xFFFF066C:36
 
 test: $(BUILD)/demo_test.bin
 	@printf '$(TEST1)' > $(BUILD)/test1.txt
@@ -67,10 +72,12 @@ test: $(BUILD)/demo_test.bin
 	@printf '$(TEST3)' > $(BUILD)/test3.txt
 	@printf '$(TEST4)' > $(BUILD)/test4.txt
 	@printf '$(TEST5)' > $(BUILD)/test5.txt
-	@for t in 1 2 3 4 5; do \
-	  $(EMU) -s -i $(BUILD)/test$$t.txt $(BUILD)/demo_test.bin > $(BUILD)/test$$t.out || \
+	@printf '$(TEST6)' > $(BUILD)/test6.txt
+	@for t in 1 2 3 4 5 6; do \
+	  dump=; [ $$t = 6 ] && dump='$(DUMP6)'; \
+	  $(EMU) -s -i $(BUILD)/test$$t.txt $$dump $(BUILD)/demo_test.bin > $(BUILD)/test$$t.out || \
 	    { echo "FAIL demo: niceemu exits with $$? on input $$t"; exit 1; }; \
-	  sed -n '/^Screen:/,$$p' $(BUILD)/test$$t.out; \
+	  sed -n -e '/^ffff/p' -e '/^Screen:/,$$p' $(BUILD)/test$$t.out; \
 	done > $(BUILD)/test.screen; \
 	if cmp -s test.expected $(BUILD)/test.screen; then echo "PASS demo"; \
 	else echo "FAIL demo"; diff test.expected $(BUILD)/test.screen; exit 1; fi

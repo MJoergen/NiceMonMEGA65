@@ -35,6 +35,8 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   the second row lists. The typewriter is F1, and runs at power-up. The
   ideas of issue #28 come next, each on a key of its own.
 - F3 shows the bytes of each key, in hex and as characters.
+- F5 shows the 256 characters of the font and ramps of seven colors, as
+  backgrounds and as foregrounds, to check the video output.
 
 **Tools**
 
