@@ -1,20 +1,27 @@
-; The demo in the ROM of the release: a welcome screen that turns into a
-; typewriter. It shows that the core runs, and that the keyboard and the
-; screen work, on a board with no computer on its debug UART. Its test, in
-; demo/Makefile, runs it in niceemu and compares the screens with
-; demo/test.expected.
+; The demos in the ROM of the release. They show that the core runs, and
+; that the keyboard and the screen work, on a board with no computer on its
+; debug UART. Their test, in demo/Makefile, runs them in niceemu and
+; compares the screens with demo/test.expected.
 ;
-; The top ten rows say what the core is and how to go further. The rows
-; below them take what is typed, from the keyboard or the UART: a
-; character goes at the cursor, RETURN starts a new line, DEL (or
-; backspace) deletes the character before the cursor, TAB goes to the next
-; column that is a multiple of 8, the cursor keys move the cursor, and
-; CTRL-L clears the rows.
+; One demo runs at a time, and a function key switches to another: the
+; menu in the second row of the screen lists them. A switch starts the demo
+; afresh. At power-up the typewriter runs. Its top rows say what the core is
+; and how to go further, and the rows below them take what is typed, from
+; the keyboard or the UART: a character goes at the cursor, RETURN starts a
+; new line, DEL (or backspace) deletes the character before the cursor, TAB
+; goes to the next column that is a multiple of 8, the cursor keys move the
+; cursor, and CTRL-L clears the rows.
 ;
-; When the cursor goes past the last row, the program scrolls these rows up
-; by one, by copying each row to the one above it. The welcome does not
+; The keys come through POLL, which every demo calls. It turns the escape
+; sequences of the cursor keys and of the function keys, as xterm sends
+; them, into codes of their own, and on a function key with a demo it
+; starts that demo. A demo starts with SP at its top, so the switch leaves
+; nothing on the stack.
+;
+; When the cursor goes past the last row, the typewriter scrolls its rows
+; up by one, by copying each row to the one above it. The top rows do not
 ; move. The display offset (0xFFFFFF85) is not used, for three reasons. It
-; would scroll the welcome away too. It wraps at the end of the screen's
+; would scroll the top rows away too. It wraps at the end of the screen's
 ; memory, whose size differs between the boards. And in niceemu it is plain
 ; memory, so the program would not scroll there.
 ;
@@ -48,6 +55,7 @@ SCR_Y   .EQU    0xFFFFFF82      ; the cursor's row
 BAR     .EQU    0x00AFFF00      ; white on blue
 TEXT    .EQU    0x000CCC00      ; light gray on black
 LINK    .EQU    0x000FF000      ; yellow on black
+MENU_ON .EQU    0xFFF00000      ; black on white, the running demo in the menu
 TYPED   .EQU    0x000FFF00      ; white on black
 
 TOP     .EQU    10              ; the first row of the typewriter
@@ -58,55 +66,44 @@ SCR_2ND .EQU    SCREEN+880      ; and of the row after it
 ; The registers that hold the typewriter's state
 COL     .EQU    R10             ; the cursor's column, 0 to 79
 ROW     .EQU    R11             ; the cursor's row, TOP to LAST
-ESC     .EQU    R9              ; 0, or 1 after ESC, or 2 after ESC [
 CR      .EQU    R8              ; 1 when the byte before was a CR
 
-        MOVE    SP, 0xFFFFFF00  ; the stack, from RAM word 0xFEFF down
+; The codes that POLL gives for the cursor keys, above those of the bytes
+KEY_UP  .EQU    0x101
+KEY_DN  .EQU    0x102
+KEY_RT  .EQU    0x103
+KEY_LT  .EQU    0x104
 
-; The welcome: the whole screen blank, the two bars, and the texts
-        MOVE    R2, SCREEN
-        MOVE    R3, TEXT+0x20
-        MOVE    R4, 2000
+        MOVE    PC, TYPEW       ; the demo at power-up
+
+; The typewriter: the welcome, and the rows below it
+TYPEW   MOVE    SP, 0xFFFFFF00  ; the stack, from RAM word 0xFEFF down
+        MOVE    R6, TYPEW
         ADD     @--SP, 2, PC
-        MOVE    PC, FILL
-        MOVE    R2, SCREEN
+        MOVE    PC, FRAME
+        MOVE    R2, SCREEN+720
         MOVE    R3, BAR+0x20
         MOVE    R4, 80
         ADD     @--SP, 2, PC
         MOVE    PC, FILL
-        MOVE    R2, SCREEN+720  ; R3 is still BAR+0x20: FILL leaves it
-        MOVE    R4, 80
+        MOVE    R5, WELCOME
         ADD     @--SP, 2, PC
-        MOVE    PC, FILL
-        MOVE    R5, TEXTS
-NEXT    MOVE[M] R2, @R5++       ; the position, or -1 at the end
-    ?X  MOVE    PC, TYPE
-        ADD     R2, R2, SCREEN
-        MOVE    R3, @R5++       ; the color
-        MOVE    R1, @R5++       ; the string
-        ADD     @--SP, 2, PC
-        MOVE    PC, PRINT
-        MOVE    PC, NEXT
-
-; The typewriter
-TYPE    MOVE    COL, 0
+        MOVE    PC, PRINTS
+        MOVE    COL, 0
         MOVE    ROW, TOP
-        MOVE    ESC, 0
         MOVE    CR, 0
         MOVE    @SCR_CTL, 0x60  ; a blinking cursor, and no display offset
 KEY     MOVE    @SCR_X, COL     ; the cursor where the next character goes
         MOVE    @SCR_Y, ROW
-WAIT    MOVE    R1, @CONSOLE
-        AND[M]  R0, R1, 0x200   ; the end of the input
-    ?!Z HALT
-        AND[M]  R0, R1, 0x100   ; Z is clear when a byte has arrived
+WAIT    ADD     @--SP, 2, PC
+        MOVE    PC, POLL
+        MOVE[M] R0, R1
     ?Z  MOVE    PC, WAIT
-        AND     R1, R1, 0xFF
-        MOVE    R7, CR          ; whether this byte follows a CR
+        MOVE    R7, CR          ; whether this key follows a CR
         MOVE    CR, 0
-        MOVE[M] R0, ESC
-    ?!Z MOVE    PC, INESC
-PLAIN   SUB[M]  R0, R1, 0x20
+        SUB[M]  R0, R1, 0x100
+    ?!C MOVE    PC, CURSOR      ; a cursor key
+        SUB[M]  R0, R1, 0x20
     ?C  MOVE    PC, CONTROL     ; below 0x20
         SUB[M]  R0, R1, 0x7F
     ?C  MOVE    PC, PUT         ; printable ASCII
@@ -137,32 +134,15 @@ CONTROL SUB[M]  R0, R1, 0x0D
     ?Z  MOVE    PC, TAB
         SUB[M]  R0, R1, 0x0C    ; CTRL-L
     ?Z  MOVE    PC, CLEAR
-        SUB[M]  R0, R1, 0x1B
-    ?Z  MOVE    ESC, 1
-        MOVE    PC, KEY         ; ESC, or a code that does nothing
+        MOVE    PC, KEY         ; a code that does nothing
 
-; An escape sequence: ESC [ and a final byte, of which A to D move the
-; cursor, as the cursor keys send them. Other final bytes, and the
-; parameters before them, do nothing. ESC without [ is dropped, and the
-; byte after it is taken as it is.
-INESC   SUB[M]  R0, ESC, 1
-    ?!Z MOVE    PC, INCSI
-        MOVE    ESC, 0
-        SUB[M]  R0, R1, 0x5B    ; [
-    ?!Z MOVE    PC, PLAIN
-        MOVE    ESC, 2
-        MOVE    PC, KEY
-INCSI   SUB[M]  R0, R1, 0x40    ; parameters are below 0x40
-    ?C  MOVE    PC, KEY
-        MOVE    ESC, 0
-        SUB[M]  R0, R1, 0x41
+; The cursor keys move the cursor within the typewriter's rows
+CURSOR  SUB[M]  R0, R1, KEY_UP
     ?Z  MOVE    PC, UP
-        SUB[M]  R0, R1, 0x42
+        SUB[M]  R0, R1, KEY_DN
     ?Z  MOVE    PC, DOWN
-        SUB[M]  R0, R1, 0x43
+        SUB[M]  R0, R1, KEY_RT
     ?Z  MOVE    PC, RIGHT
-        SUB[M]  R0, R1, 0x44
-    ?!Z MOVE    PC, KEY
         MOVE[M] R0, COL         ; left
     ?!Z SUB     COL, COL, 1
         MOVE    PC, KEY
@@ -242,21 +222,160 @@ PRINT   MOVE[M] R4, @R1++
         OR      @R2++, R4, R3
         MOVE    PC, PRINT
 
-; The texts of the welcome: the position on the screen, 80 * row + column,
-; the color, and the string, and -1 at the end
-TEXTS   .DAT    1, BAR, NAME
+; POLL takes a key from the input, if one has arrived, and sets R1 to it: a
+; byte, KEY_UP to KEY_LT for a cursor key, or 0 when there is none. It
+; reads the escape sequences that xterm sends for the cursor keys and the
+; function keys, and waits for the bytes of a sequence after its ESC. A
+; function key with a demo in FKEYS starts that demo, and POLL does not
+; return. Other sequences give 0. ESC and a byte that starts none gives that
+; byte, so an ESC alone is dropped. At the end of the input, POLL halts. It
+; changes R1 to R5.
+POLL    ADD     @--SP, 2, PC
+        MOVE    PC, READ
+    ?Z  MOVE    PC, @SP++       ; no byte, and R1 is 0
+        SUB[M]  R0, R1, 0x1B
+    ?!Z MOVE    PC, @SP++       ; a byte other than ESC
+ESCAPE  ADD     @--SP, 2, PC
+        MOVE    PC, NEXT
+        SUB[M]  R0, R1, 0x1B
+    ?Z  MOVE    PC, ESCAPE      ; ESC again starts again
+        SUB[M]  R0, R1, 0x5B    ; [
+    ?Z  MOVE    PC, CSI
+        SUB[M]  R0, R1, 0x4F    ; O
+    ?!Z MOVE    PC, @SP++
+; ESC O and a byte: A to D are the cursor keys, and P to S F1 to F4
+        ADD     @--SP, 2, PC
+        MOVE    PC, NEXT
+        SUB     R2, R1, 0x41
+        SUB[M]  R0, R2, 4
+    ?C  MOVE    PC, ARROW
+        SUB     R2, R1, 0x50
+        SUB[M]  R0, R2, 4
+    ?C  MOVE    PC, FKEY
+        MOVE    PC, NONE
+; ESC [, parameters, and a final byte, which is 0x40 or above. A to D are
+; the cursor keys, whatever the parameters. ~ is a function key, whose
+; number in FNUMS is the first parameter. R3 is the first parameter, and R4
+; is 1 once it has ended.
+CSI     MOVE    R3, 0
+        MOVE    R4, 0
+PARAM   ADD     @--SP, 2, PC
+        MOVE    PC, NEXT
+        SUB[M]  R0, R1, 0x40
+    ?!C MOVE    PC, FINAL
+        SUB     R2, R1, 0x30
+        SUB[M]  R0, R2, 10
+    ?!C MOVE    R4, 1           ; not a digit, such as ;, ends the first
+        MOVE[M] R0, R4
+    ?!Z MOVE    PC, PARAM
+        SHL     R5, R3, 1       ; R3 is 10 * R3 + the digit
+        SHL     R3, R3, 3
+        ADD     R3, R3, R5
+        ADD     R3, R3, R2
+        MOVE    PC, PARAM
+FINAL   SUB     R2, R1, 0x41
+        SUB[M]  R0, R2, 4
+    ?C  MOVE    PC, ARROW
+        SUB[M]  R0, R1, 0x7E    ; ~
+    ?!Z MOVE    PC, NONE
+        MOVE    R2, 0
+FIND    SUB[M]  R0, R3, @FNUMS[R2]
+    ?Z  MOVE    PC, FKEY
+        ADD     R2, R2, 1
+        SUB[M]  R0, R2, 12
+    ?!Z MOVE    PC, FIND
+NONE    MOVE    R1, 0
+        MOVE    PC, @SP++
+ARROW   ADD     R1, R2, KEY_UP  ; R2 is 0 to 3 for A to D
+        MOVE    PC, @SP++
+FKEY    MOVE[M] R1, @FKEYS[R2]  ; R2 is 0 to 11 for F1 to F12
+    ?Z  MOVE    PC, @SP++       ; a key without a demo, and R1 is 0
+        MOVE    PC, R1
+
+; READ reads the console. Z is set when no byte has arrived, and R1 is the
+; byte, or 0. At the end of the input it halts.
+READ    MOVE    R1, @CONSOLE
+        AND[M]  R0, R1, 0x200   ; the end of the input
+    ?!Z HALT
+        AND[M]  R0, R1, 0x100
+        AND     R1, R1, 0xFF    ; without M, so Z stays
+        MOVE    PC, @SP++
+
+; NEXT waits for a byte of the console, and sets R1 to it
+NEXT    ADD     @--SP, 2, PC
+        MOVE    PC, READ
+    ?Z  MOVE    PC, NEXT
+        MOVE    PC, @SP++
+
+; FRAME clears the screen and hides the cursor, and draws the two rows at
+; the top that every demo has: the title bar, and the menu of the demos, in
+; which the demo that starts at R6 stands out. It changes R1 to R5.
+FRAME   MOVE    @SCR_CTL, 0
+        MOVE    R2, SCREEN
+        MOVE    R3, TEXT+0x20
+        MOVE    R4, 2000
+        ADD     @--SP, 2, PC
+        MOVE    PC, FILL
+        MOVE    R2, SCREEN
+        MOVE    R3, BAR+0x20
+        MOVE    R4, 160
+        ADD     @--SP, 2, PC
+        MOVE    PC, FILL
+        MOVE    R5, TITLE
+        ADD     @--SP, 2, PC
+        MOVE    PC, PRINTS
+        MOVE    R5, MENU
+ITEM    MOVE[M] R2, @R5++       ; the position, or -1 at the end
+    ?X  MOVE    PC, @SP++
+        ADD     R2, R2, SCREEN
+        MOVE    R3, BAR
+        SUB[M]  R0, R6, @R5++   ; the demo
+    ?Z  MOVE    R3, MENU_ON
+        MOVE    R1, @R5++       ; the string
+        ADD     @--SP, 2, PC
+        MOVE    PC, PRINT
+        MOVE    PC, ITEM
+
+; PRINTS writes the texts of the table at R5 to the screen. Each has its
+; position on the screen, 80 * row + column, its color, and its string, and
+; -1 ends the table. It changes R1 to R5.
+PRINTS  MOVE[M] R2, @R5++
+    ?X  MOVE    PC, @SP++
+        ADD     R2, R2, SCREEN
+        MOVE    R3, @R5++
+        MOVE    R1, @R5++
+        ADD     @--SP, 2, PC
+        MOVE    PC, PRINT
+        MOVE    PC, PRINTS
+
+; The demos of the function keys F1 to F12, or 0 for none
+FKEYS   .DAT    TYPEW, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+
+; The numbers before ~ of F1 to F12. xterm sends ESC O P to ESC O S for F1
+; to F4, and 11 to 14 are those of the VT220.
+FNUMS   .DAT    11, 12, 13, 14, 15, 17, 18, 19, 20, 21, 23, 24
+
+; The menu: the position of each entry, the demo, and the string, and -1 at
+; the end
+MENU    .DAT    80, TYPEW, M_TYPEW
+        .DAT    -1
+
+; The texts of the title bar, and of the welcome
+TITLE   .DAT    1, BAR, NAME
         .DAT    15, BAR, VERSION
         .DAT    47, BAR, CPU
-        .DAT    162, TEXT, T1
-        .DAT    242, TEXT, T2
-        .DAT    402, TEXT, T3
-        .DAT    482, TEXT, T4
-        .DAT    562, LINK, URL
+        .DAT    -1
+WELCOME .DAT    242, TEXT, T1
+        .DAT    322, TEXT, T2
+        .DAT    482, TEXT, T3
+        .DAT    562, TEXT, T4
+        .DAT    642, LINK, URL
         .DAT    721, BAR, KEYS
         .DAT    -1
 
 NAME    .ASCII_L 'NiceMonMEGA65'
 CPU     .ASCII_L 'the 32-bit NICE CPU of B. Ulmann'
+M_TYPEW .ASCII_L ' F1 typewriter '
 T1      .ASCII_L 'This is the demo in the ROM, which the core runs at power-up. What you type'
 T2      .ASCII_L 'on the keyboard, or send to the debug UART, appears below the blue bar.'
 T3      .ASCII_L 'To run your own programs, connect a computer to the debug UART, at'

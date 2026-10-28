@@ -87,8 +87,9 @@ Programs may read the keyboard and write the screen. Until the
 [demo](demo/README.md). This shows the version and how to go further, and
 below that it is a typewriter: what you type appears on the screen.
 RETURN starts a new line, INST/DEL deletes, the cursor keys move the
-cursor, and CTRL-L clears what you typed. The reset button starts the
-demo again.
+cursor, and CTRL-L clears what you typed. The function keys switch between
+the demos that the second row lists, and the reset button starts the
+typewriter again.
 
 ### Building your own ROM
 
