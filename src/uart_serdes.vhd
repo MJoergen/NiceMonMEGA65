@@ -3,7 +3,7 @@
 -- they came out wrong, and passed on frames with a bad Stop bit. It now takes
 -- all ten bits and checks the Start and Stop bits, and starts a frame on a
 -- falling edge only. A bit now takes G_DIVISOR clock cycles, not G_DIVISOR + 1.
--- The layout and names follow CODING_STYLE.md.
+-- The layout and names follow doc/CODING_STYLE.md.
 -- Added here: rx_break_o pulses for a break, a frame whose ten bits are all 0.
 --
 

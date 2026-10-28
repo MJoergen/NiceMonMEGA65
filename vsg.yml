@@ -1,8 +1,8 @@
 # Configuration for vsg, the VHDL Style Guide
 # (https://vhdl-style-guide.readthedocs.io/). It maps the rules of
-# CODING_STYLE.md onto vsg's rules. Each entry changes one of vsg's defaults,
-# and its comment names the rule in CODING_STYLE.md. vsg's other defaults
-# apply as they are.
+# doc/CODING_STYLE.md onto vsg's rules. Each entry changes one of vsg's
+# defaults, and its comment names the rule in doc/CODING_STYLE.md. vsg's
+# other defaults apply as they are.
 #
 # Run it with "make lint". A single construct that breaks a rule on purpose
 # is wrapped in "-- vsg_off <rule>" and "-- vsg_on <rule>" markers in its

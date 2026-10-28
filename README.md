@@ -26,13 +26,13 @@ written yet (see [monitor/](monitor/README.md)). It will be in the ROM,
 and will let a MEGA65 on its own load and run programs too.
 
 This README is for those who use the core and write programs for it.
-[SYSTEM.md](SYSTEM.md) has the address map, the devices, and the words
+[SYSTEM.md](doc/SYSTEM.md) has the address map, the devices, and the words
 used for the link, such as hold, pause, and step.
-[EMULATOR.md](EMULATOR.md) has the differences from the emulator, and
+[EMULATOR.md](doc/EMULATOR.md) has the differences from the emulator, and
 [CONTRIBUTING.md](CONTRIBUTING.md) is for those who change this repository.
 The system also builds for the Digilent Nexys4DDR (see
 [synth/](synth/README.md#the-nexys4ddr) and
-[SYSTEM.md](SYSTEM.md#the-nexys4ddrs-devices)).
+[SYSTEM.md](doc/SYSTEM.md#the-nexys4ddrs-devices)).
 
 ## Quick start
 
@@ -48,7 +48,7 @@ The system also builds for the Digilent Nexys4DDR (see
    welcome, and what you type appears on it (see
    [On its own](#on-its-own)).
 
-No JTAG cable is needed. [RELEASE_NOTES.md](RELEASE_NOTES.md) has what
+No JTAG cable is needed. [RELEASE_NOTES.md](doc/RELEASE_NOTES.md) has what
 changed in each release.
 
 ## Setting up the tools
@@ -94,7 +94,7 @@ A write to the ROM is dropped, so a program in the ROM keeps its stack and
 its variables in the RAM, at `0x8000` or above. `sim/rom.nasm`, a
 greeting, and `demo/demo.nasm` are such programs. A C program keeps its
 data in its own image, which would be in the ROM, so its writes would be
-lost, and it does not run from the ROM. [SYSTEM.md](SYSTEM.md#the-rom) has
+lost, and it does not run from the ROM. [SYSTEM.md](doc/SYSTEM.md#the-rom) has
 the details. Try the program first in `niceemu`, or on the board with the
 serial port, as the ROM changes only with a new bitstream.
 
@@ -130,13 +130,13 @@ background in bits 31..20 and the foreground in bits 19..8, each 4 bits of
 red, green, and blue. So `0x000FFF41` is a white `A` on black, and `0x41`
 alone is black on black. `nice_screen_clear` fills the screen with blanks.
 The cursor, the scrolling, and the exact colors are in
-[SYSTEM.md](SYSTEM.md#the-screen).
+[SYSTEM.md](doc/SYSTEM.md#the-screen).
 
 ## With the serial port
 
 The MEGA65's debug UART runs at 2 Mbaud (2000000), 8-N-1. It carries the
 program's console both ways, and the packets of the debug link between
-its bytes (see [SYSTEM.md](SYSTEM.md#the-debug-link)). The tools in
+its bytes (see [SYSTEM.md](doc/SYSTEM.md#the-debug-link)). The tools in
 `tools/` use the link, and `niceemu --link` serves the same link, so the
 tools drive the emulator as they drive the board.
 
@@ -419,7 +419,7 @@ program with interrupts has more steps in the emulator. A read of the
 console in the emulator waits for the next byte, but on the board it
 returns 0 while no byte has arrived. So a program that waits for input in
 a loop runs more steps on the board, and its step count differs.
-[EMULATOR.md](EMULATOR.md) has the table of the known differences from the
+[EMULATOR.md](doc/EMULATOR.md) has the table of the known differences from the
 emulator.
 
 ## Writing programs
@@ -429,7 +429,7 @@ submodule into a `.bin` file, which has one line per word, the address and
 the word in hex. nice_cpu's [doc/ISA.md](nice_cpu/doc/ISA.md) is the
 instruction set, and its [doc/SYSTEM.md](nice_cpu/doc/SYSTEM.md) the
 devices: the console, the math unit, the performance counters, and the
-timer. [SYSTEM.md](SYSTEM.md) here has the address map of the board,
+timer. [SYSTEM.md](doc/SYSTEM.md) here has the address map of the board,
 with its screen and its ROM. The memory is 64K words, not 2³² as in the
 emulator.
 

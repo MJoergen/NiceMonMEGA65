@@ -10,10 +10,12 @@ monitor that is planned but not written (`monitor/README.md`), and host
 tools that load and run programs. The goal is that a program runs on the
 board exactly as `niceemu`, the emulator in `nice_cpu/emulator`, runs it.
 `README.md` is for users of the core files: on its own, and with the
-serial port. `SYSTEM.md` has the address map, the link, the screen, the
-ROM, and the Nexys4DDR's devices; `CONTRIBUTING.md` the tests, the formal
-checks, `make hwtest`, and the badge; `EMULATOR.md` the known differences
-from the emulator.
+serial port. `doc/SYSTEM.md` has the address map, the link, the screen,
+the ROM, and the Nexys4DDR's devices; `CONTRIBUTING.md` the tests, the
+formal checks, `make hwtest`, and the badge; `doc/EMULATOR.md` the known
+differences from the emulator. `doc/` also has `CODING_STYLE.md`,
+`RELEASE.md`, and `RELEASE_NOTES.md`; the root keeps only `README.md`,
+`CONTRIBUTING.md`, and this file.
 `src/nicemon.vhd` is the whole system and the file to read first; its
 header is the authoritative address map.
 
@@ -22,7 +24,7 @@ header is the authoritative address map.
     make                  # lists the targets
     make -j test          # GHDL: synth checks, tb_hello, tb_nicemon, tb_kbd, tb_ps2, tb_ps2_nicemon, tb_text, tb_board_io, check-steps, check-fmt (NICE=multi for the multi-cycle core); then the demo in niceemu
     make -j formal        # SymbiYosys jobs in formal/, each task in a work directory of its own
-    make lint             # vsg against CODING_STYLE.md; line-length warnings are tolerated
+    make lint             # vsg against doc/CODING_STYLE.md; line-length warnings are tolerated
     make examples         # C examples -> examples/build/*.bin (clang wasm32, lld, llvm)
     make demo             # the ROM's demo -> demo/build/demo.bin; make -C demo test runs it in niceemu
     make r6 [ROM=f.bin]   # Vivado bitstream, synth/r6/build/top.bit; make r3 and make nexys4ddr likewise
@@ -31,7 +33,7 @@ header is the authoritative address map.
     make run FILE=p.bin   # run it and print what niceemu prints, for diffing
     make mon [FILE=p.bin] # interactive shell on the link: memory, pause, step, breakpoints
     make bump TAG=V1.0    # nice_cpu to the tag, R6 bitstream, badge-mega65.json and verified.json, committed (--push with ARGS)
-    make release TAG=V1.0 # after the bump: gates, three bitstreams, two .cor, hwtest, staged; ARGS=--publish tags and releases (RELEASE.md); TAG=V1.0.1 keeps nice_cpu at V1.0
+    make release TAG=V1.0 # after the bump: gates, three bitstreams, two .cor, hwtest, staged; ARGS=--publish tags and releases (doc/RELEASE.md); TAG=V1.0.1 keeps nice_cpu at V1.0
     make hwtest           # check the FPGA, program it with openFPGALoader, and test the board
     make linktest         # run.py --tcp on niceemu --link against plain niceemu, no board
     make cosim            # the RTL in GHDL, its debug UART on TCP, for the tools' --cosim PORT
@@ -85,14 +87,14 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
 
 ## Rules and pitfalls
 
-- Behavior starts in nice_cpu: `doc/ISA.md` for the CPU, `doc/SYSTEM.md`
-  for the devices, the emulator for the rest. This repository follows them,
+- Behavior starts in nice_cpu: its `doc/ISA.md` for the CPU, its
+  `doc/SYSTEM.md` (not this repository's) for the devices, the emulator for the rest. This repository follows them,
   never the reverse. The submodule has its own `CLAUDE.md` and tests.
-- Tags follow nice_cpu's (RELEASE.md): `V1.0` here pins nice_cpu's
+- Tags follow nice_cpu's (doc/RELEASE.md): `V1.0` here pins nice_cpu's
   `V1.0`, and `V1.0.1`, `V1.0.2`, and so on are releases that keep the
   submodule. The submodule pins only nice_cpu tags. `RC02` and `RC04` to
   `RC06` came before. CI takes its Zig version from nice_cpu's own CI.
-  A release's notes start with its dated section of `RELEASE_NOTES.md`.
+  A release's notes start with its dated section of `doc/RELEASE_NOTES.md`.
 - After a submodule bump: `make -C nice_cpu/emulator build` (the tools and
   `hwtest` use `nice_cpu/emulator/zig-out/bin/niceemu`, and a stale binary
   checks old behavior), `make -j test`, a look at the "Compared with the
@@ -122,12 +124,12 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   (color, analyze, synchronize, behavior). The third-party files that are
   copied unchanged keep theirs, and so do the names they define, such as
   the entity `serialiser_10to1_selectio`.
-- Every README, `SYSTEM.md`, and `CONTRIBUTING.md` is kept in step with
+- Every README, `doc/SYSTEM.md`, and `CONTRIBUTING.md` is kept in step with
   the code it describes, in plain short sentences with the Oxford comma.
   Commit messages follow the 50/72 style: the subject is a short sentence
   of at most 50 characters, and the body, after a blank line, has lines
   of at most 72 characters and says what was wrong and what changed.
-- VHDL follows `CODING_STYLE.md` (3-space indent, `_i`/`_o` ports, `C_`/`G_`
+- VHDL follows `doc/CODING_STYLE.md` (3-space indent, `_i`/`_o` ports, `C_`/`G_`
   names, `synthesis`/`simulation` architectures, long headers with THEORY OF
   OPERATION and RESET). `synth/r3/max10.vhd` and `synth/mega65/hdmi/` are
   third-party, unlinted, and copied unchanged.

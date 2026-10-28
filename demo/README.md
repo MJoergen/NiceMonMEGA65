@@ -30,8 +30,8 @@ ISO 8859-1.
 
 ## How it works
 
-A write to the ROM is dropped (see [The ROM](../SYSTEM.md#the-rom) in
-SYSTEM.md), so the demo keeps its state in registers. It writes only the
+A write to the ROM is dropped (see [The ROM](../doc/SYSTEM.md#the-rom) in
+doc/SYSTEM.md), so the demo keeps its state in registers. It writes only the
 screen, the cursor's registers, and its stack.
 
 The stack grows down from `0xFFFFFEFF`, where there is no register or

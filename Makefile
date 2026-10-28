@@ -25,7 +25,7 @@ help:
 	@echo "  make [-j4] formal"
 	@echo "                  run the formal checks (needs Yosys, its GHDL plugin,"
 	@echo "                  SymbiYosys, and Yices)"
-	@echo "  make lint       check the VHDL against CODING_STYLE.md (needs vsg)"
+	@echo "  make lint       check the VHDL against doc/CODING_STYLE.md (needs vsg)"
 	@echo "  make examples   build the C examples to examples/build/*.bin (needs clang)"
 	@echo "  make demo       build the ROM's demo to demo/build/demo.bin, for a"
 	@echo "                  board's target with ROM=demo/build/demo.bin"
@@ -46,7 +46,7 @@ help:
 	@echo "  make release TAG=V1.0[.1] [PORT=/dev/ttyUSB1] [ARGS=--publish]"
 	@echo "                  build, test, and stage a release in build/release (V1.0.1"
 	@echo "                  keeps nice_cpu at V1.0); with"
-	@echo "                  --publish, tag it and create the GitHub Release (RELEASE.md)"
+	@echo "                  --publish, tag it and create the GitHub Release (doc/RELEASE.md)"
 	@echo "  make load FILE=prog.bin [PORT=/dev/ttyUSB1] [ARGS=--no-run]"
 	@echo "                  load a program into the board (MEGA65 or Nexys4DDR) and"
 	@echo "                  start it"
@@ -99,8 +99,8 @@ formal-%:
 	    build/$${job}_$$task.log || tail -n 5 build/$${job}_$$task.log; exit 1; fi
 
 # The VHDL of this repository, but not the nice_cpu submodule, which has its
-# own, nor the third-party files that keep their own style (CODING_STYLE.md):
-# synth/r3/max10.vhd and synth/mega65/hdmi/.
+# own, nor the third-party files that keep their own style
+# (doc/CODING_STYLE.md): synth/r3/max10.vhd and synth/mega65/hdmi/.
 VSG         ?= vsg
 VHDL_SOURCES = $(filter-out synth/r3/max10.vhd,$(wildcard src/*.vhd src/core/*.vhd src/video/*.vhd sim/*.vhd sim/cosim/*.vhd formal/*.vhd \
                                                           synth/common/*.vhd synth/mega65/*.vhd synth/r3/*.vhd synth/r6/*.vhd \
@@ -136,7 +136,7 @@ bump:
 	@test -n "$(TAG)" || (echo "Give the nice_cpu tag with TAG=V1.0"; exit 1)
 	$(PYTHON) tools/bump.py $(ARGS) $(TAG)
 
-# A release after a bump: staged first, then published (RELEASE.md)
+# A release after a bump: staged first, then published (doc/RELEASE.md)
 release:
 	@test -n "$(TAG)" || (echo "Give the tag with TAG=V1.0, or TAG=V1.0.1 to keep nice_cpu"; exit 1)
 	$(PYTHON) tools/release.py --port $(PORT) $(ARGS) $(TAG)

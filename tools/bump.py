@@ -25,8 +25,9 @@ of a build or of the tests is not: the submodule goes back to where it was,
 and nothing is written, for the badge must never claim what was not measured.
 
 nice_cpu's tags are Vmajor.minor (V1.0, V1.1, ...; nice_cpu's
-release/RELEASE.md, "Version names"), and the submodule pins only those, so
-the tag has two numbers, never the third of a release here (RELEASE.md).
+release/RELEASE.md, "Version names"), and the submodule pins only those,
+so the tag has two numbers, never the third of a release here
+(doc/RELEASE.md).
 
 Usage: tools/bump.py Vmajor.minor [--push]
        tools/bump.py Vmajor.minor --reports synth/r6/build
@@ -55,7 +56,7 @@ BADGE = "badge-mega65.json"
 VERIFIED = "verified.json"
 
 # A nice_cpu tag, and a tag here: the nice_cpu tag it pins, and a third
-# number for a release that keeps the submodule (RELEASE.md)
+# number for a release that keeps the submodule (doc/RELEASE.md)
 NICE_TAG = re.compile(r"V\d+\.\d+$")
 TAG = re.compile(r"(V\d+\.\d+)(\.\d+)?$")
 

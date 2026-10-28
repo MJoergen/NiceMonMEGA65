@@ -24,8 +24,8 @@
 ; SP starts at 0xFFFFFF00, as in sim/rom.nasm, so the stack grows down from
 ; 0xFFFFFEFF. No register or screen is there, so on the board these words
 ; are RAM: the 64K words of RAM repeat through the address space, and
-; 0xFFFFFEFF is RAM word 0xFEFF, far above the ROM (SYSTEM.md, "Address
-; map"). In niceemu they are ordinary memory.
+; 0xFFFFFEFF is RAM word 0xFEFF, far above the ROM (doc/SYSTEM.md,
+; "Address map"). In niceemu they are ordinary memory.
 ;
 ; On the board, a read of the console returns 0 until a byte arrives, so the
 ; program polls it in a loop. A read returns 0x200 when the input has ended,

@@ -34,7 +34,7 @@ With
 
 the core boots at reset from a ROM of 32K words at address 0 with the words
 of the `.bin` file (`src/rom.vhd`, through `G_ROM_FILE` of `top.vhd`), as
-[SYSTEM.md](../SYSTEM.md#the-rom) describes. Vivado reads the file during
+[SYSTEM.md](../doc/SYSTEM.md#the-rom) describes. Vivado reads the file during
 synthesis, so the bitstream is rebuilt when it changes. `make r6
 ROM=monitor.bin` in the top directory does the same with a path relative
 to it.
@@ -79,7 +79,7 @@ the video from MandelbrotMEGA65.
 
 The screen is shown on the VGA connector, through the video DAC, and on the
 HDMI connector, at 1280×1024 and 60 Hz (see
-[SYSTEM.md](../SYSTEM.md#the-screen)). The boards differ in the pins
+[SYSTEM.md](../doc/SYSTEM.md#the-screen)). The boards differ in the pins
 around the video, which each board's `top.vhd` drives: the R6 has a power
 save input on the DAC, and its HDMI level shifter is a PTN3363, where the
 R3 has a TPD12S016.
@@ -95,7 +95,7 @@ the console too: the board's PIC24 turns it into PS/2, which
 The receiver only listens, so the keyboard's LEDs are not set. The board's
 16 LEDs, two RGB LEDs, seven-segment display, five buttons, and 16 switches
 are registers in `0xFFFFFF90`–`96` (see
-[SYSTEM.md](../SYSTEM.md#the-nexys4ddrs-devices)). `src/seg7.vhd` scans the
+[SYSTEM.md](../doc/SYSTEM.md#the-nexys4ddrs-devices)). `src/seg7.vhd` scans the
 display, and `src/rgb_pwm.vhd` dims the RGB LEDs with 16 levels; both drive
 registered outputs in the IOBs. The CPU RESET button resets the system. The
 board differs from the MEGA65 in three ways:
@@ -181,7 +181,7 @@ the retiming it meets 90 MHz by 0.19 ns, and the Nexys4DDR has room for
 the flip-flops.
 
 The `fetch_stats` of the pipelined core (the fetch statistics in
-[SYSTEM.md](../SYSTEM.md#address-map)'s address map) has over a thousand
+[SYSTEM.md](../doc/SYSTEM.md#address-map)'s address map) has over a thousand
 flip-flops, and the multi-cycle core's has few. The pipelined core uses no
 block RAM. The multi-cycle core uses one RAMB18, which Vivado infers for
 `src2_count`, the register of the shift count. The math unit has the 4

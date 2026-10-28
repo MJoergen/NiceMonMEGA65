@@ -1,7 +1,7 @@
 -- Copied from MandelbrotMEGA65
 -- (https://github.com/MJoergen/MandelbrotMEGA65, src/vga/pix.vhd, commit
 -- a3fafd4), MIT License. Changed: the layout and names follow
--- CODING_STYLE.md.
+-- doc/CODING_STYLE.md.
 --
 -- This module generates the pixel coordinates for the video mode G_MODE (see
 -- video_pkg.vhd). The pixel (0, 0) is the top left pixel of the visible area.

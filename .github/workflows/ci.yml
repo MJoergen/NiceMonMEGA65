@@ -71,7 +71,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.x"
-      # The style of CODING_STYLE.md, as far as vsg can check it.
+      # The style of doc/CODING_STYLE.md, as far as vsg can check it.
       - run: pip install vsg==3.35.0
       - run: make lint
 

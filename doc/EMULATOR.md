@@ -8,7 +8,7 @@ address map, apart from the size of the memory and the registers at
 back what the emulator prints after a halt. `tools/run.py` runs a program
 on the board and prints what `niceemu` prints for it, so the two can be
 compared (see
-[Comparing with the emulator](README.md#comparing-with-the-emulator)).
+[Comparing with the emulator](../README.md#comparing-with-the-emulator)).
 
 ## What does not match
 
@@ -25,7 +25,7 @@ the Notes column.
 
 ## The table
 
-nice_cpu's [SYSTEM.md §5](nice_cpu/doc/SYSTEM.md#5-systems-built-on-the-fpga-core)
+nice_cpu's [SYSTEM.md §5](../nice_cpu/doc/SYSTEM.md#5-systems-built-on-the-fpga-core)
 lists what a board built on the FPGA core may do differently from the
 emulator: the reserved words, the screen, the console input, the input
 FIFO, the ROM, and the aliasing. The rows below that it covers are marked
@@ -49,7 +49,7 @@ FIFO, the ROM, and the aliasing. The rows below that it covers are marked
 | Interrupts | From the timer, `--irq`, and `--nmi` | From the timer, on IRQ | Yes, for the timer's |  |
 | After a halt | Prints why, the steps, and the registers, and exits with a status | The link sends its `h` notice after the program's last byte. The halt reason at `0xFFFFFFF1` says why, the instruction counter the steps, `0xFFFFFFE0`–`EF` hold R0–R15, and the link reads memory. `run.py` prints them as the emulator does, with its exit status | Mostly | There is no `Pending:` line, as the link cannot read whether a timer request is pending. |
 | `--dump`, `--screen`, `--input` | Options | The same options of `run.py` | Mostly | `-d` shows other values for the cycle counter, the timer's COUNT, and the fetch statistics, as they count real clocks, and at `0xFFFFFF80`–`9F` it shows the registers, where the emulator has memory. It reads at most 65536 words. |
-| `--max-steps` | Stops after N steps, prints the registers, exits with 3; there is no limit without it | `--timeout SEC` of `run.py` stops after SEC seconds: it holds the core, prints the dumps, and exits with 3 | No | It prints no registers, as a hold leaves them undefined (see [Comparing with the emulator](README.md#comparing-with-the-emulator)). |
+| `--max-steps` | Stops after N steps, prints the registers, exits with 3; there is no limit without it | `--timeout SEC` of `run.py` stops after SEC seconds: it holds the core, prints the dumps, and exits with 3 | No | It prints no registers, as a hold leaves them undefined (see [Comparing with the emulator](../README.md#comparing-with-the-emulator)). |
 | `-2004` | Puts the screen at `0x400`, for `--screen` | `run.py -2004 -s` prints the screen from `0x400`, which is plain RAM | Yes | The display shows `0xFFFF0000`. |
 | `--no-cycle-counter` | Option | Accepted by `run.py` and ignored | Yes |  |
 | Pause, bit 4 of `0xFFFFFFF0` (DEBUG.md §6) | `niceemu --link` pauses between two steps, at once, and sends `p`; a console read that waits for input pauses after the next byte arrives or the input ends | The core pauses at the next step boundary, and the link sends `p`. A program that waits for input in a loop pauses at once | Yes | A link read of a counter's low word while paused takes a snapshot here, which replaces the program's own, and none in `niceemu --link`; DEBUG.md §3 allows both. |

@@ -3,8 +3,8 @@
 This is the system that a program and the debug link see on the MEGA65 R3
 and R6, and on the Nexys4DDR: the debug link on the UART, the address map,
 the screen, the ROM, and the Nexys4DDR's devices. It follows nice_cpu's
-[doc/SYSTEM.md](nice_cpu/doc/SYSTEM.md) for the devices and
-[doc/DEBUG.md](nice_cpu/doc/DEBUG.md) for the link.
+[doc/SYSTEM.md](../nice_cpu/doc/SYSTEM.md) for the devices and
+[doc/DEBUG.md](../nice_cpu/doc/DEBUG.md) for the link.
 [EMULATOR.md](EMULATOR.md) lists where it differs from `niceemu`.
 `src/nicemon.vhd` is the system, and its header is the authoritative
 address map. DEBUG.md, ISA.md, and MICROARCH.md are nice_cpu's, in
@@ -27,7 +27,7 @@ These words are used here and in the other documents and sources:
 | Notice | A packet that the board sends on its own: `b04` at reset (the link's version, 4), `h` when the core halts, `p` when it pauses, `x` when it stops at a breakpoint, and `o` when an input byte is lost. |
 
 The MEGA65's debug UART runs at 2 Mbaud (2000000), 8-N-1, and carries the
-debug link of nice_cpu's [doc/DEBUG.md](nice_cpu/doc/DEBUG.md). It passes
+debug link of nice_cpu's [doc/DEBUG.md](../nice_cpu/doc/DEBUG.md). It passes
 the program's console bytes both ways, and between them it carries
 packets, which start with the byte `0xFF`. A console byte `0xFF` is sent
 as two. With the packets, a host reads and writes memory and the debug
@@ -222,7 +222,7 @@ touch it. So a program in the ROM must keep its stack and its variables
 in the RAM, at `0x8000` or above: `sim/rom.nasm`, the greeting that the
 tests use as the ROM, has its stack at the top of the memory, as the
 runtime has, and so has the demo that a release has in the ROM
-([demo/](demo/README.md)). With a stack in the ROM, as `hello.nasm` of
+([demo/](../demo/README.md)). With a stack in the ROM, as `hello.nasm` of
 nice_cpu has at `0x1000`, a pushed return address is lost and reads back
 as 0, and the program starts over, forever.
 

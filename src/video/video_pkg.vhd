@@ -2,7 +2,7 @@
 -- (https://github.com/MJoergen/MandelbrotMEGA65, src/vga/video_pkg.vhd, commit
 -- a3fafd4), MIT License. Changed: the read latencies of the display memory of
 -- MandelbrotMEGA65 are left out, and the layout and names follow
--- CODING_STYLE.md.
+-- doc/CODING_STYLE.md.
 --
 -- This package defines the VGA video modes, i.e. the screen resolution and the
 -- timing of the VGA output signals. The board selects a video mode in its top

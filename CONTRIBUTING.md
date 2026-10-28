@@ -25,7 +25,7 @@ or, in an existing clone:
   release puts in the ROM of its bitstreams and core files.
 - `make r3`, `make r6`, and `make nexys4ddr` build the bitstreams. With
   `ROM=file.bin`, the core boots from the file (see [The
-  ROM](SYSTEM.md#the-rom)).
+  ROM](doc/SYSTEM.md#the-rom)).
 - `make cor` builds the MEGA65 core files for MEGAFLASH (see
   [synth/README.md](synth/README.md)).
 - `make load FILE=prog.bin` loads a program into the board and starts it.
@@ -39,7 +39,7 @@ or, in an existing clone:
   timing (see [The timing badge](#the-timing-badge)).
 - `make release TAG=V1.0` builds, tests, and publishes a release, and
   `TAG=V1.0.1` one that keeps nice_cpu at `V1.0` (see
-  [RELEASE.md](RELEASE.md)).
+  [RELEASE.md](doc/RELEASE.md)).
 - `make linktest` checks the tools on `niceemu --link`, without a board
   (see [The tools and niceemu](#the-tools-and-niceemu)).
 - `make cosim` runs the system in GHDL for the tools, and `make cosimtest`
@@ -64,7 +64,7 @@ set for the pipelined core, so the multi-cycle core has room to spare.
 
 The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
 "Rules and pitfalls", and the VHDL style is in
-[CODING_STYLE.md](CODING_STYLE.md). For the boards' builds, see
+[CODING_STYLE.md](doc/CODING_STYLE.md). For the boards' builds, see
 [synth/](synth/README.md).
 
 ## Contents
@@ -84,12 +84,12 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
 | [examples/](examples/) | Example C programs, and the Makefile that builds them for the MEGA65. |
 | [tools/](tools/) | `nicelink.py`, the debug link over the board's UART, over TCP to `niceemu --link`, or over TCP to the simulated system of `make cosim`, and the tools that use it: `load.py`, which loads a program into the MEGA65 or Nexys4DDR, `run.py`, which runs a program on the board as `niceemu` runs it, `mon.py`, an interactive shell on the link, `hwtest.py`, which tests the system on the board, `bump.py`, which records the MEGA65's timing for a nice_cpu tag, `release.py`, which builds and publishes a release, `linktest.py`, which checks `run.py` on `niceemu --link`, and `cosimtest.py`, which checks `run.py` on the simulated system. |
 | [README.md](README.md) | For those who use the core files and write programs for them: on its own, and with the serial port. |
-| [SYSTEM.md](SYSTEM.md) | The system that programs and the link see: the debug link, the address map, the screen, the ROM, and the Nexys4DDR's devices. |
-| [EMULATOR.md](EMULATOR.md) | The table of the known differences from the emulator. |
-| [RELEASE_NOTES.md](RELEASE_NOTES.md) | The releases, newest first, with what changed in each. [RELEASE.md](RELEASE.md) is how to make one. |
+| [SYSTEM.md](doc/SYSTEM.md) | The system that programs and the link see: the debug link, the address map, the screen, the ROM, and the Nexys4DDR's devices. |
+| [EMULATOR.md](doc/EMULATOR.md) | The table of the known differences from the emulator. |
+| [RELEASE_NOTES.md](doc/RELEASE_NOTES.md) | The releases, newest first, with what changed in each. [RELEASE.md](doc/RELEASE.md) is how to make one. |
 | [core.mk](core.mk) | Picks the source files of the core, from `NICE`, for the Makefiles of `sim/` and `synth/`. |
 | [.claude/rules/synth.md](.claude/rules/synth.md) | Notes for Claude Code on the Vivado builds: where Vivado is, how to build, and what to check after a build. |
-| [vsg.yml](vsg.yml) | The configuration of `make lint`, which checks the VHDL against [CODING_STYLE.md](CODING_STYLE.md). |
+| [vsg.yml](vsg.yml) | The configuration of `make lint`, which checks the VHDL against [CODING_STYLE.md](doc/CODING_STYLE.md). |
 | [CLAUDE.md](CLAUDE.md) | Instructions for Claude Code: the commands, the layout, and the pitfalls. |
 | [.github/workflows/ci.yml](.github/workflows/ci.yml) | The CI: `make test` and `make cosimtest` on both cores, with niceemu built for its step counts, `make examples`, the demo's test, `make linktest`, `make formal`, and `make lint`. It cannot run `make hwtest` or build a bitstream. |
 
@@ -127,7 +127,7 @@ for one that fails. If one fails, run it alone with `make -C sim <name>`,
 such as `make -C sim tb_kbd`. `make -j test` runs all the tests side by
 side, in the time of `tb_text`, and then runs the demo in `niceemu`. `make
 -C sim test` runs them in turn. `make lint` checks the VHDL against
-[CODING_STYLE.md](CODING_STYLE.md) with vsg.
+[CODING_STYLE.md](doc/CODING_STYLE.md) with vsg.
 
 The testbenches are these:
 
@@ -488,5 +488,5 @@ does not run in CI, so neither does this.
 
 ## Releases
 
-[RELEASE.md](RELEASE.md) is how to make a release, with `make release`,
-and [RELEASE_NOTES.md](RELEASE_NOTES.md) has what changed in each.
+[RELEASE.md](doc/RELEASE.md) is how to make a release, with `make release`,
+and [RELEASE_NOTES.md](doc/RELEASE_NOTES.md) has what changed in each.

@@ -7,12 +7,12 @@ verified.json. A release Vmajor.minor.patch keeps the submodule at the
 nice_cpu tag Vmajor.minor, and follows the release Vmajor.minor here; it
 leaves verified.json and the badge as the bump left them, for they are
 nice_cpu's claim, and its notes give its own timing. So the first two numbers
-of a tag here always name the nice_cpu tag it pins (RELEASE.md). A release
+of a tag here always name the nice_cpu tag it pins (doc/RELEASE.md). A release
 has two steps, so that what is published can be looked at first.
 
 The first step, tools/release.py V1.0, changes nothing in git. In this order
 it checks that the tree is clean, is on main, and is pushed, that the tag is
-not taken here, that a point release's Vmajor.minor is, that RELEASE_NOTES.md has a
+not taken here, that a point release's Vmajor.minor is, that doc/RELEASE_NOTES.md has a
 dated section for the tag, that verified.json
 is for the nice_cpu tag and the submodule's commit and says met, that the
 submodule is at that tag, and that CI passed for the commit. It then
@@ -25,7 +25,7 @@ their version, which MEGAFLASH shows. Last it runs make hwtest on the R6 bitstre
 must be on PORT. It copies the bitstreams, the core files, a zip of the examples, and
 verified.json to build/release/V1.0, with notes.md, the release notes, and
 release.json, the commit they were built from. The notes start with the
-tag's section of RELEASE_NOTES.md, whose heading must have the date,
+tag's section of doc/RELEASE_NOTES.md, whose heading must have the date,
 "## V1.0 (2026-11-02)", and add each board's timing and the files.
 
 The second step, tools/release.py V1.0 --publish, builds nothing. It checks
@@ -53,7 +53,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STAGE = os.path.join(REPO, "build", "release")
 STAMP = "release.json"
 NOTES = "notes.md"
-RELEASE_NOTES = "RELEASE_NOTES.md"
+RELEASE_NOTES = os.path.join("doc", "RELEASE_NOTES.md")
 
 # The boards, in the order they are built; the R6 is the one tested
 BOARDS = (
@@ -197,7 +197,7 @@ def notes(tag, v, results, body):
         "on the keyboard. The debug link still loads and starts a program",
         "(`make load FILE=prog.bin`, see README.md), and hides the ROM to",
         "do so. `examples-%s.zip` has the C examples as `.bin` files." % tag,
-        "`EMULATOR.md` lists the known differences from `niceemu`.",
+        "`doc/EMULATOR.md` lists the known differences from `niceemu`.",
         "",
         "The R3 bitstream contains GPL v3 code (`synth/r3/max10.vhd`), and",
         "the MEGA65 bitstreams LGPL v3 code (`synth/mega65/hdmi/`); their",
