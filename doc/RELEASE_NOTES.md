@@ -37,6 +37,9 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 - F3 shows the bytes of each key, in hex and as characters.
 - F5 shows the 256 characters of the font and ramps of seven colors, as
   backgrounds and as foregrounds, to check the video output.
+- F7 shows the performance counters since reset, as a clock and in
+  decimal, with the clock's frequency, and those of a prime sieve that
+  runs again and again, with its cycles per instruction.
 
 **Tools**
 

@@ -1,6 +1,6 @@
 Screen:
 | NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
-| F1 typewriter   F3 key codes   F5 characters
+| F1 typewriter   F3 key codes   F5 characters   F7 counters
 |
 |  This is the demo in the ROM, which the core runs at power-up. What you type
 |  on the keyboard, or send to the debug UART, appears below the blue bar.
@@ -16,7 +16,7 @@ Screen:
 |x y z
 Screen:
 | NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
-| F1 typewriter   F3 key codes   F5 characters
+| F1 typewriter   F3 key codes   F5 characters   F7 counters
 |
 |  This is the demo in the ROM, which the core runs at power-up. What you type
 |  on the keyboard, or send to the debug UART, appears below the blue bar.
@@ -42,7 +42,7 @@ Screen:
 |        B
 Screen:
 | NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
-| F1 typewriter   F3 key codes   F5 characters
+| F1 typewriter   F3 key codes   F5 characters   F7 counters
 |
 |  This is the demo in the ROM, which the core runs at power-up. What you type
 |  on the keyboard, or send to the debug UART, appears below the blue bar.
@@ -54,7 +54,7 @@ Screen:
 |xQree F
 Screen:
 | NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
-| F1 typewriter   F3 key codes   F5 characters
+| F1 typewriter   F3 key codes   F5 characters   F7 counters
 |
 |  Each key that you type, or byte sequence that the debug UART sends, shows
 |  its bytes in hex and as characters. A control code shows as ^ and a
@@ -79,7 +79,7 @@ Screen:
 |  6A                                      j
 Screen:
 | NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
-| F1 typewriter   F3 key codes   F5 characters
+| F1 typewriter   F3 key codes   F5 characters   F7 counters
 |
 |  This is the demo in the ROM, which the core runs at power-up. What you type
 |  on the keyboard, or send to the debug UART, appears below the blue bar.
@@ -101,7 +101,7 @@ ffff0684: 000ccc20 000bbb42 000ccc20 000ccc43 000ccc20 000ddd44 000ccc20 000eee4
 ffff068c: 000ccc20 000fff46 000ccc20 000ccc20
 Screen:
 | NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
-| F1 typewriter   F3 key codes   F5 characters
+| F1 typewriter   F3 key codes   F5 characters   F7 counters
 |
 |  Characters, ISO 8859-1                    Colors, 4 bits of red, green, blue
 |     0 1 2 3 4 5 6 7 8 9 A B C D E F        Backgrounds, 0 to F
@@ -123,3 +123,26 @@ Screen:
 |  F0                                        W  0 1 2 3 4 5 6 7 8 9 A B C D E F
 |
 |  R red   G green   B blue   Y yellow   C cyan   M magenta   W gray
+Screen:
+| NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
+| F1 typewriter   F3 key codes   F5 characters   F7 counters
+|
+|  Since reset, while the core runs
+|
+|    Time, h:mm:ss.hh                              0:00:00.07
+|    Microseconds                                       79767
+|    Cycles                                             79769
+|    Instructions                                       79771
+|    Clock in MHz, cycles per microsecond                   1
+|
+|  A prime sieve to 2048, run before each update
+|    Runs                                                   2
+|    Primes found                                         309
+|    Instructions                                       30058
+|    Cycles                                             30058
+|    Microseconds                                       30058
+|    Cycles per instruction                              1.00
+|    Instructions per microsecond                        1.00
+|
+|  On the board, the time is real, and the clock is 100 MHz, or 90 MHz on the
+|  Nexys4DDR. In niceemu, each step counts as a cycle and as a microsecond.

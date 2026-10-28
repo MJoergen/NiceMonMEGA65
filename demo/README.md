@@ -19,6 +19,7 @@ so on, which the MEGA65 has without SHIFT.
 | F1 | The typewriter, which runs at power-up |
 | F3 | The key codes |
 | F5 | The characters and the colors |
+| F7 | The counters |
 
 The typewriter's top ten rows are the welcome: the two bars, what the
 demo is, how to load your own programs through the debug UART, and a third
@@ -61,6 +62,20 @@ foregrounds, the digits of the intensities on black. Intensity 0 is black,
 so its cell shows nothing. The keys do nothing here, except the function
 keys.
 
+The counters show nice_cpu's performance counters, which count while the
+core runs. The top part has those since reset: the time as `h:mm:ss.hh`,
+the microseconds, the cycles, and the instructions, all 64 bits in
+decimal, and the clock in MHz, the cycles divided by the microseconds:
+100 on the MEGA65, and 90 on the Nexys4DDR. The bottom part has a sieve of
+Eratosthenes on the numbers below 2048, which runs again before each update
+of the screen: the runs, the primes it finds, which are 309, and the
+instructions, cycles, and microseconds of the last run, with the cycles
+per instruction and the instructions per microsecond. In `niceemu`, each
+step counts as a cycle and a microsecond, so the time runs at one
+microsecond a step, the clock is 1 MHz, and the sieve has one cycle per
+instruction ([EMULATOR.md](../doc/EMULATOR.md)). The keys do nothing here,
+except the function keys.
+
 ## How it works
 
 Every demo reads the keys through `POLL`. It turns the escape sequences of
@@ -77,13 +92,17 @@ themselves puts a routine in `ECHO`, R12, which `POLL` calls with each
 byte, as the key codes do. `FRAME` sets `ECHO` to 0.
 
 A write to the ROM is dropped (see [The ROM](../doc/SYSTEM.md#the-rom) in
-doc/SYSTEM.md), so the demo keeps its state in registers. It writes only the
-screen, the cursor's registers, and its stack.
+doc/SYSTEM.md), so the demo keeps most of its state in registers, and its
+variables in the RAM below its stack: the counters keep the sieve at
+`0xFFFFF000`–`0xFFFFF7FF` and their numbers from `0xFFFFF800`. It writes
+only these words, the screen, the cursor's registers, the math unit, and
+its stack.
 
 The stack grows down from `0xFFFFFEFF`, where there is no register or
 screen, so on the board it is in RAM. The 64K words of RAM repeat through
 the address space, and `0xFFFFFEFF` is RAM word `0xFEFF`, far above the
-ROM.
+ROM. So are the variables, which are RAM on every board, also on the
+Nexys4DDR, whose RAM starts at `0xFFFF2000`.
 
 The demo scrolls by copying the rows, not with the display offset, so
 that the welcome stays, and so that it runs the same in `niceemu`, where
@@ -95,20 +114,22 @@ UART.
 
     make -C demo                  # build/demo.bin, for the ROM
     make r6 ROM=demo/build/demo.bin
-    make -C demo test             # six runs in niceemu, compared with test.expected
+    make -C demo test             # seven runs in niceemu, compared with test.expected
 
 The version in the title bar is `git describe --tags --always --dirty`, or
 `VERSION=` on the command line, which `tools/release.py` sets to the tag.
 The assembler has no include, so the Makefile joins `demo.nasm` and a line
 that defines `VERSION`. The test assembles the demo with the version `V9.9`
-into `build/demo_test.bin`, and the Makefile writes its six inputs,
-`build/test1.txt` to `build/test6.txt`, with `printf`: the first edits a
+into `build/demo_test.bin`, and the Makefile writes its seven inputs,
+`build/test1.txt` to `build/test7.txt`, with `printf`: the first edits a
 few lines, the second clears them and scrolls, the third has the function
 keys, the fourth shows key codes and scrolls them, the fifth goes from
-the key codes back to the typewriter, and the sixth shows the characters
-and the colors. `niceemu` shows no colors, so for the sixth the test also
-has the words of two rows of ramps. The six screens that `niceemu` prints,
-and those words, are in `test.expected`, which was checked by hand.
+the key codes back to the typewriter, the sixth shows the characters and
+the colors, and the seventh the counters, with two runs of the sieve.
+`niceemu` shows no colors, so for the sixth the test also has the words of
+two rows of ramps. The seven screens that `niceemu` prints, and those
+words, are in `test.expected`, which was checked by hand. In `niceemu` the
+counters count steps, so their numbers are the same in every run.
 
 The demo runs in `niceemu` like any program, at address 0. After `make -C
 demo test`, the first input shows the first screen of `test.expected`:
