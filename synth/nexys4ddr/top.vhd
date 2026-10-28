@@ -26,11 +26,15 @@
 --   so they all change at the same time.
 -- The reset button, CPU_RESETN, is active low.
 --
--- The Ethernet PHY, an SMSC LAN8720A, is held in reset, with no clock and
--- nothing to send, as it is with its pins unused, and as on the MEGA65.
+-- The Ethernet PHY, an SMSC LAN8720A, gets its 50 MHz clock and its reset
+-- from the FPGA, as on the MEGA65 (synth/mega65/mega65.vhd). There is no
+-- MAC yet, so nothing is sent, and what the PHY receives is ignored.
 
 library ieee;
    use ieee.std_logic_1164.all;
+
+library unisim;
+   use unisim.vcomponents.all;
 
 library work;
    use work.video_pkg.all;
@@ -125,6 +129,12 @@ architecture synthesis of top is
    attribute keep of vga_green_r : signal is "true";
    attribute keep of vga_blue_r  : signal is "true";
 
+   signal eth_clk : std_logic;
+   signal eth_rst : std_logic;
+
+   -- The PHY's reset, in the IOB (IOB TRUE on its port, in nexys4ddr.xdc)
+   signal eth_rst_n_r : std_logic := '0';
+
 begin
 
    i_clk_rst : entity work.clk_rst
@@ -137,7 +147,9 @@ begin
          sys_clk_i      => clk_i,
          reset_button_i => reset_n_i,
          clk_o          => clk,
-         rst_o          => rst
+         rst_o          => rst,
+         eth_clk_o      => eth_clk,
+         eth_rst_o      => eth_rst
       ); -- i_clk_rst
 
 
@@ -271,8 +283,34 @@ begin
    vga_hs_o    <= vga_hs_r;
    vga_vs_o    <= vga_vs_r;
 
-   eth_clk_o   <= '0';  -- No clock
-   eth_rst_n_o <= '0';  -- Hold the PHY in reset
+   -- The PHY's clock is the Ethernet clock, forwarded through an ODDR, so it
+   -- leaves the clock network only in the IOB.
+-- vsg_off
+   i_eth_clk : ODDR
+      generic map (
+         DDR_CLK_EDGE => "SAME_EDGE",
+         INIT         => '0',
+         SRTYPE       => "SYNC"
+      )
+      port map (
+         Q  => eth_clk_o,
+         C  => eth_clk,
+         CE => '1',
+         D1 => '1',
+         D2 => '0',
+         R  => '0',
+         S  => '0'
+      ); -- i_eth_clk
+-- vsg_on
+
+   p_eth_rst : process (eth_clk)
+   begin
+      if rising_edge(eth_clk) then
+         eth_rst_n_r <= not eth_rst;
+      end if;
+   end process p_eth_rst;
+
+   eth_rst_n_o <= eth_rst_n_r;
    eth_txd_o   <= "00";
    eth_tx_en_o <= '0';  -- Send nothing
 

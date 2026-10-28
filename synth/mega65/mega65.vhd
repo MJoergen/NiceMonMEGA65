@@ -18,6 +18,13 @@
 --   The Tyto Project) encodes the picture to TMDS symbols, and the
 --   serializers send them with the TMDS clock (540 MHz, on both edges).
 -- The clocks of the video come from their own MMCM (video_clk.vhd).
+--
+-- The Ethernet PHY (U4 = KSZ8081RNDCA) gets its 50 MHz clock from the
+-- FPGA, from clk_rst.vhd through an ODDR, and is held in reset as long as
+-- the system is: at least 10 ms after the clock starts, which is more than
+-- the PHY needs. It then runs with its reset defaults, and negotiates the
+-- link on its own. There is no MAC yet, so nothing is sent, and what the
+-- PHY receives is ignored.
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -59,7 +66,16 @@ entity mega65 is
       tmds_data_p_o  : out std_logic_vector(2 downto 0);
       tmds_data_n_o  : out std_logic_vector(2 downto 0);
       tmds_clk_p_o   : out std_logic;
-      tmds_clk_n_o   : out std_logic
+      tmds_clk_n_o   : out std_logic;
+
+      -- Ethernet, RMII
+      eth_clk_o      : out std_logic;
+      eth_rst_n_o    : out std_logic;
+      eth_rxd_i      : in  std_logic_vector(1 downto 0);
+      eth_crs_dv_i   : in  std_logic;
+      eth_rxer_i     : in  std_logic;
+      eth_txd_o      : out std_logic_vector(1 downto 0);
+      eth_tx_en_o    : out std_logic
    );
 end entity mega65;
 
@@ -110,6 +126,12 @@ architecture synthesis of mega65 is
    attribute keep of vdac_green_r : signal is "true";
    attribute keep of vdac_blue_r  : signal is "true";
 
+   signal eth_clk : std_logic;
+   signal eth_rst : std_logic;
+
+   -- The PHY's reset, in the IOB (IOB TRUE on its port, in mega65.xdc)
+   signal eth_rst_n_r : std_logic := '0';
+
 begin
 
    i_clk_rst : entity work.clk_rst
@@ -117,7 +139,9 @@ begin
          sys_clk_i      => clk_i,
          reset_button_i => reset_button_i,
          clk_o          => clk,
-         rst_o          => rst
+         rst_o          => rst,
+         eth_clk_o      => eth_clk,
+         eth_rst_o      => eth_rst
       ); -- i_clk_rst
 
    p_led : process (clk)
@@ -300,5 +324,41 @@ begin
          out_p  => tmds_clk_p_o,
          out_n  => tmds_clk_n_o
       ); -- i_hdmi_clk
+
+
+   ---------------------------------------------------------------------------
+   -- The Ethernet PHY
+   ---------------------------------------------------------------------------
+
+   -- The PHY's clock is the Ethernet clock, forwarded through an ODDR, so it
+   -- leaves the clock network only in the IOB.
+-- vsg_off
+   i_eth_clk : ODDR
+      generic map (
+         DDR_CLK_EDGE => "SAME_EDGE",
+         INIT         => '0',
+         SRTYPE       => "SYNC"
+      )
+      port map (
+         Q  => eth_clk_o,
+         C  => eth_clk,
+         CE => '1',
+         D1 => '1',
+         D2 => '0',
+         R  => '0',
+         S  => '0'
+      ); -- i_eth_clk
+-- vsg_on
+
+   p_eth_rst : process (eth_clk)
+   begin
+      if rising_edge(eth_clk) then
+         eth_rst_n_r <= not eth_rst;
+      end if;
+   end process p_eth_rst;
+
+   eth_rst_n_o <= eth_rst_n_r;
+   eth_txd_o   <= "00";
+   eth_tx_en_o <= '0';  -- Send nothing
 
 end architecture synthesis;

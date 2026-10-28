@@ -88,8 +88,8 @@ set_property -dict {PACKAGE_PIN V10  IOSTANDARD LVCMOS33} [get_ports {sw_i[15]}]
 ## The Ethernet PHY, an SMSC LAN8720A. It is RMII, clocked by 50 MHz from
 ## the FPGA on ETH_REFCLK, as on the MEGA65 (mega65.xdc). MDC and MDIO are
 ## left out, as no PHY register needs reading or writing, and so is ETH_INTN.
-## Until there is a MAC, top.vhd holds the PHY in reset, so these pins are not
-## timed yet.
+## top.vhd drives the clock and the reset. Until there is a MAC, nothing is
+## sent and the inputs are unused, so the data pins are not timed yet.
 set_property -dict {PACKAGE_PIN D5   IOSTANDARD LVCMOS33} [get_ports {eth_clk_o}];    # ETH_REFCLK
 set_property -dict {PACKAGE_PIN B3   IOSTANDARD LVCMOS33} [get_ports {eth_rst_n_o}];  # ETH_RSTN
 set_property -dict {PACKAGE_PIN C11  IOSTANDARD LVCMOS33} [get_ports {eth_rxd_i[0]}]; # ETH_RXD[0]
@@ -99,9 +99,18 @@ set_property -dict {PACKAGE_PIN C10  IOSTANDARD LVCMOS33} [get_ports {eth_rxer_i
 set_property -dict {PACKAGE_PIN A10  IOSTANDARD LVCMOS33} [get_ports {eth_txd_o[0]}]; # ETH_TXD[0]
 set_property -dict {PACKAGE_PIN A8   IOSTANDARD LVCMOS33} [get_ports {eth_txd_o[1]}]; # ETH_TXD[1]
 set_property -dict {PACKAGE_PIN B9   IOSTANDARD LVCMOS33} [get_ports {eth_tx_en_o}];  # ETH_TXEN
+set_property -dict {SLEW FAST} [get_ports {eth_clk_o}]
 
 ## The board clock, 100 MHz. Vivado derives the MMCM clocks from it.
 create_clock -period 10.000 -name sys_clk [get_ports {clk_i}]
+
+## The clock on the pin, forwarded by an ODDR from the MMCM's 50 MHz, for
+## the timing of the RMII pins. The PHY's reset is slow, and its register is
+## in the I/O tile.
+create_generated_clock -name eth_clk_pin -divide_by 1 \
+   -source [get_pins i_eth_clk/C] [get_ports {eth_clk_o}]
+set_false_path -to [get_ports {eth_rst_n_o}]
+set_property IOB TRUE [get_ports {eth_rst_n_o}]
 
 ## The system clock and the video clocks cross only through the screen's
 ## copy and the handshake of src/video/text.vhd, as on the MEGA65
@@ -115,6 +124,17 @@ set_max_delay -datapath_only \
    -to   [get_clocks -of_objects [get_pins i_video_clk/i_mmcm/CLKOUT0]] 10.000
 set_max_delay -datapath_only \
    -from [get_clocks -of_objects [get_pins i_video_clk/i_mmcm/CLKOUT0]] \
+   -to   [get_clocks -of_objects [get_pins i_clk_rst/i_mmcm/CLKOUT0]] 10.000
+
+## The Ethernet clock (CLKOUT1 of the system clock's MMCM) and the system
+## clock cross only through synchronizers, for now the PHY's reset in
+## clk_rst.vhd. Their relation is ignored, and each path only has to be
+## shorter than 10 ns, in both directions, as for the video clocks.
+set_max_delay -datapath_only \
+   -from [get_clocks -of_objects [get_pins i_clk_rst/i_mmcm/CLKOUT0]] \
+   -to   [get_clocks -of_objects [get_pins i_clk_rst/i_mmcm/CLKOUT1]] 10.000
+set_max_delay -datapath_only \
+   -from [get_clocks -of_objects [get_pins i_clk_rst/i_mmcm/CLKOUT1]] \
    -to   [get_clocks -of_objects [get_pins i_clk_rst/i_mmcm/CLKOUT0]] 10.000
 
 ## The color and sync outputs are registered in the IOBs (p_vga in

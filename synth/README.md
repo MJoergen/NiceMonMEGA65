@@ -13,7 +13,7 @@ Every board's top level has `src/system.vhd`, the NiceMon system and the
 text display of its screen, with the UART's pins. [common/](common/) holds
 the rest that every board shares, as all have a 100 MHz clock and a 7-series
 FPGA: the clock and reset (`clk_rst.vhd`, an MMCM that makes the system
-clock), and the video clocks (`video_clk.vhd`, a second MMCM that makes the
+clock and the 50 MHz clock of the Ethernet PHY), and the video clocks (`video_clk.vhd`, a second MMCM that makes the
 108 MHz pixel clock and the 540 MHz clock of the HDMI serializers).
 [Makefile.inc](Makefile.inc) is the build; each board's `Makefile` gives it
 the part, the board's sources, and its constraints.
@@ -204,16 +204,16 @@ All builds meet the clock. These are the worst setup and hold slacks:
 
 | Build | Clock | Setup | Hold |
 |---|---|---|---|
-| R6, pipelined | 100 MHz | 0.595 ns | 0.065 ns |
+| R6, pipelined | 100 MHz | 0.472 ns | 0.022 ns |
 | R6, `NICE=multi` | 100 MHz | 0.52 ns | – |
-| R3, pipelined | 100 MHz | 0.172 ns | 0.073 ns |
-| Nexys4DDR, pipelined | 90 MHz | 0.111 ns | 0.035 ns |
+| R3, pipelined | 100 MHz | 0.354 ns | 0.017 ns |
+| Nexys4DDR, pipelined | 90 MHz | 0.169 ns | 0.017 ns |
 | Nexys4DDR, `NICE=multi` | 90 MHz | 0.19 ns | – |
 
-The R6 and Nexys4DDR pipelined rows are from builds at nice_cpu RC06,
-with the debug link of version 4; the R3 row and the multi-cycle rows
-are older builds, with fewer link features, and the multi-cycle hold
-slacks were not recorded. The slacks change from build to build with
+The pipelined rows are from builds at nice_cpu V1.0, with the debug
+link of version 4 and the Ethernet PHY's clock and reset; the
+multi-cycle rows are older builds, with fewer link features, and their
+hold slacks were not recorded. The slacks change from build to build with
 placement more than with the logic. The worst paths are usually in the
 core's WRITE and FETCH stages.
 

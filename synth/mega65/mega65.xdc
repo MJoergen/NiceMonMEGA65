@@ -21,6 +21,17 @@ set_max_delay -datapath_only \
    -from [get_clocks -of_objects [get_pins {i_mega65/i_video_clk/i_mmcm/CLKOUT0 i_mega65/i_video_clk/i_mmcm/CLKOUT1}]] \
    -to   [get_clocks -of_objects [get_pins i_mega65/i_clk_rst/i_mmcm/CLKOUT0]] 10.000
 
+## The Ethernet clock (CLKOUT1 of the system clock's MMCM) and the system
+## clock cross only through synchronizers, for now the PHY's reset in
+## clk_rst.vhd. Their relation is ignored, and each path only has to be
+## shorter than 10 ns, in both directions, as for the video clocks.
+set_max_delay -datapath_only \
+   -from [get_clocks -of_objects [get_pins i_mega65/i_clk_rst/i_mmcm/CLKOUT0]] \
+   -to   [get_clocks -of_objects [get_pins i_mega65/i_clk_rst/i_mmcm/CLKOUT1]] 10.000
+set_max_delay -datapath_only \
+   -from [get_clocks -of_objects [get_pins i_mega65/i_clk_rst/i_mmcm/CLKOUT1]] \
+   -to   [get_clocks -of_objects [get_pins i_mega65/i_clk_rst/i_mmcm/CLKOUT0]] 10.000
+
 ## The color and sync outputs to the video DAC are registered in the IOBs
 ## (p_vdac in mega65.vhd), so they all change at the same time, half a VGA
 ## clock cycle before the DAC samples them. The HDMI outputs are OSERDES and
@@ -44,8 +55,9 @@ set_false_path -from [get_ports {kb_io2_i}]
 ## The Ethernet PHY (U4 = KSZ8081RNDCA), on the same pins on the R3 and R6
 ## (M2M/MEGA65-R3.xdc and MEGA65-R6.xdc). It is RMII, clocked by 50 MHz from
 ## the FPGA on ETH_CLK. MDC and MDIO are left out, as no PHY register needs
-## reading or writing, and so are ETH_INT and ETH_LED2. Until there is a MAC,
-## top.vhd holds the PHY in reset, so these pins are not timed yet.
+## reading or writing, and so are ETH_INT and ETH_LED2. mega65.vhd drives
+## the clock and the reset. Until there is a MAC, nothing is sent and the
+## inputs are unused, so the data pins are not timed yet.
 set_property -dict {PACKAGE_PIN L4   IOSTANDARD LVCMOS33} [get_ports {eth_clk_o}];    # ETH_CLK
 set_property -dict {PACKAGE_PIN K6   IOSTANDARD LVCMOS33} [get_ports {eth_rst_n_o}];  # ETH-RST
 set_property -dict {PACKAGE_PIN P4   IOSTANDARD LVCMOS33} [get_ports {eth_rxd_i[0]}]; # ETH_RX_D0
@@ -57,6 +69,14 @@ set_property -dict {PACKAGE_PIN K3   IOSTANDARD LVCMOS33} [get_ports {eth_txd_o[
 set_property -dict {PACKAGE_PIN J4   IOSTANDARD LVCMOS33} [get_ports {eth_tx_en_o}];  # ETH_TX_EN
 set_property -dict {SLEW SLOW DRIVE 4} [get_ports {eth_txd_o[*] eth_tx_en_o}]
 set_property -dict {SLEW FAST}         [get_ports {eth_clk_o}]
+
+## The clock on the pin, forwarded by an ODDR from the MMCM's 50 MHz, for
+## the timing of the RMII pins. The PHY's reset is slow, and its register is
+## in the I/O tile.
+create_generated_clock -name eth_clk_pin -divide_by 1 \
+   -source [get_pins i_mega65/i_eth_clk/C] [get_ports {eth_clk_o}]
+set_false_path -to [get_ports {eth_rst_n_o}]
+set_property IOB TRUE [get_ports {eth_rst_n_o}]
 
 ## The registers on the slow pins live in the I/O tiles, so that their
 ## timing does not depend on placement.

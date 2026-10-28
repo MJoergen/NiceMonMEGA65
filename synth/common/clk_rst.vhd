@@ -2,8 +2,10 @@
 -- whose VCO runs at 100 MHz * G_MULTIPLY, and which makes the system clock,
 -- the VCO's frequency / G_DIVIDE: 1000 MHz / 10 = 100 MHz on the MEGA65, and
 -- 900 MHz / 10 = 90 MHz on the Nexys4DDR, whose FPGA is a slower speed
--- grade. The pipelined core meets 100 MHz on the MEGA65 with little to
--- spare, so recheck the timing after a change to nice_cpu.
+-- grade. Its second output is the 50 MHz clock of the Ethernet PHY's RMII,
+-- the VCO's frequency / (2 * G_MULTIPLY) on every board. The pipelined core
+-- meets 100 MHz on the MEGA65 with little to spare, so recheck the timing
+-- after a change to nice_cpu.
 -- The reset is held while the MMCM is not locked, and while the reset
 -- button is pressed (G_BUTTON_LEVEL is its level then), and for 2^20 cycles
 -- (10 ms at 100 MHz, 12 ms at 90 MHz) after both. So the UART output is idle
@@ -13,6 +15,10 @@
 -- registers each, as in MandelbrotMEGA65's clk_rst.vhd. The button is not
 -- inverted before the first register, so that it can be an IOB flop whatever
 -- its polarity.
+-- eth_rst_o is rst_o synchronized to eth_clk_o by two registers, so it is
+-- held as long. The two clocks come from the same MMCM, but at 90 MHz their
+-- edges can be close, so the crossing is treated as asynchronous (the
+-- set_max_delay between them in the boards' XDC).
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -31,7 +37,9 @@ entity clk_rst is
       sys_clk_i      : in  std_logic; -- 100 MHz
       reset_button_i : in  std_logic; -- asynchronous
       clk_o          : out std_logic; -- 100 MHz * G_MULTIPLY / G_DIVIDE
-      rst_o          : out std_logic  -- synchronous to clk_o
+      rst_o          : out std_logic; -- synchronous to clk_o
+      eth_clk_o      : out std_logic; -- 50 MHz
+      eth_rst_o      : out std_logic  -- synchronous to eth_clk_o
    );
 end entity clk_rst;
 
@@ -40,17 +48,21 @@ architecture synthesis of clk_rst is
    signal clkfb     : std_logic;
    signal clkfb_buf : std_logic;
    signal clk_mmcm  : std_logic;
+   signal eth_mmcm  : std_logic;
+   signal eth_clk   : std_logic;
    signal locked    : std_logic;
 
    signal locked_sync : std_logic_vector(1 downto 0) := "00";
    signal button_sync : std_logic_vector(1 downto 0) := (others => G_BUTTON_LEVEL);
    signal counter     : std_logic_vector(19 downto 0) := (others => '1');
    signal rst         : std_logic := '1';
+   signal eth_rst     : std_logic_vector(1 downto 0) := "11";
 
    -- The registers of the synchronizers
    attribute async_reg : string;
    attribute async_reg of locked_sync : signal is "true";
    attribute async_reg of button_sync : signal is "true";
+   attribute async_reg of eth_rst     : signal is "true";
 
 begin
 
@@ -62,13 +74,15 @@ begin
          CLKIN1_PERIOD    => 10.0,  -- 100 MHz
          DIVCLK_DIVIDE    => 1,
          CLKFBOUT_MULT_F  => G_MULTIPLY,
-         CLKOUT0_DIVIDE_F => G_DIVIDE
+         CLKOUT0_DIVIDE_F => G_DIVIDE,
+         CLKOUT1_DIVIDE   => integer(2.0 * G_MULTIPLY)  -- 50 MHz
       )
       port map (
          CLKIN1   => sys_clk_i,
          CLKFBIN  => clkfb_buf,
          CLKFBOUT => clkfb,
          CLKOUT0  => clk_mmcm,
+         CLKOUT1  => eth_mmcm,
          LOCKED   => locked,
          PWRDWN   => '0',
          RST      => '0'
@@ -85,6 +99,12 @@ begin
          I => clk_mmcm,
          O => clk_o
       ); -- i_bufg_clk
+
+   i_bufg_eth : BUFG
+      port map (
+         I => eth_mmcm,
+         O => eth_clk
+      ); -- i_bufg_eth
 -- vsg_on
 
    p_rst : process (clk_o)
@@ -104,5 +124,15 @@ begin
    end process p_rst;
 
    rst_o <= rst;
+
+   p_eth_rst : process (eth_clk)
+   begin
+      if rising_edge(eth_clk) then
+         eth_rst <= eth_rst(0) & rst;
+      end if;
+   end process p_eth_rst;
+
+   eth_clk_o <= eth_clk;
+   eth_rst_o <= eth_rst(1);
 
 end architecture synthesis;
