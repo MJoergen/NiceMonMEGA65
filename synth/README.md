@@ -204,14 +204,14 @@ All builds meet the clock. These are the worst setup and hold slacks:
 
 | Build | Clock | Setup | Hold |
 |---|---|---|---|
-| R6, pipelined | 100 MHz | 0.225 ns | 0.016 ns |
+| R6, pipelined | 100 MHz | 0.187 ns | 0.033 ns |
 | R6, `NICE=multi` | 100 MHz | 0.52 ns | – |
-| R3, pipelined | 100 MHz | 0.171 ns | 0.055 ns |
-| Nexys4DDR, pipelined | 90 MHz | 0.125 ns | 0.029 ns |
+| R3, pipelined | 100 MHz | 0.345 ns | 0.011 ns |
+| Nexys4DDR, pipelined | 90 MHz | 0.156 ns | 0.048 ns |
 | Nexys4DDR, `NICE=multi` | 90 MHz | 0.19 ns | – |
 
 The pipelined rows are from builds at nice_cpu V1.0, with the debug
-link of version 4 and the Ethernet PHY's receiver with its FCS check; the
+link of version 4 and the Ethernet PHY's receiver, its FCS check, and its FIFO; the
 multi-cycle rows are older builds, with fewer link features, and their
 hold slacks were not recorded. The slacks change from build to build with
 placement more than with the logic. The worst paths are usually in the
@@ -236,8 +236,9 @@ The block RAMs, of 36 Kbit, are these:
 | Its copy in `text.vhd` (`scr_ram.vhd`) | 32 | 8 |
 | The font in `text.vhd` | 4 | 4 |
 | The UART's input FIFO (`rx_fifo.vhd`), one RAMB18 | 0.5 | 0.5 |
-| Total without the ROM, pipelined | 132.5 of 365 | 84.5 of 135 |
-| Total with the ROM, pipelined | 164.5 | 116.5 |
+| The FIFO of received Ethernet frames (`eth/rx_ram.vhd`), 2K bytes, one RAMB18 | 0.5 | 0.5 |
+| Total without the ROM, pipelined | 133 of 365 | 85 of 135 |
+| Total with the ROM, pipelined | 165 | 117 |
 
 The copy of the screen keeps all 32 bits, as the display reads the
 character and both 12-bit colors, so it takes as many block RAMs as the

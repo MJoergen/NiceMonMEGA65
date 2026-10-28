@@ -9,9 +9,10 @@
 -- register, LSB first, so when the four bytes of the frame check sequence
 -- have gone in too, the register of a good frame holds the residue
 -- 0xDEBB20E3, whatever the frame. eof_i then gives ok_o when the register
--- holds it, and bad_o when it does not or when err_i is '1'; a frame shorter
--- than its frame check sequence is bad, as the register does not hold the
--- residue then. The register starts again at all ones after each eof_i.
+-- holds it and the frame has at least C_MIN_LEN bytes, 64 with its check
+-- sequence, the least that IEEE 802.3 allows, and bad_o when it does not,
+-- or when err_i is '1'. The register and the count of bytes start again
+-- after each eof_i.
 -- ok_o and bad_o come a cycle after eof_i.
 --
 -- RESET
@@ -40,8 +41,11 @@ architecture synthesis of rx_fcs is
 
    constant C_POLY    : std_logic_vector(31 downto 0) := X"EDB88320";
    constant C_RESIDUE : std_logic_vector(31 downto 0) := X"DEBB20E3";
+   constant C_MIN_LEN : natural                       := 64;
 
    signal crc : std_logic_vector(31 downto 0) := (others => '1');
+   -- The bytes of the frame, up to C_MIN_LEN
+   signal len : natural range 0 to C_MIN_LEN  := 0;
 
    -- The register after the byte d, LSB first
    function crc_byte (
@@ -73,19 +77,24 @@ begin
 
          if valid_i = '1' then
             crc <= crc_byte(crc, data_i);
+            if len < C_MIN_LEN then
+               len <= len + 1;
+            end if;
          end if;
 
          if eof_i = '1' then
-            if crc = C_RESIDUE and err_i = '0' then
+            if crc = C_RESIDUE and len = C_MIN_LEN and err_i = '0' then
                ok_o <= '1';
             else
                bad_o <= '1';
             end if;
             crc <= (others => '1');
+            len <= 0;
          end if;
 
          if rst_i = '1' then
             crc   <= (others => '1');
+            len   <= 0;
             ok_o  <= '0';
             bad_o <= '0';
          end if;

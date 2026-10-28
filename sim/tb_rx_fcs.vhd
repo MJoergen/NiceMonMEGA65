@@ -9,7 +9,8 @@
 -- checked first against the CRC-32 of "123456789", 0xCBF43926. The frames:
 -- C_ARP, good; C_ARP with a bit of its data and then of its check sequence
 -- flipped, bad; C_ARP with err_i, bad; frames of 64, 100, and 1518 bytes,
--- good; a frame of 3 bytes, bad; and C_ARP again, good, after the bad one.
+-- good; frames of 3 bytes and of 63 with a right check sequence, bad, as
+-- too short; and C_ARP again, good, after the bad one.
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -166,6 +167,7 @@ begin
       send(frame_of(2, 96), '0', true, "the frame of 100 bytes");
       send(frame_of(3, 1514), '0', true, "the frame of 1518 bytes");
       send(C_ARP(0 to 2), '0', false, "the frame of 3 bytes");
+      send(frame_of(4, 59), '0', false, "the frame of 63 bytes");
       send(C_ARP, '0', true, "the ARP request after a bad frame");
 
       report "tb_rx_fcs: PASS";

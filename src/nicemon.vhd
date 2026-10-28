@@ -126,10 +126,9 @@
 --     95  The five buttons, bit 0 for the center one, then up, left, right,
 --         and down. Read only, synchronized to the clock.
 --     96  The 16 switches, bit n for switch n. Read only, synchronized.
---     98  The Ethernet frames received with a right frame check sequence,
---         eth_rx_i, a count that wraps. Read only.
---     99  The Ethernet frames received with a wrong one, or that did not
---         end on a byte, eth_rx_bad_i, as 98.
+--     98  The good Ethernet frames received, eth_rx_i, a count that wraps
+--         (system.vhd). Read only.
+--     99  The bad or dropped Ethernet frames, eth_rx_bad_i, as 98.
 --   0xFFFFFFE0-0xFFFFFFFF  The debug registers of DEBUG.md §6, for the link
 --                          only, which debug_link holds: R0-R15 of the core
 --                          after a halt or at a pause, the control

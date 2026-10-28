@@ -103,8 +103,9 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
 - `devices.vhd` has nice_cpu's devices at `0xFFFFFF10`–`7F`.
 - `scr_regs.vhd` has the screen's registers at `0xFFFFFF80`–`8F`.
 - `board_io.vhd` has the board's registers at `0xFFFFFF90`–`9F`.
-- `eth/rmii_rx.vhd` receives the Ethernet PHY's frames, and `eth/rx_fcs.vhd`
-  checks their frame check sequence.
+- `eth/rmii_rx.vhd` receives the Ethernet PHY's frames, `eth/rx_fcs.vhd`
+  checks their frame check sequence, and `eth/eth_rx_fifo.vhd`, with
+  `eth/rx_ram.vhd`, takes the good ones to the system clock.
 - The debug link is nice_cpu's `hdl/src/debug_link.vhd`.
 - `uart_serdes.vhd` is copied from
   [cmod-s7](https://github.com/MJoergen/cmod-s7), with fixes to its
@@ -161,7 +162,13 @@ The testbenches are these:
 - `sim/tb_rx_fcs.vhd` tests the check of the frame check sequence: an ARP
   request whose sequence comes from Python's `zlib.crc32`, the same with
   a bit flipped in its data and in its sequence, and frames of 3 to 1518
-  bytes. It first checks its own CRC-32 against that of `123456789`.
+  bytes, of which those under 64 are bad. It first checks its own CRC-32
+  against that of `123456789`.
+- `sim/tb_eth_rx_fifo.vhd` tests the FIFO of received frames between its
+  two clocks, with good and bad frames, a reader that is not always
+  ready, and a stall that makes frames find the FIFO full: every good
+  frame comes, whole and without its check sequence, or is counted as
+  dropped.
 - `make test` also checks that GHDL can synthesize the system, with
   `sim/rom.nasm` as its ROM and without a ROM, the keyboards, the text
   display, and `src/system.vhd` with the screen and the devices of the

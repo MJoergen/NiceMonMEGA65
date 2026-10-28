@@ -18,10 +18,9 @@
 --   5  The buttons, bit 0 for the center one, then up, left, right, and
 --      down. Read only.
 --   6  The switches, bit n for switch n. Read only.
---   8  The Ethernet frames received with a right frame check sequence,
---      eth_rx_i, on every board. Read only.
---   9  The Ethernet frames received with a wrong one, or that did not end
---      on a byte, eth_rx_bad_i, as 8.
+--   8  The good Ethernet frames received, eth_rx_i, on every board. Read
+--      only.
+--   9  The bad or dropped Ethernet frames, eth_rx_bad_i, as 8.
 -- The other words, and words 0 to 6 without G_BOARD_IO, read 0 and take
 -- no write, so then the outputs stay 0. The buttons and the switches pass
 -- through two registers, which synchronize them to the clock.

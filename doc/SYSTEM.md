@@ -308,9 +308,12 @@ to `0xFFFFFF97` (see
 `0xFFFFFF98` and `0xFFFFFF99` are on every board, the MEGA65 too. They
 are read only, and count the Ethernet frames that the PHY has received
 since reset, each wrapping at 2^32. `0xFFFFFF98` counts the good ones,
-whose frame check sequence is right, and `0xFFFFFF99` the bad ones,
-whose sequence is wrong or that did not end on a byte. Nothing is sent
-yet. The PHY negotiates the link on its own, so a cable to a switch
+which have at least 64 bytes and a right frame check sequence, and have
+come through the FIFO of received frames to the system clock.
+`0xFFFFFF99` counts the bad ones, whose sequence is wrong, that are
+shorter, or that did not end on a byte, and the good ones that found the
+FIFO full and were dropped. Nothing reads the frames yet, and nothing is
+sent. The PHY negotiates the link on its own, so a cable to a switch
 gives a good count that rises with the broadcasts on the network, and a
 bad count that stays at 0. This is the first step of a debug link over
 Ethernet

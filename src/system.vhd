@@ -22,12 +22,14 @@
 -- boards leave them open.
 -- The Ethernet PHY's receive pins go to the RMII receiver (eth/rmii_rx.vhd)
 -- in the PHY's 50 MHz clock domain, and its bytes to the check of the frame
--- check sequence (eth/rx_fcs.vhd). Each good frame flips bit 0 of
--- eth_toggle there, and each bad one bit 1. Two registers synchronize each
--- bit to clk_i, where each change counts a frame, the good ones in eth_rx
--- and the bad ones in eth_rx_bad, which the core and the link read at
--- 0xFFFFFF98 and 0xFFFFFF99. A frame takes more than 100 cycles of the
--- PHY's clock, so no change is lost.
+-- check sequence (eth/rx_fcs.vhd), and the good frames go through the FIFO
+-- of received frames (eth/eth_rx_fifo.vhd) to clk_i. Nothing reads the
+-- frames yet: the FIFO's output is always taken, and each frame that comes
+-- out counts in eth_rx. Each bad frame, and each good one that found the
+-- FIFO full, flips eth_toggle in the PHY's clock domain; two registers
+-- synchronize it to clk_i, where each change counts in eth_rx_bad. A frame
+-- takes more than 100 cycles of the PHY's clock, so no change is lost. The
+-- core and the link read the counts at 0xFFFFFF98 and 0xFFFFFF99.
 --
 -- With a ROM the core boots from it at reset; without one it waits, held,
 -- for a host on the debug link (nicemon.vhd).
@@ -126,16 +128,18 @@ architecture synthesis of system is
    signal eth_err   : std_logic;
    signal eth_ok    : std_logic;
    signal eth_bad   : std_logic;
-   -- Bit 0 flips at each good frame, bit 1 at each bad one.
-   signal eth_toggle : std_logic_vector(1 downto 0) := "00";
+   signal eth_drop  : std_logic;
+   -- Flips at each bad or dropped frame
+   signal eth_toggle : std_logic := '0';
+   -- The good frames, in the system clock domain
+   signal eth_last : std_logic;
+   signal eth_out  : std_logic;
    -- eth_toggle synchronized to clk_i, its value before, and the counts
-   signal eth_sync0    : std_logic_vector(1 downto 0)  := "00";
-   signal eth_sync1    : std_logic_vector(1 downto 0)  := "00";
-   signal eth_toggle_d : std_logic_vector(1 downto 0)  := "00";
+   signal eth_sync     : std_logic_vector(1 downto 0)  := "00";
+   signal eth_toggle_d : std_logic                     := '0';
    signal eth_rx       : std_logic_vector(31 downto 0) := (others => '0');
    signal eth_rx_bad   : std_logic_vector(31 downto 0) := (others => '0');
-   attribute async_reg of eth_sync0 : signal is "TRUE";
-   attribute async_reg of eth_sync1 : signal is "TRUE";
+   attribute async_reg of eth_sync : signal is "TRUE";
 
 begin
 
@@ -215,23 +219,42 @@ begin
          bad_o   => eth_bad
       ); -- i_rx_fcs
 
+   i_eth_rx_fifo : entity work.eth_rx_fifo
+      port map (
+         wr_clk_i   => eth_clk_i,
+         wr_rst_i   => eth_rst_i,
+         wr_data_i  => eth_data,
+         wr_valid_i => eth_valid,
+         wr_ok_i    => eth_ok,
+         wr_bad_i   => eth_bad,
+         wr_drop_o  => eth_drop,
+         rd_clk_i   => clk_i,
+         rd_rst_i   => rst_i,
+         rd_data_o  => open,
+         rd_last_o  => eth_last,
+         rd_valid_o => eth_out,
+         rd_ready_i => '1'
+      ); -- i_eth_rx_fifo
+
    p_eth_toggle : process (eth_clk_i)
    begin
       if rising_edge(eth_clk_i) then
-         eth_toggle <= eth_toggle xor (eth_bad & eth_ok);
+         if eth_bad = '1' or eth_drop = '1' then
+            eth_toggle <= not eth_toggle;
+         end if;
       end if;
    end process p_eth_toggle;
 
    p_eth_rx : process (clk_i)
    begin
       if rising_edge(clk_i) then
-         eth_sync0    <= eth_toggle;
-         eth_sync1    <= eth_sync0;
-         eth_toggle_d <= eth_sync1;
-         if eth_sync1(0) /= eth_toggle_d(0) then
+         if eth_out = '1' and eth_last = '1' then
             eth_rx <= eth_rx + 1;
          end if;
-         if eth_sync1(1) /= eth_toggle_d(1) then
+
+         eth_sync     <= eth_sync(0) & eth_toggle;
+         eth_toggle_d <= eth_sync(1);
+         if eth_sync(1) /= eth_toggle_d then
             eth_rx_bad <= eth_rx_bad + 1;
          end if;
 
