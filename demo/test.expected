@@ -1,6 +1,6 @@
 Screen:
 | NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
-| F1 typewriter   F3 key codes   F5 characters   F7 counters   F9 comet
+| F1 typewriter   F3 key codes   F5 charset   F7 counters   F9 comet   F11 test
 |
 |  This is the demo in the ROM, which the core runs at power-up. What you type
 |  on the keyboard, or send to the debug UART, appears below the blue bar.
@@ -16,7 +16,7 @@ Screen:
 |x y z
 Screen:
 | NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
-| F1 typewriter   F3 key codes   F5 characters   F7 counters   F9 comet
+| F1 typewriter   F3 key codes   F5 charset   F7 counters   F9 comet   F11 test
 |
 |  This is the demo in the ROM, which the core runs at power-up. What you type
 |  on the keyboard, or send to the debug UART, appears below the blue bar.
@@ -42,7 +42,7 @@ Screen:
 |        B
 Screen:
 | NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
-| F1 typewriter   F3 key codes   F5 characters   F7 counters   F9 comet
+| F1 typewriter   F3 key codes   F5 charset   F7 counters   F9 comet   F11 test
 |
 |  This is the demo in the ROM, which the core runs at power-up. What you type
 |  on the keyboard, or send to the debug UART, appears below the blue bar.
@@ -54,7 +54,7 @@ Screen:
 |xQree F
 Screen:
 | NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
-| F1 typewriter   F3 key codes   F5 characters   F7 counters   F9 comet
+| F1 typewriter   F3 key codes   F5 charset   F7 counters   F9 comet   F11 test
 |
 |  Each key that you type, or byte sequence that the debug UART sends, shows
 |  its bytes in hex and as characters. A control code shows as ^ and a
@@ -79,7 +79,7 @@ Screen:
 |  6A                                      j
 Screen:
 | NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
-| F1 typewriter   F3 key codes   F5 characters   F7 counters   F9 comet
+| F1 typewriter   F3 key codes   F5 charset   F7 counters   F9 comet   F11 test
 |
 |  This is the demo in the ROM, which the core runs at power-up. What you type
 |  on the keyboard, or send to the debug UART, appears below the blue bar.
@@ -101,7 +101,7 @@ ffff0684: 000ccc20 000bbb42 000ccc20 000ccc43 000ccc20 000ddd44 000ccc20 000eee4
 ffff068c: 000ccc20 000fff46 000ccc20 000ccc20
 Screen:
 | NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
-| F1 typewriter   F3 key codes   F5 characters   F7 counters   F9 comet
+| F1 typewriter   F3 key codes   F5 charset   F7 counters   F9 comet   F11 test
 |
 |  Characters, ISO 8859-1                    Colors, 4 bits of red, green, blue
 |     0 1 2 3 4 5 6 7 8 9 A B C D E F        Backgrounds, 0 to F
@@ -125,14 +125,14 @@ Screen:
 |  R red   G green   B blue   Y yellow   C cyan   M magenta   W gray
 Screen:
 | NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
-| F1 typewriter   F3 key codes   F5 characters   F7 counters   F9 comet
+| F1 typewriter   F3 key codes   F5 charset   F7 counters   F9 comet   F11 test
 |
 |  Since reset, while the core runs
 |
 |    Time, h:mm:ss.hh                              0:00:00.07
-|    Microseconds                                       79871
-|    Cycles                                             79873
-|    Instructions                                       79875
+|    Microseconds                                       79951
+|    Cycles                                             79953
+|    Instructions                                       79955
 |    Clock in MHz, cycles per microsecond                   1
 |
 |  A prime sieve to 2048, run before each update
@@ -148,7 +148,7 @@ Screen:
 |  Nexys4DDR. In niceemu, each step counts as a cycle and as a microsecond.
 Screen:
 | NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
-| F1 typewriter   F3 key codes   F5 characters   F7 counters   F9 comet
+| F1 typewriter   F3 key codes   F5 charset   F7 counters   F9 comet   F11 test
 |  Score     0   Best      1     Game over. A key starts a new game.
 |
 |
@@ -161,3 +161,18 @@ Screen:
 |                     *
 |
 | @oo
+Screen:
+| NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
+| F1 typewriter   F3 key codes   F5 charset   F7 counters   F9 comet   F11 test
+|
+|  A test of the system, which runs each time that F11 starts it
+|
+|    RAM, FFFF8000 to FFFFEFFF                     PASS
+|    Math unit, multiply and divide                PASS
+|    Timer, 10 interrupts every 1000 cycles        PASS
+|    Performance counters                          PASS
+|
+|  All tests passed.
+|
+|  A failure shows where it failed and what was read: an address and its word,
+|  or for the timer, the interrupts that came and the cycles that they took.

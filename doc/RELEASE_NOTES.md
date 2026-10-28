@@ -42,6 +42,8 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   runs again and again, with its cycles per instruction.
 - F9 is a game: the cursor keys steer a comet to the stars, and its tail
   grows with each one.
+- F11 tests the RAM, the math unit, the timer's interrupts, and the
+  performance counters, with PASS or FAIL for each.
 
 **Tools**
 

@@ -7,8 +7,9 @@
 ; menu in the second row of the screen lists them. A switch starts the demo
 ; afresh. F3 shows the bytes of each key, in hex and as characters, F5 the
 ; 256 characters of the font and ramps of colors, F7 the performance
-; counters and those of a prime sieve, and F9 is a game, the comet. At
-; power-up the typewriter, F1, runs. Its top rows say what the core is
+; counters and those of a prime sieve, F9 is a game, the comet, and F11
+; tests the RAM, the math unit, the timer's interrupts, and the counters.
+; At power-up the typewriter, F1, runs. Its top rows say what the core is
 ; and how to go further, and the rows below them take what is typed, from
 ; the keyboard or the UART: a character goes at the cursor, RETURN starts a
 ; new line, DEL (or backspace) deletes the character before the cursor, TAB
@@ -63,6 +64,11 @@ M_B     .EQU    0xFFFFFF21
 M_UMUL  .EQU    0xFFFFFF24      ; bits 31..0 of A * B
 M_UDIVQ .EQU    0xFFFFFF28      ; A / B, and the remainder
 M_UDIVR .EQU    0xFFFFFF29
+M_SMUL  .EQU    0xFFFFFF22      ; A * B, signed, and its bits 63..32
+M_SMULH .EQU    0xFFFFFF23
+M_UMULH .EQU    0xFFFFFF25      ; bits 63..32 of A * B
+M_SDIVQ .EQU    0xFFFFFF26      ; A / B, signed, and the remainder
+M_SDIVR .EQU    0xFFFFFF27
 M_CLO   .EQU    0xFFFFFF30
 M_CHI   .EQU    0xFFFFFF31
 M_DLO   .EQU    0xFFFFFF32
@@ -109,6 +115,19 @@ G_NEXT  .EQU    0xFFFFF808      ; the microsecond counter at the next tick
 G_TICK  .EQU    0xFFFFF809      ; the microseconds from a tick to the next
 G_OVER  .EQU    0xFFFFF80A      ; 1 after the game has ended
 
+; The variables of F11, in the same RAM, and the RAM that it tests, which
+; is RAM on every board
+S_TICKS .EQU    0xFFFFF800      ; the interrupts of the timer
+RAM_LO  .EQU    0xFFFF8000      ; the RAM tested, up to the variables
+RAM_N   .EQU    28672
+
+; The timer, and the vector of its interrupt, whose entry in the table at
+; VBASE * 256 is at 0x7F41
+TM_PER  .EQU    0xFFFFFF10      ; the period, in cycles, or 0 to stop
+TM_VEC  .EQU    0xFFFFFF12
+VBASE   .EQU    0x7F
+VECTOR  .EQU    0x41
+
 ; The colors: the background in bits 31..20, the foreground in bits 19..8
 BAR     .EQU    0x00AFFF00      ; white on blue
 TEXT    .EQU    0x000CCC00      ; light gray on black
@@ -116,6 +135,7 @@ LINK    .EQU    0x000FF000      ; yellow on black
 MENU_ON .EQU    0xFFF00000      ; black on white, the running demo in the menu
 TYPED   .EQU    0x000FFF00      ; white on black
 TAIL    .EQU    0x0000F000      ; green on black
+RED     .EQU    0x000F0000      ; red on black
 
 TOP     .EQU    10              ; the first row of the typewriter
 LAST    .EQU    24              ; and its last
@@ -803,6 +823,206 @@ STATUS  MOVE    @--SP, R1
         MOVE    PC, PRINT
         MOVE    PC, @SP++
 
+; The self-test: the RAM from RAM_LO, the math unit, the timer's interrupts,
+; and the performance counters, each with PASS or FAIL, once each time that
+; F11 starts it. R10 counts the failures.
+SELF    MOVE    SP, 0xFFFFFF00
+        MOVE    R6, SELF
+        ADD     @--SP, 2, PC
+        MOVE    PC, FRAME
+        MOVE    R5, S_TEXTS
+        ADD     @--SP, 2, PC
+        MOVE    PC, PRINTS
+        MOVE    R10, 0
+        ADD     @--SP, 2, PC
+        MOVE    PC, TRAM
+        MOVE    R2, SCREEN+450
+        ADD     @--SP, 2, PC
+        MOVE    PC, RESULT
+        ADD     @--SP, 2, PC
+        MOVE    PC, TMATH
+        MOVE    R2, SCREEN+530
+        ADD     @--SP, 2, PC
+        MOVE    PC, RESULT
+        ADD     @--SP, 2, PC
+        MOVE    PC, TTIMER
+        MOVE    R2, SCREEN+610
+        ADD     @--SP, 2, PC
+        MOVE    PC, RESULT
+        ADD     @--SP, 2, PC
+        MOVE    PC, TCOUNT
+        MOVE    R2, SCREEN+690
+        ADD     @--SP, 2, PC
+        MOVE    PC, RESULT
+        MOVE    R1, S_PASSED
+        MOVE    R3, TAIL
+        MOVE[M] R0, R10
+    ?!Z MOVE    R1, S_FAILED
+    ?!Z MOVE    R3, RED
+        MOVE    R2, SCREEN+802
+        ADD     @--SP, 2, PC
+        MOVE    PC, PRINT
+SPOLL   ADD     @--SP, 2, PC
+        MOVE    PC, POLL
+        MOVE    PC, SPOLL
+
+; Each test sets R1 to 0 when it passes. When it fails, R1 is 1, and R5 and
+; R6 tell what failed: an address and the word read there, or for the timer,
+; the interrupts and the cycles that they took.
+
+; TRAM writes each word of the RAM_N words from RAM_LO with its address,
+; checks them, and does the same with the addresses inverted.
+TRAM    MOVE    R7, 0           ; 0, or -1 to invert
+RPASS   MOVE    R2, RAM_LO
+        MOVE    R4, RAM_N
+RWRITE  XOR     @R2++, R2, R7
+        SUB[M]  R4, R4, 1
+    ?!Z MOVE    PC, RWRITE
+        MOVE    R2, RAM_LO
+        MOVE    R4, RAM_N
+RREAD   XOR     R6, R2, R7
+        SUB[M]  R0, @R2, R6
+    ?!Z MOVE    PC, RBAD
+        ADD     R2, R2, 1
+        SUB[M]  R4, R4, 1
+    ?!Z MOVE    PC, RREAD
+        XOR[M]  R7, R7, -1
+    ?!Z MOVE    PC, RPASS
+        MOVE    R1, 0
+        MOVE    PC, @SP++
+RBAD    MOVE    R5, R2
+        MOVE    R6, @R2
+        MOVE    R1, 1
+        MOVE    PC, @SP++
+
+; TMATH runs the script MATH, which writes operands of the math unit and
+; checks its results.
+TMATH   MOVE    R2, MATH
+MSTEP   MOVE[M] R3, @R2++       ; 1 to write, 2 to check, 0 at the end
+    ?Z  MOVE    PC, MPASS
+        MOVE    R5, @R2++       ; the address
+        MOVE    R4, @R2++       ; and the word
+        SUB[M]  R0, R3, 1
+    ?Z  MOVE    @R5, R4
+    ?Z  MOVE    PC, MSTEP
+        MOVE    R6, @R5
+        SUB[M]  R0, R6, R4
+    ?Z  MOVE    PC, MSTEP
+        MOVE    R1, 1
+        MOVE    PC, @SP++
+MPASS   MOVE    R1, 0
+        MOVE    PC, @SP++
+
+; TTIMER lets the timer raise 10 interrupts, one every 1000 cycles, which
+; TICK counts, and checks that they came in 9500 to 10500 cycles. It waits
+; at most 100000 cycles. It sets VBASE, and leaves E clear.
+TTIMER  MOVE    @S_TICKS, 0
+        MOVE    @TM_VEC, VECTOR
+        AND     R14, R14, 0xFF000000
+        OR      R14, R14, VBASE
+        MOVE    R5, @P_CYC
+        MOVE    @TM_PER, 1000
+        OR      R14, R14, 0x40000000 ; E, which lets the interrupts in
+TWAIT   SUB     R6, @P_CYC, R5
+        SUB[M]  R0, @S_TICKS, 10
+    ?Z  MOVE    PC, TSTOP
+        SUB[M]  R0, R6, 100000
+    ?C  MOVE    PC, TWAIT
+TSTOP   MOVE    @TM_PER, 0
+        MOVE    R0, R0          ; a request still pending is taken here
+        MOVE    R0, R0
+        AND     R14, R14, 0xBFFFFFFF
+        MOVE    R5, @S_TICKS
+        MOVE    R1, 1
+        SUB[M]  R0, R5, 10
+    ?C  MOVE    PC, @SP++       ; fewer than 10
+        SUB[M]  R0, R6, 9500
+    ?C  MOVE    PC, @SP++
+        SUB[M]  R0, R6, 10500
+    ?!C MOVE    PC, @SP++
+        MOVE    R1, 0
+        MOVE    PC, @SP++
+
+; TICK, the routine of the timer's interrupt, from the ROM
+TICK    ADD     @S_TICKS, @S_TICKS, 1
+        RTI
+
+; TCOUNT checks the performance counters: the instructions of a known
+; sequence, and over a loop, at least as many cycles as instructions, some
+; microseconds, and 1 to 255 cycles per microsecond.
+TCOUNT  MOVE    R5, @P_INS
+        MOVE    R0, R0          ; eight instructions
+        MOVE    R0, R0
+        MOVE    R0, R0
+        MOVE    R0, R0
+        MOVE    R0, R0
+        MOVE    R0, R0
+        MOVE    R0, R0
+        MOVE    R0, R0
+        SUB     R6, @P_INS, R5  ; read 9 instructions after the first
+        MOVE    R5, P_INS
+        MOVE    R1, 1
+        SUB[M]  R0, R6, 9
+    ?!Z MOVE    PC, @SP++
+        MOVE    R7, @P_INS
+        MOVE    R8, @P_CYC
+        MOVE    R9, @P_US
+        MOVE    R4, 1000
+CLOOP   SUB[M]  R4, R4, 1
+    ?!Z MOVE    PC, CLOOP
+        SUB     R7, @P_INS, R7
+        SUB     R8, @P_CYC, R8
+        SUB     R9, @P_US, R9
+        MOVE    R5, P_CYC
+        MOVE    R6, R8
+        SUB[M]  R0, R8, R7
+    ?C  MOVE    PC, @SP++       ; fewer cycles than instructions
+        MOVE    R5, P_US
+        MOVE    R6, R9
+        MOVE[M] R0, R9
+    ?Z  MOVE    PC, @SP++       ; no microsecond
+        MOVE    @M_A, R8
+        MOVE    @M_B, R9
+        MOVE    R5, M_UDIVQ
+        MOVE[M] R6, @M_UDIVQ
+    ?Z  MOVE    PC, @SP++
+        SUB[M]  R0, R6, 256
+    ?!C MOVE    PC, @SP++
+        MOVE    R1, 0
+        MOVE    PC, @SP++
+
+; RESULT writes PASS in green at R2 when R1 is 0, or else FAIL in red, and
+; R5 and R6 in hex after it, and counts the failure in R10. It changes R1,
+; R2, R3, R4, and R9.
+RESULT  MOVE[M] R0, R1
+    ?!Z MOVE    PC, RFAIL
+        MOVE    R1, S_PASS
+        MOVE    R3, TAIL
+        MOVE    PC, PRINT       ; which returns to the caller
+RFAIL   ADD     R10, R10, 1
+        MOVE    R1, S_FAIL
+        MOVE    R3, RED
+        ADD     @--SP, 2, PC
+        MOVE    PC, PRINT
+        ADD     R2, R2, 1
+        MOVE    R1, R5
+        MOVE    R3, TYPED
+        ADD     @--SP, 2, PC
+        MOVE    PC, HEX8
+        ADD     R2, R2, 1
+        MOVE    R1, R6
+        MOVE    PC, HEX8        ; which returns to the caller
+
+; HEX8 writes R1 in 8 hex digits from R2, in the color R3, and leaves R2
+; after them. It changes R1, R2, R4, and R9.
+HEX8    MOVE    R4, 8
+HDIGIT  SHR     R9, R1, 28
+        OR      @R2++, @HEXDIG[R9], R3
+        SHL     R1, R1, 4
+        SUB[M]  R4, R4, 1
+    ?!Z MOVE    PC, HDIGIT
+        MOVE    PC, @SP++
+
 ; POLL takes a key from the input, if one has arrived, and sets R1 to it: a
 ; byte, KEY_UP to KEY_LT for a cursor key, or 0 when there is none. It
 ; reads the escape sequences that xterm sends for the cursor keys and the
@@ -949,7 +1169,7 @@ PRINTS  MOVE[M] R2, @R5++
         MOVE    PC, PRINTS
 
 ; The demos of the function keys F1 to F12, or 0 for none
-FKEYS   .DAT    TYPEW, 0, KCODES, 0, CHARS, 0, COUNTS, 0, GAME, 0, 0, 0, 0, 0, 0, 0, 0, 0
+FKEYS   .DAT    TYPEW, 0, KCODES, 0, CHARS, 0, COUNTS, 0, GAME, 0, SELF, 0, 0, 0, 0, 0, 0, 0, 0, 0
 
 ; The numbers before ~ of F1 to F12. xterm sends ESC O P to ESC O S for F1
 ; to F4, and 11 to 14 are those of the VT220.
@@ -960,8 +1180,9 @@ FNUMS   .DAT    11, 12, 13, 14, 15, 17, 18, 19, 20, 21, 23, 24
 MENU    .DAT    80, TYPEW, M_TYPEW
         .DAT    96, KCODES, M_KEYS
         .DAT    111, CHARS, M_CHARS
-        .DAT    127, COUNTS, M_COUNT
-        .DAT    141, GAME, M_GAME
+        .DAT    124, COUNTS, M_COUNT
+        .DAT    138, GAME, M_GAME
+        .DAT    149, SELF, M_SELF
         .DAT    -1
 
 ; The texts of the title bar, and of the welcome
@@ -981,9 +1202,10 @@ NAME    .ASCII_L 'NiceMonMEGA65'
 CPU     .ASCII_L 'the 32-bit NICE CPU of B. Ulmann'
 M_TYPEW .ASCII_L ' F1 typewriter '
 M_KEYS  .ASCII_L ' F3 key codes '
-M_CHARS .ASCII_L ' F5 characters '
+M_CHARS .ASCII_L ' F5 charset '
 M_COUNT .ASCII_L ' F7 counters '
 M_GAME  .ASCII_L ' F9 comet '
+M_SELF  .ASCII_L ' F11 test '
 T1      .ASCII_L 'This is the demo in the ROM, which the core runs at power-up. What you type'
 T2      .ASCII_L 'on the keyboard, or send to the debug UART, appears below the blue bar.'
 T3      .ASCII_L 'To run your own programs, connect a computer to the debug UART, at'
@@ -1082,3 +1304,66 @@ G_END   .ASCII_L 'Game over. A key starts a new game.'
 
 ; The steps of the cursor keys up, down, right, and left
 GSTEPS  .DAT    -80, 80, 1, -1
+
+; The texts of F11
+S_TEXTS .DAT    242, LINK, S1
+        .DAT    404, TEXT, S_RAM
+        .DAT    484, TEXT, S_MATH
+        .DAT    564, TEXT, S_TIMER
+        .DAT    644, TEXT, S_COUNT
+        .DAT    962, TEXT, S_NOTE1
+        .DAT    1042, TEXT, S_NOTE2
+        .DAT    -1
+
+S1      .ASCII_L 'A test of the system, which runs each time that F11 starts it'
+S_RAM   .ASCII_L 'RAM, FFFF8000 to FFFFEFFF'
+S_MATH  .ASCII_L 'Math unit, multiply and divide'
+S_TIMER .ASCII_L 'Timer, 10 interrupts every 1000 cycles'
+S_COUNT .ASCII_L 'Performance counters'
+S_NOTE1 .ASCII_L 'A failure shows where it failed and what was read: an address and its word,'
+S_NOTE2 .ASCII_L 'or for the timer, the interrupts that came and the cycles that they took.'
+S_PASS  .ASCII_L 'PASS'
+S_FAIL  .ASCII_L 'FAIL'
+S_PASSED .ASCII_L 'All tests passed.'
+S_FAILED .ASCII_L 'A test failed.'
+
+; The script of the math unit's test: 1, an address, and a word to write
+; there, or 2, an address, and the word expected there, and 0 at the end
+MATH    .DAT    1, M_A, -7
+        .DAT    1, M_B, 6
+        .DAT    2, M_SMUL, -42
+        .DAT    2, M_SMULH, -1
+        .DAT    2, M_UMUL, 0xFFFFFFD6
+        .DAT    2, M_UMULH, 5
+        .DAT    2, M_SDIVQ, -1
+        .DAT    2, M_SDIVR, -1
+        .DAT    2, M_UDIVQ, 0x2AAAAAA9
+        .DAT    2, M_UDIVR, 3
+        .DAT    1, M_B, 0       ; a division by zero
+        .DAT    2, M_UDIVQ, 0xFFFFFFFF
+        .DAT    2, M_UDIVR, -7
+        .DAT    2, M_SDIVQ, -1
+        .DAT    2, M_SDIVR, -7
+        .DAT    1, M_A, 0x80000000
+        .DAT    1, M_B, -1
+        .DAT    2, M_SDIVQ, 0x80000000
+        .DAT    2, M_SDIVR, 0
+        .DAT    1, M_CLO, 0xA4C86240 ; 10^15 + 123456
+        .DAT    1, M_CHI, 0x00038D7E
+        .DAT    1, M_DLO, 1000000
+        .DAT    1, M_DHI, 0
+        .DAT    2, M_QLO, 0x3B9ACA00 ; 10^9
+        .DAT    2, M_QHI, 0
+        .DAT    2, M_RLO, 123456
+        .DAT    1, M_CLO, 0xFFFFFFFF ; 2^64 - 1
+        .DAT    1, M_CHI, 0xFFFFFFFF
+        .DAT    1, M_DLO, 10
+        .DAT    2, M_QLO, 0x99999999
+        .DAT    2, M_QHI, 0x19999999
+        .DAT    2, M_RLO, 5
+        .DAT    0
+
+; The entry of the timer's interrupt in the vector table, at VBASE * 256 +
+; VECTOR, near the end of the ROM, where no code is
+        .ORG    0x7F41
+        .DAT    TICK

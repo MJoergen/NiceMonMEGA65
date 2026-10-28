@@ -21,6 +21,7 @@ so on, which the MEGA65 has without SHIFT.
 | F5 | The characters and the colors |
 | F7 | The counters |
 | F9 | The comet, a game |
+| F11 | The self-test |
 
 The typewriter's top ten rows are the welcome: the two bars, what the
 demo is, how to load your own programs through the debug UART, and a third
@@ -87,6 +88,20 @@ and a key that would turn it back is ignored. The best score stays until
 another demo starts. The game takes one key at each step, so in `niceemu`,
 where a microsecond is a step, each key of the input file is one step.
 
+The self-test runs four tests each time that F11 starts it, and shows
+PASS or FAIL for each:
+
+| Test | What it checks |
+|---|---|
+| RAM | The 28672 words from `0xFFFF8000` to `0xFFFFEFFF`, RAM on every board: each is written with its address, and then with its address inverted, and read back |
+| Math unit | Signed and unsigned products and quotients of 32 bits, a division by zero, the most negative number divided by −1, and quotients of 64 bits, against known results |
+| Timer | 10 interrupts, one every 1000 cycles, which must come within 9500 to 10500 cycles of the start |
+| Performance counters | The instructions of a known sequence, and over a loop, at least as many cycles as instructions, some microseconds, and 1 to 255 cycles per microsecond |
+
+A failure shows two words in hex: the address that failed and the word
+read there, or for the timer, the interrupts that came and the cycles
+that they took. The last line says whether all tests passed.
+
 ## How it works
 
 Every demo reads the keys through `POLL`. It turns the escape sequences of
@@ -118,6 +133,12 @@ the address space, and `0xFFFFFEFF` is RAM word `0xFEFF`, far above the
 ROM. So are the variables, which are RAM on every board, also on the
 Nexys4DDR, whose RAM starts at `0xFFFF2000`.
 
+The self-test's timer interrupt goes through vector `0x41` and a vector
+table at `0x7F00`, VBASE `0x7F`, near the end of the ROM. Its only entry,
+the word at `0x7F41`, holds the address of the routine, which counts the
+interrupts in RAM. The self-test sets VBASE, and leaves the timer stopped
+and E clear when it is done, so no other demo has interrupts.
+
 The demo scrolls by copying the rows, not with the display offset, so
 that the welcome stays, and so that it runs the same in `niceemu`, where
 the screen's registers are memory. It halts at the end of the input: in
@@ -128,21 +149,22 @@ UART.
 
     make -C demo                  # build/demo.bin, for the ROM
     make r6 ROM=demo/build/demo.bin
-    make -C demo test             # eight runs in niceemu, compared with test.expected
+    make -C demo test             # nine runs in niceemu, compared with test.expected
 
 The version in the title bar is `git describe --tags --always --dirty`, or
 `VERSION=` on the command line, which `tools/release.py` sets to the tag.
 The assembler has no include, so the Makefile joins `demo.nasm` and a line
 that defines `VERSION`. The test assembles the demo with the version `V9.9`
-into `build/demo_test.bin`, and the Makefile writes its eight inputs,
-`build/test1.txt` to `build/test8.txt`, with `printf`: the first edits a
+into `build/demo_test.bin`, and the Makefile writes its nine inputs,
+`build/test1.txt` to `build/test9.txt`, with `printf`: the first edits a
 few lines, the second clears them and scrolls, the third has the function
 keys, the fourth shows key codes and scrolls them, the fifth goes from
 the key codes back to the typewriter, the sixth shows the characters and
-the colors, the seventh the counters, with two runs of the sieve, and the
-eighth plays two games of the comet.
+the colors, the seventh the counters, with two runs of the sieve, the
+eighth plays two games of the comet, and the ninth runs the self-test
+twice.
 `niceemu` shows no colors, so for the sixth the test also has the words of
-two rows of ramps. The eight screens that `niceemu` prints, and those
+two rows of ramps. The nine screens that `niceemu` prints, and those
 words, are in `test.expected`, which was checked by hand. In `niceemu` the
 counters count steps, so their numbers are the same in every run.
 
