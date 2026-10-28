@@ -47,7 +47,28 @@ program's console.
 
 They use `PORT=/dev/ttyUSB1` by default, and pass `ARGS=` on to the tool,
 for example `ARGS=--no-run` or `ARGS="-i in.txt -d 0x100:16 -s --timeout 5"`.
-`ARGS="--tcp 4000"` drives `niceemu --link 4000` instead of the board.
+`ARGS="--tcp 4000"` drives `niceemu --link 4000` instead of the board,
+and `ARGS="--eth 192.168.1.66"` drives the board over its Ethernet port
+(see [Over Ethernet](#over-ethernet)).
+
+## Over Ethernet
+
+The board also serves the debug link on TCP port 4510 of its Ethernet
+station, once it has an IP address ([SYSTEM.md](../doc/SYSTEM.md#the-debug-link-over-tcp)).
+Give it one over the UART, then use `--eth` with any tool instead of
+`--port`:
+
+    tools/mon.py --port /dev/ttyUSB1
+    mon> w FFFFFF9A C0A80142
+    mon> q
+    tools/run.py --eth 192.168.1.66 prog.bin
+
+`--eth HOST:PORT` names another port. While a host is connected over
+Ethernet, the UART carries no link: its bytes are dropped. The end of
+a program's input is a half-close of the connection, which the board
+takes as a break, and the tools end the connection with a reset, so
+that the UART has the link again. The link has no password, so give the board an IP
+address only on a network you trust.
 
 ## Running a program
 
@@ -71,7 +92,7 @@ picocom, `Ctrl-A Ctrl-\`.
 The `.bin` file has one line per word, the address and the word in hex.
 `load.py --no-run` loads the program and leaves the core held in reset.
 `load.py --tcp PORT` loads it into `niceemu --link PORT` instead of the
-board.
+board, and `load.py --eth HOST` into the board over its Ethernet port.
 
 `load.py` takes the lines that `niceemu` takes:
 
@@ -208,11 +229,14 @@ example](../README.md#using-the-interactive-shell).
 
 ### Starting it
 
-    tools/mon.py [--port /dev/ttyUSB1] [--baud 2000000] [--tcp PORT]
-                 [--cosim PORT] [--symbols FILE] [FILE.bin]
+    tools/mon.py [--port /dev/ttyUSB1] [--baud 2000000]
+                 [--eth HOST[:PORT]] [--tcp PORT] [--cosim PORT]
+                 [--symbols FILE] [FILE.bin]
 
 - `--port` names the serial device of the board's debug UART,
   `/dev/ttyUSB1` by default, and `--baud` its rate, 2000000 by default.
+- `--eth HOST` talks to the board over its Ethernet port, at its IP
+  address HOST (see [Over Ethernet](#over-ethernet)).
 - `--tcp PORT` talks to `niceemu --link PORT` instead of the board.
 - `--cosim PORT` talks to the simulated system of `make cosim`, at
   about 250 UART bytes a second.

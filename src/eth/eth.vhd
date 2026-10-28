@@ -1,22 +1,25 @@
 -- The Ethernet station: the RMII pins of the PHY on one side, and on the
 -- other, in the system clock domain, its MAC and IP addresses and the
 -- counts of its frames. It answers the ARP requests for its IP address,
--- and the pings to it.
+-- and the pings to it, and serves the debug link on a TCP port of it.
 --
 -- THEORY OF OPERATION
 -- The receive pins go to the RMII receiver (rmii_rx.vhd) in the PHY's
 -- 50 MHz clock domain, and its bytes to the check of the frame check
 -- sequence (rx_fcs.vhd). The good frames go through the FIFO of received
 -- frames (eth_rx_fifo.vhd) to clk_i, where the ARP responder, with the MAC
--- address filter, (eth_arp.vhd) and the ICMP echo responder (eth_icmp.vhd)
--- both read them, and write their replies to the FIFO of frames to send
--- (eth_tx_fifo.vhd), which takes them back to the PHY's clock, to the RMII
--- transmitter (rmii_tx.vhd) and the transmit pins. A byte is taken when
--- both responders are ready for it, so each sees every byte, and neither
--- reads while the other writes a reply. A frame gets at most one reply, as
--- one is ARP and the other IPv4, and a reply is written only while no
--- frame is read, so the two never write at the same time, and their
--- outputs are simply merged.
+-- address filter, (eth_arp.vhd), the ICMP echo responder (eth_icmp.vhd),
+-- and the TCP server of the debug link (eth_tcp.vhd) all read them, and
+-- write their frames to the FIFO of frames to send (eth_tx_fifo.vhd),
+-- which takes them back to the PHY's clock, to the RMII transmitter
+-- (rmii_tx.vhd) and the transmit pins. A byte is taken when all three are
+-- ready for it, so each sees every byte. A frame gets at most one reply
+-- from the two responders, as one is ARP and the other IPv4, and they
+-- write a reply only while no frame is read, so they never write at the
+-- same time, and their outputs are simply merged. The TCP server sends
+-- whenever it has a segment, so the output is locked to the responders or
+-- to it from the first byte of a frame to its last, and the responders
+-- come first when both start in the same cycle.
 -- Each frame that comes out of the FIFO of received frames counts in rx_o,
 -- and each that goes into the FIFO of frames to send in tx_o. Each bad
 -- frame, and each good one that found the FIFO full, flips rx_toggle in the
@@ -29,7 +32,9 @@
 --    synchronous to it.
 -- b) rst_i and eth_rst_i are both held for longer than three cycles of each
 --    clock, at the same time, as the FIFOs need (eth_rx_fifo.vhd).
--- c) mac_i and ip_i change only between frames (eth_arp.vhd).
+-- c) mac_i and ip_i change only between frames (eth_arp.vhd), and not
+--    while there is a connection (eth_tcp.vhd).
+-- d) G_CLOCK_HZ is the rate of clk_i.
 --
 -- RESET
 -- Synchronous, by rst_i in the system clock domain and by eth_rst_i in the
@@ -40,24 +45,38 @@ library ieee;
    use ieee.numeric_std_unsigned.all;
 
 entity eth is
+   generic (
+      G_CLOCK_HZ : natural
+   );
    port (
       -- The system clock domain
-      clk_i     : in  std_logic;
-      rst_i     : in  std_logic;
-      mac_i     : in  std_logic_vector(47 downto 0);
-      ip_i      : in  std_logic_vector(31 downto 0);
+      clk_i       : in  std_logic;
+      rst_i       : in  std_logic;
+      mac_i       : in  std_logic_vector(47 downto 0);
+      ip_i        : in  std_logic_vector(31 downto 0);
       -- The good frames received, the bad or dropped ones, and those sent
-      rx_o      : out std_logic_vector(31 downto 0);
-      rx_bad_o  : out std_logic_vector(31 downto 0);
-      tx_o      : out std_logic_vector(31 downto 0);
+      rx_o        : out std_logic_vector(31 downto 0);
+      rx_bad_o    : out std_logic_vector(31 downto 0);
+      tx_o        : out std_logic_vector(31 downto 0);
+      -- The debug link's byte streams over TCP (eth_tcp.vhd): on_o while
+      -- there is a connection, the host's bytes and its half-close, and the
+      -- bytes to the host
+      on_o        : out std_logic;
+      lrx_data_o  : out std_logic_vector(7 downto 0);
+      lrx_valid_o : out std_logic;
+      lrx_ready_i : in  std_logic;
+      lrx_break_o : out std_logic;
+      ltx_data_i  : in  std_logic_vector(7 downto 0);
+      ltx_valid_i : in  std_logic;
+      ltx_ready_o : out std_logic;
 
       -- The PHY's pins, in its clock domain
-      eth_clk_i : in  std_logic;
-      eth_rst_i : in  std_logic;
-      rxd_i     : in  std_logic_vector(1 downto 0);
-      crs_dv_i  : in  std_logic;
-      txd_o     : out std_logic_vector(1 downto 0);
-      tx_en_o   : out std_logic
+      eth_clk_i   : in  std_logic;
+      eth_rst_i   : in  std_logic;
+      rxd_i       : in  std_logic_vector(1 downto 0);
+      crs_dv_i    : in  std_logic;
+      txd_o       : out std_logic_vector(1 downto 0);
+      tx_en_o     : out std_logic
    );
 end entity eth;
 
@@ -81,16 +100,31 @@ architecture synthesis of eth is
    signal in_ready   : std_logic;
    signal arp_ready  : std_logic;
    signal icmp_ready : std_logic;
-   -- A byte for a responder, when the other is ready for it too
+   signal tcp_ready  : std_logic;
+   -- A byte for a reader, when the others are ready for it too
    signal arp_in  : std_logic;
    signal icmp_in : std_logic;
+   signal tcp_in  : std_logic;
    -- The replies of the two responders
-   signal arp_data   : std_logic_vector(7 downto 0);
-   signal arp_last   : std_logic;
-   signal arp_valid  : std_logic;
-   signal icmp_data  : std_logic_vector(7 downto 0);
-   signal icmp_last  : std_logic;
-   signal icmp_valid : std_logic;
+   signal arp_data      : std_logic_vector(7 downto 0);
+   signal arp_last      : std_logic;
+   signal arp_valid     : std_logic;
+   signal icmp_data     : std_logic_vector(7 downto 0);
+   signal icmp_last     : std_logic;
+   signal icmp_valid    : std_logic;
+   signal tcp_data      : std_logic_vector(7 downto 0);
+   signal tcp_last      : std_logic;
+   signal tcp_valid     : std_logic;
+   signal tcp_ready_out : std_logic;
+   -- The responders' merged output, and who has the output: the lock, and
+   -- the grant in this cycle
+   signal resp_data  : std_logic_vector(7 downto 0);
+   signal resp_last  : std_logic;
+   signal resp_valid : std_logic;
+   signal resp_ready : std_logic;
+   type   t_lock is (FREE_LK, RESP_LK, TCP_LK);
+   signal lock       : t_lock := FREE_LK;
+   signal grant_tcp  : std_logic;
    -- The frames to send, in the system clock domain
    signal out_data  : std_logic_vector(7 downto 0);
    signal out_last  : std_logic;
@@ -156,9 +190,10 @@ begin
          rd_ready_i => in_ready
       ); -- i_eth_rx_fifo
 
-   in_ready <= arp_ready and icmp_ready;
-   arp_in   <= in_valid and icmp_ready;
-   icmp_in  <= in_valid and arp_ready;
+   in_ready <= arp_ready and icmp_ready and tcp_ready;
+   arp_in   <= in_valid and icmp_ready and tcp_ready;
+   icmp_in  <= in_valid and arp_ready and tcp_ready;
+   tcp_in   <= in_valid and arp_ready and icmp_ready;
 
    i_eth_arp : entity work.eth_arp
       port map (
@@ -173,7 +208,7 @@ begin
          tx_data_o  => arp_data,
          tx_last_o  => arp_last,
          tx_valid_o => arp_valid,
-         tx_ready_i => out_ready
+         tx_ready_i => resp_ready
       ); -- i_eth_arp
 
    i_eth_icmp : entity work.eth_icmp
@@ -189,14 +224,72 @@ begin
          tx_data_o  => icmp_data,
          tx_last_o  => icmp_last,
          tx_valid_o => icmp_valid,
-         tx_ready_i => out_ready
+         tx_ready_i => resp_ready
       ); -- i_eth_icmp
 
-   out_data  <= arp_data when arp_valid = '1' else
-                icmp_data;
-   out_last  <= arp_last when arp_valid = '1' else
-                icmp_last;
-   out_valid <= arp_valid or icmp_valid;
+   i_eth_tcp : entity work.eth_tcp
+      generic map (
+         G_CLOCK_HZ => G_CLOCK_HZ
+      )
+      port map (
+         clk_i       => clk_i,
+         rst_i       => rst_i,
+         mac_i       => mac_i,
+         ip_i        => ip_i,
+         rx_data_i   => in_data,
+         rx_last_i   => in_last,
+         rx_valid_i  => tcp_in,
+         rx_ready_o  => tcp_ready,
+         tx_data_o   => tcp_data,
+         tx_last_o   => tcp_last,
+         tx_valid_o  => tcp_valid,
+         tx_ready_i  => tcp_ready_out,
+         on_o        => on_o,
+         lrx_data_o  => lrx_data_o,
+         lrx_valid_o => lrx_valid_o,
+         lrx_ready_i => lrx_ready_i,
+         lrx_break_o => lrx_break_o,
+         ltx_data_i  => ltx_data_i,
+         ltx_valid_i => ltx_valid_i,
+         ltx_ready_o => ltx_ready_o
+      ); -- i_eth_tcp
+
+   resp_data  <= arp_data when arp_valid = '1' else
+                 icmp_data;
+   resp_last  <= arp_last when arp_valid = '1' else
+                 icmp_last;
+   resp_valid <= arp_valid or icmp_valid;
+
+   grant_tcp <= '1' when lock = TCP_LK or (lock = FREE_LK and resp_valid = '0') else
+                '0';
+
+   out_data      <= tcp_data when grant_tcp = '1' else
+                    resp_data;
+   out_last      <= tcp_last when grant_tcp = '1' else
+                    resp_last;
+   out_valid     <= tcp_valid when grant_tcp = '1' else
+                    resp_valid;
+   resp_ready    <= out_ready and not grant_tcp;
+   tcp_ready_out <= out_ready and grant_tcp;
+
+   p_lock : process (clk_i)
+   begin
+      if rising_edge(clk_i) then
+         if out_valid = '1' and out_ready = '1' then
+            if out_last = '1' then
+               lock <= FREE_LK;
+            elsif grant_tcp = '1' then
+               lock <= TCP_LK;
+            else
+               lock <= RESP_LK;
+            end if;
+         end if;
+
+         if rst_i = '1' then
+            lock <= FREE_LK;
+         end if;
+      end if;
+   end process p_lock;
 
    i_eth_tx_fifo : entity work.eth_tx_fifo
       port map (

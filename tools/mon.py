@@ -17,11 +17,12 @@ arrive, above the prompt. "send TEXT" sends console bytes to the program,
 and "console" passes the terminal through to it, until Ctrl-] returns to
 the prompt.
 
-Usage: tools/mon.py [--port /dev/ttyUSB1] [--baud 2000000] [--tcp PORT]
-                    [--cosim PORT] [--symbols FILE] [FILE.bin]
+Usage: tools/mon.py [--port /dev/ttyUSB1] [--baud 2000000]
+                    [--eth HOST[:PORT]] [--tcp PORT] [--cosim PORT]
+                    [--symbols FILE] [FILE.bin]
 
-A FILE is loaded at the start, with the core held. --port, --tcp, and
---cosim pick the link, as for tools/load.py. Only the Python standard
+A FILE is loaded at the start, with the core held. --port, --eth, --tcp,
+and --cosim pick the link, as for tools/load.py. Only the Python standard
 library is used, so this runs on Linux and macOS.
 """
 

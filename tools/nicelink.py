@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """The debug link of nice_cpu/doc/DEBUG.md, for the host tools.
 
-A Link talks to the board over its debug UART, to niceemu --link over
-TCP on 127.0.0.1, or to the simulated system of make -C sim cosim, whose
-UART is on a TCP port of 127.0.0.1 too. It splits what arrives into
+A Link talks to the board over its debug UART or over TCP on its
+Ethernet port, to niceemu --link over TCP on 127.0.0.1, or to the
+simulated system of make -C sim cosim, whose UART is on a TCP port of
+127.0.0.1 too. It splits what arrives into
 console bytes, with ESC ESC as 0xFF, and packets, which it checks. A
 packet is an answer to a request, or a notice, which the board sends on
 its own (DEBUG.md §4): b at reset, o when an input byte is lost, p at a
@@ -26,8 +27,8 @@ packets of at most MAX_WORDS.
 
 Console bytes to the program are paced by the free-space register, so that
 none is lost in its input buffer. The end of the input is a break on the
-UART, and a half-close of the TCP connection, which the simulation turns
-into a break.
+UART, and a half-close of the TCP connection, which the simulation and
+the board's Ethernet port turn into a break.
 
 Only the Python standard library is used, so this runs on Linux and macOS.
 """
@@ -36,6 +37,7 @@ import argparse
 import os
 import select
 import socket
+import struct
 import sys
 import termios
 import time
@@ -79,6 +81,8 @@ ANSWER_WAIT = 0.3
 # leave room for a slower computer.
 COSIM_WAIT = 20.0
 COSIM_BYTE = 0.02
+# The TCP port of the board's debug link on Ethernet (src/eth/eth_tcp.vhd)
+ETH_PORT = 4510
 # How many times a request without an answer is sent, the first time
 # included, before the link gives up
 TRIES = 3
@@ -214,7 +218,8 @@ class Tcp(Transport):
     # Who serves the port, for the messages
     peer = "niceemu"
 
-    def __init__(self, port: int) -> None:
+    def __init__(self, port: int, host: str = "127.0.0.1") -> None:
+        self.host = host
         self.port = port
         self.sock: socket.socket | None = self._connect()
         # The half-closed connection, until niceemu closes it
@@ -223,12 +228,16 @@ class Tcp(Transport):
     def _connect(self) -> socket.socket:
         try:
             # Wait at most 5 s for the connection
-            sock = socket.create_connection(("127.0.0.1", self.port), 5)
+            sock = socket.create_connection((self.host, self.port), 5)
         except OSError as e:
-            fail(f"cannot connect to 127.0.0.1:{self.port}: {e.strerror}; is "
-                 f"niceemu --link {self.port} or make cosim running?")
+            fail(f"cannot connect to {self.host}:{self.port}: {e.strerror}; "
+                 f"{self.hint()}")
         sock.setblocking(False)
         return sock
+
+    def hint(self) -> str:
+        """What to check when the connection fails."""
+        return (f"is niceemu --link {self.port} or make cosim running?")
 
     def _reconnect(self) -> socket.socket:
         """A new connection that niceemu has taken: one that it has sent
@@ -313,6 +322,36 @@ class Cosim(Tcp):
 
     def answer_wait(self, sent: int) -> float:
         return COSIM_WAIT + sent * COSIM_BYTE
+
+
+class Eth(Tcp):
+    """The board's debug link on its Ethernet port, a TCP port of the IP
+    address that a program or the link gave it (doc/SYSTEM.md). The
+    connection is the line, as for Cosim: no b notice, nothing reset, and a
+    half-close is a break. The board takes a new connection from the same
+    host once it has closed the old one, after the output that came before,
+    so the new one is taken as it is, and the old one is read to its end
+    first."""
+
+    board = True
+    peer = "the board"
+
+    def hint(self) -> str:
+        return ("has the board this IP address (0xFFFFFF9A), and no other "
+                "host a connection to it?")
+
+    def _connect(self) -> socket.socket:
+        sock = super()._connect()
+        # A close sends a reset, not a FIN, also when the tool exits or is
+        # killed, as the board takes a FIN for a half-close, the end of the
+        # input, and keeps the connection, and the UART has no link while
+        # it does.
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER,
+                        struct.pack("ii", 1, 0))
+        return sock
+
+    def _reconnect(self) -> socket.socket:
+        return self._connect()
 
 
 class Link:
@@ -596,13 +635,17 @@ def read_words(link: Link, addrs: list[int]) -> list[int]:
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
     """The options that pick the link: --port and --baud for the board's
-    debug UART, --tcp for niceemu --link, or --cosim for make -C sim
-    cosim."""
+    debug UART, --eth for its Ethernet port, --tcp for niceemu --link, or
+    --cosim for make -C sim cosim."""
     parser.add_argument("--port", default="/dev/ttyUSB1",
                         help="the serial device of the board's debug UART "
                         "(default /dev/ttyUSB1)")
     parser.add_argument("--baud", type=int, default=2000000,
                         help="the UART's baud rate (default %(default)s)")
+    parser.add_argument("--eth", metavar="HOST[:PORT]",
+                        help="talk to the board over TCP on its Ethernet "
+                        f"port, at HOST (default port {ETH_PORT}), not on "
+                        "its UART")
     parser.add_argument("--tcp", type=int, metavar="PORT",
                         help="talk to niceemu --link PORT on 127.0.0.1, not "
                         "to the board")
@@ -628,6 +671,11 @@ def open_link(args: argparse.Namespace) -> Link:
     its version."""
     if getattr(args, "cosim", None) is not None:
         link = Link(Cosim(args.cosim))
+    elif getattr(args, "eth", None) is not None:
+        host, _, port = args.eth.partition(":")
+        if port and not port.isdigit():
+            fail(f"{args.eth} is not HOST or HOST:PORT")
+        link = Link(Eth(int(port) if port else ETH_PORT, host))
     elif args.tcp is not None:
         link = Link(Tcp(args.tcp))
         # niceemu sends b to each host that connects (DEBUG.md §7). Wait

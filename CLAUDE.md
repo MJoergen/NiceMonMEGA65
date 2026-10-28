@@ -23,7 +23,7 @@ header is the authoritative address map.
 ## Commands
 
     make                  # lists the targets
-    make -j test          # GHDL: synth checks, tb_hello, tb_nicemon, tb_kbd, tb_ps2, tb_ps2_nicemon, tb_text, tb_board_io, tb_rmii_rx, tb_rx_fcs, tb_eth_rx_fifo, tb_eth_tx_fifo, tb_rmii_tx, tb_eth, check-steps, check-fmt (NICE=multi for the multi-cycle core); then the demo in niceemu
+    make -j test          # GHDL: synth checks, tb_hello, tb_nicemon, tb_kbd, tb_ps2, tb_ps2_nicemon, tb_text, tb_board_io, tb_rmii_rx, tb_rx_fcs, tb_eth_rx_fifo, tb_eth_tx_fifo, tb_rmii_tx, tb_eth, tb_eth_tcp, check-steps, check-fmt (NICE=multi for the multi-cycle core); then the demo in niceemu
     make -j formal        # SymbiYosys jobs in formal/, each task in a work directory of its own
     make lint             # vsg against doc/CODING_STYLE.md; line-length warnings are tolerated
     make examples         # C examples -> examples/build/*.bin (clang wasm32, lld, llvm)
@@ -69,7 +69,8 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   (`seg7.vhd`, `rgb_pwm.vhd`), the Ethernet station (`eth/eth.vhd`: the
   RMII receiver and transmitter, the check of the frames, their FIFOs
   between the clocks, the MAC filter and ARP responder,
-  `eth/eth_arp.vhd`, and the ping responder, `eth/eth_icmp.vhd`), and
+  `eth/eth_arp.vhd`, the ping responder, `eth/eth_icmp.vhd`, and the
+  TCP server of the debug link, `eth/eth_tcp.vhd`), and
   `system.vhd`, which every board instantiates.
   `nice_core.vhd` with one architecture from `src/core/` wraps whichever
   nice_cpu core `core.mk` selects (`NICE=pipeline`, the default, or `multi`).
@@ -120,6 +121,11 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   has `G_BREAKS` breakpoints, 4 on every board, at `FFFFFFF4`–`FF`: the
   core pauses on its own before one, and the link sends `x` instead of
   `p`.
+- The tools take `--eth HOST[:PORT]` for the board's link over TCP on
+  its Ethernet port, 4510 by default, once 0xFFFFFF9A gives it an IP
+  address. It is the line, as the UART is: no `b` notice at connect, and
+  a half-close is a break. While a host is connected, the UART's link
+  bytes are dropped.
 - The tools take `--tcp PORT` for `niceemu --link PORT` (PORT 0 prints the
   port it picked on stderr). `make linktest` runs `run.py --tcp` against
   plain `niceemu`, which checks the tools without a board.

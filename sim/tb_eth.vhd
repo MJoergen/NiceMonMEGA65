@@ -206,8 +206,17 @@ architecture simulation of tb_eth is
       f_v.b(26 to 29) := spa_of(k);
       f_v.b(30 to 33) := dip;
       -- Echo request, the checksum, the identifier, and the sequence number
-      f_v.b(34 to 41) := (X"08", X"00", X"00", X"00", X"12", X"34",
-                          seq(15 downto 8), seq(7 downto 0));
+      f_v.b(34 to 41) :=
+      (
+         X"08",
+         X"00",
+         X"00",
+         X"00",
+         X"12",
+         X"34",
+         seq(15 downto 8),
+         seq(7 downto 0)
+      );
 
       for i in 0 to n - 1 loop
          f_v.b(42 + i) := to_stdlogicvector((k * 7 + i * 3) mod 256, 8);
@@ -303,20 +312,31 @@ begin
 
 
    i_eth : entity work.eth
+      generic map (
+         G_CLOCK_HZ => 100_000_000
+      )
       port map (
-         clk_i     => clk,
-         rst_i     => rst,
-         mac_i     => C_MAC,
-         ip_i      => ip,
-         rx_o      => rx,
-         rx_bad_o  => rx_bad,
-         tx_o      => tx,
-         eth_clk_i => eth_clk,
-         eth_rst_i => rst,
-         rxd_i     => rxd,
-         crs_dv_i  => crs_dv,
-         txd_o     => txd,
-         tx_en_o   => tx_en
+         clk_i       => clk,
+         rst_i       => rst,
+         mac_i       => C_MAC,
+         ip_i        => ip,
+         rx_o        => rx,
+         rx_bad_o    => rx_bad,
+         tx_o        => tx,
+         on_o        => open,
+         lrx_data_o  => open,
+         lrx_valid_o => open,
+         lrx_ready_i => '1',
+         lrx_break_o => open,
+         ltx_data_i  => X"00",
+         ltx_valid_i => '0',
+         ltx_ready_o => open,
+         eth_clk_i   => eth_clk,
+         eth_rst_i   => rst,
+         rxd_i       => rxd,
+         crs_dv_i    => crs_dv,
+         txd_o       => txd,
+         tx_en_o     => tx_en
       ); -- i_eth
 
 

@@ -10,12 +10,15 @@ Then the words of the file are written with W packets of the debug link
 given. The ROM stays hidden until the reset button is pressed, which
 boots the ROM's program again.
 
-Usage: tools/load.py [--port /dev/ttyUSB1] [--baud 2000000] [--tcp PORT]
-                     [--cosim PORT] [--no-run] FILE.bin
+Usage: tools/load.py [--port /dev/ttyUSB1] [--baud 2000000]
+                     [--eth HOST[:PORT]] [--tcp PORT] [--cosim PORT]
+                     [--no-run] FILE.bin
 
 --port names the serial device of the board's debug UART, /dev/ttyUSB1 by
-default. --tcp PORT talks to "niceemu --link PORT" instead, and --cosim
-PORT to the simulated system of "make -C sim cosim". Only the Python
+default. --eth HOST talks to the board over TCP on its Ethernet port, at
+its IP address HOST, on port 4510 unless HOST:PORT names another. --tcp
+PORT talks to "niceemu --link PORT" instead, and --cosim PORT to the
+simulated system of "make -C sim cosim". Only the Python
 standard library is used, so this runs on Linux and macOS. tools/run.py and
 tools/hwtest.py use the functions here, and tools/nicelink.py has the link.
 """

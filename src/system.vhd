@@ -22,7 +22,9 @@
 -- boards leave them open.
 -- The Ethernet PHY's pins go to the Ethernet station (eth/eth.vhd), whose
 -- MAC and IP addresses are registers of the board (board_io.vhd), and
--- whose counts of frames the core and the link read there too.
+-- whose counts of frames the core and the link read there too. The station
+-- also carries the debug link over TCP, in the UART's place while a host is
+-- connected (nicemon.vhd).
 --
 -- With a ROM the core boots from it at reset; without one it waits, held,
 -- for a host on the debug link (nicemon.vhd).
@@ -127,6 +129,15 @@ architecture synthesis of system is
    signal eth_rx     : std_logic_vector(31 downto 0);
    signal eth_rx_bad : std_logic_vector(31 downto 0);
    signal eth_tx     : std_logic_vector(31 downto 0);
+   -- The debug link over TCP
+   signal net_on       : std_logic;
+   signal net_rx_data  : std_logic_vector(7 downto 0);
+   signal net_rx_valid : std_logic;
+   signal net_rx_ready : std_logic;
+   signal net_rx_break : std_logic;
+   signal net_tx_data  : std_logic_vector(7 downto 0);
+   signal net_tx_valid : std_logic;
+   signal net_tx_ready : std_logic;
 
 begin
 
@@ -183,25 +194,44 @@ begin
          eth_rx_bad_i   => eth_rx_bad,
          eth_tx_i       => eth_tx,
          eth_mac_o      => eth_mac,
-         eth_ip_o       => eth_ip
+         eth_ip_o       => eth_ip,
+         net_on_i       => net_on,
+         net_rx_data_i  => net_rx_data,
+         net_rx_valid_i => net_rx_valid,
+         net_rx_ready_o => net_rx_ready,
+         net_rx_break_i => net_rx_break,
+         net_tx_data_o  => net_tx_data,
+         net_tx_valid_o => net_tx_valid,
+         net_tx_ready_i => net_tx_ready
       ); -- i_nicemon
 
 
    i_eth : entity work.eth
+      generic map (
+         G_CLOCK_HZ => G_CLOCK_HZ
+      )
       port map (
-         clk_i     => clk_i,
-         rst_i     => rst_i,
-         mac_i     => eth_mac,
-         ip_i      => eth_ip,
-         rx_o      => eth_rx,
-         rx_bad_o  => eth_rx_bad,
-         tx_o      => eth_tx,
-         eth_clk_i => eth_clk_i,
-         eth_rst_i => eth_rst_i,
-         rxd_i     => eth_rxd_i,
-         crs_dv_i  => eth_crs_dv_i,
-         txd_o     => eth_txd_o,
-         tx_en_o   => eth_tx_en_o
+         clk_i       => clk_i,
+         rst_i       => rst_i,
+         mac_i       => eth_mac,
+         ip_i        => eth_ip,
+         rx_o        => eth_rx,
+         rx_bad_o    => eth_rx_bad,
+         tx_o        => eth_tx,
+         on_o        => net_on,
+         lrx_data_o  => net_rx_data,
+         lrx_valid_o => net_rx_valid,
+         lrx_ready_i => net_rx_ready,
+         lrx_break_o => net_rx_break,
+         ltx_data_i  => net_tx_data,
+         ltx_valid_i => net_tx_valid,
+         ltx_ready_o => net_tx_ready,
+         eth_clk_i   => eth_clk_i,
+         eth_rst_i   => eth_rst_i,
+         rxd_i       => eth_rxd_i,
+         crs_dv_i    => eth_crs_dv_i,
+         txd_o       => eth_txd_o,
+         tx_en_o     => eth_tx_en_o
       ); -- i_eth
 
 

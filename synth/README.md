@@ -166,25 +166,31 @@ and neither the Nexys4DDR's devices nor the microsecond counter:
 
 | Part of the design | R6, pipelined | R6, multi | Nexys4DDR, pipelined | Nexys4DDR, multi |
 |---|---|---|---|---|
-| The core (`nice_core`) | 7370 / 2975 | 4605 / 1050 | 6953 / 3011 | 4636 / 4071 |
-| The math unit (`mpu`) | 2296 / 874 | 2172 / 874 | 2262 / 876 | 2166 / 874 |
-| The fetch statistics (`fetch_stats`) | 872 / 1361 | 44 / 99 | 887 / 1361 | 44 / 99 |
-| The debug link (`debug_link`) | 909 / 1082 | – | 821 / 1082 | – |
-| The Ethernet station (`eth/eth.vhd`) | 594 / 626 | – | 595 / 626 | – |
-| The rest: the UART, RAM, counters, timer, the Nexys4DDR's devices, and glue | 883 / 918 | 795 / 1156 | 863 / 1059 | 740 / 1119 |
+| The core (`nice_core`) | 6931 / 3032 | 4605 / 1050 | 6844 / 3027 | 4636 / 4071 |
+| The math unit (`mpu`) | 2079 / 874 | 2172 / 874 | 2080 / 874 | 2166 / 874 |
+| The fetch statistics (`fetch_stats`) | 813 / 1361 | 44 / 99 | 812 / 1361 | 44 / 99 |
+| The debug link (`debug_link`) | 873 / 1082 | – | 872 / 1082 | – |
+| The Ethernet station (`eth/eth.vhd`) | 2041 / 1783 | – | 2038 / 1791 | – |
+| Of which the TCP server (`eth/eth_tcp.vhd`) | 1431 / 1155 | – | 1429 / 1163 | – |
+| The rest: the UART, RAM, counters, timer, the Nexys4DDR's devices, and glue | 1653 / 918 | 795 / 1156 | 1836 / 1059 | 740 / 1119 |
 | The text display (`text.vhd`) | 117 / 180 | 123 / 180 | 115 / 156 | 121 / 156 |
-| The keyboard | 580 / 577 | 596 / 585 | 147 / 48 | – |
+| The keyboard | 578 / 577 | 596 / 585 | 146 / 48 | – |
 | The HDMI output | 600 / 1207 | 574 / 1207 | – | – |
-| Total | 14221 / 9800 | 8909 / 5151 | 12643 / 8219 | 7707 / 6319 |
-| Total, of the FPGA | 10.6 % / 3.7 % | 6.7 % / 1.9 % | 19.9 % / 6.5 % | 12.2 % / 5.0 % |
+| Total | 15685 / 11014 | 8909 / 5151 | 14743 / 9398 | 7707 / 6319 |
+| Total, of the FPGA | 11.7 % / 4.1 % | 6.7 % / 1.9 % | 23.3 % / 7.4 % | 12.2 % / 5.0 % |
 
-The R3 pipelined build takes 14276 LUTs and 9952 flip-flops, 10.7 % and
-3.7 % of the FPGA.
+The R3 pipelined build takes 15774 LUTs and 11166 flip-flops, 11.8 % and
+4.2 % of the FPGA.
 
-The pipelined core is about 5.5 % of the LUTs of the R6's FPGA, and 11.0 %
+Vivado optimizes across the boundaries of the modules, so the rows move
+from build to build more than the logic does: in the builds with the TCP
+server, about 700 LUTs left the core's rows for the rest of `nicemon`.
+The totals are what count.
+
+The pipelined core is about 5.2 % of the LUTs of the R6's FPGA, and 10.8 %
 of the Nexys4DDR's. The multi-cycle core has two thirds of its LUTs, 3.4 %
 and 7.3 %. On the R6 it has a third of the flip-flops too. On the
-Nexys4DDR it has 4071, more than the pipelined core's 2948, because
+Nexys4DDR it has 4071, more than the pipelined core's 3027, because
 `FLOW=timing` retimes (`synth_design -retiming`): it moves registers
 backwards and adds copies of the core's register file and state, so the
 design has twice the flip-flops. With `FLOW=default` the build has 3202
@@ -205,15 +211,15 @@ All builds meet the clock. These are the worst setup and hold slacks:
 
 | Build | Clock | Setup | Hold |
 |---|---|---|---|
-| R6, pipelined | 100 MHz | 0.370 ns | 0.084 ns |
+| R6, pipelined | 100 MHz | 0.347 ns | 0.061 ns |
 | R6, `NICE=multi` | 100 MHz | 0.52 ns | – |
-| R3, pipelined | 100 MHz | 0.236 ns | 0.074 ns |
-| Nexys4DDR, pipelined | 90 MHz | 0.143 ns | 0.055 ns |
+| R3, pipelined | 100 MHz | 0.109 ns | 0.061 ns |
+| Nexys4DDR, pipelined | 90 MHz | 0.059 ns | 0.015 ns |
 | Nexys4DDR, `NICE=multi` | 90 MHz | 0.19 ns | – |
 
 The pipelined rows are from builds at nice_cpu V1.0, with the debug
 link of version 4 and the Ethernet station, which answers ARP requests and
-pings; the
+pings and carries the link over TCP; the
 multi-cycle rows are older builds, with fewer link features, and their
 hold slacks were not recorded. The slacks change from build to build with
 placement more than with the logic. The worst paths are usually in the
@@ -243,8 +249,9 @@ The block RAMs, of 36 Kbit, are these:
 | The FIFO of received Ethernet frames (`eth/eth_ram.vhd`), 2K bytes, one RAMB18 | 0.5 | 0.5 |
 | The FIFO of Ethernet frames to send (`eth/eth_ram.vhd`), 2K bytes, one RAMB18 | 0.5 | 0.5 |
 | The copy of a ping in `eth/eth_icmp.vhd`, 2K bytes, one RAMB18 | 0.5 | 0.5 |
-| Total without the ROM, pipelined | 134 of 365 | 86 of 135 |
-| Total with the ROM, pipelined | 166 | 118 |
+| The TCP server's buffers of received and sent bytes (`eth/eth_ram.vhd` in `eth/eth_tcp.vhd`), 2K bytes each, one RAMB18 each | 1 | 1 |
+| Total without the ROM, pipelined | 135 of 365 | 87 of 135 |
+| Total with the ROM, pipelined | 167 | 119 |
 
 The copy of the screen keeps all 32 bits, as the display reads the
 character and both 12-bit colors, so it takes as many block RAMs as the

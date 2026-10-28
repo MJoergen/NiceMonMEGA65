@@ -23,7 +23,10 @@
 -- data bus shares port B of the memory and the I/O registers with the debug
 -- link (nice_cpu/hdl/src/debug_link.vhd), a second Wishbone master. The link
 -- shares the UART with the console: through it a host reads and writes the
--- memory, loads and starts a program, and learns when it halts.
+-- memory, loads and starts a program, and learns when it halts. While
+-- net_on_i is '1', the link's byte streams are those of the net_* ports
+-- instead, a connection over TCP (eth/eth_tcp.vhd), and the UART's bytes
+-- are dropped, and none is sent on it.
 --
 -- Address map, as in the emulator (nice_cpu/emulator/README.md), and the
 -- same for the link and the core's data bus apart from the link's own
@@ -301,7 +304,18 @@ entity nicemon is
       eth_rx_bad_i   : in  std_logic_vector(31 downto 0) := (others => '0');
       eth_tx_i       : in  std_logic_vector(31 downto 0) := (others => '0');
       eth_mac_o      : out std_logic_vector(47 downto 0);
-      eth_ip_o       : out std_logic_vector(31 downto 0)
+      eth_ip_o       : out std_logic_vector(31 downto 0);
+      -- The link's byte streams over TCP, which take the UART's place
+      -- while net_on_i is '1': the host's bytes and its half-close, a
+      -- break, and the bytes to the host
+      net_on_i       : in  std_logic                    := '0';
+      net_rx_data_i  : in  std_logic_vector(7 downto 0) := X"00";
+      net_rx_valid_i : in  std_logic                    := '0';
+      net_rx_ready_o : out std_logic;
+      net_rx_break_i : in  std_logic                    := '0';
+      net_tx_data_o  : out std_logic_vector(7 downto 0);
+      net_tx_valid_o : out std_logic;
+      net_tx_ready_i : in  std_logic                    := '0'
    );
 end entity nicemon;
 
@@ -491,6 +505,14 @@ architecture synthesis of nicemon is
    signal ser_tx_valid : std_logic;
    signal ser_tx_ready : std_logic;
    signal ser_tx_data  : std_logic_vector(7 downto 0);
+   -- The link's byte streams, from the UART or over TCP
+   signal lnk_rx_valid : std_logic;
+   signal lnk_rx_ready : std_logic;
+   signal lnk_rx_data  : std_logic_vector(7 downto 0);
+   signal lnk_rx_break : std_logic;
+   signal lnk_tx_valid : std_logic;
+   signal lnk_tx_ready : std_logic;
+   signal lnk_tx_data  : std_logic_vector(7 downto 0);
 
    -- The input: a console byte from the link, or a keyboard byte
    signal link_in_valid : std_logic;
@@ -942,6 +964,23 @@ begin
          uart_rx_i  => uart_rxd_i
       ); -- i_uart_serdes
 
+   -- The link's bytes go to the UART, or to the TCP connection while there
+   -- is one; the other's are dropped.
+   lnk_rx_valid   <= net_rx_valid_i when net_on_i = '1' else
+                     ser_rx_valid;
+   lnk_rx_data    <= net_rx_data_i when net_on_i = '1' else
+                     ser_rx_data;
+   lnk_rx_break   <= net_rx_break_i when net_on_i = '1' else
+                     ser_rx_break;
+   ser_rx_ready   <= lnk_rx_ready or net_on_i;
+   net_rx_ready_o <= lnk_rx_ready or not net_on_i;
+   ser_tx_data    <= lnk_tx_data;
+   net_tx_data_o  <= lnk_tx_data;
+   ser_tx_valid   <= lnk_tx_valid and not net_on_i;
+   net_tx_valid_o <= lnk_tx_valid and net_on_i;
+   lnk_tx_ready   <= net_tx_ready_i when net_on_i = '1' else
+                     ser_tx_ready;
+
    free <= (15 downto C_RX_FIFO_BITS + 1 => '0') & rx_free;
 
    i_debug_link : entity work.debug_link
@@ -954,13 +993,13 @@ begin
       port map (
          clk_i          => clk_i,
          rst_i          => rst_i,
-         rx_valid_i     => ser_rx_valid,
-         rx_ready_o     => ser_rx_ready,
-         rx_data_i      => ser_rx_data,
-         rx_break_i     => ser_rx_break,
-         tx_valid_o     => ser_tx_valid,
-         tx_ready_i     => ser_tx_ready,
-         tx_data_o      => ser_tx_data,
+         rx_valid_i     => lnk_rx_valid,
+         rx_ready_o     => lnk_rx_ready,
+         rx_data_i      => lnk_rx_data,
+         rx_break_i     => lnk_rx_break,
+         tx_valid_o     => lnk_tx_valid,
+         tx_ready_i     => lnk_tx_ready,
+         tx_data_o      => lnk_tx_data,
          con_valid_i    => cpu_tx_valid,
          con_ready_o    => cpu_tx_ready,
          con_data_i     => cpu_tx_data,

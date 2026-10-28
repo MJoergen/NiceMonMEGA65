@@ -285,7 +285,8 @@ The debug UART runs at 2 Mbaud (2000000), 8-N-1.
 [tools/README.md](tools/README.md) describes the port, and the other
 tools: `load.py`, which loads and starts a program, and `run.py`, which
 runs one as `niceemu` runs it, for comparing the two. It also shows how
-to run a C program on the board.
+to run a C program on the board, and how to use the tools over the
+board's Ethernet port instead of the UART.
 
 ## Writing programs
 

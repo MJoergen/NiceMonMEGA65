@@ -107,8 +107,9 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
   PHY's frames, `eth/rx_fcs.vhd` checks their frame check sequence, and
   `eth/eth_rx_fifo.vhd` takes the good ones to the system clock.
   `eth/eth_arp.vhd` filters them by their MAC address and answers ARP
-  requests, `eth/eth_icmp.vhd` answers pings, `eth/eth_tx_fifo.vhd` takes
-  the answers back to the PHY's clock, and `eth/rmii_tx.vhd` sends them. The FIFOs keep their bytes in
+  requests, `eth/eth_icmp.vhd` answers pings, `eth/eth_tcp.vhd` serves
+  the debug link on a TCP port, `eth/eth_tx_fifo.vhd` takes the frames
+  to send back to the PHY's clock, and `eth/rmii_tx.vhd` sends them. The FIFOs keep their bytes in
   `eth/eth_ram.vhd`, and `eth/eth_pkg.vhd` has the CRC and the Gray code.
 - The debug link is nice_cpu's `hdl/src/debug_link.vhd`.
 - `uart_serdes.vhd` is copied from
@@ -191,6 +192,14 @@ The testbenches are these:
   length longer than the frame; to a frame with a wrong check sequence;
   or to anything while the IP address is 0. The counts of frames are
   checked too.
+- `sim/tb_eth_tcp.vhd` tests the TCP server of the debug link at its
+  ports, against a host modeled in VHDL that checks both checksums of
+  every segment: the handshake, and the SYN-ACK sent again; data each
+  way, data again, out of order, with a wrong checksum, and too much for
+  the buffer; the host's window, data sent again after the timeout, and
+  an ACK that comes while it is; the host's FIN as a break after its
+  data; a new connection after it, which closes the old one first; an
+  RST; and a SYN-ACK that is never acknowledged.
 - `make test` also checks that GHDL can synthesize the system, with
   `sim/rom.nasm` as its ROM and without a ROM, the keyboards, the text
   display, and `src/system.vhd` with the screen and the devices of the

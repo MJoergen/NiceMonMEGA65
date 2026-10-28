@@ -307,10 +307,10 @@ read 0 and take no write; the keyboard's LEDs may come to `0xFFFFFF97`
 ### The Ethernet station
 
 `0xFFFFFF98`–`9D` are on every board, the MEGA65 too. They are the
-Ethernet station, the first steps of a debug link over Ethernet
+Ethernet station, which carries the debug link over TCP
 ([#30](https://github.com/MJoergen/NiceMonMEGA65/issues/30)). It
-answers ARP requests for its IP address, and pings to it, and nothing
-else yet.
+answers ARP requests for its IP address and pings to it, and serves the
+link on TCP port 4510.
 
 | Address | Access | What it is |
 |---|---|---|
@@ -344,3 +344,37 @@ two boards on one network need different ones. On the link, for example:
 
 Then `ping 192.168.1.66` from a PC on the network gets its answers, and
 `0xFFFFFF9D` counts the replies, the ARP reply and one for each ping.
+
+#### The debug link over TCP
+
+The station serves the debug link on TCP port 4510 of its IP address,
+to one host at a time. While a host is connected, the link's bytes come
+from it and go to it, and not to the UART, whose bytes are dropped. The
+connection is the line, as the UART is: connecting sends no `b` notice
+and resets nothing, unlike `niceemu --link` (DEBUG.md §7), and a host's
+half-close is a break, which ends the program's input. The tools take
+`--eth HOST`, or `--eth HOST:PORT`, for it:
+
+    python3 tools/run.py --eth 192.168.1.66 prog.bin
+    make mon ARGS="--eth 192.168.1.66"
+
+A new connection from the same host replaces the old one. If the host
+has half-closed the old one, as the tools do at the end of a program's
+input, the old one gets the output that came before the new connection,
+and then the board closes it, and only then takes the new one. A
+connection from another host gets no answer while one is open.
+
+A host's FIN is the end of the input, and the board keeps the connection
+after it, so a host that is done ends it with a reset. The tools set
+`SO_LINGER` to 0 for that, so that each close of theirs, also at an exit
+or a kill, sends one. A connection that a host closed with only a FIN
+stays until that host connects again, or the board resets. The board
+resends what the host does not acknowledge, after 200 ms, and drops the
+connection after 25 tries. It sends no reset itself, so a segment that
+fits no connection gets no answer.
+
+The link reads and writes all memory with no password, so anyone who
+can reach the port can do the same. The IP address is 0 after reset,
+which serves nothing, so a board is reachable only after a program or
+the UART's link gives it an address. Give it one only on a network you
+trust.
