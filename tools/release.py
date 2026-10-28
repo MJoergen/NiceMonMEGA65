@@ -18,9 +18,10 @@ is for the nice_cpu tag and the submodule's commit and says met, that the
 submodule is at that tag, and that CI passed for the commit. It then
 builds the examples, the demo of demo/ with the tag in its title bar, and
 the bitstreams of the R6, the R3, and the Nexys4DDR, with the demo in the
-ROM and from nothing. The R6 uses the flow of verified.json; the others try the
-default directives first and then FLOW=timing, as bump.py does. Each must
-meet timing. It makes the core files of the R3 and the R6, with the tag as
+ROM and from nothing. The R6 uses the flow of verified.json, and the
+Nexys4DDR only FLOW=timing, as its Makefile does, for it never meets timing
+with the default directives. The R3 tries the default directives first and
+then FLOW=timing, as bump.py does. Each must meet timing. It makes the core files of the R3 and the R6, with the tag as
 their version, which MEGAFLASH shows. Last it runs make hwtest on the R6 bitstream, so a MEGA65 R6
 must be on PORT. It copies the bitstreams, the core files, a zip of the examples, and
 verified.json to build/release/V1.0, with notes.md, the release notes, and
@@ -64,6 +65,9 @@ BOARDS = (
 
 # The boards with a core file (synth/Makefile.inc)
 COR_BOARDS = ("r3", "r6")
+
+# The boards built with one flow only, the one their Makefile sets
+BOARD_FLOWS = {"nexys4ddr": ("timing",)}
 
 # The ROM of every board: the demo, which the core boots from at power-up
 DEMO = os.path.join(REPO, "demo", "build", "demo.bin")
@@ -221,7 +225,7 @@ def stage(tag):
     run(["make", "-C", "demo", "VERSION=" + tag])
     results = {}
     for board, _ in BOARDS:
-        flows = (v["flow"],) if board == "r6" else FLOWS
+        flows = (v["flow"],) if board == "r6" else BOARD_FLOWS.get(board, FLOWS)
         results[board] = build(board, flows)
     # The same options as the build, or make would build the bitstream again
     for board in COR_BOARDS:

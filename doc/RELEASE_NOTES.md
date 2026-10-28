@@ -29,6 +29,12 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   `RELEASE_NOTES.md` move into `doc/`. `README.md` and `CONTRIBUTING.md`
   stay at the root.
 
+**Release**
+
+- `make release` builds the Nexys4DDR only with `FLOW=timing`, as its
+  Makefile does, and no longer tries the default flow first, which never
+  meets timing there.
+
 ## V1.0 (2026-10-28)
 
 **Upgrade notes.**
