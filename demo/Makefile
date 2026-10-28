@@ -3,8 +3,8 @@
 #
 # make          builds build/demo.bin, with VERSION in its title bar, git
 #               describe of the tree by default; the release gives its tag
-# make test     runs the demo in niceemu seven times, with the inputs below,
-#               and compares the seven screens with test.expected
+# make test     runs the demo in niceemu eight times, with the inputs below,
+#               and compares the eight screens with test.expected
 # make clean    removes build/
 #
 # The assembler has no include, so build/version.nasm, which defines the
@@ -58,8 +58,13 @@ $(BUILD)/demo_test.bin: demo.nasm $(ASM_PY) | $(BUILD)
 # its rows: the red backgrounds, row 5, and the gray foregrounds, row 20,
 # from column 44. The seventh starts the counters, F7, where a letter
 # runs the sieve again. niceemu counts each step as a cycle and a
-# microsecond, so all the numbers are the same in every run. dash's printf,
-# the shell of make on Ubuntu, has no \x.
+# microsecond, so all the numbers are the same in every run. The eighth
+# plays the comet, F9, which takes a key at each tick, so . is a tick
+# without a key. The comet waits for the right key, catches the star at
+# row 4, column 67, and turns right, down, and left into its tail. A key
+# starts a new game, in which the comet goes left, ignores the right key,
+# which would turn it back, and hits the frame. dash's printf, the shell
+# of make on Ubuntu, has no \x.
 TEST1 = Hello, world!\nabc\177\177X\tY\r\n$(shell printf '0123456789%.0s' 1 2 3 4 5 6 7 8)abcde\n\
 \033[A\033[A\033[DQ\033[C\033[BR\n\033x\033[1;5Cy\200\351z\n
 TEST3 = one\033[11~two\n\033OPthree\033OQ\033[19~\033[17;2~ F\n\033\033[Ax\033Q\033[99~
@@ -68,6 +73,8 @@ TEST5 = \033ORab\033OPback
 TEST6 = \033[15~abc\033OQ
 DUMP6 = -d 0xFFFF01BC:36 -d 0xFFFF066C:36
 TEST7 = \033[18~x
+dots  = $(shell printf '.%.0s' $$(seq $(1)))
+TEST8 = \033[20~.\033[C$(call dots,27)\033[A$(call dots,8)\033[C\033[B\033[D.\033[D..\033[C$(call dots,35)
 
 test: $(BUILD)/demo_test.bin
 	@printf '$(TEST1)' > $(BUILD)/test1.txt
@@ -78,7 +85,8 @@ test: $(BUILD)/demo_test.bin
 	@printf '$(TEST5)' > $(BUILD)/test5.txt
 	@printf '$(TEST6)' > $(BUILD)/test6.txt
 	@printf '$(TEST7)' > $(BUILD)/test7.txt
-	@for t in 1 2 3 4 5 6 7; do \
+	@printf '$(TEST8)' > $(BUILD)/test8.txt
+	@for t in 1 2 3 4 5 6 7 8; do \
 	  dump=; [ $$t = 6 ] && dump='$(DUMP6)'; \
 	  $(EMU) -s -i $(BUILD)/test$$t.txt $$dump $(BUILD)/demo_test.bin > $(BUILD)/test$$t.out || \
 	    { echo "FAIL demo: niceemu exits with $$? on input $$t"; exit 1; }; \

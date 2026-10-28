@@ -6,9 +6,9 @@
 ; One demo runs at a time, and a function key switches to another: the
 ; menu in the second row of the screen lists them. A switch starts the demo
 ; afresh. F3 shows the bytes of each key, in hex and as characters, F5 the
-; 256 characters of the font and ramps of colors, and F7 the performance
-; counters and those of a prime sieve. At power-up the typewriter, F1,
-; runs. Its top rows say what the core is
+; 256 characters of the font and ramps of colors, F7 the performance
+; counters and those of a prime sieve, and F9 is a game, the comet. At
+; power-up the typewriter, F1, runs. Its top rows say what the core is
 ; and how to go further, and the rows below them take what is typed, from
 ; the keyboard or the UART: a character goes at the cursor, RETURN starts a
 ; new line, DEL (or backspace) deletes the character before the cursor, TAB
@@ -94,12 +94,28 @@ V_CHI   .EQU    0xFFFFF807
 V_ILO   .EQU    0xFFFFF808      ; the instructions since reset
 V_IHI   .EQU    0xFFFFF809
 
+; The variables of F9, in the same RAM, as only one demo runs at a time
+BODY    .EQU    0xFFFFF000      ; the ring of the comet's cells, head last
+BODY_M  .EQU    2047            ; the mask of an index of the ring
+G_HEAD  .EQU    0xFFFFF800      ; the index of the head in the ring
+G_LEN   .EQU    0xFFFFF801      ; the cells of the comet
+G_GROW  .EQU    0xFFFFF802      ; the cells it still grows by
+G_DIR   .EQU    0xFFFFF803      ; its step, -80, 80, 1, or -1, or 0 at the start
+G_POS   .EQU    0xFFFFF804      ; the address of the head
+G_SCORE .EQU    0xFFFFF805
+G_BEST  .EQU    0xFFFFF806
+G_SEED  .EQU    0xFFFFF807      ; the state of RANDOM
+G_NEXT  .EQU    0xFFFFF808      ; the microsecond counter at the next tick
+G_TICK  .EQU    0xFFFFF809      ; the microseconds from a tick to the next
+G_OVER  .EQU    0xFFFFF80A      ; 1 after the game has ended
+
 ; The colors: the background in bits 31..20, the foreground in bits 19..8
 BAR     .EQU    0x00AFFF00      ; white on blue
 TEXT    .EQU    0x000CCC00      ; light gray on black
 LINK    .EQU    0x000FF000      ; yellow on black
 MENU_ON .EQU    0xFFF00000      ; black on white, the running demo in the menu
 TYPED   .EQU    0x000FFF00      ; white on black
+TAIL    .EQU    0x0000F000      ; green on black
 
 TOP     .EQU    10              ; the first row of the typewriter
 LAST    .EQU    24              ; and its last
@@ -609,6 +625,184 @@ FIX2    MOVE    @M_A, R1
         MOVE    PC, TWO
         MOVE    PC, @SP++
 
+; The comet, a game. The comet, @, moves through the field, rows 4 to 23
+; inside a frame, one cell at each tick, and the cursor keys steer it. Its
+; tail follows it. A star, *, makes the tail longer by 4, scores 1, and
+; makes the ticks shorter, from 150 to 50 ms, and a new star comes at a
+; random free cell. The game ends when the comet hits the frame or its
+; tail, and then a key starts a new game. The comet waits for a cursor key
+; at the start, and a key that would turn it back is ignored.
+;
+; The ticks come from the microsecond counter, and the game takes one key at
+; each tick. So in niceemu, where a microsecond is a step, an input file is
+; a script with one key for each tick. RANDOM steps while the game waits
+; for a tick, so on the board the stars depend on when the keys come. The
+; ring BODY holds the addresses of the comet's cells, and the screen itself
+; tells what is in a cell, by the whole word, as the frame is blanks too.
+GAME    MOVE    SP, 0xFFFFFF00
+        MOVE    R6, GAME
+        ADD     @--SP, 2, PC
+        MOVE    PC, FRAME
+        MOVE    R5, G_TEXTS
+        ADD     @--SP, 2, PC
+        MOVE    PC, PRINTS
+        MOVE    @G_BEST, 0
+        MOVE    @G_SEED, 0x2545F491
+GNEW    MOVE    R2, SCREEN+240  ; a new game: the frame, and the field cleared
+        MOVE    R3, BAR+0x20
+        MOVE    R4, 80
+        ADD     @--SP, 2, PC
+        MOVE    PC, FILL
+        MOVE    R5, 20          ; R2 is at row 4
+GROW    MOVE    @R2++, BAR+0x20
+        MOVE    R3, TEXT+0x20
+        MOVE    R4, 78
+        ADD     @--SP, 2, PC
+        MOVE    PC, FILL
+        MOVE    @R2++, BAR+0x20
+        SUB[M]  R5, R5, 1
+    ?!Z MOVE    PC, GROW
+        MOVE    R3, BAR+0x20
+        MOVE    R4, 80
+        ADD     @--SP, 2, PC
+        MOVE    PC, FILL
+        MOVE    R2, SCREEN+1079 ; the comet, in the middle
+        MOVE    @R2, TYPED+0x40
+        MOVE    @G_POS, R2
+        MOVE    @G_HEAD, 0
+        MOVE    @BODY, R2
+        MOVE    @G_LEN, 1
+        MOVE    @G_GROW, 2
+        MOVE    @G_DIR, 0
+        MOVE    @G_SCORE, 0
+        MOVE    @G_OVER, 0
+        MOVE    @G_TICK, 150000
+        ADD     @G_NEXT, @P_US, 150000
+        ADD     @--SP, 2, PC
+        MOVE    PC, STAR
+        MOVE    R1, G_START
+        ADD     @--SP, 2, PC
+        MOVE    PC, STATUS
+GTICK   ADD     @--SP, 2, PC    ; wait for the tick
+        MOVE    PC, RANDOM
+        SUB[M]  R0, @P_US, @G_NEXT
+    ?N  MOVE    PC, GTICK
+        ADD     @G_NEXT, @G_NEXT, @G_TICK
+        ADD     @--SP, 2, PC
+        MOVE    PC, POLL
+        MOVE[M] R0, @G_OVER
+    ?Z  MOVE    PC, GKEY
+        MOVE[M] R0, R1          ; after the end, a key starts a new game
+    ?!Z MOVE    PC, GNEW
+        MOVE    PC, GTICK
+GKEY    SUB     R2, R1, KEY_UP
+        SUB[M]  R0, R2, 4
+    ?!C MOVE    PC, GMOVE       ; no cursor key
+        MOVE    R3, @GSTEPS[R2]
+        ADD[M]  R0, R3, @G_DIR  ; 0 for the key that turns it back
+    ?!Z MOVE    @G_DIR, R3
+GMOVE   MOVE[M] R4, @G_DIR
+    ?Z  MOVE    PC, GTICK       ; not started yet
+        ADD     R5, @G_POS, R4  ; the cell of the new head
+        MOVE    R7, 0           ; 1 for a star
+        SUB[M]  R0, @R5, TYPED+0x2A
+    ?Z  MOVE    PC, GSTAR
+        SUB[M]  R0, @R5, TEXT+0x20
+    ?!Z MOVE    PC, GOVER       ; the frame, a blank on blue, or the tail
+GSTEP   MOVE    R6, @G_POS      ; the old head is now tail
+        MOVE    @R6, TAIL+0x6F
+        MOVE    @R5, TYPED+0x40
+        MOVE    @G_POS, R5
+        ADD     R2, @G_HEAD, 1
+        AND     R2, R2, BODY_M
+        MOVE    @G_HEAD, R2
+        MOVE    @BODY[R2], R5
+        MOVE[M] R0, @G_GROW
+    ?Z  MOVE    PC, GTAIL
+        SUB     @G_GROW, @G_GROW, 1
+        ADD     @G_LEN, @G_LEN, 1
+        MOVE    PC, GDONE
+GTAIL   SUB     R2, R2, @G_LEN  ; the last cell of the tail is cleared
+        AND     R2, R2, BODY_M
+        MOVE    R6, @BODY[R2]
+        MOVE    @R6, TEXT+0x20
+GDONE   MOVE[M] R0, R7
+    ?!Z ADD     @--SP, 2, PC
+    ?!Z MOVE    PC, STAR
+        MOVE    PC, GTICK
+GSTAR   ADD     @G_SCORE, @G_SCORE, 1
+        ADD     @G_GROW, @G_GROW, 4
+        SUB[M]  R0, @G_TICK, 50000
+    ?!Z SUB     @G_TICK, @G_TICK, 5000
+        MOVE    R1, G_START
+        ADD     @--SP, 2, PC
+        MOVE    PC, STATUS
+        MOVE    R7, 1
+        MOVE    PC, GSTEP
+GOVER   MOVE    @G_OVER, 1
+        SUB[M]  R0, @G_BEST, @G_SCORE
+    ?C  MOVE    @G_BEST, @G_SCORE
+        MOVE    R1, G_END
+        ADD     @--SP, 2, PC
+        MOVE    PC, STATUS
+        MOVE    PC, GTICK
+
+; STAR puts a star at a random free cell of the field. It changes R1 to R4.
+STAR    ADD     @--SP, 2, PC
+        MOVE    PC, RANDOM
+        MOVE    @M_A, R1        ; one of the 20 * 78 cells
+        MOVE    @M_B, 1560
+        MOVE    @M_A, @M_UDIVR
+        MOVE    @M_B, 78
+        SHL     R2, @M_UDIVQ, 4 ; R2 is SCREEN + 80 * (row + 4) + col + 1
+        SHL     R3, @M_UDIVQ, 6
+        ADD     R2, R2, R3
+        ADD     R2, R2, @M_UDIVR
+        ADD     R2, R2, SCREEN+321
+        SUB[M]  R0, @R2, TEXT+0x20
+    ?!Z MOVE    PC, STAR        ; not free: another
+        MOVE    @R2, TYPED+0x2A
+        MOVE    PC, @SP++
+
+; RANDOM steps G_SEED, a xorshift generator, and sets R1 to it. It changes
+; R2.
+RANDOM  MOVE    R1, @G_SEED
+        SHL     R2, R1, 13
+        XOR     R1, R1, R2
+        SHR     R2, R1, 17
+        XOR     R1, R1, R2
+        SHL     R2, R1, 5
+        XOR     R1, R1, R2
+        MOVE    @G_SEED, R1
+        MOVE    PC, @SP++
+
+; STATUS writes the score and the best in row 2, and the string at R1 after
+; them. It changes R1, R2, R3, R4, R7, and R9.
+STATUS  MOVE    @--SP, R1
+        MOVE    R3, TYPED
+        MOVE    R4, 5
+        MOVE    R1, @G_SCORE
+        MOVE    R7, 0
+        MOVE    R2, SCREEN+173
+        ADD     @--SP, 2, PC
+        MOVE    PC, DEC64
+        MOVE    R1, @G_BEST
+        MOVE    R7, 0
+        MOVE    R2, SCREEN+187
+        ADD     @--SP, 2, PC
+        MOVE    PC, DEC64
+        MOVE    R2, SCREEN+192
+        MOVE    R3, TEXT+0x20
+        MOVE    R4, 48
+        ADD     @--SP, 2, PC
+        MOVE    PC, FILL
+        MOVE    R1, @SP++
+        MOVE    R2, SCREEN+192
+        MOVE    R3, LINK
+        ADD     @--SP, 2, PC
+        MOVE    PC, PRINT
+        MOVE    PC, @SP++
+
 ; POLL takes a key from the input, if one has arrived, and sets R1 to it: a
 ; byte, KEY_UP to KEY_LT for a cursor key, or 0 when there is none. It
 ; reads the escape sequences that xterm sends for the cursor keys and the
@@ -755,7 +949,7 @@ PRINTS  MOVE[M] R2, @R5++
         MOVE    PC, PRINTS
 
 ; The demos of the function keys F1 to F12, or 0 for none
-FKEYS   .DAT    TYPEW, 0, KCODES, 0, CHARS, 0, COUNTS, 0, 0, 0, 0, 0, 0, 0, 0, 0
+FKEYS   .DAT    TYPEW, 0, KCODES, 0, CHARS, 0, COUNTS, 0, GAME, 0, 0, 0, 0, 0, 0, 0, 0, 0
 
 ; The numbers before ~ of F1 to F12. xterm sends ESC O P to ESC O S for F1
 ; to F4, and 11 to 14 are those of the VT220.
@@ -767,6 +961,7 @@ MENU    .DAT    80, TYPEW, M_TYPEW
         .DAT    96, KCODES, M_KEYS
         .DAT    111, CHARS, M_CHARS
         .DAT    127, COUNTS, M_COUNT
+        .DAT    141, GAME, M_GAME
         .DAT    -1
 
 ; The texts of the title bar, and of the welcome
@@ -788,6 +983,7 @@ M_TYPEW .ASCII_L ' F1 typewriter '
 M_KEYS  .ASCII_L ' F3 key codes '
 M_CHARS .ASCII_L ' F5 characters '
 M_COUNT .ASCII_L ' F7 counters '
+M_GAME  .ASCII_L ' F9 comet '
 T1      .ASCII_L 'This is the demo in the ROM, which the core runs at power-up. What you type'
 T2      .ASCII_L 'on the keyboard, or send to the debug UART, appears below the blue bar.'
 T3      .ASCII_L 'To run your own programs, connect a computer to the debug UART, at'
@@ -873,3 +1069,16 @@ P_CPI   .ASCII_L 'Cycles per instruction'
 P_IPUS  .ASCII_L 'Instructions per microsecond'
 P_COLON .ASCII_L ':'
 P_POINT .ASCII_L '.'
+
+; The texts of F9, and its messages
+G_TEXTS .DAT    162, TEXT, G_SCOREL
+        .DAT    176, TEXT, G_BESTL
+        .DAT    -1
+
+G_SCOREL .ASCII_L 'Score'
+G_BESTL .ASCII_L 'Best'
+G_START .ASCII_L 'The cursor keys steer the comet @ to the stars *'
+G_END   .ASCII_L 'Game over. A key starts a new game.'
+
+; The steps of the cursor keys up, down, right, and left
+GSTEPS  .DAT    -80, 80, 1, -1

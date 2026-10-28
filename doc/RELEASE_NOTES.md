@@ -40,6 +40,8 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 - F7 shows the performance counters since reset, as a clock and in
   decimal, with the clock's frequency, and those of a prime sieve that
   runs again and again, with its cycles per instruction.
+- F9 is a game: the cursor keys steer a comet to the stars, and its tail
+  grows with each one.
 
 **Tools**
 

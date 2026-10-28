@@ -20,6 +20,7 @@ so on, which the MEGA65 has without SHIFT.
 | F3 | The key codes |
 | F5 | The characters and the colors |
 | F7 | The counters |
+| F9 | The comet, a game |
 
 The typewriter's top ten rows are the welcome: the two bars, what the
 demo is, how to load your own programs through the debug UART, and a third
@@ -76,6 +77,16 @@ microsecond a step, the clock is 1 MHz, and the sieve has one cycle per
 instruction ([EMULATOR.md](../doc/EMULATOR.md)). The keys do nothing here,
 except the function keys.
 
+The comet is a small game. The cursor keys steer the comet, `@`, through
+a field in a blue frame, and its green tail follows it. Each star, `*`,
+scores a point, makes the tail longer by 4, and makes the comet faster, from
+a step every 150 ms to one every 50 ms. A new star then comes at a random
+free cell. The game ends when the comet hits the frame or its tail, and
+then any key starts a new one. The comet waits for the first cursor key,
+and a key that would turn it back is ignored. The best score stays until
+another demo starts. The game takes one key at each step, so in `niceemu`,
+where a microsecond is a step, each key of the input file is one step.
+
 ## How it works
 
 Every demo reads the keys through `POLL`. It turns the escape sequences of
@@ -94,7 +105,10 @@ byte, as the key codes do. `FRAME` sets `ECHO` to 0.
 A write to the ROM is dropped (see [The ROM](../doc/SYSTEM.md#the-rom) in
 doc/SYSTEM.md), so the demo keeps most of its state in registers, and its
 variables in the RAM below its stack: the counters keep the sieve at
-`0xFFFFF000`–`0xFFFFF7FF` and their numbers from `0xFFFFF800`. It writes
+`0xFFFFF000`–`0xFFFFF7FF` and their numbers from `0xFFFFF800`, and the
+comet keeps the addresses of its cells and its state at the same
+addresses, as only one demo runs at a time. The comet tells what is in a
+cell from the screen itself. It writes
 only these words, the screen, the cursor's registers, the math unit, and
 its stack.
 
@@ -114,20 +128,21 @@ UART.
 
     make -C demo                  # build/demo.bin, for the ROM
     make r6 ROM=demo/build/demo.bin
-    make -C demo test             # seven runs in niceemu, compared with test.expected
+    make -C demo test             # eight runs in niceemu, compared with test.expected
 
 The version in the title bar is `git describe --tags --always --dirty`, or
 `VERSION=` on the command line, which `tools/release.py` sets to the tag.
 The assembler has no include, so the Makefile joins `demo.nasm` and a line
 that defines `VERSION`. The test assembles the demo with the version `V9.9`
-into `build/demo_test.bin`, and the Makefile writes its seven inputs,
-`build/test1.txt` to `build/test7.txt`, with `printf`: the first edits a
+into `build/demo_test.bin`, and the Makefile writes its eight inputs,
+`build/test1.txt` to `build/test8.txt`, with `printf`: the first edits a
 few lines, the second clears them and scrolls, the third has the function
 keys, the fourth shows key codes and scrolls them, the fifth goes from
 the key codes back to the typewriter, the sixth shows the characters and
-the colors, and the seventh the counters, with two runs of the sieve.
+the colors, the seventh the counters, with two runs of the sieve, and the
+eighth plays two games of the comet.
 `niceemu` shows no colors, so for the sixth the test also has the words of
-two rows of ramps. The seven screens that `niceemu` prints, and those
+two rows of ramps. The eight screens that `niceemu` prints, and those
 words, are in `test.expected`, which was checked by hand. In `niceemu` the
 counters count steps, so their numbers are the same in every run.
 
