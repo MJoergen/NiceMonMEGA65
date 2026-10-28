@@ -198,21 +198,24 @@ emulator.
 ## mon.py
 
 `mon.py` is an interactive shell on the debug link. It loads a program,
-starts, holds, pauses, and steps the core, sets breakpoints, and reads
-the registers and the memory, with one short command each. It also
-passes text to and from the program. The README has [a worked
+starts, holds, pauses, and steps the core, sets breakpoints, reads
+the registers and the memory, and disassembles, with one short command
+each. It also passes text to and from the program. The README has [a worked
 example](../README.md#using-the-interactive-shell).
 
 ### Starting it
 
     tools/mon.py [--port /dev/ttyUSB1] [--baud 2000000] [--tcp PORT]
-                 [--cosim PORT] [FILE.bin]
+                 [--cosim PORT] [--symbols FILE] [FILE.bin]
 
 - `--port` names the serial device of the board's debug UART,
   `/dev/ttyUSB1` by default, and `--baud` its rate, 2000000 by default.
 - `--tcp PORT` talks to `niceemu --link PORT` instead of the board.
 - `--cosim PORT` talks to the simulated system of `make cosim`, at
   about 250 UART bytes a second.
+- `--symbols FILE` reads the labels of a `.sym` file, which
+  `niceasm.py --symbols` and `nicebuild.py --symbols` write, as the
+  `symbols` command does.
 - `FILE.bin` is optional. It is loaded at the start, as the `load`
   command does, and the core is left held in reset. Without it, `mon.py`
   starts with `status`, and leaves the core as it is.
@@ -226,11 +229,24 @@ other program may have the serial port open while it runs.
 The prompt is `mon>`. Numbers are hex, with or without `0x`, and fit in
 32 bits. `help` lists the commands, and `help CMD` describes one.
 
+With labels from `--symbols` or `symbols`, an address may also be a
+label, `label+N`, or `label-N`, with N in hex. A label comes before a
+hex number with the same spelling, such as `add`; write `0xadd` for the
+number. Addresses are then shown with their labels too, as `LOOP` or
+`LOOP+0x2`.
+
+The disassembler is nice_cpu's `assembler/nicedis.py`. When the
+submodule does not have it yet, `d` prints an error, and the PC is shown
+without its instruction.
+
 The program's output and the link's notices are shown as they arrive,
 above the prompt and what you have typed. The notices are:
 
 - `[paused, PC=...]` after a pause.
 - `[breakpoint N, PC=...]` when the core stops at a breakpoint.
+
+After these two, and after each step, the instruction at the PC comes
+after it, which is the next one to run.
 - `[halted: REASON, PC=...]` after a halt, where the reason is `HALT`,
   `reserved control instruction`, `INT inside an interrupt routine`,
   `RTI outside an interrupt routine`, or `step limit`.
@@ -297,6 +313,28 @@ instruction and does not stop at it again.
 
 While the core runs, the link reaches only its debug registers at
 `FFFFFFE0`–`FF`. Pause or hold the core to read the rest.
+
+#### Disassembly and labels
+
+- `d ADDR N` disassembles N instructions from ADDR, 16 by default. Each
+  line has the address, the instruction's words, and the instruction,
+  and the labels at an address come on lines of their own before it.
+  `d` alone goes on after the last `d`, or starts at the PC after a
+  pause, a step, or a breakpoint.
+- `symbols FILE` reads the labels of a `.sym` file, in place of those
+  read before, and shows how many there are. `symbols` alone shows the
+  count.
+
+The instructions are in the syntax that `niceasm` takes. Words that no
+instruction gives, such as a reserved control word, are a `.DAT`, with
+what they would do as a comment. With labels, a constant of `0x10` or
+more at a label is shown as the label.
+
+The disassembler reads the words one after another, and does not tell
+code from data. So it may show the words of a string as instructions,
+and get out of step after them. With labels, it starts again at each
+one: an instruction never spans a label, and when it would, its words
+before the label are a `.DAT`, marked `(cut off)`.
 
 #### The program's input
 

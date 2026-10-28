@@ -32,11 +32,11 @@ header is the authoritative address map.
     make cor [ROM=f.bin]  # MEGA65 core files for MEGAFLASH, synth/r{3,6}/build/NiceMonMEGA65-r{3,6}.cor (coretool)
     make load FILE=p.bin  # load and start a program on the board (debug UART, PORT=/dev/ttyUSB1)
     make run FILE=p.bin   # run it and print what niceemu prints, for diffing
-    make mon [FILE=p.bin] # interactive shell on the link: memory, pause, step, breakpoints
+    make mon [FILE=p.bin] # interactive shell on the link: memory, pause, step, breakpoints, disassembly, --symbols
     make bump TAG=V1.0    # nice_cpu to the tag, R6 bitstream, badge-mega65.json and verified.json, committed (--push with ARGS)
     make release TAG=V1.0 # after the bump: gates, three bitstreams, two .cor, hwtest, staged; ARGS=--publish tags and releases (doc/RELEASE.md); TAG=V1.0.1 keeps nice_cpu at V1.0
     make hwtest           # check the FPGA, program it with openFPGALoader, and test the board
-    make linktest         # run.py --tcp on niceemu --link against plain niceemu, no board
+    make linktest         # run.py --tcp on niceemu --link against plain niceemu, and mon.py's commands, no board
     make cosim            # the RTL in GHDL, its debug UART on TCP, for the tools' --cosim PORT
     make cosimtest        # run.py --cosim on make cosim against plain niceemu, no board (minutes)
 

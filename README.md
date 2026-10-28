@@ -156,6 +156,12 @@ are hex. The short names are `s` for `step`, `g` for `go`, `c` for
 - `regs` shows R0 to R15, and `status` the state of the core.
 - `r ADDR N` reads N words, and `w ADDR WORD...` writes them. `ctl VALUE`
   writes the control register.
+- `d ADDR N` disassembles N instructions, with nice_cpu's disassembler.
+  After a pause, a step, or a breakpoint, the instruction at the PC is
+  shown too.
+- `symbols FILE`, or `--symbols FILE` at the start, reads the labels of
+  the `.sym` file of `niceasm.py --symbols`. An address may then be a
+  label, such as `LOOP` or `LOOP+2`, and the output shows the labels.
 - `send TEXT` sends text to the program, with escapes such as `\n`, and
   `eof` ends its input.
 - `console` passes the terminal through to the program, until Ctrl-].
@@ -200,23 +206,24 @@ mon&gt; <b>r 0 f</b>
 00000008: 001c0080 ffffff00 022080b0 0000002e b003d800 00000000 0c000000
 </pre>
 
-Start the program, and pause it. It waits in its loop for input. R14 is
+Start the program, and pause it. It waits in its loop for input. The PC
+comes with the instruction there, the next one to run. R14 is
 `0x09000000`: Z (bit 27), as no byte has arrived, and bit 24, which is
 always 1:
 
 <pre>
 mon&gt; <b>go</b>
 mon&gt; <b>pause</b>
-[paused, PC=00000000]
+[paused, PC=00000000  MOVE R1, @0xffffff00]
 mon&gt; <b>regs</b>
 R0  00000000 R1  00000000 R2  00000000 R3  00000000
 R4  00000000 R5  00000000 R6  00000000 R7  00000000
 R8  00000000 R9  00000000 R10 00000000 R11 00000000
 R12 00000000 R13 00000000 R14 09000000 R15 00000000
 mon&gt; <b>s 3</b>
-PC=00000002
-PC=00000004
-PC=00000000
+PC=00000002  AND[M] R2, R1, 0x100
+PC=00000004  ?Z MOVE R15, 0x0
+PC=00000000  MOVE R1, @0xffffff00
 </pre>
 
 Set a breakpoint at 6, which the program reaches only when a byte has
@@ -228,19 +235,19 @@ mon&gt; <b>b 6</b>
 0: 00000006
 mon&gt; <b>g</b>
 mon&gt; <b>send A</b>
-[breakpoint 0, PC=00000006]
+[breakpoint 0, PC=00000006  AND R1, R1, 0xff]
 mon&gt; <b>regs</b>
 R0  00000000 R1  00000141 R2  00000100 R3  00000000
 R4  00000000 R5  00000000 R6  00000000 R7  00000000
 R8  00000000 R9  00000000 R10 00000000 R11 00000000
 R12 00000000 R13 00000000 R14 01000000 R15 00000006
 mon&gt; <b>s</b>
-PC=00000008
+PC=00000008  MOVE @0xffffff00, R1
 mon&gt;
 A
-PC=0000000a
+PC=0000000a  SUB[M] R2, R1, 0x2e
 mon&gt;
-PC=0000000c
+PC=0000000c  ?!Z MOVE R15, 0x0
 </pre>
 
 An empty line repeats the last `step` command, here one step at a time.

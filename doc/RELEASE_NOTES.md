@@ -23,6 +23,18 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 
 ## V1.0.1 (not yet released)
 
+**Tools**
+
+- `mon.py` disassembles with `d ADDR N`, and shows the instruction at the
+  PC after a pause, a step, and a breakpoint. The disassembler is
+  nice_cpu's `assembler/nicedis.py`, which comes after nice_cpu's `V1.0`.
+  With the `V1.0` that this release keeps, `d` says that it is missing.
+- `mon.py --symbols FILE` and its `symbols FILE` command read the labels
+  of `niceasm.py --symbols` and `nicebuild.py --symbols`. An address may
+  then be a label, `label+N`, or `label-N`, and the output shows the
+  labels.
+- `make linktest` checks `mon.py`'s commands on `niceemu --link` too.
+
 **Documentation**
 
 - `SYSTEM.md`, `EMULATOR.md`, `CODING_STYLE.md`, `RELEASE.md`, and

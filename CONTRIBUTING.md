@@ -82,7 +82,7 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
 | [monitor/](monitor/README.md) | The monitor, in NICE assembly: planned, not written yet ([#24](https://github.com/MJoergen/NiceMonMEGA65/issues/24)). Its README has the decisions it will follow, QNICE-FPGA's. |
 | [demo/](demo/README.md) | The demo in the ROM of the release, in NICE assembly: a welcome screen that turns into a typewriter. |
 | [examples/](examples/) | Example C programs, and the Makefile that builds them for the MEGA65. |
-| [tools/](tools/) | `nicelink.py`, the debug link over the board's UART, over TCP to `niceemu --link`, or over TCP to the simulated system of `make cosim`, and the tools that use it: `load.py`, which loads a program into the MEGA65 or Nexys4DDR, `run.py`, which runs a program on the board as `niceemu` runs it, `mon.py`, an interactive shell on the link, `hwtest.py`, which tests the system on the board, `bump.py`, which records the MEGA65's timing for a nice_cpu tag, `release.py`, which builds and publishes a release, `linktest.py`, which checks `run.py` on `niceemu --link`, and `cosimtest.py`, which checks `run.py` on the simulated system. |
+| [tools/](tools/) | `nicelink.py`, the debug link over the board's UART, over TCP to `niceemu --link`, or over TCP to the simulated system of `make cosim`, and the tools that use it: `load.py`, which loads a program into the MEGA65 or Nexys4DDR, `run.py`, which runs a program on the board as `niceemu` runs it, `mon.py`, an interactive shell on the link, `hwtest.py`, which tests the system on the board, `bump.py`, which records the MEGA65's timing for a nice_cpu tag, `release.py`, which builds and publishes a release, `linktest.py`, which checks `run.py` and `mon.py` on `niceemu --link`, and `cosimtest.py`, which checks `run.py` on the simulated system. |
 | [README.md](README.md) | For those who use the core files and write programs for them: on its own, and with the serial port. |
 | [SYSTEM.md](doc/SYSTEM.md) | The system that programs and the link see: the debug link, the address map, the screen, the ROM, and the Nexys4DDR's devices. |
 | [EMULATOR.md](doc/EMULATOR.md) | The table of the known differences from the emulator. |
@@ -397,7 +397,10 @@ The reset button is not tested: press it with a terminal open, and the
 `niceemu`, without a board, for the programs that `make hwtest` compares,
 and nice_cpu's benchmark, with `tools/linktest.py`. It runs hwtest's
 checks of bad packets, of the pause, of the step, and of the breakpoints
-on `niceemu --link` first. CI runs it.
+on `niceemu --link` first, and then `mon.py`'s commands, as typed at its
+prompt, with the labels of `sim/break.nasm`. Its disassembly is checked
+only when nice_cpu has its disassembler, and the summary lists it as
+skipped otherwise. CI runs it.
 
 `run.py` matches `niceemu` in the details too. It accepts
 `--no-cycle-counter` and ignores it, as the cycle counter always runs. A
