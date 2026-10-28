@@ -3,8 +3,8 @@
 This is the system that a program and the debug link see on the MEGA65 R3
 and R6, and on the Nexys4DDR: the debug link on the UART, the address map,
 the screen, the ROM, and the Nexys4DDR's devices. It follows nice_cpu's
-[doc/SYSTEM.md](../nice_cpu/doc/SYSTEM.md) for the devices and
-[doc/DEBUG.md](../nice_cpu/doc/DEBUG.md) for the link.
+[doc/SYSTEM.md](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md) for the devices and
+[doc/DEBUG.md](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEBUG.md) for the link.
 [EMULATOR.md](EMULATOR.md) lists where it differs from `niceemu`.
 `src/nicemon.vhd` is the system, and its header is the authoritative
 address map. DEBUG.md, ISA.md, and MICROARCH.md are nice_cpu's, in
@@ -18,7 +18,7 @@ These words are used here and in the other documents and sources:
 | Word | Meaning |
 |---|---|
 | The link | nice_cpu's debug link: packets between the console bytes on the UART, with which a host reads and writes memory and the debug registers. |
-| Hold | Bit 0 of the control register at `0xFFFFFFF0` is 1: the core is in reset, and the link reaches all of memory. The core is held at power-up. |
+| Hold | Bit 0 of the control register at `0xFFFFFFF0` is 1: the core is in reset, and the link reaches all of memory. Without a ROM, the core is held at power-up. |
 | Start | Bit 0 goes from 1 to 0: the devices are reset, and the core runs from address 0. |
 | Hide | Bit 3 of the control register is 1: the ROM is out of the way, so the RAM is at 0, as in the emulator. |
 | Clear | A write with bit 2 set fills the RAM and the screen with 0. |
@@ -27,7 +27,7 @@ These words are used here and in the other documents and sources:
 | Notice | A packet that the board sends on its own: `b04` at reset (the link's version, 4), `h` when the core halts, `p` when it pauses, `x` when it stops at a breakpoint, and `o` when an input byte is lost. |
 
 The MEGA65's debug UART runs at 2 Mbaud (2000000), 8-N-1, and carries the
-debug link of nice_cpu's [doc/DEBUG.md](../nice_cpu/doc/DEBUG.md). It passes
+debug link of nice_cpu's [doc/DEBUG.md](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEBUG.md). It passes
 the program's console bytes both ways, and between them it carries
 packets, which start with the byte `0xFF`. A console byte `0xFF` is sent
 as two. With the packets, a host reads and writes memory and the debug
@@ -35,11 +35,10 @@ registers at `0xFFFFFFE0`–`FF` (see [Address map](#address-map)). The
 board sends a notice at reset (`b04`), when the core halts (`h` and the
 reason), and when an input byte is lost (`o`). The tools in `tools/` are
 such a host, and `niceemu --link` serves the same link, so the tools
-drive the emulator as they drive the board. The tools use 2 Mbaud too. A
-bitstream built before the rate went up runs at 115200 baud, and the
-tools need `--baud 115200` for it.
+drive the emulator as they drive the board. The tools use 2 Mbaud too.
 
-The core is held in reset at power-up. A host loads a program with two
+Without a ROM, the core is held in reset at power-up; with one, it runs
+the ROM (see [The ROM](#the-rom)). A host loads a program with two
 writes to the control register at `0xFFFFFFF0` around the writes of its
 words. `0x0000000D` holds the core, clears the memory, and hides the ROM,
 and `0x00000008` starts the core with the ROM still hidden (see
@@ -47,10 +46,10 @@ and `0x00000008` starts the core with the ROM still hidden (see
 boots instead of the program. `tools/load.py` does all of this.
 
 While the core runs, the link reaches only its debug registers, and a
-request for any other word gets the error answer `e` with code 02. A write
-to the control register that holds the core works at any time, so a host
-can always stop a program. While the core is held or has halted, the link
-reaches the whole address map.
+request for any other word gets the error answer `e` with code 02. A
+write to the control register that holds the core works at any time, so
+a host can always stop a program. While the core is held in reset or has
+halted, the link reaches the whole address map.
 
 A host can also pause a program, with link version 2. A write of
 `0x00000018` asks for a pause: the core stops at the next step boundary,
@@ -79,10 +78,10 @@ too. The breakpoints take a write at any time, and a reset clears them.
 `tools/load.py` and `tools/run.py` disable them before they load a program.
 
 A terminal on the UART shows what the program prints, and what you type
-goes to the program while it runs. Bytes typed while it is paused wait for
-it, and bytes typed while the core is held or has halted are dropped. The
-notices show up in the terminal too, as a few letters after a stray
-character, such as `h01#C9` after a `HALT`.
+goes to the program while it runs. Bytes typed while it is paused wait
+for it, and bytes typed while the core is held in reset or has halted
+are dropped. The notices show up in the terminal too, as a few letters
+after a stray character, such as `h01#C9` after a `HALT`.
 
 ## Address map
 
@@ -121,7 +120,7 @@ effect and does not write (DEBUG.md §3).
 | Bit | Name | Meaning |
 |---|---|---|
 | 0 | Hold | 1 holds the core in reset. A write of 0 starts it. |
-| 1 | Halted | Read only. 1 after a halt, and stays 1 while the core is held, until the next start. |
+| 1 | Halted | Read only. 1 after a halt, and stays 1 while the core is held in reset, until the next start. |
 | 2 | Clear | A write with bit 2 set first clears the RAM and the screen to 0, with the core held, and is answered when the memory is clear, after 0.66 ms at 100 MHz. Bit 3 takes effect when the clear starts, and bit 0 when it ends. |
 | 3 | Hide | 1 hides the ROM, so that the RAM is at 0. Reset clears it in a bitstream with a ROM; in one without a ROM it reads 1. |
 | 4 | Pause | A write of 1 pauses the core at the next step boundary, and the link sends `p`. It reads 1 while the core is paused, and a write of 0 makes the program go on. A start with bit 4 set pauses before the first instruction. |
@@ -139,15 +138,16 @@ The tools write these values:
 Instruction fetches from `0xFFFFFF00`–`0xFFFFFFFF` read 0, as ISA.md §8.3
 requires.
 
-The input waits for the core in a FIFO of 2048 bytes, in block RAM. A UART
-byte that arrives when it is full is lost, and the link sends its `o`
-notice; a byte after a break is lost too, until a start clears the end of
-the input. A keyboard byte waits until the FIFO has room for two, so that
-a UART byte still finds room; on the Nexys4DDR, keys typed meanwhile are
-lost (see [The Nexys4DDR's devices](#the-nexys4ddrs-devices)). While the
-core is held or has halted, the bytes of the UART and the keyboard are
-dropped. While it is paused, they go into the FIFO. To end a program's
-input from a terminal, send a break (the README says how).
+The input waits for the core in a FIFO of 2048 bytes, in block RAM. A
+UART byte that arrives when it is full is lost, and the link sends its
+`o` notice; a byte after a break is lost too, until a start clears the
+end of the input. A keyboard byte waits until the FIFO has room for two,
+so that a UART byte still finds room; on the Nexys4DDR, keys typed
+meanwhile are lost (see [The Nexys4DDR's
+devices](#the-nexys4ddrs-devices)). While the core is held in reset or
+has halted, the bytes of the UART and the keyboard are dropped. While it
+is paused, they go into the FIFO. To end a program's input from a
+terminal, send a break ([tools/README.md](../tools/README.md) says how).
 
 The performance counters, the math unit, and the timer are nice_cpu's
 own, `nice_cpu/hdl/src/perf.vhd`, `mpu.vhd`, and `timer.vhd`, and behave
@@ -207,6 +207,29 @@ on red next to it.
 
 The video output comes from MandelbrotMEGA65, which uses the same mode on
 the MEGA65. The HDMI output is DVI, without sound.
+
+## The keyboard
+
+The MEGA65's own keyboard types into the same input as the UART: what
+you type goes to the program while it runs or is paused, and is dropped
+while the core is held in reset or has halted. The keys give ASCII, as a
+terminal sends it:
+
+| Key | Byte |
+|---|---|
+| Letters, digits, symbols | Their ASCII; SHIFT or CAPS LOCK for capitals |
+| RETURN | CR |
+| INST/DEL | DEL (`0x7F`), also with SHIFT or CTRL |
+| RUN/STOP | CTRL-C (`0x03`) |
+| ESC, TAB | ESC, TAB |
+| Cursor keys | `ESC [ A` to `ESC [ D`, as ANSI terminals send them |
+| CTRL with a letter | Its control code |
+| £, ↑, ← | `\`, `^`, `_` (`\|`, `~`, `` ` `` with SHIFT) |
+| SHIFT with `0`, `=`, `:`, `;` | `{`, `}`, `[`, `]` |
+
+A held key repeats after half a second, 20 times a second. The function
+keys, HELP, CLR/HOME, and the modifiers give nothing. The keyboard's drive
+LED is green while the core runs, like the user LED.
 
 ## The ROM
 
@@ -271,7 +294,7 @@ The seven-segment display takes the segments as raw bits, so a program
 brings its own font. In each byte, bit 0 is segment A, bit 1 B, and so on
 up to bit 6 for G, and bit 7 is the decimal point; a 1 lights it, and a
 byte of 0 leaves the digit dark. `0x0000006D` in `0xFFFFFF93` lights segments
-A, C, D, and F, which shows a 5 on digit 0. The display is scanned at about
+A, C, D, F, and G, which shows a 5 on digit 0. The display is scanned at about
 1 kHz per digit, so the digits look steady. The RGB LEDs are very bright at
 full level; 1 to 3 is a comfortable range. The buttons and the switches are
 synchronized to the clock but not debounced. The CPU RESET button is not a

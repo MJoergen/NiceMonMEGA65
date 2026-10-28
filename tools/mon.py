@@ -301,7 +301,7 @@ class Monitor(cmd.Cmd):
             raise ValueError("give the .bin file")
         words = read_bin(arg.strip())
         load_words(self.link, words)
-        print(f"loaded {len(words)} words; the core is held")
+        print(f"loaded {len(words)} words; the core is held in reset")
 
     def do_run(self, arg: str) -> None:
         """run: starts the program at 0 again, from a hold, a halt, a pause,

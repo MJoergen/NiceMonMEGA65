@@ -30,9 +30,9 @@ or, in an existing clone:
   [synth/README.md](synth/README.md)).
 - `make load FILE=prog.bin` loads a program into the board and starts it.
 - `make run FILE=prog.bin` runs one as `niceemu` runs it (see [Comparing
-  with the emulator](README.md#comparing-with-the-emulator)).
-- `make mon` opens an interactive shell on the link (see [Debugging a
-  program](README.md#debugging-a-program)).
+  with the emulator](tools/README.md#comparing-with-the-emulator)).
+- `make mon` opens an interactive shell on the link (see [Using the
+  interactive shell](README.md#using-the-interactive-shell)).
 - `make hwtest` tests the board (see [Testing the
   board](#testing-the-board)).
 - `make bump TAG=V1.0` moves nice_cpu to a tag and records the MEGA65's
@@ -141,11 +141,11 @@ The testbenches are these:
 - `sim/tb_ps2.vhd` tests the PS/2 receiver and its ASCII, with a model of a
   PS/2 keyboard, and checks that bad and broken frames are dropped.
 - `sim/tb_ps2_nicemon.vhd` types on that model into the system, wired as
-  the Nexys4DDR wires it. Keys typed while the core is held are dropped,
-  `sim/fifo.nasm` echoes the keys typed, and `sim/switch.nasm`, which reads
-  no input until switch 0 is on, lets the UART fill the core's input. Then
-  one key waits, the keys typed after it are lost, and the keyboard works
-  again once the program reads.
+  the Nexys4DDR wires it. Keys typed while the core is held in reset are
+  dropped, `sim/fifo.nasm` echoes the keys typed, and `sim/switch.nasm`,
+  which reads no input until switch 0 is on, lets the UART fill the
+  core's input. Then one key waits, the keys typed after it are lost,
+  and the keyboard works again once the program reads.
 - `sim/tb_text.vhd` fills the screen of the text display and checks every
   pixel of one 1280×1024 frame, and the sync pulses; then it scrolls the
   display one row, shows the cursor, and checks the first four rows of the
@@ -187,17 +187,17 @@ Then it loads and runs these programs:
 | `sim/eof.nasm` | Echoes its input until a break ends it. |
 | `sim/count.nasm` | The read counter, which a start keeps. |
 
-It also checks the error answers while the core runs, the `o` notice when
-the FIFO overflows, and that the link reads the console and the read
-counter as 0 and does not write them. Between the programs, the testbench
-writes and reads the board's registers, and checks that a clear of the
-memory and a start keep them. Then it types on the keyboard input, which
-is dropped while the core is held, and input for `sim/fifo.nasm` while it
-runs. Last it resets the system while a program runs, and checks that the
-core boots from the ROM again and that the screen's and the board's
-registers are cleared. The header of `sim/tb_nicemon.vhd` lists the steps
-in order. `tb_nicemon` and `tb_hello` take `-gG_*_FILE=` generics, as
-`sim/Makefile` shows.
+It also checks the error answers while the core runs, the `o` notice
+when the FIFO overflows, and that the link reads the console and the
+read counter as 0 and does not write them. Between the programs, the
+testbench writes and reads the board's registers, and checks that a
+clear of the memory and a start keep them. Then it types on the keyboard
+input, which is dropped while the core is held in reset, and input for
+`sim/fifo.nasm` while it runs. Last it resets the system while a program
+runs, and checks that the core boots from the ROM again and that the
+screen's and the board's registers are cleared. The header of
+`sim/tb_nicemon.vhd` lists the steps in order. `tb_nicemon` and
+`tb_hello` take `-gG_*_FILE=` generics, as `sim/Makefile` shows.
 
 ### The simulated board
 
@@ -229,7 +229,8 @@ the request. Only small programs are practical.
 
 `make cosimtest` starts `make cosim` on a free port. It runs hwtest's
 checks of bad packets on it, but for the gap of 300 ms, which is far
-shorter in simulated time, and its checks of the pause and of the step.
+shorter in simulated time, and its checks of the pause, the step, and
+the breakpoints.
 Then it runs the programs that `make hwtest` compares, with `run.py
 --cosim` and with `niceemu`, whose output and exit status must be the same.
 It leaves out nice_cpu's benchmark, which would take too long. It takes
@@ -395,8 +396,8 @@ The reset button is not tested: press it with a terminal open, and the
 `make linktest` runs `run.py --tcp` on `niceemu --link` against plain
 `niceemu`, without a board, for the programs that `make hwtest` compares,
 and nice_cpu's benchmark, with `tools/linktest.py`. It runs hwtest's
-checks of bad packets, of the pause, and of the step on `niceemu --link`
-first. CI runs it.
+checks of bad packets, of the pause, of the step, and of the breakpoints
+on `niceemu --link` first. CI runs it.
 
 `run.py` matches `niceemu` in the details too. It accepts
 `--no-cycle-counter` and ignores it, as the cycle counter always runs. A
@@ -429,8 +430,8 @@ linear memory, halts the core without a word, and only `run.py --symbols`
 shows the trap. `nice_cpu/translator/nicebuild.py -o primes.bin
 examples/primes.c` does all of these steps in one command, and by default
 it joins the trap report instead: `start_wasm_trap.nasm` at the start and
-`trapmsg.nasm` at the end. Then a trap prints a line such as `trap 2: out
-of bounds memory access at 00003dc9` before the core halts. The Makefile
+`trapmsg.nasm` at the end. Then a trap prints a line such as `trap 2:
+memory access out of bounds at 00003dc9` before the core halts. The Makefile
 keeps the plain start, so that `bench.bin` is laid out as in nice_cpu's
 testbench, and its cycles compare with those below.
 
@@ -442,19 +443,20 @@ runs it:
 
     tools/run.py examples/build/bench.bin
 
-The instructions are the same as on the emulator. The cycles are from the
-board with the pipelined core, beside those of nice_cpu's own testbench
-for the core (`bench/README.md`, with the core at nice_cpu 1a41b0c):
+The instructions are the same as on the emulator, here with nice_cpu
+V1.0. The cycles are from the R6 with the pipelined core, beside those of
+nice_cpu's own testbench for the core that predicts backward jumps
+(`bench/README.md`):
 
 | Phase | Instructions | Cycles on the board | In nice_cpu's testbench |
 |---|---|---|---|
-| `rng64` | 52768 | 83082 | 83082 |
-| `crc32` | 65816 | 83067 | 83067 |
-| `bst` | 310469 | 415028 | 416052 |
-| `heapsort` | 307416 | 387338 | 387338 |
+| `rng64` | 51746 | 82571 | 82571 |
+| `crc32` | 63514 | 80765 | 80765 |
+| `bst` | 297825 | 402384 | 403408 |
+| `heapsort` | 298396 | 378658 | 378658 |
 | `vm` | 840049 | 1248168 | 1248168 |
-| `strings` | 104562 | 166928 | 166928 |
-| total | 1681080 | 2383611 | 2384635 |
+| `strings` | 101281 | 163585 | 163585 |
+| total | 1652811 | 2356131 | 2357155 |
 
 The board takes the same cycles, or 1024 fewer in `bst`, and at 100 MHz
 the benchmark runs for about 24 ms.

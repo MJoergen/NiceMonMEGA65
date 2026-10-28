@@ -60,8 +60,8 @@ Exit status:
     1    a usage error, or a failure before or during the run: a file that
          cannot be read, a link that does not answer
     2    the program halted for another reason
-    3    the time limit ran out first; the core is held
-    130  interrupted with Ctrl-C; the core is held
+    3    the time limit ran out first; the core is held in reset
+    130  interrupted with Ctrl-C; the core is held in reset
     141  stdout closed early, as by "| head" (SIGPIPE's status, as with
          niceemu)
     Options are taken as niceemu takes them, each on its own with its value
@@ -326,7 +326,7 @@ def report_timeout(link: Link, timeout: float, dumps: list[tuple[int, int]],
     lines = [f"Stopped at the time limit after {timeout:g} s"]
     lines += dump_lines(link, dumps, screen, screen_base)
     print("\n".join(lines), flush=True)
-    print("run.py: the core is held", file=sys.stderr)
+    print("run.py: the core is held in reset", file=sys.stderr)
     return 3
 
 
@@ -415,7 +415,7 @@ def main() -> None:
             halted = run(link, infd, args.timeout)
         except KeyboardInterrupt:
             link.control(HOLD | RAM)
-            print("\nrun.py: interrupted; the core is held", file=sys.stderr)
+            print("\nrun.py: interrupted; the core is held in reset", file=sys.stderr)
             sys.exit(130)
         if halted:
             status = report(link, args.dump, args.screen, screen_base, symbols)

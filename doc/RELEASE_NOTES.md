@@ -4,7 +4,7 @@ The releases of NiceMonMEGA65, newest first: the versions from `V1.0` on,
 and the release candidates `RC02` to `RC06` before them. Each section lists
 the changes since the one before that a user of the bitstreams, the boards,
 or the tools can see. The git log has the full story, and
-[nice_cpu's release notes](../nice_cpu/RELEASE_NOTES.md) have the changes to
+[nice_cpu's release notes](https://github.com/MJoergen/nice_cpu/blob/main/RELEASE_NOTES.md) have the changes to
 the cores, the emulator, and the tools that come with the submodule.
 
 From `V1.0` on, a release here has the name of the nice_cpu tag it pins,

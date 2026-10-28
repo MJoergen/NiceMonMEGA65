@@ -11,10 +11,11 @@ tools that load and run programs. The goal is that a program runs on the
 board exactly as `niceemu`, the emulator in `nice_cpu/emulator`, runs it.
 `README.md` is for users of the core files: on its own, and with the
 serial port. `doc/SYSTEM.md` has the address map, the link, the screen,
-the ROM, and the Nexys4DDR's devices; `CONTRIBUTING.md` the tests, the
+the keyboard, the ROM, and the Nexys4DDR's devices; `CONTRIBUTING.md` the tests, the
 formal checks, `make hwtest`, and the badge; `doc/EMULATOR.md` the known
-differences from the emulator. `doc/` also has `CODING_STYLE.md`,
-`RELEASE.md`, and `RELEASE_NOTES.md`; the root keeps only `README.md`,
+differences from the emulator; `doc/PROGRAMMING.md` how to write and
+build programs. `doc/` also has `CODING_STYLE.md`, `RELEASE.md`, and
+`RELEASE_NOTES.md`; the root keeps only `README.md`,
 `CONTRIBUTING.md`, and this file.
 `src/nicemon.vhd` is the whole system and the file to read first; its
 header is the authoritative address map.
@@ -70,7 +71,8 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   nice_cpu core `core.mk` selects (`NICE=pipeline`, the default, or `multi`).
 - `src/video/`: `text.vhd` shows the screen with a cursor and a display
   offset; `scr_ram.vhd` is its dual-clock copy; `font_pkg.vhd` is generated
-  by `font/gen_font_pkg.py`.
+  by `font/gen_font_pkg.py`; `video_pkg.vhd` has the video modes and
+  `pix.vhd` the pixel coordinates, both from MandelbrotMEGA65.
 - `synth/`: `Makefile.inc` is the Vivado build, `common/` the clocks,
   `mega65/` what the R3 and R6 share (keyboard, DAC, HDMI), `r3/`, `r6/`,
   and `nexys4ddr/` the boards. See `synth/README.md`, and
