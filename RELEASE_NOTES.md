@@ -21,7 +21,7 @@ The release candidates pinned these:
 
 nice_cpu's `RC01` and `RC03` have no tag here.
 
-## V1.0 (not yet released)
+## V1.0 (2026-10-28)
 
 **Upgrade notes.**
 
@@ -39,6 +39,23 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 - Every build writes the core's worst paths in and out of the core,
   `build/core_in.rpt` and `build/core_out.rpt`, from which nice_cpu sets
   its budget for the core's ports.
+
+**Tools**
+
+- `tools/mon.py` is an interactive shell on the debug link, and `make mon
+  [FILE=p.bin]` runs it. It reads and writes memory, loads a `.bin` file,
+  starts, holds, pauses, steps, and goes on, sets the breakpoints, and
+  shows the registers and the state. It shows the program's output and
+  the link's notices as they arrive, and sends console input or passes
+  the terminal through to the program. It takes `--port`, `--tcp`, and
+  `--cosim`, as `load.py` does.
+
+**Documentation**
+
+- `README.md` is now for users of the core files: the MEGA65 on its own,
+  and with the serial port. The address map, the link, the screen, the
+  ROM, and the Nexys4DDR's devices are in `SYSTEM.md`. The tests, the
+  formal checks, `make hwtest`, and the badge are in `CONTRIBUTING.md`.
 
 **System**
 
