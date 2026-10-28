@@ -56,8 +56,8 @@ set_false_path -from [get_ports {kb_io2_i}]
 ## (M2M/MEGA65-R3.xdc and MEGA65-R6.xdc). It is RMII, clocked by 50 MHz from
 ## the FPGA on ETH_CLK. MDC and MDIO are left out, as no PHY register needs
 ## reading or writing, and so are ETH_INT and ETH_LED2. mega65.vhd drives
-## the clock and the reset. Until there is a MAC, nothing is sent and the
-## inputs are unused, so the data pins are not timed yet.
+## the clock and the reset, and src/eth/rmii_rx.vhd takes RXD and CRS_DV.
+## Nothing is sent yet, and RXER is unused.
 set_property -dict {PACKAGE_PIN L4   IOSTANDARD LVCMOS33} [get_ports {eth_clk_o}];    # ETH_CLK
 set_property -dict {PACKAGE_PIN K6   IOSTANDARD LVCMOS33} [get_ports {eth_rst_n_o}];  # ETH-RST
 set_property -dict {PACKAGE_PIN P4   IOSTANDARD LVCMOS33} [get_ports {eth_rxd_i[0]}]; # ETH_RX_D0
@@ -77,6 +77,20 @@ create_generated_clock -name eth_clk_pin -divide_by 1 \
    -source [get_pins i_mega65/i_eth_clk/C] [get_ports {eth_clk_o}]
 set_false_path -to [get_ports {eth_rst_n_o}]
 set_property IOB TRUE [get_ports {eth_rst_n_o}]
+
+## The KSZ8081RND, with 50 MHz on XI, drives RXD and CRS_DV 8 to 13 ns after
+## the clock's rising edge (tOD, Table 11 of its data sheet, Rev. 1.3), and
+## the maximum has 1 ns more for the two traces. Their registers are in the
+## I/O tiles.
+set_input_delay -clock eth_clk_pin -max 14.000 [get_ports {eth_rxd_i[*] eth_crs_dv_i}]
+set_input_delay -clock eth_clk_pin -min  8.000 [get_ports {eth_rxd_i[*] eth_crs_dv_i}]
+set_property IOB TRUE [get_ports {eth_rxd_i[*] eth_crs_dv_i}]
+
+## The clock on the pin rises 2.5 ns before the clock inside (clk_rst.vhd),
+## so the data of one of its edges is sampled by the second edge inside
+## after it, a cycle and 2.5 ns later, and held past the first.
+set_multicycle_path -setup 2 -from [get_clocks eth_clk_pin] \
+   -to [get_clocks -of_objects [get_pins i_mega65/i_clk_rst/i_mmcm/CLKOUT1]]
 
 ## The registers on the slow pins live in the I/O tiles, so that their
 ## timing does not depend on placement.

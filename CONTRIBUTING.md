@@ -103,6 +103,7 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
 - `devices.vhd` has nice_cpu's devices at `0xFFFFFF10`–`7F`.
 - `scr_regs.vhd` has the screen's registers at `0xFFFFFF80`–`8F`.
 - `board_io.vhd` has the board's registers at `0xFFFFFF90`–`9F`.
+- `eth/rmii_rx.vhd` receives the Ethernet PHY's frames.
 - The debug link is nice_cpu's `hdl/src/debug_link.vhd`.
 - `uart_serdes.vhd` is copied from
   [cmod-s7](https://github.com/MJoergen/cmod-s7), with fixes to its
@@ -153,6 +154,9 @@ The testbenches are these:
 - `sim/tb_board_io.vhd` tests the Nexys4DDR's drivers of its seven-segment
   display and RGB LEDs: every digit of the display lit in turn with its own
   segments, and the duty of an RGB output at its level.
+- `sim/tb_rmii_rx.vhd` tests the RMII receiver with a model of the PHY:
+  frames of 1 to 100 bytes, frames whose CRS_DV toggles at the end as the
+  carrier goes, one that ends half a byte late, and a false carrier.
 - `make test` also checks that GHDL can synthesize the system, with
   `sim/rom.nasm` as its ROM and without a ROM, the keyboards, the text
   display, and `src/system.vhd` with the screen and the devices of the
@@ -253,8 +257,9 @@ every time, not only the ones a testbench sends.
 - `board_io.sby` proves the board's registers at `0xFFFFFF90`–`9F`,
   `src/board_io.vhd`, with them and without them: a write sets the
   register of its word, nothing else changes one but reset, each word
-  reads its register, or 0, and the buttons reach their register two
-  cycles after their pins. Without the registers, every word reads 0.
+  reads its register, its input, or 0, and the buttons reach their
+  register two cycles after their pins. Without the registers, every
+  word reads 0 but `0xFFFFFF98`, the count of Ethernet frames.
 - `scr_regs.sby` proves the screen's registers at `0xFFFFFF80`–`8F`,
   `src/scr_regs.vhd`: a write sets the register of its word, nothing else
   changes one but a clear or reset, each word reads its register, or 0,

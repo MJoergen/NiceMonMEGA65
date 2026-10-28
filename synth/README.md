@@ -204,18 +204,25 @@ All builds meet the clock. These are the worst setup and hold slacks:
 
 | Build | Clock | Setup | Hold |
 |---|---|---|---|
-| R6, pipelined | 100 MHz | 0.472 ns | 0.022 ns |
+| R6, pipelined | 100 MHz | 0.175 ns | 0.079 ns |
 | R6, `NICE=multi` | 100 MHz | 0.52 ns | – |
-| R3, pipelined | 100 MHz | 0.354 ns | 0.017 ns |
-| Nexys4DDR, pipelined | 90 MHz | 0.169 ns | 0.017 ns |
+| R3, pipelined | 100 MHz | 0.430 ns | 0.070 ns |
+| Nexys4DDR, pipelined | 90 MHz | 0.180 ns | 0.026 ns |
 | Nexys4DDR, `NICE=multi` | 90 MHz | 0.19 ns | – |
 
 The pipelined rows are from builds at nice_cpu V1.0, with the debug
-link of version 4 and the Ethernet PHY's clock and reset; the
+link of version 4 and the Ethernet PHY's receiver; the
 multi-cycle rows are older builds, with fewer link features, and their
 hold slacks were not recorded. The slacks change from build to build with
 placement more than with the logic. The worst paths are usually in the
 core's WRITE and FETCH stages.
+
+The PHY's RXD and CRS_DV are timed against the clock on its pin, with the
+output delays of the PHYs' data sheets and 1 ns for the traces. The pin's
+clock is 2.5 ns early (`common/clk_rst.vhd`); without that, the
+Nexys4DDR misses the setup by 0.07 ns. With it, the inputs have 3.5 ns of
+setup and 6.5 ns of hold slack on the MEGA65, and 2.2 ns and 1.4 ns on
+the Nexys4DDR.
 
 ### Block RAM
 

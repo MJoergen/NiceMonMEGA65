@@ -63,6 +63,7 @@ SRC += ../../src/video/font_pkg.vhd
 SRC += ../../src/video/pix.vhd
 SRC += ../../src/video/scr_ram.vhd
 SRC += ../../src/video/text.vhd
+SRC += ../../src/eth/rmii_rx.vhd
 SRC += ../../src/system.vhd
 SRC += ../common/clk_rst.vhd
 SRC += ../common/video_clk.vhd

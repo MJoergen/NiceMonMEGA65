@@ -23,8 +23,8 @@
 -- FPGA, from clk_rst.vhd through an ODDR, and is held in reset as long as
 -- the system is: at least 10 ms after the clock starts, which is more than
 -- the PHY needs. It then runs with its reset defaults, and negotiates the
--- link on its own. There is no MAC yet, so nothing is sent, and what the
--- PHY receives is ignored.
+-- link on its own. Its receive pins go to system.vhd, which counts the
+-- frames received. Nothing is sent yet.
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -126,8 +126,9 @@ architecture synthesis of mega65 is
    attribute keep of vdac_green_r : signal is "true";
    attribute keep of vdac_blue_r  : signal is "true";
 
-   signal eth_clk : std_logic;
-   signal eth_rst : std_logic;
+   signal eth_clk     : std_logic;
+   signal eth_pin_clk : std_logic;
+   signal eth_rst     : std_logic;
 
    -- The PHY's reset, in the IOB (IOB TRUE on its port, in mega65.xdc)
    signal eth_rst_n_r : std_logic := '0';
@@ -141,6 +142,7 @@ begin
          clk_o          => clk,
          rst_o          => rst,
          eth_clk_o      => eth_clk,
+         eth_pin_clk_o  => eth_pin_clk,
          eth_rst_o      => eth_rst
       ); -- i_clk_rst
 
@@ -201,21 +203,25 @@ begin
          G_VIDEO         => C_VIDEO
       )
       port map (
-         clk_i       => clk,
-         rst_i       => rst,
-         uart_rxd_i  => uart_rxd_i,
-         uart_txd_o  => uart_txd_o,
-         kbd_valid_i => kbd_valid,
-         kbd_ready_o => kbd_ready,
-         kbd_data_i  => kbd_data,
-         running_o   => running,
-         vga_clk_i   => vga_clk,
-         vga_hs_o    => vga_hs,
-         vga_vs_o    => vga_vs,
-         vga_de_o    => vga_de,
-         vga_red_o   => vga_red,
-         vga_green_o => vga_green,
-         vga_blue_o  => vga_blue
+         clk_i        => clk,
+         rst_i        => rst,
+         uart_rxd_i   => uart_rxd_i,
+         uart_txd_o   => uart_txd_o,
+         kbd_valid_i  => kbd_valid,
+         kbd_ready_o  => kbd_ready,
+         kbd_data_i   => kbd_data,
+         running_o    => running,
+         eth_clk_i    => eth_clk,
+         eth_rst_i    => eth_rst,
+         eth_rxd_i    => eth_rxd_i,
+         eth_crs_dv_i => eth_crs_dv_i,
+         vga_clk_i    => vga_clk,
+         vga_hs_o     => vga_hs,
+         vga_vs_o     => vga_vs,
+         vga_de_o     => vga_de,
+         vga_red_o    => vga_red,
+         vga_green_o  => vga_green,
+         vga_blue_o   => vga_blue
       ); -- i_system
 
 
@@ -330,8 +336,9 @@ begin
    -- The Ethernet PHY
    ---------------------------------------------------------------------------
 
-   -- The PHY's clock is the Ethernet clock, forwarded through an ODDR, so it
-   -- leaves the clock network only in the IOB.
+   -- The PHY's clock is the early copy of the Ethernet clock (clk_rst.vhd),
+   -- forwarded through an ODDR, so it leaves the clock network only in the
+   -- IOB.
 -- vsg_off
    i_eth_clk : ODDR
       generic map (
@@ -341,7 +348,7 @@ begin
       )
       port map (
          Q  => eth_clk_o,
-         C  => eth_clk,
+         C  => eth_pin_clk,
          CE => '1',
          D1 => '1',
          D2 => '0',

@@ -3,7 +3,12 @@
 -- the VCO's frequency / G_DIVIDE: 1000 MHz / 10 = 100 MHz on the MEGA65, and
 -- 900 MHz / 10 = 90 MHz on the Nexys4DDR, whose FPGA is a slower speed
 -- grade. Its second output is the 50 MHz clock of the Ethernet PHY's RMII,
--- the VCO's frequency / (2 * G_MULTIPLY) on every board. The pipelined core
+-- the VCO's frequency / (2 * G_MULTIPLY) on every board, and its third the
+-- same clock 2.5 ns (45 degrees) early, for the PHY's clock pin. The
+-- output buffer delays the pin by about 3.5 ns, and the PHY's data comes
+-- up to 14 ns after the pin, so without the shift the data would come
+-- too late on the Nexys4DDR; the hold time has room for the shift (the
+-- multicycle path in the boards' XDC). The pipelined core
 -- meets 100 MHz on the MEGA65 with little to spare, so recheck the timing
 -- after a change to nice_cpu.
 -- The reset is held while the MMCM is not locked, and while the reset
@@ -39,6 +44,7 @@ entity clk_rst is
       clk_o          : out std_logic; -- 100 MHz * G_MULTIPLY / G_DIVIDE
       rst_o          : out std_logic; -- synchronous to clk_o
       eth_clk_o      : out std_logic; -- 50 MHz
+      eth_pin_clk_o  : out std_logic; -- 50 MHz, 2.5 ns before eth_clk_o
       eth_rst_o      : out std_logic  -- synchronous to eth_clk_o
    );
 end entity clk_rst;
@@ -50,6 +56,7 @@ architecture synthesis of clk_rst is
    signal clk_mmcm  : std_logic;
    signal eth_mmcm  : std_logic;
    signal eth_clk   : std_logic;
+   signal eth_pin   : std_logic;
    signal locked    : std_logic;
 
    signal locked_sync : std_logic_vector(1 downto 0) := "00";
@@ -75,7 +82,9 @@ begin
          DIVCLK_DIVIDE    => 1,
          CLKFBOUT_MULT_F  => G_MULTIPLY,
          CLKOUT0_DIVIDE_F => G_DIVIDE,
-         CLKOUT1_DIVIDE   => integer(2.0 * G_MULTIPLY)  -- 50 MHz
+         CLKOUT1_DIVIDE   => integer(2.0 * G_MULTIPLY), -- 50 MHz
+         CLKOUT2_DIVIDE   => integer(2.0 * G_MULTIPLY), -- 50 MHz
+         CLKOUT2_PHASE    => -45.0                      -- 2.5 ns early
       )
       port map (
          CLKIN1   => sys_clk_i,
@@ -83,6 +92,7 @@ begin
          CLKFBOUT => clkfb,
          CLKOUT0  => clk_mmcm,
          CLKOUT1  => eth_mmcm,
+         CLKOUT2  => eth_pin,
          LOCKED   => locked,
          PWRDWN   => '0',
          RST      => '0'
@@ -105,6 +115,12 @@ begin
          I => eth_mmcm,
          O => eth_clk
       ); -- i_bufg_eth
+
+   i_bufg_eth_pin : BUFG
+      port map (
+         I => eth_pin,
+         O => eth_pin_clk_o
+      ); -- i_bufg_eth_pin
 -- vsg_on
 
    p_rst : process (clk_o)

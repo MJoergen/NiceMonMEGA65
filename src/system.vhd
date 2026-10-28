@@ -20,6 +20,12 @@
 -- with LEDs, a seven-segment display, buttons, and switches sets G_BOARD_IO
 -- and connects the brd_* ports (board_io.vhd has their registers); the other
 -- boards leave them open.
+-- The Ethernet PHY's receive pins go to the RMII receiver (eth/rmii_rx.vhd)
+-- in the PHY's 50 MHz clock domain. Each frame that ends on a byte flips
+-- eth_toggle there, and two registers synchronize it to clk_i, where each
+-- change counts a frame in eth_rx, which the core and the link read at
+-- 0xFFFFFF98. A frame is at least 64 bytes, 256 cycles of the PHY's clock,
+-- so no change is lost. The frame check sequence is not checked yet.
 --
 -- With a ROM the core boots from it at reset; without one it waits, held,
 -- for a host on the debug link (nicemon.vhd).
@@ -27,13 +33,17 @@
 -- INTERFACE CONTRACTS -- these are requirements on the environment:
 -- a) vga_clk_i is the pixel clock of G_VIDEO.
 -- b) clk_i runs at G_CLOCK_HZ, as the UART's bit time depends on it.
+-- c) eth_clk_i is the PHY's 50 MHz reference clock, and eth_rst_i is
+--    synchronous to it.
 --
 -- RESET
--- Synchronous to clk_i, by rst_i, as nicemon.vhd describes. The video has no
+-- Synchronous to clk_i, by rst_i, as nicemon.vhd describes, and in the
+-- Ethernet clock domain by eth_rst_i. rst_i clears the count of frames. The video has no
 -- reset of its own (text.vhd).
 
 library ieee;
    use ieee.std_logic_1164.all;
+   use ieee.numeric_std_unsigned.all;
 
 library work;
    use work.video_pkg.all;
@@ -51,31 +61,37 @@ entity system is
       G_BREAKS        : natural      := 4
    );
    port (
-      clk_i       : in  std_logic;
-      rst_i       : in  std_logic;
-      uart_rxd_i  : in  std_logic;
-      uart_txd_o  : out std_logic;
-      kbd_valid_i : in  std_logic;
-      kbd_ready_o : out std_logic;
-      kbd_data_i  : in  std_logic_vector(7 downto 0);
-      running_o   : out std_logic;
+      clk_i        : in  std_logic;
+      rst_i        : in  std_logic;
+      uart_rxd_i   : in  std_logic;
+      uart_txd_o   : out std_logic;
+      kbd_valid_i  : in  std_logic;
+      kbd_ready_o  : out std_logic;
+      kbd_data_i   : in  std_logic_vector(7 downto 0);
+      running_o    : out std_logic;
 
       -- The board's devices, in the system clock domain (G_BOARD_IO)
-      brd_led_o   : out std_logic_vector(15 downto 0);
-      brd_rgb0_o  : out std_logic_vector(11 downto 0);
-      brd_rgb1_o  : out std_logic_vector(11 downto 0);
-      brd_seg_o   : out std_logic_vector(63 downto 0);
-      brd_btn_i   : in  std_logic_vector(4 downto 0)  := (others => '0');
-      brd_sw_i    : in  std_logic_vector(15 downto 0) := (others => '0');
+      brd_led_o    : out std_logic_vector(15 downto 0);
+      brd_rgb0_o   : out std_logic_vector(11 downto 0);
+      brd_rgb1_o   : out std_logic_vector(11 downto 0);
+      brd_seg_o    : out std_logic_vector(63 downto 0);
+      brd_btn_i    : in  std_logic_vector(4 downto 0)  := (others => '0');
+      brd_sw_i     : in  std_logic_vector(15 downto 0) := (others => '0');
+
+      -- The Ethernet PHY's receive pins, in its clock domain
+      eth_clk_i    : in  std_logic                    := '0';
+      eth_rst_i    : in  std_logic                    := '1';
+      eth_rxd_i    : in  std_logic_vector(1 downto 0) := "00";
+      eth_crs_dv_i : in  std_logic                    := '0';
 
       -- The video, in the VGA clock domain
-      vga_clk_i   : in  std_logic;
-      vga_hs_o    : out std_logic;
-      vga_vs_o    : out std_logic;
-      vga_de_o    : out std_logic;
-      vga_red_o   : out std_logic_vector(7 downto 0);
-      vga_green_o : out std_logic_vector(7 downto 0);
-      vga_blue_o  : out std_logic_vector(7 downto 0)
+      vga_clk_i    : in  std_logic;
+      vga_hs_o     : out std_logic;
+      vga_vs_o     : out std_logic;
+      vga_de_o     : out std_logic;
+      vga_red_o    : out std_logic_vector(7 downto 0);
+      vga_green_o  : out std_logic_vector(7 downto 0);
+      vga_blue_o   : out std_logic_vector(7 downto 0)
    );
 end entity system;
 
@@ -100,6 +116,16 @@ architecture synthesis of system is
    signal scr_cur_y    : std_logic_vector(4 downto 0);
    signal scr_cur_mode : std_logic_vector(2 downto 0);
    signal scr_offs     : std_logic_vector(G_SCR_ADDR_BITS - 1 downto 0);
+
+   -- The frames received, in the Ethernet clock domain
+   signal eth_eof    : std_logic;
+   signal eth_err    : std_logic;
+   signal eth_toggle : std_logic                    := '0';
+   -- eth_toggle synchronized to clk_i, the last of them before, and the count
+   signal eth_toggle_cdc : std_logic_vector(1 downto 0) := "00";
+   signal eth_toggle_d   : std_logic                    := '0';
+   signal eth_rx         : std_logic_vector(31 downto 0) := (others => '0');
+   attribute async_reg of eth_toggle_cdc : signal is "TRUE";
 
 begin
 
@@ -149,8 +175,46 @@ begin
          brd_rgb1_o     => brd_rgb1_o,
          brd_seg_o      => brd_seg_o,
          brd_btn_i      => brd_btn_i,
-         brd_sw_i       => brd_sw_i
+         brd_sw_i       => brd_sw_i,
+         eth_rx_i       => eth_rx
       ); -- i_nicemon
+
+
+   i_rmii_rx : entity work.rmii_rx
+      port map (
+         clk_i    => eth_clk_i,
+         rst_i    => eth_rst_i,
+         rxd_i    => eth_rxd_i,
+         crs_dv_i => eth_crs_dv_i,
+         data_o   => open,
+         valid_o  => open,
+         eof_o    => eth_eof,
+         err_o    => eth_err
+      ); -- i_rmii_rx
+
+   p_eth_toggle : process (eth_clk_i)
+   begin
+      if rising_edge(eth_clk_i) then
+         if eth_eof = '1' and eth_err = '0' then
+            eth_toggle <= not eth_toggle;
+         end if;
+      end if;
+   end process p_eth_toggle;
+
+   p_eth_rx : process (clk_i)
+   begin
+      if rising_edge(clk_i) then
+         eth_toggle_cdc <= eth_toggle_cdc(0) & eth_toggle;
+         eth_toggle_d   <= eth_toggle_cdc(1);
+         if eth_toggle_cdc(1) /= eth_toggle_d then
+            eth_rx <= eth_rx + 1;
+         end if;
+
+         if rst_i = '1' then
+            eth_rx <= (others => '0');
+         end if;
+      end if;
+   end process p_eth_rx;
 
 
    i_text : entity work.text
