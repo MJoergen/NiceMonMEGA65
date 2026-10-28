@@ -88,6 +88,7 @@ class Monitor(cmd.Cmd):
         self.lock = threading.RLock()
         self.at_prompt = False
         self.watcher: threading.Thread | None = None
+        self.stopping = threading.Event()
         self.next_read = 0
         self.last = ""
         # The notices already shown
@@ -147,10 +148,18 @@ class Monitor(cmd.Cmd):
         out.flush()
 
     def watch(self) -> None:
-        """The thread that shows what arrives between commands."""
-        fd = self.link.fileno()
-        while True:
-            select.select([fd], [], [], 0.05)
+        """The thread that shows what arrives between commands, until
+        stop(). The descriptor is taken on each turn, as the one of --tcp
+        and --cosim changes after "eof". A command may still close it
+        before the select, which then fails or sees another descriptor of
+        the same number; the poll, with the lock held, finds out."""
+        while not self.stopping.is_set():
+            with self.lock:
+                fd = self.link.fileno()
+            try:
+                select.select([fd], [], [], 0.05)
+            except (OSError, ValueError):
+                pass
             with self.lock:
                 try:
                     self.link.poll(0)
@@ -158,6 +167,12 @@ class Monitor(cmd.Cmd):
                 except (LinkError, OSError) as e:
                     data = f"[{e}]\n".encode()
             self.show(data)
+
+    def stop(self) -> None:
+        """Ends the watcher, so the link can be closed."""
+        self.stopping.set()
+        if self.watcher is not None:
+            self.watcher.join()
 
     # The loop
 
@@ -461,6 +476,7 @@ def main() -> None:
         except KeyboardInterrupt:
             print("^C")
             mon.intro = None
+    mon.stop()
     link.close()
 
 
