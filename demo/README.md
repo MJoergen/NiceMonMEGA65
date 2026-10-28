@@ -57,7 +57,9 @@ last row, the rows scroll up by one.
 The characters and the colors check the font and the video output at a
 glance. On the left are the 256 characters of the font, ISO 8859-1, in 16
 rows of 16. A row's label is the code of its first character, and the
-digits above the columns add to it. On the right are ramps of seven
+digits above the columns add to it. The codes below `0x20` and from
+`0x80` to `0x9F` are blank, as the font has no glyphs for them
+(`font/gen_font_pkg.py`), so they look like `0x20` and `0xA0`. On the right are ramps of seven
 colors, red, green, blue, yellow, cyan, magenta, and gray, each with the
 16 intensities `0` to `F` of 4-bit color: first as backgrounds, and then as
 foregrounds, the digits of the intensities on black. Intensity 0 is black,
@@ -72,8 +74,15 @@ decimal, and the clock in MHz, the cycles divided by the microseconds:
 Eratosthenes on the numbers below 2048, which runs again before each update
 of the screen: the runs, the primes it finds, which are 309, and the
 instructions, cycles, and microseconds of the last run, with the cycles
-per instruction and the instructions per microsecond. In `niceemu`, each
-step counts as a cycle and a microsecond, so the time runs at one
+per instruction and the instructions per microsecond. On the MEGA65, the
+sieve's 30058 instructions take about 79000 cycles, 2.6 per instruction,
+and about 38 instructions a microsecond. That is usual for the pipelined
+core on code written by hand (nice_cpu's
+[bench/README.md](https://github.com/MJoergen/nice_cpu/blob/main/bench/README.md)):
+each turn of its loops ends with a taken jump, which costs cycles, the
+count reads the sieve from memory, and each prime's square is read from
+the math unit. In `niceemu`, each step counts as a cycle and a
+microsecond, so the time runs at one
 microsecond a step, the clock is 1 MHz, and the sieve has one cycle per
 instruction ([EMULATOR.md](../doc/EMULATOR.md)). The keys do nothing here,
 except the function keys.
