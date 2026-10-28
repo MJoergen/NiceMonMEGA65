@@ -1,10 +1,10 @@
--- The memory of the FIFO of received Ethernet frames (eth_rx_fifo.vhd):
--- 2^G_ADDR_BITS words of 9 bits in block RAM, written on one clock and read
--- on another.
+-- The memory of the FIFOs of Ethernet frames (eth_rx_fifo.vhd and
+-- eth_tx_fifo.vhd): 2^G_ADDR_BITS words of 9 bits in block RAM, written on
+-- one clock and read on another.
 --
 -- THEORY OF OPERATION
--- The write port is in the PHY's clock domain and the read port in the
--- system clock domain, each clocked by its own clock, as in
+-- The write port is in the clock domain of the FIFO's writer and the read
+-- port in that of its reader, each clocked by its own clock, as in
 -- video/scr_ram.vhd. The read gives the word in the cycle after the
 -- address, as block RAM does. The memory is in an entity of its own so that
 -- Vivado makes block RAM of it (video/scr_ram.vhd says why).
@@ -16,7 +16,7 @@ library ieee;
    use ieee.std_logic_1164.all;
    use ieee.numeric_std_unsigned.all;
 
-entity rx_ram is
+entity eth_ram is
    generic (
       G_ADDR_BITS : natural
    );
@@ -30,9 +30,9 @@ entity rx_ram is
       rd_addr_i : in  std_logic_vector(G_ADDR_BITS - 1 downto 0);
       rd_data_o : out std_logic_vector(8 downto 0) := (others => '0')
    );
-end entity rx_ram;
+end entity eth_ram;
 
-architecture synthesis of rx_ram is
+architecture synthesis of eth_ram is
 
    type t_mem is array (0 to 2 ** G_ADDR_BITS - 1) of std_logic_vector(8 downto 0);
 

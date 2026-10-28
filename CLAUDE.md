@@ -23,7 +23,7 @@ header is the authoritative address map.
 ## Commands
 
     make                  # lists the targets
-    make -j test          # GHDL: synth checks, tb_hello, tb_nicemon, tb_kbd, tb_ps2, tb_ps2_nicemon, tb_text, tb_board_io, tb_rmii_rx, tb_rx_fcs, tb_eth_rx_fifo, check-steps, check-fmt (NICE=multi for the multi-cycle core); then the demo in niceemu
+    make -j test          # GHDL: synth checks, tb_hello, tb_nicemon, tb_kbd, tb_ps2, tb_ps2_nicemon, tb_text, tb_board_io, tb_rmii_rx, tb_rx_fcs, tb_eth_rx_fifo, tb_eth_tx_fifo, tb_rmii_tx, tb_eth, check-steps, check-fmt (NICE=multi for the multi-cycle core); then the demo in niceemu
     make -j formal        # SymbiYosys jobs in formal/, each task in a work directory of its own
     make lint             # vsg against doc/CODING_STYLE.md; line-length warnings are tolerated
     make examples         # C examples -> examples/build/*.bin (clang wasm32, lld, llvm)
@@ -66,10 +66,10 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   (`scr_regs.vhd`), the keyboards (`kbd_m65.vhd` and
   `kbd_m65_ascii.vhd` for the MEGA65, `kbd_ps2.vhd` and `kbd_ps2_ascii.vhd` for
   the Nexys4DDR's PS/2), the Nexys4DDR's display and RGB LED drivers
-  (`seg7.vhd`, `rgb_pwm.vhd`), the Ethernet PHY's receiver
-  (`eth/rmii_rx.vhd`), the check of its frames (`eth/rx_fcs.vhd`), and
-  their FIFO to the system clock (`eth/eth_rx_fifo.vhd`, `eth/rx_ram.vhd`),
-  and `system.vhd`, which every board instantiates.
+  (`seg7.vhd`, `rgb_pwm.vhd`), the Ethernet station (`eth/eth.vhd`: the
+  RMII receiver and transmitter, the check of the frames, their FIFOs
+  between the clocks, and the MAC filter and ARP responder,
+  `eth/eth_arp.vhd`), and `system.vhd`, which every board instantiates.
   `nice_core.vhd` with one architecture from `src/core/` wraps whichever
   nice_cpu core `core.mk` selects (`NICE=pipeline`, the default, or `multi`).
 - `src/video/`: `text.vhd` shows the screen with a cursor and a display

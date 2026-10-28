@@ -4,7 +4,7 @@
 -- sequence, a byte at a time, with the last byte of each marked.
 --
 -- THEORY OF OPERATION
--- The memory (rx_ram.vhd) has 2^G_ADDR_BITS bytes, each with a bit that
+-- The memory (eth_ram.vhd) has 2^G_ADDR_BITS bytes, each with a bit that
 -- marks the last of a frame. The pointers have a bit more, so that a full
 -- FIFO differs from an empty one. The write side writes each byte at
 -- wr_ptr as it comes, and the frame stays invisible to the reader until
@@ -44,6 +44,9 @@ library ieee;
    use ieee.std_logic_1164.all;
    use ieee.numeric_std_unsigned.all;
 
+library work;
+   use work.eth_pkg.all;
+
 entity eth_rx_fifo is
    generic (
       G_ADDR_BITS : natural := 11
@@ -71,23 +74,6 @@ end entity eth_rx_fifo;
 architecture synthesis of eth_rx_fifo is
 
    subtype t_ptr is std_logic_vector(G_ADDR_BITS downto 0);
-
-   function to_gray (b : t_ptr) return t_ptr is
-   begin
-      return b xor ('0' & b(G_ADDR_BITS downto 1));
-   end function to_gray;
-
-   function from_gray (g : t_ptr) return t_ptr is
-      variable b_v : t_ptr;
-   begin
-      b_v(G_ADDR_BITS) := g(G_ADDR_BITS);
-
-      for i in G_ADDR_BITS - 1 downto 0 loop
-         b_v(i) := b_v(i + 1) xor g(i);
-      end loop;
-
-      return b_v;
-   end function from_gray;
 
    -- The write side
    signal wr_ptr     : t_ptr                         := (others => '0');
@@ -188,7 +174,7 @@ begin
    end process p_write;
 
 
-   i_rx_ram : entity work.rx_ram
+   i_eth_ram : entity work.eth_ram
       generic map (
          G_ADDR_BITS => G_ADDR_BITS
       )
@@ -200,7 +186,7 @@ begin
          rd_clk_i  => rd_clk_i,
          rd_addr_i => rd_ptr(G_ADDR_BITS - 1 downto 0),
          rd_data_o => ram_rdata
-      ); -- i_rx_ram
+      ); -- i_eth_ram
 
 
    ---------------------------------------------------------------------------

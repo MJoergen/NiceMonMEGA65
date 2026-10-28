@@ -23,8 +23,8 @@
 -- FPGA, from clk_rst.vhd through an ODDR, and is held in reset as long as
 -- the system is: at least 10 ms after the clock starts, which is more than
 -- the PHY needs. It then runs with its reset defaults, and negotiates the
--- link on its own. Its receive pins go to system.vhd, which counts the
--- frames received. Nothing is sent yet.
+-- link on its own. Its RMII pins go to system.vhd, to the Ethernet station
+-- there (src/eth/eth.vhd).
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -215,6 +215,8 @@ begin
          eth_rst_i    => eth_rst,
          eth_rxd_i    => eth_rxd_i,
          eth_crs_dv_i => eth_crs_dv_i,
+         eth_txd_o    => eth_txd_o,
+         eth_tx_en_o  => eth_tx_en_o,
          vga_clk_i    => vga_clk,
          vga_hs_o     => vga_hs,
          vga_vs_o     => vga_vs,
@@ -365,7 +367,5 @@ begin
    end process p_eth_rst;
 
    eth_rst_n_o <= eth_rst_n_r;
-   eth_txd_o   <= "00";
-   eth_tx_en_o <= '0';  -- Send nothing
 
 end architecture synthesis;

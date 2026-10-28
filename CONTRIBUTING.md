@@ -103,9 +103,13 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
 - `devices.vhd` has nice_cpu's devices at `0xFFFFFF10`–`7F`.
 - `scr_regs.vhd` has the screen's registers at `0xFFFFFF80`–`8F`.
 - `board_io.vhd` has the board's registers at `0xFFFFFF90`–`9F`.
-- `eth/rmii_rx.vhd` receives the Ethernet PHY's frames, `eth/rx_fcs.vhd`
-  checks their frame check sequence, and `eth/eth_rx_fifo.vhd`, with
-  `eth/rx_ram.vhd`, takes the good ones to the system clock.
+- `eth/eth.vhd` is the Ethernet station. `eth/rmii_rx.vhd` receives the
+  PHY's frames, `eth/rx_fcs.vhd` checks their frame check sequence, and
+  `eth/eth_rx_fifo.vhd` takes the good ones to the system clock.
+  `eth/eth_arp.vhd` filters them by their MAC address and answers ARP
+  requests, `eth/eth_tx_fifo.vhd` takes the answers back to the PHY's
+  clock, and `eth/rmii_tx.vhd` sends them. The FIFOs keep their bytes in
+  `eth/eth_ram.vhd`, and `eth/eth_pkg.vhd` has the CRC and the Gray code.
 - The debug link is nice_cpu's `hdl/src/debug_link.vhd`.
 - `uart_serdes.vhd` is copied from
   [cmod-s7](https://github.com/MJoergen/cmod-s7), with fixes to its
@@ -169,6 +173,18 @@ The testbenches are these:
   ready, and a stall that makes frames find the FIFO full: every good
   frame comes, whole and without its check sequence, or is counted as
   dropped.
+- `sim/tb_eth_tx_fifo.vhd` tests the FIFO of frames to send between its
+  two clocks, with a writer and a reader that are not always ready: the
+  frames come in order and whole, none before it is written whole, and,
+  with the reader always ready, a byte every two cycles.
+- `sim/tb_rmii_tx.vhd` tests the RMII transmitter with a model of the
+  PHY: frames of 1 to 1514 bytes, with their preamble, padding, frame
+  check sequence, which it checks with its own CRC, and gap of 12 bytes.
+- `sim/tb_eth.vhd` tests the Ethernet station at its pins: ARP requests to
+  everyone and to the station get a reply, byte for byte; requests for
+  another address, to another station, or with a wrong check sequence,
+  an ARP reply, an IPv4 frame, and any request while the IP address is 0
+  get none; and the counts of frames are right.
 - `make test` also checks that GHDL can synthesize the system, with
   `sim/rom.nasm` as its ROM and without a ROM, the keyboards, the text
   display, and `src/system.vhd` with the screen and the devices of the
@@ -270,8 +286,10 @@ every time, not only the ones a testbench sends.
   `src/board_io.vhd`, with them and without them: a write sets the
   register of its word, nothing else changes one but reset, each word
   reads its register, its input, or 0, and the buttons reach their
-  register two cycles after their pins. Without the registers, every
-  word reads 0 but `0xFFFFFF98` and `99`, the counts of Ethernet frames.
+  register two cycles after their pins. The Ethernet station's words at
+  `0xFFFFFF98`–`9D` are there on every board, and its IP and MAC
+  addresses after reset are as the generics say. Without the other
+  registers, every word but those reads 0.
 - `scr_regs.sby` proves the screen's registers at `0xFFFFFF80`–`8F`,
   `src/scr_regs.vhd`: a write sets the register of its word, nothing else
   changes one but a clear or reset, each word reads its register, or 0,

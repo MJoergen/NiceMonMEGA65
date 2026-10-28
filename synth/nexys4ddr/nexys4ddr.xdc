@@ -88,8 +88,8 @@ set_property -dict {PACKAGE_PIN V10  IOSTANDARD LVCMOS33} [get_ports {sw_i[15]}]
 ## The Ethernet PHY, an SMSC LAN8720A. It is RMII, clocked by 50 MHz from
 ## the FPGA on ETH_REFCLK, as on the MEGA65 (mega65.xdc). MDC and MDIO are
 ## left out, as no PHY register needs reading or writing, and so is ETH_INTN.
-## top.vhd drives the clock and the reset, and src/eth/rmii_rx.vhd takes
-## RXD and CRS_DV. Nothing is sent yet, and RXERR is unused.
+## top.vhd drives the clock and the reset, src/eth/rmii_rx.vhd takes RXD
+## and CRS_DV, and src/eth/rmii_tx.vhd drives TXD and TXEN. RXERR is unused.
 set_property -dict {PACKAGE_PIN D5   IOSTANDARD LVCMOS33} [get_ports {eth_clk_o}];    # ETH_REFCLK
 set_property -dict {PACKAGE_PIN B3   IOSTANDARD LVCMOS33} [get_ports {eth_rst_n_o}];  # ETH_RSTN
 set_property -dict {PACKAGE_PIN C11  IOSTANDARD LVCMOS33} [get_ports {eth_rxd_i[0]}]; # ETH_RXD[0]
@@ -125,6 +125,14 @@ set_property IOB TRUE [get_ports {eth_rxd_i[*] eth_crs_dv_i}]
 ## after it, a cycle and 2.5 ns later, and held past the first.
 set_multicycle_path -setup 2 -from [get_clocks eth_clk_pin] \
    -to [get_clocks -of_objects [get_pins i_clk_rst/i_mmcm/CLKOUT1]]
+
+## The LAN8720A takes TXD and TXEN with a setup time of 4 ns and a hold
+## time of 1.5 ns to the clock's rising edge (tsu and tihold, Table 5-11 of
+## its data sheet, DS00002165C), and the setup has 1 ns more for the
+## traces. Their registers are in the I/O tiles, as on the MEGA65.
+set_output_delay -clock eth_clk_pin -max  5.000 [get_ports {eth_txd_o[*] eth_tx_en_o}]
+set_output_delay -clock eth_clk_pin -min -1.500 [get_ports {eth_txd_o[*] eth_tx_en_o}]
+set_property IOB TRUE [get_ports {eth_txd_o[*] eth_tx_en_o}]
 
 ## The system clock and the video clocks cross only through the screen's
 ## copy and the handshake of src/video/text.vhd, as on the MEGA65

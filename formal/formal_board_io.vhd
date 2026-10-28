@@ -23,7 +23,8 @@ entity formal_board_io is
       btn_i        : in  std_logic_vector(4 downto 0);
       sw_i         : in  std_logic_vector(15 downto 0);
       eth_rx_i     : in  std_logic_vector(31 downto 0);
-      eth_rx_bad_i : in  std_logic_vector(31 downto 0)
+      eth_rx_bad_i : in  std_logic_vector(31 downto 0);
+      eth_tx_i     : in  std_logic_vector(31 downto 0)
    );
 end entity formal_board_io;
 
@@ -57,7 +58,10 @@ begin
          btn_i        => btn_i,
          sw_i         => sw_i,
          eth_rx_i     => eth_rx_i,
-         eth_rx_bad_i => eth_rx_bad_i
+         eth_rx_bad_i => eth_rx_bad_i,
+         eth_tx_i     => eth_tx_i,
+         eth_mac_o    => open,
+         eth_ip_o     => open
       ); -- i_board_io
 
 end architecture synthesis;

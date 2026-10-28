@@ -103,7 +103,7 @@ effect and does not write (DEBUG.md §3).
 | `0xFFFFFF40`–`0xFFFFFF4F` | The performance counters of nice_cpu's SYSTEM.md §3: cycles, instructions, and microseconds, 64 bits each. The microseconds come from the clock, 100 MHz on the MEGA65 and 90 MHz on the Nexys4DDR, so they are real time, where the emulator counts one per step. They stop while the core is paused. The link reads them as the core does: a read of a low word takes the snapshot that the high word returns, where `niceemu --link` takes none. DEBUG.md §3 allows both while the core is held, halted, or paused. The words `0xFFFFFF46`–`4F` read 0 and take no write. |
 | `0xFFFFFF50`–`0xFFFFFF7F` | The fetch statistics of MICROARCH.md §8.1, the rest of the performance counters: counters of what FETCH and DECODE do, for judging the size of FETCH's buffer. A start of the core clears them, and they then count each clock while the core runs, until a write of 0 to `FS_CTRL` stops them. They stop while the core is held and after it halts. |
 | `0xFFFFFF80`–`0xFFFFFF8F` | The screen's registers: the cursor and the display offset (see [The screen](#the-screen)). |
-| `0xFFFFFF90`–`0xFFFFFF9F` | The Nexys4DDR's LEDs, seven-segment display, buttons, and switches (see [The Nexys4DDR's devices](#the-nexys4ddrs-devices)). On the MEGA65 they read 0 and take no write. On every board, `0xFFFFFF98` and `99` count the Ethernet frames received, good and bad. |
+| `0xFFFFFF90`–`0xFFFFFF9F` | The Nexys4DDR's LEDs, seven-segment display, buttons, and switches (see [The Nexys4DDR's devices](#the-nexys4ddrs-devices)). On the MEGA65 they read 0 and take no write. On every board, `0xFFFFFF98`–`9D` are the Ethernet station (see [The Ethernet station](#the-ethernet-station)). |
 | `0xFFFFFFE0`–`0xFFFFFFEF` | The debug registers of DEBUG.md §6, for the link only, here and below: R0–R15 of the core, read only. After a halt they hold what the emulator prints. While the core is paused they hold its registers, with R15 the address of the next instruction, and a hold of the paused core keeps them. A hold of a running core leaves them undefined. |
 | `0xFFFFFFF0` | Control: hold, clear, hide, pause, and step (see [The control register](#the-control-register)). |
 | `0xFFFFFFF1` | Read only: why the core halted. 0 while it has not, 1 for `HALT`, 2 for a reserved control word, 3 for `INT` inside an interrupt routine, and 4 for `RTI` outside one. |
@@ -300,21 +300,44 @@ A, C, D, F, and G, which shows a 5 on digit 0. The display is scanned at about
 1 kHz per digit, so the digits look steady. The RGB LEDs are very bright at
 full level; 1 to 3 is a comfortable range. The buttons and the switches are
 synchronized to the clock but not debounced. The CPU RESET button is not a
-register: it resets the system. The words `0xFFFFFF97` and
-`0xFFFFFF9A`–`9F` read 0 and take no write; the keyboard's LEDs may come
-to `0xFFFFFF97` (see
-[#25](https://github.com/MJoergen/NiceMonMEGA65/issues/25)).
+register: it resets the system. The words `0xFFFFFF97`, `9E`, and `9F`
+read 0 and take no write; the keyboard's LEDs may come to `0xFFFFFF97`
+(see [#25](https://github.com/MJoergen/NiceMonMEGA65/issues/25)).
 
-`0xFFFFFF98` and `0xFFFFFF99` are on every board, the MEGA65 too. They
-are read only, and count the Ethernet frames that the PHY has received
-since reset, each wrapping at 2^32. `0xFFFFFF98` counts the good ones,
-which have at least 64 bytes and a right frame check sequence, and have
-come through the FIFO of received frames to the system clock.
-`0xFFFFFF99` counts the bad ones, whose sequence is wrong, that are
-shorter, or that did not end on a byte, and the good ones that found the
-FIFO full and were dropped. Nothing reads the frames yet, and nothing is
-sent. The PHY negotiates the link on its own, so a cable to a switch
-gives a good count that rises with the broadcasts on the network, and a
-bad count that stays at 0. This is the first step of a debug link over
-Ethernet
-([#30](https://github.com/MJoergen/NiceMonMEGA65/issues/30)).
+### The Ethernet station
+
+`0xFFFFFF98`–`9D` are on every board, the MEGA65 too. They are the
+Ethernet station, the first steps of a debug link over Ethernet
+([#30](https://github.com/MJoergen/NiceMonMEGA65/issues/30)). It
+answers ARP requests for its IP address, and nothing else yet.
+
+| Address | Access | What it is |
+|---|---|---|
+| `0xFFFFFF98` | Read only | The good frames received. |
+| `0xFFFFFF99` | Read only | The bad frames received, and the good ones that were dropped. |
+| `0xFFFFFF9A` | Read, write | The IP address, the first byte in bits 31..24: `0xC0A80142` is 192.168.1.66. 0 after reset, which answers nothing. |
+| `0xFFFFFF9B` | Read, write | The first two bytes of the MAC address, in bits 15..0. Bits 31..16 read 0 and are dropped. |
+| `0xFFFFFF9C` | Read, write | The last four bytes of the MAC address. The address is 02:4E:49:43:45:00 after reset. |
+| `0xFFFFFF9D` | Read only | The frames sent. |
+
+The counts start at 0 at reset and wrap at 2^32. A good frame has at
+least 64 bytes and a right frame check sequence, and has come through the
+FIFO of received frames to the system clock. A bad frame has a wrong
+sequence, is shorter, or did not end on a byte. A good frame is dropped
+when it finds that FIFO full. The PHY negotiates the link on its own, so
+a cable to a switch gives a good count that rises with the broadcasts on
+the network, and a bad count that stays at 0.
+
+The station keeps the frames to its MAC address and to everyone, and
+drops the others. It answers each ARP request for its IP address with
+an ARP reply. With the IP address at 0, as after reset, it answers
+nothing, so a board on a network stays silent until a program or the
+link gives it an address. The MAC address is a locally administered one;
+two boards on one network need different ones. On the link, for example:
+
+    make mon PORT=/dev/ttyUSB3
+    mon> w FFFFFF9A C0A80142
+
+Then `ping 192.168.1.66` from a PC on the network gets no answer yet, but
+`ip neigh` there shows the board's MAC address, and `0xFFFFFF9D` counts
+the replies.

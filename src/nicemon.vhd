@@ -110,11 +110,12 @@
 --                          for a cycle when one is written, and when they
 --                          are cleared by reset or by the clear of the memory.
 --   0xFFFFFF90-0xFFFFFF9F  The board's devices (src/board_io.vhd): 90-96
---                          with G_BOARD_IO (the Nexys4DDR), and 98-99 on every
+--                          with G_BOARD_IO (the Nexys4DDR), and 98-9D on every
 --                          board. Without G_BOARD_IO, and in the words that
 --                          are not registers, a read returns 0 and a write
---                          is dropped. Reset clears the writable ones; a
---                          start of the core does not.
+--                          is dropped. Reset clears the writable ones, or
+--                          sets them as 9A-9C say; a start of the core does
+--                          not.
 --     90  The 16 LEDs, bit n for LED n. Read and write.
 --     91  RGB LED 0: bits 11..8 red, 7..4 green, 3..0 blue, each a level
 --         of 0 to 15. Read and write.
@@ -129,6 +130,15 @@
 --     98  The good Ethernet frames received, eth_rx_i, a count that wraps
 --         (system.vhd). Read only.
 --     99  The bad or dropped Ethernet frames, eth_rx_bad_i, as 98.
+--     9A  The Ethernet station's IP address, eth_ip_o, the first byte sent
+--         in bits 31..24: 0xC0A80142 is 192.168.1.66. G_ETH_IP after
+--         reset; 0 answers nothing. Read and write.
+--     9B  The first two bytes of its MAC address, eth_mac_o(47 downto 32),
+--         in bits 15..0. Read and write.
+--     9C  The last four bytes of its MAC address, eth_mac_o(31 downto 0).
+--         G_ETH_MAC after reset, 02:4E:49:43:45:00 by default. Read and
+--         write.
+--     9D  The Ethernet frames sent, eth_tx_i, as 98.
 --   0xFFFFFFE0-0xFFFFFFFF  The debug registers of DEBUG.md §6, for the link
 --                          only, which debug_link holds: R0-R15 of the core
 --                          after a halt or at a pause, the control
@@ -245,6 +255,9 @@ entity nicemon is
       G_BOARD_IO         : boolean := false;
       -- The number of breakpoints of the debug link, 0 to 8 (DEBUG.md §6)
       G_BREAKS           : natural range 0 to C_BREAKS_MAX := 4;
+      -- The Ethernet station's MAC and IP addresses after reset (board_io.vhd)
+      G_ETH_MAC          : std_logic_vector(47 downto 0) := X"024E49434500";
+      G_ETH_IP           : std_logic_vector(31 downto 0) := X"00000000";
       -- The checks of formal/nicemon.sby; implies G_RAM_ANY of mem
       G_FORMAL           : boolean := false
    );
@@ -282,10 +295,13 @@ entity nicemon is
       brd_seg_o      : out std_logic_vector(63 downto 0);
       brd_btn_i      : in  std_logic_vector(4 downto 0)  := (others => '0');
       brd_sw_i       : in  std_logic_vector(15 downto 0) := (others => '0');
-      -- The counts of Ethernet frames received, with their frame check
-      -- sequence right and wrong, on every board
+      -- The counts of Ethernet frames received, good and bad or dropped,
+      -- and of those sent, and the station's addresses, on every board
       eth_rx_i       : in  std_logic_vector(31 downto 0) := (others => '0');
-      eth_rx_bad_i   : in  std_logic_vector(31 downto 0) := (others => '0')
+      eth_rx_bad_i   : in  std_logic_vector(31 downto 0) := (others => '0');
+      eth_tx_i       : in  std_logic_vector(31 downto 0) := (others => '0');
+      eth_mac_o      : out std_logic_vector(47 downto 0);
+      eth_ip_o       : out std_logic_vector(31 downto 0)
    );
 end entity nicemon;
 
@@ -847,7 +863,9 @@ begin
 
    i_board_io : entity work.board_io
       generic map (
-         G_BOARD_IO => G_BOARD_IO
+         G_BOARD_IO => G_BOARD_IO,
+         G_ETH_MAC  => G_ETH_MAC,
+         G_ETH_IP   => G_ETH_IP
       )
       port map (
          clk_i        => clk_i,
@@ -864,7 +882,10 @@ begin
          btn_i        => brd_btn_i,
          sw_i         => brd_sw_i,
          eth_rx_i     => eth_rx_i,
-         eth_rx_bad_i => eth_rx_bad_i
+         eth_rx_bad_i => eth_rx_bad_i,
+         eth_tx_i     => eth_tx_i,
+         eth_mac_o    => eth_mac_o,
+         eth_ip_o     => eth_ip_o
       ); -- i_board_io
 
    -- The screen's registers, which take the request served, when it is

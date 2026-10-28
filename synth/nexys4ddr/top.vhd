@@ -27,9 +27,8 @@
 -- The reset button, CPU_RESETN, is active low.
 --
 -- The Ethernet PHY, an SMSC LAN8720A, gets its 50 MHz clock and its reset
--- from the FPGA, as on the MEGA65 (synth/mega65/mega65.vhd). Its receive
--- pins go to system.vhd, which counts the frames received. Nothing is sent
--- yet.
+-- from the FPGA, as on the MEGA65 (synth/mega65/mega65.vhd). Its RMII
+-- pins go to system.vhd, to the Ethernet station there (src/eth/eth.vhd).
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -263,6 +262,8 @@ begin
          eth_rst_i    => eth_rst,
          eth_rxd_i    => eth_rxd_i,
          eth_crs_dv_i => eth_crs_dv_i,
+         eth_txd_o    => eth_txd_o,
+         eth_tx_en_o  => eth_tx_en_o,
          vga_clk_i    => vga_clk,
          vga_hs_o     => vga_hs,
          vga_vs_o     => vga_vs,
@@ -319,7 +320,5 @@ begin
    end process p_eth_rst;
 
    eth_rst_n_o <= eth_rst_n_r;
-   eth_txd_o   <= "00";
-   eth_tx_en_o <= '0';  -- Send nothing
 
 end architecture synthesis;
