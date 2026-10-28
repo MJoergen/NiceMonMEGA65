@@ -18,8 +18,8 @@
 
 CLANG  ?= clang
 PYTHON ?= python3
-NICE    = ../nice_cpu
-LIBC    = $(NICE)/runtime/libc
+NICE_CPU = ../nice_cpu
+LIBC    = $(NICE_CPU)/runtime/libc
 BUILD   = build
 
 CFLAGS  = --target=wasm32 -mbulk-memory -O2 -ffreestanding -nostdlibinc \
@@ -27,11 +27,11 @@ CFLAGS  = --target=wasm32 -mbulk-memory -O2 -ffreestanding -nostdlibinc \
 LDFLAGS = -nostdlib -Wl,--no-entry -Wl,--export=main \
           -Wl,--stack-first -Wl,-z,stack-size=4096 -Wl,--initial-memory=65536
 
-RUNTIME = $(NICE)/runtime/lib.nasm $(NICE)/runtime/muldiv_mpu.nasm
-START   = $(NICE)/runtime/start_wasm.nasm
+RUNTIME = $(NICE_CPU)/runtime/lib.nasm $(NICE_CPU)/runtime/muldiv_mpu.nasm
+START   = $(NICE_CPU)/runtime/start_wasm.nasm
 # The tools are prerequisites, so a bump of the submodule rebuilds the files.
-NICEWASM = $(wildcard $(NICE)/translator/*.py)
-NICEASM  = $(wildcard $(NICE)/assembler/*.py)
+NICEWASM = $(wildcard $(NICE_CPU)/translator/*.py)
+NICEASM  = $(wildcard $(NICE_CPU)/assembler/*.py)
 
 PROGRAMS = primes bench
 
@@ -44,17 +44,17 @@ $(LIBC)/libc.a: FORCE
 $(BUILD)/%.wasm: %.c $(LIBC)/libc.a | $(BUILD)
 	$(CLANG) $(CFLAGS) $(LDFLAGS) -o $@ $< $(LIBC)/libc.a
 
-$(BUILD)/bench.wasm: $(NICE)/bench/bench.c $(LIBC)/libc.a | $(BUILD)
+$(BUILD)/bench.wasm: $(NICE_CPU)/bench/bench.c $(LIBC)/libc.a | $(BUILD)
 	$(CLANG) $(CFLAGS) $(LDFLAGS) -o $@ $< $(LIBC)/libc.a
 
 $(BUILD)/%.nasm: $(BUILD)/%.wasm $(NICEWASM)
-	$(PYTHON) $(NICE)/translator/nicewasm.py -o $@ $<
+	$(PYTHON) $(NICE_CPU)/translator/nicewasm.py -o $@ $<
 
 $(BUILD)/%_full.nasm: $(BUILD)/%.nasm $(START) $(RUNTIME)
 	cat $(START) $< $(RUNTIME) > $@
 
 $(BUILD)/%.bin: $(BUILD)/%_full.nasm $(NICEASM)
-	$(PYTHON) $(NICE)/assembler/niceasm.py -o $@ $<
+	$(PYTHON) $(NICE_CPU)/assembler/niceasm.py -o $@ $<
 
 $(BUILD):
 	mkdir -p $@

@@ -11,10 +11,10 @@
 # label VERSION, is joined to demo.nasm.
 
 PYTHON  ?= python3
-NICE     = ../nice_cpu
-ASM      = $(PYTHON) $(NICE)/assembler/niceasm.py
-ASM_PY   = $(wildcard $(NICE)/assembler/*.py)
-EMU      = $(NICE)/emulator/zig-out/bin/niceemu
+NICE_CPU = ../nice_cpu
+ASM      = $(PYTHON) $(NICE_CPU)/assembler/niceasm.py
+ASM_PY   = $(wildcard $(NICE_CPU)/assembler/*.py)
+EMU      = $(NICE_CPU)/emulator/zig-out/bin/niceemu
 BUILD    = build
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo unknown)
 
