@@ -34,6 +34,10 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   then be a label, `label+N`, or `label-N`, and the output shows the
   labels.
 - `make linktest` checks `mon.py`'s commands on `niceemu --link` too.
+- The tools read the link's version when they connect, and stop with a
+  message on a major other than 0 (nice_cpu's DEBUG.md §9). `mon.py`'s
+  `status` shows the version as major.minor, and `hwtest.py` checks the
+  version of the pinned nice_cpu's `debug_link.vhd`, not a fixed 4.
 
 **Documentation**
 

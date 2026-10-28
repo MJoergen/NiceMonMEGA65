@@ -23,7 +23,9 @@ The MEGA65's debug UART runs at 2 Mbaud (2000000), 8-N-1. It carries the
 program's console both ways, and the packets of the debug link between
 its bytes (see [SYSTEM.md](../doc/SYSTEM.md#the-debug-link)). The
 tools use the link, and `niceemu --link` serves the same link, so the
-tools drive the emulator as they drive the board.
+tools drive the emulator as they drive the board. When they connect, the
+tools read the link's version, and stop on a major other than 0, which
+they do not know (DEBUG.md §9).
 
 The tools use the serial device `/dev/ttyUSB1`, the MEGA65's debug UART.
 If yours is another, give it to the tools with `--port`, and open it in
@@ -269,9 +271,9 @@ The short names are `s` for `step`, `g` for `go`, `c` for `console`, and
 
 - `status` shows whether the core is running, paused, at a breakpoint,
   held in reset, or halted, and why. It also shows whether the ROM is
-  hidden, the control register, the link's version, and the free space
-  in the program's input buffer. When the core is paused or halted, it
-  shows the PC.
+  hidden, the control register, the link's version as major.minor, and
+  the free space in the program's input buffer. When the core is paused
+  or halted, it shows the PC.
 - `regs` shows R0 to R15. They are defined while the core is paused, and
   after a halt.
 

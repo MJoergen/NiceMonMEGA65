@@ -87,6 +87,8 @@ from nicelink import (BRK_COUNT, BRK_EN, CONTROL, FREE, HOLD, PAUSE, RAM,
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NICEEMU = f"{REPO}/nice_cpu/emulator/zig-out/bin/niceemu"
+# The debug link of the pinned nice_cpu, which the bitstream is built from
+DEBUG_LINK = f"{REPO}/nice_cpu/hdl/src/debug_link.vhd"
 # The clock of each board, which sets the rate of the microsecond counter
 CLOCK_HZ = {"mega65": 100_000_000, "nexys4ddr": 90_000_000}
 
@@ -296,10 +298,24 @@ def test_boot(link: Link, bit: str, cable: list[str]) -> None:
               wr(link, 0, 0x12345678) and rd(link, 0) == first)
 
 
+def link_version() -> int:
+    """The version of the link, C_VERSION of the pinned nice_cpu's
+    debug_link.vhd."""
+    with open(DEBUG_LINK) as f:
+        m = re.search(r'constant C_VERSION *: *t_word *:= *'
+                      r'X"([0-9A-Fa-f]{8})"', f.read())
+    if not m:
+        sys.exit(f"hwtest.py: no C_VERSION in {DEBUG_LINK}")
+    return int(m.group(1), 16)
+
+
 def test_link(link: Link) -> None:
     link.control(HOLD | RAM)
     require("hide the ROM", ctl(link) in ("00000009", "0000000B"), ctl(link))
-    check("version 4", rd(link, VERSION) == 4)
+    want = link_version()
+    got = rd(link, VERSION)
+    check(f"version {want >> 4}.{want & 0xF}, as nice_cpu's debug_link.vhd",
+          got == want, f"{got:02X}")
     check("W then R", wr(link, 0x100, 0xDEADBEEF) and
           rd(link, 0x100) == 0xDEADBEEF)
     words = list(range(0x1000, 0x1000 + 600))

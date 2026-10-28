@@ -49,6 +49,9 @@ REGS = 0xFFFFFFE0
 CONTROL = 0xFFFFFFF0
 HALT_REASON = 0xFFFFFFF1
 VERSION = 0xFFFFFFF2
+# The major of the version that the tools know, bits 7 to 4 of it
+# (DEBUG.md §9). A new minor, bits 3 to 0, keeps them working.
+MAJOR = 0
 FREE = 0xFFFFFFF3
 # The breakpoints (version 4): the enable bits, their number, the stop
 # register, and the address of breakpoint 0, then 1 to 7
@@ -395,6 +398,8 @@ class Link:
             self.pauses += 1
             self.breaks.append(int(payload, 16))
         else:
+            # An answer, or a notice of a newer version, which _request
+            # skips, as its tag matches no request (DEBUG.md §9).
             self._answers.append((tag, payload.upper()))
 
     def in_packet(self) -> bool:
@@ -607,11 +612,23 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
                         "slow, about 250 UART bytes a second")
 
 
+def check_version(link: Link) -> int:
+    """Reads the version of the link, and stops on a major that the tools
+    do not know (DEBUG.md §9). Returns the version."""
+    version = link.read_word(VERSION)
+    if version >> 4 != MAJOR:
+        fail(f"the system serves debug link version {version >> 4}."
+             f"{version & 0xF} (0x{version:02x}); this tool knows major "
+             f"{MAJOR}")
+    return version
+
+
 def open_link(args: argparse.Namespace) -> Link:
-    """The link that the options of add_arguments pick."""
+    """The link that the options of add_arguments pick, after a check of
+    its version."""
     if getattr(args, "cosim", None) is not None:
-        return Link(Cosim(args.cosim))
-    if args.tcp is not None:
+        link = Link(Cosim(args.cosim))
+    elif args.tcp is not None:
         link = Link(Tcp(args.tcp))
         # niceemu sends b to each host that connects (DEBUG.md §7). Wait
         # 2 s for it: long enough for a busy computer, short enough to
@@ -623,5 +640,7 @@ def open_link(args: argparse.Namespace) -> Link:
             fail(f"no b notice, the packet that niceemu --link sends to each "
                  f"host that connects, from 127.0.0.1:{args.tcp}; is that "
                  f"port served by niceemu --link, not by another program?")
-        return link
-    return Link(Serial(args.port, args.baud))
+    else:
+        link = Link(Serial(args.port, args.baud))
+    check_version(link)
+    return link

@@ -376,14 +376,16 @@ class Monitor(cmd.Cmd):
         elif ctl & HOLD:
             state = "held"
         elif ctl & PAUSE:
-            stop = link.read_word(STOP) if version >= 4 else 0
+            # open_link has checked the major, so the minor tells.
+            stop = link.read_word(STOP) if (version & 0xF) >= 4 else 0
             state = f"at breakpoint {stop & 0xFF}" if stop & 0x100 \
                 else "paused"
         else:
             state = "running"
         rom = "hidden" if ctl & RAM else "shown"
         print(f"{state}, ROM {rom}, control {ctl:08x}, link version "
-              f"{version}, input free {link.read_word(FREE)}")
+              f"{version >> 4}.{version & 0xF}, input free "
+              f"{link.read_word(FREE)}")
         if ctl & HALTED:
             print(self._pc())
         elif ctl & PAUSE:

@@ -131,14 +131,15 @@ UART:
 
 <pre>
 $ <b>tools/mon.py</b>
-halted: HALT, ROM hidden, control 0000000a, link version 4, input free 2048
+halted: HALT, ROM hidden, control 0000000a, link version 0.4, input free 2048
 PC=0000000f
 </pre>
 
 The core may be running, paused, at a breakpoint, held in reset, or halted,
 with the reason. Then come whether the ROM is hidden, the value of the
-control register, the version of the link, and the free bytes in the
-program's input buffer. A paused or halted core shows its PC too.
+control register, the version of the link as major.minor, and the free
+bytes in the program's input buffer. A paused or halted core shows its PC
+too.
 
 The commands of `mon.py` are short, and `help` lists them. They are
 described in full in [tools/README.md](tools/README.md#monpy). Numbers
@@ -193,13 +194,13 @@ the next start:
 <pre>
 $ <b>python3 nice_cpu/assembler/niceasm.py -o echo.bin sim/echo.nasm</b>
 $ <b>tools/mon.py</b>
-halted: HALT, ROM hidden, control 0000000a, link version 4, input free 2048
+halted: HALT, ROM hidden, control 0000000a, link version 0.4, input free 2048
 PC=0000000f
 'help' lists the commands, and 'q' quits.
 mon&gt; <b>load echo.bin</b>
 loaded 15 words; the core is held in reset
 mon&gt; <b>status</b>
-held, after a halt: HALT, ROM hidden, control 0000000b, link version 4, input free 2048
+held, after a halt: HALT, ROM hidden, control 0000000b, link version 0.4, input free 2048
 PC=0000000f
 mon&gt; <b>r 0 f</b>
 00000000: 00007800 ffffff00 03a080b0 00000100 3003d800 00000000 01a040b0 000000ff
@@ -264,7 +265,7 @@ mon&gt; <b>send .</b>
 .
 [halted: HALT, PC=0000000f]
 mon&gt; <b>status</b>
-halted: HALT, ROM hidden, control 0000000a, link version 4, input free 2048
+halted: HALT, ROM hidden, control 0000000a, link version 0.4, input free 2048
 PC=0000000f
 mon&gt; <b>q</b>
 </pre>
