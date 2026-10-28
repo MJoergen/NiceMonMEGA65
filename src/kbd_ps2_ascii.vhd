@@ -1,15 +1,15 @@
 -- Turns the scan codes of a PS/2 keyboard (kbd_ps2.vhd) into a stream of
 -- ASCII bytes, as kbd_m65_ascii.vhd does for the MEGA65 keyboard: one byte for a
--- key, CR for Enter, and the ANSI sequences ESC [ A to ESC [ D for the
--- cursor keys. The layout is US English.
+-- key, CR for Enter, the ANSI sequences ESC [ A to ESC [ D for the cursor
+-- keys, and xterm's sequences for F1 to F12. The layout is US English.
 --
 -- THEORY OF OPERATION
 -- The keyboard sends scan code set 2: a key's code when it is pressed, the
 -- code again every so often while it is held, and F0 and the code when it is
 -- released. Some keys have E0 before their code. So a held key repeats as
 -- the keyboard repeats it, and the release gives nothing but the release of
--- a modifier. Bytes from 80 up other than E0 and F0 are answers to commands
--- or errors, and are ignored.
+-- a modifier. Bytes from 80 up other than E0, F0, and 83, which is F7, are
+-- answers to commands or errors, and are ignored.
 --
 -- The byte of a key is in the tables below, one for codes without E0, with
 -- and without SHIFT, and a few lines for those with E0. SHIFT (either) gives
@@ -19,7 +19,9 @@
 -- would be NUL, which means no byte, so it gives nothing. Backspace and
 -- Delete give DEL (0x7F), also with SHIFT or CTRL, as INST/DEL does on the
 -- MEGA65. The keypad gives its digits and symbols, whatever Num Lock is,
--- and its Enter gives CR. Other keys give nothing.
+-- and its Enter gives CR. F1 to F4 give ESC O P to ESC O S, and F5 to F12
+-- ESC [, a number, and ~, as xterm sends them, also with SHIFT. Other keys
+-- give nothing.
 --
 -- The bytes of a key wait in out_bytes until data_ready_i takes them. A key
 -- that comes while they wait gives nothing, but the modifiers still change.
@@ -57,12 +59,35 @@ architecture synthesis of kbd_ps2_ascii is
    constant C_RSHIFT  : std_logic_vector(7 downto 0) := X"59";
    constant C_CTRL    : std_logic_vector(7 downto 0) := X"14"; -- either, E0 for the right
    constant C_CAPS    : std_logic_vector(7 downto 0) := X"58";
+   constant C_F7_CODE : std_logic_vector(7 downto 0) := X"83"; -- the only key above 7F
 
    -- The cursor keys: ESC [ A, B, C, or D
    constant C_UP    : std_logic_vector(7 downto 0) := X"80";
    constant C_DOWN  : std_logic_vector(7 downto 0) := X"81";
    constant C_RIGHT : std_logic_vector(7 downto 0) := X"82";
    constant C_LEFT  : std_logic_vector(7 downto 0) := X"83";
+
+   -- The function keys: F1 is 90, F12 is 9B
+   constant C_F1  : std_logic_vector(7 downto 0) := X"90";
+   constant C_F2  : std_logic_vector(7 downto 0) := X"91";
+   constant C_F3  : std_logic_vector(7 downto 0) := X"92";
+   constant C_F4  : std_logic_vector(7 downto 0) := X"93";
+   constant C_F5  : std_logic_vector(7 downto 0) := X"94";
+   constant C_F6  : std_logic_vector(7 downto 0) := X"95";
+   constant C_F7  : std_logic_vector(7 downto 0) := X"96";
+   constant C_F8  : std_logic_vector(7 downto 0) := X"97";
+   constant C_F9  : std_logic_vector(7 downto 0) := X"98";
+   constant C_F10 : std_logic_vector(7 downto 0) := X"99";
+   constant C_F11 : std_logic_vector(7 downto 0) := X"9A";
+   constant C_F12 : std_logic_vector(7 downto 0) := X"9B";
+
+   -- What xterm sends after ESC for each function key: two bytes for F1 to
+   -- F4, and four for the others
+   type t_fkeys is array (0 to 15) of string(1 to 4);
+
+   constant C_FKEYS : t_fkeys := (
+      "OP  ", "OQ  ", "OR  ", "OS  ", "[15~", "[17~", "[18~", "[19~",
+      "[20~", "[21~", "[23~", "[24~", others => "    ");
 
    type t_table is array (0 to 127) of std_logic_vector(7 downto 0);
 
@@ -75,6 +100,9 @@ architecture synthesis of kbd_ps2_ascii is
    -- byte.
    -- vsg_off constant_400 constant_012
    constant C_NORMAL : t_table := (
+      16#01# => C_F9,      16#03# => C_F5,      16#04# => C_F3,      16#05# => C_F1,
+      16#06# => C_F2,      16#07# => C_F12,     16#09# => C_F10,     16#0A# => C_F8,
+      16#0B# => C_F6,      16#0C# => C_F4,      16#78# => C_F11,
       16#0D# => X"09",     16#0E# => chr('`'),  16#15# => chr('q'),  16#16# => chr('1'),
       16#1A# => chr('z'),  16#1B# => chr('s'),  16#1C# => chr('a'),  16#1D# => chr('w'),
       16#1E# => chr('2'),  16#21# => chr('c'),  16#22# => chr('x'),  16#23# => chr('d'),
@@ -95,6 +123,9 @@ architecture synthesis of kbd_ps2_ascii is
       others => X"00");
 
    constant C_SHIFTED : t_table := (
+      16#01# => C_F9,      16#03# => C_F5,      16#04# => C_F3,      16#05# => C_F1,
+      16#06# => C_F2,      16#07# => C_F12,     16#09# => C_F10,     16#0A# => C_F8,
+      16#0B# => C_F6,      16#0C# => C_F4,      16#78# => C_F11,
       16#0D# => X"09",     16#0E# => chr('~'),  16#15# => chr('Q'),  16#16# => chr('!'),
       16#1A# => chr('Z'),  16#1B# => chr('S'),  16#1C# => chr('A'),  16#1D# => chr('W'),
       16#1E# => chr('@'),  16#21# => chr('C'),  16#22# => chr('X'),  16#23# => chr('D'),
@@ -130,6 +161,34 @@ architecture synthesis of kbd_ps2_ascii is
       end case;
    end function ext_byte;
 
+   -- The bytes that a byte of the tables stands for, the first in bits
+   -- 39..32: itself, ESC [ and A to D for a cursor key, or ESC and the
+   -- bytes of C_FKEYS for a function key
+   function seq_bytes(byte : std_logic_vector(7 downto 0)) return std_logic_vector is
+      variable fkey_v : string(1 to 4);
+   begin
+      if byte(7) = '0' then
+         return byte & X"00000000";
+      elsif byte(4) = '0' then
+         return X"1B" & chr('[') & (chr('A') + byte(1 downto 0)) & X"0000";
+      else
+         fkey_v := C_FKEYS(to_integer(byte(3 downto 0)));
+         return X"1B" & chr(fkey_v(1)) & chr(fkey_v(2)) & chr(fkey_v(3)) & chr(fkey_v(4));
+      end if;
+   end function seq_bytes;
+
+   -- How many bytes seq_bytes gives
+   function seq_len(byte : std_logic_vector(7 downto 0)) return natural is
+   begin
+      if byte(7) = '0' then
+         return 1;
+      elsif byte(4) = '0' or byte(3 downto 2) = "00" then
+         return 3;
+      else
+         return 5;
+      end if;
+   end function seq_len;
+
    -- The prefixes before the code: E0, and F0, the break code
    signal ext : std_logic := '0';
    signal brk : std_logic := '0';
@@ -141,21 +200,21 @@ architecture synthesis of kbd_ps2_ascii is
    signal caps      : std_logic := '0';
    signal caps_held : std_logic := '0';
 
-   -- The bytes to send: the first is in bits 23..16
-   signal out_bytes : std_logic_vector(23 downto 0) := (others => '0');
-   signal out_cnt   : natural range 0 to 3 := 0;
+   -- The bytes to send: the first is in bits 39..32
+   signal out_bytes : std_logic_vector(39 downto 0) := (others => '0');
+   signal out_cnt   : natural range 0 to 5 := 0;
 
 begin
 
    data_valid_o <= '1' when out_cnt /= 0 else '0';
-   data_o       <= out_bytes(23 downto 16);
+   data_o       <= out_bytes(39 downto 32);
 
    p_decode : process (clk_i)
       variable byte_v : std_logic_vector(7 downto 0);
    begin
       if rising_edge(clk_i) then
          if out_cnt /= 0 and data_ready_i = '1' then
-            out_bytes <= out_bytes(15 downto 0) & X"00";
+            out_bytes <= out_bytes(31 downto 0) & X"00";
             out_cnt   <= out_cnt - 1;
          end if;
 
@@ -190,7 +249,9 @@ begin
                end if;
 
                -- The byte of the key
-               if code_i(7) = '1' then
+               if ext = '0' and code_i = C_F7_CODE then
+                  byte_v := C_F7;
+               elsif code_i(7) = '1' then
                   byte_v := X"00";
                elsif ext = '1' then
                   byte_v := ext_byte(code_i);
@@ -208,13 +269,8 @@ begin
                end if;
 
                if brk = '0' and byte_v /= X"00" and out_cnt = 0 then
-                  if byte_v(7) = '1' then
-                     out_bytes <= X"1B" & chr('[') & (chr('A') + byte_v(1 downto 0));
-                     out_cnt   <= 3;
-                  else
-                     out_bytes <= byte_v & X"0000";
-                     out_cnt   <= 1;
-                  end if;
+                  out_bytes <= seq_bytes(byte_v);
+                  out_cnt   <= seq_len(byte_v);
                end if;
             end if;
          end if;

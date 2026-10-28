@@ -23,6 +23,12 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 
 ## V1.1 (not yet released)
 
+**Boards**
+
+- F1 to F12 give xterm's escape sequences, on the Nexys4DDR's keyboard
+  and on the MEGA65's, which has F1, F3, and so on to F11, and the even
+  keys with SHIFT. They gave nothing before.
+
 **Tools**
 
 - `make flash` (`tools/flash.py`) writes a bitstream into the

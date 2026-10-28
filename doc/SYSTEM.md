@@ -223,12 +223,14 @@ terminal sends it:
 | RUN/STOP | CTRL-C (`0x03`) |
 | ESC, TAB | ESC, TAB |
 | Cursor keys | `ESC [ A` to `ESC [ D`, as ANSI terminals send them |
+| F1, F3, F5, F7, F9, F11 | As xterm sends them: `ESC O P` and `ESC O R` for F1 and F3, and `ESC [ 15 ~`, `ESC [ 18 ~`, `ESC [ 20 ~`, and `ESC [ 23 ~` for the others |
+| SHIFT with F1 to F11 | The even keys F2 to F12, as xterm sends them: `ESC O Q`, `ESC O S`, `ESC [ 17 ~`, `ESC [ 19 ~`, `ESC [ 21 ~`, and `ESC [ 24 ~` |
 | CTRL with a letter | Its control code |
 | £, ↑, ← | `\`, `^`, `_` (`\|`, `~`, `` ` `` with SHIFT) |
 | SHIFT with `0`, `=`, `:`, `;` | `{`, `}`, `[`, `]` |
 
-A held key repeats after half a second, 20 times a second. The function
-keys, HELP, CLR/HOME, and the modifiers give nothing. The keyboard's drive
+A held key repeats after half a second, 20 times a second. F13, HELP,
+CLR/HOME, and the modifiers give nothing. The keyboard's drive
 LED is green while the core runs, like the user LED.
 
 ## The ROM
@@ -265,8 +267,8 @@ does. The RAM under the ROM keeps its words meanwhile.
 On the Nexys4DDR, a USB keyboard in the board's USB HID port types into the
 same input (the board's PIC24 turns it into PS/2). Its keys give the same
 bytes, for a US layout: Enter is CR, Backspace and Delete are DEL, the
-cursor keys are `ESC [ A` to `ESC [ D`, and CTRL with a letter is its
-control code. The keypad gives its digits and symbols, whatever Num Lock
+cursor keys are `ESC [ A` to `ESC [ D`, F1 to F12 are as on the MEGA65,
+also with SHIFT, and CTRL with a letter is its control code. The keypad gives its digits and symbols, whatever Num Lock
 is. A held key repeats as the keyboard repeats it. The keyboard's LEDs are
 not set, so the CAPS LOCK LED does not show whether CAPS LOCK is on. A PS/2
 keyboard can't wait, so keys typed while the core's input is full are

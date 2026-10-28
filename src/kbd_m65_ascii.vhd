@@ -1,7 +1,8 @@
 -- Turns the keys of the MEGA65 keyboard (kbd_m65.vhd) into a stream of ASCII
--- bytes, as a terminal sends them: one byte for a key, CR for RETURN, and the
--- ANSI sequences ESC [ A to ESC [ D for the cursor keys. A key that is held
--- repeats after half a second, 20 times a second.
+-- bytes, as a terminal sends them: one byte for a key, CR for RETURN, the
+-- ANSI sequences ESC [ A to ESC [ D for the cursor keys, and xterm's
+-- sequences for the function keys. A key that is held repeats after half a
+-- second, 20 times a second.
 --
 -- THEORY OF OPERATION
 -- Every 5 ms the keys are sampled. A key counts as pressed when it was
@@ -23,6 +24,9 @@
 --   ← is _, and SHIFT-← is `      (as in PETSCII)
 --   SHIFT-0 is {, and SHIFT-= is }, SHIFT-: is [, and SHIFT-; is ]
 --   INST/DEL is DEL (0x7F), also with SHIFT, RUN/STOP is CTRL-C (0x03)
+-- F1, F3, F5, F7, F9, and F11 give xterm's sequences for those keys, and
+-- with SHIFT those of F2 to F12: ESC O P to ESC O S for F1 to F4, and ESC [,
+-- a number, and ~ for the others. F13 gives nothing.
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -63,6 +67,28 @@ architecture synthesis of kbd_m65_ascii is
    constant C_RIGHT : std_logic_vector(7 downto 0) := X"82";
    constant C_LEFT  : std_logic_vector(7 downto 0) := X"83";
 
+   -- The function keys in the table: F1 is 90, F12 is 9B
+   constant C_F1  : std_logic_vector(7 downto 0) := X"90";
+   constant C_F2  : std_logic_vector(7 downto 0) := X"91";
+   constant C_F3  : std_logic_vector(7 downto 0) := X"92";
+   constant C_F4  : std_logic_vector(7 downto 0) := X"93";
+   constant C_F5  : std_logic_vector(7 downto 0) := X"94";
+   constant C_F6  : std_logic_vector(7 downto 0) := X"95";
+   constant C_F7  : std_logic_vector(7 downto 0) := X"96";
+   constant C_F8  : std_logic_vector(7 downto 0) := X"97";
+   constant C_F9  : std_logic_vector(7 downto 0) := X"98";
+   constant C_F10 : std_logic_vector(7 downto 0) := X"99";
+   constant C_F11 : std_logic_vector(7 downto 0) := X"9A";
+   constant C_F12 : std_logic_vector(7 downto 0) := X"9B";
+
+   -- What xterm sends after ESC for each function key: two bytes for F1 to
+   -- F4, and four for the others
+   type t_fkeys is array (0 to 15) of string(1 to 4);
+
+   constant C_FKEYS : t_fkeys := (
+      "OP  ", "OQ  ", "OR  ", "OS  ", "[15~", "[17~", "[18~", "[19~",
+      "[20~", "[21~", "[23~", "[24~", others => "    ");
+
    type t_table is array (0 to C_NUM_KEYS - 1) of std_logic_vector(7 downto 0);
 
    function chr(c : character) return std_logic_vector is
@@ -73,7 +99,8 @@ architecture synthesis of kbd_m65_ascii is
    -- The byte of each key without SHIFT, and with it. 0 is no byte.
    -- vsg_off constant_400 constant_012
    constant C_NORMAL : t_table := (
-       0 => X"7F",       1 => X"0D",       2 => C_RIGHT,     7 => C_DOWN,
+       0 => X"7F",       1 => X"0D",       2 => C_RIGHT,     3 => C_F7,
+       4 => C_F1,        5 => C_F3,        6 => C_F5,        7 => C_DOWN,
        8 => chr('3'),    9 => chr('w'),   10 => chr('a'),   11 => chr('4'),
       12 => chr('z'),   13 => chr('s'),   14 => chr('e'),   16 => chr('5'),
       17 => chr('r'),   18 => chr('d'),   19 => chr('6'),   20 => chr('c'),
@@ -87,11 +114,13 @@ architecture synthesis of kbd_m65_ascii is
       49 => chr('*'),   50 => chr(';'),   53 => chr('='),   54 => chr('^'),
       55 => chr('/'),   56 => chr('1'),   57 => chr('_'),   59 => chr('2'),
       60 => chr(' '),   62 => chr('q'),   63 => X"03",      65 => X"09",
-      71 => X"1B",      73 => C_UP,       74 => C_LEFT,
+      68 => C_F9,       69 => C_F11,      71 => X"1B",      73 => C_UP,
+      74 => C_LEFT,
       others => X"00");
 
    constant C_SHIFTED : t_table := (
-       0 => X"7F",       1 => X"0D",       2 => C_LEFT,      7 => C_UP,
+       0 => X"7F",       1 => X"0D",       2 => C_LEFT,      3 => C_F8,
+       4 => C_F2,        5 => C_F4,        6 => C_F6,        7 => C_UP,
        8 => chr('#'),    9 => chr('W'),   10 => chr('A'),   11 => chr('$'),
       12 => chr('Z'),   13 => chr('S'),   14 => chr('E'),   16 => chr('%'),
       17 => chr('R'),   18 => chr('D'),   19 => chr('&'),   20 => chr('C'),
@@ -105,7 +134,8 @@ architecture synthesis of kbd_m65_ascii is
       49 => chr('*'),   50 => chr(']'),   53 => chr('}'),   54 => chr('~'),
       55 => chr('?'),   56 => chr('!'),   57 => chr('`'),   59 => chr('"'),
       60 => chr(' '),   62 => chr('Q'),   63 => X"03",      65 => X"09",
-      71 => X"1B",      73 => C_UP,       74 => C_LEFT,
+      68 => C_F10,      69 => C_F12,      71 => X"1B",      73 => C_UP,
+      74 => C_LEFT,
       others => X"00");
    -- vsg_on
 
@@ -128,6 +158,34 @@ architecture synthesis of kbd_m65_ascii is
       return res_v;
    end function key_byte;
 
+   -- The bytes that a byte of the tables stands for, the first in bits
+   -- 39..32: itself, ESC [ and A to D for a cursor key, or ESC and the
+   -- bytes of C_FKEYS for a function key
+   function seq_bytes(byte : std_logic_vector(7 downto 0)) return std_logic_vector is
+      variable fkey_v : string(1 to 4);
+   begin
+      if byte(7) = '0' then
+         return byte & X"00000000";
+      elsif byte(4) = '0' then
+         return X"1B" & chr('[') & (chr('A') + byte(1 downto 0)) & X"0000";
+      else
+         fkey_v := C_FKEYS(to_integer(byte(3 downto 0)));
+         return X"1B" & chr(fkey_v(1)) & chr(fkey_v(2)) & chr(fkey_v(3)) & chr(fkey_v(4));
+      end if;
+   end function seq_bytes;
+
+   -- How many bytes seq_bytes gives
+   function seq_len(byte : std_logic_vector(7 downto 0)) return natural is
+   begin
+      if byte(7) = '0' then
+         return 1;
+      elsif byte(4) = '0' or byte(3 downto 2) = "00" then
+         return 3;
+      else
+         return 5;
+      end if;
+   end function seq_len;
+
    signal sample_cnt : natural range 0 to C_SAMPLE - 1 := 0;
    signal last       : std_logic_vector(C_NUM_KEYS - 1 downto 0) := (others => '0');
    -- The keys pressed in this sample and the last, and in the last walk
@@ -142,14 +200,14 @@ architecture synthesis of kbd_m65_ascii is
    signal rep_key   : natural range 0 to C_NUM_KEYS - 1 := 0;
    signal rep_cnt   : natural range 0 to C_REPEAT_DELAY := 0;
 
-   -- The bytes to send: the first is in bits 23..16
-   signal out_bytes : std_logic_vector(23 downto 0) := (others => '0');
-   signal out_cnt   : natural range 0 to 3 := 0;
+   -- The bytes to send: the first is in bits 39..32
+   signal out_bytes : std_logic_vector(39 downto 0) := (others => '0');
+   signal out_cnt   : natural range 0 to 5 := 0;
 
 begin
 
    data_valid_o <= '1' when out_cnt /= 0 else '0';
-   data_o       <= out_bytes(23 downto 16);
+   data_o       <= out_bytes(39 downto 32);
 
    p_scan : process (clk_i)
 
@@ -162,13 +220,8 @@ begin
          if byte_v = X"00" then
             return;
          end if;
-         if byte_v(7) = '1' then
-            out_bytes <= X"1B" & chr('[') & (chr('A') + byte_v(1 downto 0));
-            out_cnt   <= 3;
-         else
-            out_bytes <= byte_v & X"0000";
-            out_cnt   <= 1;
-         end if;
+         out_bytes <= seq_bytes(byte_v);
+         out_cnt   <= seq_len(byte_v);
       end procedure send;
 
       variable sent_v : boolean;
@@ -176,7 +229,7 @@ begin
    begin
       if rising_edge(clk_i) then
          if out_cnt /= 0 and data_ready_i = '1' then
-            out_bytes <= out_bytes(15 downto 0) & X"00";
+            out_bytes <= out_bytes(31 downto 0) & X"00";
             out_cnt   <= out_cnt - 1;
          end if;
 

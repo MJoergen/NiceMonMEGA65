@@ -227,14 +227,26 @@ begin
       tap(2);
       expect(C_ESC & "[A" & C_ESC & "[B" & C_ESC & "[D" & C_ESC & "[C");
 
+      report "tb_kbd: the function keys, as xterm sends them";
+      tap(4);                        -- F1
+      press(15);
+      tap(4);                        -- SHIFT-F1 is F2
+      tap(69);                       -- SHIFT-F11 is F12
+      lift(15);
+      tap(6);                        -- F5
+      tap(3);                        -- F7
+      tap(68);                       -- F9
+      expect(C_ESC & "OP" & C_ESC & "OQ" & C_ESC & "[24~" & C_ESC & "[15~" &
+             C_ESC & "[18~" & C_ESC & "[20~");
+
       report "tb_kbd: two keys at once, and a key without a byte";
       held(9)  <= '1';               -- W
       held(62) <= '1';               -- Q
-      held(4)  <= '1';               -- F1
+      held(70) <= '1';               -- F13
       wait for C_HOLD;
       held(9)  <= '0';
       held(62) <= '0';
-      held(4)  <= '0';
+      held(70) <= '0';
       wait for C_HOLD;
       expect("wq");
 

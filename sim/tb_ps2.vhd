@@ -218,6 +218,18 @@ begin
       tap(X"4A", true);              -- the keypad's /
       expect(C_ESC & "[A" & C_ESC & "[B" & C_ESC & "[C" & C_ESC & "[D" & C_DEL & "4/");
 
+      report "tb_ps2: the function keys, as xterm sends them";
+      tap(X"05");                    -- F1
+      tap(X"0C");                    -- F4
+      tap(X"03");                    -- F5
+      tap(X"83");                    -- F7, the code above 7F
+      press(X"12");
+      tap(X"78");                    -- F11, also with SHIFT
+      lift(X"12");
+      tap(X"07");                    -- F12
+      expect(C_ESC & "OP" & C_ESC & "OS" & C_ESC & "[15~" & C_ESC & "[18~" &
+             C_ESC & "[23~" & C_ESC & "[24~");
+
       report "tb_ps2: a key repeats as the keyboard repeats it";
       press(X"22");                  -- X
       press(X"22");
@@ -226,7 +238,7 @@ begin
       expect("xxx");
 
       report "tb_ps2: keys without a byte, and answers from the keyboard";
-      tap(X"05");                    -- F1
+      tap(X"7E");                    -- Scroll Lock
       tap(X"11");                    -- Alt
       tap(X"1F", true);              -- the left Windows key
       send(X"AA");                   -- the self-test passed
