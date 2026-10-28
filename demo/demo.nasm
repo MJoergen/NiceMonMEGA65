@@ -5,7 +5,8 @@
 ;
 ; One demo runs at a time, and a function key switches to another: the
 ; menu in the second row of the screen lists them. A switch starts the demo
-; afresh. At power-up the typewriter runs. Its top rows say what the core is
+; afresh. F3 shows the bytes of each key, in hex and as characters. At
+; power-up the typewriter, F1, runs. Its top rows say what the core is
 ; and how to go further, and the rows below them take what is typed, from
 ; the keyboard or the UART: a character goes at the cursor, RETURN starts a
 ; new line, DEL (or backspace) deletes the character before the cursor, TAB
@@ -16,7 +17,8 @@
 ; sequences of the cursor keys and of the function keys, as xterm sends
 ; them, into codes of their own, and on a function key with a demo it
 ; starts that demo. A demo starts with SP at its top, so the switch leaves
-; nothing on the stack.
+; nothing on the stack. A demo that wants the bytes themselves, as F3 does,
+; puts the address of a routine in ECHO, which POLL calls with each byte.
 ;
 ; When the cursor goes past the last row, the typewriter scrolls its rows
 ; up by one, by copying each row to the one above it. The top rows do not
@@ -61,12 +63,16 @@ TYPED   .EQU    0x000FFF00      ; white on black
 TOP     .EQU    10              ; the first row of the typewriter
 LAST    .EQU    24              ; and its last
 SCR_TOP .EQU    SCREEN+800      ; the address of row TOP, 80 * TOP words in
-SCR_2ND .EQU    SCREEN+880      ; and of the row after it
+KTOP    .EQU    8               ; the first row of the keys of F3
+SCR_KEY .EQU    SCREEN+640      ; its address, 80 * KTOP words in
+K_MAX   .EQU    12              ; the bytes of a key that F3 shows
 
-; The registers that hold the typewriter's state
-COL     .EQU    R10             ; the cursor's column, 0 to 79
-ROW     .EQU    R11             ; the cursor's row, TOP to LAST
+; The registers that hold the state of the demos
+COL     .EQU    R10             ; the typewriter's column, 0 to 79, or the
+                                ; bytes shown of the key, for F3
+ROW     .EQU    R11             ; the row, TOP or KTOP to LAST
 CR      .EQU    R8              ; 1 when the byte before was a CR
+ECHO    .EQU    R12             ; a routine that POLL calls with each byte, or 0
 
 ; The codes that POLL gives for the cursor keys, above those of the bytes
 KEY_UP  .EQU    0x101
@@ -162,15 +168,9 @@ NEWLINE MOVE    COL, 0
     ?!Z ADD     ROW, ROW, 1
     ?!Z MOVE    PC, KEY
         MOVE    R2, SCR_TOP
-        MOVE    R3, SCR_2ND
         MOVE    R4, 1120        ; the rows TOP+1 to LAST, 14 of 80 words
-SCROLL  MOVE    @R2++, @R3++
-        SUB[M]  R4, R4, 1
-    ?!Z MOVE    PC, SCROLL
-        MOVE    R3, TYPED+0x20  ; R2 is at the last row, which is cleared
-        MOVE    R4, 80
         ADD     @--SP, 2, PC
-        MOVE    PC, FILL
+        MOVE    PC, SCROLL
         MOVE    PC, KEY
 
 ; The character before the cursor deleted, in the cursor's row
@@ -222,6 +222,79 @@ PRINT   MOVE[M] R4, @R1++
         OR      @R2++, R4, R3
         MOVE    PC, PRINT
 
+; The key codes: each key on a row of its own, with its bytes in hex and as
+; characters. ECHO shows the bytes as POLL reads them, and when POLL
+; returns, the key has ended. A key that gives 0, such as a sequence that is
+; no key, still ends. An ESC alone shows with the key after it, as POLL
+; waits for it.
+KCODES  MOVE    SP, 0xFFFFFF00
+        MOVE    R6, KCODES
+        ADD     @--SP, 2, PC
+        MOVE    PC, FRAME
+        MOVE    R2, SCREEN+560  ; the bar of row 7
+        MOVE    R3, BAR+0x20
+        MOVE    R4, 80
+        ADD     @--SP, 2, PC
+        MOVE    PC, FILL
+        MOVE    R5, K_TEXTS
+        ADD     @--SP, 2, PC
+        MOVE    PC, PRINTS
+        MOVE    COL, 0
+        MOVE    ROW, KTOP
+        MOVE    ECHO, SHOWB
+KPOLL   ADD     @--SP, 2, PC
+        MOVE    PC, POLL
+        MOVE[M] R0, COL
+    ?Z  MOVE    PC, KPOLL       ; no byte yet
+        MOVE    COL, 0          ; the key has ended: the next row
+        SUB[M]  R0, ROW, LAST
+    ?!Z ADD     ROW, ROW, 1
+    ?!Z MOVE    PC, KPOLL
+        MOVE    R2, SCR_KEY     ; or a scroll after the last
+        MOVE    R4, 1280        ; the rows KTOP+1 to LAST, 16 of 80 words
+        ADD     @--SP, 2, PC
+        MOVE    PC, SCROLL
+        MOVE    PC, KPOLL
+
+; SHOWB, the ECHO of F3, shows the byte R1 in the row ROW, as the byte COL of
+; its key: in hex from column 2, and from column 42 as a character, or as ^
+; and a character for a control code. 0x80 to 0x9F have no character, and
+; the bytes after the first K_MAX of a key are not shown. It changes nothing
+; but COL, which it counts up.
+SHOWB   MOVE    @--SP, R2
+        MOVE    @--SP, R3
+        MOVE    @--SP, R4
+        SUB[M]  R0, COL, K_MAX
+    ?!C MOVE    PC, SHOWN
+        SHL     R2, ROW, 4      ; R2 is SCREEN + 80 * ROW + 3 * COL
+        SHL     R3, ROW, 6
+        ADD     R2, R2, R3
+        SHL     R4, COL, 1
+        ADD     R4, R4, COL
+        ADD     R2, R2, R4
+        ADD     R2, R2, SCREEN
+        SHR     R3, R1, 4
+        OR      @2[R2], @HEXDIG[R3], TYPED
+        AND     R3, R1, 0xF
+        OR      @3[R2], @HEXDIG[R3], TYPED
+        SUB[M]  R0, R1, 0x20
+    ?C  MOVE    PC, CARET       ; a control code
+        SUB[M]  R0, R1, 0x7F
+    ?Z  MOVE    PC, CARET       ; DEL
+    ?C  MOVE    PC, CHAR
+        SUB[M]  R0, R1, 0xA0
+    ?C  MOVE    PC, SHOWN       ; 0x80 to 0x9F
+CHAR    OR      @42[R2], R1, LINK
+        MOVE    PC, SHOWN
+CARET   MOVE    @42[R2], LINK+0x5E
+        XOR     R3, R1, 0x40    ; ^@ to ^_, and ^? for DEL
+        OR      @43[R2], R3, LINK
+SHOWN   ADD     COL, COL, 1
+        MOVE    R4, @SP++
+        MOVE    R3, @SP++
+        MOVE    R2, @SP++
+        MOVE    PC, @SP++
+
 ; POLL takes a key from the input, if one has arrived, and sets R1 to it: a
 ; byte, KEY_UP to KEY_LT for a cursor key, or 0 when there is none. It
 ; reads the escape sequences that xterm sends for the cursor keys and the
@@ -229,7 +302,7 @@ PRINT   MOVE[M] R4, @R1++
 ; function key with a demo in FKEYS starts that demo, and POLL does not
 ; return. Other sequences give 0. ESC and a byte that starts none gives that
 ; byte, so an ESC alone is dropped. At the end of the input, POLL halts. It
-; changes R1 to R5.
+; changes R1 to R5, and calls ECHO, unless it is 0, with each byte in R1.
 POLL    ADD     @--SP, 2, PC
         MOVE    PC, READ
     ?Z  MOVE    PC, @SP++       ; no byte, and R1 is 0
@@ -293,12 +366,18 @@ FKEY    MOVE[M] R1, @FKEYS[R2]  ; R2 is 0 to 11 for F1 to F12
         MOVE    PC, R1
 
 ; READ reads the console. Z is set when no byte has arrived, and R1 is the
-; byte, or 0. At the end of the input it halts.
+; byte, or 0. It calls ECHO with the byte, unless ECHO is 0. At the end of
+; the input it halts.
 READ    MOVE    R1, @CONSOLE
         AND[M]  R0, R1, 0x200   ; the end of the input
     ?!Z HALT
         AND[M]  R0, R1, 0x100
-        AND     R1, R1, 0xFF    ; without M, so Z stays
+    ?Z  MOVE    PC, @SP++       ; no byte, and R1 is 0
+        AND     R1, R1, 0xFF
+        MOVE[M] R0, ECHO
+    ?!Z ADD     @--SP, 1, PC    ; MOVE PC, ECHO is a word long
+    ?!Z MOVE    PC, ECHO
+        OR[M]   R0, R1, 0x100   ; Z is clear, also for a byte of 0
         MOVE    PC, @SP++
 
 ; NEXT waits for a byte of the console, and sets R1 to it
@@ -309,8 +388,10 @@ NEXT    ADD     @--SP, 2, PC
 
 ; FRAME clears the screen and hides the cursor, and draws the two rows at
 ; the top that every demo has: the title bar, and the menu of the demos, in
-; which the demo that starts at R6 stands out. It changes R1 to R5.
+; which the demo that starts at R6 stands out. It sets ECHO to 0, and
+; changes R1 to R5.
 FRAME   MOVE    @SCR_CTL, 0
+        MOVE    ECHO, 0
         MOVE    R2, SCREEN
         MOVE    R3, TEXT+0x20
         MOVE    R4, 2000
@@ -336,6 +417,17 @@ ITEM    MOVE[M] R2, @R5++       ; the position, or -1 at the end
         MOVE    PC, PRINT
         MOVE    PC, ITEM
 
+; SCROLL moves the R4 words from R2 + 80 to R2, which scrolls their rows up
+; by one, and clears the row after them. R4 is at least 1. It changes R2 to
+; R4.
+SCROLL  ADD     R3, R2, 80
+COPY    MOVE    @R2++, @R3++
+        SUB[M]  R4, R4, 1
+    ?!Z MOVE    PC, COPY
+        MOVE    R3, TYPED+0x20
+        MOVE    R4, 80
+        MOVE    PC, FILL        ; which returns to the caller
+
 ; PRINTS writes the texts of the table at R5 to the screen. Each has its
 ; position on the screen, 80 * row + column, its color, and its string, and
 ; -1 ends the table. It changes R1 to R5.
@@ -349,7 +441,7 @@ PRINTS  MOVE[M] R2, @R5++
         MOVE    PC, PRINTS
 
 ; The demos of the function keys F1 to F12, or 0 for none
-FKEYS   .DAT    TYPEW, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+FKEYS   .DAT    TYPEW, 0, KCODES, 0, 0, 0, 0, 0, 0, 0, 0, 0
 
 ; The numbers before ~ of F1 to F12. xterm sends ESC O P to ESC O S for F1
 ; to F4, and 11 to 14 are those of the VT220.
@@ -358,6 +450,7 @@ FNUMS   .DAT    11, 12, 13, 14, 15, 17, 18, 19, 20, 21, 23, 24
 ; The menu: the position of each entry, the demo, and the string, and -1 at
 ; the end
 MENU    .DAT    80, TYPEW, M_TYPEW
+        .DAT    96, KCODES, M_KEYS
         .DAT    -1
 
 ; The texts of the title bar, and of the welcome
@@ -376,9 +469,25 @@ WELCOME .DAT    242, TEXT, T1
 NAME    .ASCII_L 'NiceMonMEGA65'
 CPU     .ASCII_L 'the 32-bit NICE CPU of B. Ulmann'
 M_TYPEW .ASCII_L ' F1 typewriter '
+M_KEYS  .ASCII_L ' F3 key codes '
 T1      .ASCII_L 'This is the demo in the ROM, which the core runs at power-up. What you type'
 T2      .ASCII_L 'on the keyboard, or send to the debug UART, appears below the blue bar.'
 T3      .ASCII_L 'To run your own programs, connect a computer to the debug UART, at'
 T4      .ASCII_L '2000000 baud, and load and debug them with tools/mon.py. More is at'
 URL     .ASCII_L 'https://github.com/MJoergen/NiceMonMEGA65'
 KEYS    .ASCII_L 'RETURN new line   DEL delete   cursor keys move   CTRL-L clear'
+
+; The texts of F3
+K_TEXTS .DAT    242, TEXT, K1
+        .DAT    322, TEXT, K2
+        .DAT    402, TEXT, K3
+        .DAT    562, BAR, K_HEX
+        .DAT    602, BAR, K_CHARS
+        .DAT    -1
+
+K1      .ASCII_L 'Each key that you type, or byte sequence that the debug UART sends, shows'
+K2      .ASCII_L 'its bytes in hex and as characters. A control code shows as ^ and a'
+K3      .ASCII_L 'character, so ^[ is ESC and ^? is DEL. A function key with a demo starts it.'
+K_HEX   .ASCII_L 'Bytes in hex'
+K_CHARS .ASCII_L 'As characters'
+HEXDIG  .ASCII_L '0123456789ABCDEF'

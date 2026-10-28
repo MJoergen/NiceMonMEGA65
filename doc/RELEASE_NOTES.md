@@ -34,6 +34,7 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 - The function keys switch between the demos in the ROM, which a menu in
   the second row lists. The typewriter is F1, and runs at power-up. The
   ideas of issue #28 come next, each on a key of its own.
+- F3 shows the bytes of each key, in hex and as characters.
 
 **Tools**
 

@@ -1,6 +1,6 @@
 Screen:
 | NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
-| F1 typewriter
+| F1 typewriter   F3 key codes
 |
 |  This is the demo in the ROM, which the core runs at power-up. What you type
 |  on the keyboard, or send to the debug UART, appears below the blue bar.
@@ -16,7 +16,7 @@ Screen:
 |x y z
 Screen:
 | NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
-| F1 typewriter
+| F1 typewriter   F3 key codes
 |
 |  This is the demo in the ROM, which the core runs at power-up. What you type
 |  on the keyboard, or send to the debug UART, appears below the blue bar.
@@ -42,7 +42,7 @@ Screen:
 |        B
 Screen:
 | NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
-| F1 typewriter
+| F1 typewriter   F3 key codes
 |
 |  This is the demo in the ROM, which the core runs at power-up. What you type
 |  on the keyboard, or send to the debug UART, appears below the blue bar.
@@ -52,3 +52,40 @@ Screen:
 |  https://github.com/MJoergen/NiceMonMEGA65
 | RETURN new line   DEL delete   cursor keys move   CTRL-L clear
 |xQree F
+Screen:
+| NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
+| F1 typewriter   F3 key codes
+|
+|  Each key that you type, or byte sequence that the debug UART sends, shows
+|  its bytes in hex and as characters. A control code shows as ^ and a
+|  character, so ^[ is ESC and ^? is DEL. A function key with a demo starts it.
+|
+|  Bytes in hex                            As characters
+|  1B 5B 41                                ^[ [  A
+|  1B 5B 31 35 7E                          ^[ [  1  5  ~
+|  1B 5B 31 3B 35 43                       ^[ [  1  ;  5  C
+|  E9
+|  80
+|  1B 78                                   ^[ x
+|  1B 5B 31 3B 32 3B 33 3B 34 3B 35 3B     ^[ [  1  ;  2  ;  3  ;  4  ;  5  ;
+|  62                                      b
+|  63                                      c
+|  64                                      d
+|  65                                      e
+|  66                                      f
+|  67                                      g
+|  68                                      h
+|  69                                      i
+|  6A                                      j
+Screen:
+| NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
+| F1 typewriter   F3 key codes
+|
+|  This is the demo in the ROM, which the core runs at power-up. What you type
+|  on the keyboard, or send to the debug UART, appears below the blue bar.
+|
+|  To run your own programs, connect a computer to the debug UART, at
+|  2000000 baud, and load and debug them with tools/mon.py. More is at
+|  https://github.com/MJoergen/NiceMonMEGA65
+| RETURN new line   DEL delete   cursor keys move   CTRL-L clear
+|back

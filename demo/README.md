@@ -17,6 +17,7 @@ so on, which the MEGA65 has without SHIFT.
 | Key | Demo |
 |---|---|
 | F1 | The typewriter, which runs at power-up |
+| F3 | The key codes |
 
 The typewriter's top ten rows are the welcome: the two bars, what the
 demo is, how to load your own programs through the debug UART, and a third
@@ -38,6 +39,17 @@ stays. Other control codes and other escape sequences do nothing, and so do
 the bytes `0x80` to `0x9F`. The bytes from `0xA0` on are the characters of
 ISO 8859-1.
 
+The key codes show the bytes that each key sends, as
+[The keyboard](../doc/SYSTEM.md#the-keyboard) lists them, which helps when
+writing programs that read the keyboard. Each key gets a row, with its
+bytes in hex from column 2, and from column 42 as characters, a control
+code as `^` and a character: `^[` is ESC, `^C` is RUN/STOP, and `^?` is
+DEL. The bytes `0x80` to `0x9F` have no character, and a key shows at
+most 12 bytes. A sequence from the debug UART shows as one key, and an
+ESC alone shows with the key after it. A function key with a demo starts
+that demo, so its bytes show only for a moment, or not at all. Past the
+last row, the rows scroll up by one.
+
 ## How it works
 
 Every demo reads the keys through `POLL`. It turns the escape sequences of
@@ -49,7 +61,9 @@ rest of a sequence after its ESC, so an ESC alone is dropped, with the
 byte after it taken as it is. On a function key with a demo, `POLL` jumps
 to the demo, which starts with an empty stack. A new demo is a routine
 that sets SP, calls `FRAME` for the two bars, and polls the keys; its
-address goes in the tables `FKEYS` and `MENU`.
+address goes in the tables `FKEYS` and `MENU`. A demo that wants the bytes
+themselves puts a routine in `ECHO`, R12, which `POLL` calls with each
+byte, as the key codes do. `FRAME` sets `ECHO` to 0.
 
 A write to the ROM is dropped (see [The ROM](../doc/SYSTEM.md#the-rom) in
 doc/SYSTEM.md), so the demo keeps its state in registers. It writes only the
@@ -70,17 +84,18 @@ UART.
 
     make -C demo                  # build/demo.bin, for the ROM
     make r6 ROM=demo/build/demo.bin
-    make -C demo test             # three runs in niceemu, compared with test.expected
+    make -C demo test             # five runs in niceemu, compared with test.expected
 
 The version in the title bar is `git describe --tags --always --dirty`, or
 `VERSION=` on the command line, which `tools/release.py` sets to the tag.
 The assembler has no include, so the Makefile joins `demo.nasm` and a line
 that defines `VERSION`. The test assembles the demo with the version `V9.9`
-into `build/demo_test.bin`, and the Makefile writes its three inputs,
-`build/test1.txt` to `build/test3.txt`, with `printf`: the first edits a
-few lines, the second clears them and scrolls, and the third has the
-function keys. The three screens that `niceemu` prints for them are in
-`test.expected`, which was checked by hand.
+into `build/demo_test.bin`, and the Makefile writes its five inputs,
+`build/test1.txt` to `build/test5.txt`, with `printf`: the first edits a
+few lines, the second clears them and scrolls, the third has the function
+keys, the fourth shows key codes and scrolls them, and the fifth goes from
+the key codes back to the typewriter. The five screens that `niceemu`
+prints for them are in `test.expected`, which was checked by hand.
 
 The demo runs in `niceemu` like any program, at address 0. After `make -C
 demo test`, the first input shows the first screen of `test.expected`:
