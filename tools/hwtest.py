@@ -80,6 +80,7 @@ import tempfile
 import time
 from typing import Callable, TypeVar
 
+from jtag import check_board
 from load import load_words, read_bin, start
 from nicelink import (BRK_COUNT, BRK_EN, CONTROL, FREE, HOLD, PAUSE, RAM,
                       REGS, STEP, STOP, VERSION, Link, LinkError, Serial,
@@ -201,76 +202,6 @@ def assemble_labels(src: str, out_dir: str) -> tuple[str, dict[str, int]]:
         return base + ".bin", {
             name: int(addr, 16)
             for addr, name in (line.split() for line in f if line.strip())}
-
-
-# The openFPGALoader cables to try: ft2232 for the MEGA65's JTAG adapter,
-# digilent for the Nexys4DDR. Each answers on its own board only.
-CABLES = ["ft2232", "digilent"]
-
-
-def bit_part(bit: str) -> str:
-    """Returns the part a bitstream was built for, as its header names it
-    (7a200tfbg484, say): fields of a letter, a 16-bit length, and the text,
-    after a fixed preamble of 13 bytes."""
-    with open(bit, "rb") as f:
-        head = f.read(256)
-    i = 13
-    while i + 3 <= len(head):
-        key = head[i]
-        n = int.from_bytes(head[i + 1:i + 3], "big")
-        if key == ord("b"):
-            return head[i + 3:i + 3 + n].rstrip(b"\0").decode()
-        if key not in b"acd":
-            break
-        i += 3 + n
-    sys.exit(f"hwtest.py: {bit} has no part in its header")
-
-
-def usb_serial(port: str) -> str:
-    """Returns the serial number of the USB device that a serial port is an
-    interface of: the board's FTDI chip, whose other interface is JTAG. It
-    reads /sys, so this works on Linux only."""
-    tty = os.path.basename(os.path.realpath(port))
-    path = os.path.realpath(f"/sys/class/tty/{tty}/device")
-    while path != "/":
-        if os.path.exists(f"{path}/serial"):
-            with open(f"{path}/serial") as f:
-                return f.read().strip()
-        path = os.path.dirname(path)
-    sys.exit(f"hwtest.py: no USB serial number found for {port}; is it "
-             f"the board's USB serial port? try --port")
-
-
-def fpga_model(serial: str) -> tuple[str, str]:
-    """Reads the IDCODE through the JTAG cable with that serial number and
-    returns the cable that answered and the model openFPGALoader names for
-    the FPGA (xc7a200, say)."""
-    for cable in CABLES:
-        r = subprocess.run(["openFPGALoader", "-c", cable, "--ftdi-serial",
-                            serial, "--detect"], capture_output=True,
-                           text=True, timeout=30)
-        m = re.search(r"model\s+(\S+)", r.stdout + r.stderr)
-        if m:
-            return cable, m.group(1)
-    sys.exit(f"hwtest.py: no FPGA answers on the JTAG cable {serial}; is "
-             f"the board on, and is its JTAG cable connected?")
-
-
-def check_board(port: str, bit: str) -> list[str]:
-    """Stops unless the FPGA on the board of the serial port is the part of
-    the bitstream, and returns the openFPGALoader options that select its
-    JTAG cable."""
-    part = bit_part(bit)
-    serial = usb_serial(port)
-    cable, model = fpga_model(serial)
-    ok = f"xc{part}".startswith(model)
-    print(f"[{'PASS' if ok else 'FAIL'}] FPGA {model} on {port} (JTAG "
-          f"{serial}), bitstream for {part}", flush=True)
-    if not ok:
-        sys.exit(f"hwtest.py: {bit} is for {part}, but the FPGA on {port} is "
-                 f"{model}; give the --bit for this board, or the --port of "
-                 f"the board the bitstream is for")
-    return ["-c", cable, "--ftdi-serial", serial]
 
 
 def test_boot(link: Link, bit: str, cable: list[str]) -> None:
@@ -971,7 +902,7 @@ def main() -> None:
                 if not sys.platform.startswith("linux"):
                     sys.exit("hwtest.py: programming needs Linux; program "
                              "the FPGA yourself and give --no-program")
-                cable = check_board(args.port, args.bit)
+                cable, args.port = check_board(args.port, args.bit)
             link = Link(Serial(args.port, args.baud))
             opened = True
             try:

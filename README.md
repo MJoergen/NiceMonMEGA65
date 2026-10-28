@@ -52,6 +52,14 @@ the emulator, and the other reference documents.
 
 No JTAG cable is needed.
 
+A Nexys4DDR starts the system from its flash in the same way. Write the
+release's `nicemon-V1.0-nexys4ddr.bit` into the flash once, over the
+board's USB cable, with `make flash BIT=nicemon-V1.0-nexys4ddr.bit`
+(needs [openFPGALoader](https://github.com/trabucayre/openFPGALoader)).
+Set jumper JP1 (MODE) to QSPI. The board then shows the demo when it is
+switched on, with a USB keyboard in its USB HID port (see
+[synth/](synth/README.md#building)).
+
 ## Setting up the tools
 
 The tools that compile programs and generate `.cor` files are in this

@@ -36,6 +36,7 @@ header is the authoritative address map.
     make bump TAG=V1.0    # nice_cpu to the tag, R6 bitstream, badge-mega65.json and verified.json, committed (--push with ARGS)
     make release TAG=V1.0 # after the bump: gates, three bitstreams, two .cor, hwtest, staged; ARGS=--publish tags and releases (doc/RELEASE.md); TAG=V1.0.1 keeps nice_cpu at V1.0
     make hwtest           # check the FPGA, program it with openFPGALoader, and test the board
+    make flash [BIT=f.bit] # write the Nexys4DDR's flash (default its top.bit), verify, wait for the start; ARGS=--erase
     make linktest         # run.py --tcp on niceemu --link against plain niceemu, and mon.py's commands, no board
     make cosim            # the RTL in GHDL, its debug UART on TCP, for the tools' --cosim PORT
     make cosimtest        # run.py --cosim on make cosim against plain niceemu, no board (minutes)
@@ -81,7 +82,8 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   the system with its UART on TCP (`tb_cosim.vhd`, `cosim.c`). `formal/`: the
   SymbiYosys wrappers; the checks themselves are `G_FORMAL` blocks in the
   sources. `tools/`: `nicelink.py` (the link, on the UART, or over TCP to
-  `niceemu --link` or `make cosim`), `load.py`, `run.py`, `mon.py`, `hwtest.py`,
+  `niceemu --link` or `make cosim`), `load.py`, `run.py`, `mon.py`, `hwtest.py`, `flash.py` (with
+  `jtag.py`, the JTAG cable of the board's UART, which hwtest shares),
   `bump.py`, `release.py`, `linktest.py`, `cosimtest.py`. `examples/`: C programs built through
   nice_cpu's wasm translator. `demo/`: the welcome screen and typewriter
   in NICE assembly that the release puts in the ROM (`release.py`), and

@@ -9,7 +9,7 @@ PORT   ?= /dev/ttyUSB1
 ARGS   ?=
 EMU     = nice_cpu/emulator/zig-out/bin/niceemu
 
-.PHONY: help test formal lint examples demo r3 r6 nexys4ddr cor bump release load run mon hwtest linktest cosim cosimtest clean
+.PHONY: help test formal lint examples demo r3 r6 nexys4ddr cor bump release load run mon flash hwtest linktest cosim cosimtest clean
 
 # Every target but these needs the nice_cpu submodule
 ifeq ($(wildcard nice_cpu/hdl/src/nice_pkg.vhd),)
@@ -60,6 +60,9 @@ help:
 	@echo "                  built for, program it with BIT, and run the tests (needs"
 	@echo "                  openFPGALoader); for the Nexys4DDR, give"
 	@echo "                  BIT=synth/nexys4ddr/build/top.bit"
+	@echo "  make flash [BIT=synth/nexys4ddr/build/top.bit] [PORT=/dev/ttyUSB1] [ARGS=--erase]"
+	@echo "                  write BIT into the Nexys4DDR's flash, from which the board"
+	@echo "                  starts with jumper JP1 on QSPI (needs openFPGALoader)"
 	@echo "  make linktest   compare run.py on niceemu --link with niceemu, and check"
 	@echo "                  mon.py's commands, without a board"
 	@echo "  make cosim [COSIM_PORT=4000] [ROM=prog.bin]"
@@ -151,6 +154,11 @@ run:
 
 mon:
 	$(PYTHON) tools/mon.py --port $(PORT) $(ARGS) $(FILE)
+
+# The flash of the Nexys4DDR (tools/flash.py); BIT on the command line
+# overrides the default.
+flash:
+	$(PYTHON) tools/flash.py --port $(PORT) --bit $(if $(filter command line,$(origin BIT)),$(BIT),synth/nexys4ddr/build/top.bit) $(ARGS)
 
 BIT ?= synth/r6/build/top.bit
 

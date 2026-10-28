@@ -25,6 +25,11 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 
 **Tools**
 
+- `make flash` (`tools/flash.py`) writes a bitstream into the
+  Nexys4DDR's flash, verifies it, and waits for the board to start from
+  it. With jumper JP1 on QSPI, the board then starts the system at power
+  on, and with the release's bitstream it shows the demo, as a MEGA65
+  does with a core file in its flash.
 - `mon.py` disassembles with `d ADDR N`, and shows the instruction at the
   PC after a pause, a step, and a breakpoint. The disassembler is
   nice_cpu's `assembler/nicedis.py`, which comes after nice_cpu's `V1.0`.
