@@ -68,8 +68,9 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   the Nexys4DDR's PS/2), the Nexys4DDR's display and RGB LED drivers
   (`seg7.vhd`, `rgb_pwm.vhd`), the Ethernet station (`eth/eth.vhd`: the
   RMII receiver and transmitter, the check of the frames, their FIFOs
-  between the clocks, and the MAC filter and ARP responder,
-  `eth/eth_arp.vhd`), and `system.vhd`, which every board instantiates.
+  between the clocks, the MAC filter and ARP responder,
+  `eth/eth_arp.vhd`, and the ping responder, `eth/eth_icmp.vhd`), and
+  `system.vhd`, which every board instantiates.
   `nice_core.vhd` with one architecture from `src/core/` wraps whichever
   nice_cpu core `core.mk` selects (`NICE=pipeline`, the default, or `multi`).
 - `src/video/`: `text.vhd` shows the screen with a cursor and a display

@@ -1,15 +1,22 @@
 -- The Ethernet station: the RMII pins of the PHY on one side, and on the
 -- other, in the system clock domain, its MAC and IP addresses and the
--- counts of its frames. It answers the ARP requests for its IP address.
+-- counts of its frames. It answers the ARP requests for its IP address,
+-- and the pings to it.
 --
 -- THEORY OF OPERATION
 -- The receive pins go to the RMII receiver (rmii_rx.vhd) in the PHY's
 -- 50 MHz clock domain, and its bytes to the check of the frame check
 -- sequence (rx_fcs.vhd). The good frames go through the FIFO of received
--- frames (eth_rx_fifo.vhd) to clk_i, where the MAC address filter and ARP
--- responder (eth_arp.vhd) read them and write their replies to the FIFO of
--- frames to send (eth_tx_fifo.vhd), which takes them back to the PHY's
--- clock, to the RMII transmitter (rmii_tx.vhd) and the transmit pins.
+-- frames (eth_rx_fifo.vhd) to clk_i, where the ARP responder, with the MAC
+-- address filter, (eth_arp.vhd) and the ICMP echo responder (eth_icmp.vhd)
+-- both read them, and write their replies to the FIFO of frames to send
+-- (eth_tx_fifo.vhd), which takes them back to the PHY's clock, to the RMII
+-- transmitter (rmii_tx.vhd) and the transmit pins. A byte is taken when
+-- both responders are ready for it, so each sees every byte, and neither
+-- reads while the other writes a reply. A frame gets at most one reply, as
+-- one is ARP and the other IPv4, and a reply is written only while no
+-- frame is read, so the two never write at the same time, and their
+-- outputs are simply merged.
 -- Each frame that comes out of the FIFO of received frames counts in rx_o,
 -- and each that goes into the FIFO of frames to send in tx_o. Each bad
 -- frame, and each good one that found the FIFO full, flips rx_toggle in the
@@ -68,10 +75,22 @@ architecture synthesis of eth is
    signal rx_toggle : std_logic := '0';
 
    -- The good frames, in the system clock domain
-   signal in_data  : std_logic_vector(7 downto 0);
-   signal in_last  : std_logic;
-   signal in_valid : std_logic;
-   signal in_ready : std_logic;
+   signal in_data    : std_logic_vector(7 downto 0);
+   signal in_last    : std_logic;
+   signal in_valid   : std_logic;
+   signal in_ready   : std_logic;
+   signal arp_ready  : std_logic;
+   signal icmp_ready : std_logic;
+   -- A byte for a responder, when the other is ready for it too
+   signal arp_in  : std_logic;
+   signal icmp_in : std_logic;
+   -- The replies of the two responders
+   signal arp_data   : std_logic_vector(7 downto 0);
+   signal arp_last   : std_logic;
+   signal arp_valid  : std_logic;
+   signal icmp_data  : std_logic_vector(7 downto 0);
+   signal icmp_last  : std_logic;
+   signal icmp_valid : std_logic;
    -- The frames to send, in the system clock domain
    signal out_data  : std_logic_vector(7 downto 0);
    signal out_last  : std_logic;
@@ -137,6 +156,10 @@ begin
          rd_ready_i => in_ready
       ); -- i_eth_rx_fifo
 
+   in_ready <= arp_ready and icmp_ready;
+   arp_in   <= in_valid and icmp_ready;
+   icmp_in  <= in_valid and arp_ready;
+
    i_eth_arp : entity work.eth_arp
       port map (
          clk_i      => clk_i,
@@ -145,13 +168,35 @@ begin
          ip_i       => ip_i,
          rx_data_i  => in_data,
          rx_last_i  => in_last,
-         rx_valid_i => in_valid,
-         rx_ready_o => in_ready,
-         tx_data_o  => out_data,
-         tx_last_o  => out_last,
-         tx_valid_o => out_valid,
+         rx_valid_i => arp_in,
+         rx_ready_o => arp_ready,
+         tx_data_o  => arp_data,
+         tx_last_o  => arp_last,
+         tx_valid_o => arp_valid,
          tx_ready_i => out_ready
       ); -- i_eth_arp
+
+   i_eth_icmp : entity work.eth_icmp
+      port map (
+         clk_i      => clk_i,
+         rst_i      => rst_i,
+         mac_i      => mac_i,
+         ip_i       => ip_i,
+         rx_data_i  => in_data,
+         rx_last_i  => in_last,
+         rx_valid_i => icmp_in,
+         rx_ready_o => icmp_ready,
+         tx_data_o  => icmp_data,
+         tx_last_o  => icmp_last,
+         tx_valid_o => icmp_valid,
+         tx_ready_i => out_ready
+      ); -- i_eth_icmp
+
+   out_data  <= arp_data when arp_valid = '1' else
+                icmp_data;
+   out_last  <= arp_last when arp_valid = '1' else
+                icmp_last;
+   out_valid <= arp_valid or icmp_valid;
 
    i_eth_tx_fifo : entity work.eth_tx_fifo
       port map (

@@ -309,7 +309,8 @@ read 0 and take no write; the keyboard's LEDs may come to `0xFFFFFF97`
 `0xFFFFFF98`–`9D` are on every board, the MEGA65 too. They are the
 Ethernet station, the first steps of a debug link over Ethernet
 ([#30](https://github.com/MJoergen/NiceMonMEGA65/issues/30)). It
-answers ARP requests for its IP address, and nothing else yet.
+answers ARP requests for its IP address, and pings to it, and nothing
+else yet.
 
 | Address | Access | What it is |
 |---|---|---|
@@ -330,7 +331,10 @@ the network, and a bad count that stays at 0.
 
 The station keeps the frames to its MAC address and to everyone, and
 drops the others. It answers each ARP request for its IP address with
-an ARP reply. With the IP address at 0, as after reset, it answers
+an ARP reply, and each ICMP echo request, a ping, to its MAC and IP
+addresses with an echo reply of the same data, up to the 1472 bytes that
+fit in a frame. It answers only whole IPv4 packets without options, and
+no ping to everyone. With the IP address at 0, as after reset, it answers
 nothing, so a board on a network stays silent until a program or the
 link gives it an address. The MAC address is a locally administered one;
 two boards on one network need different ones. On the link, for example:
@@ -338,6 +342,5 @@ two boards on one network need different ones. On the link, for example:
     make mon PORT=/dev/ttyUSB3
     mon> w FFFFFF9A C0A80142
 
-Then `ping 192.168.1.66` from a PC on the network gets no answer yet, but
-`ip neigh` there shows the board's MAC address, and `0xFFFFFF9D` counts
-the replies.
+Then `ping 192.168.1.66` from a PC on the network gets its answers, and
+`0xFFFFFF9D` counts the replies, the ARP reply and one for each ping.

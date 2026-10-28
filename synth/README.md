@@ -166,22 +166,22 @@ and neither the Nexys4DDR's devices nor the microsecond counter:
 
 | Part of the design | R6, pipelined | R6, multi | Nexys4DDR, pipelined | Nexys4DDR, multi |
 |---|---|---|---|---|
-| The core (`nice_core`) | 7348 / 2975 | 4605 / 1050 | 6936 / 3011 | 4636 / 4071 |
-| The math unit (`mpu`) | 2298 / 874 | 2172 / 874 | 2261 / 876 | 2166 / 874 |
-| The fetch statistics (`fetch_stats`) | 872 / 1361 | 44 / 99 | 886 / 1361 | 44 / 99 |
-| The debug link (`debug_link`) | 908 / 1082 | – | 821 / 1082 | – |
-| The Ethernet station (`eth/eth.vhd`) | 405 / 494 | – | 407 / 494 | – |
-| The rest: the UART, RAM, counters, timer, the Nexys4DDR's devices, and glue | 850 / 918 | 795 / 1156 | 811 / 1059 | 740 / 1119 |
-| The text display (`text.vhd`) | 123 / 180 | 123 / 180 | 121 / 156 | 121 / 156 |
-| The keyboard | 580 / 577 | 596 / 585 | 146 / 48 | – |
+| The core (`nice_core`) | 7370 / 2975 | 4605 / 1050 | 6953 / 3011 | 4636 / 4071 |
+| The math unit (`mpu`) | 2296 / 874 | 2172 / 874 | 2262 / 876 | 2166 / 874 |
+| The fetch statistics (`fetch_stats`) | 872 / 1361 | 44 / 99 | 887 / 1361 | 44 / 99 |
+| The debug link (`debug_link`) | 909 / 1082 | – | 821 / 1082 | – |
+| The Ethernet station (`eth/eth.vhd`) | 594 / 626 | – | 595 / 626 | – |
+| The rest: the UART, RAM, counters, timer, the Nexys4DDR's devices, and glue | 883 / 918 | 795 / 1156 | 863 / 1059 | 740 / 1119 |
+| The text display (`text.vhd`) | 117 / 180 | 123 / 180 | 115 / 156 | 121 / 156 |
+| The keyboard | 580 / 577 | 596 / 585 | 147 / 48 | – |
 | The HDMI output | 600 / 1207 | 574 / 1207 | – | – |
-| Total | 13984 / 9668 | 8909 / 5151 | 12389 / 8087 | 7707 / 6319 |
-| Total, of the FPGA | 10.5 % / 3.6 % | 6.7 % / 1.9 % | 19.5 % / 6.4 % | 12.2 % / 5.0 % |
+| Total | 14221 / 9800 | 8909 / 5151 | 12643 / 8219 | 7707 / 6319 |
+| Total, of the FPGA | 10.6 % / 3.7 % | 6.7 % / 1.9 % | 19.9 % / 6.5 % | 12.2 % / 5.0 % |
 
-The R3 pipelined build takes 14117 LUTs and 9820 flip-flops, 10.6 % and
+The R3 pipelined build takes 14276 LUTs and 9952 flip-flops, 10.7 % and
 3.7 % of the FPGA.
 
-The pipelined core is about 5.5 % of the LUTs of the R6's FPGA, and 10.9 %
+The pipelined core is about 5.5 % of the LUTs of the R6's FPGA, and 11.0 %
 of the Nexys4DDR's. The multi-cycle core has two thirds of its LUTs, 3.4 %
 and 7.3 %. On the R6 it has a third of the flip-flops too. On the
 Nexys4DDR it has 4071, more than the pipelined core's 2948, because
@@ -205,14 +205,15 @@ All builds meet the clock. These are the worst setup and hold slacks:
 
 | Build | Clock | Setup | Hold |
 |---|---|---|---|
-| R6, pipelined | 100 MHz | 0.185 ns | 0.023 ns |
+| R6, pipelined | 100 MHz | 0.370 ns | 0.084 ns |
 | R6, `NICE=multi` | 100 MHz | 0.52 ns | – |
-| R3, pipelined | 100 MHz | 0.113 ns | 0.016 ns |
-| Nexys4DDR, pipelined | 90 MHz | 0.169 ns | 0.029 ns |
+| R3, pipelined | 100 MHz | 0.236 ns | 0.074 ns |
+| Nexys4DDR, pipelined | 90 MHz | 0.143 ns | 0.055 ns |
 | Nexys4DDR, `NICE=multi` | 90 MHz | 0.19 ns | – |
 
 The pipelined rows are from builds at nice_cpu V1.0, with the debug
-link of version 4 and the Ethernet station, which answers ARP requests; the
+link of version 4 and the Ethernet station, which answers ARP requests and
+pings; the
 multi-cycle rows are older builds, with fewer link features, and their
 hold slacks were not recorded. The slacks change from build to build with
 placement more than with the logic. The worst paths are usually in the
@@ -241,8 +242,9 @@ The block RAMs, of 36 Kbit, are these:
 | The UART's input FIFO (`rx_fifo.vhd`), one RAMB18 | 0.5 | 0.5 |
 | The FIFO of received Ethernet frames (`eth/eth_ram.vhd`), 2K bytes, one RAMB18 | 0.5 | 0.5 |
 | The FIFO of Ethernet frames to send (`eth/eth_ram.vhd`), 2K bytes, one RAMB18 | 0.5 | 0.5 |
-| Total without the ROM, pipelined | 133.5 of 365 | 85.5 of 135 |
-| Total with the ROM, pipelined | 165.5 | 117.5 |
+| The copy of a ping in `eth/eth_icmp.vhd`, 2K bytes, one RAMB18 | 0.5 | 0.5 |
+| Total without the ROM, pipelined | 134 of 365 | 86 of 135 |
+| Total with the ROM, pipelined | 166 | 118 |
 
 The copy of the screen keeps all 32 bits, as the display reads the
 character and both 12-bit colors, so it takes as many block RAMs as the

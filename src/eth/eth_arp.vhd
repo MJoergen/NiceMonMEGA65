@@ -1,7 +1,8 @@
 -- The MAC address filter and the ARP responder: it reads the received
 -- frames of eth_rx_fifo.vhd, keeps those to mac_i or to everyone, answers
 -- each ARP request for ip_i with an ARP reply into eth_tx_fifo.vhd, and
--- drops every other frame. ip_i at 0 turns the answers off.
+-- ignores every other frame, which eth_icmp.vhd reads too. ip_i at 0 turns
+-- the answers off.
 --
 -- THEORY OF OPERATION
 -- A frame is read a byte at a time, and idx counts its bytes up to

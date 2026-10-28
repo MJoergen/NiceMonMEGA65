@@ -69,6 +69,7 @@ SRC += ../../src/eth/rx_fcs.vhd
 SRC += ../../src/eth/eth_ram.vhd
 SRC += ../../src/eth/eth_rx_fifo.vhd
 SRC += ../../src/eth/eth_arp.vhd
+SRC += ../../src/eth/eth_icmp.vhd
 SRC += ../../src/eth/eth_tx_fifo.vhd
 SRC += ../../src/eth/rmii_tx.vhd
 SRC += ../../src/eth/eth.vhd
