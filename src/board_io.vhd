@@ -1,7 +1,7 @@
 -- The board's devices at 0xFFFFFF90-9F (src/nicemon.vhd), with G_BOARD_IO
 -- (the Nexys4DDR): the 16 LEDs, the levels of the two RGB LEDs, the
 -- segments of the seven-segment display, the five buttons, and the 16
--- switches. On every board, also the count of Ethernet frames received.
+-- switches. On every board, also the counts of Ethernet frames received.
 --
 -- THEORY OF OPERATION
 -- nicemon serves one request in a cycle, the link's or the core's, and
@@ -18,7 +18,10 @@
 --   5  The buttons, bit 0 for the center one, then up, left, right, and
 --      down. Read only.
 --   6  The switches, bit n for switch n. Read only.
---   8  The Ethernet frames received, eth_rx_i, on every board. Read only.
+--   8  The Ethernet frames received with a right frame check sequence,
+--      eth_rx_i, on every board. Read only.
+--   9  The Ethernet frames received with a wrong one, or that did not end
+--      on a byte, eth_rx_bad_i, as 8.
 -- The other words, and words 0 to 6 without G_BOARD_IO, read 0 and take
 -- no write, so then the outputs stay 0. The buttons and the switches pass
 -- through two registers, which synchronize them to the clock.
@@ -41,23 +44,25 @@ entity board_io is
       G_FORMAL   : boolean := false
    );
    port (
-      clk_i    : in  std_logic;
-      rst_i    : in  std_logic;
+      clk_i        : in  std_logic;
+      rst_i        : in  std_logic;
       -- The request served in this cycle, when it is to 0xFFFFFF90-9F
-      stb_i    : in  std_logic;
-      we_i     : in  std_logic;
-      addr_i   : in  std_logic_vector(3 downto 0);
-      wdata_i  : in  std_logic_vector(31 downto 0);
-      rdata_o  : out std_logic_vector(31 downto 0);
+      stb_i        : in  std_logic;
+      we_i         : in  std_logic;
+      addr_i       : in  std_logic_vector(3 downto 0);
+      wdata_i      : in  std_logic_vector(31 downto 0);
+      rdata_o      : out std_logic_vector(31 downto 0);
       -- The board
-      led_o    : out std_logic_vector(15 downto 0);
-      rgb0_o   : out std_logic_vector(11 downto 0);
-      rgb1_o   : out std_logic_vector(11 downto 0);
-      seg_o    : out std_logic_vector(63 downto 0);
-      btn_i    : in  std_logic_vector(4 downto 0);
-      sw_i     : in  std_logic_vector(15 downto 0);
-      -- The count of Ethernet frames received, in the clock domain of clk_i
-      eth_rx_i : in  std_logic_vector(31 downto 0)
+      led_o        : out std_logic_vector(15 downto 0);
+      rgb0_o       : out std_logic_vector(11 downto 0);
+      rgb1_o       : out std_logic_vector(11 downto 0);
+      seg_o        : out std_logic_vector(63 downto 0);
+      btn_i        : in  std_logic_vector(4 downto 0);
+      sw_i         : in  std_logic_vector(15 downto 0);
+      -- The counts of Ethernet frames received, good and bad, in the clock
+      -- domain of clk_i
+      eth_rx_i     : in  std_logic_vector(31 downto 0);
+      eth_rx_bad_i : in  std_logic_vector(31 downto 0)
    );
 end entity board_io;
 
@@ -110,6 +115,8 @@ begin
       rdata_o <= (others => '0');
       if addr_i = X"8" then
          rdata_o <= eth_rx_i;
+      elsif addr_i = X"9" then
+         rdata_o <= eth_rx_bad_i;
       elsif G_BOARD_IO then
 
          case addr_i is
@@ -167,8 +174,9 @@ begin
       -- psl f_seg_hi_keep : assert always {not f_wr(4) and not rst_i} |=> {stable(seg(63 downto 32))};
       -- psl f_reset : assert always {rst_i} |=> {led = 0 and rgb0 = 0 and rgb1 = 0 and seg = 0};
 
-      -- Word 8 reads the count of Ethernet frames, on every board.
+      -- Words 8 and 9 read the counts of Ethernet frames, on every board.
       -- psl f_rd_eth : assert always addr_i = X"8" -> rdata_o = eth_rx_i;
+      -- psl f_rd_eth_bad : assert always addr_i = X"9" -> rdata_o = eth_rx_bad_i;
 
       -- psl c_seg_hi : cover {f_wr(4) and not rst_i};
 
@@ -187,7 +195,7 @@ begin
          --    addr_i = X"5" -> rdata_o(31 downto 5) = 0 and rdata_o(4 downto 0) = btn;
          -- psl f_rd_sw : assert always
          --    addr_i = X"6" -> rdata_o(31 downto 16) = 0 and rdata_o(15 downto 0) = sw;
-         -- psl f_rd_none : assert always addr_i > X"6" and addr_i /= X"8" -> rdata_o = 0;
+         -- psl f_rd_none : assert always addr_i = X"7" or addr_i > X"9" -> rdata_o = 0;
 
          -- The buttons reach their register two cycles after their pins.
          -- psl f_btn_sync : assert always {not rst_i; not rst_i} |=> {btn = prev(btn_i, 2)};
@@ -197,9 +205,9 @@ begin
 
       gen_formal_none : if not G_BOARD_IO generate
       begin
-         -- Without G_BOARD_IO, every word but 8 reads 0, and the outputs
-         -- stay 0.
-         -- psl f_none_rd : assert always addr_i /= X"8" -> rdata_o = 0;
+         -- Without G_BOARD_IO, every word but 8 and 9 reads 0, and the
+         -- outputs stay 0.
+         -- psl f_none_rd : assert always addr_i /= X"8" and addr_i /= X"9" -> rdata_o = 0;
          -- psl f_none_out : assert always led = 0 and rgb0 = 0 and rgb1 = 0 and seg = 0;
       end generate gen_formal_none;
 

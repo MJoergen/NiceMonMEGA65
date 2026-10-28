@@ -204,14 +204,14 @@ All builds meet the clock. These are the worst setup and hold slacks:
 
 | Build | Clock | Setup | Hold |
 |---|---|---|---|
-| R6, pipelined | 100 MHz | 0.175 ns | 0.079 ns |
+| R6, pipelined | 100 MHz | 0.225 ns | 0.016 ns |
 | R6, `NICE=multi` | 100 MHz | 0.52 ns | – |
-| R3, pipelined | 100 MHz | 0.430 ns | 0.070 ns |
-| Nexys4DDR, pipelined | 90 MHz | 0.180 ns | 0.026 ns |
+| R3, pipelined | 100 MHz | 0.171 ns | 0.055 ns |
+| Nexys4DDR, pipelined | 90 MHz | 0.125 ns | 0.029 ns |
 | Nexys4DDR, `NICE=multi` | 90 MHz | 0.19 ns | – |
 
 The pipelined rows are from builds at nice_cpu V1.0, with the debug
-link of version 4 and the Ethernet PHY's receiver; the
+link of version 4 and the Ethernet PHY's receiver with its FCS check; the
 multi-cycle rows are older builds, with fewer link features, and their
 hold slacks were not recorded. The slacks change from build to build with
 placement more than with the logic. The worst paths are usually in the

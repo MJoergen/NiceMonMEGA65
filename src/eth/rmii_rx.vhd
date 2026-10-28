@@ -1,7 +1,7 @@
 -- The receive side of an RMII Ethernet PHY at 100 Mbit/s: the bytes of each
 -- frame, without its preamble and start of frame delimiter, and the end of
 -- the frame. The frame check sequence is not checked here; it arrives as
--- the last four bytes.
+-- the last four bytes, for rx_fcs.vhd.
 --
 -- THEORY OF OPERATION
 -- The PHY drives CRS_DV and RXD[1:0] from the 50 MHz reference clock, which

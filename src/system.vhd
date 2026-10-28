@@ -21,11 +21,13 @@
 -- and connects the brd_* ports (board_io.vhd has their registers); the other
 -- boards leave them open.
 -- The Ethernet PHY's receive pins go to the RMII receiver (eth/rmii_rx.vhd)
--- in the PHY's 50 MHz clock domain. Each frame that ends on a byte flips
--- eth_toggle there, and two registers synchronize it to clk_i, where each
--- change counts a frame in eth_rx, which the core and the link read at
--- 0xFFFFFF98. A frame is at least 64 bytes, 256 cycles of the PHY's clock,
--- so no change is lost. The frame check sequence is not checked yet.
+-- in the PHY's 50 MHz clock domain, and its bytes to the check of the frame
+-- check sequence (eth/rx_fcs.vhd). Each good frame flips bit 0 of
+-- eth_toggle there, and each bad one bit 1. Two registers synchronize each
+-- bit to clk_i, where each change counts a frame, the good ones in eth_rx
+-- and the bad ones in eth_rx_bad, which the core and the link read at
+-- 0xFFFFFF98 and 0xFFFFFF99. A frame takes more than 100 cycles of the
+-- PHY's clock, so no change is lost.
 --
 -- With a ROM the core boots from it at reset; without one it waits, held,
 -- for a host on the debug link (nicemon.vhd).
@@ -38,8 +40,8 @@
 --
 -- RESET
 -- Synchronous to clk_i, by rst_i, as nicemon.vhd describes, and in the
--- Ethernet clock domain by eth_rst_i. rst_i clears the count of frames. The video has no
--- reset of its own (text.vhd).
+-- Ethernet clock domain by eth_rst_i. rst_i clears the counts of frames.
+-- The video has no reset of its own (text.vhd).
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -118,14 +120,22 @@ architecture synthesis of system is
    signal scr_offs     : std_logic_vector(G_SCR_ADDR_BITS - 1 downto 0);
 
    -- The frames received, in the Ethernet clock domain
-   signal eth_eof    : std_logic;
-   signal eth_err    : std_logic;
-   signal eth_toggle : std_logic                    := '0';
-   -- eth_toggle synchronized to clk_i, the last of them before, and the count
-   signal eth_toggle_cdc : std_logic_vector(1 downto 0) := "00";
-   signal eth_toggle_d   : std_logic                    := '0';
-   signal eth_rx         : std_logic_vector(31 downto 0) := (others => '0');
-   attribute async_reg of eth_toggle_cdc : signal is "TRUE";
+   signal eth_data  : std_logic_vector(7 downto 0);
+   signal eth_valid : std_logic;
+   signal eth_eof   : std_logic;
+   signal eth_err   : std_logic;
+   signal eth_ok    : std_logic;
+   signal eth_bad   : std_logic;
+   -- Bit 0 flips at each good frame, bit 1 at each bad one.
+   signal eth_toggle : std_logic_vector(1 downto 0) := "00";
+   -- eth_toggle synchronized to clk_i, its value before, and the counts
+   signal eth_sync0    : std_logic_vector(1 downto 0)  := "00";
+   signal eth_sync1    : std_logic_vector(1 downto 0)  := "00";
+   signal eth_toggle_d : std_logic_vector(1 downto 0)  := "00";
+   signal eth_rx       : std_logic_vector(31 downto 0) := (others => '0');
+   signal eth_rx_bad   : std_logic_vector(31 downto 0) := (others => '0');
+   attribute async_reg of eth_sync0 : signal is "TRUE";
+   attribute async_reg of eth_sync1 : signal is "TRUE";
 
 begin
 
@@ -176,7 +186,8 @@ begin
          brd_seg_o      => brd_seg_o,
          brd_btn_i      => brd_btn_i,
          brd_sw_i       => brd_sw_i,
-         eth_rx_i       => eth_rx
+         eth_rx_i       => eth_rx,
+         eth_rx_bad_i   => eth_rx_bad
       ); -- i_nicemon
 
 
@@ -186,32 +197,47 @@ begin
          rst_i    => eth_rst_i,
          rxd_i    => eth_rxd_i,
          crs_dv_i => eth_crs_dv_i,
-         data_o   => open,
-         valid_o  => open,
+         data_o   => eth_data,
+         valid_o  => eth_valid,
          eof_o    => eth_eof,
          err_o    => eth_err
       ); -- i_rmii_rx
 
+   i_rx_fcs : entity work.rx_fcs
+      port map (
+         clk_i   => eth_clk_i,
+         rst_i   => eth_rst_i,
+         data_i  => eth_data,
+         valid_i => eth_valid,
+         eof_i   => eth_eof,
+         err_i   => eth_err,
+         ok_o    => eth_ok,
+         bad_o   => eth_bad
+      ); -- i_rx_fcs
+
    p_eth_toggle : process (eth_clk_i)
    begin
       if rising_edge(eth_clk_i) then
-         if eth_eof = '1' and eth_err = '0' then
-            eth_toggle <= not eth_toggle;
-         end if;
+         eth_toggle <= eth_toggle xor (eth_bad & eth_ok);
       end if;
    end process p_eth_toggle;
 
    p_eth_rx : process (clk_i)
    begin
       if rising_edge(clk_i) then
-         eth_toggle_cdc <= eth_toggle_cdc(0) & eth_toggle;
-         eth_toggle_d   <= eth_toggle_cdc(1);
-         if eth_toggle_cdc(1) /= eth_toggle_d then
+         eth_sync0    <= eth_toggle;
+         eth_sync1    <= eth_sync0;
+         eth_toggle_d <= eth_sync1;
+         if eth_sync1(0) /= eth_toggle_d(0) then
             eth_rx <= eth_rx + 1;
+         end if;
+         if eth_sync1(1) /= eth_toggle_d(1) then
+            eth_rx_bad <= eth_rx_bad + 1;
          end if;
 
          if rst_i = '1' then
-            eth_rx <= (others => '0');
+            eth_rx     <= (others => '0');
+            eth_rx_bad <= (others => '0');
          end if;
       end if;
    end process p_eth_rx;

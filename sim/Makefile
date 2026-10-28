@@ -17,6 +17,7 @@
 #                         pixel checked.
 #             tb_board_io the Nexys4DDR's display and RGB LED drivers.
 #             tb_rmii_rx  the RMII receiver of the Ethernet PHY.
+#             tb_rx_fcs   the check of a frame's frame check sequence.
 #             It also checks that GHDL can synthesize the system, the
 #             keyboards, the text display (through text_synth.vhd, in
 #             the boards' mode, with 15 and 13 screen address bits), and system.vhd as the Nexys4DDR has it, and the display and RGB LED drivers.
@@ -52,10 +53,10 @@ SRC_SOURCES  = ../src/uart_serdes.vhd ../src/rx_fifo.vhd ../src/ram.vhd ../src/r
                ../src/board_io.vhd ../src/scr_regs.vhd ../src/devices.vhd ../src/mem.vhd ../src/nicemon.vhd \
                ../src/kbd_m65.vhd ../src/kbd_m65_ascii.vhd ../src/kbd_ps2.vhd ../src/kbd_ps2_ascii.vhd ../src/seg7.vhd ../src/rgb_pwm.vhd \
                ../src/video/video_pkg.vhd ../src/video/font_pkg.vhd ../src/video/pix.vhd ../src/video/scr_ram.vhd ../src/video/text.vhd \
-               ../src/eth/rmii_rx.vhd ../src/system.vhd
-SOURCES      = $(SRC_SOURCES) text_synth.vhd tb_hello.vhd tb_nicemon.vhd tb_kbd.vhd tb_ps2.vhd tb_ps2_nicemon.vhd tb_text.vhd tb_board_io.vhd tb_rmii_rx.vhd
+               ../src/eth/rmii_rx.vhd ../src/eth/rx_fcs.vhd ../src/system.vhd
+SOURCES      = $(SRC_SOURCES) text_synth.vhd tb_hello.vhd tb_nicemon.vhd tb_kbd.vhd tb_ps2.vhd tb_ps2_nicemon.vhd tb_text.vhd tb_board_io.vhd tb_rmii_rx.vhd tb_rx_fcs.vhd
 
-.PHONY: test cosim check-steps check-fmt analyze synth clean tb_hello tb_nicemon tb_kbd tb_ps2 tb_ps2_nicemon tb_text tb_board_io tb_rmii_rx \
+.PHONY: test cosim check-steps check-fmt analyze synth clean tb_hello tb_nicemon tb_kbd tb_ps2 tb_ps2_nicemon tb_text tb_board_io tb_rmii_rx tb_rx_fcs \
         synth-nicemon synth-nicemon-norom synth-kbd_m65 synth-kbd_m65_ascii synth-kbd_ps2 \
         synth-kbd_ps2_ascii synth-text \
         synth-system synth-seg7 synth-rgb_pwm
@@ -63,7 +64,7 @@ SOURCES      = $(SRC_SOURCES) text_synth.vhd tb_hello.vhd tb_nicemon.vhd tb_kbd.
 # Each testbench and each synthesis check is a target of its own, so that
 # "make -j test" runs them side by side. They share the work library of
 # $(BUILD), which "analyze" writes first and they only read.
-test: synth tb_hello tb_nicemon tb_kbd tb_ps2 tb_ps2_nicemon tb_text tb_board_io tb_rmii_rx check-steps check-fmt
+test: synth tb_hello tb_nicemon tb_kbd tb_ps2 tb_ps2_nicemon tb_text tb_board_io tb_rmii_rx tb_rx_fcs check-steps check-fmt
 
 # The column layout of nice_cpu's NICE assembly; nicefmt.py --write fixes it
 check-fmt:
@@ -109,7 +110,7 @@ tb_ps2_nicemon: analyze $(BUILD)/fifo.bin $(BUILD)/switch.bin
 	  -gG_FIFO_FILE=fifo.bin -gG_SWITCH_FILE=switch.bin --ieee-asserts=disable > tb_ps2_nicemon.log 2>&1) && \
 	  echo "PASS tb_ps2_nicemon" || (echo "FAIL tb_ps2_nicemon"; cat $(BUILD)/tb_ps2_nicemon.log; exit 1)
 
-tb_kbd tb_ps2 tb_text tb_board_io tb_rmii_rx: analyze
+tb_kbd tb_ps2 tb_text tb_board_io tb_rmii_rx tb_rx_fcs: analyze
 	@(cd $(BUILD) && $(GHDL) --elab-run $(GHDLFLAGS) $@ > $@.log 2>&1) && \
 	  echo "PASS $@" || (echo "FAIL $@"; cat $(BUILD)/$@.log; exit 1)
 

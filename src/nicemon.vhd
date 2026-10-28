@@ -110,7 +110,7 @@
 --                          for a cycle when one is written, and when they
 --                          are cleared by reset or by the clear of the memory.
 --   0xFFFFFF90-0xFFFFFF9F  The board's devices (src/board_io.vhd): 90-96
---                          with G_BOARD_IO (the Nexys4DDR), and 98 on every
+--                          with G_BOARD_IO (the Nexys4DDR), and 98-99 on every
 --                          board. Without G_BOARD_IO, and in the words that
 --                          are not registers, a read returns 0 and a write
 --                          is dropped. Reset clears the writable ones; a
@@ -126,8 +126,10 @@
 --     95  The five buttons, bit 0 for the center one, then up, left, right,
 --         and down. Read only, synchronized to the clock.
 --     96  The 16 switches, bit n for switch n. Read only, synchronized.
---     98  The Ethernet frames received, eth_rx_i, a count that wraps.
---         Read only.
+--     98  The Ethernet frames received with a right frame check sequence,
+--         eth_rx_i, a count that wraps. Read only.
+--     99  The Ethernet frames received with a wrong one, or that did not
+--         end on a byte, eth_rx_bad_i, as 98.
 --   0xFFFFFFE0-0xFFFFFFFF  The debug registers of DEBUG.md §6, for the link
 --                          only, which debug_link holds: R0-R15 of the core
 --                          after a halt or at a pause, the control
@@ -281,8 +283,10 @@ entity nicemon is
       brd_seg_o      : out std_logic_vector(63 downto 0);
       brd_btn_i      : in  std_logic_vector(4 downto 0)  := (others => '0');
       brd_sw_i       : in  std_logic_vector(15 downto 0) := (others => '0');
-      -- The count of Ethernet frames received, on every board
-      eth_rx_i       : in  std_logic_vector(31 downto 0) := (others => '0')
+      -- The counts of Ethernet frames received, with their frame check
+      -- sequence right and wrong, on every board
+      eth_rx_i       : in  std_logic_vector(31 downto 0) := (others => '0');
+      eth_rx_bad_i   : in  std_logic_vector(31 downto 0) := (others => '0')
    );
 end entity nicemon;
 
@@ -847,20 +851,21 @@ begin
          G_BOARD_IO => G_BOARD_IO
       )
       port map (
-         clk_i    => clk_i,
-         rst_i    => rst_i,
-         stb_i    => brd_stb,
-         we_i     => bus_we,
-         addr_i   => bus_addr(3 downto 0),
-         wdata_i  => bus_wdata,
-         rdata_o  => brd_rdata,
-         led_o    => brd_led_o,
-         rgb0_o   => brd_rgb0_o,
-         rgb1_o   => brd_rgb1_o,
-         seg_o    => brd_seg_o,
-         btn_i    => brd_btn_i,
-         sw_i     => brd_sw_i,
-         eth_rx_i => eth_rx_i
+         clk_i        => clk_i,
+         rst_i        => rst_i,
+         stb_i        => brd_stb,
+         we_i         => bus_we,
+         addr_i       => bus_addr(3 downto 0),
+         wdata_i      => bus_wdata,
+         rdata_o      => brd_rdata,
+         led_o        => brd_led_o,
+         rgb0_o       => brd_rgb0_o,
+         rgb1_o       => brd_rgb1_o,
+         seg_o        => brd_seg_o,
+         btn_i        => brd_btn_i,
+         sw_i         => brd_sw_i,
+         eth_rx_i     => eth_rx_i,
+         eth_rx_bad_i => eth_rx_bad_i
       ); -- i_board_io
 
    -- The screen's registers, which take the request served, when it is
