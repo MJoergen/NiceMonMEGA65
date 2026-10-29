@@ -589,7 +589,7 @@ begin
             -- Whether the data is the next of the connection, and fits;
             -- the header has passed far enough to know.
             if idx = 47 then
-               if m_ok = '1' and conn = '1' and state /= SYN_RCVD_ST and peer_fin = '0' and
+               if m_ok = '1' and state /= LISTEN_ST and peer_fin = '0' and
                   f_sip = peer_ip and f_sport = peer_port and
                   f_dport = C_PORT and f_seq = rcv_nxt and f_doff >= 5 and plen > 0 and
                   plen <= rx_free then
@@ -663,15 +663,18 @@ begin
                      if f_seq - rcv_nxt < C_SIZE then
                         finish(rx_cmt);
                      end if;
-                  elsif state = SYN_RCVD_ST then
-                     if f_flags(4) = '1' and f_ack = iss + 1 then
+                  elsif state = SYN_RCVD_ST and not (f_flags(4) = '1' and f_ack = iss + 1) then
+                     -- Nothing but the ACK of the SYN-ACK opens the connection.
+                     null;
+                  else
+                     -- The ACK of the SYN-ACK, which may carry data and a FIN
+                     if state = SYN_RCVD_ST then
                         state   <= EST_ST;
                         keep    <= '0';
-                        snd_wnd <= f_win;
                         tries   <= 0;
                         rto_cnt <= 0;
                      end if;
-                  else
+
                      -- The ACK: the bytes it covers are free.
                      if f_flags(4) = '1' then
                         snd_wnd <= f_win;
@@ -700,7 +703,7 @@ begin
                      -- The host's FIN, if all before it has come
                      if f_flags(0) = '1' and peer_fin = '0' and f_seq + plen = rcv_v then
                         rcv_v    := rcv_v + 1;
-                        if state = EST_ST then
+                        if state = EST_ST or state = SYN_RCVD_ST then
                            state <= CLOSE_WAIT_ST;
                         end if;
                         peer_fin <= '1';

@@ -199,10 +199,10 @@ The testbenches are these:
   the buffer; the host's window, data sent again after the timeout, and
   an ACK that comes while it is; the host's FIN as a break after its
   data; a new connection after it, which closes the old one first, and
-  one before it, as when the FIN was lost, or after a crash; an
-  RST, after which the link still takes the input; a break that waits
-  for its input while a new connection's comes; and a SYN-ACK that is
-  never acknowledged.
+  one before it, as when the FIN was lost, or after a crash; data in the
+  ACK of the SYN-ACK; an RST, after which the link still takes the
+  input; a break that waits for its input while a new connection's
+  comes; and a SYN-ACK that is never acknowledged.
 - `make test` also checks that GHDL can synthesize the system, with
   `sim/rom.nasm` as its ROM and without a ROM, the keyboards, the text
   display, and `src/system.vhd` with the screen and the devices of the

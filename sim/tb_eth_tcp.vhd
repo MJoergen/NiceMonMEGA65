@@ -35,6 +35,7 @@
 --   * a SYN from another port of the host before its FIN closes the old
 --     connection with a FIN too; the old one still takes data and the
 --     host's FIN, and if that never comes, its end by an RST is a break
+--   * data in the host's ACK of the SYN-ACK is taken
 --   * a SYN-ACK that is never acknowledged ends the connection after the
 --     tries
 
@@ -822,9 +823,9 @@ begin
       assert flags_v = X"12" and ack_v = X"0000C001" and conn = '1'
          report "tb_eth_tcp: FAIL, not a SYN-ACK for the new connection"
          severity failure;
+      -- Data in the ACK of the SYN-ACK
       hseq_v := X"0000C001";
       bseq_v := seq_v + 1;
-      send_seg(C_ACK, 0);
       send_data(2);
       -- A new connection without a FIN at all, as after a crash: the RST
       -- of the old one opens the new one, and is a break.
