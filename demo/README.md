@@ -24,8 +24,8 @@ so on, which the MEGA65 has without SHIFT.
 | F11 | The board: a self-test, and the Ethernet station's addresses |
 
 The typewriter's top ten rows are the welcome: the two bars, what the
-demo is, how to load your own programs through the debug UART, and a third
-blue bar with the keys. The 15 rows below it are a typewriter.
+demo is, how to load your own programs over Ethernet, after F11 gives
+the board an IP address, and a third blue bar with the keys. The 15 rows below it are a typewriter.
 What you type on the keyboard, or send over Ethernet or the debug UART,
 appears at the blinking cursor:
 

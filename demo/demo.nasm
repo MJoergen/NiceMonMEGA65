@@ -1504,9 +1504,9 @@ M_COUNT .ASCII_L ' F7 counters '
 M_GAME  .ASCII_L ' F9 comet '
 M_BOARD .ASCII_L ' F11 board '
 T1      .ASCII_L 'This is the demo in the ROM, which the core runs at power-up. What you type'
-T2      .ASCII_L 'on the keyboard, or send to the debug UART, appears below the blue bar.'
-T3      .ASCII_L 'To run your own programs, connect a computer to the debug UART, at'
-T4      .ASCII_L '2000000 baud, and load and debug them with tools/mon.py. More is at'
+T2      .ASCII_L 'on the keyboard, or send to the console, appears below the blue bar.'
+T3      .ASCII_L 'To run your own programs, give the board an IP address with F11, then load'
+T4      .ASCII_L 'and debug them over Ethernet with tools/mon.py --eth. More is at'
 URL     .ASCII_L 'https://github.com/MJoergen/NiceMonMEGA65'
 KEYS    .ASCII_L 'RETURN new line   DEL delete   cursor keys move   CTRL-L clear'
 
@@ -1518,7 +1518,7 @@ K_TEXTS .DAT    242, TEXT, K1
         .DAT    602, BAR, K_CHARS
         .DAT    -1
 
-K1      .ASCII_L 'Each key that you type, or byte sequence that the debug UART sends, shows'
+K1      .ASCII_L 'Each key that you type, or byte sequence sent to the console, shows'
 K2      .ASCII_L 'its bytes in hex and as characters. A control code shows as ^ and a'
 K3      .ASCII_L 'character, so ^[ is ESC and ^? is DEL. A function key with a demo starts it.'
 K_HEX   .ASCII_L 'Bytes in hex'

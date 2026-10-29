@@ -3,10 +3,10 @@ Screen:
 | F1 typewriter   F3 key codes   F5 charset   F7 counters   F9 comet   F11 board
 |
 |  This is the demo in the ROM, which the core runs at power-up. What you type
-|  on the keyboard, or send to the debug UART, appears below the blue bar.
+|  on the keyboard, or send to the console, appears below the blue bar.
 |
-|  To run your own programs, connect a computer to the debug UART, at
-|  2000000 baud, and load and debug them with tools/mon.py. More is at
+|  To run your own programs, give the board an IP address with F11, then load
+|  and debug them over Ethernet with tools/mon.py --eth. More is at
 |  https://github.com/MJoergen/NiceMonMEGA65
 | RETURN new line   DEL delete   cursor keys move   CTRL-L clear
 |Hello, world!
@@ -19,10 +19,10 @@ Screen:
 | F1 typewriter   F3 key codes   F5 charset   F7 counters   F9 comet   F11 board
 |
 |  This is the demo in the ROM, which the core runs at power-up. What you type
-|  on the keyboard, or send to the debug UART, appears below the blue bar.
+|  on the keyboard, or send to the console, appears below the blue bar.
 |
-|  To run your own programs, connect a computer to the debug UART, at
-|  2000000 baud, and load and debug them with tools/mon.py. More is at
+|  To run your own programs, give the board an IP address with F11, then load
+|  and debug them over Ethernet with tools/mon.py --eth. More is at
 |  https://github.com/MJoergen/NiceMonMEGA65
 | RETURN new line   DEL delete   cursor keys move   CTRL-L clear
 |line 4
@@ -45,10 +45,10 @@ Screen:
 | F1 typewriter   F3 key codes   F5 charset   F7 counters   F9 comet   F11 board
 |
 |  This is the demo in the ROM, which the core runs at power-up. What you type
-|  on the keyboard, or send to the debug UART, appears below the blue bar.
+|  on the keyboard, or send to the console, appears below the blue bar.
 |
-|  To run your own programs, connect a computer to the debug UART, at
-|  2000000 baud, and load and debug them with tools/mon.py. More is at
+|  To run your own programs, give the board an IP address with F11, then load
+|  and debug them over Ethernet with tools/mon.py --eth. More is at
 |  https://github.com/MJoergen/NiceMonMEGA65
 | RETURN new line   DEL delete   cursor keys move   CTRL-L clear
 |xQree F
@@ -56,7 +56,7 @@ Screen:
 | NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
 | F1 typewriter   F3 key codes   F5 charset   F7 counters   F9 comet   F11 board
 |
-|  Each key that you type, or byte sequence that the debug UART sends, shows
+|  Each key that you type, or byte sequence sent to the console, shows
 |  its bytes in hex and as characters. A control code shows as ^ and a
 |  character, so ^[ is ESC and ^? is DEL. A function key with a demo starts it.
 |
@@ -82,10 +82,10 @@ Screen:
 | F1 typewriter   F3 key codes   F5 charset   F7 counters   F9 comet   F11 board
 |
 |  This is the demo in the ROM, which the core runs at power-up. What you type
-|  on the keyboard, or send to the debug UART, appears below the blue bar.
+|  on the keyboard, or send to the console, appears below the blue bar.
 |
-|  To run your own programs, connect a computer to the debug UART, at
-|  2000000 baud, and load and debug them with tools/mon.py. More is at
+|  To run your own programs, give the board an IP address with F11, then load
+|  and debug them over Ethernet with tools/mon.py --eth. More is at
 |  https://github.com/MJoergen/NiceMonMEGA65
 | RETURN new line   DEL delete   cursor keys move   CTRL-L clear
 |back
@@ -130,9 +130,9 @@ Screen:
 |  Since reset, while the core runs
 |
 |    Time, h:mm:ss.hh                              0:00:00.07
-|    Microseconds                                       79959
-|    Cycles                                             79961
-|    Instructions                                       79963
+|    Microseconds                                       79967
+|    Cycles                                             79969
+|    Instructions                                       79971
 |    Clock in MHz, cycles per microsecond                   1
 |
 |  A prime sieve to 2048, run before each update
