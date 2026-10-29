@@ -92,9 +92,10 @@
 --
 -- The server is these processes: p_tcp, the connection, which acts on the
 -- segments and owns its numbers; p_cmp, which compares a segment with it;
--- p_pick, which chooses the segment to send; and p_link, the link side of
--- the two buffers. What one tells another that it cannot read is a pulse
--- (brk_set), which lands a cycle later; each says why that is in time.
+-- p_pick, which chooses the segment to send; p_timer, the retransmission
+-- timer; and p_link, the link side of the two buffers. What one tells
+-- another that it cannot read is a pulse (brk_set, restart, tries_clr),
+-- which lands a cycle later; each says why that is in time.
 --
 -- INTERFACE CONTRACTS -- these are requirements on the environment:
 -- a) mac_i and ip_i stay stable while there is a connection.
@@ -212,10 +213,22 @@ architecture synthesis of eth_tcp is
    signal pend_port : std_logic_vector(15 downto 0) := (others => '0');
    signal pend_seq  : std_logic_vector(31 downto 0) := (others => '0');
    signal pend_win  : std_logic_vector(15 downto 0) := (others => '0');
-   -- The timers: a millisecond, the retransmission timeout, and its count
+   -- The timers (p_timer): a millisecond, the retransmission timeout, and
+   -- its count; the timer runs, ticks, runs out, and is on its last try
    signal tick_cnt : natural range 0 to C_TICK     := 0;
    signal rto_cnt  : natural range 0 to C_RTO_MS   := 0;
    signal tries    : natural range 0 to C_TRIES    := 0;
+   signal armed    : std_logic;
+   signal tick     : std_logic;
+   signal timeout  : std_logic;
+   signal last_try : std_logic;
+   -- The connection ends, once the ACK that the host is owed is sent.
+   signal ending : std_logic;
+   -- What the connection tells the timer, a cycle after: it starts again,
+   -- or the tries alone do; the timer stands still then
+   signal restart   : std_logic := '0';
+   signal tries_clr : std_logic := '0';
+   signal still     : std_logic := '0';
    -- The initial sequence number, a cycle counter
    signal isn : std_logic_vector(31 downto 0) := (others => '0');
    -- Cycles since the link's last output byte
@@ -290,7 +303,6 @@ architecture synthesis of eth_tcp is
    signal build     : t_build                       := B_IDLE;
    signal pick      : t_pick;
    signal drop      : std_logic;
-   signal timeout   : std_logic;
    signal go        : std_logic                     := '0';
    signal busy      : std_logic;
    signal seg_mac   : std_logic_vector(47 downto 0) := (others => '0');
@@ -406,19 +418,27 @@ begin
       ); -- i_tx_ram
 
 
-   -- The timer runs out this cycle, unless a segment is acted on, or the
-   -- connection ends, which come first.
-   timeout <= '1' when eval = '0' and not (fin_ack = '1' and ack_req = '0' and busy = '0') and
-                       tick_cnt = C_TICK - 1 and rto_cnt = C_RTO_MS - 1 and
-                       (state = SYN_RCVD_ST or max_ptr /= una_ptr or
+   ending <= '1' when fin_ack = '1' and ack_req = '0' and busy = '0' else
+             '0';
+
+   -- The timer runs while the SYN-ACK, data, or the FIN is out, or a
+   -- window of 0 holds data back. A tick is a millisecond, but not in a
+   -- cycle a segment is acted on or the connection ends, which come first,
+   -- nor in the cycle after, when what they tell the timer lands.
+   armed    <= '1' when state = SYN_RCVD_ST or max_ptr /= una_ptr or
                         (state = LAST_ACK_ST and fin_max = '1') or
-                        (conn = '1' and snd_wnd = 0 and lim_ptr /= una_ptr)) else
-              '0';
+                        (conn = '1' and snd_wnd = 0 and lim_ptr /= una_ptr) else
+               '0';
+   tick     <= '1' when tick_cnt = C_TICK - 1 and eval = '0' and ending = '0' and still = '0' else
+               '0';
+   timeout  <= '1' when tick = '1' and armed = '1' and rto_cnt = C_RTO_MS - 1 else
+               '0';
+   last_try <= '1' when tries = C_TRIES - 1 else
+               '0';
+
    -- A segment is acted on, the connection ends, or the timer runs out:
    -- the segment being chosen is dropped.
-   drop <= '1' when eval = '1' or (fin_ack = '1' and ack_req = '0' and busy = '0') or
-                    timeout = '1' else
-           '0';
+   drop <= eval or ending or timeout;
 
    -- The segment chosen in B_PICK: the SYN-ACK, data, the FIN, or an ACK
    pick <= NO_PK when build /= B_PICK or drop = '1' else
@@ -458,6 +478,41 @@ begin
          tx_valid_o  => tx_valid_o,
          tx_ready_i  => tx_ready_i
       ); -- i_eth_tcp_tx
+
+
+   p_timer : process (clk_i)
+   begin
+      if rising_edge(clk_i) then
+         if tick_cnt = C_TICK - 1 then
+            tick_cnt <= 0;
+         else
+            tick_cnt <= tick_cnt + 1;
+         end if;
+         still <= eval or ending;
+
+         if tick = '1' then
+            if armed = '0' then
+               rto_cnt <= 0;
+               tries   <= 0;
+            elsif timeout = '1' then
+               rto_cnt <= 0;
+               if last_try = '0' then
+                  tries <= tries + 1;
+               end if;
+            else
+               rto_cnt <= rto_cnt + 1;
+            end if;
+         end if;
+
+         -- What the connection told the timer in the cycle before
+         if restart = '1' then
+            rto_cnt <= 0;
+            tries   <= 0;
+         elsif tries_clr = '1' then
+            tries <= 0;
+         end if;
+      end if;
+   end process p_timer;
 
 
    p_link : process (clk_i)
@@ -650,8 +705,7 @@ begin
          probe     <= '0';
          pend      <= '0';
          peer_fin  <= '0';
-         tries     <= 0;
-         rto_cnt   <= 0;
+         restart   <= '1';
       end procedure accept;
 
       -- Ends the connection, and opens the one that waits, if any. Its
@@ -677,15 +731,10 @@ begin
 
    begin
       if rising_edge(clk_i) then
-         isn     <= isn + 1;
-         brk_set <= '0';
-
-         -- The milliseconds
-         if tick_cnt = C_TICK - 1 then
-            tick_cnt <= 0;
-         else
-            tick_cnt <= tick_cnt + 1;
-         end if;
+         isn       <= isn + 1;
+         brk_set   <= '0';
+         restart   <= '0';
+         tries_clr <= '0';
 
          -- A window that has grown is told.
          if state = EST_ST and rx_free >= adv_wnd + C_WND_STEP then
@@ -754,8 +803,7 @@ begin
                      if state = SYN_RCVD_ST then
                         state   <= EST_ST;
                         keep    <= '0';
-                        tries   <= 0;
-                        rto_cnt <= 0;
+                        restart <= '1';
                      end if;
 
                      -- The ACK: the bytes it covers are free.
@@ -766,7 +814,7 @@ begin
                            snd_wl1 <= f_seq;
                            snd_wl2 <= f_ack;
                            if f_win = 0 then
-                              tries <= 0;
+                              tries_clr <= '1';
                            end if;
                         end if;
                         if k /= 0 and k <= max_ptr - una_ptr then
@@ -775,8 +823,7 @@ begin
                            if k > nxt_ptr - una_ptr then
                               nxt_ptr <= una_ptr + k(G_ADDR_BITS downto 0);
                            end if;
-                           tries   <= 0;
-                           rto_cnt <= 0;
+                           restart <= '1';
                         end if;
                      end if;
 
@@ -820,37 +867,25 @@ begin
             end if;
 
          -- The end, once the ACK that the host is owed is sent
-         elsif fin_ack = '1' and ack_req = '0' and busy = '0' then
+         elsif ending = '1' then
             finish(rx_cmt);
 
          ------------------------------------------------------------------
-         -- The retransmission timer
+         -- The retransmission timer runs out (p_timer): what is out goes
+         -- again, or a byte beyond a window of 0, until the tries are up
          ------------------------------------------------------------------
-         elsif tick_cnt = C_TICK - 1 then
-            if state = SYN_RCVD_ST or max_ptr /= una_ptr or
-               (state = LAST_ACK_ST and fin_max = '1') or
-               (conn = '1' and snd_wnd = 0 and lim_ptr /= una_ptr) then
-               if rto_cnt = C_RTO_MS - 1 then
-                  rto_cnt <= 0;
-                  if tries = C_TRIES - 1 then
-                     finish(rx_cmt);
-                  else
-                     tries    <= tries + 1;
-                     nxt_ptr  <= una_ptr;
-                     fin_sent <= '0';
-                     if snd_wnd = 0 then
-                        probe <= '1';
-                     end if;
-                     if state = SYN_RCVD_ST then
-                        syn_req <= '1';
-                     end if;
-                  end if;
-               else
-                  rto_cnt <= rto_cnt + 1;
-               end if;
+         elsif timeout = '1' then
+            if last_try = '1' then
+               finish(rx_cmt);
             else
-               rto_cnt <= 0;
-               tries   <= 0;
+               nxt_ptr  <= una_ptr;
+               fin_sent <= '0';
+               if snd_wnd = 0 then
+                  probe <= '1';
+               end if;
+               if state = SYN_RCVD_ST then
+                  syn_req <= '1';
+               end if;
             end if;
          end if;
 
@@ -901,6 +936,8 @@ begin
             rx_cmt    <= (others => '0');
             peer_fin  <= '0';
             brk_set   <= '0';
+            restart   <= '0';
+            tries_clr <= '0';
          end if;
       end if;
    end process p_tcp;
