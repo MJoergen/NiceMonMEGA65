@@ -360,11 +360,15 @@ half-close is a break, which ends the program's input. The tools take
     python3 tools/run.py --eth 192.168.1.66 prog.bin
     make mon ARGS="--eth 192.168.1.66"
 
-A new connection from the same host replaces the old one. If the host
-has half-closed the old one, as the tools do at the end of a program's
-input, the old one gets the output that came before the new connection,
-and then the board closes it, and only then takes the new one. A
-connection from another host gets no answer while one is open.
+A new connection from the same host replaces the old one. The old one
+gets the output that came before the new connection, and then the board
+closes it, and only then takes the new one: when the host has
+acknowledged the board's FIN, or reset the old connection, or after the
+tries below. The tools half-close the old one first, at the end of a
+program's input. If that FIN was lost, the old connection still takes
+the host's data and FIN until it ends, and if the FIN has not come by
+then, the end is a break. A connection from another host gets no answer
+while one is open.
 
 A host's FIN is the end of the input, and the board keeps the connection
 after it, so a host that is done ends it with a reset. The tools set

@@ -198,7 +198,8 @@ The testbenches are these:
   way, data again, out of order, with a wrong checksum, and too much for
   the buffer; the host's window, data sent again after the timeout, and
   an ACK that comes while it is; the host's FIN as a break after its
-  data; a new connection after it, which closes the old one first; an
+  data; a new connection after it, which closes the old one first, and
+  one before it, as when the FIN was lost, or after a crash; an
   RST, after which the link still takes the input; a break that waits
   for its input while a new connection's comes; and a SYN-ACK that is
   never acknowledged.

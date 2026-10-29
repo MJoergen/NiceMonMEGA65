@@ -8,24 +8,31 @@
 -- The connection is the line. While there is one (on_o), the link's input
 -- comes from it and its output goes to it. A connection is one from the
 -- host's ACK of the SYN-ACK on, so that a SYN alone, as of a port scan,
--- leaves the link on the UART. The host's half-close, its FIN,
--- is a break of the line (rx_break_o), after the last byte before it
--- (brk_ptr). The link stays with the connection (on_o) after its end, by
--- an RST or the tries, until it has taken all the input and the break, so
--- that none is lost; the output in that time is dropped. The
--- states are those of a passive open, and of a close that the host starts:
+-- leaves the link on the UART. The host's half-close, its FIN, is a break
+-- of the line (rx_break_o), after the last byte before it (brk_ptr). The
+-- link stays with the connection after its end, by an RST or the tries,
+-- until it has taken all the input and the break, so that none is lost;
+-- the output in that time is dropped. The states are those of a passive
+-- open, and of a close:
 --   LISTEN_ST      no connection; a SYN to G_PORT opens one
 --   SYN_RCVD_ST    the SYN-ACK is sent, and waits for the host's ACK
 --   EST_ST         the connection is open
 --   CLOSE_WAIT_ST  the host has half-closed; output still goes to it
---   LAST_ACK_ST    this side's FIN is sent, and waits for the host's ACK
+--   LAST_ACK_ST    this side's FIN is sent, and waits for the host's ACK;
+--                  the host's FIN has come (peer_fin), or not, when this
+--                  side closed first
 -- A new SYN from the host's IP address, from another port, replaces an
--- open connection, as when a tool starts again after a crash. One that
--- comes after the half-close waits in pend_*: the old connection gets the
--- output up to that point (fin_ptr), then its FIN, and when the host has
--- acknowledged that, the new connection opens, and gets the output after
--- it; the link stays with it (keep) while it waits for the host's ACK. That is what the host tools do at the end of a program's input
--- (tools/nicelink.py). Other SYNs are ignored while a connection is open.
+-- open connection. It waits in pend_*: the old connection gets the output
+-- up to that point (fin_ptr), then its FIN, and when the host has
+-- acknowledged that, or reset the old connection, or the tries have run
+-- out, the new connection opens, and gets the output after it; an ACK
+-- that the old one still owes the host goes first (fin_ack). The link
+-- stays with it (keep) while it waits for the host's ACK. That is what the
+-- host tools do at the end of a program's input (tools/nicelink.py), after
+-- their FIN, and what a tool that starts again after a crash does,
+-- without one. The old connection takes data and a FIN until its end, and
+-- if its FIN has not come by then, the end is a break. Other SYNs are
+-- ignored while a connection is open.
 --
 -- Receive: a frame is read a byte at a time, and its fields are kept: the
 -- source MAC address, the IPv4 header without options, and the TCP header,
@@ -193,6 +200,8 @@ architecture synthesis of eth_tcp is
    signal closing  : std_logic                     := '0';
    signal fin_sent : std_logic                     := '0';
    signal fin_max  : std_logic                     := '0';
+   -- The host has acknowledged this side's FIN.
+   signal fin_ack  : std_logic                     := '0';
    signal syn_req  : std_logic                     := '0';
    signal ack_req  : std_logic                     := '0';
    -- The SYN of the next connection
@@ -251,6 +260,8 @@ architecture synthesis of eth_tcp is
    signal lfetch    : std_logic                    := '0';
    signal lrx_valid : std_logic                    := '0';
    signal fin_rcvd  : std_logic                    := '0';
+   -- The host's FIN has come.
+   signal peer_fin  : std_logic                    := '0';
    signal brk_ptr   : t_ptr                        := (others => '0');
    -- Input or a break that the link has not taken
    signal drain     : std_logic;
@@ -437,22 +448,33 @@ begin
          closing   <= '0';
          fin_sent  <= '0';
          fin_max   <= '0';
+         fin_ack   <= '0';
          syn_req   <= '1';
          ack_req   <= '0';
          pend      <= '0';
+         peer_fin  <= '0';
          tries     <= 0;
          rto_cnt   <= 0;
       end procedure accept;
 
-      -- Ends the connection, and opens the one that waits, if any.
-      procedure finish is
+      -- Ends the connection, and opens the one that waits, if any. Its
+      -- received data ends at cmt.
+      procedure finish (
+         cmt : t_ptr
+      ) is
       begin
          if pend = '1' then
             accept(pend_mac, pend_ip, pend_port, pend_seq, pend_win, fin_ptr);
             keep <= '1';
+            -- The old connection's input has ended.
+            if peer_fin = '0' then
+               fin_rcvd <= '1';
+               brk_ptr  <= cmt;
+            end if;
          else
-            state <= LISTEN_ST;
-            keep  <= '0';
+            state   <= LISTEN_ST;
+            keep    <= '0';
+            fin_ack <= '0';
          end if;
       end procedure finish;
 
@@ -567,7 +589,8 @@ begin
             -- Whether the data is the next of the connection, and fits;
             -- the header has passed far enough to know.
             if idx = 47 then
-               if m_ok = '1' and state = EST_ST and f_sip = peer_ip and f_sport = peer_port and
+               if m_ok = '1' and conn = '1' and state /= SYN_RCVD_ST and peer_fin = '0' and
+                  f_sip = peer_ip and f_sport = peer_port and
                   f_dport = C_PORT and f_seq = rcv_nxt and f_doff >= 5 and plen > 0 and
                   plen <= rx_free then
                   wr_ok <= '1';
@@ -616,15 +639,10 @@ begin
                            accept(f_smac, f_sip, f_sport, f_seq, f_win, una_ptr);
                         end if;
 
-                     when EST_ST =>
+                     when EST_ST | CLOSE_WAIT_ST | LAST_ACK_ST =>
                         if from_peer_v and f_seq = irs then
                            ack_req <= '1';
                         elsif f_sip = peer_ip then
-                           accept(f_smac, f_sip, f_sport, f_seq, f_win, tail_ptr);
-                        end if;
-
-                     when CLOSE_WAIT_ST | LAST_ACK_ST =>
-                        if f_sip = peer_ip and not (from_peer_v and f_seq = irs) then
                            pend      <= '1';
                            pend_mac  <= f_smac;
                            pend_ip   <= f_sip;
@@ -643,7 +661,7 @@ begin
                   if f_flags(2) = '1' then
                      -- A reset, with a sequence number in the window
                      if f_seq - rcv_nxt < C_SIZE then
-                        finish;
+                        finish(rx_cmt);
                      end if;
                   elsif state = SYN_RCVD_ST then
                      if f_flags(4) = '1' and f_ack = iss + 1 then
@@ -680,9 +698,12 @@ begin
                         ack_req <= '1';
                      end if;
                      -- The host's FIN, if all before it has come
-                     if f_flags(0) = '1' and state = EST_ST and f_seq + plen = rcv_v then
+                     if f_flags(0) = '1' and peer_fin = '0' and f_seq + plen = rcv_v then
                         rcv_v    := rcv_v + 1;
-                        state    <= CLOSE_WAIT_ST;
+                        if state = EST_ST then
+                           state <= CLOSE_WAIT_ST;
+                        end if;
+                        peer_fin <= '1';
                         fin_rcvd <= '1';
                         if wr_ok = '1' then
                            brk_ptr <= rx_wr;
@@ -695,11 +716,17 @@ begin
                      -- The ACK of this side's FIN ends the connection.
                      if state = LAST_ACK_ST and fin_max = '1' and f_flags(4) = '1' and
                         f_ack = una_seq + (fin_ptr - una_ptr) + 1 then
-                        finish;
+                        fin_ack <= '1';
                      end if;
                   end if;
                end if;
             end if;
+
+         -- The end, once the ACK that the host is owed is sent; as for a
+         -- timeout, the segment being chosen is dropped.
+         elsif fin_ack = '1' and ack_req = '0' and (build = B_IDLE or build = B_PICK) then
+            timeout_v := true;
+            finish(rx_cmt);
 
          ------------------------------------------------------------------
          -- The retransmission timer
@@ -711,7 +738,7 @@ begin
                   rto_cnt   <= 0;
                   timeout_v := true;
                   if tries = C_TRIES - 1 then
-                     finish;
+                     finish(rx_cmt);
                   else
                      tries    <= tries + 1;
                      nxt_ptr  <= una_ptr;
@@ -782,7 +809,7 @@ begin
                         max_ptr <= nxt_ptr + pick_n;
                      end if;
                      go_v := true;
-                  elsif (state = CLOSE_WAIT_ST or state = LAST_ACK_ST) and closing = '1' and
+                  elsif state /= LISTEN_ST and state /= SYN_RCVD_ST and closing = '1' and
                         nxt_ptr = fin_ptr and fin_sent = '0' then
                      seg_flags <= C_FIN or C_ACK;
                      fin_sent  <= '1';
@@ -871,6 +898,7 @@ begin
             closing   <= '0';
             fin_sent  <= '0';
             fin_max   <= '0';
+            fin_ack   <= '0';
             syn_req   <= '0';
             ack_req   <= '0';
             pend      <= '0';
@@ -887,6 +915,7 @@ begin
             lfetch    <= '0';
             lrx_valid <= '0';
             fin_rcvd  <= '0';
+            peer_fin  <= '0';
             build     <= B_IDLE;
             fetch     <= '0';
             tx_valid  <= '0';

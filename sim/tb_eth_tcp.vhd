@@ -32,6 +32,9 @@
 --     not replace one; the link keeps it until it has taken the input,
 --     and a break waits for the input before it, also when a new
 --     connection's input comes after it
+--   * a SYN from another port of the host before its FIN closes the old
+--     connection with a FIN too; the old one still takes data and the
+--     host's FIN, and if that never comes, its end by an RST is a break
 --   * a SYN-ACK that is never acknowledged ends the connection after the
 --     tries
 
@@ -693,8 +696,9 @@ begin
          report "tb_eth_tcp: FAIL, no break after the data"
          severity failure;
       link_out(10);
-      -- The first SYN again is not a new connection.
+      -- The first SYN again is not a new connection, and gets an ACK.
       send(seg(C_HIP, C_PORT, 40000, X"FFFFF000", X"00000000", C_SYN, 8192, 0, 0, false));
+      expect_ack;
       expect_none(10 us);
 
       -- A new connection from another port: the old one gets the output
@@ -789,6 +793,61 @@ begin
       assert n_break = 2 and brk_at = hd_v - 6 and n_log = hd_v and not lrx_bad and conn = '0'
          report "tb_eth_tcp: FAIL, the break is not after the input before it"
          severity failure;
+
+      -- A new connection before the host's FIN, as when the FIN was lost:
+      -- the old one gets the output and a FIN, and still takes data and the
+      -- host's FIN.
+      open_conn(40005, X"0000B000");
+      send_data(5);
+      ltx_req <= ltx_req + 20;
+      wait for 1 us;
+      send(seg(C_HIP, C_PORT, 40006, X"0000C000", X"00000000", C_SYN, 8192, 0, 0, false));
+      expect_data;
+      expect(1 ms, 40005);
+      assert flags_v = X"11" and seq_v = bseq_v and conn = '1'
+         report "tb_eth_tcp: FAIL, no FIN before the host's"
+         severity failure;
+      bseq_v := bseq_v + 1;
+      send_seg(C_FIN or C_ACK, 3);
+      hseq_v := hseq_v + 4;
+      hd_v   := hd_v + 3;
+      expect_ack;
+      wait for 1 us;
+      assert n_break = 3 and brk_at = hd_v and n_log = hd_v and not lrx_bad
+         report "tb_eth_tcp: FAIL, no break after the old connection's data"
+         severity failure;
+      send_seg(C_ACK, 0);
+      sport_v := 40006;
+      expect(1 ms, 40006);
+      assert flags_v = X"12" and ack_v = X"0000C001" and conn = '1'
+         report "tb_eth_tcp: FAIL, not a SYN-ACK for the new connection"
+         severity failure;
+      hseq_v := X"0000C001";
+      bseq_v := seq_v + 1;
+      send_seg(C_ACK, 0);
+      send_data(2);
+      -- A new connection without a FIN at all, as after a crash: the RST
+      -- of the old one opens the new one, and is a break.
+      send(seg(C_HIP, C_PORT, 40007, X"0000D000", X"00000000", C_SYN, 8192, 0, 0, false));
+      expect(1 ms, 40006);
+      assert flags_v = X"11" and seq_v = bseq_v
+         report "tb_eth_tcp: FAIL, no FIN for the old connection"
+         severity failure;
+      send_seg(C_RST, 0);
+      expect(1 ms, 40007);
+      assert flags_v = X"12" and ack_v = X"0000D001"
+         report "tb_eth_tcp: FAIL, not a SYN-ACK after the RST"
+         severity failure;
+      wait for 1 us;
+      assert n_break = 4 and brk_at = hd_v and n_log = hd_v
+         report "tb_eth_tcp: FAIL, no break at the end of the old connection"
+         severity failure;
+      sport_v := 40007;
+      hseq_v  := X"0000D001";
+      bseq_v  := seq_v + 1;
+      send_seg(C_ACK, 0);
+      send_seg(C_RST, 0);
+      wait for 1 us;
 
       -- A SYN-ACK that is never acknowledged ends the connection.
       send(seg(C_HIP2, C_PORT, 40002, X"00007000", X"00000000", C_SYN, 8192, 0, 0, false));
