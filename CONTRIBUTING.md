@@ -180,7 +180,10 @@ The testbenches are these:
 - `sim/tb_eth_tx_fifo.vhd` tests the FIFO of frames to send between its
   two clocks, with a writer and a reader that are not always ready: the
   frames come in order and whole, none before it is written whole, and,
-  with the reader always ready, a byte every two cycles.
+  with the reader always ready, a byte every two cycles. A second FIFO of
+  64 bytes checks the capacity to the byte: it takes 64 bytes and no more,
+  a frame that fills it goes in and out again and again, and the room
+  beside a waiting frame is used to its last byte.
 - `sim/tb_rmii_tx.vhd` tests the RMII transmitter with a model of the
   PHY: frames of 1 to 1514 bytes, with their preamble, padding, frame
   check sequence, which it checks with its own CRC, and gap of 12 bytes.
