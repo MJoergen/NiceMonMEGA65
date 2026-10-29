@@ -141,8 +141,11 @@ the host disconnects, the line goes back to the UART.
 
 As over the serial port, a plain client is a terminal to the program,
 with none of the link's features. `nc 192.168.1.65 4510` sends each
-line you type to the program, and shows what it prints. Ctrl-D ends the
-connection, which the board takes as a break.
+line you type to the program, and shows what it prints. Ctrl-C ends it.
+Its close is a break, which ends the program's input until the core is
+started again. The board keeps the connection, so the UART has no link
+until a tool connects from the same PC, such as
+`tools/mon.py --eth 192.168.1.65`, or the board is reset.
 
 The tools take `--eth 192.168.1.65` for this (see
 [tools/README.md](tools/README.md#over-ethernet)), and
