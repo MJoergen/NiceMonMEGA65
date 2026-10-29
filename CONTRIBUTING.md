@@ -35,6 +35,8 @@ or, in an existing clone:
   interactive shell](README.md#using-the-interactive-shell)).
 - `make hwtest` tests the board (see [Testing the
   board](#testing-the-board)).
+- `make flash` writes a bitstream into the Nexys4DDR's flash, from which
+  the board then starts (see [synth/README.md](synth/README.md)).
 - `make bump TAG=V1.0` moves nice_cpu to a tag and records the MEGA65's
   timing (see [The timing badge](#the-timing-badge)).
 - `make release TAG=V1.0` builds, tests, and publishes a release, and
@@ -393,9 +395,12 @@ which are off in simulation and synthesis.
   programs the FPGA through the same USB cable. Programming needs Linux,
   as the JTAG cable is found through `/sys`; with `--no-program` the
   script runs wherever `load.py` does.
-- niceemu, built with `make -C nice_cpu/emulator build`. Without it, the
-  checks that need it are skipped, and the last line names them after a
-  `SKIPPED`.
+- niceemu, built with `make -C nice_cpu/emulator build`, which `make
+  hwtest` does first. Without it, `tools/hwtest.py` skips the checks that
+  need it, and its last line names them after a `SKIPPED`.
+- The C examples, `examples/build/primes.bin` and `bench.bin`, which
+  `make hwtest` builds first with `make examples`. That needs clang, lld,
+  and llvm (see [The examples](#the-examples)).
 
 ### Running it
 
@@ -413,7 +418,8 @@ they were plugged in, so name the port by the cable's serial number, as in
 `PORT=/dev/serial/by-id/usb-Digilent_Digilent_USB_Device_<serial>-if01-port0`.
 
 A board that is already programmed can be tested with `tools/hwtest.py
---no-program`, which skips the `b` notice. A bitstream with a ROM can be
+--no-program`, which skips the programming and the whole boot test, the
+`b` notice and the checks of the ROM. A bitstream with a ROM can be
 tested, such as one with the demo (`make demo`, then `make r6
 ROM=demo/build/demo.bin`): the test holds the core and hides the ROM, as
 `load.py` does, and runs the programs from the RAM.
@@ -446,15 +452,25 @@ bitstream has one. Then it hides the ROM and uses the link:
   a hold, and a start paused.
 - It steps `sim/step.nasm` to its halt and compares the registers after
   each step with `niceemu --trace`.
+- It runs `sim/break.nasm` to its breakpoints: in a loop, two at one
+  address, one disabled, a step that ends at one, the second word of a
+  two-word instruction, an interrupt routine, and a `HALT`, each with the
+  `x` notice, R15, and the stop register.
 - It clears the memory, reads back what `sim/emu.nasm` leaves after its
-  halt, writes and reads the screen's registers, and runs
-  `examples/build/primes.bin`.
+  halt, and checks that the cycle counter and the timer stop at the halt.
+- It writes and reads the screen's registers, and the board's registers:
+  on the Nexys4DDR the LEDs, RGB LEDs, and display, and that the buttons
+  and switches take no write, and on the MEGA65 that they read 0 and take
+  no write.
+- It checks `FS_CTRL` of the fetch statistics, and runs
+  `examples/build/primes.bin`, and checks that the microsecond counter is
+  the cycles over the clock's MHz.
 - Last, it runs programs with `run.py` and with `niceemu`, whose output
   and exit status must be the same: among them `sim/eof.nasm`, with no
   input and with 1536 bytes of input, which checks the larger FIFO and the
   end of the input, the intro's `hello.nasm` with 100 lines of input that
-  it halts without reading, the emulator's `trapsym.nasm` with
-  `--symbols`, the demo of the ROM with a few keys and its screen, and
+  it halts without reading, the emulator's `reserved.nasm`, which halts
+  on a reserved control word, its `trapsym.nasm` with `--symbols`, the demo of the ROM with a few keys and its screen, and
   `examples/build/bench.bin`, but for its cycles, whose table it prints.
 
 The reset button is not tested: press it with a terminal open, and the
@@ -464,7 +480,8 @@ The reset button is not tested: press it with a terminal open, and the
 
 `make linktest` runs `run.py --tcp` on `niceemu --link` against plain
 `niceemu`, without a board, for the programs that `make hwtest` compares,
-and nice_cpu's benchmark, with `tools/linktest.py`. It runs hwtest's
+and nice_cpu's benchmark when `make examples` has built
+`examples/build/bench.bin`, with `tools/linktest.py`. It runs hwtest's
 checks of bad packets, of the pause, of the step, and of the breakpoints
 on `niceemu --link` first, and then `mon.py`'s commands, its disassembly
 among them, as typed at its prompt, with the labels of `sim/break.nasm`.
@@ -514,8 +531,10 @@ runs it:
 
     tools/run.py examples/build/bench.bin
 
-The instructions are the same as on the emulator, here with nice_cpu
-V1.0. The cycles are from the R6 with the pipelined core, beside those of
+The instructions are the same as on the emulator, and the same at nice_cpu
+V1.0 and V1.1. The cycles were measured on the R6 with the pipelined core
+at nice_cpu V1.0, and `make hwtest` prints them for the core it tests.
+They are beside those of
 nice_cpu's own testbench for the core that predicts backward jumps
 (`bench/README.md`):
 
