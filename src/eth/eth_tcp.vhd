@@ -69,12 +69,9 @@
 -- What may be sent is worked out in one cycle (B_IDLE) and the segment
 -- chosen in the next (B_PICK), for the timing; the choice is dropped if a
 -- segment is read or the timer runs out in that cycle, as both change
--- what may be sent.
--- A segment is built in two passes over its bytes: the first adds them,
--- with the pseudo header, for the IP and TCP checksums, and the second
--- sends them, with the checksums. The header is that of hdr, without
--- options, and the data comes from the send buffer, which gives a byte a
--- cycle after its address, as eth_icmp.vhd reads its memory.
+-- what may be sent. The segment's header fields (seg_*) and where its
+-- data is go to eth_tcp_tx.vhd, which builds it, with the checksums, and
+-- sends it; nothing is chosen while it is busy.
 --
 -- The receive window is the free space of the receive buffer, and when it
 -- has grown by C_WND_STEP since the last segment, an ACK tells the host.
@@ -210,9 +207,8 @@ architecture synthesis of eth_tcp is
    signal tick_cnt : natural range 0 to C_TICK     := 0;
    signal rto_cnt  : natural range 0 to C_RTO_MS   := 0;
    signal tries    : natural range 0 to C_TRIES    := 0;
-   -- The initial sequence number, a cycle counter, and the IP ID
-   signal isn   : std_logic_vector(31 downto 0) := (others => '0');
-   signal ip_id : std_logic_vector(15 downto 0) := (others => '0');
+   -- The initial sequence number, a cycle counter
+   signal isn : std_logic_vector(31 downto 0) := (others => '0');
    -- Cycles since the link's last output byte
    signal idle : natural range 0 to C_IDLE     := 0;
    -- The receive window of the last segment sent
@@ -261,12 +257,14 @@ architecture synthesis of eth_tcp is
    -- The send buffer
    signal tx_we    : std_logic;
    signal tx_ready : std_logic;
-   signal tx_raddr : t_ptr;
+   signal tx_raddr : std_logic_vector(G_ADDR_BITS - 1 downto 0);
    signal tx_rdata : std_logic_vector(8 downto 0);
 
-   -- The segment being built
-   type   t_build is (B_IDLE, B_PICK, B_INIT, B_SUM, B_SEND);
+   -- The segment being chosen, and the one being sent
+   type   t_build is (B_IDLE, B_PICK);
    signal build     : t_build                       := B_IDLE;
+   signal go        : std_logic                     := '0';
+   signal busy      : std_logic;
    signal seg_mac   : std_logic_vector(47 downto 0) := (others => '0');
    signal seg_ip    : std_logic_vector(31 downto 0) := (others => '0');
    signal seg_port  : std_logic_vector(15 downto 0) := (others => '0');
@@ -277,23 +275,9 @@ architecture synthesis of eth_tcp is
    signal seg_ptr   : t_ptr                         := (others => '0');
    -- The data that may be sent: its length, and whether it is a whole
    -- segment
-   signal pick_n    : natural range 0 to C_MSS      := 0;
-   signal pick_big  : boolean                       := false;
-   signal seg_n     : natural range 0 to C_MSS      := 0;
-   signal seg_end   : natural range 0 to 54 + C_MSS := 0;
-   signal init_k    : natural range 0 to 5          := 0;
-   signal b_ip_sum  : std_logic_vector(15 downto 0) := (others => '0');
-   signal b_tcp_sum : std_logic_vector(15 downto 0) := (others => '0');
-   signal b_hi      : std_logic_vector(7 downto 0)  := (others => '0');
-   signal sq_idx    : natural range 0 to 54 + C_MSS := 0;
-   signal fetch     : std_logic                     := '0';
-   signal f_idx     : natural range 0 to 54 + C_MSS := 0;
-   signal tx_valid  : std_logic                     := '0';
-   signal ip_ck     : std_logic_vector(15 downto 0);
-   signal tcp_ck    : std_logic_vector(15 downto 0);
-   signal hdr       : t_bytes(0 to 53);
-   signal seg_byte  : std_logic_vector(7 downto 0);
-   signal init_word : std_logic_vector(15 downto 0);
+   signal pick_n   : natural range 0 to C_MSS := 0;
+   signal pick_big : boolean                  := false;
+   signal seg_n    : natural range 0 to C_MSS := 0;
 
    signal mac_b : t_bytes(0 to 5);
    signal ip_b  : t_bytes(0 to 3);
@@ -362,8 +346,6 @@ begin
    tx_we       <= ltx_valid_i and tx_ready;
    lim_ptr     <= fin_ptr when closing = '1' else
                   tail_ptr;
-   tx_raddr    <= seg_ptr + (sq_idx - 54) when sq_idx >= 54 else
-                  seg_ptr;
 
    i_tx_ram : entity work.eth_ram
       generic map (
@@ -375,35 +357,40 @@ begin
          wr_addr_i => tail_ptr(G_ADDR_BITS - 1 downto 0),
          wr_data_i => '0' & ltx_data_i,
          rd_clk_i  => clk_i,
-         rd_addr_i => tx_raddr(G_ADDR_BITS - 1 downto 0),
+         rd_addr_i => tx_raddr,
          rd_data_o => tx_rdata
       ); -- i_tx_ram
 
-   -- The checksums are 0 while they are added up.
-   ip_ck  <= not b_ip_sum when build = B_SEND else
-             X"0000";
-   tcp_ck <= not b_tcp_sum when build = B_SEND else
-             X"0000";
 
-   hdr <= b6(seg_mac) & mac_b & t_bytes'(X"08", X"00", X"45", X"00") &
-          b2(X"0028" + seg_n) & b2(ip_id) &
-          t_bytes'(X"40", X"00", X"40", X"06") & b2(ip_ck) & ip_b & b4(seg_ip) &
-          b2(C_PORT) & b2(seg_port) & b4(seg_seq) & b4(seg_ack) &
-          t_bytes'(X"50", seg_flags) & b2(seg_wnd) & b2(tcp_ck) & t_bytes'(X"00", X"00");
-
-   seg_byte <= hdr(f_idx) when f_idx < 54 else
-               tx_rdata(7 downto 0);
-
-   -- The pseudo header: the addresses, the protocol, and the TCP length
-   with init_k select init_word <=
-      ip_i(31 downto 16) when 0,
-      ip_i(15 downto 0) when 1,
-      seg_ip(31 downto 16) when 2,
-      seg_ip(15 downto 0) when 3,
-      X"0006" when 4,
-      X"0014" + seg_n when others;
-
-   tx_valid_o <= tx_valid;
+   i_eth_tcp_tx : entity work.eth_tcp_tx
+      generic map (
+         G_PORT      => G_PORT,
+         G_ADDR_BITS => G_ADDR_BITS,
+         G_MSS       => C_MSS
+      )
+      port map (
+         clk_i       => clk_i,
+         rst_i       => rst_i,
+         mac_i       => mac_i,
+         ip_i        => ip_i,
+         go_i        => go,
+         busy_o      => busy,
+         seg_mac_i   => seg_mac,
+         seg_ip_i    => seg_ip,
+         seg_port_i  => seg_port,
+         seg_seq_i   => seg_seq,
+         seg_ack_i   => seg_ack,
+         seg_flags_i => seg_flags,
+         seg_wnd_i   => seg_wnd,
+         seg_addr_i  => seg_ptr(G_ADDR_BITS - 1 downto 0),
+         seg_n_i     => seg_n,
+         rd_addr_o   => tx_raddr,
+         rd_data_i   => tx_rdata(7 downto 0),
+         tx_data_o   => tx_data_o,
+         tx_last_o   => tx_last_o,
+         tx_valid_o  => tx_valid_o,
+         tx_ready_i  => tx_ready_i
+      ); -- i_eth_tcp_tx
 
 
    p_tcp : process (clk_i)
@@ -738,7 +725,7 @@ begin
 
          -- The end, once the ACK that the host is owed is sent; as for a
          -- timeout, the segment being chosen is dropped.
-         elsif fin_ack = '1' and ack_req = '0' and (build = B_IDLE or build = B_PICK) then
+         elsif fin_ack = '1' and ack_req = '0' and busy = '0' then
             timeout_v := true;
             finish(rx_cmt);
 
@@ -777,12 +764,15 @@ begin
          ------------------------------------------------------------------
          -- The segment to send: the SYN-ACK, data, the FIN, or an ACK
          ------------------------------------------------------------------
+         go <= '0';
+
          case build is
 
-            -- What may be sent: computed here, and chosen from in the next
-            -- cycle, unless a segment was read or the timer ran out in it.
+            -- What may be sent: computed here, once the last segment has
+            -- gone, and chosen from in the next cycle, unless a segment was
+            -- read or the timer ran out in it.
             when B_IDLE =>
-               if eval = '0' and not timeout_v then
+               if eval = '0' and not timeout_v and busy = '0' then
                   avail_v := to_integer(lim_ptr - nxt_ptr);
                   room_v  := to_integer(snd_wnd) - to_integer(nxt_ptr - una_ptr);
                   if room_v < 0 then
@@ -841,68 +831,10 @@ begin
 
                   -- Every segment acknowledges, with the window of now.
                   if go_v then
-                     ack_req   <= '0';
-                     adv_wnd   <= rx_free;
-                     init_k    <= 0;
-                     b_tcp_sum <= (others => '0');
-                     b_ip_sum  <= (others => '0');
-                     build     <= B_INIT;
+                     ack_req <= '0';
+                     adv_wnd <= rx_free;
+                     go      <= '1';
                   end if;
-               end if;
-
-            when B_INIT =>
-               b_tcp_sum <= ones_add(b_tcp_sum, init_word);
-               if init_k = 5 then
-                  seg_end <= 54 + seg_n;
-                  sq_idx  <= 14;
-                  fetch   <= '0';
-                  build   <= B_SUM;
-               else
-                  init_k <= init_k + 1;
-               end if;
-
-            when B_SUM =>
-               if fetch = '1' then
-                  if f_idx mod 2 = 0 then
-                     b_hi <= seg_byte;
-                  elsif f_idx <= 33 then
-                     b_ip_sum <= ones_add(b_ip_sum, b_hi & seg_byte);
-                  else
-                     b_tcp_sum <= ones_add(b_tcp_sum, b_hi & seg_byte);
-                  end if;
-               end if;
-               fetch <= '0';
-               if sq_idx < seg_end then
-                  fetch  <= '1';
-                  f_idx  <= sq_idx;
-                  sq_idx <= sq_idx + 1;
-               elsif fetch = '0' then
-                  -- An odd byte at the end, with a zero after it
-                  if seg_end mod 2 = 1 then
-                     b_tcp_sum <= ones_add(b_tcp_sum, b_hi & X"00");
-                  end if;
-                  sq_idx <= 0;
-                  build  <= B_SEND;
-               end if;
-
-            when B_SEND =>
-               if tx_ready_i = '1' and tx_valid = '1' then
-                  tx_valid <= '0';
-                  if tx_last_o = '1' then
-                     ip_id <= ip_id + 1;
-                     build <= B_IDLE;
-                  end if;
-               end if;
-               if fetch = '1' then
-                  tx_data_o <= seg_byte;
-                  tx_last_o <= '1' when f_idx = seg_end - 1 else '0';
-                  tx_valid  <= '1';
-               end if;
-               fetch <= '0';
-               if fetch = '0' and sq_idx < seg_end and (tx_valid = '0' or tx_ready_i = '1') then
-                  fetch  <= '1';
-                  f_idx  <= sq_idx;
-                  sq_idx <= sq_idx + 1;
                end if;
 
          end case;
@@ -936,8 +868,7 @@ begin
             fin_rcvd  <= '0';
             peer_fin  <= '0';
             build     <= B_IDLE;
-            fetch     <= '0';
-            tx_valid  <= '0';
+            go        <= '0';
          end if;
       end if;
    end process p_tcp;
