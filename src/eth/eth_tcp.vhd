@@ -11,9 +11,10 @@
 -- leaves the link on the UART. The host's half-close, its FIN, is a break
 -- of the line (rx_break_o), after the last byte before it (brk_ptr). The
 -- link stays with the connection after its end, by an RST or the tries,
--- until it has taken all the input and the break, so that none is lost;
--- the output in that time is dropped. The states are those of a passive
--- open, and of a close:
+-- until it has taken all the input and the break (drain), so that none is
+-- lost, and a cycle more, as on_o follows drain through a register, for
+-- the timing; the output in that time is dropped. The states are those of
+-- a passive open, and of a close:
 --   LISTEN_ST      no connection; a SYN to G_PORT opens one
 --   SYN_RCVD_ST    the SYN-ACK is sent, and waits for the host's ACK
 --   EST_ST         the connection is open
@@ -236,8 +237,10 @@ architecture synthesis of eth_tcp is
    -- The host's FIN has come.
    signal peer_fin : std_logic                    := '0';
    signal brk_ptr  : t_ptr                        := (others => '0');
-   -- Input or a break that the link has not taken
-   signal drain : std_logic;
+   -- Input or a break that the link has not taken, and the same a cycle
+   -- later, which on_o follows
+   signal drain   : std_logic;
+   signal drain_r : std_logic                    := '0';
 
    -- The send buffer
    signal tx_we    : std_logic;
@@ -271,7 +274,7 @@ begin
    conn <= '1' when state = EST_ST or state = CLOSE_WAIT_ST or state = LAST_ACK_ST or
                     (state = SYN_RCVD_ST and keep = '1') else
            '0';
-   on_o <= conn or drain;
+   on_o <= conn or drain_r;
 
    ---------------------------------------------------------------------------
    -- Receive
@@ -501,6 +504,7 @@ begin
             lrx_break_o <= '1';
             fin_rcvd    <= '0';
          end if;
+         drain_r <= drain;
 
          -- A window that has grown is told.
          if state = EST_ST and rx_free >= adv_wnd + C_WND_STEP then
@@ -774,6 +778,7 @@ begin
             lfetch    <= '0';
             lrx_valid <= '0';
             fin_rcvd  <= '0';
+            drain_r   <= '0';
             peer_fin  <= '0';
             build     <= B_IDLE;
             go        <= '0';
