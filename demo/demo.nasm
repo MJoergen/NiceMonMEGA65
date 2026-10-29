@@ -1351,7 +1351,8 @@ ESCAPE  ADD     @--SP, 2, PC
     ?Z  MOVE    PC, CSI
         SUB[M]  R0, R1, 0x4F    ; O
     ?!Z MOVE    PC, @SP++
-; ESC O and a byte: A to D are the cursor keys, and P to S F1 to F4
+; ESC O and a byte: A to D are the cursor keys, and P to S F1 to F4. No
+; byte in time leaves R1 0, which is none of them.
         ADD     @--SP, 2, PC
         MOVE    PC, NEXT
         SUB     R2, R1, 0x41
@@ -1364,11 +1365,13 @@ ESCAPE  ADD     @--SP, 2, PC
 ; ESC [, parameters, and a final byte, which is 0x40 or above. A to D are
 ; the cursor keys, whatever the parameters. ~ is a function key, whose
 ; number in FNUMS is the first parameter. R3 is the first parameter, and R4
-; is 1 once it has ended.
+; is 1 once it has ended. A sequence that stops before its final byte
+; gives 0 at the timeout, so that the bytes typed after it are keys again.
 CSI     MOVE    R3, 0
         MOVE    R4, 0
 PARAM   ADD     @--SP, 2, PC
         MOVE    PC, NEXT
+    ?Z  MOVE    PC, NONE        ; no byte in time
         SUB[M]  R0, R1, 0x40
     ?!C MOVE    PC, FINAL
         SUB     R2, R1, 0x30

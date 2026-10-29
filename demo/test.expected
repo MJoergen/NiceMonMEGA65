@@ -130,9 +130,9 @@ Screen:
 |  Since reset, while the core runs
 |
 |    Time, h:mm:ss.hh                              0:00:00.07
-|    Microseconds                                       79969
-|    Cycles                                             79971
-|    Instructions                                       79973
+|    Microseconds                                       79972
+|    Cycles                                             79974
+|    Instructions                                       79976
 |    Clock in MHz, cycles per microsecond                   1
 |
 |  A prime sieve to 2048, run before each update
@@ -158,9 +158,10 @@ Screen:
 |
 |
 |
-|                     *
+|
 |
 | @oo
+|                                            *
 Screen:
 | NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
 | F1 typewriter   F3 key codes   F5 charset   F7 counters   F9 comet   F11 board
