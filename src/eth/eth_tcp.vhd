@@ -68,13 +68,16 @@
 -- of the host that was lost is not waited for forever; an ACK with a
 -- window of 0 starts the tries again, so the connection lasts while the
 -- host answers.
--- What may be sent is worked out in two cycles, for the timing: how far
--- the data and the host's window go (B_IDLE), then how much of it a
--- segment takes (B_SIZE); the segment is chosen in the next (B_PICK). The
--- choice is dropped if a segment is read or the timer runs out in any of
--- them, as both change what may be sent. The segment's header fields
--- (seg_*) and where its data is go to eth_tcp_tx.vhd, which builds it,
--- with the checksums, and sends it; nothing is chosen while it is busy.
+-- What may be sent is worked out in two cycles (p_pick), for the timing:
+-- how far the data and the host's window go (B_IDLE), then how much of it
+-- a segment takes (B_SIZE); the segment is chosen in the next (B_PICK),
+-- as pick says. The choice is dropped (drop) if a segment is read or the
+-- timer runs out in any of them, as both change what may be sent. The
+-- segment's header fields (seg_*) and where its data is go to
+-- eth_tcp_tx.vhd, which builds it, with the checksums, and sends it;
+-- nothing is chosen while it is busy. The connection (p_tcp) books what
+-- the segment carries in the cycle it is chosen: the SYN-ACK or the ACK
+-- asked for is sent, the data is out, or the FIN is sent.
 --
 -- The receive window is the free space of the receive buffer, and when it
 -- has grown by C_WND_STEP since the last segment, an ACK tells the host.
@@ -273,7 +276,11 @@ architecture synthesis of eth_tcp is
 
    -- The segment being chosen, and the one being sent
    type   t_build is (B_IDLE, B_SIZE, B_PICK);
+   type   t_pick is (NO_PK, SYN_PK, DATA_PK, FIN_PK, ACK_PK);
    signal build     : t_build                       := B_IDLE;
+   signal pick      : t_pick;
+   signal drop      : std_logic;
+   signal timeout   : std_logic;
    signal go        : std_logic                     := '0';
    signal busy      : std_logic;
    signal seg_mac   : std_logic_vector(47 downto 0) := (others => '0');
@@ -389,6 +396,29 @@ begin
       ); -- i_tx_ram
 
 
+   -- The timer runs out this cycle, unless a segment is acted on, or the
+   -- connection ends, which come first.
+   timeout <= '1' when eval = '0' and not (fin_ack = '1' and ack_req = '0' and busy = '0') and
+                       tick_cnt = C_TICK - 1 and rto_cnt = C_RTO_MS - 1 and
+                       (state = SYN_RCVD_ST or max_ptr /= una_ptr or
+                        (state = LAST_ACK_ST and fin_max = '1') or
+                        (conn = '1' and snd_wnd = 0 and lim_ptr /= una_ptr)) else
+              '0';
+   -- A segment is acted on, the connection ends, or the timer runs out:
+   -- the segment being chosen is dropped.
+   drop <= '1' when eval = '1' or (fin_ack = '1' and ack_req = '0' and busy = '0') or
+                    timeout = '1' else
+           '0';
+
+   -- The segment chosen in B_PICK: the SYN-ACK, data, the FIN, or an ACK
+   pick <= NO_PK when build /= B_PICK or drop = '1' else
+           SYN_PK when syn_req = '1' and state = SYN_RCVD_ST else
+           NO_PK when state = LISTEN_ST or state = SYN_RCVD_ST else
+           DATA_PK when pick_n > 0 and (pick_big or idle = C_IDLE or closing = '1') else
+           FIN_PK when closing = '1' and nxt_ptr = fin_ptr and fin_sent = '0' else
+           ACK_PK when ack_req = '1' else
+           NO_PK;
+
    i_eth_tcp_tx : entity work.eth_tcp_tx
       generic map (
          G_PORT      => G_PORT,
@@ -438,13 +468,92 @@ begin
    end process p_cmp;
 
 
+   p_pick : process (clk_i)
+      variable room_v : natural range 0 to 2 ** 16;
+   begin
+      if rising_edge(clk_i) then
+         go <= '0';
+
+         case build is
+
+            -- What may be sent: worked out here and in B_SIZE, once the
+            -- last segment has gone, and chosen from in the cycle after,
+            -- unless a segment was read or the timer ran out meanwhile.
+            when B_IDLE =>
+               if drop = '0' and busy = '0' then
+                  avail    <= to_integer(lim_ptr - nxt_ptr);
+                  room     <= to_integer(snd_wnd) - to_integer(nxt_ptr - una_ptr);
+                  seg_mac  <= peer_mac;
+                  seg_ip   <= peer_ip;
+                  seg_port <= peer_port;
+                  seg_ack  <= rcv_nxt;
+                  seg_wnd  <= X"0000" + rx_free;
+                  seg_ptr  <= nxt_ptr;
+                  seg_n    <= 0;
+                  -- After this side's FIN, the next sequence number is past it.
+                  seg_seq  <= una_seq + (nxt_ptr - una_ptr) + fin_sent;
+                  build    <= B_SIZE;
+               end if;
+
+            when B_SIZE =>
+               build <= B_IDLE;
+               if drop = '0' then
+                  room_v := 0;
+                  if room > 0 then
+                     room_v := room;
+                  end if;
+                  pick_n   <= minimum(minimum(avail, room_v), C_MSS);
+                  pick_big <= avail >= C_MSS;
+                  if probe = '1' and room_v = 0 and avail > 0 then
+                     pick_n   <= 1;
+                     pick_big <= true;
+                  end if;
+                  build <= B_PICK;
+               end if;
+
+            when B_PICK =>
+               build <= B_IDLE;
+
+               case pick is
+
+                  when SYN_PK =>
+                     seg_flags <= C_SYN or C_ACK;
+                     seg_seq   <= iss;
+
+                  when DATA_PK =>
+                     seg_flags <= C_ACK or C_PSH;
+                     seg_n     <= pick_n;
+
+                  when FIN_PK =>
+                     seg_flags <= C_FIN or C_ACK;
+
+                  when ACK_PK =>
+                     seg_flags <= C_ACK;
+
+                  when NO_PK =>
+                     null;
+
+               end case;
+
+               -- Every segment acknowledges, with the window of now.
+               if pick /= NO_PK then
+                  adv_wnd <= rx_free;
+                  go      <= '1';
+               end if;
+
+         end case;
+
+         if rst_i = '1' then
+            build <= B_IDLE;
+            go    <= '0';
+         end if;
+      end if;
+   end process p_pick;
+
+
    p_tcp : process (clk_i)
-      variable syn_v     : boolean;
-      variable fin_v     : boolean;
-      variable room_v    : natural range 0 to 2 ** 16;
-      variable n_v       : natural range 0 to C_MSS;
-      variable timeout_v : boolean;
-      variable go_v      : boolean;
+      variable syn_v : boolean;
+      variable fin_v : boolean;
 
       -- Opens a connection for a SYN; the output after base goes to it.
       procedure accept (
@@ -558,7 +667,6 @@ begin
          ------------------------------------------------------------------
          -- The segment, in the second cycle after its last byte
          ------------------------------------------------------------------
-         timeout_v := false;
          if eval = '1' then
             rx_wr <= rx_cmt;
 
@@ -682,10 +790,8 @@ begin
                end if;
             end if;
 
-         -- The end, once the ACK that the host is owed is sent; as for a
-         -- timeout, the segment being chosen is dropped.
+         -- The end, once the ACK that the host is owed is sent
          elsif fin_ack = '1' and ack_req = '0' and busy = '0' then
-            timeout_v := true;
             finish(rx_cmt);
 
          ------------------------------------------------------------------
@@ -696,8 +802,7 @@ begin
                (state = LAST_ACK_ST and fin_max = '1') or
                (conn = '1' and snd_wnd = 0 and lim_ptr /= una_ptr) then
                if rto_cnt = C_RTO_MS - 1 then
-                  rto_cnt   <= 0;
-                  timeout_v := true;
+                  rto_cnt <= 0;
                   if tries = C_TRIES - 1 then
                      finish(rx_cmt);
                   else
@@ -721,86 +826,31 @@ begin
          end if;
 
          ------------------------------------------------------------------
-         -- The segment to send: the SYN-ACK, data, the FIN, or an ACK
+         -- The segment chosen (p_pick): what it carries is out
          ------------------------------------------------------------------
-         go <= '0';
+         if pick /= NO_PK then
+            ack_req <= '0';
+         end if;
 
-         case build is
+         case pick is
 
-            -- What may be sent: worked out here and in B_SIZE, once the
-            -- last segment has gone, and chosen from in the cycle after,
-            -- unless a segment was read or the timer ran out meanwhile.
-            when B_IDLE =>
-               if eval = '0' and not timeout_v and busy = '0' then
-                  avail    <= to_integer(lim_ptr - nxt_ptr);
-                  room     <= to_integer(snd_wnd) - to_integer(nxt_ptr - una_ptr);
-                  seg_mac  <= peer_mac;
-                  seg_ip   <= peer_ip;
-                  seg_port <= peer_port;
-                  seg_ack  <= rcv_nxt;
-                  seg_wnd  <= X"0000" + rx_free;
-                  seg_ptr  <= nxt_ptr;
-                  seg_n    <= 0;
-                  -- After this side's FIN, the next sequence number is past it.
-                  seg_seq  <= una_seq + (nxt_ptr - una_ptr) + fin_sent;
-                  build    <= B_SIZE;
+            when SYN_PK =>
+               syn_req <= '0';
+
+            when DATA_PK =>
+               probe   <= '0';
+               nxt_ptr <= nxt_ptr + pick_n;
+               if nxt_ptr + pick_n - una_ptr > max_ptr - una_ptr then
+                  max_ptr <= nxt_ptr + pick_n;
                end if;
 
-            when B_SIZE =>
-               build <= B_IDLE;
-               if eval = '0' and not timeout_v then
-                  room_v := 0;
-                  if room > 0 then
-                     room_v := room;
-                  end if;
-                  n_v      := minimum(minimum(avail, room_v), C_MSS);
-                  pick_n   <= n_v;
-                  pick_big <= avail >= C_MSS;
-                  if probe = '1' and room_v = 0 and avail > 0 then
-                     pick_n   <= 1;
-                     pick_big <= true;
-                  end if;
-                  build <= B_PICK;
-               end if;
+            when FIN_PK =>
+               fin_sent <= '1';
+               fin_max  <= '1';
+               state    <= LAST_ACK_ST;
 
-            when B_PICK =>
-               go_v  := false;
-               build <= B_IDLE;
-               if eval = '0' and not timeout_v then
-                  if syn_req = '1' and state = SYN_RCVD_ST then
-                     seg_flags <= C_SYN or C_ACK;
-                     seg_seq   <= iss;
-                     syn_req   <= '0';
-                     go_v      := true;
-                  elsif state /= LISTEN_ST and state /= SYN_RCVD_ST and pick_n > 0 and
-                        (pick_big or idle = C_IDLE or closing = '1') then
-                     seg_flags <= C_ACK or C_PSH;
-                     seg_n     <= pick_n;
-                     probe     <= '0';
-                     nxt_ptr   <= nxt_ptr + pick_n;
-                     if nxt_ptr + pick_n - una_ptr > max_ptr - una_ptr then
-                        max_ptr <= nxt_ptr + pick_n;
-                     end if;
-                     go_v := true;
-                  elsif state /= LISTEN_ST and state /= SYN_RCVD_ST and closing = '1' and
-                        nxt_ptr = fin_ptr and fin_sent = '0' then
-                     seg_flags <= C_FIN or C_ACK;
-                     fin_sent  <= '1';
-                     fin_max   <= '1';
-                     state     <= LAST_ACK_ST;
-                     go_v      := true;
-                  elsif ack_req = '1' and state /= LISTEN_ST and state /= SYN_RCVD_ST then
-                     seg_flags <= C_ACK;
-                     go_v      := true;
-                  end if;
-
-                  -- Every segment acknowledges, with the window of now.
-                  if go_v then
-                     ack_req <= '0';
-                     adv_wnd <= rx_free;
-                     go      <= '1';
-                  end if;
-               end if;
+            when ACK_PK | NO_PK =>
+               null;
 
          end case;
 
@@ -827,8 +877,6 @@ begin
             fin_rcvd  <= '0';
             drain_r   <= '0';
             peer_fin  <= '0';
-            build     <= B_IDLE;
-            go        <= '0';
          end if;
       end if;
    end process p_tcp;
