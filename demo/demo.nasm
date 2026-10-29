@@ -1246,10 +1246,12 @@ EBAD    MOVE    R1, E_BADIP
         MOVE    PC, PRINT
         MOVE    PC, BLOOP
 
-; PARSE reads the R3 characters from R2 as R6 numbers of 1 to 3 digits in
-; the base R4, from 0 to 255, with the separator R5 between them. It sets R1
-; to 0 and R11:R8 to the bytes, the first in the highest bits, or sets R1 to
-; 1 if the text is none of that. It changes R1 to R9, and R11.
+; PARSE reads the R3 characters from R2 as R6 numbers in the base R4, from
+; 0 to 255, with the separator R5 between them. A number in hex has one or
+; two digits, and one in decimal any number of them, as long as its value
+; is in range. It sets R1 to 0 and R11:R8 to the bytes, the first in the
+; highest bits, or sets R1 to 1 if the text is none of that. It changes R1
+; to R9, and R11.
 PARSE   MOVE    R11, 0
         MOVE    R8, 0
 PFIELD  MOVE    R7, 0           ; the digits of the number
@@ -1271,7 +1273,9 @@ PCHAR   MOVE[M] R0, R3
         ADD     R7, R7, 1
         SUB[M]  R0, R9, 256
     ?!C MOVE    PC, PBAD
-        SUB[M]  R0, R7, 4
+        SUB[M]  R0, R4, 16      ; hex: two digits at most
+    ?!Z MOVE    PC, PCHAR
+        SUB[M]  R0, R7, 3
     ?!C MOVE    PC, PBAD
         MOVE    PC, PCHAR
 PLAST   MOVE    R1, 0           ; R1 is 1 if a separator ended the number

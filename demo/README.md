@@ -192,24 +192,24 @@ line, as when an Ethernet host half-closes its connection.
 
     make -C demo                  # build/demo.bin, for the ROM
     make r6 ROM=demo/build/demo.bin
-    make -C demo test             # twelve runs in niceemu, compared with test.expected
+    make -C demo test             # runs in niceemu, compared with test.expected
 
 The version in the title bar is `git describe --tags --always --dirty`, or
 `VERSION=` on the command line, which `tools/release.py` sets to the tag.
 The assembler has no include, so the Makefile joins `demo.nasm` and a line
 that defines `VERSION`. The test assembles the demo with the version `V9.9`
-into `build/demo_test.bin`, and the Makefile writes its twelve inputs,
-`build/test1.txt` to `build/test12.txt`, with `printf`: the first edits a
+into `build/demo_test.bin`, and the Makefile writes its inputs,
+`build/test1.txt` to `build/test13.txt`, with `printf`: the first edits a
 few lines, the second clears them and scrolls, the third has the function
 keys, the fourth shows key codes and scrolls them, the fifth goes from
 the key codes back to the typewriter, the sixth shows the characters and
 the colors, the seventh the counters, with two runs of the sieve, the
 eighth plays two games of the comet, the ninth runs the board twice,
 the tenth types an IP address that is rejected, the eleventh writes an IP
-address and a MAC address and cancels a second one, and the twelfth types
-a MAC address that is rejected.
+address and a MAC address and cancels a second one, and the twelfth and
+the thirteenth type MAC addresses that are rejected.
 `niceemu` shows no colors, so for the sixth the test also has the words of
-two rows of ramps. The twelve screens that `niceemu` prints, and those
+two rows of ramps. The screens that `niceemu` prints, and those
 words, are in `test.expected`, which was checked by hand. In `niceemu` the
 counters count steps, so their numbers are the same in every run.
 
