@@ -169,8 +169,8 @@ halted: HALT, ROM hidden, control 0000000a, link version 0.5, input free 2048
 PC=0000000f
 </pre>
 
-The core may be running, paused, at a breakpoint, held in reset, or halted,
-with the reason. Then come whether the ROM is hidden, the value of the
+The core may be running, paused, at a breakpoint, held in reset, halted,
+or held after a halt, with the reason. Then come whether the ROM is hidden, the value of the
 control register, the version of the link as major.minor, and the free
 bytes in the program's input buffer. A paused or halted core shows its PC
 too.
@@ -178,7 +178,7 @@ too.
 The commands of `mon.py` are short, and `help` lists them. They are
 described in full in [tools/README.md](tools/README.md#monpy). Numbers
 are hex. The short names are `s` for `step`, `g` for `go`, `c` for
-`console`, and `q` for `quit`.
+`console`, and `q` for `quit`, and `help s` describes `step`.
 
 - `load FILE` loads a program, and leaves the core held in reset.
 - `go` starts a held core, or goes on from a pause. `run` starts the

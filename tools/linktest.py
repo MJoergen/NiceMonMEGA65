@@ -36,11 +36,16 @@ from run import Symbols
 
 
 def command(monitor: Monitor, line: str) -> str:
-    """What mon.py prints for a line typed at its prompt."""
+    """What mon.py prints for a line typed at its prompt, with print() or,
+    as help does, on its stdout."""
     raw = io.BytesIO()
     out = io.TextIOWrapper(raw, write_through=True)
-    with contextlib.redirect_stdout(out):
-        monitor.onecmd(monitor.precmd(line))
+    stdout, monitor.stdout = monitor.stdout, out
+    try:
+        with contextlib.redirect_stdout(out):
+            monitor.onecmd(monitor.precmd(line))
+    finally:
+        monitor.stdout = stdout
     return raw.getvalue().decode()
 
 
@@ -85,9 +90,8 @@ def test_mon_d(monitor: Monitor, at: dict[str, int]) -> None:
 
 def test_mon(port: int, prog: str, at: dict[str, int]) -> None:
     """mon.py on sim/break.nasm, with its labels: a load, a breakpoint at
-    a label and its notice, the registers, a step, a read at label+N, a
-    bad address, the disassembly when nice_cpu has its disassembler, and
-    the halt."""
+    a label and its notice, the registers, a step, help on a short name,
+    a read at label+N, a bad address, the disassembly, and the halt."""
     # niceemu refuses the new host, closing it, until it has seen the
     # last one close, so the connection is tried again for a while.
     end = time.monotonic() + 2
@@ -115,6 +119,9 @@ def test_mon(port: int, prog: str, at: dict[str, int]) -> None:
         out = command(monitor, "s")
         check("mon: a step", re.match(r"PC=[0-9a-f]{8} LOOP\+0x", out)
               is not None, repr(out))
+        out = command(monitor, "help s")
+        check("mon: help on a short name", out.startswith("step (s)"),
+              repr(out))
         out = command(monitor, "r TWO+1 1")
         check("mon: a read at label+N",
               out == f"{at['TWO'] + 1:08x}: 12345678\n", repr(out))

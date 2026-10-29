@@ -249,6 +249,11 @@ class Monitor(cmd.Cmd):
             line = " ".join(words)
         return line
 
+    def do_help(self, arg: str) -> None:
+        """help [CMD]: lists the commands, or describes one, also by its
+        short name."""
+        super().do_help(ALIASES.get(arg.strip(), arg.strip()))
+
     def onecmd(self, line: str) -> bool:
         with self.lock:
             try:

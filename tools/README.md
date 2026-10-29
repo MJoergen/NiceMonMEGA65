@@ -290,12 +290,13 @@ on.
 ### The commands
 
 The short names are `s` for `step`, `g` for `go`, `c` for `console`, and
-`q` for `quit`.
+`q` for `quit`. `help` takes them too, as in `help s`.
 
 #### The state of the core
 
 - `status` shows whether the core is running, paused, at a breakpoint,
-  held in reset, or halted, and why. It also shows whether the ROM is
+  held in reset, halted, or held after a halt (`held, after a halt:
+  REASON`, until a clear), and why it halted. It also shows whether the ROM is
   hidden, the control register, the link's version as major.minor, and
   the free space in the program's input buffer. When the core is paused
   or halted, it shows the PC.
