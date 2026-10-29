@@ -2,7 +2,8 @@
 
 This is the system that a program and the debug link see on the MEGA65 R3
 and R6, and on the Nexys4DDR: the debug link on the UART, the address map,
-the screen, the ROM, and the Nexys4DDR's devices. It follows nice_cpu's
+the screen, the keyboard, the ROM, the Nexys4DDR's devices, and the
+Ethernet station, which every board has. It follows nice_cpu's
 [doc/SYSTEM.md](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md) for the devices and
 [doc/DEBUG.md](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEBUG.md) for the link.
 [EMULATOR.md](EMULATOR.md) lists where it differs from `niceemu`.
@@ -107,12 +108,12 @@ effect and does not write (DEBUG.md §3).
 | `0xFFFFFF10`–`0xFFFFFF1F` | The timer of nice_cpu's SYSTEM.md §4: it raises IRQ every P clock cycles, through the vector it is given. |
 | `0xFFFFFF20`–`0xFFFFFF3F` | The math unit of nice_cpu's SYSTEM.md §2: 32-bit multiply and divide, and 64-bit divide. |
 | `0xFFFFFF40`–`0xFFFFFF4F` | The performance counters of nice_cpu's SYSTEM.md §3: cycles, instructions, and microseconds, 64 bits each. The microseconds come from the clock, 100 MHz on the MEGA65 and 90 MHz on the Nexys4DDR, so they are real time, where the emulator counts one per step. They stop while the core is paused. The link reads them as the core does: a read of a low word takes the snapshot that the high word returns, where `niceemu --link` takes none. DEBUG.md §3 allows both while the core is held, halted, or paused. The words `0xFFFFFF46`–`4F` read 0 and take no write. |
-| `0xFFFFFF50`–`0xFFFFFF7F` | The fetch statistics of MICROARCH.md §8.1, the rest of the performance counters: counters of what FETCH and DECODE do, for judging the size of FETCH's buffer. A start of the core clears them, and they then count each clock while the core runs, until a write of 0 to `FS_CTRL` stops them. They stop while the core is held and after it halts. |
+| `0xFFFFFF50`–`0xFFFFFF7F` | The fetch statistics of MICROARCH.md §8.1, the rest of the performance counters: counters of what FETCH and DECODE do, for judging the size of FETCH's buffer. A start of the core clears them, and they then count each clock while the core runs, until a write of 0 to `FS_CTRL` stops them. They stop while the core is held and after it halts. With the multi-cycle core (`NICE=multi`), only `FS_CYCLES` and `FS_HIST[0]` count, `FS_CTRL` reads its run bit, and the other words read 0. |
 | `0xFFFFFF80`–`0xFFFFFF8F` | The screen's registers: the cursor and the display offset (see [The screen](#the-screen)). |
 | `0xFFFFFF90`–`0xFFFFFF9F` | The Nexys4DDR's LEDs, seven-segment display, buttons, and switches (see [The Nexys4DDR's devices](#the-nexys4ddrs-devices)). On the MEGA65 they read 0 and take no write. On every board, `0xFFFFFF98`–`9D` are the Ethernet station (see [The Ethernet station](#the-ethernet-station)). |
 | `0xFFFFFFE0`–`0xFFFFFFEF` | The debug registers of DEBUG.md §6, for the link only, here and below: R0–R15 of the core, read only. After a halt they hold what the emulator prints. While the core is paused they hold its registers, with R15 the address of the next instruction, and a hold of the paused core keeps them. A hold of a running core leaves them undefined. |
 | `0xFFFFFFF0` | Control: hold, clear, hide, pause, and step (see [The control register](#the-control-register)). |
-| `0xFFFFFFF1` | Read only: why the core halted. 0 while it has not, and after a clear, 1 for `HALT`, 2 for a reserved control word, 3 for `INT` inside an interrupt routine, and 4 for `RTI` outside one. |
+| `0xFFFFFFF1` | Read only: why the core halted. 0 while it has not, and after a clear, 1 for `HALT`, 2 for a reserved control word, 3 for `INT` inside an interrupt routine, and 4 for `RTI` outside one. Reason 5, the step limit of `niceemu --link`, is the emulator's only. |
 | `0xFFFFFFF2` | Read only: the version of the link, 5. |
 | `0xFFFFFFF3` | Read only: the bytes of free space in the core's input FIFO. |
 | `0xFFFFFFF4` | The enable bits of the breakpoints: bit i enables breakpoint i. Bits 4 to 31 read 0. |
@@ -148,8 +149,8 @@ The input waits for the core in a FIFO of 2048 bytes, in block RAM. A
 UART byte that arrives when it is full is lost, and the link sends its
 `o` notice; a byte after a break is lost too, until a start clears the
 end of the input. A keyboard byte waits until the FIFO has room for two,
-so that a UART byte still finds room; on the Nexys4DDR, keys typed
-meanwhile are lost (see [The Nexys4DDR's
+so that a UART byte still finds room, and keys typed meanwhile may be
+lost (see [The keyboard](#the-keyboard) and [The Nexys4DDR's
 devices](#the-nexys4ddrs-devices)). While the core is held in reset or
 has halted, the bytes of the UART and the keyboard are dropped. While it
 is paused, they go into the FIFO. To end a program's input from a
@@ -229,6 +230,7 @@ terminal sends it:
 | RUN/STOP | CTRL-C (`0x03`) |
 | ESC, TAB | ESC, TAB |
 | Cursor keys | `ESC [ A` to `ESC [ D`, as ANSI terminals send them |
+| SHIFT with CRSR→ or CRSR↓ | The other direction, `ESC [ D` or `ESC [ A`, as on the C64 |
 | F1, F3, F5, F7, F9, F11 | As xterm sends them: `ESC O P` and `ESC O R` for F1 and F3, and `ESC [ 15 ~`, `ESC [ 18 ~`, `ESC [ 20 ~`, and `ESC [ 23 ~` for the others |
 | SHIFT with F1 to F11 | The even keys F2 to F12, as xterm sends them: `ESC O Q`, `ESC O S`, `ESC [ 17 ~`, `ESC [ 19 ~`, `ESC [ 21 ~`, and `ESC [ 24 ~` |
 | CTRL with a letter | Its control code |
@@ -238,6 +240,10 @@ terminal sends it:
 A held key repeats after half a second, 20 times a second. F13, HELP,
 CLR/HOME, and the modifiers give nothing. The keyboard's drive
 LED is green while the core runs, like the user LED.
+
+The bytes of a key wait until the core's input has room for them, and
+the keyboard is not scanned meanwhile, so a key that is pressed and
+released while they wait is lost. A key held down until then is not.
 
 ## The ROM
 
@@ -279,12 +285,15 @@ is. A held key repeats as the keyboard repeats it. The keyboard's LEDs are
 not set, so the CAPS LOCK LED does not show whether CAPS LOCK is on. A PS/2
 keyboard can't wait, so keys typed while the core's input is full are
 lost: the bytes of one key wait until there is room, and the keys typed
-meanwhile give nothing. The MEGA65's keyboard loses no key.
+meanwhile give nothing. The MEGA65's keyboard loses only the keys pressed
+and released in that time (see [The keyboard](#the-keyboard)).
 
 The Nexys4DDR's LEDs, seven-segment display, buttons, and switches are
 registers in `0xFFFFFF90`–`96`, for the core and the link alike. Only the
-Nexys4DDR has them: on the MEGA65 the whole block reads 0 and takes no
-write, where the emulator has memory there. Reset clears the registers
+Nexys4DDR has them: on the MEGA65 these words read 0 and take no write,
+where the emulator has memory there. `0xFFFFFF98`–`9D`, the Ethernet
+station, are on every board (see [The Ethernet
+station](#the-ethernet-station)). Reset clears the registers
 that can be written, and a start of the core does not, so a program's
 display stays after it halts.
 
@@ -310,7 +319,7 @@ register: it resets the system. The words `0xFFFFFF97`, `9E`, and `9F`
 read 0 and take no write; the keyboard's LEDs may come to `0xFFFFFF97`
 (see [#25](https://github.com/MJoergen/NiceMonMEGA65/issues/25)).
 
-### The Ethernet station
+## The Ethernet station
 
 `0xFFFFFF98`–`9D` are on every board, the MEGA65 too. They are the
 Ethernet station, which carries the debug link over TCP
@@ -358,7 +367,7 @@ With the demo in the ROM, its F11 shows the addresses and the counts,
 and sets the addresses from the keyboard
 ([demo/README.md](../demo/README.md)).
 
-#### The debug link over TCP
+### The debug link over TCP
 
 The station serves the debug link on TCP port 4510 of its IP address,
 to one host at a time. While a host is connected, the link's bytes come
@@ -391,8 +400,10 @@ stays until that host connects again, or the board resets. The board
 resends what the host does not acknowledge, after 300 ms, and drops the
 connection after 17 tries. While the host's window is 0, it sends one
 byte beyond it every 300 ms, and keeps the connection while the host
-answers. It sends no reset itself, so a segment that
-fits no connection gets no answer. When a connection ends, the link
+answers. It answers a host's keepalive probe with an ACK, and sends no
+probe itself. It sends no reset, so a segment that fits no connection
+gets no answer. Its SYN-ACK has no TCP options, so the host sends
+segments of at most 536 bytes, and the board sends no more either. When a connection ends, the link
 stays with it until it has taken the input that came before, and the
 output in that time is dropped.
 
