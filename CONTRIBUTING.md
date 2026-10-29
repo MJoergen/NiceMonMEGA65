@@ -476,9 +476,17 @@ bitstream has one. Then it hides the ROM and uses the link:
 
 With `ETH=IP`, as in `make hwtest ETH=192.168.1.66`, and the board's
 Ethernet port on this computer's network, it tests the Ethernet station
-last: it gives the station the IP address over the UART's link, pings
-it, checks the station's counts, and runs the programs above again with
-`run.py --eth`. The address must be free on the network.
+after all the other checks, which its failures do not stop. It loads
+the demo, and types F11, I, the IP address, and CR into it as console
+bytes over the UART, as a terminal would, and reads the address back in
+a pause. It pings the address and checks the station's counts. It
+pauses the demo over the link on TCP and reads the address again, and
+then runs the programs above with `run.py --eth`. The address must be
+free on the network. If no frame at all reaches the station during the
+ping, the board has no Ethernet connection, or the address is not on
+this computer's network: the rest is not run, and the summary names it
+after NOT COVERED, which does not fail the run. Without `ETH`, the
+summary names the Ethernet station there.
 
 The reset button is not tested: press it with a terminal open, and the
 `b05` notice comes again.

@@ -145,9 +145,14 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 - `make release` builds the R6 with the flow of `verified.json` first,
   and then with the other one, for the ROM can cost the margin of the
   bump's build. The notes say when the other flow was needed.
-- `make hwtest ETH=IP` tests the Ethernet station too: it gives the
-  station the address, pings it, and runs the programs of the comparison
-  over `run.py --eth`. `make release ARGS="--eth IP"` passes it on.
+- `make hwtest ETH=IP` tests the Ethernet station too, after all the
+  other checks: the demo's F11 gets the address as keys over the UART,
+  and gives it to the station, which is pinged, reached by the link over
+  TCP, and runs the programs of the comparison over `run.py --eth`. A
+  board that receives no frame has no Ethernet connection, and the
+  summary names the rest of the test after NOT COVERED, which fails
+  nothing; without `ETH`, it names the station there.
+  `make release ARGS="--eth IP"` passes it on.
 
 ## V1.0 (2026-10-28)
 

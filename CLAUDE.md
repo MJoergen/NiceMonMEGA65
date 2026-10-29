@@ -127,7 +127,10 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   its Ethernet port, 4510 by default, once 0xFFFFFF9A gives it an IP
   address. It is the line, as the UART is: no `b` notice at connect, and
   a half-close is a break. While a host is connected, the UART's link
-  bytes are dropped.
+  bytes are dropped. `make hwtest` tests the station last, setting its
+  address by typing into the demo's F11 over the UART. Without `ETH`,
+  or when no frame reaches the board, it prints NOT COVERED and still
+  exits 0, so read the summary after an Ethernet change.
 - The tools take `--tcp PORT` for `niceemu --link PORT` (PORT 0 prints the
   port it picked on stderr). `make linktest` runs `run.py --tcp` against
   plain `niceemu`, which checks the tools without a board.

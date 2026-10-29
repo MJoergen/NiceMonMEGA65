@@ -65,11 +65,21 @@ Checks, in this order:
     - the demo of the ROM, demo/demo.nasm, and its screen
     - nice_cpu's benchmark, examples/build/bench.bin, all but its cycles
     The programs run with the ROM hidden, so the RAM is at 0.
-    With --eth, last of all, the Ethernet station:
-    - the IP address is written over the UART's link and read back
-    - ping gets its answers, and the station counts its replies
+    With --eth, last of all, the Ethernet station, which no failure above
+    or here keeps the other checks from:
+    - the demo, loaded at 0, gets F11, I, the IP address, and CR as
+      console bytes over the UART, as from a terminal, and gives the
+      station that address, which a pause reads back
+    - ping gets its answers, and the station counts the requests and its
+      replies; when no frame at all has come, the board has no Ethernet
+      connection, and the summary names the rest after NOT COVERED
+      instead of failing
+    - the link over TCP to that address pauses the demo and reads the
+      address, while the demo still has it
     - programs run with tools/run.py --eth and with niceemu, and their
       output and exit status are compared, as above
+    Without --eth, the summary names the Ethernet station after NOT
+    COVERED.
 
 Exit status:
     0 if every check passed, else 1.
@@ -95,9 +105,9 @@ from typing import Callable, TypeVar
 
 from jtag import check_board
 from load import load_words, read_bin, start
-from nicelink import (BRK_COUNT, BRK_EN, CONTROL, FREE, HOLD, PAUSE, RAM,
-                      REGS, STEP, STOP, VERSION, Link, LinkError, Serial,
-                      packet)
+from nicelink import (BRK_COUNT, BRK_EN, CONTROL, ETH_PORT, FREE, HOLD,
+                      PAUSE, RAM, REGS, STEP, STOP, VERSION, Eth, Link,
+                      LinkError, Serial, packet)
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NICEEMU = f"{REPO}/nice_cpu/emulator/zig-out/bin/niceemu"
@@ -117,6 +127,8 @@ RUN_TIMEOUT = 10.0
 results: list[bool] = []
 # The checks that could not run, which the summary names
 skipped: list[str] = []
+# What the run did not test, and why, which the summary names too
+uncovered: list[str] = []
 
 
 def check(name: str, ok: bool, detail: str = "") -> bool:
@@ -876,23 +888,99 @@ def test_bench(link_args: list[str], bench: str) -> None:
           f"{board.stdout!r} {board.stderr!r}")
 
 
-def test_eth_address(link: Link, host: str) -> None:
-    """Gives the Ethernet station the IP address of host, over the UART's
-    link, then pings it: the replies come, and the station counts them,
-    with the frames it receives."""
-    ip = struct.unpack(">I", socket.inet_aton(socket.gethostbyname(host)))[0]
-    require(f"eth: IP address {host}", wr(link, 0xFFFFFF9A, ip) and
-            rd(link, 0xFFFFFF9A) == ip, f"{rd(link, 0xFFFFFF9A):08X}")
-    received, sent = rd(link, 0xFFFFFF98), rd(link, 0xFFFFFF9D)
-    ping = subprocess.run(["ping", "-c", "3", "-W", "2", host],
-                          capture_output=True, text=True)
-    check("eth: ping answered", ping.returncode == 0,
-          "" if ping.returncode == 0 else repr(ping.stdout + ping.stderr))
-    # Three echo replies, and an ARP reply unless the host knew the MAC
-    replies = (rd(link, 0xFFFFFF9D) - sent) & 0xFFFFFFFF
-    check("eth: the replies counted", replies >= 3, str(replies))
-    frames = (rd(link, 0xFFFFFF98) - received) & 0xFFFFFFFF
-    check("eth: the requests counted", frames >= 3, str(frames))
+def paused(link: Link, addrs: list[int]) -> list[int] | None:
+    """The words at addrs, read in a pause of the running core, which then
+    goes on; None if the pause did not come."""
+    n = link.pauses
+    link.control(PAUSE | RAM)
+    if not wait_pause(link, n):
+        return None
+    words = [rd(link, a) for a in addrs]
+    link.control(RAM)
+    return words
+
+
+def test_eth_f11(link: Link, demo: str, ip: str) -> list[int] | None:
+    """Loads the demo and types F11, I, the IP address, and CR into it as
+    console bytes, which its F11 writes to the station. Returns the
+    station's counts of the good frames received and the frames sent, or
+    None if the address did not come."""
+    want = struct.unpack(">I", socket.inet_aton(ip))[0]
+    load(link, demo)
+    time.sleep(QUIET)                  # the welcome
+    room = link.free()
+    link.send_console(b"\x1b[23~i" + ip.encode() + b"\r")
+    # Until the demo has taken every key, then the time for the CR
+    end = time.monotonic() + 10 * QUIET
+    while link.free() < room and time.monotonic() < end:
+        link.poll(0.05)
+    link.poll(QUIET)
+    got = paused(link, [0xFFFFFF9A, 0xFFFFFF98, 0xFFFFFF9D])
+    if not check(f"eth: F11 typed over the UART gives the IP address {ip}",
+                 got is not None and got[0] == want,
+                 "no pause" if got is None else f"{got[0]:08X}"):
+        return None
+    return got[1:]
+
+
+def test_eth(port: str, baud: int, eth: str,
+             programs: list[tuple[str, list[str], bool]], demo: str) -> None:
+    """The Ethernet station, last of all: the demo's F11 gives it the IP
+    address of eth's HOST from keys over the UART, ping gets the answers,
+    the link over TCP reaches the demo, and the programs run over it as
+    over the UART. A board that receives no frame at all is not connected,
+    which is not a failure but a gap in the coverage. A failure here is
+    counted, and ends this test alone."""
+    host, _, tcp = eth.partition(":")
+    try:
+        ip = socket.gethostbyname(host)
+        want = struct.unpack(">I", socket.inet_aton(ip))[0]
+        link = Link(Serial(port, baud))
+        try:
+            counts = test_eth_f11(link, demo, ip)
+            if counts is None:
+                return
+            ping = subprocess.run(["ping", "-c", "3", "-W", "2", ip],
+                                  capture_output=True, text=True)
+            after = paused(link, [0xFFFFFF98, 0xFFFFFF9D])
+            if after is None:
+                check("eth: pause after the ping", False)
+                return
+            frames = (after[0] - counts[0]) & 0xFFFFFFFF
+            replies = (after[1] - counts[1]) & 0xFFFFFFFF
+            if ping.returncode != 0 and frames == 0:
+                print(f"  no frame came to the station during the ping of "
+                      f"{ip}: no Ethernet connection, or {ip} is not on "
+                      "this computer's network, so the rest of the "
+                      "Ethernet test is not run", flush=True)
+                uncovered.append(f"the Ethernet station past its address, "
+                                 f"as no frame came from {ip}'s network")
+                return
+            check("eth: ping answered", ping.returncode == 0,
+                  "" if ping.returncode == 0 else
+                  repr(ping.stdout + ping.stderr))
+            # Three echo replies, and an ARP reply unless the host knew the
+            # MAC
+            check("eth: the replies counted", replies >= 3, str(replies))
+            check("eth: the requests counted", frames >= 3, str(frames))
+        finally:
+            link.close()
+        # The UART's link bytes are dropped while this connection is open
+        tcp_link = Link(Eth(int(tcp) if tcp else ETH_PORT, ip))
+        try:
+            got = paused(tcp_link, [0xFFFFFF9A])
+            check("eth: the link over TCP pauses the demo and reads the "
+                  "IP address", got is not None and got[0] == want,
+                  "no pause" if got is None else f"{got[0]:08X}")
+        finally:
+            tcp_link.close()
+        test_run(["--eth", eth], programs, " over Ethernet")
+    except (LinkError, OSError) as e:
+        check(f"eth: {e}", False)
+    except SystemExit as e:
+        # fail() and require() exit with a message
+        if e.code not in (0, None):
+            check(f"eth: {e.code}", False)
 
 
 def main() -> None:
@@ -960,16 +1048,16 @@ def main() -> None:
                 test_board_devices(link, board)
                 test_fetch_statistics(link)
                 test_primes(link, primes, board)
-                if args.eth:
-                    test_eth_address(link, args.eth.partition(":")[0])
             finally:
                 link.close()
             serial = ["--port", args.port, "--baud", str(args.baud)]
             test_run(serial, comparisons(tmp))
             test_bench(serial, bench)
-            if args.eth:
-                test_run(["--eth", args.eth], comparisons(tmp),
-                         " over Ethernet")
+            if not args.eth:
+                uncovered.append("the Ethernet station, without --eth")
+            else:
+                test_eth(args.port, args.baud, args.eth, comparisons(tmp),
+                         f"{REPO}/demo/build/demo_test.bin")
         except LinkError as e:
             print(f"hwtest.py: {e}", file=sys.stderr, flush=True)
             results.append(False)
@@ -988,6 +1076,8 @@ def main() -> None:
     print(f"\n{passed}/{len(results)} passed")
     if skipped:
         print(f"SKIPPED, as {NICEEMU} is missing: {', '.join(skipped)}")
+    for gap in uncovered:
+        print(f"NOT COVERED: {gap}")
     sys.exit(0 if passed == len(results) else 1)
 
 
