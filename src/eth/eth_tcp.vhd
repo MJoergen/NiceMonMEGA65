@@ -46,7 +46,10 @@
 -- the segment is checked and acted on; its data is committed (rx_cmt) only
 -- if all is right, and rcv_nxt moves past it. Every segment with data or
 -- a FIN gets an ACK (ack_req), also one that is out of order, which is
--- dropped, so the host sends it again.
+-- dropped, so the host sends it again; so does one without either whose
+-- sequence number is not rcv_nxt, such as a keepalive probe. A segment
+-- that overlaps data already taken is dropped whole, and the host sends
+-- it again from the sequence number of the ACK.
 --
 -- Send: the link's output goes into the send buffer at tail_ptr. una_ptr
 -- is the first byte not yet acknowledged, whose sequence number is
@@ -697,7 +700,9 @@ begin
                         rx_wr  <= rx_wr;
                         rcv_v  := rcv_nxt + plen;
                      end if;
-                     if plen > 0 or f_flags(0) = '1' then
+                     -- Data, a FIN, or a segment that is not the next, as a
+                     -- keepalive probe at rcv_nxt - 1 is, gets an ACK.
+                     if plen > 0 or f_flags(0) = '1' or f_seq /= rcv_nxt then
                         ack_req <= '1';
                      end if;
                      -- The host's FIN, if all before it has come

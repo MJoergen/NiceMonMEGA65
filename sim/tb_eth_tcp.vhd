@@ -17,7 +17,8 @@
 --     acknowledge it, and the host's ACK opens the connection; the link
 --     goes to it only then
 --   * data gets an ACK; the same data again, data out of order, and data
---     with a wrong checksum are dropped, and the first two get an ACK
+--     with a wrong checksum are dropped, and the first two get an ACK, as
+--     does a keepalive probe
 --   * the link's output comes in segments of at most 536 bytes, at most
 --     as many unacknowledged as the host's window takes, and again after
 --     the timeout when the host does not acknowledge it
@@ -580,6 +581,12 @@ begin
       expect_ack;
       send_seg(C_ACK, 5, bad => true);
       expect_none;
+      -- A keepalive probe, at the sequence number before the next, gets an
+      -- ACK.
+      hseq_v := hseq_v - 1;
+      send_seg(C_ACK, 0);
+      hseq_v := hseq_v + 1;
+      expect_ack;
       assert n_log = hd_v and not lrx_bad
          report "tb_eth_tcp: FAIL, the link got the wrong bytes"
          severity failure;
