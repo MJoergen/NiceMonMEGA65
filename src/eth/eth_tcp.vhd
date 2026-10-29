@@ -9,7 +9,10 @@
 -- comes from it and its output goes to it. A connection is one from the
 -- host's ACK of the SYN-ACK on, so that a SYN alone, as of a port scan,
 -- leaves the link on the UART. The host's half-close, its FIN,
--- is a break of the line (rx_break_o), after the last byte before it. The
+-- is a break of the line (rx_break_o), after the last byte before it
+-- (brk_ptr). The link stays with the connection (on_o) after its end, by
+-- an RST or the tries, until it has taken all the input and the break, so
+-- that none is lost; the output in that time is dropped. The
 -- states are those of a passive open, and of a close that the host starts:
 --   LISTEN_ST      no connection; a SYN to G_PORT opens one
 --   SYN_RCVD_ST    the SYN-ACK is sent, and waits for the host's ACK
@@ -248,6 +251,9 @@ architecture synthesis of eth_tcp is
    signal lfetch    : std_logic                    := '0';
    signal lrx_valid : std_logic                    := '0';
    signal fin_rcvd  : std_logic                    := '0';
+   signal brk_ptr   : t_ptr                        := (others => '0');
+   -- Input or a break that the link has not taken
+   signal drain     : std_logic;
 
    -- The send buffer
    signal tx_we    : std_logic;
@@ -297,7 +303,7 @@ begin
    conn  <= '1' when state = EST_ST or state = CLOSE_WAIT_ST or state = LAST_ACK_ST or
                      (state = SYN_RCVD_ST and keep = '1') else
             '0';
-   on_o  <= conn;
+   on_o  <= conn or drain;
 
    ---------------------------------------------------------------------------
    -- Receive
@@ -338,6 +344,9 @@ begin
       ); -- i_rx_ram
 
    lrx_valid_o <= lrx_valid;
+   drain       <= '1' when rx_rd /= rx_cmt or lfetch = '1' or lrx_valid = '1' or
+                           fin_rcvd = '1' else
+                  '0';
 
    ---------------------------------------------------------------------------
    -- Send
@@ -345,7 +354,7 @@ begin
 
    tx_ready    <= '1' when conn = '1' and to_integer(tail_ptr - una_ptr) < C_SIZE else
                   '0';
-   ltx_ready_o <= tx_ready;
+   ltx_ready_o <= tx_ready or not conn;
    tx_we       <= ltx_valid_i and tx_ready;
    tx_raddr    <= seg_ptr + (sq_idx - 54) when sq_idx >= 54 else
                   seg_ptr;
@@ -477,11 +486,12 @@ begin
             lrx_valid  <= '1';
          end if;
          lfetch <= '0';
-         if lfetch = '0' and rx_rd /= rx_cmt and (lrx_valid = '0' or lrx_ready_i = '1') then
+         if lfetch = '0' and rx_rd /= rx_cmt and not (fin_rcvd = '1' and rx_rd = brk_ptr) and
+            (lrx_valid = '0' or lrx_ready_i = '1') then
             lfetch <= '1';
             rx_rd  <= rx_rd + 1;
          end if;
-         if fin_rcvd = '1' and rx_rd = rx_cmt and lfetch = '0' and lrx_valid = '0' then
+         if fin_rcvd = '1' and rx_rd = brk_ptr and lfetch = '0' and lrx_valid = '0' then
             lrx_break_o <= '1';
             fin_rcvd    <= '0';
          end if;
@@ -674,6 +684,11 @@ begin
                         rcv_v    := rcv_v + 1;
                         state    <= CLOSE_WAIT_ST;
                         fin_rcvd <= '1';
+                        if wr_ok = '1' then
+                           brk_ptr <= rx_wr;
+                        else
+                           brk_ptr <= rx_cmt;
+                        end if;
                      end if;
                      rcv_nxt <= rcv_v;
 

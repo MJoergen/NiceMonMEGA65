@@ -373,7 +373,9 @@ or a kill, sends one. A connection that a host closed with only a FIN
 stays until that host connects again, or the board resets. The board
 resends what the host does not acknowledge, after 200 ms, and drops the
 connection after 25 tries. It sends no reset itself, so a segment that
-fits no connection gets no answer.
+fits no connection gets no answer. When a connection ends, the link
+stays with it until it has taken the input that came before, and the
+output in that time is dropped.
 
 The link reads and writes all memory with no password, so anyone who
 can reach the port can do the same. The IP address is 0 after reset,

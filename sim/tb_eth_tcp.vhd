@@ -29,7 +29,9 @@
 --     connection with a FIN, and opens the new one when the host has
 --     acknowledged that FIN
 --   * an RST ends the connection, and a SYN from another IP address does
---     not replace one
+--     not replace one; the link keeps it until it has taken the input,
+--     and a break waits for the input before it, also when a new
+--     connection's input comes after it
 --   * a SYN-ACK that is never acknowledged ends the connection after the
 --     tries
 
@@ -733,10 +735,12 @@ begin
          total_v := total_v + n_v;
       end loop;
       send_seg(C_ACK, 0);
+      wait for 1 us;
+      hold <= '1';
       send_data(3);
 
       -- A SYN from another IP address does not replace the connection, and
-      -- an RST ends it.
+      -- an RST ends it, once the link side has taken the input.
       send(seg(C_HIP2, C_PORT, 40002, X"00007000", X"00000000", C_SYN, 8192, 0, 0, false));
       expect_none;
       hseq_v := hseq_v + 100000;
@@ -747,9 +751,43 @@ begin
          report "tb_eth_tcp: FAIL, an RST out of the window ended the connection"
          severity failure;
       send_seg(C_RST, 0);
+      -- Output while the input drains is dropped.
+      ltx_req <= ltx_req + 5;
+      bd_v    := bd_v + 5;
       wait for 1 us;
-      assert conn = '0'
-         report "tb_eth_tcp: FAIL, the RST did not end the connection"
+      assert conn = '1' and n_log < hd_v
+         report "tb_eth_tcp: FAIL, the link left before it took the input"
+         severity failure;
+      hold <= '0';
+      wait for 1 us;
+      assert conn = '0' and n_log = hd_v and not lrx_bad
+         report "tb_eth_tcp: FAIL, the RST did not end the connection after the input"
+         severity failure;
+      expect_none(10 us);
+      assert n_ltx = ltx_req
+         report "tb_eth_tcp: FAIL, the output was not dropped"
+         severity failure;
+
+      -- A break waits for the input before it, also when a new connection's
+      -- input comes after it.
+      hold <= '1';
+      open_conn(40003, X"00009000");
+      send_data(4);
+      send_seg(C_FIN or C_ACK, 0);
+      hseq_v := hseq_v + 1;
+      expect_ack;
+      send_seg(C_RST, 0);
+      open_conn(40004, X"0000A000");
+      send_data(6);
+      send_seg(C_RST, 0);
+      wait for 1 us;
+      assert n_break = 1 and conn = '1'
+         report "tb_eth_tcp: FAIL, a break before the input"
+         severity failure;
+      hold <= '0';
+      wait for 1 us;
+      assert n_break = 2 and brk_at = hd_v - 6 and n_log = hd_v and not lrx_bad and conn = '0'
+         report "tb_eth_tcp: FAIL, the break is not after the input before it"
          severity failure;
 
       -- A SYN-ACK that is never acknowledged ends the connection.
