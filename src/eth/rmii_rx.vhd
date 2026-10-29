@@ -58,7 +58,7 @@ architecture synthesis of rmii_rx is
    signal dibit : std_logic_vector(1 downto 0) := "00";
    signal byte  : std_logic_vector(7 downto 0) := (others => '0');
    -- RX_ER came during the frame.
-   signal bad   : std_logic                    := '0';
+   signal bad : std_logic                    := '0';
 
 begin
 

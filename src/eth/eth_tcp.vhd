@@ -211,20 +211,20 @@ architecture synthesis of eth_tcp is
    signal tail_ptr  : t_ptr                         := (others => '0');
    signal fin_ptr   : t_ptr                         := (others => '0');
    -- The end of the data to send to this connection
-   signal lim_ptr   : t_ptr;
+   signal lim_ptr : t_ptr;
    -- The close of this side: started, the FIN sent since the last
    -- retransmission, and the FIN sent at all
    signal closing  : std_logic                     := '0';
    signal fin_sent : std_logic                     := '0';
    signal fin_max  : std_logic                     := '0';
    -- The host has acknowledged this side's FIN.
-   signal fin_ack  : std_logic                     := '0';
-   signal syn_req  : std_logic                     := '0';
-   signal ack_req  : std_logic                     := '0';
+   signal fin_ack : std_logic                     := '0';
+   signal syn_req : std_logic                     := '0';
+   signal ack_req : std_logic                     := '0';
    -- One byte goes beyond the host's window of 0.
-   signal probe    : std_logic                     := '0';
+   signal probe : std_logic                     := '0';
    -- The SYN of the next connection
-   signal pend      : std_logic                     := '0';
+   signal pend : std_logic                     := '0';
    -- The connection that waits for the ACK of its SYN-ACK came from pend,
    -- and has the link
    signal keep      : std_logic                     := '0';
@@ -280,10 +280,10 @@ architecture synthesis of eth_tcp is
    signal lrx_valid : std_logic                    := '0';
    signal fin_rcvd  : std_logic                    := '0';
    -- The host's FIN has come.
-   signal peer_fin  : std_logic                    := '0';
-   signal brk_ptr   : t_ptr                        := (others => '0');
+   signal peer_fin : std_logic                    := '0';
+   signal brk_ptr  : t_ptr                        := (others => '0');
    -- Input or a break that the link has not taken
-   signal drain     : std_logic;
+   signal drain : std_logic;
 
    -- The send buffer
    signal tx_we    : std_logic;
@@ -356,7 +356,7 @@ begin
 
    rx_ready_o <= not eval;
    -- Below C_MAXF, so that a longer frame writes no more than plen bytes
-   rx_we      <= '1' when rx_valid_i = '1' and eval = '0' and wr_ok = '1' and
+   rx_we <= '1' when rx_valid_i = '1' and eval = '0' and wr_ok = '1' and
                           idx >= p_start and idx < p_end and idx < C_MAXF else
                  '0';
 

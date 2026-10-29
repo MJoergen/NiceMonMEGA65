@@ -181,8 +181,8 @@ architecture simulation of tb_eth_tcp is
    -- The TCP options of a SYN from Linux: the MSS, SACK permitted, a
    -- timestamp, a NOP, and the window scale
    constant C_OPTS : t_bytes(0 to 19) := (X"02", X"04", X"05", X"B4", X"04", X"02", X"08", X"0A",
-                                          X"12", X"34", X"56", X"78", X"00", X"00", X"00", X"00",
-                                          X"01", X"03", X"03", X"07");
+      X"12", X"34", X"56", X"78", X"00", X"00", X"00", X"00",
+      X"01", X"03", X"03", X"07");
 
    -- A segment from the host, with opts words of the options of C_OPTS,
    -- and n bytes of data, byte i of which is (d + i) mod 239, padded to 60
@@ -418,8 +418,8 @@ begin
       procedure send_seg (
          flags : std_logic_vector(7 downto 0);
          n     : natural;
-         win   : natural            := 8192;
-         bad   : boolean            := false;
+         win   : natural              := 8192;
+         bad   : boolean              := false;
          opts  : natural range 0 to 5 := 0
       ) is
       begin
