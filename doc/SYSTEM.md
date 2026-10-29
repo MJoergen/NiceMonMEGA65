@@ -314,12 +314,12 @@ link on TCP port 4510.
 
 | Address | Access | What it is |
 |---|---|---|
-| `0xFFFFFF98` | Read only | The good frames received. |
+| `0xFFFFFF98` | Read only | The good frames received, to any address. |
 | `0xFFFFFF99` | Read only | The bad frames received, and the good ones that were dropped. |
 | `0xFFFFFF9A` | Read, write | The IP address, the first byte in bits 31..24: `0xC0A80142` is 192.168.1.66. 0 after reset, which answers nothing. |
 | `0xFFFFFF9B` | Read, write | The first two bytes of the MAC address, in bits 15..0. Bits 31..16 read 0 and are dropped. |
 | `0xFFFFFF9C` | Read, write | The last four bytes of the MAC address. The address is 02:4E:49:43:45:00 after reset. |
-| `0xFFFFFF9D` | Read only | The frames sent. |
+| `0xFFFFFF9D` | Read only | The frames sent: the ARP and ping replies, and the TCP segments. |
 
 The counts start at 0 at reset and wrap at 2^32. A good frame has at
 least 64 bytes and a right frame check sequence, and has come through the
@@ -328,7 +328,10 @@ sequence, is shorter, did not end on a byte, or had a receive error, a
 symbol that the PHY could not decode. A good frame is dropped
 when it finds that FIFO full. The PHY negotiates the link on its own, so
 a cable to a switch gives a good count that rises with the broadcasts on
-the network, and a bad count that stays at 0.
+the network, and a bad count that stays at 0. The station works only at
+100 Mbit/s; with a link at 10 Mbit/s, every frame counts as bad. A write
+to `0xFFFFFF9A`–`9C` while a host is connected, or while a reply goes
+out, breaks that connection or reply.
 
 The station keeps the frames to its MAC address and to everyone, and
 drops the others. It answers each ARP request for its IP address with

@@ -22,9 +22,13 @@ set_max_delay -datapath_only \
    -to   [get_clocks -of_objects [get_pins i_mega65/i_clk_rst/i_mmcm/CLKOUT0]] 10.000
 
 ## The Ethernet clock (CLKOUT1 of the system clock's MMCM) and the system
-## clock cross only through synchronizers, for now the PHY's reset in
-## clk_rst.vhd. Their relation is ignored, and each path only has to be
-## shorter than 10 ns, in both directions, as for the video clocks.
+## clock cross only through synchronizers: the PHY's reset in clk_rst.vhd,
+## and in src/eth/ the toggle of the bad frames, the read pointers of the
+## FIFOs in Gray code, and their committed pointers, which are stable when
+## they are read. Their relation is ignored, and each path only has to be
+## shorter than 10 ns, in both directions, as for the video clocks. The
+## read pointer of eth_rx_fifo.vhd can change every 20 ns, a period of the
+## Ethernet clock, so its Gray code relies on this bound.
 set_max_delay -datapath_only \
    -from [get_clocks -of_objects [get_pins i_mega65/i_clk_rst/i_mmcm/CLKOUT0]] \
    -to   [get_clocks -of_objects [get_pins i_mega65/i_clk_rst/i_mmcm/CLKOUT1]] 10.000

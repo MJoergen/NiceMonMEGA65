@@ -29,7 +29,8 @@
 -- b) A frame has at most 2^G_ADDR_BITS bytes, or it never fits.
 -- c) wr_rst_i and rd_rst_i are both held for longer than three cycles of
 --    each clock, at the same time, so that the pointers each side sees of
---    the other are 0 when each side starts.
+--    the other are 0 when each side starts. A reset of one side alone
+--    leaves the two sides out of step for good.
 --
 -- RESET
 -- Synchronous, on each side to its clock: wr_rst_i on the write side and

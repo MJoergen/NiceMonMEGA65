@@ -24,14 +24,16 @@
 -- and each that goes into the FIFO of frames to send in tx_o. Each bad
 -- frame, and each good one that found the FIFO full, flips rx_toggle in the
 -- PHY's clock domain; two registers synchronize it to clk_i, where each
--- change counts in rx_bad_o. A frame takes more than 100 cycles of the
--- PHY's clock, so no change is lost.
+-- change counts in rx_bad_o. Two flips are at least four cycles of the
+-- PHY's clock apart, more than the three of clk_i that a change takes to
+-- pass, as clk_i is the faster, so no change is lost.
 --
 -- INTERFACE CONTRACTS -- these are requirements on the environment:
 -- a) eth_clk_i is the PHY's 50 MHz reference clock, and eth_rst_i is
 --    synchronous to it.
 -- b) rst_i and eth_rst_i are both held for longer than three cycles of each
---    clock, at the same time, as the FIFOs need (eth_rx_fifo.vhd).
+--    clock, at the same time, as the FIFOs need (eth_rx_fifo.vhd); a reset
+--    of one alone leaves them out of step for good.
 -- c) mac_i and ip_i change only between frames (eth_arp.vhd), and not
 --    while there is a connection (eth_tcp.vhd).
 -- d) G_CLOCK_HZ is the rate of clk_i.
