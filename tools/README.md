@@ -45,8 +45,9 @@ the serial port (see [The serial port](#the-serial-port)), such as
   [mon.py](#monpy)).
 
 They take `ETH=192.168.1.65` for the Ethernet port, or
-`PORT=/dev/ttyUSB1` for the serial port, and one of the two. They pass `ARGS=` on to the tool, for
-example `ARGS=--no-run` or `ARGS="-i in.txt -d 0x100:16 -s --timeout 5"`.
+`PORT=/dev/ttyUSB1` for the serial port, and one of the two. They pass
+`ARGS=` on to the tool, for example `ARGS=--no-run` or
+`ARGS="-i in.txt -d 0x100:16 -s --timeout 5"`.
 `ARGS="--tcp 4000"` drives `niceemu --link 4000` instead of the board.
 
 ## Over Ethernet

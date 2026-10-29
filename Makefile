@@ -47,7 +47,7 @@ help:
 	@echo "  make bump TAG=V1.0 [ARGS=--push]"
 	@echo "                  move nice_cpu to the tag, build the R6 bitstream, and commit"
 	@echo "                  badge-mega65.json and verified.json (needs Vivado)"
-	@echo "  make release TAG=V1.0[.1] [PORT=/dev/ttyUSB1] [ARGS=--publish]"
+	@echo "  make release TAG=V1.0[.1] (PORT=/dev/ttyUSB1 | ARGS=--publish)"
 	@echo "                  build, test, and stage a release in build/release (V1.0.1"
 	@echo "                  keeps nice_cpu at V1.0); with"
 	@echo "                  --publish, tag it and create the GitHub Release (doc/RELEASE.md)"
@@ -59,13 +59,13 @@ help:
 	@echo "  make mon [FILE=prog.bin] (ETH=IP | PORT=/dev/ttyUSB1)"
 	@echo "                  an interactive shell on the debug link: read and write"
 	@echo "                  memory, pause, step, breakpoints, and the console"
-	@echo "  make hwtest [BIT=synth/r6/build/top.bit] [PORT=/dev/ttyUSB1] [ETH=IP]"
+	@echo "  make hwtest PORT=/dev/ttyUSB1 [BIT=synth/r6/build/top.bit] [ETH=IP]"
 	@echo "                  check that the FPGA on PORT's board is the part BIT was"
 	@echo "                  built for, program it with BIT, and run the tests (needs"
 	@echo "                  openFPGALoader); for the Nexys4DDR, give"
 	@echo "                  BIT=synth/nexys4ddr/build/top.bit; ETH=IP also tests the"
 	@echo "                  Ethernet station, which gets that address"
-	@echo "  make flash [BIT=synth/nexys4ddr/build/top.bit] [PORT=/dev/ttyUSB1] [ARGS=--erase]"
+	@echo "  make flash PORT=/dev/ttyUSB1 [BIT=synth/nexys4ddr/build/top.bit] [ARGS=--erase]"
 	@echo "                  write BIT into the Nexys4DDR's flash, from which the board"
 	@echo "                  starts with jumper JP1 on QSPI (needs openFPGALoader)"
 	@echo "  make linktest   compare run.py on niceemu --link with niceemu, and check"
@@ -163,7 +163,8 @@ mon:
 # The flash of the Nexys4DDR (tools/flash.py); BIT on the command line
 # overrides the default.
 flash:
-	$(PYTHON) tools/flash.py $(if $(PORT),--port $(PORT)) --bit $(if $(filter command line,$(origin BIT)),$(BIT),synth/nexys4ddr/build/top.bit) $(ARGS)
+	@test -n "$(PORT)" || (echo "Give the board's serial port with PORT=/dev/ttyUSB1"; exit 1)
+	$(PYTHON) tools/flash.py --port $(PORT) --bit $(if $(filter command line,$(origin BIT)),$(BIT),synth/nexys4ddr/build/top.bit) $(ARGS)
 
 BIT ?= synth/r6/build/top.bit
 
@@ -174,7 +175,8 @@ $(EMU): $(shell find nice_cpu/emulator/src nice_cpu/emulator/build.zig -type f 2
 
 # ETH=IP tests the Ethernet station too, giving the board that address.
 hwtest: examples $(EMU)
-	$(PYTHON) tools/hwtest.py $(if $(PORT),--port $(PORT)) --bit $(BIT) $(if $(ETH),--eth $(ETH))
+	@test -n "$(PORT)" || (echo "Give the board's serial port with PORT=/dev/ttyUSB1"; exit 1)
+	$(PYTHON) tools/hwtest.py --port $(PORT) --bit $(BIT) $(if $(ETH),--eth $(ETH))
 
 # The comparison of hwtest on niceemu --link, which needs no board; it
 # runs the benchmark only when make examples has built it.

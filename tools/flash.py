@@ -2,7 +2,7 @@
 """Write a bitstream into the Nexys4DDR's flash, from which the board starts.
 
 Usage:
-    tools/flash.py [--port /dev/ttyUSB1] [--baud 2000000]
+    tools/flash.py --port DEVICE [--baud 2000000]
                    [--bit synth/nexys4ddr/build/top.bit] [--erase]
 
     The FPGA loads the bitstream from the board's quad SPI flash at power
@@ -54,9 +54,9 @@ BOOT_WAIT = 10.0
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--port", default="/dev/ttyUSB1",
-                        help="the serial device of the board's debug UART "
-                        "(default %(default)s)")
+    parser.add_argument("--port", required=True, metavar="DEVICE",
+                        help="the serial device of the board's debug UART, "
+                        "such as /dev/ttyUSB1")
     parser.add_argument("--baud", type=int, default=2000000,
                         help="the UART's baud rate (default %(default)s)")
     parser.add_argument("--bit", default=f"{REPO}/synth/nexys4ddr/build/top.bit",

@@ -36,7 +36,7 @@ that HEAD is still the commit of release.json, makes the annotated tag,
 pushes it, and creates the GitHub Release with gh, from the files of
 build/release/V1.0.
 
-Usage: tools/release.py Vmajor.minor[.patch] [--port /dev/ttyUSB1] [--eth IP]
+Usage: tools/release.py Vmajor.minor[.patch] --port DEVICE [--eth IP]
        tools/release.py Vmajor.minor[.patch] --publish
 
 Needs Vivado, coretool (mega65-tools), openFPGALoader, gh (logged in), and what make test needs.
@@ -301,13 +301,15 @@ def publish(tag):
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("tag", help="the tag, such as V1.0, or V1.0.1 to keep nice_cpu at V1.0")
-    ap.add_argument("--port", default="/dev/ttyUSB1", help="the R6's serial port, passed to make hwtest "
-                    "(default %(default)s)")
+    ap.add_argument("--port", metavar="DEVICE", help="the R6's serial port, such as /dev/ttyUSB1, "
+                    "passed to make hwtest; needed unless --publish")
     ap.add_argument("--eth", metavar="IP", help="also test the R6's Ethernet station, "
                     "with the IP address IP on this computer's network")
     ap.add_argument("--publish", action="store_true",
                     help="tag, push, and create the GitHub Release from what is staged")
     args = ap.parse_args()
+    if not args.publish and not args.port:
+        ap.error("--port is needed to test the R6, unless --publish")
     tag = args.tag
 
     try:

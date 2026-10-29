@@ -2,7 +2,7 @@
 """Test the system on the MEGA65 or Nexys4DDR board through its debug UART.
 
 Usage:
-    tools/hwtest.py [--port /dev/ttyUSB1] [--baud 2000000]
+    tools/hwtest.py --port DEVICE [--baud 2000000]
                     [--bit synth/r6/build/top.bit]
                     [--board mega65|nexys4ddr] [--no-program]
                     [--eth HOST[:PORT]]
@@ -985,9 +985,9 @@ def test_eth(port: str, baud: int, eth: str,
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--port", default="/dev/ttyUSB1",
-                        help="the serial device of the board's debug UART "
-                        "(default %(default)s)")
+    parser.add_argument("--port", required=True, metavar="DEVICE",
+                        help="the serial device of the board's debug UART, "
+                        "such as /dev/ttyUSB1")
     parser.add_argument("--baud", type=int, default=2000000,
                         help="the UART's baud rate (default %(default)s)")
     parser.add_argument("--bit", default=f"{REPO}/synth/r6/build/top.bit",

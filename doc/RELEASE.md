@@ -99,7 +99,7 @@ and keep their names.
 4. Connect a MEGA65 R6, with its Ethernet port on the network, then
    build, test, and stage the release:
 
-       make release TAG=V1.0 [PORT=/dev/ttyUSB1] ARGS="--eth 192.168.1.65"
+       make release TAG=V1.0 PORT=/dev/ttyUSB1 ARGS="--eth 192.168.1.65"
 
    This changes nothing in git. It checks the conditions above, builds
    the examples and the three bitstreams from nothing, makes the two core

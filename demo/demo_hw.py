@@ -13,7 +13,7 @@ the demo where it runs on a release's board. The bitstream must have
 demo/build/demo.bin in its ROM (make demo, then make r6
 ROM=demo/build/demo.bin), and niceemu must be built.
 
-Usage: demo/demo_hw.py [--port /dev/ttyUSB1] [--baud 2000000]
+Usage: demo/demo_hw.py --port DEVICE [--baud 2000000]
 """
 
 import argparse
@@ -83,9 +83,9 @@ def show(words):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--port", default="/dev/ttyUSB1",
-                        help="the serial device of the board's debug UART "
-                        "(default /dev/ttyUSB1)")
+    parser.add_argument("--port", required=True, metavar="DEVICE",
+                        help="the serial device of the board's debug UART, "
+                        "such as /dev/ttyUSB1")
     parser.add_argument("--baud", type=int, default=2000000)
     args = parser.parse_args()
     for path, how in ((DEMO, "make demo"), (EMU, "make -C nice_cpu/emulator build")):

@@ -39,8 +39,11 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   ([#32](https://github.com/MJoergen/NiceMonMEGA65/issues/32)).
 - `load.py`, `run.py`, and `mon.py` have no default line: they need
   `--eth`, `--port`, `--tcp`, or `--cosim`, and stop with an error
-  without one. `/dev/ttyUSB1` was the default before. Likewise,
-  `make load`, `make run`, and `make mon` need `ETH=` or `PORT=`.
+  without one. `/dev/ttyUSB1` was the default before. `hwtest.py`,
+  `flash.py`, `release.py`, and `demo_hw.py` need `--port`. Likewise,
+  `make load`, `make run`, and `make mon` need `ETH=` or `PORT=`, and
+  `make hwtest`, `make flash`, and `make release` without
+  `ARGS=--publish` need `PORT=`.
 
 **Ethernet**
 

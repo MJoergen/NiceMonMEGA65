@@ -58,7 +58,8 @@ No JTAG cable is needed.
 
 A Nexys4DDR starts the system from its flash in the same way. Write the
 release's `nicemon-TAG-nexys4ddr.bit` into the flash once, over the
-board's USB cable, with `make flash BIT=nicemon-TAG-nexys4ddr.bit`
+board's USB cable, with
+`make flash PORT=/dev/ttyUSB1 BIT=nicemon-TAG-nexys4ddr.bit`
 (needs [openFPGALoader](https://github.com/trabucayre/openFPGALoader)).
 Set jumper JP1 (MODE) to QSPI. The board then shows the demo when it is
 switched on, with a USB keyboard in its USB HID port (see
