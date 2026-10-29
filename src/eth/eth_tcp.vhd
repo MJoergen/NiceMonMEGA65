@@ -99,6 +99,8 @@ library ieee;
    use ieee.std_logic_1164.all;
    use ieee.numeric_std_unsigned.all;
 
+   use work.eth_pkg.all;
+
 entity eth_tcp is
    generic (
       G_CLOCK_HZ  : natural;
@@ -153,35 +155,6 @@ architecture synthesis of eth_tcp is
    constant C_ACK  : std_logic_vector(7 downto 0)  := X"10";
 
    subtype t_ptr is std_logic_vector(G_ADDR_BITS downto 0);
-
-   type t_bytes is array (natural range <>) of std_logic_vector(7 downto 0);
-
-   function b2 (v : std_logic_vector(15 downto 0)) return t_bytes is
-   begin
-      return (v(15 downto 8), v(7 downto 0));
-   end function b2;
-
-   function b4 (v : std_logic_vector(31 downto 0)) return t_bytes is
-   begin
-      return (v(31 downto 24), v(23 downto 16), v(15 downto 8), v(7 downto 0));
-   end function b4;
-
-   function b6 (v : std_logic_vector(47 downto 0)) return t_bytes is
-   begin
-      return (v(47 downto 40), v(39 downto 32), v(31 downto 24), v(23 downto 16),
-              v(15 downto 8), v(7 downto 0));
-   end function b6;
-
-   -- The ones' complement sum of two words
-   function ones_add (
-      a : std_logic_vector(15 downto 0);
-      b : std_logic_vector(15 downto 0)
-   ) return std_logic_vector is
-      variable s_v : std_logic_vector(16 downto 0);
-   begin
-      s_v := ('0' & a) + ('0' & b);
-      return s_v(15 downto 0) + s_v(16);
-   end function ones_add;
 
    function minimum (a : natural; b : natural) return natural is
    begin

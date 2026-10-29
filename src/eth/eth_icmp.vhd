@@ -53,6 +53,8 @@ library ieee;
    use ieee.std_logic_1164.all;
    use ieee.numeric_std_unsigned.all;
 
+   use work.eth_pkg.all;
+
 entity eth_icmp is
    generic (
       G_ADDR_BITS : natural := 11
@@ -79,8 +81,6 @@ end entity eth_icmp;
 architecture synthesis of eth_icmp is
 
    constant C_MAX : natural := 2 ** G_ADDR_BITS - 1;
-
-   type t_bytes is array (natural range <>) of std_logic_vector(7 downto 0);
 
    type   t_state is (RX_ST, TX_ST);
    signal state : t_state := RX_ST;
@@ -119,17 +119,6 @@ architecture synthesis of eth_icmp is
    attribute ram_style : string;
    attribute ram_style of mem : signal is "block";
 
-   -- The ones' complement sum of two words
-   function ones_add (
-      a : std_logic_vector(15 downto 0);
-      b : std_logic_vector(15 downto 0)
-   ) return std_logic_vector is
-      variable s_v : std_logic_vector(16 downto 0);
-   begin
-      s_v := ('0' & a) + ('0' & b);
-      return s_v(15 downto 0) + s_v(16);
-   end function ones_add;
-
    -- Where byte i of the reply is in the request
    function source (i : natural) return natural is
    begin
@@ -146,13 +135,8 @@ architecture synthesis of eth_icmp is
 
 begin
 
-   gen_mac : for i in 0 to 5 generate
-      mac_b(i) <= mac_i(47 - 8 * i downto 40 - 8 * i);
-   end generate gen_mac;
-
-   gen_ip : for i in 0 to 3 generate
-      ip_b(i) <= ip_i(31 - 8 * i downto 24 - 8 * i);
-   end generate gen_ip;
+   mac_b <= b6(mac_i);
+   ip_b  <= b4(ip_i);
 
    ok    <= rx_data_i = X"08" when idx = 12 else
          rx_data_i = X"00" when idx = 13 else

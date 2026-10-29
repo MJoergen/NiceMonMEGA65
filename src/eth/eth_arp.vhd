@@ -41,6 +41,8 @@ library ieee;
    use ieee.std_logic_1164.all;
    use ieee.numeric_std_unsigned.all;
 
+   use work.eth_pkg.all;
+
 entity eth_arp is
    port (
       clk_i      : in  std_logic;
@@ -64,8 +66,6 @@ end entity eth_arp;
 architecture synthesis of eth_arp is
 
    constant C_ARP_LEN : natural := 42;
-
-   type t_bytes is array (natural range <>) of std_logic_vector(7 downto 0);
 
    -- Bytes 12-21 of an ARP request for IPv4 over Ethernet
    constant C_REQUEST : t_bytes(12 to 21) := (
@@ -96,15 +96,10 @@ architecture synthesis of eth_arp is
 
 begin
 
-   gen_mac : for i in 0 to 5 generate
-      mac_b(i) <= mac_i(47 - 8 * i downto 40 - 8 * i);
-      sha_b(i) <= sha(47 - 8 * i downto 40 - 8 * i);
-   end generate gen_mac;
-
-   gen_ip : for i in 0 to 3 generate
-      ip_b(i)  <= ip_i(31 - 8 * i downto 24 - 8 * i);
-      spa_b(i) <= spa(31 - 8 * i downto 24 - 8 * i);
-   end generate gen_ip;
+   mac_b <= b6(mac_i);
+   sha_b <= b6(sha);
+   ip_b  <= b4(ip_i);
+   spa_b <= b4(spa);
 
    reply_b <= sha_b & mac_b & C_REQUEST(12 to 20) & X"02" & mac_b & ip_b & sha_b & spa_b;
 
