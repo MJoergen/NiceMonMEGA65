@@ -23,6 +23,37 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 
 ## V1.1 (not yet released)
 
+**Upgrade notes.**
+
+- `0xFFFFFF98`–`9D` are the Ethernet station on every board. They read
+  0 and took no write before, on the MEGA65 and on the Nexys4DDR.
+- The debug link over Ethernet reads and writes all memory with no
+  password. The station is silent until it gets an IP address, so give
+  it one only on a network you trust.
+
+**Ethernet**
+
+- Every board has an Ethernet station on its Ethernet port, at
+  100 Mbit/s ([SYSTEM.md](SYSTEM.md#the-ethernet-station)). A write of
+  its IP address to `0xFFFFFF9A`, by a program or over the link on the
+  UART, turns it on. It is 0 after reset, which answers nothing.
+  There is no DHCP client yet, so a board needs its USB cable, or a
+  program that sets the address, before `--eth` can reach it
+  ([#34](https://github.com/MJoergen/NiceMonMEGA65/issues/34)).
+- The R3 build has the station but has not been tested on hardware yet.
+- The station answers ARP requests and pings to its IP address. Its MAC
+  address is 02:4E:49:43:45:00 after reset, and `0xFFFFFF9B`–`9C` change
+  it, which two boards on one network need.
+- It serves the debug link on TCP port 4510, to one host at a time. The
+  connection is the line, as the UART is: it sends no `b` notice, and a
+  half-close is a break. While a host is connected, the UART's link
+  bytes are dropped. A new connection from the same host replaces the
+  old one.
+- The board resends what the host does not acknowledge after 300 ms, and
+  drops the connection after 17 tries.
+- `0xFFFFFF98`, `99`, and `9D` count the good frames received, the bad
+  and dropped ones, and the frames sent.
+
 **Boards**
 
 - F1 to F12 give xterm's escape sequences, on the Nexys4DDR's keyboard
@@ -47,6 +78,9 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 
 **Tools**
 
+- `load.py`, `run.py`, and `mon.py` take `--eth HOST[:PORT]` for the
+  link over the board's Ethernet port. They close each connection with a
+  reset, by `SO_LINGER` 0.
 - `make flash` (`tools/flash.py`) writes a bitstream into the
   Nexys4DDR's flash, verifies it, and waits for the board to start from
   it. With jumper JP1 on QSPI, the board then starts the system at power
@@ -71,6 +105,13 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 - `SYSTEM.md`, `EMULATOR.md`, `CODING_STYLE.md`, `RELEASE.md`, and
   `RELEASE_NOTES.md` move into `doc/`. `README.md` and `CONTRIBUTING.md`
   stay at the root.
+
+**Tests**
+
+- `make test` runs the Ethernet station's testbenches: `tb_rmii_rx`,
+  `tb_rx_fcs`, `tb_eth_rx_fifo`, `tb_eth_tx_fifo`, `tb_rmii_tx`,
+  `tb_eth`, which drives the station at its pins, and `tb_eth_tcp`,
+  which checks the TCP server against a host modeled in VHDL.
 
 **Release**
 
