@@ -57,7 +57,7 @@ and the link sends `p`, which may come before the `k` of the write. While
 the core is paused, the link reaches the whole address map, R0–R15 at
 `0xFFFFFFE0`–`EF` hold the core's registers, and the counters and the timer
 stop. A write of `0x00000008` makes the program go on. A hold of a paused
-core keeps R0–R15 until the next start.
+core keeps R0–R15 until the next start or clear.
 
 With link version 3, a host can step a paused program. A write of
 `0x00000038` runs one step, an instruction or an interrupt entry, and the
@@ -76,6 +76,12 @@ stopped at. When the program goes on, it runs that instruction, and does
 not stop at it again. A step or a pause that ends at a breakpoint sends `x`
 too. The breakpoints take a write at any time, and a reset clears them.
 `tools/load.py` and `tools/run.py` disable them before they load a program.
+
+With link version 5, a clear ends the halt and the stop of the program
+it wipes. When the clear starts, bit 1 of the control register, the halt
+reason, and the stop register become 0. So after `0x0000000D` the
+control register reads `0x00000009`, also after a halt. A hold alone
+keeps them, as before.
 
 A terminal on the UART shows what the program prints, and what you type
 goes to the program while it runs. Bytes typed while it is paused wait
@@ -106,12 +112,12 @@ effect and does not write (DEBUG.md §3).
 | `0xFFFFFF90`–`0xFFFFFF9F` | The Nexys4DDR's LEDs, seven-segment display, buttons, and switches (see [The Nexys4DDR's devices](#the-nexys4ddrs-devices)). On the MEGA65 they read 0 and take no write. On every board, `0xFFFFFF98`–`9D` are the Ethernet station (see [The Ethernet station](#the-ethernet-station)). |
 | `0xFFFFFFE0`–`0xFFFFFFEF` | The debug registers of DEBUG.md §6, for the link only, here and below: R0–R15 of the core, read only. After a halt they hold what the emulator prints. While the core is paused they hold its registers, with R15 the address of the next instruction, and a hold of the paused core keeps them. A hold of a running core leaves them undefined. |
 | `0xFFFFFFF0` | Control: hold, clear, hide, pause, and step (see [The control register](#the-control-register)). |
-| `0xFFFFFFF1` | Read only: why the core halted. 0 while it has not, 1 for `HALT`, 2 for a reserved control word, 3 for `INT` inside an interrupt routine, and 4 for `RTI` outside one. |
+| `0xFFFFFFF1` | Read only: why the core halted. 0 while it has not, and after a clear, 1 for `HALT`, 2 for a reserved control word, 3 for `INT` inside an interrupt routine, and 4 for `RTI` outside one. |
 | `0xFFFFFFF2` | Read only: the version of the link, 4. |
 | `0xFFFFFFF3` | Read only: the bytes of free space in the core's input FIFO. |
 | `0xFFFFFFF4` | The enable bits of the breakpoints: bit i enables breakpoint i. Bits 4 to 31 read 0. |
 | `0xFFFFFFF5` | Read only: the number of breakpoints, 4. |
-| `0xFFFFFFF6` | Read only: the stop. From an `x` until the program goes on, steps, or starts, bit 8 is 1 and bits 7–0 are the breakpoint's number. Otherwise 0. |
+| `0xFFFFFFF6` | Read only: the stop. From an `x` until the program goes on, steps, starts, or is cleared, bit 8 is 1 and bits 7–0 are the breakpoint's number. Otherwise 0. |
 | `0xFFFFFFF7` | Reserved: reads 0. |
 | `0xFFFFFFF8`–`0xFFFFFFFB` | The addresses of breakpoints 0 to 3. `0xFFFFFFFC`–`FF` read 0. A reset clears the breakpoints, and a hold, a start, and a clear keep them. |
 
@@ -120,7 +126,7 @@ effect and does not write (DEBUG.md §3).
 | Bit | Name | Meaning |
 |---|---|---|
 | 0 | Hold | 1 holds the core in reset. A write of 0 starts it. |
-| 1 | Halted | Read only. 1 after a halt, and stays 1 while the core is held in reset, until the next start. |
+| 1 | Halted | Read only. 1 after a halt, and stays 1 while the core is held in reset, until the next start or clear. |
 | 2 | Clear | A write with bit 2 set first clears the RAM and the screen to 0, with the core held, and is answered when the memory is clear, after 0.66 ms at 100 MHz. Bit 3 takes effect when the clear starts, and bit 0 when it ends. |
 | 3 | Hide | 1 hides the ROM, so that the RAM is at 0. Reset clears it in a bitstream with a ROM; in one without a ROM it reads 1. |
 | 4 | Pause | A write of 1 pauses the core at the next step boundary, and the link sends `p`. It reads 1 while the core is paused, and a write of 0 makes the program go on. A start with bit 4 set pauses before the first instruction. |

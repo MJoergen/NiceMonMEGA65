@@ -23,14 +23,14 @@
 -- first. A program that halts quickly may send its `h` before the `k` of
 -- the write that started it; wr() keeps it for expect_halt(). The steps:
 --
--- 1. The link's `b04` after reset, and the ROM, which holds G_ROM_FILE: the
+-- 1. The link's `b05` after reset, and the ROM, which holds G_ROM_FILE: the
 --    core boots from it at reset, prints its greeting, and halts. Its stack
 --    is in the RAM, at the top of the memory, for a push to the ROM is lost.
 --    The ROM is at 0, read only, with the RAM above it; bit 3 of the
 --    control register hides it, and shows it again; and the core boots from
 --    it again when it is started with the ROM shown. From then on the ROM
 --    is hidden, as the tools hide it, so the RAM is at 0 as in the
---    emulator. The version register reads 4, and the free space 16, the
+--    emulator. The version register reads 5, and the free space 16, the
 --    whole FIFO.
 -- 2. Load G_HELLO_FILE with W packets, and read its first word back.
 -- 3. The control register: the core is held in reset.
@@ -82,7 +82,8 @@
 --    the buttons and switches. The start kept the screen's and the board's
 --    registers.
 -- 10. Clear the memory: what the programs left is gone, and the core is
---    held.
+--    held. The clear ends the halt, so bit 1 and the halt reason read 0
+--    (link version 5).
 -- 11. Load G_RESERVED_FILE, and run it. It halts on a reserved control
 --    word, which the halt reason and `h02` show, after the steps of niceemu.
 -- 12. Load G_BREAK_FILE, with breakpoint 0 at the address of its label READ,
@@ -90,7 +91,8 @@
 --    interrupt routine, and start it. The core stops at READ, the link
 --    sends `x00`, bit 4 reads 1, and the stop register holds 0x100. A go on
 --    stops at V3 with `x01`. Then, with the breakpoints disabled, a go on
---    runs it to its halt, and the stop register reads 0.
+--    runs it to its halt, and the stop register reads 0. A start stops at
+--    READ again, and the clear before step 13 ends the stop.
 -- 13. Load G_EOF_FILE, and run it. It echoes its input until the input ends,
 --    which a break on the UART does, and halts with 0x200 in R1. Console
 --    bytes sent after the halt are dropped.
@@ -98,7 +100,7 @@
 --    bytes typed while the core is held are dropped, and G_FIFO_FILE again,
 --    with more bytes typed than its FIFO holds. None is lost, for the
 --    keyboard waits.
--- 15. A reset while G_ECHO_FILE runs: the link sends `b04`, the core boots
+-- 15. A reset while G_ECHO_FILE runs: the link sends `b05`, the core boots
 --    from the ROM again, and the screen's and the board's registers and the
 --    breakpoints are cleared.
 --
@@ -589,20 +591,20 @@ begin
              pkt('k', "000001000002") = "k000001000002#AE" and
              pkt('R', "000001000001") = "R000001000001#94" and
              pkt('r', "00000100000111223344") = "r00000100000111223344#48" and
-             pkt('b', "04") = "b04#C6" and pkt('h', "01") = "h01#C9" and
+             pkt('b', "05") = "b05#C7" and pkt('h', "01") = "h01#C9" and
              pkt('e', "5202") = "e5202#2E" and
              pkt('W', "FFFFFFF0000100000009") = "WFFFFFFF0000100000009#BB" and
              pkt('k', "FFFFFFF00001") = "kFFFFFFF00001#46"
          report "tb_nicemon: pkt() does not give the packets of DEBUG.md §8"
          severity failure;
 
-      report "tb_nicemon: b04, and the ROM";
-      expect_pkt("b04#C6");
+      report "tb_nicemon: b05, and the ROM";
+      expect_pkt("b05#C7");
       expect_con("Hello from the ROM!" & C_LF);
       expect_halt("01");
       first_v := first_word(G_ROM_FILE);
       check("FFFFFFF0", "00000002");         -- halted, the ROM shown
-      check("FFFFFFF2", "00000004");         -- the version
+      check("FFFFFFF2", "00000005");         -- the version
       check("FFFFFFF3", "00000010");         -- the free space: 16 bytes
       check("00000000", first_v);            -- the ROM
       wr("00000000", "12345678");            -- dropped
@@ -897,7 +899,8 @@ begin
 
       report "tb_nicemon: clear the memory";
       wr("FFFFFFF0", "0000000D");
-      check("FFFFFFF0", "0000000B");         -- held, and still halted until a start
+      check("FFFFFFF0", "00000009");         -- held: the clear ends the halt
+      check("FFFFFFF1", "00000000");         -- and its reason
       check("00000000", "00000000");
       check("00000110", "00000000");
       check("FFFF0000", "00000000");         -- the screen
@@ -940,9 +943,16 @@ begin
       expect_halt("01");
       check("FFFFFFF6", "00000000");
       check("FFFFFFE7", "00001234");         -- R7, from the routine
+      wr("FFFFFFF4", "00000001");            -- start again, to READ
+      wr("FFFFFFF0", "00000009");
+      wr_stop("00000008", pkt('x', "00"));
+      check("FFFFFFF6", "00000100");
 
       report "tb_nicemon: load " & G_EOF_FILE;
       wr("FFFFFFF0", "0000000D");
+      check("FFFFFFF6", "00000000");         -- the clear ends the stop
+      check("FFFFFFF0", "00000009");
+      wr("FFFFFFF4", "00000000");
       load(G_EOF_FILE, first_v);
       wr("FFFFFFF0", "00000008");
       send_con("ab");
@@ -981,7 +991,7 @@ begin
       wait until rising_edge(clk);
       rst <= '0';
       -- The core boots from the ROM again
-      expect_pkt("b04#C6");
+      expect_pkt("b05#C7");
       expect_con("Hello from the ROM!" & C_LF);
       expect_halt("01");
       check("FFFFFFF0", "00000002");

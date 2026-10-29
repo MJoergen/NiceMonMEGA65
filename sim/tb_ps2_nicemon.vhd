@@ -9,7 +9,7 @@
 -- link as tb_nicemon does, with fewer helpers, and p_uart_rx splits the
 -- UART output into console bytes and packets. The steps:
 --
--- 1. The link's `b04` after reset. There is no ROM, and the core is held.
+-- 1. The link's `b05` after reset. There is no ROM, and the core is held.
 -- 2. Keys typed while the core is held are dropped. Then G_FIFO_FILE runs,
 --    and echoes the keys typed, in order, with SHIFT and Enter, until '.'.
 -- 3. G_SWITCH_FILE runs, which reads no input until switch 0 is on. The
@@ -378,8 +378,8 @@ begin
       wait until rising_edge(clk);
       rst <= '0';
 
-      report "tb_ps2_nicemon: b04";
-      expect_pkt("b04#C6");
+      report "tb_ps2_nicemon: b05";
+      expect_pkt("b05#C7");
       check("FFFFFFF0", "00000009");         -- held, and no ROM
 
       report "tb_ps2_nicemon: keys typed while the core is held are dropped";

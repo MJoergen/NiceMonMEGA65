@@ -145,7 +145,7 @@ UART:
 
 <pre>
 $ <b>tools/mon.py</b>
-halted: HALT, ROM hidden, control 0000000a, link version 0.4, input free 2048
+halted: HALT, ROM hidden, control 0000000a, link version 0.5, input free 2048
 PC=0000000f
 </pre>
 
@@ -201,21 +201,19 @@ instructions of this short assembly program, and their addresses:
 
 Assemble it, and start `mon.py`. The state shown here is that after an
 earlier program halted. Load the program, and the core is held in reset,
-with the program in memory. The earlier halt still shows, as bit 1 of
-the control register stays set while the core is held in reset, until
-the next start:
+with the program in memory. The load clears the memory first, and the
+clear ends the earlier halt, so bit 1 of the control register is 0:
 
 <pre>
 $ <b>python3 nice_cpu/assembler/niceasm.py -o echo.bin sim/echo.nasm</b>
 $ <b>tools/mon.py</b>
-halted: HALT, ROM hidden, control 0000000a, link version 0.4, input free 2048
+halted: HALT, ROM hidden, control 0000000a, link version 0.5, input free 2048
 PC=0000000f
 'help' lists the commands, and 'q' quits.
 mon&gt; <b>load echo.bin</b>
 loaded 15 words; the core is held in reset
 mon&gt; <b>status</b>
-held, after a halt: HALT, ROM hidden, control 0000000b, link version 0.4, input free 2048
-PC=0000000f
+held, ROM hidden, control 00000009, link version 0.5, input free 2048
 mon&gt; <b>r 0 f</b>
 00000000: 00007800 ffffff00 03a080b0 00000100 3003d800 00000000 01a040b0 000000ff
 00000008: 001c0080 ffffff00 022080b0 0000002e b003d800 00000000 0c000000
@@ -279,7 +277,7 @@ mon&gt; <b>send .</b>
 .
 [halted: HALT, PC=0000000f]
 mon&gt; <b>status</b>
-halted: HALT, ROM hidden, control 0000000a, link version 0.4, input free 2048
+halted: HALT, ROM hidden, control 0000000a, link version 0.5, input free 2048
 PC=0000000f
 mon&gt; <b>q</b>
 </pre>

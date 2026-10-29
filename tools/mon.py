@@ -371,7 +371,8 @@ class Monitor(cmd.Cmd):
         if ctl & HALTED:
             why = link.read_word(HALT_REASON)
             state = f"halted: {REASONS.get(why, why)}"
-            # A hold after a halt keeps bit 1 and the reason.
+            # A hold after a halt keeps bit 1 and the reason, until a
+            # clear (link version 5), as by load.
             if ctl & HOLD:
                 state = f"held, after a halt: {REASONS.get(why, why)}"
         elif ctl & HOLD:

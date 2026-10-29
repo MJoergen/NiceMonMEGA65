@@ -30,6 +30,13 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 - The debug link over Ethernet reads and writes all memory with no
   password. The station is silent until it gets an IP address, so give
   it one only on a network you trust.
+- nice_cpu moves to `V1.1`, and the debug link to version 5. A clear of
+  the memory now ends the halt and the stop of the program it wipes:
+  bit 1 of the control register, the halt reason, and the stop register
+  read 0 after it. So after `load` in `mon.py`, `status` shows `held`,
+  not `held, after a halt`, and the control register reads `00000009`.
+  A hold alone keeps them, as before
+  ([#32](https://github.com/MJoergen/NiceMonMEGA65/issues/32)).
 
 **Ethernet**
 
@@ -88,8 +95,7 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   does with a core file in its flash.
 - `mon.py` disassembles with `d ADDR N`, and shows the instruction at the
   PC after a pause, a step, and a breakpoint. The disassembler is
-  nice_cpu's `assembler/nicedis.py`, which comes after nice_cpu's `V1.0`.
-  With the submodule at `V1.0`, `d` says that it is missing.
+  nice_cpu's `assembler/nicedis.py`, new in nice_cpu's `V1.1`.
 - `mon.py --symbols FILE` and its `symbols FILE` command read the labels
   of `niceasm.py --symbols` and `nicebuild.py --symbols`. An address may
   then be a label, `label+N`, or `label-N`, and the output shows the
