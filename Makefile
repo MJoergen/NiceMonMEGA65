@@ -96,7 +96,8 @@ FORMAL_TASKS = rx_fifo-prove rx_fifo-cover board_io-prove board_io-none board_io
                nicemon-run nicemon-link nicemon-cover \
                nicemon-rom nicemon-rom_cover \
                eth_tcp_timer-prove eth_tcp_timer-cover \
-               eth_tcp_buf-prove eth_tcp_buf-model eth_tcp_buf-cover
+               eth_tcp_buf-prove eth_tcp_buf-model eth_tcp_buf-cover \
+               eth_tcp_pick-prove eth_tcp_pick-cover
 
 formal: $(addprefix formal-,$(FORMAL_TASKS))
 

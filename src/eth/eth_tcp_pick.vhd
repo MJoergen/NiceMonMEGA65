@@ -30,6 +30,14 @@
 --    pick_o says; more data may come at lim_ptr_i at any time.
 -- b) mac_i and ip_i stay stable while busy_o is '1'.
 --
+-- With G_FORMAL, it states the properties that formal/eth_tcp_pick.sby
+-- proves, under contract a): a segment is chosen only in B_PICK, and not
+-- while one is sent, and every one acknowledges; the SYN-ACK, data, and
+-- the FIN are chosen only as the header says, and data never beyond the
+-- data there is or the host's window, but for the probe; and the sender
+-- gets the connection's fields, its sequence number, and the length
+-- chosen, which stay while it is busy.
+--
 -- RESET
 -- Synchronous, to clk_i. Reset drops the choice and the segment being
 -- sent.
@@ -42,7 +50,9 @@ entity eth_tcp_pick is
    generic (
       G_PORT      : natural := 4510;
       G_ADDR_BITS : natural := 11;
-      G_MSS       : natural := 536
+      G_MSS       : natural := 536;
+      -- The properties for formal/eth_tcp_pick.sby
+      G_FORMAL    : boolean := false
    );
    port (
       clk_i       : in  std_logic;
@@ -252,5 +262,62 @@ begin
          end if;
       end if;
    end process p_pick;
+
+
+   gen_formal : if G_FORMAL generate
+   begin
+
+      -- psl default clock is rising_edge(clk_i);
+
+      -- The choice
+      -- psl f_build : assert always build = B_IDLE or build = B_SIZE or build = B_PICK;
+      -- psl f_when : assert always pick /= X"00" -> build = B_PICK and drop_i = '0';
+      -- psl f_idle : assert always build /= B_IDLE -> busy = '0';
+      -- psl f_go : assert always go = '1' -> prev(busy) = '0';
+      -- psl f_ack : assert always pick /= X"00" -> pick(4) = '1';
+      -- psl f_no_rst : assert always pick(2) = '0';
+      -- psl f_syn : assert always pick(1) = '1' ->
+      --    syn_req_i = '1' and syn_rcvd_i = '1' and pick = (C_SYN or C_ACK);
+      -- psl f_data : assert always pick(3) = '1' ->
+      --    estab_i = '1' and pick_n > 0 and pick = (C_ACK or C_PSH);
+      -- psl f_fin : assert always pick(0) = '1' ->
+      --    estab_i = '1' and closing_i = '1' and nxt_ptr_i = lim_ptr_i and fin_sent_i = '0' and
+      --    pick_n = 0 and pick = (C_FIN or C_ACK);
+
+      -- The size: what was worked out still holds when it is chosen from.
+      -- psl f_avail : assert always build /= B_IDLE -> avail <= to_integer(lim_ptr_i - nxt_ptr_i);
+      -- psl f_room : assert always build /= B_IDLE ->
+      --    room = to_integer(snd_wnd_i) - to_integer(nxt_ptr_i - una_ptr_i);
+      -- psl f_size : assert always build = B_PICK ->
+      --    pick_n <= avail and pick_n <= G_MSS and
+      --    (pick_n = 0 or pick_n <= room or (probe_i = '1' and pick_n = 1));
+      -- psl f_fits : assert always pick(3) = '1' ->
+      --    pick_n <= to_integer(lim_ptr_i - nxt_ptr_i) and
+      --    (pick_n + to_integer(nxt_ptr_i - una_ptr_i) <= to_integer(snd_wnd_i) or
+      --     (probe_i = '1' and pick_n = 1));
+
+      -- The segment: the connection's fields, and what was chosen
+      -- psl f_fields : assert always build /= B_IDLE ->
+      --    seg_mac = peer_mac_i and seg_ip = peer_ip_i and seg_port = peer_port_i and
+      --    seg_ack = rcv_nxt_i and seg_ptr = nxt_ptr_i and
+      --    seg_seq = una_seq_i + (nxt_ptr_i - una_ptr_i) + fin_sent_i;
+      -- psl f_sent : assert always go = '1' -> seg_flags = prev(pick) and
+      --    (seg_flags(1) = '0' or seg_seq = prev(iss_i)) and
+      --    (seg_flags(3) = '0' or seg_n = prev(pick_n)) and (seg_flags(3) = '1' or seg_n = 0);
+      -- psl f_wnd : assert always {pick /= X"00"} |=> {adv_wnd_o = prev(free_i)};
+      -- psl f_stable : assert always busy = '1' and go = '0' ->
+      --    seg_mac = prev(seg_mac) and seg_ip = prev(seg_ip) and seg_port = prev(seg_port) and
+      --    seg_seq = prev(seg_seq) and seg_ack = prev(seg_ack) and seg_flags = prev(seg_flags) and
+      --    seg_wnd = prev(seg_wnd) and seg_ptr = prev(seg_ptr) and seg_n = prev(seg_n);
+
+      -- psl c_syn_sent : cover {pick(1) = '1' and rst_i = '0'};
+      -- psl c_data : cover {pick(3) = '1' and pick_n = G_MSS and rst_i = '0'};
+      -- psl c_paused : cover {pick(3) = '1' and pick_n < G_MSS and paused_i = '1' and rst_i = '0'};
+      -- psl c_probe : cover {pick(3) = '1' and pick_n = 1 and probe_i = '1' and room <= 0 and
+      --    rst_i = '0'};
+      -- psl c_fin_sent : cover {pick(0) = '1' and rst_i = '0'};
+      -- psl c_ack_sent : cover {pick = C_ACK and rst_i = '0'};
+      -- psl c_dropped : cover {build = B_PICK and drop_i = '1' and rst_i = '0'};
+   end generate gen_formal;
 
 end architecture synthesis;
