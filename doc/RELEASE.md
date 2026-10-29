@@ -101,7 +101,8 @@ and keep their names.
 A change here alone, after the release `V1.0`, is released as `V1.0.1`:
 steps 2 to 6 with `TAG=V1.0.1`, without a bump. It builds and checks the
 three bitstreams as a bump's release does, for a change here can cost
-timing, and the R6 must meet timing with the flow of `verified.json`.
+timing. The R6 tries the flow of `verified.json` first, and then the
+other one.
 `verified.json` and the badge stay as the bump left them, for they are
 the claim of nice_cpu's tag; the release notes give this build's timing.
 The core files have the version `V1.0.1`, which MEGAFLASH shows.
@@ -110,6 +111,11 @@ The core files have the version `V1.0.1`, which MEGAFLASH shows.
 
 - A failed check in step 4 changes nothing. Fix the cause, and run step 4
   again.
+- The ROM can cost the R6 the margin of the bump's build, which has none.
+  So step 4 builds the R6 with the flow of `verified.json` first, and
+  then with the other one, and the notes say so when it took the other.
+  If both miss, there is no release: the fix belongs in nice_cpu, and a
+  new nice_cpu tag and bump follow.
 - If step 6 fails after the tag is pushed, create the release by hand:
 
       gh release create V1.0 --verify-tag --title V1.0 \

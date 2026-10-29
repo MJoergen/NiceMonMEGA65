@@ -18,10 +18,12 @@ is for the nice_cpu tag and the submodule's commit and says met, that the
 submodule is at that tag, and that CI passed for the commit. It then
 builds the examples, the demo of demo/ with the tag in its title bar, and
 the bitstreams of the R6, the R3, and the Nexys4DDR, with the demo in the
-ROM and from nothing. The R6 uses the flow of verified.json, and the
-Nexys4DDR only FLOW=timing, as its Makefile does, for it never meets timing
-with the default directives. The R3 tries the default directives first and
-then FLOW=timing, as bump.py does. Each must meet timing. It makes the core files of the R3 and the R6, with the tag as
+ROM and from nothing. The R6 tries the flow of verified.json first and
+then the other one, for the ROM can cost the margin of the bump's build,
+which had none; the notes say so when the other flow was needed. The
+Nexys4DDR uses only FLOW=timing, as its Makefile does, for it never meets
+timing with the default directives. The R3 tries the default directives
+first and then FLOW=timing, as bump.py does. Each must meet timing. It makes the core files of the R3 and the R6, with the tag as
 their version, which MEGAFLASH shows. Last it runs make hwtest on the R6 bitstream, so a MEGA65 R6
 must be on PORT. It copies the bitstreams, the core files, a zip of the examples, and
 verified.json to build/release/V1.0, with notes.md, the release notes, and
@@ -189,6 +191,15 @@ def notes(tag, v, results, body):
     lines += [
         "",
         "Built with %s, tested on the MEGA65 R6 with `make hwtest`." % v["vivado"],
+    ]
+    if results["r6"]["flow"] != v["flow"]:
+        lines += [
+            "",
+            "The R6 met timing with `FLOW=%s`, where the bump's build, without"
+            % results["r6"]["flow"],
+            "a ROM, met it with `FLOW=%s` (`verified.json`)." % v["flow"],
+        ]
+    lines += [
         "",
         "## Files",
         "",
@@ -225,7 +236,10 @@ def stage(tag):
     run(["make", "-C", "demo", "VERSION=" + tag])
     results = {}
     for board, _ in BOARDS:
-        flows = (v["flow"],) if board == "r6" else BOARD_FLOWS.get(board, FLOWS)
+        if board == "r6":
+            flows = (v["flow"],) + tuple(f for f in FLOWS if f != v["flow"])
+        else:
+            flows = BOARD_FLOWS.get(board, FLOWS)
         results[board] = build(board, flows)
     # The same options as the build, or make would build the bitstream again
     for board in COR_BOARDS:
