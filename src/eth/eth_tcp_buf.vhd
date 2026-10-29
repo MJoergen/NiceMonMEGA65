@@ -23,9 +23,11 @@
 -- and the break waits (fin_rcvd) at its place (brk_ptr, cmt_i then) until
 -- the link has taken the bytes before it; lrx_break_o is '1' for a cycle
 -- then. Nothing is read past the break meanwhile, as nothing is read past
--- cmt_i. drain_o says that the link has input or a break still to take, a
--- cycle behind, for the timing; the connection stays the line that long
--- after its end.
+-- cmt_i. on_o says that the link is on the connection: there is one
+-- (conn_i), or the link has input or a break still to take, a cycle
+-- behind, for the timing; so the link becomes the connection's a cycle
+-- after it opens, and stays with it that long after its end, and a byte
+-- or the break goes to the link only while on_o is '1'.
 --
 -- INTERFACE CONTRACTS -- these are requirements on the environment:
 -- a) cmt_i runs at most 2 ** G_ADDR_BITS bytes past rx_rd, the data the
@@ -77,8 +79,9 @@ entity eth_tcp_buf is
       lrx_valid_o : out std_logic;
       lrx_ready_i : in  std_logic;
       lrx_break_o : out std_logic                    := '0';
-      -- Input or a break that the link has not taken, a cycle behind
-      drain_o     : out std_logic                    := '0'
+      -- The link is on the connection: there is one, or input or a break
+      -- that the link has not taken, a cycle behind
+      on_o        : out std_logic                    := '0'
    );
 end entity eth_tcp_buf;
 
@@ -196,7 +199,7 @@ begin
             fin_rcvd <= '1';
             brk_ptr  <= cmt_i;
          end if;
-         drain_o <= drain;
+         on_o <= conn_i or drain;
 
          if rst_i = '1' then
             tail_ptr  <= (others => '0');
@@ -204,7 +207,7 @@ begin
             lfetch    <= '0';
             lrx_valid <= '0';
             fin_rcvd  <= '0';
-            drain_o   <= '0';
+            on_o      <= '0';
          end if;
       end if;
    end process p_buf;

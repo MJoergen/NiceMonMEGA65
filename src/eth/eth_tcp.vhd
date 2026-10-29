@@ -5,15 +5,16 @@
 -- segments to eth_tx_fifo.vhd. ip_i at 0 turns it off.
 --
 -- THEORY OF OPERATION
--- The connection is the line. While there is one (on_o), the link's input
--- comes from it and its output goes to it. A connection is one from the
+-- The connection is the line. While there is one (on_o, a cycle behind,
+-- from eth_tcp_buf.vhd), the link's input comes from it and its output
+-- goes to it. A connection is one from the
 -- host's ACK of the SYN-ACK on, so that a SYN alone, as of a port scan,
 -- leaves the link on the UART. The host's half-close, its FIN, is a break
 -- of the line (lrx_break_o), after the last byte committed (rx_cmt). The
 -- link stays with the connection after its end, by an RST or the tries,
--- until it has taken all the input and the break (drain_r, a cycle
--- behind, for the timing), so that none is lost; the output in that time
--- is dropped. The states are those of a passive open, and of a close:
+-- until it has taken all the input and the break, so that none is lost;
+-- the output in that time is dropped. The states are those of a passive
+-- open, and of a close:
 --   LISTEN_ST      no connection; a SYN to G_PORT opens one
 --   SYN_RCVD_ST    the SYN-ACK is sent, and waits for the host's ACK
 --   EST_ST         the connection is open
@@ -254,9 +255,6 @@ architecture synthesis of eth_tcp is
    signal peer_fin : std_logic := '0';
    -- The connection's half-close for the link, a cycle after
    signal brk_set : std_logic := '0';
-   -- Input or a break that the link has not taken, a cycle behind, which
-   -- on_o follows
-   signal drain_r : std_logic;
 
    -- The send buffer (eth_tcp_buf.vhd): where the link's next byte goes,
    -- that its output has paused, and the sender's reads
@@ -289,7 +287,6 @@ begin
    estab    <= '1' when state = EST_ST or state = CLOSE_WAIT_ST or state = LAST_ACK_ST else
                '0';
    conn     <= estab or (syn_rcvd and keep);
-   on_o     <= conn or drain_r;
 
    ---------------------------------------------------------------------------
    -- Receive
@@ -363,7 +360,7 @@ begin
          lrx_valid_o => lrx_valid_o,
          lrx_ready_i => lrx_ready_i,
          lrx_break_o => lrx_break_o,
-         drain_o     => drain_r
+         on_o        => on_o
       ); -- i_eth_tcp_buf
 
    ---------------------------------------------------------------------------
