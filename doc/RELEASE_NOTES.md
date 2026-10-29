@@ -84,6 +84,10 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   other five are the ideas of
   [#28](https://github.com/MJoergen/NiceMonMEGA65/issues/28), each on a
   key of its own.
+- An ESC that no byte follows within 10 ms is a key of its own, as the
+  MEGA65's ESC key sends it. The typewriter dropped it before, and took
+  the key after it as it was, and it held up the other demos until the
+  next key.
 - F3 shows the bytes of each key, in hex and as characters.
 - F5 shows the 256 characters of the font and ramps of seven colors, as
   backgrounds and as foregrounds, to check the video output.
@@ -97,7 +101,10 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   Below the tests it shows the Ethernet station's IP and MAC addresses
   and its three counts, and the I and M keys type a new IP or MAC
   address and write it to the station
-  ([#40](https://github.com/MJoergen/NiceMonMEGA65/issues/40)). A
+  ([#40](https://github.com/MJoergen/NiceMonMEGA65/issues/40)). ESC,
+  CTRL-C, or RUN/STOP cancels the typing. A byte of a MAC address has
+  one or two hex digits, and a number of an IP address any number of
+  digits, such as `001`, as long as it is 255 at most. A
   board with the demo in its ROM can thus get its IP address from its
   own keyboard, with no USB cable.
 
@@ -146,6 +153,13 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   `tb_rx_fcs`, `tb_eth_rx_fifo`, `tb_eth_tx_fifo`, `tb_rmii_tx`,
   `tb_eth`, which drives the station at its pins, and `tb_eth_tcp`,
   which checks the TCP server against a host modeled in VHDL.
+- `make hwtest` and `make linktest` run the demo's self-test, F11, and
+  check that its four tests pass. The tests of the timer and of the
+  counters depend on the core's timing, so a nice_cpu bump that changes
+  it fails them
+  ([#43](https://github.com/MJoergen/NiceMonMEGA65/issues/43)).
+- `make -C demo test` also checks how a failed self-test shows, the
+  colors of the menu and of PASS and FAIL, and the keys that no test had.
 
 **Release**
 
