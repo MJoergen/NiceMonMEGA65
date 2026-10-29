@@ -88,7 +88,8 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   sources. `tools/`: `nicelink.py` (the link, on the UART, or over TCP to
   `niceemu --link` or `make cosim`), `load.py`, `run.py`, `mon.py`, `hwtest.py`, `flash.py` (with
   `jtag.py`, the JTAG cable of the board's UART, which hwtest shares),
-  `bump.py`, `release.py`, `linktest.py`, `cosimtest.py`. `examples/`: C programs built through
+  `bump.py`, `release.py`, `linktest.py`, `cosimtest.py`, `screenshot.py`
+  (a program's screen in niceemu as a PNG). `examples/`: C programs built through
   nice_cpu's wasm translator. `demo/`: the welcome screen and typewriter
   in NICE assembly that the release puts in the ROM (`release.py`), and
   `demo_hw.py`, which checks it in the ROM of a programmed board.
