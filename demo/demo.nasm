@@ -669,7 +669,9 @@ FIX2    MOVE    @M_A, R1
 ; at the start, and a key that would turn it back is ignored.
 ;
 ; The ticks come from the microsecond counter, and the game takes one key at
-; each tick. So in niceemu, where a microsecond is a step, an input file is
+; each tick. Each tick sets the next one from the time that it came, so a
+; tick that comes late delays the ticks after it, and they do not run back
+; to back to catch up. So in niceemu, where a microsecond is a step, an input file is
 ; a script with one key for each tick. RANDOM steps while the game waits
 ; for a tick, so on the board the stars depend on when the keys come. The
 ; ring BODY holds the addresses of the comet's cells, and the screen itself
@@ -722,7 +724,7 @@ GTICK   ADD     @--SP, 2, PC    ; wait for the tick
         MOVE    PC, RANDOM
         SUB[M]  R0, @P_US, @G_NEXT
     ?N  MOVE    PC, GTICK
-        ADD     @G_NEXT, @G_NEXT, @G_TICK
+        ADD     @G_NEXT, @P_US, @G_TICK ; from now, not from G_NEXT
         ADD     @--SP, 2, PC
         MOVE    PC, POLL
         MOVE[M] R0, @G_OVER

@@ -161,7 +161,8 @@ Screen:
 |
 |
 | @oo
-|                                            *
+|
+|                                                      *
 Screen:
 | NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
 | F1 typewriter   F3 key codes   F5 charset   F7 counters   F9 comet   F11 board
