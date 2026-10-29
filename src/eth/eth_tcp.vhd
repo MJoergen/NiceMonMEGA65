@@ -365,7 +365,7 @@ begin
              X"0000";
 
    hdr <= b6(seg_mac) & mac_b & t_bytes'(X"08", X"00", X"45", X"00") &
-          b2(to_stdlogicvector(40 + seg_n, 16)) & b2(ip_id) &
+          b2(X"0028" + seg_n) & b2(ip_id) &
           t_bytes'(X"40", X"00", X"40", X"06") & b2(ip_ck) & ip_b & b4(seg_ip) &
           b2(C_PORT) & b2(seg_port) & b4(seg_seq) & b4(seg_ack) &
           t_bytes'(X"50", seg_flags) & b2(seg_wnd) & b2(tcp_ck) & t_bytes'(X"00", X"00");
@@ -380,7 +380,7 @@ begin
       seg_ip(31 downto 16) when 2,
       seg_ip(15 downto 0) when 3,
       X"0006" when 4,
-      to_stdlogicvector(20 + seg_n, 16) when others;
+      X"0014" + seg_n when others;
 
    tx_valid_o <= tx_valid;
 
@@ -730,7 +730,7 @@ begin
                   seg_ip   <= peer_ip;
                   seg_port <= peer_port;
                   seg_ack  <= rcv_nxt;
-                  seg_wnd  <= to_stdlogicvector(rx_free, 16);
+                  seg_wnd  <= X"0000" + rx_free;
                   seg_ptr  <= nxt_ptr;
                   seg_n    <= 0;
                   -- After this side's FIN, the next sequence number is past it.
