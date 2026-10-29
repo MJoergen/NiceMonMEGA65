@@ -173,7 +173,10 @@ The testbenches are these:
   two clocks, with good and bad frames, a reader that is not always
   ready, and a stall that makes frames find the FIFO full: every good
   frame comes, whole and without its check sequence, or is counted as
-  dropped.
+  dropped. A second FIFO of 64 bytes checks the capacity to the byte: a
+  frame that fills it fits and one byte more is dropped, many drops give
+  back all their space, and the room beside a waiting frame is used to
+  its last byte.
 - `sim/tb_eth_tx_fifo.vhd` tests the FIFO of frames to send between its
   two clocks, with a writer and a reader that are not always ready: the
   frames come in order and whole, none before it is written whole, and,
