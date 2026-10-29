@@ -44,9 +44,9 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   100 Mbit/s ([SYSTEM.md](SYSTEM.md#the-ethernet-station)). A write of
   its IP address to `0xFFFFFF9A`, by a program or over the link on the
   UART, turns it on. It is 0 after reset, which answers nothing.
-  There is no DHCP client yet, so a board needs its USB cable, or a
-  program that sets the address, before `--eth` can reach it
-  ([#34](https://github.com/MJoergen/NiceMonMEGA65/issues/34)).
+  There is no DHCP client yet, so a board needs its USB cable, a
+  program that sets the address, or the demo's F11, before `--eth` can
+  reach it ([#34](https://github.com/MJoergen/NiceMonMEGA65/issues/34)).
 - The R3 build has the station but has not been tested on hardware yet.
 - The station answers ARP requests and pings to its IP address. Its MAC
   address is 02:4E:49:43:45:00 after reset, and `0xFFFFFF9B`–`9C` change
@@ -80,8 +80,14 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   runs again and again, with its cycles per instruction.
 - F9 is a game: the cursor keys steer a comet to the stars, and its tail
   grows with each one.
-- F11 tests the RAM, the math unit, the timer's interrupts, and the
-  performance counters, with PASS or FAIL for each.
+- F11 is the board. It tests the RAM, the math unit, the timer's
+  interrupts, and the performance counters, with PASS or FAIL for each.
+  Below the tests it shows the Ethernet station's IP and MAC addresses
+  and its three counts, and the I and M keys type a new IP or MAC
+  address and write it to the station
+  ([#40](https://github.com/MJoergen/NiceMonMEGA65/issues/40)). A
+  board with the demo in its ROM can thus get its IP address from its
+  own keyboard, with no USB cable.
 
 **Tools**
 

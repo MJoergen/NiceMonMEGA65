@@ -7,8 +7,9 @@
 ; menu in the second row of the screen lists them. A switch starts the demo
 ; afresh. F3 shows the bytes of each key, in hex and as characters, F5 the
 ; 256 characters of the font and ramps of colors, F7 the performance
-; counters and those of a prime sieve, F9 is a game, the comet, and F11
-; tests the RAM, the math unit, the timer's interrupts, and the counters.
+; counters and those of a prime sieve, F9 is a game, the comet, and F11 is
+; the board: it tests the RAM, the math unit, the timer's interrupts, and
+; the counters, and shows and sets the Ethernet station's addresses.
 ; At power-up the typewriter, F1, runs. Its top rows say what the core is
 ; and how to go further, and the rows below them take what is typed, from
 ; the keyboard or the UART: a character goes at the cursor, RETURN starts a
@@ -118,6 +119,7 @@ G_OVER  .EQU    0xFFFFF80A      ; 1 after the game has ended
 ; The variables of F11, in the same RAM, and the RAM that it tests, which
 ; is RAM on every board
 S_TICKS .EQU    0xFFFFF800      ; the interrupts of the timer
+B_MODE  .EQU    0xFFFFF810      ; 0, or 1 or 2 while an IP or MAC address is typed
 RAM_LO  .EQU    0xFFFF8000      ; the RAM tested, up to the variables
 RAM_N   .EQU    28672
 
@@ -127,6 +129,14 @@ TM_PER  .EQU    0xFFFFFF10      ; the period, in cycles, or 0 to stop
 TM_VEC  .EQU    0xFFFFFF12
 VBASE   .EQU    0x7F
 VECTOR  .EQU    0x41
+
+; The Ethernet station (doc/SYSTEM.md, "The Ethernet station")
+E_GOOD  .EQU    0xFFFFFF98      ; the good frames received
+E_BAD   .EQU    0xFFFFFF99      ; the bad frames received, and the dropped ones
+E_IP    .EQU    0xFFFFFF9A      ; the IP address, the first byte in bits 31..24
+E_MACH  .EQU    0xFFFFFF9B      ; MAC bytes 0 and 1, in bits 15..0
+E_MACL  .EQU    0xFFFFFF9C      ; MAC bytes 2 to 5
+E_SENT  .EQU    0xFFFFFF9D      ; the frames sent
 
 ; The colors: the background in bits 31..20, the foreground in bits 19..8
 BAR     .EQU    0x00AFFF00      ; white on blue
@@ -823,11 +833,13 @@ STATUS  MOVE    @--SP, R1
         MOVE    PC, PRINT
         MOVE    PC, @SP++
 
-; The self-test: the RAM from RAM_LO, the math unit, the timer's interrupts,
-; and the performance counters, each with PASS or FAIL, once each time that
-; F11 starts it. R10 counts the failures.
-SELF    MOVE    SP, 0xFFFFFF00
-        MOVE    R6, SELF
+; The board: the self-test of the RAM from RAM_LO, the math unit, the timer's
+; interrupts, and the performance counters, each with PASS or FAIL, once each
+; time that F11 starts it. R10 counts the failures. Then the Ethernet
+; station's addresses and counts, which BLOOP shows again and again, and
+; which I and M change (see ESTART).
+BOARD   MOVE    SP, 0xFFFFFF00
+        MOVE    R6, BOARD
         ADD     @--SP, 2, PC
         MOVE    PC, FRAME
         MOVE    R5, S_TEXTS
@@ -862,9 +874,24 @@ SELF    MOVE    SP, 0xFFFFFF00
         MOVE    R2, SCREEN+802
         ADD     @--SP, 2, PC
         MOVE    PC, PRINT
-SPOLL   ADD     @--SP, 2, PC
+        ADD     @--SP, 2, PC
+        MOVE    PC, EIDLE
+BLOOP   ADD     @--SP, 2, PC
+        MOVE    PC, SHOWNET
+        ADD     @--SP, 2, PC
         MOVE    PC, POLL
-        MOVE    PC, SPOLL
+        MOVE[M] R0, R1
+    ?Z  MOVE    PC, BLOOP       ; no key
+        MOVE[M] R0, @B_MODE
+    ?!Z MOVE    PC, BEDIT       ; an address is being typed
+        OR      R1, R1, 0x20    ; I or i, M or m
+        SUB[M]  R0, R1, 0x69
+    ?Z  MOVE    R7, 1
+    ?Z  MOVE    PC, ESTART
+        SUB[M]  R0, R1, 0x6D
+    ?Z  MOVE    R7, 2
+    ?Z  MOVE    PC, ESTART
+        MOVE    PC, BLOOP
 
 ; Each test sets R1 to 0 when it passes. When it fails, R1 is 1, and R5 and
 ; R6 tell what failed: an address and the word read there, or for the timer,
@@ -989,6 +1016,276 @@ CLOOP   SUB[M]  R4, R4, 1
         SUB[M]  R0, R6, 256
     ?!C MOVE    PC, @SP++
         MOVE    R1, 0
+        MOVE    PC, @SP++
+
+; SHOWNET shows the Ethernet station's registers: the IP address in decimal
+; with dots, the MAC address in hex with colons, and the three counts. It
+; changes R1 to R7 and R9.
+SHOWNET MOVE    R3, TYPED
+        MOVE    R2, SCREEN+1304
+        MOVE    R5, @E_IP
+        MOVE    R6, 24          ; the shift of the byte, 24 down to 0
+IPBYTE  SHR     R1, R5, R6
+        AND     R1, R1, 0xFF
+        ADD     @--SP, 2, PC
+        MOVE    PC, DECB
+        SUB[M]  R6, R6, 8
+    ?N  MOVE    PC, IPEND
+        OR      @R2++, R3, 0x2E
+        MOVE    PC, IPBYTE
+IPEND   MOVE    R4, SCREEN+1319 ; blanks after a shorter address
+        SUB[M]  R4, R4, R2
+    ?!Z MOVE    R3, TEXT+0x20
+    ?!Z ADD     @--SP, 2, PC
+    ?!Z MOVE    PC, FILL
+        MOVE    R3, TYPED
+        MOVE    R2, SCREEN+1384
+        MOVE    R6, 0           ; the byte of the MAC address
+MBYTE   MOVE    R1, @E_MACH
+        SUB[M]  R0, R6, 2
+    ?!C MOVE    R1, @E_MACL
+        SHR     R1, R1, @MSHIFT[R6]
+        AND     R1, R1, 0xFF
+        ADD     @--SP, 2, PC
+        MOVE    PC, HEX2
+        ADD     R6, R6, 1
+        SUB[M]  R0, R6, 6
+    ?Z  MOVE    PC, MEND
+        OR      @R2++, R3, 0x3A
+        MOVE    PC, MBYTE
+MEND    MOVE    R4, 10
+        MOVE    R7, 0
+        MOVE    R1, @E_GOOD
+        MOVE    R2, SCREEN+1474
+        ADD     @--SP, 2, PC
+        MOVE    PC, DEC64
+        MOVE    R7, 0
+        MOVE    R1, @E_BAD
+        MOVE    R2, SCREEN+1554
+        ADD     @--SP, 2, PC
+        MOVE    PC, DEC64
+        MOVE    R7, 0
+        MOVE    R1, @E_SENT
+        MOVE    R2, SCREEN+1634
+        ADD     @--SP, 2, PC
+        MOVE    PC, DEC64
+        MOVE    PC, @SP++
+
+; DECB writes R1, which is below 256, in decimal at R2, in the color R3, and
+; leaves R2 after it. It changes R1 and R4.
+DECB    MOVE    R4, 0           ; the digits, pushed last first
+DDIV    MOVE    @M_A, R1
+        MOVE    @M_B, 10
+        ADD     @--SP, @M_UDIVR, 0x30
+        MOVE    R1, @M_UDIVQ
+        ADD     R4, R4, 1
+        MOVE[M] R0, R1
+    ?!Z MOVE    PC, DDIV
+DPUT    MOVE    R1, @SP++
+        OR      @R2++, R1, R3
+        SUB[M]  R4, R4, 1
+    ?!Z MOVE    PC, DPUT
+        MOVE    PC, @SP++
+
+; HEX2 writes R1, which is below 256, as 2 hex digits at R2, in the color R3,
+; and leaves R2 after them. It changes R9.
+HEX2    SHR     R9, R1, 4
+        OR      @R2++, @HEXDIG[R9], R3
+        AND     R9, R1, 0xF
+        OR      @R2++, @HEXDIG[R9], R3
+        MOVE    PC, @SP++
+
+; NIBBLE sets R1, a character, to its value as a hex digit, or to 99 if it
+; is none.
+NIBBLE  SUB     R1, R1, 0x30
+        SUB[M]  R0, R1, 10
+    ?C  MOVE    PC, @SP++       ; 0 to 9
+        ADD     R1, R1, 0x30
+        OR      R1, R1, 0x20    ; A to F as a to f
+        SUB     R1, R1, 0x61
+        SUB[M]  R0, R1, 6
+    ?C  ADD     R1, R1, 10
+    ?!C MOVE    R1, 99
+        MOVE    PC, @SP++
+
+; EIDLE ends the typing of an address: it clears the three rows at the
+; bottom, shows the keys that start it, and hides the cursor. It changes R1
+; to R4.
+EIDLE   MOVE    @B_MODE, 0
+        MOVE    @SCR_CTL, 0
+        MOVE    R2, SCREEN+1760
+        MOVE    R3, TEXT+0x20
+        MOVE    R4, 240
+        ADD     @--SP, 2, PC
+        MOVE    PC, FILL
+        MOVE    R1, E_HELP
+        MOVE    R2, SCREEN+1762
+        MOVE    R3, TEXT
+        ADD     @--SP, 2, PC
+        MOVE    PC, PRINT
+        MOVE    PC, @SP++
+
+; The typing of an address. I starts the IP address, with R7 = 1, and M the
+; MAC address, with R7 = 2. The characters go to row 22 from column 20, and
+; COL counts them. The keys are digits and dots for the IP address, and hex
+; digits and colons for the MAC address, DEL or backspace, CTRL-C, which is
+; RUN/STOP on the MEGA65, to cancel, and RETURN to write the address to the
+; station. A function key still starts its demo. (ESC cannot cancel, as POLL
+; takes it as the start of a key.)
+ESTART  MOVE    @B_MODE, R7
+        MOVE    COL, 0
+        MOVE    R2, SCREEN+1760
+        MOVE    R3, TEXT+0x20
+        MOVE    R4, 240
+        ADD     @--SP, 2, PC
+        MOVE    PC, FILL
+        MOVE    R1, E_NEWIP
+        MOVE    R5, E_HINTIP
+        SUB[M]  R0, R7, 1
+    ?!Z MOVE    R1, E_NEWMAC
+    ?!Z MOVE    R5, E_HINTMAC
+        MOVE    R2, SCREEN+1762
+        MOVE    R3, LINK
+        ADD     @--SP, 2, PC
+        MOVE    PC, PRINT
+        MOVE    R1, R5
+        MOVE    R2, SCREEN+1842
+        MOVE    R3, TEXT
+        ADD     @--SP, 2, PC
+        MOVE    PC, PRINT
+        MOVE    @SCR_Y, 22
+        MOVE    @SCR_X, 20
+        MOVE    @SCR_CTL, 0x60
+        MOVE    PC, BLOOP
+
+; A key while typing, in R1. The error row is cleared first.
+BEDIT   MOVE    R2, SCREEN+1920
+        MOVE    R3, TEXT+0x20
+        MOVE    R4, 80
+        ADD     @--SP, 2, PC
+        MOVE    PC, FILL
+        SUB[M]  R0, R1, 0x0D
+    ?Z  MOVE    PC, EENTER
+        SUB[M]  R0, R1, 0x0A
+    ?Z  MOVE    PC, EENTER
+        SUB[M]  R0, R1, 0x03
+    ?Z  MOVE    PC, ECANCEL
+        SUB[M]  R0, R1, 0x08
+    ?Z  MOVE    PC, EBACK
+        SUB[M]  R0, R1, 0x7F
+    ?Z  MOVE    PC, EBACK
+        MOVE    R4, 10          ; the base, the separator, and the length
+        MOVE    R5, 0x2E
+        MOVE    R6, 15
+        SUB[M]  R0, @B_MODE, 1
+    ?!Z MOVE    R4, 16
+    ?!Z MOVE    R5, 0x3A
+    ?!Z MOVE    R6, 17
+        SUB[M]  R0, COL, R6
+    ?!C MOVE    PC, BLOOP       ; the line is full
+        MOVE    R9, R1
+        SUB[M]  R0, R1, R5
+    ?Z  MOVE    PC, EPUT
+        ADD     @--SP, 2, PC
+        MOVE    PC, NIBBLE
+        SUB[M]  R0, R1, R4
+    ?!C MOVE    PC, BLOOP       ; no digit of the base
+EPUT    ADD     R2, COL, SCREEN+1780
+        OR      @R2, R9, TYPED
+        ADD     COL, COL, 1
+        ADD     @SCR_X, COL, 20
+        MOVE    PC, BLOOP
+EBACK   MOVE[M] R0, COL
+    ?Z  MOVE    PC, BLOOP
+        SUB     COL, COL, 1
+        ADD     R2, COL, SCREEN+1780
+        MOVE    @R2, TEXT+0x20
+        ADD     @SCR_X, COL, 20
+        MOVE    PC, BLOOP
+ECANCEL ADD     @--SP, 2, PC
+        MOVE    PC, EIDLE
+        MOVE    PC, BLOOP
+
+; RETURN: the text is parsed, and written to the station if it is an
+; address. Otherwise a message shows, and the typing goes on.
+EENTER  MOVE    R2, SCREEN+1780
+        MOVE    R3, COL
+        MOVE    R4, 10
+        MOVE    R5, 0x2E
+        MOVE    R6, 4
+        SUB[M]  R0, @B_MODE, 1
+    ?!Z MOVE    R4, 16
+    ?!Z MOVE    R5, 0x3A
+    ?!Z MOVE    R6, 6
+        ADD     @--SP, 2, PC
+        MOVE    PC, PARSE
+        MOVE[M] R0, R1
+    ?!Z MOVE    PC, EBAD
+        SUB[M]  R0, @B_MODE, 1
+    ?Z  MOVE    @E_IP, R8
+    ?Z  MOVE    PC, ECANCEL     ; which ends the typing
+        AND[M]  R0, R11, 0x100  ; bit 0 of the first byte: a group address
+    ?!Z MOVE    PC, EBAD
+        MOVE    @E_MACH, R11
+        MOVE    @E_MACL, R8
+        MOVE    PC, ECANCEL
+EBAD    MOVE    R1, E_BADIP
+        SUB[M]  R0, @B_MODE, 1
+    ?!Z MOVE    R1, E_BADMAC
+        MOVE    R2, SCREEN+1922
+        MOVE    R3, RED
+        ADD     @--SP, 2, PC
+        MOVE    PC, PRINT
+        MOVE    PC, BLOOP
+
+; PARSE reads the R3 characters from R2 as R6 numbers of 1 to 3 digits in
+; the base R4, from 0 to 255, with the separator R5 between them. It sets R1
+; to 0 and R11:R8 to the bytes, the first in the highest bits, or sets R1 to
+; 1 if the text is none of that. It changes R1 to R9, and R11.
+PARSE   MOVE    R11, 0
+        MOVE    R8, 0
+PFIELD  MOVE    R7, 0           ; the digits of the number
+        MOVE    R9, 0           ; and its value
+PCHAR   MOVE[M] R0, R3
+    ?Z  MOVE    PC, PLAST       ; the end of the text ends the number
+        MOVE    R1, @R2++
+        AND     R1, R1, 0xFF
+        SUB     R3, R3, 1
+        SUB[M]  R0, R1, R5
+    ?Z  MOVE    PC, PSEP
+        ADD     @--SP, 2, PC
+        MOVE    PC, NIBBLE
+        SUB[M]  R0, R1, R4
+    ?!C MOVE    PC, PBAD        ; no digit of the base
+        MOVE    @M_A, R9
+        MOVE    @M_B, R4
+        ADD     R9, @M_UMUL, R1
+        ADD     R7, R7, 1
+        SUB[M]  R0, R9, 256
+    ?!C MOVE    PC, PBAD
+        SUB[M]  R0, R7, 4
+    ?!C MOVE    PC, PBAD
+        MOVE    PC, PCHAR
+PLAST   MOVE    R1, 0           ; R1 is 1 if a separator ended the number
+        MOVE    PC, PEND
+PSEP    MOVE    R1, 1
+PEND    MOVE[M] R0, R7
+    ?Z  MOVE    PC, PBAD        ; an empty number
+        MOVE[M] R0, R6
+    ?Z  MOVE    PC, PBAD        ; one number too many
+        SUB     R6, R6, 1
+        SHL     R11, R11, 8     ; the byte goes in at the low end of R11:R8
+        SHR     R7, R8, 24
+        OR      R11, R11, R7
+        SHL     R8, R8, 8
+        OR      R8, R8, R9
+        MOVE[M] R0, R1
+    ?!Z MOVE    PC, PFIELD      ; the next number
+        MOVE[M] R0, R6
+    ?Z  MOVE    R1, 0           ; all R6 numbers, and the text has ended
+    ?!Z MOVE    R1, 1
+        MOVE    PC, @SP++
+PBAD    MOVE    R1, 1
         MOVE    PC, @SP++
 
 ; RESULT writes PASS in green at R2 when R1 is 0, or else FAIL in red, and
@@ -1169,7 +1466,7 @@ PRINTS  MOVE[M] R2, @R5++
         MOVE    PC, PRINTS
 
 ; The demos of the function keys F1 to F12, or 0 for none
-FKEYS   .DAT    TYPEW, 0, KCODES, 0, CHARS, 0, COUNTS, 0, GAME, 0, SELF, 0, 0, 0, 0, 0, 0, 0, 0, 0
+FKEYS   .DAT    TYPEW, 0, KCODES, 0, CHARS, 0, COUNTS, 0, GAME, 0, BOARD, 0, 0, 0, 0, 0, 0, 0, 0, 0
 
 ; The numbers before ~ of F1 to F12. xterm sends ESC O P to ESC O S for F1
 ; to F4, and 11 to 14 are those of the VT220.
@@ -1182,7 +1479,7 @@ MENU    .DAT    80, TYPEW, M_TYPEW
         .DAT    111, CHARS, M_CHARS
         .DAT    124, COUNTS, M_COUNT
         .DAT    138, GAME, M_GAME
-        .DAT    149, SELF, M_SELF
+        .DAT    149, BOARD, M_BOARD
         .DAT    -1
 
 ; The texts of the title bar, and of the welcome
@@ -1205,7 +1502,7 @@ M_KEYS  .ASCII_L ' F3 key codes '
 M_CHARS .ASCII_L ' F5 charset '
 M_COUNT .ASCII_L ' F7 counters '
 M_GAME  .ASCII_L ' F9 comet '
-M_SELF  .ASCII_L ' F11 test '
+M_BOARD .ASCII_L ' F11 board '
 T1      .ASCII_L 'This is the demo in the ROM, which the core runs at power-up. What you type'
 T2      .ASCII_L 'on the keyboard, or send to the debug UART, appears below the blue bar.'
 T3      .ASCII_L 'To run your own programs, connect a computer to the debug UART, at'
@@ -1305,6 +1602,9 @@ G_END   .ASCII_L 'Game over. A key starts a new game.'
 ; The steps of the cursor keys up, down, right, and left
 GSTEPS  .DAT    -80, 80, 1, -1
 
+; The shifts of the six bytes of the MAC address, in E_MACH and E_MACL
+MSHIFT  .DAT    8, 0, 24, 16, 8, 0
+
 ; The texts of F11
 S_TEXTS .DAT    242, LINK, S1
         .DAT    404, TEXT, S_RAM
@@ -1313,15 +1613,34 @@ S_TEXTS .DAT    242, LINK, S1
         .DAT    644, TEXT, S_COUNT
         .DAT    962, TEXT, S_NOTE1
         .DAT    1042, TEXT, S_NOTE2
+        .DAT    1202, LINK, S_ETH
+        .DAT    1282, TEXT, S_IP
+        .DAT    1362, TEXT, S_MAC
+        .DAT    1442, TEXT, S_GOOD
+        .DAT    1522, TEXT, S_BAD
+        .DAT    1602, TEXT, S_SENT
         .DAT    -1
 
-S1      .ASCII_L 'A test of the system, which runs each time that F11 starts it'
+S1      .ASCII_L 'A self-test, which runs each time that F11 starts it'
 S_RAM   .ASCII_L 'RAM, FFFF8000 to FFFFEFFF'
 S_MATH  .ASCII_L 'Math unit, multiply and divide'
 S_TIMER .ASCII_L 'Timer, 10 interrupts every 1000 cycles'
 S_COUNT .ASCII_L 'Performance counters'
 S_NOTE1 .ASCII_L 'A failure shows where it failed and what was read: an address and its word,'
 S_NOTE2 .ASCII_L 'or for the timer, the interrupts that came and the cycles that they took.'
+S_ETH   .ASCII_L 'The Ethernet station, 0xFFFFFF98 to 0xFFFFFF9D'
+S_IP    .ASCII_L 'IP address'
+S_MAC   .ASCII_L 'MAC address'
+S_GOOD  .ASCII_L 'Good frames received'
+S_BAD   .ASCII_L 'Bad or dropped frames'
+S_SENT  .ASCII_L 'Frames sent'
+E_HELP  .ASCII_L 'I types a new IP address, and M a new MAC address.'
+E_NEWIP .ASCII_L 'New IP address:'
+E_NEWMAC .ASCII_L 'New MAC address:'
+E_HINTIP .ASCII_L 'Digits and dots. RETURN writes it, and CTRL-C or RUN/STOP cancels.'
+E_HINTMAC .ASCII_L 'Hex digits and colons. RETURN writes it, and CTRL-C or RUN/STOP cancels.'
+E_BADIP .ASCII_L 'Not an IP address: four numbers from 0 to 255, with dots between them.'
+E_BADMAC .ASCII_L 'Not a MAC address: six bytes in hex with colons, the first one even.'
 S_PASS  .ASCII_L 'PASS'
 S_FAIL  .ASCII_L 'FAIL'
 S_PASSED .ASCII_L 'All tests passed.'

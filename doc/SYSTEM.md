@@ -354,6 +354,9 @@ two boards on one network need different ones. On the link, for example:
 
 Then `ping 192.168.1.66` from a PC on the network gets its answers, and
 `0xFFFFFF9D` counts the replies, the ARP reply and one for each ping.
+With the demo in the ROM, its F11 shows the addresses and the counts,
+and sets the addresses from the keyboard
+([demo/README.md](../demo/README.md)).
 
 #### The debug link over TCP
 

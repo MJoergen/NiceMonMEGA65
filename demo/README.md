@@ -21,7 +21,7 @@ so on, which the MEGA65 has without SHIFT.
 | F5 | The characters and the colors |
 | F7 | The counters |
 | F9 | The comet, a game |
-| F11 | The self-test |
+| F11 | The board: a self-test, and the Ethernet station's addresses |
 
 The typewriter's top ten rows are the welcome: the two bars, what the
 demo is, how to load your own programs through the debug UART, and a third
@@ -97,8 +97,8 @@ and a key that would turn it back is ignored. The best score stays until
 another demo starts. The game takes one key at each step, so in `niceemu`,
 where a microsecond is a step, each key of the input file is one step.
 
-The self-test runs four tests each time that F11 starts it, and shows
-PASS or FAIL for each:
+The board runs a self-test of four tests each time that F11 starts it,
+and shows PASS or FAIL for each:
 
 | Test | What it checks |
 |---|---|
@@ -110,6 +110,37 @@ PASS or FAIL for each:
 A failure shows two words in hex: the address that failed and the word
 read there, or for the timer, the interrupts that came and the cycles
 that they took. The last line says whether all tests passed.
+
+Below the self-test is the Ethernet station
+([The Ethernet station](../doc/SYSTEM.md#the-ethernet-station)), shown
+again and again while the demo runs: its IP address in decimal with
+dots, its MAC address in hex with colons, and its counts of the good
+frames received, the bad or dropped ones, and the frames sent. After
+reset the IP address is `0.0.0.0`, which answers nothing, and the MAC
+address is `02:4E:49:43:45:00`. So a board with this demo in its ROM can
+get its address from its own keyboard, or from a terminal on the debug
+UART, and then answers pings and serves the debug link on TCP port 4510.
+These keys change the addresses:
+
+| Key | What it does |
+|---|---|
+| I | Starts typing a new IP address, such as `192.168.1.66` |
+| M | Starts typing a new MAC address, such as `02:4E:49:43:45:01` |
+| Digits and dots, or hex digits and colons | Typed at the cursor in row 22. Other characters are dropped, and so are those past the 15 or 17 of a full address. |
+| DEL, backspace | Deletes the last character |
+| RETURN | Writes the address to the station, if it is one, and ends the typing. Otherwise a red message in row 24 says what is wrong, and the typing goes on. |
+| CTRL-C, RUN/STOP | Cancels the typing |
+
+An IP address is four numbers from 0 to 255 with dots between them. A MAC
+address is six bytes of one or two hex digits with colons between them,
+and the first byte must be even, because an odd one is a group address,
+which no board has. ESC cannot cancel, as the demo reads it as the start
+of a function key. A function key still starts its demo, which also
+cancels the typing. Writing an address while a host is connected on the
+TCP port, or while a reply goes out, breaks that connection or reply
+([SYSTEM.md](../doc/SYSTEM.md#the-ethernet-station)). In `niceemu` the
+registers of the station are plain memory, so the demo shows what it
+wrote, and the counts stay 0.
 
 ## How it works
 
@@ -158,22 +189,24 @@ UART.
 
     make -C demo                  # build/demo.bin, for the ROM
     make r6 ROM=demo/build/demo.bin
-    make -C demo test             # nine runs in niceemu, compared with test.expected
+    make -C demo test             # twelve runs in niceemu, compared with test.expected
 
 The version in the title bar is `git describe --tags --always --dirty`, or
 `VERSION=` on the command line, which `tools/release.py` sets to the tag.
 The assembler has no include, so the Makefile joins `demo.nasm` and a line
 that defines `VERSION`. The test assembles the demo with the version `V9.9`
-into `build/demo_test.bin`, and the Makefile writes its nine inputs,
-`build/test1.txt` to `build/test9.txt`, with `printf`: the first edits a
+into `build/demo_test.bin`, and the Makefile writes its twelve inputs,
+`build/test1.txt` to `build/test12.txt`, with `printf`: the first edits a
 few lines, the second clears them and scrolls, the third has the function
 keys, the fourth shows key codes and scrolls them, the fifth goes from
 the key codes back to the typewriter, the sixth shows the characters and
 the colors, the seventh the counters, with two runs of the sieve, the
-eighth plays two games of the comet, and the ninth runs the self-test
-twice.
+eighth plays two games of the comet, the ninth runs the board twice,
+the tenth types an IP address that is rejected, the eleventh writes an IP
+address and a MAC address and cancels a second one, and the twelfth types
+a MAC address that is rejected.
 `niceemu` shows no colors, so for the sixth the test also has the words of
-two rows of ramps. The nine screens that `niceemu` prints, and those
+two rows of ramps. The twelve screens that `niceemu` prints, and those
 words, are in `test.expected`, which was checked by hand. In `niceemu` the
 counters count steps, so their numbers are the same in every run.
 

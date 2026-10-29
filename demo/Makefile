@@ -3,8 +3,8 @@
 #
 # make          builds build/demo.bin, with VERSION in its title bar, git
 #               describe of the tree by default; the release gives its tag
-# make test     runs the demo in niceemu nine times, with the inputs below,
-#               and compares the nine screens with test.expected
+# make test     runs the demo in niceemu twelve times, with the inputs below,
+#               and compares the twelve screens with test.expected
 # make clean    removes build/
 #
 # The assembler has no include, so build/version.nasm, which defines the
@@ -64,8 +64,16 @@ $(BUILD)/demo_test.bin: demo.nasm $(ASM_PY) | $(BUILD)
 # row 4, column 67, and turns right, down, and left into its tail. A key
 # starts a new game, in which the comet goes left, ignores the right key,
 # which would turn it back, and hits the frame. The ninth runs the
-# self-test, F11, twice, so that the second run starts with what the first
-# left. dash's printf, the shell of make on Ubuntu, has no \x.
+# board, F11, twice, so that the second run starts with what the first
+# left. The tenth types an IP address after F11: letters and a dot that
+# do not belong are dropped, the number 256 is rejected, and the message
+# stays. The eleventh writes the IP address 192.168.1.66, with a letter
+# dropped and two DELs over the last digits, then a MAC address with
+# one-digit bytes, and cancels a second MAC address with CTRL-C. The
+# twelfth is rejected for a MAC address of a group, with an odd first
+# byte. In niceemu the registers of the Ethernet station are plain
+# memory, so what is written shows at once, and the counts stay 0.
+# dash's printf, the shell of make on Ubuntu, has no \x.
 TEST1 = Hello, world!\nabc\177\177X\tY\r\n$(shell printf '0123456789%.0s' 1 2 3 4 5 6 7 8)abcde\n\
 \033[A\033[A\033[DQ\033[C\033[BR\n\033x\033[1;5Cy\200\351z\n
 TEST3 = one\033[11~two\n\033OPthree\033OQ\033[19~\033[17;2~ F\n\033\033[Ax\033Q\033[99~
@@ -76,6 +84,10 @@ DUMP6 = -d 0xFFFF01BC:36 -d 0xFFFF066C:36
 TEST7 = \033[18~x
 dots  = $(shell printf '.%.0s' $$(seq $(1)))
 TEST8 = \033[20~.\033[C$(call dots,27)\033[A$(call dots,8)\033[C\033[B\033[D.\033[D..\033[C$(call dots,35)
+
+TEST10 = \033[23~iX10.0g.0.256\r
+TEST11 = \033[23~i192.1x68.1.65\177\17766\rm02:AB:c:D:e:F\rm02:\003
+TEST12 = \033[23~m03:00:00:00:00:01\r
 
 test: $(BUILD)/demo_test.bin
 	@printf '$(TEST1)' > $(BUILD)/test1.txt
@@ -88,7 +100,10 @@ test: $(BUILD)/demo_test.bin
 	@printf '$(TEST7)' > $(BUILD)/test7.txt
 	@printf '$(TEST8)' > $(BUILD)/test8.txt
 	@printf '\033[23~\033[23~' > $(BUILD)/test9.txt
-	@for t in 1 2 3 4 5 6 7 8 9; do \
+	@printf '$(TEST10)' > $(BUILD)/test10.txt
+	@printf '$(TEST11)' > $(BUILD)/test11.txt
+	@printf '$(TEST12)' > $(BUILD)/test12.txt
+	@for t in 1 2 3 4 5 6 7 8 9 10 11 12; do \
 	  dump=; [ $$t = 6 ] && dump='$(DUMP6)'; \
 	  $(EMU) -s -i $(BUILD)/test$$t.txt $$dump $(BUILD)/demo_test.bin > $(BUILD)/test$$t.out || \
 	    { echo "FAIL demo: niceemu exits with $$? on input $$t"; exit 1; }; \

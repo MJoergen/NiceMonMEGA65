@@ -1,6 +1,6 @@
 Screen:
 | NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
-| F1 typewriter   F3 key codes   F5 charset   F7 counters   F9 comet   F11 test
+| F1 typewriter   F3 key codes   F5 charset   F7 counters   F9 comet   F11 board
 |
 |  This is the demo in the ROM, which the core runs at power-up. What you type
 |  on the keyboard, or send to the debug UART, appears below the blue bar.
@@ -16,7 +16,7 @@ Screen:
 |x y z
 Screen:
 | NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
-| F1 typewriter   F3 key codes   F5 charset   F7 counters   F9 comet   F11 test
+| F1 typewriter   F3 key codes   F5 charset   F7 counters   F9 comet   F11 board
 |
 |  This is the demo in the ROM, which the core runs at power-up. What you type
 |  on the keyboard, or send to the debug UART, appears below the blue bar.
@@ -42,7 +42,7 @@ Screen:
 |        B
 Screen:
 | NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
-| F1 typewriter   F3 key codes   F5 charset   F7 counters   F9 comet   F11 test
+| F1 typewriter   F3 key codes   F5 charset   F7 counters   F9 comet   F11 board
 |
 |  This is the demo in the ROM, which the core runs at power-up. What you type
 |  on the keyboard, or send to the debug UART, appears below the blue bar.
@@ -54,7 +54,7 @@ Screen:
 |xQree F
 Screen:
 | NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
-| F1 typewriter   F3 key codes   F5 charset   F7 counters   F9 comet   F11 test
+| F1 typewriter   F3 key codes   F5 charset   F7 counters   F9 comet   F11 board
 |
 |  Each key that you type, or byte sequence that the debug UART sends, shows
 |  its bytes in hex and as characters. A control code shows as ^ and a
@@ -79,7 +79,7 @@ Screen:
 |  6A                                      j
 Screen:
 | NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
-| F1 typewriter   F3 key codes   F5 charset   F7 counters   F9 comet   F11 test
+| F1 typewriter   F3 key codes   F5 charset   F7 counters   F9 comet   F11 board
 |
 |  This is the demo in the ROM, which the core runs at power-up. What you type
 |  on the keyboard, or send to the debug UART, appears below the blue bar.
@@ -101,7 +101,7 @@ ffff0684: 000ccc20 000bbb42 000ccc20 000ccc43 000ccc20 000ddd44 000ccc20 000eee4
 ffff068c: 000ccc20 000fff46 000ccc20 000ccc20
 Screen:
 | NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
-| F1 typewriter   F3 key codes   F5 charset   F7 counters   F9 comet   F11 test
+| F1 typewriter   F3 key codes   F5 charset   F7 counters   F9 comet   F11 board
 |
 |  Characters, ISO 8859-1                    Colors, 4 bits of red, green, blue
 |     0 1 2 3 4 5 6 7 8 9 A B C D E F        Backgrounds, 0 to F
@@ -125,14 +125,14 @@ Screen:
 |  R red   G green   B blue   Y yellow   C cyan   M magenta   W gray
 Screen:
 | NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
-| F1 typewriter   F3 key codes   F5 charset   F7 counters   F9 comet   F11 test
+| F1 typewriter   F3 key codes   F5 charset   F7 counters   F9 comet   F11 board
 |
 |  Since reset, while the core runs
 |
 |    Time, h:mm:ss.hh                              0:00:00.07
-|    Microseconds                                       79951
-|    Cycles                                             79953
-|    Instructions                                       79955
+|    Microseconds                                       79959
+|    Cycles                                             79961
+|    Instructions                                       79963
 |    Clock in MHz, cycles per microsecond                   1
 |
 |  A prime sieve to 2048, run before each update
@@ -148,7 +148,7 @@ Screen:
 |  Nexys4DDR. In niceemu, each step counts as a cycle and as a microsecond.
 Screen:
 | NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
-| F1 typewriter   F3 key codes   F5 charset   F7 counters   F9 comet   F11 test
+| F1 typewriter   F3 key codes   F5 charset   F7 counters   F9 comet   F11 board
 |  Score     0   Best      1     Game over. A key starts a new game.
 |
 |
@@ -163,9 +163,9 @@ Screen:
 | @oo
 Screen:
 | NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
-| F1 typewriter   F3 key codes   F5 charset   F7 counters   F9 comet   F11 test
+| F1 typewriter   F3 key codes   F5 charset   F7 counters   F9 comet   F11 board
 |
-|  A test of the system, which runs each time that F11 starts it
+|  A self-test, which runs each time that F11 starts it
 |
 |    RAM, FFFF8000 to FFFFEFFF                     PASS
 |    Math unit, multiply and divide                PASS
@@ -176,3 +176,88 @@ Screen:
 |
 |  A failure shows where it failed and what was read: an address and its word,
 |  or for the timer, the interrupts that came and the cycles that they took.
+|
+|  The Ethernet station, 0xFFFFFF98 to 0xFFFFFF9D
+|  IP address            0.0.0.0
+|  MAC address           00:00:00:00:00:00
+|  Good frames received           0
+|  Bad or dropped frames          0
+|  Frames sent                    0
+|
+|  I types a new IP address, and M a new MAC address.
+Screen:
+| NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
+| F1 typewriter   F3 key codes   F5 charset   F7 counters   F9 comet   F11 board
+|
+|  A self-test, which runs each time that F11 starts it
+|
+|    RAM, FFFF8000 to FFFFEFFF                     PASS
+|    Math unit, multiply and divide                PASS
+|    Timer, 10 interrupts every 1000 cycles        PASS
+|    Performance counters                          PASS
+|
+|  All tests passed.
+|
+|  A failure shows where it failed and what was read: an address and its word,
+|  or for the timer, the interrupts that came and the cycles that they took.
+|
+|  The Ethernet station, 0xFFFFFF98 to 0xFFFFFF9D
+|  IP address            0.0.0.0
+|  MAC address           00:00:00:00:00:00
+|  Good frames received           0
+|  Bad or dropped frames          0
+|  Frames sent                    0
+|
+|  New IP address:   10.0.0.256
+|  Digits and dots. RETURN writes it, and CTRL-C or RUN/STOP cancels.
+|  Not an IP address: four numbers from 0 to 255, with dots between them.
+Screen:
+| NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
+| F1 typewriter   F3 key codes   F5 charset   F7 counters   F9 comet   F11 board
+|
+|  A self-test, which runs each time that F11 starts it
+|
+|    RAM, FFFF8000 to FFFFEFFF                     PASS
+|    Math unit, multiply and divide                PASS
+|    Timer, 10 interrupts every 1000 cycles        PASS
+|    Performance counters                          PASS
+|
+|  All tests passed.
+|
+|  A failure shows where it failed and what was read: an address and its word,
+|  or for the timer, the interrupts that came and the cycles that they took.
+|
+|  The Ethernet station, 0xFFFFFF98 to 0xFFFFFF9D
+|  IP address            192.168.1.66
+|  MAC address           02:AB:0C:0D:0E:0F
+|  Good frames received           0
+|  Bad or dropped frames          0
+|  Frames sent                    0
+|
+|  I types a new IP address, and M a new MAC address.
+Screen:
+| NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
+| F1 typewriter   F3 key codes   F5 charset   F7 counters   F9 comet   F11 board
+|
+|  A self-test, which runs each time that F11 starts it
+|
+|    RAM, FFFF8000 to FFFFEFFF                     PASS
+|    Math unit, multiply and divide                PASS
+|    Timer, 10 interrupts every 1000 cycles        PASS
+|    Performance counters                          PASS
+|
+|  All tests passed.
+|
+|  A failure shows where it failed and what was read: an address and its word,
+|  or for the timer, the interrupts that came and the cycles that they took.
+|
+|  The Ethernet station, 0xFFFFFF98 to 0xFFFFFF9D
+|  IP address            0.0.0.0
+|  MAC address           00:00:00:00:00:00
+|  Good frames received           0
+|  Bad or dropped frames          0
+|  Frames sent                    0
+|
+|  New MAC address:  03:00:00:00:00:01
+|  Hex digits and colons. RETURN writes it, and CTRL-C or RUN/STOP cancels.
+|  Not a MAC address: six bytes in hex with colons, the first one even.
