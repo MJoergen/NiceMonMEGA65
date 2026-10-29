@@ -26,6 +26,7 @@
 --     the tries, while the host answers
 --   * data that does not fit the receive buffer is dropped, and the window
 --     that it frees is told
+--   * a frame longer than the server reads overwrites no input
 --   * the host's FIN is a break after the data before it, and output still
 --     goes to the host after it
 --   * a SYN from another port of the host after the FIN closes the old
@@ -361,6 +362,32 @@ begin
          rx_last  <= '0';
          wait until rising_edge(clk);
       end procedure send;
+
+      -- A frame of len bytes, f and then zeros, whose IP length is ip_len
+      procedure send_long (
+         f      : t_frame;
+         len    : natural;
+         ip_len : natural
+      ) is
+         variable g_v : t_frame;
+      begin
+         g_v             := f;
+         g_v.b(16 to 17) := b2(to_stdlogicvector(ip_len, 16));
+         wait until rising_edge(clk);
+         for i in 0 to len - 1 loop
+            if i < f.len then
+               rx_data <= g_v.b(i);
+            else
+               rx_data <= X"00";
+            end if;
+            rx_last  <= '1' when i = len - 1 else '0';
+            rx_valid <= '1';
+            wait until rising_edge(clk) and rx_ready = '1';
+         end loop;
+         rx_valid <= '0';
+         rx_last  <= '0';
+         wait until rising_edge(clk);
+      end procedure send_long;
 
       -- A segment from the host on its connection
       procedure send_seg (
@@ -704,6 +731,20 @@ begin
       wait for 40 us;
       assert n_log = hd_v and not lrx_bad
          report "tb_eth_tcp: FAIL, the link got the wrong bytes"
+         severity failure;
+
+      -- A frame longer than the 2047 bytes that are read, with data up to
+      -- past that, writes no more than its data, and so overwrites no
+      -- input that the link side has not taken.
+      hold <= '1';
+      send_data(10);
+      send_long(seg(C_HIP, C_PORT, sport_v, hseq_v, bseq_v, C_ACK, 8192, 0, 0, false), 2200,
+                2040);
+      expect_none(10 us);
+      hold <= '0';
+      wait for 1 us;
+      assert n_log = hd_v and not lrx_bad
+         report "tb_eth_tcp: FAIL, a long frame overwrote the input"
          severity failure;
 
       -- The host's FIN: a break after the data, and output still goes to

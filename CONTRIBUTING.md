@@ -196,7 +196,8 @@ The testbenches are these:
   ports, against a host modeled in VHDL that checks both checksums of
   every segment: the handshake, and the SYN-ACK sent again; data each
   way, data again, out of order, with a wrong checksum, and too much for
-  the buffer; a keepalive probe; the host's window, a window of 0, data sent again after the timeout, and
+  the buffer, and a frame longer than it reads; a keepalive probe; the
+  host's window, a window of 0, data sent again after the timeout, and
   an ACK that comes while it is; the host's FIN as a break after its
   data; a new connection after it, which closes the old one first, and
   one before it, as when the FIN was lost, or after a crash; data in the

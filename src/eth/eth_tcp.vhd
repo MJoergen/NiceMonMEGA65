@@ -348,8 +348,9 @@ begin
    rx_free <= C_SIZE - to_integer(rx_cmt - rx_rd);
 
    rx_ready_o <= not eval;
+   -- Below C_MAXF, so that a longer frame writes no more than plen bytes
    rx_we      <= '1' when rx_valid_i = '1' and eval = '0' and wr_ok = '1' and
-                          idx >= p_start and idx < p_end else
+                          idx >= p_start and idx < p_end and idx < C_MAXF else
                  '0';
 
    i_rx_ram : entity work.eth_ram
