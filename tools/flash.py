@@ -9,7 +9,7 @@ Usage:
     on, and when PROG is pressed, if jumper JP1 (MODE) is on QSPI. The
     bitstream is built for that (synth/nexys4ddr/nexys4ddr.xdc). With the
     demo in its ROM (make demo, then make nexys4ddr ROM=demo/build/demo.bin),
-    or the release's nicemon-V1.0-nexys4ddr.bit, the board then shows the
+    or a release's nicemon-TAG-nexys4ddr.bit, the board then shows the
     demo when it is switched on, as a MEGA65 does with a core in its flash.
 
     --erase erases the whole flash instead, and the FPGA then stays empty

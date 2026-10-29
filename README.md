@@ -65,9 +65,9 @@ the emulator, and the other reference documents.
 
 1. Download the core file for your board from the latest
    [release](https://github.com/MJoergen/NiceMonMEGA65/releases):
-   `nicemon-V1.0-r6.cor` for the R6, or `nicemon-V1.0-r3.cor` for the R3
-   and R3A. A core file holds its board revision, so use the one for
-   yours.
+   `nicemon-TAG-r6.cor` for the R6, or `nicemon-TAG-r3.cor` for the R3
+   and R3A, where TAG is the release, such as `V1.1`. A core file holds
+   its board revision, so use the one for yours.
 2. Copy it to the SD card, and hold No Scroll while you switch the MEGA65
    on. MEGAFLASH, the MEGA65's core menu, then writes the core file into
    a slot of the flash.
@@ -78,8 +78,8 @@ the emulator, and the other reference documents.
 No JTAG cable is needed.
 
 A Nexys4DDR starts the system from its flash in the same way. Write the
-release's `nicemon-V1.0-nexys4ddr.bit` into the flash once, over the
-board's USB cable, with `make flash BIT=nicemon-V1.0-nexys4ddr.bit`
+release's `nicemon-TAG-nexys4ddr.bit` into the flash once, over the
+board's USB cable, with `make flash BIT=nicemon-TAG-nexys4ddr.bit`
 (needs [openFPGALoader](https://github.com/trabucayre/openFPGALoader)).
 Set jumper JP1 (MODE) to QSPI. The board then shows the demo when it is
 switched on, with a USB keyboard in its USB HID port (see

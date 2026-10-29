@@ -62,7 +62,8 @@ FPGA first.
 The Nexys4DDR may also start the system from its quad SPI flash, as a
 MEGA65 starts a core from its own. `make flash` writes
 `synth/nexys4ddr/build/top.bit` into the flash with openFPGALoader, or
-`make flash BIT=nicemon-V1.0-nexys4ddr.bit` the bitstream of a release.
+`make flash BIT=nicemon-TAG-nexys4ddr.bit` the bitstream of a release,
+TAG being its tag, such as `V1.1`.
 It checks the FPGA first, as `make hwtest` does, and refuses a MEGA65's
 bitstream. It verifies the flash, and waits for the board to start from
 it. Set jumper JP1 (MODE) to QSPI, and the FPGA then loads the system at
