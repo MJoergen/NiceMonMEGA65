@@ -7,14 +7,14 @@ as the text display (src/video/text.vhd) shows them: 1280x800 pixels, the
 font of src/video/font_pkg.vhd, each character in 16x32 pixels, and the
 colors of 4 bits, each component n as the byte n * 0x11. A cursor that is
 shown is drawn on, in the inverted colors, as large as its character or,
-when small, its bottom 4 lines. The picture of doc/images/demo.png was
-made with:
+when small, its bottom 4 lines. The pictures of doc/images/ are made
+from the demo of the release, with its tag:
 
-    make -C demo VERSION=V1.0
+    make -C demo VERSION=V1.1
     printf 'Hello from the NICE CPU on the MEGA65!\\r' > in.txt
     tools/screenshot.py -i in.txt -o doc/images/demo.png demo/build/demo.bin
 
-and that of doc/images/ethernet.png, the demo's F11, with V1.1 and:
+and doc/images/ethernet.png, the demo's F11, with:
 
     printf '\\033[23~i192.168.1.66\\rm02:4E:49:43:45:00\\r' > in.txt
     tools/screenshot.py -i in.txt -n 3000000 -o doc/images/ethernet.png \\
