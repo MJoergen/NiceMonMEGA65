@@ -3,8 +3,9 @@
 The MEGA65 and the Nexys4DDR each have an FTDI chip whose one interface
 is the debug UART and whose other is JTAG. check_board finds the JTAG
 cable of the serial port's board, and stops unless its FPGA is the part
-a bitstream was built for, so that with several boards attached a tool
-programs the board whose UART it uses. hwtest.py and flash.py use it.
+a bitstream or core file was built for, so that with several boards
+attached a tool programs the board whose UART it uses. hwtest.py and
+flash.py use it.
 The cable is found through /sys, so this works on Linux only.
 """
 
@@ -86,20 +87,25 @@ def stable_port(port: str) -> str:
 
 def check_board(port: str, bit: str) -> tuple[list[str], str]:
     """Stops unless the FPGA on the board of the serial port is the part of
-    the bitstream, and returns the openFPGALoader options that select its
-    JTAG cable, and the port's name by id (stable_port), which the tool
-    uses from then on."""
-    part = bit_part(bit)
+    the bitstream, and returns what check_part returns."""
+    return check_part(port, bit_part(bit), bit)
+
+
+def check_part(port: str, part: str, file: str) -> tuple[list[str], str]:
+    """Stops unless the FPGA on the board of the serial port is the part
+    that file was built for, and returns the openFPGALoader options that
+    select its JTAG cable, and the port's name by id (stable_port), which
+    the tool uses from then on."""
     serial = usb_serial(port)
     port = stable_port(port)
     cable, model = fpga_model(serial)
     ok = f"xc{part}".startswith(model)
     print(f"[{'PASS' if ok else 'FAIL'}] FPGA {model} on {port} (JTAG "
-          f"{serial}), bitstream for {part}", flush=True)
+          f"{serial}), {os.path.basename(file)} for {part}", flush=True)
     if not ok:
-        sys.exit(f"{PROG}: {bit} is for {part}, but the FPGA on {port} is "
-                 f"{model}; give the --bit for this board, or the --port of "
-                 f"the board the bitstream is for")
+        sys.exit(f"{PROG}: {file} is for {part}, but the FPGA on {port} is "
+                 f"{model}; give the file for this board, or the --port of "
+                 f"the board the file is for")
     wait_port(port)
     return ["-c", cable, "--ftdi-serial", serial], port
 

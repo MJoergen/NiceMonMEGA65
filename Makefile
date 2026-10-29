@@ -68,6 +68,10 @@ help:
 	@echo "  make flash PORT=/dev/ttyUSB1 [BIT=synth/nexys4ddr/build/top.bit] [ARGS=--erase]"
 	@echo "                  write BIT into the Nexys4DDR's flash, from which the board"
 	@echo "                  starts with jumper JP1 on QSPI (needs openFPGALoader)"
+	@echo "  make flash PORT=/dev/ttyUSB1 COR=synth/r6/build/NiceMonMEGA65-r6.cor SLOT=1"
+	@echo "                  write the core file COR into slot SLOT, 1 to 7, of the"
+	@echo "                  MEGA65's flash over JTAG, with no key held at power on,"
+	@echo "                  and start it"
 	@echo "  make linktest   compare run.py on niceemu --link with niceemu, and check"
 	@echo "                  mon.py's commands, without a board"
 	@echo "  make cosim [COSIM_PORT=4000] [ROM=prog.bin]"
@@ -164,11 +168,11 @@ run:
 mon:
 	$(PYTHON) tools/mon.py $(LINK) $(ARGS) $(FILE)
 
-# The flash of the Nexys4DDR (tools/flash.py); BIT on the command line
-# overrides the default.
+# The flash of the Nexys4DDR, or with COR and SLOT a slot of the MEGA65's
+# (tools/flash.py); BIT on the command line overrides the default.
 flash:
 	@test -n "$(PORT)" || (echo "Give the board's serial port with PORT=/dev/ttyUSB1"; exit 1)
-	$(PYTHON) tools/flash.py --port $(PORT) --bit $(if $(filter command line,$(origin BIT)),$(BIT),synth/nexys4ddr/build/top.bit) $(ARGS)
+	$(PYTHON) tools/flash.py --port $(PORT) $(if $(COR),--cor $(COR) $(if $(SLOT),--slot $(SLOT)),--bit $(if $(filter command line,$(origin BIT)),$(BIT),synth/nexys4ddr/build/top.bit)) $(ARGS)
 
 BIT ?= synth/r6/build/top.bit
 

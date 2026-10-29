@@ -13,7 +13,7 @@ prints its options with `--help`, and its header says more.
 | `run.py` | Runs a program on the board and prints what `niceemu` prints, for diffing. |
 | `mon.py` | An interactive shell on the link: memory, pause, step, breakpoints, and the console. |
 | `hwtest.py` | Programs the FPGA with openFPGALoader and tests the system on the board. |
-| `flash.py` | Writes a bitstream into the Nexys4DDR's flash, from which the board starts. |
+| `flash.py` | Writes a bitstream into the Nexys4DDR's flash, or a core file into a slot of the MEGA65's, from which the board starts. |
 | `linktest.py` | Checks `run.py` and the link on `niceemu --link` against plain `niceemu`, without a board. |
 | `cosimtest.py` | Checks `run.py` and the RTL on `make cosim` against plain `niceemu`, without a board. |
 | `screenshot.py` | Runs a program in `niceemu` and draws its screen as a PNG picture, as the text display shows it. |

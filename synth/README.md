@@ -52,6 +52,14 @@ R6. It needs `coretool`, the Python script `src/tools/coretool` of
 [mega65-tools](https://github.com/MEGA65/mega65-tools), on the `PATH` or
 in `CORETOOL`.
 
+`make flash COR=synth/r6/build/NiceMonMEGA65-r6.cor SLOT=1` writes the
+core file into slot 1 over the JTAG cable instead, with no key held at
+power on. It takes slots 1 to 7, as slot 0 holds the MEGA65's own core.
+It checks the FPGA first, as `make hwtest` does, and stops unless the core
+in slot 0 is for the core file's revision. It shows what the slot held,
+verifies the flash, and starts the slot, through the serial monitor of
+slot 0's core if that core does not start it.
+
 The user LED is on while the core runs. The Nexys4DDR is programmed with
 `openFPGALoader -b nexys_a7_100 synth/nexys4ddr/build/top.bit`, or with
 Vivado's hardware manager. With a MEGA65 also attached, openFPGALoader

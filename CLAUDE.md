@@ -38,6 +38,7 @@ header is the authoritative address map.
     make release TAG=V1.0 # after the bump: gates, three bitstreams, two .cor, hwtest, staged; ARGS=--publish tags and releases (doc/RELEASE.md); TAG=V1.0.1 keeps nice_cpu at V1.0
     make hwtest [ETH=IP]  # check the FPGA, program it with openFPGALoader, and test the board (ETH: its Ethernet too)
     make flash [BIT=f.bit] # write the Nexys4DDR's flash (default its top.bit), verify, wait for the start; ARGS=--erase
+    make flash COR=f.cor SLOT=1 # write a slot (1-7) of the MEGA65's flash over JTAG, no MEGAFLASH; checks slot 0's revision
     make linktest         # run.py --tcp on niceemu --link against plain niceemu, and mon.py's commands, no board
     make cosim            # the RTL in GHDL, its debug UART on TCP, for the tools' --cosim PORT
     make cosimtest        # run.py --cosim on make cosim against plain niceemu, no board (minutes)

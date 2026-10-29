@@ -118,6 +118,10 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   it. With jumper JP1 on QSPI, the board then starts the system at power
   on, and with the release's bitstream it shows the demo, as a MEGA65
   does with a core file in its flash.
+- `make flash COR=f.cor SLOT=N` writes a core file into slot N, 1 to 7,
+  of the MEGA65's flash over the JTAG cable, with no SD card and no key
+  held at power on. It stops unless slot 0's core is for the core file's
+  revision, verifies the flash, and starts the slot.
 - `mon.py` disassembles with `d ADDR N`, and shows the instruction at the
   PC after a pause, a step, and a breakpoint. The disassembler is
   nice_cpu's `assembler/nicedis.py`, new in nice_cpu's `V1.1`.
