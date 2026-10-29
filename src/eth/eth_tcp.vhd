@@ -39,15 +39,15 @@
 -- fields of a TCP segment to this station, and checks its checksums. The
 -- segment's data goes into the receive buffer at rx_wr as it comes, if it
 -- is the next data of the connection (its sequence number is rcv_nxt) and
--- fits (wr_ok, known before the data starts). In the cycle after the last
--- byte (eval), with the stream held, the segment is acted on if it is
--- good; its data is committed (rx_cmt) only then, and rcv_nxt moves past
--- it. Every segment with data or
--- a FIN gets an ACK (ack_req), also one that is out of order, which is
--- dropped, so the host sends it again; so does one without either whose
--- sequence number is not rcv_nxt, such as a keepalive probe. A segment
--- that overlaps data already taken is dropped whole, and the host sends
--- it again from the sequence number of the ACK.
+-- fits (wr_ok, known before the data starts). In the second cycle after
+-- the last byte (eval), with the stream held, the segment is acted on if
+-- it is good; its data is committed (rx_cmt) only then, and rcv_nxt moves
+-- past it. Every segment with data or a FIN gets an ACK (ack_req), also
+-- one that is out of order, which is dropped, so the host sends it again;
+-- so does one without either whose sequence number is not rcv_nxt, such
+-- as a keepalive probe. A segment that overlaps data already taken is
+-- dropped whole, and the host sends it again from the sequence number of
+-- the ACK.
 --
 -- Send: the link's output goes into the send buffer at tail_ptr. una_ptr
 -- is the first byte not yet acknowledged, whose sequence number is
@@ -209,7 +209,8 @@ architecture synthesis of eth_tcp is
    -- The receive window of the last segment sent
    signal adv_wnd : natural range 0 to C_SIZE     := 0;
 
-   -- The segment read (eth_tcp_rx.vhd), in the cycle after its last byte
+   -- The segment read (eth_tcp_rx.vhd), in the second cycle after its
+   -- last byte
    signal eval    : std_logic;
    signal good    : std_logic;
    signal f_smac  : std_logic_vector(47 downto 0);
@@ -303,7 +304,6 @@ begin
          exp_port_i => peer_port,
          exp_seq_i  => rcv_nxt,
          free_i     => rx_free,
-         wr_ok_o    => wr_ok,
          we_o       => rx_we,
          done_o     => eval,
          good_o     => good,
@@ -314,6 +314,7 @@ begin
          ack_o      => f_ack,
          flags_o    => f_flags,
          win_o      => f_win,
+         wr_ok_o    => wr_ok,
          len_o      => plen
       ); -- i_eth_tcp_rx
 
@@ -517,7 +518,7 @@ begin
          end if;
 
          ------------------------------------------------------------------
-         -- The segment, in the cycle after its last byte
+         -- The segment, in the second cycle after its last byte
          ------------------------------------------------------------------
          timeout_v := false;
          if eval = '1' then

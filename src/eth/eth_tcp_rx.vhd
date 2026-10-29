@@ -30,12 +30,14 @@
 -- segment is the next of the connection: it is from exp_ip_i and
 -- exp_port_i, its sequence number is exp_seq_i, take_i is '1', and its
 -- data is not empty and fits free_i. That is known at byte 47, before the
--- data starts, and wr_ok says so from then on. In the cycle after the last
--- byte (done_o), with the stream held (rx_ready_o), good_o says whether
--- the frame is a whole segment to this station whose checksums are
--- right, and the fields, wr_ok_o, and len_o, the length of the data,
--- stand for it; then everything starts again. A frame longer than
--- C_MAXF bytes is not good, and no data is written past C_MAXF.
+-- data starts, and wr_ok says so from then on. The stream is held
+-- (rx_ready_o) for two cycles after the last byte. In the first (last),
+-- the verdict goes into registers, for the timing: good_o, whether the
+-- frame is a whole segment to this station whose checksums are right,
+-- wr_ok_o, whether its data was written, and len_o, the length of the
+-- data; and the count and the sums start again. In the second (done_o),
+-- they and the fields stand for the segment. A frame longer than C_MAXF
+-- bytes is not good, and no data is written past C_MAXF.
 --
 -- INTERFACE CONTRACTS -- these are requirements on the environment:
 -- a) mac_i and ip_i stay stable while a frame is read, as for
@@ -79,14 +81,13 @@ entity eth_tcp_rx is
       free_i     : in  natural range 0 to 2 ** G_ADDR_BITS;
       -- The segment's data, a byte at a time on rx_data_i, while it is the
       -- next of the connection
-      wr_ok_o    : out std_logic;
       we_o       : out std_logic;
-      -- The segment, in the cycle after its last byte: whether it is good,
-      -- its fields, and the length of its data, which is below 0 when the
-      -- header is longer than the IP total length says, and the segment
-      -- is not good
+      -- The segment, in the second cycle after its last byte: whether it
+      -- is good, its fields, whether its data was written, and the length
+      -- of its data, which is below 0 when the header is longer than the
+      -- IP total length says, and the segment is not good
       done_o     : out std_logic;
-      good_o     : out std_logic;
+      good_o     : out std_logic                     := '0';
       smac_o     : out std_logic_vector(47 downto 0);
       sip_o      : out std_logic_vector(31 downto 0);
       sport_o    : out std_logic_vector(15 downto 0);
@@ -94,7 +95,8 @@ entity eth_tcp_rx is
       ack_o      : out std_logic_vector(31 downto 0);
       flags_o    : out std_logic_vector(7 downto 0);
       win_o      : out std_logic_vector(15 downto 0);
-      len_o      : out integer range -80 to 2 ** 16
+      wr_ok_o    : out std_logic                     := '0';
+      len_o      : out integer range -80 to 2 ** 16  := 0
    );
 end entity eth_tcp_rx;
 
@@ -121,9 +123,12 @@ architecture synthesis of eth_tcp_rx is
    signal tcp_sum : std_logic_vector(15 downto 0) := (others => '0');
    signal hi      : std_logic_vector(7 downto 0)  := (others => '0');
    signal wr_ok   : std_logic                     := '0';
-   signal eval    : std_logic                     := '0';
-   -- Whether the byte on rx_data_i is right
-   signal ok : boolean;
+   -- The two cycles after the last byte
+   signal last : std_logic := '0';
+   signal done : std_logic := '0';
+   -- Whether the byte on rx_data_i is right, and whether the frame is good
+   signal ok   : boolean;
+   signal good : std_logic;
    -- Where the segment's data starts and ends in the frame, and its length
    signal p_start : natural range 0 to 94;
    signal p_end   : natural range 0 to 2 ** 16 + 13;
@@ -153,17 +158,16 @@ begin
    p_end   <= 14 + to_integer(f_len);
    plen    <= to_integer(f_len) - 20 - 4 * to_integer(f_doff);
 
-   rx_ready_o <= not eval;
+   rx_ready_o <= not (last or done);
    -- Below C_MAXF, so that a longer frame writes no more than plen bytes
-   we_o    <= '1' when rx_valid_i = '1' and eval = '0' and wr_ok = '1' and
-                       idx >= p_start and idx < p_end and idx < C_MAXF else
-              '0';
-   wr_ok_o <= wr_ok;
+   we_o <= '1' when rx_valid_i = '1' and last = '0' and done = '0' and wr_ok = '1' and
+                    idx >= p_start and idx < p_end and idx < C_MAXF else
+           '0';
 
-   done_o  <= eval;
-   good_o  <= '1' when m_ok = '1' and ip_sum = X"FFFF" and tcp_sum = X"FFFF" and
+   good    <= '1' when m_ok = '1' and ip_sum = X"FFFF" and tcp_sum = X"FFFF" and
                        f_doff >= 5 and plen >= 0 and p_end <= idx else
               '0';
+   done_o  <= done;
    smac_o  <= f_smac;
    sip_o   <= f_sip;
    sport_o <= f_sport;
@@ -171,13 +175,12 @@ begin
    ack_o   <= f_ack;
    flags_o <= f_flags;
    win_o   <= f_win;
-   len_o   <= plen;
 
 
    p_rx : process (clk_i)
    begin
       if rising_edge(clk_i) then
-         if rx_valid_i = '1' and eval = '0' then
+         if rx_valid_i = '1' and last = '0' and done = '0' then
             if idx < C_MAXF then
                idx <= idx + 1;
             else
@@ -244,13 +247,17 @@ begin
             end if;
 
             if rx_last_i = '1' then
-               eval <= '1';
+               last <= '1';
             end if;
          end if;
 
-         -- The cycle after the last byte
-         if eval = '1' then
-            eval    <= '0';
+         -- The cycle after the last byte: the verdict, and the next frame
+         done <= last;
+         if last = '1' then
+            last    <= '0';
+            good_o  <= good;
+            wr_ok_o <= wr_ok;
+            len_o   <= plen;
             idx     <= 0;
             m_ok    <= '1';
             ip_sum  <= (others => '0');
@@ -264,7 +271,8 @@ begin
             ip_sum  <= (others => '0');
             tcp_sum <= (others => '0');
             wr_ok   <= '0';
-            eval    <= '0';
+            last    <= '0';
+            done    <= '0';
          end if;
       end if;
    end process p_rx;
