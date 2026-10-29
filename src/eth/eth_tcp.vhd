@@ -90,6 +90,12 @@
 -- source MAC address; the segments of this side go to the MAC address of
 -- the host's SYN.
 --
+-- The server is these processes: p_tcp, the connection, which acts on the
+-- segments and owns its numbers; p_cmp, which compares a segment with it;
+-- p_pick, which chooses the segment to send; and p_link, the link side of
+-- the two buffers. What one tells another that it cannot read is a pulse
+-- (brk_set), which lands a cycle later; each says why that is in time.
+--
 -- INTERFACE CONTRACTS -- these are requirements on the environment:
 -- a) mac_i and ip_i stay stable while there is a connection.
 -- b) G_CLOCK_HZ is the clock's rate, at least 1000, for the timers.
@@ -263,6 +269,10 @@ architecture synthesis of eth_tcp is
    -- The host's FIN has come.
    signal peer_fin : std_logic                    := '0';
    signal brk_ptr  : t_ptr                        := (others => '0');
+   -- The connection's half-close for the link, a cycle after: the break,
+   -- and where it is
+   signal brk_set : std_logic                    := '0';
+   signal brk_at  : t_ptr                        := (others => '0');
    -- Input or a break that the link has not taken, and the same a cycle
    -- later, which on_o follows
    signal drain   : std_logic;
@@ -450,6 +460,58 @@ begin
       ); -- i_eth_tcp_tx
 
 
+   p_link : process (clk_i)
+   begin
+      if rising_edge(clk_i) then
+         -- The link's output
+         if tx_we = '1' then
+            tail_ptr <= tail_ptr + 1;
+            idle     <= 0;
+         elsif idle < C_IDLE then
+            idle <= idle + 1;
+         end if;
+
+         -- The receive buffer to the link, and the host's half-close after
+         -- the last byte before it
+         lrx_break_o <= '0';
+         if lrx_ready_i = '1' then
+            lrx_valid <= '0';
+         end if;
+         if lfetch = '1' then
+            lrx_data_o <= rx_rdata(7 downto 0);
+            lrx_valid  <= '1';
+         end if;
+         lfetch <= '0';
+         if lfetch = '0' and rx_rd /= rx_cmt and not (fin_rcvd = '1' and rx_rd = brk_ptr) and
+            (lrx_valid = '0' or lrx_ready_i = '1') then
+            lfetch <= '1';
+            rx_rd  <= rx_rd + 1;
+         end if;
+         if fin_rcvd = '1' and rx_rd = brk_ptr and lfetch = '0' and lrx_valid = '0' then
+            lrx_break_o <= '1';
+            fin_rcvd    <= '0';
+         end if;
+         -- The half-close, a cycle after the connection has it; nothing is
+         -- fetched past it meanwhile, as the data after it is committed
+         -- many cycles later.
+         if brk_set = '1' then
+            fin_rcvd <= '1';
+            brk_ptr  <= brk_at;
+         end if;
+         drain_r <= drain;
+
+         if rst_i = '1' then
+            tail_ptr  <= (others => '0');
+            rx_rd     <= (others => '0');
+            lfetch    <= '0';
+            lrx_valid <= '0';
+            fin_rcvd  <= '0';
+            drain_r   <= '0';
+         end if;
+      end if;
+   end process p_link;
+
+
    p_cmp : process (clk_i)
    begin
       if rising_edge(clk_i) then
@@ -603,8 +665,8 @@ begin
             keep <= '1';
             -- The old connection's input has ended.
             if peer_fin = '0' then
-               fin_rcvd <= '1';
-               brk_ptr  <= cmt;
+               brk_set <= '1';
+               brk_at  <= cmt;
             end if;
          else
             state   <= LISTEN_ST;
@@ -615,7 +677,8 @@ begin
 
    begin
       if rising_edge(clk_i) then
-         isn <= isn + 1;
+         isn     <= isn + 1;
+         brk_set <= '0';
 
          -- The milliseconds
          if tick_cnt = C_TICK - 1 then
@@ -623,36 +686,6 @@ begin
          else
             tick_cnt <= tick_cnt + 1;
          end if;
-
-         -- The link's output
-         if tx_we = '1' then
-            tail_ptr <= tail_ptr + 1;
-            idle     <= 0;
-         elsif idle < C_IDLE then
-            idle <= idle + 1;
-         end if;
-
-         -- The receive buffer to the link, and the host's half-close after
-         -- the last byte before it
-         lrx_break_o <= '0';
-         if lrx_ready_i = '1' then
-            lrx_valid <= '0';
-         end if;
-         if lfetch = '1' then
-            lrx_data_o <= rx_rdata(7 downto 0);
-            lrx_valid  <= '1';
-         end if;
-         lfetch <= '0';
-         if lfetch = '0' and rx_rd /= rx_cmt and not (fin_rcvd = '1' and rx_rd = brk_ptr) and
-            (lrx_valid = '0' or lrx_ready_i = '1') then
-            lfetch <= '1';
-            rx_rd  <= rx_rd + 1;
-         end if;
-         if fin_rcvd = '1' and rx_rd = brk_ptr and lfetch = '0' and lrx_valid = '0' then
-            lrx_break_o <= '1';
-            fin_rcvd    <= '0';
-         end if;
-         drain_r <= drain;
 
          -- A window that has grown is told.
          if state = EST_ST and rx_free >= adv_wnd + C_WND_STEP then
@@ -773,12 +806,8 @@ begin
                            state <= CLOSE_WAIT_ST;
                         end if;
                         peer_fin <= '1';
-                        fin_rcvd <= '1';
-                        if wr_ok = '1' then
-                           brk_ptr <= rx_wr;
-                        else
-                           brk_ptr <= rx_cmt;
-                        end if;
+                        brk_set  <= '1';
+                        brk_at   <= rx_wr when wr_ok = '1' else rx_cmt;
                      end if;
 
                      -- The ACK of this side's FIN ends the connection.
@@ -859,7 +888,6 @@ begin
             una_ptr   <= (others => '0');
             nxt_ptr   <= (others => '0');
             max_ptr   <= (others => '0');
-            tail_ptr  <= (others => '0');
             closing   <= '0';
             fin_sent  <= '0';
             fin_max   <= '0';
@@ -871,12 +899,8 @@ begin
             keep      <= '0';
             rx_wr     <= (others => '0');
             rx_cmt    <= (others => '0');
-            rx_rd     <= (others => '0');
-            lfetch    <= '0';
-            lrx_valid <= '0';
-            fin_rcvd  <= '0';
-            drain_r   <= '0';
             peer_fin  <= '0';
+            brk_set   <= '0';
          end if;
       end if;
    end process p_tcp;
