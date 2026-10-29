@@ -34,6 +34,14 @@
 --    link has taken, so free_o is never exceeded.
 -- b) When brk_set_i is '1', the break is after the data committed, cmt_i.
 --
+-- With G_FORMAL, it states the properties that formal/eth_tcp_buf.sby
+-- proves, under the contracts: the link's output is taken only into room
+-- below una_ptr_i, and dropped without a connection; a byte read goes to
+-- the link in the cycle after, and stays until it is taken; the break
+-- waits from brk_set_i until the bytes before it are taken, and comes
+-- alone; and the link is on while a byte or the break is offered, and
+-- from the cycle after a connection opens.
+--
 -- RESET
 -- Synchronous, to clk_i. Reset empties both buffers, as the connection's
 -- pointers go to 0 as well, and drops the link's input and the break.
@@ -45,7 +53,9 @@ library ieee;
 entity eth_tcp_buf is
    generic (
       G_ADDR_BITS : natural := 11;
-      G_IDLE      : natural := 64
+      G_IDLE      : natural := 64;
+      -- The properties for formal/eth_tcp_buf.sby
+      G_FORMAL    : boolean := false
    );
    port (
       clk_i       : in  std_logic;
@@ -98,10 +108,11 @@ architecture synthesis of eth_tcp_buf is
    signal tx_rdata : std_logic_vector(8 downto 0);
 
    -- The receive buffer: the next byte to the link, the byte read, that it
-   -- is being read, and that the link has it; the break that waits, and
-   -- its place
+   -- is read now, and in the cycle before, and that the link has it; the
+   -- break that waits, and its place
    signal rx_rd     : std_logic_vector(G_ADDR_BITS downto 0) := (others => '0');
    signal rx_rdata  : std_logic_vector(8 downto 0);
+   signal fetch     : std_logic;
    signal lfetch    : std_logic                               := '0';
    signal lrx_valid : std_logic                               := '0';
    signal fin_rcvd  : std_logic                               := '0';
@@ -144,9 +155,16 @@ begin
 
    free_o      <= C_SIZE - to_integer(cmt_i - rx_rd);
    lrx_valid_o <= lrx_valid;
-   drain       <= '1' when rx_rd /= cmt_i or lfetch = '1' or lrx_valid = '1' or
-                           fin_rcvd = '1' else
-                  '0';
+   -- The next byte is read: there is one before the commit and the break,
+   -- none is being read, and the link has taken the last; and the link
+   -- has input or a break still to take
+   fetch <= '1' when lfetch = '0' and rx_rd /= cmt_i and
+                     not (fin_rcvd = '1' and rx_rd = brk_ptr) and
+                     (lrx_valid = '0' or lrx_ready_i = '1') else
+            '0';
+   drain <= '1' when rx_rd /= cmt_i or lfetch = '1' or lrx_valid = '1' or
+                     fin_rcvd = '1' else
+            '0';
 
    i_rx_ram : entity work.eth_ram
       generic map (
@@ -184,11 +202,9 @@ begin
             lrx_data_o <= rx_rdata(7 downto 0);
             lrx_valid  <= '1';
          end if;
-         lfetch <= '0';
-         if lfetch = '0' and rx_rd /= cmt_i and not (fin_rcvd = '1' and rx_rd = brk_ptr) and
-            (lrx_valid = '0' or lrx_ready_i = '1') then
-            lfetch <= '1';
-            rx_rd  <= rx_rd + 1;
+         lfetch <= fetch;
+         if fetch = '1' then
+            rx_rd <= rx_rd + 1;
          end if;
          if fin_rcvd = '1' and rx_rd = brk_ptr and lfetch = '0' and lrx_valid = '0' then
             lrx_break_o <= '1';
@@ -202,14 +218,68 @@ begin
          on_o <= conn_i or drain;
 
          if rst_i = '1' then
-            tail_ptr  <= (others => '0');
-            rx_rd     <= (others => '0');
-            lfetch    <= '0';
-            lrx_valid <= '0';
-            fin_rcvd  <= '0';
-            on_o      <= '0';
+            tail_ptr    <= (others => '0');
+            rx_rd       <= (others => '0');
+            lfetch      <= '0';
+            lrx_valid   <= '0';
+            lrx_break_o <= '0';
+            fin_rcvd    <= '0';
+            on_o        <= '0';
          end if;
       end if;
    end process p_buf;
+
+
+   gen_formal : if G_FORMAL generate
+      -- Cycles since the link's last output byte, up to G_IDLE
+      signal f_quiet : natural range 0 to G_IDLE := 0;
+   begin
+
+      p_quiet : process (clk_i)
+      begin
+         if rising_edge(clk_i) then
+            if tx_we = '1' then
+               f_quiet <= 0;
+            elsif f_quiet < G_IDLE then
+               f_quiet <= f_quiet + 1;
+            end if;
+         end if;
+      end process p_quiet;
+
+      -- psl default clock is rising_edge(clk_i);
+
+      -- The send buffer
+      -- psl f_we : assert always tx_we = '1' -> tail_ptr - una_ptr_i < C_SIZE;
+      -- psl f_off : assert always conn_i = '0' -> ltx_ready_o = '1' and tx_we = '0';
+      -- psl f_paused : assert always paused_o = '1' -> f_quiet = G_IDLE;
+      -- psl f_not_paused : assert always f_quiet = G_IDLE -> paused_o = '1';
+
+      -- The receive buffer
+      -- psl f_bound : assert always rst_i = '0' -> cmt_i - rx_rd <= C_SIZE;
+      -- psl f_fetch : assert always fetch = '1' ->
+      --    rx_rd /= cmt_i and lfetch = '0' and (lrx_valid = '0' or lrx_ready_i = '1');
+      -- psl f_read : assert always {fetch and not rst_i} |=> {rst_i = '1' or lfetch = '1'};
+      -- psl f_shown : assert always {lfetch and not rst_i} |=> {rst_i = '1' or lrx_valid = '1'};
+      -- psl f_hold : assert always {lrx_valid and not lrx_ready_i and not rst_i} |=>
+      --    {rst_i = '1' or (lrx_valid = '1' and lrx_data_o = prev(lrx_data_o))};
+
+      -- The break
+      -- psl f_break_set : assert always {brk_set_i and not rst_i} |=>
+      --    {rst_i = '1' or fin_rcvd = '1'};
+      -- psl f_break_waits : assert always fin_rcvd = '1' -> brk_ptr - rx_rd <= C_SIZE;
+      -- psl f_break_alone : assert always lrx_break_o = '1' ->
+      --    prev(fin_rcvd) = '1' and lrx_valid = '0' and lfetch = '0';
+
+      -- The link is on
+      -- psl f_on_byte : assert always lrx_valid = '1' -> on_o = '1';
+      -- psl f_on_break : assert always lrx_break_o = '1' -> on_o = '1';
+      -- psl f_on_conn : assert always {conn_i and not rst_i} |=> {rst_i = '1' or on_o = '1'};
+
+      -- psl c_full : cover {conn_i = '1' and tail_ptr - una_ptr_i = C_SIZE and rst_i = '0'};
+      -- psl c_paused : cover {paused_o and not rst_i};
+      -- psl c_wrap : cover {rx_rd = C_SIZE + 1 and rst_i = '0'};
+      -- psl c_break : cover {lrx_break_o and not rst_i};
+      -- psl c_stays : cover {on_o = '1' and conn_i = '0' and rst_i = '0'};
+   end generate gen_formal;
 
 end architecture synthesis;

@@ -395,9 +395,22 @@ every time, not only the ones a testbench sends.
   or ran out, and not before its time, each timeout counts a try but the
   last, and what the connection tells it lands in the cycle after.
 
+- `eth_tcp_buf.sby` proves the TCP server's buffers,
+  `src/eth/eth_tcp_buf.vhd`, with 4 bytes each: the link's output is
+  taken only into room below the first byte not acknowledged, and dropped
+  without a connection; a byte read goes to the link in the cycle after,
+  and stays until it is taken; the break waits until the bytes before it
+  are taken, and comes alone; and the link is on while a byte or the
+  break is offered, and from the cycle after a connection opens. Its
+  `model` task proves, with PDR, that the link takes the bytes of the
+  receive buffer in the order of their pointers, each as it was last
+  written, and that a byte the link writes into the send buffer is read
+  back until the buffer wraps around to its word.
+
 The checks in `rx_fifo.vhd`, `board_io.vhd`, `scr_regs.vhd`,
-`devices.vhd`, `mem.vhd`, `nicemon.vhd`, and `eth/eth_tcp_timer.vhd` are
-in `G_FORMAL` blocks, which are off in simulation and synthesis.
+`devices.vhd`, `mem.vhd`, `nicemon.vhd`, `eth/eth_tcp_timer.vhd`, and
+`eth/eth_tcp_buf.vhd` are in `G_FORMAL` blocks, which are off in
+simulation and synthesis.
 
 ## Testing the board
 

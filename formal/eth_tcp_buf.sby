@@ -1,0 +1,36 @@
+# The TCP server's buffers, src/eth/eth_tcp_buf.vhd (formal_eth_tcp_buf.vhd),
+# with 4 bytes each. "prove" proves the assertions of eth_tcp_buf.vhd for
+# every cycle by k-induction. "model" proves, with PDR, that the bytes the
+# link takes and the sender reads are those written. "cover" reaches each
+# cover statement. The depths are in cycles: 10 is the k of the induction
+# of "prove", and 30 is how far "cover" looks for each statement. "model"
+# has no depth: PDR finds its own invariant.
+
+[tasks]
+prove
+model
+cover
+
+[options]
+prove: mode prove
+prove: depth 10
+model: mode prove
+cover: mode cover
+cover: depth 30
+
+[engines]
+prove: smtbmc yices
+model: abc pdr
+cover: smtbmc yices
+
+[script]
+plugin -i ghdl
+prove: ghdl --std=08 -fpsl eth_ram.vhd eth_tcp_buf.vhd formal_eth_tcp_buf.vhd -e formal_eth_tcp_buf
+model: ghdl --std=08 -fpsl -gG_MODEL=true eth_ram.vhd eth_tcp_buf.vhd formal_eth_tcp_buf.vhd -e formal_eth_tcp_buf
+cover: ghdl --std=08 -fpsl -gG_MODEL=true eth_ram.vhd eth_tcp_buf.vhd formal_eth_tcp_buf.vhd -e formal_eth_tcp_buf
+prep -top formal_eth_tcp_buf
+
+[files]
+../src/eth/eth_ram.vhd
+../src/eth/eth_tcp_buf.vhd
+formal_eth_tcp_buf.vhd
