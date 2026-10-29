@@ -32,6 +32,26 @@ There are two ways to use the system:
   where a PC may load programs over the debug link, talk to them, and
   debug them.
 
+Either way, the debug link also runs over the board's Ethernet port, on
+TCP port 4510. A PC on the network may then load, run, and debug
+programs - with the exact same commands - as it does over the serial
+port, with no JTAG cable. The board
+answers once it has an IP address, which a program, the debug link, or
+the demo's F11 gives it. The board serves one connection at a time,
+and while a host is connected, it has the whole line: the program's
+console and the debug link. What comes in on the UART is then dropped,
+and all output goes to the host, none to the UART. When the host
+disconnects, the line goes back to the UART. In F11, I types a new IP address, and M a new
+MAC address:
+
+![The demo's F11, with the Ethernet station's addresses](doc/images/ethernet.png)
+
+The tools take `--eth 192.168.1.66` for this (see
+[tools/README.md](tools/README.md#over-ethernet)), and
+[SYSTEM.md](doc/SYSTEM.md#the-ethernet-station) describes the Ethernet
+station. The link has no password, so give the board an IP address only
+on a network you trust.
+
 A monitor like QMON, the one in
 [QNICE-FPGA](https://github.com/sy2002/QNICE-FPGA), is planned but not
 written yet (see [monitor/](monitor/README.md)). It will be in the ROM,
