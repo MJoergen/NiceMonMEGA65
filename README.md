@@ -14,52 +14,31 @@ the [MEGA65](https://mega65.org/) (R3 and R6), a modern FPGA computer in
 the form of a Commodore 65. NICE is a 32-bit CPU with its own instruction
 set, assembler, C toolchain, and emulator, `niceemu`. On the MEGA65, the
 system shows a screen of 80×25 characters on HDMI and VGA, and reads the
-keyboard. The debug UART carries the program's console and the debug
-link, which a PC may use to load, run, pause, step, and inspect
-programs. A program written in NICE assembly
+keyboard. A program written in NICE assembly
 ([ISA.md](https://github.com/MJoergen/nice_cpu/blob/main/doc/ISA.md))
-runs on the board as it runs in `niceemu`. The system also builds for
-the Digilent Nexys4DDR (see
-[synth/](synth/README.md#the-nexys4ddr) and
+runs on the board as it runs in `niceemu`.
+
+The debug UART, or the Ethernet port, carries the program's console and
+the debug link, which a PC may use to load, run, pause, step, and
+inspect programs. The system also builds for the Digilent Nexys4DDR
+(see [synth/](synth/README.md#the-nexys4ddr) and
 [SYSTEM.md](doc/SYSTEM.md#the-nexys4ddrs-devices)).
 
-There are two ways to use the system:
+There are three ways to use the system:
 
 - [On its own](#on-its-own), as a MEGA65 with a keyboard and a screen,
   with no JTAG cable and no serial cable. The program is in the core's
   ROM, and the core is loaded from the MEGA65's flash.
-- [With the serial port](#with-the-serial-port-requires-jtag-cable),
+- [Over the serial port](#over-the-serial-port), with a JTAG cable,
   where a PC may load programs over the debug link, talk to them, and
   debug them.
-
-Either way, the debug link also runs over the board's Ethernet port, on
-TCP port 4510. A PC on the network may then load, run, and debug
-programs - with the exact same commands - as it does over the serial
-port, with no JTAG cable. The board
-answers once it has an IP address, which a program, the debug link, or
-the demo's F11 gives it. The board serves one connection at a time,
-and while a host is connected, it has the whole line: the program's
-console and the debug link. What comes in on the UART is then dropped,
-and all output goes to the host, none to the UART. When the host
-disconnects, the line goes back to the UART. In F11, I types a new IP address, and M a new
-MAC address:
-
-![The demo's F11, with the Ethernet station's addresses](doc/images/ethernet.png)
-
-The tools take `--eth 192.168.1.65` for this (see
-[tools/README.md](tools/README.md#over-ethernet)), and
-[SYSTEM.md](doc/SYSTEM.md#the-ethernet-station) describes the Ethernet
-station. The link has no password, so give the board an IP address only
-on a network you trust.
+- [Over Ethernet](#over-ethernet), where a PC on the network does the
+  same, with the same tools, and with no JTAG cable.
 
 A monitor like QMON, the one in
 [QNICE-FPGA](https://github.com/sy2002/QNICE-FPGA), is planned but not
 written yet (see [monitor/](monitor/README.md)). It will be in the ROM,
 and will let a MEGA65 on its own load, run, and debug programs too.
-
-The [doc/](doc/README.md) folder has the address map, the differences from
-the emulator, and the other reference documents.
-[RELEASE_NOTES.md](doc/RELEASE_NOTES.md) has what changed in each release.
 
 ## Quick start
 
@@ -89,8 +68,8 @@ switched on, with a USB keyboard in its USB HID port (see
 
 The tools that compile programs and generate `.cor` files are in this
 repository. So are the tools that load and debug programs, which need
-the serial port (see
-[With the serial port](#with-the-serial-port-requires-jtag-cable)).
+the [serial port](#over-the-serial-port) or
+[Ethernet](#over-ethernet).
 Clone the repository with the submodule, which has the assembler, the
 emulator, and the C library:
 
@@ -114,39 +93,15 @@ below that it is a typewriter: what you type appears on the screen.
 RETURN starts a new line, INST/DEL deletes, the cursor keys move the
 cursor, and CTRL-L clears what you typed. The function keys switch between
 the demos that the second row lists, and the reset button starts the
-typewriter again.
+typewriter again. The ROM can also hold a program of your own (see
+[Building your own ROM](#building-your-own-rom)).
 
-### Building your own ROM
+## Over the serial port
 
-The ROM can hold a program of your own, built into a core file of your
-own. There are two steps: first the program, then the core.
-
-The program is
-[NICE assembly](https://github.com/MJoergen/nice_cpu/blob/main/doc/ISA.md),
-assembled with `niceasm` into a `.bin` file, like any other program:
-
-    python3 nice_cpu/assembler/niceasm.py -o prog.bin prog.nasm
-
-[PROGRAMMING.md](doc/PROGRAMMING.md) has the instructions for writing
-programs for this system, the limits and constraints of a program in the
-ROM, as well as directions for accessing the screen and the keyboard.
-Try the program in `niceemu` first, as there is currently no way to
-upload a new ROM to the MEGA65 without building a new `.cor` file.
-
-Then build the core file with the program as its ROM:
-
-    make cor ROM=prog.bin
-
-That builds the cores of the R3 and the R6 with Vivado, with `prog.bin`
-embedded within. The core files are located at
-`synth/r6/build/NiceMonMEGA65-r6.cor` and
-`synth/r3/build/NiceMonMEGA65-r3.cor`, and making them needs `coretool`
-(see [synth/](synth/README.md)).
-
-## With the serial port (requires JTAG cable)
-
-There are two ways to talk to a program on the board through its debug
-UART:
+The debug UART needs the JTAG cable, whose USB port carries it. It runs
+at 2 Mbaud (2000000), 8-N-1, and is `/dev/ttyUSB1` by default
+([tools/README.md](tools/README.md#the-serial-port) describes the port).
+There are two ways to talk to a program on the board through it:
 
 - A terminal program, such as `picocom`, sends what you type to the
   program and shows what it prints. It has none of the debug link's
@@ -159,9 +114,53 @@ UART:
   your keys straight to the program, as a terminal does, until Ctrl-]
   returns to the prompt.
 
-### Using the interactive shell
+## Over Ethernet
 
-`tools/mon.py` starts by printing the state of the core:
+The debug link also runs over the board's Ethernet port, on TCP port
+4510. A PC on the network may then load, run, and debug programs with
+the same tools and commands as over the serial port, and with no JTAG
+cable.
+
+The board answers once it has an IP address, which a program, the debug
+link, or the demo's F11 gives it. After reset, it has none, and answers
+nothing. Over the serial port, the link writes the address to
+`0xFFFFFF9A`, the first byte in bits 31..24, here 192.168.1.65:
+
+    tools/mon.py --port /dev/ttyUSB1
+    mon> w FFFFFF9A C0A80141
+    mon> q
+
+In the demo's F11, I types a new IP address, and M a new MAC address:
+
+![The demo's F11, with the Ethernet station's addresses](doc/images/ethernet.png)
+
+The board serves one connection at a time. While a host is connected,
+it has the whole line, the program's console and the debug link: what
+comes in on the UART is dropped, and all output goes to the host. When
+the host disconnects, the line goes back to the UART.
+
+As over the serial port, a plain client is a terminal to the program,
+with none of the link's features. `nc 192.168.1.65 4510` sends each
+line you type to the program, and shows what it prints. Ctrl-D ends the
+connection, which the board takes as a break.
+
+The tools take `--eth 192.168.1.65` for this (see
+[tools/README.md](tools/README.md#over-ethernet)), and
+[SYSTEM.md](doc/SYSTEM.md#the-ethernet-station) describes the Ethernet
+station. The link has no password, so give the board an IP address only
+on a network you trust.
+
+## Using the interactive shell
+
+`tools/mon.py` takes the connection to the board as an option, as the
+other tools do: `--port` for the serial port, which is `/dev/ttyUSB1`
+when it is left out, or `--eth` for the Ethernet port:
+
+    tools/mon.py --port /dev/ttyUSB1
+    tools/mon.py --eth 192.168.1.65
+
+The shell is the same either way. It starts by printing the state of the
+core:
 
 <pre>
 $ <b>tools/mon.py</b>
@@ -170,40 +169,20 @@ PC=0000000f
 </pre>
 
 The core may be running, paused, at a breakpoint, held in reset, halted,
-or held after a halt, with the reason. Then come whether the ROM is hidden, the value of the
-control register, the version of the link as major.minor, and the free
-bytes in the program's input buffer. A paused or halted core shows its PC
-too.
+or held after a halt, with the reason. Then come whether the ROM is
+hidden, the value of the control register, the version of the link as
+major.minor, and the free bytes in the program's input buffer. A paused
+or halted core shows its PC too.
 
-The commands of `mon.py` are short, and `help` lists them. They are
-described in full in [tools/README.md](tools/README.md#monpy). Numbers
-are hex. The short names are `s` for `step`, `g` for `go`, `c` for
-`console`, and `q` for `quit`, and `help s` describes `step`.
-
-- `load FILE` loads a program, and leaves the core held in reset.
-- `go` starts a held core, or goes on from a pause. `run` starts the
-  program at 0 again, and `hold` holds the core.
-- `pause` pauses the core, and `step N` runs N steps of a paused core.
-  An empty line repeats the last `step`, with its N; after other
-  commands it does nothing.
-- `b ADDR` sets a breakpoint, `b` lists them, and `bd N` or `bd all`
-  disables them.
-- `regs` shows R0 to R15, and `status` the state of the core.
-- `r ADDR N` reads N words, and `w ADDR WORD...` writes them. `ctl VALUE`
-  writes the control register.
-- `d ADDR N` disassembles N instructions, with nice_cpu's disassembler.
-  After a pause, a step, or a breakpoint, the instruction at the PC is
-  shown too.
-- `symbols FILE`, or `--symbols FILE` at the start, reads the labels of
-  the `.sym` file of `niceasm.py --symbols`. An address may then be a
-  label, such as `LOOP` or `LOOP+2`, and the output shows the labels.
-- `send TEXT` sends text to the program, with escapes such as `\n`, and
-  `eof` ends its input.
-- `console` passes the terminal through to the program, until Ctrl-].
-
-The program's output and the link's notices, such as `[paused, PC=...]`
-and `[halted: HALT, PC=...]`, are shown as they arrive. `quit` exits the
-shell and leaves the core as it is.
+The commands are short, and numbers are hex. `help` lists the commands,
+and `help CMD` describes one. `load FILE` loads a program, `go` (`g`),
+`pause`, and `step N` (`s`) run it, `b ADDR` sets a breakpoint and `bd`
+disables it, `regs` and `r ADDR N` show the registers and the memory,
+`d ADDR N` disassembles, and `send TEXT` and `console` (`c`) talk to the
+program. The program's output and the link's notices, such as
+`[paused, PC=...]`, are shown as they arrive. `quit` (`q`) leaves the
+core as it is. [tools/README.md](tools/README.md#monpy) describes every
+command.
 
 ### A worked example
 
@@ -302,19 +281,55 @@ PC=0000000f
 mon&gt; <b>q</b>
 </pre>
 
-### The other tools
+## The other tools
 
-The debug UART runs at 2 Mbaud (2000000), 8-N-1.
-[tools/README.md](tools/README.md) describes the port, and the other
-tools: `load.py`, which loads and starts a program, and `run.py`, which
-runs one as `niceemu` runs it, for comparing the two. It also shows how
-to run a C program on the board, and how to use the tools over the
-board's Ethernet port instead of the UART.
+[tools/README.md](tools/README.md) describes the other tools: `load.py`,
+which loads and starts a program, and `run.py`, which runs one as
+`niceemu` runs it, for comparing the two. It also shows how to run a C
+program on the board. They take `--port` or `--eth` as `mon.py` does.
 
 ## Writing programs
 
-Programs are NICE assembly, or C through WebAssembly. [PROGRAMMING.md](doc/PROGRAMMING.md)
-has how to build them, the C library, and the memory limits.
+Programs are NICE assembly, or C through WebAssembly.
+[PROGRAMMING.md](doc/PROGRAMMING.md) has how to build them, the C
+library, and the memory limits.
+
+### Building your own ROM
+
+The ROM can hold a program of your own, built into a core file of your
+own. There are two steps: first the program, then the core.
+
+The program is
+[NICE assembly](https://github.com/MJoergen/nice_cpu/blob/main/doc/ISA.md),
+assembled with `niceasm` into a `.bin` file, like any other program:
+
+    python3 nice_cpu/assembler/niceasm.py -o prog.bin prog.nasm
+
+[PROGRAMMING.md](doc/PROGRAMMING.md) has the instructions for writing
+programs for this system, the limits and constraints of a program in the
+ROM, as well as directions for accessing the screen and the keyboard.
+Try the program in `niceemu` first, as there is currently no way to
+upload a new ROM to the MEGA65 without building a new `.cor` file.
+
+Then build the core file with the program as its ROM:
+
+    make cor ROM=prog.bin
+
+That builds the cores of the R3 and the R6 with Vivado, with `prog.bin`
+embedded within. The core files are located at
+`synth/r6/build/NiceMonMEGA65-r6.cor` and
+`synth/r3/build/NiceMonMEGA65-r3.cor`, and making them needs `coretool`
+(see [synth/](synth/README.md)).
+
+## Documentation
+
+- [doc/](doc/README.md) has the address map, the differences from the
+  emulator, and the other reference documents.
+- [tools/README.md](tools/README.md) describes the host tools.
+- [RELEASE_NOTES.md](doc/RELEASE_NOTES.md) has what changed in each
+  release.
+- [CONTRIBUTING.md](CONTRIBUTING.md) is for those who change this
+  repository: the tests, the formal checks, and the board test.
 
 ## License
 
