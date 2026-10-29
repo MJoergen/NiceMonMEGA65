@@ -56,7 +56,7 @@ $(BUILD)/demo_fail.bin: $(BUILD)/demo_test.bin
 # VT220's F1 and xterm's F1 start the typewriter afresh, F2, F8, and
 # SHIFT-F6, which have no demo, do nothing, ESC ESC [ A is the cursor up,
 # ESC Q is Q, and a sequence that is no key does nothing. The fourth
-# starts the key codes, F3, and types a letter, CR, a control code, DEL, a
+# starts the key codes with the VT220's F3, ESC [ 13 ~, and types a letter, CR, a control code, DEL, a
 # cursor key, F10, which has no demo, a cursor key with parameters, a byte
 # of ISO 8859-1 and one of 0x80 to 0x9F, an ESC and an x, which are one
 # key, as niceemu has the x at once, a sequence longer than the 12 bytes
@@ -83,13 +83,16 @@ $(BUILD)/demo_fail.bin: $(BUILD)/demo_test.bin
 # group, with an odd first byte, and the thirteenth for a byte of three
 # hex digits, though its value, 0FF, is in range. The fourteenth runs
 # the board in build/demo_fail.bin, whose math unit's test fails, so it
-# shows FAIL, the address read, and the word read there. In niceemu the registers of the Ethernet station are plain
+# shows FAIL, the address read, and the word read there. The fifteenth
+# types in the typewriter with a backspace, 0x08, and moves with the
+# cursor keys of ESC O A to ESC O D, and the VT220's F2 and F4, which
+# have no demo, do nothing. In niceemu the registers of the Ethernet station are plain
 # memory, so what is written shows at once, and the counts stay 0.
 # dash's printf, the shell of make on Ubuntu, has no \x.
 TEST1 = Hello, world!\nabc\177\177X\tY\r\n$(shell printf '0123456789%.0s' 1 2 3 4 5 6 7 8)abcde\n\
 \033[A\033[A\033[DQ\033[C\033[BR\n\033x\033[1;5Cy\200\351z\n
 TEST3 = one\033[11~two\n\033OPthree\033OQ\033[19~\033[17;2~ F\n\033\033[Ax\033Q\033[99~
-TEST4 = \033ORa\r\003\177\033[A\033[21~\033[1;5C\351\200\033x\033[1;2;3;4;5;6;7;8~bcdefghij
+TEST4 = \033[13~a\r\003\177\033[A\033[21~\033[1;5C\351\200\033x\033[1;2;3;4;5;6;7;8~bcdefghij
 TEST5 = \033ORab\033OPback
 TEST6 = \033[15~abc\033OQ
 DUMP6 = -d 0xFFFF01BC:36 -d 0xFFFF066C:36
@@ -101,7 +104,8 @@ TEST10 = \033[23~iX10.0g.0.256\r
 TEST11 = \033[23~i192.1x68.0001.66\177\17765\rm02:AB:c:D:e:F\rm02:\003
 TEST12 = \033[23~m03:00:00:00:00:01\r
 TEST13 = \033[23~m0FF:2:3:4:5:6\r
-TESTS  = 1 2 3 4 5 6 7 8 9 10 11 12 13 14
+TEST15 = ab\010c\nwxyz\033OD\033OD\033OA1\033OC\033OB2\033[12~!\033[14~?
+TESTS  = 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
 
 test: $(BUILD)/demo_test.bin $(BUILD)/demo_fail.bin
 	@printf '$(TEST1)' > $(BUILD)/test1.txt
@@ -119,6 +123,7 @@ test: $(BUILD)/demo_test.bin $(BUILD)/demo_fail.bin
 	@printf '$(TEST12)' > $(BUILD)/test12.txt
 	@printf '$(TEST13)' > $(BUILD)/test13.txt
 	@printf '\033[23~' > $(BUILD)/test14.txt
+	@printf '$(TEST15)' > $(BUILD)/test15.txt
 	@for t in $(TESTS); do \
 	  dump=; [ $$t = 6 ] && dump='$(DUMP6)'; \
 	  bin=demo_test; [ $$t = 14 ] && bin=demo_fail; \

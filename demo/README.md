@@ -199,7 +199,7 @@ The version in the title bar is `git describe --tags --always --dirty`, or
 The assembler has no include, so the Makefile joins `demo.nasm` and a line
 that defines `VERSION`. The test assembles the demo with the version `V9.9`
 into `build/demo_test.bin`, and the Makefile writes its inputs,
-`build/test1.txt` to `build/test14.txt`, with `printf`: the first edits a
+`build/test1.txt` to `build/test15.txt`, with `printf`: the first edits a
 few lines, the second clears them and scrolls, the third has the function
 keys, the fourth shows key codes and scrolls them, the fifth goes from
 the key codes back to the typewriter, the sixth shows the characters and
@@ -207,9 +207,11 @@ the colors, the seventh the counters, with two runs of the sieve, the
 eighth plays two games of the comet, the ninth runs the board twice,
 the tenth types an IP address that is rejected, the eleventh writes an IP
 address and a MAC address and cancels a second one, the twelfth and the
-thirteenth type MAC addresses that are rejected, and the fourteenth runs
+thirteenth type MAC addresses that are rejected, the fourteenth runs
 the board in `build/demo_fail.bin`, a copy of the test's demo with a wrong
-word in the math unit's test, which shows how a failure looks.
+word in the math unit's test, which shows how a failure looks, and the
+fifteenth types with a backspace and the other cursor keys,
+`ESC O A` to `ESC O D`.
 `niceemu` shows no colors, so for the sixth the test also has the words of
 two rows of ramps. The screens that `niceemu` prints, and those
 words, are in `test.expected`, which was checked by hand. In `niceemu` the
