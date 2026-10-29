@@ -30,14 +30,15 @@
 -- segment is the next of the connection: it is from exp_ip_i and
 -- exp_port_i, its sequence number is exp_seq_i, take_i is '1', and its
 -- data is not empty and fits free_i. That is known at byte 47, before the
--- data starts, and wr_ok says so from then on. The stream is held
--- (rx_ready_o) for two cycles after the last byte. In the first (last),
--- the verdict goes into registers, for the timing: good_o, whether the
--- frame is a whole segment to this station whose checksums are right,
--- wr_ok_o, whether its data was written, and len_o, the length of the
--- data; and the count and the sums start again. In the second (done_o),
--- they and the fields stand for the segment. A frame longer than C_MAXF
--- bytes is not good, and no data is written past C_MAXF.
+-- data starts, and wr_ok says so from then on, as does len_o, the length
+-- of the data, a register as well. The stream is held (rx_ready_o) for
+-- two cycles after the last byte. In the first (last), the verdict goes
+-- into registers, for the timing: good_o, whether the frame is a whole
+-- segment to this station whose checksums are right, and wr_ok_o,
+-- whether its data was written; and the count and the sums start again.
+-- In the second (done_o), they, len_o, and the fields stand for the
+-- segment. A frame longer than C_MAXF bytes is not good, and no data is
+-- written past C_MAXF.
 --
 -- INTERFACE CONTRACTS -- these are requirements on the environment:
 -- a) mac_i and ip_i stay stable while a frame is read, as for
@@ -84,7 +85,7 @@ entity eth_tcp_rx is
       we_o       : out std_logic;
       -- The segment, in the second cycle after its last byte: whether it
       -- is good, its fields, whether its data was written, and the length
-      -- of its data, which is below 0 when the header is longer than the
+      -- of its data, from byte 48 on, 0 when the header is longer than the
       -- IP total length says, and the segment is not good
       done_o     : out std_logic;
       good_o     : out std_logic                     := '0';
@@ -96,7 +97,7 @@ entity eth_tcp_rx is
       flags_o    : out std_logic_vector(7 downto 0);
       win_o      : out std_logic_vector(15 downto 0);
       wr_ok_o    : out std_logic                     := '0';
-      len_o      : out integer range -80 to 2 ** 16  := 0
+      len_o      : out natural range 0 to 2 ** 16    := 0
    );
 end entity eth_tcp_rx;
 
@@ -240,6 +241,7 @@ begin
             -- Whether the data is the next of the connection, and fits;
             -- the header has passed far enough to know.
             if idx = 47 then
+               len_o <= plen when plen > 0 else 0;
                if m_ok = '1' and take_i = '1' and f_sip = exp_ip_i and f_sport = exp_port_i and
                   f_seq = exp_seq_i and f_doff >= 5 and plen > 0 and plen <= free_i then
                   wr_ok <= '1';
@@ -257,7 +259,6 @@ begin
             last    <= '0';
             good_o  <= good;
             wr_ok_o <= wr_ok;
-            len_o   <= plen;
             idx     <= 0;
             m_ok    <= '1';
             ip_sum  <= (others => '0');

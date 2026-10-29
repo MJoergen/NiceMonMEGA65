@@ -42,7 +42,11 @@
 -- fits (wr_ok, known before the data starts). In the second cycle after
 -- the last byte (eval), with the stream held, the segment is acted on if
 -- it is good; its data is committed (rx_cmt) only then, and rcv_nxt moves
--- past it. Every segment with data or a FIN gets an ACK (ack_req), also
+-- past it. Its sequence and acknowledgment numbers are compared with the
+-- connection's in registers (p_cmp), a cycle behind, for the timing; they
+-- stand at eval, for the fields have been there since the frame's byte
+-- 49, and the connection's numbers since the last segment acted on.
+-- Every segment with data or a FIN gets an ACK (ack_req), also
 -- one that is out of order, which is dropped, so the host sends it again;
 -- so does one without either whose sequence number is not rcv_nxt, such
 -- as a keepalive probe. A segment that overlaps data already taken is
@@ -221,10 +225,27 @@ architecture synthesis of eth_tcp is
    signal f_ack   : std_logic_vector(31 downto 0);
    signal f_flags : std_logic_vector(7 downto 0);
    signal f_win   : std_logic_vector(15 downto 0);
-   signal plen    : integer range -80 to 2 ** 16;
+   signal plen    : natural range 0 to 2 ** 16;
    signal wr_ok   : std_logic;
    -- The connection takes data.
    signal take : std_logic;
+   -- The segment against the connection, a cycle behind: it is from the
+   -- host; how far its acknowledgment number is past una_seq, its
+   -- sequence number past snd_wl1 and rcv_nxt, and its acknowledgment
+   -- number past snd_wl2; the end of its data; whether it acknowledges
+   -- the SYN-ACK, and the FIN; and rcv_nxt past its data, with the FIN
+   -- and without, and past a FIN alone
+   signal from_peer : boolean                       := false;
+   signal k         : std_logic_vector(31 downto 0) := (others => '0');
+   signal d1        : std_logic_vector(31 downto 0) := (others => '0');
+   signal seq_off   : std_logic_vector(31 downto 0) := (others => '0');
+   signal d2        : std_logic_vector(31 downto 0) := (others => '0');
+   signal f_end     : std_logic_vector(31 downto 0) := (others => '0');
+   signal syn_acked : boolean                       := false;
+   signal fin_acked : boolean                       := false;
+   signal rcv_end   : std_logic_vector(31 downto 0) := (others => '0');
+   signal rcv_end1  : std_logic_vector(31 downto 0) := (others => '0');
+   signal rcv_nxt1  : std_logic_vector(31 downto 0) := (others => '0');
 
    -- The receive buffer
    signal rx_wr     : t_ptr                        := (others => '0');
@@ -399,17 +420,31 @@ begin
       ); -- i_eth_tcp_tx
 
 
+   p_cmp : process (clk_i)
+   begin
+      if rising_edge(clk_i) then
+         from_peer <= f_sip = peer_ip and f_sport = peer_port;
+         k         <= f_ack - una_seq;
+         d1        <= f_seq - snd_wl1;
+         seq_off   <= f_seq - rcv_nxt;
+         d2        <= f_ack - snd_wl2;
+         f_end     <= f_seq + plen;
+         syn_acked <= f_ack = iss + 1;
+         fin_acked <= f_ack = una_seq + (fin_ptr - una_ptr) + 1;
+         rcv_end   <= rcv_nxt + plen;
+         rcv_end1  <= rcv_nxt + plen + 1;
+         rcv_nxt1  <= rcv_nxt + 1;
+      end if;
+   end process p_cmp;
+
+
    p_tcp : process (clk_i)
-      variable from_peer_v : boolean;
-      variable syn_v       : boolean;
-      variable k_v         : std_logic_vector(31 downto 0);
-      variable d1_v        : std_logic_vector(31 downto 0);
-      variable d2_v        : std_logic_vector(31 downto 0);
-      variable rcv_v       : std_logic_vector(31 downto 0);
-      variable room_v      : natural range 0 to 2 ** 16;
-      variable n_v         : natural range 0 to C_MSS;
-      variable timeout_v   : boolean;
-      variable go_v        : boolean;
+      variable syn_v     : boolean;
+      variable fin_v     : boolean;
+      variable room_v    : natural range 0 to 2 ** 16;
+      variable n_v       : natural range 0 to C_MSS;
+      variable timeout_v : boolean;
+      variable go_v      : boolean;
 
       -- Opens a connection for a SYN; the output after base goes to it.
       procedure accept (
@@ -528,8 +563,7 @@ begin
             rx_wr <= rx_cmt;
 
             if good = '1' and ip_i /= 0 then
-               from_peer_v := f_sip = peer_ip and f_sport = peer_port;
-               syn_v       := f_flags(1) = '1' and f_flags(4) = '0' and f_flags(2) = '0';
+               syn_v := f_flags(1) = '1' and f_flags(4) = '0' and f_flags(2) = '0';
 
                if syn_v then
 
@@ -541,14 +575,14 @@ begin
                      when SYN_RCVD_ST =>
                         -- Another SYN replaces it; the output after its base,
                         -- if the link is kept, goes to the new one.
-                        if from_peer_v and f_seq = irs then
+                        if from_peer and f_seq = irs then
                            syn_req <= '1';
                         else
                            accept(f_smac, f_sip, f_sport, f_seq, f_win, una_ptr);
                         end if;
 
                      when EST_ST | CLOSE_WAIT_ST | LAST_ACK_ST =>
-                        if from_peer_v and f_seq = irs then
+                        if from_peer and f_seq = irs then
                            ack_req <= '1';
                         elsif f_sip = peer_ip then
                            pend      <= '1';
@@ -565,13 +599,13 @@ begin
 
                   end case;
 
-               elsif from_peer_v and state /= LISTEN_ST then
+               elsif from_peer and state /= LISTEN_ST then
                   if f_flags(2) = '1' then
                      -- A reset, with a sequence number in the window
-                     if f_seq - rcv_nxt < C_SIZE then
+                     if seq_off < C_SIZE then
                         finish(rx_cmt);
                      end if;
-                  elsif state = SYN_RCVD_ST and not (f_flags(4) = '1' and f_ack = iss + 1) then
+                  elsif state = SYN_RCVD_ST and not (f_flags(4) = '1' and syn_acked) then
                      -- Nothing but the ACK of the SYN-ACK opens the connection.
                      null;
                   else
@@ -585,11 +619,8 @@ begin
 
                      -- The ACK: the bytes it covers are free.
                      if f_flags(4) = '1' then
-                        k_v  := f_ack - una_seq;
-                        d1_v := f_seq - snd_wl1;
-                        d2_v := f_ack - snd_wl2;
-                        if k_v <= max_ptr - una_ptr and
-                           ((d1_v /= 0 and d1_v(31) = '0') or (d1_v = 0 and d2_v(31) = '0')) then
+                        if k <= max_ptr - una_ptr and
+                           ((d1 /= 0 and d1(31) = '0') or (d1 = 0 and d2(31) = '0')) then
                            snd_wnd <= f_win;
                            snd_wl1 <= f_seq;
                            snd_wl2 <= f_ack;
@@ -597,32 +628,39 @@ begin
                               tries <= 0;
                            end if;
                         end if;
-                        if k_v /= 0 and k_v <= max_ptr - una_ptr then
-                           una_ptr <= una_ptr + k_v(G_ADDR_BITS downto 0);
+                        if k /= 0 and k <= max_ptr - una_ptr then
+                           una_ptr <= una_ptr + k(G_ADDR_BITS downto 0);
                            una_seq <= f_ack;
-                           if k_v > nxt_ptr - una_ptr then
-                              nxt_ptr <= una_ptr + k_v(G_ADDR_BITS downto 0);
+                           if k > nxt_ptr - una_ptr then
+                              nxt_ptr <= una_ptr + k(G_ADDR_BITS downto 0);
                            end if;
                            tries   <= 0;
                            rto_cnt <= 0;
                         end if;
                      end if;
 
+                     -- The host's FIN, if all before it has come: after the
+                     -- data written, whose sequence number is rcv_nxt, or
+                     -- at rcv_nxt otherwise
+                     fin_v := f_flags(0) = '1' and peer_fin = '0' and
+                              (wr_ok = '1' or f_end = rcv_nxt);
                      -- The data, which was written if it is the next
-                     rcv_v := rcv_nxt;
                      if wr_ok = '1' then
-                        rx_cmt <= rx_wr;
-                        rx_wr  <= rx_wr;
-                        rcv_v  := rcv_nxt + plen;
+                        rx_cmt  <= rx_wr;
+                        rx_wr   <= rx_wr;
+                        rcv_nxt <= rcv_end;
+                        if fin_v then
+                           rcv_nxt <= rcv_end1;
+                        end if;
+                     elsif fin_v then
+                        rcv_nxt <= rcv_nxt1;
                      end if;
                      -- Data, a FIN, or a segment that is not the next, as a
                      -- keepalive probe at rcv_nxt - 1 is, gets an ACK.
-                     if plen > 0 or f_flags(0) = '1' or f_seq /= rcv_nxt then
+                     if plen > 0 or f_flags(0) = '1' or seq_off /= 0 then
                         ack_req <= '1';
                      end if;
-                     -- The host's FIN, if all before it has come
-                     if f_flags(0) = '1' and peer_fin = '0' and f_seq + plen = rcv_v then
-                        rcv_v    := rcv_v + 1;
+                     if fin_v then
                         if state = EST_ST or state = SYN_RCVD_ST then
                            state <= CLOSE_WAIT_ST;
                         end if;
@@ -634,11 +672,10 @@ begin
                            brk_ptr <= rx_cmt;
                         end if;
                      end if;
-                     rcv_nxt <= rcv_v;
 
                      -- The ACK of this side's FIN ends the connection.
                      if state = LAST_ACK_ST and fin_max = '1' and f_flags(4) = '1' and
-                        f_ack = una_seq + (fin_ptr - una_ptr) + 1 then
+                        fin_acked then
                         fin_ack <= '1';
                      end if;
                   end if;
