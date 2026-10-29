@@ -72,7 +72,8 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   between the clocks, the MAC filter and ARP responder,
   `eth/eth_arp.vhd`, the ping responder, `eth/eth_icmp.vhd`, and the
   TCP server of the debug link, `eth/eth_tcp.vhd`, with its parser of
-  segments, `eth/eth_tcp_rx.vhd`, its sender, `eth/eth_tcp_tx.vhd`, its
+  segments, `eth/eth_tcp_rx.vhd`, its choice of the segments to send,
+  `eth/eth_tcp_pick.vhd`, their sender, `eth/eth_tcp_tx.vhd`, its
   buffers, `eth/eth_tcp_buf.vhd`, and its retransmission timer,
   `eth/eth_tcp_timer.vhd`), and
   `system.vhd`, which every board instantiates.

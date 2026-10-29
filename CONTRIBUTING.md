@@ -113,8 +113,9 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
   `eth/eth_arp.vhd` filters them by their MAC address and answers ARP
   requests, `eth/eth_icmp.vhd` answers pings, `eth/eth_tcp.vhd` serves
   the debug link on a TCP port, with `eth/eth_tcp_rx.vhd` parsing its
-  segments, `eth/eth_tcp_tx.vhd` sending them, `eth/eth_tcp_buf.vhd`
-  keeping the bytes of the link, and `eth/eth_tcp_timer.vhd` timing the
+  segments, `eth/eth_tcp_pick.vhd` choosing the ones to send and
+  `eth/eth_tcp_tx.vhd` sending them, `eth/eth_tcp_buf.vhd` keeping the
+  bytes of the link, and `eth/eth_tcp_timer.vhd` timing the
   retransmissions, `eth/eth_tx_fifo.vhd`
   takes the frames to send back to the PHY's clock, and `eth/rmii_tx.vhd`
   sends them. The FIFOs and the TCP server keep their bytes in

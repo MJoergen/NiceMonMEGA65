@@ -61,7 +61,7 @@ SRC_SOURCES  = ../src/uart_serdes.vhd ../src/rx_fifo.vhd ../src/ram.vhd ../src/r
                ../src/kbd_m65.vhd ../src/kbd_m65_ascii.vhd ../src/kbd_ps2.vhd ../src/kbd_ps2_ascii.vhd ../src/seg7.vhd ../src/rgb_pwm.vhd \
                ../src/video/video_pkg.vhd ../src/video/font_pkg.vhd ../src/video/pix.vhd ../src/video/scr_ram.vhd ../src/video/text.vhd \
                ../src/eth/eth_pkg.vhd ../src/eth/rmii_rx.vhd ../src/eth/rx_fcs.vhd ../src/eth/eth_ram.vhd ../src/eth/eth_rx_fifo.vhd \
-               ../src/eth/eth_arp.vhd ../src/eth/eth_icmp.vhd ../src/eth/eth_tcp_rx.vhd ../src/eth/eth_tcp_tx.vhd ../src/eth/eth_tcp_timer.vhd ../src/eth/eth_tcp_buf.vhd ../src/eth/eth_tcp.vhd ../src/eth/eth_tx_fifo.vhd ../src/eth/rmii_tx.vhd ../src/eth/eth.vhd \
+               ../src/eth/eth_arp.vhd ../src/eth/eth_icmp.vhd ../src/eth/eth_tcp_rx.vhd ../src/eth/eth_tcp_tx.vhd ../src/eth/eth_tcp_timer.vhd ../src/eth/eth_tcp_buf.vhd ../src/eth/eth_tcp_pick.vhd ../src/eth/eth_tcp.vhd ../src/eth/eth_tx_fifo.vhd ../src/eth/rmii_tx.vhd ../src/eth/eth.vhd \
                ../src/system.vhd
 SOURCES      = $(SRC_SOURCES) text_synth.vhd tb_hello.vhd tb_nicemon.vhd tb_kbd.vhd tb_ps2.vhd tb_ps2_nicemon.vhd tb_text.vhd tb_board_io.vhd tb_rmii_rx.vhd tb_rx_fcs.vhd tb_eth_rx_fifo.vhd \
                tb_eth_tx_fifo.vhd tb_rmii_tx.vhd tb_eth.vhd tb_eth_tcp.vhd

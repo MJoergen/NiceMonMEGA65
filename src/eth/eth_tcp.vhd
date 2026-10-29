@@ -67,16 +67,13 @@
 -- of the host that was lost is not waited for forever; an ACK with a
 -- window of 0 starts the tries again, so the connection lasts while the
 -- host answers.
--- What may be sent is worked out in two cycles (p_pick), for the timing:
--- how far the data and the host's window go (B_IDLE), then how much of it
--- a segment takes (B_SIZE); the segment is chosen in the next (B_PICK),
--- as pick says. The choice is dropped (drop) if a segment is read or the
--- timer runs out in any of them, as both change what may be sent. The
--- segment's header fields (seg_*) and where its data is go to
--- eth_tcp_tx.vhd, which builds it, with the checksums, and sends it;
--- nothing is chosen while it is busy. The connection (p_tcp) books what
--- the segment carries in the cycle it is chosen: the SYN-ACK or the ACK
--- asked for is sent, the data is out, or the FIN is sent.
+-- The segment to send is chosen by eth_tcp_pick.vhd, from the numbers
+-- here and what there is to send, and built and sent by eth_tcp_tx.vhd
+-- under it; the choice is dropped (drop) if a segment is read or the
+-- timer runs out meanwhile, as both change what may be sent. The
+-- connection (p_tcp) books what the segment carries in the cycle it is
+-- chosen, from its flags (pick): the SYN-ACK or the ACK asked for is
+-- sent, the data is out, or the FIN is sent.
 --
 -- The receive window is the free space of the receive buffer, and when it
 -- has grown by C_WND_STEP since the last segment, an ACK tells the host.
@@ -89,13 +86,14 @@
 -- source MAC address; the segments of this side go to the MAC address of
 -- the host's SYN.
 --
--- The server is these processes: p_tcp, the connection, which acts on the
--- segments and owns its numbers; p_cmp, which compares a segment with it;
--- and p_pick, which chooses the segment to send. The two buffers, with
--- their link side, are eth_tcp_buf.vhd, and the retransmission timer is
--- eth_tcp_timer.vhd. What one tells another that it cannot read is a
--- pulse (brk_set, restart, tries_clr), which lands a cycle later; each
--- says why that is in time.
+-- The server is p_tcp, the connection, which acts on the segments and
+-- owns its numbers, with p_cmp, which compares a segment with it, and
+-- these entities: eth_tcp_rx.vhd, the parser; eth_tcp_pick.vhd, the
+-- choice of the segments to send, with eth_tcp_tx.vhd, their sender;
+-- eth_tcp_buf.vhd, the two buffers with their link side; and
+-- eth_tcp_timer.vhd, the retransmission timer. What the connection tells
+-- one of them that it cannot read is a pulse (brk_set, restart,
+-- tries_clr), which lands a cycle later; each says why that is in time.
 --
 -- INTERFACE CONTRACTS -- these are requirements on the environment:
 -- a) mac_i and ip_i stay stable while there is a connection.
@@ -156,20 +154,7 @@ architecture synthesis of eth_tcp is
    constant C_TICK     : natural := G_CLOCK_HZ / 1000;
    constant C_WND_STEP : natural := C_SIZE / 2;
 
-   constant C_FIN : std_logic_vector(7 downto 0) := X"01";
-   constant C_SYN : std_logic_vector(7 downto 0) := X"02";
-   constant C_PSH : std_logic_vector(7 downto 0) := X"08";
-   constant C_ACK : std_logic_vector(7 downto 0) := X"10";
-
    subtype t_ptr is std_logic_vector(G_ADDR_BITS downto 0);
-
-   function minimum (a : natural; b : natural) return natural is
-   begin
-      if a < b then
-         return a;
-      end if;
-      return b;
-   end function minimum;
 
    type   t_state is (LISTEN_ST, SYN_RCVD_ST, EST_ST, CLOSE_WAIT_ST, LAST_ACK_ST);
    signal state : t_state := LISTEN_ST;
@@ -225,8 +210,6 @@ architecture synthesis of eth_tcp is
    signal tries_clr : std_logic := '0';
    -- The initial sequence number, a cycle counter
    signal isn : std_logic_vector(31 downto 0) := (others => '0');
-   -- The receive window of the last segment sent
-   signal adv_wnd : natural range 0 to C_SIZE     := 0;
 
    -- The segment read (eth_tcp_rx.vhd), in the second cycle after its
    -- last byte
@@ -282,39 +265,31 @@ architecture synthesis of eth_tcp is
    signal tx_raddr : std_logic_vector(G_ADDR_BITS - 1 downto 0);
    signal tx_rdata : std_logic_vector(7 downto 0);
 
-   -- The segment being chosen, and the one being sent
-   type   t_build is (B_IDLE, B_SIZE, B_PICK);
-   type   t_pick is (NO_PK, SYN_PK, DATA_PK, FIN_PK, ACK_PK);
-   signal build     : t_build                       := B_IDLE;
-   signal pick      : t_pick;
-   signal drop      : std_logic;
-   signal go        : std_logic                     := '0';
-   signal busy      : std_logic;
-   signal seg_mac   : std_logic_vector(47 downto 0) := (others => '0');
-   signal seg_ip    : std_logic_vector(31 downto 0) := (others => '0');
-   signal seg_port  : std_logic_vector(15 downto 0) := (others => '0');
-   signal seg_seq   : std_logic_vector(31 downto 0) := (others => '0');
-   signal seg_ack   : std_logic_vector(31 downto 0) := (others => '0');
-   signal seg_flags : std_logic_vector(7 downto 0)  := (others => '0');
-   signal seg_wnd   : std_logic_vector(15 downto 0) := (others => '0');
-   signal seg_ptr   : t_ptr                         := (others => '0');
-   -- The data that may be sent: how much there is from nxt_ptr on, the
-   -- room for it in the host's window, below 0 when more is out than the
-   -- window has, its length, and whether it is a whole segment
-   signal avail    : natural range 0 to C_SIZE          := 0;
-   signal room     : integer range -C_SIZE to 2 ** 16   := 0;
-   signal pick_n   : natural range 0 to C_MSS           := 0;
-   signal pick_big : boolean                            := false;
-   signal seg_n    : natural range 0 to C_MSS           := 0;
+   -- The segment chosen (eth_tcp_pick.vhd): its TCP flags, 0 when none,
+   -- how much data it takes, the receive window told in the last one, and
+   -- that one is being sent
+   signal pick    : std_logic_vector(7 downto 0);
+   signal pick_n  : natural range 0 to C_MSS;
+   signal adv_wnd : natural range 0 to C_SIZE;
+   signal busy    : std_logic;
+   -- A segment is acted on, the connection ends, or the timer runs out:
+   -- the segment being chosen is dropped.
+   signal drop : std_logic;
 
-   signal conn : std_logic;
+   -- The connection waits for the ACK of its SYN-ACK, is open, and is the
+   -- line
+   signal syn_rcvd : std_logic;
+   signal estab    : std_logic;
+   signal conn     : std_logic;
 
 begin
 
-   conn <= '1' when state = EST_ST or state = CLOSE_WAIT_ST or state = LAST_ACK_ST or
-                    (state = SYN_RCVD_ST and keep = '1') else
-           '0';
-   on_o <= conn or drain_r;
+   syn_rcvd <= '1' when state = SYN_RCVD_ST else
+               '0';
+   estab    <= '1' when state = EST_ST or state = CLOSE_WAIT_ST or state = LAST_ACK_ST else
+               '0';
+   conn     <= estab or (syn_rcvd and keep);
+   on_o     <= conn or drain_r;
 
    ---------------------------------------------------------------------------
    -- Receive
@@ -427,20 +402,9 @@ begin
       ); -- i_eth_tcp_timer
 
 
-   -- A segment is acted on, the connection ends, or the timer runs out:
-   -- the segment being chosen is dropped.
    drop <= eval or ending or timeout;
 
-   -- The segment chosen in B_PICK: the SYN-ACK, data, the FIN, or an ACK
-   pick <= NO_PK when build /= B_PICK or drop = '1' else
-           SYN_PK when syn_req = '1' and state = SYN_RCVD_ST else
-           NO_PK when state = LISTEN_ST or state = SYN_RCVD_ST else
-           DATA_PK when pick_n > 0 and (pick_big or paused = '1' or closing = '1') else
-           FIN_PK when closing = '1' and nxt_ptr = fin_ptr and fin_sent = '0' else
-           ACK_PK when ack_req = '1' else
-           NO_PK;
-
-   i_eth_tcp_tx : entity work.eth_tcp_tx
+   i_eth_tcp_pick : entity work.eth_tcp_pick
       generic map (
          G_PORT      => G_PORT,
          G_ADDR_BITS => G_ADDR_BITS,
@@ -451,24 +415,37 @@ begin
          rst_i       => rst_i,
          mac_i       => mac_i,
          ip_i        => ip_i,
-         go_i        => go,
+         syn_rcvd_i  => syn_rcvd,
+         estab_i     => estab,
+         syn_req_i   => syn_req,
+         ack_req_i   => ack_req,
+         closing_i   => closing,
+         fin_sent_i  => fin_sent,
+         probe_i     => probe,
+         drop_i      => drop,
+         peer_mac_i  => peer_mac,
+         peer_ip_i   => peer_ip,
+         peer_port_i => peer_port,
+         iss_i       => iss,
+         una_seq_i   => una_seq,
+         rcv_nxt_i   => rcv_nxt,
+         snd_wnd_i   => snd_wnd,
+         free_i      => rx_free,
+         una_ptr_i   => una_ptr,
+         nxt_ptr_i   => nxt_ptr,
+         lim_ptr_i   => lim_ptr,
+         paused_i    => paused,
+         pick_o      => pick,
+         pick_n_o    => pick_n,
+         adv_wnd_o   => adv_wnd,
          busy_o      => busy,
-         seg_mac_i   => seg_mac,
-         seg_ip_i    => seg_ip,
-         seg_port_i  => seg_port,
-         seg_seq_i   => seg_seq,
-         seg_ack_i   => seg_ack,
-         seg_flags_i => seg_flags,
-         seg_wnd_i   => seg_wnd,
-         seg_addr_i  => seg_ptr(G_ADDR_BITS - 1 downto 0),
-         seg_n_i     => seg_n,
          rd_addr_o   => tx_raddr,
          rd_data_i   => tx_rdata,
          tx_data_o   => tx_data_o,
          tx_last_o   => tx_last_o,
          tx_valid_o  => tx_valid_o,
          tx_ready_i  => tx_ready_i
-      ); -- i_eth_tcp_tx
+      ); -- i_eth_tcp_pick
 
 
    p_cmp : process (clk_i)
@@ -487,89 +464,6 @@ begin
          rcv_nxt1  <= rcv_nxt + 1;
       end if;
    end process p_cmp;
-
-
-   p_pick : process (clk_i)
-      variable room_v : natural range 0 to 2 ** 16;
-   begin
-      if rising_edge(clk_i) then
-         go <= '0';
-
-         case build is
-
-            -- What may be sent: worked out here and in B_SIZE, once the
-            -- last segment has gone, and chosen from in the cycle after,
-            -- unless a segment was read or the timer ran out meanwhile.
-            when B_IDLE =>
-               if drop = '0' and busy = '0' then
-                  avail    <= to_integer(lim_ptr - nxt_ptr);
-                  room     <= to_integer(snd_wnd) - to_integer(nxt_ptr - una_ptr);
-                  seg_mac  <= peer_mac;
-                  seg_ip   <= peer_ip;
-                  seg_port <= peer_port;
-                  seg_ack  <= rcv_nxt;
-                  seg_wnd  <= X"0000" + rx_free;
-                  seg_ptr  <= nxt_ptr;
-                  seg_n    <= 0;
-                  -- After this side's FIN, the next sequence number is past it.
-                  seg_seq  <= una_seq + (nxt_ptr - una_ptr) + fin_sent;
-                  build    <= B_SIZE;
-               end if;
-
-            when B_SIZE =>
-               build <= B_IDLE;
-               if drop = '0' then
-                  room_v := 0;
-                  if room > 0 then
-                     room_v := room;
-                  end if;
-                  pick_n   <= minimum(minimum(avail, room_v), C_MSS);
-                  pick_big <= avail >= C_MSS;
-                  if probe = '1' and room_v = 0 and avail > 0 then
-                     pick_n   <= 1;
-                     pick_big <= true;
-                  end if;
-                  build <= B_PICK;
-               end if;
-
-            when B_PICK =>
-               build <= B_IDLE;
-
-               case pick is
-
-                  when SYN_PK =>
-                     seg_flags <= C_SYN or C_ACK;
-                     seg_seq   <= iss;
-
-                  when DATA_PK =>
-                     seg_flags <= C_ACK or C_PSH;
-                     seg_n     <= pick_n;
-
-                  when FIN_PK =>
-                     seg_flags <= C_FIN or C_ACK;
-
-                  when ACK_PK =>
-                     seg_flags <= C_ACK;
-
-                  when NO_PK =>
-                     null;
-
-               end case;
-
-               -- Every segment acknowledges, with the window of now.
-               if pick /= NO_PK then
-                  adv_wnd <= rx_free;
-                  go      <= '1';
-               end if;
-
-         end case;
-
-         if rst_i = '1' then
-            build <= B_IDLE;
-            go    <= '0';
-         end if;
-      end if;
-   end process p_pick;
 
 
    p_tcp : process (clk_i)
@@ -789,33 +683,30 @@ begin
          end if;
 
          ------------------------------------------------------------------
-         -- The segment chosen (p_pick): what it carries is out
+         -- The segment chosen (eth_tcp_pick.vhd), by its flags: what it
+         -- carries is out
          ------------------------------------------------------------------
-         if pick /= NO_PK then
+         if pick /= X"00" then
             ack_req <= '0';
          end if;
-
-         case pick is
-
-            when SYN_PK =>
-               syn_req <= '0';
-
-            when DATA_PK =>
-               probe   <= '0';
-               nxt_ptr <= nxt_ptr + pick_n;
-               if nxt_ptr + pick_n - una_ptr > max_ptr - una_ptr then
-                  max_ptr <= nxt_ptr + pick_n;
-               end if;
-
-            when FIN_PK =>
-               fin_sent <= '1';
-               fin_max  <= '1';
-               state    <= LAST_ACK_ST;
-
-            when ACK_PK | NO_PK =>
-               null;
-
-         end case;
+         -- The SYN-ACK
+         if pick(1) = '1' then
+            syn_req <= '0';
+         end if;
+         -- The data
+         if pick(3) = '1' then
+            probe   <= '0';
+            nxt_ptr <= nxt_ptr + pick_n;
+            if nxt_ptr + pick_n - una_ptr > max_ptr - una_ptr then
+               max_ptr <= nxt_ptr + pick_n;
+            end if;
+         end if;
+         -- The FIN
+         if pick(0) = '1' then
+            fin_sent <= '1';
+            fin_max  <= '1';
+            state    <= LAST_ACK_ST;
+         end if;
 
          if rst_i = '1' then
             state     <= LISTEN_ST;
