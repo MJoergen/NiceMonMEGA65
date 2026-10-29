@@ -24,7 +24,7 @@ These words are used here and in the other documents and sources:
 | Clear | A write with bit 2 set fills the RAM and the screen with 0. |
 | Pause | Bit 4 of the control register is 1: the core stops between two instructions, and the link reaches all of memory and the core's registers. Writing 0 to bit 4 makes the program go on. |
 | Step | Bits 4 and 5 written to a paused core: it runs one instruction, or enters an interrupt, and pauses again. |
-| Notice | A packet that the board sends on its own: `b04` at reset (the link's version, 4), `h` when the core halts, `p` when it pauses, `x` when it stops at a breakpoint, and `o` when an input byte is lost. |
+| Notice | A packet that the board sends on its own: `b05` at reset (the link's version, 5), `h` when the core halts, `p` when it pauses, `x` when it stops at a breakpoint, and `o` when an input byte is lost. |
 
 The MEGA65's debug UART runs at 2 Mbaud (2000000), 8-N-1, and carries the
 debug link of nice_cpu's [doc/DEBUG.md](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEBUG.md). It passes
@@ -32,7 +32,7 @@ the program's console bytes both ways, and between them it carries
 packets, which start with the byte `0xFF`. A console byte `0xFF` is sent
 as two. With the packets, a host reads and writes memory and the debug
 registers at `0xFFFFFFE0`–`FF` (see [Address map](#address-map)). The
-board sends a notice at reset (`b04`), when the core halts (`h` and the
+board sends a notice at reset (`b05`), when the core halts (`h` and the
 reason), and when an input byte is lost (`o`). The tools in `tools/` are
 such a host, and `niceemu --link` serves the same link, so the tools
 drive the emulator as they drive the board. The tools use 2 Mbaud too.
@@ -113,7 +113,7 @@ effect and does not write (DEBUG.md §3).
 | `0xFFFFFFE0`–`0xFFFFFFEF` | The debug registers of DEBUG.md §6, for the link only, here and below: R0–R15 of the core, read only. After a halt they hold what the emulator prints. While the core is paused they hold its registers, with R15 the address of the next instruction, and a hold of the paused core keeps them. A hold of a running core leaves them undefined. |
 | `0xFFFFFFF0` | Control: hold, clear, hide, pause, and step (see [The control register](#the-control-register)). |
 | `0xFFFFFFF1` | Read only: why the core halted. 0 while it has not, and after a clear, 1 for `HALT`, 2 for a reserved control word, 3 for `INT` inside an interrupt routine, and 4 for `RTI` outside one. |
-| `0xFFFFFFF2` | Read only: the version of the link, 4. |
+| `0xFFFFFFF2` | Read only: the version of the link, 5. |
 | `0xFFFFFFF3` | Read only: the bytes of free space in the core's input FIFO. |
 | `0xFFFFFFF4` | The enable bits of the breakpoints: bit i enables breakpoint i. Bits 4 to 31 read 0. |
 | `0xFFFFFFF5` | Read only: the number of breakpoints, 4. |

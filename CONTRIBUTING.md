@@ -458,7 +458,7 @@ bitstream has one. Then it hides the ROM and uses the link:
   `examples/build/bench.bin`, but for its cycles, whose table it prints.
 
 The reset button is not tested: press it with a terminal open, and the
-`b04` notice comes again.
+`b05` notice comes again.
 
 ## The tools and niceemu
 

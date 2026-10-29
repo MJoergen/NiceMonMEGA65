@@ -121,7 +121,8 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   a paused core (version 3): one step, then `p` again, or `h`. Version 4
   has `G_BREAKS` breakpoints, 4 on every board, at `FFFFFFF4`–`FF`: the
   core pauses on its own before one, and the link sends `x` instead of
-  `p`.
+  `p`. In version 5 a clear ends the halt: bit 1 of the control register,
+  the halt reason, and the stop register become 0.
 - The tools take `--eth HOST[:PORT]` for the board's link over TCP on
   its Ethernet port, 4510 by default, once 0xFFFFFF9A gives it an IP
   address. It is the line, as the UART is: no `b` notice at connect, and
