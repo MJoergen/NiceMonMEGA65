@@ -308,10 +308,11 @@ about 4 minutes, and CI runs it on both cores.
 
 `make formal` runs the SymbiYosys jobs in `formal/`, and CI runs it too.
 It needs the tools of nice_cpu's formal checks: Yosys with the GHDL plugin,
-SymbiYosys, and the Yices 2 solver. It is tested with the packages `yosys`,
-`yosys-plugin-ghdl`, and `ghdl-gcc` of Ubuntu 24.04 (Yosys 0.33 and GHDL
-4.1.0), SymbiYosys at its tag `yosys-0.33`, and Yices 2.6.4, as CI installs
-them. Every input of each job is free, so the solver tries every input at
+SymbiYosys, and the Yices 2 solver. CI installs them as nice_cpu's CI
+does, from the OSS CAD Suite of 2026-09-30 (Yosys 0.69, GHDL 7.0.0-dev
+with its plugin, and Yices 2.7.0): download
+`oss-cad-suite-linux-x64-20260930.tgz` from the suite's releases, unpack
+it, and put its `bin/` first on the PATH. Every input of each job is free, so the solver tries every input at
 every time, not only the ones a testbench sends.
 
 - `rx_fifo.sby` proves the core's input FIFO, `src/rx_fifo.vhd`, with 4
