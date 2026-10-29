@@ -124,7 +124,7 @@ These keys change the addresses:
 
 | Key | What it does |
 |---|---|
-| I | Starts typing a new IP address, such as `192.168.1.66` |
+| I | Starts typing a new IP address, such as `192.168.1.65` |
 | M | Starts typing a new MAC address, such as `02:4E:49:43:45:01` |
 | Digits and dots, or hex digits and colons | Typed at the cursor in row 22. Other characters are dropped, and so are those past the 15 or 17 of a full address. |
 | DEL, backspace | Deletes the last character |

@@ -228,7 +228,7 @@ Screen:
 |  or for the timer, the interrupts that came and the cycles that they took.
 |
 |  The Ethernet station, 0xFFFFFF98 to 0xFFFFFF9D
-|  IP address            192.168.1.66
+|  IP address            192.168.1.65
 |  MAC address           02:AB:0C:0D:0E:0F
 |  Good frames received           0
 |  Bad or dropped frames          0

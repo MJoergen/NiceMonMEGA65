@@ -331,7 +331,7 @@ link on TCP port 4510.
 |---|---|---|
 | `0xFFFFFF98` | Read only | The good frames received, to any address. |
 | `0xFFFFFF99` | Read only | The bad frames received, and the good ones that were dropped. |
-| `0xFFFFFF9A` | Read, write | The IP address, the first byte in bits 31..24: `0xC0A80142` is 192.168.1.66. 0 after reset, which answers nothing. |
+| `0xFFFFFF9A` | Read, write | The IP address, the first byte in bits 31..24: `0xC0A80141` is 192.168.1.65. 0 after reset, which answers nothing. |
 | `0xFFFFFF9B` | Read, write | The first two bytes of the MAC address, in bits 15..0. Bits 31..16 read 0 and are dropped. |
 | `0xFFFFFF9C` | Read, write | The last four bytes of the MAC address. The address is 02:4E:49:43:45:00 after reset. |
 | `0xFFFFFF9D` | Read only | The frames sent: the ARP and ping replies, and the TCP segments. |
@@ -359,9 +359,9 @@ link gives it an address. The MAC address is a locally administered one;
 two boards on one network need different ones. On the link, for example:
 
     make mon PORT=/dev/ttyUSB3
-    mon> w FFFFFF9A C0A80142
+    mon> w FFFFFF9A C0A80141
 
-Then `ping 192.168.1.66` from a PC on the network gets its answers, and
+Then `ping 192.168.1.65` from a PC on the network gets its answers, and
 `0xFFFFFF9D` counts the replies, the ARP reply and one for each ping.
 With the demo in the ROM, its F11 shows the addresses and the counts,
 and sets the addresses from the keyboard
@@ -379,8 +379,8 @@ and resets nothing, unlike `niceemu --link` (DEBUG.md §7), and a host's
 half-close is a break, which ends the program's input. The tools take
 `--eth HOST`, or `--eth HOST:PORT`, for it:
 
-    python3 tools/run.py --eth 192.168.1.66 prog.bin
-    make mon ARGS="--eth 192.168.1.66"
+    python3 tools/run.py --eth 192.168.1.65 prog.bin
+    make mon ARGS="--eth 192.168.1.65"
 
 A new connection from the same host replaces the old one. The old one
 gets the output that came before the new connection, and then the board

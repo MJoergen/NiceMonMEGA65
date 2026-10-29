@@ -67,7 +67,7 @@ $(BUILD)/demo_test.bin: demo.nasm $(ASM_PY) | $(BUILD)
 # board, F11, twice, so that the second run starts with what the first
 # left. The tenth types an IP address after F11: letters and a dot that
 # do not belong are dropped, the number 256 is rejected, and the message
-# stays. The eleventh writes the IP address 192.168.1.66, with a letter
+# stays. The eleventh writes the IP address 192.168.1.65, with a letter
 # dropped and two DELs over the last digits, then a MAC address with
 # one-digit bytes, and cancels a second MAC address with CTRL-C. The
 # twelfth is rejected for a MAC address of a group, with an odd first
@@ -86,7 +86,7 @@ dots  = $(shell printf '.%.0s' $$(seq $(1)))
 TEST8 = \033[20~.\033[C$(call dots,27)\033[A$(call dots,8)\033[C\033[B\033[D.\033[D..\033[C$(call dots,35)
 
 TEST10 = \033[23~iX10.0g.0.256\r
-TEST11 = \033[23~i192.1x68.1.65\177\17766\rm02:AB:c:D:e:F\rm02:\003
+TEST11 = \033[23~i192.1x68.1.66\177\17765\rm02:AB:c:D:e:F\rm02:\003
 TEST12 = \033[23~m03:00:00:00:00:01\r
 
 test: $(BUILD)/demo_test.bin

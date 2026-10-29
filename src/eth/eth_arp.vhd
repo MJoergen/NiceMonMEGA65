@@ -26,7 +26,7 @@
 -- sender, and sha and spa as the target. rmii_tx.vhd pads it to the
 -- shortest frame. No frame is read while the reply is written.
 -- The bytes of mac_i and of ip_i are in the order they are sent: mac_i's
--- bits 47..40 are the first byte, and ip_i = 0xC0A80142 is 192.168.1.66.
+-- bits 47..40 are the first byte, and ip_i = 0xC0A80141 is 192.168.1.65.
 --
 -- INTERFACE CONTRACTS -- these are requirements on the environment:
 -- a) mac_i and ip_i stay stable while a frame is read and its reply is

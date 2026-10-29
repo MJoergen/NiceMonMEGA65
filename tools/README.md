@@ -49,7 +49,7 @@ program's console.
 They use `PORT=/dev/ttyUSB1` by default, and pass `ARGS=` on to the tool,
 for example `ARGS=--no-run` or `ARGS="-i in.txt -d 0x100:16 -s --timeout 5"`.
 `ARGS="--tcp 4000"` drives `niceemu --link 4000` instead of the board,
-and `ARGS="--eth 192.168.1.66"` drives the board over its Ethernet port
+and `ARGS="--eth 192.168.1.65"` drives the board over its Ethernet port
 (see [Over Ethernet](#over-ethernet)).
 
 ## Over Ethernet
@@ -60,9 +60,9 @@ Give it one over the UART, then use `--eth` with any tool instead of
 `--port`:
 
     tools/mon.py --port /dev/ttyUSB1
-    mon> w FFFFFF9A C0A80142
+    mon> w FFFFFF9A C0A80141
     mon> q
-    tools/run.py --eth 192.168.1.66 prog.bin
+    tools/run.py --eth 192.168.1.65 prog.bin
 
 `--eth HOST:PORT` names another port. While a host is connected over
 Ethernet, the UART carries no link: its bytes are dropped. The end of

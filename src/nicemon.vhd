@@ -134,7 +134,7 @@
 --         (system.vhd). Read only.
 --     99  The bad or dropped Ethernet frames, eth_rx_bad_i, as 98.
 --     9A  The Ethernet station's IP address, eth_ip_o, the first byte sent
---         in bits 31..24: 0xC0A80142 is 192.168.1.66. G_ETH_IP after
+--         in bits 31..24: 0xC0A80141 is 192.168.1.65. G_ETH_IP after
 --         reset; 0 answers nothing. Read and write.
 --     9B  The first two bytes of its MAC address, eth_mac_o(47 downto 32),
 --         in bits 15..0. Read and write.

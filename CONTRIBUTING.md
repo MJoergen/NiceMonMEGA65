@@ -474,7 +474,7 @@ bitstream has one. Then it hides the ROM and uses the link:
   on a reserved control word, its `trapsym.nasm` with `--symbols`, the demo of the ROM with a few keys and its screen, and
   `examples/build/bench.bin`, but for its cycles, whose table it prints.
 
-With `ETH=IP`, as in `make hwtest ETH=192.168.1.66`, and the board's
+With `ETH=IP`, as in `make hwtest ETH=192.168.1.65`, and the board's
 Ethernet port on this computer's network, it tests the Ethernet station
 after all the other checks, which its failures do not stop. It loads
 the demo, and types F11, I, the IP address, and CR into it as console

@@ -5,7 +5,7 @@
 --
 -- THEORY OF OPERATION
 -- The station has the MAC address 02:4E:49:43:45:00 and the IP address
--- 192.168.1.66; its clocks are 100 MHz and 50 MHz, as on the MEGA65.
+-- 192.168.1.65; its clocks are 100 MHz and 50 MHz, as on the MEGA65.
 -- p_phy sends frames on RXD and CRS_DV, as the PHY does, each with its own
 -- frame check sequence and padded to 60 bytes, and for each that must be
 -- answered, it adds the answer, which this testbench makes itself, to
@@ -66,13 +66,13 @@ architecture simulation of tb_eth is
    type t_frames is array (natural range <>) of t_frame;
 
    constant C_MAC : std_logic_vector(47 downto 0) := X"024E49434500";
-   constant C_IP  : std_logic_vector(31 downto 0) := X"C0A80142";
+   constant C_IP  : std_logic_vector(31 downto 0) := X"C0A80141";
    constant C_US  : t_bytes(0 to 5)               := (X"02", X"4E", X"49", X"43", X"45", X"00");
    -- The other station, which asks
    constant C_OTHER : t_bytes(0 to 5)               := (X"A0", X"B1", X"C2", X"D3", X"E4", X"F5");
    constant C_BC    : t_bytes(0 to 5)               := (others => X"FF");
    constant C_MIX   : t_bytes(0 to 5)               := (X"FF", X"4E", X"49", X"43", X"45", X"00");
-   constant C_TPA   : t_bytes(0 to 3)               := (X"C0", X"A8", X"01", X"42");
+   constant C_TPA   : t_bytes(0 to 3)               := (X"C0", X"A8", X"01", X"41");
    constant C_NOT   : t_bytes(0 to 3)               := (X"C0", X"A8", X"01", X"43");
    constant C_ZERO  : t_bytes(0 to 3)               := (others => X"00");
 

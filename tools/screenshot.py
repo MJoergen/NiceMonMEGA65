@@ -16,7 +16,7 @@ from the demo of the release, with its tag:
 
 and doc/images/ethernet.png, the demo's F11, with:
 
-    printf '\\033[23~i192.168.1.66\\rm02:4E:49:43:45:00\\r' > in.txt
+    printf '\\033[23~i192.168.1.65\\rm02:4E:49:43:45:00\\r' > in.txt
     tools/screenshot.py -i in.txt -n 3000000 -o doc/images/ethernet.png \\
         demo/build/demo.bin
 

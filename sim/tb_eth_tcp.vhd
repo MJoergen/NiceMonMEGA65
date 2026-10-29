@@ -59,7 +59,7 @@ end entity tb_eth_tcp;
 architecture simulation of tb_eth_tcp is
 
    constant C_MAC   : std_logic_vector(47 downto 0) := X"024E49434500";
-   constant C_IP    : std_logic_vector(31 downto 0) := X"C0A80142";
+   constant C_IP    : std_logic_vector(31 downto 0) := X"C0A80141";
    constant C_HMAC  : std_logic_vector(47 downto 0) := X"020000000001";
    constant C_HIP   : std_logic_vector(31 downto 0) := X"C0A80103";
    constant C_HIP2  : std_logic_vector(31 downto 0) := X"C0A80104";

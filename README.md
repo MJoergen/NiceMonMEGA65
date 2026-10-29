@@ -46,7 +46,7 @@ MAC address:
 
 ![The demo's F11, with the Ethernet station's addresses](doc/images/ethernet.png)
 
-The tools take `--eth 192.168.1.66` for this (see
+The tools take `--eth 192.168.1.65` for this (see
 [tools/README.md](tools/README.md#over-ethernet)), and
 [SYSTEM.md](doc/SYSTEM.md#the-ethernet-station) describes the Ethernet
 station. The link has no password, so give the board an IP address only
