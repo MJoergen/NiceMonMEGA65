@@ -10,7 +10,8 @@ the programs of hwtest.py's comparison with run.py --cosim on that port
 and with niceemu alone. Each must print the
 same and exit with the same status. So it checks the RTL, nicelink.py, and
 run.py as hwtest.py does on the board. The simulation runs far slower than
-real time, so the waits are longer, and nice_cpu's benchmark is left out.
+real time, so the waits are longer, and nice_cpu's benchmark and the demo's
+self-test are left out.
 NICE=multi in the environment picks the multi-cycle core, as for make
 test. It prints one line for each check, and last how many passed, and
 exits with status 1 when one fails. niceemu must be built first, with make

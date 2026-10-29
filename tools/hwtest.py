@@ -64,6 +64,9 @@ Checks, in this order:
     - the emulator's trapsym.nasm and its label file, for --symbols
     - the demo of the ROM, demo/demo.nasm, and its screen
     - nice_cpu's benchmark, examples/build/bench.bin, all but its cycles
+    And the demo's self-test, F11, runs with tools/run.py, and its four
+    tests must pass, as their timer and instruction counts depend on the
+    core.
     The programs run with the ROM hidden, so the RAM is at 0.
     With --eth, last of all, the Ethernet station, which no failure above
     or here keeps the other checks from:
@@ -856,6 +859,37 @@ def test_run(link_args: list[str],
               f"{board.stdout!r} {board.stderr!r}")
 
 
+def test_selftest(link_args: list[str], tmp: str) -> None:
+    """Runs the self-test of the demo's F11 with run.py, and checks that
+    its four tests pass. Two of them depend on the core's pipeline, not on
+    the ISA: the timer's 10 interrupts must come in 9500 to 10499 cycles,
+    and the instruction counter must count 9 between two reads of it. So a
+    core that times them otherwise fails here. Below the tests, the screen
+    shows the Ethernet station's addresses and counts, which differ from
+    board to board, so it is not compared with niceemu. link_args are
+    run.py's options for the link. The port must be closed meanwhile."""
+    subprocess.run(["make", "-s", "-C", f"{REPO}/demo", "build/demo_test.bin"],
+                   check=True)
+    keys = os.path.join(tmp, "f11.txt")
+    with open(keys, "wb") as f:
+        f.write(b"\x1b[23~")
+    board = subprocess.run([sys.executable, f"{REPO}/tools/run.py"] +
+                           link_args + ["--timeout", f"{RUN_TIMEOUT:g}", "-s",
+                                        "-i", keys,
+                                        f"{REPO}/demo/build/demo_test.bin"],
+                           stdin=subprocess.DEVNULL, capture_output=True)
+    rows = [line[1:] for line in
+            board.stdout.decode(errors="replace").splitlines()
+            if line.startswith("|")]
+    for name in ("RAM", "Math unit", "Timer", "Performance counters"):
+        row = next((r for r in rows if r.startswith(f"    {name}")), "")
+        ok = row[50:54] == "PASS"
+        check(f"demo self-test: {name}", ok,
+              "" if ok else row.strip() if row else
+              f"no row\n  {board.stdout!r} {board.stderr!r}")
+    check("demo self-test: all passed", "  All tests passed." in rows)
+
+
 def test_bench(link_args: list[str], bench: str) -> None:
     """Runs nice_cpu's benchmark with run.py and with niceemu, which must
     print the same and exit with the same status, but for the cycles, which
@@ -1053,6 +1087,7 @@ def main() -> None:
             serial = ["--port", args.port, "--baud", str(args.baud)]
             test_run(serial, comparisons(tmp))
             test_bench(serial, bench)
+            test_selftest(serial, tmp)
             if not args.eth:
                 uncovered.append("the Ethernet station, without --eth")
             else:

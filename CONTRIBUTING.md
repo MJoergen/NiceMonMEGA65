@@ -303,7 +303,8 @@ shorter in simulated time, and its checks of the pause, the step, and
 the breakpoints.
 Then it runs the programs that `make hwtest` compares, with `run.py
 --cosim` and with `niceemu`, whose output and exit status must be the same.
-It leaves out nice_cpu's benchmark, which would take too long. It takes
+It leaves out nice_cpu's benchmark and the demo's self-test, which would
+take too long. It takes
 about 4 minutes, and CI runs it on both cores.
 
 ## The formal checks
@@ -475,6 +476,11 @@ bitstream has one. Then it hides the ROM and uses the link:
   it halts without reading, the emulator's `reserved.nasm`, which halts
   on a reserved control word, its `trapsym.nasm` with `--symbols`, the demo of the ROM with a few keys and its screen, and
   `examples/build/bench.bin`, but for its cycles, whose table it prints.
+- Then it runs the demo's self-test, F11, with `run.py`, and checks that
+  its four tests pass. The timer's test and the counters' test check
+  counts of the core's pipeline, not of the ISA, so a core whose timing
+  changes fails them. The rest of that screen, the Ethernet station's
+  addresses and counts, differs from board to board and is not compared.
 
 With `ETH=IP`, as in `make hwtest PORT=/dev/ttyUSB1 ETH=192.168.1.65`, and the board's
 Ethernet port on this computer's network, it tests the Ethernet station
@@ -497,8 +503,8 @@ The reset button is not tested: press it with a terminal open, and the
 
 `make linktest` runs `run.py --tcp` on `niceemu --link` against plain
 `niceemu`, without a board, for the programs that `make hwtest` compares,
-and nice_cpu's benchmark when `make examples` has built
-`examples/build/bench.bin`, with `tools/linktest.py`. It runs hwtest's
+the demo's self-test, and nice_cpu's benchmark when `make examples` has
+built `examples/build/bench.bin`, with `tools/linktest.py`. It runs hwtest's
 checks of bad packets, of the pause, of the step, and of the breakpoints
 on `niceemu --link` first, and then `mon.py`'s commands, its disassembly
 among them, as typed at its prompt, with the labels of `sim/break.nasm`.
