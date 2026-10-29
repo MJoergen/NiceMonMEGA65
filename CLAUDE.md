@@ -71,7 +71,8 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   RMII receiver and transmitter, the check of the frames, their FIFOs
   between the clocks, the MAC filter and ARP responder,
   `eth/eth_arp.vhd`, the ping responder, `eth/eth_icmp.vhd`, and the
-  TCP server of the debug link, `eth/eth_tcp.vhd`), and
+  TCP server of the debug link, `eth/eth_tcp.vhd`, with its parser of
+  segments, `eth/eth_tcp_rx.vhd`, and its sender, `eth/eth_tcp_tx.vhd`), and
   `system.vhd`, which every board instantiates.
   `nice_core.vhd` with one architecture from `src/core/` wraps whichever
   nice_cpu core `core.mk` selects (`NICE=pipeline`, the default, or `multi`).

@@ -34,17 +34,14 @@
 -- if its FIN has not come by then, the end is a break. Other SYNs are
 -- ignored while a connection is open.
 --
--- Receive: a frame is read a byte at a time, and its fields are kept: the
--- source MAC address, the IPv4 header without options, and the TCP header,
--- whose options are skipped. The IP header's words are added in ip_sum,
--- and the TCP pseudo header and segment, up to the IP total length, in
--- tcp_sum, both in ones' complement. A segment's data, from the end of
--- its header to the IP total length, goes into the receive buffer at
--- rx_wr as it comes, if it is the next data of the connection (its
--- sequence number is rcv_nxt) and fits (wr_ok, known before the data
--- starts). In the cycle after the last byte (eval), with the stream held,
--- the segment is checked and acted on; its data is committed (rx_cmt) only
--- if all is right, and rcv_nxt moves past it. Every segment with data or
+-- Receive: eth_tcp_rx.vhd reads a frame a byte at a time, keeps the
+-- fields of a TCP segment to this station, and checks its checksums. The
+-- segment's data goes into the receive buffer at rx_wr as it comes, if it
+-- is the next data of the connection (its sequence number is rcv_nxt) and
+-- fits (wr_ok, known before the data starts). In the cycle after the last
+-- byte (eval), with the stream held, the segment is acted on if it is
+-- good; its data is committed (rx_cmt) only then, and rcv_nxt moves past
+-- it. Every segment with data or
 -- a FIN gets an ACK (ack_req), also one that is out of order, which is
 -- dropped, so the host sends it again; so does one without either whose
 -- sequence number is not rcv_nxt, such as a keepalive probe. A segment
@@ -142,14 +139,11 @@ architecture synthesis of eth_tcp is
    constant C_TRIES    : natural := 17;
    constant C_TICK     : natural := G_CLOCK_HZ / 1000;
    constant C_WND_STEP : natural := C_SIZE / 2;
-   -- The longest frame that is read
-   constant C_MAXF : natural := 2047;
 
-   constant C_PORT : std_logic_vector(15 downto 0) := to_stdlogicvector(G_PORT, 16);
-   constant C_FIN  : std_logic_vector(7 downto 0)  := X"01";
-   constant C_SYN  : std_logic_vector(7 downto 0)  := X"02";
-   constant C_PSH  : std_logic_vector(7 downto 0)  := X"08";
-   constant C_ACK  : std_logic_vector(7 downto 0)  := X"10";
+   constant C_FIN : std_logic_vector(7 downto 0) := X"01";
+   constant C_SYN : std_logic_vector(7 downto 0) := X"02";
+   constant C_PSH : std_logic_vector(7 downto 0) := X"08";
+   constant C_ACK : std_logic_vector(7 downto 0) := X"10";
 
    subtype t_ptr is std_logic_vector(G_ADDR_BITS downto 0);
 
@@ -214,29 +208,20 @@ architecture synthesis of eth_tcp is
    -- The receive window of the last segment sent
    signal adv_wnd : natural range 0 to C_SIZE     := 0;
 
-   -- The frame being read
-   signal idx     : natural range 0 to C_MAXF       := 0;
-   signal m_ok    : std_logic                       := '1';
-   signal f_smac  : std_logic_vector(47 downto 0)   := (others => '0');
-   signal f_sip   : std_logic_vector(31 downto 0)   := (others => '0');
-   signal f_sport : std_logic_vector(15 downto 0)   := (others => '0');
-   signal f_dport : std_logic_vector(15 downto 0)   := (others => '0');
-   signal f_seq   : std_logic_vector(31 downto 0)   := (others => '0');
-   signal f_ack   : std_logic_vector(31 downto 0)   := (others => '0');
-   signal f_doff  : std_logic_vector(3 downto 0)    := (others => '0');
-   signal f_flags : std_logic_vector(7 downto 0)    := (others => '0');
-   signal f_win   : std_logic_vector(15 downto 0)   := (others => '0');
-   signal f_len   : std_logic_vector(15 downto 0)   := (others => '0');
-   signal ip_sum  : std_logic_vector(15 downto 0)   := (others => '0');
-   signal tcp_sum : std_logic_vector(15 downto 0)   := (others => '0');
-   signal hi      : std_logic_vector(7 downto 0)    := (others => '0');
-   signal wr_ok   : std_logic                       := '0';
-   signal eval    : std_logic                       := '0';
-   signal ok      : boolean;
-   -- Where the segment's data starts and ends in the frame, and its length
-   signal p_start : natural range 0 to 94;
-   signal p_end   : natural range 0 to 2 ** 16 + 13;
+   -- The segment read (eth_tcp_rx.vhd), in the cycle after its last byte
+   signal eval    : std_logic;
+   signal good    : std_logic;
+   signal f_smac  : std_logic_vector(47 downto 0);
+   signal f_sip   : std_logic_vector(31 downto 0);
+   signal f_sport : std_logic_vector(15 downto 0);
+   signal f_seq   : std_logic_vector(31 downto 0);
+   signal f_ack   : std_logic_vector(31 downto 0);
+   signal f_flags : std_logic_vector(7 downto 0);
+   signal f_win   : std_logic_vector(15 downto 0);
    signal plen    : integer range -80 to 2 ** 16;
+   signal wr_ok   : std_logic;
+   -- The connection takes data.
+   signal take : std_logic;
 
    -- The receive buffer
    signal rx_wr     : t_ptr                        := (others => '0');
@@ -279,43 +264,56 @@ architecture synthesis of eth_tcp is
    signal pick_big : boolean                  := false;
    signal seg_n    : natural range 0 to C_MSS := 0;
 
-   signal mac_b : t_bytes(0 to 5);
-   signal ip_b  : t_bytes(0 to 3);
-   signal conn  : std_logic;
+   signal conn : std_logic;
 
 begin
 
-   mac_b <= b6(mac_i);
-   ip_b  <= b4(ip_i);
-   conn  <= '1' when state = EST_ST or state = CLOSE_WAIT_ST or state = LAST_ACK_ST or
-                     (state = SYN_RCVD_ST and keep = '1') else
-            '0';
-   on_o  <= conn or drain;
+   conn <= '1' when state = EST_ST or state = CLOSE_WAIT_ST or state = LAST_ACK_ST or
+                    (state = SYN_RCVD_ST and keep = '1') else
+           '0';
+   on_o <= conn or drain;
 
    ---------------------------------------------------------------------------
    -- Receive
    ---------------------------------------------------------------------------
 
-   ok <= rx_data_i = mac_b(idx) when idx <= 5 else
-         rx_data_i = X"08" when idx = 12 else
-         rx_data_i = X"00" when idx = 13 else
-         rx_data_i = X"45" when idx = 14 else
-         (rx_data_i and X"BF") = X"00" when idx = 20 else
-         rx_data_i = X"00" when idx = 21 else
-         rx_data_i = X"06" when idx = 23 else
-         rx_data_i = ip_b(idx - 30) when idx >= 30 and idx <= 33 else
-         true;
-
-   p_start <= 34 + 4 * to_integer(f_doff);
-   p_end   <= 14 + to_integer(f_len);
-   plen    <= to_integer(f_len) - 20 - 4 * to_integer(f_doff);
    rx_free <= C_SIZE - to_integer(rx_cmt - rx_rd);
+   take    <= '1' when state /= LISTEN_ST and peer_fin = '0' else
+              '0';
 
-   rx_ready_o <= not eval;
-   -- Below C_MAXF, so that a longer frame writes no more than plen bytes
-   rx_we <= '1' when rx_valid_i = '1' and eval = '0' and wr_ok = '1' and
-                          idx >= p_start and idx < p_end and idx < C_MAXF else
-                 '0';
+   i_eth_tcp_rx : entity work.eth_tcp_rx
+      generic map (
+         G_PORT      => G_PORT,
+         G_ADDR_BITS => G_ADDR_BITS
+      )
+      port map (
+         clk_i      => clk_i,
+         rst_i      => rst_i,
+         mac_i      => mac_i,
+         ip_i       => ip_i,
+         rx_data_i  => rx_data_i,
+         rx_last_i  => rx_last_i,
+         rx_valid_i => rx_valid_i,
+         rx_ready_o => rx_ready_o,
+         take_i     => take,
+         exp_ip_i   => peer_ip,
+         exp_port_i => peer_port,
+         exp_seq_i  => rcv_nxt,
+         free_i     => rx_free,
+         wr_ok_o    => wr_ok,
+         we_o       => rx_we,
+         done_o     => eval,
+         good_o     => good,
+         smac_o     => f_smac,
+         sip_o      => f_sip,
+         sport_o    => f_sport,
+         seq_o      => f_seq,
+         ack_o      => f_ack,
+         flags_o    => f_flags,
+         win_o      => f_win,
+         len_o      => plen
+      ); -- i_eth_tcp_rx
+
 
    i_rx_ram : entity work.eth_ram
       generic map (
@@ -509,86 +507,9 @@ begin
             ack_req <= '1';
          end if;
 
-         ------------------------------------------------------------------
-         -- A byte of a frame
-         ------------------------------------------------------------------
-         if rx_valid_i = '1' and eval = '0' then
-            if idx < C_MAXF then
-               idx <= idx + 1;
-            else
-               m_ok <= '0';
-            end if;
-            if not ok then
-               m_ok <= '0';
-            end if;
-
-            if idx >= 6 and idx <= 11 then
-               f_smac <= f_smac(39 downto 0) & rx_data_i;
-            end if;
-            if idx = 16 or idx = 17 then
-               f_len <= f_len(7 downto 0) & rx_data_i;
-            end if;
-            if idx >= 26 and idx <= 29 then
-               f_sip <= f_sip(23 downto 0) & rx_data_i;
-            end if;
-            if idx = 34 or idx = 35 then
-               f_sport <= f_sport(7 downto 0) & rx_data_i;
-            end if;
-            if idx = 36 or idx = 37 then
-               f_dport <= f_dport(7 downto 0) & rx_data_i;
-            end if;
-            if idx >= 38 and idx <= 41 then
-               f_seq <= f_seq(23 downto 0) & rx_data_i;
-            end if;
-            if idx >= 42 and idx <= 45 then
-               f_ack <= f_ack(23 downto 0) & rx_data_i;
-            end if;
-            if idx = 46 then
-               f_doff <= rx_data_i(7 downto 4);
-            end if;
-            if idx = 47 then
-               f_flags <= rx_data_i;
-            end if;
-            if idx = 48 or idx = 49 then
-               f_win <= f_win(7 downto 0) & rx_data_i;
-            end if;
-
-            -- The checksums. The pseudo header's protocol and TCP length
-            -- are 6 + (f_len - 20), added once f_len is known.
-            if idx mod 2 = 0 then
-               hi <= rx_data_i;
-            end if;
-            if idx >= 14 and idx <= 33 and idx mod 2 = 1 then
-               ip_sum <= ones_add(ip_sum, hi & rx_data_i);
-            end if;
-            if idx = 18 then
-               tcp_sum <= ones_add(tcp_sum, f_len - 14);
-            end if;
-            if idx >= 26 and idx < p_end then
-               if idx mod 2 = 1 then
-                  tcp_sum <= ones_add(tcp_sum, hi & rx_data_i);
-               elsif idx = p_end - 1 then
-                  tcp_sum <= ones_add(tcp_sum, rx_data_i & X"00");
-               end if;
-            end if;
-
-            -- Whether the data is the next of the connection, and fits;
-            -- the header has passed far enough to know.
-            if idx = 47 then
-               if m_ok = '1' and state /= LISTEN_ST and peer_fin = '0' and
-                  f_sip = peer_ip and f_sport = peer_port and
-                  f_dport = C_PORT and f_seq = rcv_nxt and f_doff >= 5 and plen > 0 and
-                  plen <= rx_free then
-                  wr_ok <= '1';
-               end if;
-            end if;
-            if rx_we = '1' then
-               rx_wr <= rx_wr + 1;
-            end if;
-
-            if rx_last_i = '1' then
-               eval <= '1';
-            end if;
+         -- A segment's data, as it comes
+         if rx_we = '1' then
+            rx_wr <= rx_wr + 1;
          end if;
 
          ------------------------------------------------------------------
@@ -596,16 +517,9 @@ begin
          ------------------------------------------------------------------
          timeout_v := false;
          if eval = '1' then
-            eval    <= '0';
-            idx     <= 0;
-            m_ok    <= '1';
-            ip_sum  <= (others => '0');
-            tcp_sum <= (others => '0');
-            wr_ok   <= '0';
-            rx_wr   <= rx_cmt;
+            rx_wr <= rx_cmt;
 
-            if m_ok = '1' and f_dport = C_PORT and ip_sum = X"FFFF" and tcp_sum = X"FFFF" and
-               f_doff >= 5 and plen >= 0 and p_end <= idx and ip_i /= 0 then
+            if good = '1' and ip_i /= 0 then
                from_peer_v := f_sip = peer_ip and f_sport = peer_port;
                syn_v       := f_flags(1) = '1' and f_flags(4) = '0' and f_flags(2) = '0';
 
@@ -854,12 +768,6 @@ begin
             probe     <= '0';
             pend      <= '0';
             keep      <= '0';
-            idx       <= 0;
-            m_ok      <= '1';
-            ip_sum    <= (others => '0');
-            tcp_sum   <= (others => '0');
-            wr_ok     <= '0';
-            eval      <= '0';
             rx_wr     <= (others => '0');
             rx_cmt    <= (others => '0');
             rx_rd     <= (others => '0');

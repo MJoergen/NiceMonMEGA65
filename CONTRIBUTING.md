@@ -112,9 +112,12 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
   `eth/eth_rx_fifo.vhd` takes the good ones to the system clock.
   `eth/eth_arp.vhd` filters them by their MAC address and answers ARP
   requests, `eth/eth_icmp.vhd` answers pings, `eth/eth_tcp.vhd` serves
-  the debug link on a TCP port, `eth/eth_tx_fifo.vhd` takes the frames
-  to send back to the PHY's clock, and `eth/rmii_tx.vhd` sends them. The FIFOs keep their bytes in
-  `eth/eth_ram.vhd`, and `eth/eth_pkg.vhd` has the CRC and the Gray code.
+  the debug link on a TCP port, with `eth/eth_tcp_rx.vhd` parsing its
+  segments and `eth/eth_tcp_tx.vhd` sending them, `eth/eth_tx_fifo.vhd`
+  takes the frames to send back to the PHY's clock, and `eth/rmii_tx.vhd`
+  sends them. The FIFOs and the TCP server keep their bytes in
+  `eth/eth_ram.vhd`, and `eth/eth_pkg.vhd` has the CRC, the Gray code,
+  and the checksum sum.
 - The debug link is nice_cpu's `hdl/src/debug_link.vhd`.
 - `uart_serdes.vhd` is copied from
   [cmod-s7](https://github.com/MJoergen/cmod-s7), with fixes to its
