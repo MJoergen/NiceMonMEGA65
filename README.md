@@ -289,13 +289,6 @@ PC=0000000f
 mon&gt; <b>q</b>
 </pre>
 
-## The other tools
-
-[tools/README.md](tools/README.md) describes the other tools: `load.py`,
-which loads and starts a program, and `run.py`, which runs one as
-`niceemu` runs it, for comparing the two. It also shows how to run a C
-program on the board. They take `--eth` or `--port` as `mon.py` does.
-
 ## Writing programs
 
 Programs are NICE assembly, or C through WebAssembly.
