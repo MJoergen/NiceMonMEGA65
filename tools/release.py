@@ -25,7 +25,7 @@ Nexys4DDR uses only FLOW=timing, as its Makefile does, for it never meets
 timing with the default directives. The R3 tries the default directives
 first and then FLOW=timing, as bump.py does. Each must meet timing. It makes the core files of the R3 and the R6, with the tag as
 their version, which MEGAFLASH shows. Last it runs make hwtest on the R6 bitstream, so a MEGA65 R6
-must be on PORT. It copies the bitstreams, the core files, a zip of the examples, and
+must be on PORT, and with --eth IP its Ethernet port on this computer's network. It copies the bitstreams, the core files, a zip of the examples, and
 verified.json to build/release/V1.0, with notes.md, the release notes, and
 release.json, the commit they were built from. The notes start with the
 tag's section of doc/RELEASE_NOTES.md, whose heading must have the date,
@@ -36,7 +36,7 @@ that HEAD is still the commit of release.json, makes the annotated tag,
 pushes it, and creates the GitHub Release with gh, from the files of
 build/release/V1.0.
 
-Usage: tools/release.py Vmajor.minor[.patch] [--port /dev/ttyUSB1]
+Usage: tools/release.py Vmajor.minor[.patch] [--port /dev/ttyUSB1] [--eth IP]
        tools/release.py Vmajor.minor[.patch] --publish
 
 Needs Vivado, coretool (mega65-tools), openFPGALoader, gh (logged in), and what make test needs.
@@ -303,6 +303,8 @@ def main():
     ap.add_argument("tag", help="the tag, such as V1.0, or V1.0.1 to keep nice_cpu at V1.0")
     ap.add_argument("--port", default="/dev/ttyUSB1", help="the R6's serial port, passed to make hwtest "
                     "(default %(default)s)")
+    ap.add_argument("--eth", metavar="IP", help="also test the R6's Ethernet station, "
+                    "with the IP address IP on this computer's network")
     ap.add_argument("--publish", action="store_true",
                     help="tag, push, and create the GitHub Release from what is staged")
     args = ap.parse_args()
@@ -314,7 +316,8 @@ def main():
             print("release: %s is published" % tag)
             return
         v, head, results, body = stage(tag)
-        run(["make", "hwtest", "BIT=synth/r6/build/top.bit", "PORT=" + args.port])
+        run(["make", "hwtest", "BIT=synth/r6/build/top.bit", "PORT=" + args.port]
+            + (["ETH=" + args.eth] if args.eth else []))
         out = write_stage(tag, v, head, results, body)
     except Failed as e:
         sys.exit("release: %s" % e)

@@ -55,11 +55,12 @@ help:
 	@echo "  make mon [FILE=prog.bin] [PORT=/dev/ttyUSB1]"
 	@echo "                  an interactive shell on the debug link: read and write"
 	@echo "                  memory, pause, step, breakpoints, and the console"
-	@echo "  make hwtest [BIT=synth/r6/build/top.bit] [PORT=/dev/ttyUSB1]"
+	@echo "  make hwtest [BIT=synth/r6/build/top.bit] [PORT=/dev/ttyUSB1] [ETH=IP]"
 	@echo "                  check that the FPGA on PORT's board is the part BIT was"
 	@echo "                  built for, program it with BIT, and run the tests (needs"
 	@echo "                  openFPGALoader); for the Nexys4DDR, give"
-	@echo "                  BIT=synth/nexys4ddr/build/top.bit"
+	@echo "                  BIT=synth/nexys4ddr/build/top.bit; ETH=IP also tests the"
+	@echo "                  Ethernet station, which gets that address"
 	@echo "  make flash [BIT=synth/nexys4ddr/build/top.bit] [PORT=/dev/ttyUSB1] [ARGS=--erase]"
 	@echo "                  write BIT into the Nexys4DDR's flash, from which the board"
 	@echo "                  starts with jumper JP1 on QSPI (needs openFPGALoader)"
@@ -167,8 +168,9 @@ BIT ?= synth/r6/build/top.bit
 $(EMU): $(shell find nice_cpu/emulator/src nice_cpu/emulator/build.zig -type f 2>/dev/null)
 	$(MAKE) -C nice_cpu/emulator build
 
+# ETH=IP tests the Ethernet station too, giving the board that address.
 hwtest: examples $(EMU)
-	$(PYTHON) tools/hwtest.py --port $(PORT) --bit $(BIT)
+	$(PYTHON) tools/hwtest.py --port $(PORT) --bit $(BIT) $(if $(ETH),--eth $(ETH))
 
 # The comparison of hwtest on niceemu --link, which needs no board; it
 # runs the benchmark only when make examples has built it.

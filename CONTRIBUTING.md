@@ -473,6 +473,12 @@ bitstream has one. Then it hides the ROM and uses the link:
   on a reserved control word, its `trapsym.nasm` with `--symbols`, the demo of the ROM with a few keys and its screen, and
   `examples/build/bench.bin`, but for its cycles, whose table it prints.
 
+With `ETH=IP`, as in `make hwtest ETH=192.168.1.66`, and the board's
+Ethernet port on this computer's network, it tests the Ethernet station
+last: it gives the station the IP address over the UART's link, pings
+it, checks the station's counts, and runs the programs above again with
+`run.py --eth`. The address must be free on the network.
+
 The reset button is not tested: press it with a terminal open, and the
 `b05` notice comes again.
 

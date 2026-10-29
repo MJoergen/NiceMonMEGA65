@@ -5,6 +5,7 @@ Usage:
     tools/hwtest.py [--port /dev/ttyUSB1] [--baud 2000000]
                     [--bit synth/r6/build/top.bit]
                     [--board mega65|nexys4ddr] [--no-program]
+                    [--eth HOST[:PORT]]
 
     Build the bitstream and the examples first, and niceemu
     (make -C nice_cpu/emulator build), or the checks that need it are
@@ -14,8 +15,13 @@ Usage:
     By default the name of the --bit file tells: a path with nexys4ddr in
     it is the Nexys4DDR, any other is a MEGA65.
 
-    --no-program skips programming and the check of the b notice, for a
-    board that is already programmed.
+    --no-program skips programming and the boot test, the b notice and the
+    checks of the ROM, for a board that is already programmed.
+
+    --eth HOST tests the Ethernet station too, with the board's Ethernet
+    port on this computer's network: HOST is the IP address the board
+    gets, which no other device may have, and PORT the link's TCP port,
+    4510 by default.
 
 Programming:
     It finds the JTAG cable on the same USB device as the serial port,
@@ -59,6 +65,11 @@ Checks, in this order:
     - the demo of the ROM, demo/demo.nasm, and its screen
     - nice_cpu's benchmark, examples/build/bench.bin, all but its cycles
     The programs run with the ROM hidden, so the RAM is at 0.
+    With --eth, last of all, the Ethernet station:
+    - the IP address is written over the UART's link and read back
+    - ping gets its answers, and the station counts its replies
+    - programs run with tools/run.py --eth and with niceemu, and their
+      output and exit status are compared, as above
 
 Exit status:
     0 if every check passed, else 1.
@@ -74,6 +85,8 @@ Notes:
 import argparse
 import os
 import re
+import socket
+import struct
 import subprocess
 import sys
 import tempfile
@@ -796,13 +809,15 @@ def comparisons(tmp: str) -> list[tuple[str, list[str], bool]]:
 
 
 def test_run(link_args: list[str],
-             programs: list[tuple[str, list[str], bool]]) -> None:
+             programs: list[tuple[str, list[str], bool]],
+             via: str = "") -> None:
     """Runs each program with run.py and with niceemu, which must print the
     same and exit with the same status. link_args are run.py's options for
     the link. A program is (path, options, polls): when polls is true, the
     program waits for input in a loop, which takes more steps on the board,
     where a read returns 0 until a byte arrives, so the step counts are not
-    compared. The port must be closed meanwhile."""
+    compared. via, such as " over Ethernet", names the link in the checks.
+    The port must be closed meanwhile."""
     if not os.path.exists(NICEEMU):
         print(f"  {NICEEMU} is missing; the comparison with the emulator "
               "is skipped")
@@ -823,7 +838,7 @@ def test_run(link_args: list[str],
                                   r.stdout)
         same = (emu.stdout == board.stdout and
                 emu.returncode == board.returncode)
-        check(f"run.py {name} as niceemu", same,
+        check(f"run.py {name} as niceemu{via}", same,
               "" if same else f"\n  niceemu (exit {emu.returncode}): "
               f"{emu.stdout!r}\n  run.py (exit {board.returncode}): "
               f"{board.stdout!r} {board.stderr!r}")
@@ -861,6 +876,25 @@ def test_bench(link_args: list[str], bench: str) -> None:
           f"{board.stdout!r} {board.stderr!r}")
 
 
+def test_eth_address(link: Link, host: str) -> None:
+    """Gives the Ethernet station the IP address of host, over the UART's
+    link, then pings it: the replies come, and the station counts them,
+    with the frames it receives."""
+    ip = struct.unpack(">I", socket.inet_aton(socket.gethostbyname(host)))[0]
+    require(f"eth: IP address {host}", wr(link, 0xFFFFFF9A, ip) and
+            rd(link, 0xFFFFFF9A) == ip, f"{rd(link, 0xFFFFFF9A):08X}")
+    received, sent = rd(link, 0xFFFFFF98), rd(link, 0xFFFFFF9D)
+    ping = subprocess.run(["ping", "-c", "3", "-W", "2", host],
+                          capture_output=True, text=True)
+    check("eth: ping answered", ping.returncode == 0,
+          "" if ping.returncode == 0 else repr(ping.stdout + ping.stderr))
+    # Three echo replies, and an ARP reply unless the host knew the MAC
+    replies = (rd(link, 0xFFFFFF9D) - sent) & 0xFFFFFFFF
+    check("eth: the replies counted", replies >= 3, str(replies))
+    frames = (rd(link, 0xFFFFFF98) - received) & 0xFFFFFFFF
+    check("eth: the requests counted", frames >= 3, str(frames))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--port", default="/dev/ttyUSB1",
@@ -874,7 +908,11 @@ def main() -> None:
     parser.add_argument("--board", choices=["mega65", "nexys4ddr"],
                         help="default: nexys4ddr if --bit has it in its path")
     parser.add_argument("--no-program", action="store_true",
-                        help="do not program the FPGA, and skip the b notice")
+                        help="do not program the FPGA, and skip the boot "
+                        "test")
+    parser.add_argument("--eth", metavar="HOST[:PORT]",
+                        help="test the Ethernet station too, giving it the "
+                        "IP address HOST")
     args = parser.parse_args()
 
     board = args.board or ("nexys4ddr" if "nexys4ddr" in args.bit
@@ -922,11 +960,16 @@ def main() -> None:
                 test_board_devices(link, board)
                 test_fetch_statistics(link)
                 test_primes(link, primes, board)
+                if args.eth:
+                    test_eth_address(link, args.eth.partition(":")[0])
             finally:
                 link.close()
             serial = ["--port", args.port, "--baud", str(args.baud)]
             test_run(serial, comparisons(tmp))
             test_bench(serial, bench)
+            if args.eth:
+                test_run(["--eth", args.eth], comparisons(tmp),
+                         " over Ethernet")
         except LinkError as e:
             print(f"hwtest.py: {e}", file=sys.stderr, flush=True)
             results.append(False)
