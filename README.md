@@ -110,17 +110,17 @@ nothing. In F11, I types a new IP address, and M a new MAC address:
 
 There are two ways to talk to a program on the board through it:
 
-- A plain client, such as `nc 192.168.1.65 4510`, is a terminal to the
-  program. It sends each line you type to the program, and shows what
-  it prints. It has none of the debug link's features: it cannot load a
-  program, pause it, or read its memory, and the link's notices show in
-  it as raw text, such as `h01#C9`.
 - `tools/mon.py --eth 192.168.1.65` is an interactive shell. It has the
   debug link's features and the console, in two modes. At its prompt, it
   takes debug commands, shows the program's output, and decodes the
   notices, and `send TEXT` sends text to the program. Its `console`
   command passes your keys straight to the program, as a terminal does,
   until Ctrl-] returns to the prompt.
+- A plain client, such as `nc 192.168.1.65 4510`, is a terminal to the
+  program. It sends each line you type to the program, and shows what
+  it prints. It has none of the debug link's features: it cannot load a
+  program, pause it, or read its memory, and the link's notices show in
+  it as raw text, such as `h01#C9`.
 
 The other tools take `--eth 192.168.1.65` too (see
 [tools/README.md](tools/README.md#over-ethernet)), and
@@ -143,11 +143,9 @@ their connections so that the line goes back at once.
 ## Over the serial port
 
 The debug link runs over the debug UART too, which needs the JTAG
-cable, whose USB port carries it. It runs at 2 Mbaud (2000000), 8-N-1,
-and is `/dev/ttyUSB1` by default
-([tools/README.md](tools/README.md#the-serial-port) describes the port).
-A terminal program, such as `picocom`, is then the plain client, and
-`tools/mon.py --port /dev/ttyUSB1` the interactive shell, as
+cable, whose USB port carries it. It runs at 2 Mbaud (2000000), 8-N-1.
+`tools/mon.py --port /dev/ttyUSB1` is then the interactive shell, and a
+terminal program, such as `picocom`, the plain client, as
 [over Ethernet](#over-ethernet). The other tools take `--port` too.
 
 The serial port also gives the board its IP address without the demo.
