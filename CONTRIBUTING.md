@@ -388,9 +388,16 @@ every time, not only the ones a testbench sends.
   few each; `make -j formal` runs all the tasks side by side. CI runs `make -j4
   formal` on its four processors.
 
+- `eth_tcp_timer.sby` proves the TCP server's retransmission timer,
+  `src/eth/eth_tcp_timer.vhd`, with a millisecond of 3 cycles, a timeout
+  of 2, and 3 tries: the counts stay in their ranges, the timer runs out
+  only at a tick while it is armed, never in the cycle after it was held
+  or ran out, and not before its time, each timeout counts a try but the
+  last, and what the connection tells it lands in the cycle after.
+
 The checks in `rx_fifo.vhd`, `board_io.vhd`, `scr_regs.vhd`,
-`devices.vhd`, `mem.vhd`, and `nicemon.vhd` are in `G_FORMAL` blocks,
-which are off in simulation and synthesis.
+`devices.vhd`, `mem.vhd`, `nicemon.vhd`, and `eth/eth_tcp_timer.vhd` are
+in `G_FORMAL` blocks, which are off in simulation and synthesis.
 
 ## Testing the board
 

@@ -94,7 +94,8 @@ FORMAL_TASKS = rx_fifo-prove rx_fifo-cover board_io-prove board_io-none board_io
                scr_regs-prove scr_regs-cover devices-prove devices-cover \
                mem-prove mem-model mem-cover \
                nicemon-run nicemon-link nicemon-cover \
-               nicemon-rom nicemon-rom_cover
+               nicemon-rom nicemon-rom_cover \
+               eth_tcp_timer-prove eth_tcp_timer-cover
 
 formal: $(addprefix formal-,$(FORMAL_TASKS))
 

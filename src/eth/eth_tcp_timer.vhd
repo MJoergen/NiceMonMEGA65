@@ -19,6 +19,13 @@
 -- a) restart_i and tries_clr_i are '1' only in the cycle after hold_i or
 --    timeout_o was '1', so that no tick meets them.
 --
+-- With G_FORMAL, it states the properties that formal/eth_tcp_timer.sby
+-- proves: the counts stay in their ranges, the timer runs out only at a
+-- tick while it is armed, never in the cycle after it was held or ran
+-- out, and not before (G_RTO_MS - 1) * G_TICK - 1 cycles after the
+-- count started; each timeout counts a try, but the last; and what the
+-- connection tells it lands in the cycle after.
+--
 -- RESET
 -- Synchronous, to clk_i. Reset clears the counts.
 
@@ -30,7 +37,9 @@ entity eth_tcp_timer is
    generic (
       G_TICK   : natural;
       G_RTO_MS : natural := 300;
-      G_TRIES  : natural := 17
+      G_TRIES  : natural := 17;
+      -- The properties for formal/eth_tcp_timer.sby
+      G_FORMAL : boolean := false
    );
    port (
       clk_i       : in  std_logic;
@@ -110,5 +119,49 @@ begin
          end if;
       end if;
    end process p_timer;
+
+
+   gen_formal : if G_FORMAL generate
+      -- Cycles since the count was 0, as far as the properties need
+      signal f_since : natural range 0 to G_RTO_MS * G_TICK := 0;
+   begin
+
+      p_since : process (clk_i)
+      begin
+         if rising_edge(clk_i) then
+            if rto_cnt = 0 then
+               f_since <= 0;
+            elsif f_since < G_RTO_MS * G_TICK then
+               f_since <= f_since + 1;
+            end if;
+         end if;
+      end process p_since;
+
+      -- psl default clock is rising_edge(clk_i);
+
+      -- psl f_tick_cnt : assert always tick_cnt < G_TICK;
+      -- psl f_rto_cnt : assert always rto_cnt < G_RTO_MS;
+      -- psl f_tries : assert always tries < G_TRIES;
+      -- psl f_last : assert always last_try_o = '1' -> tries = G_TRIES - 1;
+      -- psl f_not_last : assert always tries = G_TRIES - 1 -> last_try_o = '1';
+      -- psl f_armed : assert always timeout = '1' -> armed_i = '1' and tick_cnt = G_TICK - 1;
+      -- psl f_still : assert always {hold_i or timeout} |=> {not timeout};
+      -- psl f_apart : assert always not (timeout = '1' and (restart_i = '1' or tries_clr_i = '1'));
+      -- psl f_restart : assert always {restart_i} |=> {rto_cnt = 0 and tries = 0};
+      -- psl f_tries_clr : assert always {tries_clr_i} |=> {tries = 0};
+      -- psl f_unarmed : assert always {tick and not armed_i} |=> {rto_cnt = 0 and tries = 0};
+      -- psl f_try : assert always {timeout and not last_try_o and not rst_i} |=>
+      --    {rst_i = '1' or (rto_cnt = 0 and tries = prev(tries) + 1)};
+      -- psl f_last_try : assert always {timeout and last_try_o and not rst_i} |=>
+      --    {rst_i = '1' or (rto_cnt = 0 and tries = prev(tries))};
+      -- psl f_count : assert always rto_cnt > 0 -> f_since >= (rto_cnt - 1) * G_TICK + tick_cnt;
+      -- psl f_spacing : assert always timeout = '1' -> f_since >= (G_RTO_MS - 1) * G_TICK - 1;
+
+      -- psl c_timeout : cover {timeout and not rst_i};
+      -- psl c_last : cover {timeout and last_try_o and not rst_i};
+      -- psl c_restart : cover {restart_i and not rst_i; tick and armed_i};
+      -- psl c_deferred : cover {tick_cnt = G_TICK - 1 and hold_i = '1' and armed_i = '1' and
+      --    rto_cnt = G_RTO_MS - 1 and rst_i = '0'};
+   end generate gen_formal;
 
 end architecture synthesis;
