@@ -4,6 +4,11 @@
 
 The NICE CPU on the MEGA65, with a debug link and a demo in its ROM
 
+![The demo's welcome screen](doc/images/demo.png)
+
+The demo in the ROM, which the core runs at power-up (see
+[demo/](demo/README.md)).
+
 This project runs the [NICE CPU](https://github.com/MJoergen/nice_cpu) on
 the [MEGA65](https://mega65.org/) (R3 and R6), a modern FPGA computer in
 the form of a Commodore 65. NICE is a 32-bit CPU with its own instruction
