@@ -8,9 +8,10 @@
 -- carrier that many nibbles before its end, so CRS_DV toggles over them, as
 -- a PHY's does when it still holds the frame's di-bits. A frame with an
 -- odd nibble ends half a byte late, and a false carrier sends "10" instead
--- of a frame. p_check takes the bytes and the ends of the frames, and
--- checks them against what p_phy sent: every frame but the false carrier
--- ends once, with err_o only for the odd nibble.
+-- of a frame. A frame with rxer sets RX_ER for one di-bit in its middle.
+-- p_check takes the bytes and the ends of the frames, and checks them
+-- against what p_phy sent: every frame but the false carrier ends once,
+-- with err_o only for the odd nibble and RX_ER.
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -28,24 +29,27 @@ architecture simulation of tb_rmii_rx is
       toggle : natural; -- nibbles at the end with the carrier gone
       odd    : boolean; -- a nibble more at the end
       falsec : boolean; -- a false carrier, and no frame
+      rxer   : boolean; -- RX_ER in the middle
    end record t_frame;
 
    type t_frames is array (natural range <>) of t_frame;
 
    constant C_FRAMES : t_frames := (
-      (64,  0, false, false),
-      (60,  6, false, false),
-      (1,   0, false, false),
-      (0,   0, true,  true),
-      (100, 1, false, false),
-      (20,  0, true,  false),
-      (64,  2, false, false)
+      (64,  0, false, false, false),
+      (60,  6, false, false, false),
+      (1,   0, false, false, false),
+      (0,   0, true,  true,  false),
+      (100, 1, false, false, false),
+      (20,  0, true,  false, false),
+      (64,  0, false, false, true),
+      (64,  2, false, false, false)
    );
 
    signal clk    : std_logic;
    signal rst    : std_logic := '1';
    signal rxd    : std_logic_vector(1 downto 0) := "00";
    signal crs_dv : std_logic := '0';
+   signal rx_er  : std_logic := '0';
 
    signal data  : std_logic_vector(7 downto 0);
    signal valid : std_logic;
@@ -74,6 +78,7 @@ begin
          rst_i    => rst,
          rxd_i    => rxd,
          crs_dv_i => crs_dv,
+         rx_er_i  => rx_er,
          data_o   => data,
          valid_o  => valid,
          eof_o    => eof,
@@ -133,12 +138,14 @@ begin
 
             gone_v := n_v - 2 * C_FRAMES(k).toggle;
             for j in 0 to n_v - 1 loop
+               rx_er <= '1' when C_FRAMES(k).rxer and j = n_v / 2 else '0';
                if j < gone_v or j mod 2 = 1 then
                   send(dibits_v(2 * j + 1 downto 2 * j), '1');
                else
                   send(dibits_v(2 * j + 1 downto 2 * j), '0');
                end if;
             end loop;
+            rx_er <= '0';
          end if;
       end loop;
 
@@ -178,7 +185,7 @@ begin
          assert i_v = C_FRAMES(k_v).len
             report "tb_rmii_rx: frame " & integer'image(k_v) & " has " & integer'image(i_v) & " bytes"
             severity failure;
-         assert (err = '1') = C_FRAMES(k_v).odd
+         assert (err = '1') = (C_FRAMES(k_v).odd or C_FRAMES(k_v).rxer)
             report "tb_rmii_rx: wrong error of frame " & integer'image(k_v)
             severity failure;
          k_v := k_v + 1;

@@ -88,8 +88,8 @@ set_property -dict {PACKAGE_PIN V10  IOSTANDARD LVCMOS33} [get_ports {sw_i[15]}]
 ## The Ethernet PHY, an SMSC LAN8720A. It is RMII, clocked by 50 MHz from
 ## the FPGA on ETH_REFCLK, as on the MEGA65 (mega65.xdc). MDC and MDIO are
 ## left out, as no PHY register needs reading or writing, and so is ETH_INTN.
-## top.vhd drives the clock and the reset, src/eth/rmii_rx.vhd takes RXD
-## and CRS_DV, and src/eth/rmii_tx.vhd drives TXD and TXEN. RXERR is unused.
+## top.vhd drives the clock and the reset, src/eth/rmii_rx.vhd takes RXD,
+## CRS_DV, and RXERR, and src/eth/rmii_tx.vhd drives TXD and TXEN.
 set_property -dict {PACKAGE_PIN D5   IOSTANDARD LVCMOS33} [get_ports {eth_clk_o}];    # ETH_REFCLK
 set_property -dict {PACKAGE_PIN B3   IOSTANDARD LVCMOS33} [get_ports {eth_rst_n_o}];  # ETH_RSTN
 set_property -dict {PACKAGE_PIN C11  IOSTANDARD LVCMOS33} [get_ports {eth_rxd_i[0]}]; # ETH_RXD[0]
@@ -112,13 +112,13 @@ create_generated_clock -name eth_clk_pin -divide_by 1 \
 set_false_path -to [get_ports {eth_rst_n_o}]
 set_property IOB TRUE [get_ports {eth_rst_n_o}]
 
-## The LAN8720A, in REF_CLK In mode, drives RXD and CRS_DV 3 to 14 ns after
-## the clock's rising edge (toval and tohold, section 5.5.4.2 of its data
-## sheet, DS00002165B), and the maximum has 1 ns more for the two traces.
-## Their registers are in the I/O tiles.
-set_input_delay -clock eth_clk_pin -max 15.000 [get_ports {eth_rxd_i[*] eth_crs_dv_i}]
-set_input_delay -clock eth_clk_pin -min  3.000 [get_ports {eth_rxd_i[*] eth_crs_dv_i}]
-set_property IOB TRUE [get_ports {eth_rxd_i[*] eth_crs_dv_i}]
+## The LAN8720A, in REF_CLK In mode, drives RXD, CRS_DV, and RXER 3 to 14 ns
+## after the clock's rising edge (toval and tohold, section 5.5.4.2 of its
+## data sheet, DS00002165B), and the maximum has 1 ns more for the two
+## traces. Their registers are in the I/O tiles.
+set_input_delay -clock eth_clk_pin -max 15.000 [get_ports {eth_rxd_i[*] eth_crs_dv_i eth_rxer_i}]
+set_input_delay -clock eth_clk_pin -min  3.000 [get_ports {eth_rxd_i[*] eth_crs_dv_i eth_rxer_i}]
+set_property IOB TRUE [get_ports {eth_rxd_i[*] eth_crs_dv_i eth_rxer_i}]
 
 ## The clock on the pin rises 2.5 ns before the clock inside (clk_rst.vhd),
 ## so the data of one of its edges is sampled by the second edge inside

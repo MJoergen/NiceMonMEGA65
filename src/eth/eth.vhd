@@ -75,6 +75,7 @@ entity eth is
       eth_rst_i   : in  std_logic;
       rxd_i       : in  std_logic_vector(1 downto 0);
       crs_dv_i    : in  std_logic;
+      rx_er_i     : in  std_logic;
       txd_o       : out std_logic_vector(1 downto 0);
       tx_en_o     : out std_logic
    );
@@ -155,6 +156,7 @@ begin
          rst_i    => eth_rst_i,
          rxd_i    => rxd_i,
          crs_dv_i => crs_dv_i,
+         rx_er_i  => rx_er_i,
          data_o   => rx_data,
          valid_o  => rx_valid,
          eof_o    => rx_eof,

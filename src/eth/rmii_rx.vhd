@@ -4,8 +4,8 @@
 -- the last four bytes, for rx_fcs.vhd.
 --
 -- THEORY OF OPERATION
--- The PHY drives CRS_DV and RXD[1:0] from the 50 MHz reference clock, which
--- is clk_i, and both pass through a register in the IOB first. A di-bit is
+-- The PHY drives CRS_DV, RXD[1:0], and RX_ER from the 50 MHz reference
+-- clock, which is clk_i, and all pass through a register in the IOB first. A di-bit is
 -- two bits of a byte, LSB first, so four di-bits make a byte. CRS_DV rises
 -- when the PHY sees a carrier, and RXD is then "00" until the preamble's
 -- "01" di-bits, which end with the "11" of the start of frame delimiter.
@@ -18,7 +18,8 @@
 -- read only on the second di-bit of each nibble: clear there ends the
 -- frame, and eof_o is '1' for a cycle, two cycles after the last byte's
 -- valid_o. err_o is '1' with eof_o when the frame did not end on a byte,
--- and the partial byte is dropped.
+-- and the partial byte is dropped, or when RX_ER was '1' during the frame,
+-- as the PHY sets it for a symbol it could not decode (bad).
 -- At 10 Mbit/s the PHY repeats each di-bit ten times; that is not handled.
 --
 -- RESET
@@ -35,6 +36,7 @@ entity rmii_rx is
       -- The PHY's pins
       rxd_i    : in  std_logic_vector(1 downto 0);
       crs_dv_i : in  std_logic;
+      rx_er_i  : in  std_logic;
       -- The frame
       data_o   : out std_logic_vector(7 downto 0);
       valid_o  : out std_logic;
@@ -48,12 +50,15 @@ architecture synthesis of rmii_rx is
    -- The IOB registers of the pins
    signal rxd    : std_logic_vector(1 downto 0);
    signal crs_dv : std_logic;
+   signal rx_er  : std_logic;
 
    type   t_state is (IDLE_ST, PREAMBLE_ST, DATA_ST, DROP_ST);
    signal state : t_state                      := IDLE_ST;
    -- The di-bit of the byte, 0 to 3; bit 0 is '1' on a nibble's second
    signal dibit : std_logic_vector(1 downto 0) := "00";
    signal byte  : std_logic_vector(7 downto 0) := (others => '0');
+   -- RX_ER came during the frame.
+   signal bad   : std_logic                    := '0';
 
 begin
 
@@ -62,6 +67,7 @@ begin
       if rising_edge(clk_i) then
          rxd    <= rxd_i;
          crs_dv <= crs_dv_i;
+         rx_er  <= rx_er_i;
       end if;
    end process p_pins;
 
@@ -84,6 +90,7 @@ begin
                   state <= IDLE_ST;
                elsif rxd = "11" then
                   dibit <= "00";
+                  bad   <= '0';
                   state <= DATA_ST;
                elsif rxd = "10" then
                   state <= DROP_ST;
@@ -94,11 +101,14 @@ begin
                   -- The carrier is gone, and so are the di-bits. On a byte,
                   -- this is the second di-bit after the last byte.
                   eof_o <= '1';
-                  if dibit /= "01" then
+                  if dibit /= "01" or bad = '1' then
                      err_o <= '1';
                   end if;
                   state <= IDLE_ST;
                else
+                  if rx_er = '1' then
+                     bad <= '1';
+                  end if;
                   byte  <= rxd & byte(7 downto 2);
                   dibit <= dibit + 1;
                   if dibit = "11" then

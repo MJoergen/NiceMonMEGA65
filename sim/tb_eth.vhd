@@ -335,6 +335,7 @@ begin
          eth_rst_i   => rst,
          rxd_i       => rxd,
          crs_dv_i    => crs_dv,
+         rx_er_i     => '0',
          txd_o       => txd,
          tx_en_o     => tx_en
       ); -- i_eth

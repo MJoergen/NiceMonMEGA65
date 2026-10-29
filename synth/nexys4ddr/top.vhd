@@ -262,6 +262,7 @@ begin
          eth_rst_i    => eth_rst,
          eth_rxd_i    => eth_rxd_i,
          eth_crs_dv_i => eth_crs_dv_i,
+         eth_rx_er_i  => eth_rxer_i,
          eth_txd_o    => eth_txd_o,
          eth_tx_en_o  => eth_tx_en_o,
          vga_clk_i    => vga_clk,

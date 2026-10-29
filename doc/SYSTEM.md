@@ -324,7 +324,8 @@ link on TCP port 4510.
 The counts start at 0 at reset and wrap at 2^32. A good frame has at
 least 64 bytes and a right frame check sequence, and has come through the
 FIFO of received frames to the system clock. A bad frame has a wrong
-sequence, is shorter, or did not end on a byte. A good frame is dropped
+sequence, is shorter, did not end on a byte, or had a receive error, a
+symbol that the PHY could not decode. A good frame is dropped
 when it finds that FIFO full. The PHY negotiates the link on its own, so
 a cable to a switch gives a good count that rises with the broadcasts on
 the network, and a bad count that stays at 0.

@@ -87,6 +87,7 @@ entity system is
       eth_rst_i    : in  std_logic                    := '1';
       eth_rxd_i    : in  std_logic_vector(1 downto 0) := "00";
       eth_crs_dv_i : in  std_logic                    := '0';
+      eth_rx_er_i  : in  std_logic                    := '0';
       eth_txd_o    : out std_logic_vector(1 downto 0);
       eth_tx_en_o  : out std_logic;
 
@@ -230,6 +231,7 @@ begin
          eth_rst_i   => eth_rst_i,
          rxd_i       => eth_rxd_i,
          crs_dv_i    => eth_crs_dv_i,
+         rx_er_i     => eth_rx_er_i,
          txd_o       => eth_txd_o,
          tx_en_o     => eth_tx_en_o
       ); -- i_eth
