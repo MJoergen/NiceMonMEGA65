@@ -37,6 +37,10 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   not `held, after a halt`, and the control register reads `00000009`.
   A hold alone keeps them, as before
   ([#32](https://github.com/MJoergen/NiceMonMEGA65/issues/32)).
+- `load.py`, `run.py`, and `mon.py` have no default line: they need
+  `--eth`, `--port`, `--tcp`, or `--cosim`, and stop with an error
+  without one. `/dev/ttyUSB1` was the default before. Likewise,
+  `make load`, `make run`, and `make mon` need `ETH=` or `PORT=`.
 
 **Ethernet**
 

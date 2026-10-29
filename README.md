@@ -160,7 +160,7 @@ The link writes it to `0xFFFFFF9A`, the first byte in bits 31..24, here
 
 `tools/mon.py` takes the connection to the board as an option, as the
 other tools do: `--eth` for the Ethernet port, or `--port` for the
-serial port, which is `/dev/ttyUSB1` when neither is given:
+serial port. One of the two must be given:
 
     tools/mon.py --eth 192.168.1.65
     tools/mon.py --port /dev/ttyUSB1

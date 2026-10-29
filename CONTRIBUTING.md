@@ -49,9 +49,10 @@ or, in an existing clone:
   board](#the-simulated-board)).
 
 `make load`, `make run`, and `make mon` use the board's Ethernet port
-with `ETH=192.168.1.65`, and otherwise the serial device
-`PORT=/dev/ttyUSB1`. They pass `ARGS=` on to the tool, for
-example `ARGS=--no-run` or `ARGS="-i in.txt -d 0:10 -s --timeout 5"`.
+with `ETH=192.168.1.65`, or the serial device with `PORT=/dev/ttyUSB1`,
+and need one of the two, unless `ARGS=` picks the line, as below. They
+pass `ARGS=` on to the tool, for example `ARGS=--no-run` or
+`ARGS="-i in.txt -d 0:10 -s --timeout 5"`.
 `ARGS="--tcp 4000"` drives `niceemu --link 4000` instead of the board, and
 `ARGS="--cosim 4000"` the simulated system of `make cosim COSIM_PORT=4000`.
 The bitstream targets take `FLOW=default` or `FLOW=timing`, the directives

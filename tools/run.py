@@ -11,12 +11,13 @@ the --dump and --screen output. So the output of the two can be compared:
     diff <(niceemu -i in.txt prog.bin) <(tools/run.py -i in.txt prog.bin)
 
 Usage:
-    tools/run.py [--port /dev/ttyUSB1] [--baud 2000000] [--eth HOST[:PORT]]
-                 [--tcp PORT] [--cosim PORT] [-i FILE] [-d ADDR:N]... [-s] [-2004]
+    tools/run.py (--eth HOST[:PORT] | --port DEVICE [--baud 2000000]
+                 | --tcp PORT | --cosim PORT) [-i FILE] [-d ADDR:N]... [-s] [-2004]
                  [--symbols FILE] [--timeout SEC] FILE.bin
 
-    --eth HOST runs it on the board over its Ethernet port, as for
-    tools/load.py. --tcp PORT runs the program on "niceemu --link PORT" instead of the
+    One of --eth, --port, --tcp, and --cosim must be given. --eth HOST
+    runs it on the board over its Ethernet port, and --port DEVICE on its
+    debug UART, as for tools/load.py. --tcp PORT runs the program on "niceemu --link PORT" instead of the
     board, which checks this script and the link against the emulator.
     --cosim PORT runs it on the simulated system of "make -C sim cosim",
     which checks the RTL too.

@@ -636,23 +636,25 @@ def read_words(link: Link, addrs: list[int]) -> list[int]:
 def add_arguments(parser: argparse.ArgumentParser) -> None:
     """The options that pick the link: --port and --baud for the board's
     debug UART, --eth for its Ethernet port, --tcp for niceemu --link, or
-    --cosim for make -C sim cosim."""
-    parser.add_argument("--port", default="/dev/ttyUSB1",
-                        help="the serial device of the board's debug UART "
-                        "(default /dev/ttyUSB1)")
+    --cosim for make -C sim cosim. One of --port, --eth, --tcp, and
+    --cosim must be given."""
+    line = parser.add_mutually_exclusive_group(required=True)
+    line.add_argument("--port", metavar="DEVICE",
+                      help="the serial device of the board's debug UART, "
+                      "such as /dev/ttyUSB1")
     parser.add_argument("--baud", type=int, default=2000000,
                         help="the UART's baud rate (default %(default)s)")
-    parser.add_argument("--eth", metavar="HOST[:PORT]",
-                        help="talk to the board over TCP on its Ethernet "
-                        f"port, at HOST (default port {ETH_PORT}), not on "
-                        "its UART")
-    parser.add_argument("--tcp", type=int, metavar="PORT",
-                        help="talk to niceemu --link PORT on 127.0.0.1, not "
-                        "to the board")
-    parser.add_argument("--cosim", type=int, metavar="PORT",
-                        help="talk to the simulated system of make -C sim "
-                        "cosim on port PORT of 127.0.0.1, not to the board; "
-                        "slow, about 250 UART bytes a second")
+    line.add_argument("--eth", metavar="HOST[:PORT]",
+                      help="talk to the board over TCP on its Ethernet "
+                      f"port, at HOST (default port {ETH_PORT}), not on "
+                      "its UART")
+    line.add_argument("--tcp", type=int, metavar="PORT",
+                      help="talk to niceemu --link PORT on 127.0.0.1, not "
+                      "to the board")
+    line.add_argument("--cosim", type=int, metavar="PORT",
+                      help="talk to the simulated system of make -C sim "
+                      "cosim on port PORT of 127.0.0.1, not to the board; "
+                      "slow, about 250 UART bytes a second")
 
 
 def check_version(link: Link) -> int:

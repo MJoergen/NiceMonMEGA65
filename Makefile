@@ -5,11 +5,12 @@
 NICE   ?= pipeline
 export NICE
 PYTHON ?= python3
-PORT   ?= /dev/ttyUSB1
+PORT   ?=
 ETH    ?=
 ARGS   ?=
-# The line of load, run, and mon: the Ethernet port with ETH=IP, else PORT
-LINK    = $(if $(ETH),--eth $(ETH),--port $(PORT))
+# The line of load, run, and mon: the Ethernet port with ETH=IP, or the
+# serial device PORT; ARGS may pick --tcp or --cosim instead
+LINK    = $(if $(ETH),--eth $(ETH)) $(if $(PORT),--port $(PORT))
 EMU     = nice_cpu/emulator/zig-out/bin/niceemu
 
 .PHONY: help test formal lint examples demo r3 r6 nexys4ddr cor bump release load run mon flash hwtest linktest cosim cosimtest clean
@@ -50,12 +51,12 @@ help:
 	@echo "                  build, test, and stage a release in build/release (V1.0.1"
 	@echo "                  keeps nice_cpu at V1.0); with"
 	@echo "                  --publish, tag it and create the GitHub Release (doc/RELEASE.md)"
-	@echo "  make load FILE=prog.bin [ETH=IP | PORT=/dev/ttyUSB1] [ARGS=--no-run]"
+	@echo "  make load FILE=prog.bin (ETH=IP | PORT=/dev/ttyUSB1) [ARGS=--no-run]"
 	@echo "                  load a program into the board (MEGA65 or Nexys4DDR) and"
 	@echo "                  start it"
-	@echo "  make run FILE=prog.bin [ETH=IP | PORT=/dev/ttyUSB1] [ARGS='-i in.txt -d 0x100:16 -s --timeout 5']"
+	@echo "  make run FILE=prog.bin (ETH=IP | PORT=/dev/ttyUSB1) [ARGS='-i in.txt -d 0x100:16 -s --timeout 5']"
 	@echo "                  run a program on the board, and print what niceemu prints"
-	@echo "  make mon [FILE=prog.bin] [ETH=IP | PORT=/dev/ttyUSB1]"
+	@echo "  make mon [FILE=prog.bin] (ETH=IP | PORT=/dev/ttyUSB1)"
 	@echo "                  an interactive shell on the debug link: read and write"
 	@echo "                  memory, pause, step, breakpoints, and the console"
 	@echo "  make hwtest [BIT=synth/r6/build/top.bit] [PORT=/dev/ttyUSB1] [ETH=IP]"
@@ -146,7 +147,7 @@ bump:
 # A release after a bump: staged first, then published (doc/RELEASE.md)
 release:
 	@test -n "$(TAG)" || (echo "Give the tag with TAG=V1.0, or TAG=V1.0.1 to keep nice_cpu"; exit 1)
-	$(PYTHON) tools/release.py --port $(PORT) $(ARGS) $(TAG)
+	$(PYTHON) tools/release.py $(if $(PORT),--port $(PORT)) $(ARGS) $(TAG)
 
 load:
 	@test -n "$(FILE)" || (echo "Give the program with FILE=prog.bin"; exit 1)
@@ -162,7 +163,7 @@ mon:
 # The flash of the Nexys4DDR (tools/flash.py); BIT on the command line
 # overrides the default.
 flash:
-	$(PYTHON) tools/flash.py --port $(PORT) --bit $(if $(filter command line,$(origin BIT)),$(BIT),synth/nexys4ddr/build/top.bit) $(ARGS)
+	$(PYTHON) tools/flash.py $(if $(PORT),--port $(PORT)) --bit $(if $(filter command line,$(origin BIT)),$(BIT),synth/nexys4ddr/build/top.bit) $(ARGS)
 
 BIT ?= synth/r6/build/top.bit
 
@@ -173,7 +174,7 @@ $(EMU): $(shell find nice_cpu/emulator/src nice_cpu/emulator/build.zig -type f 2
 
 # ETH=IP tests the Ethernet station too, giving the board that address.
 hwtest: examples $(EMU)
-	$(PYTHON) tools/hwtest.py --port $(PORT) --bit $(BIT) $(if $(ETH),--eth $(ETH))
+	$(PYTHON) tools/hwtest.py $(if $(PORT),--port $(PORT)) --bit $(BIT) $(if $(ETH),--eth $(ETH))
 
 # The comparison of hwtest on niceemu --link, which needs no board; it
 # runs the benchmark only when make examples has built it.

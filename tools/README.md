@@ -33,8 +33,8 @@ major other than 0, which they do not know (DEBUG.md §9).
 
 Each tool takes the line as an option: `--eth 192.168.1.65` for the
 Ethernet port (see [Over Ethernet](#over-ethernet)), or `--port` for
-the serial port (see [The serial port](#the-serial-port)), which is
-`/dev/ttyUSB1` when neither is given.
+the serial port (see [The serial port](#the-serial-port)), such as
+`--port /dev/ttyUSB1`. One of the two must be given.
 
 `make` has a target for each tool:
 
@@ -44,8 +44,8 @@ the serial port (see [The serial port](#the-serial-port)), which is
 - `make mon` opens an interactive shell on the link (see
   [mon.py](#monpy)).
 
-They take `ETH=192.168.1.65` for the Ethernet port, and use
-`PORT=/dev/ttyUSB1` without it. They pass `ARGS=` on to the tool, for
+They take `ETH=192.168.1.65` for the Ethernet port, or
+`PORT=/dev/ttyUSB1` for the serial port, and one of the two. They pass `ARGS=` on to the tool, for
 example `ARGS=--no-run` or `ARGS="-i in.txt -d 0x100:16 -s --timeout 5"`.
 `ARGS="--tcp 4000"` drives `niceemu --link 4000` instead of the board.
 
@@ -77,9 +77,9 @@ the board an IP address only on a network you trust.
 ## The serial port
 
 The MEGA65's debug UART runs at 2 Mbaud (2000000), 8-N-1, and needs the
-JTAG cable, whose USB port carries it. The tools use the serial device
-`/dev/ttyUSB1`. If yours is another, give it to the tools with `--port`,
-or to `make` with `PORT=`, and open it in your terminal program. On
+JTAG cable, whose USB port carries it. It is usually the serial device
+`/dev/ttyUSB1`. Give it to the tools with `--port`, or to `make` with
+`PORT=`, and open it in your terminal program. On
 macOS, use the `/dev/cu.*` device, as a `/dev/tty.*` device blocks on
 open. The port must not be open in a terminal while a tool runs.
 
@@ -255,13 +255,13 @@ example](../README.md#using-the-interactive-shell).
 
 ### Starting it
 
-    tools/mon.py [--eth HOST[:PORT]] [--port /dev/ttyUSB1] [--baud 2000000]
-                 [--tcp PORT] [--cosim PORT] [--symbols FILE] [FILE.bin]
+    tools/mon.py (--eth HOST[:PORT] | --port DEVICE [--baud 2000000]
+                 | --tcp PORT | --cosim PORT) [--symbols FILE] [FILE.bin]
 
 - `--eth HOST` talks to the board over its Ethernet port, at its IP
   address HOST (see [Over Ethernet](#over-ethernet)).
-- `--port` names the serial device of the board's debug UART,
-  `/dev/ttyUSB1` by default, and `--baud` its rate, 2000000 by default.
+- `--port DEVICE` names the serial device of the board's debug UART,
+  such as `/dev/ttyUSB1`, and `--baud` its rate, 2000000 by default.
 - `--tcp PORT` talks to `niceemu --link PORT` instead of the board.
 - `--cosim PORT` talks to the simulated system of `make cosim`, at
   about 250 UART bytes a second.
@@ -273,7 +273,8 @@ example](../README.md#using-the-interactive-shell).
   starts with `status`, and leaves the core as it is.
 
 `make mon ETH=192.168.1.65` runs it over the Ethernet port, and
-`make mon` on `PORT=/dev/ttyUSB1`. It takes `FILE=` and `ARGS=`, for
+`make mon PORT=/dev/ttyUSB1` on the serial port. One of the four
+options above must be given. It takes `FILE=` and `ARGS=`, for
 example `make mon ARGS="--tcp 4000"`. On the serial port, no other
 program may have the port open while it runs.
 
