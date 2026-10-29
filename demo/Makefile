@@ -38,6 +38,15 @@ $(BUILD)/demo_test.bin: demo.nasm $(ASM_PY) | $(BUILD)
 	@(cat demo.nasm; echo "VERSION .ASCII_L 'V9.9'") > $(BUILD)/demo_test_all.nasm
 	@$(ASM) -o $@ $(BUILD)/demo_test_all.nasm
 
+# The same with a wrong word in the script of the math unit's test, the
+# high word of -7 * 6, which the self-test then shows as failed. cmp fails
+# the build if sed changed nothing.
+$(BUILD)/demo_fail.bin: $(BUILD)/demo_test.bin
+	@sed 's/^\( *\.DAT *2, M_SMULH, \)-1$$/\1-2/' $(BUILD)/demo_test_all.nasm \
+	  > $(BUILD)/demo_fail_all.nasm
+	@! cmp -s $(BUILD)/demo_test_all.nasm $(BUILD)/demo_fail_all.nasm
+	@$(ASM) -o $@ $(BUILD)/demo_fail_all.nasm
+
 # The first input edits: a DEL, a TAB, a CR LF, the cursor keys, a
 # line longer than 80 characters, an ESC without [, a sequence with
 # parameters, a byte of 0x80 to 0x9F, which is dropped, and one of
@@ -72,7 +81,9 @@ $(BUILD)/demo_test.bin: demo.nasm $(ASM_PY) | $(BUILD)
 # digits, then a MAC address with one-digit bytes, and cancels a second
 # MAC address with CTRL-C. The twelfth is rejected for a MAC address of a
 # group, with an odd first byte, and the thirteenth for a byte of three
-# hex digits, though its value, 0FF, is in range. In niceemu the registers of the Ethernet station are plain
+# hex digits, though its value, 0FF, is in range. The fourteenth runs
+# the board in build/demo_fail.bin, whose math unit's test fails, so it
+# shows FAIL, the address read, and the word read there. In niceemu the registers of the Ethernet station are plain
 # memory, so what is written shows at once, and the counts stay 0.
 # dash's printf, the shell of make on Ubuntu, has no \x.
 TEST1 = Hello, world!\nabc\177\177X\tY\r\n$(shell printf '0123456789%.0s' 1 2 3 4 5 6 7 8)abcde\n\
@@ -90,9 +101,9 @@ TEST10 = \033[23~iX10.0g.0.256\r
 TEST11 = \033[23~i192.1x68.0001.66\177\17765\rm02:AB:c:D:e:F\rm02:\003
 TEST12 = \033[23~m03:00:00:00:00:01\r
 TEST13 = \033[23~m0FF:2:3:4:5:6\r
-TESTS  = 1 2 3 4 5 6 7 8 9 10 11 12 13
+TESTS  = 1 2 3 4 5 6 7 8 9 10 11 12 13 14
 
-test: $(BUILD)/demo_test.bin
+test: $(BUILD)/demo_test.bin $(BUILD)/demo_fail.bin
 	@printf '$(TEST1)' > $(BUILD)/test1.txt
 	@{ printf 'junk\014\177'; for i in $$(seq 16); do printf 'line %d\n' $$i; done; \
 	  printf 'first\tA\t\t\t\t\t\t\t\t\t\tB'; } > $(BUILD)/test2.txt
@@ -107,9 +118,11 @@ test: $(BUILD)/demo_test.bin
 	@printf '$(TEST11)' > $(BUILD)/test11.txt
 	@printf '$(TEST12)' > $(BUILD)/test12.txt
 	@printf '$(TEST13)' > $(BUILD)/test13.txt
+	@printf '\033[23~' > $(BUILD)/test14.txt
 	@for t in $(TESTS); do \
 	  dump=; [ $$t = 6 ] && dump='$(DUMP6)'; \
-	  $(EMU) -s -i $(BUILD)/test$$t.txt $$dump $(BUILD)/demo_test.bin > $(BUILD)/test$$t.out || \
+	  bin=demo_test; [ $$t = 14 ] && bin=demo_fail; \
+	  $(EMU) -s -i $(BUILD)/test$$t.txt $$dump $(BUILD)/$$bin.bin > $(BUILD)/test$$t.out || \
 	    { echo "FAIL demo: niceemu exits with $$? on input $$t"; exit 1; }; \
 	  sed -n -e '/^ffff/p' -e '/^Screen:/,$$p' $(BUILD)/test$$t.out; \
 	done > $(BUILD)/test.screen; \

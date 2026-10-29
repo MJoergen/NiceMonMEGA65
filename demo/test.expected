@@ -289,3 +289,27 @@ Screen:
 |  New MAC address:  0FF:2:3:4:5:6
 |  Hex digits and colons. RETURN writes it; ESC, CTRL-C, or RUN/STOP cancels.
 |  Not a MAC address: six bytes in hex with colons, the first one even.
+Screen:
+| NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
+| F1 typewriter   F3 key codes   F5 charset   F7 counters   F9 comet   F11 board
+|
+|  A self-test, which runs each time that F11 starts it
+|
+|    RAM, FFFF8000 to FFFFEFFF                     PASS
+|    Math unit, multiply and divide                FAIL FFFFFF23 FFFFFFFF
+|    Timer, 10 interrupts every 1000 cycles        PASS
+|    Performance counters                          PASS
+|
+|  A test failed.
+|
+|  A failure shows where it failed and what was read: an address and its word,
+|  or for the timer, the interrupts that came and the cycles that they took.
+|
+|  The Ethernet station, 0xFFFFFF98 to 0xFFFFFF9D
+|  IP address            0.0.0.0
+|  MAC address           00:00:00:00:00:00
+|  Good frames received           0
+|  Bad or dropped frames          0
+|  Frames sent                    0
+|
+|  I types a new IP address, and M a new MAC address.
