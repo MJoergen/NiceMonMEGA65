@@ -9,12 +9,11 @@
 -- comes from it and its output goes to it. A connection is one from the
 -- host's ACK of the SYN-ACK on, so that a SYN alone, as of a port scan,
 -- leaves the link on the UART. The host's half-close, its FIN, is a break
--- of the line (rx_break_o), after the last byte before it (brk_ptr). The
+-- of the line (lrx_break_o), after the last byte committed (rx_cmt). The
 -- link stays with the connection after its end, by an RST or the tries,
--- until it has taken all the input and the break (drain), so that none is
--- lost, and a cycle more, as on_o follows drain through a register, for
--- the timing; the output in that time is dropped. The states are those of
--- a passive open, and of a close:
+-- until it has taken all the input and the break (drain_r, a cycle
+-- behind, for the timing), so that none is lost; the output in that time
+-- is dropped. The states are those of a passive open, and of a close:
 --   LISTEN_ST      no connection; a SYN to G_PORT opens one
 --   SYN_RCVD_ST    the SYN-ACK is sent, and waits for the host's ACK
 --   EST_ST         the connection is open
@@ -92,10 +91,11 @@
 --
 -- The server is these processes: p_tcp, the connection, which acts on the
 -- segments and owns its numbers; p_cmp, which compares a segment with it;
--- p_pick, which chooses the segment to send; and p_link, the link side of
--- the two buffers; the retransmission timer is eth_tcp_timer.vhd. What
--- one tells another that it cannot read is a pulse (brk_set, restart,
--- tries_clr), which lands a cycle later; each says why that is in time.
+-- and p_pick, which chooses the segment to send. The two buffers, with
+-- their link side, are eth_tcp_buf.vhd, and the retransmission timer is
+-- eth_tcp_timer.vhd. What one tells another that it cannot read is a
+-- pulse (brk_set, restart, tries_clr), which lands a cycle later; each
+-- says why that is in time.
 --
 -- INTERFACE CONTRACTS -- these are requirements on the environment:
 -- a) mac_i and ip_i stay stable while there is a connection.
@@ -188,7 +188,6 @@ architecture synthesis of eth_tcp is
    signal una_ptr   : t_ptr                         := (others => '0');
    signal nxt_ptr   : t_ptr                         := (others => '0');
    signal max_ptr   : t_ptr                         := (others => '0');
-   signal tail_ptr  : t_ptr                         := (others => '0');
    signal fin_ptr   : t_ptr                         := (others => '0');
    -- The end of the data to send to this connection
    signal lim_ptr : t_ptr;
@@ -226,8 +225,6 @@ architecture synthesis of eth_tcp is
    signal tries_clr : std_logic := '0';
    -- The initial sequence number, a cycle counter
    signal isn : std_logic_vector(31 downto 0) := (others => '0');
-   -- Cycles since the link's last output byte
-   signal idle : natural range 0 to C_IDLE     := 0;
    -- The receive window of the last segment sent
    signal adv_wnd : natural range 0 to C_SIZE     := 0;
 
@@ -264,33 +261,26 @@ architecture synthesis of eth_tcp is
    signal rcv_end1  : std_logic_vector(31 downto 0) := (others => '0');
    signal rcv_nxt1  : std_logic_vector(31 downto 0) := (others => '0');
 
-   -- The receive buffer
-   signal rx_wr     : t_ptr                        := (others => '0');
-   signal rx_cmt    : t_ptr                        := (others => '0');
-   signal rx_rd     : t_ptr                        := (others => '0');
-   signal rx_free   : natural range 0 to C_SIZE;
-   signal rx_we     : std_logic;
-   signal rx_rdata  : std_logic_vector(8 downto 0);
-   signal lfetch    : std_logic                    := '0';
-   signal lrx_valid : std_logic                    := '0';
-   signal fin_rcvd  : std_logic                    := '0';
+   -- The receive buffer (eth_tcp_buf.vhd): where a segment's data goes,
+   -- the end of the data committed, and the room after it
+   signal rx_wr   : t_ptr                     := (others => '0');
+   signal rx_cmt  : t_ptr                     := (others => '0');
+   signal rx_free : natural range 0 to C_SIZE;
+   signal rx_we   : std_logic;
    -- The host's FIN has come.
-   signal peer_fin : std_logic                    := '0';
-   signal brk_ptr  : t_ptr                        := (others => '0');
-   -- The connection's half-close for the link, a cycle after: the break,
-   -- and where it is
-   signal brk_set : std_logic                    := '0';
-   signal brk_at  : t_ptr                        := (others => '0');
-   -- Input or a break that the link has not taken, and the same a cycle
-   -- later, which on_o follows
-   signal drain   : std_logic;
-   signal drain_r : std_logic                    := '0';
+   signal peer_fin : std_logic := '0';
+   -- The connection's half-close for the link, a cycle after
+   signal brk_set : std_logic := '0';
+   -- Input or a break that the link has not taken, a cycle behind, which
+   -- on_o follows
+   signal drain_r : std_logic;
 
-   -- The send buffer
-   signal tx_we    : std_logic;
-   signal tx_ready : std_logic;
+   -- The send buffer (eth_tcp_buf.vhd): where the link's next byte goes,
+   -- that its output has paused, and the sender's reads
+   signal tail_ptr : t_ptr;
+   signal paused   : std_logic;
    signal tx_raddr : std_logic_vector(G_ADDR_BITS - 1 downto 0);
-   signal tx_rdata : std_logic_vector(8 downto 0);
+   signal tx_rdata : std_logic_vector(7 downto 0);
 
    -- The segment being chosen, and the one being sent
    type   t_build is (B_IDLE, B_SIZE, B_PICK);
@@ -330,9 +320,8 @@ begin
    -- Receive
    ---------------------------------------------------------------------------
 
-   rx_free <= C_SIZE - to_integer(rx_cmt - rx_rd);
-   take    <= '1' when state /= LISTEN_ST and peer_fin = '0' else
-              '0';
+   take <= '1' when state /= LISTEN_ST and peer_fin = '0' else
+           '0';
 
    i_eth_tcp_rx : entity work.eth_tcp_rx
       generic map (
@@ -368,50 +357,46 @@ begin
       ); -- i_eth_tcp_rx
 
 
-   i_rx_ram : entity work.eth_ram
+   ---------------------------------------------------------------------------
+   -- The buffers
+   ---------------------------------------------------------------------------
+
+   i_eth_tcp_buf : entity work.eth_tcp_buf
       generic map (
-         G_ADDR_BITS => G_ADDR_BITS
+         G_ADDR_BITS => G_ADDR_BITS,
+         G_IDLE      => C_IDLE
       )
       port map (
-         wr_clk_i  => clk_i,
-         wr_we_i   => rx_we,
-         wr_addr_i => rx_wr(G_ADDR_BITS - 1 downto 0),
-         wr_data_i => '0' & rx_data_i,
-         rd_clk_i  => clk_i,
-         rd_addr_i => rx_rd(G_ADDR_BITS - 1 downto 0),
-         rd_data_o => rx_rdata
-      ); -- i_rx_ram
-
-   lrx_valid_o <= lrx_valid;
-   drain       <= '1' when rx_rd /= rx_cmt or lfetch = '1' or lrx_valid = '1' or
-                           fin_rcvd = '1' else
-                  '0';
+         clk_i       => clk_i,
+         rst_i       => rst_i,
+         conn_i      => conn,
+         una_ptr_i   => una_ptr,
+         ltx_data_i  => ltx_data_i,
+         ltx_valid_i => ltx_valid_i,
+         ltx_ready_o => ltx_ready_o,
+         tail_ptr_o  => tail_ptr,
+         paused_o    => paused,
+         rd_addr_i   => tx_raddr,
+         rd_data_o   => tx_rdata,
+         wr_we_i     => rx_we,
+         wr_addr_i   => rx_wr,
+         wr_data_i   => rx_data_i,
+         cmt_i       => rx_cmt,
+         free_o      => rx_free,
+         brk_set_i   => brk_set,
+         lrx_data_o  => lrx_data_o,
+         lrx_valid_o => lrx_valid_o,
+         lrx_ready_i => lrx_ready_i,
+         lrx_break_o => lrx_break_o,
+         drain_o     => drain_r
+      ); -- i_eth_tcp_buf
 
    ---------------------------------------------------------------------------
    -- Send
    ---------------------------------------------------------------------------
 
-   tx_ready    <= '1' when conn = '1' and to_integer(tail_ptr - una_ptr) < C_SIZE else
-                  '0';
-   ltx_ready_o <= tx_ready or not conn;
-   tx_we       <= ltx_valid_i and tx_ready;
-   lim_ptr     <= fin_ptr when closing = '1' else
-                  tail_ptr;
-
-   i_tx_ram : entity work.eth_ram
-      generic map (
-         G_ADDR_BITS => G_ADDR_BITS
-      )
-      port map (
-         wr_clk_i  => clk_i,
-         wr_we_i   => tx_we,
-         wr_addr_i => tail_ptr(G_ADDR_BITS - 1 downto 0),
-         wr_data_i => '0' & ltx_data_i,
-         rd_clk_i  => clk_i,
-         rd_addr_i => tx_raddr,
-         rd_data_o => tx_rdata
-      ); -- i_tx_ram
-
+   lim_ptr <= fin_ptr when closing = '1' else
+              tail_ptr;
 
    ending <= '1' when fin_ack = '1' and ack_req = '0' and busy = '0' else
              '0';
@@ -450,7 +435,7 @@ begin
    pick <= NO_PK when build /= B_PICK or drop = '1' else
            SYN_PK when syn_req = '1' and state = SYN_RCVD_ST else
            NO_PK when state = LISTEN_ST or state = SYN_RCVD_ST else
-           DATA_PK when pick_n > 0 and (pick_big or idle = C_IDLE or closing = '1') else
+           DATA_PK when pick_n > 0 and (pick_big or paused = '1' or closing = '1') else
            FIN_PK when closing = '1' and nxt_ptr = fin_ptr and fin_sent = '0' else
            ACK_PK when ack_req = '1' else
            NO_PK;
@@ -478,64 +463,12 @@ begin
          seg_addr_i  => seg_ptr(G_ADDR_BITS - 1 downto 0),
          seg_n_i     => seg_n,
          rd_addr_o   => tx_raddr,
-         rd_data_i   => tx_rdata(7 downto 0),
+         rd_data_i   => tx_rdata,
          tx_data_o   => tx_data_o,
          tx_last_o   => tx_last_o,
          tx_valid_o  => tx_valid_o,
          tx_ready_i  => tx_ready_i
       ); -- i_eth_tcp_tx
-
-
-   p_link : process (clk_i)
-   begin
-      if rising_edge(clk_i) then
-         -- The link's output
-         if tx_we = '1' then
-            tail_ptr <= tail_ptr + 1;
-            idle     <= 0;
-         elsif idle < C_IDLE then
-            idle <= idle + 1;
-         end if;
-
-         -- The receive buffer to the link, and the host's half-close after
-         -- the last byte before it
-         lrx_break_o <= '0';
-         if lrx_ready_i = '1' then
-            lrx_valid <= '0';
-         end if;
-         if lfetch = '1' then
-            lrx_data_o <= rx_rdata(7 downto 0);
-            lrx_valid  <= '1';
-         end if;
-         lfetch <= '0';
-         if lfetch = '0' and rx_rd /= rx_cmt and not (fin_rcvd = '1' and rx_rd = brk_ptr) and
-            (lrx_valid = '0' or lrx_ready_i = '1') then
-            lfetch <= '1';
-            rx_rd  <= rx_rd + 1;
-         end if;
-         if fin_rcvd = '1' and rx_rd = brk_ptr and lfetch = '0' and lrx_valid = '0' then
-            lrx_break_o <= '1';
-            fin_rcvd    <= '0';
-         end if;
-         -- The half-close, a cycle after the connection has it; nothing is
-         -- fetched past it meanwhile, as the data after it is committed
-         -- many cycles later.
-         if brk_set = '1' then
-            fin_rcvd <= '1';
-            brk_ptr  <= brk_at;
-         end if;
-         drain_r <= drain;
-
-         if rst_i = '1' then
-            tail_ptr  <= (others => '0');
-            rx_rd     <= (others => '0');
-            lfetch    <= '0';
-            lrx_valid <= '0';
-            fin_rcvd  <= '0';
-            drain_r   <= '0';
-         end if;
-      end if;
-   end process p_link;
 
 
    p_cmp : process (clk_i)
@@ -679,11 +612,8 @@ begin
          restart   <= '1';
       end procedure accept;
 
-      -- Ends the connection, and opens the one that waits, if any. Its
-      -- received data ends at cmt.
-      procedure finish (
-         cmt : t_ptr
-      ) is
+      -- Ends the connection, and opens the one that waits, if any.
+      procedure finish is
       begin
          if pend = '1' then
             accept(pend_mac, pend_ip, pend_port, pend_seq, pend_win, fin_ptr);
@@ -691,7 +621,6 @@ begin
             -- The old connection's input has ended.
             if peer_fin = '0' then
                brk_set <= '1';
-               brk_at  <= cmt;
             end if;
          else
             state   <= LISTEN_ST;
@@ -764,7 +693,7 @@ begin
                   if f_flags(2) = '1' then
                      -- A reset, with a sequence number in the window
                      if seq_off < C_SIZE then
-                        finish(rx_cmt);
+                        finish;
                      end if;
                   elsif state = SYN_RCVD_ST and not (f_flags(4) = '1' and syn_acked) then
                      -- Nothing but the ACK of the SYN-ACK opens the connection.
@@ -825,7 +754,6 @@ begin
                         end if;
                         peer_fin <= '1';
                         brk_set  <= '1';
-                        brk_at   <= rx_wr when wr_ok = '1' else rx_cmt;
                      end if;
 
                      -- The ACK of this side's FIN ends the connection.
@@ -839,7 +767,7 @@ begin
 
          -- The end, once the ACK that the host is owed is sent
          elsif ending = '1' then
-            finish(rx_cmt);
+            finish;
 
          ------------------------------------------------------------------
          -- The retransmission timer runs out (eth_tcp_timer.vhd): what is out goes
@@ -847,7 +775,7 @@ begin
          ------------------------------------------------------------------
          elsif timeout = '1' then
             if last_try = '1' then
-               finish(rx_cmt);
+               finish;
             else
                nxt_ptr  <= una_ptr;
                fin_sent <= '0';

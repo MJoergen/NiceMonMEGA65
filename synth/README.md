@@ -276,7 +276,7 @@ The block RAMs, of 36 Kbit, are these:
 | The FIFO of received Ethernet frames (`eth/eth_ram.vhd`), 2K bytes, one RAMB18 | 0.5 | 0.5 |
 | The FIFO of Ethernet frames to send (`eth/eth_ram.vhd`), 2K bytes, one RAMB18 | 0.5 | 0.5 |
 | The copy of a ping in `eth/eth_icmp.vhd`, 2K bytes, one RAMB18 | 0.5 | 0.5 |
-| The TCP server's buffers of received and sent bytes (`eth/eth_ram.vhd` in `eth/eth_tcp.vhd`), 2K bytes each, one RAMB18 each | 1 | 1 |
+| The TCP server's buffers of received and sent bytes (`eth/eth_ram.vhd` in `eth/eth_tcp_buf.vhd`), 2K bytes each, one RAMB18 each | 1 | 1 |
 | Total without the ROM, pipelined | 135 of 365 | 87 of 135 |
 | Total with the ROM, pipelined | 167 | 119 |
 
