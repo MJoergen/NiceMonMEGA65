@@ -6,7 +6,9 @@
 --
 -- THEORY OF OPERATION
 -- The connection is the line. While there is one (on_o), the link's input
--- comes from it and its output goes to it. The host's half-close, its FIN,
+-- comes from it and its output goes to it. A connection is one from the
+-- host's ACK of the SYN-ACK on, so that a SYN alone, as of a port scan,
+-- leaves the link on the UART. The host's half-close, its FIN,
 -- is a break of the line (rx_break_o), after the last byte before it. The
 -- states are those of a passive open, and of a close that the host starts:
 --   LISTEN_ST      no connection; a SYN to G_PORT opens one
@@ -19,7 +21,7 @@
 -- comes after the half-close waits in pend_*: the old connection gets the
 -- output up to that point (fin_ptr), then its FIN, and when the host has
 -- acknowledged that, the new connection opens, and gets the output after
--- it. That is what the host tools do at the end of a program's input
+-- it; the link stays with it (keep) while it waits for the host's ACK. That is what the host tools do at the end of a program's input
 -- (tools/nicelink.py). Other SYNs are ignored while a connection is open.
 --
 -- Receive: a frame is read a byte at a time, and its fields are kept: the
@@ -192,6 +194,9 @@ architecture synthesis of eth_tcp is
    signal ack_req  : std_logic                     := '0';
    -- The SYN of the next connection
    signal pend      : std_logic                     := '0';
+   -- The connection that waits for the ACK of its SYN-ACK came from pend,
+   -- and has the link
+   signal keep      : std_logic                     := '0';
    signal pend_mac  : std_logic_vector(47 downto 0) := (others => '0');
    signal pend_ip   : std_logic_vector(31 downto 0) := (others => '0');
    signal pend_port : std_logic_vector(15 downto 0) := (others => '0');
@@ -289,8 +294,9 @@ begin
 
    mac_b <= b6(mac_i);
    ip_b  <= b4(ip_i);
-   conn  <= '0' when state = LISTEN_ST else
-            '1';
+   conn  <= '1' when state = EST_ST or state = CLOSE_WAIT_ST or state = LAST_ACK_ST or
+                     (state = SYN_RCVD_ST and keep = '1') else
+            '0';
    on_o  <= conn;
 
    ---------------------------------------------------------------------------
@@ -434,8 +440,10 @@ begin
       begin
          if pend = '1' then
             accept(pend_mac, pend_ip, pend_port, pend_seq, pend_win, fin_ptr);
+            keep <= '1';
          else
             state <= LISTEN_ST;
+            keep  <= '0';
          end if;
       end procedure finish;
 
@@ -590,10 +598,12 @@ begin
                         accept(f_smac, f_sip, f_sport, f_seq, f_win, tail_ptr);
 
                      when SYN_RCVD_ST =>
+                        -- Another SYN replaces it; the output after its base,
+                        -- if the link is kept, goes to the new one.
                         if from_peer_v and f_seq = irs then
                            syn_req <= '1';
                         else
-                           accept(f_smac, f_sip, f_sport, f_seq, f_win, tail_ptr);
+                           accept(f_smac, f_sip, f_sport, f_seq, f_win, una_ptr);
                         end if;
 
                      when EST_ST =>
@@ -628,6 +638,7 @@ begin
                   elsif state = SYN_RCVD_ST then
                      if f_flags(4) = '1' and f_ack = iss + 1 then
                         state   <= EST_ST;
+                        keep    <= '0';
                         snd_wnd <= f_win;
                         tries   <= 0;
                         rto_cnt <= 0;
@@ -848,6 +859,7 @@ begin
             syn_req   <= '0';
             ack_req   <= '0';
             pend      <= '0';
+            keep      <= '0';
             idx       <= 0;
             m_ok      <= '1';
             ip_sum    <= (others => '0');

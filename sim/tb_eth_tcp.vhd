@@ -14,7 +14,8 @@
 -- The steps:
 --   * a SYN while the IP address is 0, or to another port, gets nothing
 --   * a SYN gets a SYN-ACK, which comes again when the host does not
---     acknowledge it, and the host's ACK opens the connection
+--     acknowledge it, and the host's ACK opens the connection; the link
+--     goes to it only then
 --   * data gets an ACK; the same data again, data out of order, and data
 --     with a wrong checksum are dropped, and the first two get an ACK
 --   * the link's output comes in segments of at most 536 bytes, at most
@@ -546,14 +547,17 @@ begin
       assert flags_v = X"12" and seq_v = bseq_v
          report "tb_eth_tcp: FAIL, not the same SYN-ACK again"
          severity failure;
-      assert conn = '1'
-         report "tb_eth_tcp: FAIL, on_o is not 1 for a SYN"
+      assert conn = '0'
+         report "tb_eth_tcp: FAIL, on_o is 1 before the connection is open"
          severity failure;
       -- The host's sequence numbers wrap around 0 below.
       hseq_v := X"FFFFF001";
       bseq_v := bseq_v + 1;
       send_seg(C_ACK, 0);
       expect_none;
+      assert conn = '1'
+         report "tb_eth_tcp: FAIL, on_o is not 1 for an open connection"
+         severity failure;
 
       -- Data, the same again, data out of order, and a wrong checksum
       send_data(5);
@@ -714,6 +718,9 @@ begin
       expect(1 ms, 40001);
       assert flags_v = X"12" and ack_v = X"00005001"
          report "tb_eth_tcp: FAIL, not a SYN-ACK for the new connection"
+         severity failure;
+      assert conn = '1'
+         report "tb_eth_tcp: FAIL, the link left the new connection"
          severity failure;
       hseq_v := X"00005001";
       bseq_v := seq_v + 1;

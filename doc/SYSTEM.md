@@ -349,7 +349,9 @@ Then `ping 192.168.1.66` from a PC on the network gets its answers, and
 
 The station serves the debug link on TCP port 4510 of its IP address,
 to one host at a time. While a host is connected, the link's bytes come
-from it and go to it, and not to the UART, whose bytes are dropped. The
+from it and go to it, and not to the UART, whose bytes are dropped. A
+host is connected from its ACK of the board's SYN-ACK on, so a SYN alone,
+as of a port scan, leaves the link on the UART. The
 connection is the line, as the UART is: connecting sends no `b` notice
 and resets nothing, unlike `niceemu --link` (DEBUG.md §7), and a host's
 half-close is a break, which ends the program's input. The tools take
