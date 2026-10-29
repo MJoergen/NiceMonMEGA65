@@ -1,7 +1,8 @@
 # synth
 
 The Vivado builds, in non-project mode, one directory per board. The MEGA65
-is the main board; the Nexys4DDR also builds, with fewer devices.
+is the main board; the Nexys4DDR also builds, with VGA only, a smaller
+screen memory, and its LEDs, display, buttons, and switches.
 
 | Path | Board | FPGA |
 |---|---|---|
@@ -115,8 +116,8 @@ board differs from the MEGA65 in three ways:
 - Its FPGA has 135 block RAMs of 36 Kbit, where the MEGA65's has 365. The
   RAM and the ROM are the same as on the MEGA65, and take 96 of them, but
   the screen is 8K words, not 32K, so that it and its copy in `text.vhd`
-  take 16, not 64. With the font and the UART's FIFO, that is 116.5 with
-  the ROM. 8K words are still more than three screens of 80×25 for
+  take 16, not 64. With the font, the UART's FIFO, and the Ethernet
+  station's 2.5, that is 119 with the ROM. 8K words are still more than three screens of 80×25 for
   scrolling.
 - Its FPGA is speed grade -1, where the MEGA65's is -2, so the system clock
   is 90 MHz, not 100 MHz; at 100 MHz the pipelined core misses timing by a
@@ -125,6 +126,28 @@ board differs from the MEGA65 in three ways:
 - Its VGA output has 4 bits per color, from resistors, and there is no
   HDMI. The screen's colors have 4 bits per color, so they show
   as on the MEGA65.
+
+## The Ethernet PHYs
+
+Every board has an Ethernet PHY on RMII, which the Ethernet station
+(`src/eth/eth.vhd`, [SYSTEM.md](../doc/SYSTEM.md#the-ethernet-station))
+drives:
+
+| Board | PHY | Pins |
+|---|---|---|
+| MEGA65 R3 and R6 | Microchip KSZ8081RNDCA (U4) | `mega65/mega65.xdc`, the same on both |
+| Nexys4DDR | SMSC LAN8720A | `nexys4ddr/nexys4ddr.xdc` |
+
+The FPGA gives the PHY its 50 MHz reference clock, from the MMCM of
+`common/clk_rst.vhd` through an ODDR, 2.5 ns early (see
+[Timing](#timing)). The PHY's reset, active low, is a register in the IOB,
+and holds the PHY as long as the system is held in reset: at least 10 ms
+after the clock starts, more than either PHY needs. The PHY then runs
+with its reset defaults and negotiates the link on its own. MDC and MDIO
+are not connected, as no PHY register is read or written, and neither
+is the PHY's interrupt, nor the MEGA65's ETH_LED2. RXD, CRS_DV, and RXER go to
+`src/eth/rmii_rx.vhd`, and `src/eth/rmii_tx.vhd` drives TXD and TX_EN;
+all are registered in the IOBs. The station works only at 100 Mbit/s.
 
 ## Third-party files
 
@@ -160,8 +183,9 @@ The Nexys4DDR builds with `FLOW=timing`.
 
 The utilization is from `build/utilization.rpt`, and the split by module
 from `report_utilization -hierarchical` on `build/top.dcp`. These are the
-numbers without `ROM=`, in LUTs and flip-flops. The pipelined columns are
-from builds with the debug link. The multi-cycle columns are older, from
+numbers without `ROM=`, in LUTs and flip-flops. The R6's pipelined column
+is from the build of the V1.1 bump, at nice_cpu V1.1, and the Nexys4DDR's
+from one at nice_cpu V1.0, both with the Ethernet station. The multi-cycle columns are older, from
 builds that had a command line in place of the link, counted in the rest,
 and neither the Nexys4DDR's devices nor the microsecond counter:
 
@@ -170,15 +194,15 @@ and neither the Nexys4DDR's devices nor the microsecond counter:
 | The core (`nice_core`) | 6931 / 3032 | 4605 / 1050 | 6844 / 3027 | 4636 / 4071 |
 | The math unit (`mpu`) | 2079 / 874 | 2172 / 874 | 2080 / 874 | 2166 / 874 |
 | The fetch statistics (`fetch_stats`) | 813 / 1361 | 44 / 99 | 812 / 1361 | 44 / 99 |
-| The debug link (`debug_link`) | 873 / 1082 | – | 872 / 1082 | – |
-| The Ethernet station (`eth/eth.vhd`) | 2041 / 1783 | – | 2038 / 1791 | – |
-| Of which the TCP server (`eth/eth_tcp.vhd`) | 1431 / 1155 | – | 1429 / 1163 | – |
-| The rest: the UART, RAM, counters, timer, the Nexys4DDR's devices, and glue | 1653 / 918 | 795 / 1156 | 1836 / 1059 | 740 / 1119 |
+| The debug link (`debug_link`) | 875 / 1083 | – | 872 / 1082 | – |
+| The Ethernet station (`eth/eth.vhd`) | 2303 / 1866 | – | 2038 / 1791 | – |
+| Of which the TCP server (`eth/eth_tcp.vhd`) | 1690 / 1237 | – | 1429 / 1163 | – |
+| The rest: the UART, RAM, counters, timer, the Nexys4DDR's devices, and glue | 1652 / 918 | 795 / 1156 | 1836 / 1059 | 740 / 1119 |
 | The text display (`text.vhd`) | 117 / 180 | 123 / 180 | 115 / 156 | 121 / 156 |
-| The keyboard | 578 / 577 | 596 / 585 | 146 / 48 | – |
-| The HDMI output | 600 / 1207 | 574 / 1207 | – | – |
-| Total | 15685 / 11014 | 8909 / 5151 | 14743 / 9398 | 7707 / 6319 |
-| Total, of the FPGA | 11.7 % / 4.1 % | 6.7 % / 1.9 % | 23.3 % / 7.4 % | 12.2 % / 5.0 % |
+| The keyboard | 649 / 600 | 596 / 585 | 146 / 48 | – |
+| The HDMI output | 599 / 1207 | 574 / 1207 | – | – |
+| Total | 16017 / 11121 | 8909 / 5151 | 14743 / 9398 | 7707 / 6319 |
+| Total, of the FPGA | 12.0 % / 4.2 % | 6.7 % / 1.9 % | 23.3 % / 7.4 % | 12.2 % / 5.0 % |
 
 The R3 pipelined build takes 15774 LUTs and 11166 flip-flops, 11.8 % and
 4.2 % of the FPGA.
@@ -212,16 +236,18 @@ All builds meet the clock. These are the worst setup and hold slacks:
 
 | Build | Clock | Setup | Hold |
 |---|---|---|---|
-| R6, pipelined | 100 MHz | 0.347 ns | 0.061 ns |
+| R6, pipelined | 100 MHz | 0.086 ns | 0.012 ns |
 | R6, `NICE=multi` | 100 MHz | 0.52 ns | – |
 | R3, pipelined | 100 MHz | 0.109 ns | 0.061 ns |
 | Nexys4DDR, pipelined | 90 MHz | 0.059 ns | 0.015 ns |
 | Nexys4DDR, `NICE=multi` | 90 MHz | 0.19 ns | – |
 
-The pipelined rows are from builds at nice_cpu V1.0, with the debug
-link of version 4 and the Ethernet station, which answers ARP requests and
-pings and carries the link over TCP; the
-multi-cycle rows are older builds, with fewer link features, and their
+The R6's pipelined row is from the build of the V1.1 bump, at nice_cpu
+V1.1, with the debug link of version 5, the one that `verified.json`
+records. The R3's and the Nexys4DDR's pipelined rows are from builds at
+nice_cpu V1.0, with the debug link of version 4. All three have the
+Ethernet station, which answers ARP requests and pings and carries the
+link over TCP. The multi-cycle rows are older builds, with fewer link features, and their
 hold slacks were not recorded. The slacks change from build to build with
 placement more than with the logic. The worst paths are usually in the
 core's WRITE and FETCH stages.
