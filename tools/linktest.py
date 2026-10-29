@@ -7,11 +7,12 @@ breakpoints on it, and mon.py's commands, as they are typed at its
 prompt. Then it runs the programs of hwtest.py's comparison, and
 nice_cpu's benchmark when examples/build/bench.bin is built, with run.py
 --tcp on that port and with niceemu alone. Each must print the same and
-exit with the same status. The demo's self-test, F11, must pass. So it checks run.py, mon.py, nicelink.py, and
-the link of the emulator, as CI does. It prints one line for each check,
-and last how many passed, and exits with status 1 when one fails.
-niceemu must be built first, with make -C nice_cpu/emulator build. Only
-the Python standard library is used.
+exit with the same status. The demo's self-test, F11, must pass. So it
+checks run.py, mon.py, nicelink.py, and the link of the emulator, as CI
+does. It prints one line for each check, and last how many passed, and
+exits with status 1 when one fails. niceemu must be built first, with
+make -C nice_cpu/emulator build. Only the Python standard library is
+used.
 """
 
 import contextlib

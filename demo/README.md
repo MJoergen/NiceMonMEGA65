@@ -155,10 +155,11 @@ keyboard or a terminal sends a sequence at once. An ESC with no byte after
 it in time is the key ESC, `0x1B`, which the MEGA65's ESC key sends. An
 ESC and a byte that starts no sequence give that byte. On a function key
 with a demo, `POLL` jumps to the demo, which starts with an empty stack.
-A new demo is a routine that sets SP, calls `FRAME` for the two bars, and
-polls the keys; its address goes in the tables `FKEYS` and `MENU`. A demo that wants the bytes
-themselves puts a routine in `ECHO`, R12, which `POLL` calls with each
-byte, as the key codes do. `FRAME` sets `ECHO` to 0.
+A new demo is a routine that sets SP, calls `FRAME` for the two bars,
+and polls the keys; its address goes in the tables `FKEYS` and
+`MENU`. A demo that wants the bytes themselves puts a routine in
+`ECHO`, R12, which `POLL` calls with each byte, as the key codes do.
+`FRAME` sets `ECHO` to 0.
 
 A write to the ROM is dropped (see [The ROM](../doc/SYSTEM.md#the-rom) in
 doc/SYSTEM.md), so the demo keeps most of its state in registers, and its
@@ -224,8 +225,9 @@ fifteenth types with a backspace and the other cursor keys,
 `niceemu` shows no colors, so for the sixth the test also has the words of
 two rows of ramps, for the ninth those of the menu, with F11 in black on
 white, and of PASS in green, and for the fourteenth those of FAIL in red.
-The screens that `niceemu` prints, and those words, are in `test.expected`, which was checked by hand. In `niceemu` the
-counters count steps, so their numbers are the same in every run.
+The screens that `niceemu` prints, and those words, are in
+`test.expected`, which was checked by hand. In `niceemu` the counters
+count steps, so their numbers are the same in every run.
 
 The demo runs in `niceemu` like any program, at address 0. After `make -C
 demo test`, the first input shows the first screen of `test.expected`:

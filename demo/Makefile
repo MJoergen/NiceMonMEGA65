@@ -56,37 +56,38 @@ $(BUILD)/demo_fail.bin: $(BUILD)/demo_test.bin
 # VT220's F1 and xterm's F1 start the typewriter afresh, F2, F8, and
 # SHIFT-F6, which have no demo, do nothing, ESC ESC [ A is the cursor up,
 # ESC Q is Q, and a sequence that is no key does nothing. The fourth
-# starts the key codes with the VT220's F3, ESC [ 13 ~, and types a letter, CR, a control code, DEL, a
-# cursor key, F10, which has no demo, a cursor key with parameters, a byte
-# of ISO 8859-1 and one of 0x80 to 0x9F, an ESC and an x, which are one
-# key, as niceemu has the x at once, a sequence longer than the 12 bytes
-# shown, and nine letters: 20 keys, which scroll by four rows. The fifth goes from the key codes back to the typewriter,
-# which shows no bytes. The sixth starts the characters and colors, F5,
-# where letters and F2 do nothing. niceemu shows neither the colors nor
-# the characters from 0xA0 on, so the test also has the words of two of
-# its rows: the red backgrounds, row 5, and the gray foregrounds, row 20,
-# from column 44. The seventh starts the counters, F7, where a letter
-# runs the sieve again. niceemu counts each step as a cycle and a
-# microsecond, so all the numbers are the same in every run. The eighth
-# plays the comet, F9, which takes a key at each tick, so . is a tick
-# without a key. The comet waits for the right key, catches the star at
-# row 4, column 67, and turns right, down, and left into its tail. A key
-# starts a new game, in which the comet goes left, ignores the right key,
-# which would turn it back, and hits the frame. The ninth runs the
+# starts the key codes with the VT220's F3, ESC [ 13 ~, and types a
+# letter, CR, a control code, DEL, a cursor key, F10, which has no demo, a
+# cursor key with parameters, a byte of ISO 8859-1 and one of 0x80 to
+# 0x9F, an ESC and an x, which are one key, as niceemu has the x at once,
+# a sequence longer than the 12 bytes shown, and nine letters: 20 keys,
+# which scroll by four rows. The fifth goes from the key codes back to the
+# typewriter, which shows no bytes. The sixth starts the characters and
+# colors, F5, where letters and F2 do nothing. niceemu shows neither the
+# colors nor the characters from 0xA0 on, so the test also has the words
+# of two of its rows: the red backgrounds, row 5, and the gray
+# foregrounds, row 20, from column 44. The seventh starts the counters,
+# F7, where a letter runs the sieve again. niceemu counts each step as a
+# cycle and a microsecond, so all the numbers are the same in every run.
+# The eighth plays the comet, F9, which takes a key at each tick, so . is
+# a tick without a key. The comet waits for the right key, catches the
+# star at row 4, column 67, and turns right, down, and left into its tail.
+# A key starts a new game, in which the comet goes left, ignores the right
+# key, which would turn it back, and hits the frame. The ninth runs the
 # board, F11, twice, so that the second run starts with what the first
-# left. The tenth types an IP address after F11: letters and a dot that
-# do not belong are dropped, the number 256 is rejected, and the message
+# left. The tenth types an IP address after F11: letters and a dot that do
+# not belong are dropped, the number 256 is rejected, and the message
 # stays. The eleventh writes the IP address 192.168.1.65, with a letter
 # dropped, a number with leading zeros, 0001, and two DELs over the last
 # digits, then a MAC address with one-digit bytes, and cancels a second
 # MAC address with CTRL-C. The twelfth is rejected for a MAC address of a
 # group, with an odd first byte, and the thirteenth for a byte of three
-# hex digits, though its value, 0FF, is in range. The fourteenth runs
-# the board in build/demo_fail.bin, whose math unit's test fails, so it
-# shows FAIL, the address read, and the word read there. The fifteenth
-# types in the typewriter with a backspace, 0x08, and moves with the
-# cursor keys of ESC O A to ESC O D, and the VT220's F2 and F4, which
-# have no demo, do nothing. In niceemu the registers of the Ethernet station are plain
+# hex digits, though its value, 0FF, is in range. The fourteenth runs the
+# board in build/demo_fail.bin, whose math unit's test fails, so it shows
+# FAIL, the address read, and the word read there. The fifteenth types in
+# the typewriter with a backspace, 0x08, and moves with the cursor keys of
+# ESC O A to ESC O D, and the VT220's F2 and F4, which have no demo, do
+# nothing. In niceemu the registers of the Ethernet station are plain
 # memory, so what is written shows at once, and the counts stay 0.
 # dash's printf, the shell of make on Ubuntu, has no \x.
 TEST1 = Hello, world!\nabc\177\177X\tY\r\n$(shell printf '0123456789%.0s' 1 2 3 4 5 6 7 8)abcde\n\

@@ -304,8 +304,7 @@ the breakpoints.
 Then it runs the programs that `make hwtest` compares, with `run.py
 --cosim` and with `niceemu`, whose output and exit status must be the same.
 It leaves out nice_cpu's benchmark and the demo's self-test, which would
-take too long. It takes
-about 4 minutes, and CI runs it on both cores.
+take too long. It takes about 4 minutes, and CI runs it on both cores.
 
 ## The formal checks
 
