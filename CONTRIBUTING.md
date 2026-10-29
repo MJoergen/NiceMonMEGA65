@@ -190,8 +190,14 @@ The testbenches are these:
   pings to everyone or to another address, with a wrong header checksum,
   a fragment, IP options, another ICMP type or protocol, or a total
   length longer than the frame; to a frame with a wrong check sequence;
-  or to anything while the IP address is 0. The counts of frames are
-  checked too.
+  or to anything while the IP address is 0. A host also opens a TCP
+  connection to port 4510 through the pins, and twice the link side sends
+  bytes, the host sends data, and the host sends ARP requests and pings,
+  all at once, so that the replies and the TCP segments compete for the
+  transmit FIFO. Every frame sent must be whole, with right checksums, the
+  next sequence number, and the link's bytes, or the next reply expected;
+  the link side must get the host's bytes; an RST ends the connection; and
+  the counts of frames are checked too.
 - `sim/tb_eth_tcp.vhd` tests the TCP server of the debug link at its
   ports, against a host modeled in VHDL that checks both checksums of
   every segment, and sends SYNs with the options of Linux, data with

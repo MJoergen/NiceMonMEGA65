@@ -1,6 +1,7 @@
 -- Tests the Ethernet station (src/eth/eth.vhd) at its pins: the MAC address
--- filter, the ARP responder, and the ICMP echo responder, through the
--- receiver, the FIFOs, and the transmitter.
+-- filter, the ARP responder, the ICMP echo responder, and the TCP server of
+-- the debug link, through the receiver, the FIFOs, the arbiter of the
+-- transmit path, and the transmitter.
 --
 -- THEORY OF OPERATION
 -- The station has the MAC address 02:4E:49:43:45:00 and the IP address
@@ -17,12 +18,30 @@
 -- everyone, to another IP address, or have a wrong header checksum, more
 -- fragments, a fragment offset, IP options, another ICMP type, another
 -- protocol, or a total length longer than the frame. A request of each
--- kind has a wrong frame check sequence. Last, it sets the IP address to
--- 0, which answers nothing, not even a request for 0. p_wire takes TXD
--- while TX_EN is '1', checks the preamble and the frame check sequence,
--- and keeps each frame. p_check compares the frames sent with expected,
--- byte for byte, with the padding, and checks the counts of frames
--- received, bad, and sent.
+-- kind has a wrong frame check sequence.
+-- Then a host opens a TCP connection to port 4510 (SYN, the SYN-ACK, which
+-- p_phy checks as it comes, and the ACK), and twice, in a round, three
+-- things happen at the same time: the link side sends bytes, k mod 251 for
+-- byte k, which come out in TCP segments, the host sends a segment of
+-- data, byte k being k mod 239, and the host sends ARP requests and pings
+-- one after the other. So the replies of the responders and the TCP
+-- segments compete for the transmit FIFO, and the arbiter holds the output
+-- for a frame from its first byte to its last. After each round the host
+-- acknowledges all the link's bytes. An RST ends the connection. Last, it
+-- sets the IP address to 0, which answers nothing, not even a request for
+-- 0.
+-- p_wire takes TXD while TX_EN is '1', checks the preamble and the frame
+-- check sequence, and keeps each frame. p_check goes through the frames in
+-- the order they were sent. A TCP segment must have right headers and
+-- both checksums, the next sequence number, the pattern in its data, and an
+-- acknowledgment that never goes back or past the host's data; every
+-- other frame is compared with the next of expected, byte for byte, with
+-- the padding, so a frame of one source cannot have a byte of another. At
+-- the end, all the link's bytes must have come out in segments, the last
+-- acknowledgment must cover all the host's, the link side must have got
+-- the host's bytes, and the counts of frames received, bad, and sent must
+-- match. A probe of the arbiter's signals checks that a reply did wait for
+-- a segment, and a segment for a reply.
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -268,6 +287,114 @@ architecture simulation of tb_eth is
       return c_v;
    end function crc_byte;
 
+   -- The TCP host: a station of its own on the same wire
+   constant C_HIP   : t_bytes(0 to 3)               := (X"C0", X"A8", X"01", X"C8");
+   constant C_PORT  : t_bytes(0 to 1)               := (X"11", X"9E");
+   constant C_SPORT : natural                       := 40000;
+   constant C_ISN_H : std_logic_vector(31 downto 0) := X"FFFFFF00";
+   constant C_MSS   : natural                       := 536;
+   constant C_SYN   : std_logic_vector(7 downto 0)  := X"02";
+   constant C_RST   : std_logic_vector(7 downto 0)  := X"04";
+   constant C_ACK   : std_logic_vector(7 downto 0)  := X"10";
+
+   function b2 (v : std_logic_vector(15 downto 0)) return t_bytes is
+   begin
+      return (v(15 downto 8), v(7 downto 0));
+   end function b2;
+
+   function b4 (v : std_logic_vector(31 downto 0)) return t_bytes is
+   begin
+      return (v(31 downto 24), v(23 downto 16), v(15 downto 8), v(7 downto 0));
+   end function b4;
+
+   -- The TCP checksum's sum of a frame: the pseudo header, and the segment
+   -- to the end of the IP packet
+   function tcp_sum (f : t_frame) return std_logic_vector is
+      variable len_v : natural;
+      variable s_v   : std_logic_vector(15 downto 0);
+   begin
+      len_v := ip_len(f) - 20;
+      s_v   := ones_sum(f, 26, 33);
+      s_v   := ones_add(s_v, X"0006");
+      s_v   := ones_add(s_v, to_stdlogicvector(len_v, 16));
+      return ones_add(s_v, ones_sum(f, 34, 33 + len_v));
+   end function tcp_sum;
+
+   -- A segment from the host to the station, with n bytes of data, byte i
+   -- of which is (d + i) mod 239, padded to 60 bytes
+   function tseg (
+      seq   : std_logic_vector(31 downto 0);
+      ack   : std_logic_vector(31 downto 0);
+      flags : std_logic_vector(7 downto 0);
+      n     : natural;
+      d     : natural
+   ) return t_frame is
+      variable f_v : t_frame;
+      variable s_v : std_logic_vector(15 downto 0);
+   begin
+      f_v.b           := (others => X"00");
+      f_v.len         := 54 + n;
+      f_v.b(0 to 13)  := C_US & C_OTHER & t_bytes'(X"08", X"00");
+      f_v.b(14 to 33) := t_bytes'(X"45", X"00") & b2(to_stdlogicvector(40 + n, 16)) &
+                         t_bytes'(X"12", X"34", X"40", X"00", X"40", X"06", X"00", X"00") &
+                         C_HIP & C_TPA;
+      f_v.b(34 to 53) := b2(to_stdlogicvector(C_SPORT, 16)) & C_PORT & b4(seq) & b4(ack) &
+                         t_bytes'(X"50", flags) & b2(to_stdlogicvector(8192, 16)) &
+                         t_bytes'(X"00", X"00", X"00", X"00");
+
+      for i in 0 to n - 1 loop
+         f_v.b(54 + i) := to_stdlogicvector((d + i) mod 239, 8);
+      end loop;
+
+      s_v             := not ones_sum(f_v, 14, 33);
+      f_v.b(24 to 25) := b2(s_v);
+      s_v             := not tcp_sum(f_v);
+      f_v.b(50 to 51) := b2(s_v);
+      if f_v.len < 60 then
+         f_v.len := 60;
+      end if;
+      return f_v;
+   end function tseg;
+
+   -- Whether f is a TCP segment: IPv4 and protocol 6
+   function is_tcp (f : t_frame) return boolean is
+   begin
+      return f.b(12) = X"08" and f.b(13) = X"00" and f.b(23) = X"06";
+   end function is_tcp;
+
+   -- Checks a TCP segment of the station to the host, which is whole and
+   -- has both checksums right, and takes its fields
+   procedure check_tcp (
+      f              : in    t_frame;
+      variable seq   : out   std_logic_vector(31 downto 0);
+      variable ack   : out   std_logic_vector(31 downto 0);
+      variable flags : out   std_logic_vector(7 downto 0);
+      variable n     : out   natural
+   ) is
+   begin
+      assert f.b(0 to 13) = C_OTHER & C_US & t_bytes'(X"08", X"00")
+         report "tb_eth: a wrong Ethernet header of a segment"
+         severity failure;
+      assert f.b(14) = X"45" and f.b(26 to 33) = C_TPA & C_HIP and
+             f.len = maximum(60, 14 + ip_len(f)) and ip_len(f) >= 40
+         report "tb_eth: a wrong IP header of a segment"
+         severity failure;
+      assert ones_sum(f, 14, 33) = X"FFFF"
+         report "tb_eth: a wrong IP header checksum of a segment"
+         severity failure;
+      assert tcp_sum(f) = X"FFFF"
+         report "tb_eth: a wrong TCP checksum"
+         severity failure;
+      assert f.b(34 to 35) = C_PORT and f.b(36 to 37) = b2(to_stdlogicvector(C_SPORT, 16)) and
+             f.b(46) = X"50"
+         report "tb_eth: a wrong TCP header"
+         severity failure;
+      seq   := f.b(38) & f.b(39) & f.b(40) & f.b(41);
+      ack   := f.b(42) & f.b(43) & f.b(44) & f.b(45);
+      flags := f.b(47);
+      n     := ip_len(f) - 40;
+   end procedure check_tcp;
+
    type t_lens is array (natural range <>) of natural;
    type t_cks is array (natural range <>) of std_logic_vector(15 downto 0);
 
@@ -288,13 +415,36 @@ architecture simulation of tb_eth is
 
    -- The answers p_phy expects, the frames sent by the station, and the
    -- counts of frames p_phy sent, good and bad
-   signal expected   : t_frames(0 to 23);
+   signal expected   : t_frames(0 to 31);
    signal n_expected : natural := 0;
-   signal wire       : t_frames(0 to 23);
+   signal wire       : t_frames(0 to 79);
    signal wired      : natural := 0;
    signal n_good     : natural := 0;
    signal n_bad      : natural := 0;
    signal sent       : boolean := false;
+
+   -- The link side: the bytes it gets and sends, and the bytes it is to send
+   signal conn      : std_logic;
+   signal lrx_data  : std_logic_vector(7 downto 0);
+   signal lrx_valid : std_logic;
+   signal lrx_break : std_logic;
+   signal n_lrx     : natural                      := 0;
+   signal lrx_bad   : boolean                      := false;
+   signal n_break   : natural                      := 0;
+   signal ltx_data  : std_logic_vector(7 downto 0) := X"00";
+   signal ltx_valid : std_logic                    := '0';
+   signal ltx_ready : std_logic;
+   signal ltx_req   : natural                      := 0;
+   signal n_ltx     : natural                      := 0;
+
+   -- The TCP data bytes on the wire, and the host's sequence number after
+   -- its last data
+   signal tcp_data : natural                       := 0;
+   signal host_end : std_logic_vector(31 downto 0) := (others => '0');
+   -- The cycles in which a reply waits for a segment, and in which a
+   -- segment waits for a reply
+   signal n_resp_wait : natural := 0;
+   signal n_tcp_wait  : natural := 0;
 
 begin
 
@@ -323,14 +473,14 @@ begin
          rx_o        => rx,
          rx_bad_o    => rx_bad,
          tx_o        => tx,
-         on_o        => open,
-         lrx_data_o  => open,
-         lrx_valid_o => open,
+         on_o        => conn,
+         lrx_data_o  => lrx_data,
+         lrx_valid_o => lrx_valid,
          lrx_ready_i => '1',
-         lrx_break_o => open,
-         ltx_data_i  => X"00",
-         ltx_valid_i => '0',
-         ltx_ready_o => open,
+         lrx_break_o => lrx_break,
+         ltx_data_i  => ltx_data,
+         ltx_valid_i => ltx_valid,
+         ltx_ready_o => ltx_ready,
          eth_clk_i   => eth_clk,
          eth_rst_i   => rst,
          rxd_i       => rxd,
@@ -341,10 +491,77 @@ begin
       ); -- i_eth
 
 
+   -- The bytes that the link side gets, which must be the host's data, and
+   -- its breaks
+   p_lrx : process (clk)
+   begin
+      if rising_edge(clk) then
+         if lrx_valid = '1' then
+            if lrx_data /= to_stdlogicvector(n_lrx mod 239, 8) then
+               lrx_bad <= true;
+            end if;
+            n_lrx <= n_lrx + 1;
+         end if;
+         if lrx_break = '1' then
+            n_break <= n_break + 1;
+         end if;
+      end if;
+   end process p_lrx;
+
+
+   -- The bytes that the link side sends, k mod 251 for byte k
+   p_ltx : process (clk)
+   begin
+      if rising_edge(clk) then
+         if ltx_valid = '1' and ltx_ready = '1' then
+            n_ltx     <= n_ltx + 1;
+            ltx_valid <= '0';
+            if n_ltx + 1 < ltx_req then
+               ltx_data  <= to_stdlogicvector((n_ltx + 1) mod 251, 8);
+               ltx_valid <= '1';
+            end if;
+         elsif ltx_valid = '0' and n_ltx < ltx_req then
+            ltx_data  <= to_stdlogicvector(n_ltx mod 251, 8);
+            ltx_valid <= '1';
+         end if;
+      end if;
+   end process p_ltx;
+
+
+   -- A probe of the arbiter: grant_tcp with a reply valid means that the
+   -- segment has the output and the reply waits, and no grant with a valid
+   -- segment the other way around.
+   p_probe : process (clk)
+   begin
+      if rising_edge(clk) then
+         if << signal .tb_eth.i_eth.grant_tcp : std_logic >> = '1' and
+            << signal .tb_eth.i_eth.resp_valid : std_logic >> = '1' then
+            n_resp_wait <= n_resp_wait + 1;
+         end if;
+         if << signal .tb_eth.i_eth.grant_tcp : std_logic >> = '0' and
+            << signal .tb_eth.i_eth.tcp_valid : std_logic >> = '1' then
+            n_tcp_wait <= n_tcp_wait + 1;
+         end if;
+      end if;
+   end process p_probe;
+
+
    p_phy : process
       variable f_v   : t_frame;
       variable ck_v  : std_logic_vector(15 downto 0);
       variable seq_v : std_logic_vector(15 downto 0);
+      -- The TCP connection: the host's next sequence number and next
+      -- data, what it has acknowledged, and the station's first number
+      variable hseq_v : std_logic_vector(31 downto 0);
+      variable hd_v   : natural := 0;
+      variable hack_v : std_logic_vector(31 downto 0);
+      variable isn_v  : std_logic_vector(31 downto 0);
+      variable n0_v   : natural;
+      variable link_v : natural := 0;
+      variable fs_v   : std_logic_vector(31 downto 0);
+      variable fa_v   : std_logic_vector(31 downto 0);
+      variable ff_v   : std_logic_vector(7 downto 0);
+      variable fn_v   : natural;
 
       procedure send (d : std_logic_vector(1 downto 0); dv : std_logic) is
       begin
@@ -397,6 +614,40 @@ begin
          n_expected           <= n_expected + 1;
          send_frame(f);
       end procedure send_answered;
+
+      -- A round: the link side sends nl bytes, and at the same time the
+      -- host sends nh bytes of data and six requests, the first of which
+      -- is numbered k0. Then the host acknowledges the link's bytes.
+      procedure round (nl : natural; nh : natural; k0 : natural) is
+         variable g_v : t_frame;
+      begin
+         ltx_req <= ltx_req + nl;
+         link_v  := link_v + nl;
+         send_frame(tseg(hseq_v, hack_v, C_ACK, nh, hd_v));
+         hseq_v   := hseq_v + nh;
+         hd_v     := hd_v + nh;
+         host_end <= hseq_v;
+         send_answered(arp_request(C_BC, X"01", C_TPA, k0), arp_reply(k0));
+         g_v := ping(C_US, C_TPA, 0, X"0100", k0 + 1);
+         send_answered(g_v, pong(g_v));
+         g_v := ping(C_US, C_TPA, 56, X"0101", k0 + 2);
+         send_answered(g_v, pong(g_v));
+         send_answered(arp_request(C_US, X"01", C_TPA, k0 + 3), arp_reply(k0 + 3));
+         g_v := ping(C_US, C_TPA, 1472, X"0102", k0 + 4);
+         send_answered(g_v, pong(g_v));
+         g_v := ping(C_US, C_TPA, 56, X"0103", k0 + 5);
+         send_answered(g_v, pong(g_v));
+         -- All of the link's bytes are on the wire, then
+         if tcp_data < link_v then
+            wait until tcp_data >= link_v for 2 ms;
+         end if;
+         assert tcp_data = link_v
+            report "tb_eth: " & integer'image(tcp_data) & " bytes of data were sent, not " &
+                   integer'image(link_v)
+            severity failure;
+         hack_v := isn_v + 1 + link_v;
+         send_frame(tseg(hseq_v, hack_v, C_ACK, 0, 0));
+      end procedure round;
 
    begin
       for c in 1 to 10 loop
@@ -471,6 +722,57 @@ begin
       send_frame(with_ip_ck(f_v));
       send_frame(ping(C_US, C_TPA, 56, X"000B", 39), false);
 
+      -- A connection to port 4510: the SYN gets a SYN-ACK, which is
+      -- checked now, and the host's ACK opens it.
+      if wired < n_expected then
+         wait until wired = n_expected for 300 us;
+      end if;
+      assert wired = n_expected
+         report "tb_eth: the replies were not all sent"
+         severity failure;
+      hseq_v := C_ISN_H;
+      n0_v   := wired;
+      send_frame(tseg(hseq_v, X"00000000", C_SYN, 0, 0));
+      if wired = n0_v then
+         wait until wired > n0_v for 100 us;
+      end if;
+      assert wired = n0_v + 1
+         report "tb_eth: no SYN-ACK"
+         severity failure;
+      check_tcp(wire(n0_v), fs_v, fa_v, ff_v, fn_v);
+      assert ff_v = X"12" and fa_v = hseq_v + 1 and fn_v = 0
+         report "tb_eth: not a SYN-ACK"
+         severity failure;
+      isn_v  := fs_v;
+      hseq_v := hseq_v + 1;
+      hack_v := isn_v + 1;
+      assert conn = '0'
+         report "tb_eth: a connection before the ACK"
+         severity failure;
+      send_frame(tseg(hseq_v, hack_v, C_ACK, 0, 0));
+      -- The ACK still has to come through the FIFO of received frames.
+      if conn = '0' then
+         wait until conn = '1' for 20 us;
+      end if;
+      assert conn = '1'
+         report "tb_eth: no connection"
+         severity failure;
+
+      -- Two rounds of the link's bytes, the host's data, and requests
+      round(1500, 200, 50);
+      round(1100, 300, 60);
+      for c in 1 to 2000 loop
+         wait until rising_edge(eth_clk);
+      end loop;
+      -- An RST ends the connection, and is not answered.
+      send_frame(tseg(hseq_v, hack_v, C_RST, 0, 0));
+      for c in 1 to 200 loop
+         wait until rising_edge(eth_clk);
+      end loop;
+      assert conn = '0'
+         report "tb_eth: the RST did not end the connection"
+         severity failure;
+
       -- With the IP address 0, nothing is answered.
       for c in 1 to 4000 loop
          wait until rising_edge(eth_clk);
@@ -528,41 +830,107 @@ begin
       f_v.len     := n_v - 8 - 4;
       wire(wired) <= f_v;
       wired       <= wired + 1;
+      if is_tcp(f_v) and ip_len(f_v) > 40 then
+         tcp_data <= tcp_data + ip_len(f_v) - 40;
+      end if;
    end process p_wire;
 
 
    p_check : process
+      variable j_v   : natural := 0;
+      variable seq_v : std_logic_vector(31 downto 0);
+      variable ack_v : std_logic_vector(31 downto 0);
+      variable fl_v  : std_logic_vector(7 downto 0);
+      variable n_v   : natural;
+      -- The next sequence number of the station, the last acknowledgment,
+      -- and the data bytes and segments
+      variable nxt_v  : std_logic_vector(31 downto 0);
+      variable lack_v : std_logic_vector(31 downto 0) := C_ISN_H;
+      variable data_v : natural                       := 0;
+      variable n_syn  : natural                       := 0;
+      variable n_seg  : natural                       := 0;
    begin
       wait until sent;
 
-      assert wired = n_expected
-         report "tb_eth: " & integer'image(wired) & " frames were sent, not " &
-                integer'image(n_expected)
-         severity failure;
+      for k in 0 to wired - 1 loop
+         if is_tcp(wire(k)) then
+            check_tcp(wire(k), seq_v, ack_v, fl_v, n_v);
+            if fl_v = X"12" then
+               n_syn := n_syn + 1;
+               nxt_v := seq_v + 1;
+            else
+               assert n_syn = 1 and (fl_v = C_ACK or fl_v = X"18") and seq_v = nxt_v and
+                      n_v <= C_MSS and (n_v > 0) = (fl_v = X"18")
+                  report "tb_eth: frame " & integer'image(k) & " is not the segment expected"
+                  severity failure;
+               -- An acknowledgment never goes back, or past the host's data.
+               assert ack_v - lack_v < X"80000000" and host_end - ack_v < X"80000000"
+                  report "tb_eth: frame " & integer'image(k) & " has a wrong acknowledgment"
+                  severity failure;
+               lack_v := ack_v;
 
-      for k in 0 to n_expected - 1 loop
-         assert wire(k).len = expected(k).len
-            report "tb_eth: frame " & integer'image(k) & " has " & integer'image(wire(k).len) &
-                   " bytes, not " & integer'image(expected(k).len)
-            severity failure;
+               for i in 0 to n_v - 1 loop
+                  assert wire(k).b(54 + i) = to_stdlogicvector((data_v + i) mod 251, 8)
+                     report "tb_eth: byte " & integer'image(i) & " of frame " &
+                            integer'image(k) & " is not the link's"
+                     severity failure;
+               end loop;
 
-         for i in 0 to expected(k).len - 1 loop
-            assert wire(k).b(i) = expected(k).b(i)
-               report "tb_eth: byte " & integer'image(i) & " of frame " & integer'image(k) &
-                      " is " & to_hstring(wire(k).b(i)) & ", not " &
-                      to_hstring(expected(k).b(i))
+               nxt_v  := nxt_v + n_v;
+               data_v := data_v + n_v;
+               if n_v > 0 then
+                  n_seg := n_seg + 1;
+               end if;
+            end if;
+         else
+            assert j_v < n_expected
+               report "tb_eth: frame " & integer'image(k) & " was not expected"
                severity failure;
-         end loop;
+            assert wire(k).len = expected(j_v).len
+               report "tb_eth: frame " & integer'image(k) & " has " & integer'image(wire(k).len) &
+                      " bytes, not " & integer'image(expected(j_v).len)
+               severity failure;
 
+            for i in 0 to expected(j_v).len - 1 loop
+               assert wire(k).b(i) = expected(j_v).b(i)
+                  report "tb_eth: byte " & integer'image(i) & " of frame " & integer'image(k) &
+                         " is " & to_hstring(wire(k).b(i)) & ", not " &
+                         to_hstring(expected(j_v).b(i))
+                  severity failure;
+            end loop;
+
+            j_v := j_v + 1;
+         end if;
       end loop;
 
-      assert rx = n_good and rx_bad = n_bad and tx = n_expected
+      assert j_v = n_expected
+         report "tb_eth: " & integer'image(j_v) & " replies were sent, not " &
+                integer'image(n_expected)
+         severity failure;
+      assert n_syn = 1 and data_v = 2600 and n_ltx = 2600 and tcp_data = 2600
+         report "tb_eth: " & integer'image(data_v) & " bytes were sent in segments, not 2600"
+         severity failure;
+      assert lack_v = host_end
+         report "tb_eth: the last acknowledgment is not of all the host's data"
+         severity failure;
+      assert n_lrx = 500 and not lrx_bad and n_break = 0
+         report "tb_eth: the link side got " & integer'image(n_lrx) & " bytes, not 500"
+         severity failure;
+      assert n_resp_wait > 0 and n_tcp_wait > 0
+         report "tb_eth: the arbiter was not tested, " & integer'image(n_resp_wait) &
+                " cycles of a reply waiting and " & integer'image(n_tcp_wait) &
+                " of a segment"
+         severity failure;
+
+      assert rx = n_good and rx_bad = n_bad and tx = wired
          report "tb_eth: the counts are " & integer'image(to_integer(rx)) & " received, " &
                 integer'image(to_integer(rx_bad)) & " bad, and " &
                 integer'image(to_integer(tx)) & " sent"
          severity failure;
 
-      report "tb_eth: PASS, " & integer'image(n_expected) & " replies";
+      report "tb_eth: PASS, " & integer'image(n_expected) & " replies and " &
+             integer'image(n_seg) & " segments, " & integer'image(n_resp_wait) &
+             " cycles of a reply waiting and " & integer'image(n_tcp_wait) & " of a segment";
       finish;
    end process p_check;
 
