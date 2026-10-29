@@ -1,37 +1,37 @@
 {
-  "nice_cpu_tag": "V1.0",
-  "nice_cpu_commit": "526c9547d22a240ec2087bd2c6b1b863adaa9e33",
-  "repo_commit": "8b8705a4d6eb1a0639188b1a3cc3c7eb70a6219d",
+  "nice_cpu_tag": "V1.1",
+  "nice_cpu_commit": "c428ce9a946304d7f852ad55a1fda3402a9e816f",
+  "repo_commit": "1f14a4281db872d8dedf554293185e800c3efc6f",
   "vivado": "Vivado v2025.1",
   "board": "MEGA65 R6",
   "part": "xc7a200tfbg484-2",
   "clock_mhz": 100.0,
   "flow": "default",
   "met": true,
-  "wns_ns": 0.376,
+  "wns_ns": 0.086,
   "tns_ns": 0.0,
-  "whs_ns": 0.054,
+  "whs_ns": 0.012,
   "ths_ns": 0.0,
   "wpws_ns": 0.259,
   "tpws_ns": 0.0,
   "core_in": {
-    "slack_ns": 0.917,
-    "from": "i_mega65/i_system/i_nicemon/i_mem/i_ram/mem_even_reg_0_9/CLKARDCLK",
+    "slack_ns": 0.844,
+    "from": "i_mega65/i_system/i_nicemon/i_mem/i_ram/mem_odd_reg_0_6/CLKARDCLK",
     "to": "i_mega65/i_system/i_nicemon/i_core/i_core/i_pipe_write/w_r_reg[regs][14][25]/D"
   },
   "core_out": {
-    "slack_ns": 0.456,
-    "from": "i_mega65/i_system/i_nicemon/i_core/i_core/i_pipe_prepare/rd_addr_r_reg[10]/C",
-    "to": "i_mega65/i_system/i_nicemon/i_devices/i_timer/irq_vector_o_reg[0]/CE"
+    "slack_ns": 0.629,
+    "from": "i_mega65/i_system/i_nicemon/i_core/i_core/i_pipe_prepare/rd_addr_r_reg[22]/C",
+    "to": "i_mega65/i_system/i_nicemon/i_devices/i_timer/count_r_reg[6]/D"
   },
   "attempts": [
     {
       "flow": "default",
-      "wns_ns": 0.376,
-      "whs_ns": 0.054,
+      "wns_ns": 0.086,
+      "whs_ns": 0.012,
       "wpws_ns": 0.259,
       "met": true
     }
   ],
-  "date": "2026-10-27"
+  "date": "2026-10-29"
 }
