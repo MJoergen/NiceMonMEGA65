@@ -142,6 +142,12 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 - `make release` builds the Nexys4DDR only with `FLOW=timing`, as its
   Makefile does, and no longer tries the default flow first, which never
   meets timing there.
+- `make release` builds the R6 with the flow of `verified.json` first,
+  and then with the other one, for the ROM can cost the margin of the
+  bump's build. The notes say when the other flow was needed.
+- `make hwtest ETH=IP` tests the Ethernet station too: it gives the
+  station the address, pings it, and runs the programs of the comparison
+  over `run.py --eth`. `make release ARGS="--eth IP"` passes it on.
 
 ## V1.0 (2026-10-28)
 
