@@ -64,12 +64,13 @@
 -- of the host that was lost is not waited for forever; an ACK with a
 -- window of 0 starts the tries again, so the connection lasts while the
 -- host answers.
--- What may be sent is worked out in one cycle (B_IDLE) and the segment
--- chosen in the next (B_PICK), for the timing; the choice is dropped if a
--- segment is read or the timer runs out in that cycle, as both change
--- what may be sent. The segment's header fields (seg_*) and where its
--- data is go to eth_tcp_tx.vhd, which builds it, with the checksums, and
--- sends it; nothing is chosen while it is busy.
+-- What may be sent is worked out in two cycles, for the timing: how far
+-- the data and the host's window go (B_IDLE), then how much of it a
+-- segment takes (B_SIZE); the segment is chosen in the next (B_PICK). The
+-- choice is dropped if a segment is read or the timer runs out in any of
+-- them, as both change what may be sent. The segment's header fields
+-- (seg_*) and where its data is go to eth_tcp_tx.vhd, which builds it,
+-- with the checksums, and sends it; nothing is chosen while it is busy.
 --
 -- The receive window is the free space of the receive buffer, and when it
 -- has grown by C_WND_STEP since the last segment, an ACK tells the host.
@@ -250,7 +251,7 @@ architecture synthesis of eth_tcp is
    signal tx_rdata : std_logic_vector(8 downto 0);
 
    -- The segment being chosen, and the one being sent
-   type   t_build is (B_IDLE, B_PICK);
+   type   t_build is (B_IDLE, B_SIZE, B_PICK);
    signal build     : t_build                       := B_IDLE;
    signal go        : std_logic                     := '0';
    signal busy      : std_logic;
@@ -262,11 +263,14 @@ architecture synthesis of eth_tcp is
    signal seg_flags : std_logic_vector(7 downto 0)  := (others => '0');
    signal seg_wnd   : std_logic_vector(15 downto 0) := (others => '0');
    signal seg_ptr   : t_ptr                         := (others => '0');
-   -- The data that may be sent: its length, and whether it is a whole
-   -- segment
-   signal pick_n   : natural range 0 to C_MSS := 0;
-   signal pick_big : boolean                  := false;
-   signal seg_n    : natural range 0 to C_MSS := 0;
+   -- The data that may be sent: how much there is from nxt_ptr on, the
+   -- room for it in the host's window, below 0 when more is out than the
+   -- window has, its length, and whether it is a whole segment
+   signal avail    : natural range 0 to C_SIZE          := 0;
+   signal room     : integer range -C_SIZE to 2 ** 16   := 0;
+   signal pick_n   : natural range 0 to C_MSS           := 0;
+   signal pick_big : boolean                            := false;
+   signal seg_n    : natural range 0 to C_MSS           := 0;
 
    signal conn : std_logic;
 
@@ -402,8 +406,7 @@ begin
       variable d1_v        : std_logic_vector(31 downto 0);
       variable d2_v        : std_logic_vector(31 downto 0);
       variable rcv_v       : std_logic_vector(31 downto 0);
-      variable avail_v     : natural range 0 to C_SIZE;
-      variable room_v      : integer range -C_SIZE to 2 ** 16;
+      variable room_v      : natural range 0 to 2 ** 16;
       variable n_v         : natural range 0 to C_MSS;
       variable timeout_v   : boolean;
       variable go_v        : boolean;
@@ -687,24 +690,13 @@ begin
 
          case build is
 
-            -- What may be sent: computed here, once the last segment has
-            -- gone, and chosen from in the next cycle, unless a segment was
-            -- read or the timer ran out in it.
+            -- What may be sent: worked out here and in B_SIZE, once the
+            -- last segment has gone, and chosen from in the cycle after,
+            -- unless a segment was read or the timer ran out meanwhile.
             when B_IDLE =>
                if eval = '0' and not timeout_v and busy = '0' then
-                  avail_v := to_integer(lim_ptr - nxt_ptr);
-                  room_v  := to_integer(snd_wnd) - to_integer(nxt_ptr - una_ptr);
-                  if room_v < 0 then
-                     room_v := 0;
-                  end if;
-                  n_v      := minimum(minimum(avail_v, room_v), C_MSS);
-                  pick_n   <= n_v;
-                  pick_big <= avail_v >= C_MSS;
-                  if probe = '1' and room_v = 0 and avail_v > 0 then
-                     pick_n   <= 1;
-                     pick_big <= true;
-                  end if;
-
+                  avail    <= to_integer(lim_ptr - nxt_ptr);
+                  room     <= to_integer(snd_wnd) - to_integer(nxt_ptr - una_ptr);
                   seg_mac  <= peer_mac;
                   seg_ip   <= peer_ip;
                   seg_port <= peer_port;
@@ -714,7 +706,24 @@ begin
                   seg_n    <= 0;
                   -- After this side's FIN, the next sequence number is past it.
                   seg_seq  <= una_seq + (nxt_ptr - una_ptr) + fin_sent;
-                  build    <= B_PICK;
+                  build    <= B_SIZE;
+               end if;
+
+            when B_SIZE =>
+               build <= B_IDLE;
+               if eval = '0' and not timeout_v then
+                  room_v := 0;
+                  if room > 0 then
+                     room_v := room;
+                  end if;
+                  n_v      := minimum(minimum(avail, room_v), C_MSS);
+                  pick_n   <= n_v;
+                  pick_big <= avail >= C_MSS;
+                  if probe = '1' and room_v = 0 and avail > 0 then
+                     pick_n   <= 1;
+                     pick_big <= true;
+                  end if;
+                  build <= B_PICK;
                end if;
 
             when B_PICK =>
