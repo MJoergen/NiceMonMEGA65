@@ -19,9 +19,11 @@
 -- and the TCP segment's in tcp_sum, after the pseudo header, whose words
 -- INIT_ST adds first. The second (SEND_ST) sends them, with the checksums
 -- in place of the zeros of the first. In both, tx_idx is the next byte to
--- read, and fetch says that the byte read in the cycle before, fetch_idx,
--- is used; the second pass reads a byte only when tx_ready_i has taken
--- the last one, so a byte takes at least two cycles there.
+-- read, and fetch says that a byte was read in the cycle before, byte
+-- fetch_idx; it is kept in byte, with have and byte_idx, for a cycle, for
+-- the timing, and added or sent from there. The second pass reads a byte
+-- only when tx_ready_i has taken the last one, so a byte takes at least
+-- three cycles there.
 --
 -- INTERFACE CONTRACTS -- these are requirements on the environment:
 -- a) go_i is '1' only while busy_o is '0'.
@@ -91,10 +93,14 @@ architecture synthesis of eth_tcp_tx is
    signal ip_sum  : std_logic_vector(15 downto 0) := (others => '0');
    signal tcp_sum : std_logic_vector(15 downto 0) := (others => '0');
    signal hi      : std_logic_vector(7 downto 0)  := (others => '0');
-   -- The next byte to read, whether the byte read is used, and which it is
+   -- The next byte to read, whether a byte was read, and which; and the
+   -- byte, a cycle later
    signal tx_idx    : natural range 0 to 54 + G_MSS := 0;
    signal fetch     : std_logic                     := '0';
    signal fetch_idx : natural range 0 to 54 + G_MSS := 0;
+   signal have      : std_logic                     := '0';
+   signal byte_idx  : natural range 0 to 54 + G_MSS := 0;
+   signal byte      : std_logic_vector(7 downto 0)  := (others => '0');
    signal tx_valid  : std_logic                     := '0';
    signal ip_ck     : std_logic_vector(15 downto 0);
    signal tcp_ck    : std_logic_vector(15 downto 0);
@@ -137,6 +143,12 @@ begin
    p_tx : process (clk_i)
    begin
       if rising_edge(clk_i) then
+         -- The byte read in the cycle before
+         have <= fetch;
+         if fetch = '1' then
+            byte     <= seg_byte;
+            byte_idx <= fetch_idx;
+         end if;
 
          case state is
 
@@ -161,13 +173,13 @@ begin
                end if;
 
             when SUM_ST =>
-               if fetch = '1' then
-                  if fetch_idx mod 2 = 0 then
-                     hi <= seg_byte;
-                  elsif fetch_idx <= 33 then
-                     ip_sum <= ones_add(ip_sum, hi & seg_byte);
+               if have = '1' then
+                  if byte_idx mod 2 = 0 then
+                     hi <= byte;
+                  elsif byte_idx <= 33 then
+                     ip_sum <= ones_add(ip_sum, hi & byte);
                   else
-                     tcp_sum <= ones_add(tcp_sum, hi & seg_byte);
+                     tcp_sum <= ones_add(tcp_sum, hi & byte);
                   end if;
                end if;
                fetch <= '0';
@@ -178,7 +190,7 @@ begin
                   if tx_idx >= 54 then
                      rd_addr_o <= rd_addr_o + 1;
                   end if;
-               elsif fetch = '0' then
+               elsif fetch = '0' and have = '0' then
                   -- An odd byte at the end, with a zero after it
                   if len mod 2 = 1 then
                      tcp_sum <= ones_add(tcp_sum, hi & X"00");
@@ -196,13 +208,14 @@ begin
                      state <= IDLE_ST;
                   end if;
                end if;
-               if fetch = '1' then
-                  tx_data_o <= seg_byte;
-                  tx_last_o <= '1' when fetch_idx = len - 1 else '0';
+               if have = '1' then
+                  tx_data_o <= byte;
+                  tx_last_o <= '1' when byte_idx = len - 1 else '0';
                   tx_valid  <= '1';
                end if;
                fetch <= '0';
-               if fetch = '0' and tx_idx < len and (tx_valid = '0' or tx_ready_i = '1') then
+               if fetch = '0' and have = '0' and tx_idx < len and
+                  (tx_valid = '0' or tx_ready_i = '1') then
                   fetch     <= '1';
                   fetch_idx <= tx_idx;
                   tx_idx    <= tx_idx + 1;
@@ -216,6 +229,7 @@ begin
          if rst_i = '1' then
             state    <= IDLE_ST;
             fetch    <= '0';
+            have     <= '0';
             tx_valid <= '0';
          end if;
       end if;
