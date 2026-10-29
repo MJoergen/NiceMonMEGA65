@@ -18,7 +18,7 @@ keyboard. A program written in NICE assembly
 ([ISA.md](https://github.com/MJoergen/nice_cpu/blob/main/doc/ISA.md))
 runs on the board as it runs in `niceemu`.
 
-The debug UART, or the Ethernet port, carries the program's console and
+The Ethernet port, or the debug UART, carries the program's console and
 the debug link, which a PC may use to load, run, pause, step, and
 inspect programs. The system also builds for the Digilent Nexys4DDR
 (see [synth/](synth/README.md#the-nexys4ddr) and
@@ -29,11 +29,11 @@ There are three ways to use the system:
 - [On its own](#on-its-own), as a MEGA65 with a keyboard and a screen,
   with no JTAG cable and no serial cable. The program is in the core's
   ROM, and the core is loaded from the MEGA65's flash.
-- [Over the serial port](#over-the-serial-port), with a JTAG cable,
-  where a PC may load programs over the debug link, talk to them, and
+- [Over Ethernet](#over-ethernet), with no JTAG cable, where a PC on
+  the network may load programs over the debug link, talk to them, and
   debug them.
-- [Over Ethernet](#over-ethernet), where a PC on the network does the
-  same, with the same tools, and with no JTAG cable.
+- [Over the serial port](#over-the-serial-port), with a JTAG cable,
+  where a PC does the same, with the same tools.
 
 A monitor like QMON, the one in
 [QNICE-FPGA](https://github.com/sy2002/QNICE-FPGA), is planned but not
@@ -68,8 +68,8 @@ switched on, with a USB keyboard in its USB HID port (see
 
 The tools that compile programs and generate `.cor` files are in this
 repository. So are the tools that load and debug programs, which need
-the [serial port](#over-the-serial-port) or
-[Ethernet](#over-ethernet).
+[Ethernet](#over-ethernet) or the
+[serial port](#over-the-serial-port).
 Clone the repository with the submodule, which has the assembler, the
 emulator, and the C library:
 
@@ -96,77 +96,82 @@ the demos that the second row lists, and the reset button starts the
 typewriter again. The ROM can also hold a program of your own (see
 [Building your own ROM](#building-your-own-rom)).
 
-## Over the serial port
-
-The debug UART needs the JTAG cable, whose USB port carries it. It runs
-at 2 Mbaud (2000000), 8-N-1, and is `/dev/ttyUSB1` by default
-([tools/README.md](tools/README.md#the-serial-port) describes the port).
-There are two ways to talk to a program on the board through it:
-
-- A terminal program, such as `picocom`, sends what you type to the
-  program and shows what it prints. It has none of the debug link's
-  features: it cannot load a program, pause it, or read its memory, and
-  the link's notices show in it as raw text, such as `h01#C9`.
-- `tools/mon.py` is an interactive shell. It has the debug link's
-  features and the console, in two modes. At its prompt, it takes debug
-  commands, shows the program's output, and decodes the notices, and
-  `send TEXT` sends text to the program. Its `console` command passes
-  your keys straight to the program, as a terminal does, until Ctrl-]
-  returns to the prompt.
-
 ## Over Ethernet
 
-The debug link also runs over the board's Ethernet port, on TCP port
-4510. A PC on the network may then load, run, and debug programs with
-the same tools and commands as over the serial port, and with no JTAG
+The debug link runs over the board's Ethernet port, on TCP port 4510. A
+PC on the network may then load, run, and debug programs, with no JTAG
 cable.
 
 The board answers once it has an IP address, which a program, the debug
 link, or the demo's F11 gives it. After reset, it has none, and answers
-nothing. Over the serial port, the link writes the address to
-`0xFFFFFF9A`, the first byte in bits 31..24, here 192.168.1.65:
-
-    tools/mon.py --port /dev/ttyUSB1
-    mon> w FFFFFF9A C0A80141
-    mon> q
-
-In the demo's F11, I types a new IP address, and M a new MAC address:
+nothing. In F11, I types a new IP address, and M a new MAC address:
 
 ![The demo's F11, with the Ethernet station's addresses](doc/images/ethernet.png)
 
-The board serves one connection at a time. While a host is connected,
-it has the whole line, the program's console and the debug link: what
-comes in on the UART is dropped, and all output goes to the host. When
-the host disconnects, the line goes back to the UART.
+There are two ways to talk to a program on the board through it:
 
-As over the serial port, a plain client is a terminal to the program,
-with none of the link's features. `nc 192.168.1.65 4510` sends each
-line you type to the program, and shows what it prints. Ctrl-C ends it.
-Its close is a break, which ends the program's input until the core is
-started again. The board keeps the connection, so the UART has no link
-until a tool connects from the same PC, such as
-`tools/mon.py --eth 192.168.1.65`, or the board is reset.
+- A plain client, such as `nc 192.168.1.65 4510`, is a terminal to the
+  program. It sends each line you type to the program, and shows what
+  it prints. It has none of the debug link's features: it cannot load a
+  program, pause it, or read its memory, and the link's notices show in
+  it as raw text, such as `h01#C9`.
+- `tools/mon.py --eth 192.168.1.65` is an interactive shell. It has the
+  debug link's features and the console, in two modes. At its prompt, it
+  takes debug commands, shows the program's output, and decodes the
+  notices, and `send TEXT` sends text to the program. Its `console`
+  command passes your keys straight to the program, as a terminal does,
+  until Ctrl-] returns to the prompt.
 
-The tools take `--eth 192.168.1.65` for this (see
+The other tools take `--eth 192.168.1.65` too (see
 [tools/README.md](tools/README.md#over-ethernet)), and
 [SYSTEM.md](doc/SYSTEM.md#the-ethernet-station) describes the Ethernet
 station. The link has no password, so give the board an IP address only
 on a network you trust.
 
+The board serves one connection at a time. While a host is connected,
+it has the whole line, the program's console and the debug link: what
+comes in on the [serial port](#over-the-serial-port) is dropped, and all
+output goes to the host. When the host disconnects, the line goes back
+to the serial port.
+
+Ctrl-C ends `nc`. Its close is a break, which ends the program's input
+until the core is started again. The board keeps the connection, so the
+serial port has no link until a tool connects from the same PC, such as
+`tools/mon.py --eth 192.168.1.65`, or the board is reset. The tools end
+their connections so that the line goes back at once.
+
+## Over the serial port
+
+The debug link runs over the debug UART too, which needs the JTAG
+cable, whose USB port carries it. It runs at 2 Mbaud (2000000), 8-N-1,
+and is `/dev/ttyUSB1` by default
+([tools/README.md](tools/README.md#the-serial-port) describes the port).
+A terminal program, such as `picocom`, is then the plain client, and
+`tools/mon.py --port /dev/ttyUSB1` the interactive shell, as
+[over Ethernet](#over-ethernet). The other tools take `--port` too.
+
+The serial port also gives the board its IP address without the demo.
+The link writes it to `0xFFFFFF9A`, the first byte in bits 31..24, here
+192.168.1.65:
+
+    tools/mon.py --port /dev/ttyUSB1
+    mon> w FFFFFF9A C0A80141
+    mon> q
+
 ## Using the interactive shell
 
 `tools/mon.py` takes the connection to the board as an option, as the
-other tools do: `--port` for the serial port, which is `/dev/ttyUSB1`
-when it is left out, or `--eth` for the Ethernet port:
+other tools do: `--eth` for the Ethernet port, or `--port` for the
+serial port, which is `/dev/ttyUSB1` when neither is given:
 
-    tools/mon.py --port /dev/ttyUSB1
     tools/mon.py --eth 192.168.1.65
+    tools/mon.py --port /dev/ttyUSB1
 
 The shell is the same either way. It starts by printing the state of the
 core:
 
 <pre>
-$ <b>tools/mon.py</b>
+$ <b>tools/mon.py --eth 192.168.1.65</b>
 halted: HALT, ROM hidden, control 0000000a, link version 0.5, input free 2048
 PC=0000000f
 </pre>
@@ -189,8 +194,9 @@ command.
 
 ### A worked example
 
-This session ran on the MEGA65 R6, with `sim/echo.nasm`. These are the
-instructions of this short assembly program, and their addresses:
+This session ran on the MEGA65 R6, over its Ethernet port at
+192.168.1.65, with `sim/echo.nasm`. These are the instructions of this
+short assembly program, and their addresses:
 
     0  LOOP  MOVE    R1, @CONSOLE      ; bit 8 set when a byte has arrived
     2        AND[M]  R2, R1, 0x100
@@ -208,7 +214,7 @@ clear ends the earlier halt, so bit 1 of the control register is 0:
 
 <pre>
 $ <b>python3 nice_cpu/assembler/niceasm.py -o echo.bin sim/echo.nasm</b>
-$ <b>tools/mon.py</b>
+$ <b>tools/mon.py --eth 192.168.1.65</b>
 halted: HALT, ROM hidden, control 0000000a, link version 0.5, input free 2048
 PC=0000000f
 'help' lists the commands, and 'q' quits.
@@ -289,7 +295,7 @@ mon&gt; <b>q</b>
 [tools/README.md](tools/README.md) describes the other tools: `load.py`,
 which loads and starts a program, and `run.py`, which runs one as
 `niceemu` runs it, for comparing the two. It also shows how to run a C
-program on the board. They take `--port` or `--eth` as `mon.py` does.
+program on the board. They take `--eth` or `--port` as `mon.py` does.
 
 ## Writing programs
 

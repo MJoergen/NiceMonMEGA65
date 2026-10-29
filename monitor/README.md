@@ -45,8 +45,8 @@ CPU allows.
 
 ## Input and output
 
-- Output goes to the UART and to the screen; input comes from the UART and
-  the keyboard, which the hardware already merges into the console at
+- Output goes to the line (Ethernet or the UART) and to the screen; input
+  comes from the line and the keyboard, which the hardware already merges into the console at
   `0xFFFFFF00`. A read returns 0 while no byte has arrived, so the monitor
   polls, which works in the emulator too, where a read waits.
 - The screen is memory at `0xFFFF0000`, one word per character with its

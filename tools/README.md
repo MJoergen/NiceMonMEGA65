@@ -1,13 +1,14 @@
 # The host tools
 
-The tools run on the host, and talk to the board over its debug UART,
-with the debug link of [DEBUG.md](../nice_cpu/doc/DEBUG.md). They use
+The tools run on the host, and talk to the board over its Ethernet port
+or its debug UART, with the debug link of
+[DEBUG.md](../nice_cpu/doc/DEBUG.md). They use
 only the Python standard library, and run on Linux and macOS. Each one
 prints its options with `--help`, and its header says more.
 
 | Tool | What it does |
 |---|---|
-| `nicelink.py` | The debug link, which the other tools use: on the UART, over TCP to `niceemu --link`, or over TCP to `make cosim`. |
+| `nicelink.py` | The debug link, which the other tools use: over TCP to the board's Ethernet port, on the UART, over TCP to `niceemu --link`, or over TCP to `make cosim`. |
 | `load.py` | Loads a `.bin` file into cleared memory and starts it, or with `--no-run` leaves the core held in reset. |
 | `run.py` | Runs a program on the board and prints what `niceemu` prints, for diffing. |
 | `mon.py` | An interactive shell on the link: memory, pause, step, breakpoints, and the console. |
@@ -19,24 +20,21 @@ prints its options with `--help`, and its header says more.
 | `bump.py` | Moves nice_cpu to a tag, builds the R6 bitstream, and writes the badge files. |
 | `release.py` | Builds, tests, and publishes a release (see [RELEASE.md](../doc/RELEASE.md)). |
 
-## The serial port
+## The line
 
-The MEGA65's debug UART runs at 2 Mbaud (2000000), 8-N-1. It carries the
-program's console both ways, and the packets of the debug link between
-its bytes (see [SYSTEM.md](../doc/SYSTEM.md#the-debug-link)). The
-tools use the link, and `niceemu --link` serves the same link, so the
-tools drive the emulator as they drive the board. When they connect, the
-tools read the link's version, and stop on a major other than 0, which
-they do not know (DEBUG.md §9).
+The board's line carries the program's console both ways, and the
+packets of the debug link between its bytes (see
+[SYSTEM.md](../doc/SYSTEM.md#the-debug-link)). The line is a TCP
+connection to the board's Ethernet port, or its debug UART, which needs
+a JTAG cable. The tools use the link, and `niceemu --link` serves the
+same link, so the tools drive the emulator as they drive the board.
+When they connect, the tools read the link's version, and stop on a
+major other than 0, which they do not know (DEBUG.md §9).
 
-The tools use the serial device `/dev/ttyUSB1`, the MEGA65's debug UART.
-If yours is another, give it to the tools with `--port`, and open it in
-your terminal program. On macOS, use the `/dev/cu.*` device, as a
-`/dev/tty.*` device blocks on open. The port must not be open in a
-terminal while a tool runs.
-
-A terminal program that runs at 2 Mbaud, such as `picocom`, shows the
-program's console.
+Each tool takes the line as an option: `--eth 192.168.1.65` for the
+Ethernet port (see [Over Ethernet](#over-ethernet)), or `--port` for
+the serial port (see [The serial port](#the-serial-port)), which is
+`/dev/ttyUSB1` when neither is given.
 
 `make` has a target for each tool:
 
@@ -46,30 +44,54 @@ program's console.
 - `make mon` opens an interactive shell on the link (see
   [mon.py](#monpy)).
 
-They use `PORT=/dev/ttyUSB1` by default, and pass `ARGS=` on to the tool,
-for example `ARGS=--no-run` or `ARGS="-i in.txt -d 0x100:16 -s --timeout 5"`.
-`ARGS="--tcp 4000"` drives `niceemu --link 4000` instead of the board,
-and `ARGS="--eth 192.168.1.65"` drives the board over its Ethernet port
-(see [Over Ethernet](#over-ethernet)).
+They take `ETH=192.168.1.65` for the Ethernet port, and use
+`PORT=/dev/ttyUSB1` without it. They pass `ARGS=` on to the tool, for
+example `ARGS=--no-run` or `ARGS="-i in.txt -d 0x100:16 -s --timeout 5"`.
+`ARGS="--tcp 4000"` drives `niceemu --link 4000` instead of the board.
 
 ## Over Ethernet
 
-The board also serves the debug link on TCP port 4510 of its Ethernet
-station, once it has an IP address ([SYSTEM.md](../doc/SYSTEM.md#the-debug-link-over-tcp)).
-Give it one over the UART, then use `--eth` with any tool instead of
-`--port`:
+The board serves the debug link on TCP port 4510 of its Ethernet
+station, once it has an IP address
+([SYSTEM.md](../doc/SYSTEM.md#the-debug-link-over-tcp)). After reset it
+has none. The demo's F11 gives it one: I types a new IP address. Then
+use `--eth` with any tool:
+
+    tools/run.py --eth 192.168.1.65 prog.bin
+
+`--eth HOST:PORT` names another port. A plain TCP client, such as
+`nc -N 192.168.1.65 4510`, shows the program's console. It sends each
+line you type, and Ctrl-D sends a break, which ends the program's input
+(`-N` makes the end of stdin a half-close, which the board takes as a
+break). The board keeps the connection after that, so Ctrl-C then ends
+`nc`.
+
+The board serves one host at a time. While a host is connected over
+Ethernet, the UART carries no link: its bytes are dropped. A new
+connection from the same host replaces the old one. The tools end their
+connection with a reset, so that the UART has the link again at once;
+after `nc`, the UART has it again when a tool connects from the same
+host, or after a reset of the board. The link has no password, so give
+the board an IP address only on a network you trust.
+
+## The serial port
+
+The MEGA65's debug UART runs at 2 Mbaud (2000000), 8-N-1, and needs the
+JTAG cable, whose USB port carries it. The tools use the serial device
+`/dev/ttyUSB1`. If yours is another, give it to the tools with `--port`,
+or to `make` with `PORT=`, and open it in your terminal program. On
+macOS, use the `/dev/cu.*` device, as a `/dev/tty.*` device blocks on
+open. The port must not be open in a terminal while a tool runs.
+
+A terminal program that runs at 2 Mbaud, such as `picocom`, shows the
+program's console: `picocom -b 2000000 /dev/ttyUSB1`. In picocom,
+`Ctrl-A Ctrl-\` sends a break, which ends the program's input.
+
+The serial port also gives the board its IP address without the demo:
 
     tools/mon.py --port /dev/ttyUSB1
     mon> w FFFFFF9A C0A80141
     mon> q
-    tools/run.py --eth 192.168.1.65 prog.bin
-
-`--eth HOST:PORT` names another port. While a host is connected over
-Ethernet, the UART carries no link: its bytes are dropped. The end of
-a program's input is a half-close of the connection, which the board
-takes as a break, and the tools end the connection with a reset, so
-that the UART has the link again. The link has no password, so give the board an IP
-address only on a network you trust.
 
 ## Running a program
 
@@ -80,20 +102,21 @@ starts the core. For example, with `sim/echo.nasm`, which echoes what you
 type until a `.`:
 
     python3 nice_cpu/assembler/niceasm.py -o echo.bin sim/echo.nasm
-    tools/load.py echo.bin
-    picocom -b 2000000 /dev/ttyUSB1
+    tools/load.py --eth 192.168.1.65 echo.bin
+    nc -N 192.168.1.65 4510
 
-Type in the terminal and the program echoes it. When you type `.`, it
-halts, and the board sends its halt notice, which shows in the terminal
-as a few letters after a stray character, such as `h01#C9`. What you
-type goes to the program while it runs, and is dropped while the core is
-held in reset or has halted. To end a program's input, send a break: in
-picocom, `Ctrl-A Ctrl-\`.
+Type a line, and the program echoes it. When you type `.`, it halts,
+and the board sends its halt notice, which shows in the terminal as a
+few letters after a stray character, such as `h01#C9`. What you type
+goes to the program while it runs, and is dropped while the core is
+held in reset or has halted. To end a program's input, send a break:
+Ctrl-D in `nc -N`, or `Ctrl-A Ctrl-\` in picocom on the serial port,
+after `tools/load.py --port /dev/ttyUSB1 echo.bin`.
 
 The `.bin` file has one line per word, the address and the word in hex.
 `load.py --no-run` loads the program and leaves the core held in reset.
 `load.py --tcp PORT` loads it into `niceemu --link PORT` instead of the
-board, and `load.py --eth HOST` into the board over its Ethernet port.
+board.
 
 `load.py` takes the lines that `niceemu` takes:
 
@@ -121,10 +144,12 @@ that needs):
     make examples
 
 That builds `examples/build/primes.bin` from `examples/primes.c`, which
-counts primes. Load it and open a terminal:
+counts primes. Load it with `mon.py`, start it, and pass the terminal to
+it with `console`, so that its first prompt is not lost:
 
-    tools/load.py examples/build/primes.bin
-    picocom -b 2000000 /dev/ttyUSB1
+    tools/mon.py --eth 192.168.1.65 examples/build/primes.bin
+    mon> go
+    mon> c
 
 The program asks for a limit, reads it with `scanf`, and counts the primes
 up to it. It asks again until you enter 0, and then halts. The program does
@@ -147,7 +172,7 @@ halted, and the registers. It takes niceemu's `-i`, `-d`, `-s`, and
 `--symbols` options, so the output of the two can be compared:
 
     nice_cpu/emulator/zig-out/bin/niceemu -d 0x110:2 -s prog.bin > emu.txt
-    tools/run.py -d 0x110:2 -s prog.bin > board.txt
+    tools/run.py --eth 192.168.1.65 -d 0x110:2 -s prog.bin > board.txt
     diff emu.txt board.txt
 
 The exit status is that of `niceemu`:
@@ -230,14 +255,13 @@ example](../README.md#using-the-interactive-shell).
 
 ### Starting it
 
-    tools/mon.py [--port /dev/ttyUSB1] [--baud 2000000]
-                 [--eth HOST[:PORT]] [--tcp PORT] [--cosim PORT]
-                 [--symbols FILE] [FILE.bin]
+    tools/mon.py [--eth HOST[:PORT]] [--port /dev/ttyUSB1] [--baud 2000000]
+                 [--tcp PORT] [--cosim PORT] [--symbols FILE] [FILE.bin]
 
-- `--port` names the serial device of the board's debug UART,
-  `/dev/ttyUSB1` by default, and `--baud` its rate, 2000000 by default.
 - `--eth HOST` talks to the board over its Ethernet port, at its IP
   address HOST (see [Over Ethernet](#over-ethernet)).
+- `--port` names the serial device of the board's debug UART,
+  `/dev/ttyUSB1` by default, and `--baud` its rate, 2000000 by default.
 - `--tcp PORT` talks to `niceemu --link PORT` instead of the board.
 - `--cosim PORT` talks to the simulated system of `make cosim`, at
   about 250 UART bytes a second.
@@ -248,9 +272,10 @@ example](../README.md#using-the-interactive-shell).
   command does, and the core is left held in reset. Without it, `mon.py`
   starts with `status`, and leaves the core as it is.
 
-`make mon` runs it with `PORT=/dev/ttyUSB1`, and takes `FILE=` and
-`ARGS=`, for example `make mon ARGS="--tcp 4000"`. No
-other program may have the serial port open while it runs.
+`make mon ETH=192.168.1.65` runs it over the Ethernet port, and
+`make mon` on `PORT=/dev/ttyUSB1`. It takes `FILE=` and `ARGS=`, for
+example `make mon ARGS="--tcp 4000"`. On the serial port, no other
+program may have the port open while it runs.
 
 ### At the prompt
 

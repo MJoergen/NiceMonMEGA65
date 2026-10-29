@@ -26,8 +26,8 @@ so on, which the MEGA65 has without SHIFT.
 The typewriter's top ten rows are the welcome: the two bars, what the
 demo is, how to load your own programs through the debug UART, and a third
 blue bar with the keys. The 15 rows below it are a typewriter.
-What you type on the keyboard, or send to the debug UART, appears at the
-blinking cursor:
+What you type on the keyboard, or send over Ethernet or the debug UART,
+appears at the blinking cursor:
 
 | Key | What it does |
 |---|---|
@@ -49,7 +49,7 @@ writing programs that read the keyboard. Each key gets a row, with its
 bytes in hex from column 2, and from column 42 as characters, a control
 code as `^` and a character: `^[` is ESC, `^C` is RUN/STOP, and `^?` is
 DEL. The bytes `0x80` to `0x9F` have no character, and a key shows at
-most 12 bytes. A sequence from the debug UART shows as one key, and an
+most 12 bytes. A sequence from the line shows as one key, and an
 ESC alone shows with the key after it. A function key with a demo starts
 that demo, so its bytes show only for a moment, or not at all. Past the
 last row, the rows scroll up by one.
@@ -183,7 +183,7 @@ The demo scrolls by copying the rows, not with the display offset, so
 that the welcome stays, and so that it runs the same in `niceemu`, where
 the screen's registers are memory. It halts at the end of the input: in
 `niceemu`, after its input file, and on the board, after a break on the
-UART.
+line, as when an Ethernet host half-closes its connection.
 
 ## Building and testing
 

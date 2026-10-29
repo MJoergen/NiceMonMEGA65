@@ -9,8 +9,9 @@ text display on VGA and HDMI, a ROM at address 0 for a QMON-like
 monitor that is planned but not written (`monitor/README.md`), and host
 tools that load and run programs. The goal is that a program runs on the
 board exactly as `niceemu`, the emulator in `nice_cpu/emulator`, runs it.
-`README.md` is for users of the core files: on its own, and with the
-serial port. `doc/SYSTEM.md` has the address map, the link, the screen,
+`README.md` is for users of the core files: on its own, over Ethernet,
+and over the serial port, in that order, the order of their numbers of
+users. `doc/SYSTEM.md` has the address map, the link, the screen,
 the keyboard, the ROM, and the Nexys4DDR's devices; `CONTRIBUTING.md` the tests, the
 formal checks, `make hwtest`, and the badge; `doc/EMULATOR.md` the known
 differences from the emulator; `doc/PROGRAMMING.md` how to write and
@@ -30,7 +31,7 @@ header is the authoritative address map.
     make demo             # the ROM's demo -> demo/build/demo.bin; make -C demo test runs it in niceemu
     make r6 [ROM=f.bin]   # Vivado bitstream, synth/r6/build/top.bit; make r3 and make nexys4ddr likewise
     make cor [ROM=f.bin]  # MEGA65 core files for MEGAFLASH, synth/r{3,6}/build/NiceMonMEGA65-r{3,6}.cor (coretool)
-    make load FILE=p.bin  # load and start a program on the board (debug UART, PORT=/dev/ttyUSB1)
+    make load FILE=p.bin  # load and start a program on the board (ETH=IP, else the UART at PORT=/dev/ttyUSB1)
     make run FILE=p.bin   # run it and print what niceemu prints, for diffing
     make mon [FILE=p.bin] # interactive shell on the link: memory, pause, step, breakpoints, disassembly, --symbols
     make bump TAG=V1.0    # nice_cpu to the tag, R6 bitstream, badge-mega65.json and verified.json, committed (--push with ARGS)

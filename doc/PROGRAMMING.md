@@ -31,8 +31,9 @@ The C library has `printf`, `scanf`, `puts`, `putchar`, `getchar`, the
 `FILE` functions on `stdin`, `stdout`, and `stderr`, which are all the
 console, the string functions, `malloc`, `rand`, `exit`, `assert`, and more.
 `putchar` and `getchar` use the console at `0xFFFFFF00`, which writes to
-the UART and reads from the UART and the keyboard. `getchar` waits for a
-byte, and returns `EOF` once a break on the UART has ended the input.
+the line, a TCP connection to the Ethernet port or the UART, and reads
+from the line and the keyboard. `getchar` waits for a byte, and returns
+`EOF` once a break on the line has ended the input.
 `nice.h` declares the device routines of nice_cpu's runtime/ABI.md:
 `nice_putc`, `nice_getc`, `nice_pollc`, and `nice_print` for the console, and
 `nice_cycles`, `nice_instructions`, and `nice_micros` for the performance
@@ -56,7 +57,7 @@ must fit below the stack in the 64K words of memory. With `printf` and
 
 ## The keyboard
 
-The MEGA65's own keyboard types into the same input as the UART, so a
+The MEGA65's own keyboard types into the same input as the line, so a
 program reads it with `getchar`, and the keys give ASCII, as a terminal
 sends it. [SYSTEM.md](SYSTEM.md#the-keyboard) has the table of keys.
 The ROM's [demo](../demo/README.md) uses letters, digits, and symbols,

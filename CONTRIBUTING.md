@@ -48,8 +48,9 @@ or, in an existing clone:
   checks the tools and the RTL on it, without a board (see [The simulated
   board](#the-simulated-board)).
 
-`make load`, `make run`, and `make mon` use the serial device
-`PORT=/dev/ttyUSB1` by default, and pass `ARGS=` on to the tool, for
+`make load`, `make run`, and `make mon` use the board's Ethernet port
+with `ETH=192.168.1.65`, and otherwise the serial device
+`PORT=/dev/ttyUSB1`. They pass `ARGS=` on to the tool, for
 example `ARGS=--no-run` or `ARGS="-i in.txt -d 0:10 -s --timeout 5"`.
 `ARGS="--tcp 4000"` drives `niceemu --link 4000` instead of the board, and
 `ARGS="--cosim 4000"` the simulated system of `make cosim COSIM_PORT=4000`.
@@ -84,8 +85,8 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
 | [monitor/](monitor/README.md) | The monitor, in NICE assembly: planned, not written yet ([#24](https://github.com/MJoergen/NiceMonMEGA65/issues/24)). Its README has the decisions it will follow, QNICE-FPGA's. |
 | [demo/](demo/README.md) | The demos in the ROM of the release, in NICE assembly, which the function keys switch between: a welcome screen that turns into a typewriter, the key codes, the characters and colors, the counters, a game, and the board: a self-test and the Ethernet station's addresses. |
 | [examples/](examples/) | Example C programs, and the Makefile that builds them for the MEGA65. |
-| [tools/](tools/) | `nicelink.py`, the debug link over the board's UART, over TCP to `niceemu --link`, or over TCP to the simulated system of `make cosim`, and the tools that use it: `load.py`, which loads a program into the MEGA65 or Nexys4DDR, `run.py`, which runs a program on the board as `niceemu` runs it, `mon.py`, an interactive shell on the link, `hwtest.py`, which tests the system on the board, `flash.py`, which writes the Nexys4DDR's flash, `bump.py`, which records the MEGA65's timing for a nice_cpu tag, `release.py`, which builds and publishes a release, `linktest.py`, which checks `run.py` and `mon.py` on `niceemu --link`, `cosimtest.py`, which checks `run.py` on the simulated system, and `screenshot.py`, which draws a program's screen in `niceemu` as a PNG picture. |
-| [README.md](README.md) | For those who use the core files and write programs for them: on its own, and with the serial port. |
+| [tools/](tools/) | `nicelink.py`, the debug link over the board's Ethernet port or UART, over TCP to `niceemu --link`, or over TCP to the simulated system of `make cosim`, and the tools that use it: `load.py`, which loads a program into the MEGA65 or Nexys4DDR, `run.py`, which runs a program on the board as `niceemu` runs it, `mon.py`, an interactive shell on the link, `hwtest.py`, which tests the system on the board, `flash.py`, which writes the Nexys4DDR's flash, `bump.py`, which records the MEGA65's timing for a nice_cpu tag, `release.py`, which builds and publishes a release, `linktest.py`, which checks `run.py` and `mon.py` on `niceemu --link`, `cosimtest.py`, which checks `run.py` on the simulated system, and `screenshot.py`, which draws a program's screen in `niceemu` as a PNG picture. |
+| [README.md](README.md) | For those who use the core files and write programs for them: on its own, over Ethernet, and over the serial port. |
 | [SYSTEM.md](doc/SYSTEM.md) | The system that programs and the link see: the debug link, the address map, the screen, the ROM, and the Nexys4DDR's devices. |
 | [EMULATOR.md](doc/EMULATOR.md) | The table of the known differences from the emulator. |
 | [RELEASE_NOTES.md](doc/RELEASE_NOTES.md) | The releases, newest first, with what changed in each. [RELEASE.md](doc/RELEASE.md) is how to make one. |

@@ -38,6 +38,11 @@ reason), and when an input byte is lost (`o`). The tools in `tools/` are
 such a host, and `niceemu --link` serves the same link, so the tools
 drive the emulator as they drive the board. The tools use 2 Mbaud too.
 
+The Ethernet port carries the same line over TCP (see [The debug link
+over TCP](#the-debug-link-over-tcp)). While a host is connected there,
+its connection takes the UART's place in what this document says of the
+UART: the console bytes, the packets, the notices, and the break.
+
 Without a ROM, the core is held in reset at power-up; with one, it runs
 the ROM (see [The ROM](#the-rom)). A host loads a program with two
 writes to the control register at `0xFFFFFFF0` around the writes of its
@@ -84,8 +89,9 @@ reason, and the stop register become 0. So after `0x0000000D` the
 control register reads `0x00000009`, also after a halt. A hold alone
 keeps them, as before.
 
-A terminal on the UART shows what the program prints, and what you type
-goes to the program while it runs. Bytes typed while it is paused wait
+A terminal on the line, a plain TCP client such as `nc` on the Ethernet
+port or a terminal program on the UART, shows what the program prints,
+and what you type goes to the program while it runs. Bytes typed while it is paused wait
 for it, and bytes typed while the core is held in reset or has halted
 are dropped. The notices show up in the terminal too, as a few letters
 after a stray character, such as `h01#C9` after a `HALT`.

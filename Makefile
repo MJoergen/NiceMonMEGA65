@@ -6,7 +6,10 @@ NICE   ?= pipeline
 export NICE
 PYTHON ?= python3
 PORT   ?= /dev/ttyUSB1
+ETH    ?=
 ARGS   ?=
+# The line of load, run, and mon: the Ethernet port with ETH=IP, else PORT
+LINK    = $(if $(ETH),--eth $(ETH),--port $(PORT))
 EMU     = nice_cpu/emulator/zig-out/bin/niceemu
 
 .PHONY: help test formal lint examples demo r3 r6 nexys4ddr cor bump release load run mon flash hwtest linktest cosim cosimtest clean
@@ -47,12 +50,12 @@ help:
 	@echo "                  build, test, and stage a release in build/release (V1.0.1"
 	@echo "                  keeps nice_cpu at V1.0); with"
 	@echo "                  --publish, tag it and create the GitHub Release (doc/RELEASE.md)"
-	@echo "  make load FILE=prog.bin [PORT=/dev/ttyUSB1] [ARGS=--no-run]"
+	@echo "  make load FILE=prog.bin [ETH=IP | PORT=/dev/ttyUSB1] [ARGS=--no-run]"
 	@echo "                  load a program into the board (MEGA65 or Nexys4DDR) and"
 	@echo "                  start it"
-	@echo "  make run FILE=prog.bin [PORT=/dev/ttyUSB1] [ARGS='-i in.txt -d 0x100:16 -s --timeout 5']"
+	@echo "  make run FILE=prog.bin [ETH=IP | PORT=/dev/ttyUSB1] [ARGS='-i in.txt -d 0x100:16 -s --timeout 5']"
 	@echo "                  run a program on the board, and print what niceemu prints"
-	@echo "  make mon [FILE=prog.bin] [PORT=/dev/ttyUSB1]"
+	@echo "  make mon [FILE=prog.bin] [ETH=IP | PORT=/dev/ttyUSB1]"
 	@echo "                  an interactive shell on the debug link: read and write"
 	@echo "                  memory, pause, step, breakpoints, and the console"
 	@echo "  make hwtest [BIT=synth/r6/build/top.bit] [PORT=/dev/ttyUSB1] [ETH=IP]"
@@ -147,14 +150,14 @@ release:
 
 load:
 	@test -n "$(FILE)" || (echo "Give the program with FILE=prog.bin"; exit 1)
-	$(PYTHON) tools/load.py --port $(PORT) $(ARGS) $(FILE)
+	$(PYTHON) tools/load.py $(LINK) $(ARGS) $(FILE)
 
 run:
 	@test -n "$(FILE)" || (echo "Give the program with FILE=prog.bin"; exit 1)
-	$(PYTHON) tools/run.py --port $(PORT) $(ARGS) $(FILE)
+	$(PYTHON) tools/run.py $(LINK) $(ARGS) $(FILE)
 
 mon:
-	$(PYTHON) tools/mon.py --port $(PORT) $(ARGS) $(FILE)
+	$(PYTHON) tools/mon.py $(LINK) $(ARGS) $(FILE)
 
 # The flash of the Nexys4DDR (tools/flash.py); BIT on the command line
 # overrides the default.
