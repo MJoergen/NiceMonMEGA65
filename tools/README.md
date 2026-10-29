@@ -263,9 +263,8 @@ hex number with the same spelling, such as `add`; write `0xadd` for the
 number. Addresses are then shown with their labels too, as `LOOP` or
 `LOOP+0x2`.
 
-The disassembler is nice_cpu's `assembler/nicedis.py`. When the
-submodule does not have it yet, `d` prints an error, and the PC is shown
-without its instruction.
+The disassembler is nice_cpu's `assembler/nicedis.py`, which nice_cpu
+has from `V1.1` on.
 
 The program's output and the link's notices are shown as they arrive,
 above the prompt and what you have typed. The notices are:

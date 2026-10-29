@@ -124,11 +124,7 @@ def test_mon(port: int, prog: str, at: dict[str, int]) -> None:
         out = go(monitor, link, lambda l: len(l.halts))
         check("mon: the halt's notice", out.startswith("[halted: HALT, PC="),
               repr(out))
-        if mon.nicedis is not None:
-            test_mon_d(monitor, at)
-        else:
-            print("  nice_cpu has no disassembler; mon.py's d is skipped")
-            hwtest.skipped.append("mon.py's d")
+        test_mon_d(monitor, at)
     finally:
         monitor.stop()
         link.close()

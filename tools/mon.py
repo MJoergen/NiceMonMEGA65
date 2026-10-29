@@ -6,8 +6,8 @@ steps, and goes on, sets the breakpoints, shows the registers, and
 disassembles, with one short command each. "help" lists them. Numbers are
 hex, with or without 0x. An empty line repeats a step.
 
-The disassembler is nice_cpu's assembler/nicedis.py. Without it, "d" fails
-and the PC is shown without its instruction. --symbols FILE, or the
+The disassembler is nice_cpu's assembler/nicedis.py, which nice_cpu has
+from V1.1 on. --symbols FILE, or the
 command "symbols FILE", reads the labels of niceasm.py --symbols or
 nicebuild.py: an address may then be a label, or a label+N or label-N,
 and the labels are shown in what is printed.
@@ -54,12 +54,7 @@ from run import Symbols
 # It returns the text and the number of words it takes.
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__))), "nice_cpu", "assembler"))
-try:
-    import nicedis
-except ImportError:
-    nicedis = None
-NO_DISASSEMBLER = ("nice_cpu has no disassembler, assembler/nicedis.py; "
-                   "a newer nice_cpu has it")
+import nicedis
 
 # The halt reasons of DEBUG.md §6
 REASONS = {
@@ -164,12 +159,11 @@ class Monitor(cmd.Cmd):
         text = f"PC={self._where(pc)}"
         if instr:
             self.next_dis = pc
-            if nicedis is not None:
-                try:
-                    read = Words(self.link, MAX_INSTR)
-                    text += f"  {self._instr(read, pc)[0]}"
-                except LinkError:
-                    pass
+            try:
+                read = Words(self.link, MAX_INSTR)
+                text += f"  {self._instr(read, pc)[0]}"
+            except LinkError:
+                pass
         return text
 
     def pending(self, line_open: bool = False) -> bytes:
@@ -328,9 +322,6 @@ class Monitor(cmd.Cmd):
         instruction never spans a label, as in nicedis's listing: a word at
         a label after addr is missing, which makes the words before it a
         .DAT, and the next instruction starts at the label."""
-        if nicedis is None:
-            raise ValueError(NO_DISASSEMBLER)
-
         def word(a: int) -> int | None:
             return None if a != addr and a in self.first else read(a)
         return nicedis.disassemble(addr, word, self.first or None)
@@ -491,8 +482,6 @@ class Monitor(cmd.Cmd):
         default, with the labels before them. Without ADDR, it goes on
         after the last d, or at the PC of the last pause, step, or
         breakpoint. The disassembler does not tell code from data."""
-        if nicedis is None:
-            raise ValueError(NO_DISASSEMBLER)
         args = arg.split()
         addr = self.address(args[0]) if args else self.next_dis
         n = number(args[1]) if len(args) > 1 else 16

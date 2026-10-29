@@ -466,10 +466,9 @@ The reset button is not tested: press it with a terminal open, and the
 `niceemu`, without a board, for the programs that `make hwtest` compares,
 and nice_cpu's benchmark, with `tools/linktest.py`. It runs hwtest's
 checks of bad packets, of the pause, of the step, and of the breakpoints
-on `niceemu --link` first, and then `mon.py`'s commands, as typed at its
-prompt, with the labels of `sim/break.nasm`. Its disassembly is checked
-only when nice_cpu has its disassembler, and the summary lists it as
-skipped otherwise. CI runs it.
+on `niceemu --link` first, and then `mon.py`'s commands, its disassembly
+among them, as typed at its prompt, with the labels of `sim/break.nasm`.
+CI runs it.
 
 `run.py` matches `niceemu` in the details too. It accepts
 `--no-cycle-counter` and ignores it, as the cycle counter always runs. A

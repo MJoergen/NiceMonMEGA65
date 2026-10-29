@@ -62,7 +62,9 @@ CPU allows.
 
 - The SD card, FAT32, and `qtransfer` code, about half of QMON, has no
   hardware here.
-- The disassembler needs writing anew for the NICE instruction set.
+- The disassembler needs writing anew for the NICE instruction set, in
+  NICE assembly; nice_cpu's `assembler/nicedis.py`, which `mon.py` uses,
+  is the model.
 - The monitor's build is the `cat` of its files and one run of
   `nice_cpu/assembler/niceasm.py`, for the assembler has no `#include` or
   `#ifdef`; the sysdef constants become a `.nasm` file of `.EQU` lines.
