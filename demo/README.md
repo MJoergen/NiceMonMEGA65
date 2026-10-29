@@ -213,8 +213,9 @@ word in the math unit's test, which shows how a failure looks, and the
 fifteenth types with a backspace and the other cursor keys,
 `ESC O A` to `ESC O D`.
 `niceemu` shows no colors, so for the sixth the test also has the words of
-two rows of ramps. The screens that `niceemu` prints, and those
-words, are in `test.expected`, which was checked by hand. In `niceemu` the
+two rows of ramps, for the ninth those of the menu, with F11 in black on
+white, and of PASS in green, and for the fourteenth those of FAIL in red.
+The screens that `niceemu` prints, and those words, are in `test.expected`, which was checked by hand. In `niceemu` the
 counters count steps, so their numbers are the same in every run.
 
 The demo runs in `niceemu` like any program, at address 0. After `make -C

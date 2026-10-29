@@ -106,6 +106,13 @@ TEST12 = \033[23~m03:00:00:00:00:01\r
 TEST13 = \033[23~m0FF:2:3:4:5:6\r
 TEST15 = ab\010c\nwxyz\033OD\033OD\033OA1\033OC\033OB2\033[12~!\033[14~?
 TESTS  = 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
+# For the colors, which niceemu does not show, the ninth has the words of
+# the menu, with F11 in black on white, of the four PASS in green, and of
+# the line after them, and the fourteenth those of the FAIL in red, with
+# its words in white, and of the line after it
+DUMP9  = -d 0xFFFF0050:80 -d 0xFFFF01C2:4 -d 0xFFFF0212:4 -d 0xFFFF0262:4 \
+	 -d 0xFFFF02B2:4 -d 0xFFFF0322:17
+DUMP14 = -d 0xFFFF0212:22 -d 0xFFFF0322:14
 
 test: $(BUILD)/demo_test.bin $(BUILD)/demo_fail.bin
 	@printf '$(TEST1)' > $(BUILD)/test1.txt
@@ -125,7 +132,8 @@ test: $(BUILD)/demo_test.bin $(BUILD)/demo_fail.bin
 	@printf '\033[23~' > $(BUILD)/test14.txt
 	@printf '$(TEST15)' > $(BUILD)/test15.txt
 	@for t in $(TESTS); do \
-	  dump=; [ $$t = 6 ] && dump='$(DUMP6)'; \
+	  case $$t in 6) dump='$(DUMP6)';; 9) dump='$(DUMP9)';; \
+	    14) dump='$(DUMP14)';; *) dump=;; esac; \
 	  bin=demo_test; [ $$t = 14 ] && bin=demo_fail; \
 	  $(EMU) -s -i $(BUILD)/test$$t.txt $$dump $(BUILD)/$$bin.bin > $(BUILD)/test$$t.out || \
 	    { echo "FAIL demo: niceemu exits with $$? on input $$t"; exit 1; }; \

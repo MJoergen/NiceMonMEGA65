@@ -163,6 +163,23 @@ Screen:
 | @oo
 |
 |                                                      *
+ffff0050: 00afff20 00afff46 00afff31 00afff20 00afff74 00afff79 00afff70 00afff65
+ffff0058: 00afff77 00afff72 00afff69 00afff74 00afff65 00afff72 00afff20 00afff20
+ffff0060: 00afff20 00afff46 00afff33 00afff20 00afff6b 00afff65 00afff79 00afff20
+ffff0068: 00afff63 00afff6f 00afff64 00afff65 00afff73 00afff20 00afff20 00afff20
+ffff0070: 00afff46 00afff35 00afff20 00afff63 00afff68 00afff61 00afff72 00afff73
+ffff0078: 00afff65 00afff74 00afff20 00afff20 00afff20 00afff46 00afff37 00afff20
+ffff0080: 00afff63 00afff6f 00afff75 00afff6e 00afff74 00afff65 00afff72 00afff73
+ffff0088: 00afff20 00afff20 00afff20 00afff46 00afff39 00afff20 00afff63 00afff6f
+ffff0090: 00afff6d 00afff65 00afff74 00afff20 00afff20 fff00020 fff00046 fff00031
+ffff0098: fff00031 fff00020 fff00062 fff0006f fff00061 fff00072 fff00064 fff00020
+ffff01c2: 0000f050 0000f041 0000f053 0000f053
+ffff0212: 0000f050 0000f041 0000f053 0000f053
+ffff0262: 0000f050 0000f041 0000f053 0000f053
+ffff02b2: 0000f050 0000f041 0000f053 0000f053
+ffff0322: 0000f041 0000f06c 0000f06c 0000f020 0000f074 0000f065 0000f073 0000f074
+ffff032a: 0000f073 0000f020 0000f070 0000f061 0000f073 0000f073 0000f065 0000f064
+ffff0332: 0000f02e
 Screen:
 | NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
 | F1 typewriter   F3 key codes   F5 charset   F7 counters   F9 comet   F11 board
@@ -289,6 +306,11 @@ Screen:
 |  New MAC address:  0FF:2:3:4:5:6
 |  Hex digits and colons. RETURN writes it; ESC, CTRL-C, or RUN/STOP cancels.
 |  Not a MAC address: six bytes in hex with colons, the first one even.
+ffff0212: 000f0046 000f0041 000f0049 000f004c 000ccc20 000fff46 000fff46 000fff46
+ffff021a: 000fff46 000fff46 000fff46 000fff32 000fff33 000ccc20 000fff46 000fff46
+ffff0222: 000fff46 000fff46 000fff46 000fff46 000fff46 000fff46
+ffff0322: 000f0041 000f0020 000f0074 000f0065 000f0073 000f0074 000f0020 000f0066
+ffff032a: 000f0061 000f0069 000f006c 000f0065 000f0064 000f002e
 Screen:
 | NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
 | F1 typewriter   F3 key codes   F5 charset   F7 counters   F9 comet   F11 board
