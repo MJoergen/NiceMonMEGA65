@@ -376,7 +376,9 @@ after it, so a host that is done ends it with a reset. The tools set
 or a kill, sends one. A connection that a host closed with only a FIN
 stays until that host connects again, or the board resets. The board
 resends what the host does not acknowledge, after 200 ms, and drops the
-connection after 25 tries. It sends no reset itself, so a segment that
+connection after 25 tries. While the host's window is 0, it sends one
+byte beyond it every 200 ms, and keeps the connection while the host
+answers. It sends no reset itself, so a segment that
 fits no connection gets no answer. When a connection ends, the link
 stays with it until it has taken the input that came before, and the
 output in that time is dropped.

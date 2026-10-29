@@ -22,6 +22,8 @@
 --   * the link's output comes in segments of at most 536 bytes, at most
 --     as many unacknowledged as the host's window takes, and again after
 --     the timeout when the host does not acknowledge it
+--   * a window of 0 gets a byte beyond it after each timeout, also past
+--     the tries, while the host answers
 --   * data that does not fit the receive buffer is dropped, and the window
 --     that it frees is told
 --   * the host's FIN is a break after the data before it, and output still
@@ -628,6 +630,29 @@ begin
          end if;
          send_seg(C_ACK, 0, win => 300);
       end loop;
+      send_seg(C_ACK, 0);
+
+      -- A window of 0: a byte goes beyond it after each timeout, for as
+      -- long as the host answers, and the rest when the window opens.
+      send_seg(C_ACK, 0, win => 0);
+      ltx_req <= ltx_req + 10;
+      expect_none(C_RTO / 2);
+      for i in 1 to 30 loop
+         expect_data(2 * C_RTO);
+         assert n_v = 1
+            report "tb_eth_tcp: FAIL, not a probe of one byte"
+            severity failure;
+         bseq_v := bseq_v - 1;
+         bd_v   := bd_v - 1;
+         send_seg(C_ACK, 0, win => 0);
+      end loop;
+      -- The window opens, and the host takes the next probe.
+      expect_data(2 * C_RTO);
+      send_seg(C_ACK, 0);
+      expect_data;
+      assert n_v = 9
+         report "tb_eth_tcp: FAIL, not the data after the window opened"
+         severity failure;
       send_seg(C_ACK, 0);
 
       -- Data that is not acknowledged comes again.

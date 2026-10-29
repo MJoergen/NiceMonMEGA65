@@ -61,6 +61,11 @@
 -- acknowledged for C_RTO_MS, nxt_ptr goes back to una_ptr and the data is
 -- sent again (go-back-N), up to C_TRIES times, after which the connection
 -- is dropped. The SYN-ACK and the FIN are sent again in the same way.
+-- While the host's window is 0 and there is data to send, the timer runs
+-- as well, and its timeout sends one byte (probe), so that a window update
+-- of the host that was lost is not waited for forever; an ACK with a
+-- window of 0 starts the tries again, so the connection lasts while the
+-- host answers.
 -- What may be sent is worked out in one cycle (B_IDLE) and the segment
 -- chosen in the next (B_PICK), for the timing; the choice is dropped if a
 -- segment is read or the timer runs out in that cycle, as both change
@@ -198,6 +203,8 @@ architecture synthesis of eth_tcp is
    signal max_ptr   : t_ptr                         := (others => '0');
    signal tail_ptr  : t_ptr                         := (others => '0');
    signal fin_ptr   : t_ptr                         := (others => '0');
+   -- The end of the data to send to this connection
+   signal lim_ptr   : t_ptr;
    -- The close of this side: started, the FIN sent since the last
    -- retransmission, and the FIN sent at all
    signal closing  : std_logic                     := '0';
@@ -207,6 +214,8 @@ architecture synthesis of eth_tcp is
    signal fin_ack  : std_logic                     := '0';
    signal syn_req  : std_logic                     := '0';
    signal ack_req  : std_logic                     := '0';
+   -- One byte goes beyond the host's window of 0.
+   signal probe    : std_logic                     := '0';
    -- The SYN of the next connection
    signal pend      : std_logic                     := '0';
    -- The connection that waits for the ACK of its SYN-ACK came from pend,
@@ -370,6 +379,8 @@ begin
                   '0';
    ltx_ready_o <= tx_ready or not conn;
    tx_we       <= ltx_valid_i and tx_ready;
+   lim_ptr     <= fin_ptr when closing = '1' else
+                  tail_ptr;
    tx_raddr    <= seg_ptr + (sq_idx - 54) when sq_idx >= 54 else
                   seg_ptr;
 
@@ -419,7 +430,6 @@ begin
       variable syn_v       : boolean;
       variable k_v         : std_logic_vector(31 downto 0);
       variable rcv_v       : std_logic_vector(31 downto 0);
-      variable lim_v       : t_ptr;
       variable avail_v     : natural range 0 to C_SIZE;
       variable room_v      : integer range -C_SIZE to 2 ** 16;
       variable n_v         : natural range 0 to C_MSS;
@@ -454,6 +464,7 @@ begin
          fin_ack   <= '0';
          syn_req   <= '1';
          ack_req   <= '0';
+         probe     <= '0';
          pend      <= '0';
          peer_fin  <= '0';
          tries     <= 0;
@@ -681,6 +692,9 @@ begin
                      -- The ACK: the bytes it covers are free.
                      if f_flags(4) = '1' then
                         snd_wnd <= f_win;
+                        if f_win = 0 then
+                           tries <= 0;
+                        end if;
                         k_v     := f_ack - una_seq;
                         if k_v /= 0 and k_v <= max_ptr - una_ptr then
                            una_ptr <= una_ptr + k_v(G_ADDR_BITS downto 0);
@@ -741,7 +755,8 @@ begin
          ------------------------------------------------------------------
          elsif tick_cnt = C_TICK - 1 then
             if state = SYN_RCVD_ST or max_ptr /= una_ptr or
-               (state = LAST_ACK_ST and fin_max = '1') then
+               (state = LAST_ACK_ST and fin_max = '1') or
+               (conn = '1' and snd_wnd = 0 and lim_ptr /= una_ptr) then
                if rto_cnt = C_RTO_MS - 1 then
                   rto_cnt   <= 0;
                   timeout_v := true;
@@ -751,6 +766,9 @@ begin
                      tries    <= tries + 1;
                      nxt_ptr  <= una_ptr;
                      fin_sent <= '0';
+                     if snd_wnd = 0 then
+                        probe <= '1';
+                     end if;
                      if state = SYN_RCVD_ST then
                         syn_req <= '1';
                      end if;
@@ -773,12 +791,7 @@ begin
             -- cycle, unless a segment was read or the timer ran out in it.
             when B_IDLE =>
                if eval = '0' and not timeout_v then
-                  if closing = '1' then
-                     lim_v := fin_ptr;
-                  else
-                     lim_v := tail_ptr;
-                  end if;
-                  avail_v := to_integer(lim_v - nxt_ptr);
+                  avail_v := to_integer(lim_ptr - nxt_ptr);
                   room_v  := to_integer(snd_wnd) - to_integer(nxt_ptr - una_ptr);
                   if room_v < 0 then
                      room_v := 0;
@@ -786,6 +799,10 @@ begin
                   n_v      := minimum(minimum(avail_v, room_v), C_MSS);
                   pick_n   <= n_v;
                   pick_big <= avail_v >= C_MSS;
+                  if probe = '1' and room_v = 0 and avail_v > 0 then
+                     pick_n   <= 1;
+                     pick_big <= true;
+                  end if;
 
                   seg_mac  <= peer_mac;
                   seg_ip   <= peer_ip;
@@ -812,6 +829,7 @@ begin
                         (pick_big or idle = C_IDLE or closing = '1') then
                      seg_flags <= C_ACK or C_PSH;
                      seg_n     <= pick_n;
+                     probe     <= '0';
                      nxt_ptr   <= nxt_ptr + pick_n;
                      if nxt_ptr + pick_n - una_ptr > max_ptr - una_ptr then
                         max_ptr <= nxt_ptr + pick_n;
@@ -909,6 +927,7 @@ begin
             fin_ack   <= '0';
             syn_req   <= '0';
             ack_req   <= '0';
+            probe     <= '0';
             pend      <= '0';
             keep      <= '0';
             idx       <= 0;
