@@ -71,7 +71,9 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 
 - The function keys switch between the demos in the ROM, which a menu in
   the second row lists. The typewriter is F1, and runs at power-up. The
-  ideas of issue #28 come next, each on a key of its own.
+  other five are the ideas of
+  [#28](https://github.com/MJoergen/NiceMonMEGA65/issues/28), each on a
+  key of its own.
 - F3 shows the bytes of each key, in hex and as characters.
 - F5 shows the 256 characters of the font and ramps of seven colors, as
   backgrounds and as foregrounds, to check the video output.
@@ -106,6 +108,11 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   of `niceasm.py --symbols` and `nicebuild.py --symbols`. An address may
   then be a label, `label+N`, or `label-N`, and the output shows the
   labels.
+- `mon.py` ends without a traceback on `quit`, also over `--tcp` and
+  `--cosim` ([#29](https://github.com/MJoergen/NiceMonMEGA65/issues/29)).
+- `tools/screenshot.py` runs a program in `niceemu` and draws its screen
+  as a PNG picture, as the text display shows it. The README's pictures
+  of the demo are made with it.
 - `make linktest` checks `mon.py`'s commands on `niceemu --link` too.
 - The tools read the link's version when they connect, and stop with a
   message on a major other than 0 (nice_cpu's DEBUG.md §9). `mon.py`'s
@@ -117,6 +124,11 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 - `SYSTEM.md`, `EMULATOR.md`, `CODING_STYLE.md`, `RELEASE.md`, and
   `RELEASE_NOTES.md` move into `doc/`. `README.md` and `CONTRIBUTING.md`
   stay at the root.
+- The README is for users of the core files, on their own and with the
+  serial port, with a worked example. The guide to `load.py`, `run.py`,
+  and `mon.py` moves to `tools/README.md`. The new `doc/PROGRAMMING.md`
+  says how to write and build programs, and the new `doc/README.md`
+  lists the documents.
 
 **Tests**
 
