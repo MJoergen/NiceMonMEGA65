@@ -92,10 +92,10 @@
 --
 -- The server is these processes: p_tcp, the connection, which acts on the
 -- segments and owns its numbers; p_cmp, which compares a segment with it;
--- p_pick, which chooses the segment to send; p_timer, the retransmission
--- timer; and p_link, the link side of the two buffers. What one tells
--- another that it cannot read is a pulse (brk_set, restart, tries_clr),
--- which lands a cycle later; each says why that is in time.
+-- p_pick, which chooses the segment to send; and p_link, the link side of
+-- the two buffers; the retransmission timer is eth_tcp_timer.vhd. What
+-- one tells another that it cannot read is a pulse (brk_set, restart,
+-- tries_clr), which lands a cycle later; each says why that is in time.
 --
 -- INTERFACE CONTRACTS -- these are requirements on the environment:
 -- a) mac_i and ip_i stay stable while there is a connection.
@@ -213,22 +213,17 @@ architecture synthesis of eth_tcp is
    signal pend_port : std_logic_vector(15 downto 0) := (others => '0');
    signal pend_seq  : std_logic_vector(31 downto 0) := (others => '0');
    signal pend_win  : std_logic_vector(15 downto 0) := (others => '0');
-   -- The timers (p_timer): a millisecond, the retransmission timeout, and
-   -- its count; the timer runs, ticks, runs out, and is on its last try
-   signal tick_cnt : natural range 0 to C_TICK     := 0;
-   signal rto_cnt  : natural range 0 to C_RTO_MS   := 0;
-   signal tries    : natural range 0 to C_TRIES    := 0;
+   -- The retransmission timer (eth_tcp_timer.vhd) runs, runs out, and is
+   -- on its last try
    signal armed    : std_logic;
-   signal tick     : std_logic;
    signal timeout  : std_logic;
    signal last_try : std_logic;
    -- The connection ends, once the ACK that the host is owed is sent.
    signal ending : std_logic;
    -- What the connection tells the timer, a cycle after: it starts again,
-   -- or the tries alone do; the timer stands still then
+   -- or the tries alone do
    signal restart   : std_logic := '0';
    signal tries_clr : std_logic := '0';
-   signal still     : std_logic := '0';
    -- The initial sequence number, a cycle counter
    signal isn : std_logic_vector(31 downto 0) := (others => '0');
    -- Cycles since the link's last output byte
@@ -422,19 +417,30 @@ begin
              '0';
 
    -- The timer runs while the SYN-ACK, data, or the FIN is out, or a
-   -- window of 0 holds data back. A tick is a millisecond, but not in a
-   -- cycle a segment is acted on or the connection ends, which come first,
-   -- nor in the cycle after, when what they tell the timer lands.
-   armed    <= '1' when state = SYN_RCVD_ST or max_ptr /= una_ptr or
-                        (state = LAST_ACK_ST and fin_max = '1') or
-                        (conn = '1' and snd_wnd = 0 and lim_ptr /= una_ptr) else
-               '0';
-   tick     <= '1' when tick_cnt = C_TICK - 1 and eval = '0' and ending = '0' and still = '0' else
-               '0';
-   timeout  <= '1' when tick = '1' and armed = '1' and rto_cnt = C_RTO_MS - 1 else
-               '0';
-   last_try <= '1' when tries = C_TRIES - 1 else
-               '0';
+   -- window of 0 holds data back; it stands still while a segment is
+   -- acted on or the connection ends, which come first.
+   armed <= '1' when state = SYN_RCVD_ST or max_ptr /= una_ptr or
+                     (state = LAST_ACK_ST and fin_max = '1') or
+                     (conn = '1' and snd_wnd = 0 and lim_ptr /= una_ptr) else
+            '0';
+
+   i_eth_tcp_timer : entity work.eth_tcp_timer
+      generic map (
+         G_TICK   => C_TICK,
+         G_RTO_MS => C_RTO_MS,
+         G_TRIES  => C_TRIES
+      )
+      port map (
+         clk_i       => clk_i,
+         rst_i       => rst_i,
+         armed_i     => armed,
+         hold_i      => eval or ending,
+         restart_i   => restart,
+         tries_clr_i => tries_clr,
+         timeout_o   => timeout,
+         last_try_o  => last_try
+      ); -- i_eth_tcp_timer
+
 
    -- A segment is acted on, the connection ends, or the timer runs out:
    -- the segment being chosen is dropped.
@@ -478,41 +484,6 @@ begin
          tx_valid_o  => tx_valid_o,
          tx_ready_i  => tx_ready_i
       ); -- i_eth_tcp_tx
-
-
-   p_timer : process (clk_i)
-   begin
-      if rising_edge(clk_i) then
-         if tick_cnt = C_TICK - 1 then
-            tick_cnt <= 0;
-         else
-            tick_cnt <= tick_cnt + 1;
-         end if;
-         still <= eval or ending;
-
-         if tick = '1' then
-            if armed = '0' then
-               rto_cnt <= 0;
-               tries   <= 0;
-            elsif timeout = '1' then
-               rto_cnt <= 0;
-               if last_try = '0' then
-                  tries <= tries + 1;
-               end if;
-            else
-               rto_cnt <= rto_cnt + 1;
-            end if;
-         end if;
-
-         -- What the connection told the timer in the cycle before
-         if restart = '1' then
-            rto_cnt <= 0;
-            tries   <= 0;
-         elsif tries_clr = '1' then
-            tries <= 0;
-         end if;
-      end if;
-   end process p_timer;
 
 
    p_link : process (clk_i)
@@ -871,7 +842,7 @@ begin
             finish(rx_cmt);
 
          ------------------------------------------------------------------
-         -- The retransmission timer runs out (p_timer): what is out goes
+         -- The retransmission timer runs out (eth_tcp_timer.vhd): what is out goes
          -- again, or a byte beyond a window of 0, until the tries are up
          ------------------------------------------------------------------
          elsif timeout = '1' then
