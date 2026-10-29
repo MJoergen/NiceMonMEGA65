@@ -11,6 +11,8 @@
 -- pattern of byte k = k mod 251. p_lrx keeps the bytes that the link
 -- side gets, which must be the host's data, k mod 239 for its byte k,
 -- and counts the breaks; p_ltx sends the bytes that p_host asks for.
+-- The frames have a gap in rx_valid after every 13th byte, the SYNs
+-- carry the options of Linux, and some data segments carry options too.
 -- The steps:
 --   * a SYN while the IP address is 0, or to another port, gets nothing
 --   * a SYN gets a SYN-ACK, which comes again when the host does not
@@ -31,8 +33,8 @@
 --   * the host's FIN is a break after the data before it, and output still
 --     goes to the host after it
 --   * a SYN from another port of the host after the FIN closes the old
---     connection with a FIN, and opens the new one when the host has
---     acknowledged that FIN
+--     connection with a FIN, which comes again until it is acknowledged,
+--     and opens the new one when the host has acknowledged that FIN
 --   * an RST ends the connection, and a SYN from another IP address does
 --     not replace one; the link keeps it until it has taken the input,
 --     and a break waits for the input before it, also when a new
@@ -41,6 +43,7 @@
 --     connection with a FIN too; the old one still takes data and the
 --     host's FIN, and if that never comes, its end by an RST is a break
 --   * data in the host's ACK of the SYN-ACK is taken
+--   * an RST ends a connection that waits for the ACK of its SYN-ACK
 --   * a SYN-ACK that is never acknowledged ends the connection after the
 --     tries
 
@@ -63,7 +66,7 @@ architecture simulation of tb_eth_tcp is
    constant C_PORT  : std_logic_vector(15 downto 0) := X"119E";
    constant C_MSS   : natural                       := 536;
    constant C_RING  : natural                       := 16;
-   constant C_FMAX  : natural                       := 600;
+   constant C_FMAX  : natural                       := 620;
    constant C_CYCLE : time                          := 10 ns;
    -- The retransmission timeout, 200 ms of 100 cycles
    constant C_RTO : time                          := 200 * 100 * C_CYCLE;
@@ -175,8 +178,15 @@ architecture simulation of tb_eth_tcp is
       return ones_add(s_v, ones_sum(f, 34, 33 + len_v));
    end function tcp_sum;
 
-   -- A segment from the host, with n bytes of data, byte i of which is
-   -- (d + i) mod 239, padded to 60 bytes as Ethernet has it
+   -- The TCP options of a SYN from Linux: the MSS, SACK permitted, a
+   -- timestamp, a NOP, and the window scale
+   constant C_OPTS : t_bytes(0 to 19) := (X"02", X"04", X"05", X"B4", X"04", X"02", X"08", X"0A",
+                                          X"12", X"34", X"56", X"78", X"00", X"00", X"00", X"00",
+                                          X"01", X"03", X"03", X"07");
+
+   -- A segment from the host, with opts words of the options of C_OPTS,
+   -- and n bytes of data, byte i of which is (d + i) mod 239, padded to 60
+   -- bytes as Ethernet has it
    function seg (
       sip   : std_logic_vector(31 downto 0);
       dport : std_logic_vector(15 downto 0);
@@ -188,22 +198,30 @@ architecture simulation of tb_eth_tcp is
       n     : natural;
       d     : natural;
       bad   : boolean;
-      dip   : std_logic_vector(31 downto 0) := C_IP
+      dip   : std_logic_vector(31 downto 0) := C_IP;
+      opts  : natural range 0 to 5          := 0
    ) return t_frame is
       variable f_v : t_frame;
       variable s_v : std_logic_vector(15 downto 0);
+      variable h_v : natural;
+      variable o_v : std_logic_vector(7 downto 0);
    begin
+      h_v                  := 4 * opts;
+      o_v                  := to_stdlogicvector(5 + opts, 4) & "0000";
       f_v.b                := (others => X"00");
-      f_v.len              := 54 + n;
+      f_v.len              := 54 + h_v + n;
       f_v.b(0 to 13)       := b6(C_MAC) & b6(C_HMAC) & t_bytes'(X"08", X"00");
-      f_v.b(14 to 33)      := t_bytes'(X"45", X"00") & b2(to_stdlogicvector(40 + n, 16)) &
+      f_v.b(14 to 33)      := t_bytes'(X"45", X"00") & b2(to_stdlogicvector(40 + h_v + n, 16)) &
                               t_bytes'(X"12", X"34", X"40", X"00", X"40", X"06", X"00", X"00") &
                               b4(sip) & b4(dip);
       f_v.b(34 to 53)      := b2(to_stdlogicvector(sport, 16)) & b2(dport) & b4(seq) & b4(ack) &
-                              t_bytes'(X"50", flags) & b2(to_stdlogicvector(win, 16)) &
-                              t_bytes'(X"00", X"00", X"00", X"00");
+                              t_bytes'(o_v, flags) &
+                              b2(to_stdlogicvector(win, 16)) & t_bytes'(X"00", X"00", X"00", X"00");
+      for i in 0 to h_v - 1 loop
+         f_v.b(54 + i) := C_OPTS(i);
+      end loop;
       for i in 0 to n - 1 loop
-         f_v.b(54 + i) := to_stdlogicvector((d + i) mod 239, 8);
+         f_v.b(54 + h_v + i) := to_stdlogicvector((d + i) mod 239, 8);
       end loop;
       s_v             := not ones_sum(f_v, 14, 33);
       f_v.b(24 to 25) := b2(s_v);
@@ -347,6 +365,7 @@ begin
       variable total_v : natural;
       variable f_v     : t_frame;
 
+      -- With a gap in rx_valid after every 13th byte, as from a FIFO
       procedure send (
          f : t_frame
       ) is
@@ -358,6 +377,11 @@ begin
             rx_last  <= '1' when i = f.len - 1 else '0';
             rx_valid <= '1';
             wait until rising_edge(clk) and rx_ready = '1';
+            if i mod 13 = 12 then
+               rx_valid <= '0';
+               rx_data  <= X"FF";
+               wait until rising_edge(clk);
+            end if;
          end loop;
          rx_valid <= '0';
          rx_last  <= '0';
@@ -394,11 +418,12 @@ begin
       procedure send_seg (
          flags : std_logic_vector(7 downto 0);
          n     : natural;
-         win   : natural := 8192;
-         bad   : boolean := false
+         win   : natural            := 8192;
+         bad   : boolean            := false;
+         opts  : natural range 0 to 5 := 0
       ) is
       begin
-         send(seg(C_HIP, C_PORT, sport_v, hseq_v, bseq_v, flags, win, n, hd_v, bad));
+         send(seg(C_HIP, C_PORT, sport_v, hseq_v, bseq_v, flags, win, n, hd_v, bad, C_IP, opts));
       end procedure send_seg;
 
       -- Waits for the next segment, at most t, checks it, and takes its
@@ -503,7 +528,7 @@ begin
       begin
          sport_v := sport;
          hseq_v  := seq;
-         send(seg(C_HIP, C_PORT, sport, seq, X"00000000", C_SYN, 8192, 0, 0, false));
+         send(seg(C_HIP, C_PORT, sport, seq, X"00000000", C_SYN, 8192, 0, 0, false, C_IP, 5));
          expect(1 ms, sport);
          assert flags_v = X"12" and ack_v = seq + 1 and n_v = 0
             report "tb_eth_tcp: FAIL, not a SYN-ACK"
@@ -515,10 +540,11 @@ begin
 
       -- Sends n bytes of data, and expects their ACK
       procedure send_data (
-         n : natural
+         n    : natural;
+         opts : natural range 0 to 5 := 0
       ) is
       begin
-         send_seg(C_ACK, n);
+         send_seg(C_ACK, n, opts => opts);
          hseq_v := hseq_v + n;
          hd_v   := hd_v + n;
          expect_ack;
@@ -623,9 +649,10 @@ begin
       -- The SYN again gets an ACK.
       send(seg(C_HIP, C_PORT, 40000, X"FFFFF000", X"00000000", C_SYN, 8192, 0, 0, false));
       expect_ack;
-      -- Many segments, past 2^32 of the host's sequence numbers
+      -- Many segments, past 2^32 of the host's sequence numbers, with
+      -- options
       for i in 1 to 8 loop
-         send_data(C_MSS);
+         send_data(C_MSS, i mod 4);
       end loop;
       -- The link side takes a byte every two cycles.
       wait for 100 us;
@@ -802,6 +829,12 @@ begin
          report "tb_eth_tcp: FAIL, no FIN"
          severity failure;
       expect_none(10 us);
+      -- The FIN comes again when the host acknowledges only the data.
+      send_seg(C_ACK, 0);
+      expect(2 * C_RTO, 40000);
+      assert flags_v = X"11" and seq_v = bseq_v
+         report "tb_eth_tcp: FAIL, the FIN did not come again"
+         severity failure;
       -- The host's FIN again: its ACK is after this side's FIN.
       hseq_v := hseq_v - 1;
       send_seg(C_FIN or C_ACK, 0);
@@ -937,6 +970,18 @@ begin
       send_seg(C_ACK, 0);
       send_seg(C_RST, 0);
       wait for 1 us;
+
+      -- An RST ends a connection that waits for the ACK of its SYN-ACK.
+      send(seg(C_HIP2, C_PORT, 40008, X"0000E000", X"00000000", C_SYN, 8192, 0, 0, false));
+      expect(1 ms, 40008, C_HIP2);
+      assert flags_v = X"12"
+         report "tb_eth_tcp: FAIL, not a SYN-ACK"
+         severity failure;
+      send(seg(C_HIP2, C_PORT, 40008, X"0000E001", X"00000000", C_RST, 8192, 0, 0, false));
+      expect_none(2 * C_RTO);
+      assert conn = '0'
+         report "tb_eth_tcp: FAIL, the RST did not end the SYN_RCVD connection"
+         severity failure;
 
       -- A SYN-ACK that is never acknowledged ends the connection.
       send(seg(C_HIP2, C_PORT, 40002, X"00007000", X"00000000", C_SYN, 8192, 0, 0, false));
