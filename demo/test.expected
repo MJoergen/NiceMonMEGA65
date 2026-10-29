@@ -130,9 +130,9 @@ Screen:
 |  Since reset, while the core runs
 |
 |    Time, h:mm:ss.hh                              0:00:00.07
-|    Microseconds                                       79972
-|    Cycles                                             79974
-|    Instructions                                       79976
+|    Microseconds                                       79980
+|    Cycles                                             79982
+|    Instructions                                       79984
 |    Clock in MHz, cycles per microsecond                   1
 |
 |  A prime sieve to 2048, run before each update
@@ -162,7 +162,9 @@ Screen:
 |
 | @oo
 |
-|                                                      *
+|
+|
+|                      *
 ffff0050: 00afff20 00afff46 00afff31 00afff20 00afff74 00afff79 00afff70 00afff65
 ffff0058: 00afff77 00afff72 00afff69 00afff74 00afff65 00afff72 00afff20 00afff20
 ffff0060: 00afff20 00afff46 00afff33 00afff20 00afff6b 00afff65 00afff79 00afff20

@@ -1430,15 +1430,17 @@ READ    MOVE    R1, @CONSOLE
         MOVE    PC, @SP++
 
 ; NEXT waits at most T_ESC microseconds for a byte of the console, and sets
-; R1 to it, with Z clear. If none comes, R1 is 0 and Z is set. It changes
-; R5.
-NEXT    ADD     R5, @P_US, T_ESC ; the deadline
+; R1 to it, with Z clear. If none comes, R1 is 0 and Z is set. The deadline
+; is on the stack, not in a register, as the demo can halt in READ here, and
+; a time in a register would then differ from niceemu's.
+NEXT    ADD     @--SP, @P_US, T_ESC ; the deadline
 NWAIT   ADD     @--SP, 2, PC
         MOVE    PC, READ
-    ?!Z MOVE    PC, @SP++       ; a byte
-        SUB[M]  R0, @P_US, R5
+    ?!Z MOVE    PC, NDONE       ; a byte
+        SUB[M]  R0, @P_US, @SP
     ?N  MOVE    PC, NWAIT
         MOVE[M] R1, 0
+NDONE   ADD     SP, SP, 1       ; drop the deadline, and keep the flags
         MOVE    PC, @SP++
 
 ; FRAME clears the screen and hides the cursor, and draws the two rows at
