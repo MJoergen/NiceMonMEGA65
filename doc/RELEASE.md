@@ -44,7 +44,26 @@ and keep their names.
   [RELEASE_NOTES.md](RELEASE_NOTES.md), then the nice_cpu commit, each
   board's clock, flow, and WNS, the Vivado version, and the files.
 
+## What you need
+
+- Vivado 2025.1 (see [synth/](../synth/README.md)), for the three
+  bitstreams.
+- `coretool` of [mega65-tools](https://github.com/MEGA65/mega65-tools)
+  on the PATH, for the core files.
+- [openFPGALoader](https://github.com/trabucayre/openFPGALoader), and a
+  MEGA65 R6 on its USB cable, for `make hwtest`.
+- `gh`, GitHub's command line tool, logged in to an account that may
+  push to this repository and create its releases.
+- What `make test` and `make examples` need (see
+  [CONTRIBUTING.md](../CONTRIBUTING.md)).
+- For the test of the Ethernet station, the R6's Ethernet port on this
+  computer's network, and a free IP address there.
+
 ## What must pass
+
+- The working tree is clean, on `main`, and pushed: `HEAD` is
+  `origin/main`.
+- The tag is free, here and on `origin`.
 
 - CI is green for the commit on `main` that gets the tag.
 - `verified.json` is for the nice_cpu tag, the first two numbers of the
@@ -53,9 +72,10 @@ and keep their names.
 - A point release, such as `V1.0.1`, needs the release `V1.0` here to
   exist first.
 - `RELEASE_NOTES.md` has a section for the tag, whose heading has the
-  date: `## V1.0 (2026-11-02)`.
+  date: `## V1.0 (2026-10-28)`.
 - All three bitstreams meet timing.
-- `make hwtest` passes on a MEGA65 R6.
+- `make hwtest` passes on a MEGA65 R6, with its Ethernet station when
+  `--eth` is given.
 
 ## The steps
 
@@ -69,19 +89,25 @@ and keep their names.
 2. Write the tag's section of `RELEASE_NOTES.md`: what a user of the
    bitstreams, the boards, or the tools can see changed since the release
    before, with upgrade notes first. Replace "(not yet released)" in its
-   heading with the date, such as `## V1.0 (2026-11-02)`, then commit and
-   push.
+   heading with the date, such as `## V1.0 (2026-10-28)`. Draw the
+   README's pictures, `doc/images/demo.png` and `ethernet.png`, again
+   with the tag, as the docstring of `tools/screenshot.py` says. Commit
+   and push.
 
 3. Wait for CI to pass on the pushed commit.
 
-4. Connect a MEGA65 R6, then build, test, and stage the release:
+4. Connect a MEGA65 R6, with its Ethernet port on the network, then
+   build, test, and stage the release:
 
-       make release TAG=V1.0 [PORT=/dev/ttyUSB1]
+       make release TAG=V1.0 [PORT=/dev/ttyUSB1] ARGS="--eth 192.168.1.66"
 
    This changes nothing in git. It checks the conditions above, builds
    the examples and the three bitstreams from nothing, makes the two core
-   files with `coretool`, runs `make hwtest` on the R6, and puts the files
-   in `build/release/V1.0/`. It takes as long as three Vivado builds.
+   files with `coretool`, runs `make hwtest` on the R6, with `ETH=` when
+   `--eth` is given, and puts the files in `build/release/V1.0/`, with
+   `release.json`, which records the tag, the commit, and the files that
+   step 6 publishes. It takes as long as three Vivado builds. `make clean`
+   deletes `build/release/`, so do not run it between steps 4 and 6.
 
 5. Look at `build/release/V1.0/notes.md`. A change to the section goes
    into `RELEASE_NOTES.md`, which means a new commit, so steps 3 and 4 again.
@@ -92,7 +118,8 @@ and keep their names.
 
        make release TAG=V1.0 ARGS=--publish
 
-   This builds nothing. It checks that `main` has not moved since step 4,
+   This builds nothing. It reads `release.json`, checks that `main` has
+   not moved since step 4,
    makes the tag, pushes it, and creates the GitHub Release from the staged
    files. If `main` has moved, do step 4 again.
 
