@@ -30,6 +30,7 @@
 
 library ieee;
    use ieee.std_logic_1164.all;
+   use ieee.numeric_std.all;
    use ieee.numeric_std_unsigned.all;
 
 entity kbd_m65_ascii is
@@ -93,7 +94,7 @@ architecture synthesis of kbd_m65_ascii is
 
    function chr(c : character) return std_logic_vector is
    begin
-      return to_slv(character'pos(c), 8);
+      return std_logic_vector(to_unsigned(character'pos(c), 8));
    end function chr;
 
    -- The byte of each key without SHIFT, and with it. 0 is no byte.
