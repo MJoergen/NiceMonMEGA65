@@ -184,9 +184,18 @@ and E clear when it is done, so no other demo has interrupts.
 
 The demo scrolls by copying the rows, not with the display offset, so
 that the welcome stays, and so that it runs the same in `niceemu`, where
-the screen's registers are memory. It halts at the end of the input: in
-`niceemu`, after its input file, and on the board, after a break on the
-line, as when an Ethernet host half-closes its connection.
+the screen's registers are memory.
+
+The demo halts at the end of the input: in `niceemu`, after its input
+file, and on the board, after a break on the line, as when an Ethernet
+host half-closes its connection. That is on purpose. After a break,
+every read of the console returns the end, and the bytes of the line and
+the keyboard are lost, until the core is started again
+([SYSTEM.md](../doc/SYSTEM.md#address-map)), so no key could reach
+the demo. The halt says so plainly: the link sends `h`, and `run.py`,
+`hwtest.py`, and the tests in `niceemu` end on it. A terminal program
+that sends a break when it opens the port thus stops the demo, and the
+reset button, or a start from the link, starts it again.
 
 ## Building and testing
 

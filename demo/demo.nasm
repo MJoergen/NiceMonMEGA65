@@ -45,7 +45,11 @@
 ; On the board, a read of the console returns 0 until a byte arrives, so the
 ; program polls it in a loop. A read returns 0x200 when the input has ended,
 ; and then the program halts. In niceemu that happens after the last byte
-; of the input file. On the board it happens after a break on the UART.
+; of the input file. On the board it happens after a break on the line, or
+; when an Ethernet host half-closes its connection, after which the console
+; takes no byte, from the line or the keyboard, until the core is started
+; again. So the halt is on purpose: no key could come, and the tools and
+; the tests end on the halt.
 ;
 ; It is assembled with build/version.nasm after it, which defines VERSION,
 ; the version string of the title bar (demo/Makefile).
