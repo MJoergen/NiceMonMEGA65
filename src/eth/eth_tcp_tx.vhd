@@ -10,17 +10,18 @@
 -- from ip_i, with ip_id, which counts the segments sent, and the TCP
 -- header to seg_port_i from G_PORT, with seg_seq_i, seg_ack_i,
 -- seg_flags_i, and seg_wnd_i. The data, seg_n_i bytes, is read from the
--- send buffer at seg_addr_i on: rd_addr_o is the address, and the byte
--- comes on rd_data_i in the cycle after, as eth_icmp.vhd reads its
--- memory. The frame is built in two passes over its bytes, from the IP
--- header on. The first (SUM_ST) adds them up for the checksums, in ones'
--- complement: the IP header's words in ip_sum, and the TCP segment's in
--- tcp_sum, after the pseudo header, whose words INIT_ST adds first. The
--- second (SEND_ST) sends them, with the checksums in place of the zeros
--- of the first. In both, tx_idx is the next byte to read, and fetch says
--- that the byte read in the cycle before, fetch_idx, is used; the second
--- pass reads a byte only when tx_ready_i has taken the last one, so a
--- byte takes at least two cycles there.
+-- send buffer at seg_addr_i on: rd_addr_o is the address, a register
+-- that starts at seg_addr_i and moves on with each byte read after the
+-- header, and the byte comes on rd_data_i in the cycle after, as
+-- eth_icmp.vhd reads its memory. The frame is built in two passes over
+-- its bytes, from the IP header on. The first (SUM_ST) adds them up for
+-- the checksums, in ones' complement: the IP header's words in ip_sum,
+-- and the TCP segment's in tcp_sum, after the pseudo header, whose words
+-- INIT_ST adds first. The second (SEND_ST) sends them, with the checksums
+-- in place of the zeros of the first. In both, tx_idx is the next byte to
+-- read, and fetch says that the byte read in the cycle before, fetch_idx,
+-- is used; the second pass reads a byte only when tx_ready_i has taken
+-- the last one, so a byte takes at least two cycles there.
 --
 -- INTERFACE CONTRACTS -- these are requirements on the environment:
 -- a) go_i is '1' only while busy_o is '0'.
@@ -63,7 +64,7 @@ entity eth_tcp_tx is
       seg_addr_i  : in  std_logic_vector(G_ADDR_BITS - 1 downto 0);
       seg_n_i     : in  natural range 0 to G_MSS;
       -- The send buffer: the byte at rd_addr_o, a cycle later
-      rd_addr_o   : out std_logic_vector(G_ADDR_BITS - 1 downto 0);
+      rd_addr_o   : out std_logic_vector(G_ADDR_BITS - 1 downto 0) := (others => '0');
       rd_data_i   : in  std_logic_vector(7 downto 0);
       -- The frames to send, to eth_tx_fifo.vhd
       tx_data_o   : out std_logic_vector(7 downto 0) := (others => '0');
@@ -105,9 +106,6 @@ begin
 
    busy_o <= '1' when state /= IDLE_ST or go_i = '1' else
              '0';
-
-   rd_addr_o <= seg_addr_i + (tx_idx - 54) when tx_idx >= 54 else
-                seg_addr_i;
 
    -- The checksums are 0 while they are added up.
    ip_ck  <= not ip_sum when state = SEND_ST else
@@ -153,10 +151,11 @@ begin
             when INIT_ST =>
                tcp_sum <= ones_add(tcp_sum, init_word);
                if init_k = 5 then
-                  len    <= 54 + seg_n_i;
-                  tx_idx <= 14;
-                  fetch  <= '0';
-                  state  <= SUM_ST;
+                  len       <= 54 + seg_n_i;
+                  tx_idx    <= 14;
+                  rd_addr_o <= seg_addr_i;
+                  fetch     <= '0';
+                  state     <= SUM_ST;
                else
                   init_k <= init_k + 1;
                end if;
@@ -176,13 +175,17 @@ begin
                   fetch     <= '1';
                   fetch_idx <= tx_idx;
                   tx_idx    <= tx_idx + 1;
+                  if tx_idx >= 54 then
+                     rd_addr_o <= rd_addr_o + 1;
+                  end if;
                elsif fetch = '0' then
                   -- An odd byte at the end, with a zero after it
                   if len mod 2 = 1 then
                      tcp_sum <= ones_add(tcp_sum, hi & X"00");
                   end if;
-                  tx_idx <= 0;
-                  state  <= SEND_ST;
+                  tx_idx    <= 0;
+                  rd_addr_o <= seg_addr_i;
+                  state     <= SEND_ST;
                end if;
 
             when SEND_ST =>
@@ -203,6 +206,9 @@ begin
                   fetch     <= '1';
                   fetch_idx <= tx_idx;
                   tx_idx    <= tx_idx + 1;
+                  if tx_idx >= 54 then
+                     rd_addr_o <= rd_addr_o + 1;
+                  end if;
                end if;
 
          end case;
