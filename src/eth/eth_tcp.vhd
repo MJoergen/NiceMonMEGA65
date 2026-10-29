@@ -139,8 +139,8 @@ architecture synthesis of eth_tcp is
    constant C_SIZE     : natural := 2 ** G_ADDR_BITS;
    constant C_MSS      : natural := 536;
    constant C_IDLE     : natural := 64;
-   constant C_RTO_MS   : natural := 200;
-   constant C_TRIES    : natural := 25;
+   constant C_RTO_MS   : natural := 300;
+   constant C_TRIES    : natural := 17;
    constant C_TICK     : natural := G_CLOCK_HZ / 1000;
    constant C_WND_STEP : natural := C_SIZE / 2;
    -- The longest frame that is read

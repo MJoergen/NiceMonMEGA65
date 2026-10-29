@@ -379,9 +379,9 @@ after it, so a host that is done ends it with a reset. The tools set
 `SO_LINGER` to 0 for that, so that each close of theirs, also at an exit
 or a kill, sends one. A connection that a host closed with only a FIN
 stays until that host connects again, or the board resets. The board
-resends what the host does not acknowledge, after 200 ms, and drops the
-connection after 25 tries. While the host's window is 0, it sends one
-byte beyond it every 200 ms, and keeps the connection while the host
+resends what the host does not acknowledge, after 300 ms, and drops the
+connection after 17 tries. While the host's window is 0, it sends one
+byte beyond it every 300 ms, and keeps the connection while the host
 answers. It sends no reset itself, so a segment that
 fits no connection gets no answer. When a connection ends, the link
 stays with it until it has taken the input that came before, and the

@@ -4,7 +4,7 @@
 -- THEORY OF OPERATION
 -- The clock is 100 MHz, and G_CLOCK_HZ is 100 kHz, so that a millisecond of
 -- the server's timers is 100 cycles, and its retransmission timeout of
--- 200 ms is 200 us here. p_host plays the host: it sends frames into
+-- 300 ms is 300 us here. p_host plays the host: it sends frames into
 -- rx_*, one byte a cycle, and checks the segments that p_capture keeps
 -- from tx_*: their Ethernet, IPv4, and TCP headers, both checksums, which
 -- it adds up itself, and their data, which the link side sends as the
@@ -68,8 +68,9 @@ architecture simulation of tb_eth_tcp is
    constant C_RING  : natural                       := 16;
    constant C_FMAX  : natural                       := 620;
    constant C_CYCLE : time                          := 10 ns;
-   -- The retransmission timeout, 200 ms of 100 cycles
-   constant C_RTO : time                          := 200 * 100 * C_CYCLE;
+   -- The retransmission timeout, 300 ms of 100 cycles, and its tries
+   constant C_RTO   : time                          := 300 * 100 * C_CYCLE;
+   constant C_TRIES : natural                       := 17;
 
    type t_bytes is array (natural range <>) of std_logic_vector(7 downto 0);
 
@@ -985,7 +986,7 @@ begin
 
       -- A SYN-ACK that is never acknowledged ends the connection.
       send(seg(C_HIP2, C_PORT, 40002, X"00007000", X"00000000", C_SYN, 8192, 0, 0, false));
-      for i in 1 to 25 loop
+      for i in 1 to C_TRIES loop
          expect(2 * C_RTO, 40002, C_HIP2);
          assert flags_v = X"12"
             report "tb_eth_tcp: FAIL, not a SYN-ACK"
