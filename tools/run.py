@@ -90,8 +90,9 @@ import time
 from typing import NoReturn
 
 from load import load_words, read_bin, read_lines, start
-from nicelink import (DEBUG_FIRST, HALT_REASON, HOLD, RAM, REGS, Link,
-                      LinkError, add_arguments, fail, open_link, read_words)
+from nicelink import (DEBUG_FIRST, FULL_WAIT, HALT_REASON, HOLD, RAM, REGS,
+                      Link, LinkError, add_arguments, fail, open_link,
+                      read_words)
 
 INSTR_LO = 0xFFFFFF42
 INSTR_HI = 0xFFFFFF43
@@ -247,9 +248,9 @@ def run(link: Link, infd: int, timeout: float) -> bool:
                 link.send_console(pending[:n], paced=False)
                 pending = pending[n:]
             else:
-                # The program's input buffer is full: wait 10 ms for
-                # it to take bytes, or for output to arrive
-                link.poll(0.01)
+                # The program's input buffer is full: wait FULL_WAIT
+                # for it to take bytes, or for output to arrive
+                link.poll(FULL_WAIT)
             continue
         # Wake at least every 0.5 s, to see the time limit and the link
         wake = 0.5 if end is None else min(0.5, end - now)

@@ -81,6 +81,11 @@ ANSWER_WAIT = 0.3
 # leave room for a slower computer.
 COSIM_WAIT = 20.0
 COSIM_BYTE = 0.02
+# How long a sender waits while the program's input buffer is full, before
+# it reads the free space again. Well below the 10 ms in which the demo
+# takes an ESC with no byte after it as a key of its own (demo/demo.nasm,
+# T_ESC), so that a gap here does not cut an escape sequence in two.
+FULL_WAIT = 0.001
 # The TCP port of the board's debug link on Ethernet (src/eth/eth_tcp.vhd)
 ETH_PORT = 4510
 # How many times a request without an answer is sent, the first time
@@ -608,7 +613,7 @@ class Link:
             if paced:
                 n = min(n, self.free())
                 if n == 0:
-                    self.poll(0.01)
+                    self.poll(FULL_WAIT)
                     continue
             part, data = data[:n], data[n:]
             self.transport.write(part.replace(bytes([ESC]), bytes([ESC, ESC])))
