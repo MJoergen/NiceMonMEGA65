@@ -78,9 +78,14 @@
 --
 -- The receive window is the free space of the receive buffer, and when it
 -- has grown by C_WND_STEP since the last segment, an ACK tells the host.
--- This side's window is the host's, without scaling, for the SYN-ACK has
--- no options; for the same reason the host sends segments of at most 536
--- bytes. No RST is sent; a segment that fits no connection is dropped.
+-- This side's window is the host's, taken from an ACK of data sent that is
+-- not older than the last one it was taken from (snd_wl1 and snd_wl2, RFC
+-- 9293 3.10.7.4), without scaling, for the SYN-ACK has no options; for the
+-- same reason the host sends segments of at most 536 bytes. No RST is
+-- sent; a segment that fits no connection is dropped. A segment belongs to
+-- the connection by its IP address and ports, as TCP has it, whatever its
+-- source MAC address; the segments of this side go to the MAC address of
+-- the host's SYN.
 --
 -- INTERFACE CONTRACTS -- these are requirements on the environment:
 -- a) mac_i and ip_i stay stable while there is a connection.
@@ -198,6 +203,8 @@ architecture synthesis of eth_tcp is
    signal iss       : std_logic_vector(31 downto 0) := (others => '0');
    signal una_seq   : std_logic_vector(31 downto 0) := (others => '0');
    signal snd_wnd   : std_logic_vector(15 downto 0) := (others => '0');
+   signal snd_wl1   : std_logic_vector(31 downto 0) := (others => '0');
+   signal snd_wl2   : std_logic_vector(31 downto 0) := (others => '0');
    signal una_ptr   : t_ptr                         := (others => '0');
    signal nxt_ptr   : t_ptr                         := (others => '0');
    signal max_ptr   : t_ptr                         := (others => '0');
@@ -430,6 +437,8 @@ begin
       variable from_peer_v : boolean;
       variable syn_v       : boolean;
       variable k_v         : std_logic_vector(31 downto 0);
+      variable d1_v        : std_logic_vector(31 downto 0);
+      variable d2_v        : std_logic_vector(31 downto 0);
       variable rcv_v       : std_logic_vector(31 downto 0);
       variable avail_v     : natural range 0 to C_SIZE;
       variable room_v      : integer range -C_SIZE to 2 ** 16;
@@ -456,6 +465,8 @@ begin
          iss       <= isn;
          una_seq   <= isn + 1;
          snd_wnd   <= win;
+         snd_wl1   <= seq;
+         snd_wl2   <= isn;
          una_ptr   <= base;
          nxt_ptr   <= base;
          max_ptr   <= base;
@@ -692,11 +703,18 @@ begin
 
                      -- The ACK: the bytes it covers are free.
                      if f_flags(4) = '1' then
-                        snd_wnd <= f_win;
-                        if f_win = 0 then
-                           tries <= 0;
+                        k_v  := f_ack - una_seq;
+                        d1_v := f_seq - snd_wl1;
+                        d2_v := f_ack - snd_wl2;
+                        if k_v <= max_ptr - una_ptr and
+                           ((d1_v /= 0 and d1_v(31) = '0') or (d1_v = 0 and d2_v(31) = '0')) then
+                           snd_wnd <= f_win;
+                           snd_wl1 <= f_seq;
+                           snd_wl2 <= f_ack;
+                           if f_win = 0 then
+                              tries <= 0;
+                           end if;
                         end if;
-                        k_v     := f_ack - una_seq;
                         if k_v /= 0 and k_v <= max_ptr - una_ptr then
                            una_ptr <= una_ptr + k_v(G_ADDR_BITS downto 0);
                            una_seq <= f_ack;

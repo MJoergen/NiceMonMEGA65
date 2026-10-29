@@ -196,14 +196,14 @@ The testbenches are these:
   ports, against a host modeled in VHDL that checks both checksums of
   every segment: the handshake, and the SYN-ACK sent again; data each
   way, data again, out of order, with a wrong checksum, and too much for
-  the buffer, and a frame longer than it reads; a keepalive probe; the
-  host's window, a window of 0, data sent again after the timeout, and
-  an ACK that comes while it is; the host's FIN as a break after its
-  data; a new connection after it, which closes the old one first, and
-  one before it, as when the FIN was lost, or after a crash; data in the
-  ACK of the SYN-ACK; an RST, after which the link still takes the
-  input; a break that waits for its input while a new connection's
-  comes; and a SYN-ACK that is never acknowledged.
+  the buffer, and a frame longer than the server reads; a keepalive
+  probe; the host's window, a window of 0, an older window, data sent
+  again after the timeout, and an ACK that comes while it is; the host's
+  FIN as a break after its data; a new connection after it, which closes
+  the old one first, and one before it, as when the FIN was lost, or
+  after a crash; data in the ACK of the SYN-ACK; an RST, after which the
+  link still takes the input; a break that waits for its input while a
+  new connection's comes; and a SYN-ACK that is never acknowledged.
 - `make test` also checks that GHDL can synthesize the system, with
   `sim/rom.nasm` as its ROM and without a ROM, the keyboards, the text
   display, and `src/system.vhd` with the screen and the devices of the

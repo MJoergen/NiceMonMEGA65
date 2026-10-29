@@ -23,7 +23,8 @@
 --     as many unacknowledged as the host's window takes, and again after
 --     the timeout when the host does not acknowledge it
 --   * a window of 0 gets a byte beyond it after each timeout, also past
---     the tries, while the host answers
+--     the tries, while the host answers, and the window of an older
+--     segment is not taken
 --   * data that does not fit the receive buffer is dropped, and the window
 --     that it frees is told
 --   * a frame longer than the server reads overwrites no input
@@ -679,6 +680,20 @@ begin
       expect_data;
       assert n_v = 9
          report "tb_eth_tcp: FAIL, not the data after the window opened"
+         severity failure;
+      send_seg(C_ACK, 0);
+
+      -- The window of an older segment, which came late, is not taken.
+      send_data(5);
+      send_data(5);
+      hseq_v := hseq_v - 10;
+      send_seg(C_ACK, 0, win => 0);
+      hseq_v := hseq_v + 10;
+      expect_ack;
+      ltx_req <= ltx_req + 10;
+      expect_data(C_RTO / 2);
+      assert n_v = 10
+         report "tb_eth_tcp: FAIL, the window of an older segment was taken"
          severity failure;
       send_seg(C_ACK, 0);
 
