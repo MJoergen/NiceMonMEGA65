@@ -167,6 +167,11 @@ KEY_DN  .EQU    0x102
 KEY_RT  .EQU    0x103
 KEY_LT  .EQU    0x104
 
+; The longest wait for the next byte of an escape sequence, in microseconds.
+; A sequence from the keyboard or a terminal comes at once, and a person
+; cannot type a byte after ESC that fast.
+T_ESC   .EQU    10000
+
         MOVE    PC, TYPEW       ; the demo at power-up
 
 ; The typewriter: the welcome, and the rows below it
@@ -312,8 +317,8 @@ PRINT   MOVE[M] R4, @R1++
 ; The key codes: each key on a row of its own, with its bytes in hex and as
 ; characters. ECHO shows the bytes as POLL reads them, and when POLL
 ; returns, the key has ended. A key that gives 0, such as a sequence that is
-; no key, still ends. An ESC alone shows with the key after it, as POLL
-; waits for it.
+; no key, still ends. An ESC shows with the bytes that come within T_ESC
+; after it, as POLL waits for them, so an ESC alone has a row of its own.
 KCODES  MOVE    SP, 0xFFFFFF00
         MOVE    R6, KCODES
         ADD     @--SP, 2, PC
@@ -1129,9 +1134,8 @@ EIDLE   MOVE    @B_MODE, 0
 ; MAC address, with R7 = 2. The characters go to row 22 from column 20, and
 ; COL counts them. The keys are digits and dots for the IP address, and hex
 ; digits and colons for the MAC address, DEL or backspace, CTRL-C, which is
-; RUN/STOP on the MEGA65, to cancel, and RETURN to write the address to the
-; station. A function key still starts its demo. (ESC cannot cancel, as POLL
-; takes it as the start of a key.)
+; RUN/STOP on the MEGA65, or ESC to cancel, and RETURN to write the address
+; to the station. A function key still starts its demo.
 ESTART  MOVE    @B_MODE, R7
         MOVE    COL, 0
         MOVE    R2, SCREEN+1760
@@ -1169,6 +1173,8 @@ BEDIT   MOVE    R2, SCREEN+1920
         SUB[M]  R0, R1, 0x0A
     ?Z  MOVE    PC, EENTER
         SUB[M]  R0, R1, 0x03
+    ?Z  MOVE    PC, ECANCEL
+        SUB[M]  R0, R1, 0x1B
     ?Z  MOVE    PC, ECANCEL
         SUB[M]  R0, R1, 0x08
     ?Z  MOVE    PC, EBACK
@@ -1323,11 +1329,13 @@ HDIGIT  SHR     R9, R1, 28
 ; POLL takes a key from the input, if one has arrived, and sets R1 to it: a
 ; byte, KEY_UP to KEY_LT for a cursor key, or 0 when there is none. It
 ; reads the escape sequences that xterm sends for the cursor keys and the
-; function keys, and waits for the bytes of a sequence after its ESC. A
-; function key with a demo in FKEYS starts that demo, and POLL does not
-; return. Other sequences give 0. ESC and a byte that starts none gives that
-; byte, so an ESC alone is dropped. At the end of the input, POLL halts. It
-; changes R1 to R5, and calls ECHO, unless it is 0, with each byte in R1.
+; function keys, and waits for the bytes of a sequence after its ESC, at
+; most T_ESC microseconds for each. A function key with a demo in FKEYS
+; starts that demo, and POLL does not return. Other sequences give 0. ESC
+; and a byte that starts none gives that byte. An ESC with no byte after it
+; in time gives ESC, 0x1B, as the MEGA65's ESC key sends it alone. At the
+; end of the input, POLL halts. It changes R1 to R5, and calls ECHO, unless
+; it is 0, with each byte in R1.
 POLL    ADD     @--SP, 2, PC
         MOVE    PC, READ
     ?Z  MOVE    PC, @SP++       ; no byte, and R1 is 0
@@ -1335,6 +1343,8 @@ POLL    ADD     @--SP, 2, PC
     ?!Z MOVE    PC, @SP++       ; a byte other than ESC
 ESCAPE  ADD     @--SP, 2, PC
         MOVE    PC, NEXT
+    ?Z  MOVE    R1, 0x1B        ; an ESC alone is a key of its own
+    ?Z  MOVE    PC, @SP++
         SUB[M]  R0, R1, 0x1B
     ?Z  MOVE    PC, ESCAPE      ; ESC again starts again
         SUB[M]  R0, R1, 0x5B    ; [
@@ -1405,10 +1415,16 @@ READ    MOVE    R1, @CONSOLE
         OR[M]   R0, R1, 0x100   ; Z is clear, also for a byte of 0
         MOVE    PC, @SP++
 
-; NEXT waits for a byte of the console, and sets R1 to it
-NEXT    ADD     @--SP, 2, PC
+; NEXT waits at most T_ESC microseconds for a byte of the console, and sets
+; R1 to it, with Z clear. If none comes, R1 is 0 and Z is set. It changes
+; R5.
+NEXT    ADD     R5, @P_US, T_ESC ; the deadline
+NWAIT   ADD     @--SP, 2, PC
         MOVE    PC, READ
-    ?Z  MOVE    PC, NEXT
+    ?!Z MOVE    PC, @SP++       ; a byte
+        SUB[M]  R0, @P_US, R5
+    ?N  MOVE    PC, NWAIT
+        MOVE[M] R1, 0
         MOVE    PC, @SP++
 
 ; FRAME clears the screen and hides the cursor, and draws the two rows at
@@ -1637,8 +1653,8 @@ S_SENT  .ASCII_L 'Frames sent'
 E_HELP  .ASCII_L 'I types a new IP address, and M a new MAC address.'
 E_NEWIP .ASCII_L 'New IP address:'
 E_NEWMAC .ASCII_L 'New MAC address:'
-E_HINTIP .ASCII_L 'Digits and dots. RETURN writes it, and CTRL-C or RUN/STOP cancels.'
-E_HINTMAC .ASCII_L 'Hex digits and colons. RETURN writes it, and CTRL-C or RUN/STOP cancels.'
+E_HINTIP .ASCII_L 'Digits and dots. RETURN writes it; ESC, CTRL-C, or RUN/STOP cancels.'
+E_HINTMAC .ASCII_L 'Hex digits and colons. RETURN writes it; ESC, CTRL-C, or RUN/STOP cancels.'
 E_BADIP .ASCII_L 'Not an IP address: four numbers from 0 to 255, with dots between them.'
 E_BADMAC .ASCII_L 'Not a MAC address: six bytes in hex with colons, the first one even.'
 S_PASS  .ASCII_L 'PASS'

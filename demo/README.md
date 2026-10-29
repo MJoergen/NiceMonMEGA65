@@ -49,10 +49,12 @@ writing programs that read the keyboard. Each key gets a row, with its
 bytes in hex from column 2, and from column 42 as characters, a control
 code as `^` and a character: `^[` is ESC, `^C` is RUN/STOP, and `^?` is
 DEL. The bytes `0x80` to `0x9F` have no character, and a key shows at
-most 12 bytes. A sequence from the line shows as one key, and an
-ESC alone shows with the key after it. A function key with a demo starts
-that demo, so its bytes show only for a moment, or not at all. Past the
-last row, the rows scroll up by one.
+most 12 bytes. A sequence from the line shows as one key, and so
+does an ESC with the bytes that come within 10 ms after it. So the ESC
+key shows alone, and in `niceemu`, where the next byte of the input file
+is always there, an ESC shows with the key after it. A function key with
+a demo starts that demo, so its bytes show only for a moment, or not at
+all. Past the last row, the rows scroll up by one.
 
 The characters and the colors check the font and the video output at a
 glance. On the left are the 256 characters of the font, ISO 8859-1, in 16
@@ -129,13 +131,12 @@ These keys change the addresses:
 | Digits and dots, or hex digits and colons | Typed at the cursor in row 22. Other characters are dropped, and so are those past the 15 or 17 of a full address. |
 | DEL, backspace | Deletes the last character |
 | RETURN | Writes the address to the station, if it is one, and ends the typing. Otherwise a red message in row 24 says what is wrong, and the typing goes on. |
-| CTRL-C, RUN/STOP | Cancels the typing |
+| ESC, CTRL-C, RUN/STOP | Cancels the typing |
 
 An IP address is four numbers from 0 to 255 with dots between them. A MAC
 address is six bytes of one or two hex digits with colons between them,
 and the first byte must be even, because an odd one is a group address,
-which no board has. ESC cannot cancel, as the demo reads it as the start
-of a function key. A function key still starts its demo, which also
+which no board has. A function key still starts its demo, which also
 cancels the typing. Writing an address while a host is connected on the
 TCP port, or while a reply goes out, breaks that connection or reply
 ([SYSTEM.md](../doc/SYSTEM.md#the-ethernet-station)). In `niceemu` the
@@ -148,12 +149,14 @@ Every demo reads the keys through `POLL`. It turns the escape sequences of
 the cursor keys and the function keys into codes of their own: those of
 ANSI terminals and xterm, which the keyboards send (see
 [The keyboard](../doc/SYSTEM.md#the-keyboard)), and also `ESC O A` to
-`ESC O D` and the VT220's `ESC [ 11 ~` to `ESC [ 14 ~`. It waits for the
-rest of a sequence after its ESC, so an ESC alone is dropped, with the
-byte after it taken as it is. On a function key with a demo, `POLL` jumps
-to the demo, which starts with an empty stack. A new demo is a routine
-that sets SP, calls `FRAME` for the two bars, and polls the keys; its
-address goes in the tables `FKEYS` and `MENU`. A demo that wants the bytes
+`ESC O D` and the VT220's `ESC [ 11 ~` to `ESC [ 14 ~`. It waits for
+each byte of a sequence after its ESC, at most `T_ESC`, 10 ms, as a
+keyboard or a terminal sends a sequence at once. An ESC with no byte after
+it in time is the key ESC, `0x1B`, which the MEGA65's ESC key sends. An
+ESC and a byte that starts no sequence give that byte. On a function key
+with a demo, `POLL` jumps to the demo, which starts with an empty stack.
+A new demo is a routine that sets SP, calls `FRAME` for the two bars, and
+polls the keys; its address goes in the tables `FKEYS` and `MENU`. A demo that wants the bytes
 themselves puts a routine in `ECHO`, R12, which `POLL` calls with each
 byte, as the key codes do. `FRAME` sets `ECHO` to 0.
 

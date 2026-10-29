@@ -49,9 +49,9 @@ $(BUILD)/demo_test.bin: demo.nasm $(ASM_PY) | $(BUILD)
 # ESC Q is Q, and a sequence that is no key does nothing. The fourth
 # starts the key codes, F3, and types a letter, CR, a control code, DEL, a
 # cursor key, F10, which has no demo, a cursor key with parameters, a byte
-# of ISO 8859-1 and one of 0x80 to 0x9F, an ESC alone, a sequence longer
-# than the 12 bytes shown, and nine letters: 20 keys, which scroll by
-# four rows. The fifth goes from the key codes back to the typewriter,
+# of ISO 8859-1 and one of 0x80 to 0x9F, an ESC and an x, which are one
+# key, as niceemu has the x at once, a sequence longer than the 12 bytes
+# shown, and nine letters: 20 keys, which scroll by four rows. The fifth goes from the key codes back to the typewriter,
 # which shows no bytes. The sixth starts the characters and colors, F5,
 # where letters and F2 do nothing. niceemu shows neither the colors nor
 # the characters from 0xA0 on, so the test also has the words of two of
