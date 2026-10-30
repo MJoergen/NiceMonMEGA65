@@ -441,13 +441,14 @@ every time, not only the ones a testbench sends.
   numbers, which stay until it takes them, in the cycle after the choice.
 - `eth_tcp_rx.sby` proves the parser of the TCP server's frames,
   `src/eth/eth_tcp_rx.vhd`, for every frame, with the longest frame read
-  60 bytes: the stream is held for exactly the two cycles after a last
-  byte; data is written only while the stream moves, from the end of the
-  TCP header to the IP total length, of a segment that was the next of
-  the connection at byte 47, with data that fitted; a good segment whose
-  data was written has had all of it written, and no more; a longer frame
-  is not good; and the verdict and the fields stand from the last byte to
-  done. Its `cover` reaches a good segment, checksums and all.
+  60 bytes: the stream is held from the cycle after a last byte until the
+  segment, offered from the second, is taken; data is written only while
+  the stream moves, from the end of the TCP header to the IP total
+  length, of a segment that was the next of the connection at byte 47,
+  with data that fitted; a good segment whose data was written has had
+  all of it written, and no more; a longer frame is not good; and the
+  verdict and the fields stand from the last byte until the segment is
+  taken. Its `cover` reaches a good segment, checksums and all.
 - `eth_tcp_tx.sby` proves the sender of the TCP server's segments,
   `src/eth/eth_tcp_tx.vhd`, with a buffer of 4 bytes and segments of 2:
   it takes a segment offered only while idle, keeps its fields, and is

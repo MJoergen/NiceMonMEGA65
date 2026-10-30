@@ -31,13 +31,14 @@
 -- exp_port_i, its sequence number is exp_seq_i, take_i is '1', and its
 -- data is not empty and fits free_i. That is known at byte 47, before the
 -- data starts, and wr_ok says so from then on, as does len_o, the length
--- of the data, a register as well. The stream is held (rx_ready_o) for
--- two cycles after the last byte. In the first (last), the verdict goes
--- into registers, for the timing: good_o, whether the frame is a whole
--- segment to this station whose checksums are right, and wr_ok_o,
--- whether its data was written; and the count and the sums start again.
--- In the second (done_o), they, len_o, and the fields stand for the
--- segment. A frame longer than C_MAXF bytes is not good, and no data is
+-- of the data, a register as well. The stream is held (rx_ready_o) from
+-- the cycle after the last byte until the connection takes the segment.
+-- In the first (last), the verdict goes into registers, for the timing:
+-- good_o, whether the frame is a whole segment to this station whose
+-- checksums are right, and wr_ok_o, whether its data was written; and
+-- the count and the sums start again. From the second (seg_valid_o),
+-- they, len_o, and the fields stand for the segment, until seg_ready_i
+-- takes it. A frame longer than C_MAXF bytes is not good, and no data is
 -- written past C_MAXF.
 --
 -- INTERFACE CONTRACTS -- these are requirements on the environment:
@@ -48,13 +49,14 @@
 --    matter.
 --
 -- With G_FORMAL, it states the properties that formal/eth_tcp_rx.sby
--- proves: the stream is held exactly for the two cycles after a last
--- byte, which then come; data is written only while the stream moves,
--- from p_start to p_end, of a segment that wr_ok took at byte 47, whose
--- data was not empty and fitted free_i then; a good segment that wr_ok
--- took has had all of its len_o bytes written, and no more; a frame
--- longer than C_MAXF bytes is not good; and the verdict and the fields
--- stand still from the last byte to done_o.
+-- proves: the stream is held from the cycle after a last byte until the
+-- segment, offered from the second, is taken; data is written only while
+-- the stream moves, from p_start to p_end, of a segment that wr_ok took
+-- at byte 47, whose data was not empty and fitted free_i then; a good
+-- segment that wr_ok took has had all of its len_o bytes written, and no
+-- more; a frame longer than C_MAXF bytes is not good; and the verdict
+-- and the fields stand still from the last byte until the segment is
+-- taken.
 --
 -- RESET
 -- Synchronous, to clk_i. Reset starts a frame again.
@@ -74,36 +76,38 @@ entity eth_tcp_rx is
       G_FORMAL    : boolean := false
    );
    port (
-      clk_i      : in  std_logic;
-      rst_i      : in  std_logic;
+      clk_i       : in  std_logic;
+      rst_i       : in  std_logic;
       -- This station's addresses
-      mac_i      : in  std_logic_vector(47 downto 0);
-      ip_i       : in  std_logic_vector(31 downto 0);
+      mac_i       : in  std_logic_vector(47 downto 0);
+      ip_i        : in  std_logic_vector(31 downto 0);
       -- The received frames, from eth_rx_fifo.vhd
-      rx_data_i  : in  std_logic_vector(7 downto 0);
-      rx_last_i  : in  std_logic;
-      rx_valid_i : in  std_logic;
-      rx_ready_o : out std_logic;
+      rx_data_i   : in  std_logic_vector(7 downto 0);
+      rx_last_i   : in  std_logic;
+      rx_valid_i  : in  std_logic;
+      rx_ready_o  : out std_logic;
       -- The connection whose next data is written: that it takes data,
       -- the host's address and port, the sequence number of its next
       -- data, and the room for it
-      take_i     : in  std_logic;
-      exp_ip_i   : in  std_logic_vector(31 downto 0);
-      exp_port_i : in  std_logic_vector(15 downto 0);
-      exp_seq_i  : in  std_logic_vector(31 downto 0);
-      free_i     : in  natural range 0 to 2 ** G_ADDR_BITS;
+      take_i      : in  std_logic;
+      exp_ip_i    : in  std_logic_vector(31 downto 0);
+      exp_port_i  : in  std_logic_vector(15 downto 0);
+      exp_seq_i   : in  std_logic_vector(31 downto 0);
+      free_i      : in  natural range 0 to 2 ** G_ADDR_BITS;
       -- The segment's data, a byte at a time on rx_data_i, while it is the
       -- next of the connection
-      we_o       : out std_logic;
-      -- The segment, in the second cycle after its last byte: whether it
-      -- is good, its fields, whether its data was written, and the length
-      -- of its data, from byte 48 on, 0 when the header is longer than the
-      -- IP total length says, and the segment is not good
-      done_o     : out std_logic;
-      good_o     : out std_logic                     := '0';
-      seg_o      : out t_seg;
-      wr_ok_o    : out std_logic                     := '0';
-      len_o      : out natural range 0 to 2 ** 16    := 0
+      we_o        : out std_logic;
+      -- The segment, offered from the second cycle after its last byte
+      -- until the connection takes it: whether it is good, its fields,
+      -- whether its data was written, and the length of its data, from
+      -- byte 48 on, 0 when the header is longer than the IP total length
+      -- says, and the segment is not good
+      seg_valid_o : out std_logic;
+      seg_ready_i : in  std_logic;
+      good_o      : out std_logic                     := '0';
+      seg_o       : out t_seg;
+      wr_ok_o     : out std_logic                     := '0';
+      len_o       : out natural range 0 to 2 ** 16    := 0
    );
 end entity eth_tcp_rx;
 
@@ -129,9 +133,9 @@ architecture synthesis of eth_tcp_rx is
    signal tcp_sum : std_logic_vector(15 downto 0) := (others => '0');
    signal hi      : std_logic_vector(7 downto 0)  := (others => '0');
    signal wr_ok   : std_logic                     := '0';
-   -- The two cycles after the last byte
-   signal last : std_logic := '0';
-   signal done : std_logic := '0';
+   -- The cycle after the last byte, and the segment offered from the next
+   signal last      : std_logic := '0';
+   signal seg_valid : std_logic := '0';
    -- Whether the byte on rx_data_i is right, and whether the frame is good
    signal ok   : boolean;
    signal good : std_logic;
@@ -164,17 +168,17 @@ begin
    p_end   <= 14 + to_integer(f_len);
    plen    <= to_integer(f_len) - 20 - 4 * to_integer(f_doff);
 
-   rx_ready_o <= not (last or done);
+   rx_ready_o <= not (last or seg_valid);
    -- Below C_MAXF, so that a longer frame writes no more than plen bytes
-   we_o <= '1' when rx_valid_i = '1' and last = '0' and done = '0' and wr_ok = '1' and
+   we_o <= '1' when rx_valid_i = '1' and last = '0' and seg_valid = '0' and wr_ok = '1' and
                     idx >= p_start and idx < p_end and idx < C_MAXF else
            '0';
 
-   good   <= '1' when m_ok = '1' and ip_sum = X"FFFF" and tcp_sum = X"FFFF" and
-                      f_doff >= 5 and plen >= 0 and p_end <= idx else
-             '0';
-   done_o <= done;
-   seg_o  <=
+   good        <= '1' when m_ok = '1' and ip_sum = X"FFFF" and tcp_sum = X"FFFF" and
+                           f_doff >= 5 and plen >= 0 and p_end <= idx else
+                  '0';
+   seg_valid_o <= seg_valid;
+   seg_o       <=
    (
       host  => (mac => f_smac, ip => f_sip, tcp_port => f_sport),
       seq   => f_seq,
@@ -187,7 +191,7 @@ begin
    p_rx : process (clk_i)
    begin
       if rising_edge(clk_i) then
-         if rx_valid_i = '1' and last = '0' and done = '0' then
+         if rx_valid_i = '1' and last = '0' and seg_valid = '0' then
             if idx < C_MAXF then
                idx <= idx + 1;
             else
@@ -259,27 +263,31 @@ begin
             end if;
          end if;
 
-         -- The cycle after the last byte: the verdict, and the next frame
-         done <= last;
+         -- The cycle after the last byte: the verdict, and the next frame;
+         -- the segment is offered from the cycle after, until it is taken
+         if seg_valid = '1' and seg_ready_i = '1' then
+            seg_valid <= '0';
+         end if;
          if last = '1' then
-            last    <= '0';
-            good_o  <= good;
-            wr_ok_o <= wr_ok;
-            idx     <= 0;
-            m_ok    <= '1';
-            ip_sum  <= (others => '0');
-            tcp_sum <= (others => '0');
-            wr_ok   <= '0';
+            last      <= '0';
+            seg_valid <= '1';
+            good_o    <= good;
+            wr_ok_o   <= wr_ok;
+            idx       <= 0;
+            m_ok      <= '1';
+            ip_sum    <= (others => '0');
+            tcp_sum   <= (others => '0');
+            wr_ok     <= '0';
          end if;
 
          if rst_i = '1' then
-            idx     <= 0;
-            m_ok    <= '1';
-            ip_sum  <= (others => '0');
-            tcp_sum <= (others => '0');
-            wr_ok   <= '0';
-            last    <= '0';
-            done    <= '0';
+            idx       <= 0;
+            m_ok      <= '1';
+            ip_sum    <= (others => '0');
+            tcp_sum   <= (others => '0');
+            wr_ok     <= '0';
+            last      <= '0';
+            seg_valid <= '0';
          end if;
       end if;
    end process p_rx;
@@ -331,11 +339,14 @@ begin
 
       -- psl default clock is rising_edge(clk_i);
 
-      -- psl f_ready : assert always rx_ready_o = not (last or done);
-      -- psl f_apart : assert always not (last = '1' and done = '1');
+      -- psl f_ready : assert always rx_ready_o = not (last or seg_valid);
+      -- psl f_apart : assert always not (last = '1' and seg_valid = '1');
       -- psl f_end : assert always {f_acc and rx_last_i and not rst_i} |=> {last};
-      -- psl f_done : assert always {last and not rst_i} |=> {done};
-      -- psl f_after : assert always {done} |=> {not last and not done};
+      -- psl f_offer : assert always {last and not rst_i} |=> {seg_valid};
+      -- psl f_taken : assert always {seg_valid and seg_ready_i} |=> {not seg_valid};
+      -- psl f_held : assert always {seg_valid and not seg_ready_i and not rst_i} |=>
+      --    {seg_valid = '1' and good_o = prev(good_o) and wr_ok_o = prev(wr_ok_o) and
+      --     seg_o = prev(seg_o) and len_o = prev(len_o)};
       -- psl f_we : assert always we_o = '1' ->
       --    f_acc = '1' and wr_ok = '1' and idx >= p_start and idx < p_end and idx < C_MAXF;
       -- psl f_wr_ok : assert always wr_ok = '1' ->
@@ -352,9 +363,11 @@ begin
       --    {good_o = prev(good) and wr_ok_o = prev(wr_ok)};
       -- psl f_fields : assert always {last} |=> {seg_o = prev(seg_o) and len_o = prev(len_o)};
 
-      -- psl c_written : cover {done and good_o and wr_ok_o and not rst_i};
-      -- psl c_bad : cover {done and not good_o and not rst_i};
-      -- psl c_not_next : cover {done = '1' and good_o = '1' and wr_ok_o = '0' and len_o > 0 and rst_i = '0'};
+      -- psl c_written : cover {seg_valid and good_o and wr_ok_o and not rst_i};
+      -- psl c_bad : cover {seg_valid and not good_o and not rst_i};
+      -- psl c_not_next : cover {seg_valid = '1' and good_o = '1' and wr_ok_o = '0' and len_o > 0 and rst_i = '0'};
+      -- psl c_held : cover {seg_valid and not seg_ready_i;
+      --    seg_valid and seg_ready_i and not rst_i};
    end generate gen_formal;
 
 end architecture synthesis;

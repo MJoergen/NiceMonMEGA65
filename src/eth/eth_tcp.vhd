@@ -39,15 +39,19 @@
 -- fields of a TCP segment to this station, and checks its checksums. The
 -- segment's data goes into the receive buffer as it comes (rx_we), if it
 -- is the next data of the connection (its sequence number is rcv_nxt) and
--- fits (wr_ok, known before the data starts). In the second cycle after
--- the last byte (eval), with the stream held, the segment is acted on if
--- it is good; its data is committed (cmt) only then, and rcv_nxt moves
--- past it, or else it is discarded (discard), and the next segment's
--- data goes where it went. Its sequence and acknowledgment numbers are compared with the
+-- fits (wr_ok, known before the data starts). The parser offers the
+-- segment from the second cycle after the last byte, with the stream
+-- held, and the connection takes it (eval) once p_cmp has compared it
+-- with the connection as it is; it is acted on then, if it is good; its
+-- data is committed (cmt) only then, and rcv_nxt moves past it, or else
+-- it is discarded (discard), and the next segment's data goes where it
+-- went. Its sequence and acknowledgment numbers are compared with the
 -- connection's in registers (p_cmp), a cycle behind, for the timing; they
 -- stand at eval, for the fields have been there since the frame's byte
--- 49, and the connection's numbers since the last segment acted on.
--- Every segment with data or a FIN gets an ACK (ack_req), also
+-- 49, and the connection's numbers since the last segment acted on, but
+-- in the cycle after the connection ended or the timer ran out (stale),
+-- when p_cmp still has the connection before that, so the segment waits
+-- that cycle. Every segment with data or a FIN gets an ACK (ack_req), also
 -- one that is out of order, which is dropped, so the host sends it again;
 -- so does one without either whose sequence number is not rcv_nxt, such
 -- as a keepalive probe. A segment that overlaps data already taken is
@@ -240,13 +244,18 @@ architecture synthesis of eth_tcp is
    -- The initial sequence number, a cycle counter
    signal isn : std_logic_vector(31 downto 0) := (others => '0');
 
-   -- The segment read (eth_tcp_rx.vhd), in the second cycle after its
-   -- last byte
-   signal eval  : std_logic;
-   signal good  : std_logic;
-   signal f_seg : t_seg;
-   signal plen  : natural range 0 to 2 ** 16;
-   signal wr_ok : std_logic;
+   -- The segment read (eth_tcp_rx.vhd), offered from the second cycle
+   -- after its last byte, and taken (eval) once p_cmp has compared it
+   -- with the connection as it is: not in the cycle after the connection
+   -- ended or the timer ran out (stale), as p_cmp is a cycle behind
+   signal seg_valid : std_logic;
+   signal seg_ready : std_logic;
+   signal stale     : std_logic := '0';
+   signal eval      : std_logic;
+   signal good      : std_logic;
+   signal f_seg     : t_seg;
+   signal plen      : natural range 0 to 2 ** 16;
+   signal wr_ok     : std_logic;
    -- The connection takes data.
    signal take : std_logic;
    -- The segment against the connection, a cycle behind: it is from the
@@ -323,31 +332,35 @@ begin
    take <= '1' when state /= LISTEN_ST and peer_fin = '0' else
            '0';
 
+   seg_ready <= not stale;
+   eval      <= seg_valid and seg_ready;
+
    i_eth_tcp_rx : entity work.eth_tcp_rx
       generic map (
          G_PORT      => G_PORT,
          G_ADDR_BITS => G_ADDR_BITS
       )
       port map (
-         clk_i      => clk_i,
-         rst_i      => rst_i,
-         mac_i      => mac_i,
-         ip_i       => ip_i,
-         rx_data_i  => rx_data_i,
-         rx_last_i  => rx_last_i,
-         rx_valid_i => rx_valid_i,
-         rx_ready_o => rx_ready_o,
-         take_i     => take,
-         exp_ip_i   => peer.ip,
-         exp_port_i => peer.tcp_port,
-         exp_seq_i  => rcv_nxt,
-         free_i     => rx_room,
-         we_o       => rx_we,
-         done_o     => eval,
-         good_o     => good,
-         seg_o      => f_seg,
-         wr_ok_o    => wr_ok,
-         len_o      => plen
+         clk_i       => clk_i,
+         rst_i       => rst_i,
+         mac_i       => mac_i,
+         ip_i        => ip_i,
+         rx_data_i   => rx_data_i,
+         rx_last_i   => rx_last_i,
+         rx_valid_i  => rx_valid_i,
+         rx_ready_o  => rx_ready_o,
+         take_i      => take,
+         exp_ip_i    => peer.ip,
+         exp_port_i  => peer.tcp_port,
+         exp_seq_i   => rcv_nxt,
+         free_i      => rx_room,
+         we_o        => rx_we,
+         seg_valid_o => seg_valid,
+         seg_ready_i => seg_ready,
+         good_o      => good,
+         seg_o       => f_seg,
+         wr_ok_o     => wr_ok,
+         len_o       => plen
       ); -- i_eth_tcp_rx
 
 
@@ -574,6 +587,7 @@ begin
       if rising_edge(clk_i) then
          isn       <= isn + 1;
          armed_r   <= armed;
+         stale     <= ending or timeout;
          if busy = '0' then
             buf_una <= una_ptr;
          end if;
@@ -814,6 +828,7 @@ begin
             restart   <= '0';
             tries_clr <= '0';
             armed_r   <= '0';
+            stale     <= '0';
             buf_una   <= (others => '0');
          end if;
       end if;
