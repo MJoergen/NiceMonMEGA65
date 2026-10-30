@@ -168,6 +168,12 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   names, `synthesis`/`simulation` architectures, long headers with THEORY OF
   OPERATION and RESET). `synth/r3/max10.vhd` and `synth/mega65/hdmi/` are
   third-party, unlinted, and copied unchanged.
+- CI's GHDL (Ubuntu 24.04) cannot synthesize `to_slv` from
+  `numeric_std_unsigned` (`unhandled dyn operation`), though a newer
+  local GHDL can. In synthesized code, write
+  `std_logic_vector(to_unsigned(n, w))` with `numeric_std`. Run `make
+  lint` before a commit: vsg reports its errors in phases, so fixing
+  one can bring up others, which `vsg -c vsg.yml -f FILE --fix` sorts.
 - A dual-clock memory must be an entity of its own, or Vivado makes LUTRAM
   of it; grep the Vivado log for `Synth 8-6849` after changing one.
 - Every registered board pin carries `IOB TRUE` in the board's XDC, with a
