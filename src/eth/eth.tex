@@ -4,10 +4,10 @@
 %
 % What it shows: eth (eth.vhd) and the entities in it, the receive path on
 % top, the three readers of the received frames in the middle, and the
-% send path below, with the boundary between the PHY's clock domain and
-% the system's through the two FIFOs. Each block is the VHDL entity of its
-% name. It does not show the addresses, the counts of frames, the
-% handshakes, or the lock that keeps the frames of the readers apart.
+% send path below, from the arbiter that merges their frames, with the
+% boundary between the PHY's clock domain and the system's through the two
+% FIFOs. Each block is the VHDL entity of its name. It does not show the
+% addresses, the counts of frames, or the handshakes.
 
 \documentclass[border=8pt]{standalone}
 
@@ -87,12 +87,14 @@
 
    \node[block] (txf)  at (76, -48) {TX FIFO\\[-0.5mm] {\scriptsize eth\_tx\_fifo}};
    \node[block] (tx)   at (0, -48)  {RMII TX\\[-0.5mm] {\scriptsize rmii\_tx}};
+   \node[block] (arb)  at (146, -48) {ARBITER\\[-0.5mm] {\scriptsize eth\_arb}};
 
-   \draw[flow] (tcp.south) |- (txf.east);
-   \draw[flow, -] (arp.south)  -- (arp.south |- txf.east);
-   \draw[flow, -] (icmp.south) -- (icmp.south |- txf.east);
-   \fill (arp.south |- txf.east) circle (1.2pt);
-   \fill (icmp.south |- txf.east) circle (1.2pt);
+   % The responders merged, then a whole frame at a time from them or TCP
+   \draw[flow, -] (arp.south) |- (146, -36);
+   \draw[flow] (icmp.south) -- (arb.north);
+   \fill (146, -36) circle (1.2pt);
+   \draw[flow] (tcp.south) |- (arb.east);
+   \draw[flow] (arb) -- (txf);
    \draw[flow] (txf) -- (tx);
 
    \node[top, fit = {(rx) (fcs) (tcp) (tx) (76, 28)}] (eth) {};

@@ -16,10 +16,11 @@
 -- ready for it, so each sees every byte. A frame gets at most one reply
 -- from the two responders, as one is ARP and the other IPv4, and they
 -- write a reply only while no frame is read, so they never write at the
--- same time, and their outputs are simply merged. The TCP server sends
--- whenever it has a segment, so the output is locked to the responders or
--- to it from the first byte of a frame to its last, and the responders
--- come first when both start in the same cycle.
+-- same time. The TCP server sends whenever it has a segment, so the
+-- arbiter (eth_arb.vhd) merges the responders' outputs, and locks the
+-- output to the responders or to the server from the first byte of a
+-- frame to its last; the responders come first when both start in the
+-- same cycle.
 -- Each frame that comes out of the FIFO of received frames counts in rx_o,
 -- and each that goes into the FIFO of frames to send in tx_o. Each bad
 -- frame, and each good one that found the FIFO full, flips rx_toggle in the
@@ -119,15 +120,8 @@ architecture synthesis of eth is
    signal tcp_last      : std_logic;
    signal tcp_valid     : std_logic;
    signal tcp_ready_out : std_logic;
-   -- The responders' merged output, and who has the output: the lock, and
-   -- the grant in this cycle
-   signal resp_data  : std_logic_vector(7 downto 0);
-   signal resp_last  : std_logic;
-   signal resp_valid : std_logic;
+   -- The responders' ready, from the arbiter (eth_arb.vhd)
    signal resp_ready : std_logic;
-   type   t_lock is (FREE_LK, RESP_LK, TCP_LK);
-   signal lock       : t_lock := FREE_LK;
-   signal grant_tcp  : std_logic;
    -- The frames to send, in the system clock domain
    signal out_data  : std_logic_vector(7 downto 0);
    signal out_last  : std_logic;
@@ -258,42 +252,26 @@ begin
          ltx_ready_o => ltx_ready_o
       ); -- i_eth_tcp
 
-   resp_data  <= arp_data when arp_valid = '1' else
-                 icmp_data;
-   resp_last  <= arp_last when arp_valid = '1' else
-                 icmp_last;
-   resp_valid <= arp_valid or icmp_valid;
-
-   grant_tcp <= '1' when lock = TCP_LK or (lock = FREE_LK and resp_valid = '0') else
-                '0';
-
-   out_data      <= tcp_data when grant_tcp = '1' else
-                    resp_data;
-   out_last      <= tcp_last when grant_tcp = '1' else
-                    resp_last;
-   out_valid     <= tcp_valid when grant_tcp = '1' else
-                    resp_valid;
-   resp_ready    <= out_ready and not grant_tcp;
-   tcp_ready_out <= out_ready and grant_tcp;
-
-   p_lock : process (clk_i)
-   begin
-      if rising_edge(clk_i) then
-         if out_valid = '1' and out_ready = '1' then
-            if out_last = '1' then
-               lock <= FREE_LK;
-            elsif grant_tcp = '1' then
-               lock <= TCP_LK;
-            else
-               lock <= RESP_LK;
-            end if;
-         end if;
-
-         if rst_i = '1' then
-            lock <= FREE_LK;
-         end if;
-      end if;
-   end process p_lock;
+   i_eth_arb : entity work.eth_arb
+      port map (
+         clk_i        => clk_i,
+         rst_i        => rst_i,
+         arp_data_i   => arp_data,
+         arp_last_i   => arp_last,
+         arp_valid_i  => arp_valid,
+         icmp_data_i  => icmp_data,
+         icmp_last_i  => icmp_last,
+         icmp_valid_i => icmp_valid,
+         resp_ready_o => resp_ready,
+         tcp_data_i   => tcp_data,
+         tcp_last_i   => tcp_last,
+         tcp_valid_i  => tcp_valid,
+         tcp_ready_o  => tcp_ready_out,
+         out_data_o   => out_data,
+         out_last_o   => out_last,
+         out_valid_o  => out_valid,
+         out_ready_i  => out_ready
+      ); -- i_eth_arb
 
    i_eth_tx_fifo : entity work.eth_tx_fifo
       port map (

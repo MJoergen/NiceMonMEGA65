@@ -33,6 +33,8 @@ Received frames flow along the top, and frames to send along the bottom.
   ([eth_tcp_pick.vhd](eth_tcp_pick.vhd)), the sender
   ([eth_tcp_tx.vhd](eth_tcp_tx.vhd)), and the retransmission timer
   ([eth_tcp_timer.vhd](eth_tcp_timer.vhd)).
+- **ARBITER** ([eth_arb.vhd](eth_arb.vhd)) merges the replies and the
+  segments into one stream, a whole frame at a time.
 - **TX FIFO** ([eth_tx_fifo.vhd](eth_tx_fifo.vhd)) passes on a frame
   only once it is whole.
 - **RMII TX** ([rmii_tx.vhd](rmii_tx.vhd)) adds the preamble, the

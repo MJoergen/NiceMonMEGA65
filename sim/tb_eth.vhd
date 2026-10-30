@@ -534,11 +534,11 @@ begin
    p_probe : process (clk)
    begin
       if rising_edge(clk) then
-         if << signal .tb_eth.i_eth.grant_tcp : std_logic >> = '1' and
-            << signal .tb_eth.i_eth.resp_valid : std_logic >> = '1' then
+         if << signal .tb_eth.i_eth.i_eth_arb.grant_tcp : std_logic >> = '1' and
+            << signal .tb_eth.i_eth.i_eth_arb.resp_valid : std_logic >> = '1' then
             n_resp_wait <= n_resp_wait + 1;
          end if;
-         if << signal .tb_eth.i_eth.grant_tcp : std_logic >> = '0' and
+         if << signal .tb_eth.i_eth.i_eth_arb.grant_tcp : std_logic >> = '0' and
             << signal .tb_eth.i_eth.tcp_valid : std_logic >> = '1' then
             n_tcp_wait <= n_tcp_wait + 1;
          end if;

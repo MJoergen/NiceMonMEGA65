@@ -84,8 +84,8 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   segments, `eth/eth_tcp_rx.vhd`, its choice of the segments to send,
   `eth/eth_tcp_pick.vhd`, their sender, `eth/eth_tcp_tx.vhd`, its
   buffers, `eth/eth_tcp_buf.vhd`, and its retransmission timer,
-  `eth/eth_tcp_timer.vhd`), and
-  `system.vhd`, which every board instantiates.
+  `eth/eth_tcp_timer.vhd`, and the arbiter of the frames to send,
+  `eth/eth_arb.vhd`), and `system.vhd`, which every board instantiates.
   `nice_core.vhd` with one architecture from `src/core/` wraps whichever
   nice_cpu core `core.mk` selects (`NICE=pipeline`, the default, or `multi`).
 - `src/video/`: `text.vhd` shows the screen with a cursor and a display

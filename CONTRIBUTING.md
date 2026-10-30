@@ -116,9 +116,9 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
   segments, `eth/eth_tcp_pick.vhd` choosing the ones to send and
   `eth/eth_tcp_tx.vhd` sending them, `eth/eth_tcp_buf.vhd` keeping the
   bytes of the link, and `eth/eth_tcp_timer.vhd` timing the
-  retransmissions, `eth/eth_tx_fifo.vhd`
-  takes the frames to send back to the PHY's clock, and `eth/rmii_tx.vhd`
-  sends them. The FIFOs and the TCP server keep their bytes in
+  retransmissions, `eth/eth_arb.vhd` merges the frames to send a whole
+  frame at a time, `eth/eth_tx_fifo.vhd` takes them back to the PHY's
+  clock, and `eth/rmii_tx.vhd` sends them. The FIFOs and the TCP server keep their bytes in
   `eth/eth_ram.vhd`, and `eth/eth_pkg.vhd` has the CRC, the Gray code,
   and the checksum sum.
 - The debug link is nice_cpu's `hdl/src/debug_link.vhd`.
@@ -474,11 +474,19 @@ every time, not only the ones a testbench sends.
   nothing else gives either; good comes only for a frame of 64 bytes or
   more with the CRC's residue and no error, and always for one; and the
   CRC and the count start again after each frame and reset.
+- `eth_arb.sby` proves the arbiter of the frames to send,
+  `src/eth/eth_arb.vhd`, with the two responders never valid together:
+  a source's byte is taken only when the output takes it, and it is that
+  byte that goes out; each byte that goes out is one source's, which is
+  taken; the bytes of a frame, from its first to its last, all come from
+  the responders or all from the TCP server; and the responders come
+  first when both start in the same cycle.
 
 The checks in `rx_fifo.vhd`, `board_io.vhd`, `scr_regs.vhd`,
 `devices.vhd`, `mem.vhd`, `nicemon.vhd`, `eth/eth_tcp_timer.vhd`,
 `eth/eth_tcp_buf.vhd`, `eth/eth_tcp_pick.vhd`, `eth/eth_tcp_rx.vhd`,
-`eth/eth_tcp_tx.vhd`, and `eth/rx_fcs.vhd` are in `G_FORMAL` blocks,
+`eth/eth_tcp_tx.vhd`, `eth/rx_fcs.vhd`, and `eth/eth_arb.vhd` are in
+`G_FORMAL` blocks,
 which are off in simulation and synthesis.
 
 ## Testing the board
