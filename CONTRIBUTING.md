@@ -200,7 +200,12 @@ The testbenches are these:
   Page Up move the cursor and the window, also during a read of it; `a`
   moves the window to the screen's memory, where a word is written and
   read back; DEL and ESC edit the field, and ESC leaves the page; and
-  while the core runs the words are dimmed and a write gets `e02`.
+  while the core runs the words are dimmed and a write gets `e02`. Last,
+  `b` sets breakpoint 0 at the cursor, which the header lists and the
+  page colors, and a restart stops there with BRK 0; `b` sets breakpoint
+  1 and clears breakpoint 0, and `g` goes on to BRK 1; `b` then takes
+  the lowest free breakpoint, says `none free` when all four are in use,
+  and after a digit is a digit.
 - `sim/tb_dbg_host.vhd` tests the debugger's host against the debug link
   itself, on the system's third link input, with `sim/host.nasm`, which
   writes 0x00 to 0xFF to the console again and again. It reads the

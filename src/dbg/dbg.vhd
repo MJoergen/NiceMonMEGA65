@@ -4,8 +4,8 @@
 -- with single keys.
 --
 -- THEORY OF OPERATION
--- This is stage 5 of the design note: the live strip, the core keys, the
--- sticky setting, the catch, and the page. The debugger has three states. It is Off
+-- This is stage 6 of the design note: the live strip, the core keys, the
+-- sticky setting, the catch, the page, and the breakpoints. The debugger has three states. It is Off
 -- after reset. The toggle pulse, toggle_i, takes it from Off or Strip to
 -- Focus, and from Focus to Off, or to Strip while the sticky setting is
 -- on, which F12 toggles in Focus. In Strip and Focus the strip is shown
@@ -24,8 +24,10 @@
 --
 -- p_seq drives the link, one request at a time. In Focus, about 60 times a
 -- second, and at once after a key, a stop notice (`p`, `x`, or `h`), or
--- the entry into Focus, it reads the debug registers 0xFFFFFFF0-F6 in one
--- request: the control register, the halt reason, and the stop register.
+-- the entry into Focus, it reads the debug registers 0xFFFFFFF0-FB in one
+-- request: the control register, the halt reason, the stop register, and
+-- the enable bits, the number, and the addresses of the breakpoints, of
+-- which it uses 4.
 -- A key then writes the control register, with bit 3, the ROM, as it
 -- reads, and the registers are read again. When the core is paused or
 -- has halted, and R0-R15 have not been read since the stop, it reads them,
@@ -34,7 +36,10 @@
 -- request, into mem_ram, unless they were read since the stop; a move of
 -- the window reads them again, and drops a read that it overtook
 -- (mem_kill). A word's write from the page goes as a key's write does,
--- and its answer is the page's message. A request that gets no answer
+-- and its answer is the page's message. So does b: it clears an enabled
+-- breakpoint at the cursor's address, or writes the address of the lowest
+-- free one, then its enable bit. The debug registers take a write while
+-- the core runs too. A request that gets no answer
 -- shows NO LINK.
 --
 -- p_kbd turns the keyboard's bytes into the keys of DEBUGGER.md: F1 or s
@@ -44,7 +49,7 @@
 -- ESC [ 20 ~. A key that does not fit the core's state does nothing: go
 -- on and pause would start a held core. F11 or m shows the page, and on
 -- it the cursor keys, Page Up, Page Down, Home, the hex digits, DEL,
--- RETURN, a, and ESC are the page's keys, which p_page acts on. An ESC
+-- RETURN, a, b, and ESC are the page's keys, which p_page acts on. An ESC
 -- with no byte after it for 1 ms is the ESC key.
 --
 -- p_page has the window's address, the cursor, a word of the window, and
@@ -52,7 +57,8 @@
 -- bottom row the window a row; Page Up and Page Down move the window 22
 -- rows. The digits shift into the field, RETURN writes it to the cursor's
 -- word, and a on an empty field makes it an address, which RETURN moves
--- the window to.
+-- the window to. b on an empty field is the key of a breakpoint; after a
+-- digit, a and b are digits.
 --
 -- The strip is rows 25 to 28 of the overlay of text.vhd, the words 2000 to
 -- 2319, addressed row * 80 + column. C_CELLS says what each word shows: a
@@ -66,7 +72,8 @@
 -- is shown (page_o), the pass covers rows 0 to 24 too: the window's and
 -- the cursor's address, the 22 rows of the window, the field with its
 -- message, and the page's keys, from the templates of row_cells; the
--- cursor's word has its colors swapped.
+-- cursor's word has its colors swapped, and a word at an enabled
+-- breakpoint is on dark red. The header lists the 4 breakpoints.
 --
 -- RESET
 -- Synchronous to clk_i, by rst_i. The debugger is Off, knows nothing of
@@ -139,8 +146,12 @@ architecture synthesis of dbg is
    -- screen word
    constant C_COLOR : std_logic_vector(23 downto 0) := X"004FFF";
    constant C_DIM   : std_logic_vector(23 downto 0) := X"004888";
-   -- The page's cursor: the colors swapped
-   constant C_CURSOR : std_logic_vector(23 downto 0) := X"FFF004";
+   -- The page's cursor: the colors swapped; a word at an enabled
+   -- breakpoint, white or gray on dark red, and the cursor on one
+   constant C_CURSOR    : std_logic_vector(23 downto 0) := X"FFF004";
+   constant C_BREAK     : std_logic_vector(23 downto 0) := X"800FFF";
+   constant C_BREAK_DIM : std_logic_vector(23 downto 0) := X"800888";
+   constant C_CUR_BREAK : std_logic_vector(23 downto 0) := X"FFF800";
 
    -- The refresh, about 60 times a second, and the host's timeout, the
    -- link's 100 ms (DEBUG.md §5)
@@ -151,13 +162,20 @@ architecture synthesis of dbg is
 
    constant C_REGS : t_word := X"FFFFFFE0";
    constant C_CTRL : t_word := X"FFFFFFF0";
+   -- The breakpoints' enable bits, and the address of breakpoint 0
+   constant C_BRK_EN   : t_word := X"FFFFFFF4";
+   constant C_BRK_ADDR : t_word := X"FFFFFFF8";
    -- The debug registers read at each refresh: the control register up to
-   -- the stop register
-   constant C_CTRL_N : natural := 7;
+   -- the address of breakpoint 3. The page shows 4 breakpoints, as many
+   -- as every board has.
+   constant C_CTRL_N : natural := 12;
+   constant C_BRKS   : natural := 4;
 
    type t_words is array (0 to 15) of t_word;
 
-   type t_act is (ACT_NONE, ACT_STEP, ACT_GO, ACT_PAUSE, ACT_HOLD, ACT_RESTART, ACT_STICKY, ACT_POKE);
+   type t_brk_addrs is array (0 to C_BRKS - 1) of t_word;
+
+   type t_act is (ACT_NONE, ACT_STEP, ACT_GO, ACT_PAUSE, ACT_HOLD, ACT_RESTART, ACT_STICKY, ACT_POKE, ACT_BREAK);
 
    -- The keys of the page
    type t_pkey is (PK_NONE, PK_PAGE, PK_UP, PK_DOWN, PK_LEFT, PK_RIGHT, PK_PGUP, PK_PGDN, PK_HOME, PK_DIGIT, PK_DEL, PK_RETURN, PK_ESC);
@@ -168,7 +186,7 @@ architecture synthesis of dbg is
 
    type t_kbd_st is (KBD_IDLE_ST, KBD_ESC_ST, KBD_SS3_ST, KBD_CSI_ST);
 
-   type t_seq_st is (SEQ_IDLE_ST, SEQ_CTRL_ST, SEQ_WRITE_ST, SEQ_START_ST, SEQ_REGS_ST, SEQ_INSTR_ST, SEQ_MEM_ST);
+   type t_seq_st is (SEQ_IDLE_ST, SEQ_CTRL_ST, SEQ_WRITE_ST, SEQ_START_ST, SEQ_REGS_ST, SEQ_INSTR_ST, SEQ_MEM_ST, SEQ_BRK_ST);
 
    ---------------------------------------------------------------------------
    -- The cells of the strip
@@ -176,8 +194,8 @@ architecture synthesis of dbg is
 
    -- What a word of the overlay shows: a fixed character; hex digit nib of
    -- word idx, R0-R15 for 0 to 15, the word at the PC for 16, the PC for
-   -- 17, the window's address for 18, the cursor's for 19, and the row's
-   -- for 20; character idx of the state's name; flag idx of SR, X to I;
+   -- 17, the window's address for 18, the cursor's for 19, the row's for
+   -- 20, and the address of breakpoint idx - 21 for 21 to 24; character idx of the state's name; flag idx of SR, X to I;
    -- character idx of the keys' row, which depends on the state; hex digit
    -- nib of word idx of a row of memory; or character idx of the input
    -- field's label, of the field, or of the message
@@ -199,6 +217,7 @@ architecture synthesis of dbg is
    constant C_IDX_WINDOW : natural := 18;
    constant C_IDX_CURSOR : natural := 19;
    constant C_IDX_ROW    : natural := 20;
+   constant C_IDX_BRK    : natural := 21;
 
    -- The columns of row 27: the state's name, the PC, the word at the PC,
    -- and the flags, every second column
@@ -270,14 +289,15 @@ architecture synthesis of dbg is
    constant C_CELLS : t_cells := cells;
 
    -- A row of the page from a template: % is a digit of the window's
-   -- address, & of the cursor's, $ of the row's, # of a word of memory,
-   -- < a character of the field's label, ? of the field, and ! of the
+   -- address, & of the cursor's, $ of the row's, @ of a breakpoint's, # of
+   -- a word of memory, < a character of the field's label, ? of the field, and ! of the
    -- message; any other character is itself
    function row_cells(s : string) return t_row is
       constant C_S    : string(1 to C_COLS) := row(s);
       variable res_v  : t_row;
       variable run_v  : natural := 0;                     -- The place in a run of a marker
       variable word_v : natural := 0;                     -- The runs of # before
+      variable brk_v  : natural := 0;                     -- The runs of @ before
       variable ch_v   : character;
    begin
       for c in 0 to C_COLS - 1 loop
@@ -292,6 +312,11 @@ architecture synthesis of dbg is
             when '%' => res_v(c) := (kind => CELL_HEX, idx => C_IDX_WINDOW, nib => 7 - run_v, ch => X"20");
             when '&' => res_v(c) := (kind => CELL_HEX, idx => C_IDX_CURSOR, nib => 7 - run_v, ch => X"20");
             when '$' => res_v(c) := (kind => CELL_HEX, idx => C_IDX_ROW, nib => 7 - run_v, ch => X"20");
+            when '@' =>
+               res_v(c) := (kind => CELL_HEX, idx => C_IDX_BRK + brk_v, nib => 7 - run_v, ch => X"20");
+               if run_v = 7 then
+                  brk_v := brk_v + 1;
+               end if;
             when '#' =>
                res_v(c) := (kind => CELL_MEM, idx => word_v, nib => 7 - run_v, ch => X"20");
                if run_v = 7 then
@@ -307,20 +332,21 @@ architecture synthesis of dbg is
    end function row_cells;
 
    -- Row 0, the rows of memory, row 23, and row 24 of the page
-   constant C_HEAD_ROW  : t_row := row_cells(" Window %%%%%%%%  Cursor &&&&&&&&");
+   constant C_HEAD_ROW  : t_row := row_cells(" Window %%%%%%%%  Cursor &&&&&&&&  Breaks @@@@@@@@ @@@@@@@@ @@@@@@@@ @@@@@@@@");
    constant C_MEM_ROW   : t_row := row_cells("$$$$$$$$ ######## ######## ######## ######## ######## ######## ######## ########");
    constant C_INPUT_ROW : t_row := row_cells(" <<<<<<<< ????????  !!!!!!!!!!");
-   constant C_PKEYS_ROW : t_row := row_cells(" CRSR move  PgUp PgDn page  Home  0-f type  RETURN write  a address  ESC back");
+   constant C_PKEYS_ROW : t_row := row_cells(" CRSR PgUp PgDn Home move  0-f type  RETURN write  a address  b break  ESC back");
 
    -- The field's label, for a word and for an address, and the messages
    type t_labels is array (0 to 1, 0 to 7) of t_byte;
 
-   type t_msgs is array (0 to 3, 0 to 9) of t_byte;
+   type t_msgs is array (0 to 4, 0 to 9) of t_byte;
 
    constant C_MSG_NONE    : natural := 0;
    constant C_MSG_WRITTEN : natural := 1;
    constant C_MSG_ERR     : natural := 2;                -- e and the code's two digits
    constant C_MSG_TIMEOUT : natural := 3;
+   constant C_MSG_FULL    : natural := 4;                -- No breakpoint is free
 
    function labels return t_labels is
       constant C_S   : string(1 to 16) := "Word:   Address:";
@@ -335,10 +361,10 @@ architecture synthesis of dbg is
    end function labels;
 
    function msgs return t_msgs is
-      constant C_S   : string(1 to 40) := "          written   e         no answer ";
+      constant C_S   : string(1 to 50) := "          written   e         no answer none free ";
       variable res_v : t_msgs;
    begin
-      for k in 0 to 3 loop
+      for k in 0 to 4 loop
          for i in 0 to 9 loop
             res_v(k, i) := to_byte(C_S(10 * k + i + 1));
          end loop;
@@ -458,6 +484,8 @@ architecture synthesis of dbg is
    signal poke       : std_logic := '0';                 -- Write poke_data to poke_addr
    signal poke_addr  : t_word;
    signal poke_data  : t_word;
+   signal brk        : std_logic := '0';                 -- Toggle a breakpoint at brk_at
+   signal brk_at     : t_word;
 
    -- The request to the host, and its answers
    signal req_valid : std_logic := '0';
@@ -480,7 +508,9 @@ architecture synthesis of dbg is
    signal refresh   : natural range 0 to C_REFRESH - 1 := 0;
    signal rd_idx    : natural range 0 to 255;
    signal restart_r : std_logic;
-   signal poke_r    : std_logic := '0';
+   signal msg_r     : std_logic := '0';                  -- The write's answer is the page's message
+   signal msg_ok    : natural range 0 to 4;              -- ... and this, when it is k
+   signal brk_set   : std_logic_vector(C_BRKS - 1 downto 0);
    signal err_code  : t_byte;
 
    -- What the debugger knows of the core
@@ -489,6 +519,9 @@ architecture synthesis of dbg is
    signal stop_r   : std_logic_vector(8 downto 0) := (others => '0');
    signal regs_r   : t_words := (others => (others => '0'));
    signal instr_r  : t_word := (others => '0');
+   signal brk_en_r : std_logic_vector(C_BRKS - 1 downto 0) := (others => '0');
+   signal brk_n    : natural range 0 to C_BRKS := 0;     -- The breakpoints of the link, up to 4
+   signal brk_r    : t_brk_addrs := (others => (others => '0'));
    signal link_ok  : std_logic := '0';                   -- The last refresh had an answer
    signal regs_any : std_logic := '0';                   -- R0-R15 were read once
    signal regs_ok  : std_logic := '0';                   -- ... since the current stop
@@ -501,7 +534,7 @@ architecture synthesis of dbg is
    signal mem_any  : std_logic := '0';                   -- The window was read once
    signal mem_ok   : std_logic := '0';                   -- ... since the core stopped
    signal mem_kill : std_logic := '0';                   -- The read is of a window left
-   signal msg_k    : natural range 0 to 3 := C_MSG_NONE;
+   signal msg_k    : natural range 0 to 4 := C_MSG_NONE;
    signal msg_code : t_byte := (others => '0');
 
    -- The drawing: a pass over the strip after each change
@@ -523,6 +556,7 @@ architecture synthesis of dbg is
    signal s2_shown   : std_logic;                        -- The word is known
    signal s2_dim     : std_logic;
    signal s2_cur     : std_logic;                        -- The cursor's word
+   signal s2_brk     : std_logic;                        -- A word at an enabled breakpoint
    signal s2_ch      : t_byte;                           -- A fixed or state character
 
    signal ovl_we   : std_logic := '0';
@@ -699,6 +733,7 @@ begin
          pg_dirty <= '0';
          mem_move <= '0';
          poke     <= '0';
+         brk      <= '0';
          if state = FOCUS_ST and pkey /= PK_NONE then
             pg_dirty <= '1';
             if pkey = PK_PAGE then
@@ -745,9 +780,13 @@ begin
                   when PK_HOME =>
                      cur <= 0;
                   when PK_DIGIT =>
-                     -- a on an empty field is the key of an address
+                     -- a on an empty field is the key of an address, and b
+                     -- the key of a breakpoint
                      if pkey_dig = X"A" and field_n = 0 and field_addr = '0' then
                         field_addr <= '1';
+                     elsif pkey_dig = X"B" and field_n = 0 and field_addr = '0' then
+                        brk    <= '1';
+                        brk_at <= window + cur;
                      else
                         field <= field(27 downto 0) & pkey_dig;
                         if field_n /= 8 then
@@ -833,6 +872,8 @@ begin
       variable rom_v   : t_word;
       variable data_v  : t_word;
       variable write_v : boolean;
+      variable hit_v   : integer range -1 to C_BRKS - 1; -- The breakpoint at brk_at
+      variable free_v  : integer range -1 to C_BRKS - 1; -- The lowest free one
 
       procedure read(addr : t_word;
                      n    : natural) is
@@ -853,6 +894,20 @@ begin
          req_n     <= X"0001";
          req_data  <= data;
       end procedure write;
+
+      -- The page's message from the answer of a write
+      procedure answer is
+      begin
+         msg_r <= '0';
+         if err = '0' then
+            msg_k <= msg_ok;
+         elsif err_code = X"FF" then
+            msg_k <= C_MSG_TIMEOUT;
+         else
+            msg_k <= C_MSG_ERR;
+         end if;
+         msg_code <= err_code;
+      end procedure answer;
 
    begin
       if rising_edge(clk_i) then
@@ -877,7 +932,15 @@ begin
                   case rd_idx is
                      when 0      => ctrl_r   <= rd_data;
                      when 1      => reason_r <= rd_data(7 downto 0);
-                     when 6      => stop_r   <= rd_data(8 downto 0);
+                     when 4      => brk_en_r <= rd_data(C_BRKS - 1 downto 0);
+                     when 5      =>
+                        if rd_data(7 downto 0) < C_BRKS then
+                           brk_n <= to_integer(rd_data(2 downto 0));
+                        else
+                           brk_n <= C_BRKS;
+                        end if;
+                     when 6      => stop_r <= rd_data(8 downto 0);
+                     when 8 to 11 => brk_r(rd_idx mod 4) <= rd_data;
                      when others => null;
                   end case;
                when SEQ_REGS_ST  => regs_r(rd_idx mod 16) <= rd_data;
@@ -913,7 +976,7 @@ begin
                      write_v   := true;
                      data_v    := rom_v;
                      restart_r <= '0';
-                     poke_r    <= '0';
+                     msg_r     <= '0';
                      case act_r is
                         when ACT_STEP =>
                            write_v := ctrl_r(4) = '1';
@@ -929,13 +992,44 @@ begin
                            restart_r <= '1';
                            data_v    := X"00000001" or rom_v;
                         when ACT_POKE =>
-                           poke_r <= '1';
-                        when ACT_NONE | ACT_STICKY =>
+                           msg_r  <= '1';
+                           msg_ok <= C_MSG_WRITTEN;
+                        when ACT_NONE | ACT_STICKY | ACT_BREAK =>
                            write_v := false;
                      end case;
                      act_r <= ACT_NONE;
 
-                     if write_v then
+                     -- A breakpoint at brk_at is cleared, else the lowest
+                     -- free one is set there
+                     hit_v  := -1;
+                     free_v := -1;
+                     for i in C_BRKS - 1 downto 0 loop
+                        if i < brk_n and brk_en_r(i) = '1' and brk_r(i) = brk_at then
+                           hit_v := i;
+                        end if;
+                        if i < brk_n and brk_en_r(i) = '0' then
+                           free_v := i;
+                        end if;
+                     end loop;
+
+                     if act_r = ACT_BREAK then
+                        msg_r   <= '1';
+                        msg_ok  <= C_MSG_NONE;
+                        brk_set <= brk_en_r;
+                        if hit_v >= 0 then
+                           write(C_BRK_EN, (others => '0'));
+                           req_data(C_BRKS - 1 downto 0) <= brk_en_r;
+                           req_data(hit_v)               <= '0';
+                           seq_st                        <= SEQ_WRITE_ST;
+                        elsif free_v >= 0 then
+                           brk_set(free_v) <= '1';
+                           write(C_BRK_ADDR + free_v, brk_at);
+                           seq_st <= SEQ_BRK_ST;
+                        else
+                           msg_r <= '0';
+                           msg_k <= C_MSG_FULL;
+                        end if;
+                     elsif write_v then
                         if act_r = ACT_STEP or act_r = ACT_PAUSE then
                            own_r <= '1';
                         end if;
@@ -963,21 +1057,27 @@ begin
                   end if;
                end if;
 
+            -- The address of a breakpoint, then its enable bit
+            when SEQ_BRK_ST =>
+               if done = '1' then
+                  if err = '0' then
+                     write(C_BRK_EN, (others => '0'));
+                     req_data(C_BRKS - 1 downto 0) <= brk_set;
+                     seq_st                        <= SEQ_WRITE_ST;
+                  else
+                     answer;
+                     read(C_CTRL, C_CTRL_N);
+                     seq_st <= SEQ_CTRL_ST;
+                  end if;
+               end if;
+
             -- The write of a key, and the start of a restart, then the
             -- registers again
             when SEQ_WRITE_ST =>
                if done = '1' then
-                  -- The message of a word's write
-                  if poke_r = '1' then
-                     poke_r <= '0';
-                     if err = '0' then
-                        msg_k <= C_MSG_WRITTEN;
-                     elsif err_code = X"FF" then
-                        msg_k <= C_MSG_TIMEOUT;
-                     else
-                        msg_k <= C_MSG_ERR;
-                     end if;
-                     msg_code <= err_code;
+                  -- The message of a word's or a breakpoint's write
+                  if msg_r = '1' then
+                     answer;
                   end if;
                   if restart_r = '1' then
                      restart_r <= '0';
@@ -1036,6 +1136,9 @@ begin
          if poke = '1' then
             act_r <= ACT_POKE;
          end if;
+         if brk = '1' then
+            act_r <= ACT_BREAK;
+         end if;
          if ntc_valid = '1' and (ntc_tag = X"68" or ntc_tag = X"70" or ntc_tag = X"78") then
             regs_ok  <= '0';
             instr_ok <= '0';
@@ -1081,7 +1184,9 @@ begin
             regs_ok   <= '0';
             instr_ok  <= '0';
             own_r     <= '0';
-            poke_r    <= '0';
+            msg_r     <= '0';
+            brk_en_r  <= (others => '0');
+            brk_n     <= 0;
             mem_any   <= '0';
             mem_ok    <= '0';
             msg_k     <= C_MSG_NONE;
@@ -1177,6 +1282,7 @@ begin
          s2_nib   <= s1_cell.nib;
          s2_dim   <= '0';
          s2_cur   <= '0';
+         s2_brk   <= '0';
          case s1_cell.kind is
             when CELL_HEX =>
                s2_shown <= '1';
@@ -1193,6 +1299,9 @@ begin
                      s2_word <= window + cur;
                   when C_IDX_ROW =>
                      s2_word <= window + s1_row * 8 - 8;
+                  when C_IDX_BRK to C_IDX_BRK + C_BRKS - 1 =>
+                     s2_word  <= brk_r(s1_cell.idx - C_IDX_BRK);
+                     s2_shown <= brk_en_r(s1_cell.idx - C_IDX_BRK);
                   when others =>
                      s2_word  <= regs_r(s1_cell.idx mod 16);
                      s2_shown <= regs_any;
@@ -1204,6 +1313,11 @@ begin
                if s1_mem = cur then
                   s2_cur <= '1';
                end if;
+               for i in 0 to C_BRKS - 1 loop
+                  if brk_en_r(i) = '1' and brk_r(i) = window + s1_mem then
+                     s2_brk <= '1';
+                  end if;
+               end loop;
             when CELL_LABEL =>
                if field_addr = '1' then
                   s2_ch <= C_LABELS(1, s1_cell.idx mod 8);
@@ -1272,8 +1386,14 @@ begin
                null;
          end case;
          ovl_addr <= std_logic_vector(to_unsigned(s2_addr, 12));
-         if s2_cur = '1' then
+         if s2_cur = '1' and s2_brk = '1' then
+            ovl_data <= C_CUR_BREAK & ch_v;
+         elsif s2_cur = '1' then
             ovl_data <= C_CURSOR & ch_v;
+         elsif s2_brk = '1' and s2_dim = '1' then
+            ovl_data <= C_BREAK_DIM & ch_v;
+         elsif s2_brk = '1' then
+            ovl_data <= C_BREAK & ch_v;
          elsif s2_dim = '1' then
             ovl_data <= C_DIM & ch_v;
          else

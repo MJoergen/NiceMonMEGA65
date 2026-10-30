@@ -1,7 +1,7 @@
--- Tests the on-board debugger (src/dbg/dbg.vhd), stage 5 of
+-- Tests the on-board debugger (src/dbg/dbg.vhd), stage 6 of
 -- doc/DEBUGGER.md, with the system under it: the strip it draws into the
 -- overlay, the toggle, the core's keys over the debug link, the sticky
--- setting, the catch, and the page.
+-- setting, the catch, the page, and the breakpoints.
 --
 -- PASS AND FAIL
 -- Each check is an assert with severity failure, which stops GHDL with a
@@ -51,6 +51,12 @@
 --    and a second ESC leaves the page.
 -- 16. m shows the page again. r restarts the core, and the words are
 --    dimmed, and a write gets e02, until the core halts.
+-- 17. b sets breakpoint 0 at the cursor's address, which the header lists
+--    and the page colors. r restarts the core, which stops there: BRK 0.
+-- 18. b sets breakpoint 1, and b on breakpoint 0 clears it. g goes on to
+--    breakpoint 1: BRK 1.
+-- 19. b takes the lowest free breakpoint, and with none free says so.
+--    After a digit, b is a digit.
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -88,7 +94,9 @@ architecture simulation of tb_dbg is
    constant C_COLOR  : std_logic_vector(23 downto 0) := X"004FFF";
    constant C_DIM    : std_logic_vector(23 downto 0) := X"004888";
    constant C_CURSOR : std_logic_vector(23 downto 0) := X"FFF004";
-   constant C_PKEYS  : string := " CRSR move  PgUp PgDn page  Home  0-f type  RETURN write  a address  ESC back";
+   constant C_PKEYS  : string := " CRSR PgUp PgDn Home move  0-f type  RETURN write  a address  b break  ESC back";
+   constant C_BREAK  : std_logic_vector(23 downto 0) := X"800FFF";
+   constant C_CUR_BR : std_logic_vector(23 downto 0) := X"FFF800";
    constant C_NONE   : string := "________";
 
    constant C_ESC : character := character'val(27);
@@ -615,6 +623,53 @@ begin
       key("m");
       cycles(4);
       expect('1', '0', '1', "after m");
+
+      report "tb_dbg: 17. b sets a breakpoint, and the core stops there";
+      key("m");
+      key("a0" & C_CR);
+      wait_text(0, 0, " Window 00000000  Cursor 00000000  Breaks -------- -------- -------- --------");
+      key(C_ESC & "[C" & C_ESC & "[C" & "b");
+      wait_text(0, 0, " Window 00000000  Cursor 00000002  Breaks 00000002 -------- -------- --------");
+      expect_word_color(1, 2, C_CUR_BR, "the cursor on a breakpoint");
+      key(C_ESC & "[C");
+      wait_text(0, 0, " Window 00000000  Cursor 00000003 ");
+      expect_word_color(1, 2, C_BREAK, "a breakpoint");
+      expect_word_color(1, 3, C_CURSOR, "after a breakpoint");
+      key("r");
+      expect_row27("BRK 0    00000002", "at breakpoint 0");
+      assert row(25)(18 to 25) = "00000000"
+         report "tb_dbg: R1 is " & row(25)(18 to 25) & " at breakpoint 0"
+         severity failure;
+
+      report "tb_dbg: 18. b clears a breakpoint, and g goes on to the next";
+      key(C_ESC & "[C" & "b");
+      wait_text(0, 0, " Window 00000000  Cursor 00000004  Breaks 00000002 00000004 -------- --------");
+      key(C_ESC & "[D" & C_ESC & "[D" & "b");
+      wait_text(0, 0, " Window 00000000  Cursor 00000002  Breaks -------- 00000004 -------- --------");
+      expect_word_color(1, 2, C_CURSOR, "a breakpoint cleared");
+      expect_word_color(1, 4, C_BREAK, "breakpoint 1");
+      key("g");
+      expect_row27("BRK 1    00000004", "at breakpoint 1");
+
+      report "tb_dbg: 19. the lowest free breakpoint, and none free";
+      for i in 1 to 4 loop
+         key(C_ESC & "[C");
+      end loop;
+      key("b");
+      wait_text(0, 0, " Window 00000000  Cursor 00000006  Breaks 00000006 00000004 -------- --------");
+      key(C_ESC & "[C" & "b");
+      wait_text(0, 0, " Window 00000000  Cursor 00000007  Breaks 00000006 00000004 00000007 --------");
+      key(C_ESC & "[C" & "b");
+      wait_text(0, 0, " Window 00000000  Cursor 00000008  Breaks 00000006 00000004 00000007 00000008");
+      key(C_ESC & "[C" & "b");
+      wait_text(23, 20, "none free ");
+      key("1b");
+      wait_text(23, 0, " Word:    1B______");
+      key("" & C_ESC);
+      wait_text(23, 0, " Word:    " & C_NONE);
+      assert row(0)(36 to 77) = "Breaks 00000006 00000004 00000007 00000008"
+         report "tb_dbg: the header is '" & row(0) & "' after b as a digit"
+         severity failure;
       assert stray = 0
          report "tb_dbg: " & to_string(stray) & " writes outside the overlay's rows"
          severity failure;

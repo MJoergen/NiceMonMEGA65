@@ -2,14 +2,14 @@
 
 A debugger in the FPGA, with the MEGA65's own keyboard and screen and no
 host: what `tools/mon.py` does over the debug link, in a strip of text
-under the program's screen, and a page over it. **Stages 1 to 5 are
+under the program's screen, and a page over it. **Stages 1 to 6 are
 written, and the rest is planned**
 ([#52](https://github.com/MJoergen/NiceMonMEGA65/issues/52)): the toggle
 key enters Focus, where the strip shows the core's state, its registers
 at a stop, and the word at the PC, and F1 to F9 run the core; F12 keeps
 the strip up when Focus is left, and a stop in Strip comes back to
 Focus; and F11 shows the page, a window on the memory, where a word is
-written at the cursor. This note
+written and a breakpoint set at the cursor. This note
 records the design and the decisions, as
 [monitor/README.md](../monitor/README.md) does for the ROM of
 [#24](https://github.com/MJoergen/NiceMonMEGA65/issues/24), a hardware
@@ -104,22 +104,25 @@ on dark blue, `0x004` and `0xFFF`:
   The row in Focus has no room for the toggle key's name with F11 in it.
 
 The page replaces the program's 25 rows while it is up, in Focus only:
-row 0 has the window's address, the cursor's, and, with stage 6, the
-four breakpoints; rows 1 to 22 the memory from the window's address, a
-row's address and its 8 words, the cursor's word in swapped colors, and
-a word at an enabled breakpoint in a color of its own; row 23 the input
+row 0 has the window's address, the cursor's, and the addresses of
+breakpoints 0 to 3, in that order, dashes for one that is not enabled;
+rows 1 to 22 the memory from the window's address, a row's address and
+its 8 words, the cursor's word in swapped colors, and a word at an
+enabled breakpoint white on dark red, or dark red on white under the
+cursor; row 23 the input
 field, its label, `Word:` or `Address:`, and the last message,
-`written`, the link's error such as `e02`, or `no answer`; and row 24
+`written`, the link's error such as `e02`, `no answer`, or `none free`
+when `b` finds every breakpoint in use; and row 24
 the keys. The program's cursor is hidden under the page. The page stays
 on when Focus is left, and shows again when Focus comes back.
 
 ```
- Window 00000000  Cursor 00000009
+ Window 00000000  Cursor 00000009  Breaks 00000002 -------- -------- --------
 00000000 00005800 00000000 006040B0 00000001 022080B0 00000800 B003D800 00000002
 00000008 0C000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
 ...
  Word:    1234____  written
- CRSR move  PgUp PgDn page  Home  0-f type  RETURN write  a address  ESC back
+ CRSR PgUp PgDn Home move  0-f type  RETURN write  a address  b break  ESC back
 ```
 
 The words are read, all 176 in one request, when the page is shown and
@@ -172,13 +175,15 @@ On the page:
 | DEL | Remove the last digit; on an empty field, leave the address |
 | RETURN | Write the field to the word under the cursor |
 | `a` on an empty field, then digits, RETURN | Move the window to the address in the field, the cursor to its first word |
-| `b` | A breakpoint at the cursor's address: set the lowest free one, or clear the one that is there |
+| `b` on an empty field | A breakpoint at the cursor's address: clear the one that is there, or set the lowest free one |
 | ESC | Clear the field, or leave the page when it is empty |
 
 The ESC key is a lone ESC: one with no byte after it for 1 ms, as the
 keys' sequences come without a gap. A word that starts with `a` is typed
 with a 0 before it, `0a…`, as only 8 digits count.
 
+`b` writes the debug registers of DEBUG.md §4, which take a write while
+the core runs too: the address of the breakpoint, then its enable bit.
 A key that needs the core stopped, pressed while it runs, shows the
 link's answer in the message row (`e02`) and does nothing else, as
 mon.py prints its errors. F1 to F9 read the control register before they
@@ -234,7 +239,8 @@ and outputs, and its room.
   system clock is 90 MHz on a -1 part, built with retiming; the build of
   stage 1 has 0.289 ns of setup and 0.029 ns of hold slack, that of
   stage 3 0.339 ns and 0.031 ns, that of stage 4 0.532 ns and 0.029 ns,
-  that of stage 5 0.111 ns and 0.017 ns, on a path in the core, and the
+  that of stage 5 0.111 ns and 0.017 ns, on a path in the core, that
+  of stage 6 0.139 ns and 0.022 ns, also in the core, and the
   slacks move with
   placement more than with logic ([synth/README.md](../synth/README.md#timing)): every
   stage rebuilds `make nexys4ddr` and reads its timing, and a miss there
@@ -334,14 +340,18 @@ free.
   runs gets `e02`; console bytes arrive in order between packets; the
   UART's bytes are dropped; and a request that the link never gets
   times out.
-- `tb_dbg` (written for stage 5): the debugger with `nicemon`, driven
+- `tb_dbg` (written for stage 6): the debugger with `nicemon`, driven
   by keyboard bytes and toggle pulses, checking the overlay's words and
   the link's state. The program under it is `sim/dbg.nasm`, in the ROM:
   F5, s, F3, the halt, r, F7, and g and p on a held core; F12 and Strip,
   a step of its own that is not caught, the catch of a halt in Strip,
   and no catch from Off; and the page: the ROM's words, the cursor keys,
   Home, Page Up and Down, a move during a read, `a`, a write read back,
-  DEL, ESC, and a write that gets `e02` while the core runs.
+  DEL, ESC, and a write that gets `e02` while the core runs; and the
+  breakpoints: `b` sets one, which the header lists and the page colors,
+  the core stops there with `BRK 0`, `b` clears one, `g` goes on to `BRK
+  1`, `b` takes the lowest free one, and says `none free` when there is
+  none, and after a digit `b` is a digit.
 - `tb_kbd` and `tb_ps2`: the two toggle detectors, with a held key's
   repeats and its release, and one key of MEGA+HELP alone; and Page Up,
   Page Down, and Home from both keyboards.
@@ -381,8 +391,8 @@ Each a commit that builds and passes the tests:
    catch of a stop in Strip from the link's notices.
 5. **The page** (done). The window, the cursor, the input field, the
    word edit, `a`, and Page Up, Page Down, and Home from both keyboards.
-6. **The breakpoints.** `b`, the header's list, the colored words, and
-   `BRK n`.
+6. **The breakpoints** (done). `b`, the header's list, the colored
+   words, and `BRK n`.
 7. **The Nexys4DDR's buttons and display** in Focus.
 8. **The decode** of row 27, `dbg_decode.vhd`.
 9. **nice_cpu V1.2**
@@ -426,6 +436,11 @@ Made on 2026-10-30, with the reasons:
   `a` is a hex digit too, and the design gave it both meanings; on an
   empty field no digit is lost, and `0a…` types a word that starts with
   it. `b`, at stage 6, follows the same rule.
+- **The header lists the breakpoints by place** (decided at stage 6).
+  Row 0 has room for the four addresses but not for their numbers too,
+  so `Breaks` is followed by breakpoints 0 to 3 in order, as `BRK n`
+  counts them. The page shows four, the number every board has; a link
+  with more has the rest unused by the debugger.
 - **The catch is from Strip only** (changed on 2026-10-30, at stage 4,
   from a catch in every state on `nicemon`'s paused and halted
   outputs). A catch from Off takes the link from a host at the stop: a
