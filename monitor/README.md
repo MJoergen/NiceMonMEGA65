@@ -1,13 +1,17 @@
 # monitor
 
-The monitor will be a program in the ROM that loads, runs, and inspects
-programs from the MEGA65's own keyboard and screen, without a PC. It is
-in NICE assembly, a port of the QNICE monitor (QMON) from
-[QNICE-FPGA](https://github.com/sy2002/QNICE-FPGA), and is planned and not
-written yet ([#24](https://github.com/MJoergen/NiceMonMEGA65/issues/24)).
-This directory holds only this note, which records the decisions the
-monitor will follow. The rule is to stay as close to QNICE as the NICE
-CPU allows.
+The ROM at `0x0000`, which the core boots from, will hold a hardware
+abstraction layer: the routines and services that programs on the board
+need, called through a dispatch table, and, when there is storage, a
+loader. It is in NICE assembly, and planned and not written yet
+([#24](https://github.com/MJoergen/NiceMonMEGA65/issues/24)). The QNICE
+monitor (QMON) of [QNICE-FPGA](https://github.com/sy2002/QNICE-FPGA) is
+the inspiration, not the model: the decisions below were made for a port
+of it, and #24's first task, the list of the routines, revisits them.
+Debugging is the on-board debugger's
+([#52](https://github.com/MJoergen/NiceMonMEGA65/issues/52),
+[doc/DEBUGGER.md](../doc/DEBUGGER.md)), which needs no ROM. This
+directory holds only this note.
 
 ## Where it lives
 

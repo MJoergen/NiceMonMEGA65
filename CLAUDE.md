@@ -6,7 +6,8 @@ UART, VGA, a PS/2 keyboard, and its LEDs, seven-segment display, buttons,
 and switches as registers. It has nice_cpu's debug link
 (`nice_cpu/doc/DEBUG.md`, `hdl/src/debug_link.vhd`) on the debug UART, a
 text display on VGA and HDMI, a ROM at address 0 for a QMON-like
-monitor that is planned but not written (`monitor/README.md`), and host
+hardware abstraction layer that is planned but not written
+(`monitor/README.md`, issue #24), and host
 tools that load and run programs. The goal is that a program runs on the
 board exactly as `niceemu`, the emulator in `nice_cpu/emulator`, runs it.
 `README.md` is for users of the core files: on its own, over Ethernet,
@@ -15,8 +16,11 @@ users. `doc/SYSTEM.md` has the address map, the link, the screen,
 the keyboard, the ROM, and the Nexys4DDR's devices; `CONTRIBUTING.md` the tests, the
 formal checks, `make hwtest`, and the badge; `doc/EMULATOR.md` the known
 differences from the emulator; `doc/PROGRAMMING.md` how to write and
-build programs. `doc/` also has `CODING_STYLE.md`, `RELEASE.md`, and
-`RELEASE_NOTES.md`; the root keeps only `README.md`,
+build programs; `doc/DEBUGGER.md` is the design note of the on-board
+debugger, mon.py in the FPGA with the MEGA65's keyboard and a strip on
+the screen, planned but not written (issue #52, and nice_cpu#85 and
+#86 for what it needs there). `doc/` also has `CODING_STYLE.md`,
+`RELEASE.md`, and `RELEASE_NOTES.md`; the root keeps only `README.md`,
 `CONTRIBUTING.md`, and this file.
 `src/nicemon.vhd` is the whole system and the file to read first; its
 header is the authoritative address map.
