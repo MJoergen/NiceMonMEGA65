@@ -24,6 +24,7 @@
 
 library ieee;
    use ieee.std_logic_1164.all;
+   use ieee.numeric_std.all;
    use ieee.numeric_std_unsigned.all;
 
 entity dbg is
@@ -92,11 +93,11 @@ architecture synthesis of dbg is
                                  "-------- -------- -------- --------";
 
    constant C_STRIP : t_chars := chars(
-      row(" R0-7   " & C_DASHES) &
-      row(" R8-15  " & C_DASHES) &
-      row(" NO LINK") &
-      row(" F1 step   F3 go   F5 pause   F7 hold   F9 restart   F11 page   " &
-          G_TOGGLE_KEY & " back"));
+                                       row(" R0-7   " & C_DASHES) &
+                                       row(" R8-15  " & C_DASHES) &
+                                       row(" NO LINK") &
+                                       row(" F1 step   F3 go   F5 pause   F7 hold   F9 restart   F11 page   " &
+                                             G_TOGGLE_KEY & " back"));
 
    type t_state is (OFF_ST, FOCUS_ST);
 
@@ -144,7 +145,7 @@ begin
          ovl_we <= '0';
          if draw_cnt /= C_STRIP_LEN then
             ovl_we   <= '1';
-            ovl_addr <= to_slv(C_STRIP_ROW * C_COLS + draw_cnt, 12);
+            ovl_addr <= std_logic_vector(to_unsigned(C_STRIP_ROW * C_COLS + draw_cnt, 12));
             ovl_data <= C_COLOR & C_STRIP(draw_cnt);
             draw_cnt <= draw_cnt + 1;
          end if;

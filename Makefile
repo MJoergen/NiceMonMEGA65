@@ -120,7 +120,7 @@ formal-%:
 # own, nor the third-party files that keep their own style
 # (doc/CODING_STYLE.md): synth/r3/max10.vhd and synth/mega65/hdmi/.
 VSG         ?= vsg
-VHDL_SOURCES = $(filter-out synth/r3/max10.vhd,$(wildcard src/*.vhd src/core/*.vhd src/video/*.vhd src/eth/*.vhd sim/*.vhd sim/cosim/*.vhd formal/*.vhd \
+VHDL_SOURCES = $(filter-out synth/r3/max10.vhd,$(wildcard src/*.vhd src/core/*.vhd src/video/*.vhd src/dbg/*.vhd src/eth/*.vhd sim/*.vhd sim/cosim/*.vhd formal/*.vhd \
                                                           synth/common/*.vhd synth/mega65/*.vhd synth/r3/*.vhd synth/r6/*.vhd \
                                                           synth/nexys4ddr/*.vhd))
 
