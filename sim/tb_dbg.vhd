@@ -1,8 +1,8 @@
--- Tests the on-board debugger (src/dbg/dbg.vhd), stage 7 of
+-- Tests the on-board debugger (src/dbg/dbg.vhd), stage 8 of
 -- doc/DEBUGGER.md, with the system under it: the strip it draws into the
 -- overlay, the toggle, the core's keys over the debug link, the sticky
--- setting, the catch, the page, the breakpoints, and the Nexys4DDR's
--- buttons and display.
+-- setting, the catch, the page, the breakpoints, the Nexys4DDR's buttons
+-- and display, and the decode of row 27.
 --
 -- PASS AND FAIL
 -- Each check is an assert with severity failure, which stops GHDL with a
@@ -24,8 +24,9 @@
 -- 2. The toggle enters Focus: the strip is shown, and the keyboard and the
 --    link are the debugger's. The core is RUNNING, and the display shows
 --    dashes.
--- 3. F5 pauses: PAUSED, with R0-R15 in white, R15 also as the PC, and the
---    word at the PC from the ROM.
+-- 3. F5 pauses: PAUSED, with R0-R15 in white, R15 also as the PC, the
+--    word at the PC from the ROM, and its decode, as nicedis writes it,
+--    as at every stop that expect_stop checks.
 -- 4. s steps: the PC moves on, to an instruction of the loop.
 -- 5. F3 goes on: RUNNING, with the registers dimmed and no PC.
 -- 6. The core halts: HALTED 1, with R1 at 0x800, the PC after the HALT,
@@ -174,6 +175,27 @@ architecture simulation of tb_dbg is
       end loop;
       return res_v;
    end function seg_text;
+
+   -- The decode of row 27 at an address of dbg.nasm, as nicedis writes it
+   function decode(a : natural) return string is
+      variable res_v : string(1 to 34) := (others => ' ');
+
+      procedure put(s : string) is
+      begin
+         res_v(1 to s'length) := s;
+      end procedure put;
+
+   begin
+      case a is
+         when 0      => put("MOVE R1, 0x0");
+         when 2      => put("ADD R1, R1, 0x1");
+         when 4      => put("SUB[M] R2, R1, 0x800");
+         when 6      => put("?!Z MOVE R15, 0x2");
+         when 8      => put("HALT");
+         when others => put("MOVE R0, R0");
+      end case;
+      return res_v;
+   end function decode;
 
    function hex_word(s : string) return std_logic_vector is
       variable res_v : std_logic_vector(31 downto 0) := (others => '0');
@@ -386,7 +408,7 @@ begin
       procedure expect_stop(what : string) is
       begin
          loop
-            exit when row(27)(11) /= '-' and row(27)(21) /= '-' and ovl_we = '0';
+            exit when row(27)(11) /= '-' and row(27)(21) /= '-' and row(27)(47) /= ' ' and ovl_we = '0';
             wait until rising_edge(clk);
          end loop;
          cycles(400);
@@ -396,6 +418,9 @@ begin
             severity failure;
          assert hex_word(row(27)(21 to 28)) = rom_v(to_integer(pc_v(7 downto 0)))
             report "tb_dbg: " & what & ": the word at the PC is " & row(27)(21 to 28)
+            severity failure;
+         assert row(27)(47 to 80) = decode(to_integer(pc_v(7 downto 0)))
+            report "tb_dbg: " & what & ": the decode at " & to_hstring(pc_v) & " is '" & row(27)(47 to 80) & "'"
             severity failure;
          expect_color(C_COLOR, what);
       end procedure expect_stop;

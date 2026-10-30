@@ -4,9 +4,9 @@
 -- with single keys.
 --
 -- THEORY OF OPERATION
--- This is stage 7 of the design note: the live strip, the core keys, the
--- sticky setting, the catch, the page, the breakpoints, and the
--- Nexys4DDR's buttons and display. The debugger has three states. It is Off
+-- This is stage 8 of the design note: the live strip, the core keys, the
+-- sticky setting, the catch, the page, the breakpoints, the Nexys4DDR's
+-- buttons and display, and the decode of row 27. The debugger has three states. It is Off
 -- after reset. The toggle pulse, toggle_i, takes it from Off or Strip to
 -- Focus, and from Focus to Off, or to Strip while the sticky setting is
 -- on, which F12 toggles in Focus. In Strip and Focus the strip is shown
@@ -32,7 +32,9 @@
 -- A key then writes the control register, with bit 3, the ROM, as it
 -- reads, and the registers are read again. When the core is paused or
 -- has halted, and R0-R15 have not been read since the stop, it reads them,
--- and then the word at R15. While the page is shown and the core is
+-- then the word at R15, and then the constant words that the word says
+-- the instruction takes, and no word past them, which may be a device's.
+-- dbg_decode.vhd turns them into the text at the end of row 27. While the page is shown and the core is
 -- stopped, paused, halted, or held, it reads the window's 176 words in one
 -- request, into mem_ram, unless they were read since the stop; a move of
 -- the window reads them again, and drops a read that it overtook
@@ -72,7 +74,8 @@
 -- The strip is rows 25 to 28 of the overlay of text.vhd, the words 2000 to
 -- 2319, addressed row * 80 + column. C_CELLS says what each word shows: a
 -- fixed character, a hex digit of a word that the debugger read, a
--- character of the state's name, a flag of SR (R14), or a character of row
+-- character of the state's name, a flag of SR (R14), a character of the
+-- decode, or a character of row
 -- 28, the keys in Focus or a note in Strip. p_draw writes the
 -- whole strip, one word a cycle, through a pipeline of three stages, after
 -- reset and whenever what it shows has changed. R0-R15 are dimmed while
@@ -197,6 +200,8 @@ architecture synthesis of dbg is
 
    type t_words is array (0 to 15) of t_word;
 
+   type t_dec is array (natural range <>) of t_byte;
+
    type t_brk_addrs is array (0 to C_BRKS - 1) of t_word;
 
    type t_act is (ACT_NONE, ACT_STEP, ACT_GO, ACT_PAUSE, ACT_HOLD, ACT_RESTART, ACT_STICKY, ACT_POKE, ACT_BREAK);
@@ -210,7 +215,7 @@ architecture synthesis of dbg is
 
    type t_kbd_st is (KBD_IDLE_ST, KBD_ESC_ST, KBD_SS3_ST, KBD_CSI_ST);
 
-   type t_seq_st is (SEQ_IDLE_ST, SEQ_CTRL_ST, SEQ_WRITE_ST, SEQ_START_ST, SEQ_REGS_ST, SEQ_INSTR_ST, SEQ_MEM_ST, SEQ_BRK_ST);
+   type t_seq_st is (SEQ_IDLE_ST, SEQ_CTRL_ST, SEQ_WRITE_ST, SEQ_START_ST, SEQ_REGS_ST, SEQ_INSTR_ST, SEQ_CONST_ST, SEQ_MEM_ST, SEQ_BRK_ST);
 
    ---------------------------------------------------------------------------
    -- The cells of the strip
@@ -223,7 +228,7 @@ architecture synthesis of dbg is
    -- character idx of the keys' row, which depends on the state; hex digit
    -- nib of word idx of a row of memory; or character idx of the input
    -- field's label, of the field, or of the message
-   type t_kind is (CELL_FIX, CELL_HEX, CELL_STATE, CELL_FLAG, CELL_KEYS, CELL_MEM, CELL_LABEL, CELL_FIELD, CELL_MSG);
+   type t_kind is (CELL_FIX, CELL_HEX, CELL_STATE, CELL_FLAG, CELL_DEC, CELL_KEYS, CELL_MEM, CELL_LABEL, CELL_FIELD, CELL_MSG);
 
    type t_cell is record
       kind : t_kind;
@@ -249,6 +254,8 @@ architecture synthesis of dbg is
    constant C_COL_PC    : natural := 10;
    constant C_COL_INSTR : natural := 20;
    constant C_COL_FLAGS : natural := 30;
+   constant C_COL_DEC   : natural := 46;
+   constant C_DEC_LEN   : natural := C_COLS - C_COL_DEC;
    constant C_STATE_LEN : natural := 9;
 
    function to_byte(c : character) return t_byte is
@@ -301,6 +308,9 @@ architecture synthesis of dbg is
       end loop;
       for i in 0 to 6 loop
          res_v(c_v + C_COL_FLAGS + 2 * i) := (kind => CELL_FLAG, idx => i, nib => 0, ch => to_byte(' '));
+      end loop;
+      for i in 0 to C_DEC_LEN - 1 loop
+         res_v(c_v + C_COL_DEC + i) := (kind => CELL_DEC, idx => i, nib => 0, ch => to_byte(' '));
       end loop;
 
       -- Row 28: the keys
@@ -483,6 +493,21 @@ architecture synthesis of dbg is
       end case;
    end function nibble;
 
+   -- The constant words that an instruction takes (ISA.md §2.3): one for
+   -- each field of an ALU or SHIFT instruction whose mode ends in 11
+   function n_consts(w : t_word) return natural is
+      variable res_v : natural range 0 to 3 := 0;
+   begin
+      if w(27 downto 26) /= "11" then
+         for k in 0 to 2 loop
+            if w(19 - 7 * k downto 18 - 7 * k) = "11" then
+               res_v := res_v + 1;
+            end if;
+         end loop;
+      end if;
+      return res_v;
+   end function n_consts;
+
    ---------------------------------------------------------------------------
    -- Signals
    ---------------------------------------------------------------------------
@@ -568,8 +593,16 @@ architecture synthesis of dbg is
    signal link_ok  : std_logic := '0';                   -- The last refresh had an answer
    signal regs_any : std_logic := '0';                   -- R0-R15 were read once
    signal regs_ok  : std_logic := '0';                   -- ... since the current stop
-   signal instr_ok : std_logic := '0';                   -- The word at the PC too
-   signal st_code  : natural range 0 to 5;
+   signal instr_ok : std_logic := '0';                   -- The word at the PC too, and its constants
+   signal consts_r : std_logic_vector(95 downto 0) := (others => '0');
+
+   -- The decode of row 27
+   signal dec_start : std_logic := '0';
+   signal dec_text  : std_logic_vector(8 * C_DEC_LEN - 1 downto 0);
+   signal dec_chars : t_dec(0 to C_DEC_LEN - 1);
+   signal dec_valid : std_logic;
+   signal dec_done  : std_logic;
+   signal st_code   : natural range 0 to 5;
 
    -- The words of the window, read when the core is stopped
    signal mem_ram  : t_mem;
@@ -1016,6 +1049,7 @@ begin
             refresh <= refresh - 1;
          end if;
 
+         dec_start <= '0';
          if req_valid = '1' and req_ready = '1' then
             req_valid <= '0';
          end if;
@@ -1043,11 +1077,17 @@ begin
                   end case;
                when SEQ_REGS_ST  => regs_r(rd_idx mod 16) <= rd_data;
                when SEQ_INSTR_ST => instr_r               <= rd_data;
+               when SEQ_CONST_ST =>
+                  case rd_idx is
+                     when 0      => consts_r(31 downto 0)  <= rd_data;
+                     when 1      => consts_r(63 downto 32) <= rd_data;
+                     when others => consts_r(95 downto 64) <= rd_data;
+                  end case;
                when others       => null;
             end case;
          end if;
 
-         if done = '1' then
+         if done = '1' or dec_done = '1' then
             dirty <= '1';
          end if;
          if draw_start = '1' then
@@ -1205,11 +1245,30 @@ begin
                   end if;
                end if;
 
+            -- The word at the PC, then the constant words it takes, which
+            -- are read only so, as a word past the instruction may be a
+            -- device's
             when SEQ_INSTR_ST =>
                if done = '1' then
-                  instr_ok <= not err;
-                  seq_st   <= SEQ_IDLE_ST;
+                  seq_st <= SEQ_IDLE_ST;
+                  if err = '0' and n_consts(instr_r) /= 0 then
+                     read(regs_r(15) + 1, n_consts(instr_r));
+                     seq_st <= SEQ_CONST_ST;
+                  elsif err = '0' then
+                     instr_ok  <= '1';
+                     dec_start <= '1';
+                  end if;
                   -- Then the window, at once
+                  if page_on = '1' and (err = '1' or n_consts(instr_r) = 0) then
+                     tick_r <= '1';
+                  end if;
+               end if;
+
+            when SEQ_CONST_ST =>
+               if done = '1' then
+                  seq_st    <= SEQ_IDLE_ST;
+                  instr_ok  <= not err;
+                  dec_start <= not err;
                   if page_on = '1' then
                      tick_r <= '1';
                   end if;
@@ -1304,6 +1363,25 @@ begin
          mem_q <= mem_ram(s1_mem);
       end if;
    end process p_mem;
+
+   i_dbg_decode : entity work.dbg_decode
+      generic map (
+         G_LEN => C_DEC_LEN
+      )
+      port map (
+         clk_i   => clk_i,
+         rst_i   => rst_i,
+         start_i => dec_start,
+         instr_i => instr_r,
+         const_i => consts_r,
+         text_o  => dec_text,
+         valid_o => dec_valid,
+         done_o  => dec_done
+      ); -- i_dbg_decode
+
+   gen_dec : for i in 0 to C_DEC_LEN - 1 generate
+      dec_chars(i) <= dec_text(8 * i + 7 downto 8 * i);
+   end generate gen_dec;
 
    -- A stop that the debugger did not cause: a breakpoint, or a halt
    catch <= '1' when ntc_valid = '1' and own_r = '0' and
@@ -1449,6 +1527,10 @@ begin
                end if;
                if st_code = C_ST_HALTED and s1_cell.idx = C_HALT_DIG then
                   s2_ch <= hex_char(reason_r(3 downto 0));
+               end if;
+            when CELL_DEC =>
+               if instr_ok = '1' and dec_valid = '1' then
+                  s2_ch <= dec_chars(s1_cell.idx mod C_DEC_LEN);
                end if;
             when CELL_KEYS =>
                s2_ch <= C_KEYS(keys_k, s1_cell.idx);

@@ -186,8 +186,8 @@ The testbenches are these:
   after reset has no registers and NO LINK, and the debugger is Off,
   without the link. The toggle enters Focus, where it takes the
   keyboard's bytes and the link, and the core is RUNNING. F5 pauses,
-  with R0–R15 in white, R15 as the PC, and the word at the PC as the ROM
-  has it; s steps to the next instruction; F3 goes on, with the
+  with R0–R15 in white, R15 as the PC, the word at the PC as the ROM
+  has it, and its decode as nicedis writes it; s steps to the next instruction; F3 goes on, with the
   registers dimmed; and the halt shows HALTED 1, R1 at 0x800, and Z.
   r restarts, F7 holds, and g and p then leave the core held. F12 makes
   the toggle leave Focus for Strip, where the debugger keeps the link but
@@ -209,6 +209,12 @@ The testbenches are these:
   display, the display shows dashes while the core runs and the PC at a
   stop; BTND and BTNU move the cursor, a bouncing BTNL steps once, BTNR
   goes on, BTNC leaves Focus, and in Off the buttons do nothing.
+- `sim/tb_dbg_decode.vhd` tests the decode of the debugger's row 27
+  (`src/dbg/dbg_decode.vhd`) against nicedis: `sim/gen_decode.py`
+  writes about 3000 instruction words of every class, condition,
+  modifier, and mode, with constant words, and the text nicedis writes
+  for each, which the decode must write too, also after a start in the
+  middle of another decode.
 - `sim/tb_dbg_host.vhd` tests the debugger's host against the debug link
   itself, on the system's third link input, with `sim/host.nasm`, which
   writes 0x00 to 0xFF to the console again and again. It reads the

@@ -2,7 +2,7 @@
 
 A debugger in the FPGA, with the MEGA65's own keyboard and screen and no
 host: what `tools/mon.py` does over the debug link, in a strip of text
-under the program's screen, and a page over it. **Stages 1 to 7 are
+under the program's screen, and a page over it. **Stages 1 to 8 are
 written, and the rest is planned**
 ([#52](https://github.com/MJoergen/NiceMonMEGA65/issues/52)): the toggle
 key enters Focus, where the strip shows the core's state, its registers
@@ -79,7 +79,7 @@ on dark blue, `0x004` and `0xFFF`:
 ```
  R0-7   00000000 00000001 0000FFFF 00000010 00000000 00000000 00000000 00000000
  R8-15  00000000 00000000 00000000 00000000 00000000 FFFFFEF0 00000003 00001234
- PAUSED   00001234  xxxxxxxx  X C . . . . I   ADD ?1 M C  R1, @0040[R0], R1
+ PAUSED   00001234  xxxxxxxx  X C . . . . I   ADD[CM] R1, @0x40, R1
  F1 step  F3 go  F5 pause  F7 hold  F9 restart  F11 page  F12 keep strip: off
 ```
 
@@ -93,9 +93,14 @@ on dark blue, `0x004` and `0xFFF`:
   n, `HALTED n` with the reason of DEBUG.md §6, `HELD`, or `NO LINK`
   when the link does not answer; the PC; the
   instruction word at the PC; the flags of SR, X, C, Z, N, V, E, and I,
-  each shown or a dot; and the instruction decoded: the mnemonic, the
-  condition, M and C, and the operands dest, s0, and s1 in the assembler's
-  syntax, with the constant words folded in. While the core runs the
+  each shown or a dot; and the instruction decoded, from column 46: the
+  condition, the mnemonic with `[C]`, `[M]`, or `[CM]`, and the
+  operands, in the assembler's syntax as `nicedis.py` writes it, with
+  the constant words folded in, in hex, such as `?!Z MOVE R15, 0x2`. A
+  text longer than the 34 columns ends in `>`, and a reserved control
+  word is `reserved`. The debugger reads the constant words that the
+  instruction word says it takes, and none past them, which could be a
+  device's register. While the core runs the
   memory is out of reach (DEBUG.md §3), so the row shows the state, and
   the PC once it is live.
 - Row 28: the keys, and the sticky setting, `keep strip: off` or `on`.
@@ -243,7 +248,7 @@ and outputs, and its room.
   stage 3 0.339 ns and 0.031 ns, that of stage 4 0.532 ns and 0.029 ns,
   that of stage 5 0.111 ns and 0.017 ns, on a path in the core, that
   of stage 6 0.139 ns and 0.022 ns, also in the core, that of stage 7
-  0.159 ns and 0.034 ns, and the
+  0.159 ns and 0.034 ns, that of stage 8 0.187 ns and 0.019 ns, and the
   slacks move with
   placement more than with logic ([synth/README.md](../synth/README.md#timing)): every
   stage rebuilds `make nexys4ddr` and reads its timing, and a miss there
@@ -303,8 +308,8 @@ cut-off host.
   came in time; the link's byte streams, which it always takes; the
   notices out, with the version, the breakpoint's number, or the halt
   reason; and the console bytes out.
-- `src/dbg/dbg_decode.vhd`, later: the instruction word and its constant
-  words in, the text of row 27 out.
+- `src/dbg/dbg_decode.vhd` (written): the instruction word and its
+  constant words in, the text of row 27 out, a character a cycle.
 - `src/video/text.vhd`: the 29 rows, the overlay memory, and its ports:
   `ovl_we_i`, `ovl_addr_i`, `ovl_data_i`, `strip_i`, and `page_i`.
 - `src/nicemon.vhd`: the third input of the link's mux, `dbg_on_i`,
@@ -343,10 +348,15 @@ free.
   runs gets `e02`; console bytes arrive in order between packets; the
   UART's bytes are dropped; and a request that the link never gets
   times out.
-- `tb_dbg` (written for stage 7): the debugger with `nicemon`, driven
+- `tb_dbg_decode` (written): the decode against `nicedis.py`, on about
+  3000 instruction words of every class, condition, modifier, and mode,
+  with their constant words, from `sim/gen_decode.py`, and a start in
+  the middle of a decode.
+- `tb_dbg` (written for stage 8): the debugger with `nicemon`, driven
   by keyboard bytes and toggle pulses, checking the overlay's words and
   the link's state. The program under it is `sim/dbg.nasm`, in the ROM:
-  F5, s, F3, the halt, r, F7, and g and p on a held core; F12 and Strip,
+  F5, s, F3, the halt, r, F7, and g and p on a held core, with the
+  decode of row 27 at each stop; F12 and Strip,
   a step of its own that is not caught, the catch of a halt in Strip,
   and no catch from Off; and the page: the ROM's words, the cursor keys,
   Home, Page Up and Down, a move during a read, `a`, a write read back,
@@ -400,7 +410,7 @@ Each a commit that builds and passes the tests:
 6. **The breakpoints** (done). `b`, the header's list, the colored
    words, and `BRK n`.
 7. **The Nexys4DDR's buttons and display** in Focus (done).
-8. **The decode** of row 27, `dbg_decode.vhd`.
+8. **The decode** of row 27, `dbg_decode.vhd` (done).
 9. **nice_cpu V1.2**
    ([#53](https://github.com/MJoergen/NiceMonMEGA65/issues/53)). At
    the bump, the registers are live while the core runs (nice_cpu#85),
@@ -466,6 +476,11 @@ Made on 2026-10-30, with the reasons:
   condition, and the operands in the assembler's syntax are a small
   table and eight operand patterns; the full listing, with `nicedis.py`
   as the model, is a page of its own.
+- **Row 27 writes what `nicedis.py` writes** (decided at stage 8), not
+  the sketch's `ADD ?1 M C`: the assembler takes it back, mon.py shows
+  the same, and `tb_dbg_decode` compares the two. Where `nicedis.py`
+  writes `.DAT` for an unused field that is not R0, the row shows the
+  instruction without the field, as the raw word is beside it.
 - **A generic toggle pulse** per board, since the Nexys4DDR has no MEGA
   key: MEGA+HELP there, Scroll Lock on the Nexys4DDR, a key that gives
   no byte, has a plain scan code, and should pass the board's USB-to-PS/2

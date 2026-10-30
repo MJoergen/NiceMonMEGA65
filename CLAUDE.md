@@ -18,10 +18,10 @@ formal checks, `make hwtest`, and the badge; `doc/EMULATOR.md` the known
 differences from the emulator; `doc/PROGRAMMING.md` how to write and
 build programs; `doc/DEBUGGER.md` is the design note of the on-board
 debugger, mon.py in the FPGA with the MEGA65's keyboard and a strip on
-the screen, of which stages 1 to 7 are written, the overlay, its host
+the screen, of which stages 1 to 8 are written, the overlay, its host
 of the link, the live strip with the core's keys, Strip with the
-catch, the page of memory, the breakpoints, and the Nexys4DDR's buttons
-and display (issue #52, and
+catch, the page of memory, the breakpoints, the Nexys4DDR's buttons
+and display, and the decode of row 27 (issue #52, and
 nice_cpu#85 and #86 for what it needs there). `doc/` also has `CODING_STYLE.md`,
 `RELEASE.md`, and `RELEASE_NOTES.md`; the root keeps only `README.md`,
 `CONTRIBUTING.md`, and this file.
@@ -31,7 +31,7 @@ header is the authoritative address map.
 ## Commands
 
     make                  # lists the targets
-    make -j test          # GHDL: synth checks, tb_hello, tb_nicemon, tb_kbd, tb_ps2, tb_ps2_nicemon, tb_text, tb_dbg, tb_dbg_host, tb_board_io, tb_rmii_rx, tb_rx_fcs, tb_eth_rx_fifo, tb_eth_tx_fifo, tb_rmii_tx, tb_eth, tb_eth_tcp, tb_eth_tcp_random, check-steps, check-fmt (NICE=multi for the multi-cycle core); then the demo in niceemu
+    make -j test          # GHDL: synth checks, tb_hello, tb_nicemon, tb_kbd, tb_ps2, tb_ps2_nicemon, tb_text, tb_dbg, tb_dbg_host, tb_dbg_decode, tb_board_io, tb_rmii_rx, tb_rx_fcs, tb_eth_rx_fifo, tb_eth_tx_fifo, tb_rmii_tx, tb_eth, tb_eth_tcp, tb_eth_tcp_random, check-steps, check-fmt (NICE=multi for the multi-cycle core); then the demo in niceemu
     make -j formal        # SymbiYosys jobs in formal/, each task in a work directory of its own
     make lint             # vsg against doc/CODING_STYLE.md; line-length warnings are tolerated
     make diagrams         # src/system.tex and src/eth/eth.tex -> the PNGs of their READMEs (pdflatex)
@@ -78,8 +78,9 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   (`scr_regs.vhd`), the keyboards (`kbd_m65.vhd` and
   `kbd_m65_ascii.vhd` for the MEGA65, `kbd_ps2.vhd` and `kbd_ps2_ascii.vhd` for
   the Nexys4DDR's PS/2, and the debugger's toggle keys, `kbd_m65_toggle.vhd`
-  and `kbd_ps2_toggle.vhd`), the on-board debugger (`dbg/dbg.vhd`, and
-  `dbg/dbg_host.vhd`, its host of the link on `nicemon`'s `dbg_*` ports), the
+  and `kbd_ps2_toggle.vhd`), the on-board debugger (`dbg/dbg.vhd`,
+  `dbg/dbg_host.vhd`, its host of the link on `nicemon`'s `dbg_*` ports,
+  and `dbg/dbg_decode.vhd`, the decode of an instruction), the
   Nexys4DDR's display and RGB LED drivers (`seg7.vhd`, `rgb_pwm.vhd`), the Ethernet station (`eth/eth.vhd`: the
   RMII receiver and transmitter, the check of the frames, their FIFOs
   between the clocks, the MAC filter and ARP responder,

@@ -259,12 +259,14 @@ debugger takes 730 LUTs and 1051 flip-flops there, 293 and 286 of them
 in its host of the link (`dbg_host`), and half a block RAM, for the
 table of its strip's cells. A build with stage 5, the page, has 0.232
 ns and 0.053 ns, one with stage 6, the breakpoints, 0.169 ns and
-0.032 ns, and one with stage 7 0.330 ns and 0.063 ns, all with 139.5
-block RAMs. The Nexys4DDR's build with
+0.032 ns, one with stage 7 0.330 ns and 0.063 ns, and one with stage
+8, the decode of row 27, 0.410 ns and 0.047 ns, all with 139.5 block
+RAMs. The decode takes about 530 LUTs; its table of decimal digits is
+kept out of a block RAM with `rom_style`. The Nexys4DDR's build with
 stage 3 has 0.339 ns and 0.031 ns, with stage 5 0.111 ns and
 0.017 ns, with stage 6 0.139 ns and 0.022 ns, and with stage 7, its
-buttons and display in the debugger, 0.159 ns and 0.034 ns, on paths
-in the core,
+buttons and display in the debugger, 0.159 ns and 0.034 ns, and with
+stage 8 0.187 ns and 0.019 ns, on paths in the core,
 and still 92.5 block RAMs. The R3's pipelined row is from a build at nice_cpu V1.0, with
 the debug link of version 4, and the Nexys4DDR's from one at V1.1, with
 stage 1 of the on-board debugger ([DEBUGGER.md](../doc/DEBUGGER.md)).
