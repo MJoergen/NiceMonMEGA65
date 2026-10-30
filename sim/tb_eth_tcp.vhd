@@ -413,10 +413,11 @@ begin
       alias timeout   is << signal .tb_eth_tcp.i_eth_tcp.timeout : std_logic >>;
       alias restart   is << signal .tb_eth_tcp.i_eth_tcp.restart : std_logic >>;
       alias tries_clr is << signal .tb_eth_tcp.i_eth_tcp.tries_clr : std_logic >>;
-      alias rx_cmt    is << signal .tb_eth_tcp.i_eth_tcp.rx_cmt : std_logic_vector >>;
-      alias rx_wr     is << signal .tb_eth_tcp.i_eth_tcp.rx_wr : std_logic_vector >>;
       alias rx_we     is << signal .tb_eth_tcp.i_eth_tcp.rx_we : std_logic >>;
+      alias rx_room   is << signal .tb_eth_tcp.i_eth_tcp.rx_room : natural range 0 to 2048 >>;
       alias rx_free   is << signal .tb_eth_tcp.i_eth_tcp.rx_free : natural range 0 to 2048 >>;
+      alias cmt       is << signal .tb_eth_tcp.i_eth_tcp.cmt : std_logic >>;
+      alias brk_set   is << signal .tb_eth_tcp.i_eth_tcp.brk_set : std_logic >>;
       alias tail_ptr  is << signal .tb_eth_tcp.i_eth_tcp.tail_ptr : std_logic_vector >>;
       alias nxt_ptr   is << signal .tb_eth_tcp.i_eth_tcp.nxt_ptr : std_logic_vector >>;
       alias lim_ptr   is << signal .tb_eth_tcp.i_eth_tcp.lim_ptr : std_logic_vector >>;
@@ -458,8 +459,6 @@ begin
       variable quiet_v : boolean;
       variable still_v : boolean;
       variable rst_v   : std_logic;
-      variable cmt_v   : std_logic_vector(una_ptr'range);
-      variable free_v  : natural;
       variable lim_v   : std_logic_vector(una_ptr'range);
       variable nums_v  : std_logic_vector(C_NUMS - 1 downto 0);
    begin
@@ -480,20 +479,20 @@ begin
             assert not quiet_v or (restart = '0' and tries_clr = '0')
                report "tb_eth_tcp: FAIL, the timer restarted without a hold or a timeout"
                severity failure;
-            -- The buffers': a commit within the room
-            assert to_integer(rx_cmt - cmt_v) <= free_v
-               report "tb_eth_tcp: FAIL, a commit beyond the room"
-               severity failure;
             -- The chooser's: the numbers change only at a drop or a pick
             assert not still_v or (numbers = nums_v and to_integer(lim_ptr - lim_v) <= 1)
                report "tb_eth_tcp: FAIL, the chooser's numbers changed without a drop or a pick"
                severity failure;
          end if;
          if rst = '0' then
-            -- The buffers': a write only into the room, and at most a buffer
-            -- of output past una_ptr
-            assert rx_we = '0' or to_integer(rx_wr - rx_cmt) < rx_free
+            -- The buffers': a write only while there is room, the break no
+            -- earlier than the commit of the data before it, and at most a
+            -- buffer of output past una_ptr
+            assert rx_we = '0' or rx_room > 0
                report "tb_eth_tcp: FAIL, a write beyond the room"
+               severity failure;
+            assert brk_set = '0' or cmt = '1' or rx_room = rx_free
+               report "tb_eth_tcp: FAIL, a break before the commit of the data before it"
                severity failure;
             assert to_integer(tail_ptr - una_ptr) <= C_SIZE
                report "tb_eth_tcp: FAIL, more output than the buffer"
@@ -514,8 +513,6 @@ begin
          rst_v   := rst;
          quiet_v := eval = '0' and ending = '0' and timeout = '0';
          still_v := drop = '0' and pick = X"00";
-         cmt_v   := rx_cmt;
-         free_v  := rx_free;
          lim_v   := lim_ptr;
          nums_v  := numbers;
       end if;

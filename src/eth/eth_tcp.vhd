@@ -10,7 +10,7 @@
 -- goes to it. A connection is one from the
 -- host's ACK of the SYN-ACK on, so that a SYN alone, as of a port scan,
 -- leaves the link on the UART. The host's half-close, its FIN, is a break
--- of the line (lrx_break_o), after the last byte committed (rx_cmt). The
+-- of the line (lrx_break_o), after the last byte committed (cmt). The
 -- link stays with the connection after its end, by an RST or the tries,
 -- until it has taken all the input and the break, so that none is lost;
 -- the output in that time is dropped. The states are those of a passive
@@ -37,12 +37,13 @@
 --
 -- Receive: eth_tcp_rx.vhd reads a frame a byte at a time, keeps the
 -- fields of a TCP segment to this station, and checks its checksums. The
--- segment's data goes into the receive buffer at rx_wr as it comes, if it
+-- segment's data goes into the receive buffer as it comes (rx_we), if it
 -- is the next data of the connection (its sequence number is rcv_nxt) and
 -- fits (wr_ok, known before the data starts). In the second cycle after
 -- the last byte (eval), with the stream held, the segment is acted on if
--- it is good; its data is committed (rx_cmt) only then, and rcv_nxt moves
--- past it. Its sequence and acknowledgment numbers are compared with the
+-- it is good; its data is committed (cmt) only then, and rcv_nxt moves
+-- past it, or else it is discarded (discard), and the next segment's
+-- data goes where it went. Its sequence and acknowledgment numbers are compared with the
 -- connection's in registers (p_cmp), a cycle behind, for the timing; they
 -- stand at eval, for the fields have been there since the frame's byte
 -- 49, and the connection's numbers since the last segment acted on.
@@ -109,8 +110,9 @@
 -- choice of the segments to send, with eth_tcp_tx.vhd, their sender;
 -- eth_tcp_buf.vhd, the two buffers with their link side; and
 -- eth_tcp_timer.vhd, the retransmission timer. What the connection tells
--- one of them that it cannot read is a pulse (brk_set, restart,
--- tries_clr), which lands a cycle later; each says why that is in time.
+-- one of them that it cannot read is a pulse (cmt, discard, brk_set,
+-- restart, tries_clr), which lands a cycle later; each says why that is
+-- in time.
 --
 -- INTERFACE CONTRACTS -- these are requirements on the environment:
 -- a) mac_i and ip_i stay stable while there is a connection.
@@ -267,12 +269,16 @@ architecture synthesis of eth_tcp is
    signal rcv_nxt1  : std_logic_vector(31 downto 0) := (others => '0');
    signal seg_end   : std_logic_vector(31 downto 0) := (others => '0');
 
-   -- The receive buffer (eth_tcp_buf.vhd): where a segment's data goes,
-   -- the end of the data committed, and the room after it
-   signal rx_wr   : t_ptr                     := (others => '0');
-   signal rx_cmt  : t_ptr                     := (others => '0');
-   signal rx_free : natural range 0 to C_SIZE;
+   -- The receive buffer (eth_tcp_buf.vhd): a segment's data goes in as it
+   -- comes; the room for it, after the data written; and the room after
+   -- the data committed, the receive window
    signal rx_we   : std_logic;
+   signal rx_room : natural range 0 to C_SIZE;
+   signal rx_free : natural range 0 to C_SIZE;
+   -- The connection's verdict on the segment's data, for the buffer, a
+   -- cycle after: it is committed, or discarded
+   signal cmt     : std_logic := '0';
+   signal discard : std_logic := '0';
    -- The host's FIN has come.
    signal peer_fin : std_logic := '0';
    -- The connection's half-close for the link, a cycle after
@@ -335,7 +341,7 @@ begin
          exp_ip_i   => peer.ip,
          exp_port_i => peer.tcp_port,
          exp_seq_i  => rcv_nxt,
-         free_i     => rx_free,
+         free_i     => rx_room,
          we_o       => rx_we,
          done_o     => eval,
          good_o     => good,
@@ -367,9 +373,10 @@ begin
          rd_addr_i   => tx_raddr,
          rd_data_o   => tx_rdata,
          wr_we_i     => rx_we,
-         wr_addr_i   => rx_wr,
          wr_data_i   => rx_data_i,
-         cmt_i       => rx_cmt,
+         room_o      => rx_room,
+         cmt_i       => cmt,
+         discard_i   => discard,
          free_o      => rx_free,
          brk_set_i   => brk_set,
          lrx_data_o  => lrx_data_o,
@@ -570,6 +577,8 @@ begin
          if busy = '0' then
             buf_una <= una_ptr;
          end if;
+         cmt       <= '0';
+         discard   <= '0';
          brk_set   <= '0';
          restart   <= '0';
          tries_clr <= '0';
@@ -577,11 +586,6 @@ begin
          -- A window that has grown is told.
          if state = EST_ST and rx_free >= adv_wnd + C_WND_STEP then
             ack_req <= '1';
-         end if;
-
-         -- A segment's data, as it comes
-         if rx_we = '1' then
-            rx_wr <= rx_wr + 1;
          end if;
 
          ------------------------------------------------------------------
@@ -726,12 +730,13 @@ begin
                end if;
             end if;
 
-            -- The data written is committed, or else the next segment's goes
-            -- where this one's went; no byte comes in this cycle.
+            -- The data written is committed, or discarded, so that the next
+            -- segment's goes where this one's went; the buffer has it in
+            -- the cycle after, before the next frame's data.
             if cmt_v then
-               rx_cmt <= rx_wr;
+               cmt <= '1';
             else
-               rx_wr <= rx_cmt;
+               discard <= '1';
             end if;
 
          -- The end, once the ACK that the host is owed is sent
@@ -802,9 +807,9 @@ begin
             rst_req   <= '0';
             pend      <= '0';
             keep      <= '0';
-            rx_wr     <= (others => '0');
-            rx_cmt    <= (others => '0');
             peer_fin  <= '0';
+            cmt       <= '0';
+            discard   <= '0';
             brk_set   <= '0';
             restart   <= '0';
             tries_clr <= '0';
