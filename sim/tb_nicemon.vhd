@@ -310,6 +310,8 @@ begin
    end process p_uart_rx;
 
 
+   -- The steps of the test, one after another, are long by nature.
+   -- vsg_off length_003
    p_main : process
       variable con_pos_v : natural := 0;
       variable pkt_pos_v : natural := 0;
@@ -1012,5 +1014,7 @@ begin
       report "tb_nicemon: PASS";
       stop(0);
    end process p_main;
+
+   -- vsg_on length_003
 
 end architecture simulation;

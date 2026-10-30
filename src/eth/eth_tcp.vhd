@@ -213,7 +213,6 @@ architecture synthesis of eth_tcp is
    -- and has the link
    signal keep      : std_logic                     := '0';
    signal pend_mac  : std_logic_vector(47 downto 0) := (others => '0');
-   signal pend_ip   : std_logic_vector(31 downto 0) := (others => '0');
    signal pend_port : std_logic_vector(15 downto 0) := (others => '0');
    signal pend_seq  : std_logic_vector(31 downto 0) := (others => '0');
    signal pend_win  : std_logic_vector(15 downto 0) := (others => '0');
@@ -497,6 +496,7 @@ begin
       variable syn_v     : boolean;
       variable fin_v     : boolean;
       variable ack_fin_v : boolean;
+      variable cmt_v     : boolean;
 
       -- Opens a connection for a SYN; the output after base goes to it.
       procedure accept (
@@ -538,7 +538,8 @@ begin
       procedure finish is
       begin
          if pend = '1' then
-            accept(pend_mac, pend_ip, pend_port, pend_seq, pend_win, fin_ptr);
+            -- A SYN waits only from the connection's IP address.
+            accept(pend_mac, peer_ip, pend_port, pend_seq, pend_win, fin_ptr);
             keep <= '1';
             -- The old connection's input has ended.
             if peer_fin = '0' then
@@ -590,7 +591,7 @@ begin
          -- The segment, in the second cycle after its last byte
          ------------------------------------------------------------------
          if eval = '1' then
-            rx_wr <= rx_cmt;
+            cmt_v := false;
 
             if good = '1' and ip_i /= 0 then
                syn_v := f_flags(1) = '1' and f_flags(4) = '0' and f_flags(2) = '0';
@@ -617,7 +618,6 @@ begin
                         elsif f_sip = peer_ip then
                            pend      <= '1';
                            pend_mac  <= f_smac;
-                           pend_ip   <= f_sip;
                            pend_port <= f_sport;
                            pend_seq  <= f_seq;
                            pend_win  <= f_win;
@@ -687,8 +687,7 @@ begin
                               (wr_ok = '1' or f_end = rcv_nxt);
                      -- The data, which was written if it is the next
                      if wr_ok = '1' then
-                        rx_cmt  <= rx_wr;
-                        rx_wr   <= rx_wr;
+                        cmt_v   := true;
                         rcv_nxt <= rcv_end;
                         if fin_v then
                            rcv_nxt <= rcv_end1;
@@ -719,6 +718,14 @@ begin
                   -- A segment that fits no connection
                   refuse;
                end if;
+            end if;
+
+            -- The data written is committed, or else the next segment's goes
+            -- where this one's went; no byte comes in this cycle.
+            if cmt_v then
+               rx_cmt <= rx_wr;
+            else
+               rx_wr <= rx_cmt;
             end if;
 
          -- The end, once the ACK that the host is owed is sent

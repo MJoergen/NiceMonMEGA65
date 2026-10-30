@@ -23,8 +23,9 @@
 -- The choice is dropped (drop_i) if a segment is read or the timer runs
 -- out in any of the three cycles, as both change what may be sent. The
 -- segment's header fields (seg_*) and where its data is go to
--- eth_tcp_tx.vhd, those of a RST in B_PICK, as it is chosen, and
--- adv_wnd_o is the receive window that the last segment but a RST told.
+-- eth_tcp_tx.vhd; the receive window, and the fields of a RST, are taken
+-- in B_PICK, as the segment is chosen, and adv_wnd_o is the window that
+-- the last segment but a RST told, the one it sent.
 -- The connection books what the segment carries in the cycle it is chosen,
 -- from pick_o and pick_n_o.
 --
@@ -233,7 +234,6 @@ begin
                   seg_ip   <= peer_ip_i;
                   seg_port <= peer_port_i;
                   seg_ack  <= rcv_nxt_i;
-                  seg_wnd  <= X"0000" + free_i;
                   seg_ptr  <= nxt_ptr_i;
                   seg_n    <= 0;
                   -- After this side's FIN, the next sequence number is past it.
@@ -287,6 +287,7 @@ begin
                   go <= '1';
                end if;
                if pick /= X"00" and pick(2) = '0' then
+                  seg_wnd   <= X"0000" + free_i;
                   adv_wnd_o <= free_i;
                end if;
 
@@ -347,8 +348,10 @@ begin
       --      seg_port = prev(rst_port_i) and
       --      ((seg_flags(4) = '1' and seg_seq = 0 and seg_ack = prev(rst_num_i)) or
       --       (seg_flags(4) = '0' and seg_seq = prev(rst_num_i) and seg_ack = 0))));
-      -- psl f_wnd : assert always {pick /= X"00" and pick(2) = '0'} |=> {adv_wnd_o = prev(free_i)};
-      -- psl f_wnd_rst : assert always {pick(2) = '1'} |=> {adv_wnd_o = prev(adv_wnd_o)};
+      -- psl f_wnd : assert always {pick /= X"00" and pick(2) = '0'} |=>
+      --    {adv_wnd_o = prev(free_i) and to_integer(seg_wnd) = adv_wnd_o};
+      -- psl f_wnd_rst : assert always {pick(2) = '1'} |=>
+      --    {adv_wnd_o = prev(adv_wnd_o) and seg_wnd = 0};
       -- psl f_stable : assert always busy = '1' and go = '0' ->
       --    seg_mac = prev(seg_mac) and seg_ip = prev(seg_ip) and seg_port = prev(seg_port) and
       --    seg_seq = prev(seg_seq) and seg_ack = prev(seg_ack) and seg_flags = prev(seg_flags) and

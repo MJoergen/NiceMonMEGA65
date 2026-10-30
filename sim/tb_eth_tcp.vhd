@@ -382,6 +382,8 @@ begin
    end process p_probe;
 
 
+   -- The steps of the test, one after another, are long by nature.
+   -- vsg_off length_003
    p_host : process
       -- The frames taken from the ring
       variable n_seen_v : natural := 0;
@@ -1087,5 +1089,7 @@ begin
       report "tb_eth_tcp: PASS, " & integer'image(n_got) & " segments";
       finish;
    end process p_host;
+
+   -- vsg_on length_003
 
 end architecture simulation;
