@@ -335,10 +335,12 @@ Each a commit that builds and passes the tests:
    `BRK n`.
 7. **The Nexys4DDR's buttons and display** in Focus.
 8. **The decode** of row 27, `dbg_decode.vhd`.
-9. **nice_cpu V1.2.** At the bump, the registers are live while the core
-   runs (nice_cpu#85), and the strip stops dimming them; and the
-   debugger moves to the side port (nice_cpu#86): `dbg_host.vhd` becomes
-   an adapter, and the line returns to the UART and TCP.
+9. **nice_cpu V1.2**
+   ([#53](https://github.com/MJoergen/NiceMonMEGA65/issues/53)). At
+   the bump, the registers are live while the core runs (nice_cpu#85),
+   and the strip stops dimming them; and the debugger moves to the side
+   port (nice_cpu#86): `dbg_host.vhd` becomes an adapter, and the line
+   returns to the UART and TCP.
 10. Later, in no order: a console page, with a tap on the core's
     console output beside the line; the code page with a disassembler; the `board_io` register for `hwtest`; loading and
     saving on the SD card.
