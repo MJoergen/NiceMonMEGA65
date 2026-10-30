@@ -49,10 +49,8 @@ thing: the debugger can be up while the program runs.
   UART's are while a TCP host is connected today (`src/nicemon.vhd`). A
   host that is connected when the debugger comes up loses the link until
   the debugger goes Off, and so does a host whose pause request the
-  debugger catches.
-  [#44](https://github.com/MJoergen/NiceMonMEGA65/issues/44) is the way
-  to serve several hosts at once, and the side port
-  [below](#how-it-drives-the-link) removes the problem.
+  debugger catches. The side port [below](#how-it-drives-the-link)
+  removes the problem.
 - The program's keyboard input is unaffected in Off and Strip: the
   keyboard's bytes go into the console FIFO as now, not through the link.
   The console bytes that a host sends do not arrive while the debugger
@@ -341,8 +339,8 @@ Each a commit that builds and passes the tests:
    runs (nice_cpu#85), and the strip stops dimming them; and the
    debugger moves to the side port (nice_cpu#86): `dbg_host.vhd` becomes
    an adapter, and the line returns to the UART and TCP.
-10. Later, in no order: #44; a console page; the code page with a
-    disassembler; the `board_io` register for `hwtest`; loading and
+10. Later, in no order: a console page, with a tap on the core's
+    console output beside the line; the code page with a disassembler; the `board_io` register for `hwtest`; loading and
     saving on the SD card.
 
 ## Decisions
@@ -355,8 +353,14 @@ Made on 2026-10-30, with the reasons:
   nice_cpu, nice_cpu#86, and comes with V1.2, to get rid of the hex and
   of the cut-off host below.
 - **The host is cut off while the debugger is up.** Accepted until the
-  side port; #44 is the other way out. MEGA+HELP wins over a connected
-  TCP host: the person at the keyboard is at the board.
+  side port. MEGA+HELP wins over a connected TCP host: the person at
+  the keyboard is at the board.
+- **The UART and Ethernet are not served at once**
+  ([#44](https://github.com/MJoergen/NiceMonMEGA65/issues/44), closed).
+  The side port frees the line from the debugger, and the merge of two
+  hosts' packets, the routing of the answers, and the UART's FIFO cost
+  more than the few setups with both cables would gain. The console
+  page shows a program's output on the board, whichever host drives it.
 - **Four rows, not seven.** Seven rows with the breakpoints, a console
   tail, and a status row were crowded. The breakpoints are on the page,
   the state is in row 27, and the console tail waits for a page of its
