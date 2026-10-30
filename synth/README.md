@@ -250,7 +250,10 @@ Ethernet station, which answers ARP requests and pings and carries the
 link over TCP. The multi-cycle rows are older builds, with fewer link features, and their
 hold slacks were not recorded. The slacks change from build to build with
 placement more than with the logic. The worst paths are usually in the
-core's WRITE and FETCH stages.
+core's WRITE and FETCH stages. Every build writes the five worst paths
+into the TCP server, within it, and out of it to `build/tcp_paths.rpt`.
+On the R6 their worst slack is about 1.5 ns, where the core's is about
+0.2 ns.
 
 The PHY's RXD and CRS_DV are timed against the clock on its pin, with the
 output delays of the PHYs' data sheets and 1 ns for the traces. The pin's

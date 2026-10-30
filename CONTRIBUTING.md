@@ -393,8 +393,9 @@ every time, not only the ones a testbench sends.
 
 - `eth_tcp_timer.sby` proves the TCP server's retransmission timer,
   `src/eth/eth_tcp_timer.vhd`, with a millisecond of 3 cycles, a timeout
-  of 2, and 3 tries: the counts stay in their ranges, the timer runs out
-  only at a tick while it is armed, never in the cycle after it was held
+  of 2, and 3 tries: the counts stay in their ranges, the register of
+  the millisecond's last cycle is '1' in that cycle and no other, the
+  timer runs out only at a tick while it is armed, never in the cycle after it was held
   or ran out, and not before its time, each timeout counts a try but the
   last, and what the connection tells it lands in the cycle after.
 

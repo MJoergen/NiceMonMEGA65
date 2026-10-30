@@ -110,6 +110,21 @@ endef
 export CORE_REPORTS_TCL
 CORE_REPORTS = $$CORE_REPORTS_TCL
 
+# The worst paths into the TCP server (src/eth/eth_tcp.vhd), within it,
+# and out of it, five of each, to build/tcp_paths.rpt (issue 49), so that
+# its headroom can be read after any build. The catch, as above.
+define TCP_REPORTS_TCL
+if {[catch {
+   set tcp  [get_cells -hier -filter {IS_SEQUENTIAL && NAME =~ *i_eth/i_eth_tcp/*}]
+   set rest [get_cells -hier -filter {IS_SEQUENTIAL && NAME !~ *i_eth/i_eth_tcp/*}]
+   report_timing -from $$rest -to $$tcp -max_paths 5 -nworst 1 -path_type summary -file build/tcp_paths.rpt
+   report_timing -from $$tcp -to $$tcp -max_paths 5 -nworst 1 -path_type summary -file build/tcp_paths.rpt -append
+   report_timing -from $$tcp -to $$rest -max_paths 5 -nworst 1 -path_type summary -file build/tcp_paths.rpt -append
+} msg]} { puts "TCP reports failed: $$msg" }
+endef
+export TCP_REPORTS_TCL
+TCP_REPORTS = $$TCP_REPORTS_TCL
+
 # The script is remade when the Makefiles or the ROM, NICE, or FLOW option
 # change. synth_design ignores VHDL assertions without -assert, such as the
 # check in src/rom.vhd for a word beyond the ROM.
@@ -126,6 +141,7 @@ build/$(TOP).tcl: $(MAKEFILE_LIST) build/rom.conf
 	$(if $(filter timing,$(FLOW)),echo "phys_opt_design $(PHYS_OPTS)" >> $@)
 	echo "report_timing_summary -file build/timing.rpt" >> $@
 	echo "$(CORE_REPORTS)" >> $@
+	echo "$(TCP_REPORTS)" >> $@
 	echo "report_utilization -file build/utilization.rpt" >> $@
 	echo "write_checkpoint -force build/$(TOP).dcp" >> $@
 	echo "write_bitstream -force build/$(TOP).bit" >> $@

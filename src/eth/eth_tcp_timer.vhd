@@ -4,7 +4,9 @@
 --
 -- THEORY OF OPERATION
 -- tick_cnt counts the clock's cycles to a millisecond, G_TICK of them,
--- and a tick is its last cycle, but for the cycles hold_i says to skip:
+-- and a tick is its last cycle, known a cycle ahead (tick_end), so that
+-- no compare of the count is on the way to the connection, but for the
+-- cycles hold_i says to skip:
 -- the connection acts on a segment, or ends, in such a cycle, and what
 -- it tells the timer lands in the cycle after, so the timer stands still
 -- in both (still), as it does in the cycle after it ran out. At a tick,
@@ -18,9 +20,11 @@
 -- INTERFACE CONTRACTS -- these are requirements on the environment:
 -- a) restart_i and tries_clr_i are '1' only in the cycle after hold_i or
 --    timeout_o was '1', so that no tick meets them.
+-- b) G_TICK is at least 2.
 --
 -- With G_FORMAL, it states the properties that formal/eth_tcp_timer.sby
--- proves: the counts stay in their ranges, the timer runs out only at a
+-- proves: the counts stay in their ranges, tick_end is '1' in the last
+-- cycle of each millisecond and no other, the timer runs out only at a
 -- tick while it is armed, never in the cycle after it was held or ran
 -- out, and not before (G_RTO_MS - 1) * G_TICK - 1 cycles after the
 -- count started; each timeout counts a try, but the last; and what the
@@ -63,14 +67,16 @@ architecture synthesis of eth_tcp_timer is
    signal tick_cnt : natural range 0 to G_TICK   := 0;
    signal rto_cnt  : natural range 0 to G_RTO_MS := 0;
    signal tries    : natural range 0 to G_TRIES  := 0;
-   -- The timer ticks, runs out, and stands still
-   signal tick    : std_logic;
-   signal timeout : std_logic;
-   signal still   : std_logic := '0';
+   -- The millisecond's last cycle, the timer ticks, runs out, and stands
+   -- still
+   signal tick_end : std_logic := '0';
+   signal tick     : std_logic;
+   signal timeout  : std_logic;
+   signal still    : std_logic := '0';
 
 begin
 
-   tick       <= '1' when tick_cnt = G_TICK - 1 and hold_i = '0' and still = '0' else
+   tick       <= '1' when tick_end = '1' and hold_i = '0' and still = '0' else
                  '0';
    timeout    <= '1' when tick = '1' and armed_i = '1' and rto_cnt = G_RTO_MS - 1 else
                  '0';
@@ -86,6 +92,11 @@ begin
             tick_cnt <= 0;
          else
             tick_cnt <= tick_cnt + 1;
+         end if;
+         -- The next cycle is the last of the millisecond.
+         tick_end <= '0';
+         if tick_cnt = G_TICK - 2 then
+            tick_end <= '1';
          end if;
          still <= hold_i or timeout;
 
@@ -113,6 +124,7 @@ begin
 
          if rst_i = '1' then
             tick_cnt <= 0;
+            tick_end <= '0';
             rto_cnt  <= 0;
             tries    <= 0;
             still    <= '0';
@@ -140,6 +152,8 @@ begin
       -- psl default clock is rising_edge(clk_i);
 
       -- psl f_tick_cnt : assert always tick_cnt < G_TICK;
+      -- psl f_tick_end : assert always tick_end = '1' -> tick_cnt = G_TICK - 1;
+      -- psl f_tick_end_all : assert always tick_cnt = G_TICK - 1 -> tick_end = '1';
       -- psl f_rto_cnt : assert always rto_cnt < G_RTO_MS;
       -- psl f_tries : assert always tries < G_TRIES;
       -- psl f_last : assert always last_try_o = '1' -> tries = G_TRIES - 1;

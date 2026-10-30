@@ -108,7 +108,7 @@
 --
 -- INTERFACE CONTRACTS -- these are requirements on the environment:
 -- a) mac_i and ip_i stay stable while there is a connection.
--- b) G_CLOCK_HZ is the clock's rate, at least 1000, for the timers.
+-- b) G_CLOCK_HZ is the clock's rate, at least 2000, for the timers.
 --
 -- RESET
 -- Synchronous, to clk_i. Reset drops the connection and empties both
