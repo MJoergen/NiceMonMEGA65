@@ -410,7 +410,9 @@ byte beyond it every 300 ms, and keeps the connection while the host
 answers. It answers a host's keepalive probe with an ACK, and sends no
 probe itself. A segment to the port that fits no connection, as one of
 a connection that the board dropped, gets a reset, as RFC 9293 has it,
-but for a reset, which gets nothing. Segments to other ports get nothing,
+but for a reset, which gets nothing. Once a connection is open, a
+segment without ACK is dropped, and one that acknowledges what the board
+has not sent gets an ACK and is dropped. Segments to other ports get nothing,
 and neither does anything while the IP address is 0, also after the
 board resets, until it has an address again. Its SYN-ACK has no TCP options, so the host sends
 segments of at most 536 bytes, and the board sends no more either. When a connection ends, the link

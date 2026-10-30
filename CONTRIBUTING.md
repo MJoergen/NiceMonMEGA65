@@ -228,10 +228,16 @@ The testbenches are these:
   crash; data in the ACK of the SYN-ACK; an RST, after which the link
   still takes the input, and one while data is out; a break that waits
   for its input while a new connection's comes; an RST before the ACK of
-  the SYN-ACK; and a SYN-ACK that is never acknowledged. In every cycle,
-  the retransmission timer must run only while there is a connection,
-  and an ACK of the FIN must free the data before it, also when it
-  covers both at once.
+  the SYN-ACK; a SYN-ACK that is never acknowledged; the parser's bad
+  headers; a SYN with ACK, a FIN, or data; a partial ACK, an old one,
+  and one of what was not sent; a segment with old bytes and new ones,
+  one without ACK, and a FIN ahead of its data; an RST from another IP
+  address; a SYN from the connection's own port; and both sides'
+  sequence numbers across 2^32. In every cycle, the retransmission timer
+  must run only while there is a connection, an ACK of the FIN must free
+  the data before it, also when it covers both at once, and the server
+  must keep the contracts that the formal jobs of its timer, buffers,
+  and chooser assume.
 - `make test` also checks that GHDL can synthesize the system, with
   `sim/rom.nasm` as its ROM and without a ROM, the keyboards, the text
   display, and `src/system.vhd` with the screen and the devices of the

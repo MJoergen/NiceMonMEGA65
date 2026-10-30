@@ -51,7 +51,11 @@
 -- so does one without either whose sequence number is not rcv_nxt, such
 -- as a keepalive probe. A segment that overlaps data already taken is
 -- dropped whole, and the host sends it again from the sequence number of
--- the ACK.
+-- the ACK. Once the connection is open, a segment without ACK is dropped,
+-- and one whose ACK is of what was not sent gets an ACK and is dropped,
+-- data and all (RFC 9293 3.10.7.4); an old ACK, before una_seq, is not
+-- taken, but its segment's data is. A SYN with data or a FIN opens a
+-- connection for the SYN alone, and the host sends the rest again.
 --
 -- Send: the link's output goes into the send buffer at tail_ptr. una_ptr
 -- is the first byte not yet acknowledged, whose sequence number is
@@ -628,6 +632,16 @@ begin
                      if f_seg.flags(4) = '1' then
                         refuse;
                      end if;
+                  elsif f_seg.flags(4) = '0' then
+                     -- Without ACK, the segment is dropped (RFC 9293
+                     -- 3.10.7.4, step 5).
+                     null;
+                  elsif k(31) = '0' and k > max_ptr - una_ptr and
+                        not (fin_max = '1' and fin_acked) then
+                     -- An ACK of what was not sent gets an ACK, and the
+                     -- segment is dropped; one before una_seq, k(31) = '1',
+                     -- is old, and its data is taken.
+                     ack_req <= '1';
                   else
                      -- The ACK of the SYN-ACK, which may carry data and a FIN
                      if state = SYN_RCVD_ST then

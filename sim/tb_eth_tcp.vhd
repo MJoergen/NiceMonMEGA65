@@ -52,6 +52,16 @@
 --     SYN-ACK, segments while there is no connection, and an ACK of a
 --     connection that has ended
 --   * an RST while data is out ends the connection, and its timer
+--   * a data offset below 5, or an IP total length shorter than the
+--     headers, is not good
+--   * a SYN with a FIN or data opens a connection for the SYN alone; a
+--     partial ACK frees what it covers; a segment with old bytes and new
+--     ones is dropped whole; an old ACK and its window are not taken, but
+--     its data is; a segment without ACK is dropped; an ACK of what was
+--     not sent gets an ACK, and its data is dropped; an RST from another
+--     IP address does nothing; a FIN ahead of its data is not taken; and
+--     a SYN from the connection's own port replaces it
+--   * both sides' sequence numbers wrap around 2^32 in one connection
 --   * an RST ends a connection that waits for the ACK of its SYN-ACK
 --   * a SYN-ACK that is never acknowledged ends the connection after the
 --     tries
@@ -61,6 +71,9 @@ library ieee;
    use ieee.numeric_std_unsigned.all;
 
    use std.env.all;
+
+library work;
+   use work.eth_pkg.all;
 
 entity tb_eth_tcp is
 end entity tb_eth_tcp;
@@ -247,6 +260,20 @@ architecture simulation of tb_eth_tcp is
       return f_v;
    end function seg;
 
+   -- The frame f with both checksums made right again, after a change
+   function resum (
+      f : t_frame
+   ) return t_frame is
+      variable f_v : t_frame;
+   begin
+      f_v             := f;
+      f_v.b(24 to 25) := X"00" & X"00";
+      f_v.b(24 to 25) := b2(not ones_sum(f_v, 14, 33));
+      f_v.b(50 to 51) := X"00" & X"00";
+      f_v.b(50 to 51) := b2(not tcp_sum(f_v));
+      return f_v;
+   end function resum;
+
    -- The flags
    constant C_FIN : std_logic_vector(7 downto 0) := X"01";
    constant C_SYN : std_logic_vector(7 downto 0) := X"02";
@@ -359,14 +386,68 @@ begin
 
    -- A probe of the connection: the retransmission timer runs only while
    -- there is one, and an ACK of this side's FIN, which ends it, frees the
-   -- data before the FIN too.
+   -- data before the FIN too. It also checks, in the assembled server, the
+   -- contracts that the proofs of the timer, the buffers, and the chooser
+   -- assume (formal/formal_eth_tcp_*.vhd).
    p_probe : process (clk)
-      alias armed    is << signal .tb_eth_tcp.i_eth_tcp.armed : std_logic >>;
-      alias syn_rcvd is << signal .tb_eth_tcp.i_eth_tcp.syn_rcvd : std_logic >>;
-      alias estab    is << signal .tb_eth_tcp.i_eth_tcp.estab : std_logic >>;
-      alias fin_ack  is << signal .tb_eth_tcp.i_eth_tcp.fin_ack : std_logic >>;
-      alias una_ptr  is << signal .tb_eth_tcp.i_eth_tcp.una_ptr : std_logic_vector >>;
-      alias max_ptr  is << signal .tb_eth_tcp.i_eth_tcp.max_ptr : std_logic_vector >>;
+      alias armed     is << signal .tb_eth_tcp.i_eth_tcp.armed : std_logic >>;
+      alias syn_rcvd  is << signal .tb_eth_tcp.i_eth_tcp.syn_rcvd : std_logic >>;
+      alias estab     is << signal .tb_eth_tcp.i_eth_tcp.estab : std_logic >>;
+      alias fin_ack   is << signal .tb_eth_tcp.i_eth_tcp.fin_ack : std_logic >>;
+      alias una_ptr   is << signal .tb_eth_tcp.i_eth_tcp.una_ptr : std_logic_vector >>;
+      alias max_ptr   is << signal .tb_eth_tcp.i_eth_tcp.max_ptr : std_logic_vector >>;
+      alias eval      is << signal .tb_eth_tcp.i_eth_tcp.eval : std_logic >>;
+      alias ending    is << signal .tb_eth_tcp.i_eth_tcp.ending : std_logic >>;
+      alias timeout   is << signal .tb_eth_tcp.i_eth_tcp.timeout : std_logic >>;
+      alias restart   is << signal .tb_eth_tcp.i_eth_tcp.restart : std_logic >>;
+      alias tries_clr is << signal .tb_eth_tcp.i_eth_tcp.tries_clr : std_logic >>;
+      alias rx_cmt    is << signal .tb_eth_tcp.i_eth_tcp.rx_cmt : std_logic_vector >>;
+      alias rx_wr     is << signal .tb_eth_tcp.i_eth_tcp.rx_wr : std_logic_vector >>;
+      alias rx_we     is << signal .tb_eth_tcp.i_eth_tcp.rx_we : std_logic >>;
+      alias rx_free   is << signal .tb_eth_tcp.i_eth_tcp.rx_free : natural range 0 to 2048 >>;
+      alias tail_ptr  is << signal .tb_eth_tcp.i_eth_tcp.tail_ptr : std_logic_vector >>;
+      alias nxt_ptr   is << signal .tb_eth_tcp.i_eth_tcp.nxt_ptr : std_logic_vector >>;
+      alias lim_ptr   is << signal .tb_eth_tcp.i_eth_tcp.lim_ptr : std_logic_vector >>;
+      alias drop      is << signal .tb_eth_tcp.i_eth_tcp.drop : std_logic >>;
+      alias pick      is << signal .tb_eth_tcp.i_eth_tcp.pick : std_logic_vector >>;
+      alias peer      is << signal .tb_eth_tcp.i_eth_tcp.peer : t_host >>;
+      alias rst_host  is << signal .tb_eth_tcp.i_eth_tcp.rst_host : t_host >>;
+      alias iss       is << signal .tb_eth_tcp.i_eth_tcp.iss : std_logic_vector >>;
+      alias una_seq   is << signal .tb_eth_tcp.i_eth_tcp.una_seq : std_logic_vector >>;
+      alias rcv_nxt   is << signal .tb_eth_tcp.i_eth_tcp.rcv_nxt : std_logic_vector >>;
+      alias snd_wnd   is << signal .tb_eth_tcp.i_eth_tcp.snd_wnd : std_logic_vector >>;
+      alias rst_num   is << signal .tb_eth_tcp.i_eth_tcp.rst_num : std_logic_vector >>;
+      alias fin_sent  is << signal .tb_eth_tcp.i_eth_tcp.fin_sent : std_logic >>;
+      alias closing   is << signal .tb_eth_tcp.i_eth_tcp.closing : std_logic >>;
+      alias probe     is << signal .tb_eth_tcp.i_eth_tcp.probe : std_logic >>;
+      alias syn_req   is << signal .tb_eth_tcp.i_eth_tcp.syn_req : std_logic >>;
+      alias rst_req   is << signal .tb_eth_tcp.i_eth_tcp.rst_req : std_logic >>;
+      alias rst_ack   is << signal .tb_eth_tcp.i_eth_tcp.rst_ack : std_logic >>;
+
+      -- The numbers that the chooser takes, which change only at a drop or
+      -- a pick
+      impure function numbers return std_logic_vector is
+      begin
+         return nxt_ptr & una_ptr & una_seq & snd_wnd & rcv_nxt & iss &
+                peer.mac & peer.ip & peer.tcp_port &
+                rst_host.mac & rst_host.ip & rst_host.tcp_port & rst_num &
+                fin_sent & closing & probe & syn_req & syn_rcvd & estab &
+                rst_req & rst_ack;
+      end function numbers;
+
+      constant C_SIZE : natural := 2 ** (una_ptr'length - 1);
+      -- The width of numbers: two pointers, the four numbers, two hosts,
+      -- rst_num, and eight flags
+      constant C_NUMS : natural := 2 * una_ptr'length + 112 + 2 * 96 + 32 + 8;
+
+      variable first_v : boolean := true;
+      variable quiet_v : boolean;
+      variable still_v : boolean;
+      variable rst_v   : std_logic;
+      variable cmt_v   : std_logic_vector(una_ptr'range);
+      variable free_v  : natural;
+      variable lim_v   : std_logic_vector(una_ptr'range);
+      variable nums_v  : std_logic_vector(C_NUMS - 1 downto 0);
    begin
       if rising_edge(clk) then
          assert armed = '0' or syn_rcvd = '1' or estab = '1'
@@ -378,6 +459,46 @@ begin
                severity failure;
             n_fin <= n_fin + 1;
          end if;
+
+         if not first_v and rst_v = '0' then
+            -- The timer's: restart and tries_clr only after a hold or a
+            -- timeout
+            assert not quiet_v or (restart = '0' and tries_clr = '0')
+               report "tb_eth_tcp: FAIL, the timer restarted without a hold or a timeout"
+               severity failure;
+            -- The buffers': a commit within the room
+            assert to_integer(rx_cmt - cmt_v) <= free_v
+               report "tb_eth_tcp: FAIL, a commit beyond the room"
+               severity failure;
+            -- The chooser's: the numbers change only at a drop or a pick
+            assert not still_v or (numbers = nums_v and to_integer(lim_ptr - lim_v) <= 1)
+               report "tb_eth_tcp: FAIL, the chooser's numbers changed without a drop or a pick"
+               severity failure;
+         end if;
+         if rst = '0' then
+            -- The buffers': a write only into the room, and at most a buffer
+            -- of output past una_ptr
+            assert rx_we = '0' or to_integer(rx_wr - rx_cmt) < rx_free
+               report "tb_eth_tcp: FAIL, a write beyond the room"
+               severity failure;
+            assert to_integer(tail_ptr - una_ptr) <= C_SIZE
+               report "tb_eth_tcp: FAIL, more output than the buffer"
+               severity failure;
+            -- The chooser's: the pointers in order
+            assert to_integer(nxt_ptr - una_ptr) <= to_integer(lim_ptr - una_ptr) and
+                   to_integer(lim_ptr - una_ptr) <= C_SIZE
+               report "tb_eth_tcp: FAIL, the chooser's pointers out of order"
+               severity failure;
+         end if;
+
+         first_v := false;
+         rst_v   := rst;
+         quiet_v := eval = '0' and ending = '0' and timeout = '0';
+         still_v := drop = '0' and pick = X"00";
+         cmt_v   := rx_cmt;
+         free_v  := rx_free;
+         lim_v   := lim_ptr;
+         nums_v  := numbers;
       end if;
    end process p_probe;
 
@@ -403,6 +524,10 @@ begin
       variable total_v : natural;
       variable f_v     : t_frame;
       variable old_v   : std_logic_vector(31 downto 0);
+      variable nb_v    : natural;
+      -- The server's initial sequence number, a cycle counter, which a
+      -- step sets near 2^32
+      alias isn is << signal .tb_eth_tcp.i_eth_tcp.isn : std_logic_vector >>;
 
       -- With a gap in rx_valid after every 13th byte, as from a FIFO
       procedure send (
@@ -708,10 +833,11 @@ begin
       link_out(101);
       link_out(1500);
       link_out(3000);
-      -- An ACK of data not sent is ignored.
+      -- An ACK of data not sent is not taken, and gets an ACK.
       bseq_v := bseq_v + 1000;
       send_seg(C_ACK, 0);
       bseq_v := bseq_v - 1000;
+      expect_ack;
 
       -- At most the host's window, unacknowledged
       send_seg(C_ACK, 0, win => 300);
@@ -1057,6 +1183,199 @@ begin
       assert conn = '0'
          report "tb_eth_tcp: FAIL, the RST did not end the connection with data out"
          severity failure;
+
+      -- The parser's edges: a data offset below 5, and an IP total length
+      -- shorter than the headers, are not good, with right checksums.
+      f_v       := seg(C_HIP, C_PORT, 40200, X"00010000", X"00000000", C_SYN, 8192, 0, 0, false);
+      f_v.b(46) := X"40";
+      send(resum(f_v));
+      expect_none(10 us);
+      f_v           := seg(C_HIP, C_PORT, 40200, X"00010000", X"00000000", C_SYN, 8192, 0, 0, false);
+      f_v.b(16 to 17) := X"00" & X"1E";
+      send(resum(f_v));
+      expect_none(10 us);
+      assert conn = '0'
+         report "tb_eth_tcp: FAIL, a bad header opened a connection"
+         severity failure;
+
+      -- A SYN with ACK and no connection gets a RST at its acknowledgment
+      -- number.
+      send(seg(C_HIP, C_PORT, 40201, X"00011000", X"55AA0000", C_SYN or C_ACK, 8192, 0, 0, false));
+      expect(1 ms, 40201);
+      assert flags_v = C_RST and seq_v = X"55AA0000" and n_v = 0
+         report "tb_eth_tcp: FAIL, no RST for a SYN with ACK"
+         severity failure;
+
+      -- A SYN with a FIN opens a connection for the SYN alone, and the FIN
+      -- after the handshake is taken.
+      sport_v := 40202;
+      hseq_v  := X"00012000";
+      send(seg(C_HIP, C_PORT, 40202, hseq_v, X"00000000", C_SYN or C_FIN, 8192, 0, 0, false, C_IP, 5));
+      expect(1 ms, 40202);
+      assert flags_v = X"12" and ack_v = hseq_v + 1
+         report "tb_eth_tcp: FAIL, the SYN-ACK of a SYN with a FIN"
+         severity failure;
+      hseq_v := hseq_v + 1;
+      bseq_v := seq_v + 1;
+      send_seg(C_ACK, 0);
+      nb_v   := n_break;
+      send_seg(C_FIN or C_ACK, 0);
+      hseq_v := hseq_v + 1;
+      expect_ack;
+      wait for 1 us;
+      assert n_break = nb_v + 1 and brk_at = hd_v
+         report "tb_eth_tcp: FAIL, no break for the FIN after a SYN with a FIN"
+         severity failure;
+      send_seg(C_RST, 0);
+      wait for 1 us;
+
+      -- A SYN with data opens a connection for the SYN alone, and the data
+      -- after the handshake is taken, once.
+      sport_v := 40203;
+      hseq_v  := X"00013000";
+      send(seg(C_HIP, C_PORT, 40203, hseq_v, X"00000000", C_SYN, 8192, 5, hd_v, false, C_IP, 5));
+      expect(1 ms, 40203);
+      assert flags_v = X"12" and ack_v = hseq_v + 1
+         report "tb_eth_tcp: FAIL, the SYN-ACK of a SYN with data"
+         severity failure;
+      hseq_v := hseq_v + 1;
+      bseq_v := seq_v + 1;
+      send_seg(C_ACK, 0);
+      send_data(5);
+      wait for 1 us;
+      assert n_log = hd_v and not lrx_bad
+         report "tb_eth_tcp: FAIL, the data of a SYN"
+         severity failure;
+
+      -- A partial ACK frees what it covers, and after the timeout the rest
+      -- comes again from its sequence number.
+      ltx_req <= ltx_req + 50;
+      expect_data;
+      assert n_v = 50
+         report "tb_eth_tcp: FAIL, not the data for the partial ACK"
+         severity failure;
+      bseq_v := bseq_v - 30;
+      bd_v   := bd_v - 30;
+      send_seg(C_ACK, 0);
+      expect_data(2 * C_RTO);
+      assert n_v = 30
+         report "tb_eth_tcp: FAIL, not the rest after a partial ACK"
+         severity failure;
+      send_seg(C_ACK, 0);
+
+      -- A segment with old bytes and new ones is dropped whole, and gets an
+      -- ACK; the new ones then are taken.
+      hseq_v := hseq_v - 3;
+      hd_v   := hd_v - 3;
+      send_seg(C_ACK, 6);
+      hseq_v := hseq_v + 3;
+      hd_v   := hd_v + 3;
+      expect_ack;
+      send_data(3);
+
+      -- An old ACK, before una_seq, is not taken, nor its window, but its
+      -- data is.
+      bseq_v := bseq_v - 1000;
+      send_seg(C_ACK, 2, win => 0);
+      bseq_v := bseq_v + 1000;
+      hseq_v := hseq_v + 2;
+      hd_v   := hd_v + 2;
+      expect_ack;
+      ltx_req <= ltx_req + 10;
+      expect_data(C_RTO / 2);
+      assert n_v = 10
+         report "tb_eth_tcp: FAIL, the window of an old ACK was taken"
+         severity failure;
+      send_seg(C_ACK, 0);
+
+      -- Data or a FIN without ACK is dropped, with no answer.
+      send_seg(X"00", 3);
+      send_seg(C_FIN, 0);
+      nb_v := n_break;
+      expect_none(10 us);
+      assert n_log = hd_v and n_break = nb_v and conn = '1'
+         report "tb_eth_tcp: FAIL, a segment without ACK was taken"
+         severity failure;
+
+      -- An ACK of what was not sent gets an ACK, and its data is dropped.
+      bseq_v := bseq_v + 1000;
+      send_seg(C_ACK, 2);
+      bseq_v := bseq_v - 1000;
+      expect_ack;
+      wait for 1 us;
+      assert n_log = hd_v
+         report "tb_eth_tcp: FAIL, the data of an ACK of what was not sent"
+         severity failure;
+
+      -- An RST from another IP address does nothing.
+      send(seg(C_HIP2, C_PORT, sport_v, hseq_v, X"00000000", C_RST, 8192, 0, 0, false));
+      expect_none(10 us);
+      assert conn = '1'
+         report "tb_eth_tcp: FAIL, an RST from another IP address ended the connection"
+         severity failure;
+
+      -- A FIN ahead of its data gets an ACK, and is not taken; the data and
+      -- the FIN in order then are, with one break.
+      hseq_v := hseq_v + 4;
+      send_seg(C_FIN or C_ACK, 0);
+      hseq_v := hseq_v - 4;
+      expect_ack;
+      wait for 1 us;
+      assert n_break = nb_v
+         report "tb_eth_tcp: FAIL, a FIN ahead of its data was taken"
+         severity failure;
+      send_seg(C_FIN or C_ACK, 4);
+      hseq_v := hseq_v + 5;
+      hd_v   := hd_v + 4;
+      expect_ack;
+      wait for 1 us;
+      assert n_break = nb_v + 1 and brk_at = hd_v and n_log = hd_v and not lrx_bad
+         report "tb_eth_tcp: FAIL, no break after the data before the FIN"
+         severity failure;
+
+      -- A SYN from the connection's own port with another sequence number,
+      -- as after a reboot of the host, replaces the connection: the old one
+      -- gets its FIN, the host's RST ends it, and the new one opens.
+      send(seg(C_HIP, C_PORT, sport_v, X"00090000", X"00000000", C_SYN, 8192, 0, 0, false));
+      expect(1 ms, sport_v);
+      assert flags_v = X"11" and seq_v = bseq_v
+         report "tb_eth_tcp: FAIL, no FIN before the SYN from the same port"
+         severity failure;
+      send_seg(C_RST, 0);
+      expect(1 ms, sport_v);
+      assert flags_v = X"12" and ack_v = X"00090001"
+         report "tb_eth_tcp: FAIL, no SYN-ACK after the SYN from the same port"
+         severity failure;
+      hseq_v := X"00090001";
+      bseq_v := seq_v + 1;
+      send_seg(C_ACK, 0);
+      send_data(2);
+      send_seg(C_RST, 0);
+      wait for 1 us;
+
+      -- Both sides' sequence numbers wrap around 2^32 in one connection:
+      -- the host's start at X"FFFFFF00", and the server's just before it.
+      wait until rising_edge(clk);
+      isn <= force X"FFFFFF00";
+      wait until rising_edge(clk);
+      isn <= release;
+      open_conn(40204, X"FFFFFF00");
+      assert seq_v(31 downto 12) = X"FFFFF"
+         report "tb_eth_tcp: FAIL, the server's sequence number is not near 2^32"
+         severity failure;
+      for i in 1 to 3 loop
+         send_data(200);
+      end loop;
+      link_out(1200);
+      assert hseq_v(31 downto 12) = X"00000" and bseq_v(31 downto 12) = X"00000"
+         report "tb_eth_tcp: FAIL, the sequence numbers did not wrap"
+         severity failure;
+      wait for 1 us;
+      assert n_log = hd_v and not lrx_bad
+         report "tb_eth_tcp: FAIL, the link got the wrong bytes across 2^32"
+         severity failure;
+      send_seg(C_RST, 0);
+      wait for 1 us;
 
       -- An RST ends a connection that waits for the ACK of its SYN-ACK.
       send(seg(C_HIP2, C_PORT, 40008, X"0000E000", X"00000000", C_SYN, 8192, 0, 0, false));
