@@ -8,6 +8,9 @@
 -- video/scr_ram.vhd. The read gives the word in the cycle after the
 -- address, as block RAM does. The memory is in an entity of its own so that
 -- Vivado makes block RAM of it (video/scr_ram.vhd says why).
+-- With G_FORMAL, f_data_o shows the word at f_addr_i at once, for the
+-- properties of the FIFOs; otherwise it is 0, and the memory has no third
+-- port.
 --
 -- RESET
 -- None.
@@ -18,7 +21,9 @@ library ieee;
 
 entity eth_ram is
    generic (
-      G_ADDR_BITS : natural
+      G_ADDR_BITS : natural;
+      -- The port of the FIFOs' properties
+      G_FORMAL    : boolean := false
    );
    port (
       wr_clk_i  : in  std_logic;
@@ -28,7 +33,11 @@ entity eth_ram is
 
       rd_clk_i  : in  std_logic;
       rd_addr_i : in  std_logic_vector(G_ADDR_BITS - 1 downto 0);
-      rd_data_o : out std_logic_vector(8 downto 0) := (others => '0')
+      rd_data_o : out std_logic_vector(8 downto 0) := (others => '0');
+
+      -- A word of the memory, for the properties
+      f_addr_i  : in  std_logic_vector(G_ADDR_BITS - 1 downto 0) := (others => '0');
+      f_data_o  : out std_logic_vector(8 downto 0)
    );
 end entity eth_ram;
 
@@ -58,5 +67,13 @@ begin
          rd_data_o <= mem(to_integer(rd_addr_i));
       end if;
    end process p_read;
+
+   gen_formal : if G_FORMAL generate
+      f_data_o <= mem(to_integer(f_addr_i));
+   end generate gen_formal;
+
+   gen_no_formal : if not G_FORMAL generate
+      f_data_o <= (others => '0');
+   end generate gen_no_formal;
 
 end architecture synthesis;

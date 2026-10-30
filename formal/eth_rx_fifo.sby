@@ -1,0 +1,32 @@
+# The FIFO of received Ethernet frames, src/eth/eth_rx_fifo.vhd
+# (formal_eth_rx_fifo.vhd), with its two clocks: "multiclock on" makes a
+# step of the solver a moment in which either clock may rise. "prove"
+# proves the assertions in every step by k-induction, and "cover" reaches
+# each cover statement. The depths are in steps, two to a cycle of the
+# read clock: 20 is the k of the induction, and 70 is how far "cover"
+# looks, past three frames read.
+
+[tasks]
+prove
+cover
+
+[options]
+prove: mode prove
+prove: depth 20
+cover: mode cover
+cover: depth 70
+multiclock on
+
+[engines]
+smtbmc yices
+
+[script]
+plugin -i ghdl
+ghdl --std=08 -fpsl eth_pkg.vhd eth_ram.vhd eth_rx_fifo.vhd formal_eth_rx_fifo.vhd -e formal_eth_rx_fifo
+prep -top formal_eth_rx_fifo
+
+[files]
+../src/eth/eth_pkg.vhd
+../src/eth/eth_ram.vhd
+../src/eth/eth_rx_fifo.vhd
+formal_eth_rx_fifo.vhd

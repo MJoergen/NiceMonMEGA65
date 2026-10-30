@@ -481,13 +481,38 @@ every time, not only the ones a testbench sends.
   taken; the bytes of a frame, from its first to its last, all come from
   the responders or all from the TCP server; and the responders come
   first when both start in the same cycle.
+- `eth_rx_fifo.sby` and `eth_tx_fifo.sby` prove the two FIFOs of
+  frames, `src/eth/eth_rx_fifo.vhd` and `src/eth/eth_tx_fifo.vhd`,
+  across their two clocks, with SymbiYosys's `multiclock on`: each step
+  of the solver is a moment in which either clock may rise. The system
+  clock rises every other step, and the PHY's clock as the solver
+  likes, but never faster than the system clock and, for the FIFO of
+  frames to send, no more than three times slower. Both sides are reset
+  together at the start, and the FIFOs have 8 and 4 bytes. The read
+  pointer that the write side decodes from Gray code is a past value of
+  the real one, which stays at or before the committed one, which stays
+  at or before the write pointer, all within the FIFO's size of the
+  read pointer that the write side sees, and the write side is full
+  exactly when it sees the FIFO full; a write never lands on a byte not
+  yet read; the read
+  side takes the committed pointer only after it has stood still for two
+  of its cycles, and then has it exactly; a byte offered stays until it
+  is taken; and a byte that the solver picks stays in the memory until
+  its turn, and is then the byte read, with its mark. In the FIFO of
+  received frames, a bad frame, or one that found the FIFO full, gives
+  back all of its space, and a good one commits all but its check
+  sequence, with the mark on its last byte. In the FIFO of frames to
+  send, a frame is committed only with its last byte, and commits are
+  14 cycles apart, whatever the frames' lengths. The solver has no
+  metastability, so a synchronizer of one register instead of two would
+  pass.
 
 The checks in `rx_fifo.vhd`, `board_io.vhd`, `scr_regs.vhd`,
 `devices.vhd`, `mem.vhd`, `nicemon.vhd`, `eth/eth_tcp_timer.vhd`,
 `eth/eth_tcp_buf.vhd`, `eth/eth_tcp_pick.vhd`, `eth/eth_tcp_rx.vhd`,
-`eth/eth_tcp_tx.vhd`, `eth/rx_fcs.vhd`, and `eth/eth_arb.vhd` are in
-`G_FORMAL` blocks,
-which are off in simulation and synthesis.
+`eth/eth_tcp_tx.vhd`, `eth/rx_fcs.vhd`, `eth/eth_arb.vhd`,
+`eth/eth_rx_fifo.vhd`, and `eth/eth_tx_fifo.vhd` are in `G_FORMAL`
+blocks, which are off in simulation and synthesis.
 
 ## Testing the board
 
