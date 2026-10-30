@@ -252,8 +252,8 @@ hold slacks were not recorded. The slacks change from build to build with
 placement more than with the logic. The worst paths are usually in the
 core's WRITE and FETCH stages. Every build writes the five worst paths
 into the TCP server, within it, and out of it to `build/tcp_paths.rpt`.
-On the R6 their worst slack is about 1.5 ns, where the core's is about
-0.2 ns.
+On the R6 their worst slack is about 2.3 ns, where the core's is about
+0.3 ns.
 
 The PHY's RXD and CRS_DV are timed against the clock on its pin, with the
 output delays of the PHYs' data sheets and 1 ns for the traces. The pin's

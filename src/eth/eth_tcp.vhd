@@ -213,9 +213,11 @@ architecture synthesis of eth_tcp is
    signal pend_host : t_host                        := C_HOST_NONE;
    signal pend_seq  : std_logic_vector(31 downto 0) := (others => '0');
    signal pend_win  : std_logic_vector(15 downto 0) := (others => '0');
-   -- The retransmission timer (eth_tcp_timer.vhd) runs, runs out, and is
-   -- on its last try
+   -- The retransmission timer (eth_tcp_timer.vhd) runs, and the same a
+   -- cycle later, which the timer takes; it runs out, and is on its last
+   -- try
    signal armed    : std_logic;
+   signal armed_r  : std_logic := '0';
    signal timeout  : std_logic;
    signal last_try : std_logic;
    -- The connection ends, once the ACK that the host is owed is sent.
@@ -381,7 +383,13 @@ begin
    -- The timer runs while there is a connection and the SYN-ACK, data, or
    -- the FIN is out, or a window of 0 holds data back, and not after its
    -- end, whatever was out then; it stands still while a segment is acted
-   -- on or the connection ends, which come first.
+   -- on or the connection ends, which come first. The timer takes it a
+   -- cycle later (armed_r), for the timing. That is safe: armed falls only
+   -- after a cycle in which a segment was acted on, the connection ended,
+   -- or the timer ran out, as all else that it reads only grows or sets it,
+   -- and the timer stands still in the cycle after each, so no tick meets
+   -- the old value; it rises a cycle late, which delays the first timeout
+   -- by a cycle.
    armed <= '1' when syn_rcvd = '1' or
                      (estab = '1' and (max_ptr /= una_ptr or
                                        (state = LAST_ACK_ST and fin_max = '1') or
@@ -397,7 +405,7 @@ begin
       port map (
          clk_i       => clk_i,
          rst_i       => rst_i,
-         armed_i     => armed,
+         armed_i     => armed_r,
          hold_i      => eval or ending,
          restart_i   => restart,
          tries_clr_i => tries_clr,
@@ -549,6 +557,7 @@ begin
    begin
       if rising_edge(clk_i) then
          isn       <= isn + 1;
+         armed_r   <= armed;
          brk_set   <= '0';
          restart   <= '0';
          tries_clr <= '0';
@@ -777,6 +786,7 @@ begin
             brk_set   <= '0';
             restart   <= '0';
             tries_clr <= '0';
+            armed_r   <= '0';
          end if;
       end if;
    end process p_tcp;
