@@ -1,7 +1,8 @@
--- Tests the on-board debugger (src/dbg/dbg.vhd), stage 6 of
+-- Tests the on-board debugger (src/dbg/dbg.vhd), stage 7 of
 -- doc/DEBUGGER.md, with the system under it: the strip it draws into the
 -- overlay, the toggle, the core's keys over the debug link, the sticky
--- setting, the catch, the page, and the breakpoints.
+-- setting, the catch, the page, the breakpoints, and the Nexys4DDR's
+-- buttons and display.
 --
 -- PASS AND FAIL
 -- Each check is an assert with severity failure, which stops GHDL with a
@@ -14,13 +15,15 @@
 -- it takes the debugger's writes into a model, and counts those outside
 -- its 29 rows, which must be none. p_main types keys, as bytes of the
 -- keyboard, and waits for the strip's text. The debugger's G_CLOCK_HZ is
--- small, so that it refreshes every 3000 cycles. The steps:
+-- small, so that it refreshes every 3000 cycles and samples the buttons
+-- every 900. It has G_BOARD_IO, and seg_text reads its display. The steps:
 --
 -- 1. After reset the strip is drawn: no registers, NO LINK, and the keys
 --    with the MEGA65's toggle key. The debugger is Off, and the link is not
 --    its.
 -- 2. The toggle enters Focus: the strip is shown, and the keyboard and the
---    link are the debugger's. The core is RUNNING.
+--    link are the debugger's. The core is RUNNING, and the display shows
+--    dashes.
 -- 3. F5 pauses: PAUSED, with R0-R15 in white, R15 also as the PC, and the
 --    word at the PC from the ROM.
 -- 4. s steps: the PC moves on, to an instruction of the loop.
@@ -57,6 +60,10 @@
 --    breakpoint 1: BRK 1.
 -- 19. b takes the lowest free breakpoint, and with none free says so.
 --    After a digit, b is a digit.
+-- 20. The buttons: the display shows the PC at breakpoint 1, BTND and
+--    BTNU move the cursor, BTNL steps once though it bounces, BTNR goes
+--    on to breakpoint 1, and BTNC leaves Focus. In Off the buttons do
+--    nothing.
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -76,8 +83,10 @@ architecture simulation of tb_dbg is
    constant C_CLOCK_HZ : natural := 90_000_000;
    constant C_PERIOD   : time    := 1 sec / C_CLOCK_HZ;
    -- The debugger's clock rate, which sets its refresh, 3000 cycles
-   constant C_DBG_HZ  : natural := 60 * 3000;
-   constant C_TIMEOUT : time    := 2 ms;
+   constant C_DBG_HZ : natural := 60 * 3000;
+   -- The debugger's sample of the buttons
+   constant C_BTN_WAIT : natural := C_DBG_HZ / 200;
+   constant C_TIMEOUT  : time    := 2 ms;
 
    type t_ovl is array (0 to 4095) of std_logic_vector(31 downto 0);
 
@@ -125,6 +134,8 @@ architecture simulation of tb_dbg is
    signal strip    : std_logic;
    signal page     : std_logic;
    signal focus    : std_logic;
+   signal btn      : std_logic_vector(4 downto 0) := (others => '0');
+   signal seg      : std_logic_vector(63 downto 0);
 
    signal ovl    : t_ovl   := (others => (others => '0'));
    signal writes : natural := 0;
@@ -140,6 +151,29 @@ architecture simulation of tb_dbg is
       end loop;
       return res_v;
    end function row_text;
+
+   -- The display's digits as text, digit 7 first, - for a dash, ? for
+   -- anything else
+   function seg_text(sg : std_logic_vector(63 downto 0)) return string is
+      constant C_SEGS : std_logic_vector(0 to 16 * 8 - 1) :=
+                                                             X"3F065B4F666D7D077F6F777C395E7971";
+      constant C_HEX  : string(1 to 16) := "0123456789ABCDEF";
+      variable res_v  : string(1 to 8) := (others => '?');
+      variable b_v    : std_logic_vector(7 downto 0);
+   begin
+      for i in 0 to 7 loop
+         b_v := sg(8 * (7 - i) + 7 downto 8 * (7 - i));
+         if b_v = X"40" then
+            res_v(i + 1) := '-';
+         end if;
+         for d in 0 to 15 loop
+            if b_v = C_SEGS(8 * d to 8 * d + 7) then
+               res_v(i + 1) := C_HEX(d + 1);
+            end if;
+         end loop;
+      end loop;
+      return res_v;
+   end function seg_text;
 
    function hex_word(s : string) return std_logic_vector is
       variable res_v : std_logic_vector(31 downto 0) := (others => '0');
@@ -192,7 +226,8 @@ begin
 
    i_dbg : entity work.dbg
       generic map (
-         G_CLOCK_HZ => C_DBG_HZ
+         G_CLOCK_HZ => C_DBG_HZ,
+         G_BOARD_IO => true
       )
       port map (
          clk_i       => clk,
@@ -213,7 +248,9 @@ begin
          ovl_data_o  => ovl_data,
          strip_o     => strip,
          page_o      => page,
-         focus_o     => focus
+         focus_o     => focus,
+         btn_i       => btn,
+         seg_o       => seg
       ); -- i_dbg
 
 
@@ -251,6 +288,38 @@ begin
          toggle <= '0';
          cycles(2);
       end procedure pulse;
+
+      -- Presses button b for 3 samples, bouncing for the first 300 cycles
+      -- if bounce, and releases it for 3
+      procedure press(b : natural; bounce : boolean := false) is
+      begin
+         if bounce then
+            for i in 1 to 3 loop
+               btn(b) <= '1';
+               cycles(50);
+               btn(b) <= '0';
+               cycles(50);
+            end loop;
+         end if;
+         btn(b) <= '1';
+         cycles(3 * C_BTN_WAIT);
+         btn(b) <= '0';
+         cycles(3 * C_BTN_WAIT);
+      end procedure press;
+
+      -- The display, waited for
+      procedure expect_seg(t : string; what : string) is
+         variable end_v : time;
+      begin
+         end_v := now + C_TIMEOUT;
+         loop
+            exit when seg_text(seg) = t or now >= end_v;
+            wait until rising_edge(clk);
+         end loop;
+         assert seg_text(seg) = t
+            report "tb_dbg: " & what & ": the display shows " & seg_text(seg)
+            severity failure;
+      end procedure expect_seg;
 
       -- The outputs must be strip, page, and focus.
       procedure expect(s, p, f : std_logic; what : string) is
@@ -414,6 +483,7 @@ begin
          report "tb_dbg: the debugger has not the link in Focus"
          severity failure;
       expect_row27("RUNNING", "in Focus");
+      expect_seg("--------", "in Focus");
       key("z");
 
       report "tb_dbg: 3. F5 pauses";
@@ -670,6 +740,30 @@ begin
       assert row(0)(36 to 77) = "Breaks 00000006 00000004 00000007 00000008"
          report "tb_dbg: the header is '" & row(0) & "' after b as a digit"
          severity failure;
+      report "tb_dbg: 20. the buttons and the display";
+      expect_seg("00000004", "at breakpoint 1");
+      press(4);
+      wait_text(0, 0, " Window 00000000  Cursor 00000011 ");
+      press(1);
+      wait_text(0, 0, " Window 00000000  Cursor 00000009 ");
+      press(2, true);
+      expect_seg("00000006", "after BTNL");
+      cycles(10000);
+      assert row(27)(11 to 18) = "00000006"
+         report "tb_dbg: row 27 is '" & row(27) & "' after a bouncing BTNL"
+         severity failure;
+      press(3);
+      expect_row27("BRK 1    00000004", "after BTNR");
+      expect_seg("00000004", "after BTNR");
+      press(0);
+      expect('0', '0', '0', "after BTNC");
+      press(2);
+      press(3);
+      pulse;
+      expect('1', '1', '1', "back in Focus after the buttons in Off");
+      cycles(10000);
+      expect_row27("BRK 1    00000004", "after the buttons in Off");
+
       assert stray = 0
          report "tb_dbg: " & to_string(stray) & " writes outside the overlay's rows"
          severity failure;

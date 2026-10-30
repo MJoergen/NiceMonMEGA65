@@ -205,7 +205,10 @@ The testbenches are these:
   page colors, and a restart stops there with BRK 0; `b` sets breakpoint
   1 and clears breakpoint 0, and `g` goes on to BRK 1; `b` then takes
   the lowest free breakpoint, says `none free` when all four are in use,
-  and after a digit is a digit.
+  and after a digit is a digit. With the Nexys4DDR's buttons and
+  display, the display shows dashes while the core runs and the PC at a
+  stop; BTND and BTNU move the cursor, a bouncing BTNL steps once, BTNR
+  goes on, BTNC leaves Focus, and in Off the buttons do nothing.
 - `sim/tb_dbg_host.vhd` tests the debugger's host against the debug link
   itself, on the system's third link input, with `sim/host.nasm`, which
   writes 0x00 to 0xFF to the console again and again. It reads the

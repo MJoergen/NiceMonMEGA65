@@ -2,7 +2,7 @@
 
 A debugger in the FPGA, with the MEGA65's own keyboard and screen and no
 host: what `tools/mon.py` does over the debug link, in a strip of text
-under the program's screen, and a page over it. **Stages 1 to 6 are
+under the program's screen, and a page over it. **Stages 1 to 7 are
 written, and the rest is planned**
 ([#52](https://github.com/MJoergen/NiceMonMEGA65/issues/52)): the toggle
 key enters Focus, where the strip shows the core's state, its registers
@@ -221,12 +221,14 @@ and outputs, and its room.
   program's registers ([SYSTEM.md](SYSTEM.md#the-nexys4ddrs-devices)),
   so a program keeps them while the strip is up, and the debugger needs
   none of them, since Scroll Lock enters Focus. BTNL steps, BTNR goes
-  on, BTNU and BTND move the cursor, and BTNC leaves Focus. The program
-  reads the buttons as 0 meanwhile: `system.vhd` gives `nicemon` the
-  buttons masked by `focus_o`, and the debugger, which debounces them
-  itself, the raw ones. The display shows the PC, eight hex digits on
-  its eight digits, live once the registers are, through a
-  hex-to-segments table in the debugger; `system.vhd` gives the board
+  on, BTNU and BTND move the cursor, and BTNC leaves Focus (written).
+  The program reads the buttons as 0 meanwhile: `system.vhd` gives
+  `nicemon` the buttons masked by `focus_o`, and the debugger, which
+  debounces them itself, the raw ones: it samples them every 5 ms, and
+  a press is a sample at 1 after one at 0. The display shows the PC at
+  a stop, eight hex digits on its eight digits, and dashes otherwise,
+  live once the registers are, through a hex-to-segments table in the
+  debugger; `system.vhd` gives the board
   the debugger's segments in Focus and the program's otherwise. The
   LEDs stay the program's.
 - **Row 28 names the board's toggle key**, from a generic of the
@@ -240,7 +242,8 @@ and outputs, and its room.
   stage 1 has 0.289 ns of setup and 0.029 ns of hold slack, that of
   stage 3 0.339 ns and 0.031 ns, that of stage 4 0.532 ns and 0.029 ns,
   that of stage 5 0.111 ns and 0.017 ns, on a path in the core, that
-  of stage 6 0.139 ns and 0.022 ns, also in the core, and the
+  of stage 6 0.139 ns and 0.022 ns, also in the core, that of stage 7
+  0.159 ns and 0.034 ns, and the
   slacks move with
   placement more than with logic ([synth/README.md](../synth/README.md#timing)): every
   stage rebuilds `make nexys4ddr` and reads its timing, and a miss there
@@ -340,7 +343,7 @@ free.
   runs gets `e02`; console bytes arrive in order between packets; the
   UART's bytes are dropped; and a request that the link never gets
   times out.
-- `tb_dbg` (written for stage 6): the debugger with `nicemon`, driven
+- `tb_dbg` (written for stage 7): the debugger with `nicemon`, driven
   by keyboard bytes and toggle pulses, checking the overlay's words and
   the link's state. The program under it is `sim/dbg.nasm`, in the ROM:
   F5, s, F3, the halt, r, F7, and g and p on a held core; F12 and Strip,
@@ -351,7 +354,10 @@ free.
   breakpoints: `b` sets one, which the header lists and the page colors,
   the core stops there with `BRK 0`, `b` clears one, `g` goes on to `BRK
   1`, `b` takes the lowest free one, and says `none free` when there is
-  none, and after a digit `b` is a digit.
+  none, and after a digit `b` is a digit; and, with `G_BOARD_IO`, the
+  display's dashes and PC, BTND and BTNU, a bouncing BTNL that steps
+  once, BTNR, BTNC, and the buttons doing nothing in Off. The mask of
+  the core's buttons in `system.vhd` has no test of its own.
 - `tb_kbd` and `tb_ps2`: the two toggle detectors, with a held key's
   repeats and its release, and one key of MEGA+HELP alone; and Page Up,
   Page Down, and Home from both keyboards.
@@ -393,7 +399,7 @@ Each a commit that builds and passes the tests:
    word edit, `a`, and Page Up, Page Down, and Home from both keyboards.
 6. **The breakpoints** (done). `b`, the header's list, the colored
    words, and `BRK n`.
-7. **The Nexys4DDR's buttons and display** in Focus.
+7. **The Nexys4DDR's buttons and display** in Focus (done).
 8. **The decode** of row 27, `dbg_decode.vhd`.
 9. **nice_cpu V1.2**
    ([#53](https://github.com/MJoergen/NiceMonMEGA65/issues/53)). At

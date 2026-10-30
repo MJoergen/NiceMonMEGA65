@@ -35,6 +35,8 @@
 -- board without one leaves it at '0'. While the debugger has the focus, the
 -- keyboard's bytes go to it instead of the core's console FIFO, and it
 -- drives the debug link, in the place of the UART and TCP (nicemon.vhd).
+-- With G_BOARD_IO, the buttons are the debugger's then too, and the core
+-- reads them as 0, and the display shows the debugger's segments.
 --
 -- INTERFACE CONTRACTS -- these are requirements on the environment:
 -- a) vga_clk_i is the pixel clock of G_VIDEO.
@@ -165,6 +167,9 @@ architecture synthesis of system is
    signal dbg_kbd_valid : std_logic;
    signal dbg_kbd_ready : std_logic;
    signal dbg_focus     : std_logic;
+   signal dbg_seg       : std_logic_vector(63 downto 0);
+   signal sys_seg       : std_logic_vector(63 downto 0);
+   signal sys_btn       : std_logic_vector(4 downto 0);
 
    -- The debugger's overlay
    signal ovl_we    : std_logic;
@@ -221,8 +226,8 @@ begin
          brd_led_o      => brd_led_o,
          brd_rgb0_o     => brd_rgb0_o,
          brd_rgb1_o     => brd_rgb1_o,
-         brd_seg_o      => brd_seg_o,
-         brd_btn_i      => brd_btn_i,
+         brd_seg_o      => sys_seg,
+         brd_btn_i      => sys_btn,
          brd_sw_i       => brd_sw_i,
          eth_rx_i       => eth_rx,
          eth_rx_bad_i   => eth_rx_bad,
@@ -283,11 +288,17 @@ begin
    dbg_kbd_valid <= kbd_valid_i and dbg_focus;
    kbd_ready_o   <= dbg_kbd_ready when dbg_focus = '1' else sys_kbd_ready;
 
+   -- So are the board's buttons, which the core reads as 0 meanwhile, and
+   -- the display shows the debugger's segments.
+   sys_btn   <= brd_btn_i when dbg_focus = '0' else (others => '0');
+   brd_seg_o <= dbg_seg when dbg_focus = '1' else sys_seg;
+
 
    i_dbg : entity work.dbg
       generic map (
          G_CLOCK_HZ   => G_CLOCK_HZ,
-         G_TOGGLE_KEY => G_TOGGLE_KEY
+         G_TOGGLE_KEY => G_TOGGLE_KEY,
+         G_BOARD_IO   => G_BOARD_IO
       )
       port map (
          clk_i       => clk_i,
@@ -308,7 +319,9 @@ begin
          ovl_data_o  => ovl_data,
          strip_o     => ovl_strip,
          page_o      => ovl_page,
-         focus_o     => dbg_focus
+         focus_o     => dbg_focus,
+         btn_i       => brd_btn_i,
+         seg_o       => dbg_seg
       ); -- i_dbg
 
 

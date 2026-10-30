@@ -4,8 +4,9 @@
 -- with single keys.
 --
 -- THEORY OF OPERATION
--- This is stage 6 of the design note: the live strip, the core keys, the
--- sticky setting, the catch, the page, and the breakpoints. The debugger has three states. It is Off
+-- This is stage 7 of the design note: the live strip, the core keys, the
+-- sticky setting, the catch, the page, the breakpoints, and the
+-- Nexys4DDR's buttons and display. The debugger has three states. It is Off
 -- after reset. The toggle pulse, toggle_i, takes it from Off or Strip to
 -- Focus, and from Focus to Off, or to Strip while the sticky setting is
 -- on, which F12 toggles in Focus. In Strip and Focus the strip is shown
@@ -60,6 +61,14 @@
 -- the window to. b on an empty field is the key of a breakpoint; after a
 -- digit, a and b are digits.
 --
+-- With G_BOARD_IO, the board's buttons are keys in Focus too: BTNL steps,
+-- BTNR goes on, BTNU and BTND move the page's cursor, and BTNC leaves
+-- Focus as the toggle key does. p_btn synchronizes them and samples them
+-- every 5 ms, longer than they bounce, and a press is a sample at 1 after
+-- one at 0. p_seg gives the seven-segment display the PC at a stop, a
+-- hex digit on each of its eight digits, and dashes otherwise; system.vhd
+-- shows it in Focus, and masks the core's buttons then.
+--
 -- The strip is rows 25 to 28 of the overlay of text.vhd, the words 2000 to
 -- 2319, addressed row * 80 + column. C_CELLS says what each word shows: a
 -- fixed character, a hex digit of a word that the debugger read, a
@@ -89,7 +98,9 @@ entity dbg is
    generic (
       G_CLOCK_HZ   : positive := 100_000_000;
       -- The board's key that toggles the debugger, named in row 28
-      G_TOGGLE_KEY : string   := "MEGA+HELP"
+      G_TOGGLE_KEY : string   := "MEGA+HELP";
+      -- The board has buttons and a seven-segment display, the Nexys4DDR's
+      G_BOARD_IO   : boolean  := false
    );
    port (
       clk_i       : in  std_logic;
@@ -120,7 +131,13 @@ entity dbg is
       page_o      : out std_logic;
 
       -- '1' while the keyboard is the debugger's
-      focus_o     : out std_logic
+      focus_o     : out std_logic;
+
+      -- With G_BOARD_IO, the board's buttons, unsynchronized, bit 0 the
+      -- center one, then up, left, right, and down; and the display's
+      -- segments, which are the board's in Focus (seg7.vhd)
+      btn_i       : in  std_logic_vector(4 downto 0) := (others => '0');
+      seg_o       : out std_logic_vector(63 downto 0)
    );
 end entity dbg;
 
@@ -159,6 +176,13 @@ architecture synthesis of dbg is
    constant C_TIMEOUT : positive := G_CLOCK_HZ / 10;
    -- An ESC with no byte after it for 1 ms is the ESC key, not a sequence
    constant C_ESC_WAIT : positive := G_CLOCK_HZ / 1000;
+   -- The buttons are sampled every 5 ms, which outlasts their bounce
+   constant C_BTN_WAIT : positive := G_CLOCK_HZ / 200;
+   constant C_BTN_C    : natural  := 0;
+   constant C_BTN_U    : natural  := 1;
+   constant C_BTN_L    : natural  := 2;
+   constant C_BTN_R    : natural  := 3;
+   constant C_BTN_D    : natural  := 4;
 
    constant C_REGS : t_word := X"FFFFFFE0";
    constant C_CTRL : t_word := X"FFFFFFF0";
@@ -437,6 +461,13 @@ architecture synthesis of dbg is
       end if;
    end function hex_char;
 
+   -- The segments of a hex digit, bit 0 segment A to bit 6 segment G
+   type t_hex7 is array (0 to 15) of t_byte;
+
+   constant C_HEX7     : t_hex7 := (X"3F", X"06", X"5B", X"4F", X"66", X"6D", X"7D", X"07",
+      X"7F", X"6F", X"77", X"7C", X"39", X"5E", X"79", X"71");
+   constant C_SEG_DASH : t_byte := X"40";
+
    function nibble(w : t_word;
                    n : natural range 0 to 7) return std_logic_vector is
    begin
@@ -462,6 +493,18 @@ architecture synthesis of dbg is
    signal catch  : std_logic;                            -- A stop to catch in Strip
    signal own_r  : std_logic := '0';                     -- A stop of the debugger's own is due
    signal keys_k : natural range 0 to 2;
+   signal leave  : std_logic;                            -- BTNC in Focus
+
+   -- The buttons: synchronized, sampled, and the presses
+   signal btn_meta  : std_logic_vector(4 downto 0) := (others => '0');
+   signal btn_sync  : std_logic_vector(4 downto 0) := (others => '0');
+   signal btn_level : std_logic_vector(4 downto 0) := (others => '0');
+   signal btn_press : std_logic_vector(4 downto 0) := (others => '0');
+   signal btn_cnt   : natural range 0 to C_BTN_WAIT - 1 := 0;
+
+   attribute async_reg : string;
+   attribute async_reg of btn_meta : signal is "TRUE";
+   attribute async_reg of btn_sync : signal is "TRUE";
 
    signal kbd_st   : t_kbd_st := KBD_IDLE_ST;
    signal kbd_num  : natural range 0 to 99;
@@ -579,6 +622,7 @@ begin
               '0';
 
    enter <= '1' when toggle_i = '1' and state = OFF_ST else '0';
+   leave <= '1' when btn_press(C_BTN_C) = '1' and state = FOCUS_ST else '0';
 
    p_state : process (clk_i)
    begin
@@ -587,7 +631,7 @@ begin
             sticky <= not sticky;
          end if;
 
-         if toggle_i = '1' then
+         if toggle_i = '1' or leave = '1' then
             case state is
                when OFF_ST | STRIP_ST =>
                   state <= FOCUS_ST;
@@ -697,6 +741,14 @@ begin
                   end if;
 
             end case;
+         elsif state = FOCUS_ST and btn_press(C_BTN_L) = '1' then
+            key_act <= ACT_STEP;
+         elsif state = FOCUS_ST and btn_press(C_BTN_R) = '1' then
+            key_act <= ACT_GO;
+         elsif state = FOCUS_ST and btn_press(C_BTN_U) = '1' then
+            pkey <= PK_UP;
+         elsif state = FOCUS_ST and btn_press(C_BTN_D) = '1' then
+            pkey <= PK_DOWN;
          elsif kbd_st = KBD_ESC_ST then
             -- No byte after the ESC: the ESC key
             if esc_cnt = 0 then
@@ -714,6 +766,52 @@ begin
          end if;
       end if;
    end process p_kbd;
+
+   ---------------------------------------------------------------------------
+   -- The board's buttons and display
+   ---------------------------------------------------------------------------
+
+   gen_board_io : if G_BOARD_IO generate
+
+      -- A press is a sample at 1 after one at 0
+      p_btn : process (clk_i)
+      begin
+         if rising_edge(clk_i) then
+            btn_meta  <= btn_i;
+            btn_sync  <= btn_meta;
+            btn_press <= (others => '0');
+            if btn_cnt = 0 then
+               btn_cnt   <= C_BTN_WAIT - 1;
+               btn_level <= btn_sync;
+               btn_press <= btn_sync and not btn_level;
+            else
+               btn_cnt <= btn_cnt - 1;
+            end if;
+
+            if rst_i = '1' then
+               btn_level <= (others => '0');
+               btn_press <= (others => '0');
+            end if;
+         end if;
+      end process p_btn;
+
+      -- The PC at a stop, else dashes
+      p_seg : process (clk_i)
+      begin
+         if rising_edge(clk_i) then
+            for i in 0 to 7 loop
+               if regs_ok = '1' and link_ok = '1' then
+                  seg_o(8 * i + 7 downto 8 * i) <= C_HEX7(to_integer(nibble(regs_r(15), i)));
+               else
+                  seg_o(8 * i + 7 downto 8 * i) <= C_SEG_DASH;
+               end if;
+            end loop;
+         end if;
+      end process p_seg;
+
+   else generate
+      seg_o <= (others => '0');
+   end generate gen_board_io;
 
    ---------------------------------------------------------------------------
    -- The page
@@ -1149,7 +1247,7 @@ begin
          end if;
          -- Row 28 changes with the state and the sticky setting, and the
          -- page with its keys
-         if toggle_i = '1' or key_act = ACT_STICKY or catch = '1' or pg_dirty = '1' then
+         if toggle_i = '1' or leave = '1' or key_act = ACT_STICKY or catch = '1' or pg_dirty = '1' then
             dirty <= '1';
          end if;
          if enter = '1' then

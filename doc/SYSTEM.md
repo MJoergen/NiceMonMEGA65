@@ -339,7 +339,10 @@ byte of 0 leaves the digit dark. `0x0000006D` in `0xFFFFFF93` lights segments
 A, C, D, F, and G, which shows a 5 on digit 0. The display is scanned at about
 1 kHz per digit, so the digits look steady. The RGB LEDs are very bright at
 full level; 1 to 3 is a comfortable range. The buttons and the switches are
-synchronized to the clock but not debounced. The CPU RESET button is not a
+synchronized to the clock but not debounced. While the on-board debugger
+has the focus ([DEBUGGER.md](DEBUGGER.md#the-nexys4ddr)), the buttons
+are its keys and read 0 here, and the display shows its segments; the
+registers keep their values and show again when the focus is left. The CPU RESET button is not a
 register: it resets the system. The words `0xFFFFFF97`, `9E`, and `9F`
 read 0 and take no write; the keyboard's LEDs may come to `0xFFFFFF97`
 (see [#25](https://github.com/MJoergen/NiceMonMEGA65/issues/25)).
