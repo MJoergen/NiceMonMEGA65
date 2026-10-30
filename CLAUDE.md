@@ -18,8 +18,9 @@ formal checks, `make hwtest`, and the badge; `doc/EMULATOR.md` the known
 differences from the emulator; `doc/PROGRAMMING.md` how to write and
 build programs; `doc/DEBUGGER.md` is the design note of the on-board
 debugger, mon.py in the FPGA with the MEGA65's keyboard and a strip on
-the screen, of which stages 1 to 3 are written, the overlay, its host
-of the link, and the live strip with the core's keys (issue #52, and
+the screen, of which stages 1 to 4 are written, the overlay, its host
+of the link, the live strip with the core's keys, and Strip with the
+catch (issue #52, and
 nice_cpu#85 and #86 for what it needs there). `doc/` also has `CODING_STYLE.md`,
 `RELEASE.md`, and `RELEASE_NOTES.md`; the root keeps only `README.md`,
 `CONTRIBUTING.md`, and this file.

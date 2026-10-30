@@ -42,9 +42,9 @@ The Ethernet port carries the same line over TCP (see [The debug link
 over TCP](#the-debug-link-over-tcp)). While a host is connected there,
 its connection takes the UART's place in what this document says of the
 UART: the console bytes, the packets, the notices, and the break.
-While the on-board debugger is up ([DEBUGGER.md](DEBUGGER.md)), it
-drives the link itself, and the bytes of both the UART and TCP are
-dropped, and none is sent to them.
+While the on-board debugger is up ([DEBUGGER.md](DEBUGGER.md)), in
+Focus or in Strip, it drives the link itself, and the bytes of both the
+UART and TCP are dropped, and none is sent to them.
 
 Without a ROM, the core is held in reset at power-up; with one, it runs
 the ROM (see [The ROM](#the-rom)). A host loads a program with two

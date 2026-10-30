@@ -2,11 +2,13 @@
 
 A debugger in the FPGA, with the MEGA65's own keyboard and screen and no
 host: what `tools/mon.py` does over the debug link, in a strip of text
-under the program's screen, and a page over it. **Stages 1 to 3 are
+under the program's screen, and a page over it. **Stages 1 to 4 are
 written, and the rest is planned**
 ([#52](https://github.com/MJoergen/NiceMonMEGA65/issues/52)): the toggle
 key enters Focus, where the strip shows the core's state, its registers
-at a stop, and the word at the PC, and F1 to F9 run the core. This note
+at a stop, and the word at the PC, and F1 to F9 run the core; F12 keeps
+the strip up when Focus is left, and a stop in Strip comes back to
+Focus. This note
 records the design and the decisions, as
 [monitor/README.md](../monitor/README.md) does for the ROM of
 [#24](https://github.com/MJoergen/NiceMonMEGA65/issues/24), a hardware
@@ -40,17 +42,18 @@ thing: the debugger can be up while the program runs.
   the setting, and it is Off after reset.
 - On the Nexys4DDR, Focus takes the board's buttons and its seven-segment
   display too (see [The Nexys4DDR](#the-nexys4ddr)).
-- A halt, or a pause the debugger did not ask for, that is a breakpoint
-  or a host's pause request, takes the debugger to Focus from any state:
-  it catches what stops the core. It sees these on `nicemon`'s paused and
-  halted outputs, not on the link, so it catches from Off too, when the
-  link is the host's.
+- In Strip, a halt, or a pause the debugger did not ask for, such as a
+  breakpoint, takes the debugger to Focus: it catches what stops the
+  core. It sees the stop on the link, as the notice `h`, `p`, or `x`. A
+  step or a pause of its own keys is not caught, also when Focus was
+  left before its notice came. Off is not caught from: the link is a
+  host's then, and a host's tools wait for the notices of their own
+  halts and pauses, which a catch would cut off.
 - In Strip and Focus the debugger owns the link. The UART's and the TCP
   host's bytes are dropped meanwhile, and nothing is sent to them, as the
   UART's are while a TCP host is connected today (`src/nicemon.vhd`). A
   host that is connected when the debugger comes up loses the link until
-  the debugger goes Off, and so does a host whose pause request the
-  debugger catches. The side port [below](#how-it-drives-the-link)
+  the debugger goes Off. The side port [below](#how-it-drives-the-link)
   removes the problem.
 - The program's keyboard input is unaffected in Off and Strip: the
   keyboard's bytes go into the console FIFO as now, not through the link.
@@ -76,7 +79,7 @@ on dark blue, `0x004` and `0xFFF`:
  R0-7   00000000 00000001 0000FFFF 00000010 00000000 00000000 00000000 00000000
  R8-15  00000000 00000000 00000000 00000000 00000000 FFFFFEF0 00000003 00001234
  PAUSED   00001234  xxxxxxxx  X C . . . . I   ADD ?1 M C  R1, @0040[R0], R1
- F1 step   F3 go   F5 pause   F7 hold   F9 restart   F11 page   MEGA+HELP back
+ F1 step  F3 go  F5 pause  F7 hold  F9 restart  F12 strip  MEGA+HELP to off
 ```
 
 - Rows 25 and 26: R0–R15 in hex. At a stop they are the link's values.
@@ -94,8 +97,11 @@ on dark blue, `0x004` and `0xFFF`:
   syntax, with the constant words folded in. While the core runs the
   memory is out of reach (DEBUG.md §3), so the row shows the state, and
   the PC once it is live.
-- Row 28: the keys. In Strip, where the keys are the program's, it says
-  so.
+- Row 28: the keys, and where the toggle key goes from Focus, `to off`
+  or `to strip`, as the sticky setting says. In Strip, where the keys
+  are the program's, it says so: `The keys are the program's.
+  MEGA+HELP for the debugger`. F11 joins the row with the page, which
+  makes room for it.
 
 The page replaces the program's 25 rows while it is up, in Focus only:
 row 0 has the window's address and the four breakpoints; rows 1 to 22
@@ -135,7 +141,7 @@ mon.py's:
 | F9, `r` | Restart: hold, then start at 0, with bit 3, the ROM, as it is |
 | F11, `m` | The page, on or off |
 | F12 | The sticky setting: Strip or Off when Focus is left |
-| MEGA+HELP, Scroll Lock | Leave Focus |
+| MEGA+HELP, Scroll Lock | Leave Focus, for Off or Strip |
 
 On the page:
 
@@ -205,7 +211,8 @@ and outputs, and its room.
   a block RAM, the table of the strip's cells, 92.5 without a ROM. The
   system clock is 90 MHz on a -1 part, built with retiming; the build of
   stage 1 has 0.289 ns of setup and 0.029 ns of hold slack, that of
-  stage 3 0.339 ns and 0.031 ns, and the slacks move with
+  stage 3 0.339 ns and 0.031 ns, that of stage 4 0.532 ns and 0.029 ns,
+  and the slacks move with
   placement more than with logic ([synth/README.md](../synth/README.md#timing)): every
   stage rebuilds `make nexys4ddr` and reads its timing, and a miss there
   is a placement re-roll before it is a design error.
@@ -250,8 +257,8 @@ cut-off host.
 
 - `src/dbg/dbg.vhd`: the debugger: the states, the refresh, the keys,
   and the drawing into the overlay. Ports: the toggle pulse; the
-  keyboard's bytes, with valid and ready; `paused_i` and `halted_i` from
-  `nicemon`; the link's byte streams and `on_o`; the overlay's write
+  keyboard's bytes, with valid and ready; the link's byte streams and
+  `on_o`; the overlay's write
   port, `ovl_we_o`, `ovl_addr_o`, and `ovl_data_o`, with `strip_o` and
   `page_o`; `focus_o`, for the keyboard mux; and, with `G_BOARD_IO`, the
   five buttons in and the display's 64 segment bits out. A generic names
@@ -269,9 +276,7 @@ cut-off host.
 - `src/video/text.vhd`: the 29 rows, the overlay memory, and its ports:
   `ovl_we_i`, `ovl_addr_i`, `ovl_data_i`, `strip_i`, and `page_i`.
 - `src/nicemon.vhd`: the third input of the link's mux, `dbg_on_i`,
-  `dbg_rx_*`, and `dbg_tx_*`, like `net_*` (written); and, for the
-  catch, `paused_o` and `halted_o`, which are `cpu_paused` and
-  `cpu_halted`.
+  `dbg_rx_*`, and `dbg_tx_*`, like `net_*` (written).
 - `src/system.vhd`: instantiates the debugger beside `eth` and `text`;
   `dbg_toggle_i`, the pulse; the keyboard mux, which gives the bytes to
   the debugger while `focus_o` is '1' and to `nicemon` otherwise; and,
@@ -306,10 +311,12 @@ free.
   runs gets `e02`; console bytes arrive in order between packets; the
   UART's bytes are dropped; and a request that the link never gets
   times out.
-- `tb_dbg` (written for stage 3): the debugger with `nicemon`, driven
+- `tb_dbg` (written for stage 4): the debugger with `nicemon`, driven
   by keyboard bytes and toggle pulses, checking the overlay's words and
   the link's state. The program under it is `sim/dbg.nasm`, in the ROM:
-  F5, s, F3, the halt, r, F7, and g and p on a held core.
+  F5, s, F3, the halt, r, F7, and g and p on a held core; F12 and Strip,
+  a step of its own that is not caught, the catch of a halt in Strip,
+  and no catch from Off.
 - `tb_kbd` and `tb_ps2`: the two toggle detectors, with a held key's
   repeats and its release, and one key of MEGA+HELP alone; and Page Up,
   Page Down, and Home from both keyboards.
@@ -345,8 +352,8 @@ Each a commit that builds and passes the tests:
    and their letters; R0–R15 and the word at the PC read at a stop,
    which a `p`, `x`, or `h` makes the debugger look for at once. The
    first useful debugger.
-4. **The catch, and the sticky setting.** `paused_o` and `halted_o` of
-   `nicemon`, which the catch needs, as it works from Off.
+4. **The catch, and the sticky setting** (done). Strip, F12, and the
+   catch of a stop in Strip from the link's notices.
 5. **The page.** The window, the cursor, the input field, the word edit,
    `a`, and Page Up, Page Down, and Home from both keyboards.
 6. **The breakpoints.** `b`, the header's list, the colored words, and
@@ -390,10 +397,14 @@ Made on 2026-10-30, with the reasons:
 - **Three states and a sticky setting**, not a cycle: a cycle is annoying
   for a quick toggle, and the default Off changes nothing for those who
   never press the combination.
-- **A host's pause pops the debugger up too**, as a breakpoint and a halt
-  do: something stopped the core.
-- **The catch uses `nicemon`'s signals**, not the link's notices, so it
-  works from Off, when the notices go to the host.
+- **The catch is from Strip only** (changed on 2026-10-30, at stage 4,
+  from a catch in every state on `nicemon`'s paused and halted
+  outputs). A catch from Off takes the link from a host at the stop: a
+  program that `run.py` runs halts, and the `h` it waits for is cut off,
+  and so are mon.py's pause and step and `make hwtest`'s. It also showed
+  the debugger to those who never press the combination. In Strip the
+  debugger has the link already, so its notices are enough, and
+  `nicemon` needs no outputs for it.
 - **Live registers through the link**, nice_cpu#85, not a tap on the
   core's register file here: the link is the one engine, and `niceemu
   --link` returns them live already, so the board comes to match the

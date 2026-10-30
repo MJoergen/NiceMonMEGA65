@@ -187,9 +187,13 @@ The testbenches are these:
   with R0–R15 in white, R15 as the PC, and the word at the PC as the ROM
   has it; s steps to the next instruction; F3 goes on, with the
   registers dimmed; and the halt shows HALTED 1, R1 at 0x800, and Z.
-  r restarts, F7 holds, and g and p then leave the core held. The toggle
-  gives the link back, and a reset in Focus leaves the debugger Off with
-  the strip drawn again.
+  r restarts, F7 holds, and g and p then leave the core held. F12 makes
+  the toggle leave Focus for Strip, where the debugger keeps the link but
+  not the keyboard, and a step of its own does not bring it back; a
+  halt in Strip does, the catch. F12 again makes the toggle leave for
+  Off, which gives the link back. A reset in Focus leaves the debugger
+  Off with the strip drawn again, and the halt that follows leaves it
+  Off: Off is not caught from.
 - `sim/tb_dbg_host.vhd` tests the debugger's host against the debug link
   itself, on the system's third link input, with `sim/host.nasm`, which
   writes 0x00 to 0xFF to the console again and again. It reads the

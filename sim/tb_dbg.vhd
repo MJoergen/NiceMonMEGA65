@@ -1,6 +1,7 @@
--- Tests the on-board debugger (src/dbg/dbg.vhd), stage 3 of
+-- Tests the on-board debugger (src/dbg/dbg.vhd), stage 4 of
 -- doc/DEBUGGER.md, with the system under it: the strip it draws into the
--- overlay, the toggle, and the core's keys over the debug link.
+-- overlay, the toggle, the core's keys over the debug link, the sticky
+-- setting, and the catch.
 --
 -- PASS AND FAIL
 -- Each check is an assert with severity failure, which stops GHDL with a
@@ -28,8 +29,17 @@
 --    and Z among the flags.
 -- 7. r restarts, F7 holds: HELD. Then g and p do nothing, as they would
 --    start the held core.
--- 8. The toggle leaves Focus, and the link is given back. A reset in Focus
---    leaves the debugger Off, and draws the strip again.
+-- 8. F12 sets the sticky setting, which row 28 shows. r restarts, F5
+--    pauses, and s steps, and the toggle comes before the step's `p`: the
+--    debugger is in Strip, with the link but not the keyboard, and the
+--    stop it caused itself does not take it back to Focus.
+-- 9. The catch: g goes on, and the halt that comes in Strip takes the
+--    debugger to Focus.
+-- 10. F12 clears the setting, and the toggle leaves Focus for Off, and
+--    gives the link back.
+-- 11. A reset in Focus leaves the debugger Off, and draws the strip again.
+--    The core runs the ROM and halts, and the debugger stays Off: Off is
+--    not caught from.
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -61,7 +71,9 @@ architecture simulation of tb_dbg is
    constant C_LAST  : natural := 29 * 80 - 1;
 
    constant C_DASHES : string := "-------- -------- -------- -------- -------- -------- -------- -------- ";
-   constant C_ROW28  : string := " F1 step   F3 go   F5 pause   F7 hold   F9 restart   F11 page   MEGA+HELP back  ";
+   constant C_KEYS   : string := " F1 step  F3 go  F5 pause  F7 hold  F9 restart  F12 strip  MEGA+HELP to ";
+   constant C_ROW28  : string := C_KEYS & "off" & (1 to 80 - C_KEYS'length - 3 => ' ');
+   constant C_STRIP  : string := " The keys are the program's.  MEGA+HELP for the debugger";
    constant C_COLOR  : std_logic_vector(23 downto 0) := X"004FFF";
    constant C_DIM    : std_logic_vector(23 downto 0) := X"004888";
 
@@ -397,15 +409,49 @@ begin
       cycles(10000);
       expect_row27("HELD", "after g and p");
 
-      report "tb_dbg: 8. the toggle leaves Focus, and a reset in Focus";
+      report "tb_dbg: 8. F12, and a step of the debugger's own in Strip";
+      key(C_ESC & "[24~");
+      wait_text(28, 0, C_KEYS & "strip ");
+      key("r");
+      expect_row27("RUNNING", "after r");
+      key(C_ESC & "[15~");
+      expect_row27("PAUSED ", "after F5");
+      expect_stop("after F5");
+      key("s");
       pulse;
-      expect('0', '0', '0', "after the second toggle");
+      expect('1', '0', '0', "in Strip");
+      assert dbg_on = '1'
+         report "tb_dbg: the debugger has not the link in Strip"
+         severity failure;
+      wait_text(28, 0, C_STRIP);
+      cycles(20000);
+      expect('1', '0', '0', "after the step in Strip");
+      expect_row27("PAUSED ", "after the step in Strip");
+
+      report "tb_dbg: 9. the catch of a halt in Strip";
+      pulse;
+      expect('1', '0', '1', "back in Focus");
+      key("g");
+      expect_row27("RUNNING", "after g");
+      pulse;
+      expect('1', '0', '0', "in Strip again");
+      wait until focus = '1' for C_TIMEOUT;
+      expect('1', '0', '1', "after the halt in Strip");
+      expect_row27("HALTED 1", "after the catch");
+
+      report "tb_dbg: 10. F12 again, and the toggle leaves for Off";
+      key(C_ESC & "[24~");
+      wait_text(28, 0, C_ROW28);
+      pulse;
+      expect('0', '0', '0', "after the toggle to Off");
       cycles(2000);
       assert dbg_on = '0'
          report "tb_dbg: the debugger keeps the link after Focus"
          severity failure;
+
+      report "tb_dbg: 11. a reset in Focus, and no catch from Off";
       pulse;
-      expect('1', '0', '1', "after the third toggle");
+      expect('1', '0', '1', "after the toggle to Focus");
       cycles(100);
       base_v := writes;
       rst    <= '1';
@@ -414,8 +460,13 @@ begin
       cycles(400);
       expect('0', '0', '0', "after the reset");
       assert writes - base_v >= C_LAST - C_FIRST + 1 and stray = 0 and
-             row(27)(1 to 8) = " NO LINK" and row(25) = " R0-7   " & C_DASHES
+             row(27)(1 to 8) = " NO LINK" and row(25) = " R0-7   " & C_DASHES and row(28) = C_ROW28
          report "tb_dbg: the strip is not drawn again after the reset: '" & row(27) & "'"
+         severity failure;
+      wait for C_TIMEOUT;
+      expect('0', '0', '0', "after the halt in Off");
+      assert dbg_on = '0'
+         report "tb_dbg: the debugger took the link in Off"
          severity failure;
 
       report "tb_dbg: PASS";

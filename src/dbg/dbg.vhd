@@ -4,14 +4,23 @@
 -- with single keys.
 --
 -- THEORY OF OPERATION
--- This is stage 3 of the design note: the live strip and the core keys.
--- The debugger is Off after reset, and the toggle pulse, toggle_i, takes it
--- to Focus and back. In Focus the strip is shown (strip_o), the keyboard is
--- the debugger's (focus_o), and so is the debug link (on_o): nicemon.vhd
--- then gives the link's byte streams to the host in hardware here
--- (dbg_host.vhd) instead of the UART or TCP. on_o stays '1' after Focus
--- is left until the last request has ended, so that no packet is cut.
--- kbd_ready_o is always '1', as a PS/2 keyboard cannot wait.
+-- This is stage 4 of the design note: the live strip, the core keys, the
+-- sticky setting, and the catch. The debugger has three states. It is Off
+-- after reset. The toggle pulse, toggle_i, takes it from Off or Strip to
+-- Focus, and from Focus to Off, or to Strip while the sticky setting is
+-- on, which F12 toggles in Focus. In Strip and Focus the strip is shown
+-- (strip_o) and the debug link is the debugger's (on_o): nicemon.vhd then
+-- gives the link's byte streams to the host in hardware here
+-- (dbg_host.vhd) instead of the UART or TCP. In Focus the keyboard is the
+-- debugger's too (focus_o). on_o stays '1' after Strip or Focus is left
+-- until the last request has ended, so that no packet is cut. kbd_ready_o
+-- is always '1', as a PS/2 keyboard cannot wait.
+--
+-- The catch: in Strip, a stop of the core that the debugger did not cause,
+-- a `p`, `x`, or `h` notice, takes it to Focus. A stop that a key of the
+-- debugger's asked for, a step or a pause, is not caught (own_r), also
+-- when Focus was left before it came. Off is not caught from: the link is
+-- a host's then, and the host's tools wait for their own notices.
 --
 -- p_seq drives the link, one request at a time. In Focus, about 60 times a
 -- second, and at once after a key, a stop notice (`p`, `x`, or `h`), or
@@ -32,7 +41,8 @@
 -- The strip is rows 25 to 28 of the overlay of text.vhd, the words 2000 to
 -- 2319, addressed row * 80 + column. C_CELLS says what each word shows: a
 -- fixed character, a hex digit of a word that the debugger read, a
--- character of the state's name, or a flag of SR (R14). p_draw writes the
+-- character of the state's name, a flag of SR (R14), or a character of row
+-- 28, the keys in Focus or a note in Strip. p_draw writes the
 -- whole strip, one word a cycle, through a pipeline of three stages, after
 -- reset and whenever what it shows has changed. R0-R15 are dimmed while
 -- they are not the values of the current stop: until nice_cpu V1.2 the
@@ -117,9 +127,9 @@ architecture synthesis of dbg is
 
    type t_words is array (0 to 15) of t_word;
 
-   type t_act is (ACT_NONE, ACT_STEP, ACT_GO, ACT_PAUSE, ACT_HOLD, ACT_RESTART);
+   type t_act is (ACT_NONE, ACT_STEP, ACT_GO, ACT_PAUSE, ACT_HOLD, ACT_RESTART, ACT_STICKY);
 
-   type t_state is (OFF_ST, FOCUS_ST);
+   type t_state is (OFF_ST, STRIP_ST, FOCUS_ST);
 
    type t_kbd_st is (KBD_IDLE_ST, KBD_ESC_ST, KBD_SS3_ST, KBD_CSI_ST);
 
@@ -131,12 +141,13 @@ architecture synthesis of dbg is
 
    -- What a word of the strip shows: a fixed character; hex digit nib of
    -- word idx, R0-R15 for 0 to 15, the word at the PC for 16, and the PC for
-   -- 17; character idx of the state's name; or flag idx of SR, X to I
-   type t_kind is (CELL_FIX, CELL_HEX, CELL_STATE, CELL_FLAG);
+   -- 17; character idx of the state's name; flag idx of SR, X to I; or
+   -- character idx of the keys' row, which depends on the state
+   type t_kind is (CELL_FIX, CELL_HEX, CELL_STATE, CELL_FLAG, CELL_KEYS);
 
    type t_cell is record
       kind : t_kind;
-      idx  : natural range 0 to 17;
+      idx  : natural range 0 to C_COLS - 1;
       nib  : natural range 0 to 7;
       ch   : t_byte;
    end record t_cell;
@@ -159,6 +170,8 @@ architecture synthesis of dbg is
       return std_logic_vector(to_unsigned(character'pos(c), 8));
    end function to_byte;
 
+   type t_strings3 is array (0 to 2) of string(1 to C_COLS);
+
    -- s, cut or padded with spaces to a row
    function row(s : string) return string is
       variable res_v : string(1 to C_COLS) := (others => ' ');
@@ -172,8 +185,6 @@ architecture synthesis of dbg is
    end function row;
 
    function cells return t_cells is
-      constant C_KEYS : string := row(" F1 step   F3 go   F5 pause   F7 hold   F9 restart   F11 page   " &
-                                      G_TOGGLE_KEY & " back");
       constant C_FIX  : t_cell := (kind => CELL_FIX, idx => 0, nib => 0, ch => to_byte(' '));
       variable res_v  : t_cells := (others => C_FIX);
       variable c_v    : natural;
@@ -214,7 +225,7 @@ architecture synthesis of dbg is
 
       -- Row 28: the keys
       for c in 0 to C_COLS - 1 loop
-         res_v(3 * C_COLS + c).ch := to_byte(C_KEYS(c + 1));
+         res_v(3 * C_COLS + c) := (kind => CELL_KEYS, idx => c, nib => 0, ch => to_byte(' '));
       end loop;
       return res_v;
    end function cells;
@@ -250,6 +261,31 @@ architecture synthesis of dbg is
    constant C_HALT_DIG  : natural := 7;
    constant C_FLAG_CHAR : string(1 to 7) := "XCZNVEI";
 
+   -- Row 28: the keys in Focus, where the toggle key goes to Off or to
+   -- Strip as the sticky setting says, and the note of Strip
+   type t_keys is array (0 to 2, 0 to C_COLS - 1) of t_byte;
+
+   constant C_KEYS_OFF   : natural := 0;
+   constant C_KEYS_STRIP : natural := 1;
+   constant C_KEYS_PROG  : natural := 2;
+
+   function keys return t_keys is
+      constant C_F   : string := " F1 step  F3 go  F5 pause  F7 hold  F9 restart  F12 strip  " &
+                                 G_TOGGLE_KEY & " to ";
+      constant C_R   : t_strings3 := (row(C_F & "off"), row(C_F & "strip"),
+                                      row(" The keys are the program's.  " & G_TOGGLE_KEY & " for the debugger"));
+      variable res_v : t_keys;
+   begin
+      for k in 0 to 2 loop
+         for c in 0 to C_COLS - 1 loop
+            res_v(k, c) := to_byte(C_R(k)(c + 1));
+         end loop;
+      end loop;
+      return res_v;
+   end function keys;
+
+   constant C_KEYS : t_keys := keys;
+
    function hex_char(n : std_logic_vector(3 downto 0)) return t_byte is
    begin
       if n < 10 then
@@ -278,8 +314,12 @@ architecture synthesis of dbg is
    -- Signals
    ---------------------------------------------------------------------------
 
-   signal state : t_state := OFF_ST;
-   signal enter : std_logic;
+   signal state  : t_state   := OFF_ST;
+   signal enter  : std_logic;
+   signal sticky : std_logic := '0';                     -- Leave Focus to Strip
+   signal catch  : std_logic;                            -- A stop to catch in Strip
+   signal own_r  : std_logic := '0';                     -- A stop of the debugger's own is due
+   signal keys_k : natural range 0 to 2;
 
    signal kbd_st  : t_kbd_st := KBD_IDLE_ST;
    signal kbd_num : natural range 0 to 99;
@@ -346,10 +386,10 @@ begin
    ovl_addr_o <= ovl_addr;
    ovl_data_o <= ovl_data;
 
-   strip_o <= '1' when state = FOCUS_ST else '0';
+   strip_o <= '1' when state /= OFF_ST else '0';
    page_o  <= '0';
    focus_o <= '1' when state = FOCUS_ST else '0';
-   on_o    <= '1' when state = FOCUS_ST or seq_st /= SEQ_IDLE_ST or req_valid = '1' or req_ready = '0' else
+   on_o    <= '1' when state /= OFF_ST or seq_st /= SEQ_IDLE_ST or req_valid = '1' or req_ready = '0' else
               '0';
 
    enter <= '1' when toggle_i = '1' and state = OFF_ST else '0';
@@ -357,15 +397,28 @@ begin
    p_state : process (clk_i)
    begin
       if rising_edge(clk_i) then
+         if key_act = ACT_STICKY then
+            sticky <= not sticky;
+         end if;
+
          if toggle_i = '1' then
             case state is
-               when OFF_ST   => state <= FOCUS_ST;
-               when FOCUS_ST => state <= OFF_ST;
+               when OFF_ST | STRIP_ST =>
+                  state <= FOCUS_ST;
+               when FOCUS_ST =>
+                  if sticky = '1' then
+                     state <= STRIP_ST;
+                  else
+                     state <= OFF_ST;
+                  end if;
             end case;
+         elsif catch = '1' and state = STRIP_ST then
+            state <= FOCUS_ST;
          end if;
 
          if rst_i = '1' then
-            state <= OFF_ST;
+            state  <= OFF_ST;
+            sticky <= '0';
          end if;
       end if;
    end process p_state;
@@ -423,6 +476,7 @@ begin
                            when 15     => key_act <= ACT_PAUSE;   -- F5
                            when 18     => key_act <= ACT_HOLD;    -- F7
                            when 20     => key_act <= ACT_RESTART; -- F9
+                           when 24     => key_act <= ACT_STICKY;  -- F12
                            when others => null;
                         end case;
                      end if;
@@ -542,7 +596,7 @@ begin
          case seq_st is
 
             when SEQ_IDLE_ST =>
-               if state = FOCUS_ST and req_valid = '0' and (tick_r = '1' or act_r /= ACT_NONE) then
+               if state /= OFF_ST and req_valid = '0' and (tick_r = '1' or act_r /= ACT_NONE) then
                   tick_r <= '0';
                   read(C_CTRL, C_CTRL_N);
                   seq_st <= SEQ_CTRL_ST;
@@ -571,12 +625,15 @@ begin
                         when ACT_RESTART =>
                            restart_r <= '1';
                            data_v    := X"00000001" or rom_v;
-                        when ACT_NONE =>
+                        when ACT_NONE | ACT_STICKY =>
                            write_v := false;
                      end case;
                      act_r <= ACT_NONE;
 
                      if write_v then
+                        if act_r = ACT_STEP or act_r = ACT_PAUSE then
+                           own_r <= '1';
+                        end if;
                         write(data_v);
                         regs_ok  <= '0';
                         instr_ok <= '0';
@@ -630,7 +687,7 @@ begin
 
          -- A key waits for the next refresh. A stop notice, or the entry
          -- into Focus, refreshes at once, and R0-R15 are read again.
-         if key_act /= ACT_NONE then
+         if key_act /= ACT_NONE and key_act /= ACT_STICKY then
             act_r <= key_act;
          end if;
          if ntc_valid = '1' and (ntc_tag = X"68" or ntc_tag = X"70" or ntc_tag = X"78") then
@@ -638,6 +695,11 @@ begin
             instr_ok <= '0';
             tick_r   <= '1';
             dirty    <= '1';
+            own_r    <= '0';
+         end if;
+         -- Row 28 changes with the state and the sticky setting
+         if toggle_i = '1' or key_act = ACT_STICKY or catch = '1' then
+            dirty <= '1';
          end if;
          if enter = '1' then
             regs_ok  <= '0';
@@ -660,10 +722,16 @@ begin
             regs_any  <= '0';
             regs_ok   <= '0';
             instr_ok  <= '0';
+            own_r     <= '0';
             dirty     <= '1';
          end if;
       end if;
    end process p_seq;
+
+   -- A stop that the debugger did not cause: a breakpoint, or a halt
+   catch <= '1' when ntc_valid = '1' and own_r = '0' and
+                     (ntc_tag = X"68" or ntc_tag = X"70" or ntc_tag = X"78") else
+            '0';
 
    ---------------------------------------------------------------------------
    -- The drawing
@@ -675,6 +743,10 @@ begin
               C_ST_BRK when ctrl_r(4) = '1' and stop_r(8) = '1' else
               C_ST_PAUSED when ctrl_r(4) = '1' else
               C_ST_RUNNING;
+
+   keys_k <= C_KEYS_PROG when state = STRIP_ST else
+             C_KEYS_STRIP when sticky = '1' else
+             C_KEYS_OFF;
 
    draw_start <= '1' when draw_cnt = C_STRIP_LEN and dirty = '1' else '0';
 
@@ -717,13 +789,15 @@ begin
                s2_shown <= regs_any;
                s2_dim   <= not regs_ok;
             when CELL_STATE =>
-               s2_ch <= C_NAMES(st_code, s1_cell.idx);
+               s2_ch <= C_NAMES(st_code, s1_cell.idx mod C_STATE_LEN);
                if st_code = C_ST_BRK and s1_cell.idx = C_BRK_DIG then
                   s2_ch <= hex_char(stop_r(3 downto 0));
                end if;
                if st_code = C_ST_HALTED and s1_cell.idx = C_HALT_DIG then
                   s2_ch <= hex_char(reason_r(3 downto 0));
                end if;
+            when CELL_KEYS =>
+               s2_ch <= C_KEYS(keys_k, s1_cell.idx);
             when CELL_FIX =>
                null;
          end case;
@@ -739,8 +813,8 @@ begin
                end if;
             when CELL_FLAG =>
                ch_v := X"2E";                               -- .
-               if s2_shown = '1' and s2_word(25 + s2_cell.idx) = '1' then
-                  ch_v := to_byte(C_FLAG_CHAR(s2_cell.idx + 1));
+               if s2_shown = '1' and s2_word(25 + s2_cell.idx mod 7) = '1' then
+                  ch_v := to_byte(C_FLAG_CHAR(s2_cell.idx mod 7 + 1));
                end if;
             when others =>
                null;
