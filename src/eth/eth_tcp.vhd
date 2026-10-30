@@ -43,7 +43,9 @@
 -- segment from the second cycle after the last byte, with the stream
 -- held, and the connection takes it (eval) once p_cmp has compared it
 -- with the connection as it is; it is acted on then, if it is good; its
--- data is committed (cmt) only then, and rcv_nxt moves past it, or else
+-- data is committed (cmt) only then, if it is still the next, as the
+-- connection may have ended and another opened meanwhile, and rcv_nxt
+-- moves past it, or else
 -- it is discarded (discard), and the next segment's data goes where it
 -- went. Its sequence and acknowledgment numbers are compared with the
 -- connection's in registers (p_cmp), a cycle behind, for the timing; they
@@ -515,6 +517,7 @@ begin
       variable fin_v     : boolean;
       variable ack_fin_v : boolean;
       variable cmt_v     : boolean;
+      variable next_v    : boolean;
 
       -- Opens a connection for a SYN; the output after base goes to it.
       procedure accept (
@@ -704,13 +707,16 @@ begin
                         end if;
                      end if;
 
+                     -- The data, which was written if it was the next, and
+                     -- still is: the connection may have ended since, and
+                     -- another opened from the same port
+                     next_v := wr_ok = '1' and seq_off = 0;
                      -- The host's FIN, if all before it has come: after the
                      -- data written, whose sequence number is rcv_nxt, or
                      -- at rcv_nxt otherwise
                      fin_v := f_seg.flags(0) = '1' and peer_fin = '0' and
-                              (wr_ok = '1' or f_end = rcv_nxt);
-                     -- The data, which was written if it is the next
-                     if wr_ok = '1' then
+                              (next_v or f_end = rcv_nxt);
+                     if next_v then
                         cmt_v   := true;
                         rcv_nxt <= rcv_end;
                         if fin_v then
