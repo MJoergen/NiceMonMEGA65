@@ -20,6 +20,8 @@
 #                         the first, and its page over the third.
 #             tb_dbg      the on-board debugger: the strip it draws, and
 #                         the toggle.
+#             tb_dbg_host the debugger's host in hardware, on the system's
+#                         debug link, with host.nasm.
 #             tb_board_io the Nexys4DDR's display and RGB LED drivers.
 #             tb_rmii_rx  the RMII receiver of the Ethernet PHY.
 #             tb_rx_fcs   the check of a frame's frame check sequence.
@@ -33,7 +35,7 @@
 #             tb_eth_tcp_random  the same, with random actions instead
 #                         of its steps; SEED=n picks another run.
 #             It also checks that GHDL can synthesize the system, the
-#             keyboards and their toggle detectors, the debugger, the text display (through text_synth.vhd, in
+#             keyboards and their toggle detectors, the debugger and its host, the text display (through text_synth.vhd, in
 #             the boards' mode, with 15 and 13 screen address bits), and system.vhd as the Nexys4DDR has it, and the display and RGB LED drivers.
 #             With -j these all run side by side, and the test takes as
 #             long as tb_text alone. Each one is also a target: make
@@ -66,23 +68,23 @@ NICE_SIM = $(NICE_DIR)/hdl/sim/wb_mem.vhd
 SRC_SOURCES  = ../src/uart_serdes.vhd ../src/rx_fifo.vhd ../src/ram.vhd ../src/rom.vhd \
                ../src/board_io.vhd ../src/scr_regs.vhd ../src/devices.vhd ../src/mem.vhd ../src/nicemon.vhd \
                ../src/kbd_m65.vhd ../src/kbd_m65_ascii.vhd ../src/kbd_ps2.vhd ../src/kbd_ps2_ascii.vhd ../src/seg7.vhd ../src/rgb_pwm.vhd \
-               ../src/kbd_m65_toggle.vhd ../src/kbd_ps2_toggle.vhd ../src/dbg/dbg.vhd \
+               ../src/kbd_m65_toggle.vhd ../src/kbd_ps2_toggle.vhd ../src/dbg/dbg.vhd ../src/dbg/dbg_host.vhd \
                ../src/video/video_pkg.vhd ../src/video/font_pkg.vhd ../src/video/pix.vhd ../src/video/scr_ram.vhd ../src/video/text.vhd \
                ../src/eth/eth_pkg.vhd ../src/eth/rmii_rx.vhd ../src/eth/rx_fcs.vhd ../src/eth/eth_ram.vhd ../src/eth/eth_rx_fifo.vhd \
                ../src/eth/eth_arp.vhd ../src/eth/eth_icmp.vhd ../src/eth/eth_tcp_rx.vhd ../src/eth/eth_tcp_tx.vhd ../src/eth/eth_tcp_timer.vhd ../src/eth/eth_tcp_buf.vhd ../src/eth/eth_tcp_pick.vhd ../src/eth/eth_tcp.vhd ../src/eth/eth_tx_fifo.vhd ../src/eth/eth_arb.vhd ../src/eth/rmii_tx.vhd ../src/eth/eth.vhd \
                ../src/system.vhd
-SOURCES      = $(SRC_SOURCES) text_synth.vhd tb_hello.vhd tb_nicemon.vhd tb_kbd.vhd tb_ps2.vhd tb_ps2_nicemon.vhd tb_text.vhd tb_dbg.vhd tb_board_io.vhd tb_rmii_rx.vhd tb_rx_fcs.vhd tb_eth_rx_fifo.vhd \
+SOURCES      = $(SRC_SOURCES) text_synth.vhd tb_hello.vhd tb_nicemon.vhd tb_kbd.vhd tb_ps2.vhd tb_ps2_nicemon.vhd tb_text.vhd tb_dbg.vhd tb_dbg_host.vhd tb_board_io.vhd tb_rmii_rx.vhd tb_rx_fcs.vhd tb_eth_rx_fifo.vhd \
                tb_eth_tx_fifo.vhd tb_rmii_tx.vhd tb_eth.vhd tb_eth_tcp.vhd
 
-.PHONY: test cosim check-steps check-fmt analyze synth clean tb_hello tb_nicemon tb_kbd tb_ps2 tb_ps2_nicemon tb_text tb_dbg tb_board_io tb_rmii_rx tb_rx_fcs tb_eth_rx_fifo tb_eth_tx_fifo tb_rmii_tx tb_eth tb_eth_tcp tb_eth_tcp_random \
+.PHONY: test cosim check-steps check-fmt analyze synth clean tb_hello tb_nicemon tb_kbd tb_ps2 tb_ps2_nicemon tb_text tb_dbg tb_dbg_host tb_board_io tb_rmii_rx tb_rx_fcs tb_eth_rx_fifo tb_eth_tx_fifo tb_rmii_tx tb_eth tb_eth_tcp tb_eth_tcp_random \
         synth-nicemon synth-nicemon-norom synth-kbd_m65 synth-kbd_m65_ascii synth-kbd_ps2 \
-        synth-kbd_ps2_ascii synth-kbd_m65_toggle synth-kbd_ps2_toggle synth-dbg synth-text \
+        synth-kbd_ps2_ascii synth-kbd_m65_toggle synth-kbd_ps2_toggle synth-dbg synth-dbg_host synth-text \
         synth-system synth-seg7 synth-rgb_pwm
 
 # Each testbench and each synthesis check is a target of its own, so that
 # "make -j test" runs them side by side. They share the work library of
 # $(BUILD), which "analyze" writes first and they only read.
-test: synth tb_hello tb_nicemon tb_kbd tb_ps2 tb_ps2_nicemon tb_text tb_dbg tb_board_io tb_rmii_rx tb_rx_fcs tb_eth_rx_fifo tb_eth_tx_fifo tb_rmii_tx tb_eth tb_eth_tcp tb_eth_tcp_random check-steps check-fmt
+test: synth tb_hello tb_nicemon tb_kbd tb_ps2 tb_ps2_nicemon tb_text tb_dbg tb_dbg_host tb_board_io tb_rmii_rx tb_rx_fcs tb_eth_rx_fifo tb_eth_tx_fifo tb_rmii_tx tb_eth tb_eth_tcp tb_eth_tcp_random check-steps check-fmt
 
 # The column layout of nice_cpu's NICE assembly; nicefmt.py --write fixes it
 check-fmt:
@@ -128,6 +130,11 @@ tb_ps2_nicemon: analyze $(BUILD)/fifo.bin $(BUILD)/switch.bin
 	  -gG_FIFO_FILE=fifo.bin -gG_SWITCH_FILE=switch.bin --ieee-asserts=disable > tb_ps2_nicemon.log 2>&1) && \
 	  echo "PASS tb_ps2_nicemon" || (echo "FAIL tb_ps2_nicemon"; cat $(BUILD)/tb_ps2_nicemon.log; exit 1)
 
+tb_dbg_host: analyze $(BUILD)/host.bin
+	@(cd $(BUILD) && $(GHDL) --elab-run $(GHDLFLAGS) tb_dbg_host -gG_HOST_FILE=host.bin \
+	  --ieee-asserts=disable > tb_dbg_host.log 2>&1) && \
+	  echo "PASS tb_dbg_host" || (echo "FAIL tb_dbg_host"; cat $(BUILD)/tb_dbg_host.log; exit 1)
+
 tb_kbd tb_ps2 tb_text tb_dbg tb_board_io tb_rmii_rx tb_rx_fcs tb_eth_rx_fifo tb_eth_tx_fifo tb_rmii_tx tb_eth tb_eth_tcp: analyze
 	@(cd $(BUILD) && $(GHDL) --elab-run $(GHDLFLAGS) $@ > $@.log 2>&1) && \
 	  echo "PASS $@" || (echo "FAIL $@"; cat $(BUILD)/$@.log; exit 1)
@@ -144,7 +151,7 @@ tb_eth_tcp_random: analyze
 # without a ROM, and the keyboards, as nice_cpu does for its core, the text
 # display, and system.vhd with the screen of the Nexys4DDR.
 synth: synth-nicemon synth-nicemon-norom synth-kbd_m65 synth-kbd_m65_ascii synth-kbd_ps2 synth-kbd_ps2_ascii \
-       synth-kbd_m65_toggle synth-kbd_ps2_toggle synth-dbg synth-text synth-system synth-seg7 synth-rgb_pwm
+       synth-kbd_m65_toggle synth-kbd_ps2_toggle synth-dbg synth-dbg_host synth-text synth-system synth-seg7 synth-rgb_pwm
 
 synth-nicemon: analyze $(BUILD)/rom.bin
 	@(cd $(BUILD) && $(GHDL) --synth $(GHDLFLAGS) -gG_CLOCK_HZ=50000000 -gG_ROM_FILE=rom.bin nicemon > nicemon_synth.vhd 2> nicemon_synth.log) && \
@@ -166,7 +173,7 @@ synth-rgb_pwm: analyze
 	@(cd $(BUILD) && $(GHDL) --synth $(GHDLFLAGS) rgb_pwm > rgb_pwm_synth.vhd 2> rgb_pwm_synth.log) && \
 	  echo "PASS synth rgb_pwm" || (echo "FAIL synth rgb_pwm"; cat $(BUILD)/rgb_pwm_synth.log; exit 1)
 
-synth-kbd_ps2_ascii synth-kbd_ps2_toggle synth-dbg: synth-%: analyze
+synth-kbd_ps2_ascii synth-kbd_ps2_toggle synth-dbg synth-dbg_host: synth-%: analyze
 	@(cd $(BUILD) && $(GHDL) --synth $(GHDLFLAGS) $* > $*_synth.vhd 2> $*_synth.log) && \
 	  echo "PASS synth $*" || (echo "FAIL synth $*"; cat $(BUILD)/$*_synth.log; exit 1)
 
@@ -222,6 +229,9 @@ $(BUILD)/counters.bin: counters.nasm $(ASM_PY) | $(BUILD)
 	@$(ASM) -o $@ $<
 
 $(BUILD)/break.bin: break.nasm $(ASM_PY) | $(BUILD)
+	@$(ASM) -o $@ $<
+
+$(BUILD)/host.bin: host.nasm $(ASM_PY) | $(BUILD)
 	@$(ASM) -o $@ $<
 
 $(BUILD)/switch.bin: switch.nasm $(ASM_PY) | $(BUILD)

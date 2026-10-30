@@ -3,9 +3,10 @@
 A debugger in the FPGA, with the MEGA65's own keyboard and screen and no
 host: what `tools/mon.py` does over the debug link, in a strip of text
 under the program's screen, and a page over it. **Stage 1, the overlay,
-is written, and the rest is planned**
-([#52](https://github.com/MJoergen/NiceMonMEGA65/issues/52)): the toggle
-key shows a fixed strip, with no link yet. This note
+and stage 2, the host in hardware, are written, and the rest is
+planned** ([#52](https://github.com/MJoergen/NiceMonMEGA65/issues/52)):
+the toggle key shows a fixed strip, and the host is tested on the link
+but not yet connected to the debugger. This note
 records the design and the decisions, as
 [monitor/README.md](../monitor/README.md) does for the ROM of
 [#24](https://github.com/MJoergen/NiceMonMEGA65/issues/24), a hardware
@@ -250,17 +251,21 @@ cut-off host.
   `page_o`; `focus_o`, for the keyboard mux; and, with `G_BOARD_IO`, the
   five buttons in and the display's 64 segment bits out. A generic names
   the toggle key for row 28.
-- `src/dbg/dbg_host.vhd`: the host in hardware. A word-level request in,
-  address, write enable, data, and a count, and its answer or error out;
-  the link's byte streams; the notices out, with the breakpoint's number
-  or the halt reason; and the console bytes out.
+- `src/dbg/dbg_host.vhd`: the host in hardware (written). A request in,
+  with valid and ready: an `R` of a count of words from an address, or
+  a `W` of one word, as the debugger writes one register or one word at
+  a time. The words of the `r` out, as they arrive, and the end of the
+  request, with `e`'s code or a code of its own, `FF`, when no answer
+  came in time; the link's byte streams, which it always takes; the
+  notices out, with the version, the breakpoint's number, or the halt
+  reason; and the console bytes out.
 - `src/dbg/dbg_decode.vhd`, later: the instruction word and its constant
   words in, the text of row 27 out.
 - `src/video/text.vhd`: the 29 rows, the overlay memory, and its ports:
   `ovl_we_i`, `ovl_addr_i`, `ovl_data_i`, `strip_i`, and `page_i`.
 - `src/nicemon.vhd`: the third input of the link's mux, `dbg_on_i`,
-  `dbg_rx_*`, and `dbg_tx_*`, like `net_*`; and `paused_o` and
-  `halted_o`, which are `cpu_paused` and `cpu_halted`.
+  `dbg_rx_*`, and `dbg_tx_*`, like `net_*` (written); and `paused_o`
+  and `halted_o`, which are `cpu_paused` and `cpu_halted`.
 - `src/system.vhd`: instantiates the debugger beside `eth` and `text`;
   `dbg_toggle_i`, the pulse; the keyboard mux, which gives the bytes to
   the debugger while `focus_o` is '1' and to `nicemon` otherwise; and,
@@ -288,18 +293,22 @@ free.
 
 - `tb_text` with `G_PPM_FILE` writes a frame as a picture; a case with
   the strip and one with the page show the layout.
-- `tb_dbg_host`: the host in hardware against `debug_link` itself, in
-  GHDL: write the control register, read it back, pause, step, and catch
-  `p`; a read while the core runs gets `e02`; console bytes arrive
-  between packets.
+- `tb_dbg_host` (written): the host in hardware against `debug_link`
+  itself, in GHDL, on `nicemon`'s third input, with `sim/host.nasm`:
+  write the control register, read it back, load a program and read it
+  back, pause, read R0–R15, step, and catch `p`; a read while the core
+  runs gets `e02`; console bytes arrive in order between packets; the
+  UART's bytes are dropped; and a request that the link never gets
+  times out.
 - `tb_dbg`: the debugger with `nicemon`, driven by keyboard bytes and
   toggle pulses, checking the overlay's words and the link's state. The
   program under it is one of `sim/`'s `.nasm` files.
 - `tb_kbd` and `tb_ps2`: the two toggle detectors, with a held key's
   repeats and its release, and one key of MEGA+HELP alone; and Page Up,
   Page Down, and Home from both keyboards.
-- Formal: the packets of `dbg_host` are well formed, with the parser of
-  `debug_link.vhd`'s FORMAL block as the model.
+- Formal (written): the packets of `dbg_host` are well formed, with the
+  parser of `debug_link.vhd`'s FORMAL block as the model, and carry the
+  request's fields (`formal/dbg_host.sby`).
 - `make hwtest`, a stretch goal: a register of `board_io.vhd` at
   `0xFFFFFF9E` that enters Focus when written, so that the test enters
   the debugger over the UART with no one at the keyboard, and so that
@@ -322,8 +331,8 @@ Each a commit that builds and passes the tests:
    entities of their own; `system.vhd` the keyboard mux. No link
    involved. Tests: `tb_text`'s picture, the first case of `tb_dbg`, and
    the detectors in `tb_kbd` and `tb_ps2`.
-2. **The host in hardware.** `dbg_host.vhd`, the third input of the mux
-   in `nicemon.vhd`, and the formal check. Test: `tb_dbg_host`.
+2. **The host in hardware** (done). `dbg_host.vhd`, the third input of
+   the mux in `nicemon.vhd`, and the formal check. Test: `tb_dbg_host`.
 3. **The live strip and the core keys.** The refresh of the control
    register, the halt reason, and the stop register; F1 to F9 and their
    letters; R0–R15 read after `p`, `x`, or `h`; `paused_o` and

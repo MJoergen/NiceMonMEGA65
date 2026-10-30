@@ -131,6 +131,11 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
   `kbd_ps2_ascii.vhd` turns its scan codes into ASCII.
 - `seg7.vhd` scans the Nexys4DDR's seven-segment display, and
   `rgb_pwm.vhd` dims its RGB LEDs.
+- `dbg/dbg.vhd` is the on-board debugger (doc/DEBUGGER.md), and
+  `dbg/dbg_host.vhd` its host of the debug link, which turns a request
+  of a word or more into a packet, and the link's bytes back into the
+  answer, the notices, and the console bytes. `kbd_m65_toggle.vhd` and
+  `kbd_ps2_toggle.vhd` detect the boards' toggle keys.
 - `system.vhd` is what every board has: the system, the text display of
   its screen, and the UART's pins.
 
@@ -177,6 +182,16 @@ The testbenches are these:
 - `sim/tb_dbg.vhd` tests the on-board debugger: every word of the strip it
   draws after reset, the toggle between Off and Focus, and the keyboard's
   bytes, which it takes in Focus.
+- `sim/tb_dbg_host.vhd` tests the debugger's host against the debug link
+  itself, on the system's third link input, with `sim/host.nasm`, which
+  writes 0x00 to 0xFF to the console again and again. It reads the
+  version, loads the program and reads it back in one request, and
+  starts it; the console bytes come in order, 0xFF among them, while it
+  reads the control register, and a read of the memory gets `e02`. A
+  pause brings `p`, stops the console, and lets it read R0–R15 in one
+  request, and a step brings `p` again and moves R15. A packet on the
+  UART is dropped meanwhile, and nothing is sent there. With the host
+  off the link, its request ends with the timeout.
 - `sim/tb_board_io.vhd` tests the Nexys4DDR's drivers of its seven-segment
   display and RGB LEDs: every digit of the display lit in turn with its own
   segments, and the duty of an RGB output at its level.
@@ -258,8 +273,8 @@ The testbenches are these:
   and at the end everything sent each way must have come, in order,
   once. `SEED=n` picks another run.
 - `make test` also checks that GHDL can synthesize the system, with
-  `sim/rom.nasm` as its ROM and without a ROM, the keyboards, the text
-  display, and `src/system.vhd` with the screen and the devices of the
+  `sim/rom.nasm` as its ROM and without a ROM, the keyboards, the
+  debugger and its host, the text display, and `src/system.vhd` with the screen and the devices of the
   Nexys4DDR, and the drivers of its display and RGB LEDs.
 - `make -C sim check-steps`, part of `make test`, compares the step counts
   that `tb_nicemon` checks with those of niceemu. It is skipped when niceemu
@@ -531,13 +546,21 @@ every time, not only the ones a testbench sends.
   `eth_tcp_rx.sby` proves. Its `cover` reaches each state, the end by the
   last try, by a reset, and by the ACK of the FIN, the probe, and a new
   connection replacing an open one.
+- `dbg_host.sby` proves the debugger's host of the debug link,
+  `src/dbg/dbg_host.vhd`, with every input free, the link's answers
+  too: every packet it sends is whole, an `R` with 12 or a `W` with 20
+  upper-case hex digits that are the request's fields, `#`, and its
+  checksum, with no console byte; a byte offered stays until it is
+  taken; it takes a request only while none is open; and a request ends
+  once. Its `cover` reaches an `R` and a `W` sent whole.
 
 The checks in `rx_fifo.vhd`, `board_io.vhd`, `scr_regs.vhd`,
 `devices.vhd`, `mem.vhd`, `nicemon.vhd`, `eth/eth_tcp_timer.vhd`,
 `eth/eth_tcp_buf.vhd`, `eth/eth_tcp_pick.vhd`, `eth/eth_tcp_rx.vhd`,
 `eth/eth_tcp_tx.vhd`, `eth/rx_fcs.vhd`, `eth/eth_arb.vhd`,
-`eth/eth_rx_fifo.vhd`, `eth/eth_tx_fifo.vhd`, and `eth/eth_tcp.vhd` are
-in `G_FORMAL` blocks, which are off in simulation and synthesis.
+`eth/eth_rx_fifo.vhd`, `eth/eth_tx_fifo.vhd`, `eth/eth_tcp.vhd`, and
+`dbg/dbg_host.vhd` are in `G_FORMAL` blocks, which are off in
+simulation and synthesis.
 
 ## Testing the board
 

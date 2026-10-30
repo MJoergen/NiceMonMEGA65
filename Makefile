@@ -107,7 +107,8 @@ FORMAL_TASKS = rx_fifo-prove rx_fifo-cover board_io-prove board_io-none board_io
                eth_tcp_rx-prove eth_tcp_rx-cover eth_tcp_tx-prove eth_tcp_tx-cover \
                rx_fcs-prove rx_fcs-cover eth_arb-prove eth_arb-cover \
                eth_tcp-prove eth_tcp-cover \
-               eth_rx_fifo-prove eth_rx_fifo-cover eth_tx_fifo-prove eth_tx_fifo-cover
+               eth_rx_fifo-prove eth_rx_fifo-cover eth_tx_fifo-prove eth_tx_fifo-cover \
+               dbg_host-prove dbg_host-cover
 
 formal: $(addprefix formal-,$(FORMAL_TASKS))
 

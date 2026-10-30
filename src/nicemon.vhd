@@ -26,11 +26,15 @@
 -- memory, loads and starts a program, and learns when it halts. While
 -- net_on_i is '1', the link's byte streams are those of the net_* ports
 -- instead, a connection over TCP (eth/eth_tcp.vhd), and the UART's bytes
--- are dropped, and none is sent on it. The bytes to the link, and the
+-- are dropped, and none is sent on it. While dbg_on_i is '1', they are
+-- those of the dbg_* ports, the on-board debugger's host in hardware
+-- (dbg/dbg_host.vhd, doc/DEBUGGER.md), and the bytes of both others are
+-- dropped. The bytes to the link, and the
 -- breaks, go through a register stage after that choice (p_lnk_rx), for
 -- the timing: it holds a byte, and a break waits behind the byte before
 -- it, and no byte is taken while a break waits, so that the order stays
--- and a byte that waits when net_on_i changes still reaches the link.
+-- and a byte that waits when net_on_i or dbg_on_i changes still reaches
+-- the link.
 --
 -- Address map, as in the emulator (nice_cpu/emulator/README.md), and the
 -- same for the link and the core's data bus apart from the link's own
@@ -319,7 +323,16 @@ entity nicemon is
       net_rx_break_i : in  std_logic                    := '0';
       net_tx_data_o  : out std_logic_vector(7 downto 0);
       net_tx_valid_o : out std_logic;
-      net_tx_ready_i : in  std_logic                    := '0'
+      net_tx_ready_i : in  std_logic                    := '0';
+      -- The link's byte streams of the on-board debugger (dbg/dbg_host.vhd),
+      -- which take the place of both others while dbg_on_i is '1'
+      dbg_on_i       : in  std_logic                    := '0';
+      dbg_rx_data_i  : in  std_logic_vector(7 downto 0) := X"00";
+      dbg_rx_valid_i : in  std_logic                    := '0';
+      dbg_rx_ready_o : out std_logic;
+      dbg_tx_data_o  : out std_logic_vector(7 downto 0);
+      dbg_tx_valid_o : out std_logic;
+      dbg_tx_ready_i : in  std_logic                    := '0'
    );
 end entity nicemon;
 
@@ -975,21 +988,30 @@ begin
          uart_rx_i  => uart_rxd_i
       ); -- i_uart_serdes
 
-   -- The link's bytes go to the UART, or to the TCP connection while there
-   -- is one; the other's are dropped.
-   mux_rx_valid   <= net_rx_valid_i when net_on_i = '1' else
+   -- The link's bytes go to the debugger while it is on, else to the TCP
+   -- connection while there is one, else to the UART; the others' are
+   -- dropped, and so are their breaks while the debugger is on, which has
+   -- none.
+   mux_rx_valid   <= dbg_rx_valid_i when dbg_on_i = '1' else
+                     net_rx_valid_i when net_on_i = '1' else
                      ser_rx_valid;
-   mux_rx_data    <= net_rx_data_i when net_on_i = '1' else
+   mux_rx_data    <= dbg_rx_data_i when dbg_on_i = '1' else
+                     net_rx_data_i when net_on_i = '1' else
                      ser_rx_data;
-   mux_rx_break   <= net_rx_break_i when net_on_i = '1' else
+   mux_rx_break   <= '0' when dbg_on_i = '1' else
+                     net_rx_break_i when net_on_i = '1' else
                      ser_rx_break;
-   ser_rx_ready   <= mux_rx_ready or net_on_i;
-   net_rx_ready_o <= mux_rx_ready or not net_on_i;
+   ser_rx_ready   <= mux_rx_ready or net_on_i or dbg_on_i;
+   net_rx_ready_o <= mux_rx_ready or not net_on_i or dbg_on_i;
+   dbg_rx_ready_o <= mux_rx_ready or not dbg_on_i;
    ser_tx_data    <= lnk_tx_data;
    net_tx_data_o  <= lnk_tx_data;
-   ser_tx_valid   <= lnk_tx_valid and not net_on_i;
-   net_tx_valid_o <= lnk_tx_valid and net_on_i;
-   lnk_tx_ready   <= net_tx_ready_i when net_on_i = '1' else
+   dbg_tx_data_o  <= lnk_tx_data;
+   ser_tx_valid   <= lnk_tx_valid and not net_on_i and not dbg_on_i;
+   net_tx_valid_o <= lnk_tx_valid and net_on_i and not dbg_on_i;
+   dbg_tx_valid_o <= lnk_tx_valid and dbg_on_i;
+   lnk_tx_ready   <= dbg_tx_ready_i when dbg_on_i = '1' else
+                     net_tx_ready_i when net_on_i = '1' else
                      ser_tx_ready;
 
    -- The register stage: a byte is taken when the stage is empty or its

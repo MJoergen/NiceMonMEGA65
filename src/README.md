@@ -48,7 +48,9 @@ header of `nicemon.vhd` is the address map, and
   [doc/DEBUGGER.md](../doc/DEBUGGER.md)) draws a strip under the
   program's screen, in the text display's overlay. The board's toggle
   key shows it, and then the keyboard's bytes go to the debugger
-  instead of the input FIFO.
+  instead of the input FIFO. Its host of the link,
+  [dbg/dbg_host.vhd](dbg/dbg_host.vhd), is written, and the link has
+  an input for it, but `system.vhd` does not connect it yet.
 - **TEXT DISPLAY** ([video/text.vhd](video/text.vhd)) keeps its own copy
   of the screen, from the writes to it, and shows it with the cursor and
   the overlay on VGA or HDMI.
