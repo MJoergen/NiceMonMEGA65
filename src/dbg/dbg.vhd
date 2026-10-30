@@ -45,6 +45,7 @@
 
 library ieee;
    use ieee.std_logic_1164.all;
+   use ieee.numeric_std.all;
    use ieee.numeric_std_unsigned.all;
 
 entity dbg is
@@ -155,7 +156,7 @@ architecture synthesis of dbg is
 
    function to_byte(c : character) return t_byte is
    begin
-      return to_slv(character'pos(c), 8);
+      return std_logic_vector(to_unsigned(character'pos(c), 8));
    end function to_byte;
 
    -- s, cut or padded with spaces to a row
@@ -187,8 +188,13 @@ architecture synthesis of dbg is
                   res_v(r * C_COLS + c).ch := to_byte(row(" R8-15")(c + 1));
                end if;
             elsif (c - 8) mod 9 < 8 then
-               res_v(r * C_COLS + c) := (kind => CELL_HEX, idx => r * 8 + (c - 8) / 9,
-                                         nib => 7 - (c - 8) mod 9, ch => to_byte(' '));
+               res_v(r * C_COLS + c) :=
+               (
+                  kind => CELL_HEX,
+                  idx => r * 8 + (c - 8) / 9,
+                  nib => 7 - (c - 8) mod 9,
+                  ch => to_byte(' ')
+               );
             end if;
          end loop;
       end loop;
@@ -227,7 +233,7 @@ architecture synthesis of dbg is
    constant C_ST_HELD    : natural := 5;
 
    function names return t_names is
-      type t_strings is array (0 to 5) of string(1 to C_STATE_LEN);
+      type     t_strings is array (0 to 5) of string(1 to C_STATE_LEN);
       constant C_S   : t_strings := ("NO LINK  ", "RUNNING  ", "PAUSED   ", "BRK      ", "HALTED   ", "HELD     ");
       variable res_v : t_names;
    begin
@@ -412,7 +418,7 @@ begin
                      end if;
                   else
                      kbd_st <= KBD_IDLE_ST;
-                     if kbd_data_i = X"7E" then             -- ~
+                     if kbd_data_i = X"7E" then                   -- ~
                         case kbd_num is
                            when 15     => key_act <= ACT_PAUSE;   -- F5
                            when 18     => key_act <= ACT_HOLD;    -- F7
@@ -739,7 +745,7 @@ begin
             when others =>
                null;
          end case;
-         ovl_addr <= to_slv(C_STRIP_ROW * C_COLS + s2_addr, 12);
+         ovl_addr <= std_logic_vector(to_unsigned(C_STRIP_ROW * C_COLS + s2_addr, 12));
          if s2_dim = '1' then
             ovl_data <= C_DIM & ch_v;
          else
