@@ -93,13 +93,16 @@
 --    stops at V3 with `x01`. Then, with the breakpoints disabled, a go on
 --    runs it to its halt, and the stop register reads 0. A start stops at
 --    READ again, and the clear before step 13 ends the stop.
--- 13. Load G_EOF_FILE, and run it. It echoes its input until the input ends,
---    which a break on the UART does, and halts with 0x200 in R1. Console
---    bytes sent after the halt are dropped.
+-- 13. Load G_EOF_FILE, and run it. It echoes its input until the line's
+--    input ends, which a break on the UART does, and halts with 0x200 in
+--    R1. Console bytes sent after the halt are dropped.
 -- 14. The keyboard input, a stream of bytes as kbd_m65_ascii.vhd sends them:
 --    bytes typed while the core is held are dropped, and G_FIFO_FILE again,
 --    with more bytes typed than its FIFO holds. None is lost, for the
---    keyboard waits.
+--    keyboard waits. Then G_FIFO_FILE once more, with a break on the UART
+--    while it runs: the host's bytes after the break are dropped, and the
+--    keys still reach the program, which reads on at 0x200 and echoes
+--    them (nice_cpu's SYSTEM.md §5).
 -- 15. A reset while G_ECHO_FILE runs: the link sends `b05`, the core boots
 --    from the ROM again, and the screen's and the board's registers and the
 --    breakpoints are cleared.
@@ -975,6 +978,19 @@ begin
       expect_con("0123456789abcdefXYZ.");
       expect_halt("01");
       check("FFFFFFF0", "0000000A");
+
+      report "tb_nicemon: the keyboard after a break";
+      wr("FFFFFFF0", "00000009");
+      load(G_FIFO_FILE, first_v);
+      wr("FFFFFFF0", "00000008");
+      send_con("ab");
+      expect_con("ab");
+      send_break;                            -- the line's input ends
+      send_con("zz");                        -- dropped by the link
+      kbd_send("cd.");                       -- the keys still come
+      expect_con("cd.");
+      expect_halt("01");
+      check("FFFFFFF3", "00000010");         -- the FIFO is empty: no "zz"
 
       report "tb_nicemon: a reset while the core runs";
       wr("FFFFFF81", "00000021");

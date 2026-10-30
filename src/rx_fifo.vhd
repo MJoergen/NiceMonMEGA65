@@ -1,13 +1,14 @@
 -- The core's input FIFO: the bytes that the UART and the keyboard send to the
--- console of SYSTEM.md §1, 2^G_ADDR_BITS of them, in block RAM, and the end
--- of the input.
+-- console of SYSTEM.md §1, 2^G_ADDR_BITS of them, in block RAM.
 --
 -- THEORY OF OPERATION
 -- The FIFO holds the bytes from rd to wr. Each pointer has one bit more than
 -- an index, so that a full FIFO differs from an empty one. A byte on
--- wr_data_i with wr_en_i high is written, unless the FIFO is full or the
--- input has ended; then it is lost. end_i ends the input, and ended_o stays
--- high until reset.
+-- wr_data_i with wr_en_i high is written, unless the FIFO is full; then it
+-- is lost. The end of the line's input is not the FIFO's: after a break the
+-- link forwards none of the host's bytes, the keyboard's bytes still go in
+-- (SYSTEM.md §5), and nicemon.vhd answers 0x200 from the link's eoi_o once
+-- the FIFO is empty.
 --
 -- free_o is the number of bytes that the FIFO can take now, from 0 to
 -- 2^G_ADDR_BITS, in the cycle after a write or a read changes it.
@@ -22,12 +23,10 @@
 -- The solver picks any byte written, and follows it: it stays in its word,
 -- and when its turn comes it is the byte read. The pointers stay at most
 -- 2^G_ADDR_BITS apart, a byte is not written to the word at rd while the
--- FIFO holds one, an accepted byte makes the FIFO not empty, and nothing is
--- written after the end of the input.
+-- FIFO holds one, and an accepted byte makes the FIFO not empty.
 --
 -- RESET
--- Synchronous. Reset empties the FIFO and clears ended_o. The memory is not
--- changed.
+-- Synchronous. Reset empties the FIFO. The memory is not changed.
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -49,10 +48,6 @@ entity rx_fifo is
       full_o    : out std_logic;
       free_o    : out std_logic_vector(G_ADDR_BITS downto 0);
 
-      -- The input ends
-      end_i     : in  std_logic;
-      ended_o   : out std_logic;
-
       -- The oldest byte is taken; rd_data_o has it in the next cycle
       rd_en_i   : in  std_logic;
       empty_o   : out std_logic;
@@ -69,7 +64,6 @@ architecture synthesis of rx_fifo is
    signal mem   : t_mem;
    signal wr    : std_logic_vector(G_ADDR_BITS downto 0) := (others => '0');
    signal rd    : std_logic_vector(G_ADDR_BITS downto 0) := (others => '0');
-   signal ended : std_logic                              := '0';
    signal full  : std_logic;
    signal empty : std_logic;
    signal we    : std_logic;
@@ -81,12 +75,11 @@ begin
               '0';
    empty   <= '1' when wr = rd else
               '0';
-   we      <= wr_en_i and not full and not ended;
+   we      <= wr_en_i and not full;
    re      <= rd_en_i and not empty;
    full_o  <= full;
    free_o  <= C_LEN - (wr - rd);
    empty_o <= empty;
-   ended_o <= ended;
 
    p_mem : process (clk_i)
    begin
@@ -107,14 +100,10 @@ begin
          if re = '1' then
             rd <= rd + 1;
          end if;
-         if end_i = '1' then
-            ended <= '1';
-         end if;
 
          if rst_i = '1' then
-            wr    <= (others => '0');
-            rd    <= (others => '0');
-            ended <= '0';
+            wr <= (others => '0');
+            rd <= (others => '0');
          end if;
       end if;
    end process p_ptr;
@@ -166,14 +155,11 @@ begin
       -- psl f_rd_word : assert always we = '1' ->
       --    (empty = '1' or wr(G_ADDR_BITS - 1 downto 0) /= rd(G_ADDR_BITS - 1 downto 0));
       -- psl f_write_shows : assert always {we and not rst_i} |=> {rst_i or not empty};
-      -- psl f_end_holds : assert always {ended and not rst_i} |=> {rst_i or ended};
-      -- psl f_end_stops : assert always ended -> not we;
-      -- psl f_reset : assert always {rst_i} |=> {empty and not ended};
+      -- psl f_reset : assert always {rst_i} |=> {empty};
 
       -- psl c_full : cover {full and not rst_i};
       -- psl c_order : cover {f_turn and not rst_i};
       -- psl c_wrap : cover {(wr = C_LEN + 1 and rd = C_LEN) and not rst_i};
-      -- psl c_ended : cover {ended and empty and not rst_i; rd_en_i};
    end generate gen_formal;
 
 end architecture synthesis;

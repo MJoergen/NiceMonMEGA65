@@ -78,12 +78,14 @@
 --                          bytes, in block RAM, and a UART byte that arrives
 --                          when it is full is lost, and the link sends `o`.
 --                          A break on the UART, a frame of ten 0 bits, ends
---                          the input until the next start, as the end of
---                          the emulator's input does: once the FIFO is
---                          empty, a read returns 0x200 (bit 9), and bytes
---                          after the break are dropped. A read by the link
---                          returns 0 and takes nothing, and a write by the
---                          link is dropped.
+--                          the line's input until the next start, as the
+--                          end of the emulator's input does: the UART's
+--                          bytes after the break are dropped, and once the
+--                          FIFO is empty a read returns 0x200 (bit 9). The
+--                          keyboard's bytes still go into the FIFO, and a
+--                          read returns them (SYSTEM.md §5). A read by the
+--                          link returns 0 and takes nothing, and a write by
+--                          the link is dropped.
 --   0xFFFFFF01             The read counter of the emulator: a read by the
 --                          core returns the number of its reads since the
 --                          last write, and a write sets that number. A read
@@ -545,8 +547,10 @@ architecture synthesis of nicemon is
    signal kbd_take      : std_logic;
    signal in_valid      : std_logic;
    signal in_data       : std_logic_vector(7 downto 0);
-   -- The end of the input, a break on the UART. The link gives it to the
-   -- FIFO's end_i, which keeps it as rx_eof until the next start.
+   -- The end of the line's input, a break on the UART: the link's eoi_o,
+   -- high until the next start. While it is high, the link forwards none
+   -- of the host's bytes, and a read of the console with the FIFO empty
+   -- returns 0x200. The keyboard's bytes still go in (SYSTEM.md §5).
    signal link_eoi : std_logic;
 
    -- The core's console output, to the link
@@ -559,8 +563,6 @@ architecture synthesis of nicemon is
    signal rx_take  : std_logic;
    signal rx_empty : std_logic;
    signal rx_q     : std_logic_vector(7 downto 0);
-   -- The core's input has ended with a break (link_eoi).
-   signal rx_eof : std_logic;
    -- The free bytes of the FIFO
    signal rx_free : std_logic_vector(C_RX_FIFO_BITS downto 0);
    signal free    : std_logic_vector(15 downto 0);
@@ -719,7 +721,7 @@ begin
                -- rx_take takes the byte, and it comes from rx_q in the next
                -- cycle.
                rd_src <= SRC_RX;
-            elsif rx_eof = '1' then
+            elsif link_eoi = '1' then
                rd_io(9) <= '1';
             end if;
          elsif addr = C_READ_COUNT and link then
@@ -801,8 +803,7 @@ begin
    end process p_dbus;
 
    -- A byte for the core goes into its FIFO while the core runs or is
-   -- paused. The FIFO
-   -- drops it when it is full or the input has ended. A read of the console
+   -- paused. The FIFO drops it when it is full. A read of the console
    -- by the core takes the oldest byte, in the cycle that serves it: the
    -- cycle that accepts the request. The FIFO is in reset while the core is
    -- held, so a program starts with no input.
@@ -822,8 +823,6 @@ begin
          wr_data_i => in_data,
          full_o    => open,
          free_o    => rx_free,
-         end_i     => link_eoi,
-         ended_o   => rx_eof,
          rd_en_i   => rx_take,
          empty_o   => rx_empty,
          rd_data_o => rx_q
@@ -1097,12 +1096,12 @@ begin
    -- the core runs or is paused, a keyboard byte waits until the FIFO has
    -- room for two, so that a byte from the link, which the link sends only
    -- when the free space was not 0 a cycle earlier, finds room. Otherwise it
-   -- is taken and dropped: while the core is held or halted, or after the
-   -- end of the input.
+   -- is taken and dropped: while the core is held or halted. After the end
+   -- of the line's input it still goes in (SYSTEM.md §5).
    kbd_room <= '1' when rx_free >= 2 else
                '0';
    kbd_take <= kbd_valid_i and not link_in_valid and
-               (not cpu_started or rx_eof or kbd_room);
+               (not cpu_started or kbd_room);
    in_valid <= link_in_valid or kbd_take;
    in_data  <= link_in_data when link_in_valid = '1' else kbd_data_i;
 
@@ -1167,9 +1166,9 @@ begin
       end process p_wait;
 
       -- A read of the console by the core takes a byte, or finds the FIFO
-      -- empty after the end of the input
+      -- empty after the end of the line's input
       f_rx_byte <= rx_take and not rx_empty;
-      f_rx_end  <= rx_take and rx_empty and rx_eof;
+      f_rx_end  <= rx_take and rx_empty and link_eoi;
 
       f_link_con <= '1' when link_take = '1' and
                              (link_addr = C_UART_DATA or link_addr = C_READ_COUNT) else

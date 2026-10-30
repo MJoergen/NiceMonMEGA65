@@ -1,8 +1,8 @@
 -- The core's input FIFO (src/rx_fifo.vhd), with its properties, for
--- SymbiYosys. Every input is free, so the solver sends bytes, ends the
--- input, and takes bytes at any time. The FIFO has 4 bytes, so that the
--- solver soon fills it and wraps its pointers around; the properties do not
--- depend on the size.
+-- SymbiYosys. Every input is free, so the solver sends bytes and takes
+-- bytes at any time. The FIFO has 4 bytes, so that the solver soon fills
+-- it and wraps its pointers around; the properties do not depend on the
+-- size.
 --
 -- RESET
 -- The first cycle is a reset.
@@ -16,7 +16,6 @@ entity formal_rx_fifo is
       rst_i     : in  std_logic;
       wr_en_i   : in  std_logic;
       wr_data_i : in  std_logic_vector(7 downto 0);
-      end_i     : in  std_logic;
       rd_en_i   : in  std_logic
    );
 end entity formal_rx_fifo;
@@ -24,7 +23,6 @@ end entity formal_rx_fifo;
 architecture synthesis of formal_rx_fifo is
 
    signal full    : std_logic;
-   signal ended   : std_logic;
    signal empty   : std_logic;
    signal rd_data : std_logic_vector(7 downto 0);
 
@@ -46,8 +44,6 @@ begin
          wr_data_i => wr_data_i,
          full_o    => full,
          free_o    => open,
-         end_i     => end_i,
-         ended_o   => ended,
          rd_en_i   => rd_en_i,
          empty_o   => empty,
          rd_data_o => rd_data

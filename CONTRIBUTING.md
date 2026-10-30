@@ -369,7 +369,7 @@ and its UART runs at 1 Mbaud. `sim/cosim/cosim.c` serves the port, and
 
 The connection is the UART line, as a USB serial adapter is. It sends no
 `b` notice, and a new connection resets nothing. A half-close or a close
-of the connection is a break, which ends the program's input. One host is
+of the connection is a break, which ends the line's input. One host is
 served at a time. Another host waits until the first has half-closed or
 closed.
 
@@ -401,8 +401,7 @@ every time, not only the ones a testbench sends.
 
 - `rx_fifo.sby` proves the core's input FIFO, `src/rx_fifo.vhd`, with 4
   bytes: the bytes come out in the order they went in, a byte is lost only
-  when the FIFO is full or the input has ended, no byte is written to the
-  word being read, and the end of the input stays until reset.
+  when the FIFO is full, and no byte is written to the word being read.
 - `board_io.sby` proves the board's registers at `0xFFFFFF90`–`9F`,
   `src/board_io.vhd`, with them and without them: a write sets the
   register of its word, nothing else changes one but reset, each word

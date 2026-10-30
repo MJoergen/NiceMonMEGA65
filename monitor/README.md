@@ -177,8 +177,9 @@ What QMON's table has that this one leaves out:
   ends with the host's input. A new connection over Ethernet does not
   yet start the line anew, as `niceemu --link` does at a new connection
   (nice_cpu's DEBUG.md §7): the link in nice_cpu drops the host's bytes
-  until the next start, and needs a port for it, an issue there. Until
-  then, the next host cannot type to a monitor that one host has left.
+  until the next start, and needs a port for it, MJoergen/nice_cpu#90.
+  Until then, the next host cannot type to a monitor that one host has
+  left.
 - The screen is memory at `0xFFFF0000`, one word per character with its
   color, so `mon_putc` writes the words directly where QMON writes a
   register. The hardware has what QMON's VGA library needs for the rest: a

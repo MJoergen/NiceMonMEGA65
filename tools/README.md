@@ -62,7 +62,7 @@ use `--eth` with any tool:
 
 `--eth HOST:PORT` names another port. A plain TCP client, such as
 `nc -N 192.168.1.65 4510`, shows the program's console. It sends each
-line you type, and Ctrl-D sends a break, which ends the program's input
+line you type, and Ctrl-D sends a break, which ends the line's input
 (`-N` makes the end of stdin a half-close, which the board takes as a
 break). The board keeps the connection after that, so Ctrl-C then ends
 `nc`.
@@ -86,7 +86,8 @@ open. The port must not be open in a terminal while a tool runs.
 
 A terminal program that runs at 2 Mbaud, such as `picocom`, shows the
 program's console: `picocom -b 2000000 /dev/ttyUSB1`. In picocom,
-`Ctrl-A Ctrl-\` sends a break, which ends the program's input.
+`Ctrl-A Ctrl-\` sends a break, which ends the line's input; the
+keyboard's goes on.
 
 The serial port also gives the board its IP address without the demo:
 
@@ -110,7 +111,7 @@ Type a line, and the program echoes it. When you type `.`, it halts,
 and the board sends its halt notice, which shows in the terminal as a
 few letters after a stray character, such as `h01#C9`. What you type
 goes to the program while it runs, and is dropped while the core is
-held in reset or has halted. To end a program's input, send a break:
+held in reset or has halted. To end the line's input, send a break:
 Ctrl-D in `nc -N`, or `Ctrl-A Ctrl-\` in picocom on the serial port,
 after `tools/load.py --port /dev/ttyUSB1 echo.bin`.
 
