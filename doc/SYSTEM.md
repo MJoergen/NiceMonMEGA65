@@ -42,6 +42,9 @@ The Ethernet port carries the same line over TCP (see [The debug link
 over TCP](#the-debug-link-over-tcp)). While a host is connected there,
 its connection takes the UART's place in what this document says of the
 UART: the console bytes, the packets, the notices, and the break.
+While the on-board debugger is up ([DEBUGGER.md](DEBUGGER.md)), it
+drives the link itself, and the bytes of both the UART and TCP are
+dropped, and none is sent to them.
 
 Without a ROM, the core is held in reset at power-up; with one, it runs
 the ROM (see [The ROM](#the-rom)). A host loads a program with two
@@ -255,7 +258,7 @@ the MEGA65's keys:
 A held key repeats after half a second, 20 times a second. F13, HELP,
 CLR/HOME, and the modifiers give nothing. MEGA and HELP together toggle the
 on-board debugger ([DEBUGGER.md](DEBUGGER.md)), and while it is up the
-keys go to it, not to the core. The keyboard's drive
+keys go to it, not to the core, and it has the debug link. The keyboard's drive
 LED is green while the core runs, like the user LED.
 
 The bytes of a key wait until the core's input has room for them, and

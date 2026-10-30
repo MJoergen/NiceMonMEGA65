@@ -33,7 +33,8 @@
 -- overlay of the text display. dbg_toggle_i is the board's toggle key, a
 -- pulse that the board makes from its keyboard, named by G_TOGGLE_KEY; a
 -- board without one leaves it at '0'. While the debugger has the focus, the
--- keyboard's bytes go to it instead of the core's console FIFO.
+-- keyboard's bytes go to it instead of the core's console FIFO, and it
+-- drives the debug link, in the place of the UART and TCP (nicemon.vhd).
 --
 -- INTERFACE CONTRACTS -- these are requirements on the environment:
 -- a) vga_clk_i is the pixel clock of G_VIDEO.
@@ -149,6 +150,14 @@ architecture synthesis of system is
    signal net_tx_data  : std_logic_vector(7 downto 0);
    signal net_tx_valid : std_logic;
    signal net_tx_ready : std_logic;
+   -- The debug link of the debugger
+   signal dbg_on       : std_logic;
+   signal dbg_rx_data  : std_logic_vector(7 downto 0);
+   signal dbg_rx_valid : std_logic;
+   signal dbg_rx_ready : std_logic;
+   signal dbg_tx_data  : std_logic_vector(7 downto 0);
+   signal dbg_tx_valid : std_logic;
+   signal dbg_tx_ready : std_logic;
 
    -- The keyboard, to the core and to the debugger
    signal sys_kbd_valid : std_logic;
@@ -227,7 +236,14 @@ begin
          net_rx_break_i => net_rx_break,
          net_tx_data_o  => net_tx_data,
          net_tx_valid_o => net_tx_valid,
-         net_tx_ready_i => net_tx_ready
+         net_tx_ready_i => net_tx_ready,
+         dbg_on_i       => dbg_on,
+         dbg_rx_data_i  => dbg_rx_data,
+         dbg_rx_valid_i => dbg_rx_valid,
+         dbg_rx_ready_o => dbg_rx_ready,
+         dbg_tx_data_o  => dbg_tx_data,
+         dbg_tx_valid_o => dbg_tx_valid,
+         dbg_tx_ready_i => dbg_tx_ready
       ); -- i_nicemon
 
 
@@ -270,6 +286,7 @@ begin
 
    i_dbg : entity work.dbg
       generic map (
+         G_CLOCK_HZ   => G_CLOCK_HZ,
          G_TOGGLE_KEY => G_TOGGLE_KEY
       )
       port map (
@@ -279,6 +296,13 @@ begin
          kbd_valid_i => dbg_kbd_valid,
          kbd_ready_o => dbg_kbd_ready,
          kbd_data_i  => kbd_data_i,
+         on_o        => dbg_on,
+         lrx_valid_o => dbg_rx_valid,
+         lrx_ready_i => dbg_rx_ready,
+         lrx_data_o  => dbg_rx_data,
+         ltx_valid_i => dbg_tx_valid,
+         ltx_ready_o => dbg_tx_ready,
+         ltx_data_i  => dbg_tx_data,
          ovl_we_o    => ovl_we,
          ovl_addr_o  => ovl_addr,
          ovl_data_o  => ovl_data,

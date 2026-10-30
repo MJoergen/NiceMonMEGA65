@@ -135,7 +135,9 @@ The board serves one connection at a time. While a host is connected,
 it has the whole line, the program's console and the debug link: what
 comes in on the [serial port](#over-the-serial-port) is dropped, and all
 output goes to the host. When the host disconnects, the line goes back
-to the serial port.
+to the serial port. While the on-board debugger is up (MEGA+HELP, see
+[DEBUGGER.md](doc/DEBUGGER.md)), it has the line itself, and a host on
+either gets nothing until it is left.
 
 Ctrl-C ends `nc`. Its close is a break, which ends the program's input
 until the core is started again. The board keeps the connection, so the

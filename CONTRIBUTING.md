@@ -179,9 +179,17 @@ The testbenches are these:
   next frame; then it shows the page, and checks the first four rows of
   the third. It takes about a minute and a half, the longest of the
   tests.
-- `sim/tb_dbg.vhd` tests the on-board debugger: every word of the strip it
-  draws after reset, the toggle between Off and Focus, and the keyboard's
-  bytes, which it takes in Focus.
+- `sim/tb_dbg.vhd` tests the on-board debugger on the system, with
+  `sim/dbg.nasm` in the ROM, a count to 0x800 and a halt. The strip
+  after reset has no registers and NO LINK, and the debugger is Off,
+  without the link. The toggle enters Focus, where it takes the
+  keyboard's bytes and the link, and the core is RUNNING. F5 pauses,
+  with R0–R15 in white, R15 as the PC, and the word at the PC as the ROM
+  has it; s steps to the next instruction; F3 goes on, with the
+  registers dimmed; and the halt shows HALTED 1, R1 at 0x800, and Z.
+  r restarts, F7 holds, and g and p then leave the core held. The toggle
+  gives the link back, and a reset in Focus leaves the debugger Off with
+  the strip drawn again.
 - `sim/tb_dbg_host.vhd` tests the debugger's host against the debug link
   itself, on the system's third link input, with `sim/host.nasm`, which
   writes 0x00 to 0xFF to the console again and again. It reads the

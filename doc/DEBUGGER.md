@@ -2,11 +2,11 @@
 
 A debugger in the FPGA, with the MEGA65's own keyboard and screen and no
 host: what `tools/mon.py` does over the debug link, in a strip of text
-under the program's screen, and a page over it. **Stage 1, the overlay,
-and stage 2, the host in hardware, are written, and the rest is
-planned** ([#52](https://github.com/MJoergen/NiceMonMEGA65/issues/52)):
-the toggle key shows a fixed strip, and the host is tested on the link
-but not yet connected to the debugger. This note
+under the program's screen, and a page over it. **Stages 1 to 3 are
+written, and the rest is planned**
+([#52](https://github.com/MJoergen/NiceMonMEGA65/issues/52)): the toggle
+key enters Focus, where the strip shows the core's state, its registers
+at a stop, and the word at the PC, and F1 to F9 run the core. This note
 records the design and the decisions, as
 [monitor/README.md](../monitor/README.md) does for the ROM of
 [#24](https://github.com/MJoergen/NiceMonMEGA65/issues/24), a hardware
@@ -86,7 +86,8 @@ on dark blue, `0x004` and `0xFFF`:
   ([nice_cpu#85](https://github.com/MJoergen/nice_cpu/issues/85)), as
   `niceemu --link` returns it.
 - Row 27: the core's state, `RUNNING`, `PAUSED`, `BRK n` at breakpoint
-  n, `HALTED n` with the reason of DEBUG.md §6, or `HELD`; the PC; the
+  n, `HALTED n` with the reason of DEBUG.md §6, `HELD`, or `NO LINK`
+  when the link does not answer; the PC; the
   instruction word at the PC; the flags of SR, X, C, Z, N, V, E, and I,
   each shown or a dot; and the instruction decoded: the mnemonic, the
   condition, M and C, and the operands dest, s0, and s1 in the assembler's
@@ -151,7 +152,9 @@ On the page:
 
 A key that needs the core stopped, pressed while it runs, shows the
 link's answer in the message row (`e02`) and does nothing else, as
-mon.py prints its errors.
+mon.py prints its errors. F1 to F9 read the control register before they
+write it: step and go on act only on a paused core, and pause only on a
+running one, as go on and pause would otherwise start a held core.
 
 Page Up, Page Down, and Home are new bytes of both keyboards, xterm's
 `ESC [ 5 ~`, `ESC [ 6 ~`, and `ESC [ H`. On the Nexys4DDR they are the
@@ -198,9 +201,11 @@ and outputs, and its room.
 - **Room.** With stage 1, 92 of the 135 block RAMs are used without a
   ROM and 124 with one, so 11 are left at the least: the overlay took 4,
   and Vivado put the PS/2 table into one more
-  ([synth/README.md](../synth/README.md#block-ram)). The system clock
-  is 90 MHz on a -1 part, built with retiming; the build of stage 1 has
-  0.289 ns of setup and 0.029 ns of hold slack, and the slacks move with
+  ([synth/README.md](../synth/README.md#block-ram)); stage 3 adds half
+  a block RAM, the table of the strip's cells, 92.5 without a ROM. The
+  system clock is 90 MHz on a -1 part, built with retiming; the build of
+  stage 1 has 0.289 ns of setup and 0.029 ns of hold slack, that of
+  stage 3 0.339 ns and 0.031 ns, and the slacks move with
   placement more than with logic ([synth/README.md](../synth/README.md#timing)): every
   stage rebuilds `make nexys4ddr` and reads its timing, and a miss there
   is a placement re-roll before it is a design error.
@@ -264,8 +269,9 @@ cut-off host.
 - `src/video/text.vhd`: the 29 rows, the overlay memory, and its ports:
   `ovl_we_i`, `ovl_addr_i`, `ovl_data_i`, `strip_i`, and `page_i`.
 - `src/nicemon.vhd`: the third input of the link's mux, `dbg_on_i`,
-  `dbg_rx_*`, and `dbg_tx_*`, like `net_*` (written); and `paused_o`
-  and `halted_o`, which are `cpu_paused` and `cpu_halted`.
+  `dbg_rx_*`, and `dbg_tx_*`, like `net_*` (written); and, for the
+  catch, `paused_o` and `halted_o`, which are `cpu_paused` and
+  `cpu_halted`.
 - `src/system.vhd`: instantiates the debugger beside `eth` and `text`;
   `dbg_toggle_i`, the pulse; the keyboard mux, which gives the bytes to
   the debugger while `focus_o` is '1' and to `nicemon` otherwise; and,
@@ -300,9 +306,10 @@ free.
   runs gets `e02`; console bytes arrive in order between packets; the
   UART's bytes are dropped; and a request that the link never gets
   times out.
-- `tb_dbg`: the debugger with `nicemon`, driven by keyboard bytes and
-  toggle pulses, checking the overlay's words and the link's state. The
-  program under it is one of `sim/`'s `.nasm` files.
+- `tb_dbg` (written for stage 3): the debugger with `nicemon`, driven
+  by keyboard bytes and toggle pulses, checking the overlay's words and
+  the link's state. The program under it is `sim/dbg.nasm`, in the ROM:
+  F5, s, F3, the halt, r, F7, and g and p on a held core.
 - `tb_kbd` and `tb_ps2`: the two toggle detectors, with a held key's
   repeats and its release, and one key of MEGA+HELP alone; and Page Up,
   Page Down, and Home from both keyboards.
@@ -333,11 +340,13 @@ Each a commit that builds and passes the tests:
    the detectors in `tb_kbd` and `tb_ps2`.
 2. **The host in hardware** (done). `dbg_host.vhd`, the third input of
    the mux in `nicemon.vhd`, and the formal check. Test: `tb_dbg_host`.
-3. **The live strip and the core keys.** The refresh of the control
-   register, the halt reason, and the stop register; F1 to F9 and their
-   letters; R0–R15 read after `p`, `x`, or `h`; `paused_o` and
-   `halted_o` of `nicemon`. The first useful debugger.
-4. **The catch, and the sticky setting.**
+3. **The live strip and the core keys** (done). The refresh of the
+   control register, the halt reason, and the stop register; F1 to F9
+   and their letters; R0–R15 and the word at the PC read at a stop,
+   which a `p`, `x`, or `h` makes the debugger look for at once. The
+   first useful debugger.
+4. **The catch, and the sticky setting.** `paused_o` and `halted_o` of
+   `nicemon`, which the catch needs, as it works from Off.
 5. **The page.** The window, the cursor, the input field, the word edit,
    `a`, and Page Up, Page Down, and Home from both keyboards.
 6. **The breakpoints.** `b`, the header's list, the colored words, and

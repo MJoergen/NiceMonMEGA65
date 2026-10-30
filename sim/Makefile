@@ -18,8 +18,9 @@
 #             tb_text     the text display: two frames of 1280x1024, every
 #                         pixel checked, with the debugger's strip shown in
 #                         the first, and its page over the third.
-#             tb_dbg      the on-board debugger: the strip it draws, and
-#                         the toggle.
+#             tb_dbg      the on-board debugger on the system, with
+#                         dbg.nasm in its ROM: the strip it draws, the
+#                         toggle, and the core's keys.
 #             tb_dbg_host the debugger's host in hardware, on the system's
 #                         debug link, with host.nasm.
 #             tb_board_io the Nexys4DDR's display and RGB LED drivers.
@@ -68,7 +69,7 @@ NICE_SIM = $(NICE_DIR)/hdl/sim/wb_mem.vhd
 SRC_SOURCES  = ../src/uart_serdes.vhd ../src/rx_fifo.vhd ../src/ram.vhd ../src/rom.vhd \
                ../src/board_io.vhd ../src/scr_regs.vhd ../src/devices.vhd ../src/mem.vhd ../src/nicemon.vhd \
                ../src/kbd_m65.vhd ../src/kbd_m65_ascii.vhd ../src/kbd_ps2.vhd ../src/kbd_ps2_ascii.vhd ../src/seg7.vhd ../src/rgb_pwm.vhd \
-               ../src/kbd_m65_toggle.vhd ../src/kbd_ps2_toggle.vhd ../src/dbg/dbg.vhd ../src/dbg/dbg_host.vhd \
+               ../src/kbd_m65_toggle.vhd ../src/kbd_ps2_toggle.vhd ../src/dbg/dbg_host.vhd ../src/dbg/dbg.vhd \
                ../src/video/video_pkg.vhd ../src/video/font_pkg.vhd ../src/video/pix.vhd ../src/video/scr_ram.vhd ../src/video/text.vhd \
                ../src/eth/eth_pkg.vhd ../src/eth/rmii_rx.vhd ../src/eth/rx_fcs.vhd ../src/eth/eth_ram.vhd ../src/eth/eth_rx_fifo.vhd \
                ../src/eth/eth_arp.vhd ../src/eth/eth_icmp.vhd ../src/eth/eth_tcp_rx.vhd ../src/eth/eth_tcp_tx.vhd ../src/eth/eth_tcp_timer.vhd ../src/eth/eth_tcp_buf.vhd ../src/eth/eth_tcp_pick.vhd ../src/eth/eth_tcp.vhd ../src/eth/eth_tx_fifo.vhd ../src/eth/eth_arb.vhd ../src/eth/rmii_tx.vhd ../src/eth/eth.vhd \
@@ -130,12 +131,17 @@ tb_ps2_nicemon: analyze $(BUILD)/fifo.bin $(BUILD)/switch.bin
 	  -gG_FIFO_FILE=fifo.bin -gG_SWITCH_FILE=switch.bin --ieee-asserts=disable > tb_ps2_nicemon.log 2>&1) && \
 	  echo "PASS tb_ps2_nicemon" || (echo "FAIL tb_ps2_nicemon"; cat $(BUILD)/tb_ps2_nicemon.log; exit 1)
 
+tb_dbg: analyze $(BUILD)/dbg.bin
+	@(cd $(BUILD) && $(GHDL) --elab-run $(GHDLFLAGS) tb_dbg -gG_ROM_FILE=dbg.bin --ieee-asserts=disable \
+	  > tb_dbg.log 2>&1) && \
+	  echo "PASS tb_dbg" || (echo "FAIL tb_dbg"; cat $(BUILD)/tb_dbg.log; exit 1)
+
 tb_dbg_host: analyze $(BUILD)/host.bin
 	@(cd $(BUILD) && $(GHDL) --elab-run $(GHDLFLAGS) tb_dbg_host -gG_HOST_FILE=host.bin \
 	  --ieee-asserts=disable > tb_dbg_host.log 2>&1) && \
 	  echo "PASS tb_dbg_host" || (echo "FAIL tb_dbg_host"; cat $(BUILD)/tb_dbg_host.log; exit 1)
 
-tb_kbd tb_ps2 tb_text tb_dbg tb_board_io tb_rmii_rx tb_rx_fcs tb_eth_rx_fifo tb_eth_tx_fifo tb_rmii_tx tb_eth tb_eth_tcp: analyze
+tb_kbd tb_ps2 tb_text tb_board_io tb_rmii_rx tb_rx_fcs tb_eth_rx_fifo tb_eth_tx_fifo tb_rmii_tx tb_eth tb_eth_tcp: analyze
 	@(cd $(BUILD) && $(GHDL) --elab-run $(GHDLFLAGS) $@ > $@.log 2>&1) && \
 	  echo "PASS $@" || (echo "FAIL $@"; cat $(BUILD)/$@.log; exit 1)
 
@@ -229,6 +235,9 @@ $(BUILD)/counters.bin: counters.nasm $(ASM_PY) | $(BUILD)
 	@$(ASM) -o $@ $<
 
 $(BUILD)/break.bin: break.nasm $(ASM_PY) | $(BUILD)
+	@$(ASM) -o $@ $<
+
+$(BUILD)/dbg.bin: dbg.nasm $(ASM_PY) | $(BUILD)
 	@$(ASM) -o $@ $<
 
 $(BUILD)/host.bin: host.nasm $(ASM_PY) | $(BUILD)
