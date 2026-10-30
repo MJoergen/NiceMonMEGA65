@@ -44,7 +44,8 @@ its connection takes the UART's place in what this document says of the
 UART: the console bytes, the packets, the notices, and the break.
 While the on-board debugger is up ([DEBUGGER.md](DEBUGGER.md)), in
 Focus or in Strip, it drives the link itself, and the bytes of both the
-UART and TCP are dropped, and none is sent to them.
+UART and TCP are dropped, and none is sent to them; so are a break, a
+host's half-close, and the renewal of a new connection.
 
 Without a ROM, the core is held in reset at power-up; with one, it runs
 the ROM (see [The ROM](#the-rom)). A host loads a program with two
@@ -112,7 +113,7 @@ effect and does not write (DEBUG.md §3).
 | `0x00000000`–`0x00007FFF` | The ROM, in a bitstream built with one, in front of the RAM and repeating with it (see [The ROM](#the-rom)). Bit 3 of the control register hides it. |
 | `0xFFFF0000`–`0xFFFF7FFF` | The screen: 32768 words of memory of their own, the emulator's 80×25 screen and room for scrolling. The 2000 words from the display offset are shown on VGA and HDMI, or VGA only on the Nexys4DDR (see [The screen](#the-screen)), and the link reads them all. |
 | `0xFFFF8000`–`0xFFFFFEFF` | RAM, between the screen and the I/O page: the RAM words `0x8000`–`0xFEFF`, as the 64K words repeat. On the Nexys4DDR, whose screen is 8192 words, it starts lower: `0xFFFF2000`–`0xFFFFFEFF` are the words `0x2000`–`0xFEFF`. The runtime's stack starts at `0xFFFFFF00` and grows down into it, and so does the stack of a program in the ROM, such as the demo. In the emulator it is ordinary memory. |
-| `0xFFFFFF00` | The console of nice_cpu's SYSTEM.md §1. A write sends bits 7..0 to the UART. A read takes the oldest byte received from the UART or the keyboard, and returns it in bits 7..0 with bit 8 set, or 0 when no byte has arrived. A break on the UART ends the line's input until the core is started again: the UART's bytes after it are dropped, and once the bytes before it are read, a read returns `0x200` (bit 9), as at the end of the emulator's input. The keyboard's bytes still come, and a read returns them (nice_cpu's SYSTEM.md §5). |
+| `0xFFFFFF00` | The console of nice_cpu's SYSTEM.md §1. A write sends bits 7..0 to the UART. A read takes the oldest byte received from the UART or the keyboard, and returns it in bits 7..0 with bit 8 set, or 0 when no byte has arrived. A break on the UART, or a host's half-close over Ethernet, ends the line's input until the core is started again or a host connects over Ethernet (see [The debug link over TCP](#the-debug-link-over-tcp)): the host's bytes after it are dropped, and once the bytes before it are read, a read returns `0x200` (bit 9), as at the end of the emulator's input. The keyboard's bytes still come, and a read returns them (nice_cpu's SYSTEM.md §5). |
 | `0xFFFFFF01` | The emulator's read counter. A read by the core returns the number of its reads since the last write, and a write sets that number. It is 0 after reset, and a start keeps it, as in the emulator. |
 | `0xFFFFFF10`–`0xFFFFFF1F` | The timer of nice_cpu's SYSTEM.md §4: it raises IRQ every P clock cycles, through the vector it is given. |
 | `0xFFFFFF20`–`0xFFFFFF3F` | The math unit of nice_cpu's SYSTEM.md §2: 32-bit multiply and divide, and 64-bit divide. |
@@ -156,8 +157,9 @@ requires.
 
 The input waits for the core in a FIFO of 2048 bytes, in block RAM. A
 UART byte that arrives when it is full is lost, and the link sends its
-`o` notice; a UART byte after a break is lost too, until a start clears
-the end of the line's input. A keyboard byte goes in after a break as
+`o` notice; a UART byte after a break is lost too, until a start, or a
+host's connection over Ethernet, clears the end of the line's input. A
+keyboard byte goes in after a break as
 before it, so that a program that reads on, as a monitor does, gets the
 keys. A keyboard byte waits until the FIFO has room for two,
 so that a UART byte still finds room, and keys typed meanwhile may be
@@ -425,9 +427,11 @@ refused".
 
 A host's FIN is the end of the line's input, and the board keeps the
 connection after it, so a host that is done ends it with a reset. A new
-connection does not start the line anew, as one to `niceemu --link` does
-(DEBUG.md §7): the link drops the host's bytes until the next start, and
-needs a port in nice_cpu for it (MJoergen/nice_cpu#90). The tools set
+connection starts the line's input anew, as one to `niceemu --link` does
+(DEBUG.md §7): once the program has read the old connection's bytes, the
+console no longer reads `0x200`, and the new host's bytes reach the
+program, so a host can type to a monitor that another host has left. The
+tools set
 `SO_LINGER` to 0 for that, so that each close of theirs, also at an exit
 or a kill, sends one. A connection that a host closed with only a FIN
 stays until that host connects again, or the board resets. The board

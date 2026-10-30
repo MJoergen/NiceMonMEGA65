@@ -140,7 +140,8 @@ to the serial port. While the on-board debugger is up (MEGA+HELP, see
 either gets nothing until it is left.
 
 Ctrl-C ends `nc`. Its close is a break, which ends the line's input,
-not the keyboard's, until the core is started again. The board keeps the connection, so the
+not the keyboard's, until the core is started again or a host connects
+again. The board keeps the connection, so the
 serial port has no link until a tool connects from the same PC, such as
 `tools/mon.py --eth 192.168.1.65`, or the board is reset. The tools end
 their connections so that the line goes back at once.

@@ -62,13 +62,15 @@ entity eth is
       rx_bad_o    : out std_logic_vector(31 downto 0);
       tx_o        : out std_logic_vector(31 downto 0);
       -- The debug link's byte streams over TCP (eth_tcp.vhd): on_o while
-      -- there is a connection, the host's bytes and its half-close, and the
+      -- there is a connection, the host's bytes, its half-close, the
+      -- renewal of the line's input by a connection that opens, and the
       -- bytes to the host
       on_o        : out std_logic;
       lrx_data_o  : out std_logic_vector(7 downto 0);
       lrx_valid_o : out std_logic;
       lrx_ready_i : in  std_logic;
       lrx_break_o : out std_logic;
+      lrx_renew_o : out std_logic;
       ltx_data_i  : in  std_logic_vector(7 downto 0);
       ltx_valid_i : in  std_logic;
       ltx_ready_o : out std_logic;
@@ -247,6 +249,7 @@ begin
          lrx_valid_o => lrx_valid_o,
          lrx_ready_i => lrx_ready_i,
          lrx_break_o => lrx_break_o,
+         lrx_renew_o => lrx_renew_o,
          ltx_data_i  => ltx_data_i,
          ltx_valid_i => ltx_valid_i,
          ltx_ready_o => ltx_ready_o

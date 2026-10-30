@@ -198,10 +198,12 @@ the screen's registers are memory.
 The demo halts at the end of the input: in `niceemu`, after its input
 file, and on the board, after a break on the line, as when an Ethernet
 host half-closes its connection. That is on purpose. After a break,
-every read of the console returns the end, and the bytes of the line and
-the keyboard are lost, until the core is started again
-([SYSTEM.md](../doc/SYSTEM.md#address-map)), so no key could reach
-the demo. The halt says so plainly: the link sends `h`, and `run.py`,
+every read of the console returns the end once the bytes before it are
+read, and the line's bytes are dropped until the core is started again
+or a host connects over Ethernet
+([SYSTEM.md](../doc/SYSTEM.md#address-map)); the keyboard's keys
+still come, but the demo ends as `niceemu` does, rather than read on.
+The halt says so plainly: the link sends `h`, and `run.py`,
 `hwtest.py`, and the tests in `niceemu` end on it. A terminal program
 that sends a break when it opens the port thus stops the demo, and the
 reset button, or a start from the link, starts it again.

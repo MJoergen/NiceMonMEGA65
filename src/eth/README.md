@@ -26,8 +26,10 @@ Received frames flow along the top, and frames to send along the bottom.
   everyone.
 - **PING** ([eth_icmp.vhd](eth_icmp.vhd)) answers ICMP echo requests.
 - **TCP SERVER** ([eth_tcp.vhd](eth_tcp.vhd)) serves one connection at a
-  time. It passes the host's bytes to the debug link, and the link's
-  bytes back. Its parts are the parser of received segments
+  time. It passes the host's bytes to the debug link, its half-close as
+  a break, and a connection that opens as the start of the line's input
+  anew, and the link's bytes back. Its parts are the parser of received
+  segments
   ([eth_tcp_rx.vhd](eth_tcp_rx.vhd)), the two buffers
   ([eth_tcp_buf.vhd](eth_tcp_buf.vhd)), the choice of what to send
   ([eth_tcp_pick.vhd](eth_tcp_pick.vhd)), the sender

@@ -29,12 +29,12 @@
 -- are dropped, and none is sent on it. While dbg_on_i is '1', they are
 -- those of the dbg_* ports, the on-board debugger's host in hardware
 -- (dbg/dbg_host.vhd, doc/DEBUGGER.md), and the bytes of both others are
--- dropped. The bytes to the link, and the
--- breaks, go through a register stage after that choice (p_lnk_rx), for
--- the timing: it holds a byte, and a break waits behind the byte before
--- it, and no byte is taken while a break waits, so that the order stays
--- and a byte that waits when net_on_i or dbg_on_i changes still reaches
--- the link.
+-- dropped. The bytes to the link, the breaks, and the renewals of the
+-- line's input go through a register stage after that choice (p_lnk_rx),
+-- for the timing: it holds a byte, a break waits behind the byte before
+-- it, a renewal waits behind the break before it, and no byte is taken
+-- while either waits, so that the order stays and a byte that waits when
+-- net_on_i or dbg_on_i changes still reaches the link.
 --
 -- Address map, as in the emulator (nice_cpu/emulator/README.md), and the
 -- same for the link and the core's data bus apart from the link's own
@@ -77,9 +77,10 @@
 --                          core's input waits in a FIFO of 2^G_RX_FIFO_BITS
 --                          bytes, in block RAM, and a UART byte that arrives
 --                          when it is full is lost, and the link sends `o`.
---                          A break on the UART, a frame of ten 0 bits, ends
---                          the line's input until the next start, as the
---                          end of the emulator's input does: the UART's
+--                          A break on the UART, a frame of ten 0 bits, or a
+--                          host's half-close over TCP, ends the line's
+--                          input until the next start, or until a host
+--                          connects over TCP (DEBUG.md §7): the host's
 --                          bytes after the break are dropped, and once the
 --                          FIFO is empty a read returns 0x200 (bit 9). The
 --                          keyboard's bytes still go into the FIFO, and a
@@ -317,12 +318,14 @@ entity nicemon is
       eth_ip_o       : out std_logic_vector(31 downto 0);
       -- The link's byte streams over TCP, which take the UART's place
       -- while net_on_i is '1': the host's bytes and its half-close, a
-      -- break, and the bytes to the host
+      -- break, a connection that opens, which renews the line's input,
+      -- the link's resume (DEBUG.md §7), and the bytes to the host
       net_on_i       : in  std_logic                    := '0';
       net_rx_data_i  : in  std_logic_vector(7 downto 0) := X"00";
       net_rx_valid_i : in  std_logic                    := '0';
       net_rx_ready_o : out std_logic;
       net_rx_break_i : in  std_logic                    := '0';
+      net_rx_renew_i : in  std_logic                    := '0';
       net_tx_data_o  : out std_logic_vector(7 downto 0);
       net_tx_valid_o : out std_logic;
       net_tx_ready_i : in  std_logic                    := '0';
@@ -526,16 +529,19 @@ architecture synthesis of nicemon is
    signal ser_tx_data  : std_logic_vector(7 downto 0);
    -- The link's byte streams, from the UART or over TCP, and the bytes to
    -- the link after the register stage, with a break that waits behind
-   -- the byte in it
+   -- the byte in it, and a renewal that waits behind the break
    signal mux_rx_valid : std_logic;
    signal mux_rx_ready : std_logic;
    signal mux_rx_data  : std_logic_vector(7 downto 0);
    signal mux_rx_break : std_logic;
+   signal mux_rx_renew : std_logic;
    signal lnk_rx_valid : std_logic                    := '0';
    signal lnk_rx_ready : std_logic;
    signal lnk_rx_data  : std_logic_vector(7 downto 0) := X"00";
    signal lnk_rx_break : std_logic;
+   signal lnk_rx_renew : std_logic;
    signal lnk_rx_wait  : std_logic                    := '0';
+   signal lnk_rx_rwait : std_logic                    := '0';
    signal lnk_tx_valid : std_logic;
    signal lnk_tx_ready : std_logic;
    signal lnk_tx_data  : std_logic_vector(7 downto 0);
@@ -547,8 +553,9 @@ architecture synthesis of nicemon is
    signal kbd_take      : std_logic;
    signal in_valid      : std_logic;
    signal in_data       : std_logic_vector(7 downto 0);
-   -- The end of the line's input, a break on the UART: the link's eoi_o,
-   -- high until the next start. While it is high, the link forwards none
+   -- The end of the line's input, a break on the UART or a host's
+   -- half-close over TCP: the link's eoi_o, high until the next start or
+   -- the next connection over TCP. While it is high, the link forwards none
    -- of the host's bytes, and a read of the console with the FIFO empty
    -- returns 0x200. The keyboard's bytes still go in (SYSTEM.md §5).
    signal link_eoi : std_logic;
@@ -989,8 +996,8 @@ begin
 
    -- The link's bytes go to the debugger while it is on, else to the TCP
    -- connection while there is one, else to the UART; the others' are
-   -- dropped, and so are their breaks while the debugger is on, which has
-   -- none.
+   -- dropped, and so are their breaks and renewals while the debugger is
+   -- on, which has none.
    mux_rx_valid   <= dbg_rx_valid_i when dbg_on_i = '1' else
                      net_rx_valid_i when net_on_i = '1' else
                      ser_rx_valid;
@@ -1000,6 +1007,7 @@ begin
    mux_rx_break   <= '0' when dbg_on_i = '1' else
                      net_rx_break_i when net_on_i = '1' else
                      ser_rx_break;
+   mux_rx_renew   <= net_rx_renew_i and net_on_i and not dbg_on_i;
    ser_rx_ready   <= mux_rx_ready or net_on_i or dbg_on_i;
    net_rx_ready_o <= mux_rx_ready or not net_on_i or dbg_on_i;
    dbg_rx_ready_o <= mux_rx_ready or not dbg_on_i;
@@ -1014,12 +1022,17 @@ begin
                      ser_tx_ready;
 
    -- The register stage: a byte is taken when the stage is empty or its
-   -- byte goes, unless a break waits or comes; the break goes once the
-   -- byte before it has.
+   -- byte goes, unless a break or a renewal waits or comes; the break
+   -- goes once the byte before it has, and the renewal once the byte and
+   -- the break before it have, so that the link sees them in the order
+   -- of the line (DEBUG.md §7), with the next byte a cycle after the
+   -- renewal at the earliest.
    mux_rx_ready <= '1' when (lnk_rx_valid = '0' or lnk_rx_ready = '1') and
-                            lnk_rx_wait = '0' and mux_rx_break = '0' else
+                            lnk_rx_wait = '0' and lnk_rx_rwait = '0' and
+                            mux_rx_break = '0' and mux_rx_renew = '0' else
                    '0';
    lnk_rx_break <= lnk_rx_wait and not lnk_rx_valid;
+   lnk_rx_renew <= lnk_rx_rwait and not lnk_rx_wait and not lnk_rx_valid;
 
    p_lnk_rx : process (clk_i)
    begin
@@ -1037,10 +1050,16 @@ begin
          elsif lnk_rx_break = '1' then
             lnk_rx_wait <= '0';
          end if;
+         if mux_rx_renew = '1' then
+            lnk_rx_rwait <= '1';
+         elsif lnk_rx_renew = '1' then
+            lnk_rx_rwait <= '0';
+         end if;
 
          if rst_i = '1' then
             lnk_rx_valid <= '0';
             lnk_rx_wait  <= '0';
+            lnk_rx_rwait <= '0';
          end if;
       end if;
    end process p_lnk_rx;
@@ -1061,6 +1080,7 @@ begin
          rx_ready_o     => lnk_rx_ready,
          rx_data_i      => lnk_rx_data,
          rx_break_i     => lnk_rx_break,
+         rx_resume_i    => lnk_rx_renew,
          tx_valid_o     => lnk_tx_valid,
          tx_ready_i     => lnk_tx_ready,
          tx_data_o      => lnk_tx_data,

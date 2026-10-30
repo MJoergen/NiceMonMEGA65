@@ -1,8 +1,9 @@
 -- The TCP server's buffers (src/eth/eth_tcp_buf.vhd), with their
 -- properties, for SymbiYosys. The inputs are free but for the buffers'
 -- contracts: the parser writes only while there is room, the connection
--- acknowledges only what the link has written, and its pointer is 0
--- after reset; the properties do not need the break's. Each
+-- acknowledges only what the link has written, its pointer is 0 after
+-- reset, and it sets the break and the renewal in different cycles; the
+-- properties do not need the rest of the break's and the renewal's. Each
 -- buffer has 4 bytes, and the output pauses after 2 cycles, so that the
 -- solver soon wraps the pointers around; the properties do not depend on
 -- the sizes.
@@ -40,6 +41,7 @@ entity formal_eth_tcp_buf is
       cmt_i       : in  std_logic;
       discard_i   : in  std_logic;
       brk_set_i   : in  std_logic;
+      rnw_set_i   : in  std_logic;
       lrx_ready_i : in  std_logic
    );
 end entity formal_eth_tcp_buf;
@@ -57,6 +59,7 @@ architecture synthesis of formal_eth_tcp_buf is
    signal lrx_data  : std_logic_vector(7 downto 0);
    signal lrx_valid : std_logic;
    signal lrx_break : std_logic;
+   signal lrx_renew : std_logic;
    signal on_s      : std_logic;
 
 begin
@@ -66,6 +69,7 @@ begin
    -- psl f_reset : assume always {rst_i} |=> {una_ptr_i = 0};
    -- psl f_wr : assume always wr_we_i = '1' -> room > 0;
    -- psl f_una : assume always tail_ptr - una_ptr_i <= C_SIZE;
+   -- psl f_marks : assume always not (brk_set_i = '1' and rnw_set_i = '1');
 
 
    i_eth_tcp_buf : entity work.eth_tcp_buf
@@ -93,10 +97,12 @@ begin
          discard_i   => discard_i,
          free_o      => free,
          brk_set_i   => brk_set_i,
+         rnw_set_i   => rnw_set_i,
          lrx_data_o  => lrx_data,
          lrx_valid_o => lrx_valid,
          lrx_ready_i => lrx_ready_i,
          lrx_break_o => lrx_break,
+         lrx_renew_o => lrx_renew,
          on_o        => on_s
       ); -- i_eth_tcp_buf
 

@@ -30,11 +30,18 @@
 -- (fin_rcvd) at its place (brk_ptr, cmt_ptr then, that commit included)
 -- until the link has taken the bytes before it; lrx_break_o is '1' for a
 -- cycle then. Nothing is read past the break meanwhile, as nothing is
--- read past cmt_ptr. on_o says that the link is on the connection: there is one
--- (conn_i), or the link has input or a break still to take, a cycle
--- behind, for the timing; so the link becomes the connection's a cycle
--- after it opens, and stays with it that long after its end, and a byte
--- or the break goes to the link only while on_o is '1'.
+-- read past cmt_ptr. A connection that opens renews the line's input,
+-- the link's resume (nicemon.vhd): the connection says so with rnw_set_i,
+-- in the cycle after it opens, before the commit of its own first data,
+-- and the renewal waits (rnw_rcvd) at its place (rnw_ptr, cmt_ptr then,
+-- that commit excluded) until the link has taken the bytes before it, and
+-- the break before it; lrx_renew_o is '1' for a cycle then, alone. When
+-- a break and a renewal wait at one place, the one set first goes first
+-- (brk_first). on_o says that the link is on the connection: there is one
+-- (conn_i), or the link has input, a break, or a renewal still to take, a
+-- cycle behind, for the timing; so the link becomes the connection's a
+-- cycle after it opens, and stays with it that long after its end, and a
+-- byte, the break, or the renewal goes to the link only while on_o is '1'.
 --
 -- INTERFACE CONTRACTS -- these are requirements on the environment:
 -- a) wr_we_i comes only while room_o is more than 0: the parser checks a
@@ -42,6 +49,8 @@
 --    frees room.
 -- b) brk_set_i comes no earlier than the cmt_i of the data before the
 --    break: with it, or after.
+-- c) rnw_set_i comes no later than the cmt_i of the data after the
+--    renewal: with it, or before, and not in a cycle with brk_set_i.
 --
 -- With G_FORMAL, it states the properties that formal/eth_tcp_buf.sby
 -- proves, under the contracts: the link's output is taken only into room
@@ -50,13 +59,18 @@
 -- has taken, and a commit or a discard moves the one to the other; a
 -- byte read goes to the link in the cycle after, and stays until it is
 -- taken; the break waits from brk_set_i, after the data committed, until
--- the bytes before it are taken, and comes alone; and the link is on
--- while a byte or the break is offered, and from the cycle after a
+-- the bytes before it are taken, and comes alone; the renewal waits from
+-- rnw_set_i, before the data committed with it, until the bytes and the
+-- break before it are taken, and comes alone, never with the break, and
+-- not while a break set before it waits at its place, nor the break
+-- while a renewal set before it does; and the link is on while a byte,
+-- the break, or the renewal is offered, and from the cycle after a
 -- connection opens.
 --
 -- RESET
 -- Synchronous, to clk_i. Reset empties both buffers, as the connection's
--- una_ptr_i goes to 0 as well, and drops the link's input and the break.
+-- una_ptr_i goes to 0 as well, and drops the link's input, the break, and
+-- the renewal.
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -97,15 +111,19 @@ entity eth_tcp_buf is
       cmt_i       : in  std_logic;
       discard_i   : in  std_logic;
       free_o      : out natural range 0 to 2 ** G_ADDR_BITS;
-      -- The host's half-close, after the data committed
+      -- The host's half-close, after the data committed, and a connection
+      -- that opens, before the data committed with it
       brk_set_i   : in  std_logic;
-      -- The link's input, from the receive buffer, and the break
+      rnw_set_i   : in  std_logic                    := '0';
+      -- The link's input, from the receive buffer, the break, and the
+      -- renewal of the line's input
       lrx_data_o  : out std_logic_vector(7 downto 0) := (others => '0');
       lrx_valid_o : out std_logic;
       lrx_ready_i : in  std_logic;
       lrx_break_o : out std_logic                    := '0';
-      -- The link is on the connection: there is one, or input or a break
-      -- that the link has not taken, a cycle behind
+      lrx_renew_o : out std_logic                    := '0';
+      -- The link is on the connection: there is one, or input, a break, or
+      -- a renewal that the link has not taken, a cycle behind
       on_o        : out std_logic                    := '0'
    );
 end entity eth_tcp_buf;
@@ -135,7 +153,16 @@ architecture synthesis of eth_tcp_buf is
    signal lrx_valid : std_logic                               := '0';
    signal fin_rcvd  : std_logic                               := '0';
    signal brk_ptr   : std_logic_vector(G_ADDR_BITS downto 0) := (others => '0');
-   -- Input or a break that the link has not taken
+   -- The renewal that waits, its place, and that the break that waits was
+   -- set before it
+   signal rnw_rcvd  : std_logic                               := '0';
+   signal rnw_ptr   : std_logic_vector(G_ADDR_BITS downto 0) := (others => '0');
+   signal brk_first : std_logic                               := '0';
+   -- The break, or the renewal, is at the link's place, with no byte being
+   -- read or held
+   signal brk_due : std_logic;
+   signal rnw_due : std_logic;
+   -- Input, a break, or a renewal that the link has not taken
    signal drain : std_logic;
 
 begin
@@ -174,16 +201,22 @@ begin
    room_o      <= C_SIZE - to_integer(wr_ptr - rx_rd);
    free_o      <= C_SIZE - to_integer(cmt_ptr - rx_rd);
    lrx_valid_o <= lrx_valid;
-   -- The next byte is read: there is one before the commit and the break,
-   -- none is being read, and the link has taken the last; and the link
-   -- has input or a break still to take
-   fetch <= '1' when lfetch = '0' and rx_rd /= cmt_ptr and
+   -- The next byte is read: there is one before the commit, the break, and
+   -- the renewal, none is being read, and the link has taken the last; the
+   -- link has input, a break, or a renewal still to take; and the break or
+   -- the renewal is at the link's place
+   fetch   <= '1' when lfetch = '0' and rx_rd /= cmt_ptr and
                      not (fin_rcvd = '1' and rx_rd = brk_ptr) and
+                     not (rnw_rcvd = '1' and rx_rd = rnw_ptr) and
                      (lrx_valid = '0' or lrx_ready_i = '1') else
             '0';
-   drain <= '1' when rx_rd /= cmt_ptr or lfetch = '1' or lrx_valid = '1' or
-                     fin_rcvd = '1' else
+   drain   <= '1' when rx_rd /= cmt_ptr or lfetch = '1' or lrx_valid = '1' or
+                     fin_rcvd = '1' or rnw_rcvd = '1' else
             '0';
+   brk_due <= '1' when fin_rcvd = '1' and rx_rd = brk_ptr and lfetch = '0' and lrx_valid = '0' else
+              '0';
+   rnw_due <= '1' when rnw_rcvd = '1' and rx_rd = rnw_ptr and lfetch = '0' and lrx_valid = '0' else
+              '0';
 
    i_rx_ram : entity work.eth_ram
       generic map (
@@ -225,9 +258,10 @@ begin
          end if;
          cmt_ptr <= cmt_v;
 
-         -- The receive buffer to the link, and the host's half-close after
-         -- the last byte before it
+         -- The receive buffer to the link, and the host's half-close and
+         -- the renewal after the last byte before them
          lrx_break_o <= '0';
+         lrx_renew_o <= '0';
          if lrx_ready_i = '1' then
             lrx_valid <= '0';
          end if;
@@ -239,15 +273,26 @@ begin
          if fetch = '1' then
             rx_rd <= rx_rd + 1;
          end if;
-         if fin_rcvd = '1' and rx_rd = brk_ptr and lfetch = '0' and lrx_valid = '0' then
+         -- The one set first, when both wait at the link's place
+         if brk_due = '1' and (rnw_due = '0' or brk_first = '1') then
             lrx_break_o <= '1';
             fin_rcvd    <= '0';
+         elsif rnw_due = '1' then
+            lrx_renew_o <= '1';
+            rnw_rcvd    <= '0';
          end if;
          -- The half-close, a cycle after the connection has it, after the
-         -- data committed, this cycle's included
+         -- data committed, this cycle's included; and the renewal, before
+         -- the data committed this cycle, which is the new connection's
          if brk_set_i = '1' then
-            fin_rcvd <= '1';
-            brk_ptr  <= cmt_v;
+            fin_rcvd  <= '1';
+            brk_ptr   <= cmt_v;
+            brk_first <= '0';
+         end if;
+         if rnw_set_i = '1' then
+            rnw_rcvd  <= '1';
+            rnw_ptr   <= cmt_ptr;
+            brk_first <= fin_rcvd;
          end if;
          on_o <= conn_i or drain;
 
@@ -259,7 +304,10 @@ begin
             lfetch      <= '0';
             lrx_valid   <= '0';
             lrx_break_o <= '0';
+            lrx_renew_o <= '0';
             fin_rcvd    <= '0';
+            rnw_rcvd    <= '0';
+            brk_first   <= '0';
             on_o        <= '0';
          end if;
       end if;
@@ -310,10 +358,22 @@ begin
       -- psl f_break_waits : assert always fin_rcvd = '1' -> brk_ptr - rx_rd <= cmt_ptr - rx_rd;
       -- psl f_break_alone : assert always lrx_break_o = '1' ->
       --    prev(fin_rcvd) = '1' and lrx_valid = '0' and lfetch = '0';
+      -- psl f_break_order : assert always lrx_break_o = '1' ->
+      --    not (prev(rnw_rcvd) = '1' and prev(rnw_ptr) = prev(brk_ptr) and prev(brk_first) = '0');
+
+      -- The renewal
+      -- psl f_renew_set : assert always {rnw_set_i and not rst_i} |=>
+      --    {rst_i = '1' or (rnw_rcvd = '1' and rnw_ptr = prev(cmt_ptr))};
+      -- psl f_renew_waits : assert always rnw_rcvd = '1' -> rnw_ptr - rx_rd <= cmt_ptr - rx_rd;
+      -- psl f_renew_alone : assert always lrx_renew_o = '1' ->
+      --    prev(rnw_rcvd) = '1' and lrx_valid = '0' and lfetch = '0' and lrx_break_o = '0';
+      -- psl f_renew_order : assert always lrx_renew_o = '1' ->
+      --    not (prev(fin_rcvd) = '1' and prev(brk_ptr) = prev(rnw_ptr) and prev(brk_first) = '1');
 
       -- The link is on
       -- psl f_on_byte : assert always lrx_valid = '1' -> on_o = '1';
       -- psl f_on_break : assert always lrx_break_o = '1' -> on_o = '1';
+      -- psl f_on_renew : assert always lrx_renew_o = '1' -> on_o = '1';
       -- psl f_on_conn : assert always {conn_i and not rst_i} |=> {rst_i = '1' or on_o = '1'};
 
       -- psl c_full : cover {conn_i = '1' and tail_ptr - una_ptr_i = C_SIZE and rst_i = '0'};
@@ -321,6 +381,9 @@ begin
       -- psl c_discard : cover {wr_ptr /= cmt_ptr and discard_i = '1' and rst_i = '0'};
       -- psl c_wrap : cover {rx_rd = C_SIZE + 1 and rst_i = '0'};
       -- psl c_break : cover {lrx_break_o and not rst_i};
+      -- psl c_renew : cover {lrx_renew_o and not rst_i};
+      -- psl c_break_renew : cover {lrx_break_o = '1' and rst_i = '0'; lrx_renew_o = '1'};
+      -- psl c_renew_break : cover {lrx_renew_o = '1' and rst_i = '0'; lrx_break_o = '1'};
       -- psl c_stays : cover {on_o = '1' and conn_i = '0' and rst_i = '0'};
    end generate gen_formal;
 

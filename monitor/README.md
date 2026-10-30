@@ -174,12 +174,10 @@ What QMON's table has that this one leaves out:
   host's bytes are dropped until the core is started again, a read
   returns `0x200` once the FIFO is empty, and the keyboard's bytes still
   come. So the monitor reads on, and a program that reads until `0x200`
-  ends with the host's input. A new connection over Ethernet does not
-  yet start the line anew, as `niceemu --link` does at a new connection
-  (nice_cpu's DEBUG.md §7): the link in nice_cpu drops the host's bytes
-  until the next start, and needs a port for it, MJoergen/nice_cpu#90.
-  Until then, the next host cannot type to a monitor that one host has
-  left.
+  ends with the host's input. A new connection over Ethernet starts the
+  line anew, as one to `niceemu --link` does (nice_cpu's DEBUG.md §7,
+  through its link's `rx_resume_i` of MJoergen/nice_cpu#90), so the
+  next host can type to a monitor that one host has left.
 - The screen is memory at `0xFFFF0000`, one word per character with its
   color, so `mon_putc` writes the words directly where QMON writes a
   register. The hardware has what QMON's VGA library needs for the rest: a

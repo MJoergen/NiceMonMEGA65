@@ -149,6 +149,7 @@ architecture synthesis of system is
    signal net_rx_valid : std_logic;
    signal net_rx_ready : std_logic;
    signal net_rx_break : std_logic;
+   signal net_rx_renew : std_logic;
    signal net_tx_data  : std_logic_vector(7 downto 0);
    signal net_tx_valid : std_logic;
    signal net_tx_ready : std_logic;
@@ -239,6 +240,7 @@ begin
          net_rx_valid_i => net_rx_valid,
          net_rx_ready_o => net_rx_ready,
          net_rx_break_i => net_rx_break,
+         net_rx_renew_i => net_rx_renew,
          net_tx_data_o  => net_tx_data,
          net_tx_valid_o => net_tx_valid,
          net_tx_ready_i => net_tx_ready,
@@ -269,6 +271,7 @@ begin
          lrx_valid_o => net_rx_valid,
          lrx_ready_i => net_rx_ready,
          lrx_break_o => net_rx_break,
+         lrx_renew_o => net_rx_renew,
          ltx_data_i  => net_tx_data,
          ltx_valid_i => net_tx_valid,
          ltx_ready_o => net_tx_ready,

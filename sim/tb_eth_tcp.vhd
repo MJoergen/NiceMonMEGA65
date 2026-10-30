@@ -133,6 +133,7 @@ architecture simulation of tb_eth_tcp is
    signal lrx_valid : std_logic;
    signal lrx_ready : std_logic;
    signal lrx_break : std_logic;
+   signal lrx_renew : std_logic;
    signal ltx_data  : std_logic_vector(7 downto 0) := X"00";
    signal ltx_valid : std_logic                    := '0';
    signal ltx_ready : std_logic;
@@ -144,7 +145,11 @@ architecture simulation of tb_eth_tcp is
    signal n_log   : natural   := 0;
    signal n_break : natural   := 0;
    -- The bytes the link had got at the last break
-   signal brk_at  : natural   := 0;
+   signal brk_at : natural   := 0;
+   -- The renewals of the line's input, and the bytes the link had got at
+   -- the last
+   signal n_renew : natural   := 0;
+   signal rnw_at  : natural   := 0;
    signal lrx_bad : boolean   := false;
    signal hold    : std_logic := '0';
    signal tx_stop : std_logic := '0';
@@ -323,6 +328,7 @@ begin
          lrx_valid_o => lrx_valid,
          lrx_ready_i => lrx_ready,
          lrx_break_o => lrx_break,
+         lrx_renew_o => lrx_renew,
          ltx_data_i  => ltx_data,
          ltx_valid_i => ltx_valid,
          ltx_ready_o => ltx_ready
@@ -372,6 +378,10 @@ begin
          if lrx_break = '1' then
             n_break <= n_break + 1;
             brk_at  <= n_log;
+         end if;
+         if lrx_renew = '1' then
+            n_renew <= n_renew + 1;
+            rnw_at  <= n_log;
          end if;
       end if;
    end process p_lrx;
@@ -541,6 +551,7 @@ begin
       variable f_v     : t_frame;
       variable old_v   : std_logic_vector(31 downto 0);
       variable nb_v    : natural;
+      variable nr_v    : natural;
       -- The seeds of the random stage
       variable s1_v : positive := G_SEED;
       variable s2_v : positive := 4510;
@@ -981,8 +992,8 @@ begin
             host_seg(hack_v, len_v, false, 0);
             pause(20 us);
          end loop;
-         assert not lrx_bad and n_break = 0
-            report "tb_eth_tcp: FAIL, random: the link got wrong bytes, or a break"
+         assert not lrx_bad and n_break = 0 and n_renew = 1
+            report "tb_eth_tcp: FAIL, random: the link got wrong bytes, a break, or not one renewal"
             severity failure;
          report "tb_eth_tcp: PASS, random, seed " & integer'image(G_SEED) & ", " &
                 integer'image(hmax_v) & " bytes in and " & integer'image(brcv_v) & " out, " &
@@ -1050,6 +1061,9 @@ begin
       expect_none;
       assert conn = '1'
          report "tb_eth_tcp: FAIL, on_o is not 1 for an open connection"
+         severity failure;
+      assert n_renew = 1 and rnw_at = 0
+         report "tb_eth_tcp: FAIL, no renewal when the connection opened"
          severity failure;
 
       -- Data, the same again, data out of order, and a wrong checksum
@@ -1284,6 +1298,11 @@ begin
       hseq_v := X"00005001";
       bseq_v := seq_v + 1;
       send_seg(C_ACK, 0);
+      -- The new connection renews the line's input, after the break.
+      wait for 1 us;
+      assert n_renew = 2 and rnw_at = hd_v and n_log = hd_v
+         report "tb_eth_tcp: FAIL, no renewal for the new connection after the break"
+         severity failure;
       -- The output after the SYN goes to the new connection.
       ltx_req <= ltx_req + 20;
       total_v := 0;
@@ -1356,7 +1375,9 @@ begin
          severity failure;
 
       -- A break waits for the input before it, also when a new connection's
-      -- input comes after it.
+      -- input comes after it, and the new connection's renewal waits
+      -- behind the break, at the same place.
+      nr_v := n_renew;
       hold <= '1';
       open_conn(40003, X"00009000");
       send_data(4);
@@ -1373,8 +1394,9 @@ begin
          severity failure;
       hold <= '0';
       wait for 1 us;
-      assert n_break = 2 and brk_at = hd_v - 6 and n_log = hd_v and not lrx_bad and conn = '0'
-         report "tb_eth_tcp: FAIL, the break is not after the input before it"
+      assert n_break = 2 and brk_at = hd_v - 6 and n_renew = nr_v + 2 and rnw_at = hd_v - 6 and
+             n_log = hd_v and not lrx_bad and conn = '0'
+         report "tb_eth_tcp: FAIL, the break and the renewal are not after the input before them"
          severity failure;
 
       -- A new connection before the host's FIN, as when the FIN was lost:

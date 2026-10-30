@@ -103,7 +103,12 @@
 --    while it runs: the host's bytes after the break are dropped, and the
 --    keys still reach the program, which reads on at 0x200 and echoes
 --    them (nice_cpu's SYSTEM.md §5).
--- 15. A reset while G_ECHO_FILE runs: the link sends `b05`, the core boots
+-- 15. The link over TCP, with the net_* ports driven as eth/eth_tcp.vhd
+--    drives them: a host connects, and G_FIFO_FILE echoes its bytes over
+--    TCP; its half-close is a break, after which its bytes are dropped;
+--    the next connection renews the line's input, the link's resume
+--    (DEBUG.md §7), and its bytes reach the program again.
+-- 16. A reset while G_ECHO_FILE runs: the link sends `b05`, the core boots
 --    from the ROM again, and the screen's and the board's registers and the
 --    breakpoints are cleared.
 --
@@ -180,6 +185,18 @@ architecture simulation of tb_nicemon is
    signal brd_btn  : std_logic_vector(4 downto 0)  := "00000";
    signal brd_sw   : std_logic_vector(15 downto 0) := X"0000";
 
+   -- The link over TCP, as eth/eth_tcp.vhd drives nicemon: a connection,
+   -- the host's bytes, its half-close, and the renewal of the line's input
+   -- by the next connection; the bytes to the host, taken at once
+   signal net_on       : std_logic                    := '0';
+   signal net_rx_data  : std_logic_vector(7 downto 0) := X"00";
+   signal net_rx_valid : std_logic                    := '0';
+   signal net_rx_ready : std_logic;
+   signal net_rx_break : std_logic                    := '0';
+   signal net_rx_renew : std_logic                    := '0';
+   signal net_tx_data  : std_logic_vector(7 downto 0);
+   signal net_tx_valid : std_logic;
+
    -- The console bytes, and the packets, each from its tag to its checksum
    -- and an LF
    signal con_str : string(1 to 4096);
@@ -246,11 +263,21 @@ begin
          brd_rgb1_o     => brd_rgb1,
          brd_seg_o      => brd_seg,
          brd_btn_i      => brd_btn,
-         brd_sw_i       => brd_sw
+         brd_sw_i       => brd_sw,
+         net_on_i       => net_on,
+         net_rx_data_i  => net_rx_data,
+         net_rx_valid_i => net_rx_valid,
+         net_rx_ready_o => net_rx_ready,
+         net_rx_break_i => net_rx_break,
+         net_rx_renew_i => net_rx_renew,
+         net_tx_data_o  => net_tx_data,
+         net_tx_valid_o => net_tx_valid,
+         net_tx_ready_i => '1'
       ); -- i_nicemon
 
 
-   -- Decodes the UART output, 8-N-1, sampling in the middle of each bit,
+   -- Decodes the link's output, from the UART, 8-N-1, sampling in the
+   -- middle of each bit, or over TCP, a byte a cycle while net_on is '1',
    -- and splits it into console bytes and packets.
    p_uart_rx : process
       variable byte_v : std_logic_vector(7 downto 0);
@@ -261,16 +288,20 @@ begin
       variable buf_v : string(1 to 65536);
       variable n_v   : natural              := 0;
    begin
-      wait until uart_tx = '0';
-      wait for C_BIT_TIME / 2;
-      for i in 0 to 7 loop
+      wait until uart_tx = '0' or (rising_edge(clk) and net_tx_valid = '1');
+      if uart_tx = '0' then
+         wait for C_BIT_TIME / 2;
+         for i in 0 to 7 loop
+            wait for C_BIT_TIME;
+            byte_v(i) := uart_tx;
+         end loop;
          wait for C_BIT_TIME;
-         byte_v(i) := uart_tx;
-      end loop;
-      wait for C_BIT_TIME;
-      assert uart_tx = '1'
-         report "tb_nicemon: bad stop bit"
-         severity failure;
+         assert uart_tx = '1'
+            report "tb_nicemon: bad stop bit"
+            severity failure;
+      else
+         byte_v := net_tx_data;
+      end if;
       c_v := character'val(to_integer(byte_v));
 
       case st_v is
@@ -324,11 +355,23 @@ begin
       variable micros_v : std_logic_vector(31 downto 0);
       variable fs_v     : std_logic_vector(31 downto 0);
 
-      -- Sends one byte, with the stop bit given.
+      -- Sends one byte, with the stop bit given, on the UART, or over TCP
+      -- while net_on is '1', where it waits until nicemon takes it.
       procedure send_byte(c : character; stop_bit : std_logic := '1') is
          variable byte_v : std_logic_vector(7 downto 0);
       begin
-         byte_v  := to_slv(character'pos(c), 8);
+         byte_v := to_slv(character'pos(c), 8);
+         if net_on = '1' then
+            wait until rising_edge(clk);
+            net_rx_data  <= byte_v;
+            net_rx_valid <= '1';
+            loop
+               wait until rising_edge(clk);
+               exit when net_rx_ready = '1';
+            end loop;
+            net_rx_valid <= '0';
+            return;
+         end if;
          uart_rx <= '0';
          wait for C_BIT_TIME;
          for b in 0 to 7 loop
@@ -348,6 +391,24 @@ begin
          uart_rx <= '1';
          wait for C_BIT_TIME;
       end procedure send_break;
+
+      -- A host's half-close over TCP, and a connection that opens, as
+      -- eth/eth_tcp.vhd gives them: a break, and a renewal, for a cycle
+      procedure net_break is
+      begin
+         wait until rising_edge(clk);
+         net_rx_break <= '1';
+         wait until rising_edge(clk);
+         net_rx_break <= '0';
+      end procedure net_break;
+
+      procedure net_renew is
+      begin
+         wait until rising_edge(clk);
+         net_rx_renew <= '1';
+         wait until rising_edge(clk);
+         net_rx_renew <= '0';
+      end procedure net_renew;
 
       procedure send(s : string) is
       begin
@@ -991,6 +1052,24 @@ begin
       expect_con("cd.");
       expect_halt("01");
       check("FFFFFFF3", "00000010");         -- the FIFO is empty: no "zz"
+
+      report "tb_nicemon: a connection over TCP renews the line";
+      wr("FFFFFFF0", "00000009");
+      load(G_FIFO_FILE, first_v);
+      wr("FFFFFFF0", "00000008");
+      net_on <= '1';                         -- a host connects: the link is on TCP
+      net_renew;
+      send_con("ab");
+      expect_con("ab");
+      net_break;                             -- the host's half-close
+      send_con("zz");                        -- dropped by the link
+      net_renew;                             -- the next host connects
+      send_con("cd.");                       -- and its bytes reach the program
+      expect_con("cd.");
+      expect_halt("01");
+      check("FFFFFFF3", "00000010");         -- the FIFO is empty: no "zz"
+      net_on <= '0';                         -- the host leaves: the link goes back to the UART
+      wait until rising_edge(clk);
 
       report "tb_nicemon: a reset while the core runs";
       wr("FFFFFF81", "00000021");

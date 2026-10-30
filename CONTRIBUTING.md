@@ -157,8 +157,9 @@ The testbenches are these:
 - `sim/tb_hello.vhd` runs a "Hello" program on the NICE core from the
   submodule, and checks its console output.
 - `sim/tb_nicemon.vhd` drives the whole system through its UART, as a host
-  of the debug link, with `sim/rom.nasm`, a greeting, as the ROM (see
-  below).
+  of the debug link, and in one step through its TCP ports, as the
+  Ethernet station does, with `sim/rom.nasm`, a greeting, as the ROM
+  (see below).
 - `sim/tb_kbd.vhd` tests the keyboard driver and its ASCII, with a model of
   the keyboard, CLR/HOME and MEGA with the cursor keys among the keys,
   and the debugger's MEGA+HELP detector, which pulses once while the
@@ -281,10 +282,12 @@ The testbenches are these:
   data sent again after the timeout, and an ACK that comes while it is;
   the host's FIN as a break after its data; a new connection after it,
   which closes the old one first with a FIN that comes again until it is
-  acknowledged, and one before it, as when the FIN was lost, or after a
+  acknowledged, and starts the line's input anew once the break has
+  gone, and one before it, as when the FIN was lost, or after a
   crash; data in the ACK of the SYN-ACK; an RST, after which the link
   still takes the input, and one while data is out; a break that waits
-  for its input while a new connection's comes; an RST before the ACK of
+  for its input while a new connection's comes, and the new connection's
+  resume after the break; an RST before the ACK of
   the SYN-ACK; a SYN-ACK that is never acknowledged; the parser's bad
   headers; a SYN with ACK, a FIN, or data; a partial ACK, an old one,
   and one of what was not sent; a segment with old bytes and new ones,
@@ -345,7 +348,11 @@ read counter as 0 and does not write them. Between the programs, the
 testbench writes and reads the board's registers, and checks that a
 clear of the memory and a start keep them. Then it types on the keyboard
 input, which is dropped while the core is held in reset, and input for
-`sim/fifo.nasm` while it runs. Last it resets the system while a program
+`sim/fifo.nasm` while it runs, and after a break on the UART, which ends
+the line's input and not the keyboard's. Then it drives the link over
+the TCP ports as the Ethernet station does: a host's half-close is a
+break, and the next connection starts the line's input anew. Last it
+resets the system while a program
 runs, and checks that the core boots from the ROM again and that the
 screen's and the board's registers are cleared. The header of
 `sim/tb_nicemon.vhd` lists the steps in order. `tb_nicemon` and
@@ -479,8 +486,12 @@ every time, not only the ones a testbench sends.
   discard moves the one to the other; a byte read goes to the link in
   the cycle after, and stays until it is taken; the break waits, after
   the data committed, until the bytes before it are taken, and comes
-  alone; and the link is on while a byte or the
-  break is offered, and from the cycle after a connection opens. Its
+  alone; the renewal of the line's input, by a connection that opens,
+  waits before the data committed with it until the bytes and the break
+  before it are taken, and comes alone, after a break set before it and
+  before one set after it; and the link is on while a byte, the break,
+  or the renewal is offered, and from the cycle after a connection
+  opens. Its
   `model` task proves, with PDR, that the link takes the bytes of the
   receive buffer in the order of their pointers, each as it was last
   written, and that a byte the link writes into the send buffer is read

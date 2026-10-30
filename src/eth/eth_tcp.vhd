@@ -13,8 +13,10 @@
 -- of the line (lrx_break_o), after the last byte committed (cmt). The
 -- link stays with the connection after its end, by an RST or the tries,
 -- until it has taken all the input and the break, so that none is lost;
--- the output in that time is dropped. The states are those of a passive
--- open, and of a close:
+-- the output in that time is dropped. A connection that opens renews the
+-- line's input (lrx_renew_o, the link's resume), after the bytes and the
+-- break of the one before it and before its own first byte (rnw_set).
+-- The states are those of a passive open, and of a close:
 --   LISTEN_ST      no connection; a SYN to G_PORT opens one
 --   SYN_RCVD_ST    the SYN-ACK is sent, and waits for the host's ACK
 --   EST_ST         the connection is open
@@ -117,7 +119,7 @@
 -- eth_tcp_buf.vhd, the two buffers with their link side; and
 -- eth_tcp_timer.vhd, the retransmission timer. What the connection tells
 -- one of them that it cannot read is a pulse (cmt, discard, brk_set,
--- restart, tries_clr), which lands a cycle later; each says why that is
+-- rnw_set, restart, tries_clr), which lands a cycle later; each says why that is
 -- in time.
 --
 -- INTERFACE CONTRACTS -- these are requirements on the environment:
@@ -185,13 +187,15 @@ entity eth_tcp is
       tx_last_o   : out std_logic                    := '0';
       tx_valid_o  : out std_logic;
       tx_ready_i  : in  std_logic;
-      -- The link: '1' while there is a connection, the bytes from the host
-      -- and its half-close, and the bytes to the host
+      -- The link: '1' while there is a connection, the bytes from the host,
+      -- its half-close, the renewal of the line's input by a connection
+      -- that opens, and the bytes to the host
       on_o        : out std_logic;
       lrx_data_o  : out std_logic_vector(7 downto 0) := (others => '0');
       lrx_valid_o : out std_logic;
       lrx_ready_i : in  std_logic;
       lrx_break_o : out std_logic                    := '0';
+      lrx_renew_o : out std_logic                    := '0';
       ltx_data_i  : in  std_logic_vector(7 downto 0);
       ltx_valid_i : in  std_logic;
       ltx_ready_o : out std_logic
@@ -323,6 +327,8 @@ architecture synthesis of eth_tcp is
    signal peer_fin : std_logic := '0';
    -- The connection's half-close for the link, a cycle after
    signal brk_set : std_logic := '0';
+   -- A connection has opened: the line's input starts anew, before its data
+   signal rnw_set : std_logic := '0';
 
    -- The send buffer (eth_tcp_buf.vhd): where the link's next byte goes,
    -- that its output has paused, and the sender's reads
@@ -424,10 +430,12 @@ begin
          discard_i   => discard,
          free_o      => rx_free,
          brk_set_i   => brk_set,
+         rnw_set_i   => rnw_set,
          lrx_data_o  => lrx_data_o,
          lrx_valid_o => lrx_valid_o,
          lrx_ready_i => lrx_ready_i,
          lrx_break_o => lrx_break_o,
+         lrx_renew_o => lrx_renew_o,
          on_o        => on_o
       ); -- i_eth_tcp_buf
 
@@ -628,6 +636,7 @@ begin
          cmt       <= '0';
          discard   <= '0';
          brk_set   <= '0';
+         rnw_set   <= '0';
          restart   <= '0';
          tries_clr <= '0';
 
@@ -708,6 +717,9 @@ begin
                         state   <= EST_ST;
                         keep    <= '0';
                         restart <= '1';
+                        -- The line's input starts anew, before this
+                        -- segment's data
+                        rnw_set <= '1';
                      end if;
 
                      -- The ACK: the bytes it covers are free, also when it
@@ -862,6 +874,7 @@ begin
             cmt       <= '0';
             discard   <= '0';
             brk_set   <= '0';
+            rnw_set   <= '0';
             restart   <= '0';
             tries_clr <= '0';
             armed_r   <= '0';
