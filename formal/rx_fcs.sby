@@ -1,0 +1,28 @@
+# The check of a received frame's frame check sequence, src/eth/rx_fcs.vhd
+# (formal_rx_fcs.vhd). "prove" proves the assertions for every cycle by
+# k-induction, and "cover" reaches each cover statement. The depths are in
+# cycles: 4 is the k of the induction, and 70 is how far "cover" looks,
+# past a good frame of 64 bytes.
+
+[tasks]
+prove
+cover
+
+[options]
+prove: mode prove
+prove: depth 4
+cover: mode cover
+cover: depth 70
+
+[engines]
+smtbmc yices
+
+[script]
+plugin -i ghdl
+ghdl --std=08 -fpsl eth_pkg.vhd rx_fcs.vhd formal_rx_fcs.vhd -e formal_rx_fcs
+prep -top formal_rx_fcs
+
+[files]
+../src/eth/eth_pkg.vhd
+../src/eth/rx_fcs.vhd
+formal_rx_fcs.vhd

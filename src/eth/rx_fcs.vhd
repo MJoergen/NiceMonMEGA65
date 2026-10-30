@@ -12,6 +12,13 @@
 -- and the count of bytes start again after each eof_i.
 -- ok_o and bad_o come a cycle after eof_i.
 --
+-- With G_FORMAL, it states the properties that formal/rx_fcs.sby proves:
+-- each eof_i gives exactly one of ok_o and bad_o, in the cycle after, and
+-- nothing else does; ok_o comes only for a frame of C_MIN_LEN bytes or
+-- more, counted apart from len, with the residue and no err_i, and always
+-- for one; and the register and the count start again after each eof_i
+-- and reset.
+--
 -- RESET
 -- Synchronous, to clk_i. Reset starts the register again, with neither
 -- ok_o nor bad_o.
@@ -23,6 +30,10 @@ library work;
    use work.eth_pkg.all;
 
 entity rx_fcs is
+   generic (
+      -- The properties for formal/rx_fcs.sby
+      G_FORMAL : boolean := false
+   );
    port (
       clk_i   : in  std_logic;
       rst_i   : in  std_logic;
@@ -32,8 +43,8 @@ entity rx_fcs is
       eof_i   : in  std_logic;
       err_i   : in  std_logic;
       -- The end of a frame, with its check sequence right, or wrong
-      ok_o    : out std_logic;
-      bad_o   : out std_logic
+      ok_o    : out std_logic := '0';
+      bad_o   : out std_logic := '0'
    );
 end entity rx_fcs;
 
@@ -78,5 +89,42 @@ begin
          end if;
       end if;
    end process p_fcs;
+
+
+   gen_formal : if G_FORMAL generate
+      -- The bytes since the last eof_i or reset, as far as C_MIN_LEN
+      signal f_bytes : natural range 0 to C_MIN_LEN := 0;
+   begin
+
+      p_bytes : process (clk_i)
+      begin
+         if rising_edge(clk_i) then
+            if valid_i = '1' and f_bytes < C_MIN_LEN then
+               f_bytes <= f_bytes + 1;
+            end if;
+
+            if eof_i = '1' or rst_i = '1' then
+               f_bytes <= 0;
+            end if;
+         end if;
+      end process p_bytes;
+
+      -- psl default clock is rising_edge(clk_i);
+
+      -- psl f_len : assert always len = f_bytes;
+      -- psl f_apart : assert always not (ok_o = '1' and bad_o = '1');
+      -- psl f_one : assert always {eof_i and not rst_i} |=> {ok_o or bad_o};
+      -- psl f_only : assert always {not eof_i or rst_i} |=> {not ok_o and not bad_o};
+      -- psl f_err : assert always {eof_i and err_i} |=> {not ok_o};
+      -- psl f_short : assert always {eof_i = '1' and f_bytes < C_MIN_LEN} |=> {not ok_o};
+      -- psl f_residue : assert always {eof_i = '1' and crc /= C_CRC_RESIDUE} |=> {not ok_o};
+      -- psl f_good : assert always {eof_i = '1' and err_i = '0' and rst_i = '0' and
+      --    f_bytes = C_MIN_LEN and crc = C_CRC_RESIDUE} |=> {ok_o};
+      -- psl f_start : assert always {eof_i or rst_i} |=> {crc = C_CRC_INIT and len = 0};
+
+      -- psl c_ok : cover {ok_o};
+      -- psl c_bad : cover {bad_o = '1' and prev(err_i) = '0' and prev(len) = C_MIN_LEN};
+      -- psl c_short : cover {bad_o = '1' and prev(crc) = C_CRC_RESIDUE};
+   end generate gen_formal;
 
 end architecture synthesis;

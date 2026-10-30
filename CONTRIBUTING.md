@@ -468,12 +468,18 @@ every time, not only the ones a testbench sends.
   the checksums are not proved, as the solver does not get through
   ones' complement sums of free words; `tb_eth_tcp` checks both
   checksums of every segment.
+- `rx_fcs.sby` proves the check of the frame check sequence of a
+  received frame, `src/eth/rx_fcs.vhd`, with every input free: each end
+  of a frame gives exactly one of good and bad, in the cycle after, and
+  nothing else gives either; good comes only for a frame of 64 bytes or
+  more with the CRC's residue and no error, and always for one; and the
+  CRC and the count start again after each frame and reset.
 
 The checks in `rx_fifo.vhd`, `board_io.vhd`, `scr_regs.vhd`,
 `devices.vhd`, `mem.vhd`, `nicemon.vhd`, `eth/eth_tcp_timer.vhd`,
-`eth/eth_tcp_buf.vhd`, `eth/eth_tcp_pick.vhd`, `eth/eth_tcp_rx.vhd`, and
-`eth/eth_tcp_tx.vhd` are in `G_FORMAL`
-blocks, which are off in simulation and synthesis.
+`eth/eth_tcp_buf.vhd`, `eth/eth_tcp_pick.vhd`, `eth/eth_tcp_rx.vhd`,
+`eth/eth_tcp_tx.vhd`, and `eth/rx_fcs.vhd` are in `G_FORMAL` blocks,
+which are off in simulation and synthesis.
 
 ## Testing the board
 
