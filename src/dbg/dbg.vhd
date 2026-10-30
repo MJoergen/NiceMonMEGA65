@@ -337,8 +337,10 @@ architecture synthesis of dbg is
    constant C_INPUT_ROW : t_row := row_cells(" <<<<<<<< ????????  !!!!!!!!!!");
    constant C_PKEYS_ROW : t_row := row_cells(" CRSR PgUp PgDn Home move  0-f type  RETURN write  a address  b break  ESC back");
 
-   -- The field's label, for a word and for an address, and the messages
-   type t_labels is array (0 to 1, 0 to 7) of t_byte;
+   -- The field's label, for a word in 0 to 7 and for an address in 8 to
+   -- 15, one dimension, as GHDL 4.1 cannot synthesize the read of a
+   -- two-dimensional one here; and the messages
+   type t_labels is array (0 to 15) of t_byte;
 
    type t_msgs is array (0 to 4, 0 to 9) of t_byte;
 
@@ -352,10 +354,8 @@ architecture synthesis of dbg is
       constant C_S   : string(1 to 16) := "Word:   Address:";
       variable res_v : t_labels;
    begin
-      for k in 0 to 1 loop
-         for i in 0 to 7 loop
-            res_v(k, i) := to_byte(C_S(8 * k + i + 1));
-         end loop;
+      for i in 0 to 15 loop
+         res_v(i) := to_byte(C_S(i + 1));
       end loop;
       return res_v;
    end function labels;
@@ -1320,9 +1320,9 @@ begin
                end loop;
             when CELL_LABEL =>
                if field_addr = '1' then
-                  s2_ch <= C_LABELS(1, s1_cell.idx mod 8);
+                  s2_ch <= C_LABELS(8 + s1_cell.idx mod 8);
                else
-                  s2_ch <= C_LABELS(0, s1_cell.idx mod 8);
+                  s2_ch <= C_LABELS(s1_cell.idx mod 8);
                end if;
             when CELL_FIELD =>
                -- The digits typed, the first at the left
