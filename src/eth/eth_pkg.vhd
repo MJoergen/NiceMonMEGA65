@@ -4,7 +4,9 @@
 -- eth_tx_fifo.vhd) pass their pointers between the clock domains; the
 -- bytes of a frame, and of a word in the order they are sent; and the
 -- ones' complement sum of the checksums of IPv4, ICMP, and TCP, as
--- eth_icmp.vhd and eth_tcp.vhd check and compute them.
+-- eth_icmp.vhd and eth_tcp.vhd check and compute them; and the address of
+-- a TCP host and the header fields of a TCP segment, as the files of the
+-- TCP server pass them.
 --
 -- THEORY OF OPERATION
 -- The register starts at all ones, and each byte goes into it LSB first, as
@@ -32,6 +34,29 @@ package eth_pkg is
    constant C_CRC_RESIDUE : std_logic_vector(31 downto 0) := X"DEBB20E3";
 
    type t_bytes is array (natural range <>) of std_logic_vector(7 downto 0);
+
+   -- A TCP host: its MAC address, IP address, and port
+   type t_host is record
+      mac      : std_logic_vector(47 downto 0);
+      ip       : std_logic_vector(31 downto 0);
+      tcp_port : std_logic_vector(15 downto 0);
+   end record t_host;
+
+   constant C_HOST_NONE : t_host := (
+      mac      => (others => '0'),
+      ip       => (others => '0'),
+      tcp_port => (others => '0')
+   );
+
+   -- A TCP segment: its source, its sequence and acknowledgment numbers,
+   -- its flags, and its window
+   type t_seg is record
+      host  : t_host;
+      seq   : std_logic_vector(31 downto 0);
+      ack   : std_logic_vector(31 downto 0);
+      flags : std_logic_vector(7 downto 0);
+      win   : std_logic_vector(15 downto 0);
+   end record t_seg;
 
    -- The register after the byte d, LSB first
    function crc_byte (

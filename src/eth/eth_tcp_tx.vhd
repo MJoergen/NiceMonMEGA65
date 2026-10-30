@@ -6,9 +6,9 @@
 -- THEORY OF OPERATION
 -- A segment starts with go_i, and busy_o is '1' from that cycle until its
 -- last byte has gone. Its header is hdr, 54 bytes, without options: the
--- Ethernet header to seg_mac_i from mac_i, the IPv4 header to seg_ip_i
--- from ip_i, with ip_id, which counts the segments sent, and the TCP
--- header to seg_port_i from G_PORT, with seg_seq_i, seg_ack_i,
+-- Ethernet header to seg_host_i.mac from mac_i, the IPv4 header to
+-- seg_host_i.ip from ip_i, with ip_id, which counts the segments sent, and
+-- the TCP header to seg_host_i.tcp_port from G_PORT, with seg_seq_i, seg_ack_i,
 -- seg_flags_i, and seg_wnd_i. The data, seg_n_i bytes, is read from the
 -- send buffer at seg_addr_i on: rd_addr_o is the address, a register
 -- that starts at seg_addr_i and moves on with each byte read after the
@@ -56,9 +56,7 @@ entity eth_tcp_tx is
       -- its data in the send buffer
       go_i        : in  std_logic;
       busy_o      : out std_logic;
-      seg_mac_i   : in  std_logic_vector(47 downto 0);
-      seg_ip_i    : in  std_logic_vector(31 downto 0);
-      seg_port_i  : in  std_logic_vector(15 downto 0);
+      seg_host_i  : in  t_host;
       seg_seq_i   : in  std_logic_vector(31 downto 0);
       seg_ack_i   : in  std_logic_vector(31 downto 0);
       seg_flags_i : in  std_logic_vector(7 downto 0);
@@ -119,10 +117,10 @@ begin
    tcp_ck <= not tcp_sum when state = SEND_ST else
              X"0000";
 
-   hdr <= b6(seg_mac_i) & b6(mac_i) & t_bytes'(X"08", X"00", X"45", X"00") &
+   hdr <= b6(seg_host_i.mac) & b6(mac_i) & t_bytes'(X"08", X"00", X"45", X"00") &
           b2(X"0028" + seg_n_i) & b2(ip_id) &
-          t_bytes'(X"40", X"00", X"40", X"06") & b2(ip_ck) & b4(ip_i) & b4(seg_ip_i) &
-          b2(C_PORT) & b2(seg_port_i) & b4(seg_seq_i) & b4(seg_ack_i) &
+          t_bytes'(X"40", X"00", X"40", X"06") & b2(ip_ck) & b4(ip_i) & b4(seg_host_i.ip) &
+          b2(C_PORT) & b2(seg_host_i.tcp_port) & b4(seg_seq_i) & b4(seg_ack_i) &
           t_bytes'(X"50", seg_flags_i) & b2(seg_wnd_i) & b2(tcp_ck) & t_bytes'(X"00", X"00");
 
    seg_byte <= hdr(fetch_idx) when fetch_idx < 54 else
@@ -132,8 +130,8 @@ begin
    with init_k select init_word <=
       ip_i(31 downto 16) when 0,
       ip_i(15 downto 0) when 1,
-      seg_ip_i(31 downto 16) when 2,
-      seg_ip_i(15 downto 0) when 3,
+      seg_host_i.ip(31 downto 16) when 2,
+      seg_host_i.ip(15 downto 0) when 3,
       X"0006" when 4,
       X"0014" + seg_n_i when others;
 

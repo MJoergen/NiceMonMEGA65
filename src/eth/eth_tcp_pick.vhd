@@ -52,6 +52,8 @@ library ieee;
    use ieee.std_logic_1164.all;
    use ieee.numeric_std_unsigned.all;
 
+   use work.eth_pkg.all;
+
 entity eth_tcp_pick is
    generic (
       G_PORT      : natural := 4510;
@@ -61,64 +63,60 @@ entity eth_tcp_pick is
       G_FORMAL    : boolean := false
    );
    port (
-      clk_i       : in  std_logic;
-      rst_i       : in  std_logic;
+      clk_i      : in  std_logic;
+      rst_i      : in  std_logic;
       -- This station's addresses
-      mac_i       : in  std_logic_vector(47 downto 0);
-      ip_i        : in  std_logic_vector(31 downto 0);
+      mac_i      : in  std_logic_vector(47 downto 0);
+      ip_i       : in  std_logic_vector(31 downto 0);
       -- The connection: it waits for the ACK of its SYN-ACK, or is open;
       -- it owes the SYN-ACK, or an ACK; this side is closing, and its FIN
       -- has been sent; a byte goes beyond a window of 0; and what may be
       -- sent has changed
-      syn_rcvd_i  : in  std_logic;
-      estab_i     : in  std_logic;
-      syn_req_i   : in  std_logic;
-      ack_req_i   : in  std_logic;
-      closing_i   : in  std_logic;
-      fin_sent_i  : in  std_logic;
-      probe_i     : in  std_logic;
-      drop_i      : in  std_logic;
+      syn_rcvd_i : in  std_logic;
+      estab_i    : in  std_logic;
+      syn_req_i  : in  std_logic;
+      ack_req_i  : in  std_logic;
+      closing_i  : in  std_logic;
+      fin_sent_i : in  std_logic;
+      probe_i    : in  std_logic;
+      drop_i     : in  std_logic;
       -- The host, and the connection's numbers: the initial sequence
       -- number, that of the first byte not acknowledged, the next expected
       -- from the host, the host's window, and the receive window
-      peer_mac_i  : in  std_logic_vector(47 downto 0);
-      peer_ip_i   : in  std_logic_vector(31 downto 0);
-      peer_port_i : in  std_logic_vector(15 downto 0);
-      iss_i       : in  std_logic_vector(31 downto 0);
-      una_seq_i   : in  std_logic_vector(31 downto 0);
-      rcv_nxt_i   : in  std_logic_vector(31 downto 0);
-      snd_wnd_i   : in  std_logic_vector(15 downto 0);
-      free_i      : in  natural range 0 to 2 ** G_ADDR_BITS;
+      peer_i     : in  t_host;
+      iss_i      : in  std_logic_vector(31 downto 0);
+      una_seq_i  : in  std_logic_vector(31 downto 0);
+      rcv_nxt_i  : in  std_logic_vector(31 downto 0);
+      snd_wnd_i  : in  std_logic_vector(15 downto 0);
+      free_i     : in  natural range 0 to 2 ** G_ADDR_BITS;
       -- A RST to send, with ACK or not, and where to: with ACK, its
       -- sequence number is 0 and rst_num_i its acknowledgment number;
       -- without, rst_num_i is its sequence number.
-      rst_req_i   : in  std_logic;
-      rst_ack_i   : in  std_logic;
-      rst_mac_i   : in  std_logic_vector(47 downto 0);
-      rst_ip_i    : in  std_logic_vector(31 downto 0);
-      rst_port_i  : in  std_logic_vector(15 downto 0);
-      rst_num_i   : in  std_logic_vector(31 downto 0);
+      rst_req_i  : in  std_logic;
+      rst_ack_i  : in  std_logic;
+      rst_host_i : in  t_host;
+      rst_num_i  : in  std_logic_vector(31 downto 0);
       -- The data in the send buffer: the first byte not acknowledged, the
       -- next to send, and the end; and that the output has paused
-      una_ptr_i   : in  std_logic_vector(G_ADDR_BITS downto 0);
-      nxt_ptr_i   : in  std_logic_vector(G_ADDR_BITS downto 0);
-      lim_ptr_i   : in  std_logic_vector(G_ADDR_BITS downto 0);
-      paused_i    : in  std_logic;
+      una_ptr_i  : in  std_logic_vector(G_ADDR_BITS downto 0);
+      nxt_ptr_i  : in  std_logic_vector(G_ADDR_BITS downto 0);
+      lim_ptr_i  : in  std_logic_vector(G_ADDR_BITS downto 0);
+      paused_i   : in  std_logic;
       -- The segment chosen: its TCP flags, 0 when none, and how much data
       -- it takes; the receive window told in the last one; and that a
       -- segment is being sent
-      pick_o      : out std_logic_vector(7 downto 0);
-      pick_n_o    : out natural range 0 to G_MSS;
-      adv_wnd_o   : out natural range 0 to 2 ** G_ADDR_BITS := 0;
-      busy_o      : out std_logic;
+      pick_o     : out std_logic_vector(7 downto 0);
+      pick_n_o   : out natural range 0 to G_MSS;
+      adv_wnd_o  : out natural range 0 to 2 ** G_ADDR_BITS := 0;
+      busy_o     : out std_logic;
       -- The send buffer: the byte at rd_addr_o, a cycle later
-      rd_addr_o   : out std_logic_vector(G_ADDR_BITS - 1 downto 0);
-      rd_data_i   : in  std_logic_vector(7 downto 0);
+      rd_addr_o  : out std_logic_vector(G_ADDR_BITS - 1 downto 0);
+      rd_data_i  : in  std_logic_vector(7 downto 0);
       -- The frames to send, to eth_tx_fifo.vhd
-      tx_data_o   : out std_logic_vector(7 downto 0);
-      tx_last_o   : out std_logic;
-      tx_valid_o  : out std_logic;
-      tx_ready_i  : in  std_logic
+      tx_data_o  : out std_logic_vector(7 downto 0);
+      tx_last_o  : out std_logic;
+      tx_valid_o : out std_logic;
+      tx_ready_i : in  std_logic
    );
 end entity eth_tcp_pick;
 
@@ -148,9 +146,7 @@ architecture synthesis of eth_tcp_pick is
    signal pick      : std_logic_vector(7 downto 0);
    signal go        : std_logic                     := '0';
    signal busy      : std_logic;
-   signal seg_mac   : std_logic_vector(47 downto 0) := (others => '0');
-   signal seg_ip    : std_logic_vector(31 downto 0) := (others => '0');
-   signal seg_port  : std_logic_vector(15 downto 0) := (others => '0');
+   signal seg_host  : t_host                        := C_HOST_NONE;
    signal seg_seq   : std_logic_vector(31 downto 0) := (others => '0');
    signal seg_ack   : std_logic_vector(31 downto 0) := (others => '0');
    signal seg_flags : std_logic_vector(7 downto 0)  := (others => '0');
@@ -197,9 +193,7 @@ begin
          ip_i        => ip_i,
          go_i        => go,
          busy_o      => busy,
-         seg_mac_i   => seg_mac,
-         seg_ip_i    => seg_ip,
-         seg_port_i  => seg_port,
+         seg_host_i  => seg_host,
          seg_seq_i   => seg_seq,
          seg_ack_i   => seg_ack,
          seg_flags_i => seg_flags,
@@ -230,9 +224,7 @@ begin
                if drop_i = '0' and busy = '0' then
                   avail    <= to_integer(lim_ptr_i - nxt_ptr_i);
                   room     <= to_integer(snd_wnd_i) - to_integer(nxt_ptr_i - una_ptr_i);
-                  seg_mac  <= peer_mac_i;
-                  seg_ip   <= peer_ip_i;
-                  seg_port <= peer_port_i;
+                  seg_host <= peer_i;
                   seg_ack  <= rcv_nxt_i;
                   seg_ptr  <= nxt_ptr_i;
                   seg_n    <= 0;
@@ -269,9 +261,7 @@ begin
                end if;
                -- The RST's host and numbers, and no window
                if pick(2) = '1' then
-                  seg_mac  <= rst_mac_i;
-                  seg_ip   <= rst_ip_i;
-                  seg_port <= rst_port_i;
+                  seg_host <= rst_host_i;
                   seg_wnd  <= X"0000";
                   if rst_ack_i = '1' then
                      seg_seq <= X"00000000";
@@ -337,15 +327,13 @@ begin
 
       -- The segment: the connection's fields, and what was chosen
       -- psl f_fields : assert always build /= B_IDLE ->
-      --    seg_mac = peer_mac_i and seg_ip = peer_ip_i and seg_port = peer_port_i and
-      --    seg_ack = rcv_nxt_i and seg_ptr = nxt_ptr_i and
+      --    seg_host = peer_i and seg_ack = rcv_nxt_i and seg_ptr = nxt_ptr_i and
       --    seg_seq = una_seq_i + (nxt_ptr_i - una_ptr_i) + fin_sent_i;
       -- psl f_sent : assert always go = '1' -> seg_flags = prev(pick) and
       --    (seg_flags(1) = '0' or seg_seq = prev(iss_i)) and
       --    (seg_flags(3) = '0' or seg_n = prev(pick_n)) and (seg_flags(3) = '1' or seg_n = 0) and
       --    (seg_flags(2) = '0' or
-      --     (seg_mac = prev(rst_mac_i) and seg_ip = prev(rst_ip_i) and
-      --      seg_port = prev(rst_port_i) and
+      --     (seg_host = prev(rst_host_i) and
       --      ((seg_flags(4) = '1' and seg_seq = 0 and seg_ack = prev(rst_num_i)) or
       --       (seg_flags(4) = '0' and seg_seq = prev(rst_num_i) and seg_ack = 0))));
       -- psl f_wnd : assert always {pick /= X"00" and pick(2) = '0'} |=>
@@ -353,8 +341,7 @@ begin
       -- psl f_wnd_rst : assert always {pick(2) = '1'} |=>
       --    {adv_wnd_o = prev(adv_wnd_o) and seg_wnd = 0};
       -- psl f_stable : assert always busy = '1' and go = '0' ->
-      --    seg_mac = prev(seg_mac) and seg_ip = prev(seg_ip) and seg_port = prev(seg_port) and
-      --    seg_seq = prev(seg_seq) and seg_ack = prev(seg_ack) and seg_flags = prev(seg_flags) and
+      --    seg_host = prev(seg_host) and seg_seq = prev(seg_seq) and seg_ack = prev(seg_ack) and seg_flags = prev(seg_flags) and
       --    seg_wnd = prev(seg_wnd) and seg_ptr = prev(seg_ptr) and seg_n = prev(seg_n);
 
       -- psl c_syn_sent : cover {pick(1) = '1' and rst_i = '0'};

@@ -89,13 +89,7 @@ entity eth_tcp_rx is
       -- IP total length says, and the segment is not good
       done_o     : out std_logic;
       good_o     : out std_logic                     := '0';
-      smac_o     : out std_logic_vector(47 downto 0);
-      sip_o      : out std_logic_vector(31 downto 0);
-      sport_o    : out std_logic_vector(15 downto 0);
-      seq_o      : out std_logic_vector(31 downto 0);
-      ack_o      : out std_logic_vector(31 downto 0);
-      flags_o    : out std_logic_vector(7 downto 0);
-      win_o      : out std_logic_vector(15 downto 0);
+      seg_o      : out t_seg;
       wr_ok_o    : out std_logic                     := '0';
       len_o      : out natural range 0 to 2 ** 16    := 0
    );
@@ -165,17 +159,18 @@ begin
                     idx >= p_start and idx < p_end and idx < C_MAXF else
            '0';
 
-   good    <= '1' when m_ok = '1' and ip_sum = X"FFFF" and tcp_sum = X"FFFF" and
-                       f_doff >= 5 and plen >= 0 and p_end <= idx else
-              '0';
-   done_o  <= done;
-   smac_o  <= f_smac;
-   sip_o   <= f_sip;
-   sport_o <= f_sport;
-   seq_o   <= f_seq;
-   ack_o   <= f_ack;
-   flags_o <= f_flags;
-   win_o   <= f_win;
+   good   <= '1' when m_ok = '1' and ip_sum = X"FFFF" and tcp_sum = X"FFFF" and
+                      f_doff >= 5 and plen >= 0 and p_end <= idx else
+             '0';
+   done_o <= done;
+   seg_o  <=
+   (
+      host  => (mac => f_smac, ip => f_sip, tcp_port => f_sport),
+      seq   => f_seq,
+      ack   => f_ack,
+      flags => f_flags,
+      win   => f_win
+   );
 
 
    p_rx : process (clk_i)

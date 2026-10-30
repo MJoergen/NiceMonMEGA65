@@ -17,40 +17,38 @@ library ieee;
    use ieee.std_logic_1164.all;
    use ieee.numeric_std_unsigned.all;
 
+   use work.eth_pkg.all;
+
 entity formal_eth_tcp_pick is
    port (
-      clk_i       : in  std_logic;
-      rst_i       : in  std_logic;
-      mac_i       : in  std_logic_vector(47 downto 0);
-      ip_i        : in  std_logic_vector(31 downto 0);
-      syn_rcvd_i  : in  std_logic;
-      estab_i     : in  std_logic;
-      syn_req_i   : in  std_logic;
-      ack_req_i   : in  std_logic;
-      closing_i   : in  std_logic;
-      fin_sent_i  : in  std_logic;
-      probe_i     : in  std_logic;
-      drop_i      : in  std_logic;
-      peer_mac_i  : in  std_logic_vector(47 downto 0);
-      peer_ip_i   : in  std_logic_vector(31 downto 0);
-      peer_port_i : in  std_logic_vector(15 downto 0);
-      iss_i       : in  std_logic_vector(31 downto 0);
-      una_seq_i   : in  std_logic_vector(31 downto 0);
-      rcv_nxt_i   : in  std_logic_vector(31 downto 0);
-      snd_wnd_i   : in  std_logic_vector(15 downto 0);
-      free_i      : in  natural range 0 to 4;
-      rst_req_i   : in  std_logic;
-      rst_ack_i   : in  std_logic;
-      rst_mac_i   : in  std_logic_vector(47 downto 0);
-      rst_ip_i    : in  std_logic_vector(31 downto 0);
-      rst_port_i  : in  std_logic_vector(15 downto 0);
-      rst_num_i   : in  std_logic_vector(31 downto 0);
-      una_ptr_i   : in  std_logic_vector(2 downto 0);
-      nxt_ptr_i   : in  std_logic_vector(2 downto 0);
-      lim_ptr_i   : in  std_logic_vector(2 downto 0);
-      paused_i    : in  std_logic;
-      rd_data_i   : in  std_logic_vector(7 downto 0);
-      tx_ready_i  : in  std_logic
+      clk_i      : in  std_logic;
+      rst_i      : in  std_logic;
+      mac_i      : in  std_logic_vector(47 downto 0);
+      ip_i       : in  std_logic_vector(31 downto 0);
+      syn_rcvd_i : in  std_logic;
+      estab_i    : in  std_logic;
+      syn_req_i  : in  std_logic;
+      ack_req_i  : in  std_logic;
+      closing_i  : in  std_logic;
+      fin_sent_i : in  std_logic;
+      probe_i    : in  std_logic;
+      drop_i     : in  std_logic;
+      peer_i     : in  t_host;
+      iss_i      : in  std_logic_vector(31 downto 0);
+      una_seq_i  : in  std_logic_vector(31 downto 0);
+      rcv_nxt_i  : in  std_logic_vector(31 downto 0);
+      snd_wnd_i  : in  std_logic_vector(15 downto 0);
+      free_i     : in  natural range 0 to 4;
+      rst_req_i  : in  std_logic;
+      rst_ack_i  : in  std_logic;
+      rst_host_i : in  t_host;
+      rst_num_i  : in  std_logic_vector(31 downto 0);
+      una_ptr_i  : in  std_logic_vector(2 downto 0);
+      nxt_ptr_i  : in  std_logic_vector(2 downto 0);
+      lim_ptr_i  : in  std_logic_vector(2 downto 0);
+      paused_i   : in  std_logic;
+      rd_data_i  : in  std_logic_vector(7 downto 0);
+      tx_ready_i : in  std_logic
    );
 end entity formal_eth_tcp_pick;
 
@@ -75,13 +73,11 @@ begin
    --    {nxt_ptr_i = prev(nxt_ptr_i) and una_ptr_i = prev(una_ptr_i) and
    --     una_seq_i = prev(una_seq_i) and snd_wnd_i = prev(snd_wnd_i) and
    --     rcv_nxt_i = prev(rcv_nxt_i) and iss_i = prev(iss_i) and
-   --     peer_mac_i = prev(peer_mac_i) and peer_ip_i = prev(peer_ip_i) and
-   --     peer_port_i = prev(peer_port_i) and fin_sent_i = prev(fin_sent_i) and
+   --     peer_i = prev(peer_i) and fin_sent_i = prev(fin_sent_i) and
    --     closing_i = prev(closing_i) and probe_i = prev(probe_i) and
    --     syn_req_i = prev(syn_req_i) and syn_rcvd_i = prev(syn_rcvd_i) and
    --     estab_i = prev(estab_i) and rst_req_i = prev(rst_req_i) and
-   --     rst_ack_i = prev(rst_ack_i) and rst_mac_i = prev(rst_mac_i) and
-   --     rst_ip_i = prev(rst_ip_i) and rst_port_i = prev(rst_port_i) and
+   --     rst_ack_i = prev(rst_ack_i) and rst_host_i = prev(rst_host_i) and
    --     rst_num_i = prev(rst_num_i) and to_integer(lim_ptr_i - prev(lim_ptr_i)) <= 1};
    -- psl f_ptrs : assume always
    --    to_integer(nxt_ptr_i - una_ptr_i) <= to_integer(lim_ptr_i - una_ptr_i) and
@@ -97,46 +93,42 @@ begin
          G_FORMAL    => true
       )
       port map (
-         clk_i       => clk_i,
-         rst_i       => rst_i,
-         mac_i       => mac_i,
-         ip_i        => ip_i,
-         syn_rcvd_i  => syn_rcvd_i,
-         estab_i     => estab_i,
-         syn_req_i   => syn_req_i,
-         ack_req_i   => ack_req_i,
-         closing_i   => closing_i,
-         fin_sent_i  => fin_sent_i,
-         probe_i     => probe_i,
-         drop_i      => drop_i,
-         peer_mac_i  => peer_mac_i,
-         peer_ip_i   => peer_ip_i,
-         peer_port_i => peer_port_i,
-         iss_i       => iss_i,
-         una_seq_i   => una_seq_i,
-         rcv_nxt_i   => rcv_nxt_i,
-         snd_wnd_i   => snd_wnd_i,
-         free_i      => free_i,
-         rst_req_i   => rst_req_i,
-         rst_ack_i   => rst_ack_i,
-         rst_mac_i   => rst_mac_i,
-         rst_ip_i    => rst_ip_i,
-         rst_port_i  => rst_port_i,
-         rst_num_i   => rst_num_i,
-         una_ptr_i   => una_ptr_i,
-         nxt_ptr_i   => nxt_ptr_i,
-         lim_ptr_i   => lim_ptr_i,
-         paused_i    => paused_i,
-         pick_o      => pick,
-         pick_n_o    => pick_n,
-         adv_wnd_o   => adv_wnd,
-         busy_o      => busy,
-         rd_addr_o   => rd_addr,
-         rd_data_i   => rd_data_i,
-         tx_data_o   => tx_data,
-         tx_last_o   => tx_last,
-         tx_valid_o  => tx_valid,
-         tx_ready_i  => tx_ready_i
+         clk_i      => clk_i,
+         rst_i      => rst_i,
+         mac_i      => mac_i,
+         ip_i       => ip_i,
+         syn_rcvd_i => syn_rcvd_i,
+         estab_i    => estab_i,
+         syn_req_i  => syn_req_i,
+         ack_req_i  => ack_req_i,
+         closing_i  => closing_i,
+         fin_sent_i => fin_sent_i,
+         probe_i    => probe_i,
+         drop_i     => drop_i,
+         peer_i     => peer_i,
+         iss_i      => iss_i,
+         una_seq_i  => una_seq_i,
+         rcv_nxt_i  => rcv_nxt_i,
+         snd_wnd_i  => snd_wnd_i,
+         free_i     => free_i,
+         rst_req_i  => rst_req_i,
+         rst_ack_i  => rst_ack_i,
+         rst_host_i => rst_host_i,
+         rst_num_i  => rst_num_i,
+         una_ptr_i  => una_ptr_i,
+         nxt_ptr_i  => nxt_ptr_i,
+         lim_ptr_i  => lim_ptr_i,
+         paused_i   => paused_i,
+         pick_o     => pick,
+         pick_n_o   => pick_n,
+         adv_wnd_o  => adv_wnd,
+         busy_o     => busy,
+         rd_addr_o  => rd_addr,
+         rd_data_i  => rd_data_i,
+         tx_data_o  => tx_data,
+         tx_last_o  => tx_last,
+         tx_valid_o => tx_valid,
+         tx_ready_i => tx_ready_i
       ); -- i_eth_tcp_pick
 
 end architecture synthesis;
