@@ -4,8 +4,8 @@
 -- with single keys.
 --
 -- THEORY OF OPERATION
--- This is stage 4 of the design note: the live strip, the core keys, the
--- sticky setting, and the catch. The debugger has three states. It is Off
+-- This is stage 5 of the design note: the live strip, the core keys, the
+-- sticky setting, the catch, and the page. The debugger has three states. It is Off
 -- after reset. The toggle pulse, toggle_i, takes it from Off or Strip to
 -- Focus, and from Focus to Off, or to Strip while the sticky setting is
 -- on, which F12 toggles in Focus. In Strip and Focus the strip is shown
@@ -29,14 +29,30 @@
 -- A key then writes the control register, with bit 3, the ROM, as it
 -- reads, and the registers are read again. When the core is paused or
 -- has halted, and R0-R15 have not been read since the stop, it reads them,
--- and then the word at R15. A request that gets no answer shows NO LINK.
+-- and then the word at R15. While the page is shown and the core is
+-- stopped, paused, halted, or held, it reads the window's 176 words in one
+-- request, into mem_ram, unless they were read since the stop; a move of
+-- the window reads them again, and drops a read that it overtook
+-- (mem_kill). A word's write from the page goes as a key's write does,
+-- and its answer is the page's message. A request that gets no answer
+-- shows NO LINK.
 --
 -- p_kbd turns the keyboard's bytes into the keys of DEBUGGER.md: F1 or s
 -- steps a paused core, F3 or g goes on, F5 or p pauses a running core, F7
 -- or h holds, and F9 or r restarts: hold, then start. F1 and F3 are xterm's
 -- ESC O P and ESC O R, and F5, F7, and F9 ESC [ 15 ~, ESC [ 18 ~, and
 -- ESC [ 20 ~. A key that does not fit the core's state does nothing: go
--- on and pause would start a held core.
+-- on and pause would start a held core. F11 or m shows the page, and on
+-- it the cursor keys, Page Up, Page Down, Home, the hex digits, DEL,
+-- RETURN, a, and ESC are the page's keys, which p_page acts on. An ESC
+-- with no byte after it for 1 ms is the ESC key.
+--
+-- p_page has the window's address, the cursor, a word of the window, and
+-- the input field. The cursor keys move the cursor, and past the top or
+-- bottom row the window a row; Page Up and Page Down move the window 22
+-- rows. The digits shift into the field, RETURN writes it to the cursor's
+-- word, and a on an empty field makes it an address, which RETURN moves
+-- the window to.
 --
 -- The strip is rows 25 to 28 of the overlay of text.vhd, the words 2000 to
 -- 2319, addressed row * 80 + column. C_CELLS says what each word shows: a
@@ -46,12 +62,16 @@
 -- whole strip, one word a cycle, through a pipeline of three stages, after
 -- reset and whenever what it shows has changed. R0-R15 are dimmed while
 -- they are not the values of the current stop: until nice_cpu V1.2 the
--- link has no registers while the core runs (DEBUG.md §6). The page, rows
--- 0 to 24, is not written, and page_o is '0'.
+-- link has no registers while the core runs (DEBUG.md §6). While the page
+-- is shown (page_o), the pass covers rows 0 to 24 too: the window's and
+-- the cursor's address, the 22 rows of the window, the field with its
+-- message, and the page's keys, from the templates of row_cells; the
+-- cursor's word has its colors swapped.
 --
 -- RESET
 -- Synchronous to clk_i, by rst_i. The debugger is Off, knows nothing of
--- the core, and draws the strip again.
+-- the core, and draws the strip again. The page is off, its window and
+-- cursor at 0, and its field empty.
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -107,17 +127,27 @@ architecture synthesis of dbg is
    constant C_STRIP_ROW  : natural := 25;
    constant C_STRIP_ROWS : natural := 4;
    constant C_STRIP_LEN  : natural := C_STRIP_ROWS * C_COLS;
+   constant C_STRIP_ADDR : natural := C_STRIP_ROW * C_COLS;
+   -- The page: rows 0 to 24, the memory in rows 1 to 22, 8 words a row
+   constant C_MEM_ROWS  : natural := 22;
+   constant C_MEM_LEN   : natural := C_MEM_ROWS * 8;
+   constant C_FIELD_ROW : natural := C_MEM_ROWS + 1;
+   constant C_ALL_LEN   : natural := (C_STRIP_ROW + C_STRIP_ROWS) * C_COLS;
 
    -- White on dark blue, and gray on dark blue for stale values: the
    -- background in bits 31..20, the foreground in bits 19..8, as in a
    -- screen word
    constant C_COLOR : std_logic_vector(23 downto 0) := X"004FFF";
    constant C_DIM   : std_logic_vector(23 downto 0) := X"004888";
+   -- The page's cursor: the colors swapped
+   constant C_CURSOR : std_logic_vector(23 downto 0) := X"FFF004";
 
    -- The refresh, about 60 times a second, and the host's timeout, the
    -- link's 100 ms (DEBUG.md §5)
    constant C_REFRESH : positive := G_CLOCK_HZ / 60;
    constant C_TIMEOUT : positive := G_CLOCK_HZ / 10;
+   -- An ESC with no byte after it for 1 ms is the ESC key, not a sequence
+   constant C_ESC_WAIT : positive := G_CLOCK_HZ / 1000;
 
    constant C_REGS : t_word := X"FFFFFFE0";
    constant C_CTRL : t_word := X"FFFFFFF0";
@@ -127,23 +157,31 @@ architecture synthesis of dbg is
 
    type t_words is array (0 to 15) of t_word;
 
-   type t_act is (ACT_NONE, ACT_STEP, ACT_GO, ACT_PAUSE, ACT_HOLD, ACT_RESTART, ACT_STICKY);
+   type t_act is (ACT_NONE, ACT_STEP, ACT_GO, ACT_PAUSE, ACT_HOLD, ACT_RESTART, ACT_STICKY, ACT_POKE);
+
+   -- The keys of the page
+   type t_pkey is (PK_NONE, PK_PAGE, PK_UP, PK_DOWN, PK_LEFT, PK_RIGHT, PK_PGUP, PK_PGDN, PK_HOME, PK_DIGIT, PK_DEL, PK_RETURN, PK_ESC);
+
+   type t_mem is array (0 to 255) of std_logic_vector(31 downto 0);
 
    type t_state is (OFF_ST, STRIP_ST, FOCUS_ST);
 
    type t_kbd_st is (KBD_IDLE_ST, KBD_ESC_ST, KBD_SS3_ST, KBD_CSI_ST);
 
-   type t_seq_st is (SEQ_IDLE_ST, SEQ_CTRL_ST, SEQ_WRITE_ST, SEQ_START_ST, SEQ_REGS_ST, SEQ_INSTR_ST);
+   type t_seq_st is (SEQ_IDLE_ST, SEQ_CTRL_ST, SEQ_WRITE_ST, SEQ_START_ST, SEQ_REGS_ST, SEQ_INSTR_ST, SEQ_MEM_ST);
 
    ---------------------------------------------------------------------------
    -- The cells of the strip
    ---------------------------------------------------------------------------
 
-   -- What a word of the strip shows: a fixed character; hex digit nib of
-   -- word idx, R0-R15 for 0 to 15, the word at the PC for 16, and the PC for
-   -- 17; character idx of the state's name; flag idx of SR, X to I; or
-   -- character idx of the keys' row, which depends on the state
-   type t_kind is (CELL_FIX, CELL_HEX, CELL_STATE, CELL_FLAG, CELL_KEYS);
+   -- What a word of the overlay shows: a fixed character; hex digit nib of
+   -- word idx, R0-R15 for 0 to 15, the word at the PC for 16, the PC for
+   -- 17, the window's address for 18, the cursor's for 19, and the row's
+   -- for 20; character idx of the state's name; flag idx of SR, X to I;
+   -- character idx of the keys' row, which depends on the state; hex digit
+   -- nib of word idx of a row of memory; or character idx of the input
+   -- field's label, of the field, or of the message
+   type t_kind is (CELL_FIX, CELL_HEX, CELL_STATE, CELL_FLAG, CELL_KEYS, CELL_MEM, CELL_LABEL, CELL_FIELD, CELL_MSG);
 
    type t_cell is record
       kind : t_kind;
@@ -154,8 +192,13 @@ architecture synthesis of dbg is
 
    type t_cells is array (0 to C_STRIP_LEN - 1) of t_cell;
 
-   constant C_IDX_INSTR : natural := 16;
-   constant C_IDX_PC    : natural := 17;
+   type t_row is array (0 to C_COLS - 1) of t_cell;
+
+   constant C_IDX_INSTR  : natural := 16;
+   constant C_IDX_PC     : natural := 17;
+   constant C_IDX_WINDOW : natural := 18;
+   constant C_IDX_CURSOR : natural := 19;
+   constant C_IDX_ROW    : natural := 20;
 
    -- The columns of row 27: the state's name, the PC, the word at the PC,
    -- and the flags, every second column
@@ -199,13 +242,7 @@ architecture synthesis of dbg is
                   res_v(r * C_COLS + c).ch := to_byte(row(" R8-15")(c + 1));
                end if;
             elsif (c - 8) mod 9 < 8 then
-               res_v(r * C_COLS + c) :=
-               (
-                  kind => CELL_HEX,
-                  idx => r * 8 + (c - 8) / 9,
-                  nib => 7 - (c - 8) mod 9,
-                  ch => to_byte(' ')
-               );
+               res_v(r * C_COLS + c) := (kind => CELL_HEX, idx => r * 8 + (c - 8) / 9, nib => 7 - (c - 8) mod 9, ch => to_byte(' '));
             end if;
          end loop;
       end loop;
@@ -231,6 +268,86 @@ architecture synthesis of dbg is
    end function cells;
 
    constant C_CELLS : t_cells := cells;
+
+   -- A row of the page from a template: % is a digit of the window's
+   -- address, & of the cursor's, $ of the row's, # of a word of memory,
+   -- < a character of the field's label, ? of the field, and ! of the
+   -- message; any other character is itself
+   function row_cells(s : string) return t_row is
+      constant C_S    : string(1 to C_COLS) := row(s);
+      variable res_v  : t_row;
+      variable run_v  : natural := 0;                     -- The place in a run of a marker
+      variable word_v : natural := 0;                     -- The runs of # before
+      variable ch_v   : character;
+   begin
+      for c in 0 to C_COLS - 1 loop
+         ch_v := C_S(c + 1);
+         if c > 0 and ch_v = C_S(c) then
+            run_v := run_v + 1;
+         else
+            run_v := 0;
+         end if;
+         res_v(c) := (kind => CELL_FIX, idx => 0, nib => 0, ch => to_byte(ch_v));
+         case ch_v is
+            when '%' => res_v(c) := (kind => CELL_HEX, idx => C_IDX_WINDOW, nib => 7 - run_v, ch => X"20");
+            when '&' => res_v(c) := (kind => CELL_HEX, idx => C_IDX_CURSOR, nib => 7 - run_v, ch => X"20");
+            when '$' => res_v(c) := (kind => CELL_HEX, idx => C_IDX_ROW, nib => 7 - run_v, ch => X"20");
+            when '#' =>
+               res_v(c) := (kind => CELL_MEM, idx => word_v, nib => 7 - run_v, ch => X"20");
+               if run_v = 7 then
+                  word_v := word_v + 1;
+               end if;
+            when '<' => res_v(c) := (kind => CELL_LABEL, idx => run_v, nib => 0, ch => X"20");
+            when '?' => res_v(c) := (kind => CELL_FIELD, idx => run_v, nib => 0, ch => X"20");
+            when '!' => res_v(c) := (kind => CELL_MSG, idx => run_v, nib => 0, ch => X"20");
+            when others => null;
+         end case;
+      end loop;
+      return res_v;
+   end function row_cells;
+
+   -- Row 0, the rows of memory, row 23, and row 24 of the page
+   constant C_HEAD_ROW  : t_row := row_cells(" Window %%%%%%%%  Cursor &&&&&&&&");
+   constant C_MEM_ROW   : t_row := row_cells("$$$$$$$$ ######## ######## ######## ######## ######## ######## ######## ########");
+   constant C_INPUT_ROW : t_row := row_cells(" <<<<<<<< ????????  !!!!!!!!!!");
+   constant C_PKEYS_ROW : t_row := row_cells(" CRSR move  PgUp PgDn page  Home  0-f type  RETURN write  a address  ESC back");
+
+   -- The field's label, for a word and for an address, and the messages
+   type t_labels is array (0 to 1, 0 to 7) of t_byte;
+
+   type t_msgs is array (0 to 3, 0 to 9) of t_byte;
+
+   constant C_MSG_NONE    : natural := 0;
+   constant C_MSG_WRITTEN : natural := 1;
+   constant C_MSG_ERR     : natural := 2;                -- e and the code's two digits
+   constant C_MSG_TIMEOUT : natural := 3;
+
+   function labels return t_labels is
+      constant C_S   : string(1 to 16) := "Word:   Address:";
+      variable res_v : t_labels;
+   begin
+      for k in 0 to 1 loop
+         for i in 0 to 7 loop
+            res_v(k, i) := to_byte(C_S(8 * k + i + 1));
+         end loop;
+      end loop;
+      return res_v;
+   end function labels;
+
+   function msgs return t_msgs is
+      constant C_S   : string(1 to 40) := "          written   e         no answer ";
+      variable res_v : t_msgs;
+   begin
+      for k in 0 to 3 loop
+         for i in 0 to 9 loop
+            res_v(k, i) := to_byte(C_S(10 * k + i + 1));
+         end loop;
+      end loop;
+      return res_v;
+   end function msgs;
+
+   constant C_LABELS : t_labels := labels;
+   constant C_MSGS   : t_msgs   := msgs;
 
    -- The names of the states, in C_STATE_LEN characters each, and the
    -- position of the digit of BRK n and HALTED n
@@ -261,8 +378,8 @@ architecture synthesis of dbg is
    constant C_HALT_DIG  : natural := 7;
    constant C_FLAG_CHAR : string(1 to 7) := "XCZNVEI";
 
-   -- Row 28: the keys in Focus, where the toggle key goes to Off or to
-   -- Strip as the sticky setting says, and the note of Strip
+   -- Row 28: the keys in Focus, with the sticky setting, and the note of
+   -- Strip, which names the toggle key
    type t_keys is array (0 to 2, 0 to C_COLS - 1) of t_byte;
 
    constant C_KEYS_OFF   : natural := 0;
@@ -270,9 +387,8 @@ architecture synthesis of dbg is
    constant C_KEYS_PROG  : natural := 2;
 
    function keys return t_keys is
-      constant C_F   : string := " F1 step  F3 go  F5 pause  F7 hold  F9 restart  F12 strip  " &
-                                 G_TOGGLE_KEY & " to ";
-      constant C_R   : t_strings3 := (row(C_F & "off"), row(C_F & "strip"),
+      constant C_F   : string := " F1 step  F3 go  F5 pause  F7 hold  F9 restart  F11 page  F12 keep strip: ";
+      constant C_R   : t_strings3 := (row(C_F & "off"), row(C_F & "on"),
          row(" The keys are the program's.  " & G_TOGGLE_KEY & " for the debugger"));
       variable res_v : t_keys;
    begin
@@ -321,9 +437,27 @@ architecture synthesis of dbg is
    signal own_r  : std_logic := '0';                     -- A stop of the debugger's own is due
    signal keys_k : natural range 0 to 2;
 
-   signal kbd_st  : t_kbd_st := KBD_IDLE_ST;
-   signal kbd_num : natural range 0 to 99;
-   signal key_act : t_act    := ACT_NONE;
+   signal kbd_st   : t_kbd_st := KBD_IDLE_ST;
+   signal kbd_num  : natural range 0 to 99;
+   signal key_act  : t_act    := ACT_NONE;
+   signal pkey     : t_pkey   := PK_NONE;
+   signal pkey_dig : std_logic_vector(3 downto 0);
+   signal esc_cnt  : natural range 0 to C_ESC_WAIT - 1;
+
+   -- The page: shown in Focus, the window's address, the cursor's word in
+   -- it, and the input field, its digits, and whether it is an address
+   signal page_r     : std_logic := '0';
+   signal page_on    : std_logic;
+   signal window     : t_word    := (others => '0');
+   signal cur        : natural range 0 to C_MEM_LEN - 1 := 0;
+   signal field      : t_word    := (others => '0');
+   signal field_n    : natural range 0 to 8 := 0;
+   signal field_addr : std_logic := '0';
+   signal pg_dirty   : std_logic := '0';                 -- The page changed
+   signal mem_move   : std_logic := '0';                 -- The window moved
+   signal poke       : std_logic := '0';                 -- Write poke_data to poke_addr
+   signal poke_addr  : t_word;
+   signal poke_data  : t_word;
 
    -- The request to the host, and its answers
    signal req_valid : std_logic := '0';
@@ -344,8 +478,10 @@ architecture synthesis of dbg is
    signal act_r     : t_act    := ACT_NONE;
    signal tick_r    : std_logic := '0';
    signal refresh   : natural range 0 to C_REFRESH - 1 := 0;
-   signal rd_idx    : natural range 0 to 15;
+   signal rd_idx    : natural range 0 to 255;
    signal restart_r : std_logic;
+   signal poke_r    : std_logic := '0';
+   signal err_code  : t_byte;
 
    -- What the debugger knows of the core
    signal ctrl_r   : t_word := (others => '0');
@@ -359,19 +495,34 @@ architecture synthesis of dbg is
    signal instr_ok : std_logic := '0';                   -- The word at the PC too
    signal st_code  : natural range 0 to 5;
 
+   -- The words of the window, read when the core is stopped
+   signal mem_ram  : t_mem;
+   signal mem_q    : t_word;
+   signal mem_any  : std_logic := '0';                   -- The window was read once
+   signal mem_ok   : std_logic := '0';                   -- ... since the core stopped
+   signal mem_kill : std_logic := '0';                   -- The read is of a window left
+   signal msg_k    : natural range 0 to 3 := C_MSG_NONE;
+   signal msg_code : t_byte := (others => '0');
+
    -- The drawing: a pass over the strip after each change
    signal dirty      : std_logic := '1';
    signal draw_start : std_logic;
-   signal draw_cnt   : natural range 0 to C_STRIP_LEN := C_STRIP_LEN;
+   signal draw_cnt   : natural range 0 to C_ALL_LEN := C_ALL_LEN;
+   signal draw_row   : natural range 0 to C_STRIP_ROW + C_STRIP_ROWS - 1;
+   signal draw_col   : natural range 0 to C_COLS - 1;
    signal s1_valid   : std_logic := '0';
    signal s1_cell    : t_cell;
-   signal s1_addr    : natural range 0 to C_STRIP_LEN - 1;
+   signal s1_addr    : natural range 0 to C_ALL_LEN - 1;
+   signal s1_row     : natural range 0 to C_STRIP_ROW + C_STRIP_ROWS - 1;
+   signal s1_mem     : natural range 0 to 255;           -- The word of the window
    signal s2_valid   : std_logic := '0';
    signal s2_cell    : t_cell;
-   signal s2_addr    : natural range 0 to C_STRIP_LEN - 1;
+   signal s2_addr    : natural range 0 to C_ALL_LEN - 1;
    signal s2_word    : t_word;
+   signal s2_nib     : natural range 0 to 7;
    signal s2_shown   : std_logic;                        -- The word is known
    signal s2_dim     : std_logic;
+   signal s2_cur     : std_logic;                        -- The cursor's word
    signal s2_ch      : t_byte;                           -- A fixed or state character
 
    signal ovl_we   : std_logic := '0';
@@ -387,7 +538,8 @@ begin
    ovl_data_o <= ovl_data;
 
    strip_o <= '1' when state /= OFF_ST else '0';
-   page_o  <= '0';
+   page_on <= page_r when state = FOCUS_ST else '0';
+   page_o  <= page_on;
    focus_o <= '1' when state = FOCUS_ST else '0';
    on_o    <= '1' when state /= OFF_ST or seq_st /= SEQ_IDLE_ST or req_valid = '1' or req_ready = '0' else
               '0';
@@ -431,17 +583,31 @@ begin
    begin
       if rising_edge(clk_i) then
          key_act <= ACT_NONE;
+         pkey    <= PK_NONE;
          if kbd_valid_i = '1' and state = FOCUS_ST then
             case kbd_st is
 
                when KBD_IDLE_ST =>
+                  pkey_dig <= kbd_data_i(3 downto 0);
                   case kbd_data_i is
-                     when X"1B"  => kbd_st  <= KBD_ESC_ST;
+                     when X"1B"  =>
+                        kbd_st  <= KBD_ESC_ST;
+                        esc_cnt <= C_ESC_WAIT - 1;
                      when X"73"  => key_act <= ACT_STEP;    -- s
                      when X"67"  => key_act <= ACT_GO;      -- g
                      when X"70"  => key_act <= ACT_PAUSE;   -- p
                      when X"68"  => key_act <= ACT_HOLD;    -- h
                      when X"72"  => key_act <= ACT_RESTART; -- r
+                     when X"6D"  => pkey    <= PK_PAGE;     -- m
+                     when X"0D"  => pkey    <= PK_RETURN;
+                     when X"7F"  => pkey    <= PK_DEL;
+                     when X"30" | X"31" | X"32" | X"33" | X"34" |
+                          X"35" | X"36" | X"37" | X"38" | X"39" =>
+                        pkey <= PK_DIGIT;
+                     when X"41" | X"42" | X"43" | X"44" | X"45" | X"46" |
+                          X"61" | X"62" | X"63" | X"64" | X"65" | X"66" =>
+                        pkey     <= PK_DIGIT;               -- A to F, a to f
+                        pkey_dig <= kbd_data_i(3 downto 0) + 9;
                      when others => null;
                   end case;
 
@@ -450,8 +616,12 @@ begin
                   case kbd_data_i is
                      when X"4F"  => kbd_st <= KBD_SS3_ST;   -- O
                      when X"5B"  => kbd_st <= KBD_CSI_ST;   -- [
-                     when X"1B"  => kbd_st <= KBD_ESC_ST;
-                     when others => kbd_st <= KBD_IDLE_ST;
+                     when X"1B"  =>                         -- The ESC before was a key
+                        pkey    <= PK_ESC;
+                        esc_cnt <= C_ESC_WAIT - 1;
+                     when others =>
+                        pkey   <= PK_ESC;
+                        kbd_st <= KBD_IDLE_ST;
                   end case;
 
                when KBD_SS3_ST =>
@@ -471,26 +641,157 @@ begin
                      end if;
                   else
                      kbd_st <= KBD_IDLE_ST;
-                     if kbd_data_i = X"7E" then                   -- ~
-                        case kbd_num is
-                           when 15     => key_act <= ACT_PAUSE;   -- F5
-                           when 18     => key_act <= ACT_HOLD;    -- F7
-                           when 20     => key_act <= ACT_RESTART; -- F9
-                           when 24     => key_act <= ACT_STICKY;  -- F12
-                           when others => null;
-                        end case;
-                     end if;
+                     case kbd_data_i is
+                        when X"7E" =>                                -- ~
+                           case kbd_num is
+                              when 5      => pkey    <= PK_PGUP;
+                              when 6      => pkey    <= PK_PGDN;
+                              when 15     => key_act <= ACT_PAUSE;   -- F5
+                              when 18     => key_act <= ACT_HOLD;    -- F7
+                              when 20     => key_act <= ACT_RESTART; -- F9
+                              when 23     => pkey    <= PK_PAGE;     -- F11
+                              when 24     => key_act <= ACT_STICKY;  -- F12
+                              when others => null;
+                           end case;
+                        when X"41"  => pkey <= PK_UP;                -- A
+                        when X"42"  => pkey <= PK_DOWN;              -- B
+                        when X"43"  => pkey <= PK_RIGHT;             -- C
+                        when X"44"  => pkey <= PK_LEFT;              -- D
+                        when X"48"  => pkey <= PK_HOME;              -- H
+                        when others => null;
+                     end case;
                   end if;
 
             end case;
+         elsif kbd_st = KBD_ESC_ST then
+            -- No byte after the ESC: the ESC key
+            if esc_cnt = 0 then
+               pkey   <= PK_ESC;
+               kbd_st <= KBD_IDLE_ST;
+            else
+               esc_cnt <= esc_cnt - 1;
+            end if;
          end if;
 
          if rst_i = '1' then
             kbd_st  <= KBD_IDLE_ST;
             key_act <= ACT_NONE;
+            pkey    <= PK_NONE;
          end if;
       end if;
    end process p_kbd;
+
+   ---------------------------------------------------------------------------
+   -- The page
+   ---------------------------------------------------------------------------
+
+   p_page : process (clk_i)
+
+      procedure clear is
+      begin
+         field      <= (others => '0');
+         field_n    <= 0;
+         field_addr <= '0';
+      end procedure clear;
+
+   begin
+      if rising_edge(clk_i) then
+         pg_dirty <= '0';
+         mem_move <= '0';
+         poke     <= '0';
+         if state = FOCUS_ST and pkey /= PK_NONE then
+            pg_dirty <= '1';
+            if pkey = PK_PAGE then
+               page_r   <= not page_r;
+               mem_move <= not page_r;
+            elsif page_r = '1' then
+               case pkey is
+                  when PK_UP =>
+                     if cur < 8 then
+                        window   <= window - 8;
+                        mem_move <= '1';
+                     else
+                        cur <= cur - 8;
+                     end if;
+                  when PK_DOWN =>
+                     if cur >= C_MEM_LEN - 8 then
+                        window   <= window + 8;
+                        mem_move <= '1';
+                     else
+                        cur <= cur + 8;
+                     end if;
+                  when PK_LEFT =>
+                     if cur = 0 then
+                        window   <= window - 8;
+                        cur      <= 7;
+                        mem_move <= '1';
+                     else
+                        cur <= cur - 1;
+                     end if;
+                  when PK_RIGHT =>
+                     if cur = C_MEM_LEN - 1 then
+                        window   <= window + 8;
+                        cur      <= C_MEM_LEN - 8;
+                        mem_move <= '1';
+                     else
+                        cur <= cur + 1;
+                     end if;
+                  when PK_PGUP =>
+                     window   <= window - C_MEM_LEN;
+                     mem_move <= '1';
+                  when PK_PGDN =>
+                     window   <= window + C_MEM_LEN;
+                     mem_move <= '1';
+                  when PK_HOME =>
+                     cur <= 0;
+                  when PK_DIGIT =>
+                     -- a on an empty field is the key of an address
+                     if pkey_dig = X"A" and field_n = 0 and field_addr = '0' then
+                        field_addr <= '1';
+                     else
+                        field <= field(27 downto 0) & pkey_dig;
+                        if field_n /= 8 then
+                           field_n <= field_n + 1;
+                        end if;
+                     end if;
+                  when PK_DEL =>
+                     field <= X"0" & field(31 downto 4);
+                     if field_n /= 0 then
+                        field_n <= field_n - 1;
+                     else
+                        field_addr <= '0';
+                     end if;
+                  when PK_RETURN =>
+                     if field_n /= 0 and field_addr = '1' then
+                        window   <= field;
+                        cur      <= 0;
+                        mem_move <= '1';
+                     elsif field_n /= 0 then
+                        poke      <= '1';
+                        poke_addr <= window + cur;
+                        poke_data <= field;
+                     end if;
+                     clear;
+                  when PK_ESC =>
+                     if field_n /= 0 or field_addr = '1' then
+                        clear;
+                     else
+                        page_r <= '0';
+                     end if;
+                  when others =>
+                     null;
+               end case;
+            end if;
+         end if;
+
+         if rst_i = '1' then
+            page_r <= '0';
+            window <= (others => '0');
+            cur    <= 0;
+            clear;
+         end if;
+      end if;
+   end process p_page;
 
    ---------------------------------------------------------------------------
    -- The link
@@ -513,7 +814,7 @@ begin
          rd_data_o   => rd_data,
          done_o      => done,
          err_o       => err,
-         err_code_o  => open,
+         err_code_o  => err_code,
          ntc_valid_o => ntc_valid,
          ntc_tag_o   => ntc_tag,
          ntc_arg_o   => open,
@@ -543,11 +844,12 @@ begin
          rd_idx    <= 0;
       end procedure read;
 
-      procedure write(data : t_word) is
+      procedure write(addr : t_word;
+                      data : t_word) is
       begin
          req_valid <= '1';
          req_we    <= '1';
-         req_addr  <= C_CTRL;
+         req_addr  <= addr;
          req_n     <= X"0001";
          req_data  <= data;
       end procedure write;
@@ -567,7 +869,7 @@ begin
 
          -- The words of an `r`, into what the request reads
          if rd_valid = '1' then
-            if rd_idx /= 15 then
+            if rd_idx /= 255 then
                rd_idx <= rd_idx + 1;
             end if;
             case seq_st is
@@ -578,8 +880,8 @@ begin
                      when 6      => stop_r   <= rd_data(8 downto 0);
                      when others => null;
                   end case;
-               when SEQ_REGS_ST  => regs_r(rd_idx) <= rd_data;
-               when SEQ_INSTR_ST => instr_r        <= rd_data;
+               when SEQ_REGS_ST  => regs_r(rd_idx mod 16) <= rd_data;
+               when SEQ_INSTR_ST => instr_r               <= rd_data;
                when others       => null;
             end case;
          end if;
@@ -611,6 +913,7 @@ begin
                      write_v   := true;
                      data_v    := rom_v;
                      restart_r <= '0';
+                     poke_r    <= '0';
                      case act_r is
                         when ACT_STEP =>
                            write_v := ctrl_r(4) = '1';
@@ -625,6 +928,8 @@ begin
                         when ACT_RESTART =>
                            restart_r <= '1';
                            data_v    := X"00000001" or rom_v;
+                        when ACT_POKE =>
+                           poke_r <= '1';
                         when ACT_NONE | ACT_STICKY =>
                            write_v := false;
                      end case;
@@ -634,13 +939,26 @@ begin
                         if act_r = ACT_STEP or act_r = ACT_PAUSE then
                            own_r <= '1';
                         end if;
-                        write(data_v);
+                        if act_r = ACT_POKE then
+                           write(poke_addr, poke_data);
+                        else
+                           write(C_CTRL, data_v);
+                        end if;
                         regs_ok  <= '0';
                         instr_ok <= '0';
+                        mem_ok   <= '0';
                         seq_st   <= SEQ_WRITE_ST;
                      elsif (ctrl_r(4) = '1' or ctrl_r(1) = '1') and regs_ok = '0' then
                         read(C_REGS, 16);
                         seq_st <= SEQ_REGS_ST;
+                     elsif ctrl_r(4) = '1' or ctrl_r(1) = '1' or ctrl_r(0) = '1' then
+                        -- The window, while the page is shown and the core
+                        -- stopped
+                        if page_on = '1' and mem_ok = '0' then
+                           read(window, C_MEM_LEN);
+                           mem_kill <= '0';
+                           seq_st   <= SEQ_MEM_ST;
+                        end if;
                      end if;
                   end if;
                end if;
@@ -649,9 +967,21 @@ begin
             -- registers again
             when SEQ_WRITE_ST =>
                if done = '1' then
+                  -- The message of a word's write
+                  if poke_r = '1' then
+                     poke_r <= '0';
+                     if err = '0' then
+                        msg_k <= C_MSG_WRITTEN;
+                     elsif err_code = X"FF" then
+                        msg_k <= C_MSG_TIMEOUT;
+                     else
+                        msg_k <= C_MSG_ERR;
+                     end if;
+                     msg_code <= err_code;
+                  end if;
                   if restart_r = '1' then
                      restart_r <= '0';
-                     write(rom_v);
+                     write(C_CTRL, rom_v);
                      seq_st    <= SEQ_START_ST;
                   else
                      read(C_CTRL, C_CTRL_N);
@@ -681,6 +1011,19 @@ begin
                if done = '1' then
                   instr_ok <= not err;
                   seq_st   <= SEQ_IDLE_ST;
+                  -- Then the window, at once
+                  if page_on = '1' then
+                     tick_r <= '1';
+                  end if;
+               end if;
+
+            when SEQ_MEM_ST =>
+               if done = '1' then
+                  seq_st <= SEQ_IDLE_ST;
+                  if err = '0' and mem_kill = '0' then
+                     mem_ok  <= '1';
+                     mem_any <= '1';
+                  end if;
                end if;
 
          end case;
@@ -690,23 +1033,38 @@ begin
          if key_act /= ACT_NONE and key_act /= ACT_STICKY then
             act_r <= key_act;
          end if;
+         if poke = '1' then
+            act_r <= ACT_POKE;
+         end if;
          if ntc_valid = '1' and (ntc_tag = X"68" or ntc_tag = X"70" or ntc_tag = X"78") then
             regs_ok  <= '0';
             instr_ok <= '0';
+            mem_ok   <= '0';
             tick_r   <= '1';
             dirty    <= '1';
             own_r    <= '0';
          end if;
-         -- Row 28 changes with the state and the sticky setting
-         if toggle_i = '1' or key_act = ACT_STICKY or catch = '1' then
+         -- Row 28 changes with the state and the sticky setting, and the
+         -- page with its keys
+         if toggle_i = '1' or key_act = ACT_STICKY or catch = '1' or pg_dirty = '1' then
             dirty <= '1';
          end if;
          if enter = '1' then
             regs_ok  <= '0';
             instr_ok <= '0';
+            mem_ok   <= '0';
             tick_r   <= '1';
             act_r    <= ACT_NONE;
             dirty    <= '1';
+         end if;
+         -- A window moved, or the page shown again, is read again at once,
+         -- and a read of the window before shows nothing
+         if mem_move = '1' then
+            mem_ok   <= '0';
+            mem_any  <= '0';
+            mem_kill <= '1';
+            tick_r   <= '1';
+            msg_k    <= C_MSG_NONE;
          end if;
 
          if rst_i = '1' then
@@ -723,10 +1081,26 @@ begin
             regs_ok   <= '0';
             instr_ok  <= '0';
             own_r     <= '0';
+            poke_r    <= '0';
+            mem_any   <= '0';
+            mem_ok    <= '0';
+            msg_k     <= C_MSG_NONE;
             dirty     <= '1';
          end if;
       end if;
    end process p_seq;
+
+   -- The words of the window, as they arrive, and those of the page's
+   -- cells, a cycle after stage 1 of the drawing
+   p_mem : process (clk_i)
+   begin
+      if rising_edge(clk_i) then
+         if rd_valid = '1' and seq_st = SEQ_MEM_ST then
+            mem_ram(rd_idx) <= rd_data;
+         end if;
+         mem_q <= mem_ram(s1_mem);
+      end if;
+   end process p_mem;
 
    -- A stop that the debugger did not cause: a breakpoint, or a halt
    catch <= '1' when ntc_valid = '1' and own_r = '0' and
@@ -748,41 +1122,109 @@ begin
              C_KEYS_STRIP when sticky = '1' else
              C_KEYS_OFF;
 
-   draw_start <= '1' when draw_cnt = C_STRIP_LEN and dirty = '1' else '0';
+   draw_start <= '1' when draw_cnt = C_ALL_LEN and dirty = '1' else '0';
 
    p_draw : process (clk_i)
       variable ch_v : t_byte;
    begin
       if rising_edge(clk_i) then
-         -- Stage 1: the cell
+         -- Stage 1: the cell, of the strip or of a row of the page, and the
+         -- word of the window it shows
          s1_valid <= '0';
-         if draw_cnt /= C_STRIP_LEN then
+         if draw_cnt /= C_ALL_LEN then
             s1_valid <= '1';
-            s1_cell  <= C_CELLS(draw_cnt);
             s1_addr  <= draw_cnt;
+            s1_row   <= draw_row;
+            s1_mem   <= 0;
+            if draw_row >= C_STRIP_ROW then
+               s1_cell <= C_CELLS(draw_cnt - C_STRIP_ADDR);
+            elsif draw_row = 0 then
+               s1_cell <= C_HEAD_ROW(draw_col);
+            elsif draw_row < C_FIELD_ROW then
+               s1_cell <= C_MEM_ROW(draw_col);
+               s1_mem  <= (draw_row - 1) * 8 + C_MEM_ROW(draw_col).idx mod 8;
+            elsif draw_row = C_FIELD_ROW then
+               s1_cell <= C_INPUT_ROW(draw_col);
+            else
+               s1_cell <= C_PKEYS_ROW(draw_col);
+            end if;
             draw_cnt <= draw_cnt + 1;
+            if draw_col = C_COLS - 1 then
+               draw_col <= 0;
+               if draw_row /= C_STRIP_ROW + C_STRIP_ROWS - 1 then
+                  draw_row <= draw_row + 1;
+               end if;
+            else
+               draw_col <= draw_col + 1;
+            end if;
          elsif draw_start = '1' then
-            draw_cnt <= 0;
+            -- The page too while it is shown
+            draw_col <= 0;
+            if page_on = '1' then
+               draw_cnt <= 0;
+               draw_row <= 0;
+            else
+               draw_cnt <= C_STRIP_ADDR;
+               draw_row <= C_STRIP_ROW;
+            end if;
          end if;
 
-         -- Stage 2: the word it shows, or the character of the state
+         -- Stage 2: the word it shows, or its character
          s2_valid <= s1_valid;
          s2_cell  <= s1_cell;
          s2_addr  <= s1_addr;
          s2_ch    <= s1_cell.ch;
+         s2_nib   <= s1_cell.nib;
          s2_dim   <= '0';
+         s2_cur   <= '0';
          case s1_cell.kind is
             when CELL_HEX =>
-               if s1_cell.idx = C_IDX_INSTR then
-                  s2_word  <= instr_r;
-                  s2_shown <= instr_ok;
-               elsif s1_cell.idx = C_IDX_PC then
-                  s2_word  <= regs_r(15);
-                  s2_shown <= regs_ok;
+               s2_shown <= '1';
+               case s1_cell.idx is
+                  when C_IDX_INSTR =>
+                     s2_word  <= instr_r;
+                     s2_shown <= instr_ok;
+                  when C_IDX_PC =>
+                     s2_word  <= regs_r(15);
+                     s2_shown <= regs_ok;
+                  when C_IDX_WINDOW =>
+                     s2_word <= window;
+                  when C_IDX_CURSOR =>
+                     s2_word <= window + cur;
+                  when C_IDX_ROW =>
+                     s2_word <= window + s1_row * 8 - 8;
+                  when others =>
+                     s2_word  <= regs_r(s1_cell.idx mod 16);
+                     s2_shown <= regs_any;
+                     s2_dim   <= not regs_ok;
+               end case;
+            when CELL_MEM =>
+               s2_shown <= mem_any;
+               s2_dim   <= not mem_ok;
+               if s1_mem = cur then
+                  s2_cur <= '1';
+               end if;
+            when CELL_LABEL =>
+               if field_addr = '1' then
+                  s2_ch <= C_LABELS(1, s1_cell.idx mod 8);
                else
-                  s2_word  <= regs_r(s1_cell.idx mod 16);
-                  s2_shown <= regs_any;
-                  s2_dim   <= not regs_ok;
+                  s2_ch <= C_LABELS(0, s1_cell.idx mod 8);
+               end if;
+            when CELL_FIELD =>
+               -- The digits typed, the first at the left
+               s2_word  <= field;
+               s2_shown <= '0';
+               if s1_cell.idx < field_n then
+                  s2_shown <= '1';
+                  s2_nib   <= (field_n - 1 - s1_cell.idx) mod 8;
+               end if;
+            when CELL_MSG =>
+               s2_ch <= C_MSGS(msg_k, s1_cell.idx mod 10);
+               if msg_k = C_MSG_ERR and s1_cell.idx = 1 then
+                  s2_ch <= hex_char(msg_code(7 downto 4));
+               end if;
+               if msg_k = C_MSG_ERR and s1_cell.idx = 2 then
+                  s2_ch <= hex_char(msg_code(3 downto 0));
                end if;
             when CELL_FLAG =>
                s2_word  <= regs_r(14);
@@ -809,7 +1251,17 @@ begin
             when CELL_HEX =>
                ch_v := X"2D";                               -- -
                if s2_shown = '1' then
-                  ch_v := hex_char(nibble(s2_word, s2_cell.nib));
+                  ch_v := hex_char(nibble(s2_word, s2_nib));
+               end if;
+            when CELL_MEM =>
+               ch_v := X"2D";                               -- -
+               if s2_shown = '1' then
+                  ch_v := hex_char(nibble(mem_q, s2_nib));
+               end if;
+            when CELL_FIELD =>
+               ch_v := X"5F";                               -- _
+               if s2_shown = '1' then
+                  ch_v := hex_char(nibble(s2_word, s2_nib));
                end if;
             when CELL_FLAG =>
                ch_v := X"2E";                               -- .
@@ -819,15 +1271,17 @@ begin
             when others =>
                null;
          end case;
-         ovl_addr <= std_logic_vector(to_unsigned(C_STRIP_ROW * C_COLS + s2_addr, 12));
-         if s2_dim = '1' then
+         ovl_addr <= std_logic_vector(to_unsigned(s2_addr, 12));
+         if s2_cur = '1' then
+            ovl_data <= C_CURSOR & ch_v;
+         elsif s2_dim = '1' then
             ovl_data <= C_DIM & ch_v;
          else
             ovl_data <= C_COLOR & ch_v;
          end if;
 
          if rst_i = '1' then
-            draw_cnt <= C_STRIP_LEN;
+            draw_cnt <= C_ALL_LEN;
             s1_valid <= '0';
             s2_valid <= '0';
             ovl_we   <= '0';

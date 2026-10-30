@@ -257,8 +257,10 @@ and 0.042 ns, and 139 block RAMs, and one with stage 3, the debugger
 that drives the link, 0.080 ns and 0.038 ns, and 139.5 block RAMs. The
 debugger takes 730 LUTs and 1051 flip-flops there, 293 and 286 of them
 in its host of the link (`dbg_host`), and half a block RAM, for the
-table of its strip's cells. The Nexys4DDR's build with stage 3 has
-0.339 ns and 0.031 ns. The R3's pipelined row is from a build at nice_cpu V1.0, with
+table of its strip's cells. A build with stage 5, the page, has 0.232
+ns and 0.053 ns, and still 139.5 block RAMs. The Nexys4DDR's build with
+stage 3 has 0.339 ns and 0.031 ns, and with stage 5 0.111 ns and
+0.017 ns, on a path in the core, and still 92.5 block RAMs. The R3's pipelined row is from a build at nice_cpu V1.0, with
 the debug link of version 4, and the Nexys4DDR's from one at V1.1, with
 stage 1 of the on-board debugger ([DEBUGGER.md](../doc/DEBUGGER.md)).
 All three have the

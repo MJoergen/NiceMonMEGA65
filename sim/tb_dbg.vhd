@@ -1,7 +1,7 @@
--- Tests the on-board debugger (src/dbg/dbg.vhd), stage 4 of
+-- Tests the on-board debugger (src/dbg/dbg.vhd), stage 5 of
 -- doc/DEBUGGER.md, with the system under it: the strip it draws into the
 -- overlay, the toggle, the core's keys over the debug link, the sticky
--- setting, and the catch.
+-- setting, the catch, and the page.
 --
 -- PASS AND FAIL
 -- Each check is an assert with severity failure, which stops GHDL with a
@@ -12,7 +12,7 @@
 -- reset: it counts in R1 to 0x800 and halts. The debugger drives the
 -- system's link as system.vhd wires it. p_ovl is the overlay of text.vhd:
 -- it takes the debugger's writes into a model, and counts those outside
--- the strip, which must be none. p_main types keys, as bytes of the
+-- its 29 rows, which must be none. p_main types keys, as bytes of the
 -- keyboard, and waits for the strip's text. The debugger's G_CLOCK_HZ is
 -- small, so that it refreshes every 3000 cycles. The steps:
 --
@@ -40,6 +40,17 @@
 -- 11. A reset in Focus leaves the debugger Off, and draws the strip again.
 --    The core runs the ROM and halts, and the debugger stays Off: Off is
 --    not caught from.
+-- 12. F11 shows the page: the window at 0, the ROM's words in it, and the
+--    cursor on the first.
+-- 13. The cursor keys and Home move the cursor; up at the top row, Page
+--    Down, and Page Up move the window. A move while the window is read
+--    reads it again.
+-- 14. a, digits, and RETURN move the window to the screen's memory.
+-- 15. A digit and DEL, then digits and RETURN, write the word after the
+--    first, which the page reads back. After a digit, a is a digit. ESC clears the field,
+--    and a second ESC leaves the page.
+-- 16. m shows the page again. r restarts the core, and the words are
+--    dimmed, and a write gets e02, until the core halts.
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -71,13 +82,18 @@ architecture simulation of tb_dbg is
    constant C_LAST  : natural := 29 * 80 - 1;
 
    constant C_DASHES : string := "-------- -------- -------- -------- -------- -------- -------- -------- ";
-   constant C_KEYS   : string := " F1 step  F3 go  F5 pause  F7 hold  F9 restart  F12 strip  MEGA+HELP to ";
+   constant C_KEYS   : string := " F1 step  F3 go  F5 pause  F7 hold  F9 restart  F11 page  F12 keep strip: ";
    constant C_ROW28  : string := C_KEYS & "off" & (1 to 80 - C_KEYS'length - 3 => ' ');
    constant C_STRIP  : string := " The keys are the program's.  MEGA+HELP for the debugger";
    constant C_COLOR  : std_logic_vector(23 downto 0) := X"004FFF";
    constant C_DIM    : std_logic_vector(23 downto 0) := X"004888";
+   constant C_CURSOR : std_logic_vector(23 downto 0) := X"FFF004";
+   constant C_PKEYS  : string := " CRSR move  PgUp PgDn page  Home  0-f type  RETURN write  a address  ESC back";
+   constant C_NONE   : string := "________";
 
    constant C_ESC : character := character'val(27);
+   constant C_CR  : character := character'val(13);
+   constant C_DEL : character := character'val(127);
 
    signal clk : std_logic;
    signal rst : std_logic := '1';
@@ -199,7 +215,7 @@ begin
          if ovl_we = '1' then
             ovl(to_integer(ovl_addr)) <= ovl_data;
             writes                    <= writes + 1;
-            if ovl_addr < C_FIRST or ovl_addr > C_LAST then
+            if ovl_addr > C_LAST then
                stray <= stray + 1;
             end if;
          end if;
@@ -211,6 +227,7 @@ begin
       variable rom_v  : t_rom := (others => (others => '0'));
       variable pc_v   : std_logic_vector(31 downto 0);
       variable base_v : natural;
+      variable n_v    : natural;
 
       procedure cycles(n : natural) is
       begin
@@ -305,6 +322,34 @@ begin
             severity failure;
          expect_color(C_COLOR, what);
       end procedure expect_stop;
+
+      -- Row r of the page shows the ROM's words from address a
+      procedure expect_rom_row(r : natural; a : natural; what : string) is
+         variable s_v : line;
+      begin
+         write(s_v, to_hstring(to_slv(a, 32)));
+         for i in 0 to 7 loop
+            write(s_v, " " & to_hstring(rom_v(a + i)));
+         end loop;
+         wait_text(r, 0, s_v.all);
+         deallocate(s_v);
+      end procedure expect_rom_row;
+
+      -- The colors of word w of row r of the page, waited for
+      procedure expect_word_color(r, w : natural; c : std_logic_vector(23 downto 0); what : string) is
+         variable end_v : time;
+      begin
+         end_v := now + C_TIMEOUT;
+         loop
+            exit when ovl(r * 80 + 9 + 9 * w)(31 downto 8) = c and ovl_we = '0';
+            exit when now >= end_v;
+            wait until rising_edge(clk);
+         end loop;
+         assert ovl(r * 80 + 9 + 9 * w)(31 downto 8) = c
+            report "tb_dbg: " & what & ": word " & to_string(w) & " of row " & to_string(r) & " is in " &
+                   to_hstring(ovl(r * 80 + 9 + 9 * w)(31 downto 8))
+            severity failure;
+      end procedure expect_word_color;
 
       procedure read_rom is
          file     f      : text;
@@ -411,7 +456,7 @@ begin
 
       report "tb_dbg: 8. F12, and a step of the debugger's own in Strip";
       key(C_ESC & "[24~");
-      wait_text(28, 0, C_KEYS & "strip ");
+      wait_text(28, 0, C_KEYS & "on ");
       key("r");
       expect_row27("RUNNING", "after r");
       key(C_ESC & "[15~");
@@ -467,6 +512,111 @@ begin
       expect('0', '0', '0', "after the halt in Off");
       assert dbg_on = '0'
          report "tb_dbg: the debugger took the link in Off"
+         severity failure;
+
+      report "tb_dbg: 12. F11 shows the page";
+      pulse;
+      expect('1', '0', '1', "in Focus for the page");
+      expect_row27("HALTED 1", "before the page");
+      key(C_ESC & "[23~");
+      cycles(4);
+      expect('1', '1', '1', "with the page");
+      wait_text(0, 0, " Window 00000000  Cursor 00000000 ");
+      expect_rom_row(1, 0, "the first row");
+      expect_rom_row(22, 21 * 8, "the last row");
+      assert row(23)(1 to 20) = " Word:    " & C_NONE & "  " and row(24)(1 to C_PKEYS'length) = C_PKEYS
+         report "tb_dbg: rows 23 and 24 are '" & row(23) & "' and '" & row(24) & "'"
+         severity failure;
+      expect_word_color(1, 0, C_CURSOR, "the cursor");
+      expect_word_color(1, 1, C_COLOR, "after the cursor");
+
+      report "tb_dbg: 13. the cursor keys, Home, Page Down, and Page Up";
+      key(C_ESC & "[C");
+      key(C_ESC & "[B");
+      wait_text(0, 0, " Window 00000000  Cursor 00000009 ");
+      expect_word_color(2, 1, C_CURSOR, "after right and down");
+      expect_word_color(1, 0, C_COLOR, "after right and down");
+      key(C_ESC & "[H");
+      wait_text(0, 0, " Window 00000000  Cursor 00000000 ");
+      key(C_ESC & "[A");
+      wait_text(0, 0, " Window FFFFFFF8  Cursor FFFFFFF8 ");
+      expect_rom_row(2, 0, "after up at the top");
+      key(C_ESC & "[B");
+      wait_text(0, 0, " Window FFFFFFF8  Cursor 00000000 ");
+      expect_word_color(2, 0, C_CURSOR, "after down");
+      key(C_ESC & "[6~");
+      wait_text(0, 0, " Window 000000A8  Cursor 000000B0 ");
+      expect_rom_row(2, 16#B0#, "after Page Down");
+      -- Page Up, and Page Down again while the window at FFFFFFF8 is read:
+      -- that read, of the ROM's words, is not shown
+      key(C_ESC & "[5~");
+      loop
+         wait until rising_edge(clk) and dbg_tx_valid = '1' and dbg_tx_data = X"72";
+         n_v := 0;
+         loop
+            wait until rising_edge(clk) and dbg_tx_valid = '1';
+            exit when dbg_tx_data = X"23" or n_v = 200;
+            n_v := n_v + 1;
+         end loop;
+         exit when n_v = 200;
+      end loop;
+      key(C_ESC & "[6~");
+      wait_text(0, 0, " Window 000000A8  Cursor 000000B0 ");
+      expect_rom_row(2, 16#B0#, "after a Page Down during a read");
+      key(C_ESC & "[5~");
+      wait_text(0, 0, " Window FFFFFFF8  Cursor 00000000 ");
+
+      report "tb_dbg: 14. a moves the window";
+      key("a");
+      wait_text(23, 0, " Address: " & C_NONE);
+      key("ffff0010");
+      wait_text(23, 0, " Address: FFFF0010");
+      key("" & C_CR);
+      wait_text(0, 0, " Window FFFF0010  Cursor FFFF0010 ");
+      wait_text(1, 0, "FFFF0010 00000000 00000000");
+      assert row(23)(1 to 18) = " Word:    " & C_NONE
+         report "tb_dbg: the field is '" & row(23) & "' after RETURN"
+         severity failure;
+
+      report "tb_dbg: 15. a word's write, DEL, and ESC";
+      key("9");
+      wait_text(23, 0, " Word:    9_______");
+      key("" & C_DEL);
+      wait_text(23, 0, " Word:    " & C_NONE);
+      key(C_ESC & "[C");
+      wait_text(0, 0, " Window FFFF0010  Cursor FFFF0011 ");
+      key("12345678" & C_CR);
+      wait_text(23, 20, "written   ");
+      wait_text(1, 0, "FFFF0010 00000000 12345678 00000000");
+      key("1a");
+      wait_text(23, 0, " Word:    1A______");
+      key("" & C_ESC);
+      wait_text(23, 0, " Word:    " & C_NONE);
+      expect('1', '1', '1', "after an ESC with digits");
+      key("" & C_ESC);
+      wait until page = '0' for C_TIMEOUT;
+      expect('1', '0', '1', "after the second ESC");
+
+      report "tb_dbg: 16. m, and the page while the core runs";
+      key("m");
+      wait_text(1, 0, "FFFF0010 00000000 12345678 00000000");
+      assert row(23)(21 to 30) = "          "
+         report "tb_dbg: the message stays: '" & row(23) & "'"
+         severity failure;
+      key("r");
+      expect_row27("RUNNING", "after r with the page");
+      expect_word_color(1, 2, C_DIM, "while the core runs");
+      key("1" & C_CR);
+      wait_text(23, 20, "e02       ");
+      expect_row27("HALTED 1", "after the run with the page");
+      wait_text(1, 0, "FFFF0010 00000000 12345678 00000000");
+      expect_word_color(1, 2, C_COLOR, "after the halt");
+      expect_word_color(1, 1, C_CURSOR, "after the halt");
+      key("m");
+      cycles(4);
+      expect('1', '0', '1', "after m");
+      assert stray = 0
+         report "tb_dbg: " & to_string(stray) & " writes outside the overlay's rows"
          severity failure;
 
       report "tb_dbg: PASS";

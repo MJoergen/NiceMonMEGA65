@@ -195,7 +195,12 @@ The testbenches are these:
   halt in Strip does, the catch. F12 again makes the toggle leave for
   Off, which gives the link back. A reset in Focus leaves the debugger
   Off with the strip drawn again, and the halt that follows leaves it
-  Off: Off is not caught from.
+  Off: Off is not caught from. F11 then shows the page, the ROM's words
+  with the cursor on the first; the cursor keys, Home, Page Down, and
+  Page Up move the cursor and the window, also during a read of it; `a`
+  moves the window to the screen's memory, where a word is written and
+  read back; DEL and ESC edit the field, and ESC leaves the page; and
+  while the core runs the words are dimmed and a write gets `e02`.
 - `sim/tb_dbg_host.vhd` tests the debugger's host against the debug link
   itself, on the system's third link input, with `sim/host.nasm`, which
   writes 0x00 to 0xFF to the console again and again. It reads the
