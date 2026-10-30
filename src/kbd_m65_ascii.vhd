@@ -26,7 +26,10 @@
 --   INST/DEL is DEL (0x7F), also with SHIFT, RUN/STOP is CTRL-C (0x03)
 -- F1, F3, F5, F7, F9, and F11 give xterm's sequences for those keys, and
 -- with SHIFT those of F2 to F12: ESC O P to ESC O S for F1 to F4, and ESC [,
--- a number, and ~ for the others. F13 gives nothing.
+-- a number, and ~ for the others. F13 gives nothing. CLR/HOME is Home,
+-- ESC [ H, also with SHIFT, and MEGA with CRSR up or down, the key at the
+-- top right or SHIFT with CRSR down, is Page Up or Page Down, ESC [ 5 ~ or
+-- ESC [ 6 ~, as xterm sends them. MEGA changes no other key.
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -61,6 +64,7 @@ architecture synthesis of kbd_m65_ascii is
    constant C_RSHIFT : natural := 52;
    constant C_CTRL   : natural := 58;
    constant C_CAPS   : natural := 72;
+   constant C_MEGA   : natural := 61;
 
    -- The cursor keys in the table: ESC [ A, B, C, or D
    constant C_UP    : std_logic_vector(7 downto 0) := X"80";
@@ -82,13 +86,21 @@ architecture synthesis of kbd_m65_ascii is
    constant C_F11 : std_logic_vector(7 downto 0) := X"9A";
    constant C_F12 : std_logic_vector(7 downto 0) := X"9B";
 
-   -- What xterm sends after ESC for each function key: two bytes for F1 to
-   -- F4, and four for the others
+   -- Page Up, Page Down, and Home, after the function keys
+   constant C_PGUP : std_logic_vector(7 downto 0) := X"9C";
+   constant C_PGDN : std_logic_vector(7 downto 0) := X"9D";
+   constant C_HOME : std_logic_vector(7 downto 0) := X"9E";
+
+   -- What xterm sends after ESC for each function key, and for Page Up,
+   -- Page Down, and Home, and how many bytes that is with the ESC
    type t_fkeys is array (0 to 15) of string(1 to 4);
+
+   type t_flens is array (0 to 15) of natural range 0 to 5;
 
    constant C_FKEYS : t_fkeys := (
       "OP  ", "OQ  ", "OR  ", "OS  ", "[15~", "[17~", "[18~", "[19~",
-      "[20~", "[21~", "[23~", "[24~", others => "    ");
+      "[20~", "[21~", "[23~", "[24~", "[5~ ", "[6~ ", "[H  ", others => "    ");
+   constant C_FLENS : t_flens := (3, 3, 3, 3, 5, 5, 5, 5, 5, 5, 5, 5, 4, 4, 3, 0);
 
    type t_table is array (0 to C_NUM_KEYS - 1) of std_logic_vector(7 downto 0);
 
@@ -116,7 +128,7 @@ architecture synthesis of kbd_m65_ascii is
       55 => chr('/'),   56 => chr('1'),   57 => chr('_'),   59 => chr('2'),
       60 => chr(' '),   62 => chr('q'),   63 => X"03",      65 => X"09",
       68 => C_F9,       69 => C_F11,      71 => X"1B",      73 => C_UP,
-      74 => C_LEFT,
+      74 => C_LEFT,     51 => C_HOME,
       others => X"00");
 
    constant C_SHIFTED : t_table := (
@@ -136,7 +148,7 @@ architecture synthesis of kbd_m65_ascii is
       55 => chr('?'),   56 => chr('!'),   57 => chr('`'),   59 => chr('"'),
       60 => chr(' '),   62 => chr('Q'),   63 => X"03",      65 => X"09",
       68 => C_F10,      69 => C_F12,      71 => X"1B",      73 => C_UP,
-      74 => C_LEFT,
+      74 => C_LEFT,     51 => C_HOME,
       others => X"00");
    -- vsg_on
 
@@ -156,12 +168,18 @@ architecture synthesis of kbd_m65_ascii is
          res_v /= X"7F" then
          res_v(7 downto 5) := "000";
       end if;
+      -- MEGA with a cursor key up or down is Page Up or Page Down
+      if keys(C_MEGA) = '1' and res_v = C_UP then
+         res_v := C_PGUP;
+      elsif keys(C_MEGA) = '1' and res_v = C_DOWN then
+         res_v := C_PGDN;
+      end if;
       return res_v;
    end function key_byte;
 
    -- The bytes that a byte of the tables stands for, the first in bits
    -- 39..32: itself, ESC [ and A to D for a cursor key, or ESC and the
-   -- bytes of C_FKEYS for a function key
+   -- bytes of C_FKEYS for a function key, Page Up, Page Down, or Home
    function seq_bytes(byte : std_logic_vector(7 downto 0)) return std_logic_vector is
       variable fkey_v : string(1 to 4);
    begin
@@ -180,10 +198,10 @@ architecture synthesis of kbd_m65_ascii is
    begin
       if byte(7) = '0' then
          return 1;
-      elsif byte(4) = '0' or byte(3 downto 2) = "00" then
+      elsif byte(4) = '0' then
          return 3;
       else
-         return 5;
+         return C_FLENS(to_integer(byte(3 downto 0)));
       end if;
    end function seq_len;
 

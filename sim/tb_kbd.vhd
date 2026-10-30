@@ -257,6 +257,21 @@ begin
       expect(C_ESC & "OP" & C_ESC & "OQ" & C_ESC & "[24~" & C_ESC & "[15~" &
              C_ESC & "[18~" & C_ESC & "[20~");
 
+      report "tb_kbd: Home, Page Up, and Page Down";
+      tap(51);                       -- CLR/HOME
+      press(61);                     -- MEGA
+      tap(73);                       -- MEGA-up is Page Up
+      tap(7);                        -- MEGA-down is Page Down
+      press(15);
+      tap(7);                        -- MEGA-SHIFT-down is up, so Page Up
+      lift(15);
+      tap(9);                        -- MEGA changes no other key
+      lift(61);
+      press(15);
+      tap(51);                       -- SHIFT-CLR/HOME is Home too
+      lift(15);
+      expect(C_ESC & "[H" & C_ESC & "[5~" & C_ESC & "[6~" & C_ESC & "[5~" & "w" & C_ESC & "[H");
+
       report "tb_kbd: two keys at once, and a key without a byte";
       held(9)  <= '1';               -- W
       held(62) <= '1';               -- Q

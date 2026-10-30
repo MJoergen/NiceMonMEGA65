@@ -251,12 +251,15 @@ the MEGA65's keys:
 | SHIFT with CRSR→ or CRSR↓ | The other direction, `ESC [ D` or `ESC [ A`, as on the C64 |
 | F1, F3, F5, F7, F9, F11 | As xterm sends them: `ESC O P` and `ESC O R` for F1 and F3, and `ESC [ 15 ~`, `ESC [ 18 ~`, `ESC [ 20 ~`, and `ESC [ 23 ~` for the others |
 | SHIFT with F1 to F11 | The even keys F2 to F12, as xterm sends them: `ESC O Q`, `ESC O S`, `ESC [ 17 ~`, `ESC [ 19 ~`, `ESC [ 21 ~`, and `ESC [ 24 ~` |
+| CLR/HOME | Home, `ESC [ H`, as xterm sends it, also with SHIFT |
+| MEGA with CRSR↑ or CRSR↓ | Page Up or Page Down, `ESC [ 5 ~` or `ESC [ 6 ~`, as xterm sends them; SHIFT with CRSR↓ is CRSR↑ here too |
 | CTRL with a letter | Its control code |
 | £, ↑, ← | `\`, `^`, `_` (`\|`, `~`, `` ` `` with SHIFT) |
 | SHIFT with `0`, `=`, `:`, `;` | `{`, `}`, `[`, `]` |
 
 A held key repeats after half a second, 20 times a second. F13, HELP,
-CLR/HOME, and the modifiers give nothing. MEGA and HELP together toggle the
+and the modifiers give nothing, and MEGA changes no key but the cursor
+keys up and down. MEGA and HELP together toggle the
 on-board debugger ([DEBUGGER.md](DEBUGGER.md)), and while it is up the
 keys go to it, not to the core, and it has the debug link. The keyboard's drive
 LED is green while the core runs, like the user LED.
@@ -300,7 +303,8 @@ On the Nexys4DDR, a USB keyboard in the board's USB HID port types into the
 same input (the board's PIC24 turns it into PS/2). Its keys give the same
 bytes, for a US layout: Enter is CR, Backspace and Delete are DEL, the
 cursor keys are `ESC [ A` to `ESC [ D`, F1 to F12 are as on the MEGA65,
-also with SHIFT, and CTRL with a letter is its control code. The keypad gives its digits and symbols, whatever Num Lock
+also with SHIFT, Home, Page Up, and Page Down give `ESC [ H`, `ESC [ 5 ~`,
+and `ESC [ 6 ~`, and CTRL with a letter is its control code. The keypad gives its digits and symbols, whatever Num Lock
 is. Scroll Lock gives nothing, and toggles the on-board debugger, as MEGA
 and HELP do on the MEGA65. A held key repeats as the keyboard repeats it. The keyboard's LEDs are
 not set, so the CAPS LOCK LED does not show whether CAPS LOCK is on. A PS/2

@@ -20,8 +20,9 @@
 -- Delete give DEL (0x7F), also with SHIFT or CTRL, as INST/DEL does on the
 -- MEGA65. The keypad gives its digits and symbols, whatever Num Lock is,
 -- and its Enter gives CR. F1 to F4 give ESC O P to ESC O S, and F5 to F12
--- ESC [, a number, and ~, as xterm sends them, also with SHIFT. Other keys
--- give nothing.
+-- ESC [, a number, and ~, as xterm sends them, also with SHIFT. Page Up,
+-- Page Down, and Home give ESC [ 5 ~, ESC [ 6 ~, and ESC [ H, as xterm
+-- sends them. Other keys give nothing.
 --
 -- The bytes of a key wait in out_bytes until data_ready_i takes them. A key
 -- that comes while they wait gives nothing, but the modifiers still change.
@@ -82,13 +83,21 @@ architecture synthesis of kbd_ps2_ascii is
    constant C_F11 : std_logic_vector(7 downto 0) := X"9A";
    constant C_F12 : std_logic_vector(7 downto 0) := X"9B";
 
-   -- What xterm sends after ESC for each function key: two bytes for F1 to
-   -- F4, and four for the others
+   -- Page Up, Page Down, and Home, after the function keys
+   constant C_PGUP : std_logic_vector(7 downto 0) := X"9C";
+   constant C_PGDN : std_logic_vector(7 downto 0) := X"9D";
+   constant C_HOME : std_logic_vector(7 downto 0) := X"9E";
+
+   -- What xterm sends after ESC for each function key, and for Page Up,
+   -- Page Down, and Home, and how many bytes that is with the ESC
    type t_fkeys is array (0 to 15) of string(1 to 4);
+
+   type t_flens is array (0 to 15) of natural range 0 to 5;
 
    constant C_FKEYS : t_fkeys := (
       "OP  ", "OQ  ", "OR  ", "OS  ", "[15~", "[17~", "[18~", "[19~",
-      "[20~", "[21~", "[23~", "[24~", others => "    ");
+      "[20~", "[21~", "[23~", "[24~", "[5~ ", "[6~ ", "[H  ", others => "    ");
+   constant C_FLENS : t_flens := (3, 3, 3, 3, 5, 5, 5, 5, 5, 5, 5, 5, 4, 4, 3, 0);
 
    type t_table is array (0 to 127) of std_logic_vector(7 downto 0);
 
@@ -158,13 +167,16 @@ architecture synthesis of kbd_ps2_ascii is
          when X"71"  => return X"7F";     -- Delete
          when X"4A"  => return chr('/');  -- the keypad's /
          when X"5A"  => return X"0D";     -- the keypad's Enter
+         when X"7D"  => return C_PGUP;
+         when X"7A"  => return C_PGDN;
+         when X"6C"  => return C_HOME;
          when others => return X"00";
       end case;
    end function ext_byte;
 
    -- The bytes that a byte of the tables stands for, the first in bits
    -- 39..32: itself, ESC [ and A to D for a cursor key, or ESC and the
-   -- bytes of C_FKEYS for a function key
+   -- bytes of C_FKEYS for a function key, Page Up, Page Down, or Home
    function seq_bytes(byte : std_logic_vector(7 downto 0)) return std_logic_vector is
       variable fkey_v : string(1 to 4);
    begin
@@ -183,10 +195,10 @@ architecture synthesis of kbd_ps2_ascii is
    begin
       if byte(7) = '0' then
          return 1;
-      elsif byte(4) = '0' or byte(3 downto 2) = "00" then
+      elsif byte(4) = '0' then
          return 3;
       else
-         return 5;
+         return C_FLENS(to_integer(byte(3 downto 0)));
       end if;
    end function seq_len;
 

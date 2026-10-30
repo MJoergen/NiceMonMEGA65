@@ -247,6 +247,15 @@ begin
       expect(C_ESC & "OP" & C_ESC & "OS" & C_ESC & "[15~" & C_ESC & "[18~" &
              C_ESC & "[23~" & C_ESC & "[24~");
 
+      report "tb_ps2: Home, Page Up, and Page Down, and the keypad's 7, 9, and 3";
+      tap(X"6C", true);              -- Home
+      tap(X"7D", true);              -- Page Up
+      tap(X"7A", true);              -- Page Down
+      tap(X"6C");                    -- the keypad's 7
+      tap(X"7D");                    -- the keypad's 9
+      tap(X"7A");                    -- the keypad's 3
+      expect(C_ESC & "[H" & C_ESC & "[5~" & C_ESC & "[6~" & "793");
+
       report "tb_ps2: a key repeats as the keyboard repeats it";
       press(X"22");                  -- X
       press(X"22");

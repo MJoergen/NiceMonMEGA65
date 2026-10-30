@@ -162,12 +162,11 @@ mon.py prints its errors. F1 to F9 read the control register before they
 write it: step and go on act only on a paused core, and pause only on a
 running one, as go on and pause would otherwise start a held core.
 
-Page Up, Page Down, and Home are new bytes of both keyboards, xterm's
-`ESC [ 5 ~`, `ESC [ 6 ~`, and `ESC [ H`. On the Nexys4DDR they are the
-keys of those names, which give nothing today. On the MEGA65, which has
-no such keys, CLR/HOME, which gives nothing today, is Home, and MEGA with
-CRSR↑ and CRSR↓ are Page Up and Page Down, which makes MEGA a modifier
-in `kbd_m65_ascii.vhd`. Programs get them too, and the key tables of
+Page Up, Page Down, and Home are bytes of both keyboards (written),
+xterm's `ESC [ 5 ~`, `ESC [ 6 ~`, and `ESC [ H`. On the Nexys4DDR they
+are the keys of those names. On the MEGA65, which has no such keys,
+CLR/HOME is Home, and MEGA with CRSR↑ and CRSR↓ are Page Up and Page
+Down, which makes MEGA a modifier in `kbd_m65_ascii.vhd`. Programs get them too, and the key tables of
 [SYSTEM.md](SYSTEM.md#the-keyboard) move with them.
 
 ## The Nexys4DDR

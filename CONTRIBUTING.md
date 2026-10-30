@@ -160,11 +160,13 @@ The testbenches are these:
   of the debug link, with `sim/rom.nasm`, a greeting, as the ROM (see
   below).
 - `sim/tb_kbd.vhd` tests the keyboard driver and its ASCII, with a model of
-  the keyboard, and the debugger's MEGA+HELP detector, which pulses once
-  while the keys are held.
+  the keyboard, CLR/HOME and MEGA with the cursor keys among the keys,
+  and the debugger's MEGA+HELP detector, which pulses once while the
+  keys are held.
 - `sim/tb_ps2.vhd` tests the PS/2 receiver and its ASCII, with a model of a
-  PS/2 keyboard, and checks that bad and broken frames are dropped. It
-  also tests the debugger's Scroll Lock detector: one pulse for a held
+  PS/2 keyboard, and checks that bad and broken frames are dropped, and
+  that Home, Page Up, and Page Down differ from the keypad's keys with
+  the same codes. It also tests the debugger's Scroll Lock detector: one pulse for a held
   key, and none in Ctrl+Break.
 - `sim/tb_ps2_nicemon.vhd` types on that model into the system, wired as
   the Nexys4DDR wires it. Keys typed while the core is held in reset are
