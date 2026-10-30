@@ -226,9 +226,12 @@ The testbenches are these:
   which closes the old one first with a FIN that comes again until it is
   acknowledged, and one before it, as when the FIN was lost, or after a
   crash; data in the ACK of the SYN-ACK; an RST, after which the link
-  still takes the input; a break that waits for its input while a new
-  connection's comes; an RST before the ACK of the SYN-ACK; and a SYN-ACK
-  that is never acknowledged.
+  still takes the input, and one while data is out; a break that waits
+  for its input while a new connection's comes; an RST before the ACK of
+  the SYN-ACK; and a SYN-ACK that is never acknowledged. In every cycle,
+  the retransmission timer must run only while there is a connection,
+  and an ACK of the FIN must free the data before it, also when it
+  covers both at once.
 - `make test` also checks that GHDL can synthesize the system, with
   `sim/rom.nasm` as its ROM and without a ROM, the keyboards, the text
   display, and `src/system.vhd` with the screen and the devices of the

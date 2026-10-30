@@ -373,12 +373,14 @@ begin
    ending <= '1' when fin_ack = '1' and ack_req = '0' and busy = '0' else
              '0';
 
-   -- The timer runs while the SYN-ACK, data, or the FIN is out, or a
-   -- window of 0 holds data back; it stands still while a segment is
-   -- acted on or the connection ends, which come first.
-   armed <= '1' when state = SYN_RCVD_ST or max_ptr /= una_ptr or
-                     (state = LAST_ACK_ST and fin_max = '1') or
-                     (conn = '1' and snd_wnd = 0 and lim_ptr /= una_ptr) else
+   -- The timer runs while there is a connection and the SYN-ACK, data, or
+   -- the FIN is out, or a window of 0 holds data back, and not after its
+   -- end, whatever was out then; it stands still while a segment is acted
+   -- on or the connection ends, which come first.
+   armed <= '1' when syn_rcvd = '1' or
+                     (estab = '1' and (max_ptr /= una_ptr or
+                                       (state = LAST_ACK_ST and fin_max = '1') or
+                                       (snd_wnd = 0 and lim_ptr /= una_ptr))) else
             '0';
 
    i_eth_tcp_timer : entity work.eth_tcp_timer
@@ -464,8 +466,9 @@ begin
 
 
    p_tcp : process (clk_i)
-      variable syn_v : boolean;
-      variable fin_v : boolean;
+      variable syn_v     : boolean;
+      variable fin_v     : boolean;
+      variable ack_fin_v : boolean;
 
       -- Opens a connection for a SYN; the output after base goes to it.
       procedure accept (
@@ -597,9 +600,11 @@ begin
                         restart <= '1';
                      end if;
 
-                     -- The ACK: the bytes it covers are free.
+                     -- The ACK: the bytes it covers are free, also when it
+                     -- covers this side's FIN, one past them, as well.
                      if f_flags(4) = '1' then
-                        if k <= max_ptr - una_ptr and
+                        ack_fin_v := fin_max = '1' and fin_acked;
+                        if (k <= max_ptr - una_ptr or ack_fin_v) and
                            ((d1 /= 0 and d1(31) = '0') or (d1 = 0 and d2(31) = '0')) then
                            snd_wnd <= f_win;
                            snd_wl1 <= f_seq;
@@ -614,6 +619,11 @@ begin
                            if k > nxt_ptr - una_ptr then
                               nxt_ptr <= una_ptr + k(G_ADDR_BITS downto 0);
                            end if;
+                           restart <= '1';
+                        elsif ack_fin_v and max_ptr /= una_ptr then
+                           una_ptr <= max_ptr;
+                           una_seq <= f_ack - 1;
+                           nxt_ptr <= max_ptr;
                            restart <= '1';
                         end if;
                      end if;

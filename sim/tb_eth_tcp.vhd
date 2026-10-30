@@ -13,6 +13,9 @@
 -- and counts the breaks; p_ltx sends the bytes that p_host asks for.
 -- The frames have a gap in rx_valid after every 13th byte, the SYNs
 -- carry the options of Linux, and some data segments carry options too.
+-- p_probe checks, in every cycle, that the retransmission timer runs only
+-- while there is a connection, and that an ACK of this side's FIN frees
+-- the data before it, as when the ACK covers both at once.
 -- The steps:
 --   * a SYN while the IP address is 0, or to another port, gets nothing
 --   * a SYN gets a SYN-ACK, which comes again when the host does not
@@ -43,6 +46,7 @@
 --     connection with a FIN too; the old one still takes data and the
 --     host's FIN, and if that never comes, its end by an RST is a break
 --   * data in the host's ACK of the SYN-ACK is taken
+--   * an RST while data is out ends the connection, and its timer
 --   * an RST ends a connection that waits for the ACK of its SYN-ACK
 --   * a SYN-ACK that is never acknowledged ends the connection after the
 --     tries
@@ -116,6 +120,7 @@ architecture simulation of tb_eth_tcp is
    signal tx_stop : std_logic := '0';
    signal ltx_req : natural   := 0;
    signal n_ltx   : natural   := 0;
+   signal n_fin   : natural   := 0;
 
    function b2 (v : std_logic_vector(15 downto 0)) return t_bytes is
    begin
@@ -345,6 +350,31 @@ begin
          end if;
       end if;
    end process p_ltx;
+
+
+   -- A probe of the connection: the retransmission timer runs only while
+   -- there is one, and an ACK of this side's FIN, which ends it, frees the
+   -- data before the FIN too.
+   p_probe : process (clk)
+      alias armed    is << signal .tb_eth_tcp.i_eth_tcp.armed : std_logic >>;
+      alias syn_rcvd is << signal .tb_eth_tcp.i_eth_tcp.syn_rcvd : std_logic >>;
+      alias estab    is << signal .tb_eth_tcp.i_eth_tcp.estab : std_logic >>;
+      alias fin_ack  is << signal .tb_eth_tcp.i_eth_tcp.fin_ack : std_logic >>;
+      alias una_ptr  is << signal .tb_eth_tcp.i_eth_tcp.una_ptr : std_logic_vector >>;
+      alias max_ptr  is << signal .tb_eth_tcp.i_eth_tcp.max_ptr : std_logic_vector >>;
+   begin
+      if rising_edge(clk) then
+         assert armed = '0' or syn_rcvd = '1' or estab = '1'
+            report "tb_eth_tcp: FAIL, the timer runs without a connection"
+            severity failure;
+         if fin_ack = '1' then
+            assert una_ptr = max_ptr
+               report "tb_eth_tcp: FAIL, the ACK of the FIN did not free the data"
+               severity failure;
+            n_fin <= n_fin + 1;
+         end if;
+      end if;
+   end process p_probe;
 
 
    p_host : process
@@ -969,8 +999,14 @@ begin
       hseq_v  := X"0000D001";
       bseq_v  := seq_v + 1;
       send_seg(C_ACK, 0);
+      -- An RST while data is out ends the connection, and the timer with it.
+      ltx_req <= ltx_req + 10;
+      expect_data;
       send_seg(C_RST, 0);
-      wait for 1 us;
+      expect_none(2 * C_RTO);
+      assert conn = '0'
+         report "tb_eth_tcp: FAIL, the RST did not end the connection with data out"
+         severity failure;
 
       -- An RST ends a connection that waits for the ACK of its SYN-ACK.
       send(seg(C_HIP2, C_PORT, 40008, X"0000E000", X"00000000", C_SYN, 8192, 0, 0, false));
@@ -997,6 +1033,9 @@ begin
          report "tb_eth_tcp: FAIL, the connection did not end"
          severity failure;
 
+      assert n_fin > 0
+         report "tb_eth_tcp: FAIL, no ACK of a FIN"
+         severity failure;
       report "tb_eth_tcp: PASS, " & integer'image(n_got) & " segments";
       finish;
    end process p_host;
