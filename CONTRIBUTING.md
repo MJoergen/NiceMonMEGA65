@@ -443,9 +443,9 @@ every time, not only the ones a testbench sends.
   `src/eth/eth_tcp_pick.vhd`, with the sender under it, a buffer of 4
   bytes, and segments of 2: a segment is chosen only in the cycle meant
   for it, not while one is sent, and acknowledges, unless it is a reset;
-  the SYN-ACK, data, the FIN, and the reset are chosen only as its header
-  says, and data never beyond the data there is or the host's window, but
-  for the probe; and the sender is offered the connection's fields, the
+  the SYN-ACK, data, the FIN, an ACK alone, and the reset are chosen only
+  as its header says, and data never beyond the data there is or the
+  host's window, but for the probe; and the sender is offered the connection's fields, the
   sequence number, and the length chosen, or the reset's host and
   numbers, which stay until it takes them, in the cycle after the choice.
 - `eth_tcp_rx.sby` proves the parser of the TCP server's frames,
@@ -506,13 +506,38 @@ every time, not only the ones a testbench sends.
   14 cycles apart, whatever the frames' lengths. The solver has no
   metastability, so a synchronizer of one register instead of two would
   pass.
+- `eth_tcp.sby` proves the TCP server's connection, `src/eth/eth_tcp.vhd`,
+  with the real buffers and timer, and a free parser and chooser,
+  `formal/eth_tcp_rx_free.vhd` and `formal/eth_tcp_pick_free.vhd`, which
+  do anything that the real ones may do, as their own jobs prove. GHDL
+  binds the architecture analyzed last, so these replace the real ones.
+  The buffers have 4 bytes, a segment 2, the timeout 6 cycles, and the
+  tries 3, and the station's addresses stay as they are from reset. It
+  proves: the pointers of the send buffer stay in order, within the
+  buffer, and not past the FIN while closing; the connection opens, and
+  the link goes to it, only by the ACK of its SYN-ACK; the next number
+  expected from the host is the one past the data committed and its
+  FIN, and data is committed only from the peer, at that number; every
+  segment with data, a FIN, or another sequence number gets an ACK,
+  which stays asked for until it is sent; the first byte not
+  acknowledged has the right sequence number, and moves only to what an
+  ACK covers; the host's window is taken only as RFC 9293 3.10.7.4 says;
+  the connection ends only by a reset in the window, the last try, or
+  the ACK of this side's FIN; the host's half-close comes once per
+  connection; with the IP address 0, nothing opens and nothing is sent;
+  and the server keeps the contracts that the jobs of the timer, the
+  buffers, and the chooser assume. It assumes the parser's promise, that
+  a good segment whose data was written has had all of it written, which
+  `eth_tcp_rx.sby` proves. Its `cover` reaches each state, the end by the
+  last try, by a reset, and by the ACK of the FIN, the probe, and a new
+  connection replacing an open one.
 
 The checks in `rx_fifo.vhd`, `board_io.vhd`, `scr_regs.vhd`,
 `devices.vhd`, `mem.vhd`, `nicemon.vhd`, `eth/eth_tcp_timer.vhd`,
 `eth/eth_tcp_buf.vhd`, `eth/eth_tcp_pick.vhd`, `eth/eth_tcp_rx.vhd`,
 `eth/eth_tcp_tx.vhd`, `eth/rx_fcs.vhd`, `eth/eth_arb.vhd`,
-`eth/eth_rx_fifo.vhd`, and `eth/eth_tx_fifo.vhd` are in `G_FORMAL`
-blocks, which are off in simulation and synthesis.
+`eth/eth_rx_fifo.vhd`, `eth/eth_tx_fifo.vhd`, and `eth/eth_tcp.vhd` are
+in `G_FORMAL` blocks, which are off in simulation and synthesis.
 
 ## Testing the board
 

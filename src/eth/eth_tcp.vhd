@@ -124,6 +124,26 @@
 -- a) mac_i and ip_i stay stable while there is a connection.
 -- b) G_CLOCK_HZ is the clock's rate, at least 2000, for the timers.
 --
+-- With G_FORMAL, it states the properties that formal/eth_tcp.sby proves
+-- for the connection, with a free parser and chooser: the pointers of the
+-- send buffer stay in order, within the buffer, and not past fin_ptr
+-- while closing; the connection opens, and the link goes to it, only by
+-- the ACK of its SYN-ACK; rcv_nxt is the host's first number past the
+-- data committed and its FIN, and data is committed only from the peer,
+-- at rcv_nxt; every segment with data, a FIN, or another sequence number
+-- gets an ACK, which stays asked for until it is sent; una_seq is the
+-- number of the byte at una_ptr, which moves only to what an ACK covers;
+-- the host's window is taken only as RFC 9293 3.10.7.4 says; the
+-- connection ends only by a reset in the window, the last try, or the
+-- ACK of this side's FIN; the break comes once per connection, as the
+-- host's FIN comes or at the end without one; with ip_i at 0, nothing
+-- opens and nothing is sent; and the server keeps the contracts of the
+-- timer, the buffers, and the chooser. p_cmp's registers stand for the
+-- segment offered but in the cycle after it is stale. It assumes the
+-- parser's promise that a good segment whose data was written has had
+-- all of it written, and turns on the properties of the buffers and the
+-- timer.
+--
 -- RESET
 -- Synchronous, to clk_i. Reset drops the connection and empties both
 -- buffers.
@@ -138,7 +158,16 @@ entity eth_tcp is
    generic (
       G_CLOCK_HZ  : natural;
       G_PORT      : natural := 4510;
-      G_ADDR_BITS : natural := 11
+      G_ADDR_BITS : natural := 11;
+      -- The longest segment, the pause of the output that sends what
+      -- there is, the retransmission timeout, and its tries, smaller in
+      -- the formal job
+      G_MSS       : natural := 536;
+      G_IDLE      : natural := 64;
+      G_RTO_MS    : natural := 300;
+      G_TRIES     : natural := 17;
+      -- The properties for formal/eth_tcp.sby
+      G_FORMAL    : boolean := false
    );
    port (
       clk_i       : in  std_logic;
@@ -172,10 +201,10 @@ end entity eth_tcp;
 architecture synthesis of eth_tcp is
 
    constant C_SIZE     : natural := 2 ** G_ADDR_BITS;
-   constant C_MSS      : natural := 536;
-   constant C_IDLE     : natural := 64;
-   constant C_RTO_MS   : natural := 300;
-   constant C_TRIES    : natural := 17;
+   constant C_MSS      : natural := G_MSS;
+   constant C_IDLE     : natural := G_IDLE;
+   constant C_RTO_MS   : natural := G_RTO_MS;
+   constant C_TRIES    : natural := G_TRIES;
    constant C_TICK     : natural := G_CLOCK_HZ / 1000;
    constant C_WND_STEP : natural := C_SIZE / 2;
 
@@ -373,7 +402,8 @@ begin
    i_eth_tcp_buf : entity work.eth_tcp_buf
       generic map (
          G_ADDR_BITS => G_ADDR_BITS,
-         G_IDLE      => C_IDLE
+         G_IDLE      => C_IDLE,
+         G_FORMAL    => G_FORMAL
       )
       port map (
          clk_i       => clk_i,
@@ -431,7 +461,8 @@ begin
       generic map (
          G_TICK   => C_TICK,
          G_RTO_MS => C_RTO_MS,
-         G_TRIES  => C_TRIES
+         G_TRIES  => C_TRIES,
+         G_FORMAL => G_FORMAL
       )
       port map (
          clk_i       => clk_i,
@@ -839,5 +870,248 @@ begin
          end if;
       end if;
    end process p_tcp;
+
+
+   gen_formal : if G_FORMAL generate
+      -- A connection opened at the last edge, by a SYN or one that waited:
+      -- only accept leaves restart with the state SYN_RCVD_ST.
+      signal f_acc : std_logic;
+      -- The segment taken, against the connection as it is, not as p_cmp
+      -- has it: it is a SYN; it is good and acted on, from the peer of a
+      -- connection, and not a SYN; it is a reset in the window; it is
+      -- acted on as an ACK; and its ACK is of what was not sent
+      signal f_syn    : std_logic;
+      signal f_from   : boolean;
+      signal f_peer   : std_logic;
+      signal f_rst_in : std_logic;
+      signal f_acks   : std_logic;
+      signal f_unsent : std_logic;
+      signal f_k      : std_logic_vector(31 downto 0);
+      signal f_k_ptr  : t_ptr;
+      signal f_out    : t_ptr;
+      signal f_fin_ok : std_logic;
+      signal f_upd    : std_logic;
+      -- The segment's fields, for prev()
+      signal f_seq : std_logic_vector(31 downto 0);
+      signal f_ack : std_logic_vector(31 downto 0);
+      signal f_win : std_logic_vector(15 downto 0);
+      -- What a segment chosen carries: an ACK
+      signal f_pick_ack : std_logic;
+      -- una_seq past the SYN, against una_ptr past the base
+      signal f_una_off : std_logic_vector(31 downto 0);
+      -- The bytes written since the last commit or discard, and those
+      -- committed since the connection opened, with the bytes of a
+      -- commit in this cycle
+      signal f_wr   : natural range 0 to C_SIZE        := 0;
+      signal f_rcvd : std_logic_vector(31 downto 0) := (others => '0');
+      signal f_rx   : std_logic_vector(31 downto 0);
+      -- una_ptr when the connection opened
+      signal f_base  : t_ptr                         := (others => '0');
+      signal f_base0 : t_ptr;
+      -- The connection has had its break.
+      signal f_brk : std_logic := '0';
+      -- Where the segment being sent starts
+      signal f_seg_ptr : t_ptr := (others => '0');
+   begin
+
+      f_acc <= syn_rcvd and restart;
+
+      f_seq      <= f_seg.seq;
+      f_ack      <= f_seg.ack;
+      f_win      <= f_seg.win;
+      f_pick_ack <= '1' when pick /= X"00" and pick(2) = '0' else
+                    '0';
+      f_una_off  <= una_seq - iss - 1;
+
+      f_syn    <= f_seg.flags(1) and not f_seg.flags(4) and not f_seg.flags(2);
+      f_from   <= f_seg.host.ip = peer.ip and f_seg.host.tcp_port = peer.tcp_port;
+      f_peer   <= '1' when eval = '1' and good = '1' and ip_i /= 0 and f_syn = '0' and f_from and
+                           state /= LISTEN_ST else
+                  '0';
+      f_rst_in <= '1' when f_peer = '1' and f_seg.flags(2) = '1' and
+                           f_seg.seq - rcv_nxt < C_SIZE else
+                  '0';
+      f_k      <= f_seg.ack - una_seq;
+      f_k_ptr  <= f_k(G_ADDR_BITS downto 0);
+      f_out    <= max_ptr - una_ptr;
+      f_fin_ok <= '1' when fin_max = '1' and f_seg.ack = una_seq + (fin_ptr - una_ptr) + 1 else
+                  '0';
+      f_unsent <= '1' when f_peer = '1' and f_seg.flags(2) = '0' and f_seg.flags(4) = '1' and
+                           (syn_rcvd = '0' or f_seg.ack = iss + 1) and
+                           f_k(31) = '0' and f_k > f_out and f_fin_ok = '0' else
+                  '0';
+      f_acks   <= '1' when f_peer = '1' and f_seg.flags(2) = '0' and f_seg.flags(4) = '1' and
+                           (syn_rcvd = '0' or f_seg.ack = iss + 1) and f_unsent = '0' else
+                  '0';
+      -- RFC 9293 3.10.7.4: the window is taken from an ACK of what was
+      -- sent that is not older than the last one it was taken from.
+      f_upd <= '1' when f_acks = '1' and (f_k <= f_out or f_fin_ok = '1') and
+                           ((f_seg.seq - snd_wl1 /= 0 and (f_seg.seq - snd_wl1) < X"80000000") or
+                            (f_seg.seq = snd_wl1 and (f_seg.ack - snd_wl2) < X"80000000")) else
+                  '0';
+
+      f_rx    <= (f_rcvd and (31 downto 0 => not f_acc)) + f_wr when cmt = '1' else
+                 f_rcvd and (31 downto 0 => not f_acc);
+      f_base0 <= una_ptr when f_acc = '1' else
+                 f_base;
+
+      p_ghost : process (clk_i)
+      begin
+         if rising_edge(clk_i) then
+            f_rcvd <= f_rx;
+            f_base <= f_base0;
+
+            if cmt = '1' or discard = '1' then
+               f_wr <= 0;
+               if rx_we = '1' then
+                  f_wr <= 1;
+               end if;
+            elsif rx_we = '1' then
+               f_wr <= f_wr + 1;
+            end if;
+
+            if f_acc = '1' then
+               f_brk <= '0';
+            elsif brk_set = '1' then
+               f_brk <= '1';
+            end if;
+
+            if pick /= X"00" then
+               f_seg_ptr <= nxt_ptr;
+            end if;
+
+            if rst_i = '1' then
+               f_wr  <= 0;
+               f_brk <= '0';
+            end if;
+         end if;
+      end process p_ghost;
+
+      -- psl default clock is rising_edge(clk_i);
+
+      -- The parser's promise, which formal/eth_tcp_rx.sby proves: a good
+      -- segment whose data was written has had all of it written. The
+      -- free parser of eth_tcp.sby keeps it, but cannot see f_wr.
+      -- psl f_parser : assume always eval = '1' and good = '1' and wr_ok = '1' -> f_wr = plen;
+
+      -- psl f_state : assert always state = LISTEN_ST or state = SYN_RCVD_ST or state = EST_ST or
+      --    state = CLOSE_WAIT_ST or state = LAST_ACK_ST;
+
+      -- The pointers of the send buffer, in order
+      -- psl f_order : assert always nxt_ptr - una_ptr <= max_ptr - una_ptr and
+      --    max_ptr - una_ptr <= lim_ptr - una_ptr and lim_ptr - una_ptr <= tail_ptr - una_ptr and
+      --    tail_ptr - una_ptr <= C_SIZE;
+      -- psl f_buf_una : assert always una_ptr - buf_una <= tail_ptr - buf_una and
+      --    tail_ptr - buf_una <= C_SIZE;
+      -- psl f_seg_start : assert always busy = '1' ->
+      --    f_seg_ptr - buf_una <= tail_ptr - buf_una;
+      -- psl f_fin_ptr : assert always fin_max = '1' -> closing = '1' and max_ptr = fin_ptr;
+      -- psl f_fin_ack : assert always fin_ack = '1' -> una_ptr = max_ptr;
+      -- psl f_fin_ack_st : assert always fin_ack = '1' -> state = LAST_ACK_ST and fin_max = '1';
+      -- psl f_syn_fin : assert always syn_rcvd = '1' -> peer_fin = '0';
+      -- p_cmp has the segment against the connection as it is, but in the
+      -- cycle after the connection ended or the timer ran out.
+      -- psl f_cmp : assert always seg_valid = '1' and stale = '0' ->
+      --    from_peer = f_from and k = f_k and d1 = f_seg.seq - snd_wl1 and
+      --    seq_off = f_seg.seq - rcv_nxt and d2 = f_seg.ack - snd_wl2 and
+      --    f_end = f_seg.seq + plen and syn_acked = (f_seg.ack = iss + 1) and
+      --    fin_acked = (f_seg.ack = una_seq + (fin_ptr - una_ptr) + 1) and
+      --    rcv_end = rcv_nxt + plen and rcv_end1 = rcv_nxt + plen + 1 and
+      --    rcv_nxt1 = rcv_nxt + 1 and
+      --    seg_end = f_seg.seq + plen + f_seg.flags(1) + f_seg.flags(0);
+      -- psl f_pend : assert always pend = '1' -> estab = '1' and closing = '1';
+      -- psl f_sent : assert always busy = '1' -> tail_ptr - f_seg_ptr <= C_SIZE;
+
+      -- The connection opens only by the ACK of its SYN-ACK, and the link
+      -- goes to it no earlier.
+      -- psl f_keep : assert always keep = '1' -> syn_rcvd = '1';
+      -- psl f_estab : assert always {estab = '0' and rst_i = '0'} |=>
+      --    {estab = '0' or (prev(syn_rcvd) = '1' and prev(f_acks) = '1')};
+      -- psl f_conn : assert always {conn = '0' and rst_i = '0'} |=>
+      --    {conn = '0' or (prev(syn_rcvd) = '1' and prev(f_acks) = '1')};
+      -- psl f_timer : assert always timeout = '1' -> state /= LISTEN_ST;
+
+      -- The data received: rcv_nxt is the host's first number past the
+      -- data committed and its FIN, and data is committed only from the
+      -- peer, at rcv_nxt.
+      -- psl f_rcv_nxt : assert always state /= LISTEN_ST -> rcv_nxt = irs + 1 + f_rx + peer_fin;
+      -- psl f_cmt : assert always {eval = '1' and rst_i = '0'} |=>
+      --    {cmt = '0' or (prev(f_acks) = '1' and prev(f_seq) = prev(rcv_nxt))};
+      -- psl f_ack_req : assert always {((f_acks = '1' and (plen > 0 or f_seg.flags(0) = '1' or
+      --    f_seg.seq /= rcv_nxt)) or f_unsent = '1') and rst_i = '0'} |=> {ack_req};
+      -- psl f_ack_held : assert always {ack_req = '1' and rst_i = '0'} |=>
+      --    {ack_req = '1' or f_acc = '1' or prev(f_pick_ack) = '1'};
+
+      -- The data sent: una_seq is the number of the byte at una_ptr, which
+      -- moves only to what an ACK covers.
+      -- psl f_una_seq : assert always state /= LISTEN_ST ->
+      --    f_una_off(G_ADDR_BITS downto 0) = una_ptr - f_base0;
+      -- psl f_una : assert always {rst_i = '0'} |=>
+      --    {f_acc = '1' or una_ptr = prev(una_ptr) or
+      --     (prev(f_acks) = '1' and
+      --      ((prev(f_k) /= 0 and prev(f_k) <= prev(f_out) and una_seq = prev(f_ack) and
+      --        una_ptr = prev(una_ptr) + prev(f_k_ptr)) or
+      --       (prev(f_fin_ok) = '1' and una_seq = prev(f_ack) - 1 and
+      --        una_ptr = prev(max_ptr))))};
+      -- psl f_wnd : assert always {rst_i = '0'} |=>
+      --    {f_acc = '1' or
+      --     (snd_wnd = prev(snd_wnd) and snd_wl1 = prev(snd_wl1) and snd_wl2 = prev(snd_wl2)) or
+      --     (prev(f_upd) = '1' and snd_wnd = prev(f_win) and snd_wl1 = prev(f_seq) and
+      --      snd_wl2 = prev(f_ack))};
+
+      -- The end: by a reset in the window, the last try, or the ACK of
+      -- this side's FIN
+      -- psl f_ends : assert always {(syn_rcvd = '1' or estab = '1') and rst_i = '0'} |=>
+      --    {(state /= LISTEN_ST and f_acc = '0') or prev(f_rst_in) = '1' or
+      --     prev(timeout and last_try) = '1' or prev(ending) = '1' or
+      --     (prev(syn_rcvd) = '1' and prev(eval) = '1' and prev(f_syn) = '1')};
+      -- psl f_fin_acked : assert always {fin_ack = '0' and rst_i = '0'} |=>
+      --    {fin_ack = '0' or (prev(f_acks) = '1' and prev(state) = LAST_ACK_ST and
+      --     prev(f_fin_ok) = '1')};
+
+      -- The break: once per connection, as the host's FIN comes, or at
+      -- its end without one
+      -- psl f_brk_once : assert always brk_set = '1' -> f_brk = '0';
+      -- psl f_brk_peer : assert always f_acc = '0' and brk_set = '0' -> f_brk = peer_fin;
+      -- psl f_brk_fin : assert always {brk_set = '0' and rst_i = '0'} |=>
+      --    {brk_set = '0' or (peer_fin = '1' and prev(peer_fin) = '0') or
+      --     (f_acc = '1' and prev(estab) = '1' and prev(peer_fin) = '0')};
+
+      -- Without an IP address, nothing opens, and nothing is sent.
+      -- psl f_off : assert always ip_i = 0 -> state = LISTEN_ST and rst_req = '0' and pick = X"00";
+
+      -- The contracts of the timer, the buffers, and the chooser
+      -- psl f_timer_pulse : assert always {eval = '0' and ending = '0' and timeout = '0' and
+      --    rst_i = '0'} |=> {restart = '0' and tries_clr = '0'};
+      -- psl f_room : assert always rx_we = '1' -> rx_room > 0;
+      -- psl f_brk_cmt : assert always {brk_set and not rst_i} |=> {not cmt};
+      -- psl f_still : assert always {drop = '0' and pick = X"00" and rst_i = '0'} |=>
+      --    {nxt_ptr = prev(nxt_ptr) and una_ptr = prev(una_ptr) and una_seq = prev(una_seq) and
+      --     snd_wnd = prev(snd_wnd) and rcv_nxt = prev(rcv_nxt) and iss = prev(iss) and
+      --     peer.mac = prev(peer.mac) and peer.ip = prev(peer.ip) and
+      --     peer.tcp_port = prev(peer.tcp_port) and rst_host.mac = prev(rst_host.mac) and
+      --     rst_host.ip = prev(rst_host.ip) and rst_host.tcp_port = prev(rst_host.tcp_port) and
+      --     rst_num = prev(rst_num) and
+      --     fin_sent = prev(fin_sent) and closing = prev(closing) and probe = prev(probe) and
+      --     syn_req = prev(syn_req) and syn_rcvd = prev(syn_rcvd) and estab = prev(estab) and
+      --     rst_req = prev(rst_req) and rst_ack = prev(rst_ack) and
+      --     lim_ptr - prev(lim_ptr) <= 1};
+
+      -- psl c_syn_rcvd : cover {syn_rcvd = '1' and rst_i = '0'};
+      -- psl c_estab : cover {state = EST_ST and rst_i = '0'};
+      -- psl c_close_wait : cover {state = CLOSE_WAIT_ST and rst_i = '0'};
+      -- psl c_last_ack : cover {state = LAST_ACK_ST and rst_i = '0'};
+      -- psl c_closed : cover {fin_ack = '1' and ending = '1' and rst_i = '0'};
+      -- psl c_data : cover {cmt = '1' and f_wr = 2 and rst_i = '0'};
+      -- psl c_acked : cover {f_acks = '1' and f_k = 2 and rst_i = '0'};
+      -- psl c_fin_data : cover {f_acks = '1' and f_fin_ok = '1' and f_out /= 0 and rst_i = '0'};
+      -- psl c_replace : cover {f_acc = '1' and prev(estab) = '1' and prev(peer_fin) = '1' and
+      --    rst_i = '0'};
+      -- psl c_replace_brk : cover {f_acc = '1' and prev(estab) = '1' and brk_set = '1' and
+      --    rst_i = '0'};
+      -- psl c_probe : cover {pick(3) = '1' and probe = '1' and snd_wnd = 0 and rst_i = '0'};
+      -- psl c_tries : cover {timeout = '1' and last_try = '1' and estab = '1' and rst_i = '0'};
+      -- psl c_reset : cover {f_rst_in = '1' and estab = '1' and rst_i = '0'};
+   end generate gen_formal;
 
 end architecture synthesis;

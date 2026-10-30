@@ -1,0 +1,38 @@
+# The TCP server's connection, src/eth/eth_tcp.vhd (formal_eth_tcp.vhd),
+# with a free parser and a free chooser (eth_tcp_rx_free.vhd and
+# eth_tcp_pick_free.vhd), which GHDL binds as they are analyzed after the
+# real ones. "prove" proves the assertions for every cycle by k-induction,
+# and "cover" reaches each cover statement. The depths are in cycles: 8 is
+# the k of the induction, and 60 is how far "cover" looks, past the 30
+# that the end by the last try takes.
+
+[tasks]
+prove
+cover
+
+[options]
+prove: mode prove
+prove: depth 8
+cover: mode cover
+cover: depth 60
+
+[engines]
+smtbmc yices
+
+[script]
+plugin -i ghdl
+ghdl --std=08 -fpsl eth_pkg.vhd eth_ram.vhd eth_tcp_rx.vhd eth_tcp_rx_free.vhd eth_tcp_tx.vhd eth_tcp_pick.vhd eth_tcp_pick_free.vhd eth_tcp_buf.vhd eth_tcp_timer.vhd eth_tcp.vhd formal_eth_tcp.vhd -e formal_eth_tcp
+prep -top formal_eth_tcp
+
+[files]
+../src/eth/eth_pkg.vhd
+../src/eth/eth_ram.vhd
+../src/eth/eth_tcp_rx.vhd
+eth_tcp_rx_free.vhd
+../src/eth/eth_tcp_tx.vhd
+../src/eth/eth_tcp_pick.vhd
+eth_tcp_pick_free.vhd
+../src/eth/eth_tcp_buf.vhd
+../src/eth/eth_tcp_timer.vhd
+../src/eth/eth_tcp.vhd
+formal_eth_tcp.vhd

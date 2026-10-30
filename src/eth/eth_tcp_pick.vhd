@@ -40,9 +40,9 @@
 -- With G_FORMAL, it states the properties that formal/eth_tcp_pick.sby
 -- proves, under contract a): a segment is chosen only in B_PICK, and not
 -- while one is sent, and every one but a RST acknowledges; the SYN-ACK,
--- data, the FIN, and the RST are chosen only as the header says, and
--- data never beyond the data there is or the host's window, but for the
--- probe; and the sender is offered the connection's fields, its sequence
+-- data, the FIN, an ACK alone, and the RST are chosen only as the header
+-- says, and data never beyond the data there is or the host's window, but
+-- for the probe; and the sender is offered the connection's fields, its sequence
 -- number, and the length chosen, or the RST's fields and numbers, which
 -- stay until it takes them, in the cycle after the choice.
 --
@@ -316,6 +316,7 @@ begin
       --    syn_req_i = '1' and syn_rcvd_i = '1' and pick = (C_SYN or C_ACK);
       -- psl f_data : assert always pick(3) = '1' ->
       --    estab_i = '1' and pick_n > 0 and pick = (C_ACK or C_PSH);
+      -- psl f_ack_only : assert always pick = C_ACK -> estab_i = '1' and ack_req_i = '1';
       -- psl f_fin : assert always pick(0) = '1' ->
       --    estab_i = '1' and closing_i = '1' and nxt_ptr_i = lim_ptr_i and fin_sent_i = '0' and
       --    pick_n = 0 and pick = (C_FIN or C_ACK);
