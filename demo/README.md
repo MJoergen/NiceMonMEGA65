@@ -56,6 +56,14 @@ is always there, an ESC shows with the key after it. A function key with
 a demo starts that demo, so its bytes show only for a moment, or not at
 all. Past the last row, the rows scroll up by one.
 
+From nice_cpu V1.2 on, the demo runs in `niceemu --window` too, with
+the keys typed into the window, as on the board. After `make demo` and
+`make -C nice_cpu/emulator window`, run
+`nice_cpu/emulator/zig-out/bin/niceemu --window demo/build/demo.bin`. The
+window's keys send the bytes of the MEGA65's, but for the MEGA65's own
+keys, and the comet keeps its pace, as niceemu runs one step per
+microsecond. F11's self-test runs there too, but the Ethernet station's
+registers are plain memory there, so its counts stay 0.
 The characters and the colors check the font and the video output at a
 glance. On the left are the 256 characters of the font, ISO 8859-1, in 16
 rows of 16. A row's label is the code of its first character, and the

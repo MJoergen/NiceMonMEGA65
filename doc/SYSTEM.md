@@ -212,7 +212,11 @@ The words `0xFFFFFF83`, `84`, and `86`–`8F` read 0 and take no write. In
 the emulator these addresses are memory, so a program that writes them runs
 there too, without scrolling. Reset, and the clear of the memory (bit 2 of
 the control register, which `load.py` and `run.py` set), set the offset to
-0 and turn the cursor off, as at the start of the emulator.
+0 and turn the cursor off, as at the start of the emulator. From
+nice_cpu V1.2 on, `niceemu --window` draws the same cursor from these
+words, as nice_cpu's SYSTEM.md §1 says, but has no display offset.
+A column or row out of range shows no cursor there, where here only
+bits 6..0 of the column and 4..0 of the row are kept.
 
 A write of `0x000FFF41` to `0xFFFF0000` puts an `A` in the top left
 corner, white on black, and one of `0xF00FFF42` to `0xFFFF0001` a white `B`
@@ -226,7 +230,10 @@ the MEGA65. The HDMI output is DVI, without sound.
 The MEGA65's own keyboard types into the same input as the UART: what
 you type goes to the program while it runs or is paused, and is dropped
 while the core is held in reset or has halted. The keys give ASCII, as a
-terminal sends it:
+terminal sends it. nice_cpu's SYSTEM.md §1 defines the bytes of the keys
+that every keyboard has, which `niceemu --window` sends too, from
+nice_cpu V1.2 on, and the MEGA65's keyboard follows it. The table has
+the MEGA65's keys:
 
 | Key | Byte |
 |---|---|
