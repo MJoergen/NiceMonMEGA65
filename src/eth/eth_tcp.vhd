@@ -63,7 +63,9 @@
 -- data goes out in segments of at most C_MSS bytes, as much as the host's
 -- window takes, when there are C_MSS bytes or the output has paused for
 -- C_IDLE cycles, so that one answer of the link goes in few segments. An
--- ACK of the host frees the bytes it covers. If nothing new is
+-- ACK of the host frees the bytes it covers, for the link's output only
+-- once the segment that is being sent has gone (buf_una), as it may still
+-- read them, if the ACK came while it was sent again. If nothing new is
 -- acknowledged for C_RTO_MS, nxt_ptr goes back to una_ptr and the data is
 -- sent again (go-back-N), up to C_TRIES times, after which the connection
 -- is dropped. The SYN-ACK and the FIN are sent again in the same way.
@@ -184,6 +186,9 @@ architecture synthesis of eth_tcp is
    signal snd_wl1 : std_logic_vector(31 downto 0) := (others => '0');
    signal snd_wl2 : std_logic_vector(31 downto 0) := (others => '0');
    signal una_ptr : t_ptr                         := (others => '0');
+   -- una_ptr for the send buffer's room, which waits while a segment is
+   -- sent
+   signal buf_una : t_ptr                         := (others => '0');
    signal nxt_ptr : t_ptr                         := (others => '0');
    signal max_ptr : t_ptr                         := (others => '0');
    signal fin_ptr : t_ptr                         := (others => '0');
@@ -353,7 +358,7 @@ begin
          clk_i       => clk_i,
          rst_i       => rst_i,
          conn_i      => conn,
-         una_ptr_i   => una_ptr,
+         una_ptr_i   => buf_una,
          ltx_data_i  => ltx_data_i,
          ltx_valid_i => ltx_valid_i,
          ltx_ready_o => ltx_ready_o,
@@ -562,6 +567,9 @@ begin
       if rising_edge(clk_i) then
          isn       <= isn + 1;
          armed_r   <= armed;
+         if busy = '0' then
+            buf_una <= una_ptr;
+         end if;
          brk_set   <= '0';
          restart   <= '0';
          tries_clr <= '0';
@@ -801,6 +809,7 @@ begin
             restart   <= '0';
             tries_clr <= '0';
             armed_r   <= '0';
+            buf_una   <= (others => '0');
          end if;
       end if;
    end process p_tcp;

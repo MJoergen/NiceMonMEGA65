@@ -25,6 +25,8 @@
 #                         filter and the answers to ARP requests and pings.
 #             tb_eth_tcp  the TCP server of the debug link, with a host
 #                         modeled in VHDL.
+#             tb_eth_tcp_random  the same, with random actions instead
+#                         of its steps; SEED=n picks another run.
 #             It also checks that GHDL can synthesize the system, the
 #             keyboards, the text display (through text_synth.vhd, in
 #             the boards' mode, with 15 and 13 screen address bits), and system.vhd as the Nexys4DDR has it, and the display and RGB LED drivers.
@@ -66,7 +68,7 @@ SRC_SOURCES  = ../src/uart_serdes.vhd ../src/rx_fifo.vhd ../src/ram.vhd ../src/r
 SOURCES      = $(SRC_SOURCES) text_synth.vhd tb_hello.vhd tb_nicemon.vhd tb_kbd.vhd tb_ps2.vhd tb_ps2_nicemon.vhd tb_text.vhd tb_board_io.vhd tb_rmii_rx.vhd tb_rx_fcs.vhd tb_eth_rx_fifo.vhd \
                tb_eth_tx_fifo.vhd tb_rmii_tx.vhd tb_eth.vhd tb_eth_tcp.vhd
 
-.PHONY: test cosim check-steps check-fmt analyze synth clean tb_hello tb_nicemon tb_kbd tb_ps2 tb_ps2_nicemon tb_text tb_board_io tb_rmii_rx tb_rx_fcs tb_eth_rx_fifo tb_eth_tx_fifo tb_rmii_tx tb_eth tb_eth_tcp \
+.PHONY: test cosim check-steps check-fmt analyze synth clean tb_hello tb_nicemon tb_kbd tb_ps2 tb_ps2_nicemon tb_text tb_board_io tb_rmii_rx tb_rx_fcs tb_eth_rx_fifo tb_eth_tx_fifo tb_rmii_tx tb_eth tb_eth_tcp tb_eth_tcp_random \
         synth-nicemon synth-nicemon-norom synth-kbd_m65 synth-kbd_m65_ascii synth-kbd_ps2 \
         synth-kbd_ps2_ascii synth-text \
         synth-system synth-seg7 synth-rgb_pwm
@@ -74,7 +76,7 @@ SOURCES      = $(SRC_SOURCES) text_synth.vhd tb_hello.vhd tb_nicemon.vhd tb_kbd.
 # Each testbench and each synthesis check is a target of its own, so that
 # "make -j test" runs them side by side. They share the work library of
 # $(BUILD), which "analyze" writes first and they only read.
-test: synth tb_hello tb_nicemon tb_kbd tb_ps2 tb_ps2_nicemon tb_text tb_board_io tb_rmii_rx tb_rx_fcs tb_eth_rx_fifo tb_eth_tx_fifo tb_rmii_tx tb_eth tb_eth_tcp check-steps check-fmt
+test: synth tb_hello tb_nicemon tb_kbd tb_ps2 tb_ps2_nicemon tb_text tb_board_io tb_rmii_rx tb_rx_fcs tb_eth_rx_fifo tb_eth_tx_fifo tb_rmii_tx tb_eth tb_eth_tcp tb_eth_tcp_random check-steps check-fmt
 
 # The column layout of nice_cpu's NICE assembly; nicefmt.py --write fixes it
 check-fmt:
@@ -122,6 +124,14 @@ tb_ps2_nicemon: analyze $(BUILD)/fifo.bin $(BUILD)/switch.bin
 
 tb_kbd tb_ps2 tb_text tb_board_io tb_rmii_rx tb_rx_fcs tb_eth_rx_fifo tb_eth_tx_fifo tb_rmii_tx tb_eth tb_eth_tcp: analyze
 	@(cd $(BUILD) && $(GHDL) --elab-run $(GHDLFLAGS) $@ > $@.log 2>&1) && \
+	  echo "PASS $@" || (echo "FAIL $@"; cat $(BUILD)/$@.log; exit 1)
+
+# tb_eth_tcp's random stage, a target of its own so that it runs beside
+# the steps; SEED=n picks another run.
+SEED ?= 1
+tb_eth_tcp_random: analyze
+	@(cd $(BUILD) && $(GHDL) --elab-run $(GHDLFLAGS) tb_eth_tcp -gG_RANDOM=true -gG_SEED=$(SEED) \
+	  > $@.log 2>&1) && \
 	  echo "PASS $@" || (echo "FAIL $@"; cat $(BUILD)/$@.log; exit 1)
 
 # Checks that GHDL can synthesize the system, with rom.bin as its ROM and

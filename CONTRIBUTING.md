@@ -237,7 +237,17 @@ The testbenches are these:
   must run only while there is a connection, an ACK of the FIN must free
   the data before it, also when it covers both at once, and the server
   must keep the contracts that the formal jobs of its timer, buffers,
-  and chooser assume.
+  and chooser assume, and the link's output must not overwrite a
+  segment while it is sent.
+- `make -C sim tb_eth_tcp_random`, part of `make test`, runs the same
+  testbench with `G_RANDOM`: 2500 random actions on one connection
+  whose sequence numbers cross 2^32. The host sends data at random
+  offsets, old, overlapping, ahead, with options, and with a wrong
+  checksum, and ACKs and windows that never move its right edge back,
+  while the link side sends at random, stops taking input, and the host
+  stops taking frames or waits for a timeout. Every segment is checked,
+  and at the end everything sent each way must have come, in order,
+  once. `SEED=n` picks another run.
 - `make test` also checks that GHDL can synthesize the system, with
   `sim/rom.nasm` as its ROM and without a ROM, the keyboards, the text
   display, and `src/system.vhd` with the screen and the devices of the

@@ -14,8 +14,12 @@
 -- The frames have a gap in rx_valid after every 13th byte, the SYNs
 -- carry the options of Linux, and some data segments carry options too.
 -- p_probe checks, in every cycle, that the retransmission timer runs only
--- while there is a connection, and that an ACK of this side's FIN frees
--- the data before it, as when the ACK covers both at once.
+-- while there is a connection, that an ACK of this side's FIN frees the
+-- data before it, as when the ACK covers both at once, that the link's
+-- output does not overwrite a segment while it is sent, and that the
+-- server keeps the contracts that the formal jobs of its parts assume.
+-- With G_RANDOM, the random stage replaces the steps: G_STEPS random
+-- actions on one connection, from G_SEED (random_stage in p_host).
 -- The steps:
 --   * a SYN while the IP address is 0, or to another port, gets nothing
 --   * a SYN gets a SYN-ACK, which comes again when the host does not
@@ -69,6 +73,7 @@
 library ieee;
    use ieee.std_logic_1164.all;
    use ieee.numeric_std_unsigned.all;
+   use ieee.math_real.all;
 
    use std.env.all;
 
@@ -76,6 +81,13 @@ library work;
    use work.eth_pkg.all;
 
 entity tb_eth_tcp is
+   generic (
+      -- The random stage instead of the steps, with its seed and its
+      -- number of actions
+      G_RANDOM : boolean  := false;
+      G_SEED   : positive := 1;
+      G_STEPS  : natural  := 2500
+   );
 end entity tb_eth_tcp;
 
 architecture simulation of tb_eth_tcp is
@@ -423,6 +435,8 @@ begin
       alias syn_req   is << signal .tb_eth_tcp.i_eth_tcp.syn_req : std_logic >>;
       alias rst_req   is << signal .tb_eth_tcp.i_eth_tcp.rst_req : std_logic >>;
       alias rst_ack   is << signal .tb_eth_tcp.i_eth_tcp.rst_ack : std_logic >>;
+      alias busy      is << signal .tb_eth_tcp.i_eth_tcp.busy : std_logic >>;
+      alias seg_ptr   is << signal .tb_eth_tcp.i_eth_tcp.i_eth_tcp_pick.seg_ptr : std_logic_vector >>;
 
       -- The numbers that the chooser takes, which change only at a drop or
       -- a pick
@@ -484,6 +498,11 @@ begin
             assert to_integer(tail_ptr - una_ptr) <= C_SIZE
                report "tb_eth_tcp: FAIL, more output than the buffer"
                severity failure;
+            -- The link's output does not overwrite the segment being sent.
+            assert busy = '0' or ltx_valid = '0' or ltx_ready = '0' or
+                   to_integer(tail_ptr - seg_ptr) < C_SIZE
+               report "tb_eth_tcp: FAIL, output over the segment being sent"
+               severity failure;
             -- The chooser's: the pointers in order
             assert to_integer(nxt_ptr - una_ptr) <= to_integer(lim_ptr - una_ptr) and
                    to_integer(lim_ptr - una_ptr) <= C_SIZE
@@ -525,6 +544,9 @@ begin
       variable f_v     : t_frame;
       variable old_v   : std_logic_vector(31 downto 0);
       variable nb_v    : natural;
+      -- The seeds of the random stage
+      variable s1_v : positive := G_SEED;
+      variable s2_v : positive := 4510;
       -- The server's initial sequence number, a cycle counter, which a
       -- step sets near 2^32
       alias isn is << signal .tb_eth_tcp.i_eth_tcp.isn : std_logic_vector >>;
@@ -732,11 +754,253 @@ begin
             severity failure;
       end procedure link_out;
 
+      -- A random natural below n
+      procedure random (
+         n : natural;
+         r : out natural
+      ) is
+         variable x_v : real;
+      begin
+         uniform(s1_v, s2_v, x_v);
+         r := integer(floor(x_v * real(n)));
+         if r >= n then
+            r := n - 1;
+         end if;
+      end procedure random;
+
+      -- The random stage: one connection, with sequence numbers across
+      -- 2^32, and G_STEPS random actions of the host and the link side.
+      -- The host's data is at its stream offset, so a segment sent again
+      -- or overlapping carries the right bytes. The host checks every
+      -- segment: its ACK is of no more than the host has sent, and never
+      -- goes back; its data is the link side's at its offset, only what
+      -- the link side has given, and within the host's right edge, but
+      -- for a probe of one byte. The host never moves its right edge back.
+      -- At the end, everything sent each way arrives, in order, once.
+      procedure random_stage is
+         -- The host's stream: its base, the end of what it has sent, and
+         -- what the server has acknowledged
+         variable hbase_v : std_logic_vector(31 downto 0);
+         variable hmax_v  : natural := 0;
+         variable hack_v  : natural := 0;
+         -- The server's stream: its base, the end of what has come in
+         -- order, what the host has acknowledged, and its right edge
+         variable bbase_v : std_logic_vector(31 downto 0);
+         variable brcv_v  : natural := 0;
+         variable back_v  : natural := 0;
+         variable redge_v : natural := 0;
+         variable r_v     : natural;
+         variable a_v     : natural;
+         variable o_v     : natural;
+         variable len_v   : natural;
+         variable win_r   : natural;
+         variable opts_v  : natural;
+         variable d_v     : std_logic_vector(31 downto 0);
+         variable n_try_v : natural;
+
+         -- Takes the segments that came, and checks them
+         procedure drain is
+         begin
+            while n_got > n_seen_v loop
+               expect(0 ns, 40300);
+               assert (flags_v = C_ACK and n_v = 0) or (flags_v = X"18" and n_v > 0)
+                  report "tb_eth_tcp: FAIL, random: flags " & to_hstring(flags_v)
+                  severity failure;
+               d_v := ack_v - hbase_v;
+               assert d_v(31) = '0' and to_integer(d_v) <= hmax_v and to_integer(d_v) >= hack_v
+                  report "tb_eth_tcp: FAIL, random: an ACK of what was not sent, or back"
+                  severity failure;
+               hack_v := to_integer(d_v);
+               if n_v > 0 then
+                  d_v := seq_v - bbase_v;
+                  assert d_v(31) = '0'
+                     report "tb_eth_tcp: FAIL, random: data before the stream"
+                     severity failure;
+                  o_v := to_integer(d_v);
+                  assert o_v + n_v <= n_ltx
+                     report "tb_eth_tcp: FAIL, random: data that the link side did not give"
+                     severity failure;
+                  assert o_v + n_v <= redge_v + 1
+                     report "tb_eth_tcp: FAIL, random: data beyond the host's window"
+                     severity failure;
+                  for i in 0 to n_v - 1 loop
+                     assert f_v.b(54 + i) = to_stdlogicvector((o_v + i) mod 251, 8)
+                        report "tb_eth_tcp: FAIL, random: wrong data"
+                        severity failure;
+                  end loop;
+                  if o_v <= brcv_v and o_v + n_v > brcv_v then
+                     brcv_v := o_v + n_v;
+                  end if;
+               end if;
+            end loop;
+            assert conn = '1'
+               report "tb_eth_tcp: FAIL, random: the connection ended"
+               severity failure;
+         end procedure drain;
+
+         -- Waits for t, taking the segments as they come
+         procedure pause (
+            t : time
+         ) is
+            variable w_v : time;
+         begin
+            w_v := 0 ns;
+            while w_v < t loop
+               wait for 2 us;
+               w_v := w_v + 2 us;
+               drain;
+            end loop;
+         end procedure pause;
+
+         -- The window of a segment of the host, which keeps its right edge
+         procedure window (
+            w : out natural
+         ) is
+            variable w_v : natural;
+         begin
+            random(10, r_v);
+            if r_v = 0 then
+               w_v := 0;
+            elsif r_v < 4 then
+               random(1000, w_v);
+               w_v := w_v + 1;
+            else
+               w_v := 8192;
+            end if;
+            if back_v + w_v < redge_v then
+               w_v := redge_v - back_v;
+            end if;
+            redge_v := back_v + w_v;
+            w       := w_v;
+         end procedure window;
+
+         -- A segment of the host's stream from offset o, of n bytes
+         procedure host_seg (
+            o    : natural;
+            n    : natural;
+            bad  : boolean;
+            opts : natural
+         ) is
+         begin
+            window(win_r);
+            send(seg(C_HIP, C_PORT, 40300, hbase_v + o, bbase_v + back_v, C_ACK, win_r, n, o,
+                     bad, C_IP, opts));
+            if not bad and o + n > hmax_v then
+               hmax_v := o + n;
+            end if;
+         end procedure host_seg;
+
+      begin
+         -- Both sides' sequence numbers start below 2^32, the host's within
+         -- 4K of it, and the server's within 64K, as more goes out.
+         random(65536, r_v);
+         wait until rising_edge(clk);
+         isn <= force X"FFFF0000" + r_v;
+         wait until rising_edge(clk);
+         isn <= release;
+         random(4096, r_v);
+         open_conn(40300, X"FFFFF000" + r_v);
+         hbase_v := hseq_v;
+         bbase_v := bseq_v;
+         redge_v := 8192;
+         if conn = '0' then
+            wait until conn = '1' for 10 us;
+         end if;
+
+         for step in 1 to G_STEPS loop
+            random(100, a_v);
+            if a_v < 35 then
+               -- Data, from before what was acknowledged to past what was
+               -- sent, sometimes with options or a wrong checksum
+               random(201, r_v);
+               if r_v > hack_v then
+                  r_v := hack_v;
+               end if;
+               o_v := hack_v - r_v;
+               random(hmax_v - o_v + 601, r_v);
+               o_v := o_v + r_v;
+               random(C_MSS + 1, len_v);
+               random(5, opts_v);
+               if opts_v > 3 then
+                  opts_v := 0;
+               end if;
+               random(20, r_v);
+               host_seg(o_v, len_v, r_v = 0, opts_v);
+            elsif a_v < 60 then
+               -- An ACK, mostly of all that has come in order
+               random(4, r_v);
+               if r_v = 0 then
+                  random(brcv_v - back_v + 1, r_v);
+                  back_v := back_v + r_v;
+               else
+                  back_v := brcv_v;
+               end if;
+               host_seg(hack_v, 0, false, 0);
+            elsif a_v < 75 then
+               -- Output of the link side
+               random(1500, r_v);
+               ltx_req <= ltx_req + r_v;
+            elsif a_v < 80 then
+               -- The link side stops or starts taking input.
+               random(3, r_v);
+               if r_v = 0 and hold = '0' then
+                  hold <= '1';
+               else
+                  hold <= '0';
+               end if;
+            elsif a_v < 84 then
+               -- The host takes no frames for a while.
+               random(100, r_v);
+               tx_stop <= '1';
+               wait for r_v * 1 us;
+               tx_stop <= '0';
+            elsif a_v < 85 then
+               -- A wait long enough for a timeout
+               random(2 * C_RTO / 1 us, r_v);
+               pause(r_v * 1 us);
+            else
+               random(50, r_v);
+               pause(r_v * 1 us + 1 us);
+            end if;
+            drain;
+         end loop;
+
+         -- The end: the host sends what is missing and acknowledges all,
+         -- until everything sent each way has come.
+         hold    <= '0';
+         tx_stop <= '0';
+         n_try_v := 0;
+         while not (hack_v = hmax_v and n_log = hmax_v and brcv_v = ltx_req and
+                    n_ltx = ltx_req) loop
+            assert n_try_v < 2000
+               report "tb_eth_tcp: FAIL, random: the streams did not finish"
+               severity failure;
+            n_try_v := n_try_v + 1;
+            back_v  := brcv_v;
+            len_v   := hmax_v - hack_v;
+            if len_v > C_MSS then
+               len_v := C_MSS;
+            end if;
+            host_seg(hack_v, len_v, false, 0);
+            pause(20 us);
+         end loop;
+         assert not lrx_bad and n_break = 0
+            report "tb_eth_tcp: FAIL, random: the link got wrong bytes, or a break"
+            severity failure;
+         report "tb_eth_tcp: PASS, random, seed " & integer'image(G_SEED) & ", " &
+                integer'image(hmax_v) & " bytes in and " & integer'image(brcv_v) & " out, " &
+                integer'image(n_got) & " segments";
+         finish;
+      end procedure random_stage;
+
    begin
       wait for 100 ns;
       wait until rising_edge(clk);
       rst <= '0';
       wait for 100 ns;
+      if G_RANDOM then
+         random_stage;
+      end if;
 
       -- Nothing while the IP address is 0, and nothing to another port
       ip <= X"00000000";
