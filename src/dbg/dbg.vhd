@@ -185,9 +185,9 @@ architecture synthesis of dbg is
    end function row;
 
    function cells return t_cells is
-      constant C_FIX  : t_cell := (kind => CELL_FIX, idx => 0, nib => 0, ch => to_byte(' '));
-      variable res_v  : t_cells := (others => C_FIX);
-      variable c_v    : natural;
+      constant C_FIX : t_cell := (kind => CELL_FIX, idx => 0, nib => 0, ch => to_byte(' '));
+      variable res_v : t_cells := (others => C_FIX);
+      variable c_v   : natural;
    begin
       -- Rows 25 and 26: R0-R7 and R8-R15, a word in 8 digits and a space
       for r in 0 to 1 loop
@@ -273,7 +273,7 @@ architecture synthesis of dbg is
       constant C_F   : string := " F1 step  F3 go  F5 pause  F7 hold  F9 restart  F12 strip  " &
                                  G_TOGGLE_KEY & " to ";
       constant C_R   : t_strings3 := (row(C_F & "off"), row(C_F & "strip"),
-                                      row(" The keys are the program's.  " & G_TOGGLE_KEY & " for the debugger"));
+         row(" The keys are the program's.  " & G_TOGGLE_KEY & " for the debugger"));
       variable res_v : t_keys;
    begin
       for k in 0 to 2 loop
@@ -539,7 +539,7 @@ begin
          req_valid <= '1';
          req_we    <= '0';
          req_addr  <= addr;
-         req_n     <= to_slv(n, 16);
+         req_n     <= std_logic_vector(to_unsigned(n, 16));
          rd_idx    <= 0;
       end procedure read;
 
