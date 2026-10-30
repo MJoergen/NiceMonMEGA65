@@ -1,7 +1,8 @@
 -- The part of the top level that is the same on all MEGA65 boards: the clock
 -- and reset, the keyboard, the system (src/system.vhd: the NiceMon system and
 -- the text display of its screen, with the UART), and the video outputs. The
--- keyboard types into the same input as the UART.
+-- keyboard types into the same input as the UART, and MEGA+HELP toggles the
+-- on-board debugger (src/kbd_m65_toggle.vhd, doc/DEBUGGER.md).
 -- The keyboard's power LED is green, and its drive LED is green while the
 -- core runs, like the user LED.
 --
@@ -93,6 +94,7 @@ architecture synthesis of mega65 is
    signal kbd_valid  : std_logic;
    signal kbd_ready  : std_logic;
    signal kbd_data   : std_logic_vector(7 downto 0);
+   signal kbd_toggle : std_logic;
    signal drive_rgb  : std_logic_vector(23 downto 0);
 
    signal led_reg : std_logic := '0';
@@ -185,6 +187,17 @@ begin
          data_o       => kbd_data
       ); -- i_kbd_m65_ascii
 
+   i_kbd_m65_toggle : entity work.kbd_m65_toggle
+      generic map (
+         G_CLOCK_HZ => C_CLOCK_HZ
+      )
+      port map (
+         clk_i    => clk,
+         rst_i    => rst,
+         matrix_i => kbd_matrix,
+         toggle_o => kbd_toggle
+      ); -- i_kbd_m65_toggle
+
 
    i_video_clk : entity work.video_clk
       port map (
@@ -211,6 +224,7 @@ begin
          kbd_ready_o  => kbd_ready,
          kbd_data_i   => kbd_data,
          running_o    => running,
+         dbg_toggle_i => kbd_toggle,
          eth_clk_i    => eth_clk,
          eth_rst_i    => eth_rst,
          eth_rxd_i    => eth_rxd_i,

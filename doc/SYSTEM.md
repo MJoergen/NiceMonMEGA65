@@ -181,7 +181,9 @@ for it is the only device that raises one.
 
 The screen at `0xFFFF0000` is shown on the VGA connector and on the HDMI
 connector, at 1280×1024 and 60 Hz, as 80 columns and 25 rows of characters
-of 16×32 pixels, in the middle of the picture. Word `80 * row + column` is
+of 16×32 pixels. Under them are the 4 rows of the on-board debugger's
+strip ([DEBUGGER.md](DEBUGGER.md)), black unless it is shown, and the 29
+rows are in the middle of the picture, 48 black lines from its top. Word `80 * row + column` is
 one character: its code, ISO 8859-1, in bits 7..0, and its color above. The
 color is two 12-bit colors, red, green, and blue with 4 bits each, as in
 nice_cpu's `doc/SYSTEM.md` §1: the background in bits 31..20 and the
@@ -251,7 +253,9 @@ the MEGA65's keys:
 | SHIFT with `0`, `=`, `:`, `;` | `{`, `}`, `[`, `]` |
 
 A held key repeats after half a second, 20 times a second. F13, HELP,
-CLR/HOME, and the modifiers give nothing. The keyboard's drive
+CLR/HOME, and the modifiers give nothing. MEGA and HELP together toggle the
+on-board debugger ([DEBUGGER.md](DEBUGGER.md)), and while it is up the
+keys go to it, not to the core. The keyboard's drive
 LED is green while the core runs, like the user LED.
 
 The bytes of a key wait until the core's input has room for them, and
@@ -294,7 +298,8 @@ same input (the board's PIC24 turns it into PS/2). Its keys give the same
 bytes, for a US layout: Enter is CR, Backspace and Delete are DEL, the
 cursor keys are `ESC [ A` to `ESC [ D`, F1 to F12 are as on the MEGA65,
 also with SHIFT, and CTRL with a letter is its control code. The keypad gives its digits and symbols, whatever Num Lock
-is. A held key repeats as the keyboard repeats it. The keyboard's LEDs are
+is. Scroll Lock gives nothing, and toggles the on-board debugger, as MEGA
+and HELP do on the MEGA65. A held key repeats as the keyboard repeats it. The keyboard's LEDs are
 not set, so the CAPS LOCK LED does not show whether CAPS LOCK is on. A PS/2
 keyboard can't wait, so keys typed while the core's input is full are
 lost: the bytes of one key wait until there is room, and the keys typed

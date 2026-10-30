@@ -23,6 +23,11 @@ entity text_synth is
       cur_y_i     : in  std_logic_vector(4 downto 0);
       cur_mode_i  : in  std_logic_vector(2 downto 0);
       offs_i      : in  std_logic_vector(G_SCR_ADDR_BITS - 1 downto 0);
+      ovl_we_i    : in  std_logic;
+      ovl_addr_i  : in  std_logic_vector(11 downto 0);
+      ovl_data_i  : in  std_logic_vector(31 downto 0);
+      strip_i     : in  std_logic;
+      page_i      : in  std_logic;
       vga_clk_i   : in  std_logic;
       vga_hs_o    : out std_logic;
       vga_vs_o    : out std_logic;
@@ -52,6 +57,11 @@ begin
          cur_y_i     => cur_y_i,
          cur_mode_i  => cur_mode_i,
          offs_i      => offs_i,
+         ovl_we_i    => ovl_we_i,
+         ovl_addr_i  => ovl_addr_i,
+         ovl_data_i  => ovl_data_i,
+         strip_i     => strip_i,
+         page_i      => page_i,
          vga_clk_i   => vga_clk_i,
          vga_hs_o    => vga_hs_o,
          vga_vs_o    => vga_vs_o,

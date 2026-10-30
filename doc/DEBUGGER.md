@@ -2,9 +2,10 @@
 
 A debugger in the FPGA, with the MEGA65's own keyboard and screen and no
 host: what `tools/mon.py` does over the debug link, in a strip of text
-under the program's screen, and a page over it. **It is planned and not
-written yet**
-([#52](https://github.com/MJoergen/NiceMonMEGA65/issues/52)). This note
+under the program's screen, and a page over it. **Stage 1, the overlay,
+is written, and the rest is planned**
+([#52](https://github.com/MJoergen/NiceMonMEGA65/issues/52)): the toggle
+key shows a fixed strip, with no link yet. This note
 records the design and the decisions, as
 [monitor/README.md](../monitor/README.md) does for the ROM of
 [#24](https://github.com/MJoergen/NiceMonMEGA65/issues/24), a hardware
@@ -69,7 +70,8 @@ picture moves up 64 lines, in every state, and nothing jumps when the
 strip appears. `C_Y0` becomes `(v_visible - 29 * 32) / 2`, and the
 assert that the text fits counts 29 rows.
 
-The strip, rows 25 to 28, is black in Off. In Strip and Focus:
+The strip, rows 25 to 28, is black in Off. In Strip and Focus it is white
+on dark blue, `0x004` and `0xFFF`:
 
 ```
  R0-7   00000000 00000001 0000FFFF 00000010 00000000 00000000 00000000 00000000
@@ -169,13 +171,14 @@ and outputs, and its room.
 
 - **The toggle is Scroll Lock.** The board has a USB keyboard, which its
   PIC24 turns into PS/2 (`src/kbd_ps2.vhd`), and no key matrix, so the
-  detector in `synth/nexys4ddr/top.vhd` parses the scan codes. Scroll
+  detector, `src/kbd_ps2_toggle.vhd`, parses the scan codes. Scroll
   Lock is `7E`, one byte with a plain release, gives nothing today, and
   should come through the converter as any key does; Pause, the key
   meant for this, has an eight-byte code without a release, and the
   converter may not pass it. The parser pulses on a `7E` that did not
   follow `F0`, the release prefix, and arms again only after `F0 7E`, so
-  the keyboard's repeats of a held key toggle once. The first test on
+  the keyboard's repeats of a held key toggle once. It ignores a `7E`
+  after `E0`, which is part of Ctrl+Break. The first test on
   the board is the toggle itself: the demo's key-code page cannot show a
   key that gives nothing.
 - **In Focus, the buttons and the seven-segment display are the
@@ -193,11 +196,13 @@ and outputs, and its room.
   LEDs stay the program's.
 - **Row 28 names the board's toggle key**, from a generic of the
   debugger.
-- **Room.** 87 of the 135 block RAMs are used without a ROM and 119
-  with one, so the overlay's 4 leave 16 at the least. The system clock
-  is 90 MHz on a -1 part, built with retiming, with 0.059 ns of setup
-  and 0.015 ns of hold slack, and the slacks move with placement more
-  than with logic ([synth/README.md](../synth/README.md#timing)): every
+- **Room.** With stage 1, 92 of the 135 block RAMs are used without a
+  ROM and 124 with one, so 11 are left at the least: the overlay took 4,
+  and Vivado put the PS/2 table into one more
+  ([synth/README.md](../synth/README.md#block-ram)). The system clock
+  is 90 MHz on a -1 part, built with retiming; the build of stage 1 has
+  0.289 ns of setup and 0.029 ns of hold slack, and the slacks move with
+  placement more than with logic ([synth/README.md](../synth/README.md#timing)): every
   stage rebuilds `make nexys4ddr` and reads its timing, and a miss there
   is a placement re-roll before it is a design error.
 - The screen is 8K words, so the RAM behind it starts at `0xFFFF2000`.
@@ -264,13 +269,13 @@ cut-off host.
   with `G_BOARD_IO`, the buttons masked by `focus_o` to `nicemon` and
   raw to the debugger, and the debugger's segments to the board in Focus
   (see [The Nexys4DDR](#the-nexys4ddr)).
-- `synth/mega65/mega65.vhd`: the MEGA+HELP detector on `kbd_m65`'s
-  matrix, keys 61 and 67, both pressed in two samples 5 ms apart as
-  `kbd_m65_ascii.vhd` debounces, a pulse on the press and none while
-  held. Neither key gives a byte, so the combination sends nothing to
-  the program.
-- `synth/nexys4ddr/top.vhd`: the Scroll Lock detector on the scan codes
-  (see [The Nexys4DDR](#the-nexys4ddr)).
+- `src/kbd_m65_toggle.vhd`, in `synth/mega65/mega65.vhd`: the MEGA+HELP
+  detector on `kbd_m65`'s matrix, keys 61 and 67, both pressed in two
+  samples 5 ms apart as `kbd_m65_ascii.vhd` debounces, a pulse on the
+  press and none while held. Neither key gives a byte, so the
+  combination sends nothing to the program.
+- `src/kbd_ps2_toggle.vhd`, in `synth/nexys4ddr/top.vhd`: the Scroll Lock
+  detector on the scan codes (see [The Nexys4DDR](#the-nexys4ddr)).
 - `src/kbd_m65_ascii.vhd` and `src/kbd_ps2_ascii.vhd`: the bytes of
   Page Up, Page Down, and Home, and MEGA as a modifier.
 
@@ -292,9 +297,9 @@ free.
 - `tb_dbg`: the debugger with `nicemon`, driven by keyboard bytes and
   toggle pulses, checking the overlay's words and the link's state. The
   program under it is one of `sim/`'s `.nasm` files.
-- `tb_kbd` and `tb_ps2`: Page Up, Page Down, and Home from both
-  keyboards; `tb_ps2_nicemon`, or a case of `tb_dbg` with scan codes:
-  the Scroll Lock parser, with a held key's repeats and its release.
+- `tb_kbd` and `tb_ps2`: the two toggle detectors, with a held key's
+  repeats and its release, and one key of MEGA+HELP alone; and Page Up,
+  Page Down, and Home from both keyboards.
 - Formal: the packets of `dbg_host` are well formed, with the parser of
   `debug_link.vhd`'s FORMAL block as the model.
 - `make hwtest`, a stretch goal: a register of `board_io.vhd` at
@@ -312,12 +317,13 @@ come.
 
 Each a commit that builds and passes the tests:
 
-1. **The overlay.** `text.vhd` gets the 29 rows, the overlay memory, and
-   its ports; `dbg.vhd` writes a fixed strip when the toggle pulse
-   arrives; `mega65.vhd` gets the MEGA+HELP detector and
-   `nexys4ddr/top.vhd` the Scroll Lock detector; `system.vhd` the
-   keyboard mux. No link involved. Tests: `tb_text`'s picture, and the
-   first case of `tb_dbg`.
+1. **The overlay** (done). `text.vhd` gets the 29 rows, the overlay
+   memory, and its ports; `dbg.vhd` writes a fixed strip after reset,
+   which the toggle pulse shows and hides; `mega65.vhd` gets the
+   MEGA+HELP detector and `nexys4ddr/top.vhd` the Scroll Lock detector,
+   entities of their own; `system.vhd` the keyboard mux. No link
+   involved. Tests: `tb_text`'s picture, the first case of `tb_dbg`, and
+   the detectors in `tb_kbd` and `tb_ps2`.
 2. **The host in hardware.** `dbg_host.vhd`, the third input of the mux
    in `nicemon.vhd`, and the formal check. Test: `tb_dbg_host`.
 3. **The live strip and the core keys.** The refresh of the control
@@ -382,6 +388,11 @@ Made on 2026-10-30, with the reasons:
 - **The Nexys4DDR's buttons and display are the debugger's in Focus
   only**, as the keyboard is, so a program keeps them while the strip is
   up, and the debugger does not depend on them.
+- **The detectors are entities in `src/`**, not processes in the top
+  levels, which use unisim and which GHDL cannot test: `tb_kbd` and
+  `tb_ps2` test them.
+- **The strip is white on dark blue**, so that it stands apart from a
+  program's usual white on black.
 - **Page Up, Page Down, and Home on both keyboards**, as new bytes for
   programs too: a key that gives nothing is a key wasted. On the MEGA65
   they are CLR/HOME and MEGA with the cursor keys.

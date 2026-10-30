@@ -4,7 +4,9 @@
 -- board's USB-UART, and LED0 is on while the core runs, or while the program
 -- sets it. A USB keyboard in the board's USB HID port types into the same
 -- input as the UART: the board's PIC24 turns it into PS/2, which
--- kbd_ps2.vhd receives and kbd_ps2_ascii.vhd turns into ASCII. The board's 16 LEDs, two RGB LEDs,
+-- kbd_ps2.vhd receives and kbd_ps2_ascii.vhd turns into ASCII. Scroll Lock
+-- toggles the on-board debugger (kbd_ps2_toggle.vhd, doc/DEBUGGER.md), as
+-- the board has no MEGA key. The board's 16 LEDs, two RGB LEDs,
 -- seven-segment display, five buttons, and 16 switches are registers of
 -- the system, in 0xFFFFFF90-96 (src/nicemon.vhd). The RGB LEDs are driven
 -- by rgb_pwm.vhd, and the display by seg7.vhd. The buttons and the
@@ -102,11 +104,12 @@ architecture synthesis of top is
    signal brd_rgb1 : std_logic_vector(11 downto 0);
    signal brd_seg  : std_logic_vector(63 downto 0);
 
-   signal ps2_valid : std_logic;
-   signal ps2_code  : std_logic_vector(7 downto 0);
-   signal kbd_valid : std_logic;
-   signal kbd_ready : std_logic;
-   signal kbd_data  : std_logic_vector(7 downto 0);
+   signal ps2_valid  : std_logic;
+   signal ps2_code   : std_logic_vector(7 downto 0);
+   signal kbd_valid  : std_logic;
+   signal kbd_ready  : std_logic;
+   signal kbd_data   : std_logic_vector(7 downto 0);
+   signal dbg_toggle : std_logic;
 
    signal vga_clk   : std_logic;
    signal vga_hs    : std_logic;
@@ -235,13 +238,24 @@ begin
       ); -- i_kbd_ps2_ascii
 
 
+   i_kbd_ps2_toggle : entity work.kbd_ps2_toggle
+      port map (
+         clk_i        => clk,
+         rst_i        => rst,
+         code_valid_i => ps2_valid,
+         code_i       => ps2_code,
+         toggle_o     => dbg_toggle
+      ); -- i_kbd_ps2_toggle
+
+
    i_system : entity work.system
       generic map (
          G_CLOCK_HZ      => C_CLOCK_HZ,
          G_ROM_FILE      => G_ROM_FILE,
          G_SCR_ADDR_BITS => 13,
          G_VIDEO         => C_VIDEO,
-         G_BOARD_IO      => true
+         G_BOARD_IO      => true,
+         G_TOGGLE_KEY    => "Scroll Lock"
       )
       port map (
          clk_i        => clk,
@@ -252,6 +266,7 @@ begin
          kbd_ready_o  => kbd_ready,
          kbd_data_i   => kbd_data,
          running_o    => running,
+         dbg_toggle_i => dbg_toggle,
          brd_led_o    => brd_led,
          brd_rgb0_o   => brd_rgb0,
          brd_rgb1_o   => brd_rgb1,

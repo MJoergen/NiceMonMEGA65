@@ -4,19 +4,26 @@
 -- p_write fills the screen through the write port, in the system clock
 -- domain: a line of text in white on black, a line in the color of
 -- print.nasm (nice_cpu/assembler/test/print.nasm), the 256 codes in many colors, and the 48 words after the 2000
--- of the screen, which must not show at a display offset of 0. It keeps a
--- model of the screen.
+-- of the screen, which must not show at a display offset of 0. It also
+-- fills the debugger's overlay: the page, rows 0 to 24, with the 256 codes
+-- in other colors, the strip, rows 25 to 28, with text, and the words after
+-- them, which must not show. It keeps a model of the screen and of the
+-- overlay.
 --
 -- The VGA clock starts when p_write is done, so the first frame shows all
 -- the writes. p_check checks that whole frame in the VGA clock
 -- domain: the number of visible pixels in each line and of visible lines,
 -- the widths of the sync pulses, and the color of every visible pixel, as
--- the model and the font (font_pkg.vhd) give it. With G_PPM_FILE it also
--- writes the frame as a PPM picture. Then, in the vertical blanking after
--- that frame, it sets the display offset to one row and puts the cursor on
--- row 3, and checks the first four rows of text of the next frame: they show
--- the words from 80, and the cursor swaps the colors of its character. It
--- stops there, for each frame takes about half a minute to simulate.
+-- the models and the font (font_pkg.vhd) give it: the program's 25 rows
+-- from line 48, and the strip under them. With G_PPM_FILE it also writes
+-- the frame as a PPM picture. Then, in the vertical blanking after that
+-- frame, it hides the strip, sets the display offset to one row, and puts
+-- the cursor on row 3, and checks the whole next frame: the rows show the
+-- words from 80, the cursor swaps the colors of its character, and the
+-- strip's rows are black. Then it shows the page and the strip, and checks
+-- the first four rows of text of the third frame: they show the page, with
+-- no cursor. It stops there, for each frame takes about half a minute to
+-- simulate.
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -40,6 +47,7 @@ architecture simulation of tb_text is
    constant C_SCR_BITS : natural      := 15;
 
    type t_scr is array (0 to 2 ** C_SCR_BITS - 1) of std_logic_vector(31 downto 0);
+   type t_ovl is array (0 to 4095) of std_logic_vector(31 downto 0);
 
    signal clk     : std_logic := '1';
    signal vga_clk : std_logic := '1';
@@ -57,6 +65,13 @@ architecture simulation of tb_text is
    signal cur_mode : std_logic_vector(2 downto 0) := (others => '0');
    signal offs     : std_logic_vector(C_SCR_BITS - 1 downto 0) := (others => '0');
 
+   signal ovl_we    : std_logic := '0';
+   signal ovl_addr  : std_logic_vector(11 downto 0);
+   signal ovl_data  : std_logic_vector(31 downto 0);
+   signal ovl_model : t_ovl     := (others => (others => '0'));
+   signal strip     : std_logic := '0';
+   signal page      : std_logic := '0';
+
    signal hs    : std_logic;
    signal vs    : std_logic;
    signal de    : std_logic;
@@ -66,13 +81,18 @@ architecture simulation of tb_text is
 
    -- The color (RGB, 8 bits each) that the pixel (x, y) of the visible area
    -- must have, with the display offset disp and, when cursor is true, the
-   -- cursor at (cx, cy)
+   -- cursor at (cx, cy), and with the strip and the page of the overlay
+   -- shown when shown and paged are true
    function expected(scr    : t_scr;
+                     ovl    : t_ovl;
                      x, y   : natural;
                      disp   : natural;
                      cursor : boolean;
-                     cx, cy : natural) return std_logic_vector is
-      constant C_Y0  : natural := (C_MODE.v_visible - 800) / 2;
+                     cx, cy : natural;
+                     shown  : boolean;
+                     paged  : boolean) return std_logic_vector is
+      -- The program's 25 rows and the strip's 4, centered
+      constant C_Y0  : natural := (C_MODE.v_visible - 29 * 32) / 2;
       constant C_X0  : natural := (C_MODE.h_visible - 1280) / 2;
       variable row   : natural;
       variable col   : natural;
@@ -82,16 +102,23 @@ architecture simulation of tb_text is
       variable bg    : std_logic_vector(11 downto 0);
       variable c     : std_logic_vector(11 downto 0);
    begin
-      if x < C_X0 or x >= C_X0 + 1280 or y < C_Y0 or y >= C_Y0 + 800 then
+      if x < C_X0 or x >= C_X0 + 1280 or y < C_Y0 or y >= C_Y0 + 29 * 32 then
          return X"000000";
       end if;
       row   := (y - C_Y0) / 32;
       col   := (x - C_X0) / 16;
-      word  := scr((disp + row * 80 + col) mod 2 ** C_SCR_BITS);
+      if row >= 25 and not shown then
+         return X"000000";
+      end if;
+      if row >= 25 or paged then
+         word := ovl(row * 80 + col);
+      else
+         word := scr((disp + row * 80 + col) mod 2 ** C_SCR_BITS);
+      end if;
       glyph := C_FONT(to_integer(word(7 downto 0)) * 32 + (y - C_Y0) mod 32);
       fg    := word(19 downto 8);
       bg    := word(31 downto 20);
-      if cursor and row = cy and col = cx then
+      if cursor and row = cy and col = cx and row < 25 and not paged then
          c  := fg;
          fg := bg;
          bg := c;
@@ -128,6 +155,11 @@ begin
          cur_y_i     => cur_y,
          cur_mode_i  => cur_mode,
          offs_i      => offs,
+         ovl_we_i    => ovl_we,
+         ovl_addr_i  => ovl_addr,
+         ovl_data_i  => ovl_data,
+         strip_i     => strip,
+         page_i      => page,
          vga_clk_i   => vga_clk,
          vga_hs_o    => hs,
          vga_vs_o    => vs,
@@ -155,6 +187,23 @@ begin
          end loop;
       end procedure print;
 
+      procedure put_ovl(addr : natural; data : std_logic_vector(31 downto 0)) is
+      begin
+         ovl_we    <= '1';
+         ovl_addr  <= to_slv(addr, 12);
+         ovl_data  <= data;
+         ovl_model(addr) <= data;
+         wait until rising_edge(clk);
+         ovl_we <= '0';
+      end procedure put_ovl;
+
+      procedure print_ovl(addr : natural; s : string; color : std_logic_vector(23 downto 0)) is
+      begin
+         for i in s'range loop
+            put_ovl(addr + i - s'low, color & to_slv(character'pos(s(i)), 8));
+         end loop;
+      end procedure print_ovl;
+
       variable color_v : std_logic_vector(23 downto 0);
    begin
       wait until rising_edge(clk);
@@ -172,6 +221,22 @@ begin
       for i in 2000 to 2047 loop
          put(i, X"FFFFFF41");
       end loop;
+      -- The page of the overlay: the 256 codes in other colors
+      for i in 0 to 1999 loop
+         color_v := to_slv((i * 7919 + 12345) mod 2 ** 24, 24);
+         put_ovl(i, color_v & to_slv((255 - i) mod 256, 8));
+      end loop;
+      -- The strip: its first and last columns, and the codes in its last row
+      print_ovl(25 * 80, " R0-7   00000000 00000001", X"004FFF");
+      print_ovl(26 * 80 + 79, "|", X"004FFF");
+      print_ovl(27 * 80, " PAUSED   00001234", X"004FF0");
+      for i in 0 to 79 loop
+         put_ovl(28 * 80 + i, X"00FFFF" & to_slv(i + 32, 8));
+      end loop;
+      -- Words beyond the strip
+      for i in 29 * 80 to 29 * 80 + 47 loop
+         put_ovl(i, X"FFFFFF42");
+      end loop;
       written <= true;
       wait;
    end process p_write;
@@ -181,17 +246,22 @@ begin
       variable l      : line;
       variable errors : natural := 0;
 
-      -- Checks the first n_lines lines of the frame that starts now, with the display offset disp and, when
-      -- cursor is true, the cursor at (cx, cy). With all the visible lines
-      -- it also checks the vertical sync pulse after them, and returns at
-      -- its end. The picture goes to the PPM file when ppm_out is true.
-      procedure check_frame(n_lines : natural;
-                            disp    : natural;
-                            cursor  : boolean;
-                            cx, cy  : natural;
-                            ppm_out : boolean) is
+      -- Checks the first n_lines lines of the frame that starts now, with
+      -- the display offset disp and, when cursor is true, the cursor at (cx,
+      -- cy), and the strip and the page shown when strip_on and page_on are
+      -- true. With all the visible lines it also checks the vertical sync
+      -- pulse after them, and returns at its end. The picture goes to the
+      -- PPM file when ppm_out is true.
+      procedure check_frame(n_lines  : natural;
+                            disp     : natural;
+                            cursor   : boolean;
+                            cx, cy   : natural;
+                            strip_on : boolean;
+                            page_on  : boolean;
+                            ppm_out  : boolean) is
          variable x, y   : natural;
          variable rgb    : std_logic_vector(23 downto 0);
+         variable want_v : std_logic_vector(23 downto 0);
          variable hs_len : natural;
          variable vs_len : natural;
       begin
@@ -201,13 +271,13 @@ begin
             x := 0;
             wait until rising_edge(vga_clk) and de = '1';
             while de = '1' loop
-               rgb := red & green & blue;
-               if y < n_lines and rgb /= expected(model, x, y, disp, cursor, cx, cy) then
+               rgb    := red & green & blue;
+               want_v := expected(model, ovl_model, x, y, disp, cursor, cx, cy, strip_on, page_on);
+               if y < n_lines and rgb /= want_v then
                   errors := errors + 1;
                   if errors <= 10 then
                      report "Pixel (" & integer'image(x) & ", " & integer'image(y) & ") is " &
-                            to_hstring(rgb) & ", not " &
-                            to_hstring(expected(model, x, y, disp, cursor, cx, cy))
+                            to_hstring(rgb) & ", not " & to_hstring(want_v)
                         severity error;
                   end if;
                end if;
@@ -259,30 +329,40 @@ begin
 
    begin
       wait until written;
+      -- The strip crosses to the VGA clock long before its first row.
+      strip <= '1';
 
       if G_PPM_FILE /= "" then
          file_open(ppm, G_PPM_FILE, write_mode);
          write(l, string'("P3 1280 1024 255"));
          writeline(ppm, l);
       end if;
-      check_frame(C_MODE.v_visible, 0, false, 0, 0, G_PPM_FILE /= "");
+      check_frame(C_MODE.v_visible, 0, false, 0, 0, true, false, G_PPM_FILE /= "");
       if G_PPM_FILE /= "" then
          file_close(ppm);
       end if;
 
-      -- The registers: scrolled one row, with the cursor shown on row 3.
-      -- They cross to the VGA clock in a few cycles, well within the back
-      -- porch of 38 lines, so the next frame shows them.
+      -- The registers: scrolled one row, with the cursor shown on row 3,
+      -- and the strip hidden. They cross to the VGA clock in a few cycles,
+      -- well within the back porch of 38 lines, so the next frame shows
+      -- them.
       wait until rising_edge(clk);
       offs     <= to_slv(80, C_SCR_BITS);
       cur_x    <= to_slv(5, 7);
       cur_y    <= to_slv(3, 5);
       cur_mode <= "001";
       ctl_we   <= '1';
+      strip    <= '0';
       wait until rising_edge(clk);
       ctl_we <= '0';
-      -- The first four rows of text, which start 112 lines down
-      check_frame(112 + 4 * 32, 80, true, 5, 3, false);
+      check_frame(C_MODE.v_visible, 80, true, 5, 3, false, false, false);
+
+      -- The page over the program's rows, which hides the cursor. The first
+      -- four rows of text start 48 lines down.
+      wait until rising_edge(clk);
+      strip <= '1';
+      page  <= '1';
+      check_frame(48 + 4 * 32, 80, true, 5, 3, true, true, false);
 
       running <= false;
       wait;

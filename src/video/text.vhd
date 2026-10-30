@@ -29,9 +29,22 @@
 -- So the display never sees a value half written, and the paths between
 -- the clocks need not be timed.
 --
+-- The overlay is the on-board debugger's (src/dbg/dbg.vhd, doc/DEBUGGER.md):
+-- 29 rows of 80 words, in a memory of its own, 2^12 words written by the
+-- debugger (ovl_*_i) in the system clock domain, and read in the VGA clock
+-- domain, as the copy of the screen is. Its rows 0 to 24 are the page, which
+-- replaces the program's 25 rows while page_i is '1', and hides the cursor;
+-- its rows 25 to 28 are the strip, which is shown under them while strip_i
+-- is '1', and is black otherwise. A word of the overlay is at row * 80 +
+-- column, with no display offset. strip_i and page_i cross to the VGA clock
+-- through synchronizers of their own: they change rarely, and a frame half
+-- changed does no harm.
+--
 -- The characters are 16x32 pixels, from the Spleen font (font_pkg.vhd), with
--- the 256 codes of ISO 8859-1. So the text is 1280x800 pixels, in the middle
--- of the visible area, which is black around it. The color of a word is
+-- the 256 codes of ISO 8859-1. So the 29 rows are 1280x928 pixels, in the
+-- middle of the visible area, which is black around them. The program's 25
+-- rows are at their top, in every state of the debugger, so that nothing
+-- moves when the strip appears. The color of a word is
 -- two colors of 12 bits, red, green, and blue with 4 bits each: the
 -- background in bits 31..20, and the foreground in bits 19..8 (nice_cpu's
 -- doc/SYSTEM.md §1). Each 4-bit component n becomes the byte n * 0x11, so 0xF
@@ -41,10 +54,12 @@
 --
 -- The pixel counters (pix.vhd) give the pixel of stage 0. The pipeline:
 --   1: the position in the text, the address of the character, with the
---      display offset, and whether it is the cursor's
---   2: the word of the character, read from the copy of the screen
---   3: the row of the glyph, read from the font, and the colors, swapped
---      for the cursor
+--      display offset, and in the overlay, whether it is the cursor's, and
+--      whether the overlay is shown there
+--   2: the word of the character, read from the copy of the screen, and the
+--      word of the overlay
+--   3: the row of the glyph, read from the font, for the word shown, and
+--      the colors, swapped for the cursor
 --   4: the color of the pixel, and the outputs
 -- The sync signals and the visible area go through the same stages, so the
 -- outputs all belong to the same pixel. The outputs are registers, with
@@ -52,7 +67,7 @@
 --
 -- RESET
 -- None. The copy of the screen starts as zeros, as the screen does, the
--- display offset is 0, and the cursor is off.
+-- display offset is 0, and the cursor is off. The overlay starts as zeros.
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -79,6 +94,12 @@ entity text is
       cur_y_i     : in  std_logic_vector(4 downto 0);
       cur_mode_i  : in  std_logic_vector(2 downto 0);
       offs_i      : in  std_logic_vector(G_SCR_ADDR_BITS - 1 downto 0);
+      -- The debugger's overlay, in the system clock domain
+      ovl_we_i    : in  std_logic;
+      ovl_addr_i  : in  std_logic_vector(11 downto 0);
+      ovl_data_i  : in  std_logic_vector(31 downto 0);
+      strip_i     : in  std_logic;
+      page_i      : in  std_logic;
 
       -- The video output, in the VGA clock domain
       vga_clk_i   : in  std_logic;
@@ -94,7 +115,8 @@ end entity text;
 architecture synthesis of text is
 
    constant C_COLS        : natural := 80;
-   constant C_ROWS        : natural := 25;
+   constant C_ROWS        : natural := 25;  -- The program's
+   constant C_ALL_ROWS    : natural := 29;  -- With the debugger's strip
    constant C_CHAR_WIDTH  : natural := 16;
    constant C_CHAR_HEIGHT : natural := 32;
    -- The lines of the character that the small cursor covers
@@ -102,7 +124,7 @@ architecture synthesis of text is
 
    -- The top left pixel of the text
    constant C_X0 : natural := (G_MODE.h_visible - C_COLS * C_CHAR_WIDTH) / 2;
-   constant C_Y0 : natural := (G_MODE.v_visible - C_ROWS * C_CHAR_HEIGHT) / 2;
+   constant C_Y0 : natural := (G_MODE.v_visible - C_ALL_ROWS * C_CHAR_HEIGHT) / 2;
 
    constant C_HS_START : natural := G_MODE.h_visible + G_MODE.h_front;
    constant C_VS_START : natural := G_MODE.v_visible + G_MODE.v_front;
@@ -125,9 +147,15 @@ architecture synthesis of text is
    signal cur_mode_vga : std_logic_vector(2 downto 0) := (others => '0');
    signal offs_vga     : std_logic_vector(G_SCR_ADDR_BITS - 1 downto 0) := (others => '0');
 
+   -- The overlay's mode bits, synchronized to the VGA clock
+   signal strip_s : std_logic_vector(1 downto 0) := "00";
+   signal page_s  : std_logic_vector(1 downto 0) := "00";
+
    attribute async_reg : string;
    attribute async_reg of ctl_ack_s : signal is "TRUE";
    attribute async_reg of ctl_req_s : signal is "TRUE";
+   attribute async_reg of strip_s   : signal is "TRUE";
+   attribute async_reg of page_s    : signal is "TRUE";
 
    -- The frames shown, for the blinking of the cursor
    signal frame_cnt : std_logic_vector(4 downto 0) := (others => '0');
@@ -137,26 +165,31 @@ architecture synthesis of text is
    signal pix_y : std_logic_vector(10 downto 0);
 
    -- Stage 1. text_1 is '1' when the pixel is in the text, addr_1 is the
-   -- address of its character, cur_1 is '1' when the character is the
+   -- address of its character, ovl_addr_1 that in the overlay, ovl_1 is '1'
+   -- when the overlay is shown there, cur_1 is '1' when the character is the
    -- cursor's, and line_1 and col_1 are its row and column in the glyph.
-   signal hs_1   : std_logic := not G_MODE.sync_active;
-   signal vs_1   : std_logic := not G_MODE.sync_active;
-   signal vis_1  : std_logic := '0';
-   signal text_1 : std_logic := '0';
-   signal addr_1 : std_logic_vector(G_SCR_ADDR_BITS - 1 downto 0) := (others => '0');
-   signal cur_1  : std_logic := '0';
-   signal line_1 : std_logic_vector(4 downto 0) := (others => '0');
-   signal col_1  : std_logic_vector(3 downto 0) := (others => '0');
+   signal hs_1       : std_logic := not G_MODE.sync_active;
+   signal vs_1       : std_logic := not G_MODE.sync_active;
+   signal vis_1      : std_logic := '0';
+   signal text_1     : std_logic := '0';
+   signal addr_1     : std_logic_vector(G_SCR_ADDR_BITS - 1 downto 0) := (others => '0');
+   signal ovl_addr_1 : std_logic_vector(11 downto 0) := (others => '0');
+   signal ovl_1      : std_logic := '0';
+   signal cur_1      : std_logic := '0';
+   signal line_1     : std_logic_vector(4 downto 0) := (others => '0');
+   signal col_1      : std_logic_vector(3 downto 0) := (others => '0');
 
    -- Stage 2
-   signal hs_2   : std_logic := not G_MODE.sync_active;
-   signal vs_2   : std_logic := not G_MODE.sync_active;
-   signal vis_2  : std_logic := '0';
-   signal text_2 : std_logic := '0';
-   signal word_2 : std_logic_vector(31 downto 0);
-   signal cur_2  : std_logic := '0';
-   signal line_2 : std_logic_vector(4 downto 0) := (others => '0');
-   signal col_2  : std_logic_vector(3 downto 0) := (others => '0');
+   signal hs_2       : std_logic := not G_MODE.sync_active;
+   signal vs_2       : std_logic := not G_MODE.sync_active;
+   signal vis_2      : std_logic := '0';
+   signal text_2     : std_logic := '0';
+   signal word_2     : std_logic_vector(31 downto 0);
+   signal ovl_word_2 : std_logic_vector(31 downto 0);
+   signal ovl_2      : std_logic := '0';
+   signal cur_2      : std_logic := '0';
+   signal line_2     : std_logic_vector(4 downto 0) := (others => '0');
+   signal col_2      : std_logic_vector(3 downto 0) := (others => '0');
 
    -- Stage 3
    signal hs_3    : std_logic := not G_MODE.sync_active;
@@ -177,7 +210,7 @@ architecture synthesis of text is
 begin
 
    assert C_COLS * C_CHAR_WIDTH <= G_MODE.h_visible and
-          C_ROWS * C_CHAR_HEIGHT <= G_MODE.v_visible
+          C_ALL_ROWS * C_CHAR_HEIGHT <= G_MODE.v_visible
       report "The text does not fit in the visible area"
       severity failure;
 
@@ -204,6 +237,25 @@ begin
          rd_addr_i => addr_1,
          rd_data_o => word_2
       ); -- i_scr_ram
+
+
+   ---------------------------------------------------------------------------
+   -- The debugger's overlay, likewise
+   ---------------------------------------------------------------------------
+
+   i_ovl_ram : entity work.scr_ram
+      generic map (
+         G_ADDR_BITS => 12
+      )
+      port map (
+         wr_clk_i  => clk_i,
+         wr_we_i   => ovl_we_i,
+         wr_addr_i => ovl_addr_i,
+         wr_data_i => ovl_data_i,
+         rd_clk_i  => vga_clk_i,
+         rd_addr_i => ovl_addr_1,
+         rd_data_o => ovl_word_2
+      ); -- i_ovl_ram
 
 
    ---------------------------------------------------------------------------
@@ -255,6 +307,14 @@ begin
       end if;
    end process p_ctl_vga;
 
+   p_ovl_vga : process (vga_clk_i)
+   begin
+      if rising_edge(vga_clk_i) then
+         strip_s <= strip_s(0) & strip_i;
+         page_s  <= page_s(0) & page_i;
+      end if;
+   end process p_ovl_vga;
+
 
    ---------------------------------------------------------------------------
    -- The pipeline, in the VGA clock domain
@@ -275,7 +335,9 @@ begin
       variable y_v    : std_logic_vector(10 downto 0);
       variable row_v  : std_logic_vector(4 downto 0);
       variable col_v  : std_logic_vector(6 downto 0);
-      variable addr_v : std_logic_vector(10 downto 0);
+      variable addr_v : std_logic_vector(11 downto 0);
+      variable prog_v : std_logic;
+      variable word_v : std_logic_vector(31 downto 0);
       variable fg_v   : std_logic_vector(11 downto 0);
       variable bg_v   : std_logic_vector(11 downto 0);
       variable show_v : std_logic;
@@ -299,9 +361,15 @@ begin
             vs_1 <= G_MODE.sync_active;
          end if;
          vis_1 <= '1' when pix_x < G_MODE.h_visible and pix_y < G_MODE.v_visible else '0';
+         -- prog_v is '1' in the program's rows, and '0' in the strip's.
+         prog_v := '0';
+         if pix_y < C_Y0 + C_ROWS * C_CHAR_HEIGHT then
+            prog_v := '1';
+         end if;
          text_1 <= '0';
          if pix_x >= C_X0 and pix_x < C_X0 + C_COLS * C_CHAR_WIDTH and
-            pix_y >= C_Y0 and pix_y < C_Y0 + C_ROWS * C_CHAR_HEIGHT then
+            pix_y >= C_Y0 and pix_y < C_Y0 + C_ALL_ROWS * C_CHAR_HEIGHT and
+            (prog_v = '1' or strip_s(1) = '1') then
             text_1 <= '1';
          end if;
          -- The characters are 16x32 pixels, so the row is y / 32 and the
@@ -309,9 +377,16 @@ begin
          -- row * 80 = row * 64 + row * 16
          row_v  := y_v(9 downto 5);
          col_v  := x_v(10 downto 4);
-         addr_v := (row_v & "000000") + ("00" & row_v & "0000") + ("0000" & col_v);
-         addr_1 <= offs_vga + addr_v;
-         cur_1  <= '1' when row_v = cur_y_vga and col_v = cur_x_vga else '0';
+         addr_v := ('0' & row_v & "000000") + ("000" & row_v & "0000") + ("00000" & col_v);
+         -- In the program's rows addr_v is below 2000, so 11 bits of it are
+         -- the address in the screen.
+         addr_1     <= offs_vga + addr_v(10 downto 0);
+         ovl_addr_1 <= addr_v;
+         ovl_1      <= not prog_v or page_s(1);
+         cur_1      <= '0';
+         if row_v = cur_y_vga and col_v = cur_x_vga and prog_v = '1' and page_s(1) = '0' then
+            cur_1 <= '1';
+         end if;
          line_1 <= y_v(4 downto 0);
          col_1  <= x_v(3 downto 0);
 
@@ -320,14 +395,19 @@ begin
          vs_2   <= vs_1;
          vis_2  <= vis_1;
          text_2 <= text_1;
+         ovl_2  <= ovl_1;
          cur_2  <= cur_1;
          line_2 <= line_1;
          col_2  <= col_1;
 
          -- Stage 3. The cursor swaps the colors of its character.
-         glyph_3 <= C_FONT(to_integer(word_2(7 downto 0) & line_2));
-         fg_v := word_2(19 downto 8);
-         bg_v := word_2(31 downto 20);
+         word_v := word_2;
+         if ovl_2 = '1' then
+            word_v := ovl_word_2;
+         end if;
+         glyph_3 <= C_FONT(to_integer(word_v(7 downto 0) & line_2));
+         fg_v   := word_v(19 downto 8);
+         bg_v   := word_v(31 downto 20);
          show_v := '0';
          if cur_2 = '1' and cur_mode_vga(0) = '1' then
             show_v := '1';

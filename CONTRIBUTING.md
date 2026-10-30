@@ -155,19 +155,28 @@ The testbenches are these:
   of the debug link, with `sim/rom.nasm`, a greeting, as the ROM (see
   below).
 - `sim/tb_kbd.vhd` tests the keyboard driver and its ASCII, with a model of
-  the keyboard.
+  the keyboard, and the debugger's MEGA+HELP detector, which pulses once
+  while the keys are held.
 - `sim/tb_ps2.vhd` tests the PS/2 receiver and its ASCII, with a model of a
-  PS/2 keyboard, and checks that bad and broken frames are dropped.
+  PS/2 keyboard, and checks that bad and broken frames are dropped. It
+  also tests the debugger's Scroll Lock detector: one pulse for a held
+  key, and none in Ctrl+Break.
 - `sim/tb_ps2_nicemon.vhd` types on that model into the system, wired as
   the Nexys4DDR wires it. Keys typed while the core is held in reset are
   dropped, `sim/fifo.nasm` echoes the keys typed, and `sim/switch.nasm`,
   which reads no input until switch 0 is on, lets the UART fill the
   core's input. Then one key waits, the keys typed after it are lost,
   and the keyboard works again once the program reads.
-- `sim/tb_text.vhd` fills the screen of the text display and checks every
-  pixel of one 1280×1024 frame, and the sync pulses; then it scrolls the
-  display one row, shows the cursor, and checks the first four rows of the
-  next frame. It takes under a minute, the longest of the tests.
+- `sim/tb_text.vhd` fills the screen of the text display and the
+  debugger's overlay, and checks every pixel of one 1280×1024 frame with
+  the strip shown, and the sync pulses; then it hides the strip, scrolls
+  the display one row, shows the cursor, and checks every pixel of the
+  next frame; then it shows the page, and checks the first four rows of
+  the third. It takes about a minute and a half, the longest of the
+  tests.
+- `sim/tb_dbg.vhd` tests the on-board debugger: every word of the strip it
+  draws after reset, the toggle between Off and Focus, and the keyboard's
+  bytes, which it takes in Focus.
 - `sim/tb_board_io.vhd` tests the Nexys4DDR's drivers of its seven-segment
   display and RGB LEDs: every digit of the display lit in turn with its own
   segments, and the duty of an RGB output at its level.

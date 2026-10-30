@@ -1,5 +1,6 @@
--- Tests the keyboard: the driver (src/kbd_m65.vhd) and the ASCII mapping
--- (src/kbd_m65_ascii.vhd), with a model of the keyboard's own FPGA.
+-- Tests the keyboard: the driver (src/kbd_m65.vhd), the ASCII mapping
+-- (src/kbd_m65_ascii.vhd), and the debugger's MEGA+HELP detector
+-- (src/kbd_m65_toggle.vhd), with a model of the keyboard's own FPGA.
 --
 -- THEORY OF OPERATION
 -- p_keyboard models the keyboard. It finds the sync pulse, a clock that
@@ -7,7 +8,7 @@
 -- after the k-th falling edge of the clock, low while the key is pressed.
 -- Keys 76 and 77 are copies of keys 0 and 1, as on the real keyboard.
 -- p_main presses and releases keys, and checks the bytes that kbd_m65_ascii sends.
--- p_rx takes the bytes. The modules get a slow G_CLOCK_HZ, so that the test
+-- p_rx takes the bytes, and counts the detector's pulses. The modules get a slow G_CLOCK_HZ, so that the test
 -- is fast: half a period of the keyboard clock is 10 cycles, and the keys are
 -- sampled every 31250 cycles.
 
@@ -53,6 +54,9 @@ architecture simulation of tb_kbd is
    signal rx_str : string(1 to 256);
    signal rx_len : natural := 0;
 
+   signal toggle  : std_logic;
+   signal toggles : natural := 0;
+
 begin
 
    p_clk : process
@@ -88,6 +92,17 @@ begin
          data_ready_i => ready,
          data_o       => data
       ); -- i_kbd_m65_ascii
+
+   i_kbd_m65_toggle : entity work.kbd_m65_toggle
+      generic map (
+         G_CLOCK_HZ => C_CLOCK_HZ
+      )
+      port map (
+         clk_i    => clk,
+         rst_i    => rst,
+         matrix_i => matrix,
+         toggle_o => toggle
+      ); -- i_kbd_m65_toggle
 
 
    p_keyboard : process
@@ -135,6 +150,9 @@ begin
          if valid = '1' and ready = '1' then
             rx_str(rx_len + 1) <= character'val(to_integer(data));
             rx_len             <= rx_len + 1;
+         end if;
+         if toggle = '1' then
+            toggles <= toggles + 1;
          end if;
       end if;
    end process p_rx;
@@ -263,6 +281,28 @@ begin
       held(23) <= '0';
       wait for C_HOLD;
       expect("xxxx");
+
+      report "tb_kbd: MEGA+HELP toggles once while held, and sends no byte";
+      tap(67);                       -- HELP
+      tap(61);                       -- MEGA
+      assert toggles = 0
+         report "tb_kbd: HELP or MEGA alone toggled"
+         severity failure;
+      press(61);
+      press(67);
+      wait for C_DELAY + 2 * C_RATE;
+      lift(67);
+      lift(61);
+      assert toggles = 1
+         report "tb_kbd: MEGA+HELP gave " & integer'image(toggles) & " pulses, not 1"
+         severity failure;
+      press(67);                     -- HELP first
+      tap(61);
+      lift(67);
+      assert toggles = 2
+         report "tb_kbd: HELP+MEGA did not toggle"
+         severity failure;
+      expect("");
 
       report "tb_kbd: PASS";
       stop(0);

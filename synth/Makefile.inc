@@ -79,6 +79,7 @@ SRC += ../../src/eth/eth_tcp.vhd
 SRC += ../../src/eth/eth_tx_fifo.vhd
 SRC += ../../src/eth/rmii_tx.vhd
 SRC += ../../src/eth/eth.vhd
+SRC += ../../src/dbg/dbg.vhd
 SRC += ../../src/system.vhd
 SRC += ../common/clk_rst.vhd
 SRC += ../common/video_clk.vhd

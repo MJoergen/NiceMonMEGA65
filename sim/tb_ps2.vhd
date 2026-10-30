@@ -1,12 +1,14 @@
--- Tests the PS/2 keyboard: the receiver (src/kbd_ps2.vhd) and the ASCII
--- mapping (src/kbd_ps2_ascii.vhd), with a model of the keyboard.
+-- Tests the PS/2 keyboard: the receiver (src/kbd_ps2.vhd), the ASCII
+-- mapping (src/kbd_ps2_ascii.vhd), and the debugger's Scroll Lock detector
+-- (src/kbd_ps2_toggle.vhd), with a model of the keyboard.
 --
 -- THEORY OF OPERATION
 -- send() is the keyboard: it sends a frame on the two lines, with the clock
 -- at 12.5 kHz, as a keyboard drives them. p_main sends the scan codes of
 -- keys being pressed and released, and checks the bytes that kbd_ps2_ascii
 -- sends. It also sends frames with a wrong parity, start, or stop bit, and
--- half a frame, which the receiver must drop. p_rx takes the bytes. The
+-- half a frame, which the receiver must drop. p_rx takes the bytes, and
+-- counts the detector's pulses. The
 -- system clock is 10 MHz, so that the filter and the timeout of the receiver
 -- have their real lengths.
 
@@ -45,6 +47,9 @@ architecture simulation of tb_ps2 is
    signal rx_str : string(1 to 256);
    signal rx_len : natural := 0;
 
+   signal toggle  : std_logic;
+   signal toggles : natural := 0;
+
 begin
 
    p_clk : process
@@ -77,6 +82,15 @@ begin
          data_o       => data
       ); -- i_kbd_ps2_ascii
 
+   i_kbd_ps2_toggle : entity work.kbd_ps2_toggle
+      port map (
+         clk_i        => clk,
+         rst_i        => rst,
+         code_valid_i => code_valid,
+         code_i       => code,
+         toggle_o     => toggle
+      ); -- i_kbd_ps2_toggle
+
 
    p_rx : process (clk)
    begin
@@ -84,6 +98,9 @@ begin
          if valid = '1' and ready = '1' then
             rx_str(rx_len + 1) <= character'val(to_integer(data));
             rx_len             <= rx_len + 1;
+         end if;
+         if toggle = '1' then
+            toggles <= toggles + 1;
          end if;
       end if;
    end process p_rx;
@@ -266,6 +283,30 @@ begin
       ready <= '1';
       wait for 10 us;
       expect(C_ESC & "[A");
+
+      report "tb_ps2: Scroll Lock toggles once while held, and not in Ctrl+Break";
+      -- The Scroll Lock above made the first pulse.
+      assert toggles = 1
+         report "tb_ps2: Scroll Lock gave " & integer'image(toggles) & " pulses, not 1"
+         severity failure;
+      press(X"7E");
+      press(X"7E");
+      press(X"7E");
+      lift(X"7E");
+      assert toggles = 2
+         report "tb_ps2: a held Scroll Lock gave " & integer'image(toggles - 1) & " pulses, not 1"
+         severity failure;
+      press(X"14");                  -- CTRL, then Break
+      send(X"E0");
+      send(X"7E");
+      send(X"E0");
+      lift(X"7E");
+      lift(X"14");
+      tap(X"7E");
+      assert toggles = 3
+         report "tb_ps2: Ctrl+Break toggled, or Scroll Lock after it did not"
+         severity failure;
+      expect("");
 
       report "tb_ps2: PASS";
       stop(0);

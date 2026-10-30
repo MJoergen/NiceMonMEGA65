@@ -247,13 +247,16 @@ All builds meet the clock. These are the worst setup and hold slacks:
 | R6, pipelined | 100 MHz | 0.086 ns | 0.012 ns |
 | R6, `NICE=multi` | 100 MHz | 0.52 ns | – |
 | R3, pipelined | 100 MHz | 0.109 ns | 0.061 ns |
-| Nexys4DDR, pipelined | 90 MHz | 0.059 ns | 0.015 ns |
+| Nexys4DDR, pipelined | 90 MHz | 0.289 ns | 0.029 ns |
 | Nexys4DDR, `NICE=multi` | 90 MHz | 0.19 ns | – |
 
 The R6's pipelined row is from the build of the V1.1 bump, at nice_cpu
 V1.1, with the debug link of version 5, the one that `verified.json`
-records. The R3's and the Nexys4DDR's pipelined rows are from builds at
-nice_cpu V1.0, with the debug link of version 4. All three have the
+records; a later build with stage 1 of the on-board debugger has 0.114 ns
+and 0.042 ns, and 139 block RAMs. The R3's pipelined row is from a build at nice_cpu V1.0, with
+the debug link of version 4, and the Nexys4DDR's from one at V1.1, with
+stage 1 of the on-board debugger ([DEBUGGER.md](../doc/DEBUGGER.md)).
+All three have the
 Ethernet station, which answers ARP requests and pings and carries the
 link over TCP. The multi-cycle rows are older builds, with fewer link features, and their
 hold slacks were not recorded. The slacks change from build to build with
@@ -283,14 +286,20 @@ The block RAMs, of 36 Kbit, are these:
 | The screen (`i_scr` in `mem.vhd`), 32K or 8K words | 32 | 8 |
 | Its copy in `text.vhd` (`scr_ram.vhd`) | 32 | 8 |
 | The font in `text.vhd` | 4 | 4 |
+| The debugger's overlay in `text.vhd` (`scr_ram.vhd`), 4K words | 4 | 4 |
+| The table of `kbd_ps2_ascii.vhd`, as a ROM, two RAMB18 | – | 1 |
 | The UART's input FIFO (`rx_fifo.vhd`), one RAMB18 | 0.5 | 0.5 |
 | The FIFO of received Ethernet frames (`eth/eth_ram.vhd`), 2K bytes, one RAMB18 | 0.5 | 0.5 |
 | The FIFO of Ethernet frames to send (`eth/eth_ram.vhd`), 2K bytes, one RAMB18 | 0.5 | 0.5 |
 | The copy of a ping in `eth/eth_icmp.vhd`, 2K bytes, one RAMB18 | 0.5 | 0.5 |
 | The TCP server's buffers of received and sent bytes (`eth/eth_ram.vhd` in `eth/eth_tcp_buf.vhd`), 2K bytes each, one RAMB18 each | 1 | 1 |
-| Total without the ROM, pipelined | 135 of 365 | 87 of 135 |
-| Total with the ROM, pipelined | 167 | 119 |
+| Total without the ROM, pipelined | 139 of 365 | 92 of 135 |
+| Total with the ROM, pipelined | 171 | 124 |
 
 The copy of the screen keeps all 32 bits, as the display reads the
 character and both 12-bit colors, so it takes as many block RAMs as the
-screen. The multi-cycle core adds half of one more, its RAMB18.
+screen. The multi-cycle core adds half of one more, its RAMB18. Vivado
+puts the table of `kbd_ps2_ascii.vhd` into block RAM since the scan code's
+register also feeds the Scroll Lock detector (`kbd_ps2_toggle.vhd`), and
+it takes the register's copy as the ROM's address; before, the table was
+in LUTs.

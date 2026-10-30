@@ -29,6 +29,12 @@
 -- With a ROM the core boots from it at reset; without one it waits, held,
 -- for a host on the debug link (nicemon.vhd).
 --
+-- The on-board debugger (dbg/dbg.vhd, doc/DEBUGGER.md) draws into the
+-- overlay of the text display. dbg_toggle_i is the board's toggle key, a
+-- pulse that the board makes from its keyboard, named by G_TOGGLE_KEY; a
+-- board without one leaves it at '0'. While the debugger has the focus, the
+-- keyboard's bytes go to it instead of the core's console FIFO.
+--
 -- INTERFACE CONTRACTS -- these are requirements on the environment:
 -- a) vga_clk_i is the pixel clock of G_VIDEO.
 -- b) clk_i runs at G_CLOCK_HZ, as the UART's bit time depends on it.
@@ -62,7 +68,9 @@ entity system is
       -- The Ethernet station's addresses after reset; an IP address of 0
       -- answers nothing (board_io.vhd).
       G_ETH_MAC       : std_logic_vector(47 downto 0) := X"024E49434500";
-      G_ETH_IP        : std_logic_vector(31 downto 0) := X"00000000"
+      G_ETH_IP        : std_logic_vector(31 downto 0) := X"00000000";
+      -- The board's key that toggles the debugger, as its strip names it
+      G_TOGGLE_KEY    : string       := "MEGA+HELP"
    );
    port (
       clk_i        : in  std_logic;
@@ -73,6 +81,8 @@ entity system is
       kbd_ready_o  : out std_logic;
       kbd_data_i   : in  std_logic_vector(7 downto 0);
       running_o    : out std_logic;
+      -- '1' for a cycle when the debugger's toggle key is pressed
+      dbg_toggle_i : in  std_logic                     := '0';
 
       -- The board's devices, in the system clock domain (G_BOARD_IO)
       brd_led_o    : out std_logic_vector(15 downto 0);
@@ -140,6 +150,20 @@ architecture synthesis of system is
    signal net_tx_valid : std_logic;
    signal net_tx_ready : std_logic;
 
+   -- The keyboard, to the core and to the debugger
+   signal sys_kbd_valid : std_logic;
+   signal sys_kbd_ready : std_logic;
+   signal dbg_kbd_valid : std_logic;
+   signal dbg_kbd_ready : std_logic;
+   signal dbg_focus     : std_logic;
+
+   -- The debugger's overlay
+   signal ovl_we    : std_logic;
+   signal ovl_addr  : std_logic_vector(11 downto 0);
+   signal ovl_data  : std_logic_vector(31 downto 0);
+   signal ovl_strip : std_logic;
+   signal ovl_page  : std_logic;
+
 begin
 
    -- Synchronize the UART input, and register the output.
@@ -173,8 +197,8 @@ begin
          rst_i          => rst_i,
          uart_rxd_i     => rxd(1),
          uart_txd_o     => txd,
-         kbd_valid_i    => kbd_valid_i,
-         kbd_ready_o    => kbd_ready_o,
+         kbd_valid_i    => sys_kbd_valid,
+         kbd_ready_o    => sys_kbd_ready,
          kbd_data_i     => kbd_data_i,
          running_o      => running_o,
          scr_we_o       => scr_we,
@@ -237,6 +261,33 @@ begin
       ); -- i_eth
 
 
+   -- The keyboard's bytes go to the debugger while it has the focus, and to
+   -- the core otherwise.
+   sys_kbd_valid <= kbd_valid_i and not dbg_focus;
+   dbg_kbd_valid <= kbd_valid_i and dbg_focus;
+   kbd_ready_o   <= dbg_kbd_ready when dbg_focus = '1' else sys_kbd_ready;
+
+
+   i_dbg : entity work.dbg
+      generic map (
+         G_TOGGLE_KEY => G_TOGGLE_KEY
+      )
+      port map (
+         clk_i       => clk_i,
+         rst_i       => rst_i,
+         toggle_i    => dbg_toggle_i,
+         kbd_valid_i => dbg_kbd_valid,
+         kbd_ready_o => dbg_kbd_ready,
+         kbd_data_i  => kbd_data_i,
+         ovl_we_o    => ovl_we,
+         ovl_addr_o  => ovl_addr,
+         ovl_data_o  => ovl_data,
+         strip_o     => ovl_strip,
+         page_o      => ovl_page,
+         focus_o     => dbg_focus
+      ); -- i_dbg
+
+
    i_text : entity work.text
       generic map (
          G_MODE          => G_VIDEO,
@@ -252,6 +303,11 @@ begin
          cur_y_i     => scr_cur_y,
          cur_mode_i  => scr_cur_mode,
          offs_i      => scr_offs,
+         ovl_we_i    => ovl_we,
+         ovl_addr_i  => ovl_addr,
+         ovl_data_i  => ovl_data,
+         strip_i     => ovl_strip,
+         page_i      => ovl_page,
          vga_clk_i   => vga_clk_i,
          vga_hs_o    => vga_hs_o,
          vga_vs_o    => vga_vs_o,
