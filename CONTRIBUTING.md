@@ -413,11 +413,12 @@ every time, not only the ones a testbench sends.
 - `eth_tcp_pick.sby` proves the choice of the TCP server's segments,
   `src/eth/eth_tcp_pick.vhd`, with the sender under it, a buffer of 4
   bytes, and segments of 2: a segment is chosen only in the cycle meant
-  for it, not while one is sent, and acknowledges; the SYN-ACK, data, and
-  the FIN are chosen only as its header says, and data never beyond the
-  data there is or the host's window, but for the probe; and the sender
-  gets the connection's fields, the sequence number, and the length
-  chosen, which stay while it is busy.
+  for it, not while one is sent, and acknowledges, unless it is a reset;
+  the SYN-ACK, data, the FIN, and the reset are chosen only as its header
+  says, and data never beyond the data there is or the host's window, but
+  for the probe; and the sender gets the connection's fields, the sequence
+  number, and the length chosen, or the reset's host and numbers, which
+  stay while it is busy.
 
 The checks in `rx_fifo.vhd`, `board_io.vhd`, `scr_regs.vhd`,
 `devices.vhd`, `mem.vhd`, `nicemon.vhd`, `eth/eth_tcp_timer.vhd`,

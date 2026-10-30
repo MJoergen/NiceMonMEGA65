@@ -46,6 +46,11 @@
 --     connection with a FIN too; the old one still takes data and the
 --     host's FIN, and if that never comes, its end by an RST is a break
 --   * data in the host's ACK of the SYN-ACK is taken
+--   * a segment that fits no connection gets a RST, with ACK if it has
+--     none, and a RST gets nothing: a SYN from another IP address while
+--     a connection is open, an ACK from another port, an ACK not of the
+--     SYN-ACK, segments while there is no connection, and an ACK of a
+--     connection that has ended
 --   * an RST while data is out ends the connection, and its timer
 --   * an RST ends a connection that waits for the ACK of its SYN-ACK
 --   * a SYN-ACK that is never acknowledged ends the connection after the
@@ -395,6 +400,7 @@ begin
       variable n_v     : natural;
       variable total_v : natural;
       variable f_v     : t_frame;
+      variable old_v   : std_logic_vector(31 downto 0);
 
       -- With a gap in rx_valid after every 13th byte, as from a FIFO
       procedure send (
@@ -635,8 +641,13 @@ begin
       assert flags_v = X"12" and seq_v = bseq_v and ack_v = X"FFFFF001"
          report "tb_eth_tcp: FAIL, not the same SYN-ACK again"
          severity failure;
-      -- An ACK of something else is not the host's.
+      -- An ACK of something else is not the host's, and gets a RST at its
+      -- acknowledgment number.
       send(seg(C_HIP, C_PORT, 40000, X"FFFFF001", seq_v + 5, C_ACK, 8192, 0, 0, false));
+      expect(1 ms, 40000);
+      assert flags_v = C_RST and seq_v = bseq_v + 5 and n_v = 0
+         report "tb_eth_tcp: FAIL, no RST for an ACK of something else"
+         severity failure;
       expect(2 * C_RTO, 40000);
       assert flags_v = X"12" and seq_v = bseq_v
          report "tb_eth_tcp: FAIL, not the same SYN-ACK again"
@@ -897,8 +908,20 @@ begin
       send_data(3);
 
       -- A SYN from another IP address does not replace the connection, and
-      -- an RST ends it, once the link side has taken the input.
+      -- gets a RST with an ACK past it; so does an ACK from another port of
+      -- the host, at its acknowledgment number, and a RST gets nothing.
+      -- An RST ends the connection, once the link side has taken the input.
       send(seg(C_HIP2, C_PORT, 40002, X"00007000", X"00000000", C_SYN, 8192, 0, 0, false));
+      expect(1 ms, 40002, C_HIP2);
+      assert flags_v = (C_RST or C_ACK) and seq_v = 0 and ack_v = X"00007001" and n_v = 0
+         report "tb_eth_tcp: FAIL, no RST for a SYN from another IP address"
+         severity failure;
+      send(seg(C_HIP, C_PORT, 40100, X"00008000", X"12345678", C_ACK, 8192, 0, 0, false));
+      expect(1 ms, 40100);
+      assert flags_v = C_RST and seq_v = X"12345678" and n_v = 0
+         report "tb_eth_tcp: FAIL, no RST for an ACK from another port"
+         severity failure;
+      send(seg(C_HIP, C_PORT, 40100, X"00008000", X"12345678", C_RST, 8192, 0, 0, false));
       expect_none;
       hseq_v := hseq_v + 100000;
       send_seg(C_RST, 0);
@@ -923,6 +946,24 @@ begin
       expect_none(10 us);
       assert n_ltx = ltx_req
          report "tb_eth_tcp: FAIL, the output was not dropped"
+         severity failure;
+      -- With no connection, an ACK gets a RST at its acknowledgment number,
+      -- a segment without ACK a RST with an ACK past its data and FIN, and
+      -- a RST nothing.
+      send(seg(C_HIP, C_PORT, 40101, X"00009000", X"ABCD0000", C_ACK, 8192, 0, 0, false));
+      expect(1 ms, 40101);
+      assert flags_v = C_RST and seq_v = X"ABCD0000" and n_v = 0
+         report "tb_eth_tcp: FAIL, no RST for an ACK without a connection"
+         severity failure;
+      send(seg(C_HIP, C_PORT, 40101, X"00009000", X"00000000", C_FIN, 8192, 2, 0, false));
+      expect(1 ms, 40101);
+      assert flags_v = (C_RST or C_ACK) and seq_v = 0 and ack_v = X"00009003" and n_v = 0
+         report "tb_eth_tcp: FAIL, no RST with ACK for a segment without ACK"
+         severity failure;
+      send(seg(C_HIP, C_PORT, 40101, X"00009000", X"ABCD0000", C_RST or C_ACK, 8192, 0, 0, false));
+      expect_none;
+      assert conn = '0' and n_log = hd_v
+         report "tb_eth_tcp: FAIL, a segment without a connection changed something"
          severity failure;
 
       -- A break waits for the input before it, also when a new connection's
@@ -969,15 +1010,22 @@ begin
       assert n_break = 3 and brk_at = hd_v and n_log = hd_v and not lrx_bad
          report "tb_eth_tcp: FAIL, no break after the old connection's data"
          severity failure;
+      -- The old connection has ended, so an ACK of it gets a RST, after the
+      -- new connection's SYN-ACK.
       send_seg(C_ACK, 0);
+      old_v   := bseq_v;
       sport_v := 40006;
       expect(1 ms, 40006);
       assert flags_v = X"12" and ack_v = X"0000C001" and conn = '1'
          report "tb_eth_tcp: FAIL, not a SYN-ACK for the new connection"
          severity failure;
-      -- Data in the ACK of the SYN-ACK
       hseq_v := X"0000C001";
       bseq_v := seq_v + 1;
+      expect(1 ms, 40005);
+      assert flags_v = C_RST and seq_v = old_v
+         report "tb_eth_tcp: FAIL, no RST for the ended connection"
+         severity failure;
+      -- Data in the ACK of the SYN-ACK
       send_data(2);
       -- A new connection without a FIN at all, as after a crash: the RST
       -- of the old one opens the new one, and is a break.

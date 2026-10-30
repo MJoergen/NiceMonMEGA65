@@ -236,12 +236,12 @@ class Tcp(Transport):
             sock = socket.create_connection((self.host, self.port), 5)
         except OSError as e:
             fail(f"cannot connect to {self.host}:{self.port}: {e.strerror}; "
-                 f"{self.hint()}")
+                 f"{self.hint(e)}")
         sock.setblocking(False)
         return sock
 
-    def hint(self) -> str:
-        """What to check when the connection fails."""
+    def hint(self, e: OSError) -> str:
+        """What to check when the connection fails with e."""
         return (f"is niceemu --link {self.port} or make cosim running?")
 
     def _reconnect(self) -> socket.socket:
@@ -341,9 +341,11 @@ class Eth(Tcp):
     board = True
     peer = "the board"
 
-    def hint(self) -> str:
-        return ("has the board this IP address (0xFFFFFF9A), and no other "
-                "host a connection to it?")
+    def hint(self, e: OSError) -> str:
+        # The board refuses a connection only while another host has one.
+        if isinstance(e, ConnectionRefusedError):
+            return "another host has a connection to the board"
+        return "has the board this IP address (0xFFFFFF9A)?"
 
     def _connect(self) -> socket.socket:
         sock = super()._connect()

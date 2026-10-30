@@ -16,27 +16,32 @@
 -- (estab_i), data when there is a whole segment of it, or the output has
 -- paused (paused_i), or this side is closing (closing_i); then its FIN,
 -- once the data before it has been sent (nxt_ptr_i at lim_ptr_i), unless
--- it has been (fin_sent_i); or the ACK that is owed (ack_req_i). The
--- choice is dropped (drop_i) if a segment is read or the timer runs out
--- in any of the three cycles, as both change what may be sent. The
+-- it has been (fin_sent_i); or the ACK that is owed (ack_req_i); or,
+-- last of all, so that a flood of segments that fit no connection does
+-- not hold the connection's back, the RST that the connection asks for
+-- (rst_req_i), to the host, with the numbers, that it gives (rst_*_i).
+-- The choice is dropped (drop_i) if a segment is read or the timer runs
+-- out in any of the three cycles, as both change what may be sent. The
 -- segment's header fields (seg_*) and where its data is go to
--- eth_tcp_tx.vhd, and adv_wnd_o is the receive window it told. The
--- connection books what the segment carries in the cycle it is chosen,
+-- eth_tcp_tx.vhd, those of a RST in B_PICK, as it is chosen, and
+-- adv_wnd_o is the receive window that the last segment but a RST told.
+-- The connection books what the segment carries in the cycle it is chosen,
 -- from pick_o and pick_n_o.
 --
 -- INTERFACE CONTRACTS -- these are requirements on the environment:
 -- a) The data from una_ptr_i on stays in the send buffer, and the
---    connection's numbers change only in a cycle drop_i is '1', or as
---    pick_o says; more data may come at lim_ptr_i at any time.
+--    connection's numbers and the RST's change only in a cycle drop_i is
+--    '1', or as pick_o says; more data may come at lim_ptr_i at any time.
 -- b) mac_i and ip_i stay stable while busy_o is '1'.
 --
 -- With G_FORMAL, it states the properties that formal/eth_tcp_pick.sby
 -- proves, under contract a): a segment is chosen only in B_PICK, and not
--- while one is sent, and every one acknowledges; the SYN-ACK, data, and
--- the FIN are chosen only as the header says, and data never beyond the
--- data there is or the host's window, but for the probe; and the sender
--- gets the connection's fields, its sequence number, and the length
--- chosen, which stay while it is busy.
+-- while one is sent, and every one but a RST acknowledges; the SYN-ACK,
+-- data, the FIN, and the RST are chosen only as the header says, and
+-- data never beyond the data there is or the host's window, but for the
+-- probe; and the sender gets the connection's fields, its sequence
+-- number, and the length chosen, or the RST's fields and numbers, which
+-- stay while it is busy.
 --
 -- RESET
 -- Synchronous, to clk_i. Reset drops the choice and the segment being
@@ -83,6 +88,15 @@ entity eth_tcp_pick is
       rcv_nxt_i   : in  std_logic_vector(31 downto 0);
       snd_wnd_i   : in  std_logic_vector(15 downto 0);
       free_i      : in  natural range 0 to 2 ** G_ADDR_BITS;
+      -- A RST to send, with ACK or not, and where to: with ACK, its
+      -- sequence number is 0 and rst_num_i its acknowledgment number;
+      -- without, rst_num_i is its sequence number.
+      rst_req_i   : in  std_logic;
+      rst_ack_i   : in  std_logic;
+      rst_mac_i   : in  std_logic_vector(47 downto 0);
+      rst_ip_i    : in  std_logic_vector(31 downto 0);
+      rst_port_i  : in  std_logic_vector(15 downto 0);
+      rst_num_i   : in  std_logic_vector(31 downto 0);
       -- The data in the send buffer: the first byte not acknowledged, the
       -- next to send, and the end; and that the output has paused
       una_ptr_i   : in  std_logic_vector(G_ADDR_BITS downto 0);
@@ -113,6 +127,7 @@ architecture synthesis of eth_tcp_pick is
 
    constant C_FIN : std_logic_vector(7 downto 0) := X"01";
    constant C_SYN : std_logic_vector(7 downto 0) := X"02";
+   constant C_RST : std_logic_vector(7 downto 0) := X"04";
    constant C_PSH : std_logic_vector(7 downto 0) := X"08";
    constant C_ACK : std_logic_vector(7 downto 0) := X"10";
 
@@ -151,13 +166,17 @@ architecture synthesis of eth_tcp_pick is
 
 begin
 
-   -- The segment chosen in B_PICK: the SYN-ACK, data, the FIN, or an ACK
+   -- The segment chosen in B_PICK: the SYN-ACK, data, the FIN, an ACK, or
+   -- a RST
    pick <= X"00" when build /= B_PICK or drop_i = '1' else
            C_SYN or C_ACK when syn_req_i = '1' and syn_rcvd_i = '1' else
-           X"00" when estab_i = '0' else
-           C_ACK or C_PSH when pick_n > 0 and (pick_big or paused_i = '1' or closing_i = '1') else
-           C_FIN or C_ACK when closing_i = '1' and nxt_ptr_i = lim_ptr_i and fin_sent_i = '0' else
-           C_ACK when ack_req_i = '1' else
+           C_ACK or C_PSH when estab_i = '1' and pick_n > 0 and
+                               (pick_big or paused_i = '1' or closing_i = '1') else
+           C_FIN or C_ACK when estab_i = '1' and closing_i = '1' and nxt_ptr_i = lim_ptr_i and
+                               fin_sent_i = '0' else
+           C_ACK when estab_i = '1' and ack_req_i = '1' else
+           C_RST or C_ACK when rst_req_i = '1' and rst_ack_i = '1' else
+           C_RST when rst_req_i = '1' else
            X"00";
 
    pick_o   <= pick;
@@ -248,10 +267,27 @@ begin
                if pick(3) = '1' then
                   seg_n <= pick_n;
                end if;
-               -- Every segment acknowledges, with the window of now.
+               -- The RST's host and numbers, and no window
+               if pick(2) = '1' then
+                  seg_mac  <= rst_mac_i;
+                  seg_ip   <= rst_ip_i;
+                  seg_port <= rst_port_i;
+                  seg_wnd  <= X"0000";
+                  if rst_ack_i = '1' then
+                     seg_seq <= X"00000000";
+                     seg_ack <= rst_num_i;
+                  else
+                     seg_seq <= rst_num_i;
+                     seg_ack <= X"00000000";
+                  end if;
+               end if;
+               -- Every segment but a RST acknowledges, with the window of
+               -- now; a RST tells none.
                if pick /= X"00" then
+                  go <= '1';
+               end if;
+               if pick /= X"00" and pick(2) = '0' then
                   adv_wnd_o <= free_i;
-                  go        <= '1';
                end if;
 
          end case;
@@ -274,8 +310,10 @@ begin
       -- psl f_when : assert always pick /= X"00" -> build = B_PICK and drop_i = '0';
       -- psl f_idle : assert always build /= B_IDLE -> busy = '0';
       -- psl f_go : assert always go = '1' -> prev(busy) = '0';
-      -- psl f_ack : assert always pick /= X"00" -> pick(4) = '1';
-      -- psl f_no_rst : assert always pick(2) = '0';
+      -- psl f_ack : assert always pick /= X"00" and pick(2) = '0' -> pick(4) = '1';
+      -- psl f_rst : assert always pick(2) = '1' ->
+      --    rst_req_i = '1' and
+      --    ((rst_ack_i = '1' and pick = (C_RST or C_ACK)) or (rst_ack_i = '0' and pick = C_RST));
       -- psl f_syn : assert always pick(1) = '1' ->
       --    syn_req_i = '1' and syn_rcvd_i = '1' and pick = (C_SYN or C_ACK);
       -- psl f_data : assert always pick(3) = '1' ->
@@ -303,8 +341,14 @@ begin
       --    seg_seq = una_seq_i + (nxt_ptr_i - una_ptr_i) + fin_sent_i;
       -- psl f_sent : assert always go = '1' -> seg_flags = prev(pick) and
       --    (seg_flags(1) = '0' or seg_seq = prev(iss_i)) and
-      --    (seg_flags(3) = '0' or seg_n = prev(pick_n)) and (seg_flags(3) = '1' or seg_n = 0);
-      -- psl f_wnd : assert always {pick /= X"00"} |=> {adv_wnd_o = prev(free_i)};
+      --    (seg_flags(3) = '0' or seg_n = prev(pick_n)) and (seg_flags(3) = '1' or seg_n = 0) and
+      --    (seg_flags(2) = '0' or
+      --     (seg_mac = prev(rst_mac_i) and seg_ip = prev(rst_ip_i) and
+      --      seg_port = prev(rst_port_i) and
+      --      ((seg_flags(4) = '1' and seg_seq = 0 and seg_ack = prev(rst_num_i)) or
+      --       (seg_flags(4) = '0' and seg_seq = prev(rst_num_i) and seg_ack = 0))));
+      -- psl f_wnd : assert always {pick /= X"00" and pick(2) = '0'} |=> {adv_wnd_o = prev(free_i)};
+      -- psl f_wnd_rst : assert always {pick(2) = '1'} |=> {adv_wnd_o = prev(adv_wnd_o)};
       -- psl f_stable : assert always busy = '1' and go = '0' ->
       --    seg_mac = prev(seg_mac) and seg_ip = prev(seg_ip) and seg_port = prev(seg_port) and
       --    seg_seq = prev(seg_seq) and seg_ack = prev(seg_ack) and seg_flags = prev(seg_flags) and
@@ -317,6 +361,8 @@ begin
       --    rst_i = '0'};
       -- psl c_fin_sent : cover {pick(0) = '1' and rst_i = '0'};
       -- psl c_ack_sent : cover {pick = C_ACK and rst_i = '0'};
+      -- psl c_rst_sent : cover {pick = C_RST and rst_i = '0'};
+      -- psl c_rst_ack_sent : cover {pick = (C_RST or C_ACK) and rst_i = '0'};
       -- psl c_dropped : cover {build = B_PICK and drop_i = '1' and rst_i = '0'};
    end generate gen_formal;
 

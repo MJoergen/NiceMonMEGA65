@@ -1,8 +1,9 @@
 -- The choice of the TCP server's segments (src/eth/eth_tcp_pick.vhd),
 -- with its properties, for SymbiYosys, with the sender under it. The
 -- inputs are free but for the chooser's contract: the connection's
--- numbers and flags change only in the cycle after a segment is acted on
--- or the timer runs out (drop_i) or a segment is chosen (pick_o), but for
+-- numbers and flags, and the RST's, change only in the cycle after a
+-- segment is acted on or the timer runs out (drop_i) or a segment is
+-- chosen (pick_o), but for
 -- the ACK it owes, the end of the data, which grows by a byte a cycle,
 -- the room, and the pause; and the pointers are in order, at most a
 -- buffer apart. The buffer has 4 bytes and a segment takes 2, so that
@@ -38,6 +39,12 @@ entity formal_eth_tcp_pick is
       rcv_nxt_i   : in  std_logic_vector(31 downto 0);
       snd_wnd_i   : in  std_logic_vector(15 downto 0);
       free_i      : in  natural range 0 to 4;
+      rst_req_i   : in  std_logic;
+      rst_ack_i   : in  std_logic;
+      rst_mac_i   : in  std_logic_vector(47 downto 0);
+      rst_ip_i    : in  std_logic_vector(31 downto 0);
+      rst_port_i  : in  std_logic_vector(15 downto 0);
+      rst_num_i   : in  std_logic_vector(31 downto 0);
       una_ptr_i   : in  std_logic_vector(2 downto 0);
       nxt_ptr_i   : in  std_logic_vector(2 downto 0);
       lim_ptr_i   : in  std_logic_vector(2 downto 0);
@@ -72,7 +79,10 @@ begin
    --     peer_port_i = prev(peer_port_i) and fin_sent_i = prev(fin_sent_i) and
    --     closing_i = prev(closing_i) and probe_i = prev(probe_i) and
    --     syn_req_i = prev(syn_req_i) and syn_rcvd_i = prev(syn_rcvd_i) and
-   --     estab_i = prev(estab_i) and to_integer(lim_ptr_i - prev(lim_ptr_i)) <= 1};
+   --     estab_i = prev(estab_i) and rst_req_i = prev(rst_req_i) and
+   --     rst_ack_i = prev(rst_ack_i) and rst_mac_i = prev(rst_mac_i) and
+   --     rst_ip_i = prev(rst_ip_i) and rst_port_i = prev(rst_port_i) and
+   --     rst_num_i = prev(rst_num_i) and to_integer(lim_ptr_i - prev(lim_ptr_i)) <= 1};
    -- psl f_ptrs : assume always
    --    to_integer(nxt_ptr_i - una_ptr_i) <= to_integer(lim_ptr_i - una_ptr_i) and
    --    to_integer(lim_ptr_i - una_ptr_i) <= C_SIZE;
@@ -107,6 +117,12 @@ begin
          rcv_nxt_i   => rcv_nxt_i,
          snd_wnd_i   => snd_wnd_i,
          free_i      => free_i,
+         rst_req_i   => rst_req_i,
+         rst_ack_i   => rst_ack_i,
+         rst_mac_i   => rst_mac_i,
+         rst_ip_i    => rst_ip_i,
+         rst_port_i  => rst_port_i,
+         rst_num_i   => rst_num_i,
          una_ptr_i   => una_ptr_i,
          nxt_ptr_i   => nxt_ptr_i,
          lim_ptr_i   => lim_ptr_i,

@@ -395,8 +395,9 @@ acknowledged the board's FIN, or reset the old connection, or after the
 tries below. The tools half-close the old one first, at the end of a
 program's input. If that FIN was lost, the old connection still takes
 the host's data and FIN until it ends, and if the FIN has not come by
-then, the end is a break. A connection from another host gets no answer
-while one is open.
+then, the end is a break. A connection from another host gets a reset
+while one is open, so that its `connect` fails at once with "connection
+refused".
 
 A host's FIN is the end of the input, and the board keeps the connection
 after it, so a host that is done ends it with a reset. The tools set
@@ -407,8 +408,11 @@ resends what the host does not acknowledge, after 300 ms, and drops the
 connection after 17 tries. While the host's window is 0, it sends one
 byte beyond it every 300 ms, and keeps the connection while the host
 answers. It answers a host's keepalive probe with an ACK, and sends no
-probe itself. It sends no reset, so a segment that fits no connection
-gets no answer. Its SYN-ACK has no TCP options, so the host sends
+probe itself. A segment to the port that fits no connection, as one of
+a connection that the board dropped, gets a reset, as RFC 9293 has it,
+but for a reset, which gets nothing. Segments to other ports get nothing,
+and neither does anything while the IP address is 0, also after the
+board resets, until it has an address again. Its SYN-ACK has no TCP options, so the host sends
 segments of at most 536 bytes, and the board sends no more either. When a connection ends, the link
 stays with it until it has taken the input that came before, and the
 output in that time is dropped.

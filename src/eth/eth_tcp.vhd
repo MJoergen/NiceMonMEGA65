@@ -32,8 +32,8 @@
 -- host tools do at the end of a program's input (tools/nicelink.py), after
 -- their FIN, and what a tool that starts again after a crash does,
 -- without one. The old connection takes data and a FIN until its end, and
--- if its FIN has not come by then, the end is a break. Other SYNs are
--- ignored while a connection is open.
+-- if its FIN has not come by then, the end is a break. A SYN from
+-- another IP address gets a RST while a connection is open.
 --
 -- Receive: eth_tcp_rx.vhd reads a frame a byte at a time, keeps the
 -- fields of a TCP segment to this station, and checks its checksums. The
@@ -81,8 +81,18 @@
 -- This side's window is the host's, taken from an ACK of data sent that is
 -- not older than the last one it was taken from (snd_wl1 and snd_wl2, RFC
 -- 9293 3.10.7.4), without scaling, for the SYN-ACK has no options; for the
--- same reason the host sends segments of at most 536 bytes. No RST is
--- sent; a segment that fits no connection is dropped. A segment belongs to
+-- same reason the host sends segments of at most 536 bytes. A segment
+-- that fits no connection, and is no RST itself, gets a RST (refuse, RFC
+-- 9293 3.10.7.1): at its acknowledgment number, if it has an ACK, and
+-- otherwise with an ACK past its data, SYN, and FIN; so does an ACK that
+-- is not of the SYN-ACK in SYN_RCVD_ST (3.10.7.4). Those are a SYN from
+-- another IP address while a connection is open, the segments of a
+-- connection that has ended, and any but a SYN in LISTEN_ST. The RST goes
+-- to the segment's source, from its fields kept in rst_*, after what the
+-- connection has to send, so that a flood of such segments does not hold
+-- that back; one waits at a time, and the next is dropped while it does,
+-- for its host sends it again. Segments to other ports never come here
+-- (eth_tcp_rx.vhd), and get nothing. A segment belongs to
 -- the connection by its IP address and ports, as TCP has it, whatever its
 -- source MAC address; the segments of this side go to the MAC address of
 -- the host's SYN.
@@ -186,6 +196,15 @@ architecture synthesis of eth_tcp is
    signal fin_ack : std_logic                     := '0';
    signal syn_req : std_logic                     := '0';
    signal ack_req : std_logic                     := '0';
+   -- A RST to send (refuse), with ACK or not, to the source of the
+   -- segment that fits no connection; with ACK, rst_num is its
+   -- acknowledgment number, and without, its sequence number.
+   signal rst_req  : std_logic                     := '0';
+   signal rst_ack  : std_logic                     := '0';
+   signal rst_mac  : std_logic_vector(47 downto 0) := (others => '0');
+   signal rst_ip   : std_logic_vector(31 downto 0) := (others => '0');
+   signal rst_port : std_logic_vector(15 downto 0) := (others => '0');
+   signal rst_num  : std_logic_vector(31 downto 0) := (others => '0');
    -- One byte goes beyond the host's window of 0.
    signal probe : std_logic                     := '0';
    -- The SYN of the next connection
@@ -232,7 +251,8 @@ architecture synthesis of eth_tcp is
    -- sequence number past snd_wl1 and rcv_nxt, and its acknowledgment
    -- number past snd_wl2; the end of its data; whether it acknowledges
    -- the SYN-ACK, and the FIN; and rcv_nxt past its data, with the FIN
-   -- and without, and past a FIN alone
+   -- and without, and past a FIN alone; and its sequence number past its
+   -- data, SYN, and FIN, for a RST
    signal from_peer : boolean                       := false;
    signal k         : std_logic_vector(31 downto 0) := (others => '0');
    signal d1        : std_logic_vector(31 downto 0) := (others => '0');
@@ -244,6 +264,7 @@ architecture synthesis of eth_tcp is
    signal rcv_end   : std_logic_vector(31 downto 0) := (others => '0');
    signal rcv_end1  : std_logic_vector(31 downto 0) := (others => '0');
    signal rcv_nxt1  : std_logic_vector(31 downto 0) := (others => '0');
+   signal seg_end   : std_logic_vector(31 downto 0) := (others => '0');
 
    -- The receive buffer (eth_tcp_buf.vhd): where a segment's data goes,
    -- the end of the data committed, and the room after it
@@ -430,6 +451,12 @@ begin
          rcv_nxt_i   => rcv_nxt,
          snd_wnd_i   => snd_wnd,
          free_i      => rx_free,
+         rst_req_i   => rst_req,
+         rst_ack_i   => rst_ack,
+         rst_mac_i   => rst_mac,
+         rst_ip_i    => rst_ip,
+         rst_port_i  => rst_port,
+         rst_num_i   => rst_num,
          una_ptr_i   => una_ptr,
          nxt_ptr_i   => nxt_ptr,
          lim_ptr_i   => lim_ptr,
@@ -461,6 +488,7 @@ begin
          rcv_end   <= rcv_nxt + plen;
          rcv_end1  <= rcv_nxt + plen + 1;
          rcv_nxt1  <= rcv_nxt + 1;
+         seg_end   <= f_seq + plen + f_flags(1) + f_flags(0);
       end if;
    end process p_cmp;
 
@@ -523,6 +551,24 @@ begin
          end if;
       end procedure finish;
 
+      -- Asks for a RST to the segment's source, unless it is a RST, or one
+      -- waits.
+      procedure refuse is
+      begin
+         if f_flags(2) = '0' and rst_req = '0' then
+            rst_req  <= '1';
+            rst_ack  <= not f_flags(4);
+            rst_mac  <= f_smac;
+            rst_ip   <= f_sip;
+            rst_port <= f_sport;
+            if f_flags(4) = '1' then
+               rst_num <= f_ack;
+            else
+               rst_num <= seg_end;
+            end if;
+         end if;
+      end procedure refuse;
+
    begin
       if rising_edge(clk_i) then
          isn       <= isn + 1;
@@ -579,6 +625,9 @@ begin
                               closing <= '1';
                               fin_ptr <= tail_ptr;
                            end if;
+                        else
+                           -- Another host, while a connection is open
+                           refuse;
                         end if;
 
                   end case;
@@ -590,8 +639,11 @@ begin
                         finish;
                      end if;
                   elsif state = SYN_RCVD_ST and not (f_flags(4) = '1' and syn_acked) then
-                     -- Nothing but the ACK of the SYN-ACK opens the connection.
-                     null;
+                     -- Nothing but the ACK of the SYN-ACK opens the connection,
+                     -- and another ACK gets a RST.
+                     if f_flags(4) = '1' then
+                        refuse;
+                     end if;
                   else
                      -- The ACK of the SYN-ACK, which may carry data and a FIN
                      if state = SYN_RCVD_ST then
@@ -663,6 +715,9 @@ begin
                         fin_ack <= '1';
                      end if;
                   end if;
+               else
+                  -- A segment that fits no connection
+                  refuse;
                end if;
             end if;
 
@@ -693,8 +748,12 @@ begin
          -- The segment chosen (eth_tcp_pick.vhd), by its flags: what it
          -- carries is out
          ------------------------------------------------------------------
-         if pick /= X"00" then
+         if pick /= X"00" and pick(2) = '0' then
             ack_req <= '0';
+         end if;
+         -- The RST
+         if pick(2) = '1' then
+            rst_req <= '0';
          end if;
          -- The SYN-ACK
          if pick(1) = '1' then
@@ -727,6 +786,7 @@ begin
             syn_req   <= '0';
             ack_req   <= '0';
             probe     <= '0';
+            rst_req   <= '0';
             pend      <= '0';
             keep      <= '0';
             rx_wr     <= (others => '0');
