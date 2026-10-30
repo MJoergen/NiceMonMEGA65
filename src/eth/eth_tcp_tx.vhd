@@ -31,6 +31,16 @@
 --    they are while busy_o is '1'.
 -- c) mac_i and ip_i stay stable while busy_o is '1'.
 --
+-- With G_FORMAL, it states the properties that formal/eth_tcp_tx.sby
+-- proves, under the contracts: busy_o is '1' exactly from go_i until the
+-- last byte has gone; a byte offered stays until it is taken; the frame's
+-- bytes come in order, 54 + seg_n_i of them, with tx_last_o on the last;
+-- each byte of the header is that of hdr, with the checksums; and each
+-- byte of the data is the one read from the send buffer at seg_addr_i on,
+-- in order. The checksums' sums are not proved there, as the solver does
+-- not get through ones' complement sums of free words; tb_eth_tcp checks
+-- both of every segment.
+--
 -- RESET
 -- Synchronous, to clk_i. Reset drops the segment being sent.
 
@@ -44,7 +54,8 @@ entity eth_tcp_tx is
    generic (
       G_PORT      : natural := 4510;
       G_ADDR_BITS : natural := 11;
-      G_MSS       : natural := 536
+      G_MSS       : natural := 536;
+      G_FORMAL    : boolean := false
    );
    port (
       clk_i       : in  std_logic;
@@ -232,5 +243,91 @@ begin
          end if;
       end if;
    end process p_tx;
+
+
+   gen_formal : if G_FORMAL generate
+      -- The bytes of the frame taken so far, the index of the byte offered,
+      -- and the address that the byte was read from, with the one read
+      -- for byte
+      signal f_cnt     : natural range 0 to 54 + G_MSS := 0;
+      signal f_tx_idx  : natural range 0 to 54 + G_MSS := 0;
+      signal f_tx_addr : std_logic_vector(G_ADDR_BITS - 1 downto 0);
+      signal f_addr    : std_logic_vector(G_ADDR_BITS - 1 downto 0);
+      signal f_rd      : std_logic_vector(G_ADDR_BITS - 1 downto 0);
+      signal f_data    : std_logic_vector(7 downto 0);
+      signal f_byte    : std_logic_vector(G_ADDR_BITS - 1 downto 0);
+      signal f_sent    : std_logic;
+   begin
+
+      f_sent <= tx_valid and tx_ready_i;
+      -- Where rd_addr_o should be: at seg_addr_i, and on with each byte of
+      -- data read
+      f_addr <= seg_addr_i + (tx_idx - 54) when tx_idx >= 54 else
+                seg_addr_i;
+
+      p_cnt : process (clk_i)
+      begin
+         if rising_edge(clk_i) then
+            f_rd <= rd_addr_o;
+            if fetch = '1' then
+               f_byte <= f_rd;
+            end if;
+            if state = SEND_ST and have = '1' then
+               f_tx_idx  <= byte_idx;
+               f_tx_addr <= f_byte;
+            end if;
+            if f_sent = '1' then
+               f_cnt <= f_cnt + 1;
+               if tx_last_o = '1' then
+                  f_cnt <= 0;
+               end if;
+            end if;
+            if rst_i = '1' then
+               f_cnt <= 0;
+            end if;
+         end if;
+      end process p_cnt;
+
+      -- psl default clock is rising_edge(clk_i);
+
+      -- psl f_busy : assert always (busy_o = '1') = (state /= IDLE_ST or go_i = '1');
+      -- psl f_quiet : assert always state /= SEND_ST -> tx_valid = '0';
+      -- psl f_hold : assert always {tx_valid and not tx_ready_i and not rst_i} |=>
+      --    {tx_valid = '1' and tx_data_o = prev(tx_data_o) and tx_last_o = prev(tx_last_o)};
+      -- psl f_len : assert always state = SUM_ST or state = SEND_ST -> len = 54 + seg_n_i;
+      -- psl f_rd_addr : assert always state = SUM_ST or state = SEND_ST -> rd_addr_o = f_addr;
+      -- psl f_tx_idx_len : assert always state = SUM_ST or state = SEND_ST -> tx_idx <= len;
+      -- psl f_rest : assert always state = IDLE_ST or state = INIT_ST ->
+      --    fetch = '0' and have = '0';
+      -- psl f_pipe_sum : assert always state = SUM_ST and fetch = '1' -> fetch_idx = tx_idx - 1;
+      -- psl f_pipe : assert always state = SEND_ST ->
+      --    (fetch = '1' -> fetch_idx = tx_idx - 1) and
+      --    (have = '1' -> byte_idx = tx_idx - 1 and fetch = '0');
+      -- psl f_one : assert always state = SEND_ST and (fetch = '1' or have = '1') ->
+      --    tx_valid = '0';
+      -- psl f_valid_idx : assert always state = SEND_ST and tx_valid = '1' ->
+      --    f_tx_idx = tx_idx - 1;
+      -- psl f_not_last : assert always state = SEND_ST and tx_valid = '1' and tx_last_o = '0' ->
+      --    f_tx_idx < len - 1;
+      -- psl f_order : assert always tx_valid = '1' -> f_tx_idx = f_cnt;
+      -- psl f_idle_cnt : assert always state /= SEND_ST -> f_cnt = 0;
+      -- psl f_cnt_fetch : assert always state = SEND_ST and tx_valid = '0' and fetch = '1' ->
+      --    f_cnt = fetch_idx;
+      -- psl f_cnt_have : assert always state = SEND_ST and tx_valid = '0' and have = '1' ->
+      --    f_cnt = byte_idx;
+      -- psl f_cnt_none : assert always state = SEND_ST and tx_valid = '0' and fetch = '0' and
+      --    have = '0' -> f_cnt = tx_idx;
+      -- psl f_last : assert always tx_valid = '1' -> (tx_last_o = '1') = (f_tx_idx = len - 1);
+      -- psl f_hdr : assert always tx_valid = '1' and f_tx_idx < 54 -> tx_data_o = hdr(f_tx_idx);
+      -- psl f_fetch : assert always fetch = '1' and fetch_idx >= 54 ->
+      --    f_rd = seg_addr_i + (fetch_idx - 54);
+      -- psl f_byte_addr : assert always have = '1' and byte_idx >= 54 ->
+      --    f_byte = seg_addr_i + (byte_idx - 54);
+      -- psl f_data_addr : assert always tx_valid = '1' and f_tx_idx >= 54 ->
+      --    f_tx_addr = seg_addr_i + (f_tx_idx - 54);
+
+      -- psl c_send : cover {state = SEND_ST and rst_i = '0'};
+      -- psl c_hold : cover {tx_valid and not tx_ready_i and not rst_i};
+   end generate gen_formal;
 
 end architecture synthesis;

@@ -47,6 +47,15 @@
 --    the segment's byte 47 is read; what they are at other times does not
 --    matter.
 --
+-- With G_FORMAL, it states the properties that formal/eth_tcp_rx.sby
+-- proves: the stream is held exactly for the two cycles after a last
+-- byte, which then come; data is written only while the stream moves,
+-- from p_start to p_end, of a segment that wr_ok took at byte 47, whose
+-- data was not empty and fitted free_i then; a good segment that wr_ok
+-- took has had all of its len_o bytes written, and no more; a frame
+-- longer than C_MAXF bytes is not good; and the verdict and the fields
+-- stand still from the last byte to done_o.
+--
 -- RESET
 -- Synchronous, to clk_i. Reset starts a frame again.
 
@@ -59,7 +68,10 @@ library ieee;
 entity eth_tcp_rx is
    generic (
       G_PORT      : natural := 4510;
-      G_ADDR_BITS : natural := 11
+      G_ADDR_BITS : natural := 11;
+      -- The longest frame that is read, shorter in the formal job
+      G_MAXF      : natural := 2047;
+      G_FORMAL    : boolean := false
    );
    port (
       clk_i      : in  std_logic;
@@ -97,8 +109,7 @@ end entity eth_tcp_rx;
 
 architecture synthesis of eth_tcp_rx is
 
-   -- The longest frame that is read
-   constant C_MAXF : natural := 2047;
+   constant C_MAXF : natural := G_MAXF;
 
    constant C_PORT : std_logic_vector(15 downto 0) := to_stdlogicvector(G_PORT, 16);
 
@@ -272,5 +283,78 @@ begin
          end if;
       end if;
    end process p_rx;
+
+
+   gen_formal : if G_FORMAL generate
+      -- A byte is taken.
+      signal f_acc : std_logic;
+      -- The bytes written of the frame so far
+      signal f_wn : natural range 0 to C_MAXF := 0;
+
+      -- The bytes that the data written so far should have: from p_start
+      -- to idx, but not past p_end or C_MAXF
+      function f_span (
+         i : natural;
+         s : natural;
+         e : natural
+      ) return natural is
+         variable m_v : natural;
+      begin
+         m_v := i;
+         if e < m_v then
+            m_v := e;
+         end if;
+         if C_MAXF < m_v then
+            m_v := C_MAXF;
+         end if;
+         if m_v > s then
+            return m_v - s;
+         end if;
+         return 0;
+      end function f_span;
+
+   begin
+
+      f_acc <= rx_valid_i and rx_ready_o;
+
+      p_wn : process (clk_i)
+      begin
+         if rising_edge(clk_i) then
+            if we_o = '1' then
+               f_wn <= f_wn + 1;
+            end if;
+            if last = '1' or rst_i = '1' then
+               f_wn <= 0;
+            end if;
+         end if;
+      end process p_wn;
+
+      -- psl default clock is rising_edge(clk_i);
+
+      -- psl f_ready : assert always rx_ready_o = not (last or done);
+      -- psl f_apart : assert always not (last = '1' and done = '1');
+      -- psl f_end : assert always {f_acc and rx_last_i and not rst_i} |=> {last};
+      -- psl f_done : assert always {last and not rst_i} |=> {done};
+      -- psl f_after : assert always {done} |=> {not last and not done};
+      -- psl f_we : assert always we_o = '1' ->
+      --    f_acc = '1' and wr_ok = '1' and idx >= p_start and idx < p_end and idx < C_MAXF;
+      -- psl f_wr_ok : assert always wr_ok = '1' ->
+      --    idx >= 48 and f_doff >= 5 and plen > 0 and len_o = plen;
+      -- psl f_none : assert always wr_ok = '0' -> f_wn = 0;
+      -- psl f_count : assert always wr_ok = '1' -> f_wn = f_span(idx, p_start, p_end);
+      -- psl f_fits : assert always {f_acc = '1' and idx = 47 and rst_i = '0'} |=>
+      --    {wr_ok = '0' or len_o <= prev(free_i)};
+      -- psl f_whole : assert always last = '1' and wr_ok = '1' and good = '1' -> f_wn = len_o;
+      -- psl f_good : assert always good = '1' ->
+      --    m_ok = '1' and f_doff >= 5 and plen >= 0 and p_end <= idx;
+      -- psl f_long : assert always {f_acc = '1' and idx = C_MAXF and rst_i = '0'} |=> {m_ok = '0'};
+      -- psl f_verdict : assert always {last and not rst_i} |=>
+      --    {good_o = prev(good) and wr_ok_o = prev(wr_ok)};
+      -- psl f_fields : assert always {last} |=> {seg_o = prev(seg_o) and len_o = prev(len_o)};
+
+      -- psl c_written : cover {done and good_o and wr_ok_o and not rst_i};
+      -- psl c_bad : cover {done and not good_o and not rst_i};
+      -- psl c_not_next : cover {done = '1' and good_o = '1' and wr_ok_o = '0' and len_o > 0 and rst_i = '0'};
+   end generate gen_formal;
 
 end architecture synthesis;

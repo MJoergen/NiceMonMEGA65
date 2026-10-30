@@ -436,10 +436,29 @@ every time, not only the ones a testbench sends.
   for the probe; and the sender gets the connection's fields, the sequence
   number, and the length chosen, or the reset's host and numbers, which
   stay while it is busy.
+- `eth_tcp_rx.sby` proves the parser of the TCP server's frames,
+  `src/eth/eth_tcp_rx.vhd`, for every frame, with the longest frame read
+  60 bytes: the stream is held for exactly the two cycles after a last
+  byte; data is written only while the stream moves, from the end of the
+  TCP header to the IP total length, of a segment that was the next of
+  the connection at byte 47, with data that fitted; a good segment whose
+  data was written has had all of it written, and no more; a longer frame
+  is not good; and the verdict and the fields stand from the last byte to
+  done. Its `cover` reaches a good segment, checksums and all.
+- `eth_tcp_tx.sby` proves the sender of the TCP server's segments,
+  `src/eth/eth_tcp_tx.vhd`, with a buffer of 4 bytes and segments of 2:
+  it is busy from the start until the last byte has gone; a byte offered
+  stays until it is taken; the frame has 54 bytes and the data's, in
+  order, with the last marked; its header is the one built, checksums and
+  all; and its data is read from the segment's address on. The sums of
+  the checksums are not proved, as the solver does not get through
+  ones' complement sums of free words; `tb_eth_tcp` checks both
+  checksums of every segment.
 
 The checks in `rx_fifo.vhd`, `board_io.vhd`, `scr_regs.vhd`,
 `devices.vhd`, `mem.vhd`, `nicemon.vhd`, `eth/eth_tcp_timer.vhd`,
-`eth/eth_tcp_buf.vhd`, and `eth/eth_tcp_pick.vhd` are in `G_FORMAL`
+`eth/eth_tcp_buf.vhd`, `eth/eth_tcp_pick.vhd`, `eth/eth_tcp_rx.vhd`, and
+`eth/eth_tcp_tx.vhd` are in `G_FORMAL`
 blocks, which are off in simulation and synthesis.
 
 ## Testing the board

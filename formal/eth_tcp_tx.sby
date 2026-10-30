@@ -1,0 +1,28 @@
+# The sender of the TCP server's segments, src/eth/eth_tcp_tx.vhd
+# (formal_eth_tcp_tx.vhd). "prove" proves the assertions for every cycle
+# by k-induction, and "cover" reaches each cover statement. The depths are
+# in cycles: 8 is the k of the induction, and 64 is how far "cover"
+# looks, past the first pass over a frame's 56 bytes.
+
+[tasks]
+prove
+cover
+
+[options]
+prove: mode prove
+prove: depth 8
+cover: mode cover
+cover: depth 64
+
+[engines]
+smtbmc yices
+
+[script]
+plugin -i ghdl
+ghdl --std=08 -fpsl eth_pkg.vhd eth_tcp_tx.vhd formal_eth_tcp_tx.vhd -e formal_eth_tcp_tx
+prep -top formal_eth_tcp_tx
+
+[files]
+../src/eth/eth_pkg.vhd
+../src/eth/eth_tcp_tx.vhd
+formal_eth_tcp_tx.vhd
