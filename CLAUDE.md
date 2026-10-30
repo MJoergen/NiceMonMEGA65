@@ -31,6 +31,7 @@ header is the authoritative address map.
     make -j test          # GHDL: synth checks, tb_hello, tb_nicemon, tb_kbd, tb_ps2, tb_ps2_nicemon, tb_text, tb_dbg, tb_board_io, tb_rmii_rx, tb_rx_fcs, tb_eth_rx_fifo, tb_eth_tx_fifo, tb_rmii_tx, tb_eth, tb_eth_tcp, tb_eth_tcp_random, check-steps, check-fmt (NICE=multi for the multi-cycle core); then the demo in niceemu
     make -j formal        # SymbiYosys jobs in formal/, each task in a work directory of its own
     make lint             # vsg against doc/CODING_STYLE.md; line-length warnings are tolerated
+    make diagrams         # src/system.tex and src/eth/eth.tex -> the PNGs of their READMEs (pdflatex)
     make examples         # C examples -> examples/build/*.bin (clang wasm32, lld, llvm)
     make demo             # the ROM's demo -> demo/build/demo.bin; make -C demo test runs it in niceemu
     make r6 [ROM=f.bin]   # Vivado bitstream, synth/r6/build/top.bit; make r3 and make nexys4ddr likewise
@@ -63,7 +64,9 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
 
 ## Layout
 
-- `src/`: the system (`nicemon.vhd`), its memory (`mem.vhd`, with
+- `src/`: `README.md` and `eth/README.md` are block diagrams, drawn by
+  the `.tex` beside them (`make diagrams`). The system (`nicemon.vhd`),
+  its memory (`mem.vhd`, with
   `ram.vhd` and `rom.vhd`), the UART (`uart_serdes.vhd`, from cmod-s7),
   which carries the link,
   the core's input FIFO (`rx_fifo.vhd`), nice_cpu's devices at
