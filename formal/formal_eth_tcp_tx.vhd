@@ -1,8 +1,8 @@
 -- The sender of the TCP server's segments (src/eth/eth_tcp_tx.vhd), with
 -- its properties, for SymbiYosys. Every input is free, but for the
--- sender's contracts: go_i comes only while it is not busy, and the
--- segment's fields and the addresses stay while it is. The send buffer has
--- 4 bytes, and a segment at most 2.
+-- sender's contracts: a segment offered stays, with its fields, until it
+-- is taken, and the addresses stay while the sender is busy. The send
+-- buffer has 4 bytes, and a segment at most 2.
 --
 -- RESET
 -- The first cycle is a reset.
@@ -18,7 +18,7 @@ entity formal_eth_tcp_tx is
       rst_i       : in  std_logic;
       mac_i       : in  std_logic_vector(47 downto 0);
       ip_i        : in  std_logic_vector(31 downto 0);
-      go_i        : in  std_logic;
+      seg_valid_i : in  std_logic;
       seg_host_i  : in  t_host;
       seg_seq_i   : in  std_logic_vector(31 downto 0);
       seg_ack_i   : in  std_logic_vector(31 downto 0);
@@ -33,22 +33,25 @@ end entity formal_eth_tcp_tx;
 
 architecture synthesis of formal_eth_tcp_tx is
 
-   signal busy     : std_logic;
-   signal rd_addr  : std_logic_vector(1 downto 0);
-   signal tx_data  : std_logic_vector(7 downto 0);
-   signal tx_last  : std_logic;
-   signal tx_valid : std_logic;
+   signal seg_ready : std_logic;
+   signal busy      : std_logic;
+   signal rd_addr   : std_logic_vector(1 downto 0);
+   signal tx_data   : std_logic_vector(7 downto 0);
+   signal tx_last   : std_logic;
+   signal tx_valid  : std_logic;
 
 begin
 
    -- psl default clock is rising_edge(clk_i);
    -- psl f_initial_reset : assume rst_i;
-   -- psl f_go : assume always go_i = '1' -> prev(busy) = '0';
+   -- psl f_valid : assume always {seg_valid_i and not seg_ready and not rst_i} |=>
+   --    {seg_valid_i = '1' and
+   --     seg_host_i = prev(seg_host_i) and seg_seq_i = prev(seg_seq_i) and
+   --     seg_ack_i = prev(seg_ack_i) and seg_flags_i = prev(seg_flags_i) and
+   --     seg_wnd_i = prev(seg_wnd_i) and seg_addr_i = prev(seg_addr_i) and
+   --     seg_n_i = prev(seg_n_i)};
    -- psl f_stable : assume always busy = '1' and prev(busy) = '1' ->
-   --    seg_host_i = prev(seg_host_i) and seg_seq_i = prev(seg_seq_i) and
-   --    seg_ack_i = prev(seg_ack_i) and seg_flags_i = prev(seg_flags_i) and
-   --    seg_wnd_i = prev(seg_wnd_i) and seg_addr_i = prev(seg_addr_i) and
-   --    seg_n_i = prev(seg_n_i) and mac_i = prev(mac_i) and ip_i = prev(ip_i);
+   --    mac_i = prev(mac_i) and ip_i = prev(ip_i);
 
 
    i_eth_tcp_tx : entity work.eth_tcp_tx
@@ -63,7 +66,8 @@ begin
          rst_i       => rst_i,
          mac_i       => mac_i,
          ip_i        => ip_i,
-         go_i        => go_i,
+         seg_valid_i => seg_valid_i,
+         seg_ready_o => seg_ready,
          busy_o      => busy,
          seg_host_i  => seg_host_i,
          seg_seq_i   => seg_seq_i,

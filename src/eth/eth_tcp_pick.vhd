@@ -23,7 +23,9 @@
 -- The choice is dropped (drop_i) if a segment is read or the timer runs
 -- out in any of the three cycles, as both change what may be sent. The
 -- segment's header fields (seg_*) and where its data is go to
--- eth_tcp_tx.vhd; the receive window, and the fields of a RST, are taken
+-- eth_tcp_tx.vhd as a segment offered (seg_valid) until the sender takes
+-- it, which it does at once, as a segment is chosen only while the sender
+-- is idle (busy_o); the receive window, and the fields of a RST, are taken
 -- in B_PICK, as the segment is chosen, and adv_wnd_o is the window that
 -- the last segment but a RST told, the one it sent.
 -- The connection books what the segment carries in the cycle it is chosen,
@@ -40,9 +42,9 @@
 -- while one is sent, and every one but a RST acknowledges; the SYN-ACK,
 -- data, the FIN, and the RST are chosen only as the header says, and
 -- data never beyond the data there is or the host's window, but for the
--- probe; and the sender gets the connection's fields, its sequence
+-- probe; and the sender is offered the connection's fields, its sequence
 -- number, and the length chosen, or the RST's fields and numbers, which
--- stay while it is busy.
+-- stay until it takes them, in the cycle after the choice.
 --
 -- RESET
 -- Synchronous, to clk_i. Reset drops the choice and the segment being
@@ -140,11 +142,12 @@ architecture synthesis of eth_tcp_pick is
       return b;
    end function minimum;
 
-   -- The segment being chosen, and the one being sent
+   -- The segment being chosen, and the one offered to the sender
    type   t_build is (B_IDLE, B_SIZE, B_PICK);
    signal build     : t_build                       := B_IDLE;
    signal pick      : std_logic_vector(7 downto 0);
-   signal go        : std_logic                     := '0';
+   signal seg_valid : std_logic                     := '0';
+   signal seg_ready : std_logic;
    signal busy      : std_logic;
    signal seg_host  : t_host                        := C_HOST_NONE;
    signal seg_seq   : std_logic_vector(31 downto 0) := (others => '0');
@@ -191,7 +194,8 @@ begin
          rst_i       => rst_i,
          mac_i       => mac_i,
          ip_i        => ip_i,
-         go_i        => go,
+         seg_valid_i => seg_valid,
+         seg_ready_o => seg_ready,
          busy_o      => busy,
          seg_host_i  => seg_host,
          seg_seq_i   => seg_seq,
@@ -213,7 +217,9 @@ begin
       variable room_v : natural range 0 to 2 ** 16;
    begin
       if rising_edge(clk_i) then
-         go <= '0';
+         if seg_valid = '1' and seg_ready = '1' then
+            seg_valid <= '0';
+         end if;
 
          case build is
 
@@ -274,7 +280,7 @@ begin
                -- Every segment but a RST acknowledges, with the window of
                -- now; a RST tells none.
                if pick /= X"00" then
-                  go <= '1';
+                  seg_valid <= '1';
                end if;
                if pick /= X"00" and pick(2) = '0' then
                   seg_wnd   <= X"0000" + free_i;
@@ -284,8 +290,8 @@ begin
          end case;
 
          if rst_i = '1' then
-            build <= B_IDLE;
-            go    <= '0';
+            build     <= B_IDLE;
+            seg_valid <= '0';
          end if;
       end if;
    end process p_pick;
@@ -300,7 +306,8 @@ begin
       -- psl f_build : assert always build = B_IDLE or build = B_SIZE or build = B_PICK;
       -- psl f_when : assert always pick /= X"00" -> build = B_PICK and drop_i = '0';
       -- psl f_idle : assert always build /= B_IDLE -> busy = '0';
-      -- psl f_go : assert always go = '1' -> prev(busy) = '0';
+      -- psl f_raise : assert always seg_valid = '1' and prev(seg_valid) = '0' -> prev(busy) = '0';
+      -- psl f_at_once : assert always seg_valid = '1' -> seg_ready = '1';
       -- psl f_ack : assert always pick /= X"00" and pick(2) = '0' -> pick(4) = '1';
       -- psl f_rst : assert always pick(2) = '1' ->
       --    rst_req_i = '1' and
@@ -329,20 +336,18 @@ begin
       -- psl f_fields : assert always build /= B_IDLE ->
       --    seg_host = peer_i and seg_ack = rcv_nxt_i and seg_ptr = nxt_ptr_i and
       --    seg_seq = una_seq_i + (nxt_ptr_i - una_ptr_i) + fin_sent_i;
-      -- psl f_sent : assert always go = '1' -> seg_flags = prev(pick) and
-      --    (seg_flags(1) = '0' or seg_seq = prev(iss_i)) and
-      --    (seg_flags(3) = '0' or seg_n = prev(pick_n)) and (seg_flags(3) = '1' or seg_n = 0) and
-      --    (seg_flags(2) = '0' or
-      --     (seg_host = prev(rst_host_i) and
-      --      ((seg_flags(4) = '1' and seg_seq = 0 and seg_ack = prev(rst_num_i)) or
-      --       (seg_flags(4) = '0' and seg_seq = prev(rst_num_i) and seg_ack = 0))));
+      -- psl f_sent : assert always {pick /= X"00" and rst_i = '0'} |=>
+      --    {seg_valid = '1' and seg_flags = prev(pick) and
+      --     (seg_flags(1) = '0' or seg_seq = prev(iss_i)) and
+      --     (seg_flags(3) = '0' or seg_n = prev(pick_n)) and (seg_flags(3) = '1' or seg_n = 0) and
+      --     (seg_flags(2) = '0' or
+      --      (seg_host = prev(rst_host_i) and
+      --       ((seg_flags(4) = '1' and seg_seq = 0 and seg_ack = prev(rst_num_i)) or
+      --        (seg_flags(4) = '0' and seg_seq = prev(rst_num_i) and seg_ack = 0))))};
       -- psl f_wnd : assert always {pick /= X"00" and pick(2) = '0'} |=>
       --    {adv_wnd_o = prev(free_i) and to_integer(seg_wnd) = adv_wnd_o};
       -- psl f_wnd_rst : assert always {pick(2) = '1'} |=>
       --    {adv_wnd_o = prev(adv_wnd_o) and seg_wnd = 0};
-      -- psl f_stable : assert always busy = '1' and go = '0' ->
-      --    seg_host = prev(seg_host) and seg_seq = prev(seg_seq) and seg_ack = prev(seg_ack) and seg_flags = prev(seg_flags) and
-      --    seg_wnd = prev(seg_wnd) and seg_ptr = prev(seg_ptr) and seg_n = prev(seg_n);
 
       -- psl c_syn_sent : cover {pick(1) = '1' and rst_i = '0'};
       -- psl c_data : cover {pick(3) = '1' and pick_n = G_MSS and rst_i = '0'};

@@ -433,9 +433,9 @@ every time, not only the ones a testbench sends.
   for it, not while one is sent, and acknowledges, unless it is a reset;
   the SYN-ACK, data, the FIN, and the reset are chosen only as its header
   says, and data never beyond the data there is or the host's window, but
-  for the probe; and the sender gets the connection's fields, the sequence
-  number, and the length chosen, or the reset's host and numbers, which
-  stay while it is busy.
+  for the probe; and the sender is offered the connection's fields, the
+  sequence number, and the length chosen, or the reset's host and
+  numbers, which stay until it takes them, in the cycle after the choice.
 - `eth_tcp_rx.sby` proves the parser of the TCP server's frames,
   `src/eth/eth_tcp_rx.vhd`, for every frame, with the longest frame read
   60 bytes: the stream is held for exactly the two cycles after a last
@@ -447,7 +447,8 @@ every time, not only the ones a testbench sends.
   done. Its `cover` reaches a good segment, checksums and all.
 - `eth_tcp_tx.sby` proves the sender of the TCP server's segments,
   `src/eth/eth_tcp_tx.vhd`, with a buffer of 4 bytes and segments of 2:
-  it is busy from the start until the last byte has gone; a byte offered
+  it takes a segment offered only while idle, keeps its fields, and is
+  busy from the take until the last byte has gone; a byte offered
   stays until it is taken; the frame has 54 bytes and the data's, in
   order, with the last marked; its header is the one built, checksums and
   all; and its data is read from the segment's address on. The sums of
