@@ -278,8 +278,9 @@ A bitstream built with `make r6 ROM=file.bin` (or `make r3 ...`) has a ROM
 of 32K words at `0x0000`–`0x7FFF`, in front of the RAM, with the words of the
 `.bin` file, and its core boots from it at reset instead of waiting held for
 a host. That is the layout of QNICE-FPGA, whose monitor is in ROM at
-`0x0000`–`0x7FFF` and whose programs load at `0x8000`, and it is where the
-monitor will go. The file is read by Vivado, so the ROM changes only with a
+`0x0000`–`0x7FFF` and whose programs load at `0x8000`, and the
+[monitor](../monitor/README.md) is built for it, though the release's
+ROM still holds the demo. The file is read by Vivado, so the ROM changes only with a
 new bitstream, and a word beyond the ROM fails the build. A write to the
 ROM is dropped, and a clear (bit 2 of the control register) does not
 touch it. So a program in the ROM must keep its stack and its variables

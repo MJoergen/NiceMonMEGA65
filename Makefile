@@ -13,7 +13,7 @@ ARGS   ?=
 LINK    = $(if $(ETH),--eth $(ETH)) $(if $(PORT),--port $(PORT))
 EMU     = nice_cpu/emulator/zig-out/bin/niceemu
 
-.PHONY: help test formal lint diagrams examples demo r3 r6 nexys4ddr cor bump release load run mon flash hwtest linktest cosim cosimtest clean
+.PHONY: help test formal lint diagrams examples demo monitor r3 r6 nexys4ddr cor bump release load run mon flash hwtest linktest cosim cosimtest clean
 
 # Every target but these needs the nice_cpu submodule
 ifeq ($(wildcard nice_cpu/hdl/src/nice_pkg.vhd),)
@@ -24,8 +24,8 @@ endif
 
 help:
 	@echo "Targets:"
-	@echo "  make test       run the GHDL simulation tests (needs GHDL), and the demo's"
-	@echo "                  test in niceemu"
+	@echo "  make test       run the GHDL simulation tests (needs GHDL), and the tests of"
+	@echo "                  the demo and the monitor in niceemu"
 	@echo "  make [-j4] formal"
 	@echo "                  run the formal checks (needs Yosys, its GHDL plugin,"
 	@echo "                  SymbiYosys, and Yices)"
@@ -35,6 +35,8 @@ help:
 	@echo "  make examples   build the C examples to examples/build/*.bin (needs clang)"
 	@echo "  make demo       build the ROM's demo to demo/build/demo.bin, for a"
 	@echo "                  board's target with ROM=demo/build/demo.bin"
+	@echo "  make monitor    build the monitor to monitor/build/monitor.bin, for a"
+	@echo "                  board's target with ROM=monitor/build/monitor.bin"
 	@echo "  make r3 [ROM=prog.bin]"
 	@echo "                  build the bitstream for the MEGA65 R3 (needs Vivado)"
 	@echo "  make r6 [ROM=prog.bin]"
@@ -90,6 +92,7 @@ help:
 test:
 	$(MAKE) -C sim test
 	$(MAKE) -C demo test
+	$(MAKE) -C monitor test
 
 # The formal checks of formal/: each task of each .sby file must pass, as
 # a target of its own, so that "make -j4 formal" runs them side by side. Each
@@ -147,6 +150,9 @@ examples:
 
 demo:
 	$(MAKE) -C demo
+
+monitor:
+	$(MAKE) -C monitor
 
 # The ROM's path is made absolute here, for the board's Makefile runs in
 # its own directory.

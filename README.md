@@ -36,9 +36,11 @@ There are three ways to use the system:
   where a PC does the same, with the same tools.
 
 A monitor like QMON, the one in
-[QNICE-FPGA](https://github.com/sy2002/QNICE-FPGA), is planned but not
-written yet (see [monitor/](monitor/README.md)). It will be in the ROM,
-and will let a MEGA65 on its own load, run, and debug programs too.
+[QNICE-FPGA](https://github.com/sy2002/QNICE-FPGA), is written for the
+ROM and tested in the emulator (see [monitor/](monitor/README.md)): a
+hardware abstraction layer for programs at `0x8000`, and a few commands.
+It cannot load a program on its own yet, so the ROM of a release still
+holds the demo.
 
 ## Quick start
 
@@ -90,9 +92,10 @@ is built with `make -C nice_cpu/emulator build`, which needs Zig (see
 
 With no serial cable, the MEGA65 runs the program in its ROM, from reset.
 Programs may read the keyboard and write the screen. Until the
-[monitor](monitor/README.md) is written, the ROM of a release holds a
-[demo](demo/README.md). This shows the version and how to go further, and
-below that it is a typewriter: what you type appears on the screen.
+[monitor](monitor/README.md) can load a program on its own, the ROM of a
+release holds a [demo](demo/README.md). This shows the version and how to
+go further, and below that it is a typewriter: what you type appears on
+the screen.
 RETURN starts a new line, INST/DEL deletes, the cursor keys move the
 cursor, and CTRL-L clears what you typed. The function keys switch between
 the demos that the second row lists, and the reset button starts the

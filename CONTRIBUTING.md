@@ -16,7 +16,8 @@ or, in an existing clone:
 
 `make` in the top directory lists the targets:
 
-- `make test` runs the simulation tests, and the demo's test in `niceemu`.
+- `make test` runs the simulation tests, and the tests of the demo and the
+  monitor in `niceemu`.
 - `make formal` runs the formal checks (see [The formal
   checks](#the-formal-checks)).
 - `make lint` checks the VHDL style.
@@ -83,7 +84,7 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
 | [sim/](sim/) | The GHDL testbenches. `text_synth.vhd` is the wrapper with which GHDL checks that the display synthesizes. |
 | [formal/](formal/) | The formal checks, for SymbiYosys. |
 | [synth/](synth/README.md) | The Vivado builds for the MEGA65 R3 and R6 boards, and the Nexys4DDR. |
-| [monitor/](monitor/README.md) | The monitor, in NICE assembly: planned, not written yet ([#24](https://github.com/MJoergen/NiceMonMEGA65/issues/24)). Its README has the decisions it will follow, QNICE-FPGA's. |
+| [monitor/](monitor/README.md) | The monitor for the ROM, in NICE assembly: a hardware abstraction layer for programs at `0x8000`, called through a dispatch table, a main loop with a few commands, the file of routines that programs join, the stubs and the header for programs, and its tests in `niceemu`. Its README has the decisions, and [#24](https://github.com/MJoergen/NiceMonMEGA65/issues/24) what is left. |
 | [demo/](demo/README.md) | The demos in the ROM of the release, in NICE assembly, which the function keys switch between: a welcome screen that turns into a typewriter, the key codes, the characters and colors, the counters, a game, and the board: a self-test and the Ethernet station's addresses. |
 | [examples/](examples/) | Example C programs, and the Makefile that builds them for the MEGA65. |
 | [tools/](tools/) | `nicelink.py`, the debug link over the board's Ethernet port or UART, over TCP to `niceemu --link`, or over TCP to the simulated system of `make cosim`, and the tools that use it: `load.py`, which loads a program into the MEGA65 or Nexys4DDR, `run.py`, which runs a program on the board as `niceemu` runs it, `mon.py`, an interactive shell on the link, `hwtest.py`, which tests the system on the board, `flash.py`, which writes the Nexys4DDR's flash or a slot of the MEGA65's, `bump.py`, which records the MEGA65's timing for a nice_cpu tag, `release.py`, which builds and publishes a release, `linktest.py`, which checks `run.py` and `mon.py` on `niceemu --link`, `cosimtest.py`, which checks `run.py` on the simulated system, and `screenshot.py`, which draws a program's screen in `niceemu` as a PNG picture. |
@@ -95,7 +96,7 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
 | [.claude/rules/synth.md](.claude/rules/synth.md) | Notes for Claude Code on the Vivado builds: where Vivado is, how to build, and what to check after a build. |
 | [vsg.yml](vsg.yml) | The configuration of `make lint`, which checks the VHDL against [CODING_STYLE.md](doc/CODING_STYLE.md). |
 | [CLAUDE.md](CLAUDE.md) | Instructions for Claude Code: the commands, the layout, and the pitfalls. |
-| [.github/workflows/ci.yml](.github/workflows/ci.yml) | The CI: `make test` and `make cosimtest` on both cores, with niceemu built for its step counts, `make examples`, the demo's test, `make linktest`, `make formal`, and `make lint`. It cannot run `make hwtest` or build a bitstream. |
+| [.github/workflows/ci.yml](.github/workflows/ci.yml) | The CI: `make test` and `make cosimtest` on both cores, with niceemu built for its step counts, `make examples`, the tests of the demo and the monitor, `make linktest`, `make formal`, and `make lint`. It cannot run `make hwtest` or build a bitstream. |
 
 ### What is in src/
 

@@ -1,0 +1,21 @@
+NiceMon V9.9
+? lists the commands
+> r
+Hello from C at 00008000, table 1.0
+at column 40
+on the line only
+Returned 00000007
+> h
+Halted
+ffff0168: 000ff061 000ff074 000ff020 000ff063 000ff06f 000ff06c 000ff075 000ff06d
+ffff0170: 000ff06e 000ff020 000ff034 000ff030
+Screen:
+|NiceMon V9.9
+|? lists the commands
+|> r
+|Hello from C at 00008000, table 1.0
+|                                        at column 40
+|Returned 00000007
+|> h
+|Halted
+exit 0

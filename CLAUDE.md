@@ -5,9 +5,9 @@ and R6 boards, the main target; the Digilent Nexys4DDR also builds, with
 UART, VGA, a PS/2 keyboard, and its LEDs, seven-segment display, buttons,
 and switches as registers. It has nice_cpu's debug link
 (`nice_cpu/doc/DEBUG.md`, `hdl/src/debug_link.vhd`) on the debug UART, a
-text display on VGA and HDMI, a ROM at address 0 for a QMON-like
-hardware abstraction layer that is planned but not written
-(`monitor/README.md`, issue #24), and host
+text display on VGA and HDMI, a ROM at address 0 with the monitor, a
+QMON-like hardware abstraction layer for programs at 0x8000 and a few
+commands (`monitor/README.md`; issue #24 has what is left), and host
 tools that load and run programs. The goal is that a program runs on the
 board exactly as `niceemu`, the emulator in `nice_cpu/emulator`, runs it.
 `README.md` is for users of the core files: on its own, over Ethernet,
@@ -31,12 +31,13 @@ header is the authoritative address map.
 ## Commands
 
     make                  # lists the targets
-    make -j test          # GHDL: synth checks, tb_hello, tb_nicemon, tb_kbd, tb_ps2, tb_ps2_nicemon, tb_text, tb_dbg, tb_dbg_host, tb_dbg_decode, tb_board_io, tb_rmii_rx, tb_rx_fcs, tb_eth_rx_fifo, tb_eth_tx_fifo, tb_rmii_tx, tb_eth, tb_eth_tcp, tb_eth_tcp_random, check-steps, check-fmt (NICE=multi for the multi-cycle core); then the demo in niceemu
+    make -j test          # GHDL: synth checks, tb_hello, tb_nicemon, tb_kbd, tb_ps2, tb_ps2_nicemon, tb_text, tb_dbg, tb_dbg_host, tb_dbg_decode, tb_board_io, tb_rmii_rx, tb_rx_fcs, tb_eth_rx_fifo, tb_eth_tx_fifo, tb_rmii_tx, tb_eth, tb_eth_tcp, tb_eth_tcp_random, check-steps, check-fmt (NICE=multi for the multi-cycle core); then the demo and the monitor in niceemu
     make -j formal        # SymbiYosys jobs in formal/, each task in a work directory of its own
     make lint             # vsg against doc/CODING_STYLE.md; line-length warnings are tolerated
     make diagrams         # src/system.tex and src/eth/eth.tex -> the PNGs of their READMEs (pdflatex)
     make examples         # C examples -> examples/build/*.bin (clang wasm32, lld, llvm)
     make demo             # the ROM's demo -> demo/build/demo.bin; make -C demo test runs it in niceemu
+    make monitor          # the monitor -> monitor/build/monitor.bin; make -C monitor test runs it in niceemu
     make r6 [ROM=f.bin]   # Vivado bitstream, synth/r6/build/top.bit; make r3 and make nexys4ddr likewise
     make cor [ROM=f.bin]  # MEGA65 core files for MEGAFLASH, synth/r{3,6}/build/NiceMonMEGA65-r{3,6}.cor (coretool)
     make load FILE=p.bin  # load and start a program on the board (ETH=IP or PORT=/dev/ttyUSB1, one needed)
@@ -63,7 +64,7 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
 `nice_cpu/emulator/zig-out/bin/niceemu x.bin`. CI
 (`.github/workflows/ci.yml`, on Ubuntu 24.04) builds niceemu and runs
 `make -C sim -j4 test` and `make cosimtest` on both cores, `make examples`,
-`make -C demo test`, `make linktest`, `make -j4 formal`, and `make lint`.
+`make -C demo test`, `make -C monitor test`, `make linktest`, `make -j4 formal`, and `make lint`.
 
 ## Layout
 
@@ -113,6 +114,11 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   nice_cpu's wasm translator. `demo/`: the welcome screen and typewriter
   in NICE assembly that the release puts in the ROM (`release.py`), and
   `demo_hw.py`, which checks it in the ROM of a programmed board.
+  `monitor/`: the monitor for the ROM in NICE assembly (`monitor.nasm`,
+  the dispatch table, the HAL, and the commands), the routines that
+  programs join (`monlib.nasm`), the stubs and the header through which
+  a program calls the entries (`mon.nasm`, `mon.h`), and its tests in
+  niceemu (`test/`, with `cat monitor.bin prog.bin`).
 
 ## Rules and pitfalls
 
