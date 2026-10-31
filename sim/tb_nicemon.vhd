@@ -735,14 +735,18 @@ begin
       -- While the program runs, the link reaches its debug registers only,
       -- and reads R0-R15 live: R15 is in the loop that waits for a byte,
       -- the three instructions of two words at 0, 2, and 4, and moves
-      -- between reads.
+      -- between reads. The pipelined core commits an instruction at a
+      -- time, so its R15 is 0, 2, or 4; the multi-cycle core adds 1 to
+      -- R15 for each word it fetches, so a read within an instruction
+      -- shows its constant word, 1, 3, or 5, or 6 while the branch at 4
+      -- is carried out.
       check("FFFFFFF0", "00000008");
       check("FFFFFFF3", "00000010");
       read_word("FFFFFFEF", micros_v);
       moved_v := false;
       for i in 1 to 4 loop
          read_word("FFFFFFEF", cycles_v);
-         assert cycles_v = X"00000000" or cycles_v = X"00000002" or cycles_v = X"00000004"
+         assert cycles_v <= 6
             report "tb_nicemon: R15 is " & to_hstring(cycles_v) & " while the core waits for a byte"
             severity failure;
          if cycles_v /= micros_v then
