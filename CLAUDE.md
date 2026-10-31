@@ -22,7 +22,9 @@ the screen, of which stages 1 to 8 are written, the overlay, its host
 of the link, the live strip with the core's keys, Strip with the
 catch, the page of memory, the breakpoints, the Nexys4DDR's buttons
 and display, and the decode of row 27 (issue #52, and
-nice_cpu#85 and #86 for what it needs there). `doc/` also has `CODING_STYLE.md`,
+nice_cpu#85 and #86 for what it needs there). `doc/BASIC_SURVEY.md` is
+the survey of the BASIC dialects behind the interpreter in the ROM of
+issue #54 (milestone V2.0). `doc/` also has `CODING_STYLE.md`,
 `RELEASE.md`, and `RELEASE_NOTES.md`; the root keeps only `README.md`,
 `CONTRIBUTING.md`, and this file.
 `src/nicemon.vhd` is the whole system and the file to read first; its
