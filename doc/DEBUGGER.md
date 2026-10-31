@@ -2,14 +2,17 @@
 
 A debugger in the FPGA, with the MEGA65's own keyboard and screen and no
 host: what `tools/mon.py` does over the debug link, in a strip of text
-under the program's screen, and a page over it. **Stages 1 to 8 are
+under the program's screen, and a page over it. **Stages 1 to 9 are
 written, and the rest is planned**
-([#52](https://github.com/MJoergen/NiceMonMEGA65/issues/52)): the toggle
-key enters Focus, where the strip shows the core's state, its registers
-at a stop, and the word at the PC, and F1 to F9 run the core; F12 keeps
-the strip up when Focus is left, and a stop in Strip comes back to
-Focus; and F11 shows the page, a window on the memory, where a word is
-written and a breakpoint set at the cursor. This note
+([#52](https://github.com/MJoergen/NiceMonMEGA65/issues/52) and
+[#53](https://github.com/MJoergen/NiceMonMEGA65/issues/53)): the toggle
+key enters Focus, where the strip shows the core's state, its registers,
+live while it runs, and the word at the PC at a stop, and F1 to F9 run
+the core; F12 keeps the strip up when Focus is left, and a stop in Strip
+comes back to Focus; and F11 shows the page, a window on the memory,
+where a word is written and a breakpoint set at the cursor. The debugger
+is a client of the debug link inside the system, beside a host on the
+UART or over TCP, which keeps its line. This note
 records the design and the decisions, as
 [monitor/README.md](../monitor/README.md) does for the ROM of
 [#24](https://github.com/MJoergen/NiceMonMEGA65/issues/24), a hardware
@@ -30,11 +33,14 @@ load a program without a host, or know a label.
 The debugger has three states, and the core's state is a different
 thing: the debugger can be up while the program runs.
 
-| State | Overlay | The link | The keyboard |
+| State | Overlay | The link's side port | The keyboard |
 |---|---|---|---|
-| Off | None | The host's: the UART, or TCP | The program's |
-| Strip | The strip, live | The debugger's | The program's |
-| Focus | The strip, and the page on demand | The debugger's | The debugger's |
+| Off | None | Not used | The program's |
+| Strip | The strip, live | Read, 60 times a second | The program's |
+| Focus | The strip, and the page on demand | Read, and written by the keys | The debugger's |
+
+The line, the UART's or the TCP connection's, is the host's in every
+state.
 
 - Reset leaves it Off. Nothing changes for anyone who never presses the
   key combination.
@@ -45,22 +51,23 @@ thing: the debugger can be up while the program runs.
   display too (see [The Nexys4DDR](#the-nexys4ddr)).
 - In Strip, a halt, or a pause the debugger did not ask for, such as a
   breakpoint, takes the debugger to Focus: it catches what stops the
-  core. It sees the stop on the link, as the notice `h`, `p`, or `x`. A
-  step or a pause of its own keys is not caught, also when Focus was
-  left before its notice came. Off is not caught from: the link is a
-  host's then, and a host's tools wait for the notices of their own
-  halts and pauses, which a catch would cut off.
-- In Strip and Focus the debugger owns the link. The UART's and the TCP
-  host's bytes are dropped meanwhile, and nothing is sent to them, as the
-  UART's are while a TCP host is connected today (`src/nicemon.vhd`). A
-  host that is connected when the debugger comes up loses the link until
-  the debugger goes Off. The side port [below](#how-it-drives-the-link)
-  removes the problem.
+  core. It sees the stop as a rising edge of the core's pause or halt,
+  `nicemon`'s `paused_o` and `halted_o`, as the link's side port brings
+  no notices. A step or a pause of its own keys is not caught, also when
+  Focus was left before the stop came. Off is not caught from: a host's
+  tools stop the core on purpose, and a catch would take the keyboard
+  from the program and show the debugger to those who never press the
+  combination.
+- In every state the line is the host's, the UART's or the TCP
+  connection's: the debugger is a second client of the link, through its
+  side port ([below](#how-it-drives-the-link)), and the host keeps its
+  answers, its notices, and the console. The host gets the notices of a
+  stop that the debugger caused, `p`, `x`, or `h`, as it does for a
+  breakpoint, and may read a state it did not set (DEBUG.md §3).
 - The program's keyboard input is unaffected in Off and Strip: the
   keyboard's bytes go into the console FIFO as now, not through the link.
-  The console bytes that a host sends do not arrive while the debugger
-  owns the link, and the program's console output goes to the debugger,
-  which takes it and drops it until it has a console page.
+  The console is the host's in every state, both ways; a console page
+  here waits for a tap on the core's output.
 
 ## The display
 
@@ -83,15 +90,15 @@ on dark blue, `0x004` and `0xFFF`:
  F1 step  F3 go  F5 pause  F7 hold  F9 restart  F11 page  F12 keep strip: off
 ```
 
-- Rows 25 and 26: R0–R15 in hex. At a stop they are the link's values.
-  While the core runs they are what the link returns then: until
-  nice_cpu V1.2 the values of the last stop, shown dimmed, and from V1.2
-  the live register file
-  ([nice_cpu#85](https://github.com/MJoergen/nice_cpu/issues/85)), as
-  `niceemu --link` returns it.
+- Rows 25 and 26: R0–R15 in hex, as the link returns them (DEBUG.md
+  §6): live while the core runs, as `niceemu --link` returns them
+  ([nice_cpu#85](https://github.com/MJoergen/nice_cpu/issues/85)), and
+  the stop's values while it is paused or has halted. While it is held
+  they are dimmed: the link keeps the values of the last stop then,
+  which may be another program's.
 - Row 27: the core's state, `RUNNING`, `PAUSED`, `BRK n` at breakpoint
   n, `HALTED n` with the reason of DEBUG.md §6, `HELD`, or `NO LINK`
-  when the link does not answer; the PC; the
+  until the link has answered after reset; the PC; the
   instruction word at the PC; the flags of SR, X, C, Z, N, V, E, and I,
   each shown or a dot; and the instruction decoded, from column 46: the
   condition, the mnemonic with `[C]`, `[M]`, or `[CM]`, and the
@@ -101,8 +108,9 @@ on dark blue, `0x004` and `0xFFF`:
   word is `reserved`. The debugger reads the constant words that the
   instruction word says it takes, and none past them, which could be a
   device's register. While the core runs the
-  memory is out of reach (DEBUG.md §3), so the row shows the state, and
-  the PC once it is live.
+  memory is out of reach (DEBUG.md §3), so the row shows the state and
+  the PC, dashes for the word, and no decode; while the core is held,
+  dashes for the PC too.
 - Row 28: the keys, and the sticky setting, `keep strip: off` or `on`.
   In Strip, where the keys are the program's, it says so, and names the
   toggle key: `The keys are the program's.  MEGA+HELP for the debugger`.
@@ -132,8 +140,8 @@ on when Focus is left, and shows again when Focus comes back.
 
 The words are read, all 176 in one request, when the page is shown and
 the core is stopped: paused, halted, or held. They are read again after
-a stop notice, a write, and a move of the window, and while the core
-runs they are dimmed, as the registers are. A move of the window shows
+a stop, a write, and a move of the window, and while the core runs they
+are dimmed. A move of the window shows
 dashes until the new words are read, and a read that a move overtook is
 dropped. A code page, the decode of a range of instructions, comes with the
 disassembler.
@@ -230,9 +238,10 @@ and outputs, and its room.
   The program reads the buttons as 0 meanwhile: `system.vhd` gives
   `nicemon` the buttons masked by `focus_o`, and the debugger, which
   debounces them itself, the raw ones: it samples them every 5 ms, and
-  a press is a sample at 1 after one at 0. The display shows the PC at
-  a stop, eight hex digits on its eight digits, and dashes otherwise,
-  live once the registers are, through a hex-to-segments table in the
+  a press is a sample at 1 after one at 0. The display shows the PC,
+  eight hex digits on its eight digits, live while the core runs and the
+  stop's at a stop, and dashes while the core is held or before the link
+  has answered, through a hex-to-segments table in the
   debugger; `system.vhd` gives the board
   the debugger's segments in Focus and the program's otherwise. The
   LEDs stay the program's.
@@ -248,7 +257,8 @@ and outputs, and its room.
   stage 3 0.339 ns and 0.031 ns, that of stage 4 0.532 ns and 0.029 ns,
   that of stage 5 0.111 ns and 0.017 ns, on a path in the core, that
   of stage 6 0.139 ns and 0.022 ns, also in the core, that of stage 7
-  0.159 ns and 0.034 ns, that of stage 8 0.187 ns and 0.019 ns, and the
+  0.159 ns and 0.034 ns, that of stage 8 0.187 ns and 0.019 ns, that of
+  stage 9 0.166 ns and 0.025 ns, and the
   slacks move with
   placement more than with logic ([synth/README.md](../synth/README.md#timing)): every
   stage rebuilds `make nexys4ddr` and reads its timing, and a miss there
@@ -262,60 +272,66 @@ and outputs, and its room.
 
 ## How it drives the link
 
-The debugger is a third host of the link. `src/nicemon.vhd` muxes two
-today, the UART, and the TCP server while `net_on_i` is '1', through the
-register stage `p_lnk_rx`. It gets a third pair of byte streams,
-`dbg_on_i`, `dbg_rx_*`, and `dbg_tx_*`, with the debugger first, then
-TCP, then the UART. The debugger speaks DEBUG.md's packets: a `W` to the
-control register to pause, step, go on, hold, or start, `R` for the
-registers and the memory, and `W` for a word or a breakpoint. It parses
-the answers `k`, `r`, and `e`, the notices `p`, `x`, `h`, and `o`, and
-the program's console bytes, which the owner of the line receives. It
-always takes a console byte: a console write of the core waits for the
-byte before it (`nicemon.vhd`), so a host that does not take them slows
-the program.
+The debugger is a client of the debug link inside the system (DEBUG.md
+§3), through the link's side port
+([nice_cpu#86](https://github.com/MJoergen/nice_cpu/issues/86),
+`debug_link.vhd`, contract g) into `p_acc`, the process that holds the
+debug registers and runs the Wishbone master: a word at a time, with
+valid held until done, an error for a word that is not a debug register
+while the core runs, and the word read. `src/nicemon.vhd` passes the
+port through as `dbg_*`, beside the mux of the UART and the TCP server,
+which keeps the line: the host's answers, its notices, and the console
+go on as before, and the host gets the notices of a stop the debugger
+caused, `p`, `x`, or `h`, as it does for a breakpoint. The link serves
+the host's words first, and a word of the debugger's waits for a clear,
+as a host's does. The side port brings no notices, so the debugger sees
+a stop as a rising edge of the core's pause or halt, `nicemon`'s
+`paused_o` and `halted_o`, and the end of one as a falling edge, which
+drops the word at the PC and the window it read at the stop, also when
+a host went on.
 
-So `debug_link.vhd` is unchanged, its formal checks stand, the protocol
-is specified, and the host in hardware is tested against the very link
-the board has. Serializing hex inside an FPGA is odd, but at the
-keyboard's pace it costs nothing: a read of the 16 registers is about
-170 bytes, microseconds on the link. The strip is refreshed about 60
-times a second from a timer in the system clock.
+`src/dbg/dbg_host.vhd` is the adapter between the debugger's requests,
+a read of a run of words or a write of one, as a host's `R` and `W`,
+and the port's single words: it walks the addresses, gives the words
+read out one at a time, and ends the request the cycle after the last,
+or at once with the code `02` when the link refuses a word. There is
+no timeout: the link answers every word (contract g), after the host's
+accesses, a clear, and the memory, as a host's word would wait. The
+strip is refreshed about 60 times a second from a timer in the system
+clock; a refresh is 28 words, microseconds on the port.
 
-Then, with nice_cpu V1.2, the debugger gets a word-level side port into
-the link's `p_acc`, the process that holds the debug registers and runs
-the Wishbone master
-([nice_cpu#86](https://github.com/MJoergen/nice_cpu/issues/86)). The
-line stays the host's, the debugger is a client beside it, and the
-hardware host here becomes an adapter: the hex goes, and so does the
-cut-off host.
+Stages 2 to 8 had a host in hardware instead: `dbg_host.vhd` spoke
+DEBUG.md's packets into a third input of the link's mux, so that
+`debug_link.vhd` stayed unchanged until nice_cpu V1.2, and the debugger
+owned the line while it was up, with the host cut off. Serializing hex
+inside the FPGA cost nothing at the keyboard's pace, but the side port
+removed both the hex and the cut-off host.
 
 ## The modules
 
 - `src/dbg/dbg.vhd`: the debugger: the states, the refresh, the keys,
   and the drawing into the overlay. Ports: the toggle pulse; the
-  keyboard's bytes, with valid and ready; the link's byte streams and
-  `on_o`; the overlay's write
+  keyboard's bytes, with valid and ready; the link's side port, `lnk_*`,
+  and the core's `paused_i` and `halted_i`; the overlay's write
   port, `ovl_we_o`, `ovl_addr_o`, and `ovl_data_o`, with `strip_o` and
   `page_o`; `focus_o`, for the keyboard mux; and, with `G_BOARD_IO`, the
   five buttons in and the display's 64 segment bits out. A generic names
   the toggle key for row 28.
-- `src/dbg/dbg_host.vhd`: the host in hardware (written). A request in,
-  with valid and ready: an `R` of a count of words from an address, or
-  a `W` of one word, as the debugger writes one register or one word at
-  a time. The words of the `r` out, as they arrive, and the end of the
-  request, with `e`'s code or a code of its own, `FF`, when no answer
-  came in time; the link's byte streams, which it always takes; the
-  notices out, with the version, the breakpoint's number, or the halt
-  reason; and the console bytes out.
+- `src/dbg/dbg_host.vhd`: the adapter to the side port (written). A
+  request in, with valid and ready: a read of a count of words from an
+  address, or a write of one word, as the debugger writes one register
+  or one word at a time. The words read out, one a cycle at the most,
+  and the end of the request, with the link's code `02` when it refused
+  a word; and the side port out, `side_*`.
 - `src/dbg/dbg_decode.vhd` (written): the instruction word and its
   constant words in, the text of row 27 out, a character a cycle.
 - `src/video/text.vhd`: the 29 rows, the overlay memory, and its ports:
   `ovl_we_i`, `ovl_addr_i`, `ovl_data_i`, `strip_i`, and `page_i`.
-- `src/nicemon.vhd`: the third input of the link's mux, `dbg_on_i`,
-  `dbg_rx_*`, and `dbg_tx_*`, like `net_*` (written).
+- `src/nicemon.vhd`: the link's side port as `dbg_*`, and the core's
+  `paused_o` and `halted_o` (written).
 - `src/system.vhd`: instantiates the debugger beside `eth` and `text`;
-  `dbg_toggle_i`, the pulse; the keyboard mux, which gives the bytes to
+  `dbg_toggle_i`, the pulse; the side port and the core's state between
+  `nicemon` and the debugger; the keyboard mux, which gives the bytes to
   the debugger while `focus_o` is '1' and to `nicemon` otherwise; and,
   with `G_BOARD_IO`, the buttons masked by `focus_o` to `nicemon` and
   raw to the debugger, and the debugger's segments to the board in Focus
@@ -331,9 +347,9 @@ cut-off host.
   Page Up, Page Down, and Home, and MEGA as a modifier.
 
 Nothing new touches the core's paths, whose setup slack is about 0.1 ns
-([synth/README.md](../synth/README.md#timing)): the mux's third input
-goes through the register stage that exists, and the two new outputs
-are existing signals. The overlay takes 4 of the 230 free block RAMs of
+([synth/README.md](../synth/README.md#timing)): the side port is a
+client of the link's own `p_acc`, and the core's pause and halt are
+existing signals. The overlay takes 4 of the 230 free block RAMs of
 the MEGA65, and the logic a few hundred to a thousand LUTs of the 88 %
 free.
 
@@ -341,21 +357,25 @@ free.
 
 - `tb_text` with `G_PPM_FILE` writes a frame as a picture; a case with
   the strip and one with the page show the layout.
-- `tb_dbg_host` (written): the host in hardware against `debug_link`
-  itself, in GHDL, on `nicemon`'s third input, with `sim/host.nasm`:
-  write the control register, read it back, load a program and read it
-  back, pause, read R0–R15, step, and catch `p`; a read while the core
-  runs gets `e02`; console bytes arrive in order between packets; the
-  UART's bytes are dropped; and a request that the link never gets
-  times out.
+- `tb_dbg_host` (written): the adapter against `debug_link` itself, in
+  GHDL, on `nicemon`'s side port, with `sim/host.nasm` and a host on the
+  UART: read the version, load a program and read it back, start it,
+  read the control register while it runs and get `e02` for the memory,
+  pause, read R0–R15, and step; the UART gets `b05` and the `p` of each
+  stop, and the console bytes in order; a packet on the UART is answered
+  while the adapter reads, and a go on from the UART ends a long read of
+  the adapter's with `e02` after the words it got while the core was
+  paused; and a read of no words ends at once.
 - `tb_dbg_decode` (written): the decode against `nicedis.py`, on about
   3000 instruction words of every class, condition, modifier, and mode,
   with their constant words, from `sim/gen_decode.py`, and a start in
   the middle of a decode.
-- `tb_dbg` (written for stage 8): the debugger with `nicemon`, driven
+- `tb_dbg` (written for stage 9): the debugger with `nicemon`, driven
   by keyboard bytes and toggle pulses, checking the overlay's words and
-  the link's state. The program under it is `sim/dbg.nasm`, in the ROM:
-  F5, s, F3, the halt, r, F7, and g and p on a held core, with the
+  its requests on the side port. The program under it is `sim/dbg.nasm`,
+  in the ROM: the registers live, R1 counting, and the PC on the display
+  while the core runs; F5, s, F3, the halt, r, F7, with the registers
+  dimmed, and g and p on a held core, with the
   decode of row 27 at each stop; F12 and Strip,
   a step of its own that is not caught, the catch of a halt in Strip,
   and no catch from Off; and the page: the ROM's words, the cursor keys,
@@ -371,16 +391,26 @@ free.
 - `tb_kbd` and `tb_ps2`: the two toggle detectors, with a held key's
   repeats and its release, and one key of MEGA+HELP alone; and Page Up,
   Page Down, and Home from both keyboards.
-- Formal (written): the packets of `dbg_host` are well formed, with the
-  parser of `debug_link.vhd`'s FORMAL block as the model, and carry the
-  request's fields (`formal/dbg_host.sby`).
+- `tb_nicemon` (written): R15 read over the UART while the program
+  waits for a byte, in its loop and moving between reads, the live
+  registers of nice_cpu V1.2.
+- Formal (written): `dbg_host` holds a word on the side port, with its
+  fields, until the link is done with it (contract g), asks for the
+  request's addresses in order, ends after its count of words or at a
+  refusal, and once (`formal/dbg_host.sby`).
+- On the board (done on the R6 on 2026-10-31): `make hwtest` with the
+  Ethernet station passes on the bitstream of stage 9; a host over TCP
+  that reads the control register and R0–R15 twice a second keeps its
+  line while MEGA+HELP brings the debugger up, and gets the `p` of the
+  debugger's F5; and the strip shows R1 counting and the PC moving while
+  the program runs, white, and the stop's values at the pause.
 - `make hwtest`, a stretch goal: a register of `board_io.vhd` at
   `0xFFFFFF9E` that enters Focus when written, so that the test enters
   the debugger over the UART with no one at the keyboard, and so that
   `make cosimtest` reaches it too. A program can then drop into the
   debugger on purpose, a software breakpoint, which the ISA has none of.
-  This waits for the side port: with the host in hardware, the test
-  would lose its own link the moment the debugger came up.
+  The side port makes it possible: the test keeps its link while the
+  debugger is up.
 
 The testbenches join `make -j test` and the CONTRIBUTING.md list as they
 come.
@@ -396,15 +426,17 @@ Each a commit that builds and passes the tests:
    entities of their own; `system.vhd` the keyboard mux. No link
    involved. Tests: `tb_text`'s picture, the first case of `tb_dbg`, and
    the detectors in `tb_kbd` and `tb_ps2`.
-2. **The host in hardware** (done). `dbg_host.vhd`, the third input of
-   the mux in `nicemon.vhd`, and the formal check. Test: `tb_dbg_host`.
+2. **The host in hardware** (done, and replaced at stage 9).
+   `dbg_host.vhd`, the third input of the mux in `nicemon.vhd`, and the
+   formal check. Test: `tb_dbg_host`.
 3. **The live strip and the core keys** (done). The refresh of the
    control register, the halt reason, and the stop register; F1 to F9
    and their letters; R0–R15 and the word at the PC read at a stop,
    which a `p`, `x`, or `h` makes the debugger look for at once. The
    first useful debugger.
 4. **The catch, and the sticky setting** (done). Strip, F12, and the
-   catch of a stop in Strip from the link's notices.
+   catch of a stop in Strip from the link's notices, which stage 9 moved
+   to the core's pause and halt.
 5. **The page** (done). The window, the cursor, the input field, the
    word edit, `a`, and Page Up, Page Down, and Home from both keyboards.
 6. **The breakpoints** (done). `b`, the header's list, the colored
@@ -412,11 +444,13 @@ Each a commit that builds and passes the tests:
 7. **The Nexys4DDR's buttons and display** in Focus (done).
 8. **The decode** of row 27, `dbg_decode.vhd` (done).
 9. **nice_cpu V1.2**
-   ([#53](https://github.com/MJoergen/NiceMonMEGA65/issues/53)). At
-   the bump, the registers are live while the core runs (nice_cpu#85),
-   and the strip stops dimming them; and the debugger moves to the side
-   port (nice_cpu#86): `dbg_host.vhd` becomes an adapter, and the line
-   returns to the UART and TCP.
+   ([#53](https://github.com/MJoergen/NiceMonMEGA65/issues/53), done,
+   and tested on the R6). The registers are live while the core runs (nice_cpu#85), and the
+   strip dims them only while the core is held; and the debugger moved
+   to the side port (nice_cpu#86): `dbg_host.vhd` is an adapter, the
+   line is the UART's and TCP's again, and the catch watches the core's
+   pause and halt. Tests: `tb_dbg`, `tb_dbg_host`, the formal check, and
+   `tb_nicemon`.
 10. Later, in no order: a console page, with a tap on the core's
     console output beside the line; the code page with a disassembler; the `board_io` register for `hwtest`; loading and
     saving on the SD card.
@@ -425,14 +459,14 @@ Each a commit that builds and passes the tests:
 
 Made on 2026-10-30, with the reasons:
 
-- **A host in hardware first, the side port later.** The link is
-  unchanged and formally checked, the protocol is written down, and the
-  debugger is tested against the real link; the side port is a change in
-  nice_cpu, nice_cpu#86, and comes with V1.2, to get rid of the hex and
-  of the cut-off host below.
+- **A host in hardware first, the side port later** (done at stage 9).
+  The link was unchanged and formally checked, the protocol is written
+  down, and the debugger was tested against the real link; the side port
+  was a change in nice_cpu, nice_cpu#86, and came with V1.2, to get rid
+  of the hex and of the cut-off host below.
 - **The host is cut off while the debugger is up.** Accepted until the
-  side port. MEGA+HELP wins over a connected TCP host: the person at
-  the keyboard is at the board.
+  side port, which ended it at stage 9. MEGA+HELP won over a connected
+  TCP host: the person at the keyboard is at the board.
 - **The UART and Ethernet are not served at once**
   ([#44](https://github.com/MJoergen/NiceMonMEGA65/issues/44), closed).
   The side port frees the line from the debugger, and the merge of two
@@ -462,13 +496,26 @@ Made on 2026-10-30, with the reasons:
   outputs). A catch from Off takes the link from a host at the stop: a
   program that `run.py` runs halts, and the `h` it waits for is cut off,
   and so are mon.py's pause and step and `make hwtest`'s. It also showed
-  the debugger to those who never press the combination. In Strip the
-  debugger has the link already, so its notices are enough, and
-  `nicemon` needs no outputs for it.
+  the debugger to those who never press the combination. With the side
+  port the link is no longer taken, but a catch from Off would still
+  take the keyboard from the program and show the debugger unasked, so
+  Off stays uncaught.
 - **Live registers through the link**, nice_cpu#85, not a tap on the
-  core's register file here: the link is the one engine, and `niceemu
-  --link` returns them live already, so the board comes to match the
-  emulator.
+  core's register file here (done at stage 9): the link is the one
+  engine, and `niceemu --link` returns them live already, so the board
+  comes to match the emulator.
+- **Stops from the core's signals, not the link's notices** (decided at
+  stage 9). The side client gets no notices (DEBUG.md §3), and `nicemon`
+  has the core's pause and halt: a rising edge is a stop, and a falling
+  edge its end, which also sees a host's step or go on and drops the
+  word at the PC and the window read at the stop.
+- **No timeout in the adapter** (decided at stage 9). The side port
+  answers every word (contract g), and a word is held until it does; a
+  timeout would drop a word the link still holds. `NO LINK` is only the
+  state before the first answer after reset.
+- **Dimmed while held** (decided at stage 9). The link keeps the last
+  stop's registers through a hold, which may be another program's after
+  a load; gray says so, as it said "not of this stop" before.
 - **Key per action**, not a command line: a command line needs an editor
   and a parser, and a debugger at a keyboard is used with single keys.
   The letters are mon.py's, for the fingers that know them.

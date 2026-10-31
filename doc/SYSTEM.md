@@ -42,10 +42,10 @@ The Ethernet port carries the same line over TCP (see [The debug link
 over TCP](#the-debug-link-over-tcp)). While a host is connected there,
 its connection takes the UART's place in what this document says of the
 UART: the console bytes, the packets, the notices, and the break.
-While the on-board debugger is up ([DEBUGGER.md](DEBUGGER.md)), in
-Focus or in Strip, it drives the link itself, and the bytes of both the
-UART and TCP are dropped, and none is sent to them; so are a break, a
-host's half-close, and the renewal of a new connection.
+The on-board debugger ([DEBUGGER.md](DEBUGGER.md)) is a client of the
+link inside the system, through its side port (nice_cpu's DEBUG.md §3):
+while it is up, the host keeps its line, and gets the notices of a stop
+that the debugger caused.
 
 Without a ROM, the core is held in reset at power-up; with one, it runs
 the ROM (see [The ROM](#the-rom)). A host loads a program with two
@@ -121,7 +121,7 @@ effect and does not write (DEBUG.md §3).
 | `0xFFFFFF50`–`0xFFFFFF7F` | The fetch statistics of MICROARCH.md §8.1, the rest of the performance counters: counters of what FETCH and DECODE do, for judging the size of FETCH's buffer. A start of the core clears them, and they then count each clock while the core runs, until a write of 0 to `FS_CTRL` stops them. They stop while the core is held and after it halts. With the multi-cycle core (`NICE=multi`), only `FS_CYCLES` and `FS_HIST[0]` count, `FS_CTRL` reads its run bit, and the other words read 0. |
 | `0xFFFFFF80`–`0xFFFFFF8F` | The screen's registers: the cursor and the display offset (see [The screen](#the-screen)). |
 | `0xFFFFFF90`–`0xFFFFFF9F` | The Nexys4DDR's LEDs, seven-segment display, buttons, and switches (see [The Nexys4DDR's devices](#the-nexys4ddrs-devices)). On the MEGA65 they read 0 and take no write. On every board, `0xFFFFFF98`–`9D` are the Ethernet station (see [The Ethernet station](#the-ethernet-station)). |
-| `0xFFFFFFE0`–`0xFFFFFFEF` | The debug registers of DEBUG.md §6, for the link only, here and below: R0–R15 of the core, read only. After a halt they hold what the emulator prints. While the core is paused they hold its registers, with R15 the address of the next instruction, and a hold of the paused core keeps them. A hold of a running core leaves them undefined. |
+| `0xFFFFFFE0`–`0xFFFFFFEF` | The debug registers of DEBUG.md §6, for the link only, here and below: R0–R15 of the core, read only. While the core runs they read its registers live, as `niceemu --link` returns them, each word from the cycle of its own read. After a halt they hold what the emulator prints. While the core is paused they hold its registers, with R15 the address of the next instruction, and a hold of the paused core keeps them. A hold of a running core leaves them undefined. |
 | `0xFFFFFFF0` | Control: hold, clear, hide, pause, and step (see [The control register](#the-control-register)). |
 | `0xFFFFFFF1` | Read only: why the core halted. 0 while it has not, and after a clear, 1 for `HALT`, 2 for a reserved control word, 3 for `INT` inside an interrupt routine, and 4 for `RTI` outside one. Reason 5, the step limit of `niceemu --link`, is the emulator's only. |
 | `0xFFFFFFF2` | Read only: the version of the link, 5. |
@@ -264,8 +264,8 @@ the MEGA65's keys:
 A held key repeats after half a second, 20 times a second. F13, HELP,
 and the modifiers give nothing, and MEGA changes no key but the cursor
 keys up and down. MEGA and HELP together toggle the
-on-board debugger ([DEBUGGER.md](DEBUGGER.md)), and while it is up the
-keys go to it, not to the core, and it has the debug link. The keyboard's drive
+on-board debugger ([DEBUGGER.md](DEBUGGER.md)), and while it has the
+focus the keys go to it, not to the core. The keyboard's drive
 LED is green while the core runs, like the user LED.
 
 The bytes of a key wait until the core's input has room for them, and

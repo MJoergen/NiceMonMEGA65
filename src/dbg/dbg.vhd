@@ -4,36 +4,41 @@
 -- with single keys.
 --
 -- THEORY OF OPERATION
--- This is stage 8 of the design note: the live strip, the core keys, the
+-- This is stage 9 of the design note: the live strip, the core keys, the
 -- sticky setting, the catch, the page, the breakpoints, the Nexys4DDR's
--- buttons and display, and the decode of row 27. The debugger has three states. It is Off
+-- buttons and display, the decode of row 27, and the link's side port
+-- with the registers live. The debugger has three states. It is Off
 -- after reset. The toggle pulse, toggle_i, takes it from Off or Strip to
 -- Focus, and from Focus to Off, or to Strip while the sticky setting is
 -- on, which F12 toggles in Focus. In Strip and Focus the strip is shown
--- (strip_o) and the debug link is the debugger's (on_o): nicemon.vhd then
--- gives the link's byte streams to the host in hardware here
--- (dbg_host.vhd) instead of the UART or TCP. In Focus the keyboard is the
--- debugger's too (focus_o). on_o stays '1' after Strip or Focus is left
--- until the last request has ended, so that no packet is cut. kbd_ready_o
+-- (strip_o) and the debugger reads the core through the debug link's side
+-- port (dbg_host.vhd, nicemon.vhd's dbg_* ports, DEBUG.md §3), a word at
+-- a time, beside the UART or TCP host, which keeps its line. In Focus the
+-- keyboard is the debugger's too (focus_o). A request that is out when
+-- Strip or Focus is left still ends, as the side port asks. kbd_ready_o
 -- is always '1', as a PS/2 keyboard cannot wait.
 --
--- The catch: in Strip, a stop of the core that the debugger did not cause,
--- a `p`, `x`, or `h` notice, takes it to Focus. A stop that a key of the
--- debugger's asked for, a step or a pause, is not caught (own_r), also
--- when Focus was left before it came. Off is not caught from: the link is
--- a host's then, and the host's tools wait for their own notices.
+-- The catch: in Strip, a stop of the core that the debugger did not cause
+-- takes it to Focus. The side port brings no notices, so the debugger sees
+-- a stop as a rising edge of paused_i or halted_i, the core's state from
+-- nicemon.vhd, and the end of a stop as a falling edge, which clears what
+-- it read at the stop. A stop that a key of the debugger's asked for, a
+-- step or a pause, is not caught (own_r), also when Focus was left before
+-- it came. Off is not caught from: the host's tools wait for their own
+-- stops, and a catch would take the keyboard from the program.
 --
--- p_seq drives the link, one request at a time. In Focus, about 60 times a
--- second, and at once after a key, a stop notice (`p`, `x`, or `h`), or
--- the entry into Focus, it reads the debug registers 0xFFFFFFF0-FB in one
--- request: the control register, the halt reason, the stop register, and
--- the enable bits, the number, and the addresses of the breakpoints, of
--- which it uses 4.
--- A key then writes the control register, with bit 3, the ROM, as it
+-- p_seq drives the side port, one request at a time. In Strip and Focus,
+-- about 60 times a second, and at once after a key, a stop, or the entry
+-- into Focus, it reads the debug registers 0xFFFFFFF0-FB in one request:
+-- the control register, the halt reason, the stop register, and the
+-- enable bits, the number, and the addresses of the breakpoints, of which
+-- it uses 4; then R0-R15, which the link returns live while the core runs
+-- and as they were at the stop otherwise (DEBUG.md §6).
+-- A key instead writes the control register, with bit 3, the ROM, as it
 -- reads, and the registers are read again. When the core is paused or
--- has halted, and R0-R15 have not been read since the stop, it reads them,
--- then the word at R15, and then the constant words that the word says
--- the instruction takes, and no word past them, which may be a device's.
+-- has halted, and the word at R15 has not been read since the stop, it
+-- reads it, and then the constant words that the word says the
+-- instruction takes, and no word past them, which may be a device's.
 -- dbg_decode.vhd turns them into the text at the end of row 27. While the page is shown and the core is
 -- stopped, paused, halted, or held, it reads the window's 176 words in one
 -- request, into mem_ram, unless they were read since the stop; a move of
@@ -42,8 +47,9 @@
 -- and its answer is the page's message. So does b: it clears an enabled
 -- breakpoint at the cursor's address, or writes the address of the lowest
 -- free one, then its enable bit. The debug registers take a write while
--- the core runs too. A request that gets no answer
--- shows NO LINK.
+-- the core runs too; a word that the link refuses while the core runs
+-- ends the request with the code 02, the page's `e02`. Until the first
+-- answer after reset the state is NO LINK.
 --
 -- p_kbd turns the keyboard's bytes into the keys of DEBUGGER.md: F1 or s
 -- steps a paused core, F3 or g goes on, F5 or p pauses a running core, F7
@@ -67,9 +73,10 @@
 -- BTNR goes on, BTNU and BTND move the page's cursor, and BTNC leaves
 -- Focus as the toggle key does. p_btn synchronizes them and samples them
 -- every 5 ms, longer than they bounce, and a press is a sample at 1 after
--- one at 0. p_seg gives the seven-segment display the PC at a stop, a
--- hex digit on each of its eight digits, and dashes otherwise; system.vhd
--- shows it in Focus, and masks the core's buttons then.
+-- one at 0. p_seg gives the seven-segment display the PC while the
+-- registers are the core's, a hex digit on each of its eight digits, and
+-- dashes otherwise; system.vhd shows it in Focus, and masks the core's
+-- buttons then.
 --
 -- The strip is rows 25 to 28 of the overlay of text.vhd, the words 2000 to
 -- 2319, addressed row * 80 + column. C_CELLS says what each word shows: a
@@ -79,8 +86,9 @@
 -- 28, the keys in Focus or a note in Strip. p_draw writes the
 -- whole strip, one word a cycle, through a pipeline of three stages, after
 -- reset and whenever what it shows has changed. R0-R15 are dimmed while
--- they are not the values of the current stop: until nice_cpu V1.2 the
--- link has no registers while the core runs (DEBUG.md §6). While the page
+-- they are not the core's: while it is held, the link keeps the values of
+-- the last stop, which may be another program's (DEBUG.md §6), and row 27
+-- and the display show no PC then. While the page
 -- is shown (page_o), the pass covers rows 0 to 24 too: the window's and
 -- the cursor's address, the 22 rows of the window, the field with its
 -- message, and the page's keys, from the templates of row_cells; the
@@ -116,15 +124,21 @@ entity dbg is
       kbd_ready_o : out std_logic;
       kbd_data_i  : in  std_logic_vector(7 downto 0);
 
-      -- The debug link's byte streams (nicemon.vhd), which are the
-      -- debugger's while on_o is '1'
-      on_o        : out std_logic;
-      lrx_valid_o : out std_logic;
-      lrx_ready_i : in  std_logic;
-      lrx_data_o  : out std_logic_vector(7 downto 0);
-      ltx_valid_i : in  std_logic;
-      ltx_ready_o : out std_logic;
-      ltx_data_i  : in  std_logic_vector(7 downto 0);
+      -- The side port of the debug link (nicemon.vhd's dbg_* ports): a
+      -- word, held until lnk_done_i, which brings the word read or the
+      -- refusal lnk_err_i
+      lnk_valid_o : out std_logic;
+      lnk_we_o    : out std_logic;
+      lnk_addr_o  : out std_logic_vector(31 downto 0);
+      lnk_data_o  : out std_logic_vector(31 downto 0);
+      lnk_done_i  : in  std_logic;
+      lnk_err_i   : in  std_logic;
+      lnk_rdata_i : in  std_logic_vector(31 downto 0);
+
+      -- The core's pause and halt (nicemon.vhd): a stop is a rising edge
+      -- of either
+      paused_i    : in  std_logic;
+      halted_i    : in  std_logic;
 
       -- The overlay of the text display (text.vhd)
       ovl_we_o    : out std_logic;
@@ -173,10 +187,8 @@ architecture synthesis of dbg is
    constant C_BREAK_DIM : std_logic_vector(23 downto 0) := X"800888";
    constant C_CUR_BREAK : std_logic_vector(23 downto 0) := X"FFF800";
 
-   -- The refresh, about 60 times a second, and the host's timeout, the
-   -- link's 100 ms (DEBUG.md §5)
+   -- The refresh, about 60 times a second
    constant C_REFRESH : positive := G_CLOCK_HZ / 60;
-   constant C_TIMEOUT : positive := G_CLOCK_HZ / 10;
    -- An ESC with no byte after it for 1 ms is the ESC key, not a sequence
    constant C_ESC_WAIT : positive := G_CLOCK_HZ / 1000;
    -- The buttons are sampled every 5 ms, which outlasts their bounce
@@ -376,13 +388,12 @@ architecture synthesis of dbg is
    -- two-dimensional one here; and the messages
    type t_labels is array (0 to 15) of t_byte;
 
-   type t_msgs is array (0 to 4, 0 to 9) of t_byte;
+   type t_msgs is array (0 to 3, 0 to 9) of t_byte;
 
    constant C_MSG_NONE    : natural := 0;
    constant C_MSG_WRITTEN : natural := 1;
    constant C_MSG_ERR     : natural := 2;                -- e and the code's two digits
-   constant C_MSG_TIMEOUT : natural := 3;
-   constant C_MSG_FULL    : natural := 4;                -- No breakpoint is free
+   constant C_MSG_FULL    : natural := 3;                -- No breakpoint is free
 
    function labels return t_labels is
       constant C_S   : string(1 to 16) := "Word:   Address:";
@@ -395,10 +406,10 @@ architecture synthesis of dbg is
    end function labels;
 
    function msgs return t_msgs is
-      constant C_S   : string(1 to 50) := "          written   e         no answer none free ";
+      constant C_S   : string(1 to 40) := "          written   e         none free ";
       variable res_v : t_msgs;
    begin
-      for k in 0 to 4 loop
+      for k in 0 to 3 loop
          for i in 0 to 9 loop
             res_v(k, i) := to_byte(C_S(10 * k + i + 1));
          end loop;
@@ -555,7 +566,7 @@ architecture synthesis of dbg is
    signal brk        : std_logic := '0';                 -- Toggle a breakpoint at brk_at
    signal brk_at     : t_word;
 
-   -- The request to the host, and its answers
+   -- The request to the adapter of the side port, and its answers
    signal req_valid : std_logic := '0';
    signal req_ready : std_logic;
    signal req_we    : std_logic;
@@ -566,8 +577,13 @@ architecture synthesis of dbg is
    signal rd_data   : t_word;
    signal done      : std_logic;
    signal err       : std_logic;
-   signal ntc_valid : std_logic;
-   signal ntc_tag   : t_byte;
+
+   -- The core's stops: a rising edge of paused_i or halted_i, and the end
+   -- of one, a falling edge
+   signal paused_d : std_logic := '0';
+   signal halted_d : std_logic := '0';
+   signal stop     : std_logic;
+   signal go_on    : std_logic;
 
    -- The sequence of requests
    signal seq_st    : t_seq_st := SEQ_IDLE_ST;
@@ -577,24 +593,24 @@ architecture synthesis of dbg is
    signal rd_idx    : natural range 0 to 255;
    signal restart_r : std_logic;
    signal msg_r     : std_logic := '0';                  -- The write's answer is the page's message
-   signal msg_ok    : natural range 0 to 4;              -- ... and this, when it is k
+   signal msg_ok    : natural range 0 to 3;              -- ... and this, when it is k
    signal brk_set   : std_logic_vector(C_BRKS - 1 downto 0);
    signal err_code  : t_byte;
 
    -- What the debugger knows of the core
-   signal ctrl_r   : t_word := (others => '0');
-   signal reason_r : t_byte := (others => '0');
-   signal stop_r   : std_logic_vector(8 downto 0) := (others => '0');
-   signal regs_r   : t_words := (others => (others => '0'));
-   signal instr_r  : t_word := (others => '0');
-   signal brk_en_r : std_logic_vector(C_BRKS - 1 downto 0) := (others => '0');
-   signal brk_n    : natural range 0 to C_BRKS := 0;     -- The breakpoints of the link, up to 4
-   signal brk_r    : t_brk_addrs := (others => (others => '0'));
-   signal link_ok  : std_logic := '0';                   -- The last refresh had an answer
-   signal regs_any : std_logic := '0';                   -- R0-R15 were read once
-   signal regs_ok  : std_logic := '0';                   -- ... since the current stop
-   signal instr_ok : std_logic := '0';                   -- The word at the PC too, and its constants
-   signal consts_r : std_logic_vector(95 downto 0) := (others => '0');
+   signal ctrl_r    : t_word := (others => '0');
+   signal reason_r  : t_byte := (others => '0');
+   signal stop_r    : std_logic_vector(8 downto 0) := (others => '0');
+   signal regs_r    : t_words := (others => (others => '0'));
+   signal instr_r   : t_word := (others => '0');
+   signal brk_en_r  : std_logic_vector(C_BRKS - 1 downto 0) := (others => '0');
+   signal brk_n     : natural range 0 to C_BRKS := 0;     -- The breakpoints of the link, up to 4
+   signal brk_r     : t_brk_addrs := (others => (others => '0'));
+   signal link_ok   : std_logic := '0';                   -- The link has answered since reset
+   signal regs_any  : std_logic := '0';                   -- R0-R15 were read once
+   signal regs_live : std_logic;                          -- ... and are the core's: it is not held
+   signal instr_ok  : std_logic := '0';                   -- The word at the PC was read since the stop, and its constants
+   signal consts_r  : std_logic_vector(95 downto 0) := (others => '0');
 
    -- The decode of row 27
    signal dec_start : std_logic := '0';
@@ -610,7 +626,7 @@ architecture synthesis of dbg is
    signal mem_any  : std_logic := '0';                   -- The window was read once
    signal mem_ok   : std_logic := '0';                   -- ... since the core stopped
    signal mem_kill : std_logic := '0';                   -- The read is of a window left
-   signal msg_k    : natural range 0 to 4 := C_MSG_NONE;
+   signal msg_k    : natural range 0 to 3 := C_MSG_NONE;
    signal msg_code : t_byte := (others => '0');
 
    -- The drawing: a pass over the strip after each change
@@ -651,8 +667,6 @@ begin
    page_on <= page_r when state = FOCUS_ST else '0';
    page_o  <= page_on;
    focus_o <= '1' when state = FOCUS_ST else '0';
-   on_o    <= '1' when state /= OFF_ST or seq_st /= SEQ_IDLE_ST or req_valid = '1' or req_ready = '0' else
-              '0';
 
    enter <= '1' when toggle_i = '1' and state = OFF_ST else '0';
    leave <= '1' when btn_press(C_BTN_C) = '1' and state = FOCUS_ST else '0';
@@ -828,12 +842,12 @@ begin
          end if;
       end process p_btn;
 
-      -- The PC at a stop, else dashes
+      -- The PC while the registers are the core's, else dashes
       p_seg : process (clk_i)
       begin
          if rising_edge(clk_i) then
             for i in 0 to 7 loop
-               if regs_ok = '1' and link_ok = '1' then
+               if regs_live = '1' then
                   seg_o(8 * i + 7 downto 8 * i) <= C_HEX7(to_integer(nibble(regs_r(15), i)));
                else
                   seg_o(8 * i + 7 downto 8 * i) <= C_SEG_DASH;
@@ -968,35 +982,32 @@ begin
    ---------------------------------------------------------------------------
 
    i_dbg_host : entity work.dbg_host
-      generic map (
-         G_TIMEOUT => C_TIMEOUT
-      )
       port map (
-         clk_i       => clk_i,
-         rst_i       => rst_i,
-         req_valid_i => req_valid,
-         req_ready_o => req_ready,
-         req_we_i    => req_we,
-         req_addr_i  => req_addr,
-         req_n_i     => req_n,
-         req_data_i  => req_data,
-         rd_valid_o  => rd_valid,
-         rd_data_o   => rd_data,
-         done_o      => done,
-         err_o       => err,
-         err_code_o  => err_code,
-         ntc_valid_o => ntc_valid,
-         ntc_tag_o   => ntc_tag,
-         ntc_arg_o   => open,
-         con_valid_o => open,
-         con_data_o  => open,
-         lrx_valid_o => lrx_valid_o,
-         lrx_ready_i => lrx_ready_i,
-         lrx_data_o  => lrx_data_o,
-         ltx_valid_i => ltx_valid_i,
-         ltx_ready_o => ltx_ready_o,
-         ltx_data_i  => ltx_data_i
+         clk_i        => clk_i,
+         rst_i        => rst_i,
+         req_valid_i  => req_valid,
+         req_ready_o  => req_ready,
+         req_we_i     => req_we,
+         req_addr_i   => req_addr,
+         req_n_i      => req_n,
+         req_data_i   => req_data,
+         rd_valid_o   => rd_valid,
+         rd_data_o    => rd_data,
+         done_o       => done,
+         err_o        => err,
+         err_code_o   => err_code,
+         side_valid_o => lnk_valid_o,
+         side_we_o    => lnk_we_o,
+         side_addr_o  => lnk_addr_o,
+         side_data_o  => lnk_data_o,
+         side_done_i  => lnk_done_i,
+         side_err_i   => lnk_err_i,
+         side_data_i  => lnk_rdata_i
       ); -- i_dbg_host
+
+   -- A stop of the core, and the end of one
+   stop  <= (paused_i and not paused_d) or (halted_i and not halted_d);
+   go_on <= (paused_d and not paused_i) or (halted_d and not halted_i);
 
 
    p_seq : process (clk_i)
@@ -1032,8 +1043,6 @@ begin
          msg_r <= '0';
          if err = '0' then
             msg_k <= msg_ok;
-         elsif err_code = X"FF" then
-            msg_k <= C_MSG_TIMEOUT;
          else
             msg_k <= C_MSG_ERR;
          end if;
@@ -1042,6 +1051,8 @@ begin
 
    begin
       if rising_edge(clk_i) then
+         paused_d <= paused_i;
+         halted_d <= halted_i;
          if refresh = 0 then
             refresh <= C_REFRESH - 1;
             tick_r  <= '1';
@@ -1105,7 +1116,7 @@ begin
                   seq_st <= SEQ_CTRL_ST;
                end if;
 
-            -- The debug registers: a key's write, or R0-R15 at a new stop
+            -- The debug registers: a key's write, or else R0-R15
             when SEQ_CTRL_ST =>
                if done = '1' then
                   link_ok <= not err;
@@ -1176,21 +1187,12 @@ begin
                         else
                            write(C_CTRL, data_v);
                         end if;
-                        regs_ok  <= '0';
                         instr_ok <= '0';
                         mem_ok   <= '0';
                         seq_st   <= SEQ_WRITE_ST;
-                     elsif (ctrl_r(4) = '1' or ctrl_r(1) = '1') and regs_ok = '0' then
+                     else
                         read(C_REGS, 16);
                         seq_st <= SEQ_REGS_ST;
-                     elsif ctrl_r(4) = '1' or ctrl_r(1) = '1' or ctrl_r(0) = '1' then
-                        -- The window, while the page is shown and the core
-                        -- stopped
-                        if page_on = '1' and mem_ok = '0' then
-                           read(window, C_MEM_LEN);
-                           mem_kill <= '0';
-                           seq_st   <= SEQ_MEM_ST;
-                        end if;
                      end if;
                   end if;
                end if;
@@ -1233,15 +1235,23 @@ begin
                   seq_st <= SEQ_CTRL_ST;
                end if;
 
-            -- R0-R15, then the word at the PC; e02 if the core went on
+            -- R0-R15, live or of the stop; then, at a stop, the word at the
+            -- PC, unless it was read since the stop, or else the window,
+            -- while the page is shown and the core is stopped
             when SEQ_REGS_ST =>
                if done = '1' then
                   seq_st <= SEQ_IDLE_ST;
                   if err = '0' then
-                     regs_ok  <= '1';
                      regs_any <= '1';
-                     read(regs_r(15), 1);
-                     seq_st   <= SEQ_INSTR_ST;
+                     if (ctrl_r(4) = '1' or ctrl_r(1) = '1') and instr_ok = '0' then
+                        read(regs_r(15), 1);
+                        seq_st <= SEQ_INSTR_ST;
+                     elsif (ctrl_r(4) = '1' or ctrl_r(1) = '1' or ctrl_r(0) = '1') and
+                           page_on = '1' and mem_ok = '0' then
+                        read(window, C_MEM_LEN);
+                        mem_kill <= '0';
+                        seq_st   <= SEQ_MEM_ST;
+                     end if;
                   end if;
                end if;
 
@@ -1285,8 +1295,9 @@ begin
 
          end case;
 
-         -- A key waits for the next refresh. A stop notice, or the entry
-         -- into Focus, refreshes at once, and R0-R15 are read again.
+         -- A key waits for the next refresh. A stop, or the entry into
+         -- Focus, refreshes at once, and the word at the PC and the window
+         -- are read again; the end of a stop, by a host too, drops them.
          if key_act /= ACT_NONE and key_act /= ACT_STICKY then
             act_r <= key_act;
          end if;
@@ -1296,13 +1307,14 @@ begin
          if brk = '1' then
             act_r <= ACT_BREAK;
          end if;
-         if ntc_valid = '1' and (ntc_tag = X"68" or ntc_tag = X"70" or ntc_tag = X"78") then
-            regs_ok  <= '0';
+         if stop = '1' or go_on = '1' then
             instr_ok <= '0';
             mem_ok   <= '0';
             tick_r   <= '1';
             dirty    <= '1';
-            own_r    <= '0';
+         end if;
+         if stop = '1' then
+            own_r <= '0';
          end if;
          -- Row 28 changes with the state and the sticky setting, and the
          -- page with its keys
@@ -1310,7 +1322,6 @@ begin
             dirty <= '1';
          end if;
          if enter = '1' then
-            regs_ok  <= '0';
             instr_ok <= '0';
             mem_ok   <= '0';
             tick_r   <= '1';
@@ -1338,9 +1349,10 @@ begin
             stop_r    <= (others => '0');
             link_ok   <= '0';
             regs_any  <= '0';
-            regs_ok   <= '0';
             instr_ok  <= '0';
             own_r     <= '0';
+            paused_d  <= '0';
+            halted_d  <= '0';
             msg_r     <= '0';
             brk_en_r  <= (others => '0');
             brk_n     <= 0;
@@ -1383,10 +1395,12 @@ begin
       dec_chars(i) <= dec_text(8 * i + 7 downto 8 * i);
    end generate gen_dec;
 
-   -- A stop that the debugger did not cause: a breakpoint, or a halt
-   catch <= '1' when ntc_valid = '1' and own_r = '0' and
-                     (ntc_tag = X"68" or ntc_tag = X"70" or ntc_tag = X"78") else
-            '0';
+   -- A stop that the debugger did not cause: a breakpoint, a halt, or a
+   -- host's pause
+   catch <= stop and not own_r;
+
+   -- The registers shown are the core's: read, and the core not held
+   regs_live <= regs_any and link_ok and not ctrl_r(0);
 
    ---------------------------------------------------------------------------
    -- The drawing
@@ -1468,7 +1482,7 @@ begin
                      s2_shown <= instr_ok;
                   when C_IDX_PC =>
                      s2_word  <= regs_r(15);
-                     s2_shown <= regs_ok;
+                     s2_shown <= regs_live;
                   when C_IDX_WINDOW =>
                      s2_word <= window;
                   when C_IDX_CURSOR =>
@@ -1481,7 +1495,7 @@ begin
                   when others =>
                      s2_word  <= regs_r(s1_cell.idx mod 16);
                      s2_shown <= regs_any;
-                     s2_dim   <= not regs_ok;
+                     s2_dim   <= not regs_live;
                end case;
             when CELL_MEM =>
                s2_shown <= mem_any;
@@ -1519,7 +1533,7 @@ begin
             when CELL_FLAG =>
                s2_word  <= regs_r(14);
                s2_shown <= regs_any;
-               s2_dim   <= not regs_ok;
+               s2_dim   <= not regs_live;
             when CELL_STATE =>
                s2_ch <= C_NAMES(st_code, s1_cell.idx mod C_STATE_LEN);
                if st_code = C_ST_BRK and s1_cell.idx = C_BRK_DIG then

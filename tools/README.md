@@ -328,8 +328,9 @@ The short names are `s` for `step`, `g` for `go`, `c` for `console`, and
   hidden, the control register, the link's version as major.minor, and
   the free space in the program's input buffer. When the core is paused
   or halted, it shows the PC.
-- `regs` shows R0 to R15. They are defined while the core is paused, and
-  after a halt.
+- `regs` shows R0 to R15: live while the core runs, from nice_cpu V1.2
+  on, and the stop's values while the core is paused or has halted. A
+  hold of a running core leaves them undefined.
 
 #### Loading and running
 

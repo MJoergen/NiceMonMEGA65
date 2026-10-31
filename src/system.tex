@@ -5,7 +5,7 @@
 % What it shows: system (system.vhd) with its four parts, nicemon, the
 % Ethernet station, the on-board debugger, and the text display, and inside
 % nicemon the core, the
-% debug link, which the UART, TCP, or the debugger drives, the UART, the core's input FIFO, and the four parts on the
+% debug link, which the UART or TCP drives, with the debugger on its side port, the UART, the core's input FIFO, and the four parts on the
 % data bus. Each block is the VHDL entity of its name. The data bus is the
 % logic of nicemon.vhd that the core and the link share, not an entity. It
 % does not show the clocks, the resets, the interrupt, the handshakes, or
@@ -124,9 +124,9 @@
                                     {\scriptsize dbg}};
    \draw[wire] ([xshift = 6mm] dbg.south) -- ([xshift = 6mm] text.north)
       node[wirelabel, pos = 0.45, right] {overlay};
-   % The debugger's host drives the link, in the UART's place
+   % The debugger's adapter is on the link's side port, beside the UART and TCP
    \draw[both] ([yshift = -3mm] dbg.west) -| (-20, -41) -- (-15, -41);
-   \node[wirelabel, anchor = north] at (44, 21) {link bytes of the debugger};
+   \node[wirelabel, anchor = north] at (44, 21) {side port of the link};
 
    \node[top, fit = {(nicemon) (eth) (text) (dbg)}] (system) {};
    \node[toplabel] at ([xshift = 1mm, yshift = 0.5mm] system.north west) {system};

@@ -26,15 +26,17 @@
 -- memory, loads and starts a program, and learns when it halts. While
 -- net_on_i is '1', the link's byte streams are those of the net_* ports
 -- instead, a connection over TCP (eth/eth_tcp.vhd), and the UART's bytes
--- are dropped, and none is sent on it. While dbg_on_i is '1', they are
--- those of the dbg_* ports, the on-board debugger's host in hardware
--- (dbg/dbg_host.vhd, doc/DEBUGGER.md), and the bytes of both others are
--- dropped. The bytes to the link, the breaks, and the renewals of the
--- line's input go through a register stage after that choice (p_lnk_rx),
--- for the timing: it holds a byte, a break waits behind the byte before
--- it, a renewal waits behind the break before it, and no byte is taken
--- while either waits, so that the order stays and a byte that waits when
--- net_on_i or dbg_on_i changes still reaches the link.
+-- are dropped, and none is sent on it. The bytes to the link, the breaks,
+-- and the renewals of the line's input go through a register stage after
+-- that choice (p_lnk_rx), for the timing: it holds a byte, a break waits
+-- behind the byte before it, a renewal waits behind the break before it,
+-- and no byte is taken while either waits, so that the order stays and a
+-- byte that waits when net_on_i changes still reaches the link. The
+-- on-board debugger (dbg/dbg.vhd, doc/DEBUGGER.md) is the link's client
+-- in the system (DEBUG.md §3): the dbg_* ports are the link's side port,
+-- a word at a time, beside the host's line, which keeps its answers, its
+-- notices, and the console, and gets the notices of a stop that the
+-- debugger caused.
 --
 -- Address map, as in the emulator (nice_cpu/emulator/README.md), and the
 -- same for the link and the core's data bus apart from the link's own
@@ -154,8 +156,9 @@
 --         write.
 --     9D  The Ethernet frames sent, eth_tx_i, as 98.
 --   0xFFFFFFE0-0xFFFFFFFF  The debug registers of DEBUG.md §6, for the link
---                          only, which debug_link holds: R0-R15 of the core
---                          after a halt or at a pause, the control
+--                          only, which debug_link holds: R0-R15 of the core,
+--                          live while it runs and those of the stop after
+--                          a halt or at a pause (DEBUG.md §6), the control
 --                          register, the halt reason (1 to 4 here), the
 --                          version, 5 (DEBUG.md §6), the free space of the core's input
 --                          FIFO, and the G_BREAKS breakpoints: their enable
@@ -286,6 +289,10 @@ entity nicemon is
       kbd_data_i     : in  std_logic_vector(7 downto 0) := X"00";
       -- '1' while the core runs: not held, halted, or paused
       running_o      : out std_logic;
+      -- The core's pause and halt, 0 while it is held, for the on-board
+      -- debugger's catch (dbg/dbg.vhd)
+      paused_o       : out std_logic;
+      halted_o       : out std_logic;
       -- The writes to the screen, by the core or the link: the word's offset
       -- from 0xFFFF0000, and the word written
       scr_we_o       : out std_logic;
@@ -329,15 +336,17 @@ entity nicemon is
       net_tx_data_o  : out std_logic_vector(7 downto 0);
       net_tx_valid_o : out std_logic;
       net_tx_ready_i : in  std_logic                    := '0';
-      -- The link's byte streams of the on-board debugger (dbg/dbg_host.vhd),
-      -- which take the place of both others while dbg_on_i is '1'
-      dbg_on_i       : in  std_logic                    := '0';
-      dbg_rx_data_i  : in  std_logic_vector(7 downto 0) := X"00";
-      dbg_rx_valid_i : in  std_logic                    := '0';
-      dbg_rx_ready_o : out std_logic;
-      dbg_tx_data_o  : out std_logic_vector(7 downto 0);
-      dbg_tx_valid_o : out std_logic;
-      dbg_tx_ready_i : in  std_logic                    := '0'
+      -- The side port of the debug link (debug_link.vhd, contract g), for
+      -- the on-board debugger (dbg/dbg_host.vhd): a word, held until
+      -- dbg_done_o, which brings the word read, or dbg_err_o for a word
+      -- that is not a debug register while the core runs (DEBUG.md §3)
+      dbg_valid_i    : in  std_logic                     := '0';
+      dbg_we_i       : in  std_logic                     := '0';
+      dbg_addr_i     : in  std_logic_vector(31 downto 0) := (others => '0');
+      dbg_wdata_i    : in  std_logic_vector(31 downto 0) := (others => '0');
+      dbg_done_o     : out std_logic;
+      dbg_err_o      : out std_logic;
+      dbg_rdata_o    : out std_logic_vector(31 downto 0)
    );
 end entity nicemon;
 
@@ -632,6 +641,8 @@ begin
    cpu_started <= not cpu_hold and not cpu_halted;
    cpu_running <= cpu_started and not cpu_paused;
    running_o   <= cpu_running;
+   paused_o    <= cpu_paused;
+   halted_o    <= cpu_halted;
 
    gen_regs : for n in 0 to 15 generate
       cpu_regs_flat(32 * n + 31 downto 32 * n) <= cpu_regs(n);
@@ -994,31 +1005,22 @@ begin
          uart_rx_i  => uart_rxd_i
       ); -- i_uart_serdes
 
-   -- The link's bytes go to the debugger while it is on, else to the TCP
-   -- connection while there is one, else to the UART; the others' are
-   -- dropped, and so are their breaks and renewals while the debugger is
-   -- on, which has none.
-   mux_rx_valid   <= dbg_rx_valid_i when dbg_on_i = '1' else
-                     net_rx_valid_i when net_on_i = '1' else
+   -- The link's bytes go to the TCP connection while there is one, else
+   -- to the UART; the other's are dropped, and so is its break.
+   mux_rx_valid   <= net_rx_valid_i when net_on_i = '1' else
                      ser_rx_valid;
-   mux_rx_data    <= dbg_rx_data_i when dbg_on_i = '1' else
-                     net_rx_data_i when net_on_i = '1' else
+   mux_rx_data    <= net_rx_data_i when net_on_i = '1' else
                      ser_rx_data;
-   mux_rx_break   <= '0' when dbg_on_i = '1' else
-                     net_rx_break_i when net_on_i = '1' else
+   mux_rx_break   <= net_rx_break_i when net_on_i = '1' else
                      ser_rx_break;
-   mux_rx_renew   <= net_rx_renew_i and net_on_i and not dbg_on_i;
-   ser_rx_ready   <= mux_rx_ready or net_on_i or dbg_on_i;
-   net_rx_ready_o <= mux_rx_ready or not net_on_i or dbg_on_i;
-   dbg_rx_ready_o <= mux_rx_ready or not dbg_on_i;
+   mux_rx_renew   <= net_rx_renew_i and net_on_i;
+   ser_rx_ready   <= mux_rx_ready or net_on_i;
+   net_rx_ready_o <= mux_rx_ready or not net_on_i;
    ser_tx_data    <= lnk_tx_data;
    net_tx_data_o  <= lnk_tx_data;
-   dbg_tx_data_o  <= lnk_tx_data;
-   ser_tx_valid   <= lnk_tx_valid and not net_on_i and not dbg_on_i;
-   net_tx_valid_o <= lnk_tx_valid and net_on_i and not dbg_on_i;
-   dbg_tx_valid_o <= lnk_tx_valid and dbg_on_i;
-   lnk_tx_ready   <= dbg_tx_ready_i when dbg_on_i = '1' else
-                     net_tx_ready_i when net_on_i = '1' else
+   ser_tx_valid   <= lnk_tx_valid and not net_on_i;
+   net_tx_valid_o <= lnk_tx_valid and net_on_i;
+   lnk_tx_ready   <= net_tx_ready_i when net_on_i = '1' else
                      ser_tx_ready;
 
    -- The register stage: a byte is taken when the stage is empty or its
@@ -1100,6 +1102,13 @@ begin
          pause_o        => cpu_pause,
          paused_i       => cpu_paused,
          regs_i         => cpu_regs_flat,
+         side_valid_i   => dbg_valid_i,
+         side_we_i      => dbg_we_i,
+         side_addr_i    => dbg_addr_i,
+         side_data_i    => dbg_wdata_i,
+         side_done_o    => dbg_done_o,
+         side_err_o     => dbg_err_o,
+         side_data_o    => dbg_rdata_o,
          brk_addr_o     => brk_addr,
          brk_en_o       => brk_en,
          wb_cyc_o       => link_cyc,

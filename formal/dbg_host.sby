@@ -1,8 +1,8 @@
-# The debugger's host in hardware, src/dbg/dbg_host.vhd
+# The debugger's adapter to the debug link's side port, src/dbg/dbg_host.vhd
 # (formal_dbg_host.vhd). "prove" proves the assertions for every cycle by
 # k-induction, and "cover" reaches each cover statement. The depths are in
-# cycles: 8 is the k of the induction, and 30 is how far "cover" looks,
-# past a W of 25 bytes.
+# cycles: 6 is the k of the induction, and 16 is how far "cover" looks,
+# past a read of three words.
 
 [tasks]
 prove
@@ -10,9 +10,9 @@ cover
 
 [options]
 prove: mode prove
-prove: depth 8
+prove: depth 6
 cover: mode cover
-cover: depth 30
+cover: depth 16
 
 [engines]
 smtbmc yices

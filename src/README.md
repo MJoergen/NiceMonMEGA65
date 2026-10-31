@@ -48,9 +48,10 @@ header of `nicemon.vhd` is the address map, and
   [doc/DEBUGGER.md](../doc/DEBUGGER.md)) draws a strip under the
   program's screen, in the text display's overlay. The board's toggle
   key shows it, and then the keyboard's bytes go to the debugger
-  instead of the input FIFO, and the debugger drives the debug link
-  through its host, [dbg/dbg_host.vhd](dbg/dbg_host.vhd), in the place
-  of the UART and the Ethernet station. The strip shows the core's
+  instead of the input FIFO, and the debugger reads the core through
+  the debug link's side port, by its adapter,
+  [dbg/dbg_host.vhd](dbg/dbg_host.vhd), beside the UART and the
+  Ethernet station, which keep the line. The strip shows the core's
   state and registers, and the instruction at the PC, decoded by
   [dbg/dbg_decode.vhd](dbg/dbg_decode.vhd), and the function keys run
   the core. A page over the program's screen shows and writes the

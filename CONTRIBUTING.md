@@ -133,9 +133,9 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
 - `seg7.vhd` scans the Nexys4DDR's seven-segment display, and
   `rgb_pwm.vhd` dims its RGB LEDs.
 - `dbg/dbg.vhd` is the on-board debugger (doc/DEBUGGER.md), and
-  `dbg/dbg_host.vhd` its host of the debug link, which turns a request
-  of a word or more into a packet, and the link's bytes back into the
-  answer, the notices, and the console bytes. `kbd_m65_toggle.vhd` and
+  `dbg/dbg_host.vhd` its adapter to the debug link's side port, which
+  turns a request of a word or more into the port's single words, and
+  gives the words read back one at a time. `kbd_m65_toggle.vhd` and
   `kbd_ps2_toggle.vhd` detect the boards' toggle keys.
 - `system.vhd` is what every board has: the system, the text display of
   its screen, and the UART's pins.
@@ -186,16 +186,20 @@ The testbenches are these:
 - `sim/tb_dbg.vhd` tests the on-board debugger on the system, with
   `sim/dbg.nasm` in the ROM, a count to 0x800 and a halt. The strip
   after reset has no registers and NO LINK, and the debugger is Off,
-  without the link. The toggle enters Focus, where it takes the
-  keyboard's bytes and the link, and the core is RUNNING. F5 pauses,
+  asking the link nothing. The toggle enters Focus, where it takes the
+  keyboard's bytes and reads the core through the link's side port, and
+  the core is RUNNING, with R0–R15 live and white, R1 counting, the PC
+  in the program, and the display showing it. F5 pauses,
   with R0–R15 in white, R15 as the PC, the word at the PC as the ROM
   has it, and its decode as nicedis writes it; s steps to the next instruction; F3 goes on, with the
-  registers dimmed; and the halt shows HALTED 1, R1 at 0x800, and Z.
-  r restarts, F7 holds, and g and p then leave the core held. F12 makes
-  the toggle leave Focus for Strip, where the debugger keeps the link but
-  not the keyboard, and a step of its own does not bring it back; a
+  registers live; and the halt shows HALTED 1, R1 at 0x800, and Z.
+  r restarts, F7 holds, with the registers dimmed, and g and p then
+  leave the core held. F12 makes
+  the toggle leave Focus for Strip, where the debugger keeps reading the
+  core but not the keyboard, and a step of its own does not bring it
+  back; a
   halt in Strip does, the catch. F12 again makes the toggle leave for
-  Off, which gives the link back. A reset in Focus leaves the debugger
+  Off, where it asks nothing more. A reset in Focus leaves the debugger
   Off with the strip drawn again, and the halt that follows leaves it
   Off: Off is not caught from. F11 then shows the page, the ROM's words
   with the cursor on the first; the cursor keys, Home, Page Down, and
@@ -217,16 +221,18 @@ The testbenches are these:
   modifier, and mode, with constant words, and the text nicedis writes
   for each, which the decode must write too, also after a start in the
   middle of another decode.
-- `sim/tb_dbg_host.vhd` tests the debugger's host against the debug link
-  itself, on the system's third link input, with `sim/host.nasm`, which
-  writes 0x00 to 0xFF to the console again and again. It reads the
-  version, loads the program and reads it back in one request, and
-  starts it; the console bytes come in order, 0xFF among them, while it
-  reads the control register, and a read of the memory gets `e02`. A
-  pause brings `p`, stops the console, and lets it read R0–R15 in one
-  request, and a step brings `p` again and moves R15. A packet on the
-  UART is dropped meanwhile, and nothing is sent there. With the host
-  off the link, its request ends with the timeout.
+- `sim/tb_dbg_host.vhd` tests the debugger's adapter against the debug
+  link itself, on the system's side port, with a host on the UART and
+  `sim/host.nasm`, which writes 0x00 to 0xFF to the console again and
+  again. It reads the version, loads the program and reads it back in
+  one request, and starts it; the console bytes come in order on the
+  UART, 0xFF among them, while it reads the control register, and a read
+  of the memory gets `e02`. A pause sends `p` to the UART, stops the
+  console, and lets it read R0–R15 in one request, and a step sends `p`
+  again and moves R15. A packet on the UART is answered while the
+  adapter reads, and a go on from the UART ends a long read of the
+  adapter's with `e02` after the words it got while the core was paused.
+  A read of no words ends at once.
 - `sim/tb_board_io.vhd` tests the Nexys4DDR's drivers of its seven-segment
   display and RGB LEDs: every digit of the display lit in turn with its own
   segments, and the duty of an RGB output at its level.
@@ -590,13 +596,13 @@ every time, not only the ones a testbench sends.
   `eth_tcp_rx.sby` proves. Its `cover` reaches each state, the end by the
   last try, by a reset, and by the ACK of the FIN, the probe, and a new
   connection replacing an open one.
-- `dbg_host.sby` proves the debugger's host of the debug link,
-  `src/dbg/dbg_host.vhd`, with every input free, the link's answers
-  too: every packet it sends is whole, an `R` with 12 or a `W` with 20
-  upper-case hex digits that are the request's fields, `#`, and its
-  checksum, with no console byte; a byte offered stays until it is
-  taken; it takes a request only while none is open; and a request ends
-  once. Its `cover` reaches an `R` and a `W` sent whole.
+- `dbg_host.sby` proves the debugger's adapter to the debug link's side
+  port, `src/dbg/dbg_host.vhd`, with every input free, the link's
+  answers too: a word out stays, with its fields, until the link is done
+  with it; a word is out only for an open request, at the request's
+  address plus the words done before it; a read without a refusal ends
+  after its count of words; and a request ends once. Its `cover` reaches
+  a read of three words, a write, a refusal, and a read of no words.
 
 The checks in `rx_fifo.vhd`, `board_io.vhd`, `scr_regs.vhd`,
 `devices.vhd`, `mem.vhd`, `nicemon.vhd`, `eth/eth_tcp_timer.vhd`,

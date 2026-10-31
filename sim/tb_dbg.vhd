@@ -10,8 +10,9 @@
 --
 -- THEORY OF OPERATION
 -- The system, nicemon.vhd, boots G_ROM_FILE, sim/dbg.nasm, from its ROM at
--- reset: it counts in R1 to 0x800 and halts. The debugger drives the
--- system's link as system.vhd wires it. p_ovl is the overlay of text.vhd:
+-- reset: it counts in R1 to 0x800 and halts. The debugger reads the core
+-- through the link's side port, as system.vhd wires it, and p_ovl counts
+-- its requests. p_ovl is also the overlay of text.vhd:
 -- it takes the debugger's writes into a model, and counts those outside
 -- its 29 rows, which must be none. p_main types keys, as bytes of the
 -- keyboard, and waits for the strip's text. The debugger's G_CLOCK_HZ is
@@ -19,31 +20,33 @@
 -- every 900. It has G_BOARD_IO, and seg_text reads its display. The steps:
 --
 -- 1. After reset the strip is drawn: no registers, NO LINK, and the keys
---    with the MEGA65's toggle key. The debugger is Off, and the link is not
---    its.
--- 2. The toggle enters Focus: the strip is shown, and the keyboard and the
---    link are the debugger's. The core is RUNNING, and the display shows
---    dashes.
+--    with the MEGA65's toggle key. The debugger is Off, and asks the link
+--    nothing.
+-- 2. The toggle enters Focus: the strip is shown, and the keyboard is the
+--    debugger's, which reads the core. It is RUNNING, with R0-R15 live
+--    and white, R1 counting, the PC in the program and no word at it,
+--    and the display shows the PC.
 -- 3. F5 pauses: PAUSED, with R0-R15 in white, R15 also as the PC, the
 --    word at the PC from the ROM, and its decode, as nicedis writes it,
 --    as at every stop that expect_stop checks.
 -- 4. s steps: the PC moves on, to an instruction of the loop.
--- 5. F3 goes on: RUNNING, with the registers dimmed and no PC.
+-- 5. F3 goes on: RUNNING, with the registers live and no word at the PC.
 -- 6. The core halts: HALTED 1, with R1 at 0x800, the PC after the HALT,
 --    and Z among the flags.
--- 7. r restarts, F7 holds: HELD. Then g and p do nothing, as they would
---    start the held core.
+-- 7. r restarts, F7 holds: HELD, with the registers dimmed and no PC.
+--    Then g and p do nothing, as they would start the held core.
 -- 8. F12 sets the sticky setting, which row 28 shows. r restarts, F5
---    pauses, and s steps, and the toggle comes before the step's `p`: the
---    debugger is in Strip, with the link but not the keyboard, and the
---    stop it caused itself does not take it back to Focus.
+--    pauses, and s steps, and the toggle comes before the step ends: the
+--    debugger is in Strip, still reading the core but without the
+--    keyboard, and the stop it caused itself does not take it back to
+--    Focus.
 -- 9. The catch: g goes on, and the halt that comes in Strip takes the
 --    debugger to Focus.
--- 10. F12 clears the setting, and the toggle leaves Focus for Off, and
---    gives the link back.
+-- 10. F12 clears the setting, and the toggle leaves Focus for Off, where
+--    the debugger asks the link nothing more once its request has ended.
 -- 11. A reset in Focus leaves the debugger Off, and draws the strip again.
---    The core runs the ROM and halts, and the debugger stays Off: Off is
---    not caught from.
+--    The core runs the ROM and halts, and the debugger stays Off and asks
+--    nothing: Off is not caught from.
 -- 12. F11 shows the page: the window at 0, the ROM's words in it, and the
 --    cursor on the first.
 -- 13. The cursor keys and Home move the cursor; up at the top row, Page
@@ -121,13 +124,15 @@ architecture simulation of tb_dbg is
    signal kbd_ready : std_logic;
    signal kbd_data  : std_logic_vector(7 downto 0) := X"00";
 
-   signal dbg_on       : std_logic;
-   signal dbg_rx_data  : std_logic_vector(7 downto 0);
-   signal dbg_rx_valid : std_logic;
-   signal dbg_rx_ready : std_logic;
-   signal dbg_tx_data  : std_logic_vector(7 downto 0);
-   signal dbg_tx_valid : std_logic;
-   signal dbg_tx_ready : std_logic;
+   signal dbg_valid : std_logic;
+   signal dbg_we    : std_logic;
+   signal dbg_addr  : std_logic_vector(31 downto 0);
+   signal dbg_wdata : std_logic_vector(31 downto 0);
+   signal dbg_done  : std_logic;
+   signal dbg_err   : std_logic;
+   signal dbg_rdata : std_logic_vector(31 downto 0);
+   signal paused    : std_logic;
+   signal halted    : std_logic;
 
    signal ovl_we   : std_logic;
    signal ovl_addr : std_logic_vector(11 downto 0);
@@ -141,6 +146,7 @@ architecture simulation of tb_dbg is
    signal ovl    : t_ovl   := (others => (others => '0'));
    signal writes : natural := 0;
    signal stray  : natural := 0;
+   signal reqs   : natural := 0;                         -- The debugger's words on the side port
 
    -- Row r of the overlay, as text
    function row_text(o : t_ovl;
@@ -232,17 +238,19 @@ begin
          G_CPU_RUN_AT_RESET => true
       )
       port map (
-         clk_i          => clk,
-         rst_i          => rst,
-         uart_rxd_i     => '1',
-         uart_txd_o     => open,
-         dbg_on_i       => dbg_on,
-         dbg_rx_data_i  => dbg_rx_data,
-         dbg_rx_valid_i => dbg_rx_valid,
-         dbg_rx_ready_o => dbg_rx_ready,
-         dbg_tx_data_o  => dbg_tx_data,
-         dbg_tx_valid_o => dbg_tx_valid,
-         dbg_tx_ready_i => dbg_tx_ready
+         clk_i       => clk,
+         rst_i       => rst,
+         uart_rxd_i  => '1',
+         uart_txd_o  => open,
+         paused_o    => paused,
+         halted_o    => halted,
+         dbg_valid_i => dbg_valid,
+         dbg_we_i    => dbg_we,
+         dbg_addr_i  => dbg_addr,
+         dbg_wdata_i => dbg_wdata,
+         dbg_done_o  => dbg_done,
+         dbg_err_o   => dbg_err,
+         dbg_rdata_o => dbg_rdata
       ); -- i_nicemon
 
 
@@ -258,13 +266,15 @@ begin
          kbd_valid_i => kbd_valid,
          kbd_ready_o => kbd_ready,
          kbd_data_i  => kbd_data,
-         on_o        => dbg_on,
-         lrx_valid_o => dbg_rx_valid,
-         lrx_ready_i => dbg_rx_ready,
-         lrx_data_o  => dbg_rx_data,
-         ltx_valid_i => dbg_tx_valid,
-         ltx_ready_o => dbg_tx_ready,
-         ltx_data_i  => dbg_tx_data,
+         lnk_valid_o => dbg_valid,
+         lnk_we_o    => dbg_we,
+         lnk_addr_o  => dbg_addr,
+         lnk_data_o  => dbg_wdata,
+         lnk_done_i  => dbg_done,
+         lnk_err_i   => dbg_err,
+         lnk_rdata_i => dbg_rdata,
+         paused_i    => paused,
+         halted_i    => halted,
          ovl_we_o    => ovl_we,
          ovl_addr_o  => ovl_addr,
          ovl_data_o  => ovl_data,
@@ -285,6 +295,12 @@ begin
             if ovl_addr > C_LAST then
                stray <= stray + 1;
             end if;
+         end if;
+         if dbg_valid = '1' and dbg_done = '1' then
+            reqs <= reqs + 1;
+         end if;
+         if rst = '1' then
+            reqs <= 0;
          end if;
       end if;
    end process p_ovl;
@@ -404,6 +420,42 @@ begin
             severity failure;
       end procedure expect_color;
 
+      -- While the core runs: R0-R15 are live and white, R1 counts, the PC
+      -- is in the program and the word at it is not read, and the display
+      -- shows the PC
+      procedure expect_live(what : string) is
+         variable r1_v  : string(1 to 8);
+         variable end_v : time;
+      begin
+         wait_text(27, 1, "RUNNING");
+         end_v := now + C_TIMEOUT;
+         loop
+            exit when row(25)(18) /= '-' and ovl(C_FIRST + 17)(31 downto 8) = C_COLOR and ovl_we = '0';
+            assert now < end_v
+               report "tb_dbg: " & what & ": R1 is '" & row(25)(18 to 25) & "' in " &
+                      to_hstring(ovl(C_FIRST + 17)(31 downto 8)) & " while the core runs"
+               severity failure;
+            wait until rising_edge(clk);
+         end loop;
+         r1_v := row(25)(18 to 25);
+         loop
+            exit when row(25)(18 to 25) /= r1_v and row(25)(18) /= '-' and ovl_we = '0';
+            assert now < end_v
+               report "tb_dbg: " & what & ": R1 stays " & r1_v & " while the core runs"
+               severity failure;
+            wait until rising_edge(clk);
+         end loop;
+         assert row(27)(11 to 17) = "0000000" and row(27)(18) >= '0' and row(27)(18) <= '8'
+            report "tb_dbg: " & what & ": the PC is '" & row(27)(11 to 18) & "' while the core runs"
+            severity failure;
+         assert row(27)(21 to 28) = "--------"
+            report "tb_dbg: " & what & ": the word at the PC is '" & row(27)(21 to 28) & "' while the core runs"
+            severity failure;
+         assert seg_text(seg)(1 to 7) = "0000000"
+            report "tb_dbg: " & what & ": the display shows " & seg_text(seg) & " while the core runs"
+            severity failure;
+      end procedure expect_live;
+
       -- At a stop: R15 is the PC of row 27, and the word at the PC the ROM's
       procedure expect_stop(what : string) is
       begin
@@ -497,18 +549,17 @@ begin
          report "tb_dbg: the label of R0 is not white on dark blue"
          severity failure;
       expect('0', '0', '0', "after reset");
-      assert dbg_on = '0'
-         report "tb_dbg: the debugger has the link while Off"
+      assert reqs = 0
+         report "tb_dbg: the debugger asked the link while Off"
          severity failure;
 
       report "tb_dbg: 2. the toggle enters Focus";
       pulse;
       expect('1', '0', '1', "after the toggle");
-      assert dbg_on = '1'
-         report "tb_dbg: the debugger has not the link in Focus"
+      expect_live("in Focus");
+      assert reqs > 0
+         report "tb_dbg: the debugger has not asked the link in Focus"
          severity failure;
-      expect_row27("RUNNING", "in Focus");
-      expect_seg("--------", "in Focus");
       key("z");
 
       report "tb_dbg: 3. F5 pauses";
@@ -533,8 +584,7 @@ begin
 
       report "tb_dbg: 5. F3 goes on";
       key(C_ESC & "OR");
-      expect_row27("RUNNING  --------  --------", "after F3");
-      expect_color(C_DIM, "after F3");
+      expect_live("after F3");
 
       report "tb_dbg: 6. the halt";
       expect_row27("HALTED 1", "after the halt");
@@ -551,6 +601,7 @@ begin
       expect_row27("RUNNING", "after r");
       key(C_ESC & "[18~");
       expect_row27("HELD     --------", "after F7");
+      expect_color(C_DIM, "while held");
       key("g");
       cycles(10000);
       key("p");
@@ -568,11 +619,12 @@ begin
       key("s");
       pulse;
       expect('1', '0', '0', "in Strip");
-      assert dbg_on = '1'
-         report "tb_dbg: the debugger has not the link in Strip"
-         severity failure;
       wait_text(28, 0, C_STRIP);
+      n_v := reqs;
       cycles(20000);
+      assert reqs > n_v
+         report "tb_dbg: the debugger stopped asking the link in Strip"
+         severity failure;
       expect('1', '0', '0', "after the step in Strip");
       expect_row27("PAUSED ", "after the step in Strip");
 
@@ -593,8 +645,10 @@ begin
       pulse;
       expect('0', '0', '0', "after the toggle to Off");
       cycles(2000);
-      assert dbg_on = '0'
-         report "tb_dbg: the debugger keeps the link after Focus"
+      n_v := reqs;
+      cycles(7000);
+      assert reqs = n_v
+         report "tb_dbg: the debugger keeps asking the link after Focus"
          severity failure;
 
       report "tb_dbg: 11. a reset in Focus, and no catch from Off";
@@ -613,8 +667,8 @@ begin
          severity failure;
       wait for C_TIMEOUT;
       expect('0', '0', '0', "after the halt in Off");
-      assert dbg_on = '0'
-         report "tb_dbg: the debugger took the link in Off"
+      assert reqs = 0
+         report "tb_dbg: the debugger asked the link in Off"
          severity failure;
 
       report "tb_dbg: 12. F11 shows the page";
@@ -650,19 +704,14 @@ begin
       key(C_ESC & "[6~");
       wait_text(0, 0, " Window 000000A8  Cursor 000000B0 ");
       expect_rom_row(2, 16#B0#, "after Page Down");
-      -- Page Up, and Page Down again while the window at FFFFFFF8 is read:
-      -- that read, of the ROM's words, is not shown
+      -- Page Up, and Page Down again while the window at FFFFFFF8 is read,
+      -- at its 25th word: that read, of the ROM's words, is not shown
       key(C_ESC & "[5~");
-      loop
-         wait until rising_edge(clk) and dbg_tx_valid = '1' and dbg_tx_data = X"72";
-         n_v := 0;
-         loop
-            wait until rising_edge(clk) and dbg_tx_valid = '1';
-            exit when dbg_tx_data = X"23" or n_v = 200;
-            n_v := n_v + 1;
-         end loop;
-         exit when n_v = 200;
-      end loop;
+      wait until rising_edge(clk) and dbg_valid = '1' and dbg_we = '0' and dbg_addr = X"00000010"
+         for C_TIMEOUT;
+      assert dbg_valid = '1' and dbg_addr = X"00000010"
+         report "tb_dbg: the window at FFFFFFF8 is not read"
+         severity failure;
       key(C_ESC & "[6~");
       wait_text(0, 0, " Window 000000A8  Cursor 000000B0 ");
       expect_rom_row(2, 16#B0#, "after a Page Down during a read");

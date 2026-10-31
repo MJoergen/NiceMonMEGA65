@@ -18,11 +18,11 @@ formal checks, `make hwtest`, and the badge; `doc/EMULATOR.md` the known
 differences from the emulator; `doc/PROGRAMMING.md` how to write and
 build programs; `doc/DEBUGGER.md` is the design note of the on-board
 debugger, mon.py in the FPGA with the MEGA65's keyboard and a strip on
-the screen, of which stages 1 to 8 are written, the overlay, its host
+the screen, of which stages 1 to 9 are written, the overlay, its host
 of the link, the live strip with the core's keys, Strip with the
 catch, the page of memory, the breakpoints, the Nexys4DDR's buttons
-and display, and the decode of row 27 (issue #52, and
-nice_cpu#85 and #86 for what it needs there). `doc/BASIC_SURVEY.md` is
+and display, the decode of row 27, and the link's side port with the
+registers live (issues #52 and #53). `doc/BASIC_SURVEY.md` is
 the survey of the BASIC dialects behind the interpreter in the ROM of
 issue #54 (milestone V2.0). `doc/` also has `CODING_STYLE.md`,
 `RELEASE.md`, and `RELEASE_NOTES.md`; the root keeps only `README.md`,
@@ -82,8 +82,8 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   `kbd_m65_ascii.vhd` for the MEGA65, `kbd_ps2.vhd` and `kbd_ps2_ascii.vhd` for
   the Nexys4DDR's PS/2, and the debugger's toggle keys, `kbd_m65_toggle.vhd`
   and `kbd_ps2_toggle.vhd`), the on-board debugger (`dbg/dbg.vhd`,
-  `dbg/dbg_host.vhd`, its host of the link on `nicemon`'s `dbg_*` ports,
-  and `dbg/dbg_decode.vhd`, the decode of an instruction), the
+  `dbg/dbg_host.vhd`, its adapter to the link's side port, `nicemon`'s
+  `dbg_*` ports, and `dbg/dbg_decode.vhd`, the decode of an instruction), the
   Nexys4DDR's display and RGB LED drivers (`seg7.vhd`, `rgb_pwm.vhd`), the Ethernet station (`eth/eth.vhd`: the
   RMII receiver and transmitter, the check of the frames, their FIFOs
   between the clocks, the MAC filter and ARP responder,

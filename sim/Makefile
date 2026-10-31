@@ -21,8 +21,9 @@
 #             tb_dbg      the on-board debugger on the system, with
 #                         dbg.nasm in its ROM: the strip it draws, the
 #                         toggle, and the core's keys.
-#             tb_dbg_host the debugger's host in hardware, on the system's
-#                         debug link, with host.nasm.
+#             tb_dbg_host the debugger's adapter to the debug link's side
+#                         port, on the system, with host.nasm and a host
+#                         on the UART beside it.
 #             tb_dbg_decode the decode of the debugger's row 27, against
 #                         nicedis on the cases of gen_decode.py.
 #             tb_board_io the Nexys4DDR's display and RGB LED drivers.

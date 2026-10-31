@@ -33,10 +33,12 @@
 -- overlay of the text display. dbg_toggle_i is the board's toggle key, a
 -- pulse that the board makes from its keyboard, named by G_TOGGLE_KEY; a
 -- board without one leaves it at '0'. While the debugger has the focus, the
--- keyboard's bytes go to it instead of the core's console FIFO, and it
--- drives the debug link, in the place of the UART and TCP (nicemon.vhd).
--- With G_BOARD_IO, the buttons are the debugger's then too, and the core
--- reads them as 0, and the display shows the debugger's segments.
+-- keyboard's bytes go to it instead of the core's console FIFO. It reads
+-- the core through the debug link's side port, beside the UART and TCP
+-- host, which keeps its line (nicemon.vhd), and sees the core's pause and
+-- halt to catch a stop. With G_BOARD_IO, the buttons are the debugger's
+-- in Focus too, and the core reads them as 0, and the display shows the
+-- debugger's segments.
 --
 -- INTERFACE CONTRACTS -- these are requirements on the environment:
 -- a) vga_clk_i is the pixel clock of G_VIDEO.
@@ -153,14 +155,17 @@ architecture synthesis of system is
    signal net_tx_data  : std_logic_vector(7 downto 0);
    signal net_tx_valid : std_logic;
    signal net_tx_ready : std_logic;
-   -- The debug link of the debugger
-   signal dbg_on       : std_logic;
-   signal dbg_rx_data  : std_logic_vector(7 downto 0);
-   signal dbg_rx_valid : std_logic;
-   signal dbg_rx_ready : std_logic;
-   signal dbg_tx_data  : std_logic_vector(7 downto 0);
-   signal dbg_tx_valid : std_logic;
-   signal dbg_tx_ready : std_logic;
+   -- The debugger's requests on the side port of the debug link, and the
+   -- core's stops for its catch
+   signal dbg_valid  : std_logic;
+   signal dbg_we     : std_logic;
+   signal dbg_addr   : std_logic_vector(31 downto 0);
+   signal dbg_wdata  : std_logic_vector(31 downto 0);
+   signal dbg_done   : std_logic;
+   signal dbg_err    : std_logic;
+   signal dbg_rdata  : std_logic_vector(31 downto 0);
+   signal cpu_paused : std_logic;
+   signal cpu_halted : std_logic;
 
    -- The keyboard, to the core and to the debugger
    signal sys_kbd_valid : std_logic;
@@ -216,6 +221,8 @@ begin
          kbd_ready_o    => sys_kbd_ready,
          kbd_data_i     => kbd_data_i,
          running_o      => running_o,
+         paused_o       => cpu_paused,
+         halted_o       => cpu_halted,
          scr_we_o       => scr_we,
          scr_addr_o     => scr_addr,
          scr_data_o     => scr_data,
@@ -244,13 +251,13 @@ begin
          net_tx_data_o  => net_tx_data,
          net_tx_valid_o => net_tx_valid,
          net_tx_ready_i => net_tx_ready,
-         dbg_on_i       => dbg_on,
-         dbg_rx_data_i  => dbg_rx_data,
-         dbg_rx_valid_i => dbg_rx_valid,
-         dbg_rx_ready_o => dbg_rx_ready,
-         dbg_tx_data_o  => dbg_tx_data,
-         dbg_tx_valid_o => dbg_tx_valid,
-         dbg_tx_ready_i => dbg_tx_ready
+         dbg_valid_i    => dbg_valid,
+         dbg_we_i       => dbg_we,
+         dbg_addr_i     => dbg_addr,
+         dbg_wdata_i    => dbg_wdata,
+         dbg_done_o     => dbg_done,
+         dbg_err_o      => dbg_err,
+         dbg_rdata_o    => dbg_rdata
       ); -- i_nicemon
 
 
@@ -310,13 +317,15 @@ begin
          kbd_valid_i => dbg_kbd_valid,
          kbd_ready_o => dbg_kbd_ready,
          kbd_data_i  => kbd_data_i,
-         on_o        => dbg_on,
-         lrx_valid_o => dbg_rx_valid,
-         lrx_ready_i => dbg_rx_ready,
-         lrx_data_o  => dbg_rx_data,
-         ltx_valid_i => dbg_tx_valid,
-         ltx_ready_o => dbg_tx_ready,
-         ltx_data_i  => dbg_tx_data,
+         lnk_valid_o => dbg_valid,
+         lnk_we_o    => dbg_we,
+         lnk_addr_o  => dbg_addr,
+         lnk_data_o  => dbg_wdata,
+         lnk_done_i  => dbg_done,
+         lnk_err_i   => dbg_err,
+         lnk_rdata_i => dbg_rdata,
+         paused_i    => cpu_paused,
+         halted_i    => cpu_halted,
          ovl_we_o    => ovl_we,
          ovl_addr_o  => ovl_addr,
          ovl_data_o  => ovl_data,

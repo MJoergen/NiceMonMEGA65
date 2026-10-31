@@ -46,7 +46,9 @@
 --    receives until a '.', which checks the console both ways: every byte
 --    from 0x80 to 0xFF, 0xFF as ESC ESC, and a byte with a bad stop bit,
 --    which must be dropped without losing the bytes after it. While it
---    runs, the link reads its debug registers, and a read of memory gets
+--    runs, the link reads its debug registers, R15 among them, live: it
+--    is in the loop that waits for a byte, and moves between reads
+--    (DEBUG.md §6); and a read of memory gets
 --    `e02`. Then a pause: the link sends `p`, before or after the `k` of
 --    its write. While the core is paused, bit 4 of the control register
 --    reads 1, the link reads the memory and R15, which points into the
@@ -354,6 +356,7 @@ begin
       variable cycles_v : std_logic_vector(31 downto 0);
       variable micros_v : std_logic_vector(31 downto 0);
       variable fs_v     : std_logic_vector(31 downto 0);
+      variable moved_v  : boolean;
 
       -- Sends one byte, with the stop bit given, on the UART, or over TCP
       -- while net_on is '1', where it waits until nicemon takes it.
@@ -729,9 +732,26 @@ begin
          severity failure;
       send_con("ab");
       expect_con("ab");
-      -- While the program runs, the link reaches its debug registers only.
+      -- While the program runs, the link reaches its debug registers only,
+      -- and reads R0-R15 live: R15 is in the loop that waits for a byte,
+      -- the three instructions of two words at 0, 2, and 4, and moves
+      -- between reads.
       check("FFFFFFF0", "00000008");
       check("FFFFFFF3", "00000010");
+      read_word("FFFFFFEF", micros_v);
+      moved_v := false;
+      for i in 1 to 4 loop
+         read_word("FFFFFFEF", cycles_v);
+         assert cycles_v = X"00000000" or cycles_v = X"00000002" or cycles_v = X"00000004"
+            report "tb_nicemon: R15 is " & to_hstring(cycles_v) & " while the core waits for a byte"
+            severity failure;
+         if cycles_v /= micros_v then
+            moved_v := true;
+         end if;
+      end loop;
+      assert moved_v
+         report "tb_nicemon: R15 stays " & to_hstring(micros_v) & " while the core runs"
+         severity failure;
       send(C_ESC & pkt('R', "000001000001"));
       expect_answer("e5202#2E");
       send(C_ESC & pkt('W', "00000100000100000000"));

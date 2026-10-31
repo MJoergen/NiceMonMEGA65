@@ -389,8 +389,8 @@ class Monitor(cmd.Cmd):
             print(self._pc(not ctl & HOLD))
 
     def do_regs(self, arg: str) -> None:
-        """regs: R0 to R15, which are defined while the core is paused, and
-        after a halt."""
+        """regs: R0 to R15: live while the core runs, and the stop's while
+        it is paused or has halted (DEBUG.md §6)."""
         self._regs()
 
     def do_r(self, arg: str) -> None:
