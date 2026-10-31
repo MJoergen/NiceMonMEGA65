@@ -12,7 +12,9 @@ the core; F12 keeps the strip up when Focus is left, and a stop in Strip
 comes back to Focus; and F11 shows the page, a window on the memory,
 where a word is written and a breakpoint set at the cursor. The debugger
 is a client of the debug link inside the system, beside a host on the
-UART or over TCP, which keeps its line. This note
+UART or over TCP, which keeps its line. The README's
+[On its own](../README.md#the-on-board-debugger) says how to use it,
+with a picture. This note
 records the design and the decisions, as
 [monitor/README.md](../monitor/README.md) does for the ROM of
 [#24](https://github.com/MJoergen/NiceMonMEGA65/issues/24), a hardware

@@ -28,7 +28,8 @@ There are three ways to use the system:
 
 - [On its own](#on-its-own), as a MEGA65 with a keyboard and a screen,
   with no JTAG cable and no serial cable. The program is in the core's
-  ROM, and the core is loaded from the MEGA65's flash.
+  ROM, the core is loaded from the MEGA65's flash, and MEGA+HELP brings
+  up a [debugger](#the-on-board-debugger) on the screen.
 - [Over Ethernet](#over-ethernet), with no JTAG cable, where a PC on
   the network may load programs over the debug link, talk to them, and
   debug them.
@@ -102,6 +103,53 @@ the demos that the second row lists, and the reset button starts the
 typewriter again. The ROM can also hold a program of your own (see
 [Building your own ROM](#building-your-own-rom)).
 
+### The on-board debugger
+
+MEGA+HELP brings up the debugger, with no cable and no PC: a strip of
+four rows under the program's screen, and the keyboard is the
+debugger's until MEGA+HELP is pressed again. The program keeps running
+until F5 pauses it. On the Nexys4DDR the key is Scroll Lock.
+
+![The demo's typewriter, paused under the debugger's strip](doc/images/debugger.png)
+
+The demo, paused by F5 after a line was typed, drawn from `niceemu` by
+`tools/screenshot.py --debugger`, which lays the strip out as the board
+does.
+
+The strip shows R0 to R15, live while the program runs; the state,
+`RUNNING`, `PAUSED`, `BRK n` at breakpoint n, `HALTED n` with the
+reason, or `HELD`; the PC, the instruction word there, and the flags of
+the status register; the instruction decoded, in the assembler's
+syntax; and the keys:
+
+| Key | Action |
+|---|---|
+| F1 | Step: one instruction of a paused program |
+| F3 | Go on |
+| F5 | Pause |
+| F7 | Hold the core |
+| F9 | Restart the program from address 0 |
+| F11 | The page of memory, on or off |
+| F12 | Keep the strip up after MEGA+HELP, or not |
+| MEGA+HELP | Back to the program, which gets its keyboard again |
+
+The page replaces the program's screen with a window on the memory.
+The cursor keys move through it, MEGA with CRSR up or down a page at a
+time, and CLR/HOME to the window's first word. Hex digits and RETURN
+write a word at the cursor, `a` and an address move the window there,
+`b` sets a breakpoint at the cursor or clears it, and ESC leaves. The
+program stops at a breakpoint, and the strip says `BRK n`. With `keep
+strip: on`, the strip stays on the screen when MEGA+HELP goes back to
+the program, live, while the keys are the program's, and a halt or a
+breakpoint brings the debugger back.
+
+The debugger cannot load a program. That takes a host over
+[Ethernet](#over-ethernet) or the [serial port](#over-the-serial-port),
+which keeps its link while the debugger is up. The program's 25 rows
+sit 64 lines higher than they would centered, whether the strip is
+shown or not, so nothing moves when it appears.
+[DEBUGGER.md](doc/DEBUGGER.md) has the design.
+
 ## Over Ethernet
 
 The debug link runs over the board's Ethernet port, on TCP port 4510. A
@@ -138,8 +186,8 @@ The board serves one connection at a time. While a host is connected,
 it has the whole line, the program's console and the debug link: what
 comes in on the [serial port](#over-the-serial-port) is dropped, and all
 output goes to the host. When the host disconnects, the line goes back
-to the serial port. The on-board debugger (MEGA+HELP, see
-[DEBUGGER.md](doc/DEBUGGER.md)) reads the core beside the host, through
+to the serial port. The [on-board debugger](#the-on-board-debugger)
+(MEGA+HELP) reads the core beside the host, through
 the link's side port, so a host keeps its line while the debugger is up,
 and sees the `p`, `x`, or `h` of a stop that the debugger caused.
 

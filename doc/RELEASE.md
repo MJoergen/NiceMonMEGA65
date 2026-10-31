@@ -90,9 +90,9 @@ and keep their names.
    bitstreams, the boards, or the tools can see changed since the release
    before, with upgrade notes first. Replace "(not yet released)" in its
    heading with the date, such as `## V1.0 (2026-10-28)`. Draw the
-   README's pictures, `doc/images/demo.png` and `ethernet.png`, again
-   with the tag, as the docstring of `tools/screenshot.py` says. Commit
-   and push.
+   README's pictures, `doc/images/demo.png`, `ethernet.png`, and
+   `debugger.png`, again with the tag, as the docstring of
+   `tools/screenshot.py` says. Commit and push.
 
 3. Wait for CI to pass on the pushed commit.
 
