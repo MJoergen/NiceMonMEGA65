@@ -21,6 +21,231 @@ The release candidates pinned these:
 
 nice_cpu's `RC01` and `RC03` have no tag here.
 
+## V1.2 (2026-10-31)
+
+**Upgrade notes.**
+
+- nice_cpu moves to `V1.2`. The debug link stays at version 5, and
+  R0–R15 at `0xFFFFFFE0`–`EF` now read the core's registers live while
+  it runs, where they were undefined before. A hold of a running core
+  still leaves them undefined. `mon.py`'s `regs` shows them live.
+- nice_cpu V1.2's runtime moves `_exit` from `lib.nasm` into the
+  start-up files, and its C library's `nice_putc` is an import, so a C
+  program of your own needs a rebuild, and a program that joins
+  `lib.nasm` without a start-up file of the runtime's must define
+  `_exit` itself
+  ([nice_cpu's release notes](https://github.com/MJoergen/nice_cpu/blob/main/RELEASE_NOTES.md)).
+  `make examples` rebuilds the examples. A program that runs with the
+  runtime's start-up files needs no change.
+- The program's 25 rows sit 64 lines higher on HDMI and VGA: the
+  picture has 29 rows centered, the program's and the 4 rows of the
+  on-board debugger's strip under them, which are black until MEGA+HELP
+  shows the strip.
+- A break on the UART, or a host's half-close over Ethernet, ends the
+  line's input and no longer the keyboard's, as nice_cpu's SYSTEM.md §5
+  says from V1.2 on: once the bytes before it are read, the console
+  reads `0x200`, while the keyboard's bytes still come. Before, every
+  byte after a break was lost until the core was started again. A new
+  connection over Ethernet starts the line anew, as a connection to
+  `niceemu --link` does: the next host's bytes reach the program, so a
+  host can type to a monitor that another host has left. The demo
+  still ends at a break, as it does in `niceemu`.
+- Keys that gave nothing have meanings now. On the MEGA65, CLR/HOME is
+  Home, MEGA with CRSR↑ or CRSR↓ is Page Up or Page Down, and MEGA+HELP
+  is the on-board debugger's; on the Nexys4DDR, Home, Page Up, and Page
+  Down are the keys of those names, and Scroll Lock is the debugger's.
+  A program gets `ESC [ H`, `ESC [ 5 ~`, and `ESC [ 6 ~` for Home, Page
+  Up, and Page Down, as xterm sends them, and nothing for the
+  debugger's key.
+- The Ethernet station answers a segment that fits no connection with a
+  reset, so a second host's `connect` fails at once while one host is
+  connected, where it waited for its retries (see Ethernet).
+
+**The on-board debugger**
+
+- MEGA+HELP brings up a debugger in the FPGA, with no cable and no PC
+  ([DEBUGGER.md](DEBUGGER.md),
+  [#52](https://github.com/MJoergen/NiceMonMEGA65/issues/52) and
+  [#53](https://github.com/MJoergen/NiceMonMEGA65/issues/53)): a strip
+  of four rows under the program's screen, white on dark blue, and the
+  keyboard is the debugger's until MEGA+HELP again. On the Nexys4DDR
+  the key is Scroll Lock. Nothing changes for those who never press it.
+  The README's [On its own](../README.md#the-on-board-debugger) says
+  how to use it, with a picture.
+- The strip shows R0–R15, live while the program runs, and dimmed
+  while the core is held; the state, `RUNNING`, `PAUSED`, `BRK n` at
+  breakpoint n, `HALTED n` with the reason, `HELD`, or `NO LINK` until
+  the link has answered after reset; the PC, the instruction word
+  there, and the flags of the status register; and the instruction
+  decoded, as `nicedis.py` writes it, with the constant words folded
+  in.
+- F1 steps, F3 goes on, F5 pauses, F7 holds, and F9 restarts the
+  program at 0, with the ROM as it is. The letters `s`, `g`, `p`, `h`,
+  and `r` do the same, as in `mon.py`. A key that needs a stopped core
+  shows the link's answer, `e02`, and does nothing else.
+- F11 shows the page, a window on the memory over the program's rows:
+  the window's and the cursor's addresses and the four breakpoints in
+  its header, 22 rows of 8 words, the cursor's word in swapped colors,
+  and a word at a breakpoint white on dark red. The cursor keys, Page
+  Up and Page Down, and Home move; hex digits, DEL, and RETURN write a
+  word at the cursor; `a` on an empty field, an address, and RETURN
+  move the window there; `b` on an empty field sets a breakpoint at the
+  cursor, the lowest free of the four, or clears the one that is there,
+  and says `none free`; and ESC clears the field, or leaves the page.
+  The words are read while the core is stopped, and dimmed while it
+  runs.
+- F12 toggles a sticky setting, off after reset: whether MEGA+HELP
+  leaves the strip up, live, with the keys the program's. With the
+  strip up, a halt, a breakpoint, or a pause the debugger did not ask
+  for brings the debugger back, with the keyboard. From off, nothing
+  does.
+- The debugger is a client of the debug link inside the system, through
+  the side port of nice_cpu V1.2's link
+  ([nice_cpu#86](https://github.com/MJoergen/nice_cpu/issues/86)): a
+  host on the UART or over TCP keeps its line while the debugger is up,
+  and gets the `p`, `x`, or `h` of a stop that the debugger caused, as
+  it does for a breakpoint. The debugger cannot load a program, write
+  a register, or know a label; a host does that.
+- On the Nexys4DDR, while the debugger has the keyboard, BTNL steps,
+  BTNR goes on, BTNU and BTND move the page's cursor, BTNC leaves, and
+  the seven-segment display shows the PC, live, or dashes while the
+  core is held. The program reads the buttons as 0 meanwhile, and its
+  display shows again after.
+
+**Boards**
+
+- The MEGA65's keyboard sends `ESC [ H` for CLR/HOME, and `ESC [ 5 ~`
+  and `ESC [ 6 ~` for MEGA with CRSR↑ and CRSR↓, so MEGA is a modifier
+  of those two keys. The Nexys4DDR's keyboard sends the same for Home,
+  Page Up, and Page Down, apart from the keypad's keys with the same
+  scan codes. nice_cpu's SYSTEM.md §1 now defines the bytes of the keys
+  that every keyboard has, which the MEGA65's keyboard follows and
+  `niceemu --window` sends too.
+- The R6 meets 100 MHz with 0.33 ns of setup slack, and the Nexys4DDR
+  90 MHz with 0.17 ns, with the debugger. The TCP server's paths were
+  registered, so the worst paths are the core's again, and the
+  station's have about 2.3 ns to spare on the R6
+  ([#49](https://github.com/MJoergen/NiceMonMEGA65/issues/49)). The
+  debugger's overlay takes 4 block RAMs on each board.
+- The R3 build has the debugger and the station, and has not been
+  tested on hardware yet.
+
+**Ethernet**
+
+- The station answers a segment that fits no connection with a reset,
+  as RFC 9293 has it, where it answered nothing: a `connect` from a
+  second host while one is connected fails at once with "connection
+  refused", where it waited about two minutes, and a host on a
+  connection the board has dropped learns of it at once, where it
+  retried for a quarter of an hour. `nicelink.py` says that another
+  host has a connection to the board when it is refused
+  ([#46](https://github.com/MJoergen/NiceMonMEGA65/issues/46)).
+  Segments to other ports, and every segment while the IP address is
+  0, get nothing, as before.
+- Once a connection is open, a segment without ACK is dropped, and one
+  that acknowledges what the board has not sent gets an ACK and is
+  dropped, as RFC 9293 has it
+  ([#50](https://github.com/MJoergen/NiceMonMEGA65/issues/50)).
+- A new connection starts the line's input anew (see the upgrade
+  notes), as one to `niceemu --link` does, through `rx_resume_i` of
+  nice_cpu V1.2's link
+  ([nice_cpu#90](https://github.com/MJoergen/nice_cpu/issues/90)).
+- Fixed: after a reset from the host, or the last of the 17 tries, with
+  data out, the retransmission timer stayed armed and ran out every
+  300 ms until the next connection
+  ([#45](https://github.com/MJoergen/NiceMonMEGA65/issues/45)); an ACK
+  that covered the data and the board's FIN at once was not booked; an
+  ACK that came while a segment was sent again freed its first bytes,
+  which the link's next output could overwrite while the sender still
+  read them, so the host got wrong bytes with a wrong checksum; and a
+  segment of an old connection could, with odds of 1 in 2³², be taken
+  for a new connection from the same port.
+- The server is split into its parser of segments, its choice of the
+  segments to send and their sender, its buffers, and its
+  retransmission timer, and the arbiter of the frames to send is an
+  entity of its own
+  ([#39](https://github.com/MJoergen/NiceMonMEGA65/issues/39)), each
+  with a formal proof (see Tests). A segment is answered a cycle or two
+  later than before, which no timeout sees.
+
+**Monitor**
+
+- The monitor for the ROM is written and tested in `niceemu`, not on a
+  board yet ([monitor/](../monitor/README.md),
+  [#24](https://github.com/MJoergen/NiceMonMEGA65/issues/24)): a
+  dispatch table at 0 with nine entries, a hardware abstraction layer
+  for programs at `0x8000` in the C ABI, with the reset, the exit, the
+  version, the console, and the screen, and a main loop with the
+  commands `r`, `d`, `c`, `v`, `h`, and `?`. `make monitor` builds it,
+  `make -C monitor test` runs it in `niceemu` with programs built by
+  nice_cpu's `nicebuild.py --monitor`, and `make cor
+  ROM=monitor/build/monitor.bin` puts it in a core of your own. It
+  cannot load a program on its own, so the release's ROM still holds
+  the demo.
+
+**Demo**
+
+- The demo runs in `niceemu --window` too, from nice_cpu V1.2 on, with
+  the keys typed into the window, and the comet keeps its pace, as the
+  window runs one step per microsecond ([demo/](../demo/README.md)).
+
+**Tools**
+
+- `make flash COR=f.cor SLOT=N` writes a core file into slot N, 1 to 7,
+  of the MEGA65's flash over the JTAG cable, with no SD card and no key
+  held at power on. It stops unless slot 0's core is for the core
+  file's revision, shows what the slot held, verifies the flash, and
+  starts the slot, through the serial monitor of slot 0's core if that
+  core does not start it. It is written against the MEGA65's
+  documentation and openFPGALoader, and has not been run on a board yet
+  ([#41](https://github.com/MJoergen/NiceMonMEGA65/issues/41)).
+- `tools/screenshot.py --debugger` draws the on-board debugger's strip
+  under the screen, as the board shows it at the stop. The README's
+  picture of the debugger is made with it.
+- `make monitor` builds the monitor, and `make diagrams` draws the
+  block diagrams of `src/` (needs pdflatex and pdftoppm).
+
+**Documentation**
+
+- `doc/DEBUGGER.md` is the design note of the on-board debugger: the
+  states, the display, the keys, the Nexys4DDR, the side port, the
+  modules, the tests, the stages, and the decisions with their reasons.
+- `src/README.md` and `src/eth/README.md` have block diagrams of the
+  system and of the Ethernet station, drawn by `make diagrams` from the
+  `.tex` files beside them.
+- `doc/EMULATOR.md`'s table has `niceemu --window`, and a row for the
+  keyboard. `doc/SYSTEM.md` has the keys, the 29 rows, the line's
+  input, the debugger, and the station's resets.
+- `doc/BASIC_SURVEY.md` surveys the BASIC dialects behind the
+  interpreter planned for the ROM
+  ([#54](https://github.com/MJoergen/NiceMonMEGA65/issues/54),
+  milestone V2.0).
+- `monitor/README.md` has the monitor's table, the entry ABI, its
+  decisions, and what is not decided yet.
+
+**Tests**
+
+- `make test` runs `tb_dbg`, the debugger on the system, driven by
+  keys, toggles, and the Nexys4DDR's buttons; `tb_dbg_host`, its
+  adapter against the link's side port, with a host on the UART beside
+  it; `tb_dbg_decode`, the decode of row 27 against `nicedis.py` on
+  about 3000 words from `sim/gen_decode.py`; and the monitor's test in
+  `niceemu`. `tb_text` checks the strip and the page, `tb_kbd` and
+  `tb_ps2` the toggle keys and the new keys, and `tb_nicemon` the live
+  registers, the keyboard after a break, and the station's ports.
+- `tb_eth_tcp` has steps for the edges of RFC 9293, and
+  `tb_eth_tcp_random` runs 2500 random actions of the host and the link
+  on one connection whose sequence numbers cross 2³², which found the
+  retransmission bug above.
+- `make formal` proves the check of the frame check sequence, the
+  arbiter, the two FIFOs of frames across their clocks, the TCP
+  server's timer, buffers, choice, parser, and sender, the connection
+  itself with free models of its parser and choice, and the debugger's
+  adapter to the side port
+  ([#37](https://github.com/MJoergen/NiceMonMEGA65/issues/37)).
+- `make lint` checks `src/dbg/`, and every Vivado build writes the
+  worst paths of the TCP server to `build/tcp_paths.rpt`.
+
 ## V1.1 (2026-10-29)
 
 **Upgrade notes.**
@@ -118,10 +343,6 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   it. With jumper JP1 on QSPI, the board then starts the system at power
   on, and with the release's bitstream it shows the demo, as a MEGA65
   does with a core file in its flash.
-- `make flash COR=f.cor SLOT=N` writes a core file into slot N, 1 to 7,
-  of the MEGA65's flash over the JTAG cable, with no SD card and no key
-  held at power on. It stops unless slot 0's core is for the core file's
-  revision, verifies the flash, and starts the slot.
 - `mon.py` disassembles with `d ADDR N`, and shows the instruction at the
   PC after a pause, a step, and a breakpoint. The disassembler is
   nice_cpu's `assembler/nicedis.py`, new in nice_cpu's `V1.1`.
