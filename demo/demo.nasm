@@ -617,11 +617,9 @@ PCOUNT  ADD     R1, R1, @SIEVE[R5]
 
 ; DEC64 writes R7:R1 in decimal, in the color R3, right-aligned in the R4
 ; words before R2, with blanks before it. R4 must have room for the digits.
-; It changes R1, R2, R7, and R9.
-DEC64   SUB     R9, R2, R4
-DBLANK  OR      @R9++, R3, 0x20
-        SUB[M]  R0, R9, R2
-    ?!Z MOVE    PC, DBLANK
+; It changes R1, R2, R7, and R9. The digits come first and the blanks after
+; them, so a number written again and again over itself does not flicker.
+DEC64   SUB     @--SP, R2, R4   ; the start of the field
         MOVE    @M_DLO, 10
         MOVE    @M_DHI, 0
 DIGIT   MOVE    @M_CLO, R1
@@ -632,7 +630,11 @@ DIGIT   MOVE    @M_CLO, R1
         MOVE    R7, @M_QHI
         OR[M]   R0, R1, R7
     ?!Z MOVE    PC, DIGIT
-        MOVE    PC, @SP++
+        MOVE    R9, @SP++
+DBLANK  SUB[M]  R0, R9, R2
+    ?Z  MOVE    PC, @SP++
+        OR      @R9++, R3, 0x20
+        MOVE    PC, DBLANK
 
 ; TWO writes R1, which is below 100, as two digits at R2, in the color R3.
 ; It changes R9.
