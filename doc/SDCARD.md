@@ -76,7 +76,7 @@ Two limits of the R3, which the R6 does not have (#56 has the details):
   switches is not connected to GND, so CD and WP always read 1. M2M says
   that the R3A fixes it, and revision -04 has the fix. One core file serves
   the R3 and the R3A, so the R3's build ignores CD and WP on slot 1, and a
-  missing card shows as a failed reset.
+  missing card shows as a failed Init.
 
 ## The layers
 
@@ -92,99 +92,135 @@ Two limits of the R3, which the R6 does not have (#56 has the details):
 
 ## The registers
 
-Proposed for nice_cpu's `doc/SYSTEM.md` as a new section, in nice_cpu
-issue MJoergen/nice_cpu#107. They take 16 of the words that nice_cpu reserves for I/O.
+Proposed for nice_cpu's `doc/SYSTEM.md` as a new section, in nice_cpu issue
+MJoergen/nice_cpu#107, and revised after its review. They take 16 of the
+words that nice_cpu reserves for I/O.
 
 | Address | Name | A data read returns | A write |
 |---|---|---|---|
 | `0xFFFFFFA0` | `SD_CSR` | the status below | starts the command in bits 3..0 |
 | `0xFFFFFFA1` | `SD_LBA` | the sector number | sets the sector number |
-| `0xFFFFFFA2` | `SD_CURSOR` | the cursor, 0 to 127 | sets the cursor to bits 6..0 |
-| `0xFFFFFFA3` | `SD_DATA` | the buffer's word at the cursor, and the cursor moves on | writes the buffer's word at the cursor, and the cursor moves on |
-| `0xFFFFFFA4` | `SD_ERROR` | the error of the last command, 0 for none | is ignored |
-| `0xFFFFFFA5` | `SD_SELECT` | the selected slot | selects the slot in bit 0 |
-| `0xFFFFFFA6` | `SD_SIZE` | the card's size in sectors, 0 before a reset | is ignored |
-| `0xFFFFFFA7` | `SD_SLOTS` | the number of slots: 2 in the emulator and on the MEGA65, 1 on the Nexys4DDR | is ignored |
-| `0xFFFFFFA8`–`0xFFFFFFAF` | | 0 | is ignored |
+| `0xFFFFFFA2` | `SD_CHUNK` | the chunk, 0 to 15 | sets the chunk to bits 3..0 |
+| `0xFFFFFFA3` | `SD_ERROR` | the error of the last command, 0 for none | is ignored |
+| `0xFFFFFFA4` | `SD_SELECT` | the selected slot, 0 or 1 | selects the slot in bit 0 |
+| `0xFFFFFFA5` | `SD_LAST` | the number of the card's last sector, valid while "ready" is 1 | is ignored |
+| `0xFFFFFFA6` | `SD_SLOTS` | the number of slots of the system, 0 to 2 | is ignored |
+| `0xFFFFFFA7` | | 0 | is ignored |
+| `0xFFFFFFA8`–`0xFFFFFFAF` | `SD_BUF0`–`SD_BUF7` | word 8·c + k of the buffer, where c is `SD_CHUNK` and k is 0 to 7 | writes that word |
 
 The commands, in bits 3..0 of a write to `SD_CSR`:
 
-| Command | What it does |
-|---|---|
-| 0 | Reset: start the selected card up, read its size, and clear "changed" |
-| 1 | Read the sector `SD_LBA` into the buffer |
-| 2 | Write the buffer to the sector `SD_LBA` |
+| Command | Name | What it does |
+|---|---|---|
+| 0 | Init | Start the card in the selected slot up, read its size, and clear "changed" |
+| 1 | Read | Read the sector `SD_LBA` into the buffer |
+| 2 | Write | Write the buffer to the sector `SD_LBA` |
+| 3–15 | | Ignored |
 
 The status, from a read of `SD_CSR`:
 
 | Bit | Meaning |
 |---|---|
-| 0 | Busy: a command runs. A write to any register but `SD_CURSOR` and `SD_DATA` is ignored while it is 1. |
+| 0 | Busy: a command runs |
 | 1 | Error: the last command failed, and `SD_ERROR` says why |
 | 2 | Present: a card is in the selected slot |
-| 3 | Ready: the selected card is started up |
-| 4 | Changed: a card has been put into the selected slot since the last reset |
+| 3 | Ready: the card in the selected slot has been started up by Init |
+| 4 | Changed: a card has been put into the selected slot since the last Init of it |
 | 5 | Write-protected: the card's switch is set |
 | 9..8 | The card's type: 0 none, 1 SDSC, 2 SDHC or SDXC |
+| others | 0 |
 
-The errors: 1 no card, 2 not ready, 3 timeout, 4 CRC, 5 the card reported
-an error, 6 write-protected, 7 sector out of range, and 8 the start-up
-failed.
+The errors: 1 no card, 2 not ready, 3 timeout, 4 CRC, 5 the card reported an
+error, 6 write-protected, 7 sector out of range, and 8 Init failed.
 
-The rules:
+**The buffer.** It is 128 words, and each word holds 4 bytes, little-endian:
+byte 4n of the sector is bits 7..0 of word n. A program sees it 8 words at a
+time, through `SD_BUF0`–`SD_BUF7`, and `SD_CHUNK` chooses which 8. FAT is
+little-endian, so:
+- a 32-byte directory entry is exactly one chunk: entry n of a directory
+  sector is chunk n, with the file's size in `SD_BUF7`;
+- entry i of a sector of the FAT is chunk i / 8, word `SD_BUF0` + i mod 8;
+- for code from the wasm translator, a word is one little-endian `i32`
+  (WASM.md).
 
-- The buffer is 128 words, and each word holds 4 bytes, little-endian: byte
-  4n of the sector is bits 7..0 of word n. FAT is little-endian, so a sector
-  of the FAT is 128 words with entry *i* at word *i*, and a 32-byte
-  directory entry is 8 words, with the file's size in the last of them.
-- The cursor wraps from 127 to 0. A read command does not move it, so a
-  program sets it to 0 and reads 128 words.
-- `SD_LBA` is always a sector number. The controller turns it into a byte
-  address for an SDSC card.
+**No side effects on a read.** Reading any of the 16 words changes nothing,
+and a write does only what the table says, so the debug link and the on-board
+debugger read and write them as the core does, with no rule of their own
+(DEBUG.md §3). A host reads a sector with 16 writes of `SD_CHUNK` and 16 `R`
+requests of 8 words at `SD_BUF0`, and writes one likewise. The step undo of
+DEBUG.md §7.2 needs nothing from the controller, as no read moves anything.
+
+**The rules.**
+
+- A program waits for busy to be 0 before it starts a command, and after
+  one. In the emulator a command is done at once, and on a board it takes
+  from about a millisecond for a Read to hundreds for an Init, so a program
+  that waits runs the same on both.
+- While busy is 1, the buffer is not defined, and a write to `SD_CSR`,
+  `SD_LBA`, `SD_SELECT`, or `SD_BUF0`–`SD_BUF7` is ignored. `SD_CHUNK` can
+  be written at any time. No command changes `SD_CHUNK`.
 - Every command ends: the controller has a timeout for each step, so busy
-  never stays 1.
-- A program waits for busy to be 0. In the emulator a command is done at
-  once, and on the board it takes from about a millisecond for a read to
-  hundreds for a reset, so a program that polls runs the same on both.
+  does not stay 1.
+- `SD_LBA` is always a sector number. The controller turns it into a byte
+  address for an SDSC card. A Read or Write of a sector after `SD_LAST`
+  fails with error 7.
+- `SD_LAST` is the last sector's number, not the count, so that a card of 2
+  TB, 2³² sectors, fits.
 - A change of `SD_SELECT` takes effect at once. The status then shows the
-  other slot, and "ready" is 0 until a reset, as the cards share one
-  controller.
-- A read by the debug link returns the same word as a read by the core,
-  but does not move the cursor, as a link read of the console takes no
-  byte. A link write acts as a core write, so a host can fill the buffer.
+  other slot, and "ready" is 0 until an Init of it, as the slots may share
+  one controller.
 - `SD_SLOTS` is the number of slots that the system has, fixed when it is
-  built, whether or not a card is in them. An empty slot counts. A slot at
-  or above `SD_SLOTS` has no card, and a command on it fails with error 1.
-- A slot whose card detect does not work, such as the internal slot of the
-  MEGA65 R3, shows "present" as 1 at all times, "write-protected" as 0, and
-  "changed" only after the controller's reset. A command on it with no card
-  fails with error 3 or 8.
-- Reset makes the controller idle, with slot 0 selected, the cursor at 0,
-  and "changed" set if a card is present.
+  built, whether or not a card is in them. An empty slot counts. Selecting a
+  slot at or above `SD_SLOTS` shows no card, and every command fails with
+  error 1.
+- A slot whose card detect does not work shows "present" as 1 at all times,
+  "write-protected" as 0, and "changed" only after reset. A command on it
+  with no card fails with error 3 or 8. nice_cpu's SYSTEM.md §5 would say
+  which boards have such a slot.
+- The controller runs while the processor is held, paused, or halted, and
+  only reset stops it. So a host can read and write the card while the
+  processor is paused. A host that does so while a program is paused
+  restores what it changed before the program goes on: `SD_CHUNK`, `SD_LBA`,
+  `SD_SELECT`, and the buffer, which it can read first, as reads have no
+  side effects.
+- Reset, which a start of the processor gives the devices (DEBUG.md §6),
+  lets a Write that has begun finish, so that no sector on the card is torn,
+  and abandons any other command. Then the controller is idle, with slot 0
+  selected, `SD_CHUNK` and `SD_LBA` 0, "ready" 0, and "changed" set if a
+  card is present. The buffer's contents are not defined. Busy may read 1
+  after reset for as long as the Write takes, so a program waits for busy
+  before its first command, as before any other.
+- An interrupt or NMI routine does not use the card. `SD_CHUNK`, `SD_LBA`,
+  `SD_SELECT`, the buffer, and a running command are shared with the program
+  it interrupts.
 
-The registers are a 32-bit version of QNICE-FPGA's at `0xFF20`, which
-QNICE's monitor and M2M use. Two other designs were rejected. A buffer
-mapped as 128 words would make the cursor unnecessary, but needs 128 words
-of I/O space, and only 93 are free. A DMA engine that copies the sector to
-memory would be a third master on the data bus, which the core and the link
-already share.
+The registers derive from QNICE-FPGA's at `0xFF20`, which QNICE's monitor
+and M2M use. Three other designs were rejected:
+- A data port whose cursor moves on every access, as QNICE has. A read with
+  a side effect needs a rule of its own for the debug link and the on-board
+  debugger, and a memory page shown over it would eat the program's buffer.
+- A buffer mapped as 128 words. It needs 128 words of I/O space, and a board
+  has 64 left at `0xFFFFFFA0`–`0xFFFFFFDF`.
+- A DMA engine that copies the sector to memory. It would be a third master
+  on the data bus, which the core and the link already share.
 
 ## The emulator
 
-`niceemu --sd0 FILE --sd1 FILE` gives each slot an image file, whose size
-is a multiple of 512 bytes. The emulator always has 2 slots, as the MEGA65
-does, so `SD_SLOTS` is 2 with any images or none, and `--sd1` alone puts a
-card in slot 1 and leaves slot 0 empty. A card is present when its image
-is given, its type is SDHC, and it is write-protected when the file cannot
-be written. A command is done before the next instruction, and a write goes
-to the file at once. "Changed" is set at the start, so a program does the
-reset that it does on the board. The window has no hot swap.
+`niceemu --sd0 FILE --sd1 FILE` gives a slot an image file. The emulator
+refuses to start with an image whose size is not a multiple of 512 bytes.
+The emulator always has 2 slots, as the MEGA65 does, so `SD_SLOTS` is 2 with
+any images or none, and `--sd1` alone puts a card in slot 1 and leaves slot
+0 empty. A card is present when its image is given, its type is SDHC, and it
+is write-protected when the file cannot be written. A command is done before
+the next instruction, and a Write goes to the file at once. "Changed" is set
+at the start, so a program does the Init that it does on a board. The
+emulator's window has no way to take a card out.
 
 Without an image, a program sees what it sees on a MEGA65 with both slots
 empty: `SD_SLOTS` = 2, "present" 0, and error 1 on every command. The words
-`0xFFFFFFA0`–`0xFFFFFFAF` are always the registers, which changes them
-from ordinary memory, which nice_cpu's SYSTEM.md §5 says the reserved words
-are in the emulator today.
+`0xFFFFFFA0`–`0xFFFFFFAF` are always the registers, which changes them from
+ordinary memory, which nice_cpu's SYSTEM.md §5 says the reserved words are
+in the emulator today.
 
 ## The controller in the RTL
 
@@ -204,10 +240,13 @@ slot. Stage 2 (#63) adds 4-bit SD mode, and is optional.
   SPI mode. #63 starts with a test of that on a board, and stage 2 keeps SPI
   as a fall-back if it is so. The Nexys4DDR can cycle its card's power with
   `SD_RESET`.
-- `src/sd/sd.vhd`: the registers, the buffer in block RAM, and the choice
-  of slot, apart from the protocol engine, behind a small interface (start,
-  read or write, sector, a byte stream, done, and error). Stage 1 has an SPI
-  engine, from QNICE's `sdcard.vhd` rewritten to `doc/CODING_STYLE.md`.
+- The registers and the buffer in block RAM are a module of nice_cpu's
+  `hdl/src`, as the review of MJoergen/nice_cpu#107 proposed, apart from
+  the protocol engine, behind a small interface (start, read or write, the
+  sector, a stream of bytes, done, and an error). nice_cpu's `hdl/sim` gets
+  an engine over an image file, so that its tests diff programs that use
+  the card against niceemu. `src/sd/sd.vhd` here has the choice of slot and
+  the real engines. Stage 1 has an SPI engine, from QNICE's `sdcard.vhd` rewritten to `doc/CODING_STYLE.md`.
   Stage 2 adds an SD-mode engine, from
   [MJoergen/SDCard](https://github.com/MJoergen/SDCard), which reads a
   card's CID and CSD on the MEGA65, and whose write path is not finished
@@ -230,8 +269,8 @@ slot. Stage 2 (#63) adds 4-bit SD mode, and is optional.
   stage 1, and SD mode in both bus widths in stage 2. GHDL in CI cannot use
   the Verilog models in the SDCard repository. The model also gives `make
   cosim` a card.
-- `G_FORMAL` checks in `sd.vhd`: busy falls within the timeout, the cursor
-  stays in range, and no command starts while busy.
+- `G_FORMAL` checks: busy falls within the timeout, no command starts
+  while busy, and a reset during a Write lets it finish.
 
 ## The file system
 
@@ -265,7 +304,7 @@ and must be formatted. FAT12 and FAT16 are rejected with a message.
 The rule of #24 is that the dispatch table gets an entry only when a
 program cannot do without it. So:
 
-- **The sector routines** go in `monlib.nasm`, with no entry: `sd_reset`,
+- **The sector routines** go in `monlib.nasm`, with no entry: `sd_init`,
   `sd_read`, and `sd_write`, which poll busy and return the error. The
   registers are the same on every board and in the emulator, so a program
   can reach them itself.
@@ -285,7 +324,7 @@ program cannot do without it. So:
 | `fs_delete` | R1 the name | 0, or an error |
 
   A file is opened on the slot of the last `fs_mount`. The first `fs_open`
-  after a reset mounts slot 0, or slot 1 when slot 0 has no card.
+  after reset mounts slot 0, or slot 1 when slot 0 has no card.
 - **The monitor's commands**: `sd` dumps a sector, for the bring-up;
   `dir`; `load NAME` reads a program in the `.bin` text format, address and
   word pairs, which is what the tools build, so a program goes to the card
