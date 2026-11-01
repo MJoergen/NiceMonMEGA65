@@ -222,9 +222,10 @@ def checkout_tag(tag):
 
 
 def build(flow):
-    """A bitstream with the flow, from nothing, so that no old report stays."""
+    """A bitstream with the flow and without a ROM, from nothing, so that
+    no old report stays."""
     run(["make", "-C", os.path.join("synth", "r6"), "clean"])
-    run(["make", "r6", "FLOW=" + flow])
+    run(["make", "r6", "FLOW=" + flow, "ROM="])
     return read_reports(os.path.join(REPO, BUILD), flow)
 
 

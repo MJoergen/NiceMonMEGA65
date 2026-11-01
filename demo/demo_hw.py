@@ -10,8 +10,8 @@ the screen, and leaves the demo running.
 
 make hwtest hides the ROM and runs its programs from the RAM; this checks
 the demo where it runs on a release's board. The bitstream must have
-demo/build/demo.bin in its ROM (make demo, then make r6
-ROM=demo/build/demo.bin), and niceemu must be built.
+demo/build/demo.bin in its ROM (make r6, which builds the demo first),
+and niceemu must be built.
 
 Usage: demo/demo_hw.py --port DEVICE [--baud 2000000]
 """

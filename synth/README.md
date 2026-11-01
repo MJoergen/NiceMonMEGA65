@@ -28,8 +28,10 @@ To build, with Vivado installed in `/opt/Xilinx/2025.1/Vivado` (or set
 
 or `make r6` in the top directory, and likewise for `r3` and `nexys4ddr`.
 The bitstream is `synth/r6/build/top.bit`, with timing and utilization
-reports next to it. Its core waits, held, for a host on the debug link.
-With
+reports next to it. Built in `synth/r6`, it has no ROM, and its core
+waits, held, for a host on the debug link. `make r6` in the top directory
+builds the demo first and puts it in the ROM, unless `ROM=` gives another
+file, or none when empty. With
 
     make -C synth/r6 ROM=/path/to/monitor.bin
 
@@ -179,7 +181,8 @@ MandelbrotMEGA65's `mega65.vhd` does.
 
 A build takes four to six minutes on an Intel Core i9-10850K (10 cores,
 20 threads) with Vivado 2025.1, and much longer on a busy machine. These
-are the times of the last builds, in minutes and seconds, without `ROM=`:
+are the times of the last builds, in minutes and seconds, without a ROM
+(`ROM=`):
 
 | Build | Synthesis | Placement | Routing | Bitstream | Total |
 |---|---|---|---|---|---|
@@ -195,7 +198,7 @@ The Nexys4DDR builds with `FLOW=timing`.
 
 The utilization is from `build/utilization.rpt`, and the split by module
 from `report_utilization -hierarchical` on `build/top.dcp`. These are the
-numbers without `ROM=`, in LUTs and flip-flops. The R6's pipelined column
+numbers without a ROM (`ROM=`), in LUTs and flip-flops. The R6's pipelined column
 is from the build of the V1.1 bump, at nice_cpu V1.1, and the Nexys4DDR's
 from one at nice_cpu V1.0, both with the Ethernet station. The multi-cycle columns are older, from
 builds that had a command line in place of the link, counted in the rest,

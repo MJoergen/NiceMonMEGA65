@@ -211,7 +211,7 @@ reset button, or a start from the link, starts it again.
 ## Building and testing
 
     make -C demo                  # build/demo.bin, for the ROM
-    make r6 ROM=demo/build/demo.bin
+    make r6                       # the bitstream, with the demo in its ROM
     make -C demo test             # runs in niceemu, compared with test.expected
 
 The version in the title bar is `git describe --tags --always --dirty`, or

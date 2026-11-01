@@ -23,9 +23,12 @@ or, in an existing clone:
 - `make lint` checks the VHDL style.
 - `make examples` builds the C examples.
 - `make demo` builds the demo of the ROM, `demo/build/demo.bin`, which the
-  release puts in the ROM of its bitstreams and core files.
-- `make r3`, `make r6`, and `make nexys4ddr` build the bitstreams. With
-  `ROM=file.bin`, the core boots from the file (see [The
+  boards' targets and the release put in the ROM of the bitstreams and
+  core files.
+- `make r3`, `make r6`, and `make nexys4ddr` build the bitstreams, with
+  the demo in the ROM, which they build first. With `ROM=file.bin`, the
+  core boots from the file instead, and with `ROM=` the bitstream has no
+  ROM, and the core waits, held, for the link (see [The
   ROM](doc/SYSTEM.md#the-rom)).
 - `make cor` builds the MEGA65 core files for MEGAFLASH (see
   [synth/README.md](synth/README.md)).
@@ -649,9 +652,9 @@ they were plugged in, so name the port by the cable's serial number, as in
 A board that is already programmed can be tested with `tools/hwtest.py
 --no-program`, which skips the programming and the whole boot test, the
 `b` notice and the checks of the ROM. A bitstream with a ROM can be
-tested, such as one with the demo (`make demo`, then `make r6
-ROM=demo/build/demo.bin`): the test holds the core and hides the ROM, as
-`load.py` does, and runs the programs from the RAM.
+tested, such as the one of `make r6`, with the demo: the test holds the
+core and hides the ROM, as `load.py` does, and runs the programs from the
+RAM.
 
 ### What it prints
 

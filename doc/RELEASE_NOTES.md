@@ -36,6 +36,12 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   starts another slot at power on. Hold No Scroll at power on to start
   the slot from the flash
   ([#41](https://github.com/MJoergen/NiceMonMEGA65/issues/41)).
+- `make r3`, `make r6`, `make nexys4ddr`, and `make cor` put the demo in
+  the ROM by default, and build it first, as the release does. `ROM=`
+  (empty) builds a bitstream without a ROM, whose core waits, held, for
+  the link, as these targets did before.
+- `make flash` warns when the bitstream has no ROM, as the board then
+  starts from the flash with an empty screen.
 
 ## V1.2 (2026-10-31)
 

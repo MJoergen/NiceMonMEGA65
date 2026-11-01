@@ -33,17 +33,19 @@ help:
 	@echo "  make diagrams   render the block diagrams, src/*.tex and src/eth/*.tex, to PNG"
 	@echo "                  (needs pdflatex and pdftoppm)"
 	@echo "  make examples   build the C examples to examples/build/*.bin (needs clang)"
-	@echo "  make demo       build the ROM's demo to demo/build/demo.bin, for a"
-	@echo "                  board's target with ROM=demo/build/demo.bin"
+	@echo "  make demo       build the ROM's demo to demo/build/demo.bin, the"
+	@echo "                  default ROM of the boards' targets"
 	@echo "  make monitor    build the monitor to monitor/build/monitor.bin, for a"
 	@echo "                  board's target with ROM=monitor/build/monitor.bin"
 	@echo "  make r3 [ROM=prog.bin]"
 	@echo "                  build the bitstream for the MEGA65 R3 (needs Vivado)"
 	@echo "  make r6 [ROM=prog.bin]"
-	@echo "                  build the bitstream for the MEGA65 R6; with ROM, the"
-	@echo "                  core boots from the .bin file at reset"
+	@echo "                  build the bitstream for the MEGA65 R6; the core boots"
+	@echo "                  at reset from the .bin file, the demo by default, and"
+	@echo "                  ROM= (empty) leaves it held for the link"
 	@echo "  make nexys4ddr [ROM=prog.bin]"
-	@echo "                  build the bitstream for the Digilent Nexys4DDR"
+	@echo "                  build the bitstream for the Digilent Nexys4DDR, with"
+	@echo "                  the ROM as for r6"
 	@echo "  make cor [ROM=prog.bin]"
 	@echo "                  build the MEGA65 core files, synth/r3/build/NiceMonMEGA65-r3.cor"
 	@echo "                  and synth/r6/build/NiceMonMEGA65-r6.cor, for MEGAFLASH"
@@ -154,21 +156,36 @@ demo:
 monitor:
 	$(MAKE) -C monitor
 
-# The ROM's path is made absolute here, for the board's Makefile runs in
-# its own directory.
+# The boards' ROM: the demo, built first, unless ROM is given; ROM= (empty)
+# builds the bitstream without a ROM, whose core waits, held, for the link.
+# The path is made absolute here, for the board's Makefile runs in its own
+# directory. A given ROM=demo/build/demo.bin is not built again, so that
+# the release's demo keeps its tag (tools/release.py).
+ifeq ($(origin ROM),undefined)
+BOARD_ROM  = $(abspath demo/build/demo.bin)
+BUILD_DEMO = $(MAKE) -C demo
+else
+BOARD_ROM  = $(if $(ROM),$(abspath $(ROM)))
+BUILD_DEMO = @true
+endif
+
 r3:
-	$(MAKE) -C synth/r3 ROM=$(if $(ROM),$(abspath $(ROM)))
+	$(BUILD_DEMO)
+	$(MAKE) -C synth/r3 ROM=$(BOARD_ROM)
 
 r6:
-	$(MAKE) -C synth/r6 ROM=$(if $(ROM),$(abspath $(ROM)))
+	$(BUILD_DEMO)
+	$(MAKE) -C synth/r6 ROM=$(BOARD_ROM)
 
 nexys4ddr:
-	$(MAKE) -C synth/nexys4ddr ROM=$(if $(ROM),$(abspath $(ROM)))
+	$(BUILD_DEMO)
+	$(MAKE) -C synth/nexys4ddr ROM=$(BOARD_ROM)
 
 # The core files of the MEGA65 boards, from their bitstreams (synth/Makefile.inc)
 cor:
-	$(MAKE) -C synth/r3 cor ROM=$(if $(ROM),$(abspath $(ROM)))
-	$(MAKE) -C synth/r6 cor ROM=$(if $(ROM),$(abspath $(ROM)))
+	$(BUILD_DEMO)
+	$(MAKE) -C synth/r3 cor ROM=$(BOARD_ROM)
+	$(MAKE) -C synth/r6 cor ROM=$(BOARD_ROM)
 
 # nice_cpu's badge of timing met on the MEGA65 (tools/bump.py)
 bump:

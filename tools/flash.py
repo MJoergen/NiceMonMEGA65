@@ -11,10 +11,10 @@ Usage:
     The Nexys4DDR's FPGA loads the bitstream from the board's quad SPI
     flash at power on, and when PROG is pressed, if jumper JP1 (MODE) is
     on QSPI. The bitstream is built for that
-    (synth/nexys4ddr/nexys4ddr.xdc). With the demo in its ROM (make demo,
-    then make nexys4ddr ROM=demo/build/demo.bin), or a release's
-    nicemon-TAG-nexys4ddr.bit, the board then shows the demo when it is
-    switched on, as a MEGA65 does with a core in its flash.
+    (synth/nexys4ddr/nexys4ddr.xdc). With the demo in its ROM (make
+    nexys4ddr), or a release's nicemon-TAG-nexys4ddr.bit, the board then
+    shows the demo when it is switched on, as a MEGA65 does with a core in
+    its flash.
 
     --erase erases the whole flash instead, and the FPGA then stays empty
     at power on until it is programmed over JTAG. It is for the Nexys4DDR
@@ -33,8 +33,9 @@ How:
     that it loads into the FPGA over JTAG, reads it back to verify it, and
     then makes the FPGA load itself from the flash. The script last reads
     the control register over the link, whose answer says that the board
-    started from the flash. It needs Linux, as hwtest.py does, and for
-    the MEGA65 pyftdi.
+    started from the flash, and warns if it has no ROM, as the screen then
+    stays empty. It needs Linux, as hwtest.py does, and for the MEGA65
+    pyftdi.
 
     A bitstream must be for the Nexys4DDR's part. A core file must have
     the header of coretool, for a board revision with the MEGA65's part,
@@ -160,6 +161,14 @@ def started(value: int) -> str:
             f"{'held, no ROM' if value & 9 == 9 else 'running the ROM'}")
 
 
+def warn_no_rom(value: int, build: str) -> None:
+    """Warns that a board without a ROM shows nothing when it starts."""
+    if value & 9 == 9:
+        print(f"[WARN] the bitstream has no ROM, so the core waits, held, "
+              f"for the link, and the screen stays empty at power on; "
+              f"'make {build}' builds it with the demo", flush=True)
+
+
 def flash_cor(args: argparse.Namespace) -> None:
     """Writes the core file into its slot of the MEGA65's flash."""
     if not 0 < args.slot < SLOTS:
@@ -238,6 +247,7 @@ def flash_cor(args: argparse.Namespace) -> None:
                  f"{args.slot} does not start the system")
     print(f"[PASS] the bitstream of slot {args.slot} runs, {started(value)}; "
           f"hold No Scroll at power on to start the slot", flush=True)
+    warn_no_rom(value, "cor")
 
 
 def flash_bit(args: argparse.Namespace) -> None:
@@ -277,6 +287,7 @@ def flash_bit(args: argparse.Namespace) -> None:
                  "PROG")
     print(f"[PASS] the board started from the flash, {started(value)}",
           flush=True)
+    warn_no_rom(value, "nexys4ddr")
 
 
 def main() -> None:

@@ -40,7 +40,7 @@ header is the authoritative address map.
     make examples         # C examples -> examples/build/*.bin (clang wasm32, lld, llvm)
     make demo             # the ROM's demo -> demo/build/demo.bin; make -C demo test runs it in niceemu
     make monitor          # the monitor -> monitor/build/monitor.bin; make -C monitor test runs it in niceemu
-    make r6 [ROM=f.bin]   # Vivado bitstream, synth/r6/build/top.bit; make r3 and make nexys4ddr likewise
+    make r6 [ROM=f.bin]   # Vivado bitstream, synth/r6/build/top.bit, the demo in the ROM unless ROM= (none) or ROM=f.bin; make r3 and make nexys4ddr likewise
     make cor [ROM=f.bin]  # MEGA65 core files for MEGAFLASH, synth/r{3,6}/build/NiceMonMEGA65-r{3,6}.cor (coretool)
     make load FILE=p.bin  # load and start a program on the board (ETH=IP or PORT=/dev/ttyUSB1, one needed)
     make run FILE=p.bin   # run it and print what niceemu prints, for diffing

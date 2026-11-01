@@ -274,10 +274,10 @@ released while they wait is lost. A key held down until then is not.
 
 ## The ROM
 
-A bitstream built with `make r6 ROM=file.bin` (or `make r3 ...`) has a ROM
-of 32K words at `0x0000`–`0x7FFF`, in front of the RAM, with the words of the
-`.bin` file, and its core boots from it at reset instead of waiting held for
-a host. That is the layout of QNICE-FPGA, whose monitor is in ROM at
+A bitstream built with `make r6 ROM=file.bin` (or `make r3 ...`), or with
+the demo's file by default, has a ROM of 32K words at `0x0000`–`0x7FFF`, in
+front of the RAM, with the words of the `.bin` file, and its core boots
+from it at reset instead of waiting held for a host. That is the layout of QNICE-FPGA, whose monitor is in ROM at
 `0x0000`–`0x7FFF` and whose programs load at `0x8000`, and the
 [monitor](../monitor/README.md) is built for it, though the release's
 ROM still holds the demo. The file is read by Vivado, so the ROM changes only with a
