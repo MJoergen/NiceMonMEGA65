@@ -21,6 +21,22 @@ The release candidates pinned these:
 
 nice_cpu's `RC01` and `RC03` have no tag here.
 
+## V1.2.1
+
+**Tools**
+
+- `make flash COR=f.cor SLOT=N` works on the MEGA65 R6, tested into
+  slot 5. The MEGA65's flash protects its sectors with their DYB bits,
+  and openFPGALoader's erase failed on them with `timeout: 23`
+  ([trabucayre/openFPGALoader#752](https://github.com/trabucayre/openFPGALoader/issues/752)).
+  `flash.py` now clears them first through openFPGALoader's bridge,
+  which needs pyftdi (`pip install pyftdi`). It then loads the slot's
+  bitstream into the FPGA over JTAG. It no longer starts the slot
+  through slot 0's serial monitor, which is gone when slot 0's core
+  starts another slot at power on. Hold No Scroll at power on to start
+  the slot from the flash
+  ([#41](https://github.com/MJoergen/NiceMonMEGA65/issues/41)).
+
 ## V1.2 (2026-10-31)
 
 **Upgrade notes.**

@@ -3,7 +3,8 @@
 The tools run on the host, and talk to the board over its Ethernet port
 or its debug UART, with the debug link of
 [DEBUG.md](../nice_cpu/doc/DEBUG.md). They use
-only the Python standard library, and run on Linux and macOS. Each one
+only the Python standard library, and run on Linux and macOS, but
+`flash.py` needs Linux, and pyftdi for the MEGA65. Each one
 prints its options with `--help`, and its header says more.
 
 | Tool | What it does |

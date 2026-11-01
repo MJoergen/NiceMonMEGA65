@@ -57,8 +57,12 @@ core file into slot 1 over the JTAG cable instead, with no key held at
 power on. It takes slots 1 to 7, as slot 0 holds the MEGA65's own core.
 It checks the FPGA first, as `make hwtest` does, and stops unless the core
 in slot 0 is for the core file's revision. It shows what the slot held,
-verifies the flash, and starts the slot, through the serial monitor of
-slot 0's core if that core does not start it.
+and clears the protection of the slot's sectors, which openFPGALoader
+leaves set, with pyftdi (`pip install pyftdi`). It then writes and
+verifies the flash, and loads the slot's bitstream into the FPGA over
+JTAG, so the system runs at once. Hold No Scroll at power on to start
+the slot from the flash, as slot 0's core may start another slot on its
+own.
 
 The user LED is on while the core runs. The Nexys4DDR is programmed with
 `openFPGALoader -b nexys_a7_100 synth/nexys4ddr/build/top.bit`, or with

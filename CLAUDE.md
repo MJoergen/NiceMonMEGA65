@@ -110,7 +110,9 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   SymbiYosys wrappers; the checks themselves are `G_FORMAL` blocks in the
   sources. `tools/`: `nicelink.py` (the link, on the UART, or over TCP to
   `niceemu --link` or `make cosim`), `load.py`, `run.py`, `mon.py`, `hwtest.py`, `flash.py` (with
-  `jtag.py`, the JTAG cable of the board's UART, which hwtest shares),
+  `jtag.py`, the JTAG cable of the board's UART, which hwtest shares, and
+  `spiflash.py`, the MEGA65's flash through openFPGALoader's bridge with
+  pyftdi, which clears the sectors' DYB protection),
   `bump.py`, `release.py`, `linktest.py`, `cosimtest.py`, `screenshot.py`
   (a program's screen in niceemu as a PNG). `examples/`: C programs built through
   nice_cpu's wasm translator. `demo/`: the welcome screen and typewriter

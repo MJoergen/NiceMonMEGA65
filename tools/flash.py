@@ -33,7 +33,8 @@ How:
     that it loads into the FPGA over JTAG, reads it back to verify it, and
     then makes the FPGA load itself from the flash. The script last reads
     the control register over the link, whose answer says that the board
-    started from the flash. It needs Linux, as hwtest.py does.
+    started from the flash. It needs Linux, as hwtest.py does, and for
+    the MEGA65 pyftdi.
 
     A bitstream must be for the Nexys4DDR's part. A core file must have
     the header of coretool, for a board revision with the MEGA65's part,
@@ -41,15 +42,24 @@ How:
     also reads the header of the core in slot 0 and stops unless it is for
     the core file's revision. It shows what the slot held before.
 
-    The MEGA65's FPGA loads slot 0 when openFPGALoader is done, and that
-    core may start another slot on its own. If the link does not answer,
-    the script writes the slot's address to the reconfiguration registers
-    at $FFD36C8 through the MEGA65 core's serial monitor, on the same
-    UART, as m65 -Z N does, and the FPGA loads the slot.
+    The MEGA65's flash protects each sector with its DYB bit, which
+    openFPGALoader does not clear, so its erase fails. Between the reads
+    and the write, the script clears the DYBs of the sectors it writes
+    through openFPGALoader's bridge, with pyftdi (tools/spiflash.py), as
+    MEGAFLASH does. The bridge stays in the FPGA from the first read to
+    the write.
+
+    The MEGA65 then does not start the slot on its own: slot 0's core may
+    start another slot at power on, and an IPROG through JTAG leaves the
+    FPGA empty. So the script loads the slot's bitstream, which follows
+    the core file's header, into the FPGA over JTAG, and reads the
+    control register over the link. Hold No Scroll at power on to start
+    the slot from the flash.
 
 Exit status:
-    0 if the flash was written, verified, and the board started from it,
-    or the flash was erased; else 1.
+    0 if the flash was written, verified, and the board started from it
+    (for the MEGA65, the slot's bitstream over JTAG), or the flash was
+    erased; else 1.
 """
 
 import argparse
@@ -62,6 +72,7 @@ import time
 
 from jtag import bit_part, check_board, check_part, wait_port
 from nicelink import CONTROL, Link, LinkError, Serial
+from spiflash import SpiFlashError, unprotect
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # The Nexys4DDR's part, which openFPGALoader needs for its bridge, as the
@@ -85,10 +96,6 @@ HEADER = struct.Struct("<16s32s32s32sB")
 # The board revisions of the MEGA65's part, by coretool's code
 REVISIONS = {0x03: "mega65r3", 0x04: "mega65r4", 0x05: "mega65r5",
              0x06: "mega65r6"}
-# How long slot 0's core may take to start another slot on its own, and
-# the slot to load once the script has written the reconfiguration
-# registers
-MEGA65_WAIT = 8.0
 
 
 def header(data: bytes) -> tuple[str, str, int, str] | None:
@@ -113,10 +120,13 @@ def describe(data: bytes) -> str:
 
 
 def dump(loader: list[str], offset: int, size: int) -> bytes:
-    """Reads size bytes of the flash from offset through the bridge."""
+    """Reads size bytes of the flash from offset through the bridge. The
+    loader options may skip loading the bridge, and the bridge stays in
+    the FPGA afterwards (--skip-reset), for spiflash.py."""
     with tempfile.TemporaryDirectory() as tmp:
         out = os.path.join(tmp, "dump.bin")
-        r = subprocess.run(loader + ["--dump-flash", "--offset", hex(offset),
+        r = subprocess.run(loader + ["--dump-flash", "--skip-reset",
+                                     "--offset", hex(offset),
                                      "--file-size", str(size), out],
                            capture_output=True, text=True)
         if r.returncode != 0 or not os.path.exists(out):
@@ -150,26 +160,6 @@ def started(value: int) -> str:
             f"{'held, no ROM' if value & 9 == 9 else 'running the ROM'}")
 
 
-def zap(port: str, baud: int, slot: int) -> None:
-    """Makes the MEGA65 core load a slot, as m65 -Z does: the slot's
-    address, shifted right by 8, into $FFD36C8 to $FFD36CB through the
-    serial monitor, then $42 into $FFD36CF. The monitor takes one
-    character at a time, so they go slowly; the first return ends what
-    the link sent before."""
-    addr = slot * SLOT_SIZE
-    lines = ["", f"sffd36c8 {(addr >> 8) & 0xFF:x} {(addr >> 16) & 0xFF:x} "
-             f"{(addr >> 24) & 0xFF:x} 0", "sffd36cf 42"]
-    uart = Serial(port, baud)
-    try:
-        for line in lines:
-            for c in (line + "\r").encode("ascii"):
-                uart.write(bytes([c]))
-                time.sleep(0.002)
-            time.sleep(0.1)
-    finally:
-        uart.close()
-
-
 def flash_cor(args: argparse.Namespace) -> None:
     """Writes the core file into its slot of the MEGA65's flash."""
     if not 0 < args.slot < SLOTS:
@@ -193,7 +183,10 @@ def flash_cor(args: argparse.Namespace) -> None:
     cable, port = check_part(args.port, MEGA65_PART, args.cor)
     loader = ["openFPGALoader"] + cable + ["--fpga-part", f"xc{MEGA65_PART}"]
 
+    # The first dump loads the bridge; it stays in the FPGA until the
+    # write resets it
     factory = header(dump(loader, 0, HEADER_SIZE))
+    loader.append("--skip-load-bridge")
     if factory is None:
         print("[WARN] slot 0 has no core header, so the board's revision is "
               "not known", flush=True)
@@ -208,26 +201,43 @@ def flash_cor(args: argparse.Namespace) -> None:
     print(f"slot {args.slot} held "
           f"{describe(dump(loader, offset, HEADER_SIZE))}", flush=True)
 
-    r = subprocess.run(loader + ["--write-flash", "--verify", "--file-type",
-                                 "bin", "--offset", hex(offset), args.cor])
+    # The flash's sectors are protected by their DYBs, which openFPGALoader
+    # does not clear (spiflash.py)
+    try:
+        cleared = unprotect(cable[cable.index("--ftdi-serial") + 1], offset,
+                            len(data))
+    except SpiFlashError as e:
+        sys.exit(f"[FAIL] {e}")
+    print(f"[PASS] slot {args.slot} unprotected ({cleared} of its sectors "
+          f"had their DYB set)", flush=True)
+
+    r = subprocess.run(loader + ["--write-flash", "--skip-reset", "--verify",
+                                 "--file-type", "bin", "--offset", hex(offset),
+                                 args.cor])
     if r.returncode != 0:
         sys.exit("flash.py: openFPGALoader failed")
     print(f"[PASS] {name} {version} written into slot {args.slot} and "
           f"verified", flush=True)
 
-    # The FPGA now loads slot 0, which may start a slot on its own; if it
-    # does not start the system, the monitor of slot 0's core loads it.
+    # Slot 0's core may start another slot on its own at power on, and an
+    # IPROG through JTAG leaves the FPGA empty, so the script loads the
+    # bitstream of the slot, which follows the core file's header, into
+    # the FPGA over JTAG.
+    with tempfile.TemporaryDirectory() as tmp:
+        bit = os.path.join(tmp, "slot.bit")
+        with open(bit, "wb") as f:
+            f.write(data[HEADER_SIZE:])
+        r = subprocess.run(["openFPGALoader"] + cable + [bit])
+    if r.returncode != 0:
+        sys.exit("flash.py: openFPGALoader could not load the slot's "
+                 "bitstream")
     wait_port(port, BOOT_WAIT)
-    value = control(port, args.baud, MEGA65_WAIT)
+    value = control(port, args.baud, BOOT_WAIT)
     if value is None:
-        zap(port, args.baud, args.slot)
-        value = control(port, args.baud, BOOT_WAIT)
-    if value is None:
-        sys.exit(f"[FAIL] the link does not answer: the board did not start "
-                 f"slot {args.slot}; switch it off and on, and hold No "
-                 f"Scroll to choose the slot")
-    print(f"[PASS] the board started slot {args.slot}, {started(value)}",
-          flush=True)
+        sys.exit(f"[FAIL] the link does not answer: the bitstream of slot "
+                 f"{args.slot} does not start the system")
+    print(f"[PASS] the bitstream of slot {args.slot} runs, {started(value)}; "
+          f"hold No Scroll at power on to start the slot", flush=True)
 
 
 def flash_bit(args: argparse.Namespace) -> None:

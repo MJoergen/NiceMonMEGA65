@@ -57,9 +57,9 @@ holds the demo.
    welcome, and what you type appears on it (see
    [On its own](#on-its-own)).
 
-No JTAG cable is needed. With one, `make flash
-COR=nicemon-V1.0-r6.cor SLOT=1` writes the core file into slot 1 without
-the SD card and No Scroll (see [synth/](synth/README.md#building)).
+No JTAG cable is needed. With one, and pyftdi (`pip install pyftdi`),
+`make flash COR=nicemon-V1.0-r6.cor SLOT=1` writes the core file into
+slot 1 without the SD card (see [synth/](synth/README.md#building)).
 
 A Nexys4DDR starts the system from its flash in the same way. Write the
 release's `nicemon-TAG-nexys4ddr.bit` into the flash once, over the
