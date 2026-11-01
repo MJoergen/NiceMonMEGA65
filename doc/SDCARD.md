@@ -38,7 +38,8 @@ tracking issue is #62, and its subtasks are listed at the end.
 | Nexys4DDR | The microSD slot | none |
 
 Every slot has the 4-bit SD bus (CLK, CMD, and DAT0–DAT3) and card detect.
-On the R3 there are limits to both, below.
+On the R3 there are limits to both, below. The first stage of the
+controller uses the bus in SPI mode.
 The MEGA65's full-size slot also has write protect. The pins are the same on
 the R3 and the R6:
 
@@ -63,13 +64,14 @@ Digilent's master XDC (#56).
 
 Two limits of the R3, which the R6 does not have (#56 has the details):
 
-- **Slot 0 runs in 1-bit SD mode.** Its DAT2, DAT1, CMD, and DAT0 also go
-  to the TCK, TMS, TDO, and TDI of the MAX10 system controller, through 0 Ω
-  resistors, for a microSD debug breakout. In 4-bit mode DAT2 would clock
-  the MAX10's JTAG port, which could then drive TDO onto CMD. In 1-bit mode
-  DAT1 and DAT2 stay high on their pull-ups. Revision -04 of the board
-  removed the MAX10 and the resistors, so the R6 runs both slots in 4-bit
-  mode. The controller takes the bus width as a generic per slot.
+- **Slot 0 runs in SPI mode, or 1-bit SD mode.** Its DAT2, DAT1, CMD, and
+  DAT0 also go to the TCK, TMS, TDO, and TDI of the MAX10 system
+  controller, through 0 Ω resistors, for a microSD debug breakout. In 4-bit
+  mode DAT2 would clock the MAX10's JTAG port, which could then drive TDO
+  onto CMD. In SPI mode and 1-bit mode DAT1 and DAT2 stay high on their
+  pull-ups. Revision -04 of the board removed the MAX10 and the resistors,
+  so the R6 can run both slots in 4-bit mode, from stage 2 of the
+  controller.
 - **Slot 1 has no card detect.** The common pin of the tray socket's
   switches is not connected to GND, so CD and WP always read 1. M2M says
   that the R3A fixes it, and revision -04 has the fix. One core file serves
@@ -180,30 +182,54 @@ reset that it does on the board. The window has no hot swap.
 
 Without an image, a program sees what it sees on a MEGA65 with both slots
 empty: `SD_SLOTS` = 2, "present" 0, and error 1 on every command. The words
-`0xFFFFFFA0`–`0xFFFFFFAF` are always the registers, which changes them from ordinary memory, which nice_cpu's SYSTEM.md §5 says
-the reserved words are in the emulator today.
+`0xFFFFFFA0`–`0xFFFFFFAF` are always the registers, which changes them
+from ordinary memory, which nice_cpu's SYSTEM.md §5 says the reserved words
+are in the emulator today.
 
 ## The controller in the RTL
 
+The controller comes in two stages. Stage 1 (#55) is SPI mode on every
+slot. Stage 2 (#63) adds 4-bit SD mode, and is optional.
+
+- **SPI first**, because it is proven on these pins: M2M runs QNICE-FPGA's
+  `sdcard.vhd` in SPI mode on both slots of the R3 and the R6. Its lines go
+  one way each, DAT3 as chip select, CMD as data in, and DAT0 as data out,
+  so there is no tri-state, and DAT1 and DAT2 are never driven, as the R3's
+  back slot needs. At 25 MHz it gives 2–3 MB/s, enough for BASIC and the
+  monitor.
+- **SD mode may never replace it on the MEGA65.** A card in SPI mode returns
+  to SD mode only after a power cycle, and the MEGA65's cards are always
+  powered. The MEGA65's own core and the M2M cores probably use SPI, so a
+  MEGA65 that switches to this core from the core menu may hand it cards in
+  SPI mode. #63 starts with a test of that on a board, and stage 2 keeps SPI
+  as a fall-back if it is so. The Nexys4DDR can cycle its card's power with
+  `SD_RESET`.
 - `src/sd/sd.vhd`: the registers, the buffer in block RAM, and the choice
-  of slot. `src/sd/sd_ctrl.vhd`, `sd_cmd.vhd`, and `sd_dat.vhd`: the 4-bit
-  SD mode, from [MJoergen/SDCard](https://github.com/MJoergen/SDCard),
-  which reads a card's CID and CSD on the MEGA65, and whose write path is
-  not finished (5efe006). They are rewritten to `doc/CODING_STYLE.md`. QNICE-FPGA's
-  `sdcard.vhd`, in SPI mode, is the fallback.
+  of slot, apart from the protocol engine, behind a small interface (start,
+  read or write, sector, a byte stream, done, and error). Stage 1 has an SPI
+  engine, from QNICE's `sdcard.vhd` rewritten to `doc/CODING_STYLE.md`.
+  Stage 2 adds an SD-mode engine, from
+  [MJoergen/SDCard](https://github.com/MJoergen/SDCard), which reads a
+  card's CID and CSD on the MEGA65, and whose write path is not finished
+  (5efe006).
+- CRCs are on in both modes, with CMD59 in SPI mode, so that error 4 means
+  the same in both.
+- Generics per slot: the bus width (1 for SPI, and for SD mode on the R3's
+  back slot; 4 for SD mode elsewhere), whether card detect and write
+  protect are used, and a power pin.
 - The card's clock is 400 kHz for the start-up, then 25 MHz, the default
-  speed, from the system clock. High speed is not needed: a sector takes
-  about 40 µs at 25 MHz on 4 bits.
+  speed, from the system clock. High speed is not needed.
 - The two slots share the controller. The choice of slot is a multiplexer
   in front of the pins, and the slot that is not selected has its clock
   stopped. Card detect and write protect are read for both slots at all
   times.
-- The pins are registered with `IOB TRUE`, the tri-state DAT and CMD lines
-  included, in each board's XDC.
+- The pins are registered with `IOB TRUE` in each board's XDC; in stage 2,
+  the output enables of the tri-state CMD and DAT lines too.
 - A VHDL model of a card, `sim/sd_card_model.vhd`, answers the commands
-  that the controller sends and reads and writes an image file. GHDL in CI
-  cannot use the Verilog models in the SDCard repository. The model also
-  gives `make cosim` a card.
+  that the controller sends and reads and writes an image file: SPI mode in
+  stage 1, and SD mode in both bus widths in stage 2. GHDL in CI cannot use
+  the Verilog models in the SDCard repository. The model also gives `make
+  cosim` a card.
 - `G_FORMAL` checks in `sd.vhd`: busy falls within the timeout, the cursor
   stays in range, and no command starts while busy.
 
@@ -293,7 +319,6 @@ numbers and no Commodore DOS, as #54 says.
 ## Not included
 
 - exFAT, FAT12, FAT16, and writing long names.
-- SPI mode, unless the 4-bit controller cannot be finished.
 - High speed and UHS.
 - Interrupts from the controller: the ROM polls.
 - C programs' files. The C library calls nothing in the ROM (#24), and a C
@@ -324,7 +349,8 @@ ROM is developed in niceemu and needs no board.
 | Issue | What |
 |---|---|
 | MJoergen/nice_cpu#107 | The registers in nice_cpu's SYSTEM.md, and `niceemu --sd0/--sd1` |
-| #55 | The controller in the RTL, the card model, `tb_sd`, and the formal checks |
+| #55 | The controller in the RTL, stage 1: SPI mode, the card model, `tb_sd`, and the formal checks |
+| #63 | The controller, stage 2: 4-bit SD mode, optional, after a test whether a card leaves SPI mode |
 | #56 | The pins on the R3, R6, and Nexys4DDR, and the read-only check in `make hwtest` |
 | #57 | The sector routines in `monlib.nasm`, and the monitor's `sd` command |
 | #58 | FAT32 reading, `dir`, and `load` |
