@@ -38,6 +38,7 @@ tracking issue is #62, and its subtasks are listed at the end.
 | Nexys4DDR | The microSD slot | none |
 
 Every slot has the 4-bit SD bus (CLK, CMD, and DAT0–DAT3) and card detect.
+On the R3 there are limits to both, below.
 The MEGA65's full-size slot also has write protect. The pins are the same on
 the R3 and the R6:
 
@@ -52,12 +53,28 @@ the R3 and the R6:
 | CD | K1 | D17 |
 | WP | | C17 |
 
-These come from M2M's `MEGA65-R6.xdc` and mega65-core's `mega65r3.xdc`,
-which names the slots. Slot 0 is the one mega65-core gives priority to, and
-the one a user takes out and puts into a PC, so it is the default. The
-Nexys4DDR's slot also has `SD_RESET`, which must be low to power the card;
-its pins are in Digilent's master XDC. The polarity of card detect on each
-board is to be checked on the board.
+These come from the schematics, TE0765-03 for the R3 and TE0765-06 for
+the R6, and from mega65-core's `mega65r3.xdc`, which names the slots. Slot
+0 is the one mega65-core gives priority to, and the one a user takes out and
+puts into a PC, so it is the default. Every line has a 12.1 kΩ pull-up, and
+card detect is low when a card is in, as M2M reads it. The Nexys4DDR's slot
+also has `SD_RESET`, which must be low to power the card; its pins are in
+Digilent's master XDC (#56).
+
+Two limits of the R3, which the R6 does not have (#56 has the details):
+
+- **Slot 0 runs in 1-bit SD mode.** Its DAT2, DAT1, CMD, and DAT0 also go
+  to the TCK, TMS, TDO, and TDI of the MAX10 system controller, through 0 Ω
+  resistors, for a microSD debug breakout. In 4-bit mode DAT2 would clock
+  the MAX10's JTAG port, which could then drive TDO onto CMD. In 1-bit mode
+  DAT1 and DAT2 stay high on their pull-ups. Revision -04 of the board
+  removed the MAX10 and the resistors, so the R6 runs both slots in 4-bit
+  mode. The controller takes the bus width as a generic per slot.
+- **Slot 1 has no card detect.** The common pin of the tray socket's
+  switches is not connected to GND, so CD and WP always read 1. M2M says
+  that the R3A fixes it, and revision -04 has the fix. One core file serves
+  the R3 and the R3A, so the R3's build ignores CD and WP on slot 1, and a
+  missing card shows as a failed reset.
 
 ## The layers
 
@@ -136,6 +153,10 @@ The rules:
 - `SD_SLOTS` is the number of slots that the system has, fixed when it is
   built, whether or not a card is in them. An empty slot counts. A slot at
   or above `SD_SLOTS` has no card, and a command on it fails with error 1.
+- A slot whose card detect does not work, such as the internal slot of the
+  MEGA65 R3, shows "present" as 1 at all times, "write-protected" as 0, and
+  "changed" only after the controller's reset. A command on it with no card
+  fails with error 3 or 8.
 - Reset makes the controller idle, with slot 0 selected, the cursor at 0,
   and "changed" set if a card is present.
 
