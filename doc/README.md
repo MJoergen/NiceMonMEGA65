@@ -16,6 +16,8 @@ repository.
 - [DEBUGGER.md](DEBUGGER.md) is the design note of the on-board debugger,
   mon.py's functions with the MEGA65's own keyboard and screen, which is
   planned and not written yet.
+- [SDCARD.md](SDCARD.md) is the proposed design of the storage on the SD
+  cards, from the registers to BASIC's `SAVE` and `LOAD`, not written yet.
 - [CODING_STYLE.md](CODING_STYLE.md) is the style that the VHDL follows.
 - [RELEASE.md](RELEASE.md) describes how a release is made.
 - [RELEASE_NOTES.md](RELEASE_NOTES.md) lists the changes in each release,
