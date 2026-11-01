@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Write a bitstream into the Nexys4DDR's flash, or a core file into a slot
-of the MEGA65's, from which the board starts.
+"""Write a board's flash, from which the board starts: a bitstream into the
+Nexys4DDR's, or a core file into a slot of the MEGA65's.
 
 Usage:
     tools/flash.py --port DEVICE [--baud 2000000]
@@ -290,24 +290,29 @@ def flash_bit(args: argparse.Namespace) -> None:
     warn_no_rom(value, "nexys4ddr")
 
 
+DEFAULT_BIT = f"{REPO}/synth/nexys4ddr/build/top.bit"
+
+
 def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(
+        description=" ".join(__doc__.split("\n\n")[0].split()))
     parser.add_argument("--port", required=True, metavar="DEVICE",
                         help="the serial device of the board's debug UART, "
                         "such as /dev/ttyUSB1")
     parser.add_argument("--baud", type=int, default=2000000,
                         help="the UART's baud rate (default %(default)s)")
-    parser.add_argument("--bit", default=f"{REPO}/synth/nexys4ddr/build/top.bit",
-                        help="the Nexys4DDR's bitstream to write (default "
-                        "%(default)s)")
+    parser.add_argument("--bit", default=DEFAULT_BIT,
+                        help="Nexys4DDR: the bitstream to write (default "
+                        f"{os.path.relpath(DEFAULT_BIT, REPO)} in the "
+                        "repository)")
     parser.add_argument("--erase", action="store_true",
-                        help="erase the Nexys4DDR's flash instead of "
+                        help="Nexys4DDR: erase the flash instead of "
                         "writing it")
     parser.add_argument("--cor",
-                        help="a MEGA65 core file to write into --slot "
+                        help="MEGA65: a core file to write into --slot "
                         "instead")
     parser.add_argument("--slot", type=int,
-                        help="the slot of the MEGA65's flash, 1 to 7")
+                        help="MEGA65: the slot of the flash, 1 to 7")
     args = parser.parse_args()
 
     if not sys.platform.startswith("linux"):
