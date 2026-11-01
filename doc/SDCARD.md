@@ -85,7 +85,7 @@ issue MJoergen/nice_cpu#107. They take 16 of the words that nice_cpu reserves fo
 | `0xFFFFFFA4` | `SD_ERROR` | the error of the last command, 0 for none | is ignored |
 | `0xFFFFFFA5` | `SD_SELECT` | the selected slot | selects the slot in bit 0 |
 | `0xFFFFFFA6` | `SD_SIZE` | the card's size in sectors, 0 before a reset | is ignored |
-| `0xFFFFFFA7` | `SD_SLOTS` | the number of slots, 0 to 2 | is ignored |
+| `0xFFFFFFA7` | `SD_SLOTS` | the number of slots: 2 in the emulator and on the MEGA65, 1 on the Nexys4DDR | is ignored |
 | `0xFFFFFFA8`–`0xFFFFFFAF` | | 0 | is ignored |
 
 The commands, in bits 3..0 of a write to `SD_CSR`:
@@ -133,6 +133,9 @@ The rules:
 - A read by the debug link returns the same word as a read by the core,
   but does not move the cursor, as a link read of the console takes no
   byte. A link write acts as a core write, so a host can fill the buffer.
+- `SD_SLOTS` is the number of slots that the system has, fixed when it is
+  built, whether or not a card is in them. An empty slot counts. A slot at
+  or above `SD_SLOTS` has no card, and a command on it fails with error 1.
 - Reset makes the controller idle, with slot 0 selected, the cursor at 0,
   and "changed" set if a card is present.
 
@@ -146,16 +149,17 @@ already share.
 ## The emulator
 
 `niceemu --sd0 FILE --sd1 FILE` gives each slot an image file, whose size
-is a multiple of 512 bytes. `SD_SLOTS` is the number of images given. A
-card is present when its image is given, its type is SDHC, and it is
-write-protected when the file cannot be written. A command is done before
-the next instruction, and a write goes to the file at once. "Changed" is
-set at the start, so a program does the reset that it does on the board.
-The window has no hot swap.
+is a multiple of 512 bytes. The emulator always has 2 slots, as the MEGA65
+does, so `SD_SLOTS` is 2 with any images or none, and `--sd1` alone puts a
+card in slot 1 and leaves slot 0 empty. A card is present when its image
+is given, its type is SDHC, and it is write-protected when the file cannot
+be written. A command is done before the next instruction, and a write goes
+to the file at once. "Changed" is set at the start, so a program does the
+reset that it does on the board. The window has no hot swap.
 
-Without `--sd0`, the words `0xFFFFFFA0`–`0xFFFFFFAF` read as the registers
-of a system with no slots, so a program sees `SD_SLOTS` = 0 and no card.
-That changes them from ordinary memory, which nice_cpu's SYSTEM.md §5 says
+Without an image, a program sees what it sees on a MEGA65 with both slots
+empty: `SD_SLOTS` = 2, "present" 0, and error 1 on every command. The words
+`0xFFFFFFA0`–`0xFFFFFFAF` are always the registers, which changes them from ordinary memory, which nice_cpu's SYSTEM.md §5 says
 the reserved words are in the emulator today.
 
 ## The controller in the RTL
