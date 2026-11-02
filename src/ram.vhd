@@ -83,6 +83,12 @@ architecture synthesis of ram is
    signal mem_even : t_mem := load(G_INIT_FILE, '0');
    signal mem_odd  : t_mem := load(G_INIT_FILE, '1');
 
+   -- Without it, Vivado (2025.1) makes distributed RAM of the Nexys4DDR's
+   -- screen, 8K words: 2048 RAM128X1D, 8192 LUTs (issue #70)
+   attribute ram_style : string;
+   attribute ram_style of mem_even : signal is "block";
+   attribute ram_style of mem_odd  : signal is "block";
+
    -- Port B's reads of both banks, and the bank it reads
    signal b_even : std_logic_vector(31 downto 0);
    signal b_odd  : std_logic_vector(31 downto 0);

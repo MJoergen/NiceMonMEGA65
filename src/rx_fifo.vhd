@@ -69,6 +69,11 @@ architecture synthesis of rx_fifo is
    signal we    : std_logic;
    signal re    : std_logic;
 
+   -- Without it, Vivado (2025.1) makes distributed RAM of the memory on the
+   -- Nexys4DDR: 96 RAM64M, 384 LUTs (issue #70)
+   attribute ram_style : string;
+   attribute ram_style of mem : signal is "block";
+
 begin
 
    full    <= '1' when wr - rd = C_LEN else

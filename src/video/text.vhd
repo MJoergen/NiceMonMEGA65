@@ -201,6 +201,12 @@ architecture synthesis of text is
    signal bg_3    : std_logic_vector(11 downto 0) := (others => '0');
    signal col_3   : std_logic_vector(3 downto 0) := (others => '0');
 
+   -- The font, read into glyph_3, is in block RAM. Without it, Vivado
+   -- (2025.1) makes a ROM of LUTs of it on the Nexys4DDR, about 1100 LUTs
+   -- (issue #70).
+   attribute rom_style : string;
+   attribute rom_style of glyph_3 : signal is "block";
+
    -- Stage 4
    signal hs_4    : std_logic := not G_MODE.sync_active;
    signal vs_4    : std_logic := not G_MODE.sync_active;
