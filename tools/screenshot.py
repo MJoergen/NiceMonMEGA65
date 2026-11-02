@@ -75,20 +75,23 @@ FLAG_CHARS = "XCZNVEI"
 KEYS_ROW   = (" F1 step  F3 go  F5 pause  F7 hold  F9 restart  F11 page"
               "  F12 keep strip: off")
 # niceemu's halt reasons, and their numbers in DEBUG.md section 6
+# A stop: ("PAUSED", 0) at the step limit, or ("HALTED", reason)
+Stop = tuple[str, int]
 HALT_REASONS = {"HALT": 1, "reserved control instruction": 2,
                 "INT inside an interrupt routine": 3,
                 "RTI outside an interrupt routine": 4}
 
 
-def load_font():
+def load_font() -> dict[int, int]:
     """Returns the rows of the glyphs, by 32 * code + row."""
-    font = {}
+    font: dict[int, int] = {}
     for m in re.finditer(r'(\d+) => "([01]{16})"', open(FONT).read()):
         font[int(m.group(1))] = int(m.group(2), 2)
     return font
 
 
-def run(args, dumps=()):
+def run(args: argparse.Namespace, dumps: tuple[str, ...] | list[str] = ()
+        ) -> tuple[dict[int, int], list[int], Stop | None]:
     """Runs the program; returns the words that niceemu dumps, R0-R15, and
     the stop: ("PAUSED", 0) at the step limit, or ("HALTED", reason)."""
     cmd = [NICEEMU, "-d", "0xFFFFFF80:3", "-d", f"0xFFFF0000:{COLS * ROWS}"]
@@ -102,7 +105,9 @@ def run(args, dumps=()):
                        capture_output=True, text=True)
     if r.returncode not in (0, 3):
         sys.exit(f"screenshot.py: niceemu failed:\n{r.stderr}")
-    mem, regs, stop = {}, {}, None
+    mem: dict[int, int] = {}
+    regs: dict[int, int] = {}
+    stop: Stop | None = None
     for line in r.stdout.splitlines():
         m = re.match(r"([0-9a-f]{8}):((?: [0-9a-f]{8})+)$", line.strip())
         if m:
@@ -121,20 +126,21 @@ def run(args, dumps=()):
     return mem, [regs.get(i, 0) for i in range(16)], stop
 
 
-def screen_rows(mem):
+def screen_rows(mem: dict[int, int]) -> list[list[int]]:
     """The 25 rows of the screen, each the 80 words of its characters."""
     return [[mem[0xFFFF0000 + row * COLS + col] for col in range(COLS)]
             for row in range(ROWS)]
 
 
-def strip_rows(regs, stop, mem):
+def strip_rows(regs: list[int], stop: Stop | None,
+               mem: dict[int, int]) -> list[list[int]]:
     """The 4 rows of the strip at a stop, as dbg.vhd writes them: R0-R15,
     the state, the PC, the word there, the flags, the decode, and the keys."""
     if stop is None:
         sys.exit("screenshot.py: the program did not stop; give -n N")
     rows = [[" "] * COLS for _ in range(4)]
 
-    def put(row, col, text):
+    def put(row: int, col: int, text: str) -> None:
         for i, ch in enumerate(text):
             rows[row][col + i] = ch
 
@@ -161,15 +167,16 @@ def strip_rows(regs, stop, mem):
     return [[STRIP_COLOR << 8 | ord(ch) for ch in row] for row in rows]
 
 
-def color(c):
+def color(c: int) -> bytes:
     return bytes(((c >> s) & 15) * 0x11 for s in (8, 4, 0))
 
 
-def draw(rows, cursor, font):
+def draw(rows: list[list[int]], cursor: tuple[int, int, int],
+         font: dict[int, int]) -> list[bytes]:
     """Returns the rows of pixels, 3 bytes each, of the rows of words, with
     the cursor (state, x, y) of the screen's registers drawn on."""
     state, cx, cy = cursor
-    lines = []
+    lines: list[bytes] = []
     for y in range(len(rows) * H):
         row, r = divmod(y, H)
         line = bytearray()
@@ -186,8 +193,8 @@ def draw(rows, cursor, font):
     return lines
 
 
-def write_png(path, lines):
-    def chunk(kind, data):
+def write_png(path: str, lines: list[bytes]) -> None:
+    def chunk(kind: bytes, data: bytes) -> bytes:
         return (struct.pack(">I", len(data)) + kind + data
                 + struct.pack(">I", zlib.crc32(kind + data)))
     raw = b"".join(b"\0" + line for line in lines)
@@ -199,7 +206,7 @@ def write_png(path, lines):
         f.write(chunk(b"IEND", b""))
 
 
-def main():
+def main() -> None:
     p = argparse.ArgumentParser(
         description="Draw a program's screen in niceemu as a PNG picture.")
     p.add_argument("-i", "--input", help="the console input, as niceemu's -i")

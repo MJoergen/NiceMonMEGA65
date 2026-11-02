@@ -13,7 +13,7 @@ ARGS   ?=
 LINK    = $(if $(ETH),--eth $(ETH)) $(if $(PORT),--port $(PORT))
 EMU     = nice_cpu/emulator/zig-out/bin/niceemu
 
-.PHONY: help test formal lint diagrams examples demo monitor r3 r6 nexys4ddr cor bump release load run mon flash hwtest linktest cosim cosimtest clean
+.PHONY: help test formal lint typecheck diagrams examples demo monitor r3 r6 nexys4ddr cor bump release load run mon flash hwtest linktest cosim cosimtest clean
 
 # Every target but these needs the nice_cpu submodule
 ifeq ($(wildcard nice_cpu/hdl/src/nice_pkg.vhd),)
@@ -30,6 +30,7 @@ help:
 	@echo "                  run the formal checks (needs Yosys, its GHDL plugin,"
 	@echo "                  SymbiYosys, and Yices)"
 	@echo "  make lint       check the VHDL against doc/CODING_STYLE.md (needs vsg)"
+	@echo "  make typecheck  mypy --strict on the Python tools and scripts (needs mypy)"
 	@echo "  make diagrams   render the block diagrams, src/*.tex and src/eth/*.tex, to PNG"
 	@echo "                  (needs pdflatex and pdftoppm)"
 	@echo "  make examples   build the C examples to examples/build/*.bin (needs clang)"
@@ -137,6 +138,10 @@ VHDL_SOURCES = $(filter-out synth/r3/max10.vhd,$(wildcard src/*.vhd src/core/*.v
 
 lint:
 	$(VSG) -c vsg.yml -of syntastic -f $(VHDL_SOURCES)
+
+# mypy --strict on the files of mypy.ini, as nice_cpu checks its own
+typecheck:
+	$(PYTHON) -m mypy
 
 # The block diagrams of src/README.md and src/eth/README.md, as nice_cpu
 # renders its own: each .tex to a .png beside it

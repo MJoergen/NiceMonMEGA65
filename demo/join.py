@@ -22,9 +22,9 @@ PROGRAM = 0x8000        # where the demo is assembled, and runs
 ROM_WORDS = 0x8000      # the ROM, 0x0000-0x7FFF
 
 
-def load(path):
+def load(path: str) -> list[tuple[int, int]]:
     """The (address, word) pairs of a .bin file (ISA.md §10.4)."""
-    words = []
+    words: list[tuple[int, int]] = []
     with open(path) as f:
         for line in f:
             if line.strip():
@@ -33,7 +33,7 @@ def load(path):
     return words
 
 
-def demo_address():
+def demo_address() -> int:
     """The value of DEMO in monitor.nasm."""
     with open(MONITOR_NASM) as f:
         m = re.search(r"^DEMO\s+\.EQU\s+(0x[0-9A-Fa-f]+)", f.read(), re.MULTILINE)
@@ -42,7 +42,7 @@ def demo_address():
     return int(m.group(1), 16)
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("monitor")
     parser.add_argument("demo")

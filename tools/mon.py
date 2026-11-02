@@ -36,8 +36,9 @@ import threading
 
 try:
     import readline
+    HAVE_READLINE = True
 except ImportError:
-    readline = None
+    HAVE_READLINE = False
 
 from typing import Callable
 
@@ -201,7 +202,7 @@ class Monitor(cmd.Cmd):
         out.buffer.write(data if data.endswith(b"\n") else data + b"\n")
         out.buffer.flush()
         if self.at_prompt:
-            typed = readline.get_line_buffer() if readline else ""
+            typed = readline.get_line_buffer() if HAVE_READLINE else ""
             out.write(self.prompt + typed)
         out.flush()
 
@@ -282,7 +283,7 @@ class Monitor(cmd.Cmd):
     def default(self, line: str) -> None:
         print(f"unknown command '{line.split()[0]}'; 'help' lists them")
 
-    def parseline(self, line: str):
+    def parseline(self, line: str) -> tuple[str | None, str | None, str]:
         command, arg, line = super().parseline(line)
         if line:
             self.last = line

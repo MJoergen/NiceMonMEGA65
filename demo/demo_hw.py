@@ -48,13 +48,13 @@ SCR_Y = 0xFFFFFF82
 fails = 0
 
 
-def check(name, ok, detail=""):
+def check(name: str, ok: bool, detail: str = "") -> None:
     global fails
     print(f"[{'PASS' if ok else 'FAIL'}] {name} {detail}", flush=True)
     fails += not ok
 
 
-def emulator():
+def emulator() -> tuple[list[int], int, int]:
     """The screen's words that niceemu leaves for KEYS, and the cursor's
     column and row, R10 and R11."""
     with open(KEYS_FILE, "wb") as f:
@@ -68,7 +68,7 @@ def emulator():
     return words, int(regs["R10"], 16), int(regs["R11"], 16)
 
 
-def pause(link):
+def pause(link: Link) -> bool:
     """Pauses the core, with the ROM shown; False when no p came."""
     n = link.pauses
     link.control(PAUSE)
@@ -78,14 +78,14 @@ def pause(link):
     return link.pauses > n
 
 
-def show(words):
+def show(words: list[int]) -> None:
     for r in range(25):
         row = "".join(chr(w & 0xFF) if 0x20 <= w & 0xFF < 0x7F else " "
                       for w in words[80 * r:80 * r + 80])
         print("|" + row.rstrip())
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--port", required=True, metavar="DEVICE",
                         help="the serial device of the board's debug UART, "

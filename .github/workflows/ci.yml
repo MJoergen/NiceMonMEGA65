@@ -76,6 +76,20 @@ jobs:
       - run: pip install vsg==3.35.0
       - run: make lint
 
+  # mypy --strict on the Python tools and scripts (mypy.ini). The
+  # submodule has nicedis.py, which three of them import.
+  typecheck:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - run: pip install mypy
+      - run: make typecheck
+
   formal:
     runs-on: ubuntu-24.04
     steps:

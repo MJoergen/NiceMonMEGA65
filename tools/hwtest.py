@@ -576,8 +576,8 @@ def test_step(link: Link, prog: str) -> None:
         if i == 0:
             check("step: bit 5 reads 0", ctl(link) == "00000018", ctl(link))
         if i == 7:
-            got = rd(link, 0xFFFFFF42)
-            check("step: instructions counted", got == 8, f"{got:08X}")
+            count = rd(link, 0xFFFFFF42)
+            check("step: instructions counted", count == 8, f"{count:08X}")
         got = link.read(REGS, 16)
         if got != regs:
             wrong.append(f"step {i + 1}: " + " ".join(
@@ -1044,6 +1044,7 @@ def test_eth_ip(link: Link, rom: str, ip: str) -> list[int] | None:
                  got is not None and got[0] == want,
                  "no pause" if got is None else f"{got[0]:08X}"):
         return None
+    assert got is not None
     return got[1:]
 
 
@@ -1149,7 +1150,7 @@ def main() -> None:
         opened = False
         try:
             # Before the port is opened, as openFPGALoader takes the FTDI chip
-            cable = []
+            cable: list[str] = []
             if not args.no_program:
                 if not sys.platform.startswith("linux"):
                     sys.exit("hwtest.py: programming needs Linux; program "

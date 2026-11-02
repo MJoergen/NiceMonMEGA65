@@ -21,7 +21,7 @@ import nicedis  # noqa: E402
 LEN = 34
 
 
-def text(word: int, consts: list) -> str:
+def text(word: int, consts: list[int]) -> str:
     mem = {0: word, 1: consts[0], 2: consts[1], 3: consts[2]}
     insn = nicedis.decode(0, mem.get)
     if insn.reserved:

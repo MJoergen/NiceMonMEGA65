@@ -23,13 +23,13 @@ WIDTH  = 16
 HEIGHT = 32
 
 
-def load_bdf(filename):
+def load_bdf(filename: str) -> tuple[str | None, dict[int | None, list[int]]]:
     """Returns the version, and a dictionary from code point to the rows of
     the glyph."""
-    glyphs  = {}
-    version = None
-    code    = None
-    rows    = None
+    glyphs: dict[int | None, list[int]] = {}
+    version: str | None = None
+    code: int | None = None
+    rows: list[int] | None = None
     for line in open(filename):
         words = line.split()
         if not words:
@@ -46,6 +46,7 @@ def load_bdf(filename):
         elif words[0] == 'BITMAP':
             rows = []
         elif words[0] == 'ENDCHAR':
+            assert rows is not None, 'ENDCHAR without BITMAP'
             glyphs[code] = rows
             rows = None
         elif rows is not None:
@@ -53,7 +54,7 @@ def load_bdf(filename):
     return version, glyphs
 
 
-def main():
+def main() -> None:
     if len(sys.argv) != 2:
         sys.exit('usage: gen_font_pkg.py spleen-16x32.bdf > src/video/font_pkg.vhd')
     version, glyphs = load_bdf(sys.argv[1])

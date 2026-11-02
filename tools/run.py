@@ -107,7 +107,7 @@ import select
 import stat
 import sys
 import time
-from typing import NoReturn
+from typing import Any, NoReturn, Sequence
 
 from load import (RUN_COMMAND, add_monitor_arguments, load_words,
                   program_words, read_lines, start)
@@ -226,8 +226,8 @@ def dump_option(text: str) -> tuple[int, int]:
     if text.count(":") != 1:
         raise argparse.ArgumentTypeError(f"want ADDR:N, not '{text}'")
     try:
-        addr, n = text.split(":")
-        addr, n = number(addr), number(n)
+        a, b = text.split(":")
+        addr, n = number(a), number(b)
     except ValueError as e:
         raise argparse.ArgumentTypeError(f"'{text}': {e}, want ADDR:N")
     if n > MAX_DUMP:
@@ -372,14 +372,15 @@ class Parser(argparse.ArgumentParser):
     error exits 1, niceemu's status for one, not 2, its status for a halt
     other than HALT."""
 
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(allow_abbrev=False, **kwargs)
 
     def error(self, message: str) -> NoReturn:
         self.print_usage(sys.stderr)
         self.exit(1, f"{self.prog}: error: {message}\n")
 
-    def parse_args(self, args=None, namespace=None):
+    def parse_args(self, args: Sequence[str] | None = None,  # type: ignore[override]
+                   namespace: None = None) -> argparse.Namespace:
         args = sys.argv[1:] if args is None else args
         options = {s: a.nargs != 0 for a in self._actions
                    for s in a.option_strings}

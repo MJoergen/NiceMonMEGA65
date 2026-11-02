@@ -36,6 +36,7 @@ header is the authoritative address map.
     make -j test          # GHDL: synth checks, tb_hello, tb_nicemon, tb_kbd, tb_ps2, tb_ps2_nicemon, tb_text, tb_dbg, tb_dbg_host, tb_dbg_decode, tb_board_io, tb_rmii_rx, tb_rx_fcs, tb_eth_rx_fifo, tb_eth_tx_fifo, tb_rmii_tx, tb_eth, tb_eth_tcp, tb_eth_tcp_random, check-steps, check-fmt (NICE=multi for the multi-cycle core); then the demo and the monitor in niceemu
     make -j formal        # SymbiYosys jobs in formal/, each task in a work directory of its own
     make lint             # vsg against doc/CODING_STYLE.md; line-length warnings are tolerated
+    make typecheck        # mypy --strict on the Python files that mypy.ini lists
     make diagrams         # src/system.tex and src/eth/eth.tex -> the PNGs of their READMEs (pdflatex)
     make examples         # C examples -> examples/build/*.bin (clang wasm32, lld, llvm)
     make demo             # the demo at 0x8000 -> demo/build/demo.bin, behind the monitor -> demo/build/rom.bin; make -C demo test runs it in niceemu
@@ -66,7 +67,7 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
 `nice_cpu/emulator/zig-out/bin/niceemu x.bin`. CI
 (`.github/workflows/ci.yml`, on Ubuntu 24.04) builds niceemu and runs
 `make -C sim -j4 test` and `make cosimtest` on both cores, `make examples`,
-`make -C demo test`, `make -C monitor test`, `make linktest`, `make -j4 formal`, and `make lint`.
+`make -C demo test`, `make -C monitor test`, `make linktest`, `make -j4 formal`, `make lint`, and `make typecheck`.
 
 ## Layout
 

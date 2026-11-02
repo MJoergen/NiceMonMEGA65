@@ -50,7 +50,8 @@ import shutil
 import subprocess
 import sys
 
-from bump import FLOWS, TAG, VERIFIED, Failed, badge, read_reports, run, check_tree, tag_commit
+from bump import (FLOWS, TAG, VERIFIED, Failed, Record, badge, read_reports, run, check_tree,
+                  tag_commit)
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STAGE = os.path.join(REPO, "build", "release")
@@ -76,11 +77,11 @@ BOARD_FLOWS = {"nexys4ddr": ("timing",)}
 ROM = os.path.join(REPO, "demo", "build", "rom.bin")
 
 
-def met(r):
-    return badge("x", r)["color"] == "brightgreen"
+def met(r: Record) -> bool:
+    return bool(badge("x", r)["color"] == "brightgreen")
 
 
-def check_pushed():
+def check_pushed() -> str:
     run(["git", "fetch", "--quiet", "origin", "main"])
     head = run(["git", "rev-parse", "HEAD"], capture=True)
     if head != run(["git", "rev-parse", "origin/main"], capture=True):
@@ -88,7 +89,7 @@ def check_pushed():
     return head
 
 
-def nice_tag(tag):
+def nice_tag(tag: str) -> str:
     """The nice_cpu tag that a tag here pins: its first two numbers."""
     m = TAG.match(tag)
     if not m:
@@ -96,30 +97,30 @@ def nice_tag(tag):
     return m.group(1)
 
 
-def tag_exists(tag):
+def tag_exists(tag: str) -> bool:
     return bool(run(["git", "tag", "--list", tag], capture=True)
                 or run(["git", "ls-remote", "--tags", "origin", "refs/tags/" + tag], capture=True))
 
 
-def check_base(tag, nice):
+def check_base(tag: str, nice: str) -> None:
     """A point release follows the release of its nice_cpu tag here."""
     if tag != nice and not tag_exists(nice):
         raise Failed("%s keeps the submodule at %s, but there is no release %s here; "
                      "run make bump TAG=%s and release it first" % (tag, nice, nice, nice))
 
 
-def check_tag_free(tag):
+def check_tag_free(tag: str) -> None:
     if run(["git", "tag", "--list", tag], capture=True):
         raise Failed("the tag %s exists here" % tag)
     if run(["git", "ls-remote", "--tags", "origin", "refs/tags/" + tag], capture=True):
         raise Failed("the tag %s exists on origin" % tag)
 
 
-def check_verified(tag, nice):
+def check_verified(tag: str, nice: str) -> Record:
     """verified.json must be for the nice_cpu tag, which the submodule must
     be at, and met; returns it."""
     with open(os.path.join(REPO, VERIFIED)) as f:
-        v = json.load(f)
+        v: Record = json.load(f)
     if v["nice_cpu_tag"] != nice:
         if tag == nice:
             raise Failed("%s is for %s, not %s; run make bump TAG=%s"
@@ -137,7 +138,7 @@ def check_verified(tag, nice):
     return v
 
 
-def section(tag):
+def section(tag: str) -> str:
     """The body of the tag's section of RELEASE_NOTES.md, which must be dated."""
     with open(os.path.join(REPO, RELEASE_NOTES)) as f:
         text = f.read()
@@ -153,7 +154,7 @@ def section(tag):
     return body
 
 
-def check_ci(commit):
+def check_ci(commit: str) -> None:
     out = run(["gh", "run", "list", "--workflow", "ci.yml", "--commit", commit,
                "--json", "status,conclusion"], capture=True)
     runs = json.loads(out or "[]")
@@ -162,7 +163,7 @@ def check_ci(commit):
         raise Failed("CI has not passed for %s (%s)" % (commit[:7], state))
 
 
-def build(board, flows):
+def build(board: str, flows: tuple[str, ...]) -> Record:
     """The board's bitstream, from nothing and with the monitor and the
     demo in the ROM, with the first flow that meets timing; returns the
     reports."""
@@ -175,7 +176,7 @@ def build(board, flows):
     raise Failed("%s misses timing (WNS %.3f ns with FLOW=%s)" % (board, r["wns_ns"], flow))
 
 
-def notes(tag, v, results, body):
+def notes(tag: str, v: Record, results: dict[str, Record], body: str) -> str:
     lines = [
         body,
         "",
@@ -225,7 +226,7 @@ def notes(tag, v, results, body):
     return "\n".join(lines) + "\n"
 
 
-def stage(tag):
+def stage(tag: str) -> tuple[Record, str, dict[str, Record], str]:
     nice = nice_tag(tag)
     check_tree()
     head = check_pushed()
@@ -238,7 +239,7 @@ def stage(tag):
     run(["make", "-C", "nice_cpu/emulator", "build"])
     run(["make", "examples"])
     run(["make", "-C", "demo", "VERSION=" + tag])
-    results = {}
+    results: dict[str, Record] = {}
     for board, _ in BOARDS:
         if board == "r6":
             flows = (v["flow"],) + tuple(f for f in FLOWS if f != v["flow"])
@@ -252,11 +253,12 @@ def stage(tag):
     return v, head, results, body
 
 
-def write_stage(tag, v, head, results, body):
+def write_stage(tag: str, v: Record, head: str, results: dict[str, Record],
+                body: str) -> str:
     out = os.path.join(STAGE, tag)
     shutil.rmtree(out, ignore_errors=True)
     os.makedirs(out)
-    files = []
+    files: list[str] = []
     for board, _ in BOARDS:
         name = "nicemon-%s-%s.bit" % (tag, board)
         shutil.copy(os.path.join(REPO, "synth", board, "build", "top.bit"), os.path.join(out, name))
@@ -280,12 +282,12 @@ def write_stage(tag, v, head, results, body):
     return out
 
 
-def publish(tag):
+def publish(tag: str) -> None:
     nice_tag(tag)
     out = os.path.join(STAGE, tag)
     try:
         with open(os.path.join(out, STAMP)) as f:
-            s = json.load(f)
+            s: Record = json.load(f)
     except OSError:
         raise Failed("nothing is staged in %s; run tools/release.py %s first" % (out, tag))
     check_tree()
@@ -302,7 +304,7 @@ def publish(tag):
         + [os.path.join(out, name) for name in s["files"]])
 
 
-def main():
+def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("tag", help="the tag, such as V1.0, or V1.0.1 to keep nice_cpu at V1.0")
     ap.add_argument("--port", metavar="DEVICE", help="the R6's serial port, such as /dev/ttyUSB1, "

@@ -44,6 +44,7 @@ import os
 import re
 import subprocess
 import sys
+from typing import Any
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NICE = os.path.join(REPO, "nice_cpu")
@@ -64,12 +65,15 @@ TAG = re.compile(r"(V\d+\.\d+)(\.\d+)?$")
 # needs no note for.
 FLOWS = ("default", "timing")
 
+# What read_reports gives, and the badge and verified.json: JSON objects
+Record = dict[str, Any]
+
 
 class Failed(Exception):
     """A step that gives no result, as against a design that misses timing."""
 
 
-def run(cmd, cwd=REPO, capture=False):
+def run(cmd: list[str], cwd: str = REPO, capture: bool = False) -> str:
     print("+ " + " ".join(cmd), flush=True)
     p = subprocess.run(cmd, cwd=cwd, text=True, stdout=subprocess.PIPE if capture else None)
     if p.returncode != 0:
@@ -77,7 +81,7 @@ def run(cmd, cwd=REPO, capture=False):
     return p.stdout.strip() if capture else ""
 
 
-def read(path):
+def read(path: str) -> str | None:
     try:
         with open(path) as f:
             return f.read()
@@ -85,7 +89,7 @@ def read(path):
         return None
 
 
-def parse_summary(text):
+def parse_summary(text: str) -> Record:
     """The numbers of the design timing summary of report_timing_summary."""
     m = re.search(r"Design Timing Summary.*?\n\s*WNS\(ns\).*?\n\s*-+.*?\n\s*(.+)", text, re.S)
     if not m:
@@ -102,18 +106,18 @@ def parse_summary(text):
     }
 
 
-def parse_vivado(text):
+def parse_vivado(text: str) -> str | None:
     m = re.search(r"Tool Version\s*:\s*(Vivado v\.?\S+)", text)
     return m.group(1).replace("v.", "v") if m else None
 
 
-def parse_clock(text):
+def parse_clock(text: str) -> float | None:
     """The system clock, the MMCM's output, in MHz."""
     m = re.search(r"^\s*clk_mmcm\s+\{.*?\}\s+[\d.]+\s+([\d.]+)", text, re.M)
     return float(m.group(1)) if m else None
 
 
-def parse_path(text):
+def parse_path(text: str | None) -> Record | None:
     """Slack, start, and end of the worst path of a report_timing report."""
     if text is None:
         return None
@@ -125,7 +129,7 @@ def parse_path(text):
     return {"slack_ns": float(s.group(1)), "from": a.group(1), "to": b.group(1)}
 
 
-def read_reports(build, flow):
+def read_reports(build: str, flow: str) -> Record:
     """What a build left in its directory, as one record."""
     text = read(os.path.join(build, "timing.rpt"))
     if text is None:
@@ -140,7 +144,7 @@ def read_reports(build, flow):
     return r
 
 
-def badge(tag, r):
+def badge(tag: str, r: Record) -> Record:
     """The shields.io endpoint for a result."""
     note = "" if r["flow"] == FLOWS[0] else "timing flow"
     if r["met"] and r["wns_ns"] >= 0 and r["whs_ns"] >= 0 and r["wpws_ns"] >= 0:
@@ -161,7 +165,8 @@ def badge(tag, r):
     return {"schemaVersion": 1, "label": LABEL, "message": msg, "color": color}
 
 
-def verified(tag, nice_commit, repo_commit, r, attempts):
+def verified(tag: str, nice_commit: str, repo_commit: str, r: Record,
+             attempts: list[Record]) -> Record:
     return {
         "nice_cpu_tag": tag,
         "nice_cpu_commit": nice_commit,
@@ -185,16 +190,16 @@ def verified(tag, nice_commit, repo_commit, r, attempts):
     }
 
 
-def dump(obj):
+def dump(obj: Record) -> str:
     return json.dumps(obj, indent=2) + "\n"
 
 
-def write(name, obj):
+def write(name: str, obj: Record) -> None:
     with open(os.path.join(REPO, name), "w") as f:
         f.write(dump(obj))
 
 
-def check_tree():
+def check_tree() -> None:
     if run(["git", "status", "--porcelain", "--untracked-files=no"], capture=True):
         raise Failed("the working tree is not clean")
     branch = run(["git", "rev-parse", "--abbrev-ref", "HEAD"], capture=True)
@@ -202,7 +207,7 @@ def check_tree():
         raise Failed("the branch is %s, not main" % branch)
 
 
-def tag_commit(tag):
+def tag_commit(tag: str) -> str:
     """The commit of a nice_cpu tag, after a fetch of its tags."""
     if not os.path.exists(os.path.join(NICE, ".git")):
         raise Failed("nice_cpu is not checked out; run git submodule update --init")
@@ -214,14 +219,14 @@ def tag_commit(tag):
         raise Failed("nice_cpu has no tag %s" % tag)
 
 
-def checkout_tag(tag):
+def checkout_tag(tag: str) -> str:
     """Moves nice_cpu to the tag; returns its commit."""
     commit = tag_commit(tag)
     run(["git", "checkout", "--quiet", commit], cwd=NICE)
     return commit
 
 
-def build(flow):
+def build(flow: str) -> Record:
     """A bitstream with the flow and without a ROM, from nothing, so that
     no old report stays."""
     run(["make", "-C", os.path.join("synth", "r6"), "clean"])
@@ -229,14 +234,14 @@ def build(flow):
     return read_reports(os.path.join(REPO, BUILD), flow)
 
 
-def summarize(r):
+def summarize(r: Record) -> Record:
     return {"flow": r["flow"], "wns_ns": r["wns_ns"], "whs_ns": r["whs_ns"],
             "wpws_ns": r["wpws_ns"], "met": badge("x", r)["color"] == "brightgreen"}
 
 
-def measure(tag):
+def measure(tag: str) -> tuple[Record, list[Record]]:
     """Builds with each flow until one meets timing; returns the last, and all."""
-    attempts = []
+    attempts: list[Record] = []
     for flow in FLOWS:
         r = build(flow)
         attempts.append(summarize(r))
@@ -245,7 +250,7 @@ def measure(tag):
     return r, attempts
 
 
-def main():
+def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("tag", help="the nice_cpu tag, such as V1.0")
     ap.add_argument("--push", action="store_true", help="push the two commits")

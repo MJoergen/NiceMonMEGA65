@@ -167,7 +167,7 @@ def start(link: Link, rom: bool = False) -> None:
     link.control(0 if rom else RAM)
 
 
-def add_monitor_arguments(parser) -> None:
+def add_monitor_arguments(parser: argparse.ArgumentParser) -> None:
     """--monitor and --rom, which load.py and run.py share."""
     parser.add_argument("--monitor", action="store_true",
                         help="run the program, at 0x8000, under the monitor "
@@ -177,7 +177,8 @@ def add_monitor_arguments(parser) -> None:
                         "ROM, such as monitor/build/monitor.bin")
 
 
-def program_words(parser, args) -> list[tuple[int, int]]:
+def program_words(parser: argparse.ArgumentParser,
+                  args: argparse.Namespace) -> list[tuple[int, int]]:
     """The words to load for args.file, with --monitor and --rom."""
     if args.rom and not args.monitor:
         parser.error("--rom needs --monitor")
