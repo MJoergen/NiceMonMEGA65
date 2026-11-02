@@ -11,9 +11,9 @@ Usage:
     The Nexys4DDR's FPGA loads the bitstream from the board's quad SPI
     flash at power on, and when PROG is pressed, if jumper JP1 (MODE) is
     on QSPI. The bitstream is built for that
-    (synth/nexys4ddr/nexys4ddr.xdc). With the demo in its ROM (make
-    nexys4ddr), or a release's nicemon-TAG-nexys4ddr.bit, the board then
-    shows the demo when it is switched on, as a MEGA65 does with a core in
+    (synth/nexys4ddr/nexys4ddr.xdc). With the monitor and the demo in its
+    ROM (make nexys4ddr), or a release's nicemon-TAG-nexys4ddr.bit, the
+    board then shows the monitor when it is switched on, as a MEGA65 does with a core in
     its flash.
 
     --erase erases the whole flash instead, and the FPGA then stays empty
@@ -166,7 +166,7 @@ def warn_no_rom(value: int, build: str) -> None:
     if value & 9 == 9:
         print(f"[WARN] the bitstream has no ROM, so the core waits, held, "
               f"for the link, and the screen stays empty at power on; "
-              f"'make {build}' builds it with the demo", flush=True)
+              f"'make {build}' builds it with the monitor and the demo", flush=True)
 
 
 def flash_cor(args: argparse.Namespace) -> None:

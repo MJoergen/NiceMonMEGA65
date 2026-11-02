@@ -16,9 +16,9 @@ not taken here, that a point release's Vmajor.minor is, that doc/RELEASE_NOTES.m
 dated section for the tag, that verified.json
 is for the nice_cpu tag and the submodule's commit and says met, that the
 submodule is at that tag, and that CI passed for the commit. It then
-builds the examples, the demo of demo/ with the tag in its title bar, and
-the bitstreams of the R6, the R3, and the Nexys4DDR, with the demo in the
-ROM and from nothing. The R6 tries the flow of verified.json first and
+builds the examples, the monitor and the demo of demo/ with the tag in
+the monitor's banner and the demo's title bar, and the bitstreams of the
+R6, the R3, and the Nexys4DDR, with the two in the ROM and from nothing. The R6 tries the flow of verified.json first and
 then the other one, for the ROM can cost the margin of the bump's build,
 which had none; the notes say so when the other flow was needed. The
 Nexys4DDR uses only FLOW=timing, as its Makefile does, for it never meets
@@ -71,8 +71,9 @@ COR_BOARDS = ("r3", "r6")
 # The boards built with one flow only, the one their Makefile sets
 BOARD_FLOWS = {"nexys4ddr": ("timing",)}
 
-# The ROM of every board: the demo, which the core boots from at power-up
-DEMO = os.path.join(REPO, "demo", "build", "demo.bin")
+# The ROM of every board: the monitor, which the core boots from at
+# power-up, with the demo behind it, which the monitor's x runs (demo/)
+ROM = os.path.join(REPO, "demo", "build", "rom.bin")
 
 
 def met(r):
@@ -162,11 +163,12 @@ def check_ci(commit):
 
 
 def build(board, flows):
-    """The board's bitstream, from nothing and with the demo in the ROM,
-    with the first flow that meets timing; returns the reports."""
+    """The board's bitstream, from nothing and with the monitor and the
+    demo in the ROM, with the first flow that meets timing; returns the
+    reports."""
     for flow in flows:
         run(["make", "-C", os.path.join("synth", board), "clean"])
-        run(["make", board, "NICE=pipeline", "FLOW=" + flow, "ROM=" + DEMO])
+        run(["make", board, "NICE=pipeline", "FLOW=" + flow, "ROM=" + ROM])
         r = read_reports(os.path.join(REPO, "synth", board, "build"), flow)
         if met(r):
             return r
@@ -207,9 +209,11 @@ def notes(tag, v, results, body):
         "for a slot of the MEGA65's flash with MEGAFLASH; each is for its",
         "board revision alone.",
         "",
-        "The core files and the bitstreams have the demo of `demo/` in the",
-        "ROM. At power-up it shows a welcome screen, and then what is typed",
-        "on the keyboard. The debug link still loads and starts a program",
+        "The core files and the bitstreams have the monitor of `monitor/` in",
+        "the ROM, with the demo of `demo/` behind it. At power-up the monitor",
+        "shows its prompt, and its command `x` runs the demo, which shows a",
+        "welcome screen, and then what is typed on the keyboard; F12 goes",
+        "back to the monitor. The debug link still loads and starts a program",
         "(`make load FILE=prog.bin`, see README.md), and hides the ROM to",
         "do so. `examples-%s.zip` has the C examples as `.bin` files." % tag,
         "`doc/EMULATOR.md` lists the known differences from `niceemu`.",
@@ -244,7 +248,7 @@ def stage(tag):
     # The same options as the build, or make would build the bitstream again
     for board in COR_BOARDS:
         run(["make", "-C", os.path.join("synth", board), "cor", "NICE=pipeline",
-             "FLOW=" + results[board]["flow"], "ROM=" + DEMO, "COR_VERSION=" + tag])
+             "FLOW=" + results[board]["flow"], "ROM=" + ROM, "COR_VERSION=" + tag])
     return v, head, results, body
 
 

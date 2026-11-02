@@ -30,7 +30,8 @@ or `make r6` in the top directory, and likewise for `r3` and `nexys4ddr`.
 The bitstream is `synth/r6/build/top.bit`, with timing and utilization
 reports next to it. Built in `synth/r6`, it has no ROM, and its core
 waits, held, for a host on the debug link. `make r6` in the top directory
-builds the demo first and puts it in the ROM, unless `ROM=` gives another
+builds the monitor and the demo first and puts them in the ROM,
+`demo/build/rom.bin`, unless `ROM=` gives another
 file, or none when empty. With
 
     make -C synth/r6 ROM=/path/to/monitor.bin
@@ -82,8 +83,8 @@ bitstream of a release instead, TAG being its tag, such as `V1.1`.
 It checks the FPGA first, as `make hwtest` does, and refuses a MEGA65's
 bitstream. It verifies the flash, and waits for the board to start from
 it. Set jumper JP1 (MODE) to QSPI, and the FPGA then loads the system at
-power on and when PROG is pressed. A bitstream with the demo in its ROM
-then shows the demo, with no USB cable. `make flash PORT=/dev/ttyUSB1 ARGS=--erase` erases
+power on and when PROG is pressed. A bitstream with the monitor in its
+ROM then shows the monitor, with no USB cable. `make flash PORT=/dev/ttyUSB1 ARGS=--erase` erases
 the flash. Vivado's hardware manager can write the flash too.
 
 ## The MEGA65

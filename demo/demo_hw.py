@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
 """Check the demo in the ROM of a programmed board.
 
-It boots the core from the ROM, as the reset button does, pauses it, and
-compares the welcome and the cursor with what niceemu shows. It then types
-keys into the demo over the UART, pauses it again, and compares all 2000
-words of the screen and the cursor with what niceemu leaves for the same
-keys. It writes the keys to demo/build/hw_keys.txt for niceemu. It prints
-the screen, and leaves the demo running.
+It boots the core from the ROM, as the reset button does, which starts
+the monitor, types x and CR over the UART, which runs the demo, pauses
+it, and compares the welcome and the cursor with what niceemu shows. It
+then types keys into the demo over the UART, pauses it again, and
+compares all 2000 words of the screen and the cursor with what niceemu
+leaves for the same keys. It writes the keys, after x and CR, to
+demo/build/hw_keys.txt for niceemu. It prints the screen, and leaves the
+demo running.
 
 make hwtest hides the ROM and runs its programs from the RAM; this checks
 the demo where it runs on a release's board. The bitstream must have
-demo/build/demo.bin in its ROM (make r6, which builds the demo first),
-and niceemu must be built.
+demo/build/rom.bin in its ROM (make r6, which builds it first), and
+niceemu must be built.
 
 Usage: demo/demo_hw.py --port DEVICE [--baud 2000000]
 """
@@ -27,9 +29,11 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(REPO, "tools"))
 from nicelink import CONTROL, HOLD, PAUSE, Link, Serial  # noqa: E402
 
-DEMO = os.path.join(REPO, "demo", "build", "demo.bin")
+ROM = os.path.join(REPO, "demo", "build", "rom.bin")
 KEYS_FILE = os.path.join(REPO, "demo", "build", "hw_keys.txt")
 EMU = os.path.join(REPO, "nice_cpu", "emulator", "zig-out", "bin", "niceemu")
+# The monitor's command that runs the demo
+START = b"x\r"
 # Text, a DEL, a TAB, a line that wraps, the cursor keys, and enough lines
 # to scroll
 KEYS = (b"Hello from the MEGA65!\r\nabc\x7fd\tTAB\r\n"
@@ -54,8 +58,8 @@ def emulator():
     """The screen's words that niceemu leaves for KEYS, and the cursor's
     column and row, R10 and R11."""
     with open(KEYS_FILE, "wb") as f:
-        f.write(KEYS)
-    out = subprocess.run([EMU, "-i", KEYS_FILE, "-d", f"0x{SCREEN:08X}:2000", DEMO],
+        f.write(START + KEYS)
+    out = subprocess.run([EMU, "-i", KEYS_FILE, "-d", f"0x{SCREEN:08X}:2000", ROM],
                          capture_output=True, text=True, check=True).stdout
     words = [int(w, 16) for line in out.splitlines()
              if re.match(r"^ffff[0-9a-f]{4}:", line)
@@ -88,18 +92,20 @@ def main():
                         "such as /dev/ttyUSB1")
     parser.add_argument("--baud", type=int, default=2000000)
     args = parser.parse_args()
-    for path, how in ((DEMO, "make demo"), (EMU, "make -C nice_cpu/emulator build")):
+    for path, how in ((ROM, "make demo"), (EMU, "make -C nice_cpu/emulator build")):
         if not os.path.exists(path):
             sys.exit(f"demo_hw.py: {path} is missing; run '{how}'")
 
     want, col, row = emulator()
     link = Link(Serial(args.port, args.baud))
-    # Boot from the ROM, as the reset button does
+    # Boot from the ROM, as the reset button does, and start the demo
     link.control(HOLD)
     link.control(0)
     time.sleep(0.5)
     c = link.read_word(CONTROL)
     check("running from the ROM", c == 0, f"{c:08X}")
+    link.send_console(START)
+    time.sleep(0.5)
     check("paused", pause(link))
     words = link.read(SCREEN, 2000)
     check("welcome as niceemu", words[:800] == want[:800])

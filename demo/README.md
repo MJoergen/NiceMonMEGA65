@@ -1,10 +1,18 @@
 # demo
 
-The demo is the program in the ROM of every release, in NICE assembly.
-The core boots from it at power-up, so a MEGA65 with no computer on its
-debug UART still shows that the core, the keyboard, and the screen work.
-It stays until the monitor ([monitor/](../monitor/README.md)) takes its
-place in the ROM.
+The demo is a program in NICE assembly that shows that the core, the
+keyboard, and the screen work, on a MEGA65 with no computer on its debug
+UART. The ROM of every release has the monitor
+([monitor/](../monitor/README.md)), which the core boots from at
+power-up, and the demo behind it: the monitor's command `x` copies the
+demo to `0x8000` and runs it there, as `r` runs a program, and F12
+returns to the monitor. This is for the time being
+([#65](https://github.com/MJoergen/NiceMonMEGA65/issues/65)): the demo
+moves to nice_cpu
+([nice_cpu#91](https://github.com/MJoergen/nice_cpu/issues/91)), and the
+BASIC interpreter of
+[#54](https://github.com/MJoergen/NiceMonMEGA65/issues/54) takes its place
+in the ROM.
 
 ## What it shows
 
@@ -12,11 +20,13 @@ The top two rows are blue bars that every demo has: the name and the
 version, and a menu of the demos, which lists the function key of each and
 shows the running one in black on white. A function key starts its demo
 afresh, and one without a demo does nothing. The keys are F1, F3, F5, and
-so on, which the MEGA65 has without SHIFT.
+so on, which the MEGA65 has without SHIFT. F12, SHIFT and F11 on the
+MEGA65, goes back to the monitor, which clears the screen and prints
+`Returned 00000000`.
 
 | Key | Demo |
 |---|---|
-| F1 | The typewriter, which runs at power-up |
+| F1 | The typewriter, which runs when the demo starts |
 | F3 | The key codes |
 | F5 | The characters and the colors |
 | F7 | The counters |
@@ -25,7 +35,7 @@ so on, which the MEGA65 has without SHIFT.
 
 The typewriter's top ten rows are the welcome: the two bars, what the
 demo is, how to load your own programs over Ethernet, after F11 gives
-the board an IP address, and a third blue bar with the keys. The 15 rows below it are a typewriter.
+the board an IP address, and a third blue bar with the keys and F12. The 15 rows below it are a typewriter.
 What you type on the keyboard, or send over Ethernet or the debug UART,
 appears at the blinking cursor:
 
@@ -59,7 +69,8 @@ all. Past the last row, the rows scroll up by one.
 From nice_cpu V1.2 on, the demo runs in `niceemu --window` too, with
 the keys typed into the window, as on the board. After `make demo` and
 `make -C nice_cpu/emulator window`, run
-`nice_cpu/emulator/zig-out/bin/niceemu --window demo/build/demo.bin`. The
+`nice_cpu/emulator/zig-out/bin/niceemu --window demo/build/rom.bin`, and
+type `x` and RETURN at the monitor's prompt. The
 window's keys send the bytes of the MEGA65's, but for the MEGA65's own
 keys, and the comet keeps its pace, as niceemu runs one step per
 microsecond. F11's self-test runs there too, but the Ethernet station's
@@ -112,7 +123,7 @@ and shows PASS or FAIL for each:
 
 | Test | What it checks |
 |---|---|
-| RAM | The 28672 words from `0xFFFF8000` to `0xFFFFEFFF`, RAM on every board: each is written with its address, and then with its address inverted, and read back |
+| RAM | The 12288 words from `0x0000B000` to `0x0000DFFF`, above the demo's variables and below the stack, RAM on every board: each is written with its address, and then with its address inverted, and read back |
 | Math unit | Signed and unsigned products and quotients of 32 bits, a division by zero, the most negative number divided by −1, and quotients of 64 bits, against known results |
 | Timer | 10 interrupts, one every 1000 cycles, which must come within 9500 to 10500 cycles of the start |
 | Performance counters | The instructions of a known sequence, and over a loop, at least as many cycles as instructions, some microseconds, and 1 to 255 cycles per microsecond |
@@ -127,7 +138,7 @@ again and again while the demo runs: its IP address in decimal with
 dots, its MAC address in hex with colons, and its counts of the good
 frames received, the bad or dropped ones, and the frames sent. After
 reset the IP address is `0.0.0.0`, which answers nothing, and the MAC
-address is `02:4E:49:43:45:00`. So a board with this demo in its ROM can
+address is `02:4E:49:43:45:00`. So a board with the demo in its ROM can
 get its address from its own keyboard, or from a terminal on the debug
 UART, and then answers pings and serves the debug link on TCP port 4510.
 These keys change the addresses:
@@ -169,27 +180,35 @@ and polls the keys; its address goes in the tables `FKEYS` and
 `ECHO`, R12, which `POLL` calls with each byte, as the key codes do.
 `FRAME` sets `ECHO` to 0.
 
-A write to the ROM is dropped (see [The ROM](../doc/SYSTEM.md#the-rom) in
-doc/SYSTEM.md), so the demo keeps most of its state in registers, and its
-variables in the RAM below its stack: the counters keep the sieve at
-`0xFFFFF000`–`0xFFFFF7FF` and their numbers from `0xFFFFF800`, and the
-comet keeps the addresses of its cells and its state at the same
-addresses, as only one demo runs at a time. The comet tells what is in a
-cell from the screen itself. It writes
-only these words, the screen, the cursor's registers, the math unit, and
-its stack.
+The demo is a program under the monitor, as nice_cpu's
+`runtime/ABI.md` has it in "Programs under a monitor". It is assembled
+at `0x8000`, with its own entry there, which keeps the SP that the
+monitor called it with in `D_SP`. Each demo starts with SP at `D_SP`,
+on the monitor's stack, which grows down from `0xFFFFEFFF`, and F12
+returns from there with the status 0, after the monitor's `scr_cls`,
+which `mon.nasm` gives, has cleared the screen. The monitor then clears
+E, stops the timer, and sets VBASE to 0.
 
-The stack grows down from `0xFFFFFEFF`, where there is no register or
-screen, so on the board it is in RAM. The 64K words of RAM repeat through
-the address space, and `0xFFFFFEFF` is RAM word `0xFEFF`, far above the
-ROM. So are the variables, which are RAM on every board, also on the
-Nexys4DDR, whose RAM starts at `0xFFFF2000`.
+The demo keeps most of its state in registers, and its variables at
+`VARS`, `0xA000`, past its image, which the copy leaves alone: the
+counters keep the sieve at `0xA000`–`0xA7FF` and their numbers from
+`0xA800`, and the comet keeps the addresses of its cells and its state
+at the same addresses, as only one demo runs at a time. The comet tells
+what is in a cell from the screen itself. F11 tests the RAM from
+`0xB000` to `0xDFFF`. These are RAM words on every board, below the
+stack and the monitor's variables at `0xFFFFF000`: the 64K words of RAM
+repeat through the address space, so `0xFFFFEFFF` is RAM word `0xEFFF`
+on the board, and the RAM below `0x8000` is the ROM's. The assembler
+checks that the image stays below `VARS`, as the variables and the
+tested RAM are `.RES` blocks. The demo writes only these words, the
+screen, the cursor's registers, the math unit, the timer, and its stack.
 
 The self-test's timer interrupt goes through vector `0x41` and a vector
-table at `0x7F00`, VBASE `0x7F`, near the end of the ROM. Its only entry,
-the word at `0x7F41`, holds the address of the routine, which counts the
-interrupts in RAM. The self-test sets VBASE, and leaves the timer stopped
-and E clear when it is done, so no other demo has interrupts.
+table at `0x8000`, VBASE `0x80`, the first page of the image. Its only
+entry, the word at `0x8041`, holds the address of the routine, which
+counts the interrupts in RAM. The self-test sets VBASE, and leaves the
+timer stopped and E clear when it is done, so no other demo has
+interrupts.
 
 The demo scrolls by copying the rows, not with the display offset, so
 that the welcome stays, and so that it runs the same in `niceemu`, where
@@ -206,20 +225,31 @@ still come, but the demo ends as `niceemu` does, rather than read on.
 The halt says so plainly: the link sends `h`, and `run.py`,
 `hwtest.py`, and the tests in `niceemu` end on it. A terminal program
 that sends a break when it opens the port thus stops the demo, and the
-reset button, or a start from the link, starts it again.
+reset button, or a start from the link, starts the monitor again.
 
 ## Building and testing
 
-    make -C demo                  # build/demo.bin, for the ROM
-    make r6                       # the bitstream, with the demo in its ROM
+    make -C demo                  # build/demo.bin, and build/rom.bin for the ROM
+    make r6                       # the bitstream, with build/rom.bin in its ROM
     make -C demo test             # runs in niceemu, compared with test.expected
 
 The version in the title bar is `git describe --tags --always --dirty`, or
-`VERSION=` on the command line, which `tools/release.py` sets to the tag.
-The assembler has no include, so the Makefile joins `demo.nasm` and a line
-that defines `VERSION`. The test assembles the demo with the version `V9.9`
-into `build/demo_test.bin`, and the Makefile writes its inputs,
-`build/test1.txt` to `build/test15.txt`, with `printf`: the first edits a
+`VERSION=` on the command line, which `tools/release.py` sets to the tag;
+the monitor's banner gets the same. The assembler has no include, so the
+Makefile joins `demo.nasm`, the monitor's `mon.nasm`, and a line that
+defines `VERSION`, into `build/demo.bin`, from `0x8000`. `join.py` then
+puts the monitor, `monitor/build/monitor.bin`, and the demo into the
+ROM's image, `build/rom.bin`: at the monitor's `DEMO`, `0x1000`, the
+number of the demo's words, and the words after it, which `x` copies to
+`0x8000`. It fails if the monitor reaches `DEMO`, or the demo does not
+fit the ROM.
+
+The test assembles the demo with the version `V9.9` into
+`build/demo_test.bin`, joins it behind the monitor's test,
+`monitor/build/monitor_test.bin`, into `build/rom_test.bin`, and runs that
+in `niceemu`. The Makefile writes its inputs, `build/test1.txt` to
+`build/test16.txt`, with `printf`, each after `x` and CR for the monitor:
+the first edits a
 few lines, the second clears them and scrolls, the third has the function
 keys, the fourth shows key codes and scrolls them, the fifth goes from
 the key codes back to the typewriter, the sixth shows the characters and
@@ -228,10 +258,11 @@ eighth plays two games of the comet, the ninth runs the board twice,
 the tenth types an IP address that is rejected, the eleventh writes an IP
 address and a MAC address and cancels a second one, the twelfth and the
 thirteenth type MAC addresses that are rejected, the fourteenth runs
-the board in `build/demo_fail.bin`, a copy of the test's demo with a wrong
-word in the math unit's test, which shows how a failure looks, and the
+the board in `build/rom_fail.bin`, with a copy of the test's demo with a wrong
+word in the math unit's test, which shows how a failure looks, the
 fifteenth types with a backspace and the other cursor keys,
-`ESC O A` to `ESC O D`.
+`ESC O A` to `ESC O D`, and the sixteenth goes back to the monitor with
+F12, and halts it with `h`.
 `niceemu` shows no colors, so for the sixth the test also has the words of
 two rows of ramps, for the ninth those of the menu, with F11 in black on
 white, and of PASS in green, and for the fourteenth those of FAIL in red.
@@ -239,21 +270,24 @@ The screens that `niceemu` prints, and those words, are in
 `test.expected`, which was checked by hand. In `niceemu` the counters
 count steps, so their numbers are the same in every run.
 
-The demo runs in `niceemu` like any program, at address 0. After `make -C
-demo test`, the first input shows the first screen of `test.expected`:
+The ROM's image runs in `niceemu` like any program, at address 0. After
+`make -C demo test`, the first input shows the first screen of
+`test.expected`:
 
-    niceemu --screen -i demo/build/test1.txt demo/build/demo_test.bin
+    niceemu --screen -i demo/build/test1.txt demo/build/rom_test.bin
 
-`tools/hwtest.py`, and so `make linktest` and `make cosimtest`, run it with
-a few keys through `run.py`, and compare its registers and screen with
-`niceemu`'s. They hide the ROM, and run the demo from the RAM.
+`tools/hwtest.py`, and so `make linktest` and `make cosimtest`, run
+`build/rom_test.bin` with `x` and a few keys through `run.py`, and
+compare its registers and screen with `niceemu`'s. They hide the ROM,
+and run the monitor and the demo from the RAM.
 
 `demo_hw.py` checks the demo where a release runs it, in the ROM of a
 programmed board:
 
     demo/demo_hw.py --port /dev/ttyUSB1
 
-It boots the core from the ROM, compares the welcome and the cursor with
-`niceemu`'s, types keys into the demo over the UART, and compares all 2000
+It boots the core from the ROM, types `x` and CR into the monitor over
+the UART, compares the demo's welcome and the cursor with `niceemu`'s,
+types keys into the demo over the UART, and compares all 2000
 words of the screen and the cursor again. It prints the screen, and leaves
 the demo running.

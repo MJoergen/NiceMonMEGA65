@@ -60,11 +60,12 @@ $(BUILD)/hello_c.bin: test/hello.c mon.h mon.nasm $(TOOLS) | $(BUILD)
 
 # The inputs. cmds types each command, with the edits of a line: three DELs
 # that take back abc, a CTRL-C that empties junk, and the cursor key ESC [ A
-# and the function key ESC O P, which are dropped. D is d. r finds no
-# program, d 8000 0 only moves the next d to 8000, and d 0 100 shows 256
-# words, which scrolls the screen. h ends each input. dash's printf, the
+# and the function key ESC O P, which are dropped. D is d, and q is no
+# command. x finds no demo in the ROM, r no program, d 8000 0 only moves
+# the next d to 8000, and d 0 100 shows 256 words, which scrolls the
+# screen. h ends each input. dash's printf, the
 # shell of make on Ubuntu, has no \x.
-CMDS = ?\rv\rd 0 6\rd\rD 10 1\rx\r\r  c\rabc\177\177\177v\rjunk\003v\r\033[A\033OPv\rr\rd 8000 0\rd 8000\rd 0 100\rh\r
+CMDS = ?\rv\rd 0 6\rd\rD 10 1\rq\r\r  c\rabc\177\177\177v\rjunk\003v\r\033[A\033OPv\rx\rr\rd 8000 0\rd 8000\rd 0 100\rh\r
 RUN  = r\rh\r
 # The words of each test that are dumped with the screen: for cmds the
 # variables and the cursor's registers, and for the programs the text at

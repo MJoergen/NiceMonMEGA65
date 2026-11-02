@@ -16,7 +16,8 @@
 ; at 0x8000 as a subroutine, with R1 = the entry of mon_putc, R2 = 0,
 ; R3 = 0, and E = 0 (ABI.md, "Programs under a monitor"). At its return,
 ; and at mon_exit, the monitor clears E, stops the timer, sets VBASE to 0,
-; takes a fresh stack, and prints the status, R1.
+; takes a fresh stack, and prints the status, R1. x copies the demo from
+; the ROM to 0x8000 and runs it as r does, for the time being (issue #65).
 ;
 ; mon_putc writes a character to the outputs that V_OUT selects. On the
 ; line, the console at 0xFFFFFF00, every byte goes as it is. On the screen
@@ -60,6 +61,8 @@ V_LINE          .EQU    0xFFFFF010      ; the command line, LINE_MAX words and a
 LINE_MAX        .EQU    76              ; so that the prompt and the line fit a row
 
 PROGRAM         .EQU    0x8000          ; where a program is, above the ROM
+DEMO            .EQU    0x1000          ; the demo's words in the ROM, after their number
+DEMO_MAX        .EQU    0x7000          ; more words than fit from DEMO + 1 below the RAM
 COLOR           .EQU    0x000FFF00      ; white on black, the color at the cold start
 OUT_LINE        .EQU    1
 OUT_SCREEN      .EQU    2
@@ -217,6 +220,27 @@ dump_end
                 MOVE    @V_NEXT, R7
                 ADD     @--SP, 2, PC
                 MOVE    PC, _io_crlf
+                MOVE    PC, main
+
+; x: the demo, for the time being (issue #65, README.md). The ROM has its
+; number of words at DEMO, and the words after it, which are copied to
+; 0x8000 and run as r runs a program. A number of 0, or one too big for
+; the ROM, is no demo. The copy and x go when the demo goes.
+cmd_demo
+                MOVE[M] R1, @DEMO       ; the words left
+        ?Z      MOVE    PC, no_demo
+                SUB[M]  R0, R1, DEMO_MAX
+        ?!C     MOVE    PC, no_demo
+                MOVE    R2, DEMO+1
+                MOVE    R3, PROGRAM
+demo_copy
+                MOVE    @R3++, @R2++
+                SUB[M]  R1, R1, 1
+        ?!Z     MOVE    PC, demo_copy
+                MOVE    PC, cmd_run
+no_demo         MOVE    R1, S_NODEMO
+                ADD     @--SP, 2, PC
+                MOVE    PC, puts_crlf
                 MOVE    PC, main
 
 ; r: the program at 0x8000, called as ABI.md says, on this stack: the
@@ -407,6 +431,7 @@ COMMANDS
                 .DAT    0x68, cmd_halt  ; h
                 .DAT    0x72, cmd_run   ; r
                 .DAT    0x76, cmd_version  ; v
+                .DAT    0x78, cmd_demo  ; x
                 .DAT    0
 
 S_NAME          .ASCII_L 'NiceMon '
@@ -422,9 +447,12 @@ S_RETURN
                 .ASCII_L 'Returned '
 S_NOPROG
                 .ASCII_L 'No program at 00008000'
+S_NODEMO
+                .ASCII_L 'No demo in the ROM'
 
-HELP            .DAT    H_R, H_D, H_C, H_V, H_H, H_Q, 0
+HELP            .DAT    H_R, H_X, H_D, H_C, H_V, H_H, H_Q, 0
 H_R             .ASCII_L 'r             run the program at 00008000'
+H_X             .ASCII_L 'x             run the demo of the ROM, which F12 leaves'
 H_D             .ASCII_L 'd [ADDR] [N]  show N words from ADDR, in hex, or the next ones'
 H_C             .ASCII_L 'c             clear the screen'
 H_V             .ASCII_L 'v             the version'

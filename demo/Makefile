@@ -1,30 +1,53 @@
-# Builds the demo of the ROM, demo.nasm, into build/demo.bin, for
-# make r6 ROM=demo/build/demo.bin and the release (tools/release.py).
+# Builds the demo of the ROM, demo.nasm, into build/demo.bin, a program
+# under the monitor at 0x8000, and joins it behind the monitor into
+# build/rom.bin, the boards' ROM by default and the release's
+# (tools/release.py), in which the monitor's x runs it. For the time
+# being: issue #65.
 #
-# make          builds build/demo.bin, with VERSION in its title bar, git
+# make          builds build/demo.bin and build/rom.bin, with VERSION in
+#               the demo's title bar and the monitor's banner, git
 #               describe of the tree by default; the release gives its tag
-# make test     runs the demo in niceemu once for each of the inputs below,
-#               and compares the screens with test.expected
+# make test     runs the monitor and the demo in niceemu once for each of
+#               the inputs below, each after x, and compares the screens
+#               with test.expected
 # make clean    removes build/
 #
-# The assembler has no include, so build/version.nasm, which defines the
-# label VERSION, is joined to demo.nasm.
+# The assembler has no include, so the monitor's mon.nasm, for scr_cls,
+# and build/version.nasm, which defines the label VERSION, are joined to
+# demo.nasm. join.py puts the demo in the ROM's image at the monitor's
+# DEMO.
 
 PYTHON  ?= python3
 NICE_CPU = ../nice_cpu
 ASM      = $(PYTHON) $(NICE_CPU)/assembler/niceasm.py
 ASM_PY   = $(wildcard $(NICE_CPU)/assembler/*.py)
 EMU      = $(NICE_CPU)/emulator/zig-out/bin/niceemu
+MONITOR  = ../monitor
 BUILD    = build
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo unknown)
+SOURCES  = demo.nasm $(MONITOR)/mon.nasm
 
 .PHONY: all test clean FORCE
 
-all: $(BUILD)/demo.bin
+all: $(BUILD)/rom.bin
 
-$(BUILD)/demo.bin: demo.nasm $(BUILD)/version.nasm $(ASM_PY)
-	@cat demo.nasm $(BUILD)/version.nasm > $(BUILD)/demo_all.nasm
+$(BUILD)/demo.bin: $(SOURCES) $(BUILD)/version.nasm $(ASM_PY)
+	@cat $(SOURCES) $(BUILD)/version.nasm > $(BUILD)/demo_all.nasm
 	$(ASM) -o $@ $(BUILD)/demo_all.nasm
+
+# The monitor, with the same version, and the monitor of the tests, built
+# by the monitor's Makefile, once each, also under make -j
+$(MONITOR)/build/monitor.bin: FORCE
+	@$(MAKE) -s --no-print-directory -C $(MONITOR) VERSION='$(VERSION)' build/monitor.bin
+
+$(MONITOR)/build/monitor_test.bin: FORCE
+	@$(MAKE) -s --no-print-directory -C $(MONITOR) build/monitor_test.bin
+
+# The monitor and the demo behind it. Written only when it changes, so
+# that a bitstream with it is not built again for nothing.
+$(BUILD)/rom.bin: $(MONITOR)/build/monitor.bin $(BUILD)/demo.bin join.py
+	@$(PYTHON) join.py $(MONITOR)/build/monitor.bin $(BUILD)/demo.bin -o $@.new
+	@cmp -s $@.new $@ && rm $@.new || { mv $@.new $@; echo "join.py -> $@"; }
 
 # Written only when the version changes, so that the demo is not
 # assembled again, and a bitstream with it not built again, for nothing.
@@ -33,9 +56,9 @@ $(BUILD)/version.nasm: FORCE | $(BUILD)
 	  echo "VERSION .ASCII_L '$(VERSION)'" > $@
 
 # The test has a version of its own, so that its screen does not change
-# with every commit.
-$(BUILD)/demo_test.bin: demo.nasm $(ASM_PY) | $(BUILD)
-	@(cat demo.nasm; echo "VERSION .ASCII_L 'V9.9'") > $(BUILD)/demo_test_all.nasm
+# with every commit, and so has the monitor's test.
+$(BUILD)/demo_test.bin: $(SOURCES) $(ASM_PY) | $(BUILD)
+	@(cat $(SOURCES); echo "VERSION .ASCII_L 'V9.9'") > $(BUILD)/demo_test_all.nasm
 	@$(ASM) -o $@ $(BUILD)/demo_test_all.nasm
 
 # The same with a wrong word in the script of the math unit's test, the
@@ -46,6 +69,10 @@ $(BUILD)/demo_fail.bin: $(BUILD)/demo_test.bin
 	  > $(BUILD)/demo_fail_all.nasm
 	@! cmp -s $(BUILD)/demo_test_all.nasm $(BUILD)/demo_fail_all.nasm
 	@$(ASM) -o $@ $(BUILD)/demo_fail_all.nasm
+
+# The ROMs of the tests, which make hwtest loads at 0 too
+$(BUILD)/rom_%.bin: $(MONITOR)/build/monitor_test.bin $(BUILD)/demo_%.bin join.py
+	@$(PYTHON) join.py $(MONITOR)/build/monitor_test.bin $(BUILD)/demo_$*.bin -o $@
 
 # The first input edits: a DEL, a TAB, a CR LF, the cursor keys, a
 # line longer than 80 characters, an ESC without [, a sequence with
@@ -87,8 +114,11 @@ $(BUILD)/demo_fail.bin: $(BUILD)/demo_test.bin
 # FAIL, the address read, and the word read there. The fifteenth types in
 # the typewriter with a backspace, 0x08, and moves with the cursor keys of
 # ESC O A to ESC O D, and the VT220's F2 and F4, which have no demo, do
-# nothing. In niceemu the registers of the Ethernet station are plain
-# memory, so what is written shows at once, and the counts stay 0.
+# nothing. The sixteenth leaves the demo with F12, back to the monitor,
+# which has cleared the screen and says that the demo returned 0, and
+# shows its version and halts. In niceemu the registers of the Ethernet
+# station are plain memory, so what is written shows at once, and the
+# counts stay 0.
 # dash's printf, the shell of make on Ubuntu, has no \x.
 TEST1 = Hello, world!\nabc\177\177X\tY\r\n$(shell printf '0123456789%.0s' 1 2 3 4 5 6 7 8)abcde\n\
 \033[A\033[A\033[DQ\033[C\033[BR\n\033x\033[1;5Cy\200\351z\n
@@ -106,7 +136,8 @@ TEST11 = \033[23~i192.1x68.0001.66\177\17765\rm02:AB:c:D:e:F\rm02:\003
 TEST12 = \033[23~m03:00:00:00:00:01\r
 TEST13 = \033[23~m0FF:2:3:4:5:6\r
 TEST15 = ab\010c\nwxyz\033OD\033OD\033OA1\033OC\033OB2\033[12~!\033[14~?
-TESTS  = 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
+TEST16 = abc\033[24~v\rh\r
+TESTS  = 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
 # For the colors, which niceemu does not show, the ninth has the words of
 # the menu, with F11 in black on white, of the four PASS in green, and of
 # the line after them, and the fourteenth those of the FAIL in red, with
@@ -115,27 +146,29 @@ DUMP9  = -d 0xFFFF0050:80 -d 0xFFFF01C2:4 -d 0xFFFF0212:4 -d 0xFFFF0262:4 \
 	 -d 0xFFFF02B2:4 -d 0xFFFF0322:17
 DUMP14 = -d 0xFFFF0212:22 -d 0xFFFF0322:14
 
-test: $(BUILD)/demo_test.bin $(BUILD)/demo_fail.bin
-	@printf '$(TEST1)' > $(BUILD)/test1.txt
-	@{ printf 'junk\014\177'; for i in $$(seq 16); do printf 'line %d\n' $$i; done; \
+# Each input starts with x and a CR, which the monitor takes.
+test: $(BUILD)/rom_test.bin $(BUILD)/rom_fail.bin
+	@printf 'x\r$(TEST1)' > $(BUILD)/test1.txt
+	@{ printf 'x\rjunk\014\177'; for i in $$(seq 16); do printf 'line %d\n' $$i; done; \
 	  printf 'first\tA\t\t\t\t\t\t\t\t\t\tB'; } > $(BUILD)/test2.txt
-	@printf '$(TEST3)' > $(BUILD)/test3.txt
-	@printf '$(TEST4)' > $(BUILD)/test4.txt
-	@printf '$(TEST5)' > $(BUILD)/test5.txt
-	@printf '$(TEST6)' > $(BUILD)/test6.txt
-	@printf '$(TEST7)' > $(BUILD)/test7.txt
-	@printf '$(TEST8)' > $(BUILD)/test8.txt
-	@printf '\033[23~\033[23~' > $(BUILD)/test9.txt
-	@printf '$(TEST10)' > $(BUILD)/test10.txt
-	@printf '$(TEST11)' > $(BUILD)/test11.txt
-	@printf '$(TEST12)' > $(BUILD)/test12.txt
-	@printf '$(TEST13)' > $(BUILD)/test13.txt
-	@printf '\033[23~' > $(BUILD)/test14.txt
-	@printf '$(TEST15)' > $(BUILD)/test15.txt
+	@printf 'x\r$(TEST3)' > $(BUILD)/test3.txt
+	@printf 'x\r$(TEST4)' > $(BUILD)/test4.txt
+	@printf 'x\r$(TEST5)' > $(BUILD)/test5.txt
+	@printf 'x\r$(TEST6)' > $(BUILD)/test6.txt
+	@printf 'x\r$(TEST7)' > $(BUILD)/test7.txt
+	@printf 'x\r$(TEST8)' > $(BUILD)/test8.txt
+	@printf 'x\r\033[23~\033[23~' > $(BUILD)/test9.txt
+	@printf 'x\r$(TEST10)' > $(BUILD)/test10.txt
+	@printf 'x\r$(TEST11)' > $(BUILD)/test11.txt
+	@printf 'x\r$(TEST12)' > $(BUILD)/test12.txt
+	@printf 'x\r$(TEST13)' > $(BUILD)/test13.txt
+	@printf 'x\r\033[23~' > $(BUILD)/test14.txt
+	@printf 'x\r$(TEST15)' > $(BUILD)/test15.txt
+	@printf 'x\r$(TEST16)' > $(BUILD)/test16.txt
 	@for t in $(TESTS); do \
 	  case $$t in 6) dump='$(DUMP6)';; 9) dump='$(DUMP9)';; \
 	    14) dump='$(DUMP14)';; *) dump=;; esac; \
-	  bin=demo_test; [ $$t = 14 ] && bin=demo_fail; \
+	  bin=rom_test; [ $$t = 14 ] && bin=rom_fail; \
 	  $(EMU) -s -i $(BUILD)/test$$t.txt $$dump $(BUILD)/$$bin.bin > $(BUILD)/test$$t.out || \
 	    { echo "FAIL demo: niceemu exits with $$? on input $$t"; exit 1; }; \
 	  sed -n -e '/^ffff/p' -e '/^Screen:/,$$p' $(BUILD)/test$$t.out; \

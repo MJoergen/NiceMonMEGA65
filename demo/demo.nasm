@@ -10,7 +10,7 @@
 ; counters and those of a prime sieve, F9 is a game, the comet, and F11 is
 ; the board: it tests the RAM, the math unit, the timer's interrupts, and
 ; the counters, and shows and sets the Ethernet station's addresses.
-; At power-up the typewriter, F1, runs. Its top rows say what the core is
+; At the start the typewriter, F1, runs. Its top rows say what the core is
 ; and how to go further, and the rows below them take what is typed, from
 ; the keyboard or the UART: a character goes at the cursor, RETURN starts a
 ; new line, DEL (or backspace) deletes the character before the cursor, TAB
@@ -31,16 +31,20 @@
 ; memory, whose size differs between the boards. And in niceemu it is plain
 ; memory, so the program would not scroll there.
 ;
-; The program runs from the ROM, and a write to the ROM is dropped. So the
-; program keeps its variables in the RAM below the stack, from 0xFFFFF000,
-; and most of its state in registers. It writes no memory but these words,
-; the screen, the cursor's registers, the math unit, and the stack. SP
-; starts at 0xFFFFFF00, as in sim/rom.nasm, so the stack grows down from
-; 0xFFFFFEFF. No register or screen is there, so on the board these words
-; are RAM: the 64K words of RAM repeat through the address space, and
-; 0xFFFFFEFF is RAM word 0xFEFF, far above the ROM (doc/SYSTEM.md,
-; "Address map"). On the Nexys4DDR, the RAM starts at 0xFFFF2000, below
-; the variables too. In niceemu they are ordinary memory.
+; The demo is a program under the monitor (monitor/README.md), assembled
+; at 0x8000, for the time being (issue #65): the release joins it behind
+; the monitor in the ROM, and the monitor's x copies it to 0x8000 and
+; calls it there, as r calls a program, with E = 0 and SP on the
+; monitor's stack (nice_cpu/runtime/ABI.md, "Programs under a monitor").
+; Each demo starts with SP as it was at the entry, and F12 returns to the
+; monitor from there, after the monitor's scr_cls (mon.nasm, which the
+; Makefile joins) has cleared the screen. The variables are at VARS, past
+; the image, and F11 tests the RAM from RAM_LO, past them, up to 0xDFFF,
+; below the stack and the monitor's variables at 0xFFFFF000. The vector
+; table of the timer's interrupt is the page 0x8000 of the image. So the
+; demo writes no memory but these words, the screen, the cursor's
+; registers, the math unit, the timer, and the stack, and through scr_cls
+; the monitor's cursor. The words are the same in niceemu.
 ;
 ; On the board, a read of the console returns 0 until a byte arrives, so the
 ; program polls it in a loop. A read returns 0x200 when the input has ended,
@@ -51,8 +55,8 @@
 ; again. So the halt is on purpose: no key could come, and the tools and
 ; the tests end on the halt.
 ;
-; It is assembled with build/version.nasm after it, which defines VERSION,
-; the version string of the title bar (demo/Makefile).
+; It is assembled with mon.nasm and build/version.nasm after it, which
+; defines VERSION, the version string of the title bar (demo/Makefile).
 
 SP      .EQU    R13
 PC      .EQU    R15
@@ -91,47 +95,52 @@ P_INSH  .EQU    0xFFFFFF43
 P_US    .EQU    0xFFFFFF44
 P_USH   .EQU    0xFFFFFF45
 
-; The variables of F7, in the RAM below the stack
-SIEVE   .EQU    0xFFFFF000      ; the sieve, a word for each number
+; The variables, from VARS, after the image (see the entry), and the RAM
+; that F11 tests, from RAM_LO up to the stack. The stack starts below
+; the monitor's variables at 0xFFFFF000, which on the board are RAM word
+; 0xF000, as the 64K words repeat, so RAM_LO + RAM_N stays below 0xE000.
+VARS    .EQU    0xA000
+SIEVE   .EQU    VARS            ; the sieve of F7, a word for each number
 SIEVE_N .EQU    2048            ; its numbers, 0 to SIEVE_N - 1
-V_RUNS  .EQU    0xFFFFF800      ; the runs of the sieve
-V_CYC   .EQU    0xFFFFF801      ; the cycles of the last run
-V_INS   .EQU    0xFFFFF802      ; its instructions
-V_US    .EQU    0xFFFFF803      ; and its microseconds
-V_TLO   .EQU    0xFFFFF804      ; the microseconds since reset
-V_THI   .EQU    0xFFFFF805
-V_CLO   .EQU    0xFFFFF806      ; the cycles since reset
-V_CHI   .EQU    0xFFFFF807
-V_ILO   .EQU    0xFFFFF808      ; the instructions since reset
-V_IHI   .EQU    0xFFFFF809
+D_SP    .EQU    VARS+2048       ; SP at the entry, the top of each demo's stack
+V_RUNS  .EQU    VARS+2049       ; the runs of the sieve
+V_CYC   .EQU    VARS+2050       ; the cycles of the last run
+V_INS   .EQU    VARS+2051       ; its instructions
+V_US    .EQU    VARS+2052       ; and its microseconds
+V_TLO   .EQU    VARS+2053       ; the microseconds since reset
+V_THI   .EQU    VARS+2054
+V_CLO   .EQU    VARS+2055       ; the cycles since reset
+V_CHI   .EQU    VARS+2056
+V_ILO   .EQU    VARS+2057       ; the instructions since reset
+V_IHI   .EQU    VARS+2058
 
-; The variables of F9, in the same RAM, as only one demo runs at a time
-BODY    .EQU    0xFFFFF000      ; the ring of the comet's cells, head last
+; The variables of F9, in the same words, as only one demo runs at a time
+BODY    .EQU    VARS            ; the ring of the comet's cells, head last
 BODY_M  .EQU    2047            ; the mask of an index of the ring
-G_HEAD  .EQU    0xFFFFF800      ; the index of the head in the ring
-G_LEN   .EQU    0xFFFFF801      ; the cells of the comet
-G_GROW  .EQU    0xFFFFF802      ; the cells it still grows by
-G_DIR   .EQU    0xFFFFF803      ; its step, -80, 80, 1, or -1, or 0 at the start
-G_POS   .EQU    0xFFFFF804      ; the address of the head
-G_SCORE .EQU    0xFFFFF805
-G_BEST  .EQU    0xFFFFF806
-G_SEED  .EQU    0xFFFFF807      ; the state of RANDOM
-G_NEXT  .EQU    0xFFFFF808      ; the microsecond counter at the next tick
-G_TICK  .EQU    0xFFFFF809      ; the microseconds from a tick to the next
-G_OVER  .EQU    0xFFFFF80A      ; 1 after the game has ended
+G_HEAD  .EQU    VARS+2049       ; the index of the head in the ring
+G_LEN   .EQU    VARS+2050       ; the cells of the comet
+G_GROW  .EQU    VARS+2051       ; the cells it still grows by
+G_DIR   .EQU    VARS+2052       ; its step, -80, 80, 1, or -1, or 0 at the start
+G_POS   .EQU    VARS+2053       ; the address of the head
+G_SCORE .EQU    VARS+2054
+G_BEST  .EQU    VARS+2055
+G_SEED  .EQU    VARS+2056       ; the state of RANDOM
+G_NEXT  .EQU    VARS+2057       ; the microsecond counter at the next tick
+G_TICK  .EQU    VARS+2058       ; the microseconds from a tick to the next
+G_OVER  .EQU    VARS+2059       ; 1 after the game has ended
 
-; The variables of F11, in the same RAM, and the RAM that it tests, which
-; is RAM on every board
-S_TICKS .EQU    0xFFFFF800      ; the interrupts of the timer
-B_MODE  .EQU    0xFFFFF810      ; 0, or 1 or 2 while an IP or MAC address is typed
-RAM_LO  .EQU    0xFFFF8000      ; the RAM tested, up to the variables
-RAM_N   .EQU    28672
+; The variables of F11, in the same words, and the RAM that it tests
+S_TICKS .EQU    VARS+2049       ; the interrupts of the timer
+B_MODE  .EQU    VARS+2050       ; 0, or 1 or 2 while an IP or MAC address is typed
+VARS_N  .EQU    2064            ; the words from VARS
+RAM_LO  .EQU    0xB000          ; the RAM tested
+RAM_N   .EQU    12288           ; up to 0xDFFF
 
 ; The timer, and the vector of its interrupt, whose entry in the table at
-; VBASE * 256 is at 0x7F41
+; VBASE * 256 is at 0x8041, in the image (see the entry)
 TM_PER  .EQU    0xFFFFFF10      ; the period, in cycles, or 0 to stop
 TM_VEC  .EQU    0xFFFFFF12
-VBASE   .EQU    0x7F
+VBASE   .EQU    0x80
 VECTOR  .EQU    0x41
 
 ; The Ethernet station (doc/SYSTEM.md, "The Ethernet station")
@@ -176,10 +185,26 @@ KEY_LT  .EQU    0x104
 ; cannot type a byte after ESC that fast.
 T_ESC   .EQU    10000
 
-        MOVE    PC, TYPEW       ; the demo at power-up
+; The variables, which are not in the image, and the RAM that F11 tests.
+; The assembler fails if the image reaches them.
+        .ORG    VARS
+        .RES    VARS_N
+        .ORG    RAM_LO
+        .RES    RAM_N
+
+; The entry, at 0x8000, where the monitor calls the demo: the stack it
+; is called on is that of every demo, and the typewriter starts
+        .ORG    0x8000
+        MOVE    @D_SP, SP
+        MOVE    PC, TYPEW
+
+; The entry of the timer's interrupt in the vector table, at VBASE * 256 +
+; VECTOR
+        .ORG    0x8041
+        .DAT    TICK
 
 ; The typewriter: the welcome, and the rows below it
-TYPEW   MOVE    SP, 0xFFFFFF00  ; the stack, from RAM word 0xFEFF down
+TYPEW   MOVE    SP, @D_SP
         MOVE    R6, TYPEW
         ADD     @--SP, 2, PC
         MOVE    PC, FRAME
@@ -323,7 +348,7 @@ PRINT   MOVE[M] R4, @R1++
 ; returns, the key has ended. A key that gives 0, such as a sequence that is
 ; no key, still ends. An ESC shows with the bytes that come within T_ESC
 ; after it, as POLL waits for them, so an ESC alone has a row of its own.
-KCODES  MOVE    SP, 0xFFFFFF00
+KCODES  MOVE    SP, @D_SP
         MOVE    R6, KCODES
         ADD     @--SP, 2, PC
         MOVE    PC, FRAME
@@ -397,7 +422,7 @@ SHOWN   ADD     COL, COL, 1
 ; with the intensities 0 to F: as backgrounds, and below them as
 ; foregrounds, the digits of the intensities on black. The keys do nothing
 ; here, but the function keys.
-CHARS   MOVE    SP, 0xFFFFFF00
+CHARS   MOVE    SP, @D_SP
         MOVE    R6, CHARS
         ADD     @--SP, 2, PC
         MOVE    PC, FRAME
@@ -461,7 +486,7 @@ RCELL   SHL     R1, R4, R7
 ; cycles per instruction and the instructions per microsecond. The keys do
 ; nothing here, but the function keys. The values end at column 60, and R3
 ; is their color.
-COUNTS  MOVE    SP, 0xFFFFFF00
+COUNTS  MOVE    SP, @D_SP
         MOVE    R6, COUNTS
         ADD     @--SP, 2, PC
         MOVE    PC, FRAME
@@ -683,7 +708,7 @@ FIX2    MOVE    @M_A, R1
 ; keys come. The ring BODY holds the addresses of the comet's cells, and
 ; the screen itself tells what is in a cell, by the whole word, as the
 ; frame is blanks too.
-GAME    MOVE    SP, 0xFFFFFF00
+GAME    MOVE    SP, @D_SP
         MOVE    R6, GAME
         ADD     @--SP, 2, PC
         MOVE    PC, FRAME
@@ -852,7 +877,7 @@ STATUS  MOVE    @--SP, R1
 ; time that F11 starts it. R10 counts the failures. Then the Ethernet
 ; station's addresses and counts, which BLOOP shows again and again, and
 ; which I and M change (see ESTART).
-BOARD   MOVE    SP, 0xFFFFFF00
+BOARD   MOVE    SP, @D_SP
         MOVE    R6, BOARD
         ADD     @--SP, 2, PC
         MOVE    PC, FRAME
@@ -984,7 +1009,7 @@ TSTOP   MOVE    @TM_PER, 0
         MOVE    R1, 0
         MOVE    PC, @SP++
 
-; TICK, the routine of the timer's interrupt, from the ROM
+; TICK, the routine of the timer's interrupt
 TICK    ADD     @S_TICKS, @S_TICKS, 1
         RTI
 
@@ -1339,6 +1364,14 @@ HDIGIT  SHR     R9, R1, 28
     ?!Z MOVE    PC, HDIGIT
         MOVE    PC, @SP++
 
+; F12 returns to the monitor, with the screen cleared by its scr_cls and
+; the status 0. Every demo leaves the timer stopped and E clear.
+MONITOR MOVE    SP, @D_SP
+        ADD     @--SP, 2, PC
+        MOVE    PC, _scr_cls
+        MOVE    R1, 0
+        MOVE    PC, @SP++
+
 ; POLL takes a key from the input, if one has arrived, and sets R1 to it: a
 ; byte, KEY_UP to KEY_LT for a cursor key, or 0 when there is none. It
 ; reads the escape sequences that xterm sends for the cursor keys and the
@@ -1500,7 +1533,7 @@ PRINTS  MOVE[M] R2, @R5++
         MOVE    PC, PRINTS
 
 ; The demos of the function keys F1 to F12, or 0 for none
-FKEYS   .DAT    TYPEW, 0, KCODES, 0, CHARS, 0, COUNTS, 0, GAME, 0, BOARD, 0
+FKEYS   .DAT    TYPEW, 0, KCODES, 0, CHARS, 0, COUNTS, 0, GAME, 0, BOARD, MONITOR
 
 ; The numbers before ~ of F1 to F12. xterm sends ESC O P to ESC O S for F1
 ; to F4, and 11 to 14 are those of the VT220.
@@ -1537,12 +1570,12 @@ M_CHARS .ASCII_L ' F5 charset '
 M_COUNT .ASCII_L ' F7 counters '
 M_GAME  .ASCII_L ' F9 comet '
 M_BOARD .ASCII_L ' F11 board '
-T1      .ASCII_L 'This is the demo in the ROM, which the core runs at power-up. What you type'
+T1      .ASCII_L 'This is the demo of the ROM, which the monitor starts with x. What you type'
 T2      .ASCII_L 'on the keyboard, or send to the console, appears below the blue bar.'
 T3      .ASCII_L 'To run your own programs, give the board an IP address with F11, then load'
 T4      .ASCII_L 'and debug them over Ethernet with tools/mon.py --eth. More is at'
 URL     .ASCII_L 'https://github.com/MJoergen/NiceMonMEGA65'
-KEYS    .ASCII_L 'RETURN new line   DEL delete   cursor keys move   CTRL-L clear'
+KEYS    .ASCII_L 'RETURN new line   DEL delete   cursor keys move   CTRL-L clear   F12 monitor'
 
 ; The texts of F3
 K_TEXTS .DAT    242, TEXT, K1
@@ -1656,7 +1689,7 @@ S_TEXTS .DAT    242, LINK, S1
         .DAT    -1
 
 S1      .ASCII_L 'A self-test, which runs each time that F11 starts it'
-S_RAM   .ASCII_L 'RAM, FFFF8000 to FFFFEFFF'
+S_RAM   .ASCII_L 'RAM, 0000B000 to 0000DFFF'
 S_MATH  .ASCII_L 'Math unit, multiply and divide'
 S_TIMER .ASCII_L 'Timer, 10 interrupts every 1000 cycles'
 S_COUNT .ASCII_L 'Performance counters'
@@ -1715,8 +1748,3 @@ MATH    .DAT    1, M_A, -7
         .DAT    2, M_QHI, 0x19999999
         .DAT    2, M_RLO, 5
         .DAT    0
-
-; The entry of the timer's interrupt in the vector table, at VBASE * 256 +
-; VECTOR, near the end of the ROM, where no code is
-        .ORG    0x7F41
-        .DAT    TICK

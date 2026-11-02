@@ -34,8 +34,9 @@ and keep their names.
 - An annotated tag `V1.0`: `V1.0: NiceMonMEGA65 with nice_cpu V1.0 (abc1234)`.
 - A GitHub Release `V1.0` with these files:
   - `nicemon-V1.0-r6.bit`, `nicemon-V1.0-r3.bit`, and
-    `nicemon-V1.0-nexys4ddr.bit`, the bitstreams, all with the demo of
-    `demo/` in the ROM, which shows the tag in its title bar.
+    `nicemon-V1.0-nexys4ddr.bit`, the bitstreams, all with the monitor
+    of `monitor/` in the ROM, and the demo of `demo/` behind it, which
+    show the tag in the banner and the title bar.
   - `nicemon-V1.0-r3.cor` and `nicemon-V1.0-r6.cor`, the MEGA65 core
     files for MEGAFLASH, with the version `V1.0`, and the same ROM.
   - `examples-V1.0.zip`, the C examples as `.bin` files.

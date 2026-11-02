@@ -2,13 +2,13 @@ Screen:
 | NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
 | F1 typewriter   F3 key codes   F5 charset   F7 counters   F9 comet   F11 board
 |
-|  This is the demo in the ROM, which the core runs at power-up. What you type
+|  This is the demo of the ROM, which the monitor starts with x. What you type
 |  on the keyboard, or send to the console, appears below the blue bar.
 |
 |  To run your own programs, give the board an IP address with F11, then load
 |  and debug them over Ethernet with tools/mon.py --eth. More is at
 |  https://github.com/MJoergen/NiceMonMEGA65
-| RETURN new line   DEL delete   cursor keys move   CTRL-L clear
+| RETURN new line   DEL delete   cursor keys move   CTRL-L clear   F12 monitor
 |Hello, world!
 |aX      Y
 |Q1234567890123456789012345678901234567890123456789012345678901234567890123456789
@@ -18,13 +18,13 @@ Screen:
 | NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
 | F1 typewriter   F3 key codes   F5 charset   F7 counters   F9 comet   F11 board
 |
-|  This is the demo in the ROM, which the core runs at power-up. What you type
+|  This is the demo of the ROM, which the monitor starts with x. What you type
 |  on the keyboard, or send to the console, appears below the blue bar.
 |
 |  To run your own programs, give the board an IP address with F11, then load
 |  and debug them over Ethernet with tools/mon.py --eth. More is at
 |  https://github.com/MJoergen/NiceMonMEGA65
-| RETURN new line   DEL delete   cursor keys move   CTRL-L clear
+| RETURN new line   DEL delete   cursor keys move   CTRL-L clear   F12 monitor
 |line 4
 |line 5
 |line 6
@@ -44,13 +44,13 @@ Screen:
 | NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
 | F1 typewriter   F3 key codes   F5 charset   F7 counters   F9 comet   F11 board
 |
-|  This is the demo in the ROM, which the core runs at power-up. What you type
+|  This is the demo of the ROM, which the monitor starts with x. What you type
 |  on the keyboard, or send to the console, appears below the blue bar.
 |
 |  To run your own programs, give the board an IP address with F11, then load
 |  and debug them over Ethernet with tools/mon.py --eth. More is at
 |  https://github.com/MJoergen/NiceMonMEGA65
-| RETURN new line   DEL delete   cursor keys move   CTRL-L clear
+| RETURN new line   DEL delete   cursor keys move   CTRL-L clear   F12 monitor
 |xQree F
 Screen:
 | NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
@@ -81,13 +81,13 @@ Screen:
 | NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
 | F1 typewriter   F3 key codes   F5 charset   F7 counters   F9 comet   F11 board
 |
-|  This is the demo in the ROM, which the core runs at power-up. What you type
+|  This is the demo of the ROM, which the monitor starts with x. What you type
 |  on the keyboard, or send to the console, appears below the blue bar.
 |
 |  To run your own programs, give the board an IP address with F11, then load
 |  and debug them over Ethernet with tools/mon.py --eth. More is at
 |  https://github.com/MJoergen/NiceMonMEGA65
-| RETURN new line   DEL delete   cursor keys move   CTRL-L clear
+| RETURN new line   DEL delete   cursor keys move   CTRL-L clear   F12 monitor
 |back
 ffff01bc: 000ccc52 000ccc20 000ccc20 00000020 00000020 10000020 10000020 20000020
 ffff01c4: 20000020 30000020 30000020 40000020 40000020 50000020 50000020 60000020
@@ -129,10 +129,10 @@ Screen:
 |
 |  Since reset, while the core runs
 |
-|    Time, h:mm:ss.hh                              0:00:00.08
-|    Microseconds                                       80110
-|    Cycles                                             80112
-|    Instructions                                       80114
+|    Time, h:mm:ss.hh                              0:00:00.10
+|    Microseconds                                      102397
+|    Cycles                                            102399
+|    Instructions                                      102401
 |    Clock in MHz, cycles per microsecond                   1
 |
 |  A prime sieve to 2048, run before each update
@@ -184,7 +184,7 @@ Screen:
 |
 |  A self-test, which runs each time that F11 starts it
 |
-|    RAM, FFFF8000 to FFFFEFFF                     PASS
+|    RAM, 0000B000 to 0000DFFF                     PASS
 |    Math unit, multiply and divide                PASS
 |    Timer, 10 interrupts every 1000 cycles        PASS
 |    Performance counters                          PASS
@@ -208,7 +208,7 @@ Screen:
 |
 |  A self-test, which runs each time that F11 starts it
 |
-|    RAM, FFFF8000 to FFFFEFFF                     PASS
+|    RAM, 0000B000 to 0000DFFF                     PASS
 |    Math unit, multiply and divide                PASS
 |    Timer, 10 interrupts every 1000 cycles        PASS
 |    Performance counters                          PASS
@@ -234,7 +234,7 @@ Screen:
 |
 |  A self-test, which runs each time that F11 starts it
 |
-|    RAM, FFFF8000 to FFFFEFFF                     PASS
+|    RAM, 0000B000 to 0000DFFF                     PASS
 |    Math unit, multiply and divide                PASS
 |    Timer, 10 interrupts every 1000 cycles        PASS
 |    Performance counters                          PASS
@@ -258,7 +258,7 @@ Screen:
 |
 |  A self-test, which runs each time that F11 starts it
 |
-|    RAM, FFFF8000 to FFFFEFFF                     PASS
+|    RAM, 0000B000 to 0000DFFF                     PASS
 |    Math unit, multiply and divide                PASS
 |    Timer, 10 interrupts every 1000 cycles        PASS
 |    Performance counters                          PASS
@@ -284,7 +284,7 @@ Screen:
 |
 |  A self-test, which runs each time that F11 starts it
 |
-|    RAM, FFFF8000 to FFFFEFFF                     PASS
+|    RAM, 0000B000 to 0000DFFF                     PASS
 |    Math unit, multiply and divide                PASS
 |    Timer, 10 interrupts every 1000 cycles        PASS
 |    Performance counters                          PASS
@@ -315,7 +315,7 @@ Screen:
 |
 |  A self-test, which runs each time that F11 starts it
 |
-|    RAM, FFFF8000 to FFFFEFFF                     PASS
+|    RAM, 0000B000 to 0000DFFF                     PASS
 |    Math unit, multiply and divide                FAIL FFFFFF23 FFFFFFFF
 |    Timer, 10 interrupts every 1000 cycles        PASS
 |    Performance counters                          PASS
@@ -337,12 +337,18 @@ Screen:
 | NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
 | F1 typewriter   F3 key codes   F5 charset   F7 counters   F9 comet   F11 board
 |
-|  This is the demo in the ROM, which the core runs at power-up. What you type
+|  This is the demo of the ROM, which the monitor starts with x. What you type
 |  on the keyboard, or send to the console, appears below the blue bar.
 |
 |  To run your own programs, give the board an IP address with F11, then load
 |  and debug them over Ethernet with tools/mon.py --eth. More is at
 |  https://github.com/MJoergen/NiceMonMEGA65
-| RETURN new line   DEL delete   cursor keys move   CTRL-L clear
+| RETURN new line   DEL delete   cursor keys move   CTRL-L clear   F12 monitor
 |ac1
 |wxyz2!?
+Screen:
+|Returned 00000000
+|> v
+|NiceMon V9.9, table 1.0
+|> h
+|Halted

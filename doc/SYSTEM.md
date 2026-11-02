@@ -112,7 +112,7 @@ effect and does not write (DEBUG.md §3).
 | `0x00000000`–`0xFFFFFFFF` | Memory, where no register below is: 64K words of block RAM, repeated through the address space. So the runtime's stack below `0xFFFFFF00` lands in the top of it, and so do the words of `0xFFFFFF00`–`FF` that are not registers. |
 | `0x00000000`–`0x00007FFF` | The ROM, in a bitstream built with one, in front of the RAM and repeating with it (see [The ROM](#the-rom)). Bit 3 of the control register hides it. |
 | `0xFFFF0000`–`0xFFFF7FFF` | The screen: 32768 words of memory of their own, the emulator's 80×25 screen and room for scrolling. The 2000 words from the display offset are shown on VGA and HDMI, or VGA only on the Nexys4DDR (see [The screen](#the-screen)), and the link reads them all. |
-| `0xFFFF8000`–`0xFFFFFEFF` | RAM, between the screen and the I/O page: the RAM words `0x8000`–`0xFEFF`, as the 64K words repeat. On the Nexys4DDR, whose screen is 8192 words, it starts lower: `0xFFFF2000`–`0xFFFFFEFF` are the words `0x2000`–`0xFEFF`. The runtime's stack starts at `0xFFFFFF00` and grows down into it, and so does the stack of a program in the ROM, such as the demo. In the emulator it is ordinary memory. |
+| `0xFFFF8000`–`0xFFFFFEFF` | RAM, between the screen and the I/O page: the RAM words `0x8000`–`0xFEFF`, as the 64K words repeat. On the Nexys4DDR, whose screen is 8192 words, it starts lower: `0xFFFF2000`–`0xFFFFFEFF` are the words `0x2000`–`0xFEFF`. The runtime's stack starts at `0xFFFFFF00` and grows down into it, and so does the stack of a program in the ROM. The monitor's variables are at `0xFFFFF000` and up, and its stack, which the programs at `0x8000` share, grows down from there. In the emulator it is ordinary memory. |
 | `0xFFFFFF00` | The console of nice_cpu's SYSTEM.md §1. A write sends bits 7..0 to the UART. A read takes the oldest byte received from the UART or the keyboard, and returns it in bits 7..0 with bit 8 set, or 0 when no byte has arrived. A break on the UART, or a host's half-close over Ethernet, ends the line's input until the core is started again or a host connects over Ethernet (see [The debug link over TCP](#the-debug-link-over-tcp)): the host's bytes after it are dropped, and once the bytes before it are read, a read returns `0x200` (bit 9), as at the end of the emulator's input. The keyboard's bytes still come, and a read returns them (nice_cpu's SYSTEM.md §5). |
 | `0xFFFFFF01` | The emulator's read counter. A read by the core returns the number of its reads since the last write, and a write sets that number. It is 0 after reset, and a start keeps it, as in the emulator. |
 | `0xFFFFFF10`–`0xFFFFFF1F` | The timer of nice_cpu's SYSTEM.md §4: it raises IRQ every P clock cycles, through the vector it is given. |
@@ -275,19 +275,20 @@ released while they wait is lost. A key held down until then is not.
 ## The ROM
 
 A bitstream built with `make r6 ROM=file.bin` (or `make r3 ...`), or with
-the demo's file by default, has a ROM of 32K words at `0x0000`–`0x7FFF`, in
+`demo/build/rom.bin`, the monitor and the demo, by default, has a ROM of 32K words at `0x0000`–`0x7FFF`, in
 front of the RAM, with the words of the `.bin` file, and its core boots
 from it at reset instead of waiting held for a host. That is the layout of QNICE-FPGA, whose monitor is in ROM at
 `0x0000`–`0x7FFF` and whose programs load at `0x8000`, and the
-[monitor](../monitor/README.md) is built for it, though the release's
-ROM still holds the demo. The file is read by Vivado, so the ROM changes only with a
+[monitor](../monitor/README.md) is built for it. The release's ROM holds
+the monitor, and behind it the demo, which the monitor's `x` copies to
+`0x8000` and runs there ([demo/](../demo/README.md)). The file is read by Vivado, so the ROM changes only with a
 new bitstream, and a word beyond the ROM fails the build. A write to the
 ROM is dropped, and a clear (bit 2 of the control register) does not
 touch it. So a program in the ROM must keep its stack and its variables
 in the RAM, at `0x8000` or above: `sim/rom.nasm`, the greeting that the
 tests use as the ROM, has its stack at the top of the memory, as the
-runtime has, and so has the demo that a release has in the ROM
-([demo/](../demo/README.md)). With a stack in the ROM, as `hello.nasm` of
+runtime has, and the monitor has its stack and variables below
+`0xFFFFF000`. With a stack in the ROM, as `hello.nasm` of
 nice_cpu has at `0x1000`, a pushed return address is lost and reads back
 as 0, and the program starts over, forever.
 
@@ -396,7 +397,7 @@ two boards on one network need different ones. On the link, for example:
 
 Then `ping 192.168.1.65` from a PC on the network gets its answers, and
 `0xFFFFFF9D` counts the replies, the ARP reply and one for each ping.
-With the demo in the ROM, its F11 shows the addresses and the counts,
+With the demo in the ROM, its F11, after the monitor's `x`, shows the addresses and the counts,
 and sets the addresses from the keyboard
 ([demo/README.md](../demo/README.md)).
 

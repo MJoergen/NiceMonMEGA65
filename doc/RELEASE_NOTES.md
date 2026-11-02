@@ -23,6 +23,33 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 
 ## V1.2.1
 
+**Upgrade notes.**
+
+- The ROM of the boards and of the release now boots the monitor
+  (`monitor/`), with its prompt, and the demo is behind it: `x` and
+  RETURN start the demo, and F12, SHIFT and F11 on the MEGA65, goes back
+  to the monitor. This is for the time being: the demo moves to
+  nice_cpu, and a BASIC interpreter takes its place
+  ([#65](https://github.com/MJoergen/NiceMonMEGA65/issues/65)). A
+  terminal or a script that typed into the demo at power-up types `x`
+  and CR first.
+
+**Demo**
+
+- The demo is a program at `0x8000` under the monitor, which copies it
+  there from the ROM. Its variables moved to `0xA000`, and F11 tests the
+  RAM from `0x0000B000` to `0x0000DFFF`, below the monitor's stack and
+  variables, where it tested `0xFFFF8000` to `0xFFFFEFFF`.
+- `make demo` builds `demo/build/rom.bin`, the monitor with the demo
+  behind it, which `make r6`, `make r3`, `make nexys4ddr`, `make cor`,
+  and the release put in the ROM. `demo/build/demo.bin` is now the demo
+  alone, at `0x8000`.
+
+**Monitor**
+
+- `x` copies the demo from the ROM to `0x8000` and runs it, as `r` runs
+  a program, or says that the ROM has none.
+
 **Tools**
 
 - `make flash COR=f.cor SLOT=N` works on the MEGA65 R6, tested into
@@ -36,8 +63,8 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   starts another slot at power on. Hold No Scroll at power on to start
   the slot from the flash
   ([#41](https://github.com/MJoergen/NiceMonMEGA65/issues/41)).
-- `make r3`, `make r6`, `make nexys4ddr`, and `make cor` put the demo in
-  the ROM by default, and build it first, as the release does. `ROM=`
+- `make r3`, `make r6`, `make nexys4ddr`, and `make cor` put the ROM of
+  the release in the ROM by default, and build it first, as the release does. `ROM=`
   (empty) builds a bitstream without a ROM, whose core waits, held, for
   the link, as these targets did before.
 - `make flash` warns when the bitstream has no ROM, as the board then

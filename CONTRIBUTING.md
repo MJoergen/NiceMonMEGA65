@@ -22,11 +22,12 @@ or, in an existing clone:
   checks](#the-formal-checks)).
 - `make lint` checks the VHDL style.
 - `make examples` builds the C examples.
-- `make demo` builds the demo of the ROM, `demo/build/demo.bin`, which the
-  boards' targets and the release put in the ROM of the bitstreams and
-  core files.
+- `make demo` builds the demo, `demo/build/demo.bin`, a program at
+  `0x8000`, and joins it behind the monitor into `demo/build/rom.bin`,
+  which the boards' targets and the release put in the ROM of the
+  bitstreams and core files. The monitor's `x` runs the demo.
 - `make r3`, `make r6`, and `make nexys4ddr` build the bitstreams, with
-  the demo in the ROM, which they build first. With `ROM=file.bin`, the
+  the monitor and the demo in the ROM, which they build first. With `ROM=file.bin`, the
   core boots from the file instead, and with `ROM=` the bitstream has no
   ROM, and the core waits, held, for the link (see [The
   ROM](doc/SYSTEM.md#the-rom)).
@@ -88,7 +89,7 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
 | [formal/](formal/) | The formal checks, for SymbiYosys. |
 | [synth/](synth/README.md) | The Vivado builds for the MEGA65 R3 and R6 boards, and the Nexys4DDR. |
 | [monitor/](monitor/README.md) | The monitor for the ROM, in NICE assembly: a hardware abstraction layer for programs at `0x8000`, called through a dispatch table, a main loop with a few commands, the file of routines that programs join, the stubs and the header for programs, and its tests in `niceemu`. Its README has the decisions, and [#64](https://github.com/MJoergen/NiceMonMEGA65/issues/64) what is left. |
-| [demo/](demo/README.md) | The demos in the ROM of the release, in NICE assembly, which the function keys switch between: a welcome screen that turns into a typewriter, the key codes, the characters and colors, the counters, a game, and the board: a self-test and the Ethernet station's addresses. |
+| [demo/](demo/README.md) | The demos in the ROM of the release, behind the monitor, which runs them with `x`, for the time being, in NICE assembly, which the function keys switch between: a welcome screen that turns into a typewriter, the key codes, the characters and colors, the counters, a game, and the board: a self-test and the Ethernet station's addresses. |
 | [examples/](examples/) | Example C programs, and the Makefile that builds them for the MEGA65. |
 | [tools/](tools/) | `nicelink.py`, the debug link over the board's Ethernet port or UART, over TCP to `niceemu --link`, or over TCP to the simulated system of `make cosim`, and the tools that use it: `load.py`, which loads a program into the MEGA65 or Nexys4DDR, `run.py`, which runs a program on the board as `niceemu` runs it, `mon.py`, an interactive shell on the link, `hwtest.py`, which tests the system on the board, `flash.py`, which writes the Nexys4DDR's flash or a slot of the MEGA65's, `bump.py`, which records the MEGA65's timing for a nice_cpu tag, `release.py`, which builds and publishes a release, `linktest.py`, which checks `run.py` and `mon.py` on `niceemu --link`, `cosimtest.py`, which checks `run.py` on the simulated system, and `screenshot.py`, which draws a program's screen in `niceemu` as a PNG picture. |
 | [README.md](README.md) | For those who use the core files and write programs for them: on its own, over Ethernet, and over the serial port. |
@@ -652,8 +653,8 @@ they were plugged in, so name the port by the cable's serial number, as in
 A board that is already programmed can be tested with `tools/hwtest.py
 --no-program`, which skips the programming and the whole boot test, the
 `b` notice and the checks of the ROM. A bitstream with a ROM can be
-tested, such as the one of `make r6`, with the demo: the test holds the
-core and hides the ROM, as `load.py` does, and runs the programs from the
+tested, such as the one of `make r6`, with the monitor and the demo: the
+test holds the core and hides the ROM, as `load.py` does, and runs the programs from the
 RAM.
 
 ### What it prints
@@ -702,7 +703,7 @@ bitstream has one. Then it hides the ROM and uses the link:
   input and with 1536 bytes of input, which checks the larger FIFO and the
   end of the input, the intro's `hello.nasm` with 100 lines of input that
   it halts without reading, the emulator's `reserved.nasm`, which halts
-  on a reserved control word, its `trapsym.nasm` with `--symbols`, the demo of the ROM with a few keys and its screen, and
+  on a reserved control word, its `trapsym.nasm` with `--symbols`, the ROM of the monitor and the demo, `demo/build/rom_test.bin`, with `x` and a few keys and its screen, and
   `examples/build/bench.bin`, but for its cycles, whose table it prints.
 - Then it runs the demo's self-test, F11, with `run.py`, and checks that
   its four tests pass. The timer's test and the counters' test check
@@ -713,7 +714,8 @@ bitstream has one. Then it hides the ROM and uses the link:
 With `ETH=IP`, as in `make hwtest PORT=/dev/ttyUSB1 ETH=192.168.1.65`, and the board's
 Ethernet port on this computer's network, it tests the Ethernet station
 after all the other checks, which its failures do not stop. It loads
-the demo, and types F11, I, the IP address, and CR into it as console
+the monitor and the demo, and types `x` and CR into the monitor, then
+F11, I, the IP address, and CR into the demo as console
 bytes over the UART, as a terminal would, and reads the address back in
 a pause. It pings the address and checks the station's counts. It
 pauses the demo over the link on TCP and reads the address again, and

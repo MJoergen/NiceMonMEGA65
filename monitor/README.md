@@ -29,14 +29,14 @@ of it, and #24 revisited them. Debugging is the on-board debugger's
   Nothing of the monitor's is written below `0x8000`: a write to the ROM
   is dropped, so a stack there loses its return addresses (`sim/rom.nasm`
   says what happens then).
-- The bitstream is built with `make r6 ROM=monitor/build/monitor.bin` (or
-  `r3`, or `nexys4ddr`), which puts the assembled monitor in the ROM (see
-  [synth/](../synth/README.md) and
+- `make r6` (or `r3`, or `nexys4ddr`) puts the monitor in the ROM, with
+  the demo behind it, `demo/build/rom.bin`, as the release does (The
+  demo below); `make r6 ROM=monitor/build/monitor.bin` puts the monitor
+  alone (see [synth/](../synth/README.md) and
   [SYSTEM.md](../doc/SYSTEM.md#the-rom)). The ROM changes only with a new
   bitstream, so the monitor is developed in the emulator, `niceemu`, which
   runs it like any program, with its keystrokes in an input file; the
-  board is for checking. The release still puts the demo in the ROM
-  ([demo/](../demo/README.md)).
+  board is for checking.
 - The debug link stays. While the monitor runs, the link reaches only its
   debug registers, and a host holds the core to reach the rest, as
   `load.py` and `run.py` do. They hide the ROM too, so that a program at
@@ -60,6 +60,7 @@ bytes `0x80` to `0x9F` do nothing. RETURN runs the line.
 | `d [ADDR] [N]` | Shows `N` words from `ADDR`, 4 to a row with the row's address first, all in hex. Without `ADDR`, the words after the last shown; without `N`, 32 words. |
 | `c` | Clears the screen. |
 | `v` | The version of the monitor, and of the dispatch table: `NiceMon V1.2, table 1.0`. |
+| `x` | Runs the demo of the ROM, for the time being (The demo below). Without a demo in the ROM, `x` says so. |
 | `h` | Halts the core, which the reset button, or a host over the link, starts again. The tests end with it. |
 | `?` | Lists the commands. |
 
@@ -260,9 +261,10 @@ memory words, and the screen are compared with `test/NAME.expected`. The
 expected files were checked by hand; after a change that moves them,
 check the new output the same way before copying it from `build/`.
 
-On a board, `make r6 ROM=monitor/build/monitor.bin` builds a bitstream
-that boots the monitor. `make hwtest` and the release expect the demo in
-the ROM, so they are not for such a bitstream yet (Not decided yet).
+On a board, `make r6` builds a bitstream that boots the monitor, with the
+demo behind it in the ROM. `make hwtest` loads the same, with the
+versions of the tests, into the RAM, and types `x` for the demo
+([demo/](../demo/README.md)).
 
 ## Not decided yet
 
@@ -283,18 +285,24 @@ the ROM, so they are not for such a bitstream yet (Not decided yet).
   where the MEGA65's is 32768, with one `monitor.bin` for every board and
   no register that tells the size, and `niceemu` has no offset.
 
-## The demo's place
+## The demo
 
 The demo leaves this repository for nice_cpu
 ([nice_cpu#91](https://github.com/MJoergen/nice_cpu/issues/91)), and the
 BASIC interpreter of
 [#54](https://github.com/MJoergen/NiceMonMEGA65/issues/54) takes its place
-in the ROM. Until then, `release.py` puts the demo in the ROM, and
-`demo_hw.py` checks it. The next step is
-[#65](https://github.com/MJoergen/NiceMonMEGA65/issues/65): the monitor is
-always in the ROM, and a command of its main loop copies the demo, joined
-behind it, to `0x8000` and runs it there. That loader is temporary, as
-the demo is.
+in the ROM. Until then
+([#65](https://github.com/MJoergen/NiceMonMEGA65/issues/65)), the ROM of
+the boards and of the release has the demo behind the monitor, and `x`
+runs it. The demo is a program assembled at `0x8000`
+([demo/](../demo/README.md)), and `demo/join.py` puts it in the ROM at
+`DEMO`, `0x1000`: the number of its words first, then the words. `x`
+copies them to `0x8000` and runs them as `r` runs a program, and the
+demo's F12 returns. A number of 0, as in the ROM of the monitor alone
+and in `niceemu` without the demo, is no demo, and so is one that would
+not fit below `0x8000`. Neither the copy nor the demo has an entry in
+the dispatch table, and both go when the demo goes; `release.py` and
+`demo_hw.py` follow.
 
 ## What QMON has that this port will not
 

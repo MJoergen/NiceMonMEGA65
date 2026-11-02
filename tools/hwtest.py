@@ -62,7 +62,8 @@ Checks, in this order:
       1536 bytes
     - a program that halts at once although 100 lines of input wait for it
     - the emulator's trapsym.nasm and its label file, for --symbols
-    - the demo of the ROM, demo/demo.nasm, and its screen
+    - the ROM of the release, the monitor and the demo behind it,
+      demo/build/rom_test.bin, with x for the demo, and its screen
     - nice_cpu's benchmark, examples/build/bench.bin, all but its cycles
     And the demo's self-test, F11, runs with tools/run.py, and its four
     tests must pass, as their timer and instruction counts depend on the
@@ -70,7 +71,8 @@ Checks, in this order:
     The programs run with the ROM hidden, so the RAM is at 0.
     With --eth, last of all, the Ethernet station, which no failure above
     or here keeps the other checks from:
-    - the demo, loaded at 0, gets F11, I, the IP address, and CR as
+    - the ROM, loaded at 0, gets x and CR, then F11, I, the IP address,
+      and CR as
       console bytes over the UART, as from a terminal, and gives the
       station that address, which a pause reads back
     - ping gets its answers, and the station counts the requests and its
@@ -784,6 +786,18 @@ def test_primes(link: Link, primes: str, board: str) -> None:
           micros == cycles // mhz, f"{micros} of {cycles} cycles")
 
 
+# The monitor's command that runs the demo behind it in the ROM (demo/)
+DEMO_KEY = b"x\r"
+
+
+def rom_test() -> str:
+    """The ROM with the monitor and the demo, as the release has it, with
+    the version of their tests, built if need be; its path."""
+    subprocess.run(["make", "-s", "-C", f"{REPO}/demo", "build/rom_test.bin"],
+                   check=True)
+    return f"{REPO}/demo/build/rom_test.bin"
+
+
 def comparisons(tmp: str) -> list[tuple[str, list[str], bool]]:
     """The programs that test_run compares, assembled into tmp, with their
     options and input files."""
@@ -792,14 +806,13 @@ def comparisons(tmp: str) -> list[tuple[str, list[str], bool]]:
     reserved = assemble(f"{REPO}/nice_cpu/emulator/test/reserved.nasm", tmp)
     eof = assemble(f"{REPO}/sim/eof.nasm", tmp)
     trapsym = assemble(f"{REPO}/nice_cpu/emulator/test/trapsym.nasm", tmp)
-    # The demo of the ROM, with the version of its test, loaded at 0 as any
-    # program, and a few keys for it
-    subprocess.run(["make", "-s", "-C", f"{REPO}/demo", "build/demo_test.bin"],
-                   check=True)
-    demo = f"{REPO}/demo/build/demo_test.bin"
+    # The ROM, the monitor and the demo, with the version of their tests,
+    # loaded at 0 as any program, and the monitor's x and a few keys for
+    # the demo
+    demo = rom_test()
     keys = os.path.join(tmp, "keys.txt")
     with open(keys, "wb") as f:
-        f.write(b"Hello\tNICE\r\nabc\x7fd\x1b[Ae\n")
+        f.write(DEMO_KEY + b"Hello\tNICE\r\nabc\x7fd\x1b[Ae\n")
     # Every byte value, six times over: 1536 bytes, far more than the
     # 16-byte FIFO of the testbench holds
     text = os.path.join(tmp, "input.bin")
@@ -868,15 +881,13 @@ def test_selftest(link_args: list[str], tmp: str) -> None:
     shows the Ethernet station's addresses and counts, which differ from
     board to board, so it is not compared with niceemu. link_args are
     run.py's options for the link. The port must be closed meanwhile."""
-    subprocess.run(["make", "-s", "-C", f"{REPO}/demo", "build/demo_test.bin"],
-                   check=True)
+    rom = rom_test()
     keys = os.path.join(tmp, "f11.txt")
     with open(keys, "wb") as f:
-        f.write(b"\x1b[23~")
+        f.write(DEMO_KEY + b"\x1b[23~")
     board = subprocess.run([sys.executable, f"{REPO}/tools/run.py"] +
                            link_args + ["--timeout", f"{RUN_TIMEOUT:g}", "-s",
-                                        "-i", keys,
-                                        f"{REPO}/demo/build/demo_test.bin"],
+                                        "-i", keys, rom],
                            stdin=subprocess.DEVNULL, capture_output=True)
     rows = [line[1:] for line in
             board.stdout.decode(errors="replace").splitlines()
@@ -935,15 +946,16 @@ def paused(link: Link, addrs: list[int]) -> list[int] | None:
 
 
 def test_eth_f11(link: Link, demo: str, ip: str) -> list[int] | None:
-    """Loads the demo and types F11, I, the IP address, and CR into it as
+    """Loads the ROM of the monitor and the demo, and types x and CR into
+    the monitor, then F11, I, the IP address, and CR into the demo, as
     console bytes, which its F11 writes to the station. Returns the
     station's counts of the good frames received and the frames sent, or
     None if the address did not come."""
     want = struct.unpack(">I", socket.inet_aton(ip))[0]
     load(link, demo)
-    time.sleep(QUIET)                  # the welcome
+    time.sleep(QUIET)                  # the monitor's banner
     room = link.free()
-    link.send_console(b"\x1b[23~i" + ip.encode() + b"\r")
+    link.send_console(DEMO_KEY + b"\x1b[23~i" + ip.encode() + b"\r")
     # Until the demo has taken every key, then the time for the CR
     end = time.monotonic() + 10 * QUIET
     while link.free() < room and time.monotonic() < end:
@@ -1092,7 +1104,7 @@ def main() -> None:
                 uncovered.append("the Ethernet station, without --eth")
             else:
                 test_eth(args.port, args.baud, args.eth, comparisons(tmp),
-                         f"{REPO}/demo/build/demo_test.bin")
+                         rom_test())
         except LinkError as e:
             print(f"hwtest.py: {e}", file=sys.stderr, flush=True)
             results.append(False)

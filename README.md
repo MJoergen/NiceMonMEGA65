@@ -2,11 +2,11 @@
 
 [![CI](https://github.com/MJoergen/NiceMonMEGA65/actions/workflows/ci.yml/badge.svg)](https://github.com/MJoergen/NiceMonMEGA65/actions/workflows/ci.yml)
 
-The NICE CPU on the MEGA65, with a debug link and a demo in its ROM
+The NICE CPU on the MEGA65, with a debug link, and a monitor and a demo in its ROM
 
 ![The demo's welcome screen](doc/images/demo.png)
 
-The demo in the ROM, which the core runs at power-up (see
+The demo in the ROM, which the monitor's `x` runs (see
 [demo/](demo/README.md)), drawn from `niceemu` by `tools/screenshot.py`.
 
 This project runs the [NICE CPU](https://github.com/MJoergen/nice_cpu) on
@@ -37,11 +37,11 @@ There are three ways to use the system:
   where a PC does the same, with the same tools.
 
 A monitor like QMON, the one in
-[QNICE-FPGA](https://github.com/sy2002/QNICE-FPGA), is written for the
-ROM and tested in the emulator (see [monitor/](monitor/README.md)): a
-hardware abstraction layer for programs at `0x8000`, and a few commands.
-It cannot load a program on its own yet, so the ROM of a release still
-holds the demo.
+[QNICE-FPGA](https://github.com/sy2002/QNICE-FPGA), is in the ROM, and
+the core boots from it (see [monitor/](monitor/README.md)): a hardware
+abstraction layer for programs at `0x8000`, and a few commands. It
+cannot load a program on its own yet, so for the time being the ROM
+also holds the demo, which its command `x` runs.
 
 ## Quick start
 
@@ -66,8 +66,8 @@ release's `nicemon-TAG-nexys4ddr.bit` into the flash once, over the
 board's USB cable, with
 `make flash PORT=/dev/ttyUSB1 BIT=nicemon-TAG-nexys4ddr.bit`
 (needs [openFPGALoader](https://github.com/trabucayre/openFPGALoader)).
-Set jumper JP1 (MODE) to QSPI. The board then shows the demo when it is
-switched on, with a USB keyboard in its USB HID port (see
+Set jumper JP1 (MODE) to QSPI. The board then shows the monitor when it
+is switched on, with a USB keyboard in its USB HID port (see
 [synth/](synth/README.md#building)).
 
 ## Setting up the tools
@@ -92,15 +92,17 @@ is built with `make -C nice_cpu/emulator build`, which needs Zig (see
 ## On its own
 
 With no serial cable, the MEGA65 runs the program in its ROM, from reset.
-Programs may read the keyboard and write the screen. Until the
-[monitor](monitor/README.md) can load a program on its own, the ROM of a
-release holds a [demo](demo/README.md). This shows the version and how to
-go further, and below that it is a typewriter: what you type appears on
-the screen.
+Programs may read the keyboard and write the screen. The ROM of a
+release holds the [monitor](monitor/README.md), which shows its version
+and a prompt, `> `, and takes a command on each line: `?` lists them.
+Until the monitor can load a program on its own, the ROM also holds a
+[demo](demo/README.md), which `x` and RETURN start. This shows the
+version and how to go further, and below that it is a typewriter: what
+you type appears on the screen.
 RETURN starts a new line, INST/DEL deletes, the cursor keys move the
 cursor, and CTRL-L clears what you typed. The function keys switch between
-the demos that the second row lists, and the reset button starts the
-typewriter again. The ROM can also hold a program of your own (see
+the demos that the second row lists, F12 (SHIFT and F11) goes back to the
+monitor, and the reset button starts the monitor again. The ROM can also hold a program of your own (see
 [Building your own ROM](#building-your-own-rom)).
 
 ### The on-board debugger

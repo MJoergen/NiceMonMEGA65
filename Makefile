@@ -33,16 +33,17 @@ help:
 	@echo "  make diagrams   render the block diagrams, src/*.tex and src/eth/*.tex, to PNG"
 	@echo "                  (needs pdflatex and pdftoppm)"
 	@echo "  make examples   build the C examples to examples/build/*.bin (needs clang)"
-	@echo "  make demo       build the ROM's demo to demo/build/demo.bin, the"
-	@echo "                  default ROM of the boards' targets"
+	@echo "  make demo       build the ROM's demo, and the monitor with the demo"
+	@echo "                  behind it, demo/build/rom.bin, the default ROM of the"
+	@echo "                  boards' targets"
 	@echo "  make monitor    build the monitor to monitor/build/monitor.bin, for a"
 	@echo "                  board's target with ROM=monitor/build/monitor.bin"
 	@echo "  make r3 [ROM=prog.bin]"
 	@echo "                  build the bitstream for the MEGA65 R3 (needs Vivado)"
 	@echo "  make r6 [ROM=prog.bin]"
 	@echo "                  build the bitstream for the MEGA65 R6; the core boots"
-	@echo "                  at reset from the .bin file, the demo by default, and"
-	@echo "                  ROM= (empty) leaves it held for the link"
+	@echo "                  at reset from the .bin file, the monitor and the demo"
+	@echo "                  by default, and ROM= (empty) leaves it held for the link"
 	@echo "  make nexys4ddr [ROM=prog.bin]"
 	@echo "                  build the bitstream for the Digilent Nexys4DDR, with"
 	@echo "                  the ROM as for r6"
@@ -156,13 +157,14 @@ demo:
 monitor:
 	$(MAKE) -C monitor
 
-# The boards' ROM: the demo, built first, unless ROM is given; ROM= (empty)
-# builds the bitstream without a ROM, whose core waits, held, for the link.
-# The path is made absolute here, for the board's Makefile runs in its own
-# directory. A given ROM=demo/build/demo.bin is not built again, so that
-# the release's demo keeps its tag (tools/release.py).
+# The boards' ROM: the monitor with the demo behind it, demo/build/rom.bin,
+# built first, unless ROM is given; ROM= (empty) builds the bitstream
+# without a ROM, whose core waits, held, for the link. The path is made
+# absolute here, for the board's Makefile runs in its own directory. A
+# given ROM=demo/build/rom.bin is not built again, so that the release's
+# ROM keeps its tag (tools/release.py).
 ifeq ($(origin ROM),undefined)
-BOARD_ROM  = $(abspath demo/build/demo.bin)
+BOARD_ROM  = $(abspath demo/build/rom.bin)
 BUILD_DEMO = $(MAKE) -C demo
 else
 BOARD_ROM  = $(if $(ROM),$(abspath $(ROM)))

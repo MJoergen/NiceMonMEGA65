@@ -7,7 +7,7 @@ paths:
 
 - Vivado 2025.1 is at `/opt/Xilinx/2025.1/Vivado` (`VIVADO_DIR` in
   `synth/Makefile.inc`); it is not on PATH. A build is `make r6`, `make r3`,
-  or `make nexys4ddr` in the top directory, with the demo in the ROM,
+  or `make nexys4ddr` in the top directory, with the monitor and the demo in the ROM,
   `ROM=file.bin` for another ROM, `ROM=` for none, and `NICE=multi` for the multi-cycle core. `FLOW=timing` uses the
   directives for timing; the Nexys4DDR's Makefile sets it, and the MEGA65
   builds use Vivado's defaults. Each board's bitstream is `build/top.bit`

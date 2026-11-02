@@ -17,24 +17,25 @@ R14; the instruction decoded, as nicedis writes it; and the keys. The
 rows are laid out as src/dbg/dbg.vhd writes them. niceemu runs the
 program twice, the second time to read the words at the PC.
 
-The pictures of doc/images/ are made from the demo of the release, with
-its tag:
+The pictures of doc/images/ are made from the ROM of the release, the
+monitor and the demo behind it, with its tag, and x and CR first, which
+start the demo:
 
     make -C demo VERSION=V1.1
-    printf 'Hello from the NICE CPU on the MEGA65!\\r' > in.txt
-    tools/screenshot.py -i in.txt -o doc/images/demo.png demo/build/demo.bin
+    printf 'x\\rHello from the NICE CPU on the MEGA65!\\r' > in.txt
+    tools/screenshot.py -i in.txt -o doc/images/demo.png demo/build/rom.bin
 
 doc/images/ethernet.png, the demo's F11, with:
 
-    printf '\\033[23~i192.168.1.65\\rm02:4E:49:43:45:00\\r' > in.txt
+    printf 'x\\r\\033[23~i192.168.1.65\\rm02:4E:49:43:45:00\\r' > in.txt
     tools/screenshot.py -i in.txt -n 3000000 -o doc/images/ethernet.png \\
-        demo/build/demo.bin
+        demo/build/rom.bin
 
 and doc/images/debugger.png, the typewriter paused under the strip once
 the line of the first in.txt is typed, with:
 
-    tools/screenshot.py -i in.txt -n 10600 --debugger \\
-        -o doc/images/debugger.png demo/build/demo.bin
+    tools/screenshot.py -i in.txt -n 33516 --debugger \\
+        -o doc/images/debugger.png demo/build/rom.bin
 
 Usage:
     tools/screenshot.py [-i FILE] [-n N] [--debugger] [-o FILE.png] FILE.bin
