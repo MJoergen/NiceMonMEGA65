@@ -10,8 +10,10 @@ that programs join and the monitor's commands use too; `mon.nasm` has the
 stubs through which a program calls the entries, and `mon.h` their
 declarations for C. `make -C monitor` builds `build/monitor.bin`, and
 `make -C monitor test` runs it in `niceemu` (Building and testing below).
-What is left, a loader when there is storage among it, is
-[#24](https://github.com/MJoergen/NiceMonMEGA65/issues/24). The QNICE
+It was written for
+[#24](https://github.com/MJoergen/NiceMonMEGA65/issues/24), and what is
+left, a loader when there is storage among it, is
+[#64](https://github.com/MJoergen/NiceMonMEGA65/issues/64). The QNICE
 monitor (QMON) of [QNICE-FPGA](https://github.com/sy2002/QNICE-FPGA) is
 the inspiration, not the model: the decisions below were made for a port
 of it, and #24 revisited them. Debugging is the on-board debugger's
@@ -280,8 +282,19 @@ the ROM, so they are not for such a bitstream yet (Not decided yet).
   rows that left the screen, but the Nexys4DDR's screen is 8192 words
   where the MEGA65's is 32768, with one `monitor.bin` for every board and
   no register that tells the size, and `niceemu` has no offset.
-- The demo's place once the monitor is in the ROM of the release:
-  `release.py` puts the demo there, and `demo_hw.py` checks it.
+
+## The demo's place
+
+The demo leaves this repository for nice_cpu
+([nice_cpu#91](https://github.com/MJoergen/nice_cpu/issues/91)), and the
+BASIC interpreter of
+[#54](https://github.com/MJoergen/NiceMonMEGA65/issues/54) takes its place
+in the ROM. Until then, `release.py` puts the demo in the ROM, and
+`demo_hw.py` checks it. The next step is
+[#65](https://github.com/MJoergen/NiceMonMEGA65/issues/65): the monitor is
+always in the ROM, and a command of its main loop copies the demo, joined
+behind it, to `0x8000` and runs it there. That loader is temporary, as
+the demo is.
 
 ## What QMON has that this port will not
 
