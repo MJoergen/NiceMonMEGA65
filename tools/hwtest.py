@@ -67,7 +67,8 @@ Checks, in this order:
     - nice_cpu's benchmark, examples/build/bench.bin, all but its cycles
     - the monitor's test program, monitor/test/hello.nasm, with run.py
       --monitor and the monitor of the tests from --rom, against niceemu
-      on the two joined, and under the monitor in the board's ROM, if it
+      on the two joined, also with 448 rows of d that are still coming
+      when the input ends, and under the monitor in the board's ROM, if it
       has one, which must return its status
     And the demo's self-test, F11, runs with tools/run.py, and its four
     tests must pass, as their timer and instruction counts depend on the
@@ -878,7 +879,7 @@ def test_run(link_args: list[str],
 
 
 def test_monitor(link_args: list[str], tmp: str, in_rom: bool = False,
-                 via: str = "") -> None:
+                 via: str = "", long: bool = False) -> None:
     """Runs the monitor's test program, monitor/test/hello.nasm at 0x8000,
     with run.py --monitor --rom and the monitor of the tests, and with
     niceemu, on the two joined, with r and h, the commands that run it and
@@ -886,9 +887,12 @@ def test_monitor(link_args: list[str], tmp: str, in_rom: bool = False,
     the same status, but for the steps, as the monitor waits for input in
     a loop. With in_rom, it also runs under the monitor in the board's
     ROM, whose version differs, and checks the program's status, unless
-    the bitstream has no ROM. link_args are run.py's options for the
-    link, and via names it in the checks, as for test_run. The port must
-    be closed meanwhile."""
+    the bitstream has no ROM. With long, it also runs d 8000 700 before
+    the h, 448 rows, about 20 KB, which the board sends while run.py ends
+    the input with a break: the host has to read on meanwhile (issue #67).
+    The simulation of make cosim is too slow for it. link_args are
+    run.py's options for the link, and via names it in the checks, as for
+    test_run. The port must be closed meanwhile."""
     subprocess.run(["make", "-s", "-C", f"{REPO}/monitor",
                     "build/monitor_test.bin", "build/hello.bin"], check=True)
     monitor = f"{REPO}/monitor/build/monitor_test.bin"
@@ -901,25 +905,35 @@ def test_monitor(link_args: list[str], tmp: str, in_rom: bool = False,
     halt = os.path.join(tmp, "h.txt")
     with open(halt, "wb") as f:
         f.write(b"h\r")
-    both = os.path.join(tmp, "rh.txt")
-    with open(both, "wb") as f:
-        f.write(b"r\rh\r")
     run_py = [sys.executable, f"{REPO}/tools/run.py"] + link_args + [
         "--timeout", f"{RUN_TIMEOUT:g}", "--monitor"]
+    inputs = [("", b"h\r")]
+    if long:
+        inputs.append((" with d 8000 700", b"d 8000 700\rh\r"))
     if os.path.exists(NICEEMU):
-        emu = subprocess.run([NICEEMU, "-i", both, "-s", joined],
-                             stdin=subprocess.DEVNULL, capture_output=True)
-        board = subprocess.run(run_py + ["--rom", monitor, "-i", halt, "-s",
-                                         hello],
-                               stdin=subprocess.DEVNULL, capture_output=True)
-        for r in (emu, board):
-            r.stdout = re.sub(rb"after \d+ steps", b"after N steps", r.stdout)
-        same = (emu.stdout == board.stdout and
-                emu.returncode == board.returncode)
-        check(f"run.py --monitor --rom monitor_test.bin hello.bin as "
-              f"niceemu{via}", same, "" if same else f"\n  niceemu (exit {emu.returncode}): "
-              f"{emu.stdout!r}\n  run.py (exit {board.returncode}): "
-              f"{board.stdout!r} {board.stderr!r}")
+        for name, keys in inputs:
+            board_in = os.path.join(tmp, "monitor_in.txt")
+            with open(board_in, "wb") as f:
+                f.write(keys)
+            emu_in = os.path.join(tmp, "monitor_rin.txt")
+            with open(emu_in, "wb") as f:
+                f.write(b"r\r" + keys)
+            emu = subprocess.run([NICEEMU, "-i", emu_in, "-s", joined],
+                                 stdin=subprocess.DEVNULL, capture_output=True)
+            board = subprocess.run(run_py + ["--rom", monitor, "-i", board_in,
+                                             "-s", hello],
+                                   stdin=subprocess.DEVNULL,
+                                   capture_output=True)
+            for r in (emu, board):
+                r.stdout = re.sub(rb"after \d+ steps", b"after N steps",
+                                  r.stdout)
+            same = (emu.stdout == board.stdout and
+                    emu.returncode == board.returncode)
+            check(f"run.py --monitor --rom monitor_test.bin hello.bin{name} "
+                  f"as niceemu{via}", same, "" if same else
+                  f"\n  niceemu (exit {emu.returncode}): "
+                  f"{emu.stdout[-400:]!r}\n  run.py (exit {board.returncode}): "
+                  f"{board.stdout[-400:]!r} {board.stderr!r}")
     else:
         skipped.append("run.py --monitor as niceemu")
     if not in_rom:
@@ -1086,7 +1100,7 @@ def test_eth(port: str, baud: int, eth: str,
         finally:
             tcp_link.close()
         test_run(["--eth", eth], programs, " over Ethernet")
-        test_monitor(["--eth", eth], tmp, True, " over Ethernet")
+        test_monitor(["--eth", eth], tmp, True, " over Ethernet", long=True)
     except (LinkError, OSError) as e:
         check(f"eth: {e}", False)
     except SystemExit as e:
@@ -1164,7 +1178,7 @@ def main() -> None:
                 link.close()
             serial = ["--port", args.port, "--baud", str(args.baud)]
             test_run(serial, comparisons(tmp))
-            test_monitor(serial, tmp, in_rom=True)
+            test_monitor(serial, tmp, in_rom=True, long=True)
             test_bench(serial, bench)
             test_selftest(serial, tmp)
             if not args.eth:

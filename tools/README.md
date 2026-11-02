@@ -219,7 +219,9 @@ input. Before each part of at most 256 bytes, `run.py` reads the free
 space of the core's input FIFO, and sends no more than that, so no byte
 is lost, however far the program falls behind. At the end of the input,
 `run.py` sends a break, so that a read returns `0x200`, as in the
-emulator. Input that the program has not read when it halts is dropped,
+emulator. It reads the output on while it waits for the input to go out
+and holds the break, as the board sends with no flow control and the
+kernel's buffer of the serial port fills in about 20 ms. Input that the program has not read when it halts is dropped,
 as by the emulator. The link's halt notice comes after the program's last
 byte, so the output ends there.
 

@@ -35,6 +35,7 @@ Only the Python standard library is used, so this runs on Linux and macOS.
 """
 
 import argparse
+import fcntl
 import os
 import select
 import socket
@@ -43,7 +44,7 @@ import sys
 import termios
 import time
 from collections import deque
-from typing import NoReturn
+from typing import Callable, NoReturn
 
 ESC = 0xFF
 
@@ -87,6 +88,13 @@ COSIM_BYTE = 0.02
 # takes an ESC with no byte after it as a key of its own (demo/demo.nasm,
 # T_ESC), so that a gap here does not cut an escape sequence in two.
 FULL_WAIT = 0.001
+# How long a break holds the UART's line low. The board takes a frame of
+# zeros for one, 5 us at 2 Mbaud; this leaves room for the USB serial
+# chip. TIOCSBRK and TIOCCBRK set and clear it (Linux's asm-generic/ioctls.h);
+# Python's termios does not have them.
+BREAK_TIME = 0.02
+TIOCSBRK = 0x5427
+TIOCCBRK = 0x5428
 # The TCP port of the board's debug link on Ethernet (src/eth/eth_tcp.vhd)
 ETH_PORT = 4510
 # How many times a request without an answer is sent, the first time
@@ -146,7 +154,9 @@ class Transport:
         """What has arrived, after select says something has."""
         raise NotImplementedError
 
-    def end_input(self) -> None:
+    def end_input(self, wait: Callable[[float], None]) -> None:
+        """Ends the program's input. wait(t) reads what arrives for t
+        seconds, so that a transport that has to wait loses no output."""
         raise NotImplementedError
 
     def close(self) -> None:
@@ -158,7 +168,13 @@ class Serial(Transport):
     returns when the driver has handed the bytes to the USB serial chip,
     which may still be sending them, and a break sent then cuts the last
     of them off. So this keeps the time at which the bytes written are out
-    on the line, at 10 bits a byte, and end_input() waits for it."""
+    on the line, at 10 bits a byte, and end_input() waits for it.
+
+    The board sends at the full rate with no flow control, and the
+    kernel's buffer of a tty holds about 4 KB, 20 ms at 2 Mbaud. So every
+    wait of end_input() reads on, and the break is set and cleared with
+    ioctls around such a wait: tcsendbreak() blocks for 0.25 s or more,
+    and the output of that time was lost, an h notice too."""
 
     board = True
 
@@ -200,12 +216,16 @@ class Serial(Transport):
     def read(self) -> bytes:
         return os.read(self.fd, 4096)
 
-    def end_input(self) -> None:
-        # A break: the line low for longer than a frame, after the bytes
-        # before it, with 20 ms more for the latency of USB
+    def end_input(self, wait: Callable[[float], None]) -> None:
+        # A break: the line low for BREAK_TIME, far longer than a frame,
+        # after the bytes before it, with 20 ms more for the latency of USB
         termios.tcdrain(self.fd)
-        time.sleep(max(self.sent_by - time.monotonic(), 0) + 0.02)
-        termios.tcsendbreak(self.fd, 0)
+        wait(max(self.sent_by - time.monotonic(), 0) + 0.02)
+        fcntl.ioctl(self.fd, TIOCSBRK)
+        try:
+            wait(BREAK_TIME)
+        finally:
+            fcntl.ioctl(self.fd, TIOCCBRK)
 
     def close(self) -> None:
         os.close(self.fd)
@@ -304,7 +324,7 @@ class Tcp(Transport):
                             f"host may be connected")
         return data
 
-    def end_input(self) -> None:
+    def end_input(self, wait: Callable[[float], None]) -> None:
         assert self.sock is not None
         self.sock.shutdown(socket.SHUT_WR)
         self.old = self.sock
@@ -627,8 +647,14 @@ class Link:
 
     def end_input(self) -> None:
         """Ends the program's input: a break on the UART, or a half-close."""
-        self.transport.end_input()
+        self.transport.end_input(self._wait)
         self.input_ended = True
+
+    def _wait(self, seconds: float) -> None:
+        """Takes what arrives for seconds."""
+        end = time.monotonic() + seconds
+        while (now := time.monotonic()) < end:
+            self.poll(end - now)
 
 
 def read_words(link: Link, addrs: list[int]) -> list[int]:

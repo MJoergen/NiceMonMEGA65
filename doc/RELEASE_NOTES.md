@@ -60,6 +60,11 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 
 **Tools**
 
+- `run.py` on the UART lost output, and with it the halt notice, when
+  the program was still printing at the end of the input: it read
+  nothing while it sent the break, and the serial port's buffer
+  overflowed, so a long run ended at the time limit. It now reads on
+  meanwhile ([#67](https://github.com/MJoergen/NiceMonMEGA65/issues/67)).
 - `--tcp HOST:PORT` reaches `niceemu --link ADDR:PORT` on another
   computer, with the transport of `--tcp PORT`, which stays 127.0.0.1
   (`tools/README.md`, "Without a board"). The link has no
