@@ -95,7 +95,11 @@ With no serial cable, the MEGA65 runs the program in its ROM, from reset.
 Programs may read the keyboard and write the screen. The ROM of a
 release holds the [monitor](monitor/README.md), which shows its version
 and a prompt, `> `, and takes a command on each line: `?` lists them.
-Until the monitor can load a program on its own, the ROM also holds a
+`l` loads a program at `0x8000` that you type, or paste into a
+terminal on the serial port, as the lines of its `.bin` file, and `r`
+runs it
+([monitor/README.md](monitor/README.md#loading-without-a-host)).
+Until the BASIC interpreter takes its place, the ROM also holds a
 [demo](demo/README.md), which `x` and RETURN start. This shows the
 version and how to go further, and below that it is a typewriter: what
 you type appears on the screen.

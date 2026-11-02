@@ -75,6 +75,16 @@ RUN  = r\rh\r
 # rows and go round its ring; two Page Ups and a Page Down, which turn the
 # ring and show 24 rows back; and v, which shows the screen again.
 SCROLL = \033[5~\033[6~d 8000 700\r\033[5~\033[5~\033[6~v\rh\r
+# load: l with lines typed and pasted. The first is typed with edits: a
+# DEL that takes back 2, the cursor key ESC [ A, which is dropped, so it
+# writes 134 at 9000. Four lines are skipped: zz, an address in the ROM,
+# one of the monitor's variables, and a third number. Then build/hello.bin,
+# its first 3 lines ended by CR LF and the rest by LF, and CR, an empty
+# line, ends the load. A second l is ended by CTRL-C in the middle of a
+# line, which writes nothing. r runs hello, and d shows 9000 and 9001.
+LOAD_HEAD = l\r9000 12\177\033[A34\rzz\r100 5\rFFFFF000 1\r9001 5 6\r
+LOAD_TAIL = \rl\r9001 7\003r\rd 9000 2\rh\r
+
 # The words of each test that are dumped with the screen: for cmds the
 # variables, the cursor's registers, and the IP address, and for the programs the text at
 # column 40 of row 4, 80 * 4 + 40 = 360 = 0x168, with its color.
@@ -88,6 +98,7 @@ DUMP_cmds    = -d 0xFFFFF000:5 -d 0xFFFFFF80:6 -d 0xFFFFFF9A:1
 DUMP_scroll  = -d 0xFFFFF000:11 -d 0xFFFFFF80:6 -d 0xFFFF7FB4:4 -d 0xFFFF7F64:4 \
                -d 0xFFFF0804:4 -d 0xFFFF0944:4
 DUMP_hello   = -d 0xFFFF0168:12
+DUMP_load    = -d 0xFFFFF000:14
 DUMP_hello_c = -d 0xFFFF0168:12
 MAX_STEPS = 10000000
 
@@ -100,10 +111,13 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/hello.bin
 	@printf '$(CMDS)' > $(BUILD)/cmds.txt
 	@printf '$(RUN)' > $(BUILD)/run.txt
 	@printf '$(SCROLL)' > $(BUILD)/scroll.txt
-	@fail=0; for t in cmds scroll hello hello_c; do \
+	@{ printf '$(LOAD_HEAD)'; head -n 3 $(BUILD)/hello.bin | awk '{ printf "%s\r\n", $$0 }'; \
+	  tail -n +4 $(BUILD)/hello.bin; printf '$(LOAD_TAIL)'; } > $(BUILD)/load.txt
+	@fail=0; for t in cmds scroll load hello hello_c; do \
 	  case $$t in \
 	    cmds) prog=; input=cmds; dump='$(DUMP_cmds)';; \
 	    scroll) prog=; input=scroll; dump='$(DUMP_scroll)';; \
+	    load) prog=; input=load; dump='$(DUMP_load)';; \
 	    hello) prog=$(BUILD)/hello.bin; input=run; dump='$(DUMP_hello)';; \
 	    hello_c) prog=$(BUILD)/hello_c.bin; input=run; dump='$(DUMP_hello_c)'; \
 	      if ! command -v $(CLANG) > /dev/null; then echo "SKIP monitor $$t: no $(CLANG)"; continue; fi; \

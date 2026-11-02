@@ -68,12 +68,15 @@ the MEGA65 and 77 on the Nexys4DDR (Input and output below).
 | `c` | Clears the screen. |
 | `v` | The version of the monitor, and of the dispatch table: `NiceMon V1.2, table 1.0`. |
 | `i [A.B.C.D]` | Shows the Ethernet station's IP address, `IP address 192.168.1.65`, or writes it first: four decimal numbers of 0 to 255 with dots between them, such as `i 192.168.1.65`. Anything else is no address, and `i` says so and writes nothing. It writes `0xFFFFFF9A` ([SYSTEM.md](../doc/SYSTEM.md#the-ethernet-station)), so a host connected over TCP loses its connection. In `niceemu` the register is plain memory. |
+| `l` | Loads words into the RAM from lines of `ADDR WORD` in hex, as a `.bin` file has them (Loading without a host below), up to an empty line, and prints the words written and the lines skipped: `Words loaded: 600, 00008000 to 00008257`. |
 | `x` | Runs the demo of the ROM, for the time being (The demo below). Without a demo in the ROM, `x` says so. |
 | `h` | Halts the core, which the reset button, or a host over the link, starts again. The tests end with it. |
 | `?` | Lists the commands, and the keys of the history. |
 
-Anything else prints `Unknown command; ? lists them`. These are a first
-set (Not decided yet below).
+Anything else prints `Unknown command; ? lists them`. The debugger has
+pause, step, and inspect, so the monitor adds only `l`, which loads a
+program with no host's tools and no storage; the SD card's commands come
+with [#62](https://github.com/MJoergen/NiceMonMEGA65/issues/62).
 
 ## Programs
 
@@ -296,6 +299,38 @@ core, as in the tests here:
 with `test/hello.nasm`, and `make hwtest` also runs it under the monitor
 in the board's ROM, over the UART and Ethernet.
 
+## Loading without a host
+
+`l` loads a program that is typed on the keyboard, or pasted into a
+terminal on the line, with no tools on the host and no storage. It reads
+lines of `ADDR WORD`, two hex numbers of 1 to 8 digits with blanks
+between them, which is what a `.bin` file has (nice_cpu's ISA.md
+§10.4), and writes each word. CR, LF, and CR LF end a line. An empty
+line ends the load, and so does CTRL-C, which drops the line it is in.
+DEL and backspace delete, and the cursor and function keys do nothing.
+A line with anything else, or with an address outside a program's RAM,
+`0x8000` to `0xEFFF` (Programs above), is skipped: the boards' RAM
+repeats every 2^16 words, so a larger address could reach the ROM or the
+monitor's variables and stack. At the end `l` prints the number of words written, with the
+lowest and the highest address, and the number of lines skipped, with
+the first of them:
+
+    Words loaded: 601, 00008000 to 00009000
+    Lines skipped: 4, the first line 2; ADDR WORD in hex, ADDR 8000 to EFFF
+
+The lines are shown in one row of the screen, which each line clears,
+and not on the line, so the screen does not scroll, and a paste over the
+UART at 2 Mbaud keeps up: a line takes about 1400 instructions, and
+arrives in about 90 µs. On the R6, 20600 lines pasted at full speed, in
+LF lines and in CR LF lines, were all written, with no byte lost.
+
+Over Ethernet, a paste is lost. The station takes the host's bytes as
+fast as they come, at 100 Mbit/s, and the core's input FIFO of 2048
+bytes drops what does not fit, as the link sends `o` for. Lines typed
+into a plain client, such as `nc 192.168.1.65 4510`, are fine. For a
+file over Ethernet, use `load.py --eth 192.168.1.65 --monitor prog.bin`
+(Loading from a host above), which waits for room in the FIFO.
+
 ## Building and testing
 
 `make -C monitor` assembles `monitor.nasm`, `monlib.nasm`, `mon.nasm`,
@@ -306,10 +341,12 @@ unless `VERSION=` is given, and is written only when it changes.
 
 `make -C monitor test` checks the layout of the sources with nice_cpu's
 `nicefmt`, assembles the monitor with the version `V9.9`, and runs it in
-`niceemu` four times, with its keystrokes in an input file and `h` as
+`niceemu` five times, with its keystrokes in an input file and `h` as
 the last command, so that the run ends: alone, with every command and
 the edits of a line; alone, with 448 rows of `d`, which go round the
-ring of the history, and Page Up and Page Down; with `test/hello.nasm` at `0x8000`, an assembly
+ring of the history, and Page Up and Page Down; alone, with `l` and
+`build/hello.bin` pasted, lines that are skipped, and CTRL-C, then `r`;
+with `test/hello.nasm` at `0x8000`, an assembly
 program under nice_cpu's `start_mon.nasm`; and with `test/hello.c`,
 built with `nicebuild.py --monitor --asm mon.nasm`, which is skipped
 without clang. The console output, which is the copy on the line, a few
@@ -321,11 +358,6 @@ On a board, `make r6` builds a bitstream that boots the monitor, with the
 demo behind it in the ROM. `make hwtest` loads the same, with the
 versions of the tests, into the RAM, and types `x` for the demo
 ([demo/](../demo/README.md)).
-
-## Not decided yet
-
-- The main loop's other commands, which a monitor without a debugger
-  needs, as the on-board debugger has pause, step, and inspect.
 
 ## The demo
 

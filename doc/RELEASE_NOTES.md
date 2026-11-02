@@ -57,6 +57,12 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   other key shows the screen again. On the MEGA65 they are MEGA with
   CRSR↑ and CRSR↓. The rows shown stay at `0xFFFF0000`, as in
   `niceemu`, which keeps the history but cannot show it.
+- `l` loads a program from lines of `ADDR WORD` in hex, the `.bin`
+  format, typed on the keyboard or pasted into a terminal on the
+  UART, up to an empty line, so the board needs neither the host's
+  tools nor storage for it, and `r` runs it (`monitor/README.md`,
+  "Loading without a host"). A paste over Ethernet loses bytes, so
+  use `load.py --monitor` there.
 
 **Tools**
 

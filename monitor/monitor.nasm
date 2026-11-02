@@ -12,7 +12,12 @@
 ;
 ; The cold start, mon_reset, sets SP to STACK, the variables, and the
 ; screen, prints the banner, and runs the main loop. A command is a line:
-; a letter, and after d a hex address and a hex count. r runs the program
+; a letter, and after d a hex address and a hex count. l writes words into
+; the RAM from lines of ADDR WORD in hex, as a .bin file has them, typed or
+; pasted, up to an empty line, so that a program is loaded with no host's
+; tools and no storage. Each line is shown in one row of the screen, which
+; the next line clears, and not on the line, so that no line scrolls the
+; screen and a paste at 2 Mbaud keeps up. r runs the program
 ; at 0x8000 as a subroutine, with R1 = the entry of mon_putc, R2 = 0,
 ; R3 = 0, and E = 0 (ABI.md, "Programs under a monitor"). At its return,
 ; and at mon_exit, the monitor clears E, stops the timer, sets VBASE to 0,
@@ -78,10 +83,14 @@ V_HHEAD         .EQU    0xFFFFF007      ; the slot of the next row, slot i at SC
 V_HCOUNT        .EQU    0xFFFFF008      ; the rows kept, up to V_HCAP
 V_BACK          .EQU    0xFFFFF009      ; the rows shown back, 0 for the screen
 V_CTL           .EQU    0xFFFFF00A      ; SCR_CTL while the history is shown
+V_LOUT          .EQU    0xFFFFF00B      ; V_OUT while l reads its lines
+V_LEND          .EQU    0xFFFFF00C      ; the last byte that l read, for the LF of a CR LF
+V_LBAD          .EQU    0xFFFFF00D      ; the number of the first line that l skipped
 V_LINE          .EQU    0xFFFFF010      ; the command line, LINE_MAX words and a 0
 LINE_MAX        .EQU    76              ; so that the prompt and the line fit a row
 
 PROGRAM         .EQU    0x8000          ; where a program is, above the ROM
+PROGRAM_END     .EQU    0xF000          ; after a program's RAM: the variables, at 0xFFFFF000 in a RAM of 2^16 words
 DEMO            .EQU    0x1000          ; the demo's words in the ROM, after their number
 DEMO_MAX        .EQU    0x7000          ; more words than fit from DEMO + 1 below the RAM
 COLOR           .EQU    0x000FFF00      ; white on black, the color at the cold start
@@ -330,6 +339,206 @@ ip_bad          MOVE    R1, S_BADIP
                 ADD     @--SP, 2, PC
                 MOVE    PC, puts_crlf
                 MOVE    PC, main
+
+; l: words into the memory from lines of ADDR WORD, two hex numbers of 1 to
+; 8 digits with blanks between them and around them, as a .bin file has
+; them (nice_cpu's ISA.md §10.4), up to an empty line or CTRL-C, which
+; also drops the line it is in. CR, LF, and CR LF end a line, so a
+; terminal's lines and a file's both serve. A line with anything else, or
+; with ADDR outside a program's RAM, PROGRAM up to PROGRAM_END, is
+; skipped: the boards' RAM repeats every 2^16 words, so an address past it
+; could reach the ROM or the monitor's variables and stack, which are at
+; 0xF000 and up of the RAM. The count of the skipped lines and the number
+; of the first are shown at the end, with the count of the words written
+; and the lowest and highest address. DEL
+; and BS delete the character before the cursor; the other control codes,
+; the bytes from 0x80, and the escape sequences of the cursor and function
+; keys are dropped. The lines are shown in row R7, which the hint leaves
+; the cursor in, and only on the screen: each line clears the row, and its
+; end is not shown, so the screen never scrolls. R8 counts the words
+; written, R9 and R10 are the lowest and highest address written, R11
+; counts the lines, R12 the lines skipped, and R6 is the next free word of
+; the line.
+cmd_load
+                MOVE    R1, S_LHINT
+                ADD     @--SP, 2, PC
+                MOVE    PC, puts_crlf
+                MOVE    @V_LOUT, @V_OUT
+                MOVE    @V_OUT, OUT_SCREEN
+                MOVE    @V_LEND, 0
+                MOVE    R7, @V_ROW
+                MOVE    R8, 0
+                MOVE    R9, 0xFFFFFFFF
+                MOVE    R10, 0
+                MOVE    R11, 0
+                MOVE    R12, 0
+load_line
+                ADD     @--SP, 2, PC
+                MOVE    PC, load_row
+                MOVE    R6, V_LINE
+load_key
+                ADD     @--SP, 2, PC
+                MOVE    PC, _io_getc
+                MOVE    R2, @V_LEND
+                MOVE    @V_LEND, R1
+                SUB[M]  R0, R1, 0x0A
+        ?!Z     MOVE    PC, load_char
+                SUB[M]  R0, R2, 0x0D
+        ?Z      MOVE    PC, load_key    ; the LF of a CR LF
+                MOVE    PC, load_end
+load_char
+                SUB[M]  R0, R1, 0x0D
+        ?Z      MOVE    PC, load_end
+                SUB[M]  R0, R1, 0x7F
+        ?Z      MOVE    PC, load_del
+                SUB[M]  R0, R1, 0x08
+        ?Z      MOVE    PC, load_del
+                SUB[M]  R0, R1, 0x03
+        ?Z      MOVE    PC, load_done   ; CTRL-C
+                SUB[M]  R0, R1, 0x1B
+        ?Z      MOVE    PC, load_esc
+                SUB[M]  R0, R1, 0x20
+        ?C      MOVE    PC, load_key    ; another control code
+                SUB[M]  R0, R1, 0x80
+        ?!C     MOVE    PC, load_key    ; 0x80 and above
+                SUB[M]  R0, R6, V_LINE+LINE_MAX
+        ?Z      MOVE    PC, load_key    ; the line is full
+                MOVE    @R6++, R1
+                ADD     @--SP, 2, PC
+                MOVE    PC, mon_putc
+                MOVE    PC, load_key
+load_del
+                SUB[M]  R0, R6, V_LINE
+        ?Z      MOVE    PC, load_key    ; nothing before the cursor
+                SUB     R6, R6, 1
+                MOVE    R1, _io_gets.rub
+                ADD     @--SP, 2, PC
+                MOVE    PC, _io_puts
+                MOVE    PC, load_key
+; An ESC: with a [ or an O within io.t_esc, a sequence, whose bytes up to
+; its final one, 0x40 to 0x7E, are dropped; another byte is dropped with
+; the ESC.
+load_esc
+                ADD     @--SP, 2, PC
+                MOVE    PC, _io_getc.soon
+        ?Z      MOVE    PC, load_key
+                SUB[M]  R0, R1, 0x5B    ; [
+        ?Z      MOVE    PC, load_seq
+                SUB[M]  R0, R1, 0x4F    ; O
+        ?!Z     MOVE    PC, load_key
+load_seq
+                ADD     @--SP, 2, PC
+                MOVE    PC, _io_getc.soon
+        ?Z      MOVE    PC, load_key
+                SUB[M]  R0, R1, 0x40
+        ?C      MOVE    PC, load_seq    ; a parameter byte
+                MOVE    PC, load_key    ; the final byte
+; The end of a line: an empty one ends the load, and another is parsed, and
+; its word written
+load_end
+                MOVE    @R6, 0
+                SUB[M]  R0, R6, V_LINE
+        ?Z      MOVE    PC, load_done
+                ADD     R11, R11, 1
+                MOVE    R1, V_LINE
+                ADD     @--SP, 2, PC
+                MOVE    PC, _io_gethex  ; R1 the address, R2 its digits, R3 after it
+                SUB     R4, R2, 1
+                SUB[M]  R0, R4, 8
+        ?!C     MOVE    PC, load_bad    ; no digit, or more than 8
+                SUB[M]  R0, R1, PROGRAM
+        ?C      MOVE    PC, load_bad    ; in the ROM
+                SUB[M]  R0, R1, PROGRAM_END
+        ?!C     MOVE    PC, load_bad    ; the variables, or past the RAM
+                MOVE    R6, R1
+                MOVE    R1, R3
+                ADD     @--SP, 2, PC
+                MOVE    PC, _io_gethex  ; R1 the word
+                SUB     R4, R2, 1
+                SUB[M]  R0, R4, 8
+        ?!C     MOVE    PC, load_bad
+load_tail
+                SUB[M]  R0, @R3, 0x20
+        ?Z      ADD     R3, R3, 1
+        ?Z      MOVE    PC, load_tail
+                MOVE[M] R0, @R3
+        ?!Z     MOVE    PC, load_bad    ; more after the word
+                MOVE    @R6, R1
+                ADD     R8, R8, 1
+                SUB[M]  R0, R6, R9
+        ?C      MOVE    R9, R6          ; a lower address
+                SUB[M]  R0, R10, R6
+        ?C      MOVE    R10, R6         ; a higher one
+                MOVE    PC, load_line
+load_bad
+                ADD     R12, R12, 1
+                SUB[M]  R0, R12, 1
+        ?Z      MOVE    @V_LBAD, R11
+                MOVE    PC, load_line
+; The end of the load: the row blank again, the outputs back, the words
+; written, and the lines skipped
+load_done
+                ADD     @--SP, 2, PC
+                MOVE    PC, load_row
+                MOVE    @V_OUT, @V_LOUT
+                MOVE    R1, S_LOADED
+                ADD     @--SP, 2, PC
+                MOVE    PC, _io_puts
+                MOVE    R1, R8
+                ADD     @--SP, 2, PC
+                MOVE    PC, _io_putdec
+                MOVE[M] R0, R8
+        ?Z      MOVE    PC, load_skipped
+                MOVE    R1, S_LFROM
+                ADD     @--SP, 2, PC
+                MOVE    PC, _io_puts
+                MOVE    R1, R9
+                ADD     @--SP, 2, PC
+                MOVE    PC, _io_puthex
+                MOVE    R1, S_LTO
+                ADD     @--SP, 2, PC
+                MOVE    PC, _io_puts
+                MOVE    R1, R10
+                ADD     @--SP, 2, PC
+                MOVE    PC, _io_puthex
+load_skipped
+                ADD     @--SP, 2, PC
+                MOVE    PC, _io_crlf
+                MOVE[M] R0, R12
+        ?Z      MOVE    PC, main
+                MOVE    R1, S_SKIPPED
+                ADD     @--SP, 2, PC
+                MOVE    PC, _io_puts
+                MOVE    R1, R12
+                ADD     @--SP, 2, PC
+                MOVE    PC, _io_putdec
+                MOVE    R1, S_FIRST
+                ADD     @--SP, 2, PC
+                MOVE    PC, _io_puts
+                MOVE    R1, @V_LBAD
+                ADD     @--SP, 2, PC
+                MOVE    PC, _io_putdec
+                MOVE    R1, S_LFORM
+                ADD     @--SP, 2, PC
+                MOVE    PC, puts_crlf
+                MOVE    PC, main
+
+; load_row: row R7 blank in the current color, and the cursor at its column
+; 0. Uses R1-R3.
+load_row
+                SHL     R2, R7, 6
+                SHL     R1, R7, 4
+                ADD     R1, R1, R2
+                ADD     R1, R1, SCREEN
+                OR      R3, @V_COLOR, 0x20
+                MOVE    R2, 80
+load_blank
+                MOVE    @R1++, R3
+                SUB[M]  R2, R2, 1
+        ?!Z     MOVE    PC, load_blank
+                MOVE    @V_COL, 0
+                MOVE    @V_ROW, R7
+                MOVE    PC, putc_cur
 
 ; x: the demo, for the time being (issue #65, README.md). The ROM has its
 ; number of words at DEMO, and the words after it, which are copied to
@@ -718,6 +927,7 @@ COMMANDS
                 .DAT    0x64, cmd_dump  ; d
                 .DAT    0x68, cmd_halt  ; h
                 .DAT    0x69, cmd_ip    ; i
+                .DAT    0x6C, cmd_load  ; l
                 .DAT    0x72, cmd_run   ; r
                 .DAT    0x76, cmd_version  ; v
                 .DAT    0x78, cmd_demo  ; x
@@ -739,10 +949,20 @@ S_NOPROG
 S_NODEMO
                 .ASCII_L 'No demo in the ROM'
 S_IP            .ASCII_L 'IP address '
+S_LHINT         .ASCII_L 'ADDR WORD in hex on each line, as in a .bin file; an empty line ends'
+S_LOADED
+                .ASCII_L 'Words loaded: '
+S_LFROM         .ASCII_L ', '
+S_LTO           .ASCII_L ' to '
+S_SKIPPED
+                .ASCII_L 'Lines skipped: '
+S_FIRST         .ASCII_L ', the first line '
+S_LFORM         .ASCII_L '; ADDR WORD in hex, ADDR 8000 to EFFF'
 S_BADIP         .ASCII_L 'Not an IP address: four numbers from 0 to 255, with dots between them'
 
-HELP            .DAT    H_R, H_X, H_D, H_I, H_C, H_V, H_H, H_Q, H_P, 0
+HELP            .DAT    H_R, H_L, H_X, H_D, H_I, H_C, H_V, H_H, H_Q, H_P, 0
 H_R             .ASCII_L 'r             run the program at 00008000'
+H_L             .ASCII_L 'l             load lines of ADDR WORD in hex, as a .bin file has them'
 H_X             .ASCII_L 'x             run the demo of the ROM, which F12 leaves'
 H_D             .ASCII_L 'd [ADDR] [N]  show N words from ADDR, in hex, or the next ones'
 H_I             .ASCII_L 'i [A.B.C.D]   show the IP address, or set it, such as 192.168.1.65'
