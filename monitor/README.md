@@ -112,7 +112,11 @@ with [#62](https://github.com/MJoergen/NiceMonMEGA65/issues/62).
   ([SYSTEM.md](../doc/SYSTEM.md#address-map)), which reads 0 in
   `niceemu`, where it is plain memory and the memory has no limit. The
   monitor's routines use at most 32 words of the stack when a program
-  calls them.
+  calls them. The stack is in use before the program runs: `r` pushes
+  its return address at the top word of the program's RAM, `0x1EFFF` or
+  `0xEFFF`, and `l`'s own summary reaches 13 words below it. `l` and
+  `load.py --monitor` take a word there, which is then overwritten, as
+  any word in the room the stack needs is.
 - A program runs once per load: the load initializes its static data and
   its wasm linear memory. A wasm trap halts the core, as in nice_cpu,
   after the trap report's line on the monitor's output; the on-board
@@ -311,23 +315,27 @@ in the board's ROM, over the UART and Ethernet.
 
 `l` loads a program that is typed on the keyboard, or pasted into a
 terminal on the line, with no tools on the host and no storage. It reads
-lines of `ADDR WORD`, two hex numbers of 1 to 8 digits with blanks
-between them, which is what a `.bin` file has (nice_cpu's ISA.md
-§10.4), and writes each word. CR, LF, and CR LF end a line. An empty
-line ends the load, and so does CTRL-C, which drops the line it is in.
-DEL and backspace delete, and the cursor and function keys do nothing.
-A line with anything else, or with an address outside a program's RAM,
-`0x8000` to `0x1EFFF` on the MEGA65 and to `0xEFFF` on the Nexys4DDR
-(Programs above), is skipped: the RAM repeats through the address space,
-so a larger address could reach the ROM or the monitor's variables and
-stack. In `niceemu`, where `0xFFFFFF9E` reads 0, the program's RAM goes
-up to the screen, `0xFFFEFFFF`. At the end `l` prints the number of
-words written, with the lowest and the highest address, and the number
-of lines skipped, with the first of them and the last address that a
-line may have:
+lines of `ADDR WORD`, two hex numbers of 1 to 8 digits with blanks or
+tabs between them, which is what a `.bin` file has (nice_cpu's ISA.md
+§10.4), and writes each word. CR, LF, and CR LF end a line, the `l`
+line itself too. An empty line ends the load, and so does CTRL-C, which
+drops the line it is in; a line of blanks only is passed over, as
+`niceemu` passes it. DEL and backspace delete, and the cursor and
+function keys do nothing. A line with anything else, one longer than 76
+characters, or one with an address outside a program's RAM, `0x8000` to
+`0x1EFFF` on the MEGA65 and to `0xEFFF` on the Nexys4DDR (Programs
+above), is skipped: the RAM repeats through the address space, so a
+larger address could reach the ROM or the monitor's variables and
+stack. The top of that range is the stack itself, which `r` uses, so a
+program's words stay below it. A second line for an address writes its
+word over the first's, where `niceemu` rejects the file. In `niceemu`,
+where `0xFFFFFF9E` reads 0, the program's RAM goes up to the screen,
+`0xFFFEFFFF`. At the end `l` prints the number of words written, with
+the lowest and the highest address, and the number of lines skipped,
+with the first of them and the last address that a line may have:
 
     Words loaded: 601, 00008000 to 00009000
-    Lines skipped: 4, the first line 2; ADDR WORD in hex, ADDR 00008000 to 0001EFFF
+    Lines skipped: 4, first line 2; ADDR WORD in hex, ADDR 00008000 to 0001EFFF
 
 The lines are shown in one row of the screen, which each line clears,
 and not on the line, so the screen does not scroll, and a paste over the

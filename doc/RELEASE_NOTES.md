@@ -77,7 +77,10 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   "Loading without a host"). A paste over Ethernet loses bytes, so
   use `load.py --monitor` there. Its lines may have addresses up to the
   monitor's variables, which `0xFFFFFF9E` gives: `0x1EFFF` on the
-  MEGA65 and `0xEFFF` on the Nexys4DDR.
+  MEGA65 and `0xEFFF` on the Nexys4DDR, where the top words are the
+  stack that `r` uses. Tabs are blanks, a line of blanks is passed
+  over, a line longer than 76 characters is skipped, and a terminal
+  that ends the `l` line with CR LF is fine.
 
 **Tools**
 

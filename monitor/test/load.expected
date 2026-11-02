@@ -2,8 +2,8 @@ NiceMon V9.9
 ? lists the commands
 > l
 ADDR WORD in hex on each line, as in a .bin file; an empty line ends
-Words loaded: 602, 00008000 to 0001EFFF
-Lines skipped: 5, the first line 2; ADDR WORD in hex, ADDR 00008000 to 0001EFFF
+Words loaded: 604, 00008000 to 0001EFFF
+Lines skipped: 6, first line 2; ADDR WORD in hex, ADDR 00008000 to 0001EFFF
 > l
 ADDR WORD in hex on each line, as in a .bin file; an empty line ends
 Words loaded: 0
@@ -12,8 +12,8 @@ Hello from 00008000, table 00010000
 at column 40
 on the line only
 Returned 0000002A
-> d 9000 2
-00009000 00000134 00000000
+> d 9000 4
+00009000 00000134 00000000 00000008 00000000
 > d 1EFFF 1
 0001EFFF 00000009
 > h
@@ -25,8 +25,8 @@ Screen:
 |? lists the commands
 |> l
 |ADDR WORD in hex on each line, as in a .bin file; an empty line ends
-|Words loaded: 602, 00008000 to 0001EFFF
-|Lines skipped: 5, the first line 2; ADDR WORD in hex, ADDR 00008000 to 0001EFFF
+|Words loaded: 604, 00008000 to 0001EFFF
+|Lines skipped: 6, first line 2; ADDR WORD in hex, ADDR 00008000 to 0001EFFF
 |> l
 |ADDR WORD in hex on each line, as in a .bin file; an empty line ends
 |Words loaded: 0
@@ -34,8 +34,8 @@ Screen:
 |Hello from 00008000, table 00010000
 |                                        at column 40
 |Returned 0000002A
-|> d 9000 2
-|00009000 00000134 00000000
+|> d 9000 4
+|00009000 00000134 00000000 00000008 00000000
 |> d 1EFFF 1
 |0001EFFF 00000009
 |> h

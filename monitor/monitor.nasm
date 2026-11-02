@@ -88,7 +88,7 @@ V_LOUT          .EQU    0xFFFFF00B      ; V_OUT while l reads its lines
 V_LEND          .EQU    0xFFFFF00C      ; the last byte that l read, for the LF of a CR LF
 V_LBAD          .EQU    0xFFFFF00D      ; the number of the first line that l skipped
 V_PEND          .EQU    0xFFFFF00E      ; for l: after a program's RAM, at the variables
-V_LINE          .EQU    0xFFFFF010      ; the command line, LINE_MAX words and a 0
+V_LINE          .EQU    0xFFFFF010      ; the command line, LINE_MAX words, one over for l, and a 0
 LINE_MAX        .EQU    76              ; so that the prompt and the line fit a row
 
 PROGRAM         .EQU    0x8000          ; where a program is, above the ROM
@@ -346,16 +346,23 @@ ip_bad          MOVE    R1, S_BADIP
 ; 8 digits with blanks between them and around them, as a .bin file has
 ; them (nice_cpu's ISA.md §10.4), up to an empty line or CTRL-C, which
 ; also drops the line it is in. CR, LF, and CR LF end a line, so a
-; terminal's lines and a file's both serve. A line with anything else, or
+; terminal's lines and a file's both serve; V_LEND starts as a CR, so
+; that the LF of a terminal that ends the l line itself with CR LF is
+; the LF of that CR LF, not an empty line. A TAB is a blank, as niceemu
+; takes it. A line of blanks only is passed over, as niceemu passes it,
+; and counted as a line and not as skipped. A line with anything else, or
 ; with ADDR outside a program's RAM, PROGRAM up to V_PEND, is skipped:
 ; the RAM of a board repeats every RAM_WORDS words, so an address past it
 ; could reach the ROM or the monitor's variables and stack, which are at
 ; RAM_WORDS - VARS_WORDS and up of the RAM, 0x1F000 on the MEGA65 and
 ; 0xF000 on the Nexys4DDR. V_PEND is that address, or the screen where
-; RAM_WORDS reads 0, as in niceemu. The count of the words written and
-; the lowest and highest address are shown at the end, and the count of
-; the skipped lines, the number of the first, and the last address that a
-; line may have. DEL
+; RAM_WORDS reads 0, as in niceemu. A line of more than LINE_MAX
+; characters is skipped too: LINE_MAX + 1 of them are kept, which tells
+; it from a full line, and the rest dropped. A second line for an address
+; writes its word over the first's, where niceemu rejects the file. The
+; count of the words written and the lowest and highest address are
+; shown at the end, and the count of the skipped lines, the number of the
+; first, and the last address that a line may have. DEL
 ; and BS delete the character before the cursor; the other control codes,
 ; the bytes from 0x80, and the escape sequences of the cursor and function
 ; keys are dropped. The lines are shown in row R7, which the hint leaves
@@ -370,7 +377,7 @@ cmd_load
                 MOVE    PC, puts_crlf
                 MOVE    @V_LOUT, @V_OUT
                 MOVE    @V_OUT, OUT_SCREEN
-                MOVE    @V_LEND, 0
+                MOVE    @V_LEND, 0x0D   ; as after the CR of the l line
                 MOVE    R7, @V_ROW
                 MOVE    R8, 0
                 MOVE    R9, 0xFFFFFFFF
@@ -405,12 +412,14 @@ load_char
         ?Z      MOVE    PC, load_done   ; CTRL-C
                 SUB[M]  R0, R1, 0x1B
         ?Z      MOVE    PC, load_esc
+                SUB[M]  R0, R1, 0x09
+        ?Z      MOVE    R1, 0x20        ; a TAB is a blank
                 SUB[M]  R0, R1, 0x20
         ?C      MOVE    PC, load_key    ; another control code
                 SUB[M]  R0, R1, 0x80
         ?!C     MOVE    PC, load_key    ; 0x80 and above
-                SUB[M]  R0, R6, V_LINE+LINE_MAX
-        ?Z      MOVE    PC, load_key    ; the line is full
+                SUB[M]  R0, R6, V_LINE+LINE_MAX+1
+        ?Z      MOVE    PC, load_key    ; the line is over full
                 MOVE    @R6++, R1
                 ADD     @--SP, 2, PC
                 MOVE    PC, mon_putc
@@ -441,16 +450,23 @@ load_seq
                 SUB[M]  R0, R1, 0x40
         ?C      MOVE    PC, load_seq    ; a parameter byte
                 MOVE    PC, load_key    ; the final byte
-; The end of a line: an empty one ends the load, and another is parsed, and
-; its word written
+; The end of a line: an empty one ends the load, one of blanks only is
+; passed over, and another is parsed, and its word written
 load_end
                 MOVE    @R6, 0
                 SUB[M]  R0, R6, V_LINE
         ?Z      MOVE    PC, load_done
                 ADD     R11, R11, 1
+                SUB[M]  R0, R6, V_LINE+LINE_MAX+1
+        ?Z      MOVE    PC, load_bad    ; longer than LINE_MAX
                 MOVE    R1, V_LINE
                 ADD     @--SP, 2, PC
                 MOVE    PC, _io_gethex  ; R1 the address, R2 its digits, R3 after it
+                MOVE[M] R0, R2
+        ?!Z     MOVE    PC, load_addr
+                MOVE[M] R0, @R3
+        ?Z      MOVE    PC, load_line   ; blanks only
+load_addr
                 SUB     R4, R2, 1
                 SUB[M]  R0, R4, 8
         ?!C     MOVE    PC, load_bad    ; no digit, or more than 8
@@ -969,7 +985,7 @@ S_LFROM         .ASCII_L ', '
 S_LTO           .ASCII_L ' to '
 S_SKIPPED
                 .ASCII_L 'Lines skipped: '
-S_FIRST         .ASCII_L ', the first line '
+S_FIRST         .ASCII_L ', first line '
 S_LFORM         .ASCII_L '; ADDR WORD in hex, ADDR 00008000 to '
 S_BADIP         .ASCII_L 'Not an IP address: four numbers from 0 to 255, with dots between them'
 

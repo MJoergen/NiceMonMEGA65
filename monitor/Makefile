@@ -75,18 +75,24 @@ RUN  = r\rh\r
 # rows and go round its ring; two Page Ups and a Page Down, which turn the
 # ring and show 24 rows back; and v, which shows the screen again.
 SCROLL = \033[5~\033[6~d 8000 700\r\033[5~\033[5~\033[6~v\rh\r
-# load: l with lines typed and pasted. The first is typed with edits: a
-# DEL that takes back 2, the cursor key ESC [ A, which is dropped, so it
-# writes 134 at 9000. The RAM has 0x20000 words, as on the MEGA65, which
-# build/ram128k.bin writes to 0xFFFFFF9E, so 1EFFF takes a word and 1F000,
-# the alias of the monitor's variables, does not. Five lines are skipped:
-# zz, an address in the ROM, one of the monitor's variables, a third
-# number, and 1F000. Then build/hello.bin,
+# load: l with lines typed and pasted. The l line ends with CR LF, as a
+# terminal may end it, which is no empty line. The first line is typed
+# with edits: a DEL that takes back 2, the cursor key ESC [ A, which is
+# dropped, so it writes 134 at 9000. The RAM has 0x20000 words, as on the
+# MEGA65, which build/ram128k.bin writes to 0xFFFFFF9E, so 1EFFF takes a
+# word and 1F000, the alias of the monitor's variables, does not. A line
+# with TABs for blanks writes 7 at 9002, a line of blanks only is passed
+# over, and a second line for 9002 writes 8 over the 7. Six lines are
+# skipped: zz, an address in the ROM, one of the monitor's variables, a
+# third number, 1F000, and a line of 78 characters, 9003, 66 blanks, and
+# 12345678, which is longer than the 76 of a line, so it writes nothing,
+# not 123456. Then build/hello.bin,
 # its first 3 lines ended by CR LF and the rest by LF, and CR, an empty
 # line, ends the load. A second l is ended by CTRL-C in the middle of a
-# line, which writes nothing. r runs hello, and d shows 9000 and 9001.
-LOAD_HEAD = l\r9000 12\177\033[A34\rzz\r100 5\rFFFFF000 1\r9001 5 6\r1EFFF 9\r1F000 1\r
-LOAD_TAIL = \rl\r9001 7\003r\rd 9000 2\rd 1EFFF 1\rh\r
+# line, which writes nothing. r runs hello, and d shows 9000 to 9003.
+BLANKS66  = $(shell printf '%66s' '')
+LOAD_HEAD = l\r\n9000 12\177\033[A34\rzz\r100 5\rFFFFF000 1\r9001 5 6\r1EFFF 9\r1F000 1\r\t9002\t7 \r   \r9002 8\r9003$(BLANKS66)12345678\r
+LOAD_TAIL = \rl\r9001 7\003r\rd 9000 4\rd 1EFFF 1\rh\r
 # load_emu: l where 0xFFFFFF9E reads 0, as in niceemu, so a program's RAM
 # goes up to the screen: 10000 and FFFEFFFF take words, and FFFF0000 does
 # not.
