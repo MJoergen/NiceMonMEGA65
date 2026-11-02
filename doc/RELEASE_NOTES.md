@@ -120,6 +120,14 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 - `make flash` warns when the bitstream has no ROM, as the board then
   starts from the flash with an empty screen.
 
+**Nexys4DDR**
+
+- Its screen, font, and UART FIFO are in block RAM, where Vivado had
+  put them in LUTs, so its build takes 17878 LUTs, where it took
+  28964, and 123 of the 135 block RAMs
+  ([#70](https://github.com/MJoergen/NiceMonMEGA65/issues/70)). It
+  still meets 90 MHz, by 0.020 ns.
+
 ## V1.2 (2026-10-31)
 
 **Upgrade notes.**

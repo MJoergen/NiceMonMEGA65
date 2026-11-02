@@ -39,9 +39,10 @@ There are three ways to use the system:
 A monitor like QMON, the one in
 [QNICE-FPGA](https://github.com/sy2002/QNICE-FPGA), is in the ROM, and
 the core boots from it (see [monitor/](monitor/README.md)): a hardware
-abstraction layer for programs at `0x8000`, and a few commands. It
-cannot load a program on its own yet, so for the time being the ROM
-also holds the demo, which its command `x` runs.
+abstraction layer for programs at `0x8000`, and a few commands, among
+them `l`, which loads a program that you type or paste. Until a BASIC
+interpreter takes its place, the ROM also holds the demo, which its
+command `x` runs.
 
 ## Quick start
 
@@ -151,9 +152,10 @@ strip: on`, the strip stays on the screen when MEGA+HELP goes back to
 the program, live, while the keys are the program's, and a halt or a
 breakpoint brings the debugger back.
 
-The debugger cannot load a program. That takes a host over
-[Ethernet](#over-ethernet) or the [serial port](#over-the-serial-port),
-which keeps its link while the debugger is up. The program's 25 rows
+The debugger cannot load a program. That takes the monitor's `l`, or a
+host over [Ethernet](#over-ethernet) or the
+[serial port](#over-the-serial-port), which keeps its link while the
+debugger is up. The program's 25 rows
 sit 64 lines higher than they would centered, whether the strip is
 shown or not, so nothing moves when it appears.
 [DEBUGGER.md](doc/DEBUGGER.md) has the design.

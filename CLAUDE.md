@@ -7,7 +7,7 @@ and switches as registers. It has nice_cpu's debug link
 (`nice_cpu/doc/DEBUG.md`, `hdl/src/debug_link.vhd`) on the debug UART, a
 text display on VGA and HDMI, a ROM at address 0 with the monitor, a
 QMON-like hardware abstraction layer for programs at 0x8000 and a few
-commands (`monitor/README.md`; issue #64 has what is left), and host
+commands (`monitor/README.md`; loading from storage is #62), and host
 tools that load and run programs. The goal is that a program runs on the
 board exactly as `niceemu`, the emulator in `nice_cpu/emulator`, runs it.
 `README.md` is for users of the core files: on its own, over Ethernet,

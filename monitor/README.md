@@ -12,8 +12,10 @@ declarations for C. `make -C monitor` builds `build/monitor.bin`, and
 `make -C monitor test` runs it in `niceemu` (Building and testing below).
 It was written for
 [#24](https://github.com/MJoergen/NiceMonMEGA65/issues/24), and what is
-left, a loader when there is storage among it, is
-[#64](https://github.com/MJoergen/NiceMonMEGA65/issues/64). The QNICE
+finished in
+[#64](https://github.com/MJoergen/NiceMonMEGA65/issues/64). Loading
+from storage is the SD card's,
+[#62](https://github.com/MJoergen/NiceMonMEGA65/issues/62). The QNICE
 monitor (QMON) of [QNICE-FPGA](https://github.com/sy2002/QNICE-FPGA) is
 the inspiration, not the model: the decisions below were made for a port
 of it, and #24 revisited them. Debugging is the on-board debugger's
