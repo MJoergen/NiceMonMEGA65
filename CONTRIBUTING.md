@@ -430,8 +430,9 @@ every time, not only the ones a testbench sends.
   reads its register, its input, or 0, and the buttons reach their
   register two cycles after their pins. The Ethernet station's words at
   `0xFFFFFF98`–`9D` are there on every board, and its IP and MAC
-  addresses after reset are as the generics say. Without the other
-  registers, every word but those reads 0.
+  addresses after reset are as the generics say. `0xFFFFFF9E` reads the
+  words of the RAM on every board. Without the other registers, every
+  word but those reads 0.
 - `scr_regs.sby` proves the screen's registers at `0xFFFFFF80`–`8F`,
   `src/scr_regs.vhd`: a write sets the register of its word, nothing else
   changes one but a clear or reset, each word reads its register, or 0,
@@ -693,7 +694,9 @@ bitstream has one. Then it hides the ROM and uses the link:
   address, one disabled, a step that ends at one, the second word of a
   two-word instruction, an interrupt routine, and a `HALT`, each with the
   `x` notice, R15, and the stop register.
-- It clears the memory, reads back what `sim/emu.nasm` leaves after its
+- It clears the memory, checks the size of the RAM at `0xFFFFFF9E`,
+  128K words on the MEGA65 and 64K on the Nexys4DDR, and the top word of
+  the RAM, reads back what `sim/emu.nasm` leaves after its
   halt, and checks that the cycle counter and the timer stop at the halt.
 - It writes and reads the screen's registers, and the board's registers:
   on the Nexys4DDR the LEDs, RGB LEDs, and display, and that the buttons

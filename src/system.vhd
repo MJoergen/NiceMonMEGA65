@@ -64,6 +64,9 @@ entity system is
       G_CLOCK_HZ      : natural;
       -- The ROM that the core boots from, a .bin file, or "" for a build without one
       G_ROM_FILE      : string       := "";
+      -- The RAM has 2^G_RAM_ADDR_BITS words, 128K on the MEGA65 and 64K on
+      -- the Nexys4DDR.
+      G_RAM_ADDR_BITS : natural      := 16;
       -- The screen has 2^G_SCR_ADDR_BITS words, 32K on the MEGA65.
       G_SCR_ADDR_BITS : natural      := 15;
       G_VIDEO         : t_video_mode := C_VIDEO_1280X1024;
@@ -202,7 +205,7 @@ begin
       generic map (
          G_CLOCK_HZ         => G_CLOCK_HZ,
          G_UART_BAUDRATE    => 2_000_000,
-         G_RAM_ADDR_BITS    => 16,
+         G_RAM_ADDR_BITS    => G_RAM_ADDR_BITS,
          G_SCR_ADDR_BITS    => G_SCR_ADDR_BITS,
          G_ROM_FILE         => G_ROM_FILE,
          G_ROM_ADDR_BITS    => 15,

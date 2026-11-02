@@ -196,9 +196,10 @@ counters keep the sieve at `0xA000`–`0xA7FF` and their numbers from
 at the same addresses, as only one demo runs at a time. The comet tells
 what is in a cell from the screen itself. F11 tests the RAM from
 `0xB000` to `0xDFFF`. These are RAM words on every board, below the
-stack and the monitor's variables at `0xFFFFF000`: the 64K words of RAM
-repeat through the address space, so `0xFFFFEFFF` is RAM word `0xEFFF`
-on the board, and the RAM below `0x8000` is the ROM's. The assembler
+stack and the monitor's variables at `0xFFFFF000`: the RAM repeats
+through the address space, so `0xFFFFEFFF` is RAM word `0xEFFF` on the
+Nexys4DDR, with 64K words, and `0x1EFFF` on the MEGA65, with 128K, and
+the RAM below `0x8000` is the ROM's. The assembler
 checks that the image stays below `VARS`, as the variables and the
 tested RAM are `.RES` blocks. The demo writes only these words, the
 screen, the cursor's registers, the math unit, the timer, and its stack.

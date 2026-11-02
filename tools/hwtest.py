@@ -47,6 +47,8 @@ Checks, in this order:
       are compared with niceemu --trace
     - sim/break.nasm stops at breakpoints
     - the memory is cleared
+    - 0xFFFFFF9E reads the RAM's words, and the top word of the RAM holds
+      a word, apart from the word of a RAM half the size
     - what sim/emu.nasm leaves after its halt is read back, and the cycle
       counter and the timer stop there
     - the screen's registers are written and read
@@ -115,7 +117,7 @@ import time
 from typing import Callable, TypeVar
 
 from jtag import check_board
-from load import load_words, read_bin, start
+from load import RAM_SIZE, load_words, read_bin, start
 from nicelink import (BRK_COUNT, BRK_EN, CONTROL, ETH_PORT, FREE, HOLD,
                       PAUSE, RAM, REGS, STEP, STOP, VERSION, Eth, Link,
                       LinkError, Serial, packet)
@@ -427,6 +429,30 @@ def test_clear(link: Link) -> None:
     check("held after the clear", c == "00000009", c)
     got = rd(link, 0x100)
     check("memory cleared", got == 0, f"{got:08X}")
+
+
+def test_ram_size(link: Link, board: str) -> None:
+    """The words of the RAM at FFFFFF9E, 128K on the MEGA65 and 64K on the
+    Nexys4DDR, which takes no write. The top word of the RAM holds what is
+    written to it, and so does the word of a RAM half the size, which is
+    another word: the RAM has all the words it says. The address of the
+    top word plus the RAM's size reads the top word again, as the RAM
+    repeats. The core is held."""
+    want = 0x10000 if board == "nexys4ddr" else 0x20000
+    ram = rd(link, RAM_SIZE)
+    check("FFFFFF9E reads the RAM's words", ram == want,
+          f"got {ram:08X}, want {want:08X}")
+    check("FFFFFF9E takes no write",
+          wr(link, RAM_SIZE, 0) and rd(link, RAM_SIZE) == ram)
+    top, half = want - 1, want // 2 - 1
+    check(f"W {top:08X} and {half:08X}",
+          wr(link, top, 0x7A5A0001) and wr(link, half, 0x7A5A0002))
+    for addr, value in [(top, 0x7A5A0001), (half, 0x7A5A0002),
+                        (top + want, 0x7A5A0001)]:
+        got = rd(link, addr)
+        check(f"readback {addr:08X}", got == value,
+              f"got {got:08X}, want {value:08X}")
+    check("the words cleared again", wr(link, top, 0) and wr(link, half, 0))
 
 
 def steps(path: str) -> int:
@@ -1169,6 +1195,7 @@ def main() -> None:
                 test_step(link, step)
                 test_break(link, brk, brk_at)
                 test_clear(link)
+                test_ram_size(link, board)
                 test_readback(link, emu)
                 test_counters_stop(link)
                 test_screen_registers(link)

@@ -56,9 +56,9 @@ Output:
     After a halt, the lines of niceemu: the reason and the step count, the
     registers, and the --dump and --screen output. -2004 prints the screen
     from 0x400, as niceemu does, which is plain memory on the board, not
-    the screen that the board shows. The memory has 64K words, repeated
-    through the address space, so a dump beyond them reads the same words
-    again.
+    the screen that the board shows. The memory has 128K words on the
+    MEGA65 and 64K on the Nexys4DDR, repeated through the address space,
+    so a dump beyond them reads the same words again.
 
     --symbols FILE reads the labels that niceasm.py --symbols writes. After
     a halt other than HALT it prints where the program was, "At
@@ -109,15 +109,16 @@ import sys
 import time
 from typing import Any, NoReturn, Sequence
 
-from load import (RUN_COMMAND, add_monitor_arguments, load_words,
-                  program_words, read_lines, start)
+from load import (MAX_RAM_WORDS, RAM_SIZE, RUN_COMMAND,
+                  add_monitor_arguments, load_words, program_words,
+                  read_lines, start)
 from nicelink import (DEBUG_FIRST, FULL_WAIT, HALT_REASON, HOLD, RAM, REGS,
                       Link, LinkError, add_arguments, fail, open_link,
                       read_words)
 
 INSTR_LO = 0xFFFFFF42
 INSTR_HI = 0xFFFFFF43
-MAX_DUMP = 0x10000
+MAX_DUMP = MAX_RAM_WORDS
 INPUT_CHUNK = 256   # the most bytes of input sent at once
 SCREEN = 0xFFFF0000
 SCREEN_2004 = 0x400  # where niceemu -2004 has the screen, as the 2004 IDE
@@ -236,16 +237,17 @@ def dump_option(text: str) -> tuple[int, int]:
     return addr, n
 
 
-def dump_address(link: Link, addr: int) -> int:
+def dump_address(link: Link, addr: int, ram: int) -> int:
     """The address to read a dumped word at. The link sees its debug
     registers at 0xFFFFFFE0-FF, where the core and niceemu see memory. On
-    the board that memory is the RAM word at 0x0000FFE0-FF, which the link
-    reads instead. The emulator's memory there is out of the link's reach."""
+    the board that memory is the top of its RAM of ram words, which the
+    link reads instead. The emulator's memory there is out of the link's
+    reach."""
     if addr >= DEBUG_FIRST:
         if not link.board:
             fail(f"the link cannot read {addr:08x} of the emulator's memory, "
                  f"where it has its debug registers")
-        return addr & 0xFFFF
+        return addr & (ram - 1)
     return addr
 
 
@@ -293,8 +295,11 @@ def dump_lines(link: Link, dumps: list[tuple[int, int]], screen: bool,
                screen_base: int) -> list[str]:
     """The --dump and --screen output, with the screen at screen_base."""
     lines = []
+    # The board's RAM, or 64K words in a bitstream older than RAM_SIZE
+    ram = (link.read_word(RAM_SIZE) or 0x10000) if link.board and dumps else 0
     for addr, n in dumps:
-        words = read_words(link, [dump_address(link, (addr + i) & 0xFFFFFFFF)
+        words = read_words(link, [dump_address(link, (addr + i) & 0xFFFFFFFF,
+                                               ram)
                                   for i in range(n)])
         for i in range(0, n, 8):
             lines.append(f"{(addr + i) & 0xFFFFFFFF:08x}:" +
@@ -436,7 +441,7 @@ def main() -> None:
     screen_base = SCREEN_2004 if args.ide2004 else SCREEN
     link = open_link(args)
     try:
-        load_words(link, words, rom=in_rom)
+        load_words(link, words, rom=in_rom, monitor=args.monitor)
         start(link, rom=in_rom)
         try:
             halted = run(link, infd, args.timeout,

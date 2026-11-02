@@ -98,7 +98,9 @@ and a prompt, `> `, and takes a command on each line: `?` lists them.
 `l` loads a program at `0x8000` that you type, or paste into a
 terminal on the serial port, as the lines of its `.bin` file, and `r`
 runs it
-([monitor/README.md](monitor/README.md#loading-without-a-host)).
+([monitor/README.md](monitor/README.md#loading-without-a-host)). A
+program there has 92K words of RAM on the MEGA65, `0x8000` to
+`0x1EFFF`, and 28K on the Nexys4DDR.
 Until the BASIC interpreter takes its place, the ROM also holds a
 [demo](demo/README.md), which `x` and RETURN start. This shows the
 version and how to go further, and below that it is a typewriter: what

@@ -281,7 +281,10 @@ stage 3 has 0.339 ns and 0.031 ns, with stage 5 0.111 ns and
 buttons and display in the debugger, 0.159 ns and 0.034 ns, with
 stage 8 0.187 ns and 0.019 ns, and with stage 9 0.166 ns and 0.025 ns,
 on paths in the core,
-and still 92.5 block RAMs. The R3's pipelined row is from a build at nice_cpu V1.0, with
+and still 92.5 block RAMs. With the RAM of 128K words on the MEGA65
+([#68](https://github.com/MJoergen/NiceMonMEGA65/issues/68)), the R6's
+build has 0.177 ns and 0.031 ns, with 235.5 block RAMs and 18712 LUTs.
+The R3's pipelined row is from a build at nice_cpu V1.0, with
 the debug link of version 4, and the Nexys4DDR's from one at V1.1, with
 stage 1 of the on-board debugger ([DEBUGGER.md](../doc/DEBUGGER.md)).
 All three have the
@@ -309,7 +312,7 @@ The block RAMs, of 36 Kbit, are these:
 
 | Memory | MEGA65 | Nexys4DDR |
 |---|---|---|
-| The RAM (`i_ram`), 64K words | 64 | 64 |
+| The RAM (`i_ram`), 128K words on the MEGA65 and 64K on the Nexys4DDR | 128 | 64 |
 | The ROM (`i_rom`), 32K words, with `ROM=` only | 32 | 32 |
 | The screen (`i_scr` in `mem.vhd`), 32K or 8K words | 32 | 8 |
 | Its copy in `text.vhd` (`scr_ram.vhd`) | 32 | 8 |
@@ -321,8 +324,8 @@ The block RAMs, of 36 Kbit, are these:
 | The FIFO of Ethernet frames to send (`eth/eth_ram.vhd`), 2K bytes, one RAMB18 | 0.5 | 0.5 |
 | The copy of a ping in `eth/eth_icmp.vhd`, 2K bytes, one RAMB18 | 0.5 | 0.5 |
 | The TCP server's buffers of received and sent bytes (`eth/eth_ram.vhd` in `eth/eth_tcp_buf.vhd`), 2K bytes each, one RAMB18 each | 1 | 1 |
-| Total without the ROM, pipelined | 139 of 365 | 92 of 135 |
-| Total with the ROM, pipelined | 171 | 124 |
+| Total without the ROM, pipelined | 203 of 365 | 92 of 135 |
+| Total with the ROM, pipelined | 235 | 124 |
 
 The copy of the screen keeps all 32 bits, as the display reads the
 character and both 12-bit colors, so it takes as many block RAMs as the

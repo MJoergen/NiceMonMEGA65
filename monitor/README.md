@@ -101,10 +101,16 @@ with [#62](https://github.com/MJoergen/NiceMonMEGA65/issues/62).
 - A program may use the RAM from `0x8000` up to, but not including, the
   SP it was called with, and must leave room below that for the stack it
   shares with the monitor. The monitor's variables are at `0xFFFFF000`
-  and up, as the demo's are, and its stack grows down from there, so
-  programs have `0x8000`–`0xEFFF`, 28K words, for their image and their
-  stack. The monitor's routines use at most 32 words of the stack when a
-  program calls them.
+  and up, as the demo's are, and its stack grows down from there. The
+  RAM repeats through the address space, so those words are the top 4K
+  of the RAM, and programs have `0x8000` up to them for their image and
+  their stack: `0x8000`–`0x1EFFF`, 92K words, on the MEGA65, with 128K
+  words of RAM, and `0x8000`–`0xEFFF`, 28K words, on the Nexys4DDR, with
+  64K. A program learns the size of the RAM from `0xFFFFFF9E`
+  ([SYSTEM.md](../doc/SYSTEM.md#address-map)), which reads 0 in
+  `niceemu`, where it is plain memory and the memory has no limit. The
+  monitor's routines use at most 32 words of the stack when a program
+  calls them.
 - A program runs once per load: the load initializes its static data and
   its wasm linear memory. A wasm trap halts the core, as in nice_cpu,
   after the trap report's line on the monitor's output; the on-board
@@ -309,14 +315,17 @@ between them, which is what a `.bin` file has (nice_cpu's ISA.md
 line ends the load, and so does CTRL-C, which drops the line it is in.
 DEL and backspace delete, and the cursor and function keys do nothing.
 A line with anything else, or with an address outside a program's RAM,
-`0x8000` to `0xEFFF` (Programs above), is skipped: the boards' RAM
-repeats every 2^16 words, so a larger address could reach the ROM or the
-monitor's variables and stack. At the end `l` prints the number of words written, with the
-lowest and the highest address, and the number of lines skipped, with
-the first of them:
+`0x8000` to `0x1EFFF` on the MEGA65 and to `0xEFFF` on the Nexys4DDR
+(Programs above), is skipped: the RAM repeats through the address space,
+so a larger address could reach the ROM or the monitor's variables and
+stack. In `niceemu`, where `0xFFFFFF9E` reads 0, the program's RAM goes
+up to the screen, `0xFFFEFFFF`. At the end `l` prints the number of
+words written, with the lowest and the highest address, and the number
+of lines skipped, with the first of them and the last address that a
+line may have:
 
     Words loaded: 601, 00008000 to 00009000
-    Lines skipped: 4, the first line 2; ADDR WORD in hex, ADDR 8000 to EFFF
+    Lines skipped: 4, the first line 2; ADDR WORD in hex, ADDR 00008000 to 0001EFFF
 
 The lines are shown in one row of the screen, which each line clears,
 and not on the line, so the screen does not scroll, and a paste over the

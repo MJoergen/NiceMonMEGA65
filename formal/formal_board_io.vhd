@@ -40,8 +40,9 @@ begin
 
    i_board_io : entity work.board_io
       generic map (
-         G_BOARD_IO => G_BOARD_IO,
-         G_FORMAL   => true
+         G_BOARD_IO  => G_BOARD_IO,
+         G_RAM_WORDS => 16#20000#,
+         G_FORMAL    => true
       )
       port map (
          clk_i        => clk_i,

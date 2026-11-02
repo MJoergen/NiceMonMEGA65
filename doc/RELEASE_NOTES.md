@@ -34,6 +34,19 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   terminal or a script that typed into the demo at power-up types `x`
   and CR first.
 
+**Memory**
+
+- The MEGA65's RAM is 128K words, where it was 64K, so a program under
+  the monitor has `0x8000` to `0x1EFFF`, 92K words, where it had 28K
+  ([#68](https://github.com/MJoergen/NiceMonMEGA65/issues/68)). The
+  Nexys4DDR keeps 64K words, as its block RAM is nearly full.
+- `0xFFFFFF9E` reads the words of the RAM, `0x20000` on the MEGA65 and
+  `0x10000` on the Nexys4DDR. In `niceemu` it is plain memory, which
+  reads 0, meaning no limit, so one program can take what each target
+  has (`doc/PROGRAMMING.md`).
+- A clear of the memory takes 1.3 ms on the MEGA65, where it took
+  0.66 ms.
+
 **Demo**
 
 - The demo is a program at `0x8000` under the monitor, which copies it
@@ -62,10 +75,16 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   UART, up to an empty line, so the board needs neither the host's
   tools nor storage for it, and `r` runs it (`monitor/README.md`,
   "Loading without a host"). A paste over Ethernet loses bytes, so
-  use `load.py --monitor` there.
+  use `load.py --monitor` there. Its lines may have addresses up to the
+  monitor's variables, which `0xFFFFFF9E` gives: `0x1EFFF` on the
+  MEGA65 and `0xEFFF` on the Nexys4DDR.
 
 **Tools**
 
+- `load.py` and `run.py` refuse a word beyond the board's RAM, or under
+  `--monitor` at its variables or above, which would wrap onto another,
+  and take the MEGA65's 128K words; `run.py -d` reads up to 131072
+  words. `make hwtest` checks the size and the top word of the RAM.
 - `run.py` on the UART lost output, and with it the halt notice, when
   the program was still printing at the end of the input: it read
   nothing while it sent the break, and the serial port's buffer

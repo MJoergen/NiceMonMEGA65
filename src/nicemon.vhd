@@ -63,13 +63,13 @@
 --                          scr_*_o, for a display that keeps a copy
 --                          (src/video/text.vhd).
 --   0xFFFF8000-0xFFFFFEFF  RAM, between the screen and the I/O page: with
---                          a screen of 2^15 words and a RAM of 2^16, as on
---                          the MEGA65, the RAM words 0x8000-0xFEFF. A
+--                          a screen of 2^15 words and a RAM of 2^17, as on
+--                          the MEGA65, the RAM words 0x18000-0x1FEFF. A
 --                          smaller screen leaves more of them: with 2^13
---                          words, as on the Nexys4DDR, they start at
---                          0xFFFF2000. The runtime's stack starts at
---                          0xFFFFFF00 and grows down into them, and so does
---                          the stack of a program in the ROM.
+--                          words and a RAM of 2^16, as on the Nexys4DDR,
+--                          they start at 0xFFFF2000. The runtime's stack
+--                          starts at 0xFFFFFF00 and grows down into them,
+--                          and so does the stack of a program in the ROM.
 --   0xFFFFFF00             The console of SYSTEM.md §1. A write sends bits
 --                          7..0 to the UART. It waits while the previous
 --                          byte is still waiting to be sent. A read by the
@@ -126,7 +126,7 @@
 --                          for a cycle when one is written, and when they
 --                          are cleared by reset or by the clear of the memory.
 --   0xFFFFFF90-0xFFFFFF9F  The board's devices (src/board_io.vhd): 90-96
---                          with G_BOARD_IO (the Nexys4DDR), and 98-9D on every
+--                          with G_BOARD_IO (the Nexys4DDR), and 98-9E on every
 --                          board. Without G_BOARD_IO, and in the words that
 --                          are not registers, a read returns 0 and a write
 --                          is dropped. Reset clears the writable ones, or
@@ -155,6 +155,9 @@
 --         G_ETH_MAC after reset, 02:4E:49:43:45:00 by default. Read and
 --         write.
 --     9D  The Ethernet frames sent, eth_tx_i, as 98.
+--     9E  The words of the RAM, 2^G_RAM_ADDR_BITS: 0x20000 on the MEGA65
+--         and 0x10000 on the Nexys4DDR. Read only. In niceemu it is plain
+--         memory, which reads 0 after the clear, and 0 means no limit.
 --   0xFFFFFFE0-0xFFFFFFFF  The debug registers of DEBUG.md §6, for the link
 --                          only, which debug_link holds: R0-R15 of the core,
 --                          live while it runs and those of the stop after
@@ -230,8 +233,8 @@
 --
 -- A clear of the memory, which the link asks for with clear_o, writes 0 to
 -- one word of the RAM and one of the screen in each cycle, in src/mem.vhd,
--- 2^16 cycles in all on the boards, 0.66 ms at 100 MHz, and clears the
--- screen's registers.
+-- 2^17 cycles in all on the MEGA65, 1.3 ms at 100 MHz, and 2^16 on the
+-- Nexys4DDR, and clears the screen's registers.
 -- The link holds the core meanwhile, and makes no access.
 --
 -- RESET
@@ -257,6 +260,7 @@ entity nicemon is
    generic (
       G_CLOCK_HZ         : natural;
       G_UART_BAUDRATE    : natural := 115_200;
+      -- The RAM has 2^G_RAM_ADDR_BITS words, which 0xFFFFFF9E reads.
       G_RAM_ADDR_BITS    : natural := 16;
       -- The screen has 2^G_SCR_ADDR_BITS words.
       G_SCR_ADDR_BITS    : natural := 15;
@@ -926,9 +930,10 @@ begin
 
    i_board_io : entity work.board_io
       generic map (
-         G_BOARD_IO => G_BOARD_IO,
-         G_ETH_MAC  => G_ETH_MAC,
-         G_ETH_IP   => G_ETH_IP
+         G_BOARD_IO  => G_BOARD_IO,
+         G_ETH_MAC   => G_ETH_MAC,
+         G_ETH_IP    => G_ETH_IP,
+         G_RAM_WORDS => 2 ** G_RAM_ADDR_BITS
       )
       port map (
          clk_i        => clk_i,

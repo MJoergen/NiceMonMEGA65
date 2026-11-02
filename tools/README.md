@@ -129,8 +129,12 @@ board.
 - As in `niceemu`, only LF ends a line, only blanks and tabs part the
   fields, and a CR at the end of a line is ignored.
 - A word where the board has no memory of its own is rejected. The RAM is
-  the words `0` to `0xFFFF`, and the screen is the words `0xFFFF0000` to
-  `0xFFFF1FFF`, the 8192 that both boards have.
+  the words `0` to `0x1FFFF` on the MEGA65 and `0` to `0xFFFF` on the
+  Nexys4DDR, and the screen is the words `0xFFFF0000` to `0xFFFF1FFF`,
+  the 8192 that both boards have. The file is checked against the
+  MEGA65's RAM before the link opens, and against the board's, which
+  `0xFFFFFF9E` reads, after the core is held; `niceemu` reads 0 there,
+  and takes any address of the MEGA65's.
 
 Any other address would land on a RAM word, or on a register of the I/O
 page, where the emulator has a word of its own, so the program would run
@@ -153,7 +157,9 @@ leaves the RAM from `0x8000` alone, and `load.py` types `r` and CR, its
 command that runs the program. The program then prints through the
 monitor's `mon_putc`, on the screen and the line, and returns to the
 monitor, which prints its status. A program with a word below `0x8000`
-is refused, and so is a bitstream without a ROM. `--rom FILE` loads
+is refused, and so is one with a word at the monitor's variables or
+above, `0x1F000` on the MEGA65 and `0xF000` on the Nexys4DDR, and a
+bitstream without a ROM. `--rom FILE` loads
 FILE at 0 in place of the ROM, with the ROM hidden, such as
 `monitor/build/monitor.bin`: for `niceemu --link`, `make cosim`, a
 bitstream without a ROM, or another build of the monitor.
@@ -228,13 +234,15 @@ byte, so the output ends there.
 ### Dumps and symbols
 
 - `-d ADDR:N` takes numbers as `niceemu` does, up to 32 bits, with no sign
-  or underscore, but N is at most 65536 words.
+  or underscore, but N is at most 131072 words.
 - The words at `0xFFFFFFE0` to `0xFFFFFFFF` are read through their RAM
-  alias `0x0000FFE0` to `0x0000FFFF`, for the link has its debug
-  registers there. The link reads the console and the read counter,
+  alias, `0x0001FFE0` to `0x0001FFFF` on the MEGA65 and `0x0000FFE0` to
+  `0x0000FFFF` on the Nexys4DDR, for the link has its debug registers
+  there. The link reads the console and the read counter,
   `0xFFFFFF00` and `01`, as 0.
-- The memory is 64K words, repeated through the address space, so `-d`
-  beyond them shows the same words again.
+- The memory is 128K words on the MEGA65 and 64K on the Nexys4DDR,
+  repeated through the address space, so `-d` beyond them shows the same
+  words again.
 - `--symbols FILE` reads the labels that `niceasm.py --symbols` writes.
   After a halt other than `HALT`, it prints where the program was, `At
   label+0x1f`, if the file has any labels. After a halt at

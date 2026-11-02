@@ -6,8 +6,8 @@ the word in hex. nice_cpu's [doc/ISA.md](https://github.com/MJoergen/nice_cpu/bl
 instruction set, and its [doc/SYSTEM.md](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md) the
 devices: the console, the math unit, the performance counters, and the
 timer. [SYSTEM.md](SYSTEM.md) here has the address map of the board,
-with its screen and its ROM. The memory is 64K words, not 2³² as in the
-emulator.
+with its screen and its ROM. The memory is 128K words on the MEGA65 and
+64K on the Nexys4DDR, not 2³² as in the emulator.
 
 C goes through WebAssembly, with the tools of the nice_cpu submodule: clang
 compiles the program to a wasm module and links it with nice_cpu's C
@@ -52,8 +52,20 @@ without the math unit would translate with `nicewasm --no-mpu` and use
 `muldiv_soft.nasm` instead.
 
 The linear memory is one page, 16384 words, and the program and its memory
-must fit below the stack in the 64K words of memory. With `printf` and
-`scanf`, the prime example ends at word `0x631F`.
+must fit below the stack in the RAM. With `printf` and `scanf`, the prime
+example ends at word `0x631F`.
+
+A program learns the size of the RAM from `0xFFFFFF9E`, which reads its
+words, `0x20000` on the MEGA65 and `0x10000` on the Nexys4DDR. In the
+emulator that word is plain memory, which reads 0, and 0 means no limit.
+So one binary can take what each target has: build it with a cap of
+several pages, `nicebuild.py --memory-pages 4`, and at the start read
+the word with `nice_peek`, work out what fits below the stack, and grow
+the linear memory with `__builtin_wasm_memory_grow` to that, or to the
+cap when the word is 0. Under the monitor, the monitor's variables at
+`0xFFFFF000` are the top 4K words of the RAM, and the stack grows down
+from them, so a program at `0x8000` has 92K words on the MEGA65 and 28K
+on the Nexys4DDR ([monitor/README.md](../monitor/README.md)).
 
 ## The keyboard
 

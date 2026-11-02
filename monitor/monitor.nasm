@@ -70,6 +70,7 @@ SCR_Y           .EQU    0xFFFFFF82      ; the cursor's row
 SCR_OFFS        .EQU    0xFFFFFF85      ; the display offset, in words
 TIMER           .EQU    0xFFFFFF10      ; the timer's period, 0 to stop it
 E_IP            .EQU    0xFFFFFF9A      ; the Ethernet station's IP address, the first byte in bits 31..24
+RAM_WORDS       .EQU    0xFFFFFF9E      ; the words of the RAM, 0 in niceemu, where there is no limit
 
 STACK           .EQU    0xFFFFF000      ; SP at the cold start, above the program's RAM
 V_COL           .EQU    0xFFFFF000      ; the cursor's column, 0 to 79
@@ -86,11 +87,12 @@ V_CTL           .EQU    0xFFFFF00A      ; SCR_CTL while the history is shown
 V_LOUT          .EQU    0xFFFFF00B      ; V_OUT while l reads its lines
 V_LEND          .EQU    0xFFFFF00C      ; the last byte that l read, for the LF of a CR LF
 V_LBAD          .EQU    0xFFFFF00D      ; the number of the first line that l skipped
+V_PEND          .EQU    0xFFFFF00E      ; for l: after a program's RAM, at the variables
 V_LINE          .EQU    0xFFFFF010      ; the command line, LINE_MAX words and a 0
 LINE_MAX        .EQU    76              ; so that the prompt and the line fit a row
 
 PROGRAM         .EQU    0x8000          ; where a program is, above the ROM
-PROGRAM_END     .EQU    0xF000          ; after a program's RAM: the variables, at 0xFFFFF000 in a RAM of 2^16 words
+VARS_WORDS      .EQU    0x1000          ; the words from 0xFFFFF000, the variables, which end a program's RAM
 DEMO            .EQU    0x1000          ; the demo's words in the ROM, after their number
 DEMO_MAX        .EQU    0x7000          ; more words than fit from DEMO + 1 below the RAM
 COLOR           .EQU    0x000FFF00      ; white on black, the color at the cold start
@@ -345,12 +347,15 @@ ip_bad          MOVE    R1, S_BADIP
 ; them (nice_cpu's ISA.md §10.4), up to an empty line or CTRL-C, which
 ; also drops the line it is in. CR, LF, and CR LF end a line, so a
 ; terminal's lines and a file's both serve. A line with anything else, or
-; with ADDR outside a program's RAM, PROGRAM up to PROGRAM_END, is
-; skipped: the boards' RAM repeats every 2^16 words, so an address past it
+; with ADDR outside a program's RAM, PROGRAM up to V_PEND, is skipped:
+; the RAM of a board repeats every RAM_WORDS words, so an address past it
 ; could reach the ROM or the monitor's variables and stack, which are at
-; 0xF000 and up of the RAM. The count of the skipped lines and the number
-; of the first are shown at the end, with the count of the words written
-; and the lowest and highest address. DEL
+; RAM_WORDS - VARS_WORDS and up of the RAM, 0x1F000 on the MEGA65 and
+; 0xF000 on the Nexys4DDR. V_PEND is that address, or the screen where
+; RAM_WORDS reads 0, as in niceemu. The count of the words written and
+; the lowest and highest address are shown at the end, and the count of
+; the skipped lines, the number of the first, and the last address that a
+; line may have. DEL
 ; and BS delete the character before the cursor; the other control codes,
 ; the bytes from 0x80, and the escape sequences of the cursor and function
 ; keys are dropped. The lines are shown in row R7, which the hint leaves
@@ -372,6 +377,9 @@ cmd_load
                 MOVE    R10, 0
                 MOVE    R11, 0
                 MOVE    R12, 0
+                MOVE[M] R1, @RAM_WORDS
+        ?Z      MOVE    R1, SCREEN+VARS_WORDS  ; no limit
+                SUB     @V_PEND, R1, VARS_WORDS
 load_line
                 ADD     @--SP, 2, PC
                 MOVE    PC, load_row
@@ -448,7 +456,7 @@ load_end
         ?!C     MOVE    PC, load_bad    ; no digit, or more than 8
                 SUB[M]  R0, R1, PROGRAM
         ?C      MOVE    PC, load_bad    ; in the ROM
-                SUB[M]  R0, R1, PROGRAM_END
+                SUB[M]  R0, R1, @V_PEND
         ?!C     MOVE    PC, load_bad    ; the variables, or past the RAM
                 MOVE    R6, R1
                 MOVE    R1, R3
@@ -520,7 +528,12 @@ load_skipped
                 MOVE    PC, _io_putdec
                 MOVE    R1, S_LFORM
                 ADD     @--SP, 2, PC
-                MOVE    PC, puts_crlf
+                MOVE    PC, _io_puts
+                SUB     R1, @V_PEND, 1
+                ADD     @--SP, 2, PC
+                MOVE    PC, _io_puthex
+                ADD     @--SP, 2, PC
+                MOVE    PC, _io_crlf
                 MOVE    PC, main
 
 ; load_row: row R7 blank in the current color, and the cursor at its column
@@ -957,7 +970,7 @@ S_LTO           .ASCII_L ' to '
 S_SKIPPED
                 .ASCII_L 'Lines skipped: '
 S_FIRST         .ASCII_L ', the first line '
-S_LFORM         .ASCII_L '; ADDR WORD in hex, ADDR 8000 to EFFF'
+S_LFORM         .ASCII_L '; ADDR WORD in hex, ADDR 00008000 to '
 S_BADIP         .ASCII_L 'Not an IP address: four numbers from 0 to 255, with dots between them'
 
 HELP            .DAT    H_R, H_L, H_X, H_D, H_I, H_C, H_V, H_H, H_Q, H_P, 0

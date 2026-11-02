@@ -97,8 +97,9 @@ P_USH   .EQU    0xFFFFFF45
 
 ; The variables, from VARS, after the image (see the entry), and the RAM
 ; that F11 tests, from RAM_LO up to the stack. The stack starts below
-; the monitor's variables at 0xFFFFF000, which on the board are RAM word
-; 0xF000, as the 64K words repeat, so RAM_LO + RAM_N stays below 0xE000.
+; the monitor's variables at 0xFFFFF000, which on the Nexys4DDR are RAM
+; word 0xF000, as its 64K words repeat, and 0x1F000 on the MEGA65, so
+; RAM_LO + RAM_N stays below 0xE000.
 VARS    .EQU    0xA000
 SIEVE   .EQU    VARS            ; the sieve of F7, a word for each number
 SIEVE_N .EQU    2048            ; its numbers, 0 to SIEVE_N - 1

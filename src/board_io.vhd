@@ -1,8 +1,8 @@
 -- The board's devices at 0xFFFFFF90-9F (src/nicemon.vhd), with G_BOARD_IO
 -- (the Nexys4DDR): the 16 LEDs, the levels of the two RGB LEDs, the
 -- segments of the seven-segment display, the five buttons, and the 16
--- switches. On every board, also the counts of Ethernet frames, and the
--- Ethernet station's MAC and IP addresses.
+-- switches. On every board, also the counts of Ethernet frames, the
+-- Ethernet station's MAC and IP addresses, and the size of the RAM.
 --
 -- THEORY OF OPERATION
 -- nicemon serves one request in a cycle, the link's or the core's, and
@@ -29,13 +29,14 @@
 --   C  The last four bytes of its MAC address, eth_mac_o(31 downto 0), on
 --      every board. Read and write.
 --   D  The Ethernet frames sent, eth_tx_i, as 8.
+--   E  The words of the RAM, G_RAM_WORDS, on every board. Read only.
 -- The other words, and words 0 to 6 without G_BOARD_IO, read 0 and take
 -- no write, so then the outputs stay 0. The buttons and the switches pass
 -- through two registers, which synchronize them to the clock.
 --
 -- With G_FORMAL, it states the properties that formal/board_io.sby proves:
 -- a write to a register's word sets it, the registers change only so, and
--- each word reads its register, its input, or 0.
+-- each word reads its register, its input, its constant, or 0.
 --
 -- RESET
 -- Synchronous. Reset clears the writable registers, but for the IP and MAC
@@ -43,16 +44,19 @@
 
 library ieee;
    use ieee.std_logic_1164.all;
+   use ieee.numeric_std.all;
    use ieee.numeric_std_unsigned.all;
 
 entity board_io is
    generic (
-      G_BOARD_IO : boolean;
+      G_BOARD_IO  : boolean;
       -- The Ethernet station's MAC and IP addresses after reset
-      G_ETH_MAC  : std_logic_vector(47 downto 0) := X"024E49434500";
-      G_ETH_IP   : std_logic_vector(31 downto 0) := X"00000000";
+      G_ETH_MAC   : std_logic_vector(47 downto 0) := X"024E49434500";
+      G_ETH_IP    : std_logic_vector(31 downto 0) := X"00000000";
+      -- The words of the RAM, which word E reads
+      G_RAM_WORDS : natural := 0;
       -- The properties for formal/board_io.sby
-      G_FORMAL   : boolean := false
+      G_FORMAL    : boolean := false
    );
    port (
       clk_i        : in  std_logic;
@@ -154,6 +158,8 @@ begin
          rdata_o <= eth_mac(31 downto 0);
       elsif addr_i = X"D" then
          rdata_o <= eth_tx_i;
+      elsif addr_i = X"E" then
+         rdata_o <= std_logic_vector(to_unsigned(G_RAM_WORDS, 32));
       elsif G_BOARD_IO then
 
          case addr_i is
@@ -230,6 +236,10 @@ begin
       -- psl f_rd_eth_bad : assert always addr_i = X"9" -> rdata_o = eth_rx_bad_i;
       -- psl f_rd_eth_tx : assert always addr_i = X"D" -> rdata_o = eth_tx_i;
 
+      -- Word E reads the words of the RAM, on every board, and a write to
+      -- it changes nothing, as no register is written but by its word.
+      -- psl f_rd_ram : assert always addr_i = X"E" -> rdata_o = G_RAM_WORDS;
+
       -- Words A to C hold the Ethernet addresses, on every board, as the
       -- other registers hold theirs, but for their values after reset.
       -- psl f_ip_wr : assert always {f_wr_ip and not rst_i} |=> {eth_ip = prev(wdata_i)};
@@ -263,7 +273,7 @@ begin
          --    addr_i = X"5" -> rdata_o(31 downto 5) = 0 and rdata_o(4 downto 0) = btn;
          -- psl f_rd_sw : assert always
          --    addr_i = X"6" -> rdata_o(31 downto 16) = 0 and rdata_o(15 downto 0) = sw;
-         -- psl f_rd_none : assert always addr_i = X"7" or addr_i > X"D" -> rdata_o = 0;
+         -- psl f_rd_none : assert always addr_i = X"7" or addr_i = X"F" -> rdata_o = 0;
 
          -- The buttons reach their register two cycles after their pins.
          -- psl f_btn_sync : assert always {not rst_i; not rst_i} |=> {btn = prev(btn_i, 2)};
@@ -273,9 +283,9 @@ begin
 
       gen_formal_none : if not G_BOARD_IO generate
       begin
-         -- Without G_BOARD_IO, every word but 8 to D reads 0, and the
+         -- Without G_BOARD_IO, every word but 8 to E reads 0, and the
          -- outputs stay 0.
-         -- psl f_none_rd : assert always (addr_i < X"8" or addr_i > X"D") -> rdata_o = 0;
+         -- psl f_none_rd : assert always (addr_i < X"8" or addr_i = X"F") -> rdata_o = 0;
          -- psl f_none_out : assert always led = 0 and rgb0 = 0 and rgb1 = 0 and seg = 0;
       end generate gen_formal_none;
 

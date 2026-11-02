@@ -10,9 +10,13 @@ Then the words of the file are written with W packets of the debug link
 given. The ROM stays hidden until the reset button is pressed, which
 boots the ROM's program again.
 
+A word beyond the board's RAM, which 0xFFFFFF9E reads after the hold,
+is refused, as it would overwrite another.
+
 With --monitor, the program runs under the monitor in the ROM
 (monitor/README.md, "Programs"): it must be at 0x8000 or above, as a
-program for the monitor is assembled, and the ROM stays visible. The
+program for the monitor is assembled, and below the monitor's variables
+at the top of the RAM, and the ROM stays visible. The
 memory is cleared and the program written with the core held, and the
 core is started, so the monitor boots cold, which leaves the RAM from
 0x8000 alone. Then r and CR are typed on the console, the monitor's
@@ -39,17 +43,24 @@ import argparse
 from nicelink import (BRK_EN, CLEAR, CONTROL, HOLD, RAM, Link, LinkError,
                       add_arguments, fail, open_link)
 
-# The words that the board has: the RAM, which is 64K words from 0, and the
-# screen, of which both boards have the first 8K (the MEGA65 has 32K). Any
-# other address would alias a word of the RAM, mod 64K, or reach a register
-# of the I/O page, where the emulator has memory of its own.
-RAM_WORDS = 0x10000
+# The words that a board has: the RAM from 0, 128K words on the MEGA65 and
+# 64K on the Nexys4DDR, and the screen, of which both boards have the
+# first 8K (the MEGA65 has 32K). Any other address would alias a word of
+# the RAM, or reach a register of the I/O page, where the emulator has
+# memory of its own. A .bin file must fit the largest RAM, MAX_RAM_WORDS,
+# and load_words() checks it against the board's, which RAM_SIZE reads,
+# 0 in niceemu, where there is no limit.
+MAX_RAM_WORDS = 0x20000
+RAM_SIZE = 0xFFFFFF9E
 SCREEN_BASE = 0xFFFF0000
 SCREEN_WORDS = 0x2000
 
-# A program under the monitor: where it starts, above the ROM, and the
-# monitor's command that runs it (monitor/README.md)
+# A program under the monitor: where it starts, above the ROM, the words
+# of the monitor's variables at the top of the RAM, at 0xFFFFF000, where
+# the program's RAM ends, and the monitor's command that runs it
+# (monitor/README.md)
 PROGRAM = 0x8000
+MONITOR_WORDS = 0x1000
 RUN_COMMAND = b"r\r"
 
 
@@ -81,6 +92,32 @@ def read_lines(path: str) -> list[tuple[int, list[str]]]:
     return lines
 
 
+def in_screen(addr: int) -> bool:
+    """Whether addr is in the screen that both boards have."""
+    return SCREEN_BASE <= addr < SCREEN_BASE + SCREEN_WORDS
+
+
+def check_fit(link: Link, words: list[tuple[int, int]],
+              monitor: bool) -> None:
+    """Refuses words beyond the board's RAM, which would wrap onto the ROM,
+    the monitor's variables, or the program's own words. Under the
+    monitor, the program's RAM ends at the monitor's variables. The link
+    must reach RAM_SIZE: the core is held. It reads 0 in niceemu, which
+    has no limit, and in a bitstream older than the register."""
+    ram = link.read_word(RAM_SIZE)
+    if not ram:
+        return
+    end = ram - MONITOR_WORDS if monitor else ram
+    high = [a for a, _ in words if a >= end and not in_screen(a)]
+    if high:
+        what = (f"the program's RAM under the monitor, {PROGRAM:x} to "
+                f"{end - 1:x}, below the monitor's variables" if monitor
+                else f"the RAM, 0 to {end - 1:x}")
+        fail(f"address {high[0]:08x} is beyond {what}: the board has "
+             f"{ram // 1024}K words of RAM, which repeat through the "
+             f"address space, so the word would overwrite another")
+
+
 def read_bin(path: str) -> list[tuple[int, int]]:
     """The words of a .bin file, as (address, word). It takes the lines that
     niceemu takes, and rejects an address that the board has no memory at."""
@@ -97,11 +134,11 @@ def read_bin(path: str) -> list[tuple[int, int]]:
         if addr in seen:
             fail(f"{path}:{line_no}: address {addr:08x} is already "
                  f"loaded by line {seen[addr]}")
-        if not (addr < RAM_WORDS
-                or SCREEN_BASE <= addr < SCREEN_BASE + SCREEN_WORDS):
+        if not (addr < MAX_RAM_WORDS or in_screen(addr)):
             fail(f"{path}:{line_no}: address {addr:08x} is not in the RAM "
-                 f"(0 to {RAM_WORDS - 1:x}) or the screen ({SCREEN_BASE:x} "
-                 f"to {SCREEN_BASE + SCREEN_WORDS - 1:x}), so the board "
+                 f"(0 to {MAX_RAM_WORDS - 1:x} on the MEGA65) or the "
+                 f"screen ({SCREEN_BASE:x} to "
+                 f"{SCREEN_BASE + SCREEN_WORDS - 1:x}), so the board "
                  f"cannot load it as the emulator does; move the "
                  f"program into those ranges")
         seen[addr] = line_no
@@ -134,9 +171,10 @@ def monitor_words(path: str, rom: str | None) -> list[tuple[int, int]]:
 
 
 def load_words(link: Link, words: list[tuple[int, int]],
-               rom: bool = False) -> None:
+               rom: bool = False, monitor: bool = False) -> None:
     """Holds the core, hides the ROM, clears the memory, disables the
-    breakpoints, and writes the words, with one W for each run of
+    breakpoints, checks that the words fit the board's RAM, under the
+    monitor with monitor, and writes the words, with one W for each run of
     consecutive addresses. A link of version 3 or older takes the write of
     the enable bits too, as a reserved word. With rom, the ROM stays
     visible, and a bitstream without one, which reads bit 3 as 1, is
@@ -150,6 +188,7 @@ def load_words(link: Link, words: list[tuple[int, int]],
                  "monitor/build/monitor.bin, in its place")
     else:
         link.control(HOLD | CLEAR | RAM)
+    check_fit(link, words, monitor)
     link.write(BRK_EN, [0])
     words = sorted(words)
     i = 0
@@ -201,7 +240,7 @@ def main() -> None:
     in_rom = args.monitor and not args.rom
     link = open_link(args)
     try:
-        load_words(link, words, rom=in_rom)
+        load_words(link, words, rom=in_rom, monitor=args.monitor)
         print(f"load.py: loaded {len(words)} words from {args.file}"
               + (f" and {args.rom}" if args.rom else ""))
         if not args.no_run:
