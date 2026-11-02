@@ -70,10 +70,23 @@ $(BUILD)/hello_c.bin: test/hello.c mon.h mon.nasm $(TOOLS) | $(BUILD)
 # shell of make on Ubuntu, has no \x.
 CMDS = ?\rv\rd 0 6\rd\rD 10 1\rq\r\r  c\rabc\177\177\177v\rjunk\003v\r\033[A\033OPv\rx\rr\rd 8000 0\rd 8000\rd 0 100\ri\ri 192.168.1.65\ri 1.2.3\ri 256.0.0.1\ri 1..2.3\ri 1.2.3.4x\ri  010.0.0.1 \rh\r
 RUN  = r\rh\r
+# scroll: Page Up and Page Down with no history, which do nothing; d 8000
+# 700, the zeros of the empty RAM, 448 rows, which fill the history of 384
+# rows and go round its ring; two Page Ups and a Page Down, which turn the
+# ring and show 24 rows back; and v, which shows the screen again.
+SCROLL = \033[5~\033[6~d 8000 700\r\033[5~\033[5~\033[6~v\rh\r
 # The words of each test that are dumped with the screen: for cmds the
 # variables, the cursor's registers, and the IP address, and for the programs the text at
 # column 40 of row 4, 80 * 4 + 40 = 360 = 0x168, with its color.
 DUMP_cmds    = -d 0xFFFFF000:5 -d 0xFFFFFF80:6 -d 0xFFFFFF9A:1
+# For scroll the variables and the screen's registers, and the last four
+# digits of the address that starts a row of the history (the words 4 to
+# 7 of the row): the rows of 869C and 8698 that Page Up turned to slots 0
+# and 1, the row of 86A0 in slot 383, the first of the four rows that v
+# and h added at the bottom of the ring, and the oldest, of 80B0, in slot
+# 379.
+DUMP_scroll  = -d 0xFFFFF000:11 -d 0xFFFFFF80:6 -d 0xFFFF7FB4:4 -d 0xFFFF7F64:4 \
+               -d 0xFFFF0804:4 -d 0xFFFF0944:4
 DUMP_hello   = -d 0xFFFF0168:12
 DUMP_hello_c = -d 0xFFFF0168:12
 MAX_STEPS = 10000000
@@ -86,9 +99,11 @@ MAX_STEPS = 10000000
 test: fmt $(BUILD)/monitor_test.bin $(BUILD)/hello.bin
 	@printf '$(CMDS)' > $(BUILD)/cmds.txt
 	@printf '$(RUN)' > $(BUILD)/run.txt
-	@fail=0; for t in cmds hello hello_c; do \
+	@printf '$(SCROLL)' > $(BUILD)/scroll.txt
+	@fail=0; for t in cmds scroll hello hello_c; do \
 	  case $$t in \
 	    cmds) prog=; input=cmds; dump='$(DUMP_cmds)';; \
+	    scroll) prog=; input=scroll; dump='$(DUMP_scroll)';; \
 	    hello) prog=$(BUILD)/hello.bin; input=run; dump='$(DUMP_hello)';; \
 	    hello_c) prog=$(BUILD)/hello_c.bin; input=run; dump='$(DUMP_hello_c)'; \
 	      if ! command -v $(CLANG) > /dev/null; then echo "SKIP monitor $$t: no $(CLANG)"; continue; fi; \

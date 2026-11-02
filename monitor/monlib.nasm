@@ -142,14 +142,20 @@ _io_getc.poll
 ; bytes 0x80 to 0x9F, and the escape sequences of the cursor and function
 ; keys are dropped, and so is an ESC alone. Each character is echoed
 ; through mon_putc, and CR as CR LF. Uses R1-R4, and R7-R9 across the
-; calls, saved.
+; calls, saved. _io_gets.first is the same, with R3 a first byte that the
+; caller has read already, which the monitor's line uses.
 _io_gets
+                MOVE    R3, 0x100       ; no byte read
+_io_gets.first
                 MOVE    @--R13, R7
                 MOVE    @--R13, R8
                 MOVE    @--R13, R9
                 MOVE    R7, R1          ; the first word
                 ADD     R8, R1, R2      ; the word after the last
                 MOVE    R9, R1          ; the next free word
+                MOVE    R1, R3
+                AND[M]  R0, R3, 0x100
+        ?Z      MOVE    R15, _io_gets.have
 _io_gets.next
                 ADD     @--R13, 2, R15
                 MOVE    R15, _io_getc

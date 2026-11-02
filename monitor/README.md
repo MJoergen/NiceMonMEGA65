@@ -55,6 +55,12 @@ backspace delete the character before the cursor, CTRL-C empties the
 line, and the cursor and function keys, the other control codes, and the
 bytes `0x80` to `0x9F` do nothing. RETURN runs the line.
 
+Before the first key of a line, Page Up and Page Down scroll back
+through the rows that left the top of the screen, 24 rows at a time.
+On the MEGA65 they are MEGA with CRSR↑ and CRSR↓. Any other key shows
+the screen again, and goes on to the line. The history has 384 rows on
+the MEGA65 and 77 on the Nexys4DDR (Input and output below).
+
 | Command | What it does |
 |---|---|
 | `r` | Runs the program at `0x8000` (Programs below), and prints its status when it returns: `Returned 0000002A`. A word of 0 at `0x8000` is no program, and `r` says so. |
@@ -64,7 +70,7 @@ bytes `0x80` to `0x9F` do nothing. RETURN runs the line.
 | `i [A.B.C.D]` | Shows the Ethernet station's IP address, `IP address 192.168.1.65`, or writes it first: four decimal numbers of 0 to 255 with dots between them, such as `i 192.168.1.65`. Anything else is no address, and `i` says so and writes nothing. It writes `0xFFFFFF9A` ([SYSTEM.md](../doc/SYSTEM.md#the-ethernet-station)), so a host connected over TCP loses its connection. In `niceemu` the register is plain memory. |
 | `x` | Runs the demo of the ROM, for the time being (The demo below). Without a demo in the ROM, `x` says so. |
 | `h` | Halts the core, which the reset button, or a host over the link, starts again. The tests end with it. |
-| `?` | Lists the commands. |
+| `?` | Lists the commands, and the keys of the history. |
 
 Anything else prints `Unknown command; ? lists them`. These are a first
 set (Not decided yet below).
@@ -212,7 +218,7 @@ in nice_cpu's runtime or C library:
 | `_io_puthex` | R1 in hex, 8 digits. |
 | `_io_putdec` | R1 in decimal, unsigned, with the math unit. |
 | `_io_gethex` | A hex number in the string at R1, after any blanks. → R1 the value, R2 the number of digits, 0 for none, R3 the address after them. |
-| `_io_gets` | A line into the buffer at R1, up to R2 characters and a 0 word, edited as The commands says and echoed through `mon_putc`. → R1 the number of characters. |
+| `_io_gets` | A line into the buffer at R1, up to R2 characters and a 0 word, edited as The commands says and echoed through `mon_putc`. → R1 the number of characters. `_io_gets.first` is the same, with R3 a first byte already read, for the monitor's own line. |
 | `_io_getc` | → R1 the next byte of the console, which it waits for. The end of the line's input, `0x200`, is no byte, as the keyboard's bytes still come. |
 
 ## Input and output
@@ -236,11 +242,24 @@ in nice_cpu's runtime or C library:
   register. The hardware has a cursor, in registers numbered as
   QNICE-FPGA's VGA registers (`0xFFFFFF80` for `0xFF30`, and so on; see
   [SYSTEM.md](../doc/SYSTEM.md#the-screen)), which `mon_putc` keeps at
-  the next character, and a display offset over 32768 words for scrolling
-  back, which it does not use yet: past the last row it moves the rows up
-  by one, by copying, which scrolls in `niceemu` too, where the offset is
-  plain memory, and the same on a board whose screen is smaller (Not
-  decided yet below). The screen is cleared by a loop over its words.
+  the next character, and a display offset. Past the last row
+  `mon_putc` moves the rows up by one, by copying, so the rows shown are
+  always the 2000 words at `0xFFFF0000`, as in `niceemu`, and a program
+  can write them directly. The screen is cleared by a loop over its
+  words.
+- The scrollback uses the rest of the screen's memory, past the 2000
+  words: before the rows move up, row 0 is copied into a ring of rows,
+  the history, which runs down from the top of the memory. The cold
+  start finds the size of the memory from the display offset, which a
+  board keeps only in the bits that address the memory: 32768 words on
+  the MEGA65 and 8192 on the Nexys4DDR, so one `monitor.bin` serves
+  every board. Page Up shows `k` rows back with the offset `size - 80k`,
+  which wraps to row 0 of the screen, and the cursor off; the first
+  Page Up turns the ring so that its newest row is the last of the
+  memory. `niceemu` has no display offset, and keeps it as memory, so
+  there the history is kept, 384 rows, and can be read with `d` or
+  `--dump`, but is not shown. `c` and `scr_cls` leave it, as `clear`
+  in a terminal does, and the cold start empties it.
 
 ## Loading from a host
 
@@ -287,9 +306,10 @@ unless `VERSION=` is given, and is written only when it changes.
 
 `make -C monitor test` checks the layout of the sources with nice_cpu's
 `nicefmt`, assembles the monitor with the version `V9.9`, and runs it in
-`niceemu` three times, with its keystrokes in an input file and `h` as
+`niceemu` four times, with its keystrokes in an input file and `h` as
 the last command, so that the run ends: alone, with every command and
-the edits of a line; with `test/hello.nasm` at `0x8000`, an assembly
+the edits of a line; alone, with 448 rows of `d`, which go round the
+ring of the history, and Page Up and Page Down; with `test/hello.nasm` at `0x8000`, an assembly
 program under nice_cpu's `start_mon.nasm`; and with `test/hello.c`,
 built with `nicebuild.py --monitor --asm mon.nasm`, which is skipped
 without clang. The console output, which is the copy on the line, a few
@@ -306,11 +326,6 @@ versions of the tests, into the RAM, and types `x` for the demo
 
 - The main loop's other commands, which a monitor without a debugger
   needs, as the on-board debugger has pause, step, and inspect.
-- The scrollback: `mon_putc` scrolls by copying the rows, and the display
-  offset stays 0. Scrolling by the offset, as QMON does, would keep the
-  rows that left the screen, but the Nexys4DDR's screen is 8192 words
-  where the MEGA65's is 32768, with one `monitor.bin` for every board and
-  no register that tells the size, and `niceemu` has no offset.
 
 ## The demo
 

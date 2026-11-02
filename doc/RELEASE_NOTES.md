@@ -52,6 +52,11 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 - `i 192.168.1.65` gives the Ethernet station its IP address, and `i`
   alone shows it, so the board needs neither the demo nor the link for
   it. `make hwtest ETH=IP` types it in place of the demo's F11.
+- Page Up and Page Down at the prompt scroll back through the rows that
+  left the screen, 384 on the MEGA65 and 77 on the Nexys4DDR, and any
+  other key shows the screen again. On the MEGA65 they are MEGA with
+  CRSR↑ and CRSR↓. The rows shown stay at `0xFFFF0000`, as in
+  `niceemu`, which keeps the history but cannot show it.
 
 **Tools**
 

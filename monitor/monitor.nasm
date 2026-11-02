@@ -27,7 +27,21 @@
 ; nothing. Past the last column the cursor goes to the next row, and past
 ; the last row the screen's rows move up by one, by copying, which scrolls
 ; in niceemu too, where the display offset is plain memory, and the same
-; on a board whose screen is smaller. The display offset stays 0.
+; on a board whose screen is smaller. So the rows shown are always the 2000
+; words at SCREEN, as in niceemu.
+;
+; The scrollback: the row that leaves the top of the screen is copied into
+; the history, a ring of rows in the rest of the screen's memory, from its
+; top down. The cold start finds the size of the memory from the display
+; offset, which keeps only the bits that address it on a board, and all of
+; them in niceemu, where it is plain memory: 32768 words at most, 384 rows
+; of history, 77 on the Nexys4DDR. At the prompt, before a line is typed,
+; Page Up and Page Down show the history through the display offset: k
+; rows back is the offset 32768 - 80 k, which wraps to row 0 of the
+; screen, so the first Page Up turns the ring so that its newest row is
+; at the top of the memory. Any other key shows the screen again, and goes
+; on to the line. niceemu has no display offset, so there the history is
+; kept but not shown.
 ;
 ; The variables are in the RAM at 0xFFFFF000 and up, and the stack grows
 ; down from STACK, as the demo's do: a write to the ROM is dropped, so
@@ -58,6 +72,12 @@ V_ROW           .EQU    0xFFFFF001      ; and its row, 0 to 24
 V_COLOR         .EQU    0xFFFFF002      ; the color of the characters put, bits 31..8
 V_OUT           .EQU    0xFFFFF003      ; the outputs: bit 0 the line, bit 1 the screen
 V_NEXT          .EQU    0xFFFFF004      ; the address that the next d goes on at
+V_HSIZE         .EQU    0xFFFFF005      ; the words of the screen's memory
+V_HCAP          .EQU    0xFFFFF006      ; the rows of the history, after the 25 of the screen
+V_HHEAD         .EQU    0xFFFFF007      ; the slot of the next row, slot i at SCREEN + V_HSIZE - 80 (i + 1)
+V_HCOUNT        .EQU    0xFFFFF008      ; the rows kept, up to V_HCAP
+V_BACK          .EQU    0xFFFFF009      ; the rows shown back, 0 for the screen
+V_CTL           .EQU    0xFFFFF00A      ; SCR_CTL while the history is shown
 V_LINE          .EQU    0xFFFFF010      ; the command line, LINE_MAX words and a 0
 LINE_MAX        .EQU    76              ; so that the prompt and the line fit a row
 
@@ -70,6 +90,8 @@ OUT_SCREEN      .EQU    2
 TABLE_VERSION   .EQU    0x00010000      ; what mon_version returns: 1.0
 DUMP_WORDS      .EQU    32              ; the words that d shows without a count
 ROW_WORDS       .EQU    4               ; the words of a row of d
+PAGE            .EQU    24              ; the rows of a Page Up or Page Down
+SCR_MAX         .EQU    0x7FFF          ; the largest display offset
 
 ; The dispatch table (README.md, "The dispatch table"). Entries are only
 ; ever added at the end.
@@ -94,6 +116,23 @@ mon_reset
                 MOVE    @V_COLOR, COLOR
                 MOVE    @V_OUT, OUT_LINE+OUT_SCREEN
                 MOVE    @V_NEXT, PROGRAM
+; The size of the screen's memory, from the bits of the display offset
+; that it keeps, with the offset off, and the rows of history that fit
+; after the 25 of the screen. The math unit divides (nice_cpu's SYSTEM.md
+; §2).
+                MOVE    @SCR_CTL, 0
+                MOVE    @SCR_OFFS, 0xFFFFFFFF
+                AND     R1, @SCR_OFFS, SCR_MAX
+                ADD     R1, R1, 1
+                MOVE    @V_HSIZE, R1
+                SUB[M]  R1, R1, 2000
+        ?C      MOVE    R1, 0
+                MOVE    @io.mpu_a, R1
+                MOVE    @io.mpu_b, 80
+                MOVE    @V_HCAP, @io.mpu_udivq
+                MOVE    @V_HHEAD, 0
+                MOVE    @V_HCOUNT, 0
+                MOVE    @V_BACK, 0
                 ADD     @--SP, 2, PC
                 MOVE    PC, scr_cls
                 MOVE    R1, S_NAME
@@ -117,7 +156,7 @@ main            MOVE    SP, STACK
                 MOVE    R1, V_LINE
                 MOVE    R2, LINE_MAX
                 ADD     @--SP, 2, PC
-                MOVE    PC, _io_gets
+                MOVE    PC, getline
                 MOVE    R2, V_LINE
 word            MOVE[M] R1, @R2++
         ?Z      MOVE    PC, main        ; an empty line
@@ -390,6 +429,29 @@ putc_lf         MOVE    @V_COL, 0
                 SUB[M]  R0, R1, 25
         ?!Z     MOVE    @V_ROW, R1
         ?!Z     MOVE    PC, putc_cur
+; Row 0 into the history, at slot V_HHEAD, which moves down the ring, when
+; the memory has room for one
+                MOVE[M] R0, @V_HCAP
+        ?Z      MOVE    PC, putc_scroll
+                ADD     R2, @V_HHEAD, 1
+                SHL     R3, R2, 6
+                SHL     R2, R2, 4
+                ADD     R2, R2, R3      ; 80 * (V_HHEAD + 1)
+                SUB     R2, @V_HSIZE, R2
+                ADD     R2, R2, SCREEN
+                MOVE    R3, SCREEN
+                MOVE    R4, 80
+putc_hist
+                MOVE    @R2++, @R3++
+                SUB[M]  R4, R4, 1
+        ?!Z     MOVE    PC, putc_hist
+                SUB[M]  R1, @V_HHEAD, 1
+        ?C      SUB     R1, @V_HCAP, 1  ; from slot 0 to the last
+                MOVE    @V_HHEAD, R1
+                ADD     R1, @V_HCOUNT, 1
+                SUB[M]  R0, @V_HCAP, R1
+        ?!C     MOVE    @V_HCOUNT, R1
+putc_scroll
                 MOVE    R2, SCREEN
                 MOVE    R3, SCREEN+80
                 MOVE    R4, 1920        ; rows 1 to 24 to rows 0 to 23
@@ -474,6 +536,162 @@ scr_color
                 MOVE    R1, R2
                 MOVE    PC, @SP++
 
+; getline: a line into the buffer at R1, of up to R2 characters, as
+; _io_gets reads it, with the keys of the history before it: Page Up, ESC
+; [ 5 ~, and Page Down, ESC [ 6 ~. The other escape sequences are dropped,
+; as _io_gets drops them, and any key but those two shows the screen again.
+; The first key of the line goes on to _io_gets.first. _io_getc.soon uses
+; only R1 and R2, so R3 keeps the first byte of a sequence's parameter.
+getline
+                MOVE    @--SP, R1
+                MOVE    @--SP, R2
+getline_key
+                ADD     @--SP, 2, PC
+                MOVE    PC, _io_getc
+                SUB[M]  R0, R1, 0x1B
+        ?!Z     MOVE    PC, getline_line
+                ADD     @--SP, 2, PC
+                MOVE    PC, _io_getc.soon
+        ?Z      MOVE    PC, getline_drop  ; an ESC alone
+                SUB[M]  R0, R1, 0x4F    ; O: one more byte
+        ?Z      MOVE    PC, getline_ss3
+                SUB[M]  R0, R1, 0x5B    ; [
+        ?!Z     MOVE    PC, getline_line  ; another byte, on its own
+                ADD     @--SP, 2, PC
+                MOVE    PC, _io_getc.soon
+        ?Z      MOVE    PC, getline_drop
+                MOVE    R3, R1
+                SUB[M]  R0, R1, 0x40
+        ?!C     MOVE    PC, getline_drop  ; the final byte, such as A
+                ADD     @--SP, 2, PC
+                MOVE    PC, _io_getc.soon
+        ?Z      MOVE    PC, getline_drop
+                SUB[M]  R0, R1, 0x7E    ; ~
+        ?!Z     MOVE    PC, getline_csi
+                SUB[M]  R0, R3, 0x35    ; 5
+        ?Z      MOVE    PC, getline_up
+                SUB[M]  R0, R3, 0x36    ; 6
+        ?Z      MOVE    PC, getline_down
+                MOVE    PC, getline_drop
+getline_csi
+                SUB[M]  R0, R1, 0x40
+        ?!C     MOVE    PC, getline_drop  ; the final byte
+                ADD     @--SP, 2, PC
+                MOVE    PC, _io_getc.soon
+        ?Z      MOVE    PC, getline_drop
+                MOVE    PC, getline_csi
+getline_ss3
+                ADD     @--SP, 2, PC
+                MOVE    PC, _io_getc.soon
+getline_drop
+                ADD     @--SP, 2, PC
+                MOVE    PC, hist_leave
+                MOVE    PC, getline_key
+getline_up
+                ADD     @--SP, 2, PC
+                MOVE    PC, hist_up
+                MOVE    PC, getline_key
+getline_down
+                ADD     @--SP, 2, PC
+                MOVE    PC, hist_down
+                MOVE    PC, getline_key
+getline_line
+                MOVE    R3, R1
+                ADD     @--SP, 2, PC
+                MOVE    PC, hist_leave
+                MOVE    R2, @SP++
+                MOVE    R1, @SP++
+                MOVE    PC, _io_gets.first  ; which returns to the caller
+
+; hist_up: PAGE rows further back, up to the rows kept. The first turns
+; the ring and keeps SCR_CTL. Uses R1-R6.
+hist_up
+                MOVE[M] R0, @V_HCOUNT
+        ?Z      MOVE    PC, @SP++       ; no history
+                MOVE[M] R1, @V_BACK
+        ?!Z     MOVE    PC, hist_more
+                MOVE    @V_CTL, @SCR_CTL
+                ADD     @--SP, 2, PC
+                MOVE    PC, hist_turn
+                MOVE    R1, 0
+hist_more
+                ADD     R1, R1, PAGE
+                SUB[M]  R0, @V_HCOUNT, R1
+        ?C      MOVE    R1, @V_HCOUNT
+; R1 rows back: the offset V_HSIZE - 80 R1 on, and the cursor off
+hist_show
+                MOVE    @V_BACK, R1
+                SHL     R2, R1, 6
+                SHL     R1, R1, 4
+                ADD     R1, R1, R2
+                SUB     @SCR_OFFS, @V_HSIZE, R1
+                MOVE    @SCR_CTL, 0x400
+                MOVE    PC, @SP++
+
+; hist_down: PAGE rows forward, and the screen again at the end. Uses R1
+; and R2.
+hist_down
+                MOVE[M] R1, @V_BACK
+        ?Z      MOVE    PC, @SP++
+                SUB[M]  R1, R1, PAGE
+        ?C      MOVE    PC, hist_leave
+        ?Z      MOVE    PC, hist_leave
+                MOVE    PC, hist_show
+
+; hist_leave: the screen again, if the history is shown, with its SCR_CTL.
+; Uses no register.
+hist_leave
+                MOVE[M] R0, @V_BACK
+        ?Z      MOVE    PC, @SP++
+                MOVE    @V_BACK, 0
+                MOVE    @SCR_CTL, @V_CTL
+                MOVE    @SCR_OFFS, 0
+                MOVE    PC, @SP++
+
+; hist_turn: the ring turned so that its newest row, at slot V_HHEAD + 1,
+; is at slot 0, at the top of the memory, and the next goes to the last
+; slot. The slots are V_HCAP rows of words from B, slot i at a lower
+; address than slot i - 1, so this turns the words from B up by D = 80
+; (V_HHEAD + 1), with three reversals: all of them, the first D, and the
+; rest. R4 is B, R5 is D, and R6 the words of the ring. Uses R1-R6.
+hist_turn
+                ADD     R1, @V_HHEAD, 1
+                SUB[M]  R0, R1, @V_HCAP
+        ?Z      MOVE    R1, 0
+                SUB     @V_HHEAD, @V_HCAP, 1
+                SHL     R2, R1, 6
+                SHL     R5, R1, 4
+                ADD[M]  R5, R5, R2
+        ?Z      MOVE    PC, @SP++       ; turned already
+                MOVE    R6, @V_HCAP
+                SHL     R2, R6, 6
+                SHL     R6, R6, 4
+                ADD     R6, R6, R2
+                ADD     R4, @V_HSIZE, SCREEN
+                SUB     R4, R4, R6
+                MOVE    R1, R4
+                ADD     R2, R4, R6
+                ADD     @--SP, 2, PC
+                MOVE    PC, hist_rev
+                MOVE    R1, R4
+                ADD     R2, R4, R5
+                ADD     @--SP, 2, PC
+                MOVE    PC, hist_rev
+                ADD     R1, R4, R5
+                ADD     R2, R4, R6
+; hist_rev: the words from R1 up to R2, which is after the last, in the
+; reverse order. Uses R1-R3.
+hist_rev
+                SUB     R2, R2, 1       ; the last word
+hist_rev_loop
+                SUB[M]  R0, R1, R2
+        ?!C     MOVE    PC, @SP++       ; the two have met
+                MOVE    R3, @R1
+                MOVE    @R1++, @R2
+                MOVE    @R2, R3
+                SUB     R2, R2, 1
+                MOVE    PC, hist_rev_loop
+
 ; puts_crlf: the string at R1, and CR LF
 puts_crlf
                 ADD     @--SP, 2, PC
@@ -523,7 +741,7 @@ S_NODEMO
 S_IP            .ASCII_L 'IP address '
 S_BADIP         .ASCII_L 'Not an IP address: four numbers from 0 to 255, with dots between them'
 
-HELP            .DAT    H_R, H_X, H_D, H_I, H_C, H_V, H_H, H_Q, 0
+HELP            .DAT    H_R, H_X, H_D, H_I, H_C, H_V, H_H, H_Q, H_P, 0
 H_R             .ASCII_L 'r             run the program at 00008000'
 H_X             .ASCII_L 'x             run the demo of the ROM, which F12 leaves'
 H_D             .ASCII_L 'd [ADDR] [N]  show N words from ADDR, in hex, or the next ones'
@@ -532,3 +750,4 @@ H_C             .ASCII_L 'c             clear the screen'
 H_V             .ASCII_L 'v             the version'
 H_H             .ASCII_L 'h             halt the core'
 H_Q             .ASCII_L '?             the commands'
+H_P             .ASCII_L 'PgUp PgDn     scroll back, before a command; MEGA with CRSR up or down'
