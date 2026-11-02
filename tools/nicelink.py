@@ -79,8 +79,9 @@ STEP = 32
 # adapter and of the operating system
 ANSWER_WAIT = 0.3
 # The simulation takes about 4 ms of real time for each byte on its UART,
-# and clears the memory, 98K words at a word a cycle, in about 4 s. These
-# leave room for a slower computer.
+# and clears the memory, its 64K words of RAM and the screen's 32K side by
+# side, a word of each a cycle, in a few seconds. These leave room for a
+# slower computer.
 COSIM_WAIT = 20.0
 COSIM_BYTE = 0.02
 # How long a sender waits while the program's input buffer is full, before
@@ -90,11 +91,12 @@ COSIM_BYTE = 0.02
 FULL_WAIT = 0.001
 # How long a break holds the UART's line low. The board takes a frame of
 # zeros for one, 5 us at 2 Mbaud; this leaves room for the USB serial
-# chip. TIOCSBRK and TIOCCBRK set and clear it (Linux's asm-generic/ioctls.h);
-# Python's termios does not have them.
+# chip. TIOCSBRK and TIOCCBRK set and clear it: Linux's asm-generic/ioctls.h
+# has 0x5427 and 0x5428, and macOS's sys/ttycom.h, as the BSDs, 0x2000747B
+# and 0x2000747A; Python's termios does not have them.
 BREAK_TIME = 0.02
-TIOCSBRK = 0x5427
-TIOCCBRK = 0x5428
+TIOCSBRK = 0x5427 if sys.platform.startswith("linux") else 0x2000747B
+TIOCCBRK = 0x5428 if sys.platform.startswith("linux") else 0x2000747A
 # The TCP port of the board's debug link on Ethernet (src/eth/eth_tcp.vhd)
 ETH_PORT = 4510
 # How many times a request without an answer is sent, the first time
@@ -221,7 +223,13 @@ class Serial(Transport):
         # after the bytes before it, with 20 ms more for the latency of USB
         termios.tcdrain(self.fd)
         wait(max(self.sent_by - time.monotonic(), 0) + 0.02)
-        fcntl.ioctl(self.fd, TIOCSBRK)
+        try:
+            fcntl.ioctl(self.fd, TIOCSBRK)
+        except OSError:
+            # A system without the ioctl: tcsendbreak(), which blocks for
+            # 0.25 s or more, so the output of that time is lost
+            termios.tcsendbreak(self.fd, 0)
+            return
         try:
             wait(BREAK_TIME)
         finally:
@@ -265,7 +273,7 @@ class Tcp(Transport):
     def hint(self, e: OSError) -> str:
         """What to check when the connection fails with e."""
         return (f"is niceemu --link {self.port} or make cosim running?"
-                if self.host == "127.0.0.1" else
+                if self.host in ("127.0.0.1", "localhost", "::1") else
                 f"is niceemu --link ADDR:{self.port} running on "
                 f"{self.host}, with an ADDR that it can reach?")
 
@@ -673,12 +681,15 @@ def read_words(link: Link, addrs: list[int]) -> list[int]:
 
 def parse_tcp(text: str | int) -> tuple[str, int]:
     """The host and the port of --tcp [HOST:]PORT, with 127.0.0.1 if no
-    HOST is given. An IPv6 HOST is in brackets, as for niceemu --link."""
+    HOST is given. An IPv6 HOST is in brackets, as for niceemu --link, so
+    that its colons are not the one before PORT."""
     host, sep, port = str(text).rpartition(":")
     if not sep:
         host = "127.0.0.1"
     elif host.startswith("[") and host.endswith("]"):
         host = host[1:-1]
+    elif ":" in host:
+        fail(f"--tcp {text}: an IPv6 HOST goes in brackets, [HOST]:PORT")
     if not port.isdigit() or not host or int(port) > 65535:
         fail(f"--tcp {text}: not PORT or HOST:PORT")
     return host, int(port)

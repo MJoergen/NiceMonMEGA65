@@ -51,12 +51,13 @@ def main() -> None:
     base = demo_address()
     monitor = load(args.monitor)
     demo = load(args.demo)
-    if monitor and monitor[-1][0] >= base:
-        sys.exit(f"join.py: the monitor reaches {monitor[-1][0]:08X}, "
-                 f"past DEMO, {base:08X}")
-    if not demo or demo[0][0] < PROGRAM:
+    top = max((a for a, _ in monitor), default=-1)
+    if top >= base:
+        sys.exit(f"join.py: the monitor reaches {top:08X}, past DEMO, "
+                 f"{base:08X}")
+    if not demo or min(a for a, _ in demo) < PROGRAM:
         sys.exit(f"join.py: {args.demo} is not assembled from {PROGRAM:08X}")
-    n = demo[-1][0] + 1 - PROGRAM
+    n = max(a for a, _ in demo) + 1 - PROGRAM
     if base + 1 + n > ROM_WORDS:
         sys.exit(f"join.py: the demo's {n} words do not fit the ROM "
                  f"from {base + 1:08X}")

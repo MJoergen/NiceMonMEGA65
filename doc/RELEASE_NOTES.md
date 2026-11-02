@@ -92,7 +92,12 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   the program was still printing at the end of the input: it read
   nothing while it sent the break, and the serial port's buffer
   overflowed, so a long run ended at the time limit. It now reads on
-  meanwhile ([#67](https://github.com/MJoergen/NiceMonMEGA65/issues/67)).
+  meanwhile, with the break's ioctls of Linux or of macOS
+  ([#67](https://github.com/MJoergen/NiceMonMEGA65/issues/67)).
+- `load.py --monitor` and `run.py --monitor` refuse a word in the
+  screen, which the monitor clears when it boots.
+- `--tcp HOST:PORT` refuses an IPv6 HOST without brackets, whose
+  colons it cannot tell from the one before PORT.
 - `--tcp HOST:PORT` reaches `niceemu --link ADDR:PORT` on another
   computer, with the transport of `--tcp PORT`, which stays 127.0.0.1
   (`tools/README.md`, "Without a board"). The link has no

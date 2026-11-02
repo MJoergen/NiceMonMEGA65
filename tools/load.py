@@ -16,7 +16,11 @@ is refused, as it would overwrite another.
 With --monitor, the program runs under the monitor in the ROM
 (monitor/README.md, "Programs"): it must be at 0x8000 or above, as a
 program for the monitor is assembled, and below the monitor's variables
-at the top of the RAM, and the ROM stays visible. The
+at the top of the RAM, and the ROM stays visible. The top words below
+the variables are the stack that the monitor and the program share,
+which the monitor uses before the program runs, so a word there is
+overwritten; a program leaves room for the stack anyway. A word in the
+screen is refused, as the monitor clears the screen when it boots. The
 memory is cleared and the program written with the core held, and the
 core is started, so the monitor boots cold, which leaves the RAM from
 0x8000 alone. Then r and CR are typed on the console, the monitor's
@@ -101,9 +105,10 @@ def check_fit(link: Link, words: list[tuple[int, int]],
               monitor: bool) -> None:
     """Refuses words beyond the board's RAM, which would wrap onto the ROM,
     the monitor's variables, or the program's own words. Under the
-    monitor, the program's RAM ends at the monitor's variables. The link
-    must reach RAM_SIZE: the core is held. It reads 0 in niceemu, which
-    has no limit, and in a bitstream older than the register."""
+    monitor, the program's RAM ends at the monitor's variables, and
+    monitor_words() has refused the screen. The link must reach RAM_SIZE:
+    the core is held. It reads 0 in niceemu, which has no limit, and in
+    a bitstream older than the register."""
     ram = link.read_word(RAM_SIZE)
     if not ram:
         return
@@ -151,8 +156,9 @@ def read_bin(path: str) -> list[tuple[int, int]]:
 
 def monitor_words(path: str, rom: str | None) -> list[tuple[int, int]]:
     """The words of a program under the monitor, which must be at PROGRAM
-    or above, and with rom, the words of that monitor, which must be
-    below, as a ROM's are."""
+    or above and not in the screen, which the monitor clears when it
+    boots, and with rom, the words of that monitor, which must be below
+    PROGRAM, as a ROM's are."""
     words = read_bin(path)
     low = [a for a, _ in words if a < PROGRAM]
     if low:
@@ -160,6 +166,11 @@ def monitor_words(path: str, rom: str | None) -> list[tuple[int, int]]:
              f"the ROM is; a program under the monitor is assembled at "
              f"{PROGRAM:08x}, with nice_cpu's start_mon.nasm or "
              f"nicebuild.py --monitor")
+    screen = [a for a, _ in words if in_screen(a)]
+    if screen:
+        fail(f"{path}: address {screen[0]:08x} is in the screen, which the "
+             f"monitor clears when it boots, so the word would be lost; a "
+             f"program under the monitor writes the screen itself")
     if rom is None:
         return words
     rom_words = read_bin(rom)
