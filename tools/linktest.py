@@ -7,7 +7,9 @@ breakpoints on it, and mon.py's commands, as they are typed at its
 prompt. Then it runs the programs of hwtest.py's comparison, and
 nice_cpu's benchmark when examples/build/bench.bin is built, with run.py
 --tcp on that port and with niceemu alone. Each must print the same and
-exit with the same status. The demo's self-test, F11, must pass. So it
+exit with the same status. The demo's self-test, F11, must pass. Last,
+run.py --tcp HOST:PORT runs hello on "niceemu --link 127.0.0.2:0", an
+address other than 127.0.0.1, as for a niceemu on another computer. So it
 checks run.py, mon.py, nicelink.py, and the link of the emulator, as CI
 does. It prints one line for each check, and last how many passed, and
 exits with status 1 when one fails. niceemu must be built first, with
@@ -139,6 +141,44 @@ def test_mon(port: int, prog: str, at: dict[str, int]) -> None:
         link.close()
 
 
+def start_emu(addr: str) -> tuple[subprocess.Popen[bytes], str]:
+    """niceemu --link on a free port of addr, and that port."""
+    emu = subprocess.Popen([NICEEMU, "--link", f"{addr}:0"],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    assert emu.stderr is not None
+    first = emu.stderr.readline().decode(errors="replace")
+    m = re.search(r"link: port (\d+)", first)
+    if not m:
+        emu.terminate()
+        emu.wait()
+        sys.exit(f"linktest.py: niceemu --link printed {first!r}, not "
+                 "its port")
+    return emu, m.group(1)
+
+
+def test_host(tmp: str) -> None:
+    """run.py --tcp HOST:PORT on niceemu --link 127.0.0.2:0, which serves
+    the link on an address other than 127.0.0.1, as a niceemu on another
+    computer does. All of 127.0.0.0/8 is loopback on Linux; elsewhere the
+    check is skipped."""
+    if not sys.platform.startswith("linux"):
+        print("  127.0.0.2 is not loopback here; --tcp HOST:PORT is skipped")
+        hwtest.skipped.append("--tcp HOST:PORT")
+        return
+    emu, port = start_emu("127.0.0.2")
+    try:
+        drain = subprocess.Popen(["cat"], stdin=emu.stderr,
+                                 stdout=subprocess.DEVNULL)
+        hello = assemble(f"{REPO}/nice_cpu/doc/intro/examples/hello.nasm",
+                         tmp)
+        test_run(["--tcp", f"127.0.0.2:{port}"], [(hello, [], False)],
+                 " on 127.0.0.2")
+    finally:
+        emu.terminate()
+        emu.wait()
+    drain.wait()
+
+
 def main() -> None:
     argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -146,23 +186,16 @@ def main() -> None:
     if not os.path.exists(NICEEMU):
         sys.exit(f"linktest.py: {NICEEMU} is missing; run "
                  "'make -C nice_cpu/emulator build'")
-    emu = subprocess.Popen([NICEEMU, "--link", "0"], stdout=subprocess.DEVNULL,
-                           stderr=subprocess.PIPE)
+    emu, port = start_emu("127.0.0.1")
     try:
-        assert emu.stderr is not None
-        first = emu.stderr.readline().decode(errors="replace")
-        m = re.search(r"link: port (\d+)", first)
-        if not m:
-            sys.exit(f"linktest.py: niceemu --link printed {first!r}, not "
-                     "its port")
-        tcp = ["--tcp", m.group(1)]
+        tcp = ["--tcp", port]
         # niceemu prints its report of each run on stderr: read it away, so
         # that the pipe never fills.
         drain = subprocess.Popen(["cat"], stdin=emu.stderr,
                                  stdout=subprocess.DEVNULL)
         # niceemu takes one host at a time, so the link is closed before
         # run.py connects.
-        link = open_link(argparse.Namespace(tcp=int(m.group(1))))
+        link = open_link(argparse.Namespace(tcp=port))
         with tempfile.TemporaryDirectory() as tmp:
             try:
                 link.control(HOLD | RAM)
@@ -173,7 +206,7 @@ def main() -> None:
                 test_break(link, *brk)
             finally:
                 link.close()
-            test_mon(int(m.group(1)), *brk)
+            test_mon(int(port), *brk)
             test_run(tcp, comparisons(tmp))
             test_monitor(tcp, tmp)
             test_selftest(tcp, tmp)
@@ -187,6 +220,8 @@ def main() -> None:
         emu.terminate()
         emu.wait()
     drain.wait()
+    with tempfile.TemporaryDirectory() as tmp:
+        test_host(tmp)
     passed = sum(results)
     print(f"\n{passed}/{len(results)} passed")
     if hwtest.skipped:

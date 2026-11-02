@@ -21,13 +21,14 @@ have no monitor: --rom FILE loads FILE at 0 in its place, such as
 monitor/build/monitor.bin, with the ROM hidden.
 
 Usage: tools/load.py (--eth HOST[:PORT] | --port DEVICE [--baud 2000000]
-                     | --tcp PORT | --cosim PORT) [--no-run]
+                     | --tcp [HOST:]PORT | --cosim PORT) [--no-run]
                      [--monitor [--rom FILE]] FILE.bin
 
 One of --eth, --port, --tcp, and --cosim must be given. --port names the
 serial device of the board's debug UART, such as /dev/ttyUSB1. --eth HOST talks to the board over TCP on its Ethernet port, at
 its IP address HOST, on port 4510 unless HOST:PORT names another. --tcp
-PORT talks to "niceemu --link PORT" instead, and --cosim PORT to the
+PORT talks to "niceemu --link PORT" instead, --tcp HOST:PORT to one on
+another computer, and --cosim PORT to the
 simulated system of "make -C sim cosim". Only the Python
 standard library is used, so this runs on Linux and macOS. tools/run.py and
 tools/hwtest.py use the functions here, and tools/nicelink.py has the link.

@@ -259,6 +259,20 @@ board, which checks `run.py` and the link against the plain emulator:
     nice_cpu/emulator/zig-out/bin/niceemu --link 4000 &
     tools/run.py --tcp 4000 prog.bin
 
+`--tcp HOST:PORT` reaches a `niceemu` on another computer, which serves
+the link on an address other than 127.0.0.1. An IPv6 HOST goes in
+brackets, as for `niceemu --link`:
+
+    niceemu --link 0.0.0.0:4510 prog.bin       # on emuhost
+    tools/mon.py --tcp emuhost:4510            # on your own computer
+
+The link has no authentication: anyone who reaches the port can read
+and write the emulator's memory. Serve it beyond 127.0.0.1 only on a
+trusted network. Elsewhere, forward the port over SSH instead:
+
+    ssh -L 4510:127.0.0.1:4510 emuhost 'niceemu --link 4510 prog.bin'
+    tools/mon.py --tcp 4510
+
 With `--tcp`, the end of the input half-closes the connection, and `-d`
 cannot reach `0xFFFFFFE0`–`FF`, which are the emulator's memory.
 
@@ -284,13 +298,15 @@ example](../README.md#using-the-interactive-shell).
 ### Starting it
 
     tools/mon.py (--eth HOST[:PORT] | --port DEVICE [--baud 2000000]
-                 | --tcp PORT | --cosim PORT) [--symbols FILE] [FILE.bin]
+                 | --tcp [HOST:]PORT | --cosim PORT) [--symbols FILE] [FILE.bin]
 
 - `--eth HOST` talks to the board over its Ethernet port, at its IP
   address HOST (see [Over Ethernet](#over-ethernet)).
 - `--port DEVICE` names the serial device of the board's debug UART,
   such as `/dev/ttyUSB1`, and `--baud` its rate, 2000000 by default.
-- `--tcp PORT` talks to `niceemu --link PORT` instead of the board.
+- `--tcp PORT` talks to `niceemu --link PORT` instead of the board, and
+  `--tcp HOST:PORT` to one on another computer (see [Without a
+  board](#without-a-board)).
 - `--cosim PORT` talks to the simulated system of `make cosim`, at
   about 250 UART bytes a second.
 - `--symbols FILE` reads the labels of a `.sym` file, which

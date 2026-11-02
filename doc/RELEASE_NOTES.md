@@ -55,6 +55,11 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 
 **Tools**
 
+- `--tcp HOST:PORT` reaches `niceemu --link ADDR:PORT` on another
+  computer, with the transport of `--tcp PORT`, which stays 127.0.0.1
+  (`tools/README.md`, "Without a board"). The link has no
+  authentication, so serve it beyond 127.0.0.1 only on a trusted
+  network ([#51](https://github.com/MJoergen/NiceMonMEGA65/issues/51)).
 - `load.py --monitor` and `run.py --monitor` run a program at `0x8000`
   under the monitor in the ROM: they keep the ROM, load the program,
   start the core, which boots the monitor, and type `r`. `--rom FILE`

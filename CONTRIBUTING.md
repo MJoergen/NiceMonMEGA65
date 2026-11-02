@@ -742,7 +742,10 @@ built `examples/build/bench.bin`, with `tools/linktest.py`. It runs hwtest's
 checks of bad packets, of the pause, of the step, and of the breakpoints
 on `niceemu --link` first, and then `mon.py`'s commands, its disassembly
 among them, as typed at its prompt, with the labels of `sim/break.nasm`.
-CI runs it.
+Last, it runs `hello.nasm` with `run.py --tcp 127.0.0.2:PORT` on
+`niceemu --link 127.0.0.2:0`, the form for a `niceemu` on another
+computer; 127.0.0.2 is loopback on Linux, and elsewhere the check is
+skipped. CI runs it.
 
 `run.py` matches `niceemu` in the details too. It accepts
 `--no-cycle-counter` and ignores it, as the cycle counter always runs. A

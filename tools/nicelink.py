@@ -2,7 +2,8 @@
 """The debug link of nice_cpu/doc/DEBUG.md, for the host tools.
 
 A Link talks to the board over its debug UART or over TCP on its
-Ethernet port, to niceemu --link over TCP on 127.0.0.1, or to the
+Ethernet port, to niceemu --link over TCP, on 127.0.0.1 or on another
+computer, or to the
 simulated system of make -C sim cosim, whose UART is on a TCP port of
 127.0.0.1 too. It splits what arrives into
 console bytes, with ESC ESC as 0xFF, and packets, which it checks. A
@@ -211,7 +212,8 @@ class Serial(Transport):
 
 
 class Tcp(Transport):
-    """niceemu --link, on a port of 127.0.0.1 (DEBUG.md §7). A half-close
+    """niceemu --link, on a port of 127.0.0.1 or of another computer
+    (DEBUG.md §7). A half-close
     ends the program's input, and a host that has half-closed sends no more.
     So the next request after end_input() connects again, which counts the
     first connection as closed. niceemu refuses the new one, closing it at
@@ -242,7 +244,10 @@ class Tcp(Transport):
 
     def hint(self, e: OSError) -> str:
         """What to check when the connection fails with e."""
-        return (f"is niceemu --link {self.port} or make cosim running?")
+        return (f"is niceemu --link {self.port} or make cosim running?"
+                if self.host == "127.0.0.1" else
+                f"is niceemu --link ADDR:{self.port} running on "
+                f"{self.host}, with an ADDR that it can reach?")
 
     def _reconnect(self) -> socket.socket:
         """A new connection that niceemu has taken: one that it has sent
@@ -640,6 +645,19 @@ def read_words(link: Link, addrs: list[int]) -> list[int]:
     return words
 
 
+def parse_tcp(text: str | int) -> tuple[str, int]:
+    """The host and the port of --tcp [HOST:]PORT, with 127.0.0.1 if no
+    HOST is given. An IPv6 HOST is in brackets, as for niceemu --link."""
+    host, sep, port = str(text).rpartition(":")
+    if not sep:
+        host = "127.0.0.1"
+    elif host.startswith("[") and host.endswith("]"):
+        host = host[1:-1]
+    if not port.isdigit() or not host or int(port) > 65535:
+        fail(f"--tcp {text}: not PORT or HOST:PORT")
+    return host, int(port)
+
+
 def add_arguments(parser: argparse.ArgumentParser) -> None:
     """The options that pick the link: --port and --baud for the board's
     debug UART, --eth for its Ethernet port, --tcp for niceemu --link, or
@@ -655,9 +673,10 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
                       help="talk to the board over TCP on its Ethernet "
                       f"port, at HOST (default port {ETH_PORT}), not on "
                       "its UART")
-    line.add_argument("--tcp", type=int, metavar="PORT",
-                      help="talk to niceemu --link PORT on 127.0.0.1, not "
-                      "to the board")
+    line.add_argument("--tcp", metavar="[HOST:]PORT",
+                      help="talk to niceemu --link on PORT of HOST (default "
+                      "127.0.0.1), not to the board; serve the link beyond "
+                      "127.0.0.1 only on a trusted network")
     line.add_argument("--cosim", type=int, metavar="PORT",
                       help="talk to the simulated system of make -C sim "
                       "cosim on port PORT of 127.0.0.1, not to the board; "
@@ -686,7 +705,8 @@ def open_link(args: argparse.Namespace) -> Link:
             fail(f"{args.eth} is not HOST or HOST:PORT")
         link = Link(Eth(int(port) if port else ETH_PORT, host))
     elif args.tcp is not None:
-        link = Link(Tcp(args.tcp))
+        host, port = parse_tcp(args.tcp)
+        link = Link(Tcp(port, host))
         # niceemu sends b to each host that connects (DEBUG.md §7). Wait
         # 2 s for it: long enough for a busy computer, short enough to
         # report a wrong port.
@@ -695,7 +715,7 @@ def open_link(args: argparse.Namespace) -> Link:
             link.poll(end - time.monotonic())
         if not link.boots:
             fail(f"no b notice, the packet that niceemu --link sends to each "
-                 f"host that connects, from 127.0.0.1:{args.tcp}; is that "
+                 f"host that connects, from {host}:{port}; is that "
                  f"port served by niceemu --link, not by another program?")
     else:
         link = Link(Serial(args.port, args.baud))
