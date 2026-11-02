@@ -28,8 +28,8 @@ import tempfile
 
 import hwtest
 from hwtest import (NICEEMU, REPO, assemble, assemble_labels, comparisons,
-                    results, test_framing, test_pause, test_run, test_step,
-                    test_break)
+                    results, test_framing, test_monitor, test_pause, test_run,
+                    test_step, test_break)
 from nicelink import HOLD, RAM, open_link
 
 
@@ -77,6 +77,7 @@ def main() -> None:
             finally:
                 link.close()
             test_run(["--cosim", port], comparisons(tmp))
+            test_monitor(["--cosim", port], tmp)
         finally:
             os.killpg(sim.pid, signal.SIGTERM)
             sim.wait()

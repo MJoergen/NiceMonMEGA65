@@ -42,7 +42,7 @@ header is the authoritative address map.
     make monitor          # the monitor -> monitor/build/monitor.bin; make -C monitor test runs it in niceemu
     make r6 [ROM=f.bin]   # Vivado bitstream, synth/r6/build/top.bit, the monitor and the demo (demo/build/rom.bin) in the ROM unless ROM= (none) or ROM=f.bin; make r3 and make nexys4ddr likewise
     make cor [ROM=f.bin]  # MEGA65 core files for MEGAFLASH, synth/r{3,6}/build/NiceMonMEGA65-r{3,6}.cor (coretool)
-    make load FILE=p.bin  # load and start a program on the board (ETH=IP or PORT=/dev/ttyUSB1, one needed)
+    make load FILE=p.bin  # load and start a program on the board (ETH=IP or PORT=/dev/ttyUSB1, one needed); ARGS=--monitor for one at 0x8000 under the ROM's monitor
     make run FILE=p.bin   # run it and print what niceemu prints, for diffing
     make mon [FILE=p.bin] # interactive shell on the link: memory, pause, step, breakpoints, disassembly, --symbols
     make bump TAG=V1.0    # nice_cpu to the tag, R6 bitstream, badge-mega65.json and verified.json, committed (--push with ARGS)

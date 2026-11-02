@@ -41,7 +41,8 @@ of it, and #24 revisited them. Debugging is the on-board debugger's
   debug registers, and a host holds the core to reach the rest, as
   `load.py` and `run.py` do. They hide the ROM too, so that a program at
   address 0 runs as in the emulator, and the reset button boots the monitor
-  again.
+  again. With `--monitor` they keep the ROM, and run a program at
+  `0x8000` under the monitor (Loading from a host below).
 
 ## The commands
 
@@ -241,6 +242,41 @@ in nice_cpu's runtime or C library:
   plain memory, and the same on a board whose screen is smaller (Not
   decided yet below). The screen is cleared by a loop over its words.
 
+## Loading from a host
+
+A host loads a program at `0x8000` over the debug link, on the board's
+Ethernet port or its UART, with `--monitor`:
+
+    tools/load.py --eth 192.168.1.65 --monitor prog.bin
+    tools/run.py --eth 192.168.1.65 --monitor -i in.txt prog.bin
+    make load FILE=prog.bin ETH=192.168.1.65 ARGS=--monitor
+
+Each holds the core with the ROM visible, clears the memory, which
+leaves the ROM alone, writes the program, and starts the core. The
+monitor boots cold, which leaves the RAM from `0x8000` alone, and the
+tool types `r` and CR, which run the program. A program with a word
+below `0x8000` is refused, as it would be in the ROM, and so is a
+bitstream without a ROM. `--rom FILE` loads FILE at 0, with the ROM
+hidden, in the ROM's place: for `niceemu --link`, `make cosim`, a
+bitstream without a ROM, or another build of the monitor, such as
+`build/monitor_test.bin`.
+
+`run.py --monitor` prints what `niceemu` prints for the monitor and the
+program joined, with `r` and CR before the input. The monitor reads on
+at the end of the input, so the input ends with `h`, which halts the
+core, as in the tests here:
+
+    printf 'h\r' > h.txt
+    tools/run.py --tcp PORT --monitor --rom build/monitor_test.bin \
+        -i h.txt build/hello.bin
+    printf 'r\rh\r' > rh.txt
+    cat build/monitor_test.bin build/hello.bin > joined.bin
+    niceemu -i rh.txt joined.bin
+
+`make hwtest`, `make linktest`, and `make cosimtest` compare the two so
+with `test/hello.nasm`, and `make hwtest` also runs it under the monitor
+in the board's ROM, over the UART and Ethernet.
+
 ## Building and testing
 
 `make -C monitor` assembles `monitor.nasm`, `monlib.nasm`, `mon.nasm`,
@@ -270,14 +306,6 @@ versions of the tests, into the RAM, and types `x` for the demo
 
 - The main loop's other commands, which a monitor without a debugger
   needs, as the on-board debugger has pause, step, and inspect.
-- How a program reaches `0x8000` on a board with no storage: over the
-  link, which holds the core, writes the image, and starts it, after
-  which the monitor boots cold and a host types `r` on the console; or
-  which pauses the running monitor, writes the image, goes on, and types
-  the command. Either way the cold start leaves the RAM from `0x8000`
-  alone, and `load.py` and `run.py` need an option that keeps the ROM
-  visible, loads at `0x8000`, and sends the command, with the same
-  command in the input file of `niceemu`.
 - The scrollback: `mon_putc` scrolls by copying the rows, and the display
   offset stays 0. Scrolling by the offset, as QMON does, would keep the
   rows that left the screen, but the Nexys4DDR's screen is 8192 words

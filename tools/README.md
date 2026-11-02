@@ -10,8 +10,8 @@ prints its options with `--help`, and its header says more.
 | Tool | What it does |
 |---|---|
 | `nicelink.py` | The debug link, which the other tools use: over TCP to the board's Ethernet port, on the UART, over TCP to `niceemu --link`, or over TCP to `make cosim`. |
-| `load.py` | Loads a `.bin` file into cleared memory and starts it, or with `--no-run` leaves the core held in reset. |
-| `run.py` | Runs a program on the board and prints what `niceemu` prints, for diffing. |
+| `load.py` | Loads a `.bin` file into cleared memory and starts it, or with `--no-run` leaves the core held in reset. With `--monitor`, it runs a program at `0x8000` under the monitor in the ROM. |
+| `run.py` | Runs a program on the board and prints what `niceemu` prints, for diffing, also one under the monitor with `--monitor`. |
 | `mon.py` | An interactive shell on the link: memory, pause, step, breakpoints, and the console. |
 | `hwtest.py` | Programs the FPGA with openFPGALoader and tests the system on the board. |
 | `flash.py` | Writes a bitstream into the Nexys4DDR's flash, or a core file into a slot of the MEGA65's, from which the board starts. |
@@ -138,6 +138,31 @@ differently. A program can still write the rest of the MEGA65's screen
 when it runs.
 
 `load.py` holds the core first, so it also works while a program runs.
+
+## Running a program under the monitor
+
+A program for the monitor of the ROM is assembled at `0x8000`, with
+nice_cpu's `start_mon.nasm`, or built with `nicebuild.py --monitor`
+([monitor/](../monitor/README.md#programs)). `--monitor` loads it so:
+
+    tools/load.py --eth 192.168.1.65 --monitor prog.bin
+
+`load.py` holds the core and clears the memory with the ROM visible,
+writes the program, and starts the core. The monitor boots cold, which
+leaves the RAM from `0x8000` alone, and `load.py` types `r` and CR, its
+command that runs the program. The program then prints through the
+monitor's `mon_putc`, on the screen and the line, and returns to the
+monitor, which prints its status. A program with a word below `0x8000`
+is refused, and so is a bitstream without a ROM. `--rom FILE` loads
+FILE at 0 in place of the ROM, with the ROM hidden, such as
+`monitor/build/monitor.bin`: for `niceemu --link`, `make cosim`, a
+bitstream without a ROM, or another build of the monitor.
+
+`run.py --monitor` does the same, with `r` and CR before the input, and
+prints what `niceemu` prints for the monitor and the program joined.
+The monitor reads on at the end of the input, so the input ends with
+its `h`, which halts the core (monitor/README.md, "Loading from a
+host").
 
 ## Running a C program
 

@@ -29,7 +29,8 @@ from typing import Callable
 import hwtest
 from hwtest import (NICEEMU, REPO, assemble, assemble_labels, comparisons,
                     results, test_bench, test_framing, test_pause, test_run,
-                    test_selftest, test_step, test_break, check, QUIET)
+                    test_monitor, test_selftest, test_step, test_break,
+                    check, QUIET)
 import mon
 from mon import Monitor
 from nicelink import HOLD, RAM, Link, LinkError, open_link
@@ -174,6 +175,7 @@ def main() -> None:
                 link.close()
             test_mon(int(m.group(1)), *brk)
             test_run(tcp, comparisons(tmp))
+            test_monitor(tcp, tmp)
             test_selftest(tcp, tmp)
         bench = f"{REPO}/examples/build/bench.bin"
         if os.path.exists(bench):

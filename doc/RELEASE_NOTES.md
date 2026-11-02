@@ -55,6 +55,13 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 
 **Tools**
 
+- `load.py --monitor` and `run.py --monitor` run a program at `0x8000`
+  under the monitor in the ROM: they keep the ROM, load the program,
+  start the core, which boots the monitor, and type `r`. `--rom FILE`
+  loads a monitor in the ROM's place, for `niceemu --link` and `make
+  cosim`. `run.py --monitor` prints what `niceemu` prints for the two
+  joined, and `make hwtest`, `make linktest`, and `make cosimtest`
+  compare them (`monitor/README.md`, "Loading from a host").
 - `make flash COR=f.cor SLOT=N` works on the MEGA65 R6, tested into
   slot 5. The MEGA65's flash protects its sectors with their DYB bits,
   and openFPGALoader's erase failed on them with `timeout: 23`

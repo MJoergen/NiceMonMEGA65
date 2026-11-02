@@ -183,7 +183,10 @@ There are two ways to talk to a program on the board through it:
 The other tools take `--eth 192.168.1.65` too (see
 [tools/README.md](tools/README.md#over-ethernet)), and
 [SYSTEM.md](doc/SYSTEM.md#the-ethernet-station) describes the Ethernet
-station. The link has no password, so give the board an IP address only
+station. `tools/load.py --eth 192.168.1.65 --monitor prog.bin` runs a
+program built for the monitor, at `0x8000`, under the monitor in the
+ROM (see
+[tools/README.md](tools/README.md#running-a-program-under-the-monitor)). The link has no password, so give the board an IP address only
 on a network you trust.
 
 The board serves one connection at a time. While a host is connected,

@@ -65,10 +65,15 @@ Checks, in this order:
     - the ROM of the release, the monitor and the demo behind it,
       demo/build/rom_test.bin, with x for the demo, and its screen
     - nice_cpu's benchmark, examples/build/bench.bin, all but its cycles
+    - the monitor's test program, monitor/test/hello.nasm, with run.py
+      --monitor and the monitor of the tests from --rom, against niceemu
+      on the two joined, and under the monitor in the board's ROM, if it
+      has one, which must return its status
     And the demo's self-test, F11, runs with tools/run.py, and its four
     tests must pass, as their timer and instruction counts depend on the
     core.
-    The programs run with the ROM hidden, so the RAM is at 0.
+    The programs run with the ROM hidden, so the RAM is at 0, but for
+    the one under the monitor in the board's ROM.
     With --eth, last of all, the Ethernet station, which no failure above
     or here keeps the other checks from:
     - the ROM, loaded at 0, gets the monitor's i, the IP address, and CR
@@ -81,7 +86,8 @@ Checks, in this order:
     - the link over TCP to that address pauses the monitor and reads the
       address, while the monitor still has it
     - programs run with tools/run.py --eth and with niceemu, and their
-      output and exit status are compared, as above
+      output and exit status are compared, as above, and so is the
+      monitor's test program, with --monitor
     Without --eth, the summary names the Ethernet station after NOT
     COVERED.
 
@@ -871,6 +877,65 @@ def test_run(link_args: list[str],
               f"{board.stdout!r} {board.stderr!r}")
 
 
+def test_monitor(link_args: list[str], tmp: str, in_rom: bool = False,
+                 via: str = "") -> None:
+    """Runs the monitor's test program, monitor/test/hello.nasm at 0x8000,
+    with run.py --monitor --rom and the monitor of the tests, and with
+    niceemu, on the two joined, with r and h, the commands that run it and
+    halt the core, in the input. The two must print the same and exit with
+    the same status, but for the steps, as the monitor waits for input in
+    a loop. With in_rom, it also runs under the monitor in the board's
+    ROM, whose version differs, and checks the program's status, unless
+    the bitstream has no ROM. link_args are run.py's options for the
+    link, and via names it in the checks, as for test_run. The port must
+    be closed meanwhile."""
+    subprocess.run(["make", "-s", "-C", f"{REPO}/monitor",
+                    "build/monitor_test.bin", "build/hello.bin"], check=True)
+    monitor = f"{REPO}/monitor/build/monitor_test.bin"
+    hello = f"{REPO}/monitor/build/hello.bin"
+    joined = os.path.join(tmp, "monitor_hello.bin")
+    with open(joined, "w") as f:
+        for path in (monitor, hello):
+            with open(path) as g:
+                f.write(g.read())
+    halt = os.path.join(tmp, "h.txt")
+    with open(halt, "wb") as f:
+        f.write(b"h\r")
+    both = os.path.join(tmp, "rh.txt")
+    with open(both, "wb") as f:
+        f.write(b"r\rh\r")
+    run_py = [sys.executable, f"{REPO}/tools/run.py"] + link_args + [
+        "--timeout", f"{RUN_TIMEOUT:g}", "--monitor"]
+    if os.path.exists(NICEEMU):
+        emu = subprocess.run([NICEEMU, "-i", both, "-s", joined],
+                             stdin=subprocess.DEVNULL, capture_output=True)
+        board = subprocess.run(run_py + ["--rom", monitor, "-i", halt, "-s",
+                                         hello],
+                               stdin=subprocess.DEVNULL, capture_output=True)
+        for r in (emu, board):
+            r.stdout = re.sub(rb"after \d+ steps", b"after N steps", r.stdout)
+        same = (emu.stdout == board.stdout and
+                emu.returncode == board.returncode)
+        check(f"run.py --monitor --rom monitor_test.bin hello.bin as "
+              f"niceemu{via}", same, "" if same else f"\n  niceemu (exit {emu.returncode}): "
+              f"{emu.stdout!r}\n  run.py (exit {board.returncode}): "
+              f"{board.stdout!r} {board.stderr!r}")
+    else:
+        skipped.append("run.py --monitor as niceemu")
+    if not in_rom:
+        return
+    board = subprocess.run(run_py + ["-i", halt, hello],
+                           stdin=subprocess.DEVNULL, capture_output=True)
+    if b"no ROM" in board.stderr:
+        uncovered.append("run.py --monitor under the ROM's monitor, as the "
+                         "bitstream has no ROM")
+        return
+    ok = board.returncode == 0 and b"Returned 0000002A" in board.stdout
+    check(f"run.py --monitor hello.bin under the ROM's monitor{via}", ok,
+          "" if ok else f"exit {board.returncode}: {board.stdout!r} "
+          f"{board.stderr!r}")
+
+
 def test_selftest(link_args: list[str], tmp: str) -> None:
     """Runs the self-test of the demo's F11 with run.py, and checks that
     its four tests pass. Two of them depend on the core's pipeline, not on
@@ -969,7 +1034,8 @@ def test_eth_ip(link: Link, rom: str, ip: str) -> list[int] | None:
 
 
 def test_eth(port: str, baud: int, eth: str,
-             programs: list[tuple[str, list[str], bool]], rom: str) -> None:
+             programs: list[tuple[str, list[str], bool]], rom: str,
+             tmp: str) -> None:
     """The Ethernet station, last of all: the monitor's i gives it the IP
     address of eth's HOST from keys over the UART, ping gets the answers,
     the link over TCP reaches the monitor, and the programs run over it as
@@ -1020,6 +1086,7 @@ def test_eth(port: str, baud: int, eth: str,
         finally:
             tcp_link.close()
         test_run(["--eth", eth], programs, " over Ethernet")
+        test_monitor(["--eth", eth], tmp, True, " over Ethernet")
     except (LinkError, OSError) as e:
         check(f"eth: {e}", False)
     except SystemExit as e:
@@ -1097,13 +1164,14 @@ def main() -> None:
                 link.close()
             serial = ["--port", args.port, "--baud", str(args.baud)]
             test_run(serial, comparisons(tmp))
+            test_monitor(serial, tmp, in_rom=True)
             test_bench(serial, bench)
             test_selftest(serial, tmp)
             if not args.eth:
                 uncovered.append("the Ethernet station, without --eth")
             else:
                 test_eth(args.port, args.baud, args.eth, comparisons(tmp),
-                         rom_test())
+                         rom_test(), tmp)
         except LinkError as e:
             print(f"hwtest.py: {e}", file=sys.stderr, flush=True)
             results.append(False)

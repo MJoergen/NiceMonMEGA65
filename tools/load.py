@@ -10,8 +10,19 @@ Then the words of the file are written with W packets of the debug link
 given. The ROM stays hidden until the reset button is pressed, which
 boots the ROM's program again.
 
+With --monitor, the program runs under the monitor in the ROM
+(monitor/README.md, "Programs"): it must be at 0x8000 or above, as a
+program for the monitor is assembled, and the ROM stays visible. The
+memory is cleared and the program written with the core held, and the
+core is started, so the monitor boots cold, which leaves the RAM from
+0x8000 alone. Then r and CR are typed on the console, the monitor's
+command that runs the program. A bitstream without a ROM, and niceemu,
+have no monitor: --rom FILE loads FILE at 0 in its place, such as
+monitor/build/monitor.bin, with the ROM hidden.
+
 Usage: tools/load.py (--eth HOST[:PORT] | --port DEVICE [--baud 2000000]
-                     | --tcp PORT | --cosim PORT) [--no-run] FILE.bin
+                     | --tcp PORT | --cosim PORT) [--no-run]
+                     [--monitor [--rom FILE]] FILE.bin
 
 One of --eth, --port, --tcp, and --cosim must be given. --port names the
 serial device of the board's debug UART, such as /dev/ttyUSB1. --eth HOST talks to the board over TCP on its Ethernet port, at
@@ -24,7 +35,7 @@ tools/hwtest.py use the functions here, and tools/nicelink.py has the link.
 
 import argparse
 
-from nicelink import (BRK_EN, CLEAR, HOLD, RAM, Link, LinkError,
+from nicelink import (BRK_EN, CLEAR, CONTROL, HOLD, RAM, Link, LinkError,
                       add_arguments, fail, open_link)
 
 # The words that the board has: the RAM, which is 64K words from 0, and the
@@ -34,6 +45,11 @@ from nicelink import (BRK_EN, CLEAR, HOLD, RAM, Link, LinkError,
 RAM_WORDS = 0x10000
 SCREEN_BASE = 0xFFFF0000
 SCREEN_WORDS = 0x2000
+
+# A program under the monitor: where it starts, above the ROM, and the
+# monitor's command that runs it (monitor/README.md)
+PROGRAM = 0x8000
+RUN_COMMAND = b"r\r"
 
 
 def hex_field(path: str, line_no: int, text: str) -> int:
@@ -95,12 +111,44 @@ def read_bin(path: str) -> list[tuple[int, int]]:
     return words
 
 
-def load_words(link: Link, words: list[tuple[int, int]]) -> None:
+def monitor_words(path: str, rom: str | None) -> list[tuple[int, int]]:
+    """The words of a program under the monitor, which must be at PROGRAM
+    or above, and with rom, the words of that monitor, which must be
+    below, as a ROM's are."""
+    words = read_bin(path)
+    low = [a for a, _ in words if a < PROGRAM]
+    if low:
+        fail(f"{path}: address {low[0]:08x} is below {PROGRAM:08x}, where "
+             f"the ROM is; a program under the monitor is assembled at "
+             f"{PROGRAM:08x}, with nice_cpu's start_mon.nasm or "
+             f"nicebuild.py --monitor")
+    if rom is None:
+        return words
+    rom_words = read_bin(rom)
+    high = [a for a, _ in rom_words if a >= PROGRAM]
+    if high:
+        fail(f"{rom}: address {high[0]:08x} is not in the ROM, below "
+             f"{PROGRAM:08x}")
+    return rom_words + words
+
+
+def load_words(link: Link, words: list[tuple[int, int]],
+               rom: bool = False) -> None:
     """Holds the core, hides the ROM, clears the memory, disables the
     breakpoints, and writes the words, with one W for each run of
     consecutive addresses. A link of version 3 or older takes the write of
-    the enable bits too, as a reserved word."""
-    link.control(HOLD | CLEAR | RAM)
+    the enable bits too, as a reserved word. With rom, the ROM stays
+    visible, and a bitstream without one, which reads bit 3 as 1, is
+    refused: the clear leaves the ROM alone, so its program boots cold at
+    the start."""
+    if rom:
+        link.control(HOLD | CLEAR)
+        if link.read_word(CONTROL) & RAM:
+            fail("no ROM, so no monitor, as in a bitstream built without "
+                 "one or in niceemu; --rom FILE loads one, such as "
+                 "monitor/build/monitor.bin, in its place")
+    else:
+        link.control(HOLD | CLEAR | RAM)
     link.write(BRK_EN, [0])
     words = sorted(words)
     i = 0
@@ -112,10 +160,29 @@ def load_words(link: Link, words: list[tuple[int, int]]) -> None:
         i = j
 
 
-def start(link: Link) -> None:
-    """Starts the core, with the ROM hidden. load_words() has held it, so
-    this one write starts it (DEBUG.md §6)."""
-    link.control(RAM)
+def start(link: Link, rom: bool = False) -> None:
+    """Starts the core, with the ROM hidden, or with rom, visible.
+    load_words() has held it, so this one write starts it (DEBUG.md §6)."""
+    link.control(0 if rom else RAM)
+
+
+def add_monitor_arguments(parser) -> None:
+    """--monitor and --rom, which load.py and run.py share."""
+    parser.add_argument("--monitor", action="store_true",
+                        help="run the program, at 0x8000, under the monitor "
+                        "in the ROM, which boots and gets r and CR")
+    parser.add_argument("--rom", metavar="FILE",
+                        help="with --monitor, load FILE at 0 in place of the "
+                        "ROM, such as monitor/build/monitor.bin")
+
+
+def program_words(parser, args) -> list[tuple[int, int]]:
+    """The words to load for args.file, with --monitor and --rom."""
+    if args.rom and not args.monitor:
+        parser.error("--rom needs --monitor")
+    if args.monitor:
+        return monitor_words(args.file, args.rom)
+    return read_bin(args.file)
 
 
 def main() -> None:
@@ -123,18 +190,24 @@ def main() -> None:
     add_arguments(parser)
     parser.add_argument("--no-run", action="store_true",
                         help="leave the core held in reset after loading")
+    add_monitor_arguments(parser)
     parser.add_argument("file",
                         help="a .bin file: one 'address word' hex pair per line")
     args = parser.parse_args()
 
-    words = read_bin(args.file)
+    words = program_words(parser, args)
+    in_rom = args.monitor and not args.rom
     link = open_link(args)
     try:
-        load_words(link, words)
-        print(f"load.py: loaded {len(words)} words from {args.file}")
+        load_words(link, words, rom=in_rom)
+        print(f"load.py: loaded {len(words)} words from {args.file}"
+              + (f" and {args.rom}" if args.rom else ""))
         if not args.no_run:
-            start(link)
+            start(link, rom=in_rom)
             print("load.py: started the core")
+            if args.monitor:
+                link.send_console(RUN_COMMAND)
+                print("load.py: typed r for the monitor")
     except LinkError as e:
         fail(str(e))
     link.close()

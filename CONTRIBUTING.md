@@ -401,8 +401,9 @@ the request. Only small programs are practical.
 checks of bad packets on it, but for the gap of 300 ms, which is far
 shorter in simulated time, and its checks of the pause, the step, and
 the breakpoints.
-Then it runs the programs that `make hwtest` compares, with `run.py
---cosim` and with `niceemu`, whose output and exit status must be the same.
+Then it runs the programs that `make hwtest` compares, and the monitor's
+with `--monitor --rom`, with `run.py --cosim` and with `niceemu`, whose
+output and exit status must be the same.
 It leaves out nice_cpu's benchmark and the demo's self-test, which would
 take too long. It takes about 4 minutes, and CI runs it on both cores.
 
@@ -705,6 +706,10 @@ bitstream has one. Then it hides the ROM and uses the link:
   it halts without reading, the emulator's `reserved.nasm`, which halts
   on a reserved control word, its `trapsym.nasm` with `--symbols`, the ROM of the monitor and the demo, `demo/build/rom_test.bin`, with `x` and a few keys and its screen, and
   `examples/build/bench.bin`, but for its cycles, whose table it prints.
+  It runs the monitor's `test/hello.nasm` with `run.py --monitor --rom
+  monitor/build/monitor_test.bin` against `niceemu` on the two joined,
+  and with `run.py --monitor` under the monitor in the board's ROM, which
+  must return its status, 42.
 - Then it runs the demo's self-test, F11, with `run.py`, and checks that
   its four tests pass. The timer's test and the counters' test check
   counts of the core's pipeline, not of the ISA, so a core whose timing
@@ -718,7 +723,7 @@ the monitor and the demo, and types the monitor's `i`, the IP address,
 and CR as console bytes over the UART, as a terminal would, and reads
 the address back in a pause. It pings the address and checks the
 station's counts. It pauses the monitor over the link on TCP and reads the address again, and
-then runs the programs above with `run.py --eth`. The address must be
+then runs the programs above, and the monitor's, with `run.py --eth`. The address must be
 free on the network. If no frame at all reaches the station during the
 ping, the board has no Ethernet connection, or the address is not on
 this computer's network: the rest is not run, and the summary names it
@@ -732,7 +737,7 @@ The reset button is not tested: press it with a terminal open, and the
 
 `make linktest` runs `run.py --tcp` on `niceemu --link` against plain
 `niceemu`, without a board, for the programs that `make hwtest` compares,
-the demo's self-test, and nice_cpu's benchmark when `make examples` has
+the monitor's with `--monitor --rom`, the demo's self-test, and nice_cpu's benchmark when `make examples` has
 built `examples/build/bench.bin`, with `tools/linktest.py`. It runs hwtest's
 checks of bad packets, of the pause, of the step, and of the breakpoints
 on `niceemu --link` first, and then `mon.py`'s commands, its disassembly

@@ -13,7 +13,8 @@ the --dump and --screen output. So the output of the two can be compared:
 Usage:
     tools/run.py (--eth HOST[:PORT] | --port DEVICE [--baud 2000000]
                  | --tcp PORT | --cosim PORT) [-i FILE] [-d ADDR:N]... [-s] [-2004]
-                 [--symbols FILE] [--timeout SEC] FILE.bin
+                 [--symbols FILE] [--timeout SEC] [--monitor [--rom FILE]]
+                 FILE.bin
 
     One of --eth, --port, --tcp, and --cosim must be given. --eth HOST
     runs it on the board over its Ethernet port, and --port DEVICE on its
@@ -31,6 +32,24 @@ Input:
     in the emulator. Input that the program has not read when it halts is
     dropped, as by the emulator. The input file, the .bin file, and the
     link are checked before the core is started.
+
+Under the monitor:
+    --monitor runs a program at 0x8000 under the monitor in the ROM, as
+    tools/load.py --monitor loads it: the ROM stays visible, the monitor
+    boots cold, and r and CR go to the console before the input. --rom
+    FILE loads FILE at 0 in place of the ROM, with the ROM hidden, for
+    niceemu --link, the simulated system, or a bitstream without a ROM.
+    niceemu runs the same with the monitor and the program joined, and
+    the r in the input file:
+
+        diff <(niceemu -i <(printf 'r\\r'; cat in.txt) \\
+                   <(cat monitor.bin prog.bin)) \\
+             <(tools/run.py --monitor --rom monitor.bin -i in.txt prog.bin)
+
+    The output then has the monitor's too: its banner, the r, and the
+    status that the program returns. The monitor reads on at the end of
+    the input, so the run ends when the input ends with the monitor's h,
+    which halts the core, or at the time limit.
 
 Output:
     After a halt, the lines of niceemu: the reason and the step count, the
@@ -89,7 +108,8 @@ import sys
 import time
 from typing import NoReturn
 
-from load import load_words, read_bin, read_lines, start
+from load import (RUN_COMMAND, add_monitor_arguments, load_words,
+                  program_words, read_lines, start)
 from nicelink import (DEBUG_FIRST, FULL_WAIT, HALT_REASON, HOLD, RAM, REGS,
                       Link, LinkError, add_arguments, fail, open_link,
                       read_words)
@@ -228,11 +248,11 @@ def dump_address(link: Link, addr: int) -> int:
     return addr
 
 
-def run(link: Link, infd: int, timeout: float) -> bool:
-    """Copies the input to the program and its output to stdout until it
-    halts. Returns False if the time is up first."""
+def run(link: Link, infd: int, timeout: float, first: bytes = b"") -> bool:
+    """Copies first, then the input, to the program, and its output to
+    stdout, until it halts. Returns False if the time is up first."""
     out = sys.stdout.buffer
-    pending = b""   # input that is read and not yet sent
+    pending = first   # input that is read and not yet sent
     end = time.monotonic() + timeout if timeout else None
     while True:
         out.write(link.take_console())
@@ -319,11 +339,11 @@ def report(link: Link, dumps: list[tuple[int, int]], screen: bool,
 
 
 def report_timeout(link: Link, timeout: float, dumps: list[tuple[int, int]],
-                   screen: bool, screen_base: int) -> int:
+                   screen: bool, screen_base: int, hide: int = RAM) -> int:
     """Holds the core, prints the time limit and the dumps, and returns
     niceemu's exit status for the step limit. A hold leaves the registers
     undefined, so there are none, and no location for --symbols either."""
-    link.control(HOLD | RAM)
+    link.control(HOLD | hide)
     out = link.take_console()
     sys.stdout.buffer.write(out)
     lines = [f"Stopped at the time limit after {timeout:g} s"]
@@ -402,29 +422,32 @@ def main() -> None:
                         metavar="SEC",
                         help="give up after SEC seconds, with exit status 3 "
                         "(default %(default)s, 0 for none)")
+    add_monitor_arguments(parser)
     parser.add_argument("file",
                         help="a .bin file: one 'address word' hex pair per line")
     args = parser.parse_args()
 
-    words = read_bin(args.file)
+    words = program_words(parser, args)
+    in_rom = args.monitor and not args.rom
     symbols = Symbols(args.symbols) if args.symbols else None
     infd = 0 if args.input == "-" else open_input(args.input)
     screen_base = SCREEN_2004 if args.ide2004 else SCREEN
     link = open_link(args)
     try:
-        load_words(link, words)
-        start(link)
+        load_words(link, words, rom=in_rom)
+        start(link, rom=in_rom)
         try:
-            halted = run(link, infd, args.timeout)
+            halted = run(link, infd, args.timeout,
+                         RUN_COMMAND if args.monitor else b"")
         except KeyboardInterrupt:
-            link.control(HOLD | RAM)
+            link.control(HOLD | (0 if in_rom else RAM))
             print("\nrun.py: interrupted; the core is held in reset", file=sys.stderr)
             sys.exit(130)
         if halted:
             status = report(link, args.dump, args.screen, screen_base, symbols)
         else:
             status = report_timeout(link, args.timeout, args.dump, args.screen,
-                                    screen_base)
+                                    screen_base, 0 if in_rom else RAM)
         if link.overflows:
             print(f"run.py: the program's input buffer overflowed "
                   f"{link.overflows} times", file=sys.stderr)
