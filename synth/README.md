@@ -283,7 +283,9 @@ stage 8 0.187 ns and 0.019 ns, and with stage 9 0.166 ns and 0.025 ns,
 on paths in the core,
 and still 92.5 block RAMs. With the RAM of 128K words on the MEGA65
 ([#68](https://github.com/MJoergen/NiceMonMEGA65/issues/68)), the R6's
-build has 0.177 ns and 0.031 ns, with 235.5 block RAMs and 18712 LUTs.
+build has 0.177 ns and 0.031 ns, with 235.5 block RAMs and 18712 LUTs,
+and the Nexys4DDR's, whose RAM stays 64K words, 0.053 ns and 0.030 ns,
+with 110.5 block RAMs and 28964 LUTs.
 The R3's pipelined row is from a build at nice_cpu V1.0, with
 the debug link of version 4, and the Nexys4DDR's from one at V1.1, with
 stage 1 of the on-board debugger ([DEBUGGER.md](../doc/DEBUGGER.md)).
@@ -314,18 +316,18 @@ The block RAMs, of 36 Kbit, are these:
 |---|---|---|
 | The RAM (`i_ram`), 128K words on the MEGA65 and 64K on the Nexys4DDR | 128 | 64 |
 | The ROM (`i_rom`), 32K words, with `ROM=` only | 32 | 32 |
-| The screen (`i_scr` in `mem.vhd`), 32K or 8K words | 32 | 8 |
+| The screen (`i_scr` in `mem.vhd`), 32K or 8K words | 32 | 0 |
 | Its copy in `text.vhd` (`scr_ram.vhd`) | 32 | 8 |
 | The font in `text.vhd` | 4 | 4 |
 | The debugger's overlay in `text.vhd` (`scr_ram.vhd`), 4K words | 4 | 4 |
 | The table of `kbd_ps2_ascii.vhd`, as a ROM, two RAMB18 | – | 1 |
-| The UART's input FIFO (`rx_fifo.vhd`), one RAMB18 | 0.5 | 0.5 |
+| The UART's input FIFO (`rx_fifo.vhd`), one RAMB18 | 0.5 | 0 |
 | The FIFO of received Ethernet frames (`eth/eth_ram.vhd`), 2K bytes, one RAMB18 | 0.5 | 0.5 |
 | The FIFO of Ethernet frames to send (`eth/eth_ram.vhd`), 2K bytes, one RAMB18 | 0.5 | 0.5 |
 | The copy of a ping in `eth/eth_icmp.vhd`, 2K bytes, one RAMB18 | 0.5 | 0.5 |
 | The TCP server's buffers of received and sent bytes (`eth/eth_ram.vhd` in `eth/eth_tcp_buf.vhd`), 2K bytes each, one RAMB18 each | 1 | 1 |
-| Total without the ROM, pipelined | 203 of 365 | 92 of 135 |
-| Total with the ROM, pipelined | 235 | 124 |
+| Total without the ROM, pipelined | 203.5 of 365 | 78.5 of 135 |
+| Total with the ROM, pipelined | 235.5 | 110.5 |
 
 The copy of the screen keeps all 32 bits, as the display reads the
 character and both 12-bit colors, so it takes as many block RAMs as the
@@ -334,3 +336,12 @@ puts the table of `kbd_ps2_ascii.vhd` into block RAM since the scan code's
 register also feeds the Scroll Lock detector (`kbd_ps2_toggle.vhd`), and
 it takes the register's copy as the ROM's address; before, the table was
 in LUTs.
+
+The totals are those of the builds with the RAM of 128K words on the
+MEGA65 ([#68](https://github.com/MJoergen/NiceMonMEGA65/issues/68)).
+On the Nexys4DDR, Vivado now puts the screen of `mem.vhd` into
+distributed RAM, 8752 LUTs, and the UART's input FIFO too, and its
+build has 108 RAMB36 and 5 RAMB18, 110.5 in all: 5 fewer than the rows
+add up to, so the font or the table of `kbd_ps2_ascii.vhd` is in LUTs
+as well. A `ram_style` attribute on the screen would likely move it
+back.
