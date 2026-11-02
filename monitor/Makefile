@@ -26,6 +26,13 @@ TOOLS    = $(wildcard $(NICE_CPU)/assembler/*.py) $(wildcard $(NICE_CPU)/transla
 BUILD    = build
 SOURCES  = monitor.nasm monlib.nasm mon.nasm
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo unknown)
+# The monitor must end below DEMO (monitor.nasm), where join.py puts the
+# demo and x reads its size, in a ROM of the monitor alone too. niceasm
+# writes the words in the order of their addresses, so the last line has
+# the last.
+DEMO     = $(shell sed -n 's/^DEMO *\.EQU *\(0x[0-9A-Fa-f]*\).*/\1/p' monitor.nasm)
+CHECK_END = $(PYTHON) -c 'import sys; top = int(open(sys.argv[1]).read().split()[-2], 16); \
+  end = int(sys.argv[2], 16); top < end or sys.exit(f"{sys.argv[1]} reaches {top:08X}, past DEMO, {end:08X}")'
 
 .PHONY: all test fmt clean FORCE
 
@@ -34,6 +41,7 @@ all: $(BUILD)/monitor.bin
 $(BUILD)/monitor.bin: $(SOURCES) $(BUILD)/version.nasm $(TOOLS)
 	@cat $(SOURCES) $(BUILD)/version.nasm > $(BUILD)/monitor_all.nasm
 	$(ASM) -o $@ $(BUILD)/monitor_all.nasm
+	@$(CHECK_END) $@ $(DEMO)
 
 # Written only when the version changes, so that the monitor is not
 # assembled again, and a bitstream with it not built again, for nothing.
@@ -46,6 +54,20 @@ $(BUILD)/version.nasm: FORCE | $(BUILD)
 $(BUILD)/monitor_test.bin: $(SOURCES) $(TOOLS) | $(BUILD)
 	@(cat $(SOURCES); echo "VERSION .ASCII_L 'V9.9'") > $(BUILD)/monitor_test_all.nasm
 	@$(ASM) -o $@ $(BUILD)/monitor_test_all.nasm
+	@$(CHECK_END) $@ $(DEMO)
+
+# The monitors of the ring test, test/ring.py: the monitor of the tests
+# with the size of the screen's memory that the display offset of a board
+# would give it, 8192 words on the Nexys4DDR and 2048, which has no room
+# for the history, in place of the bits that niceemu keeps, all of them.
+# cmp fails the build if sed changed nothing.
+MASK_8k = 0x1FFF
+MASK_2k = 0x7FF
+$(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.bin: $(BUILD)/monitor_%.bin: $(BUILD)/monitor_test.bin
+	@sed 's/^\( *\)AND  *R1, @SCR_OFFS, SCR_MAX$$/\1MOVE    R1, $(MASK_$*)/' \
+	  $(BUILD)/monitor_test_all.nasm > $(BUILD)/monitor_$*_all.nasm
+	@! cmp -s $(BUILD)/monitor_test_all.nasm $(BUILD)/monitor_$*_all.nasm
+	@$(ASM) -o $@ $(BUILD)/monitor_$*_all.nasm
 
 # The programs of the tests, at 0x8000: hello.nasm with the runtime's
 # start-up code for a program under a monitor, and hello.c through
@@ -97,6 +119,10 @@ LOAD_TAIL = \rl\r9001 7\003r\rd 9000 4\rd 1EFFF 1\rh\r
 # goes up to the screen: 10000 and FFFEFFFF take words, and FFFF0000 does
 # not.
 LOAD_EMU = l\r10000 7\rFFFEFFFF 8\rFFFF0000 1\r\rd 10000 1\rh\r
+# load_64k: l with 0x10000 words of RAM, as on the Nexys4DDR, which
+# build/ram64k.bin writes to 0xFFFFFF9E: EFFF takes a word, and F000, the
+# monitor's variables, and 1EFFF, past the RAM, do not.
+LOAD_64K = l\rEFFF 1\rF000 2\r1EFFF 3\r\rd EFFF 1\rh\r
 
 # The words of each test that are dumped with the screen: for cmds the
 # variables, the cursor's registers, and the IP address, and for the programs the text at
@@ -113,6 +139,7 @@ DUMP_scroll  = -d 0xFFFFF000:11 -d 0xFFFFFF80:6 -d 0xFFFF7FB4:4 -d 0xFFFF7F64:4 
 DUMP_hello   = -d 0xFFFF0168:12
 DUMP_load    = -d 0xFFFFF000:15
 DUMP_load_emu = -d 0xFFFFF00E:1 -d 0xFFFEFFFF:1
+DUMP_load_64k = -d 0xFFFFF00E:1
 DUMP_hello_c = -d 0xFFFF0168:12
 MAX_STEPS = 10000000
 
@@ -120,21 +147,27 @@ MAX_STEPS = 10000000
 # compares the console output, the dumps, and the screen with
 # test/NAME.expected. The Halted line and the registers are left out, as
 # the steps and the registers change with the code. hello_c is skipped
-# without clang.
-test: fmt $(BUILD)/monitor_test.bin $(BUILD)/hello.bin
+# without clang. test/ring.py checks the ring of the history at the
+# sizes of the screen's memory of niceemu and the boards first.
+test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.bin $(BUILD)/hello.bin
+	@$(PYTHON) test/ring.py $(EMU) $(BUILD)/monitor_test.bin:32768 \
+	  $(BUILD)/monitor_8k.bin:8192 $(BUILD)/monitor_2k.bin:2048
 	@echo 'FFFFFF9E 00020000' > $(BUILD)/ram128k.bin
+	@echo 'FFFFFF9E 00010000' > $(BUILD)/ram64k.bin
 	@printf '$(LOAD_EMU)' > $(BUILD)/load_emu.txt
+	@printf '$(LOAD_64K)' > $(BUILD)/load_64k.txt
 	@printf '$(CMDS)' > $(BUILD)/cmds.txt
 	@printf '$(RUN)' > $(BUILD)/run.txt
 	@printf '$(SCROLL)' > $(BUILD)/scroll.txt
 	@{ printf '$(LOAD_HEAD)'; head -n 3 $(BUILD)/hello.bin | awk '{ printf "%s\r\n", $$0 }'; \
 	  tail -n +4 $(BUILD)/hello.bin; printf '$(LOAD_TAIL)'; } > $(BUILD)/load.txt
-	@fail=0; for t in cmds scroll load load_emu hello hello_c; do \
+	@fail=0; for t in cmds scroll load load_emu load_64k hello hello_c; do \
 	  case $$t in \
 	    cmds) prog=; input=cmds; dump='$(DUMP_cmds)';; \
 	    scroll) prog=; input=scroll; dump='$(DUMP_scroll)';; \
 	    load) prog=$(BUILD)/ram128k.bin; input=load; dump='$(DUMP_load)';; \
 	    load_emu) prog=; input=load_emu; dump='$(DUMP_load_emu)';; \
+	    load_64k) prog=$(BUILD)/ram64k.bin; input=load_64k; dump='$(DUMP_load_64k)';; \
 	    hello) prog=$(BUILD)/hello.bin; input=run; dump='$(DUMP_hello)';; \
 	    hello_c) prog=$(BUILD)/hello_c.bin; input=run; dump='$(DUMP_hello_c)'; \
 	      if ! command -v $(CLANG) > /dev/null; then echo "SKIP monitor $$t: no $(CLANG)"; continue; fi; \

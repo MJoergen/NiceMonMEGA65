@@ -9,7 +9,8 @@ nice_cpu's benchmark when examples/build/bench.bin is built, with run.py
 --tcp on that port and with niceemu alone. Each must print the same and
 exit with the same status. The demo's self-test, F11, must pass. Last,
 run.py --tcp HOST:PORT runs hello on "niceemu --link 127.0.0.2:0", an
-address other than 127.0.0.1, as for a niceemu on another computer. So it
+address other than 127.0.0.1, as for a niceemu on another computer, and
+the parsing of --tcp [HOST:]PORT is checked first. So it
 checks run.py, mon.py, nicelink.py, and the link of the emulator, as CI
 does. It prints one line for each check, and last how many passed, and
 exits with status 1 when one fails. niceemu must be built first, with
@@ -35,7 +36,7 @@ from hwtest import (NICEEMU, REPO, assemble, assemble_labels, comparisons,
                     check, QUIET)
 import mon
 from mon import Monitor
-from nicelink import HOLD, RAM, Link, LinkError, open_link
+from nicelink import HOLD, RAM, Link, LinkError, open_link, parse_tcp
 from run import Symbols
 
 
@@ -141,6 +142,28 @@ def test_mon(port: int, prog: str, at: dict[str, int]) -> None:
         link.close()
 
 
+def test_parse_tcp() -> None:
+    """parse_tcp() takes PORT, HOST:PORT, and [HOST]:PORT, with the colons
+    of an IPv6 host in brackets, and refuses the rest with fail(), which
+    exits."""
+    good: list[tuple[str | int, tuple[str, int]]] = [
+        ("5000", ("127.0.0.1", 5000)), (5000, ("127.0.0.1", 5000)),
+        ("127.0.0.2:5000", ("127.0.0.2", 5000)),
+        ("[::1]:5000", ("::1", 5000)),
+        ("[fe80::1%eth0]:1", ("fe80::1%eth0", 1))]
+    for text, want in good:
+        got = parse_tcp(text)
+        check(f"parse_tcp({text!r})", got == want, repr(got))
+    for text in ["::1:5000", "x", "", ":5000", "5000:", "1.2.3.4:70000",
+                 "[::1]", "[]:5000"]:
+        try:
+            with contextlib.redirect_stderr(io.StringIO()):
+                got = parse_tcp(text)
+            check(f"parse_tcp({text!r}) fails", False, repr(got))
+        except SystemExit:
+            check(f"parse_tcp({text!r}) fails", True)
+
+
 def start_emu(addr: str) -> tuple[subprocess.Popen[bytes], str]:
     """niceemu --link on a free port of addr, and that port."""
     emu = subprocess.Popen([NICEEMU, "--link", f"{addr}:0"],
@@ -186,6 +209,7 @@ def main() -> None:
     if not os.path.exists(NICEEMU):
         sys.exit(f"linktest.py: {NICEEMU} is missing; run "
                  "'make -C nice_cpu/emulator build'")
+    test_parse_tcp()
     emu, port = start_emu("127.0.0.1")
     try:
         tcp = ["--tcp", port]

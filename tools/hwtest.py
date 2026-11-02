@@ -11,9 +11,11 @@ Usage:
     (make -C nice_cpu/emulator build), or the checks that need it are
     skipped, and the summary names them after a SKIPPED.
 
-    --board says which board it is, for the check of the board's devices.
-    By default the name of the --bit file tells: a path with nexys4ddr in
-    it is the Nexys4DDR, any other is a MEGA65.
+    --board says which board it is, for the checks of the RAM's size and
+    the board's devices. By default the FPGA tells, when it is programmed:
+    an xc7a100t is the Nexys4DDR, and an xc7a200t a MEGA65. With
+    --no-program the name of the --bit file tells: a path with nexys4ddr
+    in it is the Nexys4DDR, any other is a MEGA65.
 
     --no-program skips programming and the boot test, the b notice and the
     checks of the ROM, for a board that is already programmed.
@@ -71,7 +73,10 @@ Checks, in this order:
       --monitor and the monitor of the tests from --rom, against niceemu
       on the two joined, also with 448 rows of d that are still coming
       when the input ends, and under the monitor in the board's ROM, if it
-      has one, which must return its status
+      has one, which must return its status; and the monitor's l, with the
+      600 lines of hello.bin pasted at the UART's full rate, then r
+    - load.py refuses a word beyond the RAM that 0xFFFFFF9E gives, under
+      the monitor and without it
     And the demo's self-test, F11, runs with tools/run.py, and its four
     tests must pass, as their timer and instruction counts depend on the
     core.
@@ -117,7 +122,8 @@ import time
 from typing import Callable, TypeVar
 
 from jtag import check_board
-from load import RAM_SIZE, load_words, read_bin, start
+from load import (MAX_RAM_WORDS, MONITOR_WORDS, PROGRAM, RAM_SIZE, load_words,
+                  read_bin, start)
 from nicelink import (BRK_COUNT, BRK_EN, CONTROL, ETH_PORT, FREE, HOLD,
                       PAUSE, RAM, REGS, STEP, STOP, VERSION, Eth, Link,
                       LinkError, Serial, packet)
@@ -128,6 +134,8 @@ NICEEMU = f"{REPO}/nice_cpu/emulator/zig-out/bin/niceemu"
 DEBUG_LINK = f"{REPO}/nice_cpu/hdl/src/debug_link.vhd"
 # The clock of each board, which sets the rate of the microsecond counter
 CLOCK_HZ = {"mega65": 100_000_000, "nexys4ddr": 90_000_000}
+# The words of the RAM, which 0xFFFFFF9E reads
+RAM_WORDS = {"mega65": 0x20000, "nexys4ddr": 0x10000}
 
 T = TypeVar("T")
 
@@ -438,7 +446,7 @@ def test_ram_size(link: Link, board: str) -> None:
     another word: the RAM has all the words it says. The address of the
     top word plus the RAM's size reads the top word again, as the RAM
     repeats. The core is held."""
-    want = 0x10000 if board == "nexys4ddr" else 0x20000
+    want = RAM_WORDS[board]
     ram = rd(link, RAM_SIZE)
     check("FFFFFF9E reads the RAM's words", ram == want,
           f"got {ram:08X}, want {want:08X}")
@@ -911,14 +919,18 @@ def test_monitor(link_args: list[str], tmp: str, in_rom: bool = False,
     niceemu, on the two joined, with r and h, the commands that run it and
     halt the core, in the input. The two must print the same and exit with
     the same status, but for the steps, as the monitor waits for input in
-    a loop. With in_rom, it also runs under the monitor in the board's
-    ROM, whose version differs, and checks the program's status, unless
-    the bitstream has no ROM. With long, it also runs d 8000 700 before
-    the h, 448 rows, about 20 KB, which the board sends while run.py ends
-    the input with a break: the host has to read on meanwhile (issue #67).
-    The simulation of make cosim is too slow for it. link_args are
-    run.py's options for the link, and via names it in the checks, as for
-    test_run. The port must be closed meanwhile."""
+    a loop. Then the monitor's l gets the lines of a .bin file pasted,
+    with a word of 0 at 0x8000 loaded before, so that the r run.py types
+    finds no program, and r runs what l wrote: a program that returns
+    0x2A, assembled here, or with long hello.bin itself, 600 lines at the
+    full rate of the line. With in_rom, it also runs under the monitor in
+    the board's ROM, whose version differs, and checks the program's
+    status, unless the bitstream has no ROM. With long, it also runs d
+    8000 700 before the h, 448 rows, about 20 KB, which the board sends
+    while run.py ends the input with a break: the host has to read on
+    meanwhile (issue #67). The simulation of make cosim is too slow for
+    it. link_args are run.py's options for the link, and via names it in
+    the checks, as for test_run. The port must be closed meanwhile."""
     subprocess.run(["make", "-s", "-C", f"{REPO}/monitor",
                     "build/monitor_test.bin", "build/hello.bin"], check=True)
     monitor = f"{REPO}/monitor/build/monitor_test.bin"
@@ -933,21 +945,43 @@ def test_monitor(link_args: list[str], tmp: str, in_rom: bool = False,
         f.write(b"h\r")
     run_py = [sys.executable, f"{REPO}/tools/run.py"] + link_args + [
         "--timeout", f"{RUN_TIMEOUT:g}", "--monitor"]
-    inputs = [("", b"h\r")]
+    # The keys, the program run.py loads, and what niceemu runs
+    inputs = [("", b"h\r", hello, joined)]
     if long:
-        inputs.append((" with d 8000 700", b"d 8000 700\rh\r"))
+        inputs.append((" with d 8000 700", b"d 8000 700\rh\r", hello,
+                       joined))
+    # l: the lines of a .bin file, each ended by LF, and an empty line, CR,
+    # which ends the load. run.py loads a word of 0 at 0x8000, no program,
+    # as niceemu has there with the monitor alone.
+    none = os.path.join(tmp, "none.bin")
+    with open(none, "w") as f:
+        f.write(f"{PROGRAM:08x} 00000000\n")
+    if long:
+        paste = hello
+    else:
+        ret = os.path.join(tmp, "ret.nasm")
+        with open(ret, "w") as f:
+            f.write("; Returns the status 0x2A to the monitor\n"
+                    "                .ORG    0x8000\n"
+                    "                MOVE    R1, 0x2A\n"
+                    "                MOVE    R15, @R13++\n")
+        paste = assemble(ret, tmp)
+    with open(paste, "rb") as f:
+        lines = f.read()
+    inputs.append((f" with l, {os.path.basename(paste)} pasted, and r",
+                   b"l\r" + lines + b"\rr\rh\r", none, monitor))
     if os.path.exists(NICEEMU):
-        for name, keys in inputs:
+        for name, keys, prog, emu_prog in inputs:
             board_in = os.path.join(tmp, "monitor_in.txt")
             with open(board_in, "wb") as f:
                 f.write(keys)
             emu_in = os.path.join(tmp, "monitor_rin.txt")
             with open(emu_in, "wb") as f:
                 f.write(b"r\r" + keys)
-            emu = subprocess.run([NICEEMU, "-i", emu_in, "-s", joined],
+            emu = subprocess.run([NICEEMU, "-i", emu_in, "-s", emu_prog],
                                  stdin=subprocess.DEVNULL, capture_output=True)
             board = subprocess.run(run_py + ["--rom", monitor, "-i", board_in,
-                                             "-s", hello],
+                                             "-s", prog],
                                    stdin=subprocess.DEVNULL,
                                    capture_output=True)
             for r in (emu, board):
@@ -955,8 +989,9 @@ def test_monitor(link_args: list[str], tmp: str, in_rom: bool = False,
                                   r.stdout)
             same = (emu.stdout == board.stdout and
                     emu.returncode == board.returncode)
-            check(f"run.py --monitor --rom monitor_test.bin hello.bin{name} "
-                  f"as niceemu{via}", same, "" if same else
+            check(f"run.py --monitor --rom monitor_test.bin "
+                  f"{os.path.basename(prog)}{name} as niceemu{via}", same,
+                  "" if same else
                   f"\n  niceemu (exit {emu.returncode}): "
                   f"{emu.stdout[-400:]!r}\n  run.py (exit {board.returncode}): "
                   f"{board.stdout[-400:]!r} {board.stderr!r}")
@@ -974,6 +1009,35 @@ def test_monitor(link_args: list[str], tmp: str, in_rom: bool = False,
     check(f"run.py --monitor hello.bin under the ROM's monitor{via}", ok,
           "" if ok else f"exit {board.returncode}: {board.stdout!r} "
           f"{board.stderr!r}")
+
+
+def test_fit(link_args: list[str], tmp: str, ram: int) -> None:
+    """load.py refuses a word beyond the RAM of ram words, which it reads
+    at 0xFFFFFF9E with the core held (load.py, check_fit): under the
+    monitor, with --rom and the monitor of the tests, a word at the
+    monitor's variables, the first past a program's RAM, and without the
+    monitor a word at the RAM's size, on a board whose RAM is smaller
+    than the MEGA65's, as read_bin() refuses one beyond that for every
+    board. A refused load leaves the core held and the memory cleared,
+    as the next load does."""
+    subprocess.run(["make", "-s", "-C", f"{REPO}/monitor",
+                    "build/monitor_test.bin"], check=True)
+    monitor = f"{REPO}/monitor/build/monitor_test.bin"
+    cases = [(ram - MONITOR_WORDS, ["--monitor", "--rom", monitor],
+              " under the monitor")]
+    if ram < MAX_RAM_WORDS:
+        cases.append((ram, [], ""))
+    for addr, options, where in cases:
+        beyond = os.path.join(tmp, "beyond.bin")
+        with open(beyond, "w") as f:
+            f.write(f"{addr:08x} 00000001\n")
+        r = subprocess.run([sys.executable, f"{REPO}/tools/load.py"] +
+                           link_args + ["--no-run"] + options + [beyond],
+                           stdin=subprocess.DEVNULL, capture_output=True,
+                           text=True)
+        ok = r.returncode != 0 and "beyond" in r.stderr
+        check(f"load.py refuses {addr:08X}{where}", ok,
+              "" if ok else f"exit {r.returncode}: {r.stdout!r} {r.stderr!r}")
 
 
 def test_selftest(link_args: list[str], tmp: str) -> None:
@@ -1181,7 +1245,10 @@ def main() -> None:
                 if not sys.platform.startswith("linux"):
                     sys.exit("hwtest.py: programming needs Linux; program "
                              "the FPGA yourself and give --no-program")
-                cable, args.port = check_board(args.port, args.bit)
+                cable, args.port, model = check_board(args.port, args.bit)
+                if not args.board:
+                    board = "nexys4ddr" if model.startswith("xc7a100") \
+                        else "mega65"
             link = Link(Serial(args.port, args.baud))
             opened = True
             try:
@@ -1207,6 +1274,7 @@ def main() -> None:
             serial = ["--port", args.port, "--baud", str(args.baud)]
             test_run(serial, comparisons(tmp))
             test_monitor(serial, tmp, in_rom=True, long=True)
+            test_fit(serial, tmp, RAM_WORDS[board])
             test_bench(serial, bench)
             test_selftest(serial, tmp)
             if not args.eth:

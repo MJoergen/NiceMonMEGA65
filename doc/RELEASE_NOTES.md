@@ -127,6 +127,13 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   the link, as these targets did before.
 - `make flash` warns when the bitstream has no ROM, as the board then
   starts from the flash with an empty screen.
+- `make hwtest` tells the board from the FPGA it programs, an xc7a100t
+  on the Nexys4DDR, and no longer from the path of the bitstream. It
+  pastes `hello.bin` into the monitor's `l` at the UART's full rate,
+  and checks that `load.py` refuses a word beyond the RAM; `make
+  cosimtest` does the same on the RTL. `make -C monitor test` checks
+  `l` with 64K words of RAM, and the ring of the history at the sizes
+  of both boards, and `tb_nicemon` reads `0xFFFFFF9E`.
 
 **Nexys4DDR**
 

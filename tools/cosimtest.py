@@ -7,11 +7,13 @@ free port of 127.0.0.1. On it, it runs hwtest.py's checks of bad packets,
 except the one of a gap between two bytes, as a gap in real time is far
 shorter in simulated time, and its checks of the pause, the step, and the breakpoints. Then it runs
 the programs of hwtest.py's comparison with run.py --cosim on that port
-and with niceemu alone. Each must print the
-same and exit with the same status. So it checks the RTL, nicelink.py, and
-run.py as hwtest.py does on the board. The simulation runs far slower than
-real time, so the waits are longer, and nice_cpu's benchmark and the demo's
-self-test are left out.
+and with niceemu alone, and the monitor's test program, with run.py
+--monitor and with the monitor's l. Each must print the
+same and exit with the same status. Last, load.py must refuse a word
+beyond the simulated system's 64K words of RAM. So it checks the RTL,
+nicelink.py, run.py, and load.py as hwtest.py does on the board. The
+simulation runs far slower than real time, so the waits are longer, and
+nice_cpu's benchmark and the demo's self-test are left out.
 NICE=multi in the environment picks the multi-cycle core, as for make
 test. It prints one line for each check, and last how many passed, and
 exits with status 1 when one fails. niceemu must be built first, with make
@@ -28,8 +30,8 @@ import tempfile
 
 import hwtest
 from hwtest import (NICEEMU, REPO, assemble, assemble_labels, comparisons,
-                    results, test_framing, test_monitor, test_pause, test_run,
-                    test_step, test_break)
+                    results, test_fit, test_framing, test_monitor, test_pause,
+                    test_run, test_step, test_break)
 from nicelink import HOLD, RAM, open_link
 
 
@@ -78,6 +80,8 @@ def main() -> None:
                 link.close()
             test_run(["--cosim", port], comparisons(tmp))
             test_monitor(["--cosim", port], tmp)
+            # The simulated system has nicemon's default RAM, 64K words
+            test_fit(["--cosim", port], tmp, 0x10000)
         finally:
             os.killpg(sim.pid, signal.SIGTERM)
             sim.wait()

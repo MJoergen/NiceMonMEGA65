@@ -359,19 +359,32 @@ defines `VERSION`, the string of the banner, `git describe` of the tree
 unless `VERSION=` is given, and is written only when it changes.
 
 `make -C monitor test` checks the layout of the sources with nice_cpu's
-`nicefmt`, assembles the monitor with the version `V9.9`, and runs it in
-`niceemu` five times, with its keystrokes in an input file and `h` as
-the last command, so that the run ends: alone, with every command and
-the edits of a line; alone, with 448 rows of `d`, which go round the
+`nicefmt`, checks that the monitor ends below `DEMO`, where the demo
+goes in the ROM, assembles the monitor with the version `V9.9`, and runs
+it in `niceemu` seven times, with its keystrokes in an input file and
+`h` as the last command, so that the run ends: alone, with every command
+and the edits of a line; alone, with 448 rows of `d`, which go round the
 ring of the history, and Page Up and Page Down; alone, with `l` and
-`build/hello.bin` pasted, lines that are skipped, and CTRL-C, then `r`;
-with `test/hello.nasm` at `0x8000`, an assembly
+`build/hello.bin` pasted, lines that are skipped, tabs, a line of
+blanks, a line too long, a second line for an address, and CTRL-C, then
+`r`, with 128K words of RAM, as on the MEGA65, which a word of the
+input file gives `0xFFFFFF9E`; alone, with `l` at the bounds of 64K
+words, as on the Nexys4DDR; alone, with `l` where `0xFFFFFF9E` reads 0,
+as in `niceemu`; with `test/hello.nasm` at `0x8000`, an assembly
 program under nice_cpu's `start_mon.nasm`; and with `test/hello.c`,
 built with `nicebuild.py --monitor --asm mon.nasm`, which is skipped
 without clang. The console output, which is the copy on the line, a few
 memory words, and the screen are compared with `test/NAME.expected`. The
 expected files were checked by hand; after a change that moves them,
 check the new output the same way before copying it from `build/`.
+`test/ring.py` checks the ring of the history first, at the sizes of the
+screen's memory of `niceemu` and the MEGA65, 32768 words, of the
+Nexys4DDR, 8192, and of 2048, which has no room for it, with the monitor
+built to take each size: it reads the rows a board would show from the
+dump of the memory, at the display offset the monitor set, and compares
+them with the console output, with the history filled in part and gone
+round, after Page Ups, Page Downs, and a key that shows the screen
+again.
 
 On a board, `make r6` builds a bitstream that boots the monitor, with the
 demo behind it in the ROM. `make hwtest` loads the same, with the

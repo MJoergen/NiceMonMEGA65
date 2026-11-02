@@ -675,6 +675,9 @@ begin
       check("FFFFFFF0", "00000002");         -- halted, the ROM shown
       check("FFFFFFF2", "00000005");         -- the version
       check("FFFFFFF3", "00000010");         -- the free space: 16 bytes
+      check("FFFFFF9E", "00001000");         -- the RAM's words, 2 ** G_RAM_ADDR_BITS
+      wr("FFFFFF9E", "00000001");            -- dropped
+      check("FFFFFF9E", "00001000");
       check("00000000", first_v);            -- the ROM
       wr("00000000", "12345678");            -- dropped
       check("00000000", first_v);

@@ -1,0 +1,23 @@
+NiceMon V9.9
+? lists the commands
+> l
+ADDR WORD in hex on each line, as in a .bin file; an empty line ends
+Words loaded: 1, 0000EFFF to 0000EFFF
+Lines skipped: 2, first line 2; ADDR WORD in hex, ADDR 00008000 to 0000EFFF
+> d EFFF 1
+0000EFFF 00000001
+> h
+Halted
+fffff00e: 0000f000
+Screen:
+|NiceMon V9.9
+|? lists the commands
+|> l
+|ADDR WORD in hex on each line, as in a .bin file; an empty line ends
+|Words loaded: 1, 0000EFFF to 0000EFFF
+|Lines skipped: 2, first line 2; ADDR WORD in hex, ADDR 00008000 to 0000EFFF
+|> d EFFF 1
+|0000EFFF 00000001
+|> h
+|Halted
+exit 0

@@ -189,7 +189,7 @@ def flash_cor(args: argparse.Namespace) -> None:
     if len(data) > SLOT_SIZE:
         sys.exit(f"flash.py: {args.cor} has {len(data)} bytes, more than "
                  f"a slot's {SLOT_SIZE}")
-    cable, port = check_part(args.port, MEGA65_PART, args.cor)
+    cable, port, _ = check_part(args.port, MEGA65_PART, args.cor)
     loader = ["openFPGALoader"] + cable + ["--fpga-part", f"xc{MEGA65_PART}"]
 
     # The first dump loads the bridge; it stays in the FPGA until the
@@ -259,7 +259,7 @@ def flash_bit(args: argparse.Namespace) -> None:
         sys.exit(f"flash.py: {args.bit} is for {bit_part(args.bit)}, not the "
                  f"Nexys4DDR's {PART}; a MEGA65 takes a core file with "
                  f"--cor")
-    cable, port = check_board(args.port, args.bit)
+    cable, port, _ = check_board(args.port, args.bit)
     loader = ["openFPGALoader"] + cable + ["--fpga-part", f"xc{PART}"]
 
     if args.erase:

@@ -85,17 +85,19 @@ def stable_port(port: str) -> str:
     return port
 
 
-def check_board(port: str, bit: str) -> tuple[list[str], str]:
+def check_board(port: str, bit: str) -> tuple[list[str], str, str]:
     """Stops unless the FPGA on the board of the serial port is the part of
     the bitstream, and returns what check_part returns."""
     return check_part(port, bit_part(bit), bit)
 
 
-def check_part(port: str, part: str, file: str) -> tuple[list[str], str]:
+def check_part(port: str, part: str,
+               file: str) -> tuple[list[str], str, str]:
     """Stops unless the FPGA on the board of the serial port is the part
     that file was built for, and returns the openFPGALoader options that
-    select its JTAG cable, and the port's name by id (stable_port), which
-    the tool uses from then on."""
+    select its JTAG cable, the port's name by id (stable_port), which the
+    tool uses from then on, and the model of the FPGA, xc7a100 on the
+    Nexys4DDR and xc7a200 on the MEGA65."""
     serial = usb_serial(port)
     port = stable_port(port)
     cable, model = fpga_model(serial)
@@ -107,7 +109,7 @@ def check_part(port: str, part: str, file: str) -> tuple[list[str], str]:
                  f"{model}; give the file for this board, or the --port of "
                  f"the board the file is for")
     wait_port(port)
-    return ["-c", cable, "--ftdi-serial", serial], port
+    return ["-c", cable, "--ftdi-serial", serial], port, model
 
 
 def wait_port(port: str, timeout: float = 5.0) -> None:

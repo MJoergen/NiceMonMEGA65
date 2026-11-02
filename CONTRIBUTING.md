@@ -405,8 +405,10 @@ checks of bad packets on it, but for the gap of 300 ms, which is far
 shorter in simulated time, and its checks of the pause, the step, and
 the breakpoints.
 Then it runs the programs that `make hwtest` compares, and the monitor's
-with `--monitor --rom`, with `run.py --cosim` and with `niceemu`, whose
-output and exit status must be the same.
+with `--monitor --rom` and with a short program pasted into `l`, with
+`run.py --cosim` and with `niceemu`, whose output and exit status must
+be the same, and checks that `load.py` refuses a word beyond the
+simulated system's 64K words of RAM.
 It leaves out nice_cpu's benchmark and the demo's self-test, which would
 take too long. It takes about 4 minutes, and CI runs it on both cores.
 
@@ -648,6 +650,9 @@ First it finds the board from its UART: the JTAG cable on the same USB
 device as the port. It reads the FPGA's IDCODE through that cable, and
 stops unless the FPGA is the part the bitstream was built for. So with a
 MEGA65 and a Nexys4DDR both attached, it never programs the wrong one.
+The IDCODE also tells it which board it tests, an xc7a100t being the
+Nexys4DDR; with `--no-program`, the path of the bitstream tells, or
+`--board`.
 
 For the R3, give `BIT=synth/r3/build/top.bit`. For the Nexys4DDR, give
 `BIT=synth/nexys4ddr/build/top.bit`. Its UART is usually `/dev/ttyUSB1`
@@ -714,8 +719,11 @@ bitstream has one. Then it hides the ROM and uses the link:
   `examples/build/bench.bin`, but for its cycles, whose table it prints.
   It runs the monitor's `test/hello.nasm` with `run.py --monitor --rom
   monitor/build/monitor_test.bin` against `niceemu` on the two joined,
-  and with `run.py --monitor` under the monitor in the board's ROM, which
-  must return its status, 42.
+  pastes the 600 lines of `hello.bin` into the monitor's `l` at the
+  UART's full rate and runs them with `r`, and runs `hello.nasm` with
+  `run.py --monitor` under the monitor in the board's ROM, which must
+  return its status, 42. `load.py` must refuse a word beyond the RAM
+  that `0xFFFFFF9E` gives, under the monitor and without it.
 - Then it runs the demo's self-test, F11, with `run.py`, and checks that
   its four tests pass. The timer's test and the counters' test check
   counts of the core's pipeline, not of the ISA, so a core whose timing
@@ -751,7 +759,7 @@ among them, as typed at its prompt, with the labels of `sim/break.nasm`.
 Last, it runs `hello.nasm` with `run.py --tcp 127.0.0.2:PORT` on
 `niceemu --link 127.0.0.2:0`, the form for a `niceemu` on another
 computer; 127.0.0.2 is loopback on Linux, and elsewhere the check is
-skipped. CI runs it.
+skipped. It checks the parsing of `--tcp [HOST:]PORT` first. CI runs it.
 
 `run.py` matches `niceemu` in the details too. It accepts
 `--no-cycle-counter` and ignores it, as the cycle counter always runs. A
