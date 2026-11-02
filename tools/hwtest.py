@@ -71,16 +71,15 @@ Checks, in this order:
     The programs run with the ROM hidden, so the RAM is at 0.
     With --eth, last of all, the Ethernet station, which no failure above
     or here keeps the other checks from:
-    - the ROM, loaded at 0, gets x and CR, then F11, I, the IP address,
-      and CR as
-      console bytes over the UART, as from a terminal, and gives the
+    - the ROM, loaded at 0, gets the monitor's i, the IP address, and CR
+      as console bytes over the UART, as from a terminal, and gives the
       station that address, which a pause reads back
     - ping gets its answers, and the station counts the requests and its
       replies; when no frame at all has come, the board has no Ethernet
       connection, and the summary names the rest after NOT COVERED
       instead of failing
-    - the link over TCP to that address pauses the demo and reads the
-      address, while the demo still has it
+    - the link over TCP to that address pauses the monitor and reads the
+      address, while the monitor still has it
     - programs run with tools/run.py --eth and with niceemu, and their
       output and exit status are compared, as above
     Without --eth, the summary names the Ethernet station after NOT
@@ -945,24 +944,24 @@ def paused(link: Link, addrs: list[int]) -> list[int] | None:
     return words
 
 
-def test_eth_f11(link: Link, demo: str, ip: str) -> list[int] | None:
-    """Loads the ROM of the monitor and the demo, and types x and CR into
-    the monitor, then F11, I, the IP address, and CR into the demo, as
-    console bytes, which its F11 writes to the station. Returns the
-    station's counts of the good frames received and the frames sent, or
-    None if the address did not come."""
+def test_eth_ip(link: Link, rom: str, ip: str) -> list[int] | None:
+    """Loads the ROM of the monitor and the demo, and types the monitor's
+    i, the IP address, and CR, as console bytes, which i writes to the
+    station. Returns the station's counts of the good frames received and
+    the frames sent, or None if the address did not come."""
     want = struct.unpack(">I", socket.inet_aton(ip))[0]
-    load(link, demo)
+    load(link, rom)
     time.sleep(QUIET)                  # the monitor's banner
     room = link.free()
-    link.send_console(DEMO_KEY + b"\x1b[23~i" + ip.encode() + b"\r")
-    # Until the demo has taken every key, then the time for the CR
+    link.send_console(b"i " + ip.encode() + b"\r")
+    # Until the monitor has taken every key, then the time for the CR
     end = time.monotonic() + 10 * QUIET
     while link.free() < room and time.monotonic() < end:
         link.poll(0.05)
     link.poll(QUIET)
     got = paused(link, [0xFFFFFF9A, 0xFFFFFF98, 0xFFFFFF9D])
-    if not check(f"eth: F11 typed over the UART gives the IP address {ip}",
+    if not check(f"eth: the monitor's i typed over the UART gives the IP "
+                 f"address {ip}",
                  got is not None and got[0] == want,
                  "no pause" if got is None else f"{got[0]:08X}"):
         return None
@@ -970,10 +969,10 @@ def test_eth_f11(link: Link, demo: str, ip: str) -> list[int] | None:
 
 
 def test_eth(port: str, baud: int, eth: str,
-             programs: list[tuple[str, list[str], bool]], demo: str) -> None:
-    """The Ethernet station, last of all: the demo's F11 gives it the IP
+             programs: list[tuple[str, list[str], bool]], rom: str) -> None:
+    """The Ethernet station, last of all: the monitor's i gives it the IP
     address of eth's HOST from keys over the UART, ping gets the answers,
-    the link over TCP reaches the demo, and the programs run over it as
+    the link over TCP reaches the monitor, and the programs run over it as
     over the UART. A board that receives no frame at all is not connected,
     which is not a failure but a gap in the coverage. A failure here is
     counted, and ends this test alone."""
@@ -983,7 +982,7 @@ def test_eth(port: str, baud: int, eth: str,
         want = struct.unpack(">I", socket.inet_aton(ip))[0]
         link = Link(Serial(port, baud))
         try:
-            counts = test_eth_f11(link, demo, ip)
+            counts = test_eth_ip(link, rom, ip)
             if counts is None:
                 return
             ping = subprocess.run(["ping", "-c", "3", "-W", "2", ip],
@@ -1015,7 +1014,7 @@ def test_eth(port: str, baud: int, eth: str,
         tcp_link = Link(Eth(int(tcp) if tcp else ETH_PORT, ip))
         try:
             got = paused(tcp_link, [0xFFFFFF9A])
-            check("eth: the link over TCP pauses the demo and reads the "
+            check("eth: the link over TCP pauses the monitor and reads the "
                   "IP address", got is not None and got[0] == want,
                   "no pause" if got is None else f"{got[0]:08X}")
         finally:

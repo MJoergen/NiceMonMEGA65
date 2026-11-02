@@ -49,6 +49,9 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 
 - `x` copies the demo from the ROM to `0x8000` and runs it, as `r` runs
   a program, or says that the ROM has none.
+- `i 192.168.1.65` gives the Ethernet station its IP address, and `i`
+  alone shows it, so the board needs neither the demo nor the link for
+  it. `make hwtest ETH=IP` types it in place of the demo's F11.
 
 **Tools**
 

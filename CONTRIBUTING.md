@@ -714,11 +714,10 @@ bitstream has one. Then it hides the ROM and uses the link:
 With `ETH=IP`, as in `make hwtest PORT=/dev/ttyUSB1 ETH=192.168.1.65`, and the board's
 Ethernet port on this computer's network, it tests the Ethernet station
 after all the other checks, which its failures do not stop. It loads
-the monitor and the demo, and types `x` and CR into the monitor, then
-F11, I, the IP address, and CR into the demo as console
-bytes over the UART, as a terminal would, and reads the address back in
-a pause. It pings the address and checks the station's counts. It
-pauses the demo over the link on TCP and reads the address again, and
+the monitor and the demo, and types the monitor's `i`, the IP address,
+and CR as console bytes over the UART, as a terminal would, and reads
+the address back in a pause. It pings the address and checks the
+station's counts. It pauses the monitor over the link on TCP and reads the address again, and
 then runs the programs above with `run.py --eth`. The address must be
 free on the network. If no frame at all reaches the station during the
 ping, the board has no Ethernet connection, or the address is not on

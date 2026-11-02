@@ -160,7 +160,7 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   address. It is the line, as the UART is: no `b` notice at connect, and
   a half-close is a break. While a host is connected, the UART's link
   bytes are dropped. `make hwtest` tests the station last, setting its
-  address by typing `x` into the monitor, then into the demo's F11, over the UART. Without `ETH`,
+  address by typing the monitor's `i` over the UART. Without `ETH`,
   or when no frame reaches the board, it prints NOT COVERED and still
   exits 0, so read the summary after an Ethernet change.
 - The tools take `--tcp PORT` for `niceemu --link PORT` (PORT 0 prints the

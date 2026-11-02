@@ -158,9 +158,11 @@ The debug link runs over the board's Ethernet port, on TCP port 4510. A
 PC on the network may then load, run, and debug programs, with no JTAG
 cable.
 
-The board answers once it has an IP address, which a program, the debug
-link, or the demo's F11 gives it. After reset, it has none, and answers
-nothing. In F11, I types a new IP address, and M a new MAC address:
+The board answers once it has an IP address, which the monitor, a
+program, the debug link, or the demo's F11 gives it. After reset, it has
+none, and answers nothing. At the monitor's prompt, `i 192.168.1.65` and
+RETURN give it that address, and `i` alone shows it. In the demo's F11,
+I types a new IP address, and M a new MAC address:
 
 ![The demo's F11, with the Ethernet station's addresses](doc/images/ethernet.png)
 
@@ -208,7 +210,8 @@ cable, whose USB port carries it. It runs at 2 Mbaud (2000000), 8-N-1.
 terminal program, such as `picocom`, the plain client, as
 [over Ethernet](#over-ethernet). The other tools take `--port` too.
 
-The serial port also gives the board its IP address without the demo.
+The serial port also gives the board its IP address without the
+monitor.
 The link writes it to `0xFFFFFF9A`, the first byte in bits 31..24, here
 192.168.1.65:
 

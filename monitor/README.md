@@ -60,13 +60,13 @@ bytes `0x80` to `0x9F` do nothing. RETURN runs the line.
 | `d [ADDR] [N]` | Shows `N` words from `ADDR`, 4 to a row with the row's address first, all in hex. Without `ADDR`, the words after the last shown; without `N`, 32 words. |
 | `c` | Clears the screen. |
 | `v` | The version of the monitor, and of the dispatch table: `NiceMon V1.2, table 1.0`. |
+| `i [A.B.C.D]` | Shows the Ethernet station's IP address, `IP address 192.168.1.65`, or writes it first: four decimal numbers of 0 to 255 with dots between them, such as `i 192.168.1.65`. Anything else is no address, and `i` says so and writes nothing. It writes `0xFFFFFF9A` ([SYSTEM.md](../doc/SYSTEM.md#the-ethernet-station)), so a host connected over TCP loses its connection. In `niceemu` the register is plain memory. |
 | `x` | Runs the demo of the ROM, for the time being (The demo below). Without a demo in the ROM, `x` says so. |
 | `h` | Halts the core, which the reset button, or a host over the link, starts again. The tests end with it. |
 | `?` | Lists the commands. |
 
 Anything else prints `Unknown command; ? lists them`. These are a first
-set: at least one more is planned, to give the board its IP address,
-which the demo's F11 does today (Not decided yet below).
+set (Not decided yet below).
 
 ## Programs
 
@@ -268,9 +268,8 @@ versions of the tests, into the RAM, and types `x` for the demo
 
 ## Not decided yet
 
-- The main loop's other commands. At least one to give the board its IP
-  address, which the demo's F11 does today, and which `make hwtest` types
-  into.
+- The main loop's other commands, which a monitor without a debugger
+  needs, as the on-board debugger has pause, step, and inspect.
 - How a program reaches `0x8000` on a board with no storage: over the
   link, which holds the core, writes the image, and starts it, after
   which the monitor boots cold and a host types `r` on the console; or

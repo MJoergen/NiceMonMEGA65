@@ -63,14 +63,17 @@ $(BUILD)/hello_c.bin: test/hello.c mon.h mon.nasm $(TOOLS) | $(BUILD)
 # and the function key ESC O P, which are dropped. D is d, and q is no
 # command. x finds no demo in the ROM, r no program, d 8000 0 only moves
 # the next d to 8000, and d 0 100 shows 256 words, which scrolls the
-# screen. h ends each input. dash's printf, the
+# screen. i shows the IP address, 0.0.0.0, and writes 192.168.1.65; four
+# addresses are rejected, with too few numbers, one past 255, an empty
+# one, and a letter after them; and the last, with blanks around it and
+# a leading zero, is written, which the dump of 0xFFFFFF9A shows. h ends each input. dash's printf, the
 # shell of make on Ubuntu, has no \x.
-CMDS = ?\rv\rd 0 6\rd\rD 10 1\rq\r\r  c\rabc\177\177\177v\rjunk\003v\r\033[A\033OPv\rx\rr\rd 8000 0\rd 8000\rd 0 100\rh\r
+CMDS = ?\rv\rd 0 6\rd\rD 10 1\rq\r\r  c\rabc\177\177\177v\rjunk\003v\r\033[A\033OPv\rx\rr\rd 8000 0\rd 8000\rd 0 100\ri\ri 192.168.1.65\ri 1.2.3\ri 256.0.0.1\ri 1..2.3\ri 1.2.3.4x\ri  010.0.0.1 \rh\r
 RUN  = r\rh\r
 # The words of each test that are dumped with the screen: for cmds the
-# variables and the cursor's registers, and for the programs the text at
+# variables, the cursor's registers, and the IP address, and for the programs the text at
 # column 40 of row 4, 80 * 4 + 40 = 360 = 0x168, with its color.
-DUMP_cmds    = -d 0xFFFFF000:5 -d 0xFFFFFF80:6
+DUMP_cmds    = -d 0xFFFFF000:5 -d 0xFFFFFF80:6 -d 0xFFFFFF9A:1
 DUMP_hello   = -d 0xFFFF0168:12
 DUMP_hello_c = -d 0xFFFF0168:12
 MAX_STEPS = 10000000

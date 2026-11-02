@@ -50,6 +50,7 @@ SCR_X           .EQU    0xFFFFFF81      ; the cursor's column
 SCR_Y           .EQU    0xFFFFFF82      ; the cursor's row
 SCR_OFFS        .EQU    0xFFFFFF85      ; the display offset, in words
 TIMER           .EQU    0xFFFFFF10      ; the timer's period, 0 to stop it
+E_IP            .EQU    0xFFFFFF9A      ; the Ethernet station's IP address, the first byte in bits 31..24
 
 STACK           .EQU    0xFFFFF000      ; SP at the cold start, above the program's RAM
 V_COL           .EQU    0xFFFFF000      ; the cursor's column, 0 to 79
@@ -220,6 +221,75 @@ dump_end
                 MOVE    @V_NEXT, R7
                 ADD     @--SP, 2, PC
                 MOVE    PC, _io_crlf
+                MOVE    PC, main
+
+; i [A.B.C.D]: the Ethernet station's IP address (doc/SYSTEM.md, "The
+; Ethernet station"), written from four decimal numbers of 0 to 255 with
+; dots between them, and shown, in decimal with dots. Without an address
+; it is only shown. Blanks may come before and after the address, and
+; anything else makes it no address, which is not written. R7 gathers the
+; address, a byte at a time, and R8 counts the numbers left.
+cmd_ip
+                MOVE    R7, 0
+                MOVE    R8, 4
+ip_blank
+                SUB[M]  R0, @R2, 0x20
+        ?Z      ADD     R2, R2, 1
+        ?Z      MOVE    PC, ip_blank
+                MOVE[M] R0, @R2
+        ?Z      MOVE    PC, ip_show     ; no address
+ip_num          MOVE    R4, 0           ; the number
+                MOVE    R5, 0           ; and its digits
+ip_digit
+                SUB     R3, @R2, 0x30
+                SUB[M]  R0, R3, 10
+        ?!C     MOVE    PC, ip_end      ; no digit
+                SHL     R1, R4, 3       ; R4 is 10 * R4 + the digit
+                SHL     R4, R4, 1
+                ADD     R4, R4, R1
+                ADD     R4, R4, R3
+                SUB[M]  R0, R4, 256
+        ?!C     MOVE    PC, ip_bad
+                ADD     R5, R5, 1
+                ADD     R2, R2, 1
+                MOVE    PC, ip_digit
+ip_end          MOVE[M] R0, R5
+        ?Z      MOVE    PC, ip_bad      ; a number without digits
+                SHL     R7, R7, 8
+                OR      R7, R7, R4
+                SUB[M]  R8, R8, 1
+        ?Z      MOVE    PC, ip_last
+                SUB[M]  R0, @R2, 0x2E   ; .
+        ?!Z     MOVE    PC, ip_bad
+                ADD     R2, R2, 1
+                MOVE    PC, ip_num
+ip_last         SUB[M]  R0, @R2, 0x20   ; blanks, then the end of the line
+        ?Z      ADD     R2, R2, 1
+        ?Z      MOVE    PC, ip_last
+                MOVE[M] R0, @R2
+        ?!Z     MOVE    PC, ip_bad
+                MOVE    @E_IP, R7
+ip_show         MOVE    R1, S_IP
+                ADD     @--SP, 2, PC
+                MOVE    PC, _io_puts
+                MOVE    R8, @E_IP
+                MOVE    R9, 4           ; the bytes left
+ip_byte         ROL     R8, R8, 8       ; the top byte to the bottom
+                AND     R1, R8, 0xFF
+                ADD     @--SP, 2, PC
+                MOVE    PC, _io_putdec
+                SUB[M]  R9, R9, 1
+        ?Z      MOVE    PC, ip_done
+                MOVE    R1, 0x2E
+                ADD     @--SP, 2, PC
+                MOVE    PC, mon_putc
+                MOVE    PC, ip_byte
+ip_done         ADD     @--SP, 2, PC
+                MOVE    PC, _io_crlf
+                MOVE    PC, main
+ip_bad          MOVE    R1, S_BADIP
+                ADD     @--SP, 2, PC
+                MOVE    PC, puts_crlf
                 MOVE    PC, main
 
 ; x: the demo, for the time being (issue #65, README.md). The ROM has its
@@ -429,6 +499,7 @@ COMMANDS
                 .DAT    0x63, cmd_cls   ; c
                 .DAT    0x64, cmd_dump  ; d
                 .DAT    0x68, cmd_halt  ; h
+                .DAT    0x69, cmd_ip    ; i
                 .DAT    0x72, cmd_run   ; r
                 .DAT    0x76, cmd_version  ; v
                 .DAT    0x78, cmd_demo  ; x
@@ -449,11 +520,14 @@ S_NOPROG
                 .ASCII_L 'No program at 00008000'
 S_NODEMO
                 .ASCII_L 'No demo in the ROM'
+S_IP            .ASCII_L 'IP address '
+S_BADIP         .ASCII_L 'Not an IP address: four numbers from 0 to 255, with dots between them'
 
-HELP            .DAT    H_R, H_X, H_D, H_C, H_V, H_H, H_Q, 0
+HELP            .DAT    H_R, H_X, H_D, H_I, H_C, H_V, H_H, H_Q, 0
 H_R             .ASCII_L 'r             run the program at 00008000'
 H_X             .ASCII_L 'x             run the demo of the ROM, which F12 leaves'
 H_D             .ASCII_L 'd [ADDR] [N]  show N words from ADDR, in hex, or the next ones'
+H_I             .ASCII_L 'i [A.B.C.D]   show the IP address, or set it, such as 192.168.1.65'
 H_C             .ASCII_L 'c             clear the screen'
 H_V             .ASCII_L 'v             the version'
 H_H             .ASCII_L 'h             halt the core'
