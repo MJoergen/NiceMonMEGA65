@@ -76,6 +76,8 @@ SCR_Y           .EQU    0xFFFFFF82      ; the cursor's row
 SCR_OFFS        .EQU    0xFFFFFF85      ; the display offset, in words
 TIMER           .EQU    0xFFFFFF10      ; the timer's period, 0 to stop it
 E_IP            .EQU    0xFFFFFF9A      ; the Ethernet station's IP address, the first byte in bits 31..24
+E_MACH          .EQU    0xFFFFFF9B      ; the first two bytes of its MAC address, in bits 15..0
+E_MACL          .EQU    0xFFFFFF9C      ; the last four bytes of its MAC address
 RAM_WORDS       .EQU    0xFFFFFF9E      ; the words of the RAM, 0 in niceemu, where there is no limit
 
 STACK           .EQU    0xFFFFF000      ; SP at the cold start, above the program's RAM
@@ -782,6 +784,97 @@ ip_bad          MOVE    R1, S_BADIP
                 MOVE    PC, puts_crlf
                 MOVE    PC, main
 
+; m [MAC]: the Ethernet station's MAC address (doc/SYSTEM.md, "The
+; Ethernet station"), written from six bytes of one or two hex digits, in
+; either case, with colons between them, and shown, two hex digits a byte
+; with colons. The first byte must be even, as bit 0 of it marks a group
+; address, which is no station's. Without an address it is only shown.
+; Blanks may come before and after the address, and anything else makes it
+; no address, which is not written. R7:R8 gather the address, a byte at a
+; time, R9 counts the bytes left, and R10 points into the line.
+cmd_mac
+                MOVE    R7, 0
+                MOVE    R8, 0
+                MOVE    R9, 6
+mac_blank
+                SUB[M]  R0, @R2, 0x20
+        ?Z      ADD     R2, R2, 1
+        ?Z      MOVE    PC, mac_blank
+                MOVE[M] R0, @R2
+        ?Z      MOVE    PC, mac_show    ; no address
+                MOVE    R10, R2
+mac_byte
+                SUB[M]  R0, @R10, 0x20  ; no blank inside the address
+        ?Z      MOVE    PC, mac_bad
+                MOVE    R1, R10
+                ADD     @--SP, 2, PC
+                MOVE    PC, _io_gethex
+                MOVE    R10, R3
+                SUB     R2, R2, 1
+                SUB[M]  R0, R2, 2
+        ?!C     MOVE    PC, mac_bad     ; no digit, or more than two
+                SHR     R4, R8, 24      ; R7:R8 shifted by a byte, and R1 in
+                SHL     R7, R7, 8
+                OR      R7, R7, R4
+                SHL     R8, R8, 8
+                OR      R8, R8, R1
+                SUB[M]  R9, R9, 1
+        ?Z      MOVE    PC, mac_last
+                SUB[M]  R0, @R10, 0x3A  ; :
+        ?!Z     MOVE    PC, mac_bad
+                ADD     R10, R10, 1
+                MOVE    PC, mac_byte
+mac_last
+                SUB[M]  R0, @R10, 0x20  ; blanks, then the end of the line
+        ?Z      ADD     R10, R10, 1
+        ?Z      MOVE    PC, mac_last
+                MOVE[M] R0, @R10
+        ?!Z     MOVE    PC, mac_bad
+                AND[M]  R0, R7, 0x100   ; bit 0 of the first byte: a group address
+        ?!Z     MOVE    PC, mac_bad
+                MOVE    @E_MACH, R7
+                MOVE    @E_MACL, R8
+; The bytes go out from the top of R7, and R8 fills R7 from below.
+mac_show
+                MOVE    R1, S_MAC
+                ADD     @--SP, 2, PC
+                MOVE    PC, _io_puts
+                AND     R7, @E_MACH, 0xFFFF
+                SHL     R7, R7, 16
+                MOVE    R8, @E_MACL
+                SHR     R1, R8, 16
+                OR      R7, R7, R1
+                SHL     R8, R8, 16
+                MOVE    R9, 6           ; the bytes left
+mac_put         SHR     R1, R7, 28      ; the top byte, a digit at a time
+                ADD     @--SP, 2, PC
+                MOVE    PC, mac_digit
+                SHR     R1, R7, 24
+                ADD     @--SP, 2, PC
+                MOVE    PC, mac_digit
+                SUB[M]  R9, R9, 1
+        ?Z      MOVE    PC, ip_done
+                SHR     R4, R8, 24
+                SHL     R7, R7, 8
+                OR      R7, R7, R4
+                SHL     R8, R8, 8
+                MOVE    R1, 0x3A        ; :
+                ADD     @--SP, 2, PC
+                MOVE    PC, mon_putc
+                MOVE    PC, mac_put
+mac_bad         MOVE    R1, S_BADMAC
+                ADD     @--SP, 2, PC
+                MOVE    PC, puts_crlf
+                MOVE    PC, main
+
+; mac_digit: bits 3..0 of R1 as a hex digit
+mac_digit
+                AND     R1, R1, 0xF
+                ADD     R1, R1, 0x30
+                SUB[M]  R0, R1, 0x3A
+        ?!C     ADD     R1, R1, 7       ; A to F
+                MOVE    PC, mon_putc    ; which returns to the caller
+
 ; l: words into the memory from lines of ADDR WORD, two hex numbers of 1 to
 ; 8 digits with blanks between them and around them, as a .bin file has
 ; them (nice_cpu's ISA.md §10.4), up to an empty line or CTRL-C, which
@@ -1412,6 +1505,7 @@ COMMANDS
                 .DAT    0x68, cmd_halt  ; h
                 .DAT    0x69, cmd_ip    ; i
                 .DAT    0x6C, cmd_load  ; l
+                .DAT    0x6D, cmd_mac   ; m
                 .DAT    0x72, cmd_run   ; r
                 .DAT    0x75, cmd_dis   ; u
                 .DAT    0x76, cmd_version  ; v
@@ -1434,6 +1528,7 @@ S_NOPROG
 S_NODEMO
                 .ASCII_L 'No demo in the ROM'
 S_IP            .ASCII_L 'IP address '
+S_MAC           .ASCII_L 'MAC address '
 S_LHINT         .ASCII_L 'ADDR WORD in hex on each line, as in a .bin file; an empty line ends'
 S_LOADED
                 .ASCII_L 'Words loaded: '
@@ -1444,14 +1539,17 @@ S_SKIPPED
 S_FIRST         .ASCII_L ', first line '
 S_LFORM         .ASCII_L '; ADDR WORD in hex, ADDR 00008000 to '
 S_BADIP         .ASCII_L 'Not an IP address: four numbers from 0 to 255, with dots between them'
+S_BADMAC
+                .ASCII_L 'Not a MAC address: six bytes in hex with colons, the first one even'
 
-HELP            .DAT    H_R, H_L, H_X, H_D, H_U, H_I, H_C, H_V, H_H, H_Q, H_P, 0
+HELP            .DAT    H_R, H_L, H_X, H_D, H_U, H_I, H_M, H_C, H_V, H_H, H_Q, H_P, 0
 H_R             .ASCII_L 'r [ADDR]      run the program at ADDR, or at 00008000; r 0 restarts'
 H_L             .ASCII_L 'l             load lines of ADDR WORD in hex, as a .bin file has them'
 H_X             .ASCII_L 'x             run the demo of the ROM, which F12 leaves'
 H_D             .ASCII_L 'd [ADDR] [N]  show N words from ADDR, in hex, or the next ones'
 H_U             .ASCII_L 'u [ADDR] [N]  disassemble N instructions from ADDR, or the next ones'
 H_I             .ASCII_L 'i [A.B.C.D]   show the IP address, or set it, such as 192.168.1.65'
+H_M             .ASCII_L 'm [MAC]       show the MAC address, or set it, such as 02:4E:49:43:45:01'
 H_C             .ASCII_L 'c             clear the screen'
 H_V             .ASCII_L 'v             the version'
 H_H             .ASCII_L 'h             halt the core'

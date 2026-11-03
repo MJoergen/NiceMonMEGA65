@@ -406,7 +406,8 @@ two boards on one network need different ones. On the link, for example:
 Then `ping 192.168.1.65` from a PC on the network gets its answers, and
 `0xFFFFFF9D` counts the replies, the ARP reply and one for each ping.
 The monitor's `i` shows and sets the IP address from the keyboard or
-the line ([monitor/README.md](../monitor/README.md)). With the demo in
+the line, and its `m` the MAC address
+([monitor/README.md](../monitor/README.md)). With the demo in
 the ROM, its F11, after the monitor's `x`, shows the addresses and the counts,
 and sets the addresses from the keyboard
 ([demo/README.md](../demo/README.md)).

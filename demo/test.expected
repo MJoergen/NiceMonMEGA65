@@ -5,8 +5,8 @@ Screen:
 |  This is the demo of the ROM, which the monitor starts with x. What you type
 |  on the keyboard, or send to the console, appears below the blue bar.
 |
-|  To run your own programs, give the board an IP address with F11, then load
-|  and debug them over Ethernet with tools/mon.py --eth. More is at
+|  To run your own programs, give the board an IP address with i in the monitor,
+|  then load and debug them over Ethernet with tools/mon.py --eth. More is at
 |  https://github.com/MJoergen/NiceMonMEGA65
 | RETURN new line   DEL delete   cursor keys move   CTRL-L clear   F12 monitor
 |Hello, world!
@@ -21,8 +21,8 @@ Screen:
 |  This is the demo of the ROM, which the monitor starts with x. What you type
 |  on the keyboard, or send to the console, appears below the blue bar.
 |
-|  To run your own programs, give the board an IP address with F11, then load
-|  and debug them over Ethernet with tools/mon.py --eth. More is at
+|  To run your own programs, give the board an IP address with i in the monitor,
+|  then load and debug them over Ethernet with tools/mon.py --eth. More is at
 |  https://github.com/MJoergen/NiceMonMEGA65
 | RETURN new line   DEL delete   cursor keys move   CTRL-L clear   F12 monitor
 |line 4
@@ -47,8 +47,8 @@ Screen:
 |  This is the demo of the ROM, which the monitor starts with x. What you type
 |  on the keyboard, or send to the console, appears below the blue bar.
 |
-|  To run your own programs, give the board an IP address with F11, then load
-|  and debug them over Ethernet with tools/mon.py --eth. More is at
+|  To run your own programs, give the board an IP address with i in the monitor,
+|  then load and debug them over Ethernet with tools/mon.py --eth. More is at
 |  https://github.com/MJoergen/NiceMonMEGA65
 | RETURN new line   DEL delete   cursor keys move   CTRL-L clear   F12 monitor
 |xQree F
@@ -84,8 +84,8 @@ Screen:
 |  This is the demo of the ROM, which the monitor starts with x. What you type
 |  on the keyboard, or send to the console, appears below the blue bar.
 |
-|  To run your own programs, give the board an IP address with F11, then load
-|  and debug them over Ethernet with tools/mon.py --eth. More is at
+|  To run your own programs, give the board an IP address with i in the monitor,
+|  then load and debug them over Ethernet with tools/mon.py --eth. More is at
 |  https://github.com/MJoergen/NiceMonMEGA65
 | RETURN new line   DEL delete   cursor keys move   CTRL-L clear   F12 monitor
 |back
@@ -130,9 +130,9 @@ Screen:
 |  Since reset, while the core runs
 |
 |    Time, h:mm:ss.hh                              0:00:00.10
-|    Microseconds                                      102445
-|    Cycles                                            102447
-|    Instructions                                      102449
+|    Microseconds                                      102542
+|    Cycles                                            102544
+|    Instructions                                      102546
 |    Clock in MHz, cycles per microsecond                   1
 |
 |  A prime sieve to 2048, run before each update
@@ -340,8 +340,8 @@ Screen:
 |  This is the demo of the ROM, which the monitor starts with x. What you type
 |  on the keyboard, or send to the console, appears below the blue bar.
 |
-|  To run your own programs, give the board an IP address with F11, then load
-|  and debug them over Ethernet with tools/mon.py --eth. More is at
+|  To run your own programs, give the board an IP address with i in the monitor,
+|  then load and debug them over Ethernet with tools/mon.py --eth. More is at
 |  https://github.com/MJoergen/NiceMonMEGA65
 | RETURN new line   DEL delete   cursor keys move   CTRL-L clear   F12 monitor
 |ac1

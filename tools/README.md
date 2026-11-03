@@ -56,7 +56,8 @@ They take `ETH=192.168.1.65` for the Ethernet port, or
 The board serves the debug link on TCP port 4510 of its Ethernet
 station, once it has an IP address
 ([SYSTEM.md](../doc/SYSTEM.md#the-debug-link-over-tcp)). After reset it
-has none. The demo's F11 gives it one: I types a new IP address. Then
+has none. The monitor's `i` gives it one, `i 192.168.1.65` at the
+prompt, and the demo's F11 does too: I types a new IP address. Then
 use `--eth` with any tool:
 
     tools/run.py --eth 192.168.1.65 prog.bin
@@ -90,7 +91,7 @@ program's console: `picocom -b 2000000 /dev/ttyUSB1`. In picocom,
 `Ctrl-A Ctrl-\` sends a break, which ends the line's input; the
 keyboard's goes on.
 
-The serial port also gives the board its IP address without the demo:
+The debug link on the serial port gives it one too, with no key typed:
 
     tools/mon.py --port /dev/ttyUSB1
     mon> w FFFFFF9A C0A80141

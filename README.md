@@ -169,8 +169,10 @@ cable.
 The board answers once it has an IP address, which the monitor, a
 program, the debug link, or the demo's F11 gives it. After reset, it has
 none, and answers nothing. At the monitor's prompt, `i 192.168.1.65` and
-RETURN give it that address, and `i` alone shows it. In the demo's F11,
-I types a new IP address, and M a new MAC address:
+RETURN give it that address, and `i` alone shows it. A second board on
+the same network also needs a MAC address of its own, which
+`m 02:4E:49:43:45:01` gives it, and `m` alone shows it. In the demo's
+F11, I types a new IP address, and M a new MAC address:
 
 ![The demo's F11, with the Ethernet station's addresses](doc/images/ethernet.png)
 
