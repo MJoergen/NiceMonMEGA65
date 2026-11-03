@@ -21,7 +21,7 @@ The release candidates pinned these:
 
 nice_cpu's `RC01` and `RC03` have no tag here.
 
-## V1.3 (not yet released)
+## V1.3 (2026-11-03)
 
 **Upgrade notes.**
 
@@ -48,6 +48,15 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   with no host, in the text of nice_cpu's `nicedis.py` and `mon.py`
   (#72). A call, `ADD @--R13, n, R15` and `MOVE R15, target`, shows as
   `CALL target`, and `MOVE R15, @R13++` as `RET`.
+- `m` shows the Ethernet station's MAC address, and `m
+  02:4E:49:43:45:01` writes it first, so two boards on one network can
+  have different ones without the demo's F11. The first byte must be
+  even.
+
+**Demo**
+
+- The welcome sends the reader to the monitor's `i` for the IP address,
+  where it named F11.
 
 **Tools**
 
