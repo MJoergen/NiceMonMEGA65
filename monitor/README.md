@@ -65,7 +65,7 @@ the MEGA65 and 77 on the Nexys4DDR (Input and output below).
 
 | Command | What it does |
 |---|---|
-| `r` | Runs the program at `0x8000` (Programs below), and prints its status when it returns: `Returned 0000002A`. A word of 0 at `0x8000` is no program, and `r` says so. |
+| `r [ADDR]` | Runs the program at `ADDR` in hex, or at `0x8000` without it (Programs below), and prints its status when it returns: `Returned 0000002A`. A word of 0 at `ADDR` is no program, and `r` says so: `No program at 00008000`. `r 0` runs entry 0 of the dispatch table, the cold start, so it restarts the monitor and leaves the RAM from `0x8000` alone. |
 | `d [ADDR] [N]` | Shows `N` words from `ADDR`, 4 to a row with the row's address first, all in hex. Without `ADDR`, the words after the last shown; without `N`, 32 words. |
 | `c` | Clears the screen. |
 | `v` | The version of the monitor, and of the dispatch table: `NiceMon V1.2, table 1.0`. |

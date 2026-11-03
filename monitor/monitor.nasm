@@ -12,13 +12,14 @@
 ;
 ; The cold start, mon_reset, sets SP to STACK, the variables, and the
 ; screen, prints the banner, and runs the main loop. A command is a line:
-; a letter, and after d a hex address and a hex count. l writes words into
-; the RAM from lines of ADDR WORD in hex, as a .bin file has them, typed or
-; pasted, up to an empty line, so that a program is loaded with no host's
-; tools and no storage. Each line is shown in one row of the screen, which
-; the next line clears, and not on the line, so that no line scrolls the
-; screen and a paste at 2 Mbaud keeps up. r runs the program
-; at 0x8000 as a subroutine, with R1 = the entry of mon_putc, R2 = 0,
+; a letter, and after d a hex address and a hex count, and after r a hex
+; address. l writes words into the RAM from lines of ADDR WORD in hex, as
+; a .bin file has them, typed or pasted, up to an empty line, so that a
+; program is loaded with no host's tools and no storage. Each line is
+; shown in one row of the screen, which the next line clears, and not on
+; the line, so that no line scrolls the screen and a paste at 2 Mbaud
+; keeps up. r runs the program at its address, or at 0x8000, as a
+; subroutine, with R1 = the entry of mon_putc, R2 = 0,
 ; R3 = 0, and E = 0 (ABI.md, "Programs under a monitor"). At its return,
 ; and at mon_exit, the monitor clears E, stops the timer, sets VBASE to 0,
 ; takes a fresh stack, and prints the status, R1. x copies the demo from
@@ -584,23 +585,33 @@ demo_copy
                 MOVE    @R3++, @R2++
                 SUB[M]  R1, R1, 1
         ?!Z     MOVE    PC, demo_copy
-                MOVE    PC, cmd_run
+                MOVE    R7, PROGRAM
+                MOVE    PC, run_at
 no_demo         MOVE    R1, S_NODEMO
                 ADD     @--SP, 2, PC
                 MOVE    PC, puts_crlf
                 MOVE    PC, main
 
-; r: the program at 0x8000, called as ABI.md says, on this stack: the
-; return address is pushed, and the program returns with MOVE PC, @SP++
-; and its status in R1. A word of 0 at 0x8000 is no program: it is MOVE
-; R0, R0, which no start-up code begins with.
-cmd_run         MOVE[M] R0, @PROGRAM
+; r [ADDR]: the program at ADDR, 0x8000 without it, called as ABI.md
+; says, on this stack: the return address is pushed, and the program
+; returns with MOVE PC, @SP++ and its status in R1. A word of 0 at ADDR is
+; no program: it is MOVE R0, R0, which no start-up code begins with. r 0
+; is entry 0 of the dispatch table, the cold start. x enters at run_at,
+; with R7 the address.
+cmd_run
+                MOVE    R1, R2
+                ADD     @--SP, 2, PC
+                MOVE    PC, _io_gethex  ; R1 the address, R2 its digits
+                MOVE    R7, R1
+                MOVE[M] R0, R2
+        ?Z      MOVE    R7, PROGRAM     ; no address
+run_at          MOVE[M] R0, @R7
         ?Z      MOVE    PC, no_prog
                 MOVE    R1, MON_PUTC    ; the entry of mon_putc (mon.nasm)
                 MOVE    R2, 0           ; argc
                 MOVE    R3, 0           ; argv
                 ADD     @--SP, 2, PC
-                MOVE    PC, PROGRAM
+                MOVE    PC, R7
 
 ; mon_exit: entry 1, and where a program returns to. Back to the main loop
 ; with R1 the status: E cleared, the timer stopped, VBASE 0, a fresh
@@ -625,7 +636,12 @@ mon_exit
                 MOVE    PC, main
 no_prog         MOVE    R1, S_NOPROG
                 ADD     @--SP, 2, PC
-                MOVE    PC, puts_crlf
+                MOVE    PC, _io_puts
+                MOVE    R1, R7
+                ADD     @--SP, 2, PC
+                MOVE    PC, _io_puthex
+                ADD     @--SP, 2, PC
+                MOVE    PC, _io_crlf
                 MOVE    PC, main
 
 ; mon_version: entry 2. R1 = the version of the table, the major number in
@@ -974,7 +990,7 @@ S_HALTED
 S_RETURN
                 .ASCII_L 'Returned '
 S_NOPROG
-                .ASCII_L 'No program at 00008000'
+                .ASCII_L 'No program at '
 S_NODEMO
                 .ASCII_L 'No demo in the ROM'
 S_IP            .ASCII_L 'IP address '
@@ -990,7 +1006,7 @@ S_LFORM         .ASCII_L '; ADDR WORD in hex, ADDR 00008000 to '
 S_BADIP         .ASCII_L 'Not an IP address: four numbers from 0 to 255, with dots between them'
 
 HELP            .DAT    H_R, H_L, H_X, H_D, H_I, H_C, H_V, H_H, H_Q, H_P, 0
-H_R             .ASCII_L 'r             run the program at 00008000'
+H_R             .ASCII_L 'r [ADDR]      run the program at ADDR, or at 00008000; r 0 restarts'
 H_L             .ASCII_L 'l             load lines of ADDR WORD in hex, as a .bin file has them'
 H_X             .ASCII_L 'x             run the demo of the ROM, which F12 leaves'
 H_D             .ASCII_L 'd [ADDR] [N]  show N words from ADDR, in hex, or the next ones'

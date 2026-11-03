@@ -83,15 +83,18 @@ $(BUILD)/hello_c.bin: test/hello.c mon.h mon.nasm $(TOOLS) | $(BUILD)
 # The inputs. cmds types each command, with the edits of a line: three DELs
 # that take back abc, a CTRL-C that empties junk, and the cursor key ESC [ A
 # and the function key ESC O P, which are dropped. D is d, and q is no
-# command. x finds no demo in the ROM, r no program, d 8000 0 only moves
+# command. x finds no demo in the ROM, r no program, nor r 9000, d 8000 0 only moves
 # the next d to 8000, and d 0 100 shows 256 words, which scrolls the
 # screen. i shows the IP address, 0.0.0.0, and writes 192.168.1.65; four
 # addresses are rejected, with too few numbers, one past 255, an empty
 # one, and a letter after them; and the last, with blanks around it and
 # a leading zero, is written, which the dump of 0xFFFFFF9A shows. h ends each input. dash's printf, the
 # shell of make on Ubuntu, has no \x.
-CMDS = ?\rv\rd 0 6\rd\rD 10 1\rq\r\r  c\rabc\177\177\177v\rjunk\003v\r\033[A\033OPv\rx\rr\rd 8000 0\rd 8000\rd 0 100\ri\ri 192.168.1.65\ri 1.2.3\ri 256.0.0.1\ri 1..2.3\ri 1.2.3.4x\ri  010.0.0.1 \rh\r
+CMDS = ?\rv\rd 0 6\rd\rD 10 1\rq\r\r  c\rabc\177\177\177v\rjunk\003v\r\033[A\033OPv\rx\rr\rr 9000\rd 8000 0\rd 8000\rd 0 100\ri\ri 192.168.1.65\ri 1.2.3\ri 256.0.0.1\ri 1..2.3\ri 1.2.3.4x\ri  010.0.0.1 \rh\r
 RUN  = r\rh\r
+# reset: r 0, the cold start, which shows the banner again and leaves the
+# RAM from 0x8000 alone, so that r then runs hello.
+RESET = r 0\rr\rh\r
 # scroll: Page Up and Page Down with no history, which do nothing; d 8000
 # 700, the zeros of the empty RAM, 448 rows, which fill the history of 384
 # rows and go round its ring; two Page Ups and a Page Down, which turn the
@@ -158,10 +161,11 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	@printf '$(LOAD_64K)' > $(BUILD)/load_64k.txt
 	@printf '$(CMDS)' > $(BUILD)/cmds.txt
 	@printf '$(RUN)' > $(BUILD)/run.txt
+	@printf '$(RESET)' > $(BUILD)/reset.txt
 	@printf '$(SCROLL)' > $(BUILD)/scroll.txt
 	@{ printf '$(LOAD_HEAD)'; head -n 3 $(BUILD)/hello.bin | awk '{ printf "%s\r\n", $$0 }'; \
 	  tail -n +4 $(BUILD)/hello.bin; printf '$(LOAD_TAIL)'; } > $(BUILD)/load.txt
-	@fail=0; for t in cmds scroll load load_emu load_64k hello hello_c; do \
+	@fail=0; for t in cmds scroll load load_emu load_64k hello reset hello_c; do \
 	  case $$t in \
 	    cmds) prog=; input=cmds; dump='$(DUMP_cmds)';; \
 	    scroll) prog=; input=scroll; dump='$(DUMP_scroll)';; \
@@ -169,6 +173,7 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	    load_emu) prog=; input=load_emu; dump='$(DUMP_load_emu)';; \
 	    load_64k) prog=$(BUILD)/ram64k.bin; input=load_64k; dump='$(DUMP_load_64k)';; \
 	    hello) prog=$(BUILD)/hello.bin; input=run; dump='$(DUMP_hello)';; \
+	    reset) prog=$(BUILD)/hello.bin; input=reset; dump='$(DUMP_hello)';; \
 	    hello_c) prog=$(BUILD)/hello_c.bin; input=run; dump='$(DUMP_hello_c)'; \
 	      if ! command -v $(CLANG) > /dev/null; then echo "SKIP monitor $$t: no $(CLANG)"; continue; fi; \
 	      $(MAKE) --no-print-directory $$prog || exit 1;; \
