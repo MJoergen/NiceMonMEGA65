@@ -77,6 +77,10 @@ $(BUILD)/hello.bin: test/hello.nasm monlib.nasm mon.nasm $(TOOLS) | $(BUILD)
 	  > $(BUILD)/hello_all.nasm
 	@$(ASM) -o $@ $(BUILD)/hello_all.nasm
 
+# The words that u disassembles in test/dis.py, at 0x8000, which never run
+$(BUILD)/dis.bin: test/dis.nasm $(TOOLS) | $(BUILD)
+	@$(ASM) -o $@ test/dis.nasm
+
 $(BUILD)/hello_c.bin: test/hello.c mon.h mon.nasm $(TOOLS) | $(BUILD)
 	@$(NICEBUILD) --monitor --asm mon.nasm -I . -o $@ test/hello.c
 
@@ -151,10 +155,13 @@ MAX_STEPS = 10000000
 # test/NAME.expected. The Halted line and the registers are left out, as
 # the steps and the registers change with the code. hello_c is skipped
 # without clang. test/ring.py checks the ring of the history at the
-# sizes of the screen's memory of niceemu and the boards first.
-test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.bin $(BUILD)/hello.bin
+# sizes of the screen's memory of niceemu and the boards first, and
+# test/dis.py the rows of u against nicedis.py and niceasm.
+test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.bin $(BUILD)/hello.bin \
+      $(BUILD)/dis.bin
 	@$(PYTHON) test/ring.py $(EMU) $(BUILD)/monitor_test.bin:32768 \
 	  $(BUILD)/monitor_8k.bin:8192 $(BUILD)/monitor_2k.bin:2048
+	@$(PYTHON) test/dis.py $(EMU) $(BUILD)/monitor_test.bin $(BUILD)/dis.bin
 	@echo 'FFFFFF9E 00020000' > $(BUILD)/ram128k.bin
 	@echo 'FFFFFF9E 00010000' > $(BUILD)/ram64k.bin
 	@printf '$(LOAD_EMU)' > $(BUILD)/load_emu.txt
@@ -189,7 +196,7 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 
 # The layout of the sources, as nice_cpu's nicefmt checks it
 fmt:
-	@$(FMT) $(SOURCES) test/hello.nasm
+	@$(FMT) $(SOURCES) test/hello.nasm test/dis.nasm
 
 $(BUILD):
 	@mkdir -p $@

@@ -52,7 +52,7 @@ At the cold start the monitor clears the screen, prints its banner,
 `NiceMon` and the version, and prints a prompt, `> `, on the screen and
 on the line. It reads a line from the console: the keyboard and the line,
 which the hardware merges. A command is a letter, in either case, and
-after `d` a hex address and a hex count, each of them optional. DEL and
+after `d` and `u` a hex address and a hex count, each of them optional. DEL and
 backspace delete the character before the cursor, CTRL-C empties the
 line, and the cursor and function keys, the other control codes, and the
 bytes `0x80` to `0x9F` do nothing. RETURN runs the line.
@@ -67,6 +67,7 @@ the MEGA65 and 77 on the Nexys4DDR (Input and output below).
 |---|---|
 | `r [ADDR]` | Runs the program at `ADDR` in hex, or at `0x8000` without it (Programs below), and prints its status when it returns: `Returned 0000002A`. A word of 0 at `ADDR` is no program, and `r` says so: `No program at 00008000`. `r 0` runs entry 0 of the dispatch table, the cold start, so it restarts the monitor and leaves the RAM from `0x8000` alone. |
 | `d [ADDR] [N]` | Shows `N` words from `ADDR`, 4 to a row with the row's address first, all in hex. Without `ADDR`, the words after the last shown; without `N`, 32 words. |
+| `u [ADDR] [N]` | Disassembles `N` instructions from `ADDR`, a row each: the address, the instruction's 1 to 4 words, and its text, all in hex (The disassembler below). Without `ADDR`, the instructions after the last shown; without `N`, 20. |
 | `c` | Clears the screen. |
 | `v` | The version of the monitor, and of the dispatch table: `NiceMon V1.2, table 1.0`. |
 | `i [A.B.C.D]` | Shows the Ethernet station's IP address, `IP address 192.168.1.65`, or writes it first: four decimal numbers of 0 to 255 with dots between them, such as `i 192.168.1.65`. Anything else is no address, and `i` says so and writes nothing. It writes `0xFFFFFF9A` ([SYSTEM.md](../doc/SYSTEM.md#the-ethernet-station)), so a host connected over TCP loses its connection. In `niceemu` the register is plain memory. |
@@ -77,8 +78,42 @@ the MEGA65 and 77 on the Nexys4DDR (Input and output below).
 
 Anything else prints `Unknown command; ? lists them`. The debugger has
 pause, step, and inspect, so the monitor adds only `l`, which loads a
-program with no host's tools and no storage; the SD card's commands come
+program with no host's tools and no storage, and `u`, which reads code
+with no host
+([#72](https://github.com/MJoergen/NiceMonMEGA65/issues/72)); the SD
+card's commands come
 with [#62](https://github.com/MJoergen/NiceMonMEGA65/issues/62).
+
+## The disassembler
+
+`u` shows each instruction as nice_cpu's `assembler/nicedis.py` and
+`mon.py` do, so the three disassemblers agree:
+
+    > u 8000 3
+    00008000 0077580f 00000002 0003d800 00008123  CALL 0x8123
+    00008004 0003f680                             RET
+    00008005 3c400007                             ?Z INT 7
+
+- The text has the condition, the mnemonic with `[C]` and `[M]`, the
+  SHIFT aliases, such as `SHL` and `ROR`, and the operands in the syntax
+  of nice_cpu's ISA.md §10.2. Constants are in lower-case hex without
+  leading zeros, and INT's vector is in decimal.
+- A reserved control word, and an instruction with a field that its
+  mnemonic does not use and that is not R0, are a `.DAT` of their words,
+  with what they would do as a comment, as nicedis.py writes them:
+  `.DAT 0x00000001 ; MOVE R0, R0 (s1: R1)`.
+- `ADD @--R13, n, R15` followed by `MOVE R15, target`, where `n` is the
+  number of words of the `MOVE`, is one row, `CALL target`, and
+  `MOVE R15, @R13++` is `RET`: the pseudo-instructions of ISA.md §10.1,
+  which `niceasm` assembles back to the same words. A condition applies
+  to both instructions of a `CALL`, so the two must have the same one,
+  as in `?Z CALL 0x8123`. A pair with two conditions, an `ADD` with a
+  modifier, an `n` that is not the length of the `MOVE`, or a `MOVE`
+  with a modifier, is two rows. nicedis.py does not show the two
+  pseudo-instructions.
+- An instruction of 4 words, with constants in all three fields, has a
+  text longer than the 34 columns left, and goes on in the next row of
+  the screen.
 
 ## Programs
 
@@ -388,7 +423,13 @@ built to take each size: it reads the rows a board would show from the
 dump of the memory, at the display offset the monitor set, and compares
 them with the console output, with the history filled in part and gone
 round, after Page Ups, Page Downs, and a key that shows the screen
-again.
+again. `test/dis.py` runs `u` over `test/dis.nasm` at `0x8000`, which
+has every opcode, operand mode, condition, and modifier, the control
+instructions, the reserved control words, unused fields that are not R0,
+and the pairs that are `CALL` and `RET` and those that are not. It
+compares each row with nicedis.py's text, or, for a `CALL` or a `RET`,
+assembles it with `niceasm` and compares the words, and checks that `u`
+without `ADDR` goes on after the last row.
 
 On a board, `make r6` builds a bitstream that boots the monitor, with the
 demo behind it in the ROM. `make hwtest` loads the same, with the
@@ -418,6 +459,6 @@ the dispatch table, and both go when the demo goes; `release.py` and
 
 - The SD card, FAT32, and `qtransfer` code, about half of QMON, has no
   hardware here.
-- The disassembler needs writing anew for the NICE instruction set, in
-  NICE assembly; nice_cpu's `assembler/nicedis.py`, which `mon.py` uses,
-  is the model.
+- QMON's disassembler is for QNICE; `u` was written anew for the NICE
+  instruction set, with nice_cpu's `assembler/nicedis.py` as the model
+  (The disassembler above).
