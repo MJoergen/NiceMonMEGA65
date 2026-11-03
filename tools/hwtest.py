@@ -48,6 +48,9 @@ Checks, in this order:
     - sim/step.nasm steps to its halt, and the registers after each step
       are compared with niceemu --trace
     - sim/break.nasm stops at breakpoints
+    - sim/step.nasm, paused, takes writes of R0-R15, and goes on from
+      them, compared with the same on niceemu --link; a write while
+      halted or held is refused
     - the memory is cleared
     - 0xFFFFFF9E reads the RAM's words, and the top word of the RAM holds
       a word, apart from the word of a RAM half the size
@@ -126,7 +129,7 @@ from load import (MAX_RAM_WORDS, MONITOR_WORDS, PROGRAM, RAM_SIZE, load_words,
                   read_bin, start)
 from nicelink import (BRK_COUNT, BRK_EN, CONTROL, ETH_PORT, FREE, HOLD,
                       PAUSE, RAM, REGS, STEP, STOP, VERSION, Eth, Link,
-                      LinkError, Serial, packet)
+                      LinkError, Serial, Tcp, packet)
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NICEEMU = f"{REPO}/nice_cpu/emulator/zig-out/bin/niceemu"
@@ -734,6 +737,154 @@ def test_break(link: Link, prog: str, at: dict[str, int]) -> None:
     link.control(HOLD | RAM)
 
 
+def start_emu(addr: str = "127.0.0.1") -> tuple[subprocess.Popen[bytes], str]:
+    """niceemu --link on a free port of addr, and that port. Its stderr,
+    where it prints the report of each run, is left for the caller to read
+    away."""
+    emu = subprocess.Popen([NICEEMU, "--link", f"{addr}:0"],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    assert emu.stderr is not None
+    first = emu.stderr.readline().decode(errors="replace")
+    m = re.search(r"link: port (\d+)", first)
+    if not m:
+        emu.terminate()
+        emu.wait()
+        sys.exit(f"hwtest.py: niceemu --link printed {first!r}, not its "
+                 "port")
+    return emu, m.group(1)
+
+
+# The words that write_regs() writes to R0-R15 of sim/step.nasm, paused
+# after its first four steps: R0 takes none, R4 is the loop's count, R13
+# points where the store goes, R14 has VBASE 1 and bit 24 clear, and R15
+# is LOOP, which write_regs() puts in.
+REG_WORDS = [0xDEADBEEF] + [0x11111111 * n for n in range(1, 13)]
+REG_WORDS[4] = 3
+REG_WORDS[13:] = [0x300, 0x00000001]
+
+
+def write_regs(link: Link, prog: str, at: dict[str, int]) -> list[object]:
+    """The writes of R0-R15 of DEBUG.md §6, link version 6, on
+    sim/step.nasm, and what follows them, as a list to compare with
+    niceemu --link's: a start paused, four steps, a write of all sixteen
+    with R15 at LOOP, R0 alone, and R14 alone with bit 24 clear, each
+    read back; then breakpoint 0 at LOOP and a go on, which runs LOOP's
+    instruction first and stops there on the next pass; then steps to the
+    halt, with R0-R15 after each, and the word stored over 0xFFFFFFFF.
+    Last, a write
+    refused with e04 while halted, and while held, after a write of R0
+    alone while paused, which takes."""
+    out: list[object] = []
+    link.halts.clear()
+    load_words(link, read_bin(prog))
+    n = link.pauses
+    link.control(HOLD | PAUSE | RAM)
+    link.control(PAUSE | RAM)
+    require("write: start paused sends p", wait_pause(link, n))
+    for _ in range(4):
+        out.append(link.step(timeout=4 * QUIET))
+    words = REG_WORDS[:15] + [at["LOOP"]]
+    out.append(wr_words(link, REGS, words))
+    out.append(link.read(REGS, 16))
+    out.append(wr(link, REGS, 0x12345678))
+    out.append(rd(link, REGS))
+    out.append(wr(link, REGS + 14, 0x00000001))
+    out.append(rd(link, REGS + 14))
+    out.append(wr(link, 0x300, 0xFFFFFFFF))
+    link.set_breaks([at["LOOP"]])
+    breaks = len(link.breaks)
+    link.control(RAM)
+    out.append(wait_break(link, breaks))
+    link.write(BRK_EN, [0])
+    out.append(link.read(REGS, 16))
+    for _ in range(8):
+        why = link.step(timeout=4 * QUIET)
+        out.append(why)
+        out.append(link.read(REGS, 16))
+        if why is not None:
+            break
+    out.append(rd(link, 0x300))
+    print("  writes of R1, halted, then held, which the link refuses:")
+    out.append(wr(link, REGS + 1, 0))
+    out.append(rd(link, REGS + 1))
+    n = link.pauses
+    link.control(HOLD | PAUSE | RAM)
+    link.control(PAUSE | RAM)
+    wait_pause(link, n)
+    out.append(wr(link, REGS, 0))
+    link.control(HOLD | RAM)
+    out.append(wr(link, REGS + 1, 0))
+    return out
+
+
+def wr_words(link: Link, addr: int, words: list[int]) -> bool:
+    """Writes the words with one W; False when the link refuses it."""
+    try:
+        link.write(addr, words)
+    except LinkError as e:
+        print(f"  {e}")
+        return False
+    return True
+
+
+def test_write_regs(link: Link, prog: str, at: dict[str, int]) -> None:
+    """write_regs() on the link, with its own checks, and compared with the
+    same on niceemu --link: R0 takes no write, R14 keeps bit 24, a write
+    of R15 is where the core goes on, a PC set onto a breakpoint runs its
+    instruction, and a write while halted or held gets e04."""
+    if not os.path.exists(NICEEMU):
+        skipped.append("write registers")
+        return
+    if rd(link, BRK_COUNT) == 0:
+        check("write: the system has no breakpoints", True)
+        return
+    got = write_regs(link, prog, at)
+    regs = got[5]
+    want = REG_WORDS[:15] + [at["LOOP"]]
+    want[0] = 0
+    want[14] |= 0x01000000
+    check("write: R0-R15 in one W", got[4] is True and regs == want,
+          " ".join(f"{r:08X}" for r in regs) if isinstance(regs, list)
+          else str(regs))
+    check("write: R0 alone takes none", got[6] is True and got[7] == 0,
+          f"{got[7]:08X}" if isinstance(got[7], int) else str(got[7]))
+    check("write: R14 keeps bit 24", got[8] is True and got[9] == 0x01000001,
+          f"{got[9]:08X}" if isinstance(got[9], int) else str(got[9]))
+    after = got[12]
+    check("write: the PC set onto a breakpoint runs it, and stops there "
+          "next", got[11] == 0 and isinstance(after, list) and
+          after[4] == 2 and after[15] == at["LOOP"],
+          f"x {got[11]}, " + (f"R4 {after[4]:08X}, R15 {after[15]:08X}"
+                              if isinstance(after, list) else str(after)))
+    check("write: the steps to the halt from the written registers",
+          got[-7] == 1 and got[-5] == 0,
+          f"halt {got[-7]}, stored {got[-5]!r}")
+    check("write: refused while halted, and R1 kept",
+          got[-4] is False and got[-3] == want[1])
+    check("write: R0 alone while paused at the start", got[-2] is True)
+    check("write: refused while held", got[-1] is False)
+    emu, port = start_emu()
+    try:
+        drain = subprocess.Popen(["cat"], stdin=emu.stderr,
+                                 stdout=subprocess.DEVNULL)
+        ref = Link(Tcp(int(port)))
+        try:
+            print("  the same on niceemu --link:")
+            ref.control(HOLD | RAM)
+            exp = write_regs(ref, prog, at)
+        finally:
+            ref.close()
+    finally:
+        emu.terminate()
+        emu.wait()
+    drain.wait()
+    diff = [f"{i}: {g!r} / {e!r}" for i, (g, e) in enumerate(zip(got, exp))
+            if g != e]
+    check("write: all of it as on niceemu --link",
+          not diff and len(got) == len(exp), "; ".join(diff) +
+          f" ({len(got)} and {len(exp)} results)")
+
+
 def test_counters_stop(link: Link) -> None:
     """After a halt the cycle counter and the timer's COUNT do not change."""
     first = rd(link, 0xFFFFFF40)
@@ -1249,6 +1400,7 @@ def main() -> None:
         pause = assemble(f"{REPO}/sim/pause.nasm", tmp)
         step = assemble(f"{REPO}/sim/step.nasm", tmp)
         brk, brk_at = assemble_labels(f"{REPO}/sim/break.nasm", tmp)
+        step_at = assemble_labels(f"{REPO}/sim/step.nasm", tmp)
         emu = assemble(f"{REPO}/sim/emu.nasm", tmp)
 
         opened = False
@@ -1275,6 +1427,7 @@ def main() -> None:
                 test_pause(link, pause)
                 test_step(link, step)
                 test_break(link, brk, brk_at)
+                test_write_regs(link, *step_at)
                 test_clear(link)
                 test_ram_size(link, board)
                 test_readback(link, emu)

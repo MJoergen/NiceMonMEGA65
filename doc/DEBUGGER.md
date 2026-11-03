@@ -26,9 +26,11 @@ The engine is the debug link of nice_cpu's
 [DEBUG.md](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEBUG.md),
 which has everything the debugger needs: pause, step, go on, hold, start,
 the four breakpoints, R0–R15 at a stop, and the memory while the core is
-stopped. What the link cannot do, the debugger cannot either: write a
-register ([#22](https://github.com/MJoergen/NiceMonMEGA65/issues/22)),
-load a program without a host, or know a label.
+stopped. Since link version 6 (nice_cpu V1.3,
+[#22](https://github.com/MJoergen/NiceMonMEGA65/issues/22)) the link
+writes R1–R15 of a paused core too, which the debugger does not use yet.
+What the link cannot do, the debugger cannot either: load a program
+without a host, or know a label.
 
 ## The states
 
@@ -454,8 +456,10 @@ Each a commit that builds and passes the tests:
    pause and halt. Tests: `tb_dbg`, `tb_dbg_host`, the formal check, and
    `tb_nicemon`.
 10. Later, in no order: a console page, with a tap on the core's
-    console output beside the line; the code page with a disassembler; the `board_io` register for `hwtest`; loading and
-    saving on the SD card.
+    console output beside the line; the code page with a disassembler;
+    a register edit on the strip or the page, with link version 6's
+    write of R1–R15, the PC among them; the `board_io` register for
+    `hwtest`; loading and saving on the SD card.
 
 ## Decisions
 

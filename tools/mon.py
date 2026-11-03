@@ -2,8 +2,8 @@
 """An interactive shell on the debug link of nice_cpu/doc/DEBUG.md.
 
 It reads and writes memory, loads a .bin file, starts, holds, pauses,
-steps, and goes on, sets the breakpoints, shows the registers, and
-disassembles, with one short command each. "help" lists them. Numbers are
+steps, and goes on, sets the breakpoints, shows and sets the registers,
+and disassembles, with one short command each. "help" lists them. Numbers are
 hex, with or without 0x. An empty line repeats a step.
 
 The disassembler is nice_cpu's assembler/nicedis.py, which nice_cpu has
@@ -73,6 +73,9 @@ ALIASES = {
     "q": "quit",
     "exit": "quit",
 }
+
+# The registers with a name of their own (ISA §1.2)
+REG_NAMES = {"sp": 13, "sr": 14, "pc": 15}
 
 # Ctrl-], which ends the console
 CONSOLE_END = 0x1D
@@ -417,6 +420,56 @@ class Monitor(cmd.Cmd):
         if addr <= CONTROL <= addr + len(words) - 1:
             raise ValueError("use ctl to write the control register")
         self.link.write(addr, words)
+
+    def _register(self, text: str) -> int:
+        """The number of a register: R0 to R15, or SP, SR, or PC, in
+        either case."""
+        name = text.lower()
+        if name in REG_NAMES:
+            return REG_NAMES[name]
+        if name[:1] == "r" and name[1:].isdecimal() and int(name[1:]) < 16:
+            return int(name[1:])
+        raise ValueError(f"'{text}' is not R0 to R15, SP, SR, or PC")
+
+    def _write_reg(self, n: int, value: int) -> int:
+        """Writes register n of a paused core, which link version 6 allows
+        (DEBUG.md §6), and returns what it reads back: R0 stays 0, and
+        R14 keeps bit 24 set."""
+        link = self.link
+        version = link.read_word(VERSION)
+        if (version & 0xF) < 6:
+            raise ValueError(f"link version {version >> 4}.{version & 0xF} "
+                             "cannot write the registers; 0.6 can")
+        if not link.read_word(CONTROL) & PAUSE:
+            raise ValueError("the core is not paused; 'pause' first")
+        link.write(REGS + n, [value])
+        return link.read_word(REGS + n)
+
+    def do_set(self, arg: str) -> None:
+        """set Rn VALUE: writes a register of a paused core, as an
+        instruction would: R0 stays 0, bit 24 of R14 stays 1, and R15 is
+        where the core goes on. SP, SR, and PC name R13, R14, and R15, and
+        VALUE may be a label."""
+        args = arg.split()
+        if len(args) != 2:
+            raise ValueError("give a register and a value")
+        n = self._register(args[0])
+        value = self.address(args[1])
+        got = self._write_reg(n, value)
+        if n == 15:
+            print(self._pc(True))
+        else:
+            print(f"R{n} {got:08x}")
+
+    def do_pc(self, arg: str) -> None:
+        """pc [ADDR]: shows the PC of a paused core and its instruction, or
+        sets the PC to ADDR, where the core goes on at the next go or
+        step. A PC set onto a breakpoint runs its instruction."""
+        if arg.strip():
+            self._write_reg(15, self.address(arg.strip()))
+        elif not self.link.read_word(CONTROL) & PAUSE:
+            raise ValueError("the core is not paused; 'pause' first")
+        print(self._pc(True))
 
     def do_ctl(self, arg: str) -> None:
         """ctl [VALUE]: reads the control register, or writes it."""

@@ -45,6 +45,16 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 - `r ADDR` runs the program at ADDR, and `r` alone the one at `0x8000`.
   `r 0` is the cold start, which leaves the RAM from `0x8000` alone.
 
+**Tools**
+
+- `mon.py` sets a register of a paused core with `set Rn VALUE`, and
+  the PC with `pc ADDR`, where the core goes on at the next `go` or
+  `step`. `pc` alone shows the PC and its instruction.
+- `hwtest.py` writes R0–R15 of a paused program, steps it to its halt,
+  and compares all of it with the same on `niceemu --link`, with `e04`
+  for a write while halted and while held. `make linktest` and `make
+  cosimtest` run it too.
+
 ## V1.2.1 (2026-11-02)
 
 **Upgrade notes.**

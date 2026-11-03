@@ -258,7 +258,8 @@ The commands are short, and numbers are hex. `help` lists the commands,
 and `help CMD` describes one. `load FILE` loads a program, `go` (`g`),
 `pause`, and `step N` (`s`) run it, `b ADDR` sets a breakpoint and `bd`
 disables it, `regs` and `r ADDR N` show the registers and the memory,
-`d ADDR N` disassembles, and `send TEXT` and `console` (`c`) talk to the
+`set Rn VALUE` and `pc ADDR` set a register and the PC of a paused
+core, `d ADDR N` disassembles, and `send TEXT` and `console` (`c`) talk to the
 program. The program's output and the link's notices, such as
 `[paused, PC=...]`, are shown as they arrive. `quit` (`q`) leaves the
 core as it is. [tools/README.md](tools/README.md#monpy) describes every

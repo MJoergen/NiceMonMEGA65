@@ -3,21 +3,22 @@
 board.
 
 It starts "make -C sim cosim", the RTL in GHDL with its debug UART on a
-free port of 127.0.0.1. On it, it runs hwtest.py's checks of bad packets,
-except the one of a gap between two bytes, as a gap in real time is far
-shorter in simulated time, and its checks of the pause, the step, and the breakpoints. Then it runs
-the programs of hwtest.py's comparison with run.py --cosim on that port
-and with niceemu alone, and the monitor's test program, with run.py
---monitor and with the monitor's l. Each must print the
-same and exit with the same status. Last, load.py must refuse a word
+free port of 127.0.0.1. On it, it runs hwtest.py's checks of bad
+packets, except the one of a gap between two bytes, as a gap in real
+time is far shorter in simulated time, and its checks of the pause, the
+step, the breakpoints, and the writes of the registers, against niceemu
+--link. Then it runs the programs of hwtest.py's comparison with run.py
+--cosim on that port and with niceemu alone, and the monitor's test
+program, with run.py --monitor and with the monitor's l. Each must print
+the same and exit with the same status. Last, load.py must refuse a word
 beyond the simulated system's 64K words of RAM. So it checks the RTL,
 nicelink.py, run.py, and load.py as hwtest.py does on the board. The
 simulation runs far slower than real time, so the waits are longer, and
-nice_cpu's benchmark and the demo's self-test are left out.
-NICE=multi in the environment picks the multi-cycle core, as for make
-test. It prints one line for each check, and last how many passed, and
-exits with status 1 when one fails. niceemu must be built first, with make
--C nice_cpu/emulator build. Only the Python standard library is used.
+nice_cpu's benchmark and the demo's self-test are left out. NICE=multi
+in the environment picks the multi-cycle core, as for make test. It
+prints one line for each check, and last how many passed, and exits with
+status 1 when one fails. niceemu must be built first, with make -C
+nice_cpu/emulator build. Only the Python standard library is used.
 """
 
 import argparse
@@ -31,7 +32,7 @@ import tempfile
 import hwtest
 from hwtest import (NICEEMU, REPO, assemble, assemble_labels, comparisons,
                     results, test_fit, test_framing, test_monitor, test_pause,
-                    test_run, test_step, test_break)
+                    test_run, test_step, test_break, test_write_regs)
 from nicelink import HOLD, RAM, open_link
 
 
@@ -76,6 +77,8 @@ def main() -> None:
                 test_step(link, assemble(f"{REPO}/sim/step.nasm", tmp))
                 test_break(link, *assemble_labels(f"{REPO}/sim/break.nasm",
                                                   tmp))
+                test_write_regs(link, *assemble_labels(
+                    f"{REPO}/sim/step.nasm", tmp))
             finally:
                 link.close()
             test_run(["--cosim", port], comparisons(tmp))

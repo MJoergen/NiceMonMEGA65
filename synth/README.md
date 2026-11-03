@@ -293,6 +293,14 @@ the screen alone
 `ram_style` and `rom_style` attributes on the three, its build has 123
 block RAMs and 17878 LUTs, and 0.020 ns and 0.007 ns, still on a path
 in the core's WRITE stage. The R6's build is the same as before.
+With nice_cpu V1.3, the debug link of version 6, whose write of R1–R15
+is a new source on the D inputs of WRITE's register file, and the
+link's hold-back over Ethernet
+([#69](https://github.com/MJoergen/NiceMonMEGA65/issues/69)), the R6's
+build has 0.042 ns and 0.057 ns, with 235.5 block RAMs and 19905 LUTs,
+on a path from the RAM into WRITE's register file, and the Nexys4DDR's
+0.047 ns and 0.025 ns, with 123 block RAMs and 19068 LUTs, on a path
+from DBUS to the timer.
 The R3's pipelined row is from a build at nice_cpu V1.0, with
 the debug link of version 4, and the Nexys4DDR's from one at V1.1, with
 stage 1 of the on-board debugger ([DEBUGGER.md](../doc/DEBUGGER.md)).

@@ -406,8 +406,8 @@ the request. Only small programs are practical.
 
 `make cosimtest` starts `make cosim` on a free port. It runs hwtest's
 checks of bad packets on it, but for the gap of 300 ms, which is far
-shorter in simulated time, and its checks of the pause, the step, and
-the breakpoints.
+shorter in simulated time, and its checks of the pause, the step, the
+breakpoints, and the writes of the registers.
 Then it runs the programs that `make hwtest` compares, and the monitor's
 with `--monitor --rom` and with a short program pasted into `l`, with
 `run.py --cosim` and with `niceemu`, whose output and exit status must
@@ -698,6 +698,13 @@ bitstream has one. Then it hides the ROM and uses the link:
   while paused, the stopped cycle counter, a console byte kept, going on,
   a write of R1 while paused that the count goes on from, one while
   running that gets `e04`, a hold, and a start paused.
+- It writes R0–R15 of `sim/step.nasm`, paused after four steps, with
+  one `W` and one at a time: R0 takes none, R14 keeps bit 24, and R15
+  is where the core goes on, at a breakpoint, which runs its
+  instruction first and stops there on the next pass. It steps to the
+  halt, and then gets `e04` for a write while halted and while held.
+  The same sequence runs on `niceemu --link`, and every result must be
+  the same.
 - It steps `sim/step.nasm` to its halt and compares the registers after
   each step with `niceemu --trace`.
 - It runs `sim/break.nasm` to its breakpoints: in a loop, two at one
@@ -758,9 +765,10 @@ The reset button is not tested: press it with a terminal open, and the
 `niceemu`, without a board, for the programs that `make hwtest` compares,
 the monitor's with `--monitor --rom`, the demo's self-test, and nice_cpu's benchmark when `make examples` has
 built `examples/build/bench.bin`, with `tools/linktest.py`. It runs hwtest's
-checks of bad packets, of the pause, of the step, and of the breakpoints
-on `niceemu --link` first, and then `mon.py`'s commands, its disassembly
-among them, as typed at its prompt, with the labels of `sim/break.nasm`.
+checks of bad packets, of the pause, of the step, of the breakpoints,
+and of the writes of the registers on `niceemu --link` first, and then
+`mon.py`'s commands, its disassembly, `set`, and `pc` among them, as
+typed at its prompt, with the labels of `sim/break.nasm`.
 Last, it runs `hello.nasm` with `run.py --tcp 127.0.0.2:PORT` on
 `niceemu --link 127.0.0.2:0`, the form for a `niceemu` on another
 computer; 127.0.0.2 is loopback on Linux, and elsewhere the check is

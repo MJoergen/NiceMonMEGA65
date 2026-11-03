@@ -2,20 +2,20 @@
 """Compare tools/run.py on niceemu --link with niceemu, without a board.
 
 It starts "niceemu --link 0", which picks a free port, and runs
-hwtest.py's checks of bad packets, the pause, the step, and the
-breakpoints on it, and mon.py's commands, as they are typed at its
-prompt. Then it runs the programs of hwtest.py's comparison, and
-nice_cpu's benchmark when examples/build/bench.bin is built, with run.py
---tcp on that port and with niceemu alone. Each must print the same and
-exit with the same status. The demo's self-test, F11, must pass. Last,
-run.py --tcp HOST:PORT runs hello on "niceemu --link 127.0.0.2:0", an
-address other than 127.0.0.1, as for a niceemu on another computer, and
-the parsing of --tcp [HOST:]PORT is checked first. So it
-checks run.py, mon.py, nicelink.py, and the link of the emulator, as CI
-does. It prints one line for each check, and last how many passed, and
-exits with status 1 when one fails. niceemu must be built first, with
-make -C nice_cpu/emulator build. Only the Python standard library is
-used.
+hwtest.py's checks of bad packets, the pause, the step, the breakpoints,
+and the writes of the registers on it, and mon.py's commands, as they
+are typed at its prompt. Then it runs the programs of hwtest.py's
+comparison, and nice_cpu's benchmark when examples/build/bench.bin is
+built, with run.py --tcp on that port and with niceemu alone. Each must
+print the same and exit with the same status. The demo's self-test, F11,
+must pass. Last, run.py --tcp HOST:PORT runs hello on "niceemu --link
+127.0.0.2:0", an address other than 127.0.0.1, as for a niceemu on
+another computer, and the parsing of --tcp [HOST:]PORT is checked first.
+So it checks run.py, mon.py, nicelink.py, and the link of the emulator,
+as CI does. It prints one line for each check, and last how many passed,
+and exits with status 1 when one fails. niceemu must be built first,
+with make -C nice_cpu/emulator build. Only the Python standard library
+is used.
 """
 
 import contextlib
@@ -33,7 +33,7 @@ import hwtest
 from hwtest import (NICEEMU, REPO, assemble, assemble_labels, comparisons,
                     results, test_bench, test_framing, test_pause, test_run,
                     test_monitor, test_selftest, test_step, test_break,
-                    check, QUIET)
+                    test_write_regs, check, start_emu, QUIET)
 import mon
 from mon import Monitor
 from nicelink import HOLD, RAM, Link, LinkError, open_link, parse_tcp
@@ -95,8 +95,9 @@ def test_mon_d(monitor: Monitor, at: dict[str, int]) -> None:
 
 def test_mon(port: int, prog: str, at: dict[str, int]) -> None:
     """mon.py on sim/break.nasm, with its labels: a load, a breakpoint at
-    a label and its notice, the registers, a step, help on a short name,
-    a read at label+N, a bad address, the disassembly, and the halt."""
+    a label and its notice, the registers, a step, set and pc, help on a
+    short name, a read at label+N, a bad address, a set while halted, the
+    disassembly, and the halt."""
     # niceemu refuses the new host, closing it, until it has seen the
     # last one close, so the connection is tried again for a while.
     end = time.monotonic() + 2
@@ -124,6 +125,21 @@ def test_mon(port: int, prog: str, at: dict[str, int]) -> None:
         out = command(monitor, "s")
         check("mon: a step", re.match(r"PC=[0-9a-f]{8} LOOP\+0x", out)
               is not None, repr(out))
+        out = command(monitor, "set R4 2")
+        check("mon: set a register", out == "R4 00000002\n", repr(out))
+        out = command(monitor, "set r0 1")
+        check("mon: set R0, which takes none", out == "R0 00000000\n",
+              repr(out))
+        out = command(monitor, "set R16 1")
+        check("mon: set a register that is not one", out ==
+              "error: 'R16' is not R0 to R15, SP, SR, or PC\n", repr(out))
+        out = command(monitor, "pc LOOP")
+        check("mon: pc at a label", out == f"PC={at['LOOP']:08x} LOOP  "
+              "SUB[M] R4, R4, 0x1\n", repr(out))
+        command(monitor, "s")
+        out = command(monitor, "regs")
+        check("mon: a step from the PC set", "R4  00000001" in out,
+              repr(out))
         out = command(monitor, "help s")
         check("mon: help on a short name", out.startswith("step (s)"),
               repr(out))
@@ -136,6 +152,9 @@ def test_mon(port: int, prog: str, at: dict[str, int]) -> None:
         out = go(monitor, link, lambda l: len(l.halts))
         check("mon: the halt's notice", out.startswith("[halted: HALT, PC="),
               repr(out))
+        out = command(monitor, "set R1 0")
+        check("mon: set while halted", out ==
+              "error: the core is not paused; 'pause' first\n", repr(out))
         test_mon_d(monitor, at)
     finally:
         monitor.stop()
@@ -162,21 +181,6 @@ def test_parse_tcp() -> None:
             check(f"parse_tcp({text!r}) fails", False, repr(got))
         except SystemExit:
             check(f"parse_tcp({text!r}) fails", True)
-
-
-def start_emu(addr: str) -> tuple[subprocess.Popen[bytes], str]:
-    """niceemu --link on a free port of addr, and that port."""
-    emu = subprocess.Popen([NICEEMU, "--link", f"{addr}:0"],
-                           stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
-    assert emu.stderr is not None
-    first = emu.stderr.readline().decode(errors="replace")
-    m = re.search(r"link: port (\d+)", first)
-    if not m:
-        emu.terminate()
-        emu.wait()
-        sys.exit(f"linktest.py: niceemu --link printed {first!r}, not "
-                 "its port")
-    return emu, m.group(1)
 
 
 def test_host(tmp: str) -> None:
@@ -228,6 +232,8 @@ def main() -> None:
                 test_step(link, assemble(f"{REPO}/sim/step.nasm", tmp))
                 brk = assemble_labels(f"{REPO}/sim/break.nasm", tmp)
                 test_break(link, *brk)
+                test_write_regs(link, *assemble_labels(
+                    f"{REPO}/sim/step.nasm", tmp))
             finally:
                 link.close()
             test_mon(int(port), *brk)

@@ -12,7 +12,7 @@ prints its options with `--help`, and its header says more.
 | `nicelink.py` | The debug link, which the other tools use: over TCP to the board's Ethernet port, on the UART, over TCP to `niceemu --link`, or over TCP to `make cosim`. |
 | `load.py` | Loads a `.bin` file into cleared memory and starts it, or with `--no-run` leaves the core held in reset. With `--monitor`, it runs a program at `0x8000` under the monitor in the ROM. |
 | `run.py` | Runs a program on the board and prints what `niceemu` prints, for diffing, also one under the monitor with `--monitor`. |
-| `mon.py` | An interactive shell on the link: memory, pause, step, breakpoints, and the console. |
+| `mon.py` | An interactive shell on the link: memory, registers, pause, step, breakpoints, and the console. |
 | `hwtest.py` | Programs the FPGA with openFPGALoader and tests the system on the board. |
 | `flash.py` | Writes a bitstream into the Nexys4DDR's flash, or a core file into a slot of the MEGA65's, from which the board starts. |
 | `linktest.py` | Checks `run.py` and the link on `niceemu --link` against plain `niceemu`, without a board. |
@@ -301,9 +301,9 @@ emulator.
 
 `mon.py` is an interactive shell on the debug link. It loads a program,
 starts, holds, pauses, and steps the core, sets breakpoints, reads
-the registers and the memory, and disassembles, with one short command
-each. It also passes text to and from the program. The README has [a worked
-example](../README.md#using-the-interactive-shell).
+and writes the registers and the memory, and disassembles, with one
+short command each. It also passes text to and from the program. The
+README has [a worked example](../README.md#using-the-interactive-shell).
 
 ### Starting it
 
@@ -383,6 +383,16 @@ The short names are `s` for `step`, `g` for `go`, `c` for `console`, and
 - `regs` shows R0 to R15: live while the core runs, from nice_cpu V1.2
   on, and the stop's values while the core is paused or has halted. A
   hold of a running core leaves them undefined.
+- `set Rn VALUE` writes a register of a paused core, from link version
+  6 (nice_cpu V1.3) on, and shows what it reads back. A write means
+  what an instruction's write means: R0 stays 0, bit 24 of R14 stays 1,
+  and R15 is where the core goes on at the next `go` or `step`. `SP`,
+  `SR`, and `PC` name R13, R14, and R15, and VALUE may be a label. A
+  core that is not paused refuses the write.
+- `pc` shows the PC of a paused core and the instruction there, and `pc
+  ADDR` sets the PC to ADDR first. A PC set onto a breakpoint runs its
+  instruction at the next `go` or `step`, as a go on from that
+  breakpoint does.
 
 #### Loading and running
 
