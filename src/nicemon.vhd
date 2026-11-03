@@ -419,6 +419,10 @@ architecture synthesis of nicemon is
    -- The link's request of a pause, and the core's pause
    signal cpu_pause  : std_logic;
    signal cpu_paused : std_logic;
+   -- A host's write of R1-R15 while paused, from the link to the core
+   signal reg_we   : std_logic;
+   signal reg_idx  : std_logic_vector(3 downto 0);
+   signal reg_data : std_logic_vector(31 downto 0);
    -- The breakpoints, which the link holds and the core compares
    signal brk_addr    : t_brk_addrs;
    signal brk_en      : std_logic_vector(C_BREAKS_MAX - 1 downto 0);
@@ -634,6 +638,9 @@ begin
          paused_o      => cpu_paused,
          brk_addr_i    => brk_addr,
          brk_en_i      => brk_en,
+         reg_we_i      => reg_we,
+         reg_idx_i     => reg_idx,
+         reg_data_i    => reg_data,
          halted_o      => cpu_halted,
          halt_reason_o => cpu_why,
          instret_o     => cpu_instret,
@@ -1088,6 +1095,7 @@ begin
          rx_data_i      => lnk_rx_data,
          rx_break_i     => lnk_rx_break,
          rx_resume_i    => lnk_rx_renew,
+         rx_flow_i      => net_on_i,
          tx_valid_o     => lnk_tx_valid,
          tx_ready_i     => lnk_tx_ready,
          tx_data_o      => lnk_tx_data,
@@ -1116,6 +1124,9 @@ begin
          side_data_o    => dbg_rdata_o,
          brk_addr_o     => brk_addr,
          brk_en_o       => brk_en,
+         reg_we_o       => reg_we,
+         reg_idx_o      => reg_idx,
+         reg_data_o     => reg_data,
          wb_cyc_o       => link_cyc,
          wb_stb_o       => link_stb,
          wb_stall_i     => link_stall,

@@ -43,7 +43,8 @@ unit's. `nice_screen_put` and `nice_screen_clear` write the screen at
 `0xFFFF0000`, which the VGA and HDMI outputs show (VGA only on the
 Nexys4DDR). `time.h` has `clock()`, which counts microseconds from the
 counter at `0xFFFFFF44`. On the board they are real time, at the clock's
-rate; in the emulator a microsecond is a step. There is no calendar, so
+rate; in the emulator they are the host's time, or a step each with
+`niceemu --step-time`. There is no calendar, so
 `time()` returns -1.
 
 The translated code and the runtime routines multiply and divide with the

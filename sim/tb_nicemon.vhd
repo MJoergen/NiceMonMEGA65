@@ -23,7 +23,7 @@
 -- first. A program that halts quickly may send its `h` before the `k` of
 -- the write that started it; wr() keeps it for expect_halt(). The steps:
 --
--- 1. The link's `b05` after reset, and the ROM, which holds G_ROM_FILE: the
+-- 1. The link's `b06` after reset, and the ROM, which holds G_ROM_FILE: the
 --    core boots from it at reset, prints its greeting, and halts. Its stack
 --    is in the RAM, at the top of the memory, for a push to the ROM is lost.
 --    The ROM is at 0, read only, with the RAM above it; bit 3 of the
@@ -52,8 +52,10 @@
 --    `e02`. Then a pause: the link sends `p`, before or after the `k` of
 --    its write. While the core is paused, bit 4 of the control register
 --    reads 1, the link reads the memory and R15, which points into the
---    program, the cycle counter and the running output stop, and a console
---    byte waits in the FIFO. When the core goes on, it echoes the byte.
+--    program, the cycle counter and the running output stop, a write of
+--    R5 takes, and a console byte waits in the FIFO. When the core goes
+--    on, it echoes the byte, a write of R5 gets `e04`, and after the halt
+--    R5 holds the word written while paused.
 -- 6. Hold the core, load G_FIFO_FILE, and start it. It waits before it
 --    echoes, so the 17 bytes sent meanwhile pile up in the core's input
 --    FIFO. The FIFO keeps the first 16, and the link drops the 17th and
@@ -110,7 +112,7 @@
 --    TCP; its half-close is a break, after which its bytes are dropped;
 --    the next connection renews the line's input, the link's resume
 --    (DEBUG.md §7), and its bytes reach the program again.
--- 16. A reset while G_ECHO_FILE runs: the link sends `b05`, the core boots
+-- 16. A reset while G_ECHO_FILE runs: the link sends `b06`, the core boots
 --    from the ROM again, and the screen's and the board's registers and the
 --    breakpoints are cleared.
 --
@@ -660,20 +662,20 @@ begin
              pkt('k', "000001000002") = "k000001000002#AE" and
              pkt('R', "000001000001") = "R000001000001#94" and
              pkt('r', "00000100000111223344") = "r00000100000111223344#48" and
-             pkt('b', "05") = "b05#C7" and pkt('h', "01") = "h01#C9" and
+             pkt('b', "06") = "b06#C8" and pkt('h', "01") = "h01#C9" and
              pkt('e', "5202") = "e5202#2E" and
              pkt('W', "FFFFFFF0000100000009") = "WFFFFFFF0000100000009#BB" and
              pkt('k', "FFFFFFF00001") = "kFFFFFFF00001#46"
          report "tb_nicemon: pkt() does not give the packets of DEBUG.md §8"
          severity failure;
 
-      report "tb_nicemon: b05, and the ROM";
-      expect_pkt("b05#C7");
+      report "tb_nicemon: b06, and the ROM";
+      expect_pkt("b06#C8");
       expect_con("Hello from the ROM!" & C_LF);
       expect_halt("01");
       first_v := first_word(G_ROM_FILE);
       check("FFFFFFF0", "00000002");         -- halted, the ROM shown
-      check("FFFFFFF2", "00000005");         -- the version
+      check("FFFFFFF2", "00000006");         -- the version
       check("FFFFFFF3", "00000010");         -- the free space: 16 bytes
       check("FFFFFF9E", "00001000");         -- the RAM's words, 2 ** G_RAM_ADDR_BITS
       wr("FFFFFF9E", "00000001");            -- dropped
@@ -776,6 +778,9 @@ begin
          severity failure;
       read_word("FFFFFF40", cycles_v);
       check("FFFFFF40", to_hstring(cycles_v));
+      -- A write of R5, which the program does not use, reaches the core
+      wr("FFFFFFE5", "0000CAFE");
+      check("FFFFFFE5", "0000CAFE");
       send_con("y");
       wait for 40 * C_BIT_TIME;
       assert con_len = con_pos_v
@@ -785,6 +790,9 @@ begin
       wr("FFFFFFF0", "00000008");
       expect_con("y");
       check("FFFFFFF0", "00000008");
+      -- A write of R0-R15 while the core runs gets e04
+      send(C_ESC & pkt('W', "FFFFFFE5000100000000"));
+      expect_answer(pkt('e', "5704"));
       -- Bytes with bit 7 set, and 0xFF as ESC ESC both ways
       for i in high_v'range loop
          high_v(i) := character'val(127 + i);
@@ -799,6 +807,7 @@ begin
       expect_con("cd.");
       expect_halt("01");
       check("FFFFFFF0", "0000000A");
+      check("FFFFFFE5", "0000CAFE");         -- the core kept the write
 
       report "tb_nicemon: load " & G_FIFO_FILE;
       wr("FFFFFFF0", "00000009");
@@ -1115,7 +1124,7 @@ begin
       wait until rising_edge(clk);
       rst <= '0';
       -- The core boots from the ROM again
-      expect_pkt("b05#C7");
+      expect_pkt("b06#C8");
       expect_con("Hello from the ROM!" & C_LF);
       expect_halt("01");
       check("FFFFFFF0", "00000002");

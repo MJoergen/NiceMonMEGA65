@@ -21,6 +21,27 @@ The release candidates pinned these:
 
 nice_cpu's `RC01` and `RC03` have no tag here.
 
+## V1.3 (not yet released)
+
+**Upgrade notes.**
+
+- nice_cpu is at `V1.3`, with debug link version 6: the reset notice is
+  `b06`, and `0xFFFFFFF2` reads 6. A host writes R1–R15 while the core
+  is paused, and the program goes on with them. A write of R0–R15 while
+  the core is not paused gets the error `e04`, where it got `k` and
+  changed nothing.
+- Over Ethernet, a console byte that finds the core's input FIFO full
+  waits up to 50 ms for room, and holds back the bytes behind it,
+  before it is lost with `o`. On the UART it is lost at once, as before.
+- `niceemu`'s microsecond counter counts the host's time, so a
+  program's microseconds in `niceemu` vary from run to run, as on the
+  board. `niceemu --step-time` counts one per step, as it did.
+
+**Monitor**
+
+- `r ADDR` runs the program at ADDR, and `r` alone the one at `0x8000`.
+  `r 0` is the cold start, which leaves the RAM from `0x8000` alone.
+
 ## V1.2.1 (2026-11-02)
 
 **Upgrade notes.**

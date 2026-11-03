@@ -22,13 +22,16 @@
 -- - con_in_valid_o comes only when free_i was not 0 in the cycle before
 --   (contract d).
 -- - tx_valid_o stays high with its byte until tx_ready_i takes it.
+-- - reg_we_o, a write of R1-R15, comes only while pause_o is high, paused_i
+--   was high in the cycle before, and hold_o is low (REGISTER WRITES).
 -- The other outputs are free, the breakpoints brk_addr_o and brk_en_o
--- too, so the core may pause on its own whenever one is enabled.
+-- too, so the core may pause on its own whenever one is enabled, and
+-- reg_idx_o and reg_data_o.
 --
 -- RESET
--- rst_i is the system's reset. After it, CYC, STB, clear_o, and pause_o are low,
--- hold_o is G_BOOT_HELD, and rom_hide_o shows the ROM, or is 1 without
--- G_HAS_ROM.
+-- rst_i is the system's reset. After it, CYC, STB, clear_o, pause_o, and
+-- reg_we_o are low, hold_o is G_BOOT_HELD, and rom_hide_o shows the ROM,
+-- or is 1 without G_HAS_ROM.
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -53,6 +56,9 @@ architecture formal of debug_link is
    signal wb_data      : std_logic_vector(31 downto 0);
    signal brk_addr     : t_brk_addrs;
    signal brk_en       : std_logic_vector(C_BREAKS_MAX - 1 downto 0);
+   signal reg_we       : std_logic;
+   signal reg_idx      : std_logic_vector(3 downto 0);
+   signal reg_data     : std_logic_vector(31 downto 0);
 
    attribute anyseq : boolean;
    attribute anyseq of rx_ready     : signal is true;
@@ -73,6 +79,9 @@ architecture formal of debug_link is
    attribute anyseq of wb_data      : signal is true;
    attribute anyseq of brk_addr     : signal is true;
    attribute anyseq of brk_en       : signal is true;
+   attribute anyseq of reg_we       : signal is true;
+   attribute anyseq of reg_idx      : signal is true;
+   attribute anyseq of reg_data     : signal is true;
 
    -- The request that waits for its ACK
    signal wb_accept : std_logic;
@@ -102,6 +111,9 @@ begin
    wb_data_o      <= wb_data;
    brk_addr_o     <= brk_addr;
    brk_en_o       <= brk_en;
+   reg_we_o       <= reg_we;
+   reg_idx_o      <= reg_idx;
+   reg_data_o     <= reg_data;
 
    boot_held <= '1' when G_BOOT_HELD else
                 '0';
@@ -143,6 +155,7 @@ begin
    -- psl f_reset : assume always
    --    {rst_i} |=>
    --    {wb_cyc = '0' and wb_stb = '0' and clear = '0' and pause = '0' and
+   --     reg_we = '0' and
    --     hold = boot_held and rom_hide = not has_rom};
 
    -- The control register
@@ -151,6 +164,9 @@ begin
    --    {rst_i = '1' or (stable(hold) and stable(rom_hide) and stable(pause)) or
    --     (wb_cyc = '0' and prev(wb_cyc) = '0')};
    -- psl f_rom : assume always has_rom = '0' -> rom_hide = '1';
+
+   -- A write of R1-R15
+   -- psl f_reg_we : assume always reg_we -> (pause and paused_r and not hold);
 
    -- The clear
    -- psl f_clear_hold : assume always clear -> hold;

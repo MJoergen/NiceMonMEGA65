@@ -25,7 +25,7 @@ These words are used here and in the other documents and sources:
 | Clear | A write with bit 2 set fills the RAM and the screen with 0. |
 | Pause | Bit 4 of the control register is 1: the core stops between two instructions, and the link reaches all of memory and the core's registers. Writing 0 to bit 4 makes the program go on. |
 | Step | Bits 4 and 5 written to a paused core: it runs one instruction, or enters an interrupt, and pauses again. |
-| Notice | A packet that the board sends on its own: `b05` at reset (the link's version, 5), `h` when the core halts, `p` when it pauses, `x` when it stops at a breakpoint, and `o` when an input byte is lost. |
+| Notice | A packet that the board sends on its own: `b06` at reset (the link's version, 6), `h` when the core halts, `p` when it pauses, `x` when it stops at a breakpoint, and `o` when an input byte is lost. |
 
 The MEGA65's debug UART runs at 2 Mbaud (2000000), 8-N-1, and carries the
 debug link of nice_cpu's [doc/DEBUG.md](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEBUG.md). It passes
@@ -93,6 +93,11 @@ reason, and the stop register become 0. So after `0x0000000D` the
 control register reads `0x00000009`, also after a halt. A hold alone
 keeps them, as before.
 
+With link version 6, a host writes R1–R15 at `0xFFFFFFE1`–`EF` while
+the core is paused, and the program goes on with them. A write of R0,
+or one while the core is not paused, changes nothing, and the link
+answers a write of R0–R15 while it is not paused with the error `04`.
+
 A terminal on the line, a plain TCP client such as `nc` on the Ethernet
 port or a terminal program on the UART, shows what the program prints,
 and what you type goes to the program while it runs. Bytes typed while it is paused wait
@@ -117,14 +122,14 @@ effect and does not write (DEBUG.md §3).
 | `0xFFFFFF01` | The emulator's read counter. A read by the core returns the number of its reads since the last write, and a write sets that number. It is 0 after reset, and a start keeps it, as in the emulator. |
 | `0xFFFFFF10`–`0xFFFFFF1F` | The timer of nice_cpu's SYSTEM.md §4: it raises IRQ every P clock cycles, through the vector it is given. |
 | `0xFFFFFF20`–`0xFFFFFF3F` | The math unit of nice_cpu's SYSTEM.md §2: 32-bit multiply and divide, and 64-bit divide. |
-| `0xFFFFFF40`–`0xFFFFFF4F` | The performance counters of nice_cpu's SYSTEM.md §3: cycles, instructions, and microseconds, 64 bits each. The microseconds come from the clock, 100 MHz on the MEGA65 and 90 MHz on the Nexys4DDR, so they are real time, where the emulator counts one per step. They stop while the core is paused. The link reads them as the core does: a read of a low word takes the snapshot that the high word returns, where `niceemu --link` takes none. DEBUG.md §3 allows both while the core is held, halted, or paused. The words `0xFFFFFF46`–`4F` read 0 and take no write. |
+| `0xFFFFFF40`–`0xFFFFFF4F` | The performance counters of nice_cpu's SYSTEM.md §3: cycles, instructions, and microseconds, 64 bits each. The microseconds come from the clock, 100 MHz on the MEGA65 and 90 MHz on the Nexys4DDR, so they are real time, as the emulator's microsecond counter is, which counts the host's time, or one per step with `--step-time`. They stop while the core is paused. The link reads them as the core does: a read of a low word takes the snapshot that the high word returns, where `niceemu --link` takes none. DEBUG.md §3 allows both while the core is held, halted, or paused. The words `0xFFFFFF46`–`4F` read 0 and take no write. |
 | `0xFFFFFF50`–`0xFFFFFF7F` | The fetch statistics of MICROARCH.md §8.1, the rest of the performance counters: counters of what FETCH and DECODE do, for judging the size of FETCH's buffer. A start of the core clears them, and they then count each clock while the core runs, until a write of 0 to `FS_CTRL` stops them. They stop while the core is held and after it halts. With the multi-cycle core (`NICE=multi`), only `FS_CYCLES` and `FS_HIST[0]` count, `FS_CTRL` reads its run bit, and the other words read 0. |
 | `0xFFFFFF80`–`0xFFFFFF8F` | The screen's registers: the cursor and the display offset (see [The screen](#the-screen)). |
 | `0xFFFFFF90`–`0xFFFFFF9F` | The Nexys4DDR's LEDs, seven-segment display, buttons, and switches (see [The Nexys4DDR's devices](#the-nexys4ddrs-devices)). On the MEGA65 they read 0 and take no write. On every board, `0xFFFFFF98`–`9D` are the Ethernet station (see [The Ethernet station](#the-ethernet-station)), and `0xFFFFFF9E` reads the words of the RAM, `0x20000` on the MEGA65 and `0x10000` on the Nexys4DDR, and takes no write. The emulator has memory there, which reads 0 after a clear, so a program takes 0 to mean no limit. |
-| `0xFFFFFFE0`–`0xFFFFFFEF` | The debug registers of DEBUG.md §6, for the link only, here and below: R0–R15 of the core, read only. While the core runs they read its registers live, as `niceemu --link` returns them, each word from the cycle of its own read; the multi-cycle core adds 1 to R15 for each word it fetches, so its live R15 may be the address of a constant word, or of the word after the instruction it carries out, where the pipelined core's is an instruction's. After a halt they hold what the emulator prints. While the core is paused they hold its registers, with R15 the address of the next instruction, and a hold of the paused core keeps them. A hold of a running core leaves them undefined. |
+| `0xFFFFFFE0`–`0xFFFFFFEF` | The debug registers of DEBUG.md §6, for the link only, here and below: R0–R15 of the core. R1–R15 take a write while the core is paused, as a register-direct write of an instruction does (ISA.md §4.3); R0 takes none. While the core runs they read its registers live, as `niceemu --link` returns them, each word from the cycle of its own read; the multi-cycle core adds 1 to R15 for each word it fetches, so its live R15 may be the address of a constant word, or of the word after the instruction it carries out, where the pipelined core's is an instruction's. After a halt they hold what the emulator prints. While the core is paused they hold its registers, with R15 the address of the next instruction, and a hold of the paused core keeps them. A hold of a running core leaves them undefined. |
 | `0xFFFFFFF0` | Control: hold, clear, hide, pause, and step (see [The control register](#the-control-register)). |
 | `0xFFFFFFF1` | Read only: why the core halted. 0 while it has not, and after a clear, 1 for `HALT`, 2 for a reserved control word, 3 for `INT` inside an interrupt routine, and 4 for `RTI` outside one. Reason 5, the step limit of `niceemu --link`, is the emulator's only. |
-| `0xFFFFFFF2` | Read only: the version of the link, 5. |
+| `0xFFFFFFF2` | Read only: the version of the link, 6. |
 | `0xFFFFFFF3` | Read only: the bytes of free space in the core's input FIFO. |
 | `0xFFFFFFF4` | The enable bits of the breakpoints: bit i enables breakpoint i. Bits 4 to 31 read 0. |
 | `0xFFFFFFF5` | Read only: the number of breakpoints, 4. |
@@ -157,7 +162,9 @@ requires.
 
 The input waits for the core in a FIFO of 2048 bytes, in block RAM. A
 UART byte that arrives when it is full is lost, and the link sends its
-`o` notice; a UART byte after a break is lost too, until a start, or a
+`o` notice. Over Ethernet, a byte that finds it full waits up to 50 ms
+for room, and holds back the bytes behind it, before it is lost with
+`o`, as TCP can wait; a UART byte after a break is lost too, until a start, or a
 host's connection over Ethernet, clears the end of the line's input. A
 keyboard byte goes in after a break as
 before it, so that a program that reads on, as a monitor does, gets the

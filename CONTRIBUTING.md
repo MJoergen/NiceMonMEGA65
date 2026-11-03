@@ -346,7 +346,7 @@ Then it loads and runs these programs:
 
 | Program | What it checks |
 |---|---|
-| `sim/echo.nasm` | Echoes what it receives. The testbench pauses it: the `p` notice, the memory, R15, and the stopped cycle counter while paused, and a byte that waits until it goes on. |
+| `sim/echo.nasm` | Echoes what it receives. The testbench pauses it: the `p` notice, the memory, R15, and the stopped cycle counter while paused, a write of R5 that the core keeps until its halt, and a byte that waits until it goes on. A write of R5 while it runs gets `e04`. |
 | `sim/fifo.nasm` | The input FIFO, which has 16 bytes there, so that the test of a full FIFO is short. |
 | `sim/devices.nasm` | The math unit, the performance counters, and the timer's interrupts. The testbench also uses the math unit over the link. |
 | `sim/emu.nasm` | The screen, the read counter, memory in the I/O range, and the registers after a halt. The testbench writes and reads the screen's registers. |
@@ -692,7 +692,8 @@ bitstream has one. Then it hides the ROM and uses the link:
   registers while the core runs, and holds and restarts the core.
 - It pauses `sim/pause.nasm`: the `p` notice, the registers and the memory
   while paused, the stopped cycle counter, a console byte kept, going on,
-  a hold, and a start paused.
+  a write of R1 while paused that the count goes on from, one while
+  running that gets `e04`, a hold, and a start paused.
 - It steps `sim/step.nasm` to its halt and compares the registers after
   each step with `niceemu --trace`.
 - It runs `sim/break.nasm` to its breakpoints: in a loop, two at one
@@ -745,7 +746,7 @@ after NOT COVERED, which does not fail the run. Without `ETH`, the
 summary names the Ethernet station there.
 
 The reset button is not tested: press it with a terminal open, and the
-`b05` notice comes again.
+`b06` notice comes again.
 
 ## The tools and niceemu
 

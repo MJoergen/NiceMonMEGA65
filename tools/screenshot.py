@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Draw a program's screen in niceemu as a PNG picture.
 
-The program runs in niceemu until it halts, and the 80x25 words of the
+The program runs in niceemu until it halts, with --step-time, so that
+its microseconds are the same each time, and the 80x25 words of the
 screen at 0xFFFF0000 and the cursor's registers at 0xFFFFFF80-82 are drawn
 as the text display (src/video/text.vhd) shows them: 1280x800 pixels, the
 font of src/video/font_pkg.vhd, each character in 16x32 pixels, and the
@@ -94,7 +95,7 @@ def run(args: argparse.Namespace, dumps: tuple[str, ...] | list[str] = ()
         ) -> tuple[dict[int, int], list[int], Stop | None]:
     """Runs the program; returns the words that niceemu dumps, R0-R15, and
     the stop: ("PAUSED", 0) at the step limit, or ("HALTED", reason)."""
-    cmd = [NICEEMU, "-d", "0xFFFFFF80:3", "-d", f"0xFFFF0000:{COLS * ROWS}"]
+    cmd = [NICEEMU, "--step-time", "-d", "0xFFFFFF80:3", "-d", f"0xFFFF0000:{COLS * ROWS}"]
     for d in dumps:
         cmd += ["-d", d]
     if args.input:

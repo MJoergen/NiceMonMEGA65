@@ -55,6 +55,12 @@ entity nice_core is
       -- has been '1' (DEBUG.md §6, and the cores' contract f)
       brk_addr_i    : in  t_brk_addrs;
       brk_en_i      : in  std_logic_vector(C_BREAKS_MAX - 1 downto 0);
+      -- A write of R1-R15 while paused, from the link's flip-flops: the
+      -- core takes reg_data_i into register reg_idx_i in the cycle after
+      -- reg_we_i (DEBUG.md §6, and the cores' contract g)
+      reg_we_i      : in  std_logic                     := '0';
+      reg_idx_i     : in  std_logic_vector(3 downto 0)  := (others => '0');
+      reg_data_i    : in  std_logic_vector(31 downto 0) := (others => '0');
       -- '1' once the core has halted, and no bus cycle is open
       halted_o      : out std_logic;
       -- Why the core halted, while halted_o is '1', else HALT_NONE

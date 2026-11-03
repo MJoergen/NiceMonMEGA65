@@ -16,7 +16,7 @@
 -- p_uart_tx sends a packet on the UART when p_main asks, so that p_main
 -- can make requests meanwhile. The steps:
 --
--- 1. The link's `b05` after reset goes to the UART, and the version
+-- 1. The link's `b06` after reset goes to the UART, and the version
 --    register reads 5 through the adapter.
 -- 2. Hold, clear, and hide the ROM, load G_HOST_FILE with writes, which
 --    wait for the clear, and read its words back with one read.
@@ -414,9 +414,9 @@ begin
       wait until rising_edge(clk);
       rst <= '0';
 
-      -- 1. b05 on the UART, and the version
-      expect_pkt(pkt('b', "05"));
-      check(C_VER, X"00000005");
+      -- 1. b06 on the UART, and the version
+      expect_pkt(pkt('b', "06"));
+      check(C_VER, X"00000006");
 
       -- 2. Load the program, and read it back
       wr(C_CTRL, X"0000000D");
@@ -478,7 +478,7 @@ begin
       while send_ack /= send_req loop
          check(C_CTRL, X"00000018");
       end loop;
-      expect_pkt(pkt('r', "FFFFFFF2000100000005"));
+      expect_pkt(pkt('r', "FFFFFFF2000100000006"));
       send(C_ESC & pkt('W', "FFFFFFF0000100000008"));
       request('0', X"00000000", C_LONG);
       assert err = '1' and err_code = X"02" and rd_cnt > 0 and rd_cnt < C_LONG

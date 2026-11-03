@@ -112,6 +112,7 @@ ERRORS = {
     2: "the program runs, and the request reaches a word that is not a "
        "debug register",
     3: "a bad payload",
+    4: "a write of R0-R15, and the processor is not paused",
 }
 
 

@@ -512,8 +512,9 @@ def test_pause(link: Link, prog: str) -> None:
     """The pause of DEBUG.md §6 on sim/pause.nasm, which counts in R1 and
     stores each count at 0x100: the p notice, bit 4, R0-R15 and the memory
     while paused, the cycle counter stopped, a console byte kept in the
-    input buffer, going on, a hold that keeps the registers, and a start
-    paused before the first instruction."""
+    input buffer, going on, a write of R1 while paused that the count
+    goes on from, one while running refused, a hold that keeps the
+    registers, and a start paused before the first instruction."""
     load(link, prog)
     n = link.pauses
     link.control(PAUSE | RAM)
@@ -544,6 +545,19 @@ def test_pause(link: Link, prog: str) -> None:
     later = rd(link, REGS + 1)
     check("count goes on after the pause", later > r1,
           f"{r1:08X}, then {later:08X}")
+    # Link version 6: R1-R15 take a write while paused, and the core goes
+    # on from it; a write while it runs is refused with e04.
+    check("write R1 while paused", wr(link, REGS + 1, 0x40000000) and
+          rd(link, REGS + 1) == 0x40000000, f"{rd(link, REGS + 1):08X}")
+    link.control(RAM)
+    print("  a write of R1 while running, which the link refuses:")
+    check("write R1 while running refused", not wr(link, REGS + 1, 0))
+    n = link.pauses
+    link.control(PAUSE | RAM)
+    require("pause after the write sends p", wait_pause(link, n))
+    later = rd(link, REGS + 1)
+    check("count goes on from the written R1",
+          0x40000000 < later < 0x50000000, f"{later:08X}")
     link.control(HOLD | RAM)
     check("hold ends the pause", ctl(link) == "00000009", ctl(link))
     check("hold keeps R1 of the pause", rd(link, REGS + 1) == later)

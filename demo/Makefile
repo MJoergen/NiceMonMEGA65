@@ -169,7 +169,7 @@ test: $(BUILD)/rom_test.bin $(BUILD)/rom_fail.bin
 	  case $$t in 6) dump='$(DUMP6)';; 9) dump='$(DUMP9)';; \
 	    14) dump='$(DUMP14)';; *) dump=;; esac; \
 	  bin=rom_test; [ $$t = 14 ] && bin=rom_fail; \
-	  $(EMU) -s -i $(BUILD)/test$$t.txt $$dump $(BUILD)/$$bin.bin > $(BUILD)/test$$t.out || \
+	  $(EMU) -s --step-time -i $(BUILD)/test$$t.txt $$dump $(BUILD)/$$bin.bin > $(BUILD)/test$$t.out || \
 	    { echo "FAIL demo: niceemu exits with $$? on input $$t"; exit 1; }; \
 	  sed -n -e '/^ffff/p' -e '/^Screen:/,$$p' $(BUILD)/test$$t.out; \
 	done > $(BUILD)/test.screen; \
