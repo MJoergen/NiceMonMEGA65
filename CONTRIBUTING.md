@@ -365,7 +365,11 @@ input, which is dropped while the core is held in reset, and input for
 `sim/fifo.nasm` while it runs, and after a break on the UART, which ends
 the line's input and not the keyboard's. Then it drives the link over
 the TCP ports as the Ethernet station does: a host's half-close is a
-break, and the next connection starts the line's input anew. Last it
+break, and the next connection starts the line's input anew. A flood
+over TCP to `sim/fifo.nasm` is held back while the FIFO is full and
+loses nothing; to the paused program, the byte that waits is lost with
+one `o` after the link's wait, 1500 µs there, and a host that leaves
+during the wait ends it at once. Last it
 resets the system while a program
 runs, and checks that the core boots from the ROM again and that the
 screen's and the board's registers are cleared. The header of

@@ -97,8 +97,8 @@ Programs may read the keyboard and write the screen. The ROM of a
 release holds the [monitor](monitor/README.md), which shows its version
 and a prompt, `> `, and takes a command on each line: `?` lists them.
 `l` loads a program at `0x8000` that you type, or paste into a
-terminal on the serial port, as the lines of its `.bin` file, and `r`
-runs it
+plain TCP client on the Ethernet port or a terminal on the serial
+port, as the lines of its `.bin` file, and `r` runs it
 ([monitor/README.md](monitor/README.md#loading-without-a-host)). A
 program there has 92K words of RAM on the MEGA65, `0x8000` to
 `0x1EFFF`, and 28K on the Nexys4DDR.

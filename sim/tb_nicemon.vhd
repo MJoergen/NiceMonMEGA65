@@ -30,7 +30,7 @@
 --    control register hides it, and shows it again; and the core boots from
 --    it again when it is started with the ROM shown. From then on the ROM
 --    is hidden, as the tools hide it, so the RAM is at 0 as in the
---    emulator. The version register reads 5, and the free space 16, the
+--    emulator. The version register reads 6, and the free space 16, the
 --    whole FIFO.
 -- 2. Load G_HELLO_FILE with W packets, and read its first word back.
 -- 3. The control register: the core is held in reset.
@@ -111,7 +111,14 @@
 --    drives them: a host connects, and G_FIFO_FILE echoes its bytes over
 --    TCP; its half-close is a break, after which its bytes are dropped;
 --    the next connection renews the line's input, the link's resume
---    (DEBUG.md §7), and its bytes reach the program again.
+--    (DEBUG.md §7), and its bytes reach the program again. Then a flood
+--    over TCP: G_FIFO_FILE's 40 bytes and a '.' sent while it waits are
+--    held back, not lost, as TCP holds the host back, and all echoed,
+--    with no `o`. While it is paused, the 17th byte waits C_LINK_WAIT,
+--    the link's G_WAIT, and is lost with one `o`; the bytes behind it
+--    are lost at once, and a request after them is answered. A host
+--    that leaves during the wait ends it at once, with the `o` on the
+--    UART.
 -- 16. A reset while G_ECHO_FILE runs: the link sends `b06`, the core boots
 --    from the ROM again, and the screen's and the board's registers and the
 --    breakpoints are cleared.
@@ -162,6 +169,13 @@ architecture simulation of tb_nicemon is
    constant C_BIT_TIME : time    := (C_CLOCK_HZ / C_BAUDRATE) * C_PERIOD;
    -- Longer than the slowest answer
    constant C_TIMEOUT : time    := 1 ms;
+   -- The wait of a console byte over TCP for room in the FIFO, longer than
+   -- G_FIFO_FILE's wait, under 200 us with the pipelined core and about
+   -- 500 us with the multi-cycle one
+   constant C_LINK_WAIT_US : positive := 1500;
+   constant C_LINK_WAIT    : time     := C_LINK_WAIT_US * 1 us;
+   -- More bytes than the FIFO holds, for the flood over TCP
+   constant C_FLOOD : string := "0123456789abcdefghijklmnopqrstuvwxyzABCD";
 
    constant C_LF  : character := character'val(10);
    constant C_ESC : character := character'val(255);
@@ -243,7 +257,8 @@ begin
          G_ROM_FILE         => G_ROM_FILE,
          G_ROM_ADDR_BITS    => 11,
          G_CPU_RUN_AT_RESET => true,
-         G_BOARD_IO         => true
+         G_BOARD_IO         => true,
+         G_LINK_WAIT_US     => C_LINK_WAIT_US
       )
       port map (
          clk_i          => clk,
@@ -359,6 +374,7 @@ begin
       variable micros_v : std_logic_vector(31 downto 0);
       variable fs_v     : std_logic_vector(31 downto 0);
       variable moved_v  : boolean;
+      variable t0_v     : time;
 
       -- Sends one byte, with the stop bit given, on the UART, or over TCP
       -- while net_on is '1', where it waits until nicemon takes it.
@@ -1106,6 +1122,63 @@ begin
       check("FFFFFFF3", "00000010");         -- the FIFO is empty: no "zz"
       net_on <= '0';                         -- the host leaves: the link goes back to the UART
       wait until rising_edge(clk);
+
+      report "tb_nicemon: a flood over TCP waits for a program that reads";
+      wr("FFFFFFF0", "00000009");
+      load(G_FIFO_FILE, first_v);
+      wr("FFFFFFF0", "00000008");
+      net_on <= '1';
+      net_renew;
+      t0_v := now;
+      send_con(C_FLOOD & ".");               -- held back while the FIFO is full
+      assert now - t0_v > 20 us
+         report "tb_nicemon: the flood over TCP was not held back"
+         severity failure;
+      expect_con(C_FLOOD & ".");             -- none lost
+      expect_halt("01");                     -- and no `o` before the halt
+      check("FFFFFFF3", "00000010");
+
+      report "tb_nicemon: a flood over TCP to a paused program gives one o";
+      wr("FFFFFFF0", "00000009");
+      load(G_FIFO_FILE, first_v);
+      wr("FFFFFFF0", "00000008");
+      wr_pause("00000018");
+      send_con("0123456789abcdef");          -- fills the FIFO
+      send_con("X");                         -- waits in the link
+      t0_v := now;
+      send_con("YZ");                        -- Z waits behind X, until the wait ends
+      assert now - t0_v >= C_LINK_WAIT - 20 * C_PERIOD and
+             now - t0_v <= C_LINK_WAIT + 200 * C_PERIOD
+         report "tb_nicemon: the wait over TCP took " & time'image(now - t0_v) &
+                ", not " & time'image(C_LINK_WAIT)
+         severity failure;
+      expect_pkt("o#6F");                    -- X is lost
+      check("FFFFFFF3", "00000000");         -- Y and Z are lost at once, with no second `o`
+      wr("FFFFFFF0", "00000008");
+      expect_con("0123456789abcdef");
+      send_con(".");                         -- there is room again: no wait
+      expect_con(".");
+      expect_halt("01");
+
+      report "tb_nicemon: a host that leaves during the wait";
+      wr("FFFFFFF0", "00000009");
+      load(G_FIFO_FILE, first_v);
+      wr("FFFFFFF0", "00000008");
+      wr_pause("00000018");
+      send_con("0123456789abcdef");
+      send_con("X");                         -- waits in the link
+      t0_v := now;
+      wait for 10 * C_PERIOD;
+      net_on <= '0';                         -- the host leaves
+      expect_pkt("o#6F");                    -- X is lost at once, and the `o` goes on the UART
+      assert now - t0_v < C_LINK_WAIT / 2
+         report "tb_nicemon: the byte waited after the host left"
+         severity failure;
+      wr("FFFFFFF0", "00000008");            -- over the UART
+      expect_con("0123456789abcdef");
+      send_con(".");
+      expect_con(".");
+      expect_halt("01");
 
       report "tb_nicemon: a reset while the core runs";
       wr("FFFFFF81", "00000021");

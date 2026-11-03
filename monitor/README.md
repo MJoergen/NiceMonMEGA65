@@ -343,12 +343,14 @@ UART at 2 Mbaud keeps up: a line takes about 1400 instructions, and
 arrives in about 90 µs. On the R6, 20600 lines pasted at full speed, in
 LF lines and in CR LF lines, were all written, with no byte lost.
 
-Over Ethernet, a paste is lost. The station takes the host's bytes as
-fast as they come, at 100 Mbit/s, and the core's input FIFO of 2048
-bytes drops what does not fit, as the link sends `o` for. Lines typed
-into a plain client, such as `nc 192.168.1.65 4510`, are fine. For a
-file over Ethernet, use `load.py --eth 192.168.1.65 --monitor prog.bin`
-(Loading from a host above), which waits for room in the FIFO.
+Over Ethernet, a paste into a plain client, such as
+`nc 192.168.1.65 4510`, keeps up too. The station takes the host's
+bytes at 100 Mbit/s, faster than `l` reads them, but a byte that finds
+the core's input FIFO of 2048 bytes full waits up to 50 ms for room,
+and TCP holds the host back meanwhile. A byte is lost, with the link's
+`o`, only when the program reads nothing for 50 ms.
+`load.py --eth 192.168.1.65 --monitor prog.bin` (Loading from a host
+above) is faster, as it writes the words into the memory.
 
 ## Building and testing
 

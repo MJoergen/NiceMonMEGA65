@@ -31,7 +31,11 @@
 -- that choice (p_lnk_rx), for the timing: it holds a byte, a break waits
 -- behind the byte before it, a renewal waits behind the break before it,
 -- and no byte is taken while either waits, so that the order stays and a
--- byte that waits when net_on_i changes still reaches the link. The
+-- byte that waits when net_on_i changes still reaches the link. A
+-- console byte that finds the core's input FIFO full waits in the link
+-- for up to G_LINK_WAIT_US, 50 ms, while net_on_i is '1', as TCP holds
+-- the host back, and is lost at once from the UART; if net_on_i falls
+-- during the wait, the byte is lost with `o` at once, on the UART. The
 -- on-board debugger (dbg/dbg.vhd, doc/DEBUGGER.md) is the link's client
 -- in the system (DEBUG.md §3): the dbg_* ports are the link's side port,
 -- a word at a time, beside the host's line, which keeps its answers, its
@@ -276,6 +280,9 @@ entity nicemon is
       G_BOARD_IO         : boolean := false;
       -- The number of breakpoints of the debug link, 0 to 8 (DEBUG.md §6)
       G_BREAKS           : natural range 0 to C_BREAKS_MAX := 4;
+      -- The microseconds that a console byte over TCP waits for room in
+      -- the core's input FIFO (DEBUG.md §1); G_CLOCK_HZ is at least 1 MHz
+      G_LINK_WAIT_US     : positive := 50_000;
       -- The Ethernet station's MAC and IP addresses after reset (board_io.vhd)
       G_ETH_MAC          : std_logic_vector(47 downto 0) := X"024E49434500";
       G_ETH_IP           : std_logic_vector(31 downto 0) := X"00000000";
@@ -1083,6 +1090,7 @@ begin
    i_debug_link : entity work.debug_link
       generic map (
          G_TIMEOUT   => G_CLOCK_HZ / 10,
+         G_WAIT      => G_CLOCK_HZ / 1_000_000 * G_LINK_WAIT_US,
          G_HAS_ROM   => G_ROM_FILE /= "",
          G_BOOT_HELD => not G_CPU_RUN_AT_RESET,
          G_BREAKS    => G_BREAKS

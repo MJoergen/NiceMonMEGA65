@@ -39,6 +39,9 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 
 **Monitor**
 
+- A paste into `l` over Ethernet, such as into `nc 192.168.1.65 4510`,
+  no longer loses bytes, as the link waits for room in the FIFO. In
+  V1.2.1 it did, and `load.py --monitor` was needed there.
 - `r ADDR` runs the program at ADDR, and `r` alone the one at `0x8000`.
   `r 0` is the cold start, which leaves the RAM from `0x8000` alone.
 
