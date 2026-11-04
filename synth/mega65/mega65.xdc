@@ -105,6 +105,35 @@ set_output_delay -clock eth_clk_pin -max  5.000 [get_ports {eth_txd_o[*] eth_tx_
 set_output_delay -clock eth_clk_pin -min -2.000 [get_ports {eth_txd_o[*] eth_tx_en_o}]
 set_property IOB TRUE [get_ports {eth_txd_o[*] eth_tx_en_o}]
 
+## The SD card slots (#56), on the same pins on the R3 and R6 (TE0765-03 and
+## TE0765-06, and M2M's MEGA65-R3.xdc and MEGA65-R6.xdc). Slot 0 is the
+## microSD slot at the back (SD_* on the R3, SD1_* on the R6), and slot 1
+## the full-size slot underneath (SD2_*), whose WP is the only one. The
+## controller runs them in SPI mode: CLK is the clock, CMD the data to the
+## card, DAT3 the chip select, and DAT0 the data from the card. DAT1 and
+## DAT2 are left out, so the FPGA never drives them, as the R3's back slot
+## needs, whose DAT1 and DAT2 reach the MAX10's JTAG port. Every line has a
+## 12.1 kOhm pull-up on the board, and CD is low with a card in.
+set_property -dict {PACKAGE_PIN G2   IOSTANDARD LVCMOS33} [get_ports {sd_clk_o[0]}];  # SD_CLK
+set_property -dict {PACKAGE_PIN J2   IOSTANDARD LVCMOS33} [get_ports {sd_cmd_o[0]}];  # SD_CMD
+set_property -dict {PACKAGE_PIN K2   IOSTANDARD LVCMOS33} [get_ports {sd_dat3_o[0]}]; # SD_D3
+set_property -dict {PACKAGE_PIN H2   IOSTANDARD LVCMOS33} [get_ports {sd_dat0_i[0]}]; # SD_D0
+set_property -dict {PACKAGE_PIN K1   IOSTANDARD LVCMOS33} [get_ports {sd_cd_n_i[0]}]; # SD_CD
+set_property -dict {PACKAGE_PIN B17  IOSTANDARD LVCMOS33} [get_ports {sd_clk_o[1]}];  # SD2_CLK
+set_property -dict {PACKAGE_PIN B16  IOSTANDARD LVCMOS33} [get_ports {sd_cmd_o[1]}];  # SD2_CMD
+set_property -dict {PACKAGE_PIN B15  IOSTANDARD LVCMOS33} [get_ports {sd_dat3_o[1]}]; # SD2_D3
+set_property -dict {PACKAGE_PIN B18  IOSTANDARD LVCMOS33} [get_ports {sd_dat0_i[1]}]; # SD2_D0
+set_property -dict {PACKAGE_PIN D17  IOSTANDARD LVCMOS33} [get_ports {sd_cd_n_i[1]}]; # SD2_CD
+set_property -dict {PACKAGE_PIN C17  IOSTANDARD LVCMOS33} [get_ports {sd_wp_i}];      # SD2_WP
+
+## The card's clock is at most 25 MHz, a quarter of the system clock, and
+## the controller counts its timing in cycles of the system clock, so the
+## pins are slow. Their registers are in the I/O tiles (src/system.vhd).
+set_false_path -to   [get_ports {sd_clk_o[*] sd_cmd_o[*] sd_dat3_o[*]}]
+set_false_path -from [get_ports {sd_dat0_i[*] sd_cd_n_i[*] sd_wp_i}]
+set_property IOB TRUE [get_ports {sd_clk_o[*] sd_cmd_o[*] sd_dat3_o[*]}]
+set_property IOB TRUE [get_ports {sd_dat0_i[*] sd_cd_n_i[*] sd_wp_i}]
+
 ## The registers on the slow pins live in the I/O tiles, so that their
 ## timing does not depend on placement.
 set_property IOB TRUE [get_ports {kb_io0_o kb_io1_o kb_io2_i uart_txd_o uart_rxd_i led_o}]

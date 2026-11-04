@@ -2,8 +2,8 @@
 
 This is the system that a program and the debug link see on the MEGA65 R3
 and R6, and on the Nexys4DDR: the debug link on the UART, the address map,
-the screen, the keyboard, the ROM, the Nexys4DDR's devices, and the
-Ethernet station, which every board has. It follows nice_cpu's
+the screen, the keyboard, the ROM, the Nexys4DDR's devices, the
+Ethernet station, which every board has, and the SD card slots. It follows nice_cpu's
 [doc/SYSTEM.md](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md) for the devices and
 [doc/DEBUG.md](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEBUG.md) for the link.
 [EMULATOR.md](EMULATOR.md) lists where it differs from `niceemu`.
@@ -468,3 +468,32 @@ can reach the port can do the same. The IP address is 0 after reset,
 which serves nothing, so a board is reachable only after a program or
 the UART's link gives it an address. Give it one only on a network you
 trust.
+
+## The SD card slots
+
+The boards' SD card slots are wired to the system
+([#56](https://github.com/MJoergen/NiceMonMEGA65/issues/56)), for the
+controller of nice_cpu's SYSTEM.md §5, which comes with
+[#55](https://github.com/MJoergen/NiceMonMEGA65/issues/55). Until then
+the pins rest, and `0xFFFFFFA0`–`AF` are memory.
+
+| Board | Slot 0, the default | Slot 1 |
+|---|---|---|
+| MEGA65 R3 and R6 | The microSD slot at the back | The full-size slot underneath, with the MEGA65's system files |
+| Nexys4DDR | The microSD slot | none |
+
+- The controller runs the cards in SPI mode: CLK is the clock, CMD the
+  data to the card, DAT3 the chip select, and DAT0 the data from the
+  card. DAT1 and DAT2 are not driven.
+- Every slot has card detect, and the MEGA65's slot 1 also has write
+  protect.
+- The MEGA65's cards are always powered. The Nexys4DDR switches its
+  card's power with `SD_RESET`, and keeps it off while the controller
+  is idle.
+- On the R3, slot 0's DAT1, DAT2, CMD, and DAT0 also reach the JTAG pins
+  of the MAX10, so the slot runs in SPI mode or 1-bit SD mode only. Plug
+  no JTAG cable into the MAX10's header J17 while a card is in it.
+- On the R3, slot 1 has no card detect and no write protect, as the
+  common pin of the socket's switches is not connected to GND. The R3
+  build ignores them, so a missing card shows as a failed start-up. The
+  R3A fixed it, but one core serves both.

@@ -167,6 +167,25 @@ set_max_delay -datapath_only \
 ## top.vhd), so they all change at the same time.
 set_property IOB TRUE [get_ports {vga_red_o[*] vga_green_o[*] vga_blue_o[*] vga_hs_o vga_vs_o}]
 
+## The microSD slot, slot 0 (#56), from Digilent's master XDC. SD_RESET
+## switches the card's power, on while it is low. The controller runs the
+## card in SPI mode: SCK is the clock, CMD the data to the card, DAT3 the
+## chip select, and DAT0 the data from the card. DAT1 and DAT2 are left
+## out. Which level of CD means a card is to be checked on the board.
+set_property -dict {PACKAGE_PIN E2   IOSTANDARD LVCMOS33} [get_ports {sd_pwr_n_o}];   # SD_RESET
+set_property -dict {PACKAGE_PIN B1   IOSTANDARD LVCMOS33} [get_ports {sd_clk_o}];     # SD_SCK
+set_property -dict {PACKAGE_PIN C1   IOSTANDARD LVCMOS33} [get_ports {sd_cmd_o}];     # SD_CMD
+set_property -dict {PACKAGE_PIN D2   IOSTANDARD LVCMOS33} [get_ports {sd_dat3_o}];    # SD_DAT[3]
+set_property -dict {PACKAGE_PIN C2   IOSTANDARD LVCMOS33} [get_ports {sd_dat0_i}];    # SD_DAT[0]
+set_property -dict {PACKAGE_PIN A1   IOSTANDARD LVCMOS33} [get_ports {sd_cd_n_i}];    # SD_CD
+
+## The card's clock is at most 25 MHz, and the controller counts its timing
+## in cycles of the system clock, so the pins are slow. Their registers are
+## in the I/O tiles (src/system.vhd).
+set_false_path -to   [get_ports {sd_pwr_n_o sd_clk_o sd_cmd_o sd_dat3_o}]
+set_false_path -from [get_ports {sd_dat0_i sd_cd_n_i}]
+set_property IOB TRUE [get_ports {sd_pwr_n_o sd_clk_o sd_cmd_o sd_dat3_o sd_dat0_i sd_cd_n_i}]
+
 ## The UART, the LEDs, the display, the keyboard, the buttons, the switches,
 ## and the reset button are slow, and synchronized or registered in the
 ## design. Their first registers are in the I/O tiles, so that their timing

@@ -9,6 +9,11 @@
 -- supply of the HDMI connector (CT_HPD) and the output enable of the level
 -- shifter (LS_OE, active high) are switched on, as in MandelbrotMEGA65's
 -- mega65_r3.vhd and the MiSTer2MEGA65 framework.
+--
+-- The full-size SD slot underneath, SD slot 1, has no card detect and no
+-- write protect, as the common pin of its switches is not connected to GND
+-- (#56), so G_SD_DETECT leaves them out. The R3A fixes it, but one core
+-- serves both.
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -58,7 +63,16 @@ entity top is
       eth_crs_dv_i       : in  std_logic;
       eth_rxer_i         : in  std_logic;
       eth_txd_o          : out std_logic_vector(1 downto 0);
-      eth_tx_en_o        : out std_logic
+      eth_tx_en_o        : out std_logic;
+
+      -- The SD card slots in SPI mode (src/system.vhd): slot 0 the microSD
+      -- slot at the back, slot 1 the full-size slot underneath
+      sd_clk_o           : out std_logic_vector(1 downto 0);
+      sd_cmd_o           : out std_logic_vector(1 downto 0);
+      sd_dat3_o          : out std_logic_vector(1 downto 0);
+      sd_dat0_i          : in  std_logic_vector(1 downto 0);
+      sd_cd_n_i          : in  std_logic_vector(1 downto 0);
+      sd_wp_i            : in  std_logic -- slot 1's
    );
 end entity top;
 
@@ -87,7 +101,8 @@ begin
 
    i_mega65 : entity work.mega65
       generic map (
-         G_ROM_FILE => G_ROM_FILE
+         G_ROM_FILE  => G_ROM_FILE,
+         G_SD_DETECT => "01"
       )
       port map (
          clk_i          => clk_i,
@@ -116,7 +131,13 @@ begin
          eth_crs_dv_i   => eth_crs_dv_i,
          eth_rxer_i     => eth_rxer_i,
          eth_txd_o      => eth_txd_o,
-         eth_tx_en_o    => eth_tx_en_o
+         eth_tx_en_o    => eth_tx_en_o,
+         sd_clk_o       => sd_clk_o,
+         sd_cmd_o       => sd_cmd_o,
+         sd_dat3_o      => sd_dat3_o,
+         sd_dat0_i      => sd_dat0_i,
+         sd_cd_n_i      => sd_cd_n_i,
+         sd_wp_i        => sd_wp_i
       ); -- i_mega65
 
    hdmi_ct_hpd_o <= '1';  -- Supply +5V to the HDMI connector

@@ -26,6 +26,11 @@
 -- the PHY needs. It then runs with its reset defaults, and negotiates the
 -- link on its own. Its RMII pins go to system.vhd, to the Ethernet station
 -- there (src/eth/eth.vhd).
+--
+-- The two SD card slots go to system.vhd in SPI mode: slot 0 is the
+-- microSD slot at the back, and slot 1 the full-size slot underneath,
+-- whose card detect and write protect G_SD_DETECT may leave out, as the R3
+-- needs (#56). The cards' power is always on.
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -41,7 +46,10 @@ entity mega65 is
    generic (
       -- The ROM that the core boots from, a .bin file, or "" for a build without a
       -- ROM, whose core waits for the debug link (see src/nicemon.vhd)
-      G_ROM_FILE : string := ""
+      G_ROM_FILE  : string                       := "";
+      -- Bit i is '1' when slot i's card detect and write protect are wired,
+      -- which slot 1 of the R3 lacks (src/system.vhd)
+      G_SD_DETECT : std_logic_vector(1 downto 0) := "11"
    );
    port (
       clk_i          : in  std_logic; -- 100 MHz
@@ -76,7 +84,16 @@ entity mega65 is
       eth_crs_dv_i   : in  std_logic;
       eth_rxer_i     : in  std_logic;
       eth_txd_o      : out std_logic_vector(1 downto 0);
-      eth_tx_en_o    : out std_logic
+      eth_tx_en_o    : out std_logic;
+
+      -- The SD card slots in SPI mode (src/system.vhd): slot 0 the microSD
+      -- slot at the back, slot 1 the full-size slot underneath
+      sd_clk_o       : out std_logic_vector(1 downto 0);
+      sd_cmd_o       : out std_logic_vector(1 downto 0);
+      sd_dat3_o      : out std_logic_vector(1 downto 0);
+      sd_dat0_i      : in  std_logic_vector(1 downto 0);
+      sd_cd_n_i      : in  std_logic_vector(1 downto 0);
+      sd_wp_i        : in  std_logic -- slot 1's
    );
 end entity mega65;
 
@@ -214,7 +231,9 @@ begin
          G_ROM_FILE      => G_ROM_FILE,
          G_RAM_ADDR_BITS => 17,
          G_SCR_ADDR_BITS => 15,
-         G_VIDEO         => C_VIDEO
+         G_VIDEO         => C_VIDEO,
+         G_SD_SLOTS      => 2,
+         G_SD_DETECT     => G_SD_DETECT
       )
       port map (
          clk_i        => clk,
@@ -233,6 +252,13 @@ begin
          eth_rx_er_i  => eth_rxer_i,
          eth_txd_o    => eth_txd_o,
          eth_tx_en_o  => eth_tx_en_o,
+         sd_clk_o     => sd_clk_o,
+         sd_cmd_o     => sd_cmd_o,
+         sd_dat3_o    => sd_dat3_o,
+         sd_dat0_i    => sd_dat0_i,
+         sd_cd_n_i    => sd_cd_n_i,
+         sd_wp_i      => sd_wp_i & '0',
+         sd_pwr_n_o   => open,
          vga_clk_i    => vga_clk,
          vga_hs_o     => vga_hs,
          vga_vs_o     => vga_vs,

@@ -31,6 +31,9 @@
 -- The Ethernet PHY, an SMSC LAN8720A, gets its 50 MHz clock and its reset
 -- from the FPGA, as on the MEGA65 (synth/mega65/mega65.vhd). Its RMII
 -- pins go to system.vhd, to the Ethernet station there (src/eth/eth.vhd).
+--
+-- The microSD slot is the system's SD slot 0, whose power the system
+-- switches with SD_RESET (src/system.vhd).
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -85,7 +88,16 @@ entity top is
       eth_crs_dv_i : in  std_logic;
       eth_rxer_i   : in  std_logic;
       eth_txd_o    : out std_logic_vector(1 downto 0);
-      eth_tx_en_o  : out std_logic
+      eth_tx_en_o  : out std_logic;
+
+      -- The microSD slot in SPI mode (src/system.vhd), and its power, on
+      -- while SD_RESET is low
+      sd_pwr_n_o   : out std_logic;
+      sd_clk_o     : out std_logic;
+      sd_cmd_o     : out std_logic;
+      sd_dat3_o    : out std_logic;
+      sd_dat0_i    : in  std_logic;
+      sd_cd_n_i    : in  std_logic
    );
 end entity top;
 
@@ -138,6 +150,11 @@ architecture synthesis of top is
 
    -- The PHY's reset, in the IOB (IOB TRUE on its port, in nexys4ddr.xdc)
    signal eth_rst_n_r : std_logic := '0';
+
+   -- The SD card's slots, of which the board has slot 0
+   signal sd_clk  : std_logic_vector(1 downto 0);
+   signal sd_cmd  : std_logic_vector(1 downto 0);
+   signal sd_dat3 : std_logic_vector(1 downto 0);
 
 begin
 
@@ -256,7 +273,9 @@ begin
          G_SCR_ADDR_BITS => 13,
          G_VIDEO         => C_VIDEO,
          G_BOARD_IO      => true,
-         G_TOGGLE_KEY    => "Scroll Lock"
+         G_TOGGLE_KEY    => "Scroll Lock",
+         G_SD_SLOTS      => 1,
+         G_SD_POWER      => true
       )
       port map (
          clk_i        => clk,
@@ -281,6 +300,12 @@ begin
          eth_rx_er_i  => eth_rxer_i,
          eth_txd_o    => eth_txd_o,
          eth_tx_en_o  => eth_tx_en_o,
+         sd_clk_o     => sd_clk,
+         sd_cmd_o     => sd_cmd,
+         sd_dat3_o    => sd_dat3,
+         sd_dat0_i    => '1' & sd_dat0_i,
+         sd_cd_n_i    => '1' & sd_cd_n_i,
+         sd_pwr_n_o   => sd_pwr_n_o,
          vga_clk_i    => vga_clk,
          vga_hs_o     => vga_hs,
          vga_vs_o     => vga_vs,
@@ -289,6 +314,10 @@ begin
          vga_green_o  => vga_green,
          vga_blue_o   => vga_blue
       ); -- i_system
+
+   sd_clk_o  <= sd_clk(0);
+   sd_cmd_o  <= sd_cmd(0);
+   sd_dat3_o <= sd_dat3(0);
 
 
    p_vga : process (vga_clk)
