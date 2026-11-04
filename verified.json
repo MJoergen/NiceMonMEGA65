@@ -1,7 +1,7 @@
 {
-  "nice_cpu_tag": "V1.3",
-  "nice_cpu_commit": "4e9f912464e796caf057b886e1f2c669e3c202a7",
-  "repo_commit": "875ec901f3bffef98413e3b2959ae89aca13bdef",
+  "nice_cpu_tag": "V1.4",
+  "nice_cpu_commit": "a64b1acdcd14ee8cb828770b05e0bae42e3fdd04",
+  "repo_commit": "c006ecc7260190d7099b01b49f6d92f12c2b0dcb",
   "vivado": "Vivado v2025.1",
   "board": "MEGA65 R6",
   "part": "xc7a200tfbg484-2",
@@ -33,5 +33,5 @@
       "met": true
     }
   ],
-  "date": "2026-11-03"
+  "date": "2026-11-04"
 }
