@@ -86,8 +86,8 @@ Two limits of the R3, which the R6 does not have (#56 has the details):
 2. **The registers** are specified in nice_cpu's `doc/SYSTEM.md`, as the
    timer and the math unit are, and `niceemu` implements them on an image
    file. So the emulator needs no model of the SD protocol.
-3. **The ROM** has the sector routines in `monlib.nasm`, and FAT32 with a
-   small file API in the dispatch table, which the monitor's commands use.
+3. **The ROM** has the sector routines and FAT32 with a small file API,
+   both in the dispatch table, which the monitor's commands use.
 4. **BASIC** calls the file API.
 
 ## The registers
@@ -297,17 +297,46 @@ and must be formatted. FAT12 and FAT16 are rejected with a message.
 - **Caches**: one sector of the FAT and one per open file, in the ROM's
   variables at `0xFFFFF000`. Two files open at once, a read and a write,
   are enough for BASIC and the monitor. "Changed" in the status drops the
-  caches and the mount.
+  caches and the mount. The caches are write-through, so the card always
+  holds what the caches hold, and `sd_read` reads what FAT32 wrote.
 
 ## The ROM
 
 The rule of #24 is that the dispatch table gets an entry only when a
-program cannot do without it. So:
+program cannot do without it, as for state that the monitor keeps. So:
 
-- **The sector routines** go in `monlib.nasm`, with no entry: `sd_init`,
-  `sd_read`, and `sd_write`, which poll busy and return the error. The
-  registers are the same on every board and in the emulator, so a program
-  can reach them itself.
+- **The sector routines** get entries in the table, 9 to 11, in the C ABI,
+  and the table becomes 1.1. The registers are the same on every board and
+  in the emulator, but the controller is state that the monitor keeps once
+  FAT32 is in the ROM: the selected slot, the buffer, the mount, and the
+  caches. A program that reached the registers itself would change them
+  behind FAT32's back. Through the entries the ROM knows: `sd_init` drops
+  the mount and the caches, and `sd_write` drops a cached copy of its
+  sector. The routines poll busy, and return 0 or the negative of
+  `SD_ERROR`, as the file API does:
+
+| Entry | Arguments | Result |
+|---|---|---|
+| `sd_init` | R1 the slot | 0, or an error |
+| `sd_read` | R1 the sector, R2 a buffer of 128 words | 0, or an error |
+| `sd_write` | R1 the sector, R2 a buffer of 128 words | 0, or an error |
+
+  - **The slot** is an argument of `sd_init` only, which selects the slot
+    and starts its card up. `sd_read` and `sd_write` use the slot of the
+    last `sd_init`. The controller has one "ready" for both slots, so a
+    change of slot costs an Init, up to hundreds of milliseconds; a slot
+    argument to every call would hide that cost, or would need a rule for
+    when to repeat the Init. `fs_mount` calls `sd_init`, and an `sd_init`
+    by a program unmounts the card.
+  - **The buffer** is in RAM, 128 words of 4 bytes each, little-endian, as
+    the controller's buffer is: byte 4n of the sector is bits 7..0 of word
+    n. The routines copy it through `SD_CHUNK` and `SD_BUF0`–`SD_BUF7`, so
+    no sector is left in the controller's buffer, which FAT32 uses too.
+    The packing keeps FAT's 32-bit fields whole and costs a quarter of the
+    words of one byte per word.
+  - The card's size is `SD_LAST`, which a program reads itself after an
+    `sd_init`; it is no result, as a card of 1 TB or more has a last
+    sector at or above 2³¹, which would read as an error.
 - **FAT32** goes in the ROM, as the monitor's own commands need it. Its
   state, the mounted card and the caches, is state that the monitor keeps,
   so the file API gets entries in the table, in the C ABI, with a negative
@@ -391,7 +420,7 @@ ROM is developed in niceemu and needs no board.
 | #55 | The controller in the RTL, stage 1: SPI mode, the card model, `tb_sd`, and the formal checks |
 | #63 | The controller, stage 2: 4-bit SD mode, optional, after a test whether a card leaves SPI mode |
 | #56 | The pins on the R3, R6, and Nexys4DDR, and the read-only check in `make hwtest` |
-| #57 | The sector routines in `monlib.nasm`, and the monitor's `sd` command |
+| #57 | The sector routines in the dispatch table, and the monitor's `sd` command |
 | #58 | FAT32 reading, `dir`, and `load` |
 | #59 | FAT32 writing, `save`, and `del` |
 | #60 | BASIC's `SAVE`, `LOAD`, and `DIR` |
