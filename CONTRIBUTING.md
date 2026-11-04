@@ -326,6 +326,14 @@ The testbenches are these:
   `sim/rom.nasm` as its ROM and without a ROM, the keyboards, the
   debugger and its host, the text display, and `src/system.vhd` with the screen and the devices of the
   Nexys4DDR, and the drivers of its display and RGB LEDs.
+- `sim/tb_sd.vhd` tests the SD card controller, `src/sd/`, at 100 MHz on
+  two models of a card, `sim/sd_card_model.vhd`: an SDHC card of 1024
+  sectors in slot 0, on `sim/Makefile`'s image, and an SDSC card of
+  version 1 with 2048 sectors in slot 1. It runs Init, reads and writes
+  sectors and checks their bytes, and checks a CRC error, write protect,
+  a start of the core during a Read, which aborts it, a card that
+  answers nothing, and a card taken out and put back. In every cycle at
+  most one slot is selected and clocked.
 - `make -C sim check-steps`, part of `make test`, compares the step counts
   that `tb_nicemon` checks with those of niceemu. It is skipped when niceemu
   is not built.
@@ -355,6 +363,7 @@ Then it loads and runs these programs:
 | `sim/break.nasm` | The breakpoints, and the `x` notice. |
 | `sim/eof.nasm` | Echoes its input until a break ends it. |
 | `sim/count.nasm` | The read counter, which a start keeps. |
+| `sim/sd.nasm` | nice_cpu's test of the SD card controller, for a card of 1024 sectors (`sim/sd_card_model.vhd`) in slot 0 and none in slot 1: Init, Read, Write, and the errors. The controller holds the end of a command, as nice_cpu's simulation does, so the step count and the 32 result words equal niceemu's with `--sd0` and `sim/Makefile`'s image. The testbench then reads the buffer over the link. |
 
 It also checks the error answers while the core runs, the `o` notice
 when the FIFO overflows, and that the link reads the console and the
@@ -611,6 +620,14 @@ every time, not only the ones a testbench sends.
   `eth_tcp_rx.sby` proves. Its `cover` reaches each state, the end by the
   last try, by a reset, and by the ACK of the FIN, the probe, and a new
   connection replacing an open one.
+- `sd_spi.sby` proves the SD card controller's engine,
+  `src/sd/sd_spi.vhd`, with a millisecond of 1 cycle and a card that
+  answers anything: a command runs from its start to its one `done_o`,
+  the buffer is written only with the bytes of a Read's block, chip
+  select is high while no command runs, and an abort or a reset ends a
+  command at once, with no `done_o` and no write of the buffer. Its
+  `cover` reaches a Read's first command, the start-up's clocks after
+  the power cycle of an Init, an abort, and an end.
 - `dbg_host.sby` proves the debugger's adapter to the debug link's side
   port, `src/dbg/dbg_host.vhd`, with every input free, the link's
   answers too: a word out stays, with its fields, until the link is done
@@ -623,8 +640,8 @@ The checks in `rx_fifo.vhd`, `board_io.vhd`, `scr_regs.vhd`,
 `devices.vhd`, `mem.vhd`, `nicemon.vhd`, `eth/eth_tcp_timer.vhd`,
 `eth/eth_tcp_buf.vhd`, `eth/eth_tcp_pick.vhd`, `eth/eth_tcp_rx.vhd`,
 `eth/eth_tcp_tx.vhd`, `eth/rx_fcs.vhd`, `eth/eth_arb.vhd`,
-`eth/eth_rx_fifo.vhd`, `eth/eth_tx_fifo.vhd`, `eth/eth_tcp.vhd`, and
-`dbg/dbg_host.vhd` are in `G_FORMAL` blocks, which are off in
+`eth/eth_rx_fifo.vhd`, `eth/eth_tx_fifo.vhd`, `eth/eth_tcp.vhd`,
+`dbg/dbg_host.vhd`, and `sd/sd_spi.vhd` are in `G_FORMAL` blocks, which are off in
 simulation and synthesis.
 
 ## Testing the board

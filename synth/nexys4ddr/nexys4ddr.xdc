@@ -181,7 +181,7 @@ set_property -dict {PACKAGE_PIN A1   IOSTANDARD LVCMOS33} [get_ports {sd_cd_n_i}
 
 ## The card's clock is at most 25 MHz, and the controller counts its timing
 ## in cycles of the system clock, so the pins are slow. Their registers are
-## in the I/O tiles (src/system.vhd).
+## in the I/O tiles (src/sd/sd.vhd).
 set_false_path -to   [get_ports {sd_pwr_n_o sd_clk_o sd_cmd_o sd_dat3_o}]
 set_false_path -from [get_ports {sd_dat0_i sd_cd_n_i}]
 set_property IOB TRUE [get_ports {sd_pwr_n_o sd_clk_o sd_cmd_o sd_dat3_o sd_dat0_i sd_cd_n_i}]

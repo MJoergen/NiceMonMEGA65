@@ -162,6 +162,15 @@
 --     9E  The words of the RAM, 2^G_RAM_ADDR_BITS: 0x20000 on the MEGA65
 --         and 0x10000 on the Nexys4DDR. Read only. In niceemu it is plain
 --         memory, which reads 0 after the clear, and 0 means no limit.
+--   0xFFFFFFA0-0xFFFFFFAF  The SD card controller of SYSTEM.md §5
+--                          (src/sd/sd.vhd, in src/devices.vhd), with
+--                          G_SD_SLOTS > 0: the registers and the buffer of
+--                          nice_cpu/hdl/src/sd_regs.vhd, and an engine in
+--                          SPI mode. Its registers are reset when the core
+--                          starts, but a Write that runs finishes, and it
+--                          runs while the core is held, paused, or halted,
+--                          so the link reaches it then. With G_SD_SLOTS =
+--                          0 the words are memory, as in the emulator.
 --   0xFFFFFFE0-0xFFFFFFFF  The debug registers of DEBUG.md §6, for the link
 --                          only, which debug_link holds: R0-R15 of the core,
 --                          live while it runs and those of the stop after
@@ -286,6 +295,15 @@ entity nicemon is
       -- The Ethernet station's MAC and IP addresses after reset (board_io.vhd)
       G_ETH_MAC          : std_logic_vector(47 downto 0) := X"024E49434500";
       G_ETH_IP           : std_logic_vector(31 downto 0) := X"00000000";
+      -- The SD card slots, 0 for no controller, and those of src/sd/sd.vhd:
+      -- the slots with card detect, slot 0's power switch, and the ACK of a
+      -- command held until it ends, as in nice_cpu's simulation, and the
+      -- card's clock during its start-up, faster in a testbench
+      G_SD_SLOTS         : natural range 0 to 2         := 0;
+      G_SD_DETECT        : std_logic_vector(1 downto 0) := "11";
+      G_SD_POWER         : boolean                      := false;
+      G_SD_HOLD_ACK      : boolean                      := false;
+      G_SD_SLOW_HZ       : positive                     := 400_000;
       -- The checks of formal/nicemon.sby; implies G_RAM_ANY of mem
       G_FORMAL           : boolean := false
    );
@@ -357,7 +375,15 @@ entity nicemon is
       dbg_wdata_i    : in  std_logic_vector(31 downto 0) := (others => '0');
       dbg_done_o     : out std_logic;
       dbg_err_o      : out std_logic;
-      dbg_rdata_o    : out std_logic_vector(31 downto 0)
+      dbg_rdata_o    : out std_logic_vector(31 downto 0);
+      -- The SD card slots' pins, bit i for slot i (src/sd/sd.vhd)
+      sd_clk_o       : out std_logic_vector(1 downto 0);
+      sd_cmd_o       : out std_logic_vector(1 downto 0);
+      sd_dat3_o      : out std_logic_vector(1 downto 0);
+      sd_dat0_i      : in  std_logic_vector(1 downto 0)  := "11";
+      sd_cd_n_i      : in  std_logic_vector(1 downto 0)  := "11";
+      sd_wp_i        : in  std_logic_vector(1 downto 0)  := "00";
+      sd_pwr_n_o     : out std_logic
    );
 end entity nicemon;
 
@@ -383,6 +409,7 @@ architecture synthesis of nicemon is
    constant C_MPU_BASE   : std_logic_vector(31 downto 5) := X"FFFFFF" & "001"; -- 0xFFFFFF20-3F
    constant C_PERF_BASE  : std_logic_vector(31 downto 4) := X"FFFFFF4";        -- 0xFFFFFF40-4F
    constant C_FS_BASE    : std_logic_vector(31 downto 6) := X"FFFFFF" & "01";  -- 0xFFFFFF40-7F; is_fs drops 40-4F
+   constant C_SD_BASE    : std_logic_vector(31 downto 4) := X"FFFFFFA";        -- 0xFFFFFFA0-AF, with G_SD_SLOTS > 0
 
    -- Whether an address is an I/O register, not memory. The words of
    -- 0xFFFFFF00-FF that are not registers are memory, as in the emulator.
@@ -397,7 +424,8 @@ architecture synthesis of nicemon is
              addr(7 downto 4) = X"1" or addr(7 downto 5) = "001" or -- timer, MPU
              addr(7 downto 6) = "01" or                             -- perf, fetch statistics
              addr(7 downto 4) = X"8" or                             -- screen registers
-             addr(7 downto 4) = X"9";                               -- the board's devices
+             addr(7 downto 4) = X"9" or                             -- the board's devices
+             (addr(7 downto 4) = X"A" and G_SD_SLOTS > 0);          -- the SD card
    end function is_io;
 
    -- Whether an address is one of the fetch statistics', which are the
@@ -411,7 +439,8 @@ architecture synthesis of nicemon is
    function is_dev(addr : std_logic_vector(31 downto 0)) return boolean is
    begin
       return addr(31 downto 5) = C_MPU_BASE or addr(31 downto 4) = C_PERF_BASE or
-             addr(31 downto 4) = C_TIMER_BASE or is_fs(addr);
+             addr(31 downto 4) = C_TIMER_BASE or is_fs(addr) or
+             (addr(31 downto 4) = C_SD_BASE and G_SD_SLOTS > 0);
    end function is_dev;
 
    -- The source of the read data of the last request served: the memory,
@@ -867,15 +896,20 @@ begin
 
    ---------------------------------------------------------------------------
    -- The math unit (SYSTEM.md §2), the performance counters (§3), the
-   -- fetch statistics, and the timer (§4) from nice_cpu, in
-   -- src/devices.vhd. They are reset with the system, and when the core
-   -- starts, as the emulator's are when it starts. The timer's request goes
-   -- straight to the core's IRQ.
+   -- fetch statistics, the timer (§4), and the SD card controller (§5)
+   -- from nice_cpu, in src/devices.vhd. They are reset with the system,
+   -- and when the core starts, as the emulator's are when it starts. The
+   -- timer's request goes straight to the core's IRQ.
    ---------------------------------------------------------------------------
 
    i_devices : entity work.devices
       generic map (
-         G_CLOCK_HZ => G_CLOCK_HZ
+         G_CLOCK_HZ    => G_CLOCK_HZ,
+         G_SD_SLOTS    => G_SD_SLOTS,
+         G_SD_DETECT   => G_SD_DETECT,
+         G_SD_POWER    => G_SD_POWER,
+         G_SD_HOLD_ACK => G_SD_HOLD_ACK,
+         G_SD_SLOW_HZ  => G_SD_SLOW_HZ
       )
       port map (
          clk_i        => clk_i,
@@ -901,7 +935,14 @@ begin
          stall_o      => dev_stall,
          irq_valid_o  => irq_valid,
          irq_ready_i  => irq_ready,
-         irq_vector_o => irq_vector
+         irq_vector_o => irq_vector,
+         sd_clk_o     => sd_clk_o,
+         sd_cmd_o     => sd_cmd_o,
+         sd_dat3_o    => sd_dat3_o,
+         sd_dat0_i    => sd_dat0_i,
+         sd_cd_n_i    => sd_cd_n_i,
+         sd_wp_i      => sd_wp_i,
+         sd_pwr_n_o   => sd_pwr_n_o
       ); -- i_devices
 
    -- The memory: the RAM, the ROM, and the screen, on the instruction bus

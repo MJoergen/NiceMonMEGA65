@@ -126,6 +126,7 @@ effect and does not write (DEBUG.md §3).
 | `0xFFFFFF50`–`0xFFFFFF7F` | The fetch statistics of MICROARCH.md §8.1, the rest of the performance counters: counters of what FETCH and DECODE do, for judging the size of FETCH's buffer. A start of the core clears them, and they then count each clock while the core runs, until a write of 0 to `FS_CTRL` stops them. They stop while the core is held and after it halts. With the multi-cycle core (`NICE=multi`), only `FS_CYCLES` and `FS_HIST[0]` count, `FS_CTRL` reads its run bit, and the other words read 0. |
 | `0xFFFFFF80`–`0xFFFFFF8F` | The screen's registers: the cursor and the display offset (see [The screen](#the-screen)). |
 | `0xFFFFFF90`–`0xFFFFFF9F` | The Nexys4DDR's LEDs, seven-segment display, buttons, and switches (see [The Nexys4DDR's devices](#the-nexys4ddrs-devices)). On the MEGA65 they read 0 and take no write. On every board, `0xFFFFFF98`–`9D` are the Ethernet station (see [The Ethernet station](#the-ethernet-station)), and `0xFFFFFF9E` reads the words of the RAM, `0x20000` on the MEGA65 and `0x10000` on the Nexys4DDR, and takes no write. The emulator has memory there, which reads 0 after a clear, so a program takes 0 to mean no limit. |
+| `0xFFFFFFA0`–`0xFFFFFFAF` | The SD card controller of nice_cpu's SYSTEM.md §5, with 2 slots on the MEGA65 and 1 on the Nexys4DDR (see [The SD card slots](#the-sd-card-slots)). |
 | `0xFFFFFFE0`–`0xFFFFFFEF` | The debug registers of DEBUG.md §6, for the link only, here and below: R0–R15 of the core. R1–R15 take a write while the core is paused, as a register-direct write of an instruction does (ISA.md §4.3); R0 takes none. While the core runs they read its registers live, as `niceemu --link` returns them, each word from the cycle of its own read; the multi-cycle core adds 1 to R15 for each word it fetches, so its live R15 may be the address of a constant word, or of the word after the instruction it carries out, where the pipelined core's is an instruction's. After a halt they hold what the emulator prints. While the core is paused they hold its registers, with R15 the address of the next instruction, and a hold of the paused core keeps them. A hold of a running core leaves them undefined. |
 | `0xFFFFFFF0` | Control: hold, clear, hide, pause, and step (see [The control register](#the-control-register)). |
 | `0xFFFFFFF1` | Read only: why the core halted. 0 while it has not, and after a clear, 1 for `HALT`, 2 for a reserved control word, 3 for `INT` inside an interrupt routine, and 4 for `RTI` outside one. Reason 5, the step limit of `niceemu --link`, is the emulator's only. |
@@ -471,11 +472,12 @@ trust.
 
 ## The SD card slots
 
-The boards' SD card slots are wired to the system
-([#56](https://github.com/MJoergen/NiceMonMEGA65/issues/56)), for the
-controller of nice_cpu's SYSTEM.md §5, which comes with
-[#55](https://github.com/MJoergen/NiceMonMEGA65/issues/55). Until then
-the pins rest, and `0xFFFFFFA0`–`AF` are memory.
+The SD card controller of nice_cpu's SYSTEM.md §5 is at
+`0xFFFFFFA0`–`AF`
+([#55](https://github.com/MJoergen/NiceMonMEGA65/issues/55)), with the
+boards' slots
+([#56](https://github.com/MJoergen/NiceMonMEGA65/issues/56)).
+`SD_SLOTS` is 2 on the MEGA65 and 1 on the Nexys4DDR.
 
 | Board | Slot 0, the default | Slot 1 |
 |---|---|---|
@@ -484,16 +486,33 @@ the pins rest, and `0xFFFFFFA0`–`AF` are memory.
 
 - The controller runs the cards in SPI mode: CLK is the clock, CMD the
   data to the card, DAT3 the chip select, and DAT0 the data from the
-  card. DAT1 and DAT2 are not driven.
+  card. DAT1 and DAT2 are not driven. One engine serves both slots, and
+  the slot that it does not serve rests, with its clock low and the
+  other lines high.
+- Init starts the card at 400 kHz, and the commands after it run at
+  25 MHz. It reads the card's version, its type, SDSC or SDHC and SDXC,
+  and its size from the CSD, and it turns the card's CRC checks on, so
+  that a corrupted command or block fails with error 4. Every step has a
+  timeout: about a second for the start-up, 100 ms for a block to read,
+  and 500 ms for a block to be written.
+- A command takes time: busy reads 1 until it ends, as on any board of
+  nice_cpu's SYSTEM.md §5, where the emulator ends it at once. A Read
+  takes up to about a millisecond, and an Init tens of milliseconds.
 - Every slot has card detect, and the MEGA65's slot 1 also has write
-  protect.
+  protect. A card that is put in or taken out counts after 10 ms.
 - The MEGA65's cards are always powered. The Nexys4DDR switches its
-  card's power with `SD_RESET`, and keeps it off while the controller
-  is idle.
+  card's power with `SD_RESET`: off after reset, off for 20 ms and on
+  again at each Init, so that the card starts from power-up, and on
+  after it.
+- A start of the core resets the controller's registers, but the
+  controller runs while the core is held, paused, or halted, so the link
+  reaches the card then. After a reset that abandoned a command, the next
+  Init first clocks 1024 bytes, so that a card in the middle of a block
+  finishes it.
 - On the R3, slot 0's DAT1, DAT2, CMD, and DAT0 also reach the JTAG pins
   of the MAX10, so the slot runs in SPI mode or 1-bit SD mode only. Plug
   no JTAG cable into the MAX10's header J17 while a card is in it.
 - On the R3, slot 1 has no card detect and no write protect, as the
   common pin of the socket's switches is not connected to GND. The R3
-  build ignores them, so a missing card shows as a failed start-up. The
-  R3A fixed it, but one core serves both.
+  build ignores them, so a missing card shows as a failed start-up,
+  error 3 or 8. The R3A fixed it, but one core serves both.

@@ -116,7 +116,7 @@ FORMAL_TASKS = rx_fifo-prove rx_fifo-cover board_io-prove board_io-none board_io
                rx_fcs-prove rx_fcs-cover eth_arb-prove eth_arb-cover \
                eth_tcp-prove eth_tcp-cover \
                eth_rx_fifo-prove eth_rx_fifo-cover eth_tx_fifo-prove eth_tx_fifo-cover \
-               dbg_host-prove dbg_host-cover
+               dbg_host-prove dbg_host-cover sd_spi-prove sd_spi-cover
 
 formal: $(addprefix formal-,$(FORMAL_TASKS))
 
@@ -132,7 +132,7 @@ formal-%:
 # own, nor the third-party files that keep their own style
 # (doc/CODING_STYLE.md): synth/r3/max10.vhd and synth/mega65/hdmi/.
 VSG         ?= vsg
-VHDL_SOURCES = $(filter-out synth/r3/max10.vhd,$(wildcard src/*.vhd src/core/*.vhd src/video/*.vhd src/dbg/*.vhd src/eth/*.vhd sim/*.vhd sim/cosim/*.vhd formal/*.vhd \
+VHDL_SOURCES = $(filter-out synth/r3/max10.vhd,$(wildcard src/*.vhd src/core/*.vhd src/video/*.vhd src/dbg/*.vhd src/eth/*.vhd src/sd/*.vhd sim/*.vhd sim/cosim/*.vhd formal/*.vhd \
                                                           synth/common/*.vhd synth/mega65/*.vhd synth/r3/*.vhd synth/r6/*.vhd \
                                                           synth/nexys4ddr/*.vhd))
 

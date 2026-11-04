@@ -1,6 +1,8 @@
--- The devices of nice_cpu/hdl/src at 0xFFFFFF10-7F (src/nicemon.vhd): the
--- timer of SYSTEM.md §4 at 10-1F, the math unit (MPU) of §2 at 20-3F, the
--- performance counters of §3 at 40-4F, and the fetch statistics at 50-7F.
+-- The devices of nice_cpu/hdl/src at 0xFFFFFF10-7F and A0-AF
+-- (src/nicemon.vhd): the timer of SYSTEM.md §4 at 10-1F, the math unit
+-- (MPU) of §2 at 20-3F, the performance counters of §3 at 40-4F, the fetch
+-- statistics at 50-7F, and, with G_SD_SLOTS > 0, the SD card controller
+-- of §5 at A0-AF (src/sd/sd.vhd).
 --
 -- THEORY OF OPERATION
 -- nicemon gives a request here in the cycle that it takes it, the core's
@@ -11,9 +13,10 @@
 -- acknowledges it on core_ack_o, with its word on rdata_o. Each device
 -- acknowledges in the cycle after it takes a request, except the MPU, which
 -- takes a read of a result that it computes and then stalls until it
--- acknowledges it. stall_o is the MPU's stall, which holds the core and the
--- link meanwhile, so the core's requests are acknowledged in their order,
--- and at most one is owed (owed_o).
+-- acknowledges it, and the SD card controller with G_SD_HOLD_ACK, which
+-- does so with a write that starts a command. stall_o is their stall,
+-- which holds the core and the link meanwhile, so the core's requests are
+-- acknowledged in their order, and at most one is owed (owed_o).
 --
 -- The link's request is latched, and the device's port is driven from the
 -- latch while busy_o is high, until the device acknowledges it on
@@ -32,6 +35,9 @@
 -- held or in the cycle after. The counters, the timer, and the fetch
 -- statistics count only while run_i is high. The timer is the only device
 -- that raises an interrupt, so its request goes straight to the core's IRQ.
+-- The SD card controller's registers are reset when the core starts, but
+-- its engine and its pins only with the system (src/sd/sd.vhd), and it
+-- runs while the core is held, paused, or halted (SYSTEM.md §5).
 --
 -- With G_FORMAL, it states the properties that formal/devices.sby proves:
 -- each acknowledge answers a request, the core's and the link's go to the
@@ -51,9 +57,15 @@ library work;
 
 entity devices is
    generic (
-      G_CLOCK_HZ : natural;
+      G_CLOCK_HZ    : natural;
+      -- The SD card slots, 0 for no controller, and those of src/sd/sd.vhd
+      G_SD_SLOTS    : natural range 0 to 2         := 0;
+      G_SD_DETECT   : std_logic_vector(1 downto 0) := "11";
+      G_SD_POWER    : boolean                      := false;
+      G_SD_HOLD_ACK : boolean                      := false;
+      G_SD_SLOW_HZ  : positive                     := 400_000;
       -- The properties for formal/devices.sby
-      G_FORMAL   : boolean := false
+      G_FORMAL      : boolean                      := false
    );
    port (
       clk_i        : in  std_logic;
@@ -88,13 +100,21 @@ entity devices is
       -- The timer's interrupt request, for the core's IRQ port
       irq_valid_o  : out std_logic;
       irq_ready_i  : in  std_logic;
-      irq_vector_o : out std_logic_vector(7 downto 0)
+      irq_vector_o : out std_logic_vector(7 downto 0);
+      -- The SD card slots' pins (src/sd/sd.vhd)
+      sd_clk_o     : out std_logic_vector(1 downto 0);
+      sd_cmd_o     : out std_logic_vector(1 downto 0);
+      sd_dat3_o    : out std_logic_vector(1 downto 0);
+      sd_dat0_i    : in  std_logic_vector(1 downto 0) := "11";
+      sd_cd_n_i    : in  std_logic_vector(1 downto 0) := "11";
+      sd_wp_i      : in  std_logic_vector(1 downto 0) := "00";
+      sd_pwr_n_o   : out std_logic
    );
 end entity devices;
 
 architecture synthesis of devices is
 
-   type t_dev is (DEV_PERF, DEV_MPU, DEV_TIMER, DEV_FS);
+   type t_dev is (DEV_PERF, DEV_MPU, DEV_TIMER, DEV_FS, DEV_SD);
 
    -- The device of the low byte of a device's address
    function dev_of(addr : std_logic_vector(7 downto 0)) return t_dev is
@@ -105,6 +125,8 @@ architecture synthesis of devices is
          return DEV_PERF;
       elsif addr(7 downto 6) = "01" then
          return DEV_FS;
+      elsif addr(7 downto 4) = X"A" then
+         return DEV_SD;
       end if;
       return DEV_TIMER;
    end function dev_of;
@@ -155,6 +177,10 @@ architecture synthesis of devices is
    signal timer_stall : std_logic;
    signal timer_ack   : std_logic;
    signal timer_data  : std_logic_vector(31 downto 0);
+   signal sd_stb      : std_logic;
+   signal sd_stall    : std_logic;
+   signal sd_ack      : std_logic;
+   signal sd_data     : std_logic_vector(31 downto 0);
 
 begin
 
@@ -227,21 +253,26 @@ begin
    timer_stb <= lnk_stb when busy = '1' and lnk_sel = DEV_TIMER else
                 core_stb_i when core_sel = DEV_TIMER else
                 '0';
+   sd_stb    <= lnk_stb when busy = '1' and lnk_sel = DEV_SD else
+                core_stb_i when core_sel = DEV_SD else
+                '0';
    io_stall  <= mpu_stall when lnk_sel = DEV_MPU else
                 perf_stall when lnk_sel = DEV_PERF else
                 fs_stall when lnk_sel = DEV_FS else
+                sd_stall when lnk_sel = DEV_SD else
                 timer_stall;
-   io_ack    <= mpu_ack or perf_ack or fs_ack or timer_ack;
+   io_ack    <= mpu_ack or perf_ack or fs_ack or timer_ack or sd_ack;
 
    core_ack_o <= owed and io_ack;
    link_ack_o <= busy and io_ack;
    rdata_o    <= mpu_data when sel = DEV_MPU else
                  perf_data when sel = DEV_PERF else
                  fs_data when sel = DEV_FS else
+                 sd_data when sel = DEV_SD else
                  timer_data;
    busy_o     <= busy;
    owed_o     <= owed;
-   stall_o    <= mpu_stall;
+   stall_o    <= mpu_stall or sd_stall;
 
    i_mpu : entity work.mpu
       port map (
@@ -311,10 +342,57 @@ begin
       ); -- i_timer
 
 
+   gen_sd : if G_SD_SLOTS > 0 generate
+
+      i_sd : entity work.sd
+         generic map (
+            G_CLOCK_HZ => G_CLOCK_HZ,
+            G_SLOTS    => G_SD_SLOTS,
+            G_DETECT   => G_SD_DETECT,
+            G_POWER    => G_SD_POWER,
+            G_HOLD_ACK => G_SD_HOLD_ACK,
+            G_SLOW_HZ  => G_SD_SLOW_HZ
+         )
+         port map (
+            clk_i      => clk_i,
+            rst_i      => rst_i,
+            dev_rst_i  => dev_rst,
+            wb_cyc_i   => io_cyc,
+            wb_stb_i   => sd_stb,
+            wb_stall_o => sd_stall,
+            wb_ack_o   => sd_ack,
+            wb_we_i    => io_we,
+            wb_addr_i  => io_addr(3 downto 0),
+            wb_data_i  => io_wdata,
+            wb_data_o  => sd_data,
+            busy_o     => open,
+            sd_clk_o   => sd_clk_o,
+            sd_cmd_o   => sd_cmd_o,
+            sd_dat3_o  => sd_dat3_o,
+            sd_dat0_i  => sd_dat0_i,
+            sd_cd_n_i  => sd_cd_n_i,
+            sd_wp_i    => sd_wp_i,
+            sd_pwr_n_o => sd_pwr_n_o
+         ); -- i_sd
+
+   else generate
+      -- No controller: nicemon sends no request here, and the pins rest.
+      sd_stall   <= '0';
+      sd_ack     <= '0';
+      sd_data    <= (others => '0');
+      sd_clk_o   <= "00";
+      sd_cmd_o   <= "11";
+      sd_dat3_o  <= "11";
+      sd_pwr_n_o <= '1';
+   end generate gen_sd;
+
+
    gen_formal : if G_FORMAL generate
       -- The stb of each device, by t_dev'pos, and the acknowledge of each
-      signal f_stb : std_logic_vector(3 downto 0);
-      signal f_ack : std_logic_vector(3 downto 0);
+      signal f_stb : std_logic_vector(4 downto 0);
+      signal f_ack : std_logic_vector(4 downto 0);
+      -- A device that stalls
+      signal f_stall : std_logic;
       -- The core's requests taken and not yet acknowledged, which a hold
       -- drops
       signal f_core_wait : natural range 0 to 3 := 0;
@@ -334,30 +412,31 @@ begin
          end if;
       end process p_core_wait;
 
-      f_stb <= fs_stb & timer_stb & mpu_stb & perf_stb;
-      f_ack <= fs_ack & timer_ack & mpu_ack & perf_ack;
+      f_stb   <= sd_stb & fs_stb & timer_stb & mpu_stb & perf_stb;
+      f_ack   <= sd_ack & fs_ack & timer_ack & mpu_ack & perf_ack;
+      f_stall <= mpu_stall or sd_stall;
 
       -- psl default clock is rising_edge(clk_i);
 
       -- Each acknowledge answers a request: the link's that waits, or one
-      -- that the core is owed, or one that a hold dropped. The MPU stalls
+      -- that the core is owed, or one that a hold dropped. A device stalls
       -- only so too. The link and the core never wait at once.
       -- psl f_dev_ack : assert always
       --    rst_i = '0' and io_ack = '1' -> busy = '1' or owed = '1' or hold_d = '1';
       -- psl f_dev_stall : assert always
-      --    rst_i = '0' and mpu_stall = '1' -> busy = '1' or owed = '1' or hold_d = '1';
+      --    rst_i = '0' and f_stall = '1' -> busy = '1' or owed = '1' or hold_d = '1';
       -- psl f_one_wait : assert always not (busy = '1' and owed = '1');
-      -- psl f_one_ack : assert always f_ack = "0000" or f_ack = "0001" or f_ack = "0010" or
-      --                               f_ack = "0100" or f_ack = "1000";
+      -- psl f_one_ack : assert always f_ack = "00000" or f_ack = "00001" or f_ack = "00010" or
+      --                               f_ack = "00100" or f_ack = "01000" or f_ack = "10000";
 
       -- A request reaches its device, and no other: the core's in the
       -- cycle it is taken, the link's from the latch until the device
       -- takes it, with the request that the link made.
       -- psl f_core_stb : assert always
       --    core_stb_i = '1' -> f_stb(t_dev'pos(dev_of(core_addr_i))) = '1';
-      -- psl f_stb_one : assert always f_stb = "0000" or f_stb = "0001" or f_stb = "0010" or
-      --                               f_stb = "0100" or f_stb = "1000";
-      -- psl f_stb_who : assert always f_stb /= "0000" -> core_stb_i = '1' or lnk_stb = '1';
+      -- psl f_stb_one : assert always f_stb = "00000" or f_stb = "00001" or f_stb = "00010" or
+      --                               f_stb = "00100" or f_stb = "01000" or f_stb = "10000";
+      -- psl f_stb_who : assert always f_stb /= "00000" -> core_stb_i = '1' or lnk_stb = '1';
       -- psl f_link_latch : assert always
       --    {link_stb_i and not busy and not rst_i} |=>
       --    {busy = '1' and lnk_stb = '1' and lnk_sel = prev(dev_of(link_addr_i)) and
@@ -367,25 +446,28 @@ begin
       --    lnk_stb = '1' -> busy = '1' and f_stb(t_dev'pos(lnk_sel)) = '1' and
       --                     io_cyc = '1' and io_we = lnk_we and io_addr = lnk_addr and
       --                     io_wdata = lnk_wdata;
-      -- psl f_link_fresh : assert always lnk_stb = '1' -> mpu_stall = '0' and io_ack = '0';
+      -- psl f_link_fresh : assert always lnk_stb = '1' -> f_stall = '0' and io_ack = '0';
       -- psl f_link_once : assert always
       --    {lnk_stb and not io_stall and not rst_i} |=> {not lnk_stb};
 
       -- An acknowledge goes to the master that made the request, with the
       -- word of the device that takes it.
-      -- psl f_owed_due : assert always owed = '1' -> io_ack = '1' or mpu_stall = '1';
+      -- psl f_owed_due : assert always owed = '1' -> io_ack = '1' or f_stall = '1';
       -- psl f_busy_due : assert always
-      --    busy = '1' and lnk_stb = '0' -> io_ack = '1' or mpu_stall = '1';
+      --    busy = '1' and lnk_stb = '0' -> io_ack = '1' or f_stall = '1';
       -- psl f_core_ack : assert always core_ack_o = '1' -> f_core_wait = 1;
       -- psl f_core_owed : assert always f_core_wait <= 1 and (f_core_wait = 1) = (owed = '1');
       -- psl f_ack_who : assert always not (core_ack_o = '1' and link_ack_o = '1');
       -- psl f_sel_link : assert always busy = '1' -> sel = lnk_sel;
       -- psl f_sel_mpu : assert always
       --    mpu_stall = '1' and (busy = '1' or owed = '1') -> sel = DEV_MPU;
+      -- psl f_sel_sd : assert always
+      --    sd_stall = '1' and (busy = '1' or owed = '1') -> sel = DEV_SD;
       -- psl f_rdata : assert always
       --    (core_ack_o = '1' or link_ack_o = '1') ->
       --    (mpu_ack = '1' and rdata_o = mpu_data) or (perf_ack = '1' and rdata_o = perf_data) or
-      --    (fs_ack = '1' and rdata_o = fs_data) or (timer_ack = '1' and rdata_o = timer_data);
+      --    (fs_ack = '1' and rdata_o = fs_data) or (timer_ack = '1' and rdata_o = timer_data) or
+      --    (sd_ack = '1' and rdata_o = sd_data);
 
       -- The devices are reset when the core starts.
       -- psl f_start : assert always {hold_i; not hold_i} |-> {dev_rst};

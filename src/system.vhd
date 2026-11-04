@@ -25,14 +25,12 @@
 -- whose counts of frames the core and the link read there too. The station
 -- also carries the debug link over TCP, in the UART's place while a host is
 -- connected (nicemon.vhd).
--- The SD card slots (#56) are in SPI mode: per slot, the clock, CMD, the
--- data to the card, and DAT3, its chip select, go out, and DAT0, the data
--- from the card, card detect, and write protect come in. The outputs are
--- registered, and the inputs pass through two registers, a synchronizer,
--- for the controller of #55. Until it comes, the pins rest: the clock low
--- and the others high, so that no card is selected, or, on a slot with a
--- power switch, the power off and every line low, so that no line powers
--- the card. A board with fewer slots leaves the ports of the others open.
+-- The SD card slots go to the SD card controller of nicemon.vhd
+-- (src/sd/sd.vhd), in SPI mode: per slot, the clock, CMD, the data to the
+-- card, and DAT3, its chip select, go out, and DAT0, the data from the
+-- card, card detect, and write protect come in. The controller registers
+-- them, the first register of each in the I/O tile. A board with fewer
+-- slots leaves the ports of the others open.
 --
 -- With a ROM the core boots from it at reset; without one it waits, held,
 -- for a host on the debug link (nicemon.vhd).
@@ -87,7 +85,8 @@ entity system is
       G_ETH_IP        : std_logic_vector(31 downto 0) := X"00000000";
       -- The board's key that toggles the debugger, as its strip names it
       G_TOGGLE_KEY    : string       := "MEGA+HELP";
-      -- The SD card slots, 0 to 2. Bit i of G_SD_DETECT is '1' when slot
+      -- The SD card slots, 1 or 2, or 0 for no controller (nicemon.vhd).
+      -- Bit i of G_SD_DETECT is '1' when slot
       -- i's card detect and write protect are wired, which slot 1 of the R3
       -- lacks; G_SD_POWER is true when slot 0's power is switched by
       -- sd_pwr_n_o, as on the Nexys4DDR.
@@ -159,48 +158,6 @@ architecture synthesis of system is
    -- low, a break, until the MMCM locks and the clock runs.
    signal txd_reg : std_logic := '1';
 
-   -- The SD card's pins. The output registers start at the resting levels
-   -- (C_SD_*), and the inputs' first registers are in the I/O tiles (IOB
-   -- TRUE in the board's XDC).
-   -- Bit 2 is the power switch, and bits 1..0 are CMD and DAT3.
-   pure function sd_rest (power : boolean) return std_logic_vector is
-   begin
-      if power then
-         return "100";
-      end if;
-      return "011";
-   end function sd_rest;
-
-   constant C_SD_REST  : std_logic_vector(2 downto 0) := sd_rest(G_SD_POWER);
-   constant C_SD_CLK   : std_logic_vector(1 downto 0) := "00";
-   constant C_SD_OUT   : std_logic_vector(1 downto 0) := C_SD_REST(1 downto 0);
-   constant C_SD_PWR_N : std_logic                    := C_SD_REST(2);
-
-   signal sd_clk     : std_logic_vector(1 downto 0);
-   signal sd_cmd     : std_logic_vector(1 downto 0);
-   signal sd_dat3    : std_logic_vector(1 downto 0);
-   signal sd_pwr_n   : std_logic;
-   signal sd_clk_r   : std_logic_vector(1 downto 0) := C_SD_CLK;
-   signal sd_cmd_r   : std_logic_vector(1 downto 0) := C_SD_OUT;
-   signal sd_dat3_r  : std_logic_vector(1 downto 0) := C_SD_OUT;
-   signal sd_pwr_n_r : std_logic                    := C_SD_PWR_N;
-   signal sd_dat0_r  : std_logic_vector(3 downto 0) := (others => '1');
-   signal sd_cd_n_r  : std_logic_vector(3 downto 0) := (others => '1');
-   signal sd_wp_r    : std_logic_vector(3 downto 0) := (others => '0');
-   attribute async_reg of sd_dat0_r : signal is "TRUE";
-   attribute async_reg of sd_cd_n_r : signal is "TRUE";
-   attribute async_reg of sd_wp_r   : signal is "TRUE";
-   -- Until the controller of #55 drives and reads them, the registers are
-   -- constant or unused, and dont_touch keeps them in the I/O tiles.
-   attribute dont_touch : string;
-   attribute dont_touch of sd_clk_r   : signal is "TRUE";
-   attribute dont_touch of sd_cmd_r   : signal is "TRUE";
-   attribute dont_touch of sd_dat3_r  : signal is "TRUE";
-   attribute dont_touch of sd_pwr_n_r : signal is "TRUE";
-   attribute dont_touch of sd_dat0_r  : signal is "TRUE";
-   attribute dont_touch of sd_cd_n_r  : signal is "TRUE";
-   attribute dont_touch of sd_wp_r    : signal is "TRUE";
-
    -- The writes to the screen and its registers, in the system clock domain
    signal scr_we       : std_logic;
    signal scr_addr     : std_logic_vector(G_SCR_ADDR_BITS - 1 downto 0);
@@ -270,33 +227,6 @@ begin
    uart_txd_o <= txd_reg;
 
 
-   -- The SD card's pins rest until the controller of #55 drives them.
-   sd_clk   <= C_SD_CLK;
-   sd_cmd   <= C_SD_OUT;
-   sd_dat3  <= C_SD_OUT;
-   sd_pwr_n <= C_SD_PWR_N;
-
-   -- Register the SD card's outputs, and synchronize its inputs: bits 1..0
-   -- of each input register are the first stage, and bits 3..2 the second.
-   p_sd : process (clk_i)
-   begin
-      if rising_edge(clk_i) then
-         sd_clk_r   <= sd_clk;
-         sd_cmd_r   <= sd_cmd;
-         sd_dat3_r  <= sd_dat3;
-         sd_pwr_n_r <= sd_pwr_n;
-         sd_dat0_r  <= sd_dat0_r(1 downto 0) & sd_dat0_i;
-         sd_cd_n_r  <= sd_cd_n_r(1 downto 0) & sd_cd_n_i;
-         sd_wp_r    <= sd_wp_r(1 downto 0) & sd_wp_i;
-      end if;
-   end process p_sd;
-
-   sd_clk_o   <= sd_clk_r;
-   sd_cmd_o   <= sd_cmd_r;
-   sd_dat3_o  <= sd_dat3_r;
-   sd_pwr_n_o <= sd_pwr_n_r;
-
-
    i_nicemon : entity work.nicemon
       generic map (
          G_CLOCK_HZ         => G_CLOCK_HZ,
@@ -309,7 +239,10 @@ begin
          G_BOARD_IO         => G_BOARD_IO,
          G_BREAKS           => G_BREAKS,
          G_ETH_MAC          => G_ETH_MAC,
-         G_ETH_IP           => G_ETH_IP
+         G_ETH_IP           => G_ETH_IP,
+         G_SD_SLOTS         => G_SD_SLOTS,
+         G_SD_DETECT        => G_SD_DETECT,
+         G_SD_POWER         => G_SD_POWER
       )
       port map (
          clk_i          => clk_i,
@@ -356,7 +289,14 @@ begin
          dbg_wdata_i    => dbg_wdata,
          dbg_done_o     => dbg_done,
          dbg_err_o      => dbg_err,
-         dbg_rdata_o    => dbg_rdata
+         dbg_rdata_o    => dbg_rdata,
+         sd_clk_o       => sd_clk_o,
+         sd_cmd_o       => sd_cmd_o,
+         sd_dat3_o      => sd_dat3_o,
+         sd_dat0_i      => sd_dat0_i,
+         sd_cd_n_i      => sd_cd_n_i,
+         sd_wp_i        => sd_wp_i,
+         sd_pwr_n_o     => sd_pwr_n_o
       ); -- i_nicemon
 
 

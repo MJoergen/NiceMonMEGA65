@@ -27,10 +27,18 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 
 - nice_cpu is at `V1.5`. Its emulator has an SD card controller at
   `0xFFFFFFA0`–`AF`, with the image files of `--sd0` and `--sd1`, where
-  it had memory. The boards have memory there until the controller lands
-  here (#55, #56). nice_cpu's SYSTEM.md §5 is the SD card, and the
-  systems built on the FPGA core are §6. The cores, the devices, and the
-  debug link are as in V1.4.
+  it had memory, and so do the boards now. nice_cpu's SYSTEM.md §5 is
+  the SD card, and the systems built on the FPGA core are §6. The cores
+  and the debug link are as in V1.4.
+
+**System**
+
+- The SD card controller of nice_cpu's SYSTEM.md §5 at
+  `0xFFFFFFA0`–`AF`, in SPI mode, on the MEGA65's two slots and the
+  Nexys4DDR's one (#55, #56). It starts SDSC, SDHC, and SDXC cards, reads
+  their size, checks the CRCs, and has a timeout for every step. A
+  command takes time on a board, so a program waits for busy, as
+  SYSTEM.md §5 asks.
 
 ## V1.4 (2026-11-04)
 

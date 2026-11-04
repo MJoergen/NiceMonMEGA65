@@ -38,6 +38,8 @@
 #                         modeled in VHDL.
 #             tb_eth_tcp_random  the same, with random actions instead
 #                         of its steps; SEED=n picks another run.
+#             tb_sd       the SD card controller on two card models, an
+#                         SDHC card and an SDSC card of version 1.
 #             It also checks that GHDL can synthesize the system, the
 #             keyboards and their toggle detectors, the debugger and its host, the text display (through text_synth.vhd, in
 #             the boards' mode, with 15 and 13 screen address bits), and system.vhd as the Nexys4DDR has it, and the display and RGB LED drivers.
@@ -70,17 +72,17 @@ include ../core.mk
 NICE_SIM = $(NICE_DIR)/hdl/sim/wb_mem.vhd
 
 SRC_SOURCES  = ../src/uart_serdes.vhd ../src/rx_fifo.vhd ../src/ram.vhd ../src/rom.vhd \
-               ../src/board_io.vhd ../src/scr_regs.vhd ../src/devices.vhd ../src/mem.vhd ../src/nicemon.vhd \
+               ../src/board_io.vhd ../src/scr_regs.vhd ../src/sd/sd_spi_byte.vhd ../src/sd/sd_spi.vhd ../src/sd/sd.vhd ../src/devices.vhd ../src/mem.vhd ../src/nicemon.vhd \
                ../src/kbd_m65.vhd ../src/kbd_m65_ascii.vhd ../src/kbd_ps2.vhd ../src/kbd_ps2_ascii.vhd ../src/seg7.vhd ../src/rgb_pwm.vhd \
                ../src/kbd_m65_toggle.vhd ../src/kbd_ps2_toggle.vhd ../src/dbg/dbg_host.vhd ../src/dbg/dbg_decode.vhd ../src/dbg/dbg.vhd \
                ../src/video/video_pkg.vhd ../src/video/font_pkg.vhd ../src/video/pix.vhd ../src/video/scr_ram.vhd ../src/video/text.vhd \
                ../src/eth/eth_pkg.vhd ../src/eth/rmii_rx.vhd ../src/eth/rx_fcs.vhd ../src/eth/eth_ram.vhd ../src/eth/eth_rx_fifo.vhd \
                ../src/eth/eth_arp.vhd ../src/eth/eth_icmp.vhd ../src/eth/eth_tcp_rx.vhd ../src/eth/eth_tcp_tx.vhd ../src/eth/eth_tcp_timer.vhd ../src/eth/eth_tcp_buf.vhd ../src/eth/eth_tcp_pick.vhd ../src/eth/eth_tcp.vhd ../src/eth/eth_tx_fifo.vhd ../src/eth/eth_arb.vhd ../src/eth/rmii_tx.vhd ../src/eth/eth.vhd \
                ../src/system.vhd
-SOURCES      = $(SRC_SOURCES) text_synth.vhd tb_hello.vhd tb_nicemon.vhd tb_kbd.vhd tb_ps2.vhd tb_ps2_nicemon.vhd tb_text.vhd tb_dbg.vhd tb_dbg_host.vhd tb_dbg_decode.vhd tb_board_io.vhd tb_rmii_rx.vhd tb_rx_fcs.vhd tb_eth_rx_fifo.vhd \
-               tb_eth_tx_fifo.vhd tb_rmii_tx.vhd tb_eth.vhd tb_eth_tcp.vhd
+SOURCES      = $(SRC_SOURCES) text_synth.vhd sd_card_model.vhd tb_hello.vhd tb_nicemon.vhd tb_kbd.vhd tb_ps2.vhd tb_ps2_nicemon.vhd tb_text.vhd tb_dbg.vhd tb_dbg_host.vhd tb_dbg_decode.vhd tb_board_io.vhd tb_rmii_rx.vhd tb_rx_fcs.vhd tb_eth_rx_fifo.vhd \
+               tb_eth_tx_fifo.vhd tb_rmii_tx.vhd tb_eth.vhd tb_eth_tcp.vhd tb_sd.vhd
 
-.PHONY: test cosim check-steps check-fmt analyze synth clean tb_hello tb_nicemon tb_kbd tb_ps2 tb_ps2_nicemon tb_text tb_dbg tb_dbg_host tb_dbg_decode tb_board_io tb_rmii_rx tb_rx_fcs tb_eth_rx_fifo tb_eth_tx_fifo tb_rmii_tx tb_eth tb_eth_tcp tb_eth_tcp_random \
+.PHONY: test cosim check-steps check-fmt analyze synth clean tb_hello tb_nicemon tb_kbd tb_ps2 tb_ps2_nicemon tb_text tb_dbg tb_dbg_host tb_dbg_decode tb_board_io tb_rmii_rx tb_rx_fcs tb_eth_rx_fifo tb_eth_tx_fifo tb_rmii_tx tb_eth tb_eth_tcp tb_eth_tcp_random tb_sd \
         synth-nicemon synth-nicemon-norom synth-kbd_m65 synth-kbd_m65_ascii synth-kbd_ps2 \
         synth-kbd_ps2_ascii synth-kbd_m65_toggle synth-kbd_ps2_toggle synth-dbg synth-dbg_host synth-dbg_decode synth-text \
         synth-system synth-seg7 synth-rgb_pwm
@@ -88,19 +90,23 @@ SOURCES      = $(SRC_SOURCES) text_synth.vhd tb_hello.vhd tb_nicemon.vhd tb_kbd.
 # Each testbench and each synthesis check is a target of its own, so that
 # "make -j test" runs them side by side. They share the work library of
 # $(BUILD), which "analyze" writes first and they only read.
-test: synth tb_hello tb_nicemon tb_kbd tb_ps2 tb_ps2_nicemon tb_text tb_dbg tb_dbg_host tb_dbg_decode tb_board_io tb_rmii_rx tb_rx_fcs tb_eth_rx_fifo tb_eth_tx_fifo tb_rmii_tx tb_eth tb_eth_tcp tb_eth_tcp_random check-steps check-fmt
+test: synth tb_hello tb_nicemon tb_kbd tb_ps2 tb_ps2_nicemon tb_text tb_dbg tb_dbg_host tb_dbg_decode tb_board_io tb_rmii_rx tb_rx_fcs tb_eth_rx_fifo tb_eth_tx_fifo tb_rmii_tx tb_eth tb_eth_tcp tb_eth_tcp_random tb_sd check-steps check-fmt
 
 # The column layout of nice_cpu's NICE assembly; nicefmt.py --write fixes it
 check-fmt:
 	@$(PYTHON) $(NICE_DIR)/assembler/nicefmt.py $(wildcard *.nasm) && echo "PASS check-fmt"
 
-check-steps: $(addprefix $(BUILD)/,hello.bin emu.bin reserved.bin)
+check-steps: $(addprefix $(BUILD)/,hello.bin emu.bin reserved.bin sd.bin sd.img)
 	@if [ ! -x $(EMU) ]; then echo "SKIP check-steps: $(EMU) is not built"; exit 0; fi; \
 	for p in hello:$(STEPS_HELLO) emu:$(STEPS_EMU) reserved:$(STEPS_RESERVED); do \
 	  n=$${p%%:*}; want=$${p##*:}; \
 	  got=$$($(EMU) $(BUILD)/$$n.bin </dev/null | sed -n 's/.* after \([0-9]*\) steps.*/\1/p'); \
 	  [ "$$got" = "$$want" ] || { echo "FAIL check-steps: niceemu runs $$n in $$got steps, STEPS_$$n is $$want"; exit 1; }; \
-	done; echo "PASS check-steps"
+	done; \
+	cp $(BUILD)/sd.img $(BUILD)/sd_emu.img; \
+	got=$$($(EMU) --sd0 $(BUILD)/sd_emu.img $(BUILD)/sd.bin </dev/null | sed -n 's/.* after \([0-9]*\) steps.*/\1/p'); \
+	[ "$$got" = "$(STEPS_SD)" ] || { echo "FAIL check-steps: niceemu runs sd in $$got steps, STEPS_SD is $(STEPS_SD)"; exit 1; }; \
+	echo "PASS check-steps"
 
 # The steps niceemu counts for the programs whose instruction counter
 # tb_nicemon checks. They are kept here, so that the tests run without
@@ -109,9 +115,21 @@ check-steps: $(addprefix $(BUILD)/,hello.bin emu.bin reserved.bin)
 STEPS_HELLO    = 56
 STEPS_EMU      = 12
 STEPS_RESERVED = 6
+STEPS_SD       = 59
 EMU            = $(NICE_DIR)/emulator/zig-out/bin/niceemu
 
-BINS = hello rom echo fifo devices emu count reserved eof counters break
+BINS = hello rom echo fifo devices emu count reserved eof counters break sd
+
+# The image of the card in slot 0 of tb_sd and tb_nicemon, and of
+# niceemu's --sd0 for the same program: 1024 sectors, in which byte o is
+# o mod 251 for o < 1024, as in nice_cpu's emulator/test/sd.nasm, and 0
+# after. niceemu writes to its image, so check-steps gives it a copy.
+$(BUILD)/sd.img: | $(BUILD)
+	@$(PYTHON) -c 'import sys; sys.stdout.buffer.write(bytes(o % 251 if o < 1024 else 0 for o in range(1024 * 512)))' > $@
+
+tb_sd: analyze $(BUILD)/sd.img
+	@(cd $(BUILD) && $(GHDL) --elab-run $(GHDLFLAGS) tb_sd -gG_IMAGE_FILE=sd.img > tb_sd.log 2>&1) && \
+	  echo "PASS tb_sd" || (echo "FAIL tb_sd"; cat $(BUILD)/tb_sd.log; exit 1)
 
 tb_hello: analyze $(BUILD)/hello.bin
 	@(cd $(BUILD) && $(GHDL) --elab-run $(GHDLFLAGS) tb_hello \
@@ -120,10 +138,10 @@ tb_hello: analyze $(BUILD)/hello.bin
 	@if cmp -s hello.expected $(BUILD)/hello.out; then echo "PASS tb_hello"; \
 	else echo "FAIL tb_hello"; diff hello.expected $(BUILD)/hello.out; exit 1; fi
 
-tb_nicemon: analyze $(addprefix $(BUILD)/,$(addsuffix .bin,$(BINS)))
+tb_nicemon: analyze $(addprefix $(BUILD)/,$(addsuffix .bin,$(BINS))) $(BUILD)/sd.img
 	@(cd $(BUILD) && $(GHDL) --elab-run $(GHDLFLAGS) tb_nicemon \
-	  -gG_HELLO_FILE=hello.bin -gG_ROM_FILE=rom.bin -gG_ECHO_FILE=echo.bin -gG_FIFO_FILE=fifo.bin -gG_DEVICES_FILE=devices.bin -gG_EMU_FILE=emu.bin -gG_COUNT_FILE=count.bin -gG_RESERVED_FILE=reserved.bin -gG_EOF_FILE=eof.bin -gG_COUNTERS_FILE=counters.bin -gG_BREAK_FILE=break.bin -gG_NICE=$(NICE) \
-	  -gG_HELLO_STEPS=$(STEPS_HELLO) -gG_EMU_STEPS=$(STEPS_EMU) -gG_RESERVED_STEPS=$(STEPS_RESERVED) > tb_nicemon.log 2>&1) && \
+	  -gG_HELLO_FILE=hello.bin -gG_ROM_FILE=rom.bin -gG_ECHO_FILE=echo.bin -gG_FIFO_FILE=fifo.bin -gG_DEVICES_FILE=devices.bin -gG_EMU_FILE=emu.bin -gG_COUNT_FILE=count.bin -gG_RESERVED_FILE=reserved.bin -gG_EOF_FILE=eof.bin -gG_COUNTERS_FILE=counters.bin -gG_BREAK_FILE=break.bin -gG_SD_FILE=sd.bin -gG_SD_IMAGE=sd.img -gG_NICE=$(NICE) \
+	  -gG_HELLO_STEPS=$(STEPS_HELLO) -gG_EMU_STEPS=$(STEPS_EMU) -gG_RESERVED_STEPS=$(STEPS_RESERVED) -gG_SD_STEPS=$(STEPS_SD) > tb_nicemon.log 2>&1) && \
 	  echo "PASS tb_nicemon" || (echo "FAIL tb_nicemon"; cat $(BUILD)/tb_nicemon.log; exit 1)
 
 # The core is held from reset and never boots from a ROM there, so its data
@@ -168,7 +186,7 @@ synth: synth-nicemon synth-nicemon-norom synth-kbd_m65 synth-kbd_m65_ascii synth
        synth-kbd_m65_toggle synth-kbd_ps2_toggle synth-dbg synth-dbg_host synth-dbg_decode synth-text synth-system synth-seg7 synth-rgb_pwm
 
 synth-nicemon: analyze $(BUILD)/rom.bin
-	@(cd $(BUILD) && $(GHDL) --synth $(GHDLFLAGS) -gG_CLOCK_HZ=50000000 -gG_ROM_FILE=rom.bin nicemon > nicemon_synth.vhd 2> nicemon_synth.log) && \
+	@(cd $(BUILD) && $(GHDL) --synth $(GHDLFLAGS) -gG_CLOCK_HZ=50000000 -gG_ROM_FILE=rom.bin -gG_SD_SLOTS=2 nicemon > nicemon_synth.vhd 2> nicemon_synth.log) && \
 	  echo "PASS synth nicemon" || (echo "FAIL synth nicemon"; cat $(BUILD)/nicemon_synth.log; exit 1)
 
 synth-nicemon-norom: analyze
@@ -199,7 +217,7 @@ synth-text: analyze
 	done
 
 synth-system: analyze
-	@(cd $(BUILD) && $(GHDL) --synth $(GHDLFLAGS) -gG_CLOCK_HZ=90000000 -gG_SCR_ADDR_BITS=13 -gG_BOARD_IO=true system > system_synth.vhd 2> system_synth.log) && \
+	@(cd $(BUILD) && $(GHDL) --synth $(GHDLFLAGS) -gG_CLOCK_HZ=90000000 -gG_SCR_ADDR_BITS=13 -gG_BOARD_IO=true -gG_SD_SLOTS=1 -gG_SD_POWER=true system > system_synth.vhd 2> system_synth.log) && \
 	  echo "PASS synth system" || (echo "FAIL synth system"; cat $(BUILD)/system_synth.log; exit 1)
 
 COSIM_PORT ?= 0
@@ -243,6 +261,9 @@ $(BUILD)/counters.bin: counters.nasm $(ASM_PY) | $(BUILD)
 	@$(ASM) -o $@ $<
 
 $(BUILD)/break.bin: break.nasm $(ASM_PY) | $(BUILD)
+	@$(ASM) -o $@ $<
+
+$(BUILD)/sd.bin: sd.nasm $(ASM_PY) | $(BUILD)
 	@$(ASM) -o $@ $<
 
 $(BUILD)/dbg.bin: dbg.nasm $(ASM_PY) | $(BUILD)

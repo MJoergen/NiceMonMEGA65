@@ -19,7 +19,7 @@ smtbmc yices
 
 [script]
 plugin -i ghdl
-ghdl --std=08 -fpsl nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd perf.vhd timer.vhd fetch_stats.vhd devices.vhd formal_devices.vhd -e formal_devices
+ghdl --std=08 -fpsl nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd perf.vhd timer.vhd fetch_stats.vhd sd_regs.vhd sd_spi_byte.vhd sd_spi.vhd sd.vhd devices.vhd formal_devices.vhd -e formal_devices
 prep -top formal_devices
 
 [files]
@@ -30,5 +30,9 @@ prep -top formal_devices
 ../nice_cpu/hdl/src/perf.vhd
 ../nice_cpu/hdl/src/timer.vhd
 ../nice_cpu/hdl/src/fetch_stats.vhd
+../nice_cpu/hdl/src/sd_regs.vhd
+../src/sd/sd_spi_byte.vhd
+../src/sd/sd_spi.vhd
+../src/sd/sd.vhd
 ../src/devices.vhd
 formal_devices.vhd

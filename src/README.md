@@ -24,8 +24,10 @@ header of `nicemon.vhd` is the address map, and
   boots from, and the screen. It has two ports: one for the instruction
   bus and one for the data bus.
 - **DEVICES** ([devices.vhd](devices.vhd)) are nice_cpu's: the timer,
-  the math unit, the performance counters, and the fetch statistics. The
-  timer interrupts the core, which the diagram does not show.
+  the math unit, the performance counters, the fetch statistics, and
+  the SD card controller ([sd/sd.vhd](sd/sd.vhd)), whose pins go to the
+  board's slots. The timer interrupts the core, and the controller has
+  the pins, which the diagram does not show.
 - **SCREEN REGS** ([scr_regs.vhd](scr_regs.vhd)) hold the cursor and the
   display offset.
 - **BOARD REGS** ([board_io.vhd](board_io.vhd)) are the Nexys4DDR's

@@ -119,7 +119,16 @@
 --    are lost at once, and a request after them is answered. A host
 --    that leaves during the wait ends it at once, with the `o` on the
 --    UART.
--- 16. A reset while G_ECHO_FILE runs: the link sends `b06`, the core boots
+-- 16. Load G_SD_FILE, and run it, with an SD card in slot 0, a model of
+--    one on the image G_SD_IMAGE (sd_card_model.vhd), and slot 1 empty.
+--    The program is nice_cpu's emulator/test/sd.nasm for a card of 1024
+--    sectors: Init, Read, and Write through the core, and the checks of
+--    the registers that need no card. The controller holds the ACK of a
+--    command until it ends, as nice_cpu's simulation does, so the program
+--    takes niceemu's steps, G_SD_STEPS, and leaves the words that
+--    "niceemu --sd0" leaves. Then the link reads the buffer while the
+--    core is halted.
+-- 17. A reset while G_ECHO_FILE runs: the link sends `b06`, the core boots
 --    from the ROM again, and the screen's and the board's registers and the
 --    breakpoints are cleared.
 --
@@ -150,12 +159,16 @@ entity tb_nicemon is
       G_EOF_FILE       : string;
       G_COUNTERS_FILE  : string;
       G_BREAK_FILE     : string;
+      G_SD_FILE        : string;
+      -- The image of the card in slot 0, sim/Makefile's sd.img
+      G_SD_IMAGE       : string;
       -- The core, pipeline or multi, as NICE selects it
       G_NICE           : string;
       -- The steps that niceemu counts for hello, emu, and reserved
       G_HELLO_STEPS    : natural;
       G_EMU_STEPS      : natural;
-      G_RESERVED_STEPS : natural
+      G_RESERVED_STEPS : natural;
+      G_SD_STEPS       : natural
    );
 end entity tb_nicemon;
 
@@ -215,6 +228,12 @@ architecture simulation of tb_nicemon is
    signal net_tx_data  : std_logic_vector(7 downto 0);
    signal net_tx_valid : std_logic;
 
+   -- The SD card slots: a card in slot 0, and none in slot 1
+   signal sd_clk  : std_logic_vector(1 downto 0);
+   signal sd_cmd  : std_logic_vector(1 downto 0);
+   signal sd_dat3 : std_logic_vector(1 downto 0);
+   signal sd_dat0 : std_logic_vector(1 downto 0) := "11";
+
    -- The console bytes, and the packets, each from its tag to its checksum
    -- and an LF
    signal con_str : string(1 to 4096);
@@ -258,7 +277,10 @@ begin
          G_ROM_ADDR_BITS    => 11,
          G_CPU_RUN_AT_RESET => true,
          G_BOARD_IO         => true,
-         G_LINK_WAIT_US     => C_LINK_WAIT_US
+         G_LINK_WAIT_US     => C_LINK_WAIT_US,
+         G_SD_SLOTS         => 2,
+         G_SD_HOLD_ACK      => true,
+         G_SD_SLOW_HZ       => 4_000_000
       )
       port map (
          clk_i          => clk,
@@ -291,8 +313,28 @@ begin
          net_rx_renew_i => net_rx_renew,
          net_tx_data_o  => net_tx_data,
          net_tx_valid_o => net_tx_valid,
-         net_tx_ready_i => '1'
+         net_tx_ready_i => '1',
+         sd_clk_o       => sd_clk,
+         sd_cmd_o       => sd_cmd,
+         sd_dat3_o      => sd_dat3,
+         sd_dat0_i      => sd_dat0,
+         sd_cd_n_i      => "10",
+         sd_wp_i        => "00",
+         sd_pwr_n_o     => open
       ); -- i_nicemon
+
+   i_sd_card_model : entity work.sd_card_model
+      generic map (
+         G_FILE    => G_SD_IMAGE,
+         G_SECTORS => 1024,
+         G_TYPE    => 2
+      )
+      port map (
+         sclk_i => sd_clk(0),
+         mosi_i => sd_cmd(0),
+         cs_n_i => sd_dat3(0),
+         miso_o => sd_dat0(0)
+      ); -- i_sd_card_model
 
 
    -- Decodes the link's output, from the UART, 8-N-1, sampling in the
@@ -1179,6 +1221,60 @@ begin
       send_con(".");
       expect_con(".");
       expect_halt("01");
+
+      report "tb_nicemon: load " & G_SD_FILE;
+      wr("FFFFFFF0", "00000009");
+      load(G_SD_FILE, first_v);
+      wr("FFFFFFF0", "00000008");
+      -- The first Init after reset clocks 1024 bytes before the card's
+      -- start-up (src/sd/sd_spi.vhd), which takes about 2 ms here.
+      wait until running = '0' for 20 ms;
+      expect_halt("01");
+      check("FFFFFF42", steps(G_SD_STEPS));
+      -- The words of "niceemu --sd0 sd.img -d 0x200:32" for the program
+      check("00000200", "00000002");         -- SD_SLOTS
+      check("00000201", "00000014");         -- present, changed
+      check("00000202", "00000000");         -- SD_LAST before Init
+      check("00000203", "00000002");         -- Read before Init: not ready
+      check("00000204", "00000016");
+      check("00000205", "0000020C");         -- Init: present, ready, type 2
+      check("00000206", "000003FF");         -- SD_LAST
+      check("00000207", "00000000");
+      check("00000208", "00000000");         -- command 7 is ignored
+      check("00000209", "00000000");         -- Read of sector 1
+      check("0000020A", "0D0C0B0A");         -- bytes 512..515
+      check("0000020B", "29282726");
+      check("0000020C", "13121110");         -- chunk 15
+      check("0000020D", "00000002");         -- SD_CHUNK takes bits 3..0
+      check("0000020E", "4D4C4B4A");
+      check("0000020F", "00000007");         -- sector 1024 is out of range
+      check("00000210", "0000020E");
+      check("00000211", "00000000");         -- Write of sector 0
+      check("00000212", "81807F7E");         -- sector 1 again
+      check("00000213", "CAFEF00D");         -- sector 0, as written
+      check("00000214", "0D0C0B0A");
+      check("00000215", "00000000");
+      check("00000216", "00000001");         -- SD_SELECT takes bits 3..0
+      check("00000217", "00000000");         -- slot 1 is empty
+      check("00000218", "00000001");         -- Init: no card
+      check("00000219", "00000002");
+      check("0000021A", "00000006");         -- slot 0: not ready, not changed
+      check("0000021B", "00000000");
+      check("0000021C", "00000002");         -- Read: not ready
+      check("0000021D", "00000001");         -- slot 5: no card
+      check("0000021E", "00000000");         -- 0xFFFFFFA7
+      check("0000021F", "00000001");         -- a write of SD_ERROR is ignored
+      check("FFFFFFA0", "00000002");         -- the controller at the end
+      check("FFFFFFA4", "00000005");
+      check("FFFFFFA8", "0D0C0B0A");
+      check("FFFFFFAF", "29282726");
+      -- The link reaches the registers and the buffer while the core is
+      -- halted. It starts no command here: with G_SD_HOLD_ACK its write
+      -- would wait for the end of the command, and the bytes of the packet
+      -- after it would be lost meanwhile. On the boards the ACK is not held.
+      wr("FFFFFFA2", "0000000F");
+      check("FFFFFFA2", "0000000F");
+      check("FFFFFFAF", "13121110");         -- bytes 1020..1023 of the image
 
       report "tb_nicemon: a reset while the core runs";
       wr("FFFFFF81", "00000021");

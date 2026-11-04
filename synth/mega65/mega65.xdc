@@ -128,7 +128,7 @@ set_property -dict {PACKAGE_PIN C17  IOSTANDARD LVCMOS33} [get_ports {sd_wp_i}];
 
 ## The card's clock is at most 25 MHz, a quarter of the system clock, and
 ## the controller counts its timing in cycles of the system clock, so the
-## pins are slow. Their registers are in the I/O tiles (src/system.vhd).
+## pins are slow. Their registers are in the I/O tiles (src/sd/sd.vhd).
 set_false_path -to   [get_ports {sd_clk_o[*] sd_cmd_o[*] sd_dat3_o[*]}]
 set_false_path -from [get_ports {sd_dat0_i[*] sd_cd_n_i[*] sd_wp_i}]
 set_property IOB TRUE [get_ports {sd_clk_o[*] sd_cmd_o[*] sd_dat3_o[*]}]

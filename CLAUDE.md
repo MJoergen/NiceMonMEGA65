@@ -33,7 +33,7 @@ header is the authoritative address map.
 ## Commands
 
     make                  # lists the targets
-    make -j test          # GHDL: synth checks, tb_hello, tb_nicemon, tb_kbd, tb_ps2, tb_ps2_nicemon, tb_text, tb_dbg, tb_dbg_host, tb_dbg_decode, tb_board_io, tb_rmii_rx, tb_rx_fcs, tb_eth_rx_fifo, tb_eth_tx_fifo, tb_rmii_tx, tb_eth, tb_eth_tcp, tb_eth_tcp_random, check-steps, check-fmt (NICE=multi for the multi-cycle core); then the demo and the monitor in niceemu
+    make -j test          # GHDL: synth checks, tb_hello, tb_nicemon, tb_kbd, tb_ps2, tb_ps2_nicemon, tb_text, tb_dbg, tb_dbg_host, tb_dbg_decode, tb_board_io, tb_rmii_rx, tb_rx_fcs, tb_eth_rx_fifo, tb_eth_tx_fifo, tb_rmii_tx, tb_eth, tb_eth_tcp, tb_eth_tcp_random, tb_sd, check-steps, check-fmt (NICE=multi for the multi-cycle core); then the demo and the monitor in niceemu
     make -j formal        # SymbiYosys jobs in formal/, each task in a work directory of its own
     make lint             # vsg against doc/CODING_STYLE.md; line-length warnings are tolerated
     make typecheck        # mypy --strict on the Python files that mypy.ini lists
@@ -94,7 +94,10 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   `eth/eth_tcp_pick.vhd`, their sender, `eth/eth_tcp_tx.vhd`, its
   buffers, `eth/eth_tcp_buf.vhd`, and its retransmission timer,
   `eth/eth_tcp_timer.vhd`, and the arbiter of the frames to send,
-  `eth/eth_arb.vhd`), and `system.vhd`, which every board instantiates.
+  `eth/eth_arb.vhd`), the SD card controller at `FFFFFFA0`–`AF` (`sd/sd.vhd`,
+  with nice_cpu's `sd_regs.vhd`, the engine in SPI mode, `sd/sd_spi.vhd`, and
+  its byte shifter, `sd/sd_spi_byte.vhd`), and `system.vhd`, which every
+  board instantiates.
   `nice_core.vhd` with one architecture from `src/core/` wraps whichever
   nice_cpu core `core.mk` selects (`NICE=pipeline`, the default, or `multi`).
 - `src/video/`: `text.vhd` shows the screen with a cursor and a display
@@ -106,7 +109,8 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   `mega65/` what the R3 and R6 share (keyboard, DAC, HDMI), `r3/`, `r6/`,
   and `nexys4ddr/` the boards. See `synth/README.md`, and
   `.claude/rules/synth.md` when working there.
-- `sim/`: the GHDL testbenches and their `.nasm` programs; `sim/cosim/` is
+- `sim/`: the GHDL testbenches and their `.nasm` programs, and a model of
+  an SD card, `sd_card_model.vhd`; `sim/cosim/` is
   the system with its UART on TCP (`tb_cosim.vhd`, `cosim.c`). `formal/`: the
   SymbiYosys wrappers; the checks themselves are `G_FORMAL` blocks in the
   sources. `tools/`: `nicelink.py` (the link, on the UART, or over TCP to
