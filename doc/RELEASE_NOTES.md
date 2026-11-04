@@ -21,6 +21,16 @@ The release candidates pinned these:
 
 nice_cpu's `RC01` and `RC03` have no tag here.
 
+## V1.4 (not yet released)
+
+**Upgrade notes.**
+
+- nice_cpu is at `V1.4`. Its assembler has the pseudo-instructions
+  `JMP`, `CMP`, `TST`, `PUSH`, `POP`, `CLR`, and `NOP` (ISA.md §10.1),
+  so a program that uses one of them as a label or an `.EQU` name no
+  longer assembles. The cores, the devices, and the debug link are as
+  in V1.3.
+
 ## V1.3 (2026-11-03)
 
 **Upgrade notes.**
