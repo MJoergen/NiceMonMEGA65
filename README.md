@@ -275,11 +275,11 @@ short assembly program, and their addresses:
 
     0  LOOP  MOVE    R1, @CONSOLE      ; bit 8 set when a byte has arrived
     2        AND[M]  R2, R1, 0x100
-    4    ?Z  MOVE    PC, LOOP          ; nothing yet
+    4    ?Z  JMP     LOOP              ; nothing yet
     6        AND     R1, R1, 0xFF
     8        MOVE    @CONSOLE, R1      ; echo the byte
     A        SUB[M]  R2, R1, 0x2E      ; a '.'?
-    C   ?!Z  MOVE    PC, LOOP
+    C   ?!Z  JMP     LOOP
     E        HALT
 
 Assemble it, and start `mon.py`. The state shown here is that after an

@@ -31,8 +31,8 @@ RESULT          .EQU    0x100
                 MOVE    @TIMER_VECTOR, 0xF0
                 MOVE    @TIMER_PERIOD, 200
                 OR      R14, R14, 0x40000000  ; E = 1
-wait            SUB[M]  R0, R6, 3
-        ?!Z     MOVE    R15, wait
+wait            CMP     R6, 3
+        ?!Z     JMP     wait
                 MOVE    @TIMER_PERIOD, 0
                 MOVE    @0x105, R6      ; 3 requests taken
                 HALT

@@ -10,7 +10,7 @@ START           MOVE    SR, 1           ; VBASE = 1: the table is at 0x100
                 MOVE    R13, 0x200
                 MOVE    R4, 3
 LOOP            SUB[M]  R4, R4, 1
-        ?!Z     MOVE    PC, LOOP
+        ?!Z     JMP     LOOP
 SKIP    ?!Z     MOVE    R3, 0x55        ; skipped: R4 is 0
 READ            MOVE    R1, @R13
 TWO             MOVE    R5, 0x12345678

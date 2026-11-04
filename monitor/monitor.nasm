@@ -4,7 +4,7 @@
 ; start of the ROM, and it has a main loop with a few commands, typed on
 ; the keyboard or sent over the line, and shown on the screen and the line.
 ;
-; The dispatch table has one MOVE PC, routine per entry, two words, so that
+; The dispatch table has one JMP routine per entry, two words, so that
 ; entry n is at address 2n, and entry 0 is the reset. The routines follow
 ; the C ABI of nice_cpu/runtime/ABI.md: the arguments in R1-R4, the result
 ; in R1, R1-R6 changed, and R7-R13 kept. mon.nasm has the address of each
@@ -119,15 +119,15 @@ SCR_MAX         .EQU    0x7FFF          ; the largest display offset
 
 ; The dispatch table (README.md, "The dispatch table"). Entries are only
 ; ever added at the end.
-                MOVE    PC, mon_reset   ; 0 at 0x00
-                MOVE    PC, mon_exit    ; 1 at 0x02
-                MOVE    PC, mon_version  ; 2 at 0x04
-                MOVE    PC, mon_putc    ; 3 at 0x06
-                MOVE    PC, mon_out     ; 4 at 0x08
-                MOVE    PC, scr_cls     ; 5 at 0x0A
-                MOVE    PC, scr_moveto  ; 6 at 0x0C
-                MOVE    PC, scr_getxy   ; 7 at 0x0E
-                MOVE    PC, scr_color   ; 8 at 0x10
+                JMP     mon_reset       ; 0 at 0x00
+                JMP     mon_exit        ; 1 at 0x02
+                JMP     mon_version     ; 2 at 0x04
+                JMP     mon_putc        ; 3 at 0x06
+                JMP     mon_out         ; 4 at 0x08
+                JMP     scr_cls         ; 5 at 0x0A
+                JMP     scr_moveto      ; 6 at 0x0C
+                JMP     scr_getxy       ; 7 at 0x0E
+                JMP     scr_color       ; 8 at 0x10
 
 ; mon_reset: the cold start, entry 0, which reset runs and a program may
 ; call. E is cleared, the timer stopped, and VBASE set to 0, as at a
@@ -158,17 +158,13 @@ mon_reset
                 MOVE    @V_HHEAD, 0
                 MOVE    @V_HCOUNT, 0
                 MOVE    @V_BACK, 0
-                ADD     @--SP, 2, PC
-                MOVE    PC, scr_cls
+                CALL    scr_cls
                 MOVE    R1, S_NAME
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_puts
+                CALL    _io_puts
                 MOVE    R1, VERSION
-                ADD     @--SP, 2, PC
-                MOVE    PC, puts_crlf
+                CALL    puts_crlf
                 MOVE    R1, S_HINT
-                ADD     @--SP, 2, PC
-                MOVE    PC, puts_crlf
+                CALL    puts_crlf
 
 ; main: the prompt, a line, and its command. SP is fresh for each line, and
 ; a command jumps back here when it is done. The first character of the
@@ -176,73 +172,60 @@ mon_reset
 ; COMMANDS; R2 points after it for the command's arguments.
 main            MOVE    SP, STACK
                 MOVE    R1, S_PROMPT
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_puts
+                CALL    _io_puts
                 MOVE    R1, V_LINE
                 MOVE    R2, LINE_MAX
-                ADD     @--SP, 2, PC
-                MOVE    PC, getline
+                CALL    getline
                 MOVE    R2, V_LINE
 word            MOVE[M] R1, @R2++
-        ?Z      MOVE    PC, main        ; an empty line
-                SUB[M]  R0, R1, 0x20
-        ?Z      MOVE    PC, word
+        ?Z      JMP     main            ; an empty line
+                CMP     R1, 0x20
+        ?Z      JMP     word
                 SUB     R3, R1, 0x41
-                SUB[M]  R0, R3, 26
+                CMP     R3, 26
         ?C      OR      R1, R1, 0x20    ; A to Z folded to a to z
                 MOVE    R3, COMMANDS
 find            MOVE[M] R4, @R3++       ; a letter, or 0 at the end
-        ?Z      MOVE    PC, unknown
-                SUB[M]  R0, R4, R1
-        ?Z      MOVE    PC, @R3         ; the command
+        ?Z      JMP     unknown
+                CMP     R4, R1
+        ?Z      JMP     @R3             ; the command
                 ADD     R3, R3, 1
-                MOVE    PC, find
+                JMP     find
 unknown         MOVE    R1, S_UNKNOWN
-                ADD     @--SP, 2, PC
-                MOVE    PC, puts_crlf
-                MOVE    PC, main
+                CALL    puts_crlf
+                JMP     main
 
 ; ?: the commands, a line each
 cmd_help
                 MOVE    R1, HELP
-                ADD     @--SP, 2, PC
-                MOVE    PC, puts_lines
-                MOVE    PC, main
+                CALL    puts_lines
+                JMP     main
 
 ; c: the screen cleared
-cmd_cls         ADD     @--SP, 2, PC
-                MOVE    PC, scr_cls
-                MOVE    PC, main
+cmd_cls         CALL    scr_cls
+                JMP     main
 
 ; v: the version of the monitor, and that of the table, major.minor
 cmd_version
                 MOVE    R1, S_NAME
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_puts
+                CALL    _io_puts
                 MOVE    R1, VERSION
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_puts
+                CALL    _io_puts
                 MOVE    R1, S_TABLE
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_puts
+                CALL    _io_puts
                 SHR     R1, TABLE_VERSION, 16
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_putdec
+                CALL    _io_putdec
                 MOVE    R1, 0x2E        ; .
-                ADD     @--SP, 2, PC
-                MOVE    PC, mon_putc
+                CALL    mon_putc
                 AND     R1, TABLE_VERSION, 0xFFFF
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_putdec
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_crlf
-                MOVE    PC, main
+                CALL    _io_putdec
+                CALL    _io_crlf
+                JMP     main
 
 ; h: the core halted, until the reset button, or a host starts it
 cmd_halt
                 MOVE    R1, S_HALTED
-                ADD     @--SP, 2, PC
-                MOVE    PC, puts_crlf
+                CALL    puts_crlf
                 HALT
 
 ; d [ADDR] [N]: N words from ADDR, in hex, ROW_WORDS to a row, each row
@@ -250,42 +233,35 @@ cmd_halt
 ; without N, DUMP_WORDS.
 cmd_dump
                 MOVE    R1, R2
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_gethex  ; R1 the address, R2 its digits, R3 after it
-                MOVE[M] R0, R2
+                CALL    _io_gethex      ; R1 the address, R2 its digits, R3 after it
+                TST     R2
         ?!Z     MOVE    @V_NEXT, R1
                 MOVE    R1, R3
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_gethex  ; R1 the count
-                MOVE[M] R0, R2
+                CALL    _io_gethex      ; R1 the count
+                TST     R2
         ?Z      MOVE    R1, DUMP_WORDS
                 MOVE[M] R8, R1          ; the words left
-        ?Z      MOVE    PC, main
+        ?Z      JMP     main
                 MOVE    R7, @V_NEXT     ; the next word
 dump_row
                 MOVE    R1, R7
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_puthex
+                CALL    _io_puthex
                 MOVE    R9, ROW_WORDS   ; the words left in the row
 dump_word
                 MOVE    R1, 0x20
-                ADD     @--SP, 2, PC
-                MOVE    PC, mon_putc
+                CALL    mon_putc
                 MOVE    R1, @R7++
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_puthex
+                CALL    _io_puthex
                 SUB[M]  R8, R8, 1
-        ?Z      MOVE    PC, dump_end
+        ?Z      JMP     dump_end
                 SUB[M]  R9, R9, 1
-        ?!Z     MOVE    PC, dump_word
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_crlf
-                MOVE    PC, dump_row
+        ?!Z     JMP     dump_word
+                CALL    _io_crlf
+                JMP     dump_row
 dump_end
                 MOVE    @V_NEXT, R7
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_crlf
-                MOVE    PC, main
+                CALL    _io_crlf
+                JMP     main
 
 ; u [ADDR] [N]: N instructions from ADDR, disassembled, a row each: the
 ; address, the instruction's words, 1 to 4, and its text, as nicedis.py
@@ -299,24 +275,22 @@ dump_end
 ; and the operands of the mnemonic at V_UNOPS.
 cmd_dis
                 MOVE    R1, R2
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_gethex  ; R1 the address, R2 its digits, R3 after it
-                MOVE[M] R0, R2
+                CALL    _io_gethex      ; R1 the address, R2 its digits, R3 after it
+                TST     R2
         ?!Z     MOVE    @V_UNEXT, R1
                 MOVE    R1, R3
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_gethex  ; R1 the count
-                MOVE[M] R0, R2
+                CALL    _io_gethex      ; R1 the count
+                TST     R2
         ?Z      MOVE    R1, DIS_ROWS
                 MOVE[M] R8, R1
-        ?Z      MOVE    PC, main
+        ?Z      JMP     main
                 MOVE    R7, @V_UNEXT
 dis_row
                 MOVE    R9, @R7
                 ADD     R12, R7, 1
                 AND     R1, R9, 0x0C000000
-                SUB[M]  R0, R1, 0x0C000000
-        ?Z      MOVE    PC, dis_ctrl
+                CMP     R1, 0x0C000000
+        ?Z      JMP     dis_ctrl
 ; An ALU or SHIFT instruction: its fields, and the constant words that
 ; follow it, in field order dest, s0, s1
                 SHR     R1, R9, 14
@@ -327,48 +301,48 @@ dis_row
                 MOVE    R11, 0
 dis_const
                 AND     R1, @V_UF[R11], 0x30
-                SUB[M]  R0, R1, 0x30
+                CMP     R1, 0x30
         ?Z      MOVE    @V_UC[R11], @R12++
                 ADD     R11, R11, 1
-                SUB[M]  R0, R11, 3
-        ?!Z     MOVE    PC, dis_const
+                CMP     R11, 3
+        ?!Z     JMP     dis_const
 ; RET, the first half of a CALL, or another instruction
                 AND     R1, R9, 0x0FFFFFFF  ; without the condition
                 MOVE    R10, 2
-                SUB[M]  R0, R1, 0x0003F680  ; MOVE R15, @R13++
-        ?Z      MOVE    PC, dis_print
+                CMP     R1, 0x0003F680  ; MOVE R15, @R13++
+        ?Z      JMP     dis_print
                 MOVE    R10, 0
-                SUB[M]  R0, R1, 0x0077580F  ; ADD @--R13, n, R15
-        ?!Z     MOVE    PC, dis_print
+                CMP     R1, 0x0077580F  ; ADD @--R13, n, R15
+        ?!Z     JMP     dis_print
                 MOVE    R2, @R12        ; the word after it
                 XOR     R3, R2, R9
                 AND[M]  R0, R3, 0xF0000000
-        ?!Z     MOVE    PC, dis_print   ; another condition
+        ?!Z     JMP     dis_print       ; another condition
                 AND     R3, R2, 0x0FFFC07F
-                SUB[M]  R0, R3, 0x0003C000  ; MOVE R15, s0
-        ?!Z     MOVE    PC, dis_print
+                CMP     R3, 0x0003C000  ; MOVE R15, s0
+        ?!Z     JMP     dis_print
                 MOVE    R4, 1           ; the words of the MOVE
                 SHR     R3, R2, 7
                 AND     R3, R3, 0x30
-                SUB[M]  R0, R3, 0x30
+                CMP     R3, 0x30
         ?Z      MOVE    R4, 2
-                SUB[M]  R0, R4, @V_UC+1
-        ?!Z     MOVE    PC, dis_print   ; n is not their number
+                CMP     R4, @V_UC+1
+        ?!Z     JMP     dis_print       ; n is not their number
                 ADD     R12, R12, R4
                 MOVE    R10, 3
-                MOVE    PC, dis_print
+                JMP     dis_print
 ; A control instruction, which is reserved with a command past INT, a bit
 ; of 20..8 set, or a vector but for INT
 dis_ctrl
                 MOVE    R10, 1
                 SHR     R1, R9, 21
                 AND     R1, R1, 0x1F
-                SUB[M]  R0, R1, 3
+                CMP     R1, 3
         ?!C     MOVE    R10, 4
                 AND[M]  R0, R9, 0x001FFF00
         ?!Z     MOVE    R10, 4
-                SUB[M]  R0, R1, 2
-        ?Z      MOVE    PC, dis_print
+                CMP     R1, 2
+        ?Z      JMP     dis_print
                 AND[M]  R0, R9, 0xFF
         ?!Z     MOVE    R10, 4
 ; The address, the words, blanks for the words that the instruction does
@@ -376,33 +350,28 @@ dis_ctrl
 dis_print
                 MOVE    R1, R7
                 MOVE    R2, 8
-                ADD     @--SP, 2, PC
-                MOVE    PC, u_hex
+                CALL    u_hex
                 MOVE    R11, R7
 dis_word
-                SUB[M]  R0, R11, R12
-        ?Z      MOVE    PC, dis_pad
+                CMP     R11, R12
+        ?Z      JMP     dis_pad
                 MOVE    R1, 0x20
-                ADD     @--SP, 2, PC
-                MOVE    PC, mon_putc
+                CALL    mon_putc
                 MOVE    R1, @R11++
                 MOVE    R2, 8
-                ADD     @--SP, 2, PC
-                MOVE    PC, u_hex
-                MOVE    PC, dis_word
+                CALL    u_hex
+                JMP     dis_word
 dis_pad         SUB     R1, R11, R7
-                SUB[M]  R0, R1, 4
-        ?Z      MOVE    PC, dis_text
+                CMP     R1, 4
+        ?Z      JMP     dis_text
                 MOVE    R1, S_UBLANK
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_puts
+                CALL    _io_puts
                 ADD     R11, R11, 1
-                MOVE    PC, dis_pad
+                JMP     dis_pad
 dis_text
                 MOVE    R1, S_UGAP
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_puts
-                MOVE    PC, @DIS_KINDS[R10]
+                CALL    _io_puts
+                JMP     @DIS_KINDS[R10]
 ; Kind 0, an ALU or SHIFT instruction, which is a .DAT if a field that its
 ; mnemonic does not use is not R0
 dis_insn
@@ -414,210 +383,174 @@ dis_insn
                 MOVE    @V_UNOPS, R2
                 MOVE    R3, 0
 dis_unused
-                SUB[M]  R0, R2, 3
-        ?Z      MOVE    PC, dis_used
+                CMP     R2, 3
+        ?Z      JMP     dis_used
                 OR      R3, R3, @V_UF[R2]
                 ADD     R2, R2, 1
-                MOVE    PC, dis_unused
+                JMP     dis_unused
 dis_used
-                MOVE[M] R0, R3
-        ?Z      MOVE    PC, dis_plain
-                ADD     @--SP, 2, PC
-                MOVE    PC, u_dat
-                ADD     @--SP, 2, PC
-                MOVE    PC, u_stmt
-                ADD     @--SP, 2, PC
-                MOVE    PC, u_unused
-                MOVE    PC, dis_end
+                TST     R3
+        ?Z      JMP     dis_plain
+                CALL    u_dat
+                CALL    u_stmt
+                CALL    u_unused
+                JMP     dis_end
 dis_plain
-                ADD     @--SP, 2, PC
-                MOVE    PC, u_stmt
-                MOVE    PC, dis_end
+                CALL    u_stmt
+                JMP     dis_end
 ; Kind 1, HALT, RTI, or INT, with its vector in decimal
 dis_cmd         MOVE    R1, R9
-                ADD     @--SP, 2, PC
-                MOVE    PC, u_cond
+                CALL    u_cond
                 SHR     R1, R9, 21
                 AND     R11, R1, 0x1F
                 MOVE    R1, @U_CTRL[R11]
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_puts
-                SUB[M]  R0, R11, 2
-        ?!Z     MOVE    PC, dis_end
+                CALL    _io_puts
+                CMP     R11, 2
+        ?!Z     JMP     dis_end
                 MOVE    R1, 0x20
-                ADD     @--SP, 2, PC
-                MOVE    PC, mon_putc
+                CALL    mon_putc
                 AND     R1, R9, 0xFF
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_putdec
-                MOVE    PC, dis_end
+                CALL    _io_putdec
+                JMP     dis_end
 ; Kind 2, RET
 dis_ret         MOVE    R1, R9
-                ADD     @--SP, 2, PC
-                MOVE    PC, u_cond
+                CALL    u_cond
                 MOVE    R1, S_URET
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_puts
-                MOVE    PC, dis_end
+                CALL    _io_puts
+                JMP     dis_end
 ; Kind 3, CALL, with the operand of the MOVE, the third word, whose
 ; constant is the fourth
 dis_call
                 MOVE    R1, R9
-                ADD     @--SP, 2, PC
-                MOVE    PC, u_cond
+                CALL    u_cond
                 MOVE    R1, S_UCALL
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_puts
+                CALL    _io_puts
                 ADD     R1, R7, 2
                 SHR     R1, @R1, 7
                 AND     R1, R1, 0x7F
                 ADD     R2, R7, 3
                 MOVE    R2, @R2
                 MOVE    R3, 0
-                ADD     @--SP, 2, PC
-                MOVE    PC, u_op
-                MOVE    PC, dis_end
+                CALL    u_op
+                JMP     dis_end
 ; Kind 4, a reserved control word
 dis_rsvd
-                ADD     @--SP, 2, PC
-                MOVE    PC, u_dat
+                CALL    u_dat
                 MOVE    R1, S_URSVD
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_puts
+                CALL    _io_puts
 ; The end of the row, and the next instruction
-dis_end         ADD     @--SP, 2, PC
-                MOVE    PC, _io_crlf
+dis_end         CALL    _io_crlf
                 MOVE    R7, R12
                 SUB[M]  R8, R8, 1
-        ?!Z     MOVE    PC, dis_row
+        ?!Z     JMP     dis_row
                 MOVE    @V_UNEXT, R7
-                MOVE    PC, main
+                JMP     main
 
 ; u_stmt: the condition, the mnemonic with its modifiers, and the operands
 ; of the ALU or SHIFT instruction R9. Uses R1-R6 and R10.
 u_stmt
                 MOVE    R1, R9
-                ADD     @--SP, 2, PC
-                MOVE    PC, u_cond
+                CALL    u_cond
                 SHR     R1, R9, 21
                 AND     R1, R1, 0xF
                 AND[M]  R0, R9, 0x08000000
         ?!Z     ADD     R1, R1, 16      ; the SHIFT names follow the ALU's
                 MOVE    R1, @U_NAMES[R1]
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_puts
+                CALL    _io_puts
                 AND[M]  R0, R9, 0x06000000
-        ?Z      MOVE    PC, u_stmt_ops  ; no modifier
+        ?Z      JMP     u_stmt_ops      ; no modifier
                 MOVE    R1, 0x5B        ; [
-                ADD     @--SP, 2, PC
-                MOVE    PC, mon_putc
+                CALL    mon_putc
                 AND[M]  R0, R9, 0x04000000
         ?!Z     MOVE    R1, 0x43        ; C
-        ?!Z     ADD     @--SP, 2, PC
-        ?!Z     MOVE    PC, mon_putc
+        ?!Z     CALL    mon_putc
                 AND[M]  R0, R9, 0x02000000
         ?!Z     MOVE    R1, 0x4D        ; M
-        ?!Z     ADD     @--SP, 2, PC
-        ?!Z     MOVE    PC, mon_putc
+        ?!Z     CALL    mon_putc
                 MOVE    R1, 0x5D        ; ]
-                ADD     @--SP, 2, PC
-                MOVE    PC, mon_putc
+                CALL    mon_putc
 u_stmt_ops
                 MOVE    R1, 0x20
-                ADD     @--SP, 2, PC
-                MOVE    PC, mon_putc
+                CALL    mon_putc
                 MOVE    R10, 0
 u_stmt_op
                 MOVE    R1, @V_UF[R10]
                 MOVE    R2, @V_UC[R10]
                 MOVE    R3, 0
-                MOVE[M] R0, R10
+                TST     R10
         ?Z      MOVE    R3, 1           ; the dest
-                ADD     @--SP, 2, PC
-                MOVE    PC, u_op
+                CALL    u_op
                 ADD     R10, R10, 1
-                SUB[M]  R0, R10, @V_UNOPS
-        ?Z      MOVE    PC, @SP++
+                CMP     R10, @V_UNOPS
+        ?Z      RET
                 MOVE    R1, S_UCOMMA
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_puts
-                MOVE    PC, u_stmt_op
+                CALL    _io_puts
+                JMP     u_stmt_op
 
 ; u_unused: the fields that the mnemonic does not use and that are not
 ; R0, by name, in brackets, as nicedis.py writes them after the .DAT.
 ; Uses R1-R6, R10, and R11.
 u_unused
                 MOVE    R1, S_UOPEN
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_puts
+                CALL    _io_puts
                 MOVE    R10, @V_UNOPS
                 MOVE    R11, 0          ; not 0 after the first
 u_unused_f
-                SUB[M]  R0, R10, 3
+                CMP     R10, 3
         ?Z      MOVE    R1, 0x29        ; )
-        ?Z      MOVE    PC, mon_putc    ; which returns to the caller
-                MOVE[M] R0, @V_UF[R10]
-        ?Z      MOVE    PC, u_unused_n
-                MOVE[M] R0, R11
+        ?Z      JMP     mon_putc        ; which returns to the caller
+                TST     @V_UF[R10]
+        ?Z      JMP     u_unused_n
+                TST     R11
         ?!Z     MOVE    R1, S_UCOMMA
-        ?!Z     ADD     @--SP, 2, PC
-        ?!Z     MOVE    PC, _io_puts
+        ?!Z     CALL    _io_puts
                 MOVE    R11, 1
                 MOVE    R1, @U_FIELDS[R10]
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_puts
+                CALL    _io_puts
                 MOVE    R1, @V_UF[R10]
                 MOVE    R2, @V_UC[R10]
                 MOVE    R3, 0
-                ADD     @--SP, 2, PC
-                MOVE    PC, u_op
+                CALL    u_op
 u_unused_n
                 ADD     R10, R10, 1
-                MOVE    PC, u_unused_f
+                JMP     u_unused_f
 
 ; u_dat: .DAT, the words from R7 up to R12 in hex, and the ; of the
 ; comment that says what they would do. Uses R1-R6 and R11.
 u_dat
                 MOVE    R1, S_UDAT
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_puts
+                CALL    _io_puts
                 MOVE    R11, R7
 u_dat_word
                 MOVE    R1, S_U0X
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_puts
+                CALL    _io_puts
                 MOVE    R1, @R11++
                 MOVE    R2, 8
-                ADD     @--SP, 2, PC
-                MOVE    PC, u_hex
-                SUB[M]  R0, R11, R12
+                CALL    u_hex
+                CMP     R11, R12
         ?Z      MOVE    R1, S_USEMI
-        ?Z      MOVE    PC, _io_puts    ; which returns to the caller
+        ?Z      JMP     _io_puts        ; which returns to the caller
                 MOVE    R1, S_UCOMMA
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_puts
-                MOVE    PC, u_dat_word
+                CALL    _io_puts
+                JMP     u_dat_word
 
 ; u_cond: the condition of the instruction word R1 and a blank, or nothing
 ; for "always". Uses R1-R5.
 u_cond
                 SHR[M]  R5, R1, 28      ; NEG and SEL
-        ?Z      MOVE    PC, @SP++
+        ?Z      RET
                 MOVE    R1, 0x3F        ; ?
-                ADD     @--SP, 2, PC
-                MOVE    PC, mon_putc
+                CALL    mon_putc
                 AND[M]  R0, R5, 8
-        ?Z      MOVE    PC, u_cond_flag
+        ?Z      JMP     u_cond_flag
                 MOVE    R1, 0x21        ; !
-                ADD     @--SP, 2, PC
-                MOVE    PC, mon_putc
+                CALL    mon_putc
 u_cond_flag
                 AND     R1, R5, 7
                 MOVE    R1, @S_UFLAGS[R1]
-                ADD     @--SP, 2, PC
-                MOVE    PC, mon_putc
+                CALL    mon_putc
                 MOVE    R1, 0x20
-                MOVE    PC, mon_putc    ; which returns to the caller
+                JMP     mon_putc        ; which returns to the caller
 
 ; u_op: the operand of the field R1, with its constant R2, in the syntax
 ; of nice_cpu's ISA.md §10.2, as nicedis.py writes it, the constant in
@@ -626,69 +559,61 @@ u_cond_flag
 u_op
                 MOVE    R5, R1          ; the field
                 MOVE    R6, R2          ; the constant
-                MOVE[M] R0, R3
-        ?Z      MOVE    PC, u_op_at
+                TST     R3
+        ?Z      JMP     u_op_at
                 AND     R4, R1, 0x70
-                SUB[M]  R0, R4, 0x10
+                CMP     R4, 0x10
         ?Z      OR      R5, R5, 0x80    ; Rx--
 u_op_at
                 AND[M]  R0, R5, 0x40
-        ?Z      MOVE    PC, u_op_mode
+        ?Z      JMP     u_op_mode
                 MOVE    R1, 0x40        ; @
-                ADD     @--SP, 2, PC
-                MOVE    PC, mon_putc
+                CALL    mon_putc
 u_op_mode
                 AND     R4, R5, 0x30
-                SUB[M]  R0, R4, 0x30
-        ?Z      MOVE    PC, u_op_const
-                SUB[M]  R0, R4, 0x10
-        ?!Z     MOVE    PC, u_op_reg
+                CMP     R4, 0x30
+        ?Z      JMP     u_op_const
+                CMP     R4, 0x10
+        ?!Z     JMP     u_op_reg
                 AND[M]  R0, R5, 0x80
-        ?!Z     MOVE    PC, u_op_reg
+        ?!Z     JMP     u_op_reg
                 MOVE    R1, S_UDEC      ; --Rx
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_puts
+                CALL    _io_puts
 u_op_reg
                 AND     R1, R5, 0xF
-                ADD     @--SP, 2, PC
-                MOVE    PC, u_reg
+                CALL    u_reg
                 AND     R4, R5, 0x30
-                SUB[M]  R0, R4, 0x20
+                CMP     R4, 0x20
         ?Z      MOVE    R1, S_UINC      ; Rx++
-        ?Z      MOVE    PC, _io_puts    ; which returns to the caller
+        ?Z      JMP     _io_puts        ; which returns to the caller
                 AND[M]  R0, R5, 0x80
-        ?Z      MOVE    PC, @SP++
+        ?Z      RET
                 MOVE    R1, S_UDEC      ; Rx--
-                MOVE    PC, _io_puts
+                JMP     _io_puts
 u_op_const
                 MOVE    R1, S_U0X
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_puts
-                MOVE    @--SP, R5
+                CALL    _io_puts
+                PUSH    R5
                 MOVE    R1, R6
                 MOVE    R2, 1
-                ADD     @--SP, 2, PC
-                MOVE    PC, u_hex
+                CALL    u_hex
                 AND[M]  R1, @SP++, 0xF  ; the register
-        ?Z      MOVE    PC, @SP++       ; R0: the constant alone
-                MOVE    @--SP, R1
+        ?Z      RET                     ; R0: the constant alone
+                PUSH    R1
                 MOVE    R1, 0x5B        ; [
-                ADD     @--SP, 2, PC
-                MOVE    PC, mon_putc
-                MOVE    R1, @SP++
-                ADD     @--SP, 2, PC
-                MOVE    PC, u_reg
+                CALL    mon_putc
+                POP     R1
+                CALL    u_reg
                 MOVE    R1, 0x5D        ; ]
-                MOVE    PC, mon_putc
+                JMP     mon_putc
 
 ; u_reg: R and the number R1 in decimal. Uses R1-R4.
 u_reg
-                MOVE    @--SP, R1
+                PUSH    R1
                 MOVE    R1, 0x52        ; R
-                ADD     @--SP, 2, PC
-                MOVE    PC, mon_putc
-                MOVE    R1, @SP++
-                MOVE    PC, _io_putdec  ; which returns to the caller
+                CALL    mon_putc
+                POP     R1
+                JMP     _io_putdec      ; which returns to the caller
 
 ; u_hex: R1 in lower-case hex, with R2 digits, 1 to 8, or more if it needs
 ; them, and no other leading zeros. Uses R1-R6.
@@ -696,24 +621,23 @@ u_hex
                 MOVE    R5, R1
                 MOVE    R6, 8           ; the digits left
 u_hex_skip
-                SUB[M]  R0, R6, R2
-        ?Z      MOVE    PC, u_hex_digit
+                CMP     R6, R2
+        ?Z      JMP     u_hex_digit
                 AND[M]  R0, R5, 0xF0000000
-        ?!Z     MOVE    PC, u_hex_digit
+        ?!Z     JMP     u_hex_digit
                 SHL     R5, R5, 4       ; a leading zero
                 SUB     R6, R6, 1
-                MOVE    PC, u_hex_skip
+                JMP     u_hex_skip
 u_hex_digit
                 ROL     R5, R5, 4       ; the top digit to the bottom
                 AND     R1, R5, 0xF
                 ADD     R1, R1, 0x30
-                SUB[M]  R0, R1, 0x3A
+                CMP     R1, 0x3A
         ?!C     ADD     R1, R1, 0x27    ; a to f
-                ADD     @--SP, 2, PC
-                MOVE    PC, mon_putc
+                CALL    mon_putc
                 SUB[M]  R6, R6, 1
-        ?!Z     MOVE    PC, u_hex_digit
-                MOVE    PC, @SP++
+        ?!Z     JMP     u_hex_digit
+                RET
 
 ; i [A.B.C.D]: the Ethernet station's IP address (doc/SYSTEM.md, "The
 ; Ethernet station"), written from four decimal numbers of 0 to 255 with
@@ -725,64 +649,59 @@ cmd_ip
                 MOVE    R7, 0
                 MOVE    R8, 4
 ip_blank
-                SUB[M]  R0, @R2, 0x20
+                CMP     @R2, 0x20
         ?Z      ADD     R2, R2, 1
-        ?Z      MOVE    PC, ip_blank
-                MOVE[M] R0, @R2
-        ?Z      MOVE    PC, ip_show     ; no address
+        ?Z      JMP     ip_blank
+                TST     @R2
+        ?Z      JMP     ip_show         ; no address
 ip_num          MOVE    R4, 0           ; the number
                 MOVE    R5, 0           ; and its digits
 ip_digit
                 SUB     R3, @R2, 0x30
-                SUB[M]  R0, R3, 10
-        ?!C     MOVE    PC, ip_end      ; no digit
+                CMP     R3, 10
+        ?!C     JMP     ip_end          ; no digit
                 SHL     R1, R4, 3       ; R4 is 10 * R4 + the digit
                 SHL     R4, R4, 1
                 ADD     R4, R4, R1
                 ADD     R4, R4, R3
-                SUB[M]  R0, R4, 256
-        ?!C     MOVE    PC, ip_bad
+                CMP     R4, 256
+        ?!C     JMP     ip_bad
                 ADD     R5, R5, 1
                 ADD     R2, R2, 1
-                MOVE    PC, ip_digit
-ip_end          MOVE[M] R0, R5
-        ?Z      MOVE    PC, ip_bad      ; a number without digits
+                JMP     ip_digit
+ip_end          TST     R5
+        ?Z      JMP     ip_bad          ; a number without digits
                 SHL     R7, R7, 8
                 OR      R7, R7, R4
                 SUB[M]  R8, R8, 1
-        ?Z      MOVE    PC, ip_last
-                SUB[M]  R0, @R2, 0x2E   ; .
-        ?!Z     MOVE    PC, ip_bad
+        ?Z      JMP     ip_last
+                CMP     @R2, 0x2E       ; .
+        ?!Z     JMP     ip_bad
                 ADD     R2, R2, 1
-                MOVE    PC, ip_num
-ip_last         SUB[M]  R0, @R2, 0x20   ; blanks, then the end of the line
+                JMP     ip_num
+ip_last         CMP     @R2, 0x20       ; blanks, then the end of the line
         ?Z      ADD     R2, R2, 1
-        ?Z      MOVE    PC, ip_last
-                MOVE[M] R0, @R2
-        ?!Z     MOVE    PC, ip_bad
+        ?Z      JMP     ip_last
+                TST     @R2
+        ?!Z     JMP     ip_bad
                 MOVE    @E_IP, R7
 ip_show         MOVE    R1, S_IP
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_puts
+                CALL    _io_puts
                 MOVE    R8, @E_IP
                 MOVE    R9, 4           ; the bytes left
 ip_byte         ROL     R8, R8, 8       ; the top byte to the bottom
                 AND     R1, R8, 0xFF
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_putdec
+                CALL    _io_putdec
                 SUB[M]  R9, R9, 1
-        ?Z      MOVE    PC, ip_done
+        ?Z      JMP     ip_done
                 MOVE    R1, 0x2E
-                ADD     @--SP, 2, PC
-                MOVE    PC, mon_putc
-                MOVE    PC, ip_byte
-ip_done         ADD     @--SP, 2, PC
-                MOVE    PC, _io_crlf
-                MOVE    PC, main
+                CALL    mon_putc
+                JMP     ip_byte
+ip_done         CALL    _io_crlf
+                JMP     main
 ip_bad          MOVE    R1, S_BADIP
-                ADD     @--SP, 2, PC
-                MOVE    PC, puts_crlf
-                MOVE    PC, main
+                CALL    puts_crlf
+                JMP     main
 
 ; m [MAC]: the Ethernet station's MAC address (doc/SYSTEM.md, "The
 ; Ethernet station"), written from six bytes of one or two hex digits, in
@@ -797,48 +716,46 @@ cmd_mac
                 MOVE    R8, 0
                 MOVE    R9, 6
 mac_blank
-                SUB[M]  R0, @R2, 0x20
+                CMP     @R2, 0x20
         ?Z      ADD     R2, R2, 1
-        ?Z      MOVE    PC, mac_blank
-                MOVE[M] R0, @R2
-        ?Z      MOVE    PC, mac_show    ; no address
+        ?Z      JMP     mac_blank
+                TST     @R2
+        ?Z      JMP     mac_show        ; no address
                 MOVE    R10, R2
 mac_byte
-                SUB[M]  R0, @R10, 0x20  ; no blank inside the address
-        ?Z      MOVE    PC, mac_bad
+                CMP     @R10, 0x20      ; no blank inside the address
+        ?Z      JMP     mac_bad
                 MOVE    R1, R10
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_gethex
+                CALL    _io_gethex
                 MOVE    R10, R3
                 SUB     R2, R2, 1
-                SUB[M]  R0, R2, 2
-        ?!C     MOVE    PC, mac_bad     ; no digit, or more than two
+                CMP     R2, 2
+        ?!C     JMP     mac_bad         ; no digit, or more than two
                 SHR     R4, R8, 24      ; R7:R8 shifted by a byte, and R1 in
                 SHL     R7, R7, 8
                 OR      R7, R7, R4
                 SHL     R8, R8, 8
                 OR      R8, R8, R1
                 SUB[M]  R9, R9, 1
-        ?Z      MOVE    PC, mac_last
-                SUB[M]  R0, @R10, 0x3A  ; :
-        ?!Z     MOVE    PC, mac_bad
+        ?Z      JMP     mac_last
+                CMP     @R10, 0x3A      ; :
+        ?!Z     JMP     mac_bad
                 ADD     R10, R10, 1
-                MOVE    PC, mac_byte
+                JMP     mac_byte
 mac_last
-                SUB[M]  R0, @R10, 0x20  ; blanks, then the end of the line
+                CMP     @R10, 0x20      ; blanks, then the end of the line
         ?Z      ADD     R10, R10, 1
-        ?Z      MOVE    PC, mac_last
-                MOVE[M] R0, @R10
-        ?!Z     MOVE    PC, mac_bad
+        ?Z      JMP     mac_last
+                TST     @R10
+        ?!Z     JMP     mac_bad
                 AND[M]  R0, R7, 0x100   ; bit 0 of the first byte: a group address
-        ?!Z     MOVE    PC, mac_bad
+        ?!Z     JMP     mac_bad
                 MOVE    @E_MACH, R7
                 MOVE    @E_MACL, R8
 ; The bytes go out from the top of R7, and R8 fills R7 from below.
 mac_show
                 MOVE    R1, S_MAC
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_puts
+                CALL    _io_puts
                 AND     R7, @E_MACH, 0xFFFF
                 SHL     R7, R7, 16
                 MOVE    R8, @E_MACL
@@ -847,33 +764,29 @@ mac_show
                 SHL     R8, R8, 16
                 MOVE    R9, 6           ; the bytes left
 mac_put         SHR     R1, R7, 28      ; the top byte, a digit at a time
-                ADD     @--SP, 2, PC
-                MOVE    PC, mac_digit
+                CALL    mac_digit
                 SHR     R1, R7, 24
-                ADD     @--SP, 2, PC
-                MOVE    PC, mac_digit
+                CALL    mac_digit
                 SUB[M]  R9, R9, 1
-        ?Z      MOVE    PC, ip_done
+        ?Z      JMP     ip_done
                 SHR     R4, R8, 24
                 SHL     R7, R7, 8
                 OR      R7, R7, R4
                 SHL     R8, R8, 8
                 MOVE    R1, 0x3A        ; :
-                ADD     @--SP, 2, PC
-                MOVE    PC, mon_putc
-                MOVE    PC, mac_put
+                CALL    mon_putc
+                JMP     mac_put
 mac_bad         MOVE    R1, S_BADMAC
-                ADD     @--SP, 2, PC
-                MOVE    PC, puts_crlf
-                MOVE    PC, main
+                CALL    puts_crlf
+                JMP     main
 
 ; mac_digit: bits 3..0 of R1 as a hex digit
 mac_digit
                 AND     R1, R1, 0xF
                 ADD     R1, R1, 0x30
-                SUB[M]  R0, R1, 0x3A
+                CMP     R1, 0x3A
         ?!C     ADD     R1, R1, 7       ; A to F
-                MOVE    PC, mon_putc    ; which returns to the caller
+                JMP     mon_putc        ; which returns to the caller
 
 ; l: words into the memory from lines of ADDR WORD, two hex numbers of 1 to
 ; 8 digits with blanks between them and around them, as a .bin file has
@@ -906,8 +819,7 @@ mac_digit
 ; the line.
 cmd_load
                 MOVE    R1, S_LHINT
-                ADD     @--SP, 2, PC
-                MOVE    PC, puts_crlf
+                CALL    puts_crlf
                 MOVE    @V_LOUT, @V_OUT
                 MOVE    @V_OUT, OUT_SCREEN
                 MOVE    @V_LEND, 0x0D   ; as after the CR of the l line
@@ -921,169 +833,146 @@ cmd_load
         ?Z      MOVE    R1, SCREEN+VARS_WORDS  ; no limit
                 SUB     @V_PEND, R1, VARS_WORDS
 load_line
-                ADD     @--SP, 2, PC
-                MOVE    PC, load_row
+                CALL    load_row
                 MOVE    R6, V_LINE
 load_key
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_getc
+                CALL    _io_getc
                 MOVE    R2, @V_LEND
                 MOVE    @V_LEND, R1
-                SUB[M]  R0, R1, 0x0A
-        ?!Z     MOVE    PC, load_char
-                SUB[M]  R0, R2, 0x0D
-        ?Z      MOVE    PC, load_key    ; the LF of a CR LF
-                MOVE    PC, load_end
+                CMP     R1, 0x0A
+        ?!Z     JMP     load_char
+                CMP     R2, 0x0D
+        ?Z      JMP     load_key        ; the LF of a CR LF
+                JMP     load_end
 load_char
-                SUB[M]  R0, R1, 0x0D
-        ?Z      MOVE    PC, load_end
-                SUB[M]  R0, R1, 0x7F
-        ?Z      MOVE    PC, load_del
-                SUB[M]  R0, R1, 0x08
-        ?Z      MOVE    PC, load_del
-                SUB[M]  R0, R1, 0x03
-        ?Z      MOVE    PC, load_done   ; CTRL-C
-                SUB[M]  R0, R1, 0x1B
-        ?Z      MOVE    PC, load_esc
-                SUB[M]  R0, R1, 0x09
+                CMP     R1, 0x0D
+        ?Z      JMP     load_end
+                CMP     R1, 0x7F
+        ?Z      JMP     load_del
+                CMP     R1, 0x08
+        ?Z      JMP     load_del
+                CMP     R1, 0x03
+        ?Z      JMP     load_done       ; CTRL-C
+                CMP     R1, 0x1B
+        ?Z      JMP     load_esc
+                CMP     R1, 0x09
         ?Z      MOVE    R1, 0x20        ; a TAB is a blank
-                SUB[M]  R0, R1, 0x20
-        ?C      MOVE    PC, load_key    ; another control code
-                SUB[M]  R0, R1, 0x80
-        ?!C     MOVE    PC, load_key    ; 0x80 and above
-                SUB[M]  R0, R6, V_LINE+LINE_MAX+1
-        ?Z      MOVE    PC, load_key    ; the line is over full
+                CMP     R1, 0x20
+        ?C      JMP     load_key        ; another control code
+                CMP     R1, 0x80
+        ?!C     JMP     load_key        ; 0x80 and above
+                CMP     R6, V_LINE+LINE_MAX+1
+        ?Z      JMP     load_key        ; the line is over full
                 MOVE    @R6++, R1
-                ADD     @--SP, 2, PC
-                MOVE    PC, mon_putc
-                MOVE    PC, load_key
+                CALL    mon_putc
+                JMP     load_key
 load_del
-                SUB[M]  R0, R6, V_LINE
-        ?Z      MOVE    PC, load_key    ; nothing before the cursor
+                CMP     R6, V_LINE
+        ?Z      JMP     load_key        ; nothing before the cursor
                 SUB     R6, R6, 1
                 MOVE    R1, _io_gets.rub
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_puts
-                MOVE    PC, load_key
+                CALL    _io_puts
+                JMP     load_key
 ; An ESC: with a [ or an O within io.t_esc, a sequence, whose bytes up to
 ; its final one, 0x40 to 0x7E, are dropped; another byte is dropped with
 ; the ESC.
 load_esc
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_getc.soon
-        ?Z      MOVE    PC, load_key
-                SUB[M]  R0, R1, 0x5B    ; [
-        ?Z      MOVE    PC, load_seq
-                SUB[M]  R0, R1, 0x4F    ; O
-        ?!Z     MOVE    PC, load_key
+                CALL    _io_getc.soon
+        ?Z      JMP     load_key
+                CMP     R1, 0x5B        ; [
+        ?Z      JMP     load_seq
+                CMP     R1, 0x4F        ; O
+        ?!Z     JMP     load_key
 load_seq
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_getc.soon
-        ?Z      MOVE    PC, load_key
-                SUB[M]  R0, R1, 0x40
-        ?C      MOVE    PC, load_seq    ; a parameter byte
-                MOVE    PC, load_key    ; the final byte
+                CALL    _io_getc.soon
+        ?Z      JMP     load_key
+                CMP     R1, 0x40
+        ?C      JMP     load_seq        ; a parameter byte
+                JMP     load_key        ; the final byte
 ; The end of a line: an empty one ends the load, one of blanks only is
 ; passed over, and another is parsed, and its word written
 load_end
                 MOVE    @R6, 0
-                SUB[M]  R0, R6, V_LINE
-        ?Z      MOVE    PC, load_done
+                CMP     R6, V_LINE
+        ?Z      JMP     load_done
                 ADD     R11, R11, 1
-                SUB[M]  R0, R6, V_LINE+LINE_MAX+1
-        ?Z      MOVE    PC, load_bad    ; longer than LINE_MAX
+                CMP     R6, V_LINE+LINE_MAX+1
+        ?Z      JMP     load_bad        ; longer than LINE_MAX
                 MOVE    R1, V_LINE
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_gethex  ; R1 the address, R2 its digits, R3 after it
-                MOVE[M] R0, R2
-        ?!Z     MOVE    PC, load_addr
-                MOVE[M] R0, @R3
-        ?Z      MOVE    PC, load_line   ; blanks only
+                CALL    _io_gethex      ; R1 the address, R2 its digits, R3 after it
+                TST     R2
+        ?!Z     JMP     load_addr
+                TST     @R3
+        ?Z      JMP     load_line       ; blanks only
 load_addr
                 SUB     R4, R2, 1
-                SUB[M]  R0, R4, 8
-        ?!C     MOVE    PC, load_bad    ; no digit, or more than 8
-                SUB[M]  R0, R1, PROGRAM
-        ?C      MOVE    PC, load_bad    ; in the ROM
-                SUB[M]  R0, R1, @V_PEND
-        ?!C     MOVE    PC, load_bad    ; the variables, or past the RAM
+                CMP     R4, 8
+        ?!C     JMP     load_bad        ; no digit, or more than 8
+                CMP     R1, PROGRAM
+        ?C      JMP     load_bad        ; in the ROM
+                CMP     R1, @V_PEND
+        ?!C     JMP     load_bad        ; the variables, or past the RAM
                 MOVE    R6, R1
                 MOVE    R1, R3
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_gethex  ; R1 the word
+                CALL    _io_gethex      ; R1 the word
                 SUB     R4, R2, 1
-                SUB[M]  R0, R4, 8
-        ?!C     MOVE    PC, load_bad
+                CMP     R4, 8
+        ?!C     JMP     load_bad
 load_tail
-                SUB[M]  R0, @R3, 0x20
+                CMP     @R3, 0x20
         ?Z      ADD     R3, R3, 1
-        ?Z      MOVE    PC, load_tail
-                MOVE[M] R0, @R3
-        ?!Z     MOVE    PC, load_bad    ; more after the word
+        ?Z      JMP     load_tail
+                TST     @R3
+        ?!Z     JMP     load_bad        ; more after the word
                 MOVE    @R6, R1
                 ADD     R8, R8, 1
-                SUB[M]  R0, R6, R9
+                CMP     R6, R9
         ?C      MOVE    R9, R6          ; a lower address
-                SUB[M]  R0, R10, R6
+                CMP     R10, R6
         ?C      MOVE    R10, R6         ; a higher one
-                MOVE    PC, load_line
+                JMP     load_line
 load_bad
                 ADD     R12, R12, 1
-                SUB[M]  R0, R12, 1
+                CMP     R12, 1
         ?Z      MOVE    @V_LBAD, R11
-                MOVE    PC, load_line
+                JMP     load_line
 ; The end of the load: the row blank again, the outputs back, the words
 ; written, and the lines skipped
 load_done
-                ADD     @--SP, 2, PC
-                MOVE    PC, load_row
+                CALL    load_row
                 MOVE    @V_OUT, @V_LOUT
                 MOVE    R1, S_LOADED
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_puts
+                CALL    _io_puts
                 MOVE    R1, R8
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_putdec
-                MOVE[M] R0, R8
-        ?Z      MOVE    PC, load_skipped
+                CALL    _io_putdec
+                TST     R8
+        ?Z      JMP     load_skipped
                 MOVE    R1, S_LFROM
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_puts
+                CALL    _io_puts
                 MOVE    R1, R9
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_puthex
+                CALL    _io_puthex
                 MOVE    R1, S_LTO
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_puts
+                CALL    _io_puts
                 MOVE    R1, R10
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_puthex
+                CALL    _io_puthex
 load_skipped
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_crlf
-                MOVE[M] R0, R12
-        ?Z      MOVE    PC, main
+                CALL    _io_crlf
+                TST     R12
+        ?Z      JMP     main
                 MOVE    R1, S_SKIPPED
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_puts
+                CALL    _io_puts
                 MOVE    R1, R12
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_putdec
+                CALL    _io_putdec
                 MOVE    R1, S_FIRST
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_puts
+                CALL    _io_puts
                 MOVE    R1, @V_LBAD
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_putdec
+                CALL    _io_putdec
                 MOVE    R1, S_LFORM
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_puts
+                CALL    _io_puts
                 SUB     R1, @V_PEND, 1
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_puthex
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_crlf
-                MOVE    PC, main
+                CALL    _io_puthex
+                CALL    _io_crlf
+                JMP     main
 
 ; load_row: row R7 blank in the current color, and the cursor at its column
 ; 0. Uses R1-R3.
@@ -1097,10 +986,10 @@ load_row
 load_blank
                 MOVE    @R1++, R3
                 SUB[M]  R2, R2, 1
-        ?!Z     MOVE    PC, load_blank
+        ?!Z     JMP     load_blank
                 MOVE    @V_COL, 0
                 MOVE    @V_ROW, R7
-                MOVE    PC, putc_cur
+                JMP     putc_cur
 
 ; x: the demo, for the time being (issue #65, README.md). The ROM has its
 ; number of words at DEMO, and the words after it, which are copied to
@@ -1108,42 +997,40 @@ load_blank
 ; the ROM, is no demo. The copy and x go when the demo goes.
 cmd_demo
                 MOVE[M] R1, @DEMO       ; the words left
-        ?Z      MOVE    PC, no_demo
-                SUB[M]  R0, R1, DEMO_MAX
-        ?!C     MOVE    PC, no_demo
+        ?Z      JMP     no_demo
+                CMP     R1, DEMO_MAX
+        ?!C     JMP     no_demo
                 MOVE    R2, DEMO+1
                 MOVE    R3, PROGRAM
 demo_copy
                 MOVE    @R3++, @R2++
                 SUB[M]  R1, R1, 1
-        ?!Z     MOVE    PC, demo_copy
+        ?!Z     JMP     demo_copy
                 MOVE    R7, PROGRAM
-                MOVE    PC, run_at
+                JMP     run_at
 no_demo         MOVE    R1, S_NODEMO
-                ADD     @--SP, 2, PC
-                MOVE    PC, puts_crlf
-                MOVE    PC, main
+                CALL    puts_crlf
+                JMP     main
 
 ; r [ADDR]: the program at ADDR, 0x8000 without it, called as ABI.md
 ; says, on this stack: the return address is pushed, and the program
-; returns with MOVE PC, @SP++ and its status in R1. A word of 0 at ADDR is
-; no program: it is MOVE R0, R0, which no start-up code begins with. r 0
+; returns with RET and its status in R1. A word of 0 at ADDR is no
+; program: it is NOP, which no start-up code begins with. r 0
 ; is entry 0 of the dispatch table, the cold start. x enters at run_at,
 ; with R7 the address.
 cmd_run
                 MOVE    R1, R2
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_gethex  ; R1 the address, R2 its digits
+                CALL    _io_gethex      ; R1 the address, R2 its digits
                 MOVE    R7, R1
-                MOVE[M] R0, R2
+                TST     R2
         ?Z      MOVE    R7, PROGRAM     ; no address
-run_at          MOVE[M] R0, @R7
-        ?Z      MOVE    PC, no_prog
+run_at          TST     @R7
+        ?Z      JMP     no_prog
                 MOVE    R1, MON_PUTC    ; the entry of mon_putc (mon.nasm)
                 MOVE    R2, 0           ; argc
                 MOVE    R3, 0           ; argv
                 ADD     @--SP, 2, PC
-                MOVE    PC, R7
+                JMP     R7
 
 ; mon_exit: entry 1, and where a program returns to. Back to the main loop
 ; with R1 the status: E cleared, the timer stopped, VBASE 0, a fresh
@@ -1153,34 +1040,27 @@ mon_exit
                 MOVE    R14, 0          ; E = 0, VBASE = 0; bit 24 stays 1
                 MOVE    @TIMER, 0
                 MOVE    SP, STACK
-                MOVE    @--SP, R1
-                MOVE[M] R0, @V_COL
-        ?!Z     ADD     @--SP, 2, PC
-        ?!Z     MOVE    PC, _io_crlf
+                PUSH    R1
+                TST     @V_COL
+        ?!Z     CALL    _io_crlf
                 MOVE    R1, S_RETURN
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_puts
-                MOVE    R1, @SP++
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_puthex
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_crlf
-                MOVE    PC, main
+                CALL    _io_puts
+                POP     R1
+                CALL    _io_puthex
+                CALL    _io_crlf
+                JMP     main
 no_prog         MOVE    R1, S_NOPROG
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_puts
+                CALL    _io_puts
                 MOVE    R1, R7
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_puthex
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_crlf
-                MOVE    PC, main
+                CALL    _io_puthex
+                CALL    _io_crlf
+                JMP     main
 
 ; mon_version: entry 2. R1 = the version of the table, the major number in
 ; bits 31..16 and the minor in 15..0.
 mon_version
                 MOVE    R1, TABLE_VERSION
-                MOVE    PC, @SP++
+                RET
 
 ; mon_putc: entry 3. R1 a character, bits 7..0, to the outputs of V_OUT:
 ; the line as it is, and the screen as the header says. Uses R1-R4.
@@ -1189,13 +1069,13 @@ mon_putc
                 AND[M]  R0, @V_OUT, OUT_LINE
         ?!Z     MOVE    @CONSOLE, R1
                 AND[M]  R0, @V_OUT, OUT_SCREEN
-        ?Z      MOVE    PC, @SP++
-                SUB[M]  R0, R1, 0x20
-        ?C      MOVE    PC, putc_ctl    ; a control code
-                SUB[M]  R0, R1, 0x7F
-        ?C      MOVE    PC, putc_chr    ; 0x20 to 0x7E
-                SUB[M]  R0, R1, 0xA0
-        ?C      MOVE    PC, @SP++       ; 0x7F to 0x9F: nothing
+        ?Z      RET
+                CMP     R1, 0x20
+        ?C      JMP     putc_ctl        ; a control code
+                CMP     R1, 0x7F
+        ?C      JMP     putc_chr        ; 0x20 to 0x7E
+                CMP     R1, 0xA0
+        ?C      RET                     ; 0x7F to 0x9F: nothing
 ; The character at the cursor, SCREEN + 80 * row + column, and the cursor
 ; moved on
 putc_chr
@@ -1206,19 +1086,19 @@ putc_chr
                 ADD     R2, R2, @V_COL
                 OR      @SCREEN[R2], R1, @V_COLOR
                 ADD     R1, @V_COL, 1
-                SUB[M]  R0, R1, 80
+                CMP     R1, 80
         ?!Z     MOVE    @V_COL, R1
-        ?!Z     MOVE    PC, putc_cur
+        ?!Z     JMP     putc_cur
 ; Column 0 of the next row, with the rows moved up by one after the last
 putc_lf         MOVE    @V_COL, 0
                 ADD     R1, @V_ROW, 1
-                SUB[M]  R0, R1, 25
+                CMP     R1, 25
         ?!Z     MOVE    @V_ROW, R1
-        ?!Z     MOVE    PC, putc_cur
+        ?!Z     JMP     putc_cur
 ; Row 0 into the history, at slot V_HHEAD, which moves down the ring, when
 ; the memory has room for one
-                MOVE[M] R0, @V_HCAP
-        ?Z      MOVE    PC, putc_scroll
+                TST     @V_HCAP
+        ?Z      JMP     putc_scroll
                 ADD     R2, @V_HHEAD, 1
                 SHL     R3, R2, 6
                 SHL     R2, R2, 4
@@ -1230,12 +1110,12 @@ putc_lf         MOVE    @V_COL, 0
 putc_hist
                 MOVE    @R2++, @R3++
                 SUB[M]  R4, R4, 1
-        ?!Z     MOVE    PC, putc_hist
+        ?!Z     JMP     putc_hist
                 SUB[M]  R1, @V_HHEAD, 1
         ?C      SUB     R1, @V_HCAP, 1  ; from slot 0 to the last
                 MOVE    @V_HHEAD, R1
                 ADD     R1, @V_HCOUNT, 1
-                SUB[M]  R0, @V_HCAP, R1
+                CMP     @V_HCAP, R1
         ?!C     MOVE    @V_HCOUNT, R1
 putc_scroll
                 MOVE    R2, SCREEN
@@ -1243,44 +1123,44 @@ putc_scroll
                 MOVE    R4, 1920        ; rows 1 to 24 to rows 0 to 23
 putc_up         MOVE    @R2++, @R3++
                 SUB[M]  R4, R4, 1
-        ?!Z     MOVE    PC, putc_up
+        ?!Z     JMP     putc_up
                 OR      R3, @V_COLOR, 0x20
                 MOVE    R4, 80          ; row 24 blank
 putc_blk
                 MOVE    @R2++, R3
                 SUB[M]  R4, R4, 1
-        ?!Z     MOVE    PC, putc_blk
+        ?!Z     JMP     putc_blk
 ; The cursor's registers from the variables
 putc_cur
                 MOVE    @SCR_X, @V_COL
                 MOVE    @SCR_Y, @V_ROW
-                MOVE    PC, @SP++
+                RET
 putc_ctl
-                SUB[M]  R0, R1, 0x0D
+                CMP     R1, 0x0D
         ?Z      MOVE    @V_COL, 0
-        ?Z      MOVE    PC, putc_cur
-                SUB[M]  R0, R1, 0x0A
-        ?Z      MOVE    PC, putc_lf
-                SUB[M]  R0, R1, 0x08
-        ?Z      MOVE    PC, putc_bs
-                SUB[M]  R0, R1, 0x09
-        ?!Z     MOVE    PC, @SP++       ; another control code: nothing
+        ?Z      JMP     putc_cur
+                CMP     R1, 0x0A
+        ?Z      JMP     putc_lf
+                CMP     R1, 0x08
+        ?Z      JMP     putc_bs
+                CMP     R1, 0x09
+        ?!Z     RET                     ; another control code: nothing
                 OR      R1, @V_COL, 7   ; TAB: the next multiple of 8
                 ADD     R1, R1, 1
-                SUB[M]  R0, R1, 80
-        ?!C     MOVE    PC, putc_lf     ; past the last column
+                CMP     R1, 80
+        ?!C     JMP     putc_lf         ; past the last column
                 MOVE    @V_COL, R1
-                MOVE    PC, putc_cur
+                JMP     putc_cur
 putc_bs         MOVE[M] R1, @V_COL
         ?!Z     SUB     @V_COL, R1, 1
-                MOVE    PC, putc_cur
+                JMP     putc_cur
 
 ; mon_out: entry 4. R1 the outputs of mon_putc, bit 0 the line and bit 1
 ; the screen. R1 = the old ones. Uses R2.
 mon_out         MOVE    R2, @V_OUT
                 AND     @V_OUT, R1, OUT_LINE+OUT_SCREEN
                 MOVE    R1, R2
-                MOVE    PC, @SP++
+                RET
 
 ; scr_cls: entry 5. The screen blank in the current color, the cursor at
 ; the top left, shown and blinking, and the display offset 0. Uses R1 and
@@ -1292,27 +1172,27 @@ scr_cls         MOVE    @SCR_OFFS, 0
 cls_loop
                 DEC[M]  R1, R1
                 MOVE    @SCREEN[R1], R3
-        ?!Z     MOVE    PC, cls_loop
+        ?!Z     JMP     cls_loop
                 MOVE    @V_COL, 0
                 MOVE    @V_ROW, 0
-                MOVE    PC, putc_cur
+                JMP     putc_cur
 
 ; scr_moveto: entry 6. The cursor to column R1 and row R2. A column past
 ; 79 is 79, and a row past 24 is 24.
 scr_moveto
-                SUB[M]  R0, R1, 80
+                CMP     R1, 80
         ?!C     MOVE    R1, 79
-                SUB[M]  R0, R2, 25
+                CMP     R2, 25
         ?!C     MOVE    R2, 24
                 MOVE    @V_COL, R1
                 MOVE    @V_ROW, R2
-                MOVE    PC, putc_cur
+                JMP     putc_cur
 
 ; scr_getxy: entry 7. R1 = the cursor's column, R2 = its row.
 scr_getxy
                 MOVE    R1, @V_COL
                 MOVE    R2, @V_ROW
-                MOVE    PC, @SP++
+                RET
 
 ; scr_color: entry 8. R1 the color of the characters put from now on, bits
 ; 31..8 of a screen word. R1 = the old one. Uses R2.
@@ -1320,7 +1200,7 @@ scr_color
                 MOVE    R2, @V_COLOR
                 AND     @V_COLOR, R1, 0xFFFFFF00
                 MOVE    R1, R2
-                MOVE    PC, @SP++
+                RET
 
 ; getline: a line into the buffer at R1, of up to R2 characters, as
 ; _io_gets reads it, with the keys of the history before it: Page Up, ESC
@@ -1329,80 +1209,69 @@ scr_color
 ; The first key of the line goes on to _io_gets.first. _io_getc.soon uses
 ; only R1 and R2, so R3 keeps the first byte of a sequence's parameter.
 getline
-                MOVE    @--SP, R1
-                MOVE    @--SP, R2
+                PUSH    R1
+                PUSH    R2
 getline_key
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_getc
-                SUB[M]  R0, R1, 0x1B
-        ?!Z     MOVE    PC, getline_line
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_getc.soon
-        ?Z      MOVE    PC, getline_drop  ; an ESC alone
-                SUB[M]  R0, R1, 0x4F    ; O: one more byte
-        ?Z      MOVE    PC, getline_ss3
-                SUB[M]  R0, R1, 0x5B    ; [
-        ?!Z     MOVE    PC, getline_line  ; another byte, on its own
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_getc.soon
-        ?Z      MOVE    PC, getline_drop
+                CALL    _io_getc
+                CMP     R1, 0x1B
+        ?!Z     JMP     getline_line
+                CALL    _io_getc.soon
+        ?Z      JMP     getline_drop    ; an ESC alone
+                CMP     R1, 0x4F        ; O: one more byte
+        ?Z      JMP     getline_ss3
+                CMP     R1, 0x5B        ; [
+        ?!Z     JMP     getline_line    ; another byte, on its own
+                CALL    _io_getc.soon
+        ?Z      JMP     getline_drop
                 MOVE    R3, R1
-                SUB[M]  R0, R1, 0x40
-        ?!C     MOVE    PC, getline_drop  ; the final byte, such as A
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_getc.soon
-        ?Z      MOVE    PC, getline_drop
-                SUB[M]  R0, R1, 0x7E    ; ~
-        ?!Z     MOVE    PC, getline_csi
-                SUB[M]  R0, R3, 0x35    ; 5
-        ?Z      MOVE    PC, getline_up
-                SUB[M]  R0, R3, 0x36    ; 6
-        ?Z      MOVE    PC, getline_down
-                MOVE    PC, getline_drop
+                CMP     R1, 0x40
+        ?!C     JMP     getline_drop    ; the final byte, such as A
+                CALL    _io_getc.soon
+        ?Z      JMP     getline_drop
+                CMP     R1, 0x7E        ; ~
+        ?!Z     JMP     getline_csi
+                CMP     R3, 0x35        ; 5
+        ?Z      JMP     getline_up
+                CMP     R3, 0x36        ; 6
+        ?Z      JMP     getline_down
+                JMP     getline_drop
 getline_csi
-                SUB[M]  R0, R1, 0x40
-        ?!C     MOVE    PC, getline_drop  ; the final byte
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_getc.soon
-        ?Z      MOVE    PC, getline_drop
-                MOVE    PC, getline_csi
+                CMP     R1, 0x40
+        ?!C     JMP     getline_drop    ; the final byte
+                CALL    _io_getc.soon
+        ?Z      JMP     getline_drop
+                JMP     getline_csi
 getline_ss3
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_getc.soon
+                CALL    _io_getc.soon
 getline_drop
-                ADD     @--SP, 2, PC
-                MOVE    PC, hist_leave
-                MOVE    PC, getline_key
+                CALL    hist_leave
+                JMP     getline_key
 getline_up
-                ADD     @--SP, 2, PC
-                MOVE    PC, hist_up
-                MOVE    PC, getline_key
+                CALL    hist_up
+                JMP     getline_key
 getline_down
-                ADD     @--SP, 2, PC
-                MOVE    PC, hist_down
-                MOVE    PC, getline_key
+                CALL    hist_down
+                JMP     getline_key
 getline_line
                 MOVE    R3, R1
-                ADD     @--SP, 2, PC
-                MOVE    PC, hist_leave
-                MOVE    R2, @SP++
-                MOVE    R1, @SP++
-                MOVE    PC, _io_gets.first  ; which returns to the caller
+                CALL    hist_leave
+                POP     R2
+                POP     R1
+                JMP     _io_gets.first  ; which returns to the caller
 
 ; hist_up: PAGE rows further back, up to the rows kept. The first turns
 ; the ring and keeps SCR_CTL. Uses R1-R6.
 hist_up
-                MOVE[M] R0, @V_HCOUNT
-        ?Z      MOVE    PC, @SP++       ; no history
+                TST     @V_HCOUNT
+        ?Z      RET                     ; no history
                 MOVE[M] R1, @V_BACK
-        ?!Z     MOVE    PC, hist_more
+        ?!Z     JMP     hist_more
                 MOVE    @V_CTL, @SCR_CTL
-                ADD     @--SP, 2, PC
-                MOVE    PC, hist_turn
+                CALL    hist_turn
                 MOVE    R1, 0
 hist_more
                 ADD     R1, R1, PAGE
-                SUB[M]  R0, @V_HCOUNT, R1
+                CMP     @V_HCOUNT, R1
         ?C      MOVE    R1, @V_HCOUNT
 ; R1 rows back: the offset V_HSIZE - 80 R1 on, and the cursor off
 hist_show
@@ -1412,27 +1281,27 @@ hist_show
                 ADD     R1, R1, R2
                 SUB     @SCR_OFFS, @V_HSIZE, R1
                 MOVE    @SCR_CTL, 0x400
-                MOVE    PC, @SP++
+                RET
 
 ; hist_down: PAGE rows forward, and the screen again at the end. Uses R1
 ; and R2.
 hist_down
                 MOVE[M] R1, @V_BACK
-        ?Z      MOVE    PC, @SP++
+        ?Z      RET
                 SUB[M]  R1, R1, PAGE
-        ?C      MOVE    PC, hist_leave
-        ?Z      MOVE    PC, hist_leave
-                MOVE    PC, hist_show
+        ?C      JMP     hist_leave
+        ?Z      JMP     hist_leave
+                JMP     hist_show
 
 ; hist_leave: the screen again, if the history is shown, with its SCR_CTL.
 ; Uses no register.
 hist_leave
-                MOVE[M] R0, @V_BACK
-        ?Z      MOVE    PC, @SP++
+                TST     @V_BACK
+        ?Z      RET
                 MOVE    @V_BACK, 0
                 MOVE    @SCR_CTL, @V_CTL
                 MOVE    @SCR_OFFS, 0
-                MOVE    PC, @SP++
+                RET
 
 ; hist_turn: the ring turned so that its newest row, at slot V_HHEAD + 1,
 ; is at slot 0, at the top of the memory, and the next goes to the last
@@ -1442,13 +1311,13 @@ hist_leave
 ; rest. R4 is B, R5 is D, and R6 the words of the ring. Uses R1-R6.
 hist_turn
                 ADD     R1, @V_HHEAD, 1
-                SUB[M]  R0, R1, @V_HCAP
+                CMP     R1, @V_HCAP
         ?Z      MOVE    R1, 0
                 SUB     @V_HHEAD, @V_HCAP, 1
                 SHL     R2, R1, 6
                 SHL     R5, R1, 4
                 ADD[M]  R5, R5, R2
-        ?Z      MOVE    PC, @SP++       ; turned already
+        ?Z      RET                     ; turned already
                 MOVE    R6, @V_HCAP
                 SHL     R2, R6, 6
                 SHL     R6, R6, 4
@@ -1457,12 +1326,10 @@ hist_turn
                 SUB     R4, R4, R6
                 MOVE    R1, R4
                 ADD     R2, R4, R6
-                ADD     @--SP, 2, PC
-                MOVE    PC, hist_rev
+                CALL    hist_rev
                 MOVE    R1, R4
                 ADD     R2, R4, R5
-                ADD     @--SP, 2, PC
-                MOVE    PC, hist_rev
+                CALL    hist_rev
                 ADD     R1, R4, R5
                 ADD     R2, R4, R6
 ; hist_rev: the words from R1 up to R2, which is after the last, in the
@@ -1470,31 +1337,29 @@ hist_turn
 hist_rev
                 SUB     R2, R2, 1       ; the last word
 hist_rev_loop
-                SUB[M]  R0, R1, R2
-        ?!C     MOVE    PC, @SP++       ; the two have met
+                CMP     R1, R2
+        ?!C     RET                     ; the two have met
                 MOVE    R3, @R1
                 MOVE    @R1++, @R2
                 MOVE    @R2, R3
                 SUB     R2, R2, 1
-                MOVE    PC, hist_rev_loop
+                JMP     hist_rev_loop
 
 ; puts_crlf: the string at R1, and CR LF
 puts_crlf
-                ADD     @--SP, 2, PC
-                MOVE    PC, _io_puts
-                MOVE    PC, _io_crlf    ; which returns to the caller
+                CALL    _io_puts
+                JMP     _io_crlf        ; which returns to the caller
 
 ; puts_lines: the strings of the table at R1, each with CR LF after it, up
 ; to a 0 word. Uses R7 across the calls, saved.
 puts_lines
-                MOVE    @--SP, R7
+                PUSH    R7
                 MOVE    R7, R1
 lines           MOVE[M] R1, @R7++
-        ?Z      MOVE    R7, @SP++
-        ?Z      MOVE    PC, @SP++
-                ADD     @--SP, 2, PC
-                MOVE    PC, puts_crlf
-                MOVE    PC, lines
+        ?Z      POP     R7
+        ?Z      RET
+                CALL    puts_crlf
+                JMP     lines
 
 ; The commands: the letter, and the routine, which main jumps to. A 0 ends
 ; the table.

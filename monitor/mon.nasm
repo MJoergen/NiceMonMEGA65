@@ -18,27 +18,26 @@ SCR_GETXY       .EQU    0x0E
 SCR_COLOR       .EQU    0x10
 
 _mon_reset
-                MOVE    R15, MON_RESET
+                JMP     MON_RESET
 _mon_exit
-                MOVE    R15, MON_EXIT
+                JMP     MON_EXIT
 _mon_version
-                MOVE    R15, MON_VERSION
+                JMP     MON_VERSION
 _mon_putc
-                MOVE    R15, MON_PUTC
+                JMP     MON_PUTC
 _mon_out
-                MOVE    R15, MON_OUT
+                JMP     MON_OUT
 _scr_cls
-                MOVE    R15, SCR_CLS
+                JMP     SCR_CLS
 _scr_moveto
-                MOVE    R15, SCR_MOVETO
+                JMP     SCR_MOVETO
 _scr_getxy
-                MOVE    R15, SCR_GETXY
+                JMP     SCR_GETXY
 _scr_color
-                MOVE    R15, SCR_COLOR
+                JMP     SCR_COLOR
 _scr_getx
-                MOVE    R15, SCR_GETXY
+                JMP     SCR_GETXY
 _scr_gety
-                ADD     @--R13, 2, R15
-                MOVE    R15, SCR_GETXY
+                CALL    SCR_GETXY
                 MOVE    R1, R2
-                MOVE    R15, @R13++
+                RET

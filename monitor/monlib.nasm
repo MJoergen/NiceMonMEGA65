@@ -19,65 +19,62 @@ io.t_esc        .EQU    10000           ; the longest wait for the byte after an
 ; _io_puts: the string at R1, one character per word up to a 0 word, through
 ; mon_putc. Uses R1, and R7 across the calls, saved.
 _io_puts
-                MOVE    @--R13, R7
+                PUSH    R7
                 MOVE    R7, R1
 _io_puts.loop
                 MOVE[M] R1, @R7++
-        ?Z      MOVE    R7, @R13++
-        ?Z      MOVE    R15, @R13++
-                ADD     @--R13, 2, R15
-                MOVE    R15, _mon_putc
-                MOVE    R15, _io_puts.loop
+        ?Z      POP     R7
+        ?Z      RET
+                CALL    _mon_putc
+                JMP     _io_puts.loop
 
 ; _io_crlf: CR LF, which ends a line on the screen and on the line
 _io_crlf
                 MOVE    R1, _io_crlf.s
-                MOVE    R15, _io_puts
+                JMP     _io_puts
 _io_crlf.s
                 .DAT    13, 10, 0
 
 ; _io_puthex: R1 in hex, 8 digits. Uses R1, and R7 and R8 across the calls,
 ; saved.
 _io_puthex
-                MOVE    @--R13, R7
-                MOVE    @--R13, R8
+                PUSH    R7
+                PUSH    R8
                 MOVE    R7, R1
                 MOVE    R8, 8
 _io_puthex.loop
                 ROL     R7, R7, 4       ; the top digit to the bottom
                 AND     R1, R7, 0xF
                 ADD     R1, R1, 0x30
-                SUB[M]  R0, R1, 0x3A
+                CMP     R1, 0x3A
         ?!C     ADD     R1, R1, 7       ; A to F
-                ADD     @--R13, 2, R15
-                MOVE    R15, _mon_putc
+                CALL    _mon_putc
                 SUB[M]  R8, R8, 1
-        ?!Z     MOVE    R15, _io_puthex.loop
-                MOVE    R8, @R13++
-                MOVE    R7, @R13++
-                MOVE    R15, @R13++
+        ?!Z     JMP     _io_puthex.loop
+                POP     R8
+                POP     R7
+                RET
 
 ; _io_putdec: R1 in decimal, unsigned, without leading zeros, with the math
 ; unit (nice_cpu's SYSTEM.md §2). The digits are pushed last first. Uses
 ; R1, and R7 across the calls, saved.
 _io_putdec
-                MOVE    @--R13, R7
+                PUSH    R7
                 MOVE    R7, 0           ; the digits pushed
                 MOVE    @io.mpu_b, 10
 _io_putdec.div
                 MOVE    @io.mpu_a, R1
-                MOVE    @--R13, @io.mpu_udivr
+                PUSH    @io.mpu_udivr
                 ADD     R7, R7, 1
                 MOVE[M] R1, @io.mpu_udivq
-        ?!Z     MOVE    R15, _io_putdec.div
+        ?!Z     JMP     _io_putdec.div
 _io_putdec.put
                 ADD     R1, @R13++, 0x30
-                ADD     @--R13, 2, R15
-                MOVE    R15, _mon_putc
+                CALL    _mon_putc
                 SUB[M]  R7, R7, 1
-        ?!Z     MOVE    R15, _io_putdec.put
-                MOVE    R7, @R13++
-                MOVE    R15, @R13++
+        ?!Z     JMP     _io_putdec.put
+                POP     R7
+                RET
 
 ; _io_gethex: a hex number in the string at R1, after any blanks, in either
 ; case. R1 = its value, R2 = the number of its digits, 0 if there is none,
@@ -88,25 +85,25 @@ _io_gethex
                 MOVE    R1, 0
                 MOVE    R2, 0
 _io_gethex.skip
-                SUB[M]  R0, @R3, 0x20
+                CMP     @R3, 0x20
         ?Z      ADD     R3, R3, 1
-        ?Z      MOVE    R15, _io_gethex.skip
+        ?Z      JMP     _io_gethex.skip
 _io_gethex.loop
                 MOVE    R4, @R3
                 SUB     R5, R4, 0x30
-                SUB[M]  R0, R5, 10
-        ?C      MOVE    R15, _io_gethex.digit  ; 0 to 9
+                CMP     R5, 10
+        ?C      JMP     _io_gethex.digit  ; 0 to 9
                 OR      R4, R4, 0x20    ; A to F as a to f
                 SUB     R5, R4, 0x61
-                SUB[M]  R0, R5, 6
-        ?!C     MOVE    R15, @R13++     ; no digit: the end
+                CMP     R5, 6
+        ?!C     RET                     ; no digit: the end
                 ADD     R5, R5, 10
 _io_gethex.digit
                 SHL     R1, R1, 4
                 OR      R1, R1, R5
                 ADD     R2, R2, 1
                 ADD     R3, R3, 1
-                MOVE    R15, _io_gethex.loop
+                JMP     _io_gethex.loop
 
 ; _io_getc: R1 = the next byte of the console, which it waits for. A read
 ; of 0x200, the end of the line's input, is no byte: on a board the
@@ -115,9 +112,9 @@ _io_gethex.digit
 _io_getc
                 MOVE    R1, @io.console
                 AND[M]  R0, R1, 0x100
-        ?Z      MOVE    R15, _io_getc
+        ?Z      JMP     _io_getc
                 AND     R1, R1, 0xFF
-                MOVE    R15, @R13++
+                RET
 
 ; _io_getc.soon: the next byte of the console if one comes within io.t_esc
 ; microseconds: R1 = the byte, and Z is clear; or R1 = 0, and Z is set.
@@ -129,11 +126,11 @@ _io_getc.poll
                 AND[M]  R0, R1, 0x100
         ?!Z     AND     R1, R1, 0xFF
         ?!Z     OR[M]   R0, R1, 0x100   ; Z clear, also for a byte of 0
-        ?!Z     MOVE    R15, @R13++
-                SUB[M]  R0, @io.us, R2
-        ?N      MOVE    R15, _io_getc.poll
+        ?!Z     RET
+                CMP     @io.us, R2
+        ?N      JMP     _io_getc.poll
                 MOVE[M] R1, 0
-                MOVE    R15, @R13++
+                RET
 
 ; _io_gets: a line into the buffer at R1, up to R2 characters, one per
 ; word, and a 0 word after them, so the buffer has R2 + 1 words. R1 = the
@@ -147,82 +144,75 @@ _io_getc.poll
 _io_gets
                 MOVE    R3, 0x100       ; no byte read
 _io_gets.first
-                MOVE    @--R13, R7
-                MOVE    @--R13, R8
-                MOVE    @--R13, R9
+                PUSH    R7
+                PUSH    R8
+                PUSH    R9
                 MOVE    R7, R1          ; the first word
                 ADD     R8, R1, R2      ; the word after the last
                 MOVE    R9, R1          ; the next free word
                 MOVE    R1, R3
                 AND[M]  R0, R3, 0x100
-        ?Z      MOVE    R15, _io_gets.have
+        ?Z      JMP     _io_gets.have
 _io_gets.next
-                ADD     @--R13, 2, R15
-                MOVE    R15, _io_getc
+                CALL    _io_getc
 _io_gets.have
-                SUB[M]  R0, R1, 0x0D
-        ?Z      MOVE    R15, _io_gets.end
-                SUB[M]  R0, R1, 0x7F
-        ?Z      MOVE    R15, _io_gets.del
-                SUB[M]  R0, R1, 0x08
-        ?Z      MOVE    R15, _io_gets.del
-                SUB[M]  R0, R1, 0x03
-        ?Z      MOVE    R15, _io_gets.cancel
-                SUB[M]  R0, R1, 0x1B
-        ?Z      MOVE    R15, _io_gets.esc
-                SUB[M]  R0, R1, 0x20
-        ?C      MOVE    R15, _io_gets.next  ; another control code
-                SUB[M]  R0, R1, 0xA0
-        ?!C     MOVE    R15, _io_gets.put  ; 0xA0 and above
-                SUB[M]  R0, R1, 0x80
-        ?!C     MOVE    R15, _io_gets.next  ; 0x80 to 0x9F
+                CMP     R1, 0x0D
+        ?Z      JMP     _io_gets.end
+                CMP     R1, 0x7F
+        ?Z      JMP     _io_gets.del
+                CMP     R1, 0x08
+        ?Z      JMP     _io_gets.del
+                CMP     R1, 0x03
+        ?Z      JMP     _io_gets.cancel
+                CMP     R1, 0x1B
+        ?Z      JMP     _io_gets.esc
+                CMP     R1, 0x20
+        ?C      JMP     _io_gets.next   ; another control code
+                CMP     R1, 0xA0
+        ?!C     JMP     _io_gets.put    ; 0xA0 and above
+                CMP     R1, 0x80
+        ?!C     JMP     _io_gets.next   ; 0x80 to 0x9F
 _io_gets.put
-                SUB[M]  R0, R9, R8
-        ?Z      MOVE    R15, _io_gets.next  ; the line is full
+                CMP     R9, R8
+        ?Z      JMP     _io_gets.next   ; the line is full
                 MOVE    @R9++, R1
-                ADD     @--R13, 2, R15
-                MOVE    R15, _mon_putc
-                MOVE    R15, _io_gets.next
+                CALL    _mon_putc
+                JMP     _io_gets.next
 _io_gets.del
-                SUB[M]  R0, R9, R7
-        ?Z      MOVE    R15, _io_gets.next  ; nothing before the cursor
+                CMP     R9, R7
+        ?Z      JMP     _io_gets.next   ; nothing before the cursor
                 SUB     R9, R9, 1
                 MOVE    R1, _io_gets.rub
-                ADD     @--R13, 2, R15
-                MOVE    R15, _io_puts
-                MOVE    R15, _io_gets.next
+                CALL    _io_puts
+                JMP     _io_gets.next
 _io_gets.cancel
                 MOVE    R9, R7
                 MOVE    R1, _io_gets.cc
-                ADD     @--R13, 2, R15
-                MOVE    R15, _io_puts
+                CALL    _io_puts
 _io_gets.end
                 MOVE    @R9, 0
-                ADD     @--R13, 2, R15
-                MOVE    R15, _io_crlf
+                CALL    _io_crlf
                 SUB     R1, R9, R7
-                MOVE    R9, @R13++
-                MOVE    R8, @R13++
-                MOVE    R7, @R13++
-                MOVE    R15, @R13++
+                POP     R9
+                POP     R8
+                POP     R7
+                RET
 ; An ESC: with a [ or an O within io.t_esc, a sequence, whose bytes up to
 ; its final one, 0x40 to 0x7E, are dropped; with another byte in time,
 ; that byte stands on its own; with none, nothing.
 _io_gets.esc
-                ADD     @--R13, 2, R15
-                MOVE    R15, _io_getc.soon
-        ?Z      MOVE    R15, _io_gets.next
-                SUB[M]  R0, R1, 0x5B    ; [
-        ?Z      MOVE    R15, _io_gets.csi
-                SUB[M]  R0, R1, 0x4F    ; O
-        ?!Z     MOVE    R15, _io_gets.have
+                CALL    _io_getc.soon
+        ?Z      JMP     _io_gets.next
+                CMP     R1, 0x5B        ; [
+        ?Z      JMP     _io_gets.csi
+                CMP     R1, 0x4F        ; O
+        ?!Z     JMP     _io_gets.have
 _io_gets.csi
-                ADD     @--R13, 2, R15
-                MOVE    R15, _io_getc.soon
-        ?Z      MOVE    R15, _io_gets.next
-                SUB[M]  R0, R1, 0x40
-        ?C      MOVE    R15, _io_gets.csi  ; a parameter byte
-                MOVE    R15, _io_gets.next  ; the final byte
+                CALL    _io_getc.soon
+        ?Z      JMP     _io_gets.next
+                CMP     R1, 0x40
+        ?C      JMP     _io_gets.csi    ; a parameter byte
+                JMP     _io_gets.next   ; the final byte
 _io_gets.rub
                 .DAT    8, 0x20, 8, 0   ; BS, a blank, BS
 _io_gets.cc

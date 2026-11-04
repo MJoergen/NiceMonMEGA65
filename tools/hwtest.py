@@ -1129,7 +1129,7 @@ def test_monitor(link_args: list[str], tmp: str, in_rom: bool = False,
             f.write("; Returns the status 0x2A to the monitor\n"
                     "                .ORG    0x8000\n"
                     "                MOVE    R1, 0x2A\n"
-                    "                MOVE    R15, @R13++\n")
+                    "                RET\n")
         paste = assemble(ret, tmp)
     with open(paste, "rb") as f:
         lines = f.read()

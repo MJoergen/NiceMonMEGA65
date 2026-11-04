@@ -15,7 +15,7 @@ SR              .EQU    R14
                 INT     3               ; PC = mem[0x103] = V3; RTI returns here
                 MOVE    R4, 2
 LOOP            SUB[M]  R4, R4, 1
-        ?!Z     MOVE    PC, LOOP
+        ?!Z     JMP     LOOP
                 MOVE    @R13++, R4
                 HALT
 V3              MOVE    R5, 0x1234

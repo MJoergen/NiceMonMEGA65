@@ -170,13 +170,13 @@ with [#62](https://github.com/MJoergen/NiceMonMEGA65/issues/62).
 
 ## The dispatch table
 
-Each entry is one `MOVE PC, routine`, two words, so entry n is at address
+Each entry is one `JMP routine`, two words, so entry n is at address
 2n, and entry 0 is the reset. A program calls entry n as it calls any
-routine, `ADD @--SP, 2, PC` then `MOVE PC, 2n`, through the names that
-`mon.nasm` gives: an `.EQU` for each entry, such as `MON_PUTC`, and a
-stub for each, such as `_mon_putc  MOVE R15, MON_PUTC`. Entries are only
-ever added at the end, never moved or removed, so a program built for one
-monitor runs on every later one.
+routine, `CALL 2n`, through the names that `mon.nasm` gives: an `.EQU`
+for each entry, such as `MON_PUTC`, and a stub for each, such as
+`_mon_putc  JMP MON_PUTC`. Entries are only ever added at the end, never
+moved or removed, so a program built for one monitor runs on every later
+one.
 
 An entry is added only when a program cannot do without it: it reaches
 hardware that the monitor owns or that differs between boards, or state

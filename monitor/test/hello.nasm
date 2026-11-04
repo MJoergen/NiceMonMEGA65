@@ -7,44 +7,30 @@
 ; only. It returns 42. The test runs it with the input test/run.txt.
 
 _main           MOVE    R1, hello.text
-                ADD     @--R13, 2, R15
-                MOVE    R15, _nice_print
-                ADD     @--R13, 2, R15
-                MOVE    R15, _mon_version
-                ADD     @--R13, 2, R15
-                MOVE    R15, _io_puthex
-                ADD     @--R13, 2, R15
-                MOVE    R15, _io_crlf
-                ADD     @--R13, 2, R15
-                MOVE    R15, _scr_getxy  ; R1 the column, R2 the row
+                CALL    _nice_print
+                CALL    _mon_version
+                CALL    _io_puthex
+                CALL    _io_crlf
+                CALL    _scr_getxy      ; R1 the column, R2 the row
                 MOVE    R1, 40
-                ADD     @--R13, 2, R15
-                MOVE    R15, _scr_moveto
+                CALL    _scr_moveto
                 MOVE    R1, 0x000FF000  ; yellow on black
-                ADD     @--R13, 2, R15
-                MOVE    R15, _scr_color
-                MOVE    @--R13, R1      ; the old color
+                CALL    _scr_color
+                PUSH    R1              ; the old color
                 MOVE    R1, hello.right
-                ADD     @--R13, 2, R15
-                MOVE    R15, _io_puts
-                MOVE    R1, @R13++
-                ADD     @--R13, 2, R15
-                MOVE    R15, _scr_color
-                ADD     @--R13, 2, R15
-                MOVE    R15, _io_crlf
+                CALL    _io_puts
+                POP     R1
+                CALL    _scr_color
+                CALL    _io_crlf
                 MOVE    R1, 1           ; the line only
-                ADD     @--R13, 2, R15
-                MOVE    R15, _mon_out
+                CALL    _mon_out
                 MOVE    R1, hello.line
-                ADD     @--R13, 2, R15
-                MOVE    R15, _io_puts
-                ADD     @--R13, 2, R15
-                MOVE    R15, _io_crlf
+                CALL    _io_puts
+                CALL    _io_crlf
                 MOVE    R1, 3           ; both again
-                ADD     @--R13, 2, R15
-                MOVE    R15, _mon_out
+                CALL    _mon_out
                 MOVE    R1, 42
-                MOVE    R15, @R13++
+                RET
 hello.text
                 .ASCII_L 'Hello from 00008000, table '
 hello.right

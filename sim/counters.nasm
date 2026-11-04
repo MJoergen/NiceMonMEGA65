@@ -26,7 +26,7 @@ RESULT          .EQU    0x100
                 MOVE    R3, 32
 SUM             ADD     R1, R1, @R2++
                 SUB[M]  R3, R3, 1
-        ?!Z     MOVE    R15, SUM
+        ?!Z     JMP     SUM
                 MOVE    @0x102, R1      ; the sum of FS_HIST
                 MOVE    @0x103, @FS_CTRL  ; 0, stopped
                 MOVE    @0x104, @CYCLE_LO

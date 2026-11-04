@@ -59,7 +59,6 @@
 ; defines VERSION, the version string of the title bar (demo/Makefile).
 
 SP      .EQU    R13
-PC      .EQU    R15
 
 CONSOLE .EQU    0xFFFFFF00      ; a read: bit 8 and the byte, or bit 9 at the end
 SCREEN  .EQU    0xFFFF0000      ; 80 x 25 words, the character in bits 7..0
@@ -197,7 +196,7 @@ T_ESC   .EQU    10000
 ; is called on is that of every demo, and the typewriter starts
         .ORG    0x8000
         MOVE    @D_SP, SP
-        MOVE    PC, TYPEW
+        JMP     TYPEW
 
 ; The entry of the timer's interrupt in the vector table, at VBASE * 256 +
 ; VECTOR
@@ -207,119 +206,111 @@ T_ESC   .EQU    10000
 ; The typewriter: the welcome, and the rows below it
 TYPEW   MOVE    SP, @D_SP
         MOVE    R6, TYPEW
-        ADD     @--SP, 2, PC
-        MOVE    PC, FRAME
+        CALL    FRAME
         MOVE    R2, SCREEN+720
         MOVE    R3, BAR+0x20
         MOVE    R4, 80
-        ADD     @--SP, 2, PC
-        MOVE    PC, FILL
+        CALL    FILL
         MOVE    R5, WELCOME
-        ADD     @--SP, 2, PC
-        MOVE    PC, PRINTS
+        CALL    PRINTS
         MOVE    COL, 0
         MOVE    ROW, TOP
         MOVE    CR, 0
         MOVE    @SCR_CTL, 0x60  ; a blinking cursor, and no display offset
 KEY     MOVE    @SCR_X, COL     ; the cursor where the next character goes
         MOVE    @SCR_Y, ROW
-WAIT    ADD     @--SP, 2, PC
-        MOVE    PC, POLL
-        MOVE[M] R0, R1
-    ?Z  MOVE    PC, WAIT
+WAIT    CALL    POLL
+        TST     R1
+    ?Z  JMP     WAIT
         MOVE    R7, CR          ; whether this key follows a CR
         MOVE    CR, 0
-        SUB[M]  R0, R1, 0x100
-    ?!C MOVE    PC, CURSOR      ; a cursor key
-        SUB[M]  R0, R1, 0x20
-    ?C  MOVE    PC, CONTROL     ; below 0x20
-        SUB[M]  R0, R1, 0x7F
-    ?C  MOVE    PC, PUT         ; printable ASCII
-    ?Z  MOVE    PC, BACK        ; DEL
-        SUB[M]  R0, R1, 0xA0
-    ?C  MOVE    PC, KEY         ; 0x80 to 0x9F have no character
+        CMP     R1, 0x100
+    ?!C JMP     CURSOR          ; a cursor key
+        CMP     R1, 0x20
+    ?C  JMP     CONTROL         ; below 0x20
+        CMP     R1, 0x7F
+    ?C  JMP     PUT             ; printable ASCII
+    ?Z  JMP     BACK            ; DEL
+        CMP     R1, 0xA0
+    ?C  JMP     KEY             ; 0x80 to 0x9F have no character
                                 ; 0xA0 and above fall through to PUT
 
 ; A character at the cursor, which moves on, to the next line after the last
 ; column
-PUT     ADD     @--SP, 2, PC
-        MOVE    PC, CELL
+PUT     CALL    CELL
         OR      @R2, R1, TYPED
         ADD     COL, COL, 1
-        SUB[M]  R0, COL, 80
-    ?Z  MOVE    PC, NEWLINE
-        MOVE    PC, KEY
+        CMP     COL, 80
+    ?Z  JMP     NEWLINE
+        JMP     KEY
 
-CONTROL SUB[M]  R0, R1, 0x0D
+CONTROL CMP     R1, 0x0D
     ?Z  MOVE    CR, 1
-    ?Z  MOVE    PC, NEWLINE
-        SUB[M]  R0, R1, 0x0A    ; LF, but only if the byte before was no CR:
-    ?Z  MOVE[M] R0, R7          ; Z after 0x0A stays only if R7, the CR, is 0
-    ?Z  MOVE    PC, NEWLINE
-        SUB[M]  R0, R1, 0x08    ; backspace
-    ?Z  MOVE    PC, BACK
-        SUB[M]  R0, R1, 0x09
-    ?Z  MOVE    PC, TAB
-        SUB[M]  R0, R1, 0x0C    ; CTRL-L
-    ?Z  MOVE    PC, CLEAR
-        MOVE    PC, KEY         ; a code that does nothing
+    ?Z  JMP     NEWLINE
+        CMP     R1, 0x0A        ; LF, but only if the byte before was no CR:
+    ?Z  TST     R7              ; Z after 0x0A stays only if R7, the CR, is 0
+    ?Z  JMP     NEWLINE
+        CMP     R1, 0x08        ; backspace
+    ?Z  JMP     BACK
+        CMP     R1, 0x09
+    ?Z  JMP     TAB
+        CMP     R1, 0x0C        ; CTRL-L
+    ?Z  JMP     CLEAR
+        JMP     KEY             ; a code that does nothing
 
 ; The cursor keys move the cursor within the typewriter's rows
-CURSOR  SUB[M]  R0, R1, KEY_UP
-    ?Z  MOVE    PC, UP
-        SUB[M]  R0, R1, KEY_DN
-    ?Z  MOVE    PC, DOWN
-        SUB[M]  R0, R1, KEY_RT
-    ?Z  MOVE    PC, RIGHT
-        MOVE[M] R0, COL         ; left
+CURSOR  CMP     R1, KEY_UP
+    ?Z  JMP     UP
+        CMP     R1, KEY_DN
+    ?Z  JMP     DOWN
+        CMP     R1, KEY_RT
+    ?Z  JMP     RIGHT
+        TST     COL             ; left
     ?!Z SUB     COL, COL, 1
-        MOVE    PC, KEY
-UP      SUB[M]  R0, ROW, TOP
+        JMP     KEY
+UP      CMP     ROW, TOP
     ?!Z SUB     ROW, ROW, 1
-        MOVE    PC, KEY
-DOWN    SUB[M]  R0, ROW, LAST
+        JMP     KEY
+DOWN    CMP     ROW, LAST
     ?!Z ADD     ROW, ROW, 1
-        MOVE    PC, KEY
-RIGHT   SUB[M]  R0, COL, 79
+        JMP     KEY
+RIGHT   CMP     COL, 79
     ?!Z ADD     COL, COL, 1
-        MOVE    PC, KEY
+        JMP     KEY
 
 ; The first column of the next row, and a scroll after the last
 NEWLINE MOVE    COL, 0
-        SUB[M]  R0, ROW, LAST
+        CMP     ROW, LAST
     ?!Z ADD     ROW, ROW, 1
-    ?!Z MOVE    PC, KEY
+    ?!Z JMP     KEY
         MOVE    R2, SCR_TOP
         MOVE    R4, 1120        ; the rows TOP+1 to LAST, 14 of 80 words
-        ADD     @--SP, 2, PC
-        MOVE    PC, SCROLL
-        MOVE    PC, KEY
+        CALL    SCROLL
+        JMP     KEY
 
 ; The character before the cursor deleted, in the cursor's row
-BACK    MOVE[M] R0, COL
-    ?Z  MOVE    PC, KEY
+BACK    TST     COL
+    ?Z  JMP     KEY
         SUB     COL, COL, 1
-        ADD     @--SP, 2, PC
-        MOVE    PC, CELL
+        CALL    CELL
         MOVE    @R2, TYPED+0x20
-        MOVE    PC, KEY
+        JMP     KEY
 
 ; The next column that is a multiple of 8, or the next line after the last
 TAB     OR      COL, COL, 7
         ADD     COL, COL, 1
-        SUB[M]  R0, COL, 80
-    ?!C MOVE    PC, NEWLINE
-        MOVE    PC, KEY
+        CMP     COL, 80
+    ?!C JMP     NEWLINE
+        JMP     KEY
 
 ; The typewriter's rows cleared, and the cursor at the top
 CLEAR   MOVE    R2, SCR_TOP
         MOVE    R3, TYPED+0x20
         MOVE    R4, 1200        ; the rows TOP to LAST, 15 of 80 words
-        ADD     @--SP, 2, PC
-        MOVE    PC, FILL
+        CALL    FILL
         MOVE    COL, 0
         MOVE    ROW, TOP
-        MOVE    PC, KEY
+        JMP     KEY
 
 ; CELL sets R2 to the address of the cursor's word, SCREEN + 80 * ROW + COL.
 ; It changes R3.
@@ -328,21 +319,21 @@ CELL    SHL     R2, ROW, 4
         ADD     R2, R2, R3
         ADD     R2, R2, COL
         ADD     R2, R2, SCREEN
-        MOVE    PC, @SP++
+        RET
 
 ; FILL writes R3 to the R4 words from R2, and leaves R2 after them. R4 is
 ; at least 1. It changes R4.
 FILL    MOVE    @R2++, R3
         SUB[M]  R4, R4, 1
-    ?!Z MOVE    PC, FILL
-        MOVE    PC, @SP++
+    ?!Z JMP     FILL
+        RET
 
 ; PRINT writes the string at R1, which ends with a 0 word, to the screen
 ; from R2, each character with the color R3. It changes R1, R2, and R4.
 PRINT   MOVE[M] R4, @R1++
-    ?Z  MOVE    PC, @SP++
+    ?Z  RET
         OR      @R2++, R4, R3
-        MOVE    PC, PRINT
+        JMP     PRINT
 
 ; The key codes: each key on a row of its own, with its bytes in hex and as
 ; characters. ECHO shows the bytes as POLL reads them, and when POLL
@@ -351,43 +342,38 @@ PRINT   MOVE[M] R4, @R1++
 ; after it, as POLL waits for them, so an ESC alone has a row of its own.
 KCODES  MOVE    SP, @D_SP
         MOVE    R6, KCODES
-        ADD     @--SP, 2, PC
-        MOVE    PC, FRAME
+        CALL    FRAME
         MOVE    R2, SCREEN+560  ; the bar of row 7
         MOVE    R3, BAR+0x20
         MOVE    R4, 80
-        ADD     @--SP, 2, PC
-        MOVE    PC, FILL
+        CALL    FILL
         MOVE    R5, K_TEXTS
-        ADD     @--SP, 2, PC
-        MOVE    PC, PRINTS
+        CALL    PRINTS
         MOVE    COL, 0
         MOVE    ROW, KTOP
         MOVE    ECHO, SHOWB
-KPOLL   ADD     @--SP, 2, PC
-        MOVE    PC, POLL
-        MOVE[M] R0, COL
-    ?Z  MOVE    PC, KPOLL       ; no byte yet
+KPOLL   CALL    POLL
+        TST     COL
+    ?Z  JMP     KPOLL           ; no byte yet
         MOVE    COL, 0          ; the key has ended: the next row
-        SUB[M]  R0, ROW, LAST
+        CMP     ROW, LAST
     ?!Z ADD     ROW, ROW, 1
-    ?!Z MOVE    PC, KPOLL
+    ?!Z JMP     KPOLL
         MOVE    R2, SCR_KEY     ; or a scroll after the last
         MOVE    R4, 1280        ; the rows KTOP+1 to LAST, 16 of 80 words
-        ADD     @--SP, 2, PC
-        MOVE    PC, SCROLL
-        MOVE    PC, KPOLL
+        CALL    SCROLL
+        JMP     KPOLL
 
 ; SHOWB, the ECHO of F3, shows the byte R1 in the row ROW, as the byte COL of
 ; its key: in hex from column 2, and from column 42 as a character, or as ^
 ; and a character for a control code. 0x80 to 0x9F have no character, and
 ; the bytes after the first K_MAX of a key are not shown. It changes nothing
 ; but COL, which it counts up.
-SHOWB   MOVE    @--SP, R2
-        MOVE    @--SP, R3
-        MOVE    @--SP, R4
-        SUB[M]  R0, COL, K_MAX
-    ?!C MOVE    PC, SHOWN
+SHOWB   PUSH    R2
+        PUSH    R3
+        PUSH    R4
+        CMP     COL, K_MAX
+    ?!C JMP     SHOWN
         SHL     R2, ROW, 4      ; R2 is SCREEN + 80 * ROW + 3 * COL
         SHL     R3, ROW, 6
         ADD     R2, R2, R3
@@ -399,23 +385,23 @@ SHOWB   MOVE    @--SP, R2
         OR      @2[R2], @HEXDIG[R3], TYPED
         AND     R3, R1, 0xF
         OR      @3[R2], @HEXDIG[R3], TYPED
-        SUB[M]  R0, R1, 0x20
-    ?C  MOVE    PC, CARET       ; a control code
-        SUB[M]  R0, R1, 0x7F
-    ?Z  MOVE    PC, CARET       ; DEL
-    ?C  MOVE    PC, CHAR
-        SUB[M]  R0, R1, 0xA0
-    ?C  MOVE    PC, SHOWN       ; 0x80 to 0x9F
+        CMP     R1, 0x20
+    ?C  JMP     CARET           ; a control code
+        CMP     R1, 0x7F
+    ?Z  JMP     CARET           ; DEL
+    ?C  JMP     CHAR
+        CMP     R1, 0xA0
+    ?C  JMP     SHOWN           ; 0x80 to 0x9F
 CHAR    OR      @42[R2], R1, LINK
-        MOVE    PC, SHOWN
+        JMP     SHOWN
 CARET   MOVE    @42[R2], LINK+0x5E
         XOR     R3, R1, 0x40    ; ^@ to ^_, and ^? for DEL
         OR      @43[R2], R3, LINK
 SHOWN   ADD     COL, COL, 1
-        MOVE    R4, @SP++
-        MOVE    R3, @SP++
-        MOVE    R2, @SP++
-        MOVE    PC, @SP++
+        POP     R4
+        POP     R3
+        POP     R2
+        RET
 
 ; The character set and the colors. On the left, the 256 characters in 16
 ; rows of 16, each row labeled with the high digit of its codes, and each
@@ -425,11 +411,9 @@ SHOWN   ADD     COL, COL, 1
 ; here, but the function keys.
 CHARS   MOVE    SP, @D_SP
         MOVE    R6, CHARS
-        ADD     @--SP, 2, PC
-        MOVE    PC, FRAME
+        CALL    FRAME
         MOVE    R5, C_TEXTS
-        ADD     @--SP, 2, PC
-        MOVE    PC, PRINTS
+        CALL    PRINTS
         MOVE    R1, 0           ; the code
         MOVE    R2, SCREEN+405  ; row 5, column 5, where code 0 goes
 CROW    SHR     R3, R1, 4       ; the label of the row: its first code
@@ -439,21 +423,18 @@ CCELL   OR      @R2, R1, TYPED
         ADD     R2, R2, 2
         ADD     R1, R1, 1
         AND[M]  R0, R1, 0xF
-    ?!Z MOVE    PC, CCELL
+    ?!Z JMP     CCELL
         ADD     R2, R2, 48      ; the next row, 80 - 2 * 16 words on
-        SUB[M]  R0, R1, 256
-    ?!Z MOVE    PC, CROW
+        CMP     R1, 256
+    ?!Z JMP     CROW
         MOVE    R2, SCREEN+444  ; row 5, column 44
         MOVE    R7, 20          ; the background
-        ADD     @--SP, 2, PC
-        MOVE    PC, RAMPS
+        CALL    RAMPS
         MOVE    R2, SCREEN+1164 ; row 14, column 44
         MOVE    R7, 8           ; the foreground
-        ADD     @--SP, 2, PC
-        MOVE    PC, RAMPS
-CPOLL   ADD     @--SP, 2, PC
-        MOVE    PC, POLL
-        MOVE    PC, CPOLL
+        CALL    RAMPS
+CPOLL   CALL    POLL
+        JMP     CPOLL
 
 ; RAMPS draws a row for each color of COLORS: its letter at R2, and from
 ; three columns on, 16 cells of two columns, with the intensities 0 to F of
@@ -462,24 +443,24 @@ CPOLL   ADD     @--SP, 2, PC
 ; of the intensity on black. It changes R1 to R5, R8, and R9.
 RAMPS   MOVE    R5, COLORS
 RROW    MOVE[M] R1, @R5++       ; the letter, or 0 after the last
-    ?Z  MOVE    PC, @SP++
+    ?Z  RET
         OR      @R2, R1, TEXT
         MOVE    R3, @R5++       ; the color at intensity 1
         MOVE    R4, 0           ; the color of the cell
         MOVE    R8, 0           ; the intensity of the cell
         ADD     R9, R2, 3       ; the cell
 RCELL   SHL     R1, R4, R7
-        SUB[M]  R0, R7, 20
+        CMP     R7, 20
     ?Z  OR      @R9, R1, 0x20
     ?Z  OR      @1[R9], R1, 0x20
     ?!Z OR      @R9, R1, @HEXDIG[R8]
         ADD     R9, R9, 2
         ADD     R4, R4, R3
         ADD     R8, R8, 1
-        SUB[M]  R0, R8, 16
-    ?!Z MOVE    PC, RCELL
+        CMP     R8, 16
+    ?!Z JMP     RCELL
         ADD     R2, R2, 80
-        MOVE    PC, RROW
+        JMP     RROW
 
 ; The performance counters: those since reset, as a clock and as numbers,
 ; and the clock's frequency, cycles per microsecond; and those of a run of a
@@ -489,17 +470,14 @@ RCELL   SHL     R1, R4, R7
 ; is their color.
 COUNTS  MOVE    SP, @D_SP
         MOVE    R6, COUNTS
-        ADD     @--SP, 2, PC
-        MOVE    PC, FRAME
+        CALL    FRAME
         MOVE    R5, P_TEXTS
-        ADD     @--SP, 2, PC
-        MOVE    PC, PRINTS
+        CALL    PRINTS
         MOVE    @V_RUNS, 0
 PLOOP   MOVE    @V_CYC, @P_CYC  ; a run of the sieve, and its counts
         MOVE    @V_INS, @P_INS
         MOVE    @V_US, @P_US
-        ADD     @--SP, 2, PC
-        MOVE    PC, PRIMES
+        CALL    PRIMES
         SUB     @V_CYC, @P_CYC, @V_CYC
         SUB     @V_INS, @P_INS, @V_INS
         SUB     @V_US, @P_US, @V_US
@@ -508,44 +486,37 @@ PLOOP   MOVE    @V_CYC, @P_CYC  ; a run of the sieve, and its counts
         MOVE    R4, 20
         MOVE    R7, 0
         MOVE    R2, SCREEN+1100 ; the primes, from R1
-        ADD     @--SP, 2, PC
-        MOVE    PC, DEC64
+        CALL    DEC64
         MOVE    R1, @V_RUNS
         MOVE    R7, 0
         MOVE    R2, SCREEN+1020
-        ADD     @--SP, 2, PC
-        MOVE    PC, DEC64
+        CALL    DEC64
         MOVE    R1, @V_INS
         MOVE    R7, 0
         MOVE    R2, SCREEN+1180
-        ADD     @--SP, 2, PC
-        MOVE    PC, DEC64
+        CALL    DEC64
         MOVE    R1, @V_CYC
         MOVE    R7, 0
         MOVE    R2, SCREEN+1260
-        ADD     @--SP, 2, PC
-        MOVE    PC, DEC64
+        CALL    DEC64
         MOVE    R1, @V_US
         MOVE    R7, 0
         MOVE    R2, SCREEN+1340
-        ADD     @--SP, 2, PC
-        MOVE    PC, DEC64
+        CALL    DEC64
         MOVE    @M_A, @V_CYC    ; 100 times the cycles per instruction
         MOVE    @M_B, 100
         MOVE    @M_A, @M_UMUL
         MOVE    @M_B, @V_INS
         MOVE    R1, @M_UDIVQ
         MOVE    R2, SCREEN+1417
-        ADD     @--SP, 2, PC
-        MOVE    PC, FIX2
+        CALL    FIX2
         MOVE    @M_A, @V_INS    ; 100 times the instructions per microsecond
         MOVE    @M_B, 100
         MOVE    @M_A, @M_UMUL
         MOVE    @M_B, @V_US
         MOVE    R1, @M_UDIVQ
         MOVE    R2, SCREEN+1497
-        ADD     @--SP, 2, PC
-        MOVE    PC, FIX2
+        CALL    FIX2
         MOVE    @V_TLO, @P_US   ; the counters since reset, low word first
         MOVE    @V_THI, @P_USH
         MOVE    @V_CLO, @P_CYC
@@ -556,18 +527,15 @@ PLOOP   MOVE    @V_CYC, @P_CYC  ; a run of the sieve, and its counts
         MOVE    R1, @V_TLO
         MOVE    R7, @V_THI
         MOVE    R2, SCREEN+540
-        ADD     @--SP, 2, PC
-        MOVE    PC, DEC64
+        CALL    DEC64
         MOVE    R1, @V_CLO
         MOVE    R7, @V_CHI
         MOVE    R2, SCREEN+620
-        ADD     @--SP, 2, PC
-        MOVE    PC, DEC64
+        CALL    DEC64
         MOVE    R1, @V_ILO
         MOVE    R7, @V_IHI
         MOVE    R2, SCREEN+700
-        ADD     @--SP, 2, PC
-        MOVE    PC, DEC64
+        CALL    DEC64
         MOVE    @M_CLO, @V_CLO  ; the cycles per microsecond
         MOVE    @M_CHI, @V_CHI
         MOVE    @M_DLO, @V_TLO
@@ -575,8 +543,7 @@ PLOOP   MOVE    @V_CYC, @P_CYC  ; a run of the sieve, and its counts
         MOVE    R1, @M_QLO
         MOVE    R7, @M_QHI
         MOVE    R2, SCREEN+780
-        ADD     @--SP, 2, PC
-        MOVE    PC, DEC64
+        CALL    DEC64
         MOVE    @M_CLO, @V_TLO  ; the clock: the seconds in R5
         MOVE    @M_CHI, @V_THI
         MOVE    @M_DLO, 1000000
@@ -586,60 +553,54 @@ PLOOP   MOVE    @V_CYC, @P_CYC  ; a run of the sieve, and its counts
         MOVE    @M_B, 10000
         MOVE    R1, @M_UDIVQ
         MOVE    R2, SCREEN+458
-        ADD     @--SP, 2, PC
-        MOVE    PC, TWO
+        CALL    TWO
         MOVE    @M_A, R5        ; the seconds, and the minutes in R5
         MOVE    @M_B, 60
         MOVE    R1, @M_UDIVR
         MOVE    R5, @M_UDIVQ
         MOVE    R2, SCREEN+455
-        ADD     @--SP, 2, PC
-        MOVE    PC, TWO
+        CALL    TWO
         MOVE    @M_A, R5        ; the minutes, and the hours in R5
         MOVE    @M_B, 60
         MOVE    R1, @M_UDIVR
         MOVE    R5, @M_UDIVQ
         MOVE    R2, SCREEN+452
-        ADD     @--SP, 2, PC
-        MOVE    PC, TWO
+        CALL    TWO
         MOVE    R1, R5
         MOVE    R7, 0
         MOVE    R4, 8
         MOVE    R2, SCREEN+451
-        ADD     @--SP, 2, PC
-        MOVE    PC, DEC64
-        ADD     @--SP, 2, PC
-        MOVE    PC, POLL
-        MOVE    PC, PLOOP
+        CALL    DEC64
+        CALL    POLL
+        JMP     PLOOP
 
 ; PRIMES runs the sieve of Eratosthenes on the numbers below SIEVE_N, and
 ; sets R1 to the primes among them. It changes R2 to R6.
 PRIMES  MOVE    R2, SIEVE       ; every number a prime
         MOVE    R3, 1
         MOVE    R4, SIEVE_N
-        ADD     @--SP, 2, PC
-        MOVE    PC, FILL
+        CALL    FILL
         MOVE    R5, 2           ; R5 is the prime, whose multiples go
-PRIME   MOVE[M] R0, @SIEVE[R5]
-    ?Z  MOVE    PC, PNEXT
+PRIME   TST     @SIEVE[R5]
+    ?Z  JMP     PNEXT
         MOVE    @M_A, R5        ; from its square on
         MOVE    @M_B, R5
         MOVE    R6, @M_UMUL
-MULT    SUB[M]  R0, R6, SIEVE_N
-    ?!C MOVE    PC, PNEXT
+MULT    CMP     R6, SIEVE_N
+    ?!C JMP     PNEXT
         MOVE    @SIEVE[R6], 0
         ADD     R6, R6, R5
-        MOVE    PC, MULT
+        JMP     MULT
 PNEXT   ADD     R5, R5, 1
-        SUB[M]  R0, R5, 46      ; up to 45, as 46 * 46 is above SIEVE_N
-    ?!Z MOVE    PC, PRIME
+        CMP     R5, 46          ; up to 45, as 46 * 46 is above SIEVE_N
+    ?!Z JMP     PRIME
         MOVE    R1, 0
         MOVE    R5, 2
 PCOUNT  ADD     R1, R1, @SIEVE[R5]
         ADD     R5, R5, 1
-        SUB[M]  R0, R5, SIEVE_N
-    ?!Z MOVE    PC, PCOUNT
-        MOVE    PC, @SP++
+        CMP     R5, SIEVE_N
+    ?!Z JMP     PCOUNT
+        RET
 
 ; DEC64 writes R7:R1 in decimal, in the color R3, right-aligned in the R4
 ; words before R2, with blanks before it. R4 must have room for the digits.
@@ -655,12 +616,12 @@ DIGIT   MOVE    @M_CLO, R1
         MOVE    R1, @M_QLO
         MOVE    R7, @M_QHI
         OR[M]   R0, R1, R7
-    ?!Z MOVE    PC, DIGIT
-        MOVE    R9, @SP++
-DBLANK  SUB[M]  R0, R9, R2
-    ?Z  MOVE    PC, @SP++
+    ?!Z JMP     DIGIT
+        POP     R9
+DBLANK  CMP     R9, R2
+    ?Z  RET
         OR      @R9++, R3, 0x20
-        MOVE    PC, DBLANK
+        JMP     DBLANK
 
 ; TWO writes R1, which is below 100, as two digits at R2, in the color R3.
 ; It changes R9.
@@ -670,7 +631,7 @@ TWO     MOVE    @M_A, R1
         OR      @R2, R9, R3
         ADD     R9, @M_UDIVR, 0x30
         OR      @1[R2], R9, R3
-        MOVE    PC, @SP++
+        RET
 
 ; FIX2 writes R1 / 100 with two decimals and its point at R2, in the color
 ; R3, and the integer part right-aligned in the 10 words before the point.
@@ -678,19 +639,17 @@ TWO     MOVE    @M_A, R1
 FIX2    MOVE    @M_A, R1
         MOVE    @M_B, 100
         MOVE    R1, @M_UDIVQ
-        MOVE    @--SP, @M_UDIVR
-        MOVE    @--SP, R2
+        PUSH    @M_UDIVR
+        PUSH    R2
         OR      @R2, R3, 0x2E
         MOVE    R7, 0
         MOVE    R4, 10
-        ADD     @--SP, 2, PC
-        MOVE    PC, DEC64
-        MOVE    R2, @SP++
-        MOVE    R1, @SP++
+        CALL    DEC64
+        POP     R2
+        POP     R1
         ADD     R2, R2, 1
-        ADD     @--SP, 2, PC
-        MOVE    PC, TWO
-        MOVE    PC, @SP++
+        CALL    TWO
+        RET
 
 ; The comet, a game. The comet, @, moves through the field, rows 4 to 23
 ; inside a frame, one cell at each tick, and the cursor keys steer it. Its
@@ -711,31 +670,26 @@ FIX2    MOVE    @M_A, R1
 ; frame is blanks too.
 GAME    MOVE    SP, @D_SP
         MOVE    R6, GAME
-        ADD     @--SP, 2, PC
-        MOVE    PC, FRAME
+        CALL    FRAME
         MOVE    R5, G_TEXTS
-        ADD     @--SP, 2, PC
-        MOVE    PC, PRINTS
+        CALL    PRINTS
         MOVE    @G_BEST, 0
         MOVE    @G_SEED, 0x2545F491
 GNEW    MOVE    R2, SCREEN+240  ; a new game: the frame, and the field cleared
         MOVE    R3, BAR+0x20
         MOVE    R4, 80
-        ADD     @--SP, 2, PC
-        MOVE    PC, FILL
+        CALL    FILL
         MOVE    R5, 20          ; R2 is at row 4
 GROW    MOVE    @R2++, BAR+0x20
         MOVE    R3, TEXT+0x20
         MOVE    R4, 78
-        ADD     @--SP, 2, PC
-        MOVE    PC, FILL
+        CALL    FILL
         MOVE    @R2++, BAR+0x20
         SUB[M]  R5, R5, 1
-    ?!Z MOVE    PC, GROW
+    ?!Z JMP     GROW
         MOVE    R3, BAR+0x20
         MOVE    R4, 80
-        ADD     @--SP, 2, PC
-        MOVE    PC, FILL
+        CALL    FILL
         MOVE    R2, SCREEN+1079 ; the comet, in the middle
         MOVE    @R2, TYPED+0x40
         MOVE    @G_POS, R2
@@ -748,37 +702,33 @@ GROW    MOVE    @R2++, BAR+0x20
         MOVE    @G_OVER, 0
         MOVE    @G_TICK, 150000
         ADD     @G_NEXT, @P_US, 150000
-        ADD     @--SP, 2, PC
-        MOVE    PC, STAR
+        CALL    STAR
         MOVE    R1, G_START
-        ADD     @--SP, 2, PC
-        MOVE    PC, STATUS
-GTICK   ADD     @--SP, 2, PC    ; wait for the tick
-        MOVE    PC, RANDOM
-        SUB[M]  R0, @P_US, @G_NEXT
-    ?N  MOVE    PC, GTICK
+        CALL    STATUS
+GTICK   CALL    RANDOM          ; wait for the tick
+        CMP     @P_US, @G_NEXT
+    ?N  JMP     GTICK
         ADD     @G_NEXT, @P_US, @G_TICK ; from now, not from G_NEXT
-        ADD     @--SP, 2, PC
-        MOVE    PC, POLL
-        MOVE[M] R0, @G_OVER
-    ?Z  MOVE    PC, GKEY
-        MOVE[M] R0, R1          ; after the end, a key starts a new game
-    ?!Z MOVE    PC, GNEW
-        MOVE    PC, GTICK
+        CALL    POLL
+        TST     @G_OVER
+    ?Z  JMP     GKEY
+        TST     R1              ; after the end, a key starts a new game
+    ?!Z JMP     GNEW
+        JMP     GTICK
 GKEY    SUB     R2, R1, KEY_UP
-        SUB[M]  R0, R2, 4
-    ?!C MOVE    PC, GMOVE       ; no cursor key
+        CMP     R2, 4
+    ?!C JMP     GMOVE           ; no cursor key
         MOVE    R3, @GSTEPS[R2]
         ADD[M]  R0, R3, @G_DIR  ; 0 for the key that turns it back
     ?!Z MOVE    @G_DIR, R3
 GMOVE   MOVE[M] R4, @G_DIR
-    ?Z  MOVE    PC, GTICK       ; not started yet
+    ?Z  JMP     GTICK           ; not started yet
         ADD     R5, @G_POS, R4  ; the cell of the new head
         MOVE    R7, 0           ; 1 for a star
-        SUB[M]  R0, @R5, TYPED+0x2A
-    ?Z  MOVE    PC, GSTAR
-        SUB[M]  R0, @R5, TEXT+0x20
-    ?!Z MOVE    PC, GOVER       ; the frame, a blank on blue, or the tail
+        CMP     @R5, TYPED+0x2A
+    ?Z  JMP     GSTAR
+        CMP     @R5, TEXT+0x20
+    ?!Z JMP     GOVER           ; the frame, a blank on blue, or the tail
 GSTEP   MOVE    R6, @G_POS      ; the old head is now tail
         MOVE    @R6, TAIL+0x6F
         MOVE    @R5, TYPED+0x40
@@ -787,39 +737,35 @@ GSTEP   MOVE    R6, @G_POS      ; the old head is now tail
         AND     R2, R2, BODY_M
         MOVE    @G_HEAD, R2
         MOVE    @BODY[R2], R5
-        MOVE[M] R0, @G_GROW
-    ?Z  MOVE    PC, GTAIL
+        TST     @G_GROW
+    ?Z  JMP     GTAIL
         SUB     @G_GROW, @G_GROW, 1
         ADD     @G_LEN, @G_LEN, 1
-        MOVE    PC, GDONE
+        JMP     GDONE
 GTAIL   SUB     R2, R2, @G_LEN  ; the last cell of the tail is cleared
         AND     R2, R2, BODY_M
         MOVE    R6, @BODY[R2]
         MOVE    @R6, TEXT+0x20
-GDONE   MOVE[M] R0, R7
-    ?!Z ADD     @--SP, 2, PC
-    ?!Z MOVE    PC, STAR
-        MOVE    PC, GTICK
+GDONE   TST     R7
+    ?!Z CALL    STAR
+        JMP     GTICK
 GSTAR   ADD     @G_SCORE, @G_SCORE, 1
         ADD     @G_GROW, @G_GROW, 4
-        SUB[M]  R0, @G_TICK, 50000
+        CMP     @G_TICK, 50000
     ?!Z SUB     @G_TICK, @G_TICK, 5000
         MOVE    R1, G_START
-        ADD     @--SP, 2, PC
-        MOVE    PC, STATUS
+        CALL    STATUS
         MOVE    R7, 1
-        MOVE    PC, GSTEP
+        JMP     GSTEP
 GOVER   MOVE    @G_OVER, 1
-        SUB[M]  R0, @G_BEST, @G_SCORE
+        CMP     @G_BEST, @G_SCORE
     ?C  MOVE    @G_BEST, @G_SCORE
         MOVE    R1, G_END
-        ADD     @--SP, 2, PC
-        MOVE    PC, STATUS
-        MOVE    PC, GTICK
+        CALL    STATUS
+        JMP     GTICK
 
 ; STAR puts a star at a random free cell of the field. It changes R1 to R4.
-STAR    ADD     @--SP, 2, PC
-        MOVE    PC, RANDOM
+STAR    CALL    RANDOM
         MOVE    @M_A, R1        ; one of the 20 * 78 cells
         MOVE    @M_B, 1560
         MOVE    @M_A, @M_UDIVR
@@ -829,10 +775,10 @@ STAR    ADD     @--SP, 2, PC
         ADD     R2, R2, R3
         ADD     R2, R2, @M_UDIVR
         ADD     R2, R2, SCREEN+321
-        SUB[M]  R0, @R2, TEXT+0x20
-    ?!Z MOVE    PC, STAR        ; not free: another
+        CMP     @R2, TEXT+0x20
+    ?!Z JMP     STAR            ; not free: another
         MOVE    @R2, TYPED+0x2A
-        MOVE    PC, @SP++
+        RET
 
 ; RANDOM steps G_SEED, a xorshift generator, and sets R1 to it. It changes
 ; R2.
@@ -844,34 +790,30 @@ RANDOM  MOVE    R1, @G_SEED
         SHL     R2, R1, 5
         XOR     R1, R1, R2
         MOVE    @G_SEED, R1
-        MOVE    PC, @SP++
+        RET
 
 ; STATUS writes the score and the best in row 2, and the string at R1 after
 ; them. It changes R1, R2, R3, R4, R7, and R9.
-STATUS  MOVE    @--SP, R1
+STATUS  PUSH    R1
         MOVE    R3, TYPED
         MOVE    R4, 5
         MOVE    R1, @G_SCORE
         MOVE    R7, 0
         MOVE    R2, SCREEN+173
-        ADD     @--SP, 2, PC
-        MOVE    PC, DEC64
+        CALL    DEC64
         MOVE    R1, @G_BEST
         MOVE    R7, 0
         MOVE    R2, SCREEN+187
-        ADD     @--SP, 2, PC
-        MOVE    PC, DEC64
+        CALL    DEC64
         MOVE    R2, SCREEN+192
         MOVE    R3, TEXT+0x20
         MOVE    R4, 48
-        ADD     @--SP, 2, PC
-        MOVE    PC, FILL
-        MOVE    R1, @SP++
+        CALL    FILL
+        POP     R1
         MOVE    R2, SCREEN+192
         MOVE    R3, LINK
-        ADD     @--SP, 2, PC
-        MOVE    PC, PRINT
-        MOVE    PC, @SP++
+        CALL    PRINT
+        RET
 
 ; The board: the self-test of the RAM from RAM_LO, the math unit, the timer's
 ; interrupts, and the performance counters, each with PASS or FAIL, once each
@@ -880,58 +822,44 @@ STATUS  MOVE    @--SP, R1
 ; which I and M change (see ESTART).
 BOARD   MOVE    SP, @D_SP
         MOVE    R6, BOARD
-        ADD     @--SP, 2, PC
-        MOVE    PC, FRAME
+        CALL    FRAME
         MOVE    R5, S_TEXTS
-        ADD     @--SP, 2, PC
-        MOVE    PC, PRINTS
+        CALL    PRINTS
         MOVE    R10, 0
-        ADD     @--SP, 2, PC
-        MOVE    PC, TRAM
+        CALL    TRAM
         MOVE    R2, SCREEN+450
-        ADD     @--SP, 2, PC
-        MOVE    PC, RESULT
-        ADD     @--SP, 2, PC
-        MOVE    PC, TMATH
+        CALL    RESULT
+        CALL    TMATH
         MOVE    R2, SCREEN+530
-        ADD     @--SP, 2, PC
-        MOVE    PC, RESULT
-        ADD     @--SP, 2, PC
-        MOVE    PC, TTIMER
+        CALL    RESULT
+        CALL    TTIMER
         MOVE    R2, SCREEN+610
-        ADD     @--SP, 2, PC
-        MOVE    PC, RESULT
-        ADD     @--SP, 2, PC
-        MOVE    PC, TCOUNT
+        CALL    RESULT
+        CALL    TCOUNT
         MOVE    R2, SCREEN+690
-        ADD     @--SP, 2, PC
-        MOVE    PC, RESULT
+        CALL    RESULT
         MOVE    R1, S_PASSED
         MOVE    R3, TAIL
-        MOVE[M] R0, R10
+        TST     R10
     ?!Z MOVE    R1, S_FAILED
     ?!Z MOVE    R3, RED
         MOVE    R2, SCREEN+802
-        ADD     @--SP, 2, PC
-        MOVE    PC, PRINT
-        ADD     @--SP, 2, PC
-        MOVE    PC, EIDLE
-BLOOP   ADD     @--SP, 2, PC
-        MOVE    PC, SHOWNET
-        ADD     @--SP, 2, PC
-        MOVE    PC, POLL
-        MOVE[M] R0, R1
-    ?Z  MOVE    PC, BLOOP       ; no key
-        MOVE[M] R0, @B_MODE
-    ?!Z MOVE    PC, BEDIT       ; an address is being typed
+        CALL    PRINT
+        CALL    EIDLE
+BLOOP   CALL    SHOWNET
+        CALL    POLL
+        TST     R1
+    ?Z  JMP     BLOOP           ; no key
+        TST     @B_MODE
+    ?!Z JMP     BEDIT           ; an address is being typed
         OR      R1, R1, 0x20    ; I or i, M or m
-        SUB[M]  R0, R1, 0x69
+        CMP     R1, 0x69
     ?Z  MOVE    R7, 1
-    ?Z  MOVE    PC, ESTART
-        SUB[M]  R0, R1, 0x6D
+    ?Z  JMP     ESTART
+        CMP     R1, 0x6D
     ?Z  MOVE    R7, 2
-    ?Z  MOVE    PC, ESTART
-        MOVE    PC, BLOOP
+    ?Z  JMP     ESTART
+        JMP     BLOOP
 
 ; Each test sets R1 to 0 when it passes. When it fails, R1 is 1, and R5 and
 ; R6 tell what failed: an address and the word read there, or for the timer,
@@ -944,41 +872,41 @@ RPASS   MOVE    R2, RAM_LO
         MOVE    R4, RAM_N
 RWRITE  XOR     @R2++, R2, R7
         SUB[M]  R4, R4, 1
-    ?!Z MOVE    PC, RWRITE
+    ?!Z JMP     RWRITE
         MOVE    R2, RAM_LO
         MOVE    R4, RAM_N
 RREAD   XOR     R6, R2, R7
-        SUB[M]  R0, @R2, R6
-    ?!Z MOVE    PC, RBAD
+        CMP     @R2, R6
+    ?!Z JMP     RBAD
         ADD     R2, R2, 1
         SUB[M]  R4, R4, 1
-    ?!Z MOVE    PC, RREAD
+    ?!Z JMP     RREAD
         XOR[M]  R7, R7, -1
-    ?!Z MOVE    PC, RPASS
+    ?!Z JMP     RPASS
         MOVE    R1, 0
-        MOVE    PC, @SP++
+        RET
 RBAD    MOVE    R5, R2
         MOVE    R6, @R2
         MOVE    R1, 1
-        MOVE    PC, @SP++
+        RET
 
 ; TMATH runs the script MATH, which writes operands of the math unit and
 ; checks its results.
 TMATH   MOVE    R2, MATH
 MSTEP   MOVE[M] R3, @R2++       ; 1 to write, 2 to check, 0 at the end
-    ?Z  MOVE    PC, MPASS
+    ?Z  JMP     MPASS
         MOVE    R5, @R2++       ; the address
         MOVE    R4, @R2++       ; and the word
-        SUB[M]  R0, R3, 1
+        CMP     R3, 1
     ?Z  MOVE    @R5, R4
-    ?Z  MOVE    PC, MSTEP
+    ?Z  JMP     MSTEP
         MOVE    R6, @R5
-        SUB[M]  R0, R6, R4
-    ?Z  MOVE    PC, MSTEP
+        CMP     R6, R4
+    ?Z  JMP     MSTEP
         MOVE    R1, 1
-        MOVE    PC, @SP++
+        RET
 MPASS   MOVE    R1, 0
-        MOVE    PC, @SP++
+        RET
 
 ; TTIMER lets the timer raise 10 interrupts, one every 1000 cycles, which
 ; TICK counts, and checks that they came in 9500 to 10500 cycles. It waits
@@ -991,24 +919,24 @@ TTIMER  MOVE    @S_TICKS, 0
         MOVE    @TM_PER, 1000
         OR      R14, R14, 0x40000000 ; E, which lets the interrupts in
 TWAIT   SUB     R6, @P_CYC, R5
-        SUB[M]  R0, @S_TICKS, 10
-    ?Z  MOVE    PC, TSTOP
-        SUB[M]  R0, R6, 100000
-    ?C  MOVE    PC, TWAIT
+        CMP     @S_TICKS, 10
+    ?Z  JMP     TSTOP
+        CMP     R6, 100000
+    ?C  JMP     TWAIT
 TSTOP   MOVE    @TM_PER, 0
-        MOVE    R0, R0          ; a request still pending is taken here
-        MOVE    R0, R0
+        NOP                     ; a request still pending is taken here
+        NOP
         AND     R14, R14, 0xBFFFFFFF
         MOVE    R5, @S_TICKS
         MOVE    R1, 1
-        SUB[M]  R0, R5, 10
-    ?C  MOVE    PC, @SP++       ; fewer than 10
-        SUB[M]  R0, R6, 9500
-    ?C  MOVE    PC, @SP++
-        SUB[M]  R0, R6, 10500
-    ?!C MOVE    PC, @SP++
+        CMP     R5, 10
+    ?C  RET                     ; fewer than 10
+        CMP     R6, 9500
+    ?C  RET
+        CMP     R6, 10500
+    ?!C RET
         MOVE    R1, 0
-        MOVE    PC, @SP++
+        RET
 
 ; TICK, the routine of the timer's interrupt
 TICK    ADD     @S_TICKS, @S_TICKS, 1
@@ -1018,45 +946,45 @@ TICK    ADD     @S_TICKS, @S_TICKS, 1
 ; sequence, and over a loop, at least as many cycles as instructions, some
 ; microseconds, and 1 to 255 cycles per microsecond.
 TCOUNT  MOVE    R5, @P_INS
-        MOVE    R0, R0          ; eight instructions
-        MOVE    R0, R0
-        MOVE    R0, R0
-        MOVE    R0, R0
-        MOVE    R0, R0
-        MOVE    R0, R0
-        MOVE    R0, R0
-        MOVE    R0, R0
+        NOP                     ; eight instructions
+        NOP
+        NOP
+        NOP
+        NOP
+        NOP
+        NOP
+        NOP
         SUB     R6, @P_INS, R5  ; read 9 instructions after the first
         MOVE    R5, P_INS
         MOVE    R1, 1
-        SUB[M]  R0, R6, 9
-    ?!Z MOVE    PC, @SP++
+        CMP     R6, 9
+    ?!Z RET
         MOVE    R7, @P_INS
         MOVE    R8, @P_CYC
         MOVE    R9, @P_US
         MOVE    R4, 1000
 CLOOP   SUB[M]  R4, R4, 1
-    ?!Z MOVE    PC, CLOOP
+    ?!Z JMP     CLOOP
         SUB     R7, @P_INS, R7
         SUB     R8, @P_CYC, R8
         SUB     R9, @P_US, R9
         MOVE    R5, P_CYC
         MOVE    R6, R8
-        SUB[M]  R0, R8, R7
-    ?C  MOVE    PC, @SP++       ; fewer cycles than instructions
+        CMP     R8, R7
+    ?C  RET                     ; fewer cycles than instructions
         MOVE    R5, P_US
         MOVE    R6, R9
-        MOVE[M] R0, R9
-    ?Z  MOVE    PC, @SP++       ; no microsecond
+        TST     R9
+    ?Z  RET                     ; no microsecond
         MOVE    @M_A, R8
         MOVE    @M_B, R9
         MOVE    R5, M_UDIVQ
         MOVE[M] R6, @M_UDIVQ
-    ?Z  MOVE    PC, @SP++
-        SUB[M]  R0, R6, 256
-    ?!C MOVE    PC, @SP++
+    ?Z  RET
+        CMP     R6, 256
+    ?!C RET
         MOVE    R1, 0
-        MOVE    PC, @SP++
+        RET
 
 ; SHOWNET shows the Ethernet station's registers: the IP address in decimal
 ; with dots, the MAC address in hex with colons, and the three counts. It
@@ -1067,49 +995,43 @@ SHOWNET MOVE    R3, TYPED
         MOVE    R6, 24          ; the shift of the byte, 24 down to 0
 IPBYTE  SHR     R1, R5, R6
         AND     R1, R1, 0xFF
-        ADD     @--SP, 2, PC
-        MOVE    PC, DECB
+        CALL    DECB
         SUB[M]  R6, R6, 8
-    ?N  MOVE    PC, IPEND
+    ?N  JMP     IPEND
         OR      @R2++, R3, 0x2E
-        MOVE    PC, IPBYTE
+        JMP     IPBYTE
 IPEND   MOVE    R4, SCREEN+1319 ; blanks after a shorter address
         SUB[M]  R4, R4, R2
     ?!Z MOVE    R3, TEXT+0x20
-    ?!Z ADD     @--SP, 2, PC
-    ?!Z MOVE    PC, FILL
+    ?!Z CALL    FILL
         MOVE    R3, TYPED
         MOVE    R2, SCREEN+1384
         MOVE    R6, 0           ; the byte of the MAC address
 MBYTE   MOVE    R1, @E_MACH
-        SUB[M]  R0, R6, 2
+        CMP     R6, 2
     ?!C MOVE    R1, @E_MACL
         SHR     R1, R1, @MSHIFT[R6]
         AND     R1, R1, 0xFF
-        ADD     @--SP, 2, PC
-        MOVE    PC, HEX2
+        CALL    HEX2
         ADD     R6, R6, 1
-        SUB[M]  R0, R6, 6
-    ?Z  MOVE    PC, MEND
+        CMP     R6, 6
+    ?Z  JMP     MEND
         OR      @R2++, R3, 0x3A
-        MOVE    PC, MBYTE
+        JMP     MBYTE
 MEND    MOVE    R4, 10
         MOVE    R7, 0
         MOVE    R1, @E_GOOD
         MOVE    R2, SCREEN+1474
-        ADD     @--SP, 2, PC
-        MOVE    PC, DEC64
+        CALL    DEC64
         MOVE    R7, 0
         MOVE    R1, @E_BAD
         MOVE    R2, SCREEN+1554
-        ADD     @--SP, 2, PC
-        MOVE    PC, DEC64
+        CALL    DEC64
         MOVE    R7, 0
         MOVE    R1, @E_SENT
         MOVE    R2, SCREEN+1634
-        ADD     @--SP, 2, PC
-        MOVE    PC, DEC64
-        MOVE    PC, @SP++
+        CALL    DEC64
+        RET
 
 ; DECB writes R1, which is below 256, in decimal at R2, in the color R3, and
 ; leaves R2 after it. It changes R1 and R4.
@@ -1119,13 +1041,13 @@ DDIV    MOVE    @M_A, R1
         ADD     @--SP, @M_UDIVR, 0x30
         MOVE    R1, @M_UDIVQ
         ADD     R4, R4, 1
-        MOVE[M] R0, R1
-    ?!Z MOVE    PC, DDIV
-DPUT    MOVE    R1, @SP++
+        TST     R1
+    ?!Z JMP     DDIV
+DPUT    POP     R1
         OR      @R2++, R1, R3
         SUB[M]  R4, R4, 1
-    ?!Z MOVE    PC, DPUT
-        MOVE    PC, @SP++
+    ?!Z JMP     DPUT
+        RET
 
 ; HEX2 writes R1, which is below 256, as 2 hex digits at R2, in the color R3,
 ; and leaves R2 after them. It changes R9.
@@ -1133,20 +1055,20 @@ HEX2    SHR     R9, R1, 4
         OR      @R2++, @HEXDIG[R9], R3
         AND     R9, R1, 0xF
         OR      @R2++, @HEXDIG[R9], R3
-        MOVE    PC, @SP++
+        RET
 
 ; NIBBLE sets R1, a character, to its value as a hex digit, or to 99 if it
 ; is none.
 NIBBLE  SUB     R1, R1, 0x30
-        SUB[M]  R0, R1, 10
-    ?C  MOVE    PC, @SP++       ; 0 to 9
+        CMP     R1, 10
+    ?C  RET                     ; 0 to 9
         ADD     R1, R1, 0x30
         OR      R1, R1, 0x20    ; A to F as a to f
         SUB     R1, R1, 0x61
-        SUB[M]  R0, R1, 6
+        CMP     R1, 6
     ?C  ADD     R1, R1, 10
     ?!C MOVE    R1, 99
-        MOVE    PC, @SP++
+        RET
 
 ; EIDLE ends the typing of an address: it clears the three rows at the
 ; bottom, shows the keys that start it, and hides the cursor. It changes R1
@@ -1156,14 +1078,12 @@ EIDLE   MOVE    @B_MODE, 0
         MOVE    R2, SCREEN+1760
         MOVE    R3, TEXT+0x20
         MOVE    R4, 240
-        ADD     @--SP, 2, PC
-        MOVE    PC, FILL
+        CALL    FILL
         MOVE    R1, E_HELP
         MOVE    R2, SCREEN+1762
         MOVE    R3, TEXT
-        ADD     @--SP, 2, PC
-        MOVE    PC, PRINT
-        MOVE    PC, @SP++
+        CALL    PRINT
+        RET
 
 ; The typing of an address. I starts the IP address, with R7 = 1, and M the
 ; MAC address, with R7 = 2. The characters go to row 22 from column 20, and
@@ -1176,76 +1096,70 @@ ESTART  MOVE    @B_MODE, R7
         MOVE    R2, SCREEN+1760
         MOVE    R3, TEXT+0x20
         MOVE    R4, 240
-        ADD     @--SP, 2, PC
-        MOVE    PC, FILL
+        CALL    FILL
         MOVE    R1, E_NEWIP
         MOVE    R5, E_HINTIP
-        SUB[M]  R0, R7, 1
+        CMP     R7, 1
     ?!Z MOVE    R1, E_NEWMAC
     ?!Z MOVE    R5, E_HINTMAC
         MOVE    R2, SCREEN+1762
         MOVE    R3, LINK
-        ADD     @--SP, 2, PC
-        MOVE    PC, PRINT
+        CALL    PRINT
         MOVE    R1, R5
         MOVE    R2, SCREEN+1842
         MOVE    R3, TEXT
-        ADD     @--SP, 2, PC
-        MOVE    PC, PRINT
+        CALL    PRINT
         MOVE    @SCR_Y, 22
         MOVE    @SCR_X, 20
         MOVE    @SCR_CTL, 0x60
-        MOVE    PC, BLOOP
+        JMP     BLOOP
 
 ; A key while typing, in R1. The error row is cleared first.
 BEDIT   MOVE    R2, SCREEN+1920
         MOVE    R3, TEXT+0x20
         MOVE    R4, 80
-        ADD     @--SP, 2, PC
-        MOVE    PC, FILL
-        SUB[M]  R0, R1, 0x0D
-    ?Z  MOVE    PC, EENTER
-        SUB[M]  R0, R1, 0x0A
-    ?Z  MOVE    PC, EENTER
-        SUB[M]  R0, R1, 0x03
-    ?Z  MOVE    PC, ECANCEL
-        SUB[M]  R0, R1, 0x1B
-    ?Z  MOVE    PC, ECANCEL
-        SUB[M]  R0, R1, 0x08
-    ?Z  MOVE    PC, EBACK
-        SUB[M]  R0, R1, 0x7F
-    ?Z  MOVE    PC, EBACK
+        CALL    FILL
+        CMP     R1, 0x0D
+    ?Z  JMP     EENTER
+        CMP     R1, 0x0A
+    ?Z  JMP     EENTER
+        CMP     R1, 0x03
+    ?Z  JMP     ECANCEL
+        CMP     R1, 0x1B
+    ?Z  JMP     ECANCEL
+        CMP     R1, 0x08
+    ?Z  JMP     EBACK
+        CMP     R1, 0x7F
+    ?Z  JMP     EBACK
         MOVE    R4, 10          ; the base, the separator, and the length
         MOVE    R5, 0x2E
         MOVE    R6, 15
-        SUB[M]  R0, @B_MODE, 1
+        CMP     @B_MODE, 1
     ?!Z MOVE    R4, 16
     ?!Z MOVE    R5, 0x3A
     ?!Z MOVE    R6, 17
-        SUB[M]  R0, COL, R6
-    ?!C MOVE    PC, BLOOP       ; the line is full
+        CMP     COL, R6
+    ?!C JMP     BLOOP           ; the line is full
         MOVE    R9, R1
-        SUB[M]  R0, R1, R5
-    ?Z  MOVE    PC, EPUT
-        ADD     @--SP, 2, PC
-        MOVE    PC, NIBBLE
-        SUB[M]  R0, R1, R4
-    ?!C MOVE    PC, BLOOP       ; no digit of the base
+        CMP     R1, R5
+    ?Z  JMP     EPUT
+        CALL    NIBBLE
+        CMP     R1, R4
+    ?!C JMP     BLOOP           ; no digit of the base
 EPUT    ADD     R2, COL, SCREEN+1780
         OR      @R2, R9, TYPED
         ADD     COL, COL, 1
         ADD     @SCR_X, COL, 20
-        MOVE    PC, BLOOP
-EBACK   MOVE[M] R0, COL
-    ?Z  MOVE    PC, BLOOP
+        JMP     BLOOP
+EBACK   TST     COL
+    ?Z  JMP     BLOOP
         SUB     COL, COL, 1
         ADD     R2, COL, SCREEN+1780
         MOVE    @R2, TEXT+0x20
         ADD     @SCR_X, COL, 20
-        MOVE    PC, BLOOP
-ECANCEL ADD     @--SP, 2, PC
-        MOVE    PC, EIDLE
-        MOVE    PC, BLOOP
+        JMP     BLOOP
+ECANCEL CALL    EIDLE
+        JMP     BLOOP
 
 ; RETURN: the text is parsed, and written to the station if it is an
 ; address. Otherwise a message shows, and the typing goes on.
@@ -1254,30 +1168,28 @@ EENTER  MOVE    R2, SCREEN+1780
         MOVE    R4, 10
         MOVE    R5, 0x2E
         MOVE    R6, 4
-        SUB[M]  R0, @B_MODE, 1
+        CMP     @B_MODE, 1
     ?!Z MOVE    R4, 16
     ?!Z MOVE    R5, 0x3A
     ?!Z MOVE    R6, 6
-        ADD     @--SP, 2, PC
-        MOVE    PC, PARSE
-        MOVE[M] R0, R1
-    ?!Z MOVE    PC, EBAD
-        SUB[M]  R0, @B_MODE, 1
+        CALL    PARSE
+        TST     R1
+    ?!Z JMP     EBAD
+        CMP     @B_MODE, 1
     ?Z  MOVE    @E_IP, R8
-    ?Z  MOVE    PC, ECANCEL     ; which ends the typing
+    ?Z  JMP     ECANCEL         ; which ends the typing
         AND[M]  R0, R11, 0x100  ; bit 0 of the first byte: a group address
-    ?!Z MOVE    PC, EBAD
+    ?!Z JMP     EBAD
         MOVE    @E_MACH, R11
         MOVE    @E_MACL, R8
-        MOVE    PC, ECANCEL
+        JMP     ECANCEL
 EBAD    MOVE    R1, E_BADIP
-        SUB[M]  R0, @B_MODE, 1
+        CMP     @B_MODE, 1
     ?!Z MOVE    R1, E_BADMAC
         MOVE    R2, SCREEN+1922
         MOVE    R3, RED
-        ADD     @--SP, 2, PC
-        MOVE    PC, PRINT
-        MOVE    PC, BLOOP
+        CALL    PRINT
+        JMP     BLOOP
 
 ; PARSE reads the R3 characters from R2 as R6 numbers in the base R4, from
 ; 0 to 255, with the separator R5 between them. A number in hex has one or
@@ -1289,71 +1201,68 @@ PARSE   MOVE    R11, 0
         MOVE    R8, 0
 PFIELD  MOVE    R7, 0           ; the digits of the number
         MOVE    R9, 0           ; and its value
-PCHAR   MOVE[M] R0, R3
-    ?Z  MOVE    PC, PLAST       ; the end of the text ends the number
+PCHAR   TST     R3
+    ?Z  JMP     PLAST           ; the end of the text ends the number
         MOVE    R1, @R2++
         AND     R1, R1, 0xFF
         SUB     R3, R3, 1
-        SUB[M]  R0, R1, R5
-    ?Z  MOVE    PC, PSEP
-        ADD     @--SP, 2, PC
-        MOVE    PC, NIBBLE
-        SUB[M]  R0, R1, R4
-    ?!C MOVE    PC, PBAD        ; no digit of the base
+        CMP     R1, R5
+    ?Z  JMP     PSEP
+        CALL    NIBBLE
+        CMP     R1, R4
+    ?!C JMP     PBAD            ; no digit of the base
         MOVE    @M_A, R9
         MOVE    @M_B, R4
         ADD     R9, @M_UMUL, R1
         ADD     R7, R7, 1
-        SUB[M]  R0, R9, 256
-    ?!C MOVE    PC, PBAD
-        SUB[M]  R0, R4, 16      ; hex: two digits at most
-    ?!Z MOVE    PC, PCHAR
-        SUB[M]  R0, R7, 3
-    ?!C MOVE    PC, PBAD
-        MOVE    PC, PCHAR
+        CMP     R9, 256
+    ?!C JMP     PBAD
+        CMP     R4, 16          ; hex: two digits at most
+    ?!Z JMP     PCHAR
+        CMP     R7, 3
+    ?!C JMP     PBAD
+        JMP     PCHAR
 PLAST   MOVE    R1, 0           ; R1 is 1 if a separator ended the number
-        MOVE    PC, PEND
+        JMP     PEND
 PSEP    MOVE    R1, 1
-PEND    MOVE[M] R0, R7
-    ?Z  MOVE    PC, PBAD        ; an empty number
-        MOVE[M] R0, R6
-    ?Z  MOVE    PC, PBAD        ; one number too many
+PEND    TST     R7
+    ?Z  JMP     PBAD            ; an empty number
+        TST     R6
+    ?Z  JMP     PBAD            ; one number too many
         SUB     R6, R6, 1
         SHL     R11, R11, 8     ; the byte goes in at the low end of R11:R8
         SHR     R7, R8, 24
         OR      R11, R11, R7
         SHL     R8, R8, 8
         OR      R8, R8, R9
-        MOVE[M] R0, R1
-    ?!Z MOVE    PC, PFIELD      ; the next number
-        MOVE[M] R0, R6
+        TST     R1
+    ?!Z JMP     PFIELD          ; the next number
+        TST     R6
     ?Z  MOVE    R1, 0           ; all R6 numbers, and the text has ended
     ?!Z MOVE    R1, 1
-        MOVE    PC, @SP++
+        RET
 PBAD    MOVE    R1, 1
-        MOVE    PC, @SP++
+        RET
 
 ; RESULT writes PASS in green at R2 when R1 is 0, or else FAIL in red, and
 ; R5 and R6 in hex after it, and counts the failure in R10. It changes R1,
 ; R2, R3, R4, and R9.
-RESULT  MOVE[M] R0, R1
-    ?!Z MOVE    PC, RFAIL
+RESULT  TST     R1
+    ?!Z JMP     RFAIL
         MOVE    R1, S_PASS
         MOVE    R3, TAIL
-        MOVE    PC, PRINT       ; which returns to the caller
+        JMP     PRINT           ; which returns to the caller
 RFAIL   ADD     R10, R10, 1
         MOVE    R1, S_FAIL
         MOVE    R3, RED
-        ADD     @--SP, 2, PC
-        MOVE    PC, PRINT
+        CALL    PRINT
         ADD     R2, R2, 1
         MOVE    R1, R5
         MOVE    R3, TYPED
-        ADD     @--SP, 2, PC
-        MOVE    PC, HEX8
+        CALL    HEX8
         ADD     R2, R2, 1
         MOVE    R1, R6
-        MOVE    PC, HEX8        ; which returns to the caller
+        JMP     HEX8            ; which returns to the caller
 
 ; HEX8 writes R1 in 8 hex digits from R2, in the color R3, and leaves R2
 ; after them. It changes R1, R2, R4, and R9.
@@ -1362,16 +1271,15 @@ HDIGIT  SHR     R9, R1, 28
         OR      @R2++, @HEXDIG[R9], R3
         SHL     R1, R1, 4
         SUB[M]  R4, R4, 1
-    ?!Z MOVE    PC, HDIGIT
-        MOVE    PC, @SP++
+    ?!Z JMP     HDIGIT
+        RET
 
 ; F12 returns to the monitor, with the screen cleared by its scr_cls and
 ; the status 0. Every demo leaves the timer stopped and E clear.
 MONITOR MOVE    SP, @D_SP
-        ADD     @--SP, 2, PC
-        MOVE    PC, _scr_cls
+        CALL    _scr_cls
         MOVE    R1, 0
-        MOVE    PC, @SP++
+        RET
 
 ; POLL takes a key from the input, if one has arrived, and sets R1 to it: a
 ; byte, KEY_UP to KEY_LT for a cursor key, or 0 when there is none. It
@@ -1383,32 +1291,29 @@ MONITOR MOVE    SP, @D_SP
 ; in time gives ESC, 0x1B, as the MEGA65's ESC key sends it alone. At the
 ; end of the input, POLL halts. It changes R1 to R5, and calls ECHO, unless
 ; it is 0, with each byte in R1.
-POLL    ADD     @--SP, 2, PC
-        MOVE    PC, READ
-    ?Z  MOVE    PC, @SP++       ; no byte, and R1 is 0
-        SUB[M]  R0, R1, 0x1B
-    ?!Z MOVE    PC, @SP++       ; a byte other than ESC
-ESCAPE  ADD     @--SP, 2, PC
-        MOVE    PC, NEXT
+POLL    CALL    READ
+    ?Z  RET                     ; no byte, and R1 is 0
+        CMP     R1, 0x1B
+    ?!Z RET                     ; a byte other than ESC
+ESCAPE  CALL    NEXT
     ?Z  MOVE    R1, 0x1B        ; an ESC alone is a key of its own
-    ?Z  MOVE    PC, @SP++
-        SUB[M]  R0, R1, 0x1B
-    ?Z  MOVE    PC, ESCAPE      ; ESC again starts again
-        SUB[M]  R0, R1, 0x5B    ; [
-    ?Z  MOVE    PC, CSI
-        SUB[M]  R0, R1, 0x4F    ; O
-    ?!Z MOVE    PC, @SP++
+    ?Z  RET
+        CMP     R1, 0x1B
+    ?Z  JMP     ESCAPE          ; ESC again starts again
+        CMP     R1, 0x5B        ; [
+    ?Z  JMP     CSI
+        CMP     R1, 0x4F        ; O
+    ?!Z RET
 ; ESC O and a byte: A to D are the cursor keys, and P to S F1 to F4. No
 ; byte in time leaves R1 0, which is none of them.
-        ADD     @--SP, 2, PC
-        MOVE    PC, NEXT
+        CALL    NEXT
         SUB     R2, R1, 0x41
-        SUB[M]  R0, R2, 4
-    ?C  MOVE    PC, ARROW
+        CMP     R2, 4
+    ?C  JMP     ARROW
         SUB     R2, R1, 0x50
-        SUB[M]  R0, R2, 4
-    ?C  MOVE    PC, FKEY
-        MOVE    PC, NONE
+        CMP     R2, 4
+    ?C  JMP     FKEY
+        JMP     NONE
 ; ESC [, parameters, and a final byte, which is 0x40 or above. A to D are
 ; the cursor keys, whatever the parameters. ~ is a function key, whose
 ; number in FNUMS is the first parameter. R3 is the first parameter, and R4
@@ -1416,39 +1321,38 @@ ESCAPE  ADD     @--SP, 2, PC
 ; gives 0 at the timeout, so that the bytes typed after it are keys again.
 CSI     MOVE    R3, 0
         MOVE    R4, 0
-PARAM   ADD     @--SP, 2, PC
-        MOVE    PC, NEXT
-    ?Z  MOVE    PC, NONE        ; no byte in time
-        SUB[M]  R0, R1, 0x40
-    ?!C MOVE    PC, FINAL
+PARAM   CALL    NEXT
+    ?Z  JMP     NONE            ; no byte in time
+        CMP     R1, 0x40
+    ?!C JMP     FINAL
         SUB     R2, R1, 0x30
-        SUB[M]  R0, R2, 10
+        CMP     R2, 10
     ?!C MOVE    R4, 1           ; not a digit, such as ;, ends the first
-        MOVE[M] R0, R4
-    ?!Z MOVE    PC, PARAM
+        TST     R4
+    ?!Z JMP     PARAM
         SHL     R5, R3, 1       ; R3 is 10 * R3 + the digit
         SHL     R3, R3, 3
         ADD     R3, R3, R5
         ADD     R3, R3, R2
-        MOVE    PC, PARAM
+        JMP     PARAM
 FINAL   SUB     R2, R1, 0x41
-        SUB[M]  R0, R2, 4
-    ?C  MOVE    PC, ARROW
-        SUB[M]  R0, R1, 0x7E    ; ~
-    ?!Z MOVE    PC, NONE
+        CMP     R2, 4
+    ?C  JMP     ARROW
+        CMP     R1, 0x7E        ; ~
+    ?!Z JMP     NONE
         MOVE    R2, 0
-FIND    SUB[M]  R0, R3, @FNUMS[R2]
-    ?Z  MOVE    PC, FKEY
+FIND    CMP     R3, @FNUMS[R2]
+    ?Z  JMP     FKEY
         ADD     R2, R2, 1
-        SUB[M]  R0, R2, 12
-    ?!Z MOVE    PC, FIND
+        CMP     R2, 12
+    ?!Z JMP     FIND
 NONE    MOVE    R1, 0
-        MOVE    PC, @SP++
+        RET
 ARROW   ADD     R1, R2, KEY_UP  ; R2 is 0 to 3 for A to D
-        MOVE    PC, @SP++
+        RET
 FKEY    MOVE[M] R1, @FKEYS[R2]  ; R2 is 0 to 11 for F1 to F12
-    ?Z  MOVE    PC, @SP++       ; a key without a demo, and R1 is 0
-        MOVE    PC, R1
+    ?Z  RET                     ; a key without a demo, and R1 is 0
+        JMP     R1
 
 ; READ reads the console. Z is set when no byte has arrived, and R1 is the
 ; byte, or 0. It calls ECHO with the byte, unless ECHO is 0. At the end of
@@ -1457,27 +1361,25 @@ READ    MOVE    R1, @CONSOLE
         AND[M]  R0, R1, 0x200   ; the end of the input
     ?!Z HALT
         AND[M]  R0, R1, 0x100
-    ?Z  MOVE    PC, @SP++       ; no byte, and R1 is 0
+    ?Z  RET                     ; no byte, and R1 is 0
         AND     R1, R1, 0xFF
-        MOVE[M] R0, ECHO
-    ?!Z ADD     @--SP, 1, PC    ; MOVE PC, ECHO is a word long
-    ?!Z MOVE    PC, ECHO
+        TST     ECHO
+    ?!Z CALL    ECHO
         OR[M]   R0, R1, 0x100   ; Z is clear, also for a byte of 0
-        MOVE    PC, @SP++
+        RET
 
 ; NEXT waits at most T_ESC microseconds for a byte of the console, and sets
 ; R1 to it, with Z clear. If none comes, R1 is 0 and Z is set. The deadline
 ; is on the stack, not in a register, as the demo can halt in READ here, and
 ; a time in a register would then differ from niceemu's.
 NEXT    ADD     @--SP, @P_US, T_ESC ; the deadline
-NWAIT   ADD     @--SP, 2, PC
-        MOVE    PC, READ
-    ?!Z MOVE    PC, NDONE       ; a byte
-        SUB[M]  R0, @P_US, @SP
-    ?N  MOVE    PC, NWAIT
+NWAIT   CALL    READ
+    ?!Z JMP     NDONE           ; a byte
+        CMP     @P_US, @SP
+    ?N  JMP     NWAIT
         MOVE[M] R1, 0
 NDONE   ADD     SP, SP, 1       ; drop the deadline, and keep the flags
-        MOVE    PC, @SP++
+        RET
 
 ; FRAME clears the screen and hides the cursor, and draws the two rows at
 ; the top that every demo has: the title bar, and the menu of the demos, in
@@ -1488,27 +1390,23 @@ FRAME   MOVE    @SCR_CTL, 0
         MOVE    R2, SCREEN
         MOVE    R3, TEXT+0x20
         MOVE    R4, 2000
-        ADD     @--SP, 2, PC
-        MOVE    PC, FILL
+        CALL    FILL
         MOVE    R2, SCREEN
         MOVE    R3, BAR+0x20
         MOVE    R4, 160
-        ADD     @--SP, 2, PC
-        MOVE    PC, FILL
+        CALL    FILL
         MOVE    R5, TITLE
-        ADD     @--SP, 2, PC
-        MOVE    PC, PRINTS
+        CALL    PRINTS
         MOVE    R5, MENU
 ITEM    MOVE[M] R2, @R5++       ; the position, or -1 at the end
-    ?X  MOVE    PC, @SP++
+    ?X  RET
         ADD     R2, R2, SCREEN
         MOVE    R3, BAR
-        SUB[M]  R0, R6, @R5++   ; the demo
+        CMP     R6, @R5++       ; the demo
     ?Z  MOVE    R3, MENU_ON
         MOVE    R1, @R5++       ; the string
-        ADD     @--SP, 2, PC
-        MOVE    PC, PRINT
-        MOVE    PC, ITEM
+        CALL    PRINT
+        JMP     ITEM
 
 ; SCROLL moves the R4 words from R2 + 80 to R2, which scrolls their rows up
 ; by one, and clears the row after them. R4 is at least 1. It changes R2 to
@@ -1516,22 +1414,21 @@ ITEM    MOVE[M] R2, @R5++       ; the position, or -1 at the end
 SCROLL  ADD     R3, R2, 80
 COPY    MOVE    @R2++, @R3++
         SUB[M]  R4, R4, 1
-    ?!Z MOVE    PC, COPY
+    ?!Z JMP     COPY
         MOVE    R3, TYPED+0x20
         MOVE    R4, 80
-        MOVE    PC, FILL        ; which returns to the caller
+        JMP     FILL            ; which returns to the caller
 
 ; PRINTS writes the texts of the table at R5 to the screen. Each has its
 ; position on the screen, 80 * row + column, its color, and its string, and
 ; -1 ends the table. It changes R1 to R5.
 PRINTS  MOVE[M] R2, @R5++
-    ?X  MOVE    PC, @SP++
+    ?X  RET
         ADD     R2, R2, SCREEN
         MOVE    R3, @R5++
         MOVE    R1, @R5++
-        ADD     @--SP, 2, PC
-        MOVE    PC, PRINT
-        MOVE    PC, PRINTS
+        CALL    PRINT
+        JMP     PRINTS
 
 ; The demos of the function keys F1 to F12, or 0 for none
 FKEYS   .DAT    TYPEW, 0, KCODES, 0, CHARS, 0, COUNTS, 0, GAME, 0, BOARD, MONITOR
