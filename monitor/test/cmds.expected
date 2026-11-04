@@ -181,4 +181,5 @@ Screen:
 |MAC address 0A:0B:0C:0D:0E:0F
 |> h
 |Halted
+VBASE at the halt 000000
 exit 0

@@ -31,6 +31,12 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   longer assembles. The cores, the devices, and the debug link are as
   in V1.3.
 
+**Monitor**
+
+- A program that `r` or `x` ran and that returns with `RET` comes back
+  to the start of `mon_exit`, which clears E and VBASE in R14. In V1.3
+  it came back one word late and kept both.
+
 ## V1.3 (2026-11-03)
 
 **Upgrade notes.**

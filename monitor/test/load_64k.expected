@@ -20,4 +20,5 @@ Screen:
 |0000EFFF 00000001
 |> h
 |Halted
+VBASE at the halt 000000
 exit 0

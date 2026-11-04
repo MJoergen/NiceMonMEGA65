@@ -485,4 +485,5 @@ Screen:
 |NiceMon V9.9, table 1.0
 |> h
 |Halted
+VBASE at the halt 000000
 exit 0

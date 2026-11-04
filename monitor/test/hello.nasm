@@ -4,7 +4,8 @@
 ; nice_print, so through the putc vector, which start_mon.nasm set to the
 ; monitor's mon_putc entry, and through the HAL: the version of the table,
 ; a text at column 40 of the next row in yellow, and a line on the line
-; only. It returns 42. The test runs it with the input test/run.txt.
+; only. It returns 42, with VBASE 0x80 in R14, which the monitor clears
+; at the return. The test runs it with the input test/run.txt.
 
 _main           MOVE    R1, hello.text
                 CALL    _nice_print
@@ -29,6 +30,7 @@ _main           MOVE    R1, hello.text
                 CALL    _io_crlf
                 MOVE    R1, 3           ; both again
                 CALL    _mon_out
+                MOVE    R14, 0x80       ; VBASE 0x80, and E 0
                 MOVE    R1, 42
                 RET
 hello.text

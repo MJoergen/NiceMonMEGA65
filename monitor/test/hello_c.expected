@@ -18,4 +18,5 @@ Screen:
 |Returned 00000007
 |> h
 |Halted
+VBASE at the halt 000000
 exit 0

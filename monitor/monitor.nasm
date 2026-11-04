@@ -1029,8 +1029,7 @@ run_at          TST     @R7
                 MOVE    R1, MON_PUTC    ; the entry of mon_putc (mon.nasm)
                 MOVE    R2, 0           ; argc
                 MOVE    R3, 0           ; argv
-                ADD     @--SP, 2, PC
-                JMP     R7
+                CALL    R7
 
 ; mon_exit: entry 1, and where a program returns to. Back to the main loop
 ; with R1 the status: E cleared, the timer stopped, VBASE 0, a fresh
