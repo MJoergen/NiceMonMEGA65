@@ -773,8 +773,22 @@ this computer's network: the rest is not run, and the summary names it
 after NOT COVERED, which does not fail the run. Without `ETH`, the
 summary names the Ethernet station there.
 
+With the core held, it tests the SD card controller at `0xFFFFFFA0`.
+It checks the number of slots, the reserved word, `SD_CHUNK`, and all
+128 words of the buffer, and that a slot the board does not have shows
+no card. Then for each slot with a card, it starts the card with Init,
+and checks its type and last sector. It reads sector 0 twice and the
+last sector, and checks that the sector after the last is out of range.
+Sector 0 must end in `55 AA`, and be a FAT boot sector, or an MBR whose
+first partition starts with one. A write-protected card must refuse a
+Write with error 6, which writes nothing; nothing is ever written to a
+card. A slot without a card, and a card without `55 AA` in sector 0,
+which is not formatted, are named after NOT COVERED. On the R3, slot 1
+has no card detect, so it is always tried, and fails without a card.
+
 The reset button is not tested: press it with a terminal open, and the
-`b06` notice comes again.
+`b06` notice comes again. Nor is card detect: take a card out, and the
+present bit of `SD_CSR` falls.
 
 ## The tools and niceemu
 

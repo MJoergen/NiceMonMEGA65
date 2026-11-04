@@ -112,6 +112,18 @@ the demos that the second row lists, F12 (SHIFT and F11) goes back to the
 monitor, and the reset button starts the monitor again. The ROM can also hold a program of your own (see
 [Building your own ROM](#building-your-own-rom)).
 
+### The SD cards
+
+Programs reach the boards' SD cards through the SD card controller of
+nice_cpu, at `0xFFFFFFA0`, a sector of 512 bytes at a time, as in
+`niceemu --sd0` and `--sd1`. The monitor does not use them yet. On the
+MEGA65, slot 0 is the microSD slot at the back, and slot 1 the
+full-size slot underneath, which holds the MEGA65's system files: a
+program that writes there can damage them, so test one on a card of its
+own in slot 0. On the Nexys4DDR, slot 0 is its microSD slot.
+[SYSTEM.md](doc/SYSTEM.md#the-sd-card-slots) has the details, and the
+limits of the R3.
+
 ### The on-board debugger
 
 MEGA+HELP brings up the debugger, with no cable and no PC: a strip of

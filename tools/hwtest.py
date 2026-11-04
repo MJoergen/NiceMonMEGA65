@@ -60,6 +60,16 @@ Checks, in this order:
     - the board's devices are written and read: on the Nexys4DDR the LEDs,
       RGB LEDs, and seven-segment display, and the buttons and switches,
       which only a read can check; on the MEGA65 the block reads 0
+    - the SD card controller (doc/SYSTEM.md, The SD card slots): its slots,
+      the reserved word, SD_CHUNK, and every word of the buffer, written
+      and read; a slot the board does not have shows no card. Then for each
+      slot with a card: Init, its type and last sector, a Read of sector 0,
+      twice, and of the last sector, and the sector after the last one out
+      of range. Sector 0 ends in 55 AA, and so does the FAT boot sector of
+      its first partition, or sector 0 is that boot sector. A
+      write-protected card refuses a Write with error 6, which writes
+      nothing. Nothing is ever written to a card. A slot without a card,
+      or with a card without 55 AA in sector 0, is named after NOT COVERED.
     - the C example examples/build/primes.bin runs, and after its halt the
       microsecond counter holds the cycle counter's count over the clock
       in MHz
@@ -139,6 +149,14 @@ DEBUG_LINK = f"{REPO}/nice_cpu/hdl/src/debug_link.vhd"
 CLOCK_HZ = {"mega65": 100_000_000, "nexys4ddr": 90_000_000}
 # The words of the RAM, which 0xFFFFFF9E reads
 RAM_WORDS = {"mega65": 0x20000, "nexys4ddr": 0x10000}
+# The SD card controller's registers (nice_cpu's SYSTEM.md §5); A7 is
+# reserved
+SD_CSR, SD_LBA, SD_CHUNK, SD_ERROR, SD_SELECT, SD_LAST, SD_SLOTS = \
+    range(0xFFFFFFA0, 0xFFFFFFA7)
+SD_RESERVED = 0xFFFFFFA7
+SD_BUF = 0xFFFFFFA8
+# The slots of each board (doc/SYSTEM.md)
+SD_SLOT_COUNT = {"mega65": 2, "nexys4ddr": 1}
 
 T = TypeVar("T")
 
@@ -948,6 +966,149 @@ def test_board_devices(link: Link, board: str) -> None:
         check(f"W {addr:08X} clears", wr(link, addr, 0) and rd(link, addr) == 0)
 
 
+def sd_said(got: tuple[int, int] | None) -> str:
+    """What sd_run returned, for a check's detail."""
+    return "busy too long" if got is None else \
+        f"status {got[0]:08X}, error {got[1]}"
+
+
+def sd_run(link: Link, cmd: int, timeout: float) -> tuple[int, int] | None:
+    """Starts an SD card command, and waits for busy to fall: the status
+    and the error after it, or None after the timeout."""
+    link.write(SD_CSR, [cmd])
+    end = time.monotonic() + timeout
+    while True:
+        csr = rd(link, SD_CSR)
+        if csr & 1 == 0:
+            return csr, rd(link, SD_ERROR)
+        if time.monotonic() > end:
+            return None
+
+
+def sd_sector(link: Link) -> bytes:
+    """The 512 bytes of the buffer, read a chunk at a time."""
+    data = bytearray()
+    for c in range(16):
+        link.write(SD_CHUNK, [c])
+        for w in link.read(SD_BUF, 8):
+            data += w.to_bytes(4, "little")
+    return bytes(data)
+
+
+def sd_read(link: Link, name: str, lba: int) -> bytes | None:
+    """Reads a sector into the buffer, and its bytes, or None when the
+    Read fails."""
+    link.write(SD_LBA, [lba])
+    got = sd_run(link, 1, 1.0)
+    if not check(f"{name}: Read of sector {lba:#x}",
+                 got is not None and got[1] == 0,
+                 sd_said(got)):
+        return None
+    return sd_sector(link)
+
+
+def fat_boot(sector: bytes) -> bool:
+    """Whether a sector is the boot sector of a FAT12, FAT16, or FAT32
+    file system: a jump, 512 bytes in a sector, the type's name where
+    the boot sector of its kind has it, and 55 AA."""
+    return (sector[0] in (0xEB, 0xE9) and sector[11:13] == b"\x00\x02"
+            and (sector[54:59] == b"FAT12" or sector[54:59] == b"FAT16"
+                 or sector[82:87] == b"FAT32")
+            and sector[510:] == b"\x55\xaa")
+
+
+def test_sd_fat(link: Link, name: str, first: bytes) -> None:
+    """Checks the file system of a card from its sector 0, first, which
+    is either a FAT boot sector itself or an MBR whose first partition
+    starts with one. A sector 0 without 55 AA is a card that is not
+    formatted, which is not covered."""
+    if first[510:] != b"\x55\xaa":
+        uncovered.append(f"{name}'s file system, as sector 0 has no 55 AA")
+        return
+    if fat_boot(first):
+        check(f"{name}: sector 0 is a FAT boot sector", True)
+        return
+    start = int.from_bytes(first[454:458], "little")
+    check(f"{name}: sector 0 is an MBR, partition 1 at {start:#x}",
+          first[450] != 0 and start > 0, f"type {first[450]:#04x}")
+    if start > 0:
+        boot = sd_read(link, name, start)
+        check(f"{name}: sector {start:#x} is a FAT boot sector",
+              boot is not None and fat_boot(boot),
+              "" if boot is None else repr(boot[3:11]))
+
+
+def test_sd(link: Link, board: str) -> None:
+    """The SD card controller at FFFFFFA0-AF, with the core held, as the
+    header says. It only reads the cards."""
+    slots = SD_SLOT_COUNT[board]
+    n = rd(link, SD_SLOTS)
+    check("SD_SLOTS", n == slots, f"got {n}, want {slots}")
+    check("FFFFFFA7 reads 0 and takes no write",
+          wr(link, SD_RESERVED, 0xFFFFFFFF) and rd(link, SD_RESERVED) == 0)
+    check("SD_CHUNK takes bits 3..0",
+          wr(link, SD_CHUNK, 0x12) and rd(link, SD_CHUNK) == 2)
+    # Every word of the buffer, eight at a time
+    for c in range(16):
+        link.write(SD_CHUNK, [c])
+        link.write(SD_BUF, [0x5D000000 + (c << 8) + k for k in range(8)])
+    bad = []
+    for c in range(16):
+        link.write(SD_CHUNK, [c])
+        bad += [8 * c + k for k, w in enumerate(link.read(SD_BUF, 8))
+                if w != 0x5D000000 + (c << 8) + k]
+    check("the SD buffer's 128 words", not bad,
+          f"wrong: {bad}" if bad else "")
+    # A slot the board does not have
+    link.write(SD_SELECT, [5])
+    csr = rd(link, SD_CSR)
+    got = sd_run(link, 0, 1.0)
+    check("SD slot 5: no card, and Init fails with error 1",
+          csr & 4 == 0 and got is not None and got[1] == 1,
+          f"present {csr >> 2 & 1}, {sd_said(got)}")
+    for slot in range(slots):
+        name = f"SD slot {slot}"
+        link.write(SD_SELECT, [slot])
+        csr = rd(link, SD_CSR)
+        if csr & 4 == 0:
+            got = sd_run(link, 0, 1.0)
+            check(f"{name}: no card, Init fails with error 1",
+                  got is not None and got[1] == 1, sd_said(got))
+            uncovered.append(f"{name}, as it has no card")
+            continue
+        t0 = time.monotonic()
+        got = sd_run(link, 0, 3.0)
+        ms = (time.monotonic() - t0) * 1000
+        if not check(f"{name}: Init", got is not None and got[1] == 0,
+                     f"{sd_said(got)}, {ms:.0f} ms") \
+                or got is None:
+            continue
+        csr = got[0]
+        kind = (csr >> 8) & 3
+        last = rd(link, SD_LAST)
+        check(f"{name}: ready, type {kind}, last sector {last:#x} "
+              f"({(last + 1) / 2048 / 1024:.2f} GiB)",
+              csr & 0x18 == 0x08 and kind in (1, 2) and last > 0,
+              f"status {csr:08X}")
+        first = sd_read(link, name, 0)
+        if first is not None:
+            check(f"{name}: sector 0 reads the same again",
+                  sd_read(link, name, 0) == first)
+            test_sd_fat(link, name, first)
+        sd_read(link, name, last)
+        link.write(SD_LBA, [last + 1])
+        got = sd_run(link, 1, 1.0)
+        check(f"{name}: Read of sector {last + 1:#x} is out of range",
+              got is not None and got[1] == 7, sd_said(got))
+        if csr & 0x20:
+            # The controller refuses it before anything reaches the card.
+            link.write(SD_LBA, [last])
+            got = sd_run(link, 2, 1.0)
+            check(f"{name}: write-protected, Write fails with error 6",
+                  got is not None and got[1] == 6, sd_said(got))
+    link.write(SD_SELECT, [0])
+
+
 def test_fetch_statistics(link: Link) -> None:
     """Checks the control word of the fetch statistics at FFFFFF50 and that
     FFFFFF5D, a word they leave at 0, reads 0."""
@@ -1434,6 +1595,7 @@ def main() -> None:
                 test_counters_stop(link)
                 test_screen_registers(link)
                 test_board_devices(link, board)
+                test_sd(link, board)
                 test_fetch_statistics(link)
                 test_primes(link, primes, board)
             finally:
