@@ -208,7 +208,11 @@ one.
 An entry is added only when a program cannot do without it: it reaches
 hardware that the monitor owns or that differs between boards, or state
 that the monitor keeps, such as the cursor and the outputs. The SD card's
-routines are the kind that will come later. Strings, memory, number
+sector routines will be such entries
+([#57](https://github.com/MJoergen/NiceMonMEGA65/issues/57)): the
+registers are the same everywhere, but once FAT32 is in the ROM, the
+selected slot, the buffer, and the caches are state that the monitor
+keeps. Strings, memory, number
 formatting, line editing, and random numbers are not the HAL's: assembly
 programs join `monlib.nasm` (The shared routines below), which the
 monitor's own commands use too, and C programs have nice_cpu's `libc`.
@@ -279,8 +283,9 @@ What QMON's table has that this one leaves out:
 - `enter!` and `leave!`: NICE has no register banks.
 - `vga_init!`, `vga_copyfont!`, and `vga_copypal!`: the font is fixed,
   and the colors are in each screen word.
-- The `sd_*!` and `f32_*!` entries: there is no SD card yet. When one
-  comes, the entries it strictly needs go at the end.
+- The `sd_*!` and `f32_*!` entries: not yet. `sd_init`, `sd_read`, and
+  `sd_write` come as entries 9 to 11 with #57, and the file API after
+  them, as `doc/SDCARD.md` on the branch `sdcard-design` says.
 
 ## The shared routines
 
