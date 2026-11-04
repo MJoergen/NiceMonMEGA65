@@ -21,6 +21,17 @@ The release candidates pinned these:
 
 nice_cpu's `RC01` and `RC03` have no tag here.
 
+## V1.5
+
+**Upgrade notes.**
+
+- nice_cpu is at `V1.5`. Its emulator has an SD card controller at
+  `0xFFFFFFA0`–`AF`, with the image files of `--sd0` and `--sd1`, where
+  it had memory. The boards have memory there until the controller lands
+  here (#55, #56). nice_cpu's SYSTEM.md §5 is the SD card, and the
+  systems built on the FPGA core are §6. The cores, the devices, and the
+  debug link are as in V1.4.
+
 ## V1.4 (2026-11-04)
 
 **Upgrade notes.**

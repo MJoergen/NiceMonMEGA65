@@ -307,7 +307,7 @@ in nice_cpu's runtime or C library:
   `0xFFFFFF00`. A read returns 0 while no byte has arrived, so the monitor
   polls, which works in the emulator too, where a read waits.
 - A break on the UART, or a host's half-close over Ethernet, ends the
-  line's input and not the keyboard's (nice_cpu's SYSTEM.md §5): the
+  line's input and not the keyboard's (nice_cpu's SYSTEM.md §6): the
   host's bytes are dropped until the core is started again, a read
   returns `0x200` once the FIFO is empty, and the keyboard's bytes still
   come. So the monitor reads on, and a program that reads until `0x200`

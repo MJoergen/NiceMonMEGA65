@@ -90,7 +90,7 @@
 --                          bytes after the break are dropped, and once the
 --                          FIFO is empty a read returns 0x200 (bit 9). The
 --                          keyboard's bytes still go into the FIFO, and a
---                          read returns them (SYSTEM.md §5). A read by the
+--                          read returns them (SYSTEM.md §6). A read by the
 --                          link returns 0 and takes nothing, and a write by
 --                          the link is dropped.
 --   0xFFFFFF01             The read counter of the emulator: a read by the
@@ -581,7 +581,7 @@ architecture synthesis of nicemon is
    -- half-close over TCP: the link's eoi_o, high until the next start or
    -- the next connection over TCP. While it is high, the link forwards none
    -- of the host's bytes, and a read of the console with the FIFO empty
-   -- returns 0x200. The keyboard's bytes still go in (SYSTEM.md §5).
+   -- returns 0x200. The keyboard's bytes still go in (SYSTEM.md §6).
    signal link_eoi : std_logic;
 
    -- The core's console output, to the link
@@ -1150,7 +1150,7 @@ begin
    -- room for two, so that a byte from the link, which the link sends only
    -- when the free space was not 0 a cycle earlier, finds room. Otherwise it
    -- is taken and dropped: while the core is held or halted. After the end
-   -- of the line's input it still goes in (SYSTEM.md §5).
+   -- of the line's input it still goes in (SYSTEM.md §6).
    kbd_room <= '1' when rx_free >= 2 else
                '0';
    kbd_take <= kbd_valid_i and not link_in_valid and

@@ -7,7 +7,7 @@
 -- wr_data_i with wr_en_i high is written, unless the FIFO is full; then it
 -- is lost. The end of the line's input is not the FIFO's: after a break the
 -- link forwards none of the host's bytes, the keyboard's bytes still go in
--- (SYSTEM.md §5), and nicemon.vhd answers 0x200 from the link's eoi_o once
+-- (SYSTEM.md §6), and nicemon.vhd answers 0x200 from the link's eoi_o once
 -- the FIFO is empty.
 --
 -- free_o is the number of bytes that the FIFO can take now, from 0 to

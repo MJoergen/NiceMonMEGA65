@@ -106,7 +106,7 @@
 --    keyboard waits. Then G_FIFO_FILE once more, with a break on the UART
 --    while it runs: the host's bytes after the break are dropped, and the
 --    keys still reach the program, which reads on at 0x200 and echoes
---    them (nice_cpu's SYSTEM.md §5).
+--    them (nice_cpu's SYSTEM.md §6).
 -- 15. The link over TCP, with the net_* ports driven as eth/eth_tcp.vhd
 --    drives them: a host connects, and G_FIFO_FILE echoes its bytes over
 --    TCP; its half-close is a break, after which its bytes are dropped;
