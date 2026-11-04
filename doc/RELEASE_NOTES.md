@@ -33,6 +33,11 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 
 **Monitor**
 
+- `u` shows the words of the pseudo-instructions `NOP`, `JMP`, `PUSH`,
+  `POP`, `CLR`, `TST`, and `CMP` as those, as it showed `CALL` and
+  `RET`, such as `?Z JMP 0x8000` and `CMP R1, 0x20`. Empty RAM shows as
+  `NOP`. Where a word matches two, the README's order says which is
+  shown, and `niceasm` assembles each row back to its words (#73).
 - A program that `r` or `x` ran and that returns with `RET` comes back
   to the start of `mon_exit`, which clears E and VBASE in R14. In V1.3
   it came back one word late and kept both.

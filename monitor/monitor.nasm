@@ -26,8 +26,9 @@
 ; the ROM to 0x8000 and runs it as r does, for the time being (issue #65).
 ;
 ; u disassembles instructions, a row each, in the text of nice_cpu's
-; nicedis.py, with the pairs of a call shown as CALL, and the return as
-; RET, the pseudo-instructions of nice_cpu's ISA.md §10.1 (README.md, "The
+; nicedis.py, with the pairs of a call shown as CALL, the return as RET,
+; and the words of NOP, JMP, PUSH, POP, CLR, TST, and CMP as those, the
+; pseudo-instructions of nice_cpu's ISA.md §10.1 (README.md, "The
 ; disassembler").
 ;
 ; mon_putc writes a character to the outputs that V_OUT selects. On the
@@ -268,11 +269,12 @@ dump_end
 ; shows it (README.md). Without ADDR, the instructions after the last
 ; shown; without N, DIS_ROWS. ADD @--R13, n, R15 and MOVE R15, target,
 ; with the same condition, no modifier, and n the words of the MOVE, are
-; one row, CALL target, and MOVE R15, @R13++ is RET (nice_cpu's ISA.md
-; §10.1). R7 is the address of the instruction, R8 counts the rows left,
-; R9 is the instruction word, R10 its kind, an index of DIS_KINDS, and R12
-; the address after it. The fields are at V_UF, their constants at V_UC,
-; and the operands of the mnemonic at V_UNOPS.
+; one row, CALL target, MOVE R15, @R13++ is RET, and the other
+; pseudo-instructions of nice_cpu's ISA.md §10.1 are those of U_PSEUDO,
+; the first that matches. R7 is the address of the instruction, R8 counts
+; the rows left, R9 is the instruction word, R10 its kind, an index of
+; DIS_KINDS, and R12 the address after it. The fields are at V_UF, their
+; constants at V_UC, and the operands of the mnemonic at V_UNOPS.
 cmd_dis
                 MOVE    R1, R2
                 CALL    _io_gethex      ; R1 the address, R2 its digits, R3 after it
@@ -306,30 +308,45 @@ dis_const
                 ADD     R11, R11, 1
                 CMP     R11, 3
         ?!Z     JMP     dis_const
-; RET, the first half of a CALL, or another instruction
+; RET, the first half of a CALL, another pseudo-instruction, or another
+; instruction
                 AND     R1, R9, 0x0FFFFFFF  ; without the condition
                 MOVE    R10, 2
                 CMP     R1, 0x0003F680  ; MOVE R15, @R13++
         ?Z      JMP     dis_print
-                MOVE    R10, 0
                 CMP     R1, 0x0077580F  ; ADD @--R13, n, R15
-        ?!Z     JMP     dis_print
+        ?!Z     JMP     dis_find
                 MOVE    R2, @R12        ; the word after it
                 XOR     R3, R2, R9
                 AND[M]  R0, R3, 0xF0000000
-        ?!Z     JMP     dis_print       ; another condition
+        ?!Z     JMP     dis_find        ; another condition
                 AND     R3, R2, 0x0FFFC07F
                 CMP     R3, 0x0003C000  ; MOVE R15, s0
-        ?!Z     JMP     dis_print
+        ?!Z     JMP     dis_find
                 MOVE    R4, 1           ; the words of the MOVE
                 SHR     R3, R2, 7
                 AND     R3, R3, 0x30
                 CMP     R3, 0x30
         ?Z      MOVE    R4, 2
                 CMP     R4, @V_UC+1
-        ?!Z     JMP     dis_print       ; n is not their number
+        ?!Z     JMP     dis_find        ; n is not their number
                 ADD     R12, R12, R4
                 MOVE    R10, 3
+                JMP     dis_print
+; The first entry of U_PSEUDO whose mask and value match, kind 5 for the
+; first, or kind 0, a plain instruction
+dis_find
+                MOVE    R10, 5
+                MOVE    R2, U_PSEUDO
+dis_find_next
+                AND     R3, R1, @R2++   ; the mask
+                CMP     R3, @R2++       ; the value
+        ?Z      JMP     dis_print
+                ADD     R2, R2, 3
+                ADD     R10, R10, 1
+                CMP     R10, 5+U_PSEUDOS
+        ?!Z     JMP     dis_find_next
+                MOVE    R10, 0
                 JMP     dis_print
 ; A control instruction, which is reserved with a command past INT, a bit
 ; of 20..8 set, or a vector but for INT
@@ -438,6 +455,24 @@ dis_rsvd
                 CALL    u_dat
                 MOVE    R1, S_URSVD
                 CALL    _io_puts
+                JMP     dis_end
+; Kinds 5 and up, the pseudo-instruction of entry R10 - 5 of U_PSEUDO,
+; with its fields, from its first, as u_stmt writes them
+dis_pseudo
+                MOVE    R1, R9
+                CALL    u_cond
+                SUB     R1, R10, 5
+                SHL     R2, R1, 2
+                ADD     R2, R2, R1
+                ADD     R11, R2, U_PSEUDO+2  ; the name, the first field, and their number
+                MOVE    R1, @R11++
+                CALL    _io_puts
+                MOVE    R10, @R11++
+                ADD[M]  @V_UNOPS, R10, @R11
+        ?Z      JMP     dis_end         ; NOP
+                MOVE    R1, 0x20
+                CALL    mon_putc
+                CALL    u_stmt_op
 ; The end of the row, and the next instruction
 dis_end         CALL    _io_crlf
                 MOVE    R7, R12
@@ -1434,6 +1469,30 @@ U_FIELDS
                 .DAT    U_FDEST, U_FS0, U_FS1
 DIS_KINDS
                 .DAT    dis_insn, dis_cmd, dis_ret, dis_call, dis_rsvd
+                .DAT    dis_pseudo, dis_pseudo, dis_pseudo, dis_pseudo
+                .DAT    dis_pseudo, dis_pseudo, dis_pseudo
+; The pseudo-instructions of u, in the order in which they are tried, after
+; RET and CALL (README.md): the mask and the value of the instruction word
+; without its condition, the name, the first field shown, and the number
+; of fields shown. The masks take in the opcode and the modifiers, which
+; must be 0 but for the [M] of TST and CMP, and the field that is unused,
+; which must be R0.
+U_PSEUDO
+                .DAT    0x0FFFFFFF, 0x00000000, U_NOP, 0, 0  ; MOVE R0, R0
+                .DAT    0x0FFFC07F, 0x0003C000, U_JMP, 1, 1  ; MOVE R15, s0
+                .DAT    0x0FFFC07F, 0x00174000, U_PUSH, 1, 1  ; MOVE @--R13, s0
+                .DAT    0x0FE03FFF, 0x00003680, U_POP, 0, 1  ; MOVE dest, @R13++
+                .DAT    0x0FE03FFF, 0x00000000, U_CLR, 0, 1  ; MOVE dest, R0
+                .DAT    0x0FFFC07F, 0x02000000, U_TST, 1, 1  ; MOVE[M] R0, s0
+                .DAT    0x0FFFC000, 0x02200000, U_CMP, 1, 2  ; SUB[M] R0, s0, s1
+U_PSEUDOS       .EQU    7
+U_NOP           .ASCII_L 'NOP'
+U_JMP           .ASCII_L 'JMP'
+U_PUSH          .ASCII_L 'PUSH'
+U_POP           .ASCII_L 'POP'
+U_CLR           .ASCII_L 'CLR'
+U_TST           .ASCII_L 'TST'
+U_CMP           .ASCII_L 'CMP'
 U_MOVE          .ASCII_L 'MOVE'
 U_SUB           .ASCII_L 'SUB'
 U_MDBL          .ASCII_L 'MDBL'

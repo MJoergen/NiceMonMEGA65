@@ -88,12 +88,15 @@ with [#62](https://github.com/MJoergen/NiceMonMEGA65/issues/62).
 ## The disassembler
 
 `u` shows each instruction as nice_cpu's `assembler/nicedis.py` and
-`mon.py` do, so the three disassemblers agree:
+`mon.py` do, so the three disassemblers agree, but for the
+pseudo-instructions below, which only `u` shows:
 
-    > u 8000 3
+    > u 8000 5
     00008000 0077580f 00000002 0003d800 00008123  CALL 0x8123
     00008004 0003f680                             RET
-    00008005 3c400007                             ?Z INT 7
+    00008005 022000b0 00000020                    CMP R1, 0x20
+    00008007 3003d800 00008000                    ?Z JMP 0x8000
+    00008009 3c400007                             ?Z INT 7
 
 - The text has the condition, the mnemonic with `[C]` and `[M]`, the
   SHIFT aliases, such as `SHL` and `ROR`, and the operands in the syntax
@@ -105,13 +108,37 @@ with [#62](https://github.com/MJoergen/NiceMonMEGA65/issues/62).
   `.DAT 0x00000001 ; MOVE R0, R0 (s1: R1)`.
 - `ADD @--R13, n, R15` followed by `MOVE R15, target`, where `n` is the
   number of words of the `MOVE`, is one row, `CALL target`, and
-  `MOVE R15, @R13++` is `RET`: the pseudo-instructions of ISA.md §10.1,
+  `MOVE R15, @R13++` is `RET`: pseudo-instructions of ISA.md §10.1,
   which `niceasm` assembles back to the same words. A condition applies
   to both instructions of a `CALL`, so the two must have the same one,
   as in `?Z CALL 0x8123`. A pair with two conditions, an `ADD` with a
   modifier, an `n` that is not the length of the `MOVE`, or a `MOVE`
-  with a modifier, is two rows. nicedis.py does not show the two
-  pseudo-instructions.
+  with a modifier, is two rows.
+- The other pseudo-instructions of §10.1 are one instruction each, and
+  are shown in its place
+  ([#73](https://github.com/MJoergen/NiceMonMEGA65/issues/73)). Some
+  words match two of them, and the first that matches, in this order, is
+  shown:
+
+  | Words | Shown as |
+  |---|---|
+  | `MOVE R0, R0`, the word 0, also of empty RAM | `NOP`, not `CLR R0` |
+  | `MOVE R15, @R13++` | `RET`, not `POP R15` or `JMP @R13++` |
+  | `ADD @--R13, n, R15` and `MOVE R15, target` | `CALL target`, whose `MOVE` is no `JMP` |
+  | `MOVE R15, target` | `JMP target`, so `MOVE R15, R0` is `JMP R0`, not `CLR R15` |
+  | `MOVE @--R13, x` | `PUSH x`, so `MOVE @--R13, R0` is `PUSH R0` |
+  | `MOVE x, @R13++` | `POP x` |
+  | `MOVE x, R0` | `CLR x` |
+  | `MOVE[M] R0, a` | `TST a` |
+  | `SUB[M] R0, a, b` | `CMP a, b` |
+
+  As with `CALL` and `RET`, a condition is shown, as in `?Z JMP 0x8000`,
+  and any other modifier makes the plain instruction: `MOVE[C] R15, R1`
+  and `SUB[CM] R0, R1, R2` stay as they are, and so do `MOVE[M]` and
+  `SUB[M]` with a dest that is not R0. A field that the `MOVE` does not
+  use and that is not R0 makes a `.DAT`, as before. `niceasm` assembles
+  each back to the same word. nicedis.py and `mon.py`, and the
+  debugger's decode of row 27, show the plain instructions.
 - An instruction of 4 words, with constants in all three fields, has a
   text longer than the 34 columns left, and goes on in the next row of
   the screen.
@@ -427,10 +454,14 @@ round, after Page Ups, Page Downs, and a key that shows the screen
 again. `test/dis.py` runs `u` over `test/dis.nasm` at `0x8000`, which
 has every opcode, operand mode, condition, and modifier, the control
 instructions, the reserved control words, unused fields that are not R0,
-and the pairs that are `CALL` and `RET` and those that are not. It
-compares each row with nicedis.py's text, or, for a `CALL` or a `RET`,
-assembles it with `niceasm` and compares the words, and checks that `u`
-without `ADDR` goes on after the last row.
+the pairs that are `CALL` and `RET` and those that are not, and the
+words of the other pseudo-instructions, with a register, a constant, a
+memory operand, and a condition each, the words that match two of them,
+and the near-misses. It compares each row with nicedis.py's text, or,
+for a pseudo-instruction, with nicedis.py's text rewritten by the rules
+above, and assembles it with `niceasm` and compares the words. It checks
+that each pseudo-instruction occurs, and that `u` without `ADDR` goes on
+after the last row.
 
 On a board, `make r6` builds a bitstream that boots the monitor, with the
 demo behind it in the ROM. `make hwtest` loads the same, with the

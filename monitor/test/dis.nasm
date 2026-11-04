@@ -1,9 +1,12 @@
 ; The words that test/dis.py disassembles with the monitor's u, at 0x8000,
-; to compare its rows with nicedis.py's text, and its CALL and RET rows
-; with niceasm. It is never run. It has every ALU and SHIFT opcode, every
-; operand mode in each field, every condition, the modifiers, the control
-; instructions, the reserved control words, unused fields that are not
-; R0, and the pairs that are CALL and RET and those that are not.
+; to compare its rows with nicedis.py's text, and its rows of
+; pseudo-instructions with niceasm. It is never run. It has every ALU and
+; SHIFT opcode, every operand mode in each field, every condition, the
+; modifiers, the control instructions, the reserved control words, unused
+; fields that are not R0, the pairs that are CALL and RET and those that
+; are not, and the words of the other pseudo-instructions, NOP, JMP, PUSH,
+; POP, CLR, TST, and CMP, and those that are not. They are written as
+; instructions, as the words are what u is tested on.
 
                 .ORG    0x8000
 ; The ALU opcodes
@@ -151,6 +154,66 @@ target          MOVE    R1, R2
 ; Words that are no RET: MOVE with [M], and with s0 @R12++
                 MOVE[M] R15, @R13++
                 MOVE    R15, @R12++
+; The other pseudo-instructions, with a register, a constant, a memory
+; operand, and a condition each
+                MOVE    R0, R0          ; NOP, the word 0
+        ?Z      MOVE    R0, R0
+                MOVE    R15, R3         ; JMP
+                MOVE    R15, @R3++
+                MOVE    R15, @0x10[R3]
+        ?!C     MOVE    R15, 0x8000
+                MOVE    @--R13, R1      ; PUSH
+                MOVE    @--R13, 0x12345678
+                MOVE    @--R13, @0x10[R3]
+        ?N      MOVE    @--R13, @R2
+                MOVE    R1, @R13++      ; POP
+                MOVE    @R2++, @R13++
+                MOVE    @0x10[R3], @R13++
+        ?!V     MOVE    @R2, @R13++
+                MOVE    R1, R0          ; CLR
+                MOVE    @R2++, R0
+                MOVE    @0x10[R3], R0
+        ?X      MOVE    R1--, R0
+                MOVE[M] R0, R1          ; TST
+                MOVE[M] R0, 0x12345678
+                MOVE[M] R0, @0x10[R3]
+        ?!Z     MOVE[M] R0, @--R2
+                SUB[M]  R0, R1, R2      ; CMP
+                SUB[M]  R0, R1, 0x20
+                SUB[M]  R0, 0x12345678, @0x10[R3]
+        ?C      SUB[M]  R0, @R1++, @R2
+; The words of two forms, which are the first in the order of the README:
+; NOP, not CLR R0; RET, not POP R15 or JMP @R13++; JMP R0, not CLR R15;
+; PUSH R0, not CLR @--R13; and PUSH @R13++, not POP @--R13
+                MOVE    R0, R0
+                MOVE    R15, @R13++
+                MOVE    R15, R0
+                MOVE    @--R13, R0
+                MOVE    @--R13, @R13++
+; Near-misses, which stay instructions: [C], [M], and [CM] on the MOVE and
+; SUB of each; TST and CMP with a dest that is not R0; and unused fields
+; that are not R0, which are a .DAT
+                MOVE[C] R15, R1
+                MOVE[M] R15, R1
+                MOVE[C] @--R13, R1
+                MOVE[M] R1, @R13++
+                MOVE[CM] R1, R0
+                MOVE[C] R0, R0
+                MOVE[C] R0, R1
+                MOVE[CM] R0, R1
+                SUB[C]  R0, R1, R2
+                SUB[CM] R0, R1, R2
+                SUB     R0, R1, R2
+                MOVE[M] R1, R2
+                MOVE[M] @R0, R2
+                SUB[M]  R1, R2, R3
+                SUB[M]  @R0, R2, R3
+                .DAT    0x0003C001      ; MOVE R15, R0 with s1 R1
+                .DAT    0x00174081      ; MOVE @--R13, R1 with s1 R1
+                .DAT    0x00003681      ; MOVE R0, @R13++ with s1 R1
+                .DAT    0x00004002      ; MOVE R1, R0 with s1 R2
+                .DAT    0x00000003      ; MOVE R0, R0 with s1 R3
+                .DAT    0x02000101      ; MOVE[M] R0, R2 with s1 R1
 ; A CALL whose MOVE is the last instruction
                 ADD     @--R13, 2, R15
                 MOVE    R15, target
