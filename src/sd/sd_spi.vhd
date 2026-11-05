@@ -277,7 +277,9 @@ architecture synthesis of sd_spi is
          shift_v := 0;
       end if;
       size_v := ("0" & X"00000" & csd(73 downto 62)) + 1;
-      size_v := shift_left(size_v, shift_v) - 1;
+      -- numeric_std's shift: CI's GHDL does not synthesize the one of
+      -- numeric_std_unsigned with a variable shift (CLAUDE.md)
+      size_v := std_logic_vector(shift_left(unsigned(size_v), shift_v)) - 1;
       return size_v(31 downto 0);
    end function csd_last;
 

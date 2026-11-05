@@ -171,7 +171,7 @@ set_property IOB TRUE [get_ports {vga_red_o[*] vga_green_o[*] vga_blue_o[*] vga_
 ## switches the card's power, on while it is low. The controller runs the
 ## card in SPI mode: SCK is the clock, CMD the data to the card, DAT3 the
 ## chip select, and DAT0 the data from the card. DAT1 and DAT2 are left
-## out. Which level of CD means a card is to be checked on the board.
+## out. CD is low with a card in.
 set_property -dict {PACKAGE_PIN E2   IOSTANDARD LVCMOS33} [get_ports {sd_pwr_n_o}];   # SD_RESET
 set_property -dict {PACKAGE_PIN B1   IOSTANDARD LVCMOS33} [get_ports {sd_clk_o}];     # SD_SCK
 set_property -dict {PACKAGE_PIN C1   IOSTANDARD LVCMOS33} [get_ports {sd_cmd_o}];     # SD_CMD

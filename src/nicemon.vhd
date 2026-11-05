@@ -170,7 +170,8 @@
 --                          starts, but a Write that runs finishes, and it
 --                          runs while the core is held, paused, or halted,
 --                          so the link reaches it then. With G_SD_SLOTS =
---                          0 the words are memory, as in the emulator.
+--                          0 there is no controller, and the words are
+--                          memory (nice_cpu's SYSTEM.md §6).
 --   0xFFFFFFE0-0xFFFFFFFF  The debug registers of DEBUG.md §6, for the link
 --                          only, which debug_link holds: R0-R15 of the core,
 --                          live while it runs and those of the stop after
