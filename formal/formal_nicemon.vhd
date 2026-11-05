@@ -9,7 +9,9 @@
 -- is 2 MHz and the UART runs at 1 Mbaud.
 -- G_ROM_FILE gives the system a ROM of 4 words, rom.bin, or none when it
 -- is empty, and G_BOARD_IO gives it the board's registers at
--- 0xFFFFFF90-9F, with free buttons and switches.
+-- 0xFFFFFF90-9F, with free buttons and switches. G_SD_SLOTS gives it the
+-- SD card controller at 0xFFFFFFA0-AF, in the boards' configuration,
+-- without G_SD_HOLD_ACK, with free card pins.
 --
 -- THEORY OF OPERATION
 -- With G_CPU_RUN_AT_RESET the core runs the program in the RAM from reset,
@@ -27,8 +29,9 @@ library ieee;
 entity formal_nicemon is
    generic (
       G_CPU_RUN_AT_RESET : boolean;
-      G_ROM_FILE         : string  := "";
-      G_BOARD_IO         : boolean := false
+      G_ROM_FILE         : string               := "";
+      G_BOARD_IO         : boolean              := false;
+      G_SD_SLOTS         : natural range 0 to 2 := 0
    );
    port (
       clk_i       : in  std_logic;
@@ -37,7 +40,10 @@ entity formal_nicemon is
       kbd_valid_i : in  std_logic;
       kbd_data_i  : in  std_logic_vector(7 downto 0);
       brd_btn_i   : in  std_logic_vector(4 downto 0);
-      brd_sw_i    : in  std_logic_vector(15 downto 0)
+      brd_sw_i    : in  std_logic_vector(15 downto 0);
+      sd_dat0_i   : in  std_logic_vector(1 downto 0);
+      sd_cd_n_i   : in  std_logic_vector(1 downto 0);
+      sd_wp_i     : in  std_logic_vector(1 downto 0)
    );
 end entity formal_nicemon;
 
@@ -58,6 +64,10 @@ architecture synthesis of formal_nicemon is
    signal brd_rgb0     : std_logic_vector(11 downto 0);
    signal brd_rgb1     : std_logic_vector(11 downto 0);
    signal brd_seg      : std_logic_vector(63 downto 0);
+   signal sd_clk       : std_logic_vector(1 downto 0);
+   signal sd_cmd       : std_logic_vector(1 downto 0);
+   signal sd_dat3      : std_logic_vector(1 downto 0);
+   signal sd_pwr_n     : std_logic;
 
 begin
 
@@ -76,6 +86,7 @@ begin
          G_ROM_ADDR_BITS    => 2,
          G_CPU_RUN_AT_RESET => G_CPU_RUN_AT_RESET,
          G_BOARD_IO         => G_BOARD_IO,
+         G_SD_SLOTS         => G_SD_SLOTS,
          G_FORMAL           => true
       )
       port map (
@@ -100,7 +111,14 @@ begin
          brd_rgb1_o     => brd_rgb1,
          brd_seg_o      => brd_seg,
          brd_btn_i      => brd_btn_i,
-         brd_sw_i       => brd_sw_i
+         brd_sw_i       => brd_sw_i,
+         sd_clk_o       => sd_clk,
+         sd_cmd_o       => sd_cmd,
+         sd_dat3_o      => sd_dat3,
+         sd_dat0_i      => sd_dat0_i,
+         sd_cd_n_i      => sd_cd_n_i,
+         sd_wp_i        => sd_wp_i,
+         sd_pwr_n_o     => sd_pwr_n
       ); -- i_nicemon
 
 end architecture synthesis;

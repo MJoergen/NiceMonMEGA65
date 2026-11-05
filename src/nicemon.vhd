@@ -1363,6 +1363,17 @@ begin
          -- psl c_brd_none : cover {brd_stb = '1' and bus_addr(3 downto 0) = X"F" and rst_i = '0'};
       end generate gen_formal_brd;
 
+      gen_formal_sd : if G_SD_SLOTS > 0 generate
+      begin
+         -- The core and the link reach the SD card controller.
+         -- psl c_sd_core : cover
+         --    {core_dev = '1' and dbus_addr(31 downto 4) = C_SD_BASE and rst_i = '0' and
+         --     cpu_rst = '0'; dbus_ack = '1'};
+         -- psl c_sd_link : cover
+         --    {link_dev = '1' and link_addr(31 downto 4) = C_SD_BASE and rst_i = '0'; true[*];
+         --     link_ack = '1'};
+      end generate gen_formal_sd;
+
    end generate gen_formal;
 
 end architecture synthesis;

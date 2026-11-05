@@ -3,23 +3,36 @@
 # "prove" proves the assertions for every cycle by k-induction, and
 # "cover" reaches each cover statement. The depths are in cycles: 4 is the
 # k of the induction, and 16 is how far "cover" looks for each statement.
+# "prove_sd" and "cover_sd" are "prove" and "cover" with the SD card
+# controller, G_SD_SLOTS=2, in the boards' configuration, without
+# G_SD_HOLD_ACK, where it acknowledges in the cycle after a request and
+# never stalls. The ghdl lines differ only in that generic.
 
 [tasks]
 prove
 cover
+prove_sd
+cover_sd
 
 [options]
 prove: mode prove
 prove: depth 4
 cover: mode cover
 cover: depth 16
+prove_sd: mode prove
+prove_sd: depth 4
+cover_sd: mode cover
+cover_sd: depth 16
 
 [engines]
 smtbmc yices
 
 [script]
 plugin -i ghdl
-ghdl --std=08 -fpsl nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd perf.vhd timer.vhd fetch_stats.vhd sd_regs.vhd sd_spi_byte.vhd sd_spi.vhd sd.vhd devices.vhd formal_devices.vhd -e formal_devices
+prove: ghdl --std=08 -fpsl nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd perf.vhd timer.vhd fetch_stats.vhd sd_regs.vhd sd_spi_byte.vhd sd_spi.vhd sd.vhd devices.vhd formal_devices.vhd -e formal_devices
+cover: ghdl --std=08 -fpsl nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd perf.vhd timer.vhd fetch_stats.vhd sd_regs.vhd sd_spi_byte.vhd sd_spi.vhd sd.vhd devices.vhd formal_devices.vhd -e formal_devices
+prove_sd: ghdl --std=08 -fpsl -gG_SD_SLOTS=2 nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd perf.vhd timer.vhd fetch_stats.vhd sd_regs.vhd sd_spi_byte.vhd sd_spi.vhd sd.vhd devices.vhd formal_devices.vhd -e formal_devices
+cover_sd: ghdl --std=08 -fpsl -gG_SD_SLOTS=2 nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd perf.vhd timer.vhd fetch_stats.vhd sd_regs.vhd sd_spi_byte.vhd sd_spi.vhd sd.vhd devices.vhd formal_devices.vhd -e formal_devices
 prep -top formal_devices
 
 [files]

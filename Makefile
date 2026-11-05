@@ -106,9 +106,10 @@ test:
 SBY ?= sby
 FORMAL_TASKS = rx_fifo-prove rx_fifo-cover board_io-prove board_io-none board_io-cover \
                scr_regs-prove scr_regs-cover devices-prove devices-cover \
+               devices-prove_sd devices-cover_sd \
                mem-prove mem-model mem-cover \
                nicemon-run nicemon-link nicemon-cover \
-               nicemon-rom nicemon-rom_cover \
+               nicemon-rom nicemon-rom_cover nicemon-sd nicemon-sd_cover \
                eth_tcp_timer-prove eth_tcp_timer-cover \
                eth_tcp_buf-prove eth_tcp_buf-model eth_tcp_buf-cover \
                eth_tcp_pick-prove eth_tcp_pick-cover \

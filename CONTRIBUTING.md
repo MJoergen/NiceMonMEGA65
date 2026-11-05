@@ -458,7 +458,10 @@ every time, not only the ones a testbench sends.
   goes to the master that made it, the core or the link, with the word of
   the device that takes it, and each request reaches its device, and no
   other, the link's from its latch until the device takes it. The devices
-  are reset when the core starts.
+  are reset when the core starts. The `prove_sd` and `cover_sd` tasks are
+  `prove` and `cover` with the SD card controller at `0xFFFFFFA0`–`AF`, in
+  the boards' configuration, two slots without `G_SD_HOLD_ACK`, where it
+  never stalls.
 - `mem.sby` proves the memory, `src/mem.vhd`, with 16 words of RAM, a ROM
   of 4 words, `formal/rom.bin`, and a screen of 8: a write reaches the
   memory of its address, and no other, and none while it is to the shown
@@ -481,7 +484,9 @@ every time, not only the ones a testbench sends.
   running from reset, and 40 with the core held for the link first. These
   have no ROM and no board registers. The `rom` and `rom_cover` tasks are
   `run` and `cover` with both: a ROM of 4 words, `formal/rom.bin`, and the
-  Nexys4DDR's registers at `0xFFFFFF90`–`9F`. It checks these properties:
+  Nexys4DDR's registers at `0xFFFFFF90`–`9F`. The `sd` and `sd_cover`
+  tasks are `run` and `cover` with the SD card controller at
+  `0xFFFFFFA0`–`AF`, as the boards have it. It checks these properties:
   - The core's two buses get an ACK only for a request that waits, which
     is what nice_cpu's proofs of the cores assume of them, also when the
     link holds a running core.

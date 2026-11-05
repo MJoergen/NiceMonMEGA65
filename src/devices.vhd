@@ -42,7 +42,8 @@
 -- With G_FORMAL, it states the properties that formal/devices.sby proves:
 -- each acknowledge answers a request, the core's and the link's go to the
 -- master that made it, with the word of the device that takes it, and
--- each request reaches its device, and no other.
+-- each request reaches its device, and no other. Without G_SD_HOLD_ACK,
+-- the SD card controller never stalls.
 --
 -- RESET
 -- Synchronous. Reset drops the link's request and what the core is owed,
@@ -477,6 +478,21 @@ begin
       -- psl c_mpu_wait : cover {core_stb_i and not rst_i; mpu_stall[*2]; core_ack_o};
       -- psl c_link_wait : cover {link_stb_i and not rst_i; true; mpu_stall[*2]; link_ack_o};
       -- psl c_back : cover {core_stb_i and not rst_i; core_stb_i and core_ack_o; core_ack_o};
+
+      gen_formal_sd_ack : if not G_SD_HOLD_ACK generate
+      begin
+         -- Without G_SD_HOLD_ACK, the SD card controller never stalls, as
+         -- it acknowledges each request in the cycle after it takes it.
+         -- psl f_sd_no_stall : assert always sd_stall = '0';
+      end generate gen_formal_sd_ack;
+
+      gen_formal_sd : if G_SD_SLOTS > 0 generate
+      begin
+         -- With the SD card controller, the core and the link reach it.
+         -- psl c_sd_core : cover {core_stb_i and sd_stb and not rst_i; core_ack_o};
+         -- psl c_sd_link : cover {link_stb_i and not rst_i; sd_stb; link_ack_o};
+      end generate gen_formal_sd;
+
    end generate gen_formal;
 
 end architecture synthesis;

@@ -7,7 +7,9 @@
 -- the core has just left reset then. The hold changes only while the
 -- link's request neither comes nor waits, as contract f_hold of
 -- formal/debug_link_formal.vhd says. Each request is to a device's
--- address, 0xFFFFFF10-7F.
+-- address, 0xFFFFFF10-7F, or, with G_SD_SLOTS > 0, A0-AF.
+-- G_SD_SLOTS gives the devices the SD card controller, in the boards'
+-- configuration, without G_SD_HOLD_ACK, and its card's pins are free.
 --
 -- RESET
 -- The first cycle is a reset.
@@ -19,6 +21,9 @@ library work;
    use work.pipe_pkg.all;
 
 entity formal_devices is
+   generic (
+      G_SD_SLOTS : natural range 0 to 2 := 0
+   );
    port (
       clk_i        : in  std_logic;
       rst_i        : in  std_logic;
@@ -34,7 +39,10 @@ entity formal_devices is
       link_we_i    : in  std_logic;
       link_addr_i  : in  std_logic_vector(7 downto 0);
       link_wdata_i : in  std_logic_vector(31 downto 0);
-      irq_ready_i  : in  std_logic
+      irq_ready_i  : in  std_logic;
+      sd_dat0_i    : in  std_logic_vector(1 downto 0);
+      sd_cd_n_i    : in  std_logic_vector(1 downto 0);
+      sd_wp_i      : in  std_logic_vector(1 downto 0)
    );
 end entity formal_devices;
 
@@ -44,6 +52,13 @@ architecture synthesis of formal_devices is
    signal owed  : std_logic;
    signal stall : std_logic;
 
+   -- Whether a low byte is a device's address
+   function is_dev(addr : std_logic_vector(7 downto 0)) return boolean is
+   begin
+      return (addr(7) = '0' and addr(6 downto 4) /= "000") or
+             (addr(7 downto 4) = X"A" and G_SD_SLOTS > 0);
+   end function is_dev;
+
 begin
 
    -- psl default clock is rising_edge(clk_i);
@@ -51,12 +66,10 @@ begin
 
    -- psl f_core_req : assume always
    --    core_stb_i = '1' -> core_cyc_i = '1' and busy = '0' and stall = '0' and hold_i = '0' and
-   --                        prev(hold_i) = '0' and rst_i = '0' and core_addr_i(7) = '0' and
-   --                        core_addr_i(6 downto 4) /= "000";
+   --                        prev(hold_i) = '0' and rst_i = '0' and is_dev(core_addr_i);
    -- psl f_link_req : assume always
    --    link_stb_i = '1' -> busy = '0' and owed = '0' and stall = '0' and core_stb_i = '0' and
-   --                        rst_i = '0' and
-   --                        link_addr_i(7) = '0' and link_addr_i(6 downto 4) /= "000";
+   --                        rst_i = '0' and is_dev(link_addr_i);
    -- psl f_hold : assume always
    --    hold_i /= prev(hold_i) -> busy = '0' and link_stb_i = '0';
 
@@ -64,6 +77,7 @@ begin
    i_devices : entity work.devices
       generic map (
          G_CLOCK_HZ => 100_000_000,
+         G_SD_SLOTS => G_SD_SLOTS,
          G_FORMAL   => true
       )
       port map (
@@ -90,7 +104,14 @@ begin
          stall_o      => stall,
          irq_valid_o  => open,
          irq_ready_i  => irq_ready_i,
-         irq_vector_o => open
+         irq_vector_o => open,
+         sd_clk_o     => open,
+         sd_cmd_o     => open,
+         sd_dat3_o    => open,
+         sd_dat0_i    => sd_dat0_i,
+         sd_cd_n_i    => sd_cd_n_i,
+         sd_wp_i      => sd_wp_i,
+         sd_pwr_n_o   => open
       ); -- i_devices
 
 end architecture synthesis;
