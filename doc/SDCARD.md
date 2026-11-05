@@ -1,7 +1,12 @@
-# The SD cards: a proposed design
+# The SD cards: the design
 
-This is the design note for storage on the SD cards. Nothing of it is
-written yet. Its end is `SAVE`, `LOAD`, and `DIR` in the BASIC of #54, and
+This is the design note for storage on the SD cards. The lower half is
+written: the registers and the emulator's images (MJoergen/nice_cpu#107),
+the controller in SPI mode (#55), and the boards' slots and `make hwtest`
+(#56), in V1.5. The registers are now specified by nice_cpu's
+`doc/SYSTEM.md` §5, and the boards' slots by "The SD card slots" in
+[SYSTEM.md](SYSTEM.md); where this note differs from them, they are right.
+The ROM, FAT32, BASIC, and the host tools are not written yet. Its end is `SAVE`, `LOAD`, and `DIR` in the BASIC of #54, and
 on the way it gives the monitor of #24 a way to load and save programs. The
 tracking issue is #62, and its subtasks are listed at the end.
 
@@ -93,9 +98,10 @@ Two limits of the R3, which the R6 does not have (#56 has the details):
 
 ## The registers
 
-Proposed for nice_cpu's `doc/SYSTEM.md` as a new section, in nice_cpu issue
-MJoergen/nice_cpu#107, and revised after its review. They take 16 of the
-words that nice_cpu reserves for I/O.
+Specified in nice_cpu's `doc/SYSTEM.md` §5, from nice_cpu issue
+MJoergen/nice_cpu#107 and its review, which is the authoritative text; this
+section keeps the design with its reasons. They take 16 of the words that
+nice_cpu reserves for I/O.
 
 | Address | Name | A data read returns | A write |
 |---|---|---|---|
@@ -219,14 +225,13 @@ emulator's window has no way to take a card out.
 
 Without an image, a program sees what it sees on a MEGA65 with both slots
 empty: `SD_SLOTS` = 2, "present" 0, and error 1 on every command. The words
-`0xFFFFFFA0`–`0xFFFFFFAF` are always the registers, which changes them from
-ordinary memory, which nice_cpu's SYSTEM.md §5 says the reserved words are
-in the emulator today.
+`0xFFFFFFA0`–`0xFFFFFFAF` are always the registers, where they were
+ordinary memory, as the other reserved words are, before #107.
 
 ## The controller in the RTL
 
 The controller comes in two stages. Stage 1 (#55) is SPI mode on every
-slot. Stage 2 (#63) adds 4-bit SD mode, and is optional.
+slot, and is written. Stage 2 (#63) adds 4-bit SD mode, and is optional.
 
 - **SPI first**, because it is proven on these pins: M2M runs QNICE-FPGA's
   `sdcard.vhd` in SPI mode on both slots of the R3 and the R6. Its lines go
@@ -406,9 +411,9 @@ numbers and no Commodore DOS, as #54 says.
 2. **Writes to the MEGA65's internal card**, which holds its system files:
    allowed as to the microSD, or only in a directory of NiceMon's own, such
    as `/NICE`.
-3. **One controller or two**: one with a multiplexer is proposed. Two would
-   keep both cards started up, and cost twice the logic for a gain only
-   when a program copies between the cards.
+3. **One controller or two**: settled by #55, one with a multiplexer. Two
+   would keep both cards started up, and cost twice the logic for a gain
+   only when a program copies between the cards.
 4. **Host tools**: a host could read and write the board's card over the
    link while the core is paused, through these registers, and run a FAT
    library on the host, so that a file goes to the card with no PC slot.
@@ -420,10 +425,10 @@ ROM is developed in niceemu and needs no board.
 
 | Issue | What |
 |---|---|
-| MJoergen/nice_cpu#107 | The registers in nice_cpu's SYSTEM.md, and `niceemu --sd0/--sd1` |
-| #55 | The controller in the RTL, stage 1: SPI mode, the card model, `tb_sd`, and the formal checks |
+| MJoergen/nice_cpu#107 | Done: the registers in nice_cpu's SYSTEM.md, and `niceemu --sd0/--sd1` |
+| #55 | Done in V1.5: the controller in the RTL, stage 1: SPI mode, the card model, `tb_sd`, and the formal checks |
 | #63 | The controller, stage 2: 4-bit SD mode, optional, after a test whether a card leaves SPI mode |
-| #56 | The pins on the R3, R6, and Nexys4DDR, and the read-only check in `make hwtest` |
+| #56 | Done in V1.5: the pins on the R3, R6, and Nexys4DDR, and the read-only check in `make hwtest` |
 | #57 | The sector routines in the ROM, and the monitor's `sd` command |
 | #58 | FAT32 reading, `dir`, and `load` |
 | #59 | FAT32 writing, `save`, and `del` |

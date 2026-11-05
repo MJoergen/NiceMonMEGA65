@@ -24,8 +24,9 @@ catch, the page of memory, the breakpoints, the Nexys4DDR's buttons
 and display, the decode of row 27, and the link's side port with the
 registers live (issues #52 and #53). `doc/BASIC_SURVEY.md` is
 the survey of the BASIC dialects behind the interpreter in the ROM of
-issue #54 (milestone V2.0). `doc/SDCARD.md` is the proposed design of the SD
-cards' storage, issue #62 and its subtasks. `doc/` also has `CODING_STYLE.md`,
+issue #54 (milestone V2.0). `doc/SDCARD.md` is the design of the SD
+cards' storage, issue #62 and its subtasks, of which the controller and
+the slots (#55 and #56) are written. `doc/` also has `CODING_STYLE.md`,
 `RELEASE.md`, and `RELEASE_NOTES.md`; the root keeps only `README.md`,
 `CONTRIBUTING.md`, and this file.
 `src/nicemon.vhd` is the whole system and the file to read first; its

@@ -288,8 +288,8 @@ What QMON's table has that this one leaves out:
   A program that drives the SD registers itself mounts the card again
   afterwards.
 - The `f32_*!` entries: not yet. The file API, `fs_mount` and the
-  others, comes as entries from 9 with #58 and #59, as `doc/SDCARD.md`
-  on the branch `sdcard-design` says.
+  others, comes as entries from 9 with #58 and #59, as
+  [doc/SDCARD.md](../doc/SDCARD.md) says.
 
 ## The shared routines
 
