@@ -3,8 +3,9 @@
 The goal is a MEGA65 that runs NICE programs as `niceemu`, the emulator in
 `nice_cpu/emulator`, runs them. **It is close, but not there yet.** The
 core and nice_cpu's devices behave as in the emulator, and so does the
-address map, apart from the size of the memory and the registers at
-`0xFFFFFF80`–`9F`, where the emulator has memory. The debug link reads
+address map, apart from the size of the memory, the registers at
+`0xFFFFFF80`–`9F`, where the emulator has memory, and the emulator's font
+at `0xFFFE0000`–`3FFF`. The debug link reads
 back what the emulator prints after a halt. `tools/run.py` runs a program
 on the board and prints what `niceemu` prints for it, so the two can be
 compared (see
@@ -18,6 +19,9 @@ compared (see
 - The Nexys4DDR's devices at `0xFFFFFF90`–`96`, and the Ethernet
   station at `0xFFFFFF98`–`9D` and the size of the RAM at `0xFFFFFF9E` of
   every board, are not in the emulator.
+- The emulator's font RAM and character ROM at `0xFFFE0000`–`3FFF`,
+  and its font base at `0xFFFFFF86`, are not on the boards, which draw
+  from Spleen alone (#71).
 - `--max-steps` has no equivalent: `run.py` has `--timeout SEC`, which
   prints no registers.
 - `--trace`, `--irq`, `--nmi`, `--color`, `--invert-fg`, and
@@ -46,6 +50,7 @@ FIFO, the ROM, and the aliasing. The rows below that it covers are marked
 | Instruction fetches from `0xFFFFFF00`–`FF` | Read 0 | Read 0 | Yes |  |
 | Memory (nice_cpu's SYSTEM.md §6) | All 2³² words, 0 at the start | 128K words (64K on the Nexys4DDR), repeated through the address space, so the words of `0xFFFFFF02`–`FF` that are not registers are the RAM words `0x0001FF02`–`FFFF`, and `0xFFFF8000`–`FEFF` the words `0x18000`–`1FEFF` (`0xFFFF2000`–`FEFF` the words `0x2000`–`FEFF` of 64K on the Nexys4DDR); the stack at `0xFFFFFF00` lands in the top. `0xFFFFFF9E` reads the number of words | No | A program, its data, and its stack must fit in the RAM, and a program that reads `0xFFFFFF9E` reads 0 in the emulator. `load.py` and `run.py` hide the ROM, if the bitstream has one, and clear the RAM to 0 before they load. |
 | Screen, `0xFFFF0000`–`07CF` (nice_cpu's SYSTEM.md §6) | 80×25 words of memory, printed by `--screen`, and shown while the program runs by `--window`, with the cursor of `0xFFFFFF80`–`82` and the same font | 32768 words of memory of their own (8192 on the Nexys4DDR), the first 2000 of which are shown on VGA and HDMI (VGA only on the Nexys4DDR), unless the display offset is set | Yes | The link reads the whole memory, though `load.py` loads only the 8192 words that both boards have. |
+| Font, `0xFFFE0000`–`3FFF`, and its base, `0xFFFFFF86` (nice_cpu's SYSTEM.md §1.8 and §6) | The font RAM, which keeps bits 15..0 of a write, Spleen as a character ROM beside it, and the base, which selects the one `--window` draws from | RAM, as the address space repeats: the words `0x0000`–`3FFF`, where the ROM or a program at 0 is. The display draws from Spleen alone, and `0xFFFFFF86` reads 0 and takes no write | No | A program's own glyphs show only in the emulator's window, and its writes to the font RAM land in the RAM at 0, or are dropped while the ROM is there. The font RAM and the base are planned (#71). |
 | Read counter, `0xFFFFFF01` | Counts the data reads since the last write, and a start keeps it | The same. The link reads it as 0 and does not write it (DEBUG.md §3), as does `niceemu --link` | Yes, but | `run.py -d` shows 0 there. |
 | The rest of `0xFFFFFF02`–`FF` (nice_cpu's SYSTEM.md §6) | Ordinary memory for data, but for the SD card's registers at `A0`–`AF` | Memory, in the top 256 words of the RAM, at `0xFFFFFF02`–`0F` and `B0`–`FF`. `10`–`7F` are the devices of the rows above, `80`–`8F` the screen's registers, `90`–`9F` the board's devices, and `A0`–`AF` the SD card controller. The link reads its debug registers at `E0`–`FF`, where the core has memory | Yes, but for `80`–`9F` | `niceemu --window` draws its cursor from `80`–`82`, which stay memory there, and has no display offset. Here only bits 6..0 of the column and 4..0 of the row are kept, so a column of 128 or more wraps, where the emulator shows no cursor. |
 | SD card, `0xFFFFFFA0`–`AF` | nice_cpu's SD card controller (SYSTEM.md §5), 2 slots, with the image files of `--sd0` and `--sd1`; a command ends in the write that starts it | The same controller, on the cards of the slots: 2 on the MEGA65 and 1 on the Nexys4DDR, so `SD_SLOTS` is 1 there. A command takes time, and busy reads 1 until it ends | Yes, for a program that waits for busy | A program that does not wait for busy reads the buffer of a command that has not ended. `tb_nicemon` runs nice_cpu's test of the controller against niceemu with the end of a command held, as in nice_cpu's simulation. |

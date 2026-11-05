@@ -225,7 +225,9 @@ QNICE-FPGA, at `0xFF30` there:
 | `0xFFFFFF82` | The cursor's row, 0 to 24. |
 | `0xFFFFFF85` | The display offset, in words, 0 to 32767 (8191 on the Nexys4DDR). It takes effect when bit 10 of the state is set. |
 
-The words `0xFFFFFF83`, `84`, and `86`–`8F` read 0 and take no write. In
+The words `0xFFFFFF83`, `84`, and `86`–`8F` read 0 and take no write.
+`0xFFFFFF86` is the emulator's font base (nice_cpu's SYSTEM.md §1.8),
+which the boards do not have yet (#71). In
 the emulator these addresses are memory, so a program that writes them runs
 there too, without scrolling. Reset, and the clear of the memory (bit 2 of
 the control register, which `load.py` and `run.py` set), set the offset to

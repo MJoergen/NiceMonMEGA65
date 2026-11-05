@@ -402,7 +402,10 @@ stack. The top of that range is the stack itself, which `r` uses, so a
 program's words stay below it. A second line for an address writes its
 word over the first's, where `niceemu` rejects the file. In `niceemu`,
 where `0xFFFFFF9E` reads 0, the program's RAM goes up to the screen,
-`0xFFFEFFFF`. At the end `l` prints the number of words written, with
+`0xFFFEFFFF`. Its font RAM at `0xFFFE0000`–`0xFFFE1FFF` keeps
+only bits 15..0 of a word, and its character ROM at
+`0xFFFE2000`–`0xFFFE3FFF` drops one, so a program there does not read
+back as loaded. At the end `l` prints the number of words written, with
 the lowest and the highest address, and the number of lines skipped,
 with the first of them and the last address that a line may have:
 

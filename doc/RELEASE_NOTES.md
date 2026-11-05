@@ -21,6 +21,17 @@ The release candidates pinned these:
 
 nice_cpu's `RC01` and `RC03` have no tag here.
 
+## V1.6
+
+**Upgrade notes.**
+
+- nice_cpu is at `V1.6`. Its emulator's window draws from a font in the
+  address space: a font RAM at `0xFFFE0000`–`1FFF`, Spleen as a
+  character ROM at `0xFFFE2000`–`3FFF`, and a font base at
+  `0xFFFFFF86` (nice_cpu's SYSTEM.md §1.8). The boards draw from Spleen
+  alone for now, and those addresses alias their RAM, as before (#71).
+  The cores, the devices, and the debug link are as in V1.5.
+
 ## V1.5 (2026-11-05)
 
 **Upgrade notes.**
