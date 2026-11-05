@@ -18,8 +18,12 @@
 -- edge, 1.4 cycles, and the next falling edge comes 2.6 cycles after
 -- that. At the slow clock the bit has long settled.
 --
--- The samples come G_LAT cycles late, so the byte ends, with done_o, when
--- the eighth sample has been taken. The next byte can start in that cycle.
+-- The samples come G_LAT cycles late. The byte ends, with done_o, when
+-- the eighth sample has been taken and the last period of the clock is
+-- over, whichever comes later: at the fast clock the sample, and at the
+-- slow clock the period, as the sample comes early in the bit's high
+-- half. So every period of the clock is whole, and the next byte can
+-- start in the cycle of done_o.
 --
 -- INTERFACE CONTRACTS -- these are requirements on the environment:
 -- a) start_i comes only while no byte is under way: at reset, or with
@@ -67,9 +71,11 @@ architecture synthesis of sd_spi_byte is
    signal tx_r     : std_logic_vector(7 downto 0)  := (others => '1');
    signal rx_r     : std_logic_vector(7 downto 0)  := (others => '1');
 
-   -- The sample strobes on their way, and the samples still to take
+   -- The sample strobes on their way, the samples still to take, and
+   -- whether the byte's done_o is still to come
    signal strobe_r : std_logic_vector(G_LAT downto 1) := (others => '0');
    signal left_r   : natural range 0 to 8            := 0;
+   signal pend_r   : std_logic                        := '0';
 
 begin
 
@@ -80,6 +86,10 @@ begin
    data_o <= rx_r;
 
    p_byte : process (clk_i)
+      -- Whether the eighth sample is in, and the clock's last period over,
+      -- after this cycle
+      variable last_v : boolean;
+      variable idle_v : boolean;
    begin
       if rising_edge(clk_i) then
          done_o <= '0';
@@ -91,10 +101,7 @@ begin
          end if;
 
          if strobe_r(G_LAT) = '1' then
-            rx_r <= rx_r(6 downto 0) & miso_i;
-            if left_r = 1 then
-               done_o <= '1';
-            end if;
+            rx_r   <= rx_r(6 downto 0) & miso_i;
             left_r <= left_r - 1;
          end if;
 
@@ -112,12 +119,22 @@ begin
             end if;
          end if;
 
+         -- The byte ends when its eighth sample is in and its last period
+         -- of the clock is over, whichever comes later.
+         last_v := left_r = 0 or (strobe_r(G_LAT) = '1' and left_r = 1);
+         idle_v := active_r = '0' or (phase_r = 2 * half_r - 1 and bit_r = 0);
+         if pend_r = '1' and last_v and idle_v then
+            done_o <= '1';
+            pend_r <= '0';
+         end if;
+
          if start_i = '1' then
             active_r <= '1';
             bit_r    <= 7;
             phase_r  <= 0;
             tx_r     <= data_i;
             left_r   <= 8;
+            pend_r   <= '1';
             if fast_i = '1' then
                half_r <= G_FAST_HALF;
             else
@@ -131,6 +148,7 @@ begin
             tx_r     <= (others => '1');
             strobe_r <= (others => '0');
             left_r   <= 0;
+            pend_r   <= '0';
          end if;
       end if;
    end process p_byte;
