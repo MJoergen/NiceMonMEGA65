@@ -207,12 +207,13 @@ one.
 
 An entry is added only when a program cannot do without it: it reaches
 hardware that the monitor owns or that differs between boards, or state
-that the monitor keeps, such as the cursor and the outputs. The SD card's
-sector routines will be such entries
-([#57](https://github.com/MJoergen/NiceMonMEGA65/issues/57)): the
-registers are the same everywhere, but once FAT32 is in the ROM, the
-selected slot, the buffer, and the caches are state that the monitor
-keeps. Strings, memory, number
+that the monitor keeps, such as the cursor and the outputs. The file API
+of the SD card will be such entries
+([#58](https://github.com/MJoergen/NiceMonMEGA65/issues/58)): once FAT32
+is in the ROM, the mounted card and the caches are state that the
+monitor keeps. Its sector routines are not: a program loads and saves
+files, not sectors, and one that wants sectors drives the registers,
+which are the same everywhere. Strings, memory, number
 formatting, line editing, and random numbers are not the HAL's: assembly
 programs join `monlib.nasm` (The shared routines below), which the
 monitor's own commands use too, and C programs have nice_cpu's `libc`.
@@ -283,9 +284,12 @@ What QMON's table has that this one leaves out:
 - `enter!` and `leave!`: NICE has no register banks.
 - `vga_init!`, `vga_copyfont!`, and `vga_copypal!`: the font is fixed,
   and the colors are in each screen word.
-- The `sd_*!` and `f32_*!` entries: not yet. `sd_init`, `sd_read`, and
-  `sd_write` come as entries 9 to 11 with #57, and the file API after
-  them, as `doc/SDCARD.md` on the branch `sdcard-design` says.
+- The `sd_*!` entries: the sector routines stay inside the ROM (#57).
+  A program that drives the SD registers itself mounts the card again
+  afterwards.
+- The `f32_*!` entries: not yet. The file API, `fs_mount` and the
+  others, comes as entries from 9 with #58 and #59, as `doc/SDCARD.md`
+  on the branch `sdcard-design` says.
 
 ## The shared routines
 
