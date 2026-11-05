@@ -5,7 +5,21 @@
 -- falling edge only. A bit now takes G_DIVISOR clock cycles, not G_DIVISOR + 1.
 -- The layout and names follow doc/CODING_STYLE.md.
 -- Added here: rx_break_o pulses for a break, a frame whose ten bits are all 0.
+-- And the bit's cycles come from div_i, which is taken once the line is
+-- quiet, so that the baud rate can change while the system runs.
 --
+-- THEORY OF OPERATION
+-- A bit takes divisor cycles, which is G_DIVISOR after reset. When div_i
+-- differs from it, the new value is taken in a cycle where neither a
+-- change of div_i nor the transmitter's last byte is less than G_QUIET
+-- cycles ago, no byte is offered, and the receiver is idle, with no Start
+-- bit beginning. So no frame is sent or received with two bit times, and
+-- the bytes sent soon after the change, such as the debug link's answer
+-- to the write that set the new rate, go out at the old one, however long
+-- the line was quiet before it.
+--
+-- RESET
+-- Synchronous. Reset ends the frames, and takes G_DIVISOR.
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -17,11 +31,16 @@ library ieee;
 
 entity uart_serdes is
    generic (
-      G_DIVISOR : natural
+      -- The cycles of a bit after reset, and those of a quiet transmitter
+      -- before a new div_i is taken
+      G_DIVISOR : positive;
+      G_QUIET   : natural
    );
    port (
       clk_i      : in  std_logic;
       rst_i      : in  std_logic;
+      -- The cycles of a bit, 1 or more
+      div_i      : in  std_logic_vector(15 downto 0);
       -- Byte level interface
       tx_valid_i : in  std_logic;
       tx_ready_o : out std_logic;
@@ -44,16 +63,48 @@ architecture synthesis of uart_serdes is
       BUSY_ST
    );
 
-   signal tx_data    : std_logic_vector(9 downto 0) := (others => '1');
-   signal tx_state   : t_state                      := IDLE_ST;
-   signal tx_counter : natural range 0 to G_DIVISOR;
+   signal tx_data  : std_logic_vector(9 downto 0) := (others => '1');
+   signal tx_state : t_state                      := IDLE_ST;
+   signal divisor  : natural range 1 to 2 ** 16 - 1 := G_DIVISOR;
+   signal quiet    : natural range 0 to G_QUIET      := 0;
+   signal div_d    : std_logic_vector(15 downto 0)   := (others => '0');
+
+   signal tx_counter : natural range 0 to 2 ** 16 - 1;
 
    signal rx_data    : std_logic_vector(10 downto 0);
    signal rx_state   : t_state                      := IDLE_ST;
-   signal rx_counter : natural range 0 to G_DIVISOR;
+   signal rx_counter : natural range 0 to 2 ** 16 - 1;
    signal rx_prev    : std_logic                    := '1';
 
 begin
+
+   assert G_DIVISOR < 2 ** 16
+      report "uart_serdes: G_DIVISOR must fit div_i"
+      severity failure;
+
+   --------------------------------------------
+   -- The bit's cycles: div_i, once the line is quiet
+   --------------------------------------------
+
+   p_div : process (clk_i)
+   begin
+      if rising_edge(clk_i) then
+         div_d <= div_i;
+         if tx_state = BUSY_ST or tx_valid_i = '1' or div_i /= div_d then
+            quiet <= G_QUIET;
+         elsif quiet > 0 then
+            quiet <= quiet - 1;
+         elsif rx_state = IDLE_ST and not (rx_prev = '1' and uart_rx_i = '0') and to_integer(unsigned(div_i)) > 0 then
+            divisor <= to_integer(unsigned(div_i));
+         end if;
+
+         if rst_i = '1' then
+            divisor <= G_DIVISOR;
+            quiet   <= 0;
+         end if;
+      end if;
+   end process p_div;
+
 
    --------------------------------------------
    -- Handler UART Transmission
@@ -73,7 +124,7 @@ begin
             when IDLE_ST =>
                if tx_valid_i = '1' then
                   tx_data    <= "1" & tx_data_i & "0"; -- Stop + Data + Start
-                  tx_counter <= G_DIVISOR - 1;
+                  tx_counter <= divisor - 1;
                   tx_state   <= BUSY_ST;
                end if;
 
@@ -82,7 +133,7 @@ begin
                   tx_counter <= tx_counter - 1;
                else
                   if or (tx_data(9 downto 1)) = '1' then
-                     tx_counter <= G_DIVISOR - 1;
+                     tx_counter <= divisor - 1;
                      tx_data    <= "0" & tx_data(9 downto 1);
                   else
                      tx_data(0) <= '1';
@@ -120,7 +171,7 @@ begin
                if rx_prev = '1' and uart_rx_i = '0' then
                   rx_data     <= (others => '1');
                   rx_data(10) <= '0';          -- Marker: reaches bit 0 after ten samples
-                  rx_counter  <= G_DIVISOR / 2;
+                  rx_counter  <= divisor / 2;
                   rx_state    <= BUSY_ST;
                end if;
 
@@ -128,7 +179,7 @@ begin
                if rx_counter > 0 then
                   rx_counter <= rx_counter - 1;
                else
-                  rx_counter <= G_DIVISOR - 1;
+                  rx_counter <= divisor - 1;
                   rx_data    <= uart_rx_i & rx_data(10 downto 1);
                end if;
 

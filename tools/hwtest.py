@@ -54,6 +54,9 @@ Checks, in this order:
     - the memory is cleared
     - 0xFFFFFF9E reads the RAM's words, and the top word of the RAM holds
       a word, apart from the word of a RAM half the size
+    - 0xFFFFFF9F reads the UART's rate, --baud, and the link answers at
+      every rate the board takes once it is written there, then at --baud
+      again
     - what sim/emu.nasm leaves after its halt is read back, and the cycle
       counter and the timer stop there
     - the screen's registers are written and read
@@ -142,9 +145,9 @@ from typing import Callable, TypeVar
 from jtag import check_board
 from load import (MAX_RAM_WORDS, MONITOR_WORDS, PROGRAM, RAM_SIZE, load_words,
                   read_bin, start)
-from nicelink import (BRK_COUNT, BRK_EN, CONTROL, ETH_PORT, FREE, HOLD,
-                      PAUSE, RAM, REGS, STEP, STOP, VERSION, Eth, Link,
-                      LinkError, Serial, Tcp, packet)
+from nicelink import (BAUD, BAUDS, BRK_COUNT, BRK_EN, CONTROL, ETH_PORT,
+                      FREE, HOLD, PAUSE, RAM, REGS, STEP, STOP, VERSION, Eth,
+                      Link, LinkError, Serial, Tcp, packet)
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NICEEMU = f"{REPO}/nice_cpu/emulator/zig-out/bin/niceemu"
@@ -487,6 +490,42 @@ def test_ram_size(link: Link, board: str) -> None:
         check(f"readback {addr:08X}", got == value,
               f"got {got:08X}, want {value:08X}")
     check("the words cleared again", wr(link, top, 0) and wr(link, half, 0))
+
+
+def test_baud(link: Link, serial: Serial, baud: int) -> None:
+    """The UART's baud rate at FFFFFF9F: it reads the rate of the host,
+    drops a value it does not take, and the link answers at each rate of
+    BAUDS once it is written, then at the host's rate again. The k of
+    each write comes at the old rate, and the board takes the new one
+    after 1 ms with nothing sent since the write. The core is held."""
+    got = rd(link, BAUD)
+    require("FFFFFF9F reads the UART's rate", got == baud,
+            f"got {got}, want {baud}")
+    check("FFFFFF9F drops 1234",
+          wr(link, BAUD, 1234) and rd(link, BAUD) == baud)
+    now = baud
+    try:
+        for rate in [r for r in BAUDS if r != baud] + [baud]:
+            ok = wr(link, BAUD, rate)
+            if ok:
+                time.sleep(0.005)
+                serial.set_baud(rate)
+                now = rate
+                try:
+                    ok = rd(link, BAUD) == rate and \
+                        rd(link, VERSION) == link_version()
+                except LinkError as e:
+                    print(f"  {e}")
+                    ok = False
+            check(f"the link at {rate} baud", ok)
+            if not ok:
+                break
+    finally:
+        if now != baud:
+            # Back to the host's rate, so that the checks after this one run
+            wr(link, BAUD, baud)
+            time.sleep(0.005)
+            serial.set_baud(baud)
 
 
 def steps(path: str) -> int:
@@ -1654,7 +1693,8 @@ def main() -> None:
                 if not args.board:
                     board = "nexys4ddr" if model.startswith("xc7a100") \
                         else "mega65"
-            link = Link(Serial(args.port, args.baud))
+            uart = Serial(args.port, args.baud)
+            link = Link(uart)
             opened = True
             try:
                 if not args.no_program:
@@ -1669,6 +1709,7 @@ def main() -> None:
                 test_write_regs(link, *step_at)
                 test_clear(link)
                 test_ram_size(link, board)
+                test_baud(link, uart, args.baud)
                 test_readback(link, emu)
                 test_counters_stop(link)
                 test_screen_registers(link)

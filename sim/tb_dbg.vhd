@@ -1,8 +1,8 @@
--- Tests the on-board debugger (src/dbg/dbg.vhd), stage 8 of
+-- Tests the on-board debugger (src/dbg/dbg.vhd), stage 10 of
 -- doc/DEBUGGER.md, with the system under it: the strip it draws into the
 -- overlay, the toggle, the core's keys over the debug link, the sticky
 -- setting, the catch, the page, the breakpoints, the Nexys4DDR's buttons
--- and display, and the decode of row 27.
+-- and display, the decode of row 27, and the settings page.
 --
 -- PASS AND FAIL
 -- Each check is an assert with severity failure, which stops GHDL with a
@@ -68,6 +68,15 @@
 --    BTNU move the cursor, BTNL steps once though it bounces, BTNR goes
 --    on to breakpoint 1, and BTNC leaves Focus. In Off the buttons do
 --    nothing.
+-- 21. n shows the settings page, with the IP address, the MAC address,
+--    the TCP port, and the baud rate, live from nicemon.vhd, and the IP
+--    address chosen. A typed IP address is written; a short one, and one
+--    with a byte over 255, say `bad value` and stay in the field, which
+--    ESC clears. CRSR down chooses the MAC address, which takes groups of
+--    one digit too, and the baud rate, where CRSR right and left step
+--    through the rates; a rate not on the list is bad. ESC leaves the
+--    page, F10 shows it again, m shows the memory page instead, and n the
+--    settings page again.
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -101,7 +110,7 @@ architecture simulation of tb_dbg is
    constant C_LAST  : natural := 29 * 80 - 1;
 
    constant C_DASHES : string := "-------- -------- -------- -------- -------- -------- -------- -------- ";
-   constant C_KEYS   : string := " F1 step  F3 go  F5 pause  F7 hold  F9 restart  F11 page  F12 keep strip: ";
+   constant C_KEYS   : string := " F1 step F3 go F5 pause F7 hold F9 restart F10 link F11 page F12 keep strip: ";
    constant C_ROW28  : string := C_KEYS & "off" & (1 to 80 - C_KEYS'length - 3 => ' ');
    constant C_STRIP  : string := " The keys are the program's.  MEGA+HELP for the debugger";
    constant C_COLOR  : std_logic_vector(23 downto 0) := X"004FFF";
@@ -133,6 +142,9 @@ architecture simulation of tb_dbg is
    signal dbg_rdata : std_logic_vector(31 downto 0);
    signal paused    : std_logic;
    signal halted    : std_logic;
+   signal set_ip    : std_logic_vector(31 downto 0);
+   signal set_mac   : std_logic_vector(47 downto 0);
+   signal set_baud  : std_logic_vector(31 downto 0);
 
    signal ovl_we   : std_logic;
    signal ovl_addr : std_logic_vector(11 downto 0);
@@ -244,6 +256,9 @@ begin
          uart_txd_o  => open,
          paused_o    => paused,
          halted_o    => halted,
+         eth_ip_o    => set_ip,
+         eth_mac_o   => set_mac,
+         uart_baud_o => set_baud,
          dbg_valid_i => dbg_valid,
          dbg_we_i    => dbg_we,
          dbg_addr_i  => dbg_addr,
@@ -275,6 +290,9 @@ begin
          lnk_rdata_i => dbg_rdata,
          paused_i    => paused,
          halted_i    => halted,
+         set_ip_i    => set_ip,
+         set_mac_i   => set_mac,
+         set_baud_i  => set_baud,
          ovl_we_o    => ovl_we,
          ovl_addr_o  => ovl_addr,
          ovl_data_o  => ovl_data,
@@ -837,6 +855,73 @@ begin
       expect('1', '1', '1', "back in Focus after the buttons in Off");
       cycles(10000);
       expect_row27("BRK 1    00000004", "after the buttons in Off");
+
+      report "tb_dbg: 21. the settings page";
+      key("n");
+      wait_text(0, 0, " Settings of the link ");
+      expect('1', '1', '1', "on the settings page");
+      wait_text(2, 0, " > IP address    0.0.0.0             ");
+      wait_text(3, 0, "   MAC address   02:4E:49:43:45:00   ");
+      wait_text(4, 0, "   TCP port      4510                ");
+      wait_text(5, 0, "   Baud rate     115200              ");
+      wait_text(9, 0, "   nothing sent, a host on it must follow, and a reset sets it back to 2000000.");
+      wait_text(23, 0, " IP:      _________________  ");
+      assert ovl(2 * 80 + 17)(31 downto 8) = C_CURSOR and ovl(3 * 80 + 17)(31 downto 8) = C_COLOR
+         report "tb_dbg: the IP address is not the setting chosen"
+         severity failure;
+      key("192.168.1.65" & C_CR);
+      wait_text(2, 0, " > IP address    192.168.1.65        ");
+      wait_text(23, 0, " IP:      _________________  written   ");
+      assert set_ip = X"C0A80141"
+         report "tb_dbg: the IP address is " & to_hstring(set_ip)
+         severity failure;
+      key("1.2.3" & C_CR);
+      wait_text(23, 0, " IP:      1.2.3____________  bad value ");
+      key("." & C_DEL & ".256" & C_CR);
+      wait_text(23, 0, " IP:      1.2.3.256________  bad value ");
+      key("" & C_ESC);
+      wait_text(23, 0, " IP:      _________________  bad value ");
+      key(C_ESC & "[B");
+      wait_text(23, 0, " MAC:     _________________            ");
+      wait_text(2, 0, "   IP address");
+      wait_text(3, 0, " > MAC address");
+      key("2:4e:49:43:45:7" & C_CR);
+      wait_text(3, 0, " > MAC address   02:4E:49:43:45:07   ");
+      wait_text(23, 0, " MAC:     _________________  written   ");
+      assert set_mac = X"024E49434507"
+         report "tb_dbg: the MAC address is " & to_hstring(set_mac)
+         severity failure;
+      key("2:4e:49:43:45" & C_CR);
+      wait_text(23, 0, " MAC:     2:4E:49:43:45____  bad value ");
+      key(C_ESC & C_ESC & "[B");
+      wait_text(5, 0, " > Baud rate     115200 ");
+      wait_text(23, 0, " Baud:    _________________            ");
+      key(C_ESC & "[C");
+      wait_text(23, 0, " Baud:    115200___________ ");
+      key(C_ESC & "[C" & C_ESC & "[C" & C_ESC & "[D");
+      wait_text(23, 0, " Baud:    230400___________ ");
+      key("" & C_CR);
+      wait_text(5, 0, " > Baud rate     230400              ");
+      wait_text(23, 0, " Baud:    _________________  written   ");
+      assert set_baud = X"00038400"
+         report "tb_dbg: the baud rate is " & to_hstring(set_baud)
+         severity failure;
+      key("1234" & C_CR);
+      wait_text(23, 0, " Baud:    1234_____________  bad value ");
+      key(C_ESC & C_ESC & "[A" & C_ESC & "[A" & C_ESC & "[A");
+      wait_text(2, 0, " > IP address");
+      key("" & C_ESC);
+      cycles(1000);
+      expect('1', '0', '1', "after ESC on the settings page");
+      key(C_ESC & "[21~");
+      wait_text(0, 0, " Settings of the link ");
+      key("m");
+      wait_text(0, 0, " Window 00000000 ");
+      key("n");
+      wait_text(0, 0, " Settings of the link ");
+      key("" & C_ESC);
+      cycles(1000);
+      expect('1', '0', '1', "after the settings page");
 
       assert stray = 0
          report "tb_dbg: " & to_string(stray) & " writes outside the overlay's rows"

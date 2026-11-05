@@ -4,10 +4,10 @@
 -- with single keys.
 --
 -- THEORY OF OPERATION
--- This is stage 9 of the design note: the live strip, the core keys, the
+-- This is stage 10 of the design note: the live strip, the core keys, the
 -- sticky setting, the catch, the page, the breakpoints, the Nexys4DDR's
--- buttons and display, the decode of row 27, and the link's side port
--- with the registers live. The debugger has three states. It is Off
+-- buttons and display, the decode of row 27, the link's side port with
+-- the registers live, and the settings page of the link (issue #75). The debugger has three states. It is Off
 -- after reset. The toggle pulse, toggle_i, takes it from Off or Strip to
 -- Focus, and from Focus to Off, or to Strip while the sticky setting is
 -- on, which F12 toggles in Focus. In Strip and Focus the strip is shown
@@ -69,6 +69,19 @@
 -- the window to. b on an empty field is the key of a breakpoint; after a
 -- digit, a and b are digits.
 --
+-- F10 or n shows the settings page instead, and F11 or m the memory page
+-- instead of it. dbg_set.vhd writes the settings' text from set_ip_i,
+-- set_mac_i, and set_baud_i, nicemon.vhd's registers, which are live
+-- without the link. On the page the cursor keys up and down choose the
+-- IP address, the MAC address, or the baud rate, the TCP port being
+-- shown only; the hex digits, the dot, and the colon go into the field
+-- (sfield), and on the rate the cursor keys left and right put the next
+-- rate of C_UART_RATES there. RETURN has dbg_set.vhd parse the field, and
+-- a good one is written as a word's write is, to 0xFFFFFF9A, to
+-- 0xFFFFFF9B and 9C, or to 0xFFFFFF9F, with `written` or the link's
+-- error; a bad one says `bad value` and stays in the field. ESC clears
+-- the field, or leaves the page when it is empty.
+--
 -- With G_BOARD_IO, the board's buttons are keys in Focus too: BTNL steps,
 -- BTNR goes on, BTNU and BTND move the page's cursor, and BTNC leaves
 -- Focus as the toggle key does. p_btn synchronizes them and samples them
@@ -93,25 +106,35 @@
 -- the cursor's address, the 22 rows of the window, the field with its
 -- message, and the page's keys, from the templates of row_cells; the
 -- cursor's word has its colors swapped, and a word at an enabled
--- breakpoint is on dark red. The header lists the 4 breakpoints.
+-- breakpoint is on dark red. The header lists the 4 breakpoints. The
+-- settings page has its own templates, and the chosen setting has the
+-- colors swapped and a > before it.
 --
 -- RESET
 -- Synchronous to clk_i, by rst_i. The debugger is Off, knows nothing of
 -- the core, and draws the strip again. The page is off, its window and
--- cursor at 0, and its field empty.
+-- cursor at 0, and its field empty, and so are the settings page and its
+-- field, with the IP address chosen.
 
 library ieee;
    use ieee.std_logic_1164.all;
    use ieee.numeric_std.all;
    use ieee.numeric_std_unsigned.all;
 
+library work;
+   use work.uart_pkg.all;
+
 entity dbg is
    generic (
-      G_CLOCK_HZ   : positive := 100_000_000;
+      G_CLOCK_HZ      : positive := 100_000_000;
       -- The board's key that toggles the debugger, named in row 28
-      G_TOGGLE_KEY : string   := "MEGA+HELP";
+      G_TOGGLE_KEY    : string   := "MEGA+HELP";
       -- The board has buttons and a seven-segment display, the Nexys4DDR's
-      G_BOARD_IO   : boolean  := false
+      G_BOARD_IO      : boolean  := false;
+      -- The TCP port of the link, and the UART's baud rate after reset,
+      -- for the settings page
+      G_TCP_PORT      : natural  := 4510;
+      G_UART_BAUDRATE : positive := 2_000_000
    );
    port (
       clk_i       : in  std_logic;
@@ -139,6 +162,12 @@ entity dbg is
       -- of either
       paused_i    : in  std_logic;
       halted_i    : in  std_logic;
+
+      -- The link's settings (nicemon.vhd): the IP and MAC addresses, and
+      -- the UART's baud rate
+      set_ip_i    : in  std_logic_vector(31 downto 0) := (others => '0');
+      set_mac_i   : in  std_logic_vector(47 downto 0) := (others => '0');
+      set_baud_i  : in  std_logic_vector(31 downto 0) := (others => '0');
 
       -- The overlay of the text display (text.vhd)
       ovl_we_o    : out std_logic;
@@ -216,10 +245,10 @@ architecture synthesis of dbg is
 
    type t_brk_addrs is array (0 to C_BRKS - 1) of t_word;
 
-   type t_act is (ACT_NONE, ACT_STEP, ACT_GO, ACT_PAUSE, ACT_HOLD, ACT_RESTART, ACT_STICKY, ACT_POKE, ACT_BREAK);
+   type t_act is (ACT_NONE, ACT_STEP, ACT_GO, ACT_PAUSE, ACT_HOLD, ACT_RESTART, ACT_STICKY, ACT_POKE, ACT_BREAK, ACT_SET);
 
    -- The keys of the page
-   type t_pkey is (PK_NONE, PK_PAGE, PK_UP, PK_DOWN, PK_LEFT, PK_RIGHT, PK_PGUP, PK_PGDN, PK_HOME, PK_DIGIT, PK_DEL, PK_RETURN, PK_ESC);
+   type t_pkey is (PK_NONE, PK_PAGE, PK_SET, PK_UP, PK_DOWN, PK_LEFT, PK_RIGHT, PK_PGUP, PK_PGDN, PK_HOME, PK_DIGIT, PK_CHAR, PK_DEL, PK_RETURN, PK_ESC);
 
    type t_mem is array (0 to 255) of std_logic_vector(31 downto 0);
 
@@ -227,7 +256,7 @@ architecture synthesis of dbg is
 
    type t_kbd_st is (KBD_IDLE_ST, KBD_ESC_ST, KBD_SS3_ST, KBD_CSI_ST);
 
-   type t_seq_st is (SEQ_IDLE_ST, SEQ_CTRL_ST, SEQ_WRITE_ST, SEQ_START_ST, SEQ_REGS_ST, SEQ_INSTR_ST, SEQ_CONST_ST, SEQ_MEM_ST, SEQ_BRK_ST);
+   type t_seq_st is (SEQ_IDLE_ST, SEQ_CTRL_ST, SEQ_WRITE_ST, SEQ_START_ST, SEQ_REGS_ST, SEQ_INSTR_ST, SEQ_CONST_ST, SEQ_MEM_ST, SEQ_BRK_ST, SEQ_SET_ST);
 
    ---------------------------------------------------------------------------
    -- The cells of the strip
@@ -239,8 +268,10 @@ architecture synthesis of dbg is
    -- 20, and the address of breakpoint idx - 21 for 21 to 24; character idx of the state's name; flag idx of SR, X to I;
    -- character idx of the keys' row, which depends on the state; hex digit
    -- nib of word idx of a row of memory; or character idx of the input
-   -- field's label, of the field, or of the message
-   type t_kind is (CELL_FIX, CELL_HEX, CELL_STATE, CELL_FLAG, CELL_DEC, CELL_KEYS, CELL_MEM, CELL_LABEL, CELL_FIELD, CELL_MSG);
+   -- field's label, of the field, or of the message; and on the settings
+   -- page character idx of setting nib, the mark of setting nib, or
+   -- character idx of the field
+   type t_kind is (CELL_FIX, CELL_HEX, CELL_STATE, CELL_FLAG, CELL_DEC, CELL_KEYS, CELL_MEM, CELL_LABEL, CELL_FIELD, CELL_MSG, CELL_SET, CELL_SEL, CELL_SFIELD);
 
    type t_cell is record
       kind : t_kind;
@@ -336,8 +367,9 @@ architecture synthesis of dbg is
 
    -- A row of the page from a template: % is a digit of the window's
    -- address, & of the cursor's, $ of the row's, @ of a breakpoint's, # of
-   -- a word of memory, < a character of the field's label, ? of the field, and ! of the
-   -- message; any other character is itself
+   -- a word of memory, < a character of the field's label, ? of the field, ! of the
+   -- message, and ^ of the settings page's field; any other character is
+   -- itself
    function row_cells(s : string) return t_row is
       constant C_S    : string(1 to C_COLS) := row(s);
       variable res_v  : t_row;
@@ -371,6 +403,7 @@ architecture synthesis of dbg is
             when '<' => res_v(c) := (kind => CELL_LABEL, idx => run_v, nib => 0, ch => X"20");
             when '?' => res_v(c) := (kind => CELL_FIELD, idx => run_v, nib => 0, ch => X"20");
             when '!' => res_v(c) := (kind => CELL_MSG, idx => run_v, nib => 0, ch => X"20");
+            when '^' => res_v(c) := (kind => CELL_SFIELD, idx => run_v, nib => 0, ch => X"20");
             when others => null;
          end case;
       end loop;
@@ -383,33 +416,148 @@ architecture synthesis of dbg is
    constant C_INPUT_ROW : t_row := row_cells(" <<<<<<<< ????????  !!!!!!!!!!");
    constant C_PKEYS_ROW : t_row := row_cells(" CRSR PgUp PgDn Home move  0-f type  RETURN write  a address  b break  ESC back");
 
-   -- The field's label, for a word in 0 to 7 and for an address in 8 to
-   -- 15, one dimension, as GHDL 4.1 cannot synthesize the read of a
-   -- two-dimensional one here; and the messages
-   type t_labels is array (0 to 15) of t_byte;
+   -- The settings page: the lines of dbg_set.vhd, of C_SET_LEN characters
+   -- from column C_SET_COL, and the longest field, a MAC address
+   constant C_SET_LEN  : natural := 20;
+   constant C_SET_COL  : natural := 17;
+   constant C_SFIELD   : natural := 17;
+   constant C_SET_IP   : natural := 0;
+   constant C_SET_MAC  : natural := 1;
+   constant C_SET_PORT : natural := 2;
+   constant C_SET_BAUD : natural := 3;
+   constant C_SET_ROW  : natural := 2;                 -- The row of the IP address
 
-   type t_msgs is array (0 to 3, 0 to 9) of t_byte;
+   -- A setting's row: its name, the mark of the chosen one in column 1,
+   -- and its text
+   function set_row(s : string; line : natural) return t_row is
+      variable res_v : t_row := row_cells(s);
+   begin
+      res_v(1) := (kind => CELL_SEL, idx => 0, nib => line, ch => X"20");
+      for c in 0 to C_SET_LEN - 1 loop
+         res_v(C_SET_COL + c) := (kind => CELL_SET, idx => c, nib => line, ch => X"20");
+      end loop;
+      return res_v;
+   end function set_row;
+
+   constant C_BLANK_ROW  : t_row := row_cells("");
+   constant C_SHEAD_ROW  : t_row := row_cells(" Settings of the link");
+   constant C_SIP_ROW    : t_row := set_row("   IP address", C_SET_IP);
+   constant C_SMAC_ROW   : t_row := set_row("   MAC address", C_SET_MAC);
+   constant C_SPORT_ROW  : t_row := set_row("   TCP port", C_SET_PORT);
+   constant C_SBAUD_ROW  : t_row := set_row("   Baud rate", C_SET_BAUD);
+   constant C_NOTE1_ROW  : t_row := row_cells("   A write needs the core paused, halted, or held. A new IP or MAC address");
+   constant C_NOTE2_ROW  : t_row := row_cells("   breaks a connected TCP host. The UART takes a new rate after 1 ms with");
+   constant C_NOTE3_ROW  : t_row := row_cells("   nothing sent, a host on it must follow, and a reset sets it back to " &
+                                              integer'image(G_UART_BAUDRATE) & ".");
+   constant C_SINPUT_ROW : t_row := row_cells(" <<<<<<<< ^^^^^^^^^^^^^^^^^  !!!!!!!!!!");
+   constant C_SKEYS_ROW  : t_row := row_cells(" CRSR up/down choose  CRSR left/right rate  0-f . : type  RETURN write  ESC back");
+
+   -- The cell of a row and column of the settings page
+   function set_cell(r : natural; c : natural) return t_cell is
+   begin
+      case r is
+         when 0 =>
+            return C_SHEAD_ROW(c);
+         when C_SET_ROW =>
+            return C_SIP_ROW(c);
+         when C_SET_ROW + 1 =>
+            return C_SMAC_ROW(c);
+         when C_SET_ROW + 2 =>
+            return C_SPORT_ROW(c);
+         when C_SET_ROW + 3 =>
+            return C_SBAUD_ROW(c);
+         when C_SET_ROW + 5 =>
+            return C_NOTE1_ROW(c);
+         when C_SET_ROW + 6 =>
+            return C_NOTE2_ROW(c);
+         when C_SET_ROW + 7 =>
+            return C_NOTE3_ROW(c);
+         when C_FIELD_ROW =>
+            return C_SINPUT_ROW(c);
+         when C_FIELD_ROW + 1 =>
+            return C_SKEYS_ROW(c);
+         when others =>
+            return C_BLANK_ROW(c);
+      end case;
+   end function set_cell;
+
+   -- The rates of C_UART_RATES as text, for the field, and their lengths
+   type t_sfield is array (0 to C_SFIELD - 1) of t_byte;
+
+   type t_rate_txts is array (C_UART_RATES'range) of t_sfield;
+
+   type t_rate_lens is array (C_UART_RATES'range) of natural range 0 to C_SFIELD;
+
+   -- The characters of a string, padded with spaces
+   function sfield_of(t : string) return t_sfield is
+      variable res_v : t_sfield := (others => X"20");
+   begin
+      for k in 0 to t'length - 1 loop
+         res_v(k) := to_byte(t(t'low + k));
+      end loop;
+      return res_v;
+   end function sfield_of;
+
+   function str_len(t : string) return natural is
+   begin
+      return t'length;
+   end function str_len;
+
+   function rate_txts return t_rate_txts is
+      variable res_v : t_rate_txts;
+   begin
+      for i in C_UART_RATES'range loop
+         res_v(i) := sfield_of(integer'image(C_UART_RATES(i)));
+      end loop;
+      return res_v;
+   end function rate_txts;
+
+   function rate_lens return t_rate_lens is
+      variable res_v : t_rate_lens;
+   begin
+      for i in C_UART_RATES'range loop
+         res_v(i) := str_len(integer'image(C_UART_RATES(i)));
+      end loop;
+      return res_v;
+   end function rate_lens;
+
+   constant C_RATE_TXTS : t_rate_txts := rate_txts;
+   constant C_RATE_LENS : t_rate_lens := rate_lens;
+   constant C_RATE_LAST : natural     := C_UART_RATES'high;
+
+   -- The field's labels, 8 characters each: for a word, for an address,
+   -- and for the settings' IP address, MAC address, and baud rate; one
+   -- dimension, as GHDL 4.1 cannot synthesize the read of a
+   -- two-dimensional one here; and the messages
+   type t_labels is array (0 to 39) of t_byte;
+
+   constant C_LBL_WORD : natural := 0;
+   constant C_LBL_ADDR : natural := 1;
+   constant C_LBL_IP   : natural := 2;
+
+   type t_msgs is array (0 to 4, 0 to 9) of t_byte;
 
    constant C_MSG_NONE    : natural := 0;
    constant C_MSG_WRITTEN : natural := 1;
    constant C_MSG_ERR     : natural := 2;                -- e and the code's two digits
    constant C_MSG_FULL    : natural := 3;                -- No breakpoint is free
+   constant C_MSG_BAD     : natural := 4;                -- A setting that does not parse
 
    function labels return t_labels is
-      constant C_S   : string(1 to 16) := "Word:   Address:";
+      constant C_S   : string(1 to 40) := "Word:   Address:IP:     MAC:    Baud:   ";
       variable res_v : t_labels;
    begin
-      for i in 0 to 15 loop
+      for i in 0 to 39 loop
          res_v(i) := to_byte(C_S(i + 1));
       end loop;
       return res_v;
    end function labels;
 
    function msgs return t_msgs is
-      constant C_S   : string(1 to 40) := "          written   e         none free ";
+      constant C_S   : string(1 to 50) := "          written   e         none free bad value ";
       variable res_v : t_msgs;
    begin
-      for k in 0 to 3 loop
+      for k in 0 to 4 loop
          for i in 0 to 9 loop
             res_v(k, i) := to_byte(C_S(10 * k + i + 1));
          end loop;
@@ -458,7 +606,7 @@ architecture synthesis of dbg is
    constant C_KEYS_PROG  : natural := 2;
 
    function keys return t_keys is
-      constant C_F   : string := " F1 step  F3 go  F5 pause  F7 hold  F9 restart  F11 page  F12 keep strip: ";
+      constant C_F   : string := " F1 step F3 go F5 pause F7 hold F9 restart F10 link F11 page F12 keep strip: ";
       constant C_R   : t_strings3 := (row(C_F & "off"), row(C_F & "on"),
          row(" The keys are the program's.  " & G_TOGGLE_KEY & " for the debugger"));
       variable res_v : t_keys;
@@ -565,6 +713,35 @@ architecture synthesis of dbg is
    signal poke_data  : t_word;
    signal brk        : std_logic := '0';                 -- Toggle a breakpoint at brk_at
    signal brk_at     : t_word;
+   signal mem_on     : std_logic;                        -- The memory page is shown
+
+   -- The settings page: shown in Focus instead of the memory page, the
+   -- setting chosen, the field, the rate that left and right are at, and
+   -- the parse and the write of the field
+   signal pkey_ch   : t_byte;
+   signal set_r     : std_logic := '0';
+   signal set_line  : natural range 0 to 3 := C_SET_IP;
+   signal sfield    : t_sfield;
+   signal sfield_n  : natural range 0 to C_SFIELD := 0;
+   signal sfield_v  : std_logic_vector(8 * C_SFIELD - 1 downto 0);
+   signal rate_i    : natural range 0 to C_RATE_LAST := C_RATE_LAST;
+   signal baud_idx  : integer range -1 to C_RATE_LAST;
+   signal set_parse : std_logic := '0';
+   signal set_kind  : natural range 0 to 2;
+   signal set_text  : std_logic_vector(8 * 4 * C_SET_LEN - 1 downto 0);
+   signal set_chars : t_dec(0 to 4 * C_SET_LEN - 1);
+   signal set_chg   : std_logic;
+   signal set_done  : std_logic;
+   signal set_ok    : std_logic;
+   signal set_value : std_logic_vector(47 downto 0);
+   signal set_go    : std_logic := '0';                  -- Write set_d0, and set_d1 after it, from set_addr
+   signal set_bad   : std_logic := '0';
+   signal set_addr  : t_word;
+   signal set_d0    : t_word;
+   signal set_d1    : t_word;
+   signal set_two   : std_logic;
+   signal msg_clr   : std_logic := '0';
+   signal lbl_k     : natural range 0 to 4;
 
    -- The request to the adapter of the side port, and its answers
    signal req_valid : std_logic := '0';
@@ -593,7 +770,7 @@ architecture synthesis of dbg is
    signal rd_idx    : natural range 0 to 255;
    signal restart_r : std_logic;
    signal msg_r     : std_logic := '0';                  -- The write's answer is the page's message
-   signal msg_ok    : natural range 0 to 3;              -- ... and this, when it is k
+   signal msg_ok    : natural range 0 to 4;              -- ... and this, when it is k
    signal brk_set   : std_logic_vector(C_BRKS - 1 downto 0);
    signal err_code  : t_byte;
 
@@ -626,7 +803,7 @@ architecture synthesis of dbg is
    signal mem_any  : std_logic := '0';                   -- The window was read once
    signal mem_ok   : std_logic := '0';                   -- ... since the core stopped
    signal mem_kill : std_logic := '0';                   -- The read is of a window left
-   signal msg_k    : natural range 0 to 3 := C_MSG_NONE;
+   signal msg_k    : natural range 0 to 4 := C_MSG_NONE;
    signal msg_code : t_byte := (others => '0');
 
    -- The drawing: a pass over the strip after each change
@@ -664,7 +841,8 @@ begin
    ovl_data_o <= ovl_data;
 
    strip_o <= '1' when state /= OFF_ST else '0';
-   page_on <= page_r when state = FOCUS_ST else '0';
+   page_on <= (page_r or set_r) when state = FOCUS_ST else '0';
+   mem_on  <= page_r when state = FOCUS_ST else '0';
    page_o  <= page_on;
    focus_o <= '1' when state = FOCUS_ST else '0';
 
@@ -714,6 +892,7 @@ begin
 
                when KBD_IDLE_ST =>
                   pkey_dig <= kbd_data_i(3 downto 0);
+                  pkey_ch  <= kbd_data_i;
                   case kbd_data_i is
                      when X"1B"  =>
                         kbd_st  <= KBD_ESC_ST;
@@ -724,6 +903,8 @@ begin
                      when X"68"  => key_act <= ACT_HOLD;    -- h
                      when X"72"  => key_act <= ACT_RESTART; -- r
                      when X"6D"  => pkey    <= PK_PAGE;     -- m
+                     when X"6E"  => pkey    <= PK_SET;      -- n
+                     when X"2E" | X"3A" => pkey <= PK_CHAR; -- . and :
                      when X"0D"  => pkey    <= PK_RETURN;
                      when X"7F"  => pkey    <= PK_DEL;
                      when X"30" | X"31" | X"32" | X"33" | X"34" |
@@ -774,6 +955,7 @@ begin
                               when 15     => key_act <= ACT_PAUSE;   -- F5
                               when 18     => key_act <= ACT_HOLD;    -- F7
                               when 20     => key_act <= ACT_RESTART; -- F9
+                              when 21     => pkey    <= PK_SET;      -- F10
                               when 23     => pkey    <= PK_PAGE;     -- F11
                               when 24     => key_act <= ACT_STICKY;  -- F12
                               when others => null;
@@ -873,17 +1055,152 @@ begin
          field_addr <= '0';
       end procedure clear;
 
+      procedure sclear is
+      begin
+         sfield   <= (others => X"20");
+         sfield_n <= 0;
+      end procedure sclear;
+
+      -- A character into the settings' field
+      procedure sput(ch : t_byte) is
+      begin
+         if sfield_n /= C_SFIELD then
+            sfield(sfield_n) <= ch;
+            sfield_n         <= sfield_n + 1;
+         end if;
+      end procedure sput;
+
+      -- The rate that left and right start from: the UART's
+      procedure rate_now is
+      begin
+         if baud_idx >= 0 then
+            rate_i <= baud_idx;
+         else
+            rate_i <= C_RATE_LAST;
+         end if;
+      end procedure rate_now;
+
+      -- The field shows rate n
+      procedure rate_put(n : natural range 0 to C_RATE_LAST) is
+      begin
+         rate_i   <= n;
+         sfield   <= C_RATE_TXTS(n);
+         sfield_n <= C_RATE_LENS(n);
+      end procedure rate_put;
+
    begin
       if rising_edge(clk_i) then
-         pg_dirty <= '0';
-         mem_move <= '0';
-         poke     <= '0';
-         brk      <= '0';
+         pg_dirty  <= '0';
+         mem_move  <= '0';
+         poke      <= '0';
+         brk       <= '0';
+         set_parse <= '0';
+         set_go    <= '0';
+         set_bad   <= '0';
+         msg_clr   <= '0';
+
+         -- The parse of the settings' field: a good value is written, and
+         -- leaves the field; a bad one stays there
+         if set_done = '1' then
+            if set_ok = '1' then
+               set_go  <= '1';
+               set_two <= '0';
+               set_d0  <= set_value(31 downto 0);
+               case set_line is
+                  when C_SET_IP =>
+                     set_addr <= X"FFFFFF9A";
+                  when C_SET_MAC =>
+                     set_addr <= X"FFFFFF9B";
+                     set_two  <= '1';
+                     set_d0   <= X"0000" & set_value(47 downto 32);
+                     set_d1   <= set_value(31 downto 0);
+                  when others =>
+                     set_addr <= X"FFFFFF9F";
+               end case;
+               sclear;
+            else
+               set_bad <= '1';
+            end if;
+         end if;
+
          if state = FOCUS_ST and pkey /= PK_NONE then
             pg_dirty <= '1';
             if pkey = PK_PAGE then
                page_r   <= not page_r;
                mem_move <= not page_r;
+               set_r    <= '0';
+            elsif pkey = PK_SET then
+               set_r    <= not set_r;
+               page_r   <= '0';
+               set_line <= C_SET_IP;
+               msg_clr  <= '1';
+               sclear;
+               rate_now;
+            elsif set_r = '1' then
+               case pkey is
+                  when PK_UP =>
+                     if set_line = C_SET_BAUD then
+                        set_line <= C_SET_MAC;
+                        msg_clr  <= '1';
+                        sclear;
+                     elsif set_line = C_SET_MAC then
+                        set_line <= C_SET_IP;
+                        msg_clr  <= '1';
+                        sclear;
+                     end if;
+                  when PK_DOWN =>
+                     if set_line = C_SET_IP then
+                        set_line <= C_SET_MAC;
+                        msg_clr  <= '1';
+                        sclear;
+                     elsif set_line = C_SET_MAC then
+                        set_line <= C_SET_BAUD;
+                        msg_clr  <= '1';
+                        sclear;
+                        rate_now;
+                     end if;
+                  when PK_LEFT =>
+                     if set_line = C_SET_BAUD then
+                        if sfield_n = 0 then
+                           rate_put(rate_i);
+                        elsif rate_i /= 0 then
+                           rate_put(rate_i - 1);
+                        else
+                           rate_put(0);
+                        end if;
+                     end if;
+                  when PK_RIGHT =>
+                     if set_line = C_SET_BAUD then
+                        if sfield_n = 0 then
+                           rate_put(rate_i);
+                        elsif rate_i /= C_RATE_LAST then
+                           rate_put(rate_i + 1);
+                        else
+                           rate_put(C_RATE_LAST);
+                        end if;
+                     end if;
+                  when PK_DIGIT =>
+                     sput(hex_char(pkey_dig));
+                  when PK_CHAR =>
+                     sput(pkey_ch);
+                  when PK_DEL =>
+                     if sfield_n /= 0 then
+                        sfield(sfield_n - 1) <= X"20";
+                        sfield_n             <= sfield_n - 1;
+                     end if;
+                  when PK_RETURN =>
+                     if sfield_n /= 0 then
+                        set_parse <= '1';
+                     end if;
+                  when PK_ESC =>
+                     if sfield_n /= 0 then
+                        sclear;
+                     else
+                        set_r <= '0';
+                     end if;
+                  when others =>
+                     null;
+               end case;
             elsif page_r = '1' then
                case pkey is
                   when PK_UP =>
@@ -969,13 +1286,52 @@ begin
          end if;
 
          if rst_i = '1' then
-            page_r <= '0';
-            window <= (others => '0');
-            cur    <= 0;
+            page_r   <= '0';
+            window   <= (others => '0');
+            cur      <= 0;
+            set_r    <= '0';
+            set_line <= C_SET_IP;
+            rate_i   <= C_RATE_LAST;
             clear;
+            sclear;
          end if;
       end if;
    end process p_page;
+
+   baud_idx <= uart_rate_index(set_baud_i);
+
+   set_kind <= 0 when set_line = C_SET_IP else
+               1 when set_line = C_SET_MAC else
+               2;
+
+   gen_set : for i in 0 to 4 * C_SET_LEN - 1 generate
+      set_chars(i) <= set_text(8 * i + 7 downto 8 * i);
+   end generate gen_set;
+
+   gen_sfield : for i in 0 to C_SFIELD - 1 generate
+      sfield_v(8 * i + 7 downto 8 * i) <= sfield(i);
+   end generate gen_sfield;
+
+   i_dbg_set : entity work.dbg_set
+      generic map (
+         G_TCP_PORT => G_TCP_PORT
+      )
+      port map (
+         clk_i     => clk_i,
+         rst_i     => rst_i,
+         ip_i      => set_ip_i,
+         mac_i     => set_mac_i,
+         baud_i    => set_baud_i,
+         text_o    => set_text,
+         changed_o => set_chg,
+         parse_i   => set_parse,
+         kind_i    => set_kind,
+         field_i   => sfield_v,
+         len_i     => sfield_n,
+         done_o    => set_done,
+         ok_o      => set_ok,
+         value_o   => set_value
+      ); -- i_dbg_set
 
    ---------------------------------------------------------------------------
    -- The link
@@ -1140,7 +1496,7 @@ begin
                         when ACT_RESTART =>
                            restart_r <= '1';
                            data_v    := X"00000001" or rom_v;
-                        when ACT_POKE =>
+                        when ACT_POKE | ACT_SET =>
                            msg_r  <= '1';
                            msg_ok <= C_MSG_WRITTEN;
                         when ACT_NONE | ACT_STICKY | ACT_BREAK =>
@@ -1182,14 +1538,19 @@ begin
                         if act_r = ACT_STEP or act_r = ACT_PAUSE then
                            own_r <= '1';
                         end if;
-                        if act_r = ACT_POKE then
-                           write(poke_addr, poke_data);
-                        else
-                           write(C_CTRL, data_v);
-                        end if;
                         instr_ok <= '0';
                         mem_ok   <= '0';
                         seq_st   <= SEQ_WRITE_ST;
+                        if act_r = ACT_POKE then
+                           write(poke_addr, poke_data);
+                        elsif act_r = ACT_SET then
+                           write(set_addr, set_d0);
+                           if set_two = '1' then
+                              seq_st <= SEQ_SET_ST;
+                           end if;
+                        else
+                           write(C_CTRL, data_v);
+                        end if;
                      else
                         read(C_REGS, 16);
                         seq_st <= SEQ_REGS_ST;
@@ -1204,6 +1565,20 @@ begin
                      write(C_BRK_EN, (others => '0'));
                      req_data(C_BRKS - 1 downto 0) <= brk_set;
                      seq_st                        <= SEQ_WRITE_ST;
+                  else
+                     answer;
+                     read(C_CTRL, C_CTRL_N);
+                     seq_st <= SEQ_CTRL_ST;
+                  end if;
+               end if;
+
+            -- The second word of a setting, the MAC address's last four
+            -- bytes
+            when SEQ_SET_ST =>
+               if done = '1' then
+                  if err = '0' then
+                     write(set_addr + 1, set_d1);
+                     seq_st <= SEQ_WRITE_ST;
                   else
                      answer;
                      read(C_CTRL, C_CTRL_N);
@@ -1247,7 +1622,7 @@ begin
                         read(regs_r(15), 1);
                         seq_st <= SEQ_INSTR_ST;
                      elsif (ctrl_r(4) = '1' or ctrl_r(1) = '1' or ctrl_r(0) = '1') and
-                           page_on = '1' and mem_ok = '0' then
+                           mem_on = '1' and mem_ok = '0' then
                         read(window, C_MEM_LEN);
                         mem_kill <= '0';
                         seq_st   <= SEQ_MEM_ST;
@@ -1269,7 +1644,7 @@ begin
                      dec_start <= '1';
                   end if;
                   -- Then the window, at once
-                  if page_on = '1' and (err = '1' or n_consts(instr_r) = 0) then
+                  if mem_on = '1' and (err = '1' or n_consts(instr_r) = 0) then
                      tick_r <= '1';
                   end if;
                end if;
@@ -1279,7 +1654,7 @@ begin
                   seq_st    <= SEQ_IDLE_ST;
                   instr_ok  <= not err;
                   dec_start <= not err;
-                  if page_on = '1' then
+                  if mem_on = '1' then
                      tick_r <= '1';
                   end if;
                end if;
@@ -1306,6 +1681,21 @@ begin
          end if;
          if brk = '1' then
             act_r <= ACT_BREAK;
+         end if;
+         if set_go = '1' then
+            act_r <= ACT_SET;
+         end if;
+         -- The settings' text, while it is shown, and a value that does
+         -- not parse
+         if set_chg = '1' and set_r = '1' then
+            dirty <= '1';
+         end if;
+         if set_bad = '1' then
+            msg_k <= C_MSG_BAD;
+            dirty <= '1';
+         end if;
+         if msg_clr = '1' then
+            msg_k <= C_MSG_NONE;
          end if;
          if stop = '1' or go_on = '1' then
             instr_ok <= '0';
@@ -1413,6 +1803,10 @@ begin
               C_ST_PAUSED when ctrl_r(4) = '1' else
               C_ST_RUNNING;
 
+   lbl_k <= C_LBL_IP + set_kind when set_r = '1' else
+            C_LBL_ADDR when field_addr = '1' else
+            C_LBL_WORD;
+
    keys_k <= C_KEYS_PROG when state = STRIP_ST else
              C_KEYS_STRIP when sticky = '1' else
              C_KEYS_OFF;
@@ -1433,6 +1827,8 @@ begin
             s1_mem   <= 0;
             if draw_row >= C_STRIP_ROW then
                s1_cell <= C_CELLS(draw_cnt - C_STRIP_ADDR);
+            elsif set_r = '1' then
+               s1_cell <= set_cell(draw_row, draw_col);
             elsif draw_row = 0 then
                s1_cell <= C_HEAD_ROW(draw_col);
             elsif draw_row < C_FIELD_ROW then
@@ -1509,10 +1905,20 @@ begin
                   end if;
                end loop;
             when CELL_LABEL =>
-               if field_addr = '1' then
-                  s2_ch <= C_LABELS(8 + s1_cell.idx mod 8);
-               else
-                  s2_ch <= C_LABELS(s1_cell.idx mod 8);
+               s2_ch <= C_LABELS(8 * lbl_k + s1_cell.idx mod 8);
+            when CELL_SET =>
+               s2_ch <= set_chars(C_SET_LEN * (s1_cell.nib mod 4) + s1_cell.idx mod C_SET_LEN);
+               if s1_cell.nib = set_line then
+                  s2_cur <= '1';
+               end if;
+            when CELL_SEL =>
+               if s1_cell.nib = set_line then
+                  s2_ch <= X"3E";                           -- >
+               end if;
+            when CELL_SFIELD =>
+               s2_ch <= X"5F";                              -- _
+               if s1_cell.idx < sfield_n then
+                  s2_ch <= sfield(s1_cell.idx mod C_SFIELD);
                end if;
             when CELL_FIELD =>
                -- The digits typed, the first at the left

@@ -37,6 +37,7 @@ board sends a notice at reset (`b05`), when the core halts (`h` and the
 reason), and when an input byte is lost (`o`). The tools in `tools/` are
 such a host, and `niceemu --link` serves the same link, so the tools
 drive the emulator as they drive the board. The tools use 2 Mbaud too.
+`0xFFFFFF9F` sets another rate (see [The baud rate](#the-baud-rate)).
 
 The Ethernet port carries the same line over TCP (see [The debug link
 over TCP](#the-debug-link-over-tcp)). While a host is connected there,
@@ -105,6 +106,30 @@ for it, and bytes typed while the core is held in reset or has halted
 are dropped. The notices show up in the terminal too, as a few letters
 after a stray character, such as `h01#C9` after a `HALT`.
 
+### The baud rate
+
+The UART runs at 2 Mbaud after reset, on every board, and
+`0xFFFFFF9F` holds the rate in bit/s, `2000000`. A write of 115200,
+230400, 460800, 921600, 1000000, 1500000, or 2000000 sets it, for the
+core and the link alike, and a write of any other value is dropped. The
+board's USB serial chip makes all of them, and 1 to 2 Mbaud exactly. The
+clocks of 100 MHz and 90 MHz make each to within 0.5 %.
+
+The UART takes the new rate once it has sent nothing for 1 ms after
+the write, and receives nothing at that moment. So the `k` that answers the write still
+goes out at the old rate. A host waits for the `k`, waits a few
+milliseconds more, and then changes its own rate, as `tools/hwtest.py`
+does. A program that keeps printing keeps the old rate until it stops for
+1 ms.
+
+Only a reset brings back 2 Mbaud. A start of the core keeps the rate, so
+a host at another rate still loads and runs programs; the tools take its
+rate with `--baud`. A program that sets a rate the host does not expect
+cuts the host off until the next reset, so a program should leave this
+register to the user. Over TCP the rate does not matter, and the line
+on the UART changes for the next host there. The emulator has plain
+memory at `0xFFFFFF9F`.
+
 ## Address map
 
 The link and the core's data accesses see the same addresses, but for the
@@ -127,7 +152,7 @@ effect and does not write (DEBUG.md §3).
 | `0xFFFFFF40`–`0xFFFFFF4F` | The performance counters of nice_cpu's SYSTEM.md §3: cycles, instructions, and microseconds, 64 bits each. The microseconds come from the clock, 100 MHz on the MEGA65 and 90 MHz on the Nexys4DDR, so they are real time, as the emulator's microsecond counter is, which counts the host's time, or one per step with `--step-time`. They stop while the core is paused. The link reads them as the core does: a read of a low word takes the snapshot that the high word returns, where `niceemu --link` takes none. DEBUG.md §3 allows both while the core is held, halted, or paused. The words `0xFFFFFF46`–`4F` read 0 and take no write. |
 | `0xFFFFFF50`–`0xFFFFFF7F` | The fetch statistics of MICROARCH.md §8.1, the rest of the performance counters: counters of what FETCH and DECODE do, for judging the size of FETCH's buffer. A start of the core clears them, and they then count each clock while the core runs, until a write of 0 to `FS_CTRL` stops them. They stop while the core is held and after it halts. With the multi-cycle core (`NICE=multi`), only `FS_CYCLES` and `FS_HIST[0]` count, `FS_CTRL` reads its run bit, and the other words read 0. |
 | `0xFFFFFF80`–`0xFFFFFF8F` | The screen's registers: the cursor and the display offset (see [The screen](#the-screen)). |
-| `0xFFFFFF90`–`0xFFFFFF9F` | The Nexys4DDR's LEDs, seven-segment display, buttons, and switches (see [The Nexys4DDR's devices](#the-nexys4ddrs-devices)). On the MEGA65 they read 0 and take no write. On every board, `0xFFFFFF98`–`9D` are the Ethernet station (see [The Ethernet station](#the-ethernet-station)), and `0xFFFFFF9E` reads the words of the RAM, `0x20000` on the MEGA65 and `0x10000` on the Nexys4DDR, and takes no write. The emulator has memory there, which reads 0 after a clear, so a program takes 0 to mean no limit. |
+| `0xFFFFFF90`–`0xFFFFFF9F` | The Nexys4DDR's LEDs, seven-segment display, buttons, and switches (see [The Nexys4DDR's devices](#the-nexys4ddrs-devices)). On the MEGA65 they read 0 and take no write. On every board, `0xFFFFFF98`–`9D` are the Ethernet station (see [The Ethernet station](#the-ethernet-station)), `0xFFFFFF9E` reads the words of the RAM, `0x20000` on the MEGA65 and `0x10000` on the Nexys4DDR, and takes no write, and `0xFFFFFF9F` is the UART's baud rate (see [The baud rate](#the-baud-rate)). The emulator has memory there, which reads 0 after a clear, so a program takes 0 to mean no limit. |
 | `0xFFFFFFA0`–`0xFFFFFFAF` | The SD card controller of nice_cpu's SYSTEM.md §5, with 2 slots on the MEGA65 and 1 on the Nexys4DDR (see [The SD card slots](#the-sd-card-slots)). |
 | `0xFFFFFFE0`–`0xFFFFFFEF` | The debug registers of DEBUG.md §6, for the link only, here and below: R0–R15 of the core. R1–R15 take a write while the core is paused, as a register-direct write of an instruction does (ISA.md §4.3); R0 takes none. While the core runs they read its registers live, as `niceemu --link` returns them, each word from the cycle of its own read; the multi-cycle core adds 1 to R15 for each word it fetches, so its live R15 may be the address of a constant word, or of the word after the instruction it carries out, where the pipelined core's is an instruction's. After a halt they hold what the emulator prints. While the core is paused they hold its registers, with R15 the address of the next instruction, and a hold of the paused core keeps them. A hold of a running core leaves them undefined. |
 | `0xFFFFFFF0` | Control: hold, clear, hide, pause, and step (see [The control register](#the-control-register)). |
@@ -374,10 +399,11 @@ registers in `0xFFFFFF90`–`96`, for the core and the link alike. Only the
 Nexys4DDR has them: on the MEGA65 these words read 0 and take no write,
 where the emulator has memory there. `0xFFFFFF98`–`9D`, the Ethernet
 station, are on every board (see [The Ethernet
-station](#the-ethernet-station)), and so is `0xFFFFFF9E`, the size of
-the RAM (see [Address map](#address-map)). Reset clears the registers
-that can be written, and a start of the core does not, so a program's
-display stays after it halts.
+station](#the-ethernet-station)), and so are `0xFFFFFF9E`, the size of
+the RAM (see [Address map](#address-map)), and `0xFFFFFF9F`, the UART's
+baud rate (see [The baud rate](#the-baud-rate)). Reset clears the
+registers that can be written, and a start of the core does not, so a
+program's display stays after it halts.
 
 | Address | Access | What it is |
 |---|---|---|

@@ -47,6 +47,19 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   on the screen as any character.
 - `tools/screenshot.py` draws a program's screen in the font that it
   selected.
+- The UART's baud rate is a register, `0xFFFFFF9F`, in bit/s (#75): a
+  write of 115200, 230400, 460800, 921600, 1000000, 1500000, or 2000000
+  sets it, and the UART takes it once it has sent nothing for 1 ms
+  after the write. A
+  reset brings back 2000000, and a start keeps the rate, which the tools
+  then take with `--baud` (doc/SYSTEM.md, The baud rate).
+- The debugger's F10, or `n`, shows the settings page (#75): the IP
+  address, the MAC address, the TCP port, and the baud rate, live, in
+  their usual notation. The first two and the rate are typed there, or
+  the rate stepped with CRSR left and right, and written while the
+  program is stopped. Row 28 names F10, with single spaces between the
+  keys.
+- `make hwtest` sets each baud rate and reads the link back at it.
 
 ## V1.5 (2026-11-05)
 

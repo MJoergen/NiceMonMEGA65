@@ -84,8 +84,8 @@ COL_STATE, COL_PC, COL_INSTR, COL_FLAGS, COL_DEC = 1, 10, 20, 30, 46
 STATE_LEN  = 9
 DEC_LEN    = COLS - COL_DEC
 FLAG_CHARS = "XCZNVEI"
-KEYS_ROW   = (" F1 step  F3 go  F5 pause  F7 hold  F9 restart  F11 page"
-              "  F12 keep strip: off")
+KEYS_ROW   = (" F1 step F3 go F5 pause F7 hold F9 restart F10 link F11 page"
+              " F12 keep strip: off")
 # niceemu's halt reasons, and their numbers in DEBUG.md section 6
 # A stop: ("PAUSED", 0) at the step limit, or ("HALTED", reason)
 Stop = tuple[str, int]

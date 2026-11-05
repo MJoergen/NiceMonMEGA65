@@ -146,12 +146,12 @@
 --                          for a cycle when one is written, and when they
 --                          are cleared by reset or by the clear of the memory.
 --   0xFFFFFF90-0xFFFFFF9F  The board's devices (src/board_io.vhd): 90-96
---                          with G_BOARD_IO (the Nexys4DDR), and 98-9E on every
+--                          with G_BOARD_IO (the Nexys4DDR), and 98-9F on every
 --                          board. Without G_BOARD_IO, and in the words that
 --                          are not registers, a read returns 0 and a write
 --                          is dropped. Reset clears the writable ones, or
---                          sets them as 9A-9C say; a start of the core does
---                          not.
+--                          sets them as 9A-9C and 9F say; a start of the
+--                          core does not.
 --     90  The 16 LEDs, bit n for LED n. Read and write.
 --     91  RGB LED 0: bits 11..8 red, 7..4 green, 3..0 blue, each a level
 --         of 0 to 15. Read and write.
@@ -178,6 +178,13 @@
 --     9E  The words of the RAM, 2^G_RAM_ADDR_BITS: 0x20000 on the MEGA65
 --         and 0x10000 on the Nexys4DDR. Read only. In niceemu it is plain
 --         memory, which reads 0 after the clear, and 0 means no limit.
+--     9F  The UART's baud rate in bit/s, uart_baud_o: G_UART_BAUDRATE after
+--         reset, 2000000 on the boards. A write of 115200, 230400, 460800,
+--         921600, 1000000, 1500000, or 2000000 sets it, and of any other
+--         value is dropped. The UART takes the new rate once it has sent
+--         nothing for 1 ms after the write, so the link's `k` to the write
+--         still goes out at the old rate. A start of the core keeps it. Read and write. In
+--         niceemu it is plain memory.
 --   0xFFFFFFA0-0xFFFFFFAF  The SD card controller of SYSTEM.md §5
 --                          (src/sd/sd.vhd, in src/devices.vhd), with
 --                          G_SD_SLOTS > 0: the registers and the buffer of
@@ -385,6 +392,8 @@ entity nicemon is
       eth_tx_i       : in  std_logic_vector(31 downto 0) := (others => '0');
       eth_mac_o      : out std_logic_vector(47 downto 0);
       eth_ip_o       : out std_logic_vector(31 downto 0);
+      -- The UART's baud rate, 0xFFFFFF9F
+      uart_baud_o    : out std_logic_vector(31 downto 0);
       -- The link's byte streams over TCP, which take the UART's place
       -- while net_on_i is '1': the host's bytes and its half-close, a
       -- break, a connection that opens, which renews the line's input,
@@ -550,6 +559,8 @@ architecture synthesis of nicemon is
    -- to 0xFFFFFF90-9F, and the word it reads
    signal brd_stb   : std_logic;
    signal brd_rdata : std_logic_vector(31 downto 0);
+   -- The cycles of the UART's bit, from the baud rate at 0xFFFFFF9F
+   signal uart_div : std_logic_vector(15 downto 0);
 
    -- The number of the core's data reads of 0xFFFFFF01 since it was written
    signal read_count : std_logic_vector(31 downto 0) := (others => '0');
@@ -1075,10 +1086,12 @@ begin
 
    i_board_io : entity work.board_io
       generic map (
-         G_BOARD_IO  => G_BOARD_IO,
-         G_ETH_MAC   => G_ETH_MAC,
-         G_ETH_IP    => G_ETH_IP,
-         G_RAM_WORDS => 2 ** G_RAM_ADDR_BITS
+         G_BOARD_IO      => G_BOARD_IO,
+         G_ETH_MAC       => G_ETH_MAC,
+         G_ETH_IP        => G_ETH_IP,
+         G_RAM_WORDS     => 2 ** G_RAM_ADDR_BITS,
+         G_CLOCK_HZ      => G_CLOCK_HZ,
+         G_UART_BAUDRATE => G_UART_BAUDRATE
       )
       port map (
          clk_i        => clk_i,
@@ -1098,7 +1111,9 @@ begin
          eth_rx_bad_i => eth_rx_bad_i,
          eth_tx_i     => eth_tx_i,
          eth_mac_o    => eth_mac_o,
-         eth_ip_o     => eth_ip_o
+         eth_ip_o     => eth_ip_o,
+         uart_baud_o  => uart_baud_o,
+         uart_div_o   => uart_div
       ); -- i_board_io
 
    -- The screen's registers, which take the request served, when it is
@@ -1181,11 +1196,13 @@ begin
 
    i_uart_serdes : entity work.uart_serdes
       generic map (
-         G_DIVISOR => G_CLOCK_HZ / G_UART_BAUDRATE
+         G_DIVISOR => (G_CLOCK_HZ + G_UART_BAUDRATE / 2) / G_UART_BAUDRATE,
+         G_QUIET   => G_CLOCK_HZ / 1000
       )
       port map (
          clk_i      => clk_i,
          rst_i      => rst_i,
+         div_i      => uart_div,
          tx_valid_i => ser_tx_valid,
          tx_ready_o => ser_tx_ready,
          tx_data_i  => ser_tx_data,

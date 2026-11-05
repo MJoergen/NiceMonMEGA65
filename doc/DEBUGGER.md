@@ -2,15 +2,18 @@
 
 A debugger in the FPGA, with the MEGA65's own keyboard and screen and no
 host: what `tools/mon.py` does over the debug link, in a strip of text
-under the program's screen, and a page over it. **Stages 1 to 9 are
+under the program's screen, and a page over it. **Stages 1 to 10 are
 written, and the rest is planned**
-([#52](https://github.com/MJoergen/NiceMonMEGA65/issues/52) and
-[#53](https://github.com/MJoergen/NiceMonMEGA65/issues/53)): the toggle
+([#52](https://github.com/MJoergen/NiceMonMEGA65/issues/52),
+[#53](https://github.com/MJoergen/NiceMonMEGA65/issues/53), and
+[#75](https://github.com/MJoergen/NiceMonMEGA65/issues/75)): the toggle
 key enters Focus, where the strip shows the core's state, its registers,
 live while it runs, and the word at the PC at a stop, and F1 to F9 run
 the core; F12 keeps the strip up when Focus is left, and a stop in Strip
 comes back to Focus; and F11 shows the page, a window on the memory,
-where a word is written and a breakpoint set at the cursor. The debugger
+where a word is written and a breakpoint set at the cursor, and F10 the
+settings page, where the link's IP and MAC addresses and the UART's baud
+rate are shown and set. The debugger
 is a client of the debug link inside the system, beside a host on the
 UART or over TCP, which keeps its line. The README's
 [On its own](../README.md#the-on-board-debugger) says how to use it,
@@ -91,7 +94,7 @@ on dark blue, `0x004` and `0xFFF`:
  R0-7   00000000 00000001 0000FFFF 00000010 00000000 00000000 00000000 00000000
  R8-15  00000000 00000000 00000000 00000000 00000000 FFFFFEF0 00000003 00001234
  PAUSED   00001234  xxxxxxxx  X C . . . . I   ADD[CM] R1, @0x40, R1
- F1 step  F3 go  F5 pause  F7 hold  F9 restart  F11 page  F12 keep strip: off
+ F1 step F3 go F5 pause F7 hold F9 restart F10 link F11 page F12 keep strip: off
 ```
 
 - Rows 25 and 26: R0–R15 in hex, as the link returns them (DEBUG.md
@@ -150,6 +153,45 @@ dashes until the new words are read, and a read that a move overtook is
 dropped. A code page, the decode of a range of instructions, comes with the
 disassembler.
 
+The settings page (stage 10,
+[#75](https://github.com/MJoergen/NiceMonMEGA65/issues/75)) takes the
+page's place in Focus, and F11 and F10 switch between the two. Row 0
+has its title; rows 2 to 5 the IP address, the MAC address, the TCP
+port, and the baud rate, from column 17, in their usual notation; rows
+7 to 9 a note on what a write does; row 23 the field, its label, `IP:`,
+`MAC:`, or `Baud:`, and the last message, `written`, `e02`, or `bad
+value`; and row 24 the keys. The setting chosen has a `>` before it and
+its colors swapped, and the TCP port, the generic `G_PORT` of
+`src/eth/`, is shown only.
+
+```
+ Settings of the link
+
+ > IP address    192.168.1.65
+   MAC address   02:4E:49:43:45:00
+   TCP port      4510
+   Baud rate     2000000
+
+   A write needs the core paused, halted, or held. A new IP or MAC address
+   breaks a connected TCP host. The UART takes a new rate after 1 ms with
+   nothing sent, a host on it must follow, and a reset sets it back to 2000000.
+...
+ IP:      _________________  written
+ CRSR up/down choose  CRSR left/right rate  0-f . : type  RETURN write  ESC back
+```
+
+The settings are registers of `board_io.vhd`, `0xFFFFFF9A` to `9C` and
+`9F`, which `nicemon` gives out, so the page shows them live, while the
+core runs too, without the link; a write goes through the link, as a
+word's write from the page does, and needs the core stopped. The IP
+address is typed with dots, 1 to 3 decimal digits a byte up to 255,
+the MAC address with colons, 1 or 2 hex digits a byte, and the rate in
+decimal, one of those that `0xFFFFFF9F` takes; anything else says `bad
+value` and stays in the field. The MAC address takes two writes, `9B`
+and then `9C`. On the rate, CRSR left and right put the rate before or
+after the one in the field in it, starting from the UART's.
+`src/dbg/dbg_set.vhd` writes the text and parses the field.
+
 The overlay is a memory of its own, like the copy of the screen
 (`src/video/scr_ram.vhd`): 2^12 words of 32 bits, 4 block RAMs, each
 word a character and its colors as a screen word is, written by the
@@ -177,6 +219,7 @@ mon.py's:
 | F5, `p` | Pause |
 | F7, `h` | Hold: bit 0 of the control register |
 | F9, `r` | Restart: hold, then start at 0, with bit 3, the ROM, as it is |
+| F10, `n` | The settings page, on or off |
 | F11, `m` | The page, on or off |
 | F12 | The sticky setting: Strip or Off when Focus is left |
 | MEGA+HELP, Scroll Lock | Leave Focus, for Off or Strip |
@@ -349,6 +392,14 @@ removed both the hex and the cut-off host.
   detector on the scan codes (see [The Nexys4DDR](#the-nexys4ddr)).
 - `src/kbd_m65_ascii.vhd` and `src/kbd_ps2_ascii.vhd`: the bytes of
   Page Up, Page Down, and Home, and MEGA as a modifier.
+- `src/dbg/dbg_set.vhd` (stage 10): the IP and MAC addresses and the
+  baud rate in, the four lines of the settings page out, written anew
+  when one changes; and the parse of the page's field into an address
+  or a rate. `dbg.vhd` takes them as `set_ip_i`, `set_mac_i`, and
+  `set_baud_i`, from `nicemon`'s `eth_ip_o`, `eth_mac_o`, and
+  `uart_baud_o`, and its generics `G_TCP_PORT` and `G_UART_BAUDRATE` for
+  the port and the rate after reset. `src/uart_pkg.vhd` has the rates,
+  which `board_io.vhd` takes.
 
 Nothing new touches the core's paths, whose setup slack is about 0.1 ns
 ([synth/README.md](../synth/README.md#timing)): the side port is a
@@ -390,8 +441,13 @@ free.
   1`, `b` takes the lowest free one, and says `none free` when there is
   none, and after a digit `b` is a digit; and, with `G_BOARD_IO`, the
   display's dashes and PC, BTND and BTNU, a bouncing BTNL that steps
-  once, BTNR, BTNC, and the buttons doing nothing in Off. The mask of
-  the core's buttons in `system.vhd` has no test of its own.
+  once, BTNR, BTNC, and the buttons doing nothing in Off; and the
+  settings page (stage 10): its four settings, live, a written IP
+  address, MAC address, and rate, which the registers take, the rates
+  stepped with CRSR left and right, `bad value` for a short address, a
+  byte over 255, and a rate not on the list, and F10 and `m` between
+  the two pages. The mask of the core's buttons in `system.vhd` has no
+  test of its own.
 - `tb_kbd` and `tb_ps2`: the two toggle detectors, with a held key's
   repeats and its release, and one key of MEGA+HELP alone; and Page Up,
   Page Down, and Home from both keyboards.
@@ -408,8 +464,8 @@ free.
   line while MEGA+HELP brings the debugger up, and gets the `p` of the
   debugger's F5; and the strip shows R1 counting and the PC moving while
   the program runs, white, and the stop's values at the pause.
-- `make hwtest`, a stretch goal: a register of `board_io.vhd` at
-  `0xFFFFFF9E` that enters Focus when written, so that the test enters
+- `make hwtest`, a stretch goal: a register of `board_io.vhd`, at
+  `0xFFFFFF97`, the only free word there, that enters Focus when written, so that the test enters
   the debugger over the UART with no one at the keyboard, and so that
   `make cosimtest` reaches it too. A program can then drop into the
   debugger on purpose, a software breakpoint, which the ISA has none of.
@@ -455,7 +511,12 @@ Each a commit that builds and passes the tests:
    line is the UART's and TCP's again, and the catch watches the core's
    pause and halt. Tests: `tb_dbg`, `tb_dbg_host`, the formal check, and
    `tb_nicemon`.
-10. Later, in no order: a console page, with a tap on the core's
+10. **The settings page**
+    ([#75](https://github.com/MJoergen/NiceMonMEGA65/issues/75), done):
+    the UART's baud rate as a register, `0xFFFFFF9F`, and F10 and `n`,
+    with `dbg_set.vhd`. Tests: `tb_dbg`, `tb_nicemon`, the formal check
+    of `board_io`, and `make hwtest`'s rates.
+11. Later, in no order: a console page, with a tap on the core's
     console output beside the line; the code page with a disassembler;
     a register edit on the strip or the page, with link version 6's
     write of R1–R15, the PC among them; the `board_io` register for
@@ -549,3 +610,34 @@ Made on 2026-10-30, with the reasons:
 - **Page Up, Page Down, and Home on both keyboards**, as new bytes for
   programs too: a key that gives nothing is a key wasted. On the MEGA65
   they are CLR/HOME and MEGA with the cursor keys.
+
+Made on 2026-11-05 for stage 10
+([#75](https://github.com/MJoergen/NiceMonMEGA65/issues/75)):
+
+- **Seven baud rates, 115200 to 2000000**: 115200, 230400, 460800,
+  921600, 1000000, 1500000, and 2000000. 3 Mbaud is left out. Every one
+  is a rate of termios, which `--baud` needs, and of the boards' USB
+  serial chip, and the clocks of 100 MHz and 90 MHz make each to within
+  0.5 %.
+- **A register in bit/s at `0xFFFFFF9F`**, the last free word but one
+  of `board_io.vhd`, so that a program, the link, and the page all set
+  it, and `115200` reads as 115200 on both boards. A value not on the
+  list is dropped, not rounded.
+- **The new rate waits for 1 ms with nothing sent after the write**, so
+  that the `k` of the write that set it still goes out at the old rate,
+  and no frame has two bit times. The wait starts at the write too, not
+  only at the last byte sent: on the board's first run, a host whose
+  write came more than 1 ms after the answer before got its `k` at the
+  new rate.
+- **Only a reset brings back 2000000**, not a start of the core: a host
+  that follows the rate with `--baud` then still loads and starts
+  programs. The reset is the way back from a rate that cut a host off.
+- **A page of its own, on F10 and `n`**, beside the memory page, rather
+  than in its header and field: the four settings, their notes, and a
+  field of 17 characters fill it. F10 is SHIFT+F9 on the MEGA65.
+- **Shown live, written when the core is stopped**: the registers come
+  out of `nicemon` anyway, for the Ethernet station, so the page reads
+  them without the link; a write goes through the link, as every write
+  of the debugger does, and needs the core paused, halted, or held.
+- **Row 28 has single spaces between the keys**, to make room for `F10
+  link` in its 80 columns.

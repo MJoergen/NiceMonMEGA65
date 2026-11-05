@@ -150,6 +150,7 @@ syntax; and the keys:
 | F5 | Pause |
 | F7 | Hold the core |
 | F9 | Restart the program from address 0 |
+| F10 | The settings of the link, on or off |
 | F11 | The page of memory, on or off |
 | F12 | Keep the strip up after MEGA+HELP, or not |
 | MEGA+HELP | Back to the program, which gets its keyboard again |
@@ -163,6 +164,15 @@ program stops at a breakpoint, and the strip says `BRK n`. With `keep
 strip: on`, the strip stays on the screen when MEGA+HELP goes back to
 the program, live, while the keys are the program's, and a halt or a
 breakpoint brings the debugger back.
+
+F10 shows the settings page instead: the IP address, the MAC address,
+the TCP port, and the UART's baud rate, as `192.168.1.65`,
+`02:4E:49:43:45:00`, `4510`, and `2000000`, live. CRSR up and down
+choose a setting, and you type the new value as it is shown, or step
+through the baud rates with CRSR left and right; RETURN writes it. The
+program must be paused, halted, or held. A new address breaks a host's
+TCP connection, and a new rate cuts off a host on the serial port until
+it follows with `--baud`; a reset brings back 2000000.
 
 The debugger cannot load a program. That takes the monitor's `l`, or a
 host over [Ethernet](#over-ethernet) or the
@@ -230,7 +240,10 @@ their connections so that the line goes back at once.
 ## Over the serial port
 
 The debug link runs over the debug UART too, which needs the JTAG
-cable, whose USB port carries it. It runs at 2 Mbaud (2000000), 8-N-1.
+cable, whose USB port carries it. It runs at 2 Mbaud (2000000), 8-N-1,
+after reset, and `0xFFFFFF9F` sets a slower rate, down to 115200
+([doc/SYSTEM.md](doc/SYSTEM.md#the-baud-rate)), which the tools then
+take with `--baud`.
 `tools/mon.py --port /dev/ttyUSB1` is then the interactive shell, and a
 terminal program, such as `picocom`, the plain client, as
 [over Ethernet](#over-ethernet). The other tools take `--port` too.

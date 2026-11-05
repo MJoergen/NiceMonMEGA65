@@ -22,11 +22,12 @@ smtbmc yices
 
 [script]
 plugin -i ghdl
-prove: ghdl --std=08 -fpsl -gG_BOARD_IO=true board_io.vhd formal_board_io.vhd -e formal_board_io
-none: ghdl --std=08 -fpsl -gG_BOARD_IO=false board_io.vhd formal_board_io.vhd -e formal_board_io
-cover: ghdl --std=08 -fpsl -gG_BOARD_IO=true board_io.vhd formal_board_io.vhd -e formal_board_io
+prove: ghdl --std=08 -fpsl -gG_BOARD_IO=true uart_pkg.vhd board_io.vhd formal_board_io.vhd -e formal_board_io
+none: ghdl --std=08 -fpsl -gG_BOARD_IO=false uart_pkg.vhd board_io.vhd formal_board_io.vhd -e formal_board_io
+cover: ghdl --std=08 -fpsl -gG_BOARD_IO=true uart_pkg.vhd board_io.vhd formal_board_io.vhd -e formal_board_io
 prep -top formal_board_io
 
 [files]
+../src/uart_pkg.vhd
 ../src/board_io.vhd
 formal_board_io.vhd

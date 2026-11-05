@@ -22,7 +22,8 @@
 #                         the character ROM.
 #             tb_dbg      the on-board debugger on the system, with
 #                         dbg.nasm in its ROM: the strip it draws, the
-#                         toggle, and the core's keys.
+#                         toggle, the core's keys, the page, and the
+#                         settings page.
 #             tb_dbg_host the debugger's adapter to the debug link's side
 #                         port, on the system, with host.nasm and a host
 #                         on the UART beside it.
@@ -74,9 +75,9 @@ include ../core.mk
 NICE_SIM = $(NICE_DIR)/hdl/sim/wb_mem.vhd
 
 SRC_SOURCES  = ../src/uart_serdes.vhd ../src/rx_fifo.vhd ../src/ram.vhd ../src/rom.vhd \
-               ../src/board_io.vhd ../src/scr_regs.vhd ../src/sd/sd_spi_byte.vhd ../src/sd/sd_spi.vhd ../src/sd/sd.vhd ../src/devices.vhd ../src/mem.vhd ../src/nicemon.vhd \
+               ../src/uart_pkg.vhd ../src/board_io.vhd ../src/scr_regs.vhd ../src/sd/sd_spi_byte.vhd ../src/sd/sd_spi.vhd ../src/sd/sd.vhd ../src/devices.vhd ../src/mem.vhd ../src/nicemon.vhd \
                ../src/kbd_m65.vhd ../src/kbd_m65_ascii.vhd ../src/kbd_ps2.vhd ../src/kbd_ps2_ascii.vhd ../src/seg7.vhd ../src/rgb_pwm.vhd \
-               ../src/kbd_m65_toggle.vhd ../src/kbd_ps2_toggle.vhd ../src/dbg/dbg_host.vhd ../src/dbg/dbg_decode.vhd ../src/dbg/dbg.vhd \
+               ../src/kbd_m65_toggle.vhd ../src/kbd_ps2_toggle.vhd ../src/dbg/dbg_host.vhd ../src/dbg/dbg_decode.vhd ../src/dbg/dbg_set.vhd ../src/dbg/dbg.vhd \
                ../src/video/video_pkg.vhd ../src/video/font_pkg.vhd ../src/video/pix.vhd ../src/video/scr_ram.vhd ../src/video/font_ram.vhd ../src/video/font_rom.vhd ../src/video/font.vhd ../src/video/text.vhd \
                ../src/eth/eth_pkg.vhd ../src/eth/rmii_rx.vhd ../src/eth/rx_fcs.vhd ../src/eth/eth_ram.vhd ../src/eth/eth_rx_fifo.vhd \
                ../src/eth/eth_arp.vhd ../src/eth/eth_icmp.vhd ../src/eth/eth_tcp_rx.vhd ../src/eth/eth_tcp_tx.vhd ../src/eth/eth_tcp_timer.vhd ../src/eth/eth_tcp_buf.vhd ../src/eth/eth_tcp_pick.vhd ../src/eth/eth_tcp.vhd ../src/eth/eth_tx_fifo.vhd ../src/eth/eth_arb.vhd ../src/eth/rmii_tx.vhd ../src/eth/eth.vhd \
@@ -86,7 +87,7 @@ SOURCES      = $(SRC_SOURCES) text_synth.vhd sd_card_model.vhd tb_hello.vhd tb_n
 
 .PHONY: test cosim check-steps check-fmt analyze synth clean tb_hello tb_nicemon tb_kbd tb_ps2 tb_ps2_nicemon tb_text tb_dbg tb_dbg_host tb_dbg_decode tb_board_io tb_rmii_rx tb_rx_fcs tb_eth_rx_fifo tb_eth_tx_fifo tb_rmii_tx tb_eth tb_eth_tcp tb_eth_tcp_random tb_sd \
         synth-nicemon synth-nicemon-norom synth-kbd_m65 synth-kbd_m65_ascii synth-kbd_ps2 \
-        synth-kbd_ps2_ascii synth-kbd_m65_toggle synth-kbd_ps2_toggle synth-dbg synth-dbg_host synth-dbg_decode synth-text \
+        synth-kbd_ps2_ascii synth-kbd_m65_toggle synth-kbd_ps2_toggle synth-dbg synth-dbg_host synth-dbg_decode synth-dbg_set synth-text \
         synth-system synth-seg7 synth-rgb_pwm
 
 # Each testbench and each synthesis check is a target of its own, so that
@@ -185,7 +186,7 @@ tb_eth_tcp_random: analyze
 # without a ROM, and the keyboards, as nice_cpu does for its core, the text
 # display, and system.vhd with the screen of the Nexys4DDR.
 synth: synth-nicemon synth-nicemon-norom synth-kbd_m65 synth-kbd_m65_ascii synth-kbd_ps2 synth-kbd_ps2_ascii \
-       synth-kbd_m65_toggle synth-kbd_ps2_toggle synth-dbg synth-dbg_host synth-dbg_decode synth-text synth-system synth-seg7 synth-rgb_pwm
+       synth-kbd_m65_toggle synth-kbd_ps2_toggle synth-dbg synth-dbg_host synth-dbg_decode synth-dbg_set synth-text synth-system synth-seg7 synth-rgb_pwm
 
 synth-nicemon: analyze $(BUILD)/rom.bin
 	@(cd $(BUILD) && $(GHDL) --synth $(GHDLFLAGS) -gG_CLOCK_HZ=50000000 -gG_ROM_FILE=rom.bin -gG_SD_SLOTS=2 nicemon > nicemon_synth.vhd 2> nicemon_synth.log) && \
@@ -207,7 +208,7 @@ synth-rgb_pwm: analyze
 	@(cd $(BUILD) && $(GHDL) --synth $(GHDLFLAGS) rgb_pwm > rgb_pwm_synth.vhd 2> rgb_pwm_synth.log) && \
 	  echo "PASS synth rgb_pwm" || (echo "FAIL synth rgb_pwm"; cat $(BUILD)/rgb_pwm_synth.log; exit 1)
 
-synth-kbd_ps2_ascii synth-kbd_ps2_toggle synth-dbg synth-dbg_host synth-dbg_decode: synth-%: analyze
+synth-kbd_ps2_ascii synth-kbd_ps2_toggle synth-dbg synth-dbg_host synth-dbg_decode synth-dbg_set: synth-%: analyze
 	@(cd $(BUILD) && $(GHDL) --synth $(GHDLFLAGS) $* > $*_synth.vhd 2> $*_synth.log) && \
 	  echo "PASS synth $*" || (echo "FAIL synth $*"; cat $(BUILD)/$*_synth.log; exit 1)
 

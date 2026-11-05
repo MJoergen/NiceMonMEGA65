@@ -132,14 +132,21 @@
 --    takes niceemu's steps, G_SD_STEPS, and leaves the words that
 --    "niceemu --sd0" leaves. Then the link reads the buffer while the
 --    core is halted.
--- 17. A reset while G_ECHO_FILE runs: the link sends `b06`, the core boots
---    from the ROM again, and the screen's and the board's registers and the
---    breakpoints are cleared.
+-- 17. The baud rate at 0xFFFFFF9F: it reads G_UART_BAUDRATE and drops a
+--    value it does not take. A write of 2000000, after more than 1 ms of
+--    quiet, is answered at the old rate, and so is a read until the UART
+--    has sent nothing for 1 ms after the write; then the link answers at
+--    2 Mbaud.
+-- 18. A reset while G_ECHO_FILE runs: the link sends `b06` at
+--    G_UART_BAUDRATE, the core boots from the ROM again, and the screen's
+--    and the board's registers, the baud rate, and the breakpoints are
+--    cleared.
 --
 -- The core's input FIFO has 16 bytes here, so that step 6 is short, and the
 -- RAM, the ROM, and the screen are small, so that the clearing is.
 --
--- The UART runs at a tenth of the clock rate, so that the test is fast.
+-- The UART runs at a tenth of the clock rate, so that the test is fast,
+-- but for step 17.
 -- G_NICE says which core runs, for the check that only the multi-cycle core
 -- passes.
 
@@ -187,6 +194,8 @@ architecture simulation of tb_nicemon is
    constant C_PERIOD   : time    := 1 sec / C_CLOCK_HZ;
    constant C_BAUDRATE : natural := 9_000_000;
    constant C_BIT_TIME : time    := (C_CLOCK_HZ / C_BAUDRATE) * C_PERIOD;
+   -- 2 Mbaud, the boards' rate, which 0xFFFFFF9F takes
+   constant C_BIT_2M : time := (C_CLOCK_HZ / 2_000_000) * C_PERIOD;
    -- Longer than the slowest answer
    constant C_TIMEOUT : time    := 1 ms;
    -- The wait of a console byte over TCP for room in the FIFO, longer than
@@ -270,6 +279,9 @@ architecture simulation of tb_nicemon is
    begin
       return tag & payload & "#" & cksum(tag & payload);
    end function pkt;
+
+   -- The UART's bit time, which follows the rate at 0xFFFFFF9F
+   signal bit_time : time := C_BIT_TIME;
 
 begin
 
@@ -384,12 +396,12 @@ begin
    begin
       wait until uart_tx = '0' or (rising_edge(clk) and net_tx_valid = '1');
       if uart_tx = '0' then
-         wait for C_BIT_TIME / 2;
+         wait for bit_time / 2;
          for i in 0 to 7 loop
-            wait for C_BIT_TIME;
+            wait for bit_time;
             byte_v(i) := uart_tx;
          end loop;
-         wait for C_BIT_TIME;
+         wait for bit_time;
          assert uart_tx = '1'
             report "tb_nicemon: bad stop bit"
             severity failure;
@@ -470,13 +482,13 @@ begin
             return;
          end if;
          uart_rx <= '0';
-         wait for C_BIT_TIME;
+         wait for bit_time;
          for b in 0 to 7 loop
             uart_rx <= byte_v(b);
-            wait for C_BIT_TIME;
+            wait for bit_time;
          end loop;
          uart_rx <= stop_bit;
-         wait for C_BIT_TIME;
+         wait for bit_time;
          uart_rx <= '1';
       end procedure send_byte;
 
@@ -484,9 +496,9 @@ begin
       procedure send_break is
       begin
          uart_rx <= '0';
-         wait for 12 * C_BIT_TIME;
+         wait for 12 * bit_time;
          uart_rx <= '1';
-         wait for C_BIT_TIME;
+         wait for bit_time;
       end procedure send_break;
 
       -- A host's half-close over TCP, and a connection that opens, as
@@ -874,7 +886,7 @@ begin
       wr("FFFFFFE5", "0000CAFE");
       check("FFFFFFE5", "0000CAFE");
       send_con("y");
-      wait for 40 * C_BIT_TIME;
+      wait for 40 * bit_time;
       assert con_len = con_pos_v
          report "tb_nicemon: the core echoed while it was paused"
          severity failure;
@@ -894,7 +906,7 @@ begin
       -- A byte with a bad stop bit is dropped, and the bytes right after it
       -- arrive.
       send_byte('x', '0');
-      wait for C_BIT_TIME;
+      wait for bit_time;
       send_con("cd.");
       expect_con("cd.");
       expect_halt("01");
@@ -1061,8 +1073,8 @@ begin
       check("FFFFFF96", "00008001");
       wr("FFFFFF97", "00000007");            -- not registers
       check("FFFFFF97", "00000000");
-      wr("FFFFFF9F", "00000001");
-      check("FFFFFF9F", "00000000");
+      wr("FFFFFF9F", "00000001");            -- not a baud rate, dropped
+      check("FFFFFF9F", "00895440");
       check("FFFFFF90", "0000A5C3");         -- the other words took no write
       brd_btn <= "00000";
       brd_sw  <= X"0000";
@@ -1349,6 +1361,26 @@ begin
       check("FFFFFFA2", "0000000F");
       check("FFFFFFAF", "13121110");         -- bytes 1020..1023 of the image
 
+      report "tb_nicemon: the UART's baud rate";
+      check("FFFFFF9F", "00895440");         -- 9000000, G_UART_BAUDRATE
+      wr("FFFFFF9F", "00001234");            -- not a rate it takes, dropped
+      check("FFFFFF9F", "00895440");
+      -- The line quiet for longer than the wait, which then starts at the
+      -- write
+      wait for 1100 us;
+      wr("FFFFFF9F", "001E8480");            -- 2000000, and the k at the old rate
+      -- The new rate waits for 1 ms with nothing sent: a read before it
+      -- is answered at the old rate, and starts the wait again
+      wait for 600 us;
+      check("FFFFFF9F", "001E8480");
+      wait for 600 us;
+      check("FFFFFF9F", "001E8480");
+      wait for 1100 us;
+      bit_time <= C_BIT_2M;
+      wait for 1 us;                         -- for the new bit time to show
+      check("FFFFFF9F", "001E8480");         -- at 2 Mbaud
+      check("FFFFFFF2", "00000006");
+
       report "tb_nicemon: a reset while the core runs";
       wr("FFFFFF81", "00000021");
       wr("FFFFFF86", "FFFE0000");
@@ -1362,11 +1394,13 @@ begin
       send_con("ab");
       expect_con("ab");
       wait until rising_edge(clk);
-      rst <= '1';
+      rst      <= '1';
+      bit_time <= C_BIT_TIME;
       wait for 100 ns;
       wait until rising_edge(clk);
       rst <= '0';
-      -- The core boots from the ROM again
+      -- The core boots from the ROM again, and the UART is back at
+      -- G_UART_BAUDRATE
       expect_pkt("b06#C8");
       expect_con("Hello from the ROM!" & C_LF);
       expect_halt("01");
@@ -1376,6 +1410,7 @@ begin
       check("FFFFFF86", "00000000");
       check("FFFFFF90", "00000000");         -- the board's registers
       check("FFFFFF94", "00000000");
+      check("FFFFFF9F", "00895440");         -- the baud rate
       check("FFFFFFF4", "00000000");         -- the breakpoints
       check("FFFFFFF8", "00000000");
       assert scr_cur_x = 0 and scr_offs = 0 and brd_led = 0 and brd_seg = 0

@@ -12,7 +12,8 @@
 -- clocks of the MEGA65 and the Nexys4DDR. The FT2232H USB chip on the
 -- other end of both boards makes exactly 2 Mbaud from its 12 MHz clock.
 -- The link sends every word as 8 hex digits, so a load at 2 Mbaud takes
--- about a seventeenth of the time it takes at 115200 baud. The video
+-- about a seventeenth of the time it takes at 115200 baud. 2 Mbaud is the
+-- rate after reset; 0xFFFFFF9F sets another (board_io.vhd). The video
 -- output is that of text.vhd, in the VGA clock domain: 8 bits per color,
 -- the two sync signals with the polarity of G_VIDEO, and vga_de_o, which is
 -- '1' in the visible area. A board with fewer bits per color takes the top
@@ -55,8 +56,9 @@
 --
 -- RESET
 -- Synchronous to clk_i, by rst_i, as nicemon.vhd describes, and in the
--- Ethernet clock domain by eth_rst_i. rst_i clears the counts of frames, and
--- sets the MAC and IP addresses to G_ETH_MAC and G_ETH_IP.
+-- Ethernet clock domain by eth_rst_i. rst_i clears the counts of frames,
+-- sets the MAC and IP addresses to G_ETH_MAC and G_ETH_IP, and the UART's
+-- baud rate to 2 Mbaud.
 -- The video has no reset of its own (text.vhd).
 
 library ieee;
@@ -181,6 +183,10 @@ architecture synthesis of system is
    signal eth_rx     : std_logic_vector(31 downto 0);
    signal eth_rx_bad : std_logic_vector(31 downto 0);
    signal eth_tx     : std_logic_vector(31 downto 0);
+   -- The UART's baud rate after reset, and now; and the link's TCP port
+   constant C_UART_BAUDRATE : positive := 2_000_000;
+   constant C_TCP_PORT      : natural  := 4510;
+   signal   uart_baud       : std_logic_vector(31 downto 0);
    -- The debug link over TCP
    signal net_on       : std_logic;
    signal net_rx_data  : std_logic_vector(7 downto 0);
@@ -237,7 +243,7 @@ begin
    i_nicemon : entity work.nicemon
       generic map (
          G_CLOCK_HZ         => G_CLOCK_HZ,
-         G_UART_BAUDRATE    => 2_000_000,
+         G_UART_BAUDRATE    => C_UART_BAUDRATE,
          G_RAM_ADDR_BITS    => G_RAM_ADDR_BITS,
          G_SCR_ADDR_BITS    => G_SCR_ADDR_BITS,
          G_ROM_FILE         => G_ROM_FILE,
@@ -286,6 +292,7 @@ begin
          eth_tx_i       => eth_tx,
          eth_mac_o      => eth_mac,
          eth_ip_o       => eth_ip,
+         uart_baud_o    => uart_baud,
          net_on_i       => net_on,
          net_rx_data_i  => net_rx_data,
          net_rx_valid_i => net_rx_valid,
@@ -314,7 +321,8 @@ begin
 
    i_eth : entity work.eth
       generic map (
-         G_CLOCK_HZ => G_CLOCK_HZ
+         G_CLOCK_HZ => G_CLOCK_HZ,
+         G_PORT     => C_TCP_PORT
       )
       port map (
          clk_i       => clk_i,
@@ -357,9 +365,11 @@ begin
 
    i_dbg : entity work.dbg
       generic map (
-         G_CLOCK_HZ   => G_CLOCK_HZ,
-         G_TOGGLE_KEY => G_TOGGLE_KEY,
-         G_BOARD_IO   => G_BOARD_IO
+         G_CLOCK_HZ      => G_CLOCK_HZ,
+         G_TOGGLE_KEY    => G_TOGGLE_KEY,
+         G_BOARD_IO      => G_BOARD_IO,
+         G_TCP_PORT      => C_TCP_PORT,
+         G_UART_BAUDRATE => C_UART_BAUDRATE
       )
       port map (
          clk_i       => clk_i,
@@ -377,6 +387,9 @@ begin
          lnk_rdata_i => dbg_rdata,
          paused_i    => cpu_paused,
          halted_i    => cpu_halted,
+         set_ip_i    => eth_ip,
+         set_mac_i   => eth_mac,
+         set_baud_i  => uart_baud,
          ovl_we_o    => ovl_we,
          ovl_addr_o  => ovl_addr,
          ovl_data_o  => ovl_data,

@@ -62,7 +62,9 @@ begin
          eth_rx_bad_i => eth_rx_bad_i,
          eth_tx_i     => eth_tx_i,
          eth_mac_o    => open,
-         eth_ip_o     => open
+         eth_ip_o     => open,
+         uart_baud_o  => open,
+         uart_div_o   => open
       ); -- i_board_io
 
 end architecture synthesis;

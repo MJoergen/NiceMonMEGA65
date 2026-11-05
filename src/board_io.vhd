@@ -2,7 +2,8 @@
 -- (the Nexys4DDR): the 16 LEDs, the levels of the two RGB LEDs, the
 -- segments of the seven-segment display, the five buttons, and the 16
 -- switches. On every board, also the counts of Ethernet frames, the
--- Ethernet station's MAC and IP addresses, and the size of the RAM.
+-- Ethernet station's MAC and IP addresses, the size of the RAM, and the
+-- UART's baud rate.
 --
 -- THEORY OF OPERATION
 -- nicemon serves one request in a cycle, the link's or the core's, and
@@ -30,33 +31,48 @@
 --      every board. Read and write.
 --   D  The Ethernet frames sent, eth_tx_i, as 8.
 --   E  The words of the RAM, G_RAM_WORDS, on every board. Read only.
+--   F  The UART's baud rate in bit/s, on every board: G_UART_BAUDRATE
+--      after reset. A write of one of C_UART_RATES (uart_pkg.vhd), 115200
+--      to 2000000, or of G_UART_BAUDRATE, sets it, and a write of any
+--      other value is dropped. A rate of C_UART_RATES whose bit would be
+--      shorter than C_UART_DIV_MIN cycles is dropped too. uart_div_o is the bit's cycles,
+--      G_CLOCK_HZ / rate rounded, which uart_serdes.vhd takes once its
+--      line is quiet. Read and write.
 -- The other words, and words 0 to 6 without G_BOARD_IO, read 0 and take
 -- no write, so then the outputs stay 0. The buttons and the switches pass
 -- through two registers, which synchronize them to the clock.
 --
 -- With G_FORMAL, it states the properties that formal/board_io.sby proves:
 -- a write to a register's word sets it, the registers change only so, and
--- each word reads its register, its input, its constant, or 0.
+-- each word reads its register, its input, its constant, or 0; and the
+-- baud rate is always one that a write may set, with its divisor.
 --
 -- RESET
 -- Synchronous. Reset clears the writable registers, but for the IP and MAC
--- addresses, which it sets to G_ETH_IP and G_ETH_MAC.
+-- addresses, which it sets to G_ETH_IP and G_ETH_MAC, and the baud rate,
+-- which it sets to G_UART_BAUDRATE.
 
 library ieee;
    use ieee.std_logic_1164.all;
    use ieee.numeric_std.all;
    use ieee.numeric_std_unsigned.all;
 
+library work;
+   use work.uart_pkg.all;
+
 entity board_io is
    generic (
-      G_BOARD_IO  : boolean;
+      G_BOARD_IO      : boolean;
       -- The Ethernet station's MAC and IP addresses after reset
-      G_ETH_MAC   : std_logic_vector(47 downto 0) := X"024E49434500";
-      G_ETH_IP    : std_logic_vector(31 downto 0) := X"00000000";
+      G_ETH_MAC       : std_logic_vector(47 downto 0) := X"024E49434500";
+      G_ETH_IP        : std_logic_vector(31 downto 0) := X"00000000";
       -- The words of the RAM, which word E reads
-      G_RAM_WORDS : natural := 0;
+      G_RAM_WORDS     : natural := 0;
+      -- The clock, and the UART's baud rate after reset, for word F
+      G_CLOCK_HZ      : positive := 100_000_000;
+      G_UART_BAUDRATE : positive := 2_000_000;
       -- The properties for formal/board_io.sby
-      G_FORMAL    : boolean := false
+      G_FORMAL        : boolean := false
    );
    port (
       clk_i        : in  std_logic;
@@ -80,11 +96,39 @@ entity board_io is
       eth_rx_bad_i : in  std_logic_vector(31 downto 0);
       eth_tx_i     : in  std_logic_vector(31 downto 0);
       eth_mac_o    : out std_logic_vector(47 downto 0);
-      eth_ip_o     : out std_logic_vector(31 downto 0)
+      eth_ip_o     : out std_logic_vector(31 downto 0);
+      -- The UART's baud rate, and the cycles of its bit
+      uart_baud_o  : out std_logic_vector(31 downto 0);
+      uart_div_o   : out std_logic_vector(15 downto 0)
    );
 end entity board_io;
 
 architecture synthesis of board_io is
+
+   -- The cycles of a bit at a rate, rounded
+   pure function divisor (rate : positive) return natural is
+   begin
+      return uart_divisor(G_CLOCK_HZ, rate);
+   end function divisor;
+
+   -- The divisor of a rate that word F takes, or 0 for one it drops: one
+   -- of C_UART_RATES whose bit is long enough, or G_UART_BAUDRATE
+   pure function rate_div (rate : std_logic_vector(31 downto 0)) return natural is
+   begin
+      if rate = std_logic_vector(to_unsigned(G_UART_BAUDRATE, 32)) then
+         return divisor(G_UART_BAUDRATE);
+      end if;
+      for i in C_UART_RATES'range loop
+         if rate = std_logic_vector(to_unsigned(C_UART_RATES(i), 32)) and
+            divisor(C_UART_RATES(i)) >= C_UART_DIV_MIN then
+            return divisor(C_UART_RATES(i));
+         end if;
+      end loop;
+      return 0;
+   end function rate_div;
+
+   constant C_BAUD : std_logic_vector(31 downto 0) := std_logic_vector(to_unsigned(G_UART_BAUDRATE, 32));
+   constant C_DIV  : std_logic_vector(15 downto 0) := std_logic_vector(to_unsigned(divisor(G_UART_BAUDRATE), 16));
 
    signal led      : std_logic_vector(15 downto 0) := (others => '0');
    signal rgb0     : std_logic_vector(11 downto 0) := (others => '0');
@@ -96,6 +140,8 @@ architecture synthesis of board_io is
    signal sw_sync  : std_logic_vector(15 downto 0) := (others => '0');
    signal eth_mac  : std_logic_vector(47 downto 0) := G_ETH_MAC;
    signal eth_ip   : std_logic_vector(31 downto 0) := G_ETH_IP;
+   signal baud     : std_logic_vector(31 downto 0) := C_BAUD;
+   signal div      : std_logic_vector(15 downto 0) := C_DIV;
 
    attribute async_reg : string;
    attribute async_reg of btn_sync : signal is "TRUE";
@@ -104,6 +150,10 @@ architecture synthesis of board_io is
    attribute async_reg of sw       : signal is "TRUE";
 
 begin
+
+   assert divisor(G_UART_BAUDRATE) >= 1 and divisor(C_UART_RATES(0)) < 2 ** 16
+      report "board_io: a bit of the UART must take 1 to 65535 cycles"
+      severity failure;
 
    p_write : process (clk_i)
    begin
@@ -127,6 +177,11 @@ begin
                when X"A"   => eth_ip                <= wdata_i;
                when X"B"   => eth_mac(47 downto 32) <= wdata_i(15 downto 0);
                when X"C"   => eth_mac(31 downto 0)  <= wdata_i;
+               when X"F"   =>
+                  if rate_div(wdata_i) /= 0 then
+                     baud <= wdata_i;
+                     div  <= std_logic_vector(to_unsigned(rate_div(wdata_i), 16));
+                  end if;
                when others => null;
             end case;
 
@@ -139,6 +194,8 @@ begin
             seg     <= (others => '0');
             eth_mac <= G_ETH_MAC;
             eth_ip  <= G_ETH_IP;
+            baud    <= C_BAUD;
+            div     <= C_DIV;
          end if;
       end if;
    end process p_write;
@@ -160,6 +217,8 @@ begin
          rdata_o <= eth_tx_i;
       elsif addr_i = X"E" then
          rdata_o <= std_logic_vector(to_unsigned(G_RAM_WORDS, 32));
+      elsif addr_i = X"F" then
+         rdata_o <= baud;
       elsif G_BOARD_IO then
 
          case addr_i is
@@ -194,6 +253,9 @@ begin
    eth_mac_o <= eth_mac;
    eth_ip_o  <= eth_ip;
 
+   uart_baud_o <= baud;
+   uart_div_o  <= div;
+
 
    gen_formal : if G_FORMAL generate
       -- A write to the word of register n in this cycle
@@ -202,6 +264,12 @@ begin
       signal f_wr_ip     : std_logic;
       signal f_wr_mac_hi : std_logic;
       signal f_wr_mac_lo : std_logic;
+      -- A write to word F, the baud rate, and whether it takes the word
+      signal f_wr_baud : std_logic;
+      signal f_wr_ok   : std_logic;
+      -- The divisor of the rate held
+      signal f_div : std_logic_vector(15 downto 0);
+      signal f_ok  : std_logic;
    begin
 
       f_wr_ip     <= stb_i and we_i when addr_i = X"A" else
@@ -209,6 +277,13 @@ begin
       f_wr_mac_hi <= stb_i and we_i when addr_i = X"B" else
                      '0';
       f_wr_mac_lo <= stb_i and we_i when addr_i = X"C" else
+                     '0';
+      f_wr_baud   <= stb_i and we_i when addr_i = X"F" else
+                     '0';
+      f_wr_ok     <= '1' when rate_div(wdata_i) /= 0 else
+                     '0';
+      f_div       <= std_logic_vector(to_unsigned(rate_div(baud), 16));
+      f_ok        <= '1' when rate_div(baud) /= 0 else
                      '0';
 
       gen_wr : for n in 0 to 4 generate
@@ -256,7 +331,19 @@ begin
       -- psl f_rd_mac_lo : assert always addr_i = X"C" -> rdata_o = eth_mac(31 downto 0);
       -- psl f_eth_out : assert always eth_ip_o = eth_ip and eth_mac_o = eth_mac;
 
+      -- Word F holds the baud rate: a write of a rate it takes sets it, and
+      -- of any other value leaves it, and it is always a rate that it
+      -- takes, with that rate's divisor out.
+      -- psl f_baud_wr : assert always {f_wr_baud and f_wr_ok and not rst_i} |=> {baud = prev(wdata_i)};
+      -- psl f_baud_keep : assert always {not (f_wr_baud and f_wr_ok) and not rst_i} |=> {stable(baud)};
+      -- psl f_baud_reset : assert always {rst_i} |=> {baud = G_UART_BAUDRATE};
+      -- psl f_baud_inv : assert always f_ok and div = f_div;
+      -- psl f_rd_baud : assert always addr_i = X"F" -> rdata_o = baud;
+      -- psl f_baud_out : assert always uart_baud_o = baud and uart_div_o = div;
+
       -- psl c_seg_hi : cover {f_wr(4) and not rst_i};
+      -- psl c_baud_new : cover {f_wr_baud = '1' and f_wr_ok = '1' and rst_i = '0' and wdata_i /= G_UART_BAUDRATE};
+      -- psl c_baud_drop : cover {f_wr_baud and not f_wr_ok and not rst_i};
 
       gen_formal_io : if G_BOARD_IO generate
       begin
@@ -273,7 +360,7 @@ begin
          --    addr_i = X"5" -> rdata_o(31 downto 5) = 0 and rdata_o(4 downto 0) = btn;
          -- psl f_rd_sw : assert always
          --    addr_i = X"6" -> rdata_o(31 downto 16) = 0 and rdata_o(15 downto 0) = sw;
-         -- psl f_rd_none : assert always addr_i = X"7" or addr_i = X"F" -> rdata_o = 0;
+         -- psl f_rd_none : assert always addr_i = X"7" -> rdata_o = 0;
 
          -- The buttons reach their register two cycles after their pins.
          -- psl f_btn_sync : assert always {not rst_i; not rst_i} |=> {btn = prev(btn_i, 2)};
@@ -283,9 +370,9 @@ begin
 
       gen_formal_none : if not G_BOARD_IO generate
       begin
-         -- Without G_BOARD_IO, every word but 8 to E reads 0, and the
+         -- Without G_BOARD_IO, every word but 8 to F reads 0, and the
          -- outputs stay 0.
-         -- psl f_none_rd : assert always (addr_i < X"8" or addr_i = X"F") -> rdata_o = 0;
+         -- psl f_none_rd : assert always addr_i < X"8" -> rdata_o = 0;
          -- psl f_none_out : assert always led = 0 and rgb0 = 0 and rgb1 = 0 and seg = 0;
       end generate gen_formal_none;
 

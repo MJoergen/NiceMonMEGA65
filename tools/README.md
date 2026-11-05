@@ -79,8 +79,10 @@ the board an IP address only on a network you trust.
 
 ## The serial port
 
-The MEGA65's debug UART runs at 2 Mbaud (2000000), 8-N-1, and needs the
-JTAG cable, whose USB port carries it. It is usually the serial device
+The MEGA65's debug UART runs at 2 Mbaud (2000000), 8-N-1, after reset,
+or at the rate written to `0xFFFFFF9F`
+([doc/SYSTEM.md](../doc/SYSTEM.md#the-baud-rate)), which `--baud` must
+match. It needs the JTAG cable, whose USB port carries it. It is usually the serial device
 `/dev/ttyUSB1`. Give it to the tools with `--port`, or to `make` with
 `PORT=`, and open it in your terminal program. On
 macOS, use the `/dev/cu.*` device, as a `/dev/tty.*` device blocks on

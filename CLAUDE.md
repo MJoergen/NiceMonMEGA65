@@ -18,11 +18,12 @@ formal checks, `make hwtest`, and the badge; `doc/EMULATOR.md` the known
 differences from the emulator; `doc/PROGRAMMING.md` how to write and
 build programs; `doc/DEBUGGER.md` is the design note of the on-board
 debugger, mon.py in the FPGA with the MEGA65's keyboard and a strip on
-the screen, of which stages 1 to 9 are written, the overlay, its host
+the screen, of which stages 1 to 10 are written, the overlay, its host
 of the link, the live strip with the core's keys, Strip with the
 catch, the page of memory, the breakpoints, the Nexys4DDR's buttons
-and display, the decode of row 27, and the link's side port with the
-registers live (issues #52 and #53). `doc/BASIC_SURVEY.md` is
+and display, the decode of row 27, the link's side port with the
+registers live (issues #52 and #53), and the settings page of the
+link with the UART's baud rate at `0xFFFFFF9F` (issue #75). `doc/BASIC_SURVEY.md` is
 the survey of the BASIC dialects behind the interpreter in the ROM of
 issue #54 (milestone V2.0). `doc/SDCARD.md` is the design of the SD
 cards' storage, issue #62 and its subtasks, of which the controller and
@@ -81,12 +82,14 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   the core's input FIFO (`rx_fifo.vhd`), nice_cpu's devices at
   `FFFFFF10`–`7F` (`devices.vhd`), the board's registers at
   `FFFFFF90`–`9F` (`board_io.vhd`) and the screen's at `FFFFFF80`–`8F`
-  (`scr_regs.vhd`), the keyboards (`kbd_m65.vhd` and
+  (`scr_regs.vhd`), the UART's baud rates (`uart_pkg.vhd`, which
+  `board_io.vhd` and the debugger share), the keyboards (`kbd_m65.vhd` and
   `kbd_m65_ascii.vhd` for the MEGA65, `kbd_ps2.vhd` and `kbd_ps2_ascii.vhd` for
   the Nexys4DDR's PS/2, and the debugger's toggle keys, `kbd_m65_toggle.vhd`
   and `kbd_ps2_toggle.vhd`), the on-board debugger (`dbg/dbg.vhd`,
   `dbg/dbg_host.vhd`, its adapter to the link's side port, `nicemon`'s
-  `dbg_*` ports, and `dbg/dbg_decode.vhd`, the decode of an instruction), the
+  `dbg_*` ports, `dbg/dbg_decode.vhd`, the decode of an instruction, and
+  `dbg/dbg_set.vhd`, the text and the parse of the settings page), the
   Nexys4DDR's display and RGB LED drivers (`seg7.vhd`, `rgb_pwm.vhd`), the Ethernet station (`eth/eth.vhd`: the
   RMII receiver and transmitter, the check of the frames, their FIFOs
   between the clocks, the MAC filter and ARP responder,

@@ -49,7 +49,9 @@ library ieee;
 
 entity eth is
    generic (
-      G_CLOCK_HZ : natural
+      G_CLOCK_HZ : natural;
+      -- The TCP port of the debug link (eth_tcp.vhd)
+      G_PORT     : natural := 4510
    );
    port (
       -- The system clock domain
@@ -229,7 +231,8 @@ begin
 
    i_eth_tcp : entity work.eth_tcp
       generic map (
-         G_CLOCK_HZ => G_CLOCK_HZ
+         G_CLOCK_HZ => G_CLOCK_HZ,
+         G_PORT     => G_PORT
       )
       port map (
          clk_i       => clk_i,

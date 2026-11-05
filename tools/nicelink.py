@@ -64,6 +64,10 @@ BRK_COUNT = 0xFFFFFFF5
 STOP = 0xFFFFFFF6
 BRK_ADDR = 0xFFFFFFF8
 DEBUG_FIRST = 0xFFFFFFE0
+# The board's UART baud rate in bit/s, 2000000 after reset, and the rates
+# it takes (doc/SYSTEM.md); niceemu has plain memory there
+BAUD = 0xFFFFFF9F
+BAUDS = (115200, 230400, 460800, 921600, 1000000, 1500000, 2000000)
 
 # Control bits: hold the core in reset, halted (read only), clear the memory
 # first, hide the ROM, so that the RAM is at 0, pause (version 2), and step
@@ -182,17 +186,26 @@ class Serial(Transport):
     board = True
 
     def __init__(self, name: str, baud: int) -> None:
-        speed = getattr(termios, f"B{baud}", None)
-        if speed is None:
-            fail(f"{baud} is not a baud rate of the serial device")
         try:
             self.fd = os.open(name, os.O_RDWR | os.O_NOCTTY)
         except OSError as e:
             fail(f"cannot open {name}: {e.strerror}")
         try:
-            attr = termios.tcgetattr(self.fd)
+            termios.tcgetattr(self.fd)
         except termios.error:
             fail(f"{name} is not a serial device")
+        self.sent_by = time.monotonic()
+        self.set_baud(baud)
+        termios.tcflush(self.fd, termios.TCIOFLUSH)
+
+    def set_baud(self, baud: int) -> None:
+        """Raw 8-N-1 at the baud rate, as after a write of it to the
+        board's 0xFFFFFF9F (BAUD) and its answer: the board takes the rate
+        once its UART has sent nothing for 1 ms after the write."""
+        speed = getattr(termios, f"B{baud}", None)
+        if speed is None:
+            fail(f"{baud} is not a baud rate of the serial device")
+        attr = termios.tcgetattr(self.fd)
         attr[0] = 0                                             # iflag
         attr[1] = 0                                             # oflag
         attr[2] = termios.CS8 | termios.CREAD | termios.CLOCAL  # cflag
@@ -201,10 +214,8 @@ class Serial(Transport):
         attr[5] = speed                                         # ospeed
         attr[6][termios.VMIN] = 0
         attr[6][termios.VTIME] = 0
-        termios.tcsetattr(self.fd, termios.TCSANOW, attr)
-        termios.tcflush(self.fd, termios.TCIOFLUSH)
+        termios.tcsetattr(self.fd, termios.TCSADRAIN, attr)
         self.byte_time = 10 / baud
-        self.sent_by = time.monotonic()
 
     def fileno(self) -> int:
         return self.fd

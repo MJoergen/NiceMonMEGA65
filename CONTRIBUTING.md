@@ -223,7 +223,13 @@ The testbenches are these:
   and after a digit is a digit. With the Nexys4DDR's buttons and
   display, the display shows dashes while the core runs and the PC at a
   stop; BTND and BTNU move the cursor, a bouncing BTNL steps once, BTNR
-  goes on, BTNC leaves Focus, and in Off the buttons do nothing.
+  goes on, BTNC leaves Focus, and in Off the buttons do nothing. Then
+  `n` shows the settings page, with the IP and MAC addresses, the TCP
+  port, and the baud rate live from the system: a typed IP address, MAC
+  address, and rate, chosen with CRSR down and stepped with CRSR left
+  and right, are written, and the registers take them; a short address,
+  a byte over 255, and a rate not on the list say `bad value`; and F10
+  and `m` switch between the two pages.
 - `sim/tb_dbg_decode.vhd` tests the decode of the debugger's row 27
   (`src/dbg/dbg_decode.vhd`) against nicedis: `sim/gen_decode.py`
   writes about 3000 instruction words of every class, condition,
@@ -380,10 +386,13 @@ break, and the next connection starts the line's input anew. A flood
 over TCP to `sim/fifo.nasm` is held back while the FIFO is full and
 loses nothing; to the paused program, the byte that waits is lost with
 one `o` after the link's wait, 1500 µs there, and a host that leaves
-during the wait ends it at once. Last it
-resets the system while a program
-runs, and checks that the core boots from the ROM again and that the
-screen's and the board's registers are cleared. The header of
+during the wait ends it at once. It sets the baud rate at `0xFFFFFF9F`
+to 2 Mbaud, which the UART takes only after 1 ms with nothing sent since the
+write, also when the line was quiet before it, and
+reads the link at it. Last it resets the system while a program runs,
+and checks that the core boots from the ROM again, that its `b` comes at
+the first rate, and that the screen's and the board's registers and the
+rate are cleared. The header of
 `sim/tb_nicemon.vhd` lists the steps in order. `tb_nicemon` and
 `tb_hello` take `-gG_*_FILE=` generics, as `sim/Makefile` shows.
 
@@ -448,8 +457,11 @@ every time, not only the ones a testbench sends.
   register two cycles after their pins. The Ethernet station's words at
   `0xFFFFFF98`–`9D` are there on every board, and its IP and MAC
   addresses after reset are as the generics say. `0xFFFFFF9E` reads the
-  words of the RAM on every board. Without the other registers, every
-  word but those reads 0.
+  words of the RAM on every board. `0xFFFFFF9F` holds the UART's baud
+  rate: a write of a rate it takes sets it, any other leaves it, reset
+  sets the generic's, and the bit's cycles that go out are always those
+  of the rate it holds. Without the other registers, every word but
+  those reads 0.
 - `scr_regs.sby` proves the screen's registers at `0xFFFFFF80`–`8F`,
   `src/scr_regs.vhd`: a write sets the register of its word, nothing else
   changes one but a clear or reset, each word reads its register, or 0,
@@ -737,7 +749,8 @@ bitstream has one. Then it hides the ROM and uses the link:
   `x` notice, R15, and the stop register.
 - It clears the memory, checks the size of the RAM at `0xFFFFFF9E`,
   128K words on the MEGA65 and 64K on the Nexys4DDR, and the top word of
-  the RAM, reads back what `sim/emu.nasm` leaves after its
+  the RAM, sets each baud rate at `0xFFFFFF9F` and reads the link back
+  at it, and returns to `--baud`, reads back what `sim/emu.nasm` leaves after its
   halt, and checks that the cycle counter and the timer stop at the halt.
 - It writes and reads the screen's registers, and the board's registers:
   on the Nexys4DDR the LEDs, RGB LEDs, and display, and that the buttons

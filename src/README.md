@@ -57,7 +57,9 @@ header of `nicemon.vhd` is the address map, and
   state and registers, and the instruction at the PC, decoded by
   [dbg/dbg_decode.vhd](dbg/dbg_decode.vhd), and the function keys run
   the core. A page over the program's screen shows and writes the
-  memory and sets breakpoints.
+  memory and sets breakpoints, and another shows and sets the link's
+  settings, the IP and MAC addresses and the UART's baud rate, as text
+  that [dbg/dbg_set.vhd](dbg/dbg_set.vhd) writes and parses.
 - **TEXT DISPLAY** ([video/text.vhd](video/text.vhd)) keeps its own copy
   of the screen, from the writes to it, and shows it with the cursor and
   the overlay on VGA or HDMI. It holds the fonts
