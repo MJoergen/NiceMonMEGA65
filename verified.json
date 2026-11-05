@@ -1,37 +1,37 @@
 {
-  "nice_cpu_tag": "V1.4",
-  "nice_cpu_commit": "a64b1acdcd14ee8cb828770b05e0bae42e3fdd04",
-  "repo_commit": "c006ecc7260190d7099b01b49f6d92f12c2b0dcb",
+  "nice_cpu_tag": "V1.5",
+  "nice_cpu_commit": "4803a9480d91125c99b303c3d7c209e4f1f8ddb2",
+  "repo_commit": "2a3685698e2609c770c878ceff559af61b0c3a18",
   "vivado": "Vivado v2025.1",
   "board": "MEGA65 R6",
   "part": "xc7a200tfbg484-2",
   "clock_mhz": 100.0,
   "flow": "default",
   "met": true,
-  "wns_ns": 0.138,
+  "wns_ns": 0.063,
   "tns_ns": 0.0,
-  "whs_ns": 0.021,
+  "whs_ns": 0.032,
   "ths_ns": 0.0,
   "wpws_ns": 0.259,
   "tpws_ns": 0.0,
   "core_in": {
-    "slack_ns": 0.138,
-    "from": "i_mega65/i_system/i_nicemon/i_mem/i_ram/mem_odd_reg_0_12/CLKARDCLK",
-    "to": "i_mega65/i_system/i_nicemon/i_core/i_core/i_pipe_write/w_r_reg[regs][15][12]/D"
+    "slack_ns": 0.21,
+    "from": "i_mega65/i_system/i_nicemon/i_mem/i_ram/mem_odd_reg_0_28/CLKARDCLK",
+    "to": "i_mega65/i_system/i_nicemon/i_core/i_core/i_pipe_write/w_r_reg[regs][14][25]/D"
   },
   "core_out": {
-    "slack_ns": 0.16,
-    "from": "i_mega65/i_system/i_nicemon/i_core/i_core/i_pipe_fetch/req_r_reg[4]_rep__3/C",
-    "to": "i_mega65/i_system/i_nicemon/i_mem/i_ram/mem_odd_reg_1_31/ADDRBWRADDR[4]"
+    "slack_ns": 0.11,
+    "from": "i_mega65/i_system/i_nicemon/i_core/i_core/i_pipe_dbus/tag_cnt_r_reg[2]/C",
+    "to": "i_mega65/i_system/i_nicemon/i_devices/i_timer/irq_vector_o_reg[0]/CE"
   },
   "attempts": [
     {
       "flow": "default",
-      "wns_ns": 0.138,
-      "whs_ns": 0.021,
+      "wns_ns": 0.063,
+      "whs_ns": 0.032,
       "wpws_ns": 0.259,
       "met": true
     }
   ],
-  "date": "2026-11-04"
+  "date": "2026-11-05"
 }
