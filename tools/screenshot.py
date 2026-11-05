@@ -22,7 +22,7 @@ The pictures of doc/images/ are made from the ROM of the release, the
 monitor and the demo behind it, with its tag, and x and CR first, which
 start the demo:
 
-    make -C demo VERSION=V1.4
+    make -C demo VERSION=V1.5
     printf 'x\\rHello from the NICE CPU on the MEGA65!\\r' > in.txt
     tools/screenshot.py -i in.txt -o doc/images/demo.png demo/build/rom.bin
 
