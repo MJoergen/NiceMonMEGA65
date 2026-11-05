@@ -782,9 +782,11 @@ last sector, and checks that the sector after the last is out of range.
 Sector 0 must end in `55 AA`, and be a FAT boot sector, or an MBR whose
 first partition starts with one. A write-protected card must refuse a
 Write with error 6, which writes nothing; nothing is ever written to a
-card. A slot without a card, and a card without `55 AA` in sector 0,
-which is not formatted, are named after NOT COVERED. On the R3, slot 1
-has no card detect, so it is always tried, and fails without a card.
+card. A slot without a card, a card without `55 AA` in sector 0, which
+is not formatted, and a card with another file system, exFAT or NTFS,
+or a GPT, which the check does not know, are named after NOT COVERED.
+On the R3, slot 1 has no card detect, so it is always tried, and fails
+without a card.
 
 The reset button is not tested: press it with a terminal open, and the
 `b06` notice comes again. Nor is card detect: take a card out, and the

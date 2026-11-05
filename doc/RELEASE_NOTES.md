@@ -44,7 +44,8 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 
 - `make hwtest` tests the SD card controller, and reads each card: its
   sector 0, the FAT boot sector, and its last sector. It never writes
-  to a card, and a slot without a card is NOT COVERED (#56).
+  to a card. A slot without a card, and a card without a FAT file
+  system, are NOT COVERED (#56).
 
 ## V1.4 (2026-11-04)
 

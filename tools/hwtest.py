@@ -65,11 +65,12 @@ Checks, in this order:
       and read; a slot the board does not have shows no card. Then for each
       slot with a card: Init, its type and last sector, a Read of sector 0,
       twice, and of the last sector, and the sector after the last one out
-      of range. Sector 0 ends in 55 AA, and so does the FAT boot sector of
-      its first partition, or sector 0 is that boot sector. A
-      write-protected card refuses a Write with error 6, which writes
-      nothing. Nothing is ever written to a card. A slot without a card,
-      or with a card without 55 AA in sector 0, is named after NOT COVERED.
+      of range. Sector 0 ends in 55 AA, and is a FAT boot sector, or an
+      MBR whose first partition starts with one. A write-protected card
+      refuses a Write with error 6, which writes nothing. Nothing is ever
+      written to a card. A slot without a card, a card without 55 AA in
+      sector 0, and a card with another file system, exFAT or NTFS, or a
+      GPT, are named after NOT COVERED.
     - the C example examples/build/primes.bin runs, and after its halt the
       microsecond counter holds the cycle counter's count over the clock
       in MHz
@@ -1007,35 +1008,58 @@ def sd_read(link: Link, name: str, lba: int) -> bytes | None:
     return sd_sector(link)
 
 
-def fat_boot(sector: bytes) -> bool:
-    """Whether a sector is the boot sector of a FAT12, FAT16, or FAT32
-    file system: a jump, 512 bytes in a sector, the type's name where
-    the boot sector of its kind has it, and 55 AA."""
-    return (sector[0] in (0xEB, 0xE9) and sector[11:13] == b"\x00\x02"
+def fs_kind(sector: bytes) -> str | None:
+    """The file system whose boot sector a sector is, or None: FAT, for
+    FAT12, FAT16, or FAT32, with a jump, 512 bytes in a sector, the
+    type's name where the boot sector of its kind has it, and 55 AA; or
+    exFAT or NTFS, by the name after the jump."""
+    if sector[510:] != b"\x55\xaa" or sector[0] not in (0xEB, 0xE9):
+        return None
+    if (sector[11:13] == b"\x00\x02"
             and (sector[54:59] == b"FAT12" or sector[54:59] == b"FAT16"
-                 or sector[82:87] == b"FAT32")
-            and sector[510:] == b"\x55\xaa")
+                 or sector[82:87] == b"FAT32")):
+        return "FAT"
+    if sector[3:11] == b"EXFAT   ":
+        return "exFAT"
+    if sector[3:11] == b"NTFS    ":
+        return "NTFS"
+    return None
 
 
 def test_sd_fat(link: Link, name: str, first: bytes) -> None:
     """Checks the file system of a card from its sector 0, first, which
     is either a FAT boot sector itself or an MBR whose first partition
     starts with one. A sector 0 without 55 AA is a card that is not
-    formatted, which is not covered."""
+    formatted, and exFAT, NTFS, and a GPT are a file system or a
+    partition table the check does not know, as an SDXC card comes with
+    exFAT: all are not covered, not failures."""
     if first[510:] != b"\x55\xaa":
         uncovered.append(f"{name}'s file system, as sector 0 has no 55 AA")
         return
-    if fat_boot(first):
+    kind = fs_kind(first)
+    if kind == "FAT":
         check(f"{name}: sector 0 is a FAT boot sector", True)
         return
+    if kind is not None:
+        uncovered.append(f"{name}'s file system, as it is {kind}")
+        return
+    ptype = first[450]
     start = int.from_bytes(first[454:458], "little")
-    check(f"{name}: sector 0 is an MBR, partition 1 at {start:#x}",
-          first[450] != 0 and start > 0, f"type {first[450]:#04x}")
-    if start > 0:
-        boot = sd_read(link, name, start)
-        check(f"{name}: sector {start:#x} is a FAT boot sector",
-              boot is not None and fat_boot(boot),
-              "" if boot is None else repr(boot[3:11]))
+    if ptype == 0xEE:
+        uncovered.append(f"{name}'s file system, as its partitions are a GPT")
+        return
+    if not check(f"{name}: sector 0 is an MBR, partition 1 at {start:#x}",
+                 ptype != 0 and start > 0, f"type {ptype:#04x}"):
+        return
+    boot = sd_read(link, name, start)
+    if boot is None:
+        return
+    kind = fs_kind(boot)
+    if kind not in (None, "FAT"):
+        uncovered.append(f"{name}'s file system, as partition 1 is {kind}")
+        return
+    check(f"{name}: sector {start:#x} is a FAT boot sector", kind == "FAT",
+          repr(boot[3:11]))
 
 
 def test_sd(link: Link, board: str) -> None:
