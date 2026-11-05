@@ -6,7 +6,8 @@ create_clock -period 10.000 -name sys_clk [get_ports {clk_i}]
 ## The video clocks come from an MMCM of their own (video_clk.vhd). What
 ## crosses between them and the system clock is the copy of the screen in
 ## src/video/scr_ram.vhd, a block RAM written on the system clock and read on
-## the VGA clock, and the screen's registers, through a handshake in
+## the VGA clock, the fonts of src/video/font.vhd, block RAMs read on both
+## clocks, and the screen's registers, through a handshake in
 ## src/video/text.vhd, whose values are held while they cross. The handshake
 ## is correct by design, but its multi-bit data paths (cur_x_r, cur_y_r,
 ## cur_mode_r, offs_r to the *_vga registers) would show a slow route only as

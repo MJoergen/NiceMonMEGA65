@@ -89,6 +89,18 @@ alone is black on black. `nice_screen_clear` fills the screen with blanks.
 The cursor, the scrolling, and the exact colors are in
 [SYSTEM.md](SYSTEM.md#the-screen).
 
+A program can draw its own characters, such as the pieces of a game. The
+font RAM at `0xFFFE0000` has a glyph of 32 words for each code, one word a
+row, the top row first, with the leftmost of its 16 pixels in bit 15.
+The character ROM at `0xFFFE2000` holds Spleen in the same layout. A
+program copies the ROM into the RAM, writes the glyphs it wants, and
+writes `0xFFFE0000` to the font base at `0xFFFFFF86` to show them. The
+codes `0x00`–`0x1F` and `0x80`–`0x9F` are blank in Spleen, so new glyphs
+there change no text. A glyph wider than a character is drawn across
+several codes side by side. The monitor shows Spleen again when the
+program returns to it. [SYSTEM.md](SYSTEM.md#the-font) has the details and
+a loop that copies the ROM, and `niceemu --window` draws the same font.
+
 ## Programs in the ROM
 
 A program can also be the ROM of a core file (see "Building your own ROM"

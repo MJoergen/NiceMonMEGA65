@@ -74,7 +74,9 @@
 --    its writes to them are dropped: G_COUNT_FILE, run next, reads the count that G_EMU_FILE left, as a start keeps it.
 --    The fetch statistics still run, but stopped at the halt: two reads of
 --    FS_CYCLES are equal. The link writes and reads the screen's
---    registers, which go out to the display.
+--    registers, which go out to the display, and the fonts: the character
+--    ROM holds Spleen and drops a write, the font RAM keeps bits 15..0 of
+--    a word and leaves the RAM it aliases, and the font base selects it.
 --    It writes and reads the board's registers (LEDs, RGB levels, display
 --    segments), which go out, and reads the buttons and switches; the
 --    read-only words and those that are not registers take no write.
@@ -83,10 +85,12 @@
 --    program stops, so FS_CYCLES is small, the FS_HIST words sum to it, and
 --    with the multi-cycle core FS_HIST[0] is all of it; the microsecond
 --    counter, right after the cycle counter; the LEDs, which it writes; and
---    the buttons and switches. The start kept the screen's and the board's
---    registers.
--- 10. Clear the memory: what the programs left is gone, and the core is
---    held. The clear ends the halt, so bit 1 and the halt reason read 0
+--    the buttons and switches; and the fonts, a row of the font RAM that
+--    it writes and reads at once, a row of the ROM, which drops its write,
+--    and the font base, which selects the RAM. The start kept the screen's
+--    and the board's registers.
+-- 10. Clear the memory: what the programs left is gone, the font RAM and
+--    the font base included, and the core is held. The clear ends the halt, so bit 1 and the halt reason read 0
 --    (link version 5).
 -- 11. Load G_RESERVED_FILE, and run it. It halts on a reserved control
 --    word, which the halt reason and `h02` show, after the steps of niceemu.
@@ -145,6 +149,9 @@ library ieee;
 
    use std.textio.all;
    use std.env.all;
+
+library work;
+   use work.font_pkg.all;
 
 entity tb_nicemon is
    generic (
@@ -208,6 +215,13 @@ architecture simulation of tb_nicemon is
    signal scr_cur_y    : std_logic_vector(4 downto 0);
    signal scr_cur_mode : std_logic_vector(2 downto 0);
    signal scr_offs     : std_logic_vector(10 downto 0);
+   signal scr_fnt_ram  : std_logic;
+
+   -- The fonts, as the display holds them (src/video/font.vhd)
+   signal fnt_we    : std_logic;
+   signal fnt_addr  : std_logic_vector(13 downto 0);
+   signal fnt_wdata : std_logic_vector(15 downto 0);
+   signal fnt_rdata : std_logic_vector(15 downto 0);
 
    signal brd_led  : std_logic_vector(15 downto 0);
    signal brd_rgb0 : std_logic_vector(11 downto 0);
@@ -299,6 +313,11 @@ begin
          scr_cur_y_o    => scr_cur_y,
          scr_cur_mode_o => scr_cur_mode,
          scr_offs_o     => scr_offs,
+         scr_fnt_ram_o  => scr_fnt_ram,
+         fnt_we_o       => fnt_we,
+         fnt_addr_o     => fnt_addr,
+         fnt_wdata_o    => fnt_wdata,
+         fnt_rdata_i    => fnt_rdata,
          brd_led_o      => brd_led,
          brd_rgb0_o     => brd_rgb0,
          brd_rgb1_o     => brd_rgb1,
@@ -322,6 +341,20 @@ begin
          sd_wp_i        => "00",
          sd_pwr_n_o     => open
       ); -- i_nicemon
+
+   -- The fonts, with the display's port idle
+   i_font : entity work.font
+      port map (
+         clk_i      => clk,
+         we_i       => fnt_we,
+         addr_i     => fnt_addr,
+         wdata_i    => fnt_wdata,
+         rdata_o    => fnt_rdata,
+         vga_clk_i  => clk,
+         vga_addr_i => (others => '0'),
+         vga_ram_i  => '0',
+         vga_row_o  => open
+      ); -- i_font
 
    i_sd_card_model : entity work.sd_card_model
       generic map (
@@ -415,6 +448,7 @@ begin
       variable cycles_v : std_logic_vector(31 downto 0);
       variable micros_v : std_logic_vector(31 downto 0);
       variable fs_v     : std_logic_vector(31 downto 0);
+      variable alias_v  : std_logic_vector(31 downto 0);
       variable moved_v  : boolean;
       variable t0_v     : time;
 
@@ -972,6 +1006,32 @@ begin
          severity failure;
       wr("FFFFFF80", "00000000");
 
+      report "tb_nicemon: the fonts";
+      check("FFFE2829", "0000" & to_hstring(C_FONT(16#41# * 32 + 9)));  -- Spleen's A, row 9
+      check("FFFE3FFF", "0000" & to_hstring(C_FONT(8191)));
+      wr("FFFE2829", "00000000");                                       -- the ROM takes no write
+      check("FFFE2829", "0000" & to_hstring(C_FONT(16#41# * 32 + 9)));
+      check("FFFE0000", "00000000");                                    -- the font RAM, 0 at power-up
+      -- The RAM that the range aliases is not written
+      read_word("00000FFF", alias_v);
+      wr("FFFE0000", "1234ABCD");            -- bits 31..16 are dropped
+      wr("FFFE1FFF", "0000FFFF");
+      check("FFFE0000", "0000ABCD");
+      check("FFFE1FFF", "0000FFFF");
+      check("00000FFF", to_hstring(alias_v));
+      check("FFFFFF86", "00000000");         -- the font base
+      wr("FFFFFF86", "FFFE0000");
+      check("FFFFFF86", "FFFE0000");
+      assert scr_fnt_ram = '1'
+         report "tb_nicemon: the font base does not select the font RAM"
+         severity failure;
+      wr("FFFFFF86", "FFFE0001");            -- reserved, so the ROM is shown
+      check("FFFFFF86", "FFFE0001");
+      assert scr_fnt_ram = '0'
+         report "tb_nicemon: a reserved font base selects the font RAM"
+         severity failure;
+      wr("FFFFFF86", "00000000");
+
       report "tb_nicemon: the board's devices";
       check("FFFFFF90", "00000000");         -- all clear after reset
       wr("FFFFFF90", "0000A5C3");
@@ -1043,13 +1103,21 @@ begin
               to_integer(micros_v) = to_integer(cycles_v) / (C_CLOCK_HZ / 1_000_000) + 1)
          report "tb_nicemon: the core reads a microsecond counter that does not match the cycle counter"
          severity failure;
-      check("00000106", "00000000");         -- TIME_HI
-      check("00000107", "00005A5A");         -- the LEDs, written by the core
+      check("00000106", "00000000");                                    -- TIME_HI
+      check("00000107", "00005A5A");                                    -- the LEDs, written by the core
       assert brd_led = X"5A5A"
          report "tb_nicemon: the core's write to the LEDs does not go out"
          severity failure;
-      check("00000108", "00000009");         -- the buttons
-      check("00000109", "00001234");         -- the switches
+      check("00000108", "00000009");                                    -- the buttons
+      check("00000109", "00001234");                                    -- the switches
+      check("0000010A", "00001234");                                    -- the glyph's row, read at once
+      check("FFFE1005", "00001234");
+      check("0000010B", "0000" & to_hstring(C_FONT(16#41# * 32 + 9)));  -- Spleen's A
+      check("0000010C", "0000" & to_hstring(C_FONT(16#41# * 32 + 9)));  -- the write dropped
+      check("0000010D", "FFFE0000");                                    -- the font base
+      assert scr_fnt_ram = '1'
+         report "tb_nicemon: the core's font base does not select the font RAM"
+         severity failure;
       -- A start does not clear the screen's and the board's registers
       check("FFFFFF81", "00000021");
       check("FFFFFF94", "FEDCBA98");
@@ -1059,20 +1127,25 @@ begin
 
       report "tb_nicemon: clear the memory";
       wr("FFFFFFF0", "0000000D");
-      check("FFFFFFF0", "00000009");         -- held: the clear ends the halt
-      check("FFFFFFF1", "00000000");         -- and its reason
+      check("FFFFFFF0", "00000009");                                    -- held: the clear ends the halt
+      check("FFFFFFF1", "00000000");                                    -- and its reason
       check("00000000", "00000000");
       check("00000110", "00000000");
-      check("FFFF0000", "00000000");         -- the screen
+      check("FFFF0000", "00000000");                                    -- the screen
       check("FFFF07CF", "00000000");
-      check("FFFFFF02", "00000000");         -- the top of the memory
-      check("FFFFFF81", "00000000");         -- the screen's registers, as at the start
+      check("FFFFFF02", "00000000");                                    -- the top of the memory
+      check("FFFFFF81", "00000000");                                    -- the screen's registers, as at the start
       check("FFFFFF82", "00000000");
       check("FFFFFF85", "00000000");
-      assert scr_cur_x = 0 and scr_cur_y = 0
-         report "tb_nicemon: the clear does not reset the cursor"
+      check("FFFFFF86", "00000000");                                    -- the font base
+      assert scr_cur_x = 0 and scr_cur_y = 0 and scr_fnt_ram = '0'
+         report "tb_nicemon: the clear does not reset the cursor and the font base"
          severity failure;
-      check("FFFFFF93", "76543210");         -- the board's registers are kept
+      check("FFFE0000", "00000000");                                    -- the font RAM
+      check("FFFE1005", "00000000");
+      check("FFFE1FFF", "00000000");
+      check("FFFE2829", "0000" & to_hstring(C_FONT(16#41# * 32 + 9)));  -- the ROM stays
+      check("FFFFFF93", "76543210");                                    -- the board's registers are kept
 
       report "tb_nicemon: load " & G_RESERVED_FILE;
       load(G_RESERVED_FILE, first_v);
@@ -1278,6 +1351,7 @@ begin
 
       report "tb_nicemon: a reset while the core runs";
       wr("FFFFFF81", "00000021");
+      wr("FFFFFF86", "FFFE0000");
       wr("FFFFFF85", "00000050");
       wr("FFFFFF90", "0000A5C3");
       wr("FFFFFFF8", "00001000");            -- a breakpoint the echo never reaches
@@ -1299,6 +1373,7 @@ begin
       check("FFFFFFF0", "00000002");
       check("FFFFFF81", "00000000");         -- the screen's registers
       check("FFFFFF85", "00000000");
+      check("FFFFFF86", "00000000");
       check("FFFFFF90", "00000000");         -- the board's registers
       check("FFFFFF94", "00000000");
       check("FFFFFFF4", "00000000");         -- the breakpoints

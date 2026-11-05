@@ -59,6 +59,19 @@
 --                          control register hides it, so that the RAM is at
 --                          0 as in the emulator, and a build without
 --                          G_ROM_FILE has no ROM.
+--   0xFFFE0000-0xFFFE1FFF  The font RAM of SYSTEM.md §1.8: the word at
+--                          0xFFFE0000 + 32 * c + r is row r of the glyph
+--                          of code c, the top row first, in bits 15..0 with
+--                          the leftmost pixel in bit 15. Bits 31..16 read
+--                          0. The memory is the display's (fnt_*_o, in
+--                          src/video/font.vhd), and a read of it takes a
+--                          cycle more than one of the memory. It is 0 at power-up and after the
+--                          clear, and a start keeps it.
+--   0xFFFE2000-0xFFFE3FFF  The character ROM, Spleen in the same layout.
+--                          A write to it is dropped. The font base, 86
+--                          below, selects the font that the display shows.
+--                          An instruction fetch in 0xFFFE0000-3FFF reads
+--                          the RAM's alias there, not a font (SYSTEM.md §5).
 --   0xFFFF0000-0xFFFF7FFF  The screen: 2^G_SCR_ADDR_BITS words of memory of
 --                          their own, so that the emulator's 80x25 screen,
 --                          the first 2000, does not land on word 0. The rest
@@ -120,13 +133,16 @@
 --                          bit 6 showing the cursor, bit 5 making it blink,
 --                          bit 4 making it small, and bit 10 enabling the
 --                          display offset; 81 and 82 are the cursor's
---                          column and row; and 85 is the display offset, in
+--                          column and row; 85 is the display offset, in
 --                          words: the display shows the 2000 words from it,
---                          so adding 80 scrolls a line.
+--                          so adding 80 scrolls a line; and 86 is the font
+--                          base of SYSTEM.md §1.8: 0xFFFE0000 shows the font
+--                          RAM, and any other value the character ROM.
 --                          Bits 11..4 of the state are kept and read back;
---                          the other bits, and the words 83, 84, and 86-8F,
+--                          the other bits, and the words 83, 84, and 87-8F,
 --                          read 0 and take no write. The registers go out on
---                          scr_cur_*_o and scr_offs_o, with scr_ctl_we_o
+--                          scr_cur_*_o, scr_offs_o, and scr_fnt_ram_o,
+--                          with scr_ctl_we_o
 --                          for a cycle when one is written, and when they
 --                          are cleared by reset or by the clear of the memory.
 --   0xFFFFFF90-0xFFFFFF9F  The board's devices (src/board_io.vhd): 90-96
@@ -236,7 +252,12 @@
 -- The data bus of the core is stalled while the link owns port B, and while a
 -- write to the UART waits. A request of the link is stalled until no device
 -- is busy or owes the core an acknowledge, and the MPU does not stall, and
--- is then served. Every request is acknowledged in the cycle after it is served.
+-- is then served. Every request is acknowledged in the cycle after it is
+-- served, but a read of the fonts: their word comes from the display's
+-- memory in the cycle after, and is registered in rd_io, so the read is
+-- acknowledged a cycle later, and both buses are stalled meanwhile. The
+-- word of the fonts is not on the paths from the RAM to the core's WRITE
+-- stage, which have little slack at 100 MHz.
 -- A request of the core for the MPU, the performance counters, the fetch
 -- statistics, or the timer goes to src/devices.vhd in the cycle it is
 -- taken, as one for memory does, and the device acknowledges it. The MPU
@@ -248,7 +269,9 @@
 -- A clear of the memory, which the link asks for with clear_o, writes 0 to
 -- one word of the RAM and one of the screen in each cycle, in src/mem.vhd,
 -- 2^17 cycles in all on the MEGA65, 1.3 ms at 100 MHz, and 2^16 on the
--- Nexys4DDR, and clears the screen's registers.
+-- Nexys4DDR, and clears the screen's registers. Beside it, a word of the
+-- font RAM is written 0 in each cycle on the fnt_* port, 8192 cycles, so
+-- the clear lasts as long as the longer of the two.
 -- The link holds the core meanwhile, and makes no access.
 --
 -- RESET
@@ -337,6 +360,15 @@ entity nicemon is
       scr_cur_y_o    : out std_logic_vector(4 downto 0);
       scr_cur_mode_o : out std_logic_vector(2 downto 0);
       scr_offs_o     : out std_logic_vector(G_SCR_ADDR_BITS - 1 downto 0);
+      -- '1' while the font base, 0xFFFFFF86, selects the font RAM
+      scr_fnt_ram_o  : out std_logic;
+      -- The fonts at 0xFFFE0000-3FFF (src/video/font.vhd): the word's offset
+      -- from 0xFFFE0000, given in every cycle, a write, and the word read at
+      -- the offset of the cycle before. Without a display, the fonts read 0.
+      fnt_we_o       : out std_logic;
+      fnt_addr_o     : out std_logic_vector(13 downto 0);
+      fnt_wdata_o    : out std_logic_vector(15 downto 0);
+      fnt_rdata_i    : in  std_logic_vector(15 downto 0) := (others => '0');
       -- The board's devices (G_BOARD_IO): the LEDs, the two RGB LEDs'
       -- levels, the display's segments, and the buttons and switches, which
       -- are synchronized here. Without G_BOARD_IO the outputs are 0.
@@ -399,6 +431,8 @@ architecture synthesis of nicemon is
    -- The screen: 0xFFFF0000 and the 2^G_SCR_ADDR_BITS words from it, of
    -- which the emulator's screen is the first 2000
    constant C_SCR_BITS : natural := G_SCR_ADDR_BITS;
+   -- The fonts: 0xFFFE0000-3FFF, the RAM and then the ROM
+   constant C_FNT_BASE : std_logic_vector(31 downto 14) := X"FFFE" & "00";
    -- The screen's registers: 0xFFFFFF80-8F
    constant C_SCR_REGS_BASE : std_logic_vector(31 downto 4) := X"FFFFFF8";
 
@@ -429,6 +463,12 @@ architecture synthesis of nicemon is
              (addr(7 downto 4) = X"A" and G_SD_SLOTS > 0);          -- the SD card
    end function is_io;
 
+   -- Whether an address is in the fonts, which are not memory
+   function is_fnt(addr : std_logic_vector(31 downto 0)) return boolean is
+   begin
+      return addr(31 downto 14) = C_FNT_BASE;
+   end function is_fnt;
+
    -- Whether an address is one of the fetch statistics', which are the
    -- words of 0xFFFFFF50-7F, after the performance counters at 40-4F
    function is_fs(addr : std_logic_vector(31 downto 0)) return boolean is
@@ -445,7 +485,8 @@ architecture synthesis of nicemon is
    end function is_dev;
 
    -- The source of the read data of the last request served: the memory,
-   -- the console's FIFO, the device that acknowledges the core, or else rd_io
+   -- the console's FIFO, the device that acknowledges the core, or else rd_io,
+   -- which also takes the word of the fonts
    type t_src is (SRC_IO, SRC_MEM, SRC_RX, SRC_DEV);
 
    -- Core
@@ -478,10 +519,20 @@ architecture synthesis of nicemon is
    -- The halt reason, the code of nice_cpu's DEBUG.md §6
    signal halt_reason : std_logic_vector(2 downto 0);
 
-   -- Clearing the memory (src/mem.vhd), and a pulse for the link when it
-   -- is done
-   signal clearing : std_logic;
-   signal clr_done : std_logic;
+   -- Clearing the memory (src/mem.vhd) and the font RAM, and a pulse for
+   -- the link when both are done. clearing is a register, '1' from the
+   -- cycle after the start until the cycle after both are done, for the
+   -- stalls, and clearing_d is clearing a cycle late.
+   signal mem_clearing : std_logic;
+   -- A read of the fonts that waits a cycle for its word, which goes to
+   -- rd_io, and whether it is the link's
+   signal fnt_rd       : std_logic                     := '0';
+   signal fnt_rd_link  : std_logic                     := '0';
+   signal fnt_clearing : std_logic                     := '0';
+   signal fnt_clr_addr : std_logic_vector(12 downto 0) := (others => '0');
+   signal clearing     : std_logic                     := '0';
+   signal clearing_d   : std_logic                     := '0';
+   signal clr_done     : std_logic;
    -- The link's request for a clear, high until clr_done, and the cycle
    -- that starts the clear
    signal link_clear : std_logic;
@@ -533,7 +584,9 @@ architecture synthesis of nicemon is
    signal link_take  : std_logic;
 
    -- A core write to the UART that waits for the byte before it to go
-   signal tx_wait      : std_logic := '0';
+   signal tx_wait : std_logic := '0';
+   -- tx_wait or fnt_rd, as one register for the stall of the buses
+   signal bus_wait     : std_logic := '0';
    signal tx_wait_data : std_logic_vector(7 downto 0);
 
    -- The devices (src/devices.vhd): the core's request for one, taken in
@@ -705,14 +758,14 @@ begin
 
    -- The core's request is taken in a cycle with no stall. The MPU's stall
    -- holds the core while it computes a result that the core reads.
-   dbus_stall <= link_owns or tx_wait or dev_busy or clearing or dev_stall;
+   dbus_stall <= link_owns or bus_wait or dev_busy or clearing or dev_stall;
    dbus_ack   <= (srv_ack or dev_core_ack) and dbus_cyc;
 
    -- The link owns port B while the core is held, halted, or paused. Its
    -- request waits while a device is busy, owes the core an acknowledge, or
    -- the MPU stalls, and is then taken.
    link_owns  <= cpu_hold or cpu_halted or cpu_paused;
-   link_stall <= not link_owns or dev_busy or core_owed or dev_stall or clearing;
+   link_stall <= not link_owns or dev_busy or core_owed or dev_stall or clearing or bus_wait;
    link_take  <= link_cyc and link_stb and not link_stall;
 
    -- A request of the core in reset is dropped: it is not taken, whatever it
@@ -735,7 +788,7 @@ begin
                 dbus_we;
    bus_wdata <= link_wdata when link_owns = '1' else
                 dbus_wdata;
-   mem_stb   <= '1' when bus_take = '1' and not is_io(bus_addr) else
+   mem_stb   <= '1' when bus_take = '1' and not is_io(bus_addr) and not is_fnt(bus_addr) else
                 '0';
 
    -- A console read returns the byte in bits 7..0 and bit 8 set (the header,
@@ -747,6 +800,10 @@ begin
 
    p_dbus : process (clk_i)
 
+      -- The next tx_wait and fnt_rd, for bus_wait
+      variable tx_wait_v : std_logic;
+      variable fnt_rd_v  : std_logic;
+
       -- Serve one request. link is true for the link's.
       procedure serve(link  : boolean;
                       addr  : std_logic_vector(31 downto 0);
@@ -755,7 +812,19 @@ begin
       begin
          rd_src <= SRC_IO;
          rd_io  <= (others => '0');
-         if not is_io(addr) then
+         if is_fnt(addr) and we = '0' then
+            -- The fonts return the word in the next cycle, which goes to
+            -- rd_io then, and is acknowledged in the cycle after.
+            fnt_rd_v    := '1';
+            fnt_rd_link <= '0';
+            if link then
+               fnt_rd_link <= '1';
+            end if;
+            return;
+         elsif is_fnt(addr) then
+            -- The fonts have taken the write (fnt_we_o).
+            null;
+         elsif not is_io(addr) then
             -- The memory has taken the request (mem_stb), and returns its
             -- word in the next cycle.
             rd_src <= SRC_MEM;
@@ -772,7 +841,7 @@ begin
             if cpu_tx_valid = '1' and cpu_tx_ready = '0' then
                -- The byte before still waits. The core may drop its request
                -- once it is taken, so the byte is kept until it can go.
-               tx_wait      <= '1';
+               tx_wait_v    := '1';
                tx_wait_data <= wdata(7 downto 0);
                return;
             end if;
@@ -823,14 +892,26 @@ begin
 
    begin
       if rising_edge(clk_i) then
-         srv_ack  <= '0';
-         link_ack <= '0';
+         srv_ack   <= '0';
+         link_ack  <= '0';
+         tx_wait_v := tx_wait;
+         fnt_rd_v  := fnt_rd;
 
          if cpu_tx_valid = '1' and cpu_tx_ready = '1' then
             cpu_tx_valid <= '0';
          end if;
 
-         if dev_busy = '1' then
+         if fnt_rd = '1' then
+            -- The word of the fonts, from a register, so that their memory
+            -- is not on the paths from the RAM to the core
+            fnt_rd_v := '0';
+            rd_io    <= X"0000" & fnt_rdata_i;
+            if fnt_rd_link = '1' then
+               link_ack <= '1';
+            else
+               srv_ack <= '1';
+            end if;
+         elsif dev_busy = '1' then
             if dev_link_ack = '1' then
                rd_src   <= SRC_IO;
                rd_io    <= dev_rdata;
@@ -847,7 +928,7 @@ begin
             if cpu_tx_valid = '0' or cpu_tx_ready = '1' then
                cpu_tx_data  <= tx_wait_data;
                cpu_tx_valid <= '1';
-               tx_wait      <= '0';
+               tx_wait_v    := '0';
                srv_ack      <= '1';
             end if;
          elsif core_take = '1' then
@@ -857,14 +938,22 @@ begin
          -- A request of the core in reset is dropped.
          if cpu_rst = '1' then
             srv_ack <= '0';
-            tx_wait <= '0';
+            tx_wait_v := '0';
+            if fnt_rd_link = '0' then
+               fnt_rd_v := '0';
+            end if;
          end if;
 
          if rst_i = '1' then
+            fnt_rd_v     := '0';
             link_ack     <= '0';
             cpu_tx_valid <= '0';
             read_count   <= (others => '0');
          end if;
+
+         tx_wait  <= tx_wait_v;
+         fnt_rd   <= fnt_rd_v;
+         bus_wait <= tx_wait_v or fnt_rd_v;
       end if;
    end process p_dbus;
 
@@ -973,8 +1062,8 @@ begin
          wdata_i      => bus_wdata,
          rdata_o      => mem_rdata,
          clear_i      => clr_start,
-         clearing_o   => clearing,
-         clear_done_o => clr_done,
+         clearing_o   => mem_clearing,
+         clear_done_o => open,
          scr_we_o     => scr_we_o,
          scr_addr_o   => scr_addr_o,
          scr_data_o   => scr_data_o
@@ -1021,6 +1110,47 @@ begin
                 '0';
    clr_start <= link_clear and not clr_done and not clearing and not dev_busy;
 
+   -- The fonts take the address of port B in every cycle, and a write that
+   -- is served, which they drop in the ROM. The clear writes 0 to the font
+   -- RAM, a word in each cycle, beside the clear of the memory, and is done
+   -- when both are.
+   fnt_we_o    <= '1' when fnt_clearing = '1' or
+                           (bus_take = '1' and bus_we = '1' and is_fnt(bus_addr)) else
+                  '0';
+   fnt_addr_o  <= '0' & fnt_clr_addr when fnt_clearing = '1' else
+                  bus_addr(13 downto 0);
+   fnt_wdata_o <= (others => '0') when fnt_clearing = '1' else
+                  bus_wdata(15 downto 0);
+
+   clr_done <= clearing_d and not clearing;
+
+   p_fnt_clear : process (clk_i)
+   begin
+      if rising_edge(clk_i) then
+         clearing_d <= clearing;
+         if clr_start = '1' then
+            clearing <= '1';
+         elsif mem_clearing = '0' and fnt_clearing = '0' then
+            clearing <= '0';
+         end if;
+         if fnt_clearing = '1' then
+            fnt_clr_addr <= fnt_clr_addr + 1;
+            if and(fnt_clr_addr) = '1' then
+               fnt_clearing <= '0';
+            end if;
+         elsif clr_start = '1' then
+            fnt_clearing <= '1';
+            fnt_clr_addr <= (others => '0');
+         end if;
+
+         if rst_i = '1' then
+            fnt_clearing <= '0';
+            clearing     <= '0';
+            clearing_d   <= '0';
+         end if;
+      end if;
+   end process p_fnt_clear;
+
    i_scr_regs : entity work.scr_regs
       generic map (
          G_SCR_ADDR_BITS => C_SCR_BITS
@@ -1038,7 +1168,8 @@ begin
          cur_x_o    => scr_cur_x_o,
          cur_y_o    => scr_cur_y_o,
          cur_mode_o => scr_cur_mode_o,
-         offs_o     => scr_offs_o
+         offs_o     => scr_offs_o,
+         fnt_ram_o  => scr_fnt_ram_o
       ); -- i_scr_regs
 
 

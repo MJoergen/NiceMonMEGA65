@@ -131,8 +131,8 @@ board differs from the MEGA65 in three ways:
 - Its FPGA has 135 block RAMs of 36 Kbit, where the MEGA65's has 365. The
   RAM and the ROM are the same as on the MEGA65, and take 96 of them, but
   the screen is 8K words, not 32K, so that it and its copy in `text.vhd`
-  take 16, not 64. With the font, the debugger's overlay, the UART's
-  FIFO, and the Ethernet station's 2.5, that is 123 of 135 with the
+  take 16, not 64. With the fonts, the debugger's overlay, the UART's
+  FIFO, and the Ethernet station's 2.5, that is 127 of 135 with the
   ROM. 8K words are still more than three screens of 80×25 for
   scrolling.
 - Its FPGA is speed grade -1, where the MEGA65's is -2, so the system clock
@@ -301,6 +301,16 @@ build has 0.042 ns and 0.057 ns, with 235.5 block RAMs and 19905 LUTs,
 on a path from the RAM into WRITE's register file, and the Nexys4DDR's
 0.047 ns and 0.025 ns, with 123 block RAMs and 19068 LUTs, on a path
 from DBUS to the timer.
+With the fonts of nice_cpu V1.6
+([#71](https://github.com/MJoergen/NiceMonMEGA65/issues/71)), 4 block
+RAMs more on each board, the R6's build with the ROM misses by 0.124 ns
+in the default flow, on a path from the farthest of the RAM's block RAMs
+into WRITE's register file, and meets with `FLOW=timing`, 0.128 ns and
+0.031 ns, with 241.5 block RAMs. A read of the fonts takes a cycle more
+than one of the RAM, so that their word is not on that path, and the
+stalls of the data bus are single registers, as before. The
+Nexys4DDR's has 0.054 ns and 0.025 ns, with 127 block RAMs and 19951
+LUTs, on a path in WRITE.
 The R3's pipelined row is from a build at nice_cpu V1.0, with
 the debug link of version 4, and the Nexys4DDR's from one at V1.1, with
 stage 1 of the on-board debugger ([DEBUGGER.md](../doc/DEBUGGER.md)).
@@ -333,15 +343,17 @@ The block RAMs, of 36 Kbit, are these:
 | The ROM (`i_rom`), 32K words, with `ROM=` only | 32 | 32 |
 | The screen (`i_scr` in `mem.vhd`), 32K or 8K words | 32 | 8 |
 | Its copy in `text.vhd` (`scr_ram.vhd`) | 32 | 8 |
-| The font in `text.vhd` | 4 | 4 |
+| The fonts in `text.vhd` (`font.vhd`): the font RAM, 8K words of 16 bits, and the character ROM, one dual-port ROM | 8 | 8 |
 | The debugger's overlay in `text.vhd` (`scr_ram.vhd`), 4K words | 4 | 4 |
 | The UART's input FIFO (`rx_fifo.vhd`), one RAMB18 | 0.5 | 0.5 |
 | The FIFO of received Ethernet frames (`eth/eth_ram.vhd`), 2K bytes, one RAMB18 | 0.5 | 0.5 |
 | The FIFO of Ethernet frames to send (`eth/eth_ram.vhd`), 2K bytes, one RAMB18 | 0.5 | 0.5 |
 | The copy of a ping in `eth/eth_icmp.vhd`, 2K bytes, one RAMB18 | 0.5 | 0.5 |
 | The TCP server's buffers of received and sent bytes (`eth/eth_ram.vhd` in `eth/eth_tcp_buf.vhd`), 2K bytes each, one RAMB18 each | 1 | 1 |
-| Total without the ROM, pipelined | 203.5 of 365 | 91 of 135 |
-| Total with the ROM, pipelined | 235.5 | 123 |
+| The SD card controller's buffer (nice_cpu's `sd_regs.vhd`), four RAMB18, on the MEGA65 only | 2 | – |
+| The table of the debugger's strip (`dbg/dbg.vhd`), one RAMB18, on the MEGA65 only | 0.5 | – |
+| Total without the ROM, pipelined | 209.5 of 365 | 95 of 135 |
+| Total with the ROM, pipelined | 241.5 | 127 |
 
 The copy of the screen keeps all 32 bits, as the display reads the
 character and both 12-bit colors, so it takes as many block RAMs as the

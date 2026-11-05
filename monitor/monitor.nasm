@@ -35,8 +35,10 @@
 ; line, the console at 0xFFFFFF00, every byte goes as it is. On the screen
 ; a character goes at the cursor, which moves on; CR moves the cursor to
 ; column 0, LF to column 0 of the next row, BS one column back, and TAB to
-; the next multiple of 8; the other control codes and 0x7F to 0x9F do
-; nothing. Past the last column the cursor goes to the next row, and past
+; the next multiple of 8; the other control codes and 0x7F do nothing.
+; 0x80 to 0x9F go on the screen as any character: they are blank in Spleen,
+; and show what a program draws for them in the font RAM (nice_cpu's
+; SYSTEM.md §1.8). Past the last column the cursor goes to the next row, and past
 ; the last row the screen's rows move up by one, by copying, which scrolls
 ; in niceemu too, where the display offset is plain memory, and the same
 ; on a board whose screen is smaller. So the rows shown are always the 2000
@@ -75,6 +77,7 @@ SCR_CTL         .EQU    0xFFFFFF80      ; bit 6 shows the cursor, bit 5 blinks i
 SCR_X           .EQU    0xFFFFFF81      ; the cursor's column
 SCR_Y           .EQU    0xFFFFFF82      ; the cursor's row
 SCR_OFFS        .EQU    0xFFFFFF85      ; the display offset, in words
+SCR_FONT        .EQU    0xFFFFFF86      ; the font base: 0 shows Spleen
 TIMER           .EQU    0xFFFFFF10      ; the timer's period, 0 to stop it
 E_IP            .EQU    0xFFFFFF9A      ; the Ethernet station's IP address, the first byte in bits 31..24
 E_MACH          .EQU    0xFFFFFF9B      ; the first two bytes of its MAC address, in bits 15..0
@@ -131,12 +134,13 @@ SCR_MAX         .EQU    0x7FFF          ; the largest display offset
                 JMP     scr_color       ; 8 at 0x10
 
 ; mon_reset: the cold start, entry 0, which reset runs and a program may
-; call. E is cleared, the timer stopped, and VBASE set to 0, as at a
-; return. The RAM from 0x8000 is left alone, so that a program a host has
+; call. E is cleared, the timer stopped, VBASE set to 0, and the font base
+; set to 0, so that the screen shows Spleen, as at a return. The RAM from 0x8000 is left alone, so that a program a host has
 ; loaded is still there.
 mon_reset
                 MOVE    R14, 0          ; E = 0, VBASE = 0; bit 24 stays 1
                 MOVE    @TIMER, 0
+                MOVE    @SCR_FONT, 0
                 MOVE    SP, STACK
                 MOVE    @V_COLOR, COLOR
                 MOVE    @V_OUT, OUT_LINE+OUT_SCREEN
@@ -1067,12 +1071,13 @@ run_at          TST     @R7
                 CALL    R7
 
 ; mon_exit: entry 1, and where a program returns to. Back to the main loop
-; with R1 the status: E cleared, the timer stopped, VBASE 0, a fresh
-; stack, and the status printed, after a new line if the program left the
+; with R1 the status: E cleared, the timer stopped, VBASE 0, the font base
+; 0, a fresh stack, and the status printed, after a new line if the program left the
 ; cursor in a row.
 mon_exit
                 MOVE    R14, 0          ; E = 0, VBASE = 0; bit 24 stays 1
                 MOVE    @TIMER, 0
+                MOVE    @SCR_FONT, 0    ; Spleen, whatever the program chose
                 MOVE    SP, STACK
                 PUSH    R1
                 TST     @V_COL
@@ -1108,8 +1113,7 @@ mon_putc
         ?C      JMP     putc_ctl        ; a control code
                 CMP     R1, 0x7F
         ?C      JMP     putc_chr        ; 0x20 to 0x7E
-                CMP     R1, 0xA0
-        ?C      RET                     ; 0x7F to 0x9F: nothing
+        ?Z      RET                     ; 0x7F: nothing
 ; The character at the cursor, SCREEN + 80 * row + column, and the cursor
 ; moved on
 putc_chr

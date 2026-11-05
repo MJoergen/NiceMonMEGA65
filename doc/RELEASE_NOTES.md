@@ -28,9 +28,25 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 - nice_cpu is at `V1.6`. Its emulator's window draws from a font in the
   address space: a font RAM at `0xFFFE0000`–`1FFF`, Spleen as a
   character ROM at `0xFFFE2000`–`3FFF`, and a font base at
-  `0xFFFFFF86` (nice_cpu's SYSTEM.md §1.8). The boards draw from Spleen
-  alone for now, and those addresses alias their RAM, as before (#71).
-  The cores, the devices, and the debug link are as in V1.5.
+  `0xFFFFFF86` (nice_cpu's SYSTEM.md §1.8). The cores, the devices, and
+  the debug link are as in V1.5.
+- A program's data accesses to `0xFFFE0000`–`3FFF` reach the fonts now,
+  not the RAM there, and `0xFFFFFF86` is a register. A program that kept
+  data in the RAM words `0x0000`–`3FFF` through those addresses must use
+  others. An instruction fetch there still reads the RAM.
+
+**New.**
+
+- The boards draw the screen from the same fonts as the emulator (#71):
+  the font RAM, which a program writes, and Spleen in the character ROM,
+  selected by the font base. A program draws its own characters, such as
+  the pieces of a game, and the debugger's strip and page stay in Spleen.
+  A clear zeros the font RAM and the base (doc/SYSTEM.md, The font).
+- The monitor writes 0 to the font base at its start and when a program
+  returns, so that its text is in Spleen, and `mon_putc` puts `0x80`–`0x9F`
+  on the screen as any character.
+- `tools/screenshot.py` draws a program's screen in the font that it
+  selected.
 
 ## V1.5 (2026-11-05)
 

@@ -1,6 +1,7 @@
 -- The part of every board's top level that does not depend on the board: the
 -- NiceMon system (nicemon.vhd) and the text display of its screen
--- (video/text.vhd), with the UART pins synchronized and registered. The
+-- (video/text.vhd), which holds the fonts that the system maps
+-- (video/font.vhd), with the UART pins synchronized and registered. The
 -- board level makes the clocks and resets, drives the keyboard, if the board
 -- has one, and turns the video output into the board's VGA or HDMI signals.
 --
@@ -167,6 +168,12 @@ architecture synthesis of system is
    signal scr_cur_y    : std_logic_vector(4 downto 0);
    signal scr_cur_mode : std_logic_vector(2 downto 0);
    signal scr_offs     : std_logic_vector(G_SCR_ADDR_BITS - 1 downto 0);
+   signal scr_fnt_ram  : std_logic;
+   -- The bus's port of the fonts, in the system clock domain
+   signal fnt_we    : std_logic;
+   signal fnt_addr  : std_logic_vector(13 downto 0);
+   signal fnt_wdata : std_logic_vector(15 downto 0);
+   signal fnt_rdata : std_logic_vector(15 downto 0);
 
    -- The Ethernet station's addresses and counts, in the system clock domain
    signal eth_mac    : std_logic_vector(47 downto 0);
@@ -263,6 +270,11 @@ begin
          scr_cur_y_o    => scr_cur_y,
          scr_cur_mode_o => scr_cur_mode,
          scr_offs_o     => scr_offs,
+         scr_fnt_ram_o  => scr_fnt_ram,
+         fnt_we_o       => fnt_we,
+         fnt_addr_o     => fnt_addr,
+         fnt_wdata_o    => fnt_wdata,
+         fnt_rdata_i    => fnt_rdata,
          brd_led_o      => brd_led_o,
          brd_rgb0_o     => brd_rgb0_o,
          brd_rgb1_o     => brd_rgb1_o,
@@ -391,6 +403,11 @@ begin
          cur_y_i     => scr_cur_y,
          cur_mode_i  => scr_cur_mode,
          offs_i      => scr_offs,
+         fnt_ram_i   => scr_fnt_ram,
+         fnt_we_i    => fnt_we,
+         fnt_addr_i  => fnt_addr,
+         fnt_wdata_i => fnt_wdata,
+         fnt_rdata_o => fnt_rdata,
          ovl_we_i    => ovl_we,
          ovl_addr_i  => ovl_addr,
          ovl_data_i  => ovl_data,

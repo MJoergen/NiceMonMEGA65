@@ -15,16 +15,19 @@
 --   2  The cursor's row, bits 4..0.
 --   5  The display offset, in words, bits G_SCR_ADDR_BITS - 1..0: the
 --      display shows the 2000 words from it, so adding 80 scrolls a line.
--- The words 3, 4, and 6-F read 0 and take no write.
+--   6  The font base of nice_cpu's doc/SYSTEM.md §1.8, all 32 bits, as
+--      QNICE's VGA_FONT_OFFS: 0xFFFE0000 shows the font RAM, and any other
+--      value the character ROM, 0 among them.
+-- The words 3, 4, and 7-F read 0 and take no write.
 --
 -- The registers go out on cur_x_o, cur_y_o, cur_mode_o (bit 0 shown, bit 1
--- blinking, bit 2 small), and offs_o, which is 0 while bit 10 of the state
--- is 0. ctl_we_o is '1' for a cycle after any write to 0xFFFFFF80-8F, and
+-- blinking, bit 2 small), offs_o, which is 0 while bit 10 of the state
+-- is 0, and fnt_ram_o, which is '1' while the base is 0xFFFE0000. ctl_we_o is '1' for a cycle after any write to 0xFFFFFF80-8F, and
 -- after clear_i or reset, which clear the registers, so that the display
 -- takes them.
 --
 -- With G_FORMAL, it states the properties that formal/scr_regs.sby proves:
--- a write to a register's word sets it, the registers change only so or by
+-- a write to a register's word sets it, the font base included, the registers change only so or by
 -- a clear or reset, each word reads its register, or 0, and ctl_we_o
 -- follows each write, clear, and reset.
 --
@@ -57,7 +60,8 @@ entity scr_regs is
       cur_x_o    : out std_logic_vector(6 downto 0);
       cur_y_o    : out std_logic_vector(4 downto 0);
       cur_mode_o : out std_logic_vector(2 downto 0);
-      offs_o     : out std_logic_vector(G_SCR_ADDR_BITS - 1 downto 0)
+      offs_o     : out std_logic_vector(G_SCR_ADDR_BITS - 1 downto 0);
+      fnt_ram_o  : out std_logic
    );
 end entity scr_regs;
 
@@ -67,7 +71,11 @@ architecture synthesis of scr_regs is
    signal cur_x  : std_logic_vector(6 downto 0)             := (others => '0');
    signal cur_y  : std_logic_vector(4 downto 0)             := (others => '0');
    signal offs   : std_logic_vector(G_SCR_ADDR_BITS - 1 downto 0) := (others => '0');
+   signal base   : std_logic_vector(31 downto 0)            := (others => '0');
    signal ctl_we : std_logic                                := '0';
+
+   -- The font base that shows the font RAM
+   constant C_FONT_RAM : std_logic_vector(31 downto 0) := X"FFFE0000";
 
 begin
 
@@ -84,6 +92,7 @@ begin
                when X"1"   => cur_x <= wdata_i(6 downto 0);
                when X"2"   => cur_y <= wdata_i(4 downto 0);
                when X"5"   => offs  <= wdata_i(G_SCR_ADDR_BITS - 1 downto 0);
+               when X"6"   => base  <= wdata_i;
                when others => null;
             end case;
 
@@ -94,6 +103,7 @@ begin
             cur_x  <= (others => '0');
             cur_y  <= (others => '0');
             offs   <= (others => '0');
+            base   <= (others => '0');
             ctl_we <= '1';
          end if;
       end if;
@@ -108,6 +118,7 @@ begin
          when X"1"   => rdata_o(6 downto 0) <= cur_x;
          when X"2"   => rdata_o(4 downto 0) <= cur_y;
          when X"5"   => rdata_o(G_SCR_ADDR_BITS - 1 downto 0) <= offs;
+         when X"6"   => rdata_o <= base;
          when others => null;
       end case;
    end process p_read;
@@ -118,12 +129,14 @@ begin
    cur_mode_o <= state(4) & state(5) & state(6);
    offs_o     <= offs when state(10) = '1' else
                  (others => '0');
+   fnt_ram_o  <= '1' when base = C_FONT_RAM else
+                 '0';
 
 
    gen_formal : if G_FORMAL generate
       -- A write to the word of register n in this cycle: the state, the
-      -- column, the row, and the offset
-      signal f_wr : std_logic_vector(3 downto 0);
+      -- column, the row, the offset, and the font base
+      signal f_wr : std_logic_vector(4 downto 0);
       -- A write, a clear, or a reset in this cycle
       signal f_any : std_logic;
    begin
@@ -132,6 +145,7 @@ begin
       f_wr(1) <= stb_i and we_i when addr_i = X"1" else '0';
       f_wr(2) <= stb_i and we_i when addr_i = X"2" else '0';
       f_wr(3) <= stb_i and we_i when addr_i = X"5" else '0';
+      f_wr(4) <= stb_i and we_i when addr_i = X"6" else '0';
       f_any   <= (stb_i and we_i) or clear_i or rst_i;
 
       -- psl default clock is rising_edge(clk_i);
@@ -147,12 +161,15 @@ begin
       -- psl f_offs_wr : assert always
       --    {f_wr(3) and not clear_i and not rst_i} |=>
       --    {offs = prev(wdata_i(G_SCR_ADDR_BITS - 1 downto 0))};
+      -- psl f_base_wr : assert always
+      --    {f_wr(4) and not clear_i and not rst_i} |=> {base = prev(wdata_i)};
       -- psl f_state_keep : assert always {not f_wr(0) and not clear_i and not rst_i} |=> {stable(state)};
       -- psl f_cur_x_keep : assert always {not f_wr(1) and not clear_i and not rst_i} |=> {stable(cur_x)};
       -- psl f_cur_y_keep : assert always {not f_wr(2) and not clear_i and not rst_i} |=> {stable(cur_y)};
       -- psl f_offs_keep : assert always {not f_wr(3) and not clear_i and not rst_i} |=> {stable(offs)};
+      -- psl f_base_keep : assert always {not f_wr(4) and not clear_i and not rst_i} |=> {stable(base)};
       -- psl f_clear : assert always
-      --    {clear_i or rst_i} |=> {state = 0 and cur_x = 0 and cur_y = 0 and offs = 0};
+      --    {clear_i or rst_i} |=> {state = 0 and cur_x = 0 and cur_y = 0 and offs = 0 and base = 0};
 
       -- The display hears of each write, clear, and reset, and of nothing
       -- else.
@@ -170,13 +187,18 @@ begin
       -- psl f_rd_offs : assert always
       --    addr_i = X"5" -> rdata_o(31 downto G_SCR_ADDR_BITS) = 0 and
       --                     rdata_o(G_SCR_ADDR_BITS - 1 downto 0) = offs;
+      -- psl f_rd_base : assert always addr_i = X"6" -> rdata_o = base;
       -- psl f_rd_none : assert always
-      --    (addr_i = X"3" or addr_i = X"4" or addr_i > X"5") -> rdata_o = 0;
+      --    (addr_i = X"3" or addr_i = X"4" or addr_i > X"6") -> rdata_o = 0;
 
       -- The offset goes out only while bit 10 of the state enables it.
       -- psl f_offs_on : assert always state(10) = '1' -> offs_o = offs;
       -- psl f_offs_off : assert always state(10) = '0' -> offs_o = 0;
 
+      -- The font RAM is shown only while the base is its address.
+      -- psl f_fnt_ram : assert always (fnt_ram_o = '1') = (base = X"FFFE0000");
+
+      -- psl c_fnt_ram : cover {f_wr(4) and not rst_i and not clear_i; fnt_ram_o};
       -- psl c_offs : cover {f_wr(0) and wdata_i(10) and not rst_i; f_wr(3) and not rst_i; offs_o /= 0};
    end generate gen_formal;
 

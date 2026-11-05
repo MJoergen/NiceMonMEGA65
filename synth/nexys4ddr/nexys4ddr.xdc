@@ -135,7 +135,7 @@ set_output_delay -clock eth_clk_pin -min -1.500 [get_ports {eth_txd_o[*] eth_tx_
 set_property IOB TRUE [get_ports {eth_txd_o[*] eth_tx_en_o}]
 
 ## The system clock and the video clocks cross only through the screen's
-## copy and the handshake of src/video/text.vhd, as on the MEGA65
+## copy, the fonts, and the handshake of src/video/text.vhd, as on the MEGA65
 ## (mega65.xdc). The relation between the clocks is ignored, and each path
 ## only has to be shorter than 10 ns, in both directions. That is the period
 ## of the 100 MHz board clock, a little less than one of the 90 MHz system

@@ -60,7 +60,10 @@ header of `nicemon.vhd` is the address map, and
   memory and sets breakpoints.
 - **TEXT DISPLAY** ([video/text.vhd](video/text.vhd)) keeps its own copy
   of the screen, from the writes to it, and shows it with the cursor and
-  the overlay on VGA or HDMI.
+  the overlay on VGA or HDMI. It holds the fonts
+  ([video/font.vhd](video/font.vhd)), the font RAM and the character
+  ROM, which the data bus reads and writes at `0xFFFE0000`–`3FFF`, and
+  draws the screen from the one that the font base selects.
 
 ## The data bus
 

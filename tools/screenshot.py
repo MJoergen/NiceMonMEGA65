@@ -4,9 +4,12 @@
 The program runs in niceemu until it halts, with --step-time, so that
 its microseconds are the same each time, and the 80x25 words of the
 screen at 0xFFFF0000 and the cursor's registers at 0xFFFFFF80-82 are drawn
-as the text display (src/video/text.vhd) shows them: 1280x800 pixels, the
-font of src/video/font_pkg.vhd, each character in 16x32 pixels, and the
-colors of 4 bits, each component n as the byte n * 0x11. A cursor that is
+as the text display (src/video/text.vhd) shows them: 1280x800 pixels, each
+character in 16x32 pixels, and the colors of 4 bits, each component n as
+the byte n * 0x11. The glyphs are those of the font that the font base at
+0xFFFFFF86 selects, the font RAM at 0xFFFE0000 or the character ROM at
+0xFFFE2000, Spleen, as niceemu holds them at the halt (nice_cpu's
+SYSTEM.md section 1.8), so a program's own glyphs show. A cursor that is
 shown is drawn on, in the inverted colors, as large as its character or,
 when small, its bottom 4 lines.
 
@@ -15,7 +18,8 @@ drawn under the screen, 4 rows more, as MEGA+HELP shows it at the stop:
 R0-R15; the state, PAUSED at the step limit of -n, as after F5, or HALTED
 with its reason; the PC, the instruction word there, and the flags of
 R14; the instruction decoded, as nicedis writes it; and the keys. The
-rows are laid out as src/dbg/dbg.vhd writes them. niceemu runs the
+rows are laid out as src/dbg/dbg.vhd writes them, in the character ROM,
+as the display draws them. niceemu runs the
 program twice, the second time to read the words at the PC.
 
 The pictures of doc/images/ are made from the ROM of the release, the
@@ -56,7 +60,6 @@ import zlib
 
 REPO    = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NICEEMU = f"{REPO}/nice_cpu/emulator/zig-out/bin/niceemu"
-FONT    = f"{REPO}/src/video/font_pkg.vhd"
 
 sys.path.insert(0, f"{REPO}/nice_cpu/assembler")
 import nicedis  # noqa: E402
@@ -65,6 +68,14 @@ COLS = 80
 ROWS = 25
 W    = 16
 H    = 32
+
+# The fonts (SYSTEM.md section 1.8): the font RAM, the character ROM, each
+# 256 glyphs of H rows, and the font base, whose value FONT_RAM selects the
+# RAM
+FONT_RAM   = 0xFFFE0000
+FONT_ROM   = 0xFFFE2000
+FONT_WORDS = 256 * H
+FONT_BASE  = 0xFFFFFF86
 
 # The strip: its colors and the layout of its rows, dbg.vhd's C_COLOR,
 # C_COL_*, and C_STATE_LEN. The flags are bits 25 to 31 of R14.
@@ -83,19 +94,18 @@ HALT_REASONS = {"HALT": 1, "reserved control instruction": 2,
                 "RTI outside an interrupt routine": 4}
 
 
-def load_font() -> dict[int, int]:
-    """Returns the rows of the glyphs, by 32 * code + row."""
-    font: dict[int, int] = {}
-    for m in re.finditer(r'(\d+) => "([01]{16})"', open(FONT).read()):
-        font[int(m.group(1))] = int(m.group(2), 2)
-    return font
+def font_at(mem: dict[int, int], base: int) -> list[int]:
+    """Returns the rows of the glyphs of the font at base, by 32 * code +
+    row, from the words that niceemu dumps."""
+    return [mem[base + i] & 0xFFFF for i in range(FONT_WORDS)]
 
 
 def run(args: argparse.Namespace, dumps: tuple[str, ...] | list[str] = ()
         ) -> tuple[dict[int, int], list[int], Stop | None]:
     """Runs the program; returns the words that niceemu dumps, R0-R15, and
     the stop: ("PAUSED", 0) at the step limit, or ("HALTED", reason)."""
-    cmd = [NICEEMU, "--step-time", "-d", "0xFFFFFF80:3", "-d", f"0xFFFF0000:{COLS * ROWS}"]
+    cmd = [NICEEMU, "--step-time", "-d", f"0x{FONT_BASE - 6:X}:7",
+           "-d", f"0xFFFF0000:{COLS * ROWS}", "-d", f"0x{FONT_RAM:X}:{2 * FONT_WORDS}"]
     for d in dumps:
         cmd += ["-d", d]
     if args.input:
@@ -173,9 +183,10 @@ def color(c: int) -> bytes:
 
 
 def draw(rows: list[list[int]], cursor: tuple[int, int, int],
-         font: dict[int, int]) -> list[bytes]:
+         font: list[int], rom: list[int]) -> list[bytes]:
     """Returns the rows of pixels, 3 bytes each, of the rows of words, with
-    the cursor (state, x, y) of the screen's registers drawn on."""
+    the cursor (state, x, y) of the screen's registers drawn on. The
+    screen's rows are drawn in font, and the strip's in rom."""
     state, cx, cy = cursor
     lines: list[bytes] = []
     for y in range(len(rows) * H):
@@ -187,7 +198,7 @@ def draw(rows: list[list[int]], cursor: tuple[int, int, int],
             if (state & 0x40 and (col, row) == (cx, cy)
                     and (not state & 0x10 or r >= H - 4)):
                 fg, bg = bg, fg
-            glyph = font.get((word & 0xFF) * H + r, 0)
+            glyph = (font if row < ROWS else rom)[(word & 0xFF) * H + r]
             for x in range(W):
                 line += fg if glyph >> (W - 1 - x) & 1 else bg
         lines.append(bytes(line))
@@ -229,7 +240,9 @@ def main() -> None:
         mem, regs, stop = run(args, [f"0x{regs[15]:X}:4"])
         rows += strip_rows(regs, stop, mem)
     cursor = (mem[0xFFFFFF80], mem[0xFFFFFF81], mem[0xFFFFFF82])
-    write_png(args.output, draw(rows, cursor, load_font()))
+    rom    = font_at(mem, FONT_ROM)
+    font   = font_at(mem, FONT_RAM) if mem[FONT_BASE] == FONT_RAM else rom
+    write_png(args.output, draw(rows, cursor, font, rom))
 
 
 if __name__ == "__main__":

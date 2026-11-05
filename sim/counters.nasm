@@ -1,7 +1,12 @@
 ; Reads through the core's data bus what the other programs leave to the
 ; debug link: the fetch statistics (MICROARCH.md §8.1), the microsecond
-; counter of SYSTEM.md §3, and the board's registers. It leaves the results
-; in memory at RESULT, where tb_nicemon reads them over the link.
+; counter of SYSTEM.md §3, the board's registers, and the fonts of SYSTEM.md
+; §1.8. It leaves the results in memory at RESULT, where tb_nicemon reads
+; them over the link.
+;
+; It writes a row of the glyph of 0x80 in the font RAM and reads it at once,
+; reads a row of Spleen's A in the character ROM, writes it, which is
+; dropped, and reads it again, and selects the font RAM with the font base.
 ;
 ; A start of the core clears the fetch statistics, and the program stops
 ; them first, so FS_CYCLES holds the few cycles before the stop, and the
@@ -17,6 +22,9 @@ TIME_HI         .EQU    0xFFFFFF45
 BRD_LED         .EQU    0xFFFFFF90
 BRD_BTN         .EQU    0xFFFFFF95
 BRD_SW          .EQU    0xFFFFFF96
+GLYPH           .EQU    0xFFFE1005      ; row 5 of 0x80 in the font RAM
+ROM_A           .EQU    0xFFFE2829      ; row 9 of A in the character ROM
+FONT_BASE       .EQU    0xFFFFFF86
 RESULT          .EQU    0x100
 
                 MOVE    @FS_CTRL, 0     ; stop the fetch statistics
@@ -36,4 +44,11 @@ SUM             ADD     R1, R1, @R2++
                 MOVE    @0x107, @BRD_LED
                 MOVE    @0x108, @BRD_BTN  ; the buttons
                 MOVE    @0x109, @BRD_SW  ; the switches
+                MOVE    @GLYPH, 0xABCD1234  ; bits 31..16 are dropped
+                MOVE    @0x10A, @GLYPH  ; 0x1234
+                MOVE    @0x10B, @ROM_A  ; Spleen's row
+                MOVE    @ROM_A, 0       ; dropped
+                MOVE    @0x10C, @ROM_A  ; Spleen's row still
+                MOVE    @FONT_BASE, 0xFFFE0000  ; the font RAM shown
+                MOVE    @0x10D, @FONT_BASE
                 HALT

@@ -17,7 +17,9 @@
 #                         Nexys4DDR has it, with fifo.nasm and switch.nasm.
 #             tb_text     the text display: two frames of 1280x1024, every
 #                         pixel checked, with the debugger's strip shown in
-#                         the first, and its page over the third.
+#                         the first, and its page over the third, and the
+#                         fonts: the first in the font RAM, the second in
+#                         the character ROM.
 #             tb_dbg      the on-board debugger on the system, with
 #                         dbg.nasm in its ROM: the strip it draws, the
 #                         toggle, and the core's keys.
@@ -75,7 +77,7 @@ SRC_SOURCES  = ../src/uart_serdes.vhd ../src/rx_fifo.vhd ../src/ram.vhd ../src/r
                ../src/board_io.vhd ../src/scr_regs.vhd ../src/sd/sd_spi_byte.vhd ../src/sd/sd_spi.vhd ../src/sd/sd.vhd ../src/devices.vhd ../src/mem.vhd ../src/nicemon.vhd \
                ../src/kbd_m65.vhd ../src/kbd_m65_ascii.vhd ../src/kbd_ps2.vhd ../src/kbd_ps2_ascii.vhd ../src/seg7.vhd ../src/rgb_pwm.vhd \
                ../src/kbd_m65_toggle.vhd ../src/kbd_ps2_toggle.vhd ../src/dbg/dbg_host.vhd ../src/dbg/dbg_decode.vhd ../src/dbg/dbg.vhd \
-               ../src/video/video_pkg.vhd ../src/video/font_pkg.vhd ../src/video/pix.vhd ../src/video/scr_ram.vhd ../src/video/text.vhd \
+               ../src/video/video_pkg.vhd ../src/video/font_pkg.vhd ../src/video/pix.vhd ../src/video/scr_ram.vhd ../src/video/font_ram.vhd ../src/video/font_rom.vhd ../src/video/font.vhd ../src/video/text.vhd \
                ../src/eth/eth_pkg.vhd ../src/eth/rmii_rx.vhd ../src/eth/rx_fcs.vhd ../src/eth/eth_ram.vhd ../src/eth/eth_rx_fifo.vhd \
                ../src/eth/eth_arp.vhd ../src/eth/eth_icmp.vhd ../src/eth/eth_tcp_rx.vhd ../src/eth/eth_tcp_tx.vhd ../src/eth/eth_tcp_timer.vhd ../src/eth/eth_tcp_buf.vhd ../src/eth/eth_tcp_pick.vhd ../src/eth/eth_tcp.vhd ../src/eth/eth_tx_fifo.vhd ../src/eth/eth_arb.vhd ../src/eth/rmii_tx.vhd ../src/eth/eth.vhd \
                ../src/system.vhd

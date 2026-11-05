@@ -40,8 +40,15 @@
 -- through synchronizers of their own: they change rarely, and a frame half
 -- changed does no harm.
 --
--- The characters are 16x32 pixels, from the Spleen font (font_pkg.vhd), with
--- the 256 codes of ISO 8859-1. So the 29 rows are 1280x928 pixels, in the
+-- The characters are 16x32 pixels, from a font of 256 glyphs (font.vhd):
+-- the character ROM, Spleen (font_pkg.vhd) with the codes of ISO 8859-1, or
+-- the font RAM, which a program writes (nice_cpu's doc/SYSTEM.md §1.8).
+-- fnt_ram_i, from the font base of scr_regs.vhd, selects the RAM, and it
+-- crosses to the VGA clock with the cursor's registers. The overlay is
+-- always drawn from the ROM, so that the debugger stays readable whatever a
+-- program did to its font. The bus reads and writes both fonts through
+-- fnt_*_i and fnt_rdata_o, in the system clock domain, as font.vhd says.
+-- So the 29 rows are 1280x928 pixels, in the
 -- middle of the visible area, which is black around them. The program's 25
 -- rows are at their top, in every state of the debugger, so that nothing
 -- moves when the strip appears. The color of a word is
@@ -59,7 +66,8 @@
 --   2: the word of the character, read from the copy of the screen, and the
 --      word of the overlay
 --   3: the row of the glyph, read from the font, for the word shown, and
---      the colors, swapped for the cursor
+--      the colors, swapped for the cursor; the font's address is the code
+--      of stage 2's word and the line
 --   4: the color of the pixel, and the outputs
 -- The sync signals and the visible area go through the same stages, so the
 -- outputs all belong to the same pixel. The outputs are registers, with
@@ -67,7 +75,8 @@
 --
 -- RESET
 -- None. The copy of the screen starts as zeros, as the screen does, the
--- display offset is 0, and the cursor is off. The overlay starts as zeros.
+-- display offset is 0, the cursor is off, and the ROM is shown. The overlay
+-- and the font RAM start as zeros.
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -75,7 +84,6 @@ library ieee;
 
 library work;
    use work.video_pkg.all;
-   use work.font_pkg.all;
 
 entity text is
    generic (
@@ -94,6 +102,14 @@ entity text is
       cur_y_i     : in  std_logic_vector(4 downto 0);
       cur_mode_i  : in  std_logic_vector(2 downto 0);
       offs_i      : in  std_logic_vector(G_SCR_ADDR_BITS - 1 downto 0);
+      -- '1' while the font base selects the font RAM
+      fnt_ram_i   : in  std_logic;
+      -- The bus's port of the fonts (font.vhd), in the system clock domain:
+      -- the offset from 0xFFFE0000, a write, and the word read a cycle later
+      fnt_we_i    : in  std_logic;
+      fnt_addr_i  : in  std_logic_vector(13 downto 0);
+      fnt_wdata_i : in  std_logic_vector(15 downto 0);
+      fnt_rdata_o : out std_logic_vector(15 downto 0);
       -- The debugger's overlay, in the system clock domain
       ovl_we_i    : in  std_logic;
       ovl_addr_i  : in  std_logic_vector(11 downto 0);
@@ -138,6 +154,7 @@ architecture synthesis of text is
    signal cur_y_r    : std_logic_vector(4 downto 0) := (others => '0');
    signal cur_mode_r : std_logic_vector(2 downto 0) := (others => '0');
    signal offs_r     : std_logic_vector(G_SCR_ADDR_BITS - 1 downto 0) := (others => '0');
+   signal fnt_ram_r  : std_logic := '0';
 
    -- The registers as the display uses them, in the VGA clock domain
    signal ctl_req_s    : std_logic_vector(1 downto 0) := "00";
@@ -146,6 +163,7 @@ architecture synthesis of text is
    signal cur_y_vga    : std_logic_vector(4 downto 0) := (others => '0');
    signal cur_mode_vga : std_logic_vector(2 downto 0) := (others => '0');
    signal offs_vga     : std_logic_vector(G_SCR_ADDR_BITS - 1 downto 0) := (others => '0');
+   signal fnt_ram_vga  : std_logic := '0';
 
    -- The overlay's mode bits, synchronized to the VGA clock
    signal strip_s : std_logic_vector(1 downto 0) := "00";
@@ -191,21 +209,18 @@ architecture synthesis of text is
    signal line_2     : std_logic_vector(4 downto 0) := (others => '0');
    signal col_2      : std_logic_vector(3 downto 0) := (others => '0');
 
-   -- Stage 3
-   signal hs_3    : std_logic := not G_MODE.sync_active;
-   signal vs_3    : std_logic := not G_MODE.sync_active;
-   signal vis_3   : std_logic := '0';
-   signal text_3  : std_logic := '0';
-   signal glyph_3 : std_logic_vector(C_CHAR_WIDTH - 1 downto 0) := (others => '0');
-   signal fg_3    : std_logic_vector(11 downto 0) := (others => '0');
-   signal bg_3    : std_logic_vector(11 downto 0) := (others => '0');
-   signal col_3   : std_logic_vector(3 downto 0) := (others => '0');
-
-   -- The font, read into glyph_3, is in block RAM. Without it, Vivado
-   -- (2025.1) makes a ROM of LUTs of it on the Nexys4DDR, about 1100 LUTs
-   -- (issue #70).
-   attribute rom_style : string;
-   attribute rom_style of glyph_3 : signal is "block";
+   -- Stage 3. The font's address and its choice of the RAM are those of
+   -- stage 2, and glyph_3 is the row that font.vhd reads.
+   signal fnt_addr_2 : std_logic_vector(12 downto 0);
+   signal fnt_ram_2  : std_logic;
+   signal hs_3       : std_logic := not G_MODE.sync_active;
+   signal vs_3       : std_logic := not G_MODE.sync_active;
+   signal vis_3      : std_logic := '0';
+   signal text_3     : std_logic := '0';
+   signal glyph_3    : std_logic_vector(C_CHAR_WIDTH - 1 downto 0);
+   signal fg_3       : std_logic_vector(11 downto 0) := (others => '0');
+   signal bg_3       : std_logic_vector(11 downto 0) := (others => '0');
+   signal col_3      : std_logic_vector(3 downto 0) := (others => '0');
 
    -- Stage 4
    signal hs_4    : std_logic := not G_MODE.sync_active;
@@ -265,12 +280,37 @@ begin
 
 
    ---------------------------------------------------------------------------
+   -- The fonts, the RAM and the ROM, read by the bus in the system clock
+   -- domain and by stage 3 in the VGA clock domain. The overlay's
+   -- characters are always the ROM's.
+   ---------------------------------------------------------------------------
+
+   fnt_addr_2 <= ovl_word_2(7 downto 0) & line_2 when ovl_2 = '1' else
+                 word_2(7 downto 0) & line_2;
+   fnt_ram_2  <= fnt_ram_vga and not ovl_2;
+
+   i_font : entity work.font
+      port map (
+         clk_i      => clk_i,
+         we_i       => fnt_we_i,
+         addr_i     => fnt_addr_i,
+         wdata_i    => fnt_wdata_i,
+         rdata_o    => fnt_rdata_o,
+         vga_clk_i  => vga_clk_i,
+         vga_addr_i => fnt_addr_2,
+         vga_ram_i  => fnt_ram_2,
+         vga_row_o  => glyph_3
+      ); -- i_font
+
+
+   ---------------------------------------------------------------------------
    -- The screen's registers, from the system clock to the VGA clock. The
    -- system side holds the values and raises the request; the VGA side
    -- takes them and raises the acknowledge, which the system side waits for
    -- before it lowers the request and takes the next write. It is a
    -- four-phase handshake: req rises, ack rises, req falls, ack falls.
-   -- While req is high, cur_x_r, cur_y_r, cur_mode_r, and offs_r do not
+   -- While req is high, cur_x_r, cur_y_r, cur_mode_r, offs_r, and
+   -- fnt_ram_r do not
    -- change, because they are loaded only when req and the acknowledge
    -- seen by the system side are both low. So the VGA side reads them
    -- stable, and only the two request and acknowledge bits are
@@ -288,6 +328,7 @@ begin
             cur_y_r    <= cur_y_i;
             cur_mode_r <= cur_mode_i;
             offs_r     <= offs_i;
+            fnt_ram_r  <= fnt_ram_i;
          elsif ctl_req = '1' and ctl_ack_s(1) = '1' then
             ctl_req <= '0';
          end if;
@@ -306,6 +347,7 @@ begin
             cur_y_vga    <= cur_y_r;
             cur_mode_vga <= cur_mode_r;
             offs_vga     <= offs_r;
+            fnt_ram_vga  <= fnt_ram_r;
             ctl_ack      <= '1';
          elsif ctl_req_s(1) = '0' then
             ctl_ack <= '0';
@@ -406,12 +448,12 @@ begin
          line_2 <= line_1;
          col_2  <= col_1;
 
-         -- Stage 3. The cursor swaps the colors of its character.
+         -- Stage 3. glyph_3 is read by i_font. The cursor swaps the colors
+         -- of its character.
          word_v := word_2;
          if ovl_2 = '1' then
             word_v := ovl_word_2;
          end if;
-         glyph_3 <= C_FONT(to_integer(word_v(7 downto 0) & line_2));
          fg_v   := word_v(19 downto 8);
          bg_v   := word_v(31 downto 20);
          show_v := '0';

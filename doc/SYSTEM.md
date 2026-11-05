@@ -116,6 +116,8 @@ effect and does not write (DEBUG.md §3).
 |---|---|
 | `0x00000000`–`0xFFFFFFFF` | Memory, where no register below is: block RAM, 128K words on the MEGA65 and 64K on the Nexys4DDR, repeated through the address space. `0xFFFFFF9E` reads the number of words. So the runtime's stack below `0xFFFFFF00` lands in the top of it, and so do the words of `0xFFFFFF00`–`FF` that are not registers. |
 | `0x00000000`–`0x00007FFF` | The ROM, in a bitstream built with one, in front of the RAM and repeating with it (see [The ROM](#the-rom)). Bit 3 of the control register hides it. |
+| `0xFFFE0000`–`0xFFFE1FFF` | The font RAM of nice_cpu's SYSTEM.md §1.8: 256 glyphs of 32 rows, one word a row, read and written, with bits 31..16 reading 0. It is 0 at power-up and after a clear, and a start keeps it (see [The font](#the-font)). |
+| `0xFFFE2000`–`0xFFFE3FFF` | The character ROM: Spleen, in the layout of the font RAM. A write is dropped. |
 | `0xFFFF0000`–`0xFFFF7FFF` | The screen: 32768 words of memory of their own, the emulator's 80×25 screen and room for scrolling. The 2000 words from the display offset are shown on VGA and HDMI, or VGA only on the Nexys4DDR (see [The screen](#the-screen)), and the link reads them all. |
 | `0xFFFF8000`–`0xFFFFFEFF` | RAM, between the screen and the I/O page: the RAM words `0x18000`–`0x1FEFF` on the MEGA65, as the 128K words repeat. On the Nexys4DDR, whose screen is 8192 words, it starts lower: `0xFFFF2000`–`0xFFFFFEFF` are the words `0x2000`–`0xFEFF` of its 64K. The runtime's stack starts at `0xFFFFFF00` and grows down into it, and so does the stack of a program in the ROM. The monitor's variables are at `0xFFFFF000` and up, the RAM words `0x1F000` and up on the MEGA65 and `0xF000` on the Nexys4DDR, and its stack, which the programs at `0x8000` share, grows down from there. In the emulator it is ordinary memory. |
 | `0xFFFFFF00` | The console of nice_cpu's SYSTEM.md §1. A write sends bits 7..0 to the UART. A read takes the oldest byte received from the UART or the keyboard, and returns it in bits 7..0 with bit 8 set, or 0 when no byte has arrived. A break on the UART, or a host's half-close over Ethernet, ends the line's input until the core is started again or a host connects over Ethernet (see [The debug link over TCP](#the-debug-link-over-tcp)): the host's bytes after it are dropped, and once the bytes before it are read, a read returns `0x200` (bit 9), as at the end of the emulator's input. The keyboard's bytes still come, and a read returns them (nice_cpu's SYSTEM.md §6). |
@@ -144,7 +146,7 @@ effect and does not write (DEBUG.md §3).
 |---|---|---|
 | 0 | Hold | 1 holds the core in reset. A write of 0 starts it. |
 | 1 | Halted | Read only. 1 after a halt, and stays 1 while the core is held in reset, until the next start or clear. |
-| 2 | Clear | A write with bit 2 set first clears the RAM and the screen to 0, with the core held, and is answered when the memory is clear, after 1.3 ms on the MEGA65 and 0.73 ms on the Nexys4DDR. Bit 3 takes effect when the clear starts, and bit 0 when it ends. |
+| 2 | Clear | A write with bit 2 set first clears the RAM, the screen, and the font RAM to 0, with the core held, and is answered when the memory is clear, after 1.3 ms on the MEGA65 and 0.73 ms on the Nexys4DDR. Bit 3 takes effect when the clear starts, and bit 0 when it ends. |
 | 3 | Hide | 1 hides the ROM, so that the RAM is at 0. Reset clears it in a bitstream with a ROM; in one without a ROM it reads 1. |
 | 4 | Pause | A write of 1 pauses the core at the next step boundary, and the link sends `p`. It reads 1 while the core is paused, and a write of 0 makes the program go on. A start with bit 4 set pauses before the first instruction. |
 | 5 | Step | A write with bits 4 and 5 set to a paused core runs one step, and the link sends `p` again, or `h`. It reads 0. |
@@ -224,14 +226,14 @@ QNICE-FPGA, at `0xFF30` there:
 | `0xFFFFFF81` | The cursor's column, 0 to 79. |
 | `0xFFFFFF82` | The cursor's row, 0 to 24. |
 | `0xFFFFFF85` | The display offset, in words, 0 to 32767 (8191 on the Nexys4DDR). It takes effect when bit 10 of the state is set. |
+| `0xFFFFFF86` | The font base of nice_cpu's SYSTEM.md §1.8, all 32 bits kept and read back: `0xFFFE0000` shows the font RAM, and 0 shows the character ROM, as do the other values, which are reserved (see [The font](#the-font)). |
 
-The words `0xFFFFFF83`, `84`, and `86`–`8F` read 0 and take no write.
-`0xFFFFFF86` is the emulator's font base (nice_cpu's SYSTEM.md §1.8),
-which the boards do not have yet (#71). In
+The words `0xFFFFFF83`, `84`, and `87`–`8F` read 0 and take no write. In
 the emulator these addresses are memory, so a program that writes them runs
 there too, without scrolling. Reset, and the clear of the memory (bit 2 of
-the control register, which `load.py` and `run.py` set), set the offset to
-0 and turn the cursor off, as at the start of the emulator. From
+the control register, which `load.py` and `run.py` set), set the offset and
+the font base to 0 and turn the cursor off, as at the start of the
+emulator. From
 nice_cpu V1.2 on, `niceemu --window` draws the same cursor from these
 words, as nice_cpu's SYSTEM.md §1 says, but has no display offset.
 A column or row out of range shows no cursor there, where here only
@@ -240,6 +242,44 @@ bits 6..0 of the column and 4..0 of the row are kept.
 A write of `0x000FFF41` to `0xFFFF0000` puts an `A` in the top left
 corner, white on black, and one of `0xF00FFF42` to `0xFFFF0001` a white `B`
 on red next to it.
+
+### The font
+
+The characters are drawn from one of two fonts of 256 glyphs, as in
+nice_cpu's SYSTEM.md §1.8 and `niceemu --window`. The character ROM at
+`0xFFFE2000` holds [Spleen](https://github.com/fcambus/spleen) 16×32 with
+the codes of ISO 8859-1, where `0x00`–`0x1F` and `0x7F`–`0x9F` are blank.
+The font RAM at `0xFFFE0000` holds what a program writes. In both, the
+word at the font's address + `32 * c + r` is row `r` of the glyph of code
+`c`, row 0 at the top, and its bits 15..0 are the 16 pixels, the leftmost
+in bit 15. A set bit is drawn in the foreground color, and a clear bit in
+the background color.
+
+The font base at `0xFFFFFF86` selects the font shown: 0, after reset and
+a clear, shows Spleen, and `0xFFFE0000` the font RAM. A write to a glyph
+shows in the next frame in every cell with its code while the RAM is
+selected, and a write to the base changes the whole screen at once. The
+debugger's strip and page are always drawn in Spleen.
+
+A program that wants Spleen's letters and a few symbols of its own copies
+the ROM into the RAM, 8192 words, changes the glyphs it wants, and writes
+`0xFFFE0000` to the base:
+
+                    MOVE    R1, 0xFFFE2000  ; the character ROM
+                    MOVE    R2, 0xFFFE0000  ; the font RAM
+                    MOVE    R3, 8192
+    COPY            MOVE    @R2++, @R1++
+                    SUB[M]  R3, R3, 1
+            ?!Z     JMP     COPY
+                    MOVE    @0xFFFFFF86, 0xFFFE0000  ; show the font RAM
+
+The monitor writes 0 to the base at its start and when a program returns
+to it, so its text is in Spleen whatever the program did, and the
+program's font stays in the RAM. The font RAM is 0 at power-up and after
+a clear, and a start keeps it, as it keeps the screen. An instruction
+fetch in `0xFFFE0000`–`0xFFFE3FFF` reads the RAM there, which these
+words alias, and not the fonts, so a program does not run from its font
+(nice_cpu's SYSTEM.md §5, and [EMULATOR.md](EMULATOR.md)).
 
 The video output comes from MandelbrotMEGA65, which uses the same mode on
 the MEGA65. The HDMI output is DVI, without sound.

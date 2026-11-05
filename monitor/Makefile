@@ -138,7 +138,9 @@ LOAD_64K = l\rEFFF 1\rF000 2\r1EFFF 3\r\rd EFFF 1\rh\r
 
 # The words of each test that are dumped with the screen: for cmds the
 # variables, the cursor's registers, and the IP and MAC addresses, and for the programs the text at
-# column 40 of row 4, 80 * 4 + 40 = 360 = 0x168, with its color.
+# column 40 of row 4, 80 * 4 + 40 = 360 = 0x168, with its color, and for
+# hello the 0x80 after it, the font base, which the return made 0, and the
+# row of the glyph of 0x80 that hello drew.
 DUMP_cmds    = -d 0xFFFFF000:5 -d 0xFFFFFF80:6 -d 0xFFFFFF9A:3
 # For scroll the variables and the screen's registers, and the last four
 # digits of the address that starts a row of the history (the words 4 to
@@ -148,7 +150,7 @@ DUMP_cmds    = -d 0xFFFFF000:5 -d 0xFFFFFF80:6 -d 0xFFFFFF9A:3
 # 379.
 DUMP_scroll  = -d 0xFFFFF000:11 -d 0xFFFFFF80:6 -d 0xFFFF7FB4:4 -d 0xFFFF7F64:4 \
                -d 0xFFFF0804:4 -d 0xFFFF0944:4
-DUMP_hello   = -d 0xFFFF0168:12
+DUMP_hello   = -d 0xFFFF0168:13 -d 0xFFFFFF86:1 -d 0xFFFE1000:1
 DUMP_load    = -d 0xFFFFF000:15
 DUMP_load_emu = -d 0xFFFFF00E:1 -d 0xFFFEFFFF:1
 DUMP_load_64k = -d 0xFFFFF00E:1

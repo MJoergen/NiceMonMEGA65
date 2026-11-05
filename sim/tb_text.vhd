@@ -8,22 +8,26 @@
 -- fills the debugger's overlay: the page, rows 0 to 24, with the 256 codes
 -- in other colors, the strip, rows 25 to 28, with text, and the words after
 -- them, which must not show. It keeps a model of the screen and of the
--- overlay.
+-- overlay. It writes the font RAM through the bus's port, Spleen with the
+-- 64 blank codes 0x00-0x1F and 0x80-0x9F drawn as boxes, which it keeps in
+-- a model too, and reads back a word of the RAM and of the ROM, which drops
+-- a write.
 --
 -- The VGA clock starts when p_write is done, so the first frame shows all
--- the writes. p_check checks that whole frame in the VGA clock
+-- the writes. p_check selects the font RAM, and checks that whole frame in the VGA clock
 -- domain: the number of visible pixels in each line and of visible lines,
 -- the widths of the sync pulses, and the color of every visible pixel, as
--- the models and the font (font_pkg.vhd) give it: the program's 25 rows
--- from line 48, and the strip under them. With G_PPM_FILE it also writes
--- the frame as a PPM picture. Then, in the vertical blanking after that
--- frame, it hides the strip, sets the display offset to one row, and puts
--- the cursor on row 3, and checks the whole next frame: the rows show the
--- words from 80, the cursor swaps the colors of its character, and the
--- strip's rows are black. Then it shows the page and the strip, and checks
--- the first four rows of text of the third frame: they show the page, with
--- no cursor. It stops there, for each frame takes about half a minute to
--- simulate.
+-- the models and the fonts give it: the program's 25 rows from line 48, in
+-- the font RAM, and the strip under them, in the ROM (font_pkg.vhd). With
+-- G_PPM_FILE it also writes the frame as a PPM picture. Then, in the
+-- vertical blanking after that frame, it hides the strip, sets the display
+-- offset to one row, puts the cursor on row 3, and selects the ROM, and
+-- checks the whole next frame: the rows show the words from 80 in Spleen,
+-- the cursor swaps the colors of its character, and the strip's rows are
+-- black. Then it shows the page and the strip, and selects the font RAM
+-- again, and checks the first four rows of text of the third frame: they
+-- show the page, in the ROM, with no cursor. It stops there, for each
+-- frame takes about half a minute to simulate.
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -64,6 +68,13 @@ architecture simulation of tb_text is
    signal cur_y    : std_logic_vector(4 downto 0) := (others => '0');
    signal cur_mode : std_logic_vector(2 downto 0) := (others => '0');
    signal offs     : std_logic_vector(C_SCR_BITS - 1 downto 0) := (others => '0');
+   signal fnt_ram  : std_logic := '0';
+
+   signal fnt_we    : std_logic := '0';
+   signal fnt_addr  : std_logic_vector(13 downto 0) := (others => '0');
+   signal fnt_wdata : std_logic_vector(15 downto 0) := (others => '0');
+   signal fnt_rdata : std_logic_vector(15 downto 0);
+   signal fnt_model : t_font := (others => (others => '0'));
 
    signal ovl_we    : std_logic := '0';
    signal ovl_addr  : std_logic_vector(11 downto 0);
@@ -82,9 +93,12 @@ architecture simulation of tb_text is
    -- The color (RGB, 8 bits each) that the pixel (x, y) of the visible area
    -- must have, with the display offset disp and, when cursor is true, the
    -- cursor at (cx, cy), and with the strip and the page of the overlay
-   -- shown when shown and paged are true
+   -- shown when shown and paged are true, and the program's rows in the font
+   -- RAM fnt when ram is true
    function expected(scr    : t_scr;
                      ovl    : t_ovl;
+                     fnt    : t_font;
+                     ram    : boolean;
                      x, y   : natural;
                      disp   : natural;
                      cursor : boolean;
@@ -115,7 +129,12 @@ architecture simulation of tb_text is
       else
          word := scr((disp + row * 80 + col) mod 2 ** C_SCR_BITS);
       end if;
-      glyph := C_FONT(to_integer(word(7 downto 0)) * 32 + (y - C_Y0) mod 32);
+      -- The overlay is always in the ROM
+      if ram and row < 25 and not paged then
+         glyph := fnt(to_integer(word(7 downto 0)) * 32 + (y - C_Y0) mod 32);
+      else
+         glyph := C_FONT(to_integer(word(7 downto 0)) * 32 + (y - C_Y0) mod 32);
+      end if;
       fg    := word(19 downto 8);
       bg    := word(31 downto 20);
       if cursor and row = cy and col = cx and row < 25 and not paged then
@@ -155,6 +174,11 @@ begin
          cur_y_i     => cur_y,
          cur_mode_i  => cur_mode,
          offs_i      => offs,
+         fnt_ram_i   => fnt_ram,
+         fnt_we_i    => fnt_we,
+         fnt_addr_i  => fnt_addr,
+         fnt_wdata_i => fnt_wdata,
+         fnt_rdata_o => fnt_rdata,
          ovl_we_i    => ovl_we,
          ovl_addr_i  => ovl_addr,
          ovl_data_i  => ovl_data,
@@ -204,9 +228,57 @@ begin
          end loop;
       end procedure print_ovl;
 
+      -- A word of the fonts, from the offset of 0xFFFE0000
+      procedure put_fnt(addr : natural; data : std_logic_vector(15 downto 0)) is
+      begin
+         fnt_we    <= '1';
+         fnt_addr  <= to_slv(addr, 14);
+         fnt_wdata <= data;
+         if addr < 8192 then
+            fnt_model(addr) <= data;
+         end if;
+         wait until rising_edge(clk);
+         fnt_we <= '0';
+      end procedure put_fnt;
+
+      -- Reads the word at the offset addr, and checks it
+      procedure check_fnt(addr : natural; data : std_logic_vector(15 downto 0)) is
+      begin
+         fnt_addr <= to_slv(addr, 14);
+         wait until rising_edge(clk);
+         wait until rising_edge(clk);
+         assert fnt_rdata = data
+            report "The font's word " & to_hstring(to_slv(addr, 14)) & " is " &
+                   to_hstring(fnt_rdata) & ", not " & to_hstring(data)
+            severity failure;
+      end procedure check_fnt;
+
       variable color_v : std_logic_vector(23 downto 0);
+      variable code_v  : natural;
+      variable row_v   : std_logic_vector(15 downto 0);
    begin
       wait until rising_edge(clk);
+      -- The font RAM: Spleen, with the 64 blank codes as boxes that hold
+      -- their code twice in the middle rows
+      for i in 0 to 8191 loop
+         code_v := i / 32;
+         row_v  := C_FONT(i);
+         if code_v < 16#20# or (code_v >= 16#80# and code_v < 16#A0#) then
+            row_v := X"8001";
+            if i mod 32 = 0 or i mod 32 = 31 then
+               row_v := X"FFFF";
+            elsif i mod 32 >= 8 and i mod 32 < 24 then
+               row_v := to_slv(code_v, 8) & to_slv(code_v, 8);
+            end if;
+         end if;
+         put_fnt(i, row_v);
+      end loop;
+      -- The words read back, and a write to the ROM is dropped
+      put_fnt(8192 + 16#41# * 32 + 9, X"5A5A");
+      check_fnt(8192 + 16#41# * 32 + 9, C_FONT(16#41# * 32 + 9));
+      check_fnt(16#41# * 32 + 9, C_FONT(16#41# * 32 + 9));
+      check_fnt(16#80# * 32, X"FFFF");
+      check_fnt(16#9F# * 32 + 12, X"9F9F");
       print(0, "NiceMon on the MEGA65: 80x25 characters, white on black.", X"000FFF");
       print(80, "Blue on orange, as in print.nasm", X"F8000F");
       -- The last column of a row, and the last word of the screen
@@ -249,7 +321,7 @@ begin
       -- Checks the first n_lines lines of the frame that starts now, with
       -- the display offset disp and, when cursor is true, the cursor at (cx,
       -- cy), and the strip and the page shown when strip_on and page_on are
-      -- true. With all the visible lines it also checks the vertical sync
+      -- true, and the font RAM selected when ram_on is true. With all the visible lines it also checks the vertical sync
       -- pulse after them, and returns at its end. The picture goes to the
       -- PPM file when ppm_out is true.
       procedure check_frame(n_lines  : natural;
@@ -258,6 +330,7 @@ begin
                             cx, cy   : natural;
                             strip_on : boolean;
                             page_on  : boolean;
+                            ram_on   : boolean;
                             ppm_out  : boolean) is
          variable x, y   : natural;
          variable rgb    : std_logic_vector(23 downto 0);
@@ -272,7 +345,8 @@ begin
             wait until rising_edge(vga_clk) and de = '1';
             while de = '1' loop
                rgb    := red & green & blue;
-               want_v := expected(model, ovl_model, x, y, disp, cursor, cx, cy, strip_on, page_on);
+               want_v := expected(model, ovl_model, fnt_model, ram_on, x, y, disp, cursor, cx, cy,
+                                  strip_on, page_on);
                if y < n_lines and rgb /= want_v then
                   errors := errors + 1;
                   if errors <= 10 then
@@ -329,21 +403,26 @@ begin
 
    begin
       wait until written;
-      -- The strip crosses to the VGA clock long before its first row.
-      strip <= '1';
+      -- The strip, and the font RAM selected, cross to the VGA clock long
+      -- before the first row.
+      strip   <= '1';
+      fnt_ram <= '1';
+      ctl_we  <= '1';
+      wait until rising_edge(clk);
+      ctl_we <= '0';
 
       if G_PPM_FILE /= "" then
          file_open(ppm, G_PPM_FILE, write_mode);
          write(l, string'("P3 1280 1024 255"));
          writeline(ppm, l);
       end if;
-      check_frame(C_MODE.v_visible, 0, false, 0, 0, true, false, G_PPM_FILE /= "");
+      check_frame(C_MODE.v_visible, 0, false, 0, 0, true, false, true, G_PPM_FILE /= "");
       if G_PPM_FILE /= "" then
          file_close(ppm);
       end if;
 
       -- The registers: scrolled one row, with the cursor shown on row 3,
-      -- and the strip hidden. They cross to the VGA clock in a few cycles,
+      -- the ROM selected, and the strip hidden. They cross to the VGA clock in a few cycles,
       -- well within the back porch of 38 lines, so the next frame shows
       -- them.
       wait until rising_edge(clk);
@@ -351,18 +430,24 @@ begin
       cur_x    <= to_slv(5, 7);
       cur_y    <= to_slv(3, 5);
       cur_mode <= "001";
+      fnt_ram  <= '0';
       ctl_we   <= '1';
       strip    <= '0';
       wait until rising_edge(clk);
       ctl_we <= '0';
-      check_frame(C_MODE.v_visible, 80, true, 5, 3, false, false, false);
+      check_frame(C_MODE.v_visible, 80, true, 5, 3, false, false, false, false);
 
-      -- The page over the program's rows, which hides the cursor. The first
-      -- four rows of text start 48 lines down.
+      -- The page over the program's rows, which hides the cursor, in the
+      -- ROM while the font RAM is selected. The first four rows of text
+      -- start 48 lines down.
       wait until rising_edge(clk);
-      strip <= '1';
-      page  <= '1';
-      check_frame(48 + 4 * 32, 80, true, 5, 3, true, true, false);
+      strip   <= '1';
+      page    <= '1';
+      fnt_ram <= '1';
+      ctl_we  <= '1';
+      wait until rising_edge(clk);
+      ctl_we <= '0';
+      check_frame(48 + 4 * 32, 80, true, 5, 3, true, true, true, false);
 
       running <= false;
       wait;

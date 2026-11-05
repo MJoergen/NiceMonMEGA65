@@ -57,6 +57,10 @@ Checks, in this order:
     - what sim/emu.nasm leaves after its halt is read back, and the cycle
       counter and the timer stop there
     - the screen's registers are written and read
+    - the fonts (doc/SYSTEM.md, The font): the character ROM holds
+      Spleen's A and drops a write, the font RAM keeps bits 15..0 of the
+      words of a glyph and leaves the RAM it aliases, the font base is
+      kept, and a clear makes the font RAM and the base 0
     - the board's devices are written and read: on the Nexys4DDR the LEDs,
       RGB LEDs, and seven-segment display, and the buttons and switches,
       which only a read can check; on the MEGA65 the block reads 0
@@ -931,6 +935,56 @@ def test_screen_registers(link: Link) -> None:
     check("the display offset off again", wr(link, 0xFFFFFF85, 0))
 
 
+# The fonts of nice_cpu's SYSTEM.md section 1.8
+FONT_RAM  = 0xFFFE0000
+FONT_ROM  = 0xFFFE2000
+FONT_BASE = 0xFFFFFF86
+
+
+def spleen(code: int) -> list[int]:
+    """The 32 rows of the glyph of code in src/video/font_pkg.vhd, which
+    lists the rows that are not 0."""
+    rows = {int(m.group(1)): int(m.group(2), 2) for m in re.finditer(
+        r'(\d+) => "([01]{16})"', open(f"{REPO}/src/video/font_pkg.vhd").read())}
+    return [rows.get(32 * code + r, 0) for r in range(32)]
+
+
+def test_fonts(link: Link) -> None:
+    """The character ROM, the font RAM, and the font base. The display
+    shows the glyph of 0x80 in the font RAM until the clear at the end."""
+    a = spleen(0x41)
+    rows = link.read(FONT_ROM + 32 * 0x41, 32)
+    check("the character ROM holds Spleen's A", rows == a,
+          " ".join(f"{w:04X}" for w in rows))
+    row9 = FONT_ROM + 32 * 0x41 + 9
+    check("W to the character ROM", wr(link, row9, 0))
+    got = rd(link, row9)
+    check("the character ROM drops a write", got == a[9], f"{got:08X}")
+    # 0xFFFE1000, the glyph of 0x80, aliases the RAM word 0x1000 on both
+    # boards
+    alias = 0x5AA5C33C
+    check("W of the RAM that the font RAM aliases", wr(link, 0x1000, alias))
+    glyph = [0xA5000000 | r * 0x0421 for r in range(32)]
+    check("W of a glyph to the font RAM", wr_words(link, FONT_RAM + 32 * 0x80, glyph))
+    rows = link.read(FONT_RAM + 32 * 0x80, 32)
+    check("the font RAM keeps bits 15..0", rows == [w & 0xFFFF for w in glyph],
+          " ".join(f"{w:08X}" for w in rows))
+    got = rd(link, 0x1000)
+    check("the font RAM leaves the RAM it aliases", got == alias,
+          f"{got:08X}")
+    check("W of the font base", wr(link, FONT_BASE, FONT_RAM))
+    got = rd(link, FONT_BASE)
+    check("the font base is kept", got == FONT_RAM, f"{got:08X}")
+    link.control(HOLD | 4 | RAM)
+    rows = link.read(FONT_RAM + 32 * 0x80, 32)
+    check("the clear zeros the font RAM", rows == [0] * 32,
+          " ".join(f"{w:04X}" for w in rows))
+    got = rd(link, FONT_BASE)
+    check("the clear zeros the font base", got == 0, f"{got:08X}")
+    got = rd(link, row9)
+    check("the clear keeps the character ROM", got == a[9], f"{got:08X}")
+
+
 def test_board_devices(link: Link, board: str) -> None:
     """On the Nexys4DDR, writes the LEDs, the RGB LEDs, and the display's
     segments at FFFFFF90-94 and reads them back. The LEDs, the RGB LEDs, and
@@ -1618,6 +1672,7 @@ def main() -> None:
                 test_readback(link, emu)
                 test_counters_stop(link)
                 test_screen_registers(link)
+                test_fonts(link)
                 test_board_devices(link, board)
                 test_sd(link, board)
                 test_fetch_statistics(link)

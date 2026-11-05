@@ -85,7 +85,7 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
 | [nice_cpu/](https://github.com/MJoergen/nice_cpu) | The NICE CPU, its assembler, its emulator, and `nicewasm`, a [translator](https://github.com/MJoergen/nice_cpu/tree/main/translator) from WebAssembly to NICE assembly, as a git submodule. |
 | [src/](src/) | The synthesizable VHDL, shared by both boards (see [What is in src/](#what-is-in-src)). |
 | [src/core/](src/core/) | `nice_core_pipeline.vhd` and `nice_core_multi.vhd`, the two architectures of `nice_core`. `src/nice_core.vhd` is the entity that wraps whichever of nice_cpu's cores `core.mk` selects with `NICE=pipeline` (the default) or `NICE=multi`. |
-| [src/video/](src/video/) | The text display: `text.vhd` shows the screen at `0xFFFF0000` as 80×25 characters on a video output, with a cursor and a display offset for scrolling. `pix.vhd` and `video_pkg.vhd` are from [MandelbrotMEGA65](https://github.com/MJoergen/MandelbrotMEGA65). `scr_ram.vhd` is the screen's dual-clock memory. `font_pkg.vhd` is the [Spleen](https://github.com/fcambus/spleen) 16×32 font, made by `font/gen_font_pkg.py`. |
+| [src/video/](src/video/) | The text display: `text.vhd` shows the screen at `0xFFFF0000` as 80×25 characters on a video output, with a cursor and a display offset for scrolling. `pix.vhd` and `video_pkg.vhd` are from [MandelbrotMEGA65](https://github.com/MJoergen/MandelbrotMEGA65). `scr_ram.vhd` is the screen's dual-clock memory. `font.vhd` holds the fonts at `0xFFFE0000`–`3FFF`, the font RAM (`font_ram.vhd`) and the character ROM (`font_rom.vhd`), each a memory of two clocks. `font_pkg.vhd` is the [Spleen](https://github.com/fcambus/spleen) 16×32 font of the ROM, made by `font/gen_font_pkg.py`. |
 | [font/](font/) | The script that makes `src/video/font_pkg.vhd` from Spleen, and Spleen's license (BSD 2-Clause). |
 | [sim/](sim/) | The GHDL testbenches. `text_synth.vhd` is the wrapper with which GHDL checks that the display synthesizes. |
 | [formal/](formal/) | The formal checks, for SymbiYosys. |
@@ -183,12 +183,14 @@ The testbenches are these:
   which reads no input until switch 0 is on, lets the UART fill the
   core's input. Then one key waits, the keys typed after it are lost,
   and the keyboard works again once the program reads.
-- `sim/tb_text.vhd` fills the screen of the text display and the
-  debugger's overlay, and checks every pixel of one 1280×1024 frame with
-  the strip shown, and the sync pulses; then it hides the strip, scrolls
-  the display one row, shows the cursor, and checks every pixel of the
-  next frame; then it shows the page, and checks the first four rows of
-  the third. It takes about a minute and a half, the longest of the
+- `sim/tb_text.vhd` fills the screen of the text display, the
+  debugger's overlay, and the font RAM, with boxes for the codes that are
+  blank in Spleen, reads the fonts back, and checks every pixel of one
+  1280×1024 frame in the font RAM with the strip shown, in Spleen, and
+  the sync pulses; then it hides the strip, scrolls the display one row,
+  shows the cursor, selects Spleen, and checks every pixel of the next
+  frame; then it shows the page over the font RAM, which is in Spleen,
+  and checks the first four rows of the third. It takes about a minute and a half, the longest of the
   tests.
 - `sim/tb_dbg.vhd` tests the on-board debugger on the system, with
   `sim/dbg.nasm` in the ROM, a count to 0x800 and a halt. The strip

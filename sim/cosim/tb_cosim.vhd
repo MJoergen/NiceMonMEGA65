@@ -12,6 +12,7 @@
 -- p_from_board decodes the UART output and hands each byte to cosim.c.
 --
 -- The system has the board's sizes, and no ROM unless G_ROM_FILE is given.
+-- It has the fonts of the display (src/video/font.vhd), with no display.
 -- The clock is 10 MHz and the UART runs at 1 Mbaud, 10 cycles per bit, so
 -- that the bytes come as quickly as the UART takes them. The simulation
 -- runs far slower than real time, but the host's bytes arrive back to
@@ -71,6 +72,13 @@ architecture simulation of tb_cosim is
    signal uart_tx : std_logic;
    signal opened  : boolean   := false;
 
+   -- The fonts, as the display holds them (src/video/font.vhd), so that a
+   -- program reads and writes them as on the boards
+   signal fnt_we    : std_logic;
+   signal fnt_addr  : std_logic_vector(13 downto 0);
+   signal fnt_wdata : std_logic_vector(15 downto 0);
+   signal fnt_rdata : std_logic_vector(15 downto 0);
+
 begin
 
    p_clk : process
@@ -117,8 +125,25 @@ begin
          brd_led_o      => open,
          brd_rgb0_o     => open,
          brd_rgb1_o     => open,
-         brd_seg_o      => open
+         brd_seg_o      => open,
+         fnt_we_o       => fnt_we,
+         fnt_addr_o     => fnt_addr,
+         fnt_wdata_o    => fnt_wdata,
+         fnt_rdata_i    => fnt_rdata
       ); -- i_nicemon
+
+   i_font : entity work.font
+      port map (
+         clk_i      => clk,
+         we_i       => fnt_we,
+         addr_i     => fnt_addr,
+         wdata_i    => fnt_wdata,
+         rdata_o    => fnt_rdata,
+         vga_clk_i  => clk,
+         vga_addr_i => (others => '0'),
+         vga_ram_i  => '0',
+         vga_row_o  => open
+      ); -- i_font
 
 
    p_to_board : process

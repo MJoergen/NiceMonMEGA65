@@ -23,6 +23,11 @@ entity text_synth is
       cur_y_i     : in  std_logic_vector(4 downto 0);
       cur_mode_i  : in  std_logic_vector(2 downto 0);
       offs_i      : in  std_logic_vector(G_SCR_ADDR_BITS - 1 downto 0);
+      fnt_ram_i   : in  std_logic;
+      fnt_we_i    : in  std_logic;
+      fnt_addr_i  : in  std_logic_vector(13 downto 0);
+      fnt_wdata_i : in  std_logic_vector(15 downto 0);
+      fnt_rdata_o : out std_logic_vector(15 downto 0);
       ovl_we_i    : in  std_logic;
       ovl_addr_i  : in  std_logic_vector(11 downto 0);
       ovl_data_i  : in  std_logic_vector(31 downto 0);
@@ -57,6 +62,11 @@ begin
          cur_y_i     => cur_y_i,
          cur_mode_i  => cur_mode_i,
          offs_i      => offs_i,
+         fnt_ram_i   => fnt_ram_i,
+         fnt_we_i    => fnt_we_i,
+         fnt_addr_i  => fnt_addr_i,
+         fnt_wdata_i => fnt_wdata_i,
+         fnt_rdata_o => fnt_rdata_o,
          ovl_we_i    => ovl_we_i,
          ovl_addr_i  => ovl_addr_i,
          ovl_data_i  => ovl_data_i,
