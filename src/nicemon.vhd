@@ -103,7 +103,7 @@
 --                          bytes after the break are dropped, and once the
 --                          FIFO is empty a read returns 0x200 (bit 9). The
 --                          keyboard's bytes still go into the FIFO, and a
---                          read returns them (SYSTEM.md §6). A read by the
+--                          read returns them (SYSTEM.md §8). A read by the
 --                          link returns 0 and takes nothing, and a write by
 --                          the link is dropped.
 --   0xFFFFFF01             The read counter of the emulator: a read by the
@@ -146,12 +146,12 @@
 --                          for a cycle when one is written, and when they
 --                          are cleared by reset or by the clear of the memory.
 --   0xFFFFFF90-0xFFFFFF9F  The board's devices (src/board_io.vhd): 90-96
---                          with G_BOARD_IO (the Nexys4DDR), and 98-9F on every
+--                          with G_BOARD_IO (the Nexys4DDR), and 9E-9F on every
 --                          board. Without G_BOARD_IO, and in the words that
 --                          are not registers, a read returns 0 and a write
 --                          is dropped. Reset clears the writable ones, or
---                          sets them as 9A-9C and 9F say; a start of the
---                          core does not.
+--                          sets them as 9F says; a start of the core does
+--                          not.
 --     90  The 16 LEDs, bit n for LED n. Read and write.
 --     91  RGB LED 0: bits 11..8 red, 7..4 green, 3..0 blue, each a level
 --         of 0 to 15. Read and write.
@@ -163,18 +163,6 @@
 --     95  The five buttons, bit 0 for the center one, then up, left, right,
 --         and down. Read only, synchronized to the clock.
 --     96  The 16 switches, bit n for switch n. Read only, synchronized.
---     98  The good Ethernet frames received, eth_rx_i, a count that wraps
---         (system.vhd). Read only.
---     99  The bad or dropped Ethernet frames, eth_rx_bad_i, as 98.
---     9A  The Ethernet station's IP address, eth_ip_o, the first byte sent
---         in bits 31..24: 0xC0A80141 is 192.168.1.65. G_ETH_IP after
---         reset; 0 answers nothing. Read and write.
---     9B  The first two bytes of its MAC address, eth_mac_o(47 downto 32),
---         in bits 15..0. Read and write.
---     9C  The last four bytes of its MAC address, eth_mac_o(31 downto 0).
---         G_ETH_MAC after reset, 02:4E:49:43:45:00 by default. Read and
---         write.
---     9D  The Ethernet frames sent, eth_tx_i, as 98.
 --     9E  The words of the RAM, 2^G_RAM_ADDR_BITS: 0x20000 on the MEGA65
 --         and 0x10000 on the Nexys4DDR. Read only. In niceemu it is plain
 --         memory, which reads 0 after the clear, and 0 means no limit.
@@ -194,7 +182,21 @@
 --                          runs while the core is held, paused, or halted,
 --                          so the link reaches it then. With G_SD_SLOTS =
 --                          0 there is no controller, and the words are
---                          memory (nice_cpu's SYSTEM.md §6).
+--                          memory (nice_cpu's SYSTEM.md §8).
+--   0xFFFFFFB0-0xFFFFFFBF  The network station of SYSTEM.md §6
+--                          (nice_cpu/hdl/src/net_regs.vhd, in
+--                          src/devices.vhd): B0 its IP address, eth_ip_o,
+--                          the first byte in bits 31..24, 0 after reset,
+--                          which answers nothing; B1 and B2 its MAC
+--                          address, eth_mac_o, bits 47..32 and 31..0,
+--                          G_ETH_MAC after reset, 02:4E:49:43:45:00 by
+--                          default; B3, B4, and B5 the counts of the good
+--                          frames received, eth_rx_i, the bad or dropped
+--                          ones, eth_rx_bad_i, and those sent, eth_tx_i
+--                          (system.vhd); B6 NET_STATUS, net_on_i in bit 31
+--                          and G_TCP_PORT in bits 15..0; B7-BF read 0.
+--                          Only the system's reset resets them, not a
+--                          start of the core.
 --   0xFFFFFFE0-0xFFFFFFFF  The debug registers of DEBUG.md §6, for the link
 --                          only, which debug_link holds: R0-R15 of the core,
 --                          live while it runs and those of the stop after
@@ -323,9 +325,10 @@ entity nicemon is
       -- The microseconds that a console byte over TCP waits for room in
       -- the core's input FIFO (DEBUG.md §1); G_CLOCK_HZ is at least 1 MHz
       G_LINK_WAIT_US     : positive := 50_000;
-      -- The Ethernet station's MAC and IP addresses after reset (board_io.vhd)
+      -- The network station's MAC address after reset, and the TCP port of
+      -- the link, which NET_STATUS reads (devices.vhd)
       G_ETH_MAC          : std_logic_vector(47 downto 0) := X"024E49434500";
-      G_ETH_IP           : std_logic_vector(31 downto 0) := X"00000000";
+      G_TCP_PORT         : natural range 0 to 65535     := 4510;
       -- The SD card slots, 0 for no controller, and those of src/sd/sd.vhd:
       -- the slots with card detect, slot 0's power switch, and the ACK of a
       -- command held until it ends, as in nice_cpu's simulation, and the
@@ -386,7 +389,7 @@ entity nicemon is
       brd_btn_i      : in  std_logic_vector(4 downto 0)  := (others => '0');
       brd_sw_i       : in  std_logic_vector(15 downto 0) := (others => '0');
       -- The counts of Ethernet frames received, good and bad or dropped,
-      -- and of those sent, and the station's addresses, on every board
+      -- and of those sent, and the station's addresses (0xFFFFFFB0-BF)
       eth_rx_i       : in  std_logic_vector(31 downto 0) := (others => '0');
       eth_rx_bad_i   : in  std_logic_vector(31 downto 0) := (others => '0');
       eth_tx_i       : in  std_logic_vector(31 downto 0) := (others => '0');
@@ -454,6 +457,7 @@ architecture synthesis of nicemon is
    constant C_PERF_BASE  : std_logic_vector(31 downto 4) := X"FFFFFF4";        -- 0xFFFFFF40-4F
    constant C_FS_BASE    : std_logic_vector(31 downto 6) := X"FFFFFF" & "01";  -- 0xFFFFFF40-7F; is_fs drops 40-4F
    constant C_SD_BASE    : std_logic_vector(31 downto 4) := X"FFFFFFA";        -- 0xFFFFFFA0-AF, with G_SD_SLOTS > 0
+   constant C_NET_BASE   : std_logic_vector(31 downto 4) := X"FFFFFFB";        -- 0xFFFFFFB0-BF
 
    -- Whether an address is an I/O register, not memory. The words of
    -- 0xFFFFFF00-FF that are not registers are memory, as in the emulator.
@@ -469,7 +473,8 @@ architecture synthesis of nicemon is
              addr(7 downto 6) = "01" or                             -- perf, fetch statistics
              addr(7 downto 4) = X"8" or                             -- screen registers
              addr(7 downto 4) = X"9" or                             -- the board's devices
-             (addr(7 downto 4) = X"A" and G_SD_SLOTS > 0);          -- the SD card
+             (addr(7 downto 4) = X"A" and G_SD_SLOTS > 0) or        -- the SD card
+             addr(7 downto 4) = X"B";                               -- the network station
    end function is_io;
 
    -- Whether an address is in the fonts, which are not memory
@@ -490,7 +495,8 @@ architecture synthesis of nicemon is
    begin
       return addr(31 downto 5) = C_MPU_BASE or addr(31 downto 4) = C_PERF_BASE or
              addr(31 downto 4) = C_TIMER_BASE or is_fs(addr) or
-             (addr(31 downto 4) = C_SD_BASE and G_SD_SLOTS > 0);
+             (addr(31 downto 4) = C_SD_BASE and G_SD_SLOTS > 0) or
+             addr(31 downto 4) = C_NET_BASE;
    end function is_dev;
 
    -- The source of the read data of the last request served: the memory,
@@ -675,7 +681,7 @@ architecture synthesis of nicemon is
    -- half-close over TCP: the link's eoi_o, high until the next start or
    -- the next connection over TCP. While it is high, the link forwards none
    -- of the host's bytes, and a read of the console with the FIFO empty
-   -- returns 0x200. The keyboard's bytes still go in (SYSTEM.md §6).
+   -- returns 0x200. The keyboard's bytes still go in (SYSTEM.md §8).
    signal link_eoi : std_logic;
 
    -- The core's console output, to the link
@@ -997,10 +1003,11 @@ begin
 
    ---------------------------------------------------------------------------
    -- The math unit (SYSTEM.md §2), the performance counters (§3), the
-   -- fetch statistics, the timer (§4), and the SD card controller (§5)
-   -- from nice_cpu, in src/devices.vhd. They are reset with the system,
-   -- and when the core starts, as the emulator's are when it starts. The
-   -- timer's request goes straight to the core's IRQ.
+   -- fetch statistics, the timer (§4), the SD card controller (§5), and
+   -- the network station (§6) from nice_cpu, in src/devices.vhd. They are
+   -- reset with the system, and all but the station also when the core
+   -- starts, as the emulator's are when it starts. The timer's request goes
+   -- straight to the core's IRQ.
    ---------------------------------------------------------------------------
 
    i_devices : entity work.devices
@@ -1010,7 +1017,8 @@ begin
          G_SD_DETECT   => G_SD_DETECT,
          G_SD_POWER    => G_SD_POWER,
          G_SD_HOLD_ACK => G_SD_HOLD_ACK,
-         G_SD_SLOW_HZ  => G_SD_SLOW_HZ
+         G_SD_SLOW_HZ  => G_SD_SLOW_HZ,
+         G_ETH_MAC     => G_ETH_MAC
       )
       port map (
          clk_i        => clk_i,
@@ -1043,7 +1051,14 @@ begin
          sd_dat0_i    => sd_dat0_i,
          sd_cd_n_i    => sd_cd_n_i,
          sd_wp_i      => sd_wp_i,
-         sd_pwr_n_o   => sd_pwr_n_o
+         sd_pwr_n_o   => sd_pwr_n_o,
+         eth_rx_i     => eth_rx_i,
+         eth_rx_bad_i => eth_rx_bad_i,
+         eth_tx_i     => eth_tx_i,
+         net_on_i     => net_on_i,
+         net_port_i   => std_logic_vector(to_unsigned(G_TCP_PORT, 16)),
+         eth_ip_o     => eth_ip_o,
+         eth_mac_o    => eth_mac_o
       ); -- i_devices
 
    -- The memory: the RAM, the ROM, and the screen, on the instruction bus
@@ -1087,33 +1102,26 @@ begin
    i_board_io : entity work.board_io
       generic map (
          G_BOARD_IO      => G_BOARD_IO,
-         G_ETH_MAC       => G_ETH_MAC,
-         G_ETH_IP        => G_ETH_IP,
          G_RAM_WORDS     => 2 ** G_RAM_ADDR_BITS,
          G_CLOCK_HZ      => G_CLOCK_HZ,
          G_UART_BAUDRATE => G_UART_BAUDRATE
       )
       port map (
-         clk_i        => clk_i,
-         rst_i        => rst_i,
-         stb_i        => brd_stb,
-         we_i         => bus_we,
-         addr_i       => bus_addr(3 downto 0),
-         wdata_i      => bus_wdata,
-         rdata_o      => brd_rdata,
-         led_o        => brd_led_o,
-         rgb0_o       => brd_rgb0_o,
-         rgb1_o       => brd_rgb1_o,
-         seg_o        => brd_seg_o,
-         btn_i        => brd_btn_i,
-         sw_i         => brd_sw_i,
-         eth_rx_i     => eth_rx_i,
-         eth_rx_bad_i => eth_rx_bad_i,
-         eth_tx_i     => eth_tx_i,
-         eth_mac_o    => eth_mac_o,
-         eth_ip_o     => eth_ip_o,
-         uart_baud_o  => uart_baud_o,
-         uart_div_o   => uart_div
+         clk_i       => clk_i,
+         rst_i       => rst_i,
+         stb_i       => brd_stb,
+         we_i        => bus_we,
+         addr_i      => bus_addr(3 downto 0),
+         wdata_i     => bus_wdata,
+         rdata_o     => brd_rdata,
+         led_o       => brd_led_o,
+         rgb0_o      => brd_rgb0_o,
+         rgb1_o      => brd_rgb1_o,
+         seg_o       => brd_seg_o,
+         btn_i       => brd_btn_i,
+         sw_i        => brd_sw_i,
+         uart_baud_o => uart_baud_o,
+         uart_div_o  => uart_div
       ); -- i_board_io
 
    -- The screen's registers, which take the request served, when it is
@@ -1340,7 +1348,7 @@ begin
    -- room for two, so that a byte from the link, which the link sends only
    -- when the free space was not 0 a cycle earlier, finds room. Otherwise it
    -- is taken and dropped: while the core is held or halted. After the end
-   -- of the line's input it still goes in (SYSTEM.md §6).
+   -- of the line's input it still goes in (SYSTEM.md §8).
    kbd_room <= '1' when rx_free >= 2 else
                '0';
    kbd_take <= kbd_valid_i and not link_in_valid and

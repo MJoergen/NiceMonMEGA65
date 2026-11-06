@@ -96,7 +96,7 @@ keyboard's goes on.
 The debug link on the serial port gives it one too, with no key typed:
 
     tools/mon.py --port /dev/ttyUSB1
-    mon> w FFFFFF9A C0A80141
+    mon> w FFFFFFB0 C0A80141
     mon> q
 
 ## Running a program

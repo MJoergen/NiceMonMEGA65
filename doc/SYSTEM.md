@@ -145,15 +145,16 @@ effect and does not write (DEBUG.md §3).
 | `0xFFFE2000`–`0xFFFE3FFF` | The character ROM: Spleen, in the layout of the font RAM. A write is dropped. |
 | `0xFFFF0000`–`0xFFFF7FFF` | The screen: 32768 words of memory of their own, the emulator's 80×25 screen and room for scrolling. The 2000 words from the display offset are shown on VGA and HDMI, or VGA only on the Nexys4DDR (see [The screen](#the-screen)), and the link reads them all. |
 | `0xFFFF8000`–`0xFFFFFEFF` | RAM, between the screen and the I/O page: the RAM words `0x18000`–`0x1FEFF` on the MEGA65, as the 128K words repeat. On the Nexys4DDR, whose screen is 8192 words, it starts lower: `0xFFFF2000`–`0xFFFFFEFF` are the words `0x2000`–`0xFEFF` of its 64K. The runtime's stack starts at `0xFFFFFF00` and grows down into it, and so does the stack of a program in the ROM. The monitor's variables are at `0xFFFFF000` and up, the RAM words `0x1F000` and up on the MEGA65 and `0xF000` on the Nexys4DDR, and its stack, which the programs at `0x8000` share, grows down from there. In the emulator it is ordinary memory. |
-| `0xFFFFFF00` | The console of nice_cpu's SYSTEM.md §1. A write sends bits 7..0 to the UART. A read takes the oldest byte received from the UART or the keyboard, and returns it in bits 7..0 with bit 8 set, or 0 when no byte has arrived. A break on the UART, or a host's half-close over Ethernet, ends the line's input until the core is started again or a host connects over Ethernet (see [The debug link over TCP](#the-debug-link-over-tcp)): the host's bytes after it are dropped, and once the bytes before it are read, a read returns `0x200` (bit 9), as at the end of the emulator's input. The keyboard's bytes still come, and a read returns them (nice_cpu's SYSTEM.md §6). |
+| `0xFFFFFF00` | The console of nice_cpu's SYSTEM.md §1. A write sends bits 7..0 to the UART. A read takes the oldest byte received from the UART or the keyboard, and returns it in bits 7..0 with bit 8 set, or 0 when no byte has arrived. A break on the UART, or a host's half-close over Ethernet, ends the line's input until the core is started again or a host connects over Ethernet (see [The debug link over TCP](#the-debug-link-over-tcp)): the host's bytes after it are dropped, and once the bytes before it are read, a read returns `0x200` (bit 9), as at the end of the emulator's input. The keyboard's bytes still come, and a read returns them (nice_cpu's SYSTEM.md §8). |
 | `0xFFFFFF01` | The emulator's read counter. A read by the core returns the number of its reads since the last write, and a write sets that number. It is 0 after reset, and a start keeps it, as in the emulator. |
 | `0xFFFFFF10`–`0xFFFFFF1F` | The timer of nice_cpu's SYSTEM.md §4: it raises IRQ every P clock cycles, through the vector it is given. |
 | `0xFFFFFF20`–`0xFFFFFF3F` | The math unit of nice_cpu's SYSTEM.md §2: 32-bit multiply and divide, and 64-bit divide. |
 | `0xFFFFFF40`–`0xFFFFFF4F` | The performance counters of nice_cpu's SYSTEM.md §3: cycles, instructions, and microseconds, 64 bits each. The microseconds come from the clock, 100 MHz on the MEGA65 and 90 MHz on the Nexys4DDR, so they are real time, as the emulator's microsecond counter is, which counts the host's time, or one per step with `--step-time`. They stop while the core is paused. The link reads them as the core does: a read of a low word takes the snapshot that the high word returns, where `niceemu --link` takes none. DEBUG.md §3 allows both while the core is held, halted, or paused. The words `0xFFFFFF46`–`4F` read 0 and take no write. |
 | `0xFFFFFF50`–`0xFFFFFF7F` | The fetch statistics of MICROARCH.md §8.1, the rest of the performance counters: counters of what FETCH and DECODE do, for judging the size of FETCH's buffer. A start of the core clears them, and they then count each clock while the core runs, until a write of 0 to `FS_CTRL` stops them. They stop while the core is held and after it halts. With the multi-cycle core (`NICE=multi`), only `FS_CYCLES` and `FS_HIST[0]` count, `FS_CTRL` reads its run bit, and the other words read 0. |
 | `0xFFFFFF80`–`0xFFFFFF8F` | The screen's registers: the cursor and the display offset (see [The screen](#the-screen)). |
-| `0xFFFFFF90`–`0xFFFFFF9F` | The Nexys4DDR's LEDs, seven-segment display, buttons, and switches (see [The Nexys4DDR's devices](#the-nexys4ddrs-devices)). On the MEGA65 they read 0 and take no write. On every board, `0xFFFFFF98`–`9D` are the Ethernet station (see [The Ethernet station](#the-ethernet-station)), `0xFFFFFF9E` reads the words of the RAM, `0x20000` on the MEGA65 and `0x10000` on the Nexys4DDR, and takes no write, and `0xFFFFFF9F` is the UART's baud rate (see [The baud rate](#the-baud-rate)). The emulator has memory there, which reads 0 after a clear, so a program takes 0 to mean no limit. |
+| `0xFFFFFF90`–`0xFFFFFF9F` | The Nexys4DDR's LEDs, seven-segment display, buttons, and switches (see [The Nexys4DDR's devices](#the-nexys4ddrs-devices)). On the MEGA65 they read 0 and take no write. On every board, `0xFFFFFF9E` reads the words of the RAM, `0x20000` on the MEGA65 and `0x10000` on the Nexys4DDR, and takes no write, and `0xFFFFFF9F` is the UART's baud rate (see [The baud rate](#the-baud-rate)). The emulator has memory there, which reads 0 after a clear, so a program takes 0 to mean no limit. |
 | `0xFFFFFFA0`–`0xFFFFFFAF` | The SD card controller of nice_cpu's SYSTEM.md §5, with 2 slots on the MEGA65 and 1 on the Nexys4DDR (see [The SD card slots](#the-sd-card-slots)). |
+| `0xFFFFFFB0`–`0xFFFFFFBF` | The network station of nice_cpu's SYSTEM.md §6, on every board: the Ethernet station's addresses, its counts of frames, and the state of the debug link over TCP (see [The Ethernet station](#the-ethernet-station)). |
 | `0xFFFFFFE0`–`0xFFFFFFEF` | The debug registers of DEBUG.md §6, for the link only, here and below: R0–R15 of the core. R1–R15 take a write while the core is paused, as a register-direct write of an instruction does (ISA.md §4.3); R0 takes none. While the core runs they read its registers live, as `niceemu --link` returns them, each word from the cycle of its own read; the multi-cycle core adds 1 to R15 for each word it fetches, so its live R15 may be the address of a constant word, or of the word after the instruction it carries out, where the pipelined core's is an instruction's. After a halt they hold what the emulator prints. While the core is paused they hold its registers, with R15 the address of the next instruction, and a hold of the paused core keeps them. A hold of a running core leaves them undefined. |
 | `0xFFFFFFF0` | Control: hold, clear, hide, pause, and step (see [The control register](#the-control-register)). |
 | `0xFFFFFFF1` | Read only: why the core halted. 0 while it has not, and after a clear, 1 for `HALT`, 2 for a reserved control word, 3 for `INT` inside an interrupt routine, and 4 for `RTI` outside one. Reason 5, the step limit of `niceemu --link`, is the emulator's only. |
@@ -397,11 +398,11 @@ and released in that time (see [The keyboard](#the-keyboard)).
 The Nexys4DDR's LEDs, seven-segment display, buttons, and switches are
 registers in `0xFFFFFF90`–`96`, for the core and the link alike. Only the
 Nexys4DDR has them: on the MEGA65 these words read 0 and take no write,
-where the emulator has memory there. `0xFFFFFF98`–`9D`, the Ethernet
-station, are on every board (see [The Ethernet
-station](#the-ethernet-station)), and so are `0xFFFFFF9E`, the size of
-the RAM (see [Address map](#address-map)), and `0xFFFFFF9F`, the UART's
-baud rate (see [The baud rate](#the-baud-rate)). Reset clears the
+where the emulator has memory there. `0xFFFFFF9E`, the size of
+the RAM, is on every board (see [Address map](#address-map)), and `0xFFFFFF9F`, the UART's
+baud rate (see [The baud rate](#the-baud-rate)), and so is the Ethernet
+station at `0xFFFFFFB0` (see [The Ethernet
+station](#the-ethernet-station)). Reset clears the
 registers that can be written, and a start of the core does not, so a
 program's display stays after it halts.
 
@@ -426,28 +427,35 @@ synchronized to the clock but not debounced. While the on-board debugger
 has the focus ([DEBUGGER.md](DEBUGGER.md#the-nexys4ddr)), the buttons
 are its keys and read 0 here, and the display shows its segments; the
 registers keep their values and show again when the focus is left. The CPU RESET button is not a
-register: it resets the system. The words `0xFFFFFF97` and `9F`
+register: it resets the system. The words `0xFFFFFF97` to `9D`
 read 0 and take no write; the keyboard's LEDs may come to `0xFFFFFF97`
 (see [#25](https://github.com/MJoergen/NiceMonMEGA65/issues/25)).
 
 ## The Ethernet station
 
-`0xFFFFFF98`–`9D` are on every board, the MEGA65 too. They are the
-Ethernet station, which carries the debug link over TCP
+`0xFFFFFFB0`–`BF` are on every board, the MEGA65 too. They are the
+network station of nice_cpu's SYSTEM.md §6, here the Ethernet station,
+which carries the debug link over TCP
 ([#30](https://github.com/MJoergen/NiceMonMEGA65/issues/30)). It
 answers ARP requests for its IP address and pings to it, and serves the
-link on TCP port 4510.
+link on TCP port 4510. Until V1.7 it was at `0xFFFFFF98`–`9D`, in
+another order and without `NET_STATUS`.
 
-| Address | Access | What it is |
-|---|---|---|
-| `0xFFFFFF98` | Read only | The good frames received, to any address. |
-| `0xFFFFFF99` | Read only | The bad frames received, and the good ones that were dropped. |
-| `0xFFFFFF9A` | Read, write | The IP address, the first byte in bits 31..24: `0xC0A80141` is 192.168.1.65. 0 after reset, which answers nothing. |
-| `0xFFFFFF9B` | Read, write | The first two bytes of the MAC address, in bits 15..0. Bits 31..16 read 0 and are dropped. |
-| `0xFFFFFF9C` | Read, write | The last four bytes of the MAC address. The address is 02:4E:49:43:45:00 after reset. |
-| `0xFFFFFF9D` | Read only | The frames sent: the ARP and ping replies, and the TCP segments. |
+| Address | Name | Access | What it is |
+|---|---|---|---|
+| `0xFFFFFFB0` | `NET_IP` | Read, write | The IP address, the first byte in bits 31..24: `0xC0A80141` is 192.168.1.65. 0 after reset, which answers nothing. |
+| `0xFFFFFFB1` | `NET_MAC_HI` | Read, write | The first two bytes of the MAC address, in bits 15..0. Bits 31..16 read 0 and are dropped. |
+| `0xFFFFFFB2` | `NET_MAC_LO` | Read, write | The last four bytes of the MAC address. The address is 02:4E:49:43:45:00 after reset. |
+| `0xFFFFFFB3` | `NET_RX_GOOD` | Read only | The good frames received, to any address. |
+| `0xFFFFFFB4` | `NET_RX_BAD` | Read only | The bad frames received, and the good ones that were dropped. |
+| `0xFFFFFFB5` | `NET_TX` | Read only | The frames sent: the ARP and ping replies, and the TCP segments. |
+| `0xFFFFFFB6` | `NET_STATUS` | Read only | Bit 31 while a host is connected to the link over TCP, and the TCP port of the link, 4510, in bits 15..0. |
+| `0xFFFFFFB7`–`BF` | | Read only | 0. |
 
-The counts start at 0 at reset and wrap at 2^32. A good frame has at
+Only a reset of the system sets the addresses and the counts, not a
+start of the core nor the link's clear, so a host keeps its connection
+through a start, and a program finds the addresses that an earlier one
+set. The counts start at 0 at reset and wrap at 2^32. A good frame has at
 least 64 bytes and a right frame check sequence, and has come through the
 FIFO of received frames to the system clock. A bad frame has a wrong
 sequence, is shorter, did not end on a byte, or had a receive error, a
@@ -456,8 +464,10 @@ when it finds that FIFO full. The PHY negotiates the link on its own, so
 a cable to a switch gives a good count that rises with the broadcasts on
 the network, and a bad count that stays at 0. The station works only at
 100 Mbit/s; with a link at 10 Mbit/s, every frame counts as bad. A write
-to `0xFFFFFF9A`–`9C` while a host is connected, or while a reply goes
-out, breaks that connection or reply.
+to `0xFFFFFFB0`–`B2` while a host is connected, or while a reply goes
+out, breaks that connection or reply. The board has no port for Ethernet
+frames, nice_cpu's SYSTEM.md §7, so `0xFFFFFFC0`–`CF` are memory, and
+the frames that the station does not serve are dropped.
 
 The station keeps the frames to its MAC address and to everyone, and
 drops the others. It answers each ARP request for its IP address with
@@ -470,10 +480,10 @@ link gives it an address. The MAC address is a locally administered one;
 two boards on one network need different ones. On the link, for example:
 
     make mon PORT=/dev/ttyUSB3
-    mon> w FFFFFF9A C0A80141
+    mon> w FFFFFFB0 C0A80141
 
 Then `ping 192.168.1.65` from a PC on the network gets its answers, and
-`0xFFFFFF9D` counts the replies, the ARP reply and one for each ping.
+`0xFFFFFFB5` counts the replies, the ARP reply and one for each ping.
 The monitor's `i` shows and sets the IP address from the keyboard or
 the line, and its `m` the MAC address
 ([monitor/README.md](../monitor/README.md)). With the demo in

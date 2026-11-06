@@ -68,6 +68,13 @@ DEBUG_FIRST = 0xFFFFFFE0
 # it takes (doc/SYSTEM.md); niceemu has plain memory there
 BAUD = 0xFFFFFF9F
 BAUDS = (115200, 230400, 460800, 921600, 1000000, 1500000, 2000000)
+# The network station of nice_cpu's SYSTEM.md §6: the IP address, the
+# counts of the good frames received and of those sent, and NET_STATUS,
+# bit 31 for a host connected over TCP and the link's port in bits 15..0
+NET_IP = 0xFFFFFFB0
+NET_RX_GOOD = 0xFFFFFFB3
+NET_TX = 0xFFFFFFB5
+NET_STATUS = 0xFFFFFFB6
 
 # Control bits: hold the core in reset, halted (read only), clear the memory
 # first, hide the ROM, so that the RAM is at 0, pause (version 2), and step
@@ -90,8 +97,9 @@ COSIM_WAIT = 20.0
 COSIM_BYTE = 0.02
 # How long a sender waits while the program's input buffer is full, before
 # it reads the free space again. Well below the 10 ms in which the demo
-# takes an ESC with no byte after it as a key of its own (demo/demo.nasm,
-# T_ESC), so that a gap here does not cut an escape sequence in two.
+# takes an ESC with no byte after it as a key of its own (nice_cpu's
+# demo/demo.nasm, T_ESC), so that a gap here does not cut an escape
+# sequence in two.
 FULL_WAIT = 0.001
 # How long a break holds the UART's line low. The board takes a frame of
 # zeros for one, 5 us at 2 Mbaud; this leaves room for the USB serial
@@ -390,7 +398,7 @@ class Eth(Tcp):
         # The board refuses a connection only while another host has one.
         if isinstance(e, ConnectionRefusedError):
             return "another host has a connection to the board"
-        return "has the board this IP address (0xFFFFFF9A)?"
+        return f"has the board this IP address (0x{NET_IP:08X})?"
 
     def _connect(self) -> socket.socket:
         sock = super()._connect()

@@ -110,4 +110,4 @@ A program in the ROM also has some limits on its writes, which
 [SYSTEM.md](SYSTEM.md#the-rom) describes: the main one is that the stack
 and the variables must be in the RAM, at `0x8000` or above.
 [`sim/rom.nasm`](../sim/rom.nasm) is a small example, a greeting, and
-[demo/](../demo/README.md) is a larger one.
+the monitor, [monitor/](../monitor/README.md), is a larger one.

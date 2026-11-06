@@ -92,12 +92,12 @@ $(BUILD)/hello_c.bin: test/hello.c mon.h mon.nasm $(TOOLS) | $(BUILD)
 # screen. i shows the IP address, 0.0.0.0, and writes 192.168.1.65; four
 # addresses are rejected, with too few numbers, one past 255, an empty
 # one, and a letter after them; and the last, with blanks around it and
-# a leading zero, is written, which the dump of 0xFFFFFF9A shows. m shows
-# the MAC address, 00:00:00:00:00:00 in niceemu, and writes
+# a leading zero, is written, which the dump of 0xFFFFFFB0 shows. m shows
+# the MAC address, 02:4E:49:43:45:00 after niceemu's reset, and writes
 # 02:4E:49:43:45:01; five addresses are rejected, with too few bytes, a
 # byte of three digits, a group address, a blank inside, and a letter
 # after them; and the last, with blanks around it and bytes of one digit
-# in lower case, is written, which the dump of 0xFFFFFF9B-9C shows. h ends
+# in lower case, is written, which the dump of 0xFFFFFFB1-B2 shows. h ends
 # each input. dash's printf, the shell of make on Ubuntu, has no \x.
 CMDS = ?\rv\rd 0 6\rd\rD 10 1\rq\r\r  c\rabc\177\177\177v\rjunk\003v\r\033[A\033OPv\rx\rr\rr 9000\rd 8000 0\rd 8000\rd 0 100\ri\ri 192.168.1.65\ri 1.2.3\ri 256.0.0.1\ri 1..2.3\ri 1.2.3.4x\ri  010.0.0.1 \rm\rm 02:4E:49:43:45:01\rm 2:4e:49:43:45\rm 2:4e:49:43:45:123\rm 3:0:0:0:0:0\rm 2:4e: 49:43:45:1\rm 2:4e:49:43:45:1x\rm  a:b:c:d:e:f \rh\r
 RUN  = r\rh\r
@@ -141,7 +141,7 @@ LOAD_64K = l\rEFFF 1\rF000 2\r1EFFF 3\r\rd EFFF 1\rh\r
 # column 40 of row 4, 80 * 4 + 40 = 360 = 0x168, with its color, and for
 # hello the 0x80 after it, the font base, which the return made 0, and the
 # row of the glyph of 0x80 that hello drew.
-DUMP_cmds    = -d 0xFFFFF000:5 -d 0xFFFFFF80:6 -d 0xFFFFFF9A:3
+DUMP_cmds    = -d 0xFFFFF000:5 -d 0xFFFFFF80:6 -d 0xFFFFFFB0:3
 # For scroll the variables and the screen's registers, and the last four
 # digits of the address that starts a row of the history (the words 4 to
 # 7 of the row): the rows of 869C and 8698 that Page Up turned to slots 0

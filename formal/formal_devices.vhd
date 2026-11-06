@@ -7,9 +7,10 @@
 -- the core has just left reset then. The hold changes only while the
 -- link's request neither comes nor waits, as contract f_hold of
 -- formal/debug_link_formal.vhd says. Each request is to a device's
--- address, 0xFFFFFF10-7F, or, with G_SD_SLOTS > 0, A0-AF.
+-- address, 0xFFFFFF10-7F, B0-BF, or, with G_SD_SLOTS > 0, A0-AF.
 -- G_SD_SLOTS gives the devices the SD card controller, in the boards'
--- configuration, without G_SD_HOLD_ACK, and its card's pins are free.
+-- configuration, without G_SD_HOLD_ACK, and its card's pins are free, as
+-- are the network station's counts and status.
 --
 -- RESET
 -- The first cycle is a reset.
@@ -42,7 +43,12 @@ entity formal_devices is
       irq_ready_i  : in  std_logic;
       sd_dat0_i    : in  std_logic_vector(1 downto 0);
       sd_cd_n_i    : in  std_logic_vector(1 downto 0);
-      sd_wp_i      : in  std_logic_vector(1 downto 0)
+      sd_wp_i      : in  std_logic_vector(1 downto 0);
+      eth_rx_i     : in  std_logic_vector(31 downto 0);
+      eth_rx_bad_i : in  std_logic_vector(31 downto 0);
+      eth_tx_i     : in  std_logic_vector(31 downto 0);
+      net_on_i     : in  std_logic;
+      net_port_i   : in  std_logic_vector(15 downto 0)
    );
 end entity formal_devices;
 
@@ -56,7 +62,7 @@ architecture synthesis of formal_devices is
    function is_dev(addr : std_logic_vector(7 downto 0)) return boolean is
    begin
       return (addr(7) = '0' and addr(6 downto 4) /= "000") or
-             (addr(7 downto 4) = X"A" and G_SD_SLOTS > 0);
+             (addr(7 downto 4) = X"A" and G_SD_SLOTS > 0) or addr(7 downto 4) = X"B";
    end function is_dev;
 
 begin
@@ -111,7 +117,14 @@ begin
          sd_dat0_i    => sd_dat0_i,
          sd_cd_n_i    => sd_cd_n_i,
          sd_wp_i      => sd_wp_i,
-         sd_pwr_n_o   => open
+         sd_pwr_n_o   => open,
+         eth_rx_i     => eth_rx_i,
+         eth_rx_bad_i => eth_rx_bad_i,
+         eth_tx_i     => eth_tx_i,
+         net_on_i     => net_on_i,
+         net_port_i   => net_port_i,
+         eth_ip_o     => open,
+         eth_mac_o    => open
       ); -- i_devices
 
 end architecture synthesis;

@@ -1,39 +1,57 @@
-# Builds the demo of the ROM, demo.nasm, into build/demo.bin, a program
-# under the monitor at 0x8000, and joins it behind the monitor into
-# build/rom.bin, the boards' ROM by default and the release's
-# (tools/release.py), in which the monitor's x runs it. For the time
-# being: issue #65.
+# Builds the demo of the ROM, nice_cpu's demo (nice_cpu/demo), with the
+# board's text, text.nasm, into build/demo.bin, a program under the
+# monitor at 0x8000, and joins it behind the monitor into build/rom.bin,
+# the boards' ROM by default and the release's (tools/release.py), in
+# which the monitor's x runs it. For the time being: issue #65.
 #
 # make          builds build/demo.bin and build/rom.bin, with VERSION in
 #               the demo's title bar and the monitor's banner, git
 #               describe of the tree by default; the release gives its tag
-# make test     runs the monitor and the demo in niceemu once for each of
-#               the inputs below, each after x, and compares the screens
-#               with test.expected
+# make test     runs the ROM of the tests in niceemu, with x and a few
+#               keys, and with F12 and the monitor's v and h after them,
+#               and compares the screens with test.expected
 # make clean    removes build/
 #
-# The assembler has no include, so the monitor's mon.nasm, for scr_cls,
-# and build/version.nasm, which defines the label VERSION, are joined to
-# demo.nasm. join.py puts the demo in the ROM's image at the monitor's
+# The demo itself, its source and its tests, are nice_cpu's: a change to
+# it reaches the boards only with a tag of nice_cpu. Its Makefile joins
+# TEXT after demo.nasm, and writes into BUILD, here build/ and
+# build/test/. join.py puts the demo in the ROM's image at the monitor's
 # DEMO.
 
 PYTHON  ?= python3
 NICE_CPU = ../nice_cpu
-ASM      = $(PYTHON) $(NICE_CPU)/assembler/niceasm.py
-ASM_PY   = $(wildcard $(NICE_CPU)/assembler/*.py)
 EMU      = $(NICE_CPU)/emulator/zig-out/bin/niceemu
 MONITOR  = ../monitor
+DEMO     = $(NICE_CPU)/demo
 BUILD    = build
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo unknown)
-SOURCES  = demo.nasm $(MONITOR)/mon.nasm
+TEXT     = $(abspath text.nasm)
+
+# The demo's Makefile, with the board's text, into a directory here
+DEMO_MAKE = $(MAKE) -s --no-print-directory -C $(DEMO) TEXT='$(TEXT)'
 
 .PHONY: all test clean FORCE
 
 all: $(BUILD)/rom.bin
 
-$(BUILD)/demo.bin: $(SOURCES) $(BUILD)/version.nasm $(ASM_PY)
-	@cat $(SOURCES) $(BUILD)/version.nasm > $(BUILD)/demo_all.nasm
-	$(ASM) -o $@ $(BUILD)/demo_all.nasm
+# The demo, with the version, built by its Makefile, which writes it only
+# when it changes, so that a bitstream with it is not built again for
+# nothing
+$(BUILD)/demo.bin: FORCE | $(BUILD)
+	@$(DEMO_MAKE) BUILD='$(abspath $(BUILD))' VERSION='$(VERSION)' '$(abspath $@)'
+
+# The same with the version of the tests, V9.9, so that their screens do
+# not change with every commit, and with a wrong word in the math unit's
+# test, which the self-test then shows as failed
+$(BUILD)/test/demo_test.bin: FORCE | $(BUILD)
+	@$(DEMO_MAKE) BUILD='$(abspath $(BUILD)/test)' VERSION=V9.9 '$(abspath $(BUILD)/test/demo.bin)'
+	@cmp -s $(BUILD)/test/demo.bin $@ || cp $(BUILD)/test/demo.bin $@
+
+$(BUILD)/test/demo_fail.bin: $(BUILD)/test/demo_test.bin
+	@sed 's/^\( *\.DAT *2, M_SMULH, \)-1$$/\1-2/' $(BUILD)/test/demo_all.nasm \
+	  > $(BUILD)/test/demo_fail_all.nasm
+	@! cmp -s $(BUILD)/test/demo_all.nasm $(BUILD)/test/demo_fail_all.nasm
+	@$(PYTHON) $(NICE_CPU)/assembler/niceasm.py -o $@ $(BUILD)/test/demo_fail_all.nasm
 
 # The monitor, with the same version, and the monitor of the tests, built
 # by the monitor's Makefile, once each, also under make -j
@@ -49,129 +67,27 @@ $(BUILD)/rom.bin: $(MONITOR)/build/monitor.bin $(BUILD)/demo.bin join.py
 	@$(PYTHON) join.py $(MONITOR)/build/monitor.bin $(BUILD)/demo.bin -o $@.new
 	@cmp -s $@.new $@ && rm $@.new || { mv $@.new $@; echo "join.py -> $@"; }
 
-# Written only when the version changes, so that the demo is not
-# assembled again, and a bitstream with it not built again, for nothing.
-$(BUILD)/version.nasm: FORCE | $(BUILD)
-	@echo "VERSION .ASCII_L '$(VERSION)'" | cmp -s - $@ || \
-	  echo "VERSION .ASCII_L '$(VERSION)'" > $@
-
-# The test has a version of its own, so that its screen does not change
-# with every commit, and so has the monitor's test.
-$(BUILD)/demo_test.bin: $(SOURCES) $(ASM_PY) | $(BUILD)
-	@(cat $(SOURCES); echo "VERSION .ASCII_L 'V9.9'") > $(BUILD)/demo_test_all.nasm
-	@$(ASM) -o $@ $(BUILD)/demo_test_all.nasm
-
-# The same with a wrong word in the script of the math unit's test, the
-# high word of -7 * 6, which the self-test then shows as failed. cmp fails
-# the build if sed changed nothing.
-$(BUILD)/demo_fail.bin: $(BUILD)/demo_test.bin
-	@sed 's/^\( *\.DAT *2, M_SMULH, \)-1$$/\1-2/' $(BUILD)/demo_test_all.nasm \
-	  > $(BUILD)/demo_fail_all.nasm
-	@! cmp -s $(BUILD)/demo_test_all.nasm $(BUILD)/demo_fail_all.nasm
-	@$(ASM) -o $@ $(BUILD)/demo_fail_all.nasm
-
 # The ROMs of the tests, which make hwtest loads at 0 too
-$(BUILD)/rom_%.bin: $(MONITOR)/build/monitor_test.bin $(BUILD)/demo_%.bin join.py
-	@$(PYTHON) join.py $(MONITOR)/build/monitor_test.bin $(BUILD)/demo_$*.bin -o $@
+$(BUILD)/rom_%.bin: $(MONITOR)/build/monitor_test.bin $(BUILD)/test/demo_%.bin join.py
+	@$(PYTHON) join.py $(MONITOR)/build/monitor_test.bin $(BUILD)/test/demo_$*.bin -o $@
 
-# The first input edits: a DEL, a TAB, a CR LF, the cursor keys, a
-# line longer than 80 characters, an ESC without [, a sequence with
-# parameters, a byte of 0x80 to 0x9F, which is dropped, and one of
-# ISO 8859-1, which niceemu shows as a blank. The second clears what it
-# typed, deletes at the first column, and scrolls by three rows, the last
-# with a TAB past the last column. The third has the function keys: the
-# VT220's F1 and xterm's F1 start the typewriter afresh, F2, F8, and
-# SHIFT-F6, which have no demo, do nothing, ESC ESC [ A is the cursor up,
-# ESC Q is Q, and a sequence that is no key does nothing. The fourth
-# starts the key codes with the VT220's F3, ESC [ 13 ~, and types a
-# letter, CR, a control code, DEL, a cursor key, F10, which has no demo, a
-# cursor key with parameters, a byte of ISO 8859-1 and one of 0x80 to
-# 0x9F, an ESC and an x, which are one key, as niceemu has the x at once,
-# a sequence longer than the 12 bytes shown, and nine letters: 20 keys,
-# which scroll by four rows. The fifth goes from the key codes back to the
-# typewriter, which shows no bytes. The sixth starts the characters and
-# colors, F5, where letters and F2 do nothing. niceemu shows neither the
-# colors nor the characters from 0xA0 on, so the test also has the words
-# of two of its rows: the red backgrounds, row 5, and the gray
-# foregrounds, row 20, from column 44. The seventh starts the counters,
-# F7, where a letter runs the sieve again. niceemu counts each step as a
-# cycle and a microsecond, so all the numbers are the same in every run.
-# The eighth plays the comet, F9, which takes a key at each tick, so . is
-# a tick without a key. The comet waits for the right key, catches the
-# star at row 4, column 67, and turns right, down, and left into its tail.
-# A key starts a new game, in which the comet goes left, ignores the right
-# key, which would turn it back, and hits the frame. The ninth runs the
-# board, F11, twice, so that the second run starts with what the first
-# left. The tenth types an IP address after F11: letters and a dot that do
-# not belong are dropped, the number 256 is rejected, and the message
-# stays. The eleventh writes the IP address 192.168.1.65, with a letter
-# dropped, a number with leading zeros, 0001, and two DELs over the last
-# digits, then a MAC address with one-digit bytes, and cancels a second
-# MAC address with CTRL-C. The twelfth is rejected for a MAC address of a
-# group, with an odd first byte, and the thirteenth for a byte of three
-# hex digits, though its value, 0FF, is in range. The fourteenth runs the
-# board in build/demo_fail.bin, whose math unit's test fails, so it shows
-# FAIL, the address read, and the word read there. The fifteenth types in
-# the typewriter with a backspace, 0x08, and moves with the cursor keys of
-# ESC O A to ESC O D, and the VT220's F2 and F4, which have no demo, do
-# nothing. The sixteenth leaves the demo with F12, back to the monitor,
-# which has cleared the screen and says that the demo returned 0, and
-# shows its version and halts. In niceemu the registers of the Ethernet
-# station are plain memory, so what is written shows at once, and the
-# counts stay 0.
-# dash's printf, the shell of make on Ubuntu, has no \x.
-TEST1 = Hello, world!\nabc\177\177X\tY\r\n$(shell printf '0123456789%.0s' 1 2 3 4 5 6 7 8)abcde\n\
-\033[A\033[A\033[DQ\033[C\033[BR\n\033x\033[1;5Cy\200\351z\n
-TEST3 = one\033[11~two\n\033OPthree\033OQ\033[19~\033[17;2~ F\n\033\033[Ax\033Q\033[99~
-TEST4 = \033[13~a\r\003\177\033[A\033[21~\033[1;5C\351\200\033x\033[1;2;3;4;5;6;7;8~bcdefghij
-TEST5 = \033ORab\033OPback
-TEST6 = \033[15~abc\033OQ
-DUMP6 = -d 0xFFFF01BC:36 -d 0xFFFF066C:36
-TEST7 = \033[18~x
-dots  = $(shell printf '.%.0s' $$(seq $(1)))
-TEST8 = \033[20~.\033[C$(call dots,27)\033[A$(call dots,8)\033[C\033[B\033[D.\033[D..\033[C$(call dots,35)
+# nice_cpu's own test runs the demo, behind its stand-in for a monitor.
+# This one checks the join, with two inputs. In the first, the monitor's
+# x runs the demo, which shows the board's text and the version V9.9,
+# and takes what is typed, and halts at the end of the input. In the
+# second, F12 returns to the monitor, which clears the screen and says
+# that the demo returned 0, and v shows the monitor's version, and h
+# halts.
+TEST1 = x\rHello, NiceMonMEGA65!
+TEST2 = x\rabc\033[24~v\rh\r
 
-TEST10 = \033[23~iX10.0g.0.256\r
-TEST11 = \033[23~i192.1x68.0001.66\177\17765\rm02:AB:c:D:e:F\rm02:\003
-TEST12 = \033[23~m03:00:00:00:00:01\r
-TEST13 = \033[23~m0FF:2:3:4:5:6\r
-TEST15 = ab\010c\nwxyz\033OD\033OD\033OA1\033OC\033OB2\033[12~!\033[14~?
-TEST16 = abc\033[24~v\rh\r
-TESTS  = 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
-# For the colors, which niceemu does not show, the ninth has the words of
-# the menu, with F11 in black on white, of the four PASS in green, and of
-# the line after them, and the fourteenth those of the FAIL in red, with
-# its words in white, and of the line after it
-DUMP9  = -d 0xFFFF0050:80 -d 0xFFFF01C2:4 -d 0xFFFF0212:4 -d 0xFFFF0262:4 \
-	 -d 0xFFFF02B2:4 -d 0xFFFF0322:17
-DUMP14 = -d 0xFFFF0212:22 -d 0xFFFF0322:14
-
-# Each input starts with x and a CR, which the monitor takes.
-test: $(BUILD)/rom_test.bin $(BUILD)/rom_fail.bin
-	@printf 'x\r$(TEST1)' > $(BUILD)/test1.txt
-	@{ printf 'x\rjunk\014\177'; for i in $$(seq 16); do printf 'line %d\n' $$i; done; \
-	  printf 'first\tA\t\t\t\t\t\t\t\t\t\tB'; } > $(BUILD)/test2.txt
-	@printf 'x\r$(TEST3)' > $(BUILD)/test3.txt
-	@printf 'x\r$(TEST4)' > $(BUILD)/test4.txt
-	@printf 'x\r$(TEST5)' > $(BUILD)/test5.txt
-	@printf 'x\r$(TEST6)' > $(BUILD)/test6.txt
-	@printf 'x\r$(TEST7)' > $(BUILD)/test7.txt
-	@printf 'x\r$(TEST8)' > $(BUILD)/test8.txt
-	@printf 'x\r\033[23~\033[23~' > $(BUILD)/test9.txt
-	@printf 'x\r$(TEST10)' > $(BUILD)/test10.txt
-	@printf 'x\r$(TEST11)' > $(BUILD)/test11.txt
-	@printf 'x\r$(TEST12)' > $(BUILD)/test12.txt
-	@printf 'x\r$(TEST13)' > $(BUILD)/test13.txt
-	@printf 'x\r\033[23~' > $(BUILD)/test14.txt
-	@printf 'x\r$(TEST15)' > $(BUILD)/test15.txt
-	@printf 'x\r$(TEST16)' > $(BUILD)/test16.txt
-	@for t in $(TESTS); do \
-	  case $$t in 6) dump='$(DUMP6)';; 9) dump='$(DUMP9)';; \
-	    14) dump='$(DUMP14)';; *) dump=;; esac; \
-	  bin=rom_test; [ $$t = 14 ] && bin=rom_fail; \
-	  $(EMU) -s --step-time -i $(BUILD)/test$$t.txt $$dump $(BUILD)/$$bin.bin > $(BUILD)/test$$t.out || \
+test: $(BUILD)/rom_test.bin
+	@printf '$(TEST1)' > $(BUILD)/test1.txt
+	@printf '$(TEST2)' > $(BUILD)/test2.txt
+	@for t in 1 2; do \
+	  $(EMU) -s --step-time -i $(BUILD)/test$$t.txt $(BUILD)/rom_test.bin > $(BUILD)/test$$t.out || \
 	    { echo "FAIL demo: niceemu exits with $$? on input $$t"; exit 1; }; \
-	  sed -n -e '/^ffff/p' -e '/^Screen:/,$$p' $(BUILD)/test$$t.out; \
+	  sed -n '/^Screen:/,$$p' $(BUILD)/test$$t.out; \
 	done > $(BUILD)/test.screen; \
 	if cmp -s test.expected $(BUILD)/test.screen; then echo "PASS demo"; \
 	else echo "FAIL demo"; diff test.expected $(BUILD)/test.screen; exit 1; fi

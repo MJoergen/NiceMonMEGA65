@@ -1,8 +1,9 @@
--- The devices of nice_cpu/hdl/src at 0xFFFFFF10-7F and A0-AF
+-- The devices of nice_cpu/hdl/src at 0xFFFFFF10-7F and A0-BF
 -- (src/nicemon.vhd): the timer of SYSTEM.md §4 at 10-1F, the math unit
 -- (MPU) of §2 at 20-3F, the performance counters of §3 at 40-4F, the fetch
--- statistics at 50-7F, and, with G_SD_SLOTS > 0, the SD card controller
--- of §5 at A0-AF (src/sd/sd.vhd).
+-- statistics at 50-7F, with G_SD_SLOTS > 0 the SD card controller of §5
+-- at A0-AF (src/sd/sd.vhd), and the registers of the network station of
+-- §6 at B0-BF (nice_cpu/hdl/src/net_regs.vhd).
 --
 -- THEORY OF OPERATION
 -- nicemon gives a request here in the cycle that it takes it, the core's
@@ -37,17 +38,22 @@
 -- that raises an interrupt, so its request goes straight to the core's IRQ.
 -- The SD card controller's registers are reset when the core starts, but
 -- its engine and its pins only with the system (src/sd/sd.vhd), and it
--- runs while the core is held, paused, or halted (SYSTEM.md §5).
+-- runs while the core is held, paused, or halted (SYSTEM.md §5). The
+-- network station's registers are reset only with the system, not when
+-- the core starts, so that a program finds the addresses that an earlier
+-- one set, and a host keeps its connection (SYSTEM.md §6).
 --
 -- With G_FORMAL, it states the properties that formal/devices.sby proves:
 -- each acknowledge answers a request, the core's and the link's go to the
 -- master that made it, with the word of the device that takes it, and
 -- each request reaches its device, and no other. Without G_SD_HOLD_ACK,
--- the SD card controller never stalls.
+-- the SD card controller never stalls. A start of the core keeps the
+-- station's addresses.
 --
 -- RESET
 -- Synchronous. Reset drops the link's request and what the core is owed,
--- and resets the devices.
+-- and resets the devices. It sets the station's IP address to 0 and its
+-- MAC address to G_ETH_MAC.
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -65,6 +71,8 @@ entity devices is
       G_SD_POWER    : boolean                      := false;
       G_SD_HOLD_ACK : boolean                      := false;
       G_SD_SLOW_HZ  : positive                     := 400_000;
+      -- The network station's MAC address after reset
+      G_ETH_MAC     : std_logic_vector(47 downto 0) := X"024E49434500";
       -- The properties for formal/devices.sby
       G_FORMAL      : boolean                      := false
    );
@@ -109,13 +117,24 @@ entity devices is
       sd_dat0_i    : in  std_logic_vector(1 downto 0) := "11";
       sd_cd_n_i    : in  std_logic_vector(1 downto 0) := "11";
       sd_wp_i      : in  std_logic_vector(1 downto 0) := "00";
-      sd_pwr_n_o   : out std_logic
+      sd_pwr_n_o   : out std_logic;
+      -- The network station (net_regs.vhd): its counts of Ethernet frames
+      -- received, good and bad, and sent, a host connected to the link
+      -- over TCP, and the port of the link, in the clock domain of clk_i,
+      -- and its IP and MAC addresses
+      eth_rx_i     : in  std_logic_vector(31 downto 0) := (others => '0');
+      eth_rx_bad_i : in  std_logic_vector(31 downto 0) := (others => '0');
+      eth_tx_i     : in  std_logic_vector(31 downto 0) := (others => '0');
+      net_on_i     : in  std_logic                     := '0';
+      net_port_i   : in  std_logic_vector(15 downto 0) := (others => '0');
+      eth_ip_o     : out std_logic_vector(31 downto 0);
+      eth_mac_o    : out std_logic_vector(47 downto 0)
    );
 end entity devices;
 
 architecture synthesis of devices is
 
-   type t_dev is (DEV_PERF, DEV_MPU, DEV_TIMER, DEV_FS, DEV_SD);
+   type t_dev is (DEV_PERF, DEV_MPU, DEV_TIMER, DEV_FS, DEV_SD, DEV_NET);
 
    -- The device of the low byte of a device's address
    function dev_of(addr : std_logic_vector(7 downto 0)) return t_dev is
@@ -128,6 +147,8 @@ architecture synthesis of devices is
          return DEV_FS;
       elsif addr(7 downto 4) = X"A" then
          return DEV_SD;
+      elsif addr(7 downto 4) = X"B" then
+         return DEV_NET;
       end if;
       return DEV_TIMER;
    end function dev_of;
@@ -182,6 +203,10 @@ architecture synthesis of devices is
    signal sd_stall    : std_logic;
    signal sd_ack      : std_logic;
    signal sd_data     : std_logic_vector(31 downto 0);
+   signal net_stb     : std_logic;
+   signal net_stall   : std_logic;
+   signal net_ack     : std_logic;
+   signal net_data    : std_logic_vector(31 downto 0);
 
 begin
 
@@ -257,12 +282,16 @@ begin
    sd_stb    <= lnk_stb when busy = '1' and lnk_sel = DEV_SD else
                 core_stb_i when core_sel = DEV_SD else
                 '0';
+   net_stb   <= lnk_stb when busy = '1' and lnk_sel = DEV_NET else
+                core_stb_i when core_sel = DEV_NET else
+                '0';
    io_stall  <= mpu_stall when lnk_sel = DEV_MPU else
                 perf_stall when lnk_sel = DEV_PERF else
                 fs_stall when lnk_sel = DEV_FS else
                 sd_stall when lnk_sel = DEV_SD else
+                net_stall when lnk_sel = DEV_NET else
                 timer_stall;
-   io_ack    <= mpu_ack or perf_ack or fs_ack or timer_ack or sd_ack;
+   io_ack    <= mpu_ack or perf_ack or fs_ack or timer_ack or sd_ack or net_ack;
 
    core_ack_o <= owed and io_ack;
    link_ack_o <= busy and io_ack;
@@ -270,6 +299,7 @@ begin
                  perf_data when sel = DEV_PERF else
                  fs_data when sel = DEV_FS else
                  sd_data when sel = DEV_SD else
+                 net_data when sel = DEV_NET else
                  timer_data;
    busy_o     <= busy;
    owed_o     <= owed;
@@ -387,11 +417,40 @@ begin
       sd_pwr_n_o <= '1';
    end generate gen_sd;
 
+   -- The network station's registers, which only the system's reset
+   -- resets. A write of an address while a host is connected, or while a
+   -- reply goes out, breaks it (eth/eth.vhd, contract c), as SYSTEM.md §6
+   -- allows, so wr_o is not needed.
+   i_net_regs : entity work.net_regs
+      generic map (
+         G_MAC => G_ETH_MAC
+      )
+      port map (
+         clk_i       => clk_i,
+         rst_i       => rst_i,
+         wb_cyc_i    => io_cyc,
+         wb_stb_i    => net_stb,
+         wb_stall_o  => net_stall,
+         wb_ack_o    => net_ack,
+         wb_we_i     => io_we,
+         wb_addr_i   => io_addr(3 downto 0),
+         wb_data_i   => io_wdata,
+         wb_data_o   => net_data,
+         rx_good_i   => eth_rx_i,
+         rx_bad_i    => eth_rx_bad_i,
+         tx_i        => eth_tx_i,
+         connected_i => net_on_i,
+         port_i      => net_port_i,
+         ip_o        => eth_ip_o,
+         mac_o       => eth_mac_o,
+         wr_o        => open
+      ); -- i_net_regs
+
 
    gen_formal : if G_FORMAL generate
       -- The stb of each device, by t_dev'pos, and the acknowledge of each
-      signal f_stb : std_logic_vector(4 downto 0);
-      signal f_ack : std_logic_vector(4 downto 0);
+      signal f_stb : std_logic_vector(5 downto 0);
+      signal f_ack : std_logic_vector(5 downto 0);
       -- A device that stalls
       signal f_stall : std_logic;
       -- The core's requests taken and not yet acknowledged, which a hold
@@ -413,8 +472,8 @@ begin
          end if;
       end process p_core_wait;
 
-      f_stb   <= sd_stb & fs_stb & timer_stb & mpu_stb & perf_stb;
-      f_ack   <= sd_ack & fs_ack & timer_ack & mpu_ack & perf_ack;
+      f_stb   <= net_stb & sd_stb & fs_stb & timer_stb & mpu_stb & perf_stb;
+      f_ack   <= net_ack & sd_ack & fs_ack & timer_ack & mpu_ack & perf_ack;
       f_stall <= mpu_stall or sd_stall;
 
       -- psl default clock is rising_edge(clk_i);
@@ -427,17 +486,19 @@ begin
       -- psl f_dev_stall : assert always
       --    rst_i = '0' and f_stall = '1' -> busy = '1' or owed = '1' or hold_d = '1';
       -- psl f_one_wait : assert always not (busy = '1' and owed = '1');
-      -- psl f_one_ack : assert always f_ack = "00000" or f_ack = "00001" or f_ack = "00010" or
-      --                               f_ack = "00100" or f_ack = "01000" or f_ack = "10000";
+      -- psl f_one_ack : assert always f_ack = "000000" or f_ack = "000001" or f_ack = "000010" or
+      --                               f_ack = "000100" or f_ack = "001000" or f_ack = "010000" or
+      --                               f_ack = "100000";
 
       -- A request reaches its device, and no other: the core's in the
       -- cycle it is taken, the link's from the latch until the device
       -- takes it, with the request that the link made.
       -- psl f_core_stb : assert always
       --    core_stb_i = '1' -> f_stb(t_dev'pos(dev_of(core_addr_i))) = '1';
-      -- psl f_stb_one : assert always f_stb = "00000" or f_stb = "00001" or f_stb = "00010" or
-      --                               f_stb = "00100" or f_stb = "01000" or f_stb = "10000";
-      -- psl f_stb_who : assert always f_stb /= "00000" -> core_stb_i = '1' or lnk_stb = '1';
+      -- psl f_stb_one : assert always f_stb = "000000" or f_stb = "000001" or f_stb = "000010" or
+      --                               f_stb = "000100" or f_stb = "001000" or f_stb = "010000" or
+      --                               f_stb = "100000";
+      -- psl f_stb_who : assert always f_stb /= "000000" -> core_stb_i = '1' or lnk_stb = '1';
       -- psl f_link_latch : assert always
       --    {link_stb_i and not busy and not rst_i} |=>
       --    {busy = '1' and lnk_stb = '1' and lnk_sel = prev(dev_of(link_addr_i)) and
@@ -468,10 +529,18 @@ begin
       --    (core_ack_o = '1' or link_ack_o = '1') ->
       --    (mpu_ack = '1' and rdata_o = mpu_data) or (perf_ack = '1' and rdata_o = perf_data) or
       --    (fs_ack = '1' and rdata_o = fs_data) or (timer_ack = '1' and rdata_o = timer_data) or
-      --    (sd_ack = '1' and rdata_o = sd_data);
+      --    (sd_ack = '1' and rdata_o = sd_data) or (net_ack = '1' and rdata_o = net_data);
 
       -- The devices are reset when the core starts.
       -- psl f_start : assert always {hold_i; not hold_i} |-> {dev_rst};
+
+      -- The station never stalls, and only the system's reset sets its
+      -- addresses: a start of the core keeps them.
+      -- psl f_net_no_stall : assert always net_stall = '0';
+      -- psl f_net_keep : assert always
+      --    {not rst_i and not net_stb} |=> {stable(eth_ip_o) and stable(eth_mac_o)};
+      -- psl c_net_core : cover {core_stb_i and net_stb and not rst_i; core_ack_o};
+      -- psl c_net_link : cover {link_stb_i and not rst_i; net_stb; link_ack_o};
 
       -- psl c_core : cover {core_stb_i and not rst_i; core_ack_o};
       -- psl c_link : cover {link_stb_i and not rst_i; true; link_ack_o};

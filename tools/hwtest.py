@@ -146,8 +146,9 @@ from jtag import check_board
 from load import (MAX_RAM_WORDS, MONITOR_WORDS, PROGRAM, RAM_SIZE, load_words,
                   read_bin, start)
 from nicelink import (BAUD, BAUDS, BRK_COUNT, BRK_EN, CONTROL, ETH_PORT,
-                      FREE, HOLD, PAUSE, RAM, REGS, STEP, STOP, VERSION, Eth,
-                      Link, LinkError, Serial, Tcp, packet)
+                      FREE, HOLD, NET_IP, NET_RX_GOOD, NET_STATUS, NET_TX,
+                      PAUSE, RAM, REGS, STEP, STOP, VERSION, Eth, Link,
+                      LinkError, Serial, Tcp, packet)
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NICEEMU = f"{REPO}/nice_cpu/emulator/zig-out/bin/niceemu"
@@ -1571,14 +1572,16 @@ def test_eth_ip(link: Link, rom: str, ip: str) -> list[int] | None:
     while link.free() < room and time.monotonic() < end:
         link.poll(0.05)
     link.poll(QUIET)
-    got = paused(link, [0xFFFFFF9A, 0xFFFFFF98, 0xFFFFFF9D])
+    got = paused(link, [NET_IP, NET_RX_GOOD, NET_TX, NET_STATUS])
     if not check(f"eth: the monitor's i typed over the UART gives the IP "
                  f"address {ip}",
                  got is not None and got[0] == want,
                  "no pause" if got is None else f"{got[0]:08X}"):
         return None
     assert got is not None
-    return got[1:]
+    check(f"eth: NET_STATUS has the port {ETH_PORT} and no host",
+          got[3] == ETH_PORT, f"{got[3]:08X}")
+    return got[1:3]
 
 
 def test_eth(port: str, baud: int, eth: str,
@@ -1601,7 +1604,7 @@ def test_eth(port: str, baud: int, eth: str,
                 return
             ping = subprocess.run(["ping", "-c", "3", "-W", "2", ip],
                                   capture_output=True, text=True)
-            after = paused(link, [0xFFFFFF98, 0xFFFFFF9D])
+            after = paused(link, [NET_RX_GOOD, NET_TX])
             if after is None:
                 check("eth: pause after the ping", False)
                 return
@@ -1627,10 +1630,13 @@ def test_eth(port: str, baud: int, eth: str,
         # The UART's link bytes are dropped while this connection is open
         tcp_link = Link(Eth(int(tcp) if tcp else ETH_PORT, ip))
         try:
-            got = paused(tcp_link, [0xFFFFFF9A])
+            got = paused(tcp_link, [NET_IP, NET_STATUS])
             check("eth: the link over TCP pauses the monitor and reads the "
                   "IP address", got is not None and got[0] == want,
                   "no pause" if got is None else f"{got[0]:08X}")
+            if got is not None:
+                check("eth: NET_STATUS has a host connected",
+                      got[1] == 0x80000000 | ETH_PORT, f"{got[1]:08X}")
         finally:
             tcp_link.close()
         test_run(["--eth", eth], programs, " over Ethernet")

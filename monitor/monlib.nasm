@@ -107,7 +107,7 @@ _io_gethex.digit
 
 ; _io_getc: R1 = the next byte of the console, which it waits for. A read
 ; of 0x200, the end of the line's input, is no byte: on a board the
-; keyboard's bytes still come (nice_cpu's SYSTEM.md §6), and in niceemu
+; keyboard's bytes still come (nice_cpu's SYSTEM.md §8), and in niceemu
 ; the input file has ended. Uses R1.
 _io_getc
                 MOVE    R1, @io.console

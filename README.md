@@ -250,11 +250,11 @@ terminal program, such as `picocom`, the plain client, as
 
 The serial port also gives the board its IP address without the
 monitor.
-The link writes it to `0xFFFFFF9A`, the first byte in bits 31..24, here
+The link writes it to `0xFFFFFFB0`, the first byte in bits 31..24, here
 192.168.1.65:
 
     tools/mon.py --port /dev/ttyUSB1
-    mon> w FFFFFF9A C0A80141
+    mon> w FFFFFFB0 C0A80141
     mon> q
 
 ## Using the interactive shell

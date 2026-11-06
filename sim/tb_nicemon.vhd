@@ -31,7 +31,10 @@
 --    it again when it is started with the ROM shown. From then on the ROM
 --    is hidden, as the tools hide it, so the RAM is at 0 as in the
 --    emulator. The version register reads 6, and the free space 16, the
---    whole FIFO.
+--    whole FIFO. The network station at 0xFFFFFFB0 has its addresses after
+--    reset, IP 0 and MAC 02:4E:49:43:45:00, which a write sets, its counts
+--    at 0, and NET_STATUS with the port and no host; a start keeps the
+--    addresses.
 -- 2. Load G_HELLO_FILE with W packets, and read its first word back.
 -- 3. The control register: the core is held in reset.
 -- 4. Start the core. It prints "Hello, NICE!" and halts, and the link sends
@@ -90,7 +93,8 @@
 --    and the font base, which selects the RAM. The start kept the screen's
 --    and the board's registers.
 -- 10. Clear the memory: what the programs left is gone, the font RAM and
---    the font base included, and the core is held. The clear ends the halt, so bit 1 and the halt reason read 0
+--    the font base included, and the core is held. The station keeps its
+--    addresses. The clear ends the halt, so bit 1 and the halt reason read 0
 --    (link version 5).
 -- 11. Load G_RESERVED_FILE, and run it. It halts on a reserved control
 --    word, which the halt reason and `h02` show, after the steps of niceemu.
@@ -110,13 +114,14 @@
 --    keyboard waits. Then G_FIFO_FILE once more, with a break on the UART
 --    while it runs: the host's bytes after the break are dropped, and the
 --    keys still reach the program, which reads on at 0x200 and echoes
---    them (nice_cpu's SYSTEM.md §6).
+--    them (nice_cpu's SYSTEM.md §8).
 -- 15. The link over TCP, with the net_* ports driven as eth/eth_tcp.vhd
 --    drives them: a host connects, and G_FIFO_FILE echoes its bytes over
 --    TCP; its half-close is a break, after which its bytes are dropped;
 --    the next connection renews the line's input, the link's resume
---    (DEBUG.md §7), and its bytes reach the program again. Then a flood
---    over TCP: G_FIFO_FILE's 40 bytes and a '.' sent while it waits are
+--    (DEBUG.md §7), and its bytes reach the program again; NET_STATUS has
+--    bit 31 while the host is connected. Then a flood over TCP:
+--    G_FIFO_FILE's 40 bytes and a '.' sent while it waits are
 --    held back, not lost, as TCP holds the host back, and all echoed,
 --    with no `o`. While it is paused, the 17th byte waits C_LINK_WAIT,
 --    the link's G_WAIT, and is lost with one `o`; the bytes behind it
@@ -139,8 +144,8 @@
 --    2 Mbaud.
 -- 18. A reset while G_ECHO_FILE runs: the link sends `b06` at
 --    G_UART_BAUDRATE, the core boots from the ROM again, and the screen's
---    and the board's registers, the baud rate, and the breakpoints are
---    cleared.
+--    and the board's registers, the baud rate, the station's addresses,
+--    and the breakpoints are cleared.
 --
 -- The core's input FIFO has 16 bytes here, so that step 6 is short, and the
 -- RAM, the ROM, and the screen are small, so that the clearing is.
@@ -784,6 +789,21 @@ begin
       check("FFFFFF9E", "00001000");         -- the RAM's words, 2 ** G_RAM_ADDR_BITS
       wr("FFFFFF9E", "00000001");            -- dropped
       check("FFFFFF9E", "00001000");
+      check("FFFFFFB0", "00000000");         -- NET_IP, 0 after reset
+      check("FFFFFFB1", "0000024E");         -- NET_MAC_HI and NET_MAC_LO, 02:4E:49:43:45:00
+      check("FFFFFFB2", "49434500");
+      check("FFFFFFB3", "00000000");         -- the counts
+      check("FFFFFFB5", "00000000");
+      check("FFFFFFB6", "0000119E");         -- NET_STATUS: no host, port 4510
+      check("FFFFFFB7", "00000000");
+      wr("FFFFFFB0", "C0A80141");            -- 192.168.1.65
+      wr("FFFFFFB1", "FFFF0002");            -- bits 31..16 are dropped
+      wr("FFFFFFB2", "4E494301");
+      wr("FFFFFFB6", "00000001");            -- read only
+      check("FFFFFFB0", "C0A80141");
+      check("FFFFFFB1", "00000002");
+      check("FFFFFFB2", "4E494301");
+      check("FFFFFFB6", "0000119E");
       check("00000000", first_v);            -- the ROM
       wr("00000000", "12345678");            -- dropped
       check("00000000", first_v);
@@ -801,6 +821,8 @@ begin
       expect_con("Hello from the ROM!" & C_LF);
       expect_halt("01");
       check("FFFFFFF0", "00000002");
+      check("FFFFFFB0", "C0A80141");         -- the start keeps the station's addresses
+      check("FFFFFFB2", "4E494301");
       wr("FFFFFFF0", "00000009");            -- hidden from here on
       check("00000000", "ABCD1234");
 
@@ -1158,6 +1180,7 @@ begin
       check("FFFE1FFF", "00000000");
       check("FFFE2829", "0000" & to_hstring(C_FONT(16#41# * 32 + 9)));  -- the ROM stays
       check("FFFFFF93", "76543210");                                    -- the board's registers are kept
+      check("FFFFFFB0", "C0A80141");                                    -- and the station's addresses
 
       report "tb_nicemon: load " & G_RESERVED_FILE;
       load(G_RESERVED_FILE, first_v);
@@ -1247,8 +1270,10 @@ begin
       expect_con("cd.");
       expect_halt("01");
       check("FFFFFFF3", "00000010");         -- the FIFO is empty: no "zz"
+      check("FFFFFFB6", "8000119E");         -- NET_STATUS: a host, on port 4510
       net_on <= '0';                         -- the host leaves: the link goes back to the UART
       wait until rising_edge(clk);
+      check("FFFFFFB6", "0000119E");
 
       report "tb_nicemon: a flood over TCP waits for a program that reads";
       wr("FFFFFFF0", "00000009");
@@ -1411,6 +1436,8 @@ begin
       check("FFFFFF90", "00000000");         -- the board's registers
       check("FFFFFF94", "00000000");
       check("FFFFFF9F", "00895440");         -- the baud rate
+      check("FFFFFFB0", "00000000");         -- the station's addresses
+      check("FFFFFFB2", "49434500");
       check("FFFFFFF4", "00000000");         -- the breakpoints
       check("FFFFFFF8", "00000000");
       assert scr_cur_x = 0 and scr_offs = 0 and brd_led = 0 and brd_seg = 0

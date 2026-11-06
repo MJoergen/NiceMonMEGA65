@@ -24,15 +24,17 @@ header of `nicemon.vhd` is the address map, and
   boots from, and the screen. It has two ports: one for the instruction
   bus and one for the data bus.
 - **DEVICES** ([devices.vhd](devices.vhd)) are nice_cpu's: the timer,
-  the math unit, the performance counters, the fetch statistics, and
-  the SD card controller ([sd/sd.vhd](sd/sd.vhd)), whose pins go to the
-  board's slots. The timer interrupts the core, and the controller has
-  the pins, which the diagram does not show.
+  the math unit, the performance counters, the fetch statistics, the
+  SD card controller ([sd/sd.vhd](sd/sd.vhd)), whose pins go to the
+  board's slots, and the network station's registers, the Ethernet
+  station's addresses and its counts of frames. The timer interrupts the
+  core, and the controller has the pins, which the diagram does not
+  show.
 - **SCREEN REGS** ([scr_regs.vhd](scr_regs.vhd)) hold the cursor and the
   display offset.
 - **BOARD REGS** ([board_io.vhd](board_io.vhd)) are the Nexys4DDR's
-  LEDs, display, buttons, and switches, and, on every board, the
-  Ethernet station's addresses and its counts of frames.
+  LEDs, display, buttons, and switches, and, on every board, the size of
+  the RAM and the UART's baud rate.
 - **INPUT FIFO** ([rx_fifo.vhd](rx_fifo.vhd)) holds the console bytes
   that wait for the core: those from the host, which come through the
   link, and those from the keyboard.

@@ -24,8 +24,8 @@ or, in an existing clone:
 - `make typecheck` checks the Python tools and scripts with `mypy
   --strict`, as nice_cpu checks its own. `mypy.ini` lists the files.
 - `make examples` builds the C examples.
-- `make demo` builds the demo, `demo/build/demo.bin`, a program at
-  `0x8000`, and joins it behind the monitor into `demo/build/rom.bin`,
+- `make demo` builds nice_cpu's demo with the board's text,
+  `demo/build/demo.bin`, a program at `0x8000`, and joins it behind the monitor into `demo/build/rom.bin`,
   which the boards' targets and the release put in the ROM of the
   bitstreams and core files. The monitor's `x` runs the demo.
 - `make r3`, `make r6`, and `make nexys4ddr` build the bitstreams, with
@@ -91,7 +91,7 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
 | [formal/](formal/) | The formal checks, for SymbiYosys. |
 | [synth/](synth/README.md) | The Vivado builds for the MEGA65 R3 and R6 boards, and the Nexys4DDR. |
 | [monitor/](monitor/README.md) | The monitor for the ROM, in NICE assembly: a hardware abstraction layer for programs at `0x8000`, called through a dispatch table, a main loop with a few commands, the file of routines that programs join, the stubs and the header for programs, and its tests in `niceemu`. Its README has the decisions, and [#62](https://github.com/MJoergen/NiceMonMEGA65/issues/62) the loading from storage. |
-| [demo/](demo/README.md) | The demos in the ROM of the release, behind the monitor, which runs them with `x`, for the time being, in NICE assembly, which the function keys switch between: a welcome screen that turns into a typewriter, the key codes, the characters and colors, the counters, a game, and the board: a self-test and the Ethernet station's addresses. |
+| [demo/](demo/README.md) | The demo in the ROM of the release, behind the monitor, which runs it with `x`, for the time being: nice_cpu's demo (`nice_cpu/demo`), whose function keys switch between a welcome screen that turns into a typewriter, the key codes, the characters and colors, the counters, a game, and the board, a self-test and the network station's addresses. Here are the board's text, `text.nasm`, the join behind the monitor, `join.py`, and its check on a board, `demo_hw.py`. |
 | [examples/](examples/) | Example C programs, and the Makefile that builds them for the MEGA65. |
 | [tools/](tools/) | `nicelink.py`, the debug link over the board's Ethernet port or UART, over TCP to `niceemu --link`, or over TCP to the simulated system of `make cosim`, and the tools that use it: `load.py`, which loads a program into the MEGA65 or Nexys4DDR, `run.py`, which runs a program on the board as `niceemu` runs it, `mon.py`, an interactive shell on the link, `hwtest.py`, which tests the system on the board, `flash.py`, which writes the Nexys4DDR's flash or a slot of the MEGA65's, `bump.py`, which records the MEGA65's timing for a nice_cpu tag, `release.py`, which builds and publishes a release, `linktest.py`, which checks `run.py` and `mon.py` on `niceemu --link`, `cosimtest.py`, which checks `run.py` on the simulated system, and `screenshot.py`, which draws a program's screen in `niceemu` as a PNG picture. |
 | [README.md](README.md) | For those who use the core files and write programs for them: on its own, over Ethernet, and over the serial port. |
@@ -156,7 +156,8 @@ You need GHDL (tested with 4.1.0) and Python 3, and gcc for `make cosim`.
 It prints a `PASS` line for each testbench, and a `FAIL` line with the log
 for one that fails. If one fails, run it alone with `make -C sim <name>`,
 such as `make -C sim tb_kbd`. `make -j test` runs all the tests side by
-side, in the time of `tb_text`, and then runs the demo in `niceemu`. `make
+side, in the time of `tb_text`, and then runs the demo behind the
+monitor, and the monitor, in `niceemu`. `make
 -C sim test` runs them in turn. `make lint` checks the VHDL against
 [CODING_STYLE.md](doc/CODING_STYLE.md) with vsg.
 
@@ -454,9 +455,8 @@ every time, not only the ones a testbench sends.
   `src/board_io.vhd`, with them and without them: a write sets the
   register of its word, nothing else changes one but reset, each word
   reads its register, its input, or 0, and the buttons reach their
-  register two cycles after their pins. The Ethernet station's words at
-  `0xFFFFFF98`–`9D` are there on every board, and its IP and MAC
-  addresses after reset are as the generics say. `0xFFFFFF9E` reads the
+  register two cycles after their pins. `0xFFFFFF97`–`9D` read 0.
+  `0xFFFFFF9E` reads the
   words of the RAM on every board. `0xFFFFFF9F` holds the UART's baud
   rate: a write of a rate it takes sets it, any other leaves it, reset
   sets the generic's, and the bit's cycles that go out are always those
@@ -472,7 +472,10 @@ every time, not only the ones a testbench sends.
   goes to the master that made it, the core or the link, with the word of
   the device that takes it, and each request reaches its device, and no
   other, the link's from its latch until the device takes it. The devices
-  are reset when the core starts. The `prove_sd` and `cover_sd` tasks are
+  are reset when the core starts, but for the network station at
+  `0xFFFFFFB0`–`BF`, nice_cpu's `net_regs.vhd`, whose addresses only a
+  reset of the system changes, and which never stalls; nice_cpu's own
+  `net_regs.sby` proves its registers. The `prove_sd` and `cover_sd` tasks are
   `prove` and `cover` with the SD card controller at `0xFFFFFFA0`–`AF`, in
   the boards' configuration, two slots without `G_SD_HOLD_ACK`, where it
   never stalls.

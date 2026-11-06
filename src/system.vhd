@@ -57,8 +57,8 @@
 -- RESET
 -- Synchronous to clk_i, by rst_i, as nicemon.vhd describes, and in the
 -- Ethernet clock domain by eth_rst_i. rst_i clears the counts of frames,
--- sets the MAC and IP addresses to G_ETH_MAC and G_ETH_IP, and the UART's
--- baud rate to 2 Mbaud.
+-- sets the MAC address to G_ETH_MAC and the IP address to 0, and the
+-- UART's baud rate to 2 Mbaud.
 -- The video has no reset of its own (text.vhd).
 
 library ieee;
@@ -82,10 +82,9 @@ entity system is
       G_BOARD_IO      : boolean      := false;
       -- The number of breakpoints of the debug link (DEBUG.md §6)
       G_BREAKS        : natural      := 4;
-      -- The Ethernet station's addresses after reset; an IP address of 0
-      -- answers nothing (board_io.vhd).
+      -- The Ethernet station's MAC address after reset; its IP address is
+      -- 0 then, which answers nothing (nicemon.vhd, 0xFFFFFFB0-BF).
       G_ETH_MAC       : std_logic_vector(47 downto 0) := X"024E49434500";
-      G_ETH_IP        : std_logic_vector(31 downto 0) := X"00000000";
       -- The board's key that toggles the debugger, as its strip names it
       G_TOGGLE_KEY    : string       := "MEGA+HELP";
       -- The SD card slots, 1 or 2, or 0 for no controller (nicemon.vhd).
@@ -252,7 +251,7 @@ begin
          G_BOARD_IO         => G_BOARD_IO,
          G_BREAKS           => G_BREAKS,
          G_ETH_MAC          => G_ETH_MAC,
-         G_ETH_IP           => G_ETH_IP,
+         G_TCP_PORT         => C_TCP_PORT,
          G_SD_SLOTS         => G_SD_SLOTS,
          G_SD_DETECT        => G_SD_DETECT,
          G_SD_POWER         => G_SD_POWER

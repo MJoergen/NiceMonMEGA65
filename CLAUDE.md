@@ -42,7 +42,7 @@ header is the authoritative address map.
     make typecheck        # mypy --strict on the Python files that mypy.ini lists
     make diagrams         # src/system.tex and src/eth/eth.tex -> the PNGs of their READMEs (pdflatex)
     make examples         # C examples -> examples/build/*.bin (clang wasm32, lld, llvm)
-    make demo             # the demo at 0x8000 -> demo/build/demo.bin, behind the monitor -> demo/build/rom.bin; make -C demo test runs it in niceemu
+    make demo             # nice_cpu's demo at 0x8000 -> demo/build/demo.bin, behind the monitor -> demo/build/rom.bin; make -C demo test runs the join in niceemu
     make monitor          # the monitor -> monitor/build/monitor.bin; make -C monitor test runs it in niceemu
     make r6 [ROM=f.bin]   # Vivado bitstream, synth/r6/build/top.bit, the monitor and the demo (demo/build/rom.bin) in the ROM unless ROM= (none) or ROM=f.bin; make r3 and make nexys4ddr likewise
     make cor [ROM=f.bin]  # MEGA65 core files for MEGAFLASH, synth/r{3,6}/build/NiceMonMEGA65-r{3,6}.cor (coretool)
@@ -128,8 +128,9 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   pyftdi, which clears the sectors' DYB protection),
   `bump.py`, `release.py`, `linktest.py`, `cosimtest.py`, `screenshot.py`
   (a program's screen in niceemu as a PNG). `examples/`: C programs built through
-  nice_cpu's wasm translator. `demo/`: the welcome screen and typewriter
-  in NICE assembly, a program at 0x8000 that `join.py` puts behind the
+  nice_cpu's wasm translator. `demo/`: nice_cpu's demo (`nice_cpu/demo`,
+  since V1.7), built by its Makefile with the board's `text.nasm`, a
+  program at 0x8000 that `join.py` puts behind the
   monitor in the ROM of the boards and the release (`release.py`), where
   the monitor's `x` copies it to 0x8000 and runs it, for the time being
   (#65), and `demo_hw.py`, which checks it in the ROM of a programmed board.
@@ -171,7 +172,7 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   R1–R15 while paused, and over Ethernet a console byte waits up to
   50 ms for room in the full FIFO before it is lost.
 - The tools take `--eth HOST[:PORT]` for the board's link over TCP on
-  its Ethernet port, 4510 by default, once 0xFFFFFF9A gives it an IP
+  its Ethernet port, 4510 by default, once 0xFFFFFFB0 gives it an IP
   address. It is the line, as the UART is: no `b` notice at connect, and
   a half-close is a break. While a host is connected, the UART's link
   bytes are dropped. `make hwtest` tests the station last, setting its

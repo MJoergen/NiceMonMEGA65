@@ -77,8 +77,8 @@
 -- shown only; the hex digits, the dot, and the colon go into the field
 -- (sfield), and on the rate the cursor keys left and right put the next
 -- rate of C_UART_RATES there. RETURN has dbg_set.vhd parse the field, and
--- a good one is written as a word's write is, to 0xFFFFFF9A, to
--- 0xFFFFFF9B and 9C, or to 0xFFFFFF9F, with `written` or the link's
+-- a good one is written as a word's write is, to 0xFFFFFFB0, to
+-- 0xFFFFFFB1 and B2, or to 0xFFFFFF9F, with `written` or the link's
 -- error; a bad one says `bad value` and stays in the field. ESC clears
 -- the field, or leaves the page when it is empty.
 --
@@ -1108,9 +1108,9 @@ begin
                set_d0  <= set_value(31 downto 0);
                case set_line is
                   when C_SET_IP =>
-                     set_addr <= X"FFFFFF9A";
+                     set_addr <= X"FFFFFFB0";
                   when C_SET_MAC =>
-                     set_addr <= X"FFFFFF9B";
+                     set_addr <= X"FFFFFFB1";
                      set_two  <= '1';
                      set_d0   <= X"0000" & set_value(47 downto 32);
                      set_d1   <= set_value(31 downto 0);

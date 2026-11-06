@@ -29,10 +29,10 @@ smtbmc yices
 
 [script]
 plugin -i ghdl
-prove: ghdl --std=08 -fpsl nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd perf.vhd timer.vhd fetch_stats.vhd sd_regs.vhd sd_spi_byte.vhd sd_spi.vhd sd.vhd devices.vhd formal_devices.vhd -e formal_devices
-cover: ghdl --std=08 -fpsl nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd perf.vhd timer.vhd fetch_stats.vhd sd_regs.vhd sd_spi_byte.vhd sd_spi.vhd sd.vhd devices.vhd formal_devices.vhd -e formal_devices
-prove_sd: ghdl --std=08 -fpsl -gG_SD_SLOTS=2 nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd perf.vhd timer.vhd fetch_stats.vhd sd_regs.vhd sd_spi_byte.vhd sd_spi.vhd sd.vhd devices.vhd formal_devices.vhd -e formal_devices
-cover_sd: ghdl --std=08 -fpsl -gG_SD_SLOTS=2 nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd perf.vhd timer.vhd fetch_stats.vhd sd_regs.vhd sd_spi_byte.vhd sd_spi.vhd sd.vhd devices.vhd formal_devices.vhd -e formal_devices
+prove: ghdl --std=08 -fpsl nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd perf.vhd timer.vhd fetch_stats.vhd sd_regs.vhd net_regs.vhd sd_spi_byte.vhd sd_spi.vhd sd.vhd devices.vhd formal_devices.vhd -e formal_devices
+cover: ghdl --std=08 -fpsl nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd perf.vhd timer.vhd fetch_stats.vhd sd_regs.vhd net_regs.vhd sd_spi_byte.vhd sd_spi.vhd sd.vhd devices.vhd formal_devices.vhd -e formal_devices
+prove_sd: ghdl --std=08 -fpsl -gG_SD_SLOTS=2 nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd perf.vhd timer.vhd fetch_stats.vhd sd_regs.vhd net_regs.vhd sd_spi_byte.vhd sd_spi.vhd sd.vhd devices.vhd formal_devices.vhd -e formal_devices
+cover_sd: ghdl --std=08 -fpsl -gG_SD_SLOTS=2 nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd perf.vhd timer.vhd fetch_stats.vhd sd_regs.vhd net_regs.vhd sd_spi_byte.vhd sd_spi.vhd sd.vhd devices.vhd formal_devices.vhd -e formal_devices
 prep -top formal_devices
 
 [files]
@@ -44,6 +44,7 @@ prep -top formal_devices
 ../nice_cpu/hdl/src/timer.vhd
 ../nice_cpu/hdl/src/fetch_stats.vhd
 ../nice_cpu/hdl/src/sd_regs.vhd
+../nice_cpu/hdl/src/net_regs.vhd
 ../src/sd/sd_spi_byte.vhd
 ../src/sd/sd_spi.vhd
 ../src/sd/sd.vhd

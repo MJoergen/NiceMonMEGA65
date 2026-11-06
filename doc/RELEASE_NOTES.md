@@ -21,6 +21,45 @@ The release candidates pinned these:
 
 nice_cpu's `RC01` and `RC03` have no tag here.
 
+## V1.7
+
+**Upgrade notes.**
+
+- nice_cpu is at `V1.7`. Its SYSTEM.md has a network station at
+  `0xFFFFFFB0`–`BF` (§6) and a port for Ethernet frames at
+  `0xFFFFFFC0`–`CF` (§7), and its "Systems built on the FPGA core" is §8,
+  from §6. The demo of the ROM moved to nice_cpu, to `nice_cpu/demo`
+  (nice_cpu#91). The cores and the debug link are as in V1.6.
+- The Ethernet station moved from `0xFFFFFF98`–`9D` to `0xFFFFFFB0`–`B6`,
+  as nice_cpu's §6 has it (#78): `NET_IP`, `NET_MAC_HI`, `NET_MAC_LO`,
+  `NET_RX_GOOD`, `NET_RX_BAD`, `NET_TX`, and `NET_STATUS`, which is new.
+  `0xFFFFFF98`–`9D` read 0 now and take no write. A program or a script
+  that wrote the IP address to `0xFFFFFF9A` writes it to `0xFFFFFFB0`.
+- The tools and the ROM of V1.7 use the new addresses, so they need a
+  bitstream of V1.7, and the tools of earlier releases a bitstream of
+  theirs, for the station.
+
+**New.**
+
+- `NET_STATUS`, `0xFFFFFFB6`, has bit 31 while a host is connected to
+  the link over TCP, and the port of the link, 4510, in bits 15..0. The
+  demo's F11 shows it in the row "Debug link, TCP port".
+- The station's registers are nice_cpu's `hdl/src/net_regs.vhd`, in
+  `devices.vhd`, and only a reset of the system resets them, as before.
+- The demo is nice_cpu's, built with the board's text, `demo/text.nasm`.
+  It runs the same, but for F11's new row, and F12, which clears the
+  screen itself before it returns to the monitor.
+
+**Tests.**
+
+- `tb_nicemon` reads and writes the station at `0xFFFFFFB0`, and checks
+  that a start and a clear keep its addresses, that a reset sets them
+  again, and `NET_STATUS` with and without a host. `make hwtest` reads
+  `NET_STATUS` over the UART and over TCP.
+- `make -C demo test` checks the join behind the monitor: `x`, the
+  board's text, F12 back to the monitor, `v`, and `h`. nice_cpu's own
+  test checks the demos.
+
 ## V1.6 (2026-11-06)
 
 **Upgrade notes.**

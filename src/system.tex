@@ -60,18 +60,18 @@
 
    \node[block, minimum height = 16mm] (mem)  at (62, 0)   {MEMORY\\[-0.5mm]
                                                            {\scriptsize RAM, ROM, screen}};
-   \node[block]                        (dev)  at (62, -22) {DEVICES\\[-0.5mm]
-                                                           {\scriptsize timer, math, counters}};
-   \node[block]                        (sreg) at (62, -38) {SCREEN REGS\\[-0.5mm]
-                                                           {\scriptsize scr\_regs}};
-   \node[block]                        (bio)  at (62, -54) {BOARD REGS\\[-0.5mm]
+   \node[block]                        (bio)  at (62, -38) {BOARD REGS\\[-0.5mm]
                                                            {\scriptsize board\_io}};
+   \node[block]                        (sreg) at (62, -22) {SCREEN REGS\\[-0.5mm]
+                                                           {\scriptsize scr\_regs}};
+   \node[block]                        (dev)  at (62, -54) {DEVICES\\[-0.5mm]
+                                                           {\scriptsize timer, math, SD, station}};
 
    % The data bus, port B of the memory and the registers
    \coordinate (busx) at (31, 0);
-   \draw[bus] (busx |- 0, -4) -- (busx |- bio.west);
+   \draw[bus] (busx |- 0, -4) -- (busx |- dev.west);
    \node[wirelabel, rotate = 90, anchor = south]
-      at ($ (busx |- dev.west)!0.5!(busx |- sreg.west) + (-1.5, 0) $) {data bus};
+      at ($ (busx |- bio.west)!0.5!(busx |- sreg.west) + (-1.5, 0) $) {data bus};
 
    \draw[both] ([yshift = -4mm] core.east) -- (busx |- 0, -4);
    \draw[wire] (fifo.east) -- (busx |- fifo.east);
@@ -93,7 +93,7 @@
       node[wirelabel, midway, right] {console input};
    \draw[both] (uart.east) -- (link.west);
 
-   \node[top, fit = (core) (link) (uart) (mem) (bio)] (nicemon) {};
+   \node[top, fit = (core) (link) (uart) (mem) (dev)] (nicemon) {};
    \node[toplabel] at ([xshift = 1mm, yshift = 0.5mm] nicemon.north west) {nicemon};
 
    %% ---------------------------------------------------------------
@@ -101,15 +101,15 @@
    %% ---------------------------------------------------------------
 
    \node[block, inner sep = 0pt,
-         fit = {(uart.west |- 0, -78) (bio.east |- 0, -88)}] (eth) {ETHERNET STATION\\[-0.5mm]
+         fit = {(uart.west |- 0, -78) (dev.east |- 0, -88)}] (eth) {ETHERNET STATION\\[-0.5mm]
          {\scriptsize eth: ARP, ping, and the debug link over TCP}};
 
    \draw[both] (link.south) -- (link.south |- eth.north)
       node[wirelabel, midway, right] {link bytes over TCP};
-   \draw[both] (bio.south) -- (bio.south |- eth.north)
+   \draw[both] (dev.south) -- (dev.south |- eth.north)
       node[wirelabel, midway, right, align = left] {addresses,\\ counts};
 
-   \node[block] (text) at (108, -19) {TEXT DISPLAY\\[-0.5mm]
+   \node[block] (text) at (108, -10) {TEXT DISPLAY\\[-0.5mm]
                                       {\scriptsize text}};
    \draw[wire] (mem.east) -| ([xshift = -6mm] text.north)
       node[wirelabel, pos = 0.3, above] {screen writes};

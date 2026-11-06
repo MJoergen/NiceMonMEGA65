@@ -180,15 +180,16 @@ its colors swapped, and the TCP port, the generic `G_PORT` of
  CRSR up/down choose  CRSR left/right rate  0-f . : type  RETURN write  ESC back
 ```
 
-The settings are registers of `board_io.vhd`, `0xFFFFFF9A` to `9C` and
-`9F`, which `nicemon` gives out, so the page shows them live, while the
+The settings are registers of the network station, `0xFFFFFFB0` to `B2`
+in `devices.vhd`, and of `board_io.vhd`, `0xFFFFFF9F`, which `nicemon`
+gives out, so the page shows them live, while the
 core runs too, without the link; a write goes through the link, as a
 word's write from the page does, and needs the core stopped. The IP
 address is typed with dots, 1 to 3 decimal digits a byte up to 255,
 the MAC address with colons, 1 or 2 hex digits a byte, and the rate in
 decimal, one of those that `0xFFFFFF9F` takes; anything else says `bad
-value` and stays in the field. The MAC address takes two writes, `9B`
-and then `9C`. On the rate, CRSR left and right put the rate before or
+value` and stays in the field. The MAC address takes two writes, `B1`
+and then `B2`. On the rate, CRSR left and right put the rate before or
 after the one in the field in it, starting from the UART's.
 `src/dbg/dbg_set.vhd` writes the text and parses the field.
 

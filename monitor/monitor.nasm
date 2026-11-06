@@ -79,9 +79,9 @@ SCR_Y           .EQU    0xFFFFFF82      ; the cursor's row
 SCR_OFFS        .EQU    0xFFFFFF85      ; the display offset, in words
 SCR_FONT        .EQU    0xFFFFFF86      ; the font base: 0 shows Spleen
 TIMER           .EQU    0xFFFFFF10      ; the timer's period, 0 to stop it
-E_IP            .EQU    0xFFFFFF9A      ; the Ethernet station's IP address, the first byte in bits 31..24
-E_MACH          .EQU    0xFFFFFF9B      ; the first two bytes of its MAC address, in bits 15..0
-E_MACL          .EQU    0xFFFFFF9C      ; the last four bytes of its MAC address
+E_IP            .EQU    0xFFFFFFB0      ; the network station's IP address, NET_IP, the first byte in bits 31..24
+E_MACH          .EQU    0xFFFFFFB1      ; the first two bytes of its MAC address, in bits 15..0
+E_MACL          .EQU    0xFFFFFFB2      ; the last four bytes of its MAC address
 RAM_WORDS       .EQU    0xFFFFFF9E      ; the words of the RAM, 0 in niceemu, where there is no limit
 
 STACK           .EQU    0xFFFFF000      ; SP at the cold start, above the program's RAM
@@ -1033,7 +1033,10 @@ load_blank
 ; x: the demo, for the time being (issue #65, README.md). The ROM has its
 ; number of words at DEMO, and the words after it, which are copied to
 ; 0x8000 and run as r runs a program. A number of 0, or one too big for
-; the ROM, is no demo. The copy and x go when the demo goes.
+; the ROM, is no demo. The demo, nice_cpu's, clears the screen at its
+; return, and leaves the timer stopped and E clear, but the cursor of
+; V_COL and V_ROW is the monitor's, so scr_cls sets it again before
+; mon_exit. The copy and x go when the demo goes.
 cmd_demo
                 MOVE[M] R1, @DEMO       ; the words left
         ?Z      JMP     no_demo
@@ -1045,8 +1048,14 @@ demo_copy
                 MOVE    @R3++, @R2++
                 SUB[M]  R1, R1, 1
         ?!Z     JMP     demo_copy
-                MOVE    R7, PROGRAM
-                JMP     run_at
+                MOVE    R1, MON_PUTC    ; as run_at calls a program
+                MOVE    R2, 0
+                MOVE    R3, 0
+                CALL    PROGRAM
+                PUSH    R1              ; the status
+                CALL    scr_cls
+                POP     R1
+                JMP     mon_exit
 no_demo         MOVE    R1, S_NODEMO
                 CALL    puts_crlf
                 JMP     main

@@ -70,8 +70,8 @@ the MEGA65 and 77 on the Nexys4DDR (Input and output below).
 | `u [ADDR] [N]` | Disassembles `N` instructions from `ADDR`, a row each: the address, the instruction's 1 to 4 words, and its text, all in hex (The disassembler below). Without `ADDR`, the instructions after the last shown; without `N`, 20. |
 | `c` | Clears the screen. |
 | `v` | The version of the monitor, and of the dispatch table: `NiceMon V1.2, table 1.0`. |
-| `i [A.B.C.D]` | Shows the Ethernet station's IP address, `IP address 192.168.1.65`, or writes it first: four decimal numbers of 0 to 255 with dots between them, such as `i 192.168.1.65`. Anything else is no address, and `i` says so and writes nothing. It writes `0xFFFFFF9A` ([SYSTEM.md](../doc/SYSTEM.md#the-ethernet-station)), so a host connected over TCP loses its connection. In `niceemu` the register is plain memory. |
-| `m [MAC]` | Shows the station's MAC address, `MAC address 02:4E:49:43:45:00`, or writes it first: six bytes of one or two hex digits, in either case, with colons between them, such as `m 02:4E:49:43:45:01`. The first byte must be even, as an odd one makes a group address. Anything else is no address, and `m` says so and writes nothing. It writes `0xFFFFFF9B` and `9C`, so a host connected over TCP loses its connection. Two boards on one network need different MAC addresses. In `niceemu` the registers are plain memory, and the address shows as `00:00:00:00:00:00`. |
+| `i [A.B.C.D]` | Shows the Ethernet station's IP address, `IP address 192.168.1.65`, or writes it first: four decimal numbers of 0 to 255 with dots between them, such as `i 192.168.1.65`. Anything else is no address, and `i` says so and writes nothing. It writes `0xFFFFFFB0`, `NET_IP` ([SYSTEM.md](../doc/SYSTEM.md#the-ethernet-station)), so a host connected over TCP loses its connection. In `niceemu` it is a register that keeps what is written. |
+| `m [MAC]` | Shows the station's MAC address, `MAC address 02:4E:49:43:45:00`, or writes it first: six bytes of one or two hex digits, in either case, with colons between them, such as `m 02:4E:49:43:45:01`. The first byte must be even, as an odd one makes a group address. Anything else is no address, and `m` says so and writes nothing. It writes `0xFFFFFFB1` and `B2`, so a host connected over TCP loses its connection. Two boards on one network need different MAC addresses. In `niceemu` they are registers too, with the address of a board after reset. |
 | `l` | Loads words into the RAM from lines of `ADDR WORD` in hex, as a `.bin` file has them (Loading without a host below), up to an empty line, and prints the words written and the lines skipped: `Words loaded: 600, 00008000 to 00008257`. |
 | `x` | Runs the demo of the ROM, for the time being (The demo below). Without a demo in the ROM, `x` says so. |
 | `h` | Halts the core, which the reset button, or a host over the link, starts again. The tests end with it. |
@@ -321,7 +321,7 @@ in nice_cpu's runtime or C library:
   `0xFFFFFF00`. A read returns 0 while no byte has arrived, so the monitor
   polls, which works in the emulator too, where a read waits.
 - A break on the UART, or a host's half-close over Ethernet, ends the
-  line's input and not the keyboard's (nice_cpu's SYSTEM.md §6): the
+  line's input and not the keyboard's (nice_cpu's SYSTEM.md §8): the
   host's bytes are dropped until the core is started again, a read
   returns `0x200` once the FIFO is empty, and the keyboard's bytes still
   come. So the monitor reads on, and a program that reads until `0x200`
@@ -487,7 +487,7 @@ versions of the tests, into the RAM, and types `x` for the demo
 
 ## The demo
 
-The demo leaves this repository for nice_cpu
+The demo is nice_cpu's
 ([nice_cpu#91](https://github.com/MJoergen/nice_cpu/issues/91)), and the
 BASIC interpreter of
 [#54](https://github.com/MJoergen/NiceMonMEGA65/issues/54) takes its place
@@ -498,7 +498,10 @@ runs it. The demo is a program assembled at `0x8000`
 ([demo/](../demo/README.md)), and `demo/join.py` puts it in the ROM at
 `DEMO`, `0x1000`: the number of its words first, then the words. `x`
 copies them to `0x8000` and runs them as `r` runs a program, and the
-demo's F12 returns. A number of 0, as in the ROM of the monitor alone
+demo's F12 returns. The demo clears the screen before it returns, and
+leaves the cursor at the top left, but the monitor keeps a cursor of its
+own, so `x` calls `scr_cls` after the return, and then goes on as at
+`mon_exit`. A number of 0, as in the ROM of the monitor alone
 and in `niceemu` without the demo, is no demo, and so is one that would
 not fit below `0x8000`. Neither the copy nor the demo has an entry in
 the dispatch table, and both go when the demo goes; `release.py` and
