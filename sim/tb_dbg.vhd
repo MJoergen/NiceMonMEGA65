@@ -74,7 +74,8 @@
 --    with a byte over 255, say `bad value` and stay in the field, which
 --    ESC clears. CRSR down chooses the MAC address, which takes groups of
 --    one digit too, and the baud rate, where CRSR right and left step
---    through the rates; a rate not on the list is bad. ESC leaves the
+--    through the rates; a rate not on the list is bad, and the field's
+--    cursor blinks after its last character. ESC leaves the
 --    page, F10 shows it again, m shows the memory page instead, and n the
 --    settings page again.
 
@@ -908,6 +909,20 @@ begin
          severity failure;
       key("1234" & C_CR);
       wait_text(23, 0, " Baud:    1234_____________  bad value ");
+      -- The cursor blinks where the next character goes
+      for i in 1 to 2 loop
+         wait until ovl(23 * 80 + 14)(31 downto 8) = C_CURSOR for C_TIMEOUT;
+         assert ovl(23 * 80 + 14)(31 downto 8) = C_CURSOR
+            report "tb_dbg: the field's cursor does not show"
+            severity failure;
+         assert ovl(23 * 80 + 13)(31 downto 8) = C_COLOR and ovl(23 * 80 + 15)(31 downto 8) = C_COLOR
+            report "tb_dbg: the field's cursor is not after the 4"
+            severity failure;
+         wait until ovl(23 * 80 + 14)(31 downto 8) = C_COLOR for C_TIMEOUT;
+         assert ovl(23 * 80 + 14)(31 downto 8) = C_COLOR
+            report "tb_dbg: the field's cursor does not blink"
+            severity failure;
+      end loop;
       key(C_ESC & C_ESC & "[A" & C_ESC & "[A" & C_ESC & "[A");
       wait_text(2, 0, " > IP address");
       key("" & C_ESC);

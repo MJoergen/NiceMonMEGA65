@@ -76,8 +76,10 @@
 -- without the link. On the page the cursor keys up and down choose the
 -- IP address, the MAC address, or the baud rate, the TCP port being
 -- shown only; the hex digits, the dot, and the colon go into the field
--- (sfield), and on the rate the cursor keys left and right put the next
--- rate of C_UART_RATES there. RETURN has dbg_set.vhd parse the field, and
+-- (sfield), where a cursor in swapped colors blinks on the place of the
+-- next character, 16 refreshes on and 16 off, as the program's does, and
+-- on the rate the cursor keys left and right put the next rate of
+-- C_UART_RATES there. RETURN has dbg_set.vhd parse the field, and
 -- a good one is written as a word's write is, to 0xFFFFFFB0, to
 -- 0xFFFFFFB1 and B2, or to 0xFFFFFF9F, with `written` or the link's
 -- error; a bad one says `bad value` and stays in the field. ESC clears
@@ -769,10 +771,11 @@ architecture synthesis of dbg is
    signal act_r     : t_act    := ACT_NONE;
    signal tick_r    : std_logic := '0';
    signal refresh   : natural range 0 to C_REFRESH - 1 := 0;
+   signal blink_cnt : unsigned(4 downto 0) := (others => '0'); -- Refreshes, for the field's cursor
    signal rd_idx    : natural range 0 to 255;
    signal restart_r : std_logic;
-   signal msg_r     : std_logic := '0';                  -- The write's answer is the page's message
-   signal msg_ok    : natural range 0 to 4;              -- ... and this, when it is k
+   signal msg_r     : std_logic := '0';                        -- The write's answer is the page's message
+   signal msg_ok    : natural range 0 to 4;                    -- ... and this, when it is k
    signal brk_set   : std_logic_vector(C_BRKS - 1 downto 0);
    signal err_code  : t_byte;
 
@@ -1414,8 +1417,13 @@ begin
          paused_d <= paused_i;
          halted_d <= halted_i;
          if refresh = 0 then
-            refresh <= C_REFRESH - 1;
-            tick_r  <= '1';
+            refresh   <= C_REFRESH - 1;
+            tick_r    <= '1';
+            blink_cnt <= blink_cnt + 1;
+            -- The settings' field's cursor blinks: 16 refreshes on, 16 off
+            if blink_cnt(3 downto 0) = "1111" and set_r = '1' and page_on = '1' then
+               dirty <= '1';
+            end if;
          else
             refresh <= refresh - 1;
          end if;
@@ -1738,6 +1746,7 @@ begin
             act_r     <= ACT_NONE;
             tick_r    <= '0';
             refresh   <= 0;
+            blink_cnt <= (others => '0');
             ctrl_r    <= (others => '0');
             reason_r  <= (others => '0');
             stop_r    <= (others => '0');
@@ -1923,6 +1932,12 @@ begin
                s2_ch <= X"5F";                              -- _
                if s1_cell.idx < sfield_n then
                   s2_ch <= sfield(s1_cell.idx mod C_SFIELD);
+               end if;
+               -- The cursor, where the next character goes, or on the
+               -- last of a full field
+               if blink_cnt(4) = '1' and (s1_cell.idx = sfield_n or
+                                          (sfield_n = C_SFIELD and s1_cell.idx = C_SFIELD - 1)) then
+                  s2_cur <= '1';
                end if;
             when CELL_FIELD =>
                -- The digits typed, the first at the left

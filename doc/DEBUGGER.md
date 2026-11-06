@@ -162,8 +162,9 @@ port, and the baud rate, from column 17, in their usual notation; rows
 7 to 9 a note on what a write does; row 23 the field, its label, `IP:`,
 `MAC:`, or `Baud:`, and the last message, `written`, `not paused`, or `bad
 value`; and row 24 the keys. The setting chosen has a `>` before it and
-its colors swapped, and the TCP port, the generic `G_PORT` of
-`src/eth/`, is shown only.
+its colors swapped, the field's cursor blinks where the next character
+goes, and the TCP port, the generic `G_PORT` of `src/eth/`, is shown
+only.
 
 ```
  Settings of the link
