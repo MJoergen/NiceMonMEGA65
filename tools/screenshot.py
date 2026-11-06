@@ -39,7 +39,7 @@ doc/images/ethernet.png, the demo's F11, with:
 and doc/images/debugger.png, the typewriter paused under the strip once
 the line of the first in.txt is typed, with:
 
-    tools/screenshot.py -i in.txt -n 33031 --debugger \\
+    tools/screenshot.py -i in.txt -n 33032 --debugger \\
         -o doc/images/debugger.png demo/build/rom.bin
 
 Usage:
