@@ -32,6 +32,14 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   nothing. The letters are as they were, and `h` still holds. On the
   Nexys4DDR, BTNR pauses or goes on as F3 does.
 
+**New.**
+
+- The monitor's `sd [SLOT] LBA` shows a sector of an SD card, in hex and
+  as text ([#57](https://github.com/MJoergen/NiceMonMEGA65/issues/57)),
+  or the controller's error, such as `SD error 1 in slot 1, no card`.
+  It starts the card up when it needs to. Without `SLOT`, it reads the
+  slot of the last `sd`, 0 after reset.
+
 ## V1.7 (2026-11-06)
 
 **Upgrade notes.**

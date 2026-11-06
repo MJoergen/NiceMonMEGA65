@@ -77,6 +77,15 @@ $(BUILD)/hello.bin: test/hello.nasm monlib.nasm mon.nasm $(TOOLS) | $(BUILD)
 	  > $(BUILD)/hello_all.nasm
 	@$(ASM) -o $@ $(BUILD)/hello_all.nasm
 
+# The test of the sector routines, test/sd.nasm, which calls them by their
+# labels, so it is assembled after the monitor's sources, and only its words,
+# from 0x8000, are kept: the monitor's are those of monitor_test.bin. The
+# addresses below 0x8000 start with 0000 and a digit of 0 to 7.
+$(BUILD)/sd.bin: $(BUILD)/monitor_test.bin test/sd.nasm
+	@cat $(BUILD)/monitor_test_all.nasm test/sd.nasm > $(BUILD)/sd_all.nasm
+	@$(ASM) -o $(BUILD)/sd_full.bin $(BUILD)/sd_all.nasm
+	@grep -v '^0000[0-7]' $(BUILD)/sd_full.bin > $@
+
 # The words that u disassembles in test/dis.py, at 0x8000, which never run
 $(BUILD)/dis.bin: test/dis.nasm $(TOOLS) | $(BUILD)
 	@$(ASM) -o $@ test/dis.nasm
@@ -135,6 +144,15 @@ LOAD_EMU = l\r10000 7\rFFFEFFFF 8\rFFFF0000 1\r\rd 10000 1\rh\r
 # build/ram64k.bin writes to 0xFFFFFF9E: EFFF takes a word, and F000, the
 # monitor's variables, and 1EFFF, past the RAM, do not.
 LOAD_64K = l\rEFFF 1\rF000 2\r1EFFF 3\r\rd EFFF 1\rh\r
+# sd: the image of test/sd_image.py in slot 0 and none in slot 1. sd 1
+# shows the bytes 0 to 255 twice, SD 3 the last sector, and sd 4, after the
+# last, is error 7. sd 1 0 is error 1, no card, and so is sd 0, which reads
+# in slot 1, the last; sd 0 0 goes back to slot 0, with the 55 AA of sector
+# 0. sd 2 0 has no slot 2, and sd alone, sd 1 2 3, sd 1x, and a sector of 9
+# digits are no arguments; sdx is no command.
+SD   = sd 1\rSD 3\rsd 4\rsd 1 0\rsd 0\rsd 0 0\rsd 2 0\rsd\rsd 1 2 3\rsd 1x\rsd 123456789\rsdx\rh\r
+# sd_write: r runs test/sd.nasm, which writes sector 2, and sd 2 shows it.
+SD_WRITE = r\rsd 2\rh\r
 
 # The words of each test that are dumped with the screen: for cmds the
 # variables, the cursor's registers, and the IP and MAC addresses, and for the programs the text at
@@ -156,6 +174,10 @@ DUMP_load    = -d 0xFFFFF000:15
 DUMP_load_emu = -d 0xFFFFF00E:1 -d 0xFFFEFFFF:1
 DUMP_load_64k = -d 0xFFFFF00E:1
 DUMP_hello_c = -d 0xFFFF0168:12
+# For sd the controller's registers, SD_CSR to SD_SLOTS, and for sd_write
+# the results of test/sd.nasm's calls
+DUMP_sd       = -d 0xFFFFFFA0:7
+DUMP_sd_write = -d 0x9100:6
 MAX_STEPS = 10000000
 
 # Each test runs the monitor with its input and its program, if any, and
@@ -168,7 +190,7 @@ MAX_STEPS = 10000000
 # sizes of the screen's memory of niceemu and the boards first, and
 # test/dis.py the rows of u against nicedis.py and niceasm.
 test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.bin $(BUILD)/hello.bin \
-      $(BUILD)/dis.bin
+      $(BUILD)/dis.bin $(BUILD)/sd.bin
 	@$(PYTHON) test/ring.py $(EMU) $(BUILD)/monitor_test.bin:32768 \
 	  $(BUILD)/monitor_8k.bin:8192 $(BUILD)/monitor_2k.bin:2048
 	@$(PYTHON) test/dis.py $(EMU) $(BUILD)/monitor_test.bin $(BUILD)/dis.bin
@@ -180,15 +202,23 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	@printf '$(RUN)' > $(BUILD)/run.txt
 	@printf '$(RESET)' > $(BUILD)/reset.txt
 	@printf '$(SCROLL)' > $(BUILD)/scroll.txt
+	@printf '$(SD)' > $(BUILD)/sd.txt
+	@printf '$(SD_WRITE)' > $(BUILD)/sd_write.txt
+	@$(PYTHON) test/sd_image.py $(BUILD)/sd.img
+	@$(PYTHON) test/sd_image.py --written $(BUILD)/sd_written.img
 	@{ printf '$(LOAD_HEAD)'; head -n 3 $(BUILD)/hello.bin | awk '{ printf "%s\r\n", $$0 }'; \
 	  tail -n +4 $(BUILD)/hello.bin; printf '$(LOAD_TAIL)'; } > $(BUILD)/load.txt
-	@fail=0; for t in cmds scroll load load_emu load_64k hello reset hello_c; do \
+	@fail=0; for t in cmds scroll load load_emu load_64k sd sd_write hello reset hello_c; do \
+	  opts=; \
 	  case $$t in \
 	    cmds) prog=; input=cmds; dump='$(DUMP_cmds)';; \
 	    scroll) prog=; input=scroll; dump='$(DUMP_scroll)';; \
 	    load) prog=$(BUILD)/ram128k.bin; input=load; dump='$(DUMP_load)';; \
 	    load_emu) prog=; input=load_emu; dump='$(DUMP_load_emu)';; \
 	    load_64k) prog=$(BUILD)/ram64k.bin; input=load_64k; dump='$(DUMP_load_64k)';; \
+	    sd) prog=; input=sd; dump='$(DUMP_sd)'; opts="--sd0 $(BUILD)/sd.img";; \
+	    sd_write) prog=$(BUILD)/sd.bin; input=sd_write; dump='$(DUMP_sd_write)'; \
+	      cp $(BUILD)/sd.img $(BUILD)/sd_write.img; opts="--sd0 $(BUILD)/sd_write.img";; \
 	    hello) prog=$(BUILD)/hello.bin; input=run; dump='$(DUMP_hello)';; \
 	    reset) prog=$(BUILD)/hello.bin; input=reset; dump='$(DUMP_hello)';; \
 	    hello_c) prog=$(BUILD)/hello_c.bin; input=run; dump='$(DUMP_hello_c)'; \
@@ -196,11 +226,13 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	      $(MAKE) --no-print-directory $$prog || exit 1;; \
 	  esac; \
 	  cat $(BUILD)/monitor_test.bin $$prog > $(BUILD)/$$t.full.bin; \
-	  $(EMU) -s -n $(MAX_STEPS) -i $(BUILD)/$$input.txt $$dump $(BUILD)/$$t.full.bin \
+	  $(EMU) -s -n $(MAX_STEPS) -i $(BUILD)/$$input.txt $$dump $$opts $(BUILD)/$$t.full.bin \
 	    > $(BUILD)/$$t.raw; status=$$?; \
 	  { sed -e '/^Halted (HALT)/,/^R12 /d' $(BUILD)/$$t.raw; \
 	    sed -n 's/.* R14 ..\(......\) .*/VBASE at the halt \1/p' $(BUILD)/$$t.raw; \
-	    echo "exit $$status"; } \
+	    echo "exit $$status"; \
+	    if [ $$t = sd_write ]; then cmp $(BUILD)/sd_written.img $(BUILD)/sd_write.img 2>&1 \
+	      && echo "The image as test/sd_image.py --written makes it"; fi; } \
 	    > $(BUILD)/$$t.out; \
 	  if cmp -s test/$$t.expected $(BUILD)/$$t.out; then echo "PASS monitor $$t"; \
 	  else echo "FAIL monitor $$t"; diff test/$$t.expected $(BUILD)/$$t.out; fail=1; fi; \
@@ -208,7 +240,7 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 
 # The layout of the sources, as nice_cpu's nicefmt checks it
 fmt:
-	@$(FMT) $(SOURCES) test/hello.nasm test/dis.nasm
+	@$(FMT) $(SOURCES) test/hello.nasm test/dis.nasm test/sd.nasm
 
 $(BUILD):
 	@mkdir -p $@

@@ -24,6 +24,9 @@
 ; and at mon_exit, the monitor clears E, stops the timer, sets VBASE to 0,
 ; shows the cursor, blinking, takes a fresh stack, and prints the status, R1. x copies the demo from
 ; the ROM to 0x8000 and runs it as r does, for the time being (issue #65).
+; sd shows a sector of an SD card, which the sector routines sd_init,
+; sd_read, and sd_write read; they are the ROM's own, with no entries in
+; the dispatch table (issue #57, doc/SDCARD.md).
 ;
 ; u disassembles instructions, a row each, in the text of nice_cpu's
 ; nicedis.py, with the pairs of a call shown as CALL, the return as RET,
@@ -83,6 +86,14 @@ E_IP            .EQU    0xFFFFFFB0      ; the network station's IP address, NET_
 E_MACH          .EQU    0xFFFFFFB1      ; the first two bytes of its MAC address, in bits 15..0
 E_MACL          .EQU    0xFFFFFFB2      ; the last four bytes of its MAC address
 RAM_WORDS       .EQU    0xFFFFFF9E      ; the words of the RAM, 0 in niceemu, where there is no limit
+SD_CSR          .EQU    0xFFFFFFA0      ; the SD card's status, and a write starts a command (nice_cpu's SYSTEM.md §5)
+SD_LBA          .EQU    0xFFFFFFA1      ; the sector of a Read or Write
+SD_CHUNK        .EQU    0xFFFFFFA2      ; the 8 words of the buffer at SD_BUF
+SD_ERROR        .EQU    0xFFFFFFA3      ; the error of the last command, 0 for none
+SD_SELECT       .EQU    0xFFFFFFA4      ; the selected slot
+SD_LAST         .EQU    0xFFFFFFA5      ; the card's last sector, while it is ready
+SD_SLOTS        .EQU    0xFFFFFFA6      ; the slots of the system
+SD_BUF          .EQU    0xFFFFFFA8      ; SD_BUF0 to SD_BUF7, the words of the chunk
 
 STACK           .EQU    0xFFFFF000      ; SP at the cold start, above the program's RAM
 V_COL           .EQU    0xFFFFF000      ; the cursor's column, 0 to 79
@@ -106,11 +117,12 @@ LINE_MAX        .EQU    76              ; so that the prompt and the line fit a 
 V_UF            .EQU    0xFFFFF060      ; for u: the fields dest, s0, and s1,
 V_UC            .EQU    0xFFFFF063      ; their constant words,
 V_UNOPS         .EQU    0xFFFFF066      ; and the operands of the mnemonic
+V_SECTOR        .EQU    0xFFFFF080      ; for sd: a sector, 128 words of 4 bytes, little-endian
 
 PROGRAM         .EQU    0x8000          ; where a program is, above the ROM
 VARS_WORDS      .EQU    0x1000          ; the words from 0xFFFFF000, the variables, which end a program's RAM
-DEMO            .EQU    0x1000          ; the demo's words in the ROM, after their number
-DEMO_MAX        .EQU    0x7000          ; more words than fit from DEMO + 1 below the RAM
+DEMO            .EQU    0x2000          ; the demo's words in the ROM, after their number
+DEMO_MAX        .EQU    PROGRAM-DEMO    ; more words than fit from DEMO + 1 below the RAM
 COLOR           .EQU    0x000FFF00      ; white on black, the color at the cold start
 OUT_LINE        .EQU    1
 OUT_SCREEN      .EQU    2
@@ -120,6 +132,12 @@ ROW_WORDS       .EQU    4               ; the words of a row of d
 DIS_ROWS        .EQU    20              ; the instructions that u shows without a count
 PAGE            .EQU    24              ; the rows of a Page Up or Page Down
 SCR_MAX         .EQU    0x7FFF          ; the largest display offset
+SD_INIT         .EQU    0               ; the commands of SD_CSR
+SD_RD           .EQU    1
+SD_WR           .EQU    2
+SD_BUSY         .EQU    0x01            ; the bits of its status
+SD_READY        .EQU    0x08
+SD_CHANGED      .EQU    0x10
 
 ; The dispatch table (README.md, "The dispatch table"). Entries are only
 ; ever added at the end.
@@ -1030,6 +1048,246 @@ load_blank
                 MOVE    @V_ROW, R7
                 JMP     putc_cur
 
+; sd [SLOT] LBA: the sector LBA of the card in SLOT, both in hex, read with
+; sd_read into V_SECTOR and shown as 32 rows of 16 bytes: the offset of
+; the row, the bytes in hex, and the bytes as text, with a dot for a byte
+; outside 0x20 to 0x7E. Without SLOT, the slot that SD_SELECT holds, which
+; is 0 after reset and the slot of the last sd_init after it. The card is
+; started up with sd_init when the slot is not the selected one, or its
+; card is not ready, or has changed since its last Init, so that a second
+; sd on a slot costs no Init. A SLOT at or above SD_SLOTS is no slot. An
+; error of the controller is shown with its number and its meaning. The
+; command is the letter s, which main finds, and a d after it. R7 is the
+; slot, R8 the sector, R9 the offset of the row, and R10 the bytes left in
+; the row.
+cmd_sd
+                MOVE    R1, @R2++
+                OR      R1, R1, 0x20    ; D as d
+                CMP     R1, 0x64        ; d
+        ?!Z     JMP     unknown
+                CMP     @R2, 0x20
+        ?Z      JMP     sd_args
+                TST     @R2
+        ?!Z     JMP     unknown         ; another letter, such as sdx
+sd_args
+                MOVE    R1, R2
+                CALL    _io_gethex      ; R1 the first number, R2 its digits, R3 after it
+                SUB     R4, R2, 1
+                CMP     R4, 8
+        ?!C     JMP     sd_bad          ; no digit, or more than 8
+                MOVE    R8, R1
+                MOVE    R7, @SD_SELECT
+                MOVE    R1, R3
+                CALL    _io_gethex      ; a second number
+                TST     R2
+        ?Z      JMP     sd_tail
+                SUB     R4, R2, 1
+                CMP     R4, 8
+        ?!C     JMP     sd_bad
+                MOVE    R7, R8          ; the first was the slot
+                MOVE    R8, R1
+                MOVE    R1, R3
+                CALL    _io_gethex      ; for the blanks after it
+                TST     R2
+        ?!Z     JMP     sd_bad          ; a third number
+sd_tail
+                TST     @R3
+        ?!Z     JMP     sd_bad          ; more after the numbers
+                CMP     R7, @SD_SLOTS
+        ?!C     JMP     sd_noslot
+                CALL    sd_wait
+                CMP     R7, @SD_SELECT
+        ?!Z     JMP     sd_start
+                AND     R1, @SD_CSR, SD_READY+SD_CHANGED
+                CMP     R1, SD_READY
+        ?Z      JMP     sd_ready
+sd_start
+                MOVE    R1, R7
+                CALL    sd_init
+                TST     R1
+        ?!Z     JMP     sd_fail
+sd_ready
+                MOVE    R1, R8
+                MOVE    R2, V_SECTOR
+                CALL    sd_read
+                TST     R1
+        ?!Z     JMP     sd_fail
+                MOVE    R1, S_SLOT
+                CALL    _io_puts
+                MOVE    R1, R7
+                CALL    _io_putdec
+                MOVE    R1, S_SECTOR
+                CALL    _io_puts
+                MOVE    R1, R8
+                CALL    _io_puthex
+                CALL    _io_crlf
+                MOVE    R9, 0
+sd_row
+                SHR     R1, R9, 8       ; the offset, in three digits
+                CALL    mac_digit
+                SHR     R1, R9, 4
+                CALL    mac_digit
+                MOVE    R1, R9
+                CALL    mac_digit
+                MOVE    R1, 0x20
+                CALL    mon_putc
+                MOVE    R10, 16
+sd_hex
+                MOVE    R1, 0x20
+                CALL    mon_putc
+                ADD     R1, R9, 16
+                SUB     R1, R1, R10
+                CALL    sd_byte
+                PUSH    R1
+                SHR     R1, R1, 4
+                CALL    mac_digit
+                POP     R1
+                CALL    mac_digit
+                SUB[M]  R10, R10, 1
+        ?!Z     JMP     sd_hex
+                MOVE    R1, S_UGAP
+                CALL    _io_puts
+                MOVE    R10, 16
+sd_text
+                ADD     R1, R9, 16
+                SUB     R1, R1, R10
+                CALL    sd_byte
+                CMP     R1, 0x20
+        ?C      MOVE    R1, 0x2E        ; a control code as a dot
+                CMP     R1, 0x7F
+        ?!C     MOVE    R1, 0x2E        ; and 0x7F and up
+                CALL    mon_putc
+                SUB[M]  R10, R10, 1
+        ?!Z     JMP     sd_text
+                CALL    _io_crlf
+                ADD     R9, R9, 16
+                CMP     R9, 512
+        ?!Z     JMP     sd_row
+                JMP     main
+; An error of the controller, R1 its negative: the number, the slot, and
+; the meaning, with the last sector after error 7
+sd_fail
+                SUB     R8, R0, R1      ; the error
+                MOVE    R1, S_SDERR
+                CALL    _io_puts
+                MOVE    R1, R8
+                CALL    _io_putdec
+                MOVE    R1, S_INSLOT
+                CALL    _io_puts
+                MOVE    R1, R7
+                CALL    _io_putdec
+                MOVE    R1, S_UCOMMA
+                CALL    _io_puts
+                SUB     R1, R8, 1
+                CMP     R1, SD_ERRS
+        ?!C     JMP     sd_fail_end     ; an error without a meaning here
+                ADD     R1, R1, SD_ERRORS
+                MOVE    R1, @R1
+                CALL    _io_puts
+                CMP     R8, 7
+        ?!Z     JMP     sd_fail_end
+                MOVE    R1, @SD_LAST
+                CALL    _io_puthex
+sd_fail_end
+                CALL    _io_crlf
+                JMP     main
+sd_noslot
+                MOVE    R1, S_NOSLOT
+                CALL    _io_puts
+                MOVE    R1, R7
+                CALL    _io_putdec
+                MOVE    R1, S_SLOTS
+                CALL    _io_puts
+                MOVE    R1, @SD_SLOTS
+                CALL    _io_putdec
+                CALL    _io_crlf
+                JMP     main
+sd_bad
+                MOVE    R1, S_BADSD
+                CALL    puts_crlf
+                JMP     main
+
+; sd_byte: R1 = the byte R1 of the sector at V_SECTOR, 4 bytes a word,
+; little-endian. Uses R1 and R2.
+sd_byte
+                SHR     R2, R1, 2
+                ADD     R2, R2, V_SECTOR
+                AND     R1, R1, 3
+                SHL     R1, R1, 3
+                SHR     R1, @R2, R1
+                AND     R1, R1, 0xFF
+                RET
+
+; The sector routines, the ROM's own, with no entries in the dispatch table
+; (doc/SDCARD.md, "The ROM"). They follow the C ABI, wait for busy before
+; the command and after it, as nice_cpu's SYSTEM.md §5 asks, and return 0,
+; or the negative of SD_ERROR. sd_init selects the slot and starts its card
+; up; sd_read and sd_write use the slot that is selected, which is the
+; slot of the last sd_init unless a program has changed it. Their buffer is
+; 128 words in RAM, 4 bytes a word, little-endian, as the controller's is,
+; and is copied through SD_CHUNK and SD_BUF0-SD_BUF7, so that no sector of
+; theirs is left for another to rely on in the controller's buffer.
+
+; sd_init: R1 the slot, selected, and its card started up. Uses R1.
+sd_init
+                CALL    sd_wait
+                MOVE    @SD_SELECT, R1
+                MOVE    @SD_CSR, SD_INIT
+                JMP     sd_end
+
+; sd_read: the sector R1 into the 128 words at R2. Uses R1-R4.
+sd_read
+                CALL    sd_wait
+                MOVE    @SD_LBA, R1
+                MOVE    @SD_CSR, SD_RD
+                CALL    sd_wait
+                MOVE[M] R1, @SD_ERROR
+        ?!Z     JMP     sd_neg
+                MOVE    R3, 0           ; the chunk
+sd_read_chunk
+                MOVE    @SD_CHUNK, R3
+                MOVE    R4, SD_BUF
+sd_read_word
+                MOVE    @R2++, @R4++
+                CMP     R4, SD_BUF+8
+        ?!Z     JMP     sd_read_word
+                ADD     R3, R3, 1
+                CMP     R3, 16
+        ?!Z     JMP     sd_read_chunk
+                RET                     ; R1 is 0
+
+; sd_write: the 128 words at R2 to the sector R1. Uses R1-R4.
+sd_write
+                CALL    sd_wait         ; as the buffer takes no write while busy
+                MOVE    R3, 0
+sd_write_chunk
+                MOVE    @SD_CHUNK, R3
+                MOVE    R4, SD_BUF
+sd_write_word
+                MOVE    @R4++, @R2++
+                CMP     R4, SD_BUF+8
+        ?!Z     JMP     sd_write_word
+                ADD     R3, R3, 1
+                CMP     R3, 16
+        ?!Z     JMP     sd_write_chunk
+                MOVE    @SD_LBA, R1
+                MOVE    @SD_CSR, SD_WR
+; sd_end: the end of a command, R1 = 0, or the negative of SD_ERROR
+sd_end
+                CALL    sd_wait
+                MOVE[M] R1, @SD_ERROR
+        ?Z      RET
+sd_neg
+                SUB     R1, R0, R1
+                RET
+
+; sd_wait: until busy is 0, which every command reaches, as the controller
+; has a timeout for each step. Uses no register.
+sd_wait
+                AND[M]  R0, @SD_CSR, SD_BUSY
+        ?!Z     JMP     sd_wait
+                RET
+
 ; x: the demo, for the time being (issue #65, README.md). The ROM has its
 ; number of words at DEMO, and the words after it, which are copied to
 ; 0x8000 and run as r runs a program. A number of 0, or one too big for
@@ -1420,6 +1678,7 @@ COMMANDS
                 .DAT    0x6C, cmd_load  ; l
                 .DAT    0x6D, cmd_mac   ; m
                 .DAT    0x72, cmd_run   ; r
+                .DAT    0x73, cmd_sd    ; s, for sd
                 .DAT    0x75, cmd_dis   ; u
                 .DAT    0x76, cmd_version  ; v
                 .DAT    0x78, cmd_demo  ; x
@@ -1454,13 +1713,36 @@ S_LFORM         .ASCII_L '; ADDR WORD in hex, ADDR 00008000 to '
 S_BADIP         .ASCII_L 'Not an IP address: four numbers from 0 to 255, with dots between them'
 S_BADMAC
                 .ASCII_L 'Not a MAC address: six bytes in hex with colons, the first one even'
+S_BADSD         .ASCII_L 'sd [SLOT] LBA: the slot and the sector in hex, such as sd 0 800'
+S_NOSLOT
+                .ASCII_L 'No SD slot '
+S_SLOTS         .ASCII_L '; the SD slots of this system: '
+S_SLOT          .ASCII_L 'Slot '
+S_SECTOR
+                .ASCII_L ', sector '
+S_SDERR         .ASCII_L 'SD error '
+S_INSLOT
+                .ASCII_L ' in slot '
+; The meanings of the errors 1 to SD_ERRS of SD_ERROR
+SD_ERRORS
+                .DAT    E_SD1, E_SD2, E_SD3, E_SD4, E_SD5, E_SD6, E_SD7, E_SD8
+SD_ERRS         .EQU    8
+E_SD1           .ASCII_L 'no card'
+E_SD2           .ASCII_L 'the card is not ready'
+E_SD3           .ASCII_L 'timeout, the card did not answer'
+E_SD4           .ASCII_L 'CRC, the data from the card was corrupted'
+E_SD5           .ASCII_L 'the card reported an error'
+E_SD6           .ASCII_L 'the card is write-protected'
+E_SD7           .ASCII_L 'the sector is after the last, '
+E_SD8           .ASCII_L 'Init failed'
 
-HELP            .DAT    H_R, H_L, H_X, H_D, H_U, H_I, H_M, H_C, H_V, H_H, H_Q, H_P, 0
+HELP            .DAT    H_R, H_L, H_X, H_D, H_U, H_S, H_I, H_M, H_C, H_V, H_H, H_Q, H_P, 0
 H_R             .ASCII_L 'r [ADDR]      run the program at ADDR, or at 00008000; r 0 restarts'
 H_L             .ASCII_L 'l             load lines of ADDR WORD in hex, as a .bin file has them'
 H_X             .ASCII_L 'x             run the demo of the ROM, which F12 leaves'
 H_D             .ASCII_L 'd [ADDR] [N]  show N words from ADDR, in hex, or the next ones'
 H_U             .ASCII_L 'u [ADDR] [N]  disassemble N instructions from ADDR, or the next ones'
+H_S             .ASCII_L 'sd [SLOT] LBA show sector LBA of the SD card in SLOT, or in the last slot'
 H_I             .ASCII_L 'i [A.B.C.D]   show the IP address, or set it, such as 192.168.1.65'
 H_M             .ASCII_L 'm [MAC]       show the MAC address, or set it, such as 02:4E:49:43:45:01'
 H_C             .ASCII_L 'c             clear the screen'

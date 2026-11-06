@@ -51,8 +51,9 @@ of it, and #24 revisited them. Debugging is the on-board debugger's
 At the cold start the monitor clears the screen, prints its banner,
 `NiceMon` and the version, and prints a prompt, `> `, on the screen and
 on the line. It reads a line from the console: the keyboard and the line,
-which the hardware merges. A command is a letter, in either case, and
-after `d` and `u` a hex address and a hex count, each of them optional. DEL and
+which the hardware merges. A command is a letter, in either case, or the
+two letters `sd`, and after `d` and `u` a hex address and a hex count,
+each of them optional. DEL and
 backspace delete the character before the cursor, CTRL-C empties the
 line, and the cursor and function keys, the other control codes, and the
 bytes `0x80` to `0x9F` do nothing. RETURN runs the line.
@@ -73,17 +74,50 @@ the MEGA65 and 77 on the Nexys4DDR (Input and output below).
 | `i [A.B.C.D]` | Shows the Ethernet station's IP address, `IP address 192.168.1.65`, or writes it first: four decimal numbers of 0 to 255 with dots between them, such as `i 192.168.1.65`. Anything else is no address, and `i` says so and writes nothing. It writes `0xFFFFFFB0`, `NET_IP` ([SYSTEM.md](../doc/SYSTEM.md#the-ethernet-station)), so a host connected over TCP loses its connection. In `niceemu` it is a register that keeps what is written. |
 | `m [MAC]` | Shows the station's MAC address, `MAC address 02:4E:49:43:45:00`, or writes it first: six bytes of one or two hex digits, in either case, with colons between them, such as `m 02:4E:49:43:45:01`. The first byte must be even, as an odd one makes a group address. Anything else is no address, and `m` says so and writes nothing. It writes `0xFFFFFFB1` and `B2`, so a host connected over TCP loses its connection. Two boards on one network need different MAC addresses. In `niceemu` they are registers too, with the address of a board after reset. |
 | `l` | Loads words into the RAM from lines of `ADDR WORD` in hex, as a `.bin` file has them (Loading without a host below), up to an empty line, and prints the words written and the lines skipped: `Words loaded: 600, 00008000 to 00008257`. |
+| `sd [SLOT] LBA` | Shows the sector `LBA` of the SD card in `SLOT`, both in hex, as 32 rows of 16 bytes: the offset in the sector, the bytes in hex, and the bytes as text, with a dot for a byte outside `0x20` to `0x7E` (The SD cards below). Without `SLOT`, the slot of the last `sd`, 0 after reset. An error of the controller is shown with its number and its meaning: `SD error 1 in slot 1, no card`. |
 | `x` | Runs the demo of the ROM, for the time being (The demo below). Without a demo in the ROM, `x` says so. |
 | `h` | Halts the core, which the reset button, or a host over the link, starts again. The tests end with it. |
 | `?` | Lists the commands, and the keys of the history. |
 
 Anything else prints `Unknown command; ? lists them`. The debugger has
 pause, step, and inspect, so the monitor adds only `l`, which loads a
-program with no host's tools and no storage, and `u`, which reads code
+program with no host's tools and no storage, `u`, which reads code
 with no host
-([#72](https://github.com/MJoergen/NiceMonMEGA65/issues/72)); the SD
-card's commands come
-with [#62](https://github.com/MJoergen/NiceMonMEGA65/issues/62).
+([#72](https://github.com/MJoergen/NiceMonMEGA65/issues/72)), and `sd`,
+which reads a card with no file system, for the bring-up of the SD card's
+storage
+([#57](https://github.com/MJoergen/NiceMonMEGA65/issues/57)). Its
+commands for files come with FAT32
+([#62](https://github.com/MJoergen/NiceMonMEGA65/issues/62)).
+
+## The SD cards
+
+The ROM has three sector routines of its own, with no entries in the
+dispatch table ([doc/SDCARD.md](../doc/SDCARD.md), "The ROM"). They drive
+the controller's registers at `0xFFFFFFA0`, which nice_cpu's SYSTEM.md §5
+specifies, the same on every board and in `niceemu`. They follow the C
+ABI, wait for busy before the command and after it, and return 0, or the
+negative of `SD_ERROR`:
+
+| Routine | Arguments | What it does |
+|---|---|---|
+| `sd_init` | R1 the slot | Selects the slot, and starts its card up |
+| `sd_read` | R1 the sector, R2 a buffer of 128 words | Reads the sector into the buffer |
+| `sd_write` | R1 the sector, R2 a buffer of 128 words | Writes the buffer to the sector |
+
+- `sd_read` and `sd_write` use the selected slot, the slot of the last
+  `sd_init`. The controller has one "ready" for both slots, so a change
+  of slot costs an Init, up to hundreds of milliseconds on a board.
+- The buffer is in RAM, 4 bytes a word, little-endian, as the
+  controller's is: byte 4n of the sector is bits 7..0 of word n. The
+  routines copy it through `SD_CHUNK` and `SD_BUF0`–`SD_BUF7`.
+- `sd` calls `sd_init` only when its slot is not the selected one, or
+  the card there is not ready, or has changed since its last Init, so a
+  second `sd` on a slot reads at once. Its buffer is at `0xFFFFF080`,
+  with the monitor's variables.
+- FAT32 ([#58](https://github.com/MJoergen/NiceMonMEGA65/issues/58)) will
+  call the routines, and its file API will be the table's entries for
+  the card. A program that wants sectors drives the registers itself.
 
 ## The disassembler
 
@@ -446,7 +480,7 @@ unless `VERSION=` is given, and is written only when it changes.
 `make -C monitor test` checks the layout of the sources with nice_cpu's
 `nicefmt`, checks that the monitor ends below `DEMO`, where the demo
 goes in the ROM, assembles the monitor with the version `V9.9`, and runs
-it in `niceemu` seven times, with its keystrokes in an input file and
+it in `niceemu` nine times, with its keystrokes in an input file and
 `h` as the last command, so that the run ends: alone, with every command
 and the edits of a line; alone, with 448 rows of `d`, which go round the
 ring of the history, and Page Up and Page Down; alone, with `l` and
@@ -455,7 +489,15 @@ blanks, a line too long, a second line for an address, and CTRL-C, then
 `r`, with 128K words of RAM, as on the MEGA65, which a word of the
 input file gives `0xFFFFFF9E`; alone, with `l` at the bounds of 64K
 words, as on the Nexys4DDR; alone, with `l` where `0xFFFFFF9E` reads 0,
-as in `niceemu`; with `test/hello.nasm` at `0x8000`, an assembly
+as in `niceemu`; alone, with `sd` on the image of `test/sd_image.py`
+in slot 0, 4 sectors, and none in slot 1: a sector with every byte, the
+last sector, the one after it, the empty slot, the slot of the last `sd`,
+a slot that the system does not have, and arguments that are not; with
+`test/sd.nasm` at `0x8000`, which calls `sd_init`, `sd_read`, and
+`sd_write` by their labels, as it is assembled after the monitor's
+sources, and writes a sector, which `sd` then shows, and the image is
+compared with the one that `test/sd_image.py --written` makes; with
+`test/hello.nasm` at `0x8000`, an assembly
 program under nice_cpu's `start_mon.nasm`; and with `test/hello.c`,
 built with `nicebuild.py --monitor --asm mon.nasm`, which is skipped
 without clang. The console output, which is the copy on the line, a few
@@ -497,7 +539,7 @@ in the ROM. Until then
 the boards and of the release has the demo behind the monitor, and `x`
 runs it. The demo is a program assembled at `0x8000`
 ([demo/](../demo/README.md)), and `demo/join.py` puts it in the ROM at
-`DEMO`, `0x1000`: the number of its words first, then the words. `x`
+`DEMO`, `0x2000`: the number of its words first, then the words. `x`
 copies them to `0x8000` and runs them as `r` runs a program, and the
 demo's F12 returns. The demo clears the screen before it returns, and
 leaves the cursor at the top left, but the monitor keeps a cursor of its
@@ -510,8 +552,11 @@ the dispatch table, and both go when the demo goes; `release.py` and
 
 ## What QMON has that this port will not
 
-- The SD card, FAT32, and `qtransfer` code, about half of QMON, has no
-  hardware here.
+- QMON's SD card and FAT32 code, about half of QMON, is for QNICE's
+  registers, and `qtransfer` has no hardware here. The sector routines
+  were written anew for nice_cpu's registers (The SD cards above), and
+  FAT32 comes with
+  [#58](https://github.com/MJoergen/NiceMonMEGA65/issues/58).
 - QMON's disassembler is for QNICE; `u` was written anew for the NICE
   instruction set, with nice_cpu's `assembler/nicedis.py` as the model
   (The disassembler above).

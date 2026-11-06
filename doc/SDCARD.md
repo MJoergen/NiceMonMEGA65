@@ -6,8 +6,10 @@ the controller in SPI mode (#55), and the boards' slots and `make hwtest`
 (#56), in V1.5. The registers are now specified by nice_cpu's
 `doc/SYSTEM.md` §5, and the boards' slots by "The SD card slots" in
 [SYSTEM.md](SYSTEM.md); where this note differs from them, they are right.
-The ROM, FAT32, BASIC, and the host tools are not written yet. Its end is `SAVE`, `LOAD`, and `DIR` in the BASIC of #54, and
-on the way it gives the monitor of #24 a way to load and save programs. The
+The ROM's sector routines and its `sd` command (#57) are written too, in
+V1.7.1, and [monitor/README.md](../monitor/README.md) describes them.
+FAT32, BASIC, and the host tools are not written yet. Its end is `SAVE`,
+`LOAD`, and `DIR` in the BASIC of #54, and on the way it gives the monitor of #24 a way to load and save programs. The
 tracking issue is #62, and its subtasks are listed at the end.
 
 ## Contents
@@ -429,7 +431,7 @@ ROM is developed in niceemu and needs no board.
 | #55 | Done in V1.5: the controller in the RTL, stage 1: SPI mode, the card model, `tb_sd`, and the formal checks |
 | #63 | The controller, stage 2: 4-bit SD mode, optional, after a test whether a card leaves SPI mode |
 | #56 | Done in V1.5: the pins on the R3, R6, and Nexys4DDR, and the read-only check in `make hwtest` |
-| #57 | The sector routines in the ROM, and the monitor's `sd` command |
+| #57 | Done in V1.7.1: the sector routines in the ROM, and the monitor's `sd` command |
 | #58 | FAT32 reading, `dir`, and `load` |
 | #59 | FAT32 writing, `save`, and `del` |
 | #60 | BASIC's `SAVE`, `LOAD`, and `DIR` |
