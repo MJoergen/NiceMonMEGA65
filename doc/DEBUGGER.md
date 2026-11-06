@@ -131,8 +131,9 @@ its 8 words, the cursor's word in swapped colors, and a word at an
 enabled breakpoint white on dark red, or dark red on white under the
 cursor; row 23 the input
 field, its label, `Word:` or `Address:`, and the last message,
-`written`, the link's error such as `e02`, `no answer`, or `none free`
-when `b` finds every breakpoint in use; and row 24
+`written`, `not paused` when the link refuses a write while the core
+runs (its `e02`), another error of the link such as `e04`, `no answer`,
+or `none free` when `b` finds every breakpoint in use; and row 24
 the keys. The program's cursor is hidden under the page. The page stays
 on when Focus is left, and shows again when Focus comes back.
 
@@ -159,7 +160,7 @@ page's place in Focus, and F11 and F10 switch between the two. Row 0
 has its title; rows 2 to 5 the IP address, the MAC address, the TCP
 port, and the baud rate, from column 17, in their usual notation; rows
 7 to 9 a note on what a write does; row 23 the field, its label, `IP:`,
-`MAC:`, or `Baud:`, and the last message, `written`, `e02`, or `bad
+`MAC:`, or `Baud:`, and the last message, `written`, `not paused`, or `bad
 value`; and row 24 the keys. The setting chosen has a `>` before it and
 its colors swapped, and the TCP port, the generic `G_PORT` of
 `src/eth/`, is shown only.
@@ -246,8 +247,8 @@ with a 0 before it, `0a…`, as only 8 digits count.
 `b` writes the debug registers of DEBUG.md §4, which take a write while
 the core runs too: the address of the breakpoint, then its enable bit.
 A key that needs the core stopped, pressed while it runs, shows the
-link's answer in the message row (`e02`) and does nothing else, as
-mon.py prints its errors. F1 to F9 read the control register before they
+link's answer in the message row (`not paused`, the link's `e02`) and
+does nothing else, as mon.py prints its errors. F1 to F9 read the control register before they
 write it: step and go on act only on a paused core, and pause only on a
 running one, as go on and pause would otherwise start a held core.
 
@@ -436,7 +437,7 @@ free.
   a step of its own that is not caught, the catch of a halt in Strip,
   and no catch from Off; and the page: the ROM's words, the cursor keys,
   Home, Page Up and Down, a move during a read, `a`, a write read back,
-  DEL, ESC, and a write that gets `e02` while the core runs; and the
+  DEL, ESC, and a write that gets `not paused` while the core runs; and the
   breakpoints: `b` sets one, which the header lists and the page colors,
   the core stops there with `BRK 0`, `b` clears one, `g` goes on to `BRK
   1`, `b` takes the lowest free one, and says `none free` when there is

@@ -48,8 +48,9 @@
 -- breakpoint at the cursor's address, or writes the address of the lowest
 -- free one, then its enable bit. The debug registers take a write while
 -- the core runs too; a word that the link refuses while the core runs
--- ends the request with the code 02, the page's `e02`. Until the first
--- answer after reset the state is NO LINK.
+-- ends the request with the code 02, which the page shows as `not
+-- paused`, and any other code as `e` and its two digits. Until the
+-- first answer after reset the state is NO LINK.
 --
 -- p_kbd turns the keyboard's bytes into the keys of DEBUGGER.md: F1 or s
 -- steps a paused core, F3 or g goes on, F5 or p pauses a running core, F7
@@ -535,13 +536,14 @@ architecture synthesis of dbg is
    constant C_LBL_ADDR : natural := 1;
    constant C_LBL_IP   : natural := 2;
 
-   type t_msgs is array (0 to 4, 0 to 9) of t_byte;
+   type t_msgs is array (0 to 5, 0 to 9) of t_byte;
 
    constant C_MSG_NONE    : natural := 0;
    constant C_MSG_WRITTEN : natural := 1;
    constant C_MSG_ERR     : natural := 2;                -- e and the code's two digits
    constant C_MSG_FULL    : natural := 3;                -- No breakpoint is free
    constant C_MSG_BAD     : natural := 4;                -- A setting that does not parse
+   constant C_MSG_RUN     : natural := 5;                -- e02: the core runs
 
    function labels return t_labels is
       constant C_S   : string(1 to 40) := "Word:   Address:IP:     MAC:    Baud:   ";
@@ -554,10 +556,10 @@ architecture synthesis of dbg is
    end function labels;
 
    function msgs return t_msgs is
-      constant C_S   : string(1 to 50) := "          written   e         none free bad value ";
+      constant C_S   : string(1 to 60) := "          written   e         none free bad value not paused";
       variable res_v : t_msgs;
    begin
-      for k in 0 to 4 loop
+      for k in 0 to 5 loop
          for i in 0 to 9 loop
             res_v(k, i) := to_byte(C_S(10 * k + i + 1));
          end loop;
@@ -803,7 +805,7 @@ architecture synthesis of dbg is
    signal mem_any  : std_logic := '0';                   -- The window was read once
    signal mem_ok   : std_logic := '0';                   -- ... since the core stopped
    signal mem_kill : std_logic := '0';                   -- The read is of a window left
-   signal msg_k    : natural range 0 to 4 := C_MSG_NONE;
+   signal msg_k    : natural range 0 to 5 := C_MSG_NONE;
    signal msg_code : t_byte := (others => '0');
 
    -- The drawing: a pass over the strip after each change
@@ -1399,6 +1401,8 @@ begin
          msg_r <= '0';
          if err = '0' then
             msg_k <= msg_ok;
+         elsif err_code = X"02" then
+            msg_k <= C_MSG_RUN;
          else
             msg_k <= C_MSG_ERR;
          end if;

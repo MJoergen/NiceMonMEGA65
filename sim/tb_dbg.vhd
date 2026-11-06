@@ -57,7 +57,7 @@
 --    first, which the page reads back. After a digit, a is a digit. ESC clears the field,
 --    and a second ESC leaves the page.
 -- 16. m shows the page again. r restarts the core, and the words are
---    dimmed, and a write gets e02, until the core halts.
+--    dimmed, and a write gets `not paused`, until the core halts.
 -- 17. b sets breakpoint 0 at the cursor's address, which the header lists
 --    and the page colors. r restarts the core, which stops there: BRK 0.
 -- 18. b sets breakpoint 1, and b on breakpoint 0 clears it. g goes on to
@@ -777,7 +777,7 @@ begin
       expect_row27("RUNNING", "after r with the page");
       expect_word_color(1, 2, C_DIM, "while the core runs");
       key("1" & C_CR);
-      wait_text(23, 20, "e02       ");
+      wait_text(23, 20, "not paused");
       expect_row27("HALTED 1", "after the run with the page");
       wait_text(1, 0, "FFFF0010 00000000 12345678 00000000");
       expect_word_color(1, 2, C_COLOR, "after the halt");
