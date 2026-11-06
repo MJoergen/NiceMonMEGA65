@@ -8,10 +8,10 @@ written, and the rest is planned**
 [#53](https://github.com/MJoergen/NiceMonMEGA65/issues/53), and
 [#75](https://github.com/MJoergen/NiceMonMEGA65/issues/75)): the toggle
 key enters Focus, where the strip shows the core's state, its registers,
-live while it runs, and the word at the PC at a stop, and F1 to F9 run
-the core; F12 keeps the strip up when Focus is left, and a stop in Strip
+live while it runs, and the word at the PC at a stop, and F1, F3, and
+F4 run the core; F12 keeps the strip up when Focus is left, and a stop in Strip
 comes back to Focus; and F11 shows the page, a window on the memory,
-where a word is written and a breakpoint set at the cursor, and F10 the
+where a word is written and a breakpoint set at the cursor, and F5 the
 settings page, where the link's IP and MAC addresses and the UART's baud
 rate are shown and set. The debugger
 is a client of the debug link inside the system, beside a host on the
@@ -94,7 +94,7 @@ on dark blue, `0x004` and `0xFFF`:
  R0-7   00000000 00000001 0000FFFF 00000010 00000000 00000000 00000000 00000000
  R8-15  00000000 00000000 00000000 00000000 00000000 FFFFFEF0 00000003 00001234
  PAUSED   00001234  xxxxxxxx  X C . . . . I   ADD[CM] R1, @0x40, R1
- F1 step F3 go F5 pause F7 hold F9 restart F10 link F11 page F12 keep strip: off
+ F1 step F3 pause/go F4 restart F5 link F11 page F12 keep strip: off
 ```
 
 - Rows 25 and 26: R0–R15 in hex, as the link returns them (DEBUG.md
@@ -121,7 +121,6 @@ on dark blue, `0x004` and `0xFFF`:
 - Row 28: the keys, and the sticky setting, `keep strip: off` or `on`.
   In Strip, where the keys are the program's, it says so, and names the
   toggle key: `The keys are the program's.  MEGA+HELP for the debugger`.
-  The row in Focus has no room for the toggle key's name with F11 in it.
 
 The page replaces the program's 25 rows while it is up, in Focus only:
 row 0 has the window's address, the cursor's, and the addresses of
@@ -156,7 +155,7 @@ disassembler.
 
 The settings page (stage 10,
 [#75](https://github.com/MJoergen/NiceMonMEGA65/issues/75)) takes the
-page's place in Focus, and F11 and F10 switch between the two. Row 0
+page's place in Focus, and F11 and F5 switch between the two. Row 0
 has its title; rows 2 to 5 the IP address, the MAC address, the TCP
 port, and the baud rate, from column 17, in their usual notation; rows
 7 to 9 a note on what a write does; row 23 the field, its label, `IP:`,
@@ -213,16 +212,21 @@ word it writes, so the display has no second cursor.
 In Focus, the keyboard's bytes (`src/kbd_m65_ascii.vhd`: ASCII, and
 xterm's sequences for the cursor and function keys) go to the debugger
 instead of the console FIFO. One key is one action, and the letters are
-mon.py's:
+mon.py's. The keys used most need no SHIFT on the MEGA65, F1, F3, F5,
+and F11, and the restart and F12 are the shifted F4 and F12
+([#81](https://github.com/MJoergen/NiceMonMEGA65/issues/81)). On the
+Nexys4DDR's keyboard F4 is a key of its own, with no SHIFT before it.
+F7, F9, and F10 do nothing.
 
 | Key | Action |
 |---|---|
 | F1, `s` | Step: one step of a paused core; the strip shows the new state |
-| F3, `g` | Go on |
-| F5, `p` | Pause |
-| F7, `h` | Hold: bit 0 of the control register |
-| F9, `r` | Restart: hold, then start at 0, with bit 3, the ROM, as it is |
-| F10, `n` | The settings page, on or off |
+| F3 | Pause a running core, or go on from a paused one |
+| `g` | Go on |
+| `p` | Pause |
+| `h` | Hold: bit 0 of the control register |
+| F4, `r` | Restart: hold, then start at 0, with bit 3, the ROM, as it is |
+| F5, `n` | The settings page, on or off |
 | F11, `m` | The page, on or off |
 | F12 | The sticky setting: Strip or Off when Focus is left |
 | MEGA+HELP, Scroll Lock | Leave Focus, for Off or Strip |
@@ -249,9 +253,12 @@ with a 0 before it, `0a…`, as only 8 digits count.
 the core runs too: the address of the breakpoint, then its enable bit.
 A key that needs the core stopped, pressed while it runs, shows the
 link's answer in the message row (`not paused`, the link's `e02`) and
-does nothing else, as mon.py prints its errors. F1 to F9 read the control register before they
+does nothing else, as mon.py prints its errors. The keys of the core read the control register before they
 write it: step and go on act only on a paused core, and pause only on a
-running one, as go on and pause would otherwise start a held core.
+running one, as go on and pause would otherwise start a held core. So F3
+does nothing on a held or halted core, and a second F3 while the first
+one's pause is on its way, with bit 4 still at 0, asks for the pause
+again rather than going on.
 
 Page Up, Page Down, and Home are bytes of both keyboards (written),
 xterm's `ESC [ 5 ~`, `ESC [ 6 ~`, and `ESC [ H`. On the Nexys4DDR they
@@ -283,8 +290,8 @@ and outputs, and its room.
   debugger's**, as the keyboard is; in Off and Strip they are the
   program's registers ([SYSTEM.md](SYSTEM.md#the-nexys4ddrs-devices)),
   so a program keeps them while the strip is up, and the debugger needs
-  none of them, since Scroll Lock enters Focus. BTNL steps, BTNR goes
-  on, BTNU and BTND move the cursor, and BTNC leaves Focus (written).
+  none of them, since Scroll Lock enters Focus. BTNL steps, BTNR pauses
+  or goes on as F3 does, BTNU and BTND move the cursor, and BTNC leaves Focus (written).
   The program reads the buttons as 0 meanwhile: `system.vhd` gives
   `nicemon` the buttons masked by `focus_o`, and the debugger, which
   debounces them itself, the raw ones: it samples them every 5 ms, and
@@ -432,9 +439,10 @@ free.
   by keyboard bytes and toggle pulses, checking the overlay's words and
   its requests on the side port. The program under it is `sim/dbg.nasm`,
   in the ROM: the registers live, R1 counting, and the PC on the display
-  while the core runs; F5, s, F3, the halt, r, F7, with the registers
-  dimmed, and g and p on a held core, with the
-  decode of row 27 at each stop; F12 and Strip,
+  while the core runs; F3 pausing, s, F3 going on, the halt, r, F7 and
+  F9 doing nothing, h, with the registers dimmed, and g, p, and F3 on a
+  held core, with the
+  decode of row 27 at each stop; F12, F4, and Strip,
   a step of its own that is not caught, the catch of a halt in Strip,
   and no catch from Off; and the page: the ROM's words, the cursor keys,
   Home, Page Up and Down, a move during a read, `a`, a write read back,
@@ -448,8 +456,8 @@ free.
   settings page (stage 10): its four settings, live, a written IP
   address, MAC address, and rate, which the registers take, the rates
   stepped with CRSR left and right, `bad value` for a short address, a
-  byte over 255, and a rate not on the list, and F10 and `m` between
-  the two pages. The mask of the core's buttons in `system.vhd` has no
+  byte over 255, and a rate not on the list, F10 doing nothing, and F5
+  and `m` between the two pages. The mask of the core's buttons in `system.vhd` has no
   test of its own.
 - `tb_kbd` and `tb_ps2`: the two toggle detectors, with a held key's
   repeats and its release, and one key of MEGA+HELP alone; and Page Up,
@@ -465,7 +473,7 @@ free.
   Ethernet station passes on the bitstream of stage 9; a host over TCP
   that reads the control register and R0–R15 twice a second keeps its
   line while MEGA+HELP brings the debugger up, and gets the `p` of the
-  debugger's F5; and the strip shows R1 counting and the PC moving while
+  debugger's pause; and the strip shows R1 counting and the PC moving while
   the program runs, white, and the stop's values at the pause.
 - `make hwtest`, a stretch goal: a register of `board_io.vhd`, at
   `0xFFFFFF97`, the only free word there, that enters Focus when written, so that the test enters
@@ -635,12 +643,15 @@ Made on 2026-11-05 for stage 10
 - **Only a reset brings back 2000000**, not a start of the core: a host
   that follows the rate with `--baud` then still loads and starts
   programs. The reset is the way back from a rate that cut a host off.
-- **A page of its own, on F10 and `n`**, beside the memory page, rather
+- **A page of its own, on F5 and `n`**, beside the memory page, rather
   than in its header and field: the four settings, their notes, and a
-  field of 17 characters fill it. F10 is SHIFT+F9 on the MEGA65.
+  field of 17 characters fill it. It was F10, SHIFT+F9 on the MEGA65,
+  until [#81](https://github.com/MJoergen/NiceMonMEGA65/issues/81).
 - **Shown live, written when the core is stopped**: the registers come
   out of `nicemon` anyway, for the Ethernet station, so the page reads
   them without the link; a write goes through the link, as every write
   of the debugger does, and needs the core paused, halted, or held.
-- **Row 28 has single spaces between the keys**, to make room for `F10
-  link` in its 80 columns.
+- **Row 28 has single spaces between the keys**, which made room for
+  `F10 link` in its 80 columns before
+  [#81](https://github.com/MJoergen/NiceMonMEGA65/issues/81) moved the
+  keys.

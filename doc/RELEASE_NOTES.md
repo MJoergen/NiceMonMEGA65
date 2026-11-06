@@ -21,6 +21,17 @@ The release candidates pinned these:
 
 nice_cpu's `RC01` and `RC03` have no tag here.
 
+## V1.7.1 (not yet released)
+
+**Upgrade notes.**
+
+- The on-board debugger's keys have moved
+  ([#81](https://github.com/MJoergen/NiceMonMEGA65/issues/81)). F3
+  pauses a running program and goes on from a paused one, F4 (SHIFT and
+  F3) restarts, and F5 shows the settings page. F7, F9, and F10 do
+  nothing. The letters are as they were, and `h` still holds. On the
+  Nexys4DDR, BTNR pauses or goes on as F3 does.
+
 ## V1.7 (2026-11-06)
 
 **Upgrade notes.**

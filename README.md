@@ -129,11 +129,11 @@ limits of the R3.
 MEGA+HELP brings up the debugger, with no cable and no PC: a strip of
 four rows under the program's screen, and the keyboard is the
 debugger's until MEGA+HELP is pressed again. The program keeps running
-until F5 pauses it. On the Nexys4DDR the key is Scroll Lock.
+until F3 pauses it. On the Nexys4DDR the key is Scroll Lock.
 
 ![The demo's typewriter, paused under the debugger's strip](doc/images/debugger.png)
 
-The demo, paused by F5 after a line was typed, drawn from `niceemu` by
+The demo, paused by F3 after a line was typed, drawn from `niceemu` by
 `tools/screenshot.py --debugger`, which lays the strip out as the board
 does.
 
@@ -146,11 +146,9 @@ syntax; and the keys:
 | Key | Action |
 |---|---|
 | F1 | Step: one instruction of a paused program |
-| F3 | Go on |
-| F5 | Pause |
-| F7 | Hold the core |
-| F9 | Restart the program from address 0 |
-| F10 | The settings of the link, on or off |
+| F3 | Pause, or go on |
+| F4 (SHIFT and F3) | Restart the program from address 0 |
+| F5 | The settings of the link, on or off |
 | F11 | The page of memory, on or off |
 | F12 | Keep the strip up after MEGA+HELP, or not |
 | MEGA+HELP | Back to the program, which gets its keyboard again |
@@ -165,7 +163,7 @@ strip: on`, the strip stays on the screen when MEGA+HELP goes back to
 the program, live, while the keys are the program's, and a halt or a
 breakpoint brings the debugger back.
 
-F10 shows the settings page instead: the IP address, the MAC address,
+F5 shows the settings page instead: the IP address, the MAC address,
 the TCP port, and the UART's baud rate, as `192.168.1.65`,
 `02:4E:49:43:45:00`, `4510`, and `2000000`, live. CRSR up and down
 choose a setting, and you type the new value as it is shown, or step

@@ -53,11 +53,14 @@
 -- first answer after reset the state is NO LINK.
 --
 -- p_kbd turns the keyboard's bytes into the keys of DEBUGGER.md: F1 or s
--- steps a paused core, F3 or g goes on, F5 or p pauses a running core, F7
--- or h holds, and F9 or r restarts: hold, then start. F1 and F3 are xterm's
--- ESC O P and ESC O R, and F5, F7, and F9 ESC [ 15 ~, ESC [ 18 ~, and
--- ESC [ 20 ~. A key that does not fit the core's state does nothing: go
--- on and pause would start a held core. F11 or m shows the page, and on
+-- steps a paused core, F3 pauses a running core and goes on from a paused
+-- one, g goes on, p pauses, h holds, and F4 or r restarts: hold, then
+-- start. F1, F3, and F4 are xterm's ESC O P, ESC O R, and ESC O S; the
+-- seldom-used keys are the shifted ones on the MEGA65, F4 among them. A
+-- key that does not fit the core's state does nothing: go on and pause
+-- would start a held core, so F3 does nothing on a held or halted core,
+-- and a second F3 while the first pause is on its way, which reads bit 4
+-- at 0, pauses again. F11 or m shows the page, and on
 -- it the cursor keys, Page Up, Page Down, Home, the hex digits, DEL,
 -- RETURN, a, b, and ESC are the page's keys, which p_page acts on. An ESC
 -- with no byte after it for 1 ms is the ESC key.
@@ -70,7 +73,7 @@
 -- the window to. b on an empty field is the key of a breakpoint; after a
 -- digit, a and b are digits.
 --
--- F10 or n shows the settings page instead, and F11 or m the memory page
+-- F5 or n shows the settings page instead, and F11 or m the memory page
 -- instead of it. dbg_set.vhd writes the settings' text from set_ip_i,
 -- set_mac_i, and set_baud_i, nicemon.vhd's registers, which are live
 -- without the link. On the page the cursor keys up and down choose the
@@ -86,10 +89,10 @@
 -- the field, or leaves the page when it is empty.
 --
 -- With G_BOARD_IO, the board's buttons are keys in Focus too: BTNL steps,
--- BTNR goes on, BTNU and BTND move the page's cursor, and BTNC leaves
--- Focus as the toggle key does. p_btn synchronizes them and samples them
--- every 5 ms, longer than they bounce, and a press is a sample at 1 after
--- one at 0. p_seg gives the seven-segment display the PC while the
+-- BTNR pauses or goes on as F3 does, BTNU and BTND move the page's
+-- cursor, and BTNC leaves Focus as the toggle key does. p_btn synchronizes
+-- them and samples them every 5 ms, longer than they bounce, and a press
+-- is a sample at 1 after one at 0. p_seg gives the seven-segment display the PC while the
 -- registers are the core's, a hex digit on each of its eight digits, and
 -- dashes otherwise; system.vhd shows it in Focus, and masks the core's
 -- buttons then.
@@ -248,7 +251,7 @@ architecture synthesis of dbg is
 
    type t_brk_addrs is array (0 to C_BRKS - 1) of t_word;
 
-   type t_act is (ACT_NONE, ACT_STEP, ACT_GO, ACT_PAUSE, ACT_HOLD, ACT_RESTART, ACT_STICKY, ACT_POKE, ACT_BREAK, ACT_SET);
+   type t_act is (ACT_NONE, ACT_STEP, ACT_GO, ACT_PAUSE, ACT_TOGGLE, ACT_HOLD, ACT_RESTART, ACT_STICKY, ACT_POKE, ACT_BREAK, ACT_SET);
 
    -- The keys of the page
    type t_pkey is (PK_NONE, PK_PAGE, PK_SET, PK_UP, PK_DOWN, PK_LEFT, PK_RIGHT, PK_PGUP, PK_PGDN, PK_HOME, PK_DIGIT, PK_CHAR, PK_DEL, PK_RETURN, PK_ESC);
@@ -610,7 +613,7 @@ architecture synthesis of dbg is
    constant C_KEYS_PROG  : natural := 2;
 
    function keys return t_keys is
-      constant C_F   : string := " F1 step F3 go F5 pause F7 hold F9 restart F10 link F11 page F12 keep strip: ";
+      constant C_F   : string := " F1 step F3 pause/go F4 restart F5 link F11 page F12 keep strip: ";
       constant C_R   : t_strings3 := (row(C_F & "off"), row(C_F & "on"),
          row(" The keys are the program's.  " & G_TOGGLE_KEY & " for the debugger"));
       variable res_v : t_keys;
@@ -939,7 +942,8 @@ begin
                   kbd_st <= KBD_IDLE_ST;
                   case kbd_data_i is
                      when X"50"  => key_act <= ACT_STEP;    -- F1
-                     when X"52"  => key_act <= ACT_GO;      -- F3
+                     when X"52"  => key_act <= ACT_TOGGLE;  -- F3
+                     when X"53"  => key_act <= ACT_RESTART; -- F4
                      when others => null;
                   end case;
 
@@ -957,10 +961,7 @@ begin
                            case kbd_num is
                               when 5      => pkey    <= PK_PGUP;
                               when 6      => pkey    <= PK_PGDN;
-                              when 15     => key_act <= ACT_PAUSE;   -- F5
-                              when 18     => key_act <= ACT_HOLD;    -- F7
-                              when 20     => key_act <= ACT_RESTART; -- F9
-                              when 21     => pkey    <= PK_SET;      -- F10
+                              when 15     => pkey    <= PK_SET;      -- F5
                               when 23     => pkey    <= PK_PAGE;     -- F11
                               when 24     => key_act <= ACT_STICKY;  -- F12
                               when others => null;
@@ -978,7 +979,7 @@ begin
          elsif state = FOCUS_ST and btn_press(C_BTN_L) = '1' then
             key_act <= ACT_STEP;
          elsif state = FOCUS_ST and btn_press(C_BTN_R) = '1' then
-            key_act <= ACT_GO;
+            key_act <= ACT_TOGGLE;
          elsif state = FOCUS_ST and btn_press(C_BTN_U) = '1' then
             pkey <= PK_UP;
          elsif state = FOCUS_ST and btn_press(C_BTN_D) = '1' then
@@ -1503,6 +1504,12 @@ begin
                         when ACT_PAUSE =>
                            write_v := ctrl_r(4) = '0' and ctrl_r(1) = '0' and ctrl_r(0) = '0';
                            data_v  := X"00000010" or rom_v;
+                        when ACT_TOGGLE =>
+                           -- Go on from a pause, else pause as ACT_PAUSE
+                           if ctrl_r(4) = '0' then
+                              write_v := ctrl_r(1) = '0' and ctrl_r(0) = '0';
+                              data_v  := X"00000010" or rom_v;
+                           end if;
                         when ACT_HOLD =>
                            data_v := X"00000001" or rom_v;
                         when ACT_RESTART =>
@@ -1547,7 +1554,8 @@ begin
                            msg_k <= C_MSG_FULL;
                         end if;
                      elsif write_v then
-                        if act_r = ACT_STEP or act_r = ACT_PAUSE then
+                        if act_r = ACT_STEP or act_r = ACT_PAUSE or
+                           (act_r = ACT_TOGGLE and ctrl_r(4) = '0') then
                            own_r <= '1';
                         end if;
                         instr_ok <= '0';

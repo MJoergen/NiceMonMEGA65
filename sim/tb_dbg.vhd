@@ -26,16 +26,16 @@
 --    debugger's, which reads the core. It is RUNNING, with R0-R15 live
 --    and white, R1 counting, the PC in the program and no word at it,
 --    and the display shows the PC.
--- 3. F5 pauses: PAUSED, with R0-R15 in white, R15 also as the PC, the
+-- 3. F3 pauses: PAUSED, with R0-R15 in white, R15 also as the PC, the
 --    word at the PC from the ROM, and its decode, as nicedis writes it,
 --    as at every stop that expect_stop checks.
 -- 4. s steps: the PC moves on, to an instruction of the loop.
--- 5. F3 goes on: RUNNING, with the registers live and no word at the PC.
+-- 5. F3 goes on again: RUNNING, with the registers live and no word at the PC.
 -- 6. The core halts: HALTED 1, with R1 at 0x800, the PC after the HALT,
---    and Z among the flags.
--- 7. r restarts, F7 holds: HELD, with the registers dimmed and no PC.
---    Then g and p do nothing, as they would start the held core.
--- 8. F12 sets the sticky setting, which row 28 shows. r restarts, F5
+--    and Z among the flags. F3, F7, and F9 do nothing then.
+-- 7. r restarts, h holds: HELD, with the registers dimmed and no PC.
+--    Then g, p, and F3 do nothing, as they would start the held core.
+-- 8. F12 sets the sticky setting, which row 28 shows. F4 restarts, F3
 --    pauses, and s steps, and the toggle comes before the step ends: the
 --    debugger is in Strip, still reading the core but without the
 --    keyboard, and the stop it caused itself does not take it back to
@@ -76,7 +76,7 @@
 --    one digit too, and the baud rate, where CRSR right and left step
 --    through the rates; a rate not on the list is bad, and the field's
 --    cursor blinks after its last character. ESC leaves the
---    page, F10 shows it again, m shows the memory page instead, and n the
+--    page, F10 does nothing, F5 shows it again, m shows the memory page instead, and n the
 --    settings page again.
 
 library ieee;
@@ -111,7 +111,7 @@ architecture simulation of tb_dbg is
    constant C_LAST  : natural := 29 * 80 - 1;
 
    constant C_DASHES : string := "-------- -------- -------- -------- -------- -------- -------- -------- ";
-   constant C_KEYS   : string := " F1 step F3 go F5 pause F7 hold F9 restart F10 link F11 page F12 keep strip: ";
+   constant C_KEYS   : string := " F1 step F3 pause/go F4 restart F5 link F11 page F12 keep strip: ";
    constant C_ROW28  : string := C_KEYS & "off" & (1 to 80 - C_KEYS'length - 3 => ' ');
    constant C_STRIP  : string := " The keys are the program's.  MEGA+HELP for the debugger";
    constant C_COLOR  : std_logic_vector(23 downto 0) := X"004FFF";
@@ -581,10 +581,10 @@ begin
          severity failure;
       key("z");
 
-      report "tb_dbg: 3. F5 pauses";
-      key(C_ESC & "[15~");
-      expect_row27("PAUSED ", "after F5");
-      expect_stop("after F5");
+      report "tb_dbg: 3. F3 pauses";
+      key(C_ESC & "OR");
+      expect_row27("PAUSED ", "after F3");
+      expect_stop("after F3");
       assert pc_v >= 2 and pc_v <= 6
          report "tb_dbg: the PC is " & to_hstring(pc_v) & " at a pause"
          severity failure;
@@ -601,9 +601,9 @@ begin
          report "tb_dbg: the PC is " & to_hstring(pc_v) & " after a step"
          severity failure;
 
-      report "tb_dbg: 5. F3 goes on";
+      report "tb_dbg: 5. F3 goes on again";
       key(C_ESC & "OR");
-      expect_live("after F3");
+      expect_live("after the second F3");
 
       report "tb_dbg: 6. the halt";
       expect_row27("HALTED 1", "after the halt");
@@ -614,27 +614,36 @@ begin
       assert row(27)(31 to 43) = ". . Z . . . ."
          report "tb_dbg: the flags are '" & row(27)(31 to 43) & "' at the halt"
          severity failure;
+      key(C_ESC & "OR");
+      cycles(10000);
+      key(C_ESC & "[18~");
+      cycles(10000);
+      key(C_ESC & "[20~");
+      cycles(10000);
+      expect_row27("HALTED 1", "after F3, F7, and F9 at the halt");
 
-      report "tb_dbg: 7. r restarts, F7 holds, and g and p do not start";
+      report "tb_dbg: 7. r restarts, h holds, and g, p, and F3 do not start";
       key("r");
       expect_row27("RUNNING", "after r");
-      key(C_ESC & "[18~");
-      expect_row27("HELD     --------", "after F7");
+      key("h");
+      expect_row27("HELD     --------", "after h");
       expect_color(C_DIM, "while held");
       key("g");
       cycles(10000);
       key("p");
       cycles(10000);
-      expect_row27("HELD", "after g and p");
+      key(C_ESC & "OR");
+      cycles(10000);
+      expect_row27("HELD", "after g, p, and F3");
 
       report "tb_dbg: 8. F12, and a step of the debugger's own in Strip";
       key(C_ESC & "[24~");
       wait_text(28, 0, C_KEYS & "on ");
-      key("r");
-      expect_row27("RUNNING", "after r");
-      key(C_ESC & "[15~");
-      expect_row27("PAUSED ", "after F5");
-      expect_stop("after F5");
+      key(C_ESC & "OS");
+      expect_row27("RUNNING", "after F4");
+      key(C_ESC & "OR");
+      expect_row27("PAUSED ", "after F3");
+      expect_stop("after F3");
       key("s");
       pulse;
       expect('1', '0', '0', "in Strip");
@@ -929,6 +938,9 @@ begin
       cycles(1000);
       expect('1', '0', '1', "after ESC on the settings page");
       key(C_ESC & "[21~");
+      cycles(1000);
+      expect('1', '0', '1', "after F10");
+      key(C_ESC & "[15~");
       wait_text(0, 0, " Settings of the link ");
       key("m");
       wait_text(0, 0, " Window 00000000 ");

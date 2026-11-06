@@ -199,12 +199,13 @@ The testbenches are these:
   asking the link nothing. The toggle enters Focus, where it takes the
   keyboard's bytes and reads the core through the link's side port, and
   the core is RUNNING, with R0–R15 live and white, R1 counting, the PC
-  in the program, and the display showing it. F5 pauses,
+  in the program, and the display showing it. F3 pauses,
   with R0–R15 in white, R15 as the PC, the word at the PC as the ROM
   has it, and its decode as nicedis writes it; s steps to the next instruction; F3 goes on, with the
   registers live; and the halt shows HALTED 1, R1 at 0x800, and Z.
-  r restarts, F7 holds, with the registers dimmed, and g and p then
-  leave the core held. F12 makes
+  r restarts, F7 and F9 do nothing, h holds, with the registers
+  dimmed, and g, p, and F3 then leave the core held. F12 and F4, the
+  restart, come next, and F12 makes
   the toggle leave Focus for Strip, where the debugger keeps reading the
   core but not the keyboard, and a step of its own does not bring it
   back; a
@@ -229,8 +230,8 @@ The testbenches are these:
   port, and the baud rate live from the system: a typed IP address, MAC
   address, and rate, chosen with CRSR down and stepped with CRSR left
   and right, are written, and the registers take them; a short address,
-  a byte over 255, and a rate not on the list say `bad value`; and F10
-  and `m` switch between the two pages.
+  a byte over 255, and a rate not on the list say `bad value`; F10 does
+  nothing; and F5 and `m` switch between the two pages.
 - `sim/tb_dbg_decode.vhd` tests the decode of the debugger's row 27
   (`src/dbg/dbg_decode.vhd`) against nicedis: `sim/gen_decode.py`
   writes about 3000 instruction words of every class, condition,

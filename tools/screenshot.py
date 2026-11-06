@@ -15,7 +15,7 @@ when small, its bottom 4 lines.
 
 With --debugger, the strip of the on-board debugger (doc/DEBUGGER.md) is
 drawn under the screen, 4 rows more, as MEGA+HELP shows it at the stop:
-R0-R15; the state, PAUSED at the step limit of -n, as after F5, or HALTED
+R0-R15; the state, PAUSED at the step limit of -n, as after F3, or HALTED
 with its reason; the PC, the instruction word there, and the flags of
 R14; the instruction decoded, as nicedis writes it; and the keys. The
 rows are laid out as src/dbg/dbg.vhd writes them, in the character ROM,
@@ -84,7 +84,7 @@ COL_STATE, COL_PC, COL_INSTR, COL_FLAGS, COL_DEC = 1, 10, 20, 30, 46
 STATE_LEN  = 9
 DEC_LEN    = COLS - COL_DEC
 FLAG_CHARS = "XCZNVEI"
-KEYS_ROW   = (" F1 step F3 go F5 pause F7 hold F9 restart F10 link F11 page"
+KEYS_ROW   = (" F1 step F3 pause/go F4 restart F5 link F11 page"
               " F12 keep strip: off")
 # niceemu's halt reasons, and their numbers in DEBUG.md section 6
 # A stop: ("PAUSED", 0) at the step limit, or ("HALTED", reason)
