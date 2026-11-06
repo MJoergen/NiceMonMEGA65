@@ -21,7 +21,7 @@ The release candidates pinned these:
 
 nice_cpu's `RC01` and `RC03` have no tag here.
 
-## V1.7
+## V1.7 (2026-11-06)
 
 **Upgrade notes.**
 
@@ -50,6 +50,17 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   It runs the same, but for F11's new row, and F12, which clears the
   screen itself before it returns to the monitor.
 
+**Fixed.**
+
+- A program that hid the cursor, as nice_chess does when it quits, left
+  it hidden at the monitor's prompt. The monitor now shows the cursor,
+  blinking, when a program returns to it (#79).
+- The debugger shows a write refused because the core runs, from the
+  memory page, the settings page, or a key, as "not paused" instead of
+  `e02` (#80).
+- The field of the debugger's settings page (F10) has a blinking cursor
+  where the next character goes.
+
 **Tests.**
 
 - `tb_nicemon` reads and writes the station at `0xFFFFFFB0`, and checks
@@ -59,6 +70,8 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 - `make -C demo test` checks the join behind the monitor: `x`, the
   board's text, F12 back to the monitor, `v`, and `h`. nice_cpu's own
   test checks the demos.
+- The monitor's hello test hides the cursor before it returns, and
+  `tb_dbg` checks "not paused" and the settings page's cursor.
 
 ## V1.6 (2026-11-06)
 
