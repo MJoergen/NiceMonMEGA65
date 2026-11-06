@@ -22,7 +22,7 @@
 ; subroutine, with R1 = the entry of mon_putc, R2 = 0,
 ; R3 = 0, and E = 0 (ABI.md, "Programs under a monitor"). At its return,
 ; and at mon_exit, the monitor clears E, stops the timer, sets VBASE to 0,
-; takes a fresh stack, and prints the status, R1. x copies the demo from
+; shows the cursor, blinking, takes a fresh stack, and prints the status, R1. x copies the demo from
 ; the ROM to 0x8000 and runs it as r does, for the time being (issue #65).
 ;
 ; u disassembles instructions, a row each, in the text of nice_cpu's
@@ -1081,12 +1081,13 @@ run_at          TST     @R7
 
 ; mon_exit: entry 1, and where a program returns to. Back to the main loop
 ; with R1 the status: E cleared, the timer stopped, VBASE 0, the font base
-; 0, a fresh stack, and the status printed, after a new line if the program left the
+; 0, the cursor shown and blinking with the display offset off, a fresh stack, and the status printed, after a new line if the program left the
 ; cursor in a row.
 mon_exit
                 MOVE    R14, 0          ; E = 0, VBASE = 0; bit 24 stays 1
                 MOVE    @TIMER, 0
                 MOVE    @SCR_FONT, 0    ; Spleen, whatever the program chose
+                MOVE    @SCR_CTL, 0x60  ; the cursor, which a program may hide
                 MOVE    SP, STACK
                 PUSH    R1
                 TST     @V_COL
