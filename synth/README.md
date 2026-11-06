@@ -194,7 +194,11 @@ are the times of the last builds, in minutes and seconds, without a ROM
 | Nexys4DDR, `NICE=multi` | 1:53 | 0:31 | 1:15 | 0:28 | 4:18 |
 | R3, pipelined | 3:10 | 0:46 | 1:10 | 0:36 | 6:05 |
 
-The Nexys4DDR builds with `FLOW=timing`.
+The Nexys4DDR builds with `FLOW=timing`. With it the R6 places with
+`-directive AltSpreadLogic_high` instead of `ExtraTimingOpt` (the
+`PLACE_TIMING` of `synth/r6/Makefile`): since issue #75, `ExtraTimingOpt`
+misses 100 MHz by 0.198 ns in the core's path from the RAM to its WRITE
+stage, and `AltSpreadLogic_high` meets it by 0.015 ns.
 
 ### Utilization
 

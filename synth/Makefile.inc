@@ -1,7 +1,7 @@
 # The Vivado build, in non-project mode, shared by the boards. A board's
 # Makefile sets PART, BOARD_SRC, and BOARD_XDC, and includes this file;
 # BOARD_SRC has the board's own sources, with top.vhd last. It may set FLOW
-# too.
+# and PLACE_TIMING too.
 #
 # make                builds build/top.bit, whose core waits, held, for
 #                     the debug link
@@ -16,15 +16,18 @@
 # directives, with which the MEGA65 meets 100 MHz. FLOW = timing runs every
 # step with a directive for timing, and phys_opt_design again after routing,
 # as synth/nexys4ddr/Makefile does: in nice_cpu issue 34 that gained its slower part
-# about 0.5 ns.
+# about 0.5 ns. PLACE_TIMING is place_design's directive in it,
+# ExtraTimingOpt unless the board's Makefile picks another, as
+# synth/r6/Makefile does.
 
 VIVADO_DIR ?= /opt/Xilinx/2025.1/Vivado
-FLOW       ?= default
+FLOW         ?= default
+PLACE_TIMING ?= ExtraTimingOpt
 
 ifeq ($(FLOW),timing)
 SYNTH_OPTS = -directive PerformanceOptimized -retiming
 OPT_OPTS   = -directive Explore
-PLACE_OPTS = -directive ExtraTimingOpt
+PLACE_OPTS = -directive $(PLACE_TIMING)
 PHYS_OPTS  = -directive AggressiveExplore
 ROUTE_OPTS = -directive AggressiveExplore
 else ifeq ($(FLOW),default)
@@ -137,8 +140,8 @@ endef
 export TCP_REPORTS_TCL
 TCP_REPORTS = $$TCP_REPORTS_TCL
 
-# The script is remade when the Makefiles or the ROM, NICE, or FLOW option
-# change. synth_design ignores VHDL assertions without -assert, such as the
+# The script is remade when the Makefiles or the ROM, NICE, FLOW, or
+# PLACE_TIMING option change. synth_design ignores VHDL assertions without -assert, such as the
 # check in src/rom.vhd for a word beyond the ROM.
 build/$(TOP).tcl: $(MAKEFILE_LIST) build/rom.conf
 	echo "# A tcl script for Vivado, made by make" > $@
@@ -159,10 +162,10 @@ build/$(TOP).tcl: $(MAKEFILE_LIST) build/rom.conf
 	echo "write_bitstream -force build/$(TOP).bit" >> $@
 	echo "exit" >> $@
 
-# The ROM, NICE, and FLOW options, written only when they change, so that
-# the script is not remade for nothing.
+# The ROM, NICE, FLOW, and PLACE_TIMING options, written only when they
+# change, so that the script is not remade for nothing.
 build/rom.conf: FORCE | build
-	@echo "$(ROM_ABS) $(NICE) $(FLOW)" | cmp -s - $@ || echo "$(ROM_ABS) $(NICE) $(FLOW)" > $@
+	@echo "$(ROM_ABS) $(NICE) $(FLOW) $(PLACE_TIMING)" | cmp -s - $@ || echo "$(ROM_ABS) $(NICE) $(FLOW) $(PLACE_TIMING)" > $@
 
 build:
 	mkdir -p build
