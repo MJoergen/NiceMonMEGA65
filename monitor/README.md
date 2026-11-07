@@ -71,7 +71,8 @@ the MEGA65 and 77 on the Nexys4DDR (Input and output below).
 | `u [ADDR] [N]` | Disassembles `N` instructions from `ADDR`, a row each: the address, the instruction's 1 to 4 words, and its text, all in hex (The disassembler below). Without `ADDR`, the instructions after the last shown; without `N`, 20. |
 | `c` | Clears the screen. |
 | `v` | The version of the monitor, and of the dispatch table: `NiceMon V1.2, table 1.0`. |
-| `i [A.B.C.D]` | Shows the Ethernet station's IP address, `IP address 192.168.1.65`, or writes it first: four decimal numbers of 0 to 255 with dots between them, such as `i 192.168.1.65`. Anything else is no address, and `i` says so and writes nothing. It writes `0xFFFFFFB0`, `NET_IP` ([SYSTEM.md](../doc/SYSTEM.md#the-ethernet-station)), so a host connected over TCP loses its connection. In `niceemu` it is a register that keeps what is written. |
+| `i [A.B.C.D]` | Shows the Ethernet station's IP address, `IP address 192.168.1.65`, or writes it first: four decimal numbers of 0 to 255 with dots between them, such as `i 192.168.1.65`. Anything but an address or `dhcp` is no address, and `i` says so and writes nothing. It writes `0xFFFFFFB0`, `NET_IP` ([SYSTEM.md](../doc/SYSTEM.md#the-ethernet-station)), so a host connected over TCP loses its connection. In `niceemu` it is a register that keeps what is written. |
+| `i dhcp` | Gets the IP address from the network's DHCP server and writes it, as `i A.B.C.D` does, then shows it, with the mask, the gateway, and the server, a line each (The network below). Without an answer, it prints `No answer from a DHCP server` after about 16 seconds, and leaves the address as it was. |
 | `m [MAC]` | Shows the station's MAC address, `MAC address 02:4E:49:43:45:00`, or writes it first: six bytes of one or two hex digits, in either case, with colons between them, such as `m 02:4E:49:43:45:01`. The first byte must be even, as an odd one makes a group address. Anything else is no address, and `m` says so and writes nothing. It writes `0xFFFFFFB1` and `B2`, so a host connected over TCP loses its connection. Two boards on one network need different MAC addresses. In `niceemu` they are registers too, with the address of a board after reset. |
 | `l` | Loads words into the RAM from lines of `ADDR WORD` in hex, as a `.bin` file has them (Loading without a host below), up to an empty line, and prints the words written and the lines skipped: `Words loaded: 600, 00008000 to 00008257`. |
 | `sd [SLOT] LBA` | Shows the sector `LBA` of the SD card in `SLOT`, both in hex, as 32 rows of 16 bytes: the offset in the sector, the bytes in hex, and the bytes as text, with a dot for a byte outside `0x20` to `0x7E` (The SD cards below). Without `SLOT`, the slot of the last `sd`, 0 after reset. An error of the controller is shown with its number and its meaning: `SD error 1 in slot 1, no card`. |
@@ -88,7 +89,9 @@ which reads a card with no file system, for the bring-up of the SD card's
 storage
 ([#57](https://github.com/MJoergen/NiceMonMEGA65/issues/57)). Its
 commands for files come with FAT32
-([#62](https://github.com/MJoergen/NiceMonMEGA65/issues/62)).
+([#62](https://github.com/MJoergen/NiceMonMEGA65/issues/62)). `i dhcp`
+gives a board on a network an address with no host
+([#83](https://github.com/MJoergen/NiceMonMEGA65/issues/83)).
 
 ## The SD cards
 
@@ -118,6 +121,47 @@ negative of `SD_ERROR`:
 - FAT32 ([#58](https://github.com/MJoergen/NiceMonMEGA65/issues/58)) will
   call the routines, and its file API will be the table's entries for
   the card. A program that wants sectors drives the registers itself.
+
+## The network
+
+The ROM has frame routines of its own, with no entries in the dispatch
+table, as the sector routines have none. They drive the port for
+Ethernet frames at `0xFFFFFFC0`, which nice_cpu's SYSTEM.md §7
+specifies, the same on every board and in `niceemu`, and follow the C
+ABI. A frame is in RAM as the port's buffers have it: from byte 2 of its
+buffer, 4 bytes a word, big-endian, so that the fields fall on the words
+of SYSTEM.md §7.
+
+| Routine | Arguments | What it does |
+|---|---|---|
+| `eth_on` | | Enables the port, with its queue emptied |
+| `eth_recv` | R1 a buffer of 380 words | Copies the frame at the head of the queue to the buffer, and releases it. R1 is its length in bytes, 0 when the queue is empty |
+| `eth_send` | R1 a frame, R2 its length in bytes | Waits while the port is busy, then copies the frame to the send buffer and sends it |
+| `arp_resolve` | R1 an IP address | R1 is 0, and R2 and R3 its MAC address as `NET_MAC_HI` and `NET_MAC_LO` have it; or R1 is -1 when no reply came |
+
+- The cold start and the return of a program, `mon_exit`, disable the
+  port, so a program that does not use the network sees no frame. A
+  program that enables it reads the frames itself.
+- `arp_resolve` looks in the ARP cache, 4 entries at `0xFFFFF100`, which
+  the cold start empties. Else it broadcasts a request, up to 3 times,
+  waits a second for each reply, and puts the reply into the cache. An
+  entry is kept about a minute, and a new one takes the entry of its
+  address, or else the next in turn. The frames that come while it
+  waits and are no ARP reply are released unread. The port must be
+  enabled. The station answers the requests for its own address itself.
+- `i dhcp` enables the port, broadcasts a DISCOVER, and waits 2 seconds
+  for an OFFER, then broadcasts a REQUEST of the address offered and
+  waits as long for the ACK (RFC 2131). A timeout or a NAK starts again
+  from the DISCOVER, up to 4 times. The ACK's address is written to
+  `NET_IP`, which breaks a host's connection over TCP, as `i A.B.C.D`
+  does, and the port is disabled again. The frames come from 0.0.0.0, to
+  everyone, with the broadcast flag set, and ask for the mask, the
+  gateway, and the DNS servers. The transaction's number is the
+  microsecond counter at the start, XOR the low word of the MAC address.
+  The lease is not renewed: a board that runs longer than its lease may
+  have its address given to another station.
+- The UDP entries for programs, and TFTP for `load`, follow in
+  [#84](https://github.com/MJoergen/NiceMonMEGA65/issues/84).
 
 ## The disassembler
 
@@ -326,7 +370,8 @@ What QMON's table has that this one leaves out:
   a program's return, so that its text is in Spleen.
 - The `sd_*!` entries: the sector routines stay inside the ROM (#57).
   A program that drives the SD registers itself mounts the card again
-  afterwards.
+  afterwards. The frame routines and the ARP cache stay inside it too
+  (#83), until the UDP entries of #84.
 - The `f32_*!` entries: not yet. The file API, `fs_mount` and the
   others, comes as entries from 9 with #58 and #59, as
   [doc/SDCARD.md](../doc/SDCARD.md) says.
@@ -480,7 +525,7 @@ unless `VERSION=` is given, and is written only when it changes.
 `make -C monitor test` checks the layout of the sources with nice_cpu's
 `nicefmt`, checks that the monitor ends below `DEMO`, where the demo
 goes in the ROM, assembles the monitor with the version `V9.9`, and runs
-it in `niceemu` nine times, with its keystrokes in an input file and
+it in `niceemu` ten times, with its keystrokes in an input file and
 `h` as the last command, so that the run ends: alone, with every command
 and the edits of a line; alone, with 448 rows of `d`, which go round the
 ring of the history, and Page Up and Page Down; alone, with `l` and
@@ -497,6 +542,11 @@ a slot that the system does not have, and arguments that are not; with
 `sd_write` by their labels, as it is assembled after the monitor's
 sources, and writes a sector, which `sd` then shows, and the image is
 compared with the one that `test/sd_image.py --written` makes; with
+`test/arp.nasm` at `0x8000`, built as `test/sd.nasm` is, which calls
+`arp_resolve` with the frames of `test/arp.eth` and `--step-time`: a
+reply after frames that are not, the cache, an address with no reply, an
+entry aged out, and the cache filled and gone round, and its frames sent
+are compared too; with
 `test/hello.nasm` at `0x8000`, an assembly
 program under nice_cpu's `start_mon.nasm`; and with `test/hello.c`,
 built with `nicebuild.py --monitor --asm mon.nasm`, which is skipped
@@ -521,7 +571,13 @@ and the near-misses. It compares each row with nicedis.py's text, or,
 for a pseudo-instruction, with nicedis.py's text rewritten by the rules
 above, and assembles it with `niceasm` and compares the words. It checks
 that each pseudo-instruction occurs, and that `u` without `ADDR` goes on
-after the last row.
+after the last row. `test/dhcp.py` runs `i dhcp` with `--step-time`, so
+that each run takes the same steps: first with no server, which gives it
+the transaction's number, and then with the OFFER and the ACK that it
+builds from it, among frames that are not for the monitor, and with a
+NAK, which starts again. It compares the output and the frames sent,
+with the transaction as `xx`, with `test/dhcp.expected`, and checks the
+IPv4 checksums.
 
 On a board, `make r6` builds a bitstream that boots the monitor, with the
 demo behind it in the ROM. `make hwtest` loads the same, with the

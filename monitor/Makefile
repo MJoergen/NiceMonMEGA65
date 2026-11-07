@@ -86,6 +86,13 @@ $(BUILD)/sd.bin: $(BUILD)/monitor_test.bin test/sd.nasm
 	@$(ASM) -o $(BUILD)/sd_full.bin $(BUILD)/sd_all.nasm
 	@grep -v '^0000[0-7]' $(BUILD)/sd_full.bin > $@
 
+# The test of the ARP cache, test/arp.nasm, which calls arp_resolve by its
+# label, built as sd.bin is
+$(BUILD)/arp.bin: $(BUILD)/monitor_test.bin test/arp.nasm
+	@cat $(BUILD)/monitor_test_all.nasm test/arp.nasm > $(BUILD)/arp_all.nasm
+	@$(ASM) -o $(BUILD)/arp_full.bin $(BUILD)/arp_all.nasm
+	@grep -v '^0000[0-7]' $(BUILD)/arp_full.bin > $@
+
 # The words that u disassembles in test/dis.py, at 0x8000, which never run
 $(BUILD)/dis.bin: test/dis.nasm $(TOOLS) | $(BUILD)
 	@$(ASM) -o $@ test/dis.nasm
@@ -178,6 +185,8 @@ DUMP_hello_c = -d 0xFFFF0168:12
 # the results of test/sd.nasm's calls
 DUMP_sd       = -d 0xFFFFFFA0:7
 DUMP_sd_write = -d 0x9100:6
+# For arp the results of test/arp.nasm's calls, and the cache it copied
+DUMP_arp      = -d 0x9100:37
 MAX_STEPS = 10000000
 
 # Each test runs the monitor with its input and its program, if any, and
@@ -188,12 +197,16 @@ MAX_STEPS = 10000000
 # VBASE 0x80, and so tests that a program returns to mon_exit. hello_c
 # is skipped without clang. test/ring.py checks the ring of the history at the
 # sizes of the screen's memory of niceemu and the boards first, and
-# test/dis.py the rows of u against nicedis.py and niceasm.
+# test/dis.py the rows of u against nicedis.py and niceasm, and
+# test/dhcp.py runs i dhcp against the frames that it builds. arp runs
+# with --step-time, as its timeouts count, and the frames it sends are
+# added to its output.
 test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.bin $(BUILD)/hello.bin \
-      $(BUILD)/dis.bin $(BUILD)/sd.bin
+      $(BUILD)/dis.bin $(BUILD)/sd.bin $(BUILD)/arp.bin
 	@$(PYTHON) test/ring.py $(EMU) $(BUILD)/monitor_test.bin:32768 \
 	  $(BUILD)/monitor_8k.bin:8192 $(BUILD)/monitor_2k.bin:2048
 	@$(PYTHON) test/dis.py $(EMU) $(BUILD)/monitor_test.bin $(BUILD)/dis.bin
+	@$(PYTHON) test/dhcp.py $(EMU) $(BUILD)/monitor_test.bin test/dhcp.expected $(BUILD)/dhcp.out
 	@echo 'FFFFFF9E 00020000' > $(BUILD)/ram128k.bin
 	@echo 'FFFFFF9E 00010000' > $(BUILD)/ram64k.bin
 	@printf '$(LOAD_EMU)' > $(BUILD)/load_emu.txt
@@ -208,7 +221,7 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	@$(PYTHON) test/sd_image.py --written $(BUILD)/sd_written.img
 	@{ printf '$(LOAD_HEAD)'; head -n 3 $(BUILD)/hello.bin | awk '{ printf "%s\r\n", $$0 }'; \
 	  tail -n +4 $(BUILD)/hello.bin; printf '$(LOAD_TAIL)'; } > $(BUILD)/load.txt
-	@fail=0; for t in cmds scroll load load_emu load_64k sd sd_write hello reset hello_c; do \
+	@fail=0; for t in cmds scroll load load_emu load_64k sd sd_write arp hello reset hello_c; do \
 	  opts=; \
 	  case $$t in \
 	    cmds) prog=; input=cmds; dump='$(DUMP_cmds)';; \
@@ -219,6 +232,8 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	    sd) prog=; input=sd; dump='$(DUMP_sd)'; opts="--sd0 $(BUILD)/sd.img";; \
 	    sd_write) prog=$(BUILD)/sd.bin; input=sd_write; dump='$(DUMP_sd_write)'; \
 	      cp $(BUILD)/sd.img $(BUILD)/sd_write.img; opts="--sd0 $(BUILD)/sd_write.img";; \
+	    arp) prog=$(BUILD)/arp.bin; input=run; dump='$(DUMP_arp)'; \
+	      opts="--step-time --eth-in test/arp.eth --eth-out $(BUILD)/arp.eth.out";; \
 	    hello) prog=$(BUILD)/hello.bin; input=run; dump='$(DUMP_hello)';; \
 	    reset) prog=$(BUILD)/hello.bin; input=reset; dump='$(DUMP_hello)';; \
 	    hello_c) prog=$(BUILD)/hello_c.bin; input=run; dump='$(DUMP_hello_c)'; \
@@ -232,7 +247,8 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	    sed -n 's/.* R14 ..\(......\) .*/VBASE at the halt \1/p' $(BUILD)/$$t.raw; \
 	    echo "exit $$status"; \
 	    if [ $$t = sd_write ]; then cmp $(BUILD)/sd_written.img $(BUILD)/sd_write.img 2>&1 \
-	      && echo "The image as test/sd_image.py --written makes it"; fi; } \
+	      && echo "The image as test/sd_image.py --written makes it"; fi; \
+	    if [ $$t = arp ]; then echo "Frames sent:"; cat $(BUILD)/arp.eth.out; fi; } \
 	    > $(BUILD)/$$t.out; \
 	  if cmp -s test/$$t.expected $(BUILD)/$$t.out; then echo "PASS monitor $$t"; \
 	  else echo "FAIL monitor $$t"; diff test/$$t.expected $(BUILD)/$$t.out; fail=1; fi; \
@@ -240,7 +256,7 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 
 # The layout of the sources, as nice_cpu's nicefmt checks it
 fmt:
-	@$(FMT) $(SOURCES) test/hello.nasm test/dis.nasm test/sd.nasm
+	@$(FMT) $(SOURCES) test/hello.nasm test/dis.nasm test/sd.nasm test/arp.nasm
 
 $(BUILD):
 	@mkdir -p $@

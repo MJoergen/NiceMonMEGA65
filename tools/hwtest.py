@@ -120,6 +120,11 @@ Checks, in this order:
     - programs run with tools/run.py --eth and with niceemu, and their
       output and exit status are compared, as above, and so is the
       monitor's test program, with --monitor
+    - the ROM, loaded at 0, gets the monitor's i dhcp over the UART, and
+      gets an address from the network's DHCP server, which the station
+      then has, with the port for Ethernet frames disabled again, and
+      which ping answers; when no server answers, the summary names DHCP
+      after NOT COVERED instead of failing. The board keeps that address
     Without --eth, the summary names the Ethernet station after NOT
     COVERED.
 
@@ -172,6 +177,11 @@ SD_SLOT_COUNT = {"mega65": 2, "nexys4ddr": 1}
 # The UDP port that sim/udp.nasm answers on, through the port for Ethernet
 # frames
 UDP_PORT = 4511
+# The port's status, 0 while it is disabled
+ETH_CSR = 0xFFFFFFC0
+# The longest that the monitor's i dhcp takes: DHCP_TRIES DISCOVERs, and a
+# REQUEST after each, with DHCP_WAIT seconds for each reply (monitor.nasm)
+DHCP_TIME = 4 * 2 * 2.0
 
 T = TypeVar("T")
 
@@ -1614,6 +1624,57 @@ def test_eth_frames(link: Link, udp: str, ip: str) -> None:
     check("eth: the program halts after its answer", wait_halt(link) == 1)
 
 
+def test_eth_dhcp(port: str, baud: int, rom: str) -> None:
+    """Loads the ROM of the monitor and the demo, and types the monitor's
+    i dhcp over the UART. When a server answers, the address shown must be
+    the station's, the port for Ethernet frames disabled again, and ping
+    must reach the board there. No answer is a gap in the coverage."""
+    link = Link(Serial(port, baud))
+    try:
+        load(link, rom)
+        console(link)                  # the banner
+        link.send_console(b"i dhcp\r")
+        text = b""
+        end = time.monotonic() + DHCP_TIME + 10 * QUIET
+        while time.monotonic() < end:
+            link.poll(0.1)
+            text += link.take_console()
+            if b"> " in text.partition(b"i dhcp")[2]:
+                break                  # the prompt after the answer
+        said = text.partition(b"i dhcp")[2].decode("latin-1")
+        if "No answer from a DHCP server" in said:
+            print("  no DHCP server answered the monitor's i dhcp",
+                  flush=True)
+            uncovered.append("the monitor's i dhcp, as no DHCP server "
+                             "answered on the board's network")
+            return
+        dotted = r"(\d+\.\d+\.\d+\.\d+)"
+        got = re.search(rf"IP address {dotted}\r\nMask {dotted}\r\n"
+                        rf"Gateway {dotted}\r\nDHCP server {dotted}", said)
+        if not check("eth: the monitor's i dhcp gets an address from the "
+                     "network's DHCP server", got is not None,
+                     repr(said) if got is None else
+                     f"{got[1]}, mask {got[2]}, gateway {got[3]}, "
+                     f"server {got[4]}"):
+            return
+        assert got is not None
+        addr = got[1]
+        words = paused(link, [NET_IP, ETH_CSR])
+        want = struct.unpack(">I", socket.inet_aton(addr))[0]
+        check("eth: the station has the address of i dhcp, and the port is "
+              "disabled", words == [want, 0],
+              "no pause" if words is None else
+              f"{words[0]:08X} {words[1]:08X}")
+        ping = subprocess.run(["ping", "-c", "3", "-W", "2", addr],
+                              capture_output=True, text=True)
+        check(f"eth: ping answered at {addr}, the address of i dhcp",
+              ping.returncode == 0,
+              "" if ping.returncode == 0 else
+              repr(ping.stdout + ping.stderr))
+    finally:
+        link.close()
+
+
 def test_eth(port: str, baud: int, eth: str,
              programs: list[tuple[str, list[str], bool]], rom: str,
              udp: str, tmp: str) -> None:
@@ -1672,6 +1733,7 @@ def test_eth(port: str, baud: int, eth: str,
             tcp_link.close()
         test_run(["--eth", eth], programs, " over Ethernet")
         test_monitor(["--eth", eth], tmp, True, " over Ethernet", long=True)
+        test_eth_dhcp(port, baud, rom)
     except (LinkError, OSError) as e:
         check(f"eth: {e}", False)
     except SystemExit as e:

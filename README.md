@@ -189,7 +189,12 @@ cable.
 The board answers once it has an IP address, which the monitor, a
 program, the debug link, or the demo's F11 gives it. After reset, it has
 none, and answers nothing. At the monitor's prompt, `i 192.168.1.65` and
-RETURN give it that address, and `i` alone shows it. A second board on
+RETURN give it that address, and `i` alone shows it. On a network with
+a DHCP server, `i dhcp` gets an address from it and shows it, with the
+mask, the gateway, and the server. The board does not renew the lease,
+so a server that wants the address back after the lease may give it to
+another computer; a fixed address outside the server's range, or one
+the server reserves for the MAC address, avoids that. A second board on
 the same network also needs a MAC address of its own, which
 `m 02:4E:49:43:45:01` gives it, and `m` alone shows it. In the demo's
 F11, I types a new IP address, and M a new MAC address:

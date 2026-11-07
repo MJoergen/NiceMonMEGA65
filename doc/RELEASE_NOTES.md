@@ -33,6 +33,14 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   address is 0, and sends frames of its own, as in niceemu. `NET_TX`
   counts them too. `sim/udp.nasm` is an example, which answers a UDP
   datagram to port 4511, and `make hwtest ETH=...` runs it.
+- The monitor's `i dhcp` gets the IP address from the network's DHCP
+  server, and shows it with the mask, the gateway, and the server
+  ([#83](https://github.com/MJoergen/NiceMonMEGA65/issues/83)). It
+  does not renew the lease. The ROM's frame routines and ARP cache have
+  no entries for programs yet. The monitor disables the port at its
+  start and when a program returns. `make hwtest ETH=...` runs `i dhcp`
+  last, so the board keeps the address it gets, and names it after NOT
+  COVERED when no server answers.
 
 ## V1.7.1 (2026-11-06)
 

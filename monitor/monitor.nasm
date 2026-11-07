@@ -26,7 +26,11 @@
 ; the ROM to 0x8000 and runs it as r does, for the time being (issue #65).
 ; sd shows a sector of an SD card, which the sector routines sd_init,
 ; sd_read, and sd_write read; they are the ROM's own, with no entries in
-; the dispatch table (issue #57, doc/SDCARD.md).
+; the dispatch table (issue #57, doc/SDCARD.md). i dhcp gets the IP
+; address from a DHCP server through the port for Ethernet frames, with
+; the frame routines eth_on, eth_recv, and eth_send, which are the ROM's
+; own too, as is the ARP cache of arp_resolve (issue #83, README.md, "The
+; network").
 ;
 ; u disassembles instructions, a row each, in the text of nice_cpu's
 ; nicedis.py, with the pairs of a call shown as CALL, the return as RET,
@@ -94,6 +98,12 @@ SD_SELECT       .EQU    0xFFFFFFA4      ; the selected slot
 SD_LAST         .EQU    0xFFFFFFA5      ; the card's last sector, while it is ready
 SD_SLOTS        .EQU    0xFFFFFFA6      ; the slots of the system
 SD_BUF          .EQU    0xFFFFFFA8      ; SD_BUF0 to SD_BUF7, the words of the chunk
+ETH_CSR         .EQU    0xFFFFFFC0      ; the port for Ethernet frames: its status, and a write of bit 0 enables it (nice_cpu's SYSTEM.md §7)
+ETH_RX_LEN      .EQU    0xFFFFFFC1      ; the bytes of the frame at the head of the queue, and a write releases it
+ETH_TX_LEN      .EQU    0xFFFFFFC2      ; a write of N sends the first N bytes of the send buffer
+ETH_CHUNK       .EQU    0xFFFFFFC3      ; the 8 words at ETH_BUF, and in bit 8 the buffer: 0 the queue's, 1 the send buffer
+ETH_BUF         .EQU    0xFFFFFFC8      ; ETH_BUF0 to ETH_BUF7, the words of the chunk
+TIME_HI         .EQU    0xFFFFFF45      ; bits 63..32 of the microseconds, from the snapshot that a read of io.us takes
 
 STACK           .EQU    0xFFFFF000      ; SP at the cold start, above the program's RAM
 V_COL           .EQU    0xFFFFF000      ; the cursor's column, 0 to 79
@@ -118,6 +128,19 @@ V_UF            .EQU    0xFFFFF060      ; for u: the fields dest, s0, and s1,
 V_UC            .EQU    0xFFFFF063      ; their constant words,
 V_UNOPS         .EQU    0xFFFFF066      ; and the operands of the mnemonic
 V_SECTOR        .EQU    0xFFFFF080      ; for sd: a sector, 128 words of 4 bytes, little-endian
+V_ARP           .EQU    0xFFFFF100      ; the ARP cache: ARP_SLOTS entries of an IP address, 0 for none, the MAC address as E_MACH and E_MACL have it, and the time of arp_tick it was learned
+V_ARPNEXT       .EQU    0xFFFFF110      ; the entry that arp_learn takes next, 4 times its number
+V_XID           .EQU    0xFFFFF111      ; for i dhcp: the transaction's number,
+V_DIP           .EQU    0xFFFFF112      ; and the address of the OFFER or the ACK, its server, mask, and gateway,
+V_DSRV          .EQU    0xFFFFF113
+V_DMASK         .EQU    0xFFFFF114
+V_DGW           .EQU    0xFFFFF115
+V_PIP           .EQU    0xFFFFF116      ; and those of the last reply that dhcp_parse took
+V_PSRV          .EQU    0xFFFFF117
+V_PMASK         .EQU    0xFFFFF118
+V_PGW           .EQU    0xFFFFF119
+V_TXF           .EQU    0xFFFFF120      ; a frame to send, from byte 2, DHCP_WORDS words, as the send buffer has it
+V_RXF           .EQU    0xFFFFF180      ; a frame received, from byte 2, 380 words, as the queue's buffer has it
 
 PROGRAM         .EQU    0x8000          ; where a program is, above the ROM
 VARS_WORDS      .EQU    0x1000          ; the words from 0xFFFFF000, the variables, which end a program's RAM
@@ -138,6 +161,22 @@ SD_WR           .EQU    2
 SD_BUSY         .EQU    0x01            ; the bits of its status
 SD_READY        .EQU    0x08
 SD_CHANGED      .EQU    0x10
+ETH_ON          .EQU    0x01            ; the bits of ETH_CSR: enabled,
+ETH_BUSY        .EQU    0x04            ; and a frame being sent
+ETH_TXBUF       .EQU    0x100           ; the send buffer, in ETH_CHUNK
+ARP_SLOTS       .EQU    4               ; the entries of the ARP cache
+ARP_AGE         .EQU    60              ; the ticks of arp_tick an entry is kept, about a minute
+ARP_TRIES       .EQU    3               ; the requests that arp_resolve sends
+ARP_WAIT        .EQU    1000000         ; the microseconds it waits for a reply to each
+DHCP_TRIES      .EQU    4               ; the DISCOVERs that i dhcp sends
+DHCP_WAIT       .EQU    2000000         ; the microseconds it waits for each reply
+DHCP_LEN        .EQU    342             ; the bytes of its frames: 14 Ethernet, 20 IP, 8 UDP, and 300 DHCP
+DHCP_WORDS      .EQU    86              ; their words, with the 2 bytes before the frame
+DHCP_DISCOVER   .EQU    1               ; the message types of option 53
+DHCP_OFFER      .EQU    2
+DHCP_REQUEST    .EQU    3
+DHCP_ACK        .EQU    5
+DHCP_NAK        .EQU    6
 
 ; The dispatch table (README.md, "The dispatch table"). Entries are only
 ; ever added at the end.
@@ -152,14 +191,22 @@ SD_CHANGED      .EQU    0x10
                 JMP     scr_color       ; 8 at 0x10
 
 ; mon_reset: the cold start, entry 0, which reset runs and a program may
-; call. E is cleared, the timer stopped, VBASE set to 0, and the font base
-; set to 0, so that the screen shows Spleen, as at a return. The RAM from 0x8000 is left alone, so that a program a host has
-; loaded is still there.
+; call. E is cleared, the timer stopped, VBASE set to 0, the font base
+; set to 0, so that the screen shows Spleen, and the port for Ethernet
+; frames disabled, as at a return, and the ARP cache emptied. The RAM
+; from 0x8000 is left alone, so that a program a host has loaded is still
+; there.
 mon_reset
                 MOVE    R14, 0          ; E = 0, VBASE = 0; bit 24 stays 1
                 MOVE    @TIMER, 0
                 MOVE    @SCR_FONT, 0
+                MOVE    @ETH_CSR, 0
                 MOVE    SP, STACK
+                MOVE    R1, V_ARP
+arp_clear
+                MOVE    @R1++, 0
+                CMP     R1, V_ARP+4*ARP_SLOTS+1  ; and V_ARPNEXT
+        ?!Z     JMP     arp_clear
                 MOVE    @V_COLOR, COLOR
                 MOVE    @V_OUT, OUT_LINE+OUT_SCREEN
                 MOVE    @V_NEXT, PROGRAM
@@ -696,12 +743,13 @@ u_hex_digit
         ?!Z     JMP     u_hex_digit
                 RET
 
-; i [A.B.C.D]: the Ethernet station's IP address (doc/SYSTEM.md, "The
-; Ethernet station"), written from four decimal numbers of 0 to 255 with
-; dots between them, and shown, in decimal with dots. Without an address
-; it is only shown. Blanks may come before and after the address, and
-; anything else makes it no address, which is not written. R7 gathers the
-; address, a byte at a time, and R8 counts the numbers left.
+; i [A.B.C.D | dhcp]: the Ethernet station's IP address (doc/SYSTEM.md,
+; "The Ethernet station"), written from four decimal numbers of 0 to 255
+; with dots between them, or from DHCP with the word dhcp, in either
+; case, and shown, in decimal with dots. Without an address it is only
+; shown. Blanks may come before and after the address, and anything else
+; makes it no address, which is not written. R7 gathers the address, a
+; byte at a time, and R8 counts the numbers left.
 cmd_ip
                 MOVE    R7, 0
                 MOVE    R8, 4
@@ -711,6 +759,10 @@ ip_blank
         ?Z      JMP     ip_blank
                 TST     @R2
         ?Z      JMP     ip_show         ; no address
+                OR      R1, @R2, 0x20
+                SUB     R1, R1, 0x61
+                CMP     R1, 26
+        ?C      JMP     ip_word         ; a letter
 ip_num          MOVE    R4, 0           ; the number
                 MOVE    R5, 0           ; and its digits
 ip_digit
@@ -743,22 +795,102 @@ ip_last         CMP     @R2, 0x20       ; blanks, then the end of the line
         ?!Z     JMP     ip_bad
                 MOVE    @E_IP, R7
 ip_show         MOVE    R1, S_IP
-                CALL    _io_puts
-                MOVE    R8, @E_IP
-                MOVE    R9, 4           ; the bytes left
-ip_byte         ROL     R8, R8, 8       ; the top byte to the bottom
-                AND     R1, R8, 0xFF
-                CALL    _io_putdec
-                SUB[M]  R9, R9, 1
-        ?Z      JMP     ip_done
-                MOVE    R1, 0x2E
-                CALL    mon_putc
-                JMP     ip_byte
-ip_done         CALL    _io_crlf
+                MOVE    R2, @E_IP
+                CALL    show_ip
                 JMP     main
 ip_bad          MOVE    R1, S_BADIP
                 CALL    puts_crlf
                 JMP     main
+; The word after i, which must be dhcp, and blanks after it
+ip_word
+                MOVE    R3, S_DHCPW
+ip_word_chr
+                MOVE[M] R4, @R3++
+        ?Z      JMP     ip_word_end
+                OR      R1, @R2++, 0x20  ; A to Z as a to z
+                CMP     R1, R4
+        ?Z      JMP     ip_word_chr
+                JMP     ip_bad
+ip_word_end
+                CMP     @R2, 0x20
+        ?Z      ADD     R2, R2, 1
+        ?Z      JMP     ip_word_end
+                TST     @R2
+        ?!Z     JMP     ip_bad
+
+; i dhcp: the IP address from a DHCP server (RFC 2131), through the port
+; for Ethernet frames, which it enables, and disables at the end. It
+; broadcasts a DISCOVER, waits DHCP_WAIT microseconds for an OFFER, then
+; broadcasts a REQUEST of the address offered, from the server that
+; offered it, and waits as long for its ACK. A timeout or a NAK starts
+; again from the DISCOVER, up to DHCP_TRIES times, with the same
+; transaction, whose number is the microseconds at the start, XOR the low
+; word of the MAC address. The ACK's address is written to E_IP, which
+; breaks a host's connection over TCP, as a write of i does, and shown,
+; with the mask, the gateway, and the server. Without an ACK, i says so
+; and leaves E_IP alone. The lease is not renewed. R7 counts the tries
+; left.
+ip_dhcp
+                CALL    eth_on
+                MOVE    R1, @io.us
+                XOR     @V_XID, R1, @E_MACL
+                MOVE    R7, DHCP_TRIES
+dhcp_try
+                MOVE    R1, DHCP_DISCOVER
+                CALL    dhcp_send
+                MOVE    R1, DHCP_OFFER
+                CALL    dhcp_wait
+                CMP     R1, DHCP_OFFER
+        ?!Z     JMP     dhcp_again
+                MOVE    R1, DHCP_REQUEST
+                CALL    dhcp_send
+                MOVE    R1, DHCP_ACK
+                CALL    dhcp_wait
+                CMP     R1, DHCP_ACK
+        ?Z      JMP     dhcp_bound
+dhcp_again
+                SUB[M]  R7, R7, 1
+        ?!Z     JMP     dhcp_try
+                MOVE    @ETH_CSR, 0
+                MOVE    R1, S_NODHCP
+                CALL    puts_crlf
+                JMP     main
+dhcp_bound
+                MOVE    @ETH_CSR, 0
+                MOVE    @E_IP, @V_DIP
+                MOVE    R1, S_IP
+                MOVE    R2, @E_IP
+                CALL    show_ip
+                MOVE    R1, S_MASK
+                MOVE    R2, @V_DMASK
+                CALL    show_ip
+                MOVE    R1, S_GW
+                MOVE    R2, @V_DGW
+                CALL    show_ip
+                MOVE    R1, S_DSRV
+                MOVE    R2, @V_DSRV
+                CALL    show_ip
+                JMP     main
+
+; show_ip: the string at R1, the IP address R2 in decimal with dots, and
+; CR LF. Uses R1-R4, and R7 and R8 across the calls, saved.
+show_ip
+                PUSH    R7
+                PUSH    R8
+                MOVE    R8, R2
+                CALL    _io_puts
+                MOVE    R7, 4           ; the bytes left
+ip_byte         ROL     R8, R8, 8       ; the top byte to the bottom
+                AND     R1, R8, 0xFF
+                CALL    _io_putdec
+                SUB[M]  R7, R7, 1
+        ?Z      JMP     ip_done
+                MOVE    R1, 0x2E
+                CALL    mon_putc
+                JMP     ip_byte
+ip_done         POP     R8
+                POP     R7
+                JMP     _io_crlf        ; which returns to the caller
 
 ; m [MAC]: the Ethernet station's MAC address (doc/SYSTEM.md, "The
 ; Ethernet station"), written from six bytes of one or two hex digits, in
@@ -825,7 +957,7 @@ mac_put         SHR     R1, R7, 28      ; the top byte, a digit at a time
                 SHR     R1, R7, 24
                 CALL    mac_digit
                 SUB[M]  R9, R9, 1
-        ?Z      JMP     ip_done
+        ?Z      JMP     mac_done
                 SHR     R4, R8, 24
                 SHL     R7, R7, 8
                 OR      R7, R7, R4
@@ -833,6 +965,9 @@ mac_put         SHR     R1, R7, 28      ; the top byte, a digit at a time
                 MOVE    R1, 0x3A        ; :
                 CALL    mon_putc
                 JMP     mac_put
+mac_done
+                CALL    _io_crlf
+                JMP     main
 mac_bad         MOVE    R1, S_BADMAC
                 CALL    puts_crlf
                 JMP     main
@@ -1288,6 +1423,472 @@ sd_wait
         ?!Z     JMP     sd_wait
                 RET
 
+; The frame routines, the ROM's own, with no entries in the dispatch table
+; (README.md, "The network"). They follow the C ABI, and drive the port for
+; Ethernet frames of nice_cpu's SYSTEM.md §7. A frame is in RAM as the
+; port's buffers have it: from byte 2 of its buffer, 4 bytes a word,
+; big-endian, so that word n of the RAM is word n of the port's buffer,
+; and the words of nice_cpu's SYSTEM.md §7 are where its table says.
+
+; eth_on: the port enabled, with its queue emptied, so that no frame from
+; before comes. Uses no register.
+eth_on
+                MOVE    @ETH_CSR, 0
+                MOVE    @ETH_CSR, ETH_ON
+                RET
+
+; eth_recv: the frame at the head of the queue copied to the 380 words at
+; R1, and released. R1 = its length in bytes, or 0 when the queue is
+; empty. Uses R1-R5.
+eth_recv
+                MOVE[M] R2, @ETH_RX_LEN
+        ?Z      MOVE    R1, 0
+        ?Z      RET
+                ADD     R3, R2, 5       ; the words, with the 2 bytes before the frame
+                SHR     R3, R3, 2
+                MOVE    R4, 0           ; the chunk, of the queue's buffer
+eth_recv_chunk
+                MOVE    @ETH_CHUNK, R4
+                MOVE    R5, ETH_BUF
+eth_recv_word
+                MOVE    @R1++, @R5++
+                SUB[M]  R3, R3, 1
+        ?Z      JMP     eth_recv_end
+                CMP     R5, ETH_BUF+8
+        ?!Z     JMP     eth_recv_word
+                ADD     R4, R4, 1
+                JMP     eth_recv_chunk
+eth_recv_end
+                MOVE    @ETH_RX_LEN, 0  ; the frame released
+                MOVE    R1, R2
+                RET
+
+; eth_send: the frame at R1, R2 bytes long, 14 to 1514, copied to the send
+; buffer and sent, after the frame before it has gone. The port must be
+; enabled, or nothing is sent. Uses R1-R5.
+eth_send
+                AND[M]  R0, @ETH_CSR, ETH_BUSY
+        ?!Z     JMP     eth_send        ; as the send buffer takes no write while busy
+                ADD     R3, R2, 5
+                SHR     R3, R3, 2
+                MOVE    R4, ETH_TXBUF   ; chunk 0 of the send buffer
+eth_send_chunk
+                MOVE    @ETH_CHUNK, R4
+                MOVE    R5, ETH_BUF
+eth_send_word
+                MOVE    @R5++, @R1++
+                SUB[M]  R3, R3, 1
+        ?Z      JMP     eth_send_go
+                CMP     R5, ETH_BUF+8
+        ?!Z     JMP     eth_send_word
+                ADD     R4, R4, 1
+                JMP     eth_send_chunk
+eth_send_go
+                MOVE    @ETH_TX_LEN, R2
+                RET
+
+; eth_head: the Ethernet header of the frame at R1: to everyone, from the
+; station's MAC address, with the EtherType R2. Uses R3 and R4.
+eth_head
+                MOVE    @R1, 0xFFFF
+                MOVE    @1[R1], 0xFFFFFFFF
+                SHL     R3, @E_MACH, 16
+                SHR     R4, @E_MACL, 16
+                OR      @2[R1], R3, R4
+                SHL     R3, @E_MACL, 16
+                OR      @3[R1], R3, R2
+                RET
+
+; ip_csum: the checksum of the IPv4 header of the frame at R1, the 5
+; words 4 to 8, written to bits 15..0 of word 6: the ones' complement of
+; the ones' complement sum of its halves. Uses R2-R6.
+ip_csum
+                AND     @6[R1], @6[R1], 0xFFFF0000
+                ADD     R2, R1, 4
+                MOVE    R3, 5
+                MOVE    R4, 0
+ip_csum_word
+                MOVE    R5, @R2++
+                SHR     R6, R5, 16
+                ADD     R4, R4, R6
+                AND     R5, R5, 0xFFFF
+                ADD     R4, R4, R5
+                SUB[M]  R3, R3, 1
+        ?!Z     JMP     ip_csum_word
+                SHR     R5, R4, 16      ; the carries added back in, twice
+                AND     R4, R4, 0xFFFF
+                ADD     R4, R4, R5
+                SHR     R5, R4, 16
+                AND     R4, R4, 0xFFFF
+                ADD     R4, R4, R5
+                XOR     R4, R4, 0xFFFF
+                OR      @6[R1], @6[R1], R4
+                RET
+
+; rx_byte: R1 = the byte at R1 of V_RXF, counted from the start of the
+; buffer, 2 bytes before the frame. Uses R1 and R2.
+rx_byte
+                SHR     R2, R1, 2
+                AND     R1, R1, 3
+                XOR     R1, R1, 3
+                SHL     R1, R1, 3       ; 8 times the bytes after it in the word
+                SHR     R1, @V_RXF[R2], R1
+                AND     R1, R1, 0xFF
+                RET
+
+; rx_long: R1 = the 4 bytes from the byte at R1 of V_RXF, big-endian,
+; whichever byte of a word they start at. Uses R1-R3.
+rx_long
+                SHR     R2, R1, 2
+                AND     R1, R1, 3
+                SHL     R1, R1, 3
+                SHL     R3, @V_RXF[R2], R1
+                SUB     R1, 32, R1      ; a shift of 32 gives 0
+                ADD     R2, R2, 1
+                SHR     R1, @V_RXF[R2], R1
+                OR      R1, R1, R3
+                RET
+
+; The ARP cache: ARP_SLOTS entries at V_ARP, which the cold start empties.
+; arp_resolve gives the MAC address of an IP address, from the cache, or
+; else from a request, broadcast up to ARP_TRIES times, and the reply,
+; which goes into the cache. An entry is kept ARP_AGE ticks of arp_tick,
+; about a minute, and a new one takes the entry of its IP address, or else
+; the next in turn. The port must be enabled. The frames received while
+; arp_resolve waits that are no ARP reply are released unread.
+
+; arp_resolve: R1 an IP address, not 0. R1 = 0, R2 the MAC address's first
+; two bytes, as E_MACH has them, and R3 its last four, as E_MACL has
+; them; or R1 = -1 when no reply came. Uses R1-R6, and R7-R9 across the
+; calls, saved.
+arp_resolve
+                PUSH    R7
+                PUSH    R8
+                PUSH    R9
+                MOVE    R7, R1          ; the IP address
+                MOVE    R8, ARP_TRIES   ; the requests left
+arp_look
+                MOVE    R1, R7
+                CALL    arp_find
+                TST     R1
+        ?!Z     JMP     arp_found
+                TST     R8
+        ?Z      JMP     arp_none
+                SUB     R8, R8, 1
+                MOVE    R1, R7
+                CALL    arp_request
+                MOVE    R9, @io.us      ; when it was sent
+arp_listen
+                MOVE    R1, V_RXF
+                CALL    eth_recv
+                TST     R1
+        ?!Z     CALL    arp_take
+                MOVE    R1, R7
+                CALL    arp_find
+                TST     R1
+        ?!Z     JMP     arp_found
+                SUB     R1, @io.us, R9
+                CMP     R1, ARP_WAIT
+        ?C      JMP     arp_listen
+                JMP     arp_look
+arp_found
+                MOVE    R2, @1[R1]
+                MOVE    R3, @2[R1]
+                MOVE    R1, 0
+                JMP     arp_end
+arp_none
+                MOVE    R1, -1
+arp_end
+                POP     R9
+                POP     R8
+                POP     R7
+                RET
+
+; arp_find: R1 = the entry of the IP address R1, if it is younger than
+; ARP_AGE, or 0. Uses R1-R4.
+arp_find
+                MOVE[M] R3, R1
+        ?Z      RET                     ; 0, which marks no entry
+                CALL    arp_tick
+                MOVE    R4, V_ARP
+arp_find_next
+                CMP     @R4, R3
+        ?!Z     JMP     arp_find_skip
+                SUB     R2, R1, @3[R4]
+                CMP     R2, ARP_AGE
+        ?C      MOVE    R1, R4
+        ?C      RET
+arp_find_skip
+                ADD     R4, R4, 4
+                CMP     R4, V_ARP+4*ARP_SLOTS
+        ?!Z     JMP     arp_find_next
+                MOVE    R1, 0
+                RET
+
+; arp_take: the frame of R1 bytes at V_RXF learned, if it is an ARP reply,
+; for Ethernet and IPv4, whoever it is to. Uses R1-R6.
+arp_take
+                CMP     R1, 42
+        ?C      RET                     ; too short
+                AND     R2, @V_RXF+3, 0xFFFF
+                CMP     R2, 0x0806
+        ?!Z     RET
+                CMP     @V_RXF+4, 0x00010800  ; Ethernet, IPv4
+        ?!Z     RET
+                CMP     @V_RXF+5, 0x06040002  ; their lengths, and a reply
+        ?!Z     RET
+                SHL     R1, @V_RXF+7, 16  ; the sender's IP address
+                SHR     R2, @V_RXF+8, 16
+                OR      R1, R1, R2
+                SHR     R2, @V_RXF+6, 16  ; and its MAC address
+                SHL     R3, @V_RXF+6, 16
+                SHR     R4, @V_RXF+7, 16
+                OR      R3, R3, R4
+; arp_learn: the IP address R1 at the MAC address R2 and R3 into the
+; cache, at the time of now. Uses R1-R6.
+arp_learn
+                MOVE    R4, V_ARP
+arp_learn_same
+                CMP     @R4, R1
+        ?Z      JMP     arp_learn_put
+                ADD     R4, R4, 4
+                CMP     R4, V_ARP+4*ARP_SLOTS
+        ?!Z     JMP     arp_learn_same
+                MOVE    R4, @V_ARPNEXT  ; the next entry in turn
+                ADD     R5, R4, 4
+                AND     @V_ARPNEXT, R5, 4*ARP_SLOTS-1
+                ADD     R4, R4, V_ARP
+arp_learn_put
+                MOVE    @R4++, R1
+                MOVE    @R4++, R2
+                MOVE    @R4++, R3
+                MOVE    R6, R4
+                CALL    arp_tick
+                MOVE    @R6, R1
+                RET
+
+; arp_tick: R1 = the time in units of 2^20 microseconds, about a second,
+; from the 64 bits of the microsecond counter, so that it wraps after
+; 4000 years. Uses R1 and R2.
+arp_tick
+                SHR     R1, @io.us, 20  ; which takes the snapshot of TIME_HI
+                SHL     R2, @TIME_HI, 12
+                OR      R1, R1, R2
+                RET
+
+; arp_request: a request for the IP address R1 broadcast, from E_IP and the
+; station's MAC address. Uses R1-R6.
+arp_request
+                MOVE    R6, R1
+                MOVE    R1, V_TXF
+                MOVE    R2, 0x0806
+                CALL    eth_head
+                MOVE    @V_TXF+4, 0x00010800  ; Ethernet, IPv4
+                MOVE    @V_TXF+5, 0x06040001  ; their lengths, and a request
+                MOVE    @V_TXF+6, @V_TXF+2  ; the sender's MAC address
+                SHL     R3, @E_MACL, 16
+                SHR     R4, @E_IP, 16
+                OR      @V_TXF+7, R3, R4  ; and its IP address
+                SHL     @V_TXF+8, @E_IP, 16  ; the target's MAC address, 0
+                MOVE    @V_TXF+9, 0
+                MOVE    @V_TXF+10, R6
+                MOVE    R1, V_TXF
+                MOVE    R2, 42
+                JMP     eth_send        ; which returns to the caller
+
+; The frames of i dhcp (RFC 2131 and RFC 2132): a DISCOVER or a REQUEST,
+; broadcast from 0.0.0.0 port 68 to port 67, with the broadcast flag set,
+; as the station has no address yet, and padded to the 300 bytes of a
+; BOOTP message (RFC 1542). The UDP checksum is 0, none, as IPv4 allows.
+; With the 2 bytes before the frame, the fields fall on words: the IP
+; header at 4, the UDP header at 9, the message at 11, its transaction at
+; 12, the address offered at 15, the client's MAC address at 18, the
+; magic cookie at 70, and the options from 71, which are written a word at
+; a time: 53, the message type; for a REQUEST, 50, the address asked for,
+; and 54, the server; 55, the options asked for, 1 the mask, 3 the gateway,
+; and 6 the DNS servers; and 255, the end.
+
+; dhcp_send: a message of the type R1, DHCP_DISCOVER, or DHCP_REQUEST of
+; the address V_DIP from the server V_DSRV, with the transaction V_XID.
+; Uses R1-R6.
+dhcp_send
+                MOVE    R6, R1
+                MOVE    R1, V_TXF
+                MOVE    R2, DHCP_WORDS
+dhcp_zero
+                MOVE    @R1++, 0
+                SUB[M]  R2, R2, 1
+        ?!Z     JMP     dhcp_zero
+                MOVE    R1, V_TXF
+                MOVE    R2, 0x0800
+                CALL    eth_head
+                MOVE    @V_TXF+4, 0x45000000+DHCP_LEN-14  ; IPv4, a header of 5 words, and the length
+                MOVE    @V_TXF+6, 0x40110000  ; the TTL 64, UDP
+                MOVE    @V_TXF+8, 0xFFFFFFFF  ; to everyone
+                MOVE    @V_TXF+9, 0x00440043  ; from port 68 to 67
+                MOVE    @V_TXF+10, 0x10000*DHCP_LEN-0x10000*34  ; the UDP length, and checksum 0
+                MOVE    @V_TXF+11, 0x01010600  ; a request, Ethernet, 6 bytes of MAC address
+                MOVE    @V_TXF+12, @V_XID
+                MOVE    @V_TXF+13, 0x8000  ; broadcast
+                MOVE    @V_TXF+18, @V_TXF+2  ; the MAC address
+                SHL     @V_TXF+19, @E_MACL, 16
+                MOVE    @V_TXF+70, 0x63825363
+                CMP     R6, DHCP_REQUEST
+        ?Z      JMP     dhcp_req
+                MOVE    @V_TXF+71, 0x35010137  ; 53 DISCOVER, and 55
+                MOVE    @V_TXF+72, 0x03010306
+                MOVE    @V_TXF+73, 0xFF000000
+                JMP     dhcp_go
+dhcp_req
+                MOVE    @V_TXF+71, 0x35010332  ; 53 REQUEST, and 50
+                MOVE    R1, @V_DIP
+                MOVE    R2, @V_DSRV
+                SHR     R3, R1, 8
+                OR      @V_TXF+72, R3, 0x04000000
+                SHL     R3, R1, 24
+                SHR     R4, R2, 24
+                OR      R3, R3, R4
+                OR      @V_TXF+73, R3, 0x00360400  ; and 54
+                SHL     R3, R2, 8
+                OR      @V_TXF+74, R3, 0x37  ; and 55
+                MOVE    @V_TXF+75, 0x03010306
+                MOVE    @V_TXF+76, 0xFF000000
+dhcp_go
+                MOVE    R1, V_TXF
+                CALL    ip_csum
+                MOVE    R1, V_TXF
+                MOVE    R2, DHCP_LEN
+                JMP     eth_send        ; which returns to the caller
+
+; dhcp_wait: the reply of the type R1, DHCP_OFFER or DHCP_ACK, to the
+; transaction V_XID, within DHCP_WAIT microseconds. R1 = its type, or
+; DHCP_NAK when an ACK is waited for and a NAK comes, or 0 when none came.
+; The address, the server, the mask, and the gateway of the reply that
+; is waited for are copied to V_DIP, V_DSRV, V_DMASK, and V_DGW. The other
+; frames are released unread. Uses R1-R6, and R7 and R8 across the calls,
+; saved.
+dhcp_wait
+                PUSH    R7
+                PUSH    R8
+                MOVE    R7, R1
+                MOVE    R8, @io.us      ; the start
+dhcp_listen
+                MOVE    R1, V_RXF
+                CALL    eth_recv
+                TST     R1
+        ?Z      JMP     dhcp_time
+                CALL    dhcp_parse
+                CMP     R1, R7
+        ?Z      JMP     dhcp_got
+                CMP     R1, DHCP_NAK
+        ?!Z     JMP     dhcp_time
+                CMP     R7, DHCP_ACK
+        ?Z      JMP     dhcp_wait_end   ; a NAK, R1
+dhcp_time
+                SUB     R1, @io.us, R8
+                CMP     R1, DHCP_WAIT
+        ?C      JMP     dhcp_listen
+                MOVE    R1, 0
+                JMP     dhcp_wait_end
+dhcp_got
+                MOVE    @V_DIP, @V_PIP
+                MOVE    @V_DSRV, @V_PSRV
+                MOVE    @V_DMASK, @V_PMASK
+                MOVE    @V_DGW, @V_PGW
+dhcp_wait_end
+                POP     R8
+                POP     R7
+                RET
+
+; dhcp_parse: the frame of R1 bytes at V_RXF, if it is a DHCP reply to the
+; transaction V_XID: an IPv4 packet with a header of 5 words, UDP from port
+; 67 to 68, a BOOTP reply, and the magic cookie. Its checksums are not
+; checked, as the FCS was. R1 = the message type of option 53, or 0 when
+; it is no reply of ours or has no type, and V_PIP, V_PSRV, V_PMASK, and
+; V_PGW are its address, and the options 54, 1, and 3, the first address
+; of each, or 0 without them. The options are walked from byte 284 of the
+; buffer up to 255, or the end of the frame, R8, the byte after its last;
+; R7 is the option, and R5 the type. Uses R1-R6, and R7 and R8 across the
+; calls, saved.
+dhcp_parse
+                PUSH    R7
+                PUSH    R8
+                ADD     R8, R1, 2
+                MOVE    R5, 0
+                CMP     R1, 282         ; up to the cookie
+        ?C      JMP     dhcp_parse_end
+                AND     R2, @V_RXF+3, 0xFFFF
+                CMP     R2, 0x0800
+        ?!Z     JMP     dhcp_parse_end
+                SHR     R2, @V_RXF+4, 24
+                CMP     R2, 0x45
+        ?!Z     JMP     dhcp_parse_end
+                SHR     R2, @V_RXF+6, 16
+                AND     R2, R2, 0xFF
+                CMP     R2, 17          ; UDP
+        ?!Z     JMP     dhcp_parse_end
+                CMP     @V_RXF+9, 0x00430044
+        ?!Z     JMP     dhcp_parse_end
+                SHR     R2, @V_RXF+11, 24
+                CMP     R2, 2           ; a reply
+        ?!Z     JMP     dhcp_parse_end
+                CMP     @V_RXF+12, @V_XID
+        ?!Z     JMP     dhcp_parse_end
+                CMP     @V_RXF+70, 0x63825363
+        ?!Z     JMP     dhcp_parse_end
+                MOVE    @V_PIP, @V_RXF+15
+                MOVE    @V_PSRV, 0
+                MOVE    @V_PMASK, 0
+                MOVE    @V_PGW, 0
+                MOVE    R7, 284
+dhcp_opt
+                CMP     R7, R8
+        ?!C     JMP     dhcp_parse_end  ; at the end of the frame
+                MOVE    R1, R7
+                CALL    rx_byte
+                MOVE[M] R6, R1          ; the option's code
+        ?Z      ADD     R7, R7, 1       ; a pad
+        ?Z      JMP     dhcp_opt
+                CMP     R6, 255
+        ?Z      JMP     dhcp_parse_end
+                ADD     R1, R7, 1
+                CMP     R1, R8
+        ?!C     JMP     dhcp_parse_end  ; no length
+                CALL    rx_byte
+                MOVE    R4, R1          ; the length
+                ADD     R1, R7, 2       ; the value
+                ADD     R7, R1, R4      ; the next option
+                CMP     R8, R7
+        ?C      JMP     dhcp_parse_end  ; past the end
+                TST     R4
+        ?Z      JMP     dhcp_opt
+                CMP     R6, 53
+        ?Z      JMP     dhcp_type
+                CMP     R4, 4
+        ?C      JMP     dhcp_opt        ; too short for an address
+                CMP     R6, 1
+        ?Z      MOVE    R6, V_PMASK
+        ?Z      JMP     dhcp_addr
+                CMP     R6, 3
+        ?Z      MOVE    R6, V_PGW
+        ?Z      JMP     dhcp_addr
+                CMP     R6, 54
+        ?!Z     JMP     dhcp_opt
+                MOVE    R6, V_PSRV
+dhcp_addr
+                CALL    rx_long
+                MOVE    @R6, R1
+                JMP     dhcp_opt
+dhcp_type
+                CALL    rx_byte
+                MOVE    R5, R1
+                JMP     dhcp_opt
+dhcp_parse_end
+                MOVE    R1, R5
+                POP     R8
+                POP     R7
+                RET
+
 ; x: the demo, for the time being (issue #65, README.md). The ROM has its
 ; number of words at DEMO, and the words after it, which are copied to
 ; 0x8000 and run as r runs a program. A number of 0, or one too big for
@@ -1339,12 +1940,14 @@ run_at          TST     @R7
 
 ; mon_exit: entry 1, and where a program returns to. Back to the main loop
 ; with R1 the status: E cleared, the timer stopped, VBASE 0, the font base
-; 0, the cursor shown and blinking with the display offset off, a fresh stack, and the status printed, after a new line if the program left the
-; cursor in a row.
+; 0, the port for Ethernet frames disabled, the cursor shown and blinking
+; with the display offset off, a fresh stack, and the status printed,
+; after a new line if the program left the cursor in a row.
 mon_exit
                 MOVE    R14, 0          ; E = 0, VBASE = 0; bit 24 stays 1
                 MOVE    @TIMER, 0
                 MOVE    @SCR_FONT, 0    ; Spleen, whatever the program chose
+                MOVE    @ETH_CSR, 0     ; no frames, if the program took them
                 MOVE    @SCR_CTL, 0x60  ; the cursor, which a program may hide
                 MOVE    SP, STACK
                 PUSH    R1
@@ -1711,6 +2314,12 @@ S_SKIPPED
 S_FIRST         .ASCII_L ', first line '
 S_LFORM         .ASCII_L '; ADDR WORD in hex, ADDR 00008000 to '
 S_BADIP         .ASCII_L 'Not an IP address: four numbers from 0 to 255, with dots between them'
+S_DHCPW         .ASCII_L 'dhcp'
+S_NODHCP
+                .ASCII_L 'No answer from a DHCP server'
+S_MASK          .ASCII_L 'Mask '
+S_GW            .ASCII_L 'Gateway '
+S_DSRV          .ASCII_L 'DHCP server '
 S_BADMAC
                 .ASCII_L 'Not a MAC address: six bytes in hex with colons, the first one even'
 S_BADSD         .ASCII_L 'sd [SLOT] LBA: the slot and the sector in hex, such as sd 0 800'
@@ -1736,7 +2345,7 @@ E_SD6           .ASCII_L 'the card is write-protected'
 E_SD7           .ASCII_L 'the sector is after the last, '
 E_SD8           .ASCII_L 'Init failed'
 
-HELP            .DAT    H_R, H_L, H_X, H_D, H_U, H_S, H_I, H_M, H_C, H_V, H_H, H_Q, H_P, 0
+HELP            .DAT    H_R, H_L, H_X, H_D, H_U, H_S, H_I, H_ID, H_M, H_C, H_V, H_H, H_Q, H_P, 0
 H_R             .ASCII_L 'r [ADDR]      run the program at ADDR, or at 00008000; r 0 restarts'
 H_L             .ASCII_L 'l             load lines of ADDR WORD in hex, as a .bin file has them'
 H_X             .ASCII_L 'x             run the demo of the ROM, which F12 leaves'
@@ -1744,6 +2353,7 @@ H_D             .ASCII_L 'd [ADDR] [N]  show N words from ADDR, in hex, or the n
 H_U             .ASCII_L 'u [ADDR] [N]  disassemble N instructions from ADDR, or the next ones'
 H_S             .ASCII_L 'sd [SLOT] LBA show sector LBA of the SD card in SLOT, or in the last slot'
 H_I             .ASCII_L 'i [A.B.C.D]   show the IP address, or set it, such as 192.168.1.65'
+H_ID            .ASCII_L 'i dhcp        get the IP address from a DHCP server'
 H_M             .ASCII_L 'm [MAC]       show the MAC address, or set it, such as 02:4E:49:43:45:01'
 H_C             .ASCII_L 'c             clear the screen'
 H_V             .ASCII_L 'v             the version'
