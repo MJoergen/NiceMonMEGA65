@@ -99,8 +99,10 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   segments, `eth/eth_tcp_rx.vhd`, its choice of the segments to send,
   `eth/eth_tcp_pick.vhd`, their sender, `eth/eth_tcp_tx.vhd`, its
   buffers, `eth/eth_tcp_buf.vhd`, and its retransmission timer,
-  `eth/eth_tcp_timer.vhd`, and the arbiter of the frames to send,
-  `eth/eth_arb.vhd`), the SD card controller at `FFFFFFA0`–`AF` (`sd/sd.vhd`,
+  `eth/eth_tcp_timer.vhd`, the station's side of the port for Ethernet
+  frames at `FFFFFFC0`–`CF`, `eth/eth_frames.vhd`, with nice_cpu's
+  `eth_regs.vhd` in `devices.vhd`, and the arbiter of the frames to
+  send, `eth/eth_arb.vhd`), the SD card controller at `FFFFFFA0`–`AF` (`sd/sd.vhd`,
   with nice_cpu's `sd_regs.vhd`, the engine in SPI mode, `sd/sd_spi.vhd`, and
   its byte shifter, `sd/sd_spi_byte.vhd`), and `system.vhd`, which every
   board instantiates.

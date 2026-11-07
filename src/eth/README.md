@@ -7,7 +7,8 @@ in the top directory renders it. Edit the LaTeX, not the PNG.
 
 The station ([eth.vhd](eth.vhd)) connects to the board's Ethernet PHY
 by RMII, at 100 Mbit/s. It answers ARP requests and pings for its IP
-address, and serves the debug link on TCP port 4510.
+address, serves the debug link on TCP port 4510, and passes the other
+frames to the port for Ethernet frames, whose frames it sends.
 [doc/SYSTEM.md](../../doc/SYSTEM.md#the-ethernet-station) describes it
 for users.
 
@@ -35,15 +36,21 @@ Received frames flow along the top, and frames to send along the bottom.
   ([eth_tcp_pick.vhd](eth_tcp_pick.vhd)), the sender
   ([eth_tcp_tx.vhd](eth_tcp_tx.vhd)), and the retransmission timer
   ([eth_tcp_timer.vhd](eth_tcp_timer.vhd)).
-- **ARBITER** ([eth_arb.vhd](eth_arb.vhd)) merges the replies and the
-  segments into one stream, a whole frame at a time.
+- **FRAMES** ([eth_frames.vhd](eth_frames.vhd)) is the station's side
+  of the port for Ethernet frames, nice_cpu's `eth_regs.vhd` in
+  [devices.vhd](../devices.vhd). It decides, as niceemu does, which
+  frames the other three serve, puts the others into the port's queue,
+  and sends the frames of the port's send buffer.
+- **ARBITER** ([eth_arb.vhd](eth_arb.vhd)) merges the replies, the
+  segments, and a program's frames into one stream, a whole frame at a
+  time.
 - **TX FIFO** ([eth_tx_fifo.vhd](eth_tx_fifo.vhd)) passes on a frame
   only once it is whole.
 - **RMII TX** ([rmii_tx.vhd](rmii_tx.vhd)) adds the preamble, the
   padding, and the CRC, and drives the PHY's pins.
 
-The three readers in the middle see every received frame, and each
-keeps only those for it. Their replies share the TX FIFO, one frame at
+The four readers in the middle see every received frame, and each
+keeps only those for it. Their frames share the TX FIFO, one frame at
 a time.
 
 ## The clocks

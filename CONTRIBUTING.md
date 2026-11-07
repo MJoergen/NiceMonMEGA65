@@ -112,7 +112,9 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
   registers, and the debug link.
 - `mem.vhd`, with `ram.vhd` and `rom.vhd`, is the memory.
 - `rx_fifo.vhd` is the core's input FIFO.
-- `devices.vhd` has nice_cpu's devices at `0xFFFFFF10`–`7F`.
+- `devices.vhd` has nice_cpu's devices at `0xFFFFFF10`–`7F`, and the
+  SD card controller, the network station, and the port for Ethernet
+  frames at `0xFFFFFFA0`–`CF`.
 - `scr_regs.vhd` has the screen's registers at `0xFFFFFF80`–`8F`.
 - `board_io.vhd` has the board's registers at `0xFFFFFF90`–`9F`.
 - `eth/eth.vhd` is the Ethernet station. `eth/rmii_rx.vhd` receives the
@@ -124,8 +126,9 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
   segments, `eth/eth_tcp_pick.vhd` choosing the ones to send and
   `eth/eth_tcp_tx.vhd` sending them, `eth/eth_tcp_buf.vhd` keeping the
   bytes of the link, and `eth/eth_tcp_timer.vhd` timing the
-  retransmissions, `eth/eth_arb.vhd` merges the frames to send a whole
-  frame at a time, `eth/eth_tx_fifo.vhd` takes them back to the PHY's
+  retransmissions, `eth/eth_frames.vhd` passes the other frames to the
+  port for Ethernet frames and sends the port's, `eth/eth_arb.vhd`
+  merges the frames to send a whole frame at a time, `eth/eth_tx_fifo.vhd` takes them back to the PHY's
   clock, and `eth/rmii_tx.vhd` sends them. The FIFOs and the TCP server keep their bytes in
   `eth/eth_ram.vhd`, and `eth/eth_pkg.vhd` has the CRC, the Gray code,
   and the checksum sum.
@@ -168,7 +171,10 @@ The testbenches are these:
 - `sim/tb_nicemon.vhd` drives the whole system through its UART, as a host
   of the debug link, and in one step through its TCP ports, as the
   Ethernet station does, with `sim/rom.nasm`, a greeting, as the ROM
-  (see below).
+  (see below). In one step, nice_cpu's `emulator/test/eth.nasm` runs
+  with nice_cpu's `hdl/sim/eth_sim.vhd` as the station, which gives it
+  the frames of `eth.in`, and the words it leaves and the frames it
+  sends must be niceemu's.
 - `sim/tb_kbd.vhd` tests the keyboard driver and its ASCII, with a model of
   the keyboard, CLR/HOME and MEGA with the cursor keys among the keys,
   and the debugger's MEGA+HELP detector, which pulses once while the
@@ -295,7 +301,14 @@ The testbenches are these:
   transmit FIFO. Every frame sent must be whole, with right checksums, the
   next sequence number, and the link's bytes, or the next reply expected;
   the link side must get the host's bytes; an RST ends the connection; and
-  the counts of frames are checked too.
+  the counts of frames are checked too. Before that, the port for
+  Ethernet frames, nice_cpu's `eth_regs.vhd`, takes the frames that the
+  station does not serve, such as pings and ARP requests for another
+  address and TCP to another port, but not the pings and ARP requests
+  that it serves, frames to another station, or frames with a wrong
+  check sequence, and drops a fifth while its queue is full. The port
+  sends frames of 20 bytes, padded, and of 1514, and while the IP address
+  is 0, it takes every frame.
 - `sim/tb_eth_tcp.vhd` tests the TCP server of the debug link at its
   ports, against a host modeled in VHDL that checks both checksums of
   every segment, and sends SYNs with the options of Linux, data with
@@ -476,7 +489,9 @@ every time, not only the ones a testbench sends.
   are reset when the core starts, but for the network station at
   `0xFFFFFFB0`–`BF`, nice_cpu's `net_regs.vhd`, whose addresses only a
   reset of the system changes, and which never stalls; nice_cpu's own
-  `net_regs.sby` proves its registers. The `prove_sd` and `cover_sd` tasks are
+  `net_regs.sby` proves its registers. The port for Ethernet frames at
+  `0xFFFFFFC0`–`CF`, nice_cpu's `eth_regs.vhd`, never stalls without
+  `G_ETH_HOLD_ACK`. The `prove_sd` and `cover_sd` tasks are
   `prove` and `cover` with the SD card controller at `0xFFFFFFA0`–`AF`, in
   the boards' configuration, two slots without `G_SD_HOLD_ACK`, where it
   never stalls.
@@ -591,8 +606,9 @@ every time, not only the ones a testbench sends.
   a source's byte is taken only when the output takes it, and it is that
   byte that goes out; each byte that goes out is one source's, which is
   taken; the bytes of a frame, from its first to its last, all come from
-  the responders or all from the TCP server; and the responders come
-  first when both start in the same cycle.
+  the responders, all from the TCP server, or all from the port for
+  Ethernet frames; and the responders come first, then the TCP server,
+  when they start in the same cycle.
 - `eth_rx_fifo.sby` and `eth_tx_fifo.sby` prove the two FIFOs of
   frames, `src/eth/eth_rx_fifo.vhd` and `src/eth/eth_tx_fifo.vhd`,
   across their two clocks, with SymbiYosys's `multiclock on`: each step

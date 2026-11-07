@@ -30,6 +30,21 @@
 -- acknowledges all the link's bytes. An RST ends the connection. Last, it
 -- sets the IP address to 0, which answers nothing, not even a request for
 -- 0.
+-- Before the connection, a program enables the port for Ethernet frames
+-- (eth_regs.vhd, as src/devices.vhd has it) through its Wishbone port,
+-- and the frames that the station serves, the ARP request and the ping
+-- that are answered, a ping to everyone, and a ping with IP options, do
+-- not go into its queue, nor those to another station or with a wrong
+-- check sequence. The four that the station does not serve do: a ping to
+-- another IP address, an ARP request for one, a TCP SYN to port 80, and a
+-- ping of 1514 bytes, the longest frame. A fifth is dropped, and
+-- ETH_DROPPED counts it. The program reads the four frames through the
+-- window, word by word, and releases them. Then it sends a frame of 20
+-- bytes, which goes out padded to 60, and one of 1514 bytes, busy while
+-- it is sent. The connection and its rounds run with the port enabled,
+-- and put nothing into the queue. With the IP address 0, the two frames
+-- go into the queue, as the station serves nothing, and disabling the
+-- port empties it and clears ETH_DROPPED.
 -- p_wire takes TXD while TX_EN is '1', checks the preamble and the frame
 -- check sequence, and keeps each frame. p_check goes through the frames in
 -- the order they were sent. A TCP segment must have right headers and
@@ -417,7 +432,7 @@ architecture simulation of tb_eth is
    -- counts of frames p_phy sent, good and bad
    signal expected   : t_frames(0 to 31);
    signal n_expected : natural := 0;
-   signal wire       : t_frames(0 to 79);
+   signal wire       : t_frames(0 to 99);
    signal wired      : natural := 0;
    signal n_good     : natural := 0;
    signal n_bad      : natural := 0;
@@ -446,6 +461,34 @@ architecture simulation of tb_eth is
    signal n_resp_wait : natural := 0;
    signal n_tcp_wait  : natural := 0;
 
+   -- The port for Ethernet frames (eth_regs.vhd), its Wishbone port, and
+   -- the station's side of it
+   constant C_ETH_CSR     : std_logic_vector(3 downto 0) := X"0";
+   constant C_ETH_RX_LEN  : std_logic_vector(3 downto 0) := X"1";
+   constant C_ETH_TX_LEN  : std_logic_vector(3 downto 0) := X"2";
+   constant C_ETH_CHUNK   : std_logic_vector(3 downto 0) := X"3";
+   constant C_ETH_DROPPED : std_logic_vector(3 downto 0) := X"4";
+
+   signal wb_cyc   : std_logic                     := '0';
+   signal wb_stb   : std_logic                     := '0';
+   signal wb_stall : std_logic;
+   signal wb_ack   : std_logic;
+   signal wb_we    : std_logic                     := '0';
+   signal wb_addr  : std_logic_vector(3 downto 0)  := (others => '0');
+   signal wb_wdata : std_logic_vector(31 downto 0) := (others => '0');
+   signal wb_rdata : std_logic_vector(31 downto 0);
+   signal q_start  : std_logic;
+   signal q_we     : std_logic;
+   signal q_addr   : std_logic_vector(8 downto 0);
+   signal q_data   : std_logic_vector(31 downto 0);
+   signal q_done   : std_logic;
+   signal q_len    : std_logic_vector(10 downto 0);
+   signal f_start  : std_logic;
+   signal f_len    : std_logic_vector(10 downto 0);
+   signal f_addr   : std_logic_vector(8 downto 0);
+   signal f_data   : std_logic_vector(31 downto 0);
+   signal f_done   : std_logic;
+
 begin
 
    p_clk : process
@@ -466,29 +509,70 @@ begin
          G_CLOCK_HZ => 100_000_000
       )
       port map (
-         clk_i       => clk,
-         rst_i       => rst,
-         mac_i       => C_MAC,
-         ip_i        => ip,
-         rx_o        => rx,
-         rx_bad_o    => rx_bad,
-         tx_o        => tx,
-         on_o        => conn,
-         lrx_data_o  => lrx_data,
-         lrx_valid_o => lrx_valid,
-         lrx_ready_i => '1',
-         lrx_break_o => lrx_break,
-         ltx_data_i  => ltx_data,
-         ltx_valid_i => ltx_valid,
-         ltx_ready_o => ltx_ready,
-         eth_clk_i   => eth_clk,
-         eth_rst_i   => rst,
-         rxd_i       => rxd,
-         crs_dv_i    => crs_dv,
-         rx_er_i     => '0',
-         txd_o       => txd,
-         tx_en_o     => tx_en
+         clk_i          => clk,
+         rst_i          => rst,
+         mac_i          => C_MAC,
+         ip_i           => ip,
+         rx_o           => rx,
+         rx_bad_o       => rx_bad,
+         tx_o           => tx,
+         on_o           => conn,
+         lrx_data_o     => lrx_data,
+         lrx_valid_o    => lrx_valid,
+         lrx_ready_i    => '1',
+         lrx_break_o    => lrx_break,
+         ltx_data_i     => ltx_data,
+         ltx_valid_i    => ltx_valid,
+         ltx_ready_o    => ltx_ready,
+         frm_q_start_o  => q_start,
+         frm_q_we_o     => q_we,
+         frm_q_addr_o   => q_addr,
+         frm_q_data_o   => q_data,
+         frm_q_done_o   => q_done,
+         frm_q_len_o    => q_len,
+         frm_tx_start_i => f_start,
+         frm_tx_len_i   => f_len,
+         frm_tx_addr_o  => f_addr,
+         frm_tx_data_i  => f_data,
+         frm_tx_done_o  => f_done,
+         eth_clk_i      => eth_clk,
+         eth_rst_i      => rst,
+         rxd_i          => rxd,
+         crs_dv_i       => crs_dv,
+         rx_er_i        => '0',
+         txd_o          => txd,
+         tx_en_o        => tx_en
       ); -- i_eth
+
+
+   i_eth_regs : entity work.eth_regs
+      port map (
+         clk_i         => clk,
+         rst_i         => rst,
+         wb_cyc_i      => wb_cyc,
+         wb_stb_i      => wb_stb,
+         wb_stall_o    => wb_stall,
+         wb_ack_o      => wb_ack,
+         wb_we_i       => wb_we,
+         wb_addr_i     => wb_addr,
+         wb_data_i     => wb_wdata,
+         wb_data_o     => wb_rdata,
+         enabled_o     => open,
+         enable_o      => open,
+         enable_done_i => '0',
+         rx_start_i    => q_start,
+         rx_we_i       => q_we,
+         rx_addr_i     => q_addr,
+         rx_data_i     => q_data,
+         rx_done_i     => q_done,
+         rx_len_i      => q_len,
+         tx_start_o    => f_start,
+         busy_o        => open,
+         tx_len_o      => f_len,
+         tx_addr_i     => f_addr,
+         tx_data_o     => f_data,
+         tx_done_i     => f_done
+      ); -- i_eth_regs
 
 
    -- The bytes that the link side gets, which must be the host's data, and
@@ -562,6 +646,8 @@ begin
       variable fa_v   : std_logic_vector(31 downto 0);
       variable ff_v   : std_logic_vector(7 downto 0);
       variable fn_v   : natural;
+      -- The frames that the port must queue
+      variable q_v : t_frames(0 to 3);
 
       procedure send (d : std_logic_vector(1 downto 0); dv : std_logic) is
       begin
@@ -614,6 +700,131 @@ begin
          n_expected           <= n_expected + 1;
          send_frame(f);
       end procedure send_answered;
+
+      -- A request of the program to the port, which acknowledges it in
+      -- the cycle after it takes it
+      procedure wb_req (we : std_logic; a : std_logic_vector(3 downto 0);
+                        d  : std_logic_vector(31 downto 0)) is
+      begin
+         wait until rising_edge(clk);
+         wb_cyc   <= '1';
+         wb_stb   <= '1';
+         wb_we    <= we;
+         wb_addr  <= a;
+         wb_wdata <= d;
+         wait until rising_edge(clk) and wb_stall = '0';
+         wb_stb <= '0';
+         wait until rising_edge(clk) and wb_ack = '1';
+         wb_cyc <= '0';
+      end procedure wb_req;
+
+      procedure wb_write (a : std_logic_vector(3 downto 0); d : natural) is
+      begin
+         wb_req('1', a, to_stdlogicvector(d, 32));
+      end procedure wb_write;
+
+      procedure wb_expect (a : std_logic_vector(3 downto 0); d : natural; what : string) is
+      begin
+         wb_req('0', a, X"00000000");
+         assert wb_rdata = to_stdlogicvector(d, 32)
+            report "tb_eth: " & what & " reads " & to_hstring(wb_rdata) & ", not " &
+                   to_hstring(to_stdlogicvector(d, 32))
+            severity failure;
+      end procedure wb_expect;
+
+      -- Word n of the buffer that holds f, from byte 2, which bytes past
+      -- f's end leave 0
+      function word_of (f : t_frame; n : natural) return std_logic_vector is
+         variable w_v : std_logic_vector(31 downto 0) := (others => '0');
+         variable i_v : integer;
+      begin
+         for j in 0 to 3 loop
+            i_v := 4 * n + j - 2;
+            if i_v >= 0 and i_v < f.len then
+               w_v(31 - 8 * j downto 24 - 8 * j) := f.b(i_v);
+            end if;
+         end loop;
+         return w_v;
+      end function word_of;
+
+      -- The frame at the head of the queue must be f; it is released.
+      procedure take_queued (f : t_frame; k : natural) is
+         variable n_v : natural;
+         variable w_v : std_logic_vector(31 downto 0);
+      begin
+         wb_expect(C_ETH_RX_LEN, f.len, "ETH_RX_LEN of queued frame " & integer'image(k));
+         n_v := (f.len + 2 + 3) / 4;
+
+         for c in 0 to (n_v - 1) / 8 loop
+            wb_write(C_ETH_CHUNK, c);
+
+            for i in 0 to 7 loop
+               if 8 * c + i < n_v then
+                  wb_req('0', to_stdlogicvector(8 + i, 4), X"00000000");
+                  w_v := word_of(f, 8 * c + i);
+                  if 8 * c + i = n_v - 1 then
+                     -- The bytes after the frame's last are not defined.
+                     for j in 0 to 3 loop
+                        if 4 * (8 * c + i) + j - 2 >= f.len then
+                           w_v(31 - 8 * j downto 24 - 8 * j) := wb_rdata(31 - 8 * j downto 24 - 8 * j);
+                        end if;
+                     end loop;
+                  end if;
+                  assert wb_rdata = w_v
+                     report "tb_eth: word " & integer'image(8 * c + i) & " of queued frame " &
+                            integer'image(k) & " is " & to_hstring(wb_rdata) & ", not " &
+                            to_hstring(w_v)
+                     severity failure;
+               end if;
+            end loop;
+
+         end loop;
+
+         wb_write(C_ETH_RX_LEN, 0);
+      end procedure take_queued;
+
+      -- The program writes f into the send buffer and sends it; it must
+      -- go out padded to 60 bytes, after the frames expected before it.
+      procedure send_port (f : t_frame) is
+         variable n_v : natural;
+         variable a_v : t_frame;
+      begin
+         n_v := (f.len + 2 + 3) / 4;
+
+         for c in 0 to (n_v - 1) / 8 loop
+            wb_write(C_ETH_CHUNK, 256 + c);
+
+            for i in 0 to 7 loop
+               if 8 * c + i < n_v then
+                  wb_req('1', to_stdlogicvector(8 + i, 4), word_of(f, 8 * c + i));
+               end if;
+            end loop;
+
+         end loop;
+
+         a_v := f;
+         if a_v.len < 60 then
+            a_v.len := 60;
+         end if;
+         expected(n_expected) <= a_v;
+         n_expected           <= n_expected + 1;
+         wb_write(C_ETH_TX_LEN, f.len);
+      end procedure send_port;
+
+      -- All frames that p_phy sent have been through the station, and the
+      -- frames it put into the port too.
+      procedure settle is
+      begin
+         if rx /= n_good then
+            wait until rx = n_good for 1 ms;
+         end if;
+         assert rx = n_good
+            report "tb_eth: the station did not take all the frames"
+            severity failure;
+         for c in 1 to 1000 loop
+            wait until rising_edge(clk);
+         end loop;
+      end procedure settle;
 
       -- A round: the link side sends nl bytes, and at the same time the
       -- host sends nh bytes of data and six requests, the first of which
@@ -722,6 +933,74 @@ begin
       send_frame(with_ip_ck(f_v));
       send_frame(ping(C_US, C_TPA, 56, X"000B", 39), false);
 
+      -- The program enables the port. The frames that the station serves,
+      -- or that are not for it, do not reach the queue; the others do.
+      settle;
+      wb_write(C_ETH_CSR, 1);
+      q_v(0) := ping(C_US, C_NOT, 56, X"0010", 42);
+      send_frame(q_v(0));
+      send_answered(arp_request(C_BC, X"01", C_TPA, 43), arp_reply(43));
+      f_v := ping(C_US, C_TPA, 0, X"0011", 44);
+      send_answered(f_v, pong(f_v));
+      send_frame(ping(C_BC, C_TPA, 56, X"0012", 45));
+      q_v(1) := arp_request(C_BC, X"01", C_NOT, 46);
+      send_frame(q_v(1));
+      send_frame(arp_request(C_OTHER, X"01", C_TPA, 47));
+      send_frame(ping(C_US, C_NOT, 56, X"0014", 48), false);
+      -- A ping with 4 bytes of IP options, which the station serves as
+      -- niceemu's does, though its responder does not answer it
+      f_v                := ping(C_US, C_TPA, 56, X"0015", 49);
+      f_v.b(38 to 101)   := f_v.b(34 to 97);
+      f_v.b(34 to 37)    := (X"01", X"01", X"01", X"00");
+      f_v.b(14)          := X"46";
+      f_v.b(16 to 17)    := (X"00", X"58");
+      f_v.len            := f_v.len + 4;
+      send_frame(f_v);
+      q_v(2)          := tseg(X"00000001", X"00000000", C_SYN, 0, 0);
+      q_v(2).b(36 to 37) := (X"00", X"50");
+      send_frame(q_v(2));
+      q_v(3) := ping(C_US, C_NOT, 1472, X"0016", 50);
+      send_frame(q_v(3));
+      -- The queue is full.
+      send_frame(arp_request(C_BC, X"01", C_NOT, 51));
+      settle;
+      wb_expect(C_ETH_CSR, 3, "ETH_CSR with frames");
+      wb_expect(C_ETH_DROPPED, 1, "ETH_DROPPED");
+
+      for k in 0 to 3 loop
+         take_queued(q_v(k), k);
+      end loop;
+
+      wb_expect(C_ETH_RX_LEN, 0, "ETH_RX_LEN of the empty queue");
+      wb_expect(C_ETH_CSR, 1, "ETH_CSR of the empty queue");
+
+      -- The program sends a short frame and the longest, once the replies
+      -- are out, so that they go out in the order expected.
+      if wired < n_expected then
+         wait until wired = n_expected for 300 us;
+      end if;
+      f_v.b           := (others => X"00");
+      f_v.len         := 20;
+      f_v.b(0 to 19)  := C_OTHER & C_US & t_bytes'(X"88", X"B5", X"01", X"02", X"03", X"04",
+                                                   X"05", X"06");
+      send_port(f_v);
+      wb_req('0', C_ETH_CSR, X"00000000");
+      while wb_rdata(2) = '1' loop
+         wb_req('0', C_ETH_CSR, X"00000000");
+      end loop;
+      f_v.len := C_MAX_LEN;
+
+      for i in 14 to C_MAX_LEN - 1 loop
+         f_v.b(i) := to_stdlogicvector((i * 5) mod 256, 8);
+      end loop;
+
+      send_port(f_v);
+      wb_expect(C_ETH_CSR, 5, "ETH_CSR while a frame is sent");
+      wb_req('0', C_ETH_CSR, X"00000000");
+      while wb_rdata(2) = '1' loop
+         wb_req('0', C_ETH_CSR, X"00000000");
+      end loop;
+
       -- A connection to port 4510: the SYN gets a SYN-ACK, which is
       -- checked now, and the host's ACK opens it.
       if wired < n_expected then
@@ -772,14 +1051,28 @@ begin
       assert conn = '0'
          report "tb_eth: the RST did not end the connection"
          severity failure;
+      -- The station served all of the connection's frames.
+      settle;
+      wb_expect(C_ETH_RX_LEN, 0, "ETH_RX_LEN after the connection");
+      wb_expect(C_ETH_DROPPED, 1, "ETH_DROPPED after the connection");
 
       -- With the IP address 0, nothing is answered.
       for c in 1 to 4000 loop
          wait until rising_edge(eth_clk);
       end loop;
       ip <= X"00000000";
-      send_frame(arp_request(C_BC, X"01", C_ZERO, 40));
-      send_frame(ping(C_US, C_ZERO, 56, X"000C", 41));
+      q_v(0) := arp_request(C_BC, X"01", C_ZERO, 40);
+      send_frame(q_v(0));
+      q_v(1) := ping(C_US, C_ZERO, 56, X"000C", 41);
+      send_frame(q_v(1));
+      -- They went into the queue, which a disable empties.
+      settle;
+      take_queued(q_v(0), 4);
+      wb_expect(C_ETH_RX_LEN, q_v(1).len, "ETH_RX_LEN with the IP address 0");
+      wb_write(C_ETH_CSR, 0);
+      wb_expect(C_ETH_RX_LEN, 0, "ETH_RX_LEN after a disable");
+      wb_expect(C_ETH_DROPPED, 0, "ETH_DROPPED after a disable");
+      wb_expect(C_ETH_CSR, 0, "ETH_CSR after a disable");
 
       for c in 1 to 4000 loop
          wait until rising_edge(eth_clk);

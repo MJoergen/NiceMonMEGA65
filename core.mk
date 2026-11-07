@@ -29,5 +29,5 @@ $(error NICE must be pipeline or multi, not "$(NICE)")
 endif
 
 NICE_SOURCES = $(NICE_COMMON) $(NICE_CORE) \
-               $(addprefix $(NICE_HDL)/,mpu.vhd perf.vhd timer.vhd fetch_stats.vhd sd_regs.vhd net_regs.vhd debug_link.vhd) \
+               $(addprefix $(NICE_HDL)/,mpu.vhd perf.vhd timer.vhd fetch_stats.vhd sd_regs.vhd net_regs.vhd eth_regs.vhd debug_link.vhd) \
                $(REPO)/src/nice_core.vhd $(REPO)/src/core/nice_core_$(NICE).vhd

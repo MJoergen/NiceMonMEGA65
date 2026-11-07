@@ -23,6 +23,9 @@ entity formal_eth_arb is
       tcp_data_i   : in  std_logic_vector(7 downto 0);
       tcp_last_i   : in  std_logic;
       tcp_valid_i  : in  std_logic;
+      frm_data_i   : in  std_logic_vector(7 downto 0);
+      frm_last_i   : in  std_logic;
+      frm_valid_i  : in  std_logic;
       out_ready_i  : in  std_logic
    );
 end entity formal_eth_arb;
@@ -31,6 +34,7 @@ architecture synthesis of formal_eth_arb is
 
    signal resp_ready : std_logic;
    signal tcp_ready  : std_logic;
+   signal frm_ready  : std_logic;
    signal out_data   : std_logic_vector(7 downto 0);
    signal out_last   : std_logic;
    signal out_valid  : std_logic;
@@ -60,6 +64,10 @@ begin
          tcp_last_i   => tcp_last_i,
          tcp_valid_i  => tcp_valid_i,
          tcp_ready_o  => tcp_ready,
+         frm_data_i   => frm_data_i,
+         frm_last_i   => frm_last_i,
+         frm_valid_i  => frm_valid_i,
+         frm_ready_o  => frm_ready,
          out_data_o   => out_data,
          out_last_o   => out_last,
          out_valid_o  => out_valid,

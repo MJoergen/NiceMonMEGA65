@@ -86,6 +86,7 @@ SRC += ../../src/eth/eth_tcp_timer.vhd
 SRC += ../../src/eth/eth_tcp_buf.vhd
 SRC += ../../src/eth/eth_tcp_pick.vhd
 SRC += ../../src/eth/eth_tcp.vhd
+SRC += ../../src/eth/eth_frames.vhd
 SRC += ../../src/eth/eth_tx_fifo.vhd
 SRC += ../../src/eth/eth_arb.vhd
 SRC += ../../src/eth/rmii_tx.vhd

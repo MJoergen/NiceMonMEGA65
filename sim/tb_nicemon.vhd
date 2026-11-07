@@ -137,12 +137,21 @@
 --    takes niceemu's steps, G_SD_STEPS, and leaves the words that
 --    "niceemu --sd0" leaves. Then the link reads the buffer while the
 --    core is halted.
--- 17. The baud rate at 0xFFFFFF9F: it reads G_UART_BAUDRATE and drops a
+-- 17. Load G_ETH_FILE, nice_cpu's emulator/test/eth.nasm, and run it
+--    with the port for Ethernet frames and nice_cpu's simulation of its
+--    station (hdl/sim/eth_sim.vhd), which gives the frames of
+--    G_ETH_IN_FILE, test/eth.in, and writes those sent to
+--    G_ETH_OUT_FILE, as niceemu's --eth-in and --eth-out do. The port
+--    holds the ACK of a write that enables it or sends until the station
+--    has served it, so the program takes niceemu's steps, G_ETH_STEPS,
+--    and leaves the words of test/eth.expected. sim/Makefile compares the
+--    frames sent with test/eth.frames.expected.
+-- 18. The baud rate at 0xFFFFFF9F: it reads G_UART_BAUDRATE and drops a
 --    value it does not take. A write of 2000000, after more than 1 ms of
 --    quiet, is answered at the old rate, and so is a read until the UART
 --    has sent nothing for 1 ms after the write; then the link answers at
 --    2 Mbaud.
--- 18. A reset while G_ECHO_FILE runs: the link sends `b06` at
+-- 19. A reset while G_ECHO_FILE runs: the link sends `b06` at
 --    G_UART_BAUDRATE, the core boots from the ROM again, and the screen's
 --    and the board's registers, the baud rate, the station's addresses,
 --    and the breakpoints are cleared.
@@ -151,7 +160,7 @@
 -- RAM, the ROM, and the screen are small, so that the clearing is.
 --
 -- The UART runs at a tenth of the clock rate, so that the test is fast,
--- but for step 17.
+-- but for step 18.
 -- G_NICE says which core runs, for the check that only the multi-cycle core
 -- passes.
 
@@ -181,13 +190,19 @@ entity tb_nicemon is
       G_SD_FILE        : string;
       -- The image of the card in slot 0, sim/Makefile's sd.img
       G_SD_IMAGE       : string;
+      -- nice_cpu's eth.nasm, the frames it gets, and the file of the
+      -- frames it sends
+      G_ETH_FILE       : string;
+      G_ETH_IN_FILE    : string;
+      G_ETH_OUT_FILE   : string;
       -- The core, pipeline or multi, as NICE selects it
       G_NICE           : string;
       -- The steps that niceemu counts for hello, emu, and reserved
       G_HELLO_STEPS    : natural;
       G_EMU_STEPS      : natural;
       G_RESERVED_STEPS : natural;
-      G_SD_STEPS       : natural
+      G_SD_STEPS       : natural;
+      G_ETH_STEPS      : natural
    );
 end entity tb_nicemon;
 
@@ -288,6 +303,24 @@ architecture simulation of tb_nicemon is
    -- The UART's bit time, which follows the rate at 0xFFFFFF9F
    signal bit_time : time := C_BIT_TIME;
 
+   -- The station's addresses, and the port for Ethernet frames with the
+   -- simulation's station
+   signal eth_ip          : std_logic_vector(31 downto 0);
+   signal eth_mac         : std_logic_vector(47 downto 0);
+   signal eth_enable      : std_logic;
+   signal eth_enable_done : std_logic;
+   signal eth_q_start     : std_logic;
+   signal eth_q_we        : std_logic;
+   signal eth_q_addr      : std_logic_vector(8 downto 0);
+   signal eth_q_data      : std_logic_vector(31 downto 0);
+   signal eth_q_done      : std_logic;
+   signal eth_q_len       : std_logic_vector(10 downto 0);
+   signal eth_tx_start    : std_logic;
+   signal eth_tx_len      : std_logic_vector(10 downto 0);
+   signal eth_tx_addr     : std_logic_vector(8 downto 0);
+   signal eth_tx_data     : std_logic_vector(31 downto 0);
+   signal eth_tx_done     : std_logic;
+
 begin
 
    p_clk : process
@@ -311,53 +344,95 @@ begin
          G_LINK_WAIT_US     => C_LINK_WAIT_US,
          G_SD_SLOTS         => 2,
          G_SD_HOLD_ACK      => true,
-         G_SD_SLOW_HZ       => 4_000_000
+         G_SD_SLOW_HZ       => 4_000_000,
+         G_ETH_HOLD_ACK     => true
       )
       port map (
-         clk_i          => clk,
-         rst_i          => rst,
-         uart_rxd_i     => uart_rx,
-         uart_txd_o     => uart_tx,
-         kbd_valid_i    => kbd_valid,
-         kbd_ready_o    => kbd_ready,
-         kbd_data_i     => kbd_data,
-         running_o      => running,
-         scr_we_o       => open,
-         scr_addr_o     => open,
-         scr_data_o     => open,
-         scr_ctl_we_o   => scr_ctl_we,
-         scr_cur_x_o    => scr_cur_x,
-         scr_cur_y_o    => scr_cur_y,
-         scr_cur_mode_o => scr_cur_mode,
-         scr_offs_o     => scr_offs,
-         scr_fnt_ram_o  => scr_fnt_ram,
-         fnt_we_o       => fnt_we,
-         fnt_addr_o     => fnt_addr,
-         fnt_wdata_o    => fnt_wdata,
-         fnt_rdata_i    => fnt_rdata,
-         brd_led_o      => brd_led,
-         brd_rgb0_o     => brd_rgb0,
-         brd_rgb1_o     => brd_rgb1,
-         brd_seg_o      => brd_seg,
-         brd_btn_i      => brd_btn,
-         brd_sw_i       => brd_sw,
-         net_on_i       => net_on,
-         net_rx_data_i  => net_rx_data,
-         net_rx_valid_i => net_rx_valid,
-         net_rx_ready_o => net_rx_ready,
-         net_rx_break_i => net_rx_break,
-         net_rx_renew_i => net_rx_renew,
-         net_tx_data_o  => net_tx_data,
-         net_tx_valid_o => net_tx_valid,
-         net_tx_ready_i => '1',
-         sd_clk_o       => sd_clk,
-         sd_cmd_o       => sd_cmd,
-         sd_dat3_o      => sd_dat3,
-         sd_dat0_i      => sd_dat0,
-         sd_cd_n_i      => "10",
-         sd_wp_i        => "00",
-         sd_pwr_n_o     => open
+         clk_i             => clk,
+         rst_i             => rst,
+         uart_rxd_i        => uart_rx,
+         uart_txd_o        => uart_tx,
+         kbd_valid_i       => kbd_valid,
+         kbd_ready_o       => kbd_ready,
+         kbd_data_i        => kbd_data,
+         running_o         => running,
+         scr_we_o          => open,
+         scr_addr_o        => open,
+         scr_data_o        => open,
+         scr_ctl_we_o      => scr_ctl_we,
+         scr_cur_x_o       => scr_cur_x,
+         scr_cur_y_o       => scr_cur_y,
+         scr_cur_mode_o    => scr_cur_mode,
+         scr_offs_o        => scr_offs,
+         scr_fnt_ram_o     => scr_fnt_ram,
+         fnt_we_o          => fnt_we,
+         fnt_addr_o        => fnt_addr,
+         fnt_wdata_o       => fnt_wdata,
+         fnt_rdata_i       => fnt_rdata,
+         brd_led_o         => brd_led,
+         brd_rgb0_o        => brd_rgb0,
+         brd_rgb1_o        => brd_rgb1,
+         brd_seg_o         => brd_seg,
+         brd_btn_i         => brd_btn,
+         brd_sw_i          => brd_sw,
+         net_on_i          => net_on,
+         net_rx_data_i     => net_rx_data,
+         net_rx_valid_i    => net_rx_valid,
+         net_rx_ready_o    => net_rx_ready,
+         net_rx_break_i    => net_rx_break,
+         net_rx_renew_i    => net_rx_renew,
+         net_tx_data_o     => net_tx_data,
+         net_tx_valid_o    => net_tx_valid,
+         net_tx_ready_i    => '1',
+         sd_clk_o          => sd_clk,
+         sd_cmd_o          => sd_cmd,
+         sd_dat3_o         => sd_dat3,
+         sd_dat0_i         => sd_dat0,
+         sd_cd_n_i         => "10",
+         sd_wp_i           => "00",
+         sd_pwr_n_o        => open,
+         eth_mac_o         => eth_mac,
+         eth_ip_o          => eth_ip,
+         eth_enable_o      => eth_enable,
+         eth_enable_done_i => eth_enable_done,
+         eth_q_start_i     => eth_q_start,
+         eth_q_we_i        => eth_q_we,
+         eth_q_addr_i      => eth_q_addr,
+         eth_q_data_i      => eth_q_data,
+         eth_q_done_i      => eth_q_done,
+         eth_q_len_i       => eth_q_len,
+         eth_tx_start_o    => eth_tx_start,
+         eth_tx_len_o      => eth_tx_len,
+         eth_tx_addr_i     => eth_tx_addr,
+         eth_tx_data_o     => eth_tx_data,
+         eth_tx_done_i     => eth_tx_done
       ); -- i_nicemon
+
+   -- nice_cpu's simulation of the station of the port for Ethernet frames
+   i_eth_sim : entity work.eth_sim
+      generic map (
+         G_IN_FILE  => G_ETH_IN_FILE,
+         G_OUT_FILE => G_ETH_OUT_FILE
+      )
+      port map (
+         clk_i         => clk,
+         ip_i          => eth_ip,
+         mac_i         => eth_mac,
+         tcp_port_i    => X"119E",
+         enable_i      => eth_enable,
+         enable_done_o => eth_enable_done,
+         rx_start_o    => eth_q_start,
+         rx_we_o       => eth_q_we,
+         rx_addr_o     => eth_q_addr,
+         rx_data_o     => eth_q_data,
+         rx_done_o     => eth_q_done,
+         rx_len_o      => eth_q_len,
+         tx_start_i    => eth_tx_start,
+         tx_len_i      => eth_tx_len,
+         tx_addr_o     => eth_tx_addr,
+         tx_data_i     => eth_tx_data,
+         tx_done_o     => eth_tx_done
+      ); -- i_eth_sim
 
    -- The fonts, with the display's port idle
    i_font : entity work.font
@@ -1385,6 +1460,58 @@ begin
       wr("FFFFFFA2", "0000000F");
       check("FFFFFFA2", "0000000F");
       check("FFFFFFAF", "13121110");         -- bytes 1020..1023 of the image
+
+      report "tb_nicemon: load " & G_ETH_FILE;
+      wr("FFFFFFF0", "00000009");
+      -- niceemu's MAC address, as the frames of G_ETH_IN_FILE are to it
+      wr("FFFFFFB1", "0000024E");
+      wr("FFFFFFB2", "49434500");
+      load(G_ETH_FILE, first_v);
+      wr("FFFFFFF0", "00000008");
+      wait until running = '0' for 1 ms;
+      expect_halt("01");
+      check("FFFFFF42", steps(G_ETH_STEPS));
+      -- The words of "niceemu --eth-in test/eth.in -d 0x200:33" for it
+      check("00000200", "00000000");         -- ETH_CSR after reset
+      check("00000201", "00000000");         -- ETH_RX_LEN
+      check("00000202", "00000000");         -- ETH_DROPPED
+      check("00000203", "00000003");         -- enabled, a frame waits
+      check("00000204", "0000003C");         -- A
+      check("00000205", "00000001");         -- E dropped
+      check("00000206", "0000024E");         -- A's destination
+      check("00000207", "49434500");
+      check("00000208", "02000000");         -- its source
+      check("00000209", "000188B5");         -- and the EtherType
+      check("0000020A", "00010203");
+      check("0000020B", "04050607");
+      check("0000020C", "08090A0B");
+      check("0000020D", "0C0D0E0F");
+      check("0000020E", "10111213");         -- chunk 1
+      check("0000020F", "00000000");         -- chunk 48
+      check("00000210", "0000013F");         -- ETH_CHUNK after 0x1FF
+      check("00000211", "0000000E");         -- B
+      check("00000212", "000288B5");
+      check("00000213", "0000000E");         -- C
+      check("00000214", "000388B5");
+      check("00000215", "0000000E");         -- D
+      check("00000216", "000488B5");
+      check("00000217", "00000000");         -- the queue is empty
+      check("00000218", "00000001");
+      check("00000219", "00000003");         -- F arrived after the send
+      check("0000021A", "00000014");
+      check("0000021B", "000688B5");
+      check("0000021C", "A1A2A3A4");
+      check("0000021D", "450088B5");         -- the send buffer
+      check("0000021E", "00000000");         -- after a write of 0
+      check("0000021F", "00000000");
+      check("00000220", "00000000");
+      -- The port at the end, as the link reads it while the core is halted
+      check("FFFFFFC0", "00000000");
+      check("FFFFFFC3", "00000100");
+      check("FFFFFFC8", "0000FFFF");         -- the send buffer's first words
+      check("FFFFFFC9", "FFFFFFFF");
+      check("FFFFFFCA", "024E4943");
+      check("FFFFFFCB", "450088B5");
 
       report "tb_nicemon: the UART's baud rate";
       check("FFFFFF9F", "00895440");         -- 9000000, G_UART_BAUDRATE

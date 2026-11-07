@@ -23,10 +23,12 @@
 -- and connects the brd_* ports (board_io.vhd has their registers); the other
 -- boards leave them open.
 -- The Ethernet PHY's pins go to the Ethernet station (eth/eth.vhd), whose
--- MAC and IP addresses are registers of the board (board_io.vhd), and
+-- MAC and IP addresses are registers of the system (devices.vhd), and
 -- whose counts of frames the core and the link read there too. The station
 -- also carries the debug link over TCP, in the UART's place while a host is
--- connected (nicemon.vhd).
+-- connected (nicemon.vhd), and puts the frames it does not serve into the
+-- port for Ethernet frames of the system, and sends the frames of the
+-- port's send buffer (eth/eth_frames.vhd).
 -- The SD card slots go to the SD card controller of nicemon.vhd
 -- (src/sd/sd.vhd), in SPI mode: per slot, the clock, CMD, the data to the
 -- card, and DAT3, its chip select, go out, and DAT0, the data from the
@@ -182,6 +184,19 @@ architecture synthesis of system is
    signal eth_rx     : std_logic_vector(31 downto 0);
    signal eth_rx_bad : std_logic_vector(31 downto 0);
    signal eth_tx     : std_logic_vector(31 downto 0);
+
+   -- The port for Ethernet frames (devices.vhd) and its station
+   signal frm_q_start  : std_logic;
+   signal frm_q_we     : std_logic;
+   signal frm_q_addr   : std_logic_vector(8 downto 0);
+   signal frm_q_data   : std_logic_vector(31 downto 0);
+   signal frm_q_done   : std_logic;
+   signal frm_q_len    : std_logic_vector(10 downto 0);
+   signal frm_tx_start : std_logic;
+   signal frm_tx_len   : std_logic_vector(10 downto 0);
+   signal frm_tx_addr  : std_logic_vector(8 downto 0);
+   signal frm_tx_data  : std_logic_vector(31 downto 0);
+   signal frm_tx_done  : std_logic;
    -- The UART's baud rate after reset, and now; and the link's TCP port
    constant C_UART_BAUDRATE : positive := 2_000_000;
    constant C_TCP_PORT      : natural  := 4510;
@@ -291,6 +306,18 @@ begin
          eth_tx_i       => eth_tx,
          eth_mac_o      => eth_mac,
          eth_ip_o       => eth_ip,
+         eth_enable_o   => open,
+         eth_q_start_i  => frm_q_start,
+         eth_q_we_i     => frm_q_we,
+         eth_q_addr_i   => frm_q_addr,
+         eth_q_data_i   => frm_q_data,
+         eth_q_done_i   => frm_q_done,
+         eth_q_len_i    => frm_q_len,
+         eth_tx_start_o => frm_tx_start,
+         eth_tx_len_o   => frm_tx_len,
+         eth_tx_addr_i  => frm_tx_addr,
+         eth_tx_data_o  => frm_tx_data,
+         eth_tx_done_i  => frm_tx_done,
          uart_baud_o    => uart_baud,
          net_on_i       => net_on,
          net_rx_data_i  => net_rx_data,
@@ -324,29 +351,40 @@ begin
          G_PORT     => C_TCP_PORT
       )
       port map (
-         clk_i       => clk_i,
-         rst_i       => rst_i,
-         mac_i       => eth_mac,
-         ip_i        => eth_ip,
-         rx_o        => eth_rx,
-         rx_bad_o    => eth_rx_bad,
-         tx_o        => eth_tx,
-         on_o        => net_on,
-         lrx_data_o  => net_rx_data,
-         lrx_valid_o => net_rx_valid,
-         lrx_ready_i => net_rx_ready,
-         lrx_break_o => net_rx_break,
-         lrx_renew_o => net_rx_renew,
-         ltx_data_i  => net_tx_data,
-         ltx_valid_i => net_tx_valid,
-         ltx_ready_o => net_tx_ready,
-         eth_clk_i   => eth_clk_i,
-         eth_rst_i   => eth_rst_i,
-         rxd_i       => eth_rxd_i,
-         crs_dv_i    => eth_crs_dv_i,
-         rx_er_i     => eth_rx_er_i,
-         txd_o       => eth_txd_o,
-         tx_en_o     => eth_tx_en_o
+         clk_i          => clk_i,
+         rst_i          => rst_i,
+         mac_i          => eth_mac,
+         ip_i           => eth_ip,
+         rx_o           => eth_rx,
+         rx_bad_o       => eth_rx_bad,
+         tx_o           => eth_tx,
+         on_o           => net_on,
+         lrx_data_o     => net_rx_data,
+         lrx_valid_o    => net_rx_valid,
+         lrx_ready_i    => net_rx_ready,
+         lrx_break_o    => net_rx_break,
+         lrx_renew_o    => net_rx_renew,
+         ltx_data_i     => net_tx_data,
+         ltx_valid_i    => net_tx_valid,
+         ltx_ready_o    => net_tx_ready,
+         frm_q_start_o  => frm_q_start,
+         frm_q_we_o     => frm_q_we,
+         frm_q_addr_o   => frm_q_addr,
+         frm_q_data_o   => frm_q_data,
+         frm_q_done_o   => frm_q_done,
+         frm_q_len_o    => frm_q_len,
+         frm_tx_start_i => frm_tx_start,
+         frm_tx_len_i   => frm_tx_len,
+         frm_tx_addr_o  => frm_tx_addr,
+         frm_tx_data_i  => frm_tx_data,
+         frm_tx_done_o  => frm_tx_done,
+         eth_clk_i      => eth_clk_i,
+         eth_rst_i      => eth_rst_i,
+         rxd_i          => eth_rxd_i,
+         crs_dv_i       => eth_crs_dv_i,
+         rx_er_i        => eth_rx_er_i,
+         txd_o          => eth_txd_o,
+         tx_en_o        => eth_tx_en_o
       ); -- i_eth
 
 

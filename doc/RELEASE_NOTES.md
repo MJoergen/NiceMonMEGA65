@@ -21,6 +21,19 @@ The release candidates pinned these:
 
 nice_cpu's `RC01` and `RC03` have no tag here.
 
+## V1.7.2
+
+**New.**
+
+- Every board has the port for Ethernet frames of nice_cpu's SYSTEM.md
+  §7 at `0xFFFFFFC0`–`CF`
+  ([#82](https://github.com/MJoergen/NiceMonMEGA65/issues/82)), which
+  were memory before. A program receives the frames that the station
+  does not serve, and every frame to its MAC address while the IP
+  address is 0, and sends frames of its own, as in niceemu. `NET_TX`
+  counts them too. `sim/udp.nasm` is an example, which answers a UDP
+  datagram to port 4511, and `make hwtest ETH=...` runs it.
+
 ## V1.7.1 (2026-11-06)
 
 **Upgrade notes.**

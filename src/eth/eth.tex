@@ -3,7 +3,8 @@
 % this file, not the PNG, and render again when the entities change.
 %
 % What it shows: eth (eth.vhd) and the entities in it, the receive path on
-% top, the three readers of the received frames in the middle, and the
+% top, the four readers of the received frames in the middle, the last of
+% which is the station's side of the port for Ethernet frames, and the
 % send path below, from the arbiter that merges their frames, with the
 % boundary between the PHY's clock domain and the system's through the two
 % FIFOs. Each block is the VHDL entity of its name. It does not show the
@@ -67,19 +68,22 @@
       node[wirelabel, pos = 0.3, above] {good or bad};
 
    %% ---------------------------------------------------------------
-   %% The three readers of the received frames, side by side
+   %% The four readers of the received frames, side by side
    %% ---------------------------------------------------------------
 
    \node[block] (arp)  at (114, -24) {ARP\\[-0.5mm] {\scriptsize eth\_arp, MAC filter}};
    \node[block] (icmp) at (146, -24) {PING\\[-0.5mm] {\scriptsize eth\_icmp}};
    \node[block] (tcp)  at (178, -24) {TCP SERVER\\[-0.5mm] {\scriptsize eth\_tcp}};
+   \node[block] (frm)  at (210, -24) {FRAMES\\[-0.5mm] {\scriptsize eth\_frames}};
 
-   % Every byte goes to all three
-   \draw[flow] (rxf.east) -| (tcp.north);
+   % Every byte goes to all four
+   \draw[flow] (rxf.east) -| (frm.north);
    \draw[flow] (114, 0) -- (arp.north);
    \draw[flow] (icmp.north |- 0, 0) -- (icmp.north);
+   \draw[flow] (tcp.north |- 0, 0) -- (tcp.north);
    \fill (114, 0) circle (1.2pt);
    \fill (icmp.north |- 0, 0) circle (1.2pt);
+   \fill (tcp.north |- 0, 0) circle (1.2pt);
 
    %% ---------------------------------------------------------------
    %% Send, bottom
@@ -93,11 +97,12 @@
    \draw[flow, -] (arp.south) |- (146, -36);
    \draw[flow] (icmp.south) -- (arb.north);
    \fill (146, -36) circle (1.2pt);
-   \draw[flow] (tcp.south) |- (arb.east);
+   \draw[flow] ([xshift = -6mm] tcp.south) |- ([yshift = 2mm] arb.east);
+   \draw[flow] (frm.south) |- ([yshift = -2mm] arb.east);
    \draw[flow] (arb) -- (txf);
    \draw[flow] (txf) -- (tx);
 
-   \node[top, fit = {(rx) (fcs) (tcp) (tx) (76, 28)}] (eth) {};
+   \node[top, fit = {(rx) (fcs) (frm) (tx) (76, 28) (76, -60)}] (eth) {};
    \node[toplabel] at ([xshift = 1mm, yshift = 0.5mm] eth.north west) {eth};
 
    %% ---------------------------------------------------------------
@@ -112,9 +117,15 @@
    \draw[wire] (tx.west) -- (left |- tx.west);
    \node[wirelabel, anchor = east, align = right] at (left |- tx.west) {PHY\\ TXD, TX\_EN};
 
-   \draw[both] (tcp.east) -- (right |- tcp.east);
-   \node[wirelabel, anchor = west, align = left] at (right |- tcp.east)
+   \coordinate (below) at ([yshift = -10mm] eth.south);
+
+   \draw[both] ([xshift = 6mm] tcp.south) -- ([xshift = 6mm] tcp.south |- below);
+   \node[wirelabel, anchor = north] at ([xshift = 6mm] tcp.south |- below)
       {debug link\\ (nicemon)};
+
+   \draw[both] (frm.east) -- (right |- frm.east);
+   \node[wirelabel, anchor = west, align = left] at (right |- frm.east)
+      {port for Ethernet frames\\ (eth\_regs in devices)};
 
 \end{tikzpicture}
 

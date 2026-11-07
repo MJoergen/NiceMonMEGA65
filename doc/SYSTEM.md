@@ -155,6 +155,7 @@ effect and does not write (DEBUG.md §3).
 | `0xFFFFFF90`–`0xFFFFFF9F` | The Nexys4DDR's LEDs, seven-segment display, buttons, and switches (see [The Nexys4DDR's devices](#the-nexys4ddrs-devices)). On the MEGA65 they read 0 and take no write. On every board, `0xFFFFFF9E` reads the words of the RAM, `0x20000` on the MEGA65 and `0x10000` on the Nexys4DDR, and takes no write, and `0xFFFFFF9F` is the UART's baud rate (see [The baud rate](#the-baud-rate)). The emulator has memory there, which reads 0 after a clear, so a program takes 0 to mean no limit. |
 | `0xFFFFFFA0`–`0xFFFFFFAF` | The SD card controller of nice_cpu's SYSTEM.md §5, with 2 slots on the MEGA65 and 1 on the Nexys4DDR (see [The SD card slots](#the-sd-card-slots)). |
 | `0xFFFFFFB0`–`0xFFFFFFBF` | The network station of nice_cpu's SYSTEM.md §6, on every board: the Ethernet station's addresses, its counts of frames, and the state of the debug link over TCP (see [The Ethernet station](#the-ethernet-station)). |
+| `0xFFFFFFC0`–`0xFFFFFFCF` | The port for Ethernet frames of nice_cpu's SYSTEM.md §7, on every board: a queue of 4 frames received and a send buffer, through which a program sends and receives frames of its own (see [Ethernet frames](#ethernet-frames)). |
 | `0xFFFFFFE0`–`0xFFFFFFEF` | The debug registers of DEBUG.md §6, for the link only, here and below: R0–R15 of the core. R1–R15 take a write while the core is paused, as a register-direct write of an instruction does (ISA.md §4.3); R0 takes none. While the core runs they read its registers live, as `niceemu --link` returns them, each word from the cycle of its own read; the multi-cycle core adds 1 to R15 for each word it fetches, so its live R15 may be the address of a constant word, or of the word after the instruction it carries out, where the pipelined core's is an instruction's. After a halt they hold what the emulator prints. While the core is paused they hold its registers, with R15 the address of the next instruction, and a hold of the paused core keeps them. A hold of a running core leaves them undefined. |
 | `0xFFFFFFF0` | Control: hold, clear, hide, pause, and step (see [The control register](#the-control-register)). |
 | `0xFFFFFFF1` | Read only: why the core halted. 0 while it has not, and after a clear, 1 for `HALT`, 2 for a reserved control word, 3 for `INT` inside an interrupt routine, and 4 for `RTI` outside one. Reason 5, the step limit of `niceemu --link`, is the emulator's only. |
@@ -448,7 +449,7 @@ another order and without `NET_STATUS`.
 | `0xFFFFFFB2` | `NET_MAC_LO` | Read, write | The last four bytes of the MAC address. The address is 02:4E:49:43:45:00 after reset. |
 | `0xFFFFFFB3` | `NET_RX_GOOD` | Read only | The good frames received, to any address. |
 | `0xFFFFFFB4` | `NET_RX_BAD` | Read only | The bad frames received, and the good ones that were dropped. |
-| `0xFFFFFFB5` | `NET_TX` | Read only | The frames sent: the ARP and ping replies, and the TCP segments. |
+| `0xFFFFFFB5` | `NET_TX` | Read only | The frames sent: the ARP and ping replies, the TCP segments, and a program's frames. |
 | `0xFFFFFFB6` | `NET_STATUS` | Read only | Bit 31 while a host is connected to the link over TCP, and the TCP port of the link, 4510, in bits 15..0. |
 | `0xFFFFFFB7`–`BF` | | Read only | 0. |
 
@@ -465,9 +466,9 @@ a cable to a switch gives a good count that rises with the broadcasts on
 the network, and a bad count that stays at 0. The station works only at
 100 Mbit/s; with a link at 10 Mbit/s, every frame counts as bad. A write
 to `0xFFFFFFB0`–`B2` while a host is connected, or while a reply goes
-out, breaks that connection or reply. The board has no port for Ethernet
-frames, nice_cpu's SYSTEM.md §7, so `0xFFFFFFC0`–`CF` are memory, and
-the frames that the station does not serve are dropped.
+out, breaks that connection or reply. The frames that the station does
+not serve go to the port for Ethernet frames (see [Ethernet
+frames](#ethernet-frames)).
 
 The station keeps the frames to its MAC address and to everyone, and
 drops the others. It answers each ARP request for its IP address with
@@ -490,6 +491,41 @@ the line, and its `m` the MAC address
 the ROM, its F11, after the monitor's `x`, shows the addresses and the counts,
 and sets the addresses from the keyboard
 ([demo/README.md](../demo/README.md)).
+
+### Ethernet frames
+
+`0xFFFFFFC0`–`CF` are the port for Ethernet frames of nice_cpu's
+SYSTEM.md §7, on every board
+([#82](https://github.com/MJoergen/NiceMonMEGA65/issues/82)). A
+program sends and receives frames of its own through it, for DHCP, DNS,
+or TFTP, and builds and parses them itself. §7 has the registers, the
+queue of 4 frames received, the send buffer, and the window of
+`ETH_BUF0`–`7` on them. Before V1.7.2 these words were memory.
+
+The station keeps the frames it serves, as niceemu's does: an ARP
+request for its IP address, an ICMP echo request to it, and TCP to port
+4510 of it, while the IP address is not 0. Every other frame to its MAC
+address, or to everyone, goes to the port, so while the IP address is 0
+they all do. The station decides as niceemu does, from the headers, so
+a program sees the frames that it sees in niceemu. A ping that the
+station keeps may still get no answer, as its responder answers only the
+pings above. The port takes a frame only while it is enabled, and counts
+it in `ETH_DROPPED` when its queue is full. A frame that the station
+keeps never counts there.
+
+A frame that a program sends goes out with the station's own frames,
+one at a time; the replies and the TCP segments of the link come first
+when they are ready at the same time. The station pads a frame shorter
+than 60 bytes, adds the check sequence, and counts it in `NET_TX`. Busy,
+bit 2 of `ETH_CSR`, reads 1 while the frame goes out, about 12 µs for
+the shortest, where the emulator sends a frame in the write of
+`ETH_TX_LEN`.
+
+A start of the core resets the port: it is disabled, its queue is
+empty, and `ETH_DROPPED` and `ETH_CHUNK` are 0. A frame that is being
+sent goes on. The send buffer keeps its words, and is 0 after a reset
+of the system. The link reads and writes the port as the core does,
+while the core is paused, held, or halted.
 
 ### The debug link over TCP
 

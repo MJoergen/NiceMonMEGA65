@@ -197,6 +197,21 @@
 --                          and G_TCP_PORT in bits 15..0; B7-BF read 0.
 --                          Only the system's reset resets them, not a
 --                          start of the core.
+--   0xFFFFFFC0-0xFFFFFFCF  The port for Ethernet frames of SYSTEM.md §7
+--                          (nice_cpu/hdl/src/eth_regs.vhd, in
+--                          src/devices.vhd): ETH_CSR, ETH_RX_LEN,
+--                          ETH_TX_LEN, ETH_CHUNK, ETH_DROPPED, and the
+--                          window ETH_BUF0-7 on the queue of 4 frames
+--                          received and the send buffer. The station puts
+--                          the frames it does not serve into the queue,
+--                          and sends the frame of the send buffer, through
+--                          eth_q_*_i and eth_tx_* (eth/eth_frames.vhd).
+--                          A start of the core resets the port, but a
+--                          frame being sent goes on. Without a station,
+--                          as in tb_nicemon, no frame comes, and with
+--                          G_ETH_HOLD_ACK the simulation's station
+--                          (nice_cpu/hdl/sim/eth_sim.vhd) serves the
+--                          writes that enable and send, as in niceemu.
 --   0xFFFFFFE0-0xFFFFFFFF  The debug registers of DEBUG.md §6, for the link
 --                          only, which debug_link holds: R0-R15 of the core,
 --                          live while it runs and those of the stop after
@@ -338,97 +353,117 @@ entity nicemon is
       G_SD_POWER         : boolean                      := false;
       G_SD_HOLD_ACK      : boolean                      := false;
       G_SD_SLOW_HZ       : positive                     := 400_000;
+      -- The ACK of a write that enables the port for Ethernet frames, or
+      -- sends a frame, held until eth_sim.vhd has served it
+      G_ETH_HOLD_ACK     : boolean                      := false;
       -- The checks of formal/nicemon.sby; implies G_RAM_ANY of mem
       G_FORMAL           : boolean := false
    );
    port (
-      clk_i          : in  std_logic;
-      rst_i          : in  std_logic;
-      uart_rxd_i     : in  std_logic;
-      uart_txd_o     : out std_logic;
+      clk_i             : in  std_logic;
+      rst_i             : in  std_logic;
+      uart_rxd_i        : in  std_logic;
+      uart_txd_o        : out std_logic;
       -- The keyboard's bytes, input like the UART's
-      kbd_valid_i    : in  std_logic := '0';
-      kbd_ready_o    : out std_logic;
-      kbd_data_i     : in  std_logic_vector(7 downto 0) := X"00";
+      kbd_valid_i       : in  std_logic := '0';
+      kbd_ready_o       : out std_logic;
+      kbd_data_i        : in  std_logic_vector(7 downto 0) := X"00";
       -- '1' while the core runs: not held, halted, or paused
-      running_o      : out std_logic;
+      running_o         : out std_logic;
       -- The core's pause and halt, 0 while it is held, for the on-board
       -- debugger's catch (dbg/dbg.vhd)
-      paused_o       : out std_logic;
-      halted_o       : out std_logic;
+      paused_o          : out std_logic;
+      halted_o          : out std_logic;
       -- The writes to the screen, by the core or the link: the word's offset
       -- from 0xFFFF0000, and the word written
-      scr_we_o       : out std_logic;
-      scr_addr_o     : out std_logic_vector(G_SCR_ADDR_BITS - 1 downto 0);
-      scr_data_o     : out std_logic_vector(31 downto 0);
+      scr_we_o          : out std_logic;
+      scr_addr_o        : out std_logic_vector(G_SCR_ADDR_BITS - 1 downto 0);
+      scr_data_o        : out std_logic_vector(31 downto 0);
       -- The screen's registers: the cursor's column, row, and mode (bit 0
       -- shown, bit 1 blinking, bit 2 small), and the display offset, which
       -- is 0 while bit 10 of the state is 0. scr_ctl_we_o is '1' for a
       -- cycle when a register is written.
-      scr_ctl_we_o   : out std_logic;
-      scr_cur_x_o    : out std_logic_vector(6 downto 0);
-      scr_cur_y_o    : out std_logic_vector(4 downto 0);
-      scr_cur_mode_o : out std_logic_vector(2 downto 0);
-      scr_offs_o     : out std_logic_vector(G_SCR_ADDR_BITS - 1 downto 0);
+      scr_ctl_we_o      : out std_logic;
+      scr_cur_x_o       : out std_logic_vector(6 downto 0);
+      scr_cur_y_o       : out std_logic_vector(4 downto 0);
+      scr_cur_mode_o    : out std_logic_vector(2 downto 0);
+      scr_offs_o        : out std_logic_vector(G_SCR_ADDR_BITS - 1 downto 0);
       -- '1' while the font base, 0xFFFFFF86, selects the font RAM
-      scr_fnt_ram_o  : out std_logic;
+      scr_fnt_ram_o     : out std_logic;
       -- The fonts at 0xFFFE0000-3FFF (src/video/font.vhd): the word's offset
       -- from 0xFFFE0000, given in every cycle, a write, and the word read at
       -- the offset of the cycle before. Without a display, the fonts read 0.
-      fnt_we_o       : out std_logic;
-      fnt_addr_o     : out std_logic_vector(13 downto 0);
-      fnt_wdata_o    : out std_logic_vector(15 downto 0);
-      fnt_rdata_i    : in  std_logic_vector(15 downto 0) := (others => '0');
+      fnt_we_o          : out std_logic;
+      fnt_addr_o        : out std_logic_vector(13 downto 0);
+      fnt_wdata_o       : out std_logic_vector(15 downto 0);
+      fnt_rdata_i       : in  std_logic_vector(15 downto 0) := (others => '0');
       -- The board's devices (G_BOARD_IO): the LEDs, the two RGB LEDs'
       -- levels, the display's segments, and the buttons and switches, which
       -- are synchronized here. Without G_BOARD_IO the outputs are 0.
-      brd_led_o      : out std_logic_vector(15 downto 0);
-      brd_rgb0_o     : out std_logic_vector(11 downto 0);
-      brd_rgb1_o     : out std_logic_vector(11 downto 0);
-      brd_seg_o      : out std_logic_vector(63 downto 0);
-      brd_btn_i      : in  std_logic_vector(4 downto 0)  := (others => '0');
-      brd_sw_i       : in  std_logic_vector(15 downto 0) := (others => '0');
+      brd_led_o         : out std_logic_vector(15 downto 0);
+      brd_rgb0_o        : out std_logic_vector(11 downto 0);
+      brd_rgb1_o        : out std_logic_vector(11 downto 0);
+      brd_seg_o         : out std_logic_vector(63 downto 0);
+      brd_btn_i         : in  std_logic_vector(4 downto 0)  := (others => '0');
+      brd_sw_i          : in  std_logic_vector(15 downto 0) := (others => '0');
       -- The counts of Ethernet frames received, good and bad or dropped,
       -- and of those sent, and the station's addresses (0xFFFFFFB0-BF)
-      eth_rx_i       : in  std_logic_vector(31 downto 0) := (others => '0');
-      eth_rx_bad_i   : in  std_logic_vector(31 downto 0) := (others => '0');
-      eth_tx_i       : in  std_logic_vector(31 downto 0) := (others => '0');
-      eth_mac_o      : out std_logic_vector(47 downto 0);
-      eth_ip_o       : out std_logic_vector(31 downto 0);
+      eth_rx_i          : in  std_logic_vector(31 downto 0) := (others => '0');
+      eth_rx_bad_i      : in  std_logic_vector(31 downto 0) := (others => '0');
+      eth_tx_i          : in  std_logic_vector(31 downto 0) := (others => '0');
+      eth_mac_o         : out std_logic_vector(47 downto 0);
+      eth_ip_o          : out std_logic_vector(31 downto 0);
+      -- The port for Ethernet frames (0xFFFFFFC0-CF, devices.vhd): the
+      -- frames that the station puts into its queue, and the frame of its
+      -- send buffer, which the station sends; eth_enable_o and
+      -- eth_enable_done_i for G_ETH_HOLD_ACK
+      eth_enable_o      : out std_logic;
+      eth_enable_done_i : in  std_logic                     := '0';
+      eth_q_start_i     : in  std_logic                     := '0';
+      eth_q_we_i        : in  std_logic                     := '0';
+      eth_q_addr_i      : in  std_logic_vector(8 downto 0)  := (others => '0');
+      eth_q_data_i      : in  std_logic_vector(31 downto 0) := (others => '0');
+      eth_q_done_i      : in  std_logic                     := '0';
+      eth_q_len_i       : in  std_logic_vector(10 downto 0) := (others => '0');
+      eth_tx_start_o    : out std_logic;
+      eth_tx_len_o      : out std_logic_vector(10 downto 0);
+      eth_tx_addr_i     : in  std_logic_vector(8 downto 0)  := (others => '0');
+      eth_tx_data_o     : out std_logic_vector(31 downto 0);
+      eth_tx_done_i     : in  std_logic                     := '0';
       -- The UART's baud rate, 0xFFFFFF9F
-      uart_baud_o    : out std_logic_vector(31 downto 0);
+      uart_baud_o       : out std_logic_vector(31 downto 0);
       -- The link's byte streams over TCP, which take the UART's place
       -- while net_on_i is '1': the host's bytes and its half-close, a
       -- break, a connection that opens, which renews the line's input,
       -- the link's resume (DEBUG.md §7), and the bytes to the host
-      net_on_i       : in  std_logic                    := '0';
-      net_rx_data_i  : in  std_logic_vector(7 downto 0) := X"00";
-      net_rx_valid_i : in  std_logic                    := '0';
-      net_rx_ready_o : out std_logic;
-      net_rx_break_i : in  std_logic                    := '0';
-      net_rx_renew_i : in  std_logic                    := '0';
-      net_tx_data_o  : out std_logic_vector(7 downto 0);
-      net_tx_valid_o : out std_logic;
-      net_tx_ready_i : in  std_logic                    := '0';
+      net_on_i          : in  std_logic                    := '0';
+      net_rx_data_i     : in  std_logic_vector(7 downto 0) := X"00";
+      net_rx_valid_i    : in  std_logic                    := '0';
+      net_rx_ready_o    : out std_logic;
+      net_rx_break_i    : in  std_logic                    := '0';
+      net_rx_renew_i    : in  std_logic                    := '0';
+      net_tx_data_o     : out std_logic_vector(7 downto 0);
+      net_tx_valid_o    : out std_logic;
+      net_tx_ready_i    : in  std_logic                    := '0';
       -- The side port of the debug link (debug_link.vhd, contract g), for
       -- the on-board debugger (dbg/dbg_host.vhd): a word, held until
       -- dbg_done_o, which brings the word read, or dbg_err_o for a word
       -- that is not a debug register while the core runs (DEBUG.md §3)
-      dbg_valid_i    : in  std_logic                     := '0';
-      dbg_we_i       : in  std_logic                     := '0';
-      dbg_addr_i     : in  std_logic_vector(31 downto 0) := (others => '0');
-      dbg_wdata_i    : in  std_logic_vector(31 downto 0) := (others => '0');
-      dbg_done_o     : out std_logic;
-      dbg_err_o      : out std_logic;
-      dbg_rdata_o    : out std_logic_vector(31 downto 0);
+      dbg_valid_i       : in  std_logic                     := '0';
+      dbg_we_i          : in  std_logic                     := '0';
+      dbg_addr_i        : in  std_logic_vector(31 downto 0) := (others => '0');
+      dbg_wdata_i       : in  std_logic_vector(31 downto 0) := (others => '0');
+      dbg_done_o        : out std_logic;
+      dbg_err_o         : out std_logic;
+      dbg_rdata_o       : out std_logic_vector(31 downto 0);
       -- The SD card slots' pins, bit i for slot i (src/sd/sd.vhd)
-      sd_clk_o       : out std_logic_vector(1 downto 0);
-      sd_cmd_o       : out std_logic_vector(1 downto 0);
-      sd_dat3_o      : out std_logic_vector(1 downto 0);
-      sd_dat0_i      : in  std_logic_vector(1 downto 0)  := "11";
-      sd_cd_n_i      : in  std_logic_vector(1 downto 0)  := "11";
-      sd_wp_i        : in  std_logic_vector(1 downto 0)  := "00";
-      sd_pwr_n_o     : out std_logic
+      sd_clk_o          : out std_logic_vector(1 downto 0);
+      sd_cmd_o          : out std_logic_vector(1 downto 0);
+      sd_dat3_o         : out std_logic_vector(1 downto 0);
+      sd_dat0_i         : in  std_logic_vector(1 downto 0)  := "11";
+      sd_cd_n_i         : in  std_logic_vector(1 downto 0)  := "11";
+      sd_wp_i           : in  std_logic_vector(1 downto 0)  := "00";
+      sd_pwr_n_o        : out std_logic
    );
 end entity nicemon;
 
@@ -458,6 +493,7 @@ architecture synthesis of nicemon is
    constant C_FS_BASE    : std_logic_vector(31 downto 6) := X"FFFFFF" & "01";  -- 0xFFFFFF40-7F; is_fs drops 40-4F
    constant C_SD_BASE    : std_logic_vector(31 downto 4) := X"FFFFFFA";        -- 0xFFFFFFA0-AF, with G_SD_SLOTS > 0
    constant C_NET_BASE   : std_logic_vector(31 downto 4) := X"FFFFFFB";        -- 0xFFFFFFB0-BF
+   constant C_ETH_BASE   : std_logic_vector(31 downto 4) := X"FFFFFFC";        -- 0xFFFFFFC0-CF
 
    -- Whether an address is an I/O register, not memory. The words of
    -- 0xFFFFFF00-FF that are not registers are memory, as in the emulator.
@@ -474,7 +510,8 @@ architecture synthesis of nicemon is
              addr(7 downto 4) = X"8" or                             -- screen registers
              addr(7 downto 4) = X"9" or                             -- the board's devices
              (addr(7 downto 4) = X"A" and G_SD_SLOTS > 0) or        -- the SD card
-             addr(7 downto 4) = X"B";                               -- the network station
+             addr(7 downto 4) = X"B" or                             -- the network station
+             addr(7 downto 4) = X"C";                               -- the port for frames
    end function is_io;
 
    -- Whether an address is in the fonts, which are not memory
@@ -496,7 +533,7 @@ architecture synthesis of nicemon is
       return addr(31 downto 5) = C_MPU_BASE or addr(31 downto 4) = C_PERF_BASE or
              addr(31 downto 4) = C_TIMER_BASE or is_fs(addr) or
              (addr(31 downto 4) = C_SD_BASE and G_SD_SLOTS > 0) or
-             addr(31 downto 4) = C_NET_BASE;
+             addr(31 downto 4) = C_NET_BASE or addr(31 downto 4) = C_ETH_BASE;
    end function is_dev;
 
    -- The source of the read data of the last request served: the memory,
@@ -1003,62 +1040,77 @@ begin
 
    ---------------------------------------------------------------------------
    -- The math unit (SYSTEM.md §2), the performance counters (§3), the
-   -- fetch statistics, the timer (§4), the SD card controller (§5), and
-   -- the network station (§6) from nice_cpu, in src/devices.vhd. They are
-   -- reset with the system, and all but the station also when the core
-   -- starts, as the emulator's are when it starts. The timer's request goes
+   -- fetch statistics, the timer (§4), the SD card controller (§5), the
+   -- network station (§6), and the port for Ethernet frames (§7) from
+   -- nice_cpu, in src/devices.vhd. They are reset with the system, and all
+   -- but the station also when the core starts, as the emulator's are when
+   -- it starts. The timer's request goes
    -- straight to the core's IRQ.
    ---------------------------------------------------------------------------
 
    i_devices : entity work.devices
       generic map (
-         G_CLOCK_HZ    => G_CLOCK_HZ,
-         G_SD_SLOTS    => G_SD_SLOTS,
-         G_SD_DETECT   => G_SD_DETECT,
-         G_SD_POWER    => G_SD_POWER,
-         G_SD_HOLD_ACK => G_SD_HOLD_ACK,
-         G_SD_SLOW_HZ  => G_SD_SLOW_HZ,
-         G_ETH_MAC     => G_ETH_MAC
+         G_CLOCK_HZ     => G_CLOCK_HZ,
+         G_SD_SLOTS     => G_SD_SLOTS,
+         G_SD_DETECT    => G_SD_DETECT,
+         G_SD_POWER     => G_SD_POWER,
+         G_SD_HOLD_ACK  => G_SD_HOLD_ACK,
+         G_SD_SLOW_HZ   => G_SD_SLOW_HZ,
+         G_ETH_HOLD_ACK => G_ETH_HOLD_ACK,
+         G_ETH_MAC      => G_ETH_MAC
       )
       port map (
-         clk_i        => clk_i,
-         rst_i        => rst_i,
-         hold_i       => cpu_hold,
-         run_i        => cpu_running,
-         instret_i    => cpu_instret,
-         events_i     => cpu_stats,
-         core_cyc_i   => dbus_cyc,
-         core_stb_i   => core_dev,
-         core_we_i    => dbus_we,
-         core_addr_i  => dbus_addr(7 downto 0),
-         core_wdata_i => dbus_wdata,
-         core_ack_o   => dev_core_ack,
-         link_stb_i   => link_dev,
-         link_we_i    => link_we,
-         link_addr_i  => link_addr(7 downto 0),
-         link_wdata_i => link_wdata,
-         link_ack_o   => dev_link_ack,
-         rdata_o      => dev_rdata,
-         busy_o       => dev_busy,
-         owed_o       => core_owed,
-         stall_o      => dev_stall,
-         irq_valid_o  => irq_valid,
-         irq_ready_i  => irq_ready,
-         irq_vector_o => irq_vector,
-         sd_clk_o     => sd_clk_o,
-         sd_cmd_o     => sd_cmd_o,
-         sd_dat3_o    => sd_dat3_o,
-         sd_dat0_i    => sd_dat0_i,
-         sd_cd_n_i    => sd_cd_n_i,
-         sd_wp_i      => sd_wp_i,
-         sd_pwr_n_o   => sd_pwr_n_o,
-         eth_rx_i     => eth_rx_i,
-         eth_rx_bad_i => eth_rx_bad_i,
-         eth_tx_i     => eth_tx_i,
-         net_on_i     => net_on_i,
-         net_port_i   => std_logic_vector(to_unsigned(G_TCP_PORT, 16)),
-         eth_ip_o     => eth_ip_o,
-         eth_mac_o    => eth_mac_o
+         clk_i             => clk_i,
+         rst_i             => rst_i,
+         hold_i            => cpu_hold,
+         run_i             => cpu_running,
+         instret_i         => cpu_instret,
+         events_i          => cpu_stats,
+         core_cyc_i        => dbus_cyc,
+         core_stb_i        => core_dev,
+         core_we_i         => dbus_we,
+         core_addr_i       => dbus_addr(7 downto 0),
+         core_wdata_i      => dbus_wdata,
+         core_ack_o        => dev_core_ack,
+         link_stb_i        => link_dev,
+         link_we_i         => link_we,
+         link_addr_i       => link_addr(7 downto 0),
+         link_wdata_i      => link_wdata,
+         link_ack_o        => dev_link_ack,
+         rdata_o           => dev_rdata,
+         busy_o            => dev_busy,
+         owed_o            => core_owed,
+         stall_o           => dev_stall,
+         irq_valid_o       => irq_valid,
+         irq_ready_i       => irq_ready,
+         irq_vector_o      => irq_vector,
+         sd_clk_o          => sd_clk_o,
+         sd_cmd_o          => sd_cmd_o,
+         sd_dat3_o         => sd_dat3_o,
+         sd_dat0_i         => sd_dat0_i,
+         sd_cd_n_i         => sd_cd_n_i,
+         sd_wp_i           => sd_wp_i,
+         sd_pwr_n_o        => sd_pwr_n_o,
+         eth_rx_i          => eth_rx_i,
+         eth_rx_bad_i      => eth_rx_bad_i,
+         eth_tx_i          => eth_tx_i,
+         net_on_i          => net_on_i,
+         net_port_i        => std_logic_vector(to_unsigned(G_TCP_PORT, 16)),
+         eth_ip_o          => eth_ip_o,
+         eth_mac_o         => eth_mac_o,
+         eth_enable_o      => eth_enable_o,
+         eth_enable_done_i => eth_enable_done_i,
+         eth_q_start_i     => eth_q_start_i,
+         eth_q_we_i        => eth_q_we_i,
+         eth_q_addr_i      => eth_q_addr_i,
+         eth_q_data_i      => eth_q_data_i,
+         eth_q_done_i      => eth_q_done_i,
+         eth_q_len_i       => eth_q_len_i,
+         eth_tx_start_o    => eth_tx_start_o,
+         eth_tx_len_o      => eth_tx_len_o,
+         eth_tx_addr_i     => eth_tx_addr_i,
+         eth_tx_data_o     => eth_tx_data_o,
+         eth_tx_done_i     => eth_tx_done_i
       ); -- i_devices
 
    -- The memory: the RAM, the ROM, and the screen, on the instruction bus

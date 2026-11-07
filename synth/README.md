@@ -315,6 +315,11 @@ than one of the RAM, so that their word is not on that path, and the
 stalls of the data bus are single registers, as before. The
 Nexys4DDR's has 0.054 ns and 0.025 ns, with 127 block RAMs and 19951
 LUTs, on a path in WRITE.
+With the port for Ethernet frames
+([#82](https://github.com/MJoergen/NiceMonMEGA65/issues/82)), the R6's
+build with the ROM and `FLOW=timing` has 0.086 ns and 0.058 ns, with
+245 block RAMs and 22549 LUTs, on a path from the RAM into WRITE's
+register file. The station's buffer of a frame received is a RAMB18.
 The R3's pipelined row is from a build at nice_cpu V1.0, with
 the debug link of version 4, and the Nexys4DDR's from one at V1.1, with
 stage 1 of the on-board debugger ([DEBUGGER.md](../doc/DEBUGGER.md)).

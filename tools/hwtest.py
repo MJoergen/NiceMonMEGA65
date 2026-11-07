@@ -114,6 +114,9 @@ Checks, in this order:
       instead of failing
     - the link over TCP to that address pauses the monitor and reads the
       address, while the monitor still has it
+    - sim/udp.nasm, loaded over TCP, answers a UDP datagram to port 4511
+      through the port for Ethernet frames, with the addresses and the
+      ports swapped, and halts
     - programs run with tools/run.py --eth and with niceemu, and their
       output and exit status are compared, as above, and so is the
       monitor's test program, with --monitor
@@ -166,6 +169,9 @@ SD_RESERVED = 0xFFFFFFA7
 SD_BUF = 0xFFFFFFA8
 # The slots of each board (doc/SYSTEM.md)
 SD_SLOT_COUNT = {"mega65": 2, "nexys4ddr": 1}
+# The UDP port that sim/udp.nasm answers on, through the port for Ethernet
+# frames
+UDP_PORT = 4511
 
 T = TypeVar("T")
 
@@ -1584,9 +1590,33 @@ def test_eth_ip(link: Link, rom: str, ip: str) -> list[int] | None:
     return got[1:3]
 
 
+def test_eth_frames(link: Link, udp: str, ip: str) -> None:
+    """Loads sim/udp.nasm, which answers one UDP datagram to UDP_PORT
+    through the port for Ethernet frames, sends it one, up to three times
+    if no answer comes, and checks the answer and the halt after it."""
+    load(link, udp)
+    payload = b"NiceMon " + os.urandom(8).hex().encode()
+    got: tuple[bytes, tuple[str, int]] | None = None
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        sock.settimeout(1.0)
+        for _ in range(3):
+            sock.sendto(payload, (ip, UDP_PORT))
+            try:
+                data, addr = sock.recvfrom(2048)
+            except socket.timeout:
+                continue
+            got = (data, (addr[0], addr[1]))
+            break
+    check("eth: a program answers a UDP datagram through the port for "
+          "Ethernet frames",
+          got is not None and got == (payload, (ip, UDP_PORT)),
+          "no answer" if got is None else repr(got))
+    check("eth: the program halts after its answer", wait_halt(link) == 1)
+
+
 def test_eth(port: str, baud: int, eth: str,
              programs: list[tuple[str, list[str], bool]], rom: str,
-             tmp: str) -> None:
+             udp: str, tmp: str) -> None:
     """The Ethernet station, last of all: the monitor's i gives it the IP
     address of eth's HOST from keys over the UART, ping gets the answers,
     the link over TCP reaches the monitor, and the programs run over it as
@@ -1637,6 +1667,7 @@ def test_eth(port: str, baud: int, eth: str,
             if got is not None:
                 check("eth: NET_STATUS has a host connected",
                       got[1] == 0x80000000 | ETH_PORT, f"{got[1]:08X}")
+            test_eth_frames(tcp_link, udp, ip)
         finally:
             tcp_link.close()
         test_run(["--eth", eth], programs, " over Ethernet")
@@ -1736,7 +1767,8 @@ def main() -> None:
                 uncovered.append("the Ethernet station, without --eth")
             else:
                 test_eth(args.port, args.baud, args.eth, comparisons(tmp),
-                         rom_test(), tmp)
+                         rom_test(), assemble(f"{REPO}/sim/udp.nasm", tmp),
+                         tmp)
         except LinkError as e:
             print(f"hwtest.py: {e}", file=sys.stderr, flush=True)
             results.append(False)
