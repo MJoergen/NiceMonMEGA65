@@ -21,6 +21,34 @@ The release candidates pinned these:
 
 nice_cpu's `RC01` and `RC03` have no tag here.
 
+## V1.8
+
+**Upgrade notes.**
+
+- nice_cpu is at `V1.8`. Its SYSTEM.md §3 has five event counters, and
+  its MICROARCH.md §8.1 new fetch statistics. The ports of the cores but
+  the fetch statistics', and the debug link, are as in V1.7.
+- The performance counters take `0xFFFFFF40`–`5F`, from `40`–`4F`, and
+  the fetch statistics `0xFFFFFF60`–`7F`, from `50`–`7F`, with new words
+  (#85). `FS_CTRL` moved from `0xFFFFFF50` to `0xFFFFFF60`, and
+  `FS_HIST` is gone: the fetch statistics now give a cause for each cycle,
+  and the flushes by cause. A program that read them reads the new map.
+
+**New.**
+
+- The event counters at `0xFFFFFF4A`–`53` count a program's data reads,
+  stores, skipped instructions, jumps, and interrupts, as niceemu counts
+  them, on both cores. The link's reads and writes do not count.
+
+**Tests.**
+
+- `tb_nicemon` checks the event counters after `hello.nasm` against the
+  counts that `make -C sim check-steps` takes from niceemu, and `make
+  hwtest` those after `sim/emu.nasm` against niceemu's own.
+- `tb_nicemon` and `sim/counters.nasm` read the fetch statistics at
+  their new addresses, and check that the causes sum to the cycles.
+  `make hwtest` checks `FS_CTRL` at `0xFFFFFF60`.
+
 ## V1.7.2 (2026-11-07)
 
 **New.**

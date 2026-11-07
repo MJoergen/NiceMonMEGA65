@@ -1,7 +1,7 @@
 -- The devices of nice_cpu/hdl/src at 0xFFFFFF10-7F and A0-CF
 -- (src/nicemon.vhd): the timer of SYSTEM.md §4 at 10-1F, the math unit
--- (MPU) of §2 at 20-3F, the performance counters of §3 at 40-4F, the fetch
--- statistics at 50-7F, with G_SD_SLOTS > 0 the SD card controller of §5
+-- (MPU) of §2 at 20-3F, the performance counters of §3 at 40-5F, the fetch
+-- statistics at 60-7F, with G_SD_SLOTS > 0 the SD card controller of §5
 -- at A0-AF (src/sd/sd.vhd), the registers of the network station of §6
 -- at B0-BF (nice_cpu/hdl/src/net_regs.vhd), and the port for Ethernet
 -- frames of §7 at C0-CF (nice_cpu/hdl/src/eth_regs.vhd).
@@ -69,6 +69,7 @@ library ieee;
    use ieee.numeric_std_unsigned.all;
 
 library work;
+   use work.trace_pkg.all;
    use work.pipe_pkg.all;
 
 entity devices is
@@ -96,6 +97,12 @@ entity devices is
       run_i             : in  std_logic;
       instret_i         : in  std_logic;
       events_i          : in  t_fetch_events;
+      -- The core's report of each step, and its own data bus requests,
+      -- without the link's, for the event counters of perf.vhd
+      retire_i          : in  t_retire                      := C_RETIRE_NONE;
+      dbus_stb_i        : in  std_logic                     := '0';
+      dbus_we_i         : in  std_logic                     := '0';
+      dbus_stall_i      : in  std_logic                     := '0';
       -- The core's data bus, and its request for a device, taken in this
       -- cycle
       core_cyc_i        : in  std_logic;
@@ -169,9 +176,9 @@ architecture synthesis of devices is
    begin
       if addr(7 downto 5) = "001" then
          return DEV_MPU;
-      elsif addr(7 downto 4) = X"4" then
+      elsif addr(7 downto 5) = "010" then
          return DEV_PERF;
-      elsif addr(7 downto 6) = "01" then
+      elsif addr(7 downto 5) = "011" then
          return DEV_FS;
       elsif addr(7 downto 4) = X"A" then
          return DEV_SD;
@@ -363,18 +370,22 @@ begin
          G_CLK_HZ => G_CLOCK_HZ
       )
       port map (
-         clk_i      => clk_i,
-         rst_i      => dev_rst,
-         run_i      => run_i,
-         instret_i  => instret_i,
-         wb_cyc_i   => io_cyc,
-         wb_stb_i   => perf_stb,
-         wb_stall_o => perf_stall,
-         wb_ack_o   => perf_ack,
-         wb_we_i    => io_we,
-         wb_addr_i  => io_addr(3 downto 0),
-         wb_data_i  => io_wdata,
-         wb_data_o  => perf_data
+         clk_i        => clk_i,
+         rst_i        => dev_rst,
+         run_i        => run_i,
+         instret_i    => instret_i,
+         retire_i     => retire_i,
+         dbus_stb_i   => dbus_stb_i,
+         dbus_we_i    => dbus_we_i,
+         dbus_stall_i => dbus_stall_i,
+         wb_cyc_i     => io_cyc,
+         wb_stb_i     => perf_stb,
+         wb_stall_o   => perf_stall,
+         wb_ack_o     => perf_ack,
+         wb_we_i      => io_we,
+         wb_addr_i    => io_addr(4 downto 0),
+         wb_data_i    => io_wdata,
+         wb_data_o    => perf_data
       ); -- i_perf
 
    i_fetch_stats : entity work.fetch_stats
@@ -388,7 +399,7 @@ begin
          wb_stall_o => fs_stall,
          wb_ack_o   => fs_ack,
          wb_we_i    => io_we,
-         wb_addr_i  => io_addr,
+         wb_addr_i  => io_addr(4 downto 0),
          wb_data_i  => io_wdata,
          wb_data_o  => fs_data
       ); -- i_fetch_stats

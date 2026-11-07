@@ -118,11 +118,13 @@
 --                          cycles, and its request goes to the core's IRQ.
 --   0xFFFFFF20-0xFFFFFF3F  The math unit of SYSTEM.md §2
 --                          (nice_cpu/hdl/src/mpu.vhd).
---   0xFFFFFF40-0xFFFFFF4F  The performance counters of SYSTEM.md §3
+--   0xFFFFFF40-0xFFFFFF5F  The performance counters of SYSTEM.md §3
 --                          (nice_cpu/hdl/src/perf.vhd): cycles,
 --                          instructions, and microseconds, the last
---                          derived from G_CLOCK_HZ.
---   0xFFFFFF50-0xFFFFFF7F  The fetch statistics of MICROARCH.md §8.1
+--                          derived from G_CLOCK_HZ, and the event counters
+--                          at 4A-53: data reads, stores, skips, jumps,
+--                          and interrupts, of the core's own requests.
+--   0xFFFFFF60-0xFFFFFF7F  The fetch statistics of MICROARCH.md §8.1
 --                          (nice_cpu/hdl/src/fetch_stats.vhd), part of the
 --                          performance counters of SYSTEM.md §3. The
 --                          multi-cycle core reports no events to them, so
@@ -489,8 +491,8 @@ architecture synthesis of nicemon is
    -- The devices of nice_cpu/hdl/src, by the address bits above their offset
    constant C_TIMER_BASE : std_logic_vector(31 downto 4) := X"FFFFFF1";        -- 0xFFFFFF10-1F
    constant C_MPU_BASE   : std_logic_vector(31 downto 5) := X"FFFFFF" & "001"; -- 0xFFFFFF20-3F
-   constant C_PERF_BASE  : std_logic_vector(31 downto 4) := X"FFFFFF4";        -- 0xFFFFFF40-4F
-   constant C_FS_BASE    : std_logic_vector(31 downto 6) := X"FFFFFF" & "01";  -- 0xFFFFFF40-7F; is_fs drops 40-4F
+   constant C_PERF_BASE  : std_logic_vector(31 downto 5) := X"FFFFFF" & "010"; -- 0xFFFFFF40-5F
+   constant C_FS_BASE    : std_logic_vector(31 downto 5) := X"FFFFFF" & "011"; -- 0xFFFFFF60-7F
    constant C_SD_BASE    : std_logic_vector(31 downto 4) := X"FFFFFFA";        -- 0xFFFFFFA0-AF, with G_SD_SLOTS > 0
    constant C_NET_BASE   : std_logic_vector(31 downto 4) := X"FFFFFFB";        -- 0xFFFFFFB0-BF
    constant C_ETH_BASE   : std_logic_vector(31 downto 4) := X"FFFFFFC";        -- 0xFFFFFFC0-CF
@@ -520,18 +522,11 @@ architecture synthesis of nicemon is
       return addr(31 downto 14) = C_FNT_BASE;
    end function is_fnt;
 
-   -- Whether an address is one of the fetch statistics', which are the
-   -- words of 0xFFFFFF50-7F, after the performance counters at 40-4F
-   function is_fs(addr : std_logic_vector(31 downto 0)) return boolean is
-   begin
-      return addr(31 downto 6) = C_FS_BASE and addr(5 downto 4) /= "00";
-   end function is_fs;
-
    -- Whether an address is one of a device's
    function is_dev(addr : std_logic_vector(31 downto 0)) return boolean is
    begin
-      return addr(31 downto 5) = C_MPU_BASE or addr(31 downto 4) = C_PERF_BASE or
-             addr(31 downto 4) = C_TIMER_BASE or is_fs(addr) or
+      return addr(31 downto 5) = C_MPU_BASE or addr(31 downto 5) = C_PERF_BASE or
+             addr(31 downto 4) = C_TIMER_BASE or addr(31 downto 5) = C_FS_BASE or
              (addr(31 downto 4) = C_SD_BASE and G_SD_SLOTS > 0) or
              addr(31 downto 4) = C_NET_BASE or addr(31 downto 4) = C_ETH_BASE;
    end function is_dev;
@@ -557,6 +552,7 @@ architecture synthesis of nicemon is
    signal brk_addr    : t_brk_addrs;
    signal brk_en      : std_logic_vector(C_BREAKS_MAX - 1 downto 0);
    signal cpu_instret : std_logic;
+   signal cpu_retire  : t_retire;
    signal cpu_stats   : t_fetch_events;
    -- The core's registers, for the link, which keeps them at a halt, and
    -- the same as one vector, R(n) in bits 32 * n + 31 .. 32 * n
@@ -789,7 +785,7 @@ begin
          halt_reason_o => cpu_why,
          instret_o     => cpu_instret,
          regs_o        => cpu_regs,
-         retire_o      => open,
+         retire_o      => cpu_retire,
          stats_o       => cpu_stats
       ); -- i_core
 
@@ -1066,6 +1062,10 @@ begin
          run_i             => cpu_running,
          instret_i         => cpu_instret,
          events_i          => cpu_stats,
+         retire_i          => cpu_retire,
+         dbus_stb_i        => dbus_stb,
+         dbus_we_i         => dbus_we,
+         dbus_stall_i      => dbus_stall,
          core_cyc_i        => dbus_cyc,
          core_stb_i        => core_dev,
          core_we_i         => dbus_we,

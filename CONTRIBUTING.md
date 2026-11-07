@@ -382,7 +382,7 @@ Then it loads and runs these programs:
 | `sim/devices.nasm` | The math unit, the performance counters, and the timer's interrupts. The testbench also uses the math unit over the link. |
 | `sim/emu.nasm` | The screen, the read counter, memory in the I/O range, and the registers after a halt. The testbench writes and reads the screen's registers. |
 | `reserved.nasm` of the emulator's tests | A halt on a reserved control word, after the testbench has cleared the memory. |
-| `sim/counters.nasm` | The fetch statistics, the microsecond counter, and the board's registers through the core's data bus. A start clears the fetch statistics, and with the multi-cycle core every cycle counts as one with no word in the buffer. |
+| `sim/counters.nasm` | The fetch statistics, the microsecond counter, and the board's registers through the core's data bus. A start clears the fetch statistics, whose causes sum to their cycles, and with the multi-cycle core every cycle is of cause OTHER. |
 | `sim/break.nasm` | The breakpoints, and the `x` notice. |
 | `sim/eof.nasm` | Echoes its input until a break ends it. |
 | `sim/count.nasm` | The read counter, which a start keeps. |
@@ -771,7 +771,7 @@ bitstream has one. Then it hides the ROM and uses the link:
   128K words on the MEGA65 and 64K on the Nexys4DDR, and the top word of
   the RAM, sets each baud rate at `0xFFFFFF9F` and reads the link back
   at it, and returns to `--baud`, reads back what `sim/emu.nasm` leaves after its
-  halt, and checks that the cycle counter and the timer stop at the halt.
+  halt, with the instruction and event counters as `niceemu` counts them, and checks that the cycle counter and the timer stop at the halt.
 - It writes and reads the screen's registers, and the board's registers:
   on the Nexys4DDR the LEDs, RGB LEDs, and display, and that the buttons
   and switches take no write, and on the MEGA65 that they read 0 and take

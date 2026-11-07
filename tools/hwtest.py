@@ -555,6 +555,29 @@ def steps(path: str) -> int:
     return int(m.group(1))
 
 
+# The low words of the event counters of SYSTEM.md §3: data reads, stores,
+# skips, jumps, and interrupts
+EVENTS = (0xFFFFFF4A, 0xFFFFFF4C, 0xFFFFFF4E, 0xFFFFFF50, 0xFFFFFF52)
+
+
+def events(path: str) -> dict[int, int]:
+    """The low words of the event counters that niceemu counts for the
+    program, from its dump of 0xFFFFFF4A-53."""
+    r = subprocess.run([NICEEMU, "-d", "0xffffff4a:10", path],
+                       stdin=subprocess.DEVNULL, capture_output=True,
+                       check=True)
+    words: dict[int, int] = {}
+    for line in r.stdout.decode().splitlines():
+        m = re.match(r"([0-9a-f]{8}):((?: [0-9a-f]{8})+)$", line)
+        if m:
+            base = int(m.group(1), 16)
+            for i, w in enumerate(m.group(2).split()):
+                words[base + i] = int(w, 16)
+    if any(a not in words for a in EVENTS):
+        raise SystemExit(f"hwtest: no event counters in niceemu's dump for {path}")
+    return {a: words[a] for a in EVENTS}
+
+
 def test_readback(link: Link, emu: str) -> None:
     load(link, emu)
     require("halt notice", wait_halt(link) == 1)
@@ -572,8 +595,10 @@ def test_readback(link: Link, emu: str) -> None:
     }
     if os.path.exists(NICEEMU):
         expected[0xFFFFFF42] = steps(emu)  # as niceemu says
+        expected.update(events(emu))       # and its event counters
     else:
         skipped.append("readback FFFFFF42")
+        skipped.append("readback of the event counters")
     for addr, want in expected.items():
         got = rd(link, addr)
         check(f"readback {addr:08X}", got == want,
@@ -1244,13 +1269,15 @@ def test_sd(link: Link, board: str) -> None:
 
 
 def test_fetch_statistics(link: Link) -> None:
-    """Checks the control word of the fetch statistics at FFFFFF50 and that
-    FFFFFF5D, a word they leave at 0, reads 0."""
-    check("FS_CTRL runs", rd(link, 0xFFFFFF50) == 1)
-    check("FS_CTRL stops", wr(link, 0xFFFFFF50, 0) and rd(link, 0xFFFFFF50) == 0)
-    check("FS_CTRL clears and runs", wr(link, 0xFFFFFF50, 3) and
-          rd(link, 0xFFFFFF50) == 1)
-    check("FFFFFF5D reads 0", rd(link, 0xFFFFFF5D) == 0)
+    """Checks the control word of the fetch statistics at FFFFFF60, and
+    that FFFFFF54, a word the performance counters leave at 0, and
+    FFFFFF65, one the fetch statistics leave at 0, read 0."""
+    check("FS_CTRL runs", rd(link, 0xFFFFFF60) == 1)
+    check("FS_CTRL stops", wr(link, 0xFFFFFF60, 0) and rd(link, 0xFFFFFF60) == 0)
+    check("FS_CTRL clears and runs", wr(link, 0xFFFFFF60, 3) and
+          rd(link, 0xFFFFFF60) == 1)
+    check("FFFFFF54 reads 0", rd(link, 0xFFFFFF54) == 0)
+    check("FFFFFF65 reads 0", rd(link, 0xFFFFFF65) == 0)
 
 
 def counter(link: Link, lo: int) -> int:

@@ -111,10 +111,13 @@ check-steps: $(addprefix $(BUILD)/,hello.bin emu.bin reserved.bin sd.bin sd.img 
 	[ "$$got" = "$(STEPS_SD)" ] || { echo "FAIL check-steps: niceemu runs sd in $$got steps, STEPS_SD is $(STEPS_SD)"; exit 1; }; \
 	got=$$($(EMU) --eth-in $(ETH_IN) $(BUILD)/eth.bin </dev/null | sed -n 's/.* after \([0-9]*\) steps.*/\1/p'); \
 	[ "$$got" = "$(STEPS_ETH)" ] || { echo "FAIL check-steps: niceemu runs eth in $$got steps, STEPS_ETH is $(STEPS_ETH)"; exit 1; }; \
+	got=$$($(EMU) -d 0xffffff4a:10 $(BUILD)/hello.bin </dev/null | \
+	  awk '/^ffffff4a:/ { e = $$2 $$4 $$6 $$8 } /^ffffff52:/ { e = e $$2 } END { print toupper(e) }'); \
+	[ "$$got" = "$(EVENTS_HELLO)" ] || { echo "FAIL check-steps: niceemu counts the events of hello as $$got, EVENTS_HELLO is $(EVENTS_HELLO)"; exit 1; }; \
 	echo "PASS check-steps"
 
 # The steps niceemu counts for the programs whose instruction counter
-# tb_nicemon checks. They are kept here, so that the tests run without
+# tb_nicemon checks, and the events it counts for hello. They are kept here, so that the tests run without
 # niceemu, and "make check-steps" compares them with a niceemu that is
 # built, as CI builds it.
 STEPS_HELLO    = 56
@@ -122,6 +125,9 @@ STEPS_EMU      = 12
 STEPS_RESERVED = 6
 STEPS_SD       = 59
 STEPS_ETH      = 75
+# The low words of the event counters at 0xFFFFFF4A, 4C, 4E, 50, and 52
+# after hello, in hex: its data reads, stores, skips, jumps, and interrupts
+EVENTS_HELLO   = 0000000E0000000E0000000C0000000E00000000
 EMU            = $(NICE_DIR)/emulator/zig-out/bin/niceemu
 
 BINS = hello rom echo fifo devices emu count reserved eof counters break sd eth
@@ -153,7 +159,7 @@ tb_nicemon: analyze $(addprefix $(BUILD)/,$(addsuffix .bin,$(BINS))) $(BUILD)/sd
 	@(cd $(BUILD) && $(GHDL) --elab-run $(GHDLFLAGS) tb_nicemon \
 	  -gG_HELLO_FILE=hello.bin -gG_ROM_FILE=rom.bin -gG_ECHO_FILE=echo.bin -gG_FIFO_FILE=fifo.bin -gG_DEVICES_FILE=devices.bin -gG_EMU_FILE=emu.bin -gG_COUNT_FILE=count.bin -gG_RESERVED_FILE=reserved.bin -gG_EOF_FILE=eof.bin -gG_COUNTERS_FILE=counters.bin -gG_BREAK_FILE=break.bin -gG_SD_FILE=sd.bin -gG_SD_IMAGE=sd.img -gG_NICE=$(NICE) \
 	  -gG_ETH_FILE=eth.bin -gG_ETH_IN_FILE=$(ETH_IN) -gG_ETH_OUT_FILE=eth_frames.out \
-	  -gG_HELLO_STEPS=$(STEPS_HELLO) -gG_EMU_STEPS=$(STEPS_EMU) -gG_RESERVED_STEPS=$(STEPS_RESERVED) -gG_SD_STEPS=$(STEPS_SD) -gG_ETH_STEPS=$(STEPS_ETH) > tb_nicemon.log 2>&1) && \
+	  -gG_HELLO_STEPS=$(STEPS_HELLO) -gG_EMU_STEPS=$(STEPS_EMU) -gG_RESERVED_STEPS=$(STEPS_RESERVED) -gG_SD_STEPS=$(STEPS_SD) -gG_ETH_STEPS=$(STEPS_ETH) -gG_HELLO_EVENTS=$(EVENTS_HELLO) > tb_nicemon.log 2>&1) && \
 	  diff $(ETH_TEST)/eth.frames.expected $(BUILD)/eth_frames.out >> $(BUILD)/tb_nicemon.log 2>&1 && \
 	  echo "PASS tb_nicemon" || (echo "FAIL tb_nicemon"; cat $(BUILD)/tb_nicemon.log; exit 1)
 

@@ -10,8 +10,10 @@
 -- for that and FAIL, with the log, for anything else. The step counts that
 -- steps 4, 9, and 11 check are the generics G_HELLO_STEPS, G_EMU_STEPS,
 -- and G_RESERVED_STEPS, which sim/Makefile sets from STEPS_HELLO,
--- STEPS_EMU, and STEPS_RESERVED. "make -C sim check-steps" runs the same
--- programs in niceemu and compares its counts with those.
+-- STEPS_EMU, and STEPS_RESERVED. The event counters of SYSTEM.md §3 that
+-- step 4 checks after hello are G_HELLO_EVENTS, from EVENTS_HELLO. "make
+-- -C sim check-steps" runs the same programs in niceemu and compares its
+-- counts with those.
 --
 -- THEORY OF OPERATION
 -- p_main sends packets and console bytes to the UART. p_uart_rx decodes the
@@ -202,7 +204,10 @@ entity tb_nicemon is
       G_EMU_STEPS      : natural;
       G_RESERVED_STEPS : natural;
       G_SD_STEPS       : natural;
-      G_ETH_STEPS      : natural
+      G_ETH_STEPS      : natural;
+      -- The low words of the event counters that niceemu counts for hello:
+      -- the data reads, stores, skips, jumps, and interrupts, in hex
+      G_HELLO_EVENTS   : string
    );
 end entity tb_nicemon;
 
@@ -917,6 +922,13 @@ begin
       check("FFFFFFF1", "00000001");         -- halted by HALT
       check("FFFFFF42", steps(G_HELLO_STEPS));
       check("FFFFFF43", "00000000");
+      -- The event counters count the program's own reads and stores, not
+      -- the link's (SYSTEM.md §3), as niceemu counts them
+      check("FFFFFF4A", G_HELLO_EVENTS(1 to 8));
+      check("FFFFFF4C", G_HELLO_EVENTS(9 to 16));
+      check("FFFFFF4E", G_HELLO_EVENTS(17 to 24));
+      check("FFFFFF50", G_HELLO_EVENTS(25 to 32));
+      check("FFFFFF52", G_HELLO_EVENTS(33 to 40));
       -- The microsecond counter stopped with the cycle counter, so it holds
       -- the cycles over the cycles per microsecond
       read_word("FFFFFF40", cycles_v);
@@ -1083,14 +1095,14 @@ begin
          severity failure;
 
       report "tb_nicemon: the screen's registers";
-      check("FFFFFF50", "00000001");         -- the fetch statistics run
-      read_word("FFFFFF51", fs_v);           -- but not after the halt
+      check("FFFFFF60", "00000001");         -- the fetch statistics run
+      read_word("FFFFFF61", fs_v);           -- but not after the halt
       wait for 1 us;
-      check("FFFFFF51", to_hstring(fs_v));
-      wr("FFFFFF50", "00000000");            -- stop them
-      check("FFFFFF50", "00000000");
-      wr("FFFFFF50", "00000003");            -- run, and clear
-      check("FFFFFF50", "00000001");
+      check("FFFFFF61", to_hstring(fs_v));
+      wr("FFFFFF60", "00000000");            -- stop them
+      check("FFFFFF60", "00000000");
+      wr("FFFFFF60", "00000003");            -- run, and clear
+      check("FFFFFF60", "00000001");
       wr("FFFFFF80", "000000E0");            -- the cursor shown, blinking
       wr("FFFFFF81", "0000004F");            -- column 79
       wr("FFFFFF82", "00000018");            -- row 24
@@ -1194,10 +1206,10 @@ begin
       assert fs_v /= 0 and fs_v < 64
          report "tb_nicemon: the start does not clear the fetch statistics, or they do not count"
          severity failure;
-      -- The FS_HIST words sum to FS_CYCLES, which stays stopped
+      -- The FS_CAUSE words sum to FS_CYCLES, which stays stopped
       check("00000102", to_hstring(fs_v));
-      check("FFFFFF51", to_hstring(fs_v));
-      -- The multi-cycle core has no word in the buffer in any cycle
+      check("FFFFFF61", to_hstring(fs_v));
+      -- Every cycle of the multi-cycle core is OTHER
       if G_NICE = "multi" then
          check("00000101", to_hstring(fs_v));
       end if;
