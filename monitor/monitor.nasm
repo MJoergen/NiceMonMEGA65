@@ -70,6 +70,19 @@
 ; no ROM, the monitor is a program at 0 like any other, and cat
 ; monitor.bin prog.bin runs it with a program at 0x8000 (Makefile, test).
 ;
+; The ROM's C code, rom.c and the files after it in the Makefile's ROM_C,
+; is one wasm module, which nicewasm --ram translates for a ROM and the
+; Makefile joins after mon.nasm, with nice_cpu's lib.nasm and
+; muldiv_mpu.nasm (README.md, "C in the ROM"). The words that it writes,
+; its mutable globals and its memory, with its stack, are in the RAM
+; from WASM_RAM up to below WASM_END, which the Makefile checks against
+; ___wasm_ram_end; ___wasm_start copies their initial values there at
+; every cold start. The two vectors that lib.nasm jumps through are words
+; of the variables, which the cold start sets: ___putc_vector to
+; mon_putc, and ___wasm_trap_vector to mon_trap, which prints the trap
+; and goes back to the main loop as mon_exit does, so that a trap of the
+; C code, or of a program's, does not halt the core.
+;
 ; The routines that the commands share with programs, _io_puts, _io_crlf,
 ; _io_puthex, _io_putdec, _io_gethex, _io_gets, and _io_getc, are in
 ; monlib.nasm, which the Makefile joins after this file, with mon.nasm and
@@ -141,6 +154,10 @@ V_PMASK         .EQU    0xFFFFF118
 V_PGW           .EQU    0xFFFFF119
 V_TXF           .EQU    0xFFFFF120      ; a frame to send, from byte 2, DHCP_WORDS words, as the send buffer has it
 V_RXF           .EQU    0xFFFFF180      ; a frame received, from byte 2, 380 words, as the queue's buffer has it
+___wasm_trap_vector .EQU 0xFFFFF300     ; the routine that a wasm trap jumps to, mon_trap (lib.nasm)
+___putc_vector  .EQU    0xFFFFF301      ; the routine that nice_putc and nice_print jump to, mon_putc
+WASM_RAM        .EQU    0xFFFFF400      ; the words that the ROM's C code writes, from here
+WASM_END        .EQU    0xFFFFFF00      ; up to below here, the I/O page, which the Makefile checks
 
 PROGRAM         .EQU    0x8000          ; where a program is, above the ROM
 VARS_WORDS      .EQU    0x1000          ; the words from 0xFFFFF000, the variables, which end a program's RAM
@@ -193,15 +210,19 @@ DHCP_NAK        .EQU    6
 ; mon_reset: the cold start, entry 0, which reset runs and a program may
 ; call. E is cleared, the timer stopped, VBASE set to 0, the font base
 ; set to 0, so that the screen shows Spleen, and the port for Ethernet
-; frames disabled, as at a return, and the ARP cache emptied. The RAM
-; from 0x8000 is left alone, so that a program a host has loaded is still
-; there.
+; frames disabled, as at a return, and the ARP cache emptied. The vectors
+; of lib.nasm are set, and ___wasm_start gives the words of the ROM's C
+; code their initial values. The RAM from 0x8000 is left alone, so that
+; a program a host has loaded is still there.
 mon_reset
                 MOVE    R14, 0          ; E = 0, VBASE = 0; bit 24 stays 1
                 MOVE    @TIMER, 0
                 MOVE    @SCR_FONT, 0
                 MOVE    @ETH_CSR, 0
                 MOVE    SP, STACK
+                MOVE    @___wasm_trap_vector, mon_trap
+                MOVE    @___putc_vector, mon_putc
+                CALL    ___wasm_start
                 MOVE    R1, V_ARP
 arp_clear
                 MOVE    @R1++, 0
@@ -1947,21 +1968,48 @@ run_at          TST     @R7
 ; with the display offset off, a fresh stack, and the status printed,
 ; after a new line if the program left the cursor in a row.
 mon_exit
-                MOVE    R14, 0          ; E = 0, VBASE = 0; bit 24 stays 1
-                MOVE    @TIMER, 0
-                MOVE    @SCR_FONT, 0    ; Spleen, whatever the program chose
-                MOVE    @ETH_CSR, 0     ; no frames, if the program took them
-                MOVE    @SCR_CTL, 0x60  ; the cursor, which a program may hide
                 MOVE    SP, STACK
                 PUSH    R1
-                TST     @V_COL
-        ?!Z     CALL    _io_crlf
+                CALL    exit_restore
                 MOVE    R1, S_RETURN
                 CALL    _io_puts
                 POP     R1
                 CALL    _io_puthex
                 CALL    _io_crlf
                 JMP     main
+
+; mon_trap: where a wasm trap of the ROM's C code jumps through
+; ___wasm_trap_vector, with R1 the trap's code and R2 its address
+; (nice_cpu's WASM.md). Back to the main loop as from mon_exit, with
+; "Trap N at ADDR" printed, the code in decimal and the address in hex.
+mon_trap
+                MOVE    SP, STACK
+                MOVE    R7, R1          ; the code
+                MOVE    R8, R2          ; the address
+                CALL    exit_restore
+                MOVE    R1, S_TRAP
+                CALL    _io_puts
+                MOVE    R1, R7
+                CALL    _io_putdec
+                MOVE    R1, S_AT
+                CALL    _io_puts
+                MOVE    R1, R8
+                CALL    _io_puthex
+                CALL    _io_crlf
+                JMP     main
+
+; exit_restore: for mon_exit and mon_trap, the state as the header of
+; mon_exit says, but the stack, and a new line if the cursor is not in
+; column 0.
+exit_restore
+                MOVE    R14, 0          ; E = 0, VBASE = 0; bit 24 stays 1
+                MOVE    @TIMER, 0
+                MOVE    @SCR_FONT, 0    ; Spleen, whatever the program chose
+                MOVE    @ETH_CSR, 0     ; no frames, if the program took them
+                MOVE    @SCR_CTL, 0x60  ; the cursor, which a program may hide
+                TST     @V_COL
+        ?!Z     JMP     _io_crlf        ; which returns to the caller
+                RET
 no_prog         MOVE    R1, S_NOPROG
                 CALL    _io_puts
                 MOVE    R1, R7
@@ -2301,6 +2349,8 @@ S_HALTED
                 .ASCII_L 'Halted'
 S_RETURN
                 .ASCII_L 'Returned '
+S_TRAP          .ASCII_L 'Trap '
+S_AT            .ASCII_L ' at '
 S_NOPROG
                 .ASCII_L 'No program at '
 S_NODEMO

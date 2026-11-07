@@ -42,6 +42,9 @@ meets it again, and has V1.8's changes too.
 - A program that joins nice_cpu's `lib.nasm` joins `muldiv_mpu.nasm` or
   `muldiv_soft.nasm` after it, and one that calls `scanf` joins
   `float.nasm` too. The monitor's tests and the C examples do (#89).
+- The monitor has C code in the ROM, so building it, and a bitstream with
+  it in the ROM, needs clang with the wasm32 target, lld, and llvm, as
+  the C examples do (#86).
 
 **New.**
 
@@ -51,6 +54,12 @@ meets it again, and has V1.8's changes too.
 - The math unit counts the leading and trailing 0 bits and the 1 bits of
   A at `0xFFFFFF2A`–`2C`, and takes the square root of C, with its
   remainder, at `0xFFFFFF3C`–`3E`, as niceemu does.
+- The monitor's ROM joins C code through nice_cpu's `nicewasm --ram`,
+  with its writable words at `0xFFFFF400`–`0xFFFFFEFF`, which the cold
+  start initializes
+  ([#86](https://github.com/MJoergen/NiceMonMEGA65/issues/86)). It is
+  empty until the FAT32 code of #58. A wasm trap in it prints `Trap N at
+  ADDR` and goes back to the monitor's prompt.
 
 **Tests.**
 

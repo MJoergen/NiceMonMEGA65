@@ -1,0 +1,28 @@
+NiceMon V9.9
+? lists the commands
+> r
+Hello from the ROM's C code
+Trap 1 at _rom_trap
+> r
+Hello from the ROM's C code
+Trap 1 at _rom_trap
+> r 0
+NiceMon V9.9
+? lists the commands
+> r
+Hello from the ROM's C code
+Trap 1 at _rom_trap
+> h
+Halted
+00009100: 00000003 00000007 00000008 00000000 00000009 0000000a 0000000a 00000007
+00009108: 00000008 00000000
+Screen:
+|NiceMon V9.9
+|? lists the commands
+|> r
+|Hello from the ROM's C code
+|Trap 1 at _rom_trap
+|> h
+|Halted
+VBASE at the halt 000000
+exit 0

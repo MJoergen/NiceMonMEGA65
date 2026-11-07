@@ -28,6 +28,8 @@ of it, and #24 revisited them. Debugging is the on-board debugger's
   boots from it at reset. The RAM is above it, from `0x8000`, and the
   monitor's variables are at `0xFFFFF000` and up, below the I/O page, as
   QMON's are below `0xFF00`. The stack grows down from `0xFFFFF000`.
+  The words that the ROM's C code writes are at `0xFFFFF400`–`0xFFFFFEFF`
+  with them (C in the ROM below).
   Nothing of the monitor's is written below `0x8000`: a write to the ROM
   is dropped, so a stack there loses its return addresses (`sim/rom.nasm`
   says what happens then).
@@ -377,6 +379,41 @@ What QMON's table has that this one leaves out:
   others, comes as entries from 9 with #58 and #59, as
   [doc/SDCARD.md](../doc/SDCARD.md) says.
 
+## C in the ROM
+
+Part of the ROM is C, through nice_cpu's wasm translator, as the FAT32
+code of [#58](https://github.com/MJoergen/NiceMonMEGA65/issues/58)
+will be. `rom.c` and the files after it in the Makefile's `ROM_C` are
+compiled to one wasm module, which `nicewasm --ram` translates for code
+that runs from a ROM (nice_cpu's translator README, "Code in a ROM").
+The Makefile joins it after `mon.nasm`, with nice_cpu's `lib.nasm` and
+`muldiv_mpu.nasm`. `rom.c` is empty until #58, so the module is only its
+stack.
+
+- **Calls.** Every function of the C code that is not `static` is
+  exported, and the monitor's assembly calls it as `_name`, in the C ABI.
+  The C code calls the monitor's routines by their labels too: they are
+  undefined in the module, and the assembler finds them.
+- **The RAM.** The words that the module writes, its mutable globals and
+  its memory, with its stack of 4096 bytes, are in the RAM from
+  `WASM_RAM`, `0xFFFFF400`, up to below `WASM_END`, `0xFFFFFF00`, with the
+  monitor's variables. The Makefile checks `___wasm_ram_end`, the word
+  after them, against `WASM_END`. The module may use no floats and no
+  `malloc`, which `--ram` rejects.
+- **The cold start** calls `___wasm_start`, which copies the initial
+  values to the RAM and sets the rest of the module's memory to 0, at
+  every start, also after `r 0`, which leaves the rest of the RAM alone.
+- **The vectors** that `lib.nasm` jumps through are words of the
+  variables, `0xFFFFF300` and `0xFFFFF301`, which the cold start sets:
+  `___putc_vector` to `mon_putc`, so that `nice_print` prints on the
+  outputs of `mon_out`, and `___wasm_trap_vector` to `mon_trap`. A
+  program at `0x8000` that joins `lib.nasm` has its own vectors.
+- **A trap** of the C code prints `Trap N at ADDR`, with the trap's code
+  of nice_cpu's WASM.md in decimal and its address in hex, and goes back
+  to the main loop as a program's return does, with the state that
+  `mon_exit` restores. So a trap does not halt the core, also when a
+  program called the C code.
+
 ## The shared routines
 
 `monlib.nasm` is joined after a program, with `mon.nasm`, whose stubs its
@@ -518,15 +555,20 @@ above) is faster, as it writes the words into the memory.
 ## Building and testing
 
 `make -C monitor` assembles `monitor.nasm`, `monlib.nasm`, `mon.nasm`,
-and `build/version.nasm`, the `cat` of them, with `niceasm` into
-`build/monitor.bin`, as the assembler has no include. `version.nasm`
-defines `VERSION`, the string of the banner, `git describe` of the tree
-unless `VERSION=` is given, and is written only when it changes.
+`build/rom_c.nasm`, nice_cpu's `lib.nasm` and `muldiv_mpu.nasm`, and
+`build/version.nasm`, the `cat` of them, with `niceasm` into
+`build/monitor.bin`, as the assembler has no include. `build/rom_c.nasm`
+is the ROM's C code (C in the ROM above), so the monitor, and a
+bitstream with it in the ROM, needs clang with the wasm32 target,
+`wasm-ld`, and `llvm-ar` (on Debian and Ubuntu, the `clang`, `lld`, and
+`llvm` packages). `version.nasm` defines `VERSION`, the string of the
+banner, `git describe` of the tree unless `VERSION=` is given, and is
+written only when it changes.
 
 `make -C monitor test` checks the layout of the sources with nice_cpu's
 `nicefmt`, checks that the monitor ends below `DEMO`, where the demo
 goes in the ROM, assembles the monitor with the version `V9.9`, and runs
-it in `niceemu` ten times, with its keystrokes in an input file and
+it in `niceemu` twelve times, with its keystrokes in an input file and
 `h` as the last command, so that the run ends: alone, with every command
 and the edits of a line; alone, with 448 rows of `d`, which go round the
 ring of the history, and Page Up and Page Down; alone, with `l` and
@@ -547,11 +589,14 @@ compared with the one that `test/sd_image.py --written` makes; with
 `arp_resolve` with the frames of `test/arp.eth` and `--step-time`: a
 reply after frames that are not, the cache, an address with no reply, an
 entry aged out, and the cache filled and gone round, and its frames sent
-are compared too; with
-`test/hello.nasm` at `0x8000`, an assembly
-program under nice_cpu's `start_mon.nasm`; and with `test/hello.c`,
-built with `nicebuild.py --monitor --asm mon.nasm`, which is skipped
-without clang. The console output, which is the copy on the line, a few
+are compared too; with `test/rom.c` joined to the ROM's C code, in
+`build/rom.bin`, the monitor of the tests with `test/rom.nasm` at
+`0x8000`, which calls its functions by their labels: the initial value
+of a global, a static array set to 0, both again after `r 0`,
+`nice_print`, and a trap, whose address is compared as the label it
+must be; with `test/hello.nasm` at `0x8000`, an assembly program under
+nice_cpu's `start_mon.nasm`, also after `r 0`; and with `test/hello.c`,
+built with `nicebuild.py --monitor --asm mon.nasm`. The console output, which is the copy on the line, a few
 memory words, and the screen are compared with `test/NAME.expected`. The
 expected files were checked by hand; after a change that moves them,
 check the new output the same way before copying it from `build/`.
