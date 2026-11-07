@@ -27,8 +27,8 @@ link with the UART's baud rate at `0xFFFFFF9F` (issue #75). `doc/BASIC_SURVEY.md
 the survey of the BASIC dialects behind the interpreter in the ROM of
 issue #54 (milestone V2.0). `doc/SDCARD.md` is the design of the SD
 cards' storage, issue #62 and its subtasks, of which the controller, the
-slots, and the ROM's sector routines with the `sd` command (#55, #56, and
-#57) are written. `doc/` also has `CODING_STYLE.md`,
+slots, the ROM's sector routines with the `sd` command, and FAT32's
+reading with `dir` and `load` (#55, #56, #57, and #58) are written. `doc/` also has `CODING_STYLE.md`,
 `RELEASE.md`, and `RELEASE_NOTES.md`; the root keeps only `README.md`,
 `CONTRIBUTING.md`, and this file.
 `src/nicemon.vhd` is the whole system and the file to read first; its
@@ -138,9 +138,10 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   the monitor's `x` copies it to 0x8000 and runs it, for the time being
   (#65), and `demo_hw.py`, which checks it in the ROM of a programmed board.
   `monitor/`: the monitor for the ROM in NICE assembly (`monitor.nasm`,
-  the dispatch table, the HAL, and the commands), its C code (`rom.c`,
-  one wasm module through `nicewasm --ram`, with its writable words at
-  `0xFFFFF400`; building the monitor needs clang), the routines that
+  the dispatch table, the HAL, and the commands), its C code (`fat32.c`
+  and `rom.c`, one wasm module through `nicewasm --ram`, with its
+  writable words at `0xFFFFF400`; building the monitor needs clang, and
+  its tests mtools, `mkfs.fat`, and `sfdisk`), the routines that
   programs join (`monlib.nasm`), the stubs and the header through which
   a program calls the entries (`mon.nasm`, `mon.h`), and its tests in
   niceemu (`test/`, with `cat monitor.bin prog.bin`).

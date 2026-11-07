@@ -1,14 +1,14 @@
 # monitor
 
 The ROM at `0x0000`, which the core boots from, holds the monitor: a
-hardware abstraction layer, the HAL, of nine routines that reach the
+hardware abstraction layer, the HAL, of fourteen routines that reach the
 hardware or the state the monitor keeps, called through a dispatch table
 at the start of the ROM, and a main loop with a few commands. It is not a
 library: what a program can do for itself stays in the program. It is in
-NICE assembly. `monitor.nasm` is the ROM; `monlib.nasm` has the routines
-that programs join and the monitor's commands use too; `mon.nasm` has the
-stubs through which a program calls the entries, and `mon.h` their
-declarations for C. `make -C monitor` builds `build/monitor.bin`, and
+NICE assembly, with FAT32 in C. `monitor.nasm` is the ROM, and
+`fat32.c` its FAT32; `monlib.nasm` has the routines that programs join
+and the monitor's commands use too; `mon.nasm` has the stubs through
+which a program calls the entries, and `mon.h` their declarations for C. `make -C monitor` builds `build/monitor.bin`, and
 `make -C monitor test` runs it in `niceemu` (Building and testing below).
 It was written for
 [#24](https://github.com/MJoergen/NiceMonMEGA65/issues/24), and what is
@@ -29,7 +29,8 @@ of it, and #24 revisited them. Debugging is the on-board debugger's
   monitor's variables are at `0xFFFFF000` and up, below the I/O page, as
   QMON's are below `0xFF00`. The stack grows down from `0xFFFFF000`.
   The words that the ROM's C code writes are at `0xFFFFF400`–`0xFFFFFEFF`
-  with them (C in the ROM below).
+  with them (C in the ROM below). The demo follows the monitor in the
+  ROM, from `0x4000` (The demo below).
   Nothing of the monitor's is written below `0x8000`: a write to the ROM
   is dropped, so a stack there loses its return addresses (`sim/rom.nasm`
   says what happens then).
@@ -53,9 +54,9 @@ of it, and #24 revisited them. Debugging is the on-board debugger's
 At the cold start the monitor clears the screen, prints its banner,
 `NiceMon` and the version, and prints a prompt, `> `, on the screen and
 on the line. It reads a line from the console: the keyboard and the line,
-which the hardware merges. A command is a letter, in either case, or the
-two letters `sd`, and after `d` and `u` a hex address and a hex count,
-each of them optional. DEL and
+which the hardware merges. A command is a letter, in either case, or
+`sd`, `dir`, or `load`, and after `d` and `u` a hex address and a hex
+count, each of them optional. DEL and
 backspace delete the character before the cursor, CTRL-C empties the
 line, and the cursor and function keys, the other control codes, and the
 bytes `0x80` to `0x9F` do nothing. RETURN runs the line.
@@ -72,12 +73,14 @@ the MEGA65 and 77 on the Nexys4DDR (Input and output below).
 | `d [ADDR] [N]` | Shows `N` words from `ADDR`, 4 to a row with the row's address first, all in hex. Without `ADDR`, the words after the last shown; without `N`, 32 words. |
 | `u [ADDR] [N]` | Disassembles `N` instructions from `ADDR`, a row each: the address, the instruction's 1 to 4 words, and its text, all in hex (The disassembler below). Without `ADDR`, the instructions after the last shown; without `N`, 20. |
 | `c` | Clears the screen. |
-| `v` | The version of the monitor, and of the dispatch table: `NiceMon V1.2, table 1.0`. |
+| `v` | The version of the monitor, and of the dispatch table: `NiceMon V1.9, table 1.1`. |
 | `i [A.B.C.D]` | Shows the Ethernet station's IP address, `IP address 192.168.1.65`, or writes it first: four decimal numbers of 0 to 255 with dots between them, such as `i 192.168.1.65`. Anything but an address or `dhcp` is no address, and `i` says so and writes nothing. It writes `0xFFFFFFB0`, `NET_IP` ([SYSTEM.md](../doc/SYSTEM.md#the-ethernet-station)), so a host connected over TCP loses its connection. In `niceemu` it is a register that keeps what is written. |
 | `i dhcp` | Gets the IP address from the network's DHCP server and writes it, as `i A.B.C.D` does, then shows it, with the mask, the gateway, and the server, a line each (The network below). Without an answer, it prints `No answer from a DHCP server` after about 16 seconds, and leaves the address as it was. |
 | `m [MAC]` | Shows the station's MAC address, `MAC address 02:4E:49:43:45:00`, or writes it first: six bytes of one or two hex digits, in either case, with colons between them, such as `m 02:4E:49:43:45:01`. The first byte must be even, as an odd one makes a group address. Anything else is no address, and `m` says so and writes nothing. It writes `0xFFFFFFB1` and `B2`, so a host connected over TCP loses its connection. Two boards on one network need different MAC addresses. In `niceemu` they are registers too, with the address of a board after reset. |
 | `l` | Loads words into the RAM from lines of `ADDR WORD` in hex, as a `.bin` file has them (Loading without a host below), up to an empty line, and prints the words written and the lines skipped: `Words loaded: 600, 00008000 to 00008257`. |
 | `sd [SLOT] LBA` | Shows the sector `LBA` of the SD card in `SLOT`, both in hex, as 32 rows of 16 bytes: the offset in the sector, the bytes in hex, and the bytes as text, with a dot for a byte outside `0x20` to `0x7E` (The SD cards below). Without `SLOT`, the slot of the last `sd`, 0 after reset. An error of the controller is shown with its number and its meaning: `SD error 1 in slot 1, no card`. |
+| `dir [SLOT]` | Lists the root directory of the SD card's FAT32 file system (Files below): a row for each file, its 8.3 name and its size in decimal, and for each directory, its name and `<DIR>`, then `Files: 25, directories: 1`. With `SLOT` in hex, it mounts the card in it first; without, it lists the card mounted, which the first `dir` or `load` after reset mounts. An error is shown with its number and meaning: `File error 18, FAT16, which is not supported`. |
+| `load NAME` | Loads the `.bin` file `NAME` of the card's root directory as `l` loads lines, and prints the same summary, so a program copied to the card on a PC loads with no host. Unlike `l`, an empty line is passed over, the end of the file ends the load, and a skipped line is counted from the first line of the file. `NAME` is an 8.3 name, in either case. |
 | `x` | Runs the demo of the ROM, for the time being (The demo below). Without a demo in the ROM, `x` says so. |
 | `h` | Halts the core, which the reset button, or a host over the link, starts again. The tests end with it. |
 | `?` | Lists the commands, and the keys of the history. |
@@ -89,9 +92,11 @@ with no host
 ([#72](https://github.com/MJoergen/NiceMonMEGA65/issues/72)), and `sd`,
 which reads a card with no file system, for the bring-up of the SD card's
 storage
-([#57](https://github.com/MJoergen/NiceMonMEGA65/issues/57)). Its
-commands for files come with FAT32
-([#62](https://github.com/MJoergen/NiceMonMEGA65/issues/62)). `i dhcp`
+([#57](https://github.com/MJoergen/NiceMonMEGA65/issues/57)). `dir`
+and `load` read programs from a card's FAT32 file system
+([#58](https://github.com/MJoergen/NiceMonMEGA65/issues/58)); writing
+comes with [#59](https://github.com/MJoergen/NiceMonMEGA65/issues/59).
+`i dhcp`
 gives a board on a network an address with no host
 ([#83](https://github.com/MJoergen/NiceMonMEGA65/issues/83)).
 
@@ -120,9 +125,55 @@ negative of `SD_ERROR`:
   the card there is not ready, or has changed since its last Init, so a
   second `sd` on a slot reads at once. Its buffer is at `0xFFFFF080`,
   with the monitor's variables.
-- FAT32 ([#58](https://github.com/MJoergen/NiceMonMEGA65/issues/58)) will
-  call the routines, and its file API will be the table's entries for
-  the card. A program that wants sectors drives the registers itself.
+- FAT32 (Files below) calls the routines, and its file API is the
+  table's entries for the card. A program that wants sectors drives the
+  registers itself, and calls `fs_mount` before it uses the files again.
+
+## Files
+
+The ROM reads FAT32 ([#58](https://github.com/MJoergen/NiceMonMEGA65/issues/58),
+[doc/SDCARD.md](../doc/SDCARD.md), "The file system") with `fat32.c`,
+the ROM's C code (C in the ROM below). It does not write yet
+([#59](https://github.com/MJoergen/NiceMonMEGA65/issues/59)).
+
+- **The card** is FAT32 when its sector 0 is a FAT32 boot sector, as
+  `mkfs.fat` makes on a whole card, or an MBR whose first partition of
+  type `0x0B` or `0x0C` has one. FAT12, FAT16, and exFAT are rejected with
+  errors of their own. The type is told by the count of clusters, as
+  Microsoft's specification says.
+- **The mount**: `fs_mount` mounts the card in a slot. `fs_open`, `dir`,
+  and `load` mount the slot of the last mount when there is none, or
+  after reset slot 0, or slot 1 when slot 0 has no card. The mount, and
+  the files open, are dropped when the selected slot is no longer the
+  mounted one, as after `sd` on the other slot, or the card there is not
+  ready or has changed. A mount of a slot that the system does not have
+  changes nothing.
+- **The root directory** only, with 8.3 names, matched in either case.
+  Long names are passed over, so a file shows its 8.3 name, such as
+  `ALONGN~1.TXT`, and so are the volume label and deleted entries.
+- **The caches** are one sector of the FAT, and one for each of the two
+  files that may be open at once, in the C code's RAM.
+
+The entries 9 to 13 of the dispatch table (below) are its file API, in
+the C ABI. A name is one character per word up to a 0 word, and an
+address is a word address. An error is negative: those of the SD
+controller, -1 to -8, as `sd` shows them, and these:
+
+| Error | Meaning |
+|---|---|
+| -16 | No FAT32 file system |
+| -17 | FAT12, which is not supported |
+| -18 | FAT16, which is not supported |
+| -19 | exFAT, which is not supported |
+| -20 | Not an 8.3 name |
+| -21 | No such file |
+| -22 | A directory, opened as a file |
+| -23 | Too many open files: two are |
+| -24 | Not an open file, or not one of the right kind |
+| -25 | No such mode |
+| -26 | The FAT is damaged: a cluster outside the volume, or a chain shorter than the file |
+| -27 | No such slot |
+| -28 | The card has changed, and the mount was dropped |
 
 ## The network
 
@@ -289,10 +340,10 @@ one.
 An entry is added only when a program cannot do without it: it reaches
 hardware that the monitor owns or that differs between boards, or state
 that the monitor keeps, such as the cursor and the outputs. The file API
-of the SD card will be such entries
-([#58](https://github.com/MJoergen/NiceMonMEGA65/issues/58)): once FAT32
-is in the ROM, the mounted card and the caches are state that the
-monitor keeps. Its sector routines are not: a program loads and saves
+of the SD card is such entries
+([#58](https://github.com/MJoergen/NiceMonMEGA65/issues/58)): with FAT32
+in the ROM, the mounted card and the caches are state that the monitor
+keeps. Its sector routines are not: a program loads and saves
 files, not sectors, and one that wants sectors drives the registers,
 which are the same everywhere. Strings, memory, number
 formatting, line editing, and random numbers are not the HAL's: assembly
@@ -327,13 +378,18 @@ offset off, as a program may have hidden the one or used the other.
 |---|---|---|---|---|
 | 0 | `00` | `mon_reset` | Cold start: E, the timer, VBASE, and the font base cleared, the stack, the variables, the screen, the banner, the main loop. The RAM from `0x8000` is left alone. | `reset!` |
 | 1 | `02` | `mon_exit` | R1 a status. Back to the main loop with a fresh stack, with E, the timer, VBASE, and the font base cleared, the cursor shown and blinking, the display offset off, and the status printed; for a program that has not kept the SP of its entry. A program with the runtime's start-up code returns or calls `exit` instead, which lands here too. | `exit!` |
-| 2 | `04` | `mon_version` | → R1 the version of the table, major in bits 31..16, minor in 15..0: `0x00010000`. | — |
+| 2 | `04` | `mon_version` | → R1 the version of the table, major in bits 31..16, minor in 15..0: `0x00010001`, 1.1. | — |
 | 3 | `06` | `mon_putc` | R1 a character, to the outputs `mon_out` selects. On the screen it goes at the cursor, which moves on, to the next row after the last column; CR moves the cursor to column 0, LF to column 0 of the next row, BS one back, and TAB to the next multiple of 8; the other control codes and `0x7F` do nothing, and `0x80` to `0x9F` go on the screen as any character, blank in Spleen and drawn from the font RAM when a program selected it; past the last row the rows move up by one. On the line every byte goes as it is. | `putc!` |
 | 4 | `08` | `mon_out` | R1 the outputs: bit 0 the line, bit 1 the screen; both at reset. → R1 the old ones. | — |
 | 5 | `0A` | `scr_cls` | Clears the screen in the current color, cursor home, shown and blinking, display offset 0. | `vga_cls!` |
 | 6 | `0C` | `scr_moveto` | R1 the column, R2 the row; a column past 79 is 79, and a row past 24 is 24. | `vga_moveto!` |
 | 7 | `0E` | `scr_getxy` | → R1 the column, R2 the row. | `vga_getxy!` |
 | 8 | `10` | `scr_color` | R1 the color for later characters, bits 31..8 of a screen word. → R1 the old one. | — |
+| 9 | `12` | `fs_mount` | R1 a slot. Mounts its card, and closes the files that were open (Files above). → R1 0, or an error. Table 1.1. | — |
+| 10 | `14` | `fs_open` | R1 a name, R2 a mode: 0 to read a file of the root directory, 2 for the root directory itself, whose name is empty or `/`. Mounts a card when none is. → R1 a handle, 0 or 1, or an error. Table 1.1. | — |
+| 11 | `16` | `fs_read` | R1 a handle of a file, R2 a buffer, R3 a number of bytes. Reads up to that many, one byte per word. → R1 the number read, 0 at the end, or an error. Table 1.1. | — |
+| 12 | `18` | `fs_readdir` | R1 a handle of a directory, R2 a buffer of 4 words. The next entry: in words 0 to 2 the 11 bytes of its 8.3 name, padded with blanks, and its attributes, as FAT has them, 4 bytes to a word from bits 7..0, and in word 3 its size. → R1 1, 0 at the end, or an error. Table 1.1. | — |
+| 13 | `1A` | `fs_close` | R1 a handle. → R1 0, or an error. Table 1.1. | — |
 
 Three entries of the first draft went on 2026-10-30, by the table's own
 rule ([#24](https://github.com/MJoergen/NiceMonMEGA65/issues/24), the
@@ -385,15 +441,19 @@ Part of the ROM is C, through nice_cpu's wasm translator, as the FAT32
 code of [#58](https://github.com/MJoergen/NiceMonMEGA65/issues/58)
 will be. `rom.c` and the files after it in the Makefile's `ROM_C` are
 compiled to one wasm module, which `nicewasm --ram` translates for code
-that runs from a ROM (nice_cpu's translator README, "Code in a ROM").
-The Makefile joins it after `mon.nasm`, with nice_cpu's `lib.nasm` and
-`muldiv_mpu.nasm`. `rom.c` is empty until #58, so the module is only its
-stack.
+that runs from a ROM (nice_cpu's translator README, "Code in a ROM"),
+at `-Os`, which makes it a fifth smaller than `-O2`. The Makefile joins
+it after `mon.nasm`, with nice_cpu's `lib.nasm` and `muldiv_mpu.nasm`.
+`fat32.c` is FAT32 (Files above), about 3900 words, and `rom.c` is
+empty.
 
 - **Calls.** Every function of the C code that is not `static` is
-  exported, and the monitor's assembly calls it as `_name`, in the C ABI.
-  The C code calls the monitor's routines by their labels too: they are
-  undefined in the module, and the assembler finds them.
+  exported, and the monitor's assembly calls it as `_name`, in the C ABI;
+  the entries 9 to 13 jump to `fat32.c`'s `fat_mount` to `fat_close`. The
+  C code calls the monitor's routines by their labels too: they are
+  undefined in the module, and the assembler finds them, such as
+  `_fat_sd_read`, which turns the C code's byte address of a buffer into
+  a word address for `sd_read`.
 - **The RAM.** The words that the module writes, its mutable globals and
   its memory, with its stack of 4096 bytes, are in the RAM from
   `WASM_RAM`, `0xFFFFF400`, up to below `WASM_END`, `0xFFFFFF00`, with the
@@ -561,14 +621,21 @@ above) is faster, as it writes the words into the memory.
 is the ROM's C code (C in the ROM above), so the monitor, and a
 bitstream with it in the ROM, needs clang with the wasm32 target,
 `wasm-ld`, and `llvm-ar` (on Debian and Ubuntu, the `clang`, `lld`, and
-`llvm` packages). `version.nasm` defines `VERSION`, the string of the
+`llvm` packages). The test's images need `mkfs.fat`, `sfdisk`, and
+mtools (`dosfstools`, `fdisk`, and `mtools`). `test/fat_image.py` makes
+them with these tools, so FAT32 is tested against them: a card with an
+MBR, a FAT16 partition, and a FAT32 one, whose root has a volume label,
+a subdirectory, a long name, a name in lower case, 20 more files past its
+first cluster, deleted entries, and `FRAG.BIN`, whose clusters are not
+contiguous; a card that is FAT32 on the whole, with no partition table; a
+FAT16 card; and an exFAT one. `version.nasm` defines `VERSION`, the string of the
 banner, `git describe` of the tree unless `VERSION=` is given, and is
 written only when it changes.
 
 `make -C monitor test` checks the layout of the sources with nice_cpu's
 `nicefmt`, checks that the monitor ends below `DEMO`, where the demo
 goes in the ROM, assembles the monitor with the version `V9.9`, and runs
-it in `niceemu` twelve times, with its keystrokes in an input file and
+it in `niceemu` sixteen times, with its keystrokes in an input file and
 `h` as the last command, so that the run ends: alone, with every command
 and the edits of a line; alone, with 448 rows of `d`, which go round the
 ring of the history, and Page Up and Page Down; alone, with `l` and
@@ -594,7 +661,15 @@ are compared too; with `test/rom.c` joined to the ROM's C code, in
 `0x8000`, which calls its functions by their labels: the initial value
 of a global, a static array set to 0, both again after `r 0`,
 `nice_print`, and a trap, whose address is compared as the label it
-must be; with `test/hello.nasm` at `0x8000`, an assembly program under
+must be; with `test/fs.nasm` at `0x8000`, which calls the file entries
+through `mon.nasm`'s stubs, with the images of `test/fat_image.py` in
+both slots: handles, reads across the fragments of a file and at its end,
+the root directory's entries, each error that a program can cause, and
+mounts; with the commands `dir` and `load` on those images, the
+fragmented `FRAG.BIN` and a text file loaded, the errors and the
+arguments that are not, and `HELLO.BIN` loaded and run; with `dir` on a
+FAT16 and an exFAT card; with `dir` and no card in slot 0, which mounts
+slot 1; with `test/hello.nasm` at `0x8000`, an assembly program under
 nice_cpu's `start_mon.nasm`, also after `r 0`; and with `test/hello.c`,
 built with `nicebuild.py --monitor --asm mon.nasm`. The console output, which is the copy on the line, a few
 memory words, and the screen are compared with `test/NAME.expected`. The

@@ -45,6 +45,9 @@ meets it again, and has V1.8's changes too.
 - The monitor has C code in the ROM, so building it, and a bitstream with
   it in the ROM, needs clang with the wasm32 target, lld, and llvm, as
   the C examples do (#86).
+- The demo is at `0x4000` in the ROM, from `0x2000`, behind the monitor,
+  which FAT32 made larger. The dispatch table is 1.1, with entries 9 to
+  13 for files (#58).
 
 **New.**
 
@@ -60,6 +63,15 @@ meets it again, and has V1.8's changes too.
   ([#86](https://github.com/MJoergen/NiceMonMEGA65/issues/86)). It is
   empty until the FAT32 code of #58. A wasm trap in it prints `Trap N at
   ADDR` and goes back to the monitor's prompt.
+- The monitor reads FAT32 SD cards
+  ([#58](https://github.com/MJoergen/NiceMonMEGA65/issues/58)): `dir
+  [SLOT]` lists the root directory, and `load NAME` loads a `.bin` file
+  from it as `l` loads lines, so a program copied to the card on a PC
+  runs with no host. Programs read files through the dispatch table's
+  new entries `fs_mount`, `fs_open`, `fs_read`, `fs_readdir`, and
+  `fs_close`. The card is FAT32 on the whole, or in the first FAT32
+  partition of an MBR; FAT12, FAT16, and exFAT are rejected. Writing
+  comes with #59.
 
 **Tests.**
 

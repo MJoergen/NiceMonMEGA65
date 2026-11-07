@@ -7,8 +7,9 @@ the controller in SPI mode (#55), and the boards' slots and `make hwtest`
 `doc/SYSTEM.md` §5, and the boards' slots by "The SD card slots" in
 [SYSTEM.md](SYSTEM.md); where this note differs from them, they are right.
 The ROM's sector routines and its `sd` command (#57) are written too, in
-V1.7.1, and [monitor/README.md](../monitor/README.md) describes them.
-FAT32, BASIC, and the host tools are not written yet. Its end is `SAVE`,
+V1.7.1, and [monitor/README.md](../monitor/README.md) describes them,
+and so is FAT32's reading, with `dir` and `load` (#58), in V1.9, in C.
+Writing, BASIC, and the host tools are not written yet. Its end is `SAVE`,
 `LOAD`, and `DIR` in the BASIC of #54, and on the way it gives the monitor of #24 a way to load and save programs. The
 tracking issue is #62, and its subtasks are listed at the end.
 
@@ -406,10 +407,10 @@ numbers and no Commodore DOS, as #54 says.
 
 ## Open questions
 
-1. **The language of the FAT32 code**: NICE assembly, as the monitor is,
-   with QNICE-FPGA's `fat32_library.asm` (BSD-3-Clause) as the guide to its
-   structure, or C through the wasm translator. This is #54's second
-   question, and one answer serves both.
+1. **The language of the FAT32 code**: settled on 2026-11-06, C through
+   the wasm translator, in the ROM with `nicewasm --ram`
+   (MJoergen/nice_cpu#138, #86). This decides nothing for BASIC, #54's
+   second question.
 2. **Writes to the MEGA65's internal card**, which holds its system files:
    allowed as to the microSD, or only in a directory of NiceMon's own, such
    as `/NICE`.
@@ -432,7 +433,7 @@ ROM is developed in niceemu and needs no board.
 | #63 | The controller, stage 2: 4-bit SD mode, optional, after a test whether a card leaves SPI mode |
 | #56 | Done in V1.5: the pins on the R3, R6, and Nexys4DDR, and the read-only check in `make hwtest` |
 | #57 | Done in V1.7.1: the sector routines in the ROM, and the monitor's `sd` command |
-| #58 | FAT32 reading, `dir`, and `load` |
+| #58 | Done in V1.9: FAT32 reading, `dir`, and `load` |
 | #59 | FAT32 writing, `save`, and `del` |
 | #60 | BASIC's `SAVE`, `LOAD`, and `DIR` |
 | #61 | Later: host tools for files on the board's card, over the link |

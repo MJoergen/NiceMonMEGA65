@@ -1,0 +1,17 @@
+NiceMon V9.9
+? lists the commands
+> dir
+HELLO    BIN       13158
+Files: 1, directories: 0
+> h
+Halted
+Screen:
+|NiceMon V9.9
+|? lists the commands
+|> dir
+|HELLO    BIN       13158
+|Files: 1, directories: 0
+|> h
+|Halted
+VBASE at the halt 000000
+exit 0

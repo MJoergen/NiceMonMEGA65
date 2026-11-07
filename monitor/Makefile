@@ -32,12 +32,13 @@ LIBC     = $(NICE_CPU)/runtime/libc
 BUILD    = build
 SOURCES  = monitor.nasm monlib.nasm mon.nasm
 # The ROM's C code, and nice_cpu's runtime library that it is joined with
-ROM_C    = rom.c
+ROM_C    = rom.c fat32.c
 RUNTIME_ROM = $(RUNTIME)/lib.nasm $(RUNTIME)/muldiv_mpu.nasm
 # The options of nicebuild.py --ram (nice_cpu's translator README), but
 # that every function that is not static is exported, for the monitor's
-# assembly, and nothing needs a main. The stack is nicebuild's 4096 bytes.
-ROM_CFLAGS = --target=wasm32 -mbulk-memory -mtail-call -O2 -ffreestanding -fvisibility=default \
+# assembly, nothing needs a main, and -Os, which makes the code a fifth
+# smaller than -O2. The stack is nicebuild's 4096 bytes.
+ROM_CFLAGS = --target=wasm32 -mbulk-memory -mtail-call -Os -ffreestanding -fvisibility=default \
              -nostdlibinc -isystem $(LIBC)/include -nostdlib -Wl,--no-entry \
              -Wl,--export-dynamic -Wl,--allow-undefined -Wl,--stack-first \
              -Wl,--export=__heap_base -Wl,-z,stack-size=4096
@@ -68,9 +69,9 @@ $(BUILD)/monitor.bin: $(SOURCES) $(BUILD)/rom_c.nasm $(RUNTIME_ROM) $(BUILD)/ver
 
 # The ROM's C code, and for the test of it, rom, with test/rom.c after
 # ROM_C. The C library is built if it is missing.
-$(BUILD)/rom_c.wasm: $(ROM_C) $(LIBC)/libc.a | $(BUILD)
+$(BUILD)/rom_c.wasm: $(ROM_C) $(LIBC)/libc.a Makefile | $(BUILD)
 	@$(CLANG) $(ROM_CFLAGS) -o $@ $(ROM_C) $(LIBC)/libc.a
-$(BUILD)/rom_c_test.wasm: $(ROM_C) test/rom.c $(LIBC)/libc.a | $(BUILD)
+$(BUILD)/rom_c_test.wasm: $(ROM_C) test/rom.c $(LIBC)/libc.a Makefile | $(BUILD)
 	@$(CLANG) $(ROM_CFLAGS) -o $@ $(ROM_C) test/rom.c $(LIBC)/libc.a
 $(BUILD)/rom_c.nasm $(BUILD)/rom_c_test.nasm: $(BUILD)/%.nasm: $(BUILD)/%.wasm $(TOOLS) monitor.nasm
 	@$(NICEWASM) --ram $(WASM_RAM) -o $@ $<
@@ -138,6 +139,19 @@ $(BUILD)/arp.bin: $(BUILD)/monitor_test.bin test/arp.nasm
 	@cat $(BUILD)/monitor_test_all.nasm test/arp.nasm > $(BUILD)/arp_all.nasm
 	@$(ASM) -o $(BUILD)/arp_full.bin $(BUILD)/arp_all.nasm
 	@grep -v '^0000[0-7]' $(BUILD)/arp_full.bin > $@
+
+# The test of the file entries, test/fs.nasm, at 0x8000, which calls them
+# through the stubs of mon.nasm, as hello.nasm does
+$(BUILD)/fs.bin: test/fs.nasm mon.nasm $(TOOLS) | $(BUILD)
+	@cat test/fs.nasm mon.nasm > $(BUILD)/fs_all.nasm
+	@$(ASM) -o $@ $(BUILD)/fs_all.nasm
+
+# The FAT images of the tests, from test/fat_image.py, with build/hello.bin
+# as HELLO.BIN. They need mkfs.fat, sfdisk, and mtools.
+FAT_IMAGES = $(addprefix $(BUILD)/fat/,fat32.img super.img fat16.img exfat.img)
+$(FAT_IMAGES) &: test/fat_image.py $(BUILD)/hello.bin
+	@mkdir -p $(BUILD)/fat
+	@$(PYTHON) test/fat_image.py $(BUILD)/hello.bin $(BUILD)/fat
 
 # The words that u disassembles in test/dis.py, at 0x8000, which never run
 $(BUILD)/dis.bin: test/dis.nasm $(TOOLS) | $(BUILD)
@@ -209,6 +223,20 @@ SD   = sd 1\rSD 3\rsd 4\rsd 1 0\rsd 0\rsd 0 0\rsd 2 0\rsd\rsd 1 2 3\rsd 1x\rsd 1
 ROM  = r\rr\rr 0\rr\rh\r
 # sd_write: r runs test/sd.nasm, which writes sector 2, and sd 2 shows it.
 SD_WRITE = r\rsd 2\rh\r
+# fat: fat32.img of test/fat_image.py in slot 0 and super.img in slot 1.
+# dir mounts slot 0, DIR 1 and dir 0 mount each slot. load frag.bin reads
+# the fragmented FRAG.BIN, whose words d shows, the first and the last
+# four, and load readme.txt a text file, whose 2 lines are skipped. Then
+# a name that is no file, a directory, a name that is no 8.3 name, load
+# alone, two names, loadx, dirx, dir 2, which has no slot and changes
+# nothing, and dir with two numbers, or a slot of 9 digits. load
+# HELLO.BIN, r runs it.
+FAT  = dir\rDIR 1\rdir 0\rload frag.bin\rd 9000 4\rd 9068 4\rload readme.txt\rload nofile.bin\rload sub\rload toolongname.bin\rload\rload a b\rloadx\rdirx\rdir 2\rdir 1 2\rdir 123456789\rLOAD HELLO.BIN\rr\rh\r
+# fatbad: fat16.img in slot 0 and exfat.img in slot 1, which dir rejects
+# with the errors of each, and fat1: no card in slot 0 and super.img in
+# slot 1, which the first dir mounts
+FATBAD = dir\rdir 1\rdir 0\rh\r
+FAT1 = dir\rh\r
 
 # The words of each test that are dumped with the screen: for cmds the
 # variables, the cursor's registers, and the IP and MAC addresses, and for the programs the text at
@@ -234,6 +262,11 @@ DUMP_hello_c = -d 0xFFFF0168:12
 # the results of test/sd.nasm's calls
 DUMP_sd       = -d 0xFFFFFFA0:7
 DUMP_sd_write = -d 0x9100:6
+# For fs the results of test/fs.nasm's calls, the entry that fs_readdir
+# wrote, and the first 45 bytes that fs_read wrote, and for fat the
+# numbers of fat_load for load NAME
+DUMP_fs       = -d 0x9100:29 -d 0x9180:4 -d 0x9200:45
+DUMP_fat      = -d 0xFFFFF11A:5
 # For rom the number of runs and the results of test/rom.nasm's calls
 DUMP_rom      = -d 0x9100:10
 # For arp the results of test/arp.nasm's calls, and the cache it copied
@@ -255,7 +288,8 @@ MAX_STEPS = 10000000
 # with --step-time, as its timeouts count, and the frames it sends are
 # added to its output.
 test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.bin $(BUILD)/hello.bin \
-      $(BUILD)/dis.bin $(BUILD)/sd.bin $(BUILD)/arp.bin $(BUILD)/rom.bin
+      $(BUILD)/dis.bin $(BUILD)/sd.bin $(BUILD)/arp.bin $(BUILD)/rom.bin $(BUILD)/fs.bin \
+      $(FAT_IMAGES)
 	@$(PYTHON) test/ring.py $(EMU) $(BUILD)/monitor_test.bin:32768 \
 	  $(BUILD)/monitor_8k.bin:8192 $(BUILD)/monitor_2k.bin:2048
 	@$(PYTHON) test/dis.py $(EMU) $(BUILD)/monitor_test.bin $(BUILD)/dis.bin
@@ -271,11 +305,14 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	@printf '$(SD)' > $(BUILD)/sd.txt
 	@printf '$(SD_WRITE)' > $(BUILD)/sd_write.txt
 	@printf '$(ROM)' > $(BUILD)/rom.txt
+	@printf '$(FAT)' > $(BUILD)/fat.txt
+	@printf '$(FATBAD)' > $(BUILD)/fatbad.txt
+	@printf '$(FAT1)' > $(BUILD)/fat1.txt
 	@$(PYTHON) test/sd_image.py $(BUILD)/sd.img
 	@$(PYTHON) test/sd_image.py --written $(BUILD)/sd_written.img
 	@{ printf '$(LOAD_HEAD)'; head -n 3 $(BUILD)/hello.bin | awk '{ printf "%s\r\n", $$0 }'; \
 	  tail -n +4 $(BUILD)/hello.bin; printf '$(LOAD_TAIL)'; } > $(BUILD)/load.txt
-	@fail=0; for t in cmds scroll load load_emu load_64k sd sd_write arp rom hello reset hello_c; do \
+	@fail=0; for t in cmds scroll load load_emu load_64k sd sd_write arp rom fs fat fatbad fat1 hello reset hello_c; do \
 	  opts=; rom=$(BUILD)/monitor_test.bin; \
 	  case $$t in \
 	    cmds) prog=; input=cmds; dump='$(DUMP_cmds)';; \
@@ -289,6 +326,13 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	    arp) prog=$(BUILD)/arp.bin; input=run; dump='$(DUMP_arp)'; \
 	      opts="--step-time --eth-in test/arp.eth --eth-out $(BUILD)/arp.eth.out";; \
 	    rom) prog=; rom=$(BUILD)/rom.bin; input=rom; dump='$(DUMP_rom)';; \
+	    fs) prog=$(BUILD)/fs.bin; input=run; dump='$(DUMP_fs)'; \
+	      opts="--sd0 $(BUILD)/fat/fat32.img --sd1 $(BUILD)/fat/super.img";; \
+	    fat) prog=; input=fat; dump='$(DUMP_fat)'; \
+	      opts="--sd0 $(BUILD)/fat/fat32.img --sd1 $(BUILD)/fat/super.img";; \
+	    fatbad) prog=; input=fatbad; dump=; \
+	      opts="--sd0 $(BUILD)/fat/fat16.img --sd1 $(BUILD)/fat/exfat.img";; \
+	    fat1) prog=; input=fat1; dump=; opts="--sd1 $(BUILD)/fat/super.img";; \
 	    hello) prog=$(BUILD)/hello.bin; input=run; dump='$(DUMP_hello)';; \
 	    reset) prog=$(BUILD)/hello.bin; input=reset; dump='$(DUMP_hello)';; \
 	    hello_c) prog=$(BUILD)/hello_c.bin; input=run; dump='$(DUMP_hello_c)'; \
@@ -313,7 +357,8 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 
 # The layout of the sources, as nice_cpu's nicefmt checks it
 fmt:
-	@$(FMT) $(SOURCES) test/hello.nasm test/dis.nasm test/sd.nasm test/arp.nasm test/rom.nasm
+	@$(FMT) $(SOURCES) test/hello.nasm test/dis.nasm test/sd.nasm test/arp.nasm test/rom.nasm \
+	  test/fs.nasm
 
 $(BUILD):
 	@mkdir -p $@

@@ -16,6 +16,11 @@ SCR_CLS         .EQU    0x0A
 SCR_MOVETO      .EQU    0x0C
 SCR_GETXY       .EQU    0x0E
 SCR_COLOR       .EQU    0x10
+FS_MOUNT        .EQU    0x12
+FS_OPEN         .EQU    0x14
+FS_READ         .EQU    0x16
+FS_READDIR      .EQU    0x18
+FS_CLOSE        .EQU    0x1A
 
 _mon_reset
                 JMP     MON_RESET
@@ -35,6 +40,16 @@ _scr_getxy
                 JMP     SCR_GETXY
 _scr_color
                 JMP     SCR_COLOR
+_fs_mount
+                JMP     FS_MOUNT
+_fs_open
+                JMP     FS_OPEN
+_fs_read
+                JMP     FS_READ
+_fs_readdir
+                JMP     FS_READDIR
+_fs_close
+                JMP     FS_CLOSE
 _scr_getx
                 JMP     SCR_GETXY
 _scr_gety

@@ -1,6 +1,6 @@
 ; The monitor, the program of the ROM at 0x0000 (README.md). The core boots
 ; from it at reset. It gives the programs at 0x8000 a hardware abstraction
-; layer, the HAL: nine routines, called through the dispatch table at the
+; layer, the HAL: fourteen routines, called through the dispatch table at the
 ; start of the ROM, and it has a main loop with a few commands, typed on
 ; the keyboard or sent over the line, and shown on the screen and the line.
 ;
@@ -26,7 +26,11 @@
 ; the ROM to 0x8000 and runs it as r does, for the time being (issue #65).
 ; sd shows a sector of an SD card, which the sector routines sd_init,
 ; sd_read, and sd_write read; they are the ROM's own, with no entries in
-; the dispatch table (issue #57, doc/SDCARD.md). i dhcp gets the IP
+; the dispatch table (issue #57, doc/SDCARD.md). dir lists the root
+; directory of the card's FAT32 file system, and load NAME reads a .bin
+; file from it as l reads lines, with fat32.c, the ROM's C code, whose
+; functions are also the entries 9 to 13, fs_mount, fs_open, fs_read,
+; fs_readdir, and fs_close (issue #58). i dhcp gets the IP
 ; address from a DHCP server through the port for Ethernet frames, with
 ; the frame routines eth_on, eth_recv, and eth_send, which are the ROM's
 ; own too, as is the ARP cache of arp_resolve (issue #83, README.md, "The
@@ -152,6 +156,7 @@ V_PIP           .EQU    0xFFFFF116      ; and those of the last reply that dhcp_
 V_PSRV          .EQU    0xFFFFF117
 V_PMASK         .EQU    0xFFFFF118
 V_PGW           .EQU    0xFFFFF119
+V_LSTATS        .EQU    0xFFFFF11A      ; for load NAME: what fat_load gives, 5 words
 V_TXF           .EQU    0xFFFFF120      ; a frame to send, from byte 2, DHCP_WORDS words, as the send buffer has it
 V_RXF           .EQU    0xFFFFF180      ; a frame received, from byte 2, 380 words, as the queue's buffer has it
 ___wasm_trap_vector .EQU 0xFFFFF300     ; the routine that a wasm trap jumps to, mon_trap (lib.nasm)
@@ -161,12 +166,12 @@ WASM_END        .EQU    0xFFFFFF00      ; up to below here, the I/O page, which 
 
 PROGRAM         .EQU    0x8000          ; where a program is, above the ROM
 VARS_WORDS      .EQU    0x1000          ; the words from 0xFFFFF000, the variables, which end a program's RAM
-DEMO            .EQU    0x2000          ; the demo's words in the ROM, after their number
+DEMO            .EQU    0x4000          ; the demo's words in the ROM, after their number
 DEMO_MAX        .EQU    PROGRAM-DEMO    ; more words than fit from DEMO + 1 below the RAM
 COLOR           .EQU    0x000FFF00      ; white on black, the color at the cold start
 OUT_LINE        .EQU    1
 OUT_SCREEN      .EQU    2
-TABLE_VERSION   .EQU    0x00010000      ; what mon_version returns: 1.0
+TABLE_VERSION   .EQU    0x00010001      ; what mon_version returns: 1.1
 DUMP_WORDS      .EQU    32              ; the words that d shows without a count
 ROW_WORDS       .EQU    4               ; the words of a row of d
 DIS_ROWS        .EQU    20              ; the instructions that u shows without a count
@@ -206,6 +211,11 @@ DHCP_NAK        .EQU    6
                 JMP     scr_moveto      ; 6 at 0x0C
                 JMP     scr_getxy       ; 7 at 0x0E
                 JMP     scr_color       ; 8 at 0x10
+                JMP     _fat_mount      ; 9 at 0x12, fs_mount
+                JMP     _fat_open       ; 10 at 0x14, fs_open
+                JMP     _fat_read       ; 11 at 0x16, fs_read
+                JMP     _fat_readdir    ; 12 at 0x18, fs_readdir
+                JMP     _fat_close      ; 13 at 0x1A, fs_close
 
 ; mon_reset: the cold start, entry 0, which reset runs and a program may
 ; call. E is cleared, the timer stopped, VBASE set to 0, the font base
@@ -321,8 +331,11 @@ cmd_halt
 
 ; d [ADDR] [N]: N words from ADDR, in hex, ROW_WORDS to a row, each row
 ; with its address first. Without ADDR, the words after the last shown;
-; without N, DUMP_WORDS.
+; without N, DUMP_WORDS. A d with ir after it is dir.
 cmd_dump
+                OR      R1, @R2, 0x20   ; I as i
+                CMP     R1, 0x69        ; i
+        ?Z      JMP     cmd_dir
                 MOVE    R1, R2
                 CALL    _io_gethex      ; R1 the address, R2 its digits, R3 after it
                 TST     R2
@@ -1029,8 +1042,11 @@ mac_digit
 ; end is not shown, so the screen never scrolls. R8 counts the words
 ; written, R9 and R10 are the lowest and highest address written, R11
 ; counts the lines, R12 the lines skipped, and R6 is the next free word of
-; the line.
+; the line. An l with oad after it is load NAME.
 cmd_load
+                OR      R1, @R2, 0x20   ; O as o
+                CMP     R1, 0x6F        ; o
+        ?Z      JMP     cmd_fload
                 MOVE    R1, S_LHINT
                 CALL    puts_crlf
                 MOVE    @V_LOUT, @V_OUT
@@ -1042,9 +1058,7 @@ cmd_load
                 MOVE    R10, 0
                 MOVE    R11, 0
                 MOVE    R12, 0
-                MOVE[M] R1, @RAM_WORDS
-        ?Z      MOVE    R1, SCREEN+VARS_WORDS  ; no limit
-                SUB     @V_PEND, R1, VARS_WORDS
+                CALL    load_pend
 load_line
                 CALL    load_row
                 MOVE    R6, V_LINE
@@ -1154,6 +1168,7 @@ load_bad
 load_done
                 CALL    load_row
                 MOVE    @V_OUT, @V_LOUT
+load_summary
                 MOVE    R1, S_LOADED
                 CALL    _io_puts
                 MOVE    R1, R8
@@ -1186,6 +1201,163 @@ load_skipped
                 CALL    _io_puthex
                 CALL    _io_crlf
                 JMP     main
+
+; load_pend: V_PEND, the end of a program's RAM, where the variables
+; start, from the size of the RAM, or the screen in niceemu. Uses R1.
+load_pend
+                MOVE[M] R1, @RAM_WORDS
+        ?Z      MOVE    R1, SCREEN+VARS_WORDS  ; no limit
+                SUB     @V_PEND, R1, VARS_WORDS
+                RET
+
+; dir [SLOT]: the root directory of the card in SLOT, in hex, mounted
+; first, or of the card mounted, with fat_dir of fat32.c. R2 points after
+; the d.
+cmd_dir
+                MOVE    R1, @R2++
+                OR      R1, @R2++, 0x20  ; R as r
+                CMP     R1, 0x72        ; r
+        ?!Z     JMP     unknown
+                MOVE    R1, @R2
+                CMP     R1, 0x20
+        ?Z      JMP     dir_args
+                TST     R1
+        ?!Z     JMP     unknown         ; dirx
+dir_args
+                MOVE    R1, R2
+                CALL    _io_gethex      ; R1 the slot, R2 its digits, R3 after it
+                MOVE    R7, R1
+                CMP     R2, 9
+        ?!C     JMP     dir_bad         ; more than 8 digits
+                TST     R2
+        ?Z      MOVE    R7, 0xFFFFFFFF  ; no slot: the card mounted
+                CALL    rest_blank
+        ?!Z     JMP     dir_bad
+                MOVE    R1, R7
+                CALL    _fat_dir
+                TST     R1
+        ?N      JMP     fs_fail
+                JMP     main
+dir_bad
+                MOVE    R1, S_BADDIR
+                CALL    puts_crlf
+                JMP     main
+
+; load NAME: the .bin file NAME of the card's root directory, read with
+; fat_load of fat32.c, which writes its words as l does, and shown as l
+; shows its lines. R2 points after the l.
+cmd_fload
+                MOVE    R1, R2
+                MOVE    R2, S_OAD
+                CALL    match           ; R1 after oad, or 0
+                TST     R1
+        ?Z      JMP     unknown
+                TST     @R1
+        ?Z      JMP     fload_bad       ; load alone
+                CMP     @R1, 0x20
+        ?!Z     JMP     unknown         ; loadx
+fload_blank
+                CMP     @R1, 0x20
+        ?Z      ADD     R1, R1, 1
+        ?Z      JMP     fload_blank
+                TST     @R1
+        ?Z      JMP     fload_bad       ; no name
+                MOVE    R7, R1          ; the name
+fload_end
+                ADD     R1, R1, 1
+                TST     @R1
+        ?Z      JMP     fload_open
+                CMP     @R1, 0x20
+        ?!Z     JMP     fload_end
+                MOVE    @R1, 0          ; the name ends at the first blank
+                ADD     R3, R1, 1
+                CALL    rest_blank
+        ?!Z     JMP     fload_bad       ; a second word
+fload_open
+                MOVE    R1, R7
+                MOVE    R2, 0           ; to read
+                CALL    _fat_open
+                TST     R1
+        ?N      JMP     fs_fail
+                MOVE    R8, R1          ; the handle
+                CALL    load_pend
+                MOVE    R1, R8
+                MOVE    R2, @V_PEND
+                MOVE    R3, V_LSTATS
+                CALL    _fat_load
+                MOVE    R9, R1
+                MOVE    R1, R8
+                CALL    _fat_close
+                MOVE    R1, R9
+                TST     R1
+        ?N      JMP     fs_fail
+                MOVE    R8, @V_LSTATS
+                MOVE    R9, @V_LSTATS+1
+                MOVE    R10, @V_LSTATS+2
+                MOVE    R12, @V_LSTATS+3
+                MOVE    @V_LBAD, @V_LSTATS+4
+                JMP     load_summary
+fload_bad
+                MOVE    R1, S_BADLOAD
+                CALL    puts_crlf
+                JMP     main
+
+; match: Z clear and R1 after the string at R2 when the line at R1 starts
+; with it, in either case, or R1 = 0. Uses R1-R4.
+match
+                MOVE[M] R3, @R2++
+        ?Z      RET
+                OR      R3, R3, 0x20
+                OR      R4, @R1++, 0x20
+                CMP     R3, R4
+        ?Z      JMP     match
+                MOVE    R1, 0
+                RET
+
+; rest_blank: Z when the line from R3 has only blanks. Uses R3.
+rest_blank
+                CMP     @R3, 0x20
+        ?Z      ADD     R3, R3, 1
+        ?Z      JMP     rest_blank
+                TST     @R3
+                RET
+
+; fs_fail: an error of fat32.c, R1 its negative: one of the SD controller's
+; as sd shows it, with the selected slot, or a file error, its number and
+; its meaning
+fs_fail
+                CMP     R1, 0xFFFFFFF8  ; -8
+        ?C      JMP     fs_file         ; below -8
+                MOVE    R7, @SD_SELECT
+                JMP     sd_fail
+fs_file
+                SUB     R8, R0, R1      ; the error
+                MOVE    R1, S_FSERR
+                CALL    _io_puts
+                MOVE    R1, R8
+                CALL    _io_putdec
+                SUB     R1, R8, FS_ERR0
+                CMP     R1, FS_ERRS
+        ?!C     JMP     fs_file_end     ; an error without a meaning here
+                ADD     R1, R1, FS_ERRORS
+                MOVE    R7, @R1
+                MOVE    R1, S_UCOMMA
+                CALL    _io_puts
+                MOVE    R1, R7
+                CALL    _io_puts
+fs_file_end
+                CALL    _io_crlf
+                JMP     main
+
+; The sector routines for fat32.c, by the names that it imports: R2 of
+; fat_sd_read is a byte address of the C code's memory, at a multiple of
+; 4, so a word of it
+_fat_sd_init
+                JMP     sd_init
+_fat_sd_read
+                SHR     R2, R2, 2
+                ADD     R2, R2, ___wasm_memory
+                JMP     sd_read
 
 ; load_row: row R7 blank in the current color, and the cursor at its column
 ; 0. Uses R1-R3.
@@ -2383,6 +2555,12 @@ S_SLOT          .ASCII_L 'Slot '
 S_SECTOR
                 .ASCII_L ', sector '
 S_SDERR         .ASCII_L 'SD error '
+S_FSERR         .ASCII_L 'File error '
+S_OAD           .ASCII_L 'oad'
+S_BADDIR
+                .ASCII_L 'dir [SLOT]: the slot in hex, such as dir 1'
+S_BADLOAD
+                .ASCII_L 'load NAME: the 8.3 name of a file, such as load HELLO.BIN'
 S_INSLOT
                 .ASCII_L ' in slot '
 ; The meanings of the errors 1 to SD_ERRS of SD_ERROR
@@ -2397,14 +2575,36 @@ E_SD5           .ASCII_L 'the card reported an error'
 E_SD6           .ASCII_L 'the card is write-protected'
 E_SD7           .ASCII_L 'the sector is after the last, '
 E_SD8           .ASCII_L 'Init failed'
+; The meanings of fat32.c's errors FS_ERR0 to FS_ERR0 + FS_ERRS - 1
+FS_ERRORS
+                .DAT    E_FS16, E_FS17, E_FS18, E_FS19, E_FS20, E_FS21, E_FS22
+                .DAT    E_FS23, E_FS24, E_FS25, E_FS26, E_FS27, E_FS28
+FS_ERR0         .EQU    16
+FS_ERRS         .EQU    13
+E_FS16          .ASCII_L 'no FAT32 file system'
+E_FS17          .ASCII_L 'FAT12, which is not supported'
+E_FS18          .ASCII_L 'FAT16, which is not supported'
+E_FS19          .ASCII_L 'exFAT, which is not supported'
+E_FS20          .ASCII_L 'not an 8.3 name'
+E_FS21          .ASCII_L 'no such file'
+E_FS22          .ASCII_L 'a directory'
+E_FS23          .ASCII_L 'too many open files'
+E_FS24          .ASCII_L 'not an open file'
+E_FS25          .ASCII_L 'no such mode'
+E_FS26          .ASCII_L 'the FAT is damaged'
+E_FS27          .ASCII_L 'no such slot'
+E_FS28          .ASCII_L 'the card has changed'
 
-HELP            .DAT    H_R, H_L, H_X, H_D, H_U, H_S, H_I, H_ID, H_M, H_C, H_V, H_H, H_Q, H_P, 0
+HELP            .DAT    H_R, H_L, H_LOAD, H_X, H_D, H_U, H_S, H_DIR, H_I, H_ID, H_M, H_C, H_V, H_H
+                .DAT    H_Q, H_P, 0
 H_R             .ASCII_L 'r [ADDR]      run the program at ADDR, or at 00008000; r 0 restarts'
 H_L             .ASCII_L 'l             load lines of ADDR WORD in hex, as a .bin file has them'
+H_LOAD          .ASCII_L 'load NAME     load the .bin file NAME of the SD card, as l loads lines'
 H_X             .ASCII_L 'x             run the demo of the ROM, which F12 leaves'
 H_D             .ASCII_L 'd [ADDR] [N]  show N words from ADDR, in hex, or the next ones'
 H_U             .ASCII_L 'u [ADDR] [N]  disassemble N instructions from ADDR, or the next ones'
 H_S             .ASCII_L 'sd [SLOT] LBA show sector LBA of the SD card in SLOT, or in the last slot'
+H_DIR           .ASCII_L 'dir [SLOT]    list the files of the SD card in SLOT, or of the card mounted'
 H_I             .ASCII_L 'i [A.B.C.D]   show the IP address, or set it, such as 192.168.1.65'
 H_ID            .ASCII_L 'i dhcp        get the IP address from a DHCP server'
 H_M             .ASCII_L 'm [MAC]       show the MAC address, or set it, such as 02:4E:49:43:45:01'

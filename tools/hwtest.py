@@ -78,6 +78,9 @@ Checks, in this order:
       written to a card. A slot without a card, a card without 55 AA in
       sector 0, and a card with another file system, exFAT or NTFS, or a
       GPT, are named after NOT COVERED.
+    - for each card with a FAT32 file system, as the monitor finds it: the
+      monitor of the tests, with dir SLOT, lists the root directory as the
+      host lists it from the sectors read over the link (issue #58)
     - the C example examples/build/primes.bin runs, and after its halt the
       microsecond counter holds the cycle counter's count over the clock
       in MHz
@@ -1197,9 +1200,79 @@ def test_sd_fat(link: Link, name: str, first: bytes) -> None:
           repr(boot[3:11]))
 
 
-def test_sd(link: Link, board: str) -> None:
+def fat32_base(link: Link, name: str, first: bytes) -> int | None:
+    """The sector of the FAT32 boot sector that the monitor's fat32.c
+    mounts on a card whose sector 0 is first: sector 0 itself, or the
+    first partition of type 0x0B or 0x0C of an MBR. None for no FAT32."""
+    if first[510:] != b"\x55\xaa":
+        return None
+    if fs_kind(first) == "FAT":
+        return 0 if first[82:87] == b"FAT32" else None
+    for i in range(4):
+        entry = first[446 + 16 * i:462 + 16 * i]
+        if entry[4] in (0x0B, 0x0C):
+            base = int.from_bytes(entry[8:12], "little")
+            boot = sd_read(link, name, base)
+            if boot is not None and fs_kind(boot) == "FAT" \
+                    and boot[82:87] == b"FAT32":
+                return base
+            return None
+    return None
+
+
+def fat32_dir(link: Link, name: str, base: int) -> list[str] | None:
+    """The rows of the monitor's dir for the FAT32 volume at the sector
+    base, from its root directory read over the link, or None when a
+    sector cannot be read. It is the host's own reading of FAT32, to which
+    the monitor's must come out the same."""
+    boot = sd_read(link, name, base)
+    if boot is None:
+        return None
+    spc = boot[13]
+    fat = base + int.from_bytes(boot[14:16], "little")
+    data = fat + boot[16] * int.from_bytes(boot[36:40], "little")
+    clus = int.from_bytes(boot[44:48], "little")
+    rows: list[str] = []
+    files = dirs = 0
+    seen = 0
+    while clus < 0x0FFFFFF8 and seen < 4096:
+        seen += 1
+        for k in range(spc):
+            sector = sd_read(link, name, data + (clus - 2) * spc + k)
+            if sector is None:
+                return None
+            for e in range(0, 512, 32):
+                entry = sector[e:e + 32]
+                if entry[0] == 0:
+                    rows.append(f"Files: {files}, directories: {dirs}")
+                    return rows
+                if entry[0] == 0xE5 or entry[11] == 0x0F or entry[11] & 0x08 \
+                        or entry[0] == 0x2E:
+                    continue
+                raw = bytes([0xE5]) + entry[1:11] if entry[0] == 5 else entry[:11]
+                text = raw[:8].decode("latin-1") + " " + raw[8:].decode("latin-1")
+                if entry[11] & 0x10:
+                    rows.append(text + "  <DIR>")
+                    dirs += 1
+                else:
+                    size = int.from_bytes(entry[28:32], "little")
+                    rows.append(f"{text}{size:12d}")
+                    files += 1
+        fat_sector = sd_read(link, name, fat + clus // 128)
+        if fat_sector is None:
+            return None
+        at = 4 * (clus % 128)
+        clus = int.from_bytes(fat_sector[at:at + 4], "little") & 0x0FFFFFFF
+    rows.append(f"Files: {files}, directories: {dirs}")
+    return rows
+
+
+def test_sd(link: Link, board: str) -> dict[int, list[str]]:
     """The SD card controller at FFFFFFA0-AF, with the core held, as the
-    header says. It only reads the cards."""
+    header says. It only reads the cards. The rows of the monitor's dir for
+    each slot whose card has a FAT32 file system, as test_fat_dir checks
+    them."""
+    fat: dict[int, list[str]] = {}
     slots = SD_SLOT_COUNT[board]
     n = rd(link, SD_SLOTS)
     check("SD_SLOTS", n == slots, f"got {n}, want {slots}")
@@ -1254,6 +1327,14 @@ def test_sd(link: Link, board: str) -> None:
             check(f"{name}: sector 0 reads the same again",
                   sd_read(link, name, 0) == first)
             test_sd_fat(link, name, first)
+            base = fat32_base(link, name, first)
+            if base is None:
+                uncovered.append(f"{name}'s files, as the card has no FAT32 "
+                                 "file system for the monitor's dir")
+            else:
+                rows = fat32_dir(link, name, base)
+                if rows is not None:
+                    fat[slot] = rows
         sd_read(link, name, last)
         link.write(SD_LBA, [last + 1])
         got = sd_run(link, 1, 1.0)
@@ -1266,6 +1347,7 @@ def test_sd(link: Link, board: str) -> None:
             check(f"{name}: write-protected, Write fails with error 6",
                   got is not None and got[1] == 6, sd_said(got))
     link.write(SD_SELECT, [0])
+    return fat
 
 
 def test_fetch_statistics(link: Link) -> None:
@@ -1286,6 +1368,41 @@ def counter(link: Link, lo: int) -> int:
     low = rd(link, lo)
     high = rd(link, lo + 1)
     return high << 32 | low
+
+
+def test_fat_dir(link: Link, fat: dict[int, list[str]]) -> None:
+    """The monitor of the tests, loaded and started, lists the root
+    directory of each card in fat with dir SLOT as the host listed it,
+    then halts with h."""
+    if not fat:
+        return
+    subprocess.run(["make", "-s", "-C", f"{REPO}/monitor",
+                    "build/monitor_test.bin"], check=True)
+    load(link, f"{REPO}/monitor/build/monitor_test.bin")
+    console(link)                      # the banner
+    for slot, want in fat.items():
+        cmd = f"dir {slot}\r".encode()
+        link.send_console(cmd)
+        text = b""
+        end = time.monotonic() + 30.0
+        while time.monotonic() < end:
+            link.poll(0.1)
+            text += link.take_console()
+            if b"> " in text.partition(cmd)[2]:
+                break                  # the prompt after the listing
+        # The rows after the echo of the command, whose CR the monitor
+        # ends with an LF, up to the prompt
+        said = text.partition(cmd)[2].decode("latin-1").removeprefix("\n")
+        rows = said.split("\r\n")[:-1]
+        bad = [i for i, (a, b) in enumerate(zip(rows, want)) if a != b]
+        check(f"SD slot {slot}: the monitor's dir lists the {len(want) - 1} "
+              "entries of the root as the host reads them",
+              rows == want,
+              f"{len(rows)} rows, want {len(want)}"
+              + (f"; first difference {rows[bad[0]]!r}, want "
+                 f"{want[bad[0]]!r}" if bad else ""))
+    link.send_console(b"h\r")
+    console(link, 1.0)
 
 
 def test_primes(link: Link, primes: str, board: str) -> None:
@@ -1841,9 +1958,10 @@ def main() -> None:
                 test_screen_registers(link)
                 test_fonts(link)
                 test_board_devices(link, board)
-                test_sd(link, board)
+                fat = test_sd(link, board)
                 test_fetch_statistics(link)
                 test_primes(link, primes, board)
+                test_fat_dir(link, fat)
             finally:
                 link.close()
             serial = ["--port", args.port, "--baud", str(args.baud)]

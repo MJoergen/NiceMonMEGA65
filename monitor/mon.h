@@ -40,4 +40,33 @@ int scr_gety(void);
 // old one.
 unsigned scr_color(unsigned color);
 
+// The files of the SD card's FAT32 file system, from table 1.1
+// (monitor/README.md, "Files"). The addresses are NICE word addresses, not
+// C pointers: a name is one character per word up to a 0 word, and
+// fs_read writes one byte per word, so a C program passes the address of
+// words outside its memory, which it reads with nice_peek. An error is
+// negative: -1 to -8 those of the SD controller, and -16 on those of
+// fat32.c.
+
+// The card in a slot mounted, and the files that were open closed. 0, or
+// an error.
+int fs_mount(unsigned slot);
+
+// A file of the root directory opened, with mode 0 to read, or with mode
+// 2 the root directory itself, whose name is empty or /. Two may be open
+// at once. A handle, 0 or 1, or an error.
+int fs_open(unsigned name, int mode);
+
+// Up to n bytes of a file read, one per word from buf. The number read, 0
+// at the end, or an error.
+int fs_read(int handle, unsigned buf, unsigned n);
+
+// The next entry of a directory: in the 4 words from buf, the 11 bytes of
+// the 8.3 name, padded with blanks, and the attributes, 4 bytes to a word
+// from bits 7..0, and the size. 1, 0 at the end, or an error.
+int fs_readdir(int handle, unsigned buf);
+
+// A file or directory closed. 0, or an error.
+int fs_close(int handle);
+
 #endif

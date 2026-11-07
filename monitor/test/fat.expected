@@ -1,0 +1,127 @@
+NiceMon V9.9
+? lists the commands
+> dir
+HELLO    BIN       13158
+SUB           <DIR>
+ALONGN~1 TXT          26
+README   TXT          30
+FILE01   TXT          15
+FILE02   TXT          15
+FILE03   TXT          15
+FILE04   TXT          15
+FILE05   TXT          15
+FILE06   TXT          15
+FILE07   TXT          15
+FILE08   TXT          15
+FILE09   TXT          15
+FILE10   TXT          15
+FILE11   TXT          15
+FILE12   TXT          15
+FILE13   TXT          15
+FILE14   TXT          15
+FILE15   TXT          15
+FILE16   TXT          15
+FILE17   TXT          15
+FILE18   TXT          15
+FILE19   TXT          15
+FILE20   TXT          15
+FRAG     BIN        1944
+KEEP     TXT         512
+Files: 25, directories: 1
+> DIR 1
+HELLO    BIN       13158
+Files: 1, directories: 0
+> dir 0
+HELLO    BIN       13158
+SUB           <DIR>
+ALONGN~1 TXT          26
+README   TXT          30
+FILE01   TXT          15
+FILE02   TXT          15
+FILE03   TXT          15
+FILE04   TXT          15
+FILE05   TXT          15
+FILE06   TXT          15
+FILE07   TXT          15
+FILE08   TXT          15
+FILE09   TXT          15
+FILE10   TXT          15
+FILE11   TXT          15
+FILE12   TXT          15
+FILE13   TXT          15
+FILE14   TXT          15
+FILE15   TXT          15
+FILE16   TXT          15
+FILE17   TXT          15
+FILE18   TXT          15
+FILE19   TXT          15
+FILE20   TXT          15
+FRAG     BIN        1944
+KEEP     TXT         512
+Files: 25, directories: 1
+> load frag.bin
+Words loaded: 108, 00009000 to 0000906B
+> d 9000 4
+00009000 00000000 00000001 00000002 00000003
+> d 9068 4
+00009068 00000068 00000069 0000006A 0000006B
+> load readme.txt
+Words loaded: 0
+Lines skipped: 2, first line 1; ADDR WORD in hex, ADDR 00008000 to FFFEFFFF
+> load nofile.bin
+File error 21, no such file
+> load sub
+File error 22, a directory
+> load toolongname.bin
+File error 20, not an 8.3 name
+> load
+load NAME: the 8.3 name of a file, such as load HELLO.BIN
+> load a b
+load NAME: the 8.3 name of a file, such as load HELLO.BIN
+> loadx
+Unknown command; ? lists them
+> dirx
+Unknown command; ? lists them
+> dir 2
+File error 27, no such slot
+> dir 1 2
+dir [SLOT]: the slot in hex, such as dir 1
+> dir 123456789
+dir [SLOT]: the slot in hex, such as dir 1
+> LOAD HELLO.BIN
+Words loaded: 731, 00008000 to 000082DA
+> r
+Hello from 00008000, table 00010001
+at column 40
+on the line only
+Returned 0000002A
+> h
+Halted
+fffff11a: 000002db 00008000 000082da 00000000 00000000
+Screen:
+|> load toolongname.bin
+|File error 20, not an 8.3 name
+|> load
+|load NAME: the 8.3 name of a file, such as load HELLO.BIN
+|> load a b
+|load NAME: the 8.3 name of a file, such as load HELLO.BIN
+|> loadx
+|Unknown command; ? lists them
+|> dirx
+|Unknown command; ? lists them
+|> dir 2
+|File error 27, no such slot
+|> dir 1 2
+|dir [SLOT]: the slot in hex, such as dir 1
+|> dir 123456789
+|dir [SLOT]: the slot in hex, such as dir 1
+|> LOAD HELLO.BIN
+|Words loaded: 731, 00008000 to 000082DA
+|> r
+|Hello from 00008000, table 00010001
+|                                        at column 40
+|Returned 0000002A
+|> h
+|Halted
+VBASE at the halt 000000
+exit 0
