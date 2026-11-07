@@ -21,24 +21,36 @@ The release candidates pinned these:
 
 nice_cpu's `RC01` and `RC03` have no tag here.
 
-## V1.8
+## V1.9
+
+There is no `V1.8` here: with nice_cpu's `V1.8`, the R6 missed timing at
+100 MHz (nice_cpu#141). This release pins nice_cpu's `V1.9`, which
+meets it again, and has V1.8's changes too.
 
 **Upgrade notes.**
 
-- nice_cpu is at `V1.8`. Its SYSTEM.md §3 has five event counters, and
-  its MICROARCH.md §8.1 new fetch statistics. The ports of the cores but
-  the fetch statistics', and the debug link, are as in V1.7.
+- nice_cpu is at `V1.9`. Its SYSTEM.md §3 has five event counters, its
+  MICROARCH.md §8.1 new fetch statistics, and its SYSTEM.md §2 new
+  words of the math unit. The ports of the cores but the fetch
+  statistics', and the debug link, are as in V1.7.
 - The performance counters take `0xFFFFFF40`–`5F`, from `40`–`4F`, and
   the fetch statistics `0xFFFFFF60`–`7F`, from `50`–`7F`, with new words
   (#85). `FS_CTRL` moved from `0xFFFFFF50` to `0xFFFFFF60`, and
   `FS_HIST` is gone: the fetch statistics now give a cause for each cycle,
   and the flushes by cause. A program that read them reads the new map.
 
+- A program that joins nice_cpu's `lib.nasm` joins `muldiv_mpu.nasm` or
+  `muldiv_soft.nasm` after it, and one that calls `scanf` joins
+  `float.nasm` too. The monitor's tests and the C examples do (#89).
+
 **New.**
 
 - The event counters at `0xFFFFFF4A`–`53` count a program's data reads,
   stores, skipped instructions, jumps, and interrupts, as niceemu counts
   them, on both cores. The link's reads and writes do not count.
+- The math unit counts the leading and trailing 0 bits and the 1 bits of
+  A at `0xFFFFFF2A`–`2C`, and takes the square root of C, with its
+  remainder, at `0xFFFFFF3C`–`3E`, as niceemu does.
 
 **Tests.**
 

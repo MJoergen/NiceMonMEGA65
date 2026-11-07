@@ -74,7 +74,7 @@ $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.bin: $(BUILD)/monitor_%.bin: $(BUILD
 # nicebuild, which needs clang.
 $(BUILD)/hello.bin: test/hello.nasm monlib.nasm mon.nasm $(TOOLS) | $(BUILD)
 	@cat $(RUNTIME)/start_mon.nasm test/hello.nasm monlib.nasm mon.nasm $(RUNTIME)/lib.nasm \
-	  > $(BUILD)/hello_all.nasm
+	  $(RUNTIME)/muldiv_mpu.nasm > $(BUILD)/hello_all.nasm
 	@$(ASM) -o $@ $(BUILD)/hello_all.nasm
 
 # The test of the sector routines, test/sd.nasm, which calls them by their
