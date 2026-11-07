@@ -72,7 +72,8 @@ $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.bin: $(BUILD)/monitor_%.bin: $(BUILD
 # The programs of the tests, at 0x8000: hello.nasm with the runtime's
 # start-up code for a program under a monitor, and hello.c through
 # nicebuild, which needs clang.
-$(BUILD)/hello.bin: test/hello.nasm monlib.nasm mon.nasm $(TOOLS) | $(BUILD)
+$(BUILD)/hello.bin: test/hello.nasm monlib.nasm mon.nasm $(RUNTIME)/start_mon.nasm \
+                    $(RUNTIME)/lib.nasm $(RUNTIME)/muldiv_mpu.nasm $(TOOLS) | $(BUILD)
 	@cat $(RUNTIME)/start_mon.nasm test/hello.nasm monlib.nasm mon.nasm $(RUNTIME)/lib.nasm \
 	  $(RUNTIME)/muldiv_mpu.nasm > $(BUILD)/hello_all.nasm
 	@$(ASM) -o $@ $(BUILD)/hello_all.nasm
