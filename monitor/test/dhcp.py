@@ -12,8 +12,9 @@ transaction from its first frame, and builds the frames of the next runs
 with it, each line waiting for the frames sent before it (nice_cpu's
 SYSTEM.md §7):
 - ok: after the DISCOVER, an ARP request of another station, an OFFER of
-  another transaction, and the OFFER of 192.168.1.1, with its options
-  out of word order, a pad, and two gateways; after the REQUEST, the
+  another transaction, an OFFER of ours without an address, which is
+  passed over, and the OFFER of 192.168.1.1, with its options out of
+  word order, a pad, and two gateways; after the REQUEST, the
   OFFER of a second server, which must change nothing, and the ACK.
 - nak: an OFFER, a NAK of the REQUEST, which starts again from a
   DISCOVER, a second OFFER of another address, and its ACK.
@@ -143,9 +144,11 @@ def main() -> None:
             + bytes([6, 4]) + ip("192.168.1.3")
         ok_in = "\n".join([
             "# after the DISCOVER: an ARP request, an OFFER of another",
-            "# transaction, and the OFFER, to the station's MAC address",
+            "# transaction, an OFFER of ours without an address, and the",
+            "# OFFER, to the station's MAC address",
             "1:" + arp_request("10.0.0.1", "10.0.0.77"),
             "1:" + reply(xid ^ 1, 2, "10.0.0.66", "10.0.0.2"),
+            "1:" + reply(xid, 2, "0.0.0.0", "10.0.0.3"),
             "1:" + reply(xid, 2, "192.168.1.50", "192.168.1.1", MAC, offer),
             "# after the REQUEST: a second server's OFFER, and the ACK",
             "2:" + reply(xid, 2, "192.168.1.60", "192.168.1.2"),

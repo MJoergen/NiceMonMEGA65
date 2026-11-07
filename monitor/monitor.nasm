@@ -822,14 +822,14 @@ ip_word_end
 ; for Ethernet frames, which it enables, and disables at the end. It
 ; broadcasts a DISCOVER, waits DHCP_WAIT microseconds for an OFFER, then
 ; broadcasts a REQUEST of the address offered, from the server that
-; offered it, and waits as long for its ACK. A timeout or a NAK starts
-; again from the DISCOVER, up to DHCP_TRIES times, with the same
-; transaction, whose number is the microseconds at the start, XOR the low
-; word of the MAC address. The ACK's address is written to E_IP, which
-; breaks a host's connection over TCP, as a write of i does, and shown,
-; with the mask, the gateway, and the server. Without an ACK, i says so
-; and leaves E_IP alone. The lease is not renewed. R7 counts the tries
-; left.
+; offered it, and waits as long for its ACK; a reply without an address
+; is passed over. A timeout or a NAK starts again from the DISCOVER, up
+; to DHCP_TRIES times, with the same transaction, whose number is the
+; microseconds at the start, XOR the low word of the MAC address. The
+; ACK's address is written to E_IP, which breaks a host's connection over
+; TCP, as a write of i does, and shown, with the mask, the gateway, and
+; the server. Without an ACK, i says so and leaves E_IP alone. The lease
+; is not renewed. R7 counts the tries left.
 ip_dhcp
                 CALL    eth_on
                 MOVE    R1, @io.us
@@ -1764,9 +1764,10 @@ dhcp_go
 ; transaction V_XID, within DHCP_WAIT microseconds. R1 = its type, or
 ; DHCP_NAK when an ACK is waited for and a NAK comes, or 0 when none came.
 ; The address, the server, the mask, and the gateway of the reply that
-; is waited for are copied to V_DIP, V_DSRV, V_DMASK, and V_DGW. The other
-; frames are released unread. Uses R1-R6, and R7 and R8 across the calls,
-; saved.
+; is waited for are copied to V_DIP, V_DSRV, V_DMASK, and V_DGW. A reply
+; of the type without an address is passed over, so that the station's
+; address is never made 0. The other frames are released unread. Uses
+; R1-R6, and R7 and R8 across the calls, saved.
 dhcp_wait
                 PUSH    R7
                 PUSH    R8
@@ -1791,6 +1792,8 @@ dhcp_time
                 MOVE    R1, 0
                 JMP     dhcp_wait_end
 dhcp_got
+                TST     @V_PIP
+        ?Z      JMP     dhcp_time       ; no address: passed over
                 MOVE    @V_DIP, @V_PIP
                 MOVE    @V_DSRV, @V_PSRV
                 MOVE    @V_DMASK, @V_PMASK

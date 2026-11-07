@@ -152,14 +152,15 @@ of SYSTEM.md §7.
 - `i dhcp` enables the port, broadcasts a DISCOVER, and waits 2 seconds
   for an OFFER, then broadcasts a REQUEST of the address offered and
   waits as long for the ACK (RFC 2131). A timeout or a NAK starts again
-  from the DISCOVER, up to 4 times. The ACK's address is written to
-  `NET_IP`, which breaks a host's connection over TCP, as `i A.B.C.D`
-  does, and the port is disabled again. The frames come from 0.0.0.0, to
-  everyone, with the broadcast flag set, and ask for the mask, the
-  gateway, and the DNS servers. The transaction's number is the
-  microsecond counter at the start, XOR the low word of the MAC address.
-  The lease is not renewed: a board that runs longer than its lease may
-  have its address given to another station.
+  from the DISCOVER, up to 4 times; an OFFER or an ACK without an
+  address is passed over. The ACK's address is written to `NET_IP`,
+  which breaks a host's connection over TCP, as `i A.B.C.D` does, and
+  the port is disabled again. The frames come from 0.0.0.0, to everyone,
+  with the broadcast flag set, and ask for the mask, the gateway, and
+  the DNS servers. The transaction's number is the microsecond counter
+  at the start, XOR the low word of the MAC address. The lease is not
+  renewed: a board that runs longer than its lease may have its address
+  given to another station.
 - The UDP entries for programs, and TFTP for `load`, follow in
   [#84](https://github.com/MJoergen/NiceMonMEGA65/issues/84).
 
@@ -574,10 +575,10 @@ that each pseudo-instruction occurs, and that `u` without `ADDR` goes on
 after the last row. `test/dhcp.py` runs `i dhcp` with `--step-time`, so
 that each run takes the same steps: first with no server, which gives it
 the transaction's number, and then with the OFFER and the ACK that it
-builds from it, among frames that are not for the monitor, and with a
-NAK, which starts again. It compares the output and the frames sent,
-with the transaction as `xx`, with `test/dhcp.expected`, and checks the
-IPv4 checksums.
+builds from it, among frames that are not for the monitor and an OFFER
+without an address, and with a NAK, which starts again. It compares the
+output and the frames sent, with the transaction as `xx`, with
+`test/dhcp.expected`, and checks the IPv4 checksums.
 
 On a board, `make r6` builds a bitstream that boots the monitor, with the
 demo behind it in the ROM. `make hwtest` loads the same, with the

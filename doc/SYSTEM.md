@@ -517,9 +517,12 @@ A frame that a program sends goes out with the station's own frames,
 one at a time; the replies and the TCP segments of the link come first
 when they are ready at the same time. The station pads a frame shorter
 than 60 bytes, adds the check sequence, and counts it in `NET_TX`. Busy,
-bit 2 of `ETH_CSR`, reads 1 while the frame goes out, about 12 µs for
-the shortest, where the emulator sends a frame in the write of
-`ETH_TX_LEN`.
+bit 2 of `ETH_CSR`, reads 1 while the frame is copied into the station's
+FIFO of frames to send, about 6 cycles a word: 0.3 µs for a frame of 20
+bytes and 23 µs for one of 1514 at 100 MHz, and longer while the station
+sends a frame of its own first. The frame may still be on its way to the
+wire when busy is 0, but the send buffer is free, as the FIFO has the
+whole frame. The emulator sends a frame in the write of `ETH_TX_LEN`.
 
 A start of the core resets the port: it is disabled, its queue is
 empty, and `ETH_DROPPED` and `ETH_CHUNK` are 0. A frame that is being

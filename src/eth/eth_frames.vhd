@@ -34,9 +34,9 @@
 -- sees the frames that niceemu's program does. A frame passes to the port
 -- if it is to mac_i or to everyone, the station does not serve it, and it
 -- has 14 to 1514 bytes.
--- A frame that passes is then put into the port: rx_start_o for a cycle,
+-- A frame that passes is then put into the port: q_start_o for a cycle,
 -- then its words from buf, one a cycle, a cycle after each is read, and
--- rx_done_o with its length. eth_regs.vhd decides whether it takes the
+-- q_done_o with its length. eth_regs.vhd decides whether it takes the
 -- frame, and counts it as dropped if it is enabled and full, so the
 -- frames that the station serves never count. The stream is held while
 -- the frame is decided and put, at most 382 cycles, which the FIFO of
@@ -329,7 +329,7 @@ begin
 
             when PUT_ST =>
                -- A word is read, and written to the port in the cycle
-               -- after; rx_done_o follows the last.
+               -- after; q_done_o follows the last.
                if rd_addr < n_words then
                   rd_data  <= buf(to_integer(rd_addr));
                   q_we_o   <= '1';
