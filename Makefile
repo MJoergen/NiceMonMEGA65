@@ -82,7 +82,7 @@ help:
 	@echo "                  MEGA65's flash over JTAG, with no key held at power on,"
 	@echo "                  and start it"
 	@echo "  make linktest   compare run.py on niceemu --link with niceemu, and check"
-	@echo "                  mon.py's commands, without a board"
+	@echo "                  mon.py's check of the memory, without a board"
 	@echo "  make cosim [COSIM_PORT=4000] [ROM=prog.bin]"
 	@echo "                  run the system in GHDL with its debug UART on a TCP port,"
 	@echo "                  for the tools' --cosim PORT, until it is stopped"

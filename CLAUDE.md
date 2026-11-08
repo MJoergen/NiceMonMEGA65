@@ -55,7 +55,7 @@ header is the authoritative address map.
     make hwtest [ETH=IP]  # check the FPGA, program it with openFPGALoader, and test the board (ETH: its Ethernet too)
     make flash [BIT=f.bit] # write the Nexys4DDR's flash (default its top.bit), verify, wait for the start; ARGS=--erase
     make flash COR=f.cor SLOT=1 # write a slot (1-7) of the MEGA65's flash over JTAG, no MEGAFLASH; checks slot 0's revision
-    make linktest         # run.py --tcp on niceemu --link against plain niceemu, and mon.py's commands, no board
+    make linktest         # run.py --tcp on niceemu --link against plain niceemu, and mon.py's memory check, no board
     make cosim            # the RTL in GHDL, its debug UART on TCP, for the tools' --cosim PORT
     make cosimtest        # run.py --cosim on make cosim against plain niceemu, no board (minutes)
 
@@ -124,8 +124,12 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   an SD card, `sd_card_model.vhd`; `sim/cosim/` is
   the system with its UART on TCP (`tb_cosim.vhd`, `cosim.c`). `formal/`: the
   SymbiYosys wrappers; the checks themselves are `G_FORMAL` blocks in the
-  sources. `tools/`: `nicelink.py` (the link, on the UART, or over TCP to
-  `niceemu --link` or `make cosim`), `load.py`, `run.py`, `mon.py`, `hwtest.py`, `flash.py` (with
+  sources. `tools/`: `boardlink.py` (the link: nice_cpu's
+  `debugger/nicelink.py`, on the UART or over TCP to `niceemu --link`,
+  with the board's Ethernet port and `make cosim`; the tools import it
+  first, as it puts nice_cpu's `debugger/` on the path), `load.py`
+  (around nice_cpu's `nicebin.py`, with the board's memory), `run.py`,
+  `mon.py` (nice_cpu's `nicedbg.py` with the board's hooks), `hwtest.py`, `flash.py` (with
   `jtag.py`, the JTAG cable of the board's UART, which hwtest shares, and
   `spiflash.py`, the MEGA65's flash through openFPGALoader's bridge with
   pyftdi, which clears the sectors' DYB protection),
@@ -191,7 +195,7 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
 - The tools take `--cosim PORT` for `make cosim`, the RTL in GHDL at
   about 250 UART bytes a second. That connection is a UART line: no `b`
   notice, and a half-close is a break. hwtest.py's `QUIET` and
-  `RUN_TIMEOUT` and nicelink's `COSIM_WAIT` are the waits it needs.
+  `RUN_TIMEOUT` and boardlink's `COSIM_WAIT` are the waits it needs.
 - American spelling everywhere, in comments, documentation, and identifiers
   (color, analyze, synchronize, behavior). The third-party files that are
   copied unchanged keep theirs, and so do the names they define, such as

@@ -264,8 +264,8 @@ The link writes it to `0xFFFFFFB0`, the first byte in bits 31..24, here
 192.168.1.65:
 
     tools/mon.py --port /dev/ttyUSB1
-    mon> w FFFFFFB0 C0A80141
-    mon> q
+    dbg> w FFFFFFB0 C0A80141
+    dbg> q
 
 ## Using the interactive shell
 
@@ -299,8 +299,11 @@ disables it, `regs` and `r ADDR N` show the registers and the memory,
 core, `d ADDR N` disassembles, and `send TEXT` and `console` (`c`) talk to the
 program. The program's output and the link's notices, such as
 `[paused, PC=...]`, are shown as they arrive. `quit` (`q`) leaves the
-core as it is. [tools/README.md](tools/README.md#monpy) describes every
-command.
+core as it is. The shell is nice_cpu's debugger, with the prompt
+`dbg>`, and its
+[debugger/README.md](https://github.com/MJoergen/nice_cpu/blob/main/debugger/README.md#the-commands)
+describes every command; [tools/README.md](tools/README.md#monpy) has
+what the board adds.
 
 ### A worked example
 
@@ -328,11 +331,11 @@ $ <b>tools/mon.py --eth 192.168.1.65</b>
 halted: HALT, ROM hidden, control 0000000a, link version 0.5, input free 2048
 PC=0000000f
 'help' lists the commands, and 'q' quits.
-mon&gt; <b>load echo.bin</b>
-loaded 15 words; the core is held in reset
-mon&gt; <b>status</b>
+dbg&gt; <b>load echo.bin</b>
+loaded 15 words; the processor is held in reset
+dbg&gt; <b>status</b>
 held, ROM hidden, control 00000009, link version 0.5, input free 2048
-mon&gt; <b>r 0 f</b>
+dbg&gt; <b>r 0 f</b>
 00000000: 00007800 ffffff00 03a080b0 00000100 3003d800 00000000 01a040b0 000000ff
 00000008: 001c0080 ffffff00 022080b0 0000002e b003d800 00000000 0c000000
 </pre>
@@ -343,15 +346,15 @@ comes with the instruction there, the next one to run. R14 is
 always 1:
 
 <pre>
-mon&gt; <b>go</b>
-mon&gt; <b>pause</b>
+dbg&gt; <b>go</b>
+dbg&gt; <b>pause</b>
 [paused, PC=00000000  MOVE R1, @0xffffff00]
-mon&gt; <b>regs</b>
+dbg&gt; <b>regs</b>
 R0  00000000 R1  00000000 R2  00000000 R3  00000000
 R4  00000000 R5  00000000 R6  00000000 R7  00000000
 R8  00000000 R9  00000000 R10 00000000 R11 00000000
 R12 00000000 R13 00000000 R14 09000000 R15 00000000
-mon&gt; <b>s 3</b>
+dbg&gt; <b>s 3</b>
 PC=00000002  AND[M] R2, R1, 0x100
 PC=00000004  ?Z MOVE R15, 0x0
 PC=00000000  MOVE R1, @0xffffff00
@@ -362,22 +365,22 @@ arrived, and go on. Send it an `A`, and it stops. R1 holds the console's
 read: bit 8 set, and `0x41`, the `A`. R14 is `0x01000000`, as Z is clear:
 
 <pre>
-mon&gt; <b>b 6</b>
+dbg&gt; <b>b 6</b>
 0: 00000006
-mon&gt; <b>g</b>
-mon&gt; <b>send A</b>
+dbg&gt; <b>g</b>
+dbg&gt; <b>send A</b>
 [breakpoint 0, PC=00000006  AND R1, R1, 0xff]
-mon&gt; <b>regs</b>
+dbg&gt; <b>regs</b>
 R0  00000000 R1  00000141 R2  00000100 R3  00000000
 R4  00000000 R5  00000000 R6  00000000 R7  00000000
 R8  00000000 R9  00000000 R10 00000000 R11 00000000
 R12 00000000 R13 00000000 R14 01000000 R15 00000006
-mon&gt; <b>s</b>
+dbg&gt; <b>s</b>
 PC=00000008  MOVE @0xffffff00, R1
-mon&gt;
+dbg&gt;
 A
 PC=0000000a  SUB[M] R2, R1, 0x2e
-mon&gt;
+dbg&gt;
 PC=0000000c  ?!Z MOVE R15, 0x0
 </pre>
 
@@ -386,18 +389,18 @@ The step at 8 echoes the `A`. Then disable the breakpoint, go on, and
 type to the program in the console, until Ctrl-]. A `.` ends it:
 
 <pre>
-mon&gt; <b>bd all</b>
-mon&gt; <b>g</b>
-mon&gt; <b>c</b>
+dbg&gt; <b>bd all</b>
+dbg&gt; <b>g</b>
+dbg&gt; <b>c</b>
 console; Ctrl-] returns to the prompt
 Hello
-mon&gt; <b>send .</b>
+dbg&gt; <b>send .</b>
 .
 [halted: HALT, PC=0000000f]
-mon&gt; <b>status</b>
+dbg&gt; <b>status</b>
 halted: HALT, ROM hidden, control 0000000a, link version 0.5, input free 2048
 PC=0000000f
-mon&gt; <b>q</b>
+dbg&gt; <b>q</b>
 </pre>
 
 ## Writing programs

@@ -481,7 +481,7 @@ link gives it an address. The MAC address is a locally administered one;
 two boards on one network need different ones. On the link, for example:
 
     make mon PORT=/dev/ttyUSB3
-    mon> w FFFFFFB0 C0A80141
+    dbg> w FFFFFFB0 C0A80141
 
 Then `ping 192.168.1.65` from a PC on the network gets its answers, and
 `0xFFFFFFB5` counts the replies, the ARP reply and one for each ping.

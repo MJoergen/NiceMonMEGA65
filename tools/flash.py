@@ -72,7 +72,7 @@ import tempfile
 import time
 
 from jtag import bit_part, check_board, check_part, wait_port
-from nicelink import CONTROL, Link, LinkError, Serial
+from boardlink import CONTROL, Link, LinkError, Serial
 from spiflash import SpiFlashError, unprotect
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

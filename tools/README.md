@@ -9,10 +9,10 @@ prints its options with `--help`, and its header says more.
 
 | Tool | What it does |
 |---|---|
-| `nicelink.py` | The debug link, which the other tools use: over TCP to the board's Ethernet port, on the UART, over TCP to `niceemu --link`, or over TCP to `make cosim`. |
+| `boardlink.py` | The debug link, which the other tools use: nice_cpu's `debugger/nicelink.py`, over TCP to `niceemu --link` and on the UART, with the board's own links over TCP to its Ethernet port and to `make cosim`. |
 | `load.py` | Loads a `.bin` file into cleared memory and starts it, or with `--no-run` leaves the core held in reset. With `--monitor`, it runs a program at `0x8000` under the monitor in the ROM. |
 | `run.py` | Runs a program on the board and prints what `niceemu` prints, for diffing, also one under the monitor with `--monitor`. |
-| `mon.py` | An interactive shell on the link: memory, registers, pause, step, breakpoints, and the console. |
+| `mon.py` | An interactive shell on the link: memory, registers, pause, step, breakpoints, and the console. It is nice_cpu's `debugger/nicedbg.py` with the board's links. |
 | `hwtest.py` | Programs the FPGA with openFPGALoader and tests the system on the board. |
 | `flash.py` | Writes a bitstream into the Nexys4DDR's flash, or a core file into a slot of the MEGA65's, from which the board starts. |
 | `linktest.py` | Checks `run.py` and the link on `niceemu --link` against plain `niceemu`, without a board. |
@@ -96,8 +96,8 @@ keyboard's goes on.
 The debug link on the serial port gives it one too, with no key typed:
 
     tools/mon.py --port /dev/ttyUSB1
-    mon> w FFFFFFB0 C0A80141
-    mon> q
+    dbg> w FFFFFFB0 C0A80141
+    dbg> q
 
 ## Running a program
 
@@ -185,8 +185,8 @@ counts primes. Load it with `mon.py`, start it, and pass the terminal to
 it with `console`, so that its first prompt is not lost:
 
     tools/mon.py --eth 192.168.1.65 examples/build/primes.bin
-    mon> go
-    mon> c
+    dbg> go
+    dbg> c
 
 The program asks for a limit, reads it with `scanf`, and counts the primes
 up to it. It asks again until you enter 0, and then halts. The program does
@@ -308,6 +308,11 @@ and writes the registers and the memory, and disassembles, with one
 short command each. It also passes text to and from the program. The
 README has [a worked example](../README.md#using-the-interactive-shell).
 
+It is nice_cpu's debugger, `nicedbg.py`, with the board's links and a
+check of the board's memory. nice_cpu's
+[debugger/README.md](../nice_cpu/debugger/README.md#the-commands)
+describes the commands, the notices, and the labels.
+
 ### Starting it
 
     tools/mon.py (--eth HOST[:PORT] | --port DEVICE [--baud 2000000]
@@ -325,9 +330,10 @@ README has [a worked example](../README.md#using-the-interactive-shell).
 - `--symbols FILE` reads the labels of a `.sym` file, which
   `niceasm.py --symbols` and `nicebuild.py --symbols` write, as the
   `symbols` command does.
-- `FILE.bin` is optional. It is loaded at the start, as the `load`
-  command does, and the core is left held in reset. Without it, `mon.py`
-  starts with `status`, and leaves the core as it is.
+- `FILE.bin` is optional. It is checked before the link opens, and
+  loaded at the start, as the `load` command does, and the core is left
+  held in reset. Without it, `mon.py` starts with `status`, and leaves
+  the core as it is.
 
 `make mon ETH=192.168.1.65` runs it over the Ethernet port, and
 `make mon PORT=/dev/ttyUSB1` on the serial port. One of the four
@@ -335,140 +341,18 @@ options above must be given. It takes `FILE=` and `ARGS=`, for
 example `make mon ARGS="--tcp 4000"`. On the serial port, no other
 program may have the port open while it runs.
 
-### At the prompt
+### On the board
 
-The prompt is `mon>`. Numbers are hex, with or without `0x`, and fit in
-32 bits. `help` lists the commands, and `help CMD` describes one.
+The prompt is `dbg>`, nicedbg's. `help` lists the commands, and `help
+CMD` describes one. Its messages say "the processor", which is the core
+here. Leaving changes nothing on the board: a running program goes on.
 
-With labels from `--symbols` or `symbols`, an address may also be a
-label, `label+N`, or `label-N`, with N in hex. A label comes before a
-hex number with the same spelling, such as `add`; write `0xadd` for the
-number. Addresses are then shown with their labels too, as `LOOP` or
-`LOOP+0x2`.
-
-The disassembler is nice_cpu's `assembler/nicedis.py`, which nice_cpu
-has from `V1.1` on.
-
-The program's output and the link's notices are shown as they arrive,
-above the prompt and what you have typed. The notices are:
-
-- `[paused, PC=...]` after a pause.
-- `[breakpoint N, PC=...]` when the core stops at a breakpoint.
-
-After these two, and after each step, the instruction at the PC comes
-after it, which is the next one to run.
-- `[halted: REASON, PC=...]` after a halt, where the reason is `HALT`,
-  `reserved control instruction`, `INT inside an interrupt routine`,
-  `RTI outside an interrupt routine`, or `step limit`.
-- `[boot]` after a reset of the board.
-- `[input overflow]` when an input byte is lost.
-- `[bad packet dropped]` when a packet has a bad checksum.
-
-An error, such as a bad number or a link that does not answer, prints a
-line that starts with `error:`, and the prompt comes back. Ctrl-C stops
-the command that runs, and Ctrl-D, `quit`, `q`, or `exit` leaves
-`mon.py`. Leaving changes nothing on the board: a running program goes
-on.
-
-### The commands
-
-The short names are `s` for `step`, `g` for `go`, `c` for `console`, and
-`q` for `quit`. `help` takes them too, as in `help s`.
-
-#### The state of the core
-
-- `status` shows whether the core is running, paused, at a breakpoint,
-  held in reset, halted, or held after a halt (`held, after a halt:
-  REASON`, until a clear), and why it halted. It also shows whether the ROM is
-  hidden, the control register, the link's version as major.minor, and
-  the free space in the program's input buffer. When the core is paused
-  or halted, it shows the PC.
-- `regs` shows R0 to R15: live while the core runs, from nice_cpu V1.2
-  on, and the stop's values while the core is paused or has halted. A
-  hold of a running core leaves them undefined.
-- `set Rn VALUE` writes a register of a paused core, from link version
-  6 (nice_cpu V1.3) on, and shows what it reads back. A write means
-  what an instruction's write means: R0 stays 0, bit 24 of R14 stays 1,
-  and R15 is where the core goes on at the next `go` or `step`. `SP`,
-  `SR`, and `PC` name R13, R14, and R15, and VALUE may be a label. A
-  core that is not paused refuses the write.
-- `pc` shows the PC of a paused core and the instruction there, and `pc
-  ADDR` sets the PC to ADDR first. A PC set onto a breakpoint runs its
-  instruction at the next `go` or `step`, as a go on from that
-  breakpoint does.
-
-#### Loading and running
-
-- `load FILE` holds the core, hides the ROM, clears the memory, disables
-  the breakpoints, and loads the `.bin` file. The core stays held in
-  reset.
-- `go` (`g`) starts a held core at 0, or goes on from a pause.
-- `run` starts the program at 0 again: from a hold, a halt, a pause, or
-  while it runs. It does not load the memory again.
-- `hold` holds the core in reset. A hold of a paused core keeps R0 to
-  R15, and a hold of a running core leaves them undefined.
-- `pause` pauses a running core, and shows where.
-- `step N` (`s N`) runs N steps of a paused core, 1 by default. It shows
-  the PC after each step, or, for more than 16 steps, after the last one
-  only. It stops at a breakpoint and at a halt. An empty line repeats
-  the last `step`, with its N; after other commands it does nothing.
-
-#### Breakpoints
-
-The MEGA65 and the Nexys4DDR have 4 breakpoints. The core stops before
-the instruction at a breakpoint's address. When it goes on, it runs that
-instruction and does not stop at it again.
-
-- `b ADDR` sets a breakpoint at ADDR, in the first free slot, and shows
-  its number.
-- `b` lists the breakpoints that are set.
-- `bd N` disables breakpoint N, and `bd all` disables all of them.
-
-#### Memory and the control register
-
-- `r ADDR N` reads N words from ADDR, 16 by default, 8 words to a line.
-  `r` alone goes on after the last read.
-- `w ADDR WORD...` writes the words from ADDR on. It does not write the
-  control register.
-- `ctl` reads the control register, and `ctl VALUE` writes it. The
-  values are in [SYSTEM.md](../doc/SYSTEM.md#the-control-register).
-
-While the core runs, the link reaches only its debug registers at
-`FFFFFFE0`–`FF`. Pause or hold the core to read the rest.
-
-#### Disassembly and labels
-
-- `d ADDR N` disassembles N instructions from ADDR, 16 by default. Each
-  line has the address, the instruction's words, and the instruction,
-  and the labels at an address come on lines of their own before it.
-  `d` alone goes on after the last `d`, or starts at the PC after a
-  pause, a step, or a breakpoint.
-- `symbols FILE` reads the labels of a `.sym` file, in place of those
-  read before, and shows how many there are. `symbols` alone shows the
-  count.
-
-The instructions are in the syntax that `niceasm` takes. Words that no
-instruction gives, such as a reserved control word, are a `.DAT`, with
-what they would do as a comment. With labels, a constant of `0x10` or
-more at a label is shown as the label.
-
-The disassembler reads the words one after another, and does not tell
-code from data. So it may show the words of a string as instructions,
-and get out of step after them. With labels, it starts again at each
-one: an instruction never spans a label, and when it would, its words
-before the label are a `.DAT`, marked `(cut off)`.
-
-#### The program's input
-
-- `send TEXT` sends the text to the program, with escapes such as `\n`,
-  `\r`, and `\x1b`.
-- `eof` ends the program's input, as the end of a file does. A read of
-  the console then returns `0x200`, until the program starts again.
-- `console` (`c`) passes the terminal through to the program: each key
-  goes to its input as you type it, and its output is shown as it
-  arrives, with nothing echoed but what the program echoes. Ctrl-]
-  returns to the prompt.
-
-The text is sent no faster than the program's input buffer takes it, so
-no byte is lost. Bytes sent while the core is held in reset or has
-halted are dropped, and bytes sent while it is paused wait for it.
+- `load FILE`, and a `FILE.bin` at the start, refuse a word that the
+  board has no memory at, as `load.py` does: one beyond the MEGA65's
+  RAM and the screen, or beyond the RAM that `0xFFFFFF9E` reads.
+- The MEGA65 and the Nexys4DDR have 4 breakpoints.
+- While the core runs, the link reaches only its debug registers at
+  `FFFFFFE0`–`FF`. Pause or hold the core to read the rest. `regs`
+  shows R0 to R15 live while it runs.
+- Bytes sent while the core is held in reset or has halted are dropped,
+  and bytes sent while it is paused wait for it.

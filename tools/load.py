@@ -39,13 +39,17 @@ PORT talks to "niceemu --link PORT" instead, --tcp HOST:PORT to one on
 another computer, and --cosim PORT to the
 simulated system of "make -C sim cosim". Only the Python
 standard library is used, so this runs on Linux and macOS. tools/run.py and
-tools/hwtest.py use the functions here, and tools/nicelink.py has the link.
+tools/hwtest.py use the functions here, tools/boardlink.py has the link,
+and nice_cpu's debugger/nicebin.py reads the files and writes the words.
 """
 
 import argparse
 
-from nicelink import (BRK_EN, CLEAR, CONTROL, HOLD, RAM, Link, LinkError,
-                      add_arguments, fail, open_link)
+from boardlink import (BRK_EN, CLEAR, CONTROL, HOLD, RAM, Link, LinkError,
+                       add_arguments, fail, open_link)
+# After boardlink, which puts nice_cpu's debugger/ on the path
+import nicebin
+from nicebin import Words, read_lines
 
 # The words that a board has: the RAM from 0, 128K words on the MEGA65 and
 # 64K on the Nexys4DDR, and the screen, of which both boards have the
@@ -68,41 +72,12 @@ MONITOR_WORDS = 0x1000
 RUN_COMMAND = b"r\r"
 
 
-def hex_field(path: str, line_no: int, text: str) -> int:
-    """A field of a .bin file: 1 to 8 hex digits, as niceemu takes them."""
-    if not text or not all(c in "0123456789abcdefABCDEF" for c in text):
-        fail(f"{path}:{line_no}: '{text}' is not a hex number")
-    if len(text) > 8:
-        fail(f"{path}:{line_no}: '{text}' has more than 8 hex digits")
-    return int(text, 16)
-
-
-def read_lines(path: str) -> list[tuple[int, list[str]]]:
-    """The lines of a .bin or .sym file that are not blank, as (line number,
-    fields), split as niceemu splits them: lines at LF only, with blanks,
-    tabs, and CRs stripped, and fields at blanks and tabs only. A byte that
-    is not ASCII stays in its field as an escape, which no field takes."""
-    try:
-        with open(path, "rb") as f:
-            data = f.read()
-    except OSError as e:
-        fail(f"cannot read {path}: {e.strerror}")
-    lines = []
-    for line_no, raw in enumerate(data.split(b"\n"), 1):
-        line = raw.strip(b" \t\r").decode("ascii", "backslashreplace")
-        fields = [f for f in line.replace("\t", " ").split(" ") if f]
-        if fields:
-            lines.append((line_no, fields))
-    return lines
-
-
 def in_screen(addr: int) -> bool:
     """Whether addr is in the screen that both boards have."""
     return SCREEN_BASE <= addr < SCREEN_BASE + SCREEN_WORDS
 
 
-def check_fit(link: Link, words: list[tuple[int, int]],
-              monitor: bool) -> None:
+def check_fit(link: Link, words: Words, monitor: bool) -> None:
     """Refuses words beyond the board's RAM, which would wrap onto the ROM,
     the monitor's variables, or the program's own words. Under the
     monitor, the program's RAM ends at the monitor's variables, and
@@ -123,22 +98,13 @@ def check_fit(link: Link, words: list[tuple[int, int]],
              f"address space, so the word would overwrite another")
 
 
-def read_bin(path: str) -> list[tuple[int, int]]:
+def read_bin(path: str) -> Words:
     """The words of a .bin file, as (address, word). It takes the lines that
-    niceemu takes, and rejects an address that the board has no memory at."""
-    words: list[tuple[int, int]] = []
-    seen: dict[int, int] = {}
-    for line_no, fields in read_lines(path):
-        if len(fields) < 2:
-            fail(f"{path}:{line_no}: expected 'address word', "
-                 f"found only '{fields[0]}'")
-        if len(fields) > 2:
-            fail(f"{path}:{line_no}: unexpected '{fields[2]}' after the word")
-        addr = hex_field(path, line_no, fields[0])
-        word = hex_field(path, line_no, fields[1])
-        if addr in seen:
-            fail(f"{path}:{line_no}: address {addr:08x} is already "
-                 f"loaded by line {seen[addr]}")
+    niceemu takes, with nice_cpu's nicebin.read_bin(), and rejects an
+    address that the board has no memory at. Each line that is not blank
+    has one word, so the words are in the order of those lines."""
+    words = nicebin.read_bin(path)
+    for (line_no, _), (addr, _) in zip(read_lines(path), words):
         if not (addr < MAX_RAM_WORDS or in_screen(addr)):
             fail(f"{path}:{line_no}: address {addr:08x} is not in the RAM "
                  f"(0 to {MAX_RAM_WORDS - 1:x} on the MEGA65) or the "
@@ -146,15 +112,10 @@ def read_bin(path: str) -> list[tuple[int, int]]:
                  f"{SCREEN_BASE + SCREEN_WORDS - 1:x}), so the board "
                  f"cannot load it as the emulator does; move the "
                  f"program into those ranges")
-        seen[addr] = line_no
-        words.append((addr, word))
-    if not words:
-        fail(f"{path}: no words to load; is it a .bin file, as niceasm.py "
-             f"writes with -o?")
     return words
 
 
-def monitor_words(path: str, rom: str | None) -> list[tuple[int, int]]:
+def monitor_words(path: str, rom: str | None) -> Words:
     """The words of a program under the monitor, which must be at PROGRAM
     or above and not in the screen, which the monitor clears when it
     boots, and with rom, the words of that monitor, which must be below
@@ -181,34 +142,27 @@ def monitor_words(path: str, rom: str | None) -> list[tuple[int, int]]:
     return rom_words + words
 
 
-def load_words(link: Link, words: list[tuple[int, int]],
-               rom: bool = False, monitor: bool = False) -> None:
-    """Holds the core, hides the ROM, clears the memory, disables the
-    breakpoints, checks that the words fit the board's RAM, under the
-    monitor with monitor, and writes the words, with one W for each run of
-    consecutive addresses. A link of version 3 or older takes the write of
-    the enable bits too, as a reserved word. With rom, the ROM stays
-    visible, and a bitstream without one, which reads bit 3 as 1, is
-    refused: the clear leaves the ROM alone, so its program boots cold at
-    the start."""
-    if rom:
-        link.control(HOLD | CLEAR)
-        if link.read_word(CONTROL) & RAM:
-            fail("no ROM, so no monitor, as in a bitstream built without "
-                 "one or in niceemu; --rom FILE loads one, such as "
-                 "monitor/build/monitor.bin, in its place")
-    else:
-        link.control(HOLD | CLEAR | RAM)
+def load_words(link: Link, words: Words, rom: bool = False,
+               monitor: bool = False) -> None:
+    """Holds the core, hides the ROM, clears the memory, checks that the
+    words fit the board's RAM, under the monitor with monitor, disables the
+    breakpoints, and writes the words, with nice_cpu's nicebin.load_words().
+    A link of version 3 or older takes the write of the enable bits too, as
+    a reserved word. With rom, the ROM stays visible, and a bitstream
+    without one, which reads bit 3 as 1, is refused: the clear leaves the
+    ROM alone, so its program boots cold at the start."""
+    if not rom:
+        nicebin.load_words(link, words,
+                           lambda link, words: check_fit(link, words, monitor))
+        return
+    link.control(HOLD | CLEAR)
+    if link.read_word(CONTROL) & RAM:
+        fail("no ROM, so no monitor, as in a bitstream built without "
+             "one or in niceemu; --rom FILE loads one, such as "
+             "monitor/build/monitor.bin, in its place")
     check_fit(link, words, monitor)
     link.write(BRK_EN, [0])
-    words = sorted(words)
-    i = 0
-    while i < len(words):
-        j = i + 1
-        while j < len(words) and words[j][0] == words[j - 1][0] + 1:
-            j += 1
-        link.write(words[i][0], [w for _, w in words[i:j]])
-        i = j
+    nicebin.write_words(link, words)
 
 
 def start(link: Link, rom: bool = False) -> None:
@@ -228,7 +182,7 @@ def add_monitor_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def program_words(parser: argparse.ArgumentParser,
-                  args: argparse.Namespace) -> list[tuple[int, int]]:
+                  args: argparse.Namespace) -> Words:
     """The words to load for args.file, with --monitor and --rom."""
     if args.rom and not args.monitor:
         parser.error("--rom needs --monitor")

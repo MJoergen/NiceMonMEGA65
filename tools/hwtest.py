@@ -156,10 +156,10 @@ from typing import Callable, TypeVar
 from jtag import check_board
 from load import (MAX_RAM_WORDS, MONITOR_WORDS, PROGRAM, RAM_SIZE, load_words,
                   read_bin, start)
-from nicelink import (BAUD, BAUDS, BRK_COUNT, BRK_EN, CONTROL, ETH_PORT,
-                      FREE, HOLD, NET_IP, NET_RX_GOOD, NET_STATUS, NET_TX,
-                      PAUSE, RAM, REGS, STEP, STOP, VERSION, Eth, Link,
-                      LinkError, Serial, Tcp, packet)
+from boardlink import (BAUD, BAUDS, BRK_COUNT, BRK_EN, CONTROL, ETH_PORT,
+                       FREE, HOLD, NET_IP, NET_RX_GOOD, NET_STATUS, NET_TX,
+                       PAUSE, RAM, REGS, STEP, STOP, VERSION, Eth, Link,
+                       LinkError, Serial, Tcp, packet)
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NICEEMU = f"{REPO}/nice_cpu/emulator/zig-out/bin/niceemu"

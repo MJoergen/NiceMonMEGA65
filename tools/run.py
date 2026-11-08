@@ -101,7 +101,6 @@ Notes:
 """
 
 import argparse
-import bisect
 import os
 import select
 import stat
@@ -110,11 +109,12 @@ import time
 from typing import Any, NoReturn, Sequence
 
 from load import (MAX_RAM_WORDS, RAM_SIZE, RUN_COMMAND,
-                  add_monitor_arguments, load_words, program_words,
-                  read_lines, start)
-from nicelink import (DEBUG_FIRST, FULL_WAIT, HALT_REASON, HOLD, RAM, REGS,
-                      Link, LinkError, add_arguments, fail, open_link,
-                      read_words)
+                  add_monitor_arguments, load_words, program_words, start)
+from boardlink import (DEBUG_FIRST, FULL_WAIT, HALT_REASON, HOLD, RAM, REGS,
+                       Link, LinkError, add_arguments, fail, open_link,
+                       read_words)
+# After boardlink, which puts nice_cpu's debugger/ on the path
+from nicebin import Symbols
 
 INSTR_LO = 0xFFFFFF42
 INSTR_HI = 0xFFFFFF43
@@ -146,52 +146,6 @@ TRAP_NAMES = {
     6: "call_indirect: bad index",
     7: "call_indirect: type mismatch",
 }
-
-
-class Symbols:
-    """The labels of a file that niceasm.py --symbols writes, lines of
-    "address name", for naming an address as niceemu does."""
-
-    def __init__(self, path: str) -> None:
-        symbols = []
-        for line_no, fields in read_lines(path):
-            where = f"{path}:{line_no}"
-            if len(fields) == 1:
-                fail(f"{where}: expected 'address name', found only "
-                     f"'{fields[0]}'")
-            if len(fields) > 2:
-                fail(f"{where}: unexpected '{fields[2]}' after the name")
-            addr, name = fields
-            if not all(c in "0123456789abcdefABCDEF" for c in addr):
-                fail(f"{where}: '{addr}' is not a hex number")
-            if len(addr) > 8:
-                fail(f"{where}: '{addr}' has more than 8 hex digits")
-            symbols.append((int(addr, 16), name))
-        # A stable sort keeps the file's order of the labels at one address
-        symbols.sort(key=lambda s: s[0])
-        self.addrs = [a for a, _ in symbols]
-        self.names = [n for _, n in symbols]
-
-    def before(self, addr: int) -> int | None:
-        """The index of the label at or before addr, the first in the file
-        of those at one address, or None when addr is before them all."""
-        i = bisect.bisect_right(self.addrs, addr)
-        if i == 0:
-            return None
-        i -= 1
-        while i > 0 and self.addrs[i - 1] == self.addrs[i]:
-            i -= 1
-        return i
-
-    def location(self, addr: int) -> str:
-        """addr as niceemu prints it: the label at it, "label+0x1f" after
-        one, or eight hex digits when no label is at or before it."""
-        i = self.before(addr)
-        if i is None:
-            return f"{addr:08x}"
-        if addr == self.addrs[i]:
-            return self.names[i]
-        return f"{self.names[i]}+0x{addr - self.addrs[i]:x}"
 
 
 def where_lines(symbols: Symbols, regs: list[int]) -> list[str]:

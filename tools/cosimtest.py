@@ -12,7 +12,7 @@ step, the breakpoints, and the writes of the registers, against niceemu
 program, with run.py --monitor and with the monitor's l. Each must print
 the same and exit with the same status. Last, load.py must refuse a word
 beyond the simulated system's 64K words of RAM. So it checks the RTL,
-nicelink.py, run.py, and load.py as hwtest.py does on the board. The
+boardlink.py, run.py, and load.py as hwtest.py does on the board. The
 simulation runs far slower than real time, so the waits are longer, and
 nice_cpu's benchmark and the demo's self-test are left out. NICE=multi
 in the environment picks the multi-cycle core, as for make test. It
@@ -33,7 +33,7 @@ import hwtest
 from hwtest import (NICEEMU, REPO, assemble, assemble_labels, comparisons,
                     results, test_fit, test_framing, test_monitor, test_pause,
                     test_run, test_step, test_break, test_write_regs)
-from nicelink import HOLD, RAM, open_link
+from boardlink import HOLD, RAM, open_link
 
 
 def main() -> None:

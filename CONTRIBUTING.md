@@ -93,7 +93,7 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
 | [monitor/](monitor/README.md) | The monitor for the ROM, in NICE assembly: a hardware abstraction layer for programs at `0x8000`, called through a dispatch table, a main loop with a few commands, the file of routines that programs join, the stubs and the header for programs, and its tests in `niceemu`. Its README has the decisions, and [#62](https://github.com/MJoergen/NiceMonMEGA65/issues/62) the loading from storage. |
 | [demo/](demo/README.md) | The demo in the ROM of the release, behind the monitor, which runs it with `x`, for the time being: nice_cpu's demo (`nice_cpu/demo`), whose function keys switch between a welcome screen that turns into a typewriter, the key codes, the characters and colors, the counters, a game, and the board, a self-test and the network station's addresses. Here are the board's text, `text.nasm`, the join behind the monitor, `join.py`, and its check on a board, `demo_hw.py`. |
 | [examples/](examples/) | Example C programs, and the Makefile that builds them for the MEGA65. |
-| [tools/](tools/) | `nicelink.py`, the debug link over the board's Ethernet port or UART, over TCP to `niceemu --link`, or over TCP to the simulated system of `make cosim`, and the tools that use it: `load.py`, which loads a program into the MEGA65 or Nexys4DDR, `run.py`, which runs a program on the board as `niceemu` runs it, `mon.py`, an interactive shell on the link, `hwtest.py`, which tests the system on the board, `flash.py`, which writes the Nexys4DDR's flash or a slot of the MEGA65's, `bump.py`, which records the MEGA65's timing for a nice_cpu tag, `release.py`, which builds and publishes a release, `linktest.py`, which checks `run.py` and `mon.py` on `niceemu --link`, `cosimtest.py`, which checks `run.py` on the simulated system, and `screenshot.py`, which draws a program's screen in `niceemu` as a PNG picture. |
+| [tools/](tools/) | `boardlink.py`, the debug link of nice_cpu's `debugger/nicelink.py`, over the board's UART or TCP to `niceemu --link`, with the board's Ethernet port and the simulated system of `make cosim`, and the tools that use it: `load.py`, which loads a program into the MEGA65 or Nexys4DDR, `run.py`, which runs a program on the board as `niceemu` runs it, `mon.py`, an interactive shell on the link, nice_cpu's `nicedbg.py` with the board's links, `hwtest.py`, which tests the system on the board, `flash.py`, which writes the Nexys4DDR's flash or a slot of the MEGA65's, `bump.py`, which records the MEGA65's timing for a nice_cpu tag, `release.py`, which builds and publishes a release, `linktest.py`, which checks `run.py` and `mon.py` on `niceemu --link`, `cosimtest.py`, which checks `run.py` on the simulated system, and `screenshot.py`, which draws a program's screen in `niceemu` as a PNG picture. |
 | [README.md](README.md) | For those who use the core files and write programs for them: on its own, over Ethernet, and over the serial port. |
 | [SYSTEM.md](doc/SYSTEM.md) | The system that programs and the link see: the debug link, the address map, the screen, the ROM, and the Nexys4DDR's devices. |
 | [EMULATOR.md](doc/EMULATOR.md) | The table of the known differences from the emulator. |
@@ -435,7 +435,7 @@ closed.
 
 The simulation is far slower than real time, about 250 bytes a second on
 the UART. A short request takes a fraction of a second, a clear of the
-memory about 4 s, and a load of 1000 words about 40 s. So `nicelink.py`
+memory about 4 s, and a load of 1000 words about 40 s. So `boardlink.py`
 waits longer for an answer there: 20 s, and 20 ms more for each byte of
 the request. Only small programs are practical.
 
@@ -745,7 +745,7 @@ bitstream has one. Then it hides the ROM and uses the link:
 
 - It writes and reads memory.
 - It checks that the link drops a packet with a bad checksum, one cut
-  short by an ESC, and one with a gap of 300 ms, that `nicelink.py` sends
+  short by an ESC, and one with a gap of 300 ms, that the link sends
   a dropped `R` or `W` again, and that an unknown tag gets `e01` and a bad
   payload `e03`.
 - It runs `sim/echo.nasm`, checks that the link reaches only its debug
@@ -844,12 +844,14 @@ the monitor's with `--monitor --rom`, the demo's self-test, and nice_cpu's bench
 built `examples/build/bench.bin`, with `tools/linktest.py`. It runs hwtest's
 checks of bad packets, of the pause, of the step, of the breakpoints,
 and of the writes of the registers on `niceemu --link` first, and then
-`mon.py`'s commands, its disassembly, `set`, and `pc` among them, as
-typed at its prompt, with the labels of `sim/break.nasm`.
+what `mon.py` adds to nice_cpu's debugger: a load, and the check of the
+board's memory, at a load and before the link opens. nice_cpu's `make
+-C debugger test` checks the debugger's commands, and the parsing of
+`--tcp [HOST:]PORT`.
 Last, it runs `hello.nasm` with `run.py --tcp 127.0.0.2:PORT` on
 `niceemu --link 127.0.0.2:0`, the form for a `niceemu` on another
 computer; 127.0.0.2 is loopback on Linux, and elsewhere the check is
-skipped. It checks the parsing of `--tcp [HOST:]PORT` first. CI runs it.
+skipped. CI runs it.
 
 `run.py` matches `niceemu` in the details too. It accepts
 `--no-cycle-counter` and ignores it, as the cycle counter always runs. A

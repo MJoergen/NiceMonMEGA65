@@ -48,6 +48,13 @@ meets it again, and has V1.8's changes too.
 - The demo is at `0x4000` in the ROM, from `0x2000`, behind the monitor,
   which FAT32 made larger. The dispatch table is 1.1, with entries 9 to
   13 for files (#58).
+- The tools take the debug link, the loader, and the debugger from
+  nice_cpu's `debugger/` (#87). `tools/nicelink.py` is now
+  `tools/boardlink.py`, with only the board's own links, Ethernet and
+  `make cosim`, and `mon.py` is nice_cpu's `nicedbg.py` with them. Its
+  prompt is `dbg>`, and its messages say "the processor" for the core.
+  A send of console bytes to a program that does not read them for 2 s
+  is an error, where it waited forever.
 
 **New.**
 

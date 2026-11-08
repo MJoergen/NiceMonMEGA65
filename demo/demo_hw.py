@@ -27,7 +27,7 @@ import time
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(REPO, "tools"))
-from nicelink import CONTROL, HOLD, PAUSE, Link, Serial  # noqa: E402
+from boardlink import CONTROL, HOLD, PAUSE, Link, Serial  # noqa: E402
 
 ROM = os.path.join(REPO, "demo", "build", "rom.bin")
 KEYS_FILE = os.path.join(REPO, "demo", "build", "hw_keys.txt")
