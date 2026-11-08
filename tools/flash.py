@@ -3,9 +3,9 @@
 Nexys4DDR's, or a core file into a slot of the MEGA65's.
 
 Usage:
-    tools/flash.py --port DEVICE [--baud 2000000]
+    tools/flash.py --port DEVICE [--baud 230400]
                    [--bit synth/nexys4ddr/build/top.bit] [--erase]
-    tools/flash.py --port DEVICE [--baud 2000000]
+    tools/flash.py --port DEVICE [--baud 230400]
                    --cor synth/r6/build/NiceMonMEGA65-r6.cor --slot N
 
     The Nexys4DDR's FPGA loads the bitstream from the board's quad SPI
@@ -72,7 +72,7 @@ import tempfile
 import time
 
 from jtag import bit_part, check_board, check_part, wait_port
-from boardlink import CONTROL, Link, LinkError, Serial
+from boardlink import DEFAULT_BAUD, CONTROL, Link, LinkError, Serial
 from spiflash import SpiFlashError, unprotect
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -299,7 +299,7 @@ def main() -> None:
     parser.add_argument("--port", required=True, metavar="DEVICE",
                         help="the serial device of the board's debug UART, "
                         "such as /dev/ttyUSB1")
-    parser.add_argument("--baud", type=int, default=2000000,
+    parser.add_argument("--baud", type=int, default=DEFAULT_BAUD,
                         help="the UART's baud rate (default %(default)s)")
     parser.add_argument("--bit", default=DEFAULT_BIT,
                         help="Nexys4DDR: the bitstream to write (default "

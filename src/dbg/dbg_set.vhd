@@ -11,7 +11,7 @@
 --   1  The MAC address, mac_i, in hex with colons, the byte in bits 47..40
 --      first: 02:4E:49:43:45:00.
 --   2  The TCP port of the link, G_TCP_PORT, in decimal.
---   3  The UART's baud rate, baud_i, in decimal: 2000000.
+--   3  The UART's baud rate, baud_i, in decimal: 230400.
 -- When ip_i, mac_i, or baud_i differs from the values of the text, p_fmt
 -- takes the three, writes the lines anew, a character a cycle, and pulses
 -- changed_o after the last, about 80 cycles later. The decimal digits of

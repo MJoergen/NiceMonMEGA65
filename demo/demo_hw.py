@@ -15,7 +15,7 @@ the demo where it runs on a release's board. The bitstream must have
 demo/build/rom.bin in its ROM (make r6, which builds it first), and
 niceemu must be built.
 
-Usage: demo/demo_hw.py --port DEVICE [--baud 2000000]
+Usage: demo/demo_hw.py --port DEVICE [--baud 230400]
 """
 
 import argparse
@@ -27,7 +27,8 @@ import time
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(REPO, "tools"))
-from boardlink import CONTROL, HOLD, PAUSE, Link, Serial  # noqa: E402
+from boardlink import (CONTROL, DEFAULT_BAUD, HOLD, PAUSE, Link,  # noqa: E402
+                       Serial)
 
 ROM = os.path.join(REPO, "demo", "build", "rom.bin")
 KEYS_FILE = os.path.join(REPO, "demo", "build", "hw_keys.txt")
@@ -90,7 +91,7 @@ def main() -> None:
     parser.add_argument("--port", required=True, metavar="DEVICE",
                         help="the serial device of the board's debug UART, "
                         "such as /dev/ttyUSB1")
-    parser.add_argument("--baud", type=int, default=2000000)
+    parser.add_argument("--baud", type=int, default=DEFAULT_BAUD)
     args = parser.parse_args()
     for path, how in ((ROM, "make demo"), (EMU, "make -C nice_cpu/emulator build")):
         if not os.path.exists(path):

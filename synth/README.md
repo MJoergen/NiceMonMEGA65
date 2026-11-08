@@ -139,7 +139,7 @@ board differs from the MEGA65 in three ways:
 - Its FPGA is speed grade -1, where the MEGA65's is -2, so the system clock
   is 90 MHz, not 100 MHz; at 100 MHz the pipelined core misses timing by a
   few tenths of a nanosecond or less, as placement varies. The UART runs
-  at 2 Mbaud as on the MEGA65.
+  at 230400 baud after reset, as on the MEGA65.
 - Its VGA output has 4 bits per color, from resistors, and there is no
   HDMI. The screen's colors have 4 bits per color, so they show
   as on the MEGA65.

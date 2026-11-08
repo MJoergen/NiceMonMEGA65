@@ -2,7 +2,7 @@
 """Test the system on the MEGA65 or Nexys4DDR board through its debug UART.
 
 Usage:
-    tools/hwtest.py --port DEVICE [--baud 2000000]
+    tools/hwtest.py --port DEVICE [--baud 230400]
                     [--bit synth/r6/build/top.bit]
                     [--board mega65|nexys4ddr] [--no-program]
                     [--eth HOST[:PORT]]
@@ -156,7 +156,8 @@ from typing import Callable, TypeVar
 from jtag import check_board
 from load import (MAX_RAM_WORDS, MONITOR_WORDS, PROGRAM, RAM_SIZE, load_words,
                   read_bin, start)
-from boardlink import (BAUD, BAUDS, BRK_COUNT, BRK_EN, CONTROL, ETH_PORT,
+from boardlink import (BAUD, BAUDS, BRK_COUNT, BRK_EN, CONTROL, DEFAULT_BAUD,
+                       ETH_PORT,
                        FREE, HOLD, NET_IP, NET_RX_GOOD, NET_STATUS, NET_TX,
                        PAUSE, RAM, REGS, STEP, STOP, VERSION, Eth, Link,
                        LinkError, Serial, Tcp, packet)
@@ -1891,7 +1892,7 @@ def main() -> None:
     parser.add_argument("--port", required=True, metavar="DEVICE",
                         help="the serial device of the board's debug UART, "
                         "such as /dev/ttyUSB1")
-    parser.add_argument("--baud", type=int, default=2000000,
+    parser.add_argument("--baud", type=int, default=DEFAULT_BAUD,
                         help="the UART's baud rate (default %(default)s)")
     parser.add_argument("--bit", default=f"{REPO}/synth/r6/build/top.bit",
                         help="the bitstream to program (default "

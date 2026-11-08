@@ -79,17 +79,18 @@ the board an IP address only on a network you trust.
 
 ## The serial port
 
-The MEGA65's debug UART runs at 2 Mbaud (2000000), 8-N-1, after reset,
-or at the rate written to `0xFFFFFF9F`
+The MEGA65's debug UART runs at 230400 baud, 8-N-1, after reset, the
+tools' `--baud` by default, or at the rate written to `0xFFFFFF9F`
 ([doc/SYSTEM.md](../doc/SYSTEM.md#the-baud-rate)), which `--baud` must
-match. It needs the JTAG cable, whose USB port carries it. It is usually the serial device
+match. A core built before `V1.9` runs at 2 Mbaud after reset, and needs
+`--baud 2000000`. It needs the JTAG cable, whose USB port carries it. It is usually the serial device
 `/dev/ttyUSB1`. Give it to the tools with `--port`, or to `make` with
 `PORT=`, and open it in your terminal program. On
 macOS, use the `/dev/cu.*` device, as a `/dev/tty.*` device blocks on
 open. The port must not be open in a terminal while a tool runs.
 
-A terminal program that runs at 2 Mbaud, such as `picocom`, shows the
-program's console: `picocom -b 2000000 /dev/ttyUSB1`. In picocom,
+A terminal program, such as `picocom`, shows the program's console:
+`picocom -b 230400 /dev/ttyUSB1`. In picocom,
 `Ctrl-A Ctrl-\` sends a break, which ends the line's input; the
 keyboard's goes on.
 
@@ -315,13 +316,13 @@ describes the commands, the notices, and the labels.
 
 ### Starting it
 
-    tools/mon.py (--eth HOST[:PORT] | --port DEVICE [--baud 2000000]
+    tools/mon.py (--eth HOST[:PORT] | --port DEVICE [--baud 230400]
                  | --tcp [HOST:]PORT | --cosim PORT) [--symbols FILE] [FILE.bin]
 
 - `--eth HOST` talks to the board over its Ethernet port, at its IP
   address HOST (see [Over Ethernet](#over-ethernet)).
 - `--port DEVICE` names the serial device of the board's debug UART,
-  such as `/dev/ttyUSB1`, and `--baud` its rate, 2000000 by default.
+  such as `/dev/ttyUSB1`, and `--baud` its rate, 230400 by default.
 - `--tcp PORT` talks to `niceemu --link PORT` instead of the board, and
   `--tcp HOST:PORT` to one on another computer (see [Without a
   board](#without-a-board)).

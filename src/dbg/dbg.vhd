@@ -140,7 +140,7 @@ entity dbg is
       -- The TCP port of the link, and the UART's baud rate after reset,
       -- for the settings page
       G_TCP_PORT      : natural  := 4510;
-      G_UART_BAUDRATE : positive := 2_000_000
+      G_UART_BAUDRATE : positive := 230_400
    );
    port (
       clk_i       : in  std_logic;

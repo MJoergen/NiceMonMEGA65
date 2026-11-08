@@ -13,7 +13,7 @@ loader that refuses a word that the board has no memory at, as
 tools/load.py does. A FILE is checked before the link opens, and loaded
 at the start, with the processor held.
 
-Usage: tools/mon.py (--eth HOST[:PORT] | --port DEVICE [--baud 2000000]
+Usage: tools/mon.py (--eth HOST[:PORT] | --port DEVICE [--baud 230400]
                     | --tcp [HOST:]PORT | --cosim PORT) [--symbols FILE] [FILE.bin]
 
 Only the Python standard library is used, so this runs on Linux and macOS.

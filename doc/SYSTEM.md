@@ -27,7 +27,7 @@ These words are used here and in the other documents and sources:
 | Step | Bits 4 and 5 written to a paused core: it runs one instruction, or enters an interrupt, and pauses again. |
 | Notice | A packet that the board sends on its own: `b06` at reset (the link's version, 6), `h` when the core halts, `p` when it pauses, `x` when it stops at a breakpoint, and `o` when an input byte is lost. |
 
-The MEGA65's debug UART runs at 2 Mbaud (2000000), 8-N-1, and carries the
+The MEGA65's debug UART runs at 230400 baud, 8-N-1, and carries the
 debug link of nice_cpu's [doc/DEBUG.md](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEBUG.md). It passes
 the program's console bytes both ways, and between them it carries
 packets, which start with the byte `0xFF`. A console byte `0xFF` is sent
@@ -36,7 +36,7 @@ registers at `0xFFFFFFE0`–`FF` (see [Address map](#address-map)). The
 board sends a notice at reset (`b05`), when the core halts (`h` and the
 reason), and when an input byte is lost (`o`). The tools in `tools/` are
 such a host, and `niceemu --link` serves the same link, so the tools
-drive the emulator as they drive the board. The tools use 2 Mbaud too.
+drive the emulator as they drive the board. The tools use 230400 baud too.
 `0xFFFFFF9F` sets another rate (see [The baud rate](#the-baud-rate)).
 
 The Ethernet port carries the same line over TCP (see [The debug link
@@ -108,8 +108,11 @@ after a stray character, such as `h01#C9` after a `HALT`.
 
 ### The baud rate
 
-The UART runs at 2 Mbaud after reset, on every board, and
-`0xFFFFFF9F` holds the rate in bit/s, `2000000`. A write of 115200,
+The UART runs at 230400 baud after reset, on every board, and
+`0xFFFFFF9F` holds the rate in bit/s, `230400`. It is the highest rate
+that the termios of both Linux and macOS have a constant for, so a host
+of either reaches the board as it is. A core built before `V1.9` runs
+at 2 Mbaud after reset. A write of 115200,
 230400, 460800, 921600, 1000000, 1500000, or 2000000 sets it, for the
 core and the link alike, and a write of any other value is dropped. The
 board's USB serial chip makes all of them, and 1 to 2 Mbaud exactly. The
@@ -122,7 +125,7 @@ milliseconds more, and then changes its own rate, as `tools/hwtest.py`
 does. A program that keeps printing keeps the old rate until it stops for
 1 ms.
 
-Only a reset brings back 2 Mbaud. A start of the core keeps the rate, so
+Only a reset brings back 230400 baud. A start of the core keeps the rate, so
 a host at another rate still loads and runs programs; the tools take its
 rate with `--baud`. A program that sets a rate the host does not expect
 cuts the host off until the next reset, so a program should leave this

@@ -29,30 +29,29 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__))), "nice_cpu", "debugger"))
 import nicelink  # noqa: E402
 from nicelink import (BRK_ADDR, BRK_COUNT, BRK_EN, CLEAR,  # noqa: E402
-                      CONTROL, FREE, FULL_WAIT, HALT_REASON, HALTED, HOLD,
-                      PAUSE, RAM, REASONS, REGS, STEP, STOP, VERSION, Link,
-                      LinkError, Serial, Tcp, check_version, fail, packet,
-                      parse_tcp, read_words)
+                      CONTROL, DEFAULT_BAUD, FREE, FULL_WAIT, HALT_REASON,
+                      HALTED, HOLD, PAUSE, RAM, REASONS, REGS, STEP, STOP,
+                      VERSION, Link, LinkError, Serial, Tcp, check_version,
+                      fail, packet, parse_tcp, read_words)
 
 # What the tools import from here: nice_cpu's link, and the board's own
 __all__ = [
-    "BRK_ADDR", "BRK_COUNT", "BRK_EN", "CLEAR", "CONTROL", "FREE",
-    "FULL_WAIT", "HALT_REASON", "HALTED", "HOLD", "PAUSE", "RAM", "REASONS",
+    "BRK_ADDR", "BRK_COUNT", "BRK_EN", "CLEAR", "CONTROL", "DEFAULT_BAUD",
+    "FREE", "FULL_WAIT", "HALT_REASON", "HALTED", "HOLD", "PAUSE", "RAM", "REASONS",
     "REGS", "STEP", "STOP", "VERSION", "Link", "LinkError", "Serial", "Tcp",
     "check_version", "fail", "packet", "parse_tcp", "read_words",
-    "BAUD", "BAUDS", "BOARD_BAUD", "COSIM_BYTE", "COSIM_WAIT", "Cosim",
+    "BAUD", "BAUDS", "COSIM_BYTE", "COSIM_WAIT", "Cosim",
     "DEBUG_FIRST", "ETH_PORT", "Eth", "NET_IP", "NET_RX_GOOD", "NET_STATUS",
     "NET_TX", "add_arguments", "open_link",
 ]
 
 # The first of the debug registers, which only the link reaches
 DEBUG_FIRST = 0xFFFFFFE0
-# The board's UART baud rate in bit/s, 2000000 after reset, and the rates
-# it takes (doc/SYSTEM.md); niceemu has plain memory there
+# The board's UART baud rate in bit/s, 230400 after reset, nice_cpu's
+# DEFAULT_BAUD, and the rates it takes (doc/SYSTEM.md); niceemu has plain
+# memory there
 BAUD = 0xFFFFFF9F
 BAUDS = (115200, 230400, 460800, 921600, 1000000, 1500000, 2000000)
-# The rate of the board's UART after reset, the default of --baud
-BOARD_BAUD = 2000000
 # The network station of nice_cpu's SYSTEM.md §6: the IP address, the
 # counts of the good frames received and of those sent, and NET_STATUS,
 # bit 31 for a host connected over TCP and the link's port in bits 15..0
@@ -129,10 +128,9 @@ def add_arguments(parser: argparse.ArgumentParser
     """The options that pick the link: nice_cpu's --tcp for niceemu --link,
     and --port and --baud for the board's debug UART, with --eth for its
     Ethernet port, and --cosim for make -C sim cosim. One of --eth, --port,
-    --tcp, and --cosim must be given. --baud is the board's rate after
-    reset by default."""
+    --tcp, and --cosim must be given. --baud is 230400 by default, the
+    board's rate after reset."""
     line = nicelink.add_arguments(parser)
-    parser.set_defaults(baud=BOARD_BAUD)
     line.add_argument("--eth", metavar="HOST[:PORT]",
                       help="talk to the board over TCP on its Ethernet "
                       f"port, at HOST (default port {ETH_PORT}), not on "

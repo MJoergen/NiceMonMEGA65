@@ -8,12 +8,14 @@
 -- THEORY OF OPERATION
 -- The UART input passes through two registers, a synchronizer, and the UART
 -- output through one, so that it changes only on the clock edge. The UART
--- runs at 2 Mbaud, a bit of 50 cycles at 100 MHz and of 45 at 90 MHz, the
--- clocks of the MEGA65 and the Nexys4DDR. The FT2232H USB chip on the
--- other end of both boards makes exactly 2 Mbaud from its 12 MHz clock.
--- The link sends every word as 8 hex digits, so a load at 2 Mbaud takes
--- about a seventeenth of the time it takes at 115200 baud. 2 Mbaud is the
--- rate after reset; 0xFFFFFF9F sets another (board_io.vhd). The video
+-- runs at 230400 baud after reset, a bit of 434 cycles at 100 MHz and of
+-- 391 at 90 MHz, the clocks of the MEGA65 and the Nexys4DDR: the highest
+-- rate that the termios of both Linux and macOS have a constant for, so
+-- that a host of either reaches the board as it is. 0xFFFFFF9F sets
+-- another, up to 2 Mbaud (board_io.vhd), which the FT2232H USB chip on the
+-- other end of both boards makes exactly from its 12 MHz clock. The link
+-- sends every word as 8 hex digits, so a load at 2 Mbaud takes about a
+-- ninth of the time it takes at 230400 baud. The video
 -- output is that of text.vhd, in the VGA clock domain: 8 bits per color,
 -- the two sync signals with the polarity of G_VIDEO, and vga_de_o, which is
 -- '1' in the visible area. A board with fewer bits per color takes the top
@@ -60,7 +62,7 @@
 -- Synchronous to clk_i, by rst_i, as nicemon.vhd describes, and in the
 -- Ethernet clock domain by eth_rst_i. rst_i clears the counts of frames,
 -- sets the MAC address to G_ETH_MAC and the IP address to 0, and the
--- UART's baud rate to 2 Mbaud.
+-- UART's baud rate to 230400 baud.
 -- The video has no reset of its own (text.vhd).
 
 library ieee;
@@ -198,7 +200,7 @@ architecture synthesis of system is
    signal frm_tx_data  : std_logic_vector(31 downto 0);
    signal frm_tx_done  : std_logic;
    -- The UART's baud rate after reset, and now; and the link's TCP port
-   constant C_UART_BAUDRATE : positive := 2_000_000;
+   constant C_UART_BAUDRATE : positive := 230_400;
    constant C_TCP_PORT      : natural  := 4510;
    signal   uart_baud       : std_logic_vector(31 downto 0);
    -- The debug link over TCP

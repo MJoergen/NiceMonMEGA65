@@ -169,7 +169,7 @@
 --         and 0x10000 on the Nexys4DDR. Read only. In niceemu it is plain
 --         memory, which reads 0 after the clear, and 0 means no limit.
 --     9F  The UART's baud rate in bit/s, uart_baud_o: G_UART_BAUDRATE after
---         reset, 2000000 on the boards. A write of 115200, 230400, 460800,
+--         reset, 230400 on the boards. A write of 115200, 230400, 460800,
 --         921600, 1000000, 1500000, or 2000000 sets it, and of any other
 --         value is dropped. The UART takes the new rate once it has sent
 --         nothing for 1 ms after the write, so the link's `k` to the write

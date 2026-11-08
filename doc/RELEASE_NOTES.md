@@ -48,6 +48,14 @@ meets it again, and has V1.8's changes too.
 - The demo is at `0x4000` in the ROM, from `0x2000`, behind the monitor,
   which FAT32 made larger. The dispatch table is 1.1, with entries 9 to
   13 for files (#58).
+- The debug UART runs at 230400 baud after reset, from 2 Mbaud, and the
+  tools' `--baud` is 230400 by default (#88): the highest rate that the
+  termios of both Linux and macOS have a constant for, so a Mac reaches
+  the board on its serial port. A load over the UART takes about nine
+  times as long; Ethernet is unchanged, and on Linux the settings page
+  or `0xFFFFFF9F` sets 2 Mbaud again, with `--baud 2000000`. A core
+  file older than `V1.9` still runs at 2 Mbaud after reset, so the
+  tools need `--baud 2000000` with it.
 - The tools take the debug link, the loader, and the debugger from
   nice_cpu's `debugger/` (#87). `tools/nicelink.py` is now
   `tools/boardlink.py`, with only the board's own links, Ethernet and

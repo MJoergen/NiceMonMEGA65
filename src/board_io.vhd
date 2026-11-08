@@ -56,7 +56,7 @@ entity board_io is
       G_RAM_WORDS     : natural := 0;
       -- The clock, and the UART's baud rate after reset, for word F
       G_CLOCK_HZ      : positive := 100_000_000;
-      G_UART_BAUDRATE : positive := 2_000_000;
+      G_UART_BAUDRATE : positive := 230_400;
       -- The properties for formal/board_io.sby
       G_FORMAL        : boolean := false
    );

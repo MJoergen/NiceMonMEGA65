@@ -874,7 +874,7 @@ begin
       wait_text(3, 0, "   MAC address   02:4E:49:43:45:00   ");
       wait_text(4, 0, "   TCP port      4510                ");
       wait_text(5, 0, "   Baud rate     115200              ");
-      wait_text(9, 0, "   nothing sent, a host on it must follow, and a reset sets it back to 2000000.");
+      wait_text(9, 0, "   nothing sent, a host on it must follow, and a reset sets it back to 230400.");
       wait_text(23, 0, " IP:      _________________  ");
       assert ovl(2 * 80 + 17)(31 downto 8) = C_CURSOR and ovl(3 * 80 + 17)(31 downto 8) = C_COLOR
          report "tb_dbg: the IP address is not the setting chosen"

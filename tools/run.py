@@ -11,7 +11,7 @@ the --dump and --screen output. So the output of the two can be compared:
     diff <(niceemu -i in.txt prog.bin) <(tools/run.py -i in.txt prog.bin)
 
 Usage:
-    tools/run.py (--eth HOST[:PORT] | --port DEVICE [--baud 2000000]
+    tools/run.py (--eth HOST[:PORT] | --port DEVICE [--baud 230400]
                  | --tcp [HOST:]PORT | --cosim PORT) [-i FILE] [-d ADDR:N]... [-s] [-2004]
                  [--symbols FILE] [--timeout SEC] [--monitor [--rom FILE]]
                  FILE.bin

@@ -28,7 +28,7 @@ command that runs the program. A bitstream without a ROM, and niceemu,
 have no monitor: --rom FILE loads FILE at 0 in its place, such as
 monitor/build/monitor.bin, with the ROM hidden.
 
-Usage: tools/load.py (--eth HOST[:PORT] | --port DEVICE [--baud 2000000]
+Usage: tools/load.py (--eth HOST[:PORT] | --port DEVICE [--baud 230400]
                      | --tcp [HOST:]PORT | --cosim PORT) [--no-run]
                      [--monitor [--rom FILE]] FILE.bin
 

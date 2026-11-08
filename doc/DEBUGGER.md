@@ -171,11 +171,11 @@ only.
  > IP address    192.168.1.65
    MAC address   02:4E:49:43:45:00
    TCP port      4510
-   Baud rate     2000000
+   Baud rate     230400
 
    A write needs the core paused, halted, or held. A new IP or MAC address
    breaks a connected TCP host. The UART takes a new rate after 1 ms with
-   nothing sent, a host on it must follow, and a reset sets it back to 2000000.
+   nothing sent, a host on it must follow, and a reset sets it back to 230400.
 ...
  IP:      _________________  written
  CRSR up/down choose  CRSR left/right rate  0-f . : type  RETURN write  ESC back
@@ -640,7 +640,8 @@ Made on 2026-11-05 for stage 10
   only at the last byte sent: on the board's first run, a host whose
   write came more than 1 ms after the answer before got its `k` at the
   new rate.
-- **Only a reset brings back 2000000**, not a start of the core: a host
+- **Only a reset brings back the rate after reset**, 2000000 then and
+  230400 since `V1.9` (#88), not a start of the core: a host
   that follows the rate with `--baud` then still loads and starts
   programs. The reset is the way back from a rate that cut a host off.
 - **A page of its own, on F5 and `n`**, beside the memory page, rather
