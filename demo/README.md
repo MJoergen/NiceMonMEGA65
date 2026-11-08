@@ -64,7 +64,7 @@ this repository, or `VERSION=` on the command line, which
 `tools/release.py` sets to the tag; the monitor's banner gets the same.
 The demo is assembled from `0x8000` into `build/demo.bin`. `join.py`
 then puts the monitor, `monitor/build/monitor.bin`, and the demo into
-the ROM's image, `build/rom.bin`: at the monitor's `DEMO`, `0x4000`, the
+the ROM's image, `build/rom.bin`: at the monitor's `DEMO`, `0x6000`, the
 number of the demo's words, and the words after it, which `x` copies to
 `0x8000`. It fails if the monitor reaches `DEMO`, or the demo does not
 fit the ROM.
