@@ -177,6 +177,8 @@ V_TTIME         .EQU    0xFFFFF314      ; the microseconds when it was sent,
 V_TLAST         .EQU    0xFFFFF315      ; the byte before, for the LF of a CR LF,
 V_TLINE         .EQU    0xFFFFF316      ; the next free word of V_LINE,
 V_TEND          .EQU    0xFFFFF317      ; the bytes of the DATA's block,
+V_TPORT         .EQU    0xFFFFF318      ; the server's port for the RRQ,
+V_TLIST         .EQU    0xFFFFF319      ; not 0 for a listing, a name with * or ?,
 V_TPKT          .EQU    0xFFFFF320      ; and the packet sent, a byte per word, up to TFTP_PKT
 WASM_RAM        .EQU    0xFFFFF400      ; the words that the ROM's C code writes, from here
 WASM_END        .EQU    0xFFFFFF00      ; up to below here, the I/O page, which the Makefile checks
@@ -2503,11 +2505,14 @@ dhcp_parse_end
                 POP     R7
                 RET
 
-; tftp IP NAME: the .bin file NAME of the TFTP server at IP (RFC 1350),
-; read in octet mode through the UDP endpoint, which it opens on a port
-; that udp_open picks, and closes at the end, and its lines written as
-; load NAME writes them, with bin_line, and shown as l shows them. The
-; RRQ goes to port 69, and the server's first DATA gives its TID; the
+; tftp IP[:PORT] [NAME]: the .bin file NAME of the TFTP server at IP
+; (RFC 1350), read in octet mode through the UDP endpoint, which it opens
+; on a port that udp_open picks, and closes at the end, and its lines
+; written as load NAME writes them, with bin_line, and shown as l shows
+; them. A NAME with * or ? is a pattern, which tools/tftpd.py answers with
+; a listing of its files, whose lines are shown instead; no NAME is *.
+; The RRQ goes to PORT, 69 by default, and the server's first DATA gives
+; its TID; the
 ; packets of other hosts and TIDs are passed over. Each DATA of the block
 ; waited for is answered with its ACK, and a DATA of the block before
 ; with the ACK again; a block of less than 512 bytes is the last. A
@@ -2532,15 +2537,55 @@ tftp_blank
                 TST     R2
         ?Z      JMP     tftp_bad
                 MOVE    @V_TSRV, R1
+                MOVE    @V_TPORT, TFTP_PORT
+                CMP     @R3, 0x3A       ; :
+        ?!Z     JMP     tftp_name
+                ADD     R3, R3, 1
+                MOVE    R4, 0           ; the port
+                MOVE    R5, R3          ; where it starts
+tftp_port_digit
+                SUB     R2, @R3, 0x30
+                CMP     R2, 10
+        ?!C     JMP     tftp_port_end   ; no digit
+                ADD     R4, R4, R4      ; R4 is 10 * R4 + the digit
+                ADD     R2, R2, R4
+                SHL     R4, R4, 2
+                ADD     R4, R4, R2
+                CMP     R4, 0x10000
+        ?!C     JMP     tftp_bad
+                ADD     R3, R3, 1
+                JMP     tftp_port_digit
+tftp_port_end
+                CMP     R3, R5
+        ?Z      JMP     tftp_bad        ; a port without digits
+                TST     R4
+        ?Z      JMP     tftp_bad        ; port 0
+                MOVE    @V_TPORT, R4
+tftp_name
+                MOVE    R7, S_STAR
+                TST     @R3
+        ?Z      JMP     tftp_rrq        ; no name: the listing of *
                 CMP     @R3, 0x20
         ?!Z     JMP     tftp_bad        ; no blank after the address
                 MOVE    R1, R3
                 CALL    fs_name
                 TST     R1
-        ?Z      JMP     tftp_bad        ; no name
+        ?Z      JMP     tftp_rrq        ; only blanks
                 MOVE    R7, R1
                 CALL    rest_blank
         ?!Z     JMP     tftp_bad        ; a third word
+tftp_rrq
+                MOVE    @V_TLIST, 0
+                MOVE    R1, R7
+tftp_wild
+                MOVE[M] R2, @R1++
+        ?Z      JMP     tftp_wild_end
+                CMP     R2, 0x2A        ; *
+        ?Z      MOVE    @V_TLIST, 1
+                CMP     R2, 0x3F        ; ?
+        ?Z      MOVE    @V_TLIST, 1
+                JMP     tftp_wild
+tftp_wild_end
 ; The RRQ: the opcode 1, the name, a 0, octet, and a 0
                 MOVE    R2, V_TPKT
                 MOVE    @R2++, 0
@@ -2572,7 +2617,7 @@ tftp_try
 tftp_send
                 MOVE    R1, @V_TSRV
                 MOVE[M] R2, @V_TTID
-        ?Z      MOVE    R2, TFTP_PORT
+        ?Z      MOVE    R2, @V_TPORT
                 MOVE    R3, V_TPKT
                 MOVE    R4, @V_TLEN
                 CALL    udp_send
@@ -2636,13 +2681,11 @@ tftp_ack
                 MOVE    R3, V_TPKT
                 MOVE    R4, 4
                 CALL    udp_send
-                MOVE    R6, @V_TLINE    ; the last line, with no end
-                CMP     R6, V_LINE
-        ?Z      JMP     tftp_done
-                MOVE    @R6, 0
-                CALL    bin_line
-tftp_done
+                CMP     @V_TLINE, V_LINE  ; the last line, with no end
+        ?!Z     CALL    tftp_eol
                 CALL    udp_close
+                TST     @V_TLIST
+        ?!Z     JMP     main            ; a listing, shown
                 JMP     load_summary
 tftp_time
                 SUB     R1, @io.us, @V_TTIME
@@ -2698,7 +2741,8 @@ tftp_bad
 
 ; tftp_char: the byte R1 of a DATA, into the line at V_TLINE, as fat_load
 ; of fat32.c takes the bytes of a file: CR, LF, or CR LF ends a line,
-; which goes to bin_line, or is counted and passed over when it is empty;
+; which is shown for a listing, or else goes to bin_line, or is counted
+; and passed over when it is empty;
 ; TAB is a blank, and other control codes and bytes from 0x80 are dropped,
 ; and so are the bytes after LINE_MAX + 1. Uses R1-R6.
 tftp_char
@@ -2727,6 +2771,9 @@ tftp_eol
                 MOVE    R6, @V_TLINE
                 MOVE    @V_TLINE, V_LINE
                 MOVE    @R6, 0
+                MOVE    R1, V_LINE
+                TST     @V_TLIST
+        ?!Z     JMP     puts_crlf       ; a line of a listing, shown
                 CMP     R6, V_LINE
         ?!Z     JMP     bin_line        ; which returns to the caller
                 ADD     R11, R11, 1     ; an empty line, passed over
@@ -3219,8 +3266,9 @@ S_DELETED
                 .ASCII_L 'Deleted '
 S_FTP           .ASCII_L 'ftp'
 S_OCTET         .ASCII_L 'octet'
+S_STAR          .ASCII_L '*'
 S_BADTFTP
-                .ASCII_L 'tftp IP NAME: the server and the file, such as tftp 192.168.1.10 hello.bin'
+                .ASCII_L 'tftp IP[:PORT] [NAME]: tftp 192.168.1.10 hello.bin loads, *.bin lists'
 S_NOTFTP
                 .ASCII_L 'No answer from the TFTP server'
 S_TFTPERR
@@ -3270,14 +3318,15 @@ E_FS30          .ASCII_L 'the card or the folder is full'
 E_FS31          .ASCII_L 'the file is open'
 E_FS32          .ASCII_L 'the file is read-only'
 
-HELP            .DAT    H_R, H_L, H_LOAD, H_SAVE, H_DEL, H_TFTP, H_X, H_D, H_U, H_S, H_DIR, H_I
-                .DAT    H_ID, H_M, H_C, H_V, H_H, H_Q, H_P, 0
+HELP            .DAT    H_R, H_L, H_LOAD, H_SAVE, H_DEL, H_TFTP, H_TFTPL, H_X, H_D, H_U, H_S
+                .DAT    H_DIR, H_I, H_ID, H_M, H_C, H_V, H_H, H_Q, H_P, 0
 H_R             .ASCII_L 'r [ADDR]      run the program at ADDR, or at 00008000; r 0 restarts'
 H_L             .ASCII_L 'l             load lines of ADDR WORD in hex, as a .bin file has them'
 H_LOAD          .ASCII_L 'load NAME     load the .bin file NAME of the SD card, as l loads lines'
 H_SAVE          .ASCII_L 'save NAME A N save N words from A, both in hex, as the .bin file NAME'
 H_DEL           .ASCII_L 'del NAME      delete the file NAME of the SD card'
 H_TFTP          .ASCII_L 'tftp IP NAME  load the .bin file NAME from the TFTP server at IP'
+H_TFTPL         .ASCII_L 'tftp IP [PAT] list the files of tools/tftpd.py at IP, or those of PAT'
 H_X             .ASCII_L 'x             run the demo of the ROM, which F12 leaves'
 H_D             .ASCII_L 'd [ADDR] [N]  show N words from ADDR, in hex, or the next ones'
 H_U             .ASCII_L 'u [ADDR] [N]  disassemble N instructions from ADDR, or the next ones'

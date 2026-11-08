@@ -83,7 +83,8 @@ the MEGA65 and 77 on the Nexys4DDR (Input and output below).
 | `load NAME` | Loads the `.bin` file `NAME` of the card's folder `NICE` as `l` loads lines, and prints the same summary, so a program copied to the card on a PC loads with no host. Unlike `l`, an empty line is passed over, the end of the file ends the load, and a skipped line is counted from the first line of the file. `NAME` is an 8.3 name, in either case. |
 | `save NAME ADDR N` | Writes `N` words from `ADDR`, both in hex, to the file `NAME` of the card's folder `NICE` as a `.bin` file, a line of `ADDR WORD` in hex for each, and prints `Words saved: 600, 00008000 to 00008257`. It makes the file, or truncates it when it is there, and `load` reads it back. When the card fills up, the file keeps what fitted, and `save` prints error 30. |
 | `del NAME` | Deletes the file `NAME` of the card's folder `NICE`, with its long name, if it has one, and prints `Deleted NAME`. |
-| `tftp IP NAME` | Loads the `.bin` file `NAME` from the TFTP server at the IP address `IP`, such as `tftp 192.168.1.10 hello.bin`, as `load` loads one from the card, and prints the same summary (The network below). It needs an IP address, from `i`. Without an answer, it prints `No answer from the TFTP server` after about 5 seconds; an error of the server is shown with its code and its message: `TFTP error 1, File not found`. |
+| `tftp IP NAME` | Loads the `.bin` file `NAME` from the TFTP server at the IP address `IP`, such as `tftp 192.168.1.10 hello.bin`, as `load` loads one from the card, and prints the same summary (The network below). `IP:PORT` sends the request to `PORT` instead of 69. It needs an IP address, from `i`. Without an answer, it prints `No answer from the TFTP server` after about 5 seconds; an error of the server is shown with its code and its message: `TFTP error 1, File not found`. |
+| `tftp IP [PAT]` | Lists the files of the server `tools/tftpd.py` at `IP` whose names match the pattern `PAT`, with `*` and `?`, such as `tftp 192.168.1.10 *.bin`, a line each with the name and the size; without `PAT`, all of them. Another server answers with an error. |
 | `x` | Runs the demo of the ROM, for the time being (The demo below). Without a demo in the ROM, `x` says so. |
 | `h` | Halts the core, which the reset button, or a host over the link, starts again. The tests end with it. |
 | `?` | Lists the commands, and the keys of the history. |
@@ -292,20 +293,32 @@ datagram is one byte per word, bits 7..0, as the file entries have it:
 
 `tftp IP NAME` reads a file of a TFTP server (RFC 1350), in octet mode,
 through the endpoint, which it opens on a port of its own choice and
-closes at the end. The RRQ goes to port 69, and the server's first DATA
+closes at the end. The RRQ goes to port 69, or to `PORT` of `IP:PORT`,
+and the server's first DATA
 gives the port that the rest come from; packets of other hosts and
 ports are passed over. Each DATA is answered with its ACK, a DATA of the
 block before with the ACK again, and a block of less than 512 bytes is
 the last. A packet with no answer within a second is sent again, up to
 5 times in all. The lines are taken as `load` takes those of a file, and
-the words written as `l` writes them. To serve a file from a PC, a TFTP
-server such as `tftpd-hpa` with the file in its folder will do:
+the words written as `l` writes them.
 
-    sudo apt install tftpd-hpa
-    sudo cp build/hello.bin /srv/tftp/
+A `NAME` with `*` or `?` is a pattern, and no `NAME` is `*`: the lines
+received are shown instead of loaded. The repository's own server,
+`tools/tftpd.py`, answers a pattern with a listing of the files of its
+folder that match it, a line each with the name and the size in bytes,
+which no other server does
+([#95](https://github.com/MJoergen/NiceMonMEGA65/issues/95)). To serve
+the examples from a PC:
 
-and on the board, `i dhcp`, then `tftp 192.168.1.10 hello.bin` with the
-PC's address.
+    make tftpd TFTP_DIR=examples/build
+
+Port 69 needs root, or the capability that `tools/tftpd.py --help`
+gives; without either, `make tftpd TFTP_DIR=examples/build
+TFTP_PORT=6969` serves on port 6969. On the board, `i dhcp`, then
+`tftp 192.168.1.10 *.bin` lists the programs, and `tftp 192.168.1.10
+hello.bin` loads one, with the PC's address, and `:6969` after it for
+the other port. Any other TFTP server, such as `tftpd-hpa`, serves the
+files too, but answers a pattern with an error.
 
 ## The disassembler
 
@@ -822,10 +835,11 @@ runs `tftp` the same way: first with no server, which gives it the
 client's port, and then with a file of two blocks among packets of
 another host and another port and a DATA again, with a DATA and an ACK
 lost, with an ERROR, with a file of 512 bytes, and with an empty file,
-and with the arguments that are not, no IP address, and no answer to
-ARP. It compares the output and the frames sent, with the client's port
+with a listing, with the request to port 6969 of `IP:PORT`, and with
+the arguments that are not, no IP address, and no answer to ARP. It compares the output and the frames sent, with the client's port
 as `pp pp`, with `test/tftp.expected`, and checks the IPv4 checksums
-and the ports.
+and the ports. `make tftptest`, in the repository's root, runs the
+monitor against `tools/tftpd.py` itself (CONTRIBUTING.md).
 
 On a board, `make r6` builds a bitstream that boots the monitor, with the
 demo behind it in the ROM. `make hwtest` loads the same, with the

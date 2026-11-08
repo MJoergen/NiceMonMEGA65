@@ -64,6 +64,7 @@ jobs:
       - run: make -C demo test
       - run: make -C monitor test
       - run: make linktest
+      - run: make tftptest
 
   lint:
     runs-on: ubuntu-24.04

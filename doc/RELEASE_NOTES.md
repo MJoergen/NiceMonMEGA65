@@ -47,6 +47,11 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   Programs send and receive UDP datagrams through four new entries,
   with ARP and the gateway of `i dhcp` resolved in the ROM, so that a
   game of two boards needs no network stack of its own.
+- `tools/tftpd.py`, a TFTP server of the repository's own, `make tftpd`,
+  also answers a name with `*` or `?` with a listing of its folder, which
+  `tftp IP *.bin` shows on the board
+  ([#95](https://github.com/MJoergen/NiceMonMEGA65/issues/95)).
+  `tftp IP:PORT NAME` reaches a server on another port than 69.
 
 **Tests.**
 
@@ -57,6 +62,8 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 - The UDP entries and `tftp` run in `niceemu` against frames of
   `--eth-in`, with the frames sent compared: `test/udp.nasm` and
   `test/tftp.py`, with lost packets, duplicates, and an ERROR.
+  `make tftptest` runs the monitor in `niceemu` against `tools/tftpd.py`
+  itself, in CI too.
 
 ## V1.9 (2026-11-08)
 

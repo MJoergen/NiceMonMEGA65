@@ -187,24 +187,83 @@ frame 3, 46 bytes
 000  0a 00 00 00 00 02 02 4e 49 43 45 00 08 00 45 00
 010  00 20 00 00 40 00 40 11 26 c3 0a 00 00 09 0a 00
 020  00 02 pp pp 0d 80 00 0c 00 00 00 04 00 01
+== list
+NiceMon V9.9
+? lists the commands
+> i 10.0.0.9
+IP address 10.0.0.9
+> tftp 10.0.0.2 *.bin
+demo.bin                      41022
+hello.bin                     13374
+a-long-name-of-a-program.bin          7
+> h
+Halted
+exit 0
+frame 1, 42 bytes
+000  ff ff ff ff ff ff 02 4e 49 43 45 00 08 06 00 01
+010  08 00 06 04 00 01 02 4e 49 43 45 00 0a 00 00 09
+020  00 00 00 00 00 00 0a 00 00 02
+frame 2, 56 bytes
+000  0a 00 00 00 00 02 02 4e 49 43 45 00 08 00 45 00
+010  00 2a 00 00 40 00 40 11 26 b9 0a 00 00 09 0a 00
+020  00 02 pp pp 00 45 00 16 00 00 00 01 2a 2e 62 69
+030  6e 00 6f 63 74 65 74 00
+frame 3, 46 bytes
+000  0a 00 00 00 00 02 02 4e 49 43 45 00 08 00 45 00
+010  00 20 00 00 40 00 40 11 26 c3 0a 00 00 09 0a 00
+020  00 02 pp pp 0d 80 00 0c 00 00 00 04 00 01
+== port
+NiceMon V9.9
+? lists the commands
+> i 10.0.0.9
+IP address 10.0.0.9
+> tftp 10.0.0.2:6969 prog.bin
+Words loaded: 27, 00009000 to 0000901A
+Lines skipped: 2, first line 21; ADDR WORD in hex, ADDR 00008000 to FFFEFFFF
+> d 9000 4
+00009000 00000000 01010101 02020202 03030303
+> h
+Halted
+exit 0
+frame 1, 42 bytes
+000  ff ff ff ff ff ff 02 4e 49 43 45 00 08 06 00 01
+010  08 00 06 04 00 01 02 4e 49 43 45 00 0a 00 00 09
+020  00 00 00 00 00 00 0a 00 00 02
+frame 2, 59 bytes
+000  0a 00 00 00 00 02 02 4e 49 43 45 00 08 00 45 00
+010  00 2d 00 00 40 00 40 11 26 b6 0a 00 00 09 0a 00
+020  00 02 pp pp 1b 39 00 19 00 00 00 01 70 72 6f 67
+030  2e 62 69 6e 00 6f 63 74 65 74 00
+frame 3, 46 bytes
+000  0a 00 00 00 00 02 02 4e 49 43 45 00 08 00 45 00
+010  00 20 00 00 40 00 40 11 26 c3 0a 00 00 09 0a 00
+020  00 02 pp pp 0d 80 00 0c 00 00 00 04 00 01
 == args
 NiceMon V9.9
 ? lists the commands
 > tftp
-tftp IP NAME: the server and the file, such as tftp 192.168.1.10 hello.bin
+tftp IP[:PORT] [NAME]: tftp 192.168.1.10 hello.bin loads, *.bin lists
 > tftp x
-tftp IP NAME: the server and the file, such as tftp 192.168.1.10 hello.bin
-> tftp 10.0.0.2
-tftp IP NAME: the server and the file, such as tftp 192.168.1.10 hello.bin
+tftp IP[:PORT] [NAME]: tftp 192.168.1.10 hello.bin loads, *.bin lists
 > tftp 10.0.0.2 a b
-tftp IP NAME: the server and the file, such as tftp 192.168.1.10 hello.bin
+tftp IP[:PORT] [NAME]: tftp 192.168.1.10 hello.bin loads, *.bin lists
 > tftp 10.0.0.256 a
-tftp IP NAME: the server and the file, such as tftp 192.168.1.10 hello.bin
+tftp IP[:PORT] [NAME]: tftp 192.168.1.10 hello.bin loads, *.bin lists
 > tftp 10.0.0.2x a
-tftp IP NAME: the server and the file, such as tftp 192.168.1.10 hello.bin
+tftp IP[:PORT] [NAME]: tftp 192.168.1.10 hello.bin loads, *.bin lists
+> tftp 10.0.0.2: a
+tftp IP[:PORT] [NAME]: tftp 192.168.1.10 hello.bin loads, *.bin lists
+> tftp 10.0.0.2:0 a
+tftp IP[:PORT] [NAME]: tftp 192.168.1.10 hello.bin loads, *.bin lists
+> tftp 10.0.0.2:65536 a
+tftp IP[:PORT] [NAME]: tftp 192.168.1.10 hello.bin loads, *.bin lists
+> tftp 10.0.0.2:6x a
+tftp IP[:PORT] [NAME]: tftp 192.168.1.10 hello.bin loads, *.bin lists
 > tftpx
 Unknown command; ? lists them
 > tftp 10.0.0.2 a.bin
+No IP address; i sets one
+> tftp 10.0.0.2
 No IP address; i sets one
 > i 10.0.0.9
 IP address 10.0.0.9

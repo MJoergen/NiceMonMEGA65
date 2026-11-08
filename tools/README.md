@@ -16,6 +16,8 @@ prints its options with `--help`, and its header says more.
 | `hwtest.py` | Programs the FPGA with openFPGALoader and tests the system on the board. |
 | `flash.py` | Writes a bitstream into the Nexys4DDR's flash, or a core file into a slot of the MEGA65's, from which the board starts. |
 | `linktest.py` | Checks `run.py` and the link on `niceemu --link` against plain `niceemu`, without a board. |
+| `tftpd.py` | A TFTP server for the monitor's `tftp`, which also lists the files of its folder for a name with `*` or `?`. |
+| `tftptest.py` | Checks `tftpd.py`, and the monitor's `tftp` in `niceemu` against it, without a board. |
 | `cosimtest.py` | Checks `run.py` and the RTL on `make cosim` against plain `niceemu`, without a board. |
 | `screenshot.py` | Runs a program in `niceemu` and draws its screen as a PNG picture, as the text display shows it, and with `--debugger` the on-board debugger's strip under it. |
 | `bump.py` | Moves nice_cpu to a tag, builds the R6 and Nexys4DDR bitstreams, and writes the badge files and `verified.json`. |

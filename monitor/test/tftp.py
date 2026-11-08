@@ -22,6 +22,11 @@ the next runs with it, each line waiting for the frames sent before it
 - exact: a file of 512 bytes, 25 lines ended by CR LF and 37 empty
   lines, whose DATA 2 is empty.
 - empty: an empty file, one empty DATA 1.
+The runs list, with the input LIST, tftp 10.0.0.2 *.bin, and port, with
+PORT, tftp 10.0.0.2:6969 prog.bin, have ports of their own, which a run
+with only the ARP reply gives first: list gets a listing as
+tools/tftpd.py sends it, which is shown, and port gets the first block of
+PROG from the RRQ to port 6969.
 The run args has the input ARGS, with no frames: tftp's arguments that
 are not, tftp with no IP address, and tftp to a server that does not
 answer ARP.
@@ -29,7 +34,7 @@ Each run's console output, up to the halt, and the frames sent, 16 bytes
 a row with the client's port as pp pp, are written to OUT and compared
 with EXPECTED. The script also checks each frame's IPv4 checksum, and
 that each TFTP packet comes from the port of the first RRQ, the RRQs to
-port 69 and the ACKs to the TID. Exits with status 1 when a check fails.
+port 69, or 6969 in the run port, and the ACKs to the TID. Exits with status 1 when a check fails.
 Only the Python standard library is used.
 """
 
@@ -43,9 +48,15 @@ from typing import List, Optional, Tuple
 MAC = bytes.fromhex("024E49434500")      # the station's after reset
 SERVER_MAC = bytes.fromhex("0A0000000002")
 RUN = b"i 10.0.0.9\rtftp 10.0.0.2 prog.bin\rd 9000 4\rh\r"
-ARGS = (b"tftp\rtftp x\rtftp 10.0.0.2\rtftp 10.0.0.2 a b\rtftp 10.0.0.256 a\r"
-        b"tftp 10.0.0.2x a\rtftpx\rtftp 10.0.0.2 a.bin\ri 10.0.0.9\r"
+LIST = b"i 10.0.0.9\rtftp 10.0.0.2 *.bin\rh\r"
+PORT = b"i 10.0.0.9\rtftp 10.0.0.2:6969 prog.bin\rd 9000 4\rh\r"
+ARGS = (b"tftp\rtftp x\rtftp 10.0.0.2 a b\rtftp 10.0.0.256 a\r"
+        b"tftp 10.0.0.2x a\rtftp 10.0.0.2: a\rtftp 10.0.0.2:0 a\r"
+        b"tftp 10.0.0.2:65536 a\rtftp 10.0.0.2:6x a\rtftpx\r"
+        b"tftp 10.0.0.2 a.bin\rtftp 10.0.0.2\ri 10.0.0.9\r"
         b"tftp 10.0.0.3 a.bin\rh\r")
+LISTING = b"".join(f"{n:<24} {size:>10}\n".encode() for n, size in (
+    ("demo.bin", 41022), ("hello.bin", 13374), ("a-long-name-of-a-program.bin", 7)))
 STEPS = 40_000_000
 TID = 3456
 PORT_AT = 34                             # the client's port in a frame sent
@@ -150,6 +161,7 @@ def main() -> None:
             sys.exit(1)
         port: int = struct.unpack(">H", udp[0][PORT_AT:PORT_AT + 2])[0]
         runs = [("none", lines, frames)]
+        port_of = {"none": port}
         text = prog()
         first, second = text[:512], text[512:]
         ok_in = "\n".join([
@@ -185,6 +197,16 @@ def main() -> None:
         runs.append(("exact", *run(emu, monitor, RUN, exact_in, tmp, "exact")))
         empty_in = "\n".join(["1:" + arp_reply(), "2:" + data(port, 1, b""), ""])
         runs.append(("empty", *run(emu, monitor, RUN, empty_in, tmp, "empty")))
+        for name, inp, payload in (("list", LIST, LISTING), ("port", PORT, first)):
+            _, probe = run(emu, monitor, inp, "1:" + arp_reply() + "\n", tmp, name + "0")
+            sent = [f for f in probe if f[12:14] == b"\x08\x00"]
+            check(f"tftp {name}: an RRQ sent", len(sent) > 0)
+            if not sent:
+                sys.exit(1)
+            at: int = struct.unpack(">H", sent[0][PORT_AT:PORT_AT + 2])[0]
+            port_of[name] = at
+            eth_in = "\n".join(["1:" + arp_reply(), "2:" + data(at, 1, payload[:500]), ""])
+            runs.append((name, *run(emu, monitor, inp, eth_in, tmp, name)))
         runs.append(("args", *run(emu, monitor, ARGS, None, tmp, "args")))
 
     for name, lines, frames in runs:
@@ -195,11 +217,12 @@ def main() -> None:
         sums = [checksum(f[14:34]) == 0 for f in udp]
         check(f"tftp {name}: the IPv4 checksums", all(sums))
         ports = {struct.unpack(">H", f[PORT_AT:PORT_AT + 2])[0] for f in udp}
-        check(f"tftp {name}: one client port, the first run's",
-              name == "args" or ports == {port})
+        check(f"tftp {name}: one client port, its probe's",
+              name == "args" or ports == {port_of.get(name, port)})
         dst = [struct.unpack(">HH", f[36:38] + f[42:44]) for f in udp]
-        check(f"tftp {name}: RRQs to port 69, ACKs to the TID",
-              all((d, op) in ((69, 1), (TID, 4)) for d, op in dst))
+        rrq = 6969 if name == "port" else 69
+        check(f"tftp {name}: RRQs to port {rrq}, ACKs to the TID",
+              all((d, op) in ((rrq, 1), (TID, 4)) for d, op in dst))
     with open(out, "w") as f:
         f.write("\n".join(report) + "\n")
     try:

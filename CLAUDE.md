@@ -57,6 +57,8 @@ header is the authoritative address map.
     make flash [BIT=f.bit] # write the Nexys4DDR's flash (default its top.bit), verify, wait for the start; ARGS=--erase
     make flash COR=f.cor SLOT=1 # write a slot (1-7) of the MEGA65's flash over JTAG, no MEGAFLASH; checks slot 0's revision
     make linktest         # run.py --tcp on niceemu --link against plain niceemu, and mon.py's memory check, no board
+    make tftpd [TFTP_DIR=d] [TFTP_PORT=69] # tools/tftpd.py for the monitor's tftp, with listings for tftp IP *.bin
+    make tftptest         # tftpd.py, and the monitor's tftp in niceemu --eth-udp against it, no board
     make cosim            # the RTL in GHDL, its debug UART on TCP, for the tools' --cosim PORT
     make cosimtest        # run.py --cosim on make cosim against plain niceemu, no board (minutes)
 
@@ -72,7 +74,7 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
 `nice_cpu/emulator/zig-out/bin/niceemu x.bin`. CI
 (`.github/workflows/ci.yml`, on Ubuntu 24.04) builds niceemu and runs
 `make -C sim -j4 test` and `make cosimtest` on both cores, `make examples`,
-`make -C demo test`, `make -C monitor test`, `make linktest`, `make -j4 formal`, `make lint`, and `make typecheck`.
+`make -C demo test`, `make -C monitor test`, `make linktest`, `make tftptest`, `make -j4 formal`, `make lint`, and `make typecheck`.
 
 ## Layout
 
@@ -134,7 +136,9 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   `jtag.py`, the JTAG cable of the board's UART, which hwtest shares, and
   `spiflash.py`, the MEGA65's flash through openFPGALoader's bridge with
   pyftdi, which clears the sectors' DYB protection),
-  `bump.py`, `release.py`, `linktest.py`, `cosimtest.py`, `screenshot.py`
+  `bump.py`, `release.py`, `linktest.py`, `tftpd.py` (the TFTP server for
+  the monitor's `tftp`, with listings, #95) and `tftptest.py`,
+  `cosimtest.py`, `screenshot.py`
   (a program's screen in niceemu as a PNG). `examples/`: C programs built through
   nice_cpu's wasm translator. `demo/`: nice_cpu's demo (`nice_cpu/demo`,
   since V1.7), built by its Makefile with the board's `text.nasm`, a

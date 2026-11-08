@@ -13,7 +13,7 @@ ARGS   ?=
 LINK    = $(if $(ETH),--eth $(ETH)) $(if $(PORT),--port $(PORT))
 EMU     = nice_cpu/emulator/zig-out/bin/niceemu
 
-.PHONY: help test formal lint typecheck diagrams examples demo monitor r3 r6 nexys4ddr cor bump release load run mon flash hwtest linktest cosim cosimtest clean
+.PHONY: help test formal lint typecheck diagrams examples demo monitor r3 r6 nexys4ddr cor bump release load run mon flash hwtest linktest tftpd tftptest cosim cosimtest clean
 
 # Every target but these needs the nice_cpu submodule
 ifeq ($(wildcard nice_cpu/hdl/src/nice_pkg.vhd),)
@@ -87,6 +87,11 @@ help:
 	@echo "                  and start it"
 	@echo "  make linktest   compare run.py on niceemu --link with niceemu, and check"
 	@echo "                  mon.py's check of the memory, without a board"
+	@echo "  make tftpd [TFTP_DIR=.] [TFTP_PORT=69]"
+	@echo "                  serve the files of TFTP_DIR to the monitor's tftp, with"
+	@echo "                  listings for tftp IP *.bin (port 69 needs root)"
+	@echo "  make tftptest   check tools/tftpd.py, and the monitor's tftp in niceemu"
+	@echo "                  against it, without a board"
 	@echo "  make cosim [COSIM_PORT=4000] [ROM=prog.bin]"
 	@echo "                  run the system in GHDL with its debug UART on a TCP port,"
 	@echo "                  for the tools' --cosim PORT, until it is stopped"
@@ -243,6 +248,17 @@ hwtest: examples $(EMU)
 # runs the benchmark only when make examples has built it.
 linktest: $(EMU)
 	$(PYTHON) tools/linktest.py
+
+# The TFTP server for the monitor's tftp (tools/tftpd.py), and its check,
+# which runs the monitor in niceemu against it
+TFTP_DIR ?= .
+TFTP_PORT ?= 69
+tftpd:
+	$(PYTHON) tools/tftpd.py --dir $(TFTP_DIR) --port $(TFTP_PORT)
+
+tftptest: $(EMU)
+	$(MAKE) -C monitor build/monitor_test.bin
+	$(PYTHON) tools/tftptest.py
 
 # The system in GHDL, its debug UART on a TCP port of 127.0.0.1, for the
 # tools' --cosim (sim/Makefile)
