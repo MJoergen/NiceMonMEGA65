@@ -435,11 +435,11 @@ ROM is developed in niceemu and needs no board.
 |---|---|
 | MJoergen/nice_cpu#107 | Done: the registers in nice_cpu's SYSTEM.md, and `niceemu --sd0/--sd1` |
 | #55 | Done in V1.5: the controller in the RTL, stage 1: SPI mode, the card model, `tb_sd`, and the formal checks |
-| #63 | The controller, stage 2: 4-bit SD mode, optional, after a test whether a card leaves SPI mode |
+| #63 | In V1.9.1: the controller, stage 2: 4-bit SD mode, optional, after a test whether a card leaves SPI mode |
 | #56 | Done in V1.5: the pins on the R3, R6, and Nexys4DDR, and the read-only check in `make hwtest` |
 | #57 | Done in V1.7.1: the sector routines in the ROM, and the monitor's `sd` command |
 | #58 | Done in V1.9: FAT32 reading, `dir`, and `load` |
 | #91 | Done in V1.9: the folder `NICE`, set at build time |
-| #59 | FAT32 writing, `save`, and `del` |
+| #59 | In V1.9.1: FAT32 writing, `save`, and `del` |
 | #60 | BASIC's `SAVE`, `LOAD`, and `DIR` |
 | #61 | In V1.9.1: host tools for files on the board's card, over the link |
