@@ -60,7 +60,7 @@ header is the authoritative address map.
     make linktest         # run.py --tcp on niceemu --link against plain niceemu, and mon.py's memory check, no board
     make tftpd [TFTP_DIR=d] [TFTP_PORT=69] # tools/tftpd.py for the monitor's tftp, with listings for tftp IP *.bin
     make tftptest         # tftpd.py, and the monitor's tftp in niceemu --eth-udp against it, no board
-    make sdcard CMD=ls    # the board's SD card over the link: ls, or get NAME [DEST] (ETH= or PORT=)
+    make sdcard CMD=ls    # the board's SD card over the link: ls, get NAME [DEST], put SRC [NAME], del NAME (ETH= or PORT=)
     make sdtest           # sdcard.py on niceemu --link with images that mtools made, no board
     make cosim            # the RTL in GHDL, its debug UART on TCP, for the tools' --cosim PORT
     make cosimtest        # run.py --cosim on make cosim against plain niceemu, no board (minutes)
@@ -139,8 +139,9 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   `jtag.py`, the JTAG cable of the board's UART, which hwtest shares, and
   `spiflash.py`, the MEGA65's flash through openFPGALoader's bridge with
   pyftdi, which clears the sectors' DYB protection),
-  `sdcard.py` (the SD card's files over the link, with FAT32 read on
-  the host, which hwtest shares, #61) and `sdtest.py`,
+  `sdcard.py` (the SD card's files over the link, with FAT32 read and
+  written on the host in fat32.c's order, which hwtest shares, #61) and
+  `sdtest.py`,
   `bump.py`, `release.py`, `linktest.py`, `tftpd.py` (the TFTP server for
   the monitor's `tftp`, with listings, #95) and `tftptest.py`,
   `cosimtest.py`, `screenshot.py`

@@ -887,7 +887,16 @@ an MBR; one with no `NICE`; and FAT16. On a held core in `niceemu
 be the monitor's. On a running core, `sim/sdhold.nasm`, which has read
 a sector, the tool must leave the core running and `SD_LBA`,
 `SD_CHUNK`, and the buffer as they were, and refuse a card that the
-program has not started up. It takes a few seconds, and CI runs it.
+program has not started up. Then `put` and `del` write copies of the
+images, each checked with `fsck.fat -n`, `mdir`, and `mtype`: new files,
+an empty one, one of 60 clusters, a file truncated shorter and longer,
+deletions with long names, 20 files that grow the folder by a cluster,
+freed clusters taken again, a full card, and a write-protected one, and
+the errors of names and of read-only files. On a running core, `put`
+must start it again from reset. Last, the monitor of the tests lists the
+card, the tool puts a `.bin` file, which the monitor, started again,
+lists and loads, and deletes it. It takes about 40 seconds, and CI runs
+it.
 
 `make linktest` runs `run.py --tcp` on `niceemu --link` against plain
 `niceemu`, without a board, for the programs that `make hwtest` compares,

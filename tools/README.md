@@ -13,7 +13,7 @@ prints its options with `--help`, and its header says more.
 | `load.py` | Loads a `.bin` file into cleared memory and starts it, or with `--no-run` leaves the core held in reset. With `--monitor`, it runs a program at `0x8000` under the monitor in the ROM. |
 | `run.py` | Runs a program on the board and prints what `niceemu` prints, for diffing, also one under the monitor with `--monitor`. |
 | `mon.py` | An interactive shell on the link: memory, registers, pause, step, breakpoints, and the console. It is nice_cpu's `debugger/nicedbg.py` with the board's links. |
-| `sdcard.py` | Lists the folder `NICE` of the board's SD card, and copies a file of it to the host, with no PC slot. |
+| `sdcard.py` | Lists, copies, writes, and deletes the files of the folder `NICE` on the board's SD card, with no PC slot. |
 | `hwtest.py` | Programs the FPGA with openFPGALoader and tests the system on the board. |
 | `flash.py` | Writes a bitstream into the Nexys4DDR's flash, or a core file into a slot of the MEGA65's, from which the board starts. |
 | `linktest.py` | Checks `run.py` and the link on `niceemu --link` against plain `niceemu`, without a board. |
@@ -431,24 +431,45 @@ SLOT=N` the MEGA65's ([synth/README.md](../synth/README.md#building)).
 
 ## sdcard.py
 
-`sdcard.py` reads the board's SD card over the link, so a file comes off
-the card with no PC slot. It reads the card's FAT32 itself, as the
-monitor does, and only the monitor's folder `NICE` (see
-[SYSTEM.md](../doc/SYSTEM.md#the-sd-card-slots)). `ls` lists the folder
-as the monitor's `dir` does, with the long names after the rows, and
-`get NAME [DEST]` copies a file to `DEST`, by default its name in the
-current directory, or with `-` to stdout:
+`sdcard.py` reads and writes the board's SD card over the link, so a
+file goes to the card and comes off it with no PC slot
+([#61](https://github.com/MJoergen/NiceMonMEGA65/issues/61)). It reads
+and writes the card's FAT32 itself, as the monitor does, and only the
+monitor's folder `NICE` (see
+[SYSTEM.md](../doc/SYSTEM.md#the-sd-card-slots)):
 
-    tools/sdcard.py --eth 192.168.1.65 ls
-    tools/sdcard.py --eth 192.168.1.65 get HELLO.BIN
-    make sdcard ETH=192.168.1.65 CMD="get HELLO.BIN"
+- `ls` lists the folder as the monitor's `dir` does, with the long names
+  after the rows.
+- `get NAME [DEST]` copies a file to `DEST`, by default its name in the
+  current directory, or with `-` to stdout.
+- `put SRC [NAME]` writes the host's file `SRC`, or stdin for `-`, as the
+  file `NAME`, by default `SRC`'s own name. It makes the file, or
+  truncates it when it is there, as the monitor's `save` does.
+- `del NAME` deletes a file, with its long name, if it has one.
 
-`NAME` is the 8.3 name or the long name, in either case. `--folder`
-names another folder of the root, and `--slot` the slot. It only reads:
-`put` and `del` come next
-([#61](https://github.com/MJoergen/NiceMonMEGA65/issues/61)).
+```
+tools/sdcard.py --eth 192.168.1.65 ls
+tools/sdcard.py --eth 192.168.1.65 get HELLO.BIN
+tools/sdcard.py --eth 192.168.1.65 put prog.bas
+make sdcard ETH=192.168.1.65 CMD="del PROG.BAS"
+```
 
-The core can be in any state. A running core is paused for the reads,
+`get` and `del` take the 8.3 name or the long name, in either case.
+`put` writes only 8.3 names, as the monitor does: a host file such as
+`my program.bas` needs a `NAME`, such as `PROG.BAS`. `--folder` names
+another folder of the root, and `--slot` the slot.
+
+The writes keep to the order of the monitor's FAT32 code, so that a
+reset at any point leaves the card no worse than with lost clusters,
+which `fsck.fat` frees. A new entry has the host's date and time. When
+the card fills up, the file keeps what fitted, and `put` says error 30.
+
+The core can be in any state. `put` and `del` hold a running or paused
+core, and start it again from reset after the write, as the monitor
+keeps a sector of the FAT and its mount between commands, which the
+write makes stale. So a program at `0x8000` under the monitor is gone
+afterwards, and the monitor shows its prompt again. A held core stays
+held. For `ls` and `get`, a running core is paused for the reads,
 and goes on after them. While it is paused, the tool uses the program's
 card as it is: its slot, which the monitor's `dir` or `load` must have
 started up, and it puts back `SD_LBA`, `SD_CHUNK`, and the buffer at the

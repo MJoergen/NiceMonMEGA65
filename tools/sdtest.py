@@ -28,9 +28,27 @@ SD_CHUNK, and the buffer must be as they were. --slot 1 is refused
 there, and so is a card that the program has not started up, with the
 core left running.
 
+The writes, on copies of super.img, each checked afterwards with
+fsck.fat -n, which may report only FSInfo's free count as unknown, and
+with mtype: put of a new file, of an empty one, and of one of 60
+clusters; put over a file, shorter and longer; del of a file with a long
+name, whose long-name entries must go too, and of the fragmented one;
+put of 20 files, which the folder grows by a cluster for; and put into
+the clusters that del freed. The errors: a name that is not 8.3, put
+over and del of a directory and of a read-only file, and del of a
+missing one. A card that fills up keeps what fitted, with error 30, and
+a write-protected card is left as it was, with the controller's error 6.
+
+On a running core, put holds it, and starts it again from reset, which
+sim/sdhold.nasm shows by reading sector 5 again. Last, the monitor of
+the tests, monitor/build/monitor_test.bin, lists the card with dir, the
+tool puts a .bin file, and the monitor, started again, lists it and
+loads it; then the tool deletes it, and dir no longer lists it.
+
 It prints a line for each check, and last how many passed, and exits with
 status 1 when one fails. niceemu must be built first, with make -C
-nice_cpu/emulator build. Only the Python standard library is used, and
+nice_cpu/emulator build, and so must the monitor of the tests, with
+make -C monitor build/monitor_test.bin. Only the Python standard library is used, and
 the tools of dosfstools, util-linux, and mtools.
 """
 
@@ -53,6 +71,7 @@ NICEEMU = os.path.join(REPO, "nice_cpu", "emulator", "zig-out", "bin",
                        "niceemu")
 SDCARD = os.path.join(REPO, "tools", "sdcard.py")
 HOLD_PROG = os.path.join(REPO, "sim", "sdhold.nasm")
+MONITOR = os.path.join(REPO, "monitor", "build", "monitor_test.bin")
 MB = 1024 * 1024
 
 passed = 0
@@ -157,13 +176,15 @@ def sfdisk(img: str, part: str) -> None:
 class Emu:
     """niceemu --link on a free port, with images in its slots."""
 
-    def __init__(self, sd0: str | None, sd1: str | None = None) -> None:
+    def __init__(self, sd0: str | None, sd1: str | None = None,
+                 prog: str | None = None) -> None:
         cmd = [NICEEMU]
         if sd0:
             cmd += ["--sd0", sd0]
         if sd1:
             cmd += ["--sd1", sd1]
-        self.proc = subprocess.Popen(cmd + ["--link", "0"],
+        self.proc = subprocess.Popen(cmd + ["--link", "0"] +
+                                     ([prog] if prog else []),
                                      stdout=subprocess.DEVNULL,
                                      stderr=subprocess.PIPE)
         assert self.proc.stderr is not None
@@ -393,6 +414,301 @@ def test_running(imgs: dict[str, str], tmp: str) -> None:
         emu.close()
 
 
+def fsck(img: str) -> list[str]:
+    """What fsck.fat -n says of the FAT32 of img but its version, its
+    summary, and FSInfo's free count left unknown, which the monitor's
+    writes leave so too."""
+    r = subprocess.run(["fsck.fat", "-n", img], capture_output=True,
+                       text=True)
+    return [line for line in (r.stdout + r.stderr).splitlines()[1:]
+            if line and not line.startswith(img + ":")
+            and not line.startswith("Free cluster summary uninitialized")]
+
+
+def mtype(img: str, name: str) -> bytes | None:
+    r = subprocess.run(["mtype", "-i", img, f"::NICE/{name}"],
+                       capture_output=True)
+    return r.stdout if r.returncode == 0 else None
+
+
+def mnames(img: str) -> list[str]:
+    r = subprocess.run(["mdir", "-b", "-i", img, "::NICE"],
+                       capture_output=True, text=True)
+    return [n.replace("::/NICE/", "") for n in r.stdout.split()]
+
+
+def copy(src: str, dst: str) -> str:
+    with open(src, "rb") as f, open(dst, "wb") as g:
+        g.write(f.read())
+    return dst
+
+
+def check_card(img: str, what: str) -> None:
+    errors = fsck(img)
+    check(f"{what}: fsck.fat -n finds nothing", not errors,
+          "; ".join(errors))
+
+
+def test_writes(imgs: dict[str, str], tmp: str) -> None:
+    print("put and del on a held core, a copy of super.img")
+    img = copy(imgs["super"], os.path.join(tmp, "w.img"))
+    data = {
+        "NEW.TXT": b"a new file\n",
+        "NEW0.TXT": b"",
+        "NEW60.BIN": bytes((i * 31 + i // 300) & 0xFF for i in range(30000)),
+        "BIG.BIN": b"shorter now\n",
+        "HELLO.TXT": bytes((i * 5) & 0xFF for i in range(5000)),
+    }
+    src = os.path.join(tmp, "src.dat")
+    emu = Emu(img)
+    try:
+        for name, body in data.items():
+            with open(src, "wb") as f:
+                f.write(body)
+            r = emu.tool("put", src, name)
+            check(f"put {name}: {len(body)} bytes",
+                  r.returncode == 0 and
+                  f"{name}: {len(body)} bytes written" in r.stdout.decode(),
+                  text(r))
+        r = emu.tool("del", "a long FILE name.dat")
+        check("del by the long name", r.returncode == 0 and
+              "Deleted ALONGF~1.DAT" in r.stdout.decode(), text(r))
+        r = emu.tool("del", "frag.bin")
+        check("del FRAG.BIN", r.returncode == 0, text(r))
+    finally:
+        emu.close()
+    check_card(img, "after put and del")
+    for name, body in data.items():
+        check(f"mtype {name}", mtype(img, name) == body)
+    names = mnames(img)
+    check("mdir: the deleted files and their long names are gone",
+          not any(n.lower().startswith(("a long", "alongf", "frag"))
+                  for n in names), " ".join(names))
+    print("20 files, which grow the folder, and the freed clusters taken")
+    emu = Emu(img)
+    try:
+        ok = True
+        for i in range(1, 21):
+            with open(src, "wb") as f:
+                f.write(f"file {i}\n".encode() * i)
+            r = emu.tool("put", src, f"F{i:02d}.TXT")
+            ok = ok and r.returncode == 0
+        check("put F01.TXT to F20.TXT", ok)
+        body = bytes((i * 3) & 0xFF for i in range(8000))
+        with open(src, "wb") as f:
+            f.write(body)
+        r = emu.tool("put", src, "REUSE.BIN")
+        check("put REUSE.BIN, 16 clusters", r.returncode == 0, text(r))
+        r = emu.tool("get", "f20.txt", "-")
+        check("get F20.TXT back", r.stdout == b"file 20\n" * 20, text(r))
+        r = emu.tool("ls")
+        check("ls lists 27 files", "Files: 27, directories: 1" in
+              r.stdout.decode(), text(r))
+    finally:
+        emu.close()
+    check_card(img, "after 21 more files")
+    with open(img, "rb") as g:
+        def read(lba: int) -> bytes:
+            g.seek(512 * lba)
+            return g.read(512)
+        vol = Volume(read)
+        grown = len(list(vol.clusters(vol.dir)))
+        chain = list(vol.clusters(vol.find("REUSE.BIN").first))
+    check(f"the folder has grown to {grown} clusters", grown >= 2)
+    check("REUSE.BIN takes the clusters that del freed, below BIG.BIN's "
+          f"old ones: {chain[:4]}...", chain[0] < 60, str(chain))
+    check("mtype F20.TXT and REUSE.BIN",
+          mtype(img, "F20.TXT") == b"file 20\n" * 20 and
+          mtype(img, "REUSE.BIN") == body)
+    print("the errors of put and del")
+    run("mattrib", "-i", img, "+r", "::NICE/NEW.TXT")
+    with open(img, "rb") as g:
+        before = g.read()
+    emu = Emu(img)
+    try:
+        r = emu.tool("put", os.path.join(tmp, "toolongname.txt"))
+        check("put of a host file whose name is not 8.3",
+              r.returncode == 1 and "File error 20, not an 8.3 name" in
+              r.stderr.decode(), text(r))
+        r = emu.tool("put", src, "A.B.C")
+        check("put as A.B.C: File error 20", r.returncode == 1 and
+              "File error 20" in r.stderr.decode(), text(r))
+        for args, want in ((("put", src, "SUB"), "File error 22"),
+                           (("del", "SUB"), "File error 22"),
+                           (("put", src, "NEW.TXT"), "File error 32"),
+                           (("del", "NEW.TXT"), "File error 32"),
+                           (("del", "NOPE.TXT"), "File error 21")):
+            r = emu.tool(*args)
+            check(f"{' '.join(args[:1] + args[-1:])}: {want}",
+                  r.returncode == 1 and want in r.stderr.decode(), text(r))
+    finally:
+        emu.close()
+    with open(img, "rb") as g:
+        check("the errors change nothing on the card", g.read() == before)
+
+
+def free_clusters(img: str) -> int:
+    with open(img, "rb") as f:
+        def read(lba: int) -> bytes:
+            f.seek(512 * lba)
+            return f.read(512)
+        vol = Volume(read)
+        return sum(vol.next(c) == 0 for c in range(2, vol.top))
+
+
+def test_full(tmp: str) -> None:
+    print("a card that fills up")
+    img = os.path.join(tmp, "full.img")
+    blank(img, 34 * MB)
+    run("mkfs.fat", "-F", "32", "-s", "1", img)
+    run("mmd", "-i", img, "::NICE")
+    put(img, b"\0" * 512 * (free_clusters(img) - 4), "FILL.BIN", tmp)
+    left = free_clusters(img)
+    emu = Emu(img)
+    try:
+        src = os.path.join(tmp, "src.dat")
+        body = bytes(range(256)) * 20
+        with open(src, "wb") as f:
+            f.write(body)
+        r = emu.tool("put", src, "OVER.BIN")
+        check(f"put of 10 clusters on {left} free: File error 30",
+              r.returncode == 1 and "File error 30" in r.stderr.decode(),
+              text(r))
+    finally:
+        emu.close()
+    check_card(img, "the full card")
+    got = mtype(img, "OVER.BIN")
+    check(f"OVER.BIN keeps what fitted, {512 * left} bytes",
+          got == body[:512 * left], f"{len(got or b'')} bytes")
+
+
+def test_protected(imgs: dict[str, str], tmp: str) -> None:
+    img = copy(imgs["super"], os.path.join(tmp, "ro.img"))
+    os.chmod(img, 0o444)
+    with open(img, "rb") as f:
+        before = f.read()
+    emu = Emu(img)
+    try:
+        r = emu.tool("put", HOLD_PROG, "X.TXT")
+        check("put on a write-protected card: the controller's error 6",
+              r.returncode == 1 and "error 6, write-protected" in
+              r.stderr.decode(), text(r))
+    finally:
+        emu.close()
+    with open(img, "rb") as f:
+        check("and the card is as it was", f.read() == before)
+
+
+def test_write_running(imgs: dict[str, str], tmp: str) -> None:
+    print("put on a running core, sim/sdhold.nasm")
+    img = copy(imgs["super"], os.path.join(tmp, "run.img"))
+    emu = Emu(img)
+    try:
+        start_hold(emu, tmp, True)
+        link = emu.link()
+        try:
+            link.control(PAUSE | RAM)
+            time.sleep(0.1)
+            link.write(SD_LBA, [9])
+            link.control(RAM)
+        finally:
+            link.close()
+        r = emu.tool("put", HOLD_PROG, "HOLD.TXT")
+        check("put while it runs, and the core started again",
+              r.returncode == 0 and "started again from reset" in
+              r.stderr.decode(), text(r))
+        time.sleep(0.2)
+        ctl, lba, chunk, _ = paused_state(emu)
+        check("the program ran again from the start: SD_LBA 5, not 9",
+              ctl & (HOLD | PAUSE) == 0 and lba == 5 and chunk == 3,
+              f"control {ctl:08X}, LBA {lba}, chunk {chunk}")
+    finally:
+        emu.close()
+    with open(HOLD_PROG, "rb") as f:
+        check("mtype HOLD.TXT", mtype(img, "HOLD.TXT") == f.read())
+    check_card(img, "after put on a running core")
+
+
+def prompt(emu_link: Link, wait: float = 2.0) -> None:
+    """Waits for the monitor's first prompt, after its start."""
+    out = b""
+    end = time.monotonic() + wait
+    while time.monotonic() < end and not out.endswith(b"> "):
+        emu_link.poll(0.05)
+        out += emu_link.take_console()
+
+
+def console(emu_link: Link, line: str, wait: float = 2.0) -> str:
+    """Types a line into the monitor, and what it printed until its next
+    prompt."""
+    emu_link.take_console()
+    emu_link.send_console(line.encode() + b"\r")
+    out = b""
+    end = time.monotonic() + wait
+    while time.monotonic() < end and not out.endswith(b"> "):
+        emu_link.poll(0.05)
+        out += emu_link.take_console()
+    return out.decode(errors="replace")
+
+
+def test_monitor(imgs: dict[str, str], tmp: str) -> None:
+    print("the monitor of the tests, and put and del")
+    if not os.path.exists(MONITOR):
+        check(f"{MONITOR} is built", False,
+              "make -C monitor build/monitor_test.bin")
+        return
+    img = copy(imgs["super"], os.path.join(tmp, "mon.img"))
+    emu = Emu(img, prog=MONITOR)
+    prog = os.path.join(tmp, "prog.bin")
+    with open(prog, "w") as f:
+        f.write("8000 12345678\n8001 9ABCDEF0\n")
+    try:
+        link = emu.link()
+        try:
+            link.control(RAM)
+            prompt(link)
+            out = console(link, "dir")
+            check("the monitor's dir", "Files: 5, directories: 1" in out,
+                  repr(out))
+        finally:
+            link.close()
+        r = emu.tool("put", prog)
+        check("put PROG.BIN while the monitor runs", r.returncode == 0 and
+              "started again" in r.stderr.decode(), text(r))
+        link = emu.link()
+        try:
+            out = console(link, "dir")
+            check("the monitor, started again, lists PROG.BIN",
+                  "PROG     BIN          28" in out and
+                  "Files: 6, directories: 1" in out, repr(out))
+            out = console(link, "load prog.bin")
+            check("and loads it", "Words loaded: 2, 00008000 to 00008001"
+                  in out, repr(out))
+            pauses = link.pauses
+            link.control(PAUSE | RAM)
+            end = time.monotonic() + 2
+            while link.pauses == pauses and time.monotonic() < end:
+                link.poll(0.1)
+            words = link.read(0x8000, 2)
+            check("the words loaded", words == [0x12345678, 0x9ABCDEF0],
+                  str(words))
+            link.control(RAM)
+        finally:
+            link.close()
+        r = emu.tool("del", "prog.bin")
+        check("del PROG.BIN", r.returncode == 0, text(r))
+        link = emu.link()
+        try:
+            out = console(link, "dir")
+            check("dir no longer lists it", "PROG" not in out and
+                  "Files: 5, directories: 1" in out, repr(out))
+        finally:
+            link.close()
+    finally:
+        emu.close()
+    check_card(img, "after the monitor's test")
+
+
 def main() -> None:
     if not os.path.exists(NICEEMU):
         sys.exit(f"sdtest.py: no {NICEEMU}; make -C nice_cpu/emulator build")
@@ -401,6 +717,11 @@ def main() -> None:
         test_fragmented(imgs["super"])
         test_held(imgs, tmp)
         test_running(imgs, tmp)
+        test_writes(imgs, tmp)
+        test_full(tmp)
+        test_protected(imgs, tmp)
+        test_write_running(imgs, tmp)
+        test_monitor(imgs, tmp)
     print(f"{passed} passed, {failed} failed")
     sys.exit(1 if failed else 0)
 

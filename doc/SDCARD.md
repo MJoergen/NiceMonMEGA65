@@ -10,9 +10,8 @@ The ROM's sector routines and its `sd` command (#57) are written too, in
 V1.7.1, and [monitor/README.md](../monitor/README.md) describes them,
 and so is FAT32's reading, with `dir` and `load` (#58), in V1.9, in C,
 and its writing, with `save` and `del` (#59), in V1.9.1. The host tool
-`tools/sdcard.py` lists the card and copies its files to the host
-(#61, its first step), in V1.9.1; its writing and BASIC are not written
-yet. Its end is `SAVE`,
+`tools/sdcard.py` lists the card, and reads, writes, and deletes its
+files from the host (#61), in V1.9.1. BASIC is not written yet. Its end is `SAVE`,
 `LOAD`, and `DIR` in the BASIC of #54, and on the way it gives the monitor of #24 a way to load and save programs. The
 tracking issue is #62, and its subtasks are listed at the end.
 
@@ -424,7 +423,9 @@ numbers and no Commodore DOS, as #54 says.
   as the card is the user's. A slot with no card is NOT COVERED.
 - **The host tool**: `make sdtest` runs `tools/sdcard.py` on `niceemu
   --link` with images made by `mkfs.fat`, `sfdisk`, and `mcopy`, on a held
-  core and on a running one that has the card in use.
+  core and on a running one that has the card in use. After its writes,
+  `fsck.fat -n` checks the images, and `mdir` and `mtype` what is on
+  them, and the monitor of the tests lists and loads what it put.
 
 ## Not included
 
@@ -470,4 +471,4 @@ ROM is developed in niceemu and needs no board.
 | #91 | Done in V1.9: the folder `NICE`, set at build time |
 | #59 | Done in V1.9.1: FAT32 writing, `save`, and `del` |
 | #60 | BASIC's `SAVE`, `LOAD`, and `DIR` |
-| #61 | In V1.9.1: host tools for files on the board's card, over the link: `ls` and `get`, then `put` and `del`, which reset the core after a write |
+| #61 | Done in V1.9.1: `tools/sdcard.py`, the files on the board's card over the link: `ls`, `get`, `put`, and `del`, which reset the core after a write |

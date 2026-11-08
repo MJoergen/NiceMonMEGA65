@@ -53,10 +53,12 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   ([#95](https://github.com/MJoergen/NiceMonMEGA65/issues/95)).
   `tftp IP:PORT NAME` reaches a server on another port than 69.
 - `tools/sdcard.py`, `make sdcard`, lists the folder `NICE` of the
-  board's SD card and copies its files to the host, over the debug link,
-  with no PC slot ([#61](https://github.com/MJoergen/NiceMonMEGA65/issues/61)).
-  A running core is paused for the reads and goes on after them, with
-  the program's card as it was.
+  board's SD card, copies its files to the host, writes them, and
+  deletes them, over the debug link, with no PC slot
+  ([#61](https://github.com/MJoergen/NiceMonMEGA65/issues/61)). A
+  running core is paused for `ls` and `get` and goes on after them, with
+  the program's card as it was; `put` and `del` start it again from
+  reset.
 
 **Tests.**
 
@@ -70,7 +72,8 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   `make tftptest` runs the monitor in `niceemu` against `tools/tftpd.py`
   itself, in CI too.
 - `make sdtest` checks `tools/sdcard.py` on `niceemu --link` with cards
-  made by dosfstools and mtools, in CI too. `make hwtest` reads the
+  made by dosfstools and mtools, which `fsck.fat -n` and mtools check
+  after its writes, and with the monitor, in CI too. `make hwtest` reads the
   folder `NICE` with the same code.
 
 ## V1.9 (2026-11-08)

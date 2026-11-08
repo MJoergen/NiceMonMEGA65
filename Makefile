@@ -72,9 +72,9 @@ help:
 	@echo "  make mon [FILE=prog.bin] (ETH=IP | PORT=/dev/ttyUSB1)"
 	@echo "                  an interactive shell on the debug link: read and write"
 	@echo "                  memory, pause, step, breakpoints, and the console"
-	@echo "  make sdcard CMD='ls | get NAME [DEST]' (ETH=IP | PORT=/dev/ttyUSB1)"
-	@echo "                  list the folder NICE of the board's SD card, or copy a"
-	@echo "                  file of it to the host, over the debug link"
+	@echo "  make sdcard CMD='ls | get NAME [DEST] | put SRC [NAME] | del NAME' (ETH=IP | PORT=/dev/ttyUSB1)"
+	@echo "                  list, copy, write, or delete the files of the folder NICE"
+	@echo "                  of the board's SD card, over the debug link"
 	@echo "  make hwtest PORT=/dev/ttyUSB1 [BIT=synth/r6/build/top.bit] [ETH=IP]"
 	@echo "                  check that the FPGA on PORT's board is the part BIT was"
 	@echo "                  built for, program it with BIT, and run the tests (needs"
@@ -233,7 +233,7 @@ mon:
 
 # The files of the board's SD card over the link (tools/sdcard.py)
 sdcard:
-	@test -n "$(CMD)" || (echo "Give the command with CMD=ls or CMD='get NAME'"; exit 1)
+	@test -n "$(CMD)" || (echo "Give the command with CMD=ls, CMD='get NAME', CMD='put SRC', or CMD='del NAME'"; exit 1)
 	$(PYTHON) tools/sdcard.py $(LINK) $(ARGS) $(CMD)
 
 # The flash of the Nexys4DDR, or with COR and SLOT a slot of the MEGA65's
@@ -261,6 +261,7 @@ linktest: $(EMU)
 
 # sdcard.py on niceemu --link with images of a card, which needs no board
 sdtest: $(EMU)
+	$(MAKE) -C monitor build/monitor_test.bin
 	$(PYTHON) tools/sdtest.py
 
 # The TFTP server for the monitor's tftp (tools/tftpd.py), and its check,
