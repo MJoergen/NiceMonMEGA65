@@ -44,8 +44,11 @@ it selects the slot of --slot, or slot 0, or slot 1 when slot 0 has no
 card, as the monitor's first mount does, and starts the card with Init
 when it is not ready.
 
-put and del hold a running or paused core first, and start it again from
-reset after the write, as a program such as the monitor keeps a sector
+With --hold, ls and get hold a running or paused core too, as put and
+del do, and start it again from reset afterwards, so that they reach
+any slot, as while the core is held, whatever the program had: the
+program is lost. put and del hold a running or paused core first, and
+start it again from reset after the write, as a program such as the monitor keeps a sector
 of the FAT and its mount between commands, which the write makes stale.
 A program in the middle of a write of its own loses it, as at a reset,
 with lost clusters at worst. A held core stays held.
@@ -56,7 +59,7 @@ library is used, so this runs on Linux and macOS.
 
 Usage: tools/sdcard.py (--eth HOST[:PORT] | --port DEVICE [--baud 230400]
                        | --tcp [HOST:]PORT | --cosim PORT)
-                       [--slot N] [--folder NAME]
+                       [--slot N] [--folder NAME] [--hold]
                        (ls | get NAME [DEST] | put SRC [NAME] | del NAME)
 """
 
@@ -207,14 +210,15 @@ class Card:
     """The card in a slot of the board, over the link, for a with block.
     For reads, it pauses a running core at the start, and at the end
     restores what the program had and lets the core go on; for writes,
-    it holds a running or paused core, and starts it again at the end, as
-    the header says."""
+    and for reads with hold, it holds a running or paused core, and starts
+    it again at the end, as the header says."""
 
     def __init__(self, link: Link, slot: int | None = None,
-                 write: bool = False) -> None:
+                 write: bool = False, hold: bool = False) -> None:
         self.link = link
         self.want = slot
         self.writes = write
+        self.hold = hold or write
         self.slot = 0
         self.last = 0
         self.ctl = 0
@@ -251,8 +255,9 @@ class Card:
     def _start(self) -> None:
         link = self.link
         self.ctl = link.read_word(CONTROL)
-        if self.writes and not self.ctl & (HOLD | HALTED):
-            # A running or paused program's state of the card goes stale
+        if self.hold and not self.ctl & (HOLD | HALTED):
+            # A running or paused program's state of the card goes stale,
+            # or the tool takes the card as it wants it
             link.control(HOLD | (self.ctl & RAM))
             self.restart = True
         elif not self.ctl & (HOLD | HALTED | PAUSE):
@@ -269,7 +274,8 @@ class Card:
             if self.want is not None and self.want != self.slot:
                 raise SdError(
                     f"the paused program uses slot {self.slot}; hold the "
-                    f"core to read the card in slot {self.want}")
+                    f"core to read the card in slot {self.want}, or give "
+                    "--hold, which starts it again from reset")
             # SD_CHUNK before the buffer, whose read moves it
             lba = link.read_word(SD_LBA)
             chunk = link.read_word(SD_CHUNK)
@@ -278,13 +284,14 @@ class Card:
             if not csr & PRESENT:
                 raise SdError(
                     f"the paused program uses slot {self.slot}, which has "
-                    "no card; type dir SLOT on the board first, or hold "
-                    "the core")
+                    "no card; type dir SLOT on the board first, or give "
+                    "--hold, which starts the core again from reset")
             if not csr & READY or csr & CHANGED:
                 raise SdError(
                     f"the card in slot {self.slot} is not started up, and "
                     "the tool does no Init while a program is paused; type "
-                    "dir on the board first, or hold the core")
+                    "dir on the board first, or give --hold, which starts "
+                    "the core again from reset")
         else:
             slot = self.want
             if slot is None:
@@ -882,9 +889,13 @@ def main() -> None:
     add_arguments(parser)
     parser.add_argument("--slot", type=int,
                         help="the slot of the card, while the core is held "
-                        "or has halted, and for put and del (default 0, or "
-                        "1 when 0 has no card); a paused program's slot "
-                        "otherwise")
+                        "or has halted, with --hold, and for put and del "
+                        "(default 0, or 1 when 0 has no card); a paused "
+                        "program's slot otherwise")
+    parser.add_argument("--hold", action="store_true",
+                        help="for ls and get: hold a running or paused core, "
+                        "and start it again from reset afterwards, as put "
+                        "and del do, so that any slot can be read")
     parser.add_argument("--folder", default=FOLDER,
                         help="the folder of the root that the files are in "
                         "(default %(default)s, the monitor's)")
@@ -922,7 +933,7 @@ def main() -> None:
     link = open_link(args)
     try:
         writes = args.cmd in ("put", "del")
-        with Card(link, args.slot, writes) as card:
+        with Card(link, args.slot, writes, args.hold) as card:
             vol = Volume(card.read, args.folder,
                          card.write if writes else None)
             if args.cmd == "ls":

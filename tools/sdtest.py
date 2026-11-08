@@ -26,7 +26,8 @@ On a running core, sim/sdhold.nasm, which has read sector 5 and left
 SD_CHUNK at 3: ls must work, the core must run on afterwards, and SD_LBA,
 SD_CHUNK, and the buffer must be as they were. --slot 1 is refused
 there, and so is a card that the program has not started up, with the
-core left running.
+core left running. --hold reads both, and starts the program again from
+reset, and leaves a held core held.
 
 The writes, on copies of super.img, each checked afterwards with
 fsck.fat -n, which may report only FSInfo's free count as unknown, and
@@ -410,6 +411,44 @@ def test_running(imgs: dict[str, str], tmp: str) -> None:
         check("and the program runs on, with SD_LBA and SD_CHUNK as they "
               "were", ctl & (HOLD | PAUSE) == 0 and lba == 5 and chunk == 3,
               f"control {ctl:08X}, LBA {lba}, chunk {chunk}")
+        r = emu.tool("--hold", "ls")
+        check("ls --hold reads it, and starts the core again",
+              r.returncode == 0 and "Files: 5, directories: 1" in
+              r.stdout.decode() and "started again from reset" in
+              r.stderr.decode(), text(r))
+        ctl, lba, chunk, _ = paused_state(emu)
+        check("and the program ran again from the start",
+              ctl & (HOLD | PAUSE) == 0 and lba == 5 and chunk == 3,
+              f"control {ctl:08X}, LBA {lba}, chunk {chunk}")
+    finally:
+        emu.close()
+    emu = Emu(None, imgs["super"])
+    try:
+        start_hold(emu, tmp, True)
+        r = emu.tool("--slot", "1", "get", "HELLO.TXT", "-")
+        check("get --slot 1 while the program has slot 0 is refused",
+              r.returncode == 1 and "hold the core" in r.stderr.decode(),
+              text(r))
+        r = emu.tool("--hold", "--slot", "1", "get", "HELLO.TXT", "-")
+        check("get --hold --slot 1 reads it",
+              r.returncode == 0 and r.stdout == FILES["HELLO.TXT"], text(r))
+        ctl = paused_state(emu)[0]
+        check("and the core runs again", ctl & (HOLD | PAUSE) == 0,
+              f"control {ctl:08X}")
+    finally:
+        emu.close()
+    emu = Emu(imgs["super"])
+    try:
+        r = emu.tool("--hold", "ls")
+        check("ls --hold on a held core leaves it held",
+              r.returncode == 0 and "started again" not in
+              r.stderr.decode(), text(r))
+        link = emu.link()
+        try:
+            ctl = link.read_word(CONTROL)
+        finally:
+            link.close()
+        check("the core is still held", bool(ctl & HOLD), f"{ctl:08X}")
     finally:
         emu.close()
 

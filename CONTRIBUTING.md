@@ -887,7 +887,8 @@ an MBR; one with no `NICE`; and FAT16. On a held core in `niceemu
 be the monitor's. On a running core, `sim/sdhold.nasm`, which has read
 a sector, the tool must leave the core running and `SD_LBA`,
 `SD_CHUNK`, and the buffer as they were, and refuse a card that the
-program has not started up. Then `put` and `del` write copies of the
+program has not started up, and another slot, which `--hold` reads, with
+the program started again. Then `put` and `del` write copies of the
 images, each checked with `fsck.fat -n`, `mdir`, and `mtype`: new files,
 an empty one, one of 60 clusters, a file truncated shorter and longer,
 deletions with long names, 20 files that grow the folder by a cluster,

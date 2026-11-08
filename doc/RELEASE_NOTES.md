@@ -58,7 +58,7 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   ([#61](https://github.com/MJoergen/NiceMonMEGA65/issues/61)). A
   running core is paused for `ls` and `get` and goes on after them, with
   the program's card as it was; `put` and `del` start it again from
-  reset.
+  reset, and so do `ls` and `get` with `--hold`, which reach any slot.
 
 **Tests.**
 

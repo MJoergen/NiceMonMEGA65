@@ -477,9 +477,17 @@ end. `--slot` of another slot is refused then. While the core is held or
 has halted, the tool takes the slot of `--slot`, or slot 0, or slot 1
 when slot 0 has no card, as the monitor does, and starts the card up.
 
-After a write, the monitor starts again with slot 0 selected, so with
-the card in slot 1 an `ls` or `get` while it runs needs a `dir 1` on the
-board first, or the core held.
+`--hold` makes `ls` and `get` hold a running or paused core too, and
+start it again from reset afterwards, as `put` and `del` do, so that
+they read any slot, whatever the program had. Without it, they need the
+program's own card: after a write, the monitor starts again with slot 0
+selected, so with the card in slot 1 an `ls` while it runs needs a
+`dir 1` on the board first, or `--hold`:
+
+```
+tools/sdcard.py --eth 192.168.1.65 --slot 1 put prog.bas
+tools/sdcard.py --eth 192.168.1.65 --slot 1 --hold get PROG.BAS
+```
 
 A sector takes 16 writes and 16 reads on the link, each a request that
 waits for its answer. On an R6, a file comes at about 115 KB a second
