@@ -166,10 +166,12 @@ static void put32(unsigned char *p, unsigned v)
 }
 
 // A sector written, but none outside the partition, nor below its first
-// FAT but FSInfo, so never the MBR or the boot sector
+// FAT but FSInfo, when the volume has one, so never the MBR or the boot
+// sector
 static int wr(unsigned lba, const unsigned *buf)
 {
-    if ((lba < vol.fat && lba != vol.fsinfo) || lba >= vol.end)
+    if ((lba < vol.fat && !(vol.fsinfo && lba == vol.fsinfo)) ||
+        lba >= vol.end)
         return E_BADFAT;
     return fat_sd_write(lba, buf);
 }
@@ -704,14 +706,17 @@ int fat_open(unsigned name, int mode)
     int r = mounted();
     if (r < 0)
         return r;
+    // The handle, whose lack, E_TOOMANY, is reported after the errors of
+    // the name and the file, as in table 1.1, and before the entry is
+    // changed, so that a full table leaves the file as it was
     int h = freeh();
-    if (h < 0)
-        return h;
     if (mode == 2) {
         // The folder, the only directory: an empty name, or /
         unsigned c = nice_peek(name);
         if (c && !(c == '/' && nice_peek(name + 1) == 0))
             return E_NAME;
+        if (h < 0)
+            return h;
         start(&files[h], vol.dir, K_DIR, 0);
         return h;
     }
@@ -733,10 +738,14 @@ int fat_open(unsigned name, int mode)
         size = u32(e + 28);
         if (size && (first < 2 || first >= vol.top))
             return E_BADFAT;
+        if (h < 0)
+            return h;
     } else if (r == 1) {
         // Truncated: the entry emptied, then its clusters freed
         if ((r = writable(e)) < 0)
             return r;
+        if (h < 0)
+            return h;
         unsigned old = cluster(e);
         put16(e + 20, 0);
         put16(e + 26, 0);
@@ -744,6 +753,8 @@ int fat_open(unsigned name, int mode)
         if ((r = wr(dirf.lba, dirf.buf)) < 0 || (r = release(old)) < 0 ||
             (r = infodone()) < 0)
             return r;
+    } else if (h < 0) {
+        return h;
     } else if ((r = make(n, &e)) < 0 || (r = infodone()) < 0) {
         return r;
     }

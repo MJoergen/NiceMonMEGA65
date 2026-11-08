@@ -207,8 +207,8 @@ RETURN give it that address, and `i` alone shows it. On a network with
 a DHCP server, `i dhcp` gets an address from it and shows it, with the
 mask, the gateway, and the server, and `tftp 192.168.1.10 hello.bin`
 then loads a program from a TFTP server on the network, such as `make
-tftpd TFTP_DIR=examples/build` on a PC, and `tftp 192.168.1.10 *.bin`
-lists its programs
+tftpd` on a PC, which serves `examples/build`, and `tftp 192.168.1.10
+*.bin` lists its programs
 ([monitor/README.md](monitor/README.md#the-network)). The board does not renew the lease,
 so a server that wants the address back after the lease may give it to
 another computer; a fixed address outside the server's range, or one

@@ -269,8 +269,10 @@ datagram is one byte per word, bits 7..0, as the file entries have it:
   when none waits. The frames before it that are not one are released
   unread, so a program that also wants other frames drives the port
   itself. An empty datagram, a fragment, and IP options are passed
-  over. The queue holds 4 frames (nice_cpu's SYSTEM.md §7), so a program
-  that receives a burst reads it soon.
+  over. A call with no room, 0 bytes, copies nothing and leaves the
+  queue as it is, so no datagram is lost to it. The queue holds 4 frames
+  (nice_cpu's SYSTEM.md §7), so a program that receives a burst reads it
+  soon.
 
 | Error | Meaning |
 |---|---|
@@ -299,11 +301,13 @@ which no other server does
 ([#95](https://github.com/MJoergen/NiceMonMEGA65/issues/95)). To serve
 the examples from a PC:
 
-    make tftpd TFTP_DIR=examples/build
+    make tftpd
 
+It serves `examples/build`, the folder of `make examples`, or with
+`TFTP_DIR=FOLDER` another folder, its regular files and nothing else.
 Port 69 needs root, or the capability that `tools/tftpd.py --help`
-gives; without either, `make tftpd TFTP_DIR=examples/build
-TFTP_PORT=6969` serves on port 6969. On the board, `i dhcp`, then
+gives; without either, `make tftpd TFTP_PORT=6969` serves on port
+6969. On the board, `i dhcp`, then
 `tftp 192.168.1.10 *.bin` lists the programs, and `tftp 192.168.1.10
 hello.bin` loads one, with the PC's address, and `:6969` after it for
 the other port. Any other TFTP server, such as `tftpd-hpa`, serves the
@@ -486,7 +490,7 @@ offset off, as a program may have hidden the one or used the other.
 | 15 | `1E` | `fs_delete` | R1 a name. Deletes the file of the folder `NICE`, with its long name. → R1 0, or an error. Table 1.2. | — |
 | 16 | `20` | `udp_open` | R1 a local port, or 0 for one of 49152 to 65535. Opens the UDP endpoint, and enables the port for Ethernet frames (The network above). → R1 the port, or an error. Table 1.3. | — |
 | 17 | `22` | `udp_send` | R1 an IP address, R2 a port, R3 a buffer, R4 a number of bytes, one per word, up to 1472. Sends them as a datagram. → R1 0, or an error. Table 1.3. | — |
-| 18 | `24` | `udp_recv` | R1 a buffer, R2 a number of bytes, R3 the address of 2 words, or 0. Does not wait. Copies up to that many bytes of the next datagram, one per word, and its source's IP address and port to the 2 words. → R1 the bytes copied, 0 when none waits, or an error. Table 1.3. | — |
+| 18 | `24` | `udp_recv` | R1 a buffer, R2 a number of bytes, R3 the address of 2 words, or 0. Does not wait. Copies up to that many bytes of the next datagram, one per word, and its source's IP address and port to the 2 words; with R2 0 copies nothing, and leaves the datagram waiting. → R1 the bytes copied, 0 when none waits, or an error. Table 1.3. | — |
 | 19 | `26` | `udp_close` | Closes the endpoint, and disables the port for Ethernet frames. → R1 0. Table 1.3. | — |
 
 Three entries of the first draft went on 2026-10-30, by the table's own

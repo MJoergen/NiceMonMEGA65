@@ -32,7 +32,7 @@ or, in an existing clone:
   for a board's target with `ROM=monitor/build/monitor.bin`. `FOLDER=NAME`
   puts its files in another folder of the SD card than `NICE`, which a
   board's target takes too (see
-  [monitor/](monitor/README.md#building-and-testing)).
+  [monitor/INTERNALS.md](monitor/INTERNALS.md#building-and-testing)).
 - `make diagrams` renders the block diagrams of `src/README.md` and
   `src/eth/README.md` from the `.tex` files beside them (needs pdflatex
   and pdftoppm).
@@ -59,9 +59,13 @@ or, in an existing clone:
   `TAG=V1.0.1` one that keeps nice_cpu at `V1.0` (see
   [RELEASE.md](doc/RELEASE.md)).
 - `make linktest` checks the tools on `niceemu --link`, without a board
-- `make tftptest` checks `tools/tftpd.py`, and the monitor's `tftp` against it, without a board
-- `make sdtest` checks `tools/sdcard.py` on `niceemu --link` with images of a card, without a board
   (see [The tools and niceemu](#the-tools-and-niceemu)).
+- `make tftptest` checks `tools/tftpd.py`, and the monitor's `tftp`
+  against it, without a board (see [The tools and
+  niceemu](#the-tools-and-niceemu)).
+- `make sdtest` checks `tools/sdcard.py` on `niceemu --link` with images
+  of a card, without a board (see [The tools and
+  niceemu](#the-tools-and-niceemu)).
 - `make cosim` runs the system in GHDL for the tools, and `make cosimtest`
   checks the tools and the RTL on it, without a board (see [The simulated
   board](#the-simulated-board)).
@@ -870,21 +874,24 @@ present bit of `SD_CSR` falls.
 
 `make tftptest` runs `tools/tftptest.py`. It checks `tools/tftpd.py`
 with a client of its own: files of 0 to 140,000 bytes, a name in
-another case, listings, the errors, a lost and a duplicate ACK, and a
-packet of another port. Then it runs the monitor of the tests in
-`niceemu` with `--eth-udp`, whose frames go to a bridge in the script
-that answers ARP for 10.0.0.2 and passes its datagrams to `tftpd.py`,
-and checks that `tftp` lists the folder, loads a program, and shows an
-ERROR. It takes about a second.
+another case, listings, the errors, a symbolic link out of the folder,
+a lost and a duplicate ACK, a packet of another port, and an ERROR from
+the client, which ends the transfer. Then it runs the monitor of the
+tests in `niceemu` with `--eth-udp`, whose frames go to a bridge in the
+script that answers ARP for 10.0.0.2 and passes its datagrams to
+`tftpd.py`, and checks that `tftp` lists the folder, loads a program,
+and shows an ERROR. It takes about a second.
 
 `make sdtest` runs `tools/sdtest.py`. It makes images of a card with
 `mkfs.fat`, `sfdisk`, and `mtools`: FAT32 on the whole card, with a
 short file, an empty one, a long name, a file of 40 clusters, a
 fragmented one, and a subdirectory in `NICE`; FAT32 in a partition of
-an MBR; one with no `NICE`; and FAT16. On a held core in `niceemu
---link`, `sdcard.py ls` must list `NICE` with its sizes and long names,
-`get` must give each file's bytes, by either name, and the errors must
-be the monitor's. On a running core, `sim/sdhold.nasm`, which has read
+an MBR; one with no `NICE`; FAT16; a boot sector without its signature;
+and a long name that is a path, `../evil.dat`. On a held core in
+`niceemu --link`, `sdcard.py ls` must list `NICE` with its sizes and
+long names, `get` must give each file's bytes, by either name, and
+under the 8.3 name when the long name is a path, and the errors must be
+the monitor's. On a running core, `sim/sdhold.nasm`, which has read
 a sector, the tool must leave the core running and `SD_LBA`,
 `SD_CHUNK`, and the buffer as they were, and refuse a card that the
 program has not started up, and another slot, which `--hold` reads, with

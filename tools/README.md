@@ -441,7 +441,9 @@ monitor's folder `NICE` (see
 - `ls` lists the folder as the monitor's `dir` does, with the long names
   after the rows.
 - `get NAME [DEST]` copies a file to `DEST`, by default its name in the
-  current directory, or with `-` to stdout.
+  current directory, or with `-` to stdout. The name it writes is the
+  long name when that is a plain file name, or else the 8.3 name, so a
+  card's long name with a path in it writes nowhere else.
 - `put SRC [NAME]` writes the host's file `SRC`, or stdin for `-`, as the
   file `NAME`, by default `SRC`'s own name. It makes the file, or
   truncates it when it is there, as the monitor's `save` does.

@@ -2,15 +2,18 @@
 """A TFTP server for the monitor's tftp, with listings of its folder.
 
 It serves the regular files of one folder, --dir, and nothing below or
-above it, to read requests (RFC 1350) in octet mode, and in netascii
-mode as octet, as the .bin files are text already. A name is found as
-it is, or else without regard to case, when that matches one file. The
-options of RFC 2347 are ignored, as the RFC allows, so blocks are 512
-bytes. The block number goes round from 65535 to 0, as most clients
-expect. Each transfer has a socket of its own, its TID, and a thread:
-a block with no ACK within --timeout seconds is sent again, up to
---tries times in all, and a packet from another TID is answered with
-ERROR 5 and passed over.
+above it, nor through a symbolic link, to read requests (RFC 1350) in
+octet mode, and in netascii mode as octet, as the .bin files are text
+already. A name is found as it is, or else without regard to case, when
+that matches one file. The options of RFC 2347 are ignored, as the RFC
+allows, so blocks are 512 bytes. The block number goes round from 65535
+to 0, as most clients expect. Each transfer has a socket of its own,
+its TID, and a thread, and reads the file a block at a time as it sends
+it: a block with no ACK within --timeout seconds is sent again, up to
+--tries times in all, an ERROR from the client ends the transfer, as
+RFC 1350 says, and a packet from another TID is answered with ERROR 5
+and passed over. At most MAX_TRANSFERS, 16, run at once, so that a
+flood of requests takes no more than that; one more gets ERROR 0.
 
 The extension: a name with * or ? is a pattern, and the server answers
 it with a text file made on the spot, the listing of the files that
@@ -34,16 +37,18 @@ Python standard library is used.
 
 import argparse
 import fnmatch
+import io
 import os
 import socket
 import struct
 import sys
 import threading
-from typing import Optional, Tuple
+from typing import BinaryIO, Optional, Tuple
 
 RRQ, WRQ, DATA, ACK, ERROR = 1, 2, 3, 4, 5
 BLOCK = 512
 NAME_WIDTH = 24
+MAX_TRANSFERS = 16
 
 Addr = Tuple[str, int]
 
@@ -55,6 +60,10 @@ class Refused(Exception):
         super().__init__(message)
         self.code = code
         self.message = message
+
+
+class Ended(Exception):
+    """The client's ERROR, which ends a transfer: what it said."""
 
 
 def error_packet(code: int, message: str) -> bytes:
@@ -77,12 +86,19 @@ def parse_request(packet: bytes) -> Tuple[int, str, str]:
     return op, name, mode
 
 
+def served(folder: str, name: str) -> bool:
+    """Whether name is a file the server gives out: a regular file of
+    folder, not a symbolic link, whose name does not start with a dot."""
+    path = os.path.join(folder, name)
+    return (not name.startswith(".") and os.path.isfile(path)
+            and not os.path.islink(path))
+
+
 def listing(folder: str, pattern: str) -> bytes:
     """The text of the files of folder that match pattern."""
     names = []
     for name in os.listdir(folder):
-        path = os.path.join(folder, name)
-        if (not name.startswith(".") and os.path.isfile(path)
+        if (served(folder, name)
                 and fnmatch.fnmatchcase(name.lower(), pattern.lower())):
             names.append(name)
     if not names:
@@ -93,50 +109,56 @@ def listing(folder: str, pattern: str) -> bytes:
         .encode("utf-8", "replace") for name in names)
 
 
-def content(folder: str, name: str) -> Tuple[str, bytes]:
-    """The name served and the bytes of a request's name, a file or a
-    listing."""
+def content(folder: str, name: str) -> Tuple[str, BinaryIO]:
+    """The name served and the bytes of a request's name, the file open
+    to read, or a listing, which the caller closes."""
     if not name or name.startswith(".") or "/" in name or "\\" in name or ".." in name:
         raise Refused(2, "Only names of files in the folder")
     if "*" in name or "?" in name:
-        return name, listing(folder, name)
-    path = os.path.join(folder, name)
-    if not os.path.isfile(path):
+        return name, io.BytesIO(listing(folder, name))
+    if not served(folder, name):
         same = [n for n in os.listdir(folder)
-                if n.lower() == name.lower() and not n.startswith(".")
-                and os.path.isfile(os.path.join(folder, n))]
+                if n.lower() == name.lower() and served(folder, n)]
         if len(same) != 1:
             raise Refused(1, "File not found")
-        name, path = same[0], os.path.join(folder, same[0])
+        name = same[0]
     try:
-        with open(path, "rb") as f:
-            return name, f.read()
+        return name, open(os.path.join(folder, name), "rb")
     except OSError as e:
         raise Refused(2, e.strerror or "Cannot read") from None
 
 
-def send_file(sock: socket.socket, client: Addr, data: bytes, timeout: float,
-              tries: int) -> Optional[str]:
-    """data to client in blocks, each sent again until its ACK comes. None
-    when the last block's ACK came, or the reason it did not."""
+def send_file(sock: socket.socket, client: Addr, src: BinaryIO, timeout: float,
+              tries: int) -> Tuple[int, Optional[str]]:
+    """src to client in blocks, read as they are sent, each sent again
+    until its ACK comes. The bytes sent, and None when the last block's
+    ACK came, or the reason the transfer ended before it."""
     sock.settimeout(timeout)
-    count = len(data) // BLOCK + 1      # a last block of less than 512
-    for n in range(count):
-        block = (n + 1) & 0xFFFF
-        packet = struct.pack(">HH", DATA, block) + data[n * BLOCK:(n + 1) * BLOCK]
+    n = sent = 0
+    while True:
+        chunk = src.read(BLOCK)         # the last block has less than 512
+        n += 1
+        block = n & 0xFFFF
+        packet = struct.pack(">HH", DATA, block) + chunk
         for _ in range(tries):
             sock.sendto(packet, client)
-            if wait_ack(sock, client, block):
-                break
+            try:
+                if wait_ack(sock, client, block):
+                    break
+            except Ended as e:
+                return sent, str(e)
         else:
-            return f"no ACK of block {n + 1}"
-    return None
+            return sent, f"no ACK of block {n}"
+        sent += len(chunk)
+        if len(chunk) < BLOCK:
+            return sent, None
 
 
 def wait_ack(sock: socket.socket, client: Addr, block: int) -> bool:
     """Whether the ACK of block comes from client before the timeout.
     ACKs of earlier blocks are passed over, so that a duplicate does not
-    send a block again (the Sorcerer's Apprentice of RFC 1123)."""
+    send a block again (the Sorcerer's Apprentice of RFC 1123). An ERROR
+    from the client raises Ended."""
     while True:
         try:
             packet, addr = sock.recvfrom(BLOCK + 4)
@@ -149,30 +171,35 @@ def wait_ack(sock: socket.socket, client: Addr, block: int) -> bool:
             continue
         op, n = struct.unpack(">HH", packet[:4])
         if op == ERROR:
-            return False
+            text = packet[4:].split(b"\0", 1)[0].decode("latin-1", "replace")
+            raise Ended(f"the client's ERROR {n}, {text}")
         if op == ACK and n == block:
             return True
 
 
 def serve(client: Addr, packet: bytes, args: argparse.Namespace,
-          lock: threading.Lock) -> None:
-    """One request, on a socket of its own."""
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-        sock.bind((args.addr, 0))
-        name = "?"
-        try:
-            op, name, mode = parse_request(packet)
-            if op == WRQ:
-                raise Refused(2, "Writing is not supported")
-            if mode not in ("octet", "netascii"):
-                raise Refused(0, f"Mode {mode} is not supported")
-            name, data = content(args.dir, name)
-        except Refused as e:
-            sock.sendto(error_packet(e.code, e.message), client)
-            report(lock, client, name, f"error {e.code}, {e.message}")
-            return
-        reason = send_file(sock, client, data, args.timeout, args.tries)
-        report(lock, client, name, reason or f"{len(data)} bytes")
+          lock: threading.Lock, slots: threading.BoundedSemaphore) -> None:
+    """One request, on a socket of its own, in one of the slots."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            sock.bind((args.addr, 0))
+            name = "?"
+            try:
+                op, name, mode = parse_request(packet)
+                if op == WRQ:
+                    raise Refused(2, "Writing is not supported")
+                if mode not in ("octet", "netascii"):
+                    raise Refused(0, f"Mode {mode} is not supported")
+                name, src = content(args.dir, name)
+            except Refused as e:
+                sock.sendto(error_packet(e.code, e.message), client)
+                report(lock, client, name, f"error {e.code}, {e.message}")
+                return
+            with src:
+                sent, reason = send_file(sock, client, src, args.timeout, args.tries)
+            report(lock, client, name, reason or f"{sent} bytes")
+    finally:
+        slots.release()
 
 
 def report(lock: threading.Lock, client: Addr, name: str, what: str) -> None:
@@ -204,10 +231,15 @@ def main() -> None:
     print(f"tftpd.py: serving {os.path.abspath(args.dir)} on port {port}",
           file=sys.stderr, flush=True)
     lock = threading.Lock()
+    slots = threading.BoundedSemaphore(MAX_TRANSFERS)
     try:
         while True:
             packet, client = sock.recvfrom(BLOCK + 4)
-            threading.Thread(target=serve, args=(client, packet, args, lock),
+            if not slots.acquire(blocking=False):
+                sock.sendto(error_packet(0, "Too many transfers"), client)
+                report(lock, client, "?", "error 0, too many transfers")
+                continue
+            threading.Thread(target=serve, args=(client, packet, args, lock, slots),
                              daemon=True).start()
     except KeyboardInterrupt:
         pass

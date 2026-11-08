@@ -378,7 +378,7 @@ A C program keeps its data in its own image, which would be in the ROM,
 so its writes would be lost. It runs from the ROM when it is built with
 `nicebuild.py --ram ADDR`, which puts the words it writes in the RAM from
 `ADDR`, as the monitor's C code has them at `0xFFFFF400`
-([monitor/README.md](../monitor/README.md#c-in-the-rom)).
+([monitor/INTERNALS.md](../monitor/INTERNALS.md#c-in-the-rom)).
 
 While the core runs from the ROM, the link reaches only its debug
 registers. Bit 3 of the control register hides the ROM: a write of

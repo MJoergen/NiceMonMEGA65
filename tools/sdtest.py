@@ -15,6 +15,12 @@ is checked against them:
 - nonice.img: FAT32 with no folder NICE, which the tool rejects with the
   monitor's error 29, as --folder OTHER does on super.img.
 - fat16.img: an MBR with a FAT16 partition, error 18.
+- nosig.img: super.img without the boot sector's 55 AA signature, which
+  the monitor refuses with error 16, so the tool must too.
+- evil.img: super.img with the long name of ALONGF~1.DAT rewritten as
+  ../evil.dat, a path, as a card from elsewhere may spell one: get must
+  write the file under its 8.3 name, here or in the directory given,
+  and nowhere else.
 
 On a held core, ls must list what is in NICE, with its sizes and long
 names, and the counts, and get must give each file's bytes, by its 8.3
@@ -65,7 +71,8 @@ import time
 from boardlink import CONTROL, HOLD, PAUSE, RAM, Link, Tcp
 from load import load_words, read_bin
 import nicelink
-from sdcard import (SD_CHUNK, SD_LBA, Volume, read_buffer, to_bytes)
+from sdcard import (SD_CHUNK, SD_LBA, Volume, lfn_sum, read_buffer,
+                    to_bytes)
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NICEEMU = os.path.join(REPO, "nice_cpu", "emulator", "zig-out", "bin",
@@ -130,10 +137,40 @@ FILES = {
 }
 
 
+def lfn_entry(seq: int, chars: list[int], csum: int) -> bytes:
+    """A long-name entry: its sequence number, its 13 characters, and
+    the checksum of the 8.3 name."""
+    e = bytearray(32)
+    e[0], e[11], e[13] = seq, 0x0F, csum
+    text = b"".join(c.to_bytes(2, "little") for c in chars)
+    e[1:11], e[14:26], e[28:32] = text[:10], text[10:22], text[22:26]
+    return bytes(e)
+
+
+def rename_long(img: str, short: str, long: str) -> None:
+    """The long name of the file short of NICE in img set to long, of up
+    to 13 characters, in the long-name entry right before the file's;
+    its other long-name entries are marked deleted."""
+    assert len(long) <= 13
+    with open(img, "r+b") as f:
+        def read(lba: int) -> bytes:
+            f.seek(512 * lba)
+            return f.read(512)
+        e = Volume(read).find(short)
+        assert e.lfn, f"{short} has no long name"
+        chars = ([ord(c) for c in long] + [0] + [0xFFFF] * 12)[:13]
+        for i, (lba, at) in enumerate(e.lfn):
+            f.seek(512 * lba + at)
+            if i == len(e.lfn) - 1:
+                f.write(lfn_entry(0x41, chars, lfn_sum(e.raw)))
+            else:
+                f.write(b"\xe5")
+
+
 def make_images(tmp: str) -> dict[str, str]:
     """The images of the header, by name."""
     imgs = {n: os.path.join(tmp, n + ".img")
-            for n in ("super", "mbr", "nonice", "fat16")}
+            for n in ("super", "mbr", "nonice", "fat16", "nosig", "evil")}
     img = imgs["super"]
     blank(img, 64 * MB)
     run("mkfs.fat", "-F", "32", "-s", "1", "-n", "SDTEST", img)
@@ -166,6 +203,12 @@ def make_images(tmp: str) -> dict[str, str]:
     sfdisk(img, "2048,,6")
     run("mkfs.fat", "-F", "16", "--offset", "2048", img,
         str((20 * MB - MB) // 1024))
+    img = copy(imgs["super"], imgs["nosig"])
+    with open(img, "r+b") as f:
+        f.seek(510)
+        f.write(b"\0\0")
+    rename_long(copy(imgs["super"], imgs["evil"]), "ALONGF~1.DAT",
+                "../evil.dat")
     return imgs
 
 
@@ -196,14 +239,16 @@ class Emu:
             sys.exit(f"sdtest.py: niceemu --link printed {first!r}")
         self.port = m.group(1)
 
-    def tool(self, *args: str) -> subprocess.CompletedProcess[bytes]:
-        """sdcard.py --tcp on the port with args. niceemu refuses a new
-        host until it has seen the last one close, so a run that got no
-        connection is tried again for a while."""
+    def tool(self, *args: str,
+             cwd: str | None = None) -> subprocess.CompletedProcess[bytes]:
+        """sdcard.py --tcp on the port with args, in cwd if given. niceemu
+        refuses a new host until it has seen the last one close, so a run
+        that got no connection is tried again for a while."""
         end = time.monotonic() + 2
         while True:
             r = subprocess.run([sys.executable, SDCARD, "--tcp", self.port,
-                                *args], capture_output=True, timeout=60)
+                                *args], capture_output=True, timeout=60,
+                               cwd=cwd)
             err = r.stderr.decode(errors="replace")
             if (r.returncode == 0 or "no b notice" not in err and
                     "closed the connection" not in err or
@@ -305,7 +350,8 @@ def test_held(imgs: dict[str, str], tmp: str) -> None:
     for name, want in (("mbr", "HELLO    TXT          12"),
                        ("nonice", "File error 29, no folder NICE on the card"),
                        ("fat16", "File error 18, FAT16, which is not "
-                        "supported")):
+                        "supported"),
+                       ("nosig", "File error 16, no FAT32 file system")):
         emu = Emu(imgs[name])
         try:
             r = emu.tool("ls")
@@ -321,6 +367,28 @@ def test_held(imgs: dict[str, str], tmp: str) -> None:
         r = emu.tool("ls")
         check("the card in slot 1 only: ls takes slot 1",
               "HELLO    TXT          12" in text(r), text(r))
+    finally:
+        emu.close()
+    # A long name that is a path: the file is written under its 8.3 name
+    here = os.path.join(tmp, "here")
+    os.makedirs(here, exist_ok=True)
+    safe = os.path.join(here, "ALONGF~1.DAT")
+    evil = os.path.join(tmp, "evil.dat")
+    emu = Emu(imgs["evil"])
+    try:
+        r = emu.tool("ls")
+        check("evil.img: ls shows the long name ../evil.dat",
+              "ALONGF~1 DAT         768  ../evil.dat" in text(r), text(r))
+        r = emu.tool("get", "ALONGF~1.DAT", cwd=here)
+        check("evil.img: get writes ALONGF~1.DAT here, not ../evil.dat",
+              r.returncode == 0 and os.path.exists(safe) and
+              not os.path.exists(evil), text(r))
+        os.remove(safe)
+        r = emu.tool("get", "../evil.dat", here)
+        check("evil.img: get by the long name to a directory, as "
+              "ALONGF~1.DAT there",
+              r.returncode == 0 and os.path.exists(safe) and
+              not os.path.exists(evil), text(r))
     finally:
         emu.close()
 

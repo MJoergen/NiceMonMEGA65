@@ -16,8 +16,10 @@ that --folder names:
 
 ls prints the rows of the monitor's dir, with the long name, where a file
 has one, after its row. get takes the 8.3 name or the long name, in
-either case, and writes the file to DEST, by default the name in the
-current directory, or with DEST - to stdout. put writes the host's file
+either case, and writes the file to DEST, by default its name in the
+current directory, or with DEST - to stdout: the long name, when it is a
+plain file name, or else the 8.3 name, so that a card's name with a
+path in it, such as ../x, writes nowhere else. put writes the host's file
 SRC, or stdin for -, as the file NAME, by default SRC's own name, which
 must be an 8.3 name: it makes the file, or truncates it when it is
 there. del deletes a file, by either name, with its long name.
@@ -69,6 +71,7 @@ import argparse
 import os
 import sys
 import time
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from types import TracebackType
 from typing import Callable, Iterator
@@ -91,6 +94,9 @@ READ_WAIT = 1.0
 WRITE_WAIT = 2.0
 # How long a pause waits for the p, x, or h that it brings
 PAUSE_WAIT = 2.0
+# The sectors that a Card keeps, the last read or written, so that the
+# FAT and the directory are read once, while a file's data passes through
+CACHE_SECTORS = 256
 
 # The controller's errors in SD_ERROR, and the file system's of
 # monitor/fat32.c, with the monitor's texts (monitor/monitor.nasm, E_FS*)
@@ -225,7 +231,7 @@ class Card:
         self.paused_here = False
         self.restart = False
         self.saved: tuple[int, int, list[int]] | None = None
-        self.cache: dict[int, bytes] = {}
+        self.cache: OrderedDict[int, bytes] = OrderedDict()
 
     def __enter__(self) -> Card:
         try:
@@ -335,10 +341,19 @@ class Card:
                 print("sdcard.py: the core was started again from reset",
                       file=sys.stderr)
 
+    def _keep(self, lba: int, data: bytes) -> None:
+        """data as the sector lba's, the last used, and the oldest let go
+        when more than CACHE_SECTORS are kept."""
+        self.cache[lba] = data
+        self.cache.move_to_end(lba)
+        if len(self.cache) > CACHE_SECTORS:
+            self.cache.popitem(last=False)
+
     def read(self, lba: int) -> bytes:
         """The 512 bytes of the sector lba."""
         got = self.cache.get(lba)
         if got is not None:
+            self.cache.move_to_end(lba)
             return got
         if lba > self.last:
             raise SdError(f"sector {lba:#x} is after the card's last, "
@@ -349,7 +364,7 @@ class Card:
             raise SdError(f"Read of sector {lba:#x} in slot {self.slot}: "
                           f"{sd_said(done)}")
         data = to_bytes(read_buffer(self.link))
-        self.cache[lba] = data
+        self._keep(lba, data)
         return data
 
     def write(self, lba: int, data: bytes) -> None:
@@ -366,7 +381,7 @@ class Card:
         if done is None or done[1]:
             raise SdError(f"Write of sector {lba:#x} in slot {self.slot}: "
                           f"{sd_said(done)}")
-        self.cache[lba] = bytes(data)
+        self._keep(lba, bytes(data))
 
 
 def u16(b: bytes | bytearray, at: int) -> int:
@@ -388,15 +403,17 @@ def put32(b: bytearray, at: int, v: int) -> None:
 def boot_kind(b: bytes) -> int:
     """What the sector b is, as fat32.c's kind() says: 0 for a FAT32 boot
     sector, a FileError's code for another file system, and 1 for no boot
-    sector. The type is told by the count of clusters."""
+    sector, or one without the 55 AA signature. The type is told by the
+    count of clusters."""
     if b[3:11] == b"EXFAT   ":
         return E_EXFAT
     spc, rsvd, nfats = b[13], u16(b, 14), b[16]
+    fatsz = u16(b, 22) or u32(b, 36)
     if (b[0] not in (0xEB, 0xE9) or u16(b, 11) != 512 or spc == 0
-            or spc & (spc - 1) or rsvd == 0 or nfats == 0):
+            or spc & (spc - 1) or rsvd == 0 or nfats == 0 or fatsz == 0
+            or b[510:512] != b"\x55\xaa"):
         return 1
     rootsecs = (u16(b, 17) * 32 + 511) // 512
-    fatsz = u16(b, 22) or u32(b, 36)
     total = u16(b, 19) or u32(b, 32)
     meta = rsvd + nfats * fatsz + rootsecs
     if total <= meta:
@@ -649,10 +666,12 @@ class Volume:
 
     def wr(self, lba: int, data: bytes) -> None:
         """A sector written, but none outside the partition, nor below its
-        first FAT but FSInfo, so never the MBR or the boot sector."""
+        first FAT but FSInfo, when the volume has one, so never the MBR or
+        the boot sector."""
         if self._write is None:
             raise SdError("a write to a volume mounted to read")
-        if (lba < self.fat and lba != self.fsinfo) or lba >= self.end:
+        if ((lba < self.fat and not (self.fsinfo and lba == self.fsinfo))
+                or lba >= self.end):
             raise FileError(E_BADFAT)
         self._write(lba, data)
 
@@ -855,6 +874,18 @@ def do_ls(vol: Volume) -> None:
     print(rows[-1])
 
 
+def host_name(e: Entry) -> str:
+    """The name that get writes the file of the entry e under: its long
+    name when that is a plain file name, or else its 8.3 name, which
+    always is. A card is not trusted with a path: a long name with / or
+    \\, or . or .., would write outside the directory given."""
+    long = e.long
+    if (long is None or not long or long in (".", "..") or "/" in long
+            or "\\" in long or "\0" in long):
+        return e.short
+    return long
+
+
 def do_get(vol: Volume, name: str, dest: str | None) -> None:
     e = vol.find(name)
     data = vol.contents(e)
@@ -863,9 +894,9 @@ def do_get(vol: Volume, name: str, dest: str | None) -> None:
         sys.stdout.buffer.flush()
         return
     if dest is None:
-        dest = e.long if e.long is not None else e.short
+        dest = host_name(e)
     elif os.path.isdir(dest):
-        dest = os.path.join(dest, e.long if e.long is not None else e.short)
+        dest = os.path.join(dest, host_name(e))
     with open(dest, "wb") as f:
         f.write(data)
     print(f"{e.short}: {len(data)} bytes to {dest}")

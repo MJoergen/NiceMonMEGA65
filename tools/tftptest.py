@@ -5,10 +5,12 @@ First it starts tftpd.py --port 0 on a folder of test files and checks
 it with a client of its own: files of 0, 511, 512, 513, and 140,000
 bytes, more than 255 blocks; a name in another case; the listing of *
 and of *.BIN; a pattern that matches none, a missing file, names outside
-the folder, a write request, and a mode other than octet, each with its
-ERROR; a lost ACK, after which the block comes again; a duplicate ACK,
-which sends nothing again; and a packet from another port, which gets
-ERROR 5 while the transfer goes on.
+the folder, a symbolic link to a file outside it, which the listing
+leaves out too, a write request, and a mode other than octet, each with
+its ERROR; a lost ACK, after which the block comes again; a duplicate
+ACK, which sends nothing again; a packet from another port, which gets
+ERROR 5 while the transfer goes on; and an ERROR from the client, after
+which nothing comes again.
 
 Then it runs the monitor of the tests, monitor/build/monitor_test.bin, in
 niceemu with --eth-udp and --eth-peer, whose frames go to a bridge in
@@ -43,9 +45,11 @@ TFTPD = os.path.join(REPO, "tools", "tftpd.py")
 SERVER_IP = bytes([10, 0, 0, 2])
 SERVER_MAC = bytes.fromhex("0A0000000002")
 TIMEOUT = 0.3                            # tftpd.py's, so that a lost ACK is quick
+LINK = "link.bin"                        # a symbolic link out of the folder, if one can be made
 
 passed = 0
 failed = 0
+linked = False
 
 
 def check(name: str, ok: bool, detail: str = "") -> None:
@@ -129,7 +133,12 @@ def test_server(port: int) -> None:
         res = get(port, name, mode, op)
         check(f"tftpd {'WRQ' if op == 2 else 'RRQ'} {name!r} {mode}: ERROR {code}",
               res[0] == "error" and res[2] == code, str(res))
+    if linked:
+        res = get(port, LINK)
+        check("tftpd a symbolic link out of the folder: ERROR 1",
+              res[0] == "error" and res[2] == 1, str(res))
     test_lost(port)
+    test_abort(port)
 
 
 def test_lost(port: int) -> None:
@@ -158,6 +167,23 @@ def test_lost(port: int) -> None:
         check("tftpd after another TID: block 4",
               struct.unpack(">HH", packet[:4]) == (3, 4))
         sock.sendto(struct.pack(">HH", 5, 0) + b"done\0", addr)  # the end
+
+
+def test_abort(port: int) -> None:
+    """An ERROR from the client ends the transfer: the block does not come
+    again, as it would after a lost ACK."""
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        sock.settimeout(5)
+        sock.sendto(request(1, "big.dat"), ("127.0.0.1", port))
+        packet, addr = sock.recvfrom(1024)
+        sock.sendto(struct.pack(">HH", 5, 3) + b"Disk full\0", addr)
+        sock.settimeout(3 * TIMEOUT)
+        try:
+            packet, _ = sock.recvfrom(1024)
+            check("tftpd an ERROR from the client: nothing more", False,
+                  f"got {struct.unpack('>HH', packet[:4])}")
+        except socket.timeout:
+            check("tftpd an ERROR from the client: nothing more", True)
 
 
 # The bridge between niceemu's frames and the host's UDP
@@ -276,6 +302,15 @@ def main() -> None:
         for name, content in FILES.items():
             with open(os.path.join(folder, name), "wb") as f:
                 f.write(content)
+        outside = os.path.join(tmp, "outside.bin")
+        with open(outside, "wb") as f:
+            f.write(b"not served\n")
+        global linked
+        try:
+            os.symlink(outside, os.path.join(folder, LINK))
+            linked = True
+        except (OSError, NotImplementedError):
+            pass
         server = subprocess.Popen(
             [sys.executable, TFTPD, "--dir", folder, "--port", "0",
              "--addr", "127.0.0.1", "--timeout", str(TIMEOUT)],

@@ -520,11 +520,15 @@ udp_send_end
 ; and its source's IP address and port to the 2 words at R3, unless R3
 ; is 0. R1 = the bytes copied, 0 when no datagram waits, or E_UCLOSED.
 ; The frames before it that are no datagram for the endpoint are
-; released unread, and so are empty datagrams. Uses R1-R6, and R7-R9
-; across the calls, saved.
+; released unread, and so are empty datagrams. With R2 0 nothing is
+; copied, and the queue is left as it is, so no datagram is lost to a
+; call with no room. Uses R1-R6, and R7-R9 across the calls, saved.
 udp_recv
                 TST     @V_UPORT
         ?Z      MOVE    R1, E_UCLOSED
+        ?Z      RET
+                TST     R2
+        ?Z      MOVE    R1, 0           ; no room: the datagram stays
         ?Z      RET
                 PUSH    R7
                 PUSH    R8

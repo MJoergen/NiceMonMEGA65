@@ -218,7 +218,7 @@ in the [README](../README.md)). The program must fit in the 32K words of
 the ROM. A C program keeps its data in its image, which would be in the
 ROM too, so it is built with `nicebuild.py --ram ADDR`, which puts the
 words it writes in the RAM from `ADDR`, as the monitor's C code is
-([monitor/README.md](../monitor/README.md#c-in-the-rom)).
+([monitor/INTERNALS.md](../monitor/INTERNALS.md#c-in-the-rom)).
 A program in the ROM also has some limits on its writes, which
 [SYSTEM.md](SYSTEM.md#the-rom) describes: the main one is that the stack
 and the variables must be in the RAM, at `0x8000` or above.

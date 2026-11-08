@@ -21,28 +21,30 @@
 ;     UDT_BUF and UDT_SRC, after the frames that are no datagram for it:
 ;     the queue's 4 frames, which udp_recv releases
 ; 10  udp_send of hi to 255.255.255.255 port 9 again, 0: frame 4
-; 11  udp_recv of up to 2 bytes, 2, ab of the broadcast of 10.0.0.3 port
+; 11  udp_recv of up to 0 bytes, 0, which copies nothing and leaves the
+;     queue as it is, so that the next call gets its datagram
+; 12  udp_recv of up to 2 bytes, 2, ab of the broadcast of 10.0.0.3 port
 ;     9 at UDT_BUF2 and UDT_SRC2, after an ARP request and an empty
 ;     datagram
-; 12  udp_recv, 0, as no datagram waits
-; 13  udp_send of q to 8.8.8.8 port 53, 0, with the mask 255.255.255.0 and
+; 13  udp_recv, 0, as no datagram waits
+; 14  udp_send of q to 8.8.8.8 port 53, 0, with the mask 255.255.255.0 and
 ;     the gateway 10.0.0.1: an ARP request for the gateway, its reply, and
 ;     the datagram to the gateway's MAC address, frames 5 and 6
-; 14  udp_send of x to 10.0.0.2 port 7, 0, in the network, from the ARP
+; 15  udp_send of x to 10.0.0.2 port 7, 0, in the network, from the ARP
 ;     cache: frame 7
-; 15  udp_send to 8.8.8.8 without a gateway, -44, with no frame
-; 16  udp_send to 10.0.0.99, -44, after ARP_TRIES requests with no reply,
+; 16  udp_send to 8.8.8.8 without a gateway, -44, with no frame
+; 17  udp_send to 10.0.0.99, -44, after ARP_TRIES requests with no reply,
 ;     frames 8 to 10
-; 17  udp_close, 0
-; 18  udp_recv after udp_close, -42
+; 18  udp_close, 0
+; 19  udp_recv after udp_close, -42
 ;
-; It returns the number of results, 19.
+; It returns the number of results, 20.
 
                 .ORG    0x8000
 UDT_RESULTS     .EQU    0x9100
-UDT_BUF         .EQU    0x9180          ; the bytes of the 9th result
+UDT_BUF         .EQU    0x9180          ; the bytes of result 9
 UDT_SRC         .EQU    0x9188          ; and its source
-UDT_BUF2        .EQU    0x918A          ; the bytes of the 10th
+UDT_BUF2        .EQU    0x918A          ; the bytes of result 12
 UDT_SRC2        .EQU    0x918C          ; and its source
 
 udt_main
@@ -105,6 +107,11 @@ udt_main
                 MOVE    R3, UDT_HI
                 MOVE    R4, 2
                 CALL    _udp_send
+                MOVE    @R7++, R1
+                MOVE    R1, UDT_BUF2
+                MOVE    R2, 0
+                MOVE    R3, UDT_SRC2
+                CALL    _udp_recv
                 MOVE    @R7++, R1
                 MOVE    R1, UDT_BUF2
                 MOVE    R2, 2

@@ -322,7 +322,7 @@ DUMP_sd_write = -d 0x9100:6
 # For fs the results of test/fs.nasm's calls, the entry that fs_readdir
 # wrote, and the first 45 bytes that fs_read wrote, for fsw the results
 # of test/fsw.nasm's, and for fat the numbers of fat_load for load NAME
-DUMP_fs       = -d 0x9100:29 -d 0x9180:4 -d 0x9200:45
+DUMP_fs       = -d 0x9100:30 -d 0x9180:4 -d 0x9200:45
 DUMP_fsw      = -d 0x9100:42
 DUMP_fat      = -d 0xFFFFF11A:5
 # For rom the number of runs and the results of test/rom.nasm's calls
@@ -331,7 +331,7 @@ DUMP_rom      = -d 0x9100:10
 # and for udp the results of test/udp.nasm's, and the bytes and the
 # sources that udp_recv wrote
 DUMP_arp      = -d 0x9100:37
-DUMP_udp      = -d 0x9100:19 -d 0x9180:14
+DUMP_udp      = -d 0x9100:20 -d 0x9180:14
 MAX_STEPS = 10000000
 # The first sector of fat32.img's FAT32 partition (test/fat_image.py), and
 # its byte offset, for mtools

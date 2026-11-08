@@ -92,7 +92,7 @@ help:
 	@echo "                  mon.py's check of the memory, without a board"
 	@echo "  make sdtest     check tools/sdcard.py on niceemu --link with images of a"
 	@echo "                  card, without a board"
-	@echo "  make tftpd [TFTP_DIR=.] [TFTP_PORT=69]"
+	@echo "  make tftpd [TFTP_DIR=examples/build] [TFTP_PORT=69]"
 	@echo "                  serve the files of TFTP_DIR to the monitor's tftp, with"
 	@echo "                  listings for tftp IP *.bin (port 69 needs root)"
 	@echo "  make tftptest   check tools/tftpd.py, and the monitor's tftp in niceemu"
@@ -266,7 +266,7 @@ sdtest: $(EMU)
 
 # The TFTP server for the monitor's tftp (tools/tftpd.py), and its check,
 # which runs the monitor in niceemu against it
-TFTP_DIR ?= .
+TFTP_DIR ?= examples/build
 TFTP_PORT ?= 69
 tftpd:
 	$(PYTHON) tools/tftpd.py --dir $(TFTP_DIR) --port $(TFTP_PORT)
