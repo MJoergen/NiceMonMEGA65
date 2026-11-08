@@ -44,8 +44,8 @@ or, in an existing clone:
   board](#testing-the-board)).
 - `make flash` writes a bitstream into the Nexys4DDR's flash, from which
   the board then starts (see [synth/README.md](synth/README.md)).
-- `make bump TAG=V1.0` moves nice_cpu to a tag and records the MEGA65's
-  timing (see [The timing badge](#the-timing-badge)).
+- `make bump TAG=V1.0` moves nice_cpu to a tag and records the timing
+  of the MEGA65 and the Nexys4DDR (see [The timing badges](#the-timing-badges)).
 - `make release TAG=V1.0` builds, tests, and publishes a release, and
   `TAG=V1.0.1` one that keeps nice_cpu at `V1.0` (see
   [RELEASE.md](doc/RELEASE.md)).
@@ -93,7 +93,7 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
 | [monitor/](monitor/README.md) | The monitor for the ROM, in NICE assembly: a hardware abstraction layer for programs at `0x8000`, called through a dispatch table, a main loop with a few commands, the file of routines that programs join, the stubs and the header for programs, and its tests in `niceemu`. Its README has the decisions, and [#62](https://github.com/MJoergen/NiceMonMEGA65/issues/62) the loading from storage. |
 | [demo/](demo/README.md) | The demo in the ROM of the release, behind the monitor, which runs it with `x`, for the time being: nice_cpu's demo (`nice_cpu/demo`), whose function keys switch between a welcome screen that turns into a typewriter, the key codes, the characters and colors, the counters, a game, and the board, a self-test and the network station's addresses. Here are the board's text, `text.nasm`, the join behind the monitor, `join.py`, and its check on a board, `demo_hw.py`. |
 | [examples/](examples/) | Example C programs, and the Makefile that builds them for the MEGA65. |
-| [tools/](tools/) | `boardlink.py`, the debug link of nice_cpu's `debugger/nicelink.py`, over the board's UART or TCP to `niceemu --link`, with the board's Ethernet port and the simulated system of `make cosim`, and the tools that use it: `load.py`, which loads a program into the MEGA65 or Nexys4DDR, `run.py`, which runs a program on the board as `niceemu` runs it, `mon.py`, an interactive shell on the link, nice_cpu's `nicedbg.py` with the board's links, `hwtest.py`, which tests the system on the board, `flash.py`, which writes the Nexys4DDR's flash or a slot of the MEGA65's, `bump.py`, which records the MEGA65's timing for a nice_cpu tag, `release.py`, which builds and publishes a release, `linktest.py`, which checks `run.py` and `mon.py` on `niceemu --link`, `cosimtest.py`, which checks `run.py` on the simulated system, and `screenshot.py`, which draws a program's screen in `niceemu` as a PNG picture. |
+| [tools/](tools/) | `boardlink.py`, the debug link of nice_cpu's `debugger/nicelink.py`, over the board's UART or TCP to `niceemu --link`, with the board's Ethernet port and the simulated system of `make cosim`, and the tools that use it: `load.py`, which loads a program into the MEGA65 or Nexys4DDR, `run.py`, which runs a program on the board as `niceemu` runs it, `mon.py`, an interactive shell on the link, nice_cpu's `nicedbg.py` with the board's links, `hwtest.py`, which tests the system on the board, `flash.py`, which writes the Nexys4DDR's flash or a slot of the MEGA65's, `bump.py`, which records the timing of the MEGA65 and the Nexys4DDR for a nice_cpu tag, `release.py`, which builds and publishes a release, `linktest.py`, which checks `run.py` and `mon.py` on `niceemu --link`, `cosimtest.py`, which checks `run.py` on the simulated system, and `screenshot.py`, which draws a program's screen in `niceemu` as a PNG picture. |
 | [README.md](README.md) | For those who use the core files and write programs for them: on its own, over Ethernet, and over the serial port. |
 | [SYSTEM.md](doc/SYSTEM.md) | The system that programs and the link see: the debug link, the address map, the screen, the ROM, and the Nexys4DDR's devices. |
 | [EMULATOR.md](doc/EMULATOR.md) | The table of the known differences from the emulator. |
@@ -920,31 +920,36 @@ nice_cpu's own testbench for the core that predicts backward jumps
 The board takes the same cycles, or 1024 fewer in `bst`, and at 100 MHz
 the benchmark runs for about 24 ms.
 
-## The timing badge
+## The timing badges
 
-The badge claims that nice_cpu's core meets timing at 100 MHz in a MEGA65
-build, here: the R6 bitstream, built with Vivado. nice_cpu shows the
-badge, and this repository is the proof. `make bump TAG=V1.0`, which runs
-`tools/bump.py`, checks that the tree is clean and on `main`, moves the
-`nice_cpu` submodule to the tag, builds `niceemu`, runs `make test`, and
-builds the R6 bitstream with Vivado's default directives. If that misses
-timing, it builds again with `FLOW=timing`, and the badge says so.
+The badges claim that nice_cpu's core meets timing at 100 MHz in a MEGA65
+build, the R6 bitstream, and at 90 MHz in a Nexys4DDR build, here, built
+with Vivado. nice_cpu shows the badges, and this repository is the proof.
+`make bump TAG=V1.0`, which runs `tools/bump.py`, checks that the tree is
+clean and on `main`, moves the `nice_cpu` submodule to the tag, builds
+`niceemu`, runs `make test`, and builds the R6 bitstream and then the
+Nexys4DDR's with Vivado's default directives. If a board misses timing,
+it builds that board again with `FLOW=timing`, and its badge says so.
 
-It writes two files at the top level and commits them, after a commit of
-the submodule bump. `badge-mega65.json` is the badge in the shields.io
-endpoint format: `V1.0 met` in green, `V1.0 met (timing flow)`, or `V1.0
-failed (WNS -0.12 ns)` in red. `verified.json` is the full record: the
-nice_cpu tag and commit, the Vivado version, WNS, TNS, and the hold and
-pulse width slacks, the worst paths into and out of the core, the clock,
-the board, the flow, and the date. The paths into and out of the core
+It writes three files at the top level and commits them, after a commit
+of the submodule bump. `badge-mega65.json` and `badge-nexys4ddr.json` are
+the badges in the shields.io endpoint format, labeled `MEGA65 100 MHz`
+and `Nexys4DDR 90 MHz`: `V1.0 met` in green, `V1.0 met (timing flow)`,
+or `V1.0 failed (WNS -0.12 ns)` in red. `verified.json` is the full
+record: the nice_cpu tag and commit, the Vivado version, WNS, TNS, and
+the hold and pulse width slacks, the worst paths into and out of the
+core, the clock, the board, the flow, and the date, for the R6 at the
+top level and for the Nexys4DDR under `nexys4ddr`. The paths into and out of the core
 come from `build/core_in.rpt` and `build/core_out.rpt`, which every build
 writes, and nice_cpu sets its budget for the core's ports from them.
 
-A timing miss is a result, and the red badge is committed. A failed build
+A timing miss is a result, and the red badge is committed, beside the
+other board's. A failed build
 or test is not: the submodule goes back to where it was, and nothing is
 written. The script pushes only with `ARGS=--push`, for a push publishes
-the badge. `tools/bump.py V1.0 --reports synth/r6/build` prints the two
-files for the reports of an earlier build, and changes nothing. Vivado
+the badges. `tools/bump.py V1.0 --reports synth/r6/build
+--nexys-reports synth/nexys4ddr/build` prints the files for the reports
+of earlier builds, and changes nothing. Vivado
 does not run in CI, so neither does this.
 
 ## Releases

@@ -2,10 +2,11 @@
 """Build, test, and publish a release: tag this repository V1.0, which pins nice_cpu's tag V1.0.
 
 A release Vmajor.minor follows make bump (tools/bump.py), which moves
-nice_cpu to the tag of the same name and records the MEGA65's timing in
-verified.json. A release Vmajor.minor.patch keeps the submodule at the
-nice_cpu tag Vmajor.minor, and follows the release Vmajor.minor here; it
-leaves verified.json and the badge as the bump left them, for they are
+nice_cpu to the tag of the same name and records the timing of the MEGA65
+and the Nexys4DDR in verified.json. A release Vmajor.minor.patch keeps the
+submodule at the nice_cpu tag Vmajor.minor, and follows the release
+Vmajor.minor here; it leaves verified.json and the badges as the bump left
+them, for they are
 nice_cpu's claim, and its notes give its own timing. So the first two numbers
 of a tag here always name the nice_cpu tag it pins (doc/RELEASE.md). A release
 has two steps, so that what is published can be looked at first.

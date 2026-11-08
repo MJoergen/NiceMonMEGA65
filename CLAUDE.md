@@ -50,7 +50,7 @@ header is the authoritative address map.
     make load FILE=p.bin  # load and start a program on the board (ETH=IP or PORT=/dev/ttyUSB1, one needed); ARGS=--monitor for one at 0x8000 under the ROM's monitor
     make run FILE=p.bin   # run it and print what niceemu prints, for diffing
     make mon [FILE=p.bin] # interactive shell on the link: memory, pause, step, breakpoints, disassembly, --symbols
-    make bump TAG=V1.0    # nice_cpu to the tag, R6 bitstream, badge-mega65.json and verified.json, committed (--push with ARGS)
+    make bump TAG=V1.0    # nice_cpu to the tag, R6 and Nexys4DDR bitstreams, badge-mega65.json, badge-nexys4ddr.json, and verified.json, committed (--push with ARGS)
     make release TAG=V1.0 # after the bump: gates, three bitstreams, two .cor, hwtest, staged; ARGS=--publish tags and releases (doc/RELEASE.md); TAG=V1.0.1 keeps nice_cpu at V1.0
     make hwtest [ETH=IP]  # check the FPGA, program it with openFPGALoader, and test the board (ETH: its Ethernet too)
     make flash [BIT=f.bit] # write the Nexys4DDR's flash (default its top.bit), verify, wait for the start; ARGS=--erase

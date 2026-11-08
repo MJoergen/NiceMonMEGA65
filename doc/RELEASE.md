@@ -40,7 +40,8 @@ and keep their names.
   - `nicemon-V1.0-r3.cor` and `nicemon-V1.0-r6.cor`, the MEGA65 core
     files for MEGAFLASH, with the version `V1.0`, and the same ROM.
   - `examples-V1.0.zip`, the C examples as `.bin` files.
-  - `verified.json`, the MEGA65 R6's timing record from `make bump`.
+  - `verified.json`, the timing record of the MEGA65 R6 and the
+    Nexys4DDR from `make bump`.
 - The release notes: the tag's section of
   [RELEASE_NOTES.md](RELEASE_NOTES.md), then the nice_cpu commit, each
   board's clock, flow, and WNS, the Vivado version, and the files.
@@ -84,8 +85,9 @@ and keep their names.
 
        make bump TAG=V1.0 ARGS=--push
 
-   If the badge is red (timing missed), stop. The red badge is still
-   pushed, as the honest result, but no release is made.
+   It builds the R6 and the Nexys4DDR, and writes a badge for each. If
+   a badge is red (timing missed), stop. The red badge is still pushed,
+   as the honest result, but no release is made.
 
 2. Write the tag's section of `RELEASE_NOTES.md`: what a user of the
    bitstreams, the boards, or the tools can see changed since the release

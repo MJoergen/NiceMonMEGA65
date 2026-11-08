@@ -53,8 +53,9 @@ help:
 	@echo "                  and synth/r6/build/NiceMonMEGA65-r6.cor, for MEGAFLASH"
 	@echo "                  (needs Vivado and coretool, from mega65-tools)"
 	@echo "  make bump TAG=V1.0 [ARGS=--push]"
-	@echo "                  move nice_cpu to the tag, build the R6 bitstream, and commit"
-	@echo "                  badge-mega65.json and verified.json (needs Vivado)"
+	@echo "                  move nice_cpu to the tag, build the R6 and Nexys4DDR bitstreams,"
+	@echo "                  and commit badge-mega65.json, badge-nexys4ddr.json, and"
+	@echo "                  verified.json (needs Vivado)"
 	@echo "  make release TAG=V1.0[.1] (PORT=/dev/ttyUSB1 | ARGS=--publish)"
 	@echo "                  build, test, and stage a release in build/release (V1.0.1"
 	@echo "                  keeps nice_cpu at V1.0); with"
@@ -196,7 +197,7 @@ cor:
 	$(MAKE) -C synth/r3 cor ROM=$(BOARD_ROM)
 	$(MAKE) -C synth/r6 cor ROM=$(BOARD_ROM)
 
-# nice_cpu's badge of timing met on the MEGA65 (tools/bump.py)
+# nice_cpu's badges of timing met on the MEGA65 and the Nexys4DDR (tools/bump.py)
 bump:
 	@test -n "$(TAG)" || (echo "Give the nice_cpu tag with TAG=V1.0"; exit 1)
 	$(PYTHON) tools/bump.py $(ARGS) $(TAG)

@@ -87,6 +87,11 @@ meets it again, and has V1.8's changes too.
   `fs_close`. The card is FAT32 on the whole, or in the first FAT32
   partition of an MBR; FAT12, FAT16, and exFAT are rejected. Writing
   comes with #59.
+- `make bump` also builds the Nexys4DDR, and writes
+  `badge-nexys4ddr.json`, the badge of nice_cpu's core at 90 MHz there,
+  beside the MEGA65's, with the Nexys4DDR's timing in `verified.json`
+  under `nexys4ddr`
+  ([#77](https://github.com/MJoergen/NiceMonMEGA65/issues/77)).
 
 **Tests.**
 

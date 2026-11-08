@@ -1,27 +1,31 @@
 #!/usr/bin/env python3
-"""Move nice_cpu to a tag, build the R6 bitstream, and write the badge files.
+"""Move nice_cpu to a tag, build the R6 and Nexys4DDR bitstreams, and write
+the badge files.
 
-nice_cpu shows a badge of whether its core meets 100 MHz on the MEGA65
-(nice_cpu issue 19 here). This script makes the two files it reads,
-badge-mega65.json and verified.json, at the top level of the repository:
+nice_cpu shows badges of whether its core meets 100 MHz on the MEGA65
+(nice_cpu issue 19 here) and 90 MHz on the Nexys4DDR (#77). This script
+makes the three files they read at the top level of the repository:
 
-  badge-mega65.json  a shields.io endpoint: "V1.0 met" in green, or
-                     "V1.0 failed (WNS -0.12 ns)" in red
-  verified.json      the nice_cpu tag and commit, the Vivado version, WNS, TNS,
-                     the hold and pulse width slacks, the worst paths into and
-                     out of the core, the clock, the board, the flow, the date,
-                     and this repository's commit
+  badge-mega65.json     a shields.io endpoint: "V1.0 met" in green, or
+                        "V1.0 failed (WNS -0.12 ns)" in red, for the R6
+  badge-nexys4ddr.json  the same for the Nexys4DDR
+  verified.json         the nice_cpu tag and commit, the Vivado version, and
+                        the R6's WNS, TNS, hold and pulse width slacks, worst
+                        paths into and out of the core, clock, board, and
+                        flow, the date, and this repository's commit, with
+                        the same for the Nexys4DDR under "nexys4ddr"
 
 In this order it checks that the tree is clean, is on main, and that the tag
 exists, checks out the tag in nice_cpu, builds niceemu, runs make test, and
-builds the bitstream with Vivado's default directives. If the default flow
-misses timing it builds again with FLOW=timing, the weaker claim, and the
-badge says so: "V1.0 met (timing flow)". Then it makes two commits, the
-submodule bump and the two files. It pushes only with --push, for a push
-publishes the badge.
+builds each board's bitstream, the R6 first, with Vivado's default
+directives. If the default flow misses timing it builds that board again
+with FLOW=timing, the weaker claim, and its badge says so: "V1.0 met
+(timing flow)". Then it makes two commits, the submodule bump and the three
+files. It pushes only with --push, for a push publishes the badges.
 
-A timing miss is a result: the red badge is written and committed. A failure
-of a build or of the tests is not: the submodule goes back to where it was,
+A timing miss is a result: the red badge is written and committed, and the
+other board's badge is as its own build says. A failure of a build or of
+the tests is not: the submodule goes back to where it was,
 and nothing is written, for the badge must never claim what was not measured.
 
 nice_cpu's tags are Vmajor.minor (V1.0, V1.1, ...; nice_cpu's
@@ -31,8 +35,9 @@ so the tag has two numbers, never the third of a release here
 
 Usage: tools/bump.py Vmajor.minor [--push]
        tools/bump.py Vmajor.minor --reports synth/r6/build
-           prints the files that the reports in that directory would give,
-           and builds, checks out, writes, and commits nothing
+                     [--nexys-reports synth/nexys4ddr/build]
+           prints the files that the reports in those directories would
+           give, and builds, checks out, writes, and commits nothing
 
 Needs Vivado (VIVADO_DIR of synth/Makefile.inc), and what make test needs.
 """
@@ -48,12 +53,18 @@ from typing import Any
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NICE = os.path.join(REPO, "nice_cpu")
-BUILD = os.path.join("synth", "r6", "build")
 
-BOARD = "MEGA65 R6"
-PART = "xc7a200tfbg484-2"
-LABEL = "MEGA65 100 MHz"
-BADGE = "badge-mega65.json"
+# The boards that get a badge: the make target, the name, the FPGA, the
+# badge's label, and its file. The first is the one at the top level of
+# verified.json, which release.py reads; the others are under their target.
+BOARDS: list[dict[str, str]] = [
+    {"target": "r6", "board": "MEGA65 R6", "part": "xc7a200tfbg484-2",
+     "label": "MEGA65 100 MHz", "badge": "badge-mega65.json"},
+    {"target": "nexys4ddr", "board": "Nexys4DDR", "part": "xc7a100tcsg324-1",
+     "label": "Nexys4DDR 90 MHz", "badge": "badge-nexys4ddr.json"},
+]
+LABEL = BOARDS[0]["label"]
+BADGE = BOARDS[0]["badge"]
 VERIFIED = "verified.json"
 
 # A nice_cpu tag, and a tag here: the nice_cpu tag it pins, and a third
@@ -144,7 +155,7 @@ def read_reports(build: str, flow: str) -> Record:
     return r
 
 
-def badge(tag: str, r: Record) -> Record:
+def badge(tag: str, r: Record, label: str = LABEL) -> Record:
     """The shields.io endpoint for a result."""
     note = "" if r["flow"] == FLOWS[0] else "timing flow"
     if r["met"] and r["wns_ns"] >= 0 and r["whs_ns"] >= 0 and r["wpws_ns"] >= 0:
@@ -162,21 +173,18 @@ def badge(tag: str, r: Record) -> Record:
             what = "constraints not met"
         msg = "%s failed (%s)" % (tag, ", ".join([what] + ([note] if note else [])))
         color = "red"
-    return {"schemaVersion": 1, "label": LABEL, "message": msg, "color": color}
+    return {"schemaVersion": 1, "label": label, "message": msg, "color": color}
 
 
-def verified(tag: str, nice_commit: str, repo_commit: str, r: Record,
-             attempts: list[Record]) -> Record:
+def board_record(tag: str, board: dict[str, str], r: Record,
+                 attempts: list[Record]) -> Record:
+    """A board's part of verified.json."""
     return {
-        "nice_cpu_tag": tag,
-        "nice_cpu_commit": nice_commit,
-        "repo_commit": repo_commit,
-        "vivado": r["vivado"],
-        "board": BOARD,
-        "part": PART,
+        "board": board["board"],
+        "part": board["part"],
         "clock_mhz": r["clock_mhz"],
         "flow": r["flow"],
-        "met": badge(tag, r)["color"] == "brightgreen",
+        "met": badge(tag, r, board["label"])["color"] == "brightgreen",
         "wns_ns": r["wns_ns"],
         "tns_ns": r["tns_ns"],
         "whs_ns": r["whs_ns"],
@@ -186,8 +194,25 @@ def verified(tag: str, nice_commit: str, repo_commit: str, r: Record,
         "core_in": r["core_in"],
         "core_out": r["core_out"],
         "attempts": attempts,
-        "date": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d"),
     }
+
+
+def verified(tag: str, nice_commit: str, repo_commit: str,
+             results: list[tuple[Record, list[Record]]]) -> Record:
+    """verified.json: the first board's record at the top level, as before
+    the second board, and each other board's under its target."""
+    first, attempts = results[0]
+    v: Record = {
+        "nice_cpu_tag": tag,
+        "nice_cpu_commit": nice_commit,
+        "repo_commit": repo_commit,
+        "vivado": first["vivado"],
+    }
+    v.update(board_record(tag, BOARDS[0], first, attempts))
+    for board, (r, att) in zip(BOARDS[1:], results[1:]):
+        v[board["target"]] = {"vivado": r["vivado"], **board_record(tag, board, r, att)}
+    v["date"] = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
+    return v
 
 
 def dump(obj: Record) -> str:
@@ -226,12 +251,12 @@ def checkout_tag(tag: str) -> str:
     return commit
 
 
-def build(flow: str) -> Record:
-    """A bitstream with the flow and without a ROM, from nothing, so that
-    no old report stays."""
-    run(["make", "-C", os.path.join("synth", "r6"), "clean"])
-    run(["make", "r6", "FLOW=" + flow, "ROM="])
-    return read_reports(os.path.join(REPO, BUILD), flow)
+def build(target: str, flow: str) -> Record:
+    """The board's bitstream with the flow and without a ROM, from nothing,
+    so that no old report stays."""
+    run(["make", "-C", os.path.join("synth", target), "clean"])
+    run(["make", target, "FLOW=" + flow, "ROM="])
+    return read_reports(os.path.join(REPO, "synth", target, "build"), flow)
 
 
 def summarize(r: Record) -> Record:
@@ -239,11 +264,12 @@ def summarize(r: Record) -> Record:
             "wpws_ns": r["wpws_ns"], "met": badge("x", r)["color"] == "brightgreen"}
 
 
-def measure(tag: str) -> tuple[Record, list[Record]]:
-    """Builds with each flow until one meets timing; returns the last, and all."""
+def measure(target: str) -> tuple[Record, list[Record]]:
+    """Builds the board with each flow until one meets timing; returns the
+    last, and all."""
     attempts: list[Record] = []
     for flow in FLOWS:
-        r = build(flow)
+        r = build(target, flow)
         attempts.append(summarize(r))
         if attempts[-1]["met"]:
             break
@@ -255,20 +281,27 @@ def main() -> None:
     ap.add_argument("tag", help="the nice_cpu tag, such as V1.0")
     ap.add_argument("--push", action="store_true", help="push the two commits")
     ap.add_argument("--reports", metavar="DIR",
-                    help="build and commit nothing; print the badge-mega65.json and "
-                    "verified.json that the timing reports in DIR would give")
+                    help="build and commit nothing; print the badge files and "
+                    "verified.json that the R6's timing reports in DIR would give")
+    ap.add_argument("--nexys-reports", metavar="DIR",
+                    help="with --reports, the Nexys4DDR's timing reports in DIR too")
     args = ap.parse_args()
     tag = args.tag
     if not NICE_TAG.match(tag):
         sys.exit("bump: %s is not a nice_cpu tag Vmajor.minor, such as V1.0" % tag)
 
+    if args.nexys_reports and not args.reports:
+        ap.error("--nexys-reports needs --reports")
     if args.reports:
+        dirs = [args.reports] + ([args.nexys_reports] if args.nexys_reports else [])
         try:
-            r = read_reports(args.reports, os.environ.get("FLOW", FLOWS[0]))
+            reports = [read_reports(d, os.environ.get("FLOW", FLOWS[0])) for d in dirs]
         except Failed as e:
             sys.exit("bump: " + str(e))
-        print(BADGE + ":\n" + dump(badge(tag, r)))
-        print(VERIFIED + ":\n" + dump(verified(tag, "-", "-", r, [summarize(r)])))
+        for board, r in zip(BOARDS, reports):
+            print(board["badge"] + ":\n" + dump(badge(tag, r, board["label"])))
+        print(VERIFIED + ":\n" + dump(verified(tag, "-", "-",
+                                                [(r, [summarize(r)]) for r in reports])))
         return
 
     old = None
@@ -280,32 +313,35 @@ def main() -> None:
         # CLAUDE.md: after a bump, niceemu is rebuilt, and the tests run
         run(["make", "-C", "nice_cpu/emulator", "build"])
         run(["make", "-j", "test"])
-        r, attempts = measure(tag)
+        results = [measure(board["target"]) for board in BOARDS]
     except Failed as e:
         if old:
             subprocess.run(["git", "checkout", "--quiet", old], cwd=NICE)
             sys.exit("bump: %s; nice_cpu is back at %s and nothing is written" % (e, old[:7]))
         sys.exit("bump: %s; nothing is changed" % e)
 
-    b = badge(tag, r)
-    v = verified(tag, nice_commit, repo_commit, r, attempts)
-    write(BADGE, b)
-    write(VERIFIED, v)
+    badges = [badge(tag, r, board["label"]) for board, (r, _) in zip(BOARDS, results)]
+    for board, b in zip(BOARDS, badges):
+        write(board["badge"], b)
+    write(VERIFIED, verified(tag, nice_commit, repo_commit, results))
 
     if old != nice_commit:
         run(["git", "add", "nice_cpu"])
         run(["git", "commit", "-q", "-m", "Bump nice_cpu to %s" % tag,
              "-m", "nice_cpu %s is commit %s." % (tag, nice_commit[:7])])
-    run(["git", "add", BADGE, VERIFIED])
-    run(["git", "commit", "-q", "-m", "Record the MEGA65 timing of %s" % tag,
-         "-m", "Badge: %s.\nFlow %s, WNS %.3f ns, TNS %.3f ns, WHS %.3f ns."
-         % (b["message"], r["flow"], r["wns_ns"], r["tns_ns"], r["whs_ns"])])
-    print("%s: %s" % (BADGE, b["message"]))
+    run(["git", "add"] + [board["badge"] for board in BOARDS] + [VERIFIED])
+    body = "\n".join("%s: %s, flow %s, WNS %.3f ns, TNS %.3f ns, WHS %.3f ns."
+                     % (board["board"], b["message"], r["flow"], r["wns_ns"],
+                        r["tns_ns"], r["whs_ns"])
+                     for board, b, (r, _) in zip(BOARDS, badges, results))
+    run(["git", "commit", "-q", "-m", "Record the timing of %s" % tag, "-m", body])
+    for board, b in zip(BOARDS, badges):
+        print("%s: %s" % (board["badge"], b["message"]))
 
     if args.push:
         run(["git", "push"])
     else:
-        print("Not pushed; run git push to publish the badge.")
+        print("Not pushed; run git push to publish the badges.")
 
 
 if __name__ == "__main__":
