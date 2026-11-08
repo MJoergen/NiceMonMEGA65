@@ -105,9 +105,14 @@ and keep their names.
        make release TAG=V1.0 PORT=/dev/ttyUSB1 ARGS="--eth 192.168.1.65"
 
    This changes nothing in git. It checks the conditions above, builds
-   the examples and the three bitstreams from nothing, makes the two core
-   files with `coretool`, runs `make hwtest` on the R6, with `ETH=` when
-   `--eth` is given, and puts the files in `build/release/V1.0/`, with
+   the examples and the three bitstreams from nothing, each with the
+   first flow that meets timing: the R6 with the flow of `verified.json`
+   first, the R3 with the default directives first and then `FLOW=timing`,
+   and the Nexys4DDR with `FLOW=timing` only, as its Makefile has it. A
+   board that misses with its last flow stops the release. Then it makes
+   the two core files with `coretool`, runs `make hwtest` on the R6, with
+   `ETH=` when `--eth` is given, and puts the files in
+   `build/release/V1.0/`, with
    `release.json`, which records the tag, the commit, and the files that
    step 6 publishes. It takes as long as three Vivado builds. `make clean`
    deletes `build/release/`, so do not run it between steps 4 and 6.

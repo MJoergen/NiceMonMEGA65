@@ -28,6 +28,14 @@ or, in an existing clone:
   `demo/build/demo.bin`, a program at `0x8000`, and joins it behind the monitor into `demo/build/rom.bin`,
   which the boards' targets and the release put in the ROM of the
   bitstreams and core files. The monitor's `x` runs the demo.
+- `make monitor` builds the monitor alone, `monitor/build/monitor.bin`,
+  for a board's target with `ROM=monitor/build/monitor.bin`. `FOLDER=NAME`
+  puts its files in another folder of the SD card than `NICE`, which a
+  board's target takes too (see
+  [monitor/](monitor/README.md#building-and-testing)).
+- `make diagrams` renders the block diagrams of `src/README.md` and
+  `src/eth/README.md` from the `.tex` files beside them (needs pdflatex
+  and pdftoppm).
 - `make r3`, `make r6`, and `make nexys4ddr` build the bitstreams, with
   the monitor and the demo in the ROM, which they build first. With `ROM=file.bin`, the
   core boots from the file instead, and with `ROM=` the bitstream has no
@@ -42,7 +50,8 @@ or, in an existing clone:
   interactive shell](README.md#using-the-interactive-shell)).
 - `make hwtest` tests the board (see [Testing the
   board](#testing-the-board)).
-- `make flash` writes a bitstream into the Nexys4DDR's flash, from which
+- `make flash` writes a bitstream into the Nexys4DDR's flash, or with
+  `COR=` and `SLOT=` a core file into a slot of the MEGA65's, from which
   the board then starts (see [synth/README.md](synth/README.md)).
 - `make bump TAG=V1.0` moves nice_cpu to a tag and records the timing
   of the MEGA65 and the Nexys4DDR (see [The timing badges](#the-timing-badges)).
@@ -95,8 +104,13 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
 | [examples/](examples/) | Example C programs, and the Makefile that builds them for the MEGA65. |
 | [tools/](tools/) | `boardlink.py`, the debug link of nice_cpu's `debugger/nicelink.py`, over the board's UART or TCP to `niceemu --link`, with the board's Ethernet port and the simulated system of `make cosim`, and the tools that use it: `load.py`, which loads a program into the MEGA65 or Nexys4DDR, `run.py`, which runs a program on the board as `niceemu` runs it, `mon.py`, an interactive shell on the link, nice_cpu's `nicedbg.py` with the board's links, `hwtest.py`, which tests the system on the board, `flash.py`, which writes the Nexys4DDR's flash or a slot of the MEGA65's, `bump.py`, which records the timing of the MEGA65 and the Nexys4DDR for a nice_cpu tag, `release.py`, which builds and publishes a release, `linktest.py`, which checks `run.py` and `mon.py` on `niceemu --link`, `cosimtest.py`, which checks `run.py` on the simulated system, and `screenshot.py`, which draws a program's screen in `niceemu` as a PNG picture. |
 | [README.md](README.md) | For those who use the core files and write programs for them: on its own, over Ethernet, and over the serial port. |
-| [SYSTEM.md](doc/SYSTEM.md) | The system that programs and the link see: the debug link, the address map, the screen, the ROM, and the Nexys4DDR's devices. |
+| [SYSTEM.md](doc/SYSTEM.md) | The system that programs and the link see: the debug link, the address map, the screen and the font, the keyboard, the ROM, the Nexys4DDR's devices, the baud rate, the Ethernet station, and the SD card slots. |
 | [EMULATOR.md](doc/EMULATOR.md) | The table of the known differences from the emulator. |
+| [PROGRAMMING.md](doc/PROGRAMMING.md) | How to write and build programs, in NICE assembly and in C, and how they use the screen, the keyboard, the monitor, and the ROM. |
+| [DEBUGGER.md](doc/DEBUGGER.md) | The design note of the on-board debugger: its stages, its tests, and its decisions. |
+| [SDCARD.md](doc/SDCARD.md) | The design of the storage on the SD cards, from the controller to the files and BASIC, with its issues. |
+| [BASIC_SURVEY.md](doc/BASIC_SURVEY.md) | The survey of the BASIC dialects behind the interpreter planned for the ROM ([#54](https://github.com/MJoergen/NiceMonMEGA65/issues/54)). |
+| [CODING_STYLE.md](doc/CODING_STYLE.md) | The style of the VHDL, which `make lint` checks as far as vsg can. |
 | [RELEASE_NOTES.md](doc/RELEASE_NOTES.md) | The releases, newest first, with what changed in each. [RELEASE.md](doc/RELEASE.md) is how to make one. |
 | [core.mk](core.mk) | Picks the source files of the core, from `NICE`, for the Makefiles of `sim/` and `synth/`. |
 | [.claude/rules/synth.md](.claude/rules/synth.md) | Notes for Claude Code on the Vivado builds: where Vivado is, how to build, and what to check after a build. |
@@ -116,7 +130,12 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
   SD card controller, the network station, and the port for Ethernet
   frames at `0xFFFFFFA0`–`CF`.
 - `scr_regs.vhd` has the screen's registers at `0xFFFFFF80`–`8F`.
-- `board_io.vhd` has the board's registers at `0xFFFFFF90`–`9F`.
+- `board_io.vhd` has the board's registers at `0xFFFFFF90`–`9F`, and
+  `uart_pkg.vhd` the UART's baud rates, which it shares with the
+  debugger's settings page.
+- `sd/sd.vhd` is the SD card controller at `0xFFFFFFA0`–`AF`: nice_cpu's
+  `sd_regs.vhd` with the boards' slots, `sd/sd_spi.vhd`, the engine in
+  SPI mode, and `sd/sd_spi_byte.vhd`, its byte shifter.
 - `eth/eth.vhd` is the Ethernet station. `eth/rmii_rx.vhd` receives the
   PHY's frames, `eth/rx_fcs.vhd` checks their frame check sequence, and
   `eth/eth_rx_fifo.vhd` takes the good ones to the system clock.
@@ -145,7 +164,9 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
 - `dbg/dbg.vhd` is the on-board debugger (doc/DEBUGGER.md), and
   `dbg/dbg_host.vhd` its adapter to the debug link's side port, which
   turns a request of a word or more into the port's single words, and
-  gives the words read back one at a time. `kbd_m65_toggle.vhd` and
+  gives the words read back one at a time. `dbg/dbg_decode.vhd` decodes
+  the instruction of the strip's row 27, and `dbg/dbg_set.vhd` has the
+  text and the parse of the settings page. `kbd_m65_toggle.vhd` and
   `kbd_ps2_toggle.vhd` detect the boards' toggle keys.
 - `system.vhd` is what every board has: the system, the text display of
   its screen, and the UART's pins.
@@ -153,6 +174,12 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
 ## Running the tests
 
 You need GHDL (tested with 4.1.0) and Python 3, and gcc for `make cosim`.
+The tests of the demo and the monitor need niceemu, `make -C
+nice_cpu/emulator build`, which needs Zig. The monitor's build needs
+clang with the wasm32 target, lld, and llvm, as `make examples` does
+(see [The examples](#the-examples)), and its tests mtools, `mkfs.fat`,
+and `sfdisk`. `make lint` needs vsg, 3.35.0 in CI, and `make typecheck`
+mypy. `.github/workflows/ci.yml` installs them all.
 
     make -j test
 

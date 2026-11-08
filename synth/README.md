@@ -44,6 +44,22 @@ synthesis, so the bitstream is rebuilt when it changes. `make r6
 ROM=monitor.bin` in the top directory does the same with a path relative
 to it.
 
+`FLOW=default`, the default, runs every step of Vivado with its default
+directives, with which the MEGA65 meets 100 MHz. `FLOW=timing` runs them
+with directives for timing: `synth_design -directive
+PerformanceOptimized -retiming`, `opt_design -directive Explore`,
+`place_design -directive ExtraTimingOpt`, or the `PLACE_TIMING` of the
+board's Makefile, `AltSpreadLogic_high` on the R6, and `AggressiveExplore`
+for `phys_opt_design` and `route_design`, with `phys_opt_design` again
+after routing ([Makefile.inc](Makefile.inc)). The Nexys4DDR's Makefile
+sets `FLOW=timing`, as its slower part needs it (see [Timing](#timing)).
+
+Every registered pin carries `IOB TRUE` in the board's XDC, with a plain
+register in front of the pin and no logic between them, so that Vivado
+packs the register into the I/O tile. A register that also feeds internal
+logic is replicated with a warning; the logic is driven from the source
+signal instead.
+
 `make -C synth/r6 cor`, or `make cor` in the top directory for both
 revisions, makes the core file `synth/r6/build/NiceMonMEGA65-r6.cor`
 from the bitstream, which it builds first if needed. MEGAFLASH writes a
@@ -179,6 +195,14 @@ repository.
 a3fafd4), copied unchanged: the Tyto Project by Adam Barnes, via C64MEGA65,
 LGPL v3. `mega65/mega65.vhd` drives it, the video DAC, and the clocks as
 MandelbrotMEGA65's `mega65.vhd` does.
+
+The other third-party files are `src/uart_serdes.vhd`, from
+[cmod-s7](https://github.com/MJoergen/cmod-s7), MIT, with fixes to its
+receiver and break detection; `src/video/pix.vhd`, the pixel coordinates,
+and `src/video/video_pkg.vhd`, the video modes, from MandelbrotMEGA65,
+MIT; and `src/video/font_pkg.vhd`, the
+[Spleen](https://github.com/fcambus/spleen) 16×32 font, BSD 2-Clause
+(`font/LICENSE.spleen`), which `font/gen_font_pkg.py` makes.
 
 ## Build times and size
 

@@ -18,7 +18,7 @@ prints its options with `--help`, and its header says more.
 | `linktest.py` | Checks `run.py` and the link on `niceemu --link` against plain `niceemu`, without a board. |
 | `cosimtest.py` | Checks `run.py` and the RTL on `make cosim` against plain `niceemu`, without a board. |
 | `screenshot.py` | Runs a program in `niceemu` and draws its screen as a PNG picture, as the text display shows it, and with `--debugger` the on-board debugger's strip under it. |
-| `bump.py` | Moves nice_cpu to a tag, builds the R6 bitstream, and writes the badge files. |
+| `bump.py` | Moves nice_cpu to a tag, builds the R6 and Nexys4DDR bitstreams, and writes the badge files and `verified.json`. |
 | `release.py` | Builds, tests, and publishes a release (see [RELEASE.md](../doc/RELEASE.md)). |
 
 ## The line
@@ -54,6 +54,11 @@ They take `ETH=192.168.1.65` for the Ethernet port, or
 `ARGS=` on to the tool: `ARGS=--no-run` for `make load`, or
 `ARGS="-i in.txt -d 0x100:16 -s --timeout 5"` for `make run`.
 `ARGS="--tcp 4000"` drives `niceemu --link 4000` instead of the board.
+
+The other tools have targets too: `make hwtest` and `make flash` (see
+[hwtest.py](#hwtestpy) and [flash.py](#flashpy)), `make linktest`,
+`make cosim` and `make cosimtest`, `make bump`, and `make release` (see
+[The other tools](#the-other-tools)).
 
 ## Over Ethernet
 
@@ -173,7 +178,8 @@ FILE at 0 in place of the ROM, with the ROM hidden, such as
 bitstream without a ROM, or another build of the monitor.
 
 `run.py --monitor` does the same, with `r` and CR before the input, and
-prints what `niceemu` prints for the monitor and the program joined.
+`--rom FILE` too, and prints what `niceemu` prints for the monitor and
+the program joined.
 The monitor reads on at the end of the input, so the input ends with
 its `h`, which halts the core (monitor/README.md, "Loading from a
 host").
@@ -211,7 +217,8 @@ take about 0.56 ms.
 its input, and copies its output to stdout. When the program halts, it
 prints what `niceemu` prints: why and after how many steps the program
 halted, and the registers. It takes niceemu's `-i`, `-d`, `-s`, and
-`--symbols` options, so the output of the two can be compared:
+`--symbols` options, the long forms `--input`, `--dump`, and `--screen`
+among them, so the output of the two can be compared:
 
     nice_cpu/emulator/zig-out/bin/niceemu -d 0x110:2 -s prog.bin > emu.txt
     tools/run.py --eth 192.168.1.65 -d 0x110:2 -s prog.bin > board.txt
@@ -258,6 +265,8 @@ byte, so the output ends there.
   code and location from R1 and R2, as `niceemu` does.
 - `-2004` prints the screen from `0x400`, as `niceemu -2004` does. That
   is plain RAM on the board, not the screen that the display shows.
+- `--no-cycle-counter` is accepted and ignored, as the cycle counter
+  always runs.
 
 ### The time limit
 
@@ -361,3 +370,82 @@ here. Leaving changes nothing on the board: a running program goes on.
   shows R0 to R15 live while it runs.
 - Bytes sent while the core is held in reset or has halted are dropped,
   and bytes sent while it is paused wait for it.
+
+## hwtest.py
+
+`tools/hwtest.py` programs the FPGA and tests the system on the board,
+which [CONTRIBUTING.md](../CONTRIBUTING.md#testing-the-board) describes
+check by check. It needs the board's debug UART, `--port`, and finds the
+JTAG cable on the same USB device:
+
+    tools/hwtest.py --port /dev/ttyUSB1 [--baud 230400] [--bit FILE]
+                    [--board mega65|nexys4ddr] [--no-program]
+                    [--eth HOST[:PORT]]
+
+- `--bit FILE` is the bitstream to program, `synth/r6/build/top.bit` by
+  default. The FPGA's IDCODE must be the part the bitstream was built
+  for, and tells which board is tested. `--board` names the board
+  instead; without either, a path with `nexys4ddr` in it means the
+  Nexys4DDR.
+- `--no-program` skips the programming and the boot test, for a board
+  that is already programmed. Programming needs Linux; with
+  `--no-program` the script runs wherever `load.py` does.
+- `--eth HOST` tests the Ethernet station too, after every other check:
+  it gives the board the IP address HOST through the monitor's `i`,
+  pings it, and runs the programs over TCP. Without `--eth`, or when no
+  frame reaches the station, the summary names the station after NOT
+  COVERED, and the run still passes.
+- It prints a line for each check, and last how many passed, with
+  SKIPPED for the checks that need niceemu when it is missing.
+
+`make hwtest PORT=/dev/ttyUSB1 [BIT=FILE] [ETH=IP]` builds the examples
+and niceemu first, and runs it.
+
+## flash.py
+
+`tools/flash.py` writes the flash that a board starts from, over the
+JTAG cable on the USB device of `--port`, with openFPGALoader, and
+checks the FPGA first, as `hwtest.py` does. It runs on Linux only, and
+the MEGA65 needs pyftdi.
+
+    tools/flash.py --port /dev/ttyUSB1 [--bit FILE | --erase]
+    tools/flash.py --port /dev/ttyUSB1 --cor FILE --slot N
+
+- On the Nexys4DDR, `--bit FILE` is the bitstream to write,
+  `synth/nexys4ddr/build/top.bit` by default, and `--erase` erases the
+  flash instead. It refuses a MEGA65's bitstream, verifies the flash,
+  and waits for the board to start from it.
+- On the MEGA65, `--cor FILE --slot N` writes a core file into slot N of
+  the flash, 1 to 7, with no MEGAFLASH: it checks that slot 0's core is
+  for the file's board revision, shows what the slot held, clears the
+  protection of the slot's sectors, writes, verifies, and loads the slot
+  into the FPGA.
+
+`make flash PORT=/dev/ttyUSB1 [BIT=FILE]` is the Nexys4DDR's form, with
+`ARGS=--erase` to erase, and `make flash PORT=/dev/ttyUSB1 COR=FILE
+SLOT=N` the MEGA65's ([synth/README.md](../synth/README.md#building)).
+
+## The other tools
+
+- `tools/bump.py TAG [--push]` moves nice_cpu to the tag, builds the R6
+  and the Nexys4DDR, and commits `badge-mega65.json`,
+  `badge-nexys4ddr.json`, and `verified.json`, pushed with `--push`.
+  `--reports DIR [--nexys-reports DIR]` builds and commits nothing, and
+  prints what the timing reports in DIR would give. `make bump TAG=V1.0
+  [ARGS=--push]` runs it
+  ([CONTRIBUTING.md](../CONTRIBUTING.md#the-timing-badges)).
+- `tools/release.py TAG --port DEVICE [--eth IP]` builds, tests, and
+  stages a release, and `tools/release.py TAG --publish` tags and
+  publishes it. `make release TAG=V1.0 PORT=DEVICE` passes the port, and
+  `ARGS="--eth IP"` or `ARGS=--publish` the rest
+  ([RELEASE.md](../doc/RELEASE.md)).
+- `tools/linktest.py` and `tools/cosimtest.py` take no options. Both
+  need niceemu, and say so when `nice_cpu/emulator/zig-out/bin/niceemu`
+  is missing; `make linktest` and `make cosimtest` build it first
+  ([CONTRIBUTING.md](../CONTRIBUTING.md#the-tools-and-niceemu)).
+- `tools/screenshot.py [-i FILE] [-n N] [--debugger] [-o FILE] prog.bin`
+  runs the program in niceemu, with the console input of `-i` and at
+  most `-n` steps, as niceemu's options, and draws the screen as the
+  display shows it into `-o`, `screen.png` by default, with the on-board
+  debugger's strip under it with `--debugger`. The README's pictures are
+  drawn with it, as its docstring says.

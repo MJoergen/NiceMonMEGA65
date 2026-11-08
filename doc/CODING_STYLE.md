@@ -73,7 +73,10 @@ All code is VHDL-2008, analyzed with plain `ghdl --std=08` (no `-frelaxed`).
 - Reset is synchronous and active high. It is the last `if` inside
   `if rising_edge(clk_i) then`, so it overrides the rest.
 - Use `numeric_std_unsigned` for arithmetic on `std_logic_vector`. Import
-  `numeric_std` only where `signed` or `unsigned` is needed.
+  `numeric_std` only where `signed` or `unsigned` is needed. One exception:
+  in synthesized code, write `std_logic_vector(to_unsigned(n, w))` with
+  `numeric_std`, not `to_slv`, which CI's GHDL (Ubuntu 24.04) cannot
+  synthesize (`unhandled dyn operation`), though a newer GHDL can.
 - Subprogram headers are compact: `function f(a : t;` with the other
   parameters aligned under `a`.
 - `report` and `severity` go on lines of their own, indented under the

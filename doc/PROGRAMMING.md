@@ -35,9 +35,10 @@ the line, a TCP connection to the Ethernet port or the UART, and reads
 from the line and the keyboard. `getchar` waits for a byte, and returns
 `EOF` once a break on the line has ended the input.
 `nice.h` declares the device routines of nice_cpu's runtime/ABI.md:
-`nice_putc`, `nice_getc`, `nice_pollc`, and `nice_print` for the console, and
+`nice_putc`, `nice_getc`, `nice_pollc`, and `nice_print` for the console,
 `nice_cycles`, `nice_instructions`, and `nice_micros` for the performance
-counters. `examples/primes.c` uses the first two. It also declares `nice_peek`
+counters, and `nice_isqrt64`, the math unit's square root.
+`examples/primes.c` uses the two counters. It also declares `nice_peek`
 and `nice_poke`, which read and write any NICE address, such as the math
 unit's. `nice_screen_put` and `nice_screen_clear` write the screen at
 `0xFFFF0000`, which the VGA and HDMI outputs show (VGA only on the
@@ -100,6 +101,32 @@ there change no text. A glyph wider than a character is drawn across
 several codes side by side. The monitor shows Spleen again when the
 program returns to it. [SYSTEM.md](SYSTEM.md#the-font) has the details and
 a loop that copies the ROM, and `niceemu --window` draws the same font.
+
+## Programs under the monitor
+
+The monitor in the ROM runs a program at `0x8000` as a subroutine, and
+the program returns to it. Such a program is assembled with nice_cpu's
+`start_mon.nasm` in place of its start-up file, or built with
+`nicebuild.py --monitor`, and the monitor's `l` or `load`, or
+`tools/load.py --monitor`, loads it
+([monitor/README.md](../monitor/README.md#programs)). It has 92K words of
+RAM on the MEGA65 and 28K on the Nexys4DDR. The monitor's entries are its
+hardware abstraction layer: the console and the screen, and the files of
+the SD card, `fs_mount`, `fs_open`, `fs_read`, `fs_readdir`, and
+`fs_close`, which read a file of the card's folder `NICE`. A C program
+declares them with `monitor/mon.h` and joins the stubs of `mon.nasm`,
+`nicebuild.py --monitor --asm monitor/mon.nasm`
+([monitor/README.md](../monitor/README.md#the-dispatch-table)).
+
+A program that runs on its own, at 0, has no monitor to call. It reaches
+the SD card controller at `0xFFFFFFA0` itself, a sector at a time
+(nice_cpu's SYSTEM.md §5, and [SYSTEM.md](SYSTEM.md#the-sd-card-slots)),
+and the port for Ethernet frames at `0xFFFFFFC0`, which receives the
+frames that the station does not serve and sends the program's
+(nice_cpu's SYSTEM.md §7, and [SYSTEM.md](SYSTEM.md#ethernet-frames));
+`sim/udp.nasm` answers a UDP datagram through it. A program under the
+monitor may use both too, and one that drives the SD registers itself
+mounts the card again afterwards.
 
 ## Programs in the ROM
 
