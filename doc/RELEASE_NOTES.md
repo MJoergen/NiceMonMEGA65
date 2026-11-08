@@ -21,7 +21,7 @@ The release candidates pinned these:
 
 nice_cpu's `RC01` and `RC03` have no tag here.
 
-## V1.9 (not yet released)
+## V1.9 (2026-11-08)
 
 There is no `V1.8` here: with nice_cpu's `V1.8`, the R6 missed timing at
 100 MHz (nice_cpu#141). This release pins nice_cpu's `V1.9`, which
