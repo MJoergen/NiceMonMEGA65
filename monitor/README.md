@@ -5,8 +5,9 @@ hardware abstraction layer, the HAL, of fourteen routines that reach the
 hardware or the state the monitor keeps, called through a dispatch table
 at the start of the ROM, and a main loop with a few commands. It is not a
 library: what a program can do for itself stays in the program. It is in
-NICE assembly, with FAT32 in C. `monitor.nasm` is the ROM, and
-`fat32.c` its FAT32; `monlib.nasm` has the routines that programs join
+NICE assembly, with FAT32 in C. `monitor.nasm` is the ROM, with its
+disassembler in `monitor_dis.nasm`, its SD cards in `monitor_sd.nasm`,
+and its network in `monitor_eth.nasm`, and `fat32.c` is its FAT32; `monlib.nasm` has the routines that programs join
 and the monitor's commands use too; `mon.nasm` has the stubs through
 which a program calls the entries, and `mon.h` their declarations for C. `make -C monitor` builds `build/monitor.bin`, and
 `make -C monitor test` runs it in `niceemu` (Building and testing below).
@@ -724,7 +725,8 @@ above) is faster, as it writes the words into the memory.
 
 ## Building and testing
 
-`make -C monitor` assembles `monitor.nasm`, `monlib.nasm`, `mon.nasm`,
+`make -C monitor` assembles `monitor.nasm`, `monitor_dis.nasm`,
+`monitor_sd.nasm`, `monitor_eth.nasm`, `monlib.nasm`, `mon.nasm`,
 `build/rom_c.nasm`, nice_cpu's `lib.nasm` and `muldiv_mpu.nasm`, and
 `build/version.nasm`, the `cat` of them, with `niceasm` into
 `build/monitor.bin`, as the assembler has no include. `build/rom_c.nasm`

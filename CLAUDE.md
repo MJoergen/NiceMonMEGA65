@@ -147,7 +147,9 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   the monitor's `x` copies it to 0x8000 and runs it, for the time being
   (#65), and `demo_hw.py`, which checks it in the ROM of a programmed board.
   `monitor/`: the monitor for the ROM in NICE assembly (`monitor.nasm`,
-  the dispatch table, the HAL, and the commands), its C code (`fat32.c`
+  the dispatch table, the HAL, the map of its RAM, and the commands, with
+  `u` in `monitor_dis.nasm`, `sd` and the sector routines in
+  `monitor_sd.nasm`, and the network in `monitor_eth.nasm`), its C code (`fat32.c`
   and `rom.c`, one wasm module through `nicewasm --ram`, with its
   writable words at `0xFFFFF400`; building the monitor needs clang, and
   its tests mtools, `mkfs.fat`, and `sfdisk`), the routines that

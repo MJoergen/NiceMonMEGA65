@@ -10,8 +10,9 @@
 #               test/*.expected
 # make clean    removes build/
 #
-# The assembler has no include, so the monitor is the cat of monitor.nasm,
-# monlib.nasm, mon.nasm, build/rom_c.nasm, nice_cpu's lib.nasm and
+# The assembler has no include, so the monitor is the cat of SOURCES
+# (monitor.nasm, the three files of its commands that its header lists,
+# monlib.nasm, and mon.nasm), build/rom_c.nasm, nice_cpu's lib.nasm and
 # muldiv_mpu.nasm, build/version.nasm, which defines the label VERSION
 # (monitor.nasm), and build/folder.nasm, the text of the error of a card
 # without the folder FOLDER. build/rom_c.nasm is the ROM's C code, ROM_C, which clang
@@ -31,7 +32,7 @@ NICEWASM = $(PYTHON) $(NICE_CPU)/translator/nicewasm.py
 TOOLS    = $(wildcard $(NICE_CPU)/assembler/*.py) $(wildcard $(NICE_CPU)/translator/*.py)
 LIBC     = $(NICE_CPU)/runtime/libc
 BUILD    = build
-SOURCES  = monitor.nasm monlib.nasm mon.nasm
+SOURCES  = monitor.nasm monitor_dis.nasm monitor_sd.nasm monitor_eth.nasm monlib.nasm mon.nasm
 # The ROM's C code, and nice_cpu's runtime library that it is joined with
 ROM_C    = rom.c fat32.c
 RUNTIME_ROM = $(RUNTIME)/lib.nasm $(RUNTIME)/muldiv_mpu.nasm

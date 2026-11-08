@@ -184,7 +184,7 @@ UDP_PORT = 4511
 # The port's status, 0 while it is disabled
 ETH_CSR = 0xFFFFFFC0
 # The longest that the monitor's i dhcp takes: DHCP_TRIES DISCOVERs, and a
-# REQUEST after each, with DHCP_WAIT seconds for each reply (monitor.nasm)
+# REQUEST after each, with DHCP_WAIT seconds for each reply (monitor_eth.nasm)
 DHCP_TIME = 4 * 2 * 2.0
 
 T = TypeVar("T")

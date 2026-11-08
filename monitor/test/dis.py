@@ -30,7 +30,7 @@ ASSEMBLER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..",
 sys.path.insert(0, ASSEMBLER)
 import nicedis  # noqa: E402
 
-DIS_ROWS = 20               # monitor.nasm, DIS_ROWS
+DIS_ROWS = 20               # monitor_dis.nasm, DIS_ROWS
 START = 0x8000
 STEPS = 20_000_000
 ALWAYS = 0x0FFFFFFF         # the bits below the condition
