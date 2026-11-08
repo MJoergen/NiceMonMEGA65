@@ -10,7 +10,7 @@
 ; The bytes written are FSW_TEXT's: 1000 of them, digits from 0 to 9 and
 ; round again, with an LF after every 49.
 ;
-;  0  mon_version, 0x00010002, table 1.2
+;  0  mon_version, 0x00010003, table 1.3
 ;  1  fs_open of NEW.TXT with mode 1, 0, which mounts slot 0 and makes it
 ;  2  fs_write of 600 bytes, 600, which take two clusters of one sector
 ;  3  fs_write of 0 bytes, 0

@@ -538,13 +538,15 @@ sent goes on. The send buffer keeps its words, and is 0 after a reset
 of the system. The link reads and writes the port as the core does,
 while the core is paused, held, or halted.
 
-The monitor in the ROM uses the port only in its `i dhcp`, which gets
-the station's IP address from a DHCP server
-([#83](https://github.com/MJoergen/NiceMonMEGA65/issues/83)). It
-disables the port at its start, at the end of `i dhcp`, and when a
-program returns, so a program that does not enable it sees no frame.
-Its frame routines and ARP cache are its own, with no entries for
-programs ([monitor/](../monitor/README.md#the-network)).
+The monitor in the ROM uses the port in its `i dhcp`, which gets the
+station's IP address from a DHCP server
+([#83](https://github.com/MJoergen/NiceMonMEGA65/issues/83)), in its
+`tftp`, which loads a file from a TFTP server, and in its UDP entries
+for programs ([#84](https://github.com/MJoergen/NiceMonMEGA65/issues/84)).
+It disables the port at its start, at the end of `i dhcp` and `tftp`,
+and when a program returns, so a program that does not enable it sees
+no frame. Its frame routines and ARP cache are its own, with no entries
+for programs ([monitor/](../monitor/README.md#the-network)).
 
 ### The debug link over TCP
 

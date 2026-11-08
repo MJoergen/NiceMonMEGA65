@@ -25,8 +25,12 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 
 **Upgrade notes.**
 
-- The dispatch table is 1.2, with two entries more, `fs_write` and
-  `fs_delete` (#59). A program built for 1.1 runs as before.
+- The dispatch table is 1.3, with six entries more: `fs_write` and
+  `fs_delete` (#59), and `udp_open`, `udp_send`, `udp_recv`, and
+  `udp_close` (#84). A program built for 1.1 runs as before.
+- The demo is at `0x6000` in the ROM, from `0x4000`, so that the
+  monitor has room (#84). A ROM made with `demo/join.py` of an earlier
+  release has the demo where `x` no longer looks.
 
 **New.**
 
@@ -37,6 +41,12 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   through `fs_open` with mode 1, `fs_write`, and `fs_close`, and delete
   them with `fs_delete`. A reset in the middle of a write leaves at worst
   clusters that `fsck.fat` frees.
+- The monitor's `tftp IP NAME` loads a `.bin` file from a TFTP server,
+  as `load` loads one from the card
+  ([#84](https://github.com/MJoergen/NiceMonMEGA65/issues/84)).
+  Programs send and receive UDP datagrams through four new entries,
+  with ARP and the gateway of `i dhcp` resolved in the ROM, so that a
+  game of two boards needs no network stack of its own.
 
 **Tests.**
 
@@ -44,6 +54,9 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   check them with `fsck.fat -n`, `mdir`, and `mtype`: files written
   across clusters, a truncated file, deletions with long names, a folder
   that grows by a cluster, a full card, and a write-protected one.
+- The UDP entries and `tftp` run in `niceemu` against frames of
+  `--eth-in`, with the frames sent compared: `test/udp.nasm` and
+  `test/tftp.py`, with lost packets, duplicates, and an ERROR.
 
 ## V1.9 (2026-11-08)
 

@@ -81,4 +81,25 @@ int fs_write(int handle, unsigned buf, unsigned n);
 // Table 1.2.
 int fs_delete(unsigned name);
 
+// The UDP endpoint, from table 1.3 (monitor/README.md, "The network"): one
+// local port, and datagrams of bytes one per word, as for the files. An
+// error is negative, from -40.
+
+// The endpoint opened on a local port, or with 0 on one from 49152 to
+// 65535, and the port for Ethernet frames enabled. The port, or an error.
+int udp_open(unsigned port);
+
+// n bytes, up to 1472, from bits 7..0 of the words from buf, sent as a
+// datagram to a port of an IP address, through the gateway of i dhcp when
+// the address is in another network. 0, or an error.
+int udp_send(unsigned ip, unsigned port, unsigned buf, unsigned n);
+
+// Up to n bytes of the next datagram copied, one per word from buf, and
+// its source's IP address and port to the 2 words at src, unless src is
+// 0. Does not wait. The bytes copied, 0 when none waits, or an error.
+int udp_recv(unsigned buf, unsigned n, unsigned src);
+
+// The endpoint closed, and the port for Ethernet frames disabled. 0.
+int udp_close(void);
+
 #endif

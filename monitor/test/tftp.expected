@@ -1,0 +1,227 @@
+== none
+NiceMon V9.9
+? lists the commands
+> i 10.0.0.9
+IP address 10.0.0.9
+> tftp 10.0.0.2 prog.bin
+No answer from the TFTP server
+> d 9000 4
+00009000 00000000 00000000 00000000 00000000
+> h
+Halted
+exit 0
+frame 1, 42 bytes
+000  ff ff ff ff ff ff 02 4e 49 43 45 00 08 06 00 01
+010  08 00 06 04 00 01 02 4e 49 43 45 00 0a 00 00 09
+020  00 00 00 00 00 00 0a 00 00 02
+frame 2, 59 bytes
+000  0a 00 00 00 00 02 02 4e 49 43 45 00 08 00 45 00
+010  00 2d 00 00 40 00 40 11 26 b6 0a 00 00 09 0a 00
+020  00 02 pp pp 00 45 00 19 00 00 00 01 70 72 6f 67
+030  2e 62 69 6e 00 6f 63 74 65 74 00
+frame 3, 59 bytes
+000  0a 00 00 00 00 02 02 4e 49 43 45 00 08 00 45 00
+010  00 2d 00 00 40 00 40 11 26 b6 0a 00 00 09 0a 00
+020  00 02 pp pp 00 45 00 19 00 00 00 01 70 72 6f 67
+030  2e 62 69 6e 00 6f 63 74 65 74 00
+frame 4, 59 bytes
+000  0a 00 00 00 00 02 02 4e 49 43 45 00 08 00 45 00
+010  00 2d 00 00 40 00 40 11 26 b6 0a 00 00 09 0a 00
+020  00 02 pp pp 00 45 00 19 00 00 00 01 70 72 6f 67
+030  2e 62 69 6e 00 6f 63 74 65 74 00
+frame 5, 59 bytes
+000  0a 00 00 00 00 02 02 4e 49 43 45 00 08 00 45 00
+010  00 2d 00 00 40 00 40 11 26 b6 0a 00 00 09 0a 00
+020  00 02 pp pp 00 45 00 19 00 00 00 01 70 72 6f 67
+030  2e 62 69 6e 00 6f 63 74 65 74 00
+frame 6, 59 bytes
+000  0a 00 00 00 00 02 02 4e 49 43 45 00 08 00 45 00
+010  00 2d 00 00 40 00 40 11 26 b6 0a 00 00 09 0a 00
+020  00 02 pp pp 00 45 00 19 00 00 00 01 70 72 6f 67
+030  2e 62 69 6e 00 6f 63 74 65 74 00
+== ok
+NiceMon V9.9
+? lists the commands
+> i 10.0.0.9
+IP address 10.0.0.9
+> tftp 10.0.0.2 prog.bin
+Words loaded: 38, 00009000 to 00009025
+Lines skipped: 1, first line 21; ADDR WORD in hex, ADDR 00008000 to FFFEFFFF
+> d 9000 4
+00009000 00000000 01010101 02020202 03030303
+> h
+Halted
+exit 0
+frame 1, 42 bytes
+000  ff ff ff ff ff ff 02 4e 49 43 45 00 08 06 00 01
+010  08 00 06 04 00 01 02 4e 49 43 45 00 0a 00 00 09
+020  00 00 00 00 00 00 0a 00 00 02
+frame 2, 59 bytes
+000  0a 00 00 00 00 02 02 4e 49 43 45 00 08 00 45 00
+010  00 2d 00 00 40 00 40 11 26 b6 0a 00 00 09 0a 00
+020  00 02 pp pp 00 45 00 19 00 00 00 01 70 72 6f 67
+030  2e 62 69 6e 00 6f 63 74 65 74 00
+frame 3, 46 bytes
+000  0a 00 00 00 00 02 02 4e 49 43 45 00 08 00 45 00
+010  00 20 00 00 40 00 40 11 26 c3 0a 00 00 09 0a 00
+020  00 02 pp pp 0d 80 00 0c 00 00 00 04 00 01
+frame 4, 46 bytes
+000  0a 00 00 00 00 02 02 4e 49 43 45 00 08 00 45 00
+010  00 20 00 00 40 00 40 11 26 c3 0a 00 00 09 0a 00
+020  00 02 pp pp 0d 80 00 0c 00 00 00 04 00 01
+frame 5, 46 bytes
+000  0a 00 00 00 00 02 02 4e 49 43 45 00 08 00 45 00
+010  00 20 00 00 40 00 40 11 26 c3 0a 00 00 09 0a 00
+020  00 02 pp pp 0d 80 00 0c 00 00 00 04 00 02
+== lost
+NiceMon V9.9
+? lists the commands
+> i 10.0.0.9
+IP address 10.0.0.9
+> tftp 10.0.0.2 prog.bin
+Words loaded: 38, 00009000 to 00009025
+Lines skipped: 1, first line 21; ADDR WORD in hex, ADDR 00008000 to FFFEFFFF
+> d 9000 4
+00009000 00000000 01010101 02020202 03030303
+> h
+Halted
+exit 0
+frame 1, 42 bytes
+000  ff ff ff ff ff ff 02 4e 49 43 45 00 08 06 00 01
+010  08 00 06 04 00 01 02 4e 49 43 45 00 0a 00 00 09
+020  00 00 00 00 00 00 0a 00 00 02
+frame 2, 59 bytes
+000  0a 00 00 00 00 02 02 4e 49 43 45 00 08 00 45 00
+010  00 2d 00 00 40 00 40 11 26 b6 0a 00 00 09 0a 00
+020  00 02 pp pp 00 45 00 19 00 00 00 01 70 72 6f 67
+030  2e 62 69 6e 00 6f 63 74 65 74 00
+frame 3, 59 bytes
+000  0a 00 00 00 00 02 02 4e 49 43 45 00 08 00 45 00
+010  00 2d 00 00 40 00 40 11 26 b6 0a 00 00 09 0a 00
+020  00 02 pp pp 00 45 00 19 00 00 00 01 70 72 6f 67
+030  2e 62 69 6e 00 6f 63 74 65 74 00
+frame 4, 46 bytes
+000  0a 00 00 00 00 02 02 4e 49 43 45 00 08 00 45 00
+010  00 20 00 00 40 00 40 11 26 c3 0a 00 00 09 0a 00
+020  00 02 pp pp 0d 80 00 0c 00 00 00 04 00 01
+frame 5, 46 bytes
+000  0a 00 00 00 00 02 02 4e 49 43 45 00 08 00 45 00
+010  00 20 00 00 40 00 40 11 26 c3 0a 00 00 09 0a 00
+020  00 02 pp pp 0d 80 00 0c 00 00 00 04 00 01
+frame 6, 46 bytes
+000  0a 00 00 00 00 02 02 4e 49 43 45 00 08 00 45 00
+010  00 20 00 00 40 00 40 11 26 c3 0a 00 00 09 0a 00
+020  00 02 pp pp 0d 80 00 0c 00 00 00 04 00 02
+== error
+NiceMon V9.9
+? lists the commands
+> i 10.0.0.9
+IP address 10.0.0.9
+> tftp 10.0.0.2 prog.bin
+TFTP error 1, File not found
+> d 9000 4
+00009000 00000000 00000000 00000000 00000000
+> h
+Halted
+exit 0
+frame 1, 42 bytes
+000  ff ff ff ff ff ff 02 4e 49 43 45 00 08 06 00 01
+010  08 00 06 04 00 01 02 4e 49 43 45 00 0a 00 00 09
+020  00 00 00 00 00 00 0a 00 00 02
+frame 2, 59 bytes
+000  0a 00 00 00 00 02 02 4e 49 43 45 00 08 00 45 00
+010  00 2d 00 00 40 00 40 11 26 b6 0a 00 00 09 0a 00
+020  00 02 pp pp 00 45 00 19 00 00 00 01 70 72 6f 67
+030  2e 62 69 6e 00 6f 63 74 65 74 00
+== exact
+NiceMon V9.9
+? lists the commands
+> i 10.0.0.9
+IP address 10.0.0.9
+> tftp 10.0.0.2 prog.bin
+Words loaded: 25, 00009000 to 00009018
+> d 9000 4
+00009000 00000000 00000001 00000002 00000003
+> h
+Halted
+exit 0
+frame 1, 42 bytes
+000  ff ff ff ff ff ff 02 4e 49 43 45 00 08 06 00 01
+010  08 00 06 04 00 01 02 4e 49 43 45 00 0a 00 00 09
+020  00 00 00 00 00 00 0a 00 00 02
+frame 2, 59 bytes
+000  0a 00 00 00 00 02 02 4e 49 43 45 00 08 00 45 00
+010  00 2d 00 00 40 00 40 11 26 b6 0a 00 00 09 0a 00
+020  00 02 pp pp 00 45 00 19 00 00 00 01 70 72 6f 67
+030  2e 62 69 6e 00 6f 63 74 65 74 00
+frame 3, 46 bytes
+000  0a 00 00 00 00 02 02 4e 49 43 45 00 08 00 45 00
+010  00 20 00 00 40 00 40 11 26 c3 0a 00 00 09 0a 00
+020  00 02 pp pp 0d 80 00 0c 00 00 00 04 00 01
+frame 4, 46 bytes
+000  0a 00 00 00 00 02 02 4e 49 43 45 00 08 00 45 00
+010  00 20 00 00 40 00 40 11 26 c3 0a 00 00 09 0a 00
+020  00 02 pp pp 0d 80 00 0c 00 00 00 04 00 02
+== empty
+NiceMon V9.9
+? lists the commands
+> i 10.0.0.9
+IP address 10.0.0.9
+> tftp 10.0.0.2 prog.bin
+Words loaded: 0
+> d 9000 4
+00009000 00000000 00000000 00000000 00000000
+> h
+Halted
+exit 0
+frame 1, 42 bytes
+000  ff ff ff ff ff ff 02 4e 49 43 45 00 08 06 00 01
+010  08 00 06 04 00 01 02 4e 49 43 45 00 0a 00 00 09
+020  00 00 00 00 00 00 0a 00 00 02
+frame 2, 59 bytes
+000  0a 00 00 00 00 02 02 4e 49 43 45 00 08 00 45 00
+010  00 2d 00 00 40 00 40 11 26 b6 0a 00 00 09 0a 00
+020  00 02 pp pp 00 45 00 19 00 00 00 01 70 72 6f 67
+030  2e 62 69 6e 00 6f 63 74 65 74 00
+frame 3, 46 bytes
+000  0a 00 00 00 00 02 02 4e 49 43 45 00 08 00 45 00
+010  00 20 00 00 40 00 40 11 26 c3 0a 00 00 09 0a 00
+020  00 02 pp pp 0d 80 00 0c 00 00 00 04 00 01
+== args
+NiceMon V9.9
+? lists the commands
+> tftp
+tftp IP NAME: the server and the file, such as tftp 192.168.1.10 hello.bin
+> tftp x
+tftp IP NAME: the server and the file, such as tftp 192.168.1.10 hello.bin
+> tftp 10.0.0.2
+tftp IP NAME: the server and the file, such as tftp 192.168.1.10 hello.bin
+> tftp 10.0.0.2 a b
+tftp IP NAME: the server and the file, such as tftp 192.168.1.10 hello.bin
+> tftp 10.0.0.256 a
+tftp IP NAME: the server and the file, such as tftp 192.168.1.10 hello.bin
+> tftp 10.0.0.2x a
+tftp IP NAME: the server and the file, such as tftp 192.168.1.10 hello.bin
+> tftpx
+Unknown command; ? lists them
+> tftp 10.0.0.2 a.bin
+No IP address; i sets one
+> i 10.0.0.9
+IP address 10.0.0.9
+> tftp 10.0.0.3 a.bin
+No answer to ARP from the server, or from the gateway
+> h
+Halted
+exit 0
+frame 1, 42 bytes
+000  ff ff ff ff ff ff 02 4e 49 43 45 00 08 06 00 01
+010  08 00 06 04 00 01 02 4e 49 43 45 00 0a 00 00 09
+020  00 00 00 00 00 00 0a 00 00 03
+frame 2, 42 bytes
+000  ff ff ff ff ff ff 02 4e 49 43 45 00 08 06 00 01
+010  08 00 06 04 00 01 02 4e 49 43 45 00 0a 00 00 09
+020  00 00 00 00 00 00 0a 00 00 03
+frame 3, 42 bytes
+000  ff ff ff ff ff ff 02 4e 49 43 45 00 08 06 00 01
+010  08 00 06 04 00 01 02 4e 49 43 45 00 0a 00 00 09
+020  00 00 00 00 00 00 0a 00 00 03

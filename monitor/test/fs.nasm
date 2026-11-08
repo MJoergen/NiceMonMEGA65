@@ -7,7 +7,7 @@
 ; dumps, with the bytes that fs_read wrote at FST_BUF and the entry that
 ; fs_readdir wrote at FST_ENTRY:
 ;
-;  0  mon_version, 0x00010002, table 1.2
+;  0  mon_version, 0x00010003, table 1.3
 ;  1  fs_open of HELLO.BIN, 0, which mounts slot 0
 ;  2  fs_open of frag.bin, in lower case, 1
 ;  3  fs_open of KEEP.TXT, -23, too many open files

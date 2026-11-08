@@ -23,6 +23,10 @@ FS_READDIR      .EQU    0x18
 FS_CLOSE        .EQU    0x1A
 FS_WRITE        .EQU    0x1C
 FS_DELETE       .EQU    0x1E
+UDP_OPEN        .EQU    0x20
+UDP_SEND        .EQU    0x22
+UDP_RECV        .EQU    0x24
+UDP_CLOSE       .EQU    0x26
 
 _mon_reset
                 JMP     MON_RESET
@@ -56,6 +60,14 @@ _fs_write
                 JMP     FS_WRITE
 _fs_delete
                 JMP     FS_DELETE
+_udp_open
+                JMP     UDP_OPEN
+_udp_send
+                JMP     UDP_SEND
+_udp_recv
+                JMP     UDP_RECV
+_udp_close
+                JMP     UDP_CLOSE
 _scr_getx
                 JMP     SCR_GETXY
 _scr_gety

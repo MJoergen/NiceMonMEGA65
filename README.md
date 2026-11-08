@@ -200,7 +200,9 @@ program, the debug link, or the demo's F11 gives it. After reset, it has
 none, and answers nothing. At the monitor's prompt, `i 192.168.1.65` and
 RETURN give it that address, and `i` alone shows it. On a network with
 a DHCP server, `i dhcp` gets an address from it and shows it, with the
-mask, the gateway, and the server. The board does not renew the lease,
+mask, the gateway, and the server, and `tftp 192.168.1.10 hello.bin`
+then loads a program from a TFTP server on the network
+([monitor/README.md](monitor/README.md#the-network)). The board does not renew the lease,
 so a server that wants the address back after the lease may give it to
 another computer; a fixed address outside the server's range, or one
 the server reserves for the MAC address, avoids that. A second board on

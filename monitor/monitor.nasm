@@ -35,7 +35,10 @@
 ; address from a DHCP server through the port for Ethernet frames, with
 ; the frame routines eth_on, eth_recv, and eth_send, which are the ROM's
 ; own too, as is the ARP cache of arp_resolve (issue #83, README.md, "The
-; network").
+; network"). The UDP endpoint is the entries 16 to 19, udp_open,
+; udp_send, udp_recv, and udp_close, and tftp IP NAME reads a .bin file
+; through it from a TFTP server as load NAME reads one from the card
+; (issue #84).
 ;
 ; u disassembles instructions, a row each, in the text of nice_cpu's
 ; nicedis.py, with the pairs of a call shown as CALL, the return as RET,
@@ -162,6 +165,19 @@ V_TXF           .EQU    0xFFFFF120      ; a frame to send, from byte 2, DHCP_WOR
 V_RXF           .EQU    0xFFFFF180      ; a frame received, from byte 2, 380 words, as the queue's buffer has it
 ___wasm_trap_vector .EQU 0xFFFFF300     ; the routine that a wasm trap jumps to, mon_trap (lib.nasm)
 ___putc_vector  .EQU    0xFFFFF301      ; the routine that nice_putc and nice_print jump to, mon_putc
+V_MASK          .EQU    0xFFFFF302      ; the network's mask, from i dhcp, 0 for none
+V_GW            .EQU    0xFFFFF303      ; and its gateway, 0 for none
+V_UPORT         .EQU    0xFFFFF304      ; the local port of the UDP endpoint, 0 while it is closed
+V_UHDR          .EQU    0xFFFFF305      ; for udp_send: the headers, UDP_HDR words, as the send buffer has them
+V_TSRV          .EQU    0xFFFFF310      ; for tftp: the server's IP address,
+V_TTID          .EQU    0xFFFFF311      ; its port, its TID, 0 before its first DATA,
+V_TBLK          .EQU    0xFFFFF312      ; the block waited for,
+V_TLEN          .EQU    0xFFFFF313      ; the bytes of the packet at V_TPKT,
+V_TTIME         .EQU    0xFFFFF314      ; the microseconds when it was sent,
+V_TLAST         .EQU    0xFFFFF315      ; the byte before, for the LF of a CR LF,
+V_TLINE         .EQU    0xFFFFF316      ; the next free word of V_LINE,
+V_TEND          .EQU    0xFFFFF317      ; the bytes of the DATA's block,
+V_TPKT          .EQU    0xFFFFF320      ; and the packet sent, a byte per word, up to TFTP_PKT
 WASM_RAM        .EQU    0xFFFFF400      ; the words that the ROM's C code writes, from here
 WASM_END        .EQU    0xFFFFFF00      ; up to below here, the I/O page, which the Makefile checks
 
@@ -172,7 +188,7 @@ DEMO_MAX        .EQU    PROGRAM-DEMO    ; more words than fit from DEMO + 1 belo
 COLOR           .EQU    0x000FFF00      ; white on black, the color at the cold start
 OUT_LINE        .EQU    1
 OUT_SCREEN      .EQU    2
-TABLE_VERSION   .EQU    0x00010002      ; what mon_version returns: 1.2
+TABLE_VERSION   .EQU    0x00010003      ; what mon_version returns: 1.3
 DUMP_WORDS      .EQU    32              ; the words that d shows without a count
 ROW_WORDS       .EQU    4               ; the words of a row of d
 DIS_ROWS        .EQU    20              ; the instructions that u shows without a count
@@ -200,6 +216,17 @@ DHCP_OFFER      .EQU    2
 DHCP_REQUEST    .EQU    3
 DHCP_ACK        .EQU    5
 DHCP_NAK        .EQU    6
+UDP_HDR         .EQU    11              ; the words of the headers of a datagram, with the 2 bytes before the frame
+UDP_MAX         .EQU    1472            ; the bytes of a datagram's data, at most
+E_NOIP          .EQU    -40             ; the errors of the UDP entries: no IP address,
+E_PORT          .EQU    -41             ; no such port,
+E_UCLOSED       .EQU    -42             ; the endpoint is not open,
+E_ULONG         .EQU    -43             ; a datagram too long,
+E_NOROUTE       .EQU    -44             ; and no answer to ARP from the host or the gateway
+TFTP_PORT       .EQU    69              ; the TFTP server's port (RFC 1350)
+TFTP_TRIES      .EQU    5               ; the sends of a packet that tftp waits for an answer to
+TFTP_WAIT       .EQU    1000000         ; the microseconds it waits after each
+TFTP_PKT        .EQU    96              ; the words of V_TPKT
 
 ; The dispatch table (README.md, "The dispatch table"). Entries are only
 ; ever added at the end.
@@ -219,6 +246,10 @@ DHCP_NAK        .EQU    6
                 JMP     _fat_close      ; 13 at 0x1A, fs_close
                 JMP     _fat_write      ; 14 at 0x1C, fs_write
                 JMP     _fat_delete     ; 15 at 0x1E, fs_delete
+                JMP     udp_open        ; 16 at 0x20
+                JMP     udp_send        ; 17 at 0x22
+                JMP     udp_recv        ; 18 at 0x24
+                JMP     udp_close       ; 19 at 0x26
 
 ; mon_reset: the cold start, entry 0, which reset runs and a program may
 ; call. E is cleared, the timer stopped, VBASE set to 0, the font base
@@ -232,6 +263,9 @@ mon_reset
                 MOVE    @TIMER, 0
                 MOVE    @SCR_FONT, 0
                 MOVE    @ETH_CSR, 0
+                MOVE    @V_UPORT, 0
+                MOVE    @V_MASK, 0
+                MOVE    @V_GW, 0
                 MOVE    SP, STACK
                 MOVE    @___wasm_trap_vector, mon_trap
                 MOVE    @___putc_vector, mon_putc
@@ -789,52 +823,28 @@ u_hex_digit
 ; with dots between them, or from DHCP with the word dhcp, in either
 ; case, and shown, in decimal with dots. Without an address it is only
 ; shown. Blanks may come before and after the address, and anything else
-; makes it no address, which is not written. R7 gathers the address, a
-; byte at a time, and R8 counts the numbers left.
+; makes it no address, which is not written. A written address has no
+; mask and no gateway, which only i dhcp gives.
 cmd_ip
-                MOVE    R7, 0
-                MOVE    R8, 4
-ip_blank
                 CMP     @R2, 0x20
         ?Z      ADD     R2, R2, 1
-        ?Z      JMP     ip_blank
+        ?Z      JMP     cmd_ip
                 TST     @R2
         ?Z      JMP     ip_show         ; no address
                 OR      R1, @R2, 0x20
                 SUB     R1, R1, 0x61
                 CMP     R1, 26
         ?C      JMP     ip_word         ; a letter
-ip_num          MOVE    R4, 0           ; the number
-                MOVE    R5, 0           ; and its digits
-ip_digit
-                SUB     R3, @R2, 0x30
-                CMP     R3, 10
-        ?!C     JMP     ip_end          ; no digit
-                SHL     R1, R4, 3       ; R4 is 10 * R4 + the digit
-                SHL     R4, R4, 1
-                ADD     R4, R4, R1
-                ADD     R4, R4, R3
-                CMP     R4, 256
-        ?!C     JMP     ip_bad
-                ADD     R5, R5, 1
-                ADD     R2, R2, 1
-                JMP     ip_digit
-ip_end          TST     R5
-        ?Z      JMP     ip_bad          ; a number without digits
-                SHL     R7, R7, 8
-                OR      R7, R7, R4
-                SUB[M]  R8, R8, 1
-        ?Z      JMP     ip_last
-                CMP     @R2, 0x2E       ; .
-        ?!Z     JMP     ip_bad
-                ADD     R2, R2, 1
-                JMP     ip_num
-ip_last         CMP     @R2, 0x20       ; blanks, then the end of the line
-        ?Z      ADD     R2, R2, 1
-        ?Z      JMP     ip_last
-                TST     @R2
+                MOVE    R1, R2
+                CALL    get_ip
+                TST     R2
+        ?Z      JMP     ip_bad
+                MOVE    R7, R1
+                CALL    rest_blank
         ?!Z     JMP     ip_bad
                 MOVE    @E_IP, R7
+                MOVE    @V_MASK, 0
+                MOVE    @V_GW, 0
 ip_show         MOVE    R1, S_IP
                 MOVE    R2, @E_IP
                 CALL    show_ip
@@ -899,6 +909,8 @@ dhcp_again
 dhcp_bound
                 MOVE    @ETH_CSR, 0
                 MOVE    @E_IP, @V_DIP
+                MOVE    @V_MASK, @V_DMASK
+                MOVE    @V_GW, @V_DGW
                 MOVE    R1, S_IP
                 MOVE    R2, @E_IP
                 CALL    show_ip
@@ -912,6 +924,44 @@ dhcp_bound
                 MOVE    R2, @V_DSRV
                 CALL    show_ip
                 JMP     main
+
+; get_ip: the IP address at R1, four decimal numbers of 0 to 255 with dots
+; between them: R1 the address, R2 = 1, and R3 after it, or R2 = 0 when
+; there is none. Uses R1-R6.
+get_ip
+                MOVE    R3, R1          ; the next character
+                MOVE    R1, 0           ; the address
+                MOVE    R6, 4           ; the numbers left
+get_ip_num
+                MOVE    R4, 0           ; the number
+                MOVE    R5, R3          ; where it starts
+get_ip_digit
+                SUB     R2, @R3, 0x30
+                CMP     R2, 10
+        ?!C     JMP     get_ip_end      ; no digit
+                ADD     R4, R4, R4      ; R4 is 10 * R4 + the digit
+                ADD     R2, R2, R4
+                SHL     R4, R4, 2
+                ADD     R4, R4, R2
+                CMP     R4, 256
+        ?!C     JMP     get_ip_bad
+                ADD     R3, R3, 1
+                JMP     get_ip_digit
+get_ip_end
+                CMP     R3, R5
+        ?Z      JMP     get_ip_bad      ; a number without digits
+                SHL     R1, R1, 8
+                OR      R1, R1, R4
+                SUB[M]  R6, R6, 1
+        ?Z      MOVE    R2, 1
+        ?Z      RET
+                CMP     @R3, 0x2E       ; .
+        ?!Z     JMP     get_ip_bad
+                ADD     R3, R3, 1
+                JMP     get_ip_num
+get_ip_bad
+                MOVE    R2, 0
+                RET
 
 ; show_ip: the string at R1, the IP address R2 in decimal with dots, and
 ; CR LF. Uses R1-R4, and R7 and R8 across the calls, saved.
@@ -1123,53 +1173,63 @@ load_seq
                 CMP     R1, 0x40
         ?C      JMP     load_seq        ; a parameter byte
                 JMP     load_key        ; the final byte
-; The end of a line: an empty one ends the load, one of blanks only is
-; passed over, and another is parsed, and its word written
+; The end of a line: an empty one ends the load, and another goes to
+; bin_line
 load_end
                 MOVE    @R6, 0
                 CMP     R6, V_LINE
         ?Z      JMP     load_done
+                CALL    bin_line
+                JMP     load_line
+
+; bin_line: the line at V_LINE, which ends at R6 with a 0, LINE_MAX + 1
+; characters when it was longer, of l and tftp: counted in R11, passed
+; over when it has blanks only, or else parsed, and its word written,
+; counted in R8, with the lowest and highest address in R9 and R10, or
+; skipped, counted in R12, with the number of the first in V_LBAD. Uses
+; R1-R6.
+bin_line
                 ADD     R11, R11, 1
                 CMP     R6, V_LINE+LINE_MAX+1
-        ?Z      JMP     load_bad        ; longer than LINE_MAX
+        ?Z      JMP     bin_bad         ; longer than LINE_MAX
                 MOVE    R1, V_LINE
                 CALL    _io_gethex      ; R1 the address, R2 its digits, R3 after it
                 TST     R2
-        ?!Z     JMP     load_addr
+        ?!Z     JMP     bin_addr
                 TST     @R3
-        ?Z      JMP     load_line       ; blanks only
-load_addr
+        ?Z      RET                     ; blanks only
+bin_addr
                 SUB     R4, R2, 1
                 CMP     R4, 8
-        ?!C     JMP     load_bad        ; no digit, or more than 8
+        ?!C     JMP     bin_bad         ; no digit, or more than 8
                 CMP     R1, PROGRAM
-        ?C      JMP     load_bad        ; in the ROM
+        ?C      JMP     bin_bad         ; in the ROM
                 CMP     R1, @V_PEND
-        ?!C     JMP     load_bad        ; the variables, or past the RAM
+        ?!C     JMP     bin_bad         ; the variables, or past the RAM
                 MOVE    R6, R1
                 MOVE    R1, R3
                 CALL    _io_gethex      ; R1 the word
                 SUB     R4, R2, 1
                 CMP     R4, 8
-        ?!C     JMP     load_bad
-load_tail
+        ?!C     JMP     bin_bad
+bin_tail
                 CMP     @R3, 0x20
         ?Z      ADD     R3, R3, 1
-        ?Z      JMP     load_tail
+        ?Z      JMP     bin_tail
                 TST     @R3
-        ?!Z     JMP     load_bad        ; more after the word
+        ?!Z     JMP     bin_bad         ; more after the word
                 MOVE    @R6, R1
                 ADD     R8, R8, 1
                 CMP     R6, R9
         ?C      MOVE    R9, R6          ; a lower address
                 CMP     R10, R6
         ?C      MOVE    R10, R6         ; a higher one
-                JMP     load_line
-load_bad
+                RET
+bin_bad
                 ADD     R12, R12, 1
                 CMP     R12, 1
         ?Z      MOVE    @V_LBAD, R11
-                JMP     load_line
+                RET
 ; The end of the load: the row blank again, the outputs back, the words
 ; written, and the lines skipped
 load_done
@@ -2018,6 +2078,235 @@ arp_request
                 MOVE    R2, 42
                 JMP     eth_send        ; which returns to the caller
 
+; The UDP endpoint, the entries 16 to 19 (README.md, "The network"): one
+; local port, V_UPORT, 0 while it is closed, which the cold start and
+; mon_exit close, as they disable the port for Ethernet frames. Datagrams
+; are IPv4, from E_IP, with no options, not fragmented, and with the UDP
+; checksum 0, none, as IPv4 allows. A datagram's data is one byte per
+; word, bits 7..0, as the file entries have it.
+
+; udp_open: the endpoint opened on the local port R1, or with R1 = 0 on a
+; port from 49152 to 65535 that the microsecond counter picks, and the
+; port for Ethernet frames enabled, with its queue emptied. R1 = the
+; port, or E_NOIP without an IP address, or E_PORT for one past 65535.
+; Uses R1.
+udp_open
+                TST     @E_IP
+        ?Z      MOVE    R1, E_NOIP
+        ?Z      RET
+                CMP     R1, 0x10000
+        ?!C     MOVE    R1, E_PORT
+        ?!C     RET
+                TST     R1
+        ?Z      AND     R1, @io.us, 0x3FFF
+        ?Z      OR      R1, R1, 0xC000
+                MOVE    @V_UPORT, R1
+                JMP     eth_on          ; which returns to the caller
+
+; udp_close: the endpoint closed, and the port for Ethernet frames
+; disabled. R1 = 0.
+udp_close
+                MOVE    @V_UPORT, 0
+                MOVE    @ETH_CSR, 0
+                MOVE    R1, 0
+                RET
+
+; udp_send: the R4 bytes at R3 sent to the port R2 of the IP address R1,
+; through the gateway, V_GW, when the mask, V_MASK, puts the address in
+; another network, and to everyone for 255.255.255.255. R1 = 0, or
+; E_UCLOSED, E_PORT for a port of 0 or past 65535, E_ULONG for more than
+; UDP_MAX bytes, or E_NOROUTE when the host or the gateway did not answer
+; ARP. The headers are built at V_UHDR, and copied with the bytes to the
+; send buffer a word at a time. Uses R1-R6, and R7-R10 across the calls,
+; saved: the address, the port, the bytes, and their number.
+udp_send
+                TST     @V_UPORT
+        ?Z      MOVE    R1, E_UCLOSED
+        ?Z      RET
+                SUB     R5, R2, 1
+                CMP     R5, 0xFFFF
+        ?!C     MOVE    R1, E_PORT
+        ?!C     RET
+                CMP     R4, UDP_MAX+1
+        ?!C     MOVE    R1, E_ULONG
+        ?!C     RET
+                PUSH    R7
+                PUSH    R8
+                PUSH    R9
+                PUSH    R10
+                MOVE    R7, R1
+                MOVE    R8, R2
+                MOVE    R9, R3
+                MOVE    R10, R4
+; The next hop's MAC address, in R2 and R3
+                MOVE    R2, 0xFFFF
+                MOVE    R3, 0xFFFFFFFF
+                CMP     R1, 0xFFFFFFFF
+        ?Z      JMP     udp_head        ; to everyone
+                XOR     R2, R1, @E_IP
+                AND[M]  R0, R2, @V_MASK
+        ?Z      JMP     udp_arp         ; in this network, or no mask
+                MOVE[M] R1, @V_GW
+        ?Z      JMP     udp_noroute
+udp_arp
+                CALL    arp_resolve
+                TST     R1
+        ?!Z     JMP     udp_noroute
+udp_head
+                MOVE    @V_UHDR, R2
+                MOVE    @V_UHDR+1, R3
+                SHL     R3, @E_MACH, 16
+                SHR     R4, @E_MACL, 16
+                OR      @V_UHDR+2, R3, R4
+                SHL     R3, @E_MACL, 16
+                OR      @V_UHDR+3, R3, 0x0800
+                ADD     R1, R10, 28
+                OR      @V_UHDR+4, R1, 0x45000000  ; IPv4, a header of 5 words, and the length
+                MOVE    @V_UHDR+5, 0x4000  ; don't fragment
+                MOVE    @V_UHDR+6, 0x40110000  ; the TTL 64, UDP
+                MOVE    @V_UHDR+7, @E_IP
+                MOVE    @V_UHDR+8, R7
+                SHL     R1, @V_UPORT, 16
+                OR      @V_UHDR+9, R1, R8
+                ADD     R1, R10, 8
+                SHL     @V_UHDR+10, R1, 16  ; the UDP length, and checksum 0
+                MOVE    R1, V_UHDR
+                CALL    ip_csum
+udp_busy
+                AND[M]  R0, @ETH_CSR, ETH_BUSY
+        ?!Z     JMP     udp_busy        ; as the send buffer takes no write while busy
+                MOVE    R5, 0           ; the word of the send buffer
+                MOVE    R6, R10         ; the bytes left
+udp_word
+                CMP     R5, UDP_HDR
+        ?!C     JMP     udp_data
+                MOVE    R2, @V_UHDR[R5]
+                JMP     udp_put
+udp_data
+                TST     R6
+        ?Z      JMP     udp_go          ; all written
+                MOVE    R2, 0
+                MOVE    R4, 4
+udp_byte
+                SHL     R2, R2, 8
+                TST     R6
+        ?Z      JMP     udp_byte_next
+                AND     R1, @R9++, 0xFF
+                OR      R2, R2, R1
+                SUB     R6, R6, 1
+udp_byte_next
+                SUB[M]  R4, R4, 1
+        ?!Z     JMP     udp_byte
+udp_put
+                SHR     R1, R5, 3
+                OR      @ETH_CHUNK, R1, ETH_TXBUF
+                AND     R1, R5, 7
+                MOVE    @ETH_BUF[R1], R2
+                ADD     R5, R5, 1
+                JMP     udp_word
+udp_go
+                ADD     @ETH_TX_LEN, R10, 42
+                MOVE    R1, 0
+                JMP     udp_send_end
+udp_noroute
+                MOVE    R1, E_NOROUTE
+udp_send_end
+                POP     R10
+                POP     R9
+                POP     R8
+                POP     R7
+                RET
+
+; udp_recv: the next datagram for the endpoint, of the frames in the
+; queue, copied to the words at R1, R2 bytes at most, a byte per word,
+; and its source's IP address and port to the 2 words at R3, unless R3
+; is 0. R1 = the bytes copied, 0 when no datagram waits, or E_UCLOSED.
+; The frames before it that are no datagram for the endpoint are
+; released unread, and so are empty datagrams. Uses R1-R6, and R7-R9
+; across the calls, saved.
+udp_recv
+                TST     @V_UPORT
+        ?Z      MOVE    R1, E_UCLOSED
+        ?Z      RET
+                PUSH    R7
+                PUSH    R8
+                PUSH    R9
+                MOVE    R7, R1
+                MOVE    R8, R2
+                MOVE    R9, R3
+                CALL    udp_next
+                CMP     R1, R8
+        ?C      MOVE    R8, R1          ; the bytes to copy
+                TST     R1
+        ?Z      JMP     udp_recv_end
+                TST     R9
+        ?Z      JMP     udp_recv_copy
+                MOVE    @R9, @V_RXF+7
+                SHR     @1[R9], @V_RXF+9, 16
+udp_recv_copy
+                MOVE    R6, 0           ; the byte
+                MOVE[M] R5, R8
+        ?Z      JMP     udp_recv_done
+udp_recv_byte
+                ADD     R1, R6, 4*UDP_HDR
+                CALL    rx_byte
+                MOVE    @R7++, R1
+                ADD     R6, R6, 1
+                CMP     R6, R5
+        ?!Z     JMP     udp_recv_byte
+udp_recv_done
+                MOVE    R1, R8
+udp_recv_end
+                POP     R9
+                POP     R8
+                POP     R7
+                RET
+
+; udp_next: the next frame of the queue that is a datagram for the
+; endpoint in V_RXF, its data from word UDP_HDR, its source's IP address
+; in word 7, and its port in bits 31..16 of word 9. R1 = its bytes, or 0
+; when the queue has none. The frames before it are released unread:
+; frames that are not IPv4 with a header of 5 words, not UDP, fragments,
+; to another IP address than E_IP and 255.255.255.255, to another port,
+; shorter than their UDP length says, or of no data. Uses R1-R5.
+udp_next
+                MOVE    R1, V_RXF
+                CALL    eth_recv
+                TST     R1
+        ?Z      RET                     ; none
+                CMP     R1, 42
+        ?C      JMP     udp_next        ; too short
+                AND     R2, @V_RXF+3, 0xFFFF
+                CMP     R2, 0x0800
+        ?!Z     JMP     udp_next
+                SHR     R2, @V_RXF+4, 24
+                CMP     R2, 0x45
+        ?!Z     JMP     udp_next
+                SHR     R2, @V_RXF+6, 16
+                AND     R2, R2, 0xFF
+                CMP     R2, 17          ; UDP
+        ?!Z     JMP     udp_next
+                AND[M]  R0, @V_RXF+5, 0x3FFF
+        ?!Z     JMP     udp_next        ; a fragment
+                MOVE    R2, @V_RXF+8
+                CMP     R2, 0xFFFFFFFF
+        ?Z      JMP     udp_next_port
+                CMP     R2, @E_IP
+        ?!Z     JMP     udp_next
+udp_next_port
+                AND     R2, @V_RXF+9, 0xFFFF
+                CMP     R2, @V_UPORT
+        ?!Z     JMP     udp_next
+                SHR     R2, @V_RXF+10, 16  ; the UDP length
+                SUB     R3, R1, 34      ; the bytes after the IP header
+                CMP     R3, R2
+        ?C      JMP     udp_next        ; shorter than that
+                SUB     R1, R2, 9       ; the bytes of data, less 1
+                CMP     R1, UDP_MAX
+        ?!C     JMP     udp_next        ; no data, or too long
+                ADD     R1, R1, 1
+                RET
+
 ; The frames of i dhcp (RFC 2131 and RFC 2132): a DISCOVER or a REQUEST,
 ; broadcast from 0.0.0.0 port 68 to port 67, with the broadcast flag set,
 ; as the station has no address yet, and padded to the 300 bytes of a
@@ -2214,6 +2503,235 @@ dhcp_parse_end
                 POP     R7
                 RET
 
+; tftp IP NAME: the .bin file NAME of the TFTP server at IP (RFC 1350),
+; read in octet mode through the UDP endpoint, which it opens on a port
+; that udp_open picks, and closes at the end, and its lines written as
+; load NAME writes them, with bin_line, and shown as l shows them. The
+; RRQ goes to port 69, and the server's first DATA gives its TID; the
+; packets of other hosts and TIDs are passed over. Each DATA of the block
+; waited for is answered with its ACK, and a DATA of the block before
+; with the ACK again; a block of less than 512 bytes is the last. A
+; packet that has no answer within TFTP_WAIT microseconds is sent again,
+; up to TFTP_TRIES times in all. An ERROR ends the load with its code and
+; its message. R7 counts the sends left, and R8-R12 are bin_line's.
+cmd_tftp
+                MOVE    R1, R2
+                MOVE    R2, S_FTP
+                CALL    match           ; R1 after ftp, or 0
+                TST     R1
+        ?Z      JMP     unknown
+                TST     @R1
+        ?Z      JMP     tftp_bad        ; tftp alone
+                CMP     @R1, 0x20
+        ?!Z     JMP     unknown         ; tftpx
+tftp_blank
+                CMP     @R1, 0x20
+        ?Z      ADD     R1, R1, 1
+        ?Z      JMP     tftp_blank
+                CALL    get_ip
+                TST     R2
+        ?Z      JMP     tftp_bad
+                MOVE    @V_TSRV, R1
+                CMP     @R3, 0x20
+        ?!Z     JMP     tftp_bad        ; no blank after the address
+                MOVE    R1, R3
+                CALL    fs_name
+                TST     R1
+        ?Z      JMP     tftp_bad        ; no name
+                MOVE    R7, R1
+                CALL    rest_blank
+        ?!Z     JMP     tftp_bad        ; a third word
+; The RRQ: the opcode 1, the name, a 0, octet, and a 0
+                MOVE    R2, V_TPKT
+                MOVE    @R2++, 0
+                MOVE    @R2++, 1
+tftp_rrq_name
+                MOVE[M] @R2++, @R7++
+        ?!Z     JMP     tftp_rrq_name
+                MOVE    R1, S_OCTET
+tftp_rrq_mode
+                MOVE[M] @R2++, @R1++
+        ?!Z     JMP     tftp_rrq_mode
+                SUB     @V_TLEN, R2, V_TPKT
+                MOVE    R1, 0
+                CALL    udp_open
+                TST     R1
+        ?N      JMP     tftp_fail
+                MOVE    @V_TTID, 0
+                MOVE    @V_TBLK, 1
+                MOVE    @V_TLAST, 0
+                MOVE    @V_TLINE, V_LINE
+                CALL    load_pend
+                MOVE    R8, 0
+                MOVE    R9, 0xFFFFFFFF
+                MOVE    R10, 0
+                MOVE    R11, 0
+                MOVE    R12, 0
+tftp_try
+                MOVE    R7, TFTP_TRIES
+tftp_send
+                MOVE    R1, @V_TSRV
+                MOVE[M] R2, @V_TTID
+        ?Z      MOVE    R2, TFTP_PORT
+                MOVE    R3, V_TPKT
+                MOVE    R4, @V_TLEN
+                CALL    udp_send
+                TST     R1
+        ?N      JMP     tftp_fail
+                MOVE    @V_TTIME, @io.us
+tftp_wait
+                CALL    udp_next
+                TST     R1
+        ?Z      JMP     tftp_time
+                CMP     @V_RXF+7, @V_TSRV
+        ?!Z     JMP     tftp_wait       ; from another host
+                SHR     R2, @V_RXF+9, 16  ; its port
+                MOVE[M] R3, @V_TTID
+        ?Z      JMP     tftp_op
+                CMP     R2, R3
+        ?!Z     JMP     tftp_wait       ; from another TID
+tftp_op
+                SHR     R3, @V_RXF+UDP_HDR, 16  ; the opcode
+                CMP     R3, 5
+        ?Z      JMP     tftp_error
+                CMP     R3, 3
+        ?!Z     JMP     tftp_wait       ; no DATA
+                CMP     R1, 4
+        ?C      JMP     tftp_wait       ; too short
+                AND     R4, @V_RXF+UDP_HDR, 0xFFFF  ; the block
+                CMP     R4, @V_TBLK
+        ?Z      JMP     tftp_data
+                ADD     R4, R4, 1
+                AND     R4, R4, 0xFFFF
+                CMP     R4, @V_TBLK
+        ?!Z     JMP     tftp_wait
+                TST     @V_TTID
+        ?Z      JMP     tftp_wait
+                JMP     tftp_send       ; the block before: its ACK again
+tftp_data
+                MOVE    @V_TTID, R2
+                SUB     @V_TEND, R1, 4
+                MOVE    R7, 0           ; the byte of the block
+tftp_byte
+                CMP     R7, @V_TEND
+        ?Z      JMP     tftp_ack
+                ADD     R1, R7, 4*UDP_HDR+4
+                CALL    rx_byte
+                ADD     R7, R7, 1
+                CALL    tftp_char
+                JMP     tftp_byte
+tftp_ack
+                MOVE    @V_TPKT, 0
+                MOVE    @V_TPKT+1, 4
+                MOVE    R1, @V_TBLK
+                SHR     @V_TPKT+2, R1, 8
+                AND     @V_TPKT+3, R1, 0xFF
+                MOVE    @V_TLEN, 4
+                ADD     R1, R1, 1
+                AND     @V_TBLK, R1, 0xFFFF
+                CMP     @V_TEND, 512
+        ?!C     JMP     tftp_try        ; a full block, so more follow
+                MOVE    R1, @V_TSRV     ; the last ACK
+                MOVE    R2, @V_TTID
+                MOVE    R3, V_TPKT
+                MOVE    R4, 4
+                CALL    udp_send
+                MOVE    R6, @V_TLINE    ; the last line, with no end
+                CMP     R6, V_LINE
+        ?Z      JMP     tftp_done
+                MOVE    @R6, 0
+                CALL    bin_line
+tftp_done
+                CALL    udp_close
+                JMP     load_summary
+tftp_time
+                SUB     R1, @io.us, @V_TTIME
+                CMP     R1, TFTP_WAIT
+        ?C      JMP     tftp_wait
+                SUB[M]  R7, R7, 1
+        ?!Z     JMP     tftp_send
+                CALL    udp_close
+                MOVE    R1, S_NOTFTP
+                CALL    puts_crlf
+                JMP     main
+; An ERROR: its code, and its message, up to a 0 or the end of the
+; datagram, without control codes. R7 is the byte, and R8 the end.
+tftp_error
+                MOVE    R7, 4*UDP_HDR+4
+                ADD     R8, R1, 4*UDP_HDR
+                CALL    udp_close
+                MOVE    R1, S_TFTPERR
+                CALL    _io_puts
+                AND     R1, @V_RXF+UDP_HDR, 0xFFFF
+                CALL    _io_putdec
+                MOVE    R1, S_UCOMMA
+                CALL    _io_puts
+tftp_msg
+                CMP     R7, R8
+        ?!C     JMP     tftp_msg_end
+                MOVE    R1, R7
+                CALL    rx_byte
+                TST     R1
+        ?Z      JMP     tftp_msg_end
+                ADD     R7, R7, 1
+                SUB     R2, R1, 0x20
+                CMP     R2, 0x5F
+        ?!C     JMP     tftp_msg        ; a control code
+                CALL    mon_putc
+                JMP     tftp_msg
+tftp_msg_end
+                CALL    _io_crlf
+                JMP     main
+; An error of udp_open or udp_send: no IP address, or no route
+tftp_fail
+                MOVE    R7, R1
+                CALL    udp_close
+                MOVE    R1, S_NOIP
+                CMP     R7, E_NOIP
+        ?!Z     MOVE    R1, S_NOROUTE
+                CALL    puts_crlf
+                JMP     main
+tftp_bad
+                MOVE    R1, S_BADTFTP
+                CALL    puts_crlf
+                JMP     main
+
+; tftp_char: the byte R1 of a DATA, into the line at V_TLINE, as fat_load
+; of fat32.c takes the bytes of a file: CR, LF, or CR LF ends a line,
+; which goes to bin_line, or is counted and passed over when it is empty;
+; TAB is a blank, and other control codes and bytes from 0x80 are dropped,
+; and so are the bytes after LINE_MAX + 1. Uses R1-R6.
+tftp_char
+                MOVE    R2, @V_TLAST
+                MOVE    @V_TLAST, R1
+                CMP     R1, 0x0A
+        ?!Z     JMP     tftp_char_cr
+                CMP     R2, 0x0D
+        ?Z      RET                     ; the LF of a CR LF
+                JMP     tftp_eol
+tftp_char_cr
+                CMP     R1, 0x0D
+        ?Z      JMP     tftp_eol
+                CMP     R1, 0x09
+        ?Z      MOVE    R1, 0x20
+                SUB     R2, R1, 0x20
+                CMP     R2, 0x60
+        ?!C     RET                     ; another control code, or from 0x80
+                MOVE    R6, @V_TLINE
+                CMP     R6, V_LINE+LINE_MAX+1
+        ?Z      RET                     ; the line is over full
+                MOVE    @R6++, R1
+                MOVE    @V_TLINE, R6
+                RET
+tftp_eol
+                MOVE    R6, @V_TLINE
+                MOVE    @V_TLINE, V_LINE
+                MOVE    @R6, 0
+                CMP     R6, V_LINE
+        ?!Z     JMP     bin_line        ; which returns to the caller
+                ADD     R11, R11, 1     ; an empty line, passed over
+                RET
+
 ; x: the demo, for the time being (issue #65, README.md). The ROM has its
 ; number of words at DEMO, and the words after it, which are copied to
 ; 0x8000 and run as r runs a program. A number of 0, or one too big for
@@ -2307,6 +2825,7 @@ exit_restore
                 MOVE    @TIMER, 0
                 MOVE    @SCR_FONT, 0    ; Spleen, whatever the program chose
                 MOVE    @ETH_CSR, 0     ; no frames, if the program took them
+                MOVE    @V_UPORT, 0     ; and the UDP endpoint closed
                 MOVE    @SCR_CTL, 0x60  ; the cursor, which a program may hide
                 TST     @V_COL
         ?!Z     JMP     _io_crlf        ; which returns to the caller
@@ -2634,6 +3153,7 @@ COMMANDS
                 .DAT    0x6D, cmd_mac   ; m
                 .DAT    0x72, cmd_run   ; r
                 .DAT    0x73, cmd_sd    ; s, for sd
+                .DAT    0x74, cmd_tftp  ; t, for tftp
                 .DAT    0x75, cmd_dis   ; u
                 .DAT    0x76, cmd_version  ; v
                 .DAT    0x78, cmd_demo  ; x
@@ -2697,6 +3217,17 @@ S_BADSAVE
                 .ASCII_L 'save NAME ADDR N: a name, and the address and the count in hex'
 S_DELETED
                 .ASCII_L 'Deleted '
+S_FTP           .ASCII_L 'ftp'
+S_OCTET         .ASCII_L 'octet'
+S_BADTFTP
+                .ASCII_L 'tftp IP NAME: the server and the file, such as tftp 192.168.1.10 hello.bin'
+S_NOTFTP
+                .ASCII_L 'No answer from the TFTP server'
+S_TFTPERR
+                .ASCII_L 'TFTP error '
+S_NOIP          .ASCII_L 'No IP address; i sets one'
+S_NOROUTE
+                .ASCII_L 'No answer to ARP from the server, or from the gateway'
 S_BADDEL
                 .ASCII_L 'del NAME: the 8.3 name of a file, such as del HELLO.BIN'
 S_INSLOT
@@ -2739,13 +3270,14 @@ E_FS30          .ASCII_L 'the card or the folder is full'
 E_FS31          .ASCII_L 'the file is open'
 E_FS32          .ASCII_L 'the file is read-only'
 
-HELP            .DAT    H_R, H_L, H_LOAD, H_SAVE, H_DEL, H_X, H_D, H_U, H_S, H_DIR, H_I, H_ID
-                .DAT    H_M, H_C, H_V, H_H, H_Q, H_P, 0
+HELP            .DAT    H_R, H_L, H_LOAD, H_SAVE, H_DEL, H_TFTP, H_X, H_D, H_U, H_S, H_DIR, H_I
+                .DAT    H_ID, H_M, H_C, H_V, H_H, H_Q, H_P, 0
 H_R             .ASCII_L 'r [ADDR]      run the program at ADDR, or at 00008000; r 0 restarts'
 H_L             .ASCII_L 'l             load lines of ADDR WORD in hex, as a .bin file has them'
 H_LOAD          .ASCII_L 'load NAME     load the .bin file NAME of the SD card, as l loads lines'
 H_SAVE          .ASCII_L 'save NAME A N save N words from A, both in hex, as the .bin file NAME'
 H_DEL           .ASCII_L 'del NAME      delete the file NAME of the SD card'
+H_TFTP          .ASCII_L 'tftp IP NAME  load the .bin file NAME from the TFTP server at IP'
 H_X             .ASCII_L 'x             run the demo of the ROM, which F12 leaves'
 H_D             .ASCII_L 'd [ADDR] [N]  show N words from ADDR, in hex, or the next ones'
 H_U             .ASCII_L 'u [ADDR] [N]  disassemble N instructions from ADDR, or the next ones'

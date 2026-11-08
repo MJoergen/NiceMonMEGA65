@@ -55,7 +55,7 @@ At the cold start the monitor clears the screen, prints its banner,
 `NiceMon` and the version, and prints a prompt, `> `, on the screen and
 on the line. It reads a line from the console: the keyboard and the line,
 which the hardware merges. A command is a letter, in either case, or
-`sd`, `dir`, `load`, `save`, or `del`, and after `d` and `u` a hex address and a hex
+`sd`, `dir`, `load`, `save`, `del`, or `tftp`, and after `d` and `u` a hex address and a hex
 count, each of them optional. DEL and
 backspace delete the character before the cursor, CTRL-C empties the
 line, and the cursor and function keys, the other control codes, and the
@@ -73,7 +73,7 @@ the MEGA65 and 77 on the Nexys4DDR (Input and output below).
 | `d [ADDR] [N]` | Shows `N` words from `ADDR`, 4 to a row with the row's address first, all in hex. Without `ADDR`, the words after the last shown; without `N`, 32 words. |
 | `u [ADDR] [N]` | Disassembles `N` instructions from `ADDR`, a row each: the address, the instruction's 1 to 4 words, and its text, all in hex (The disassembler below). Without `ADDR`, the instructions after the last shown; without `N`, 20. |
 | `c` | Clears the screen. |
-| `v` | The version of the monitor, and of the dispatch table: `NiceMon V1.9.1, table 1.2`. |
+| `v` | The version of the monitor, and of the dispatch table: `NiceMon V1.9.1, table 1.3`. |
 | `i [A.B.C.D]` | Shows the Ethernet station's IP address, `IP address 192.168.1.65`, or writes it first: four decimal numbers of 0 to 255 with dots between them, such as `i 192.168.1.65`. Anything but an address or `dhcp` is no address, and `i` says so and writes nothing. It writes `0xFFFFFFB0`, `NET_IP` ([SYSTEM.md](../doc/SYSTEM.md#the-ethernet-station)), so a host connected over TCP loses its connection. In `niceemu` it is a register that keeps what is written. |
 | `i dhcp` | Gets the IP address from the network's DHCP server and writes it, as `i A.B.C.D` does, then shows it, with the mask, the gateway, and the server, a line each (The network below). Without an answer, it prints `No answer from a DHCP server` after about 16 seconds, and leaves the address as it was. |
 | `m [MAC]` | Shows the station's MAC address, `MAC address 02:4E:49:43:45:00`, or writes it first: six bytes of one or two hex digits, in either case, with colons between them, such as `m 02:4E:49:43:45:01`. The first byte must be even, as an odd one makes a group address. Anything else is no address, and `m` says so and writes nothing. It writes `0xFFFFFFB1` and `B2`, so a host connected over TCP loses its connection. Two boards on one network need different MAC addresses. In `niceemu` they are registers too, with the address of a board after reset. |
@@ -83,6 +83,7 @@ the MEGA65 and 77 on the Nexys4DDR (Input and output below).
 | `load NAME` | Loads the `.bin` file `NAME` of the card's folder `NICE` as `l` loads lines, and prints the same summary, so a program copied to the card on a PC loads with no host. Unlike `l`, an empty line is passed over, the end of the file ends the load, and a skipped line is counted from the first line of the file. `NAME` is an 8.3 name, in either case. |
 | `save NAME ADDR N` | Writes `N` words from `ADDR`, both in hex, to the file `NAME` of the card's folder `NICE` as a `.bin` file, a line of `ADDR WORD` in hex for each, and prints `Words saved: 600, 00008000 to 00008257`. It makes the file, or truncates it when it is there, and `load` reads it back. When the card fills up, the file keeps what fitted, and `save` prints error 30. |
 | `del NAME` | Deletes the file `NAME` of the card's folder `NICE`, with its long name, if it has one, and prints `Deleted NAME`. |
+| `tftp IP NAME` | Loads the `.bin` file `NAME` from the TFTP server at the IP address `IP`, such as `tftp 192.168.1.10 hello.bin`, as `load` loads one from the card, and prints the same summary (The network below). It needs an IP address, from `i`. Without an answer, it prints `No answer from the TFTP server` after about 5 seconds; an error of the server is shown with its code and its message: `TFTP error 1, File not found`. |
 | `x` | Runs the demo of the ROM, for the time being (The demo below). Without a demo in the ROM, `x` says so. |
 | `h` | Halts the core, which the reset button, or a host over the link, starts again. The tests end with it. |
 | `?` | Lists the commands, and the keys of the history. |
@@ -101,7 +102,9 @@ and `load` read programs from a card's FAT32 file system
 ([#59](https://github.com/MJoergen/NiceMonMEGA65/issues/59)).
 `i dhcp`
 gives a board on a network an address with no host
-([#83](https://github.com/MJoergen/NiceMonMEGA65/issues/83)).
+([#83](https://github.com/MJoergen/NiceMonMEGA65/issues/83)), and `tftp`
+loads a program from a server on it
+([#84](https://github.com/MJoergen/NiceMonMEGA65/issues/84)).
 
 ## The SD cards
 
@@ -253,8 +256,56 @@ of SYSTEM.md §7.
   at the start, XOR the low word of the MAC address. The lease is not
   renewed: a board that runs longer than its lease may have its address
   given to another station.
-- The UDP entries for programs, and TFTP for `load`, follow in
-  [#84](https://github.com/MJoergen/NiceMonMEGA65/issues/84).
+- `i dhcp` keeps the mask and the gateway of the ACK, which UDP uses
+  below; `i A.B.C.D` and the cold start set both to none.
+
+The UDP endpoint is the entries 16 to 19 of the dispatch table (below)
+([#84](https://github.com/MJoergen/NiceMonMEGA65/issues/84)), so that a
+program, such as a game of two boards, or the BASIC of #54, needs no
+network stack of its own. They are in the C ABI, and the data of a
+datagram is one byte per word, bits 7..0, as the file entries have it:
+
+- **One endpoint**, one local port, which `udp_open` opens and enables
+  the port for Ethernet frames, with its queue emptied, and `udp_close`
+  closes, with the port disabled. The cold start and a program's return
+  close it too. Port 0 picks one from 49152 to 65535.
+- **Sending**: a datagram goes to its address, through the gateway when
+  the mask puts the address in another network, and to everyone for
+  255.255.255.255, after `arp_resolve` finds the MAC address. It is IPv4
+  with no options, not to be fragmented, and with the UDP checksum 0,
+  none, as IPv4 allows; up to 1472 bytes, which fill a frame.
+- **Receiving** does not wait: `udp_recv` returns the next datagram to
+  the endpoint's port of the station's address or 255.255.255.255, or 0
+  when none waits. The frames before it that are not one are released
+  unread, so a program that also wants other frames drives the port
+  itself. An empty datagram, a fragment, and IP options are passed
+  over. The queue holds 4 frames (nice_cpu's SYSTEM.md §7), so a program
+  that receives a burst reads it soon.
+
+| Error | Meaning |
+|---|---|
+| -40 | No IP address: `NET_IP` is 0 |
+| -41 | No such port: 0 to send to, or past 65535 |
+| -42 | The endpoint is not open |
+| -43 | More than 1472 bytes |
+| -44 | No answer to ARP from the host, or from the gateway, or none for a host in another network |
+
+`tftp IP NAME` reads a file of a TFTP server (RFC 1350), in octet mode,
+through the endpoint, which it opens on a port of its own choice and
+closes at the end. The RRQ goes to port 69, and the server's first DATA
+gives the port that the rest come from; packets of other hosts and
+ports are passed over. Each DATA is answered with its ACK, a DATA of the
+block before with the ACK again, and a block of less than 512 bytes is
+the last. A packet with no answer within a second is sent again, up to
+5 times in all. The lines are taken as `load` takes those of a file, and
+the words written as `l` writes them. To serve a file from a PC, a TFTP
+server such as `tftpd-hpa` with the file in its folder will do:
+
+    sudo apt install tftpd-hpa
+    sudo cp build/hello.bin /srv/tftp/
+
+and on the board, `i dhcp`, then `tftp 192.168.1.10 hello.bin` with the
+PC's address.
 
 ## The disassembler
 
@@ -417,7 +468,7 @@ offset off, as a program may have hidden the one or used the other.
 |---|---|---|---|---|
 | 0 | `00` | `mon_reset` | Cold start: E, the timer, VBASE, and the font base cleared, the stack, the variables, the screen, the banner, the main loop. The RAM from `0x8000` is left alone. | `reset!` |
 | 1 | `02` | `mon_exit` | R1 a status. Back to the main loop with a fresh stack, with E, the timer, VBASE, and the font base cleared, the cursor shown and blinking, the display offset off, and the status printed; for a program that has not kept the SP of its entry. A program with the runtime's start-up code returns or calls `exit` instead, which lands here too. | `exit!` |
-| 2 | `04` | `mon_version` | → R1 the version of the table, major in bits 31..16, minor in 15..0: `0x00010002`, 1.2. | — |
+| 2 | `04` | `mon_version` | → R1 the version of the table, major in bits 31..16, minor in 15..0: `0x00010003`, 1.3. | — |
 | 3 | `06` | `mon_putc` | R1 a character, to the outputs `mon_out` selects. On the screen it goes at the cursor, which moves on, to the next row after the last column; CR moves the cursor to column 0, LF to column 0 of the next row, BS one back, and TAB to the next multiple of 8; the other control codes and `0x7F` do nothing, and `0x80` to `0x9F` go on the screen as any character, blank in Spleen and drawn from the font RAM when a program selected it; past the last row the rows move up by one. On the line every byte goes as it is. | `putc!` |
 | 4 | `08` | `mon_out` | R1 the outputs: bit 0 the line, bit 1 the screen; both at reset. → R1 the old ones. | — |
 | 5 | `0A` | `scr_cls` | Clears the screen in the current color, cursor home, shown and blinking, display offset 0. | `vga_cls!` |
@@ -431,6 +482,10 @@ offset off, as a program may have hidden the one or used the other.
 | 13 | `1A` | `fs_close` | R1 a handle. Finishes a file opened to write: its last sector, and its size in its directory entry. The handle is closed also after an error. → R1 0, or an error. Table 1.1. | — |
 | 14 | `1C` | `fs_write` | R1 a handle of a file opened to write, R2 a buffer, R3 a number of bytes, one per word, bits 7..0. → R1 the number written, fewer when the card is full, or an error. Table 1.2. | — |
 | 15 | `1E` | `fs_delete` | R1 a name. Deletes the file of the folder `NICE`, with its long name. → R1 0, or an error. Table 1.2. | — |
+| 16 | `20` | `udp_open` | R1 a local port, or 0 for one of 49152 to 65535. Opens the UDP endpoint, and enables the port for Ethernet frames (The network above). → R1 the port, or an error. Table 1.3. | — |
+| 17 | `22` | `udp_send` | R1 an IP address, R2 a port, R3 a buffer, R4 a number of bytes, one per word, up to 1472. Sends them as a datagram. → R1 0, or an error. Table 1.3. | — |
+| 18 | `24` | `udp_recv` | R1 a buffer, R2 a number of bytes, R3 the address of 2 words, or 0. Does not wait. Copies up to that many bytes of the next datagram, one per word, and its source's IP address and port to the 2 words. → R1 the bytes copied, 0 when none waits, or an error. Table 1.3. | — |
+| 19 | `26` | `udp_close` | Closes the endpoint, and disables the port for Ethernet frames. → R1 0. Table 1.3. | — |
 
 Three entries of the first draft went on 2026-10-30, by the table's own
 rule ([#24](https://github.com/MJoergen/NiceMonMEGA65/issues/24), the
@@ -471,7 +526,8 @@ What QMON's table has that this one leaves out:
 - The `sd_*!` entries: the sector routines stay inside the ROM (#57).
   A program that drives the SD registers itself mounts the card again
   afterwards. The frame routines and the ARP cache stay inside it too
-  (#83), until the UDP entries of #84.
+  (#83): a program gets datagrams through the UDP entries of #84, or
+  drives the port for Ethernet frames itself.
 - The `f32_*!` entries: the file API, `fs_mount` to `fs_delete`, is the
   entries 9 to 15, from #58 and #59, as
   [doc/SDCARD.md](../doc/SDCARD.md) says.
@@ -681,7 +737,7 @@ written only when it changes.
 `make -C monitor test` checks the layout of the sources with nice_cpu's
 `nicefmt`, checks that the monitor ends below `DEMO`, where the demo
 goes in the ROM, assembles the monitor with the version `V9.9`, and runs
-it in `niceemu` nineteen times, with its keystrokes in an input file and
+it in `niceemu` twenty times, with its keystrokes in an input file and
 `h` as the last command, so that the run ends: alone, with every command
 and the edits of a line; alone, with 448 rows of `d`, which go round the
 ring of the history, and Page Up and Page Down; alone, with `l` and
@@ -702,7 +758,12 @@ compared with the one that `test/sd_image.py --written` makes; with
 `arp_resolve` with the frames of `test/arp.eth` and `--step-time`: a
 reply after frames that are not, the cache, an address with no reply, an
 entry aged out, and the cache filled and gone round, and its frames sent
-are compared too; with `test/rom.c` joined to the ROM's C code, in
+are compared too; with `test/udp.nasm` at `0x8000`, built as
+`test/arp.nasm` is, which calls the UDP entries with the frames of
+`test/udp.eth`: each error, a datagram sent after ARP, a broadcast, two
+received after frames that are no datagram for the endpoint, one cut
+short, one sent through the gateway, and its frames sent are compared
+too; with `test/rom.c` joined to the ROM's C code, in
 `build/rom.bin`, the monitor of the tests with `test/rom.nasm` at
 `0x8000`, which calls its functions by their labels: the initial value
 of a global, a static array set to 0, both again after `r 0`,
@@ -756,7 +817,15 @@ the transaction's number, and then with the OFFER and the ACK that it
 builds from it, among frames that are not for the monitor and an OFFER
 without an address, and with a NAK, which starts again. It compares the
 output and the frames sent, with the transaction as `xx`, with
-`test/dhcp.expected`, and checks the IPv4 checksums.
+`test/dhcp.expected`, and checks the IPv4 checksums. `test/tftp.py`
+runs `tftp` the same way: first with no server, which gives it the
+client's port, and then with a file of two blocks among packets of
+another host and another port and a DATA again, with a DATA and an ACK
+lost, with an ERROR, with a file of 512 bytes, and with an empty file,
+and with the arguments that are not, no IP address, and no answer to
+ARP. It compares the output and the frames sent, with the client's port
+as `pp pp`, with `test/tftp.expected`, and checks the IPv4 checksums
+and the ports.
 
 On a board, `make r6` builds a bitstream that boots the monitor, with the
 demo behind it in the ROM. `make hwtest` loads the same, with the
