@@ -314,7 +314,7 @@ and must be formatted. FAT12 and FAT16 are rejected with a message.
   freed. Before the first change of the FAT after a mount, FSInfo's free
   count is set to unknown, `0xFFFFFFFF`, which every FAT driver accepts,
   and `fsck.fat` reports as uninitialized. A new file has the date
-  1980-01-01, as the boards have no clock of the time of day yet
+  2026-01-01, as the boards have no clock of the time of day yet
   (MJoergen/nice_cpu#122). A folder that is full grows by a cluster of
   zeros, written before it is linked, up to 65536 entries.
 - **Safety**: the ROM writes only inside the partition, never the MBR or

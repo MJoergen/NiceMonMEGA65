@@ -90,7 +90,7 @@ int fat_sd_write(unsigned lba, const unsigned *buf);
 #define EOC 0x0FFFFFFFu  // the FAT entry written at the end of a chain
 #define FILES 2
 #define DIR_MAX (65536u * 32)   // the bytes of a directory at most
-#define DATE 0x0021u    // the date of a new entry, 1980-01-01, as there is no clock
+#define DATE 0x5C21u    // the date of a new entry, 2026-01-01, as there is no clock
 
 // The kinds of an open file
 #define K_READ 0
