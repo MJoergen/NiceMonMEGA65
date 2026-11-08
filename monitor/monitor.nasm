@@ -1,6 +1,6 @@
 ; The monitor, the program of the ROM at 0x0000 (README.md). The core boots
 ; from it at reset. It gives the programs at 0x8000 a hardware abstraction
-; layer, the HAL: fourteen routines, called through the dispatch table at the
+; layer, the HAL: twenty routines, called through the dispatch table at the
 ; start of the ROM, and it has a main loop with a few commands, typed on
 ; the keyboard or sent over the line, and shown on the screen and the line.
 ;
@@ -80,7 +80,7 @@
 ; no ROM, the monitor is a program at 0 like any other, and cat
 ; monitor.bin prog.bin runs it with a program at 0x8000 (Makefile, test).
 ;
-; The ROM's C code, rom.c and the files after it in the Makefile's ROM_C,
+; The ROM's C code, the files of the Makefile's ROM_C, fat32.c for now,
 ; is one wasm module, which nicewasm --ram translates for a ROM and the
 ; Makefile joins after mon.nasm, with nice_cpu's lib.nasm and
 ; muldiv_mpu.nasm (README.md, "C in the ROM"). The words that it writes,
@@ -186,7 +186,13 @@ PAGE            .EQU    24              ; the rows of a Page Up or Page Down
 SCR_MAX         .EQU    0x7FFF          ; the largest display offset
 
 ; The dispatch table (README.md, "The dispatch table"). Entries are only
-; ever added at the end.
+; ever added at the end. The comment of each entry is its name in mon.nasm
+; and mon.h. The entries 9 to 15 jump to the C functions fat_mount to
+; fat_delete of fat32.c, which are _fat_mount to _fat_delete here, and
+; not fs_mount to fs_delete: mon.nasm is joined to the monitor too, for
+; monlib.nasm, and its stubs _fs_mount to _fs_delete would clash with
+; them. The routines in assembly have no such clash, as their labels,
+; such as udp_open, have no _ in front of them.
                 JMP     mon_reset       ; 0 at 0x00
                 JMP     mon_exit        ; 1 at 0x02
                 JMP     mon_version     ; 2 at 0x04

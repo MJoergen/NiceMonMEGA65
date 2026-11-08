@@ -34,7 +34,7 @@ LIBC     = $(NICE_CPU)/runtime/libc
 BUILD    = build
 SOURCES  = monitor.nasm monitor_dis.nasm monitor_sd.nasm monitor_eth.nasm monlib.nasm mon.nasm
 # The ROM's C code, and nice_cpu's runtime library that it is joined with
-ROM_C    = rom.c fat32.c
+ROM_C    = fat32.c
 RUNTIME_ROM = $(RUNTIME)/lib.nasm $(RUNTIME)/muldiv_mpu.nasm
 # The options of nicebuild.py --ram (nice_cpu's translator README), but
 # that every function that is not static is exported, for the monitor's
