@@ -226,7 +226,10 @@ class Card:
             self.saved = (lba, chunk, read_buffer(link))
             csr = link.read_word(SD_CSR)
             if not csr & PRESENT:
-                raise SdError(f"slot {self.slot} has no card")
+                raise SdError(
+                    f"the paused program uses slot {self.slot}, which has "
+                    "no card; type dir SLOT on the board first, or hold "
+                    "the core")
             if not csr & READY or csr & CHANGED:
                 raise SdError(
                     f"the card in slot {self.slot} is not started up, and "

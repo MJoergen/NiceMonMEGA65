@@ -456,8 +456,13 @@ end. `--slot` of another slot is refused then. While the core is held or
 has halted, the tool takes the slot of `--slot`, or slot 0, or slot 1
 when slot 0 has no card, as the monitor does, and starts the card up.
 
-A sector takes 16 writes and 16 reads on the link, so a file comes at a
-few KB a second on the serial port, and faster on Ethernet.
+A sector takes 16 writes and 16 reads on the link, each a request that
+waits for its answer. On an R6, a file comes at about 115 KB a second
+over Ethernet, and at about 0.9 KB a second on the serial port, 0.58 s
+a sector, as each request waits for the 16 ms latency timer of the FTDI
+chip. Linux sets the timer in
+`/sys/bus/usb-serial/devices/ttyUSB1/latency_timer`, for the board's
+port; the timer, not the baud rate, sets the speed there.
 `make sdtest` checks the tool on `niceemu --link`, without a board.
 
 ## The other tools
