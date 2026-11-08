@@ -416,7 +416,12 @@ dbg&gt; <b>q</b>
 
 Programs are NICE assembly, or C through WebAssembly.
 [PROGRAMMING.md](doc/PROGRAMMING.md) has how to build them, the C
-library, and the memory limits.
+library, and the memory limits. A program uses three levels, which it
+describes: the hardware's registers, which every program has, also in
+the emulator; the monitor's routines in the ROM, through its dispatch
+table at `0x0000`, for a program at `0x8000` that the monitor runs; and
+the libraries that a program joins when it is built
+([monitor/](monitor/README.md)).
 
 ### Building your own ROM
 

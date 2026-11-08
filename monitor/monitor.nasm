@@ -40,7 +40,7 @@
 ;   through (issue #57, doc/SDCARD.md).
 ; - monitor_eth.nasm: the network, the frame routines, the ARP cache, the
 ;   UDP entries 16 to 19, i dhcp, and tftp (issues #83 and #84, README.md,
-;   "The network").
+;   "The network", and INTERNALS.md, "The frame routines").
 ;
 ; Each has the .EQUs of its devices and its constants, and its texts, but
 ; the variables of all four are here, as one map of the RAM. The commands
@@ -83,7 +83,7 @@
 ; The ROM's C code, the files of the Makefile's ROM_C, fat32.c for now,
 ; is one wasm module, which nicewasm --ram translates for a ROM and the
 ; Makefile joins after mon.nasm, with nice_cpu's lib.nasm and
-; muldiv_mpu.nasm (README.md, "C in the ROM"). The words that it writes,
+; muldiv_mpu.nasm (INTERNALS.md, "C in the ROM"). The words that it writes,
 ; its mutable globals and its memory, with its stack, are in the RAM
 ; from WASM_RAM up to below WASM_END, which the Makefile checks against
 ; ___wasm_ram_end; ___wasm_start copies their initial values there at

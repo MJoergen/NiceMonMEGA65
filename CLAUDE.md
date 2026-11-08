@@ -16,7 +16,8 @@ users. `doc/SYSTEM.md` has the address map, the link, the screen,
 the keyboard, the ROM, the Nexys4DDR's devices, and the SD card slots; `CONTRIBUTING.md` the tests, the
 formal checks, `make hwtest`, and the badge; `doc/EMULATOR.md` the known
 differences from the emulator; `doc/PROGRAMMING.md` how to write and
-build programs; `doc/DEBUGGER.md` is the design note of the on-board
+build programs, on the three levels of the hardware, the ROM's dispatch
+table, and the libraries that a program joins; `doc/DEBUGGER.md` is the design note of the on-board
 debugger, mon.py in the FPGA with the MEGA65's keyboard and a strip on
 the screen, of which stages 1 to 10 are written, the overlay, its host
 of the link, the live strip with the core's keys, Strip with the
@@ -149,13 +150,16 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   `monitor/`: the monitor for the ROM in NICE assembly (`monitor.nasm`,
   the dispatch table, the HAL, the map of its RAM, and the commands, with
   `u` in `monitor_dis.nasm`, `sd` and the sector routines in
-  `monitor_sd.nasm`, and the network in `monitor_eth.nasm`), its C code (`fat32.c`
-  and `rom.c`, one wasm module through `nicewasm --ram`, with its
+  `monitor_sd.nasm`, and the network in `monitor_eth.nasm`), its C code (`fat32.c`,
+  one wasm module through `nicewasm --ram`, with its
   writable words at `0xFFFFF400`; building the monitor needs clang, and
   its tests mtools, `mkfs.fat`, and `sfdisk`), the routines that
   programs join (`monlib.nasm`), the stubs and the header through which
   a program calls the entries (`mon.nasm`, `mon.h`), and its tests in
-  niceemu (`test/`, with `cat monitor.bin prog.bin`).
+  niceemu (`test/`, with `cat monitor.bin prog.bin`). `monitor/README.md`
+  is the monitor for those who use it and write programs for it, and
+  `monitor/INTERNALS.md` the routines with no entries, the C in the
+  ROM, and the build and the tests.
 
 ## Rules and pitfalls
 

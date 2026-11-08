@@ -17,7 +17,7 @@
 # (monitor.nasm), and build/folder.nasm, the text of the error of a card
 # without the folder FOLDER. build/rom_c.nasm is the ROM's C code, ROM_C, which clang
 # compiles to one wasm module and nicewasm --ram translates for the ROM
-# (README.md, "C in the ROM"), so the monitor needs clang with the wasm32
+# (INTERNALS.md, "C in the ROM"), so the monitor needs clang with the wasm32
 # target, wasm-ld, and llvm-ar for the C library.
 
 PYTHON  ?= python3

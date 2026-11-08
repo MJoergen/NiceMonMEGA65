@@ -1,6 +1,6 @@
 // FAT32 for the ROM: reading and writing, in the folder FOLDER of the root
 // directory (issues #58, #59, and #91, doc/SDCARD.md, "The file system").
-// It is part of the ROM's C code (README.md, "C in the ROM"), and the
+// It is part of the ROM's C code (INTERNALS.md, "C in the ROM"), and the
 // dispatch table's entries fs_mount, fs_open, fs_read, fs_readdir,
 // fs_close, fs_write, and fs_delete jump to its functions fat_mount,
 // fat_open, fat_read, fat_readdir, fat_close, fat_write, and fat_delete,

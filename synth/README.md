@@ -33,7 +33,7 @@ waits, held, for a host on the debug link. `make r6` in the top directory
 builds the monitor and the demo first and puts them in the ROM,
 `demo/build/rom.bin`, unless `ROM=` gives another
 file, or none when empty. The monitor has C code, so that needs clang
-too ([monitor/](../monitor/README.md#building-and-testing)). With
+too ([monitor/](../monitor/INTERNALS.md#building-and-testing)). With
 
     make -C synth/r6 ROM=/path/to/monitor.bin
 

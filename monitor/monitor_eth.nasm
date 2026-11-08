@@ -104,7 +104,7 @@ dhcp_bound
                 JMP     main
 
 ; The frame routines, the ROM's own, with no entries in the dispatch table
-; (README.md, "The network"). They follow the C ABI, and drive the port for
+; (INTERNALS.md, "The frame routines"). They follow the C ABI, and drive the port for
 ; Ethernet frames of nice_cpu's SYSTEM.md §7. A frame is in RAM as the
 ; port's buffers have it: from byte 2 of its buffer, 4 bytes a word,
 ; big-endian, so that word n of the RAM is word n of the port's buffer,

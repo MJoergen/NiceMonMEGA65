@@ -9,6 +9,85 @@ timer. [SYSTEM.md](SYSTEM.md) here has the address map of the board,
 with its screen and its ROM. The memory is 128K words on the MEGA65 and
 64K on the Nexys4DDR, not 2³² as in the emulator.
 
+## Three levels
+
+A program uses what the system gives on three levels, and each is
+there in different cases:
+
+| Level | What it is | Where it is | In `niceemu` |
+|---|---|---|---|
+| 1. The hardware | The CPU and the I/O registers, in the RTL | Always | The same, but for the differences of [EMULATOR.md](EMULATOR.md) |
+| 2. The ROM | The monitor's dispatch table at `0x0000`: the screen's cursor and outputs, the files of the SD card, and UDP | While the ROM is visible: for a program at `0x8000` under the monitor | Only with the monitor joined at 0 |
+| 3. The libraries | `monlib.nasm`, nice_cpu's runtime, and its C library | In the program's own image, joined when it is built | The same |
+
+**The hardware.** Every program has the console at `0xFFFFFF00`, the
+math unit, the counters, the timer, the screen, the fonts, the
+keyboard, the network station, the port for Ethernet frames, and the SD
+card controller, as registers. nice_cpu's SYSTEM.md specifies its
+devices, and [SYSTEM.md](SYSTEM.md) here the address map and the
+board's own registers. `niceemu` has all of them, with the differences
+that [EMULATOR.md](EMULATOR.md) lists: the size of the memory, the
+Nexys4DDR's devices, and the RAM's size and the baud rate at
+`0xFFFFFF9E` and `9F`, which are memory there. Its SD cards are image
+files, `--sd0 FILE` and `--sd1 FILE`, and its frames come from a file,
+`--eth-in`, or from UDP, `--eth-udp`. A program that uses only this
+level is built at 0, and runs alone on the board, loaded with
+`tools/load.py` (which hides the ROM), and in `niceemu`.
+
+**The ROM.** The monitor in the ROM gives a program at `0x8000` twenty
+routines, through a dispatch table at `0x0000`
+([monitor/README.md](../monitor/README.md#the-dispatch-table)): a
+terminal on the screen, with the cursor, the scrolling, and the copy to
+the line (`mon_putc`, `mon_out`, `scr_cls`, `scr_moveto`, `scr_getxy`,
+and `scr_color`), the files of the SD card's FAT32 (`fs_mount` to
+`fs_delete`), and a UDP endpoint (`udp_open` to `udp_close`), with the
+return to the monitor and its version. A program calls them through the
+stubs of `monitor/mon.nasm`, and C declares them with `monitor/mon.h`.
+They are there whenever the ROM is visible, as it is for a program that
+the monitor runs: one loaded with `l`, `load`, or `tftp` on the board
+and run with `r`, or loaded with `tools/load.py --monitor` from a host. They are not
+there for a program at 0, as `load.py` without `--monitor` hides the
+ROM. The ROM has other routines, such as the SD card's sectors and the
+ARP cache, which have no entries, and which a program does not call
+([monitor/INTERNALS.md](../monitor/INTERNALS.md)).
+
+`niceemu` has no ROM. There the monitor is a program at 0 like any
+other, and a program under it is joined after it, as a `.bin` file is
+address and word pairs:
+
+    cat monitor/build/monitor.bin prog.bin > joined.bin
+    printf 'r\rh\r' > rh.txt
+    niceemu -i rh.txt --sd0 card.img joined.bin
+
+The input types `r`, which runs the program at `0x8000`, and `h`,
+which halts the core when the program returns, and `--sd0` gives it a
+card. A program built for the monitor that runs alone in `niceemu`
+jumps into an empty dispatch table.
+
+**The libraries.** These are assembly files and C libraries that a
+program joins when it is built. They are in its image, and only in a
+program that joins them: there is no linker, so a program that joins a
+file has all of it. `monitor/monlib.nasm` has the routines that the
+monitor's commands use too, `_io_puts`, `_io_puthex`, `_io_gets`, and
+others ([monitor/README.md](../monitor/README.md#the-shared-routines));
+they print through `mon_putc`, so they need the ROM. nice_cpu's runtime
+(`lib.nasm`, `muldiv_mpu.nasm`) and its C library need no ROM, and run
+the same on the board and in `niceemu`.
+
+To build a program for the monitor, assemble it at `0x8000` with
+nice_cpu's `start_mon.nasm` in front, and join the files it uses after
+it, as `monitor/Makefile` builds `test/hello.nasm`:
+
+    cat nice_cpu/runtime/start_mon.nasm prog.nasm monitor/monlib.nasm \
+        monitor/mon.nasm nice_cpu/runtime/lib.nasm \
+        nice_cpu/runtime/muldiv_mpu.nasm > prog_all.nasm
+    python3 nice_cpu/assembler/niceasm.py -o prog.bin prog_all.nasm
+
+A C program is built with `nicebuild.py --monitor --asm monitor/mon.nasm
+-I monitor` ([monitor/README.md](../monitor/README.md#programs)).
+
+## C
+
 C goes through WebAssembly, with the tools of the nice_cpu submodule: clang
 compiles the program to a wasm module and links it with nice_cpu's C
 library, `nicewasm` translates the module to NICE assembly, and `niceasm`
@@ -57,6 +136,8 @@ The linear memory is one page, 16384 words, and the program and its memory
 must fit below the stack in the RAM. With `printf` and `scanf`, the prime
 example ends at word `0x9C5A`.
 
+## The memory
+
 A program learns the size of the RAM from `0xFFFFFF9E`, which reads its
 words, `0x20000` on the MEGA65 and `0x10000` on the Nexys4DDR. In the
 emulator that word is plain memory, which reads 0, and 0 means no limit.
@@ -88,7 +169,9 @@ background in bits 31..20 and the foreground in bits 19..8, each 4 bits of
 red, green, and blue. So `0x000FFF41` is a white `A` on black, and `0x41`
 alone is black on black. `nice_screen_clear` fills the screen with blanks.
 The cursor, the scrolling, and the exact colors are in
-[SYSTEM.md](SYSTEM.md#the-screen).
+[SYSTEM.md](SYSTEM.md#the-screen). Under the monitor, `mon_putc` and the
+`scr_*` entries are a terminal on the screen, which moves the cursor and
+scrolls (Three levels above).
 
 A program can draw its own characters, such as the pieces of a game. The
 font RAM at `0xFFFE0000` has a glyph of 32 words for each code, one word a

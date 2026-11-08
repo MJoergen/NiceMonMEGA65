@@ -1,16 +1,44 @@
 # monitor
 
 The ROM at `0x0000`, which the core boots from, holds the monitor: a
-hardware abstraction layer, the HAL, of fourteen routines that reach the
+hardware abstraction layer, the HAL, of twenty routines that reach the
 hardware or the state the monitor keeps, called through a dispatch table
 at the start of the ROM, and a main loop with a few commands. It is not a
-library: what a program can do for itself stays in the program. It is in
-NICE assembly, with FAT32 in C. `monitor.nasm` is the ROM, with its
-disassembler in `monitor_dis.nasm`, its SD cards in `monitor_sd.nasm`,
-and its network in `monitor_eth.nasm`, and `fat32.c` is its FAT32; `monlib.nasm` has the routines that programs join
-and the monitor's commands use too; `mon.nasm` has the stubs through
-which a program calls the entries, and `mon.h` their declarations for C. `make -C monitor` builds `build/monitor.bin`, and
-`make -C monitor test` runs it in `niceemu` (Building and testing below).
+library: what a program can do for itself stays in the program.
+
+A program under the monitor sees three levels, which
+[doc/PROGRAMMING.md](../doc/PROGRAMMING.md#three-levels) describes for
+those who write programs:
+
+1. **The hardware**: the I/O registers of
+   [doc/SYSTEM.md](../doc/SYSTEM.md) and nice_cpu's SYSTEM.md, the same
+   in `niceemu` but for the differences of
+   [doc/EMULATOR.md](../doc/EMULATOR.md). Every program has them.
+2. **The ROM**: the entries of the dispatch table (The dispatch table
+   below), which are there whenever the ROM is visible. A host that
+   loads a program at 0 hides the ROM, and the entries go with it.
+   `niceemu` has no ROM: there the monitor is a program at 0 like any
+   other, and `cat monitor.bin prog.bin` runs it with a program at
+   `0x8000` (Programs below).
+3. **The library**: the routines of `monlib.nasm` (The shared routines
+   below), and the stubs of `mon.nasm`, which are joined to a program
+   when it is built, so they are in its image only when it joins them.
+   There is no linker, so a program that joins a file has all of it.
+
+The ROM also has routines of its own, which have no entries and which
+programs do not call: the sector routines of the SD cards, the frame
+routines and the ARP cache of the network, and FAT32 in C.
+[INTERNALS.md](INTERNALS.md) describes them, with the build and the
+tests.
+
+The monitor is in NICE assembly, with FAT32 in C. `monitor.nasm` is the
+ROM, with its disassembler in `monitor_dis.nasm`, its SD cards in
+`monitor_sd.nasm`, and its network in `monitor_eth.nasm`, and `fat32.c`
+is its FAT32; `monlib.nasm` has the routines that programs join and the
+monitor's commands use too; `mon.nasm` has the stubs through which a
+program calls the entries, and `mon.h` their declarations for C.
+`make -C monitor` builds `build/monitor.bin`, and `make -C monitor test`
+runs it in `niceemu` ([INTERNALS.md](INTERNALS.md#building-and-testing)).
 It was written for
 [#24](https://github.com/MJoergen/NiceMonMEGA65/issues/24), and what is
 finished in
@@ -30,7 +58,7 @@ of it, and #24 revisited them. Debugging is the on-board debugger's
   monitor's variables are at `0xFFFFF000` and up, below the I/O page, as
   QMON's are below `0xFF00`. The stack grows down from `0xFFFFF000`.
   The words that the ROM's C code writes are at `0xFFFFF400`–`0xFFFFFEFF`
-  with them (C in the ROM below). The demo follows the monitor in the
+  with them ([INTERNALS.md](INTERNALS.md#c-in-the-rom)). The demo follows the monitor in the
   ROM, from `0x6000` (The demo below).
   Nothing of the monitor's is written below `0x8000`: a write to the ROM
   is dropped, so a stack there loses its return addresses (`sim/rom.nasm`
@@ -79,7 +107,7 @@ the MEGA65 and 77 on the Nexys4DDR (Input and output below).
 | `i dhcp` | Gets the IP address from the network's DHCP server and writes it, as `i A.B.C.D` does, then shows it, with the mask, the gateway, and the server, a line each (The network below). Without an answer, it prints `No answer from a DHCP server` after about 16 seconds, and leaves the address as it was. |
 | `m [MAC]` | Shows the station's MAC address, `MAC address 02:4E:49:43:45:00`, or writes it first: six bytes of one or two hex digits, in either case, with colons between them, such as `m 02:4E:49:43:45:01`. The first byte must be even, as an odd one makes a group address. Anything else is no address, and `m` says so and writes nothing. It writes `0xFFFFFFB1` and `B2`, so a host connected over TCP loses its connection. Two boards on one network need different MAC addresses. In `niceemu` they are registers too, with the address of a board after reset. |
 | `l` | Loads words into the RAM from lines of `ADDR WORD` in hex, as a `.bin` file has them (Loading without a host below), up to an empty line, and prints the words written and the lines skipped: `Words loaded: 600, 00008000 to 00008257`. |
-| `sd [SLOT] LBA` | Shows the sector `LBA` of the SD card in `SLOT`, both in hex, as 32 rows of 16 bytes: the offset in the sector, the bytes in hex, and the bytes as text, with a dot for a byte outside `0x20` to `0x7E` (The SD cards below). Without `SLOT`, the slot of the last `sd`, 0 after reset. An error of the controller is shown with its number and its meaning: `SD error 1 in slot 1, no card`. |
+| `sd [SLOT] LBA` | Shows the sector `LBA` of the SD card in `SLOT`, both in hex, as 32 rows of 16 bytes: the offset in the sector, the bytes in hex, and the bytes as text, with a dot for a byte outside `0x20` to `0x7E` ([INTERNALS.md](INTERNALS.md#the-sector-routines)). Without `SLOT`, the slot of the last `sd`, 0 after reset. An error of the controller is shown with its number and its meaning: `SD error 1 in slot 1, no card`. |
 | `dir [SLOT]` | Lists the folder `NICE` of the SD card's FAT32 file system (Files below): `Directory of NICE`, then a row for each file, its 8.3 name and its size in decimal, and for each directory, its name and `<DIR>`, then `Files: 25, directories: 1`. With `SLOT` in hex, it mounts the card in it first; without, it lists the card mounted, which the first `dir` or `load` after reset mounts. An error is shown with its number and meaning: `File error 18, FAT16, which is not supported`. |
 | `load NAME` | Loads the `.bin` file `NAME` of the card's folder `NICE` as `l` loads lines, and prints the same summary, so a program copied to the card on a PC loads with no host. Unlike `l`, an empty line is passed over, the end of the file ends the load, and a skipped line is counted from the first line of the file. `NAME` is an 8.3 name, in either case. |
 | `save NAME ADDR N` | Writes `N` words from `ADDR`, both in hex, to the file `NAME` of the card's folder `NICE` as a `.bin` file, a line of `ADDR WORD` in hex for each, and prints `Words saved: 600, 00008000 to 00008257`. It makes the file, or truncates it when it is there, and `load` reads it back. When the card fills up, the file keeps what fitted, and `save` prints error 30. |
@@ -108,42 +136,13 @@ gives a board on a network an address with no host
 loads a program from a server on it
 ([#84](https://github.com/MJoergen/NiceMonMEGA65/issues/84)).
 
-## The SD cards
-
-The ROM has three sector routines of its own, with no entries in the
-dispatch table ([doc/SDCARD.md](../doc/SDCARD.md), "The ROM"). They drive
-the controller's registers at `0xFFFFFFA0`, which nice_cpu's SYSTEM.md §5
-specifies, the same on every board and in `niceemu`. They follow the C
-ABI, wait for busy before the command and after it, and return 0, or the
-negative of `SD_ERROR`:
-
-| Routine | Arguments | What it does |
-|---|---|---|
-| `sd_init` | R1 the slot | Selects the slot, and starts its card up |
-| `sd_read` | R1 the sector, R2 a buffer of 128 words | Reads the sector into the buffer |
-| `sd_write` | R1 the sector, R2 a buffer of 128 words | Writes the buffer to the sector |
-
-- `sd_read` and `sd_write` use the selected slot, the slot of the last
-  `sd_init`. The controller has one "ready" for both slots, so a change
-  of slot costs an Init, up to hundreds of milliseconds on a board.
-- The buffer is in RAM, 4 bytes a word, little-endian, as the
-  controller's is: byte 4n of the sector is bits 7..0 of word n. The
-  routines copy it through `SD_CHUNK` and `SD_BUF0`–`SD_BUF7`.
-- `sd` calls `sd_init` only when its slot is not the selected one, or
-  the card there is not ready, or has changed since its last Init, so a
-  second `sd` on a slot reads at once. Its buffer is at `0xFFFFF080`,
-  with the monitor's variables.
-- FAT32 (Files below) calls the routines, and its file API is the
-  table's entries for the card. A program that wants sectors drives the
-  registers itself, and calls `fs_mount` before it uses the files again.
-
 ## Files
 
 The ROM reads and writes FAT32
 ([#58](https://github.com/MJoergen/NiceMonMEGA65/issues/58),
 [#59](https://github.com/MJoergen/NiceMonMEGA65/issues/59),
 [doc/SDCARD.md](../doc/SDCARD.md), "The file system") with `fat32.c`,
-the ROM's C code (C in the ROM below).
+the ROM's C code ([INTERNALS.md](INTERNALS.md#c-in-the-rom)).
 
 To load a program from a card, make the folder `NICE` in its root on a
 PC, copy the `.bin` file into it, and type `dir` and `load NAME` on the
@@ -193,6 +192,10 @@ folder itself, so a card is written only where its user made room.
   files that may be open at once, in the C code's RAM. The FAT and the
   folder are written through; a file's sector is written when it is full,
   and at `fs_close`.
+- **Sectors** are not the HAL's: a program that wants them drives the
+  SD controller's registers at `0xFFFFFFA0` itself, which are the same
+  on every board and in `niceemu` (nice_cpu's SYSTEM.md §5), and calls
+  `fs_mount` before it uses the files again.
 
 The entries 9 to 15 of the dispatch table (below) are its file API, in
 the C ABI. A name is one character per word up to a 0 word, and an
@@ -221,31 +224,16 @@ controller, -1 to -8, as `sd` shows them, and these:
 
 ## The network
 
-The ROM has frame routines of its own, with no entries in the dispatch
-table, as the sector routines have none. They drive the port for
-Ethernet frames at `0xFFFFFFC0`, which nice_cpu's SYSTEM.md §7
-specifies, the same on every board and in `niceemu`, and follow the C
-ABI. A frame is in RAM as the port's buffers have it: from byte 2 of its
-buffer, 4 bytes a word, big-endian, so that the fields fall on the words
-of SYSTEM.md §7.
-
-| Routine | Arguments | What it does |
-|---|---|---|
-| `eth_on` | | Enables the port, with its queue emptied |
-| `eth_recv` | R1 a buffer of 380 words | Copies the frame at the head of the queue to the buffer, and releases it. R1 is its length in bytes, 0 when the queue is empty |
-| `eth_send` | R1 a frame, R2 its length in bytes | Waits while the port is busy, then copies the frame to the send buffer and sends it |
-| `arp_resolve` | R1 an IP address | R1 is 0, and R2 and R3 its MAC address as `NET_MAC_HI` and `NET_MAC_LO` have it; or R1 is -1 when no reply came |
+A program reaches the network through the UDP entries below, or drives
+the port for Ethernet frames at `0xFFFFFFC0` itself, which nice_cpu's
+SYSTEM.md §7 specifies, the same on every board and in `niceemu`. The
+ROM's own frame routines and its ARP cache, which `i dhcp`, `tftp`, and
+the UDP entries use, have no entries in the dispatch table
+([INTERNALS.md](INTERNALS.md#the-frame-routines)).
 
 - The cold start and the return of a program, `mon_exit`, disable the
   port, so a program that does not use the network sees no frame. A
   program that enables it reads the frames itself.
-- `arp_resolve` looks in the ARP cache, 4 entries at `0xFFFFF100`, which
-  the cold start empties. Else it broadcasts a request, up to 3 times,
-  waits a second for each reply, and puts the reply into the cache. An
-  entry is kept about a minute, and a new one takes the entry of its
-  address, or else the next in turn. The frames that come while it
-  waits and are no ARP reply are released unread. The port must be
-  enabled. The station answers the requests for its own address itself.
 - `i dhcp` enables the port, broadcasts a DISCOVER, and waits 2 seconds
   for an OFFER, then broadcasts a REQUEST of the address offered and
   waits as long for the ACK (RFC 2131). A timeout or a NAK starts again
@@ -273,7 +261,7 @@ datagram is one byte per word, bits 7..0, as the file entries have it:
   close it too. Port 0 picks one from 49152 to 65535.
 - **Sending**: a datagram goes to its address, through the gateway when
   the mask puts the address in another network, and to everyone for
-  255.255.255.255, after `arp_resolve` finds the MAC address. It is IPv4
+  255.255.255.255, after the ROM's ARP finds the MAC address. It is IPv4
   with no options, not to be fragmented, and with the UDP checksum 0,
   none, as IPv4 allows; up to 1472 bytes, which fill a frame.
 - **Receiving** does not wait: `udp_recv` returns the next datagram to
@@ -546,49 +534,16 @@ What QMON's table has that this one leaves out:
   entries 9 to 15, from #58 and #59, as
   [doc/SDCARD.md](../doc/SDCARD.md) says.
 
-## C in the ROM
-
-Part of the ROM is C, through nice_cpu's wasm translator, as the FAT32
-code of [#58](https://github.com/MJoergen/NiceMonMEGA65/issues/58)
-will be. `rom.c` and the files after it in the Makefile's `ROM_C` are
-compiled to one wasm module, which `nicewasm --ram` translates for code
-that runs from a ROM (nice_cpu's translator README, "Code in a ROM"),
-at `-Oz`, which makes it more than a quarter smaller than `-O2`. The Makefile joins
-it after `mon.nasm`, with nice_cpu's `lib.nasm` and `muldiv_mpu.nasm`.
-`fat32.c` is FAT32 (Files above), about 7100 words, and `rom.c` is
-empty.
-
-- **Calls.** Every function of the C code that is not `static` is
-  exported, and the monitor's assembly calls it as `_name`, in the C ABI;
-  the entries 9 to 15 jump to `fat32.c`'s `fat_mount` to `fat_delete`.
-  The C code calls the monitor's routines by their labels too: they are
-  undefined in the module, and the assembler finds them, such as
-  `_fat_sd_read` and `_fat_sd_write`, which turn the C code's byte
-  address of a buffer into a word address for `sd_read` and `sd_write`.
-- **The RAM.** The words that the module writes, its mutable globals and
-  its memory, with its stack of 4096 bytes, are in the RAM from
-  `WASM_RAM`, `0xFFFFF400`, up to below `WASM_END`, `0xFFFFFF00`, with the
-  monitor's variables. The Makefile checks `___wasm_ram_end`, the word
-  after them, against `WASM_END`. The module may use no floats and no
-  `malloc`, which `--ram` rejects.
-- **The cold start** calls `___wasm_start`, which copies the initial
-  values to the RAM and sets the rest of the module's memory to 0, at
-  every start, also after `r 0`, which leaves the rest of the RAM alone.
-- **The vectors** that `lib.nasm` jumps through are words of the
-  variables, `0xFFFFF300` and `0xFFFFF301`, which the cold start sets:
-  `___putc_vector` to `mon_putc`, so that `nice_print` prints on the
-  outputs of `mon_out`, and `___wasm_trap_vector` to `mon_trap`. A
-  program at `0x8000` that joins `lib.nasm` has its own vectors.
-- **A trap** of the C code prints `Trap N at ADDR`, with the trap's code
-  of nice_cpu's WASM.md in decimal and its address in hex, and goes back
-  to the main loop as a program's return does, with the state that
-  `mon_exit` restores. So a trap does not halt the core, also when a
-  program called the C code.
-
 ## The shared routines
 
-`monlib.nasm` is joined after a program, with `mon.nasm`, whose stubs its
-routines call, and the monitor joins it too. The routines follow the C
+`monlib.nasm` is a library: it is joined after a program when the
+program is built, with `mon.nasm`, whose stubs its routines call, so
+its routines are in the program's image, and only in a program that
+joins it. They print through `mon_putc`, entry 3, so they need the ROM,
+as the entries do; in `niceemu` the monitor is joined at 0 (Programs
+above). The monitor joins the file too, for its own commands, but a
+program does not reach the monitor's copy, which has no entry. A C
+program has nice_cpu's `libc` instead. The routines follow the C
 ABI, and their names start with `_io_`, so that they clash with nothing
 in nice_cpu's runtime or C library:
 
@@ -723,131 +678,6 @@ and through `nc`, were all written, with no byte lost, in about 0.7 s.
 `load.py --eth 192.168.1.65 --monitor prog.bin` (Loading from a host
 above) is faster, as it writes the words into the memory.
 
-## Building and testing
-
-`make -C monitor` assembles `monitor.nasm`, `monitor_dis.nasm`,
-`monitor_sd.nasm`, `monitor_eth.nasm`, `monlib.nasm`, `mon.nasm`,
-`build/rom_c.nasm`, nice_cpu's `lib.nasm` and `muldiv_mpu.nasm`, and
-`build/version.nasm`, the `cat` of them, with `niceasm` into
-`build/monitor.bin`, as the assembler has no include. `build/rom_c.nasm`
-is the ROM's C code (C in the ROM above), so the monitor, and a
-bitstream with it in the ROM, needs clang with the wasm32 target,
-`wasm-ld`, and `llvm-ar` (on Debian and Ubuntu, the `clang`, `lld`, and
-`llvm` packages). The test's images need `mkfs.fat`, `sfdisk`, and
-mtools (`dosfstools`, `fdisk`, and `mtools`). `test/fat_image.py` makes
-them with these tools, so FAT32 is tested against them: a card with an
-MBR, a FAT16 partition, and a FAT32 one, whose root has a volume label,
-another core's folder, a `HELLO.BIN` that is not NiceMon's, and the
-folder `NICE`, with a subdirectory, a long name, a name in lower case, 20
-more files past its first cluster, deleted entries, and `FRAG.BIN`, whose
-clusters are not contiguous; a card that is FAT32 on the whole, with no
-partition table; a card without `NICE`, and one whose `NICE` is a file; a
-FAT16 card; an exFAT one; and a FAT32 card whose free clusters are
-marked bad but the last three, so that a write fills it. After a test
-that writes, `test/fat_check.py` checks the card with `fsck.fat -n`, and
-lists the folder and shows the files written with `mdir` and `mtype`. `version.nasm` defines `VERSION`, the string of the
-banner, `git describe` of the tree unless `VERSION=` is given, and is
-written only when it changes.
-
-`make -C monitor test` checks the layout of the sources with nice_cpu's
-`nicefmt`, checks that the monitor ends below `DEMO`, where the demo
-goes in the ROM, assembles the monitor with the version `V9.9`, and runs
-it in `niceemu` twenty times, with its keystrokes in an input file and
-`h` as the last command, so that the run ends: alone, with every command
-and the edits of a line; alone, with 448 rows of `d`, which go round the
-ring of the history, and Page Up and Page Down; alone, with `l` and
-`build/hello.bin` pasted, lines that are skipped, tabs, a line of
-blanks, a line too long, a second line for an address, and CTRL-C, then
-`r`, with 128K words of RAM, as on the MEGA65, which a word of the
-input file gives `0xFFFFFF9E`; alone, with `l` at the bounds of 64K
-words, as on the Nexys4DDR; alone, with `l` where `0xFFFFFF9E` reads 0,
-as in `niceemu`; alone, with `sd` on the image of `test/sd_image.py`
-in slot 0, 4 sectors, and none in slot 1: a sector with every byte, the
-last sector, the one after it, the empty slot, the slot of the last `sd`,
-a slot that the system does not have, and arguments that are not; with
-`test/sd.nasm` at `0x8000`, which calls `sd_init`, `sd_read`, and
-`sd_write` by their labels, as it is assembled after the monitor's
-sources, and writes a sector, which `sd` then shows, and the image is
-compared with the one that `test/sd_image.py --written` makes; with
-`test/arp.nasm` at `0x8000`, built as `test/sd.nasm` is, which calls
-`arp_resolve` with the frames of `test/arp.eth` and `--step-time`: a
-reply after frames that are not, the cache, an address with no reply, an
-entry aged out, and the cache filled and gone round, and its frames sent
-are compared too; with `test/udp.nasm` at `0x8000`, built as
-`test/arp.nasm` is, which calls the UDP entries with the frames of
-`test/udp.eth`: each error, a datagram sent after ARP, a broadcast, two
-received after frames that are no datagram for the endpoint, one cut
-short, one sent through the gateway, and its frames sent are compared
-too; with `test/rom.c` joined to the ROM's C code, in
-`build/rom.bin`, the monitor of the tests with `test/rom.nasm` at
-`0x8000`, which calls its functions by their labels: the initial value
-of a global, a static array set to 0, both again after `r 0`,
-`nice_print`, and a trap, whose address is compared as the label it
-must be; with `test/fs.nasm` at `0x8000`, which calls the file entries
-through `mon.nasm`'s stubs, with the images of `test/fat_image.py` in
-both slots: handles, reads across the fragments of a file and at its end,
-the folder's entries, each error that a program can cause, and
-mounts; with `test/fsw.nasm` at `0x8000`, which calls the entries that
-write, on a copy of the card with the partitions, one of whose files is
-read-only, and a write-protected copy of the card with none: a file
-written in three pieces across clusters and read back, a file
-truncated, a file of ten clusters, deletions, one of a long name, the
-folder filled until it takes a new cluster, a mount that drops a file
-open to write, and each error that a program can cause; with the
-commands `dir` and `load` on those images, the
-fragmented `FRAG.BIN` and a text file loaded, the errors and the
-arguments that are not, and `HELLO.BIN` loaded and run; with `dir` on a
-FAT16 and an exFAT card; with `dir` and no card in slot 0, which mounts
-slot 1; with `dir` and `load` on the cards without the folder, which fail
-with error 29; with `save`, `load`, `dir`, and `del` on a copy of the
-card with no partitions, a program saved and loaded back, a file
-truncated and deleted, and the arguments that are not, and on a copy of
-the card that a write fills, which `save` fills with error 30, and
-which has room again after `del`; with `test/hello.nasm` at `0x8000`, an assembly program under
-nice_cpu's `start_mon.nasm`, also after `r 0`; and with `test/hello.c`,
-built with `nicebuild.py --monitor --asm mon.nasm`. The console output, which is the copy on the line, a few
-memory words, and the screen are compared with `test/NAME.expected`. The
-expected files were checked by hand; after a change that moves them,
-check the new output the same way before copying it from `build/`.
-`test/ring.py` checks the ring of the history first, at the sizes of the
-screen's memory of `niceemu` and the MEGA65, 32768 words, of the
-Nexys4DDR, 8192, and of 2048, which has no room for it, with the monitor
-built to take each size: it reads the rows a board would show from the
-dump of the memory, at the display offset the monitor set, and compares
-them with the console output, with the history filled in part and gone
-round, after Page Ups, Page Downs, and a key that shows the screen
-again. `test/dis.py` runs `u` over `test/dis.nasm` at `0x8000`, which
-has every opcode, operand mode, condition, and modifier, the control
-instructions, the reserved control words, unused fields that are not R0,
-the pairs that are `CALL` and `RET` and those that are not, and the
-words of the other pseudo-instructions, with a register, a constant, a
-memory operand, and a condition each, the words that match two of them,
-and the near-misses. It compares each row with nicedis.py's text, or,
-for a pseudo-instruction, with nicedis.py's text rewritten by the rules
-above, and assembles it with `niceasm` and compares the words. It checks
-that each pseudo-instruction occurs, and that `u` without `ADDR` goes on
-after the last row. `test/dhcp.py` runs `i dhcp` with `--step-time`, so
-that each run takes the same steps: first with no server, which gives it
-the transaction's number, and then with the OFFER and the ACK that it
-builds from it, among frames that are not for the monitor and an OFFER
-without an address, and with a NAK, which starts again. It compares the
-output and the frames sent, with the transaction as `xx`, with
-`test/dhcp.expected`, and checks the IPv4 checksums. `test/tftp.py`
-runs `tftp` the same way: first with no server, which gives it the
-client's port, and then with a file of two blocks among packets of
-another host and another port and a DATA again, with a DATA and an ACK
-lost, with an ERROR, with a file of 512 bytes, and with an empty file,
-with a listing, with the request to port 6969 of `IP:PORT`, and with
-the arguments that are not, no IP address, and no answer to ARP. It compares the output and the frames sent, with the client's port
-as `pp pp`, with `test/tftp.expected`, and checks the IPv4 checksums
-and the ports. `make tftptest`, in the repository's root, runs the
-monitor against `tools/tftpd.py` itself (CONTRIBUTING.md).
-
-On a board, `make r6` builds a bitstream that boots the monitor, with the
-demo behind it in the ROM. `make hwtest` loads the same, with the
-versions of the tests, into the RAM, and types `x` for the demo
-([demo/](../demo/README.md)).
-
 ## The demo
 
 The demo is nice_cpu's
@@ -874,9 +704,11 @@ the dispatch table, and both go when the demo goes; `release.py` and
 
 - QMON's SD card and FAT32 code, about half of QMON, is for QNICE's
   registers, and `qtransfer` has no hardware here. The sector routines
-  were written anew for nice_cpu's registers (The SD cards above), and
-  FAT32 comes with
-  [#58](https://github.com/MJoergen/NiceMonMEGA65/issues/58).
+  were written anew for nice_cpu's registers
+  ([INTERNALS.md](INTERNALS.md#the-sector-routines)), and FAT32 in C
+  (Files above), with
+  [#58](https://github.com/MJoergen/NiceMonMEGA65/issues/58) and
+  [#59](https://github.com/MJoergen/NiceMonMEGA65/issues/59).
 - QMON's disassembler is for QNICE; `u` was written anew for the NICE
   instruction set, with nice_cpu's `assembler/nicedis.py` as the model
   (The disassembler above).

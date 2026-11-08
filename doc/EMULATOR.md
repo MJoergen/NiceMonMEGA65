@@ -12,6 +12,12 @@ compared (see
 
 ## What does not match
 
+- The emulator has no ROM, so it has no monitor and no dispatch table
+  at `0x0000` until the monitor is joined there:
+  `cat monitor/build/monitor.bin prog.bin` runs a program at `0x8000`
+  under it, with `r` in the input
+  ([PROGRAMMING.md](PROGRAMMING.md#three-levels)). A program at 0 runs
+  the same on both, as the tools hide the board's ROM.
 - The memory is 128K words on the MEGA65 and 64K on the Nexys4DDR, not
   2³². A program, its data, and its stack must fit. `0xFFFFFF9E` reads
   the number of words on a board, and 0 in the emulator.
