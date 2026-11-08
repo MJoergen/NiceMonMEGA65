@@ -23,6 +23,8 @@ doc/SDCARD.md says, so that the monitor's FAT32 is tested against them:
 - nicefile.img: the same with a file named NICE, which is no folder, and
   which the monitor rejects too.
 - fat16.img: an MBR with one FAT16 partition, which the monitor rejects.
+- full.img: FAT32 on the whole card with NICE/HELLO.BIN, and every free
+  cluster but the last FULL_FREE marked bad, so that a write fills it.
 - exfat.img: an MBR with one partition of type 7 whose boot sector is
   exFAT's, which the monitor rejects.
 
@@ -111,9 +113,36 @@ def unknown_hint(img: str, offset: int) -> None:
         f.write(b"\xff\xff\xff\xff")
 
 
+def fill(img: str) -> None:
+    """Marks every free cluster of the FAT32 at offset 0 of img bad, but
+    the last FULL_FREE, in each copy of the FAT, and gives FSInfo their
+    count and the hint 2, from which a search goes through all the others."""
+    with open(img, "r+b") as f:
+        boot = f.read(SECTOR)
+        spc = boot[13]
+        reserved, nfats = struct.unpack_from("<HB", boot, 14)
+        total, fatsz = struct.unpack_from("<II", boot, 32)
+        fsinfo: int = struct.unpack_from("<H", boot, 48)[0]
+        data = reserved + nfats * fatsz
+        top = (total - data) // spc + 2
+        f.seek(reserved * SECTOR)
+        fat = bytearray(f.read(fatsz * SECTOR))
+        for c in range(2, top - FULL_FREE):
+            if struct.unpack_from("<I", fat, 4 * c)[0] & 0x0FFFFFFF == 0:
+                struct.pack_into("<I", fat, 4 * c, 0x0FFFFFF7)
+        for k in range(nfats):
+            f.seek((reserved + k * fatsz) * SECTOR)
+            f.write(fat)
+        f.seek(fsinfo * SECTOR + 488)
+        f.write(struct.pack("<II", FULL_FREE, 2))
+
+
 def mbr(img: str, parts: str) -> None:
     run("sfdisk", "--no-reread", "--no-tell-kernel", "-q", img, stdin=parts)
 
+
+# The free clusters of full.img, its last ones
+FULL_FREE = 3
 
 # The root's HELLO.BIN, which is not NiceMon's, so no test may load it
 DECOY = b"00008000 DEADBEEF\n"
@@ -184,6 +213,13 @@ def main() -> None:
     run("mkfs.fat", "-F", "32", "-s", "1", "-i", "4E494345", img)
     others(img, 0, tmp)
     mcopy(img, 0, text("NICE", 1), "NICE", tmp)
+
+    img = os.path.join(args.dir, "full.img")
+    blank(img, 34 * MB)
+    run("mkfs.fat", "-F", "32", "-s", "1", "-i", "4E494345", img)
+    run("mmd", "-i", f"{img}@@0", "::NICE")
+    mcopy(img, 0, hello, "NICE/HELLO.BIN", tmp)
+    fill(img)
 
     img = os.path.join(args.dir, "fat16.img")
     blank(img, 20 * MB)

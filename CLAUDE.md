@@ -27,8 +27,9 @@ link with the UART's baud rate at `0xFFFFFF9F` (issue #75). `doc/BASIC_SURVEY.md
 the survey of the BASIC dialects behind the interpreter in the ROM of
 issue #54 (milestone V2.0). `doc/SDCARD.md` is the design of the SD
 cards' storage, issue #62 and its subtasks, of which the controller, the
-slots, the ROM's sector routines with the `sd` command, and FAT32's
-reading with `dir` and `load` (#55, #56, #57, and #58) are written. `doc/` also has `CODING_STYLE.md`,
+slots, the ROM's sector routines with the `sd` command, FAT32's
+reading with `dir` and `load`, and its writing with `save` and `del`
+(#55, #56, #57, #58, and #59) are written. `doc/` also has `CODING_STYLE.md`,
 `RELEASE.md`, and `RELEASE_NOTES.md`; the root keeps only `README.md`,
 `CONTRIBUTING.md`, and this file.
 `src/nicemon.vhd` is the whole system and the file to read first; its

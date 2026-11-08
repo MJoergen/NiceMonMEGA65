@@ -21,6 +21,30 @@ The release candidates pinned these:
 
 nice_cpu's `RC01` and `RC03` have no tag here.
 
+## V1.9.1
+
+**Upgrade notes.**
+
+- The dispatch table is 1.2, with two entries more, `fs_write` and
+  `fs_delete` (#59). A program built for 1.1 runs as before.
+
+**New.**
+
+- The monitor writes FAT32 cards, in the folder `NICE`
+  ([#59](https://github.com/MJoergen/NiceMonMEGA65/issues/59)).
+  `save NAME ADDR N` writes N words from ADDR as a `.bin` file, which
+  `load` reads back, and `del NAME` deletes a file. Programs write files
+  through `fs_open` with mode 1, `fs_write`, and `fs_close`, and delete
+  them with `fs_delete`. A reset in the middle of a write leaves at worst
+  clusters that `fsck.fat` frees.
+
+**Tests.**
+
+- The monitor's tests write to cards made by dosfstools and mtools, and
+  check them with `fsck.fat -n`, `mdir`, and `mtype`: files written
+  across clusters, a truncated file, deletions with long names, a folder
+  that grows by a cluster, a full card, and a write-protected one.
+
 ## V1.9 (2026-11-08)
 
 There is no `V1.8` here: with nice_cpu's `V1.8`, the R6 missed timing at

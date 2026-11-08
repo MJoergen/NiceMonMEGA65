@@ -26,11 +26,12 @@
 ; the ROM to 0x8000 and runs it as r does, for the time being (issue #65).
 ; sd shows a sector of an SD card, which the sector routines sd_init,
 ; sd_read, and sd_write read; they are the ROM's own, with no entries in
-; the dispatch table (issue #57, doc/SDCARD.md). dir lists the root
-; directory of the card's FAT32 file system, and load NAME reads a .bin
-; file from it as l reads lines, with fat32.c, the ROM's C code, whose
-; functions are also the entries 9 to 13, fs_mount, fs_open, fs_read,
-; fs_readdir, and fs_close (issue #58). i dhcp gets the IP
+; the dispatch table (issue #57, doc/SDCARD.md). dir lists the folder
+; NICE of the card's FAT32 file system, load NAME reads a .bin file from
+; it as l reads lines, save NAME ADDR N writes one, and del NAME deletes
+; a file, with fat32.c, the ROM's C code, whose functions are also the
+; entries 9 to 15, fs_mount, fs_open, fs_read, fs_readdir, fs_close,
+; fs_write, and fs_delete (issues #58 and #59). i dhcp gets the IP
 ; address from a DHCP server through the port for Ethernet frames, with
 ; the frame routines eth_on, eth_recv, and eth_send, which are the ROM's
 ; own too, as is the ARP cache of arp_resolve (issue #83, README.md, "The
@@ -171,7 +172,7 @@ DEMO_MAX        .EQU    PROGRAM-DEMO    ; more words than fit from DEMO + 1 belo
 COLOR           .EQU    0x000FFF00      ; white on black, the color at the cold start
 OUT_LINE        .EQU    1
 OUT_SCREEN      .EQU    2
-TABLE_VERSION   .EQU    0x00010001      ; what mon_version returns: 1.1
+TABLE_VERSION   .EQU    0x00010002      ; what mon_version returns: 1.2
 DUMP_WORDS      .EQU    32              ; the words that d shows without a count
 ROW_WORDS       .EQU    4               ; the words of a row of d
 DIS_ROWS        .EQU    20              ; the instructions that u shows without a count
@@ -216,6 +217,8 @@ DHCP_NAK        .EQU    6
                 JMP     _fat_read       ; 11 at 0x16, fs_read
                 JMP     _fat_readdir    ; 12 at 0x18, fs_readdir
                 JMP     _fat_close      ; 13 at 0x1A, fs_close
+                JMP     _fat_write      ; 14 at 0x1C, fs_write
+                JMP     _fat_delete     ; 15 at 0x1E, fs_delete
 
 ; mon_reset: the cold start, entry 0, which reset runs and a program may
 ; call. E is cleared, the timer stopped, VBASE set to 0, the font base
@@ -331,11 +334,15 @@ cmd_halt
 
 ; d [ADDR] [N]: N words from ADDR, in hex, ROW_WORDS to a row, each row
 ; with its address first. Without ADDR, the words after the last shown;
-; without N, DUMP_WORDS. A d with ir after it is dir.
+; without N, DUMP_WORDS. A d with ir after it is dir, and one with el
+; and a blank or nothing after it del.
 cmd_dump
                 OR      R1, @R2, 0x20   ; I as i
                 CMP     R1, 0x69        ; i
         ?Z      JMP     cmd_dir
+                CMP     R1, 0x65        ; e
+        ?Z      JMP     cmd_del
+dump_args
                 MOVE    R1, R2
                 CALL    _io_gethex      ; R1 the address, R2 its digits, R3 after it
                 TST     R2
@@ -1255,24 +1262,12 @@ cmd_fload
         ?Z      JMP     fload_bad       ; load alone
                 CMP     @R1, 0x20
         ?!Z     JMP     unknown         ; loadx
-fload_blank
-                CMP     @R1, 0x20
-        ?Z      ADD     R1, R1, 1
-        ?Z      JMP     fload_blank
-                TST     @R1
+                CALL    fs_name
+                TST     R1
         ?Z      JMP     fload_bad       ; no name
                 MOVE    R7, R1          ; the name
-fload_end
-                ADD     R1, R1, 1
-                TST     @R1
-        ?Z      JMP     fload_open
-                CMP     @R1, 0x20
-        ?!Z     JMP     fload_end
-                MOVE    @R1, 0          ; the name ends at the first blank
-                ADD     R3, R1, 1
                 CALL    rest_blank
         ?!Z     JMP     fload_bad       ; a second word
-fload_open
                 MOVE    R1, R7
                 MOVE    R2, 0           ; to read
                 CALL    _fat_open
@@ -1300,6 +1295,134 @@ fload_bad
                 MOVE    R1, S_BADLOAD
                 CALL    puts_crlf
                 JMP     main
+
+; save NAME ADDR N: the N words from ADDR, both in hex, written to the
+; file NAME of the card's folder, which is made or truncated, as a .bin
+; file, with fat_save of fat32.c, and the words saved shown as load shows
+; those loaded. R2 points after the s.
+cmd_save
+                MOVE    R1, R2
+                MOVE    R2, S_AVE
+                CALL    match           ; R1 after ave, or 0
+                TST     R1
+        ?Z      JMP     unknown
+                TST     @R1
+        ?Z      JMP     save_bad        ; save alone
+                CMP     @R1, 0x20
+        ?!Z     JMP     unknown         ; savex
+                CALL    fs_name
+                TST     R1
+        ?Z      JMP     save_bad        ; no name
+                MOVE    R7, R1          ; the name
+                MOVE    R1, R3
+                CALL    _io_gethex      ; R1 the address, R2 its digits, R3 after it
+                SUB     R4, R2, 1
+                CMP     R4, 8
+        ?!C     JMP     save_bad        ; no digit, or more than 8
+                MOVE    R9, R1
+                MOVE    R1, R3
+                CALL    _io_gethex      ; R1 the count
+                SUB     R4, R2, 1
+                CMP     R4, 8
+        ?!C     JMP     save_bad
+                MOVE    R10, R1
+                CALL    rest_blank
+        ?!Z     JMP     save_bad        ; a fourth word
+                MOVE    R1, R7
+                MOVE    R2, 1           ; to write
+                CALL    _fat_open
+                TST     R1
+        ?N      JMP     fs_fail
+                MOVE    R8, R1          ; the handle
+                MOVE    R2, R9
+                MOVE    R3, R10
+                CALL    _fat_save
+                MOVE    R11, R1
+                MOVE    R1, R8
+                CALL    _fat_close
+                TST     R11
+        ?N      MOVE    R1, R11         ; the error of the save, before the close's
+                TST     R1
+        ?N      JMP     fs_fail
+                MOVE    R1, S_SAVED
+                CALL    _io_puts
+                MOVE    R1, R10
+                CALL    _io_putdec
+                TST     R10
+        ?Z      JMP     save_end
+                MOVE    R1, S_LFROM
+                CALL    _io_puts
+                MOVE    R1, R9
+                CALL    _io_puthex
+                MOVE    R1, S_LTO
+                CALL    _io_puts
+                ADD     R1, R9, R10
+                SUB     R1, R1, 1
+                CALL    _io_puthex
+save_end
+                CALL    _io_crlf
+                JMP     main
+save_bad
+                MOVE    R1, S_BADSAVE
+                CALL    puts_crlf
+                JMP     main
+
+; del NAME: the file NAME of the card's folder deleted, with fat_delete of
+; fat32.c. R2 points after the d, at the e; a d with e and no l after it,
+; such as de 10, is d.
+cmd_del
+                MOVE    R7, R2
+                MOVE    R1, R2
+                MOVE    R2, S_EL
+                CALL    match           ; R1 after el, or 0
+                TST     R1
+        ?Z      JMP     del_dump
+                TST     @R1
+        ?Z      JMP     del_bad         ; del alone
+                CMP     @R1, 0x20
+        ?!Z     JMP     unknown         ; delx
+                CALL    fs_name
+                TST     R1
+        ?Z      JMP     del_bad         ; no name
+                MOVE    R7, R1          ; the name
+                CALL    rest_blank
+        ?!Z     JMP     del_bad         ; a second word
+                MOVE    R1, R7
+                CALL    _fat_delete
+                TST     R1
+        ?N      JMP     fs_fail
+                MOVE    R1, S_DELETED
+                CALL    _io_puts
+                MOVE    R1, R7
+                CALL    puts_crlf
+                JMP     main
+del_dump
+                MOVE    R2, R7
+                JMP     dump_args
+del_bad
+                MOVE    R1, S_BADDEL
+                CALL    puts_crlf
+                JMP     main
+
+; fs_name: the name of a file in the line from R1, after blanks, ended in
+; the line with a 0 at the first blank after it: R1 the name, and R3 the
+; rest of the line, or R1 = 0 when the line has no more. Uses R1-R3.
+fs_name
+                CMP     @R1, 0x20
+        ?Z      ADD     R1, R1, 1
+        ?Z      JMP     fs_name
+                TST     @R1
+        ?Z      MOVE    R1, 0
+        ?Z      RET
+                MOVE    R3, R1
+fs_name_end
+                ADD     R3, R3, 1
+                TST     @R3
+        ?Z      RET
+                CMP     @R3, 0x20
+        ?!Z     JMP     fs_name_end
+                MOVE    @R3++, 0
+                RET
 
 ; match: Z clear and R1 after the string at R2 when the line at R1 starts
 ; with it, in either case, or R1 = 0. Uses R1-R4.
@@ -1349,14 +1472,18 @@ fs_file_end
                 JMP     main
 
 ; The sector routines for fat32.c, by the names that it imports: R2 of
-; fat_sd_read is a byte address of the C code's memory, at a multiple of
-; 4, so a word of it
+; fat_sd_read and fat_sd_write is a byte address of the C code's memory,
+; at a multiple of 4, so a word of it
 _fat_sd_init
                 JMP     sd_init
 _fat_sd_read
                 SHR     R2, R2, 2
                 ADD     R2, R2, ___wasm_memory
                 JMP     sd_read
+_fat_sd_write
+                SHR     R2, R2, 2
+                ADD     R2, R2, ___wasm_memory
+                JMP     sd_write
 
 ; load_row: row R7 blank in the current color, and the cursor at its column
 ; 0. Uses R1-R3.
@@ -1388,6 +1515,9 @@ load_blank
 ; slot, R8 the sector, R9 the offset of the row, and R10 the bytes left in
 ; the row.
 cmd_sd
+                OR      R1, @R2, 0x20   ; A as a
+                CMP     R1, 0x61        ; a
+        ?Z      JMP     cmd_save
                 MOVE    R1, @R2++
                 OR      R1, R1, 0x20    ; D as d
                 CMP     R1, 0x64        ; d
@@ -2560,6 +2690,15 @@ S_BADDIR
                 .ASCII_L 'dir [SLOT]: the slot in hex, such as dir 1'
 S_BADLOAD
                 .ASCII_L 'load NAME: the 8.3 name of a file, such as load HELLO.BIN'
+S_AVE           .ASCII_L 'ave'
+S_EL            .ASCII_L 'el'
+S_SAVED         .ASCII_L 'Words saved: '
+S_BADSAVE
+                .ASCII_L 'save NAME ADDR N: a name, and the address and the count in hex'
+S_DELETED
+                .ASCII_L 'Deleted '
+S_BADDEL
+                .ASCII_L 'del NAME: the 8.3 name of a file, such as del HELLO.BIN'
 S_INSLOT
                 .ASCII_L ' in slot '
 ; The meanings of the errors 1 to SD_ERRS of SD_ERROR
@@ -2580,8 +2719,9 @@ E_SD8           .ASCII_L 'Init failed'
 FS_ERRORS
                 .DAT    E_FS16, E_FS17, E_FS18, E_FS19, E_FS20, E_FS21, E_FS22
                 .DAT    E_FS23, E_FS24, E_FS25, E_FS26, E_FS27, E_FS28, E_FS29
+                .DAT    E_FS30, E_FS31, E_FS32
 FS_ERR0         .EQU    16
-FS_ERRS         .EQU    14
+FS_ERRS         .EQU    17
 E_FS16          .ASCII_L 'no FAT32 file system'
 E_FS17          .ASCII_L 'FAT12, which is not supported'
 E_FS18          .ASCII_L 'FAT16, which is not supported'
@@ -2595,12 +2735,17 @@ E_FS25          .ASCII_L 'no such mode'
 E_FS26          .ASCII_L 'the FAT is damaged'
 E_FS27          .ASCII_L 'no such slot'
 E_FS28          .ASCII_L 'the card has changed'
+E_FS30          .ASCII_L 'the card or the folder is full'
+E_FS31          .ASCII_L 'the file is open'
+E_FS32          .ASCII_L 'the file is read-only'
 
-HELP            .DAT    H_R, H_L, H_LOAD, H_X, H_D, H_U, H_S, H_DIR, H_I, H_ID, H_M, H_C, H_V, H_H
-                .DAT    H_Q, H_P, 0
+HELP            .DAT    H_R, H_L, H_LOAD, H_SAVE, H_DEL, H_X, H_D, H_U, H_S, H_DIR, H_I, H_ID
+                .DAT    H_M, H_C, H_V, H_H, H_Q, H_P, 0
 H_R             .ASCII_L 'r [ADDR]      run the program at ADDR, or at 00008000; r 0 restarts'
 H_L             .ASCII_L 'l             load lines of ADDR WORD in hex, as a .bin file has them'
 H_LOAD          .ASCII_L 'load NAME     load the .bin file NAME of the SD card, as l loads lines'
+H_SAVE          .ASCII_L 'save NAME A N save N words from A, both in hex, as the .bin file NAME'
+H_DEL           .ASCII_L 'del NAME      delete the file NAME of the SD card'
 H_X             .ASCII_L 'x             run the demo of the ROM, which F12 leaves'
 H_D             .ASCII_L 'd [ADDR] [N]  show N words from ADDR, in hex, or the next ones'
 H_U             .ASCII_L 'u [ADDR] [N]  disassemble N instructions from ADDR, or the next ones'

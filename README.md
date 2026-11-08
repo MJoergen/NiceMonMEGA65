@@ -102,7 +102,8 @@ plain TCP client on the Ethernet port or a terminal on the serial
 port, as the lines of its `.bin` file, and `r` runs it
 ([monitor/README.md](monitor/README.md#loading-without-a-host)). `load
 NAME` loads a `.bin` file that you copied to a FAT32 SD card on a PC,
-and `dir` lists the files (see [The SD cards](#the-sd-cards)). A
+`save NAME ADDR N` writes one, and `dir` lists the files (see [The SD
+cards](#the-sd-cards)). A
 program there has 92K words of RAM on the MEGA65, `0x8000` to
 `0x1EFFF`, and 28K on the Nexys4DDR.
 Until the BASIC interpreter takes its place, the ROM also holds a
@@ -119,13 +120,12 @@ monitor, and the reset button starts the monitor again. The ROM can also hold a 
 
 Programs reach the boards' SD cards through the SD card controller of
 nice_cpu, at `0xFFFFFFA0`, a sector of 512 bytes at a time, as in
-`niceemu --sd0` and `--sd1`. The monitor reads FAT32 cards, in the
-folder `NICE` of the root directory, with `dir` and `load`, and fails
-on a card without it, as a card may be shared with other cores, each
-with a folder of its own. Programs read their files
-through its entries
-([monitor/README.md](monitor/README.md#files)). It does not write them
-yet. On the
+`niceemu --sd0` and `--sd1`. The monitor reads and writes FAT32 cards,
+in the folder `NICE` of the root directory, with `dir`, `load`, `save`,
+and `del`, and fails on a card without it, as a card may be shared with
+other cores, each with a folder of its own. Programs read and write
+their files through its entries
+([monitor/README.md](monitor/README.md#files)). On the
 MEGA65, slot 0 is the microSD slot at the back, and slot 1 the
 full-size slot underneath, which holds the MEGA65's system files: a
 program that writes there can damage them, so test one on a card of its

@@ -1,11 +1,13 @@
-// FAT32 for the ROM: reading, in the folder FOLDER of the root directory
-// (issues #58 and #91, doc/SDCARD.md, "The file system"). It is part of the ROM's C code
-// (README.md, "C in the ROM"), and the dispatch table's entries fs_mount,
-// fs_open, fs_read, fs_readdir, and fs_close jump to its functions
-// fat_mount, fat_open, fat_read, fat_readdir, and fat_close, which take
-// the arguments of the entries: addresses are NICE word addresses, not C
-// pointers, read and written with nice_peek and nice_poke. fat_load reads
-// a .bin file for the monitor's load command.
+// FAT32 for the ROM: reading and writing, in the folder FOLDER of the root
+// directory (issues #58, #59, and #91, doc/SDCARD.md, "The file system").
+// It is part of the ROM's C code (README.md, "C in the ROM"), and the
+// dispatch table's entries fs_mount, fs_open, fs_read, fs_readdir,
+// fs_close, fs_write, and fs_delete jump to its functions fat_mount,
+// fat_open, fat_read, fat_readdir, fat_close, fat_write, and fat_delete,
+// which take the arguments of the entries: addresses are NICE word
+// addresses, not C pointers, read and written with nice_peek and
+// nice_poke. fat_load reads a .bin file for the monitor's load command,
+// and fat_save writes one for save.
 //
 // The card is the one in the slot of the last fat_mount. A card is FAT32
 // when its sector 0 is a FAT32 boot sector, or an MBR whose first
@@ -27,7 +29,23 @@
 // two files that may be open at once. They are in the RAM of the C code,
 // 128 words each, 4 bytes to a word, as sd_read and the SD controller have
 // them. Errors are negative: those of the SD controller, -1 to -8, as
-// sd_init and sd_read give them, and those below, from -16.
+// sd_init, sd_read, and sd_write give them, and those below, from -16.
+//
+// Writing keeps to an order in which a reset at any point leaves the card
+// no worse than with lost clusters, which fsck.fat frees. A file opened
+// to write gets its directory entry at once, empty, with no clusters, and
+// an existing file is truncated so: the entry first, then its clusters
+// freed. The file's clusters are taken from the FAT as its data reaches
+// them, each marked as the end of the chain in every copy of the FAT
+// before the one before it is linked to it, and its data written; only
+// fat_close puts the first cluster and the size into the entry. A
+// deletion marks the long-name entries, then the entry, then frees the
+// clusters. A new cluster is searched from FSInfo's next-free hint, and
+// the first change of the FAT after a mount sets FSInfo's free count to
+// unknown, 0xFFFFFFFF, before it; the hint is written after each change.
+// The FAT's cache and the directory's are written through; a file's
+// sector is written when it is full, and at fat_close. No sector outside
+// the partition is ever written, nor its boot sector: wr checks each.
 
 #include <nice.h>
 
@@ -35,6 +53,7 @@
 // from a byte address of the C code's memory to a NICE word address
 int fat_sd_init(unsigned slot);
 int fat_sd_read(unsigned lba, unsigned *buf);
+int fat_sd_write(unsigned lba, const unsigned *buf);
 
 #define SD_CSR 0xFFFFFFA0u
 #define SD_SELECT 0xFFFFFFA4u
@@ -52,11 +71,14 @@ int fat_sd_read(unsigned lba, unsigned *buf);
 #define E_ISDIR -22     // a directory, opened as a file
 #define E_TOOMANY -23   // two files open already
 #define E_HANDLE -24    // not an open file, or not of the right kind
-#define E_MODE -25      // a mode that is not 0 or 2
+#define E_MODE -25      // a mode that is not 0, 1, or 2
 #define E_BADFAT -26    // a cluster outside the volume
 #define E_SLOT -27      // no such slot
 #define E_CHANGED -28   // the card changed, or the mount was dropped
 #define E_NOFOLDER -29  // no folder FOLDER in the root directory
+#define E_FULL -30      // no free cluster, or the folder has 65536 entries
+#define E_OPEN -31      // the file is open, and may not be opened or deleted so
+#define E_RDONLY -32    // the file is read-only
 
 // The folder of NiceMon's files, an 8.3 name of up to 8 characters in
 // upper case, which the Makefile checks
@@ -65,7 +87,15 @@ int fat_sd_read(unsigned lba, unsigned *buf);
 #endif
 
 #define END 0x0FFFFFF8u  // a FAT entry from here ends a chain
+#define EOC 0x0FFFFFFFu  // the FAT entry written at the end of a chain
 #define FILES 2
+#define DIR_MAX (65536u * 32)   // the bytes of a directory at most
+#define DATE 0x0021u    // the date of a new entry, 1980-01-01, as there is no clock
+
+// The kinds of an open file
+#define K_READ 0
+#define K_WRITE 1
+#define K_DIR 2
 
 static struct {
     int mounted;
@@ -77,14 +107,24 @@ static struct {
     unsigned root;      // the first cluster of the root directory
     unsigned dir;       // the first cluster of the folder FOLDER
     unsigned top;       // the cluster after the last
+    unsigned nfats;     // the copies of the FAT,
+    unsigned fatsz;     // and the sectors of each
+    unsigned end;       // the sector after the partition
+    unsigned fsinfo;    // the sector of FSInfo, 0 for none
+    unsigned hint;      // the cluster to search for a free one from, 0 for FSInfo's
+    int unknown;        // FSInfo's free count is set to unknown since the mount
+    int changed;        // the FAT changed since FSInfo was written
 } vol;
 
 static unsigned fatbuf[128];
 static unsigned fatlba = ~0u;   // the sector in fatbuf
 
+// An open file, or a directory. A file opened to write has its first
+// cluster in first, 0 while it has none, its last in clus, and the sector
+// that pos is in, in buf, at lba, once a byte of it is written.
 static struct file {
     int open;
-    int dir;            // a directory, read with fat_readdir
+    int kind;           // K_READ, K_WRITE, or K_DIR, read with fat_readdir
     int done;           // the directory's end was found
     unsigned first;     // the first cluster, 0 for an empty file
     unsigned clus;      // the cluster that holds the byte at cpos
@@ -92,8 +132,16 @@ static struct file {
     unsigned pos;       // the byte offset of the next byte
     unsigned size;
     unsigned lba;       // the sector in buf
+    unsigned elba;      // a file's directory entry: its sector,
+    unsigned eoff;      // and its byte offset there
+    unsigned lfn;       // a directory's: the offset of the long name before the entry entry() gave, or ~0u
     unsigned buf[128];
 } files[FILES];
+
+// The directory that find and make search, whose buffer holds the entry
+// they give, and a sector for FSInfo, an entry, or a new cluster's zeros
+static struct file dirf;
+static unsigned sec[128];
 
 static unsigned u16(const unsigned char *p)
 {
@@ -103,6 +151,27 @@ static unsigned u16(const unsigned char *p)
 static unsigned u32(const unsigned char *p)
 {
     return p[0] | p[1] << 8 | p[2] << 16 | (unsigned)p[3] << 24;
+}
+
+static void put16(unsigned char *p, unsigned v)
+{
+    p[0] = (unsigned char)v;
+    p[1] = (unsigned char)(v >> 8);
+}
+
+static void put32(unsigned char *p, unsigned v)
+{
+    put16(p, v);
+    put16(p + 2, v >> 16);
+}
+
+// A sector written, but none outside the partition, nor below its first
+// FAT but FSInfo, so never the MBR or the boot sector
+static int wr(unsigned lba, const unsigned *buf)
+{
+    if ((lba < vol.fat && lba != vol.fsinfo) || lba >= vol.end)
+        return E_BADFAT;
+    return fat_sd_write(lba, buf);
 }
 
 static void drop(void)
@@ -177,6 +246,9 @@ static int mount(unsigned slot)
     drop();
     vol.ever = 1;
     vol.slot = slot;
+    vol.hint = 0;
+    vol.unknown = 0;
+    vol.changed = 0;
     int r = fat_sd_init(slot);
     if (r < 0 || (r = fat_sd_read(0, fatbuf)) < 0)
         return r;
@@ -207,9 +279,17 @@ static int mount(unsigned slot)
         return k == 1 ? E_NOFS : k;
     vol.spc = b[13];
     vol.fat = base + u16(b + 14);
-    vol.data = vol.fat + b[16] * u32(b + 36);
+    vol.nfats = b[16];
+    vol.fatsz = u32(b + 36);
+    vol.data = vol.fat + vol.nfats * vol.fatsz;
     vol.root = u32(b + 44);
-    vol.top = (base + u32(b + 32) - vol.data) / vol.spc + 2;
+    vol.end = base + u32(b + 32);
+    vol.top = (vol.end - vol.data) / vol.spc + 2;
+    // FAT32's FATs may have more entries than the volume has clusters
+    if (vol.top > vol.fatsz * 128)
+        vol.top = vol.fatsz * 128;
+    unsigned fsi = u16(b + 48);
+    vol.fsinfo = fsi >= 1 && fsi < u16(b + 14) ? base + fsi : 0;
     fatlba = ~0u;
     if (vol.root < 2 || vol.root >= vol.top)
         return E_BADFAT;
@@ -234,8 +314,9 @@ int fat_mount(unsigned slot)
     return mount(slot);
 }
 
-// The FAT's entry of cluster c in *next, or an error
-static int next(unsigned c, unsigned *next)
+// The sector of the first FAT that holds the entry of cluster c in
+// fatbuf: 0, or an error
+static int fatsec(unsigned c)
 {
     unsigned lba = vol.fat + (c >> 7);
     if (lba != fatlba) {
@@ -246,7 +327,133 @@ static int next(unsigned c, unsigned *next)
         }
         fatlba = lba;
     }
+    return 0;
+}
+
+// The FAT's entry of cluster c in *next, or an error
+static int next(unsigned c, unsigned *next)
+{
+    int r = fatsec(c);
+    if (r < 0)
+        return r;
     *next = fatbuf[c & 127] & 0x0FFFFFFF;
+    return 0;
+}
+
+// FSInfo with the free count unknown and the next-free hint, vol.hint,
+// which it gives when vol.hint is 0. A sector without FSInfo's signatures
+// is left alone. 0, or an error.
+static int info(void)
+{
+    if (!vol.fsinfo)
+        return 0;
+    unsigned char *b = (unsigned char *)sec;
+    int r = fat_sd_read(vol.fsinfo, sec);
+    if (r < 0)
+        return r;
+    if (u32(b) != 0x41615252u || u32(b + 484) != 0x61417272u || u32(b + 508) != 0xAA550000u)
+        return 0;
+    if (!vol.hint)
+        vol.hint = u32(b + 492);
+    put32(b + 488, 0xFFFFFFFFu);
+    put32(b + 492, vol.hint);
+    if ((r = wr(vol.fsinfo, sec)) < 0)
+        return r;
+    vol.unknown = 1;
+    vol.changed = 0;
+    return 0;
+}
+
+// FSInfo written after a change of the FAT
+static int infodone(void)
+{
+    return vol.changed ? info() : 0;
+}
+
+// The FAT's entry of cluster c set to v, in every copy of the FAT, after
+// FSInfo's free count is unknown. 0, or an error.
+static int set(unsigned c, unsigned v)
+{
+    int r;
+    if (!vol.unknown && (r = info()) < 0)
+        return r;
+    if ((r = fatsec(c)) < 0)
+        return r;
+    fatbuf[c & 127] = (fatbuf[c & 127] & 0xF0000000u) | v;
+    vol.changed = 1;
+    for (unsigned k = 0; k < vol.nfats; k++) {
+        if ((r = wr(fatlba + k * vol.fatsz, fatbuf)) < 0) {
+            fatlba = ~0u;   // the card may not hold what the cache does
+            return r;
+        }
+    }
+    return 0;
+}
+
+// A free cluster in *c, searched from the hint up to the last and then
+// from 2, a sector of the FAT at a time, but not taken. 0, E_FULL, or an
+// error.
+static int search(unsigned *c)
+{
+    if (!vol.hint && vol.fsinfo) {
+        int r = info();     // for its hint
+        if (r < 0)
+            return r;
+    }
+    unsigned k = vol.hint >= 2 && vol.hint < vol.top ? vol.hint : 2;
+    unsigned left = vol.top - 2;
+    while (left) {
+        int r = fatsec(k);
+        if (r < 0)
+            return r;
+        unsigned stop = (k | 127) + 1;
+        if (stop > vol.top)
+            stop = vol.top;
+        if (stop - k > left)
+            stop = k + left;
+        left -= stop - k;
+        for (; k < stop; k++) {
+            if (!(fatbuf[k & 127] & 0x0FFFFFFF)) {
+                *c = k;
+                return 0;
+            }
+        }
+        if (k == vol.top)
+            k = 2;
+    }
+    return E_FULL;
+}
+
+// The free cluster c taken as the end of a chain, and linked after prev,
+// unless prev is 0. 0, or an error.
+static int take(unsigned prev, unsigned c)
+{
+    int r = set(c, EOC);
+    if (r == 0 && prev)
+        r = set(prev, c);
+    if (r == 0)
+        vol.hint = c + 1 < vol.top ? c + 1 : 2;
+    return r;
+}
+
+// The chain from cluster c freed, up to its end, or a cluster outside the
+// volume, or a free one, as a chain with a loop in it comes back to one.
+// The hint goes back to the first freed below it. 0, or an error.
+static int release(unsigned c)
+{
+    while (c >= 2 && c < vol.top) {
+        unsigned n;
+        int r = next(c, &n);
+        if (r < 0)
+            return r;
+        if (n == 0)
+            return E_BADFAT;
+        if ((r = set(c, 0)) < 0)
+            return r;
+        if (c < vol.hint)
+            vol.hint = c;
+        c = n;
+    }
     return 0;
 }
 
@@ -279,11 +486,11 @@ static int seek(struct file *f)
     return 0;
 }
 
-// The open file of handle h of the kind dir, or 0, which closes all when
+// The open file of handle h of the kind kind, or 0, which closes all when
 // the mount was dropped
-static struct file *handle(int h, int dir, int *err)
+static struct file *handle(int h, int kind, int *err)
 {
-    if (h < 0 || h >= FILES || !files[h].open || files[h].dir != dir) {
+    if (h < 0 || h >= FILES || !files[h].open || files[h].kind != kind) {
         *err = E_HANDLE;
         return 0;
     }
@@ -325,9 +532,11 @@ static int name83(unsigned name, unsigned char n[11])
 }
 
 // The next entry of the directory f that is a file or a directory, at e,
-// 32 bytes in f->buf: 1, 0 at the end, or an error
+// 32 bytes in f->buf, with f->lfn the offset of the long-name entries
+// right before it, or ~0u: 1, 0 at the end, or an error
 static int entry(struct file *f, unsigned char **e)
 {
+    unsigned lfn = ~0u;
     while (!f->done) {
         int r = seek(f);
         if (r < 0)
@@ -338,8 +547,16 @@ static int entry(struct file *f, unsigned char **e)
         f->pos += 32;
         if (p[0] == 0)
             break;
-        if (p[0] == 0xE5 || p[11] == 0x0F || (p[11] & 0x08) || p[0] == '.')
+        if (p[0] != 0xE5 && p[11] == 0x0F) {
+            if (lfn == ~0u)
+                lfn = f->pos - 32;
             continue;
+        }
+        if (p[0] == 0xE5 || (p[11] & 0x08) || p[0] == '.') {
+            lfn = ~0u;
+            continue;
+        }
+        f->lfn = lfn;
         *e = p;
         return 1;
     }
@@ -347,17 +564,16 @@ static int entry(struct file *f, unsigned char **e)
     return 0;
 }
 
-static void start(struct file *f, unsigned first, int dir, unsigned size);
+static void start(struct file *f, unsigned first, int kind, unsigned size);
 
 // The entry of the 8.3 name n in the directory whose first cluster is
-// first, at e: 1, 0 when there is none, or an error. The entry is in the
-// buffer of a static file, which keeps it until the next call.
+// first, at e: 1, 0 when there is none, or an error. The entry is in
+// dirf's buffer, which keeps it until the next call, at dirf.lba.
 static int find(unsigned first, const unsigned char n[11], unsigned char **e)
 {
-    static struct file d;
-    start(&d, first, 1, 0);
+    start(&dirf, first, K_DIR, 0);
     int r;
-    while ((r = entry(&d, e)) == 1) {
+    while ((r = entry(&dirf, e)) == 1) {
         int same = 1;
         for (int k = 0; k < 11; k++)
             same &= (k == 0 && (*e)[0] == 0x05 ? 0xE5 : (*e)[k]) == n[k];
@@ -367,10 +583,10 @@ static int find(unsigned first, const unsigned char n[11], unsigned char **e)
     return r;
 }
 
-static void start(struct file *f, unsigned first, int dir, unsigned size)
+static void start(struct file *f, unsigned first, int kind, unsigned size)
 {
     f->open = 1;
-    f->dir = dir;
+    f->kind = kind;
     f->done = 0;
     f->first = first;
     f->clus = first;
@@ -396,52 +612,152 @@ static int mounted(void)
     return r;
 }
 
-// A free handle, with its file started as start says, or E_TOOMANY
-static int opened(unsigned first, int dir, unsigned size)
+// A free handle, or E_TOOMANY
+static int freeh(void)
+{
+    for (int h = 0; h < FILES; h++)
+        if (!files[h].open)
+            return h;
+    return E_TOOMANY;
+}
+
+// An open file whose directory entry is at the sector lba and the offset
+// off, that is opened to write, or of any kind when any is 1, or 0
+static int busy(unsigned lba, unsigned off, int any)
 {
     for (int h = 0; h < FILES; h++) {
-        if (!files[h].open) {
-            start(&files[h], first, dir, size);
-            return h;
-        }
+        struct file *f = &files[h];
+        if (f->open && f->kind != K_DIR && f->elba == lba && f->eoff == off &&
+            (any || f->kind == K_WRITE))
+            return 1;
     }
-    return E_TOOMANY;
+    return 0;
+}
+
+// The first cluster of the entry e
+static unsigned cluster(const unsigned char *e)
+{
+    return u16(e + 20) << 16 | u16(e + 26);
+}
+
+// A file's entry e checked for a change: E_ISDIR, E_RDONLY, E_OPEN when a
+// file has it open, or 0
+static int writable(const unsigned char *e)
+{
+    if (e[11] & 0x10)
+        return E_ISDIR;
+    if (e[11] & 0x01)
+        return E_RDONLY;
+    if (busy(dirf.lba, (unsigned)(e - (unsigned char *)dirf.buf), 1))
+        return E_OPEN;
+    return 0;
+}
+
+// A new entry of the 8.3 name n in the folder, empty, in the first free
+// entry, or in a new cluster of zeros added to the folder. It is in
+// dirf's buffer at e, written. 0, or an error.
+static int make(const unsigned char n[11], unsigned char **e)
+{
+    start(&dirf, vol.dir, K_DIR, 0);
+    int r;
+    for (;;) {
+        if (dirf.pos >= DIR_MAX)
+            return E_FULL;
+        if ((r = seek(&dirf)) < 0)
+            return r;
+        if (r == 1) {
+            // The end of the chain, dirf.clus its last cluster: a new one,
+            // its zeros written before it is taken and linked
+            unsigned c;
+            if ((r = search(&c)) < 0)
+                return r;
+            for (int k = 0; k < 128; k++)
+                sec[k] = 0;
+            unsigned lba = vol.data + (c - 2) * vol.spc;
+            for (unsigned k = 0; k < vol.spc; k++)
+                if ((r = wr(lba + k, sec)) < 0)
+                    return r;
+            if ((r = take(dirf.clus, c)) < 0)
+                return r;
+            continue;
+        }
+        unsigned char *p = (unsigned char *)dirf.buf + (dirf.pos & 511);
+        if (p[0] == 0 || p[0] == 0xE5) {
+            for (int k = 0; k < 32; k++)
+                p[k] = k < 11 ? n[k] : 0;
+            p[11] = 0x20;           // archive
+            put16(p + 16, DATE);    // created,
+            put16(p + 18, DATE);    // read,
+            put16(p + 24, DATE);    // and written
+            *e = p;
+            return wr(dirf.lba, dirf.buf);
+        }
+        dirf.pos += 32;
+    }
 }
 
 int fat_open(unsigned name, int mode)
 {
     unsigned char n[11];
-    if (mode != 0 && mode != 2)
+    if (mode < 0 || mode > 2)
         return E_MODE;
     int r = mounted();
     if (r < 0)
         return r;
+    int h = freeh();
+    if (h < 0)
+        return h;
     if (mode == 2) {
         // The folder, the only directory: an empty name, or /
         unsigned c = nice_peek(name);
         if (c && !(c == '/' && nice_peek(name + 1) == 0))
             return E_NAME;
-        return opened(vol.dir, 1, 0);
+        start(&files[h], vol.dir, K_DIR, 0);
+        return h;
     }
     r = name83(name, n);
     if (r < 0)
         return r;
     unsigned char *e;
-    if ((r = find(vol.dir, n, &e)) != 1)
-        return r < 0 ? r : E_NOFILE;
-    if (e[11] & 0x10)
-        return E_ISDIR;
-    unsigned first = u16(e + 20) << 16 | u16(e + 26);
-    unsigned size = u32(e + 28);
-    if (size && (first < 2 || first >= vol.top))
-        return E_BADFAT;
-    return opened(first, 0, size);
+    if ((r = find(vol.dir, n, &e)) < 0)
+        return r;
+    unsigned first = 0, size = 0;
+    if (mode == 0) {
+        if (r == 0)
+            return E_NOFILE;
+        if (e[11] & 0x10)
+            return E_ISDIR;
+        if (busy(dirf.lba, (unsigned)(e - (unsigned char *)dirf.buf), 0))
+            return E_OPEN;
+        first = cluster(e);
+        size = u32(e + 28);
+        if (size && (first < 2 || first >= vol.top))
+            return E_BADFAT;
+    } else if (r == 1) {
+        // Truncated: the entry emptied, then its clusters freed
+        if ((r = writable(e)) < 0)
+            return r;
+        unsigned old = cluster(e);
+        put16(e + 20, 0);
+        put16(e + 26, 0);
+        put32(e + 28, 0);
+        if ((r = wr(dirf.lba, dirf.buf)) < 0 || (r = release(old)) < 0 ||
+            (r = infodone()) < 0)
+            return r;
+    } else if ((r = make(n, &e)) < 0 || (r = infodone()) < 0) {
+        return r;
+    }
+    struct file *f = &files[h];
+    start(f, first, mode == 0 ? K_READ : K_WRITE, size);
+    f->elba = dirf.lba;
+    f->eoff = (unsigned)(e - (unsigned char *)dirf.buf);
+    return h;
 }
 
 int fat_read(int h, unsigned buf, unsigned n)
 {
     int err;
-    struct file *f = handle(h, 0, &err);
+    struct file *f = handle(h, K_READ, &err);
     if (!f)
         return err;
     unsigned done = 0;
@@ -466,7 +782,7 @@ int fat_read(int h, unsigned buf, unsigned n)
 int fat_readdir(int h, unsigned buf)
 {
     int err;
-    struct file *f = handle(h, 1, &err);
+    struct file *f = handle(h, K_DIR, &err);
     if (!f)
         return err;
     unsigned char *e;
@@ -483,12 +799,140 @@ int fat_readdir(int h, unsigned buf)
     return 1;
 }
 
+// n bytes written to the file f opened to write: from the C code's
+// memory at src, or when src is 0 from the words at the word address buf,
+// bits 7..0 of each. A cluster is taken when the first byte of it is
+// written, and a sector written when it is full. The bytes written, or
+// an error: E_FULL only when none was.
+static int put(struct file *f, const unsigned char *src, unsigned buf, unsigned n)
+{
+    unsigned bytes = vol.spc * 512, done = 0;
+    unsigned char *b = (unsigned char *)f->buf;
+    while (done < n) {
+        unsigned at = f->pos & 511;
+        int r;
+        if (at == 0 && f->lba == ~0u) {
+            // A new sector, in a new cluster at the start of one
+            if (f->clus == 0 || f->pos - f->cpos == bytes) {
+                unsigned c;
+                if ((r = search(&c)) < 0 || (r = take(f->clus, c)) < 0)
+                    return r == E_FULL && done ? (int)done : r;
+                if (f->clus)
+                    f->cpos += bytes;
+                else
+                    f->first = c;
+                f->clus = c;
+            }
+            f->lba = vol.data + (f->clus - 2) * vol.spc + (f->pos - f->cpos) / 512;
+            for (int k = 0; k < 128; k++)
+                f->buf[k] = 0;
+        }
+        unsigned k = 512 - at;
+        if (k > n - done)
+            k = n - done;
+        for (unsigned i = 0; i < k; i++)
+            b[at + i] = src ? src[done + i] : (unsigned char)nice_peek(buf + done + i);
+        if (at + k == 512) {
+            if ((r = wr(f->lba, f->buf)) < 0)
+                return r;
+            f->lba = ~0u;
+        }
+        f->pos += k;
+        done += k;
+    }
+    return (int)done;
+}
+
+int fat_write(int h, unsigned buf, unsigned n)
+{
+    int err;
+    struct file *f = handle(h, K_WRITE, &err);
+    if (!f)
+        return err;
+    return put(f, 0, buf, n);
+}
+
+// A file opened to write is finished: its last sector, then its first
+// cluster and its size in its entry, then FSInfo. The handle is closed
+// also after an error.
 int fat_close(int h)
 {
     if (h < 0 || h >= FILES || !files[h].open)
         return E_HANDLE;
-    files[h].open = 0;
+    struct file *f = &files[h];
+    f->open = 0;
+    if (f->kind != K_WRITE)
+        return 0;
+    if (!valid())
+        return E_CHANGED;
+    int r;
+    if (f->lba != ~0u && (r = wr(f->lba, f->buf)) < 0)
+        return r;
+    unsigned char *e = (unsigned char *)sec + f->eoff;
+    if ((r = fat_sd_read(f->elba, sec)) < 0)
+        return r;
+    put16(e + 20, f->first >> 16);
+    put16(e + 26, f->first);
+    put32(e + 28, f->pos);
+    if ((r = wr(f->elba, sec)) < 0)
+        return r;
+    return infodone();
+}
+
+// The checksum of an 8.3 name that its long-name entries hold
+static unsigned char sum(const unsigned char *n)
+{
+    unsigned char s = 0;
+    for (int k = 0; k < 11; k++)
+        s = (unsigned char)(((s & 1) << 7) + (s >> 1) + n[k]);
+    return s;
+}
+
+// The entry of the folder at the offset off, at the pointer that dirf's
+// buffer has it, read from the start of the folder when it is before
+// dirf's position. 0, or an error.
+static int at(unsigned off, unsigned char **p)
+{
+    if (off < dirf.cpos)
+        start(&dirf, vol.dir, K_DIR, 0);
+    dirf.pos = off;
+    int r = seek(&dirf);
+    if (r)
+        return r < 0 ? r : E_BADFAT;
+    *p = (unsigned char *)dirf.buf + (off & 511);
     return 0;
+}
+
+// A file deleted: its long-name entries marked free, then its entry, each
+// sector written as it changes, then its clusters freed, then FSInfo
+int fat_delete(unsigned name)
+{
+    unsigned char n[11], *e;
+    int r = mounted();
+    if (r < 0 || (r = name83(name, n)) < 0 || (r = find(vol.dir, n, &e)) < 0)
+        return r;
+    if (r == 0)
+        return E_NOFILE;
+    if ((r = writable(e)) < 0)
+        return r;
+    unsigned first = cluster(e), lfn = dirf.lfn, off = dirf.pos - 32;
+    unsigned char s = sum(e);
+    for (unsigned q = lfn; lfn != ~0u && q < off; q += 32) {
+        unsigned char *p;
+        if ((r = at(q, &p)) < 0)
+            return r;
+        if (p[11] == 0x0F && p[13] == s) {
+            p[0] = 0xE5;
+            if ((r = wr(dirf.lba, dirf.buf)) < 0)
+                return r;
+        }
+    }
+    if ((r = at(off, &e)) < 0)
+        return r;
+    e[0] = 0xE5;
+    if ((r = wr(dirf.lba, dirf.buf)) < 0 || (r = release(first)) < 0)
+        return r;
+    return infodone();
 }
 
 // fat_dir: the folder FOLDER of the card, for the monitor's dir command:
@@ -515,7 +959,7 @@ int fat_dir(int slot)
     if (r < 0)
         return r;
     struct file d;
-    start(&d, vol.dir, 1, 0);
+    start(&d, vol.dir, K_DIR, 0);
     unsigned char *e;
     unsigned nfiles = 0, ndirs = 0;
     nice_print("Directory of " FOLDER "\r\n");
@@ -591,7 +1035,7 @@ int fat_load(int h, unsigned end, unsigned stats)
     static unsigned char line[LINE_MAX + 2];
     unsigned words = 0, lo = ~0u, hi = 0, bad = 0, first = 0, number = 0;
     int len = 0, last = 0, err;
-    struct file *f = handle(h, 0, &err);
+    struct file *f = handle(h, K_READ, &err);
     if (!f)
         return err;
     for (;;) {
@@ -645,5 +1089,34 @@ int fat_load(int h, unsigned end, unsigned stats)
     nice_poke(stats + 2, hi);
     nice_poke(stats + 3, bad);
     nice_poke(stats + 4, first);
+    return 0;
+}
+
+// fat_save: the n words from the word address addr written to the file h,
+// opened to write, as lines of ADDR WORD in 8 hex digits each, in lower
+// case, ended by LF, as niceasm writes a .bin file. 0, or an error, E_FULL
+// too when the card filled up.
+int fat_save(int h, unsigned addr, unsigned n)
+{
+    static const char digits[] = "0123456789abcdef";
+    unsigned char line[18];
+    int err;
+    struct file *f = handle(h, K_WRITE, &err);
+    if (!f)
+        return err;
+    for (unsigned i = 0; i < n; i++, addr++) {
+        unsigned w = nice_peek(addr);
+        for (int k = 0; k < 8; k++) {
+            line[k] = (unsigned char)digits[addr >> (28 - 4 * k) & 15];
+            line[9 + k] = (unsigned char)digits[w >> (28 - 4 * k) & 15];
+        }
+        line[8] = ' ';
+        line[17] = '\n';
+        int r = put(f, line, 0, sizeof line);
+        if (r < 0)
+            return r;
+        if (r != (int)sizeof line)
+            return E_FULL;
+    }
     return 0;
 }

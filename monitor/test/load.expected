@@ -2,13 +2,13 @@ NiceMon V9.9
 ? lists the commands
 > l
 ADDR WORD in hex on each line, as in a .bin file; an empty line ends
-Words loaded: 735, 00008000 to 0001EFFF
+Words loaded: 739, 00008000 to 0001EFFF
 Lines skipped: 6, first line 2; ADDR WORD in hex, ADDR 00008000 to 0001EFFF
 > l
 ADDR WORD in hex on each line, as in a .bin file; an empty line ends
 Words loaded: 0
 > r
-Hello from 00008000, table 00010001
+Hello from 00008000, table 00010002
 at column 40
 on the line only
 Returned 0000002A
@@ -25,13 +25,13 @@ Screen:
 |? lists the commands
 |> l
 |ADDR WORD in hex on each line, as in a .bin file; an empty line ends
-|Words loaded: 735, 00008000 to 0001EFFF
+|Words loaded: 739, 00008000 to 0001EFFF
 |Lines skipped: 6, first line 2; ADDR WORD in hex, ADDR 00008000 to 0001EFFF
 |> l
 |ADDR WORD in hex on each line, as in a .bin file; an empty line ends
 |Words loaded: 0
 |> r
-|Hello from 00008000, table 00010001
+|Hello from 00008000, table 00010002
 |                                        at column 40
 |Returned 0000002A
 |> d 9000 4

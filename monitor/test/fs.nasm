@@ -1,12 +1,13 @@
-; The test of the file entries, fs_mount, fs_open, fs_read, fs_readdir,
-; and fs_close, of table 1.1 (README.md, "Files"), a program at 0x8000
-; that calls them through the stubs of mon.nasm, which the Makefile joins
-; after it. Slot 0 has test/fat_image.py's fat32.img, and slot 1 its
-; super.img. The program stores the result of each call at FST_RESULTS,
-; which the test dumps, with the bytes that fs_read wrote at FST_BUF and
-; the entry that fs_readdir wrote at FST_ENTRY:
+; The test of the file entries that read, fs_mount, fs_open, fs_read,
+; fs_readdir, and fs_close, of table 1.1 (README.md, "Files"), a program
+; at 0x8000 that calls them through the stubs of mon.nasm, which the
+; Makefile joins after it; test/fsw.nasm tests those that write. Slot 0
+; has test/fat_image.py's fat32.img, and slot 1 its super.img. The
+; program stores the result of each call at FST_RESULTS, which the test
+; dumps, with the bytes that fs_read wrote at FST_BUF and the entry that
+; fs_readdir wrote at FST_ENTRY:
 ;
-;  0  mon_version, 0x00010001, table 1.1
+;  0  mon_version, 0x00010002, table 1.2
 ;  1  fs_open of HELLO.BIN, 0, which mounts slot 0
 ;  2  fs_open of frag.bin, in lower case, 1
 ;  3  fs_open of KEEP.TXT, -23, too many open files
@@ -27,7 +28,7 @@
 ; 18  fs_open of NOFILE, -21, no such file
 ; 19  fs_open of TOOLONGNAME, -20, not an 8.3 name
 ; 20  fs_open of A.B.C, -20
-; 21  fs_open with mode 1, -25, no such mode
+; 21  fs_open with mode 3, -25, no such mode
 ; 22  fs_mount of slot 1, 0, which closes the files
 ; 23  fs_close of handle 0, -24
 ; 24  fs_open of HELLO.BIN on super.img, 0
@@ -134,7 +135,7 @@ fst_dir_end
                 CALL    _fs_open
                 MOVE    @R7++, R1
                 MOVE    R1, FST_HELLO
-                MOVE    R2, 1
+                MOVE    R2, 3
                 CALL    _fs_open
                 MOVE    @R7++, R1
 ; Mounts

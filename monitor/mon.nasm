@@ -21,6 +21,8 @@ FS_OPEN         .EQU    0x14
 FS_READ         .EQU    0x16
 FS_READDIR      .EQU    0x18
 FS_CLOSE        .EQU    0x1A
+FS_WRITE        .EQU    0x1C
+FS_DELETE       .EQU    0x1E
 
 _mon_reset
                 JMP     MON_RESET
@@ -50,6 +52,10 @@ _fs_readdir
                 JMP     FS_READDIR
 _fs_close
                 JMP     FS_CLOSE
+_fs_write
+                JMP     FS_WRITE
+_fs_delete
+                JMP     FS_DELETE
 _scr_getx
                 JMP     SCR_GETXY
 _scr_gety

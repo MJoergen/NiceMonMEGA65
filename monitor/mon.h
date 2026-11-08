@@ -40,21 +40,23 @@ int scr_gety(void);
 // old one.
 unsigned scr_color(unsigned color);
 
-// The files of the SD card's FAT32 file system, from table 1.1
-// (monitor/README.md, "Files"). The addresses are NICE word addresses, not
-// C pointers: a name is one character per word up to a 0 word, and
-// fs_read writes one byte per word, so a C program passes the address of
-// words outside its memory, which it reads with nice_peek. An error is
-// negative: -1 to -8 those of the SD controller, and -16 on those of
-// fat32.c.
+// The files of the SD card's FAT32 file system, from table 1.1, and
+// fs_write and fs_delete from table 1.2 (monitor/README.md, "Files"). The
+// addresses are NICE word addresses, not C pointers: a name is one
+// character per word up to a 0 word, and fs_read and fs_write take one
+// byte per word, so a C program passes the address of words outside its
+// memory, which it reads with nice_peek and writes with nice_poke. An
+// error is negative: -1 to -8 those of the SD controller, and -16 on
+// those of fat32.c.
 
 // The card in a slot mounted, and the files that were open closed. 0, or
 // an error.
 int fs_mount(unsigned slot);
 
 // A file of the folder NICE of the card's root directory opened, with
-// mode 0 to read, or with mode 2 the folder itself, whose name is empty
-// or /. Two may be open at once. A handle, 0 or 1, or an error.
+// mode 0 to read, with mode 1 to write, made or truncated (table 1.2), or
+// with mode 2 the folder itself, whose name is empty or /. Two may be
+// open at once. A handle, 0 or 1, or an error.
 int fs_open(unsigned name, int mode);
 
 // Up to n bytes of a file read, one per word from buf. The number read, 0
@@ -66,7 +68,17 @@ int fs_read(int handle, unsigned buf, unsigned n);
 // from bits 7..0, and the size. 1, 0 at the end, or an error.
 int fs_readdir(int handle, unsigned buf);
 
-// A file or directory closed. 0, or an error.
+// A file or directory closed; a file opened to write is finished, its
+// size written. 0, or an error.
 int fs_close(int handle);
+
+// Up to n bytes written to a file opened to write, from bits 7..0 of the
+// words from buf. The number written, fewer when the card is full, or an
+// error. Table 1.2.
+int fs_write(int handle, unsigned buf, unsigned n);
+
+// A file of the folder NICE deleted, with its long name. 0, or an error.
+// Table 1.2.
+int fs_delete(unsigned name);
 
 #endif

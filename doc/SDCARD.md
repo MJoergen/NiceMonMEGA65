@@ -8,8 +8,9 @@ the controller in SPI mode (#55), and the boards' slots and `make hwtest`
 [SYSTEM.md](SYSTEM.md); where this note differs from them, they are right.
 The ROM's sector routines and its `sd` command (#57) are written too, in
 V1.7.1, and [monitor/README.md](../monitor/README.md) describes them,
-and so is FAT32's reading, with `dir` and `load` (#58), in V1.9, in C.
-Writing, BASIC, and the host tools are not written yet. Its end is `SAVE`,
+and so is FAT32's reading, with `dir` and `load` (#58), in V1.9, in C,
+and its writing, with `save` and `del` (#59), in V1.9.1. BASIC and the
+host tools are not written yet. Its end is `SAVE`,
 `LOAD`, and `DIR` in the BASIC of #54, and on the way it gives the monitor of #24 a way to load and save programs. The
 tracking issue is #62, and its subtasks are listed at the end.
 
@@ -299,19 +300,38 @@ and must be formatted. FAT12 and FAT16 are rejected with a message.
   cores on the MEGA65, each with a root folder of its own. A card without
   it is refused, with no fallback to the root, and the ROM never creates
   it, so writing (#59) happens only in a folder that the user made.
-- **Writing**, in an order that a reset at any point leaves no worse than a
-  lost cluster: the data, then both copies of the FAT, then the directory
-  entry. A new cluster is searched from FSInfo's next-free hint, as the FAT
-  of a 32 GB card has about four million entries. FSInfo's free count is
-  set to unknown, `0xFFFFFFFF`, which every FAT driver accepts.
+- **Writing**, in an order that a reset at any point leaves no worse than
+  lost clusters, which `fsck.fat` frees. A file opened to write gets its
+  directory entry at once, empty, with no clusters; an existing file is
+  truncated so, the entry first and then its clusters freed. The file's
+  clusters are taken as its data reaches them, each marked as the end of
+  the chain in both copies of the FAT before the one before it is linked
+  to it, and its data written; only the close puts the first cluster and
+  the size into the entry. A deletion marks the long-name entries, then
+  the entry, then frees the clusters. A new cluster is searched from
+  FSInfo's next-free hint, as the FAT of a 32 GB card has about four
+  million entries, and a deletion moves the hint back to the clusters it
+  freed. Before the first change of the FAT after a mount, FSInfo's free
+  count is set to unknown, `0xFFFFFFFF`, which every FAT driver accepts,
+  and `fsck.fat` reports as uninitialized. A new file has the date
+  1980-01-01, as the boards have no clock of the time of day yet
+  (MJoergen/nice_cpu#122). A folder that is full grows by a cluster of
+  zeros, written before it is linked, up to 65536 entries.
 - **Safety**: the ROM writes only inside the partition, never the MBR or
   the boot sector, and refuses a card whose FAT32 boot sector does not
   check.
 - **Caches**: one sector of the FAT and one per open file, in the ROM's
   variables at `0xFFFFF000`. Two files open at once, a read and a write,
   are enough for BASIC and the monitor. "Changed" in the status drops the
-  caches and the mount. The caches are write-through, so the card always
-  holds what the caches hold, and `sd_read` reads what FAT32 wrote.
+  caches and the mount. The FAT's cache and the directory's are
+  write-through. A file's sector is written when it is full and at the
+  close, so that a program that writes a line at a time, as BASIC's
+  `SAVE` does, does not write each sector many times; after the close,
+  the card holds what the caches hold, and `sd_read` reads what FAT32
+  wrote.
+- **Open files**: a file open to write may not be opened again, and a
+  file open at all may not be truncated or deleted. A read-only file is
+  neither written nor deleted, and no directory is deleted.
 
 ## The ROM
 
@@ -355,15 +375,15 @@ program cannot do without it, as for state that the monitor keeps. So:
 - **FAT32** goes in the ROM, as the monitor's own commands need it. Its
   state, the mounted card and the caches, is state that the monitor keeps,
   so the file API gets entries in the table, from 9 on, in the C ABI, with
-  a negative result for an error, and the table becomes 1.1 with them
-  (#58, and `fs_write` and `fs_delete` with #59):
+  a negative result for an error. The table became 1.1 with the first
+  five (#58), and 1.2 with `fs_write` and `fs_delete` (#59):
 
 | Entry | Arguments | Result |
 |---|---|---|
 | `fs_mount` | R1 the slot | 0, or an error |
 | `fs_open` | R1 the name, one character per word up to a 0 word; R2 the mode: 0 read, 1 write (create or truncate), 2 the directory | a handle |
 | `fs_read` | R1 the handle, R2 the buffer, R3 the number of bytes | the bytes read, one per word; 0 at the end |
-| `fs_write` | R1 the handle, R2 the buffer, R3 the number of bytes | the bytes written |
+| `fs_write` | R1 the handle, R2 the buffer, R3 the number of bytes, one per word | the bytes written, fewer when the card is full |
 | `fs_close` | R1 the handle | 0, or an error |
 | `fs_readdir` | R1 the handle of a directory, R2 a buffer of 4 words | 1 with the 8.3 name, the size, and the attributes in the buffer, or 0 at the end |
 | `fs_delete` | R1 the name | 0, or an error |
@@ -440,6 +460,6 @@ ROM is developed in niceemu and needs no board.
 | #57 | Done in V1.7.1: the sector routines in the ROM, and the monitor's `sd` command |
 | #58 | Done in V1.9: FAT32 reading, `dir`, and `load` |
 | #91 | Done in V1.9: the folder `NICE`, set at build time |
-| #59 | In V1.9.1: FAT32 writing, `save`, and `del` |
+| #59 | Done in V1.9.1: FAT32 writing, `save`, and `del` |
 | #60 | BASIC's `SAVE`, `LOAD`, and `DIR` |
 | #61 | In V1.9.1: host tools for files on the board's card, over the link |

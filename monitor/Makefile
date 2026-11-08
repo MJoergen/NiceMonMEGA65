@@ -37,9 +37,9 @@ ROM_C    = rom.c fat32.c
 RUNTIME_ROM = $(RUNTIME)/lib.nasm $(RUNTIME)/muldiv_mpu.nasm
 # The options of nicebuild.py --ram (nice_cpu's translator README), but
 # that every function that is not static is exported, for the monitor's
-# assembly, nothing needs a main, and -Os, which makes the code a fifth
-# smaller than -O2. The stack is nicebuild's 4096 bytes.
-ROM_CFLAGS = --target=wasm32 -mbulk-memory -mtail-call -Os -ffreestanding -fvisibility=default \
+# assembly, nothing needs a main, and -Oz, which makes the code more than a
+# quarter smaller than -O2. The stack is nicebuild's 4096 bytes.
+ROM_CFLAGS = --target=wasm32 -mbulk-memory -mtail-call -Oz -ffreestanding -fvisibility=default \
              -nostdlibinc -isystem $(LIBC)/include -nostdlib -Wl,--no-entry \
              -Wl,--export-dynamic -Wl,--allow-undefined -Wl,--stack-first \
              -Wl,--export=__heap_base -Wl,-z,stack-size=4096 -DFOLDER='"$(FOLDER_UC)"'
@@ -174,10 +174,15 @@ $(BUILD)/fs.bin: test/fs.nasm mon.nasm $(TOOLS) | $(BUILD)
 	@cat test/fs.nasm mon.nasm > $(BUILD)/fs_all.nasm
 	@$(ASM) -o $@ $(BUILD)/fs_all.nasm
 
+# The test of the file entries that write, test/fsw.nasm, built as fs.bin
+$(BUILD)/fsw.bin: test/fsw.nasm mon.nasm $(TOOLS) | $(BUILD)
+	@cat test/fsw.nasm mon.nasm > $(BUILD)/fsw_all.nasm
+	@$(ASM) -o $@ $(BUILD)/fsw_all.nasm
+
 # The FAT images of the tests, from test/fat_image.py, with build/hello.bin
 # as HELLO.BIN. They need mkfs.fat, sfdisk, and mtools.
 FAT_IMAGES = $(addprefix $(BUILD)/fat/,fat32.img super.img fat16.img exfat.img nonice.img \
-                                    nicefile.img)
+                                    nicefile.img full.img)
 $(FAT_IMAGES) &: test/fat_image.py $(BUILD)/hello.bin
 	@mkdir -p $(BUILD)/fat
 	@$(PYTHON) test/fat_image.py $(BUILD)/hello.bin $(BUILD)/fat
@@ -270,6 +275,17 @@ FAT1 = dir\rh\r
 # nicefile.img in slot 1, whose NICE is a file, which dir and load reject
 # with error 29, and never fall back to the root's HELLO.BIN
 FATNONE = dir\rload hello.bin\rdir 1\rload hello.bin\rh\r
+# fatw: a copy of super.img in slot 0 and of full.img in slot 1. l writes
+# two words, which save writes to test.bin, dir lists, and load reads
+# back, and d shows. save of 0 words truncates HELLO.BIN, which load then
+# finds empty. del deletes test.bin, and a second del finds none. Then
+# the arguments that are not: save alone, with a name only, with no
+# count, with a fourth word, and with an address of 9 digits, savex, a
+# name that is no 8.3 name, del alone, with two names, and delx, and de 0,
+# which is d. On full.img, save of 256 words fills the card with
+# FULL.BIN's first 1536 bytes, which dir shows, and is error 30; del
+# frees them, and a save of 2 words fits.
+FATW = l\r8000 1234ABCD\r8001 5\r\rsave test.bin 8000 2\rdir\rload TEST.BIN\rd 8000 2\rsave hello.bin 8000 0\rload hello.bin\rdel test.bin\rdel test.bin\rsave\rsave x\rsave x 8000\rsave x 8000 1 2\rsave x 123456789 1\rsavex\rSAVE toolongname.bin 8000 1\rdel\rdel a b\rdelx\rde 0\rdir 1\rsave full.bin 8000 100\rdir\rdel full.bin\rsave full.bin 8000 2\rdir\rh\r
 
 # The words of each test that are dumped with the screen: for cmds the
 # variables, the cursor's registers, and the IP and MAC addresses, and for the programs the text at
@@ -296,15 +312,20 @@ DUMP_hello_c = -d 0xFFFF0168:12
 DUMP_sd       = -d 0xFFFFFFA0:7
 DUMP_sd_write = -d 0x9100:6
 # For fs the results of test/fs.nasm's calls, the entry that fs_readdir
-# wrote, and the first 45 bytes that fs_read wrote, and for fat the
-# numbers of fat_load for load NAME
+# wrote, and the first 45 bytes that fs_read wrote, for fsw the results
+# of test/fsw.nasm's, and for fat the numbers of fat_load for load NAME
 DUMP_fs       = -d 0x9100:29 -d 0x9180:4 -d 0x9200:45
+DUMP_fsw      = -d 0x9100:42
 DUMP_fat      = -d 0xFFFFF11A:5
 # For rom the number of runs and the results of test/rom.nasm's calls
 DUMP_rom      = -d 0x9100:10
 # For arp the results of test/arp.nasm's calls, and the cache it copied
 DUMP_arp      = -d 0x9100:37
 MAX_STEPS = 10000000
+# The first sector of fat32.img's FAT32 partition (test/fat_image.py), and
+# its byte offset, for mtools
+FAT32_START = 34816
+FAT32_START_BYTES = $(shell echo $$(($(FAT32_START) * 512)))
 
 # Each test runs the monitor with its input and its program, if any, and
 # compares the console output, the dumps, and the screen with
@@ -321,7 +342,7 @@ MAX_STEPS = 10000000
 # with --step-time, as its timeouts count, and the frames it sends are
 # added to its output.
 test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.bin $(BUILD)/hello.bin \
-      $(BUILD)/dis.bin $(BUILD)/sd.bin $(BUILD)/arp.bin $(BUILD)/rom.bin $(BUILD)/fs.bin \
+      $(BUILD)/dis.bin $(BUILD)/sd.bin $(BUILD)/arp.bin $(BUILD)/rom.bin $(BUILD)/fs.bin $(BUILD)/fsw.bin \
       $(FAT_IMAGES)
 	@test '$(FOLDER_UC)' = NICE || { echo "make test needs FOLDER=NICE, not $(FOLDER)"; exit 1; }
 	@$(PYTHON) test/ring.py $(EMU) $(BUILD)/monitor_test.bin:32768 \
@@ -343,11 +364,13 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	@printf '$(FATBAD)' > $(BUILD)/fatbad.txt
 	@printf '$(FAT1)' > $(BUILD)/fat1.txt
 	@printf '$(FATNONE)' > $(BUILD)/fatnone.txt
+	@printf '$(FATW)' > $(BUILD)/fatw.txt
 	@$(PYTHON) test/sd_image.py $(BUILD)/sd.img
 	@$(PYTHON) test/sd_image.py --written $(BUILD)/sd_written.img
 	@{ printf '$(LOAD_HEAD)'; head -n 3 $(BUILD)/hello.bin | awk '{ printf "%s\r\n", $$0 }'; \
 	  tail -n +4 $(BUILD)/hello.bin; printf '$(LOAD_TAIL)'; } > $(BUILD)/load.txt
-	@fail=0; for t in cmds scroll load load_emu load_64k sd sd_write arp rom fs fat fatbad fat1 fatnone hello reset hello_c; do \
+	@fail=0; for t in cmds scroll load load_emu load_64k sd sd_write arp rom fs fsw fat fatw fatbad fat1 fatnone \
+	           hello reset hello_c; do \
 	  opts=; rom=$(BUILD)/monitor_test.bin; \
 	  case $$t in \
 	    cmds) prog=; input=cmds; dump='$(DUMP_cmds)';; \
@@ -363,8 +386,16 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	    rom) prog=; rom=$(BUILD)/rom.bin; input=rom; dump='$(DUMP_rom)';; \
 	    fs) prog=$(BUILD)/fs.bin; input=run; dump='$(DUMP_fs)'; \
 	      opts="--sd0 $(BUILD)/fat/fat32.img --sd1 $(BUILD)/fat/super.img";; \
+	    fsw) prog=$(BUILD)/fsw.bin; input=run; dump='$(DUMP_fsw)'; \
+	      cp $(BUILD)/fat/fat32.img $(BUILD)/fsw0.img; \
+	      mattrib -i $(BUILD)/fsw0.img@@$(FAT32_START_BYTES) +r ::NICE/KEEP.TXT; \
+	      rm -f $(BUILD)/fsw1.img; cp $(BUILD)/fat/super.img $(BUILD)/fsw1.img; chmod a-w $(BUILD)/fsw1.img; \
+	      opts="--sd0 $(BUILD)/fsw0.img --sd1 $(BUILD)/fsw1.img";; \
 	    fat) prog=; input=fat; dump='$(DUMP_fat)'; \
 	      opts="--sd0 $(BUILD)/fat/fat32.img --sd1 $(BUILD)/fat/super.img";; \
+	    fatw) prog=; input=fatw; dump=; \
+	      cp $(BUILD)/fat/super.img $(BUILD)/fatw0.img; cp $(BUILD)/fat/full.img $(BUILD)/fatw1.img; \
+	      opts="--sd0 $(BUILD)/fatw0.img --sd1 $(BUILD)/fatw1.img";; \
 	    fatbad) prog=; input=fatbad; dump=; \
 	      opts="--sd0 $(BUILD)/fat/fat16.img --sd1 $(BUILD)/fat/exfat.img";; \
 	    fat1) prog=; input=fat1; dump=; opts="--sd1 $(BUILD)/fat/super.img";; \
@@ -383,7 +414,13 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	    echo "exit $$status"; \
 	    if [ $$t = sd_write ]; then cmp $(BUILD)/sd_written.img $(BUILD)/sd_write.img 2>&1 \
 	      && echo "The image as test/sd_image.py --written makes it"; fi; \
-	    if [ $$t = arp ]; then echo "Frames sent:"; cat $(BUILD)/arp.eth.out; fi; } \
+	    if [ $$t = arp ]; then echo "Frames sent:"; cat $(BUILD)/arp.eth.out; fi; \
+	    if [ $$t = fsw ]; then \
+	      $(PYTHON) test/fat_check.py $(BUILD)/fsw0.img --start $(FAT32_START) NEW.TXT HELLO.BIN DROP.TXT; \
+	      cmp $(BUILD)/fat/super.img $(BUILD)/fsw1.img && echo "Slot 1's card as it was"; fi; \
+	    if [ $$t = fatw ]; then \
+	      $(PYTHON) test/fat_check.py $(BUILD)/fatw0.img HELLO.BIN; \
+	      $(PYTHON) test/fat_check.py $(BUILD)/fatw1.img FULL.BIN; fi; } \
 	    > $(BUILD)/$$t.out; \
 	  if [ $$t = rom ]; then \
 	    trap=$$(sed -n 's/^\(........\) _rom_trap$$/\1/p' $(BUILD)/rom.sym | tr a-f A-F); \
@@ -395,7 +432,7 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 # The layout of the sources, as nice_cpu's nicefmt checks it
 fmt:
 	@$(FMT) $(SOURCES) test/hello.nasm test/dis.nasm test/sd.nasm test/arp.nasm test/rom.nasm \
-	  test/fs.nasm
+	  test/fs.nasm test/fsw.nasm
 
 $(BUILD):
 	@mkdir -p $@
