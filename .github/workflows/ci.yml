@@ -102,8 +102,10 @@ jobs:
       # the OSS CAD Suite of 2026-09-30: Yosys 0.69 with the GHDL plugin,
       # SymbiYosys, and Yices 2.7.0. Its programs set up their own
       # environment. The digest is the one GitHub gives for the asset.
+      # An HTTP error is retried, and then fails with its status, so it
+      # is not saved as the archive and reported as a checksum mismatch.
       - run: |
-          curl -sSLo "$RUNNER_TEMP/oss-cad-suite.tgz" https://github.com/YosysHQ/oss-cad-suite-build/releases/download/2026-09-30/oss-cad-suite-linux-x64-20260930.tgz
+          curl --fail --retry 5 --retry-delay 30 --retry-all-errors -sSLo "$RUNNER_TEMP/oss-cad-suite.tgz" https://github.com/YosysHQ/oss-cad-suite-build/releases/download/2026-09-30/oss-cad-suite-linux-x64-20260930.tgz
           echo "9e50078dd84062bb78b19cc27a2185b9d37f8cd3d80c03242ec6d85044895fc1  $RUNNER_TEMP/oss-cad-suite.tgz" | sha256sum -c
           tar xzf "$RUNNER_TEMP/oss-cad-suite.tgz" -C "$RUNNER_TEMP"
           echo "$RUNNER_TEMP/oss-cad-suite/bin" >> "$GITHUB_PATH"
