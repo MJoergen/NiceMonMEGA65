@@ -15,7 +15,7 @@
 // it the open files, when the selected slot is no longer the mounted one,
 // or its card is not ready or has changed. fat_open mounts again when it
 // finds no mount: the slot of the last mount, or after reset slot 0, or
-// slot 1 when slot 0 has no card.
+// slot 1 when slot 0 has no card and the board has a slot 1.
 //
 // The files are those of the folder FOLDER, NICE unless the build sets
 // another (make FOLDER=NAME), as a card may be shared by several cores,
@@ -127,7 +127,8 @@ static int valid(void)
 }
 
 // What the sector in b is: 0 for a FAT32 boot sector, an error for
-// another file system, and 1 for no boot sector.
+// another file system, and 1 for no boot sector, or one without the 55 AA
+// signature.
 static int kind(const unsigned char *b)
 {
     static const char exfat[8] = "EXFAT   ";
@@ -137,13 +138,22 @@ static int kind(const unsigned char *b)
     if (ex)
         return E_EXFAT;
     unsigned spc = b[13], rsvd = u16(b + 14), nfats = b[16];
-    if ((b[0] != 0xEB && b[0] != 0xE9) || u16(b + 11) != 512 || spc == 0 ||
-        (spc & (spc - 1)) || rsvd == 0 || nfats == 0)
-        return 1;
-    unsigned rootsecs = (u16(b + 17) * 32 + 511) / 512;
     unsigned fatsz = u16(b + 22) ? u16(b + 22) : u32(b + 36);
     unsigned total = u16(b + 19) ? u16(b + 19) : u32(b + 32);
-    unsigned meta = rsvd + nfats * fatsz + rootsecs;
+    if ((b[0] != 0xEB && b[0] != 0xE9) || u16(b + 11) != 512 || spc == 0 ||
+        (spc & (spc - 1)) || rsvd == 0 || nfats == 0 || fatsz == 0 ||
+        b[510] != 0x55 || b[511] != 0xAA)
+        return 1;
+    // The sectors before the data, the reserved ones, the FATs, and FAT12
+    // and FAT16's root directory, must leave room for the data. A damaged
+    // sector can say FATs of billions of sectors, so the FATs are checked
+    // against the room before their size is summed, which could wrap and
+    // let a cluster count past the volume through.
+    unsigned rootsecs = (u16(b + 17) * 32 + 511) / 512;
+    unsigned fixed = rsvd + rootsecs;
+    if (total <= fixed || fatsz > (total - fixed) / nfats)
+        return E_NOFS;
+    unsigned meta = fixed + nfats * fatsz;
     if (total <= meta)
         return E_NOFS;
     unsigned clusters = (total - meta) / spc;
@@ -371,7 +381,9 @@ static void start(struct file *f, unsigned first, int dir, unsigned size)
 }
 
 // A mount, the one that stands, or a new one of the slot of the last, or
-// after reset of slot 0, or of slot 1 when slot 0 has no card
+// after reset of slot 0, or of slot 1 when slot 0 has no card and the
+// board has a slot 1, as the MEGA65 has and the Nexys4DDR has not; on a
+// board with one slot, slot 0's error stands
 static int mounted(void)
 {
     if (valid())
@@ -379,7 +391,7 @@ static int mounted(void)
     int r;
     if (vol.ever)
         r = mount(vol.slot);
-    else if ((r = mount(0)) == E_NOCARD)
+    else if ((r = mount(0)) == E_NOCARD && nice_peek(SD_SLOTS) > 1)
         r = mount(1);
     return r;
 }

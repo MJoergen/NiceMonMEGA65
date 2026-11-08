@@ -48,7 +48,12 @@ VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo unkn
 # (fat32.c, README.md, "Files"): NICE, or with make FOLDER=NAME another
 # 8.3 name of 1 to 8 letters, digits, _, and -, in either case. It reaches
 # the C code as the define FOLDER, and build/folder.nasm as the text of
-# error 29. The tests need NICE.
+# error 29. The tests need NICE. A FOLDER of the environment is passed
+# over, as a shell may well export one of that common name for something
+# else; the name counts on the command line, make FOLDER=NAME, alone.
+ifeq ($(origin FOLDER),environment)
+FOLDER  := NICE
+endif
 FOLDER  ?= NICE
 FOLDER_UC := $(shell echo '$(FOLDER)' | tr a-z A-Z)
 ifneq ($(shell echo '$(FOLDER_UC)' | grep -Ex '[A-Z0-9_-]{1,8}'),$(FOLDER_UC))

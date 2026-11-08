@@ -79,7 +79,7 @@ Checks, in this order:
       sector 0, and a card with another file system, exFAT or NTFS, or a
       GPT, are named after NOT COVERED.
     - for each card with a FAT32 file system, as the monitor finds it: the
-      monitor of the tests, with dir SLOT, lists the root directory as the
+      monitor of the tests, with dir SLOT, lists the folder NICE as the
       host lists it from the sectors read over the link (issue #58)
     - the C example examples/build/primes.bin runs, and after its halt the
       microsecond counter holds the cycle counter's count over the clock

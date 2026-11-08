@@ -947,7 +947,11 @@ writes, and nice_cpu sets its budget for the core's ports from them.
 A timing miss is a result, and the red badge is committed, beside the
 other board's. A failed build
 or test is not: the submodule goes back to where it was, and nothing is
-written. The script pushes only with `ARGS=--push`, for a push publishes
+written. A board built before the failure keeps its measurement in its
+`build/bump.json`, with the tag and the commits, and the next run of the
+same bump reads it instead of building that board again, so a failure of
+the Nexys4DDR's build does not cost the R6's. The script pushes only with
+`ARGS=--push`, for a push publishes
 the badges. `tools/bump.py V1.0 --reports synth/r6/build
 --nexys-reports synth/nexys4ddr/build` prints the files for the reports
 of earlier builds, and changes nothing. Vivado

@@ -27,6 +27,10 @@ A timing miss is a result: the red badge is written and committed, and the
 other board's badge is as its own build says. A failure of a build or of
 the tests is not: the submodule goes back to where it was,
 and nothing is written, for the badge must never claim what was not measured.
+A board that was built before the failure keeps its measurement in
+synth/TARGET/build/bump.json, with the tag and the two commits, and the
+next run of the same bump takes it from there instead of building the
+board again; a run with another tag or commit builds, and removes it.
 
 nice_cpu's tags are Vmajor.minor (V1.0, V1.1, ...; nice_cpu's
 release/RELEASE.md, "Version names"), and the submodule pins only those,
@@ -264,15 +268,55 @@ def summarize(r: Record) -> Record:
             "wpws_ns": r["wpws_ns"], "met": badge("x", r)["color"] == "brightgreen"}
 
 
-def measure(target: str) -> tuple[Record, list[Record]]:
+def kept(target: str) -> str:
+    """The file in the board's build directory that keeps its measurement
+    for the next run of the same bump, with the key of the run that made it."""
+    return os.path.join(REPO, "synth", target, "build", "bump.json")
+
+
+def load_kept(target: str, key: Record) -> Record | None:
+    """The measurement that a run with the same key kept, or None."""
+    text = read(kept(target))
+    if text is None:
+        return None
+    try:
+        k: Record = json.loads(text)
+    except ValueError:
+        return None
+    return k if isinstance(k, dict) and k.get("key") == key else None
+
+
+def measured(key: Record) -> list[str]:
+    """The targets whose measurement a run with the key kept."""
+    return [b["target"] for b in BOARDS if load_kept(b["target"], key) is not None]
+
+
+def measure(target: str, key: Record) -> tuple[Record, list[Record]]:
     """Builds the board with each flow until one meets timing; returns the
-    last, and all."""
+    last, and all. The result is kept in the build directory under key,
+    the tag and the commits, and a run with the same key takes it from
+    there, so that a failure of a later board does not cost this board's
+    build again. A build removes the file first, and a run with another
+    key builds, so the file never claims what was not measured."""
     attempts: list[Record] = []
+    k = load_kept(target, key)
+    if k is not None:
+        print("+ %s was measured by an earlier run of this bump; its reports "
+              "are in synth/%s/build" % (target, target), flush=True)
+        result: Record = k["result"]
+        attempts = k["attempts"]
+        return result, attempts
+    try:
+        os.remove(kept(target))
+    except OSError:
+        pass
     for flow in FLOWS:
         r = build(target, flow)
         attempts.append(summarize(r))
         if attempts[-1]["met"]:
             break
+    with open(kept(target), "w") as f:
+        f.write(dump({"key": key, "result": r, "attempts": attempts}))
     return r, attempts
 
 
@@ -305,6 +349,7 @@ def main() -> None:
         return
 
     old = None
+    key: Record | None = None
     try:
         check_tree()
         old = run(["git", "-C", "nice_cpu", "rev-parse", "HEAD"], capture=True)
@@ -313,11 +358,18 @@ def main() -> None:
         # CLAUDE.md: after a bump, niceemu is rebuilt, and the tests run
         run(["make", "-C", "nice_cpu/emulator", "build"])
         run(["make", "-j", "test"])
-        results = [measure(board["target"]) for board in BOARDS]
+        # What a kept measurement must have been made from: the tag, and the
+        # commits of the submodule and of the clean tree
+        key = {"tag": tag, "nice_cpu_commit": nice_commit, "repo_commit": repo_commit}
+        results = [measure(board["target"], key) for board in BOARDS]
     except Failed as e:
         if old:
             subprocess.run(["git", "checkout", "--quiet", old], cwd=NICE)
-            sys.exit("bump: %s; nice_cpu is back at %s and nothing is written" % (e, old[:7]))
+            done = measured(key) if key else []
+            keeps = ("; %s keeps its measurement for the next run of this bump"
+                     % " and ".join(done) if done else "")
+            sys.exit("bump: %s; nice_cpu is back at %s and nothing is written%s"
+                     % (e, old[:7], keeps))
         sys.exit("bump: %s; nothing is changed" % e)
 
     badges = [badge(tag, r, board["label"]) for board, (r, _) in zip(BOARDS, results)]

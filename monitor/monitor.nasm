@@ -1210,9 +1210,8 @@ load_pend
                 SUB     @V_PEND, R1, VARS_WORDS
                 RET
 
-; dir [SLOT]: the root directory of the card in SLOT, in hex, mounted
-; first, or of the card mounted, with fat_dir of fat32.c. R2 points after
-; the d.
+; dir [SLOT]: the folder NICE of the card in SLOT, in hex, mounted first,
+; or of the card mounted, with fat_dir of fat32.c. R2 points after the d.
 cmd_dir
                 MOVE    R1, @R2++
                 OR      R1, @R2++, 0x20  ; R as r
@@ -1243,7 +1242,7 @@ dir_bad
                 CALL    puts_crlf
                 JMP     main
 
-; load NAME: the .bin file NAME of the card's root directory, read with
+; load NAME: the .bin file NAME of the card's folder NICE, read with
 ; fat_load of fat32.c, which writes its words as l does, and shown as l
 ; shows its lines. R2 points after the l.
 cmd_fload

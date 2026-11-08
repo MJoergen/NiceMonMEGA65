@@ -52,9 +52,9 @@ unsigned scr_color(unsigned color);
 // an error.
 int fs_mount(unsigned slot);
 
-// A file of the root directory opened, with mode 0 to read, or with mode
-// 2 the root directory itself, whose name is empty or /. Two may be open
-// at once. A handle, 0 or 1, or an error.
+// A file of the folder NICE of the card's root directory opened, with
+// mode 0 to read, or with mode 2 the folder itself, whose name is empty
+// or /. Two may be open at once. A handle, 0 or 1, or an error.
 int fs_open(unsigned name, int mode);
 
 // Up to n bytes of a file read, one per word from buf. The number read, 0

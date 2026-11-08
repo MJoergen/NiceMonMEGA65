@@ -133,8 +133,8 @@ def add_arguments(parser: argparse.ArgumentParser
     line = nicelink.add_arguments(parser)
     line.add_argument("--eth", metavar="HOST[:PORT]",
                       help="talk to the board over TCP on its Ethernet "
-                      f"port, at HOST (default port {ETH_PORT}), not on "
-                      "its UART")
+                      "port, at HOST, a name or an IPv4 address (default "
+                      f"port {ETH_PORT}), not on its UART")
     line.add_argument("--cosim", type=int, metavar="PORT",
                       help="talk to the simulated system of make -C sim "
                       "cosim on port PORT of 127.0.0.1, not to the board; "
@@ -149,7 +149,7 @@ def open_link(args: argparse.Namespace) -> Link:
         link = Link(Cosim(args.cosim))
     elif getattr(args, "eth", None) is not None:
         host, _, port = args.eth.partition(":")
-        if port and not port.isdigit():
+        if not host or (port and not port.isdigit()):
             fail(f"{args.eth} is not HOST or HOST:PORT")
         link = Link(Eth(int(port) if port else ETH_PORT, host))
     else:

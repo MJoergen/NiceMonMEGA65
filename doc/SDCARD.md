@@ -369,7 +369,8 @@ program cannot do without it, as for state that the monitor keeps. So:
 | `fs_delete` | R1 the name | 0, or an error |
 
   A file is opened on the slot of the last `fs_mount`. The first `fs_open`
-  after reset mounts slot 0, or slot 1 when slot 0 has no card.
+  after reset mounts slot 0, or slot 1 when slot 0 has no card and the
+  board has a slot 1.
 - **The monitor's commands**: `sd` dumps a sector, for the bring-up;
   `dir`; `load NAME` reads a program in the `.bin` text format, address and
   word pairs, which is what the tools build, so a program goes to the card

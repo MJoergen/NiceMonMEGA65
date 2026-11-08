@@ -150,8 +150,9 @@ board:
   Microsoft's specification says.
 - **The mount**: `fs_mount` mounts the card in a slot. `fs_open`, `dir`,
   and `load` mount the slot of the last mount when there is none, or
-  after reset slot 0, or slot 1 when slot 0 has no card. The mount, and
-  the files open, are dropped when the selected slot is no longer the
+  after reset slot 0, or slot 1 when slot 0 has no card and the board
+  has a slot 1, as the MEGA65 has and the Nexys4DDR has not. The mount,
+  and the files open, are dropped when the selected slot is no longer the
   mounted one, as after `sd` on the other slot, or the card there is not
   ready or has changed. A mount of a slot that the system does not have
   changes nothing.
