@@ -9,8 +9,10 @@ the controller in SPI mode (#55), and the boards' slots and `make hwtest`
 The ROM's sector routines and its `sd` command (#57) are written too, in
 V1.7.1, and [monitor/README.md](../monitor/README.md) describes them,
 and so is FAT32's reading, with `dir` and `load` (#58), in V1.9, in C,
-and its writing, with `save` and `del` (#59), in V1.9.1. BASIC and the
-host tools are not written yet. Its end is `SAVE`,
+and its writing, with `save` and `del` (#59), in V1.9.1. The host tool
+`tools/sdcard.py` lists the card and copies its files to the host
+(#61, its first step), in V1.9.1; its writing and BASIC are not written
+yet. Its end is `SAVE`,
 `LOAD`, and `DIR` in the BASIC of #54, and on the way it gives the monitor of #24 a way to load and save programs. The
 tracking issue is #62, and its subtasks are listed at the end.
 
@@ -420,6 +422,9 @@ numbers and no Commodore DOS, as #54 says.
 - **The board**: `make hwtest` reads sector 0 of each card that is present
   and checks its `55AA`, and reads the FAT32 boot sector. It never writes,
   as the card is the user's. A slot with no card is NOT COVERED.
+- **The host tool**: `make sdtest` runs `tools/sdcard.py` on `niceemu
+  --link` with images made by `mkfs.fat`, `sfdisk`, and `mcopy`, on a held
+  core and on a running one that has the card in use.
 
 ## Not included
 
@@ -445,6 +450,9 @@ numbers and no Commodore DOS, as #54 says.
 4. **Host tools**: a host could read and write the board's card over the
    link while the core is paused, through these registers, and run a FAT
    library on the host, so that a file goes to the card with no PC slot.
+   Settled by #61: `tools/sdcard.py`, with its own FAT32 in Python, as
+   the monitor's, and only in its folder. A write resets the core after
+   it, as the ROM keeps the FAT's sector and the mount between commands.
 
 ## Subtasks
 

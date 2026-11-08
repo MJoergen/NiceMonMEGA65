@@ -130,6 +130,9 @@ MEGA65, slot 0 is the microSD slot at the back, and slot 1 the
 full-size slot underneath, which holds the MEGA65's system files: a
 program that writes there can damage them, so test one on a card of its
 own in slot 0. On the Nexys4DDR, slot 0 is its microSD slot.
+`make sdcard ETH=192.168.1.65 CMD=ls` lists `NICE` from the host, and
+`CMD="get NAME"` copies a file off the card, with no PC slot
+([tools/README.md](tools/README.md#sdcardpy)).
 [SYSTEM.md](doc/SYSTEM.md#the-sd-card-slots) has the details, and the
 limits of the R3.
 

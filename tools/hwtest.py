@@ -154,6 +154,11 @@ import time
 from typing import Callable, TypeVar
 
 from jtag import check_board
+# The SD controller's registers and its sectors, and FAT32 as the
+# monitor reads it, as tools/sdcard.py has them
+from sdcard import (E_NOFOLDER, FOLDER, SD_BUF, SD_CHUNK, SD_CSR, SD_ERROR,
+                    SD_LAST, SD_LBA, SD_SELECT, SD_SLOTS, FileError, Volume,
+                    read_buffer, sd_command, to_bytes)
 from load import (MAX_RAM_WORDS, MONITOR_WORDS, PROGRAM, RAM_SIZE, load_words,
                   read_bin, start)
 from boardlink import (BAUD, BAUDS, BRK_COUNT, BRK_EN, CONTROL, DEFAULT_BAUD,
@@ -172,10 +177,7 @@ CLOCK_HZ = {"mega65": 100_000_000, "nexys4ddr": 90_000_000}
 RAM_WORDS = {"mega65": 0x20000, "nexys4ddr": 0x10000}
 # The SD card controller's registers (nice_cpu's SYSTEM.md §5); A7 is
 # reserved
-SD_CSR, SD_LBA, SD_CHUNK, SD_ERROR, SD_SELECT, SD_LAST, SD_SLOTS = \
-    range(0xFFFFFFA0, 0xFFFFFFA7)
 SD_RESERVED = 0xFFFFFFA7
-SD_BUF = 0xFFFFFFA8
 # The slots of each board (doc/SYSTEM.md)
 SD_SLOT_COUNT = {"mega65": 2, "nexys4ddr": 1}
 # The UDP port that sim/udp.nasm answers on, through the port for Ethernet
@@ -1107,39 +1109,21 @@ def test_board_devices(link: Link, board: str) -> None:
 
 
 def sd_said(got: tuple[int, int] | None) -> str:
-    """What sd_run returned, for a check's detail."""
+    """What sd_command returned, for a check's detail."""
     return "busy too long" if got is None else \
         f"status {got[0]:08X}, error {got[1]}"
 
 
-def sd_run(link: Link, cmd: int, timeout: float) -> tuple[int, int] | None:
-    """Starts an SD card command, and waits for busy to fall: the status
-    and the error after it, or None after the timeout."""
-    link.write(SD_CSR, [cmd])
-    end = time.monotonic() + timeout
-    while True:
-        csr = rd(link, SD_CSR)
-        if csr & 1 == 0:
-            return csr, rd(link, SD_ERROR)
-        if time.monotonic() > end:
-            return None
-
-
 def sd_sector(link: Link) -> bytes:
     """The 512 bytes of the buffer, read a chunk at a time."""
-    data = bytearray()
-    for c in range(16):
-        link.write(SD_CHUNK, [c])
-        for w in link.read(SD_BUF, 8):
-            data += w.to_bytes(4, "little")
-    return bytes(data)
+    return to_bytes(read_buffer(link))
 
 
 def sd_read(link: Link, name: str, lba: int) -> bytes | None:
     """Reads a sector into the buffer, and its bytes, or None when the
     Read fails."""
     link.write(SD_LBA, [lba])
-    got = sd_run(link, 1, 1.0)
+    got = sd_command(link, 1, 1.0)
     if not check(f"{name}: Read of sector {lba:#x}",
                  got is not None and got[1] == 0,
                  sd_said(got)):
@@ -1201,96 +1185,31 @@ def test_sd_fat(link: Link, name: str, first: bytes) -> None:
           repr(boot[3:11]))
 
 
-def fat32_base(link: Link, name: str, first: bytes) -> int | None:
-    """The sector of the FAT32 boot sector that the monitor's fat32.c
-    mounts on a card whose sector 0 is first: sector 0 itself, or the
-    first partition of type 0x0B or 0x0C of an MBR. None for no FAT32."""
-    if first[510:] != b"\x55\xaa":
+class Unread(Exception):
+    """A sector that sd_read could not read, which it has reported."""
+
+
+def fat32_dir(link: Link, name: str) -> list[str] | None:
+    """The rows of the monitor's dir for the card in the selected slot,
+    from its folder FOLDER, as tools/sdcard.py reads FAT32 over the link,
+    or the monitor's error when the root has no such folder. None when a
+    sector cannot be read, and when the card has no FAT32 file system that
+    the monitor mounts, which is not covered. It is the host's own reading
+    of FAT32, to which the monitor's must come out the same."""
+    def read(lba: int) -> bytes:
+        sector = sd_read(link, name, lba)
+        if sector is None:
+            raise Unread
+        return sector
+    try:
+        return Volume(read, FOLDER).rows()
+    except Unread:
         return None
-    if fs_kind(first) == "FAT":
-        return 0 if first[82:87] == b"FAT32" else None
-    for i in range(4):
-        entry = first[446 + 16 * i:462 + 16 * i]
-        if entry[4] in (0x0B, 0x0C):
-            base = int.from_bytes(entry[8:12], "little")
-            boot = sd_read(link, name, base)
-            if boot is not None and fs_kind(boot) == "FAT" \
-                    and boot[82:87] == b"FAT32":
-                return base
-            return None
-    return None
-
-
-# The folder of the monitor's files on a card (monitor/fat32.c, #91), the
-# monitor's FOLDER of the build, which for monitor_test.bin is NICE
-FOLDER = "NICE"
-
-
-def fat32_dir(link: Link, name: str, base: int) -> list[str] | None:
-    """The rows of the monitor's dir for the FAT32 volume at the sector
-    base, from its folder FOLDER read over the link, or the monitor's error
-    when the root has no such folder; None when a sector cannot be read.
-    It is the host's own reading of FAT32, to which the monitor's must come
-    out the same."""
-    boot = sd_read(link, name, base)
-    if boot is None:
+    except FileError as e:
+        if e.code == E_NOFOLDER:
+            return [str(e)]
+        uncovered.append(f"{name}'s files, as the monitor's dir gives {e}")
         return None
-    spc = boot[13]
-    fat = base + int.from_bytes(boot[14:16], "little")
-    data = fat + boot[16] * int.from_bytes(boot[36:40], "little")
-
-    def entries(clus: int) -> list[bytes] | None:
-        """The entries of the directory from cluster clus that dir lists:
-        not deleted, not long names, not the volume label, not . and .."""
-        found: list[bytes] = []
-        seen = 0
-        while clus < 0x0FFFFFF8 and seen < 4096:
-            seen += 1
-            for k in range(spc):
-                sector = sd_read(link, name, data + (clus - 2) * spc + k)
-                if sector is None:
-                    return None
-                for e in range(0, 512, 32):
-                    entry = sector[e:e + 32]
-                    if entry[0] == 0:
-                        return found
-                    if entry[0] == 0xE5 or entry[11] == 0x0F \
-                            or entry[11] & 0x08 or entry[0] == 0x2E:
-                        continue
-                    found.append(entry)
-            fat_sector = sd_read(link, name, fat + clus // 128)
-            if fat_sector is None:
-                return None
-            at = 4 * (clus % 128)
-            clus = int.from_bytes(fat_sector[at:at + 4], "little") & 0x0FFFFFFF
-        return found
-
-    root = entries(int.from_bytes(boot[44:48], "little"))
-    if root is None:
-        return None
-    short = FOLDER.ljust(11).encode()
-    folder = [e for e in root if e[:11] == short]
-    if not folder or not folder[0][11] & 0x10:
-        return [f"File error 29, no folder {FOLDER} on the card"]
-    first = int.from_bytes(folder[0][20:22], "little") << 16 \
-        | int.from_bytes(folder[0][26:28], "little")
-    listed = entries(first)
-    if listed is None:
-        return None
-    rows = [f"Directory of {FOLDER}"]
-    files = dirs = 0
-    for entry in listed:
-        raw = bytes([0xE5]) + entry[1:11] if entry[0] == 5 else entry[:11]
-        text = raw[:8].decode("latin-1") + " " + raw[8:].decode("latin-1")
-        if entry[11] & 0x10:
-            rows.append(text + "  <DIR>")
-            dirs += 1
-        else:
-            size = int.from_bytes(entry[28:32], "little")
-            rows.append(f"{text}{size:12d}")
-            files += 1
-    rows.append(f"Files: {files}, directories: {dirs}")
-    return rows
 
 
 def test_sd(link: Link, board: str) -> dict[int, list[str]]:
@@ -1320,7 +1239,7 @@ def test_sd(link: Link, board: str) -> dict[int, list[str]]:
     # A slot the board does not have
     link.write(SD_SELECT, [5])
     csr = rd(link, SD_CSR)
-    got = sd_run(link, 0, 1.0)
+    got = sd_command(link, 0, 1.0)
     check("SD slot 5: no card, and Init fails with error 1",
           csr & 4 == 0 and got is not None and got[1] == 1,
           f"present {csr >> 2 & 1}, {sd_said(got)}")
@@ -1329,13 +1248,13 @@ def test_sd(link: Link, board: str) -> dict[int, list[str]]:
         link.write(SD_SELECT, [slot])
         csr = rd(link, SD_CSR)
         if csr & 4 == 0:
-            got = sd_run(link, 0, 1.0)
+            got = sd_command(link, 0, 1.0)
             check(f"{name}: no card, Init fails with error 1",
                   got is not None and got[1] == 1, sd_said(got))
             uncovered.append(f"{name}, as it has no card")
             continue
         t0 = time.monotonic()
-        got = sd_run(link, 0, 3.0)
+        got = sd_command(link, 0, 3.0)
         ms = (time.monotonic() - t0) * 1000
         if not check(f"{name}: Init", got is not None and got[1] == 0,
                      f"{sd_said(got)}, {ms:.0f} ms") \
@@ -1353,23 +1272,18 @@ def test_sd(link: Link, board: str) -> dict[int, list[str]]:
             check(f"{name}: sector 0 reads the same again",
                   sd_read(link, name, 0) == first)
             test_sd_fat(link, name, first)
-            base = fat32_base(link, name, first)
-            if base is None:
-                uncovered.append(f"{name}'s files, as the card has no FAT32 "
-                                 "file system for the monitor's dir")
-            else:
-                rows = fat32_dir(link, name, base)
-                if rows is not None:
-                    fat[slot] = rows
+            rows = fat32_dir(link, name)
+            if rows is not None:
+                fat[slot] = rows
         sd_read(link, name, last)
         link.write(SD_LBA, [last + 1])
-        got = sd_run(link, 1, 1.0)
+        got = sd_command(link, 1, 1.0)
         check(f"{name}: Read of sector {last + 1:#x} is out of range",
               got is not None and got[1] == 7, sd_said(got))
         if csr & 0x20:
             # The controller refuses it before anything reaches the card.
             link.write(SD_LBA, [last])
-            got = sd_run(link, 2, 1.0)
+            got = sd_command(link, 2, 1.0)
             check(f"{name}: write-protected, Write fails with error 6",
                   got is not None and got[1] == 6, sd_said(got))
     link.write(SD_SELECT, [0])

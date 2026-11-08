@@ -13,10 +13,12 @@ prints its options with `--help`, and its header says more.
 | `load.py` | Loads a `.bin` file into cleared memory and starts it, or with `--no-run` leaves the core held in reset. With `--monitor`, it runs a program at `0x8000` under the monitor in the ROM. |
 | `run.py` | Runs a program on the board and prints what `niceemu` prints, for diffing, also one under the monitor with `--monitor`. |
 | `mon.py` | An interactive shell on the link: memory, registers, pause, step, breakpoints, and the console. It is nice_cpu's `debugger/nicedbg.py` with the board's links. |
+| `sdcard.py` | Lists the folder `NICE` of the board's SD card, and copies a file of it to the host, with no PC slot. |
 | `hwtest.py` | Programs the FPGA with openFPGALoader and tests the system on the board. |
 | `flash.py` | Writes a bitstream into the Nexys4DDR's flash, or a core file into a slot of the MEGA65's, from which the board starts. |
 | `linktest.py` | Checks `run.py` and the link on `niceemu --link` against plain `niceemu`, without a board. |
 | `tftpd.py` | A TFTP server for the monitor's `tftp`, which also lists the files of its folder for a name with `*` or `?`. |
+| `sdtest.py` | Checks `sdcard.py` on `niceemu --link` with images of a card, without a board. |
 | `tftptest.py` | Checks `tftpd.py`, and the monitor's `tftp` in `niceemu` against it, without a board. |
 | `cosimtest.py` | Checks `run.py` and the RTL on `make cosim` against plain `niceemu`, without a board. |
 | `screenshot.py` | Runs a program in `niceemu` and draws its screen as a PNG picture, as the text display shows it, and with `--debugger` the on-board debugger's strip under it. |
@@ -426,6 +428,37 @@ the MEGA65 needs pyftdi.
 `make flash PORT=/dev/ttyUSB1 [BIT=FILE]` is the Nexys4DDR's form, with
 `ARGS=--erase` to erase, and `make flash PORT=/dev/ttyUSB1 COR=FILE
 SLOT=N` the MEGA65's ([synth/README.md](../synth/README.md#building)).
+
+## sdcard.py
+
+`sdcard.py` reads the board's SD card over the link, so a file comes off
+the card with no PC slot. It reads the card's FAT32 itself, as the
+monitor does, and only the monitor's folder `NICE` (see
+[SYSTEM.md](../doc/SYSTEM.md#the-sd-card-slots)). `ls` lists the folder
+as the monitor's `dir` does, with the long names after the rows, and
+`get NAME [DEST]` copies a file to `DEST`, by default its name in the
+current directory, or with `-` to stdout:
+
+    tools/sdcard.py --eth 192.168.1.65 ls
+    tools/sdcard.py --eth 192.168.1.65 get HELLO.BIN
+    make sdcard ETH=192.168.1.65 CMD="get HELLO.BIN"
+
+`NAME` is the 8.3 name or the long name, in either case. `--folder`
+names another folder of the root, and `--slot` the slot. It only reads:
+`put` and `del` come next
+([#61](https://github.com/MJoergen/NiceMonMEGA65/issues/61)).
+
+The core can be in any state. A running core is paused for the reads,
+and goes on after them. While it is paused, the tool uses the program's
+card as it is: its slot, which the monitor's `dir` or `load` must have
+started up, and it puts back `SD_LBA`, `SD_CHUNK`, and the buffer at the
+end. `--slot` of another slot is refused then. While the core is held or
+has halted, the tool takes the slot of `--slot`, or slot 0, or slot 1
+when slot 0 has no card, as the monitor does, and starts the card up.
+
+A sector takes 16 writes and 16 reads on the link, so a file comes at a
+few KB a second on the serial port, and faster on Ethernet.
+`make sdtest` checks the tool on `niceemu --link`, without a board.
 
 ## The other tools
 

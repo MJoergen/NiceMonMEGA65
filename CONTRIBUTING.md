@@ -60,6 +60,7 @@ or, in an existing clone:
   [RELEASE.md](doc/RELEASE.md)).
 - `make linktest` checks the tools on `niceemu --link`, without a board
 - `make tftptest` checks `tools/tftpd.py`, and the monitor's `tftp` against it, without a board
+- `make sdtest` checks `tools/sdcard.py` on `niceemu --link` with images of a card, without a board
   (see [The tools and niceemu](#the-tools-and-niceemu)).
 - `make cosim` runs the system in GHDL for the tools, and `make cosimtest`
   checks the tools and the RTL on it, without a board (see [The simulated
@@ -103,7 +104,7 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
 | [monitor/](monitor/README.md) | The monitor for the ROM, in NICE assembly: a hardware abstraction layer for programs at `0x8000`, called through a dispatch table, a main loop with a few commands, the file of routines that programs join, the stubs and the header for programs, and its tests in `niceemu`. Its README has the decisions, [INTERNALS.md](monitor/INTERNALS.md) the routines with no entries, the C in the ROM, and the build and the tests, and [#62](https://github.com/MJoergen/NiceMonMEGA65/issues/62) the loading from storage. |
 | [demo/](demo/README.md) | The demo in the ROM of the release, behind the monitor, which runs it with `x`, for the time being: nice_cpu's demo (`nice_cpu/demo`), whose function keys switch between a welcome screen that turns into a typewriter, the key codes, the characters and colors, the counters, a game, and the board, a self-test and the network station's addresses. Here are the board's text, `text.nasm`, the join behind the monitor, `join.py`, and its check on a board, `demo_hw.py`. |
 | [examples/](examples/) | Example C programs, and the Makefile that builds them for the MEGA65. |
-| [tools/](tools/) | `boardlink.py`, the debug link of nice_cpu's `debugger/nicelink.py`, over the board's UART or TCP to `niceemu --link`, with the board's Ethernet port and the simulated system of `make cosim`, and the tools that use it: `load.py`, which loads a program into the MEGA65 or Nexys4DDR, `run.py`, which runs a program on the board as `niceemu` runs it, `mon.py`, an interactive shell on the link, nice_cpu's `nicedbg.py` with the board's links, `hwtest.py`, which tests the system on the board, `flash.py`, which writes the Nexys4DDR's flash or a slot of the MEGA65's, `bump.py`, which records the timing of the MEGA65 and the Nexys4DDR for a nice_cpu tag, `release.py`, which builds and publishes a release, `linktest.py`, which checks `run.py` and `mon.py` on `niceemu --link`, `tftpd.py`, a TFTP server for the monitor's `tftp`, with listings, `tftptest.py`, which checks it, `cosimtest.py`, which checks `run.py` on the simulated system, and `screenshot.py`, which draws a program's screen in `niceemu` as a PNG picture. |
+| [tools/](tools/) | `boardlink.py`, the debug link of nice_cpu's `debugger/nicelink.py`, over the board's UART or TCP to `niceemu --link`, with the board's Ethernet port and the simulated system of `make cosim`, and the tools that use it: `load.py`, which loads a program into the MEGA65 or Nexys4DDR, `run.py`, which runs a program on the board as `niceemu` runs it, `mon.py`, an interactive shell on the link, nice_cpu's `nicedbg.py` with the board's links, `sdcard.py`, which lists the board's SD card and copies its files to the host, `hwtest.py`, which tests the system on the board, `flash.py`, which writes the Nexys4DDR's flash or a slot of the MEGA65's, `bump.py`, which records the timing of the MEGA65 and the Nexys4DDR for a nice_cpu tag, `release.py`, which builds and publishes a release, `linktest.py`, which checks `run.py` and `mon.py` on `niceemu --link`, `tftpd.py`, a TFTP server for the monitor's `tftp`, with listings, `tftptest.py`, which checks it, `sdtest.py`, which checks `sdcard.py`, `cosimtest.py`, which checks `run.py` on the simulated system, and `screenshot.py`, which draws a program's screen in `niceemu` as a PNG picture. |
 | [README.md](README.md) | For those who use the core files and write programs for them: on its own, over Ethernet, and over the serial port. |
 | [SYSTEM.md](doc/SYSTEM.md) | The system that programs and the link see: the debug link, the address map, the screen and the font, the keyboard, the ROM, the Nexys4DDR's devices, the baud rate, the Ethernet station, and the SD card slots. |
 | [EMULATOR.md](doc/EMULATOR.md) | The table of the known differences from the emulator. |
@@ -118,7 +119,7 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
 | [vsg.yml](vsg.yml) | The configuration of `make lint`, which checks the VHDL against [CODING_STYLE.md](doc/CODING_STYLE.md). |
 | [mypy.ini](mypy.ini) | The configuration of `make typecheck`, `mypy --strict` on the Python files that it lists: `tools/`, `demo/`, `font/`, `sim/gen_decode.py`, and the scripts of `monitor/test/`. |
 | [CLAUDE.md](CLAUDE.md) | Instructions for Claude Code: the commands, the layout, and the pitfalls. |
-| [.github/workflows/ci.yml](.github/workflows/ci.yml) | The CI: `make test` and `make cosimtest` on both cores, with niceemu built for its step counts, `make examples`, the tests of the demo and the monitor, `make linktest`, `make tftptest`, `make formal`, `make lint`, and `make typecheck`. It cannot run `make hwtest` or build a bitstream. |
+| [.github/workflows/ci.yml](.github/workflows/ci.yml) | The CI: `make test` and `make cosimtest` on both cores, with niceemu built for its step counts, `make examples`, the tests of the demo and the monitor, `make linktest`, `make tftptest`, `make sdtest`, `make formal`, `make lint`, and `make typecheck`. It cannot run `make hwtest` or build a bitstream. |
 
 ### What is in src/
 
@@ -875,6 +876,18 @@ packet of another port. Then it runs the monitor of the tests in
 that answers ARP for 10.0.0.2 and passes its datagrams to `tftpd.py`,
 and checks that `tftp` lists the folder, loads a program, and shows an
 ERROR. It takes about a second.
+
+`make sdtest` runs `tools/sdtest.py`. It makes images of a card with
+`mkfs.fat`, `sfdisk`, and `mtools`: FAT32 on the whole card, with a
+short file, an empty one, a long name, a file of 40 clusters, a
+fragmented one, and a subdirectory in `NICE`; FAT32 in a partition of
+an MBR; one with no `NICE`; and FAT16. On a held core in `niceemu
+--link`, `sdcard.py ls` must list `NICE` with its sizes and long names,
+`get` must give each file's bytes, by either name, and the errors must
+be the monitor's. On a running core, `sim/sdhold.nasm`, which has read
+a sector, the tool must leave the core running and `SD_LBA`,
+`SD_CHUNK`, and the buffer as they were, and refuse a card that the
+program has not started up. It takes a few seconds, and CI runs it.
 
 `make linktest` runs `run.py --tcp` on `niceemu --link` against plain
 `niceemu`, without a board, for the programs that `make hwtest` compares,
