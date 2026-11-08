@@ -441,4 +441,4 @@ ROM is developed in niceemu and needs no board.
 | #91 | Done in V1.9: the folder `NICE`, set at build time |
 | #59 | FAT32 writing, `save`, and `del` |
 | #60 | BASIC's `SAVE`, `LOAD`, and `DIR` |
-| #61 | Later: host tools for files on the board's card, over the link |
+| #61 | In V1.9.1: host tools for files on the board's card, over the link |
