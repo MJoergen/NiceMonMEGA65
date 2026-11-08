@@ -80,9 +80,13 @@ meets it again, and has V1.8's changes too.
   ADDR` and goes back to the monitor's prompt.
 - The monitor reads FAT32 SD cards
   ([#58](https://github.com/MJoergen/NiceMonMEGA65/issues/58)): `dir
-  [SLOT]` lists the root directory, and `load NAME` loads a `.bin` file
-  from it as `l` loads lines, so a program copied to the card on a PC
-  runs with no host. Programs read files through the dispatch table's
+  [SLOT]` lists the folder `NICE` of the root directory, and `load
+  NAME` loads a `.bin` file from it as `l` loads lines, so a program
+  copied to the card on a PC runs with no host. A card without the
+  folder is refused with error 29, as a card may be shared with other
+  cores, each with a root folder of its own, and `make monitor
+  FOLDER=NAME` builds a monitor with another
+  ([#91](https://github.com/MJoergen/NiceMonMEGA65/issues/91)). Programs read files through the dispatch table's
   new entries `fs_mount`, `fs_open`, `fs_read`, `fs_readdir`, and
   `fs_close`. The card is FAT32 on the whole, or in the first FAT32
   partition of an MBR; FAT12, FAT16, and exFAT are rejected. Writing

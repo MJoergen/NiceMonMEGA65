@@ -2575,12 +2575,14 @@ E_SD5           .ASCII_L 'the card reported an error'
 E_SD6           .ASCII_L 'the card is write-protected'
 E_SD7           .ASCII_L 'the sector is after the last, '
 E_SD8           .ASCII_L 'Init failed'
-; The meanings of fat32.c's errors FS_ERR0 to FS_ERR0 + FS_ERRS - 1
+; The meanings of fat32.c's errors FS_ERR0 to FS_ERR0 + FS_ERRS - 1.
+; E_FS29 names the folder of the build, so the Makefile writes it, in
+; build/folder.nasm.
 FS_ERRORS
                 .DAT    E_FS16, E_FS17, E_FS18, E_FS19, E_FS20, E_FS21, E_FS22
-                .DAT    E_FS23, E_FS24, E_FS25, E_FS26, E_FS27, E_FS28
+                .DAT    E_FS23, E_FS24, E_FS25, E_FS26, E_FS27, E_FS28, E_FS29
 FS_ERR0         .EQU    16
-FS_ERRS         .EQU    13
+FS_ERRS         .EQU    14
 E_FS16          .ASCII_L 'no FAT32 file system'
 E_FS17          .ASCII_L 'FAT12, which is not supported'
 E_FS18          .ASCII_L 'FAT16, which is not supported'

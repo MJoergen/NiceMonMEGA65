@@ -1221,49 +1221,74 @@ def fat32_base(link: Link, name: str, first: bytes) -> int | None:
     return None
 
 
+# The folder of the monitor's files on a card (monitor/fat32.c, #91), the
+# monitor's FOLDER of the build, which for monitor_test.bin is NICE
+FOLDER = "NICE"
+
+
 def fat32_dir(link: Link, name: str, base: int) -> list[str] | None:
     """The rows of the monitor's dir for the FAT32 volume at the sector
-    base, from its root directory read over the link, or None when a
-    sector cannot be read. It is the host's own reading of FAT32, to which
-    the monitor's must come out the same."""
+    base, from its folder FOLDER read over the link, or the monitor's error
+    when the root has no such folder; None when a sector cannot be read.
+    It is the host's own reading of FAT32, to which the monitor's must come
+    out the same."""
     boot = sd_read(link, name, base)
     if boot is None:
         return None
     spc = boot[13]
     fat = base + int.from_bytes(boot[14:16], "little")
     data = fat + boot[16] * int.from_bytes(boot[36:40], "little")
-    clus = int.from_bytes(boot[44:48], "little")
-    rows: list[str] = []
-    files = dirs = 0
-    seen = 0
-    while clus < 0x0FFFFFF8 and seen < 4096:
-        seen += 1
-        for k in range(spc):
-            sector = sd_read(link, name, data + (clus - 2) * spc + k)
-            if sector is None:
+
+    def entries(clus: int) -> list[bytes] | None:
+        """The entries of the directory from cluster clus that dir lists:
+        not deleted, not long names, not the volume label, not . and .."""
+        found: list[bytes] = []
+        seen = 0
+        while clus < 0x0FFFFFF8 and seen < 4096:
+            seen += 1
+            for k in range(spc):
+                sector = sd_read(link, name, data + (clus - 2) * spc + k)
+                if sector is None:
+                    return None
+                for e in range(0, 512, 32):
+                    entry = sector[e:e + 32]
+                    if entry[0] == 0:
+                        return found
+                    if entry[0] == 0xE5 or entry[11] == 0x0F \
+                            or entry[11] & 0x08 or entry[0] == 0x2E:
+                        continue
+                    found.append(entry)
+            fat_sector = sd_read(link, name, fat + clus // 128)
+            if fat_sector is None:
                 return None
-            for e in range(0, 512, 32):
-                entry = sector[e:e + 32]
-                if entry[0] == 0:
-                    rows.append(f"Files: {files}, directories: {dirs}")
-                    return rows
-                if entry[0] == 0xE5 or entry[11] == 0x0F or entry[11] & 0x08 \
-                        or entry[0] == 0x2E:
-                    continue
-                raw = bytes([0xE5]) + entry[1:11] if entry[0] == 5 else entry[:11]
-                text = raw[:8].decode("latin-1") + " " + raw[8:].decode("latin-1")
-                if entry[11] & 0x10:
-                    rows.append(text + "  <DIR>")
-                    dirs += 1
-                else:
-                    size = int.from_bytes(entry[28:32], "little")
-                    rows.append(f"{text}{size:12d}")
-                    files += 1
-        fat_sector = sd_read(link, name, fat + clus // 128)
-        if fat_sector is None:
-            return None
-        at = 4 * (clus % 128)
-        clus = int.from_bytes(fat_sector[at:at + 4], "little") & 0x0FFFFFFF
+            at = 4 * (clus % 128)
+            clus = int.from_bytes(fat_sector[at:at + 4], "little") & 0x0FFFFFFF
+        return found
+
+    root = entries(int.from_bytes(boot[44:48], "little"))
+    if root is None:
+        return None
+    short = FOLDER.ljust(11).encode()
+    folder = [e for e in root if e[:11] == short]
+    if not folder or not folder[0][11] & 0x10:
+        return [f"File error 29, no folder {FOLDER} on the card"]
+    first = int.from_bytes(folder[0][20:22], "little") << 16 \
+        | int.from_bytes(folder[0][26:28], "little")
+    listed = entries(first)
+    if listed is None:
+        return None
+    rows = [f"Directory of {FOLDER}"]
+    files = dirs = 0
+    for entry in listed:
+        raw = bytes([0xE5]) + entry[1:11] if entry[0] == 5 else entry[:11]
+        text = raw[:8].decode("latin-1") + " " + raw[8:].decode("latin-1")
+        if entry[11] & 0x10:
+            rows.append(text + "  <DIR>")
+            dirs += 1
+        else:
+            size = int.from_bytes(entry[28:32], "little")
+            rows.append(f"{text}{size:12d}")
+            files += 1
     rows.append(f"Files: {files}, directories: {dirs}")
     return rows
 
@@ -1372,9 +1397,9 @@ def counter(link: Link, lo: int) -> int:
 
 
 def test_fat_dir(link: Link, fat: dict[int, list[str]]) -> None:
-    """The monitor of the tests, loaded and started, lists the root
-    directory of each card in fat with dir SLOT as the host listed it,
-    then halts with h."""
+    """The monitor of the tests, loaded and started, lists the folder
+    FOLDER of each card in fat with dir SLOT as the host listed it, or
+    says that the card has none, then halts with h."""
     if not fat:
         return
     subprocess.run(["make", "-s", "-C", f"{REPO}/monitor",
@@ -1396,8 +1421,9 @@ def test_fat_dir(link: Link, fat: dict[int, list[str]]) -> None:
         said = text.partition(cmd)[2].decode("latin-1").removeprefix("\n")
         rows = said.split("\r\n")[:-1]
         bad = [i for i, (a, b) in enumerate(zip(rows, want)) if a != b]
-        check(f"SD slot {slot}: the monitor's dir lists the {len(want) - 1} "
-              "entries of the root as the host reads them",
+        what = (f"lists the {len(want) - 2} entries of {FOLDER}"
+                if len(want) > 1 else f"finds no folder {FOLDER}")
+        check(f"SD slot {slot}: the monitor's dir {what} as the host reads the card",
               rows == want,
               f"{len(rows)} rows, want {len(want)}"
               + (f"; first difference {rows[bad[0]]!r}, want "

@@ -1,6 +1,7 @@
 NiceMon V9.9
 ? lists the commands
 > dir
+Directory of NICE
 HELLO    BIN       13158
 SUB           <DIR>
 ALONGN~1 TXT          26
@@ -29,9 +30,11 @@ FRAG     BIN        1944
 KEEP     TXT         512
 Files: 25, directories: 1
 > DIR 1
+Directory of NICE
 HELLO    BIN       13158
 Files: 1, directories: 0
 > dir 0
+Directory of NICE
 HELLO    BIN       13158
 SUB           <DIR>
 ALONGN~1 TXT          26

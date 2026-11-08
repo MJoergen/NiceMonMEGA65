@@ -44,7 +44,7 @@ header is the authoritative address map.
     make diagrams         # src/system.tex and src/eth/eth.tex -> the PNGs of their READMEs (pdflatex)
     make examples         # C examples -> examples/build/*.bin (clang wasm32, lld, llvm)
     make demo             # nice_cpu's demo at 0x8000 -> demo/build/demo.bin, behind the monitor -> demo/build/rom.bin; make -C demo test runs the join in niceemu
-    make monitor          # the monitor -> monitor/build/monitor.bin; make -C monitor test runs it in niceemu
+    make monitor [FOLDER=NICE] # the monitor -> monitor/build/monitor.bin, its files in the card's folder FOLDER; make -C monitor test runs it in niceemu
     make r6 [ROM=f.bin]   # Vivado bitstream, synth/r6/build/top.bit, the monitor and the demo (demo/build/rom.bin) in the ROM unless ROM= (none) or ROM=f.bin; make r3 and make nexys4ddr likewise
     make cor [ROM=f.bin]  # MEGA65 core files for MEGAFLASH, synth/r{3,6}/build/NiceMonMEGA65-r{3,6}.cor (coretool)
     make load FILE=p.bin  # load and start a program on the board (ETH=IP or PORT=/dev/ttyUSB1, one needed); ARGS=--monitor for one at 0x8000 under the ROM's monitor

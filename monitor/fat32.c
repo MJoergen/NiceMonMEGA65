@@ -1,5 +1,5 @@
-// FAT32 for the ROM: reading, in the root directory (issue #58,
-// doc/SDCARD.md, "The file system"). It is part of the ROM's C code
+// FAT32 for the ROM: reading, in the folder FOLDER of the root directory
+// (issues #58 and #91, doc/SDCARD.md, "The file system"). It is part of the ROM's C code
 // (README.md, "C in the ROM"), and the dispatch table's entries fs_mount,
 // fs_open, fs_read, fs_readdir, and fs_close jump to its functions
 // fat_mount, fat_open, fat_read, fat_readdir, and fat_close, which take
@@ -16,6 +16,12 @@
 // or its card is not ready or has changed. fat_open mounts again when it
 // finds no mount: the slot of the last mount, or after reset slot 0, or
 // slot 1 when slot 0 has no card.
+//
+// The files are those of the folder FOLDER, NICE unless the build sets
+// another (make FOLDER=NAME), as a card may be shared by several cores,
+// each with a root folder of its own. A mount looks the folder up in the
+// root directory, and fails without it, so nothing reaches the root's
+// files or another core's.
 //
 // The caches are one sector of the FAT, and one sector for each of the
 // two files that may be open at once. They are in the RAM of the C code,
@@ -50,6 +56,13 @@ int fat_sd_read(unsigned lba, unsigned *buf);
 #define E_BADFAT -26    // a cluster outside the volume
 #define E_SLOT -27      // no such slot
 #define E_CHANGED -28   // the card changed, or the mount was dropped
+#define E_NOFOLDER -29  // no folder FOLDER in the root directory
+
+// The folder of NiceMon's files, an 8.3 name of up to 8 characters in
+// upper case, which the Makefile checks
+#ifndef FOLDER
+#define FOLDER "NICE"
+#endif
 
 #define END 0x0FFFFFF8u  // a FAT entry from here ends a chain
 #define FILES 2
@@ -62,6 +75,7 @@ static struct {
     unsigned data;      // the first sector of cluster 2
     unsigned spc;       // sectors per cluster
     unsigned root;      // the first cluster of the root directory
+    unsigned dir;       // the first cluster of the folder FOLDER
     unsigned top;       // the cluster after the last
 } vol;
 
@@ -142,6 +156,8 @@ static int kind(const unsigned char *b)
     return 0;
 }
 
+static int find(unsigned first, const unsigned char n[11], unsigned char **e);
+
 // A slot that the system does not have changes nothing.
 static int mount(unsigned slot)
 {
@@ -186,6 +202,18 @@ static int mount(unsigned slot)
     vol.top = (base + u32(b + 32) - vol.data) / vol.spc + 2;
     fatlba = ~0u;
     if (vol.root < 2 || vol.root >= vol.top)
+        return E_BADFAT;
+    // The folder: FOLDER padded with blanks, a directory of the root
+    unsigned char n[11], *e;
+    static const char folder[] = FOLDER;
+    for (int k = 0; k < 11; k++)
+        n[k] = k < (int)sizeof folder - 1 ? (unsigned char)folder[k] : ' ';
+    if ((r = find(vol.root, n, &e)) < 0)
+        return r;
+    if (r == 0 || !(e[11] & 0x10))
+        return E_NOFOLDER;
+    vol.dir = u16(e + 20) << 16 | u16(e + 26);
+    if (vol.dir < 2 || vol.dir >= vol.top)
         return E_BADFAT;
     vol.mounted = 1;
     return 0;
@@ -309,6 +337,26 @@ static int entry(struct file *f, unsigned char **e)
     return 0;
 }
 
+static void start(struct file *f, unsigned first, int dir, unsigned size);
+
+// The entry of the 8.3 name n in the directory whose first cluster is
+// first, at e: 1, 0 when there is none, or an error. The entry is in the
+// buffer of a static file, which keeps it until the next call.
+static int find(unsigned first, const unsigned char n[11], unsigned char **e)
+{
+    static struct file d;
+    start(&d, first, 1, 0);
+    int r;
+    while ((r = entry(&d, e)) == 1) {
+        int same = 1;
+        for (int k = 0; k < 11; k++)
+            same &= (k == 0 && (*e)[0] == 0x05 ? 0xE5 : (*e)[k]) == n[k];
+        if (same)
+            return 1;
+    }
+    return r;
+}
+
 static void start(struct file *f, unsigned first, int dir, unsigned size)
 {
     f->open = 1;
@@ -357,33 +405,25 @@ int fat_open(unsigned name, int mode)
     if (r < 0)
         return r;
     if (mode == 2) {
-        // The root, the only directory for now: an empty name, or /
+        // The folder, the only directory: an empty name, or /
         unsigned c = nice_peek(name);
         if (c && !(c == '/' && nice_peek(name + 1) == 0))
             return E_NAME;
-        return opened(vol.root, 1, 0);
+        return opened(vol.dir, 1, 0);
     }
     r = name83(name, n);
     if (r < 0)
         return r;
-    struct file root;
-    start(&root, vol.root, 1, 0);
     unsigned char *e;
-    while ((r = entry(&root, &e)) == 1) {
-        int same = 1;
-        for (int k = 0; k < 11; k++)
-            same &= (k == 0 && e[0] == 0x05 ? 0xE5 : e[k]) == n[k];
-        if (!same)
-            continue;
-        if (e[11] & 0x10)
-            return E_ISDIR;
-        unsigned first = u16(e + 20) << 16 | u16(e + 26);
-        unsigned size = u32(e + 28);
-        if (size && (first < 2 || first >= vol.top))
-            return E_BADFAT;
-        return opened(first, 0, size);
-    }
-    return r < 0 ? r : E_NOFILE;
+    if ((r = find(vol.dir, n, &e)) != 1)
+        return r < 0 ? r : E_NOFILE;
+    if (e[11] & 0x10)
+        return E_ISDIR;
+    unsigned first = u16(e + 20) << 16 | u16(e + 26);
+    unsigned size = u32(e + 28);
+    if (size && (first < 2 || first >= vol.top))
+        return E_BADFAT;
+    return opened(first, 0, size);
 }
 
 int fat_read(int h, unsigned buf, unsigned n)
@@ -439,8 +479,8 @@ int fat_close(int h)
     return 0;
 }
 
-// fat_dir: the root directory of the card, for the monitor's dir command:
-// a row for each file, its 8.3 name and its size in decimal, and for each
+// fat_dir: the folder FOLDER of the card, for the monitor's dir command:
+// a row with its name, then a row for each file, its 8.3 name and its size in decimal, and for each
 // directory, its name and <DIR>, then the numbers of both. With a slot
 // from 0, the card in it is mounted first. 0, or an error.
 static void dec(unsigned v, int width)
@@ -463,9 +503,10 @@ int fat_dir(int slot)
     if (r < 0)
         return r;
     struct file d;
-    start(&d, vol.root, 1, 0);
+    start(&d, vol.dir, 1, 0);
     unsigned char *e;
     unsigned nfiles = 0, ndirs = 0;
+    nice_print("Directory of " FOLDER "\r\n");
     while ((r = entry(&d, &e)) == 1) {
         for (int k = 0; k < 11; k++) {
             if (k == 8)

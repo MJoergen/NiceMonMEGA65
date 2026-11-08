@@ -826,9 +826,10 @@ card. A slot without a card, a card without `55 AA` in sector 0, which
 is not formatted, and a card with another file system, exFAT or NTFS,
 or a GPT, which the check does not know, are named after NOT COVERED.
 For a card with a FAT32 file system, as the monitor finds it, the script
-also lists the root directory itself from the sectors it reads, and,
-after the primes, loads the monitor of the tests and types `dir SLOT`,
-whose rows must be the same (#58); a card with none is NOT COVERED there.
+also lists the folder `NICE` itself from the sectors it reads, or finds
+that the root has none, and, after the primes, loads the monitor of the
+tests and types `dir SLOT`, whose rows, or error 29, must be the same
+(#58, #91); a card with no FAT32 is NOT COVERED there.
 On the R3, slot 1 has no card detect, so it is always tried, and fails
 without a card.
 

@@ -120,7 +120,9 @@ monitor, and the reset button starts the monitor again. The ROM can also hold a 
 Programs reach the boards' SD cards through the SD card controller of
 nice_cpu, at `0xFFFFFFA0`, a sector of 512 bytes at a time, as in
 `niceemu --sd0` and `--sd1`. The monitor reads FAT32 cards, in the
-root directory, with `dir` and `load`, and programs read their files
+folder `NICE` of the root directory, with `dir` and `load`, and fails
+on a card without it, as a card may be shared with other cores, each
+with a folder of its own. Programs read their files
 through its entries
 ([monitor/README.md](monitor/README.md#files)). It does not write them
 yet. On the

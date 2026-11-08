@@ -12,8 +12,9 @@
 #
 # The assembler has no include, so the monitor is the cat of monitor.nasm,
 # monlib.nasm, mon.nasm, build/rom_c.nasm, nice_cpu's lib.nasm and
-# muldiv_mpu.nasm, and build/version.nasm, which defines the label VERSION
-# (monitor.nasm). build/rom_c.nasm is the ROM's C code, ROM_C, which clang
+# muldiv_mpu.nasm, build/version.nasm, which defines the label VERSION
+# (monitor.nasm), and build/folder.nasm, the text of the error of a card
+# without the folder FOLDER. build/rom_c.nasm is the ROM's C code, ROM_C, which clang
 # compiles to one wasm module and nicewasm --ram translates for the ROM
 # (README.md, "C in the ROM"), so the monitor needs clang with the wasm32
 # target, wasm-ld, and llvm-ar for the C library.
@@ -41,8 +42,19 @@ RUNTIME_ROM = $(RUNTIME)/lib.nasm $(RUNTIME)/muldiv_mpu.nasm
 ROM_CFLAGS = --target=wasm32 -mbulk-memory -mtail-call -Os -ffreestanding -fvisibility=default \
              -nostdlibinc -isystem $(LIBC)/include -nostdlib -Wl,--no-entry \
              -Wl,--export-dynamic -Wl,--allow-undefined -Wl,--stack-first \
-             -Wl,--export=__heap_base -Wl,-z,stack-size=4096
+             -Wl,--export=__heap_base -Wl,-z,stack-size=4096 -DFOLDER='"$(FOLDER_UC)"'
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo unknown)
+# The folder of the card's root directory that holds NiceMon's files
+# (fat32.c, README.md, "Files"): NICE, or with make FOLDER=NAME another
+# 8.3 name of 1 to 8 letters, digits, _, and -, in either case. It reaches
+# the C code as the define FOLDER, and build/folder.nasm as the text of
+# error 29. The tests need NICE.
+FOLDER  ?= NICE
+FOLDER_UC := $(shell echo '$(FOLDER)' | tr a-z A-Z)
+ifneq ($(shell echo '$(FOLDER_UC)' | grep -Ex '[A-Z0-9_-]{1,8}'),$(FOLDER_UC))
+$(error FOLDER=$(FOLDER) is not a folder name of 1 to 8 letters, digits, _, and -)
+endif
+FOLDER_ERROR = E_FS29 .ASCII_L 'no folder $(FOLDER_UC) on the card'
 # The words that the ROM's C code writes are in the RAM from WASM_RAM up to
 # below WASM_END (monitor.nasm), and ___wasm_ram_end is the word after them.
 WASM_RAM = $(shell sed -n 's/^WASM_RAM *\.EQU *\(0x[0-9A-Fa-f]*\).*/\1/p' monitor.nasm)
@@ -62,16 +74,18 @@ CHECK_END = $(PYTHON) -c 'import sys; top = int(open(sys.argv[1]).read().split()
 
 all: $(BUILD)/monitor.bin
 
-$(BUILD)/monitor.bin: $(SOURCES) $(BUILD)/rom_c.nasm $(RUNTIME_ROM) $(BUILD)/version.nasm $(TOOLS)
-	@cat $(SOURCES) $(BUILD)/rom_c.nasm $(RUNTIME_ROM) $(BUILD)/version.nasm > $(BUILD)/monitor_all.nasm
+$(BUILD)/monitor.bin: $(SOURCES) $(BUILD)/rom_c.nasm $(RUNTIME_ROM) $(BUILD)/version.nasm \
+                      $(BUILD)/folder.nasm $(TOOLS)
+	@cat $(SOURCES) $(BUILD)/rom_c.nasm $(RUNTIME_ROM) $(BUILD)/version.nasm \
+	  $(BUILD)/folder.nasm > $(BUILD)/monitor_all.nasm
 	$(ASM) -o $@ $(BUILD)/monitor_all.nasm
 	@$(CHECK_END) $@ $(DEMO)
 
 # The ROM's C code, and for the test of it, rom, with test/rom.c after
 # ROM_C. The C library is built if it is missing.
-$(BUILD)/rom_c.wasm: $(ROM_C) $(LIBC)/libc.a Makefile | $(BUILD)
+$(BUILD)/rom_c.wasm: $(ROM_C) $(LIBC)/libc.a Makefile $(BUILD)/folder.nasm | $(BUILD)
 	@$(CLANG) $(ROM_CFLAGS) -o $@ $(ROM_C) $(LIBC)/libc.a
-$(BUILD)/rom_c_test.wasm: $(ROM_C) test/rom.c $(LIBC)/libc.a Makefile | $(BUILD)
+$(BUILD)/rom_c_test.wasm: $(ROM_C) test/rom.c $(LIBC)/libc.a Makefile $(BUILD)/folder.nasm | $(BUILD)
 	@$(CLANG) $(ROM_CFLAGS) -o $@ $(ROM_C) test/rom.c $(LIBC)/libc.a
 $(BUILD)/rom_c.nasm $(BUILD)/rom_c_test.nasm: $(BUILD)/%.nasm: $(BUILD)/%.wasm $(TOOLS) monitor.nasm
 	@$(NICEWASM) --ram $(WASM_RAM) -o $@ $<
@@ -86,10 +100,17 @@ $(BUILD)/version.nasm: FORCE | $(BUILD)
 	@echo "VERSION .ASCII_L '$(VERSION)'" | cmp -s - $@ || \
 	  echo "VERSION .ASCII_L '$(VERSION)'" > $@
 
+# Written only when FOLDER changes, as version.nasm is, and the C code is
+# compiled again then
+$(BUILD)/folder.nasm: FORCE | $(BUILD)
+	@echo "$(FOLDER_ERROR)" | cmp -s - $@ || echo "$(FOLDER_ERROR)" > $@
+
 # The test has a version of its own, so that its output does not change
 # with every commit.
-$(BUILD)/monitor_test.bin: $(SOURCES) $(BUILD)/rom_c.nasm $(RUNTIME_ROM) $(TOOLS) | $(BUILD)
-	@(cat $(SOURCES) $(BUILD)/rom_c.nasm $(RUNTIME_ROM); echo "VERSION .ASCII_L 'V9.9'") \
+$(BUILD)/monitor_test.bin: $(SOURCES) $(BUILD)/rom_c.nasm $(RUNTIME_ROM) $(BUILD)/folder.nasm \
+                           $(TOOLS) | $(BUILD)
+	@(cat $(SOURCES) $(BUILD)/rom_c.nasm $(RUNTIME_ROM) $(BUILD)/folder.nasm; \
+	  echo "VERSION .ASCII_L 'V9.9'") \
 	  > $(BUILD)/monitor_test_all.nasm
 	@$(ASM) -o $@ $(BUILD)/monitor_test_all.nasm
 	@$(CHECK_END) $@ $(DEMO)
@@ -97,8 +118,10 @@ $(BUILD)/monitor_test.bin: $(SOURCES) $(BUILD)/rom_c.nasm $(RUNTIME_ROM) $(TOOLS
 # The test of the ROM's C code: the monitor of the tests with test/rom.c in
 # its module, and test/rom.nasm after it, which calls its functions by
 # their labels, in one image, which runs without monitor_test.bin.
-$(BUILD)/rom.bin: $(SOURCES) $(BUILD)/rom_c_test.nasm test/rom.nasm $(RUNTIME_ROM) $(TOOLS) | $(BUILD)
-	@(cat $(SOURCES) $(BUILD)/rom_c_test.nasm $(RUNTIME_ROM); echo "VERSION .ASCII_L 'V9.9'"; \
+$(BUILD)/rom.bin: $(SOURCES) $(BUILD)/rom_c_test.nasm test/rom.nasm $(RUNTIME_ROM) \
+                  $(BUILD)/folder.nasm $(TOOLS) | $(BUILD)
+	@(cat $(SOURCES) $(BUILD)/rom_c_test.nasm $(RUNTIME_ROM) $(BUILD)/folder.nasm; \
+	  echo "VERSION .ASCII_L 'V9.9'"; \
 	  cat test/rom.nasm) > $(BUILD)/rom_all.nasm
 	@$(ASM) --symbols $(BUILD)/rom.sym -o $@ $(BUILD)/rom_all.nasm
 
@@ -148,7 +171,8 @@ $(BUILD)/fs.bin: test/fs.nasm mon.nasm $(TOOLS) | $(BUILD)
 
 # The FAT images of the tests, from test/fat_image.py, with build/hello.bin
 # as HELLO.BIN. They need mkfs.fat, sfdisk, and mtools.
-FAT_IMAGES = $(addprefix $(BUILD)/fat/,fat32.img super.img fat16.img exfat.img)
+FAT_IMAGES = $(addprefix $(BUILD)/fat/,fat32.img super.img fat16.img exfat.img nonice.img \
+                                    nicefile.img)
 $(FAT_IMAGES) &: test/fat_image.py $(BUILD)/hello.bin
 	@mkdir -p $(BUILD)/fat
 	@$(PYTHON) test/fat_image.py $(BUILD)/hello.bin $(BUILD)/fat
@@ -237,6 +261,10 @@ FAT  = dir\rDIR 1\rdir 0\rload frag.bin\rd 9000 4\rd 9068 4\rload readme.txt\rlo
 # slot 1, which the first dir mounts
 FATBAD = dir\rdir 1\rdir 0\rh\r
 FAT1 = dir\rh\r
+# fatnone: nonice.img in slot 0, a card without the folder NICE, and
+# nicefile.img in slot 1, whose NICE is a file, which dir and load reject
+# with error 29, and never fall back to the root's HELLO.BIN
+FATNONE = dir\rload hello.bin\rdir 1\rload hello.bin\rh\r
 
 # The words of each test that are dumped with the screen: for cmds the
 # variables, the cursor's registers, and the IP and MAC addresses, and for the programs the text at
@@ -290,6 +318,7 @@ MAX_STEPS = 10000000
 test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.bin $(BUILD)/hello.bin \
       $(BUILD)/dis.bin $(BUILD)/sd.bin $(BUILD)/arp.bin $(BUILD)/rom.bin $(BUILD)/fs.bin \
       $(FAT_IMAGES)
+	@test '$(FOLDER_UC)' = NICE || { echo "make test needs FOLDER=NICE, not $(FOLDER)"; exit 1; }
 	@$(PYTHON) test/ring.py $(EMU) $(BUILD)/monitor_test.bin:32768 \
 	  $(BUILD)/monitor_8k.bin:8192 $(BUILD)/monitor_2k.bin:2048
 	@$(PYTHON) test/dis.py $(EMU) $(BUILD)/monitor_test.bin $(BUILD)/dis.bin
@@ -308,11 +337,12 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	@printf '$(FAT)' > $(BUILD)/fat.txt
 	@printf '$(FATBAD)' > $(BUILD)/fatbad.txt
 	@printf '$(FAT1)' > $(BUILD)/fat1.txt
+	@printf '$(FATNONE)' > $(BUILD)/fatnone.txt
 	@$(PYTHON) test/sd_image.py $(BUILD)/sd.img
 	@$(PYTHON) test/sd_image.py --written $(BUILD)/sd_written.img
 	@{ printf '$(LOAD_HEAD)'; head -n 3 $(BUILD)/hello.bin | awk '{ printf "%s\r\n", $$0 }'; \
 	  tail -n +4 $(BUILD)/hello.bin; printf '$(LOAD_TAIL)'; } > $(BUILD)/load.txt
-	@fail=0; for t in cmds scroll load load_emu load_64k sd sd_write arp rom fs fat fatbad fat1 hello reset hello_c; do \
+	@fail=0; for t in cmds scroll load load_emu load_64k sd sd_write arp rom fs fat fatbad fat1 fatnone hello reset hello_c; do \
 	  opts=; rom=$(BUILD)/monitor_test.bin; \
 	  case $$t in \
 	    cmds) prog=; input=cmds; dump='$(DUMP_cmds)';; \
@@ -333,6 +363,8 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	    fatbad) prog=; input=fatbad; dump=; \
 	      opts="--sd0 $(BUILD)/fat/fat16.img --sd1 $(BUILD)/fat/exfat.img";; \
 	    fat1) prog=; input=fat1; dump=; opts="--sd1 $(BUILD)/fat/super.img";; \
+	    fatnone) prog=; input=fatnone; dump=; \
+	      opts="--sd0 $(BUILD)/fat/nonice.img --sd1 $(BUILD)/fat/nicefile.img";; \
 	    hello) prog=$(BUILD)/hello.bin; input=run; dump='$(DUMP_hello)';; \
 	    reset) prog=$(BUILD)/hello.bin; input=reset; dump='$(DUMP_hello)';; \
 	    hello_c) prog=$(BUILD)/hello_c.bin; input=run; dump='$(DUMP_hello_c)'; \

@@ -1,6 +1,7 @@
 NiceMon V9.9
 ? lists the commands
 > dir
+Directory of NICE
 HELLO    BIN       13158
 Files: 1, directories: 0
 > h
@@ -9,6 +10,7 @@ Screen:
 |NiceMon V9.9
 |? lists the commands
 |> dir
+|Directory of NICE
 |HELLO    BIN       13158
 |Files: 1, directories: 0
 |> h

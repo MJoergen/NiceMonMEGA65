@@ -294,7 +294,11 @@ and must be formatted. FAT12 and FAT16 are rejected with a message.
   that `fsck.fat` finds no orphans.
 - **Directories**: in FAT32 the root directory is a cluster chain like any
   other, so a current directory is one cluster number, and `cd` costs
-  little. The first stage has the root only.
+  little. NiceMon works in its folder of the root, `NICE` unless the
+  monitor's build sets another (#91), as a card may be shared by several
+  cores on the MEGA65, each with a root folder of its own. A card without
+  it is refused, with no fallback to the root, and the ROM never creates
+  it, so writing (#59) happens only in a folder that the user made.
 - **Writing**, in an order that a reset at any point leaves no worse than a
   lost cluster: the data, then both copies of the FAT, then the directory
   entry. A new cluster is searched from FSInfo's next-free hint, as the FAT
@@ -412,8 +416,8 @@ numbers and no Commodore DOS, as #54 says.
    (MJoergen/nice_cpu#138, #86). This decides nothing for BASIC, #54's
    second question.
 2. **Writes to the MEGA65's internal card**, which holds its system files:
-   allowed as to the microSD, or only in a directory of NiceMon's own, such
-   as `/NICE`.
+   settled by #91, only in NiceMon's folder, `/NICE`, on either card, as
+   reading is.
 3. **One controller or two**: settled by #55, one with a multiplexer. Two
    would keep both cards started up, and cost twice the logic for a gain
    only when a program copies between the cards.
@@ -434,6 +438,7 @@ ROM is developed in niceemu and needs no board.
 | #56 | Done in V1.5: the pins on the R3, R6, and Nexys4DDR, and the read-only check in `make hwtest` |
 | #57 | Done in V1.7.1: the sector routines in the ROM, and the monitor's `sd` command |
 | #58 | Done in V1.9: FAT32 reading, `dir`, and `load` |
+| #91 | Done in V1.9: the folder `NICE`, set at build time |
 | #59 | FAT32 writing, `save`, and `del` |
 | #60 | BASIC's `SAVE`, `LOAD`, and `DIR` |
 | #61 | Later: host tools for files on the board's card, over the link |
