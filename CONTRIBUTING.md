@@ -101,7 +101,7 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
 | [core.mk](core.mk) | Picks the source files of the core, from `NICE`, for the Makefiles of `sim/` and `synth/`. |
 | [.claude/rules/synth.md](.claude/rules/synth.md) | Notes for Claude Code on the Vivado builds: where Vivado is, how to build, and what to check after a build. |
 | [vsg.yml](vsg.yml) | The configuration of `make lint`, which checks the VHDL against [CODING_STYLE.md](doc/CODING_STYLE.md). |
-| [mypy.ini](mypy.ini) | The configuration of `make typecheck`, `mypy --strict` on the Python files of `tools/`, `demo/`, `font/`, and `sim/`. |
+| [mypy.ini](mypy.ini) | The configuration of `make typecheck`, `mypy --strict` on the Python files that it lists: `tools/`, `demo/`, `font/`, `sim/gen_decode.py`, and the scripts of `monitor/test/`. |
 | [CLAUDE.md](CLAUDE.md) | Instructions for Claude Code: the commands, the layout, and the pitfalls. |
 | [.github/workflows/ci.yml](.github/workflows/ci.yml) | The CI: `make test` and `make cosimtest` on both cores, with niceemu built for its step counts, `make examples`, the tests of the demo and the monitor, `make linktest`, `make formal`, `make lint`, and `make typecheck`. It cannot run `make hwtest` or build a bitstream. |
 

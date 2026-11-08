@@ -286,7 +286,7 @@ core:
 
 <pre>
 $ <b>tools/mon.py --eth 192.168.1.65</b>
-halted: HALT, ROM hidden, control 0000000a, link version 0.5, input free 2048
+halted: HALT, ROM hidden, control 0000000a, link version 0.6, input free 2048
 PC=0000000f
 </pre>
 
@@ -333,13 +333,13 @@ clear ends the earlier halt, so bit 1 of the control register is 0:
 <pre>
 $ <b>python3 nice_cpu/assembler/niceasm.py -o echo.bin sim/echo.nasm</b>
 $ <b>tools/mon.py --eth 192.168.1.65</b>
-halted: HALT, ROM hidden, control 0000000a, link version 0.5, input free 2048
+halted: HALT, ROM hidden, control 0000000a, link version 0.6, input free 2048
 PC=0000000f
 'help' lists the commands, and 'q' quits.
 dbg&gt; <b>load echo.bin</b>
 loaded 15 words; the processor is held in reset
 dbg&gt; <b>status</b>
-held, ROM hidden, control 00000009, link version 0.5, input free 2048
+held, ROM hidden, control 00000009, link version 0.6, input free 2048
 dbg&gt; <b>r 0 f</b>
 00000000: 00007800 ffffff00 03a080b0 00000100 3003d800 00000000 01a040b0 000000ff
 00000008: 001c0080 ffffff00 022080b0 0000002e b003d800 00000000 0c000000
@@ -403,7 +403,7 @@ dbg&gt; <b>send .</b>
 .
 [halted: HALT, PC=0000000f]
 dbg&gt; <b>status</b>
-halted: HALT, ROM hidden, control 0000000a, link version 0.5, input free 2048
+halted: HALT, ROM hidden, control 0000000a, link version 0.6, input free 2048
 PC=0000000f
 dbg&gt; <b>q</b>
 </pre>

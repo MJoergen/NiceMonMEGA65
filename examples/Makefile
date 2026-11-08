@@ -6,9 +6,10 @@
 # assembles it with the start-up code and the runtime library. The options
 # are those of nice_cpu/runtime/README.md: they keep the linear memory to
 # one page, 16384 words, so the program fits in the 64K words of the
-# MEGA65's memory. The translated code and the runtime use the math unit,
-# so muldiv_mpu.nasm is joined in. A program that calls scanf is joined
-# with the float library, float.nasm, too, which the runtime builds.
+# Nexys4DDR's memory, the smaller board's. The translated code and the
+# runtime use the math unit, so muldiv_mpu.nasm is joined in. A program
+# that calls scanf is joined with the float library, float.nasm, too,
+# which the runtime builds.
 #
 # make          builds build/primes.bin, and build/bench.bin from nice_cpu's
 #               benchmark, bench/bench.c, which tools/hwtest.py runs

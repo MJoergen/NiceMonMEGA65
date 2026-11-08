@@ -15,10 +15,11 @@ repository.
   and the emulator, `niceemu`.
 - [DEBUGGER.md](DEBUGGER.md) is the design note of the on-board debugger,
   mon.py's functions with the MEGA65's own keyboard and screen, of which
-  stages 1 to 9 are written.
+  stages 1 to 10 are written.
 - [SDCARD.md](SDCARD.md) is the design of the storage on the SD cards,
-  from the registers to BASIC's `SAVE` and `LOAD`. The controller and the
-  slots are written; the ROM's FAT32 and BASIC are not yet.
+  from the registers to BASIC's `SAVE` and `LOAD`. The controller, the
+  slots, and the ROM's reading of FAT32 cards are written; writing and
+  BASIC are not yet.
 - [CODING_STYLE.md](CODING_STYLE.md) is the style that the VHDL follows.
 - [RELEASE.md](RELEASE.md) describes how a release is made.
 - [RELEASE_NOTES.md](RELEASE_NOTES.md) lists the changes in each release,

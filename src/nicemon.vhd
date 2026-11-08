@@ -12,7 +12,7 @@
 --   start   bit 0 goes from 1 to 0: the devices reset, and the core runs
 --   hidden  bit 3 is 1: the ROM is out of the way, and the RAM is at 0
 --   paused  bit 4 is 1: the core stops between instructions
---   notice  a packet the link sends on its own: b05 at reset, h at a halt,
+--   notice  a packet the link sends on its own: b06 at reset, h at a halt,
 --           p at a pause, x at a breakpoint, and o for a lost input byte
 --
 -- THEORY OF OPERATION
@@ -71,7 +71,7 @@
 --                          A write to it is dropped. The font base, 86
 --                          below, selects the font that the display shows.
 --                          An instruction fetch in 0xFFFE0000-3FFF reads
---                          the RAM's alias there, not a font (SYSTEM.md §5).
+--                          the RAM's alias there, not a font (SYSTEM.md §8).
 --   0xFFFF0000-0xFFFF7FFF  The screen: 2^G_SCR_ADDR_BITS words of memory of
 --                          their own, so that the emulator's 80x25 screen,
 --                          the first 2000, does not land on word 0. The rest
@@ -128,7 +128,7 @@
 --                          (nice_cpu/hdl/src/fetch_stats.vhd), part of the
 --                          performance counters of SYSTEM.md §3. The
 --                          multi-cycle core reports no events to them, so
---                          only FS_CYCLES and FS_HIST[0] count.
+--                          only FS_CYCLES and FS_CAUSE + 14, OTHER, count.
 --   0xFFFFFF80-0xFFFFFF8F  The screen's registers (src/scr_regs.vhd),
 --                          numbered as QNICE-FPGA's VGA registers at
 --                          0xFF30, for the display: 80 is the state, with
@@ -219,7 +219,7 @@
 --                          live while it runs and those of the stop after
 --                          a halt or at a pause (DEBUG.md §6), the control
 --                          register, the halt reason (1 to 4 here), the
---                          version, 5 (DEBUG.md §6), the free space of the core's input
+--                          version, 6 (DEBUG.md §6), the free space of the core's input
 --                          FIFO, and the G_BREAKS breakpoints: their enable
 --                          bits, their number, the stop register, and
 --                          their addresses. The bits of the control
@@ -304,7 +304,7 @@
 -- Synchronous. After reset bit 0 of the control register is 1 when
 -- G_CPU_RUN_AT_RESET is false, so the core waits for the host, and 0
 -- otherwise, so the core boots from the ROM, which reset shows: rom_hidden is
--- cleared, or stays 1 in a build without a ROM. The link sends `b05`, and
+-- cleared, or stays 1 in a build without a ROM. The link sends `b06`, and
 -- clears the breakpoints. The
 -- screen's registers, the read counter, and the board's writable registers
 -- (LEDs, RGB levels, and display segments), which the clear keeps, are

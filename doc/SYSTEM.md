@@ -33,7 +33,7 @@ the program's console bytes both ways, and between them it carries
 packets, which start with the byte `0xFF`. A console byte `0xFF` is sent
 as two. With the packets, a host reads and writes memory and the debug
 registers at `0xFFFFFFE0`–`FF` (see [Address map](#address-map)). The
-board sends a notice at reset (`b05`), when the core halts (`h` and the
+board sends a notice at reset (`b06`), when the core halts (`h` and the
 reason), and when an input byte is lost (`o`). The tools in `tools/` are
 such a host, and `niceemu --link` serves the same link, so the tools
 drive the emulator as they drive the board. The tools use 230400 baud too.
@@ -309,7 +309,7 @@ program's font stays in the RAM. The font RAM is 0 at power-up and after
 a clear, and a start keeps it, as it keeps the screen. An instruction
 fetch in `0xFFFE0000`–`0xFFFE3FFF` reads the RAM there, which these
 words alias, and not the fonts, so a program does not run from its font
-(nice_cpu's SYSTEM.md §5, and [EMULATOR.md](EMULATOR.md)).
+(nice_cpu's SYSTEM.md §8, and [EMULATOR.md](EMULATOR.md)).
 
 The video output comes from MandelbrotMEGA65, which uses the same mode on
 the MEGA65. The HDMI output is DVI, without sound.
@@ -372,8 +372,11 @@ runtime has, and the monitor has its stack and variables below
 nice_cpu has at `0x1000`, a pushed return address is lost and reads back
 as 0, and the program starts over, forever.
 
-A C program cannot run from the ROM either: it keeps its data in its own
-image, which would be in the ROM, so its writes would be lost.
+A C program keeps its data in its own image, which would be in the ROM,
+so its writes would be lost. It runs from the ROM when it is built with
+`nicebuild.py --ram ADDR`, which puts the words it writes in the RAM from
+`ADDR`, as the monitor's C code has them at `0xFFFFF400`
+([monitor/README.md](../monitor/README.md#c-in-the-rom)).
 
 While the core runs from the ROM, the link reaches only its debug
 registers. Bit 3 of the control register hides the ROM: a write of
@@ -618,7 +621,8 @@ boards' slots
   the slot that it does not serve rests, with its clock low and the
   other lines high.
 - Init starts the card at 400 kHz, and the commands after it run at
-  25 MHz. It reads the card's version, its type, SDSC or SDHC and SDXC,
+  25 MHz on the MEGA65 and 22.5 MHz on the Nexys4DDR, the clock divided
+  by 4. It reads the card's version, its type, SDSC or SDHC and SDXC,
   and its size from the CSD, and it turns the card's CRC checks on, so
   that a corrupted command or block fails with error 4. Every step has a
   timeout: about a second for the start-up, 100 ms for a block to read,

@@ -265,9 +265,10 @@ All builds meet the clock. These are the worst setup and hold slacks:
 | Nexys4DDR, `NICE=multi` | 90 MHz | 0.19 ns | – |
 
 The R6's pipelined row is from the build of the V1.1 bump, at nice_cpu
-V1.1, with the debug link of version 5, the one that `verified.json`
-records; a later build with stage 1 of the on-board debugger has 0.114 ns
-and 0.042 ns, and 139 block RAMs, and one with stage 3, the debugger
+V1.1, with the debug link of version 5, and `verified.json` records the
+build of the latest release's bump. A later build with stage 1 of the
+on-board debugger has 0.114 ns and 0.042 ns, and 139 block RAMs, and
+one with stage 3, the debugger
 that drives the link, 0.080 ns and 0.038 ns, and 139.5 block RAMs. The
 debugger takes 730 LUTs and 1051 flip-flops there, 293 and 286 of them
 in its host of the link (`dbg_host`), and half a block RAM, for the

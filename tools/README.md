@@ -32,10 +32,14 @@ same link, so the tools drive the emulator as they drive the board.
 When they connect, the tools read the link's version, and stop on a
 major other than 0, which they do not know (DEBUG.md §9).
 
-Each tool takes the line as an option: `--eth 192.168.1.65` for the
-Ethernet port (see [Over Ethernet](#over-ethernet)), or `--port` for
-the serial port (see [The serial port](#the-serial-port)), such as
-`--port /dev/ttyUSB1`. One of the two must be given.
+`load.py`, `run.py`, and `mon.py` take the line as an option:
+`--eth 192.168.1.65` for the Ethernet port (see
+[Over Ethernet](#over-ethernet)), `--port` for the serial port (see
+[The serial port](#the-serial-port)), such as `--port /dev/ttyUSB1`, or
+`--tcp` and `--cosim` for `niceemu --link` and `make cosim`, with no
+board (see [Without a board](#without-a-board) and [mon.py](#monpy)).
+One of them must be given. `flash.py` and `hwtest.py` take `--port`
+alone, and `hwtest.py`'s `--eth` tests the Ethernet port beside it.
 
 `make` has a target for each tool:
 
@@ -47,8 +51,8 @@ the serial port (see [The serial port](#the-serial-port)), such as
 
 They take `ETH=192.168.1.65` for the Ethernet port, or
 `PORT=/dev/ttyUSB1` for the serial port, and one of the two. They pass
-`ARGS=` on to the tool, for example `ARGS=--no-run` or
-`ARGS="-i in.txt -d 0x100:16 -s --timeout 5"`.
+`ARGS=` on to the tool: `ARGS=--no-run` for `make load`, or
+`ARGS="-i in.txt -d 0x100:16 -s --timeout 5"` for `make run`.
 `ARGS="--tcp 4000"` drives `niceemu --link 4000` instead of the board.
 
 ## Over Ethernet

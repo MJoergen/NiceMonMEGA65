@@ -54,7 +54,7 @@ without the math unit would translate with `nicewasm --no-mpu` and use
 
 The linear memory is one page, 16384 words, and the program and its memory
 must fit below the stack in the RAM. With `printf` and `scanf`, the prime
-example ends at word `0x631F`.
+example ends at word `0x9C5A`.
 
 A program learns the size of the RAM from `0xFFFFFF9E`, which reads its
 words, `0x20000` on the MEGA65 and `0x10000` on the Nexys4DDR. In the
@@ -105,7 +105,10 @@ a loop that copies the ROM, and `niceemu --window` draws the same font.
 
 A program can also be the ROM of a core file (see "Building your own ROM"
 in the [README](../README.md)). The program must fit in the 32K words of
-the ROM. A C program cannot be a ROM, as its data would be in the ROM too.
+the ROM. A C program keeps its data in its image, which would be in the
+ROM too, so it is built with `nicebuild.py --ram ADDR`, which puts the
+words it writes in the RAM from `ADDR`, as the monitor's C code is
+([monitor/README.md](../monitor/README.md#c-in-the-rom)).
 A program in the ROM also has some limits on its writes, which
 [SYSTEM.md](SYSTEM.md#the-rom) describes: the main one is that the stack
 and the variables must be in the RAM, at `0x8000` or above.

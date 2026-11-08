@@ -87,8 +87,8 @@
 --    read-only words and those that are not registers take no write.
 -- 9c. Then G_COUNTERS_FILE reads through the core's data bus what the link
 --    reads elsewhere: the fetch statistics, which the start cleared and the
---    program stops, so FS_CYCLES is small, the FS_HIST words sum to it, and
---    with the multi-cycle core FS_HIST[0] is all of it; the microsecond
+--    program stops, so FS_CYCLES is small, the FS_CAUSE words sum to it, and
+--    with the multi-cycle core only FS_CAUSE + 14 counts; the microsecond
 --    counter, right after the cycle counter; the LEDs, which it writes; and
 --    the buttons and switches; and the fonts, a row of the font RAM that
 --    it writes and reads at once, a row of the ROM, which drops its write,

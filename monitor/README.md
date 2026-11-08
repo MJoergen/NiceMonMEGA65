@@ -75,11 +75,11 @@ the MEGA65 and 77 on the Nexys4DDR (Input and output below).
 | `c` | Clears the screen. |
 | `v` | The version of the monitor, and of the dispatch table: `NiceMon V1.9, table 1.1`. |
 | `i [A.B.C.D]` | Shows the Ethernet station's IP address, `IP address 192.168.1.65`, or writes it first: four decimal numbers of 0 to 255 with dots between them, such as `i 192.168.1.65`. Anything but an address or `dhcp` is no address, and `i` says so and writes nothing. It writes `0xFFFFFFB0`, `NET_IP` ([SYSTEM.md](../doc/SYSTEM.md#the-ethernet-station)), so a host connected over TCP loses its connection. In `niceemu` it is a register that keeps what is written. |
-| `i dhcp` | Gets the IP address from the network's DHCP server and writes it, as `i A.B.C.D` does, then shows it, with the mask, the gateway, and the server, a line each (The network below). Without an answer, it prints `No answer from a DHCP server` after about 16 seconds, and leaves the address as it was. |
+| `i dhcp` | Gets the IP address from the network's DHCP server and writes it, as `i A.B.C.D` does, then shows it, with the mask, the gateway, and the server, a line each (The network below). Without an answer, it prints `No answer from a DHCP server` after about 8 seconds, and leaves the address as it was. |
 | `m [MAC]` | Shows the station's MAC address, `MAC address 02:4E:49:43:45:00`, or writes it first: six bytes of one or two hex digits, in either case, with colons between them, such as `m 02:4E:49:43:45:01`. The first byte must be even, as an odd one makes a group address. Anything else is no address, and `m` says so and writes nothing. It writes `0xFFFFFFB1` and `B2`, so a host connected over TCP loses its connection. Two boards on one network need different MAC addresses. In `niceemu` they are registers too, with the address of a board after reset. |
 | `l` | Loads words into the RAM from lines of `ADDR WORD` in hex, as a `.bin` file has them (Loading without a host below), up to an empty line, and prints the words written and the lines skipped: `Words loaded: 600, 00008000 to 00008257`. |
 | `sd [SLOT] LBA` | Shows the sector `LBA` of the SD card in `SLOT`, both in hex, as 32 rows of 16 bytes: the offset in the sector, the bytes in hex, and the bytes as text, with a dot for a byte outside `0x20` to `0x7E` (The SD cards below). Without `SLOT`, the slot of the last `sd`, 0 after reset. An error of the controller is shown with its number and its meaning: `SD error 1 in slot 1, no card`. |
-| `dir [SLOT]` | Lists the folder `NICE` of the SD card's FAT32 file system (Files below): `Directory of NICE`, then a row for each file, its 8.3 name and its size in decimal, and for each directory, its name and `<DIR>`, then `Files: 25, directories: 1`. With `SLOT` in hex, it mounts the card in it first; without, it lists the card mounted, which the first `dir` or `load` after reset mounts. An error is shown with its number and meaning: `File error 18, FAT16, which is not supported`. |
+| `dir [SLOT]` | Lists the folder `NICE` of the SD card's FAT32 file system (Files below): `Directory of NICE`, then a row for each file, its 8.3 name, the name and the extension a space apart, and its size in decimal, and for each directory, its name and `<DIR>`, then `Files: 25, directories: 1`. With `SLOT` in hex, it mounts the card in it first; without, it lists the card mounted, which the first `dir` or `load` after reset mounts. An error is shown with its number and meaning: `File error 18, FAT16, which is not supported`. |
 | `load NAME` | Loads the `.bin` file `NAME` of the card's folder `NICE` as `l` loads lines, and prints the same summary, so a program copied to the card on a PC loads with no host. Unlike `l`, an empty line is passed over, the end of the file ends the load, and a skipped line is counted from the first line of the file. `NAME` is an 8.3 name, in either case. |
 | `x` | Runs the demo of the ROM, for the time being (The demo below). Without a demo in the ROM, `x` says so. |
 | `h` | Halts the core, which the reset button, or a host over the link, starts again. The tests end with it. |
@@ -144,10 +144,11 @@ board:
     cp build/hello.bin /media/card/NICE/
 
 - **The card** is FAT32 when its sector 0 is a FAT32 boot sector, as
-  `mkfs.fat` makes on a whole card, or an MBR whose first partition of
-  type `0x0B` or `0x0C` has one. FAT12, FAT16, and exFAT are rejected with
-  errors of their own. The type is told by the count of clusters, as
-  Microsoft's specification says.
+  `mkfs.fat` makes on a whole card, or an MBR with a partition of type
+  `0x0B` or `0x0C`, the first of them, which has one; without such a
+  partition, the first partition's boot sector says what it holds. FAT12,
+  FAT16, and exFAT are rejected with errors of their own. The type is
+  told by the count of clusters, as Microsoft's specification says.
 - **The mount**: `fs_mount` mounts the card in a slot. `fs_open`, `dir`,
   and `load` mount the slot of the last mount when there is none, or
   after reset slot 0, or slot 1 when slot 0 has no card and the board
@@ -165,7 +166,7 @@ board:
   is built, `make monitor FOLDER=NAME`, an 8.3 name of 1 to 8 letters,
   digits, `_`, and `-`, in either case, which error -29's text names; the
   tests need `NICE`. Long names are passed over, so a file shows its 8.3
-  name, such as `ALONGN~1.TXT`, and so are deleted entries, `.`, and
+  name, such as `ALONGN~1 TXT`, and so are deleted entries, `.`, and
   `..`.
 - **The caches** are one sector of the FAT, and one for each of the two
   files that may be open at once, in the C code's RAM.
@@ -448,15 +449,15 @@ What QMON's table has that this one leaves out:
   A program that drives the SD registers itself mounts the card again
   afterwards. The frame routines and the ARP cache stay inside it too
   (#83), until the UDP entries of #84.
-- The `f32_*!` entries: not yet. The file API, `fs_mount` and the
-  others, comes as entries from 9 with #58 and #59, as
+- The `f32_*!` entries: the file API instead, `fs_mount` and the others,
+  entries 9 to 13 (#58), with writing to come (#59), as
   [doc/SDCARD.md](../doc/SDCARD.md) says.
 
 ## C in the ROM
 
-Part of the ROM is C, through nice_cpu's wasm translator, as the FAT32
-code of [#58](https://github.com/MJoergen/NiceMonMEGA65/issues/58)
-will be. `rom.c` and the files after it in the Makefile's `ROM_C` are
+Part of the ROM is C, through nice_cpu's wasm translator: the FAT32
+code of [#58](https://github.com/MJoergen/NiceMonMEGA65/issues/58),
+`fat32.c`. `rom.c` and the files after it in the Makefile's `ROM_C` are
 compiled to one wasm module, which `nicewasm --ram` translates for code
 that runs from a ROM (nice_cpu's translator README, "Code in a ROM"),
 at `-Os`, which makes it a fifth smaller than `-O2`. The Makefile joins
@@ -736,7 +737,7 @@ in the ROM. Until then
 the boards and of the release has the demo behind the monitor, and `x`
 runs it. The demo is a program assembled at `0x8000`
 ([demo/](../demo/README.md)), and `demo/join.py` puts it in the ROM at
-`DEMO`, `0x2000`: the number of its words first, then the words. `x`
+`DEMO`, `0x4000`: the number of its words first, then the words. `x`
 copies them to `0x8000` and runs them as `r` runs a program, and the
 demo's F12 returns. The demo clears the screen before it returns, and
 leaves the cursor at the top left, but the monitor keeps a cursor of its
@@ -752,7 +753,7 @@ the dispatch table, and both go when the demo goes; `release.py` and
 - QMON's SD card and FAT32 code, about half of QMON, is for QNICE's
   registers, and `qtransfer` has no hardware here. The sector routines
   were written anew for nice_cpu's registers (The SD cards above), and
-  FAT32 comes with
+  FAT32 in C, `fat32.c`, with
   [#58](https://github.com/MJoergen/NiceMonMEGA65/issues/58).
 - QMON's disassembler is for QNICE; `u` was written anew for the NICE
   instruction set, with nice_cpu's `assembler/nicedis.py` as the model

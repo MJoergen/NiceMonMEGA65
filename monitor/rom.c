@@ -3,5 +3,5 @@
 // translates for the ROM, with its writable words in the RAM at WASM_RAM
 // (monitor.nasm). Each function that is not static is exported, and the
 // monitor's assembly calls it as _name, in the C ABI of nice_cpu's
-// runtime/ABI.md. The file is empty until the FAT32 code of issue #58
-// comes, so the module is only its stack.
+// runtime/ABI.md. This file is empty; the module's code is fat32.c, the
+// FAT32 code of issue #58.
