@@ -215,9 +215,13 @@ $(BUILD)/hello_c.bin: test/hello.c mon.h mon.nasm $(TOOLS) | $(BUILD)
 # 02:4E:49:43:45:01; five addresses are rejected, with too few bytes, a
 # byte of three digits, a group address, a blank inside, and a letter
 # after them; and the last, with blanks around it and bytes of one digit
-# in lower case, is written, which the dump of 0xFFFFFFB1-B2 shows. h ends
-# each input. dash's printf, the shell of make on Ubuntu, has no \x.
-CMDS = ?\rv\rd 0 6\rd\rD 10 1\rq\r\r  c\rabc\177\177\177v\rjunk\003v\r\033[A\033OPv\rx\rr\rr 9000\rd 8000 0\rd 8000\rd 0 100\ri\ri 192.168.1.65\ri 1.2.3\ri 256.0.0.1\ri 1..2.3\ri 1.2.3.4x\ri  010.0.0.1 \rm\rm 02:4E:49:43:45:01\rm 2:4e:49:43:45\rm 2:4e:49:43:45:123\rm 3:0:0:0:0:0\rm 2:4e: 49:43:45:1\rm 2:4e:49:43:45:1x\rm  a:b:c:d:e:f \rh\r
+# in lower case, is written, which the dump of 0xFFFFFFB1-B2 shows. baud
+# shows the rate, 0 in niceemu, and writes 921600; six rates are
+# rejected, one not in the list, a letter after the digits, two numbers,
+# and too many digits, baudx and b are no commands; and the last, in upper
+# case with blanks around it, is written, which the dump of 0xFFFFFF9F
+# shows. h ends each input. dash's printf, the shell of make on Ubuntu, has no \x.
+CMDS = ?\rv\rd 0 6\rd\rD 10 1\rq\r\r  c\rabc\177\177\177v\rjunk\003v\r\033[A\033OPv\rx\rr\rr 9000\rd 8000 0\rd 8000\rd 0 100\ri\ri 192.168.1.65\ri 1.2.3\ri 256.0.0.1\ri 1..2.3\ri 1.2.3.4x\ri  010.0.0.1 \rm\rm 02:4E:49:43:45:01\rm 2:4e:49:43:45\rm 2:4e:49:43:45:123\rm 3:0:0:0:0:0\rm 2:4e: 49:43:45:1\rm 2:4e:49:43:45:1x\rm  a:b:c:d:e:f \rbaud\rbaud 921600\rbaud 9600\rbaud 9600x\rbaud 1 2\rbaud 123456789\rbaudx\rb\rBAUD  115200 \rh\r
 RUN  = r\rh\r
 # reset: r 0, the cold start, which shows the banner again and leaves the
 # RAM from 0x8000 alone, so that r then runs hello.
@@ -295,7 +299,7 @@ FATW = l\r8000 1234ABCD\r8001 5\r\rsave test.bin 8000 2\rdir\rload TEST.BIN\rd 8
 # hello the 0x80 after it, the screen's state, in which the return showed
 # the cursor that hello hid, the font base, which the return made 0, and
 # the row of the glyph of 0x80 that hello drew.
-DUMP_cmds    = -d 0xFFFFF000:5 -d 0xFFFFFF80:6 -d 0xFFFFFFB0:3
+DUMP_cmds    = -d 0xFFFFF000:5 -d 0xFFFFFF80:6 -d 0xFFFFFF9F:1 -d 0xFFFFFFB0:3
 # For scroll the variables and the screen's registers, and the last four
 # digits of the address that starts a row of the history (the words 4 to
 # 7 of the row): the rows of 869C and 8698 that Page Up turned to slots 0

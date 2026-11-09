@@ -114,6 +114,7 @@ E_IP            .EQU    0xFFFFFFB0      ; the network station's IP address, NET_
 E_MACH          .EQU    0xFFFFFFB1      ; the first two bytes of its MAC address, in bits 15..0
 E_MACL          .EQU    0xFFFFFFB2      ; the last four bytes of its MAC address
 RAM_WORDS       .EQU    0xFFFFFF9E      ; the words of the RAM, 0 in niceemu, where there is no limit
+UART_BAUD       .EQU    0xFFFFFF9F      ; the UART's baud rate in bit/s, memory in niceemu
 
 STACK           .EQU    0xFFFFF000      ; SP at the cold start, above the program's RAM
 V_COL           .EQU    0xFFFFF000      ; the cursor's column, 0 to 79
@@ -479,6 +480,67 @@ ip_byte         ROL     R8, R8, 8       ; the top byte to the bottom
 ip_done         POP     R8
                 POP     R7
                 JMP     _io_crlf        ; which returns to the caller
+
+; baud [RATE]: the UART's baud rate (doc/SYSTEM.md, "The baud rate"),
+; written from a decimal number that is one of the rates of BAUD_RATES,
+; and shown. Without a rate it is only shown. Blanks may come before and
+; after the rate, and anything else, or a rate not in the list, makes it
+; no rate, which is not written. The monitor checks the list itself, as
+; niceemu has memory at UART_BAUD. The UART takes the new rate once it
+; has sent nothing for 1 ms, so what the monitor prints after the write,
+; and its prompt, still go out at the old rate. R2 points after the b, R7
+; gathers the rate, and R3 points into the line.
+cmd_baud
+                MOVE    R1, R2
+                MOVE    R2, S_AUD
+                CALL    match           ; R1 after aud, or 0
+                TST     R1
+        ?Z      JMP     unknown
+                MOVE    R3, R1
+                TST     @R3
+        ?Z      JMP     baud_show       ; baud alone
+                CMP     @R3, 0x20
+        ?!Z     JMP     unknown         ; baudx
+baud_blank
+                CMP     @R3, 0x20
+        ?Z      ADD     R3, R3, 1
+        ?Z      JMP     baud_blank
+                TST     @R3
+        ?Z      JMP     baud_show       ; no rate
+                MOVE    R7, 0
+baud_digit
+                SUB     R2, @R3, 0x30
+                CMP     R2, 10
+        ?!C     JMP     baud_end        ; no digit
+                CMP     R7, 10000000
+        ?!C     JMP     baud_bad        ; too many digits for a rate
+                ADD     R7, R7, R7      ; R7 is 10 * R7 + the digit
+                ADD     R2, R2, R7
+                SHL     R7, R7, 2
+                ADD     R7, R7, R2
+                ADD     R3, R3, 1
+                JMP     baud_digit
+baud_end
+                CALL    rest_blank      ; also no digit at all
+        ?!Z     JMP     baud_bad
+                MOVE    R1, BAUD_RATES
+baud_find
+                MOVE[M] R2, @R1++
+        ?Z      JMP     baud_bad        ; not in the list
+                CMP     R2, R7
+        ?!Z     JMP     baud_find
+                MOVE    @UART_BAUD, R7
+baud_show
+                MOVE    R1, S_BAUD
+                CALL    _io_puts
+                MOVE    R1, @UART_BAUD
+                CALL    _io_putdec
+                CALL    _io_crlf
+                JMP     main
+baud_bad
+                MOVE    R1, S_BADBAUD
+                CALL    puts_crlf
+                JMP     main
 
 ; m [MAC]: the Ethernet station's MAC address (doc/SYSTEM.md, "The
 ; Ethernet station"), written from six bytes of one or two hex digits, in
@@ -1458,6 +1520,7 @@ lines           MOVE[M] R1, @R7++
 ; the table.
 COMMANDS
                 .DAT    0x3F, cmd_help  ; ?
+                .DAT    0x62, cmd_baud  ; b, for baud
                 .DAT    0x63, cmd_cls   ; c
                 .DAT    0x64, cmd_dump  ; d
                 .DAT    0x68, cmd_halt  ; h
@@ -1491,6 +1554,7 @@ S_NODEMO
                 .ASCII_L 'No demo in the ROM'
 S_IP            .ASCII_L 'IP address '
 S_MAC           .ASCII_L 'MAC address '
+S_BAUD          .ASCII_L 'Baud rate '
 S_LHINT         .ASCII_L 'ADDR WORD in hex on each line, as in a .bin file; an empty line ends'
 S_LOADED
                 .ASCII_L 'Words loaded: '
@@ -1504,6 +1568,11 @@ S_BADIP         .ASCII_L 'Not an IP address: four numbers from 0 to 255, with do
 S_DHCPW         .ASCII_L 'dhcp'
 S_BADMAC
                 .ASCII_L 'Not a MAC address: six bytes in hex with colons, the first one even'
+S_BADBAUD
+                .ASCII_L 'Not a baud rate: 115200, 230400, 460800, 921600, 1000000, 1500000, or 2000000'
+; The rates that UART_BAUD takes, and a 0
+BAUD_RATES
+                .DAT    115200, 230400, 460800, 921600, 1000000, 1500000, 2000000, 0
 S_FSERR         .ASCII_L 'File error '
 S_OAD           .ASCII_L 'oad'
 S_BADDIR
@@ -1511,6 +1580,7 @@ S_BADDIR
 S_BADLOAD
                 .ASCII_L 'load NAME: the 8.3 name of a file, such as load HELLO.BIN'
 S_AVE           .ASCII_L 'ave'
+S_AUD           .ASCII_L 'aud'
 S_EL            .ASCII_L 'el'
 S_SAVED         .ASCII_L 'Words saved: '
 S_BADSAVE
@@ -1546,7 +1616,7 @@ E_FS31          .ASCII_L 'the file is open'
 E_FS32          .ASCII_L 'the file is read-only'
 
 HELP            .DAT    H_R, H_L, H_LOAD, H_SAVE, H_DEL, H_TFTP, H_TFTPL, H_X, H_D, H_U
-                .DAT    H_DIR, H_I, H_ID, H_M, H_C, H_V, H_H, H_Q, H_P, 0
+                .DAT    H_DIR, H_I, H_ID, H_M, H_B, H_C, H_V, H_H, H_Q, H_P, 0
 H_R             .ASCII_L 'r [ADDR]      run the program at ADDR, or at 00008000; r 0 restarts'
 H_L             .ASCII_L 'l             enter lines of ADDR WORD in hex, as a .bin file has them'
 H_LOAD          .ASCII_L 'load NAME     load the .bin file NAME of the SD card, as l loads lines'
@@ -1561,6 +1631,7 @@ H_DIR           .ASCII_L 'dir [SLOT]    list the files of the SD card in SLOT, o
 H_I             .ASCII_L 'i [A.B.C.D]   show the IP address, or set it, such as 192.168.1.65'
 H_ID            .ASCII_L 'i dhcp        get the IP address from a DHCP server'
 H_M             .ASCII_L 'm [MAC]       show the MAC address, or set it, such as 02:4E:49:43:45:01'
+H_B             .ASCII_L 'baud [RATE]   show the UART baud rate, or set it, such as 921600'
 H_C             .ASCII_L 'c             clear the screen'
 H_V             .ASCII_L 'v             the version'
 H_H             .ASCII_L 'h             halt the core'

@@ -263,10 +263,10 @@ their connections so that the line goes back at once.
 Remote control runs over the debug UART too, which needs the JTAG
 cable, whose USB port carries it. It runs at 230400 baud, 8-N-1, after
 reset, which the tools use by default on Linux and macOS alike, and
-`0xFFFFFF9F` sets another rate, from 115200 to 2 Mbaud
-([doc/SYSTEM.md](doc/SYSTEM.md#the-baud-rate)), which the tools then
-take with `--baud`. On Linux, 2 Mbaud loads a program about nine times
-as fast. A core file older than `V1.9` runs at 2 Mbaud after reset, so
+the monitor's `baud`, or a write of `0xFFFFFF9F`, sets another rate,
+from 115200 to 2 Mbaud ([doc/SYSTEM.md](doc/SYSTEM.md#the-baud-rate)),
+which the tools then take with `--baud`. On Linux, 2 Mbaud loads a
+program about nine times as fast. A core file older than `V1.9` runs at 2 Mbaud after reset, so
 the tools need `--baud 2000000` with it.
 `tools/mon.py --port /dev/ttyUSB1` is then the interactive shell, and a
 terminal program, such as `picocom`, the plain client, as

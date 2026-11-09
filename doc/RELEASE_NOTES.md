@@ -39,6 +39,9 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 
 **New.**
 
+- The monitor's `baud [RATE]` shows the UART's baud rate, or sets it
+  to one of the seven rates of `0xFFFFFF9F`, as the on-board debugger's
+  settings page does.
 - The link shows a wait for an interrupt in bit 6 of the control
   register ([#93](https://github.com/MJoergen/NiceMonMEGA65/issues/93)),
   and the hidden state of an interrupt routine in bits 7 and 8,

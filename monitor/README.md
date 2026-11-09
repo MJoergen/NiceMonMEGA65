@@ -93,11 +93,11 @@ At the cold start the monitor clears the screen, prints its banner,
 `NiceMon` and the version, and prints a prompt, `> `, on the screen and
 on the line. It reads a line from the console: the keyboard and the
 line, which the hardware merges. A command is a letter, in either case,
-or `dir`, `load`, `save`, `del`, or `tftp`, and after `d` and `u` a hex
-address and a hex count, each of them optional. DEL and backspace delete
-the character before the cursor, CTRL-C empties the line, and the cursor
-and function keys, the other control codes, and the bytes `0x80` to
-`0x9F` do nothing. RETURN runs the line.
+or `baud`, `dir`, `load`, `save`, `del`, or `tftp`, and after `d` and
+`u` a hex address and a hex count, each of them optional. DEL and
+backspace delete the character before the cursor, CTRL-C empties the
+line, and the cursor and function keys, the other control codes, and the
+bytes `0x80` to `0x9F` do nothing. RETURN runs the line.
 
 Before the first key of a line, Page Up and Page Down scroll back
 through the rows that left the top of the screen, 24 rows at a time.
@@ -115,6 +115,7 @@ the MEGA65 and 77 on the Nexys4DDR (Input and output below).
 | `i [A.B.C.D]` | Shows the Ethernet station's IP address, `IP address 192.168.1.65`, or writes it first: four decimal numbers of 0 to 255 with dots between them, such as `i 192.168.1.65`. Anything but an address or `dhcp` is no address, and `i` says so and writes nothing. It writes `0xFFFFFFB0`, `NET_IP` ([SYSTEM.md](../doc/SYSTEM.md#the-ethernet-station)), so a host connected over TCP loses its connection. In `niceemu` it is a register that keeps what is written. |
 | `i dhcp` | Gets the IP address from the network's DHCP server and writes it, as `i A.B.C.D` does, then shows it, with the mask, the gateway, and the server, a line each (The network below). Without an answer, it prints `No answer from a DHCP server` after about 16 seconds, and leaves the address as it was. |
 | `m [MAC]` | Shows the station's MAC address, `MAC address 02:4E:49:43:45:00`, or writes it first: six bytes of one or two hex digits, in either case, with colons between them, such as `m 02:4E:49:43:45:01`. The first byte must be even, as an odd one makes a group address. Anything else is no address, and `m` says so and writes nothing. It writes `0xFFFFFFB1` and `B2`, so a host connected over TCP loses its connection. Two boards on one network need different MAC addresses. In `niceemu` they are registers too, with the address of a board after reset. |
+| `baud [RATE]` | Shows the UART's baud rate, `Baud rate 230400`, or writes it first: 115200, 230400, 460800, 921600, 1000000, 1500000, or 2000000, in decimal, such as `baud 921600`. Anything else is no rate, and `baud` says so and writes nothing. It writes `0xFFFFFF9F` ([SYSTEM.md](../doc/SYSTEM.md#the-baud-rate)), as the on-board debugger's settings page does. The UART takes the new rate once it has sent nothing for 1 ms, so the answer and the prompt still come at the old rate, and a terminal on the UART then changes to the new one; only a reset brings back 230400. Over Ethernet the rate does not matter. In `niceemu` the word is memory, which reads 0 after a clear. |
 | `l` | Enters words into the RAM from lines of `ADDR WORD` in hex, as a `.bin` file has them (Loading without a host below), up to an empty line, and prints the words written and the lines skipped: `Words loaded: 600, 00008000 to 00008257`. |
 | `dir [SLOT]` | Lists the folder `NICE` of the SD card's FAT32 file system (Files below): `Directory of NICE`, then a row for each file, its 8.3 name and its size in decimal, and for each directory, its name and `<DIR>`, then `Files: 25, directories: 1`. With `SLOT` in hex, it mounts the card in it first; without, it lists the card mounted, which the first `dir` or `load` after reset mounts. An error is shown with its number and meaning: `File error 18, FAT16, which is not supported`. |
 | `load NAME` | Loads the `.bin` file `NAME` of the card's folder `NICE` as `l` loads lines, and prints the same summary, so a program copied to the card on a PC loads with no host. Unlike `l`, an empty line is passed over, the end of the file ends the load, and a skipped line is counted from the first line of the file. `NAME` is an 8.3 name, in either case. |
