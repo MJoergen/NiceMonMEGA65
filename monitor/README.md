@@ -67,7 +67,8 @@ in this order, and the words of each are those of the build of
 
 | File | What it is | Words |
 |---|---|---:|
-| `monitor.nasm` | The dispatch table, the HAL, the main loop, and the commands | 4588 |
+| `monitor.nasm` | The dispatch table, the HAL, the screen, and the line with its scrollback | 690 |
+| `monitor_cmd.nasm` | The main loop and the commands, which BASIC is to replace | 3902 |
 | `monitor_dis.nasm` | The disassembler of `u` | 1079 |
 | `monitor_sd.nasm` | The routines for the SD cards | 390 |
 | `monitor_eth.nasm` | The routines for the network | 1856 |
@@ -76,7 +77,7 @@ in this order, and the words of each are those of the build of
 | `fat32.c` | FAT32, translated by `nicewasm --ram` | 7200 |
 | nice_cpu's `lib.nasm` and `muldiv_mpu.nasm` | The runtime of the C code | 259 |
 | `build/version.nasm` and `build/folder.nasm` | The version and the card's folder, which the Makefile writes | 46 |
-| | All of the monitor, of the 24576 words below the demo at `0x6000` | 15725 |
+| | All of the monitor, of the 24576 words below the demo at `0x6000` | 15729 |
 
 `mon.h` has the entries' declarations for C, and is no part of the ROM.
 

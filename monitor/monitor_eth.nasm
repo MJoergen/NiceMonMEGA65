@@ -8,7 +8,7 @@
 ; from a TFTP server as load NAME reads one from the card (issue #84).
 ;
 ; The i command, which shows and writes the IP address, is in
-; monitor.nasm, and jumps to ip_dhcp for the word dhcp. tftp reads its
+; monitor_cmd.nasm, and jumps to ip_dhcp for the word dhcp. tftp reads its
 ; lines with l's bin_line, and its names with the file commands' fs_name
 ; and match. The cold start disables the port and empties the ARP cache.
 ; The variables of all of it are in monitor.nasm, with the others.

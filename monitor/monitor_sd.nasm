@@ -2,7 +2,7 @@
 ; after monitor.nasm (its header): the sector routines sd_init, sd_read,
 ; and sd_write, the ROM's own, with no entries in the dispatch table
 ; (doc/SDCARD.md, "The ROM"), and the names by which fat32.c calls them.
-; The file commands of monitor.nasm show the errors of the controller with
+; The file commands of monitor_cmd.nasm show the errors of the controller with
 ; sd_fail.
 
 SD_CSR          .EQU    0xFFFFFFA0      ; the SD card's status, and a write starts a command (nice_cpu's SYSTEM.md §5)

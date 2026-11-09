@@ -99,7 +99,7 @@ PAUSE_WAIT = 2.0
 CACHE_SECTORS = 256
 
 # The controller's errors in SD_ERROR, and the file system's of
-# monitor/fat32.c, with the monitor's texts (monitor/monitor.nasm, E_FS*)
+# monitor/fat32.c, with the monitor's texts (monitor/monitor_cmd.nasm, E_FS*)
 SD_ERRORS = {
     1: "no card",
     2: "the card is not ready",

@@ -2,7 +2,7 @@
 """Join the demo behind the monitor, into the image of the ROM.
 
 The monitor's x copies the demo from the ROM to 0x8000 and runs it there
-(monitor/monitor.nasm, cmd_demo). So the ROM has the monitor from 0, and
+(monitor/monitor_cmd.nasm, cmd_demo). So the ROM has the monitor from 0, and
 at DEMO, an .EQU of monitor.nasm, the number of the demo's words, which
 are assembled from 0x8000, and the words themselves after it. The words
 that the assembler skipped are 0 in the ROM, and so after the copy. This

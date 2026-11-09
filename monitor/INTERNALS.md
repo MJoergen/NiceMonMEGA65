@@ -123,10 +123,10 @@ it after `mon.nasm`, with nice_cpu's `lib.nasm` and `muldiv_mpu.nasm`.
 
 ## Building and testing
 
-`make -C monitor` assembles `monitor.nasm`, `monitor_dis.nasm`,
-`monitor_sd.nasm`, `monitor_eth.nasm`, `monlib.nasm`, `mon.nasm`,
-`build/rom_c.nasm`, nice_cpu's `lib.nasm` and `muldiv_mpu.nasm`, and
-`build/version.nasm`, the `cat` of them, with `niceasm` into
+`make -C monitor` assembles `monitor.nasm`, `monitor_cmd.nasm`,
+`monitor_dis.nasm`, `monitor_sd.nasm`, `monitor_eth.nasm`, `monlib.nasm`,
+`mon.nasm`, `build/rom_c.nasm`, nice_cpu's `lib.nasm` and
+`muldiv_mpu.nasm`, and `build/version.nasm`, the `cat` of them, with `niceasm` into
 `build/monitor.bin`, as the assembler has no include. `build/rom_c.nasm`
 is the ROM's C code (C in the ROM above), so the monitor, and a
 bitstream with it in the ROM, needs clang with the wasm32 target,
