@@ -22,9 +22,9 @@ SCRATCH7        .EQU    0x407           ; its words 7, 8, and 9
 UDP_PORT        .EQU    4511
 
                 MOVE    @ETH_CSR, 1
-WAIT            MOVE    R1, @ETH_CSR
+RXWAIT          MOVE    R1, @ETH_CSR
                 AND[M]  R0, R1, 2       ; a frame waits?
-        ?Z      JMP     WAIT
+        ?Z      JMP     RXWAIT
                 MOVE    @ETH_CHUNK, 0
                 MOVE    R1, @ETH_BUF3   ; the EtherType in bits 15..0
                 AND     R1, R1, 0xFFFF
@@ -127,4 +127,4 @@ BUSY            MOVE    R1, @ETH_CSR
                 HALT
 
 SKIP            MOVE    @ETH_RX_LEN, 0
-                JMP     WAIT
+                JMP     RXWAIT

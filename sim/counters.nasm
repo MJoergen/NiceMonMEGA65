@@ -38,8 +38,8 @@ SUM             ADD     R1, R1, @R2++
         ?!Z     JMP     SUM
                 MOVE    @0x102, R1      ; the sum of FS_CAUSE
                 MOVE    R3, 32
-WAIT            SUB[M]  R3, R3, 1
-        ?!Z     JMP     WAIT
+DELAY           SUB[M]  R3, R3, 1
+        ?!Z     JMP     DELAY
                 MOVE    @0x103, @FS_CTRL  ; 0, stopped
                 MOVE    @0x104, @CYCLE_LO
                 MOVE    @0x105, @TIME_LO
