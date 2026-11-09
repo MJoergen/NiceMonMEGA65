@@ -103,10 +103,11 @@ answers a write of R0–R15 while it is not paused with the error `04`.
 
 Link version 7 (nice_cpu V2.0) adds a wait for an interrupt, the hidden
 state of an interrupt routine, and watchpoints, and its registers start
-at `0xFFFFFFD0`. The board does not wire them to the core yet: bits 6 to
-10 of the control register read 0, `0xFFFFFFD0`–`DF` read 0 and take no
-write, and the number of watchpoints at `0xFFFFFFD5` is 0 (#93, #98,
-#99). A host of version 6 works unchanged.
+at `0xFFFFFFD0`. Bits 6 to 10 of the control register read the wait, the
+hidden state, and the pending requests, and `0xFFFFFFD0` and `D1`
+`saved_pc` and `saved_sr` (see [The control register](#the-control-register)).
+The board has no watchpoints yet: their number at `0xFFFFFFD5` is 0
+(#99). A host of version 6 works unchanged.
 
 A terminal on the line, a plain TCP client such as `nc` on the Ethernet
 port or a terminal program on the UART, shows what the program prints,
@@ -168,7 +169,7 @@ effect and does not write (DEBUG.md §3).
 | `0xFFFFFFA0`–`0xFFFFFFAF` | The SD card controller of nice_cpu's SYSTEM.md §5, with 2 slots on the MEGA65 and 1 on the Nexys4DDR (see [The SD card slots](#the-sd-card-slots)). |
 | `0xFFFFFFB0`–`0xFFFFFFBF` | The network station of nice_cpu's SYSTEM.md §6, on every board: the Ethernet station's addresses, its counts of frames, and the state of the debug link over TCP (see [The Ethernet station](#the-ethernet-station)). |
 | `0xFFFFFFC0`–`0xFFFFFFCF` | The port for Ethernet frames of nice_cpu's SYSTEM.md §7, on every board: a queue of 4 frames received and a send buffer, through which a program sends and receives frames of its own (see [Ethernet frames](#ethernet-frames)). |
-| `0xFFFFFFD0`–`0xFFFFFFDF` | The debug registers of DEBUG.md §6, for the link only, here and below: the hidden state and the watchpoints of link version 7. The board does not wire them yet (#98, #99), so they read 0 and take no write. A data access of the core here goes to the memory. |
+| `0xFFFFFFD0`–`0xFFFFFFDF` | The debug registers of DEBUG.md §6, for the link only, here and below, of link version 7: `saved_pc` and `saved_sr` of the core at `0xFFFFFFD0` and `D1`, read only, which hold the PC and the SR saved at the entry of an interrupt routine and read as R0–R15 do, and the watchpoints at `0xFFFFFFD4`–`DB`, of which the board has none yet (#99). A data access of the core here goes to the memory. |
 | `0xFFFFFFE0`–`0xFFFFFFEF` | The debug registers of DEBUG.md §6, for the link only: R0–R15 of the core. R1–R15 take a write while the core is paused, as a register-direct write of an instruction does (ISA.md §4.3); R0 takes none. While the core runs they read its registers live, as `niceemu --link` returns them, each word from the cycle of its own read; the multi-cycle core adds 1 to R15 for each word it fetches, so its live R15 may be the address of a constant word, or of the word after the instruction it carries out, where the pipelined core's is an instruction's. After a halt they hold what the emulator prints. While the core is paused they hold its registers, with R15 the address of the next instruction, and a hold of the paused core keeps them. A hold of a running core leaves them undefined. |
 | `0xFFFFFFF0` | Control: hold, clear, hide, pause, and step (see [The control register](#the-control-register)). |
 | `0xFFFFFFF1` | Read only: why the core halted. 0 while it has not, and after a clear, 1 for `HALT`, 2 for a reserved control word, 3 for `INT` inside an interrupt routine, and 4 for `RTI` outside one. Reason 5, the step limit of `niceemu --link`, is the emulator's only. |
@@ -190,6 +191,11 @@ effect and does not write (DEBUG.md §3).
 | 3 | Hide | 1 hides the ROM, so that the RAM is at 0. Reset clears it in a bitstream with a ROM; in one without a ROM it reads 1. |
 | 4 | Pause | A write of 1 pauses the core at the next step boundary, and the link sends `p`. It reads 1 while the core is paused, and a write of 0 makes the program go on. A start with bit 4 set pauses before the first instruction. |
 | 5 | Step | A write with bits 4 and 5 set to a paused core runs one step, and the link sends `p` again, or `h`. It reads 0. |
+| 6 | Waiting | Read only. 1 while the core waits for an interrupt after `WAIT`, also while paused, until a request is pending. |
+| 7 | In service | Read only. 1 from the entry of an interrupt routine until its `RTI`, read as R0–R15 are, so not defined after a clear. |
+| 8 | After RTI | Read only. 1 from an `RTI` until the next instruction completes, read as R0–R15 are. |
+| 9 | NMI pending | Read only. Always 0, as the board raises no NMI. |
+| 10 | IRQ pending | Read only. 1 while the timer's request is pending, also while E = 0 or an interrupt routine keeps it from being taken, and 0 while the core is held or has halted. |
 
 The tools write these values:
 

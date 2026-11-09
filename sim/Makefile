@@ -130,7 +130,7 @@ STEPS_ETH      = 75
 EVENTS_HELLO   = 0000000E0000000E0000000C0000000E00000000
 EMU            = $(NICE_DIR)/emulator/zig-out/bin/niceemu
 
-BINS = hello rom echo fifo devices emu count reserved eof counters break sd eth
+BINS = hello rom echo fifo devices emu count reserved eof counters break wait sd eth
 
 # nice_cpu's test of the port for Ethernet frames, which tb_nicemon runs:
 # its frames, and the frames it must send
@@ -157,7 +157,7 @@ tb_hello: analyze $(BUILD)/hello.bin
 
 tb_nicemon: analyze $(addprefix $(BUILD)/,$(addsuffix .bin,$(BINS))) $(BUILD)/sd.img
 	@(cd $(BUILD) && $(GHDL) --elab-run $(GHDLFLAGS) tb_nicemon \
-	  -gG_HELLO_FILE=hello.bin -gG_ROM_FILE=rom.bin -gG_ECHO_FILE=echo.bin -gG_FIFO_FILE=fifo.bin -gG_DEVICES_FILE=devices.bin -gG_EMU_FILE=emu.bin -gG_COUNT_FILE=count.bin -gG_RESERVED_FILE=reserved.bin -gG_EOF_FILE=eof.bin -gG_COUNTERS_FILE=counters.bin -gG_BREAK_FILE=break.bin -gG_SD_FILE=sd.bin -gG_SD_IMAGE=sd.img -gG_NICE=$(NICE) \
+	  -gG_HELLO_FILE=hello.bin -gG_ROM_FILE=rom.bin -gG_ECHO_FILE=echo.bin -gG_FIFO_FILE=fifo.bin -gG_DEVICES_FILE=devices.bin -gG_EMU_FILE=emu.bin -gG_COUNT_FILE=count.bin -gG_RESERVED_FILE=reserved.bin -gG_EOF_FILE=eof.bin -gG_COUNTERS_FILE=counters.bin -gG_BREAK_FILE=break.bin -gG_WAIT_FILE=wait.bin -gG_SD_FILE=sd.bin -gG_SD_IMAGE=sd.img -gG_NICE=$(NICE) \
 	  -gG_ETH_FILE=eth.bin -gG_ETH_IN_FILE=$(ETH_IN) -gG_ETH_OUT_FILE=eth_frames.out \
 	  -gG_HELLO_STEPS=$(STEPS_HELLO) -gG_EMU_STEPS=$(STEPS_EMU) -gG_RESERVED_STEPS=$(STEPS_RESERVED) -gG_SD_STEPS=$(STEPS_SD) -gG_ETH_STEPS=$(STEPS_ETH) -gG_HELLO_EVENTS=$(EVENTS_HELLO) > tb_nicemon.log 2>&1) && \
 	  diff $(ETH_TEST)/eth.frames.expected $(BUILD)/eth_frames.out >> $(BUILD)/tb_nicemon.log 2>&1 && \
@@ -171,9 +171,11 @@ tb_ps2_nicemon: analyze $(BUILD)/fifo.bin $(BUILD)/switch.bin
 	  -gG_FIFO_FILE=fifo.bin -gG_SWITCH_FILE=switch.bin --ieee-asserts=disable > tb_ps2_nicemon.log 2>&1) && \
 	  echo "PASS tb_ps2_nicemon" || (echo "FAIL tb_ps2_nicemon"; cat $(BUILD)/tb_ps2_nicemon.log; exit 1)
 
-tb_dbg: analyze $(BUILD)/dbg.bin
+tb_dbg: analyze $(BUILD)/dbg.bin $(BUILD)/dbg_wait.bin
 	@(cd $(BUILD) && $(GHDL) --elab-run $(GHDLFLAGS) tb_dbg -gG_ROM_FILE=dbg.bin --ieee-asserts=disable \
-	  > tb_dbg.log 2>&1) && \
+	  > tb_dbg.log 2>&1 && \
+	  $(GHDL) --elab-run $(GHDLFLAGS) tb_dbg -gG_ROM_FILE=dbg_wait.bin -gG_WAIT=true --ieee-asserts=disable \
+	  >> tb_dbg.log 2>&1) && \
 	  echo "PASS tb_dbg" || (echo "FAIL tb_dbg"; cat $(BUILD)/tb_dbg.log; exit 1)
 
 tb_dbg_host: analyze $(BUILD)/host.bin
@@ -282,6 +284,9 @@ $(BUILD)/counters.bin: counters.nasm $(ASM_PY) | $(BUILD)
 $(BUILD)/break.bin: break.nasm $(ASM_PY) | $(BUILD)
 	@$(ASM) -o $@ $<
 
+$(BUILD)/wait.bin: wait.nasm $(ASM_PY) | $(BUILD)
+	@$(ASM) -o $@ $<
+
 $(BUILD)/sd.bin: sd.nasm $(ASM_PY) | $(BUILD)
 	@$(ASM) -o $@ $<
 
@@ -289,6 +294,9 @@ $(BUILD)/eth.bin: $(ETH_TEST)/eth.nasm $(ASM_PY) | $(BUILD)
 	@$(ASM) -o $@ $<
 
 $(BUILD)/dbg.bin: dbg.nasm $(ASM_PY) | $(BUILD)
+	@$(ASM) -o $@ $<
+
+$(BUILD)/dbg_wait.bin: dbg_wait.nasm $(ASM_PY) | $(BUILD)
 	@$(ASM) -o $@ $<
 
 $(BUILD)/host.bin: host.nasm $(ASM_PY) | $(BUILD)

@@ -63,19 +63,20 @@ architecture synthesis of dbg_decode is
    type t_words is array (0 to 2) of t_word;
 
    -- The names, 8 characters each, padded with spaces: the ALU operations
-   -- 0 to 15, the SHIFT operations 16 to 31, HALT, RTI, INT, and a
+   -- 0 to 15, the SHIFT operations 16 to 31, HALT, RTI, INT, WAIT, and a
    -- reserved control word. One dimension, as GHDL 4.1 cannot synthesize
    -- the read of a two-dimensional constant.
    constant C_HALT     : natural := 32;
    constant C_RTI      : natural := 33;
    constant C_INT      : natural := 34;
-   constant C_RESERVED : natural := 35;
+   constant C_WAIT     : natural := 35;
+   constant C_RESERVED : natural := 36;
    constant C_NAMES_S  : string  :=
                                     "MOVE    SUB     MDBL    ADD     DBL     DEC     NOT     NOR     " &
                                     "IAND    NAND    XOR     IOR     XNOR    AND     ONE     OR      " &
                                     "SHL     0<1     0<C     C<0     C<1     C<C     ROL     BPL     " &
                                     "SHR     1>0     C>0     0>C     1>C     C>C     ROR     BPR     " &
-                                    "HALT    RTI     INT     reserved";
+                                    "HALT    RTI     INT     WAIT    reserved";
    constant C_FLAGS_S  : string  := "1XCZNVEI";
 
    type t_bytes is array (natural range <>) of t_byte;
@@ -444,7 +445,7 @@ begin
             cmd_v := to_integer(instr_i(25 downto 21));
             if instr_i(27 downto 26) = "11" then
                nops <= 0;
-               if cmd_v > 2 or instr_i(20 downto 8) /= 0 or (cmd_v /= 2 and instr_i(7 downto 0) /= 0) then
+               if cmd_v > 3 or instr_i(20 downto 8) /= 0 or (cmd_v /= 2 and instr_i(7 downto 0) /= 0) then
                   name <= C_RESERVED;
                else
                   name <= C_HALT + cmd_v;
@@ -465,7 +466,7 @@ begin
             if instr_i(30 downto 28) = 0 and instr_i(31) = '0' then
                st <= NAME_ST;
             elsif instr_i(27 downto 26) = "11" and
-                  (cmd_v > 2 or instr_i(20 downto 8) /= 0 or (cmd_v /= 2 and instr_i(7 downto 0) /= 0)) then
+                  (cmd_v > 3 or instr_i(20 downto 8) /= 0 or (cmd_v /= 2 and instr_i(7 downto 0) /= 0)) then
                st <= NAME_ST;
             else
                st <= COND_ST;

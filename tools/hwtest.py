@@ -52,6 +52,9 @@ Checks, in this order:
       them, compared with the same on niceemu --link; a write while
       halted or held is refused
     - the memory is cleared
+    - sim/wait.nasm waits for the timer's IRQ, which bit 6 shows, also
+      paused, and paused in its interrupt routine, bits 7 and 10,
+      saved_pc, and saved_sr show the hidden state (link version 7)
     - 0xFFFFFF9E reads the RAM's words, and the top word of the RAM holds
       a word, apart from the word of a RAM half the size
     - 0xFFFFFF9F reads the UART's rate, --baud, and the link answers at
@@ -489,6 +492,52 @@ def test_clear(link: Link) -> None:
     check("held after the clear", c == "00000009", c)
     got = rd(link, 0x100)
     check("memory cleared", got == 0, f"{got:08X}")
+
+
+# The link's words of the hidden state of version 7 (DEBUG.md §6)
+SAVED_PC = 0xFFFFFFD0
+SAVED_SR = 0xFFFFFFD1
+
+
+def test_wait(link: Link, prog: str, at: dict[str, int], board: str) -> None:
+    """WAIT and the hidden state of DEBUG.md §6, version 7, on
+    sim/wait.nasm, with the timer's period a quarter of a second: bit 6
+    while the core waits, also while paused, as the timer stops then;
+    then, paused in the routine after two periods, bit 6 clear, bit 7,
+    in_service, and bit 10, the timer's next request, set, saved_pc the
+    word after the WAIT, and saved_sr the SR that the program set. It
+    leaves the core held, after a start that resets the hidden state."""
+    period = CLOCK_HZ[board] // 4
+    words = [(a, period if a == at["SET_PERIOD"] + 2 else w)
+             for a, w in read_bin(prog)]
+    link.halts.clear()
+    load_words(link, words)
+    start(link)
+    check("wait: bit 6 while waiting", ctl(link) == "00000048", ctl(link))
+    n = link.pauses
+    link.control(PAUSE | RAM)
+    require("wait: pause sends p", wait_pause(link, n))
+    check("wait: bit 6 while paused in the wait", ctl(link) == "00000058",
+          ctl(link))
+    link.control(RAM)
+    time.sleep(2.5 * period / CLOCK_HZ[board])
+    n = link.pauses
+    link.control(PAUSE | RAM)
+    require("wait: pause in the routine sends p", wait_pause(link, n))
+    check("wait: in service, an IRQ pending, no wait",
+          ctl(link) == "00000498", ctl(link))
+    pc, sr = rd(link, SAVED_PC), rd(link, SAVED_SR)
+    check("wait: saved_pc is the word after the WAIT",
+          pc == at["AFTER"], f"{pc:08X}")
+    check("wait: saved_sr is the SR before the entry",
+          sr == 0x41000000, f"{sr:08X}")
+    r15 = rd(link, REGS + 15)
+    check("wait: R15 in the routine", r15 == at["on_timer"], f"{r15:08X}")
+    n = link.pauses
+    link.control(HOLD | PAUSE | RAM)
+    link.control(PAUSE | RAM)
+    wait_pause(link, n)
+    link.control(HOLD | RAM)
 
 
 def test_ram_size(link: Link, board: str) -> None:
@@ -1862,6 +1911,7 @@ def main() -> None:
         pause = assemble(f"{REPO}/sim/pause.nasm", tmp)
         step = assemble(f"{REPO}/sim/step.nasm", tmp)
         brk, brk_at = assemble_labels(f"{REPO}/sim/break.nasm", tmp)
+        wait, wait_at = assemble_labels(f"{REPO}/sim/wait.nasm", tmp)
         step_at = assemble_labels(f"{REPO}/sim/step.nasm", tmp)
         emu = assemble(f"{REPO}/sim/emu.nasm", tmp)
 
@@ -1892,6 +1942,7 @@ def main() -> None:
                 test_break(link, brk, brk_at)
                 test_write_regs(link, *step_at)
                 test_clear(link)
+                test_wait(link, wait, wait_at, board)
                 test_ram_size(link, board)
                 test_baud(link, uart, args.baud)
                 test_readback(link, emu)

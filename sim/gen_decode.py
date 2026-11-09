@@ -57,7 +57,7 @@ def word() -> int:
     if k == 0:
         return random.randrange(1 << 32)
     if k == 1:  # a valid control word
-        cmd = random.randrange(3)
+        cmd = random.randrange(4)
         vec = random.randrange(256) if cmd == 2 else 0
         return cond | 3 << 26 | cmd << 21 | vec
     # ALU or SHIFT, with fields of every mode
@@ -76,7 +76,8 @@ def main() -> None:
     args = ap.parse_args()
     random.seed(args.seed)
     fixed = [0x00000000, 0x0C000000, 0x0C200000, 0x0C4000FF, 0x0C400000,
-             0x8C000000, 0x0C000001, 0x0FE00000]
+             0x8C000000, 0x0C000001, 0x0FE00000, 0x0C600000, 0x9C600000,
+             0x0C600001, 0x0C800000]
     # The longest: three constants of 8 digits with R10 to R15
     fixed.append(0x01 << 25 | 0x3 << 21 | 0x7F << 14 | 0x7E << 7 | 0x7D)
     for i in range(len(fixed) + args.count):

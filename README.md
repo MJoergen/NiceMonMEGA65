@@ -152,8 +152,9 @@ The demo, paused by F3 after a line was typed, drawn from `niceemu` by
 does.
 
 The strip shows R0 to R15, live while the program runs; the state,
-`RUNNING`, `PAUSED`, `BRK n` at breakpoint n, `HALTED n` with the
-reason, or `HELD`; the PC, the instruction word there, and the flags of
+`RUNNING`, `WAITING` in a wait for an interrupt, `PAUSED`, `PAUSED W`
+paused in a wait, `BRK n` at breakpoint n, `HALTED n` with the reason,
+or `HELD`; the PC, the instruction word there, and the flags of
 the status register; the instruction decoded, in the assembler's
 syntax; and the keys:
 

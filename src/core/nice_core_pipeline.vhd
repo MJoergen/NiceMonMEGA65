@@ -38,10 +38,15 @@ begin
          reg_we_i      => reg_we_i,
          reg_idx_i     => reg_idx_i,
          reg_data_i    => reg_data_i,
+         waiting_o     => waiting_o,
          halted_o      => halted_o,
          halt_reason_o => halt_reason_o,
          instret_o     => instret_o,
          regs_o        => regs_o,
+         in_service_o  => in_service_o,
+         after_rti_o   => after_rti_o,
+         saved_pc_o    => saved_pc_o,
+         saved_sr_o    => saved_sr_o,
          retire_o      => retire_o,
          stats_o       => stats_o
       ); -- i_core

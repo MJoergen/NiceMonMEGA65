@@ -215,10 +215,10 @@
 --                          (nice_cpu/hdl/sim/eth_sim.vhd) serves the
 --                          writes that enable and send, as in niceemu.
 --   0xFFFFFFD0-0xFFFFFFFF  The debug registers of DEBUG.md §6, for the link
---                          only, which debug_link holds: at D0-DF the
---                          hidden state and the watchpoints of version 7,
---                          which read 0 here as nothing drives them
---                          (#98, #99), and R0-R15 of the core,
+--                          only, which debug_link holds: saved_pc and
+--                          saved_sr of the core at D0 and D1, the
+--                          watchpoints of version 7 at D4-DB, of which
+--                          there are none yet (#99), and R0-R15 of the core,
 --                          live while it runs and those of the stop after
 --                          a halt or at a pause (DEBUG.md §6), the control
 --                          register, the halt reason (1 to 4 here), the
@@ -236,6 +236,11 @@
 --                               a ROM
 --                            4  pause the core
 --                            5  step, with bit 4, a paused core
+--                            6  the core waits for an interrupt, read
+--                               only
+--                            7, 8  in_service and after_rti, read only
+--                            9, 10  a pending NMI, always 0 here, and a
+--                               pending IRQ, read only
 --                          The core's data accesses to these words go to
 --                          the memory.
 -- Instruction fetches from 0xFFFFFF00-0xFFFFFFFF read 0 (ISA.md §8.3).
@@ -561,6 +566,12 @@ architecture synthesis of nicemon is
    -- the same as one vector, R(n) in bits 32 * n + 31 .. 32 * n
    signal cpu_regs      : t_regs;
    signal cpu_regs_flat : std_logic_vector(511 downto 0);
+   -- The wait and the hidden state of the core, for the link (DEBUG.md §6)
+   signal cpu_waiting    : std_logic;
+   signal cpu_in_service : std_logic;
+   signal cpu_after_rti  : std_logic;
+   signal cpu_saved_pc   : std_logic_vector(31 downto 0);
+   signal cpu_saved_sr   : std_logic_vector(31 downto 0);
    -- '1' while the core is started and has not halted: it runs or is
    -- paused, and takes input
    signal cpu_started : std_logic;
@@ -784,10 +795,15 @@ begin
          reg_we_i      => reg_we,
          reg_idx_i     => reg_idx,
          reg_data_i    => reg_data,
+         waiting_o     => cpu_waiting,
          halted_o      => cpu_halted,
          halt_reason_o => cpu_why,
          instret_o     => cpu_instret,
          regs_o        => cpu_regs,
+         in_service_o  => cpu_in_service,
+         after_rti_o   => cpu_after_rti,
+         saved_pc_o    => cpu_saved_pc,
+         saved_sr_o    => cpu_saved_sr,
          retire_o      => cpu_retire,
          stats_o       => cpu_stats
       ); -- i_core
@@ -1376,6 +1392,13 @@ begin
          pause_o        => cpu_pause,
          paused_i       => cpu_paused,
          regs_i         => cpu_regs_flat,
+         waiting_i      => cpu_waiting,
+         in_service_i   => cpu_in_service,
+         after_rti_i    => cpu_after_rti,
+         saved_pc_i     => cpu_saved_pc,
+         saved_sr_i     => cpu_saved_sr,
+         nmi_pending_i  => '0',
+         irq_pending_i  => irq_valid,
          side_valid_i   => dbg_valid_i,
          side_we_i      => dbg_we_i,
          side_addr_i    => dbg_addr_i,

@@ -107,17 +107,24 @@
 --    stops at V3 with `x01`. Then, with the breakpoints disabled, a go on
 --    runs it to its halt, and the stop register reads 0. A start stops at
 --    READ again, and the clear before step 13 ends the stop.
--- 13. Load G_EOF_FILE, and run it. It echoes its input until the line's
+-- 13. Load G_WAIT_FILE, and start it. It waits for the timer's IRQ, and
+--    bit 6 of the control register reads 1, also while paused, with the
+--    timer stopped. Once it goes on, the IRQ ends the wait, and the routine
+--    spins. Paused there, bit 6 reads 0, bit 7, in_service, and bit 10, the
+--    timer's next request, read 1, and saved_pc at 0xFFFFFFD0 and saved_sr
+--    at 0xFFFFFFD1 hold the word after the WAIT and the SR before the
+--    entry (link version 7).
+-- 14. Load G_EOF_FILE, and run it. It echoes its input until the line's
 --    input ends, which a break on the UART does, and halts with 0x200 in
 --    R1. Console bytes sent after the halt are dropped.
--- 14. The keyboard input, a stream of bytes as kbd_m65_ascii.vhd sends them:
+-- 15. The keyboard input, a stream of bytes as kbd_m65_ascii.vhd sends them:
 --    bytes typed while the core is held are dropped, and G_FIFO_FILE again,
 --    with more bytes typed than its FIFO holds. None is lost, for the
 --    keyboard waits. Then G_FIFO_FILE once more, with a break on the UART
 --    while it runs: the host's bytes after the break are dropped, and the
 --    keys still reach the program, which reads on at 0x200 and echoes
 --    them (nice_cpu's SYSTEM.md §8).
--- 15. The link over TCP, with the net_* ports driven as eth/eth_tcp.vhd
+-- 16. The link over TCP, with the net_* ports driven as eth/eth_tcp.vhd
 --    drives them: a host connects, and G_FIFO_FILE echoes its bytes over
 --    TCP; its half-close is a break, after which its bytes are dropped;
 --    the next connection renews the line's input, the link's resume
@@ -130,7 +137,7 @@
 --    are lost at once, and a request after them is answered. A host
 --    that leaves during the wait ends it at once, with the `o` on the
 --    UART.
--- 16. Load G_SD_FILE, and run it, with an SD card in slot 0, a model of
+-- 17. Load G_SD_FILE, and run it, with an SD card in slot 0, a model of
 --    one on the image G_SD_IMAGE (sd_card_model.vhd), and slot 1 empty.
 --    The program is nice_cpu's emulator/test/sd.nasm for a card of 1024
 --    sectors: Init, Read, and Write through the core, and the checks of
@@ -139,7 +146,7 @@
 --    takes niceemu's steps, G_SD_STEPS, and leaves the words that
 --    "niceemu --sd0" leaves. Then the link reads the buffer while the
 --    core is halted.
--- 17. Load G_ETH_FILE, nice_cpu's emulator/test/eth.nasm, and run it
+-- 18. Load G_ETH_FILE, nice_cpu's emulator/test/eth.nasm, and run it
 --    with the port for Ethernet frames and nice_cpu's simulation of its
 --    station (hdl/sim/eth_sim.vhd), which gives the frames of
 --    G_ETH_IN_FILE, test/eth.in, and writes those sent to
@@ -148,12 +155,12 @@
 --    has served it, so the program takes niceemu's steps, G_ETH_STEPS,
 --    and leaves the words of test/eth.expected. sim/Makefile compares the
 --    frames sent with test/eth.frames.expected.
--- 18. The baud rate at 0xFFFFFF9F: it reads G_UART_BAUDRATE and drops a
+-- 19. The baud rate at 0xFFFFFF9F: it reads G_UART_BAUDRATE and drops a
 --    value it does not take. A write of 2000000, after more than 1 ms of
 --    quiet, is answered at the old rate, and so is a read until the UART
 --    has sent nothing for 1 ms after the write; then the link answers at
 --    2 Mbaud.
--- 19. A reset while G_ECHO_FILE runs: the link sends `b07` at
+-- 20. A reset while G_ECHO_FILE runs: the link sends `b07` at
 --    G_UART_BAUDRATE, the core boots from the ROM again, and the screen's
 --    and the board's registers, the baud rate, the station's addresses,
 --    and the breakpoints are cleared.
@@ -162,7 +169,7 @@
 -- RAM, the ROM, and the screen are small, so that the clearing is.
 --
 -- The UART runs at a tenth of the clock rate, so that the test is fast,
--- but for step 18.
+-- but for step 19.
 -- G_NICE says which core runs, for the check that only the multi-cycle core
 -- passes.
 
@@ -189,6 +196,7 @@ entity tb_nicemon is
       G_EOF_FILE       : string;
       G_COUNTERS_FILE  : string;
       G_BREAK_FILE     : string;
+      G_WAIT_FILE      : string;
       G_SD_FILE        : string;
       -- The image of the card in slot 0, sim/Makefile's sd.img
       G_SD_IMAGE       : string;
@@ -1303,11 +1311,26 @@ begin
       wr_stop("00000008", pkt('x', "00"));
       check("FFFFFFF6", "00000100");
 
-      report "tb_nicemon: load " & G_EOF_FILE;
+      report "tb_nicemon: load " & G_WAIT_FILE;
       wr("FFFFFFF0", "0000000D");
       check("FFFFFFF6", "00000000");         -- the clear ends the stop
       check("FFFFFFF0", "00000009");
       wr("FFFFFFF4", "00000000");
+      load(G_WAIT_FILE, first_v);
+      wr("FFFFFFF0", "00000008");
+      check("FFFFFFF0", "00000048");         -- waiting
+      wr_pause("00000018");
+      check("FFFFFFF0", "00000058");         -- paused, and still waiting
+      wr("FFFFFFF0", "00000008");
+      wait for 1300 us;                      -- two periods of the timer
+      wr_pause("00000018");
+      check("FFFFFFF0", "00000498");         -- in service, and an IRQ pending
+      check("FFFFFFD0", "00000009");         -- saved_pc: AFTER
+      check("FFFFFFD1", "41000000");         -- saved_sr: E, and bit 24
+      check("FFFFFFEF", "00000042");         -- R15: the routine's loop
+
+      report "tb_nicemon: load " & G_EOF_FILE;
+      wr("FFFFFFF0", "0000000D");            -- bits 7 and 8 are not defined now
       load(G_EOF_FILE, first_v);
       wr("FFFFFFF0", "00000008");
       send_con("ab");

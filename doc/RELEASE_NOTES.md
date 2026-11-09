@@ -33,13 +33,23 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   `0xFFFFFFD0`–`DF` reaches the link, where it reached the RAM. A host
   of version 6 works unchanged.
 
-**Changed.** The monitor's `u` shows `0x0C600000` as `WAIT`, as nicedis
-does, where it showed a reserved control word.
+**New.**
 
-**Not yet on the board.** The board runs `WAIT`, but the on-board
-debugger shows it as reserved. The board does not yet have the wait (#93), the hidden state (#98), or the watchpoints (#99)
-of link version 7, the byte windows (#90), or the clock of the time of
-day (#97).
+- The link shows a wait for an interrupt in bit 6 of the control
+  register ([#93](https://github.com/MJoergen/NiceMonMEGA65/issues/93)),
+  and the hidden state of an interrupt routine in bits 7 and 8,
+  `saved_pc` at `0xFFFFFFD0`, and `saved_sr` at `0xFFFFFFD1`, with the
+  timer's pending IRQ in bit 10
+  ([#98](https://github.com/MJoergen/NiceMonMEGA65/issues/98)).
+  `nicedbg status` shows them on the board, and the on-board debugger's
+  state is `WAITING` in a wait, and `PAUSED W` paused in one (#93).
+
+**Changed.** The monitor's `u` and the on-board debugger's row 27 show
+`0x0C600000` as `WAIT`, as nicedis does, where they showed a reserved
+control word (#93).
+
+**Not yet on the board.** The watchpoints of link version 7 (#99), the
+byte windows (#90), and the clock of the time of day (#97).
 [EMULATOR.md](EMULATOR.md) lists them.
 
 ## V1.9.1 (2026-11-08)

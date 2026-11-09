@@ -270,7 +270,10 @@ The testbenches are these:
   address, and rate, chosen with CRSR down and stepped with CRSR left
   and right, are written, and the registers take them; a short address,
   a byte over 255, and a rate not on the list say `bad value`; F10 does
-  nothing; and F5 and `m` switch between the two pages.
+  nothing; and F5 and `m` switch between the two pages. A second run,
+  with `sim/dbg_wait.nasm` in the ROM, a `WAIT` that no request ends,
+  shows WAITING, PAUSED W after F3, with the PC at the HALT after the
+  `WAIT`, and WAITING after F3 again.
 - `sim/tb_dbg_decode.vhd` tests the decode of the debugger's row 27
   (`src/dbg/dbg_decode.vhd`) against nicedis: `sim/gen_decode.py`
   writes about 3000 instruction words of every class, condition,
@@ -417,6 +420,7 @@ Then it loads and runs these programs:
 | `reserved.nasm` of the emulator's tests | A halt on a reserved control word, after the testbench has cleared the memory. |
 | `sim/counters.nasm` | The fetch statistics, the microsecond counter, and the board's registers through the core's data bus. A start clears the fetch statistics, whose causes sum to their cycles, and with the multi-cycle core every cycle is of cause OTHER. |
 | `sim/break.nasm` | The breakpoints, and the `x` notice. |
+| `sim/wait.nasm` | `WAIT`, and the hidden state of an interrupt routine (link version 7): bit 6 of the control register while the core waits, also paused, and bits 7 and 10, `saved_pc`, and `saved_sr` while it is paused in the timer's routine. |
 | `sim/eof.nasm` | Echoes its input until a break ends it. |
 | `sim/count.nasm` | The read counter, which a start keeps. |
 | `sim/sd.nasm` | nice_cpu's test of the SD card controller, for a card of 1024 sectors (`sim/sd_card_model.vhd`) in slot 0 and none in slot 1: Init, Read, Write, and the errors. The controller holds the end of a command, as nice_cpu's simulation does, so the step count and the 32 result words equal niceemu's with `--sd0` and `sim/Makefile`'s image. The testbench then reads the buffer over the link. |
