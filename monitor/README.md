@@ -1,19 +1,30 @@
 # monitor
 
-The ROM at `0x0000`, which the core boots from, holds the monitor: a
-hardware abstraction layer, the HAL, of twenty routines that reach the
-hardware or the state the monitor keeps, called through a dispatch table
-at the start of the ROM, and a main loop with a few commands. It is not a
-library: what a program can do for itself stays in the program.
+The ROM at `0x0000`, which the core boots from, holds the monitor:
+
+- a hardware abstraction layer, the HAL, of twenty routines that reach
+  the hardware or the state the monitor keeps, called through a dispatch
+  table at the start of the ROM. It is not a library: what a program can
+  do for itself stays in the program.
+- a main loop with a few commands.
 
 A program under the monitor sees three levels, which
-[doc/PROGRAMMING.md](../doc/PROGRAMMING.md#three-levels) describes for
+[doc/PROGRAMMING.md](../doc/PROGRAMMING.md) describes for
 those who write programs:
 
 1. **The hardware**: the I/O registers of
    [doc/SYSTEM.md](../doc/SYSTEM.md) and nice_cpu's SYSTEM.md, the same
    in `niceemu` but for the differences of
-   [doc/EMULATOR.md](../doc/EMULATOR.md). Every program has them.
+   [doc/EMULATOR.md](../doc/EMULATOR.md). Every program has them. The
+   hardware also has the integrated debugger, on the board's own
+   keyboard and screen (the README's
+   [The on-board debugger](../README.md#the-on-board-debugger), and
+   [doc/DEBUGGER.md](../doc/DEBUGGER.md)), and the debug link, through
+   which a host loads, runs, and debugs a program over Ethernet or the
+   UART (nice_cpu's
+   [DEBUG.md](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEBUG.md),
+   and the host tools in [tools/](../tools/README.md)). Neither needs
+   the ROM.
 2. **The ROM**: the entries of the dispatch table (The dispatch table
    below), which are there whenever the ROM is visible. A host that
    loads a program at 0 hides the ROM, and the entries go with it.
@@ -31,18 +42,23 @@ routines and the ARP cache of the network, and FAT32 in C.
 [INTERNALS.md](INTERNALS.md) describes them, with the build and the
 tests.
 
-The monitor is in NICE assembly, with FAT32 in C. `monitor.nasm` is the
-ROM, with its disassembler in `monitor_dis.nasm`, its SD cards in
-`monitor_sd.nasm`, and its network in `monitor_eth.nasm`, and `fat32.c`
-is its FAT32; `monlib.nasm` has the routines that programs join and the
-monitor's commands use too; `mon.nasm` has the stubs through which a
-program calls the entries, and `mon.h` their declarations for C.
+The monitor is in NICE assembly, with FAT32 in C:
+
+- `monitor.nasm` is the ROM.
+- `monitor_dis.nasm` is its disassembler.
+- `monitor_sd.nasm` has its routines for the SD cards.
+- `monitor_eth.nasm` has its routines for the network.
+- `fat32.c` is its FAT32.
+- `monlib.nasm` has the routines that programs join, which the monitor's
+  commands use too.
+- `mon.nasm` has the stubs through which a program calls the entries.
+- `mon.h` has their declarations for C.
+
 `make -C monitor` builds `build/monitor.bin`, and `make -C monitor test`
 runs it in `niceemu` ([INTERNALS.md](INTERNALS.md#building-and-testing)).
 The QNICE monitor (QMON) of
 [QNICE-FPGA](https://github.com/sy2002/QNICE-FPGA) is the inspiration,
-not the model. Debugging is the on-board debugger's
-([doc/DEBUGGER.md](../doc/DEBUGGER.md)), which needs no ROM.
+not the model.
 
 ## Where it lives
 
@@ -99,7 +115,7 @@ the MEGA65 and 77 on the Nexys4DDR (Input and output below).
 | `i [A.B.C.D]` | Shows the Ethernet station's IP address, `IP address 192.168.1.65`, or writes it first: four decimal numbers of 0 to 255 with dots between them, such as `i 192.168.1.65`. Anything but an address or `dhcp` is no address, and `i` says so and writes nothing. It writes `0xFFFFFFB0`, `NET_IP` ([SYSTEM.md](../doc/SYSTEM.md#the-ethernet-station)), so a host connected over TCP loses its connection. In `niceemu` it is a register that keeps what is written. |
 | `i dhcp` | Gets the IP address from the network's DHCP server and writes it, as `i A.B.C.D` does, then shows it, with the mask, the gateway, and the server, a line each (The network below). Without an answer, it prints `No answer from a DHCP server` after about 16 seconds, and leaves the address as it was. |
 | `m [MAC]` | Shows the station's MAC address, `MAC address 02:4E:49:43:45:00`, or writes it first: six bytes of one or two hex digits, in either case, with colons between them, such as `m 02:4E:49:43:45:01`. The first byte must be even, as an odd one makes a group address. Anything else is no address, and `m` says so and writes nothing. It writes `0xFFFFFFB1` and `B2`, so a host connected over TCP loses its connection. Two boards on one network need different MAC addresses. In `niceemu` they are registers too, with the address of a board after reset. |
-| `l` | Loads words into the RAM from lines of `ADDR WORD` in hex, as a `.bin` file has them (Loading without a host below), up to an empty line, and prints the words written and the lines skipped: `Words loaded: 600, 00008000 to 00008257`. |
+| `l` | Enters words into the RAM from lines of `ADDR WORD` in hex, as a `.bin` file has them (Loading without a host below), up to an empty line, and prints the words written and the lines skipped: `Words loaded: 600, 00008000 to 00008257`. |
 | `sd [SLOT] LBA` | Shows the sector `LBA` of the SD card in `SLOT`, both in hex, as 32 rows of 16 bytes: the offset in the sector, the bytes in hex, and the bytes as text, with a dot for a byte outside `0x20` to `0x7E` ([INTERNALS.md](INTERNALS.md#the-sector-routines)). Without `SLOT`, the slot of the last `sd`, 0 after reset. An error of the controller is shown with its number and its meaning: `SD error 1 in slot 1, no card`. |
 | `dir [SLOT]` | Lists the folder `NICE` of the SD card's FAT32 file system (Files below): `Directory of NICE`, then a row for each file, its 8.3 name and its size in decimal, and for each directory, its name and `<DIR>`, then `Files: 25, directories: 1`. With `SLOT` in hex, it mounts the card in it first; without, it lists the card mounted, which the first `dir` or `load` after reset mounts. An error is shown with its number and meaning: `File error 18, FAT16, which is not supported`. |
 | `load NAME` | Loads the `.bin` file `NAME` of the card's folder `NICE` as `l` loads lines, and prints the same summary, so a program copied to the card on a PC loads with no host. Unlike `l`, an empty line is passed over, the end of the file ends the load, and a skipped line is counted from the first line of the file. `NAME` is an 8.3 name, in either case. |
@@ -181,28 +197,8 @@ folder itself, so a card is written only where its user made room.
 
 The entries 9 to 15 of the dispatch table (below) are its file API, in
 the C ABI. A name is one character per word up to a 0 word, and an
-address is a word address. An error is negative: those of the SD
-controller, -1 to -8, as `sd` shows them, and these:
-
-| Error | Meaning |
-|---|---|
-| -16 | No FAT32 file system |
-| -17 | FAT12, which is not supported |
-| -18 | FAT16, which is not supported |
-| -19 | exFAT, which is not supported |
-| -20 | Not an 8.3 name |
-| -21 | No such file |
-| -22 | A directory, opened as a file |
-| -23 | Too many open files: two are |
-| -24 | Not an open file, or not one of the right kind |
-| -25 | No such mode |
-| -26 | The FAT is damaged: a cluster outside the volume, or a chain shorter than the file |
-| -27 | No such slot |
-| -28 | The card has changed, and the mount was dropped |
-| -29 | No folder `NICE` on the card, or the folder of the build |
-| -30 | The card is full, or the folder has 65536 entries |
-| -31 | The file is open: to write, or at all for a write or a deletion |
-| -32 | The file is read-only |
+address is a word address. An error is negative
+([doc/PROGRAMMING.md](../doc/PROGRAMMING.md#the-monitors-error-codes)).
 
 ## The network
 
@@ -256,13 +252,8 @@ it:
   (nice_cpu's SYSTEM.md §7), so a program that receives a burst reads it
   soon.
 
-| Error | Meaning |
-|---|---|
-| -40 | No IP address: `NET_IP` is 0 |
-| -41 | No such port: 0 to send to, or past 65535 |
-| -42 | The endpoint is not open |
-| -43 | More than 1472 bytes |
-| -44 | No answer to ARP from the host, or from the gateway, or none for a host in another network |
+An error of the UDP entries is negative
+([doc/PROGRAMMING.md](../doc/PROGRAMMING.md#the-monitors-error-codes)).
 
 `tftp IP NAME` reads a file of a TFTP server (RFC 1350), in octet mode,
 through the endpoint, which it opens on a port of its own choice and

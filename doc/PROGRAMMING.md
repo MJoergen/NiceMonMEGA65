@@ -220,6 +220,58 @@ frames that the station does not serve and sends the program's
 monitor may use both too, and one that drives the SD registers itself
 mounts the card again afterwards.
 
+## The monitor's error codes
+
+The entries of the files and the network return a negative number for an
+error, and the monitor's commands print the number with its text, as
+`File error 29, no folder NICE on the card`. The SD controller's errors
+are those of `SD_ERROR` (nice_cpu's SYSTEM.md §5), negated:
+
+| Error | Meaning |
+|---|---|
+| -1 | No card is in the selected slot |
+| -2 | The card is not ready: Read or Write before a successful Init |
+| -3 | Timeout: the card did not answer |
+| -4 | CRC: the data from the card was corrupted |
+| -5 | The card reported an error |
+| -6 | Write-protected: Write to a card whose switch is set |
+| -7 | Out of range: Read or Write of a sector after `SD_LAST` |
+| -8 | Init failed |
+
+The file entries, `fs_mount` to `fs_delete`, add those of FAT32
+([monitor/README.md](../monitor/README.md#files)):
+
+| Error | Meaning |
+|---|---|
+| -16 | No FAT32 file system |
+| -17 | FAT12, which is not supported |
+| -18 | FAT16, which is not supported |
+| -19 | exFAT, which is not supported |
+| -20 | Not an 8.3 name |
+| -21 | No such file |
+| -22 | A directory, opened as a file |
+| -23 | Too many open files: two are |
+| -24 | Not an open file, or not one of the right kind |
+| -25 | No such mode |
+| -26 | The FAT is damaged: a cluster outside the volume, or a chain shorter than the file |
+| -27 | No such slot |
+| -28 | The card has changed, and the mount was dropped |
+| -29 | No folder `NICE` on the card, or the folder of the build |
+| -30 | The card is full, or the folder has 65536 entries |
+| -31 | The file is open: to write, or at all for a write or a deletion |
+| -32 | The file is read-only |
+
+The UDP entries, `udp_open` to `udp_close`, have their own
+([monitor/README.md](../monitor/README.md#the-network)):
+
+| Error | Meaning |
+|---|---|
+| -40 | No IP address: `NET_IP` is 0 |
+| -41 | No such port: 0 to send to, or past 65535 |
+| -42 | The endpoint is not open |
+| -43 | More than 1472 bytes |
+| -44 | No answer to ARP from the host, or from the gateway, or none for a host in another network |
+
 ## Programs in the ROM
 
 A program can also be the ROM of a core file (see "Building your own ROM"

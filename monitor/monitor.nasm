@@ -1549,7 +1549,7 @@ E_FS32          .ASCII_L 'the file is read-only'
 HELP            .DAT    H_R, H_L, H_LOAD, H_SAVE, H_DEL, H_TFTP, H_TFTPL, H_X, H_D, H_U, H_S
                 .DAT    H_DIR, H_I, H_ID, H_M, H_C, H_V, H_H, H_Q, H_P, 0
 H_R             .ASCII_L 'r [ADDR]      run the program at ADDR, or at 00008000; r 0 restarts'
-H_L             .ASCII_L 'l             load lines of ADDR WORD in hex, as a .bin file has them'
+H_L             .ASCII_L 'l             enter lines of ADDR WORD in hex, as a .bin file has them'
 H_LOAD          .ASCII_L 'load NAME     load the .bin file NAME of the SD card, as l loads lines'
 H_SAVE          .ASCII_L 'save NAME A N save N words from A, both in hex, as the .bin file NAME'
 H_DEL           .ASCII_L 'del NAME      delete the file NAME of the SD card'

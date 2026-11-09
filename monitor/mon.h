@@ -41,7 +41,8 @@ int scr_gety(void);
 unsigned scr_color(unsigned color);
 
 // The files of the SD card's FAT32 file system, from table 1.1, and
-// fs_write and fs_delete from table 1.2 (monitor/README.md, "Files"). The
+// fs_write and fs_delete from table 1.2 (monitor/README.md, "Files";
+// the errors in doc/PROGRAMMING.md, "The monitor's error codes"). The
 // addresses are NICE word addresses, not C pointers: a name is one
 // character per word up to a 0 word, and fs_read and fs_write take one
 // byte per word, so a C program passes the address of words outside its
@@ -83,7 +84,8 @@ int fs_delete(unsigned name);
 
 // The UDP endpoint, from table 1.3 (monitor/README.md, "The network"): one
 // local port, and datagrams of bytes one per word, as for the files. An
-// error is negative, from -40.
+// error is negative, from -40 (doc/PROGRAMMING.md, "The monitor's error
+// codes").
 
 // The endpoint opened on a local port, or with 0 on one from 49152 to
 // 65535, and the port for Ethernet frames enabled. The port, or an error.
