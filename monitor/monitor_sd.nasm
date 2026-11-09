@@ -1,11 +1,9 @@
 ; The monitor's SD cards below the file system, which the Makefile joins
 ; after monitor.nasm (its header): the sector routines sd_init, sd_read,
 ; and sd_write, the ROM's own, with no entries in the dispatch table
-; (issue #57, doc/SDCARD.md, "The ROM"), the names by which fat32.c calls
-; them, and sd, which shows a sector. The file commands of monitor.nasm
-; show the errors of the controller with sd_fail, and sd's letter s is
-; also that of save, to which cmd_sd jumps. The sector that sd shows is
-; at V_SECTOR, in monitor.nasm, with the other variables.
+; (doc/SDCARD.md, "The ROM"), and the names by which fat32.c calls them.
+; The file commands of monitor.nasm show the errors of the controller with
+; sd_fail.
 
 SD_CSR          .EQU    0xFFFFFFA0      ; the SD card's status, and a write starts a command (nice_cpu's SYSTEM.md §5)
 SD_LBA          .EQU    0xFFFFFFA1      ; the sector of a Read or Write
@@ -36,125 +34,6 @@ _fat_sd_write
                 ADD     R2, R2, ___wasm_memory
                 JMP     sd_write
 
-; sd [SLOT] LBA: the sector LBA of the card in SLOT, both in hex, read with
-; sd_read into V_SECTOR and shown as 32 rows of 16 bytes: the offset of
-; the row, the bytes in hex, and the bytes as text, with a dot for a byte
-; outside 0x20 to 0x7E. Without SLOT, the slot that SD_SELECT holds, which
-; is 0 after reset and the slot of the last sd_init after it. The card is
-; started up with sd_init when the slot is not the selected one, or its
-; card is not ready, or has changed since its last Init, so that a second
-; sd on a slot costs no Init. A SLOT at or above SD_SLOTS is no slot. An
-; error of the controller is shown with its number and its meaning. The
-; command is the letter s, which main finds, and a d after it. R7 is the
-; slot, R8 the sector, R9 the offset of the row, and R10 the bytes left in
-; the row.
-cmd_sd
-                OR      R1, @R2, 0x20   ; A as a
-                CMP     R1, 0x61        ; a
-        ?Z      JMP     cmd_save
-                MOVE    R1, @R2++
-                OR      R1, R1, 0x20    ; D as d
-                CMP     R1, 0x64        ; d
-        ?!Z     JMP     unknown
-                CMP     @R2, 0x20
-        ?Z      JMP     sd_args
-                TST     @R2
-        ?!Z     JMP     unknown         ; another letter, such as sdx
-sd_args
-                MOVE    R1, R2
-                CALL    _io_gethex      ; R1 the first number, R2 its digits, R3 after it
-                SUB     R4, R2, 1
-                CMP     R4, 8
-        ?!C     JMP     sd_bad          ; no digit, or more than 8
-                MOVE    R8, R1
-                MOVE    R7, @SD_SELECT
-                MOVE    R1, R3
-                CALL    _io_gethex      ; a second number
-                TST     R2
-        ?Z      JMP     sd_tail
-                SUB     R4, R2, 1
-                CMP     R4, 8
-        ?!C     JMP     sd_bad
-                MOVE    R7, R8          ; the first was the slot
-                MOVE    R8, R1
-                MOVE    R1, R3
-                CALL    _io_gethex      ; for the blanks after it
-                TST     R2
-        ?!Z     JMP     sd_bad          ; a third number
-sd_tail
-                TST     @R3
-        ?!Z     JMP     sd_bad          ; more after the numbers
-                CMP     R7, @SD_SLOTS
-        ?!C     JMP     sd_noslot
-                CALL    sd_wait
-                CMP     R7, @SD_SELECT
-        ?!Z     JMP     sd_start
-                AND     R1, @SD_CSR, SD_READY+SD_CHANGED
-                CMP     R1, SD_READY
-        ?Z      JMP     sd_ready
-sd_start
-                MOVE    R1, R7
-                CALL    sd_init
-                TST     R1
-        ?!Z     JMP     sd_fail
-sd_ready
-                MOVE    R1, R8
-                MOVE    R2, V_SECTOR
-                CALL    sd_read
-                TST     R1
-        ?!Z     JMP     sd_fail
-                MOVE    R1, S_SLOT
-                CALL    _io_puts
-                MOVE    R1, R7
-                CALL    _io_putdec
-                MOVE    R1, S_SECTOR
-                CALL    _io_puts
-                MOVE    R1, R8
-                CALL    _io_puthex
-                CALL    _io_crlf
-                MOVE    R9, 0
-sd_row
-                SHR     R1, R9, 8       ; the offset, in three digits
-                CALL    mac_digit
-                SHR     R1, R9, 4
-                CALL    mac_digit
-                MOVE    R1, R9
-                CALL    mac_digit
-                MOVE    R1, 0x20
-                CALL    mon_putc
-                MOVE    R10, 16
-sd_hex
-                MOVE    R1, 0x20
-                CALL    mon_putc
-                ADD     R1, R9, 16
-                SUB     R1, R1, R10
-                CALL    sd_byte
-                PUSH    R1
-                SHR     R1, R1, 4
-                CALL    mac_digit
-                POP     R1
-                CALL    mac_digit
-                SUB[M]  R10, R10, 1
-        ?!Z     JMP     sd_hex
-                MOVE    R1, S_UGAP
-                CALL    _io_puts
-                MOVE    R10, 16
-sd_text
-                ADD     R1, R9, 16
-                SUB     R1, R1, R10
-                CALL    sd_byte
-                CMP     R1, 0x20
-        ?C      MOVE    R1, 0x2E        ; a control code as a dot
-                CMP     R1, 0x7F
-        ?!C     MOVE    R1, 0x2E        ; and 0x7F and up
-                CALL    mon_putc
-                SUB[M]  R10, R10, 1
-        ?!Z     JMP     sd_text
-                CALL    _io_crlf
-                ADD     R9, R9, 16
-                CMP     R9, 512
-        ?!Z     JMP     sd_row
-                JMP     main
 ; An error of the controller, R1 its negative: the number, the slot, and
 ; the meaning, with the last sector after error 7
 sd_fail
@@ -182,32 +61,6 @@ sd_fail
 sd_fail_end
                 CALL    _io_crlf
                 JMP     main
-sd_noslot
-                MOVE    R1, S_NOSLOT
-                CALL    _io_puts
-                MOVE    R1, R7
-                CALL    _io_putdec
-                MOVE    R1, S_SLOTS
-                CALL    _io_puts
-                MOVE    R1, @SD_SLOTS
-                CALL    _io_putdec
-                CALL    _io_crlf
-                JMP     main
-sd_bad
-                MOVE    R1, S_BADSD
-                CALL    puts_crlf
-                JMP     main
-
-; sd_byte: R1 = the byte R1 of the sector at V_SECTOR, 4 bytes a word,
-; little-endian. Uses R1 and R2.
-sd_byte
-                SHR     R2, R1, 2
-                ADD     R2, R2, V_SECTOR
-                AND     R1, R1, 3
-                SHL     R1, R1, 3
-                SHR     R1, @R2, R1
-                AND     R1, R1, 0xFF
-                RET
 
 ; The sector routines, the ROM's own, with no entries in the dispatch table
 ; (doc/SDCARD.md, "The ROM"). They follow the C ABI, wait for busy before
@@ -279,13 +132,6 @@ sd_wait
         ?!Z     JMP     sd_wait
                 RET
 
-S_BADSD         .ASCII_L 'sd [SLOT] LBA: the slot and the sector in hex, such as sd 0 800'
-S_NOSLOT
-                .ASCII_L 'No SD slot '
-S_SLOTS         .ASCII_L '; the SD slots of this system: '
-S_SLOT          .ASCII_L 'Slot '
-S_SECTOR
-                .ASCII_L ', sector '
 S_SDERR         .ASCII_L 'SD error '
 S_INSLOT
                 .ASCII_L ' in slot '

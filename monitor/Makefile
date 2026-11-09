@@ -253,18 +253,12 @@ LOAD_EMU = l\r10000 7\rFFFEFFFF 8\rFFFF0000 1\r\rd 10000 1\rh\r
 # build/ram64k.bin writes to 0xFFFFFF9E: EFFF takes a word, and F000, the
 # monitor's variables, and 1EFFF, past the RAM, do not.
 LOAD_64K = l\rEFFF 1\rF000 2\r1EFFF 3\r\rd EFFF 1\rh\r
-# sd: the image of test/sd_image.py in slot 0 and none in slot 1. sd 1
-# shows the bytes 0 to 255 twice, SD 3 the last sector, and sd 4, after the
-# last, is error 7. sd 1 0 is error 1, no card, and so is sd 0, which reads
-# in slot 1, the last; sd 0 0 goes back to slot 0, with the 55 AA of sector
-# 0. sd 2 0 has no slot 2, and sd alone, sd 1 2 3, sd 1x, and a sector of 9
-# digits are no arguments; sdx is no command.
-SD   = sd 1\rSD 3\rsd 4\rsd 1 0\rsd 0\rsd 0 0\rsd 2 0\rsd\rsd 1 2 3\rsd 1x\rsd 123456789\rsdx\rh\r
 # rom: r runs test/rom.nasm, which traps, twice, then r 0, the cold start,
 # which gives the C code its initial values again, and r once more.
 ROM  = r\rr\rr 0\rr\rh\r
-# sd_write: r runs test/sd.nasm, which writes sector 2, and sd 2 shows it.
-SD_WRITE = r\rsd 2\rh\r
+# sd_write: r runs test/sd.nasm, which writes sector 2, which the image
+# shows.
+SD_WRITE = r\rh\r
 # fat: fat32.img of test/fat_image.py in slot 0 and super.img in slot 1.
 # dir mounts slot 0, DIR 1 and dir 0 mount each slot. load frag.bin reads
 # the fragmented FRAG.BIN, whose words d shows, the first and the last
@@ -315,9 +309,7 @@ DUMP_load    = -d 0xFFFFF000:15
 DUMP_load_emu = -d 0xFFFFF00E:1 -d 0xFFFEFFFF:1
 DUMP_load_64k = -d 0xFFFFF00E:1
 DUMP_hello_c = -d 0xFFFF0168:12
-# For sd the controller's registers, SD_CSR to SD_SLOTS, and for sd_write
-# the results of test/sd.nasm's calls
-DUMP_sd       = -d 0xFFFFFFA0:7
+# For sd_write the results of test/sd.nasm's calls
 DUMP_sd_write = -d 0x9100:6
 # For fs the results of test/fs.nasm's calls, the entry that fs_readdir
 # wrote, and the first 45 bytes that fs_read wrote, for fsw the results
@@ -369,7 +361,6 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	@printf '$(RUN)' > $(BUILD)/run.txt
 	@printf '$(RESET)' > $(BUILD)/reset.txt
 	@printf '$(SCROLL)' > $(BUILD)/scroll.txt
-	@printf '$(SD)' > $(BUILD)/sd.txt
 	@printf '$(SD_WRITE)' > $(BUILD)/sd_write.txt
 	@printf '$(ROM)' > $(BUILD)/rom.txt
 	@printf '$(FAT)' > $(BUILD)/fat.txt
@@ -381,7 +372,7 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	@$(PYTHON) test/sd_image.py --written $(BUILD)/sd_written.img
 	@{ printf '$(LOAD_HEAD)'; head -n 3 $(BUILD)/hello.bin | awk '{ printf "%s\r\n", $$0 }'; \
 	  tail -n +4 $(BUILD)/hello.bin; printf '$(LOAD_TAIL)'; } > $(BUILD)/load.txt
-	@fail=0; for t in cmds scroll load load_emu load_64k sd sd_write arp udp rom fs fsw fat fatw fatbad fat1 fatnone \
+	@fail=0; for t in cmds scroll load load_emu load_64k sd_write arp udp rom fs fsw fat fatw fatbad fat1 fatnone \
 	           hello reset hello_c; do \
 	  opts=; rom=$(BUILD)/monitor_test.bin; \
 	  case $$t in \
@@ -390,7 +381,6 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	    load) prog=$(BUILD)/ram128k.bin; input=load; dump='$(DUMP_load)';; \
 	    load_emu) prog=; input=load_emu; dump='$(DUMP_load_emu)';; \
 	    load_64k) prog=$(BUILD)/ram64k.bin; input=load_64k; dump='$(DUMP_load_64k)';; \
-	    sd) prog=; input=sd; dump='$(DUMP_sd)'; opts="--sd0 $(BUILD)/sd.img";; \
 	    sd_write) prog=$(BUILD)/sd.bin; input=sd_write; dump='$(DUMP_sd_write)'; \
 	      cp $(BUILD)/sd.img $(BUILD)/sd_write.img; opts="--sd0 $(BUILD)/sd_write.img";; \
 	    arp) prog=$(BUILD)/arp.bin; input=run; dump='$(DUMP_arp)'; \

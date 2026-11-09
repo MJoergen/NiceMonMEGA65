@@ -32,6 +32,10 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   registers start at `0xFFFFFFD0`, so a link request to
   `0xFFFFFFD0`–`DF` reaches the link, where it reached the RAM. A host
   of version 6 works unchanged.
+- The monitor has no `sd` command any more, which showed a sector of the
+  SD card, for the bring-up of the cards. `dir`, `load`, `save`, and
+  `del` reach the card's files, and a program or a host drives the
+  controller's registers for its sectors.
 
 **New.**
 

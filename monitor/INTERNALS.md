@@ -28,10 +28,6 @@ negative of `SD_ERROR`:
 - The buffer is in RAM, 4 bytes a word, little-endian, as the
   controller's is: byte 4n of the sector is bits 7..0 of word n. The
   routines copy it through `SD_CHUNK` and `SD_BUF0`–`SD_BUF7`.
-- `sd` calls `sd_init` only when its slot is not the selected one, or
-  the card there is not ready, or has changed since its last Init, so a
-  second `sd` on a slot reads at once. Its buffer is at `0xFFFFF080`,
-  with the monitor's variables.
 - FAT32 (README.md, "Files") calls the routines, and its file API is
   the table's entries for the card. A program that wants sectors drives
   the registers itself, and calls `fs_mount` before it uses the files
@@ -149,14 +145,11 @@ blanks, a line too long, a second line for an address, and CTRL-C, then
 `r`, with 128K words of RAM, as on the MEGA65, which a word of the
 input file gives `0xFFFFFF9E`; alone, with `l` at the bounds of 64K
 words, as on the Nexys4DDR; alone, with `l` where `0xFFFFFF9E` reads 0,
-as in `niceemu`; alone, with `sd` on the image of `test/sd_image.py`
-in slot 0, 4 sectors, and none in slot 1: a sector with every byte, the
-last sector, the one after it, the empty slot, the slot of the last `sd`,
-a slot that the system does not have, and arguments that are not; with
-`test/sd.nasm` at `0x8000`, which calls `sd_init`, `sd_read`, and
-`sd_write` by their labels, as it is assembled after the monitor's
-sources, and writes a sector, which `sd` then shows, and the image is
-compared with the one that `test/sd_image.py --written` makes; with
+as in `niceemu`; with `test/sd.nasm` at `0x8000` and the image of
+`test/sd_image.py` in slot 0, 4 sectors, and none in slot 1, which calls
+`sd_init`, `sd_read`, and `sd_write` by their labels, as it is assembled
+after the monitor's sources: the empty slot, a sector read and written,
+and the one after the last, and the image is compared with the one that `test/sd_image.py --written` makes; with
 `test/arp.nasm` at `0x8000`, built as `test/sd.nasm` is, which calls
 `arp_resolve` with the frames of `test/arp.eth` and `--step-time`: a
 reply after frames that are not, the cache, an address with no reply, an

@@ -5,9 +5,9 @@ written: the registers and the emulator's images, the controller in SPI
 mode, and the boards' slots and `make hwtest`, in V1.5. The registers
 are now specified by nice_cpu's `doc/SYSTEM.md` §5, and the boards'
 slots by "The SD card slots" in [SYSTEM.md](SYSTEM.md); where this note
-differs from them, they are right. The ROM's sector routines and its
-`sd` command are written too, in V1.7.1, and
-[monitor/README.md](../monitor/README.md) describes them, and so is
+differs from them, they are right. The ROM's sector routines are
+written too, in V1.7.1, and
+[monitor/INTERNALS.md](../monitor/INTERNALS.md) describes them, and so is
 FAT32's reading, with `dir` and `load`, in V1.9, in C, and its writing,
 with `save` and `del`, in V1.9.1. The host tool `tools/sdcard.py` lists
 the card, and reads, writes, and deletes its files from the host, in
@@ -393,11 +393,10 @@ program cannot do without it, as for state that the monitor keeps. So:
   A file is opened on the slot of the last `fs_mount`. The first `fs_open`
   after reset mounts slot 0, or slot 1 when slot 0 has no card and the
   board has a slot 1.
-- **The monitor's commands**: `sd` dumps a sector, for the bring-up;
-  `dir`; `load NAME` reads a program in the `.bin` text format, address and
-  word pairs, which is what the tools build, so a program goes to the card
-  by a copy on a PC; `save NAME ADDR N` writes N words from ADDR in the same
-  format; and `del NAME`.
+- **The monitor's commands**: `dir`; `load NAME` reads a program in the
+  `.bin` text format, address and word pairs, which is what the tools
+  build, so a program goes to the card by a copy on a PC; `save NAME
+  ADDR N` writes N words from ADDR in the same format; and `del NAME`.
 
 ## BASIC
 
@@ -466,7 +465,7 @@ ROM is developed in niceemu and needs no board.
 | The controller in the RTL, stage 1: SPI mode, the card model, `tb_sd`, and the formal checks | Done in V1.5 |
 | The controller, stage 2: 4-bit SD mode, optional, after a test whether a card leaves SPI mode | Later |
 | The pins on the R3, R6, and Nexys4DDR, and the read-only check in `make hwtest` | Done in V1.5 |
-| The sector routines in the ROM, and the monitor's `sd` command | Done in V1.7.1 |
+| The sector routines in the ROM | Done in V1.7.1 |
 | FAT32 reading, `dir`, and `load` | Done in V1.9 |
 | The folder `NICE`, set at build time | Done in V1.9 |
 | FAT32 writing, `save`, and `del` | Done in V1.9.1 |

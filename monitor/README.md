@@ -91,13 +91,13 @@ not the model.
 
 At the cold start the monitor clears the screen, prints its banner,
 `NiceMon` and the version, and prints a prompt, `> `, on the screen and
-on the line. It reads a line from the console: the keyboard and the line,
-which the hardware merges. A command is a letter, in either case, or
-`sd`, `dir`, `load`, `save`, `del`, or `tftp`, and after `d` and `u` a hex address and a hex
-count, each of them optional. DEL and
-backspace delete the character before the cursor, CTRL-C empties the
-line, and the cursor and function keys, the other control codes, and the
-bytes `0x80` to `0x9F` do nothing. RETURN runs the line.
+on the line. It reads a line from the console: the keyboard and the
+line, which the hardware merges. A command is a letter, in either case,
+or `dir`, `load`, `save`, `del`, or `tftp`, and after `d` and `u` a hex
+address and a hex count, each of them optional. DEL and backspace delete
+the character before the cursor, CTRL-C empties the line, and the cursor
+and function keys, the other control codes, and the bytes `0x80` to
+`0x9F` do nothing. RETURN runs the line.
 
 Before the first key of a line, Page Up and Page Down scroll back
 through the rows that left the top of the screen, 24 rows at a time.
@@ -116,7 +116,6 @@ the MEGA65 and 77 on the Nexys4DDR (Input and output below).
 | `i dhcp` | Gets the IP address from the network's DHCP server and writes it, as `i A.B.C.D` does, then shows it, with the mask, the gateway, and the server, a line each (The network below). Without an answer, it prints `No answer from a DHCP server` after about 16 seconds, and leaves the address as it was. |
 | `m [MAC]` | Shows the station's MAC address, `MAC address 02:4E:49:43:45:00`, or writes it first: six bytes of one or two hex digits, in either case, with colons between them, such as `m 02:4E:49:43:45:01`. The first byte must be even, as an odd one makes a group address. Anything else is no address, and `m` says so and writes nothing. It writes `0xFFFFFFB1` and `B2`, so a host connected over TCP loses its connection. Two boards on one network need different MAC addresses. In `niceemu` they are registers too, with the address of a board after reset. |
 | `l` | Enters words into the RAM from lines of `ADDR WORD` in hex, as a `.bin` file has them (Loading without a host below), up to an empty line, and prints the words written and the lines skipped: `Words loaded: 600, 00008000 to 00008257`. |
-| `sd [SLOT] LBA` | Shows the sector `LBA` of the SD card in `SLOT`, both in hex, as 32 rows of 16 bytes: the offset in the sector, the bytes in hex, and the bytes as text, with a dot for a byte outside `0x20` to `0x7E` ([INTERNALS.md](INTERNALS.md#the-sector-routines)). Without `SLOT`, the slot of the last `sd`, 0 after reset. An error of the controller is shown with its number and its meaning: `SD error 1 in slot 1, no card`. |
 | `dir [SLOT]` | Lists the folder `NICE` of the SD card's FAT32 file system (Files below): `Directory of NICE`, then a row for each file, its 8.3 name and its size in decimal, and for each directory, its name and `<DIR>`, then `Files: 25, directories: 1`. With `SLOT` in hex, it mounts the card in it first; without, it lists the card mounted, which the first `dir` or `load` after reset mounts. An error is shown with its number and meaning: `File error 18, FAT16, which is not supported`. |
 | `load NAME` | Loads the `.bin` file `NAME` of the card's folder `NICE` as `l` loads lines, and prints the same summary, so a program copied to the card on a PC loads with no host. Unlike `l`, an empty line is passed over, the end of the file ends the load, and a skipped line is counted from the first line of the file. `NAME` is an 8.3 name, in either case. |
 | `save NAME ADDR N` | Writes `N` words from `ADDR`, both in hex, to the file `NAME` of the card's folder `NICE` as a `.bin` file, a line of `ADDR WORD` in hex for each, and prints `Words saved: 600, 00008000 to 00008257`. It makes the file, or truncates it when it is there, and `load` reads it back. When the card fills up, the file keeps what fitted, and `save` prints error 30. |
@@ -130,8 +129,7 @@ the MEGA65 and 77 on the Nexys4DDR (Input and output below).
 Anything else prints `Unknown command; ? lists them`. The debugger has
 pause, step, and inspect, so the monitor adds only `l`, which loads a
 program with no host's tools and no storage, `u`, which reads code
-with no host, and `sd`, which reads a card with no file system, for the
-bring-up of the SD card's storage. `dir` and `load` read programs from
+with no host. `dir` and `load` read programs from
 a card's FAT32 file system, and `save` and `del` write it. `i dhcp`
 gives a board on a network an address with no host, and `tftp` loads a
 program from a server on it.
@@ -161,9 +159,9 @@ folder itself, so a card is written only where its user made room.
   and `load` mount the slot of the last mount when there is none, or
   after reset slot 0, or slot 1 when slot 0 has no card. The mount, and
   the files open, are dropped when the selected slot is no longer the
-  mounted one, as after `sd` on the other slot, or the card there is not
-  ready or has changed. A mount of a slot that the system does not have
-  changes nothing.
+  mounted one, as after a program selects the other slot, or the card
+  there is not ready or has changed. A mount of a slot that the system
+  does not have changes nothing.
 - **The folder `NICE`** of the root directory only, with 8.3
   names, matched in either case. A card may be shared by several cores
   on the MEGA65, each with a folder of its own in the root, so NiceMon

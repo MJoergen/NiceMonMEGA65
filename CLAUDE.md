@@ -28,7 +28,7 @@ link with the UART's baud rate at `0xFFFFFF9F` (issue #75). `doc/BASIC_SURVEY.md
 the survey of the BASIC dialects behind the interpreter in the ROM of
 issue #54 (milestone V2.0). `doc/SDCARD.md` is the design of the SD
 cards' storage, issue #62 and its subtasks, of which the controller, the
-slots, the ROM's sector routines with the `sd` command, FAT32's
+slots, the ROM's sector routines, FAT32's
 reading with `dir` and `load`, and its writing with `save` and `del`
 (#55, #56, #57, #58, and #59) are written. `doc/` also has `CODING_STYLE.md`,
 `RELEASE.md`, and `RELEASE_NOTES.md`; the root keeps only `README.md`,
@@ -155,7 +155,7 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   (#65), and `demo_hw.py`, which checks it in the ROM of a programmed board.
   `monitor/`: the monitor for the ROM in NICE assembly (`monitor.nasm`,
   the dispatch table, the HAL, the map of its RAM, and the commands, with
-  `u` in `monitor_dis.nasm`, `sd` and the sector routines in
+  `u` in `monitor_dis.nasm`, the sector routines in
   `monitor_sd.nasm`, and the network in `monitor_eth.nasm`), its C code (`fat32.c`,
   one wasm module through `nicewasm --ram`, with its
   writable words at `0xFFFFF400`; building the monitor needs clang, and

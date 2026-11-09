@@ -35,7 +35,7 @@
 ;
 ; - monitor_dis.nasm: u, the disassembler (README.md, "The
 ;   disassembler").
-; - monitor_sd.nasm: the SD cards below the file system, sd and the sector
+; - monitor_sd.nasm: the SD cards below the file system, the sector
 ;   routines sd_init, sd_read, and sd_write that fat32.c reads and writes
 ;   through (issue #57, doc/SDCARD.md).
 ; - monitor_eth.nasm: the network, the frame routines, the ARP cache, the
@@ -137,7 +137,6 @@ LINE_MAX        .EQU    76              ; so that the prompt and the line fit a 
 V_UF            .EQU    0xFFFFF060      ; for u: the fields dest, s0, and s1,
 V_UC            .EQU    0xFFFFF063      ; their constant words,
 V_UNOPS         .EQU    0xFFFFF066      ; and the operands of the mnemonic
-V_SECTOR        .EQU    0xFFFFF080      ; for sd: a sector, 128 words of 4 bytes, little-endian
 V_ARP           .EQU    0xFFFFF100      ; the ARP cache: ARP_SLOTS entries of an IP address, 0 for none, the MAC address as E_MACH and E_MACL have it, and the time of arp_tick it was learned
 V_ARPNEXT       .EQU    0xFFFFF110      ; the entry that arp_learn takes next, 4 times its number
 V_XID           .EQU    0xFFFFF111      ; for i dhcp: the transaction's number,
@@ -1003,7 +1002,7 @@ rest_blank
                 RET
 
 ; fs_fail: an error of fat32.c, R1 its negative: one of the SD controller's
-; as sd shows it, with the selected slot, or a file error, its number and
+; as sd_fail shows it, with the selected slot, or a file error, its number and
 ; its meaning
 fs_fail
                 CMP     R1, 0xFFFFFFF8  ; -8
@@ -1466,7 +1465,7 @@ COMMANDS
                 .DAT    0x6C, cmd_load  ; l
                 .DAT    0x6D, cmd_mac   ; m
                 .DAT    0x72, cmd_run   ; r
-                .DAT    0x73, cmd_sd    ; s, for sd
+                .DAT    0x73, cmd_save  ; s, for save
                 .DAT    0x74, cmd_tftp  ; t, for tftp
                 .DAT    0x75, cmd_dis   ; u
                 .DAT    0x76, cmd_version  ; v
@@ -1546,7 +1545,7 @@ E_FS30          .ASCII_L 'the card or the folder is full'
 E_FS31          .ASCII_L 'the file is open'
 E_FS32          .ASCII_L 'the file is read-only'
 
-HELP            .DAT    H_R, H_L, H_LOAD, H_SAVE, H_DEL, H_TFTP, H_TFTPL, H_X, H_D, H_U, H_S
+HELP            .DAT    H_R, H_L, H_LOAD, H_SAVE, H_DEL, H_TFTP, H_TFTPL, H_X, H_D, H_U
                 .DAT    H_DIR, H_I, H_ID, H_M, H_C, H_V, H_H, H_Q, H_P, 0
 H_R             .ASCII_L 'r [ADDR]      run the program at ADDR, or at 00008000; r 0 restarts'
 H_L             .ASCII_L 'l             enter lines of ADDR WORD in hex, as a .bin file has them'
@@ -1558,7 +1557,6 @@ H_TFTPL         .ASCII_L 'tftp IP [PAT] list the files of tools/tftpd.py at IP, 
 H_X             .ASCII_L 'x             run the demo of the ROM, which F12 leaves'
 H_D             .ASCII_L 'd [ADDR] [N]  show N words from ADDR, in hex, or the next ones'
 H_U             .ASCII_L 'u [ADDR] [N]  disassemble N instructions from ADDR, or the next ones'
-H_S             .ASCII_L 'sd [SLOT] LBA show sector LBA of the SD card in SLOT, or in the last slot'
 H_DIR           .ASCII_L 'dir [SLOT]    list the files of the SD card in SLOT, or of the card mounted'
 H_I             .ASCII_L 'i [A.B.C.D]   show the IP address, or set it, such as 192.168.1.65'
 H_ID            .ASCII_L 'i dhcp        get the IP address from a DHCP server'
