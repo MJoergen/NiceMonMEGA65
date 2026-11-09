@@ -50,15 +50,15 @@ sd_fail
                 CALL    _io_puts
                 SUB     R1, R8, 1
                 CMP     R1, SD_ERRS
-        ?!C     JMP     sd_fail_end     ; an error without a meaning here
+        ?!C     JMP     :+              ; an error without a meaning here
                 ADD     R1, R1, SD_ERRORS
                 MOVE    R1, @R1
                 CALL    _io_puts
                 CMP     R8, 7
-        ?!Z     JMP     sd_fail_end
+        ?!Z     JMP     :+
                 MOVE    R1, @SD_LAST
                 CALL    _io_puthex
-sd_fail_end
+:
                 CALL    _io_crlf
                 JMP     main
 
@@ -88,32 +88,32 @@ sd_read
                 MOVE[M] R1, @SD_ERROR
         ?!Z     JMP     sd_neg
                 MOVE    R3, 0           ; the chunk
-sd_read_chunk
+:
                 MOVE    @SD_CHUNK, R3
                 MOVE    R4, SD_BUF
-sd_read_word
+:
                 MOVE    @R2++, @R4++
                 CMP     R4, SD_BUF+8
-        ?!Z     JMP     sd_read_word
+        ?!Z     JMP     :-
                 ADD     R3, R3, 1
                 CMP     R3, 16
-        ?!Z     JMP     sd_read_chunk
+        ?!Z     JMP     :--
                 RET                     ; R1 is 0
 
 ; sd_write: the 128 words at R2 to the sector R1. Uses R1-R4.
 sd_write
                 CALL    sd_wait         ; as the buffer takes no write while busy
                 MOVE    R3, 0
-sd_write_chunk
+:
                 MOVE    @SD_CHUNK, R3
                 MOVE    R4, SD_BUF
-sd_write_word
+:
                 MOVE    @R4++, @R2++
                 CMP     R4, SD_BUF+8
-        ?!Z     JMP     sd_write_word
+        ?!Z     JMP     :-
                 ADD     R3, R3, 1
                 CMP     R3, 16
-        ?!Z     JMP     sd_write_chunk
+        ?!Z     JMP     :--
                 MOVE    @SD_LBA, R1
                 MOVE    @SD_CSR, SD_WR
 ; sd_end: the end of a command, R1 = 0, or the negative of SD_ERROR

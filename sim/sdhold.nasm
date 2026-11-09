@@ -15,12 +15,12 @@ START           MOVE    @SD_SELECT, 0
                 CMP     R1, 0
         ?Z      JMP     CHUNK
                 MOVE    @SD_CSR, 0      ; Init
-WAIT1           MOVE    R1, @SD_CSR
+:               MOVE    R1, @SD_CSR
                 AND[M]  R1, R1, 1       ; busy
-        ?!Z     JMP     WAIT1
+        ?!Z     JMP     :-
                 MOVE    @SD_CSR, 1      ; Read sector 5
-WAIT2           MOVE    R1, @SD_CSR
+:               MOVE    R1, @SD_CSR
                 AND[M]  R1, R1, 1
-        ?!Z     JMP     WAIT2
+        ?!Z     JMP     :-
 CHUNK           MOVE    @SD_CHUNK, 3
 LOOP            JMP     LOOP

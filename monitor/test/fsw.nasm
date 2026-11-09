@@ -68,19 +68,19 @@ fsw_main
                 MOVE    R1, FSW_TEXT
                 MOVE    R2, 0x30        ; the next digit
                 MOVE    R3, 0           ; the digits of the line
-fsw_fill
+:
                 CMP     R3, 49
         ?Z      MOVE    @R1++, 0x0A
         ?Z      MOVE    R3, 0
-        ?Z      JMP     fsw_fill_next
+        ?Z      JMP     :+
                 MOVE    @R1++, R2
                 ADD     R2, R2, 1
                 CMP     R2, 0x3A
         ?Z      MOVE    R2, 0x30
                 ADD     R3, R3, 1
-fsw_fill_next
+:
                 CMP     R1, FSW_TEXT+1000
-        ?!Z     JMP     fsw_fill
+        ?!Z     JMP     :--
                 CALL    _mon_version
                 MOVE    @R7++, R1
 ; NEW.TXT, written in three pieces, and read back
@@ -135,12 +135,12 @@ fsw_fill_next
                 MOVE    @R7++, R1
                 MOVE    R1, 0           ; the bytes that differ
                 MOVE    R2, 0
-fsw_cmp
+:
                 CMP     @FSW_TEXT[R2], @FSW_READ[R2]
         ?!Z     ADD     R1, R1, 1
                 ADD     R2, R2, 1
                 CMP     R2, 700
-        ?!Z     JMP     fsw_cmp
+        ?!Z     JMP     :-
                 MOVE    @R7++, R1
                 MOVE    R1, FSW_NEW
                 MOVE    R2, 1
@@ -172,14 +172,14 @@ fsw_cmp
                 MOVE    R8, R1
                 MOVE    R9, 5           ; the writes left
                 MOVE    R10, 0          ; the bytes written
-fsw_big
+:
                 MOVE    R1, R8
                 MOVE    R2, FSW_TEXT
                 MOVE    R3, 1000
                 CALL    _fs_write
                 ADD     R10, R10, R1
                 SUB[M]  R9, R9, 1
-        ?!Z     JMP     fsw_big
+        ?!Z     JMP     :-
                 MOVE    @R7++, R10
                 MOVE    R1, R8
                 CALL    _fs_close
@@ -218,20 +218,20 @@ fsw_big
 ; E00.TXT to E23.TXT, empty, the digits of the name in FSW_NAME+1 and +2
                 MOVE    R1, FSW_NAME
                 MOVE    R2, FSW_E00
-fsw_ename
+:
                 MOVE[M] @R1++, @R2++
-        ?!Z     JMP     fsw_ename
+        ?!Z     JMP     :-
                 MOVE    R9, 0           ; the files made
 fsw_e
                 MOVE    R1, FSW_NAME
                 MOVE    R2, 1
                 CALL    _fs_open
                 TST     R1
-        ?N      JMP     fsw_e_next
+        ?N      JMP     :+
                 CALL    _fs_close
                 TST     R1
         ?Z      ADD     R9, R9, 1
-fsw_e_next
+:
                 ADD     @FSW_NAME+2, @FSW_NAME+2, 1
                 CMP     @FSW_NAME+2, 0x3A
         ?Z      MOVE    @FSW_NAME+2, 0x30

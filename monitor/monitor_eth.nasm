@@ -70,21 +70,21 @@ dhcp_try
                 MOVE    R1, DHCP_OFFER
                 CALL    dhcp_wait
                 CMP     R1, DHCP_OFFER
-        ?!Z     JMP     dhcp_again
+        ?!Z     JMP     :+
                 MOVE    R1, DHCP_REQUEST
                 CALL    dhcp_send
                 MOVE    R1, DHCP_ACK
                 CALL    dhcp_wait
                 CMP     R1, DHCP_ACK
-        ?Z      JMP     dhcp_bound
-dhcp_again
+        ?Z      JMP     :++
+:
                 SUB[M]  R7, R7, 1
         ?!Z     JMP     dhcp_try
                 MOVE    @ETH_CSR, 0
                 MOVE    R1, S_NODHCP
                 CALL    puts_crlf
                 JMP     main
-dhcp_bound
+:
                 MOVE    @ETH_CSR, 0
                 MOVE    @E_IP, @V_DIP
                 MOVE    @V_MASK, @V_DMASK
@@ -127,18 +127,18 @@ eth_recv
                 ADD     R3, R2, 5       ; the words, with the 2 bytes before the frame
                 SHR     R3, R3, 2
                 MOVE    R4, 0           ; the chunk, of the queue's buffer
-eth_recv_chunk
+:
                 MOVE    @ETH_CHUNK, R4
                 MOVE    R5, ETH_BUF
-eth_recv_word
+:
                 MOVE    @R1++, @R5++
                 SUB[M]  R3, R3, 1
-        ?Z      JMP     eth_recv_end
+        ?Z      JMP     :+
                 CMP     R5, ETH_BUF+8
-        ?!Z     JMP     eth_recv_word
+        ?!Z     JMP     :-
                 ADD     R4, R4, 1
-                JMP     eth_recv_chunk
-eth_recv_end
+                JMP     :--
+:
                 MOVE    @ETH_RX_LEN, 0  ; the frame released
                 MOVE    R1, R2
                 RET
@@ -152,18 +152,18 @@ eth_send
                 ADD     R3, R2, 5
                 SHR     R3, R3, 2
                 MOVE    R4, ETH_TXBUF   ; chunk 0 of the send buffer
-eth_send_chunk
+:
                 MOVE    @ETH_CHUNK, R4
                 MOVE    R5, ETH_BUF
-eth_send_word
+:
                 MOVE    @R5++, @R1++
                 SUB[M]  R3, R3, 1
-        ?Z      JMP     eth_send_go
+        ?Z      JMP     :+
                 CMP     R5, ETH_BUF+8
-        ?!Z     JMP     eth_send_word
+        ?!Z     JMP     :-
                 ADD     R4, R4, 1
-                JMP     eth_send_chunk
-eth_send_go
+                JMP     :--
+:
                 MOVE    @ETH_TX_LEN, R2
                 RET
 
@@ -187,14 +187,14 @@ ip_csum
                 ADD     R2, R1, 4
                 MOVE    R3, 5
                 MOVE    R4, 0
-ip_csum_word
+:
                 MOVE    R5, @R2++
                 SHR     R6, R5, 16
                 ADD     R4, R4, R6
                 AND     R5, R5, 0xFFFF
                 ADD     R4, R4, R5
                 SUB[M]  R3, R3, 1
-        ?!Z     JMP     ip_csum_word
+        ?!Z     JMP     :-
                 SHR     R5, R4, 16      ; the carries added back in, twice
                 AND     R4, R4, 0xFFFF
                 ADD     R4, R4, R5
@@ -258,7 +258,7 @@ arp_look
                 MOVE    R1, R7
                 CALL    arp_request
                 MOVE    R9, @io.us      ; when it was sent
-arp_listen
+:
                 MOVE    R1, V_RXF
                 CALL    eth_recv
                 TST     R1
@@ -269,16 +269,16 @@ arp_listen
         ?!Z     JMP     arp_found
                 SUB     R1, @io.us, R9
                 CMP     R1, ARP_WAIT
-        ?C      JMP     arp_listen
+        ?C      JMP     :-
                 JMP     arp_look
 arp_found
                 MOVE    R2, @1[R1]
                 MOVE    R3, @2[R1]
                 MOVE    R1, 0
-                JMP     arp_end
+                JMP     :+
 arp_none
                 MOVE    R1, -1
-arp_end
+:
                 POP     R9
                 POP     R8
                 POP     R7
@@ -291,17 +291,17 @@ arp_find
         ?Z      RET                     ; 0, which marks no entry
                 CALL    arp_tick
                 MOVE    R4, V_ARP
-arp_find_next
+:
                 CMP     @R4, R3
-        ?!Z     JMP     arp_find_skip
+        ?!Z     JMP     :+
                 SUB     R2, R1, @3[R4]
                 CMP     R2, ARP_AGE
         ?C      MOVE    R1, R4
         ?C      RET
-arp_find_skip
+:
                 ADD     R4, R4, 4
                 CMP     R4, V_ARP+4*ARP_SLOTS
-        ?!Z     JMP     arp_find_next
+        ?!Z     JMP     :--
                 MOVE    R1, 0
                 RET
 
@@ -328,17 +328,17 @@ arp_take
 ; cache, at the time of now. Uses R1-R6.
 arp_learn
                 MOVE    R4, V_ARP
-arp_learn_same
+:
                 CMP     @R4, R1
-        ?Z      JMP     arp_learn_put
+        ?Z      JMP     :+
                 ADD     R4, R4, 4
                 CMP     R4, V_ARP+4*ARP_SLOTS
-        ?!Z     JMP     arp_learn_same
+        ?!Z     JMP     :-
                 MOVE    R4, @V_ARPNEXT  ; the next entry in turn
                 ADD     R5, R4, 4
                 AND     @V_ARPNEXT, R5, 4*ARP_SLOTS-1
                 ADD     R4, R4, V_ARP
-arp_learn_put
+:
                 MOVE    @R4++, R1
                 MOVE    @R4++, R2
                 MOVE    @R4++, R3
@@ -440,17 +440,17 @@ udp_send
                 MOVE    R2, 0xFFFF
                 MOVE    R3, 0xFFFFFFFF
                 CMP     R1, 0xFFFFFFFF
-        ?Z      JMP     udp_head        ; to everyone
+        ?Z      JMP     :++             ; to everyone
                 XOR     R2, R1, @E_IP
                 AND[M]  R0, R2, @V_MASK
-        ?Z      JMP     udp_arp         ; in this network, or no mask
+        ?Z      JMP     :+              ; in this network, or no mask
                 MOVE[M] R1, @V_GW
         ?Z      JMP     udp_noroute
-udp_arp
+:
                 CALL    arp_resolve
                 TST     R1
         ?!Z     JMP     udp_noroute
-udp_head
+:
                 MOVE    @V_UHDR, R2
                 MOVE    @V_UHDR+1, R3
                 SHL     R3, @E_MACH, 16
@@ -470,31 +470,31 @@ udp_head
                 SHL     @V_UHDR+10, R1, 16  ; the UDP length, and checksum 0
                 MOVE    R1, V_UHDR
                 CALL    ip_csum
-udp_busy
+:
                 AND[M]  R0, @ETH_CSR, ETH_BUSY
-        ?!Z     JMP     udp_busy        ; as the send buffer takes no write while busy
+        ?!Z     JMP     :-              ; as the send buffer takes no write while busy
                 MOVE    R5, 0           ; the word of the send buffer
                 MOVE    R6, R10         ; the bytes left
 udp_word
                 CMP     R5, UDP_HDR
-        ?!C     JMP     udp_data
+        ?!C     JMP     :+
                 MOVE    R2, @V_UHDR[R5]
                 JMP     udp_put
-udp_data
+:
                 TST     R6
         ?Z      JMP     udp_go          ; all written
                 MOVE    R2, 0
                 MOVE    R4, 4
-udp_byte
+:
                 SHL     R2, R2, 8
                 TST     R6
-        ?Z      JMP     udp_byte_next
+        ?Z      JMP     :+
                 AND     R1, @R9++, 0xFF
                 OR      R2, R2, R1
                 SUB     R6, R6, 1
-udp_byte_next
+:
                 SUB[M]  R4, R4, 1
-        ?!Z     JMP     udp_byte
+        ?!Z     JMP     :--
 udp_put
                 SHR     R1, R5, 3
                 OR      @ETH_CHUNK, R1, ETH_TXBUF
@@ -505,10 +505,10 @@ udp_put
 udp_go
                 ADD     @ETH_TX_LEN, R10, 42
                 MOVE    R1, 0
-                JMP     udp_send_end
+                JMP     :+
 udp_noroute
                 MOVE    R1, E_NOROUTE
-udp_send_end
+:
                 POP     R10
                 POP     R9
                 POP     R8
@@ -542,21 +542,21 @@ udp_recv
                 TST     R1
         ?Z      JMP     udp_recv_end
                 TST     R9
-        ?Z      JMP     udp_recv_copy
+        ?Z      JMP     :+
                 MOVE    @R9, @V_RXF+7
                 SHR     @1[R9], @V_RXF+9, 16
-udp_recv_copy
+:
                 MOVE    R6, 0           ; the byte
                 MOVE[M] R5, R8
-        ?Z      JMP     udp_recv_done
-udp_recv_byte
+        ?Z      JMP     :++
+:
                 ADD     R1, R6, 4*UDP_HDR
                 CALL    rx_byte
                 MOVE    @R7++, R1
                 ADD     R6, R6, 1
                 CMP     R6, R5
-        ?!Z     JMP     udp_recv_byte
-udp_recv_done
+        ?!Z     JMP     :-
+:
                 MOVE    R1, R8
 udp_recv_end
                 POP     R9
@@ -592,10 +592,10 @@ udp_next
         ?!Z     JMP     udp_next        ; a fragment
                 MOVE    R2, @V_RXF+8
                 CMP     R2, 0xFFFFFFFF
-        ?Z      JMP     udp_next_port
+        ?Z      JMP     :+
                 CMP     R2, @E_IP
         ?!Z     JMP     udp_next
-udp_next_port
+:
                 AND     R2, @V_RXF+9, 0xFFFF
                 CMP     R2, @V_UPORT
         ?!Z     JMP     udp_next
@@ -628,10 +628,10 @@ dhcp_send
                 MOVE    R6, R1
                 MOVE    R1, V_TXF
                 MOVE    R2, DHCP_WORDS
-dhcp_zero
+:
                 MOVE    @R1++, 0
                 SUB[M]  R2, R2, 1
-        ?!Z     JMP     dhcp_zero
+        ?!Z     JMP     :-
                 MOVE    R1, V_TXF
                 MOVE    R2, 0x0800
                 CALL    eth_head
@@ -647,12 +647,12 @@ dhcp_zero
                 SHL     @V_TXF+19, @E_MACL, 16
                 MOVE    @V_TXF+70, 0x63825363
                 CMP     R6, DHCP_REQUEST
-        ?Z      JMP     dhcp_req
+        ?Z      JMP     :+
                 MOVE    @V_TXF+71, 0x35010137  ; 53 DISCOVER, and 55
                 MOVE    @V_TXF+72, 0x03010306
                 MOVE    @V_TXF+73, 0xFF000000
                 JMP     dhcp_go
-dhcp_req
+:
                 MOVE    @V_TXF+71, 0x35010332  ; 53 REQUEST, and 50
                 MOVE    R1, @V_DIP
                 MOVE    R2, @V_DSRV
@@ -690,23 +690,23 @@ dhcp_listen
                 MOVE    R1, V_RXF
                 CALL    eth_recv
                 TST     R1
-        ?Z      JMP     dhcp_time
+        ?Z      JMP     :+
                 CALL    dhcp_parse
                 CMP     R1, R7
-        ?Z      JMP     dhcp_got
+        ?Z      JMP     :++
                 CMP     R1, DHCP_NAK
-        ?!Z     JMP     dhcp_time
+        ?!Z     JMP     :+
                 CMP     R7, DHCP_ACK
         ?Z      JMP     dhcp_wait_end   ; a NAK, R1
-dhcp_time
+:
                 SUB     R1, @io.us, R8
                 CMP     R1, DHCP_WAIT
         ?C      JMP     dhcp_listen
                 MOVE    R1, 0
                 JMP     dhcp_wait_end
-dhcp_got
+:
                 TST     @V_PIP
-        ?Z      JMP     dhcp_time       ; no address: passed over
+        ?Z      JMP     :--             ; no address: passed over
                 MOVE    @V_DIP, @V_PIP
                 MOVE    @V_DSRV, @V_PSRV
                 MOVE    @V_DMASK, @V_PMASK
@@ -784,14 +784,14 @@ dhcp_opt
         ?C      JMP     dhcp_opt        ; too short for an address
                 CMP     R6, 1
         ?Z      MOVE    R6, V_PMASK
-        ?Z      JMP     dhcp_addr
+        ?Z      JMP     :+
                 CMP     R6, 3
         ?Z      MOVE    R6, V_PGW
-        ?Z      JMP     dhcp_addr
+        ?Z      JMP     :+
                 CMP     R6, 54
         ?!Z     JMP     dhcp_opt
                 MOVE    R6, V_PSRV
-dhcp_addr
+:
                 CALL    rx_long
                 MOVE    @R6, R1
                 JMP     dhcp_opt
@@ -829,10 +829,10 @@ cmd_tftp
         ?Z      JMP     tftp_bad        ; tftp alone
                 CMP     @R1, 0x20
         ?!Z     JMP     unknown         ; tftpx
-tftp_blank
+:
                 CMP     @R1, 0x20
         ?Z      ADD     R1, R1, 1
-        ?Z      JMP     tftp_blank
+        ?Z      JMP     :-
                 CALL    get_ip
                 TST     R2
         ?Z      JMP     tftp_bad
@@ -843,10 +843,10 @@ tftp_blank
                 ADD     R3, R3, 1
                 MOVE    R4, 0           ; the port
                 MOVE    R5, R3          ; where it starts
-tftp_port_digit
+:
                 SUB     R2, @R3, 0x30
                 CMP     R2, 10
-        ?!C     JMP     tftp_port_end   ; no digit
+        ?!C     JMP     :+              ; no digit
                 ADD     R4, R4, R4      ; R4 is 10 * R4 + the digit
                 ADD     R2, R2, R4
                 SHL     R4, R4, 2
@@ -854,8 +854,8 @@ tftp_port_digit
                 CMP     R4, 0x10000
         ?!C     JMP     tftp_bad
                 ADD     R3, R3, 1
-                JMP     tftp_port_digit
-tftp_port_end
+                JMP     :-
+:
                 CMP     R3, R5
         ?Z      JMP     tftp_bad        ; a port without digits
                 TST     R4
@@ -864,39 +864,39 @@ tftp_port_end
 tftp_name
                 MOVE    R7, S_STAR
                 TST     @R3
-        ?Z      JMP     tftp_rrq        ; no name: the listing of *
+        ?Z      JMP     :+              ; no name: the listing of *
                 CMP     @R3, 0x20
         ?!Z     JMP     tftp_bad        ; no blank after the address
                 MOVE    R1, R3
                 CALL    fs_name
                 TST     R1
-        ?Z      JMP     tftp_rrq        ; only blanks
+        ?Z      JMP     :+              ; only blanks
                 MOVE    R7, R1
                 CALL    rest_blank
         ?!Z     JMP     tftp_bad        ; a third word
-tftp_rrq
+:
                 MOVE    @V_TLIST, 0
                 MOVE    R1, R7
-tftp_wild
+:
                 MOVE[M] R2, @R1++
-        ?Z      JMP     tftp_wild_end
+        ?Z      JMP     :+
                 CMP     R2, 0x2A        ; *
         ?Z      MOVE    @V_TLIST, 1
                 CMP     R2, 0x3F        ; ?
         ?Z      MOVE    @V_TLIST, 1
-                JMP     tftp_wild
-tftp_wild_end
+                JMP     :-
+:
 ; The RRQ: the opcode 1, the name, a 0, octet, and a 0
                 MOVE    R2, V_TPKT
                 MOVE    @R2++, 0
                 MOVE    @R2++, 1
-tftp_rrq_name
+:
                 MOVE[M] @R2++, @R7++
-        ?!Z     JMP     tftp_rrq_name
+        ?!Z     JMP     :-
                 MOVE    R1, S_OCTET
-tftp_rrq_mode
+:
                 MOVE[M] @R2++, @R1++
-        ?!Z     JMP     tftp_rrq_mode
+        ?!Z     JMP     :-
                 SUB     @V_TLEN, R2, V_TPKT
                 MOVE    R1, 0
                 CALL    udp_open
@@ -932,10 +932,10 @@ tftp_wait
         ?!Z     JMP     tftp_wait       ; from another host
                 SHR     R2, @V_RXF+9, 16  ; its port
                 MOVE[M] R3, @V_TTID
-        ?Z      JMP     tftp_op
+        ?Z      JMP     :+
                 CMP     R2, R3
         ?!Z     JMP     tftp_wait       ; from another TID
-tftp_op
+:
                 SHR     R3, @V_RXF+UDP_HDR, 16  ; the opcode
                 CMP     R3, 5
         ?Z      JMP     tftp_error
@@ -945,7 +945,7 @@ tftp_op
         ?C      JMP     tftp_wait       ; too short
                 AND     R4, @V_RXF+UDP_HDR, 0xFFFF  ; the block
                 CMP     R4, @V_TBLK
-        ?Z      JMP     tftp_data
+        ?Z      JMP     :+
                 ADD     R4, R4, 1
                 AND     R4, R4, 0xFFFF
                 CMP     R4, @V_TBLK
@@ -953,19 +953,19 @@ tftp_op
                 TST     @V_TTID
         ?Z      JMP     tftp_wait
                 JMP     tftp_send       ; the block before: its ACK again
-tftp_data
+:
                 MOVE    @V_TTID, R2
                 SUB     @V_TEND, R1, 4
                 MOVE    R7, 0           ; the byte of the block
-tftp_byte
+:
                 CMP     R7, @V_TEND
-        ?Z      JMP     tftp_ack
+        ?Z      JMP     :+
                 ADD     R1, R7, 4*UDP_HDR+4
                 CALL    rx_byte
                 ADD     R7, R7, 1
                 CALL    tftp_char
-                JMP     tftp_byte
-tftp_ack
+                JMP     :-
+:
                 MOVE    @V_TPKT, 0
                 MOVE    @V_TPKT+1, 4
                 MOVE    R1, @V_TBLK
@@ -1009,20 +1009,20 @@ tftp_error
                 CALL    _io_putdec
                 MOVE    R1, S_UCOMMA
                 CALL    _io_puts
-tftp_msg
+:
                 CMP     R7, R8
-        ?!C     JMP     tftp_msg_end
+        ?!C     JMP     :+
                 MOVE    R1, R7
                 CALL    rx_byte
                 TST     R1
-        ?Z      JMP     tftp_msg_end
+        ?Z      JMP     :+
                 ADD     R7, R7, 1
                 SUB     R2, R1, 0x20
                 CMP     R2, 0x5F
-        ?!C     JMP     tftp_msg        ; a control code
+        ?!C     JMP     :-              ; a control code
                 CALL    mon_putc
-                JMP     tftp_msg
-tftp_msg_end
+                JMP     :-
+:
                 CALL    _io_crlf
                 JMP     main
 ; An error of udp_open or udp_send: no IP address, or no route
@@ -1049,11 +1049,11 @@ tftp_char
                 MOVE    R2, @V_TLAST
                 MOVE    @V_TLAST, R1
                 CMP     R1, 0x0A
-        ?!Z     JMP     tftp_char_cr
+        ?!Z     JMP     :+
                 CMP     R2, 0x0D
         ?Z      RET                     ; the LF of a CR LF
                 JMP     tftp_eol
-tftp_char_cr
+:
                 CMP     R1, 0x0D
         ?Z      JMP     tftp_eol
                 CMP     R1, 0x09

@@ -235,10 +235,10 @@ mon_reset
                 MOVE    @___putc_vector, mon_putc
                 CALL    ___wasm_start
                 MOVE    R1, V_ARP
-arp_clear
+:
                 MOVE    @R1++, 0
                 CMP     R1, V_ARP+4*ARP_SLOTS+1  ; and V_ARPNEXT
-        ?!Z     JMP     arp_clear
+        ?!Z     JMP     :-
                 MOVE    @V_COLOR, COLOR
                 MOVE    @V_OUT, OUT_LINE+OUT_SCREEN
                 MOVE    @V_NEXT, PROGRAM
@@ -279,20 +279,20 @@ main            MOVE    SP, STACK
                 MOVE    R2, LINE_MAX
                 CALL    getline
                 MOVE    R2, V_LINE
-word            MOVE[M] R1, @R2++
+:               MOVE[M] R1, @R2++
         ?Z      JMP     main            ; an empty line
                 CMP     R1, 0x20
-        ?Z      JMP     word
+        ?Z      JMP     :-
                 SUB     R3, R1, 0x41
                 CMP     R3, 26
         ?C      OR      R1, R1, 0x20    ; A to Z folded to a to z
                 MOVE    R3, COMMANDS
-find            MOVE[M] R4, @R3++       ; a letter, or 0 at the end
+:               MOVE[M] R4, @R3++       ; a letter, or 0 at the end
         ?Z      JMP     unknown
                 CMP     R4, R1
         ?Z      JMP     @R3             ; the command
                 ADD     R3, R3, 1
-                JMP     find
+                JMP     :-
 unknown         MOVE    R1, S_UNKNOWN
                 CALL    puts_crlf
                 JMP     main
@@ -356,18 +356,18 @@ dump_row
                 MOVE    R1, R7
                 CALL    _io_puthex
                 MOVE    R9, ROW_WORDS   ; the words left in the row
-dump_word
+:
                 MOVE    R1, 0x20
                 CALL    mon_putc
                 MOVE    R1, @R7++
                 CALL    _io_puthex
                 SUB[M]  R8, R8, 1
-        ?Z      JMP     dump_end
+        ?Z      JMP     :+
                 SUB[M]  R9, R9, 1
-        ?!Z     JMP     dump_word
+        ?!Z     JMP     :-
                 CALL    _io_crlf
                 JMP     dump_row
-dump_end
+:
                 MOVE    @V_NEXT, R7
                 CALL    _io_crlf
                 JMP     main
@@ -409,17 +409,17 @@ ip_bad          MOVE    R1, S_BADIP
 ; The word after i, which must be dhcp, and blanks after it
 ip_word
                 MOVE    R3, S_DHCPW
-ip_word_chr
+:
                 MOVE[M] R4, @R3++
-        ?Z      JMP     ip_word_end
+        ?Z      JMP     :+
                 OR      R1, @R2++, 0x20  ; A to Z as a to z
                 CMP     R1, R4
-        ?Z      JMP     ip_word_chr
+        ?Z      JMP     :-
                 JMP     ip_bad
-ip_word_end
+:
                 CMP     @R2, 0x20
         ?Z      ADD     R2, R2, 1
-        ?Z      JMP     ip_word_end
+        ?Z      JMP     :-
                 TST     @R2
         ?!Z     JMP     ip_bad
                 JMP     ip_dhcp
@@ -434,10 +434,10 @@ get_ip
 get_ip_num
                 MOVE    R4, 0           ; the number
                 MOVE    R5, R3          ; where it starts
-get_ip_digit
+:
                 SUB     R2, @R3, 0x30
                 CMP     R2, 10
-        ?!C     JMP     get_ip_end      ; no digit
+        ?!C     JMP     :+              ; no digit
                 ADD     R4, R4, R4      ; R4 is 10 * R4 + the digit
                 ADD     R2, R2, R4
                 SHL     R4, R4, 2
@@ -445,8 +445,8 @@ get_ip_digit
                 CMP     R4, 256
         ?!C     JMP     get_ip_bad
                 ADD     R3, R3, 1
-                JMP     get_ip_digit
-get_ip_end
+                JMP     :-
+:
                 CMP     R3, R5
         ?Z      JMP     get_ip_bad      ; a number without digits
                 SHL     R1, R1, 8
@@ -470,15 +470,15 @@ show_ip
                 MOVE    R8, R2
                 CALL    _io_puts
                 MOVE    R7, 4           ; the bytes left
-ip_byte         ROL     R8, R8, 8       ; the top byte to the bottom
+:               ROL     R8, R8, 8       ; the top byte to the bottom
                 AND     R1, R8, 0xFF
                 CALL    _io_putdec
                 SUB[M]  R7, R7, 1
-        ?Z      JMP     ip_done
+        ?Z      JMP     :+
                 MOVE    R1, 0x2E
                 CALL    mon_putc
-                JMP     ip_byte
-ip_done         POP     R8
+                JMP     :-
+:               POP     R8
                 POP     R7
                 JMP     _io_crlf        ; which returns to the caller
 
@@ -502,17 +502,17 @@ cmd_baud
         ?Z      JMP     baud_show       ; baud alone
                 CMP     @R3, 0x20
         ?!Z     JMP     unknown         ; baudx
-baud_blank
+:
                 CMP     @R3, 0x20
         ?Z      ADD     R3, R3, 1
-        ?Z      JMP     baud_blank
+        ?Z      JMP     :-
                 TST     @R3
         ?Z      JMP     baud_show       ; no rate
                 MOVE    R7, 0
-baud_digit
+:
                 SUB     R2, @R3, 0x30
                 CMP     R2, 10
-        ?!C     JMP     baud_end        ; no digit
+        ?!C     JMP     :+              ; no digit
                 CMP     R7, 10000000
         ?!C     JMP     baud_bad        ; too many digits for a rate
                 ADD     R7, R7, R7      ; R7 is 10 * R7 + the digit
@@ -520,16 +520,16 @@ baud_digit
                 SHL     R7, R7, 2
                 ADD     R7, R7, R2
                 ADD     R3, R3, 1
-                JMP     baud_digit
-baud_end
+                JMP     :-
+:
                 CALL    rest_blank      ; also no digit at all
         ?!Z     JMP     baud_bad
                 MOVE    R1, BAUD_RATES
-baud_find
+:
                 MOVE[M] R2, @R1++
         ?Z      JMP     baud_bad        ; not in the list
                 CMP     R2, R7
-        ?!Z     JMP     baud_find
+        ?!Z     JMP     :-
                 MOVE    @UART_BAUD, R7
 baud_show
                 MOVE    R1, S_BAUD
@@ -555,10 +555,10 @@ cmd_mac
                 MOVE    R7, 0
                 MOVE    R8, 0
                 MOVE    R9, 6
-mac_blank
+:
                 CMP     @R2, 0x20
         ?Z      ADD     R2, R2, 1
-        ?Z      JMP     mac_blank
+        ?Z      JMP     :-
                 TST     @R2
         ?Z      JMP     mac_show        ; no address
                 MOVE    R10, R2
@@ -577,15 +577,15 @@ mac_byte
                 SHL     R8, R8, 8
                 OR      R8, R8, R1
                 SUB[M]  R9, R9, 1
-        ?Z      JMP     mac_last
+        ?Z      JMP     :+
                 CMP     @R10, 0x3A      ; :
         ?!Z     JMP     mac_bad
                 ADD     R10, R10, 1
                 JMP     mac_byte
-mac_last
+:
                 CMP     @R10, 0x20      ; blanks, then the end of the line
         ?Z      ADD     R10, R10, 1
-        ?Z      JMP     mac_last
+        ?Z      JMP     :-
                 TST     @R10
         ?!Z     JMP     mac_bad
                 AND[M]  R0, R7, 0x100   ; bit 0 of the first byte: a group address
@@ -603,20 +603,20 @@ mac_show
                 OR      R7, R7, R1
                 SHL     R8, R8, 16
                 MOVE    R9, 6           ; the bytes left
-mac_put         SHR     R1, R7, 28      ; the top byte, a digit at a time
+:               SHR     R1, R7, 28      ; the top byte, a digit at a time
                 CALL    mac_digit
                 SHR     R1, R7, 24
                 CALL    mac_digit
                 SUB[M]  R9, R9, 1
-        ?Z      JMP     mac_done
+        ?Z      JMP     :+
                 SHR     R4, R8, 24
                 SHL     R7, R7, 8
                 OR      R7, R7, R4
                 SHL     R8, R8, 8
                 MOVE    R1, 0x3A        ; :
                 CALL    mon_putc
-                JMP     mac_put
-mac_done
+                JMP     :-
+:
                 CALL    _io_crlf
                 JMP     main
 mac_bad         MOVE    R1, S_BADMAC
@@ -684,11 +684,11 @@ load_key
                 MOVE    R2, @V_LEND
                 MOVE    @V_LEND, R1
                 CMP     R1, 0x0A
-        ?!Z     JMP     load_char
+        ?!Z     JMP     :+
                 CMP     R2, 0x0D
         ?Z      JMP     load_key        ; the LF of a CR LF
                 JMP     load_end
-load_char
+:
                 CMP     R1, 0x0D
         ?Z      JMP     load_end
                 CMP     R1, 0x7F
@@ -724,14 +724,14 @@ load_esc
                 CALL    _io_getc.soon
         ?Z      JMP     load_key
                 CMP     R1, 0x5B        ; [
-        ?Z      JMP     load_seq
+        ?Z      JMP     :+
                 CMP     R1, 0x4F        ; O
         ?!Z     JMP     load_key
-load_seq
+:
                 CALL    _io_getc.soon
         ?Z      JMP     load_key
                 CMP     R1, 0x40
-        ?C      JMP     load_seq        ; a parameter byte
+        ?C      JMP     :-              ; a parameter byte
                 JMP     load_key        ; the final byte
 ; The end of a line: an empty one ends the load, and another goes to
 ; bin_line
@@ -755,10 +755,10 @@ bin_line
                 MOVE    R1, V_LINE
                 CALL    _io_gethex      ; R1 the address, R2 its digits, R3 after it
                 TST     R2
-        ?!Z     JMP     bin_addr
+        ?!Z     JMP     :+
                 TST     @R3
         ?Z      RET                     ; blanks only
-bin_addr
+:
                 SUB     R4, R2, 1
                 CMP     R4, 8
         ?!C     JMP     bin_bad         ; no digit, or more than 8
@@ -772,10 +772,10 @@ bin_addr
                 SUB     R4, R2, 1
                 CMP     R4, 8
         ?!C     JMP     bin_bad
-bin_tail
+:
                 CMP     @R3, 0x20
         ?Z      ADD     R3, R3, 1
-        ?Z      JMP     bin_tail
+        ?Z      JMP     :-
                 TST     @R3
         ?!Z     JMP     bin_bad         ; more after the word
                 MOVE    @R6, R1
@@ -801,7 +801,7 @@ load_summary
                 MOVE    R1, R8
                 CALL    _io_putdec
                 TST     R8
-        ?Z      JMP     load_skipped
+        ?Z      JMP     :+
                 MOVE    R1, S_LFROM
                 CALL    _io_puts
                 MOVE    R1, R9
@@ -810,7 +810,7 @@ load_summary
                 CALL    _io_puts
                 MOVE    R1, R10
                 CALL    _io_puthex
-load_skipped
+:
                 CALL    _io_crlf
                 TST     R12
         ?Z      JMP     main
@@ -846,25 +846,25 @@ cmd_dir
         ?!Z     JMP     unknown
                 MOVE    R1, @R2
                 CMP     R1, 0x20
-        ?Z      JMP     dir_args
+        ?Z      JMP     :+
                 TST     R1
         ?!Z     JMP     unknown         ; dirx
-dir_args
+:
                 MOVE    R1, R2
                 CALL    _io_gethex      ; R1 the slot, R2 its digits, R3 after it
                 MOVE    R7, R1
                 CMP     R2, 9
-        ?!C     JMP     dir_bad         ; more than 8 digits
+        ?!C     JMP     :+              ; more than 8 digits
                 TST     R2
         ?Z      MOVE    R7, 0xFFFFFFFF  ; no slot: the card mounted
                 CALL    rest_blank
-        ?!Z     JMP     dir_bad
+        ?!Z     JMP     :+
                 MOVE    R1, R7
                 CALL    _fat_dir
                 TST     R1
         ?N      JMP     fs_fail
                 JMP     main
-dir_bad
+:
                 MOVE    R1, S_BADDIR
                 CALL    puts_crlf
                 JMP     main
@@ -969,7 +969,7 @@ cmd_save
                 MOVE    R1, R10
                 CALL    _io_putdec
                 TST     R10
-        ?Z      JMP     save_end
+        ?Z      JMP     :+
                 MOVE    R1, S_LFROM
                 CALL    _io_puts
                 MOVE    R1, R9
@@ -979,7 +979,7 @@ cmd_save
                 ADD     R1, R9, R10
                 SUB     R1, R1, 1
                 CALL    _io_puthex
-save_end
+:
                 CALL    _io_crlf
                 JMP     main
 save_bad
@@ -1035,12 +1035,12 @@ fs_name
         ?Z      MOVE    R1, 0
         ?Z      RET
                 MOVE    R3, R1
-fs_name_end
+:
                 ADD     R3, R3, 1
                 TST     @R3
         ?Z      RET
                 CMP     @R3, 0x20
-        ?!Z     JMP     fs_name_end
+        ?!Z     JMP     :-
                 MOVE    @R3++, 0
                 RET
 
@@ -1069,10 +1069,10 @@ rest_blank
 ; its meaning
 fs_fail
                 CMP     R1, 0xFFFFFFF8  ; -8
-        ?C      JMP     fs_file         ; below -8
+        ?C      JMP     :+              ; below -8
                 MOVE    R7, @SD_SELECT
                 JMP     sd_fail
-fs_file
+:
                 SUB     R8, R0, R1      ; the error
                 MOVE    R1, S_FSERR
                 CALL    _io_puts
@@ -1080,14 +1080,14 @@ fs_file
                 CALL    _io_putdec
                 SUB     R1, R8, FS_ERR0
                 CMP     R1, FS_ERRS
-        ?!C     JMP     fs_file_end     ; an error without a meaning here
+        ?!C     JMP     :+              ; an error without a meaning here
                 ADD     R1, R1, FS_ERRORS
                 MOVE    R7, @R1
                 MOVE    R1, S_UCOMMA
                 CALL    _io_puts
                 MOVE    R1, R7
                 CALL    _io_puts
-fs_file_end
+:
                 CALL    _io_crlf
                 JMP     main
 
@@ -1100,10 +1100,10 @@ load_row
                 ADD     R1, R1, SCREEN
                 OR      R3, @V_COLOR, 0x20
                 MOVE    R2, 80
-load_blank
+:
                 MOVE    @R1++, R3
                 SUB[M]  R2, R2, 1
-        ?!Z     JMP     load_blank
+        ?!Z     JMP     :-
                 MOVE    @V_COL, 0
                 MOVE    @V_ROW, R7
                 JMP     putc_cur
@@ -1122,10 +1122,10 @@ cmd_demo
         ?!C     JMP     no_demo
                 MOVE    R2, DEMO+1
                 MOVE    R3, PROGRAM
-demo_copy
+:
                 MOVE    @R3++, @R2++
                 SUB[M]  R1, R1, 1
-        ?!Z     JMP     demo_copy
+        ?!Z     JMP     :-
                 MOVE    R1, MON_PUTC    ; as run_at calls a program
                 MOVE    R2, 0
                 MOVE    R3, 0
@@ -1230,11 +1230,11 @@ mon_putc
                 CMP     R1, 0x20
         ?C      JMP     putc_ctl        ; a control code
                 CMP     R1, 0x7F
-        ?C      JMP     putc_chr        ; 0x20 to 0x7E
+        ?C      JMP     :+              ; 0x20 to 0x7E
         ?Z      RET                     ; 0x7F: nothing
 ; The character at the cursor, SCREEN + 80 * row + column, and the cursor
 ; moved on
-putc_chr
+:
                 MOVE    R2, @V_ROW
                 SHL     R3, R2, 6
                 SHL     R2, R2, 4
@@ -1263,10 +1263,10 @@ putc_lf         MOVE    @V_COL, 0
                 ADD     R2, R2, SCREEN
                 MOVE    R3, SCREEN
                 MOVE    R4, 80
-putc_hist
+:
                 MOVE    @R2++, @R3++
                 SUB[M]  R4, R4, 1
-        ?!Z     JMP     putc_hist
+        ?!Z     JMP     :-
                 SUB[M]  R1, @V_HHEAD, 1
         ?C      SUB     R1, @V_HCAP, 1  ; from slot 0 to the last
                 MOVE    @V_HHEAD, R1
@@ -1277,15 +1277,15 @@ putc_scroll
                 MOVE    R2, SCREEN
                 MOVE    R3, SCREEN+80
                 MOVE    R4, 1920        ; rows 1 to 24 to rows 0 to 23
-putc_up         MOVE    @R2++, @R3++
+:               MOVE    @R2++, @R3++
                 SUB[M]  R4, R4, 1
-        ?!Z     JMP     putc_up
+        ?!Z     JMP     :-
                 OR      R3, @V_COLOR, 0x20
                 MOVE    R4, 80          ; row 24 blank
-putc_blk
+:
                 MOVE    @R2++, R3
                 SUB[M]  R4, R4, 1
-        ?!Z     JMP     putc_blk
+        ?!Z     JMP     :-
 ; The cursor's registers from the variables
 putc_cur
                 MOVE    @SCR_X, @V_COL
@@ -1298,7 +1298,7 @@ putc_ctl
                 CMP     R1, 0x0A
         ?Z      JMP     putc_lf
                 CMP     R1, 0x08
-        ?Z      JMP     putc_bs
+        ?Z      JMP     :+
                 CMP     R1, 0x09
         ?!Z     RET                     ; another control code: nothing
                 OR      R1, @V_COL, 7   ; TAB: the next multiple of 8
@@ -1307,7 +1307,7 @@ putc_ctl
         ?!C     JMP     putc_lf         ; past the last column
                 MOVE    @V_COL, R1
                 JMP     putc_cur
-putc_bs         MOVE[M] R1, @V_COL
+:               MOVE[M] R1, @V_COL
         ?!Z     SUB     @V_COL, R1, 1
                 JMP     putc_cur
 
@@ -1325,10 +1325,10 @@ scr_cls         MOVE    @SCR_OFFS, 0
                 MOVE    @SCR_CTL, 0x60
                 OR      R3, @V_COLOR, 0x20
                 MOVE    R1, 2000
-cls_loop
+:
                 DEC[M]  R1, R1
                 MOVE    @SCREEN[R1], R3
-        ?!Z     JMP     cls_loop
+        ?!Z     JMP     :-
                 MOVE    @V_COL, 0
                 MOVE    @V_ROW, 0
                 JMP     putc_cur
@@ -1390,18 +1390,18 @@ getline_key
                 CALL    _io_getc.soon
         ?Z      JMP     getline_drop
                 CMP     R1, 0x7E        ; ~
-        ?!Z     JMP     getline_csi
+        ?!Z     JMP     :+
                 CMP     R3, 0x35        ; 5
         ?Z      JMP     getline_up
                 CMP     R3, 0x36        ; 6
         ?Z      JMP     getline_down
                 JMP     getline_drop
-getline_csi
+:
                 CMP     R1, 0x40
         ?!C     JMP     getline_drop    ; the final byte
                 CALL    _io_getc.soon
         ?Z      JMP     getline_drop
-                JMP     getline_csi
+                JMP     :-
 getline_ss3
                 CALL    _io_getc.soon
 getline_drop
@@ -1409,18 +1409,18 @@ getline_drop
                 JMP     getline_key
 getline_row_up
                 MOVE    R3, 1
-                JMP     getline_up_rows
+                JMP     :+
 getline_up
                 MOVE    R3, PAGE
-getline_up_rows
+:
                 CALL    hist_up
                 JMP     getline_key
 getline_row_down
                 MOVE    R3, 1
-                JMP     getline_down_rows
+                JMP     :+
 getline_down
                 MOVE    R3, PAGE
-getline_down_rows
+:
                 CALL    hist_down
                 JMP     getline_key
 getline_line
@@ -1436,12 +1436,12 @@ hist_up
                 TST     @V_HCOUNT
         ?Z      RET                     ; no history
                 TST     @V_BACK
-        ?!Z     JMP     hist_more
+        ?!Z     JMP     :+
                 MOVE    @V_CTL, @SCR_CTL
                 PUSH    R3
                 CALL    hist_turn
                 POP     R3
-hist_more
+:
                 ADD     R1, @V_BACK, R3
                 CMP     @V_HCOUNT, R1
         ?C      MOVE    R1, @V_HCOUNT
@@ -1508,14 +1508,14 @@ hist_turn
 ; reverse order. Uses R1-R3.
 hist_rev
                 SUB     R2, R2, 1       ; the last word
-hist_rev_loop
+:
                 CMP     R1, R2
         ?!C     RET                     ; the two have met
                 MOVE    R3, @R1
                 MOVE    @R1++, @R2
                 MOVE    @R2, R3
                 SUB     R2, R2, 1
-                JMP     hist_rev_loop
+                JMP     :-
 
 ; puts_crlf: the string at R1, and CR LF
 puts_crlf

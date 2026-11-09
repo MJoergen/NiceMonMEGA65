@@ -33,9 +33,9 @@ RESULT          .EQU    0x100
                 MOVE    @0x101, @FS_OTHER  ; those of cause OTHER
                 MOVE    R2, FS_CAUSE
                 MOVE    R3, 15
-SUM             ADD     R1, R1, @R2++
+:               ADD     R1, R1, @R2++
                 SUB[M]  R3, R3, 1
-        ?!Z     JMP     SUM
+        ?!Z     JMP     :-
                 MOVE    @0x102, R1      ; the sum of FS_CAUSE
                 MOVE    R3, 32
 DELAY           SUB[M]  R3, R3, 1

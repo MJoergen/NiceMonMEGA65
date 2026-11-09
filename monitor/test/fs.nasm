@@ -109,15 +109,15 @@ fst_main
                 CALL    _fs_readdir
                 MOVE    @R7++, R1
                 MOVE    R9, 0           ; the entries
-fst_dir
+:
                 MOVE    R1, R8
                 MOVE    R2, FST_BUF
                 CALL    _fs_readdir
                 CMP     R1, 1
-        ?!Z     JMP     fst_dir_end
+        ?!Z     JMP     :+
                 ADD     R9, R9, 1
-                JMP     fst_dir
-fst_dir_end
+                JMP     :-
+:
                 MOVE    @R7++, R9
                 MOVE    @R7++, R1
                 MOVE    R1, R8

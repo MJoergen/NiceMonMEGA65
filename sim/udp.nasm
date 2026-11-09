@@ -55,17 +55,17 @@ RXWAIT          MOVE    R1, @ETH_CSR
                 SHR     R12, R12, 2
                 MOVE    R6, 0
                 MOVE    R7, SCRATCH
-COPY_IN         MOVE    @ETH_CHUNK, R6
+:               MOVE    @ETH_CHUNK, R6
                 MOVE    R2, ETH_BUF0
                 MOVE    R3, 8
-COPY_IN8
+:
                 MOVE    @R7++, @R2++
                 SUB[M]  R3, R3, 1
-        ?!Z     JMP     COPY_IN8
+        ?!Z     JMP     :-
                 ADD     R6, R6, 1
                 SHL     R1, R6, 3
                 CMP     R1, R12         ; C while words remain
-        ?C      JMP     COPY_IN
+        ?C      JMP     :--
 
 ; Words 0 to 3: the destination, the source, and the EtherType, from
 ; byte 2. The source becomes the destination, and the station's MAC
@@ -105,24 +105,24 @@ COPY_IN8
 ; SCRATCH into the send buffer, and the frame goes out.
                 MOVE    R6, 0x100
                 MOVE    R7, SCRATCH
-COPY_OUT
+:
                 MOVE    @ETH_CHUNK, R6
                 MOVE    R2, ETH_BUF0
                 MOVE    R3, 8
-COPY_OUT8
+:
                 MOVE    @R2++, @R7++
                 SUB[M]  R3, R3, 1
-        ?!Z     JMP     COPY_OUT8
+        ?!Z     JMP     :-
                 ADD     R6, R6, 1
                 AND     R1, R6, 0xFF
                 SHL     R1, R1, 3
                 CMP     R1, R12
-        ?C      JMP     COPY_OUT
+        ?C      JMP     :--
                 MOVE    @ETH_TX_LEN, R4
                 MOVE    @ETH_RX_LEN, 0
-BUSY            MOVE    R1, @ETH_CSR
+:               MOVE    R1, @ETH_CSR
                 AND[M]  R0, R1, 4       ; busy while it is sent
-        ?!Z     JMP     BUSY
+        ?!Z     JMP     :-
                 MOVE    @ETH_CSR, 0
                 HALT
 

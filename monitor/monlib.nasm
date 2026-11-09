@@ -21,12 +21,12 @@ io.t_esc        .EQU    10000           ; the longest wait for the byte after an
 _io_puts
                 PUSH    R7
                 MOVE    R7, R1
-_io_puts.loop
+:
                 MOVE[M] R1, @R7++
         ?Z      POP     R7
         ?Z      RET
                 CALL    _mon_putc
-                JMP     _io_puts.loop
+                JMP     :-
 
 ; _io_crlf: CR LF, which ends a line on the screen and on the line
 _io_crlf
@@ -42,7 +42,7 @@ _io_puthex
                 PUSH    R8
                 MOVE    R7, R1
                 MOVE    R8, 8
-_io_puthex.loop
+:
                 ROL     R7, R7, 4       ; the top digit to the bottom
                 AND     R1, R7, 0xF
                 ADD     R1, R1, 0x30
@@ -50,7 +50,7 @@ _io_puthex.loop
         ?!C     ADD     R1, R1, 7       ; A to F
                 CALL    _mon_putc
                 SUB[M]  R8, R8, 1
-        ?!Z     JMP     _io_puthex.loop
+        ?!Z     JMP     :-
                 POP     R8
                 POP     R7
                 RET
@@ -62,17 +62,17 @@ _io_putdec
                 PUSH    R7
                 MOVE    R7, 0           ; the digits pushed
                 MOVE    @io.mpu_b, 10
-_io_putdec.div
+:
                 MOVE    @io.mpu_a, R1
                 PUSH    @io.mpu_udivr
                 ADD     R7, R7, 1
                 MOVE[M] R1, @io.mpu_udivq
-        ?!Z     JMP     _io_putdec.div
-_io_putdec.put
+        ?!Z     JMP     :-
+:
                 ADD     R1, @R13++, 0x30
                 CALL    _mon_putc
                 SUB[M]  R7, R7, 1
-        ?!Z     JMP     _io_putdec.put
+        ?!Z     JMP     :-
                 POP     R7
                 RET
 
@@ -84,21 +84,21 @@ _io_gethex
                 MOVE    R3, R1
                 MOVE    R1, 0
                 MOVE    R2, 0
-_io_gethex.skip
+:
                 CMP     @R3, 0x20
         ?Z      ADD     R3, R3, 1
-        ?Z      JMP     _io_gethex.skip
+        ?Z      JMP     :-
 _io_gethex.loop
                 MOVE    R4, @R3
                 SUB     R5, R4, 0x30
                 CMP     R5, 10
-        ?C      JMP     _io_gethex.digit  ; 0 to 9
+        ?C      JMP     :+              ; 0 to 9
                 OR      R4, R4, 0x20    ; A to F as a to f
                 SUB     R5, R4, 0x61
                 CMP     R5, 6
         ?!C     RET                     ; no digit: the end
                 ADD     R5, R5, 10
-_io_gethex.digit
+:
                 SHL     R1, R1, 4
                 OR      R1, R1, R5
                 ADD     R2, R2, 1
@@ -121,14 +121,14 @@ _io_getc
 ; Uses R1 and R2.
 _io_getc.soon
                 ADD     R2, @io.us, io.t_esc  ; the deadline
-_io_getc.poll
+:
                 MOVE    R1, @io.console
                 AND[M]  R0, R1, 0x100
         ?!Z     AND     R1, R1, 0xFF
         ?!Z     OR[M]   R0, R1, 0x100   ; Z clear, also for a byte of 0
         ?!Z     RET
                 CMP     @io.us, R2
-        ?N      JMP     _io_getc.poll
+        ?N      JMP     :-
                 MOVE[M] R1, 0
                 RET
 
@@ -169,10 +169,10 @@ _io_gets.have
                 CMP     R1, 0x20
         ?C      JMP     _io_gets.next   ; another control code
                 CMP     R1, 0xA0
-        ?!C     JMP     _io_gets.put    ; 0xA0 and above
+        ?!C     JMP     :+              ; 0xA0 and above
                 CMP     R1, 0x80
         ?!C     JMP     _io_gets.next   ; 0x80 to 0x9F
-_io_gets.put
+:
                 CMP     R9, R8
         ?Z      JMP     _io_gets.next   ; the line is full
                 MOVE    @R9++, R1
@@ -204,14 +204,14 @@ _io_gets.esc
                 CALL    _io_getc.soon
         ?Z      JMP     _io_gets.next
                 CMP     R1, 0x5B        ; [
-        ?Z      JMP     _io_gets.csi
+        ?Z      JMP     :+
                 CMP     R1, 0x4F        ; O
         ?!Z     JMP     _io_gets.have
-_io_gets.csi
+:
                 CALL    _io_getc.soon
         ?Z      JMP     _io_gets.next
                 CMP     R1, 0x40
-        ?C      JMP     _io_gets.csi    ; a parameter byte
+        ?C      JMP     :-              ; a parameter byte
                 JMP     _io_gets.next   ; the final byte
 _io_gets.rub
                 .DAT    8, 0x20, 8, 0   ; BS, a blank, BS

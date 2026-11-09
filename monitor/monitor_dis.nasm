@@ -46,13 +46,13 @@ dis_row
                 AND     @V_UF+1, R1, 0x7F
                 AND     @V_UF+2, R9, 0x7F
                 MOVE    R11, 0
-dis_const
+:
                 AND     R1, @V_UF[R11], 0x30
                 CMP     R1, 0x30
         ?Z      MOVE    @V_UC[R11], @R12++
                 ADD     R11, R11, 1
                 CMP     R11, 3
-        ?!Z     JMP     dis_const
+        ?!Z     JMP     :-
 ; RET, the first half of a CALL, another pseudo-instruction, or another
 ; instruction
                 AND     R1, R9, 0x0FFFFFFF  ; without the condition
@@ -83,14 +83,14 @@ dis_const
 dis_find
                 MOVE    R10, 5
                 MOVE    R2, U_PSEUDO
-dis_find_next
+:
                 AND     R3, R1, @R2++   ; the mask
                 CMP     R3, @R2++       ; the value
         ?Z      JMP     dis_print
                 ADD     R2, R2, 3
                 ADD     R10, R10, 1
                 CMP     R10, 5+U_PSEUDOS
-        ?!Z     JMP     dis_find_next
+        ?!Z     JMP     :-
                 MOVE    R10, 0
                 JMP     dis_print
 ; A control instruction, which is reserved with a command past WAIT, a bit
@@ -114,23 +114,23 @@ dis_print
                 MOVE    R2, 8
                 CALL    u_hex
                 MOVE    R11, R7
-dis_word
+:
                 CMP     R11, R12
-        ?Z      JMP     dis_pad
+        ?Z      JMP     :+
                 MOVE    R1, 0x20
                 CALL    mon_putc
                 MOVE    R1, @R11++
                 MOVE    R2, 8
                 CALL    u_hex
-                JMP     dis_word
-dis_pad         SUB     R1, R11, R7
+                JMP     :-
+:               SUB     R1, R11, R7
                 CMP     R1, 4
-        ?Z      JMP     dis_text
+        ?Z      JMP     :+
                 MOVE    R1, S_UBLANK
                 CALL    _io_puts
                 ADD     R11, R11, 1
-                JMP     dis_pad
-dis_text
+                JMP     :-
+:
                 MOVE    R1, S_UGAP
                 CALL    _io_puts
                 JMP     @DIS_KINDS[R10]
@@ -144,20 +144,20 @@ dis_insn
         ?Z      MOVE    R2, @U_NOPS[R1]  ; an ALU instruction's
                 MOVE    @V_UNOPS, R2
                 MOVE    R3, 0
-dis_unused
+:
                 CMP     R2, 3
-        ?Z      JMP     dis_used
+        ?Z      JMP     :+
                 OR      R3, R3, @V_UF[R2]
                 ADD     R2, R2, 1
-                JMP     dis_unused
-dis_used
+                JMP     :-
+:
                 TST     R3
-        ?Z      JMP     dis_plain
+        ?Z      JMP     :+
                 CALL    u_dat
                 CALL    u_stmt
                 CALL    u_unused
                 JMP     dis_end
-dis_plain
+:
                 CALL    u_stmt
                 JMP     dis_end
 ; Kind 1, HALT, RTI, INT, with its vector in decimal, or WAIT
@@ -238,7 +238,7 @@ u_stmt
                 MOVE    R1, @U_NAMES[R1]
                 CALL    _io_puts
                 AND[M]  R0, R9, 0x06000000
-        ?Z      JMP     u_stmt_ops      ; no modifier
+        ?Z      JMP     :+              ; no modifier
                 MOVE    R1, 0x5B        ; [
                 CALL    mon_putc
                 AND[M]  R0, R9, 0x04000000
@@ -249,7 +249,7 @@ u_stmt
         ?!Z     CALL    mon_putc
                 MOVE    R1, 0x5D        ; ]
                 CALL    mon_putc
-u_stmt_ops
+:
                 MOVE    R1, 0x20
                 CALL    mon_putc
                 MOVE    R10, 0
@@ -280,7 +280,7 @@ u_unused_f
         ?Z      MOVE    R1, 0x29        ; )
         ?Z      JMP     mon_putc        ; which returns to the caller
                 TST     @V_UF[R10]
-        ?Z      JMP     u_unused_n
+        ?Z      JMP     :+
                 TST     R11
         ?!Z     MOVE    R1, S_UCOMMA
         ?!Z     CALL    _io_puts
@@ -291,7 +291,7 @@ u_unused_f
                 MOVE    R2, @V_UC[R10]
                 MOVE    R3, 0
                 CALL    u_op
-u_unused_n
+:
                 ADD     R10, R10, 1
                 JMP     u_unused_f
 
@@ -301,7 +301,7 @@ u_dat
                 MOVE    R1, S_UDAT
                 CALL    _io_puts
                 MOVE    R11, R7
-u_dat_word
+:
                 MOVE    R1, S_U0X
                 CALL    _io_puts
                 MOVE    R1, @R11++
@@ -312,7 +312,7 @@ u_dat_word
         ?Z      JMP     _io_puts        ; which returns to the caller
                 MOVE    R1, S_UCOMMA
                 CALL    _io_puts
-                JMP     u_dat_word
+                JMP     :-
 
 ; u_cond: the condition of the instruction word R1 and a blank, or nothing
 ; for "always". Uses R1-R5.
@@ -322,10 +322,10 @@ u_cond
                 MOVE    R1, 0x3F        ; ?
                 CALL    mon_putc
                 AND[M]  R0, R5, 8
-        ?Z      JMP     u_cond_flag
+        ?Z      JMP     :+
                 MOVE    R1, 0x21        ; !
                 CALL    mon_putc
-u_cond_flag
+:
                 AND     R1, R5, 7
                 MOVE    R1, @S_UFLAGS[R1]
                 CALL    mon_putc
@@ -340,26 +340,26 @@ u_op
                 MOVE    R5, R1          ; the field
                 MOVE    R6, R2          ; the constant
                 TST     R3
-        ?Z      JMP     u_op_at
+        ?Z      JMP     :+
                 AND     R4, R1, 0x70
                 CMP     R4, 0x10
         ?Z      OR      R5, R5, 0x80    ; Rx--
-u_op_at
+:
                 AND[M]  R0, R5, 0x40
-        ?Z      JMP     u_op_mode
+        ?Z      JMP     :+
                 MOVE    R1, 0x40        ; @
                 CALL    mon_putc
-u_op_mode
+:
                 AND     R4, R5, 0x30
                 CMP     R4, 0x30
         ?Z      JMP     u_op_const
                 CMP     R4, 0x10
-        ?!Z     JMP     u_op_reg
+        ?!Z     JMP     :+
                 AND[M]  R0, R5, 0x80
-        ?!Z     JMP     u_op_reg
+        ?!Z     JMP     :+
                 MOVE    R1, S_UDEC      ; --Rx
                 CALL    _io_puts
-u_op_reg
+:
                 AND     R1, R5, 0xF
                 CALL    u_reg
                 AND     R4, R5, 0x30
@@ -400,15 +400,15 @@ u_reg
 u_hex
                 MOVE    R5, R1
                 MOVE    R6, 8           ; the digits left
-u_hex_skip
+:
                 CMP     R6, R2
-        ?Z      JMP     u_hex_digit
+        ?Z      JMP     :+
                 AND[M]  R0, R5, 0xF0000000
-        ?!Z     JMP     u_hex_digit
+        ?!Z     JMP     :+
                 SHL     R5, R5, 4       ; a leading zero
                 SUB     R6, R6, 1
-                JMP     u_hex_skip
-u_hex_digit
+                JMP     :-
+:
                 ROL     R5, R5, 4       ; the top digit to the bottom
                 AND     R1, R5, 0xF
                 ADD     R1, R1, 0x30
@@ -416,7 +416,7 @@ u_hex_digit
         ?!C     ADD     R1, R1, 0x27    ; a to f
                 CALL    mon_putc
                 SUB[M]  R6, R6, 1
-        ?!Z     JMP     u_hex_digit
+        ?!Z     JMP     :-
                 RET
 
 ; The text of u: the mnemonics of the ALU instructions by opcode, and then

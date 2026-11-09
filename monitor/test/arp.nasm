@@ -31,20 +31,20 @@ art_main
                 MOVE    R1, 0x0A000001
                 CALL    art_resolve
                 MOVE    R8, 0x0A000003
-art_fill
+:
                 MOVE    R1, R8
                 CALL    art_resolve
                 ADD     R8, R8, 1
                 CMP     R8, 0x0A000007
-        ?!Z     JMP     art_fill
+        ?!Z     JMP     :-
                 MOVE    R1, V_ARP
-art_copy
+:
                 MOVE    @R7++, @R1++    ; the IP address and the MAC address
                 MOVE    @R7++, @R1++
                 MOVE    @R7++, @R1++
                 ADD     R1, R1, 1       ; but not the time
                 CMP     R1, V_ARP+4*ARP_SLOTS
-        ?!Z     JMP     art_copy
+        ?!Z     JMP     :-
                 MOVE    @R7++, @V_ARPNEXT
                 MOVE    R1, 0
                 RET
