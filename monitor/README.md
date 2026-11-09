@@ -1,5 +1,17 @@
 # monitor
 
+- [Hardware abstraction layer](#hardware-abstraction-layer)
+  - [The dispatch table](#the-dispatch-table)
+  - [The shared routines](#the-shared-routines)
+- [The commands](#the-commands)
+- [Files](#files)
+- [The network](#the-network)
+- [The disassembler](#the-disassembler)
+- [Programs](#programs)
+- [Remote control](#remote-control)
+- [Loading without a host](#loading-without-a-host)
+- [The demo](#the-demo)
+
 The ROM at `0x0000`–`0x7FFF`, which the core boots from, holds:
 
 - a hardware abstraction layer, the HAL, of twenty routines that reach
