@@ -168,8 +168,8 @@ syntax; and the keys:
 | MEGA+HELP | Back to the program, which gets its keyboard again |
 
 The page replaces the program's screen with a window on the memory.
-The cursor keys move through it, MEGA with CRSR up or down a page at a
-time, and CLR/HOME to the window's first word. Hex digits and RETURN
+The cursor keys move through it, CTRL and MEGA with CRSR up or down a
+page at a time, and CLR/HOME to the window's first word. Hex digits and RETURN
 write a word at the cursor, `a` and an address move the window there,
 `b` sets a breakpoint at the cursor or clears it, and ESC leaves. The
 program stops at a breakpoint, and the strip says `BRK n`. With `keep

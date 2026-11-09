@@ -260,17 +260,25 @@ begin
       report "tb_kbd: Home, Page Up, and Page Down";
       tap(51);                       -- CLR/HOME
       press(61);                     -- MEGA
-      tap(73);                       -- MEGA-up is Page Up
-      tap(7);                        -- MEGA-down is Page Down
+      tap(73);                       -- MEGA-up is up
+      tap(7);                        -- MEGA-down is down
+      press(58);                     -- CTRL
+      tap(73);                       -- CTRL-MEGA-up is Page Up
+      tap(7);                        -- CTRL-MEGA-down is Page Down
       press(15);
-      tap(7);                        -- MEGA-SHIFT-down is up, so Page Up
+      tap(7);                        -- CTRL-MEGA-SHIFT-down is up, so Page Up
       lift(15);
+      lift(58);
       tap(9);                        -- MEGA changes no other key
       lift(61);
+      press(58);
+      tap(73);                       -- CTRL-up is up
+      lift(58);
       press(15);
       tap(51);                       -- SHIFT-CLR/HOME is Home too
       lift(15);
-      expect(C_ESC & "[H" & C_ESC & "[5~" & C_ESC & "[6~" & C_ESC & "[5~" & "w" & C_ESC & "[H");
+      expect(C_ESC & "[H" & C_ESC & "[A" & C_ESC & "[B" & C_ESC & "[5~" & C_ESC & "[6~" &
+             C_ESC & "[5~" & "w" & C_ESC & "[A" & C_ESC & "[H");
 
       report "tb_kbd: two keys at once, and a key without a byte";
       held(9)  <= '1';               -- W

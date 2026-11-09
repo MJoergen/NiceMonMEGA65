@@ -67,10 +67,11 @@
 ; offset, which keeps only the bits that address it on a board, and all of
 ; them in niceemu, where it is plain memory: 32768 words at most, 384 rows
 ; of history, 77 on the Nexys4DDR. At the prompt, before a line is typed,
-; Page Up and Page Down show the history through the display offset: k
-; rows back is the offset 32768 - 80 k, which wraps to row 0 of the
-; screen, so the first Page Up turns the ring so that its newest row is
-; at the top of the memory. Any other key shows the screen again, and goes
+; the cursor keys up and down, ESC [ A and ESC [ B, show the history a row
+; further back or forward, and Page Up and Page Down a page, through the
+; display offset: k rows back is the offset 32768 - 80 k, which wraps to
+; row 0 of the screen, so the first of those keys turns the ring so that
+; its newest row is at the top of the memory. Any other key shows the screen again, and goes
 ; on to the line. niceemu has no display offset, so there the history is
 ; kept but not shown.
 ;
@@ -1358,9 +1359,10 @@ scr_color
                 RET
 
 ; getline: a line into the buffer at R1, of up to R2 characters, as
-; _io_gets reads it, with the keys of the history before it: Page Up, ESC
-; [ 5 ~, and Page Down, ESC [ 6 ~. The other escape sequences are dropped,
-; as _io_gets drops them, and any key but those two shows the screen again.
+; _io_gets reads it, with the keys of the history before it: up, ESC [ A,
+; and down, ESC [ B, a row, and Page Up, ESC [ 5 ~, and Page Down, ESC [ 6
+; ~, a page. The other escape sequences are dropped, as _io_gets drops
+; them, and any key but those four shows the screen again.
 ; The first key of the line goes on to _io_gets.first. _io_getc.soon uses
 ; only R1 and R2, so R3 keeps the first byte of a sequence's parameter.
 getline
@@ -1379,8 +1381,12 @@ getline_key
                 CALL    _io_getc.soon
         ?Z      JMP     getline_drop
                 MOVE    R3, R1
+                CMP     R1, 0x41        ; A
+        ?Z      JMP     getline_row_up
+                CMP     R1, 0x42        ; B
+        ?Z      JMP     getline_row_down
                 CMP     R1, 0x40
-        ?!C     JMP     getline_drop    ; the final byte, such as A
+        ?!C     JMP     getline_drop    ; another final byte, such as C
                 CALL    _io_getc.soon
         ?Z      JMP     getline_drop
                 CMP     R1, 0x7E        ; ~
@@ -1401,10 +1407,20 @@ getline_ss3
 getline_drop
                 CALL    hist_leave
                 JMP     getline_key
+getline_row_up
+                MOVE    R3, 1
+                JMP     getline_up_rows
 getline_up
+                MOVE    R3, PAGE
+getline_up_rows
                 CALL    hist_up
                 JMP     getline_key
+getline_row_down
+                MOVE    R3, 1
+                JMP     getline_down_rows
 getline_down
+                MOVE    R3, PAGE
+getline_down_rows
                 CALL    hist_down
                 JMP     getline_key
 getline_line
@@ -1414,18 +1430,19 @@ getline_line
                 POP     R1
                 JMP     _io_gets.first  ; which returns to the caller
 
-; hist_up: PAGE rows further back, up to the rows kept. The first turns
+; hist_up: R3 rows further back, up to the rows kept. The first turns
 ; the ring and keeps SCR_CTL. Uses R1-R6.
 hist_up
                 TST     @V_HCOUNT
         ?Z      RET                     ; no history
-                MOVE[M] R1, @V_BACK
+                TST     @V_BACK
         ?!Z     JMP     hist_more
                 MOVE    @V_CTL, @SCR_CTL
+                PUSH    R3
                 CALL    hist_turn
-                MOVE    R1, 0
+                POP     R3
 hist_more
-                ADD     R1, R1, PAGE
+                ADD     R1, @V_BACK, R3
                 CMP     @V_HCOUNT, R1
         ?C      MOVE    R1, @V_HCOUNT
 ; R1 rows back: the offset V_HSIZE - 80 R1 on, and the cursor off
@@ -1438,12 +1455,12 @@ hist_show
                 MOVE    @SCR_CTL, 0x400
                 RET
 
-; hist_down: PAGE rows forward, and the screen again at the end. Uses R1
+; hist_down: R3 rows forward, and the screen again at the end. Uses R1
 ; and R2.
 hist_down
                 MOVE[M] R1, @V_BACK
         ?Z      RET
-                SUB[M]  R1, R1, PAGE
+                SUB[M]  R1, R1, R3
         ?C      JMP     hist_leave
         ?Z      JMP     hist_leave
                 JMP     hist_show
@@ -1616,7 +1633,7 @@ E_FS31          .ASCII_L 'the file is open'
 E_FS32          .ASCII_L 'the file is read-only'
 
 HELP            .DAT    H_R, H_L, H_LOAD, H_SAVE, H_DEL, H_TFTP, H_TFTPL, H_X, H_D, H_U
-                .DAT    H_DIR, H_I, H_ID, H_M, H_B, H_C, H_V, H_H, H_Q, H_P, 0
+                .DAT    H_DIR, H_I, H_ID, H_M, H_B, H_C, H_V, H_H, H_Q, H_P, H_PG, 0
 H_R             .ASCII_L 'r [ADDR]      run the program at ADDR, or at 00008000; r 0 restarts'
 H_L             .ASCII_L 'l             enter lines of ADDR WORD in hex, as a .bin file has them'
 H_LOAD          .ASCII_L 'load NAME     load the .bin file NAME of the SD card, as l loads lines'
@@ -1636,7 +1653,8 @@ H_C             .ASCII_L 'c             clear the screen'
 H_V             .ASCII_L 'v             the version'
 H_H             .ASCII_L 'h             halt the core'
 H_Q             .ASCII_L '?             the commands'
-H_P             .ASCII_L 'PgUp PgDn     scroll back, before a command; MEGA with CRSR up or down'
+H_P             .ASCII_L 'CRSR up down  scroll back a row, before a command'
+H_PG            .ASCII_L 'PgUp PgDn     a page; on the MEGA65 CTRL and MEGA with CRSR up or down'
 S_UCOMMA
                 .ASCII_L ', '
 S_UGAP          .ASCII_L '  '

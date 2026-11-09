@@ -10,7 +10,8 @@ have it, 8192, as the Nexys4DDR has, and 2048, which leaves no room for
 the history. For each, the monitor runs with d 8000 N, for an N whose
 rows fill part of the history and one whose rows go round its ring, and
 with Page Up more times than there are rows back, then the same and
-three Page Downs, then the same and v, which shows the screen again.
+three Page Downs, then the same and five cursor keys up and two down, a
+row each, then the same and v, which shows the screen again.
 niceemu has no display offset, so the rows that a board would show are
 read from the dump of the screen's memory, at the offset the monitor
 set, modulo WORDS. They must be the rows of the console output, which
@@ -34,6 +35,7 @@ ROWS, COLS = 25, 80
 PAGE = 24                   # the rows of a Page Up (monitor.nasm, PAGE)
 HIST_SHOWN = 0x400          # SCR_CTL while the history is shown
 PAGE_UP, PAGE_DOWN = b"\x1b[5~", b"\x1b[6~"
+UP, DOWN = b"\x1b[A", b"\x1b[B"   # a row each
 STEPS = 20_000_000
 # The d counts for each size: one whose rows leave part of the history
 # empty, and one whose rows go round the ring
@@ -107,9 +109,11 @@ def test(emu: str, monitor: str, words: int, tmp: str) -> None:
         base = f"d 8000 {count:X}\r".encode()
         ups = PAGE_UP * 20
         downs = ups + PAGE_DOWN * 3
+        rows = downs + UP * 5 + DOWN * 2
         stages = [("20 Page Ups", base + ups),
                   ("20 Page Ups and 3 Page Downs", base + downs),
-                  ("20 Page Ups, 3 Page Downs, and v", base + downs + b"v\r")]
+                  ("then 5 ups and 2 downs", base + rows),
+                  ("then v", base + rows + b"v\r")]
         want_back = 0
         for i, (name, keys) in enumerate(stages):
             text, mem = run(emu, monitor, words, keys, tmp)
@@ -120,6 +124,9 @@ def test(emu: str, monitor: str, words: int, tmp: str) -> None:
                 want_back = min(20 * PAGE, min(scrolled, hcap))
             elif i == 1:
                 want_back = max(0, want_back - 3 * PAGE)
+            elif i == 2:
+                want_back = min(want_back + 5, min(scrolled, hcap))
+                want_back = max(0, want_back - 2)
             else:
                 want_back = 0
             what = f"{words} words, d 8000 {count:X}, {name}"

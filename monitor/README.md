@@ -99,9 +99,11 @@ backspace delete the character before the cursor, CTRL-C empties the
 line, and the cursor and function keys, the other control codes, and the
 bytes `0x80` to `0x9F` do nothing. RETURN runs the line.
 
-Before the first key of a line, Page Up and Page Down scroll back
-through the rows that left the top of the screen, 24 rows at a time.
-On the MEGA65 they are MEGA with CRSR↑ and CRSR↓. Any other key shows
+Before the first key of a line, the cursor keys up and down scroll
+back through the rows that left the top of the screen a row at a time,
+and Page Up and Page Down 24 rows at a time. On the MEGA65 Page Up and
+Page Down are CTRL and MEGA with CRSR↑ and CRSR↓, and CRSR↑ and CRSR↓
+are the cursor keys, with MEGA or without. Any other key shows
 the screen again, and goes on to the line. The history has 384 rows on
 the MEGA65 and 77 on the Nexys4DDR (Input and output below).
 
@@ -530,9 +532,9 @@ in nice_cpu's runtime or C library:
   start finds the size of the memory from the display offset, which a
   board keeps only in the bits that address the memory: 32768 words on
   the MEGA65 and 8192 on the Nexys4DDR, so one `monitor.bin` serves
-  every board. Page Up shows `k` rows back with the offset `size - 80k`,
-  which wraps to row 0 of the screen, and the cursor off; the first
-  Page Up turns the ring so that its newest row is the last of the
+  every board. A cursor key up or Page Up shows `k` rows back with the
+  offset `size - 80k`, which wraps to row 0 of the screen, and the
+  cursor off; the first turns the ring so that its newest row is the last of the
   memory. `niceemu` has no display offset, and keeps it as memory, so
   there the history is kept, 384 rows, and can be read with `d` or
   `--dump`, but is not shown. `c` and `scr_cls` leave it, as `clear`

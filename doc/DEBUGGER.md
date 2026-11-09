@@ -258,8 +258,8 @@ again rather than going on.
 Page Up, Page Down, and Home are bytes of both keyboards (written),
 xterm's `ESC [ 5 ~`, `ESC [ 6 ~`, and `ESC [ H`. On the Nexys4DDR they
 are the keys of those names. On the MEGA65, which has no such keys,
-CLR/HOME is Home, and MEGA with CRSR↑ and CRSR↓ are Page Up and Page
-Down, which makes MEGA a modifier in `kbd_m65_ascii.vhd`. Programs get them too, and the key tables of
+CLR/HOME is Home, and CTRL and MEGA with CRSR↑ and CRSR↓ are Page Up
+and Page Down, which makes MEGA a modifier in `kbd_m65_ascii.vhd`. Programs get them too, and the key tables of
 [SYSTEM.md](SYSTEM.md#the-keyboard) move with them.
 
 ## The Nexys4DDR
@@ -611,7 +611,7 @@ Made on 2026-10-30, with the reasons:
   program's usual white on black.
 - **Page Up, Page Down, and Home on both keyboards**, as new bytes for
   programs too: a key that gives nothing is a key wasted. On the MEGA65
-  they are CLR/HOME and MEGA with the cursor keys.
+  they are CLR/HOME and CTRL and MEGA with the cursor keys.
 
 Made on 2026-11-05 for stage 10:
 

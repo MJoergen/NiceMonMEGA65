@@ -196,8 +196,8 @@ Nexys4DDR, 8192, and of 2048, which has no room for it, with the monitor
 built to take each size: it reads the rows a board would show from the
 dump of the memory, at the display offset the monitor set, and compares
 them with the console output, with the history filled in part and gone
-round, after Page Ups, Page Downs, and a key that shows the screen
-again. `test/dis.py` runs `u` over `test/dis.nasm` at `0x8000`, which
+round, after Page Ups, Page Downs, the cursor keys up and down, and a
+key that shows the screen again. `test/dis.py` runs `u` over `test/dis.nasm` at `0x8000`, which
 has every opcode, operand mode, condition, and modifier, the control
 instructions, the reserved control words, unused fields that are not R0,
 the pairs that are `CALL` and `RET` and those that are not, and the

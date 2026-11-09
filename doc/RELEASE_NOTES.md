@@ -36,12 +36,18 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   SD card, for the bring-up of the cards. `dir`, `load`, `save`, and
   `del` reach the card's files, and a program or a host drives the
   controller's registers for its sectors.
+- On the MEGA65, Page Up and Page Down are CTRL and MEGA with CRSR↑ and
+  CRSR↓, where they were MEGA with them, and MEGA with CRSR↑ and CRSR↓
+  is the cursor key. This holds for programs and for the on-board
+  debugger's page of memory too.
 
 **New.**
 
 - The monitor's `baud [RATE]` shows the UART's baud rate, or sets it
   to one of the seven rates of `0xFFFFFF9F`, as the on-board debugger's
   settings page does.
+- At the monitor's prompt, the cursor keys up and down scroll back a
+  row at a time, and Page Up and Page Down still a page.
 - The link shows a wait for an interrupt in bit 6 of the control
   register ([#93](https://github.com/MJoergen/NiceMonMEGA65/issues/93)),
   and the hidden state of an interrupt routine in bits 7 and 8,

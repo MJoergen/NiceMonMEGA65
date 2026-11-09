@@ -354,14 +354,15 @@ the MEGA65's keys:
 | F1, F3, F5, F7, F9, F11 | As xterm sends them: `ESC O P` and `ESC O R` for F1 and F3, and `ESC [ 15 ~`, `ESC [ 18 ~`, `ESC [ 20 ~`, and `ESC [ 23 ~` for the others |
 | SHIFT with F1 to F11 | The even keys F2 to F12, as xterm sends them: `ESC O Q`, `ESC O S`, `ESC [ 17 ~`, `ESC [ 19 ~`, `ESC [ 21 ~`, and `ESC [ 24 ~` |
 | CLR/HOME | Home, `ESC [ H`, as xterm sends it, also with SHIFT |
-| MEGA with CRSR↑ or CRSR↓ | Page Up or Page Down, `ESC [ 5 ~` or `ESC [ 6 ~`, as xterm sends them; SHIFT with CRSR↓ is CRSR↑ here too |
+| CTRL and MEGA with CRSR↑ or CRSR↓ | Page Up or Page Down, `ESC [ 5 ~` or `ESC [ 6 ~`, as xterm sends them; SHIFT with CRSR↓ is CRSR↑ here too |
 | CTRL with a letter | Its control code |
 | £, ↑, ← | `\`, `^`, `_` (`\|`, `~`, `` ` `` with SHIFT) |
 | SHIFT with `0`, `=`, `:`, `;` | `{`, `}`, `[`, `]` |
 
 A held key repeats after half a second, 20 times a second. F13, HELP,
-and the modifiers give nothing, and MEGA changes no key but the cursor
-keys up and down. MEGA and HELP together toggle the
+and the modifiers give nothing, and MEGA changes no key on its own: with
+CTRL it makes the cursor keys up and down Page Up and Page Down, and
+without CTRL they stay the cursor keys. MEGA and HELP together toggle the
 on-board debugger ([DEBUGGER.md](DEBUGGER.md)), and while it has the
 focus the keys go to it, not to the core. The keyboard's drive
 LED is green while the core runs, like the user LED.

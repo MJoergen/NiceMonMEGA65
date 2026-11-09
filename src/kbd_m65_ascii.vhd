@@ -27,9 +27,10 @@
 -- F1, F3, F5, F7, F9, and F11 give xterm's sequences for those keys, and
 -- with SHIFT those of F2 to F12: ESC O P to ESC O S for F1 to F4, and ESC [,
 -- a number, and ~ for the others. F13 gives nothing. CLR/HOME is Home,
--- ESC [ H, also with SHIFT, and MEGA with CRSR up or down, the key at the
--- top right or SHIFT with CRSR down, is Page Up or Page Down, ESC [ 5 ~ or
--- ESC [ 6 ~, as xterm sends them. MEGA changes no other key.
+-- ESC [ H, also with SHIFT, and CTRL and MEGA with CRSR up or down, the
+-- key at the top right or SHIFT with CRSR down, is Page Up or Page Down,
+-- ESC [ 5 ~ or ESC [ 6 ~, as xterm sends them. MEGA changes no key on its
+-- own, so MEGA with CRSR up or down is the cursor key.
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -168,10 +169,10 @@ architecture synthesis of kbd_m65_ascii is
          res_v /= X"7F" then
          res_v(7 downto 5) := "000";
       end if;
-      -- MEGA with a cursor key up or down is Page Up or Page Down
-      if keys(C_MEGA) = '1' and res_v = C_UP then
+      -- CTRL and MEGA with a cursor key up or down is Page Up or Page Down
+      if keys(C_MEGA) = '1' and keys(C_CTRL) = '1' and res_v = C_UP then
          res_v := C_PGUP;
-      elsif keys(C_MEGA) = '1' and res_v = C_DOWN then
+      elsif keys(C_MEGA) = '1' and keys(C_CTRL) = '1' and res_v = C_DOWN then
          res_v := C_PGDN;
       end if;
       return res_v;

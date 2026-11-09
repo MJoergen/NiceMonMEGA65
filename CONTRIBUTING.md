@@ -209,7 +209,8 @@ The testbenches are these:
   the frames of `eth.in`, and the words it leaves and the frames it
   sends must be niceemu's.
 - `sim/tb_kbd.vhd` tests the keyboard driver and its ASCII, with a model of
-  the keyboard, CLR/HOME and MEGA with the cursor keys among the keys,
+  the keyboard, CLR/HOME and MEGA, with CTRL and without, with the
+  cursor keys among the keys,
   and the debugger's MEGA+HELP detector, which pulses once while the
   keys are held.
 - `sim/tb_ps2.vhd` tests the PS/2 receiver and its ASCII, with a model of a
