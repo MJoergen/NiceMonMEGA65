@@ -1,7 +1,7 @@
 # The host tools
 
-The tools run on the host, and talk to the board over its Ethernet port
-or its debug UART, with the debug link of
+The tools run on the host, and control the board remotely over its
+Ethernet port or its debug UART, with the debug link of
 [DEBUG.md](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEBUG.md).
 They use only the Python standard library, and run on Linux and macOS, but
 `flash.py` needs Linux, and pyftdi for the MEGA65. Each one
@@ -66,7 +66,7 @@ The other tools have targets too: `make hwtest` and `make flash` (see
 
 ## Over Ethernet
 
-The board serves the debug link on TCP port 4510 of its Ethernet
+The board serves remote control on TCP port 4510 of its Ethernet
 station, once it has an IP address
 ([SYSTEM.md](../doc/SYSTEM.md#the-debug-link-over-tcp)). After reset it
 has none. The monitor's `i` gives it one, `i 192.168.1.65` at the
@@ -167,6 +167,7 @@ nice_cpu's `start_mon.nasm`, or built with `nicebuild.py --monitor`
 ([monitor/](../monitor/README.md#programs)). `--monitor` loads it so:
 
     tools/load.py --eth 192.168.1.65 --monitor prog.bin
+    make load FILE=prog.bin ETH=192.168.1.65 ARGS=--monitor
 
 `load.py` holds the core and clears the memory with the ROM visible,
 writes the program, and starts the core. The monitor boots cold, which
@@ -183,10 +184,20 @@ bitstream without a ROM, or another build of the monitor.
 
 `run.py --monitor` does the same, with `r` and CR before the input, and
 `--rom FILE` too, and prints what `niceemu` prints for the monitor and
-the program joined.
-The monitor reads on at the end of the input, so the input ends with
-its `h`, which halts the core (monitor/README.md, "Loading from a
-host").
+the program joined. The monitor reads on at the end of the input, so
+the input ends with its `h`, which halts the core, as in the monitor's
+tests:
+
+    printf 'h\r' > h.txt
+    tools/run.py --tcp PORT --monitor --rom monitor/build/monitor_test.bin \
+        -i h.txt monitor/build/hello.bin
+    printf 'r\rh\r' > rh.txt
+    cat monitor/build/monitor_test.bin monitor/build/hello.bin > joined.bin
+    niceemu -i rh.txt joined.bin
+
+`make hwtest`, `make linktest`, and `make cosimtest` compare the two so
+with `monitor/test/hello.nasm`, and `make hwtest` also runs it under the
+monitor in the board's ROM, over the UART and Ethernet.
 
 ## Running a C program
 
@@ -320,7 +331,7 @@ emulator.
 
 ## mon.py
 
-`mon.py` is an interactive shell on the debug link. It loads a program,
+`mon.py` is an interactive shell for remote control. It loads a program,
 starts, holds, pauses, and steps the core, sets breakpoints, reads
 and writes the registers and the memory, and disassembles, with one
 short command each. It also passes text to and from the program. The

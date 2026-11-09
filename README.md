@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/MJoergen/NiceMonMEGA65/actions/workflows/ci.yml/badge.svg)](https://github.com/MJoergen/NiceMonMEGA65/actions/workflows/ci.yml)
 
-The NICE CPU on the MEGA65, with a debug link, and a monitor and a demo in its ROM
+The NICE CPU on the MEGA65, with remote control, and a monitor and a demo in its ROM
 
 ![The demo's welcome screen](doc/images/demo.png)
 
@@ -20,8 +20,8 @@ runs on the board as it runs in `niceemu`. The system also builds for
 the Digilent Nexys4DDR (see [synth/](synth/README.md#the-nexys4ddr)).
 
 The Ethernet port, or the debug UART, carries the program's console and
-the debug link, which a PC may use to load, run, pause, step, and
-inspect programs.
+remote control, nice_cpu's debug link, which a PC may use to load, run,
+pause, step, and inspect programs.
 
 There are three ways to use the system:
 
@@ -30,7 +30,7 @@ There are three ways to use the system:
   ROM, the core is loaded from the MEGA65's flash, and MEGA+HELP brings
   up a [debugger](#the-on-board-debugger) on the screen.
 - [Over Ethernet](#over-ethernet), with no JTAG cable, where a PC on
-  the network may load programs over the debug link, talk to them, and
+  the network may load programs by remote control, talk to them, and
   debug them.
 - [Over the serial port](#over-the-serial-port), with a JTAG cable,
   where a PC does the same, with the same tools.
@@ -196,12 +196,12 @@ shown or not, so nothing moves when it appears.
 
 ## Over Ethernet
 
-The debug link runs over the board's Ethernet port, on TCP port 4510. A
+Remote control runs over the board's Ethernet port, on TCP port 4510. A
 PC on the network may then load, run, and debug programs, with no JTAG
 cable.
 
 The board answers once it has an IP address, which the monitor, a
-program, the debug link, or the demo's F11 gives it. After reset, it has
+program, remote control, or the demo's F11 gives it. After reset, it has
 none, and answers nothing. At the monitor's prompt, `i 192.168.1.65` and
 RETURN give it that address, and `i` alone shows it. On a network with
 a DHCP server, `i dhcp` gets an address from it and shows it, with the
@@ -222,16 +222,16 @@ F11, I types a new IP address, and M a new MAC address:
 There are two ways to talk to a program on the board through it:
 
 - `tools/mon.py --eth 192.168.1.65` is an interactive shell. It has the
-  debug link's features and the console, in two modes. At its prompt, it
-  takes debug commands, shows the program's output, and decodes the
-  notices, and `send TEXT` sends text to the program. Its `console`
-  command passes your keys straight to the program, as a terminal does,
-  until Ctrl-] returns to the prompt.
+  features of remote control and the console, in two modes. At its
+  prompt, it takes debug commands, shows the program's output, and
+  decodes the notices, and `send TEXT` sends text to the program. Its
+  `console` command passes your keys straight to the program, as a
+  terminal does, until Ctrl-] returns to the prompt.
 - A plain client, such as `nc 192.168.1.65 4510`, is a terminal to the
-  program. It sends each line you type to the program, and shows what
-  it prints. It has none of the debug link's features: it cannot load a
-  program, pause it, or read its memory, and the link's notices show in
-  it as raw text, such as `h01#C9`.
+  program. It sends each line you type to the program, and shows what it
+  prints. It has none of the features of remote control: it cannot load
+  a program, pause it, or read its memory, and the link's notices show
+  in it as raw text, such as `h01#C9`.
 
 The other tools take `--eth 192.168.1.65` too (see
 [tools/README.md](tools/README.md#over-ethernet)), and
@@ -243,7 +243,7 @@ ROM (see
 on a network you trust.
 
 The board serves one connection at a time. While a host is connected,
-it has the whole line, the program's console and the debug link: what
+it has the whole line, the program's console and remote control: what
 comes in on the [serial port](#over-the-serial-port) is dropped, and all
 output goes to the host. When the host disconnects, the line goes back
 to the serial port. The [on-board debugger](#the-on-board-debugger)
@@ -260,7 +260,7 @@ their connections so that the line goes back at once.
 
 ## Over the serial port
 
-The debug link runs over the debug UART too, which needs the JTAG
+Remote control runs over the debug UART too, which needs the JTAG
 cable, whose USB port carries it. It runs at 230400 baud, 8-N-1, after
 reset, which the tools use by default on Linux and macOS alike, and
 `0xFFFFFF9F` sets another rate, from 115200 to 2 Mbaud

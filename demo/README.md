@@ -34,7 +34,7 @@ has what each demo shows and how it works. On the boards:
   address is `0.0.0.0` after reset, which answers nothing, and its MAC
   address `02:4E:49:43:45:00`. So a board with the demo in its ROM can
   get its address from its own keyboard, or from a terminal on the debug
-  UART, with I and M, and then answers pings and serves the debug link
+  UART, with I and M, and then answers pings and serves remote control
   on TCP port 4510, which the row "Debug link, TCP port" shows, with "a
   host connected" while one is. The counts are the board's frames.
 - The demo halts at the end of the input: after a break on the line, as

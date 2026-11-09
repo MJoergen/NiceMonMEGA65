@@ -19,7 +19,7 @@ those who write programs:
    hardware also has the integrated debugger, on the board's own
    keyboard and screen (the README's
    [The on-board debugger](../README.md#the-on-board-debugger), and
-   [doc/DEBUGGER.md](../doc/DEBUGGER.md)), and the debug link, through
+   [doc/DEBUGGER.md](../doc/DEBUGGER.md)), and remote control, through
    which a host loads, runs, and debugs a program over Ethernet or the
    UART (nice_cpu's
    [DEBUG.md](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEBUG.md),
@@ -80,12 +80,12 @@ not the model.
   bitstream, so the monitor is developed in the emulator, `niceemu`, which
   runs it like any program, with its keystrokes in an input file; the
   board is for checking.
-- The debug link stays. While the monitor runs, the link reaches only its
-  debug registers, and a host holds the core to reach the rest, as
+- Remote control stays. While the monitor runs, the link reaches only
+  its debug registers, and a host holds the core to reach the rest, as
   `load.py` and `run.py` do. They hide the ROM too, so that a program at
-  address 0 runs as in the emulator, and the reset button boots the monitor
-  again. With `--monitor` they keep the ROM, and run a program at
-  `0x8000` under the monitor (Loading from a host below).
+  address 0 runs as in the emulator, and the reset button boots the
+  monitor again. With `--monitor` they keep the ROM, and run a program
+  at `0x8000` under the monitor (Remote control below).
 
 ## The commands
 
@@ -208,6 +208,16 @@ SYSTEM.md §7 specifies, the same on every board and in `niceemu`. The
 ROM's own frame routines and its ARP cache, which `i dhcp`, `tftp`, and
 the UDP entries use, have no entries in the dispatch table
 ([INTERNALS.md](INTERNALS.md#the-frame-routines)).
+
+The network of programs is separate from remote control (Remote control
+below), but both use the board's one MAC address and one IP address,
+those of its Ethernet station
+([SYSTEM.md](../doc/SYSTEM.md#the-ethernet-station)). The station
+answers ARP for that IP address and pings to it, and serves remote
+control on TCP port 4510. Every other frame to the board, UDP to any
+port among them, goes to the port for Ethernet frames while a program
+or the UDP entries have it enabled. The address that `i` or `i dhcp`
+sets serves both.
 
 - The cold start and the return of a program, `mon_exit`, disable the
   port, so a program that does not use the network sees no frame. A
@@ -529,40 +539,18 @@ in nice_cpu's runtime or C library:
   `--dump`, but is not shown. `c` and `scr_cls` leave it, as `clear`
   in a terminal does, and the cold start empties it.
 
-## Loading from a host
+## Remote control
 
-A host loads a program at `0x8000` over the debug link, on the board's
-Ethernet port or its UART, with `--monitor`:
+A host, over the board's Ethernet port or its UART, controls the board
+with the tools of [tools/](../tools/README.md): it holds, starts,
+pauses, and steps the core, and reads and writes the memory. With
+`--monitor`, `load.py` and `run.py` keep the ROM, load a program at
+`0x8000`, and run it under the monitor:
 
     tools/load.py --eth 192.168.1.65 --monitor prog.bin
-    tools/run.py --eth 192.168.1.65 --monitor -i in.txt prog.bin
-    make load FILE=prog.bin ETH=192.168.1.65 ARGS=--monitor
 
-Each holds the core with the ROM visible, clears the memory, which
-leaves the ROM alone, writes the program, and starts the core. The
-monitor boots cold, which leaves the RAM from `0x8000` alone, and the
-tool types `r` and CR, which run the program. A program with a word
-below `0x8000` is refused, as it would be in the ROM, and so is a
-bitstream without a ROM. `--rom FILE` loads FILE at 0, with the ROM
-hidden, in the ROM's place: for `niceemu --link`, `make cosim`, a
-bitstream without a ROM, or another build of the monitor, such as
-`build/monitor_test.bin`.
-
-`run.py --monitor` prints what `niceemu` prints for the monitor and the
-program joined, with `r` and CR before the input. The monitor reads on
-at the end of the input, so the input ends with `h`, which halts the
-core, as in the tests here:
-
-    printf 'h\r' > h.txt
-    tools/run.py --tcp PORT --monitor --rom build/monitor_test.bin \
-        -i h.txt build/hello.bin
-    printf 'r\rh\r' > rh.txt
-    cat build/monitor_test.bin build/hello.bin > joined.bin
-    niceemu -i rh.txt joined.bin
-
-`make hwtest`, `make linktest`, and `make cosimtest` compare the two so
-with `test/hello.nasm`, and `make hwtest` also runs it under the monitor
-in the board's ROM, over the UART and Ethernet.
+The tools' README has the details, in [Running a program under the
+monitor](../tools/README.md#running-a-program-under-the-monitor).
 
 ## Loading without a host
 
@@ -607,8 +595,8 @@ and TCP holds the host back meanwhile. A byte is lost, with the link's
 `o`, only when the program reads nothing for 50 ms. On the R6, 20600
 lines pasted at full speed over TCP, in LF lines and in CR LF lines,
 and through `nc`, were all written, with no byte lost, in about 0.7 s.
-`load.py --eth 192.168.1.65 --monitor prog.bin` (Loading from a host
-above) is faster, as it writes the words into the memory.
+`load.py --eth 192.168.1.65 --monitor prog.bin` (Remote control above)
+is faster, as it writes the words into the memory.
 
 ## The demo
 
