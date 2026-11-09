@@ -123,122 +123,145 @@ it after `mon.nasm`, with nice_cpu's `lib.nasm` and `muldiv_mpu.nasm`.
 
 ## Building and testing
 
-`make -C monitor` assembles `monitor.nasm`, `monitor_cmd.nasm`,
-`monitor_dis.nasm`, `monitor_sd.nasm`, `monitor_eth.nasm`, `monlib.nasm`,
-`mon.nasm`, `build/rom_c.nasm`, nice_cpu's `lib.nasm` and
-`muldiv_mpu.nasm`, and `build/version.nasm`, the `cat` of them, with `niceasm` into
-`build/monitor.bin`, as the assembler has no include. `build/rom_c.nasm`
-is the ROM's C code (C in the ROM above), so the monitor, and a
-bitstream with it in the ROM, needs clang with the wasm32 target,
-`wasm-ld`, and `llvm-ar` (on Debian and Ubuntu, the `clang`, `lld`, and
-`llvm` packages). The test's images need `mkfs.fat`, `sfdisk`, and
-mtools (`dosfstools`, `fdisk`, and `mtools`). `test/fat_image.py` makes
-them with these tools, so FAT32 is tested against them: a card with an
-MBR, a FAT16 partition, and a FAT32 one, whose root has a volume label,
-another core's folder, a `HELLO.BIN` that is not NiceMon's, and the
-folder `NICE`, with a subdirectory, a long name, a name in lower case, 20
-more files past its first cluster, deleted entries, and `FRAG.BIN`, whose
-clusters are not contiguous; a card that is FAT32 on the whole, with no
-partition table; a card without `NICE`, and one whose `NICE` is a file; a
-FAT16 card; an exFAT one; and a FAT32 card whose free clusters are
-marked bad but the last three, so that a write fills it. After a test
-that writes, `test/fat_check.py` checks the card with `fsck.fat -n`, and
-lists the folder and shows the files written with `mdir` and `mtype`. `version.nasm` defines `VERSION`, the string of the
-banner, `git describe` of the tree unless `VERSION=` is given, and is
-written only when it changes.
+### What the build needs
 
-`make -C monitor test` checks the layout of the sources with nice_cpu's
-`nicefmt`, checks that the monitor ends below `DEMO`, where the demo
-goes in the ROM, assembles the monitor with the version `V9.9`, and runs
-it in `niceemu` twenty times, with its keystrokes in an input file and
-`h` as the last command, so that the run ends: alone, with every command
-and the edits of a line; alone, with 448 rows of `d`, which go round the
-ring of the history, and Page Up and Page Down; alone, with `l` and
-`build/hello.bin` pasted, lines that are skipped, tabs, a line of
-blanks, a line too long, a second line for an address, and CTRL-C, then
-`r`, with 128K words of RAM, as on the MEGA65, which a word of the
-input file gives `0xFFFFFF9E`; alone, with `l` at the bounds of 64K
-words, as on the Nexys4DDR; alone, with `l` where `0xFFFFFF9E` reads 0,
-as in `niceemu`; with `test/sd.nasm` at `0x8000` and the image of
-`test/sd_image.py` in slot 0, 4 sectors, and none in slot 1, which calls
-`sd_init`, `sd_read`, and `sd_write` by their labels, as it is assembled
-after the monitor's sources: the empty slot, a sector read and written,
-and the one after the last, and the image is compared with the one that `test/sd_image.py --written` makes; with
-`test/arp.nasm` at `0x8000`, built as `test/sd.nasm` is, which calls
-`arp_resolve` with the frames of `test/arp.eth` and `--step-time`: a
-reply after frames that are not, the cache, an address with no reply, an
-entry aged out, and the cache filled and gone round, and its frames sent
-are compared too; with `test/udp.nasm` at `0x8000`, built as
-`test/arp.nasm` is, which calls the UDP entries with the frames of
-`test/udp.eth`: each error, a datagram sent after ARP, a broadcast, two
-received after frames that are no datagram for the endpoint, one cut
-short, one sent through the gateway, and its frames sent are compared
-too; with `test/rom.c` joined to the ROM's C code, in
-`build/rom.bin`, the monitor of the tests with `test/rom.nasm` at
-`0x8000`, which calls its functions by their labels: the initial value
-of a global, a static array set to 0, both again after `r 0`,
-`nice_print`, and a trap, whose address is compared as the label it
-must be; with `test/fs.nasm` at `0x8000`, which calls the file entries
-through `mon.nasm`'s stubs, with the images of `test/fat_image.py` in
-both slots: handles, reads across the fragments of a file and at its end,
-the folder's entries, each error that a program can cause, and
-mounts; with `test/fsw.nasm` at `0x8000`, which calls the entries that
-write, on a copy of the card with the partitions, one of whose files is
-read-only, and a write-protected copy of the card with none: a file
-written in three pieces across clusters and read back, a file
-truncated, a file of ten clusters, deletions, one of a long name, the
-folder filled until it takes a new cluster, a mount that drops a file
-open to write, and each error that a program can cause; with the
-commands `dir` and `load` on those images, the
-fragmented `FRAG.BIN` and a text file loaded, the errors and the
-arguments that are not, and `HELLO.BIN` loaded and run; with `dir` on a
-FAT16 and an exFAT card; with `dir` and no card in slot 0, which mounts
-slot 1; with `dir` and `load` on the cards without the folder, which fail
-with error 29; with `save`, `load`, `dir`, and `del` on a copy of the
-card with no partitions, a program saved and loaded back, a file
-truncated and deleted, and the arguments that are not, and on a copy of
-the card that a write fills, which `save` fills with error 30, and
-which has room again after `del`; with `test/hello.nasm` at `0x8000`, an assembly program under
-nice_cpu's `start_mon.nasm`, also after `r 0`; and with `test/hello.c`,
-built with `nicebuild.py --monitor --asm mon.nasm`. The console output, which is the copy on the line, a few
-memory words, and the screen are compared with `test/NAME.expected`. The
-expected files were checked by hand; after a change that moves them,
-check the new output the same way before copying it from `build/`.
-`test/ring.py` checks the ring of the history first, at the sizes of the
-screen's memory of `niceemu` and the MEGA65, 32768 words, of the
-Nexys4DDR, 8192, and of 2048, which has no room for it, with the monitor
-built to take each size: it reads the rows a board would show from the
-dump of the memory, at the display offset the monitor set, and compares
-them with the console output, with the history filled in part and gone
-round, after Page Ups, Page Downs, the cursor keys up and down, and a
-key that shows the screen again. `test/dis.py` runs `u` over `test/dis.nasm` at `0x8000`, which
-has every opcode, operand mode, condition, and modifier, the control
-instructions, the reserved control words, unused fields that are not R0,
-the pairs that are `CALL` and `RET` and those that are not, and the
-words of the other pseudo-instructions, with a register, a constant, a
-memory operand, and a condition each, the words that match two of them,
-and the near-misses. It compares each row with nicedis.py's text, or,
-for a pseudo-instruction, with nicedis.py's text rewritten by the rules
-of README.md, "The disassembler", and assembles it with `niceasm` and compares the words. It checks
-that each pseudo-instruction occurs, and that `u` without `ADDR` goes on
-after the last row. `test/dhcp.py` runs `i dhcp` with `--step-time`, so
-that each run takes the same steps: first with no server, which gives it
-the transaction's number, and then with the OFFER and the ACK that it
-builds from it, among frames that are not for the monitor and an OFFER
-without an address, and with a NAK, which starts again. It compares the
-output and the frames sent, with the transaction as `xx`, with
-`test/dhcp.expected`, and checks the IPv4 checksums. `test/tftp.py`
-runs `tftp` the same way: first with no server, which gives it the
-client's port, and then with a file of two blocks among packets of
-another host and another port and a DATA again, with a DATA and an ACK
-lost, with an ERROR, with a file of 512 bytes, and with an empty file,
-with a listing, with the request to port 6969 of `IP:PORT`, and with
-the arguments that are not, no IP address, and no answer to ARP. It compares the output and the frames sent, with the client's port
-as `pp pp`, with `test/tftp.expected`, and checks the IPv4 checksums
-and the ports. `make tftptest`, in the repository's root, runs the
-monitor against `tools/tftpd.py` itself (CONTRIBUTING.md).
+- **For the monitor:** clang with the wasm32 target, `wasm-ld`, and
+  `llvm-ar`, for the ROM's C code. On Debian and Ubuntu these are the
+  `clang`, `lld`, and `llvm` packages. A bitstream with the monitor in its
+  ROM needs them too.
+- **For the tests:** also `mkfs.fat`, `sfdisk`, and mtools, from the
+  `dosfstools`, `fdisk`, and `mtools` packages, for the images of the SD
+  cards, and nice_cpu's `niceemu`.
 
-On a board, `make r6` builds a bitstream that boots the monitor, with the
-demo behind it in the ROM. `make hwtest` loads the same, with the
-versions of the tests, into the RAM, and types `x` for the demo
+### The build
+
+`make -C monitor` writes `build/monitor.bin`. The assembler has no
+include, so the Makefile joins the sources with `cat` and assembles the
+result with `niceasm`. In this order:
+
+1. `monitor.nasm`, `monitor_cmd.nasm`, `monitor_dis.nasm`,
+   `monitor_sd.nasm`, `monitor_eth.nasm`, `monlib.nasm`, and `mon.nasm`.
+2. `build/rom_c.nasm`, the ROM's C code (C in the ROM, above).
+3. nice_cpu's `lib.nasm` and `muldiv_mpu.nasm`.
+4. `build/version.nasm`, which defines `VERSION`, the text of the
+   banner: `git describe` of the tree, or the `VERSION=` of the command
+   line.
+5. `build/folder.nasm`, the text of error 29, with the card's folder
+   (README.md, "Files").
+
+`version.nasm` and `folder.nasm` are written only when they change, so
+that the monitor, and a bitstream with it, is not built again for
+nothing. The build fails if the monitor reaches `DEMO`, where the demo
+starts in the ROM.
+
+### The tests
+
+`make -C monitor test` runs everything in `niceemu`, with no board. The
+monitor of the tests, `build/monitor_test.bin`, has the version `V9.9`,
+so that the expected output does not change with every commit. The test
+needs `FOLDER=NICE`, the default. It runs these steps in order:
+
+1. **The layout.** nice_cpu's `nicefmt` checks the sources and the
+   tests' `.nasm` files.
+2. **The scrollback.** `test/ring.py` checks the ring of the history at
+   three sizes of the screen's memory: 32768 words, as in `niceemu` and
+   on the MEGA65, 8192, as on the Nexys4DDR, and 2048, which has no room
+   for it. For each, it reads the rows a board would show from a dump of
+   the memory, and compares them with the console output. It does this
+   with the history partly filled and gone round, and after Page Up, Page
+   Down, the cursor keys, and a key that shows the screen again.
+3. **The disassembler.** `test/dis.py` runs `u` over `test/dis.nasm`,
+   which has every opcode, operand mode, condition, and modifier, the
+   control instructions, the reserved words, and each pseudo-instruction
+   with its near-misses. It compares each row with the text of
+   `nicedis.py`, rewritten by the rules of README.md, "The disassembler",
+   for a pseudo-instruction. It assembles each row again and compares the
+   words.
+4. **DHCP.** `test/dhcp.py` runs `i dhcp` with `--step-time`, so that
+   each run takes the same steps. A first run with no server gives the
+   transaction's number. Then it builds the OFFER and the ACK, among
+   frames that are not for the monitor, an OFFER without an address, and
+   a NAK. It compares the output and the frames sent with
+   `test/dhcp.expected`, and checks the IPv4 checksums.
+5. **TFTP.** `test/tftp.py` runs `tftp` the same way, against
+   `test/tftp.expected`. It covers a file of two blocks among packets of
+   other hosts and ports, lost packets, an ERROR, files of 512 and 0
+   bytes, a listing, a port given as `IP:PORT`, bad arguments, and no
+   answer to ARP.
+6. **The runs.** The monitor runs once for each test below, with its
+   keystrokes from an input file that ends with `h`, so that the run
+   halts. Some runs add a program at `0x8000`, SD card images, or
+   Ethernet frames.
+
+Each run's console output, a few memory words, and the screen are
+compared with `test/NAME.expected`:
+
+| Test | What runs | What it checks |
+|---|---|---|
+| `cmds` | The monitor alone | Every command, its bad arguments, and the edits of a line. |
+| `scroll` | The monitor alone | 448 rows of `d`, which go round the history, and Page Up and Page Down. |
+| `load` | The monitor, with 128K words of RAM, as on the MEGA65 | `l` with `build/hello.bin` pasted: CR LF and LF line ends, tabs, blank lines, skipped lines, a line too long, an address given twice, and CTRL-C. Then `r` runs it. |
+| `load_64k` | The monitor, with 64K words, as on the Nexys4DDR | `l` at the end of that RAM. |
+| `load_emu` | The monitor, with `0xFFFFFF9E` reading 0, as in `niceemu` | `l` up to the screen. |
+| `sd_write` | `test/sd.nasm`, with a card of 4 sectors in slot 0 and none in slot 1 | `sd_init`, `sd_read`, and `sd_write`: the empty slot, a sector read and written, and the sector past the end. The card must then equal the image of `test/sd_image.py --written`. |
+| `arp` | `test/arp.nasm`, with the frames of `test/arp.eth` | `arp_resolve`: a reply after other frames, the cache, no reply, an entry aged out, and the cache filled and gone round. The frames sent are compared too. |
+| `udp` | `test/udp.nasm`, with the frames of `test/udp.eth` | The UDP entries: each error, a datagram sent after ARP, a broadcast, datagrams received among other frames, one cut short, and one sent through the gateway. The frames sent are compared too. |
+| `rom` | `build/rom.bin`: the monitor with `test/rom.c` in its C code, and `test/rom.nasm` | The C code in the ROM: a global's initial value, a static array set to 0, both again after `r 0`, `nice_print`, and a trap, whose address must be the label `_rom_trap`. |
+| `fs` | `test/fs.nasm`, with FAT images in both slots | The file entries, through `mon.nasm`'s stubs: handles, reads across the fragments of a file and at its end, the folder's entries, mounts, and each error a program can cause. |
+| `fsw` | `test/fsw.nasm`, with a copy of the card with partitions, one file read-only, and a write-protected card | The entries that write: a file written in pieces across clusters and read back, truncated, a file of ten clusters, deletions, one of a long name, a folder that grows a cluster, a mount that drops an open file, and each error. |
+| `fat` | The monitor, with FAT images in both slots | `dir` and `load`: the fragmented `FRAG.BIN`, a text file, bad arguments, and `HELLO.BIN` loaded and run. |
+| `fatw` | The monitor, with a copy of the card without partitions, and one that a write fills | `save`, `load`, `dir`, and `del`: a program saved and loaded back, a file truncated and deleted, bad arguments, and a full card, error 30, which has room again after `del`. |
+| `fatbad` | The monitor, with a FAT16 card and an exFAT card | `dir` rejects each. |
+| `fat1` | The monitor, with no card in slot 0 | `dir` mounts slot 1. |
+| `fatnone` | The monitor, with a card without the folder `NICE`, and one whose `NICE` is a file | `dir` and `load` fail with error 29. |
+| `hello` | `test/hello.nasm`, under nice_cpu's `start_mon.nasm` | A program in assembly, run with `r`, that returns to the monitor. |
+| `reset` | The same | `r 0`, the cold start, and `r` again. |
+| `hello_c` | `test/hello.c`, built with `nicebuild.py --monitor --asm mon.nasm` | A program in C. |
+
+`sd_write`, `arp`, `udp`, and `rom` call the monitor's routines by their
+labels, so they are assembled after the monitor's sources, and only
+their words from `0x8000` are kept. `fs`, `fsw`, `hello`, and `hello_c`
+call the entries through `mon.nasm`'s stubs, as any program does. `arp`
+and `udp` run with `--step-time`, as their timeouts count steps.
+
+The comments above each input in the Makefile say what each keystroke
+tests.
+
+### The cards of the tests
+
+`test/fat_image.py` makes the FAT images with `mkfs.fat`, `sfdisk`, and
+mtools, so that the monitor's FAT32 is tested against those tools:
+
+- `fat32.img`: an MBR with a FAT16 partition and a FAT32 one. Its root
+  has a volume label, another core's folder, a `HELLO.BIN` that is not
+  NiceMon's, and the folder `NICE`. `NICE` has a subdirectory, a long
+  name, a name in lower case, 20 more files past its first cluster,
+  deleted entries, and `FRAG.BIN`, whose clusters are not contiguous.
+- `super.img`: FAT32 on the whole card, with no partition table.
+- `nonice.img`, without the folder `NICE`, and `nicefile.img`, whose
+  `NICE` is a file.
+- `fat16.img` and `exfat.img`.
+- `full.img`: FAT32 with all free clusters marked bad but three, so
+  that a write fills it.
+
+After `fsw` and `fatw`, `test/fat_check.py` checks the cards that were
+written: `fsck.fat -n`, the folder with `mdir`, and the files written
+with `mtype`.
+
+### The expected files
+
+The expected files were checked by hand. After a change that alters an
+expected output, check the new output the same way before you copy it
+from `build/` to `test/`. The `Halted` line and the registers are left
+out, as they change with the code, except for VBASE, which must be 0
+after every run.
+
+`make tftptest`, in the repository's root, runs the monitor against
+`tools/tftpd.py` (CONTRIBUTING.md).
+
+### On a board
+
+`make r6` builds a bitstream that boots the monitor, with the demo
+behind it in the ROM. `make hwtest` loads the same, with the versions of
+the tests, into the RAM, and types `x` for the demo
 ([demo/](../demo/README.md), and README.md, "The demo").
