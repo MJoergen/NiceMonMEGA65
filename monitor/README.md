@@ -49,17 +49,24 @@ routines and the ARP cache of the network, and FAT32 in C.
 [INTERNALS.md](INTERNALS.md) describes them, with the build and the
 tests.
 
-The monitor is in NICE assembly, with FAT32 in C:
+The monitor is in NICE assembly, with FAT32 in C. The ROM is its files
+in this order, and the words of each are those of the build of
+2026-11-09:
 
-- `monitor.nasm` is the ROM.
-- `monitor_dis.nasm` is its disassembler.
-- `monitor_sd.nasm` has its routines for the SD cards.
-- `monitor_eth.nasm` has its routines for the network.
-- `fat32.c` is its FAT32.
-- `monlib.nasm` has the routines that programs join, which the monitor's
-  commands use too.
-- `mon.nasm` has the stubs through which a program calls the entries.
-- `mon.h` has their declarations for C.
+| File | What it is | Words |
+|---|---|---:|
+| `monitor.nasm` | The dispatch table, the HAL, the main loop, and the commands | 4588 |
+| `monitor_dis.nasm` | The disassembler of `u` | 1079 |
+| `monitor_sd.nasm` | The routines for the SD cards | 390 |
+| `monitor_eth.nasm` | The routines for the network | 1856 |
+| `monlib.nasm` | The routines that programs join, which the commands use too | 259 |
+| `mon.nasm` | The stubs through which a program calls the entries | 48 |
+| `fat32.c` | FAT32, translated by `nicewasm --ram` | 7200 |
+| nice_cpu's `lib.nasm` and `muldiv_mpu.nasm` | The runtime of the C code | 259 |
+| `build/version.nasm` and `build/folder.nasm` | The version and the card's folder, which the Makefile writes | 46 |
+| | All of the monitor, of the 24576 words below the demo at `0x6000` | 15725 |
+
+`mon.h` has the entries' declarations for C, and is no part of the ROM.
 
 `make -C monitor` builds `build/monitor.bin`, and `make -C monitor test`
 runs it in `niceemu` ([INTERNALS.md](INTERNALS.md#building-and-testing)).
