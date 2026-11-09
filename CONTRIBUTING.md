@@ -867,7 +867,7 @@ On the R3, slot 1 has no card detect, so it is always tried, and fails
 without a card.
 
 The reset button is not tested: press it with a terminal open, and the
-`b06` notice comes again. Nor is card detect: take a card out, and the
+`b07` notice comes again. Nor is card detect: take a card out, and the
 present bit of `SD_CSR` falls.
 
 ## The tools and niceemu

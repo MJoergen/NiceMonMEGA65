@@ -93,13 +93,13 @@ dis_find_next
         ?!Z     JMP     dis_find_next
                 MOVE    R10, 0
                 JMP     dis_print
-; A control instruction, which is reserved with a command past INT, a bit
+; A control instruction, which is reserved with a command past WAIT, a bit
 ; of 20..8 set, or a vector but for INT
 dis_ctrl
                 MOVE    R10, 1
                 SHR     R1, R9, 21
                 AND     R1, R1, 0x1F
-                CMP     R1, 3
+                CMP     R1, 4
         ?!C     MOVE    R10, 4
                 AND[M]  R0, R9, 0x001FFF00
         ?!Z     MOVE    R10, 4
@@ -160,7 +160,7 @@ dis_used
 dis_plain
                 CALL    u_stmt
                 JMP     dis_end
-; Kind 1, HALT, RTI, or INT, with its vector in decimal
+; Kind 1, HALT, RTI, INT, with its vector in decimal, or WAIT
 dis_cmd         MOVE    R1, R9
                 CALL    u_cond
                 SHR     R1, R9, 21
@@ -427,7 +427,7 @@ U_NAMES         .DAT    U_MOVE, U_SUB, U_MDBL, U_ADD, U_DBL, U_DEC, U_NOT, U_NOR
                 .DAT    U_IAND, U_NAND, U_XOR, U_IOR, U_XNOR, U_AND, U_ONE, U_OR
                 .DAT    U_SHL, U_S1, U_S2, U_S3, U_S4, U_S5, U_ROL, U_BPL
                 .DAT    U_SHR, U_S9, U_S10, U_S11, U_S12, U_S13, U_ROR, U_BPR
-U_CTRL          .DAT    U_HALT, U_RTI, U_INT
+U_CTRL          .DAT    U_HALT, U_RTI, U_INT, U_WAIT
 U_NOPS          .DAT    2, 3, 3, 3, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 1, 3
 U_FIELDS
                 .DAT    U_FDEST, U_FS0, U_FS1
@@ -492,6 +492,7 @@ U_BPR           .ASCII_L 'BPR'
 U_HALT          .ASCII_L 'HALT'
 U_RTI           .ASCII_L 'RTI'
 U_INT           .ASCII_L 'INT'
+U_WAIT          .ASCII_L 'WAIT'
 U_FDEST         .ASCII_L 'dest: '
 U_FS0           .ASCII_L 's0: '
 U_FS1           .ASCII_L 's1: '

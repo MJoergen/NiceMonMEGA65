@@ -21,6 +21,27 @@ The release candidates pinned these:
 
 nice_cpu's `RC01` and `RC03` have no tag here.
 
+## V2.0
+
+**Upgrade notes.**
+
+- nice_cpu is at `V2.0`. `WAIT` is a mnemonic, so a program with a label
+  or an `.EQU` name `WAIT`, in any case of letters, no longer assembles
+  until it is renamed; the testbenches renamed theirs (#92).
+- The debug link is version 7, and the board sends `b07` at reset. Its
+  registers start at `0xFFFFFFD0`, so a link request to
+  `0xFFFFFFD0`–`DF` reaches the link, where it reached the RAM. A host
+  of version 6 works unchanged.
+
+**Changed.** The monitor's `u` shows `0x0C600000` as `WAIT`, as nicedis
+does, where it showed a reserved control word.
+
+**Not yet on the board.** The board runs `WAIT`, but the on-board
+debugger shows it as reserved. The board does not yet have the wait (#93), the hidden state (#98), or the watchpoints (#99)
+of link version 7, the byte windows (#90), or the clock of the time of
+day (#97).
+[EMULATOR.md](EMULATOR.md) lists them.
+
 ## V1.9.1 (2026-11-08)
 
 **Upgrade notes.**

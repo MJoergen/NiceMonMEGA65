@@ -12,7 +12,7 @@
 --   start   bit 0 goes from 1 to 0: the devices reset, and the core runs
 --   hidden  bit 3 is 1: the ROM is out of the way, and the RAM is at 0
 --   paused  bit 4 is 1: the core stops between instructions
---   notice  a packet the link sends on its own: b06 at reset, h at a halt,
+--   notice  a packet the link sends on its own: b07 at reset, h at a halt,
 --           p at a pause, x at a breakpoint, and o for a lost input byte
 --
 -- THEORY OF OPERATION
@@ -214,12 +214,15 @@
 --                          G_ETH_HOLD_ACK the simulation's station
 --                          (nice_cpu/hdl/sim/eth_sim.vhd) serves the
 --                          writes that enable and send, as in niceemu.
---   0xFFFFFFE0-0xFFFFFFFF  The debug registers of DEBUG.md §6, for the link
---                          only, which debug_link holds: R0-R15 of the core,
+--   0xFFFFFFD0-0xFFFFFFFF  The debug registers of DEBUG.md §6, for the link
+--                          only, which debug_link holds: at D0-DF the
+--                          hidden state and the watchpoints of version 7,
+--                          which read 0 here as nothing drives them
+--                          (#98, #99), and R0-R15 of the core,
 --                          live while it runs and those of the stop after
 --                          a halt or at a pause (DEBUG.md §6), the control
 --                          register, the halt reason (1 to 4 here), the
---                          version, 6 (DEBUG.md §6), the free space of the core's input
+--                          version, 7 (DEBUG.md §6), the free space of the core's input
 --                          FIFO, and the G_BREAKS breakpoints: their enable
 --                          bits, their number, the stop register, and
 --                          their addresses. The bits of the control
@@ -304,7 +307,7 @@
 -- Synchronous. After reset bit 0 of the control register is 1 when
 -- G_CPU_RUN_AT_RESET is false, so the core waits for the host, and 0
 -- otherwise, so the core boots from the ROM, which reset shows: rom_hidden is
--- cleared, or stays 1 in a build without a ROM. The link sends `b06`, and
+-- cleared, or stays 1 in a build without a ROM. The link sends `b07`, and
 -- clears the breakpoints. The
 -- screen's registers, the read counter, and the board's writable registers
 -- (LEDs, RGB levels, and display segments), which the clear keeps, are
@@ -500,7 +503,7 @@ architecture synthesis of nicemon is
    -- Whether an address is an I/O register, not memory. The words of
    -- 0xFFFFFF00-FF that are not registers are memory, as in the emulator.
    -- They land in the top 256 words of the RAM, which nothing else reaches.
-   -- The link never puts its debug registers, 0xFFFFFFE0-FF, on the bus.
+   -- The link never puts its debug registers, 0xFFFFFFD0-FF, on the bus.
    function is_io(addr : std_logic_vector(31 downto 0)) return boolean is
    begin
       if and(addr(31 downto 8)) = '0' then

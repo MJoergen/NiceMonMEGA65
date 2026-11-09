@@ -212,7 +212,7 @@ and M2M use. Three other designs were rejected:
   a side effect needs a rule of its own for the debug link and the on-board
   debugger, and a memory page shown over it would eat the program's buffer.
 - A buffer mapped as 128 words. It needs 128 words of I/O space, and a board
-  has 64 left at `0xFFFFFFA0`–`0xFFFFFFDF`.
+  has 48 left at `0xFFFFFFA0`–`0xFFFFFFCF`.
 - A DMA engine that copies the sector to memory. It would be a third master
   on the data bus, which the core and the link already share.
 
