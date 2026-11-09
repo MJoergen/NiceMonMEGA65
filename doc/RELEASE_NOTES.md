@@ -64,6 +64,11 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   `--byte-windows` runs on the board. The link reads and writes through
   them too. A read of a byte or a halfword takes a cycle more than one of
   a word, for the timing at 100 MHz, as a read of the fonts does.
+- `make examples` builds `primes.bin` with nicewasm's `--byte-windows`
+  and `--trust-alignment`, and `bench_win.bin`, nice_cpu's benchmark
+  built so, beside `bench.bin`, which is built as before. On the R6
+  `bench_win.bin` takes 10% fewer cycles. `make hwtest` and `make
+  linktest` run both benchmarks.
 - `run.py --symbols` names wasm trap 8, `memory beyond the byte windows`,
   as niceemu does
   ([#101](https://github.com/MJoergen/NiceMonMEGA65/issues/101)).

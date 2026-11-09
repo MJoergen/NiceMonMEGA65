@@ -135,7 +135,10 @@ without the math unit would translate with `nicewasm --no-mpu` and use
 The board has the byte windows of nice_cpu's SYSTEM.md §9, so
 `nicebuild.py --byte-windows` makes each byte or halfword load and store
 of the program one `MOVE`, where it is a few instructions without them.
-nice_cpu's benchmark, `bench/bench.c`, runs 11% fewer steps so. Such a program runs on the board and in the
+nice_cpu's benchmark, `bench/bench.c`, built so with
+`--trust-alignment` too, as `make examples` builds its programs, runs
+15% fewer instructions and 10% fewer cycles on the board
+(CONTRIBUTING.md, "The examples"). Such a program runs on the board and in the
 emulator, but not on a system without the windows. Its start-up code
 halts with wasm trap 8, `memory beyond the byte windows`, when the linear
 memory lies above the words that the windows reach, which cannot happen

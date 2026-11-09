@@ -11,8 +11,16 @@
 # that calls scanf is joined with the float library, float.nasm, too,
 # which the runtime builds.
 #
-# make          builds build/primes.bin, and build/bench.bin from nice_cpu's
-#               benchmark, bench/bench.c, which tools/hwtest.py runs
+# The programs use the byte windows of nice_cpu's SYSTEM.md §9, which the
+# board and the emulator have: nicewasm's WINDOWS options make each byte
+# or halfword load and store one MOVE, and take an access to be aligned as
+# its hint says. bench.bin alone is built without them, so that its code
+# and cycles compare with those of nice_cpu's testbench; bench_win.bin is
+# the same benchmark with them.
+#
+# make          builds build/primes.bin, and build/bench.bin and
+#               build/bench_win.bin from nice_cpu's benchmark,
+#               bench/bench.c, which tools/hwtest.py runs
 # make clean    removes build/
 #
 # Needs clang with the wasm32 target, wasm-ld and llvm-ar (the lld and llvm
@@ -36,7 +44,10 @@ FLOAT   = $(NICE_CPU)/runtime/float.nasm
 NICEWASM = $(wildcard $(NICE_CPU)/translator/*.py)
 NICEASM  = $(wildcard $(NICE_CPU)/assembler/*.py)
 
-PROGRAMS = primes bench
+PROGRAMS = primes bench bench_win
+# nicewasm's options for the byte windows, for every program but bench
+WINDOWS  = --byte-windows --trust-alignment
+WASM_OPTS = $(if $(filter bench,$*),,$(WINDOWS))
 # The programs that call scanf, and so need float.nasm.
 FLOAT_PROGRAMS = primes
 
@@ -52,11 +63,11 @@ $(FLOAT): FORCE
 $(BUILD)/%.wasm: %.c $(LIBC)/libc.a | $(BUILD)
 	$(CLANG) $(CFLAGS) $(LDFLAGS) -o $@ $< $(LIBC)/libc.a
 
-$(BUILD)/bench.wasm: $(NICE_CPU)/bench/bench.c $(LIBC)/libc.a | $(BUILD)
+$(BUILD)/bench.wasm $(BUILD)/bench_win.wasm: $(NICE_CPU)/bench/bench.c $(LIBC)/libc.a | $(BUILD)
 	$(CLANG) $(CFLAGS) $(LDFLAGS) -o $@ $< $(LIBC)/libc.a
 
-$(BUILD)/%.nasm: $(BUILD)/%.wasm $(NICEWASM)
-	$(PYTHON) $(NICE_CPU)/translator/nicewasm.py -o $@ $<
+$(BUILD)/%.nasm: $(BUILD)/%.wasm $(NICEWASM) Makefile
+	$(PYTHON) $(NICE_CPU)/translator/nicewasm.py $(WASM_OPTS) -o $@ $<
 
 $(BUILD)/%_full.nasm: $(BUILD)/%.nasm $(START) $(RUNTIME)
 	cat $(START) $< $(RUNTIME) > $@

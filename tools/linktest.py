@@ -5,9 +5,9 @@ It starts "niceemu --link 0", which picks a free port, and runs
 hwtest.py's checks of bad packets, the pause, the step, the breakpoints,
 and the writes of the registers on it, and mon.py's checks of the
 board's memory, which it adds to nice_cpu's debugger. Then it runs the programs of hwtest.py's
-comparison, and nice_cpu's benchmark when examples/build/bench.bin is
-built, with run.py --tcp on that port and with niceemu alone. Each must
-print the same and exit with the same status. The demo's self-test, F11,
+comparison, and nice_cpu's benchmark when examples/build/bench.bin and
+bench_win.bin are built, with run.py --tcp on that port and with niceemu
+alone. Each must print the same and exit with the same status. The demo's self-test, F11,
 must pass. Last, run.py --tcp HOST:PORT runs hello on "niceemu --link
 127.0.0.2:0", an address other than 127.0.0.1, as for a niceemu on
 another computer. So it checks run.py, mon.py, boardlink.py, and the
@@ -126,12 +126,13 @@ def main() -> None:
             test_run(tcp, comparisons(tmp))
             test_monitor(tcp, tmp)
             test_selftest(tcp, tmp)
-        bench = f"{REPO}/examples/build/bench.bin"
-        if os.path.exists(bench):
-            test_bench(tcp, bench)
-        else:
-            print(f"  {bench} is missing; the benchmark is skipped")
-            hwtest.skipped.append("bench.bin")
+        for name in ("bench.bin", "bench_win.bin"):
+            bench = f"{REPO}/examples/build/{name}"
+            if os.path.exists(bench):
+                test_bench(tcp, bench)
+            else:
+                print(f"  {bench} is missing; the benchmark is skipped")
+                hwtest.skipped.append(name)
     finally:
         emu.terminate()
         emu.wait()

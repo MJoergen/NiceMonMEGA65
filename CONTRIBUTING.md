@@ -743,7 +743,8 @@ simulation and synthesis.
 - niceemu, built with `make -C nice_cpu/emulator build`, which `make
   hwtest` does first. Without it, `tools/hwtest.py` skips the checks that
   need it, and its last line names them after a `SKIPPED`.
-- The C examples, `examples/build/primes.bin` and `bench.bin`, which
+- The C examples, `examples/build/primes.bin`, `bench.bin`, and
+  `bench_win.bin`, which
   `make hwtest` builds first with `make examples`. That needs clang, lld,
   and llvm (see [The examples](#the-examples)).
 
@@ -834,7 +835,8 @@ bitstream has one. Then it hides the ROM and uses the link:
   end of the input, the intro's `hello.nasm` with 100 lines of input that
   it halts without reading, the emulator's `reserved.nasm`, which halts
   on a reserved control word, its `trapsym.nasm` with `--symbols`, the ROM of the monitor and the demo, `demo/build/rom_test.bin`, with `x` and a few keys and its screen, and
-  `examples/build/bench.bin`, but for its cycles, whose table it prints.
+  `examples/build/bench.bin` and `bench_win.bin`, but for their cycles,
+  whose tables it prints.
   It runs the monitor's `test/hello.nasm` with `run.py --monitor --rom
   monitor/build/monitor_test.bin` against `niceemu` on the two joined,
   pastes the 600 lines of `hello.bin` into the monitor's `l` at the
@@ -925,7 +927,7 @@ it.
 `make linktest` runs `run.py --tcp` on `niceemu --link` against plain
 `niceemu`, without a board, for the programs that `make hwtest` compares,
 the monitor's with `--monitor --rom`, the demo's self-test, and nice_cpu's benchmark when `make examples` has
-built `examples/build/bench.bin`, with `tools/linktest.py`. It runs hwtest's
+built `examples/build/bench.bin` and `bench_win.bin`, with `tools/linktest.py`. It runs hwtest's
 checks of bad packets, of the pause, of the step, of the breakpoints,
 and of the writes of the registers on `niceemu --link` first, and then
 what `mon.py` adds to nice_cpu's debugger: a load, and the check of the
@@ -959,14 +961,19 @@ errors in both. When stdout closes early, as with `run.py ... | head`,
         -Wl,--no-entry -Wl,--export=main -Wl,--stack-first \
         -Wl,-z,stack-size=4096 -Wl,--initial-memory=65536 \
         -o primes.wasm examples/primes.c nice_cpu/runtime/libc/libc.a
-    nice_cpu/translator/nicewasm.py -o primes.nasm primes.wasm
+    nice_cpu/translator/nicewasm.py --byte-windows --trust-alignment \
+        -o primes.nasm primes.wasm
     cat nice_cpu/runtime/start_wasm.nasm primes.nasm nice_cpu/runtime/lib.nasm \
         nice_cpu/runtime/muldiv_mpu.nasm nice_cpu/runtime/float.nasm \
         > primes_full.nasm
     nice_cpu/assembler/niceasm.py -o primes.bin primes_full.nasm
 
-`float.nasm` is the float library, which a program that calls `scanf`
-needs, as `primes.c` does, and `bench.c` does not. With plain `start_wasm.nasm`, a wasm trap, such as an access outside the
+`--byte-windows` makes each byte or halfword load and store one `MOVE`
+through the byte windows of nice_cpu's SYSTEM.md §9, which the board and
+`niceemu` have, and `--trust-alignment` takes an access to be aligned as
+its hint says (nice_cpu's translator README). `float.nasm` is the float
+library, which a program that calls `scanf` needs, as `primes.c` does,
+and `bench.c` does not. With plain `start_wasm.nasm`, a wasm trap, such as an access outside the
 linear memory, halts the core without a word, and only `run.py --symbols`
 shows the trap. `nice_cpu/translator/nicebuild.py -o primes.bin
 examples/primes.c` does all of these steps in one command, and by default
@@ -1003,6 +1010,23 @@ nice_cpu's own testbench for the core that predicts backward jumps
 
 The board takes the same cycles, or 1024 fewer in `bst`, and at 100 MHz
 the benchmark runs for about 24 ms.
+
+`bench.bin` is built without the byte windows, so that it compares with
+nice_cpu's testbench, and `examples/build/bench_win.bin` is the same
+benchmark built with them, as `primes.bin` is. On the R6 with the
+pipelined core at nice_cpu V2.0, the two options save 14.7% of the
+instructions and 10.2% of the cycles, as a read of a byte or a halfword
+through the windows takes a cycle more than one of a word:
+
+| Phase | Instructions | With the windows | Cycles | With the windows |
+|---|---|---|---|---|
+| `rng64` | 51746 | 50202 | 82060 | 80503 |
+| `crc32` | 63514 | 50966 | 80762 | 68211 |
+| `bst` | 297825 | 273040 | 401861 | 378101 |
+| `heapsort` | 298396 | 297372 | 378646 | 369976 |
+| `vm` | 840049 | 664042 | 1232167 | 1068147 |
+| `strings` | 101281 | 74417 | 163090 | 133988 |
+| total | 1652811 | 1410039 | 2338586 | 2098926 |
 
 ## The timing badges
 

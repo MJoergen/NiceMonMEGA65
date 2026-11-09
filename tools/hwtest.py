@@ -98,7 +98,8 @@ Checks, in this order:
     - the emulator's trapsym.nasm and its label file, for --symbols
     - the ROM of the release, the monitor and the demo behind it,
       demo/build/rom_test.bin, with x for the demo, and its screen
-    - nice_cpu's benchmark, examples/build/bench.bin, all but its cycles
+    - nice_cpu's benchmark, examples/build/bench.bin, and bench_win.bin,
+      built for the byte windows, all but their cycles
     - the monitor's test program, monitor/test/hello.nasm, with run.py
       --monitor and the monitor of the tests from --rom, against niceemu
       on the two joined, also with 448 rows of d that are still coming
@@ -1724,16 +1725,18 @@ def test_selftest(link_args: list[str], tmp: str) -> None:
 
 
 def test_bench(link_args: list[str], bench: str) -> None:
-    """Runs nice_cpu's benchmark with run.py and with niceemu, which must
-    print the same and exit with the same status, but for the cycles, which
-    the board counts in clock cycles. So the steps differ too, since
-    printing other numbers takes other steps. The board's table is printed.
-    link_args are run.py's options for the link. The port must be closed
-    meanwhile."""
+    """Runs nice_cpu's benchmark, bench.bin or bench_win.bin, with run.py
+    and with niceemu, which must print the same and exit with the same
+    status, but for the cycles, which the board counts in clock cycles. So
+    the steps differ too, since printing other numbers takes other steps.
+    The board's table is printed. link_args are run.py's options for the
+    link. The port must be closed meanwhile."""
+    name = os.path.basename(bench)
     if not os.path.exists(NICEEMU):
         print(f"  {NICEEMU} is missing; the benchmark is skipped")
-        skipped.append("bench.bin as niceemu")
+        skipped.append(f"{name} as niceemu")
         return
+    print(f"  {name}:")
     emu = subprocess.run([NICEEMU, bench], stdin=subprocess.DEVNULL,
                          capture_output=True)
     board = subprocess.run([sys.executable, f"{REPO}/tools/run.py"] +
@@ -1749,7 +1752,7 @@ def test_bench(link_args: list[str], bench: str) -> None:
         r.stdout = phase.sub(rb"\1 N", r.stdout)
         r.stdout = re.sub(rb"after \d+ steps", b"after N steps", r.stdout)
     same = emu.stdout == board.stdout and emu.returncode == board.returncode
-    check("bench.bin as niceemu, but for the cycles", same,
+    check(f"{name} as niceemu, but for the cycles", same,
           "" if same else f"\n  niceemu (exit {emu.returncode}): "
           f"{emu.stdout!r}\n  run.py (exit {board.returncode}): "
           f"{board.stdout!r} {board.stderr!r}")
@@ -1959,8 +1962,9 @@ def main() -> None:
     board = args.board or ("nexys4ddr" if "nexys4ddr" in args.bit
                            else "mega65")
     primes = f"{REPO}/examples/build/primes.bin"
-    bench = f"{REPO}/examples/build/bench.bin"
-    for path in (primes, bench):
+    benches = [f"{REPO}/examples/build/{b}.bin"
+               for b in ("bench", "bench_win")]
+    for path in [primes] + benches:
         if not os.path.exists(path):
             sys.exit(f"hwtest.py: {path} is missing; run 'make examples'")
     if not args.no_program and not os.path.exists(args.bit):
@@ -2022,7 +2026,8 @@ def main() -> None:
             test_run(serial, comparisons(tmp))
             test_monitor(serial, tmp, in_rom=True, long=True)
             test_fit(serial, tmp, RAM_WORDS[board])
-            test_bench(serial, bench)
+            for bench in benches:
+                test_bench(serial, bench)
             test_selftest(serial, tmp)
             if not args.eth:
                 uncovered.append("the Ethernet station, without --eth")
