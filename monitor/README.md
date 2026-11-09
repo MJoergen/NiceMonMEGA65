@@ -37,7 +37,7 @@ those who write programs:
    loads a program at 0 hides the ROM, and the entries go with it.
    `niceemu` has no ROM: there the monitor is a program at 0 like any
    other, and `cat monitor.bin prog.bin` runs it with a program at
-   `0x8000` (Programs below).
+   `0x8000`, for a `.bin` file is address and word pairs.
 3. **The library**: the routines of `monlib.nasm` (The shared routines
    below), and the stubs of `mon.nasm`, which are joined to a program
    when it is built, so they are in its image only when it joins them.
@@ -150,8 +150,8 @@ scrolling, and the copy to the line.
 program is built, with `mon.nasm`, whose stubs its routines call, so
 its routines are in the program's image, and only in a program that
 joins it. They print through `mon_putc`, entry 3, so they need the ROM,
-as the entries do; in `niceemu` the monitor is joined at 0 (Programs
-below). The monitor joins the file too, for its own commands, but a
+as the entries do; in `niceemu` the monitor is joined at 0 (The ROM
+above). The monitor joins the file too, for its own commands, but a
 program does not reach the monitor's copy, which has no entry. A C
 program has nice_cpu's `libc` instead. The routines follow the C
 ABI, and their names start with `_io_`, so that they clash with nothing
@@ -438,54 +438,41 @@ pseudo-instructions below, which only `u` shows:
 
 ## Programs
 
-- Programs for the monitor are assembled at `0x8000`, with nice_cpu's
+- A program for the monitor is assembled at `0x8000`, with nice_cpu's
   `start_mon.nasm`, `start_wasm_mon.nasm`, or `start_wasm_trap_mon.nasm`
   in place of its start-up files at 0 (`nice_cpu/runtime/ABI.md`,
   "Programs under a monitor"), and `nicebuild.py --monitor` builds a C,
-  Zig, or Rust program so. They return to the monitor instead of
-  halting: when `main` returns, through `exit`, or with `RET` on the SP
-  of the entry. `test/hello.nasm` and `test/hello.c` are two such
-  programs, and the Makefile shows how they are built.
+  Zig, or Rust program so. `test/hello.nasm` and `test/hello.c` are two
+  such programs, and the Makefile shows how they are built.
 - The monitor runs a program as a subroutine on its own stack: it pushes
   a return address and jumps to `0x8000` with E = 0, R1 = the address of
   `mon_putc`'s entry, and R2 = 0 and R3 = 0, `argc` and `argv` for a
   command line later. The start-up code stores R1 in `___putc_vector`, so
   `nice_putc`, `nice_print`, the C library's `printf`, and the trap report
-  print through `mon_putc`. At the return the monitor relies on SP and
-  R1, the status, and on nothing else. It clears E, stops the timer, and
-  sets VBASE back to 0 itself, so a program may own the interrupts, with
-  a vector table in its own image.
+  print through `mon_putc`. The program returns when `main` returns,
+  through `exit`, or with `RET` on the SP of the entry. The monitor then
+  relies on SP and R1, the status, and on nothing else, and restores the
+  rest as at `mon_exit` (The dispatch table above).
+  `nice_cpu/runtime/test/monitor.nasm`, the stand-in for the monitor in
+  nice_cpu's own tests, does the same.
 - A program may use the RAM from `0x8000` up to, but not including, the
   SP it was called with, and must leave room below that for the stack it
-  shares with the monitor. The monitor's variables are at `0xFFFFF000`
-  and up, as the demo's are, and its stack grows down from there. The
-  RAM repeats through the address space, so those words are the top 4K
-  of the RAM, and programs have `0x8000` up to them for their image and
-  their stack: `0x8000`–`0x1EFFF`, 92K words, on the MEGA65, with 128K
-  words of RAM, and `0x8000`–`0xEFFF`, 28K words, on the Nexys4DDR, with
-  64K. A program learns the size of the RAM from `0xFFFFFF9E`
+  shares with the monitor. That is `0x8000`–`0x1EFFF`, 92K words, on the
+  MEGA65, and `0x8000`–`0xEFFF`, 28K words, on the Nexys4DDR, as the
+  monitor's variables are the top 4K words of the RAM. A program learns
+  the size of the RAM from `0xFFFFFF9E`
   ([SYSTEM.md](../doc/SYSTEM.md#address-map)), which reads 0 in
-  `niceemu`, where it is plain memory and the memory has no limit. The
-  monitor's routines use at most 32 words of the stack when a program
-  calls them. The stack is in use before the program runs: `r` pushes
-  its return address at the top word of the program's RAM, `0x1EFFF` or
-  `0xEFFF`, and `l`'s own summary reaches 13 words below it. `l` and
-  `load.py --monitor` take a word there, which is then overwritten, as
-  any word in the room the stack needs is.
+  `niceemu`, where the memory has no limit. The monitor's routines use
+  at most 32 words of the stack when a program calls them. The stack is
+  in use before the program runs: `r` pushes its return address at the
+  top word, `0x1EFFF` or `0xEFFF`, and `l`'s own summary reaches 13
+  words below it. `l` and `load.py --monitor` take a word there, which
+  is then overwritten, as any word in the room the stack needs is.
 - A program runs once per load: the load initializes its static data and
   its wasm linear memory. A wasm trap halts the core, as in nice_cpu,
   after the trap report's line on the monitor's output; the on-board
   debugger then has the state, and the reset button boots the monitor
   again.
-- The monitor's routines are called through a dispatch table at the start
-  of the ROM, so that programs need
-  not be reassembled when the monitor changes. The table is above.
-- In `niceemu`, which has no ROM, the monitor is a program at 0 like any
-  other, and `cat monitor.bin prog.bin` runs it with a program at
-  `0x8000`, for a `.bin` file is address and word pairs. Its keystrokes
-  come from an input file. nice_cpu's own tests use a stand-in for the
-  monitor, `nice_cpu/runtime/test/monitor.nasm`, which shows what the
-  monitor does to run a program.
 
 ## Remote control
 
