@@ -164,8 +164,8 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   a program calls the entries (`mon.nasm`, `mon.h`), and its tests in
   niceemu (`test/`, with `cat monitor.bin prog.bin`). `monitor/README.md`
   is the monitor for those who use it and write programs for it, and
-  `monitor/INTERNALS.md` the routines with no entries, the C in the
-  ROM, and the build and the tests.
+  `monitor/INTERNALS.md` the routines with no entries, the scrollback,
+  the C in the ROM, and the build and the tests.
 
 ## Rules and pitfalls
 

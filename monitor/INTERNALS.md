@@ -2,8 +2,8 @@
 
 What the ROM has for itself, behind the dispatch table of
 [README.md](README.md): the routines with no entries, which only the
-monitor's commands and its C code call, the C in the ROM, and the build
-and the tests. A program does not call these routines, as they have no
+monitor's commands and its C code call, the scrollback, the C in the
+ROM, and the build and the tests. A program does not call these routines, as they have no
 entries and their addresses change with every build; it calls the
 entries, or drives the registers itself.
 
@@ -64,6 +64,20 @@ of SYSTEM.md §7.
   `test/arp.nasm` calls `arp_resolve` by its label, as `test/sd.nasm`
   calls the sector routines, as both are assembled after the monitor's
   sources (Building and testing below).
+
+## The scrollback
+
+The history is a ring of rows in the screen's memory past its 2000
+words, from the top of the memory down. Before `mon_putc` moves the rows
+up, it copies row 0 into the ring. The cold start finds the size of the
+memory from the display offset, which a board keeps only in the bits
+that address the memory: 32768 words on the MEGA65 and 8192 on the
+Nexys4DDR, so one `monitor.bin` serves every board. `k` rows back is the
+display offset `size - 80k`, which wraps to row 0 of the screen, with
+the cursor off. The first key that scrolls back turns the ring so that
+its newest row is the last of the memory. In `niceemu` the display
+offset is plain memory, so all its bits are kept: the history has 384
+rows there, which `d` and `--dump` read.
 
 ## C in the ROM
 
