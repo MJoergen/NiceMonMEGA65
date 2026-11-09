@@ -62,6 +62,9 @@ Checks, in this order:
       again
     - what sim/emu.nasm leaves after its halt is read back, and the cycle
       counter and the timer stop there
+    - the byte windows of nice_cpu's SYSTEM.md §9: the link reads bytes
+      and halfwords through them and writes them, and sim/bytewin.nasm
+      leaves the registers and the words that niceemu leaves (issue #90)
     - the screen's registers are written and read
     - the fonts (doc/SYSTEM.md, The font): the character ROM holds
       Spleen's A and drops a write, the font RAM keeps bits 15..0 of the
@@ -660,6 +663,63 @@ def test_readback(link: Link, emu: str) -> None:
               f"got {got:08X}, want {want:08X}")
     regs = link.read(0xFFFFFFE0, 16)
     print("  R0-R15:", " ".join(f"{r:08X}" for r in regs))
+
+
+def emu_regs(path: str) -> list[int]:
+    """R0-R15 as niceemu prints them after the program's halt."""
+    r = subprocess.run([NICEEMU, path], stdin=subprocess.DEVNULL,
+                       capture_output=True, check=True)
+    regs = dict((int(n), int(v, 16)) for n, v in
+                re.findall(r"R(\d+) +([0-9a-f]{8})", r.stdout.decode()))
+    if sorted(regs) != list(range(16)):
+        raise SystemExit(f"hwtest: no registers in niceemu's output for {path}")
+    return [regs[i] for i in range(16)]
+
+
+def test_byte_windows(link: Link, prog: str, board: str) -> None:
+    """The byte windows (doc/SYSTEM.md, Address map): a data access at A
+    with top nibble 1 to 5 reaches word (A >> 2) AND 0x03FFFFFF, its word,
+    a byte, or a halfword. The link's reads and writes take them, at word
+    0x100 and at the top word of the RAM, which a window address beyond
+    the RAM aliases, as a plain one does. Then sim/bytewin.nasm runs, and
+    its registers and words are those of niceemu."""
+    word = 0x100
+    check("W 00000100 for the windows", wr(link, word, 0x80FF7F01))
+    for addr, want in [(0x10000400, 0x80FF7F01), (0x20000401, 0x0000007F),
+                       (0x30000403, 0xFFFFFF80), (0x20000402, 0x000000FF),
+                       (0x40000402, 0x000080FF), (0x50000402, 0xFFFF80FF),
+                       (0x50000400, 0x00007F01)]:
+        got = rd(link, addr)
+        check(f"window read {addr:08X}", got == want,
+              f"got {got:08X}, want {want:08X}")
+    check("window writes of a byte and a halfword",
+          wr(link, 0x20000400, 0x123456AA) and wr(link, 0x50000402, 0xFFFFBEEF))
+    got = rd(link, word)
+    check("they leave the rest of the word", got == 0xBEEF7FAA,
+          f"got {got:08X}, want BEEF7FAA")
+    top = RAM_WORDS[board] - 1
+    check(f"window write of the top word, {top:08X}",
+          wr(link, 0x10000000 + 4 * top, 0x7A5A0003))
+    for addr, want in [(top, 0x7A5A0003),
+                       (0x20000000 + 4 * (top + RAM_WORDS[board]) + 3, 0x7A)]:
+        got = rd(link, addr)
+        check(f"readback {addr:08X}", got == want,
+              f"got {got:08X}, want {want:08X}")
+    check("the words cleared again", wr(link, word, 0) and wr(link, top, 0))
+
+    load(link, prog)
+    require("halt notice", wait_halt(link) == 1)
+    expected = {0x202: 0xAB007800, 0x203: 0xCAFE1234, 0x204: 0x11223344}
+    if os.path.exists(NICEEMU):
+        expected[0xFFFFFF42] = steps(prog)
+        for i, r in enumerate(emu_regs(prog)[1:15], 1):
+            expected[0xFFFFFFE0 + i] = r
+    else:
+        skipped.append("bytewin.nasm against niceemu")
+    for addr, want in expected.items():
+        got = rd(link, addr)
+        check(f"bytewin {addr:08X}", got == want,
+              f"got {got:08X}, want {want:08X}")
 
 
 def wait_pause(link: Link, before: int) -> bool:
@@ -1914,6 +1974,7 @@ def main() -> None:
         wait, wait_at = assemble_labels(f"{REPO}/sim/wait.nasm", tmp)
         step_at = assemble_labels(f"{REPO}/sim/step.nasm", tmp)
         emu = assemble(f"{REPO}/sim/emu.nasm", tmp)
+        bytewin = assemble(f"{REPO}/sim/bytewin.nasm", tmp)
 
         opened = False
         try:
@@ -1946,6 +2007,7 @@ def main() -> None:
                 test_ram_size(link, board)
                 test_baud(link, uart, args.baud)
                 test_readback(link, emu)
+                test_byte_windows(link, bytewin, board)
                 test_counters_stop(link)
                 test_screen_registers(link)
                 test_fonts(link)

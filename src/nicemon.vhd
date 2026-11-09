@@ -59,6 +59,16 @@
 --                          control register hides it, so that the RAM is at
 --                          0 as in the emulator, and a build without
 --                          G_ROM_FILE has no ROM.
+--   0x10000000-0x5FFFFFFF  The byte windows of SYSTEM.md §9 (src/mem.vhd),
+--                          for the data bus and the link: an address A
+--                          reaches word (A >> 2) AND 0x03FFFFFF, the
+--                          word, a byte, or a halfword of it, zero- or
+--                          sign-extended, by the top four bits, 1 to 5.
+--                          That word is in the RAM, or in the ROM while it
+--                          is shown. A fetch there reads the RAM or the
+--                          ROM that the address aliases. A read through
+--                          windows 2 to 5 takes a cycle more than one of
+--                          the memory, as one of the fonts does.
 --   0xFFFE0000-0xFFFE1FFF  The font RAM of SYSTEM.md §1.8: the word at
 --                          0xFFFE0000 + 32 * c + r is row r of the glyph
 --                          of code c, the top row first, in bits 15..0 with
@@ -524,6 +534,13 @@ architecture synthesis of nicemon is
              addr(7 downto 4) = X"C";                               -- the port for frames
    end function is_io;
 
+   -- Whether an address is in the byte or halfword windows of SYSTEM.md
+   -- §9, 0x20000000-0x5FFFFFFF, whose reads take a cycle more
+   function is_win(addr : std_logic_vector(31 downto 0)) return boolean is
+   begin
+      return addr(31 downto 28) >= X"2" and addr(31 downto 28) <= X"5";
+   end function is_win;
+
    -- Whether an address is in the fonts, which are not memory
    function is_fnt(addr : std_logic_vector(31 downto 0)) return boolean is
    begin
@@ -586,10 +603,11 @@ architecture synthesis of nicemon is
    -- cycle after the start until the cycle after both are done, for the
    -- stalls, and clearing_d is clearing a cycle late.
    signal mem_clearing : std_logic;
-   -- A read of the fonts that waits a cycle for its word, which goes to
-   -- rd_io, and whether it is the link's
+   -- A read of the fonts, or through a byte window, that waits a cycle for
+   -- its word, which goes to rd_io, and whether it is the link's
    signal fnt_rd       : std_logic                     := '0';
-   signal fnt_rd_link  : std_logic                     := '0';
+   signal win_rd       : std_logic                     := '0';
+   signal late_link    : std_logic                     := '0';
    signal fnt_clearing : std_logic                     := '0';
    signal fnt_clr_addr : std_logic_vector(12 downto 0) := (others => '0');
    signal clearing     : std_logic                     := '0';
@@ -649,7 +667,7 @@ architecture synthesis of nicemon is
 
    -- A core write to the UART that waits for the byte before it to go
    signal tx_wait : std_logic := '0';
-   -- tx_wait or fnt_rd, as one register for the stall of the buses
+   -- tx_wait, fnt_rd, or win_rd, as one register for the stall of the buses
    signal bus_wait     : std_logic := '0';
    signal tx_wait_data : std_logic_vector(7 downto 0);
 
@@ -682,8 +700,9 @@ architecture synthesis of nicemon is
 
    -- The memory (src/mem.vhd): the request served, when it is to memory,
    -- and the word it reads
-   signal mem_stb   : std_logic;
-   signal mem_rdata : std_logic_vector(31 downto 0);
+   signal mem_stb       : std_logic;
+   signal mem_rdata     : std_logic_vector(31 downto 0);
+   signal mem_rdata_win : std_logic_vector(31 downto 0);
 
    -- The source of the read data of the last request, and the word of an
    -- I/O register
@@ -869,9 +888,13 @@ begin
 
    p_dbus : process (clk_i)
 
-      -- The next tx_wait and fnt_rd, for bus_wait
+      -- The next tx_wait, fnt_rd, and win_rd, for bus_wait
       variable tx_wait_v : std_logic;
       variable fnt_rd_v  : std_logic;
+      variable win_rd_v  : std_logic;
+      -- The next late_link, which a read of the link that waits keeps from
+      -- the drop of the core's requests in reset
+      variable late_link_v : std_logic;
 
       -- Serve one request. link is true for the link's.
       procedure serve(link  : boolean;
@@ -884,10 +907,21 @@ begin
          if is_fnt(addr) and we = '0' then
             -- The fonts return the word in the next cycle, which goes to
             -- rd_io then, and is acknowledged in the cycle after.
-            fnt_rd_v    := '1';
-            fnt_rd_link <= '0';
+            fnt_rd_v  := '1';
+            late_link_v := '0';
             if link then
-               fnt_rd_link <= '1';
+               late_link_v := '1';
+            end if;
+            return;
+         elsif is_win(addr) and we = '0' then
+            -- The memory has taken the request (mem_stb). The byte or the
+            -- halfword of its word comes a LUT level later than the word,
+            -- too late for the core in the next cycle, so it goes to rd_io
+            -- then, and is acknowledged in the cycle after, as the fonts'.
+            win_rd_v  := '1';
+            late_link_v := '0';
+            if link then
+               late_link_v := '1';
             end if;
             return;
          elsif is_fnt(addr) then
@@ -965,17 +999,26 @@ begin
          link_ack  <= '0';
          tx_wait_v := tx_wait;
          fnt_rd_v  := fnt_rd;
+         win_rd_v  := win_rd;
+         late_link_v := late_link;
 
          if cpu_tx_valid = '1' and cpu_tx_ready = '1' then
             cpu_tx_valid <= '0';
          end if;
 
-         if fnt_rd = '1' then
-            -- The word of the fonts, from a register, so that their memory
-            -- is not on the paths from the RAM to the core
+         if fnt_rd = '1' or win_rd = '1' then
+            -- The word of the fonts, or of the byte window, from a
+            -- register, so that their logic is not on the paths from the
+            -- RAM to the core
             fnt_rd_v := '0';
-            rd_io    <= X"0000" & fnt_rdata_i;
-            if fnt_rd_link = '1' then
+            win_rd_v := '0';
+            rd_src   <= SRC_IO;
+            if fnt_rd = '1' then
+               rd_io <= X"0000" & fnt_rdata_i;
+            else
+               rd_io <= mem_rdata_win;
+            end if;
+            if late_link = '1' then
                link_ack <= '1';
             else
                srv_ack <= '1';
@@ -1008,13 +1051,15 @@ begin
          if cpu_rst = '1' then
             srv_ack <= '0';
             tx_wait_v := '0';
-            if fnt_rd_link = '0' then
+            if late_link_v = '0' then
                fnt_rd_v := '0';
+               win_rd_v := '0';
             end if;
          end if;
 
          if rst_i = '1' then
             fnt_rd_v     := '0';
+            win_rd_v     := '0';
             link_ack     <= '0';
             cpu_tx_valid <= '0';
             read_count   <= (others => '0');
@@ -1022,7 +1067,9 @@ begin
 
          tx_wait  <= tx_wait_v;
          fnt_rd   <= fnt_rd_v;
-         bus_wait <= tx_wait_v or fnt_rd_v;
+         win_rd   <= win_rd_v;
+         late_link <= late_link_v;
+         bus_wait <= tx_wait_v or fnt_rd_v or win_rd_v;
       end if;
    end process p_dbus;
 
@@ -1158,6 +1205,7 @@ begin
          addr_i       => bus_addr,
          wdata_i      => bus_wdata,
          rdata_o      => mem_rdata,
+         rdata_win_o  => mem_rdata_win,
          clear_i      => clr_start,
          clearing_o   => mem_clearing,
          clear_done_o => open,
@@ -1461,6 +1509,8 @@ begin
       signal f_link_wait : std_logic := '0';
       signal f_rx_byte   : std_logic;
       signal f_rx_end    : std_logic;
+      -- A request through windows 2 to 5
+      signal f_win : std_logic;
       -- A link access of the console or the read counter
       signal f_link_con : std_logic;
    begin
@@ -1499,6 +1549,8 @@ begin
       f_rx_byte <= rx_take and not rx_empty;
       f_rx_end  <= rx_take and rx_empty and link_eoi;
 
+      f_win      <= '1' when is_win(bus_addr) else
+               '0';
       f_link_con <= '1' when link_take = '1' and
                              (link_addr = C_UART_DATA or link_addr = C_READ_COUNT) else
                     '0';
@@ -1558,10 +1610,25 @@ begin
       -- A read of memory, 0xFFFFFF80-8F, or 0xFFFFFF90-9F returns the word
       -- of the memory, the screen's registers, or the board's, which
       -- formal/mem.sby, formal/scr_regs.sby, and formal/board_io.sby prove
-      -- right. The memory's word comes in the cycle after the request.
+      -- right. The memory's word comes in the cycle after the request, and
+      -- its byte or halfword through windows 2 to 5 in the cycle after that.
       -- psl f_mem_read : assert always
-      --    {mem_stb and not bus_we and not rst_i} |=>
+      --    {mem_stb and not bus_we and not rst_i and not f_win} |=>
       --    {rst_i = '1' or ((link_ack or srv_ack) = '1' and dbus_rdata = mem_rdata)};
+      -- The link's read is answered also while the core is in reset.
+      -- psl f_win_read : assert always
+      --    {mem_stb and not bus_we and not rst_i and f_win and core_take} |=>
+      --    {rst_i = '1' or (link_ack = '0' and srv_ack = '0' and bus_wait = '1');
+      --     rst_i = '1' or prev(rst_i) = '1' or cpu_rst = '1' or prev(cpu_rst) = '1' or
+      --     (srv_ack = '1' and dbus_rdata = prev(mem_rdata_win))};
+      -- psl f_win_read_link : assert always
+      --    {mem_stb and not bus_we and not rst_i and f_win and link_take} |=>
+      --    {rst_i = '1' or (link_ack = '0' and srv_ack = '0' and bus_wait = '1');
+      --     rst_i = '1' or prev(rst_i) = '1' or
+      --     (link_ack = '1' and dbus_rdata = prev(mem_rdata_win))};
+      -- psl c_win_read : cover {mem_stb and not bus_we and not rst_i and f_win and core_take; true; srv_ack};
+      -- psl c_win_read_link : cover
+      --    {mem_stb and not bus_we and not rst_i and f_win and link_take and cpu_rst; true; link_ack};
       -- psl f_sreg_read : assert always
       --    {sreg_stb and not bus_we and not rst_i} |=>
       --    {rst_i = '1' or ((link_ack or srv_ack) = '1' and dbus_rdata = prev(sreg_rdata))};

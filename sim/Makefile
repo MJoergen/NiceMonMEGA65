@@ -8,7 +8,8 @@
 #             tb_nicemon  the whole system, driven through its UART, as a
 #                         host on the debug link would drive it, and
 #                         its keyboard input, with rom.nasm as its ROM. It
-#                         also runs reserved.nasm of the emulator's tests.
+#                         also runs reserved.nasm of the emulator's tests,
+#                         and bytewin.nasm, the byte windows.
 #             tb_kbd      the keyboard driver, its ASCII mapping, and the
 #                         MEGA+HELP detector.
 #             tb_ps2      the PS/2 keyboard receiver, its ASCII mapping, and
@@ -99,9 +100,9 @@ test: synth tb_hello tb_nicemon tb_kbd tb_ps2 tb_ps2_nicemon tb_text tb_dbg tb_d
 check-fmt:
 	@$(PYTHON) $(NICE_DIR)/assembler/nicefmt.py $(wildcard *.nasm) && echo "PASS check-fmt"
 
-check-steps: $(addprefix $(BUILD)/,hello.bin emu.bin reserved.bin sd.bin sd.img eth.bin)
+check-steps: $(addprefix $(BUILD)/,hello.bin emu.bin reserved.bin bytewin.bin sd.bin sd.img eth.bin)
 	@if [ ! -x $(EMU) ]; then echo "SKIP check-steps: $(EMU) is not built"; exit 0; fi; \
-	for p in hello:$(STEPS_HELLO) emu:$(STEPS_EMU) reserved:$(STEPS_RESERVED); do \
+	for p in hello:$(STEPS_HELLO) emu:$(STEPS_EMU) reserved:$(STEPS_RESERVED) bytewin:$(STEPS_BYTEWIN); do \
 	  n=$${p%%:*}; want=$${p##*:}; \
 	  got=$$($(EMU) $(BUILD)/$$n.bin </dev/null | sed -n 's/.* after \([0-9]*\) steps.*/\1/p'); \
 	  [ "$$got" = "$$want" ] || { echo "FAIL check-steps: niceemu runs $$n in $$got steps, STEPS_$$n is $$want"; exit 1; }; \
@@ -123,6 +124,7 @@ check-steps: $(addprefix $(BUILD)/,hello.bin emu.bin reserved.bin sd.bin sd.img 
 STEPS_HELLO    = 56
 STEPS_EMU      = 12
 STEPS_RESERVED = 6
+STEPS_BYTEWIN  = 17
 STEPS_SD       = 59
 STEPS_ETH      = 75
 # The low words of the event counters at 0xFFFFFF4A, 4C, 4E, 50, and 52
@@ -130,7 +132,7 @@ STEPS_ETH      = 75
 EVENTS_HELLO   = 0000000E0000000E0000000C0000000E00000000
 EMU            = $(NICE_DIR)/emulator/zig-out/bin/niceemu
 
-BINS = hello rom echo fifo devices emu count reserved eof counters break wait sd eth
+BINS = hello rom echo fifo devices emu count reserved bytewin eof counters break wait sd eth
 
 # nice_cpu's test of the port for Ethernet frames, which tb_nicemon runs:
 # its frames, and the frames it must send
@@ -157,9 +159,9 @@ tb_hello: analyze $(BUILD)/hello.bin
 
 tb_nicemon: analyze $(addprefix $(BUILD)/,$(addsuffix .bin,$(BINS))) $(BUILD)/sd.img
 	@(cd $(BUILD) && $(GHDL) --elab-run $(GHDLFLAGS) tb_nicemon \
-	  -gG_HELLO_FILE=hello.bin -gG_ROM_FILE=rom.bin -gG_ECHO_FILE=echo.bin -gG_FIFO_FILE=fifo.bin -gG_DEVICES_FILE=devices.bin -gG_EMU_FILE=emu.bin -gG_COUNT_FILE=count.bin -gG_RESERVED_FILE=reserved.bin -gG_EOF_FILE=eof.bin -gG_COUNTERS_FILE=counters.bin -gG_BREAK_FILE=break.bin -gG_WAIT_FILE=wait.bin -gG_SD_FILE=sd.bin -gG_SD_IMAGE=sd.img -gG_NICE=$(NICE) \
+	  -gG_HELLO_FILE=hello.bin -gG_ROM_FILE=rom.bin -gG_ECHO_FILE=echo.bin -gG_FIFO_FILE=fifo.bin -gG_DEVICES_FILE=devices.bin -gG_EMU_FILE=emu.bin -gG_COUNT_FILE=count.bin -gG_RESERVED_FILE=reserved.bin -gG_BYTEWIN_FILE=bytewin.bin -gG_EOF_FILE=eof.bin -gG_COUNTERS_FILE=counters.bin -gG_BREAK_FILE=break.bin -gG_WAIT_FILE=wait.bin -gG_SD_FILE=sd.bin -gG_SD_IMAGE=sd.img -gG_NICE=$(NICE) \
 	  -gG_ETH_FILE=eth.bin -gG_ETH_IN_FILE=$(ETH_IN) -gG_ETH_OUT_FILE=eth_frames.out \
-	  -gG_HELLO_STEPS=$(STEPS_HELLO) -gG_EMU_STEPS=$(STEPS_EMU) -gG_RESERVED_STEPS=$(STEPS_RESERVED) -gG_SD_STEPS=$(STEPS_SD) -gG_ETH_STEPS=$(STEPS_ETH) -gG_HELLO_EVENTS=$(EVENTS_HELLO) > tb_nicemon.log 2>&1) && \
+	  -gG_HELLO_STEPS=$(STEPS_HELLO) -gG_EMU_STEPS=$(STEPS_EMU) -gG_RESERVED_STEPS=$(STEPS_RESERVED) -gG_BYTEWIN_STEPS=$(STEPS_BYTEWIN) -gG_SD_STEPS=$(STEPS_SD) -gG_ETH_STEPS=$(STEPS_ETH) -gG_HELLO_EVENTS=$(EVENTS_HELLO) > tb_nicemon.log 2>&1) && \
 	  diff $(ETH_TEST)/eth.frames.expected $(BUILD)/eth_frames.out >> $(BUILD)/tb_nicemon.log 2>&1 && \
 	  echo "PASS tb_nicemon" || (echo "FAIL tb_nicemon"; cat $(BUILD)/tb_nicemon.log; exit 1)
 
@@ -270,6 +272,9 @@ $(BUILD)/count.bin: count.nasm $(ASM_PY) | $(BUILD)
 	@$(ASM) -o $@ $<
 
 $(BUILD)/reserved.bin: $(NICE_DIR)/emulator/test/reserved.nasm $(ASM_PY) | $(BUILD)
+	@$(ASM) -o $@ $<
+
+$(BUILD)/bytewin.bin: bytewin.nasm $(ASM_PY) | $(BUILD)
 	@$(ASM) -o $@ $<
 
 $(BUILD)/eof.bin: eof.nasm $(ASM_PY) | $(BUILD)

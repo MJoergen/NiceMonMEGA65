@@ -9,8 +9,8 @@
 -- run that passes every check exits with 0, and sim/Makefile prints PASS
 -- for that and FAIL, with the log, for anything else. The step counts that
 -- steps 4, 9, and 11 check are the generics G_HELLO_STEPS, G_EMU_STEPS,
--- and G_RESERVED_STEPS, which sim/Makefile sets from STEPS_HELLO,
--- STEPS_EMU, and STEPS_RESERVED. The event counters of SYSTEM.md §3 that
+-- G_RESERVED_STEPS, and G_BYTEWIN_STEPS, which sim/Makefile sets from
+-- STEPS_HELLO, STEPS_EMU, STEPS_RESERVED, and STEPS_BYTEWIN. The event counters of SYSTEM.md §3 that
 -- step 4 checks after hello are G_HELLO_EVENTS, from EVENTS_HELLO. "make
 -- -C sim check-steps" runs the same programs in niceemu and compares its
 -- counts with those.
@@ -100,6 +100,11 @@
 --    (link version 5).
 -- 11. Load G_RESERVED_FILE, and run it. It halts on a reserved control
 --    word, which the halt reason and `h02` show, after the steps of niceemu.
+--    Then G_BYTEWIN_FILE, which reads and writes through the byte windows
+--    of nice_cpu's SYSTEM.md §9: its registers and the words it wrote are
+--    those of niceemu, after its steps. The link reads a byte and a
+--    signed halfword through the windows, and writes a byte, which leaves
+--    the rest of its word.
 -- 12. Load G_BREAK_FILE, with breakpoint 0 at the address of its label READ,
 --    an instruction that reads memory, and 1 at V3, the first of its
 --    interrupt routine, and start it. The core stops at READ, the link
@@ -193,6 +198,7 @@ entity tb_nicemon is
       G_EMU_FILE       : string;
       G_COUNT_FILE     : string;
       G_RESERVED_FILE  : string;
+      G_BYTEWIN_FILE   : string;
       G_EOF_FILE       : string;
       G_COUNTERS_FILE  : string;
       G_BREAK_FILE     : string;
@@ -207,10 +213,12 @@ entity tb_nicemon is
       G_ETH_OUT_FILE   : string;
       -- The core, pipeline or multi, as NICE selects it
       G_NICE           : string;
-      -- The steps that niceemu counts for hello, emu, and reserved
+      -- The steps that niceemu counts for hello, emu, reserved, bytewin,
+      -- sd, and eth
       G_HELLO_STEPS    : natural;
       G_EMU_STEPS      : natural;
       G_RESERVED_STEPS : natural;
+      G_BYTEWIN_STEPS  : natural;
       G_SD_STEPS       : natural;
       G_ETH_STEPS      : natural;
       -- The low words of the event counters that niceemu counts for hello:
@@ -1285,6 +1293,30 @@ begin
       check("FFFFFF42", steps(G_RESERVED_STEPS));
       check("FFFFFFE1", "00000001");         -- R1
       check("FFFFFFEF", "00000007");         -- R15
+
+      report "tb_nicemon: load " & G_BYTEWIN_FILE;
+      wr("FFFFFFF0", "0000000D");
+      load(G_BYTEWIN_FILE, first_v);
+      wr("FFFFFFF0", "00000008");
+      expect_halt("01");
+      check("FFFFFF42", steps(G_BYTEWIN_STEPS));
+      check("FFFFFFE1", "00000001");         -- R1, byte 0
+      check("FFFFFFE2", "FFFFFF80");         -- R2, byte 3, signed
+      check("FFFFFFE3", "000000FF");         -- R3, byte 2
+      check("FFFFFFE4", "0000007F");         -- R4, byte 1, signed
+      check("FFFFFFE5", "FFFF8001");         -- R5, halfword 1, signed
+      check("FFFFFFE6", "00007FFF");         -- R6, halfword 0
+      check("FFFFFFE7", "80017FFF");         -- R7, the word
+      check("FFFFFFE8", "00007FFF");         -- R8, halfword 0, signed
+      check("FFFFFFE9", "00000022");         -- R9, byte 2 of word 0x204
+      check("FFFFFFEC", "00000078");         -- R12, indexed
+      check("00000202", "AB007800");         -- bytes 1 and 3
+      check("00000203", "CAFE1234");         -- halfwords 0 and 1
+      check("00000204", "11223344");         -- the word
+      check("20000809", "00000078");         -- the link reads a byte
+      check("5000080E", "FFFFCAFE");         -- and a signed halfword
+      wr("20000808", "123456EE");            -- and writes byte 0
+      check("00000202", "AB0078EE");
 
       report "tb_nicemon: load " & G_BREAK_FILE;
       wr("FFFFFFF0", "0000000D");

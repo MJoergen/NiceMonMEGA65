@@ -132,6 +132,15 @@ math unit, so the program is joined with `muldiv_mpu.nasm`. A system
 without the math unit would translate with `nicewasm --no-mpu` and use
 `muldiv_soft.nasm` instead.
 
+The board has the byte windows of nice_cpu's SYSTEM.md §9, so
+`nicebuild.py --byte-windows` makes each byte or halfword load and store
+of the program one `MOVE`, where it is a few instructions without them.
+nice_cpu's benchmark, `bench/bench.c`, runs 11% fewer steps so. Such a program runs on the board and in the
+emulator, but not on a system without the windows. Its start-up code
+halts with wasm trap 8, `memory beyond the byte windows`, when the linear
+memory lies above the words that the windows reach, which cannot happen
+in the board's RAM.
+
 The linear memory is one page, 16384 words, and the program and its memory
 must fit below the stack in the RAM. With `printf` and `scanf`, the prime
 example ends at word `0x9C5A`.

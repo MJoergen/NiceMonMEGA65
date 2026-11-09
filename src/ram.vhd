@@ -9,10 +9,11 @@
 -- Port B takes the low G_ADDR_BITS bits of the word address. So the memory
 -- repeats through the whole address space. The words are kept in two banks,
 -- the even words and the odd ones: port A reads both, and port B reaches
--- the bank that bit 0 of its address selects. Each port reads in the cycle
--- after the address is given, as block RAM does. When both ports reach the
--- same word in one cycle, port A reads the value from before port B's
--- write.
+-- the bank that bit 0 of its address selects. Port B writes the bytes of
+-- the word whose bits of b_we_i are 1, bit i for bits 8i + 7..8i, as the
+-- byte enables of block RAM do. Each port reads in the cycle after the
+-- address is given, as block RAM does. When both ports reach the same word
+-- in one cycle, port A reads the value from before port B's write.
 --
 -- The memory is loaded at configuration time from G_INIT_FILE, a .bin file
 -- (ISA.md §10.4): one line per word, an 8-digit hex address, a space, and the
@@ -41,7 +42,8 @@ entity ram is
       a_data_o  : out std_logic_vector(63 downto 0);
 
       b_addr_i  : in  std_logic_vector(G_ADDR_BITS - 1 downto 0);
-      b_we_i    : in  std_logic;
+      -- The bytes to write, bit i for bits 8i + 7..8i
+      b_we_i    : in  std_logic_vector(3 downto 0);
       b_wdata_i : in  std_logic_vector(31 downto 0);
       b_rdata_o : out std_logic_vector(31 downto 0)
    );
@@ -106,9 +108,11 @@ begin
    p_b_even : process (clk_i)
    begin
       if rising_edge(clk_i) then
-         if b_we_i = '1' and b_addr_i(0) = '0' then
-            mem_even(to_integer(b_addr_i(G_ADDR_BITS - 1 downto 1))) <= b_wdata_i;
-         end if;
+         for i in 0 to 3 loop
+            if b_we_i(i) = '1' and b_addr_i(0) = '0' then
+               mem_even(to_integer(b_addr_i(G_ADDR_BITS - 1 downto 1)))(8 * i + 7 downto 8 * i) <= b_wdata_i(8 * i + 7 downto 8 * i);
+            end if;
+         end loop;
          b_even <= mem_even(to_integer(b_addr_i(G_ADDR_BITS - 1 downto 1)));
       end if;
    end process p_b_even;
@@ -116,9 +120,11 @@ begin
    p_b_odd : process (clk_i)
    begin
       if rising_edge(clk_i) then
-         if b_we_i = '1' and b_addr_i(0) = '1' then
-            mem_odd(to_integer(b_addr_i(G_ADDR_BITS - 1 downto 1))) <= b_wdata_i;
-         end if;
+         for i in 0 to 3 loop
+            if b_we_i(i) = '1' and b_addr_i(0) = '1' then
+               mem_odd(to_integer(b_addr_i(G_ADDR_BITS - 1 downto 1)))(8 * i + 7 downto 8 * i) <= b_wdata_i(8 * i + 7 downto 8 * i);
+            end if;
+         end loop;
          b_odd <= mem_odd(to_integer(b_addr_i(G_ADDR_BITS - 1 downto 1)));
       end if;
    end process p_b_odd;

@@ -418,6 +418,7 @@ Then it loads and runs these programs:
 | `sim/devices.nasm` | The math unit, the performance counters, and the timer's interrupts. The testbench also uses the math unit over the link. |
 | `sim/emu.nasm` | The screen, the read counter, memory in the I/O range, and the registers after a halt. The testbench writes and reads the screen's registers. |
 | `reserved.nasm` of the emulator's tests | A halt on a reserved control word, after the testbench has cleared the memory. |
+| `sim/bytewin.nasm` | The byte windows: reads of bytes and halfwords, zero- and sign-extended, writes that change only their byte or halfword, and an indexed operand, as nice_cpu's `bytewin.nasm` checks them, without its words beyond the RAM and its fetch from a window, which alias the RAM here. The testbench reads and writes through the windows over the link. |
 | `sim/counters.nasm` | The fetch statistics, the microsecond counter, and the board's registers through the core's data bus. A start clears the fetch statistics, whose causes sum to their cycles, and with the multi-cycle core every cycle is of cause OTHER. |
 | `sim/break.nasm` | The breakpoints, and the `x` notice. |
 | `sim/wait.nasm` | `WAIT`, and the hidden state of an interrupt routine (link version 7): bit 6 of the control register while the core waits, also paused, and bits 7 and 10, `saved_pc`, and `saved_sr` while it is paused in the timer's routine. |
@@ -534,13 +535,16 @@ every time, not only the ones a testbench sends.
   never stalls.
 - `mem.sby` proves the memory, `src/mem.vhd`, with 16 words of RAM, a ROM
   of 4 words, `formal/rom.bin`, and a screen of 8: a write reaches the
-  memory of its address, and no other, and none while it is to the shown
+  memory of its address, or of the word its byte window reaches, in the
+  bytes of its window, and no other, and none while it is to the shown
   ROM, a clear writes 0 to every word of the RAM and the screen, a read
-  returns the word of the memory of its address, a fetch in the I/O page
-  returns 0, and each fetch gets one ACK. Its `model` task proves, with
-  PDR, that a read of a word of the RAM or the screen returns the word last
-  written there, or 0 after a clear, on both ports, and a read of the
-  shown ROM returns its word, and a clear ends.
+  returns the word of the memory of its address, or its window's byte or
+  halfword, a fetch in the I/O page returns 0, and each fetch gets one
+  ACK. Its `model` task proves, with PDR, that a read of a word of the RAM
+  or the screen returns the word last written there, or 0 after a clear,
+  on both ports, through the byte windows too, where a write changes only
+  its byte or halfword and a read extends it, and a read of the shown ROM
+  returns its word, and a clear ends.
 - `nicemon.sby` checks the whole system, with 16 words of RAM and
   a free core, `formal/nice_core_formal.vhd`. The free core does anything
   that either of nice_cpu's cores may do on its ports, as nice_cpu's own
@@ -570,7 +574,10 @@ every time, not only the ones a testbench sends.
   - What a read of the console returns.
   - A read of memory returns the word of `mem.vhd`, one of
     `0xFFFFFF90`–`9F` that of `board_io.vhd`, and one of
-    `0xFFFFFF80`–`8F` that of `scr_regs.vhd`.
+    `0xFFFFFF80`–`8F` that of `scr_regs.vhd`. A read through the byte
+    windows `0x2…`–`0x5…` returns `mem.vhd`'s byte or halfword a cycle
+    later, and the link's is answered also while the core is in
+    reset.
 
   The `link` and `rom` tasks take about 14 minutes each, and the others a
   few each; `make -j formal` runs all the tasks side by side. CI runs `make -j4
@@ -809,6 +816,10 @@ bitstream has one. Then it hides the ROM and uses the link:
   the RAM, sets each baud rate at `0xFFFFFF9F` and reads the link back
   at it, and returns to `--baud`, reads back what `sim/emu.nasm` leaves after its
   halt, with the instruction and event counters as `niceemu` counts them, and checks that the cycle counter and the timer stop at the halt.
+- It reads and writes bytes and halfwords through the byte windows over
+  the link, at a low word and at the top word of the RAM, and runs
+  `sim/bytewin.nasm`, whose registers, words, and steps must be
+  `niceemu`'s.
 - It writes and reads the screen's registers, and the board's registers:
   on the Nexys4DDR the LEDs, RGB LEDs, and display, and that the buttons
   and switches take no write, and on the MEGA65 that they read 0 and take

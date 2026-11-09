@@ -145,6 +145,7 @@ TRAP_NAMES = {
     5: "float to integer conversion",
     6: "call_indirect: bad index",
     7: "call_indirect: type mismatch",
+    8: "memory beyond the byte windows",
 }
 
 

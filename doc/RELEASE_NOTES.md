@@ -44,12 +44,27 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   `nicedbg status` shows them on the board, and the on-board debugger's
   state is `WAITING` in a wait, and `PAUSED W` paused in one (#93).
 
+- The byte windows of nice_cpu's SYSTEM.md §9 at `0x10000000`–`0x5FFFFFFF`
+  ([#90](https://github.com/MJoergen/NiceMonMEGA65/issues/90)): a data
+  access there reaches a word, a byte, or a halfword of the RAM, with
+  byte enables on the block RAM, so that a program built with nicewasm's
+  `--byte-windows` runs on the board. The link reads and writes through
+  them too. A read of a byte or a halfword takes a cycle more than one of
+  a word, for the timing at 100 MHz, as a read of the fonts does.
+- `run.py --symbols` names wasm trap 8, `memory beyond the byte windows`,
+  as niceemu does
+  ([#101](https://github.com/MJoergen/NiceMonMEGA65/issues/101)).
+
 **Changed.** The monitor's `u` and the on-board debugger's row 27 show
 `0x0C600000` as `WAIT`, as nicedis does, where they showed a reserved
 control word (#93).
 
-**Not yet on the board.** The watchpoints of link version 7 (#99), the
-byte windows (#90), and the clock of the time of day (#97).
+**Fixed.** A link read of the fonts while the core was held could go
+unanswered, when the read before it had been the core's, so that the
+host waited for its answer in vain (#90).
+
+**Not yet on the board.** The watchpoints of link version 7 (#99) and
+the clock of the time of day (#97).
 [EMULATOR.md](EMULATOR.md) lists them.
 
 ## V1.9.1 (2026-11-08)

@@ -57,6 +57,7 @@ board that was not built then.
 | 2026-11-07 | The port for Ethernet frames (#82), with the ROM and `FLOW=timing` | 0.086 / 0.058 | – |
 | 2026-11-09 | nice_cpu V2.0, debug link 7, with the ROM | −0.993 in the default flow; 0.075 with `FLOW=timing` | – |
 | 2026-11-09 | The wait and the hidden state on the link (#93, #98), and the strip's wait, with the ROM and `FLOW=timing` | 0.047 | – |
+| 2026-11-09 | The byte windows (#90), with the ROM and `FLOW=timing`: −0.258 with the byte or halfword taken from the RAM's word on the way to the core; 0.032 with it a cycle later | 0.032 / 0.031 | – |
 
 The R3's first record is from a build at nice_cpu V1.0, with debug link
 4 and the Ethernet station: 0.109 ns and 0.061 ns.

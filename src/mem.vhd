@@ -23,7 +23,24 @@
 -- memory (stb_i), and its address, which nicemon drives in every cycle.
 -- A write goes to the screen or to the RAM, unless it is to the ROM while
 -- the ROM is shown, where it is dropped. A read returns the word of the
--- memory of its address on rdata_o, in the next cycle. Every write to the
+-- memory of its address on rdata_o, in the next cycle.
+--
+-- Port B has the byte windows of nice_cpu's SYSTEM.md §9. An address A
+-- whose top four bits are 1 to 5 reaches the word W = (A >> 2) AND
+-- 0x03FFFFFF, which lies in the RAM, or in the ROM while it is shown, as
+-- a plain address W does, and never in the screen. A write through the
+-- byte windows, 2 and 3, writes bits 7..0 of the value to byte A mod 4 of
+-- W, and one through the halfword windows, 4 and 5, bits 15..0 to
+-- halfword bit 1 of A, with the RAM's byte enables, in one access. A read
+-- returns the word W on rdata_o, and on rdata_win_o the value of its
+-- window: that byte or halfword, zero-extended by windows 2 and 4 and
+-- sign-extended by 3 and 5, or the whole word in window 1 and outside the
+-- windows. The window and bits 1..0 of A are kept for the cycle of the
+-- read's word. rdata_win_o is a LUT level or two later than rdata_o, too
+-- late for the core's path from the RAM at 100 MHz, so nicemon registers
+-- it and acknowledges a read through windows 2 to 5 a cycle later. Port A does
+-- not decode the windows: a fetch there reads the RAM or the ROM that the
+-- address aliases, which SYSTEM.md §9 allows. Every write to the
 -- screen is also given out on scr_*_o, a cycle late, for a display that
 -- keeps a copy (src/video/text.vhd). The register keeps the core's store
 -- paths short, for the display lies far from the core on the FPGA.
@@ -34,7 +51,8 @@
 -- for a cycle. nicemon takes no request meanwhile.
 --
 -- With G_FORMAL, it states the properties that formal/mem.sby proves: each
--- write reaches the memory of its address, and no other, the clear writes
+-- write reaches the memory of its address, and no other, in the bytes of
+-- its window, the clear writes
 -- 0 to every word, a read returns the word of the memory of its address,
 -- and each fetch is acknowledged once.
 --
@@ -79,8 +97,10 @@ entity mem is
       we_i         : in  std_logic;
       addr_i       : in  std_logic_vector(31 downto 0);
       wdata_i      : in  std_logic_vector(31 downto 0);
-      -- The word read by the request one cycle earlier
+      -- The word read by the request one cycle earlier, and its value
+      -- through the request's byte window
       rdata_o      : out std_logic_vector(31 downto 0);
+      rdata_win_o  : out std_logic_vector(31 downto 0);
       -- The clear: its start, while it runs, and a pulse at its end
       clear_i      : in  std_logic;
       clearing_o   : out std_logic;
@@ -116,6 +136,110 @@ architecture synthesis of mem is
    -- it is shown, or else the RAM
    type t_mem is (MEM_RAM, MEM_ROM, MEM_SCR);
 
+   -- The byte window of a data address (SYSTEM.md §9), by its top four
+   -- bits, 1 to 5, or none
+   type t_win is (WIN_NONE, WIN_WORD, WIN_BYTE, WIN_SBYTE, WIN_HALF, WIN_SHALF);
+
+   function win_of(addr : std_logic_vector(31 downto 0)) return t_win is
+   begin
+
+      case addr(31 downto 28) is
+         when "0001" => return WIN_WORD;
+         when "0010" => return WIN_BYTE;
+         when "0011" => return WIN_SBYTE;
+         when "0100" => return WIN_HALF;
+         when "0101" => return WIN_SHALF;
+         when others => return WIN_NONE;
+      end case;
+
+   end function win_of;
+
+   -- The word address that a data address reaches: (A >> 2) AND 0x03FFFFFF
+   -- in a window, else A itself
+   function word_of(addr : std_logic_vector(31 downto 0)) return std_logic_vector is
+   begin
+      if win_of(addr) = WIN_NONE then
+         return addr;
+      end if;
+      return "000000" & addr(27 downto 2);
+   end function word_of;
+
+   -- The bytes that a write through window win changes, bit i for bits
+   -- 8i + 7..8i, with lane = bits 1..0 of its address
+   function lanes_of(win  : t_win;
+                     lane : std_logic_vector(1 downto 0)) return std_logic_vector is
+   begin
+
+      case win is
+         when WIN_BYTE | WIN_SBYTE =>
+
+            case lane is
+               when "00" => return "0001";
+               when "01" => return "0010";
+               when "10" => return "0100";
+               when others => return "1000";
+            end case;
+
+         when WIN_HALF | WIN_SHALF =>
+            if lane(1) = '1' then
+               return "1100";
+            end if;
+            return "0011";
+         when others =>
+            return "1111";
+      end case;
+
+   end function lanes_of;
+
+   -- The value of a write through window win, in every lane that it may
+   -- change: bits 7..0 in each byte, or bits 15..0 in each halfword
+   function lane_data(win  : t_win;
+                      data : std_logic_vector(31 downto 0)) return std_logic_vector is
+   begin
+
+      case win is
+         when WIN_BYTE | WIN_SBYTE =>
+            return data(7 downto 0) & data(7 downto 0) & data(7 downto 0) & data(7 downto 0);
+         when WIN_HALF | WIN_SHALF =>
+            return data(15 downto 0) & data(15 downto 0);
+         when others =>
+            return data;
+      end case;
+
+   end function lane_data;
+
+   -- What a read through window win returns of word, with lane = bits 1..0
+   -- of its address
+   function win_read(win  : t_win;
+                     lane : std_logic_vector(1 downto 0);
+                     word : std_logic_vector(31 downto 0)) return std_logic_vector is
+      variable byte_v : std_logic_vector(7 downto 0);
+      variable half_v : std_logic_vector(15 downto 0);
+   begin
+
+      case lane is
+         when "00" => byte_v := word(7 downto 0);
+         when "01" => byte_v := word(15 downto 8);
+         when "10" => byte_v := word(23 downto 16);
+         when others => byte_v := word(31 downto 24);
+      end case;
+
+      if lane(1) = '1' then
+         half_v := word(31 downto 16);
+      else
+         half_v := word(15 downto 0);
+      end if;
+
+      case win is
+         when WIN_BYTE => return X"000000" & byte_v;
+         when WIN_SBYTE => return (31 downto 8 => byte_v(7)) & byte_v;
+         when WIN_HALF => return X"0000" & half_v;
+         when WIN_SHALF => return (31 downto 16 => half_v(15)) & half_v;
+         when others => return word;
+      end case;
+
+   end function win_read;
+
    function mem_of(addr       : std_logic_vector(31 downto 0);
                    rom_hidden : std_logic) return t_mem is
    begin
@@ -138,14 +262,20 @@ architecture synthesis of mem is
    signal ibus_io   : std_logic := '0';
    signal ibus_mem  : t_mem     := MEM_RAM;
 
-   -- Port B: the memory of the last request
-   signal rd_mem : t_mem := MEM_RAM;
+   -- Port B: the window and the word address of the request, and the
+   -- memory, the window, and bits 1..0 of the address of the last one
+   signal b_win   : t_win;
+   signal b_word  : std_logic_vector(31 downto 0);
+   signal rd_mem  : t_mem                        := MEM_RAM;
+   signal rd_win  : t_win                        := WIN_NONE;
+   signal rd_lane : std_logic_vector(1 downto 0) := "00";
+   signal rd_word : std_logic_vector(31 downto 0);
 
    -- The RAM's ports
    signal ram_a_addr  : std_logic_vector(G_RAM_ADDR_BITS - 2 downto 0);
    signal ram_a_data  : std_logic_vector(63 downto 0);
    signal ram_b_addr  : std_logic_vector(G_RAM_ADDR_BITS - 1 downto 0);
-   signal ram_b_we    : std_logic;
+   signal ram_b_we    : std_logic_vector(3 downto 0);
    signal ram_b_wdata : std_logic_vector(31 downto 0);
    signal ram_b_rdata : std_logic_vector(31 downto 0);
 
@@ -199,28 +329,32 @@ begin
    -- Port B and the clear
    ---------------------------------------------------------------------------
 
+   b_win  <= win_of(addr_i);
+   b_word <= word_of(addr_i);
+
    ram_b_addr  <= clr_addr(G_RAM_ADDR_BITS - 1 downto 0) when clearing = '1' else
-                  addr_i(G_RAM_ADDR_BITS - 1 downto 0);
+                  b_word(G_RAM_ADDR_BITS - 1 downto 0);
    ram_b_wdata <= (others => '0') when clearing = '1' else
-                  wdata_i;
+                  lane_data(b_win, wdata_i);
    scr_b_addr  <= clr_addr(C_SCR_BITS - 1 downto 0) when clearing = '1' else
                   addr_i(C_SCR_BITS - 1 downto 0);
 
    -- A write is served in the cycle that its request is taken, and in no
-   -- other cycle. While the memory is cleared, both are written.
+   -- other cycle. While the memory is cleared, both are written. The
+   -- screen lies beyond the windows, so its writes are of whole words.
    p_we : process (all)
    begin
-      ram_b_we <= '0';
+      ram_b_we <= "0000";
       scr_b_we <= '0';
       if clearing = '1' then
-         ram_b_we <= '1';
+         ram_b_we <= "1111";
          scr_b_we <= '1';
-      elsif stb_i = '1' then
+      elsif stb_i = '1' and we_i = '1' then
 
-         case mem_of(addr_i, rom_hidden_i) is
-            when MEM_SCR => scr_b_we <= we_i;
+         case mem_of(b_word, rom_hidden_i) is
+            when MEM_SCR => scr_b_we <= '1';
             when MEM_ROM => null;
-            when MEM_RAM => ram_b_we <= we_i;
+            when MEM_RAM => ram_b_we <= lanes_of(b_win, addr_i(1 downto 0));
          end case;
 
       end if;
@@ -232,7 +366,9 @@ begin
          clr_done <= '0';
 
          if stb_i = '1' then
-            rd_mem <= mem_of(addr_i, rom_hidden_i);
+            rd_mem  <= mem_of(b_word, rom_hidden_i);
+            rd_win  <= b_win;
+            rd_lane <= addr_i(1 downto 0);
          end if;
 
          if clearing = '1' then
@@ -253,9 +389,11 @@ begin
       end if;
    end process p_b;
 
-   rdata_o <= scr_b_rdata when rd_mem = MEM_SCR else
+   rd_word     <= scr_b_rdata when rd_mem = MEM_SCR else
               rom_b_data when rd_mem = MEM_ROM else
               ram_b_rdata;
+   rdata_o     <= rd_word;
+   rdata_win_o <= win_read(rd_win, rd_lane, rd_word);
 
    clearing_o   <= clearing;
    clear_done_o <= clr_done;
@@ -327,7 +465,7 @@ begin
          a_addr_i  => ibus_addr_i(C_SCR_BITS - 2 downto 0),
          a_data_o  => scr_a_data,
          b_addr_i  => scr_b_addr,
-         b_we_i    => scr_b_we,
+         b_we_i    => (others => scr_b_we),
          b_wdata_i => ram_b_wdata,
          b_rdata_o => scr_b_rdata
       ); -- i_scr
@@ -349,26 +487,30 @@ begin
       signal f_last : std_logic;
    begin
 
-      f_mem   <= mem_of(addr_i, rom_hidden_i);
+      f_mem   <= mem_of(b_word, rom_hidden_i);
       f_imem  <= mem_of(ibus_word, rom_hidden_i);
       f_ifull <= and(ibus_word(31 downto 8));
       f_last  <= clearing and and(clr_addr);
 
       -- psl default clock is rising_edge(clk_i);
 
-      -- A write reaches the memory of its address, at that address, and no
-      -- other; a write to the ROM while it is shown reaches none. Nothing
-      -- but the clear writes the RAM under the shown ROM.
+      -- A write reaches the memory of its address, at the word that its
+      -- window reaches, in the bytes of its window, and no other; a write
+      -- to the ROM while it is shown reaches none. Nothing but the clear
+      -- writes the RAM under the shown ROM. formal_mem.vhd checks the
+      -- windows' bytes against a model of its own.
       -- psl f_we_ram : assert always
       --    clearing = '0' ->
-      --    (ram_b_we = '1') = (stb_i = '1' and we_i = '1' and f_mem = MEM_RAM) and
-      --    ram_b_addr = addr_i(G_RAM_ADDR_BITS - 1 downto 0) and ram_b_wdata = wdata_i;
+      --    (ram_b_we /= 0) = (stb_i = '1' and we_i = '1' and f_mem = MEM_RAM) and
+      --    (ram_b_we = 0 or ram_b_we = lanes_of(b_win, addr_i(1 downto 0))) and
+      --    ram_b_addr = b_word(G_RAM_ADDR_BITS - 1 downto 0) and
+      --    ram_b_wdata = lane_data(b_win, wdata_i);
       -- psl f_we_scr : assert always
       --    clearing = '0' ->
       --    (scr_b_we = '1') = (stb_i = '1' and we_i = '1' and f_mem = MEM_SCR) and
       --    scr_b_addr = addr_i(C_SCR_BITS - 1 downto 0);
       -- psl f_rom_we : assert always
-      --    clearing = '0' and ram_b_we = '1' ->
+      --    clearing = '0' and ram_b_we /= 0 ->
       --    rom_hidden_i = '1' or or(ram_b_addr(G_RAM_ADDR_BITS - 1 downto G_ROM_ADDR_BITS)) = '1';
 
       -- The clear writes 0 to both memories at clr_addr, which counts from
@@ -376,7 +518,7 @@ begin
       -- cycle. It starts only with clear_i.
       -- psl f_clr_we : assert always
       --    clearing = '1' ->
-      --    ram_b_we = '1' and scr_b_we = '1' and ram_b_wdata = 0 and
+      --    ram_b_we = "1111" and scr_b_we = '1' and ram_b_wdata = 0 and
       --    ram_b_addr = clr_addr(G_RAM_ADDR_BITS - 1 downto 0) and
       --    scr_b_addr = clr_addr(C_SCR_BITS - 1 downto 0);
       -- psl f_clr_start : assert always
@@ -392,12 +534,15 @@ begin
       --    {not f_last or rst_i} |=> {not clr_done};
 
       -- A read returns the word of the memory of its address, which the
-      -- memory reads at the address of f_we_ram and f_we_scr.
+      -- memory reads at the address of f_we_ram and f_we_scr, and its byte
+      -- or halfword through a window on rdata_win_o.
       -- psl f_read : assert always
       --    {stb_i = '1' and we_i = '0'} |=>
-      --    {(prev(f_mem) = MEM_RAM and rdata_o = ram_b_rdata) or
-      --     (prev(f_mem) = MEM_ROM and rdata_o = rom_b_data) or
-      --     (prev(f_mem) = MEM_SCR and rdata_o = scr_b_rdata)};
+      --    {rd_win = prev(b_win) and rd_lane = prev(addr_i(1 downto 0)) and
+      --     rdata_o = rd_word and rdata_win_o = win_read(rd_win, rd_lane, rd_word) and
+      --     ((prev(f_mem) = MEM_RAM and rd_word = ram_b_rdata) or
+      --      (prev(f_mem) = MEM_ROM and rd_word = rom_b_data) or
+      --      (prev(f_mem) = MEM_SCR and rd_word = scr_b_rdata))};
 
       -- Each fetch is acknowledged once, in the next cycle, unless the core
       -- is reset or drops CYC, and its pair is read from the memory of its
@@ -423,6 +568,11 @@ begin
       --     scr_data_o = prev(ram_b_wdata)};
 
       -- psl c_clear : cover {clear_i and not rst_i; clearing[*]; clr_done};
+      -- psl c_win_write : cover
+      --    {stb_i = '1' and we_i = '1' and rst_i = '0' and b_win = WIN_BYTE and
+      --     addr_i(1 downto 0) = "10" and f_mem = MEM_RAM};
+      -- psl c_win_read : cover
+      --    {stb_i = '1' and we_i = '0' and rst_i = '0' and b_win = WIN_SHALF and f_mem = MEM_RAM; true};
       -- psl c_rom_read : cover
       --    {stb_i = '1' and we_i = '0' and rst_i = '0' and f_mem = MEM_ROM; true};
       -- psl c_rom_write : cover {stb_i = '1' and we_i = '1' and rst_i = '0' and f_mem = MEM_ROM};

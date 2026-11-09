@@ -280,7 +280,7 @@ These are the worst setup and hold slacks, in ns:
 | Build | Clock | Setup | Hold |
 |---|---|---|---|
 | R6, pipelined, default flow | 100 MHz | **−0.526**, 324 endpoints | 0.069 |
-| R6, pipelined, `FLOW=timing` | 100 MHz | 0.047 | 0.047 |
+| R6, pipelined, `FLOW=timing` | 100 MHz | 0.032 | 0.031 |
 | R6, `NICE=multi` | 100 MHz | 0.187 | 0.075 |
 | R3, pipelined, default flow | 100 MHz | **−0.073**, 2 endpoints | 0.035 |
 | R3, pipelined, `FLOW=timing` | 100 MHz | 0.126 | 0.041 |
@@ -291,8 +291,8 @@ So the pipelined core meets its clock on every board with `FLOW=timing`
 only, and the R6 and the Nexys4DDR with little to spare. On the MEGA65,
 `make release` tries the default flow first, then `FLOW=timing`. The R6's worst paths
 are in the core's WRITE stage in the default flow, from its
-micro-operation to its value, and in the timing flow from the send
-buffer of the port for Ethernet frames into WRITE's register file. The R3's worst paths in the
+micro-operation to its value, and in the timing flow from the SD card
+controller's buffer into WRITE's register file. The R3's worst paths in the
 default flow are from the MAX10's inputs (`max10.vhd`), and the
 Nexys4DDR's from WRITE into its register file. `verified.json` records
 the build of the latest release's bump, and the badge shows it.
