@@ -1541,7 +1541,7 @@ S_PROMPT
                 .ASCII_L '> '
 S_UNKNOWN
                 .ASCII_L 'Unknown command; ? lists them'
-S_TABLE         .ASCII_L ', table '
+S_TABLE         .ASCII_L ', dispatch table '
 S_HALTED
                 .ASCII_L 'Halted'
 S_RETURN
