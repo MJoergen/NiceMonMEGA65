@@ -105,7 +105,7 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
 | [sim/](sim/) | The GHDL testbenches. `text_synth.vhd` is the wrapper with which GHDL checks that the display synthesizes. |
 | [formal/](formal/) | The formal checks, for SymbiYosys. |
 | [synth/](synth/README.md) | The Vivado builds for the MEGA65 R3 and R6 boards, and the Nexys4DDR. |
-| [monitor/](monitor/README.md) | The monitor for the ROM, in NICE assembly: a hardware abstraction layer for programs at `0x8000`, called through a dispatch table, a main loop with a few commands, the file of routines that programs join, the stubs and the header for programs, and its tests in `niceemu`. Its README has the decisions, [INTERNALS.md](monitor/INTERNALS.md) the routines with no entries, the C in the ROM, and the build and the tests, and [#62](https://github.com/MJoergen/NiceMonMEGA65/issues/62) the loading from storage. |
+| [monitor/](monitor/README.md) | The monitor for the ROM, in NICE assembly: a hardware abstraction layer for programs at `0x8000`, called through a dispatch table, a main loop with a few commands, the file of routines that programs join, the stubs and the header for programs, and its tests in `niceemu`. Its README has the decisions, [INTERNALS.md](monitor/INTERNALS.md) the routines with no entries, the C in the ROM, and the build and the tests. |
 | [demo/](demo/README.md) | The demo in the ROM of the release, behind the monitor, which runs it with `x`, for the time being: nice_cpu's demo (`nice_cpu/demo`), whose function keys switch between a welcome screen that turns into a typewriter, the key codes, the characters and colors, the counters, a game, and the board, a self-test and the network station's addresses. Here are the board's text, `text.nasm`, the join behind the monitor, `join.py`, and its check on a board, `demo_hw.py`. |
 | [examples/](examples/) | Example C programs, and the Makefile that builds them for the MEGA65. |
 | [tools/](tools/) | `boardlink.py`, the debug link of nice_cpu's `debugger/nicelink.py`, over the board's UART or TCP to `niceemu --link`, with the board's Ethernet port and the simulated system of `make cosim`, and the tools that use it: `load.py`, which loads a program into the MEGA65 or Nexys4DDR, `run.py`, which runs a program on the board as `niceemu` runs it, `mon.py`, an interactive shell on the link, nice_cpu's `nicedbg.py` with the board's links, `sdcard.py`, which lists the board's SD card and copies its files to the host, `hwtest.py`, which tests the system on the board, `flash.py`, which writes the Nexys4DDR's flash or a slot of the MEGA65's, `bump.py`, which records the timing of the MEGA65 and the Nexys4DDR for a nice_cpu tag, `release.py`, which builds and publishes a release, `linktest.py`, which checks `run.py` and `mon.py` on `niceemu --link`, `tftpd.py`, a TFTP server for the monitor's `tftp`, with listings, `tftptest.py`, which checks it, `sdtest.py`, which checks `sdcard.py`, `cosimtest.py`, which checks `run.py` on the simulated system, and `screenshot.py`, which draws a program's screen in `niceemu` as a PNG picture. |
@@ -115,7 +115,7 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
 | [PROGRAMMING.md](doc/PROGRAMMING.md) | How to write and build programs, in NICE assembly and in C, and how they use the screen, the keyboard, the monitor, and the ROM. |
 | [DEBUGGER.md](doc/DEBUGGER.md) | The design note of the on-board debugger: its stages, its tests, and its decisions. |
 | [SDCARD.md](doc/SDCARD.md) | The design of the storage on the SD cards, from the controller to the files and BASIC, with its issues. |
-| [BASIC_SURVEY.md](doc/BASIC_SURVEY.md) | The survey of the BASIC dialects behind the interpreter planned for the ROM ([#54](https://github.com/MJoergen/NiceMonMEGA65/issues/54)). |
+| [BASIC_SURVEY.md](doc/BASIC_SURVEY.md) | The survey of the BASIC dialects behind the interpreter planned for the ROM. |
 | [CODING_STYLE.md](doc/CODING_STYLE.md) | The style of the VHDL, which `make lint` checks as far as vsg can. |
 | [RELEASE_NOTES.md](doc/RELEASE_NOTES.md) | The releases, newest first, with what changed in each. [RELEASE.md](doc/RELEASE.md) is how to make one. |
 | [core.mk](core.mk) | Picks the source files of the core, from `NICE`, for the Makefiles of `sim/` and `synth/`. |
@@ -876,8 +876,8 @@ or a GPT, which the check does not know, are named after NOT COVERED.
 For a card with a FAT32 file system, as the monitor finds it, the script
 also lists the folder `NICE` itself from the sectors it reads, or finds
 that the root has none, and, after the primes, loads the monitor of the
-tests and types `dir SLOT`, whose rows, or error 29, must be the same
-(#58, #91); a card with no FAT32 is NOT COVERED there.
+tests and types `dir SLOT`, whose rows, or error 29, must be the same;
+a card with no FAT32 is NOT COVERED there.
 On the R3, slot 1 has no card detect, so it is always tried, and fails
 without a card.
 

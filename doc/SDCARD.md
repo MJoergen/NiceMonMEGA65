@@ -1,19 +1,20 @@
 # The SD cards: the design
 
 This is the design note for storage on the SD cards. The lower half is
-written: the registers and the emulator's images (MJoergen/nice_cpu#107),
-the controller in SPI mode (#55), and the boards' slots and `make hwtest`
-(#56), in V1.5. The registers are now specified by nice_cpu's
-`doc/SYSTEM.md` §5, and the boards' slots by "The SD card slots" in
-[SYSTEM.md](SYSTEM.md); where this note differs from them, they are right.
-The ROM's sector routines and its `sd` command (#57) are written too, in
-V1.7.1, and [monitor/README.md](../monitor/README.md) describes them,
-and so is FAT32's reading, with `dir` and `load` (#58), in V1.9, in C,
-and its writing, with `save` and `del` (#59), in V1.9.1. The host tool
-`tools/sdcard.py` lists the card, and reads, writes, and deletes its
-files from the host (#61), in V1.9.1. BASIC is not written yet. Its end is `SAVE`,
-`LOAD`, and `DIR` in the BASIC of #54, and on the way it gives the monitor of #24 a way to load and save programs. The
-tracking issue is #62, and its subtasks are listed at the end.
+written: the registers and the emulator's images, the controller in SPI
+mode, and the boards' slots and `make hwtest`, in V1.5. The registers
+are now specified by nice_cpu's `doc/SYSTEM.md` §5, and the boards'
+slots by "The SD card slots" in [SYSTEM.md](SYSTEM.md); where this note
+differs from them, they are right. The ROM's sector routines and its
+`sd` command are written too, in V1.7.1, and
+[monitor/README.md](../monitor/README.md) describes them, and so is
+FAT32's reading, with `dir` and `load`, in V1.9, in C, and its writing,
+with `save` and `del`, in V1.9.1. The host tool `tools/sdcard.py` lists
+the card, and reads, writes, and deletes its files from the host, in
+V1.9.1. BASIC is not written yet. Its end is `SAVE`, `LOAD`, and `DIR`
+in the BASIC interpreter planned for the ROM, and on the way it gives
+the monitor a way to load and save programs. The subtasks are listed at
+the end.
 
 ## Contents
 
@@ -70,9 +71,9 @@ the R6, and from mega65-core's `mega65r3.xdc`, which names the slots. Slot
 puts into a PC, so it is the default. Every line has a 12.1 kΩ pull-up, and
 card detect is low when a card is in, as M2M reads it. The Nexys4DDR's slot
 also has `SD_RESET`, which must be low to power the card; its pins are in
-Digilent's master XDC (#56).
+Digilent's master XDC.
 
-Two limits of the R3, which the R6 does not have (#56 has the details):
+Two limits of the R3, which the R6 does not have:
 
 - **Slot 0 runs in SPI mode, or 1-bit SD mode.** Its DAT2, DAT1, CMD, and
   DAT0 also go to the TCK, TMS, TDO, and TDI of the MAX10 system
@@ -103,8 +104,8 @@ Two limits of the R3, which the R6 does not have (#56 has the details):
 
 ## The registers
 
-Specified in nice_cpu's `doc/SYSTEM.md` §5, from nice_cpu issue
-MJoergen/nice_cpu#107 and its review, which is the authoritative text; this
+Specified in nice_cpu's `doc/SYSTEM.md` §5, which is the authoritative
+text; this
 section keeps the design with its reasons. They take 16 of the words that
 nice_cpu reserves for I/O.
 
@@ -231,12 +232,12 @@ emulator's window has no way to take a card out.
 Without an image, a program sees what it sees on a MEGA65 with both slots
 empty: `SD_SLOTS` = 2, "present" 0, and error 1 on every command. The words
 `0xFFFFFFA0`–`0xFFFFFFAF` are always the registers, where they were
-ordinary memory, as the other reserved words are, before #107.
+ordinary memory, as the other reserved words are, before V1.5.
 
 ## The controller in the RTL
 
-The controller comes in two stages. Stage 1 (#55) is SPI mode on every
-slot, and is written. Stage 2 (#63) adds 4-bit SD mode, and is optional.
+The controller comes in two stages. Stage 1 is SPI mode on every
+slot, and is written. Stage 2 adds 4-bit SD mode, and is optional.
 
 - **SPI first**, because it is proven on these pins: M2M runs QNICE-FPGA's
   `sdcard.vhd` in SPI mode on both slots of the R3 and the R6. Its lines go
@@ -244,15 +245,15 @@ slot, and is written. Stage 2 (#63) adds 4-bit SD mode, and is optional.
   so there is no tri-state, and DAT1 and DAT2 are never driven, as the R3's
   back slot needs. At 25 MHz it gives 2–3 MB/s, enough for BASIC and the
   monitor.
-- **SD mode may never replace it on the MEGA65.** A card in SPI mode returns
-  to SD mode only after a power cycle, and the MEGA65's cards are always
-  powered. The MEGA65's own core and the M2M cores probably use SPI, so a
-  MEGA65 that switches to this core from the core menu may hand it cards in
-  SPI mode. #63 starts with a test of that on a board, and stage 2 keeps SPI
-  as a fall-back if it is so. The Nexys4DDR can cycle its card's power with
-  `SD_RESET`.
+- **SD mode may never replace it on the MEGA65.** A card in SPI mode
+  returns to SD mode only after a power cycle, and the MEGA65's cards
+  are always powered. The MEGA65's own core and the M2M cores probably
+  use SPI, so a MEGA65 that switches to this core from the core menu may
+  hand it cards in SPI mode. Stage 2 starts with a test of that on a
+  board, and stage 2 keeps SPI as a fall-back if it is so. The Nexys4DDR
+  can cycle its card's power with `SD_RESET`.
 - The registers and the buffer in block RAM are a module of nice_cpu's
-  `hdl/src`, as the review of MJoergen/nice_cpu#107 proposed, apart from
+  `hdl/src`, as nice_cpu's review of the registers proposed, apart from
   the protocol engine, behind a small interface (start, read or write, the
   sector, a stream of bytes, done, and an error). nice_cpu's `hdl/sim` gets
   an engine over an image file, so that its tests diff programs that use
@@ -297,10 +298,10 @@ and must be formatted. FAT12 and FAT16 are rejected with a message.
 - **Directories**: in FAT32 the root directory is a cluster chain like any
   other, so a current directory is one cluster number, and `cd` costs
   little. NiceMon works in its folder of the root, `NICE` unless the
-  monitor's build sets another (#91), as a card may be shared by several
+  monitor's build sets another, as a card may be shared by several
   cores on the MEGA65, each with a root folder of its own. A card without
   it is refused, with no fallback to the root, and the ROM never creates
-  it, so writing (#59) happens only in a folder that the user made.
+  it, so writing happens only in a folder that the user made.
 - **Writing**, in an order that a reset at any point leaves no worse than
   lost clusters, which `fsck.fat` frees. A file opened to write gets its
   directory entry at once, empty, with no clusters; an existing file is
@@ -315,8 +316,8 @@ and must be formatted. FAT12 and FAT16 are rejected with a message.
   freed. Before the first change of the FAT after a mount, FSInfo's free
   count is set to unknown, `0xFFFFFFFF`, which every FAT driver accepts,
   and `fsck.fat` reports as uninitialized. A new file has the date
-  2026-01-01, as the boards have no clock of the time of day yet
-  (MJoergen/nice_cpu#122). A folder that is full grows by a cluster of
+  2026-01-01, as the boards have no clock of the time of day yet. A
+  folder that is full grows by a cluster of
   zeros, written before it is linked, up to 65536 entries.
 - **Safety**: the ROM writes only inside the partition, never the MBR or
   the boot sector, and refuses a card whose FAT32 boot sector does not
@@ -336,7 +337,7 @@ and must be formatted. FAT12 and FAT16 are rejected with a message.
 
 ## The ROM
 
-The rule of #24 is that the dispatch table gets an entry only when a
+The monitor's rule is that the dispatch table gets an entry only when a
 program cannot do without it, as for state that the monitor keeps. So:
 
 - **The sector routines** are the ROM's own, with no entries in the table.
@@ -377,7 +378,7 @@ program cannot do without it, as for state that the monitor keeps. So:
   state, the mounted card and the caches, is state that the monitor keeps,
   so the file API gets entries in the table, from 9 on, in the C ABI, with
   a negative result for an error. The table became 1.1 with the first
-  five (#58), and 1.2 with `fs_write` and `fs_delete` (#59):
+  five, and 1.2 with `fs_write` and `fs_delete`:
 
 | Entry | Arguments | Result |
 |---|---|---|
@@ -404,8 +405,8 @@ program cannot do without it, as for state that the monitor keeps. So:
 added when the name has no extension. `LOAD "NAME"` reads the file as lines
 typed in, after a `NEW`. `DIR` lists the directory. The text format is the
 one that a host pastes into the console, so a program moves between a PC,
-the console, and the card in one format, as #54 wants. There are no device
-numbers and no Commodore DOS, as #54 says.
+the console, and the card in one format, as the plan for BASIC wants.
+There are no device numbers and no Commodore DOS.
 
 ## Testing
 
@@ -432,7 +433,7 @@ numbers and no Commodore DOS, as #54 says.
 - exFAT, FAT12, FAT16, and writing long names.
 - High speed and UHS.
 - Interrupts from the controller: the ROM polls.
-- C programs' files. The C library calls nothing in the ROM (#24), and a C
+- C programs' files. The C library calls nothing in the ROM, and a C
   buffer packs 4 bytes in a word. C gets its own `fopen` later, if a
   program needs one.
 
@@ -440,18 +441,17 @@ numbers and no Commodore DOS, as #54 says.
 
 1. **The language of the FAT32 code**: settled on 2026-11-06, C through
    the wasm translator, in the ROM with `nicewasm --ram`
-   (MJoergen/nice_cpu#138, #86). This decides nothing for BASIC, #54's
-   second question.
+   This decides nothing for the BASIC interpreter.
 2. **Writes to the MEGA65's internal card**, which holds its system files:
-   settled by #91, only in NiceMon's folder, `/NICE`, on either card, as
+   settled: only in NiceMon's folder, `/NICE`, on either card, as
    reading is.
-3. **One controller or two**: settled by #55, one with a multiplexer. Two
+3. **One controller or two**: settled, one with a multiplexer. Two
    would keep both cards started up, and cost twice the logic for a gain
    only when a program copies between the cards.
 4. **Host tools**: a host could read and write the board's card over the
    link while the core is paused, through these registers, and run a FAT
    library on the host, so that a file goes to the card with no PC slot.
-   Settled by #61: `tools/sdcard.py`, with its own FAT32 in Python, as
+   Settled: `tools/sdcard.py`, with its own FAT32 in Python, as
    the monitor's, and only in its folder. A write resets the core after
    it, as the ROM keeps the FAT's sector and the mount between commands.
 
@@ -460,15 +460,15 @@ numbers and no Commodore DOS, as #54 says.
 The spec comes first. After it, the RTL and the ROM go in parallel, as the
 ROM is developed in niceemu and needs no board.
 
-| Issue | What |
+| Part | Status |
 |---|---|
-| MJoergen/nice_cpu#107 | Done: the registers in nice_cpu's SYSTEM.md, and `niceemu --sd0/--sd1` |
-| #55 | Done in V1.5: the controller in the RTL, stage 1: SPI mode, the card model, `tb_sd`, and the formal checks |
-| #63 | Later, no milestone: the controller, stage 2: 4-bit SD mode, optional, after a test whether a card leaves SPI mode |
-| #56 | Done in V1.5: the pins on the R3, R6, and Nexys4DDR, and the read-only check in `make hwtest` |
-| #57 | Done in V1.7.1: the sector routines in the ROM, and the monitor's `sd` command |
-| #58 | Done in V1.9: FAT32 reading, `dir`, and `load` |
-| #91 | Done in V1.9: the folder `NICE`, set at build time |
-| #59 | Done in V1.9.1: FAT32 writing, `save`, and `del` |
-| #60 | BASIC's `SAVE`, `LOAD`, and `DIR` |
-| #61 | Done in V1.9.1: `tools/sdcard.py`, the files on the board's card over the link: `ls`, `get`, `put`, and `del`, which reset the core after a write |
+| The registers in nice_cpu's SYSTEM.md, and `niceemu --sd0/--sd1` | Done |
+| The controller in the RTL, stage 1: SPI mode, the card model, `tb_sd`, and the formal checks | Done in V1.5 |
+| The controller, stage 2: 4-bit SD mode, optional, after a test whether a card leaves SPI mode | Later |
+| The pins on the R3, R6, and Nexys4DDR, and the read-only check in `make hwtest` | Done in V1.5 |
+| The sector routines in the ROM, and the monitor's `sd` command | Done in V1.7.1 |
+| FAT32 reading, `dir`, and `load` | Done in V1.9 |
+| The folder `NICE`, set at build time | Done in V1.9 |
+| FAT32 writing, `save`, and `del` | Done in V1.9.1 |
+| `tools/sdcard.py`, the files on the board's card over the link: `ls`, `get`, `put`, and `del`, which reset the core after a write | Done in V1.9.1 |
+| BASIC's `SAVE`, `LOAD`, and `DIR` | Not yet |

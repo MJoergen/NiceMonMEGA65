@@ -20,11 +20,10 @@ repository.
   stages 1 to 10 are written.
 - [SDCARD.md](SDCARD.md) is the design of the storage on the SD cards,
   from the registers to BASIC's `SAVE` and `LOAD`. The controller, the
-  slots, and the ROM's reading of FAT32 cards are written; writing and
-  BASIC are not yet.
+  slots, and the ROM's reading and writing of FAT32 cards are written;
+  BASIC is not yet.
 - [BASIC_SURVEY.md](BASIC_SURVEY.md) is the survey of the BASIC dialects
-  behind the interpreter planned for the ROM
-  ([#54](https://github.com/MJoergen/NiceMonMEGA65/issues/54)).
+  behind the interpreter planned for the ROM.
 - [CODING_STYLE.md](CODING_STYLE.md) is the style that the VHDL follows.
 - [RELEASE.md](RELEASE.md) describes how a release is made.
 - [RELEASE_NOTES.md](RELEASE_NOTES.md) lists the changes in each release,

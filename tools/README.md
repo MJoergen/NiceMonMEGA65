@@ -2,8 +2,8 @@
 
 The tools run on the host, and talk to the board over its Ethernet port
 or its debug UART, with the debug link of
-[DEBUG.md](../nice_cpu/doc/DEBUG.md). They use
-only the Python standard library, and run on Linux and macOS, but
+[DEBUG.md](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEBUG.md).
+They use only the Python standard library, and run on Linux and macOS, but
 `flash.py` needs Linux, and pyftdi for the MEGA65. Each one
 prints its options with `--help`, and its header says more.
 
@@ -328,7 +328,7 @@ README has [a worked example](../README.md#using-the-interactive-shell).
 
 It is nice_cpu's debugger, `nicedbg.py`, with the board's links and a
 check of the board's memory. nice_cpu's
-[debugger/README.md](../nice_cpu/debugger/README.md#the-commands)
+[debugger/README.md](https://github.com/MJoergen/nice_cpu/blob/main/debugger/README.md#the-commands)
 describes the commands, the notices, and the labels.
 
 ### Starting it
@@ -432,9 +432,8 @@ SLOT=N` the MEGA65's ([synth/README.md](../synth/README.md#building)).
 ## sdcard.py
 
 `sdcard.py` reads and writes the board's SD card over the link, so a
-file goes to the card and comes off it with no PC slot
-([#61](https://github.com/MJoergen/NiceMonMEGA65/issues/61)). It reads
-and writes the card's FAT32 itself, as the monitor does, and only the
+file goes to the card and comes off it with no PC slot. It reads and
+writes the card's FAT32 itself, as the monitor does, and only the
 monitor's folder `NICE` (see
 [SYSTEM.md](../doc/SYSTEM.md#the-sd-card-slots)):
 

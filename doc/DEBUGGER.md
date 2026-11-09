@@ -3,10 +3,7 @@
 A debugger in the FPGA, with the MEGA65's own keyboard and screen and no
 host: what `tools/mon.py` does over the debug link, in a strip of text
 under the program's screen, and a page over it. **Stages 1 to 10 are
-written, and the rest is planned**
-([#52](https://github.com/MJoergen/NiceMonMEGA65/issues/52),
-[#53](https://github.com/MJoergen/NiceMonMEGA65/issues/53), and
-[#75](https://github.com/MJoergen/NiceMonMEGA65/issues/75)): the toggle
+written, and the rest is planned**: the toggle
 key enters Focus, where the strip shows the core's state, its registers,
 live while it runs, and the word at the PC at a stop, and F1, F3, and
 F4 run the core; F12 keeps the strip up when Focus is left, and a stop in Strip
@@ -19,8 +16,7 @@ UART or over TCP, which keeps its line. The README's
 [On its own](../README.md#the-on-board-debugger) says how to use it,
 with a picture. This note
 records the design and the decisions, as
-[monitor/README.md](../monitor/README.md) does for the ROM of
-[#24](https://github.com/MJoergen/NiceMonMEGA65/issues/24), a hardware
+[monitor/README.md](../monitor/README.md) does for the ROM, a hardware
 abstraction layer for programs, which the debugger does not need and
 does not touch. It cannot load a program, so a host, the ROM, or a later
 SD card still does that.
@@ -29,8 +25,8 @@ The engine is the debug link of nice_cpu's
 [DEBUG.md](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEBUG.md),
 which has everything the debugger needs: pause, step, go on, hold, start,
 the four breakpoints, R0–R15 at a stop, and the memory while the core is
-stopped. Since link version 6 (nice_cpu V1.3,
-[#22](https://github.com/MJoergen/NiceMonMEGA65/issues/22)) the link
+stopped. Since link version 6 (nice_cpu V1.3)
+the link
 writes R1–R15 of a paused core too, which the debugger does not use yet.
 What the link cannot do, the debugger cannot either: load a program
 without a host, or know a label.
@@ -98,8 +94,7 @@ on dark blue, `0x004` and `0xFFF`:
 ```
 
 - Rows 25 and 26: R0–R15 in hex, as the link returns them (DEBUG.md
-  §6): live while the core runs, as `niceemu --link` returns them
-  ([nice_cpu#85](https://github.com/MJoergen/nice_cpu/issues/85)), and
+  §6): live while the core runs, as `niceemu --link` returns them, and
   the stop's values while it is paused or has halted. While it is held
   they are dimmed: the link keeps the values of the last stop then,
   which may be another program's.
@@ -155,8 +150,7 @@ dashes until the new words are read, and a read that a move overtook is
 dropped. A code page, the decode of a range of instructions, comes with the
 disassembler.
 
-The settings page (stage 10,
-[#75](https://github.com/MJoergen/NiceMonMEGA65/issues/75)) takes the
+The settings page (stage 10) takes the
 page's place in Focus, and F11 and F5 switch between the two. Row 0
 has its title; rows 2 to 5 the IP address, the MAC address, the TCP
 port, and the baud rate, from column 17, in their usual notation; rows
@@ -215,8 +209,7 @@ In Focus, the keyboard's bytes (`src/kbd_m65_ascii.vhd`: ASCII, and
 xterm's sequences for the cursor and function keys) go to the debugger
 instead of the console FIFO. One key is one action, and the letters are
 mon.py's. The keys used most need no SHIFT on the MEGA65, F1, F3, F5,
-and F11, and the restart and F12 are the shifted F4 and F12
-([#81](https://github.com/MJoergen/NiceMonMEGA65/issues/81)). On the
+and F11, and the restart and F12 are the shifted F4 and F12. On the
 Nexys4DDR's keyboard F4 is a key of its own, with no SHIFT before it.
 F7, F9, and F10 do nothing.
 
@@ -333,8 +326,7 @@ and outputs, and its room.
 
 The debugger is a client of the debug link inside the system (DEBUG.md
 §3), through the link's side port
-([nice_cpu#86](https://github.com/MJoergen/nice_cpu/issues/86),
-`debug_link.vhd`, contract g) into `p_acc`, the process that holds the
+(`debug_link.vhd`, contract g) into `p_acc`, the process that holds the
 debug registers and runs the Wishbone master: a word at a time, with
 valid held until done, an error for a word that is not a debug register
 while the core runs, and the word read. `src/nicemon.vhd` passes the
@@ -516,16 +508,14 @@ Each a commit that builds and passes the tests:
    words, and `BRK n`.
 7. **The Nexys4DDR's buttons and display** in Focus (done).
 8. **The decode** of row 27, `dbg_decode.vhd` (done).
-9. **nice_cpu V1.2**
-   ([#53](https://github.com/MJoergen/NiceMonMEGA65/issues/53), done,
-   and tested on the R6). The registers are live while the core runs (nice_cpu#85), and the
+9. **nice_cpu V1.2** (done, and tested on the R6). The registers are
+   live while the core runs, and the
    strip dims them only while the core is held; and the debugger moved
-   to the side port (nice_cpu#86): `dbg_host.vhd` is an adapter, the
+   to the side port: `dbg_host.vhd` is an adapter, the
    line is the UART's and TCP's again, and the catch watches the core's
    pause and halt. Tests: `tb_dbg`, `tb_dbg_host`, the formal check, and
    `tb_nicemon`.
-10. **The settings page**
-    ([#75](https://github.com/MJoergen/NiceMonMEGA65/issues/75), done):
+10. **The settings page** (done):
     the UART's baud rate as a register, `0xFFFFFF9F`, and F10 and `n`,
     with `dbg_set.vhd`. Tests: `tb_dbg`, `tb_nicemon`, the formal check
     of `board_io`, and `make hwtest`'s rates.
@@ -542,17 +532,16 @@ Made on 2026-10-30, with the reasons:
 - **A host in hardware first, the side port later** (done at stage 9).
   The link was unchanged and formally checked, the protocol is written
   down, and the debugger was tested against the real link; the side port
-  was a change in nice_cpu, nice_cpu#86, and came with V1.2, to get rid
+  was a change in nice_cpu, and came with V1.2, to get rid
   of the hex and of the cut-off host below.
 - **The host is cut off while the debugger is up.** Accepted until the
   side port, which ended it at stage 9. MEGA+HELP won over a connected
   TCP host: the person at the keyboard is at the board.
-- **The UART and Ethernet are not served at once**
-  ([#44](https://github.com/MJoergen/NiceMonMEGA65/issues/44), closed).
-  The side port frees the line from the debugger, and the merge of two
-  hosts' packets, the routing of the answers, and the UART's FIFO cost
-  more than the few setups with both cables would gain. The console
-  page shows a program's output on the board, whichever host drives it.
+- **The UART and Ethernet are not served at once.** The side port frees
+  the line from the debugger, and the merge of two hosts' packets, the
+  routing of the answers, and the UART's FIFO cost more than the few
+  setups with both cables would gain. The console page shows a program's
+  output on the board, whichever host drives it.
 - **Four rows, not seven.** Seven rows with the breakpoints, a console
   tail, and a status row were crowded. The breakpoints are on the page,
   the state is in row 27, and the console tail waits for a page of its
@@ -580,7 +569,7 @@ Made on 2026-10-30, with the reasons:
   port the link is no longer taken, but a catch from Off would still
   take the keyboard from the program and show the debugger unasked, so
   Off stays uncaught.
-- **Live registers through the link**, nice_cpu#85, not a tap on the
+- **Live registers through the link**, not a tap on the
   core's register file here (done at stage 9): the link is the one
   engine, and `niceemu --link` returns them live already, so the board
   comes to match the emulator.
@@ -624,8 +613,7 @@ Made on 2026-10-30, with the reasons:
   programs too: a key that gives nothing is a key wasted. On the MEGA65
   they are CLR/HOME and MEGA with the cursor keys.
 
-Made on 2026-11-05 for stage 10
-([#75](https://github.com/MJoergen/NiceMonMEGA65/issues/75)):
+Made on 2026-11-05 for stage 10:
 
 - **Seven baud rates, 115200 to 2000000**: 115200, 230400, 460800,
   921600, 1000000, 1500000, and 2000000. 3 Mbaud is left out. Every one
@@ -643,18 +631,17 @@ Made on 2026-11-05 for stage 10
   write came more than 1 ms after the answer before got its `k` at the
   new rate.
 - **Only a reset brings back the rate after reset**, 2000000 then and
-  230400 since `V1.9` (#88), not a start of the core: a host
+  230400 since `V1.9`, not a start of the core: a host
   that follows the rate with `--baud` then still loads and starts
   programs. The reset is the way back from a rate that cut a host off.
 - **A page of its own, on F5 and `n`**, beside the memory page, rather
   than in its header and field: the four settings, their notes, and a
   field of 17 characters fill it. It was F10, SHIFT+F9 on the MEGA65,
-  until [#81](https://github.com/MJoergen/NiceMonMEGA65/issues/81).
+  the keys moved.
 - **Shown live, written when the core is stopped**: the registers come
   out of `nicemon` anyway, for the Ethernet station, so the page reads
   them without the link; a write goes through the link, as every write
   of the debugger does, and needs the core paused, halted, or held.
 - **Row 28 has single spaces between the keys**, which made room for
-  `F10 link` in its 80 columns before
-  [#81](https://github.com/MJoergen/NiceMonMEGA65/issues/81) moved the
-  keys.
+  `F10 link` in its 80 columns before the
+  keys moved.

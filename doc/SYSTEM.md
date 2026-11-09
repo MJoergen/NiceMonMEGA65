@@ -106,8 +106,8 @@ state of an interrupt routine, and watchpoints, and its registers start
 at `0xFFFFFFD0`. Bits 6 to 10 of the control register read the wait, the
 hidden state, and the pending requests, and `0xFFFFFFD0` and `D1`
 `saved_pc` and `saved_sr` (see [The control register](#the-control-register)).
-The board has no watchpoints yet: their number at `0xFFFFFFD5` is 0
-(#99). A host of version 6 works unchanged.
+The board has no watchpoints yet: their number at `0xFFFFFFD5` is 0.
+A host of version 6 works unchanged.
 
 A terminal on the line, a plain TCP client such as `nc` on the Ethernet
 port or a terminal program on the UART, shows what the program prints,
@@ -170,7 +170,7 @@ effect and does not write (DEBUG.md §3).
 | `0xFFFFFFA0`–`0xFFFFFFAF` | The SD card controller of nice_cpu's SYSTEM.md §5, with 2 slots on the MEGA65 and 1 on the Nexys4DDR (see [The SD card slots](#the-sd-card-slots)). |
 | `0xFFFFFFB0`–`0xFFFFFFBF` | The network station of nice_cpu's SYSTEM.md §6, on every board: the Ethernet station's addresses, its counts of frames, and the state of the debug link over TCP (see [The Ethernet station](#the-ethernet-station)). |
 | `0xFFFFFFC0`–`0xFFFFFFCF` | The port for Ethernet frames of nice_cpu's SYSTEM.md §7, on every board: a queue of 4 frames received and a send buffer, through which a program sends and receives frames of its own (see [Ethernet frames](#ethernet-frames)). |
-| `0xFFFFFFD0`–`0xFFFFFFDF` | The debug registers of DEBUG.md §6, for the link only, here and below, of link version 7: `saved_pc` and `saved_sr` of the core at `0xFFFFFFD0` and `D1`, read only, which hold the PC and the SR saved at the entry of an interrupt routine and read as R0–R15 do, and the watchpoints at `0xFFFFFFD4`–`DB`, of which the board has none yet (#99). A data access of the core here goes to the memory. |
+| `0xFFFFFFD0`–`0xFFFFFFDF` | The debug registers of DEBUG.md §6, for the link only, here and below, of link version 7: `saved_pc` and `saved_sr` of the core at `0xFFFFFFD0` and `D1`, read only, which hold the PC and the SR saved at the entry of an interrupt routine and read as R0–R15 do, and the watchpoints at `0xFFFFFFD4`–`DB`, of which the board has none yet. A data access of the core here goes to the memory. |
 | `0xFFFFFFE0`–`0xFFFFFFEF` | The debug registers of DEBUG.md §6, for the link only: R0–R15 of the core. R1–R15 take a write while the core is paused, as a register-direct write of an instruction does (ISA.md §4.3); R0 takes none. While the core runs they read its registers live, as `niceemu --link` returns them, each word from the cycle of its own read; the multi-cycle core adds 1 to R15 for each word it fetches, so its live R15 may be the address of a constant word, or of the word after the instruction it carries out, where the pipelined core's is an instruction's. After a halt they hold what the emulator prints. While the core is paused they hold its registers, with R15 the address of the next instruction, and a hold of the paused core keeps them. A hold of a running core leaves them undefined. |
 | `0xFFFFFFF0` | Control: hold, clear, hide, pause, and step (see [The control register](#the-control-register)). |
 | `0xFFFFFFF1` | Read only: why the core halted. 0 while it has not, and after a clear, 1 for `HALT`, 2 for a reserved control word, 3 for `INT` inside an interrupt routine, and 4 for `RTI` outside one. Reason 5, the step limit of `niceemu --link`, is the emulator's only. |
@@ -452,18 +452,17 @@ has the focus ([DEBUGGER.md](DEBUGGER.md#the-nexys4ddr)), the buttons
 are its keys and read 0 here, and the display shows its segments; the
 registers keep their values and show again when the focus is left. The CPU RESET button is not a
 register: it resets the system. The words `0xFFFFFF97` to `9D`
-read 0 and take no write; the keyboard's LEDs may come to `0xFFFFFF97`
-(see [#25](https://github.com/MJoergen/NiceMonMEGA65/issues/25)).
+read 0 and take no write; the keyboard's LEDs may come to
+`0xFFFFFF97`.
 
 ## The Ethernet station
 
 `0xFFFFFFB0`–`BF` are on every board, the MEGA65 too. They are the
 network station of nice_cpu's SYSTEM.md §6, here the Ethernet station,
-which carries the debug link over TCP
-([#30](https://github.com/MJoergen/NiceMonMEGA65/issues/30)). It
-answers ARP requests for its IP address and pings to it, and serves the
-link on TCP port 4510. Until V1.7 it was at `0xFFFFFF98`–`9D`, in
-another order and without `NET_STATUS`.
+which carries the debug link over TCP. It answers ARP requests for its
+IP address and pings to it, and serves the link on TCP port 4510. Until
+V1.7 it was at `0xFFFFFF98`–`9D`, in another order and without
+`NET_STATUS`.
 
 | Address | Name | Access | What it is |
 |---|---|---|---|
@@ -518,12 +517,11 @@ and sets the addresses from the keyboard
 ### Ethernet frames
 
 `0xFFFFFFC0`–`CF` are the port for Ethernet frames of nice_cpu's
-SYSTEM.md §7, on every board
-([#82](https://github.com/MJoergen/NiceMonMEGA65/issues/82)). A
-program sends and receives frames of its own through it, for DHCP, DNS,
-or TFTP, and builds and parses them itself. §7 has the registers, the
-queue of 4 frames received, the send buffer, and the window of
-`ETH_BUF0`–`7` on them. Before V1.7.2 these words were memory.
+SYSTEM.md §7, on every board. A program sends and receives frames of its
+own through it, for DHCP, DNS, or TFTP, and builds and parses them
+itself. §7 has the registers, the queue of 4 frames received, the send
+buffer, and the window of `ETH_BUF0`–`7` on them. Before V1.7.2 these
+words were memory.
 
 The station keeps the frames it serves, as niceemu's does: an ARP
 request for its IP address, an ICMP echo request to it, and TCP to port
@@ -554,10 +552,8 @@ of the system. The link reads and writes the port as the core does,
 while the core is paused, held, or halted.
 
 The monitor in the ROM uses the port in its `i dhcp`, which gets the
-station's IP address from a DHCP server
-([#83](https://github.com/MJoergen/NiceMonMEGA65/issues/83)), in its
-`tftp`, which loads a file from a TFTP server, and in its UDP entries
-for programs ([#84](https://github.com/MJoergen/NiceMonMEGA65/issues/84)).
+station's IP address from a DHCP server, in its `tftp`, which loads a
+file from a TFTP server, and in its UDP entries for programs.
 It disables the port at its start, at the end of `i dhcp` and `tftp`,
 and when a program returns, so a program that does not enable it sees
 no frame. Its frame routines and ARP cache are its own, with no entries
@@ -623,10 +619,7 @@ trust.
 ## The SD card slots
 
 The SD card controller of nice_cpu's SYSTEM.md §5 is at
-`0xFFFFFFA0`–`AF`
-([#55](https://github.com/MJoergen/NiceMonMEGA65/issues/55)), with the
-boards' slots
-([#56](https://github.com/MJoergen/NiceMonMEGA65/issues/56)).
+`0xFFFFFFA0`–`AF`, with the boards' slots.
 `SD_SLOTS` is 2 on the MEGA65 and 1 on the Nexys4DDR.
 
 | Board | Slot 0, the default | Slot 1 |

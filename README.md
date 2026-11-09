@@ -17,8 +17,7 @@ system shows a screen of 80×25 characters on HDMI and VGA, and reads the
 keyboard. A program written in NICE assembly
 ([ISA.md](https://github.com/MJoergen/nice_cpu/blob/main/doc/ISA.md))
 runs on the board as it runs in `niceemu`. The system also builds for
-the Digilent Nexys4DDR (see [synth/](synth/README.md#the-nexys4ddr) and
-[SYSTEM.md](doc/SYSTEM.md#the-nexys4ddrs-devices)).
+the Digilent Nexys4DDR (see [synth/](synth/README.md#the-nexys4ddr)).
 
 The Ethernet port, or the debug UART, carries the program's console and
 the debug link, which a PC may use to load, run, pause, step, and

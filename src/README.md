@@ -41,10 +41,11 @@ header of `nicemon.vhd` is the address map, and
   that wait for the core: those from the host, which come through the
   link, and those from the keyboard.
 - **DEBUG LINK** is nice_cpu's `debug_link`
-  ([DEBUG.md](../nice_cpu/doc/DEBUG.md)). A host on the other end reads
-  and writes the memory and the registers, loads and starts a program,
-  and pauses and steps the core, which also stops at breakpoints. The
-  link also carries the console in both directions.
+  ([DEBUG.md](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEBUG.md)).
+  A host on the other end reads and writes the memory and the
+  registers, loads and starts a program, and pauses and steps the core,
+  which also stops at breakpoints. The link also carries the console in
+  both directions.
 - **UART** ([uart_serdes.vhd](uart_serdes.vhd)) is the link's serial
   line.
 - **ETHERNET STATION** ([eth/](eth/README.md)) answers ARP and pings,

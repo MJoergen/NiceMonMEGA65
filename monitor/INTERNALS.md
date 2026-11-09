@@ -72,8 +72,7 @@ of SYSTEM.md §7.
 ## C in the ROM
 
 Part of the ROM is C, through nice_cpu's wasm translator: the FAT32
-code of [#58](https://github.com/MJoergen/NiceMonMEGA65/issues/58) and
-[#59](https://github.com/MJoergen/NiceMonMEGA65/issues/59). The files
+code. The files
 of the Makefile's `ROM_C`, `fat32.c` for now, are compiled to one wasm
 module, which `nicewasm --ram` translates for code
 that runs from a ROM (nice_cpu's translator README, "Code in a ROM"),

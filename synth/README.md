@@ -209,7 +209,7 @@ MIT; and `src/video/font_pkg.vhd`, the
 ## Build times and size
 
 These are the builds of 2026-11-09, at nice_cpu V2.0 with the wait and
-the hidden state on the debug link (#93, #98), each with the ROM of the
+the hidden state on the debug link, each with the ROM of the
 monitor and the demo, as `make release` builds them. The history of
 these numbers, and what the builds before taught, is in
 [HISTORY.md](HISTORY.md).
@@ -344,5 +344,5 @@ On the Nexys4DDR, Vivado puts the memories marked "on the MEGA65 only"
 into distributed RAM, about 2500 LUTs of it, though 8 block RAMs are
 free: the port's queue of frames alone takes 352 RAM64M. Without their
 `ram_style` or `rom_style` attributes, Vivado did the same with the
-screen of `mem.vhd`, its font, and the UART's FIFO (#70); the
+screen of `mem.vhd`, its font, and the UART's FIFO; the
 attributes keep those in block RAM, as on the MEGA65.

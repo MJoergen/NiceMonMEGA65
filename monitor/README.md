@@ -39,24 +39,17 @@ monitor's commands use too; `mon.nasm` has the stubs through which a
 program calls the entries, and `mon.h` their declarations for C.
 `make -C monitor` builds `build/monitor.bin`, and `make -C monitor test`
 runs it in `niceemu` ([INTERNALS.md](INTERNALS.md#building-and-testing)).
-It was written for
-[#24](https://github.com/MJoergen/NiceMonMEGA65/issues/24), and what is
-finished in
-[#64](https://github.com/MJoergen/NiceMonMEGA65/issues/64). Loading
-from storage is the SD card's,
-[#62](https://github.com/MJoergen/NiceMonMEGA65/issues/62). The QNICE
-monitor (QMON) of [QNICE-FPGA](https://github.com/sy2002/QNICE-FPGA) is
-the inspiration, not the model: the decisions below were made for a port
-of it, and #24 revisited them. Debugging is the on-board debugger's
-([#52](https://github.com/MJoergen/NiceMonMEGA65/issues/52),
-[doc/DEBUGGER.md](../doc/DEBUGGER.md)), which needs no ROM.
+The QNICE monitor (QMON) of
+[QNICE-FPGA](https://github.com/sy2002/QNICE-FPGA) is the inspiration,
+not the model. Debugging is the on-board debugger's
+([doc/DEBUGGER.md](../doc/DEBUGGER.md)), which needs no ROM.
 
 ## Where it lives
 
-- The monitor is in the ROM at `0x0000`–`0x7FFF`, as QMON is, and the core
-  boots from it at reset. The RAM is above it, from `0x8000`, and the
-  monitor's variables are at `0xFFFFF000` and up, below the I/O page, as
-  QMON's are below `0xFF00`. The stack grows down from `0xFFFFF000`.
+- The monitor is in the ROM at `0x0000`–`0x7FFF`, and the core boots
+  from it at reset. The RAM is above it, from `0x8000`, and the
+  monitor's variables are at `0xFFFFF000` and up, below the I/O page.
+  The stack grows down from `0xFFFFF000`.
   The words that the ROM's C code writes are at `0xFFFFF400`–`0xFFFFFEFF`
   with them ([INTERNALS.md](INTERNALS.md#c-in-the-rom)). The demo follows the monitor in the
   ROM, from `0x6000` (The demo below).
@@ -121,27 +114,16 @@ the MEGA65 and 77 on the Nexys4DDR (Input and output below).
 Anything else prints `Unknown command; ? lists them`. The debugger has
 pause, step, and inspect, so the monitor adds only `l`, which loads a
 program with no host's tools and no storage, `u`, which reads code
-with no host
-([#72](https://github.com/MJoergen/NiceMonMEGA65/issues/72)), and `sd`,
-which reads a card with no file system, for the bring-up of the SD card's
-storage
-([#57](https://github.com/MJoergen/NiceMonMEGA65/issues/57)). `dir`
-and `load` read programs from a card's FAT32 file system
-([#58](https://github.com/MJoergen/NiceMonMEGA65/issues/58)), and
-`save` and `del` write it
-([#59](https://github.com/MJoergen/NiceMonMEGA65/issues/59)).
-`i dhcp`
-gives a board on a network an address with no host
-([#83](https://github.com/MJoergen/NiceMonMEGA65/issues/83)), and `tftp`
-loads a program from a server on it
-([#84](https://github.com/MJoergen/NiceMonMEGA65/issues/84)).
+with no host, and `sd`, which reads a card with no file system, for the
+bring-up of the SD card's storage. `dir` and `load` read programs from
+a card's FAT32 file system, and `save` and `del` write it. `i dhcp`
+gives a board on a network an address with no host, and `tftp` loads a
+program from a server on it.
 
 ## Files
 
 The ROM reads and writes FAT32
-([#58](https://github.com/MJoergen/NiceMonMEGA65/issues/58),
-[#59](https://github.com/MJoergen/NiceMonMEGA65/issues/59),
-[doc/SDCARD.md](../doc/SDCARD.md), "The file system") with `fat32.c`,
+([doc/SDCARD.md](../doc/SDCARD.md), "The file system") with `fat32.c`,
 the ROM's C code ([INTERNALS.md](INTERNALS.md#c-in-the-rom)).
 
 To load a program from a card, make the folder `NICE` in its root on a
@@ -166,7 +148,7 @@ folder itself, so a card is written only where its user made room.
   mounted one, as after `sd` on the other slot, or the card there is not
   ready or has changed. A mount of a slot that the system does not have
   changes nothing.
-- **The folder `NICE`** of the root directory only (#91), with 8.3
+- **The folder `NICE`** of the root directory only, with 8.3
   names, matched in either case. A card may be shared by several cores
   on the MEGA65, each with a folder of its own in the root, so NiceMon
   keeps to its own. A mount fails with error -29 when the root has no
@@ -249,11 +231,11 @@ the UDP entries use, have no entries in the dispatch table
 - `i dhcp` keeps the mask and the gateway of the ACK, which UDP uses
   below; `i A.B.C.D` and the cold start set both to none.
 
-The UDP endpoint is the entries 16 to 19 of the dispatch table (below)
-([#84](https://github.com/MJoergen/NiceMonMEGA65/issues/84)), so that a
-program, such as a game of two boards, or the BASIC of #54, needs no
-network stack of its own. They are in the C ABI, and the data of a
-datagram is one byte per word, bits 7..0, as the file entries have it:
+The UDP endpoint is the entries 16 to 19 of the dispatch table (below),
+so that a program, such as a game of two boards, or a BASIC interpreter,
+needs no network stack of its own. They are in the C ABI, and the data
+of a datagram is one byte per word, bits 7..0, as the file entries have
+it:
 
 - **One endpoint**, one local port, which `udp_open` opens and enables
   the port for Ethernet frames, with its queue emptied, and `udp_close`
@@ -297,9 +279,7 @@ A `NAME` with `*` or `?` is a pattern, and no `NAME` is `*`: the lines
 received are shown instead of loaded. The repository's own server,
 `tools/tftpd.py`, answers a pattern with a listing of the files of its
 folder that match it, a line each with the name and the size in bytes,
-which no other server does
-([#95](https://github.com/MJoergen/NiceMonMEGA65/issues/95)). To serve
-the examples from a PC:
+which no other server does. To serve the examples from a PC:
 
     make tftpd
 
@@ -343,10 +323,8 @@ pseudo-instructions below, which only `u` shows:
   modifier, an `n` that is not the length of the `MOVE`, or a `MOVE`
   with a modifier, is two rows.
 - The other pseudo-instructions of §10.1 are one instruction each, and
-  are shown in its place
-  ([#73](https://github.com/MJoergen/NiceMonMEGA65/issues/73)). Some
-  words match two of them, and the first that matches, in this order, is
-  shown:
+  are shown in its place. Some words match two of them, and the first
+  that matches, in this order, is shown:
 
   | Words | Shown as |
   |---|---|
@@ -373,15 +351,14 @@ pseudo-instructions below, which only `u` shows:
 
 ## Programs
 
-- Programs for the monitor are assembled at `0x8000`, as QNICE programs
-  are, with nice_cpu's `start_mon.nasm`, `start_wasm_mon.nasm`, or
-  `start_wasm_trap_mon.nasm` in place of its start-up files at 0
-  (`nice_cpu/runtime/ABI.md`, "Programs under a monitor"), and
-  `nicebuild.py --monitor` builds a C, Zig, or Rust program so. They
-  return to the monitor instead of halting: when `main` returns, through
-  `exit`, or with `RET` on the SP of the entry. `test/hello.nasm` and
-  `test/hello.c` are two such programs, and the Makefile shows how they
-  are built.
+- Programs for the monitor are assembled at `0x8000`, with nice_cpu's
+  `start_mon.nasm`, `start_wasm_mon.nasm`, or `start_wasm_trap_mon.nasm`
+  in place of its start-up files at 0 (`nice_cpu/runtime/ABI.md`,
+  "Programs under a monitor"), and `nicebuild.py --monitor` builds a C,
+  Zig, or Rust program so. They return to the monitor instead of
+  halting: when `main` returns, through `exit`, or with `RET` on the SP
+  of the entry. `test/hello.nasm` and `test/hello.c` are two such
+  programs, and the Makefile shows how they are built.
 - The monitor runs a program as a subroutine on its own stack: it pushes
   a return address and jumps to `0x8000` with E = 0, R1 = the address of
   `mon_putc`'s entry, and R2 = 0 and R3 = 0, `argc` and `argv` for a
@@ -414,7 +391,7 @@ pseudo-instructions below, which only `u` shows:
   debugger then has the state, and the reset button boots the monitor
   again.
 - The monitor's routines are called through a dispatch table at the start
-  of the ROM, as QMON's `getc!` and `putc!` are, so that programs need
+  of the ROM, so that programs need
   not be reassembled when the monitor changes. The table is below.
 - In `niceemu`, which has no ROM, the monitor is a program at 0 like any
   other, and `cat monitor.bin prog.bin` runs it with a program at
@@ -436,29 +413,26 @@ one.
 An entry is added only when a program cannot do without it: it reaches
 hardware that the monitor owns or that differs between boards, or state
 that the monitor keeps, such as the cursor and the outputs. The file API
-of the SD card is such entries
-([#58](https://github.com/MJoergen/NiceMonMEGA65/issues/58)): with FAT32
-in the ROM, the mounted card and the caches are state that the monitor
-keeps. Its sector routines are not: a program loads and saves
-files, not sectors, and one that wants sectors drives the registers,
-which are the same everywhere. Strings, memory, number
-formatting, line editing, and random numbers are not the HAL's: assembly
-programs join `monlib.nasm` (The shared routines below), which the
-monitor's own commands use too, and C programs have nice_cpu's `libc`.
-The ROM's routines could not serve C anyway, for a C string is bytes
-packed four to a word in wasm's linear memory
+of the SD card is such entries: with FAT32 in the ROM, the mounted card
+and the caches are state that the monitor keeps. Its sector routines are
+not: a program loads and saves files, not sectors, and one that wants
+sectors drives the registers, which are the same everywhere. Strings,
+memory, number formatting, line editing, and random numbers are not the
+HAL's: assembly programs join `monlib.nasm` (The shared routines below),
+which the monitor's own commands use too, and C programs have nice_cpu's
+`libc`. The ROM's routines could not serve C anyway, for a C string is
+bytes packed four to a word in wasm's linear memory
 (`nice_cpu/translator/WASM.md`), and libc must run in `niceemu`, which
 has no ROM.
 
-The routines follow the C ABI of `nice_cpu/runtime/ABI.md`, not QMON's
-registers from R8 up: arguments in R1–R4, the result in R1, R1–R6
-changed, and R7–R13 kept. A C program for the monitor declares them with
-`mon.h`, and is joined with the stubs of `mon.nasm`
-(`nicebuild.py --monitor --asm mon.nasm`), as the translator makes a call
-to the `env` import `mon_putc` a call to `_mon_putc`. For C, `mon.nasm`
-also has `_scr_getx` and `_scr_gety`, as `scr_getxy` returns two values.
-Such a program runs only with the ROM visible, as every program built at
-`0x8000` for the monitor does.
+The routines follow the C ABI of `nice_cpu/runtime/ABI.md`: arguments in
+R1–R4, the result in R1, R1–R6 changed, and R7–R13 kept. A C program for
+the monitor declares them with `mon.h`, and is joined with the stubs of
+`mon.nasm` (`nicebuild.py --monitor --asm mon.nasm`), as the translator
+makes a call to the `env` import `mon_putc` a call to `_mon_putc`. For
+C, `mon.nasm` also has `_scr_getx` and `_scr_gety`, as `scr_getxy`
+returns two values. Such a program runs only with the ROM visible, as
+every program built at `0x8000` for the monitor does.
 
 VBASE is 0 at reset and stays 0. The monitor has no interrupts of its
 own, as the debugger is hardware and the board has no NMI source, and it
@@ -470,73 +444,38 @@ that the screen shows Spleen, and leaves the font RAM as the program left
 it. It also shows the cursor again, blinking, and turns the display
 offset off, as a program may have hidden the one or used the other.
 
-| # | Addr | Name | Arguments → result | QMON |
-|---|---|---|---|---|
-| 0 | `00` | `mon_reset` | Cold start: E, the timer, VBASE, and the font base cleared, the stack, the variables, the screen, the banner, the main loop. The RAM from `0x8000` is left alone. | `reset!` |
-| 1 | `02` | `mon_exit` | R1 a status. Back to the main loop with a fresh stack, with E, the timer, VBASE, and the font base cleared, the cursor shown and blinking, the display offset off, and the status printed; for a program that has not kept the SP of its entry. A program with the runtime's start-up code returns or calls `exit` instead, which lands here too. | `exit!` |
-| 2 | `04` | `mon_version` | → R1 the version of the table, major in bits 31..16, minor in 15..0: `0x00010003`, 1.3. | — |
-| 3 | `06` | `mon_putc` | R1 a character, to the outputs `mon_out` selects. On the screen it goes at the cursor, which moves on, to the next row after the last column; CR moves the cursor to column 0, LF to column 0 of the next row, BS one back, and TAB to the next multiple of 8; the other control codes and `0x7F` do nothing, and `0x80` to `0x9F` go on the screen as any character, blank in Spleen and drawn from the font RAM when a program selected it; past the last row the rows move up by one. On the line every byte goes as it is. | `putc!` |
-| 4 | `08` | `mon_out` | R1 the outputs: bit 0 the line, bit 1 the screen; both at reset. → R1 the old ones. | — |
-| 5 | `0A` | `scr_cls` | Clears the screen in the current color, cursor home, shown and blinking, display offset 0. | `vga_cls!` |
-| 6 | `0C` | `scr_moveto` | R1 the column, R2 the row; a column past 79 is 79, and a row past 24 is 24. | `vga_moveto!` |
-| 7 | `0E` | `scr_getxy` | → R1 the column, R2 the row. | `vga_getxy!` |
-| 8 | `10` | `scr_color` | R1 the color for later characters, bits 31..8 of a screen word. → R1 the old one. | — |
-| 9 | `12` | `fs_mount` | R1 a slot. Mounts its card, and closes the files that were open (Files above). → R1 0, or an error. Table 1.1. | — |
-| 10 | `14` | `fs_open` | R1 a name, R2 a mode: 0 to read a file of the folder `NICE`, 1 to write one, which is made or truncated (table 1.2), 2 for the folder itself, whose name is empty or `/`. Mounts a card when none is. → R1 a handle, 0 or 1, or an error. Table 1.1. | — |
-| 11 | `16` | `fs_read` | R1 a handle of a file, R2 a buffer, R3 a number of bytes. Reads up to that many, one byte per word. → R1 the number read, 0 at the end, or an error. Table 1.1. | — |
-| 12 | `18` | `fs_readdir` | R1 a handle of a directory, R2 a buffer of 4 words. The next entry: in words 0 to 2 the 11 bytes of its 8.3 name, padded with blanks, and its attributes, as FAT has them, 4 bytes to a word from bits 7..0, and in word 3 its size. → R1 1, 0 at the end, or an error. Table 1.1. | — |
-| 13 | `1A` | `fs_close` | R1 a handle. Finishes a file opened to write: its last sector, and its size in its directory entry. The handle is closed also after an error. → R1 0, or an error. Table 1.1. | — |
-| 14 | `1C` | `fs_write` | R1 a handle of a file opened to write, R2 a buffer, R3 a number of bytes, one per word, bits 7..0. → R1 the number written, fewer when the card is full, or an error. Table 1.2. | — |
-| 15 | `1E` | `fs_delete` | R1 a name. Deletes the file of the folder `NICE`, with its long name. → R1 0, or an error. Table 1.2. | — |
-| 16 | `20` | `udp_open` | R1 a local port, or 0 for one of 49152 to 65535. Opens the UDP endpoint, and enables the port for Ethernet frames (The network above). → R1 the port, or an error. Table 1.3. | — |
-| 17 | `22` | `udp_send` | R1 an IP address, R2 a port, R3 a buffer, R4 a number of bytes, one per word, up to 1472. Sends them as a datagram. → R1 0, or an error. Table 1.3. | — |
-| 18 | `24` | `udp_recv` | R1 a buffer, R2 a number of bytes, R3 the address of 2 words, or 0. Does not wait. Copies up to that many bytes of the next datagram, one per word, and its source's IP address and port to the 2 words; with R2 0 copies nothing, and leaves the datagram waiting. → R1 the bytes copied, 0 when none waits, or an error. Table 1.3. | — |
-| 19 | `26` | `udp_close` | Closes the endpoint, and disables the port for Ethernet frames. → R1 0. Table 1.3. | — |
+| # | Addr | Name | Arguments → result |
+|---|---|---|---|
+| 0 | `00` | `mon_reset` | Cold start: E, the timer, VBASE, and the font base cleared, the stack, the variables, the screen, the banner, the main loop. The RAM from `0x8000` is left alone. |
+| 1 | `02` | `mon_exit` | R1 a status. Back to the main loop with a fresh stack, with E, the timer, VBASE, and the font base cleared, the cursor shown and blinking, the display offset off, and the status printed; for a program that has not kept the SP of its entry. A program with the runtime's start-up code returns or calls `exit` instead, which lands here too. |
+| 2 | `04` | `mon_version` | → R1 the version of the table, major in bits 31..16, minor in 15..0: `0x00010003`, 1.3. |
+| 3 | `06` | `mon_putc` | R1 a character, to the outputs `mon_out` selects. On the screen it goes at the cursor, which moves on, to the next row after the last column; CR moves the cursor to column 0, LF to column 0 of the next row, BS one back, and TAB to the next multiple of 8; the other control codes and `0x7F` do nothing, and `0x80` to `0x9F` go on the screen as any character, blank in Spleen and drawn from the font RAM when a program selected it; past the last row the rows move up by one. On the line every byte goes as it is. |
+| 4 | `08` | `mon_out` | R1 the outputs: bit 0 the line, bit 1 the screen; both at reset. → R1 the old ones. |
+| 5 | `0A` | `scr_cls` | Clears the screen in the current color, cursor home, shown and blinking, display offset 0. |
+| 6 | `0C` | `scr_moveto` | R1 the column, R2 the row; a column past 79 is 79, and a row past 24 is 24. |
+| 7 | `0E` | `scr_getxy` | → R1 the column, R2 the row. |
+| 8 | `10` | `scr_color` | R1 the color for later characters, bits 31..8 of a screen word. → R1 the old one. |
+| 9 | `12` | `fs_mount` | R1 a slot. Mounts its card, and closes the files that were open (Files above). → R1 0, or an error. Table 1.1. |
+| 10 | `14` | `fs_open` | R1 a name, R2 a mode: 0 to read a file of the folder `NICE`, 1 to write one, which is made or truncated (table 1.2), 2 for the folder itself, whose name is empty or `/`. Mounts a card when none is. → R1 a handle, 0 or 1, or an error. Table 1.1. |
+| 11 | `16` | `fs_read` | R1 a handle of a file, R2 a buffer, R3 a number of bytes. Reads up to that many, one byte per word. → R1 the number read, 0 at the end, or an error. Table 1.1. |
+| 12 | `18` | `fs_readdir` | R1 a handle of a directory, R2 a buffer of 4 words. The next entry: in words 0 to 2 the 11 bytes of its 8.3 name, padded with blanks, and its attributes, as FAT has them, 4 bytes to a word from bits 7..0, and in word 3 its size. → R1 1, 0 at the end, or an error. Table 1.1. |
+| 13 | `1A` | `fs_close` | R1 a handle. Finishes a file opened to write: its last sector, and its size in its directory entry. The handle is closed also after an error. → R1 0, or an error. Table 1.1. |
+| 14 | `1C` | `fs_write` | R1 a handle of a file opened to write, R2 a buffer, R3 a number of bytes, one per word, bits 7..0. → R1 the number written, fewer when the card is full, or an error. Table 1.2. |
+| 15 | `1E` | `fs_delete` | R1 a name. Deletes the file of the folder `NICE`, with its long name. → R1 0, or an error. Table 1.2. |
+| 16 | `20` | `udp_open` | R1 a local port, or 0 for one of 49152 to 65535. Opens the UDP endpoint, and enables the port for Ethernet frames (The network above). → R1 the port, or an error. Table 1.3. |
+| 17 | `22` | `udp_send` | R1 an IP address, R2 a port, R3 a buffer, R4 a number of bytes, one per word, up to 1472. Sends them as a datagram. → R1 0, or an error. Table 1.3. |
+| 18 | `24` | `udp_recv` | R1 a buffer, R2 a number of bytes, R3 the address of 2 words, or 0. Does not wait. Copies up to that many bytes of the next datagram, one per word, and its source's IP address and port to the 2 words; with R2 0 copies nothing, and leaves the datagram waiting. → R1 the bytes copied, 0 when none waits, or an error. Table 1.3. |
+| 19 | `26` | `udp_close` | Closes the endpoint, and disables the port for Ethernet frames. → R1 0. Table 1.3. |
 
-Three entries of the first draft went on 2026-10-30, by the table's own
-rule ([#24](https://github.com/MJoergen/NiceMonMEGA65/issues/24), the
-comments of that day): `mon_getc` and `mon_getc_nb`, as the console at
-`0xFFFFFF00` is the same on every board and in the emulator, with the
-line and the keyboard merged by the hardware, and nice_cpu's `nice_getc`
-and `nice_pollc` read it; and `mon_setvec`, as the monitor keeps no
-vector table. `mon_out` stayed, one routine and one piece of state in
-place of a `scr_putc` and a `ser_putc`: the line is the console, which
-any program can write, and the screen's memory is the same everywhere,
-so what the HAL adds is the terminal, the cursor, the scrolling, and the
-copy to the line.
-
-What QMON's table has that this one leaves out:
-
-- `getc!`: see above.
-- `puts!`, `crlf!`, `gets!`, `gets_s!`, `gets_slf!`, `puthex!`,
-  `gethex!`, and `h2dstr!`: they are built on `getc!` and `putc!`, and
-  are in `monlib.nasm`.
-- `memset!`, `memcpy!`, `strlen!`, `strcmp!`, `strcpy!`, `strchr!`,
-  `strstr!`, `chr2upper!`, `chr2lower!`, `str2upper!`, `chomp!`, and
-  `split!`: they go in `monlib.nasm` when a program needs them.
-- `wait!`, `srand!`, and `rand!`: a program reads the microsecond
-  counter at `0xFFFFFF44` itself, the same on every board and in the
-  emulator, and libc has `clock`, `rand`, and `srand`.
-- `muls!`, `mulu!`, `divu!`, `divs!`, `mulu32!`, `divu32!`,
-  `in_range_u!`, and `in_range_s!`: the math unit at `0xFFFFFF20` does
-  them, and a word has 32 bits.
-- `shl32!` and `shr32!`: a word has 32 bits.
-- `til!`: there are LEDs and a seven-segment display only on the
-  Nexys4DDR, as registers.
-- `enter!` and `leave!`: NICE has no register banks.
-- `vga_init!`, `vga_copyfont!`, and `vga_copypal!`: a program copies the
-  character ROM into the font RAM itself, a loop of 8192 words
-  ([SYSTEM.md](../doc/SYSTEM.md#the-font)), and the colors are in each
-  screen word. The monitor writes 0 to the font base at its start and at
-  a program's return, so that its text is in Spleen.
-- The `sd_*!` entries: the sector routines stay inside the ROM (#57).
-  A program that drives the SD registers itself mounts the card again
-  afterwards. The frame routines and the ARP cache stay inside it too
-  (#83): a program gets datagrams through the UDP entries of #84, or
-  drives the port for Ethernet frames itself.
-- The `f32_*!` entries: the file API, `fs_mount` to `fs_delete`, is the
-  entries 9 to 15, from #58 and #59, as
-  [doc/SDCARD.md](../doc/SDCARD.md) says.
+By the table's own rule, it has no `mon_getc` or `mon_getc_nb`, as the
+console at `0xFFFFFF00` is the same on every board and in the emulator,
+with the line and the keyboard merged by the hardware, and nice_cpu's
+`nice_getc` and `nice_pollc` read it; and no `mon_setvec`, as the
+monitor keeps no vector table. `mon_out` is one routine and one piece of
+state in place of a `scr_putc` and a `ser_putc`: the line is the
+console, which any program can write, and the screen's memory is the
+same everywhere, so what the HAL adds is the terminal, the cursor, the
+scrolling, and the copy to the line.
 
 ## The shared routines
 
@@ -575,18 +514,16 @@ in nice_cpu's runtime or C library:
   come. So the monitor reads on, and a program that reads until `0x200`
   ends with the host's input. A new connection over Ethernet starts the
   line anew, as one to `niceemu --link` does (nice_cpu's DEBUG.md §7,
-  through its link's `rx_resume_i` of MJoergen/nice_cpu#90), so the
+  through its link's `rx_resume_i`), so the
   next host can type to a monitor that one host has left.
 - The screen is memory at `0xFFFF0000`, one word per character with its
-  color, so `mon_putc` writes the words directly where QMON writes a
-  register. The hardware has a cursor, in registers numbered as
-  QNICE-FPGA's VGA registers (`0xFFFFFF80` for `0xFF30`, and so on; see
-  [SYSTEM.md](../doc/SYSTEM.md#the-screen)), which `mon_putc` keeps at
-  the next character, and a display offset. Past the last row
-  `mon_putc` moves the rows up by one, by copying, so the rows shown are
-  always the 2000 words at `0xFFFF0000`, as in `niceemu`, and a program
-  can write them directly. The screen is cleared by a loop over its
-  words.
+  color, so `mon_putc` writes the words directly. The hardware has a
+  cursor, in registers ([SYSTEM.md](../doc/SYSTEM.md#the-screen)), which
+  `mon_putc` keeps at the next character, and a display offset. Past the
+  last row `mon_putc` moves the rows up by one, by copying, so the rows
+  shown are always the 2000 words at `0xFFFF0000`, as in `niceemu`, and
+  a program can write them directly. The screen is cleared by a loop
+  over its words.
 - The scrollback uses the rest of the screen's memory, past the 2000
   words: before the rows move up, row 0 is copied into a ring of rows,
   the history, which runs down from the top of the memory. The cold
@@ -684,35 +621,17 @@ above) is faster, as it writes the words into the memory.
 
 ## The demo
 
-The demo is nice_cpu's
-([nice_cpu#91](https://github.com/MJoergen/nice_cpu/issues/91)), and the
-BASIC interpreter of
-[#54](https://github.com/MJoergen/NiceMonMEGA65/issues/54) takes its place
-in the ROM. Until then
-([#65](https://github.com/MJoergen/NiceMonMEGA65/issues/65)), the ROM of
-the boards and of the release has the demo behind the monitor, and `x`
-runs it. The demo is a program assembled at `0x8000`
-([demo/](../demo/README.md)), and `demo/join.py` puts it in the ROM at
-`DEMO`, `0x6000`: the number of its words first, then the words. `x`
-copies them to `0x8000` and runs them as `r` runs a program, and the
-demo's F12 returns. The demo clears the screen before it returns, and
-leaves the cursor at the top left, but the monitor keeps a cursor of its
-own, so `x` calls `scr_cls` after the return, and then goes on as at
-`mon_exit`. A number of 0, as in the ROM of the monitor alone
-and in `niceemu` without the demo, is no demo, and so is one that would
-not fit below `0x8000`. Neither the copy nor the demo has an entry in
-the dispatch table, and both go when the demo goes; `release.py` and
+The demo is nice_cpu's, and a BASIC interpreter will take its place in
+the ROM. Until then, the ROM of the boards and of the release has the
+demo behind the monitor, and `x` runs it. The demo is a program
+assembled at `0x8000` ([demo/](../demo/README.md)), and `demo/join.py`
+puts it in the ROM at `DEMO`, `0x6000`: the number of its words first,
+then the words. `x` copies them to `0x8000` and runs them as `r` runs a
+program, and the demo's F12 returns. The demo clears the screen before
+it returns, and leaves the cursor at the top left, but the monitor keeps
+a cursor of its own, so `x` calls `scr_cls` after the return, and then
+goes on as at `mon_exit`. A number of 0, as in the ROM of the monitor
+alone and in `niceemu` without the demo, is no demo, and so is one that
+would not fit below `0x8000`. Neither the copy nor the demo has an entry
+in the dispatch table, and both go when the demo goes; `release.py` and
 `demo_hw.py` follow.
-
-## What QMON has that this port will not
-
-- QMON's SD card and FAT32 code, about half of QMON, is for QNICE's
-  registers, and `qtransfer` has no hardware here. The sector routines
-  were written anew for nice_cpu's registers
-  ([INTERNALS.md](INTERNALS.md#the-sector-routines)), and FAT32 in C
-  (Files above), with
-  [#58](https://github.com/MJoergen/NiceMonMEGA65/issues/58) and
-  [#59](https://github.com/MJoergen/NiceMonMEGA65/issues/59).
-- QMON's disassembler is for QNICE; `u` was written anew for the NICE
-  instruction set, with nice_cpu's `assembler/nicedis.py` as the model
-  (The disassembler above).

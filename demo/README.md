@@ -2,16 +2,13 @@
 
 The demo shows that the core, the keyboard, and the screen work, on a
 MEGA65 with no computer on its debug UART. It is nice_cpu's demo,
-[nice_cpu/demo](../nice_cpu/demo/README.md), with the text of the boards
-in `text.nasm`. The ROM of every release has the monitor
-([monitor/](../monitor/README.md)), which the core boots from at
-power-up, and the demo behind it: the monitor's command `x` copies the
-demo to `0x8000` and runs it there, as `r` runs a program, and F12
-returns to the monitor. This is for the time being
-([#65](https://github.com/MJoergen/NiceMonMEGA65/issues/65)): the
-BASIC interpreter of
-[#54](https://github.com/MJoergen/NiceMonMEGA65/issues/54) takes its place
-in the ROM.
+[nice_cpu/demo](https://github.com/MJoergen/nice_cpu/blob/main/demo/README.md),
+with the text of the boards in `text.nasm`. The ROM of every release has
+the monitor ([monitor/](../monitor/README.md)), which the core boots
+from at power-up, and the demo behind it: the monitor's command `x`
+copies the demo to `0x8000` and runs it there, as `r` runs a program,
+and F12 returns to the monitor. This is for the time being: a BASIC
+interpreter will take its place in the ROM.
 
 The demo's source, its documentation, and its tests are in nice_cpu, so a
 change to it reaches the boards only with a tag of nice_cpu
@@ -20,8 +17,9 @@ text, the join behind the monitor, and the check on a board.
 
 ## On the boards
 
-nice_cpu's [README](../nice_cpu/demo/README.md) has what each demo shows
-and how it works. On the boards:
+nice_cpu's
+[README](https://github.com/MJoergen/nice_cpu/blob/main/demo/README.md)
+has what each demo shows and how it works. On the boards:
 
 - The keys are those of the MEGA65's keyboard, or of the Nexys4DDR's
   PS/2 keyboard ([The keyboard](../doc/SYSTEM.md#the-keyboard)). F1, F3,
