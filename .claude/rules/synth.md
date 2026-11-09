@@ -10,11 +10,13 @@ paths:
   or `make nexys4ddr` in the top directory, with the monitor and the demo in the ROM,
   `ROM=file.bin` for another ROM, `ROM=` for none, and `NICE=multi` for the multi-cycle core. `FLOW=timing` uses the
   directives for timing; the Nexys4DDR's Makefile sets it, and the MEGA65
-  builds use Vivado's defaults. Each board's bitstream is `build/top.bit`
+  builds default to Vivado's defaults, with which they miss 100 MHz since
+  nice_cpu V2.0, so they need `FLOW=timing` too. Each board's bitstream is `build/top.bit`
   in its directory whichever core is built, so build one core at a time.
-- After a build, check `build/timing.rpt` for WNS. The pipelined core meets
-  100 MHz on the MEGA65 by a few tenths of a nanosecond, and 90 MHz on the
-  Nexys4DDR's -1 part; a nice_cpu change can take that margin away. The
+- After a build, check `build/timing.rpt` for WNS. With `FLOW=timing`, the
+  pipelined core meets 100 MHz on the MEGA65 and 90 MHz on the Nexys4DDR's
+  -1 part by a few hundredths of a nanosecond or less; a nice_cpu change
+  can take that margin away. The
   worst paths are usually in nice_cpu's WRITE and FETCH stages, so a fix
   belongs there, not here.
 - `synth/README.md` records the build times, the utilization, and the slack

@@ -124,7 +124,8 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   `pix.vhd` the pixel coordinates, both from MandelbrotMEGA65.
 - `synth/`: `Makefile.inc` is the Vivado build, `common/` the clocks,
   `mega65/` what the R3 and R6 share (keyboard, DAC, HDMI), `r3/`, `r6/`,
-  and `nexys4ddr/` the boards. See `synth/README.md`, and
+  and `nexys4ddr/` the boards. See `synth/README.md`, with the history of its
+  numbers in `synth/HISTORY.md`, and
   `.claude/rules/synth.md` when working there.
 - `sim/`: the GHDL testbenches and their `.nasm` programs, and a model of
   an SD card, `sd_card_model.vhd`; `sim/cosim/` is

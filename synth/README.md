@@ -45,7 +45,9 @@ ROM=monitor.bin` in the top directory does the same with a path relative
 to it.
 
 `FLOW=default`, the default, runs every step of Vivado with its default
-directives, with which the MEGA65 meets 100 MHz. `FLOW=timing` runs them
+directives, with which the MEGA65 met 100 MHz until nice_cpu V2.0; now
+it misses, and the MEGA65 needs `FLOW=timing` (see [Timing](#timing)).
+`FLOW=timing` runs them
 with directives for timing: `synth_design -directive
 PerformanceOptimized -retiming`, `opt_design -directive Explore`,
 `place_design -directive ExtraTimingOpt`, or the `PLACE_TIMING` of the
@@ -206,158 +208,98 @@ MIT; and `src/video/font_pkg.vhd`, the
 
 ## Build times and size
 
-A build takes four to six minutes on an Intel Core i9-10850K (10 cores,
-20 threads) with Vivado 2025.1, and much longer on a busy machine. These
-are the times of the last builds, in minutes and seconds, without a ROM
-(`ROM=`):
+These are the builds of 2026-11-09, at nice_cpu V2.0 with the wait and
+the hidden state on the debug link (#93, #98), each with the ROM of the
+monitor and the demo, as `make release` builds them. The history of
+these numbers, and what the builds before taught, is in
+[HISTORY.md](HISTORY.md).
+
+A build takes ten to twenty minutes on an Intel Core i9-10850K (10
+cores, 20 threads) with Vivado 2025.1, and the R6 with `FLOW=timing`
+an hour, most of it in routing. These are the times, in minutes and
+seconds, on a machine busy with other work, at a load of about 12, but
+for the R6's default flow, at about 5:
 
 | Build | Synthesis | Placement | Routing | Bitstream | Total |
 |---|---|---|---|---|---|
-| R6, pipelined | 3:06 | 0:42 | 1:19 | 0:34 | 6:05 |
-| R6, `NICE=multi` | 1:29 | 0:28 | 1:06 | 0:32 | 3:55 |
-| Nexys4DDR, pipelined | 3:06 | 0:55 | 1:03 | 0:29 | 5:49 |
-| Nexys4DDR, `NICE=multi` | 1:53 | 0:31 | 1:15 | 0:28 | 4:18 |
-| R3, pipelined | 3:10 | 0:46 | 1:10 | 0:36 | 6:05 |
+| R6, pipelined, default flow | 3:35 | 1:41 | 2:30 | 0:39 | 9:11 |
+| R6, pipelined, `FLOW=timing` | 5:43 | 6:54 | 45:16 | 0:51 | 59:22 |
+| R6, `NICE=multi` | 4:46 | 2:07 | 2:49 | 0:54 | 11:41 |
+| R3, pipelined, default flow | 5:25 | 3:06 | 4:24 | 0:50 | 14:53 |
+| R3, pipelined, `FLOW=timing` | 5:25 | 8:52 | 5:19 | 0:52 | 21:05 |
+| Nexys4DDR, pipelined | 4:31 | 4:46 | 6:22 | 0:49 | 17:12 |
+| Nexys4DDR, `NICE=multi` | 3:25 | 2:03 | 1:59 | 0:46 | 8:50 |
 
-The Nexys4DDR builds with `FLOW=timing`. With it the R6 places with
-`-directive AltSpreadLogic_high` instead of `ExtraTimingOpt` (the
-`PLACE_TIMING` of `synth/r6/Makefile`): since issue #75, `ExtraTimingOpt`
-misses 100 MHz by 0.198 ns in the core's path from the RAM to its WRITE
-stage, and `AltSpreadLogic_high` meets it by 0.015 ns.
+Placement includes `phys_opt_design` before routing, and routing the
+one after it. The total is that of `make`, with the steps of Vivado
+between them.
 
 ### Utilization
 
 The utilization is from `build/utilization.rpt`, and the split by module
-from `report_utilization -hierarchical` on `build/top.dcp`. These are the
-numbers without a ROM (`ROM=`), in LUTs and flip-flops. The R6's pipelined column
-is from the build of the V1.1 bump, at nice_cpu V1.1, and the Nexys4DDR's
-from one at nice_cpu V1.0, both with the Ethernet station. The multi-cycle columns are older, from
-builds that had a command line in place of the link, counted in the rest,
-and neither the Nexys4DDR's devices nor the microsecond counter:
+from `report_utilization -hierarchical` on `build/top.dcp`, in LUTs and
+flip-flops:
 
 | Part of the design | R6, pipelined | R6, multi | Nexys4DDR, pipelined | Nexys4DDR, multi |
 |---|---|---|---|---|
-| The core (`nice_core`) | 6931 / 3032 | 4605 / 1050 | 6844 / 3027 | 4636 / 4071 |
-| The math unit (`mpu`) | 2079 / 874 | 2172 / 874 | 2080 / 874 | 2166 / 874 |
-| The fetch statistics (`fetch_stats`) | 813 / 1361 | 44 / 99 | 812 / 1361 | 44 / 99 |
-| The debug link (`debug_link`) | 875 / 1083 | – | 872 / 1082 | – |
-| The Ethernet station (`eth/eth.vhd`) | 2303 / 1866 | – | 2038 / 1791 | – |
-| Of which the TCP server (`eth/eth_tcp.vhd`) | 1690 / 1237 | – | 1429 / 1163 | – |
-| The rest: the UART, RAM, counters, timer, the Nexys4DDR's devices, and glue | 1652 / 918 | 795 / 1156 | 1836 / 1059 | 740 / 1119 |
-| The text display (`text.vhd`) | 117 / 180 | 123 / 180 | 115 / 156 | 121 / 156 |
-| The keyboard | 649 / 600 | 596 / 585 | 146 / 48 | – |
-| The HDMI output | 599 / 1207 | 574 / 1207 | – | – |
-| Total | 16017 / 11121 | 8909 / 5151 | 14743 / 9398 | 7707 / 6319 |
-| Total, of the FPGA | 12.0 % / 4.2 % | 6.7 % / 1.9 % | 23.3 % / 7.4 % | 12.2 % / 5.0 % |
+| The core (`nice_core`) | 7634 / 3428 | 4881 / 1203 | 7579 / 3165 | 4970 / 1047 |
+| The debug link (`debug_link`) | 2541 / 1286 | 2623 / 1285 | 2517 / 1285 | 2644 / 1285 |
+| The devices (`devices.vhd`): the math unit, the counters, the fetch statistics, the timer, the SD card controller, the network station's registers, and the port for Ethernet frames | 5322 / 3497 | 4269 / 2857 | 7759 / 3645 | 6669 / 3005 |
+| The Ethernet station (`eth/eth.vhd`) | 2766 / 2732 | 2763 / 2732 | 3247 / 2867 | 3248 / 2865 |
+| Of which the TCP server (`eth/eth_tcp.vhd`) | 1905 / 1897 | 1902 / 1897 | 1632 / 1920 | 1633 / 1920 |
+| The on-board debugger (`dbg/dbg.vhd`) | 3029 / 2838 | 3026 / 2838 | 3283 / 2959 | 3282 / 2959 |
+| The text display (`text.vhd`) | 136 / 202 | 139 / 202 | 136 / 178 | 142 / 178 |
+| The keyboard | 720 / 592 | 720 / 592 | 236 / 89 | 235 / 89 |
+| The HDMI output | 600 / 1207 | 600 / 1207 | – | – |
+| The rest: the UART, the memory's buses, the board's and the screen's registers, and glue | 680 / 528 | 746 / 530 | 551 / 633 | 629 / 631 |
+| Total | 23428 / 16310 | 19767 / 13446 | 25308 / 14821 | 21819 / 12059 |
+| Total, of the FPGA | 17.5 % / 6.1 % | 14.8 % / 5.0 % | 39.9 % / 11.7 % | 34.4 % / 9.5 % |
 
-The R3 pipelined build takes 15774 LUTs and 11166 flip-flops, 11.8 % and
-4.2 % of the FPGA.
+The R6's pipelined column is from the build with `FLOW=timing`, whose
+retiming adds about 60 LUTs to the default flow's 23368 and 16302. The
+R3's pipelined build with `FLOW=timing` takes 23484 LUTs and 16435
+flip-flops, 17.6 % and 6.1 % of the FPGA.
 
-Vivado optimizes across the boundaries of the modules, so the rows move
-from build to build more than the logic does: in the builds with the TCP
-server, about 700 LUTs left the core's rows for the rest of `nicemon`.
-The totals are what count.
+The pipelined core is 5.7 % of the LUTs of the R6's FPGA, and 12.0 % of
+the Nexys4DDR's. The multi-cycle core has about two thirds of its LUTs,
+3.6 % and 7.8 %, and a third of its flip-flops. On the Nexys4DDR the
+devices take about 2400 LUTs more than on the R6, as Vivado puts their
+buffers into LUTs there (see [Block RAM](#block-ram)). Vivado optimizes
+across the boundaries of the modules, so the rows move from build to
+build more than the logic does; the totals are what count.
 
-The pipelined core is about 5.2 % of the LUTs of the R6's FPGA, and 10.8 %
-of the Nexys4DDR's. The multi-cycle core has two thirds of its LUTs, 3.4 %
-and 7.3 %. On the R6 it has a third of the flip-flops too. On the
-Nexys4DDR it has 4071, more than the pipelined core's 3027, because
-`FLOW=timing` retimes (`synth_design -retiming`): it moves registers
-backwards and adds copies of the core's register file and state, so the
-design has twice the flip-flops. With `FLOW=default` the build has 3202
-flip-flops but misses 90 MHz by 0.37 ns, so the copies buy timing. With
-the retiming it meets 90 MHz by 0.19 ns, and the Nexys4DDR has room for
-the flip-flops.
-
-The `fetch_stats` of the pipelined core (the fetch statistics in
-[SYSTEM.md](../doc/SYSTEM.md#address-map)'s address map) has over a thousand
-flip-flops, and the multi-cycle core's has few. The pipelined core uses no
-block RAM. The multi-cycle core uses one RAMB18, which Vivado infers for
-`src2_count`, the register of the shift count. The math unit has the 4
-DSPs of the design.
+The math unit and the settings page of the debugger (`dbg/dbg_set.vhd`)
+have the 6 DSPs of the design. The pipelined core uses no block RAM, and
+the multi-cycle core one RAMB18, which Vivado infers for `src2_count`,
+the register of the shift count.
 
 ### Timing
 
-All builds meet the clock. These are the worst setup and hold slacks:
+These are the worst setup and hold slacks, in ns:
 
 | Build | Clock | Setup | Hold |
 |---|---|---|---|
-| R6, pipelined | 100 MHz | 0.086 ns | 0.012 ns |
-| R6, `NICE=multi` | 100 MHz | 0.52 ns | – |
-| R3, pipelined | 100 MHz | 0.109 ns | 0.061 ns |
-| Nexys4DDR, pipelined | 90 MHz | 0.289 ns | 0.029 ns |
-| Nexys4DDR, `NICE=multi` | 90 MHz | 0.19 ns | – |
+| R6, pipelined, default flow | 100 MHz | **−0.526**, 324 endpoints | 0.069 |
+| R6, pipelined, `FLOW=timing` | 100 MHz | 0.047 | 0.047 |
+| R6, `NICE=multi` | 100 MHz | 0.187 | 0.075 |
+| R3, pipelined, default flow | 100 MHz | **−0.073**, 2 endpoints | 0.035 |
+| R3, pipelined, `FLOW=timing` | 100 MHz | 0.126 | 0.041 |
+| Nexys4DDR, pipelined, `FLOW=timing` | 90 MHz | 0.004 | 0.050 |
+| Nexys4DDR, `NICE=multi`, `FLOW=timing` | 90 MHz | 0.186 | 0.019 |
 
-The R6's pipelined row is from the build of the V1.1 bump, at nice_cpu
-V1.1, with the debug link of version 5, and `verified.json` records the
-build of the latest release's bump. A later build with stage 1 of the
-on-board debugger has 0.114 ns and 0.042 ns, and 139 block RAMs, and
-one with stage 3, the debugger
-that drives the link, 0.080 ns and 0.038 ns, and 139.5 block RAMs. The
-debugger takes 730 LUTs and 1051 flip-flops there, 293 and 286 of them
-in its host of the link (`dbg_host`), and half a block RAM, for the
-table of its strip's cells. A build with stage 5, the page, has 0.232
-ns and 0.053 ns, one with stage 6, the breakpoints, 0.169 ns and
-0.032 ns, one with stage 7 0.330 ns and 0.063 ns, one with stage
-8, the decode of row 27, 0.410 ns and 0.047 ns, and one with stage 9,
-the debugger on the link's side port with the registers live, 0.328 ns
-and 0.056 ns, all with 139.5 block
-RAMs. The decode takes about 530 LUTs; its table of decimal digits is
-kept out of a block RAM with `rom_style`. With stage 9 the debugger
-takes 1878 LUTs and 1885 flip-flops, 170 and 119 of them in its adapter
-to the side port (`dbg_host`), where the host of the link took 293 and
-286, and the link itself 977 and 1118. The Nexys4DDR's build with
-stage 3 has 0.339 ns and 0.031 ns, with stage 5 0.111 ns and
-0.017 ns, with stage 6 0.139 ns and 0.022 ns, and with stage 7, its
-buttons and display in the debugger, 0.159 ns and 0.034 ns, with
-stage 8 0.187 ns and 0.019 ns, and with stage 9 0.166 ns and 0.025 ns,
-on paths in the core,
-and still 92.5 block RAMs. With the RAM of 128K words on the MEGA65
-([#68](https://github.com/MJoergen/NiceMonMEGA65/issues/68)), the R6's
-build has 0.177 ns and 0.031 ns, with 235.5 block RAMs and 18712 LUTs,
-and the Nexys4DDR's, whose RAM stays 64K words, 0.053 ns and 0.030 ns,
-with 110.5 block RAMs and 28964 LUTs. There Vivado had put the screen
-of `mem.vhd`, the font, and the UART's FIFO into LUTs, 8192 of them for
-the screen alone
-([#70](https://github.com/MJoergen/NiceMonMEGA65/issues/70)). With
-`ram_style` and `rom_style` attributes on the three, its build has 123
-block RAMs and 17878 LUTs, and 0.020 ns and 0.007 ns, still on a path
-in the core's WRITE stage. The R6's build is the same as before.
-With nice_cpu V1.3, the debug link of version 6, whose write of R1–R15
-is a new source on the D inputs of WRITE's register file, and the
-link's hold-back over Ethernet
-([#69](https://github.com/MJoergen/NiceMonMEGA65/issues/69)), the R6's
-build has 0.042 ns and 0.057 ns, with 235.5 block RAMs and 19905 LUTs,
-on a path from the RAM into WRITE's register file, and the Nexys4DDR's
-0.047 ns and 0.025 ns, with 123 block RAMs and 19068 LUTs, on a path
-from DBUS to the timer.
-With the fonts of nice_cpu V1.6
-([#71](https://github.com/MJoergen/NiceMonMEGA65/issues/71)), 4 block
-RAMs more on each board, the R6's build with the ROM misses by 0.124 ns
-in the default flow, on a path from the farthest of the RAM's block RAMs
-into WRITE's register file, and meets with `FLOW=timing`, 0.128 ns and
-0.031 ns, with 241.5 block RAMs. A read of the fonts takes a cycle more
-than one of the RAM, so that their word is not on that path, and the
-stalls of the data bus are single registers, as before. The
-Nexys4DDR's has 0.054 ns and 0.025 ns, with 127 block RAMs and 19951
-LUTs, on a path in WRITE.
-With the port for Ethernet frames
-([#82](https://github.com/MJoergen/NiceMonMEGA65/issues/82)), the R6's
-build with the ROM and `FLOW=timing` has 0.086 ns and 0.058 ns, with
-245 block RAMs and 22549 LUTs, on a path from the RAM into WRITE's
-register file. The station's buffer of a frame received is a RAMB18.
-The R3's pipelined row is from a build at nice_cpu V1.0, with
-the debug link of version 4, and the Nexys4DDR's from one at V1.1, with
-stage 1 of the on-board debugger ([DEBUGGER.md](../doc/DEBUGGER.md)).
-All three have the
-Ethernet station, which answers ARP requests and pings and carries the
-link over TCP. The multi-cycle rows are older builds, with fewer link features, and their
-hold slacks were not recorded. The slacks change from build to build with
-placement more than with the logic. The worst paths are usually in the
-core's WRITE and FETCH stages. Every build writes the five worst paths
-into the TCP server, within it, and out of it to `build/tcp_paths.rpt`.
-On the R6 their worst slack is about 2.3 ns, where the core's is about
-0.3 ns.
+So the pipelined core meets its clock on every board with `FLOW=timing`
+only, and the R6 and the Nexys4DDR with little to spare. On the MEGA65,
+`make release` tries the default flow first, then `FLOW=timing`. The R6's worst paths
+are in the core's WRITE stage in the default flow, from its
+micro-operation to its value, and in the timing flow from the send
+buffer of the port for Ethernet frames into WRITE's register file. The R3's worst paths in the
+default flow are from the MAX10's inputs (`max10.vhd`), and the
+Nexys4DDR's from WRITE into its register file. `verified.json` records
+the build of the latest release's bump, and the badge shows it.
+
+Every build writes the five worst paths into the TCP server, within it,
+and out of it to `build/tcp_paths.rpt`. Their worst slack is 1.171 ns on
+the R6 and 0.920 ns on the Nexys4DDR.
 
 The PHY's RXD and CRS_DV are timed against the clock on its pin, with the
 output delays of the PHYs' data sheets and 1 ns for the traces. The pin's
@@ -375,7 +317,7 @@ The block RAMs, of 36 Kbit, are these:
 | Memory | MEGA65 | Nexys4DDR |
 |---|---|---|
 | The RAM (`i_ram`), 128K words on the MEGA65 and 64K on the Nexys4DDR | 128 | 64 |
-| The ROM (`i_rom`), 32K words, with `ROM=` only | 32 | 32 |
+| The ROM (`i_rom`), 32K words, with a ROM only | 32 | 32 |
 | The screen (`i_scr` in `mem.vhd`), 32K or 8K words | 32 | 8 |
 | Its copy in `text.vhd` (`scr_ram.vhd`) | 32 | 8 |
 | The fonts in `text.vhd` (`font.vhd`): the font RAM, 8K words of 16 bits, and the character ROM, one dual-port ROM | 8 | 8 |
@@ -385,22 +327,22 @@ The block RAMs, of 36 Kbit, are these:
 | The FIFO of Ethernet frames to send (`eth/eth_ram.vhd`), 2K bytes, one RAMB18 | 0.5 | 0.5 |
 | The copy of a ping in `eth/eth_icmp.vhd`, 2K bytes, one RAMB18 | 0.5 | 0.5 |
 | The TCP server's buffers of received and sent bytes (`eth/eth_ram.vhd` in `eth/eth_tcp_buf.vhd`), 2K bytes each, one RAMB18 each | 1 | 1 |
+| The station's buffer of a frame for the port for Ethernet frames (`eth/eth_frames.vhd`), 512 words, one RAMB18, on the MEGA65 only | 0.5 | – |
+| The port for Ethernet frames (nice_cpu's `eth_regs.vhd`): the queue of frames received, 2K words, and the send buffer, 512 words, on the MEGA65 only | 3 | – |
 | The SD card controller's buffer (nice_cpu's `sd_regs.vhd`), four RAMB18, on the MEGA65 only | 2 | – |
-| The table of the debugger's strip (`dbg/dbg.vhd`), one RAMB18, on the MEGA65 only | 0.5 | – |
-| Total without the ROM, pipelined | 209.5 of 365 | 95 of 135 |
-| Total with the ROM, pipelined | 241.5 | 127 |
+| The debugger's page (`mem_ram` in `dbg/dbg.vhd`), 256 words, one RAMB18, on the MEGA65 only | 0.5 | – |
+| Total without the ROM, pipelined | 213 of 365 | 95 of 135 |
+| Total with the ROM, pipelined | 245 | 127 |
 
 The copy of the screen keeps all 32 bits, as the display reads the
 character and both 12-bit colors, so it takes as many block RAMs as the
-screen. The multi-cycle core adds half of one more, its RAMB18. The
-table of `kbd_ps2_ascii.vhd` is in LUTs, 58 of them, though Vivado's
-preliminary report of ROMs shows it in block RAM.
+screen. The multi-cycle core adds half of one more, its RAMB18, on the
+MEGA65. The table of `kbd_ps2_ascii.vhd` is in LUTs, 58 of them, though
+Vivado's preliminary report of ROMs shows it in block RAM.
 
-The totals are those of the builds with the RAM of 128K words on the
-MEGA65 ([#68](https://github.com/MJoergen/NiceMonMEGA65/issues/68)).
-Without its `ram_style` or `rom_style` attribute, Vivado (2025.1) puts
-the Nexys4DDR's screen of `mem.vhd`, its font, and its UART's FIFO into
-LUTs, though block RAM is free, on every flow
-([#70](https://github.com/MJoergen/NiceMonMEGA65/issues/70)). The
-attributes keep them in block RAM, as on the MEGA65. The debugger's
-page, 256 words, stays in 176 LUTs of distributed RAM.
+On the Nexys4DDR, Vivado puts the memories marked "on the MEGA65 only"
+into distributed RAM, about 2500 LUTs of it, though 8 block RAMs are
+free: the port's queue of frames alone takes 352 RAM64M. Without their
+`ram_style` or `rom_style` attributes, Vivado did the same with the
+screen of `mem.vhd`, its font, and the UART's FIFO (#70); the
+attributes keep those in block RAM, as on the MEGA65.
