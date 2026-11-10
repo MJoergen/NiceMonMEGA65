@@ -58,6 +58,7 @@ board that was not built then.
 | 2026-11-09 | nice_cpu V2.0, debug link 7, with the ROM | −0.993 in the default flow; 0.075 with `FLOW=timing` | – |
 | 2026-11-09 | The wait and the hidden state on the link (#93, #98), and the strip's wait, with the ROM and `FLOW=timing` | 0.047 | – |
 | 2026-11-09 | The byte windows (#90), with the ROM and `FLOW=timing`: −0.258 with the byte or halfword taken from the RAM's word on the way to the core; 0.032 with it a cycle later | 0.032 / 0.031 | – |
+| 2026-11-10 | The keys for Page Up and Page Down (53a18ab), 13 lines of the keyboard map, which moved the placement, with the ROM and `FLOW=timing`: −0.473 placed with `AltSpreadLogic_high`, −0.447 with `ExtraTimingOpt`, on the path from the RAM through the multiplexers of the read data into WRITE's register file; 0.004 with the read data picked by one AND-OR of one-hot registered bits | 0.004 / 0.047 | – |
 
 The R3's first record is from a build at nice_cpu V1.0, with debug link
 4 and the Ethernet station: 0.109 ns and 0.061 ns.

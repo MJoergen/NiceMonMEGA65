@@ -556,10 +556,25 @@ architecture synthesis of nicemon is
              addr(31 downto 4) = C_NET_BASE or addr(31 downto 4) = C_ETH_BASE;
    end function is_dev;
 
-   -- The source of the read data of the last request served: the memory,
-   -- the console's FIFO, the device that acknowledges the core, or else rd_io,
-   -- which also takes the word of the fonts
-   type t_src is (SRC_IO, SRC_MEM, SRC_RX, SRC_DEV);
+   -- The source of the read data of the last request served, one bit
+   -- each: rd_io, which also takes the word of the fonts, the RAM, the
+   -- ROM, and the screen (bits 3..1 as src/mem.vhd's b_mem_o), the
+   -- console's FIFO, or the device that acknowledges the core. One-hot,
+   -- so that the read data is one AND-OR of registered bits, for the path
+   -- from the RAM to the core, which has the least slack.
+
+   subtype t_src is std_logic_vector(5 downto 0);
+
+   constant C_SRC_IO  : t_src := "000001";
+   constant C_SRC_RX  : t_src := "010000";
+   constant C_SRC_DEV : t_src := "100000";
+
+   -- word if sel is '1', else 0
+   function gate(word : std_logic_vector(31 downto 0);
+                 sel  : std_logic) return std_logic_vector is
+   begin
+      return word and (31 downto 0 => sel);
+   end function gate;
 
    -- Core
    signal cpu_rst    : std_logic;
@@ -703,10 +718,16 @@ architecture synthesis of nicemon is
    signal mem_stb       : std_logic;
    signal mem_rdata     : std_logic_vector(31 downto 0);
    signal mem_rdata_win : std_logic_vector(31 downto 0);
+   -- The memory that the request on the bus reaches, and the word of each
+   -- memory, for dbus_rdata
+   signal mem_b_mem     : std_logic_vector(2 downto 0);
+   signal mem_rdata_ram : std_logic_vector(31 downto 0);
+   signal mem_rdata_rom : std_logic_vector(31 downto 0);
+   signal mem_rdata_scr : std_logic_vector(31 downto 0);
 
    -- The source of the read data of the last request, and the word of an
    -- I/O register
-   signal rd_src : t_src := SRC_IO;
+   signal rd_src : t_src := C_SRC_IO;
    signal rd_io  : std_logic_vector(31 downto 0);
 
    -- UART
@@ -881,10 +902,12 @@ begin
 
    -- A console read returns the byte in bits 7..0 and bit 8 set (the header,
    -- 0xFFFFFF00).
-   dbus_rdata <= mem_rdata when rd_src = SRC_MEM else
-                 X"00000" & "0001" & rx_q when rd_src = SRC_RX else
-                 dev_rdata when rd_src = SRC_DEV else
-                 rd_io;
+   dbus_rdata <= gate(rd_io, rd_src(0)) or
+                 gate(mem_rdata_ram, rd_src(1)) or
+                 gate(mem_rdata_rom, rd_src(2)) or
+                 gate(mem_rdata_scr, rd_src(3)) or
+                 gate(X"00000" & "0001" & rx_q, rd_src(4)) or
+                 gate(dev_rdata, rd_src(5));
 
    p_dbus : process (clk_i)
 
@@ -902,7 +925,7 @@ begin
                       we    : std_logic;
                       wdata : std_logic_vector(31 downto 0)) is
       begin
-         rd_src <= SRC_IO;
+         rd_src <= C_SRC_IO;
          rd_io  <= (others => '0');
          if is_fnt(addr) and we = '0' then
             -- The fonts return the word in the next cycle, which goes to
@@ -929,12 +952,12 @@ begin
             null;
          elsif not is_io(addr) then
             -- The memory has taken the request (mem_stb), and returns its
-            -- word in the next cycle.
-            rd_src <= SRC_MEM;
+            -- word in the next cycle, from the memory of mem_b_mem.
+            rd_src <= "00" & mem_b_mem & '0';
          elsif is_dev(addr) and not link then
             -- A device has taken the core's request (core_dev), and it
             -- acknowledges it, with its word.
-            rd_src <= SRC_DEV;
+            rd_src <= C_SRC_DEV;
             return;
          elsif is_dev(addr) then
             -- The devices have latched the link's request (link_dev), which
@@ -958,7 +981,7 @@ begin
             if rx_empty = '0' then
                -- rx_take takes the byte, and it comes from rx_q in the next
                -- cycle.
-               rd_src <= SRC_RX;
+               rd_src <= C_SRC_RX;
             elsif link_eoi = '1' then
                rd_io(9) <= '1';
             end if;
@@ -1012,7 +1035,7 @@ begin
             -- RAM to the core
             fnt_rd_v := '0';
             win_rd_v := '0';
-            rd_src   <= SRC_IO;
+            rd_src   <= C_SRC_IO;
             if fnt_rd = '1' then
                rd_io <= X"0000" & fnt_rdata_i;
             else
@@ -1025,7 +1048,7 @@ begin
             end if;
          elsif dev_busy = '1' then
             if dev_link_ack = '1' then
-               rd_src   <= SRC_IO;
+               rd_src   <= C_SRC_IO;
                rd_io    <= dev_rdata;
                link_ack <= '1';
             end if;
@@ -1206,6 +1229,10 @@ begin
          wdata_i      => bus_wdata,
          rdata_o      => mem_rdata,
          rdata_win_o  => mem_rdata_win,
+         b_mem_o      => mem_b_mem,
+         rdata_ram_o  => mem_rdata_ram,
+         rdata_rom_o  => mem_rdata_rom,
+         rdata_scr_o  => mem_rdata_scr,
          clear_i      => clr_start,
          clearing_o   => mem_clearing,
          clear_done_o => open,

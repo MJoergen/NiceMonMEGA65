@@ -23,7 +23,14 @@
 -- memory (stb_i), and its address, which nicemon drives in every cycle.
 -- A write goes to the screen or to the RAM, unless it is to the ROM while
 -- the ROM is shown, where it is dropped. A read returns the word of the
--- memory of its address on rdata_o, in the next cycle.
+-- memory of its address on rdata_o, in the next cycle. For the core's
+-- path from the RAM, which has the least slack at 100 MHz, the words of
+-- the three memories also come out on their own, on rdata_ram_o,
+-- rdata_rom_o, and rdata_scr_o, and b_mem_o says, in the cycle of the
+-- request, in which of them its word will be, one bit each: nicemon
+-- registers that with the other sources of its read data, so that it
+-- picks the word with one AND-OR of registered bits, not with a chain of
+-- multiplexers.
 --
 -- Port B has the byte windows of nice_cpu's SYSTEM.md §9. An address A
 -- whose top four bits are 1 to 5 reaches the word W = (A >> 2) AND
@@ -101,6 +108,12 @@ entity mem is
       -- through the request's byte window
       rdata_o      : out std_logic_vector(31 downto 0);
       rdata_win_o  : out std_logic_vector(31 downto 0);
+      -- The memory of addr_i, one bit each: bit 0 the RAM, bit 1 the ROM,
+      -- and bit 2 the screen; and the word that each read, as rdata_o is
+      b_mem_o      : out std_logic_vector(2 downto 0);
+      rdata_ram_o  : out std_logic_vector(31 downto 0);
+      rdata_rom_o  : out std_logic_vector(31 downto 0);
+      rdata_scr_o  : out std_logic_vector(31 downto 0);
       -- The clear: its start, while it runs, and a pulse at its end
       clear_i      : in  std_logic;
       clearing_o   : out std_logic;
@@ -394,6 +407,15 @@ begin
               ram_b_rdata;
    rdata_o     <= rd_word;
    rdata_win_o <= win_read(rd_win, rd_lane, rd_word);
+
+   with mem_of(b_word, rom_hidden_i) select b_mem_o <=
+      "001" when MEM_RAM,
+      "010" when MEM_ROM,
+      "100" when MEM_SCR;
+
+   rdata_ram_o <= ram_b_rdata;
+   rdata_rom_o <= rom_b_data;
+   rdata_scr_o <= scr_b_rdata;
 
    clearing_o   <= clearing;
    clear_done_o <= clr_done;
