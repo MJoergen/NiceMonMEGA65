@@ -23,7 +23,7 @@ The ROM at `0x0000`–`0x7FFF`, which the core boots from, holds:
   being (The demo below).
 
 The monitor's variables are in the RAM at `0xFFFFF000` and up, and its
-stack grows down from there ([SYSTEM.md](../doc/SYSTEM.md#the-rom)).
+stack grows down from there ([SYSTEM.md](../doc/SYSTEM.md#stack-heap-and-variables)).
 
 ## Hardware abstraction layer
 

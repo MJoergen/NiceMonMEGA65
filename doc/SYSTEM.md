@@ -26,34 +26,26 @@ effect and does not write ([DEBUG.md §3](https://github.com/MJoergen/nice_cpu/b
 |---|---|
 | `0x00000000`–`0xFFFFFFFF` | Memory, where no register below is: block RAM, 128K words on the MEGA65 and 64K on the Nexys4DDR, repeated through the address space. `0xFFFFFF9E` reads the number of words. So the runtime's stack below `0xFFFFFF00` lands in the top of it, and so do the words of `0xFFFFFF00`–`FF` that are not registers. |
 | `0x00000000`–`0x00007FFF` | The ROM, in a bitstream built with one, in front of the RAM and repeating with it (see [The ROM](#the-rom)). Bit 3 of the control register hides it. |
-| `0x10000000`–`0x5FFFFFFF` | The byte windows of [nice_cpu's SYSTEM.md §9](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#9-byte-windows), for the core's data accesses and the link. An address A reaches the word (A >> 2) AND `0x03FFFFFF`, which lies in the RAM, or in the ROM while it is shown, as the plain address of that word does. `0x1…` is the whole word, `0x2…` and `0x3…` byte A mod 4 of it, and `0x4…` and `0x5…` halfword bit 1 of A, zero-extended by `2` and `4` and sign-extended by `3` and `5`. A write there changes only its byte or halfword, in one access, and a read of a byte or a halfword takes a cycle more than one of a word, for the timing at 100 MHz. An instruction fetch there reads the RAM or the ROM that the address aliases, where the emulator reads 0, so no code runs through a window. A program built with nicewasm's `--byte-windows` uses them. |
+| `0x10000000`–`0x5FFFFFFF` | The byte windows of [nice_cpu's SYSTEM.md §9](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#9-byte-windows): a word, a byte, or a halfword of the RAM, or of the ROM while it is shown, at a byte address, for the core's data accesses and the link (see [The byte windows](#the-byte-windows)). |
 | `0xFFFE0000`–`0xFFFE1FFF` | The font RAM of [nice_cpu's SYSTEM.md §1.8](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#18-font): 256 glyphs of 32 rows, one word a row, read and written, with bits 31..16 reading 0. It is 0 at power-up and after a clear, and a start keeps it (see [The font](#the-font)). |
 | `0xFFFE2000`–`0xFFFE3FFF` | The character ROM: Spleen, in the layout of the font RAM. A write is dropped. |
 | `0xFFFF0000`–`0xFFFF7FFF` | The screen: 32768 words of memory of their own, the emulator's 80×25 screen and room for scrolling. The 2000 words from the display offset are shown on VGA and HDMI, or VGA only on the Nexys4DDR (see [The screen](#the-screen)), and the link reads them all. |
-| `0xFFFF8000`–`0xFFFFFEFF` | RAM, between the screen and the I/O page: the RAM words `0x18000`–`0x1FEFF` on the MEGA65, as the 128K words repeat. On the Nexys4DDR, whose screen is 8192 words, it starts lower: `0xFFFF2000`–`0xFFFFFEFF` are the words `0x2000`–`0xFEFF` of its 64K. The runtime's stack starts at `0xFFFFFF00` and grows down into it, and so does the stack of a program in the ROM. The monitor's variables are at `0xFFFFF000` and up, the RAM words `0x1F000` and up on the MEGA65 and `0xF000` on the Nexys4DDR, and its stack, which the programs at `0x8000` share, grows down from there. In the emulator it is ordinary memory. |
-| `0xFFFFFF00` | The console of [nice_cpu's SYSTEM.md §1](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#1-console-screen-and-read-counter). A write sends bits 7..0 to the UART. A read takes the oldest byte received from the UART or the keyboard, and returns it in bits 7..0 with bit 8 set, or 0 when no byte has arrived. A break on the UART, or a host's half-close over Ethernet, ends the line's input until the core is started again or a host connects over Ethernet (see [The debug link over TCP](DEBUG_LINK.md#the-debug-link-over-tcp)): the host's bytes after it are dropped, and once the bytes before it are read, a read returns `0x200` (bit 9), as at the end of the emulator's input. The keyboard's bytes still come, and a read returns them ([nice_cpu's SYSTEM.md §8](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#8-systems-built-on-the-fpga-core)). |
-| `0xFFFFFF01` | The emulator's read counter. A read by the core returns the number of its reads since the last write, and a write sets that number. It is 0 after reset, and a start keeps it, as in the emulator. |
-| `0xFFFFFF10`–`0xFFFFFF1F` | The timer of [nice_cpu's SYSTEM.md §4](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#4-timer): it raises IRQ every P clock cycles, through the vector it is given. |
-| `0xFFFFFF20`–`0xFFFFFF3F` | The math unit of [nice_cpu's SYSTEM.md §2](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#2-math-unit): 32-bit multiply and divide, and 64-bit divide. |
-| `0xFFFFFF40`–`0xFFFFFF5F` | The performance counters of [nice_cpu's SYSTEM.md §3](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#3-performance-counters): cycles, instructions, and microseconds, and the event counters of data reads, stores, skips, jumps, and interrupts at `0xFFFFFF4A`–`53`, 64 bits each. The microseconds come from the clock, 100 MHz on the MEGA65 and 90 MHz on the Nexys4DDR, so they are real time, as the emulator's microsecond counter is, which counts the host's time, or one per step with `--step-time`. They stop while the core is paused. The link reads them as the core does: a read of a low word takes the snapshot that the high word returns, where `niceemu --link` takes none. [DEBUG.md §3](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEBUG.md#3-requests-and-answers) allows both while the core is held, halted, or paused. The event counters count the core's own reads and stores, not the link's, and so count as the emulator's do. The words `0xFFFFFF54`–`5F` read 0 and take no write. |
-| `0xFFFFFF46`–`0xFFFFFF49` | The clock of the time of day of [nice_cpu's SYSTEM.md §10](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#10-clock) (`tod.vhd`), within the performance counters: the microseconds, the seconds since the Unix epoch in 64 bits, and "set". It counts in real time from the board's clock, also while the core is held, paused, or halted, and only a reset of the system resets it, so a start keeps its time. After a reset it is 0 and not set, until a program sets it; the board does not read the MEGA65's real-time clock yet. A read of `0xFFFFFF46` takes the snapshot of the seconds, by the core and by the link alike. |
-| `0xFFFFFF60`–`0xFFFFFF7F` | The fetch statistics of [MICROARCH.md §8.1](https://github.com/MJoergen/nice_cpu/blob/main/doc/MICROARCH.md#81-fetch-statistics), the rest of the performance counters: a cause for each cycle of the pipelined core, and its flushes by cause, which show where the cycles of a program go. A start of the core clears them, and they then count each clock while the core runs, until a write of 0 to `FS_CTRL` stops them. They stop while the core is held, paused, and after it halts. With the multi-cycle core (`NICE=multi`), only `FS_CYCLES` and `FS_CAUSE` + 14, OTHER, count, `FS_CTRL` reads its run bit, and the other words read 0. |
+| `0xFFFF8000`–`0xFFFFFEFF` | RAM: the top words of the RAM, as it repeats, from `0xFFFF2000` on the Nexys4DDR. The stacks and the monitor's variables are here (see [Stack, heap, and variables](#stack-heap-and-variables)). |
+| `0xFFFFFF00` | The console of [nice_cpu's SYSTEM.md §1.2](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#12-console). Its output goes to the line, the UART or a host over TCP, and its input comes from the line and the keyboard, through the input FIFO (below). A break on the UART, or a host's half-close over TCP, ends the line's input, and a read returns `0x200` once the bytes before it are read, until a start or the next connection ([DEBUG_LINK.md](DEBUG_LINK.md#the-debug-link-over-tcp)). The keyboard's bytes still come ([nice_cpu's SYSTEM.md §8](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#8-systems-built-on-the-fpga-core)). |
+| `0xFFFFFF01` | The read counter of [nice_cpu's SYSTEM.md §1.7](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#17-read-counter), as in the emulator. A start keeps it. |
+| `0xFFFFFF10`–`0xFFFFFF1F` | The timer of [nice_cpu's SYSTEM.md §4](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#4-timer). It counts clock cycles, at 100 MHz on the MEGA65 and 90 MHz on the Nexys4DDR, where the emulator counts steps. |
+| `0xFFFFFF20`–`0xFFFFFF3F` | The math unit of [nice_cpu's SYSTEM.md §2](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#2-math-unit), as in the emulator. |
+| `0xFFFFFF40`–`0xFFFFFF5F` | The performance counters of [nice_cpu's SYSTEM.md §3](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#3-performance-counters). The cycles are those of the board's clock, at 100 MHz on the MEGA65 and 90 MHz on the Nexys4DDR, and the microseconds come from it, so they are real time. The instructions and the event counters count as the emulator's do. A read of a low word by the link takes the snapshot, as the core's does, where `niceemu --link` takes none. |
+| `0xFFFFFF46`–`0xFFFFFF49` | The clock of the time of day of [nice_cpu's SYSTEM.md §10](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#10-clock), within the performance counters, counted from the board's clock. After a reset it is not set until a program sets it: the board does not read the MEGA65's real-time clock yet. A read of `0xFFFFFF46` by the link takes the snapshot too. |
+| `0xFFFFFF60`–`0xFFFFFF7F` | The fetch statistics of [MICROARCH.md §8.1](https://github.com/MJoergen/nice_cpu/blob/main/doc/MICROARCH.md#81-fetch-statistics), which the emulator does not have. With the multi-cycle core (`NICE=multi`), only two of them count. |
 | `0xFFFFFF80`–`0xFFFFFF8F` | The screen's registers: the cursor and the display offset (see [The screen](#the-screen)). |
 | `0xFFFFFF90`–`0xFFFFFF9F` | The Nexys4DDR's LEDs, seven-segment display, buttons, and switches (see [The Nexys4DDR's devices](#the-nexys4ddrs-devices)). On the MEGA65 they read 0 and take no write. On every board, `0xFFFFFF9E` reads the words of the RAM, `0x20000` on the MEGA65 and `0x10000` on the Nexys4DDR, and takes no write, and `0xFFFFFF9F` is the UART's baud rate (see [The baud rate](DEBUG_LINK.md#the-baud-rate)). The emulator has memory there, which reads 0 after a clear, so a program takes 0 to mean no limit. |
 | `0xFFFFFFA0`–`0xFFFFFFAF` | The SD card controller of [nice_cpu's SYSTEM.md §5](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#5-sd-card), with 2 slots on the MEGA65 and 1 on the Nexys4DDR (see [The SD card slots](#the-sd-card-slots)). |
 | `0xFFFFFFB0`–`0xFFFFFFBF` | The network station of [nice_cpu's SYSTEM.md §6](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#6-network-station), on every board: the Ethernet station's addresses, its counts of frames, and the state of the debug link over TCP (see [The Ethernet station](#the-ethernet-station)). |
 | `0xFFFFFFC0`–`0xFFFFFFCF` | The port for Ethernet frames of [nice_cpu's SYSTEM.md §7](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#7-ethernet-frames), on every board: a queue of 4 frames received and a send buffer, through which a program sends and receives frames of its own (see [Ethernet frames](#ethernet-frames)). |
-| `0xFFFFFFD0`–`0xFFFFFFDF` | The debug registers of [DEBUG.md §6](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEBUG.md#6-the-debug-registers), for the link only, here and below, of link version 7: `saved_pc` and `saved_sr` of the core at `0xFFFFFFD0` and `D1`, read only, which hold the PC and the SR saved at the entry of an interrupt routine and read as R0–R15 do, and the 4 watchpoints at `0xFFFFFFD4`–`DB`: their enable bits, two for each, their number, the address of the step that hit, and their addresses. A step of the core that reads or writes a watched word pauses it after the step, with the `w` notice and bit 9 of the stop register. While a watchpoint is enabled, the pipelined core runs more slowly. A data access of the core here goes to the memory. |
-| `0xFFFFFFE0`–`0xFFFFFFEF` | The debug registers of [DEBUG.md §6](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEBUG.md#6-the-debug-registers), for the link only: R0–R15 of the core. R1–R15 take a write while the core is paused, as a register-direct write of an instruction does ([ISA.md §4.3](https://github.com/MJoergen/nice_cpu/blob/main/doc/ISA.md#43-special-registers-in-operands)); R0 takes none. While the core runs they read its registers live, as `niceemu --link` returns them, each word from the cycle of its own read; the multi-cycle core adds 1 to R15 for each word it fetches, so its live R15 may be the address of a constant word, or of the word after the instruction it carries out, where the pipelined core's is an instruction's. After a halt they hold what the emulator prints. While the core is paused they hold its registers, with R15 the address of the next instruction, and a hold of the paused core keeps them. A hold of a running core leaves them undefined. |
-| `0xFFFFFFF0` | Control: hold, clear, hide, pause, and step (see [The control register](DEBUG_LINK.md#the-control-register)). |
-| `0xFFFFFFF1` | Read only: why the core halted. 0 while it has not, and after a clear, 1 for `HALT`, 2 for a reserved control word, 3 for `INT` inside an interrupt routine, and 4 for `RTI` outside one. Reason 5, the step limit of `niceemu --link`, is the emulator's only. |
-| `0xFFFFFFF2` | Read only: the version of the link, 7. |
-| `0xFFFFFFF3` | Read only: the bytes of free space in the core's input FIFO. |
-| `0xFFFFFFF4` | The enable bits of the breakpoints: bit i enables breakpoint i. Bits 4 to 31 read 0. |
-| `0xFFFFFFF5` | Read only: the number of breakpoints, 4. |
-| `0xFFFFFFF6` | Read only: the stop. From an `x` until the program goes on, steps, starts, or is cleared, bit 8 is 1 and bits 7–0 are the breakpoint's number, and from a `w` until then, bit 9 is 1 and bits 7–0 are the watchpoint's number. Otherwise 0. |
-| `0xFFFFFFF7` | Reserved: reads 0. |
-| `0xFFFFFFF8`–`0xFFFFFFFB` | The addresses of breakpoints 0 to 3. `0xFFFFFFFC`–`FF` read 0. A reset clears the breakpoints, and a hold, a start, and a clear keep them. |
+| `0xFFFFFFD0`–`0xFFFFFFDF` | The debug registers of [DEBUG.md §6](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEBUG.md#6-the-debug-registers), for the link only, here and below: `saved_pc`, `saved_sr`, and 4 watchpoints. While a watchpoint is enabled, the pipelined core runs more slowly. A data access of the core here, and below, goes to the RAM. |
+| `0xFFFFFFE0`–`0xFFFFFFEF` | R0–R15 of the core, read live while it runs. The multi-cycle core adds 1 to R15 for each word it fetches, so its live R15 may be the address of a constant word, or of the word after the instruction it carries out. |
+| `0xFFFFFFF0`–`0xFFFFFFFF` | The control register ([DEBUG_LINK.md](DEBUG_LINK.md#the-control-register)), the halt reason, never 5 here, the link's version, 7, the free space of the 2048-byte input FIFO, the stop, and 4 breakpoints at `0xFFFFFFF8`–`FB`. |
 
 Instruction fetches from `0xFFFFFF00`–`0xFFFFFFFF` read 0, as [ISA.md §8.3](https://github.com/MJoergen/nice_cpu/blob/main/doc/ISA.md#83-input-and-output)
 requires.
@@ -88,6 +80,119 @@ other steps, and the step counts differ. The cycle counter and the
 timer's counter run only while the core runs, so they stop at a halt, as
 the emulator's do. The timer's request goes straight to the core's IRQ,
 for it is the only device that raises one.
+
+### The byte windows
+
+The memory is word-addressed: each address is a word of 32 bits. C and
+WebAssembly hold byte addresses, and read and write single bytes and
+halfwords. The byte windows let a data access take a byte address, so
+that such a load or store is one `MOVE`, with no shifts and masks.
+
+A window address A has the window in its top four bits, and the byte
+address in the rest. It reaches the word W = (A >> 2) AND `0x03FFFFFF`,
+and byte A mod 4 of it, or halfword bit 1 of A. Byte 0 is bits 7..0 of
+the word, and halfword 0 bits 15..0, as in WebAssembly.
+
+| Window | Addresses | A read returns | A write changes |
+|---|---|---|---|
+| Word | `0x10000000`–`0x1FFFFFFF` | Word W. | Word W. |
+| Byte | `0x20000000`–`0x2FFFFFFF` | The byte, zero-extended. | The byte, to bits 7..0 of the value. |
+| Signed byte | `0x30000000`–`0x3FFFFFFF` | The byte, sign-extended. | As the byte window. |
+| Halfword | `0x40000000`–`0x4FFFFFFF` | The halfword, zero-extended. | The halfword, to bits 15..0 of the value. |
+| Signed halfword | `0x50000000`–`0x5FFFFFFF` | The halfword, sign-extended. | As the halfword window. |
+
+So the byte address of word W is 4 × W, and a window adds its base to
+it. For example, the word at `0x8000`, where a program under the monitor
+starts, has the byte address `0x20000`. If it holds `0x12A4C6E8`:
+
+| Address | Window | A read returns |
+|---|---|---|
+| `0x10020000` | Word | `0x12A4C6E8` |
+| `0x20020000` | Byte 0 | `0x000000E8` |
+| `0x20020001` | Byte 1 | `0x000000C6` |
+| `0x20020003` | Byte 3 | `0x00000012` |
+| `0x30020001` | Signed byte 1 | `0xFFFFFFC6` |
+| `0x40020000` | Halfword 0 | `0x0000C6E8` |
+| `0x50020000` | Signed halfword 0 | `0xFFFFC6E8` |
+| `0x50020002` | Signed halfword 1 | `0x000012A4` |
+
+A write of `0x000003FF` to `0x20020001` changes byte 1 only, and the
+word then holds `0x12A4FFE8`: the bits of the value above bit 7 are
+dropped. The word window ignores bits 1..0 of A, and the halfword
+windows bit 0, so an access through a window never straddles two words.
+With the byte address in R2, a program reads the byte with
+`MOVE R1, @0x20000000[R2]`, and writes R1 to it with
+`MOVE @0x20000000[R2], R1`.
+
+On the board:
+
+- **One access.** A write through a window changes its byte or halfword
+  in one access to the RAM, with byte enables, so no interrupt routine
+  can change the word between a read and a write of it. A read of a
+  byte or a halfword takes a cycle more than a read of a word, for the
+  timing at 100 MHz.
+- **The RAM repeats.** W reaches the first 64M words, `0x00000000`–
+  `0x03FFFFFF`, and the RAM repeats through them as through the whole
+  address space, so W reaches the word that its plain address does: RAM
+  word W mod 128K on the MEGA65, or W mod 64K on the Nexys4DDR, with
+  the ROM in front of the first `0x8000` words of each repeat while it
+  is shown. A window never reaches the screen, the font, or the I/O
+  registers.
+- **No code.** An instruction fetch from a window reads the RAM or the
+  ROM that the address aliases, where the emulator reads 0, so no code
+  runs through a window.
+- **The link** reads and writes through the windows as the core does.
+
+A C or wasm program built with nicewasm's `--byte-windows`, or
+`nicebuild.py --byte-windows`, uses them ([PROGRAMMING.md](PROGRAMMING.md)).
+
+### Stack, heap, and variables
+
+The board decodes only the low 17 bits of a RAM address on the MEGA65,
+and the low 16 on the Nexys4DDR, so the RAM repeats through the address
+space ([nice_cpu's SYSTEM.md §8](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#8-systems-built-on-the-fpga-core), Aliasing). Each word of the RAM has many
+addresses, and a program picks the one that suits it. The top of the
+address space is the top of the RAM: on the MEGA65, `0xFFFFF000` is RAM
+word `0x1F000`, as are `0x0001F000` and `0x0003F000`. Where a device or
+the screen is, its address reaches the device instead, and the RAM word
+behind it is reached by another address. So on the MEGA65,
+`0xFFFF0000`–`7FFF` is the screen, and the RAM words `0x10000`–`0x17FFF`
+are reached at `0x00010000`–`0x00017FFF`.
+
+A program that the tools load at 0, with the ROM hidden, has its code
+and its data from 0 up, and the runtime's start-up code sets SP to
+`0xFFFFFF00`, so its stack grows down from the top of the RAM:
+
+| RAM words, MEGA65 | Nexys4DDR | What |
+|---|---|---|
+| `0x00000` and up | `0x0000` and up | The program: its code, its static data, and, for C, its wasm linear memory. |
+| below `0x1FF00` | below `0xFF00` | The stack, from SP = `0xFFFFFF00` down. |
+| `0x1FF00`–`0x1FFFF` | `0xFF00`–`0xFFFF` | The words behind the I/O page, `0xFFFFFF00`–`FF`, that are no register. |
+
+A program under the monitor starts at `0x8000`, as the ROM is at
+`0x0000`–`0x7FFF`, and shares the monitor's stack, which grows down
+from `0xFFFFF000`. The monitor keeps the top 4K words for itself
+([monitor/README.md](../monitor/README.md)):
+
+| RAM words, MEGA65 | Nexys4DDR | Address | What |
+|---|---|---|---|
+| `0x08000` and up | `0x8000` and up | `0x00008000` and up | The program and the stack: 92K words on the MEGA65, and 28K on the Nexys4DDR. |
+| below `0x1F000` | below `0xF000` | below `0xFFFFF000` | The stack of the monitor and the program, from SP = `0xFFFFF000` down. |
+| `0x1F000`–`0x1F3FF` | `0xF000`–`0xF3FF` | `0xFFFFF000`–`F3FF` | The monitor's variables. |
+| `0x1F400`–`0x1FEFF` | `0xF400`–`0xFEFF` | `0xFFFFF400`–`FEFF` | The words of the monitor's C code, its FAT32, with its own stack ([monitor/INTERNALS.md](../monitor/INTERNALS.md)). |
+
+The heap of a C program is in its wasm linear memory, after its static
+data and its C stack, which are there too: `malloc` takes more of the
+linear memory with `memory.grow`, up to the cap that the program was
+built with. The NICE stack, which holds the return addresses and the
+registers that a call saves, is the one that SP points at. So the
+program, its linear memory, and the NICE stack must all fit in the RAM,
+and nothing checks that the stack does not grow into the program. A
+program learns the size of the RAM from `0xFFFFFF9E`
+([PROGRAMMING.md](PROGRAMMING.md#the-memory)).
+
+In the emulator the memory has 2^32 words and does not repeat, so the
+same addresses work there, but each is a word of its own.
 
 ## The screen
 
