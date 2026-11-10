@@ -295,9 +295,19 @@ Every MEGA65's internal card
 is FAT32, and so is any SDHC card as it is sold. SDXC cards come with exFAT
 and must be formatted. FAT12 and FAT16 are rejected with a message.
 
-- **Names** are 8.3, stored in upper case and matched in either case. Long
-  names are skipped when reading, so a file shows its 8.3 name. They are
-  never written. Deleting a file also deletes its long-name entries, so
+- **Names** are long names (VFAT, #102) of up to 255 characters, or
+  8.3 names, matched in either case. A long name is read from the
+  long-name entries before an 8.3 entry when their sequence numbers,
+  the last-entry bit, and the checksum check; a set that does not is
+  passed over, and the 8.3 name stands, as Windows and Linux do. The
+  lower-case flags of byte 12 are read too. A character outside ASCII is
+  `?`, and such a name is reached by its 8.3 name only. A new file
+  whose name is an 8.3 name in upper case, or in lower case in a part,
+  which byte 12 keeps, gets no long-name entries; any other gets them,
+  with an 8.3 alias as Windows and mtools make it, with a tail `~1`,
+  `~2`, and on, counted up, when the name does not fit. The entries
+  take a run of free slots in a row, which may go on into a new cluster
+  of the folder. Deleting a file also deletes its long-name entries, so
   that `fsck.fat` finds no orphans.
 - **Directories**: in FAT32 the root directory is a cluster chain like any
   other, so a current directory is one cluster number, and `cd` costs
@@ -313,8 +323,11 @@ and must be formatted. FAT12 and FAT16 are rejected with a message.
   clusters are taken as its data reaches them, each marked as the end of
   the chain in both copies of the FAT before the one before it is linked
   to it, and its data written; only the close puts the first cluster and
-  the size into the entry. A deletion marks the long-name entries, then
-  the entry, then frees the clusters. A new cluster is searched from
+  the size into the entry. A new file's long-name entries are written
+  before its 8.3 entry, so a reset between them leaves orphan long-name
+  entries, which `fsck.fat` removes as it frees lost clusters. A
+  deletion marks the long-name entries, then the entry, then frees the
+  clusters. A new cluster is searched from
   FSInfo's next-free hint, as the FAT of a 32 GB card has about four
   million entries, and a deletion moves the hint back to the clusters it
   freed. Before the first change of the FAT after a mount, FSInfo's free
@@ -384,7 +397,8 @@ program cannot do without it, as for state that the monitor keeps. So:
   state, the mounted card and the caches, is state that the monitor keeps,
   so the file API gets entries in the table, from 9 on, in the C ABI, with
   a negative result for an error. The table became 1.1 with the first
-  five, and 1.2 with `fs_write` and `fs_delete`:
+  five, 1.2 with `fs_write` and `fs_delete`, and 1.4 with `fs_readname`,
+  for the long names (#102):
 
 | Entry | Arguments | Result |
 |---|---|---|
@@ -395,11 +409,13 @@ program cannot do without it, as for state that the monitor keeps. So:
 | `fs_close` | R1 the handle | 0, or an error |
 | `fs_readdir` | R1 the handle of a directory, R2 a buffer of 4 words | 1 with the 8.3 name, the size, and the attributes in the buffer, or 0 at the end |
 | `fs_delete` | R1 the name | 0, or an error |
+| `fs_readname` | R1 the handle of a directory, R2 a buffer of 4 words, R3 a buffer of 256 words | as `fs_readdir`, and the name in R3's buffer, one character per word up to a 0 word: the long name, or the 8.3 name as a name |
 
   A file is opened on the slot of the last `fs_mount`. The first `fs_open`
   after reset mounts slot 0, or slot 1 when slot 0 has no card and the
   board has a slot 1.
-- **The monitor's commands**: `dir`; `load NAME` reads a program in the
+- **The monitor's commands**: `dir`, which shows the long names;
+  `load NAME` reads a program in the
   `.bin` text format, address and word pairs, which is what the tools
   build, so a program goes to the card by a copy on a PC; `save NAME
   ADDR N` writes N words from ADDR in the same format; and `del NAME`.
@@ -437,7 +453,9 @@ There are no device numbers and no Commodore DOS.
 
 ## Not included
 
-- exFAT, FAT12, FAT16, and writing long names.
+- exFAT, FAT12, and FAT16.
+- Characters outside ASCII in long names: they read as `?`, and are
+  never written.
 - High speed and UHS.
 - Interrupts from the controller: the ROM polls.
 - C programs' files. The C library calls nothing in the ROM, and a C

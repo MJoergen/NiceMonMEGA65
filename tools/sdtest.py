@@ -22,9 +22,10 @@ is checked against them:
   write the file under its 8.3 name, here or in the directory given,
   and nowhere else.
 
-On a held core, ls must list what is in NICE, with its sizes and long
-names, and the counts, and get must give each file's bytes, by its 8.3
-name and by its long name, in either case, to a file and to stdout. A
+On a held core, ls must list what is in NICE as the monitor's dir does,
+with its long names and sizes, the 8.3 names after them, and the
+counts, and get must give each file's bytes, by its 8.3 name and by its
+long name, in either case, to a file and to stdout. A
 missing file, a directory, and --slot of a slot with no card are errors,
 with status 1. With the image in slot 1 only, the tool takes slot 1.
 
@@ -40,8 +41,14 @@ fsck.fat -n, which may report only FSInfo's free count as unknown, and
 with mtype: put of a new file, of an empty one, and of one of 60
 clusters; put over a file, shorter and longer; del of a file with a long
 name, whose long-name entries must go too, and of the fragmented one;
-put of 20 files, which the folder grows by a cluster for; and put into
-the clusters that del freed. The errors: a name that is not 8.3, put
+put of long names: one with blanks, one in mixed case that fits 8.3, one
+in lower case, which needs none, two that share their first 6 letters,
+for the tails ~1 and ~2, one with characters that an 8.3 name may not
+have, and one of 255 characters, and put over one by its 8.3 name, with
+the 8.3 names and the rows that ls shows, and the files that mdir and
+mtype see; put of 20 files, which the folder grows by a cluster for; and
+put into the clusters that del freed. The errors: names that are not
+valid, put
 over and del of a directory and of a read-only file, and del of a
 missing one. A card that fills up keeps what fitted, with error 30, and
 a write-protected card is left as it was, with the controller's error 6.
@@ -49,8 +56,9 @@ a write-protected card is left as it was, with the controller's error 6.
 On a running core, put holds it, and starts it again from reset, which
 sim/sdhold.nasm shows by reading sector 5 again. Last, the monitor of
 the tests, monitor/build/monitor_test.bin, lists the card with dir, the
-tool puts a .bin file, and the monitor, started again, lists it and
-loads it; then the tool deletes it, and dir no longer lists it.
+tool puts a .bin file with a long name, my prog.bin, and the monitor,
+started again, lists it and loads it by that name; then the tool
+deletes it, and dir no longer lists it.
 
 It prints a line for each check, and last how many passed, and exits with
 status 1 when one fails. niceemu must be built first, with make -C
@@ -84,6 +92,12 @@ MB = 1024 * 1024
 
 passed = 0
 failed = 0
+
+
+def row(name: str, size: int | str) -> str:
+    """A row of the monitor's dir: the name in 24 columns, and the size
+    or <DIR> in 12."""
+    return f"{name:<24}{size:>12}"
 
 
 def check(name: str, ok: bool, detail: str = "") -> bool:
@@ -306,11 +320,11 @@ def test_held(imgs: dict[str, str], tmp: str) -> None:
         check("ls: the folder", rows[:1] == ["Directory of NICE"], out)
         check("ls: the counts", rows[-1:] == ["Files: 5, directories: 1"],
               out)
-        for row in ("HELLO    TXT          12", "EMPTY    TXT           0",
-                    "BIG      BIN       20000", "FRAG     BIN        3000",
-                    "SUB           <DIR>",
-                    "ALONGF~1 DAT         768  A long file name.dat"):
-            check(f"ls: {row!r}", row in rows, out)
+        for want in (row("HELLO.TXT", 12), row("EMPTY.TXT", 0),
+                     row("BIG.BIN", 20000), row("FRAG.BIN", 3000),
+                     row("SUB", "<DIR>"),
+                     row("A long file name.dat", 768) + "  ALONGF~1.DAT"):
+            check(f"ls: {want!r}", want in rows, out)
         check("ls: nothing of the root", "ROOT" not in out, out)
         for name, data in FILES.items():
             dest = os.path.join(tmp, "got")
@@ -347,7 +361,7 @@ def test_held(imgs: dict[str, str], tmp: str) -> None:
                   r.returncode == 1 and want in r.stderr.decode(), text(r))
     finally:
         emu.close()
-    for name, want in (("mbr", "HELLO    TXT          12"),
+    for name, want in (("mbr", row("HELLO.TXT", 12)),
                        ("nonice", "File error 29, no folder NICE on the card"),
                        ("fat16", "File error 18, FAT16, which is not "
                         "supported"),
@@ -366,7 +380,7 @@ def test_held(imgs: dict[str, str], tmp: str) -> None:
     try:
         r = emu.tool("ls")
         check("the card in slot 1 only: ls takes slot 1",
-              "HELLO    TXT          12" in text(r), text(r))
+              row("HELLO.TXT", 12) in text(r), text(r))
     finally:
         emu.close()
     # A long name that is a path: the file is written under its 8.3 name
@@ -378,7 +392,7 @@ def test_held(imgs: dict[str, str], tmp: str) -> None:
     try:
         r = emu.tool("ls")
         check("evil.img: ls shows the long name ../evil.dat",
-              "ALONGF~1 DAT         768  ../evil.dat" in text(r), text(r))
+              row("../evil.dat", 768) + "  ALONGF~1.DAT" in text(r), text(r))
         r = emu.tool("get", "ALONGF~1.DAT", cwd=here)
         check("evil.img: get writes ALONGF~1.DAT here, not ../evil.dat",
               r.returncode == 0 and os.path.exists(safe) and
@@ -579,7 +593,7 @@ def test_writes(imgs: dict[str, str], tmp: str) -> None:
                   text(r))
         r = emu.tool("del", "a long FILE name.dat")
         check("del by the long name", r.returncode == 0 and
-              "Deleted ALONGF~1.DAT" in r.stdout.decode(), text(r))
+              "Deleted A long file name.dat" in r.stdout.decode(), text(r))
         r = emu.tool("del", "frag.bin")
         check("del FRAG.BIN", r.returncode == 0, text(r))
     finally:
@@ -591,6 +605,48 @@ def test_writes(imgs: dict[str, str], tmp: str) -> None:
     check("mdir: the deleted files and their long names are gone",
           not any(n.lower().startswith(("a long", "alongf", "frag"))
                   for n in names), " ".join(names))
+    print("long names written")
+    longs = {
+        "a long name.bin": b"long\n",
+        "mixed.Bin": b"mixed\n",
+        "lower.txt": b"lower\n",
+        "mandelbrot1.txt": b"one\n",
+        "mandelbrot2.txt": b"two\n",
+        "a+b;c.txt": b"plus\n",
+        "n" * 251 + ".txt": b"n\n",
+    }
+    emu = Emu(img)
+    try:
+        for name, body in longs.items():
+            with open(src, "wb") as f:
+                f.write(body)
+            r = emu.tool("put", src, name)
+            check(f"put {name[:20]!r}", r.returncode == 0, text(r))
+        r = emu.tool("get", "A LONG NAME.BIN", "-")
+        check("get by the long name in upper case",
+              r.returncode == 0 and r.stdout == b"long\n", text(r))
+        with open(src, "wb") as f:
+            f.write(b"over\n")
+        r = emu.tool("put", src, "MIXED.BIN")
+        check("put over mixed.Bin by its 8.3 name", r.returncode == 0,
+              text(r))
+        longs["mixed.Bin"] = b"over\n"
+        r = emu.tool("ls")
+        for want in (row("a long name.bin", 5) + "  ALONGN~1.BIN",
+                     row("mixed.Bin", 5) + "  MIXED.BIN",
+                     row("lower.txt", 6),
+                     row("mandelbrot1.txt", 4) + "  MANDEL~1.TXT",
+                     row("mandelbrot2.txt", 4) + "  MANDEL~2.TXT",
+                     row("a+b;c.txt", 5) + "  A_B_C~1.TXT"):
+            check(f"ls: {want!r}", want in r.stdout.decode(), text(r))
+    finally:
+        emu.close()
+    check_card(img, "after the long names")
+    for name, body in longs.items():
+        check(f"mtype {name[:20]!r}", mtype(img, name) == body)
+    names = mnames(img)
+    check("mdir: the long names", all(n in names for n in longs if " " not in n),
+          " ".join(names))
     print("20 files, which grow the folder, and the freed clusters taken")
     emu = Emu(img)
     try:
@@ -609,7 +665,7 @@ def test_writes(imgs: dict[str, str], tmp: str) -> None:
         r = emu.tool("get", "f20.txt", "-")
         check("get F20.TXT back", r.stdout == b"file 20\n" * 20, text(r))
         r = emu.tool("ls")
-        check("ls lists 27 files", "Files: 27, directories: 1" in
+        check("ls lists 34 files", "Files: 34, directories: 1" in
               r.stdout.decode(), text(r))
     finally:
         emu.close()
@@ -633,13 +689,14 @@ def test_writes(imgs: dict[str, str], tmp: str) -> None:
         before = g.read()
     emu = Emu(img)
     try:
-        r = emu.tool("put", os.path.join(tmp, "toolongname.txt"))
-        check("put of a host file whose name is not 8.3",
-              r.returncode == 1 and "File error 20, not an 8.3 name" in
+        r = emu.tool("put", os.path.join(tmp, "a:b.txt"))
+        check("put of a host file whose name is not valid",
+              r.returncode == 1 and "File error 20, not a valid name" in
               r.stderr.decode(), text(r))
-        r = emu.tool("put", src, "A.B.C")
-        check("put as A.B.C: File error 20", r.returncode == 1 and
-              "File error 20" in r.stderr.decode(), text(r))
+        for bad in ("a*b", "end.", "end "):
+            r = emu.tool("put", src, bad)
+            check(f"put as {bad!r}: File error 20", r.returncode == 1 and
+                  "File error 20" in r.stderr.decode(), text(r))
         for args, want in ((("put", src, "SUB"), "File error 22"),
                            (("del", "SUB"), "File error 22"),
                            (("put", src, "NEW.TXT"), "File error 32"),
@@ -766,7 +823,7 @@ def test_monitor(imgs: dict[str, str], tmp: str) -> None:
         return
     img = copy(imgs["super"], os.path.join(tmp, "mon.img"))
     emu = Emu(img, prog=MONITOR)
-    prog = os.path.join(tmp, "prog.bin")
+    prog = os.path.join(tmp, "my prog.bin")
     with open(prog, "w") as f:
         f.write("8000 12345678\n8001 9ABCDEF0\n")
     try:
@@ -780,15 +837,15 @@ def test_monitor(imgs: dict[str, str], tmp: str) -> None:
         finally:
             link.close()
         r = emu.tool("put", prog)
-        check("put PROG.BIN while the monitor runs", r.returncode == 0 and
+        check("put my prog.bin while the monitor runs", r.returncode == 0 and
               "started again" in r.stderr.decode(), text(r))
         link = emu.link()
         try:
             out = console(link, "dir")
-            check("the monitor, started again, lists PROG.BIN",
-                  "PROG     BIN          28" in out and
+            check("the monitor, started again, lists my prog.bin",
+                  row("my prog.bin", 28) in out and
                   "Files: 6, directories: 1" in out, repr(out))
-            out = console(link, "load prog.bin")
+            out = console(link, 'load "my prog.bin"')
             check("and loads it", "Words loaded: 2, 00008000 to 00008001"
                   in out, repr(out))
             pauses = link.pauses
@@ -802,12 +859,12 @@ def test_monitor(imgs: dict[str, str], tmp: str) -> None:
             link.control(RAM)
         finally:
             link.close()
-        r = emu.tool("del", "prog.bin")
-        check("del PROG.BIN", r.returncode == 0, text(r))
+        r = emu.tool("del", "MY PROG.BIN")
+        check("del my prog.bin", r.returncode == 0, text(r))
         link = emu.link()
         try:
             out = console(link, "dir")
-            check("dir no longer lists it", "PROG" not in out and
+            check("dir no longer lists it", "prog" not in out and
                   "Files: 5, directories: 1" in out, repr(out))
         finally:
             link.close()

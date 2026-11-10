@@ -56,8 +56,9 @@ int fs_mount(unsigned slot);
 
 // A file of the folder NICE of the card's root directory opened, with
 // mode 0 to read, with mode 1 to write, made or truncated (table 1.2), or
-// with mode 2 the folder itself, whose name is empty or /. Two may be
-// open at once. A handle, 0 or 1, or an error.
+// with mode 2 the folder itself, whose name is empty or /. The name is
+// its long name, up to 255 characters, or its 8.3 name, in either case
+// (table 1.4). Two may be open at once. A handle, 0 or 1, or an error.
 int fs_open(unsigned name, int mode);
 
 // Up to n bytes of a file read, one per word from buf. The number read, 0
@@ -78,7 +79,8 @@ int fs_close(int handle);
 // error. Table 1.2.
 int fs_write(int handle, unsigned buf, unsigned n);
 
-// A file of the folder NICE deleted, with its long name. 0, or an error.
+// A file of the folder NICE deleted, with its long-name entries. 0, or an
+// error.
 // Table 1.2.
 int fs_delete(unsigned name);
 
@@ -104,5 +106,13 @@ int udp_recv(unsigned buf, unsigned n, unsigned src);
 
 // The endpoint closed, and the port for Ethernet frames disabled. 0.
 int udp_close(void);
+
+// The next entry of a directory, as fs_readdir gives it in the 4 words
+// from buf, and its name in the words from name, one character per word
+// up to a 0 word, 256 words at most: its long name, or else its 8.3 name
+// as a name, HELLO.BIN, in lower case where the entry says so. A
+// character of a long name outside ASCII is ?. 1, 0 at the end, or an
+// error. Table 1.4 (monitor/README.md, "Files").
+int fs_readname(int handle, unsigned buf, unsigned name);
 
 #endif

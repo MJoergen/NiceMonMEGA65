@@ -343,7 +343,7 @@ The file entries, `fs_mount` to `fs_delete`, add those of FAT32
 | -17 | FAT12, which is not supported |
 | -18 | FAT16, which is not supported |
 | -19 | exFAT, which is not supported |
-| -20 | Not an 8.3 name |
+| -20 | Not a valid name: empty, or longer than 255 characters; for a new file also a name with a control code, one of `"*/:<>?`, a backslash, or a vertical bar, or one that ends in a blank or a dot |
 | -21 | No such file |
 | -22 | A directory, opened as a file |
 | -23 | Too many open files: two are |

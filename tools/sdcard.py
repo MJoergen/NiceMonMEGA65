@@ -14,15 +14,20 @@ that --folder names:
     tools/sdcard.py --eth 192.168.1.65 put prog.bas [NAME]
     tools/sdcard.py --eth 192.168.1.65 del NAME
 
-ls prints the rows of the monitor's dir, with the long name, where a file
-has one, after its row. get takes the 8.3 name or the long name, in
+ls prints the rows of the monitor's dir, which shows a file's long name
+where it has one, with its 8.3 name after its size. get takes the 8.3
+name or the long name, in
 either case, and writes the file to DEST, by default its name in the
 current directory, or with DEST - to stdout: the long name, when it is a
 plain file name, or else the 8.3 name, so that a card's name with a
 path in it, such as ../x, writes nowhere else. put writes the host's file
-SRC, or stdin for -, as the file NAME, by default SRC's own name, which
-must be an 8.3 name: it makes the file, or truncates it when it is
-there. del deletes a file, by either name, with its long name.
+SRC, or stdin for -, as the file NAME, by default SRC's own name, a long
+name of up to 255 characters or an 8.3 name: it makes the file, or
+truncates it when it is there, by either name. A new file gets
+long-name entries and an 8.3 alias with a tail, MANDEL~1.BIN, as
+fat32.c makes them, unless its name is an 8.3 name in upper case, or in
+lower case in a part. del deletes a file, by either name, with its
+long-name entries.
 
 The writes keep to fat32.c's order, in which a reset at any point leaves
 the card no worse than with lost clusters, which fsck.fat frees: FSInfo's
@@ -30,10 +35,10 @@ free count set to unknown before the first change of the FAT, a new
 cluster marked as the end of its chain in every FAT before the one
 before it is linked to it, a truncated file's entry emptied before its
 clusters are freed, a new file's first cluster and size put into its
-entry last, and a deleted file's long-name entries marked before its
-entry. No sector outside the partition is written, nor one below its
-first FAT but FSInfo. The date and time of a new entry are the host's.
-Long names are not written, as the monitor writes none.
+entry last, a new file's long-name entries written before its 8.3 entry,
+and a deleted file's long-name entries marked before its entry. No
+sector outside the partition is written, nor one below its first FAT
+but FSInfo. The date and time of a new entry are the host's.
 
 The core: for ls and get, a running one is paused, and goes on after
 them. While it is paused, by the tool or before, the tool keeps to the
@@ -69,6 +74,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import struct
 import sys
 import time
 from collections import OrderedDict
@@ -115,7 +121,7 @@ FS_ERRORS = {
     17: "FAT12, which is not supported",
     18: "FAT16, which is not supported",
     19: "exFAT, which is not supported",
-    20: "not an 8.3 name",
+    20: "not a valid name",
     21: "no such file",
     22: "a directory",
     26: "the FAT is damaged",
@@ -136,9 +142,18 @@ EOC = 0x0FFFFFFF
 END = 0x0FFFFFF8
 # The bytes of a directory at most, as fat32.c's DIR_MAX
 DIR_MAX = 65536 * 32
-# The characters that an 8.3 name may not have, beside those up to blank
-# and from 0x7F (fat32.c's name83)
-NOT_83 = set('"*+,./:;<=>?[\\]|')
+# The characters that no name may have, beside those below blank and
+# from 0x7F (fat32.c's bad), and those that a long name may have, but an
+# 8.3 name not (fat32.c's not83)
+BAD = set('"*/:<>?\\|')
+NOT_83 = set(" +,.;=[]")
+# The characters of a long name at most, and its long-name entries
+NAME_MAX = 255
+LFN_MAX = 20
+# The bytes of a long-name entry that hold its 13 characters, UTF-16
+LFN_AT = (1, 3, 5, 7, 9, 14, 16, 18, 20, 22, 24, 28, 30)
+# The columns of the name in a row of dir, as fat32.c's DIR_NAME
+DIR_NAME = 24
 
 
 class SdError(Exception):
@@ -428,17 +443,91 @@ def boot_kind(b: bytes) -> int:
     return 0
 
 
-def name83(name: str) -> bytes:
+def bad(c: str) -> bool:
+    """A character that no name may have (fat32.c's bad)."""
+    return c < " " or c >= "\x7f" or c in BAD
+
+
+def name83(name: str) -> tuple[bytes, int] | None:
     """The 11 bytes of the 8.3 name name, in upper case, as fat32.c's
     name83 makes them: a base of 1 to 8 characters, and an extension of
-    1 to 3 after a dot, if any."""
+    1 to 3 after a dot, if any; and the flags of byte 12 for a part in
+    lower case, or -1 for a part in mixed case. None when name is no 8.3
+    name."""
     base, dot, ext = name.partition(".")
     if not base or dot and not ext or len(base) > 8 or len(ext) > 3:
-        raise FileError(E_NAME)
-    for c in base + ext:
-        if c <= " " or c >= "\x7f" or c in NOT_83:
-            raise FileError(E_NAME)
-    return (base.upper().ljust(8) + ext.upper().ljust(3)).encode("ascii")
+        return None
+    if any(bad(c) or c in NOT_83 for c in base + ext):
+        return None
+    lower = 0
+    for part, flag in ((base, 0x08), (ext, 0x10)):
+        if part != part.upper():
+            lower = -1 if part != part.lower() or lower < 0 else lower | flag
+    return (base.upper().ljust(8) + ext.upper().ljust(3)).encode("ascii"), lower
+
+
+def long_ok(name: str) -> bool:
+    """name as the long name of a new file (fat32.c's longok): 1 to 255
+    characters that bad() lets through, not ending in a blank or a dot."""
+    return (0 < len(name) <= NAME_MAX and not any(bad(c) for c in name)
+            and name[-1] not in " .")
+
+
+def basis(name: str) -> tuple[bytes, bool]:
+    """The basis of name's 8.3 alias, as fat32.c's basis makes it: the
+    base from the characters before the last dot, and the extension from
+    those after it, in upper case, without blanks and dots, and with _ for
+    +,;=[]; and whether that lost a character, or cut a part, so that the
+    alias needs a tail. A name whose dots are all at its start has no
+    extension."""
+    dot = len(name)
+    seen = False
+    for i, c in enumerate(name):
+        if c == ".":
+            dot = i if seen else len(name)
+        elif c != " ":
+            seen = True
+    parts = ["", ""]
+    lossy = False
+    for i, c in enumerate(name):
+        if i == dot:
+            continue
+        k = int(i > dot)
+        if c in " ." or len(parts[k]) == (3 if k else 8):
+            lossy = True
+            continue
+        if c in NOT_83:
+            c = "_"
+            lossy = True
+        parts[k] += c.upper()
+    return (parts[0].ljust(8) + parts[1].ljust(3)).encode("ascii"), lossy
+
+
+def with_tail(raw: bytes, t: int) -> bytes:
+    """The basis raw with the tail ~t, the base cut to make room for it."""
+    base = raw[:8].rstrip(b" ")
+    tail = b"~%d" % t
+    return (base[:8 - len(tail)] + tail).ljust(8) + raw[8:]
+
+
+def lfn_entries(name: str, raw: bytes) -> list[bytes]:
+    """The long-name entries of name for the 8.3 name raw, in the order
+    on the card: the last part first, its number with bit 6 set, then
+    down to 1, the characters after the name a 0 and then 0xFFFF."""
+    n = (len(name) + 12) // 13
+    s = lfn_sum(raw)
+    out = []
+    for m in range(n, 0, -1):
+        e = bytearray(32)
+        e[0] = m | (0x40 if m == n else 0)
+        e[11] = 0x0F
+        e[13] = s
+        for j, at in enumerate(LFN_AT):
+            pos = 13 * (m - 1) + j
+            put16(e, at, ord(name[pos]) if pos < len(name)
+                  else 0 if pos == len(name) else 0xFFFF)
+        out.append(bytes(e))
+    return out
 
 
 def fat_stamp(t: float) -> tuple[int, int]:
@@ -462,6 +551,7 @@ class Entry:
     lba: int = 0
     off: int = 0
     lfn: list[tuple[int, int]] = field(default_factory=list)
+    case: int = 0
 
     @property
     def is_dir(self) -> bool:
@@ -474,14 +564,33 @@ class Entry:
         ext = self.raw[8:].decode("latin-1").rstrip()
         return base + "." + ext if ext else base
 
-    def row(self) -> str:
-        """The row of the monitor's dir: the 8.3 name as its 11 bytes,
-        with a blank between the two parts, and the size or <DIR>."""
-        text = self.raw[:8].decode("latin-1") + " " + \
-            self.raw[8:].decode("latin-1")
-        if self.is_dir:
-            return text + "  <DIR>"
-        return f"{text}{self.size:12d}"
+    @property
+    def name(self) -> str:
+        """The name as the monitor shows it, as fat32.c's lname has it:
+        the long name, or else the 8.3 name as a name, each part in lower
+        case when byte 12 says so, with ? for a character outside
+        ASCII."""
+        if self.long is not None:
+            return "".join(c if " " <= c < "\x7f" else "?"
+                           for c in self.long)
+        base = self.raw[:8].decode("latin-1").rstrip()
+        ext = self.raw[8:].decode("latin-1").rstrip()
+        if self.case & 0x08:
+            base = base.lower()
+        if self.case & 0x10:
+            ext = ext.lower()
+        text = base + "." + ext if ext else base
+        return "".join(c if " " <= c < "\x7f" else "?" for c in text)
+
+    def rows(self) -> list[str]:
+        """The rows of the monitor's dir: the name in DIR_NAME columns,
+        or on a row of its own when it is that long or longer, and the
+        size or <DIR> in 12."""
+        name = self.name
+        size = "<DIR>" if self.is_dir else str(self.size)
+        if len(name) >= DIR_NAME:
+            return [name, " " * DIR_NAME + f"{size:>12}"]
+        return [f"{name:<{DIR_NAME}}{size:>12}"]
 
 
 def lfn_sum(raw: bytes) -> int:
@@ -494,20 +603,28 @@ def lfn_sum(raw: bytes) -> int:
 
 def lfn_text(parts: list[bytes], raw: bytes) -> str | None:
     """The long name of the long-name entries before an entry, in the
-    order on the card, or None when they are not those of raw: a wrong
-    checksum, or numbers out of sequence."""
-    if not parts:
+    order on the card, as fat32.c's entry() takes them: those from the
+    last with bit 6 set in its number, or None when they are not those of
+    raw: a wrong checksum, numbers out of sequence, more than LFN_MAX
+    entries, or a name that is empty or longer than NAME_MAX."""
+    starts = [i for i, p in enumerate(parts) if p[0] & 0x40]
+    if not starts:
         return None
+    parts = parts[starts[-1]:]
     n = len(parts)
-    if parts[0][0] != 0x40 | n:
+    if parts[0][0] & 0x1F != n or n > LFN_MAX:
         return None
-    text = b""
+    units: list[int] = []
     for i, p in enumerate(reversed(parts)):
         if p[0] & 0x1F != i + 1 or p[13] != lfn_sum(raw):
             return None
-        text += p[1:11] + p[14:26] + p[28:32]
-    name = text.decode("utf-16-le", errors="replace")
-    return name.split("\0", 1)[0]
+        units += [u16(p, at) for at in LFN_AT]
+    if 0 in units:
+        units = units[:units.index(0)]
+    if not 0 < len(units) <= NAME_MAX:
+        return None
+    return b"".join(struct.pack("<H", u) for u in units).decode(
+        "utf-16-le", errors="replace")
 
 
 class Volume:
@@ -621,7 +738,7 @@ class Volume:
                 raw = (b"\xe5" + e[1:11]) if e[0] == 0x05 else e[:11]
                 yield Entry(raw, lfn_text(parts, e[:11]), e[11],
                             u16(e, 20) << 16 | u16(e, 26), u32(e, 28),
-                            lba, at, where)
+                            lba, at, where, e[12])
                 parts, where = [], []
 
     def listing(self) -> list[Entry]:
@@ -635,18 +752,26 @@ class Volume:
             listed = self.listing()
         files = sum(not e.is_dir for e in listed)
         return ([f"Directory of {self.folder.upper()}"] +
-                [e.row() for e in listed] +
+                [r for e in listed for r in e.rows()] +
                 [f"Files: {files}, directories: {len(listed) - files}"])
 
     def find(self, name: str) -> Entry:
         """The entry of the folder whose long name or 8.3 name is name, in
         either case."""
+        e = self.lookup(name)
+        if e is None:
+            raise FileError(E_NOFILE)
+        return e
+
+    def lookup(self, name: str) -> Entry | None:
+        """The entry of the folder whose long name or 8.3 name is name, in
+        either case, or None."""
         want = name.casefold()
         for e in self.listing():
             if (e.long is not None and e.long.casefold() == want
                     or e.short.casefold() == want):
                 return e
-        raise FileError(E_NOFILE)
+        return None
 
     def contents(self, e: Entry) -> bytes:
         """The bytes of the file of the entry e."""
@@ -743,33 +868,44 @@ class Volume:
                 self.hint = c
             c = n
 
-    def make(self, raw: bytes) -> tuple[int, int]:
-        """A new entry of the 8.3 name raw in the folder, empty, in the
-        first free entry, or in a new cluster of zeros added to the folder,
-        written. Its sector and offset."""
+    def make(self, raw: bytes, lower: int = 0,
+             lfn: list[bytes] | None = None) -> tuple[int, int]:
+        """A new entry of the 8.3 name raw in the folder, empty, with the
+        flags lower in byte 12, and the long-name entries lfn before it,
+        in the first run of free entries for all, which may go on into a
+        new cluster of zeros added to the folder. The long-name entries
+        are written first, then the 8.3 entry, a sector at a time, as
+        fat32.c's make writes them. Its sector and offset."""
         date, tod = fat_stamp(self.now)
+        e = bytearray(32)
+        e[:11] = raw
+        e[11] = 0x20            # archive
+        e[12] = lower
+        put16(e, 14, tod)       # created,
+        put16(e, 16, date)
+        put16(e, 18, date)      # read,
+        put16(e, 22, tod)       # and written
+        put16(e, 24, date)
+        todo = (lfn or []) + [bytes(e)]
+        run: list[tuple[int, int]] = []
         pos, last = 0, 0
         clus = self.dir
-        while True:
-            if pos >= DIR_MAX:
-                raise FileError(E_FULL)
+        while len(run) < len(todo):
             for k in range(self.spc):
                 lba = self.first_sector(clus) + k
-                b = bytearray(self.read(lba))
+                b = self.read(lba)
                 for at in range(0, 512, 32):
+                    if len(run) == len(todo):
+                        break
+                    if pos >= DIR_MAX:
+                        raise FileError(E_FULL)
                     if b[at] in (0, 0xE5):
-                        e = bytearray(32)
-                        e[:11] = raw
-                        e[11] = 0x20            # archive
-                        put16(e, 14, tod)       # created,
-                        put16(e, 16, date)
-                        put16(e, 18, date)      # read,
-                        put16(e, 22, tod)       # and written
-                        put16(e, 24, date)
-                        b[at:at + 32] = e
-                        self.wr(lba, bytes(b))
-                        return lba, at
+                        run.append((lba, at))
+                    else:
+                        run = []
                     pos += 32
+            if len(run) == len(todo):
+                break
             last = clus
             clus = self.next(clus)
             if clus >= END:
@@ -781,6 +917,35 @@ class Volume:
                 self.take(last, clus)
             elif clus < 2 or clus >= self.top:
                 raise FileError(E_BADFAT)
+        sector = bytearray()
+        for i, ((lba, at), data) in enumerate(zip(run, todo)):
+            if i == 0 or lba != run[i - 1][0]:
+                sector = bytearray(self.read(lba))
+            sector[at:at + 32] = data
+            if i == len(run) - 1 or run[i + 1][0] != lba:
+                self.wr(lba, bytes(sector))
+        return run[-1]
+
+    def new_name(self, name: str) -> tuple[bytes, int, list[bytes]]:
+        """The 8.3 name of a new file name, the flags of its byte 12, and
+        its long-name entries, as fat32.c's newname makes them: name
+        itself when it is an 8.3 name in upper case, or in lower case in a
+        part, with no long-name entries; or else its basis, with the first
+        tail ~1, ~2, and on that no entry of the folder has, when it needs
+        one."""
+        got = name83(name)
+        if got is not None and got[1] >= 0:
+            return got[0], got[1], []
+        if not long_ok(name):
+            raise FileError(E_NAME)
+        raw, lossy = basis(name)
+        if lossy:
+            taken = {e.raw for e in self.listing()}
+            t = 1
+            while with_tail(raw, t) in taken:
+                t += 1
+            raw = with_tail(raw, t)
+        return raw, 0, lfn_entries(name, raw)
 
     def writable(self, e: Entry) -> None:
         if e.is_dir:
@@ -789,14 +954,13 @@ class Volume:
             raise FileError(E_RDONLY)
 
     def put(self, name: str, data: bytes) -> int:
-        """Writes data as the file name of the folder, an 8.3 name, made,
-        or truncated when it is there, and returns its size. When the card
-        fills up, the file keeps what fitted, and FileError 30 follows."""
-        raw = name83(name)
-        old = [e for e in self.listing() if e.raw == raw]
-        if old:
+        """Writes data as the file name of the folder, its long name or
+        its 8.3 name, made, or truncated when it is there, and returns its
+        size. When the card fills up, the file keeps what fitted, and
+        FileError 30 follows."""
+        e = self.lookup(name)
+        if e is not None:
             # Truncated: the entry emptied, then its clusters freed
-            e = old[0]
             self.writable(e)
             b = bytearray(self.read(e.lba))
             put16(b, e.off + 20, 0)
@@ -807,7 +971,7 @@ class Volume:
             self.infodone()
             elba, eoff = e.lba, e.off
         else:
-            elba, eoff = self.make(raw)
+            elba, eoff = self.make(*self.new_name(name))
             self.infodone()
         first = clus = 0
         done = 0
@@ -865,12 +1029,16 @@ class Volume:
 
 
 def do_ls(vol: Volume) -> None:
-    """The rows of the monitor's dir, with the long names."""
+    """The rows of the monitor's dir, with the 8.3 name after those of a
+    file whose name is a long name."""
     listed = vol.listing()
     rows = vol.rows(listed)
     print(rows[0])
-    for e, row in zip(listed, rows[1:-1]):
-        print(row + (f"  {e.long}" if e.long is not None else ""))
+    for e in listed:
+        *first, last = e.rows()
+        for row in first:
+            print(row)
+        print(last + (f"  {e.short}" if e.long is not None else ""))
     print(rows[-1])
 
 
@@ -903,14 +1071,15 @@ def do_get(vol: Volume, name: str, dest: str | None) -> None:
 
 
 def put_name(src: str, name: str | None) -> str:
-    """The 8.3 name that put writes src as, checked before the link
-    opens."""
+    """The name that put writes src as, checked before the link opens: an
+    8.3 name, or a long name that fat32.c's longok takes."""
     if name is None:
         if src == "-":
             raise FileError(E_NAME)
         name = os.path.basename(src)
-    name83(name)
-    return name.upper()
+    if name83(name) is None and not long_ok(name):
+        raise FileError(E_NAME)
+    return name
 
 
 def main() -> None:
@@ -932,7 +1101,7 @@ def main() -> None:
                         "(default %(default)s, the monitor's)")
     cmds = parser.add_subparsers(dest="cmd", required=True)
     cmds.add_parser("ls", help="list the folder, as the monitor's dir does, "
-                    "with the long names")
+                    "with the 8.3 names of the long names")
     get = cmds.add_parser("get", help="copy a file of the folder to the host")
     get.add_argument("name", help="its 8.3 name or its long name")
     get.add_argument("dest", nargs="?",
@@ -942,7 +1111,8 @@ def main() -> None:
                           "folder; holds the core, and starts it again")
     put.add_argument("src", help="the host's file, or - for stdin")
     put.add_argument("name", nargs="?",
-                     help="the 8.3 name on the card (default: SRC's name)")
+                     help="the name on the card, a long name or an 8.3 "
+                     "name (default: SRC's name)")
     rm = cmds.add_parser("del", help="delete a file of the folder; holds "
                          "the core, and starts it again")
     rm.add_argument("name", help="its 8.3 name or its long name")
@@ -958,7 +1128,7 @@ def main() -> None:
                     data = f.read()
     except FileError as e:
         sys.exit(f"sdcard.py: {e}; give the name on the card, such as "
-                 "put SRC PROG.BAS")
+                 "put SRC prog.bas")
     except OSError as e:
         sys.exit(f"sdcard.py: {e}")
     link = open_link(args)
@@ -976,7 +1146,7 @@ def main() -> None:
                 print(f"{name}: {n} bytes written")
             else:
                 gone = vol.delete(args.name)
-                print(f"Deleted {gone.short}")
+                print(f"Deleted {gone.name}")
     except (SdError, FileError, LinkError, OSError) as e:
         sys.exit(f"sdcard.py: {e}")
     finally:

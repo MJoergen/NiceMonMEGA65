@@ -168,7 +168,7 @@ DEMO_MAX        .EQU    PROGRAM-DEMO    ; more words than fit from DEMO + 1 belo
 COLOR           .EQU    0x000FFF00      ; white on black, the color at the cold start
 OUT_LINE        .EQU    1
 OUT_SCREEN      .EQU    2
-TABLE_VERSION   .EQU    0x00010003      ; what mon_version returns: 1.3
+TABLE_VERSION   .EQU    0x00010004      ; what mon_version returns: 1.4
 PAGE            .EQU    24              ; the rows of a Page Up or Page Down
 SCR_MAX         .EQU    0x7FFF          ; the largest display offset
 
@@ -200,6 +200,7 @@ SCR_MAX         .EQU    0x7FFF          ; the largest display offset
                 JMP     udp_send        ; 17 at 0x22
                 JMP     udp_recv        ; 18 at 0x24
                 JMP     udp_close       ; 19 at 0x26
+                JMP     _fat_readname   ; 20 at 0x28, fs_readname
 
 ; mon_reset: the cold start, entry 0, which reset runs and a program may
 ; call. E is cleared, the timer stopped, VBASE set to 0, the font base

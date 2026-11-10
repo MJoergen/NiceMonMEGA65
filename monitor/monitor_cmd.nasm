@@ -799,8 +799,10 @@ del_bad
                 JMP     main
 
 ; fs_name: the name of a file in the line from R1, after blanks, ended in
-; the line with a 0 at the first blank after it: R1 the name, and R3 the
-; rest of the line, or R1 = 0 when the line has no more. Uses R1-R3.
+; the line with a 0 at the first blank after it, or in quotes, "my
+; prog.bin", with blanks in it, ended with a 0 at the closing quote: R1
+; the name, and R3 the rest of the line, or R1 = 0 when the line has no
+; more, or no closing quote. Uses R1-R3.
 fs_name
                 CMP     @R1, 0x20
         ?Z      ADD     R1, R1, 1
@@ -808,6 +810,8 @@ fs_name
                 TST     @R1
         ?Z      MOVE    R1, 0
         ?Z      RET
+                CMP     @R1, 0x22       ; "
+        ?Z      JMP     fs_quoted
                 MOVE    R3, R1
 :
                 ADD     R3, R3, 1
@@ -815,6 +819,20 @@ fs_name
         ?Z      RET
                 CMP     @R3, 0x20
         ?!Z     JMP     :-
+                MOVE    @R3++, 0
+                RET
+fs_quoted
+                ADD     R1, R1, 1
+                MOVE    R3, R1
+:
+                TST     @R3
+        ?Z      MOVE    R1, 0           ; no closing quote
+        ?Z      RET
+                CMP     @R3, 0x22
+        ?Z      JMP     :+
+                ADD     R3, R3, 1
+                JMP     :-
+:
                 MOVE    @R3++, 0
                 RET
 
@@ -1008,7 +1026,7 @@ S_OAD           .ASCII_L 'oad'
 S_BADDIR
                 .ASCII_L 'dir [SLOT]: the slot in hex, such as dir 1'
 S_BADLOAD
-                .ASCII_L 'load NAME: the 8.3 name of a file, such as load HELLO.BIN'
+                .ASCII_L 'load NAME: the name of a file, such as load hello.bin, or load "my prog.bin"'
 S_AVE           .ASCII_L 'ave'
 S_AUD           .ASCII_L 'aud'
 S_EL            .ASCII_L 'el'
@@ -1018,7 +1036,7 @@ S_BADSAVE
 S_DELETED
                 .ASCII_L 'Deleted '
 S_BADDEL
-                .ASCII_L 'del NAME: the 8.3 name of a file, such as del HELLO.BIN'
+                .ASCII_L 'del NAME: the name of a file, such as del hello.bin, or del "my prog.bin"'
 ; The meanings of fat32.c's errors FS_ERR0 to FS_ERR0 + FS_ERRS - 1.
 ; E_FS29 names the folder of the build, so the Makefile writes it, in
 ; build/folder.nasm.
@@ -1032,7 +1050,7 @@ E_FS16          .ASCII_L 'no FAT32 file system'
 E_FS17          .ASCII_L 'FAT12, which is not supported'
 E_FS18          .ASCII_L 'FAT16, which is not supported'
 E_FS19          .ASCII_L 'exFAT, which is not supported'
-E_FS20          .ASCII_L 'not an 8.3 name'
+E_FS20          .ASCII_L 'not a valid name'
 E_FS21          .ASCII_L 'no such file'
 E_FS22          .ASCII_L 'a directory'
 E_FS23          .ASCII_L 'too many open files'

@@ -1,0 +1,126 @@
+NiceMon V9.9
+? lists the commands
+> l
+ADDR WORD in hex on each line, as in a .bin file; an empty line ends
+Words loaded: 2, 00008000 to 00008001
+> save mandelbrot.bin 8000 2
+Words saved: 2, 00008000 to 00008001
+> save mandelbrot3.txt 8000 2
+Words saved: 2, 00008000 to 00008001
+> save Hello.bin 8000 2
+Words saved: 2, 00008000 to 00008001
+> save lower.bin 8000 2
+Words saved: 2, 00008000 to 00008001
+> save "a b.bin" 8000 2
+Words saved: 2, 00008000 to 00008001
+> save MIXED.BIN 8000 1
+Words saved: 1, 00008000 to 00008000
+> save "a*b" 8000 1
+File error 20, not a valid name
+> save "end." 8000 1
+File error 20, not a valid name
+> del mandelbrot1.txt
+Deleted mandelbrot1.txt
+> del "mandelbrot2.txt"
+Deleted mandelbrot2.txt
+> save "a much longer name of a file.bin" 8000 2
+Words saved: 2, 00008000 to 00008001
+> save x.bin 8000 2
+Words saved: 2, 00008000 to 00008001
+> dir
+Directory of NICE
+my prog.bin                    13410
+mixed.Bin                         18
+lower.txt                         14
+caf?.txt                          14
+?x.txt                            12
+a much longer name of a file.bin
+                                  36
+x.bin                             36
+nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn.txt
+                                  17
+PAD01.TXT                         14
+PAD02.TXT                         14
+PAD03.TXT                         14
+PAD04.TXT                         14
+PAD05.TXT                         14
+PAD06.TXT                         14
+PAD07.TXT                         14
+PAD08.TXT                         14
+PAD09.TXT                         14
+PAD10.TXT                         14
+across a sector.txt               15
+PAD11.TXT                         14
+PAD12.TXT                         14
+PAD13.TXT                         14
+PAD14.TXT                         14
+PAD15.TXT                         14
+PAD16.TXT                         14
+PAD17.TXT                         14
+PAD18.TXT                         14
+PAD19.TXT                         14
+PAD20.TXT                         14
+PAD21.TXT                         14
+PAD22.TXT                         14
+PAD23.TXT                         14
+across a cluster.txt              16
+BADSUM~1.TXT                      15
+mandelbrot.bin                    36
+mandelbrot3.txt                   36
+Hello.bin                         36
+lower.bin                         36
+a b.bin                           36
+Files: 39, directories: 0
+> load "A MUCH LONGER NAME OF A FILE.BIN"
+Words loaded: 2, 00008000 to 00008001
+> d 8000 2
+00008000 1234ABCD 00000005
+> load mandel~1.bin
+Words loaded: 2, 00008000 to 00008001
+> h
+Halted
+Screen:
+|PAD16.TXT                         14
+|PAD17.TXT                         14
+|PAD18.TXT                         14
+|PAD19.TXT                         14
+|PAD20.TXT                         14
+|PAD21.TXT                         14
+|PAD22.TXT                         14
+|PAD23.TXT                         14
+|across a cluster.txt              16
+|BADSUM~1.TXT                      15
+|mandelbrot.bin                    36
+|mandelbrot3.txt                   36
+|Hello.bin                         36
+|lower.bin                         36
+|a b.bin                           36
+|Files: 39, directories: 0
+|> load "A MUCH LONGER NAME OF A FILE.BIN"
+|Words loaded: 2, 00008000 to 00008001
+|> d 8000 2
+|00008000 1234ABCD 00000005
+|> load mandel~1.bin
+|Words loaded: 2, 00008000 to 00008001
+|> h
+|Halted
+VBASE at the halt 000000
+exit 0
+fsck.fat -n:
+Wrong checksum for long file name "bad sum.txt".
+  (Short name BADSUM~1.TXT may have changed without updating the long name)
+  Not auto-correcting this.
+Free cluster summary uninitialized (should be 129984)
+IMAGE: 40 files, 56/130040 clusters
+Files in NICE: my prog.bin mixed.Bin lower.txt cafÉ.txt λx.txt a much longer name of a file.bin x.bin nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn.txt PAD01.TXT PAD02.TXT PAD03.TXT PAD04.TXT PAD05.TXT PAD06.TXT PAD07.TXT PAD08.TXT PAD09.TXT PAD10.TXT across a sector.txt PAD11.TXT PAD12.TXT PAD13.TXT PAD14.TXT PAD15.TXT PAD16.TXT PAD17.TXT PAD18.TXT PAD19.TXT PAD20.TXT PAD21.TXT PAD22.TXT PAD23.TXT across a cluster.txt BADSUM~1.TXT mandelbrot.bin mandelbrot3.txt Hello.bin lower.bin a b.bin
+mandelbrot.bin:
+00008000 1234abcd
+00008001 00000005
+a b.bin:
+00008000 1234abcd
+00008001 00000005
+a much longer name of a file.bin:
+00008000 1234abcd
+00008001 00000005
+mixed.Bin:
+00008000 1234abcd

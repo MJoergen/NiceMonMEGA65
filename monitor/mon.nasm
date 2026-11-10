@@ -27,6 +27,7 @@ UDP_OPEN        .EQU    0x20
 UDP_SEND        .EQU    0x22
 UDP_RECV        .EQU    0x24
 UDP_CLOSE       .EQU    0x26
+FS_READNAME     .EQU    0x28
 
 _mon_reset
                 JMP     MON_RESET
@@ -68,6 +69,8 @@ _udp_recv
                 JMP     UDP_RECV
 _udp_close
                 JMP     UDP_CLOSE
+_fs_readname
+                JMP     FS_READNAME
 _scr_getx
                 JMP     SCR_GETXY
 _scr_gety

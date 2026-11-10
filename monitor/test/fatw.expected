@@ -7,8 +7,8 @@ Words loaded: 2, 00008000 to 00008001
 Words saved: 2, 00008000 to 00008001
 > dir
 Directory of NICE
-HELLO    BIN       13374
-TEST     BIN          36
+HELLO.BIN                      13410
+test.bin                          36
 Files: 2, directories: 0
 > load TEST.BIN
 Words loaded: 2, 00008000 to 00008001
@@ -34,25 +34,25 @@ save NAME ADDR N: a name, and the address and the count in hex
 save NAME ADDR N: a name, and the address and the count in hex
 > savex
 Unknown command; ? lists them
-> SAVE toolongname.bin 8000 1
-File error 20, not an 8.3 name
+> SAVE "a:b" 8000 1
+File error 20, not a valid name
 > del
-del NAME: the 8.3 name of a file, such as del HELLO.BIN
+del NAME: the name of a file, such as del hello.bin, or del "my prog.bin"
 > del a b
-del NAME: the 8.3 name of a file, such as del HELLO.BIN
+del NAME: the name of a file, such as del hello.bin, or del "my prog.bin"
 > delx
 Unknown command; ? lists them
 > de 0
 > dir 1
 Directory of NICE
-HELLO    BIN       13374
+HELLO.BIN                      13410
 Files: 1, directories: 0
 > save full.bin 8000 100
 File error 30, the card or the folder is full
 > dir
 Directory of NICE
-HELLO    BIN       13374
-FULL     BIN        1536
+HELLO.BIN                      13410
+full.bin                        1536
 Files: 2, directories: 0
 > del full.bin
 Deleted full.bin
@@ -60,8 +60,8 @@ Deleted full.bin
 Words saved: 2, 00008000 to 00008001
 > dir
 Directory of NICE
-HELLO    BIN       13374
-FULL     BIN          36
+HELLO.BIN                      13410
+full.bin                          36
 Files: 2, directories: 0
 > h
 Halted
@@ -70,14 +70,14 @@ Screen:
 |> de 0
 |> dir 1
 |Directory of NICE
-|HELLO    BIN       13374
+|HELLO.BIN                      13410
 |Files: 1, directories: 0
 |> save full.bin 8000 100
 |File error 30, the card or the folder is full
 |> dir
 |Directory of NICE
-|HELLO    BIN       13374
-|FULL     BIN        1536
+|HELLO.BIN                      13410
+|full.bin                        1536
 |Files: 2, directories: 0
 |> del full.bin
 |Deleted full.bin
@@ -85,8 +85,8 @@ Screen:
 |Words saved: 2, 00008000 to 00008001
 |> dir
 |Directory of NICE
-|HELLO    BIN       13374
-|FULL     BIN          36
+|HELLO.BIN                      13410
+|full.bin                          36
 |Files: 2, directories: 0
 |> h
 |Halted
@@ -100,7 +100,7 @@ HELLO.BIN:
 fsck.fat -n:
 Free cluster summary uninitialized (should be 2)
 IMAGE: 3 files, 68526/68528 clusters
-Files in NICE: HELLO.BIN FULL.BIN
+Files in NICE: HELLO.BIN full.bin
 FULL.BIN:
 00008000 1234abcd
 00008001 00000005

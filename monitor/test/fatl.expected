@@ -1,0 +1,106 @@
+NiceMon V9.9
+? lists the commands
+> dir
+Directory of NICE
+my prog.bin                    13410
+mixed.Bin                         14
+lower.txt                         14
+caf?.txt                          14
+?x.txt                            12
+mandelbrot1.txt                   17
+mandelbrot2.txt                   17
+nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn.txt
+                                  17
+PAD01.TXT                         14
+PAD02.TXT                         14
+PAD03.TXT                         14
+PAD04.TXT                         14
+PAD05.TXT                         14
+PAD06.TXT                         14
+PAD07.TXT                         14
+PAD08.TXT                         14
+PAD09.TXT                         14
+PAD10.TXT                         14
+across a sector.txt               15
+PAD11.TXT                         14
+PAD12.TXT                         14
+PAD13.TXT                         14
+PAD14.TXT                         14
+PAD15.TXT                         14
+PAD16.TXT                         14
+PAD17.TXT                         14
+PAD18.TXT                         14
+PAD19.TXT                         14
+PAD20.TXT                         14
+PAD21.TXT                         14
+PAD22.TXT                         14
+PAD23.TXT                         14
+across a cluster.txt              16
+BADSUM~1.TXT                      15
+Files: 34, directories: 0
+> load "my prog.bin"
+Words loaded: 745, 00008000 to 000082E8
+> r
+Hello from 00008000, table 00010004
+at column 40
+on the line only
+Returned 0000002A
+> load MYPROG~1.BIN
+Words loaded: 745, 00008000 to 000082E8
+> load "MY PROG.BIN"
+Words loaded: 745, 00008000 to 000082E8
+> load mixed.bin
+Words loaded: 0
+Lines skipped: 1, first line 1; ADDR WORD in hex, ADDR 00008000 to FFFEFFFF
+> load LOWER.TXT
+Words loaded: 0
+Lines skipped: 1, first line 1; ADDR WORD in hex, ADDR 00008000 to FFFEFFFF
+> load "across a sector.txt"
+Words loaded: 0
+Lines skipped: 1, first line 1; ADDR WORD in hex, ADDR 00008000 to FFFEFFFF
+> load "ACROSS A CLUSTER.TXT"
+Words loaded: 0
+Lines skipped: 1, first line 1; ADDR WORD in hex, ADDR 00008000 to FFFEFFFF
+> load "bad sum.txt"
+File error 21, no such file
+> load badsum~1.txt
+Words loaded: 0
+Lines skipped: 1, first line 1; ADDR WORD in hex, ADDR 00008000 to FFFEFFFF
+> load "my prog.bin
+load NAME: the name of a file, such as load hello.bin, or load "my prog.bin"
+> load caf?.txt
+File error 21, no such file
+> load _x.txt
+Words loaded: 0
+Lines skipped: 1, first line 1; ADDR WORD in hex, ADDR 00008000 to FFFEFFFF
+> load ""
+File error 20, not a valid name
+> h
+Halted
+Screen:
+|Words loaded: 0
+|Lines skipped: 1, first line 1; ADDR WORD in hex, ADDR 00008000 to FFFEFFFF
+|> load "across a sector.txt"
+|Words loaded: 0
+|Lines skipped: 1, first line 1; ADDR WORD in hex, ADDR 00008000 to FFFEFFFF
+|> load "ACROSS A CLUSTER.TXT"
+|Words loaded: 0
+|Lines skipped: 1, first line 1; ADDR WORD in hex, ADDR 00008000 to FFFEFFFF
+|> load "bad sum.txt"
+|File error 21, no such file
+|> load badsum~1.txt
+|Words loaded: 0
+|Lines skipped: 1, first line 1; ADDR WORD in hex, ADDR 00008000 to FFFEFFFF
+|> load "my prog.bin
+|load NAME: the name of a file, such as load hello.bin, or load "my prog.bin"
+|> load caf?.txt
+|File error 21, no such file
+|> load _x.txt
+|Words loaded: 0
+|Lines skipped: 1, first line 1; ADDR WORD in hex, ADDR 00008000 to FFFEFFFF
+|> load ""
+|File error 20, not a valid name
+|> h
+|Halted
+VBASE at the halt 000000
+exit 0

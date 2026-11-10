@@ -2,65 +2,65 @@ NiceMon V9.9
 ? lists the commands
 > dir
 Directory of NICE
-HELLO    BIN       13374
-SUB           <DIR>
-ALONGN~1 TXT          26
-README   TXT          30
-FILE01   TXT          15
-FILE02   TXT          15
-FILE03   TXT          15
-FILE04   TXT          15
-FILE05   TXT          15
-FILE06   TXT          15
-FILE07   TXT          15
-FILE08   TXT          15
-FILE09   TXT          15
-FILE10   TXT          15
-FILE11   TXT          15
-FILE12   TXT          15
-FILE13   TXT          15
-FILE14   TXT          15
-FILE15   TXT          15
-FILE16   TXT          15
-FILE17   TXT          15
-FILE18   TXT          15
-FILE19   TXT          15
-FILE20   TXT          15
-FRAG     BIN        1944
-KEEP     TXT         512
+HELLO.BIN                      13410
+SUB                            <DIR>
+A long name.txt                   26
+readme.txt                        30
+FILE01.TXT                        15
+FILE02.TXT                        15
+FILE03.TXT                        15
+FILE04.TXT                        15
+FILE05.TXT                        15
+FILE06.TXT                        15
+FILE07.TXT                        15
+FILE08.TXT                        15
+FILE09.TXT                        15
+FILE10.TXT                        15
+FILE11.TXT                        15
+FILE12.TXT                        15
+FILE13.TXT                        15
+FILE14.TXT                        15
+FILE15.TXT                        15
+FILE16.TXT                        15
+FILE17.TXT                        15
+FILE18.TXT                        15
+FILE19.TXT                        15
+FILE20.TXT                        15
+FRAG.BIN                        1944
+KEEP.TXT                         512
 Files: 25, directories: 1
 > DIR 1
 Directory of NICE
-HELLO    BIN       13374
+HELLO.BIN                      13410
 Files: 1, directories: 0
 > dir 0
 Directory of NICE
-HELLO    BIN       13374
-SUB           <DIR>
-ALONGN~1 TXT          26
-README   TXT          30
-FILE01   TXT          15
-FILE02   TXT          15
-FILE03   TXT          15
-FILE04   TXT          15
-FILE05   TXT          15
-FILE06   TXT          15
-FILE07   TXT          15
-FILE08   TXT          15
-FILE09   TXT          15
-FILE10   TXT          15
-FILE11   TXT          15
-FILE12   TXT          15
-FILE13   TXT          15
-FILE14   TXT          15
-FILE15   TXT          15
-FILE16   TXT          15
-FILE17   TXT          15
-FILE18   TXT          15
-FILE19   TXT          15
-FILE20   TXT          15
-FRAG     BIN        1944
-KEEP     TXT         512
+HELLO.BIN                      13410
+SUB                            <DIR>
+A long name.txt                   26
+readme.txt                        30
+FILE01.TXT                        15
+FILE02.TXT                        15
+FILE03.TXT                        15
+FILE04.TXT                        15
+FILE05.TXT                        15
+FILE06.TXT                        15
+FILE07.TXT                        15
+FILE08.TXT                        15
+FILE09.TXT                        15
+FILE10.TXT                        15
+FILE11.TXT                        15
+FILE12.TXT                        15
+FILE13.TXT                        15
+FILE14.TXT                        15
+FILE15.TXT                        15
+FILE16.TXT                        15
+FILE17.TXT                        15
+FILE18.TXT                        15
+FILE19.TXT                        15
+FILE20.TXT                        15
+FRAG.BIN                        1944
+KEEP.TXT                         512
 Files: 25, directories: 1
 > load frag.bin
 Words loaded: 108, 00009000 to 0000906B
@@ -76,11 +76,11 @@ File error 21, no such file
 > load sub
 File error 22, a directory
 > load toolongname.bin
-File error 20, not an 8.3 name
+File error 21, no such file
 > load
-load NAME: the 8.3 name of a file, such as load HELLO.BIN
+load NAME: the name of a file, such as load hello.bin, or load "my prog.bin"
 > load a b
-load NAME: the 8.3 name of a file, such as load HELLO.BIN
+load NAME: the name of a file, such as load hello.bin, or load "my prog.bin"
 > loadx
 Unknown command; ? lists them
 > dirx
@@ -92,22 +92,22 @@ dir [SLOT]: the slot in hex, such as dir 1
 > dir 123456789
 dir [SLOT]: the slot in hex, such as dir 1
 > LOAD HELLO.BIN
-Words loaded: 743, 00008000 to 000082E6
+Words loaded: 745, 00008000 to 000082E8
 > r
-Hello from 00008000, table 00010003
+Hello from 00008000, table 00010004
 at column 40
 on the line only
 Returned 0000002A
 > h
 Halted
-fffff11a: 000002e7 00008000 000082e6 00000000 00000000
+fffff11a: 000002e9 00008000 000082e8 00000000 00000000
 Screen:
 |> load toolongname.bin
-|File error 20, not an 8.3 name
+|File error 21, no such file
 |> load
-|load NAME: the 8.3 name of a file, such as load HELLO.BIN
+|load NAME: the name of a file, such as load hello.bin, or load "my prog.bin"
 |> load a b
-|load NAME: the 8.3 name of a file, such as load HELLO.BIN
+|load NAME: the name of a file, such as load hello.bin, or load "my prog.bin"
 |> loadx
 |Unknown command; ? lists them
 |> dirx
@@ -119,9 +119,9 @@ Screen:
 |> dir 123456789
 |dir [SLOT]: the slot in hex, such as dir 1
 |> LOAD HELLO.BIN
-|Words loaded: 743, 00008000 to 000082E6
+|Words loaded: 745, 00008000 to 000082E8
 |> r
-|Hello from 00008000, table 00010003
+|Hello from 00008000, table 00010004
 |                                        at column 40
 |Returned 0000002A
 |> h

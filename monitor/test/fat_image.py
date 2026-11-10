@@ -25,6 +25,8 @@ doc/SDCARD.md says, so that the monitor's FAT32 is tested against them:
 - fat16.img: an MBR with one FAT16 partition, which the monitor rejects.
 - full.img: FAT32 on the whole card with NICE/HELLO.BIN, and every free
   cluster but the last FULL_FREE marked bad, so that a write fills it.
+- lfn.img: FAT32 on the whole card with long names in NICE, as lfn()
+  says.
 - exfat.img: an MBR with one partition of type 7 whose boot sector is
   exFAT's, which the monitor rejects.
 
@@ -137,6 +139,78 @@ def fill(img: str) -> None:
         f.write(struct.pack("<II", FULL_FREE, 2))
 
 
+def entries(img: str, offset: int, path: str) -> list[int]:
+    """The byte offsets in img of the entries of the folder at path, up to
+    the first free one with a 0, which ends it."""
+    with open(img, "rb") as f:
+        f.seek(offset)
+        boot = f.read(SECTOR)
+        spc = boot[13]
+        reserved, nfats = struct.unpack_from("<HB", boot, 14)
+        fatsz = struct.unpack_from("<I", boot, 36)[0]
+        data_at = offset + (reserved + nfats * fatsz) * SECTOR
+        at: list[int] = []
+        for c in chain(img, offset, path):
+            for k in range(spc * SECTOR // 32):
+                where = data_at + (c - 2) * spc * SECTOR + 32 * k
+                f.seek(where)
+                if f.read(1) == b"\0":
+                    return at
+                at.append(where)
+        return at
+
+
+def pad(img: str, offset: int, path: str, slots: int, tmp: str) -> None:
+    """Short files PAD01.TXT and on in the folder at path, until its next
+    entry is the last of a run of slots entries, so that a name of two
+    long-name entries after them has its first in the run and the rest
+    after it."""
+    k = 1
+    while len(entries(img, offset, path)) % slots != slots - 1:
+        mcopy(img, offset, text(f"PAD{k:02}", 1), f"{path}/PAD{k:02}.TXT", tmp)
+        k += 1
+
+
+def lfn(img: str, hello: bytes, tmp: str) -> None:
+    """lfn.img: FAT32 on the whole card of 128 MB, with clusters of 2
+    sectors, which are enough for FAT32, and
+    long names in NICE: my prog.bin, the .bin file given, with a blank in
+    its name; mixed.Bin, whose 8.3 name needs no tail; lower.txt, which
+    mtools writes as an 8.3 name with the lower-case flags of byte 12;
+    café.txt, an 8.3 name with a character of code page 850; λx.txt, a
+    long name with a character outside ASCII and code page 850;
+    mandelbrot1.txt and mandelbrot2.txt, which share their first 6
+    letters, MANDEL~1.TXT and MANDEL~2.TXT; a name of 255 characters;
+    two names whose long-name entries cross the end of a sector, and of a
+    cluster, after the files PAD01.TXT and on; and bad sum.txt, whose
+    long-name entry has a wrong checksum."""
+    blank(img, 128 * MB)
+    run("mkfs.fat", "-F", "32", "-s", "2", "-i", "4E494345", img)
+    run("mmd", "-i", f"{img}@@0", "::NICE")
+    mcopy(img, 0, hello, "NICE/my prog.bin", tmp)
+    for name in ("mixed.Bin", "lower.txt", "caf\u00e9.txt", "\u03bbx.txt",
+                 "mandelbrot1.txt", "mandelbrot2.txt", "n" * 251 + ".txt"):
+        mcopy(img, 0, text(name.split(".")[0][:8], 1), "NICE/" + name, tmp)
+    pad(img, 0, "NICE", 16, tmp)
+    mcopy(img, 0, text("SECTOR", 1), "NICE/across a sector.txt", tmp)
+    pad(img, 0, "NICE", 32, tmp)
+    mcopy(img, 0, text("CLUSTER", 1), "NICE/across a cluster.txt", tmp)
+    if len(entries(img, 0, "NICE")) % 32 != 2:
+        raise SystemExit(f"{img}: the long name does not cross a cluster")
+    # bad sum.txt's one long-name entry, before its 8.3 entry, with its
+    # checksum off by one, last, as mtools would take the entry for a
+    # free one
+    mcopy(img, 0, text("BADSUM", 1), "NICE/bad sum.txt", tmp)
+    at = entries(img, 0, "NICE")[-2]
+    with open(img, "r+b") as f:
+        f.seek(at + 11)
+        attr, _, check = f.read(3)
+        if attr != 0x0F:
+            raise SystemExit(f"{img}: no long-name entry before BADSUM~1.TXT")
+        f.seek(at + 13)
+        f.write(bytes([check ^ 1]))
+
+
 def mbr(img: str, parts: str) -> None:
     run("sfdisk", "--no-reread", "--no-tell-kernel", "-q", img, stdin=parts)
 
@@ -196,6 +270,8 @@ def main() -> None:
         hello = f.read()
     tmp = args.dir
     fat32(os.path.join(args.dir, "fat32.img"), hello, tmp)
+
+    lfn(os.path.join(args.dir, "lfn.img"), hello, tmp)
 
     img = os.path.join(args.dir, "super.img")
     blank(img, 64 * MB)

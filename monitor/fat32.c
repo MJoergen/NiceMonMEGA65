@@ -2,12 +2,23 @@
 // directory (issues #58, #59, and #91, doc/SDCARD.md, "The file system").
 // It is part of the ROM's C code (INTERNALS.md, "C in the ROM"), and the
 // dispatch table's entries fs_mount, fs_open, fs_read, fs_readdir,
-// fs_close, fs_write, and fs_delete jump to its functions fat_mount,
-// fat_open, fat_read, fat_readdir, fat_close, fat_write, and fat_delete,
-// which take the arguments of the entries: addresses are NICE word
-// addresses, not C pointers, read and written with nice_peek and
-// nice_poke. fat_load reads a .bin file for the monitor's load command,
-// and fat_save writes one for save.
+// fs_close, fs_write, fs_delete, and fs_readname jump to its functions
+// fat_mount, fat_open, fat_read, fat_readdir, fat_close, fat_write,
+// fat_delete, and fat_readname, which take the arguments of the entries:
+// addresses are NICE word addresses, not C pointers, read and written
+// with nice_peek and nice_poke. fat_load reads a .bin file for the
+// monitor's load command, and fat_save writes one for save.
+//
+// Names are long names (VFAT, #102) of up to 255 characters, matched in
+// either case, or 8.3 names. A long name is read from the long-name
+// entries before an 8.3 entry, when their numbers, their last-entry bit,
+// and their checksum check; a set that does not is passed over, and the
+// 8.3 name stands, with the lower-case flags of byte 12. A character
+// outside ASCII is ?, and such a name is reached by its 8.3 name only. A
+// new file whose name is not an 8.3 name in upper case, or in lower case
+// in either part, which byte 12 keeps, gets long-name entries and an 8.3
+// alias, with a tail ~1, ~2, and on when the name does not fit, as
+// mtools makes them.
 //
 // The card is the one in the slot of the last fat_mount. A card is FAT32
 // when its sector 0 is a FAT32 boot sector, or an MBR whose first
@@ -40,7 +51,9 @@
 // before the one before it is linked to it, and its data written; only
 // fat_close puts the first cluster and the size into the entry. A
 // deletion marks the long-name entries, then the entry, then frees the
-// clusters. A new cluster is searched from FSInfo's next-free hint, and
+// clusters. A new entry's long-name entries are written before its 8.3
+// entry, so a reset between them leaves orphan long-name entries, which
+// fsck.fat removes too. A new cluster is searched from FSInfo's next-free hint, and
 // the first change of the FAT after a mount sets FSInfo's free count to
 // unknown, 0xFFFFFFFF, before it; the hint is written after each change.
 // The FAT's cache and the directory's are written through; a file's
@@ -66,7 +79,7 @@ int fat_sd_write(unsigned lba, const unsigned *buf);
 #define E_FAT12 -17     // FAT12
 #define E_FAT16 -18     // FAT16
 #define E_EXFAT -19     // exFAT
-#define E_NAME -20      // not an 8.3 name
+#define E_NAME -20      // not a valid name
 #define E_NOFILE -21    // no file of that name
 #define E_ISDIR -22     // a directory, opened as a file
 #define E_TOOMANY -23   // two files open already
@@ -91,6 +104,8 @@ int fat_sd_write(unsigned lba, const unsigned *buf);
 #define FILES 2
 #define DIR_MAX (65536u * 32)   // the bytes of a directory at most
 #define DATE 0x5C21u    // the date of a new entry, 2026-01-01, as there is no clock
+#define NAME_MAX 255    // the characters of a long name at most,
+#define LFN_MAX 20      // and its long-name entries, 13 characters each
 
 // The kinds of an open file
 #define K_READ 0
@@ -142,6 +157,18 @@ static struct file {
 // they give, and a sector for FSInfo, an entry, or a new cluster's zeros
 static struct file dirf;
 static unsigned sec[128];
+
+// The name of the entry that entry() gave last: its long name, or else its
+// 8.3 name as a name, HELLO.BIN, in the case of byte 12, up to a 0 byte;
+// lascii is 0 when it has a ? for a character outside ASCII. The name
+// given to fat_open or fat_delete, as getname reads it, wlen characters.
+static unsigned char lname[NAME_MAX + 1];
+static int lascii;
+static unsigned char want[NAME_MAX + 1];
+static unsigned wlen;
+
+// The bytes of a long-name entry that hold its 13 characters, UTF-16
+static const unsigned char lfnat[13] = {1, 3, 5, 7, 9, 14, 16, 18, 20, 22, 24, 28, 30};
 
 static unsigned u16(const unsigned char *p)
 {
@@ -237,7 +264,7 @@ static int kind(const unsigned char *b)
     return 0;
 }
 
-static int find(unsigned first, const unsigned char n[11], unsigned char **e);
+static int find(unsigned first, const unsigned char *n, int bylong, unsigned char **e);
 
 // A slot that the system does not have changes nothing.
 static int mount(unsigned slot)
@@ -300,7 +327,7 @@ static int mount(unsigned slot)
     static const char folder[] = FOLDER;
     for (int k = 0; k < 11; k++)
         n[k] = k < (int)sizeof folder - 1 ? (unsigned char)folder[k] : ' ';
-    if ((r = find(vol.root, n, &e)) < 0)
+    if ((r = find(vol.root, n, 0, &e)) < 0)
         return r;
     if (r == 0 || !(e[11] & 0x10))
         return E_NOFOLDER;
@@ -504,41 +531,129 @@ static struct file *handle(int h, int kind, int *err)
 }
 
 // The name at the word address name, one character per word up to a 0
-// word, as an 8.3 name in upper case padded with blanks in n, or E_NAME
-static int name83(unsigned name, unsigned char n[11])
+// word, in want and wlen: 0, or E_NAME when it is empty or longer than
+// NAME_MAX, or has a character outside bits 7..0
+static int getname(unsigned name)
 {
-    int i = 0, part = 0, len = 0;
-    for (int k = 0; k < 11; k++)
-        n[k] = ' ';
-    for (;;) {
-        unsigned c = nice_peek(name + i++);
+    for (wlen = 0;; wlen++) {
+        unsigned c = nice_peek(name + wlen);
         if (c == 0)
             break;
+        if (wlen == NAME_MAX || c > 0xFF)
+            return E_NAME;
+        want[wlen] = (unsigned char)c;
+    }
+    want[wlen] = 0;
+    return wlen ? 0 : E_NAME;
+}
+
+// A character that no name may have, in either kind: a control code, a
+// character outside ASCII, or one of "*/:<>?\|
+static int bad(unsigned c)
+{
+    return c < 0x20 || c >= 0x7F || c == '"' || c == '*' || c == '/' || c == ':' ||
+           c == '<' || c == '>' || c == '?' || c == '\\' || c == '|';
+}
+
+// A character that a long name may have, but an 8.3 name not: the blank
+// and +,.;=[]
+static int not83(unsigned c)
+{
+    return c == ' ' || c == '+' || c == ',' || c == '.' || c == ';' || c == '=' ||
+           c == '[' || c == ']';
+}
+
+// want as an 8.3 name in upper case padded with blanks in n: 1, with the
+// flags of byte 12 in *lower for a part in lower case, or ~0u for a part
+// in mixed case, or 0 when it is no 8.3 name
+static int name83(unsigned char n[11], unsigned *lower)
+{
+    int part = 0, len = 0;
+    unsigned up[2] = {0, 0}, low[2] = {0, 0};
+    for (int k = 0; k < 11; k++)
+        n[k] = ' ';
+    for (unsigned i = 0; i < wlen; i++) {
+        unsigned c = want[i];
         if (c == '.' && part == 0 && len > 0) {
             part = 1;
             len = 0;
             continue;
         }
-        if (c >= 'a' && c <= 'z')
+        if (c >= 'a' && c <= 'z') {
+            low[part] = 1;
             c -= 0x20;
-        if (c <= 0x20 || c >= 0x7F || c == '"' || c == '*' || c == '+' || c == ',' ||
-            c == '.' || c == '/' || c == ':' || c == ';' || c == '<' || c == '=' ||
-            c == '>' || c == '?' || c == '[' || c == '\\' || c == ']' || c == '|')
-            return E_NAME;
-        if (len == (part ? 3 : 8))
-            return E_NAME;
+        } else if (c >= 'A' && c <= 'Z') {
+            up[part] = 1;
+        }
+        if (bad(c) || not83(c) || len == (part ? 3 : 8))
+            return 0;
         n[part ? 8 + len : len] = (unsigned char)c;
         len++;
     }
-    return (part == 0 && len == 0) || (part == 1 && len == 0) ? E_NAME : 0;
+    if (len == 0)
+        return 0;
+    *lower = (up[0] && low[0]) || (up[1] && low[1]) ? ~0u : (low[0] ? 0x08 : 0) | (low[1] ? 0x10 : 0);
+    return 1;
+}
+
+// want as a name that a new file may have: a long name of characters
+// that bad() lets through, which does not end in a blank or a dot, as
+// Windows drops those. 1, or 0.
+static int longok(void)
+{
+    for (unsigned i = 0; i < wlen; i++)
+        if (bad(want[i]))
+            return 0;
+    return want[wlen - 1] != ' ' && want[wlen - 1] != '.';
+}
+
+// The checksum of an 8.3 name that its long-name entries hold
+static unsigned char sum(const unsigned char *n)
+{
+    unsigned char s = 0;
+    for (int k = 0; k < 11; k++)
+        s = (unsigned char)(((s & 1) << 7) + (s >> 1) + n[k]);
+    return s;
+}
+
+// The 8.3 name of the entry e in lname as a name: the base, then a dot
+// and the extension if it has one, without their blanks, each part in
+// lower case when byte 12 says so
+static void short_name(const unsigned char *e)
+{
+    unsigned len = 0;
+    lascii = 1;
+    for (int k = 0; k < 11; k++) {
+        unsigned c = k == 0 && e[0] == 0x05 ? 0xE5 : e[k];
+        if (k == 8 && e[8] != ' ')
+            lname[len++] = '.';
+        if (c == ' ')
+            continue;
+        if (c >= 'A' && c <= 'Z' && (e[12] & (k < 8 ? 0x08 : 0x10)))
+            c += 0x20;
+        if (c < 0x20 || c >= 0x7F) {
+            c = '?';
+            lascii = 0;
+        }
+        lname[len++] = (unsigned char)c;
+    }
+    lname[len] = 0;
 }
 
 // The next entry of the directory f that is a file or a directory, at e,
 // 32 bytes in f->buf, with f->lfn the offset of the long-name entries
-// right before it, or ~0u: 1, 0 at the end, or an error
+// right before it, or ~0u, and its name in lname: 1, 0 at the end, or an
+// error. The long-name entries are checked as they come, as they may be
+// in the sectors before e's: the first holds the last part, its number
+// with bit 6 set, and the checksum, and each after it the number one
+// less and the same checksum, down to 1. Their characters go to lname as
+// they come, at the offsets of their numbers.
 static int entry(struct file *f, unsigned char **e)
 {
-    unsigned lfn = ~0u;
+    unsigned lfn = ~0u, len = 0;
+    int next = -1;          // the number of the long-name entry due, 0 after 1, -1 for none
+    int ascii = 1;
+    unsigned char s = 0;
     while (!f->done) {
         int r = seek(f);
         if (r < 0)
@@ -552,11 +667,45 @@ static int entry(struct file *f, unsigned char **e)
         if (p[0] != 0xE5 && p[11] == 0x0F) {
             if (lfn == ~0u)
                 lfn = f->pos - 32;
+            int k = p[0] & 0x1F;
+            if (p[0] & 0x40) {
+                next = k;
+                s = p[13];
+                len = 13 * k;
+                ascii = 1;
+            }
+            if (k == 0 || k > LFN_MAX || k != next || p[13] != s) {
+                next = -1;
+                continue;
+            }
+            for (int j = 0; j < 13; j++) {
+                unsigned pos = 13 * (k - 1) + j, c = u16(p + lfnat[j]);
+                if (pos >= len)
+                    break;
+                if (c == 0) {
+                    len = pos;
+                    break;
+                }
+                if (c < 0x20 || c >= 0x7F) {
+                    c = '?';
+                    ascii = 0;
+                }
+                if (pos < NAME_MAX)
+                    lname[pos] = (unsigned char)c;
+            }
+            next = k - 1;
             continue;
         }
         if (p[0] == 0xE5 || (p[11] & 0x08) || p[0] == '.') {
             lfn = ~0u;
+            next = -1;
             continue;
+        }
+        if (next == 0 && sum(p) == s && len >= 1 && len <= NAME_MAX) {
+            lname[len] = 0;
+            lascii = ascii;
+        } else {
+            short_name(p);
         }
         f->lfn = lfn;
         *e = p;
@@ -566,23 +715,50 @@ static int entry(struct file *f, unsigned char **e)
     return 0;
 }
 
+// The same name, but that a letter of a matches either case in b
+static int same(const unsigned char *a, const unsigned char *b)
+{
+    for (;; a++, b++) {
+        unsigned x = *a, y = *b;
+        if (x >= 'a' && x <= 'z')
+            x -= 0x20;
+        if (y >= 'a' && y <= 'z')
+            y -= 0x20;
+        if (x != y)
+            return 0;
+        if (x == 0)
+            return 1;
+    }
+}
+
 static void start(struct file *f, unsigned first, int kind, unsigned size);
 
-// The entry of the 8.3 name n in the directory whose first cluster is
-// first, at e: 1, 0 when there is none, or an error. The entry is in
-// dirf's buffer, which keeps it until the next call, at dirf.lba.
-static int find(unsigned first, const unsigned char n[11], unsigned char **e)
+// The entry in the directory whose first cluster is first of the 8.3 name
+// n, unless n is 0, or when bylong is 1 of the name in want, as its long
+// name in either case, at e: 1, 0 when there is none, or an error. The
+// entry is in dirf's buffer, which keeps it until the next call, at
+// dirf.lba.
+static int find(unsigned first, const unsigned char *n, int bylong, unsigned char **e)
 {
     start(&dirf, first, K_DIR, 0);
     int r;
     while ((r = entry(&dirf, e)) == 1) {
-        int same = 1;
-        for (int k = 0; k < 11; k++)
-            same &= (k == 0 && (*e)[0] == 0x05 ? 0xE5 : (*e)[k]) == n[k];
-        if (same)
+        int ok = n != 0;
+        for (int k = 0; ok && k < 11; k++)
+            ok = (k == 0 && (*e)[0] == 0x05 ? 0xE5 : (*e)[k]) == n[k];
+        if (ok || (bylong && lascii && same(lname, want)))
             return 1;
     }
     return r;
+}
+
+// The entry of the name in want, as find gives it: by its 8.3 name, when
+// want is one, and by its long name
+static int lookup(unsigned char **e)
+{
+    unsigned char n[11];
+    unsigned lower;
+    return find(vol.dir, name83(n, &lower) ? n : 0, 1, e);
 }
 
 static void start(struct file *f, unsigned first, int kind, unsigned size)
@@ -655,14 +831,20 @@ static int writable(const unsigned char *e)
     return 0;
 }
 
-// A new entry of the 8.3 name n in the folder, empty, in the first free
-// entry, or in a new cluster of zeros added to the folder. It is in
-// dirf's buffer at e, written. 0, or an error.
-static int make(const unsigned char n[11], unsigned char **e)
+static int at(unsigned off, unsigned char **p);
+
+// A new entry of the 8.3 name n in the folder, empty, with the flags lower
+// in byte 12, and nl long-name entries of the name in want before it, in
+// the first run of nl + 1 free entries, which may go on into a new
+// cluster of zeros added to the folder. The long-name entries are written
+// first, then the 8.3 entry, a sector at a time. It is in dirf's buffer
+// at e. 0, or an error.
+static int make(const unsigned char n[11], unsigned lower, unsigned nl, unsigned char **e)
 {
     start(&dirf, vol.dir, K_DIR, 0);
+    unsigned run = 0, from = 0;
     int r;
-    for (;;) {
+    while (run <= nl) {
         if (dirf.pos >= DIR_MAX)
             return E_FULL;
         if ((r = seek(&dirf)) < 0)
@@ -685,22 +867,129 @@ static int make(const unsigned char n[11], unsigned char **e)
         }
         unsigned char *p = (unsigned char *)dirf.buf + (dirf.pos & 511);
         if (p[0] == 0 || p[0] == 0xE5) {
-            for (int k = 0; k < 32; k++)
-                p[k] = k < 11 ? n[k] : 0;
+            if (run++ == 0)
+                from = dirf.pos;
+        } else {
+            run = 0;
+        }
+        dirf.pos += 32;
+    }
+    unsigned char s = sum(n);
+    for (unsigned k = 0; k <= nl; k++) {
+        unsigned q = from + 32 * k;
+        unsigned char *p;
+        if ((r = at(q, &p)) < 0)
+            return r;
+        for (int i = 0; i < 32; i++)
+            p[i] = 0;
+        if (k < nl) {
+            // The long-name entry of the number nl - k, its 13 characters
+            // from want, then a 0 after the name, and 0xFFFF after that
+            unsigned m = nl - k;
+            p[0] = (unsigned char)(m | (k == 0 ? 0x40 : 0));
+            p[11] = 0x0F;
+            p[13] = s;
+            for (int j = 0; j < 13; j++) {
+                unsigned pos = 13 * (m - 1) + j;
+                put16(p + lfnat[j], pos < wlen ? want[pos] : pos == wlen ? 0 : 0xFFFF);
+            }
+        } else {
+            for (int i = 0; i < 11; i++)
+                p[i] = n[i];
             p[11] = 0x20;           // archive
+            p[12] = (unsigned char)lower;
             put16(p + 16, DATE);    // created,
             put16(p + 18, DATE);    // read,
             put16(p + 24, DATE);    // and written
             *e = p;
-            return wr(dirf.lba, dirf.buf);
         }
-        dirf.pos += 32;
+        if ((k == nl || ((q + 32) & 511) == 0) && (r = wr(dirf.lba, dirf.buf)) < 0)
+            return r;
+    }
+    return 0;
+}
+
+// The basis of want's 8.3 alias, as Windows makes it, in upper case in n:
+// the base from the characters before the last dot, and the extension
+// from those after it, without blanks and dots, and with _ for +,;=[].
+// 1 when that lost a character, or cut a part, so that the alias needs a
+// tail, or else 0. A name whose dots are all at its start has no
+// extension.
+static int basis(unsigned char n[11])
+{
+    unsigned dot = wlen, len = 0;
+    int lossy = 0, part = 0, any = 0;
+    for (unsigned i = 0; i < wlen; i++) {
+        if (want[i] == '.')
+            dot = any ? i : wlen;
+        else if (want[i] != ' ')
+            any = 1;
+    }
+    for (int k = 0; k < 11; k++)
+        n[k] = ' ';
+    for (unsigned i = 0; i < wlen; i++) {
+        unsigned c = want[i];
+        if (i == dot) {
+            part = 1;
+            len = 0;
+            continue;
+        }
+        if (c >= 'a' && c <= 'z')
+            c -= 0x20;
+        if (c == ' ' || c == '.' || len == (part ? 3u : 8u)) {
+            lossy = 1;
+            continue;
+        }
+        if (not83(c)) {
+            c = '_';
+            lossy = 1;
+        }
+        n[part ? 8 + len : len] = (unsigned char)c;
+        len++;
+    }
+    return lossy;
+}
+
+// The 8.3 name of a new file of the name in want in n, with the flags
+// of byte 12 in *lower, and the number of its long-name entries in *nl:
+// want itself when it is an 8.3 name in upper case, or in lower case in
+// a part, with no long-name entries; or else want's basis, with the
+// first tail ~1, ~2, and on that no entry of the folder has, when it
+// needs one. 0, E_NAME, or an error.
+static int newname(unsigned char n[11], unsigned *lower, unsigned *nl)
+{
+    *nl = 0;
+    if (name83(n, lower) && *lower != ~0u)
+        return 0;
+    if (!longok())
+        return E_NAME;
+    *lower = 0;
+    *nl = (wlen + 12) / 13;
+    if (!basis(n))
+        return 0;   // free, as lookup found no file of this 8.3 name
+    unsigned base = 0;
+    while (base < 8 && n[base] != ' ')
+        base++;
+    for (unsigned t = 1;; t++) {
+        char d[7];
+        int nd = 0;
+        for (unsigned v = t; v; v /= 10)
+            d[nd++] = (char)('0' + v % 10);
+        unsigned k = base < 7u - nd ? base : 7u - nd;
+        n[k++] = '~';
+        while (nd)
+            n[k++] = (unsigned char)d[--nd];
+        while (k < 8)
+            n[k++] = ' ';
+        unsigned char *e;
+        int r = find(vol.dir, n, 0, &e);
+        if (r <= 0)
+            return r;
     }
 }
 
 int fat_open(unsigned name, int mode)
 {
-    unsigned char n[11];
     if (mode < 0 || mode > 2)
         return E_MODE;
     int r = mounted();
@@ -720,11 +1009,8 @@ int fat_open(unsigned name, int mode)
         start(&files[h], vol.dir, K_DIR, 0);
         return h;
     }
-    r = name83(name, n);
-    if (r < 0)
-        return r;
     unsigned char *e;
-    if ((r = find(vol.dir, n, &e)) < 0)
+    if ((r = getname(name)) < 0 || (r = lookup(&e)) < 0)
         return r;
     unsigned first = 0, size = 0;
     if (mode == 0) {
@@ -753,10 +1039,15 @@ int fat_open(unsigned name, int mode)
         if ((r = wr(dirf.lba, dirf.buf)) < 0 || (r = release(old)) < 0 ||
             (r = infodone()) < 0)
             return r;
-    } else if (h < 0) {
-        return h;
-    } else if ((r = make(n, &e)) < 0 || (r = infodone()) < 0) {
-        return r;
+    } else {
+        unsigned char n[11];
+        unsigned lower, nl;
+        if ((r = newname(n, &lower, &nl)) < 0)
+            return r;
+        if (h < 0)
+            return h;
+        if ((r = make(n, lower, nl, &e)) < 0 || (r = infodone()) < 0)
+            return r;
     }
     struct file *f = &files[h];
     start(f, first, mode == 0 ? K_READ : K_WRITE, size);
@@ -790,7 +1081,10 @@ int fat_read(int h, unsigned buf, unsigned n)
     return (int)done;
 }
 
-int fat_readdir(int h, unsigned buf)
+// The next entry of the directory of handle h, as fat_readdir and
+// fat_readname give it, its 4 words at buf, and when withname is 1 its
+// name at name, one character per word up to a 0 word
+static int readdir(int h, unsigned buf, int withname, unsigned name)
 {
     int err;
     struct file *f = handle(h, K_DIR, &err);
@@ -807,7 +1101,22 @@ int fat_readdir(int h, unsigned buf)
     nice_poke(buf + 1, u32(e + 4));
     nice_poke(buf + 2, u32(e + 8));
     nice_poke(buf + 3, u32(e + 28));
+    for (unsigned k = 0; withname; k++) {
+        nice_poke(name + k, lname[k]);
+        if (lname[k] == 0)
+            break;
+    }
     return 1;
+}
+
+int fat_readdir(int h, unsigned buf)
+{
+    return readdir(h, buf, 0, 0);
+}
+
+int fat_readname(int h, unsigned buf, unsigned name)
+{
+    return readdir(h, buf, 1, name);
 }
 
 // n bytes written to the file f opened to write: from the C code's
@@ -890,15 +1199,6 @@ int fat_close(int h)
     return infodone();
 }
 
-// The checksum of an 8.3 name that its long-name entries hold
-static unsigned char sum(const unsigned char *n)
-{
-    unsigned char s = 0;
-    for (int k = 0; k < 11; k++)
-        s = (unsigned char)(((s & 1) << 7) + (s >> 1) + n[k]);
-    return s;
-}
-
 // The entry of the folder at the offset off, at the pointer that dirf's
 // buffer has it, read from the start of the folder when it is before
 // dirf's position. 0, or an error.
@@ -918,9 +1218,9 @@ static int at(unsigned off, unsigned char **p)
 // sector written as it changes, then its clusters freed, then FSInfo
 int fat_delete(unsigned name)
 {
-    unsigned char n[11], *e;
+    unsigned char *e;
     int r = mounted();
-    if (r < 0 || (r = name83(name, n)) < 0 || (r = find(vol.dir, n, &e)) < 0)
+    if (r < 0 || (r = getname(name)) < 0 || (r = lookup(&e)) < 0)
         return r;
     if (r == 0)
         return E_NOFILE;
@@ -947,9 +1247,13 @@ int fat_delete(unsigned name)
 }
 
 // fat_dir: the folder FOLDER of the card, for the monitor's dir command:
-// a row with its name, then a row for each file, its 8.3 name and its size in decimal, and for each
-// directory, its name and <DIR>, then the numbers of both. With a slot
+// a row with its name, then a row for each file, its name, the long name
+// or the 8.3 name, in DIR_NAME columns and its size in decimal in 12, and
+// for each directory, its name and <DIR>, then the numbers of both. A
+// name of DIR_NAME characters or more has a row of its own. With a slot
 // from 0, the card in it is mounted first. 0, or an error.
+#define DIR_NAME 24
+
 static void dec(unsigned v, int width)
 {
     char d[10];
@@ -975,13 +1279,17 @@ int fat_dir(int slot)
     unsigned nfiles = 0, ndirs = 0;
     nice_print("Directory of " FOLDER "\r\n");
     while ((r = entry(&d, &e)) == 1) {
-        for (int k = 0; k < 11; k++) {
-            if (k == 8)
-                nice_putc(' ');
-            nice_putc(k == 0 && e[0] == 0x05 ? 0xE5 : e[k]);
+        int len = 0;
+        while (lname[len])
+            nice_putc(lname[len++]);
+        if (len >= DIR_NAME) {
+            nice_print("\r\n");
+            len = 0;
         }
+        while (len++ < DIR_NAME)
+            nice_putc(' ');
         if (e[11] & 0x10) {
-            nice_print("  <DIR>");
+            nice_print("       <DIR>");
             ndirs++;
         } else {
             dec(u32(e + 28), 12);

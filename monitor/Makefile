@@ -190,7 +190,7 @@ $(BUILD)/fsw.bin: test/fsw.nasm mon.nasm $(TOOLS) | $(BUILD)
 # The FAT images of the tests, from test/fat_image.py, with build/hello.bin
 # as HELLO.BIN. They need mkfs.fat, sfdisk, and mtools.
 FAT_IMAGES = $(addprefix $(BUILD)/fat/,fat32.img super.img fat16.img exfat.img nonice.img \
-                                    nicefile.img full.img)
+                                    nicefile.img full.img lfn.img)
 $(FAT_IMAGES) &: test/fat_image.py $(BUILD)/hello.bin
 	@mkdir -p $(BUILD)/fat
 	@$(PYTHON) test/fat_image.py $(BUILD)/hello.bin $(BUILD)/fat
@@ -267,7 +267,7 @@ SD_WRITE = r\rh\r
 # dir mounts slot 0, DIR 1 and dir 0 mount each slot. load frag.bin reads
 # the fragmented FRAG.BIN, whose words d shows, the first and the last
 # four, and load readme.txt a text file, whose 2 lines are skipped. Then
-# a name that is no file, a directory, a name that is no 8.3 name, load
+# a name that is no file, a directory, a long name that is no file, load
 # alone, two names, loadx, dirx, dir 2, which has no slot and changes
 # nothing, and dir with two numbers, or a slot of 9 digits. load
 # HELLO.BIN, r runs it.
@@ -282,16 +282,38 @@ FAT1 = dir\rh\r
 # with error 29, and never fall back to the root's HELLO.BIN
 FATNONE = dir\rload hello.bin\rdir 1\rload hello.bin\rh\r
 # fatw: a copy of super.img in slot 0 and of full.img in slot 1. l writes
-# two words, which save writes to test.bin, dir lists, and load reads
+# two words, which save writes to test.bin, an 8.3 name in lower case,
+# which dir lists so, and load reads
 # back, and d shows. save of 0 words truncates HELLO.BIN, which load then
 # finds empty. del deletes test.bin, and a second del finds none. Then
 # the arguments that are not: save alone, with a name only, with no
 # count, with a fourth word, and with an address of 9 digits, savex, a
-# name that is no 8.3 name, del alone, with two names, and delx, and de 0,
+# name that is not valid, with a colon, del alone, with two names, and delx, and de 0,
 # which is d. On full.img, save of 256 words fills the card with
 # FULL.BIN's first 1536 bytes, which dir shows, and is error 30; del
 # frees them, and a save of 2 words fits.
-FATW = l\r8000 1234ABCD\r8001 5\r\rsave test.bin 8000 2\rdir\rload TEST.BIN\rd 8000 2\rsave hello.bin 8000 0\rload hello.bin\rdel test.bin\rdel test.bin\rsave\rsave x\rsave x 8000\rsave x 8000 1 2\rsave x 123456789 1\rsavex\rSAVE toolongname.bin 8000 1\rdel\rdel a b\rdelx\rde 0\rdir 1\rsave full.bin 8000 100\rdir\rdel full.bin\rsave full.bin 8000 2\rdir\rh\r
+FATW = l\r8000 1234ABCD\r8001 5\r\rsave test.bin 8000 2\rdir\rload TEST.BIN\rd 8000 2\rsave hello.bin 8000 0\rload hello.bin\rdel test.bin\rdel test.bin\rsave\rsave x\rsave x 8000\rsave x 8000 1 2\rsave x 123456789 1\rsavex\rSAVE "a:b" 8000 1\rdel\rdel a b\rdelx\rde 0\rdir 1\rsave full.bin 8000 100\rdir\rdel full.bin\rsave full.bin 8000 2\rdir\rh\r
+# fatl: lfn.img of test/fat_image.py in slot 0, with long names. dir
+# shows them, load reads my prog.bin by its long name in quotes, which r
+# runs, then by its 8.3 name, and by its long name in upper case; the
+# text files mixed.Bin, lower.txt, and those whose long-name entries
+# cross a sector and a cluster, by their names in another case; bad
+# sum.txt, whose long-name entry has a wrong checksum, only by its 8.3
+# name; a name with no closing quote; caf?.txt, as dir shows café.txt,
+# which is no name; λx.txt by its 8.3 name, _X.TXT; and an empty
+# name in quotes.
+FATL = dir\rload "my prog.bin"\rr\rload MYPROG~1.BIN\rload "MY PROG.BIN"\rload mixed.bin\rload LOWER.TXT\rload "across a sector.txt"\rload "ACROSS A CLUSTER.TXT"\rload "bad sum.txt"\rload badsum~1.txt\rload "my prog.bin\rload caf?.txt\rload _x.txt\rload ""\rh\r
+# fatlw: a copy of lfn.img in slot 0. l writes two words, and save writes
+# them to new files: mandelbrot.bin, MANDEL~1.BIN, as the MANDEL~1 that
+# is there is a .TXT; mandelbrot3.txt, MANDEL~3.TXT after ~1 and ~2;
+# Hello.bin, HELLO.BIN with no tail and a long name; lower.bin, LOWER.BIN
+# with byte 12's flags and no long name; and "a b.bin", AB~1.BIN. A save
+# of MIXED.BIN truncates mixed.Bin, which keeps its name. "a*b" and
+# "end." are no names. del deletes mandelbrot1.txt and mandelbrot2.txt,
+# whose 4 entries in a row take the 4 of a much longer name of a
+# file.bin, and x.bin goes at the end. dir shows them, and load reads
+# two back.
+FATLW = l\r8000 1234ABCD\r8001 5\r\rsave mandelbrot.bin 8000 2\rsave mandelbrot3.txt 8000 2\rsave Hello.bin 8000 2\rsave lower.bin 8000 2\rsave "a b.bin" 8000 2\rsave MIXED.BIN 8000 1\rsave "a*b" 8000 1\rsave "end." 8000 1\rdel mandelbrot1.txt\rdel "mandelbrot2.txt"\rsave "a much longer name of a file.bin" 8000 2\rsave x.bin 8000 2\rdir\rload "A MUCH LONGER NAME OF A FILE.BIN"\rd 8000 2\rload mandel~1.bin\rh\r
 
 # The words of each test that are dumped with the screen: for cmds the
 # variables, the cursor's registers, and the IP and MAC addresses, and for the programs the text at
@@ -315,10 +337,11 @@ DUMP_load_64k = -d 0xFFFFF00E:1
 DUMP_hello_c = -d 0xFFFF0168:12
 # For sd_write the results of test/sd.nasm's calls
 DUMP_sd_write = -d 0x9100:6
-# For fs the results of test/fs.nasm's calls, the entry that fs_readdir
-# wrote, and the first 45 bytes that fs_read wrote, for fsw the results
+# For fs the results of test/fs.nasm's calls, the entries that fs_readdir
+# and fs_readname wrote, the first 45 bytes that fs_read wrote, and the
+# names of fs_readname, for fsw the results
 # of test/fsw.nasm's, and for fat the numbers of fat_load for load NAME
-DUMP_fs       = -d 0x9100:30 -d 0x9180:4 -d 0x9200:45
+DUMP_fs       = -d 0x9100:36 -d 0x9180:8 -d 0x9200:45 -d 0x9280:16 -d 0x92A0:11
 DUMP_fsw      = -d 0x9100:42
 DUMP_fat      = -d 0xFFFFF11A:5
 # For rom the number of runs and the results of test/rom.nasm's calls
@@ -372,11 +395,13 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	@printf '$(FAT1)' > $(BUILD)/fat1.txt
 	@printf '$(FATNONE)' > $(BUILD)/fatnone.txt
 	@printf '$(FATW)' > $(BUILD)/fatw.txt
+	@printf '$(FATL)' > $(BUILD)/fatl.txt
+	@printf '$(FATLW)' > $(BUILD)/fatlw.txt
 	@$(PYTHON) test/sd_image.py $(BUILD)/sd.img
 	@$(PYTHON) test/sd_image.py --written $(BUILD)/sd_written.img
 	@{ printf '$(LOAD_HEAD)'; head -n 3 $(BUILD)/hello.bin | awk '{ printf "%s\r\n", $$0 }'; \
 	  tail -n +4 $(BUILD)/hello.bin; printf '$(LOAD_TAIL)'; } > $(BUILD)/load.txt
-	@fail=0; for t in cmds scroll load load_emu load_64k sd_write arp udp rom fs fsw fat fatw fatbad fat1 fatnone \
+	@fail=0; for t in cmds scroll load load_emu load_64k sd_write arp udp rom fs fsw fat fatw fatl fatlw fatbad fat1 fatnone \
 	           hello reset hello_c; do \
 	  opts=; rom=$(BUILD)/monitor_test.bin; \
 	  case $$t in \
@@ -404,6 +429,9 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	    fatw) prog=; input=fatw; dump=; \
 	      cp $(BUILD)/fat/super.img $(BUILD)/fatw0.img; cp $(BUILD)/fat/full.img $(BUILD)/fatw1.img; \
 	      opts="--sd0 $(BUILD)/fatw0.img --sd1 $(BUILD)/fatw1.img";; \
+	    fatl) prog=; input=fatl; dump=; opts="--sd0 $(BUILD)/fat/lfn.img";; \
+	    fatlw) prog=; input=fatlw; dump=; \
+	      cp $(BUILD)/fat/lfn.img $(BUILD)/fatlw0.img; opts="--sd0 $(BUILD)/fatlw0.img";; \
 	    fatbad) prog=; input=fatbad; dump=; \
 	      opts="--sd0 $(BUILD)/fat/fat16.img --sd1 $(BUILD)/fat/exfat.img";; \
 	    fat1) prog=; input=fat1; dump=; opts="--sd1 $(BUILD)/fat/super.img";; \
@@ -428,7 +456,10 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	      cmp $(BUILD)/fat/super.img $(BUILD)/fsw1.img && echo "Slot 1's card as it was"; fi; \
 	    if [ $$t = fatw ]; then \
 	      $(PYTHON) test/fat_check.py $(BUILD)/fatw0.img HELLO.BIN; \
-	      $(PYTHON) test/fat_check.py $(BUILD)/fatw1.img FULL.BIN; fi; } \
+	      $(PYTHON) test/fat_check.py $(BUILD)/fatw1.img FULL.BIN; fi; \
+	    if [ $$t = fatlw ]; then \
+	      $(PYTHON) test/fat_check.py $(BUILD)/fatlw0.img mandelbrot.bin "a b.bin" \
+	        "a much longer name of a file.bin" mixed.Bin; fi; } \
 	    > $(BUILD)/$$t.out; \
 	  if [ $$t = rom ]; then \
 	    trap=$$(sed -n 's/^\(........\) _rom_trap$$/\1/p' $(BUILD)/rom.sym | tr a-f A-F); \

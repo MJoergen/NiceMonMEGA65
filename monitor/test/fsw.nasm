@@ -10,7 +10,7 @@
 ; The bytes written are FSW_TEXT's: 1000 of them, digits from 0 to 9 and
 ; round again, with an LF after every 49.
 ;
-;  0  mon_version, 0x00010003, table 1.3
+;  0  mon_version, 0x00010004, table 1.4
 ;  1  fs_open of NEW.TXT with mode 1, 0, which mounts slot 0 and makes it
 ;  2  fs_write of 600 bytes, 600, which take two clusters of one sector
 ;  3  fs_write of 0 bytes, 0
@@ -39,7 +39,7 @@
 ; 26  fs_delete of SUB, -22, a directory
 ; 27  fs_delete of KEEP.TXT, -32, read-only
 ; 28  fs_open of KEEP.TXT with mode 1, -32
-; 29  fs_delete of TOOLONGNAME, -20, not an 8.3 name
+; 29  fs_delete of TOOLONGNAME, -21, which may be a long name
 ; 30  fs_open with mode 3, -25, no such mode
 ; 31  the files E00.TXT to E23.TXT made empty with fs_open and fs_close,
 ;     24, which fill the folder's free entries and take a new cluster
