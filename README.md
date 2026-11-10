@@ -29,9 +29,10 @@ A few words come up throughout:
 - The **monitor** is the program in the ROM that the system starts
   with. It shows a prompt, and takes commands that load and run
   programs ([monitor/](monitor/README.md)).
-- **Remote control** lets a PC load, run, pause, step, and inspect
-  programs on the board, over its Ethernet port or its serial port. It
-  is nice_cpu's debug link.
+- **[Remote control](doc/DEBUG_LINK.md)** lets a PC load, run, pause,
+  step, and inspect programs on the board, over its Ethernet port or its
+  serial port. It is nice_cpu's
+  [debug link](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEBUG.md).
 - The **console** is a program's text input and output. The output goes
   to the PC, over the same connection as remote control, and the input
   comes from the PC and from the keyboard.
@@ -54,7 +55,7 @@ There are three ways to use the system:
 1. Download the core file for your board from the latest
    [release](https://github.com/MJoergen/NiceMonMEGA65/releases):
    `nicemon-TAG-r6.cor` for the R6, or `nicemon-TAG-r3.cor` for the R3
-   and R3A, where TAG is the release, such as `V1.1`. A core file holds
+   and R3A, where TAG is the release, such as `V2.0`. A core file holds
    its board revision, so use the one for yours.
 2. Copy it to the SD card, and hold No Scroll while you switch the MEGA65
    on. MEGAFLASH, the MEGA65's core menu, appears. Let it write the core
@@ -62,38 +63,6 @@ There are three ways to use the system:
 3. Start the system from that slot. The screen shows the monitor's
    banner and its prompt, `> `. Type `?` and RETURN for the commands, or
    `x` and RETURN for the demo (see [On its own](#on-its-own)).
-
-No JTAG cable is needed. With one, on Linux,
-`make flash PORT=/dev/ttyUSB1 COR=nicemon-V1.0-r6.cor SLOT=1` writes the
-core file into slot 1 without the SD card. It needs
-[openFPGALoader](https://github.com/trabucayre/openFPGALoader) and
-pyftdi (`pip install pyftdi`; see [synth/](synth/README.md#building)).
-
-A Nexys4DDR starts the system from its flash in the same way. Write the
-release's `nicemon-TAG-nexys4ddr.bit` into the flash once, over the
-board's USB cable, with
-`make flash PORT=/dev/ttyUSB1 BIT=nicemon-TAG-nexys4ddr.bit`
-(needs openFPGALoader). Set jumper JP1 (MODE) to QSPI. The board then
-shows the monitor when it is switched on, with a USB keyboard in its
-USB HID port (see [synth/](synth/README.md#building)).
-
-## Setting up the tools
-
-The monitor needs no tools on a PC. They are for building programs, and
-for remote control over [Ethernet](#over-ethernet) or the
-[serial port](#over-the-serial-port). They are all in this repository.
-Clone it with the submodule, which has the assembler, the emulator, and
-the C library:
-
-    git clone --recurse-submodules https://github.com/MJoergen/NiceMonMEGA65.git
-
-or, in an existing clone:
-
-    git submodule update --init
-
-The tools need only Python 3, on Linux or macOS. The emulator, `niceemu`,
-is built with `make -C nice_cpu/emulator build`, which needs Zig (see
-[nice_cpu/emulator/](https://github.com/MJoergen/nice_cpu/blob/main/emulator/README.md)).
 
 ## On its own
 
@@ -243,6 +212,24 @@ PC on the network may then load, run, and debug programs, with no JTAG
 cable. Remote control has no password, so give the board an IP address
 only on a network you trust.
 
+### Setting up the tools
+
+The monitor needs no tools on a PC. They are for building programs, and
+for remote control, over Ethernet as here or over the
+[serial port](#over-the-serial-port). They are all in this repository.
+Clone it with the submodule, which has the assembler, the emulator, and
+the C library:
+
+    git clone --recurse-submodules https://github.com/MJoergen/NiceMonMEGA65.git
+
+or, in an existing clone:
+
+    git submodule update --init
+
+The tools need only Python 3, on Linux or macOS. The emulator, `niceemu`,
+is built with `make -C nice_cpu/emulator build`, which needs Zig (see
+[nice_cpu/emulator/](https://github.com/MJoergen/nice_cpu/blob/main/emulator/README.md)).
+
 ### Giving the board an address
 
 After reset the board has no IP address, and answers nothing. The
@@ -319,7 +306,8 @@ Remote control runs over the MEGA65's serial port too, its debug UART.
 It needs the JTAG cable, whose USB port carries it.
 `tools/mon.py --port /dev/ttyUSB1` is then the interactive shell, and a
 terminal program, such as `picocom`, the plain client, as
-[over Ethernet](#over-ethernet). The other tools take `--port` too.
+[over Ethernet](#over-ethernet). The other tools take `--port` too. To
+set them up, see [Setting up the tools](#setting-up-the-tools).
 
 The port runs at 230400 baud, 8-N-1, after reset, which is the tools'
 default on Linux and macOS alike. The monitor's `baud` sets another
@@ -496,7 +484,8 @@ dbg&gt; <b>q</b>
 ## Writing programs
 
 Programs are NICE assembly, or C through WebAssembly, built on a PC
-into `.bin` files. There are two kinds:
+into `.bin` files, with the tools of this repository (see
+[Setting up the tools](#setting-up-the-tools)). There are two kinds:
 
 | | A program on its own | A program under the monitor |
 |---|---|---|
@@ -535,6 +524,16 @@ That builds the cores of the R3 and the R6, with `prog.bin` in their
 ROM. It needs Vivado and `coretool` (see [synth/](synth/README.md)). The core
 files are `synth/r6/build/NiceMonMEGA65-r6.cor` and
 `synth/r3/build/NiceMonMEGA65-r3.cor`.
+
+## On the Nexys4DDR
+
+A Nexys4DDR starts the system from its flash, as the MEGA65 does. Write
+the release's `nicemon-TAG-nexys4ddr.bit` into the flash once, over the
+board's USB cable, with
+`make flash PORT=/dev/ttyUSB1 BIT=nicemon-TAG-nexys4ddr.bit`
+(needs openFPGALoader). Set jumper JP1 (MODE) to QSPI. The board then
+shows the monitor when it is switched on, with a USB keyboard in its
+USB HID port (see [synth/](synth/README.md#building)).
 
 ## Documentation
 
