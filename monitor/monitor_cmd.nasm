@@ -256,7 +256,7 @@ show_ip
                 POP     R7
                 JMP     _io_crlf        ; which returns to the caller
 
-; baud [RATE]: the UART's baud rate (doc/SYSTEM.md, "The baud rate"),
+; baud [RATE]: the UART's baud rate (doc/DEBUG_LINK.md, "The baud rate"),
 ; written from a decimal number that is one of the rates of BAUD_RATES,
 ; and shown. Without a rate it is only shown. Blanks may come before and
 ; after the rate, and anything else, or a rate not in the list, makes it

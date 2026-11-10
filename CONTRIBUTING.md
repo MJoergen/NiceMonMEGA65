@@ -110,7 +110,8 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
 | [examples/](examples/) | Example C programs, and the Makefile that builds them for the MEGA65. |
 | [tools/](tools/) | `boardlink.py`, the debug link of nice_cpu's `debugger/nicelink.py`, over the board's UART or TCP to `niceemu --link`, with the board's Ethernet port and the simulated system of `make cosim`, and the tools that use it: `load.py`, which loads a program into the MEGA65 or Nexys4DDR, `run.py`, which runs a program on the board as `niceemu` runs it, `mon.py`, an interactive shell on the link, nice_cpu's `nicedbg.py` with the board's links, `sdcard.py`, which lists the board's SD card and copies its files to the host, `hwtest.py`, which tests the system on the board, `flash.py`, which writes the Nexys4DDR's flash or a slot of the MEGA65's, `bump.py`, which records the timing of the MEGA65 and the Nexys4DDR for a nice_cpu tag, `release.py`, which builds and publishes a release, `linktest.py`, which checks `run.py` and `mon.py` on `niceemu --link`, `tftpd.py`, a TFTP server for the monitor's `tftp`, with listings, `tftptest.py`, which checks it, `sdtest.py`, which checks `sdcard.py`, `cosimtest.py`, which checks `run.py` on the simulated system, and `screenshot.py`, which draws a program's screen in `niceemu` as a PNG picture. |
 | [README.md](README.md) | For those who use the core files and write programs for them: on its own, over Ethernet, and over the serial port. |
-| [SYSTEM.md](doc/SYSTEM.md) | The system that programs and the link see: the debug link, the address map, the screen and the font, the keyboard, the ROM, the Nexys4DDR's devices, the baud rate, the Ethernet station, and the SD card slots. |
+| [SYSTEM.md](doc/SYSTEM.md) | The system that programs and the link see: the address map, the screen and the font, the keyboard, the ROM, the Nexys4DDR's devices, the Ethernet station, and the SD card slots. |
+| [DEBUG_LINK.md](doc/DEBUG_LINK.md) | The debug link: its words, how a host loads, pauses, steps, and stops a program, its versions, the control register, the UART's baud rate, and the link over TCP. |
 | [EMULATOR.md](doc/EMULATOR.md) | The table of the known differences from the emulator. |
 | [PROGRAMMING.md](doc/PROGRAMMING.md) | How to write and build programs, in NICE assembly and in C, and how they use the screen, the keyboard, the monitor, and the ROM. |
 | [DEBUGGER.md](doc/DEBUGGER.md) | The design note of the on-board debugger: its stages, its tests, and its decisions. |
@@ -980,7 +981,7 @@ errors in both. When stdout closes early, as with `run.py ... | head`,
     nice_cpu/assembler/niceasm.py -o primes.bin primes_full.nasm
 
 `--byte-windows` makes each byte or halfword load and store one `MOVE`
-through the byte windows of nice_cpu's SYSTEM.md §9, which the board and
+through the byte windows of [nice_cpu's SYSTEM.md §9](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#9-byte-windows), which the board and
 `niceemu` have, and `--trust-alignment` takes an access to be aligned as
 its hint says (nice_cpu's translator README). `float.nasm` is the float
 library, which a program that calls `scanf` needs, as `primes.c` does,

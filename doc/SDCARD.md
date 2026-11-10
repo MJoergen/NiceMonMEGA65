@@ -159,9 +159,9 @@ little-endian, so:
 **No side effects on a read.** Reading any of the 16 words changes nothing,
 and a write does only what the table says, so the debug link and the on-board
 debugger read and write them as the core does, with no rule of their own
-(DEBUG.md §3). A host reads a sector with 16 writes of `SD_CHUNK` and 16 `R`
+([DEBUG.md §3](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEBUG.md#3-requests-and-answers)). A host reads a sector with 16 writes of `SD_CHUNK` and 16 `R`
 requests of 8 words at `SD_BUF0`, and writes one likewise. The step undo of
-DEBUG.md §7.2 needs nothing from the controller, as no read moves anything.
+[DEBUG.md §7.2](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEBUG.md#72-the-emulator) needs nothing from the controller, as no read moves anything.
 
 **The rules.**
 
@@ -188,7 +188,7 @@ DEBUG.md §7.2 needs nothing from the controller, as no read moves anything.
   error 1.
 - A slot whose card detect does not work shows "present" as 1 at all times,
   "write-protected" as 0, and "changed" only after reset. A command on it
-  with no card fails with error 3 or 8. nice_cpu's SYSTEM.md §5 would say
+  with no card fails with error 3 or 8. [nice_cpu's SYSTEM.md §5](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#5-sd-card) would say
   which boards have such a slot.
 - The controller runs while the processor is held, paused, or halted, and
   only reset stops it. So a host can read and write the card while the
@@ -196,7 +196,7 @@ DEBUG.md §7.2 needs nothing from the controller, as no read moves anything.
   restores what it changed before the program goes on: `SD_CHUNK`, `SD_LBA`,
   `SD_SELECT`, and the buffer, which it can read first, as reads have no
   side effects.
-- Reset, which a start of the processor gives the devices (DEBUG.md §6),
+- Reset, which a start of the processor gives the devices ([DEBUG.md §6](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEBUG.md#6-the-debug-registers)),
   lets a Write that has begun finish, so that no sector on the card is torn,
   and abandons any other command. Then the controller is idle, with slot 0
   selected, `SD_CHUNK` and `SD_LBA` 0, "ready" 0, and "changed" set if a

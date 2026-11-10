@@ -51,7 +51,7 @@ __all__ = [
 # version 7; 0xFFFFFFE0 before it)
 DEBUG_FIRST = 0xFFFFFFD0
 # The board's UART baud rate in bit/s, 230400 after reset, nice_cpu's
-# DEFAULT_BAUD, and the rates it takes (doc/SYSTEM.md); niceemu has plain
+# DEFAULT_BAUD, and the rates it takes (doc/DEBUG_LINK.md); niceemu has plain
 # memory there
 BAUD = 0xFFFFFF9F
 BAUDS = (115200, 230400, 460800, 921600, 1000000, 1500000, 2000000)

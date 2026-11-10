@@ -3,7 +3,7 @@
 -- board's top level gives it a clock, a reset, the UART pins, and optionally
 -- a keyboard: a stream of bytes that is input like the UART's.
 --
--- Words used here (SYSTEM.md has them in full; DEBUG.md, ISA.md,
+-- Words used here (doc/DEBUG_LINK.md has them in full; DEBUG.md, ISA.md,
 -- MICROARCH.md, and SYSTEM.md with a section number are nice_cpu's, in
 -- nice_cpu/doc/):
 --   link    nice_cpu's debug link, a second bus master that a host drives

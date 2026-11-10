@@ -11,7 +11,7 @@ entries, or drives the registers itself.
 
 The ROM has three sector routines of its own, with no entries in the
 dispatch table ([doc/SDCARD.md](../doc/SDCARD.md), "The ROM"). They drive
-the controller's registers at `0xFFFFFFA0`, which nice_cpu's SYSTEM.md §5
+the controller's registers at `0xFFFFFFA0`, which [nice_cpu's SYSTEM.md §5](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#5-sd-card)
 specifies, the same on every board and in `niceemu`. They follow the C
 ABI, wait for busy before the command and after it, and return 0, or the
 negative of `SD_ERROR`:
@@ -37,11 +37,11 @@ negative of `SD_ERROR`:
 
 The ROM has frame routines of its own, with no entries in the dispatch
 table, as the sector routines have none. They drive the port for
-Ethernet frames at `0xFFFFFFC0`, which nice_cpu's SYSTEM.md §7
+Ethernet frames at `0xFFFFFFC0`, which [nice_cpu's SYSTEM.md §7](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#7-ethernet-frames)
 specifies, the same on every board and in `niceemu`, and follow the C
 ABI. A frame is in RAM as the port's buffers have it: from byte 2 of its
 buffer, 4 bytes a word, big-endian, so that the fields fall on the words
-of SYSTEM.md §7.
+of [SYSTEM.md §7](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#7-ethernet-frames).
 
 | Routine | Arguments | What it does |
 |---|---|---|

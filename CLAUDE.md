@@ -12,8 +12,10 @@ tools that load and run programs. The goal is that a program runs on the
 board exactly as `niceemu`, the emulator in `nice_cpu/emulator`, runs it.
 `README.md` is for users of the core files: on its own, over Ethernet,
 and over the serial port, in that order, the order of their numbers of
-users. `doc/SYSTEM.md` has the address map, the link, the screen,
-the keyboard, the ROM, the Nexys4DDR's devices, and the SD card slots; `CONTRIBUTING.md` the tests, the
+users. `doc/SYSTEM.md` has the address map, the screen,
+the keyboard, the ROM, the Nexys4DDR's devices, and the SD card slots;
+`doc/DEBUG_LINK.md` the link, its control register, the UART's baud
+rate, and the link over TCP; `CONTRIBUTING.md` the tests, the
 formal checks, `make hwtest`, and the badge; `doc/EMULATOR.md` the known
 differences from the emulator; `doc/PROGRAMMING.md` how to write and
 build programs, on the three levels of the hardware, the ROM's dispatch
@@ -222,7 +224,7 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   (color, analyze, synchronize, behavior). The third-party files that are
   copied unchanged keep theirs, and so do the names they define, such as
   the entity `serialiser_10to1_selectio`.
-- Every README, `doc/SYSTEM.md`, and `CONTRIBUTING.md` is kept in step with
+- Every README, `doc/SYSTEM.md`, `doc/DEBUG_LINK.md`, and `CONTRIBUTING.md` is kept in step with
   the code it describes, in plain short sentences with the Oxford comma.
   Commit messages follow the 50/72 style: the subject is a short sentence
   of at most 50 characters, and the body, after a blank line, has lines

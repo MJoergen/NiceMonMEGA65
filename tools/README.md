@@ -29,12 +29,12 @@ prints its options with `--help`, and its header says more.
 
 The board's line carries the program's console both ways, and the
 packets of the debug link between its bytes (see
-[SYSTEM.md](../doc/SYSTEM.md#the-debug-link)). The line is a TCP
+[DEBUG_LINK.md](../doc/DEBUG_LINK.md)). The line is a TCP
 connection to the board's Ethernet port, or its debug UART, which needs
 a JTAG cable. The tools use the link, and `niceemu --link` serves the
 same link, so the tools drive the emulator as they drive the board.
 When they connect, the tools read the link's version, and stop on a
-major other than 0, which they do not know (DEBUG.md §9).
+major other than 0, which they do not know ([DEBUG.md §9](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEBUG.md#9-versions)).
 
 `load.py`, `run.py`, and `mon.py` take the line as an option:
 `--eth 192.168.1.65` for the Ethernet port (see
@@ -68,7 +68,7 @@ The other tools have targets too: `make hwtest` and `make flash` (see
 
 The board serves remote control on TCP port 4510 of its Ethernet
 station, once it has an IP address
-([SYSTEM.md](../doc/SYSTEM.md#the-debug-link-over-tcp)). After reset it
+([DEBUG_LINK.md](../doc/DEBUG_LINK.md#the-debug-link-over-tcp)). After reset it
 has none. The monitor's `i` gives it one, `i 192.168.1.65` at the
 prompt, and the demo's F11 does too: I types a new IP address. Then
 use `--eth` with any tool:
@@ -94,7 +94,7 @@ the board an IP address only on a network you trust.
 
 The MEGA65's debug UART runs at 230400 baud, 8-N-1, after reset, the
 tools' `--baud` by default, or at the rate written to `0xFFFFFF9F`
-([doc/SYSTEM.md](../doc/SYSTEM.md#the-baud-rate)), which `--baud` must
+([doc/DEBUG_LINK.md](../doc/DEBUG_LINK.md#the-baud-rate)), which `--baud` must
 match. A core built before `V1.9` runs at 2 Mbaud after reset, and needs
 `--baud 2000000`. It needs the JTAG cable, whose USB port carries it. It is usually the serial device
 `/dev/ttyUSB1`. Give it to the tools with `--port`, or to `make` with
@@ -291,7 +291,7 @@ limit, `run.py` holds the core, prints "Stopped at the time limit after
 SEC s" and the `--dump` and `--screen` output, and exits with status 3,
 as `niceemu -n` does at its step limit. It prints no registers, no step
 count, and no location for `--symbols`, as a hold leaves the registers
-undefined (DEBUG.md §6).
+undefined ([DEBUG.md §6](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEBUG.md#6-the-debug-registers)).
 
 ### Without a board
 

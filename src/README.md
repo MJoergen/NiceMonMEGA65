@@ -22,8 +22,8 @@ header of `nicemon.vhd` is the address map, and
   its own, two words at a time, and everything else on the data bus.
 - **MEMORY** ([mem.vhd](mem.vhd)) holds the RAM, the ROM that the core
   boots from, and the screen. It has two ports: one for the instruction
-  bus and one for the data bus, which has the byte windows of nice_cpu's
-  SYSTEM.md §9, with byte enables on the RAM.
+  bus and one for the data bus, which has the byte windows of [nice_cpu's
+  SYSTEM.md §9](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#9-byte-windows), with byte enables on the RAM.
 - **DEVICES** ([devices.vhd](devices.vhd)) are nice_cpu's: the timer,
   the math unit, the performance counters, the fetch statistics, the
   SD card controller ([sd/sd.vhd](sd/sd.vhd)), whose pins go to the

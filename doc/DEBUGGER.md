@@ -66,7 +66,7 @@ state.
   side port ([below](#how-it-drives-the-link)), and the host keeps its
   answers, its notices, and the console. The host gets the notices of a
   stop that the debugger caused, `p`, `x`, or `h`, as it does for a
-  breakpoint, and may read a state it did not set (DEBUG.md §3).
+  breakpoint, and may read a state it did not set ([DEBUG.md §3](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEBUG.md#3-requests-and-answers)).
 - The program's keyboard input is unaffected in Off and Strip: the
   keyboard's bytes go into the console FIFO as now, not through the link.
   The console is the host's in every state, both ways; a console page
@@ -93,8 +93,8 @@ on dark blue, `0x004` and `0xFFF`:
  F1 step F3 pause/go F4 restart F5 link F11 page F12 keep strip: off
 ```
 
-- Rows 25 and 26: R0–R15 in hex, as the link returns them (DEBUG.md
-  §6): live while the core runs, as `niceemu --link` returns them, and
+- Rows 25 and 26: R0–R15 in hex, as the link returns them ([DEBUG.md
+  §6](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEBUG.md#6-the-debug-registers)): live while the core runs, as `niceemu --link` returns them, and
   the stop's values while it is paused or has halted. While it is held
   they are dimmed: the link keeps the values of the last stop then,
   which may be another program's.
@@ -102,7 +102,7 @@ on dark blue, `0x004` and `0xFFF`:
   interrupt after `WAIT` (bit 6 of the control register, link version
   7), `PAUSED`, `PAUSED W` while it is paused in a wait, `BRK n` at
   breakpoint n, `WCH n` after a step that hit watchpoint n, which only a
-  host of the link sets (DEBUG.md §6), `HALTED n` with the reason of DEBUG.md §6, `HELD`, or `NO LINK`
+  host of the link sets ([DEBUG.md §6](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEBUG.md#6-the-debug-registers)), `HALTED n` with the reason of [DEBUG.md §6](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEBUG.md#6-the-debug-registers), `HELD`, or `NO LINK`
   until the link has answered after reset; the PC; the
   instruction word at the PC; the flags of SR, X, C, Z, N, V, E, and I,
   each shown or a dot; and the instruction decoded, from column 46: the
@@ -113,7 +113,7 @@ on dark blue, `0x004` and `0xFFF`:
   word is `reserved`. The debugger reads the constant words that the
   instruction word says it takes, and none past them, which could be a
   device's register. While the core runs the
-  memory is out of reach (DEBUG.md §3), so the row shows the state and
+  memory is out of reach ([DEBUG.md §3](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEBUG.md#3-requests-and-answers)), so the row shows the state and
   the PC, dashes for the word, and no decode; while the core is held,
   dashes for the PC too.
 - Row 28: the keys, and the sticky setting, `keep strip: off` or `on`.
@@ -245,7 +245,7 @@ The ESC key is a lone ESC: one with no byte after it for 1 ms, as the
 keys' sequences come without a gap. A word that starts with `a` is typed
 with a 0 before it, `0a…`, as only 8 digits count.
 
-`b` writes the debug registers of DEBUG.md §4, which take a write while
+`b` writes the debug registers of [DEBUG.md §6](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEBUG.md#6-the-debug-registers), which take a write while
 the core runs too: the address of the breakpoint, then its enable bit.
 A key that needs the core stopped, pressed while it runs, shows the
 link's answer in the message row (`not paused`, the link's `e02`) and
@@ -325,8 +325,8 @@ and outputs, and its room.
 
 ## How it drives the link
 
-The debugger is a client of the debug link inside the system (DEBUG.md
-§3), through the link's side port
+The debugger is a client of the debug link inside the system ([DEBUG.md
+§3](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEBUG.md#3-requests-and-answers)), through the link's side port
 (`debug_link.vhd`, contract g) into `p_acc`, the process that holds the
 debug registers and runs the Wishbone master: a word at a time, with
 valid held until done, an error for a word that is not a debug register
@@ -575,7 +575,7 @@ Made on 2026-10-30, with the reasons:
   engine, and `niceemu --link` returns them live already, so the board
   comes to match the emulator.
 - **Stops from the core's signals, not the link's notices** (decided at
-  stage 9). The side client gets no notices (DEBUG.md §3), and `nicemon`
+  stage 9). The side client gets no notices ([DEBUG.md §3](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEBUG.md#3-requests-and-answers)), and `nicemon`
   has the core's pause and halt: a rising edge is a stop, and a falling
   edge its end, which also sees a host's step or go on and drops the
   word at the PC and the window read at the stop.

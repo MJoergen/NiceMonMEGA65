@@ -132,7 +132,7 @@ math unit, so the program is joined with `muldiv_mpu.nasm`. A system
 without the math unit would translate with `nicewasm --no-mpu` and use
 `muldiv_soft.nasm` instead.
 
-The board has the byte windows of nice_cpu's SYSTEM.md §9, so
+The board has the byte windows of [nice_cpu's SYSTEM.md §9](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#9-byte-windows), so
 `nicebuild.py --byte-windows` makes each byte or halfword load and store
 of the program one `MOVE`, where it is a few instructions without them.
 nice_cpu's benchmark, `bench/bench.c`, built so with
@@ -215,10 +215,10 @@ declares them with `monitor/mon.h` and joins the stubs of `mon.nasm`,
 
 A program that runs on its own, at 0, has no monitor to call. It reaches
 the SD card controller at `0xFFFFFFA0` itself, a sector at a time
-(nice_cpu's SYSTEM.md §5, and [SYSTEM.md](SYSTEM.md#the-sd-card-slots)),
+([nice_cpu's SYSTEM.md §5](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#5-sd-card), and [SYSTEM.md](SYSTEM.md#the-sd-card-slots)),
 and the port for Ethernet frames at `0xFFFFFFC0`, which receives the
 frames that the station does not serve and sends the program's
-(nice_cpu's SYSTEM.md §7, and [SYSTEM.md](SYSTEM.md#ethernet-frames));
+([nice_cpu's SYSTEM.md §7](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#7-ethernet-frames), and [SYSTEM.md](SYSTEM.md#ethernet-frames));
 `sim/udp.nasm` answers a UDP datagram through it. A program under the
 monitor may use both too, and one that drives the SD registers itself
 mounts the card again afterwards.
@@ -228,7 +228,7 @@ mounts the card again afterwards.
 The entries of the files and the network return a negative number for an
 error, and the monitor's commands print the number with its text, as
 `File error 29, no folder NICE on the card`. The SD controller's errors
-are those of `SD_ERROR` (nice_cpu's SYSTEM.md §5), negated:
+are those of `SD_ERROR` ([nice_cpu's SYSTEM.md §5](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#5-sd-card)), negated:
 
 | Error | Meaning |
 |---|---|

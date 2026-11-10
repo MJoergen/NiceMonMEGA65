@@ -222,7 +222,7 @@ offset, so there the history is kept but not shown.
 | `i [A.B.C.D]` | Shows the Ethernet station's IP address, `IP address 192.168.1.65`, or writes it first: four decimal numbers of 0 to 255 with dots between them, such as `i 192.168.1.65`. Anything but an address or `dhcp` is no address, and `i` says so and writes nothing. It writes `0xFFFFFFB0`, `NET_IP` ([SYSTEM.md](../doc/SYSTEM.md#the-ethernet-station)), so a host connected over TCP loses its connection. In `niceemu` it is a register that keeps what is written. |
 | `i dhcp` | Gets the IP address from the network's DHCP server and writes it, as `i A.B.C.D` does, then shows it, with the mask, the gateway, and the server, a line each (The network below). Without an answer, it prints `No answer from a DHCP server` after about 16 seconds, and leaves the address as it was. |
 | `m [MAC]` | Shows the station's MAC address, `MAC address 02:4E:49:43:45:00`, or writes it first: six bytes of one or two hex digits, in either case, with colons between them, such as `m 02:4E:49:43:45:01`. The first byte must be even, as an odd one makes a group address. Anything else is no address, and `m` says so and writes nothing. It writes `0xFFFFFFB1` and `B2`, so a host connected over TCP loses its connection. Two boards on one network need different MAC addresses. In `niceemu` they are registers too, with the address of a board after reset. |
-| `baud [RATE]` | Shows the UART's baud rate, `Baud rate 230400`, or writes it first: 115200, 230400, 460800, 921600, 1000000, 1500000, or 2000000, in decimal, such as `baud 921600`. Anything else is no rate, and `baud` says so and writes nothing. It writes `0xFFFFFF9F` ([SYSTEM.md](../doc/SYSTEM.md#the-baud-rate)), as the on-board debugger's settings page does. The UART takes the new rate once it has sent nothing for 1 ms, so the answer and the prompt still come at the old rate, and a terminal on the UART then changes to the new one; only a reset brings back 230400. Over Ethernet the rate does not matter. In `niceemu` the word is memory, which reads 0 after a clear. |
+| `baud [RATE]` | Shows the UART's baud rate, `Baud rate 230400`, or writes it first: 115200, 230400, 460800, 921600, 1000000, 1500000, or 2000000, in decimal, such as `baud 921600`. Anything else is no rate, and `baud` says so and writes nothing. It writes `0xFFFFFF9F` ([DEBUG_LINK.md](../doc/DEBUG_LINK.md#the-baud-rate)), as the on-board debugger's settings page does. The UART takes the new rate once it has sent nothing for 1 ms, so the answer and the prompt still come at the old rate, and a terminal on the UART then changes to the new one; only a reset brings back 230400. Over Ethernet the rate does not matter. In `niceemu` the word is memory, which reads 0 after a clear. |
 | `l` | Enters words into the RAM from lines of `ADDR WORD` in hex, as a `.bin` file has them (Loading without a host below), up to an empty line, and prints the words written and the lines skipped: `Words loaded: 600, 00008000 to 00008257`. |
 | `dir [SLOT]` | Lists the folder `NICE` of the SD card's FAT32 file system (Files below): `Directory of NICE`, then a row for each file, its 8.3 name and its size in decimal, and for each directory, its name and `<DIR>`, then `Files: 25, directories: 1`. With `SLOT` in hex, it mounts the card in it first; without, it lists the card mounted, which the first `dir` or `load` after reset mounts. An error is shown with its number and meaning: `File error 18, FAT16, which is not supported`. |
 | `load NAME` | Loads the `.bin` file `NAME` of the card's folder `NICE` as `l` loads lines, and prints the same summary, so a program copied to the card on a PC loads with no host. Unlike `l`, an empty line is passed over, the end of the file ends the load, and a skipped line is counted from the first line of the file. `NAME` is an 8.3 name, in either case. |
@@ -299,7 +299,7 @@ folder itself, so a card is written only where its user made room.
   and at `fs_close`.
 - **Sectors** are not the HAL's: a program that wants them drives the
   SD controller's registers at `0xFFFFFFA0` itself, which are the same
-  on every board and in `niceemu` (nice_cpu's SYSTEM.md §5), and calls
+  on every board and in `niceemu` ([nice_cpu's SYSTEM.md §5](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#5-sd-card)), and calls
   `fs_mount` before it uses the files again.
 
 The entries 9 to 15 of the dispatch table (above) are its file API, in
@@ -310,8 +310,8 @@ address is a word address. An error is negative
 ## The network
 
 A program reaches the network through the UDP entries above, or drives
-the port for Ethernet frames at `0xFFFFFFC0` itself, which nice_cpu's
-SYSTEM.md §7 specifies, the same on every board and in `niceemu`. The
+the port for Ethernet frames at `0xFFFFFFC0` itself, which [nice_cpu's
+SYSTEM.md §7](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#7-ethernet-frames) specifies, the same on every board and in `niceemu`. The
 ROM's own frame routines and its ARP cache, which `i dhcp`, `tftp`, and
 the UDP entries use, have no entries in the dispatch table
 ([INTERNALS.md](INTERNALS.md#the-frame-routines)).
@@ -366,7 +366,7 @@ it:
   itself. An empty datagram, a fragment, and IP options are passed
   over. A call with no room, 0 bytes, copies nothing and leaves the
   queue as it is, so no datagram is lost to it. The queue holds 4 frames
-  (nice_cpu's SYSTEM.md §7), so a program that receives a burst reads it
+  ([nice_cpu's SYSTEM.md §7](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#7-ethernet-frames)), so a program that receives a burst reads it
   soon.
 
 An error of the UDP entries is negative
@@ -416,7 +416,7 @@ pseudo-instructions below, which only `u` shows:
 
 - The text has the condition, the mnemonic with `[C]` and `[M]`, the
   SHIFT aliases, such as `SHL` and `ROR`, and the operands in the syntax
-  of nice_cpu's ISA.md §10.2. Constants are in lower-case hex without
+  of [nice_cpu's ISA.md §10.2](https://github.com/MJoergen/nice_cpu/blob/main/doc/ISA.md#102-operands). Constants are in lower-case hex without
   leading zeros, and INT's vector is in decimal.
 - A reserved control word, and an instruction with a field that its
   mnemonic does not use and that is not R0, are a `.DAT` of their words,
@@ -424,7 +424,7 @@ pseudo-instructions below, which only `u` shows:
   `.DAT 0x00000001 ; MOVE R0, R0 (s1: R1)`.
 - `ADD @--R13, n, R15` followed by `MOVE R15, target`, where `n` is the
   number of words of the `MOVE`, is one row, `CALL target`, and
-  `MOVE R15, @R13++` is `RET`: pseudo-instructions of ISA.md §10.1,
+  `MOVE R15, @R13++` is `RET`: pseudo-instructions of [ISA.md §10.1](https://github.com/MJoergen/nice_cpu/blob/main/doc/ISA.md#101-statements),
   which `niceasm` assembles back to the same words. A condition applies
   to both instructions of a `CALL`, so the two must have the same one,
   as in `?Z CALL 0x8123`. A pair with two conditions, an `ADD` with a
@@ -516,8 +516,8 @@ monitor](../tools/README.md#running-a-program-under-the-monitor).
 `l` loads a program that is typed on the keyboard, or pasted into a
 terminal on the line, with no tools on the host and no storage. It reads
 lines of `ADDR WORD`, two hex numbers of 1 to 8 digits with blanks or
-tabs between them, which is what a `.bin` file has (nice_cpu's ISA.md
-§10.4), and writes each word. CR, LF, and CR LF end a line, the `l`
+tabs between them, which is what a `.bin` file has ([nice_cpu's ISA.md
+§10.4](https://github.com/MJoergen/nice_cpu/blob/main/doc/ISA.md#104-object-format)), and writes each word. CR, LF, and CR LF end a line, the `l`
 line itself too. An empty line ends the load, and so does CTRL-C, which
 drops the line it is in; a line of blanks only is passed over, as
 `niceemu` passes it. DEL and backspace delete, and the cursor and
