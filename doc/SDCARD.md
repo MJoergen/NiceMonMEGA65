@@ -269,7 +269,8 @@ slot, and is written. Stage 2 adds 4-bit SD mode, and is optional.
   back slot; 4 for SD mode elsewhere), whether card detect and write
   protect are used, and a power pin.
 - The card's clock is 400 kHz for the start-up, then 25 MHz, the default
-  speed, from the system clock. High speed is not needed.
+  speed, from the system clock, which makes 22.5 MHz of it on the
+  Nexys4DDR. High speed is not needed.
 - The two slots share the controller. The choice of slot is a multiplexer
   in front of the pins, and the slot that is not selected has its clock
   stopped. Card detect and write protect are read for both slots at all
@@ -279,15 +280,18 @@ slot, and is written. Stage 2 adds 4-bit SD mode, and is optional.
 - A VHDL model of a card, `sim/sd_card_model.vhd`, answers the commands
   that the controller sends and reads and writes an image file: SPI mode in
   stage 1, and SD mode in both bus widths in stage 2. GHDL in CI cannot use
-  the Verilog models in the SDCard repository. The model also gives `make
-  cosim` a card.
-- `G_FORMAL` checks: busy falls within the timeout, no command starts
-  while busy, and a reset during a Write lets it finish.
+  the Verilog models in the SDCard repository. `make cosim` has no card
+  yet.
+- `G_FORMAL` checks, in the engine of SPI mode, `sd_spi.vhd`: every
+  state belongs to the command that runs, the card is deselected while
+  the engine is idle, the end of a command is one pulse, only a Read
+  writes the buffer, and an abort or a reset ends a command at once.
 
 ## The file system
 
-FAT32 only, in the first FAT32 partition of an MBR, or on a card with no
-partition table, as `mkfs.fat` makes an image. Every MEGA65's internal card
+FAT32 only, in the first partition of type `0x0B` or `0x0C` of an MBR,
+or on a card with no partition table, as `mkfs.fat` makes an image.
+Every MEGA65's internal card
 is FAT32, and so is any SDHC card as it is sold. SDXC cards come with exFAT
 and must be formatted. FAT12 and FAT16 are rejected with a message.
 
@@ -316,14 +320,16 @@ and must be formatted. FAT12 and FAT16 are rejected with a message.
   freed. Before the first change of the FAT after a mount, FSInfo's free
   count is set to unknown, `0xFFFFFFFF`, which every FAT driver accepts,
   and `fsck.fat` reports as uninitialized. A new file has the date
-  2026-01-01, as the boards have no clock of the time of day yet. A
+  2026-01-01, as the ROM does not read the clock of the time of day
+  yet, which no board sets by itself. A
   folder that is full grows by a cluster of
   zeros, written before it is linked, up to 65536 entries.
 - **Safety**: the ROM writes only inside the partition, never the MBR or
   the boot sector, and refuses a card whose FAT32 boot sector does not
   check.
-- **Caches**: one sector of the FAT and one per open file, in the ROM's
-  variables at `0xFFFFF000`. Two files open at once, a read and a write,
+- **Caches**: one sector of the FAT and one per open file, in the RAM
+  of the ROM's C code, from `0xFFFFF400`. Two files open at once, a
+  read and a write,
   are enough for BASIC and the monitor. "Changed" in the status drops the
   caches and the mount. The FAT's cache and the directory's are
   write-through. A file's sector is written when it is full and at the
@@ -415,12 +421,14 @@ There are no device numbers and no Commodore DOS.
   against a reference, and needs no board.
 - **GHDL**: `tb_sd` runs `sd.vhd` against the card model, through every
   command and error. `tb_nicemon` reads and writes a sector through the
-  core. `make formal` runs the checks in `sd.vhd`.
-- **Cosim**: `make cosim` with an image in the card model, so that
-  `cosimtest` can run the monitor's commands on the RTL.
+  core. `make formal` runs the checks in `sd_spi.vhd`.
+- **Cosim**: not written. `make cosim` has no card, so `cosimtest` does
+  not reach the controller.
 - **The board**: `make hwtest` reads sector 0 of each card that is present
-  and checks its `55AA`, and reads the FAT32 boot sector. It never writes,
-  as the card is the user's. A slot with no card is NOT COVERED.
+  and checks its `55AA`, and reads the FAT32 boot sector. For a FAT32
+  card, the monitor's `dir` must list the folder `NICE` as the host
+  reads it from the sectors. It never writes, as the card is the
+  user's. A slot with no card is NOT COVERED.
 - **The host tool**: `make sdtest` runs `tools/sdcard.py` on `niceemu
   --link` with images made by `mkfs.fat`, `sfdisk`, and `mcopy`, on a held
   core and on a running one that has the card in use. After its writes,

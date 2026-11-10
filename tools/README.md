@@ -107,10 +107,14 @@ A terminal program, such as `picocom`, shows the program's console:
 `Ctrl-A Ctrl-\` sends a break, which ends the line's input; the
 keyboard's goes on.
 
-The debug link on the serial port gives it one too, with no key typed:
+The debug link on the serial port gives it one too, with no key typed.
+The core is paused for the write, as the link reaches only its own
+registers while the core runs:
 
     tools/mon.py --port /dev/ttyUSB1
+    dbg> pause
     dbg> w FFFFFFB0 C0A80141
+    dbg> go
     dbg> q
 
 ## Running a program

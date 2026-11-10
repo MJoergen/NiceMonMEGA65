@@ -2,24 +2,29 @@
 
 A debugger in the FPGA, with the MEGA65's own keyboard and screen and no
 host: what `tools/mon.py` does over the debug link, in a strip of text
-under the program's screen, and a page over it. **Stages 1 to 10 are
-written, and the rest is planned**: the toggle
-key enters Focus, where the strip shows the core's state, its registers,
-live while it runs, and the word at the PC at a stop, and F1, F3, and
-F4 run the core; F12 keeps the strip up when Focus is left, and a stop in Strip
-comes back to Focus; and F11 shows the page, a window on the memory,
-where a word is written and a breakpoint set at the cursor, and F5 the
-settings page, where the link's IP and MAC addresses and the UART's baud
-rate are shown and set. The debugger
-is a client of the debug link inside the system, beside a host on the
-UART or over TCP, which keeps its line. The README's
+under the program's screen, and a page over it. The README's
 [On its own](../README.md#the-on-board-debugger) says how to use it,
-with a picture. This note
-records the design and the decisions, as
-[monitor/README.md](../monitor/README.md) does for the ROM, a hardware
-abstraction layer for programs, which the debugger does not need and
-does not touch. It cannot load a program, so a host, the ROM, or a later
-SD card still does that.
+with a picture. This note records the design and the decisions.
+
+**Stages 1 to 10 are written, and the rest is planned** (see
+[Stages](#stages)):
+
+- The toggle key, MEGA+HELP, enters Focus, where the keyboard is the
+  debugger's. The strip shows the core's state, its registers, live
+  while it runs, and the word at the PC at a stop, and F1, F3, and F4
+  run the core.
+- F12 keeps the strip up when Focus is left, and a stop in Strip comes
+  back to Focus.
+- F11 shows the page, a window on the memory, where a word is written
+  and a breakpoint set at the cursor.
+- F5 shows the settings page, where the link's IP and MAC addresses and
+  the UART's baud rate are shown and set.
+
+The debugger is a client of the debug link inside the system, beside a
+host on the UART or over TCP, which keeps its line. It does not need
+the monitor in the ROM ([monitor/README.md](../monitor/README.md)), and
+does not touch it. It cannot load a program, so a host, the monitor, or
+a later SD card page still does that.
 
 The engine is the debug link of nice_cpu's
 [DEBUG.md](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEBUG.md),
@@ -300,21 +305,15 @@ and outputs, and its room.
   LEDs stay the program's.
 - **Row 28 names the board's toggle key**, from a generic of the
   debugger.
-- **Room.** With stage 1, 92 of the 135 block RAMs are used without a
-  ROM and 124 with one, so 11 are left at the least: the overlay took 4,
-  and Vivado put the PS/2 table into one more
-  ([synth/README.md](../synth/README.md#block-ram)); stage 3 adds half
-  a block RAM, the table of the strip's cells, 92.5 without a ROM. The
-  system clock is 90 MHz on a -1 part, built with retiming; the build of
-  stage 1 has 0.289 ns of setup and 0.029 ns of hold slack, that of
-  stage 3 0.339 ns and 0.031 ns, that of stage 4 0.532 ns and 0.029 ns,
-  that of stage 5 0.111 ns and 0.017 ns, on a path in the core, that
-  of stage 6 0.139 ns and 0.022 ns, also in the core, that of stage 7
-  0.159 ns and 0.034 ns, that of stage 8 0.187 ns and 0.019 ns, that of
-  stage 9 0.166 ns and 0.025 ns, and the
-  slacks move with
-  placement more than with logic ([synth/README.md](../synth/README.md#timing)): every
-  stage rebuilds `make nexys4ddr` and reads its timing, and a miss there
+- **Room.** The board has little. It has 135 block RAMs, of which the
+  system now uses 133 with a ROM
+  ([synth/README.md](../synth/README.md#block-ram)): the overlay took 4
+  of them, and the table of the strip's cells half of one. The system
+  clock is 90 MHz on a -1 part, built with retiming. The builds of
+  stages 1 to 9 had 0.11 to 0.53 ns of setup slack and 0.017 to
+  0.034 ns of hold slack, and the slacks moved with placement more than
+  with logic ([synth/README.md](../synth/README.md#timing)): every
+  stage rebuilt `make nexys4ddr` and read its timing, and a miss there
   is a placement re-roll before it is a design error.
 - The screen is 8K words, so the RAM behind it starts at `0xFFFF2000`.
   The overlay is a memory of its own and does not care; only a page
@@ -406,12 +405,11 @@ removed both the hex and the cut-off host.
   the port and the rate after reset. `src/uart_pkg.vhd` has the rates,
   which `board_io.vhd` takes.
 
-Nothing new touches the core's paths, whose setup slack is about 0.1 ns
+Nothing here touches the core's paths, which have little setup slack
 ([synth/README.md](../synth/README.md#timing)): the side port is a
 client of the link's own `p_acc`, and the core's pause and halt are
-existing signals. The overlay takes 4 of the 230 free block RAMs of
-the MEGA65, and the logic a few hundred to a thousand LUTs of the 88 %
-free.
+existing signals. The overlay takes 4 block RAMs, and the debugger
+about 3000 LUTs ([synth/README.md](../synth/README.md#utilization)).
 
 ## Tests
 
@@ -421,7 +419,7 @@ free.
   GHDL, on `nicemon`'s side port, with `sim/host.nasm` and a host on the
   UART: read the version, load a program and read it back, start it,
   read the control register while it runs and get `e02` for the memory,
-  pause, read R0–R15, and step; the UART gets `b05` and the `p` of each
+  pause, read R0–R15, and step; the UART gets `b07` and the `p` of each
   stop, and the console bytes in order; a packet on the UART is answered
   while the adapter reads, and a go on from the UART ends a long read of
   the adapter's with `e02` after the words it got while the core was
@@ -452,8 +450,10 @@ free.
   address, MAC address, and rate, which the registers take, the rates
   stepped with CRSR left and right, `bad value` for a short address, a
   byte over 255, and a rate not on the list, F10 doing nothing, and F5
-  and `m` between the two pages. The mask of the core's buttons in `system.vhd` has no
-  test of its own.
+  and `m` between the two pages. It runs twice more, with
+  `sim/dbg_wait.nasm` for `WAITING` and `PAUSED W`, and with
+  `sim/dbg_watch.nasm` for `WCH n`. The mask of the core's buttons in
+  `system.vhd` has no test of its own.
 - `tb_kbd` and `tb_ps2`: the two toggle detectors, with a held key's
   repeats and its release, and one key of MEGA+HELP alone; and Page Up,
   Page Down, and Home from both keyboards.
@@ -471,7 +471,8 @@ free.
   debugger's pause; and the strip shows R1 counting and the PC moving while
   the program runs, white, and the stop's values at the pause.
 - `make hwtest`, a stretch goal: a register of `board_io.vhd`, at
-  `0xFFFFFF97`, the only free word there, that enters Focus when written, so that the test enters
+  `0xFFFFFF97`, a free word there, that enters Focus when written, so
+  that the test enters
   the debugger over the UART with no one at the keyboard, and so that
   `make cosimtest` reaches it too. A program can then drop into the
   debugger on purpose, a software breakpoint, which the ISA has none of.

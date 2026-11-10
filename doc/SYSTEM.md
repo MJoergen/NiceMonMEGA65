@@ -1,19 +1,29 @@
 # The system
 
-This is the system that a program and the debug link see on the MEGA65 R3
-and R6, and on the Nexys4DDR: the address map, the screen and the font,
-the keyboard, the Nexys4DDR's devices, the Ethernet station,
-which every board has, with the port for frames, and the SD card slots.
-[DEBUG_LINK.md](DEBUG_LINK.md) has the debug link: its words, the
-control register, the UART's baud rate, and the link over TCP. It
-follows nice_cpu's
-[doc/SYSTEM.md](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md) for the devices and
-[doc/DEBUG.md](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEBUG.md) for the link.
+This is the system that a program sees on the MEGA65 R3 and R6, and on
+the Nexys4DDR: the address map, the screen and the font, the keyboard,
+the Nexys4DDR's devices, the Ethernet station, which every board has,
+with the port for frames, and the SD card slots.
+[PROGRAMMING.md](PROGRAMMING.md) says how to write a program for it, and
 [EMULATOR.md](EMULATOR.md) lists where it differs from `niceemu`.
+
+Some words used here come from other documents:
+
+- **The core** is the NICE CPU, and **the link** is the debug link, the
+  remote control with which a PC, the host, reads and writes the board's
+  memory. [DEBUG_LINK.md](DEBUG_LINK.md) has the link, and the words
+  hold, start, clear, hide, and pause, which are what the link does to
+  the core and the memory.
+- **nice_cpu's SYSTEM.md** is another document than this one:
+  [doc/SYSTEM.md](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md)
+  of nice_cpu, which specifies the devices, and which this system
+  follows. It is always cited with a section number. DEBUG.md, ISA.md,
+  and MICROARCH.md are nice_cpu's too, in `nice_cpu/doc/`.
+- **The runtime** is nice_cpu's start-up code and library, which a
+  program is built with.
+
 `src/nicemon.vhd` is the system, and its header is the authoritative
-address map. DEBUG.md, ISA.md, and MICROARCH.md are nice_cpu's, in
-`nice_cpu/doc/`, and so is the SYSTEM.md with a section number, which is
-not this file.
+address map.
 
 ## Address map
 
@@ -24,7 +34,7 @@ effect and does not write ([DEBUG.md §3](https://github.com/MJoergen/nice_cpu/b
 
 | Address | What it is |
 |---|---|
-| `0x00000000`–`0xFFFFFFFF` | Memory, where no register below is: block RAM, 128K words on the MEGA65 and 64K on the Nexys4DDR, repeated through the address space. `0xFFFFFF9E` reads the number of words. So the runtime's stack below `0xFFFFFF00` lands in the top of it, and so do the words of `0xFFFFFF00`–`FF` that are not registers. |
+| `0x00000000`–`0xFFFFFFFF` | RAM, wherever nothing below is: 128K words on the MEGA65 and 64K on the Nexys4DDR, repeated through the address space (see [Stack, heap, and variables](#stack-heap-and-variables)). `0xFFFFFF9E` reads the number of words. |
 | `0x00000000`–`0x00007FFF` | The ROM, 32K words, in a bitstream built with one, in front of the RAM and repeating with it. The core boots from it at reset, instead of waiting held for a host. A write to it is dropped, and a clear does not touch it. Bit 3 of the control register hides it, and the RAM under it keeps its words meanwhile ([DEBUG_LINK.md](DEBUG_LINK.md#the-control-register)). [PROGRAMMING.md](PROGRAMMING.md#programs-in-the-rom) has what a program in the ROM must do. |
 | `0x10000000`–`0x5FFFFFFF` | The byte windows of [nice_cpu's SYSTEM.md §9](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#9-byte-windows): a word, a byte, or a halfword of the RAM, or of the ROM while it is shown, at a byte address, for the core's data accesses and the link (see [The byte windows](#the-byte-windows)). |
 | `0xFFFE0000`–`0xFFFE1FFF` | The font RAM of [nice_cpu's SYSTEM.md §1.8](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#18-font): 256 glyphs of 32 rows, one word a row, read and written, with bits 31..16 reading 0. It is 0 at power-up and after a clear, and a start keeps it (see [The font](#the-font)). |
@@ -119,7 +129,7 @@ and its data from 0 up, and the runtime's start-up code sets SP to
 |---|---|---|
 | `0x00000` and up | `0x0000` and up | The program: its code, its static data, and, for C, its wasm linear memory. |
 | below `0x1FF00` | below `0xFF00` | The stack, from SP = `0xFFFFFF00` down. |
-| `0x1FF00`–`0x1FFFF` | `0xFF00`–`0xFFFF` | The words behind the I/O page, `0xFFFFFF00`–`FF`, that are no register. |
+| `0x1FF00`–`0x1FFFF` | `0xFF00`–`0xFFFF` | The words behind the I/O page. A program reaches those at `0xFFFFFF02`–`0F` and `D0`–`FF`, where it has no registers. |
 
 A program under the monitor starts at `0x8000`, as the ROM is at
 `0x0000`–`0x7FFF`, and shares the monitor's stack, which grows down
@@ -143,6 +153,13 @@ and nothing checks that the stack does not grow into the program. A
 program learns the size of the RAM from `0xFFFFFF9E`
 ([PROGRAMMING.md](PROGRAMMING.md#the-memory)).
 
+The stack has a second limit, the screen. On the MEGA65 the addresses
+below `0xFFFF8000` are the screen's, not the RAM's, so a stack from
+`0xFFFFFF00` has `0x7F00` words, nearly 32K, and one under the monitor,
+from `0xFFFFF000`, has 28K. A deeper stack writes into the screen's
+memory. On the Nexys4DDR the screen ends at `0xFFFF2000`, so a stack
+from `0xFFFFFF00` has `0xDF00` words, nearly 56K.
+
 In the emulator the memory has 2^32 words and does not repeat, so the
 same addresses work there, but each is a word of its own.
 
@@ -150,7 +167,8 @@ same addresses work there, but each is a word of its own.
 
 The words `0xFFFFFF00`–`FF` are the I/O page. Most of its devices are
 nice_cpu's, and the rows below say what differs on the board. The
-words where no register is reach the RAM behind them.
+words `0xFFFFFF02`–`0F` are RAM, and so are `0xFFFFFFD0`–`FF` for the
+core, where only the link has registers.
 
 | Address | What it is |
 |---|---|
@@ -159,7 +177,7 @@ words where no register is reach the RAM behind them.
 | `0xFFFFFF10`–`0xFFFFFF1F` | The timer of [nice_cpu's SYSTEM.md §4](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#4-timer). It counts clock cycles, at 100 MHz on the MEGA65 and 90 MHz on the Nexys4DDR, where the emulator counts steps. |
 | `0xFFFFFF20`–`0xFFFFFF3F` | The math unit of [nice_cpu's SYSTEM.md §2](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#2-math-unit), as in the emulator. |
 | `0xFFFFFF40`–`0xFFFFFF5F` | The performance counters of [nice_cpu's SYSTEM.md §3](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#3-performance-counters). The cycles are those of the board's clock, at 100 MHz on the MEGA65 and 90 MHz on the Nexys4DDR, and the microseconds come from it, so they are real time. The instructions and the event counters count as the emulator's do. A read of a low word by the link takes the snapshot, as the core's does, where `niceemu --link` takes none. |
-| `0xFFFFFF46`–`0xFFFFFF49` | The clock of the time of day of [nice_cpu's SYSTEM.md §10](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#10-clock), within the performance counters, counted from the board's clock. After a reset it is not set until a program sets it: the board does not read the MEGA65's real-time clock yet. A read of `0xFFFFFF46` by the link takes the snapshot too. |
+| `0xFFFFFF46`–`0xFFFFFF49` | The clock of the time of day of [nice_cpu's SYSTEM.md §10](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#10-clock), within the performance counters, counted from the board's clock. After a reset it is not set until a program sets it: the board does not read the MEGA65's real-time clock yet. Only a reset of the system resets it: a start keeps the time, and it runs while the core is held, paused, or halted. A read of `0xFFFFFF46` by the link takes the snapshot too. |
 | `0xFFFFFF60`–`0xFFFFFF7F` | The fetch statistics of [MICROARCH.md §8.1](https://github.com/MJoergen/nice_cpu/blob/main/doc/MICROARCH.md#81-fetch-statistics), which the emulator does not have. With the multi-cycle core (`NICE=multi`), only two of them count. |
 | `0xFFFFFF80`–`0xFFFFFF8F` | The screen's registers: the cursor and the display offset (see [The screen](#the-screen)). |
 | `0xFFFFFF90`–`0xFFFFFF9F` | The Nexys4DDR's LEDs, seven-segment display, buttons, and switches (see [The Nexys4DDR's devices](#the-nexys4ddrs-devices)). On the MEGA65 they read 0 and take no write. On every board, `0xFFFFFF9E` reads the words of the RAM, `0x20000` on the MEGA65 and `0x10000` on the Nexys4DDR, and takes no write, and `0xFFFFFF9F` is the UART's baud rate (see [The baud rate](DEBUG_LINK.md#the-baud-rate)). The emulator has memory there, which reads 0 after a clear, so a program takes 0 to mean no limit. |
@@ -173,36 +191,43 @@ words where no register is reach the RAM behind them.
 Instruction fetches from `0xFFFFFF00`–`0xFFFFFFFF` read 0, as [ISA.md §8.3](https://github.com/MJoergen/nice_cpu/blob/main/doc/ISA.md#83-input-and-output)
 requires.
 
-The input waits for the core in a FIFO of 2048 bytes, in block RAM. A
-UART byte that arrives when it is full is lost, and the link sends its
-`o` notice. Over Ethernet, a byte that finds it full waits up to 50 ms
-for room, and holds back the bytes behind it, before it is lost with
-`o`, as TCP can wait; a UART byte after a break is lost too, until a start, or a
-host's connection over Ethernet, clears the end of the line's input. A
-keyboard byte goes in after a break as
-before it, so that a program that reads on, as a monitor does, gets the
-keys. A keyboard byte waits until the FIFO has room for two,
-so that a UART byte still finds room, and keys typed meanwhile may be
-lost (see [The keyboard](#the-keyboard) and [The Nexys4DDR's
-devices](#the-nexys4ddrs-devices)). While the core is held in reset or
-has halted, the bytes of the UART and the keyboard are dropped. While it
-is paused, they go into the FIFO. To end a program's input from a
-terminal, send a break ([tools/README.md](../tools/README.md) says how).
+**The console's input** waits for the core in a FIFO of 2048 bytes. Its
+bytes come from the line, which is the UART or a host over TCP, and
+from the keyboard:
 
-The performance counters, the math unit, and the timer are nice_cpu's
-own, `nice_cpu/hdl/src/perf.vhd`, `mpu.vhd`, and `timer.vhd`, and behave
-as the emulator's. The fetch statistics are nice_cpu's `fetch_stats.vhd`,
-which the emulator does not have. `src/devices.vhd` connects the four.
-They are reset with the system, and each time the core starts, as the
-emulator's are when it starts, but not while the link holds the core, so
-the link reads them after a halt. So after a halt the instruction counter
-holds the steps that the emulator prints, unless the program starts the
-timer. The timer counts clock cycles, at 100 MHz (90 MHz on the
-Nexys4DDR), where the emulator counts steps, so its interrupts come at
-other steps, and the step counts differ. The cycle counter and the
-timer's counter run only while the core runs, so they stop at a halt, as
-the emulator's do. The timer's request goes straight to the core's IRQ,
-for it is the only device that raises one.
+- A UART byte that arrives when the FIFO is full is lost, and the link
+  sends its `o` notice. Over Ethernet, such a byte waits up to 50 ms for
+  room, and holds back the bytes behind it, before it is lost with `o`,
+  as TCP can wait.
+- A keyboard byte waits until the FIFO has room for two, so that a UART
+  byte still finds room, and keys typed meanwhile may be lost (see
+  [The keyboard](#the-keyboard) and
+  [The Nexys4DDR's devices](#the-nexys4ddrs-devices)).
+- A break ends the line's input. To end a program's input from a
+  terminal, send one ([tools/README.md](../tools/README.md) says how).
+  The line's bytes after it are lost, until a start, or a host's
+  connection over Ethernet, clears the end of the line's input. A
+  keyboard byte goes in after a break as before it, so that a program
+  that reads on, as the monitor does, gets the keys.
+- While the core is held in reset or has halted, the bytes of the line
+  and the keyboard are dropped. While it is paused, they go into the
+  FIFO.
+
+**The counters, the math unit, and the timer** are nice_cpu's own
+modules, and behave as the emulator's:
+
+- They are reset with the system, and each time the core starts, as the
+  emulator's are when it starts, but not while the link holds the core,
+  so the link reads them after a halt. The clock of the time of day is
+  the exception: only a reset of the system resets it.
+- After a halt, the instruction counter holds the steps that the
+  emulator prints, unless the program starts the timer. The timer
+  counts clock cycles, at 100 MHz (90 MHz on the Nexys4DDR), where the
+  emulator counts steps, so its interrupts come at other steps, and the
+  step counts differ.
+- The cycle counter and the timer's counter run only while the core
+  runs, so they stop at a halt, as the emulator's do.
+- The timer is the only device that raises an interrupt, the IRQ.
 
 ## The screen
 
@@ -210,16 +235,25 @@ The screen at `0xFFFF0000` is shown on the VGA connector and on the HDMI
 connector, at 1280×1024 and 60 Hz, as 80 columns and 25 rows of characters
 of 16×32 pixels. Under them are the 4 rows of the on-board debugger's
 strip ([DEBUGGER.md](DEBUGGER.md)), black unless it is shown, and the 29
-rows are in the middle of the picture, 48 black lines from its top. Word `80 * row + column` is
-one character: its code, ISO 8859-1, in bits 7..0, and its color above. The
-color is two 12-bit colors, red, green, and blue with 4 bits each, as in
-nice_cpu's `doc/SYSTEM.md` §1: the background in bits 31..20 and the
-foreground in bits 19..8. A component `n` gives the byte `n × 0x11`, so
-`0xF` is full intensity and `0x0` is none. Unlike in NICE's original IDE of
-2004, the foreground is not inverted. So a word with only a character, such
-as `0x41`, is black on black, and `0x000FFF41` is a white `A` on black. The
-screen is 0 at power-up, which shows as black, and `nice_screen_clear`
-fills it with blanks.
+rows are in the middle of the picture, 48 black lines from its top.
+
+Word `80 * row + column` is one character, as in nice_cpu's SYSTEM.md
+§1:
+
+| Bits | What they are |
+|---|---|
+| 31..20 | The background color: red, green, and blue, with 4 bits each |
+| 19..8 | The foreground color, in the same way |
+| 7..0 | The character's code, ISO 8859-1 |
+
+A color component `n` gives the byte `n × 0x11`, so `0xF` is full
+intensity and `0x0` is none. A write of `0x000FFF41` to `0xFFFF0000`
+puts an `A` in the top left corner, white on black, and one of
+`0xF00FFF42` to `0xFFFF0001` a white `B` on red next to it. A word with
+only a character, such as `0x41`, is black on black. Unlike in NICE's
+original IDE of 2004, the foreground is not inverted. The screen is 0
+at power-up, which shows as black, and `nice_screen_clear` fills it
+with blanks.
 
 The screen's memory is 32768 words, `0xFFFF0000`–`0xFFFF7FFF` (8192
 words, `0xFFFF0000`–`0xFFFF1FFF`, on the Nexys4DDR), of which the display
@@ -243,15 +277,10 @@ the emulator these addresses are memory, so a program that writes them runs
 there too, without scrolling. Reset, and the clear of the memory (bit 2 of
 the control register, which `load.py` and `run.py` set), set the offset and
 the font base to 0 and turn the cursor off, as at the start of the
-emulator. From
-nice_cpu V1.2 on, `niceemu --window` draws the same cursor from these
+emulator. `niceemu --window` draws the same cursor from these
 words, as [nice_cpu's SYSTEM.md §1](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#1-console-screen-and-read-counter) says, but has no display offset.
 A column or row out of range shows no cursor there, where here only
 bits 6..0 of the column and 4..0 of the row are kept.
-
-A write of `0x000FFF41` to `0xFFFF0000` puts an `A` in the top left
-corner, white on black, and one of `0xF00FFF42` to `0xFFFF0001` a white `B`
-on red next to it.
 
 ### The font
 
@@ -300,8 +329,8 @@ The MEGA65's own keyboard types into the same input as the UART: what
 you type goes to the program while it runs or is paused, and is dropped
 while the core is held in reset or has halted. The keys give ASCII, as a
 terminal sends it. [nice_cpu's SYSTEM.md §1](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#1-console-screen-and-read-counter) defines the bytes of the keys
-that every keyboard has, which `niceemu --window` sends too, from
-nice_cpu V1.2 on, and the MEGA65's keyboard follows it. The table has
+that every keyboard has, which `niceemu --window` sends too, and the
+MEGA65's keyboard follows it. The table has
 the MEGA65's keys:
 
 | Key | Byte |
@@ -391,9 +420,7 @@ read 0 and take no write; the keyboard's LEDs may come to
 network station of [nice_cpu's SYSTEM.md §6](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#6-network-station), here the Ethernet station,
 which carries the debug link over TCP
 ([DEBUG_LINK.md](DEBUG_LINK.md#the-debug-link-over-tcp)). It answers ARP requests for its
-IP address and pings to it, and serves the link on TCP port 4510. Until
-V1.7 it was at `0xFFFFFF98`–`9D`, in another order and without
-`NET_STATUS`.
+IP address and pings to it, and serves the link on TCP port 4510.
 
 | Address | Name | Access | What it is |
 |---|---|---|---|
@@ -431,10 +458,14 @@ fit in a frame. It answers only whole IPv4 packets without options, and
 no ping to everyone. With the IP address at 0, as after reset, it answers
 nothing, so a board on a network stays silent until a program or the
 link gives it an address. The MAC address is a locally administered one;
-two boards on one network need different ones. On the link, for example:
+two boards on one network need different ones. On the link, for
+example, with the core paused, as the link reaches only its own
+registers while the core runs:
 
-    make mon PORT=/dev/ttyUSB3
+    make mon PORT=/dev/ttyUSB1
+    dbg> pause
     dbg> w FFFFFFB0 C0A80141
+    dbg> go
 
 Then `ping 192.168.1.65` from a PC on the network gets its answers, and
 `0xFFFFFFB5` counts the replies, the ARP reply and one for each ping.
@@ -451,8 +482,7 @@ and sets the addresses from the keyboard
 SYSTEM.md §7](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#7-ethernet-frames), on every board. A program sends and receives frames of its
 own through it, for DHCP, DNS, or TFTP, and builds and parses them
 itself. §7 has the registers, the queue of 4 frames received, the send
-buffer, and the window of `ETH_BUF0`–`7` on them. Before V1.7.2 these
-words were memory.
+buffer, and the window of `ETH_BUF0`–`7` on them.
 
 The station keeps the frames it serves, as niceemu's does: an ARP
 request for its IP address, an ICMP echo request to it, and TCP to port
