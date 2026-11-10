@@ -32,7 +32,8 @@ import tempfile
 import hwtest
 from hwtest import (NICEEMU, REPO, assemble, assemble_labels, comparisons,
                     results, test_fit, test_framing, test_monitor, test_pause,
-                    test_run, test_step, test_break, test_write_regs)
+                    test_run, test_step, test_break, test_watch,
+                    test_write_regs)
 from boardlink import HOLD, RAM, open_link
 
 
@@ -75,8 +76,9 @@ def main() -> None:
                 test_framing(link, gap=False)
                 test_pause(link, assemble(f"{REPO}/sim/pause.nasm", tmp))
                 test_step(link, assemble(f"{REPO}/sim/step.nasm", tmp))
-                test_break(link, *assemble_labels(f"{REPO}/sim/break.nasm",
-                                                  tmp))
+                brk = assemble_labels(f"{REPO}/sim/break.nasm", tmp)
+                test_break(link, *brk)
+                test_watch(link, *brk)
                 test_write_regs(link, *assemble_labels(
                     f"{REPO}/sim/step.nasm", tmp))
             finally:

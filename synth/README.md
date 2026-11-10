@@ -244,31 +244,32 @@ flip-flops:
 
 | Part of the design | R6, pipelined | R6, multi | Nexys4DDR, pipelined | Nexys4DDR, multi |
 |---|---|---|---|---|
-| The core (`nice_core`) | 7634 / 3428 | 4881 / 1203 | 7647 / 3164 | 4970 / 1047 |
-| The debug link (`debug_link`) | 2541 / 1286 | 2623 / 1285 | 2503 / 1285 | 2644 / 1285 |
-| The devices (`devices.vhd`): the math unit, the counters, the fetch statistics, the timer, the SD card controller, the network station's registers, and the port for Ethernet frames | 5322 / 3497 | 4269 / 2857 | 5373 / 3469 | 6669 / 3005 |
-| The Ethernet station (`eth/eth.vhd`) | 2766 / 2732 | 2763 / 2732 | 2771 / 2755 | 3248 / 2865 |
-| Of which the TCP server (`eth/eth_tcp.vhd`) | 1905 / 1897 | 1902 / 1897 | 1630 / 1920 | 1633 / 1920 |
-| The on-board debugger (`dbg/dbg.vhd`) | 3029 / 2838 | 3026 / 2838 | 3075 / 2927 | 3282 / 2959 |
-| The text display (`text.vhd`) | 136 / 202 | 139 / 202 | 134 / 178 | 142 / 178 |
+| The core (`nice_core`) | 8616 / 3544 | 4881 / 1203 | 8519 / 3340 | 4970 / 1047 |
+| The debug link (`debug_link`) | 2540 / 1456 | 2623 / 1285 | 2570 / 1456 | 2644 / 1285 |
+| The devices (`devices.vhd`): the math unit, the counters, the fetch statistics, the timer, the SD card controller, the network station's registers, and the port for Ethernet frames | 4971 / 3768 | 4269 / 2857 | 5012 / 3743 | 6669 / 3005 |
+| The Ethernet station (`eth/eth.vhd`) | 2766 / 2732 | 2763 / 2732 | 2770 / 2755 | 3248 / 2865 |
+| Of which the TCP server (`eth/eth_tcp.vhd`) | 1904 / 1897 | 1902 / 1897 | 1632 / 1920 | 1633 / 1920 |
+| The on-board debugger (`dbg/dbg.vhd`) | 3028 / 2853 | 3026 / 2838 | 3072 / 2942 | 3282 / 2959 |
+| The text display (`text.vhd`) | 136 / 202 | 139 / 202 | 138 / 178 | 142 / 178 |
 | The keyboard | 720 / 592 | 720 / 592 | 236 / 89 | 235 / 89 |
 | The HDMI output | 600 / 1207 | 600 / 1207 | – | – |
-| The rest: the UART, the memory's buses, the board's and the screen's registers, and glue | 680 / 528 | 746 / 530 | 728 / 633 | 629 / 631 |
-| Total | 23428 / 16310 | 19767 / 13446 | 22467 / 14500 | 21819 / 12059 |
-| Total, of the FPGA | 17.5 % / 6.1 % | 14.8 % / 5.0 % | 35.4 % / 11.4 % | 34.4 % / 9.5 % |
+| The rest: the UART, the memory's buses, the board's and the screen's registers, and glue | 719 / 552 | 746 / 530 | 733 / 637 | 629 / 631 |
+| Total | 24096 / 16914 | 19767 / 13446 | 23050 / 15140 | 21819 / 12059 |
+| Total, of the FPGA | 18.0 % / 6.3 % | 14.8 % / 5.0 % | 36.4 % / 11.9 % | 34.4 % / 9.5 % |
 
-The R6's pipelined column is from the build with `FLOW=timing`, whose
-retiming adds about 60 LUTs to the default flow's 23368 and 16302. The
+The pipelined columns are from the builds of 2026-11-10, with `FLOW=timing`,
+which have the 4 watchpoints of the debug link (issue #99) and the clock
+of the time of day (issue #97); the others are older. The watchpoints
+take about 900 to 1000 LUTs of the core. The
 R3's pipelined build with `FLOW=timing` takes 23484 LUTs and 16435
 flip-flops, 17.6 % and 6.1 % of the FPGA.
 
-The pipelined core is 5.7 % of the LUTs of the R6's FPGA, and 12.1 % of
+The pipelined core is 6.4 % of the LUTs of the R6's FPGA, and 13.4 % of
 the Nexys4DDR's. The multi-cycle core has about two thirds of its LUTs,
 3.6 % and 7.8 %, and a third of its flip-flops. The Nexys4DDR's
-pipelined column is from the build of 2026-11-10, after issue #103 put
-five memories into block RAM (see [Block RAM](#block-ram)); its
-multi-cycle column is older, and its devices still have about 2400 LUTs
-of those memories. Vivado optimizes
+multi-cycle column is from before issue #103 put five memories into
+block RAM (see [Block RAM](#block-ram)), so its devices still have about
+2400 LUTs of those memories. Vivado optimizes
 across the boundaries of the modules, so the rows move from build to
 build more than the logic does; the totals are what count.
 
@@ -284,26 +285,32 @@ These are the worst setup and hold slacks, in ns:
 | Build | Clock | Setup | Hold |
 |---|---|---|---|
 | R6, pipelined, default flow | 100 MHz | **−0.526**, 324 endpoints | 0.069 |
-| R6, pipelined, `FLOW=timing` | 100 MHz | 0.004 | 0.047 |
+| R6, pipelined, `FLOW=timing` | 100 MHz | 0.001 | 0.043 |
 | R6, `NICE=multi` | 100 MHz | 0.187 | 0.075 |
 | R3, pipelined, default flow | 100 MHz | **−0.073**, 2 endpoints | 0.035 |
 | R3, pipelined, `FLOW=timing` | 100 MHz | 0.126 | 0.041 |
-| Nexys4DDR, pipelined, `FLOW=timing` | 90 MHz | 0.013 | 0.049 |
+| Nexys4DDR, pipelined, `FLOW=timing` | 90 MHz | 0.140 | 0.039 |
 | Nexys4DDR, `NICE=multi`, `FLOW=timing` | 90 MHz | 0.186 | 0.019 |
 
 So the pipelined core meets its clock on every board with `FLOW=timing`
 only, and the R6 and the Nexys4DDR with little to spare. On the MEGA65,
 `make release` tries the default flow first, then `FLOW=timing`. The R6's worst paths
 are in the core's WRITE stage in the default flow, from its
-micro-operation to its value, and in the timing flow from the RAM's
-read data into WRITE's register file. The R3's worst paths in the
+micro-operation to its value, and in the timing flow from the read
+data of the ROM, the RAM, or a device into WRITE's register file. With
+the watchpoints and the clock, the R6 missed by 0.404 ns while
+`devices.vhd` picked its read data with a chain of multiplexers; it
+picks it with one AND-OR now, as `nicemon.vhd` does. Before that,
+the R6 without the watchpoints missed by 0.112 ns, and without the
+clock met by 0.031 ns, so the clock's word in that chain cost more
+than the watchpoints. The R3's worst paths in the
 default flow are from the MAX10's inputs (`max10.vhd`), and the
 Nexys4DDR's from WRITE into its register file. `verified.json` records
 the build of the latest release's bump, and the badge shows it.
 
 Every build writes the five worst paths into the TCP server, within it,
-and out of it to `build/tcp_paths.rpt`. Their worst slack is 1.171 ns on
-the R6 and 1.565 ns on the Nexys4DDR.
+and out of it to `build/tcp_paths.rpt`. Their worst slack is 1.639 ns on
+the R6 and 1.994 ns on the Nexys4DDR.
 
 The PHY's RXD and CRS_DV are timed against the clock on its pin, with the
 output delays of the PHYs' data sheets and 1 ns for the traces. The pin's

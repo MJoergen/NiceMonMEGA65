@@ -29,10 +29,10 @@ smtbmc yices
 
 [script]
 plugin -i ghdl
-prove: ghdl --std=08 -fpsl nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd perf.vhd timer.vhd fetch_stats.vhd sd_regs.vhd net_regs.vhd eth_regs.vhd sd_spi_byte.vhd sd_spi.vhd sd.vhd devices.vhd formal_devices.vhd -e formal_devices
-cover: ghdl --std=08 -fpsl nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd perf.vhd timer.vhd fetch_stats.vhd sd_regs.vhd net_regs.vhd eth_regs.vhd sd_spi_byte.vhd sd_spi.vhd sd.vhd devices.vhd formal_devices.vhd -e formal_devices
-prove_sd: ghdl --std=08 -fpsl -gG_SD_SLOTS=2 nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd perf.vhd timer.vhd fetch_stats.vhd sd_regs.vhd net_regs.vhd eth_regs.vhd sd_spi_byte.vhd sd_spi.vhd sd.vhd devices.vhd formal_devices.vhd -e formal_devices
-cover_sd: ghdl --std=08 -fpsl -gG_SD_SLOTS=2 nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd perf.vhd timer.vhd fetch_stats.vhd sd_regs.vhd net_regs.vhd eth_regs.vhd sd_spi_byte.vhd sd_spi.vhd sd.vhd devices.vhd formal_devices.vhd -e formal_devices
+prove: ghdl --std=08 -fpsl nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd perf.vhd tod.vhd timer.vhd fetch_stats.vhd sd_regs.vhd net_regs.vhd eth_regs.vhd sd_spi_byte.vhd sd_spi.vhd sd.vhd devices.vhd formal_devices.vhd -e formal_devices
+cover: ghdl --std=08 -fpsl nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd perf.vhd tod.vhd timer.vhd fetch_stats.vhd sd_regs.vhd net_regs.vhd eth_regs.vhd sd_spi_byte.vhd sd_spi.vhd sd.vhd devices.vhd formal_devices.vhd -e formal_devices
+prove_sd: ghdl --std=08 -fpsl -gG_SD_SLOTS=2 nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd perf.vhd tod.vhd timer.vhd fetch_stats.vhd sd_regs.vhd net_regs.vhd eth_regs.vhd sd_spi_byte.vhd sd_spi.vhd sd.vhd devices.vhd formal_devices.vhd -e formal_devices
+cover_sd: ghdl --std=08 -fpsl -gG_SD_SLOTS=2 nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd perf.vhd tod.vhd timer.vhd fetch_stats.vhd sd_regs.vhd net_regs.vhd eth_regs.vhd sd_spi_byte.vhd sd_spi.vhd sd.vhd devices.vhd formal_devices.vhd -e formal_devices
 prep -top formal_devices
 
 [files]
@@ -41,6 +41,7 @@ prep -top formal_devices
 ../nice_cpu/hdl/src/pipe_pkg.vhd
 ../nice_cpu/hdl/src/mpu.vhd
 ../nice_cpu/hdl/src/perf.vhd
+../nice_cpu/hdl/src/tod.vhd
 ../nice_cpu/hdl/src/timer.vhd
 ../nice_cpu/hdl/src/fetch_stats.vhd
 ../nice_cpu/hdl/src/sd_regs.vhd

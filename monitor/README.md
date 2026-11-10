@@ -289,7 +289,8 @@ folder itself, so a card is written only where its user made room.
   deletes a file, with its long name, and no directory. A file open to
   write may not be opened again, a file open at all may not be truncated
   or deleted, and a read-only one is not changed. A new file has the date
-  2026-01-01, as there is no clock of the time of day. FSInfo's count of
+  2026-01-01, as fat32.c does not read the clock of the time of day,
+  which is not set at a reset. FSInfo's count of
   the free clusters is set to unknown, which `fsck.fat` reports as
   uninitialized, and its hint is kept.
 - **The caches** are one sector of the FAT, and one for each of the two

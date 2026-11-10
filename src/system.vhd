@@ -86,6 +86,8 @@ entity system is
       G_BOARD_IO      : boolean      := false;
       -- The number of breakpoints of the debug link (DEBUG.md §6)
       G_BREAKS        : natural      := 4;
+      -- The number of watchpoints of the debug link (DEBUG.md §6)
+      G_WATCHES       : natural      := 4;
       -- The Ethernet station's MAC address after reset; its IP address is
       -- 0 then, which answers nothing (nicemon.vhd, 0xFFFFFFB0-BF).
       G_ETH_MAC       : std_logic_vector(47 downto 0) := X"024E49434500";
@@ -267,6 +269,7 @@ begin
          G_CPU_RUN_AT_RESET => G_ROM_FILE /= "",
          G_BOARD_IO         => G_BOARD_IO,
          G_BREAKS           => G_BREAKS,
+         G_WATCHES          => G_WATCHES,
          G_ETH_MAC          => G_ETH_MAC,
          G_TCP_PORT         => C_TCP_PORT,
          G_SD_SLOTS         => G_SD_SLOTS,

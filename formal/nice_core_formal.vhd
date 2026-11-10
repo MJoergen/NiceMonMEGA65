@@ -19,11 +19,14 @@
 --   holds its value while it is high.
 -- - paused_o is high only while no bus cycle is open, and low after reset.
 --   It is high only in the cycle after one with pause_i high, but for a
---   pause of the core's own at a breakpoint (DEBUG.md §6), which may rise
---   while a breakpoint was enabled the cycle before, and lasts until
---   pause_i has been high (the cores' contract f). Once high, it stays
---   high while pause_i is high, until reset.
--- The step report, retire_o, regs_o, instret_o, and stats_o are free.
+--   pause of the core's own at a breakpoint or after a watchpoint's hit
+--   (DEBUG.md §6). That may rise while a breakpoint was enabled the cycle
+--   before, or once a watchpoint has been enabled since reset, as a hit
+--   pauses at the next step boundary, after its enable may have been
+--   cleared; it lasts until pause_i has been high (the cores' contract
+--   f). Once high, it stays high while pause_i is high, until reset.
+-- The step report, retire_o, regs_o, instret_o, stats_o, and the
+-- watchpoints' wch_hit_o and wch_pc_o are free.
 --
 -- Two of the assumptions matter most here, and nice_cpu proves both for
 -- every cycle: in multicycle.sby, and for the pipelined core in
@@ -67,12 +70,17 @@ architecture formal of nice_core is
    signal retire    : t_retire;
    signal stats     : t_fetch_events;
    signal regs      : t_regs;
+   signal wch_hit   : std_logic_vector(C_WATCHES_MAX - 1 downto 0);
+   signal wch_pc    : std_logic_vector(31 downto 0);
 
    -- The pause of the core's own, as formal_debug_link.vhd has it: whether
-   -- a breakpoint is enabled, paused_o and pause_i the cycle before, and
+   -- a breakpoint is enabled, whether a watchpoint has been since reset,
+   -- paused_o and pause_i the cycle before, and
    -- whether a pause of the core's own still waits for pause_i. The
    -- assumptions are plain Booleans on the *_d signals, as there.
    signal brk_any  : std_logic;
+   signal wch_any  : std_logic;
+   signal wch_seen : std_logic := '0';
    signal paused_d : std_logic := '0';
    signal pause_d  : std_logic := '0';
    signal own_wait : std_logic;
@@ -98,6 +106,8 @@ architecture formal of nice_core is
    attribute anyseq of retire    : signal is true;
    attribute anyseq of stats     : signal is true;
    attribute anyseq of regs      : signal is true;
+   attribute anyseq of wch_hit   : signal is true;
+   attribute anyseq of wch_pc    : signal is true;
 
    -- The requests that wait for their ACK on each bus
    signal ibus_wait   : natural range 0 to C_IBUS_MAX + 1 := 0;
@@ -125,6 +135,8 @@ begin
    instret_o   <= instret;
    regs_o      <= regs;
    stats_o     <= stats;
+   wch_hit_o   <= wch_hit;
+   wch_pc_o    <= wch_pc;
 
    p_reason : process (all)
    begin
@@ -175,6 +187,9 @@ begin
    brk_any  <= '1' when G_BREAKS > 0 and
                         brk_en_i(G_BREAKS - 1 downto 0) /= (G_BREAKS - 1 downto 0 => '0') else
                '0';
+   wch_any  <= '1' when G_WATCHES > 0 and
+                        wch_en_i(2 * G_WATCHES - 1 downto 0) /= (2 * G_WATCHES - 1 downto 0 => '0') else
+               '0';
    own_wait <= not pause_i and (wait_r or (paused and not paused_d and not pause_d));
 
    p_pause : process (clk_i)
@@ -183,8 +198,9 @@ begin
          paused_d <= paused and not rst_i;
          pause_d  <= pause_i and not rst_i;
          wait_r   <= own_wait and not rst_i;
+         wch_seen <= (wch_seen or wch_any) and not rst_i;
          keep_d   <= paused and (pause_i or own_wait) and not rst_i;
-         allow_d  <= (pause_i or own_wait or (brk_any and not paused)) and not rst_i;
+         allow_d  <= (pause_i or own_wait or ((brk_any or wch_any or wch_seen) and not paused)) and not rst_i;
       end if;
    end process p_pause;
 

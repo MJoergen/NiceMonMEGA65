@@ -6,7 +6,8 @@ begin
 
    i_core : entity work.multicycle
       generic map (
-         G_BREAKS => G_BREAKS
+         G_BREAKS  => G_BREAKS,
+         G_WATCHES => G_WATCHES
       )
       port map (
          clk_i         => clk_i,
@@ -35,6 +36,10 @@ begin
          paused_o      => paused_o,
          brk_addr_i    => brk_addr_i,
          brk_en_i      => brk_en_i,
+         wch_addr_i    => wch_addr_i,
+         wch_en_i      => wch_en_i,
+         wch_hit_o     => wch_hit_o,
+         wch_pc_o      => wch_pc_o,
          reg_we_i      => reg_we_i,
          reg_idx_i     => reg_idx_i,
          reg_data_i    => reg_data_i,

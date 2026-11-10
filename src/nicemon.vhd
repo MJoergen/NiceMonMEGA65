@@ -134,6 +134,9 @@
 --                          derived from G_CLOCK_HZ, and the event counters
 --                          at 4A-53: data reads, stores, skips, jumps,
 --                          and interrupts, of the core's own requests.
+--                          Within them, at 46-49, the clock of the time of
+--                          day of SYSTEM.md §10 (nice_cpu/hdl/src/tod.vhd),
+--                          which only rst_i resets (devices.vhd).
 --   0xFFFFFF60-0xFFFFFF7F  The fetch statistics of MICROARCH.md §8.1
 --                          (nice_cpu/hdl/src/fetch_stats.vhd), part of the
 --                          performance counters of SYSTEM.md §3. The
@@ -227,13 +230,15 @@
 --   0xFFFFFFD0-0xFFFFFFFF  The debug registers of DEBUG.md §6, for the link
 --                          only, which debug_link holds: saved_pc and
 --                          saved_sr of the core at D0 and D1, the
---                          watchpoints of version 7 at D4-DB, of which
---                          there are none yet (#99), and R0-R15 of the core,
---                          live while it runs and those of the stop after
---                          a halt or at a pause (DEBUG.md §6), the control
---                          register, the halt reason (1 to 4 here), the
---                          version, 7 (DEBUG.md §6), the free space of the core's input
---                          FIFO, and the G_BREAKS breakpoints: their enable
+--                          G_WATCHES watchpoints at D4-DB: their enable
+--                          bits, their number, the address of the step
+--                          that hit, and their addresses, R0-R15 of the
+--                          core, live while it runs and those of the stop
+--                          after a halt or at a pause (DEBUG.md §6), the
+--                          control register, the halt reason (1 to 4
+--                          here), the version, 7 (DEBUG.md §6), the free
+--                          space of the core's input FIFO, and the
+--                          G_BREAKS breakpoints: their enable
 --                          bits, their number, the stop register, and
 --                          their addresses. The bits of the control
 --                          register:
@@ -357,6 +362,8 @@ entity nicemon is
       G_BOARD_IO         : boolean := false;
       -- The number of breakpoints of the debug link, 0 to 8 (DEBUG.md §6)
       G_BREAKS           : natural range 0 to C_BREAKS_MAX := 4;
+      -- The number of watchpoints of the debug link, 0 to 4 (DEBUG.md §6)
+      G_WATCHES          : natural range 0 to C_WATCHES_MAX := 4;
       -- The microseconds that a console byte over TCP waits for room in
       -- the core's input FIFO (DEBUG.md §1); G_CLOCK_HZ is at least 1 MHz
       G_LINK_WAIT_US     : positive := 50_000;
@@ -591,6 +598,10 @@ architecture synthesis of nicemon is
    -- The breakpoints, which the link holds and the core compares
    signal brk_addr    : t_brk_addrs;
    signal brk_en      : std_logic_vector(C_BREAKS_MAX - 1 downto 0);
+   signal wch_addr    : t_wch_addrs;
+   signal wch_en      : std_logic_vector(2 * C_WATCHES_MAX - 1 downto 0);
+   signal wch_hit     : std_logic_vector(C_WATCHES_MAX - 1 downto 0);
+   signal wch_pc      : std_logic_vector(31 downto 0);
    signal cpu_instret : std_logic;
    signal cpu_retire  : t_retire;
    signal cpu_stats   : t_fetch_events;
@@ -803,7 +814,8 @@ begin
 
    i_core : entity work.nice_core
       generic map (
-         G_BREAKS => G_BREAKS
+         G_BREAKS  => G_BREAKS,
+         G_WATCHES => G_WATCHES
       )
       port map (
          clk_i         => clk_i,
@@ -832,6 +844,10 @@ begin
          paused_o      => cpu_paused,
          brk_addr_i    => brk_addr,
          brk_en_i      => brk_en,
+         wch_addr_i    => wch_addr,
+         wch_en_i      => wch_en,
+         wch_hit_o     => wch_hit,
+         wch_pc_o      => wch_pc,
          reg_we_i      => reg_we,
          reg_idx_i     => reg_idx,
          reg_data_i    => reg_data,
@@ -1437,7 +1453,8 @@ begin
          G_WAIT      => G_CLOCK_HZ / 1_000_000 * G_LINK_WAIT_US,
          G_HAS_ROM   => G_ROM_FILE /= "",
          G_BOOT_HELD => not G_CPU_RUN_AT_RESET,
-         G_BREAKS    => G_BREAKS
+         G_BREAKS    => G_BREAKS,
+         G_WATCHES   => G_WATCHES
       )
       port map (
          clk_i          => clk_i,
@@ -1483,6 +1500,10 @@ begin
          side_data_o    => dbg_rdata_o,
          brk_addr_o     => brk_addr,
          brk_en_o       => brk_en,
+         wch_addr_o     => wch_addr,
+         wch_en_o       => wch_en,
+         wch_hit_i      => wch_hit,
+         wch_pc_i       => wch_pc,
          reg_we_o       => reg_we,
          reg_idx_o      => reg_idx,
          reg_data_o     => reg_data,

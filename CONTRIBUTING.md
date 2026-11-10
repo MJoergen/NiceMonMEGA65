@@ -421,7 +421,7 @@ Then it loads and runs these programs:
 | `reserved.nasm` of the emulator's tests | A halt on a reserved control word, after the testbench has cleared the memory. |
 | `sim/bytewin.nasm` | The byte windows: reads of bytes and halfwords, zero- and sign-extended, writes that change only their byte or halfword, and an indexed operand, as nice_cpu's `bytewin.nasm` checks them, without its words beyond the RAM and its fetch from a window, which alias the RAM here. The testbench reads and writes through the windows over the link. |
 | `sim/counters.nasm` | The fetch statistics, the microsecond counter, and the board's registers through the core's data bus. A start clears the fetch statistics, whose causes sum to their cycles, and with the multi-cycle core every cycle is of cause OTHER. |
-| `sim/break.nasm` | The breakpoints, and the `x` notice. |
+| `sim/break.nasm` | The breakpoints, and the `x` notice, and the watchpoints on the word that it reads and writes, and the `w` notice. |
 | `sim/wait.nasm` | `WAIT`, and the hidden state of an interrupt routine (link version 7): bit 6 of the control register while the core waits, also paused, and bits 7 and 10, `saved_pc`, and `saved_sr` while it is paused in the timer's routine. |
 | `sim/eof.nasm` | Echoes its input until a break ends it. |
 | `sim/count.nasm` | The read counter, which a start keeps. |
@@ -812,12 +812,18 @@ bitstream has one. Then it hides the ROM and uses the link:
 - It runs `sim/break.nasm` to its breakpoints: in a loop, two at one
   address, one disabled, a step that ends at one, the second word of a
   two-word instruction, an interrupt routine, and a `HALT`, each with the
-  `x` notice, R15, and the stop register.
+  `x` notice, R15, and the stop register. Then to its watchpoints: one
+  on the reads of the word that `READ` reads, and one on its writes in
+  the interrupt routine, each with the `w` notice, R15 after the step,
+  the address of the step at `0xFFFFFFD6`, and the stop register.
 - It clears the memory, checks the size of the RAM at `0xFFFFFF9E`,
   128K words on the MEGA65 and 64K on the Nexys4DDR, and the top word of
   the RAM, sets each baud rate at `0xFFFFFF9F` and reads the link back
   at it, and returns to `--baud`, reads back what `sim/emu.nasm` leaves after its
   halt, with the instruction and event counters as `niceemu` counts them, and checks that the cycle counter and the timer stop at the halt.
+  It sets the clock of the time of day to the host's time, and checks
+  that it is set, and counts as the host's clock does over a start,
+  which keeps it.
 - It reads and writes bytes and halfwords through the byte windows over
   the link, at a low word and at the top word of the RAM, and runs
   `sim/bytewin.nasm`, whose registers, words, and steps must be

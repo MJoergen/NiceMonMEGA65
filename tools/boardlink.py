@@ -31,14 +31,16 @@ import nicelink  # noqa: E402
 from nicelink import (BRK_ADDR, BRK_COUNT, BRK_EN, CLEAR,  # noqa: E402
                       CONTROL, DEFAULT_BAUD, FREE, FULL_WAIT, HALT_REASON,
                       HALTED, HOLD, PAUSE, RAM, REASONS, REGS, STEP, STOP,
-                      VERSION, Link, LinkError, Serial, Tcp, check_version,
-                      fail, packet, parse_tcp, read_words)
+                      VERSION, WCH_ADDR, WCH_COUNT, WCH_EN, WCH_PC,
+                      WCH_READ, WCH_WRITE, Link, LinkError, Serial, Tcp,
+                      check_version, fail, packet, parse_tcp, read_words)
 
 # What the tools import from here: nice_cpu's link, and the board's own
 __all__ = [
     "BRK_ADDR", "BRK_COUNT", "BRK_EN", "CLEAR", "CONTROL", "DEFAULT_BAUD",
     "FREE", "FULL_WAIT", "HALT_REASON", "HALTED", "HOLD", "PAUSE", "RAM", "REASONS",
-    "REGS", "STEP", "STOP", "VERSION", "Link", "LinkError", "Serial", "Tcp",
+    "REGS", "STEP", "STOP", "VERSION", "WCH_ADDR", "WCH_COUNT", "WCH_EN",
+    "WCH_PC", "WCH_READ", "WCH_WRITE", "Link", "LinkError", "Serial", "Tcp",
     "check_version", "fail", "packet", "parse_tcp", "read_words",
     "BAUD", "BAUDS", "COSIM_BYTE", "COSIM_WAIT", "Cosim",
     "DEBUG_FIRST", "ETH_PORT", "Eth", "NET_IP", "NET_RX_GOOD", "NET_STATUS",

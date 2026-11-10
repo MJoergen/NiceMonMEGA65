@@ -65,11 +65,18 @@
 --    echoes, so the 17 bytes sent meanwhile pile up in the core's input
 --    FIFO. The FIFO keeps the first 16, and the link drops the 17th and
 --    sends `o`, so a '.' sent after them is echoed right after the 16th.
--- 7. Use the math unit from the link.
+-- 7. Use the math unit from the link, and the clock of the time of day
+--    (nice_cpu's SYSTEM.md §10): not set after reset; set to 999990
+--    microseconds before a second, it reads the next second 20
+--    microseconds later, the seconds of the snapshot that the read of
+--    CLOCK_USEC took, and "set". The words around it are still the
+--    counters'. A clear of "set" keeps the time.
 -- 8. Hold the core, load G_DEVICES_FILE, and run it. It uses the math unit,
 --    the performance counters, and the timer, whose interrupts it counts,
 --    and leaves the results in memory, which the link reads back after the
---    core has halted. The link reads and writes the timer too.
+--    core has halted. The link reads and writes the timer too. The start
+--    kept the clock and its "set", as only a reset of the system resets
+--    it.
 -- 9a. Hold the core, load G_EMU_FILE, and run it. It writes the screen,
 --    memory in the I/O range, and the read counter, and sets R5. The link
 --    reads them back, and the registers, with the values that
@@ -110,8 +117,14 @@
 --    interrupt routine, and start it. The core stops at READ, the link
 --    sends `x00`, bit 4 reads 1, and the stop register holds 0x100. A go on
 --    stops at V3 with `x01`. Then, with the breakpoints disabled, a go on
---    runs it to its halt, and the stop register reads 0. A start stops at
---    READ again, and the clear before step 13 ends the stop.
+--    runs it to its halt, and the stop register reads 0. Then the four
+--    watchpoints (link version 7): watchpoint 0 on the reads of 0x200
+--    stops after READ with `w00`, R15 at the next instruction,
+--    0xFFFFFFD6 at READ, and 0x200 in the stop register; watchpoint 1 on
+--    the writes there stops after STORE, in the interrupt routine, with
+--    `w01`, and 0x201. Disabled, a go on runs to the halt, and 0xFFFFFFD6
+--    and the stop register read 0. A start stops at READ again, and the
+--    clear before step 13 ends the stop.
 -- 13. Load G_WAIT_FILE, and start it. It waits for the timer's IRQ, and
 --    bit 6 of the control register reads 1, also while paused, with the
 --    timer stopped. Once it goes on, the IRQ ends the wait, and the routine
@@ -1056,6 +1069,26 @@ begin
       check("FFFFFF28", "0000008E");         -- A / B = 142
       check("FFFFFF24", "00001B58");         -- A * B = 7000
 
+      report "tb_nicemon: the clock of the time of day from the link";
+      check("FFFFFF49", "00000000");         -- not set after reset
+      wr("FFFFFF47", "12345678");            -- the seconds, staged
+      wr("FFFFFF48", "00000009");
+      wr("FFFFFF46", "000F41F6");            -- 999990 us: sets the clock
+      check("FFFFFF49", "00000001");
+      wait for 20 us;
+      read_word("FFFFFF46", micros_v);       -- takes the snapshot
+      assert to_integer(micros_v) < 100
+         report "tb_nicemon: the clock's microseconds after a second are " & to_hstring(micros_v)
+         severity failure;
+      check("FFFFFF47", "12345679");         -- the next second
+      check("FFFFFF48", "00000009");
+      check("FFFFFF45", "00000000");         -- the counters' words around it
+      wr("FFFFFF49", "00000000");            -- clears "set"
+      check("FFFFFF49", "00000000");
+      check("FFFFFF48", "00000009");
+      wr("FFFFFF46", "00000000");            -- sets it again, at the staged time
+      check("FFFFFF49", "00000001");
+
       report "tb_nicemon: load " & G_DEVICES_FILE;
       wr("FFFFFFF0", "00000009");
       load(G_DEVICES_FILE, first_v);
@@ -1073,6 +1106,9 @@ begin
       check("FFFFFF12", "000000F0");         -- with its vector
       wr("FFFFFF12", "00000123");            -- the link writes the timer
       check("FFFFFF12", "00000023");         -- bits 7..0 only
+      check("FFFFFF49", "00000001");         -- the start kept the clock
+      read_word("FFFFFF46", micros_v);
+      check("FFFFFF48", "00000009");
 
       report "tb_nicemon: load " & G_EMU_FILE;
       wr("FFFFFFF0", "00000009");
@@ -1338,6 +1374,29 @@ begin
       expect_halt("01");
       check("FFFFFFF6", "00000000");
       check("FFFFFFE7", "00001234");         -- R7, from the routine
+
+      report "tb_nicemon: the watchpoints";
+      check("FFFFFFD5", "00000004");         -- four watchpoints
+      wr("FFFFFFD8", "00000200");            -- 0 and 1 at the word READ reads
+      wr("FFFFFFD9", "00000200");
+      wr("FFFFFFD4", "00000001");            -- 0 on its reads
+      check("FFFFFFD4", "00000001");
+      wr("FFFFFFF0", "00000009");
+      wr_stop("00000008", pkt('w', "00"));
+      check("FFFFFFF0", "00000018");         -- paused
+      check("FFFFFFEF", "0000000D");         -- R15 at TWO, after READ
+      check("FFFFFFD6", "0000000C");         -- the hit at READ
+      check("FFFFFFF6", "00000200");         -- the stop
+      wr("FFFFFFD4", "00000008");            -- 1 on its writes
+      wr_stop("00000008", pkt('w', "01"));
+      check("FFFFFFD6", "00000015");         -- the hit at STORE
+      check("FFFFFFF6", "00000201");
+      check("00000200", "00001234");
+      wr("FFFFFFD4", "00000000");
+      wr("FFFFFFF0", "00000008");
+      expect_halt("01");
+      check("FFFFFFD6", "00000000");
+      check("FFFFFFF6", "00000000");
       wr("FFFFFFF4", "00000001");            -- start again, to READ
       wr("FFFFFFF0", "00000009");
       wr_stop("00000008", pkt('x', "00"));

@@ -3,8 +3,9 @@
 -- architecture comes from one of the files in src/core/, which the build
 -- picks with NICE=pipeline or NICE=multi (core.mk). So only that core is
 -- analyzed, and no generic has to reach it from the top level. G_BREAKS
--- is the generic of both, the number of breakpoints (DEBUG.md §6). Its
--- default is 0; nicemon.vhd and system.vhd default to 4, and pass it on.
+-- and G_WATCHES are generics of both, the numbers of breakpoints and
+-- watchpoints (DEBUG.md §6). Their defaults are 0; nicemon.vhd and
+-- system.vhd default to 4, and pass them on.
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -14,7 +15,8 @@ library ieee;
 
 entity nice_core is
    generic (
-      G_BREAKS : natural range 0 to C_BREAKS_MAX := 0
+      G_BREAKS  : natural range 0 to C_BREAKS_MAX  := 0;
+      G_WATCHES : natural range 0 to C_WATCHES_MAX := 0
    );
    port (
       clk_i         : in  std_logic;
@@ -55,6 +57,17 @@ entity nice_core is
       -- has been '1' (DEBUG.md §6, and the cores' contract f)
       brk_addr_i    : in  t_brk_addrs;
       brk_en_i      : in  std_logic_vector(C_BREAKS_MAX - 1 downto 0);
+      -- The watchpoints, from flip-flops: an address and two enable bits
+      -- each, 2i for its reads and 2i + 1 for its writes. A step that reads
+      -- or writes the word pauses the core after it, before anything else,
+      -- until pause_i has been '1'. wch_hit_o has a bit for each
+      -- watchpoint that the step hit, and wch_pc_o the step's address, both
+      -- held while the core is paused (DEBUG.md §6, and the cores'
+      -- WATCHPOINTS)
+      wch_addr_i    : in  t_wch_addrs                                      := (others => (others => '0'));
+      wch_en_i      : in  std_logic_vector(2 * C_WATCHES_MAX - 1 downto 0) := (others => '0');
+      wch_hit_o     : out std_logic_vector(C_WATCHES_MAX - 1 downto 0);
+      wch_pc_o      : out std_logic_vector(31 downto 0);
       -- A write of R1-R15 while paused, from the link's flip-flops: the
       -- core takes reg_data_i into register reg_idx_i in the cycle after
       -- reg_we_i (DEBUG.md §6, and the cores' contract g)

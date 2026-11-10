@@ -25,8 +25,8 @@
 -- - reg_we_o, a write of R1-R15, comes only while pause_o is high, paused_i
 --   was high in the cycle before, and hold_o is low (REGISTER WRITES).
 -- The other outputs are free, the breakpoints brk_addr_o and brk_en_o
--- too, so the core may pause on its own whenever one is enabled, and
--- reg_idx_o and reg_data_o.
+-- and the watchpoints wch_addr_o and wch_en_o too, so the core may pause
+-- on its own whenever one is enabled, and reg_idx_o and reg_data_o.
 --
 -- RESET
 -- rst_i is the system's reset. After it, CYC, STB, clear_o, pause_o, and
@@ -56,6 +56,8 @@ architecture formal of debug_link is
    signal wb_data      : std_logic_vector(31 downto 0);
    signal brk_addr     : t_brk_addrs;
    signal brk_en       : std_logic_vector(C_BREAKS_MAX - 1 downto 0);
+   signal wch_addr     : t_wch_addrs;
+   signal wch_en       : std_logic_vector(2 * C_WATCHES_MAX - 1 downto 0);
    signal reg_we       : std_logic;
    signal reg_idx      : std_logic_vector(3 downto 0);
    signal reg_data     : std_logic_vector(31 downto 0);
@@ -79,6 +81,8 @@ architecture formal of debug_link is
    attribute anyseq of wb_data      : signal is true;
    attribute anyseq of brk_addr     : signal is true;
    attribute anyseq of brk_en       : signal is true;
+   attribute anyseq of wch_addr     : signal is true;
+   attribute anyseq of wch_en       : signal is true;
    attribute anyseq of reg_we       : signal is true;
    attribute anyseq of reg_idx      : signal is true;
    attribute anyseq of reg_data     : signal is true;
@@ -111,6 +115,8 @@ begin
    wb_data_o      <= wb_data;
    brk_addr_o     <= brk_addr;
    brk_en_o       <= brk_en;
+   wch_addr_o     <= wch_addr;
+   wch_en_o       <= wch_en;
    reg_we_o       <= reg_we;
    reg_idx_o      <= reg_idx;
    reg_data_o     <= reg_data;

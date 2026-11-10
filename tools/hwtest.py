@@ -47,7 +47,8 @@ Checks, in this order:
       hold, and after a start paused
     - sim/step.nasm steps to its halt, and the registers after each step
       are compared with niceemu --trace
-    - sim/break.nasm stops at breakpoints
+    - sim/break.nasm stops at breakpoints, and at watchpoints on the
+      word that it reads and writes
     - sim/step.nasm, paused, takes writes of R0-R15, and goes on from
       them, compared with the same on niceemu --link; a write while
       halted or held is refused
@@ -62,6 +63,8 @@ Checks, in this order:
       again
     - what sim/emu.nasm leaves after its halt is read back, and the cycle
       counter and the timer stop there
+    - the clock of the time of day, set to the host's time, counts as
+      the host's clock does, over a start too, and is left at that time
     - the byte windows of nice_cpu's SYSTEM.md §9: the link reads bytes
       and halfwords through them and writes them, and sim/bytewin.nasm
       leaves the registers and the words that niceemu leaves (issue #90)
@@ -171,7 +174,8 @@ from load import (MAX_RAM_WORDS, MONITOR_WORDS, PROGRAM, RAM_SIZE, load_words,
 from boardlink import (BAUD, BAUDS, BRK_COUNT, BRK_EN, CONTROL, DEFAULT_BAUD,
                        ETH_PORT,
                        FREE, HOLD, NET_IP, NET_RX_GOOD, NET_STATUS, NET_TX,
-                       PAUSE, RAM, REGS, STEP, STOP, VERSION, Eth, Link,
+                       PAUSE, RAM, REGS, STEP, STOP, VERSION, WCH_COUNT,
+                       WCH_EN, WCH_PC, WCH_READ, WCH_WRITE, Eth, Link,
                        LinkError, Serial, Tcp, packet)
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -957,6 +961,67 @@ def test_break(link: Link, prog: str, at: dict[str, int]) -> None:
     link.control(HOLD | RAM)
 
 
+def test_watch(link: Link, prog: str, at: dict[str, int]) -> None:
+    """The watchpoints of DEBUG.md §6 (link version 7) on sim/break.nasm,
+    at the word 0x200 that READ reads and STORE writes: a watchpoint on
+    its reads stops after READ, one on its writes after STORE in the
+    interrupt routine, each with w and its number, R15 at the next
+    instruction, the step's address at 0xFFFFFFD6, and 0x200 plus the
+    number in the stop register. One on the reads and the writes of a
+    word the program never touches does not stop it, and after the halt
+    0xFFFFFFD6 and the stop register read 0. A system without
+    watchpoints passes this."""
+    count = rd(link, WCH_COUNT)
+    if count == 0:
+        check("watch: the system has no watchpoints", True)
+        return
+    require("watch: 4 watchpoints or more", count >= 4, str(count))
+    link.halts.clear()
+    load_words(link, read_bin(prog))
+    pauses, first = link.pauses, len(link.watches)
+    seen = first
+
+    def stop(name: str, label: str, after: int, number: int) -> None:
+        nonlocal seen
+        end = time.monotonic() + 4 * QUIET
+        while len(link.watches) == seen and time.monotonic() < end:
+            link.poll(end - time.monotonic())
+        got = link.watches[seen] if len(link.watches) > seen else None
+        seen = len(link.watches)
+        r15 = rd(link, REGS + 15)
+        pc = rd(link, WCH_PC)
+        stop_reg = rd(link, STOP)
+        check(f"watch: {name}", got == number and r15 == after and
+              pc == at[label] and stop_reg == 0x200 + number,
+              f"w {got}, R15 {r15:08X}, hit {pc:08X}, stop {stop_reg:08X}")
+
+    link.set_watches([(0x200, WCH_READ), None, (0x300, WCH_READ | WCH_WRITE)])
+    link.control(HOLD | RAM)
+    link.control(RAM)
+    stop("a read, after READ", "READ", at["TWO"], 0)
+    check("watch: bit 4 reads 1", ctl(link) == "00000018", ctl(link))
+    link.set_watches([None, (0x200, WCH_WRITE)])
+    link.control(RAM)
+    stop("a write in an interrupt routine, after STORE", "STORE",
+         at["STORE"] + 1, 1)
+    link.write(WCH_EN, [0])
+    link.control(RAM)
+    reason = wait_halt(link)
+    check("watch: disabled, the program runs to its halt", reason == 1,
+          str(reason))
+    check("watch: 0xFFFFFFD6 and the stop register read 0 after the halt",
+          rd(link, WCH_PC) == 0 and rd(link, STOP) == 0,
+          f"{rd(link, WCH_PC):08X} {rd(link, STOP):08X}")
+    check("watch: no p notice, and no x",
+          link.pauses - pauses == len(link.watches) - first,
+          f"{link.pauses - pauses} stops, {len(link.watches) - first} w")
+    n = link.pauses
+    link.control(HOLD | PAUSE | RAM)
+    link.control(PAUSE | RAM)
+    wait_pause(link, n)
+    link.control(HOLD | RAM)
+
+
 def start_emu(addr: str = "127.0.0.1") -> tuple[subprocess.Popen[bytes], str]:
     """niceemu --link on a free port of addr, and that port. Its stderr,
     where it prints the report of each run, is left for the caller to read
@@ -1116,6 +1181,46 @@ def test_counters_stop(link: Link) -> None:
     time.sleep(0.5)
     check("timer COUNT stops at a halt",
           count != 0 and rd(link, 0xFFFFFF11) == count, f"{count:08X}")
+
+
+# The clock of the time of day of nice_cpu's SYSTEM.md section 10
+CLOCK_USEC = 0xFFFFFF46
+CLOCK_SEC_LO = 0xFFFFFF47
+CLOCK_SEC_HI = 0xFFFFFF48
+CLOCK_STATUS = 0xFFFFFF49
+
+
+def read_clock(link: Link) -> float:
+    """The clock's time in seconds: the read of CLOCK_USEC takes the
+    snapshot of the seconds that the next two reads return."""
+    usec = rd(link, CLOCK_USEC)
+    sec = rd(link, CLOCK_SEC_LO) | rd(link, CLOCK_SEC_HI) << 32
+    return sec + usec / 1e6
+
+
+def test_clock(link: Link) -> None:
+    """The clock of the time of day: set to the host's time, it is set,
+    and counts one second in a second of the host, also over a start,
+    which keeps it. It is left at the host's time."""
+    now = time.time()
+    sec = int(now)
+    check("W CLOCK_SEC_LO", wr(link, CLOCK_SEC_LO, sec & 0xFFFFFFFF))
+    check("W CLOCK_SEC_HI", wr(link, CLOCK_SEC_HI, sec >> 32))
+    check("W CLOCK_USEC", wr(link, CLOCK_USEC, int((now - sec) * 1e6)))
+    check("clock: set", rd(link, CLOCK_STATUS) == 1,
+          f"{rd(link, CLOCK_STATUS):08X}")
+    start, board = time.time(), read_clock(link)
+    n = link.pauses
+    link.control(HOLD | PAUSE | RAM)
+    link.control(PAUSE | RAM)
+    wait_pause(link, n)
+    link.control(HOLD | RAM)
+    time.sleep(1.0)
+    host = time.time() - start
+    ran = read_clock(link) - board
+    check("clock: counts as the host's clock, over a start",
+          abs(ran - host) < 0.1 and rd(link, CLOCK_STATUS) == 1,
+          f"{ran:.3f} s in {host:.3f} s")
 
 
 def test_screen_registers(link: Link) -> None:
@@ -2005,6 +2110,7 @@ def main() -> None:
                 test_pause(link, pause)
                 test_step(link, step)
                 test_break(link, brk, brk_at)
+                test_watch(link, brk, brk_at)
                 test_write_regs(link, *step_at)
                 test_clear(link)
                 test_wait(link, wait, wait_at, board)
@@ -2013,6 +2119,7 @@ def main() -> None:
                 test_readback(link, emu)
                 test_byte_windows(link, bytewin, board)
                 test_counters_stop(link)
+                test_clock(link)
                 test_screen_registers(link)
                 test_fonts(link)
                 test_board_devices(link, board)

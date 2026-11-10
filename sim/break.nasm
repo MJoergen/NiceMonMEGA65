@@ -1,8 +1,9 @@
 ; A short program for the checks of the breakpoints (tools/hwtest.py),
 ; which sets them at its labels, from niceasm.py --symbols: a loop of three
 ; passes, a skipped instruction, a read from memory, a two-word instruction,
-; whose second word never matches, an INT with its routine and RTI, and a
-; HALT. The routine's vector is at 0x103, as VBASE is 1.
+; whose second word never matches, an INT with its routine, which writes
+; the word that READ reads, and RTI, and a HALT. tb_nicemon sets its
+; watchpoints on that word. The routine's vector is at 0x103, as VBASE is 1.
 PC              .EQU    R15
 SR              .EQU    R14
 
@@ -18,6 +19,7 @@ TWO             MOVE    R5, 0x12345678
 AFTER           MOVE    R6, 7
 DONE            HALT
 V3              MOVE    R7, 0x1234
+STORE           MOVE    @R13, R7
                 RTI
                 .ORG    0x103           ; vector 3 of the table at 0x100
                 .DAT    V3
