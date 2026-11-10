@@ -200,7 +200,7 @@ line, and the cursor and function keys, the other control codes, and the
 bytes `0x80` to `0x9F` do nothing. RETURN runs the line. A break on
 the UART, or a host's half-close over Ethernet, ends the line's input
 and not the keyboard's, and the next host to connect over Ethernet can
-type again ([SYSTEM.md](../doc/SYSTEM.md#address-map), `0xFFFFFF00`).
+type again ([SYSTEM.md](../doc/SYSTEM.md#io-registers), `0xFFFFFF00`).
 
 Before the first key of a line, the cursor keys up and down scroll
 back through the rows that left the top of the screen a row at a time,
@@ -482,7 +482,7 @@ pseudo-instructions below, which only `u` shows:
   MEGA65, and `0x8000`–`0xEFFF`, 28K words, on the Nexys4DDR, as the
   monitor's variables are the top 4K words of the RAM. A program learns
   the size of the RAM from `0xFFFFFF9E`
-  ([SYSTEM.md](../doc/SYSTEM.md#address-map)), which reads 0 in
+  ([SYSTEM.md](../doc/SYSTEM.md#io-registers)), which reads 0 in
   `niceemu`, where the memory has no limit. The monitor's routines use
   at most 32 words of the stack when a program calls them. The stack is
   in use before the program runs: `r` pushes its return address at the

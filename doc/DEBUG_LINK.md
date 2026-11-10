@@ -24,7 +24,7 @@ debug link of nice_cpu's [doc/DEBUG.md](https://github.com/MJoergen/nice_cpu/blo
 the program's console bytes both ways, and between them it carries
 packets, which start with the byte `0xFF`. A console byte `0xFF` is sent
 as two. With the packets, a host reads and writes memory and the debug
-registers at `0xFFFFFFD0`–`FF` (see [Address map](SYSTEM.md#address-map)). The
+registers at `0xFFFFFFD0`–`FF` (see [I/O registers](SYSTEM.md#io-registers)). The
 board sends a notice at reset (`b07`), when the core halts (`h` and the
 reason), and when an input byte is lost (`o`). The tools in `tools/` are
 such a host, and `niceemu --link` serves the same link, so the tools

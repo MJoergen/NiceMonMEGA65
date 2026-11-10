@@ -42,7 +42,7 @@ has what each demo shows and how it works. On the boards:
   read of the console returns the end once the bytes before it are read,
   and the line's bytes are dropped until the core is started again or a
   host connects over Ethernet
-  ([SYSTEM.md](../doc/SYSTEM.md#address-map)); the keyboard's keys still
+  ([SYSTEM.md](../doc/SYSTEM.md#io-registers)); the keyboard's keys still
   come, but the demo ends as `niceemu` does, rather than read on. The
   link sends `h`, and `run.py`, `hwtest.py`, and the tests in `niceemu`
   end on it. A terminal program that sends a break when it opens the port
