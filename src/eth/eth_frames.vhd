@@ -122,6 +122,11 @@ architecture synthesis of eth_frames is
 
    signal buf : t_ram := (others => (others => '0'));
 
+   -- Without it, Vivado (2025.1) makes distributed RAM of the buffer on the
+   -- Nexys4DDR: 88 RAM64M (issue #103)
+   attribute ram_style : string;
+   attribute ram_style of buf : signal is "block";
+
    -- Reading a frame, deciding it in two steps, and putting it into the
    -- port
    type   t_rx_state is (READ_ST, CHECK_ST, DECIDE_ST, PUT_ST);

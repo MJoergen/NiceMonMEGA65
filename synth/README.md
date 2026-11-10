@@ -134,10 +134,12 @@ R3 has a TPD12S016.
 ## The Nexys4DDR
 
 `nexys4ddr/top.vhd` is the whole top level, and `nexys4ddr.xdc` has its
-pins, from Digilent's master XDC. The console is the board's USB-UART, the
-screen is on its VGA connector, and LED0 is on while the core runs, or
-while the program sets it. A USB keyboard in the USB HID port types into
-the console too: the board's PIC24 turns it into PS/2, which
+pins, from Digilent's master XDC. `nexys4ddr_synth.xdc` keeps two of
+nice_cpu's memories in block RAM (see [Block RAM](#block-ram)). The
+console is the board's USB-UART, the screen is on its VGA connector, and
+LED0 is on while the core runs, or while the program sets it. A USB
+keyboard in the USB HID port types into the console too: the board's
+PIC24 turns it into PS/2, which
 `src/kbd_ps2.vhd` receives and `src/kbd_ps2_ascii.vhd` turns into ASCII.
 The receiver only listens, so the keyboard's LEDs are not set. The board's
 16 LEDs, two RGB LEDs, seven-segment display, five buttons, and 16 switches
@@ -242,29 +244,31 @@ flip-flops:
 
 | Part of the design | R6, pipelined | R6, multi | Nexys4DDR, pipelined | Nexys4DDR, multi |
 |---|---|---|---|---|
-| The core (`nice_core`) | 7634 / 3428 | 4881 / 1203 | 7579 / 3165 | 4970 / 1047 |
-| The debug link (`debug_link`) | 2541 / 1286 | 2623 / 1285 | 2517 / 1285 | 2644 / 1285 |
-| The devices (`devices.vhd`): the math unit, the counters, the fetch statistics, the timer, the SD card controller, the network station's registers, and the port for Ethernet frames | 5322 / 3497 | 4269 / 2857 | 7759 / 3645 | 6669 / 3005 |
-| The Ethernet station (`eth/eth.vhd`) | 2766 / 2732 | 2763 / 2732 | 3247 / 2867 | 3248 / 2865 |
-| Of which the TCP server (`eth/eth_tcp.vhd`) | 1905 / 1897 | 1902 / 1897 | 1632 / 1920 | 1633 / 1920 |
-| The on-board debugger (`dbg/dbg.vhd`) | 3029 / 2838 | 3026 / 2838 | 3283 / 2959 | 3282 / 2959 |
-| The text display (`text.vhd`) | 136 / 202 | 139 / 202 | 136 / 178 | 142 / 178 |
+| The core (`nice_core`) | 7634 / 3428 | 4881 / 1203 | 7647 / 3164 | 4970 / 1047 |
+| The debug link (`debug_link`) | 2541 / 1286 | 2623 / 1285 | 2503 / 1285 | 2644 / 1285 |
+| The devices (`devices.vhd`): the math unit, the counters, the fetch statistics, the timer, the SD card controller, the network station's registers, and the port for Ethernet frames | 5322 / 3497 | 4269 / 2857 | 5373 / 3469 | 6669 / 3005 |
+| The Ethernet station (`eth/eth.vhd`) | 2766 / 2732 | 2763 / 2732 | 2771 / 2755 | 3248 / 2865 |
+| Of which the TCP server (`eth/eth_tcp.vhd`) | 1905 / 1897 | 1902 / 1897 | 1630 / 1920 | 1633 / 1920 |
+| The on-board debugger (`dbg/dbg.vhd`) | 3029 / 2838 | 3026 / 2838 | 3075 / 2927 | 3282 / 2959 |
+| The text display (`text.vhd`) | 136 / 202 | 139 / 202 | 134 / 178 | 142 / 178 |
 | The keyboard | 720 / 592 | 720 / 592 | 236 / 89 | 235 / 89 |
 | The HDMI output | 600 / 1207 | 600 / 1207 | – | – |
-| The rest: the UART, the memory's buses, the board's and the screen's registers, and glue | 680 / 528 | 746 / 530 | 551 / 633 | 629 / 631 |
-| Total | 23428 / 16310 | 19767 / 13446 | 25308 / 14821 | 21819 / 12059 |
-| Total, of the FPGA | 17.5 % / 6.1 % | 14.8 % / 5.0 % | 39.9 % / 11.7 % | 34.4 % / 9.5 % |
+| The rest: the UART, the memory's buses, the board's and the screen's registers, and glue | 680 / 528 | 746 / 530 | 728 / 633 | 629 / 631 |
+| Total | 23428 / 16310 | 19767 / 13446 | 22467 / 14500 | 21819 / 12059 |
+| Total, of the FPGA | 17.5 % / 6.1 % | 14.8 % / 5.0 % | 35.4 % / 11.4 % | 34.4 % / 9.5 % |
 
 The R6's pipelined column is from the build with `FLOW=timing`, whose
 retiming adds about 60 LUTs to the default flow's 23368 and 16302. The
 R3's pipelined build with `FLOW=timing` takes 23484 LUTs and 16435
 flip-flops, 17.6 % and 6.1 % of the FPGA.
 
-The pipelined core is 5.7 % of the LUTs of the R6's FPGA, and 12.0 % of
+The pipelined core is 5.7 % of the LUTs of the R6's FPGA, and 12.1 % of
 the Nexys4DDR's. The multi-cycle core has about two thirds of its LUTs,
-3.6 % and 7.8 %, and a third of its flip-flops. On the Nexys4DDR the
-devices take about 2400 LUTs more than on the R6, as Vivado puts their
-buffers into LUTs there (see [Block RAM](#block-ram)). Vivado optimizes
+3.6 % and 7.8 %, and a third of its flip-flops. The Nexys4DDR's
+pipelined column is from the build of 2026-11-10, after issue #103 put
+five memories into block RAM (see [Block RAM](#block-ram)); its
+multi-cycle column is older, and its devices still have about 2400 LUTs
+of those memories. Vivado optimizes
 across the boundaries of the modules, so the rows move from build to
 build more than the logic does; the totals are what count.
 
@@ -284,7 +288,7 @@ These are the worst setup and hold slacks, in ns:
 | R6, `NICE=multi` | 100 MHz | 0.187 | 0.075 |
 | R3, pipelined, default flow | 100 MHz | **−0.073**, 2 endpoints | 0.035 |
 | R3, pipelined, `FLOW=timing` | 100 MHz | 0.126 | 0.041 |
-| Nexys4DDR, pipelined, `FLOW=timing` | 90 MHz | 0.004 | 0.050 |
+| Nexys4DDR, pipelined, `FLOW=timing` | 90 MHz | 0.013 | 0.049 |
 | Nexys4DDR, `NICE=multi`, `FLOW=timing` | 90 MHz | 0.186 | 0.019 |
 
 So the pipelined core meets its clock on every board with `FLOW=timing`
@@ -299,7 +303,7 @@ the build of the latest release's bump, and the badge shows it.
 
 Every build writes the five worst paths into the TCP server, within it,
 and out of it to `build/tcp_paths.rpt`. Their worst slack is 1.171 ns on
-the R6 and 0.920 ns on the Nexys4DDR.
+the R6 and 1.565 ns on the Nexys4DDR.
 
 The PHY's RXD and CRS_DV are timed against the clock on its pin, with the
 output delays of the PHYs' data sheets and 1 ns for the traces. The pin's
@@ -327,12 +331,12 @@ The block RAMs, of 36 Kbit, are these:
 | The FIFO of Ethernet frames to send (`eth/eth_ram.vhd`), 2K bytes, one RAMB18 | 0.5 | 0.5 |
 | The copy of a ping in `eth/eth_icmp.vhd`, 2K bytes, one RAMB18 | 0.5 | 0.5 |
 | The TCP server's buffers of received and sent bytes (`eth/eth_ram.vhd` in `eth/eth_tcp_buf.vhd`), 2K bytes each, one RAMB18 each | 1 | 1 |
-| The station's buffer of a frame for the port for Ethernet frames (`eth/eth_frames.vhd`), 512 words, one RAMB18, on the MEGA65 only | 0.5 | – |
-| The port for Ethernet frames (nice_cpu's `eth_regs.vhd`): the queue of frames received, 2K words, and the send buffer, 512 words, on the MEGA65 only | 3 | – |
-| The SD card controller's buffer (nice_cpu's `sd_regs.vhd`), four RAMB18, on the MEGA65 only | 2 | – |
-| The debugger's page (`mem_ram` in `dbg/dbg.vhd`), 256 words, one RAMB18, on the MEGA65 only | 0.5 | – |
-| Total without the ROM, pipelined | 213 of 365 | 95 of 135 |
-| Total with the ROM, pipelined | 245 | 127 |
+| The station's buffer of a frame for the port for Ethernet frames (`eth/eth_frames.vhd`), 512 words, one RAMB18 | 0.5 | 0.5 |
+| The port for Ethernet frames (nice_cpu's `eth_regs.vhd`): the queue of frames received, 2K words, and the send buffer, 512 words | 3 | 3 |
+| The SD card controller's buffer (nice_cpu's `sd_regs.vhd`), four RAMB18 | 2 | 2 |
+| The debugger's page (`mem_ram` in `dbg/dbg.vhd`), 256 words, one RAMB18 | 0.5 | 0.5 |
+| Total without the ROM, pipelined | 213 of 365 | 101 of 135 |
+| Total with the ROM, pipelined | 245 | 133 |
 
 The copy of the screen keeps all 32 bits, as the display reads the
 character and both 12-bit colors, so it takes as many block RAMs as the
@@ -340,9 +344,13 @@ screen. The multi-cycle core adds half of one more, its RAMB18, on the
 MEGA65. The table of `kbd_ps2_ascii.vhd` is in LUTs, 58 of them, though
 Vivado's preliminary report of ROMs shows it in block RAM.
 
-On the Nexys4DDR, Vivado puts the memories marked "on the MEGA65 only"
-into distributed RAM, about 2500 LUTs of it, though 8 block RAMs are
-free: the port's queue of frames alone takes 352 RAM64M. Without their
-`ram_style` or `rom_style` attributes, Vivado did the same with the
-screen of `mem.vhd`, its font, and the UART's FIFO; the
-attributes keep those in block RAM, as on the MEGA65.
+On the Nexys4DDR, Vivado makes distributed RAM of a memory that has no
+`ram_style` or `rom_style` attribute, though block RAMs are free: it did
+with the screen of `mem.vhd`, its font, and the UART's FIFO (issue #70),
+and with the five memories of the last four rows above, about 2500 LUTs, of which the port's queue of frames alone took 352 RAM64M (issue
+#103). The local memories have the attribute. The two in nice_cpu's
+`eth_regs.vhd` and `sd_regs.vhd` get `RAM_STYLE` from
+`nexys4ddr/nexys4ddr_synth.xdc`, which only synthesis reads, as its
+cells' names change in synthesis. That left 2 of the 135 free and gained
+the Nexys4DDR 0.009 ns of setup slack; its worst path into the core now
+starts at the SD card controller's buffer, with 0.176 ns to spare.

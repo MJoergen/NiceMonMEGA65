@@ -8,6 +8,7 @@ BOARD_SRC += ../../src/seg7.vhd
 BOARD_SRC += ../../src/rgb_pwm.vhd
 BOARD_SRC += top.vhd
 BOARD_XDC = nexys4ddr.xdc
+SYNTH_XDC = nexys4ddr_synth.xdc
 FLOW      = timing
 
 include ../Makefile.inc

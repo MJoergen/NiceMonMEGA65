@@ -1,7 +1,8 @@
 # The Vivado build, in non-project mode, shared by the boards. A board's
 # Makefile sets PART, BOARD_SRC, and BOARD_XDC, and includes this file;
 # BOARD_SRC has the board's own sources, with top.vhd last. It may set FLOW
-# and PLACE_TIMING too.
+# and PLACE_TIMING too, and SYNTH_XDC, constraints that only synthesis
+# reads, for they name cells that synthesis renames or removes.
 #
 # make                builds build/top.bit, whose core waits, held, for
 #                     the debug link
@@ -101,7 +102,7 @@ SRC += ../common/clk_rst.vhd
 SRC += ../common/video_clk.vhd
 SRC += $(BOARD_SRC)
 
-XDC = $(BOARD_XDC)
+XDC = $(BOARD_XDC) $(SYNTH_XDC)
 
 # Batch mode exits nonzero on an error in the script, where Tcl mode drops to
 # a prompt that reads EOF and exits 0. The old bitstream is removed first, so
@@ -148,7 +149,9 @@ TCP_REPORTS = $$TCP_REPORTS_TCL
 build/$(TOP).tcl: $(MAKEFILE_LIST) build/rom.conf
 	echo "# A tcl script for Vivado, made by make" > $@
 	echo "read_vhdl -vhdl2008 { $(SRC) }" >> $@
-	echo "read_xdc { $(XDC) }" >> $@
+	echo "read_xdc { $(BOARD_XDC) }" >> $@
+	$(if $(SYNTH_XDC),echo "read_xdc { $(SYNTH_XDC) }" >> $@)
+	$(if $(SYNTH_XDC),echo "set_property USED_IN_IMPLEMENTATION false [get_files { $(SYNTH_XDC) }]" >> $@)
 	echo "set_property PART $(PART) [current_project]" >> $@
 	echo "synth_design -top $(TOP) -assert $(GENERICS) $(SYNTH_OPTS)" >> $@
 	echo "opt_design $(OPT_OPTS)" >> $@

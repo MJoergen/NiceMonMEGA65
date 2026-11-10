@@ -845,6 +845,11 @@ architecture synthesis of dbg is
    signal ovl_addr : std_logic_vector(11 downto 0) := (others => '0');
    signal ovl_data : std_logic_vector(31 downto 0) := (others => '0');
 
+   -- Without it, Vivado (2025.1) makes distributed RAM of the page on the
+   -- Nexys4DDR: 44 RAM64M (issue #103)
+   attribute ram_style : string;
+   attribute ram_style of mem_ram : signal is "block";
+
 begin
 
    kbd_ready_o <= '1';
