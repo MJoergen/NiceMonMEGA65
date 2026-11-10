@@ -13,7 +13,7 @@ ARGS   ?=
 LINK    = $(if $(ETH),--eth $(ETH)) $(if $(PORT),--port $(PORT))
 EMU     = nice_cpu/emulator/zig-out/bin/niceemu
 
-.PHONY: help test formal lint typecheck diagrams examples demo monitor r3 r6 nexys4ddr cor bump release load run mon sdcard flash hwtest linktest sdtest tftpd tftptest cosim cosimtest clean
+.PHONY: help test formal lint typecheck diagrams examples demo monitor r3 r6 nexys4ddr cor bump release load run mon sdcard sdnbd flash hwtest linktest sdtest tftpd tftptest cosim cosimtest clean
 
 # Every target but these needs the nice_cpu submodule
 ifeq ($(wildcard nice_cpu/hdl/src/nice_pkg.vhd),)
@@ -75,6 +75,9 @@ help:
 	@echo "  make sdcard CMD='ls | get NAME [DEST] | put SRC [NAME] | del NAME' (ETH=IP | PORT=/dev/ttyUSB1)"
 	@echo "                  list, copy, write, or delete the files of the folder NICE"
 	@echo "                  of the board's SD card, over the debug link"
+	@echo "  make sdnbd (ETH=IP | PORT=/dev/ttyUSB1) [ARGS='--read-only --slot 1']"
+	@echo "                  serve the board's SD card over NBD, for nbd-client and a"
+	@echo "                  mount of its files on the host; holds the core until Ctrl-C"
 	@echo "  make hwtest PORT=/dev/ttyUSB1 [BIT=synth/r6/build/top.bit] [ETH=IP]"
 	@echo "                  check that the FPGA on PORT's board is the part BIT was"
 	@echo "                  built for, program it with BIT, and run the tests (needs"
@@ -90,8 +93,8 @@ help:
 	@echo "                  and start it"
 	@echo "  make linktest   compare run.py on niceemu --link with niceemu, and check"
 	@echo "                  mon.py's check of the memory, without a board"
-	@echo "  make sdtest     check tools/sdcard.py on niceemu --link with images of a"
-	@echo "                  card, without a board"
+	@echo "  make sdtest     check tools/sdcard.py and tools/sdnbd.py on niceemu --link"
+	@echo "                  with images of a card, without a board"
 	@echo "  make tftpd [TFTP_DIR=examples/build] [TFTP_PORT=69]"
 	@echo "                  serve the files of TFTP_DIR to the monitor's tftp, with"
 	@echo "                  listings for tftp IP *.bin (port 69 needs root)"
@@ -236,6 +239,11 @@ sdcard:
 	@test -n "$(CMD)" || (echo "Give the command with CMD=ls, CMD='get NAME', CMD='put SRC', or CMD='del NAME'"; exit 1)
 	$(PYTHON) tools/sdcard.py $(LINK) $(ARGS) $(CMD)
 
+# The board's SD card as a block device of the host, for nbd-client and a
+# mount (tools/sdnbd.py), until Ctrl-C
+sdnbd:
+	$(PYTHON) tools/sdnbd.py $(LINK) $(ARGS)
+
 # The flash of the Nexys4DDR, or with COR and SLOT a slot of the MEGA65's
 # (tools/flash.py); BIT on the command line overrides the default.
 flash:
@@ -259,7 +267,7 @@ hwtest: examples $(EMU)
 linktest: $(EMU)
 	$(PYTHON) tools/linktest.py
 
-# sdcard.py on niceemu --link with images of a card, which needs no board
+# sdcard.py and sdnbd.py on niceemu --link with images of a card, which needs no board
 sdtest: $(EMU)
 	$(MAKE) -C monitor build/monitor_test.bin
 	$(PYTHON) tools/sdtest.py

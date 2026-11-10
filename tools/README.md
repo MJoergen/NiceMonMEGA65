@@ -14,11 +14,12 @@ prints its options with `--help`, and its header says more.
 | `run.py` | Runs a program on the board and prints what `niceemu` prints, for diffing, also one under the monitor with `--monitor`. |
 | `mon.py` | An interactive shell on the link: memory, registers, pause, step, breakpoints, and the console. It is nice_cpu's `debugger/nicedbg.py` with the board's links. |
 | `sdcard.py` | Lists, copies, writes, and deletes the files of the folder `NICE` on the board's SD card, with no PC slot. |
+| `sdnbd.py` | Serves the board's SD card as a block device over NBD, so that Linux mounts it as a folder, all of the card, for the file manager. |
 | `hwtest.py` | Programs the FPGA with openFPGALoader and tests the system on the board. |
 | `flash.py` | Writes a bitstream into the Nexys4DDR's flash, or a core file into a slot of the MEGA65's, from which the board starts. |
 | `linktest.py` | Checks `run.py` and the link on `niceemu --link` against plain `niceemu`, without a board. |
 | `tftpd.py` | A TFTP server for the monitor's `tftp`, which also lists the files of its folder for a name with `*` or `?`. |
-| `sdtest.py` | Checks `sdcard.py` on `niceemu --link` with images of a card, without a board. |
+| `sdtest.py` | Checks `sdcard.py` and `sdnbd.py` on `niceemu --link` with images of a card, without a board. |
 | `tftptest.py` | Checks `tftpd.py`, and the monitor's `tftp` in `niceemu` against it, without a board. |
 | `cosimtest.py` | Checks `run.py` and the RTL on `make cosim` against plain `niceemu`, without a board. |
 | `screenshot.py` | Runs a program in `niceemu` and draws its screen as a PNG picture, as the text display shows it, and with `--debugger` the on-board debugger's strip under it. |
@@ -513,6 +514,58 @@ request waits for the 16 ms latency timer of the FTDI chip. Linux sets the timer
 `/sys/bus/usb-serial/devices/ttyUSB1/latency_timer`, for the board's
 port; the timer, not the baud rate, sets the speed there.
 `make sdtest` checks the tool on `niceemu --link`, without a board.
+
+## sdnbd.py
+
+`sdnbd.py` makes the board's SD card a disk of a Linux PC, so that the
+card is a folder there, and files go to it and come off it with the
+file manager. It is a server of NBD, Linux's network block device, on
+port 10809 of `127.0.0.1`. Its disk is the card: each read and write is
+a read or write of the card's sectors over the link. `nbd-client`
+connects `/dev/nbd0` to it, and the kernel mounts the card's FAT32 as
+any other, all of it, not only `NICE`, with every folder, long names,
+and renames. It needs the `nbd` module and `nbd-client` (package
+`nbd-client` on Debian and Ubuntu), and root for them and the mount:
+
+```
+tools/sdnbd.py --eth 192.168.1.65 &
+sudo modprobe nbd
+sudo nbd-client -N sd localhost /dev/nbd0
+sudo mount -o uid=$(id -u),gid=$(id -g) /dev/nbd0p1 /mnt
+cp prog.bas /mnt/NICE/
+sudo umount /mnt
+sudo nbd-client -d /dev/nbd0
+kill %1
+```
+
+`/dev/nbd0p1` is the first partition of a card with an MBR, as the
+MEGA65's cards have; a card that is FAT32 from sector 0 mounts as
+`/dev/nbd0`. A desktop usually mounts the partition itself once
+`nbd-client` has connected it. `make sdnbd ETH=192.168.1.65` runs the
+server, and `--listen HOST:PORT` moves it.
+
+The core is held from the start until the server ends, with Ctrl-C, and
+then starts again from reset, as after `sdcard.py`'s `put`. The kernel
+keeps the card's FAT and folders in its cache, so a program on the board
+that used the card at the same time would see it stale, and the board
+would see the kernel's. A held core stays held. `--slot` picks the
+slot, as for `sdcard.py`.
+
+Unmount before the server stops: `umount` writes what the kernel kept.
+The kernel writes in its own order, not in the careful order of
+`sdcard.py` and the monitor, so a link that breaks during a write can
+leave the FAT damaged, which `fsck.fat` repairs.
+
+With `--read-only`, the server refuses writes, and the core is paused
+instead of held, and goes on at the end, as for `sdcard.py`'s `ls`. The
+card is then the paused program's, in its slot, which it must have
+started up; `--hold` holds the core all the same, to reach any slot.
+Mount it with `-o ro`.
+
+The speed is that of `sdcard.py`: about 115 KB a second reading and
+80 KB a second writing over Ethernet on an R6, and a hundred times less
+on the serial port. `make sdtest` checks the server with a client of
+its own on `niceemu --link`.
 
 ## The other tools
 

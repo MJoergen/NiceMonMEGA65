@@ -155,7 +155,11 @@ A PC reaches the card by remote control too, with no card reader:
 `make sdcard ETH=192.168.1.65 CMD=ls` lists `NICE`, `CMD="get NAME"`
 copies a file off the card, `CMD="put FILE"` writes one, and
 `CMD="del NAME"` deletes one. After a write, the monitor starts again
-from reset ([tools/README.md](tools/README.md#sdcardpy)).
+from reset ([tools/README.md](tools/README.md#sdcardpy)). On Linux,
+`make sdnbd ETH=192.168.1.65` serves the whole card as a disk, which
+`nbd-client` connects and the PC mounts as a folder, for the file
+manager, while the core is held
+([tools/README.md](tools/README.md#sdnbdpy)).
 
 A program reads and writes files through the monitor's routines
 ([monitor/README.md](monitor/README.md#files)), or drives the SD card

@@ -71,6 +71,9 @@ from __future__ import annotations
 
 import os
 import re
+import signal
+import socket
+import struct
 import subprocess
 import sys
 import tempfile
@@ -86,6 +89,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NICEEMU = os.path.join(REPO, "nice_cpu", "emulator", "zig-out", "bin",
                        "niceemu")
 SDCARD = os.path.join(REPO, "tools", "sdcard.py")
+SDNBD = os.path.join(REPO, "tools", "sdnbd.py")
 HOLD_PROG = os.path.join(REPO, "sim", "sdhold.nasm")
 MONITOR = os.path.join(REPO, "monitor", "build", "monitor_test.bin")
 MB = 1024 * 1024
@@ -793,6 +797,183 @@ def test_write_running(imgs: dict[str, str], tmp: str) -> None:
     check_card(img, "after put on a running core")
 
 
+class NbdClient:
+    """A client of sdnbd.py's NBD server, as nbd-client and the kernel
+    speak to it: the fixed newstyle handshake, with NBD_OPT_GO, or the
+    old NBD_OPT_EXPORT_NAME, and then the requests, with simple replies."""
+
+    def __init__(self, port: int, go: bool = True) -> None:
+        self.sock = socket.create_connection(("127.0.0.1", port), timeout=60)
+        hello = self.recv(18)
+        assert hello[:8] == b"NBDMAGIC", hello
+        self.sock.sendall(struct.pack(">I", 3))
+        self.block: tuple[int, int, int] | None = None
+        if go:
+            data = struct.pack(">I", 2) + b"sd" + struct.pack(">HH", 1, 3)
+            self.sock.sendall(struct.pack(">QII", 0x49484156454F5054, 7,
+                                          len(data)) + data)
+            while True:
+                _, _, kind, n = struct.unpack(">QIII", self.recv(20))
+                reply = self.recv(n)
+                if kind == 1:
+                    break
+                assert kind == 3, f"reply {kind:#x}"
+                (info,) = struct.unpack(">H", reply[:2])
+                if info == 0:
+                    self.size, self.flags = struct.unpack(">QH", reply[2:])
+                elif info == 3:
+                    self.block = struct.unpack(">III", reply[2:])
+        else:
+            self.sock.sendall(struct.pack(">QII", 0x49484156454F5054, 1, 0))
+            self.size, self.flags = struct.unpack(">QH", self.recv(10))
+        self.cookie = 0
+
+    def recv(self, n: int) -> bytes:
+        data = b""
+        while len(data) < n:
+            got = self.sock.recv(n - len(data))
+            if not got:
+                raise ConnectionError("sdnbd.py closed the connection")
+            data += got
+        return data
+
+    def request(self, kind: int, offset: int, length: int,
+                data: bytes = b"") -> tuple[int, bytes]:
+        """The error of the reply, and the bytes of a read."""
+        self.cookie += 1
+        self.sock.sendall(struct.pack(">IHHQQI", 0x25609513, 0, kind,
+                                      self.cookie, offset, length) + data)
+        magic, error, cookie = struct.unpack(">IIQ", self.recv(16))
+        assert magic == 0x67446698 and cookie == self.cookie
+        return error, (self.recv(length) if kind == 0 and not error
+                       else b"")
+
+    def read(self, offset: int, length: int) -> bytes:
+        error, data = self.request(0, offset, length)
+        assert not error, f"read error {error}"
+        return data
+
+    def close(self) -> None:
+        self.sock.sendall(struct.pack(">IHHQQI", 0x25609513, 0, 2, 0, 0, 0))
+        self.sock.close()
+
+
+def start_nbd(emu: Emu, *args: str) -> tuple[subprocess.Popen[bytes], int]:
+    """sdnbd.py on the link of emu, on a free port: the process, and the
+    port. niceemu takes a new host only after it has seen the last one
+    close, so a start that got no connection is tried again for a while."""
+    end = time.monotonic() + 2
+    while True:
+        proc = subprocess.Popen([sys.executable, SDNBD, "--tcp", emu.port,
+                                 "--listen", "127.0.0.1:0", *args],
+                                stderr=subprocess.PIPE)
+        assert proc.stderr is not None
+        line = proc.stderr.readline().decode(errors="replace")
+        m = re.search(r" on 127\.0\.0\.1:(\d+)", line)
+        if m:
+            proc.stderr.readline()
+            return proc, int(m.group(1))
+        proc.wait()
+        if time.monotonic() > end:
+            sys.exit(f"sdtest.py: sdnbd.py printed {line!r}")
+        time.sleep(0.05)
+
+
+def stop_nbd(proc: subprocess.Popen[bytes]) -> str:
+    """Stops sdnbd.py, as Ctrl-C does: what it printed after its start."""
+    proc.send_signal(signal.SIGTERM)
+    assert proc.stderr is not None
+    err = proc.stderr.read().decode(errors="replace")
+    proc.wait()
+    return err
+
+
+def test_nbd(imgs: dict[str, str], tmp: str) -> None:
+    print("sdnbd.py, the card as a block device, on a running core, "
+          "sim/sdhold.nasm")
+    img = copy(imgs["super"], os.path.join(tmp, "nbd.img"))
+    # What a host's mount would write: a new folder and file, made with
+    # mtools on a copy, whose sectors that differ are written over NBD
+    want = copy(img, os.path.join(tmp, "nbdwant.img"))
+    run("mmd", "-i", want, "::NICE/HOSTDIR")
+    put(want, bytes((i * 11) & 0xFF for i in range(5000)),
+        "NICE/HOSTDIR/From the host.bin", tmp)
+    with open(img, "rb") as f:
+        old = f.read()
+    with open(want, "rb") as f:
+        new = f.read()
+    changed = [lba for lba in range(len(new) // 512)
+               if old[512 * lba:512 * lba + 512] !=
+               new[512 * lba:512 * lba + 512]]
+    emu = Emu(img)
+    start_hold(emu, tmp, True)
+    proc, port = start_nbd(emu)
+    try:
+        c = NbdClient(port)
+        check("NBD_OPT_GO: the card's size, writable",
+              c.size == len(old) and c.flags & 2 == 0,
+              f"{c.size} bytes, flags {c.flags:#x}")
+        check("NBD_OPT_GO: block sizes of 512, 4096, and 32 MB",
+              c.block == (512, 4096, 32 * MB), str(c.block))
+        check("read sector 0", c.read(0, 512) == old[:512])
+        check("read 3000 bytes from byte 1000",
+              c.read(1000, 3000) == old[1000:4000])
+        check("read the last sector",
+              c.read(len(old) - 512, 512) == old[-512:])
+        error, _ = c.request(0, len(old) - 512, 1024)
+        check("read past the end: EINVAL", error == 22, str(error))
+        ok = True
+        for lba in changed:
+            # Each sector in two writes, split off its boundaries
+            at = 512 * lba
+            for a, b in ((at, at + 100), (at + 100, at + 512)):
+                error, _ = c.request(1, a, b - a, new[a:b])
+                ok = ok and error == 0
+        check(f"write {len(changed)} sectors, in parts", ok)
+        ok = all(c.read(512 * lba, 512) == new[512 * lba:512 * lba + 512]
+                 for lba in changed)
+        check("and read them back", ok)
+        error, _ = c.request(3, 0, 0)
+        check("flush", error == 0, str(error))
+        c.close()
+        c = NbdClient(port, go=False)
+        check("a second connection, with NBD_OPT_EXPORT_NAME",
+              c.size == len(old) and c.read(0, 512) == new[:512])
+        c.close()
+    finally:
+        err = stop_nbd(proc)
+        emu.close()
+    check("stopped, and the core started again from reset",
+          proc.returncode == 0 and "started again from reset" in err, err)
+    with open(img, "rb") as f:
+        check("the card is as mtools made the copy", f.read() == new)
+    check("mtype what the host wrote",
+          mtype(img, "HOSTDIR/From the host.bin") ==
+          bytes((i * 11) & 0xFF for i in range(5000)))
+    check_card(img, "after the writes over NBD")
+    print("sdnbd.py --read-only")
+    emu = Emu(imgs["mbr"])
+    proc, port = start_nbd(emu, "--read-only")
+    try:
+        c = NbdClient(port)
+        check("read-only", c.flags & 2 == 2, f"flags {c.flags:#x}")
+        with open(imgs["mbr"], "rb") as f:
+            mbr = f.read(MB + 512)
+        check("read the MBR and the partition's boot sector",
+              c.read(0, 512) == mbr[:512] and
+              c.read(MB, 512) == mbr[MB:])
+        error, _ = c.request(1, 0, 512, bytes(512))
+        check("a write: EPERM", error == 1, str(error))
+        c.close()
+    finally:
+        err = stop_nbd(proc)
+        emu.close()
+    check("stopped, the held core left held",
+          proc.returncode == 0 and "started again" not in err, err)
+    with open(imgs["mbr"], "rb") as f:
+        check("and the card is as it was", f.read(MB + 512) == mbr)
+
+
 def prompt(emu_link: Link, wait: float = 2.0) -> None:
     """Waits for the monitor's first prompt, after its start."""
     out = b""
@@ -886,6 +1067,7 @@ def main() -> None:
         test_protected(imgs, tmp)
         test_write_running(imgs, tmp)
         test_monitor(imgs, tmp)
+        test_nbd(imgs, tmp)
     print(f"{passed} passed, {failed} failed")
     sys.exit(1 if failed else 0)
 

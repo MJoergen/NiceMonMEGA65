@@ -449,7 +449,9 @@ There are no device numbers and no Commodore DOS.
   --link` with images made by `mkfs.fat`, `sfdisk`, and `mcopy`, on a held
   core and on a running one that has the card in use. After its writes,
   `fsck.fat -n` checks the images, and `mdir` and `mtype` what is on
-  them, and the monitor of the tests lists and loads what it put.
+  them, and the monitor of the tests lists and loads what it put. It
+  also runs `tools/sdnbd.py`, the card as a block device over NBD, with
+  a client of its own.
 
 ## Not included
 
@@ -496,4 +498,5 @@ ROM is developed in niceemu and needs no board.
 | The folder `NICE`, set at build time | Done in V1.9 |
 | FAT32 writing, `save`, and `del` | Done in V1.9.1 |
 | `tools/sdcard.py`, the files on the board's card over the link: `ls`, `get`, `put`, and `del`, which reset the core after a write | Done in V1.9.1 |
+| `tools/sdnbd.py`, the whole card as a block device of a Linux host over NBD, for a mount, while the core is held | Done |
 | BASIC's `SAVE`, `LOAD`, and `DIR` | Not yet |

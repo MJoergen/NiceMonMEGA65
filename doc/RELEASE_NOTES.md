@@ -80,6 +80,11 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 - `run.py --symbols` names wasm trap 8, `memory beyond the byte windows`,
   as niceemu does
   ([#101](https://github.com/MJoergen/NiceMonMEGA65/issues/101)).
+- `tools/sdnbd.py`, and `make sdnbd`, serve the board's SD card over
+  the link as a disk of Linux's network block device, which
+  `nbd-client` connects and the PC mounts as a folder, all of the card,
+  for the file manager. The core is held meanwhile, and starts again
+  from reset at the end ([tools/README.md](../tools/README.md#sdnbdpy)).
 
 **Changed.**
 
