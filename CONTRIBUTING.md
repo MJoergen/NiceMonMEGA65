@@ -135,6 +135,8 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
 - `devices.vhd` has nice_cpu's devices at `0xFFFFFF10`–`7F`, and the
   SD card controller, the network station, and the port for Ethernet
   frames at `0xFFFFFFA0`–`CF`.
+- `bus_pkg.vhd` has `gate()`, with which `devices.vhd` and `nicemon.vhd`
+  pick their read data.
 - `scr_regs.vhd` has the screen's registers at `0xFFFFFF80`–`8F`.
 - `board_io.vhd` has the board's registers at `0xFFFFFF90`–`9F`, and
   `uart_pkg.vhd` the UART's baud rates, which it shares with the
@@ -274,7 +276,10 @@ The testbenches are these:
   nothing; and F5 and `m` switch between the two pages. A second run,
   with `sim/dbg_wait.nasm` in the ROM, a `WAIT` that no request ends,
   shows WAITING, PAUSED W after F3, with the PC at the HALT after the
-  `WAIT`, and WAITING after F3 again.
+  `WAIT`, and WAITING after F3 again. A third run, with
+  `sim/dbg_watch.nasm`, which reads one word for good, writes a
+  watchpoint on its reads from the page, and shows WCH 1 after `g`, with
+  the PC after the read, PAUSED after `s`, and WCH 1 after `g` again.
 - `sim/tb_dbg_decode.vhd` tests the decode of the debugger's row 27
   (`src/dbg/dbg_decode.vhd`) against nicedis: `sim/gen_decode.py`
   writes about 3000 instruction words of every class, condition,

@@ -106,7 +106,7 @@ state of an interrupt routine, and watchpoints, and its registers start
 at `0xFFFFFFD0`. Bits 6 to 10 of the control register read the wait, the
 hidden state, and the pending requests, and `0xFFFFFFD0` and `D1`
 `saved_pc` and `saved_sr` (see [The control register](#the-control-register)).
-The board has no watchpoints yet: their number at `0xFFFFFFD5` is 0.
+The board has four watchpoints: their number at `0xFFFFFFD5` is 4.
 A host of version 6 works unchanged.
 
 A terminal on the line, a plain TCP client such as `nc` on the Ethernet

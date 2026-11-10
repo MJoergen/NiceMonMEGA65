@@ -83,6 +83,13 @@
 -- ends, and only this runs after step 1: the toggle enters Focus with the
 -- core WAITING, F3 pauses it, PAUSED W, with the PC at the HALT after the
 -- WAIT, and F3 goes on, WAITING again.
+--
+-- With G_WATCH, G_ROM_FILE is sim/dbg_watch.nasm, which reads one word for
+-- good, and only this runs after step 1: F3 pauses the core, the page
+-- writes the enable bit of the reads of watchpoint 1 at 0xFFFFFFD4 and the
+-- word's address at 0xFFFFFFD9, and g goes on to the stop after the read:
+-- WCH 1, with the PC at the JMP after the read. s steps to the read,
+-- PAUSED, and g goes on to the stop again.
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -95,7 +102,9 @@ entity tb_dbg is
    generic (
       G_ROM_FILE : string;
       -- G_ROM_FILE is sim/dbg_wait.nasm, and only the steps of G_WAIT run
-      G_WAIT     : boolean := false
+      G_WAIT     : boolean := false;
+      -- G_ROM_FILE is sim/dbg_watch.nasm, and only the steps of G_WATCH run
+      G_WATCH    : boolean := false
    );
 end entity tb_dbg;
 
@@ -601,6 +610,35 @@ begin
          key(C_ESC & "OR");
          expect_row27("WAITING ", "after F3 again in a wait");
          report "tb_dbg: G_WAIT done";
+         stop(0);
+      end if;
+
+      if G_WATCH then
+         report "tb_dbg: G_WATCH. the state at a watchpoint";
+         pulse;
+         expect('1', '0', '1', "after the toggle");
+         expect_row27("RUNNING ", "before the watchpoint");
+         key(C_ESC & "OR");
+         expect_row27("PAUSED   ", "after F3");
+         key("m");
+         key("affffffd4" & C_CR);
+         wait_text(0, 0, " Window FFFFFFD4  Cursor FFFFFFD4 ");
+         key("4" & C_CR);
+         wait_text(23, 20, "written   ");
+         wait_text(1, 0, "FFFFFFD4 00000004 00000004 ");
+         for i in 1 to 5 loop
+            key(C_ESC & "[C");
+         end loop;
+         wait_text(0, 0, " Window FFFFFFD4  Cursor FFFFFFD9 ");
+         key("800" & C_CR);
+         wait_text(1, 0, "FFFFFFD4 00000004 00000004 00000000 00000000 00000000 00000800 ");
+         key("g");
+         expect_row27("WCH 1    00000003", "at watchpoint 1");
+         key("s");
+         expect_row27("PAUSED   00000002", "after s at watchpoint 1");
+         key("g");
+         expect_row27("WCH 1    00000003", "at watchpoint 1 again");
+         report "tb_dbg: G_WATCH done";
          stop(0);
       end if;
 

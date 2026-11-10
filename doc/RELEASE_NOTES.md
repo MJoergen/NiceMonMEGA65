@@ -56,6 +56,15 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   ([#98](https://github.com/MJoergen/NiceMonMEGA65/issues/98)).
   `nicedbg status` shows them on the board, and the on-board debugger's
   state is `WAITING` in a wait, and `PAUSED W` paused in one (#93).
+- The four watchpoints of link version 7 at `0xFFFFFFD4`–`DB`
+  ([#99](https://github.com/MJoergen/NiceMonMEGA65/issues/99)): a host
+  sets them, `mon.py` among them, and the core pauses after a step that
+  read or wrote a watched word. The on-board debugger's state is
+  `WCH n` then. The pipelined core runs more slowly while one is
+  enabled.
+- The clock of the time of day at `0xFFFFFF46`–`49`
+  ([#97](https://github.com/MJoergen/NiceMonMEGA65/issues/97)), from
+  the board's clock. It holds no time until a program sets it.
 
 - The byte windows of nice_cpu's SYSTEM.md §9 at `0x10000000`–`0x5FFFFFFF`
   ([#90](https://github.com/MJoergen/NiceMonMEGA65/issues/90)): a data
@@ -80,10 +89,6 @@ control word (#93).
 **Fixed.** A link read of the fonts while the core was held could go
 unanswered, when the read before it had been the core's, so that the
 host waited for its answer in vain (#90).
-
-**Not yet on the board.** The watchpoints of link version 7 (#99) and
-the clock of the time of day (#97).
-[EMULATOR.md](EMULATOR.md) lists them.
 
 ## V1.9.1 (2026-11-08)
 

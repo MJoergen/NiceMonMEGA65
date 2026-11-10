@@ -52,7 +52,9 @@
 -- paused`, and any other code as `e` and its two digits. Until the
 -- first answer after reset the state is NO LINK. Bit 6 of the control
 -- register shows a wait for an interrupt: WAITING while the core runs,
--- and PAUSED W while it is paused.
+-- and PAUSED W while it is paused. Bit 9 of the stop register shows a
+-- stop at a watchpoint, WCH n, as bit 8 one at a breakpoint, BRK n; the
+-- debugger sets no watchpoints itself.
 --
 -- p_kbd turns the keyboard's bytes into the keys of DEBUGGER.md: F1 or s
 -- steps a paused core, F3 pauses a running core and goes on from a paused
@@ -578,8 +580,8 @@ architecture synthesis of dbg is
    constant C_MSGS   : t_msgs   := msgs;
 
    -- The names of the states, in C_STATE_LEN characters each, and the
-   -- position of the digit of BRK n and HALTED n
-   type t_names is array (0 to 7, 0 to C_STATE_LEN - 1) of t_byte;
+   -- position of the digit of BRK n, WCH n, and HALTED n
+   type t_names is array (0 to 8, 0 to C_STATE_LEN - 1) of t_byte;
 
    constant C_ST_NOLINK  : natural := 0;
    constant C_ST_RUNNING : natural := 1;
@@ -589,14 +591,15 @@ architecture synthesis of dbg is
    constant C_ST_HELD    : natural := 5;
    constant C_ST_WAITING : natural := 6;
    constant C_ST_PAUSEDW : natural := 7;
+   constant C_ST_WCH     : natural := 8;
 
    function names return t_names is
-      type     t_strings is array (0 to 7) of string(1 to C_STATE_LEN);
+      type     t_strings is array (0 to 8) of string(1 to C_STATE_LEN);
       constant C_S   : t_strings := ("NO LINK  ", "RUNNING  ", "PAUSED   ", "BRK      ", "HALTED   ", "HELD     ",
-         "WAITING  ", "PAUSED W ");
+         "WAITING  ", "PAUSED W ", "WCH      ");
       variable res_v : t_names;
    begin
-      for s in 0 to 7 loop
+      for s in 0 to 8 loop
          for i in 0 to C_STATE_LEN - 1 loop
             res_v(s, i) := to_byte(C_S(s)(i + 1));
          end loop;
@@ -790,7 +793,7 @@ architecture synthesis of dbg is
    -- What the debugger knows of the core
    signal ctrl_r    : t_word := (others => '0');
    signal reason_r  : t_byte := (others => '0');
-   signal stop_r    : std_logic_vector(8 downto 0) := (others => '0');
+   signal stop_r    : std_logic_vector(9 downto 0) := (others => '0');
    signal regs_r    : t_words := (others => (others => '0'));
    signal instr_r   : t_word := (others => '0');
    signal brk_en_r  : std_logic_vector(C_BRKS - 1 downto 0) := (others => '0');
@@ -808,7 +811,7 @@ architecture synthesis of dbg is
    signal dec_chars : t_dec(0 to C_DEC_LEN - 1);
    signal dec_valid : std_logic;
    signal dec_done  : std_logic;
-   signal st_code   : natural range 0 to 7;
+   signal st_code   : natural range 0 to 8;
 
    -- The words of the window, read when the core is stopped
    signal mem_ram  : t_mem;
@@ -1461,7 +1464,7 @@ begin
                         else
                            brk_n <= C_BRKS;
                         end if;
-                     when 6      => stop_r <= rd_data(8 downto 0);
+                     when 6      => stop_r <= rd_data(9 downto 0);
                      when 8 to 11 => brk_r(rd_idx mod 4) <= rd_data;
                      when others => null;
                   end case;
@@ -1830,6 +1833,7 @@ begin
    st_code <= C_ST_NOLINK when link_ok = '0' else
               C_ST_HALTED when ctrl_r(1) = '1' else
               C_ST_HELD when ctrl_r(0) = '1' else
+              C_ST_WCH when ctrl_r(4) = '1' and stop_r(9) = '1' else
               C_ST_BRK when ctrl_r(4) = '1' and stop_r(8) = '1' else
               C_ST_PAUSEDW when ctrl_r(4) = '1' and ctrl_r(6) = '1' else
               C_ST_PAUSED when ctrl_r(4) = '1' else
@@ -1981,7 +1985,7 @@ begin
                s2_dim   <= not regs_live;
             when CELL_STATE =>
                s2_ch <= C_NAMES(st_code, s1_cell.idx mod C_STATE_LEN);
-               if st_code = C_ST_BRK and s1_cell.idx = C_BRK_DIG then
+               if (st_code = C_ST_BRK or st_code = C_ST_WCH) and s1_cell.idx = C_BRK_DIG then
                   s2_ch <= hex_char(stop_r(3 downto 0));
                end if;
                if st_code = C_ST_HALTED and s1_cell.idx = C_HALT_DIG then

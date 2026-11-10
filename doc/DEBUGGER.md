@@ -101,7 +101,8 @@ on dark blue, `0x004` and `0xFFF`:
 - Row 27: the core's state, `RUNNING`, `WAITING` while it waits for an
   interrupt after `WAIT` (bit 6 of the control register, link version
   7), `PAUSED`, `PAUSED W` while it is paused in a wait, `BRK n` at
-  breakpoint n, `HALTED n` with the reason of DEBUG.md §6, `HELD`, or `NO LINK`
+  breakpoint n, `WCH n` after a step that hit watchpoint n, which only a
+  host of the link sets (DEBUG.md §6), `HALTED n` with the reason of DEBUG.md §6, `HELD`, or `NO LINK`
   until the link has answered after reset; the PC; the
   instruction word at the PC; the flags of SR, X, C, Z, N, V, E, and I,
   each shown or a dot; and the instruction decoded, from column 46: the

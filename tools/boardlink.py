@@ -47,8 +47,9 @@ __all__ = [
     "NET_TX", "add_arguments", "open_link",
 ]
 
-# The first of the debug registers, which only the link reaches
-DEBUG_FIRST = 0xFFFFFFE0
+# The first of the debug registers, which only the link reaches (link
+# version 7; 0xFFFFFFE0 before it)
+DEBUG_FIRST = 0xFFFFFFD0
 # The board's UART baud rate in bit/s, 230400 after reset, nice_cpu's
 # DEFAULT_BAUD, and the rates it takes (doc/SYSTEM.md); niceemu has plain
 # memory there

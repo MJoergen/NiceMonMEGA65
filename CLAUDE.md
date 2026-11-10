@@ -89,7 +89,8 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   the core's input FIFO (`rx_fifo.vhd`), nice_cpu's devices at
   `FFFFFF10`–`7F` (`devices.vhd`), the board's registers at
   `FFFFFF90`–`9F` (`board_io.vhd`) and the screen's at `FFFFFF80`–`8F`
-  (`scr_regs.vhd`), the UART's baud rates (`uart_pkg.vhd`, which
+  (`scr_regs.vhd`), the gate of their read data (`bus_pkg.vhd`), the
+  UART's baud rates (`uart_pkg.vhd`, which
   `board_io.vhd` and the debugger share), the keyboards (`kbd_m65.vhd` and
   `kbd_m65_ascii.vhd` for the MEGA65, `kbd_ps2.vhd` and `kbd_ps2_ascii.vhd` for
   the Nexys4DDR's PS/2, and the debugger's toggle keys, `kbd_m65_toggle.vhd`
@@ -188,7 +189,7 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   clear, and hide, then `00000008` to run), so a program loads at 0 as in
   the emulator.
 - While the core runs, the link reaches only its debug registers at
-  `FFFFFFE0`–`FF`, and the link reads the console and the read counter as
+  `FFFFFFD0`–`FF`, and the link reads the console and the read counter as
   0. A hold of a running core leaves R0–R15 undefined. Bit 4 pauses the
   core (link version 2): the link sends `p`, and reaches everything while
   paused, with R0–R15 defined and the counters stopped. Bits 4 and 5 step
@@ -198,7 +199,10 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   `p`. In version 5 a clear ends the halt: bit 1 of the control register,
   the halt reason, and the stop register become 0. Version 6 writes
   R1–R15 while paused, and over Ethernet a console byte waits up to
-  50 ms for room in the full FIFO before it is lost.
+  50 ms for room in the full FIFO before it is lost. Version 7 starts
+  the registers at `FFFFFFD0`, and has `G_WATCHES` watchpoints, 4 on
+  every board, at `FFFFFFD4`–`DB`: the core pauses after a step that hit
+  one, and the link sends `w`.
 - The tools take `--eth HOST[:PORT]` for the board's link over TCP on
   its Ethernet port, 4510 by default, once 0xFFFFFFB0 gives it an IP
   address. It is the line, as the UART is: no `b` notice at connect, and

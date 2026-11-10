@@ -152,7 +152,8 @@ does.
 
 The strip shows R0 to R15, live while the program runs; the state,
 `RUNNING`, `WAITING` in a wait for an interrupt, `PAUSED`, `PAUSED W`
-paused in a wait, `BRK n` at breakpoint n, `HALTED n` with the reason,
+paused in a wait, `BRK n` at breakpoint n, `WCH n` at watchpoint n,
+which a host sets, `HALTED n` with the reason,
 or `HELD`; the PC, the instruction word there, and the flags of
 the status register; the instruction decoded, in the assembler's
 syntax; and the keys:

@@ -76,7 +76,7 @@ include ../core.mk
 NICE_SIM = $(NICE_DIR)/hdl/sim/wb_mem.vhd $(NICE_DIR)/hdl/sim/eth_sim.vhd
 
 SRC_SOURCES  = ../src/uart_serdes.vhd ../src/rx_fifo.vhd ../src/ram.vhd ../src/rom.vhd \
-               ../src/uart_pkg.vhd ../src/board_io.vhd ../src/scr_regs.vhd ../src/sd/sd_spi_byte.vhd ../src/sd/sd_spi.vhd ../src/sd/sd.vhd ../src/devices.vhd ../src/mem.vhd ../src/nicemon.vhd \
+               ../src/uart_pkg.vhd ../src/bus_pkg.vhd ../src/board_io.vhd ../src/scr_regs.vhd ../src/sd/sd_spi_byte.vhd ../src/sd/sd_spi.vhd ../src/sd/sd.vhd ../src/devices.vhd ../src/mem.vhd ../src/nicemon.vhd \
                ../src/kbd_m65.vhd ../src/kbd_m65_ascii.vhd ../src/kbd_ps2.vhd ../src/kbd_ps2_ascii.vhd ../src/seg7.vhd ../src/rgb_pwm.vhd \
                ../src/kbd_m65_toggle.vhd ../src/kbd_ps2_toggle.vhd ../src/dbg/dbg_host.vhd ../src/dbg/dbg_decode.vhd ../src/dbg/dbg_set.vhd ../src/dbg/dbg.vhd \
                ../src/video/video_pkg.vhd ../src/video/font_pkg.vhd ../src/video/pix.vhd ../src/video/scr_ram.vhd ../src/video/font_ram.vhd ../src/video/font_rom.vhd ../src/video/font.vhd ../src/video/text.vhd \
@@ -173,10 +173,12 @@ tb_ps2_nicemon: analyze $(BUILD)/fifo.bin $(BUILD)/switch.bin
 	  -gG_FIFO_FILE=fifo.bin -gG_SWITCH_FILE=switch.bin --ieee-asserts=disable > tb_ps2_nicemon.log 2>&1) && \
 	  echo "PASS tb_ps2_nicemon" || (echo "FAIL tb_ps2_nicemon"; cat $(BUILD)/tb_ps2_nicemon.log; exit 1)
 
-tb_dbg: analyze $(BUILD)/dbg.bin $(BUILD)/dbg_wait.bin
+tb_dbg: analyze $(BUILD)/dbg.bin $(BUILD)/dbg_wait.bin $(BUILD)/dbg_watch.bin
 	@(cd $(BUILD) && $(GHDL) --elab-run $(GHDLFLAGS) tb_dbg -gG_ROM_FILE=dbg.bin --ieee-asserts=disable \
 	  > tb_dbg.log 2>&1 && \
 	  $(GHDL) --elab-run $(GHDLFLAGS) tb_dbg -gG_ROM_FILE=dbg_wait.bin -gG_WAIT=true --ieee-asserts=disable \
+	  >> tb_dbg.log 2>&1 && \
+	  $(GHDL) --elab-run $(GHDLFLAGS) tb_dbg -gG_ROM_FILE=dbg_watch.bin -gG_WATCH=true --ieee-asserts=disable \
 	  >> tb_dbg.log 2>&1) && \
 	  echo "PASS tb_dbg" || (echo "FAIL tb_dbg"; cat $(BUILD)/tb_dbg.log; exit 1)
 
@@ -302,6 +304,9 @@ $(BUILD)/dbg.bin: dbg.nasm $(ASM_PY) | $(BUILD)
 	@$(ASM) -o $@ $<
 
 $(BUILD)/dbg_wait.bin: dbg_wait.nasm $(ASM_PY) | $(BUILD)
+	@$(ASM) -o $@ $<
+
+$(BUILD)/dbg_watch.bin: dbg_watch.nasm $(ASM_PY) | $(BUILD)
 	@$(ASM) -o $@ $<
 
 $(BUILD)/host.bin: host.nasm $(ASM_PY) | $(BUILD)

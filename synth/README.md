@@ -285,7 +285,7 @@ These are the worst setup and hold slacks, in ns:
 | Build | Clock | Setup | Hold |
 |---|---|---|---|
 | R6, pipelined, default flow | 100 MHz | **−0.526**, 324 endpoints | 0.069 |
-| R6, pipelined, `FLOW=timing` | 100 MHz | 0.001 | 0.043 |
+| R6, pipelined, `FLOW=timing` | 100 MHz | 0.008 | 0.070 |
 | R6, `NICE=multi` | 100 MHz | 0.187 | 0.075 |
 | R3, pipelined, default flow | 100 MHz | **−0.073**, 2 endpoints | 0.035 |
 | R3, pipelined, `FLOW=timing` | 100 MHz | 0.126 | 0.041 |

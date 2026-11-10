@@ -265,8 +265,8 @@ byte, so the output ends there.
 
 - `-d ADDR:N` takes numbers as `niceemu` does, up to 32 bits, with no sign
   or underscore, but N is at most 131072 words.
-- The words at `0xFFFFFFE0` to `0xFFFFFFFF` are read through their RAM
-  alias, `0x0001FFE0` to `0x0001FFFF` on the MEGA65 and `0x0000FFE0` to
+- The words at `0xFFFFFFD0` to `0xFFFFFFFF` are read through their RAM
+  alias, `0x0001FFD0` to `0x0001FFFF` on the MEGA65 and `0x0000FFD0` to
   `0x0000FFFF` on the Nexys4DDR, for the link has its debug registers
   there. The link reads the console and the read counter,
   `0xFFFFFF00` and `01`, as 0.
@@ -316,7 +316,7 @@ trusted network. Elsewhere, forward the port over SSH instead:
     tools/mon.py --tcp 4510
 
 With `--tcp`, the end of the input half-closes the connection, and `-d`
-cannot reach `0xFFFFFFE0`–`FF`, which are the emulator's memory.
+cannot reach `0xFFFFFFD0`–`FF`, which are the emulator's memory.
 
 ### Step counts
 
@@ -381,7 +381,7 @@ here. Leaving changes nothing on the board: a running program goes on.
   RAM and the screen, or beyond the RAM that `0xFFFFFF9E` reads.
 - The MEGA65 and the Nexys4DDR have 4 breakpoints.
 - While the core runs, the link reaches only its debug registers at
-  `FFFFFFE0`–`FF`. Pause or hold the core to read the rest. `regs`
+  `FFFFFFD0`–`FF`. Pause or hold the core to read the rest. `regs`
   shows R0 to R15 live while it runs.
 - Bytes sent while the core is held in reset or has halted are dropped,
   and bytes sent while it is paused wait for it.

@@ -341,6 +341,7 @@ library ieee;
 library work;
    use work.trace_pkg.all;
    use work.pipe_pkg.all;
+   use work.bus_pkg.all;
 
 entity nicemon is
    generic (
@@ -575,13 +576,6 @@ architecture synthesis of nicemon is
    constant C_SRC_IO  : t_src := "000001";
    constant C_SRC_RX  : t_src := "010000";
    constant C_SRC_DEV : t_src := "100000";
-
-   -- word if sel is '1', else 0
-   function gate(word : std_logic_vector(31 downto 0);
-                 sel  : std_logic) return std_logic_vector is
-   begin
-      return word and (31 downto 0 => sel);
-   end function gate;
 
    -- Core
    signal cpu_rst    : std_logic;

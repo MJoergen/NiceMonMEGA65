@@ -194,7 +194,7 @@ def dump_option(text: str) -> tuple[int, int]:
 
 def dump_address(link: Link, addr: int, ram: int) -> int:
     """The address to read a dumped word at. The link sees its debug
-    registers at 0xFFFFFFE0-FF, where the core and niceemu see memory. On
+    registers at 0xFFFFFFD0-FF, where the core and niceemu see memory. On
     the board that memory is the top of its RAM of ram words, which the
     link reads instead. The emulator's memory there is out of the link's
     reach."""

@@ -79,6 +79,7 @@ library ieee;
 library work;
    use work.trace_pkg.all;
    use work.pipe_pkg.all;
+   use work.bus_pkg.all;
 
 entity devices is
    generic (
@@ -219,13 +220,6 @@ architecture synthesis of devices is
       res_v(t_dev'pos(dev)) := '1';
       return res_v;
    end function onehot;
-
-   -- word if sel is '1', else 0
-   function gate(word : std_logic_vector(31 downto 0);
-                 sel  : std_logic) return std_logic_vector is
-   begin
-      return word and (31 downto 0 => sel);
-   end function gate;
 
    -- The link's latched request
    signal busy      : std_logic := '0';
