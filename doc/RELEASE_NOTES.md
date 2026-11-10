@@ -21,7 +21,7 @@ The release candidates pinned these:
 
 nice_cpu's `RC01` and `RC03` have no tag here.
 
-## V2.0
+## V2.0 (2026-11-10)
 
 **Upgrade notes.**
 
@@ -65,7 +65,6 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 - The clock of the time of day at `0xFFFFFF46`–`49`
   ([#97](https://github.com/MJoergen/NiceMonMEGA65/issues/97)), from
   the board's clock. It holds no time until a program sets it.
-
 - The byte windows of nice_cpu's SYSTEM.md §9 at `0x10000000`–`0x5FFFFFFF`
   ([#90](https://github.com/MJoergen/NiceMonMEGA65/issues/90)): a data
   access there reaches a word, a byte, or a halfword of the RAM, with
