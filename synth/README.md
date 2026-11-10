@@ -39,8 +39,9 @@ too ([monitor/](../monitor/INTERNALS.md#building-and-testing)). With
 
 the core boots at reset from a ROM of 32K words at address 0 with the words
 of the `.bin` file (`src/rom.vhd`, through `G_ROM_FILE` of `top.vhd`), as
-[SYSTEM.md](../doc/SYSTEM.md#the-rom) describes. Vivado reads the file during
-synthesis, so the bitstream is rebuilt when it changes. `make r6
+[PROGRAMMING.md](../doc/PROGRAMMING.md#programs-in-the-rom) describes. Vivado reads the file during
+synthesis, so the bitstream is rebuilt when it changes, and a word
+beyond the ROM fails the build. `make r6
 ROM=monitor.bin` in the top directory does the same with a path relative
 to it.
 

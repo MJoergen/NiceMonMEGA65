@@ -2,7 +2,7 @@
 
 This is the system that a program and the debug link see on the MEGA65 R3
 and R6, and on the Nexys4DDR: the address map, the screen and the font,
-the keyboard, the ROM, the Nexys4DDR's devices, the Ethernet station,
+the keyboard, the Nexys4DDR's devices, the Ethernet station,
 which every board has, with the port for frames, and the SD card slots.
 [DEBUG_LINK.md](DEBUG_LINK.md) has the debug link: its words, the
 control register, the UART's baud rate, and the link over TCP. It
@@ -25,7 +25,7 @@ effect and does not write ([DEBUG.md §3](https://github.com/MJoergen/nice_cpu/b
 | Address | What it is |
 |---|---|
 | `0x00000000`–`0xFFFFFFFF` | Memory, where no register below is: block RAM, 128K words on the MEGA65 and 64K on the Nexys4DDR, repeated through the address space. `0xFFFFFF9E` reads the number of words. So the runtime's stack below `0xFFFFFF00` lands in the top of it, and so do the words of `0xFFFFFF00`–`FF` that are not registers. |
-| `0x00000000`–`0x00007FFF` | The ROM, in a bitstream built with one, in front of the RAM and repeating with it (see [The ROM](#the-rom)). Bit 3 of the control register hides it. |
+| `0x00000000`–`0x00007FFF` | The ROM, 32K words, in a bitstream built with one, in front of the RAM and repeating with it. The core boots from it at reset, instead of waiting held for a host. A write to it is dropped, and a clear does not touch it. Bit 3 of the control register hides it, and the RAM under it keeps its words meanwhile ([DEBUG_LINK.md](DEBUG_LINK.md#the-control-register)). [PROGRAMMING.md](PROGRAMMING.md#programs-in-the-rom) has what a program in the ROM must do. |
 | `0x10000000`–`0x5FFFFFFF` | The byte windows of [nice_cpu's SYSTEM.md §9](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#9-byte-windows): a word, a byte, or a halfword of the RAM, or of the ROM while it is shown, at a byte address, for the core's data accesses and the link (see [The byte windows](#the-byte-windows)). |
 | `0xFFFE0000`–`0xFFFE1FFF` | The font RAM of [nice_cpu's SYSTEM.md §1.8](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#18-font): 256 glyphs of 32 rows, one word a row, read and written, with bits 31..16 reading 0. It is 0 at power-up and after a clear, and a start keeps it (see [The font](#the-font)). |
 | `0xFFFE2000`–`0xFFFE3FFF` | The character ROM: Spleen, in the layout of the font RAM. A write is dropped. |
@@ -332,40 +332,6 @@ LED is green while the core runs, like the user LED.
 The bytes of a key wait until the core's input has room for them, and
 the keyboard is not scanned meanwhile, so a key that is pressed and
 released while they wait is lost. A key held down until then is not.
-
-## The ROM
-
-A bitstream built with `make r6 ROM=file.bin` (or `make r3 ...`), or with
-`demo/build/rom.bin`, the monitor and the demo, by default, has a ROM of 32K words at `0x0000`–`0x7FFF`, in
-front of the RAM, with the words of the `.bin` file, and its core boots
-from it at reset instead of waiting held for a host. That is the layout of QNICE-FPGA, whose monitor is in ROM at
-`0x0000`–`0x7FFF` and whose programs load at `0x8000`, and the
-[monitor](../monitor/README.md) is built for it. The release's ROM holds
-the monitor, and behind it the demo, which the monitor's `x` copies to
-`0x8000` and runs there ([demo/](../demo/README.md)). The file is read by Vivado, so the ROM changes only with a
-new bitstream, and a word beyond the ROM fails the build. A write to the
-ROM is dropped, and a clear (bit 2 of the control register) does not
-touch it. So a program in the ROM must keep its stack and its variables
-in the RAM, at `0x8000` or above: `sim/rom.nasm`, the greeting that the
-tests use as the ROM, has its stack at the top of the memory, as the
-runtime has, and the monitor has its stack and variables below
-`0xFFFFF000`. With a stack in the ROM, as `hello.nasm` of
-nice_cpu has at `0x1000`, a pushed return address is lost and reads back
-as 0, and the program starts over, forever.
-
-A C program keeps its data in its own image, which would be in the ROM,
-so its writes would be lost. It runs from the ROM when it is built with
-`nicebuild.py --ram ADDR`, which puts the words it writes in the RAM from
-`ADDR`, as the monitor's C code has them at `0xFFFFF400`
-([monitor/INTERNALS.md](../monitor/INTERNALS.md#c-in-the-rom)).
-
-While the core runs from the ROM, the link reaches only its debug
-registers. Bit 3 of the control register hides the ROM: a write of
-`0x00000009` holds the core with the ROM hidden, and the RAM is at address
-0, as in the emulator, so a program loads and runs as without a ROM, with
-`0x00000008` to start it. `load.py` does this. `0x00000001` and then
-`0x00000000` show the ROM again and boot from it, as the reset button
-does. The RAM under the ROM keeps its words meanwhile.
 
 ## The Nexys4DDR's devices
 

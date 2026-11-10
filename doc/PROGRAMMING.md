@@ -283,8 +283,12 @@ the ROM. A C program keeps its data in its image, which would be in the
 ROM too, so it is built with `nicebuild.py --ram ADDR`, which puts the
 words it writes in the RAM from `ADDR`, as the monitor's C code is
 ([monitor/INTERNALS.md](../monitor/INTERNALS.md#c-in-the-rom)).
-A program in the ROM also has some limits on its writes, which
-[SYSTEM.md](SYSTEM.md#the-rom) describes: the main one is that the stack
-and the variables must be in the RAM, at `0x8000` or above.
+The ROM is at `0x0000`–`0x7FFF`, and a write to it is dropped, so a
+program in the ROM keeps its stack and its variables in the RAM, at
+`0x8000` or above ([SYSTEM.md](SYSTEM.md#stack-heap-and-variables)).
+With a stack in the ROM, as `hello.nasm` of nice_cpu has at `0x1000`, a
+pushed return address is lost and reads back as 0, and the program
+starts over, forever. The layout is that of QNICE-FPGA, whose monitor
+is in the ROM at `0x0000`–`0x7FFF` and whose programs load at `0x8000`.
 [`sim/rom.nasm`](../sim/rom.nasm) is a small example, a greeting, and
 the monitor, [monitor/](../monitor/README.md), is a larger one.

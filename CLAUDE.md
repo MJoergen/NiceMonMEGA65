@@ -13,7 +13,7 @@ board exactly as `niceemu`, the emulator in `nice_cpu/emulator`, runs it.
 `README.md` is for users of the core files: on its own, over Ethernet,
 and over the serial port, in that order, the order of their numbers of
 users. `doc/SYSTEM.md` has the address map, the screen,
-the keyboard, the ROM, the Nexys4DDR's devices, and the SD card slots;
+the keyboard, the Nexys4DDR's devices, and the SD card slots;
 `doc/DEBUG_LINK.md` the link, its control register, the UART's baud
 rate, and the link over TCP; `CONTRIBUTING.md` the tests, the
 formal checks, `make hwtest`, and the badge; `doc/EMULATOR.md` the known

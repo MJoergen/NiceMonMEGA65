@@ -41,11 +41,11 @@ while it is up, the host keeps its line, and gets the notices of a stop
 that the debugger caused.
 
 Without a ROM, the core is held in reset at power-up; with one, it runs
-the ROM (see [The ROM](SYSTEM.md#the-rom)). A host loads a program with two
+the ROM ([PROGRAMMING.md](PROGRAMMING.md#programs-in-the-rom)). A host loads a program with two
 writes to the control register at `0xFFFFFFF0` around the writes of its
 words. `0x0000000D` holds the core, clears the memory, and hides the ROM,
 and `0x00000008` starts the core with the ROM still hidden (see
-[The ROM](SYSTEM.md#the-rom)). A start without bit 3 shows the ROM again, which
+[The control register](#the-control-register)). A start without bit 3 shows the ROM again, which
 boots instead of the program. `tools/load.py` does all of this.
 
 While the core runs, the link reaches only its debug registers, and a
