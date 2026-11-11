@@ -21,6 +21,78 @@ The release candidates pinned these:
 
 nice_cpu's `RC01` and `RC03` have no tag here.
 
+## V2.0.1
+
+**Upgrade notes.**
+
+- The dispatch table is 1.4, with one entry more, `fs_readname` (#102).
+  A program built for 1.3 runs as before.
+- `dir` shows a file's long name, so a file that a PC wrote as
+  `mandelbrot.bin` shows so, where it showed as `MANDEL~1.BIN`. Either
+  name still reaches it.
+- On the MEGA65, the clock of the time of day is set after the cold
+  start, when the real-time clock has the time, where it was not set
+  until a program set it (#105).
+
+**New.**
+
+- The monitor reads and writes long file names on FAT32 cards, of up to
+  255 characters
+  ([#102](https://github.com/MJoergen/NiceMonMEGA65/issues/102)). `dir`
+  shows them, and `load`, `save`, and `del` take the long name or the
+  8.3 name, in either case, in quotes when it has a blank:
+  `load "my prog.bin"`. `save` writes a long name when the name is no
+  8.3 name, with an 8.3 alias as mtools makes them. Programs read the
+  names with the new entry `fs_readname`, and `fs_open` takes either
+  name. A character outside ASCII shows as `?`
+  ([monitor/README.md](../monitor/README.md#files)).
+- The monitor's `time` shows the clock of the time of day, and
+  `time 2026-11-11 14:30:00` sets it first, in the years 1970 to 2105
+  ([#109](https://github.com/MJoergen/NiceMonMEGA65/issues/109)). The
+  clock keeps local time, as the MEGA65's real-time clock does. A file
+  that the monitor writes gets the clock's date and time, where every
+  file got 2026-01-01, which it still gets while the clock is not set.
+- Every board has an I2C master at `0xFFFFFF97`–`9D`, which does a whole
+  transaction of up to 16 bytes with a chip on the board's bus: the
+  MEGA65's real-time clock, or the Nexys4DDR's temperature sensor
+  ([#105](https://github.com/MJoergen/NiceMonMEGA65/issues/105),
+  [SYSTEM.md](SYSTEM.md#the-i2c-bus)).
+- On the MEGA65, the monitor's cold start sets the clock from the
+  real-time clock, the R6's RV-3032-C7 or the R3's ISL12020M, unless the
+  chip says that it lost its time. `time` with a date and a time in the
+  years 2000 to 2099 sets the real-time clock too, so `time` once sets
+  the clock for every later start, and for the MEGA65's other cores.
+- `tools/sdnbd.py`, and `make sdnbd`, serve the board's SD card over
+  the link as a disk of Linux's network block device, which
+  `nbd-client` connects and the PC mounts as a folder, all of the card,
+  for the file manager. The core is held meanwhile, and starts again
+  from reset at the end ([tools/README.md](../tools/README.md#sdnbdpy)).
+- `tools/sdcard.py` lists, reads, writes, and deletes files by their
+  long names, as the monitor does.
+- `make flash COR=f.cor SLOT=N` writes an R3 whose flash is an
+  S25FL256S of 32 MiB, in the slots 1 to 3, where it knew only the R6's
+  S25FL512S ([synth/README.md](../synth/README.md#building)).
+- `doc/BASIC.md` is the design note of the BASIC interpreter for the
+  ROM ([#54](https://github.com/MJoergen/NiceMonMEGA65/issues/54)), with
+  its decisions and its stages. Nothing of it is written.
+
+**Tests.**
+
+- `sim/tb_i2c.vhd` tests the I2C master on models of the three chips,
+  and `i2c.sby` proves it. `make cosimtest` checks the clock after the
+  cold start on a model of the R6's real-time clock, types `time`, and
+  reads the model back. `make hwtest` checks the bus on the boards, sets
+  the MEGA65's real-time clock to the host's local time, and reads it
+  back.
+- The monitor's tests read and write a card with long names, `lfn.img`,
+  against mtools and `fsck.fat -n`, check `time` and the dates of the
+  files with `mdir`, and run the cold start and `time` in `niceemu` on
+  the registers of a real-time clock, with digits over 9 and dates that
+  are none (`test/rtc.py`).
+- `make sdtest` checks `tools/sdnbd.py` with an NBD client of its own on
+  `niceemu --link`: the handshakes, reads, the writes that mtools made
+  on a copy, a bad option, and a write that is too long.
+
 ## V2.0 (2026-11-10)
 
 **Upgrade notes.**
@@ -80,11 +152,6 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 - `run.py --symbols` names wasm trap 8, `memory beyond the byte windows`,
   as niceemu does
   ([#101](https://github.com/MJoergen/NiceMonMEGA65/issues/101)).
-- `tools/sdnbd.py`, and `make sdnbd`, serve the board's SD card over
-  the link as a disk of Linux's network block device, which
-  `nbd-client` connects and the PC mounts as a folder, all of the card,
-  for the file manager. The core is held meanwhile, and starts again
-  from reset at the end ([tools/README.md](../tools/README.md#sdnbdpy)).
 
 **Changed.**
 
