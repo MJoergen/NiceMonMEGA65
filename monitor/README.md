@@ -75,10 +75,10 @@ of 2026-11-11:
 | `monlib.nasm` | The routines that programs join, which the commands use too | 259 |
 | `mon.nasm` | The stubs through which a program calls the entries | 50 |
 | `fat32.c` | FAT32, translated by `nicewasm --ram`, with the data of the module | 9435 |
-| `clock.c` | The `time` command, the dates of files, and the real-time clock | 1176 |
+| `clock.c` | The `time` command, the dates of files, and the real-time clock | 1199 |
 | nice_cpu's `lib.nasm` and `muldiv_mpu.nasm` | The runtime of the C code | 259 |
 | `build/version.nasm` and `build/folder.nasm` | The version and the card's folder, which the Makefile writes | 49 |
-| | All of the monitor, of the 24576 words below the demo at `0x6000` | 19319 |
+| | All of the monitor, of the 24576 words below the demo at `0x6000` | 19342 |
 
 `mon.h` has the entries' declarations for C, and is no part of the ROM.
 

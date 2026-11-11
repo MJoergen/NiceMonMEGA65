@@ -193,7 +193,19 @@ needs `FOLDER=NICE`, the default. It runs these steps in order:
    other hosts and ports, lost packets, an ERROR, files of 512 and 0
    bytes, a listing, a port given as `IP:PORT`, bad arguments, and no
    answer to ARP.
-6. **The runs.** The monitor runs once for each test below, with its
+6. **The real-time clock.** `test/rtc.py` starts the monitor on the
+   words of an I2C master, which are memory in `niceemu`: a status that
+   says that a master is present, and data that are the registers of the
+   R6's real-time clock. With `--step-time` the clock is not set, so the
+   cold start reads them, and `time` shows the result. It covers dates
+   and times that the chip holds, the chip's flags that say that it lost
+   its time, no master, a digit over 9 in each register, and numbers
+   that are no date or time. Then it types `time` with a date and a
+   time, and checks the master's command: left alone without a master,
+   and in a year that the chip does not hold. The R3's chip is read only
+   when the R6's does not answer, which memory cannot do, so that part
+   runs only on an R3.
+7. **The runs.** The monitor runs once for each test below, with its
    keystrokes from an input file that ends with `h`, so that the run
    halts. Some runs add a program at `0x8000`, SD card images, or
    Ethernet frames.
@@ -236,8 +248,9 @@ each time. The other tests run with the host's clock, so the files they
 write have the host's date, which no test shows.
 
 `niceemu` has no I2C master: its status word is memory, which reads 0,
-so the cold start of every test finds none, and `time` shows that the
-clock is not set. The real-time clock itself is tested in the simulated
+so the cold start of every run finds none, and `time` shows that the
+clock is not set. `test/rtc.py` alone sets that memory, as step 6 says.
+The I2C bus and the chip are tested in the simulated
 system, whose bus has a model of the R6's real-time clock: `make
 cosimtest` runs the monitor's cold start there, and checks the clock
 after it, and then types `time` with a date and a time, and reads the

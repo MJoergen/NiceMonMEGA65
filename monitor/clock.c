@@ -40,6 +40,7 @@
 #define YEAR_MIN 1970   // the years that time sets
 #define YEAR_MAX 2105
 #define FAT_MIN 1980    // the first year that FAT's dates hold
+#define BAD 255u        // a byte of the real-time clock that is no two digits
 
 // The date and the time of the pattern FORM, a # for each digit: the
 // year, the month, the day, the hours, the minutes, and the seconds, in
@@ -102,12 +103,12 @@ unsigned clock_fat(unsigned *t)
 
 // Sets the clock to the date and the time in field, at us microseconds,
 // which sets "set". 0, with nothing set, when they are no date and time
-// of the years YEAR_MIN to YEAR_MAX.
+// of the years YEAR_MIN to YEAR_MAX, or us is a second or more.
 static int set(unsigned us)
 {
     if (field[0] < YEAR_MIN || field[0] > YEAR_MAX || field[1] - 1 > 11 ||
         field[2] - 1 >= mlen(field[0], field[1] - 1) || field[3] > 23 || field[4] > 59 ||
-        field[5] > 59)
+        field[5] > 59 || us > 999999)
         return 0;
     days = field[2] - 1;
     for (unsigned y = YEAR_MIN; y < field[0]; y++)
@@ -165,10 +166,11 @@ static unsigned tobcd(unsigned n)
 // from register 0, in another order, with bit 7 of the hours for 24-hour
 // mode, while WRTC, bit 6 of its register 8, allows the write, as the
 // MEGA65 core writes it; the write clears RTCF. Nothing answers on the
-// Nexys4DDR, which has no real-time clock.
+// Nexys4DDR, which has no real-time clock, and nothing is written without
+// an I2C master, as in niceemu, where its words are plain memory.
 static void rtc_write(void)
 {
-    if (field[0] < 2000 || field[0] > 2099)
+    if (field[0] < 2000 || field[0] > 2099 || !(nice_peek(I2C_STATUS) & I2C_PRESENT))
         return;
     unsigned wday = (days + 4) % 7;
     unsigned hms = tobcd(field[5]) | tobcd(field[4]) << 8 | tobcd(field[3]) << 16;
@@ -182,12 +184,13 @@ static void rtc_write(void)
 }
 
 // Byte i of the data that the I2C master read, as a number from its two
-// BCD digits, of the bits of mask. A digit over 9 gives 100 or more, which
-// no field takes.
+// BCD digits, of the bits of mask. A digit over 9 gives BAD, which no
+// field takes: set refuses it, also as a year after 2000 and as
+// hundredths of a second.
 static unsigned bcd(unsigned i, unsigned mask)
 {
     unsigned b = nice_peek(I2C_DATA + i / 4) >> i % 4 * 8 & mask;
-    return (b & 15) > 9 ? 100 : (b >> 4) * 10 + (b & 15);
+    return (b & 15) > 9 || b >> 4 > 9 ? BAD : (b >> 4) * 10 + (b & 15);
 }
 
 // The clock from the MEGA65's real-time clock, at the cold start (issue
@@ -200,9 +203,9 @@ static unsigned bcd(unsigned i, unsigned mask)
 // seconds, the minutes, the hours, the date, the month, the year, and the
 // weekday from register 0, and its status at 7, whose RTCF says that it
 // lost its time. Its hours have bit 7 set in 24-hour mode, and else bit 5
-// for PM, and 12 for 0. Both keep the local time, in BCD, and the years
-// 2000 to 2099. The clock is not set when no chip answers, it lost its
-// time, or it holds no date and time.
+// for PM, and 1 to 12, with 12 for 0. Both keep the local time, in BCD,
+// and the years 2000 to 2099. The clock is not set when no chip answers,
+// it lost its time, or it holds no date and time, as with a digit over 9.
 void clock_rtc(void)
 {
     if ((nice_peek(CLOCK_STATUS) & 1) || !(nice_peek(I2C_STATUS) & I2C_PRESENT))
@@ -219,8 +222,10 @@ void clock_rtc(void)
         if (nice_peek(I2C_DATA + 1) & 0x01000000)
             return;
         field[3] = bcd(2, 0x3F);
-        if (!(nice_peek(I2C_DATA) & 0x800000))
-            field[3] = bcd(2, 0x1F) % 12 + (nice_peek(I2C_DATA) & 0x200000 ? 12 : 0);
+        if (!(nice_peek(I2C_DATA) & 0x800000)) {
+            unsigned h = bcd(2, 0x1F);
+            field[3] = h - 1 > 11 ? BAD : h % 12 + (nice_peek(I2C_DATA) & 0x200000 ? 12 : 0);
+        }
         sec = 0;
         date = 3;
     } else {

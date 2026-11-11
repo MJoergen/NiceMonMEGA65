@@ -592,7 +592,8 @@ real-time clock, when the clock is not set yet. So after the power-up a
 program finds the clock set. The monitor leaves the clock as it is when
 the real-time clock says that it lost its time, as after a flat battery
 or a new chip: the RV-3032-C7's flags VLF and PORF, and the ISL12020M's
-flag RTCF.
+flag RTCF. It leaves it too when what the chip holds is no date and
+time, such as a digit over 9.
 
 **`time` writes it.** The monitor's `time` with a date and a time sets
 the real-time clock too, in the years 2000 to 2099, and clears the flags

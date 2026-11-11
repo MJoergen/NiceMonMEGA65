@@ -383,7 +383,9 @@ FAT32_START_BYTES = $(shell echo $$(($(FAT32_START) * 512)))
 # sizes of the screen's memory of niceemu and the boards first, and
 # test/dis.py the rows of u against nicedis.py and niceasm, and
 # test/dhcp.py runs i dhcp against the frames that it builds, and
-# test/tftp.py tftp. arp and udp run with --step-time, as their timeouts
+# test/tftp.py tftp, and test/rtc.py the cold start and time on the words
+# of an I2C master that it sets, as a real-time clock. arp and udp run
+# with --step-time, as their timeouts
 # count, and the frames they send are added to their output.
 test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.bin $(BUILD)/hello.bin \
       $(BUILD)/dis.bin $(BUILD)/sd.bin $(BUILD)/arp.bin $(BUILD)/udp.bin $(BUILD)/rom.bin $(BUILD)/fs.bin $(BUILD)/fsw.bin \
@@ -394,6 +396,7 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	@$(PYTHON) test/dis.py $(EMU) $(BUILD)/monitor_test.bin $(BUILD)/dis.bin
 	@$(PYTHON) test/dhcp.py $(EMU) $(BUILD)/monitor_test.bin test/dhcp.expected $(BUILD)/dhcp.out
 	@$(PYTHON) test/tftp.py $(EMU) $(BUILD)/monitor_test.bin test/tftp.expected $(BUILD)/tftp.out
+	@$(PYTHON) test/rtc.py $(EMU) $(BUILD)/monitor_test.bin
 	@echo 'FFFFFF9E 00020000' > $(BUILD)/ram128k.bin
 	@echo 'FFFFFF9E 00010000' > $(BUILD)/ram64k.bin
 	@printf '$(LOAD_EMU)' > $(BUILD)/load_emu.txt
