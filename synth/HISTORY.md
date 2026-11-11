@@ -9,8 +9,9 @@ the clock.
 ## The releases
 
 `make bump` builds the R6 without a ROM and records the result in
-`verified.json`, which the badge shows. These are its records, in the
-default flow at 100 MHz:
+`verified.json`, which the badge shows. These are its records at
+100 MHz, in the default flow until V1.9, and with `FLOW=timing` from
+V2.0 on:
 
 | Release | Date | Setup | Hold |
 |---|---|---|---|
@@ -24,13 +25,17 @@ default flow at 100 MHz:
 | V1.6 | 2026-11-06 | 0.138 | 0.076 |
 | V1.7 | 2026-11-06 | 0.019 | 0.044 |
 | V1.9 | 2026-11-08 | 0.062 | 0.042 |
+| V2.0 | 2026-11-11 | 0.196 | 0.049 |
 
 From V1.9 on, `verified.json` has the Nexys4DDR too, at 90 MHz: it
 missed by 0.27 ns in the default flow and met by 0.033 ns with
 `FLOW=timing`. V1.8 has no release here: nice_cpu V1.8 left the R6 short
 of 100 MHz in both flows, by 0.210 ns in the default flow and 0.135 ns
 with `FLOW=timing`, on a path from the RAM into WRITE's register file
-(nice_cpu#141). nice_cpu V1.9 fixed it.
+(nice_cpu#141). nice_cpu V1.9 fixed it. nice_cpu V2.0 missed by 0.443 ns
+in the default flow, and met by 0.058 ns with `FLOW=timing`; the RAM
+without cascaded block RAMs (#107) took that to 0.196 ns before the
+release.
 
 ## The builds after each change
 
@@ -59,6 +64,7 @@ board that was not built then.
 | 2026-11-09 | The wait and the hidden state on the link (#93, #98), and the strip's wait, with the ROM and `FLOW=timing` | 0.047 | – |
 | 2026-11-09 | The byte windows (#90), with the ROM and `FLOW=timing`: −0.258 with the byte or halfword taken from the RAM's word on the way to the core; 0.032 with it a cycle later | 0.032 / 0.031 | – |
 | 2026-11-10 | The keys for Page Up and Page Down (53a18ab), 13 lines of the keyboard map, which moved the placement, with the ROM and `FLOW=timing`: −0.473 placed with `AltSpreadLogic_high`, −0.447 with `ExtraTimingOpt`, on the path from the RAM through the multiplexers of the read data into WRITE's register file; 0.004 with the read data picked by one AND-OR of one-hot registered bits | 0.004 / 0.047 | – |
+| 2026-11-11 | The RAM without cascaded block RAMs (#107), the release V2.0, with the ROM and `FLOW=timing`: 11 minutes from nothing, where the R6 took up to an hour | 0.057 / 0.080 | 0.004 / 0.021 |
 
 The R3's first record is from a build at nice_cpu V1.0, with debug link
 4 and the Ethernet station: 0.109 ns and 0.061 ns.

@@ -212,26 +212,25 @@ MIT; and `src/video/font_pkg.vhd`, the
 
 ## Build times and size
 
-These are the builds of 2026-11-09, at nice_cpu V2.0 with the wait and
-the hidden state on the debug link, each with the ROM of the
-monitor and the demo, as `make release` builds them. The history of
+The pipelined builds are those of the release V2.0, of 2026-11-11, each
+with the ROM of the monitor and the demo and with `FLOW=timing`, as
+`make release` builds them; the multi-cycle ones are older. The history of
 these numbers, and what the builds before taught, is in
 [HISTORY.md](HISTORY.md).
 
-A build takes ten to twenty minutes on an Intel Core i9-10850K (10
-cores, 20 threads) with Vivado 2025.1, and the R6 with `FLOW=timing`
-an hour, most of it in routing. These are the times, in minutes and
-seconds, on a machine busy with other work, at a load of about 12, but
-for the R6's default flow, at about 5:
+A build takes ten to fifteen minutes on an Intel Core i9-10850K (10
+cores, 20 threads) with Vivado 2025.1. Before issue #107 built the
+MEGA65's RAM without cascaded block RAMs, the R6 with `FLOW=timing` took
+up to an hour, most of it in routing. These are the times, in minutes
+and seconds, of builds run one at a time; the multi-cycle ones are with
+the default flow, on a machine busy with other work:
 
 | Build | Synthesis | Placement | Routing | Bitstream | Total |
 |---|---|---|---|---|---|
-| R6, pipelined, default flow | 3:35 | 1:41 | 2:30 | 0:39 | 9:11 |
-| R6, pipelined, `FLOW=timing` | 5:43 | 6:54 | 45:16 | 0:51 | 59:22 |
+| R6, pipelined | 3:38 | 3:27 | 3:13 | 0:38 | 11:21 |
 | R6, `NICE=multi` | 4:46 | 2:07 | 2:49 | 0:54 | 11:41 |
-| R3, pipelined, default flow | 5:25 | 3:06 | 4:24 | 0:50 | 14:53 |
-| R3, pipelined, `FLOW=timing` | 5:25 | 8:52 | 5:19 | 0:52 | 21:05 |
-| Nexys4DDR, pipelined | 4:31 | 4:46 | 6:22 | 0:49 | 17:12 |
+| R3, pipelined | 4:01 | 1:33 | 2:08 | 0:39 | 8:49 |
+| Nexys4DDR, pipelined | 2:45 | 3:05 | 6:04 | 0:49 | 13:22 |
 | Nexys4DDR, `NICE=multi` | 3:25 | 2:03 | 1:59 | 0:46 | 8:50 |
 
 Placement includes `phys_opt_design` before routing, and routing the
@@ -286,27 +285,30 @@ These are the worst setup and hold slacks, in ns:
 
 | Build | Clock | Setup | Hold |
 |---|---|---|---|
-| R6, pipelined, default flow | 100 MHz | **−0.526**, 324 endpoints | 0.069 |
-| R6, pipelined, `FLOW=timing` | 100 MHz | 0.008 | 0.070 |
+| R6, pipelined | 100 MHz | 0.057 | 0.080 |
 | R6, `NICE=multi` | 100 MHz | 0.187 | 0.075 |
-| R3, pipelined, default flow | 100 MHz | **−0.073**, 2 endpoints | 0.035 |
-| R3, pipelined, `FLOW=timing` | 100 MHz | 0.126 | 0.041 |
-| Nexys4DDR, pipelined, `FLOW=timing` | 90 MHz | 0.140 | 0.039 |
-| Nexys4DDR, `NICE=multi`, `FLOW=timing` | 90 MHz | 0.186 | 0.019 |
+| R3, pipelined | 100 MHz | 0.122 | 0.064 |
+| Nexys4DDR, pipelined | 90 MHz | 0.004 | 0.021 |
+| Nexys4DDR, `NICE=multi` | 90 MHz | 0.186 | 0.019 |
 
-So the pipelined core meets its clock on every board with `FLOW=timing`
-only, and the R6 and the Nexys4DDR with little to spare. The R6's worst paths
-are in the core's WRITE stage in the default flow, from its
-micro-operation to its value, and in the timing flow from the read
-data of the ROM, the RAM, or a device into WRITE's register file. With
+The pipelined builds are those of the release V2.0, with `FLOW=timing`;
+the multi-cycle ones are older. The pipelined core meets its clock on
+every board with `FLOW=timing` only, and the R6 and the Nexys4DDR with
+little to spare. In the default flow, the R6 misses by about 0.15 ns
+inside the core, in the check of a store into fetched code (issue #107).
+
+The R6's worst path is inside the core, from WRITE's register file to
+PREPARE, and the paths into the core have 0.307 ns since #107. Before
+it, the RAM's cascaded block RAMs made the read data of the RAM into
+WRITE's register file the worst path of the R6. The R3's worst path is
+from the core's stores to the RAM's write enable, and so is the
+Nexys4DDR's, whose RAM of 64K words never had the cascade. With
 the watchpoints and the clock, the R6 missed by 0.404 ns while
 `devices.vhd` picked its read data with a chain of multiplexers; it
 picks it with one AND-OR now, as `nicemon.vhd` does. Before that,
 the R6 without the watchpoints missed by 0.112 ns, and without the
 clock met by 0.031 ns, so the clock's word in that chain cost more
-than the watchpoints. The R3's worst paths in the
-default flow are from the MAX10's inputs (`max10.vhd`), and the
-Nexys4DDR's from WRITE into its register file. `verified.json` records
+than the watchpoints. `verified.json` records
 the build of the latest release's bump, and the badge shows it.
 
 Every build writes the five worst paths into the TCP server, within it,
