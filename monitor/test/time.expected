@@ -1,0 +1,100 @@
+NiceMon V9.9
+? lists the commands
+> time
+Clock not set
+> l
+ADDR WORD in hex on each line, as in a .bin file; an empty line ends
+Words loaded: 1, 00008000 to 00008000
+> save old.bin 8000 1
+Words saved: 1, 00008000 to 00008000
+> time 2026-11-11 14:30:01
+2026-11-11 14:30:01
+> time
+2026-11-11 14:30:01
+> save new.bin 8000 1
+Words saved: 1, 00008000 to 00008000
+> time 2023-02-29 00:00:00
+time [YYYY-MM-DD HH:MM:SS]: the local date and time, such as time 2026-11-11 14:30:00
+> time 2100-02-29 00:00:00
+time [YYYY-MM-DD HH:MM:SS]: the local date and time, such as time 2026-11-11 14:30:00
+> time 1969-12-31 23:59:59
+time [YYYY-MM-DD HH:MM:SS]: the local date and time, such as time 2026-11-11 14:30:00
+> time 2106-01-01 00:00:00
+time [YYYY-MM-DD HH:MM:SS]: the local date and time, such as time 2026-11-11 14:30:00
+> time 2026-13-01 00:00:00
+time [YYYY-MM-DD HH:MM:SS]: the local date and time, such as time 2026-11-11 14:30:00
+> time 2026-11-31 00:00:00
+time [YYYY-MM-DD HH:MM:SS]: the local date and time, such as time 2026-11-11 14:30:00
+> time 2026-11-11 24:00:00
+time [YYYY-MM-DD HH:MM:SS]: the local date and time, such as time 2026-11-11 14:30:00
+> time 2026-11-11 23:60:00
+time [YYYY-MM-DD HH:MM:SS]: the local date and time, such as time 2026-11-11 14:30:00
+> time 2026-11-11 23:59:60
+time [YYYY-MM-DD HH:MM:SS]: the local date and time, such as time 2026-11-11 14:30:00
+> time 26-11-11 00:00:00
+time [YYYY-MM-DD HH:MM:SS]: the local date and time, such as time 2026-11-11 14:30:00
+> time 2026-1-1 00:00:00
+time [YYYY-MM-DD HH:MM:SS]: the local date and time, such as time 2026-11-11 14:30:00
+> time 2026-11-11
+time [YYYY-MM-DD HH:MM:SS]: the local date and time, such as time 2026-11-11 14:30:00
+> time 2026-11-11 01:02:03 x
+time [YYYY-MM-DD HH:MM:SS]: the local date and time, such as time 2026-11-11 14:30:00
+> time 2026-11-11 001:02:03
+time [YYYY-MM-DD HH:MM:SS]: the local date and time, such as time 2026-11-11 14:30:00
+> time 2026-11-11 1:2:3
+time [YYYY-MM-DD HH:MM:SS]: the local date and time, such as time 2026-11-11 14:30:00
+> timex
+Unknown command; ? lists them
+> ti
+Unknown command; ? lists them
+> time 2000-02-29 00:00:00
+2000-02-29 00:00:00
+> time 2100-03-01 00:00:00
+2100-03-01 00:00:00
+> time 2104-02-29 12:00:00
+2104-02-29 12:00:00
+> time 2038-01-19 03:14:08
+2038-01-19 03:14:08
+> time 2105-12-31 23:59:59
+2105-12-31 23:59:59
+> TIME  1970-01-01 00:00:00 
+1970-01-01 00:00:00
+> save y1970.bin 8000 1
+Words saved: 1, 00008000 to 00008000
+> h
+Halted
+Screen:
+|30:00
+|> time 2026-11-11 1:2:3
+|time [YYYY-MM-DD HH:MM:SS]: the local date and time, such as time 2026-11-11 14:
+|30:00
+|> timex
+|Unknown command; ? lists them
+|> ti
+|Unknown command; ? lists them
+|> time 2000-02-29 00:00:00
+|2000-02-29 00:00:00
+|> time 2100-03-01 00:00:00
+|2100-03-01 00:00:00
+|> time 2104-02-29 12:00:00
+|2104-02-29 12:00:00
+|> time 2038-01-19 03:14:08
+|2038-01-19 03:14:08
+|> time 2105-12-31 23:59:59
+|2105-12-31 23:59:59
+|> TIME  1970-01-01 00:00:00
+|1970-01-01 00:00:00
+|> save y1970.bin 8000 1
+|Words saved: 1, 00008000 to 00008000
+|> h
+|Halted
+VBASE at the halt 000000
+exit 0
+fsck.fat -n:
+Free cluster summary uninitialized (should be 128990)
+IMAGE: 5 files, 32/129022 clusters
+Files in NICE: HELLO.BIN old.bin new.bin y1970.bin
+Dates in NICE:
+old      bin        18 2026-01-01   0:00 
+new      bin        18 2026-11-11  14:30 
+y1970    bin        18 2026-01-01   0:00 

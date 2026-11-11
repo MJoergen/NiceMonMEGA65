@@ -63,7 +63,7 @@ Checks, in this order:
       again
     - what sim/emu.nasm leaves after its halt is read back, and the cycle
       counter and the timer stop there
-    - the clock of the time of day, set to the host's time, counts as
+    - the clock of the time of day, set to the host's local time, counts as
       the host's clock does, over a start too, and is left at that time
     - the byte windows of nice_cpu's SYSTEM.md §9: the link reads bytes
       and halfwords through them and writes them, and sim/bytewin.nasm
@@ -1199,10 +1199,12 @@ def read_clock(link: Link) -> float:
 
 
 def test_clock(link: Link) -> None:
-    """The clock of the time of day: set to the host's time, it is set,
-    and counts one second in a second of the host, also over a start,
-    which keeps it. It is left at the host's time."""
+    """The clock of the time of day: set to the host's local time, as the
+    clock keeps local time (issue #109), it is set, and counts one second
+    in a second of the host, also over a start, which keeps it. It is
+    left at the host's local time, which the monitor's time shows."""
     now = time.time()
+    now += time.localtime(now).tm_gmtoff
     sec = int(now)
     check("W CLOCK_SEC_LO", wr(link, CLOCK_SEC_LO, sec & 0xFFFFFFFF))
     check("W CLOCK_SEC_HI", wr(link, CLOCK_SEC_HI, sec >> 32))

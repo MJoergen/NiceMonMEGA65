@@ -332,9 +332,12 @@ and must be formatted. FAT12 and FAT16 are rejected with a message.
   million entries, and a deletion moves the hint back to the clusters it
   freed. Before the first change of the FAT after a mount, FSInfo's free
   count is set to unknown, `0xFFFFFFFF`, which every FAT driver accepts,
-  and `fsck.fat` reports as uninitialized. A new file has the date
-  2026-01-01, as the ROM does not read the clock of the time of day
-  yet, which no board sets by itself. A
+  and `fsck.fat` reports as uninitialized. `fat_close` puts the date and
+  the time of the clock of the time of day into the entry of a file
+  written, and a new entry gets them as its creation too, from `clock.c`
+  (#109). The clock keeps local time, as FAT's dates do. While it is not
+  set, or its year is before 1980 or past 2106, the date is 2026-01-01 at
+  00:00. A
   folder that is full grows by a cluster of
   zeros, written before it is linked, up to 65536 entries.
 - **Safety**: the ROM writes only inside the partition, never the MBR or

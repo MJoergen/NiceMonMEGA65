@@ -49,7 +49,7 @@
 // freed. The file's clusters are taken from the FAT as its data reaches
 // them, each marked as the end of the chain in every copy of the FAT
 // before the one before it is linked to it, and its data written; only
-// fat_close puts the first cluster and the size into the entry. A
+// fat_close puts the first cluster, the size, and the date into the entry. A
 // deletion marks the long-name entries, then the entry, then frees the
 // clusters. A new entry's long-name entries are written before its 8.3
 // entry, so a reset between them leaves orphan long-name entries, which
@@ -103,7 +103,7 @@ int fat_sd_write(unsigned lba, const unsigned *buf);
 #define EOC 0x0FFFFFFFu  // the FAT entry written at the end of a chain
 #define FILES 2
 #define DIR_MAX (65536u * 32)   // the bytes of a directory at most
-#define DATE 0x5C21u    // the date of a new entry, 2026-01-01, as there is no clock
+#define DATE 0x5C21u    // the date of an entry, 2026-01-01, while the clock is not set
 #define NAME_MAX 255    // the characters of a long name at most,
 #define LFN_MAX 20      // and its long-name entries, 13 characters each
 
@@ -190,6 +190,29 @@ static void put32(unsigned char *p, unsigned v)
 {
     put16(p, v);
     put16(p + 2, v >> 16);
+}
+
+// The date and the time of the 8.3 entry at p: from the clock, with
+// clock_fat of clock.c, or the fixed DATE at 00:00:00 while the clock is
+// not set. Written always, and created too for a new entry. Read keeps
+// the date of the write, as a read writes nothing.
+unsigned clock_fat(unsigned *t);
+static void stamp(unsigned char *p, int created)
+{
+    unsigned t = 0;
+    unsigned d = clock_fat(&t);
+    if (!d) {
+        d = DATE;
+        t = 0;
+    }
+    if (created) {
+        p[13] = (unsigned char)(t >> 16);
+        put16(p + 14, t);
+        put16(p + 16, d);
+    }
+    put16(p + 18, d);
+    put16(p + 22, t);
+    put16(p + 24, d);
 }
 
 // A sector written, but none outside the partition, nor below its first
@@ -898,9 +921,7 @@ static int make(const unsigned char n[11], unsigned lower, unsigned nl, unsigned
                 p[i] = n[i];
             p[11] = 0x20;           // archive
             p[12] = (unsigned char)lower;
-            put16(p + 16, DATE);    // created,
-            put16(p + 18, DATE);    // read,
-            put16(p + 24, DATE);    // and written
+            stamp(p, 1);
             *e = p;
         }
         if ((k == nl || ((q + 32) & 511) == 0) && (r = wr(dirf.lba, dirf.buf)) < 0)
@@ -1173,7 +1194,8 @@ int fat_write(int h, unsigned buf, unsigned n)
 }
 
 // A file opened to write is finished: its last sector, then its first
-// cluster and its size in its entry, then FSInfo. The handle is closed
+// cluster, its size, and the date and the time of the write in its entry,
+// then FSInfo. The handle is closed
 // also after an error.
 int fat_close(int h)
 {
@@ -1194,6 +1216,7 @@ int fat_close(int h)
     put16(e + 20, f->first >> 16);
     put16(e + 26, f->first);
     put32(e + 28, f->pos);
+    stamp(e, 0);
     if ((r = wr(f->elba, sec)) < 0)
         return r;
     return infodone();

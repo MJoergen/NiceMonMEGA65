@@ -22,8 +22,10 @@
 ; NAME ADDR N writes one, and del NAME deletes a file, with fat32.c, the
 ; ROM's C code, whose functions are also the entries 9 to 15, fs_mount,
 ; fs_open, fs_read, fs_readdir, fs_close, fs_write, and fs_delete (issues
-; #58 and #59). The commands u, i dhcp, and tftp are in monitor_dis.nasm
-; and monitor_eth.nasm, and use the routines of this file.
+; #58 and #59). time shows the clock of the time of day, or sets it, with
+; clock.c (issue #109). The commands u, i dhcp, and tftp are in
+; monitor_dis.nasm and monitor_eth.nasm, and use the routines of this
+; file.
 
 RAM_WORDS       .EQU    0xFFFFFF9E      ; the words of the RAM, 0 in niceemu, where there is no limit
 UART_BAUD       .EQU    0xFFFFFF9F      ; the UART's baud rate in bit/s, memory in niceemu
@@ -957,6 +959,29 @@ no_prog         MOVE    R1, S_NOPROG
                 CALL    _io_crlf
                 JMP     main
 
+; t: time, when an i follows the t, or else tftp. R2 points after the t.
+cmd_t
+                OR      R1, @R2, 0x20   ; I as i
+                CMP     R1, 0x69        ; i
+        ?!Z     JMP     cmd_tftp
+
+; time [YYYY-MM-DD HH:MM:SS]: the clock of the time of day (nice_cpu's
+; SYSTEM.md §10), which keeps local time, set first when a date and a time
+; follow, and shown, with clock_cmd of clock.c. R2 points after the t.
+cmd_time
+                MOVE    R1, R2
+                MOVE    R2, S_IME
+                CALL    match           ; R1 after ime, or 0
+                TST     R1
+        ?Z      JMP     unknown
+                TST     @R1
+        ?Z      JMP     :+              ; time alone
+                CMP     @R1, 0x20
+        ?!Z     JMP     unknown         ; timex
+:
+                CALL    _clock_cmd
+                JMP     main
+
 ; puts_lines: the strings of the table at R1, each with CR LF after it, up
 ; to a 0 word. Uses R7 across the calls, saved.
 puts_lines
@@ -981,7 +1006,7 @@ COMMANDS
                 .DAT    0x6D, cmd_mac   ; m
                 .DAT    0x72, cmd_run   ; r
                 .DAT    0x73, cmd_save  ; s, for save
-                .DAT    0x74, cmd_tftp  ; t, for tftp
+                .DAT    0x74, cmd_t     ; t, for time and tftp
                 .DAT    0x75, cmd_dis   ; u
                 .DAT    0x76, cmd_version  ; v
                 .DAT    0x78, cmd_demo  ; x
@@ -1030,6 +1055,7 @@ S_BADLOAD
 S_AVE           .ASCII_L 'ave'
 S_AUD           .ASCII_L 'aud'
 S_EL            .ASCII_L 'el'
+S_IME           .ASCII_L 'ime'
 S_SAVED         .ASCII_L 'Words saved: '
 S_BADSAVE
                 .ASCII_L 'save NAME ADDR N: a name, and the address and the count in hex'
@@ -1064,7 +1090,7 @@ E_FS31          .ASCII_L 'the file is open'
 E_FS32          .ASCII_L 'the file is read-only'
 
 HELP            .DAT    H_R, H_L, H_LOAD, H_SAVE, H_DEL, H_TFTP, H_TFTPL, H_X, H_D, H_U
-                .DAT    H_DIR, H_I, H_ID, H_M, H_B, H_C, H_V, H_H, H_Q, H_P, H_PG, 0
+                .DAT    H_DIR, H_I, H_ID, H_M, H_B, H_T, H_C, H_V, H_H, H_Q, H_P, H_PG, 0
 H_R             .ASCII_L 'r [ADDR]      run the program at ADDR, or at 00008000; r 0 restarts'
 H_L             .ASCII_L 'l             enter lines of ADDR WORD in hex, as a .bin file has them'
 H_LOAD          .ASCII_L 'load NAME     load the .bin file NAME of the SD card, as l loads lines'
@@ -1080,6 +1106,7 @@ H_I             .ASCII_L 'i [A.B.C.D]   show the IP address, or set it, such as 
 H_ID            .ASCII_L 'i dhcp        get the IP address from a DHCP server'
 H_M             .ASCII_L 'm [MAC]       show the MAC address, or set it, such as 02:4E:49:43:45:01'
 H_B             .ASCII_L 'baud [RATE]   show the UART baud rate, or set it, such as 921600'
+H_T             .ASCII_L 'time [D T]    show the local time, or set it, such as 2026-11-11 14:30:00'
 H_C             .ASCII_L 'c             clear the screen'
 H_V             .ASCII_L 'v             the version'
 H_H             .ASCII_L 'h             halt the core'

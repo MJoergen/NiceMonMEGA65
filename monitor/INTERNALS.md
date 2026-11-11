@@ -82,13 +82,15 @@ rows there, which `d` and `--dump` read.
 ## C in the ROM
 
 Part of the ROM is C, through nice_cpu's wasm translator: the FAT32
-code. The files
-of the Makefile's `ROM_C`, `fat32.c` for now, are compiled to one wasm
+code and the clock's. The files
+of the Makefile's `ROM_C`, `fat32.c` and `clock.c`, are compiled to one wasm
 module, which `nicewasm --ram` translates for code
 that runs from a ROM (nice_cpu's translator README, "Code in a ROM"),
 at `-Oz`, which makes it more than a quarter smaller than `-O2`. The Makefile joins
 it after `mon.nasm`, with nice_cpu's `lib.nasm` and `muldiv_mpu.nasm`.
-`fat32.c` is FAT32 (README.md, "Files"), about 7100 words.
+`fat32.c` is FAT32 (README.md, "Files"), about 9200 words, and
+`clock.c` the `time` command and the dates of FAT's entries, about 700
+words, small rather than general, as its header says.
 
 - **Calls.** Every function of the C code that is not `static` is
   exported, and the monitor's assembly calls it as `_name`, in the C ABI;
@@ -216,6 +218,7 @@ compared with `test/NAME.expected`:
 | `fatbad` | The monitor, with a FAT16 card and an exFAT card | `dir` rejects each. |
 | `fat1` | The monitor, with no card in slot 0 | `dir` mounts slot 1. |
 | `fatnone` | The monitor, with a card without the folder `NICE`, and one whose `NICE` is a file | `dir` and `load` fail with error 29. |
+| `time` | The monitor, with `--step-time` and a copy of the card without partitions | `time` not set, set, and shown; dates that are not, such as leap days of years without one, fields of one digit, and 2106, and the edges that are, 2000-02-29, 2100-03-01, 2104-02-29, 2^31 seconds, and 2105-12-31; and the dates of `save`, from the clock and while it is not set or before 1980, which `mdir` shows. |
 | `hello` | `test/hello.nasm`, under nice_cpu's `start_mon.nasm` | A program in assembly, run with `r`, that returns to the monitor. |
 | `reset` | The same | `r 0`, the cold start, and `r` again. |
 | `hello_c` | `test/hello.c`, built with `nicebuild.py --monitor --asm mon.nasm` | A program in C. |
@@ -224,7 +227,10 @@ compared with `test/NAME.expected`:
 labels, so they are assembled after the monitor's sources, and only
 their words from `0x8000` are kept. `fs`, `fsw`, `hello`, and `hello_c`
 call the entries through `mon.nasm`'s stubs, as any program does. `arp`
-and `udp` run with `--step-time`, as their timeouts count steps.
+and `udp` run with `--step-time`, as their timeouts count steps, and
+`time` too, so that its clock starts at 0, not set, and counts the same
+each time. The other tests run with the host's clock, so the files they
+write have the host's date, which no test shows.
 
 The comments above each input in the Makefile say what each keystroke
 tests.

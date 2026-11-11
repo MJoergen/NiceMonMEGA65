@@ -61,23 +61,24 @@ routines and the ARP cache of the network, and FAT32 in C.
 [INTERNALS.md](INTERNALS.md) describes them, with the build and the
 tests.
 
-The monitor is in NICE assembly, with FAT32 in C. The ROM is its files
-in this order, and the words of each are those of the build of
-2026-11-09:
+The monitor is in NICE assembly, with FAT32 and the clock in C. The ROM
+is its files in this order, and the words of each are those of the build
+of 2026-11-11:
 
 | File | What it is | Words |
 |---|---|---:|
-| `monitor.nasm` | The dispatch table, the HAL, the screen, and the line with its scrollback | 690 |
-| `monitor_cmd.nasm` | The main loop and the commands, which BASIC is to replace | 3902 |
+| `monitor.nasm` | The dispatch table, the HAL, the screen, and the line with its scrollback | 692 |
+| `monitor_cmd.nasm` | The main loop and the commands, which BASIC is to replace | 4070 |
 | `monitor_dis.nasm` | The disassembler of `u` | 1079 |
 | `monitor_sd.nasm` | The routines for the SD cards | 390 |
 | `monitor_eth.nasm` | The routines for the network | 1856 |
 | `monlib.nasm` | The routines that programs join, which the commands use too | 259 |
-| `mon.nasm` | The stubs through which a program calls the entries | 48 |
-| `fat32.c` | FAT32, translated by `nicewasm --ram` | 7200 |
+| `mon.nasm` | The stubs through which a program calls the entries | 50 |
+| `fat32.c` | FAT32, translated by `nicewasm --ram`, with the data of the module | 9435 |
+| `clock.c` | The `time` command and the dates of files | 659 |
 | nice_cpu's `lib.nasm` and `muldiv_mpu.nasm` | The runtime of the C code | 259 |
-| `build/version.nasm` and `build/folder.nasm` | The version and the card's folder, which the Makefile writes | 46 |
-| | All of the monitor, of the 24576 words below the demo at `0x6000` | 15729 |
+| `build/version.nasm` and `build/folder.nasm` | The version and the card's folder, which the Makefile writes | 49 |
+| | All of the monitor, of the 24576 words below the demo at `0x6000` | 18798 |
 
 `mon.h` has the entries' declarations for C, and is no part of the ROM.
 
@@ -223,6 +224,7 @@ offset, so there the history is kept but not shown.
 | `i [A.B.C.D]` | Shows the Ethernet station's IP address, `IP address 192.168.1.65`, or writes it first: four decimal numbers of 0 to 255 with dots between them, such as `i 192.168.1.65`. Anything but an address or `dhcp` is no address, and `i` says so and writes nothing. It writes `0xFFFFFFB0`, `NET_IP` ([SYSTEM.md](../doc/SYSTEM.md#the-ethernet-station)), so a host connected over TCP loses its connection. In `niceemu` it is a register that keeps what is written. |
 | `i dhcp` | Gets the IP address from the network's DHCP server and writes it, as `i A.B.C.D` does, then shows it, with the mask, the gateway, and the server, a line each (The network below). Without an answer, it prints `No answer from a DHCP server` after about 8 seconds, and leaves the address as it was. |
 | `m [MAC]` | Shows the station's MAC address, `MAC address 02:4E:49:43:45:00`, or writes it first: six bytes of one or two hex digits, in either case, with colons between them, such as `m 02:4E:49:43:45:01`. The first byte must be even, as an odd one makes a group address. Anything else is no address, and `m` says so and writes nothing. It writes `0xFFFFFFB1` and `B2`, so a host connected over TCP loses its connection. Two boards on one network need different MAC addresses. In `niceemu` they are registers too, with the address of a board after reset. |
+| `time [YYYY-MM-DD HH:MM:SS]` | Shows the clock of the time of day, `2026-11-11 14:30:00`, or sets it first to the date and the time given, two digits for each part but the year, in the years 1970 to 2105, with blanks around them, such as `time 2026-11-11 14:30:00`. The clock keeps local time, as the MEGA65's real-time clock does, and knows no time zones. After a reset of the system it is not set, and `time` prints `Clock not set` until a program, a host, or `time` sets it; a start of a program keeps it. Anything else is no time, and `time` says so and sets nothing. A clock that a program set past 2106-02-07 shows as `Clock past 2106`. In `niceemu` the clock is the host's time in UTC from the start. |
 | `baud [RATE]` | Shows the UART's baud rate, `Baud rate 230400`, or writes it first: 115200, 230400, 460800, 921600, 1000000, 1500000, or 2000000, in decimal, such as `baud 921600`. Anything else is no rate, and `baud` says so and writes nothing. It writes `0xFFFFFF9F` ([DEBUG_LINK.md](../doc/DEBUG_LINK.md#the-baud-rate)), as the on-board debugger's settings page does. The UART takes the new rate once it has sent nothing for 1 ms, so the answer and the prompt still come at the old rate, and a terminal on the UART then changes to the new one; only a reset brings back 230400. Over Ethernet the rate does not matter. In `niceemu` the word is memory, which reads 0 after a clear. |
 | `l` | Enters words into the RAM from lines of `ADDR WORD` in hex, as a `.bin` file has them (Loading without a host below), up to an empty line, and prints the words written and the lines skipped: `Words loaded: 600, 00008000 to 00008257`. |
 | `dir [SLOT]` | Lists the folder `NICE` of the SD card's FAT32 file system (Files below): `Directory of NICE`, then a row for each file, its name in 24 columns, the long name where it has one or else the 8.3 name, and its size in decimal, and for each directory, its name and `<DIR>`, then `Files: 25, directories: 1`. A name of 24 characters or more has a row of its own, and the size is on the next. With `SLOT` in hex, it mounts the card in it first; without, it lists the card mounted, which the first `dir` or `load` after reset mounts. An error is shown with its number and meaning: `File error 18, FAT16, which is not supported`. |
@@ -239,7 +241,8 @@ Anything else prints `Unknown command; ? lists them`. The debugger has
 pause, step, and inspect, so the monitor adds only `l`, which loads a
 program with no host's tools and no storage, `u`, which reads code
 with no host. `dir` and `load` read programs from
-a card's FAT32 file system, and `save` and `del` write it. `i dhcp`
+a card's FAT32 file system, and `save` and `del` write it. `time`
+shows the clock, which the dates of the files come from. `i dhcp`
 gives a board on a network an address with no host, and `tftp` loads a
 program from a server on it.
 
@@ -302,9 +305,11 @@ folder itself, so a card is written only where its user made room.
   at worst clusters that no file has, which `fsck.fat` frees. `fs_delete`
   deletes a file, with its long name, and no directory. A file open to
   write may not be opened again, a file open at all may not be truncated
-  or deleted, and a read-only one is not changed. A new file has the date
-  2026-01-01, as fat32.c does not read the clock of the time of day,
-  which is not set at a reset. FSInfo's count of
+  or deleted, and a read-only one is not changed. A file written gets the
+  date and the time of the clock (`time` above), and a new one as its
+  creation too; while the clock is not set, or its year is before 1980
+  or after 2106, the date is 2026-01-01 at 00:00.
+  FSInfo's count of
   the free clusters is set to unknown, which `fsck.fat` reports as
   uninitialized, and its hint is kept.
 - **The caches** are one sector of the FAT, and one for each of the two

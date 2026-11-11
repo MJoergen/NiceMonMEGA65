@@ -163,6 +163,7 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   the main loop and the commands, which BASIC (#54) is to replace, with
   `u` in `monitor_dis.nasm`, the sector routines in
   `monitor_sd.nasm`, and the network in `monitor_eth.nasm`), its C code (`fat32.c`,
+  and `clock.c`, the `time` command and the dates of files (#109), in
   one wasm module through `nicewasm --ram`, with its
   writable words at `0xFFFFF400`; building the monitor needs clang, and
   its tests mtools, `mkfs.fat`, and `sfdisk`), the routines that

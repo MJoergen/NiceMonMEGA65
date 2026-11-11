@@ -34,7 +34,7 @@ LIBC     = $(NICE_CPU)/runtime/libc
 BUILD    = build
 SOURCES  = monitor.nasm monitor_cmd.nasm monitor_dis.nasm monitor_sd.nasm monitor_eth.nasm monlib.nasm mon.nasm
 # The ROM's C code, and nice_cpu's runtime library that it is joined with
-ROM_C    = fat32.c
+ROM_C    = fat32.c clock.c
 RUNTIME_ROM = $(RUNTIME)/lib.nasm $(RUNTIME)/muldiv_mpu.nasm
 # The options of nicebuild.py --ram (nice_cpu's translator README), but
 # that every function that is not static is exported, for the monitor's
@@ -315,6 +315,20 @@ FATL = dir\rload "my prog.bin"\rr\rload MYPROG~1.BIN\rload "MY PROG.BIN"\rload m
 # two back.
 FATLW = l\r8000 1234ABCD\r8001 5\r\rsave mandelbrot.bin 8000 2\rsave mandelbrot3.txt 8000 2\rsave Hello.bin 8000 2\rsave lower.bin 8000 2\rsave "a b.bin" 8000 2\rsave MIXED.BIN 8000 1\rsave "a*b" 8000 1\rsave "end." 8000 1\rdel mandelbrot1.txt\rdel "mandelbrot2.txt"\rsave "a much longer name of a file.bin" 8000 2\rsave x.bin 8000 2\rdir\rload "A MUCH LONGER NAME OF A FILE.BIN"\rd 8000 2\rload mandel~1.bin\rh\r
 
+# time: with --step-time, so the clock starts at 0, not set, and counts a
+# microsecond a step, and a copy of super.img in slot 0. time shows that
+# it is not set, and save writes old.bin with the fixed date. time sets
+# 2026-11-11 14:30:01, which time shows, and save writes new.bin with it,
+# at 14:30:00 and 100 hundredths. Fifteen times are rejected: 2023-02-29
+# and 2100-02-29, as those years have no leap day, 1969 and 2106, before
+# and after the years time sets, month 13, November 31, hour 24, minute
+# 60, second 60, a year of two digits, a month and a day of one digit, no
+# time, a word after it, an hour of three digits, and a time of one
+# digit each; timex and ti are no commands. Then the edges that are
+# taken: 2000-02-29, 2100-03-01, 2104-02-29, the second past 2^31, the
+# last of 2105, and the first of 1970, in upper case with blanks, whose
+# year FAT cannot hold, so save writes y1970.bin with the fixed date.
+TIME = time\rl\r8000 1\r\rsave old.bin 8000 1\rtime 2026-11-11 14:30:01\rtime\rsave new.bin 8000 1\rtime 2023-02-29 00:00:00\rtime 2100-02-29 00:00:00\rtime 1969-12-31 23:59:59\rtime 2106-01-01 00:00:00\rtime 2026-13-01 00:00:00\rtime 2026-11-31 00:00:00\rtime 2026-11-11 24:00:00\rtime 2026-11-11 23:60:00\rtime 2026-11-11 23:59:60\rtime 26-11-11 00:00:00\rtime 2026-1-1 00:00:00\rtime 2026-11-11\rtime 2026-11-11 01:02:03 x\rtime 2026-11-11 001:02:03\rtime 2026-11-11 1:2:3\rtimex\rti\rtime 2000-02-29 00:00:00\rtime 2100-03-01 00:00:00\rtime 2104-02-29 12:00:00\rtime 2038-01-19 03:14:08\rtime 2105-12-31 23:59:59\rTIME  1970-01-01 00:00:00 \rsave y1970.bin 8000 1\rh\r
 # The words of each test that are dumped with the screen: for cmds the
 # variables, the cursor's registers, and the IP and MAC addresses, and for the programs the text at
 # column 40 of row 4, 80 * 4 + 40 = 360 = 0x168, with its color, and for
@@ -397,11 +411,12 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	@printf '$(FATW)' > $(BUILD)/fatw.txt
 	@printf '$(FATL)' > $(BUILD)/fatl.txt
 	@printf '$(FATLW)' > $(BUILD)/fatlw.txt
+	@printf '$(TIME)' > $(BUILD)/time.txt
 	@$(PYTHON) test/sd_image.py $(BUILD)/sd.img
 	@$(PYTHON) test/sd_image.py --written $(BUILD)/sd_written.img
 	@{ printf '$(LOAD_HEAD)'; head -n 3 $(BUILD)/hello.bin | awk '{ printf "%s\r\n", $$0 }'; \
 	  tail -n +4 $(BUILD)/hello.bin; printf '$(LOAD_TAIL)'; } > $(BUILD)/load.txt
-	@fail=0; for t in cmds scroll load load_emu load_64k sd_write arp udp rom fs fsw fat fatw fatl fatlw fatbad fat1 fatnone \
+	@fail=0; for t in cmds scroll load load_emu load_64k sd_write arp udp rom fs fsw fat fatw fatl fatlw fatbad fat1 fatnone time \
 	           hello reset hello_c; do \
 	  opts=; rom=$(BUILD)/monitor_test.bin; \
 	  case $$t in \
@@ -435,6 +450,8 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	    fatbad) prog=; input=fatbad; dump=; \
 	      opts="--sd0 $(BUILD)/fat/fat16.img --sd1 $(BUILD)/fat/exfat.img";; \
 	    fat1) prog=; input=fat1; dump=; opts="--sd1 $(BUILD)/fat/super.img";; \
+	    time) prog=; input=time; dump=; cp $(BUILD)/fat/super.img $(BUILD)/time0.img; \
+	      opts="--step-time --sd0 $(BUILD)/time0.img";; \
 	    fatnone) prog=; input=fatnone; dump=; \
 	      opts="--sd0 $(BUILD)/fat/nonice.img --sd1 $(BUILD)/fat/nicefile.img";; \
 	    hello) prog=$(BUILD)/hello.bin; input=run; dump='$(DUMP_hello)';; \
@@ -457,6 +474,9 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	    if [ $$t = fatw ]; then \
 	      $(PYTHON) test/fat_check.py $(BUILD)/fatw0.img HELLO.BIN; \
 	      $(PYTHON) test/fat_check.py $(BUILD)/fatw1.img FULL.BIN; fi; \
+	    if [ $$t = time ]; then \
+	      $(PYTHON) test/fat_check.py $(BUILD)/time0.img; \
+	      echo "Dates in NICE:"; mdir -i $(BUILD)/time0.img ::NICE | grep -E '^(old|new|y1970) '; fi; \
 	    if [ $$t = fatlw ]; then \
 	      $(PYTHON) test/fat_check.py $(BUILD)/fatlw0.img mandelbrot.bin "a b.bin" \
 	        "a much longer name of a file.bin" mixed.Bin; fi; } \
