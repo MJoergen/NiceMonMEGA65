@@ -89,7 +89,8 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 - The MEGA65's builds use `FLOW=timing` alone, as the Nexys4DDR's do,
   so `make r6`, `make r3`, and `make cor` need it no more. Their RAM is
   built from block RAMs that are not cascaded in pairs, which gives the
-  core's paths from the RAM about 0.4 ns more slack, and the builds
+  core's paths from the RAM more slack: the R6 meets 100 MHz by
+  0.196 ns without a ROM, where it met it by 0.058 ns, and its builds
   take less time
   ([#107](https://github.com/MJoergen/NiceMonMEGA65/issues/107)).
 
