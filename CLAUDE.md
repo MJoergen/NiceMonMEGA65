@@ -14,7 +14,8 @@ board exactly as `niceemu`, the emulator in `nice_cpu/emulator`, runs it.
 and over the serial port, in that order, the order of their numbers of
 users. `doc/SYSTEM.md` has the address map, the screen,
 the keyboard, the Nexys4DDR's devices, the SD card slots, and the I2C
-bus with the MEGA65's real-time clock, which the ROM reads (#105);
+bus with the MEGA65's real-time clock, which the ROM reads and `time`
+writes (#105);
 `doc/DEBUG_LINK.md` the link, its control register, the UART's baud
 rate, and the link over TCP; `CONTRIBUTING.md` the tests, the
 formal checks, `make hwtest`, and the badge; `doc/EMULATOR.md` the known
@@ -170,7 +171,8 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   `u` in `monitor_dis.nasm`, the sector routines in
   `monitor_sd.nasm`, and the network in `monitor_eth.nasm`), its C code (`fat32.c`,
   and `clock.c`, the `time` command, the dates of files (#109), and the
-  clock from the real-time clock at the cold start (#105), in
+  clock from the real-time clock at the cold start, which `time`
+  writes (#105), in
   one wasm module through `nicewasm --ram`, with its
   writable words at `0xFFFFF400`; building the monitor needs clang, and
   its tests mtools, `mkfs.fat`, and `sfdisk`), the routines that

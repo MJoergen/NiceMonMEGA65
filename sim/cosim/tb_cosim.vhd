@@ -15,7 +15,8 @@
 -- It has the fonts of the display (src/video/font.vhd), with no display,
 -- and the I2C master with a model of the R6's real-time clock on its bus
 -- (i2c_chip_model.vhd), an RV-3032-C7 at 2026-11-11 12:34:56.50, which
--- does not run; the monitor's cold start reads it (#105).
+-- does not run; the monitor's cold start reads it, and its time writes it
+-- (#105). Its status has EVF, bit 2, which time clears with VLF and PORF.
 -- The clock is 10 MHz and the UART runs at 1 Mbaud, 10 cycles per bit, so
 -- that the bytes come as quickly as the UART takes them. The simulation
 -- runs far slower than real time, but the host's bytes arrive back to
@@ -157,7 +158,7 @@ begin
    i_rtc : entity work.i2c_chip_model
       generic map (
          G_ADDR => "1010001",
-         G_REGS => X"0000000000000000000000000000000000000000000000002611110312345650"
+         G_REGS => X"0000000000000000000000000000000000000400000000002611110312345650"
       )
       port map (
          scl_io => i2c_scl,

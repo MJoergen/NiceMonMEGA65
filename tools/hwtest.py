@@ -44,8 +44,10 @@ Checks, in this order:
       real-time clock answers, its time is printed, and after the ROM's
       start the clock is set and near the host's local time, unless the
       real-time clock says that it lost its time. A time more than five
-      minutes off is printed as a WARNING, and does not fail, as the
-      MEGA65 core's settings set it (#105)
+      minutes off is printed as a WARNING, and does not fail. Then the
+      real-time clock is set to the host's local time, as the monitor's
+      time sets it, and read back, with the flags that say that it lost
+      its time cleared (#105)
     - bad packets are dropped, and nicelink sends a dropped request again
     - sim/echo.nasm loads and runs, and the link reaches only its debug
       registers while it runs
@@ -161,6 +163,7 @@ Notes:
 """
 
 import argparse
+import calendar
 import os
 import re
 import socket
@@ -210,11 +213,13 @@ DHCP_TIME = 4 * 2 * 2.0
 
 T = TypeVar("T")
 
-# How long console() and answers() wait for the next byte, and run.py's
-# --timeout in test_run. tools/cosimtest.py makes them longer for the
-# simulation, which runs far slower than real time.
+# How long console() and answers() wait for the next byte, run.py's
+# --timeout in test_run, and how long i2c() waits for a transaction.
+# tools/cosimtest.py makes them longer for the simulation, which runs far
+# slower than real time.
 QUIET = 0.5
 RUN_TIMEOUT = 10.0
+I2C_WAIT = 1.0
 
 results: list[bool] = []
 # The checks that could not run, which the summary names
@@ -1217,8 +1222,8 @@ def read_clock(link: Link) -> float:
 
 def i2c(link: Link, cmd: int) -> int:
     """A transaction of the I2C master with the command cmd: its status
-    when it is done, or 2, busy, after a second."""
-    deadline = time.time() + 1.0
+    when it is done, or with busy set after I2C_WAIT seconds."""
+    deadline = time.time() + I2C_WAIT
     while rd(link, I2C_STATUS) & 2 and time.time() < deadline:
         pass
     wr(link, I2C_CMD, cmd)
@@ -1243,8 +1248,10 @@ def test_i2c(link: Link, board: str, booted: bool) -> None:
     """The I2C master (#105), as the docstring says. booted is True when
     the core booted from the ROM after the FPGA was programmed, whose
     start sets the clock from the real-time clock."""
+    # NACK may be left from the ROM's start, which looked for a real-time
+    # clock where none is, as on the Nexys4DDR.
     status = rd(link, I2C_STATUS)
-    check("I2C master present, idle", status == 1, f"{status:08X}")
+    check("I2C master present, idle", status & 3 == 1, f"{status:08X}")
     status = i2c(link, i2c_read(0x22, 0, 1))
     check("I2C: NACK from 0x22, where no chip is", status == 5,
           f"{status:08X}")
@@ -1280,26 +1287,89 @@ def test_i2c(link: Link, board: str, booted: bool) -> None:
     print(f"  {name}: 20{date[2]:02X}-{date[1]:02X}-{date[0]:02X} "
           f"{hour:02X}:{mins:02X}:{sec:02X}, status register {flags:02X}"
           f"{', it lost its time' if lost else ''}", flush=True)
+    rv = name.startswith("RV")
     if not booted:
         uncovered.append("the clock from the real-time clock at the ROM's "
                          "start, as the FPGA was not programmed, or has no "
                          "ROM")
-        return
-    if lost:
+    elif lost:
         check("clock not set at the ROM's start, as the real-time clock "
               "lost its time", set_ == 0, f"{set_:08X}")
-        uncovered.append("the clock from the real-time clock, which lost "
-                         "its time: set it in the MEGA65 core")
-        return
-    check("clock set from the real-time clock at the ROM's start",
-          set_ == 1, f"{set_:08X}")
+        uncovered.append("the clock from the real-time clock at the ROM's "
+                         "start, as it had lost its time; this run sets it, "
+                         "so the next one covers it")
+    else:
+        check("clock set from the real-time clock at the ROM's start",
+              set_ == 1, f"{set_:08X}")
+        now = time.time()
+        off = read_clock(link) - (now + time.localtime(now).tm_gmtoff)
+        print(f"  the clock is {off:+.1f} s from the host's local time",
+              flush=True)
+        if abs(off) > 300:
+            print("  WARNING: the real-time clock was more than five "
+                  "minutes off; this run sets it", flush=True)
+    rtc_set(link, rv)
+
+
+def bcd(n: int) -> int:
+    """n as two BCD digits."""
+    return n // 10 << 4 | n % 10
+
+
+def unbcd(b: int) -> int:
+    """The number of two BCD digits."""
+    return (b >> 4) * 10 + (b & 15)
+
+
+def i2c_write(link: Link, chip: int, reg: int, data: list[int],
+              at: float = 0.0) -> int:
+    """A write of the bytes of data to register reg of chip, started at
+    the host's time at, if it is still to come. Its status."""
+    for i in range(0, len(data), 4):
+        wr(link, I2C_DATA + i // 4,
+           sum(b << 8 * j for j, b in enumerate(data[i:i + 4])))
+    wait = at - time.time()
+    if wait > 0:
+        time.sleep(wait)
+    return i2c(link, len(data) << 16 | reg << 8 | chip)
+
+
+def rtc_set(link: Link, rv: bool) -> None:
+    """Sets the MEGA65's real-time clock to the host's local time, at the
+    start of a second, as the monitor's time writes it (monitor/clock.c),
+    and checks it: the time read back, and the flags that say that it lost
+    its time cleared."""
+    at = int(time.time()) + 2
+    t = time.localtime(at)
+    hms = [bcd(t.tm_sec), bcd(t.tm_min), bcd(t.tm_hour)]
+    dmy = [bcd(t.tm_mday), bcd(t.tm_mon), bcd(t.tm_year - 2000)]
+    wday = (t.tm_wday + 1) % 7         # 0 for Sunday, as the MEGA65 core
+    if rv:
+        ok = (i2c_write(link, 0x51, 1, hms + [wday] + dmy, at) == 1 and
+              i2c_write(link, 0x51, 0x0D, [0]) == 1)
+        status = i2c(link, i2c_read(0x51, 0, 14))
+        b = i2c_bytes(link, 14)
+        lost = b[13] & 3
+        got = [b[7], b[6], b[5], b[3], b[2], b[1]]
+    else:
+        ok = (i2c_write(link, 0x6F, 8, [0x41]) == 1 and
+              i2c_write(link, 0x6F, 0, [hms[0], hms[1], hms[2] | 0x80] +
+                        dmy + [wday], at) == 1 and
+              i2c_write(link, 0x6F, 8, [0x01]) == 1)
+        status = i2c(link, i2c_read(0x6F, 0, 8))
+        b = i2c_bytes(link, 8)
+        lost = b[7] & 1
+        got = [b[5], b[4], b[3], b[2] & 0x3F, b[1], b[0]]
     now = time.time()
-    off = read_clock(link) - (now + time.localtime(now).tm_gmtoff)
-    print(f"  the clock is {off:+.1f} s from the host's local time",
-          flush=True)
-    if abs(off) > 300:
-        print("  WARNING: the real-time clock is more than five minutes "
-              "off; set it in the MEGA65 core", flush=True)
+    try:
+        y, mo, d, h, mi, sec = (unbcd(x) for x in got)
+        rtc = calendar.timegm((2000 + y, mo, d, h, mi, sec))
+        off = rtc - (now + time.localtime(now).tm_gmtoff)
+    except (ValueError, OverflowError):
+        off = float("inf")
+    check("I2C: the real-time clock set to the host's local time",
+          ok and status == 1 and abs(off) < 3 and not lost,
+          f"{off:+.1f} s, flags {b[-1]:02X}")
 
 
 def test_clock(link: Link) -> None:

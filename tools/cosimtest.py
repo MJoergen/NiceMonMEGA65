@@ -31,6 +31,7 @@ import signal
 import subprocess
 import sys
 import tempfile
+import time
 
 import hwtest
 from hwtest import (NICEEMU, REPO, assemble, assemble_labels, comparisons,
@@ -42,13 +43,19 @@ from boardlink import HOLD, RAM, open_link
 # The time of the model of the RV-3032-C7 in sim/cosim/tb_cosim.vhd, as
 # the clock counts local time: seconds since 1970 as if it were UTC
 RTC_TIME = calendar.timegm((2026, 11, 11, 12, 34, 56)) + 0.5
+# The monitor's time, and the registers 1 to 7 of the RV-3032-C7 that it
+# writes: the seconds to the year in BCD, with the weekday, 4, Thursday
+RTC_SET = b"time 2027-03-04 05:06:07\r"
+RTC_REGS = [0x07, 0x06, 0x05, 0x04, 0x04, 0x03, 0x27]
 
 
 def test_rtc(port: str, tmp: str) -> None:
     """The clock from the real-time clock: the I2C master is present, and
     with "set" cleared, the monitor's cold start in test_monitor sets the
     clock to the model's time, which the simulation has run on from for
-    no more than a minute."""
+    no more than a minute. Then the monitor that test_monitor left in the
+    RAM starts again, and its time, typed, writes the model, whose
+    registers it reads back, and clears its status."""
     args = argparse.Namespace(cosim=int(port), tcp=None)
     link = open_link(args)
     try:
@@ -69,6 +76,28 @@ def test_rtc(port: str, tmp: str) -> None:
         hwtest.check("clock set from the real-time clock at the cold start",
                      ok and 0 <= clock - RTC_TIME < 60,
                      f"{clock - RTC_TIME:+.3f} s from the model's time")
+        link.control(RAM)
+        text = b""
+        end = time.monotonic() + 300
+        while b"> " not in text and time.monotonic() < end:
+            link.poll(0.5)
+            text += link.take_console()
+        link.send_console(RTC_SET)
+        text = b""
+        while b"> " not in text and time.monotonic() < end:
+            link.poll(0.5)
+            text += link.take_console()
+        link.control(HOLD | RAM)
+        hwtest.check("the monitor's time typed", b"2027-03-04 05:06:" in text,
+                     repr(text))
+        status = hwtest.i2c(link, hwtest.i2c_read(0x51, 1, 13))
+        regs = hwtest.i2c_bytes(link, 13)
+        hwtest.check("time wrote the real-time clock",
+                     status == 1 and regs[:7] == RTC_REGS,
+                     f"status {status:08X}, "
+                     + " ".join(f"{b:02X}" for b in regs[:7]))
+        hwtest.check("time cleared the real-time clock's status",
+                     regs[12] == 0, f"{regs[12]:02X}")
     finally:
         link.close()
 
@@ -82,6 +111,7 @@ def main() -> None:
                  "'make -C nice_cpu/emulator build'")
     hwtest.QUIET = 5.0
     hwtest.RUN_TIMEOUT = 600.0
+    hwtest.I2C_WAIT = 600.0
     with tempfile.TemporaryDirectory() as tmp:
         log_path = os.path.join(tmp, "cosim.log")
         with open(log_path, "wb") as log:

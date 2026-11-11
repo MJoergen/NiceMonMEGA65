@@ -1,6 +1,7 @@
 // The clock of the time of day for the ROM (issue #109): the monitor's
 // time command, the dates of FAT's entries for fat32.c, and the clock set
-// from the MEGA65's real-time clock at the cold start (issue #105). It is
+// from the MEGA65's real-time clock at the cold start, which time sets
+// (issue #105). It is
 // part of the ROM's C code (INTERNALS.md, "C in the ROM"), with fat32.c.
 //
 // The clock (nice_cpu's SYSTEM.md §10) counts seconds since 1970-01-01
@@ -46,6 +47,7 @@
 static const char form[] = "####-##-## ##:##:##";
 static unsigned field[6];
 static unsigned usec;   // the microseconds of the last split
+static unsigned days;   // the days since 1970 of the last set
 
 static const unsigned char mdays[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
@@ -107,7 +109,7 @@ static int set(unsigned us)
         field[2] - 1 >= mlen(field[0], field[1] - 1) || field[3] > 23 || field[4] > 59 ||
         field[5] > 59)
         return 0;
-    unsigned days = field[2] - 1;
+    days = field[2] - 1;
     for (unsigned y = YEAR_MIN; y < field[0]; y++)
         days += ylen(y);
     for (unsigned m = 0; m + 1 < field[1]; m++)
@@ -118,17 +120,65 @@ static int set(unsigned us)
     return 1;
 }
 
-// A read of n bytes from register reg of the I2C chip at address chip,
-// into the master's data. 1 when the chip answered every byte.
-static int i2c_read(unsigned chip, unsigned reg, unsigned n)
+// A transaction of the I2C master with the command cmd. 1 when the chip
+// answered every byte.
+static int i2c(unsigned cmd)
 {
     while (nice_peek(I2C_STATUS) & I2C_BUSY)
         ;
-    nice_poke(I2C_CMD, n << 16 | reg << 8 | I2C_READ | chip);
+    nice_poke(I2C_CMD, cmd);
     unsigned s;
     while ((s = nice_peek(I2C_STATUS)) & I2C_BUSY)
         ;
     return !(s & I2C_FAIL);
+}
+
+// A read of n bytes from register reg of the I2C chip at address chip,
+// into the master's data. 1 when the chip answered every byte.
+static int i2c_read(unsigned chip, unsigned reg, unsigned n)
+{
+    return i2c(n << 16 | reg << 8 | I2C_READ | chip);
+}
+
+// A write of the n bytes of lo and hi, byte 0 in bits 7..0 of lo, to
+// register reg of the I2C chip at address chip. 1 when the chip answered
+// every byte.
+static int i2c_write(unsigned chip, unsigned reg, unsigned n, unsigned lo, unsigned hi)
+{
+    nice_poke(I2C_DATA, lo);
+    nice_poke(I2C_DATA + 1, hi);
+    return i2c(n << 16 | reg << 8 | chip);
+}
+
+// n as two BCD digits
+static unsigned tobcd(unsigned n)
+{
+    return n / 10 << 4 | n % 10;
+}
+
+// The MEGA65's real-time clock set to the date and the time in field, and
+// the weekday of days, 0 for Sunday, as the MEGA65 core counts them, when
+// the year is one that the chip holds, 2000 to 2099 (issue #105). The
+// RV-3032-C7 takes the seconds to the year from register 1, which also
+// clears its hundredths, and then 0 in its status, which clears VLF and
+// PORF, so that the next cold start trusts it. The ISL12020M takes them
+// from register 0, in another order, with bit 7 of the hours for 24-hour
+// mode, while WRTC, bit 6 of its register 8, allows the write, as the
+// MEGA65 core writes it; the write clears RTCF. Nothing answers on the
+// Nexys4DDR, which has no real-time clock.
+static void rtc_write(void)
+{
+    if (field[0] < 2000 || field[0] > 2099)
+        return;
+    unsigned wday = (days + 4) % 7;
+    unsigned hms = tobcd(field[5]) | tobcd(field[4]) << 8 | tobcd(field[3]) << 16;
+    unsigned dmy = tobcd(field[2]) | tobcd(field[1]) << 8 | tobcd(field[0] - 2000) << 16;
+    if (i2c_write(RV3032, 1, 7, hms | wday << 24, dmy)) {
+        i2c_write(RV3032, 0x0D, 1, 0, 0);
+    } else if (i2c_write(ISL12020M, 8, 1, 0x41, 0)) {
+        i2c_write(ISL12020M, 0, 7, hms | 0x800000 | (dmy & 0xFF) << 24, dmy >> 8 | wday << 16);
+        i2c_write(ISL12020M, 8, 1, 0x01, 0);
+    }
 }
 
 // Byte i of the data that the I2C master read, as a number from its two
@@ -186,7 +236,8 @@ void clock_rtc(void)
 
 // time [YYYY-MM-DD HH:MM:SS]: the line from p, the word after time. With
 // a date and a time as FORM has them, with blanks before and after, the
-// clock is set to them, at 0 microseconds, which sets "set"; anything
+// clock is set to them, at 0 microseconds, which sets "set", and so is the
+// MEGA65's real-time clock, in the years 2000 to 2099; anything
 // else that is not blank is no time, and sets nothing. Then the clock is
 // shown as FORM has it, or that it is not set.
 void clock_cmd(unsigned p)
@@ -214,6 +265,7 @@ void clock_cmd(unsigned p)
             p++;
         if (nice_peek(p) || !set(0))
             goto bad;
+        rtc_write();
     }
     if (!split()) {
         nice_print(nice_peek(CLOCK_STATUS) & 1 ? "Clock past 2106\r\n" : "Clock not set\r\n");

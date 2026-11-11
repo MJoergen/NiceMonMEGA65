@@ -505,7 +505,9 @@ with `--monitor --rom` and with a short program pasted into `l`, with
 be the same, and checks that `load.py` refuses a word beyond the
 simulated system's 64K words of RAM. The simulated system's I2C bus has
 a model of the R6's real-time clock, and the monitor's cold start must
-set the clock of the time of day to its time (#105).
+set the clock of the time of day to its time. Then the monitor starts
+again, gets `time` with a date and a time, and must write them to the
+model and clear its status (#105).
 It leaves out nice_cpu's benchmark and the demo's self-test, which would
 take too long. It takes about an hour, most of it in the monitor's runs,
 and CI runs it on both cores.
@@ -826,8 +828,10 @@ bitstream has one. Then it hides the ROM and uses the link:
   ROM's start the clock must be set, unless the real-time clock says
   that it lost its time, which the summary names after NOT COVERED. A
   clock more than five minutes from the host's local time gets a
-  WARNING, but does not fail, as the MEGA65 core's settings set the
-  real-time clock.
+  WARNING, but does not fail. Then the script sets the real-time clock
+  to the host's local time, as the monitor's `time` does, and reads it
+  back, with the flags that say that it lost its time cleared, so the
+  next run covers the clock at the ROM's start.
 - It checks that the link drops a packet with a bad checksum, one cut
   short by an ESC, and one with a gap of 300 ms, that the link sends
   a dropped `R` or `W` again, and that an unknown tag gets `e01` and a bad

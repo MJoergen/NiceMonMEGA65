@@ -583,19 +583,24 @@ answers. Every board has an I2C master at `0xFFFFFF97`–`9D` (issue
 | Nexys4DDR | The temperature sensor, an ADT7420 at `0x4B` |
 
 The **real-time clock** keeps the date and the time with a battery,
-while the board is off. All the MEGA65's cores share it, and the MEGA65
-core and its configure tool set its time, in local time.
+while the board is off. All the MEGA65's cores share it, and keep it in
+local time.
 
 **The ROM reads it.** At its start, the monitor in the ROM sets the
 clock of the time of day (see [I/O registers](#io-registers)) from the
 real-time clock, when the clock is not set yet. So after the power-up a
-program finds the clock set, with the time that the MEGA65 core shows.
-The monitor leaves the clock as it is when the real-time clock says
-that it lost its time, as after a flat battery: the RV-3032-C7's flags
-VLF and PORF, and the ISL12020M's flag RTCF. Nothing here ever writes
-the real-time clock, so that the other cores keep their time. The
-Nexys4DDR has no real-time clock, so its clock is not set until a
-program sets it.
+program finds the clock set. The monitor leaves the clock as it is when
+the real-time clock says that it lost its time, as after a flat battery
+or a new chip: the RV-3032-C7's flags VLF and PORF, and the ISL12020M's
+flag RTCF.
+
+**`time` writes it.** The monitor's `time` with a date and a time sets
+the real-time clock too, in the years 2000 to 2099, and clears the flags
+that say that it lost its time. So `time` once sets the clock for every
+later start, and for the MEGA65's other cores. `make hwtest` sets it to
+the host's local time. A program that sets the clock of the time of day
+leaves the real-time clock as it is. The Nexys4DDR has no real-time
+clock, so its clock is not set until a program or `time` sets it.
 
 A chip's data are in its **registers**, each a byte, which a
 transaction reads or writes. The master does a whole transaction at
