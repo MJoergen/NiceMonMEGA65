@@ -118,6 +118,7 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
 | [DEBUGGER.md](doc/DEBUGGER.md) | The design note of the on-board debugger: its stages, its tests, and its decisions. |
 | [SDCARD.md](doc/SDCARD.md) | The design of the storage on the SD cards, from the controller to the files and BASIC, with its issues. |
 | [BASIC_SURVEY.md](doc/BASIC_SURVEY.md) | The survey of the BASIC dialects behind the interpreter planned for the ROM. |
+| [BASIC.md](doc/BASIC.md) | The design note of the BASIC interpreter planned for the ROM: its decisions, its internals, the room in the ROM, and its stages. |
 | [CODING_STYLE.md](doc/CODING_STYLE.md) | The style of the VHDL, which `make lint` checks as far as vsg can. |
 | [RELEASE_NOTES.md](doc/RELEASE_NOTES.md) | The releases, newest first, with what changed in each. [RELEASE.md](doc/RELEASE.md) is how to make one. |
 | [core.mk](core.mk) | Picks the source files of the core, from `NICE`, for the Makefiles of `sim/` and `synth/`. |

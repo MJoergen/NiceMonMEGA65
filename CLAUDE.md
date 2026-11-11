@@ -30,7 +30,9 @@ and display, the decode of row 27, the link's side port with the
 registers live (issues #52 and #53), and the settings page of the
 link with the UART's baud rate at `0xFFFFFF9F` (issue #75). `doc/BASIC_SURVEY.md` is
 the survey of the BASIC dialects behind the interpreter in the ROM of
-issue #54 (milestone V2.0). `doc/SDCARD.md` is the design of the SD
+issue #54 (milestone V2.0.2), and `doc/BASIC.md` its design note, with
+the decisions, the room in the ROM, and the stages, of which none is
+written. `doc/SDCARD.md` is the design of the SD
 cards' storage, issue #62 and its subtasks, of which the controller, the
 slots, the ROM's sector routines, FAT32's
 reading with `dir` and `load`, and its writing with `save` and `del`
