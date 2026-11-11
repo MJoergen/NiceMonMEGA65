@@ -971,11 +971,15 @@ the errors of names and of read-only files. On a running core, `put`
 must start it again from reset. Last, the monitor of the tests lists the
 card, the tool puts a `.bin` file, which the monitor, started again,
 lists and loads, and deletes it. Then `sdnbd.py` serves a card while
-`sim/sdhold.nasm` runs, to a client of NBD in the script: the handshake
-with `NBD_OPT_GO` and with `NBD_OPT_EXPORT_NAME`, reads of whole sectors
-and of parts, a read past the end, and the writes that `mtools` made on
-a copy, in parts of sectors, after which the card must be that copy and
-pass `fsck.fat -n`, and the core must start again from reset. With
+`sim/sdhold.nasm` runs, to a client of NBD in the script: an
+`NBD_OPT_GO` whose list of requests is cut short, which is refused, the
+handshake with `NBD_OPT_GO` and with `NBD_OPT_EXPORT_NAME`, reads of
+whole sectors and of parts, a read past the end, and the writes that
+`mtools` made on a copy, in parts of sectors. A write longer than the
+server takes is refused with no wait for its data, and ends the
+connection, and the next one is served. After them the card must be
+that copy and pass `fsck.fat -n`, and the core must start again from
+reset. With
 `--read-only`, a write is refused, and the held core stays held. It
 takes about 40 seconds, and CI runs it.
 

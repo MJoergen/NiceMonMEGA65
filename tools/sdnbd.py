@@ -176,6 +176,9 @@ def negotiate(conn: socket.socket, disk: Disk) -> bool:
                 opt_reply(conn, opt, REP_ERR_INVALID)
                 continue
             (count,) = struct.unpack(">H", data[4 + name_len:6 + name_len])
+            if 6 + name_len + 2 * count > n:
+                opt_reply(conn, opt, REP_ERR_INVALID)
+                continue
             reqs = struct.unpack(f">{count}H",
                                  data[6 + name_len:6 + name_len + 2 * count])
             opt_reply(conn, opt, REP_INFO,
@@ -198,6 +201,10 @@ def transmit(conn: socket.socket, disk: Disk) -> None:
         magic, _, kind, cookie, offset, length = struct.unpack(
             ">IHHQQI", recv_exact(conn, 28))
         if magic != REQUEST_MAGIC:
+            raise Closed()
+        if kind == CMD_WRITE and length > MAX_REQUEST:
+            # Its data is not read, so the connection ends with the reply
+            conn.sendall(struct.pack(">IIQ", SIMPLE_MAGIC, EINVAL, cookie))
             raise Closed()
         data = recv_exact(conn, length) if kind == CMD_WRITE else b""
         if kind == CMD_DISC:

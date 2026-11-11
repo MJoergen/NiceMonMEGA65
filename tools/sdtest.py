@@ -800,14 +800,23 @@ def test_write_running(imgs: dict[str, str], tmp: str) -> None:
 class NbdClient:
     """A client of sdnbd.py's NBD server, as nbd-client and the kernel
     speak to it: the fixed newstyle handshake, with NBD_OPT_GO, or the
-    old NBD_OPT_EXPORT_NAME, and then the requests, with simple replies."""
+    old NBD_OPT_EXPORT_NAME, and then the requests, with simple replies.
+    With first, an NBD_OPT_GO of that data comes before them, and first
+    is then the type of its reply."""
 
-    def __init__(self, port: int, go: bool = True) -> None:
+    def __init__(self, port: int, go: bool = True,
+                 first: bytes | None = None) -> None:
         self.sock = socket.create_connection(("127.0.0.1", port), timeout=60)
         hello = self.recv(18)
         assert hello[:8] == b"NBDMAGIC", hello
         self.sock.sendall(struct.pack(">I", 3))
         self.block: tuple[int, int, int] | None = None
+        self.first = 0
+        if first is not None:
+            self.sock.sendall(struct.pack(">QII", 0x49484156454F5054, 7,
+                                          len(first)) + first)
+            _, _, self.first, n = struct.unpack(">QIII", self.recv(20))
+            self.recv(n)
         if go:
             data = struct.pack(">I", 2) + b"sd" + struct.pack(">HH", 1, 3)
             self.sock.sendall(struct.pack(">QII", 0x49484156454F5054, 7,
@@ -856,6 +865,16 @@ class NbdClient:
     def close(self) -> None:
         self.sock.sendall(struct.pack(">IHHQQI", 0x25609513, 0, 2, 0, 0, 0))
         self.sock.close()
+
+    def closed(self) -> bool:
+        """Whether sdnbd.py has closed the connection, which is then
+        closed here too."""
+        try:
+            return self.sock.recv(1) == b""
+        except ConnectionError:
+            return True
+        finally:
+            self.sock.close()
 
 
 def start_nbd(emu: Emu, *args: str) -> tuple[subprocess.Popen[bytes], int]:
@@ -909,7 +928,10 @@ def test_nbd(imgs: dict[str, str], tmp: str) -> None:
     start_hold(emu, tmp, True)
     proc, port = start_nbd(emu)
     try:
-        c = NbdClient(port)
+        # First an NBD_OPT_GO with no name, whose 5 requests are missing
+        c = NbdClient(port, first=struct.pack(">IH", 0, 5))
+        check("NBD_OPT_GO with its list cut short: NBD_REP_ERR_INVALID",
+              c.first == 0x80000003, f"{c.first:#x}")
         check("NBD_OPT_GO: the card's size, writable",
               c.size == len(old) and c.flags & 2 == 0,
               f"{c.size} bytes, flags {c.flags:#x}")
@@ -935,7 +957,11 @@ def test_nbd(imgs: dict[str, str], tmp: str) -> None:
         check("and read them back", ok)
         error, _ = c.request(3, 0, 0)
         check("flush", error == 0, str(error))
-        c.close()
+        # A write longer than the server takes, of which no data is sent
+        error, _ = c.request(1, 0, 32 * MB + 512)
+        check("a write of more than 32 MB: EINVAL, with no wait for its "
+              "data", error == 22, str(error))
+        check("and the connection closed", c.closed())
         c = NbdClient(port, go=False)
         check("a second connection, with NBD_OPT_EXPORT_NAME",
               c.size == len(old) and c.read(0, 512) == new[:512])
