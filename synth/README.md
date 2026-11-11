@@ -45,17 +45,18 @@ beyond the ROM fails the build. `make r6
 ROM=monitor.bin` in the top directory does the same with a path relative
 to it.
 
-`FLOW=default`, the default, runs every step of Vivado with its default
-directives, with which the MEGA65 met 100 MHz until nice_cpu V2.0; now
-it misses, and the MEGA65 needs `FLOW=timing` (see [Timing](#timing)).
+`FLOW=default` runs every step of Vivado with its default
+directives, with which the MEGA65 met 100 MHz until nice_cpu V2.0.
 `FLOW=timing` runs them
 with directives for timing: `synth_design -directive
 PerformanceOptimized -retiming`, `opt_design -directive Explore`,
 `place_design -directive ExtraTimingOpt`, or the `PLACE_TIMING` of the
 board's Makefile, `AltSpreadLogic_high` on the R6, and `AggressiveExplore`
 for `phys_opt_design` and `route_design`, with `phys_opt_design` again
-after routing ([Makefile.inc](Makefile.inc)). The Nexys4DDR's Makefile
-sets `FLOW=timing`, as its slower part needs it (see [Timing](#timing)).
+after routing ([Makefile.inc](Makefile.inc)). Every board's Makefile
+sets `FLOW=timing`: the Nexys4DDR's slower part needs it, and the
+MEGA65 misses 100 MHz without it since nice_cpu V2.0 (see
+[Timing](#timing)).
 
 Every registered pin carries `IOB TRUE` in the board's XDC, with a plain
 register in front of the pin and no logic between them, so that Vivado
@@ -294,8 +295,7 @@ These are the worst setup and hold slacks, in ns:
 | Nexys4DDR, `NICE=multi`, `FLOW=timing` | 90 MHz | 0.186 | 0.019 |
 
 So the pipelined core meets its clock on every board with `FLOW=timing`
-only, and the R6 and the Nexys4DDR with little to spare. On the MEGA65,
-`make release` tries the default flow first, then `FLOW=timing`. The R6's worst paths
+only, and the R6 and the Nexys4DDR with little to spare. The R6's worst paths
 are in the core's WRITE stage in the default flow, from its
 micro-operation to its value, and in the timing flow from the read
 data of the ROM, the RAM, or a device into WRITE's register file. With

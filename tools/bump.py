@@ -17,10 +17,12 @@ makes the three files they read at the top level of the repository:
 
 In this order it checks that the tree is clean, is on main, and that the tag
 exists, checks out the tag in nice_cpu, builds niceemu, runs make test, and
-builds each board's bitstream, the R6 first, with Vivado's default
-directives. If the default flow misses timing it builds that board again
-with FLOW=timing, the weaker claim, and its badge says so: "V1.0 met
-(timing flow)". Then it makes two commits, the submodule bump and the three
+builds each board's bitstream, the R6 first. The Nexys4DDR is built with
+Vivado's default directives, and if that misses timing, again with
+FLOW=timing, the weaker claim. The R6 is built with FLOW=timing alone,
+as its Makefile has it, for the core misses 100 MHz in the default flow
+since nice_cpu V2.0 (issue #107). A badge of FLOW=timing says so: "V1.0
+met (timing flow)". Then it makes two commits, the submodule bump and the three
 files. It pushes only with --push, for a push publishes the badges.
 
 A timing miss is a result: the red badge is written and committed, and the
@@ -79,6 +81,9 @@ TAG = re.compile(r"(V\d+\.\d+)(\.\d+)?$")
 # The flows in the order they are tried; the first is the one the badge
 # needs no note for.
 FLOWS = ("default", "timing")
+
+# The boards that try one flow alone, the one their Makefile sets
+BOARD_FLOWS = {"r6": ("timing",)}
 
 # What read_reports gives, and the badge and verified.json: JSON objects
 Record = dict[str, Any]
@@ -310,7 +315,7 @@ def measure(target: str, key: Record) -> tuple[Record, list[Record]]:
         os.remove(kept(target))
     except OSError:
         pass
-    for flow in FLOWS:
+    for flow in BOARD_FLOWS.get(target, FLOWS):
         r = build(target, flow)
         attempts.append(summarize(r))
         if attempts[-1]["met"]:

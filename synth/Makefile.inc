@@ -14,11 +14,11 @@
 # make clean          removes the build
 #
 # FLOW = default, the default, runs every step with Vivado's default
-# directives, with which the MEGA65 met 100 MHz until nice_cpu V2.0; now
-# it needs FLOW = timing (synth/README.md, Timing). FLOW = timing runs every
-# step with a directive for timing, and phys_opt_design again after routing,
-# as synth/nexys4ddr/Makefile does: in nice_cpu issue 34 that gained its slower part
-# about 0.5 ns. PLACE_TIMING is place_design's directive in it,
+# directives, with which the MEGA65 met 100 MHz until nice_cpu V2.0.
+# FLOW = timing runs every step with a directive for timing, and
+# phys_opt_design again after routing: in nice_cpu issue 34 that gained
+# the Nexys4DDR's slower part about 0.5 ns. The Makefiles of the
+# Nexys4DDR and the MEGA65 (mega65/mega65.mk) set it. PLACE_TIMING is place_design's directive in it,
 # ExtraTimingOpt unless the board's Makefile picks another, as
 # synth/r6/Makefile does.
 

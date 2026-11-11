@@ -5,6 +5,10 @@
 
 PART = xc7a200tfbg484-2
 
+# The MEGA65 misses 100 MHz with Vivado's default directives since
+# nice_cpu V2.0, in the core alone (issue #107)
+FLOW = timing
+
 MEGA65_SRC  = ../../src/kbd_m65.vhd
 MEGA65_SRC += ../../src/kbd_m65_ascii.vhd
 MEGA65_SRC += ../../src/kbd_m65_toggle.vhd

@@ -525,11 +525,10 @@ new core file.
 
 Then build the core file with the program as its ROM:
 
-    make cor ROM=prog.bin FLOW=timing
+    make cor ROM=prog.bin
 
 That builds the cores of the R3 and the R6, with `prog.bin` in their
-ROM. It needs Vivado and `coretool` (see [synth/](synth/README.md)), and
-`FLOW=timing`, as the MEGA65 misses its timing without it. The core
+ROM. It needs Vivado and `coretool` (see [synth/](synth/README.md)). The core
 files are `synth/r6/build/NiceMonMEGA65-r6.cor` and
 `synth/r3/build/NiceMonMEGA65-r3.cor`.
 

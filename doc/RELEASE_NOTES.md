@@ -81,9 +81,17 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   as niceemu does
   ([#101](https://github.com/MJoergen/NiceMonMEGA65/issues/101)).
 
-**Changed.** The monitor's `u` and the on-board debugger's row 27 show
-`0x0C600000` as `WAIT`, as nicedis does, where they showed a reserved
-control word (#93).
+**Changed.**
+
+- The monitor's `u` and the on-board debugger's row 27 show
+  `0x0C600000` as `WAIT`, as nicedis does, where they showed a reserved
+  control word (#93).
+- The MEGA65's builds use `FLOW=timing` alone, as the Nexys4DDR's do,
+  so `make r6`, `make r3`, and `make cor` need it no more. Their RAM is
+  built from block RAMs that are not cascaded in pairs, which gives the
+  core's paths from the RAM about 0.4 ns more slack, and the builds
+  take less time
+  ([#107](https://github.com/MJoergen/NiceMonMEGA65/issues/107)).
 
 **Fixed.** A link read of the fonts while the core was held could go
 unanswered, when the read before it had been the core's, so that the

@@ -19,12 +19,9 @@ is for the nice_cpu tag and the submodule's commit and says met, that the
 submodule is at that tag, and that CI passed for the commit. It then
 builds the examples, the monitor and the demo of demo/ with the tag in
 the monitor's banner and the demo's title bar, and the bitstreams of the
-R6, the R3, and the Nexys4DDR, with the two in the ROM and from nothing. The R6 tries the flow of verified.json first and
-then the other one, for the ROM can cost the margin of the bump's build,
-which had none; the notes say so when the other flow was needed. The
-Nexys4DDR uses only FLOW=timing, as its Makefile does, for it never meets
-timing with the default directives. The R3 tries the default directives
-first and then FLOW=timing, as bump.py does. Each must meet timing. It makes the core files of the R3 and the R6, with the tag as
+R6, the R3, and the Nexys4DDR, with the two in the ROM and from nothing,
+each with FLOW=timing alone, as their Makefiles have it. Each must meet
+timing. It makes the core files of the R3 and the R6, with the tag as
 their version, which MEGAFLASH shows. Last it runs make hwtest on the R6 bitstream, so a MEGA65 R6
 must be on PORT, and with --eth IP its Ethernet port on this computer's network. It copies the bitstreams, the core files, a zip of the examples, and
 verified.json to build/release/V1.0, with notes.md, the release notes, and
@@ -51,7 +48,7 @@ import shutil
 import subprocess
 import sys
 
-from bump import (FLOWS, TAG, VERIFIED, Failed, Record, badge, read_reports, run, check_tree,
+from bump import (TAG, VERIFIED, Failed, Record, badge, read_reports, run, check_tree,
                   tag_commit)
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -70,8 +67,8 @@ BOARDS = (
 # The boards with a core file (synth/Makefile.inc)
 COR_BOARDS = ("r3", "r6")
 
-# The boards built with one flow only, the one their Makefile sets
-BOARD_FLOWS = {"nexys4ddr": ("timing",)}
+# The flow of every board, the one its Makefile sets
+FLOW = "timing"
 
 # The ROM of every board: the monitor, which the core boots from at
 # power-up, with the demo behind it, which the monitor's x runs (demo/)
@@ -164,17 +161,15 @@ def check_ci(commit: str) -> None:
         raise Failed("CI has not passed for %s (%s)" % (commit[:7], state))
 
 
-def build(board: str, flows: tuple[str, ...]) -> Record:
+def build(board: str) -> Record:
     """The board's bitstream, from nothing and with the monitor and the
-    demo in the ROM, with the first flow that meets timing; returns the
-    reports."""
-    for flow in flows:
-        run(["make", "-C", os.path.join("synth", board), "clean"])
-        run(["make", board, "NICE=pipeline", "FLOW=" + flow, "ROM=" + ROM])
-        r = read_reports(os.path.join(REPO, "synth", board, "build"), flow)
-        if met(r):
-            return r
-    raise Failed("%s misses timing (WNS %.3f ns with FLOW=%s)" % (board, r["wns_ns"], flow))
+    demo in the ROM; returns the reports, which must meet timing."""
+    run(["make", "-C", os.path.join("synth", board), "clean"])
+    run(["make", board, "NICE=pipeline", "FLOW=" + FLOW, "ROM=" + ROM])
+    r = read_reports(os.path.join(REPO, "synth", board, "build"), FLOW)
+    if not met(r):
+        raise Failed("%s misses timing (WNS %.3f ns with FLOW=%s)" % (board, r["wns_ns"], FLOW))
+    return r
 
 
 def notes(tag: str, v: Record, results: dict[str, Record], body: str) -> str:
@@ -196,13 +191,6 @@ def notes(tag: str, v: Record, results: dict[str, Record], body: str) -> str:
         "",
         "Built with %s, tested on the MEGA65 R6 with `make hwtest`." % v["vivado"],
     ]
-    if results["r6"]["flow"] != v["flow"]:
-        lines += [
-            "",
-            "The R6 met timing with `FLOW=%s`, where the bump's build, without"
-            % results["r6"]["flow"],
-            "a ROM, met it with `FLOW=%s` (`verified.json`)." % v["flow"],
-        ]
     lines += [
         "",
         "## Files",
@@ -242,11 +230,7 @@ def stage(tag: str) -> tuple[Record, str, dict[str, Record], str]:
     run(["make", "-C", "demo", "VERSION=" + tag])
     results: dict[str, Record] = {}
     for board, _ in BOARDS:
-        if board == "r6":
-            flows = (v["flow"],) + tuple(f for f in FLOWS if f != v["flow"])
-        else:
-            flows = BOARD_FLOWS.get(board, FLOWS)
-        results[board] = build(board, flows)
+        results[board] = build(board)
     # The same options as the build, or make would build the bitstream again
     for board in COR_BOARDS:
         run(["make", "-C", os.path.join("synth", board), "cor", "NICE=pipeline",

@@ -69,7 +69,7 @@ and keep their names.
 
 - CI is green for the commit on `main` that gets the tag.
 - `verified.json` is for the nice_cpu tag, the first two numbers of the
-  tag, and says met. The default flow or `FLOW=timing` is fine.
+  tag, and says met.
 - The submodule is at that nice_cpu tag.
 - A point release, such as `V1.0.1`, needs the release `V1.0` here to
   exist first.
@@ -106,10 +106,8 @@ and keep their names.
 
    This changes nothing in git. It checks the conditions above, builds
    the examples and the three bitstreams from nothing, each with the
-   first flow that meets timing: the R6 with the flow of `verified.json`
-   first, the R3 with the default directives first and then `FLOW=timing`,
-   and the Nexys4DDR with `FLOW=timing` only, as its Makefile has it. A
-   board that misses with its last flow stops the release. Then it makes
+   directives for timing, `FLOW=timing`, as the boards' Makefiles have
+   it. A board that misses timing stops the release. Then it makes
    the two core files with `coretool`, runs `make hwtest` on the R6, with
    `ETH=` when `--eth` is given, and puts the files in
    `build/release/V1.0/`, with
@@ -136,8 +134,7 @@ and keep their names.
 A change here alone, after the release `V1.0`, is released as `V1.0.1`:
 steps 2 to 6 with `TAG=V1.0.1`, without a bump. It builds and checks the
 three bitstreams as a bump's release does, for a change here can cost
-timing. The R6 tries the flow of `verified.json` first, and then the
-other one.
+timing.
 `verified.json` and the badge stay as the bump left them, for they are
 the claim of nice_cpu's tag; the release notes give this build's timing.
 The core files have the version `V1.0.1`, which MEGAFLASH shows.
@@ -146,11 +143,9 @@ The core files have the version `V1.0.1`, which MEGAFLASH shows.
 
 - A failed check in step 4 changes nothing. Fix the cause, and run step 4
   again.
-- The ROM can cost the R6 the margin of the bump's build, which has none.
-  So step 4 builds the R6 with the flow of `verified.json` first, and
-  then with the other one, and the notes say so when it took the other.
-  If both miss, there is no release: the fix belongs in nice_cpu, and a
-  new nice_cpu tag and bump follow.
+- The ROM can cost a board the margin of the bump's build. If a board
+  misses timing in step 4, there is no release: the fix belongs in
+  nice_cpu, and a new nice_cpu tag and bump follow.
 - If step 6 fails after the tag is pushed, create the release by hand:
 
       gh release create V1.0 --verify-tag --title V1.0 \

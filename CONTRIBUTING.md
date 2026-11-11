@@ -78,7 +78,8 @@ pass `ARGS=` on to the tool, for example `ARGS=--no-run` or
 `ARGS="--tcp 4000"` drives `niceemu --link 4000` instead of the board, and
 `ARGS="--cosim 4000"` the simulated system of `make cosim COSIM_PORT=4000`.
 The bitstream targets take `FLOW=default` or `FLOW=timing`, the directives
-of Vivado's steps (see [synth/](synth/README.md)). `make hwtest` rebuilds
+of Vivado's steps; every board's Makefile sets `FLOW=timing` (see
+[synth/](synth/README.md)). `make hwtest` rebuilds
 `niceemu` first, if its sources have changed.
 
 `make test` and the boards' targets use nice_cpu's pipelined core. Add
@@ -1048,8 +1049,11 @@ with Vivado. nice_cpu shows the badges, and this repository is the proof.
 `make bump TAG=V1.0`, which runs `tools/bump.py`, checks that the tree is
 clean and on `main`, moves the `nice_cpu` submodule to the tag, builds
 `niceemu`, runs `make test`, and builds the R6 bitstream and then the
-Nexys4DDR's with Vivado's default directives. If a board misses timing,
-it builds that board again with `FLOW=timing`, and its badge says so.
+Nexys4DDR's. The R6 is built with `FLOW=timing`, as its Makefile has it,
+for it misses 100 MHz with Vivado's default directives since nice_cpu
+V2.0. The Nexys4DDR is built with the default directives, and if it
+misses timing, again with `FLOW=timing`. A badge of `FLOW=timing` says
+so.
 
 It writes three files at the top level and commits them, after a commit
 of the submodule bump. `badge-mega65.json` and `badge-nexys4ddr.json` are
