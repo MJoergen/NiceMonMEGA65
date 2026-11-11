@@ -91,6 +91,13 @@ architecture synthesis of ram is
    attribute ram_style of mem_even : signal is "block";
    attribute ram_style of mem_odd  : signal is "block";
 
+   -- Without it, Vivado (2025.1) builds the MEGA65's 128K words from
+   -- cascaded pairs of RAMB36E1, whose read is 0.8 ns slower, and the
+   -- core's path from the RAM had no margin (issue #107)
+   attribute cascade_height : integer;
+   attribute cascade_height of mem_even : signal is 1;
+   attribute cascade_height of mem_odd  : signal is 1;
+
    -- Port B's reads of both banks, and the bank it reads
    signal b_even : std_logic_vector(31 downto 0);
    signal b_odd  : std_logic_vector(31 downto 0);

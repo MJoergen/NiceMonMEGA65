@@ -105,7 +105,17 @@ The sizes, from the same builds:
 - **With the ROM, the R6 sometimes needs `FLOW=timing`.** Since #71,
   the ROM's 32 block RAMs push the RAM's farther, and some builds with
   the ROM missed in the default flow and met with `FLOW=timing`. So
-  `make release` tries the default flow first, then `FLOW=timing`.
+  `make release` tried the default flow first, then `FLOW=timing`, until
+  #107 made `FLOW=timing` the MEGA65's only flow: since nice_cpu V2.0
+  the R6 misses in the default flow in the core alone.
+- **A cascaded pair of block RAMs reads 0.8 ns slower than one.** Vivado
+  built the MEGA65's 128K words of RAM from 64K×1 memories, each a
+  cascaded pair of RAMB36E1, which take 2.945 ns from the clock to the
+  data, against 2.125 ns for one. So every build with the ROM worked at
+  the limit of the design, and the router's time, up to an hour, depended
+  on the placement. Since #107, `cascade_height` of 1 in `src/ram.vhd`
+  builds it from 128 RAMB36E1 of 32K×1, with no cascade, for about 80
+  more LUTs and no cycle.
 - **Placement moves the slack more than the logic does.** Stage 8 added
   530 LUTs and gained 0.08 ns on the R6. The rows of a split by module
   move too: in the builds with the TCP server, about 700 LUTs moved
