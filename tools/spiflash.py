@@ -1,8 +1,9 @@
 """The MEGA65's SPI flash through openFPGALoader's spiOverJtag bridge, for
 what openFPGALoader does not do: clear the sectors' protection.
 
-The S25FL512S of the MEGA65 has Advanced Sector Protection. Each sector
-of 256 KiB has a volatile DYB and a persistent PPB, and the chip refuses
+The MEGA65's flash, an S25FL512S of 64 MiB on the R6 and an S25FL256S
+of 32 MiB on some R3s, has Advanced Sector Protection. Each sector has a
+volatile DYB and a persistent PPB, and the chip refuses
 to erase or program a sector if either protects it: it sets E_ERR or
 P_ERR in status register 1, and WIP then stays set until Clear Status.
 On the MEGA65 the DYBs protect the sectors when a host gets to the flash.
@@ -20,7 +21,12 @@ clock of the flash with TDI on its MOSI, Update-DR raises the chip
 select, and TDO is the flash's MISO, one bit late. The bytes go most
 significant bit first. Version 2 bridges of newer openFPGALoaders have a
 header in each scan; unprotect() first reads the JEDEC ID, and stops
-when the answer is not the S25FL512S's.
+when the answer is neither chip's.
+
+The sectors are of 256 KiB, or of 64 KiB with thirty-two parameter
+sectors of 4 KiB in the first or the last 128 KiB, as the fifth byte of
+the ID and TBPARM in the configuration register say. The S25FL512S has
+the uniform sectors of 256 KiB only.
 
 The script talks to the FTDI chip's JTAG interface with pyftdi's MPSSE,
 on the pins of openFPGALoader's ft2232 cable: TCK, TDI, TDO, and TMS on
@@ -40,10 +46,13 @@ FREQUENCY = 6e6
 USER1 = 0x02
 IR_LEN = 6
 
-# The S25FL512S's commands, with 4-byte addresses
-JEDEC_ID = bytes([0x01, 0x02, 0x20])
+# The JEDEC IDs of the S25FL512S and the S25FL256S, and their sizes
+SIZES = {bytes([0x01, 0x02, 0x20]): 64 << 20,
+         bytes([0x01, 0x02, 0x19]): 32 << 20}
+# Their commands, with 4-byte addresses
 RDID = 0x9F
 RDSR1 = 0x05
+RDCR = 0x35
 WREN = 0x06
 CLSR = 0x30
 DYBRD = 0xE0
@@ -53,8 +62,14 @@ PPBRD = 0xE2
 WIP = 0x01
 E_ERR = 0x20
 P_ERR = 0x40
-# Its uniform sectors, and the DYB and PPB value of an unprotected one
-SECTOR_SIZE = 256 << 10
+# The configuration register's TBPARM: the parameter sectors at the top
+TBPARM = 0x04
+# The fifth byte of the ID: uniform sectors of 256 KiB, or of 64 KiB
+# with the parameter sectors of 4 KiB in 128 KiB
+UNIFORM = 0x00
+PARAM_SIZE = 4 << 10
+PARAM_AREA = 128 << 10
+# The DYB and PPB value of an unprotected sector
 UNPROTECTED = 0xFF
 # How long a DYB write may take; the datasheet gives microseconds
 WAIT = 1.0
@@ -184,21 +199,54 @@ def address(cmd: int, addr: int) -> bytes:
     return bytes([cmd]) + addr.to_bytes(4, "big")
 
 
+def sector_starts(offset: int, length: int, size: int, uniform: bool,
+                  top: bool) -> list[int]:
+    """The addresses of the sectors that offset to offset + length
+    touches, in a flash of size bytes: of 256 KiB if uniform, else of
+    64 KiB, with those of 4 KiB in the last 128 KiB if top, else in the
+    first."""
+    if uniform:
+        step = 256 << 10
+        return list(range(offset // step * step, offset + length, step))
+    param = range(size - PARAM_AREA, size) if top else range(0, PARAM_AREA)
+    starts = []
+    addr = offset // PARAM_SIZE * PARAM_SIZE
+    while addr < offset + length:
+        if addr in param:
+            starts.append(addr)
+            addr += PARAM_SIZE
+        else:
+            start = addr // (64 << 10) * (64 << 10)
+            starts.append(start)
+            addr = start + (64 << 10)
+    return starts
+
+
 def unprotect(serial: str, offset: int, length: int) -> int:
     """Clears the DYBs of the sectors of offset to offset + length, through
     the bridge that openFPGALoader left in the FPGA. Clears a status
     register that an earlier erase or program left with an error. Raises
-    SpiFlashError if the bridge does not reach an S25FL512S, a sector has
-    its PPB set, or a DYB stays set. Returns the number of sectors whose
-    DYB it cleared."""
+    SpiFlashError if the bridge reaches neither an S25FL512S nor an
+    S25FL256S, the range goes beyond the chip, a sector has its PPB set,
+    or a DYB stays set. Returns the number of sectors whose DYB it
+    cleared."""
     bridge = Bridge(serial)
     try:
-        jedec = bridge.xfer(bytes([RDID]), 3)
-        if jedec != JEDEC_ID:
+        ident = bridge.xfer(bytes([RDID]), 5)
+        jedec = ident[:3]
+        if jedec not in SIZES:
             raise SpiFlashError(
-                f"the bridge answers the JEDEC ID {jedec.hex(' ')}, not the "
-                f"S25FL512S's {JEDEC_ID.hex(' ')}; is openFPGALoader's "
+                f"the bridge answers the JEDEC ID {jedec.hex(' ')}, not an "
+                f"S25FL512S's or an S25FL256S's; is openFPGALoader's "
                 f"spiOverJtag bridge of version 1 loaded?")
+        size = SIZES[jedec]
+        if offset + length > size:
+            raise SpiFlashError(
+                f"{offset + length:08X} is beyond the flash's "
+                f"{size >> 20} MiB")
+        top = bool(bridge.xfer(bytes([RDCR]), 1)[0] & TBPARM)
+        sectors = sector_starts(offset, length, size, ident[4] == UNIFORM,
+                                top)
         if bridge.status() & (WIP | E_ERR | P_ERR):
             bridge.xfer(bytes([CLSR]))
             sr = bridge.status()
@@ -206,10 +254,7 @@ def unprotect(serial: str, offset: int, length: int) -> int:
                 raise SpiFlashError(f"Clear Status leaves the status "
                                     f"register at {sr:02X}")
         cleared = 0
-        first = offset // SECTOR_SIZE
-        last = (offset + length - 1) // SECTOR_SIZE
-        for sector in range(first, last + 1):
-            addr = sector * SECTOR_SIZE
+        for addr in sectors:
             ppb = bridge.xfer(address(PPBRD, addr), 1)[0]
             if ppb != UNPROTECTED:
                 raise SpiFlashError(

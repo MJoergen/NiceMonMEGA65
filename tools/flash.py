@@ -21,7 +21,8 @@ Usage:
     only.
 
     --cor writes a MEGA65 core file (make cor) into slot N of the MEGA65's
-    flash, 1 to 7, as MEGAFLASH does, but over the JTAG cable, with no key
+    flash, 1 to 7, or 1 to 3 in an R3's flash of 32 MiB, which
+    spiflash.py checks, as MEGAFLASH does, but over the JTAG cable, with no key
     held at power on. Slot 0 holds the MEGA65's own core, which the board
     starts at power on and which MEGAFLASH runs in, so the script refuses
     it.

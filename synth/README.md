@@ -78,7 +78,8 @@ in `CORETOOL`.
 
 `make flash COR=synth/r6/build/NiceMonMEGA65-r6.cor SLOT=1` writes the
 core file into slot 1 over the JTAG cable instead, with no key held at
-power on. It takes slots 1 to 7, as slot 0 holds the MEGA65's own core.
+power on. It takes slots 1 to 7, as slot 0 holds the MEGA65's own core,
+or 1 to 3 on an R3 with a flash of 32 MiB, an S25FL256S.
 It checks the FPGA first, as `make hwtest` does, and stops unless the core
 in slot 0 is for the core file's revision. It shows what the slot held,
 and clears the protection of the slot's sectors, which openFPGALoader

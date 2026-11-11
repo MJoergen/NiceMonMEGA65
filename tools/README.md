@@ -436,7 +436,8 @@ the MEGA65 needs pyftdi.
   flash instead. It refuses a MEGA65's bitstream, verifies the flash,
   and waits for the board to start from it.
 - On the MEGA65, `--cor FILE --slot N` writes a core file into slot N of
-  the flash, 1 to 7, with no MEGAFLASH: it checks that slot 0's core is
+  the flash, 1 to 7, or 1 to 3 in an R3's flash of 32 MiB, with no
+  MEGAFLASH: it checks that slot 0's core is
   for the file's board revision, shows what the slot held, clears the
   protection of the slot's sectors, writes, verifies, and loads the slot
   into the FPGA.
