@@ -1,7 +1,8 @@
 -- The board's devices at 0xFFFFFF90-9F (src/nicemon.vhd), with G_BOARD_IO
 -- (the Nexys4DDR): the 16 LEDs, the levels of the two RGB LEDs, the
 -- segments of the seven-segment display, the five buttons, and the 16
--- switches. On every board, also the size of the RAM and the UART's baud
+-- switches. With G_I2C, the I2C master of the board's I2C bus (i2c.vhd,
+-- #105). On every board, also the size of the RAM and the UART's baud
 -- rate. The network station's registers are at 0xFFFFFFB0-BF, in
 -- src/devices.vhd.
 --
@@ -20,6 +21,8 @@
 --   5  The buttons, bit 0 for the center one, then up, left, right, and
 --      down. Read only.
 --   6  The switches, bit n for switch n. Read only.
+--   7  With G_I2C, the I2C master's command, 8 its status, 9 to C its
+--      data, and D free, as i2c.vhd has them.
 --   E  The words of the RAM, G_RAM_WORDS, on every board. Read only.
 --   F  The UART's baud rate in bit/s, on every board: G_UART_BAUDRATE
 --      after reset. A write of one of C_UART_RATES (uart_pkg.vhd), 115200
@@ -28,8 +31,9 @@
 --      shorter than C_UART_DIV_MIN cycles is dropped too. uart_div_o is the bit's cycles,
 --      G_CLOCK_HZ / rate rounded, which uart_serdes.vhd takes once its
 --      line is quiet. Read and write.
--- The other words, and words 0 to 6 without G_BOARD_IO, read 0 and take
--- no write, so then the outputs stay 0. The buttons and the switches pass
+-- The other words, words 0 to 6 without G_BOARD_IO, and words 7 to D
+-- without G_I2C, read 0 and take no write, so then the outputs stay 0, and
+-- the I2C lines released. The buttons and the switches pass
 -- through two registers, which synchronize them to the clock.
 --
 -- With G_FORMAL, it states the properties that formal/board_io.sby proves:
@@ -52,6 +56,8 @@ library work;
 entity board_io is
    generic (
       G_BOARD_IO      : boolean;
+      -- The I2C master at words 7 to D (i2c.vhd)
+      G_I2C           : boolean  := false;
       -- The words of the RAM, which word E reads
       G_RAM_WORDS     : natural := 0;
       -- The clock, and the UART's baud rate after reset, for word F
@@ -78,7 +84,12 @@ entity board_io is
       sw_i        : in  std_logic_vector(15 downto 0);
       -- The UART's baud rate, and the cycles of its bit
       uart_baud_o : out std_logic_vector(31 downto 0);
-      uart_div_o  : out std_logic_vector(15 downto 0)
+      uart_div_o  : out std_logic_vector(15 downto 0);
+      -- The I2C bus's lines (i2c.vhd): 0 pulls the pin low, 1 releases it
+      i2c_scl_o   : out std_logic;
+      i2c_sda_o   : out std_logic;
+      i2c_scl_i   : in  std_logic := '1';
+      i2c_sda_i   : in  std_logic := '1'
    );
 end entity board_io;
 
@@ -119,6 +130,9 @@ architecture synthesis of board_io is
    signal sw_sync  : std_logic_vector(15 downto 0) := (others => '0');
    signal baud     : std_logic_vector(31 downto 0) := C_BAUD;
    signal div      : std_logic_vector(15 downto 0) := C_DIV;
+   -- A request to the I2C master's words, 7 to D, and the word it reads
+   signal i2c_stb   : std_logic;
+   signal i2c_rdata : std_logic_vector(31 downto 0);
 
    attribute async_reg : string;
    attribute async_reg of btn_sync : signal is "TRUE";
@@ -179,6 +193,10 @@ begin
          rdata_o <= std_logic_vector(to_unsigned(G_RAM_WORDS, 32));
       elsif addr_i = X"F" then
          rdata_o <= baud;
+      elsif addr_i >= X"7" and addr_i <= X"D" then
+         if G_I2C then
+            rdata_o <= i2c_rdata;
+         end if;
       elsif G_BOARD_IO then
 
          case addr_i is
@@ -212,6 +230,37 @@ begin
 
    uart_baud_o <= baud;
    uart_div_o  <= div;
+
+
+   gen_i2c : if G_I2C generate
+   begin
+      i2c_stb <= stb_i when addr_i >= X"7" and addr_i <= X"D" else
+                 '0';
+
+      i_i2c : entity work.i2c
+         generic map (
+            G_CLOCK_HZ => G_CLOCK_HZ
+         )
+         port map (
+            clk_i   => clk_i,
+            rst_i   => rst_i,
+            stb_i   => i2c_stb,
+            we_i    => we_i,
+            addr_i  => addr_i,
+            wdata_i => wdata_i,
+            rdata_o => i2c_rdata,
+            scl_o   => i2c_scl_o,
+            sda_o   => i2c_sda_o,
+            scl_i   => i2c_scl_i,
+            sda_i   => i2c_sda_i
+         ); -- i_i2c
+
+   else generate
+      i2c_stb   <= '0';
+      i2c_rdata <= (others => '0');
+      i2c_scl_o <= '1';
+      i2c_sda_o <= '1';
+   end generate gen_i2c;
 
 
    gen_formal : if G_FORMAL generate
@@ -253,8 +302,12 @@ begin
       -- psl f_seg_hi_keep : assert always {not f_wr(4) and not rst_i} |=> {stable(seg(63 downto 32))};
       -- psl f_reset : assert always {rst_i} |=> {led = 0 and rgb0 = 0 and rgb1 = 0 and seg = 0};
 
-      -- Words 7 to D are no registers, and read 0.
-      -- psl f_rd_none : assert always addr_i >= X"7" and addr_i <= X"D" -> rdata_o = 0;
+      -- Words 7 to D are no registers without G_I2C, and read 0; with it
+      -- they are the I2C master's.
+      -- psl f_rd_none : assert always
+      --    (addr_i >= X"7" and addr_i <= X"D" and not G_I2C) -> rdata_o = 0;
+      -- psl f_rd_i2c : assert always
+      --    (addr_i >= X"7" and addr_i <= X"D" and G_I2C) -> rdata_o = i2c_rdata;
 
       -- Word E reads the words of the RAM, on every board, and a write to
       -- it changes nothing, as no register is written but by its word.
@@ -289,7 +342,6 @@ begin
          --    addr_i = X"5" -> rdata_o(31 downto 5) = 0 and rdata_o(4 downto 0) = btn;
          -- psl f_rd_sw : assert always
          --    addr_i = X"6" -> rdata_o(31 downto 16) = 0 and rdata_o(15 downto 0) = sw;
-         -- psl f_rd_none : assert always addr_i = X"7" -> rdata_o = 0;
 
          -- The buttons reach their register two cycles after their pins.
          -- psl f_btn_sync : assert always {not rst_i; not rst_i} |=> {btn = prev(btn_i, 2)};
@@ -299,9 +351,9 @@ begin
 
       gen_formal_none : if not G_BOARD_IO generate
       begin
-         -- Without G_BOARD_IO, every word but 8 to F reads 0, and the
-         -- outputs stay 0.
-         -- psl f_none_rd : assert always addr_i < X"8" -> rdata_o = 0;
+         -- Without G_BOARD_IO, words 0 to 6 read 0, and the outputs stay
+         -- 0.
+         -- psl f_none_rd : assert always addr_i < X"7" -> rdata_o = 0;
          -- psl f_none_out : assert always led = 0 and rgb0 = 0 and rgb1 = 0 and seg = 0;
       end generate gen_formal_none;
 

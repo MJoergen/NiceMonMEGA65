@@ -38,6 +38,14 @@ Programming:
 Checks, in this order:
     - the link's b notice, and the ROM when the bitstream has one
     Then, with the ROM hidden, the debug link (nice_cpu/doc/DEBUG.md):
+    - the I2C master (doc/SYSTEM.md, The I2C bus): an address that no chip
+      has gets a NACK; on the Nexys4DDR the temperature sensor's ID reads
+      0xCB, and the ROM's start left the clock not set; on the MEGA65 the
+      real-time clock answers, its time is printed, and after the ROM's
+      start the clock is set and near the host's local time, unless the
+      real-time clock says that it lost its time. A time more than five
+      minutes off is printed as a WARNING, and does not fail, as the
+      MEGA65 core's settings set it (#105)
     - bad packets are dropped, and nicelink sends a dropped request again
     - sim/echo.nasm loads and runs, and the link reaches only its debug
       registers while it runs
@@ -313,7 +321,9 @@ def assemble_labels(src: str, out_dir: str) -> tuple[str, dict[str, int]]:
             for addr, name in (line.split() for line in f if line.strip())}
 
 
-def test_boot(link: Link, bit: str, cable: list[str]) -> None:
+def test_boot(link: Link, bit: str, cable: list[str]) -> bool:
+    """Programs the FPGA, and checks the b notice and the ROM. True when
+    the core booted from the ROM."""
     r = subprocess.run(["openFPGALoader"] + cable + [bit],
                        capture_output=True, text=True)
     if r.returncode != 0:
@@ -336,6 +346,8 @@ def test_boot(link: Link, bit: str, cable: list[str]) -> None:
         check("ROM at address 0", first != 0, f"{first:08X}")
         check("write to the ROM dropped",
               wr(link, 0, 0x12345678) and rd(link, 0) == first)
+        return True
+    return False
 
 
 def link_version() -> int:
@@ -1189,6 +1201,11 @@ CLOCK_SEC_LO = 0xFFFFFF47
 CLOCK_SEC_HI = 0xFFFFFF48
 CLOCK_STATUS = 0xFFFFFF49
 
+# The I2C master of doc/SYSTEM.md: its command, its status, and its data
+I2C_CMD = 0xFFFFFF97
+I2C_STATUS = 0xFFFFFF98
+I2C_DATA = 0xFFFFFF99
+
 
 def read_clock(link: Link) -> float:
     """The clock's time in seconds: the read of CLOCK_USEC takes the
@@ -1196,6 +1213,93 @@ def read_clock(link: Link) -> float:
     usec = rd(link, CLOCK_USEC)
     sec = rd(link, CLOCK_SEC_LO) | rd(link, CLOCK_SEC_HI) << 32
     return sec + usec / 1e6
+
+
+def i2c(link: Link, cmd: int) -> int:
+    """A transaction of the I2C master with the command cmd: its status
+    when it is done, or 2, busy, after a second."""
+    deadline = time.time() + 1.0
+    while rd(link, I2C_STATUS) & 2 and time.time() < deadline:
+        pass
+    wr(link, I2C_CMD, cmd)
+    while True:
+        status = rd(link, I2C_STATUS)
+        if not status & 2 or time.time() > deadline:
+            return status
+
+
+def i2c_bytes(link: Link, n: int) -> list[int]:
+    """The first n bytes of the I2C master's data."""
+    words = [rd(link, I2C_DATA + i) for i in range((n + 3) // 4)]
+    return [words[i // 4] >> i % 4 * 8 & 0xFF for i in range(n)]
+
+
+def i2c_read(chip: int, reg: int, n: int) -> int:
+    """The command of a read of n bytes from register reg of chip."""
+    return n << 16 | reg << 8 | 0x80 | chip
+
+
+def test_i2c(link: Link, board: str, booted: bool) -> None:
+    """The I2C master (#105), as the docstring says. booted is True when
+    the core booted from the ROM after the FPGA was programmed, whose
+    start sets the clock from the real-time clock."""
+    status = rd(link, I2C_STATUS)
+    check("I2C master present, idle", status == 1, f"{status:08X}")
+    status = i2c(link, i2c_read(0x22, 0, 1))
+    check("I2C: NACK from 0x22, where no chip is", status == 5,
+          f"{status:08X}")
+    set_ = rd(link, CLOCK_STATUS)
+    if board == "nexys4ddr":
+        status = i2c(link, i2c_read(0x4B, 0x0B, 1))
+        ident = i2c_bytes(link, 1)[0]
+        check("I2C: the ADT7420's ID", status == 1 and ident == 0xCB,
+              f"status {status:08X}, ID {ident:02X}")
+        if booted:
+            check("clock not set at the ROM's start, with no real-time "
+                  "clock", set_ == 0, f"{set_:08X}")
+        return
+    # The R6's RV-3032-C7 has the hundredths, the seconds, and so on from
+    # register 0, and its flags at 0x0D; the R3's ISL12020M the seconds
+    # from register 0, and its flags at 7, and its hours in 12-hour mode
+    # without bit 7.
+    status = i2c(link, i2c_read(0x51, 0, 14))
+    if status == 1:
+        b = i2c_bytes(link, 14)
+        name, lost = "RV-3032-C7 at 0x51", b[13] & 3
+        sec, mins, hour, date = b[1], b[2], b[3] & 0x3F, b[5:8]
+        flags = b[13]
+    else:
+        status = i2c(link, i2c_read(0x6F, 0, 8))
+        b = i2c_bytes(link, 8)
+        name, lost = "ISL12020M at 0x6F", b[7] & 1
+        sec, mins, hour, date = b[0], b[1], b[2], b[3:6]
+        flags = b[7]
+    if not check("I2C: the real-time clock answers", status == 1,
+                 f"{name}, status {status:08X}"):
+        return
+    print(f"  {name}: 20{date[2]:02X}-{date[1]:02X}-{date[0]:02X} "
+          f"{hour:02X}:{mins:02X}:{sec:02X}, status register {flags:02X}"
+          f"{', it lost its time' if lost else ''}", flush=True)
+    if not booted:
+        uncovered.append("the clock from the real-time clock at the ROM's "
+                         "start, as the FPGA was not programmed, or has no "
+                         "ROM")
+        return
+    if lost:
+        check("clock not set at the ROM's start, as the real-time clock "
+              "lost its time", set_ == 0, f"{set_:08X}")
+        uncovered.append("the clock from the real-time clock, which lost "
+                         "its time: set it in the MEGA65 core")
+        return
+    check("clock set from the real-time clock at the ROM's start",
+          set_ == 1, f"{set_:08X}")
+    now = time.time()
+    off = read_clock(link) - (now + time.localtime(now).tm_gmtoff)
+    print(f"  the clock is {off:+.1f} s from the host's local time",
+          flush=True)
+    if abs(off) > 300:
+        print("  WARNING: the real-time clock is more than five minutes "
+              "off; set it in the MEGA65 core", flush=True)
 
 
 def test_clock(link: Link) -> None:
@@ -1318,8 +1422,8 @@ def test_board_devices(link: Link, board: str) -> None:
           wr(link, 0xFFFFFF96, 0xFFFFFFFF) and
           rd(link, 0xFFFFFF95) == buttons and
           rd(link, 0xFFFFFF96) == switches)
-    check("FFFFFF97 is not a register",
-          wr(link, 0xFFFFFF97, 0xFFFFFFFF) and rd(link, 0xFFFFFF97) == 0)
+    check("FFFFFF9D is not a register",
+          wr(link, 0xFFFFFF9D, 0xFFFFFFFF) and rd(link, 0xFFFFFF9D) == 0)
     # Leave the devices dark
     for addr in range(0xFFFFFF90, 0xFFFFFF95):
         check(f"W {addr:08X} clears", wr(link, addr, 0) and rd(link, addr) == 0)
@@ -2103,9 +2207,11 @@ def main() -> None:
             link = Link(uart)
             opened = True
             try:
+                booted = False
                 if not args.no_program:
-                    test_boot(link, args.bit, cable)
+                    booted = test_boot(link, args.bit, cable)
                 test_link(link)
+                test_i2c(link, board, booted)
                 test_framing(link)
                 test_echo(link, echo)
                 test_reset(link, echo)

@@ -37,6 +37,11 @@
 -- card, card detect, and write protect come in. The controller registers
 -- them, the first register of each in the I/O tile. A board with fewer
 -- slots leaves the ports of the others open.
+-- A board with an I2C bus sets G_I2C, and its top level makes the pins
+-- open drain from i2c_scl_o and i2c_sda_o: low while one is 0, and
+-- released while it is 1 (src/i2c.vhd). The master registers them, and
+-- the pins' levels, i2c_scl_i and i2c_sda_i, the first register of each
+-- in the I/O tile.
 --
 -- With a ROM the core boots from it at reset; without one it waits, held,
 -- for a host on the debug link (nicemon.vhd).
@@ -100,7 +105,9 @@ entity system is
       -- sd_pwr_n_o, as on the Nexys4DDR.
       G_SD_SLOTS      : natural range 0 to 2         := 0;
       G_SD_DETECT     : std_logic_vector(1 downto 0) := "11";
-      G_SD_POWER      : boolean                      := false
+      G_SD_POWER      : boolean                      := false;
+      -- The board's I2C bus, with the master at 0xFFFFFF97-9D (nicemon.vhd)
+      G_I2C           : boolean                      := false
    );
    port (
       clk_i        : in  std_logic;
@@ -142,6 +149,12 @@ entity system is
       sd_cd_n_i    : in  std_logic_vector(1 downto 0) := "11";
       sd_wp_i      : in  std_logic_vector(1 downto 0) := "00";
       sd_pwr_n_o   : out std_logic;
+
+      -- The I2C bus with G_I2C: 0 pulls a pin low, and 1 releases it
+      i2c_scl_o    : out std_logic;
+      i2c_sda_o    : out std_logic;
+      i2c_scl_i    : in  std_logic                    := '1';
+      i2c_sda_i    : in  std_logic                    := '1';
 
       -- The video, in the VGA clock domain
       vga_clk_i    : in  std_logic;
@@ -274,7 +287,8 @@ begin
          G_TCP_PORT         => C_TCP_PORT,
          G_SD_SLOTS         => G_SD_SLOTS,
          G_SD_DETECT        => G_SD_DETECT,
-         G_SD_POWER         => G_SD_POWER
+         G_SD_POWER         => G_SD_POWER,
+         G_I2C              => G_I2C
       )
       port map (
          clk_i          => clk_i,
@@ -346,7 +360,11 @@ begin
          sd_dat0_i      => sd_dat0_i,
          sd_cd_n_i      => sd_cd_n_i,
          sd_wp_i        => sd_wp_i,
-         sd_pwr_n_o     => sd_pwr_n_o
+         sd_pwr_n_o     => sd_pwr_n_o,
+         i2c_scl_o      => i2c_scl_o,
+         i2c_sda_o      => i2c_sda_o,
+         i2c_scl_i      => i2c_scl_i,
+         i2c_sda_i      => i2c_sda_i
       ); -- i_nicemon
 
 

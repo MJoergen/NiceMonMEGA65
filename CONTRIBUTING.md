@@ -142,7 +142,9 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
 - `scr_regs.vhd` has the screen's registers at `0xFFFFFF80`–`8F`.
 - `board_io.vhd` has the board's registers at `0xFFFFFF90`–`9F`, and
   `uart_pkg.vhd` the UART's baud rates, which it shares with the
-  debugger's settings page.
+  debugger's settings page. `i2c.vhd` is the I2C master at
+  `0xFFFFFF97`–`9D` in it, which does a whole transaction of up to 16
+  bytes with a chip on the board's I2C bus.
 - `sd/sd.vhd` is the SD card controller at `0xFFFFFFA0`–`AF`: nice_cpu's
   `sd_regs.vhd` with the boards' slots, `sd/sd_spi.vhd`, the engine in
   SPI mode, and `sd/sd_spi_byte.vhd`, its byte shifter.
@@ -401,6 +403,14 @@ The testbenches are these:
   a start of the core during a Read, which aborts it, a card that
   answers nothing, and a card taken out and put back. In every cycle at
   most one slot is selected and clocked.
+- `sim/tb_i2c.vhd` tests the I2C master, `src/i2c.vhd`, at 10 MHz on
+  three models of a chip, `sim/i2c_chip_model.vhd`: the R6's real-time
+  clock, which a reset left holding SDA low, the R3's, which stretches
+  the clock, and the Nexys4DDR's temperature sensor. It checks the
+  recovery of the bus after reset, reads of each chip, a write and its
+  read back, a read with no register, a count over 16, a NACK, a
+  command and data written while busy, which are dropped, and a
+  timeout, with SCL held low.
 - `make -C sim check-steps`, part of `make test`, compares the step counts
   that `tb_nicemon` checks with those of niceemu. It is skipped when niceemu
   is not built.
@@ -493,9 +503,12 @@ Then it runs the programs that `make hwtest` compares, and the monitor's
 with `--monitor --rom` and with a short program pasted into `l`, with
 `run.py --cosim` and with `niceemu`, whose output and exit status must
 be the same, and checks that `load.py` refuses a word beyond the
-simulated system's 64K words of RAM.
+simulated system's 64K words of RAM. The simulated system's I2C bus has
+a model of the R6's real-time clock, and the monitor's cold start must
+set the clock of the time of day to its time (#105).
 It leaves out nice_cpu's benchmark and the demo's self-test, which would
-take too long. It takes about 4 minutes, and CI runs it on both cores.
+take too long. It takes about an hour, most of it in the monitor's runs,
+and CI runs it on both cores.
 
 ## The formal checks
 
@@ -515,7 +528,8 @@ every time, not only the ones a testbench sends.
   `src/board_io.vhd`, with them and without them: a write sets the
   register of its word, nothing else changes one but reset, each word
   reads its register, its input, or 0, and the buttons reach their
-  register two cycles after their pins. `0xFFFFFF97`–`9D` read 0.
+  register two cycles after their pins. `0xFFFFFF97`–`9D` read 0
+  without the I2C master, and its words with it.
   `0xFFFFFF9E` reads the
   words of the RAM on every board. `0xFFFFFF9F` holds the UART's baud
   rate: a write of a rate it takes sets it, any other leaves it, reset
@@ -719,6 +733,14 @@ every time, not only the ones a testbench sends.
   command at once, with no `done_o` and no write of the buffer. Its
   `cover` reaches a Read's first command, the start-up's clocks after
   the power cycle of an Init, an abort, and an end.
+- `i2c.sby` proves the I2C master, `src/i2c.vhd`, with a quarter of
+  the bus's clock of 1 cycle and chips that drive the lines as they
+  please: SDA changes while SCL is high only in START and STOP, or when
+  a timeout or reset releases the lines; no line is pulled low after a
+  transaction; a command or data written while busy is dropped, and one
+  written while idle is taken; and a byte of the data is always one of
+  the command's. Its `cover` reaches the recovery after reset, a NACK, a
+  timeout, and a read of a byte that ends with neither.
 - `dbg_host.sby` proves the debugger's adapter to the debug link's side
   port, `src/dbg/dbg_host.vhd`, with every input free, the link's
   answers too: a word out stays, with its fields, until the link is done
@@ -732,7 +754,7 @@ The checks in `rx_fifo.vhd`, `board_io.vhd`, `scr_regs.vhd`,
 `eth/eth_tcp_buf.vhd`, `eth/eth_tcp_pick.vhd`, `eth/eth_tcp_rx.vhd`,
 `eth/eth_tcp_tx.vhd`, `eth/rx_fcs.vhd`, `eth/eth_arb.vhd`,
 `eth/eth_rx_fifo.vhd`, `eth/eth_tx_fifo.vhd`, `eth/eth_tcp.vhd`,
-`dbg/dbg_host.vhd`, and `sd/sd_spi.vhd` are in `G_FORMAL` blocks, which are off in
+`dbg/dbg_host.vhd`, `sd/sd_spi.vhd`, and `i2c.vhd` are in `G_FORMAL` blocks, which are off in
 simulation and synthesis.
 
 ## Testing the board
@@ -797,6 +819,15 @@ every board, and checks the link's `b` notice, and the ROM when the
 bitstream has one. Then it hides the ROM and uses the link:
 
 - It writes and reads memory.
+- It checks the I2C master: an address with no chip gets a NACK. On the
+  Nexys4DDR the temperature sensor's ID reads `0xCB`, and the ROM's
+  start left the clock not set. On the MEGA65 the real-time clock
+  answers, and the script prints its time and its flags. After the
+  ROM's start the clock must be set, unless the real-time clock says
+  that it lost its time, which the summary names after NOT COVERED. A
+  clock more than five minutes from the host's local time gets a
+  WARNING, but does not fail, as the MEGA65 core's settings set the
+  real-time clock.
 - It checks that the link drops a packet with a bad checksum, one cut
   short by an ESC, and one with a gap of 300 ms, that the link sends
   a dropped `R` or `W` again, and that an unknown tag gets `e01` and a bad

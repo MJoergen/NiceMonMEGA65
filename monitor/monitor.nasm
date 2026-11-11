@@ -207,8 +207,10 @@ SCR_MAX         .EQU    0x7FFF          ; the largest display offset
 ; set to 0, so that the screen shows Spleen, and the port for Ethernet
 ; frames disabled, as at a return, and the ARP cache emptied. The vectors
 ; of lib.nasm are set, and ___wasm_start gives the words of the ROM's C
-; code their initial values. The RAM from 0x8000 is left alone, so that
-; a program a host has loaded is still there.
+; code their initial values. The clock of the time of day, while it is not
+; set, is set from the MEGA65's real-time clock, with clock_rtc of clock.c
+; (issue #105). The RAM from 0x8000 is left alone, so that a program a
+; host has loaded is still there.
 mon_reset
                 MOVE    R14, 0          ; E = 0, VBASE = 0; bit 24 stays 1
                 MOVE    @TIMER, 0
@@ -246,6 +248,7 @@ mon_reset
                 MOVE    @V_HCOUNT, 0
                 MOVE    @V_BACK, 0
                 CALL    scr_cls
+                CALL    _clock_rtc
                 JMP     cmd_start       ; monitor_cmd.nasm
 
 ; mon_exit: entry 1, and where a program returns to. Back to the main loop,

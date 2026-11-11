@@ -44,6 +44,9 @@
 #                         of its steps; SEED=n picks another run.
 #             tb_sd       the SD card controller on two card models, an
 #                         SDHC card and an SDSC card of version 1.
+#             tb_i2c      the I2C master on three chip models: the two
+#                         real-time clocks of the MEGA65 and the
+#                         Nexys4DDR's temperature sensor.
 #             It also checks that GHDL can synthesize the system, the
 #             keyboards and their toggle detectors, the debugger and its host, the text display (through text_synth.vhd, in
 #             the boards' mode, with 15 and 13 screen address bits), and system.vhd as the Nexys4DDR has it, and the display and RGB LED drivers.
@@ -76,17 +79,17 @@ include ../core.mk
 NICE_SIM = $(NICE_DIR)/hdl/sim/wb_mem.vhd $(NICE_DIR)/hdl/sim/eth_sim.vhd
 
 SRC_SOURCES  = ../src/uart_serdes.vhd ../src/rx_fifo.vhd ../src/ram.vhd ../src/rom.vhd \
-               ../src/uart_pkg.vhd ../src/bus_pkg.vhd ../src/board_io.vhd ../src/scr_regs.vhd ../src/sd/sd_spi_byte.vhd ../src/sd/sd_spi.vhd ../src/sd/sd.vhd ../src/devices.vhd ../src/mem.vhd ../src/nicemon.vhd \
+               ../src/uart_pkg.vhd ../src/bus_pkg.vhd ../src/i2c.vhd ../src/board_io.vhd ../src/scr_regs.vhd ../src/sd/sd_spi_byte.vhd ../src/sd/sd_spi.vhd ../src/sd/sd.vhd ../src/devices.vhd ../src/mem.vhd ../src/nicemon.vhd \
                ../src/kbd_m65.vhd ../src/kbd_m65_ascii.vhd ../src/kbd_ps2.vhd ../src/kbd_ps2_ascii.vhd ../src/seg7.vhd ../src/rgb_pwm.vhd \
                ../src/kbd_m65_toggle.vhd ../src/kbd_ps2_toggle.vhd ../src/dbg/dbg_host.vhd ../src/dbg/dbg_decode.vhd ../src/dbg/dbg_set.vhd ../src/dbg/dbg.vhd \
                ../src/video/video_pkg.vhd ../src/video/font_pkg.vhd ../src/video/pix.vhd ../src/video/scr_ram.vhd ../src/video/font_ram.vhd ../src/video/font_rom.vhd ../src/video/font.vhd ../src/video/text.vhd \
                ../src/eth/eth_pkg.vhd ../src/eth/rmii_rx.vhd ../src/eth/rx_fcs.vhd ../src/eth/eth_ram.vhd ../src/eth/eth_rx_fifo.vhd \
                ../src/eth/eth_arp.vhd ../src/eth/eth_icmp.vhd ../src/eth/eth_tcp_rx.vhd ../src/eth/eth_tcp_tx.vhd ../src/eth/eth_tcp_timer.vhd ../src/eth/eth_tcp_buf.vhd ../src/eth/eth_tcp_pick.vhd ../src/eth/eth_tcp.vhd ../src/eth/eth_frames.vhd ../src/eth/eth_tx_fifo.vhd ../src/eth/eth_arb.vhd ../src/eth/rmii_tx.vhd ../src/eth/eth.vhd \
                ../src/system.vhd
-SOURCES      = $(SRC_SOURCES) text_synth.vhd sd_card_model.vhd tb_hello.vhd tb_nicemon.vhd tb_kbd.vhd tb_ps2.vhd tb_ps2_nicemon.vhd tb_text.vhd tb_dbg.vhd tb_dbg_host.vhd tb_dbg_decode.vhd tb_board_io.vhd tb_rmii_rx.vhd tb_rx_fcs.vhd tb_eth_rx_fifo.vhd \
-               tb_eth_tx_fifo.vhd tb_rmii_tx.vhd tb_eth.vhd tb_eth_tcp.vhd tb_sd.vhd
+SOURCES      = $(SRC_SOURCES) text_synth.vhd sd_card_model.vhd i2c_chip_model.vhd tb_hello.vhd tb_nicemon.vhd tb_kbd.vhd tb_ps2.vhd tb_ps2_nicemon.vhd tb_text.vhd tb_dbg.vhd tb_dbg_host.vhd tb_dbg_decode.vhd tb_board_io.vhd tb_rmii_rx.vhd tb_rx_fcs.vhd tb_eth_rx_fifo.vhd \
+               tb_eth_tx_fifo.vhd tb_rmii_tx.vhd tb_eth.vhd tb_eth_tcp.vhd tb_sd.vhd tb_i2c.vhd
 
-.PHONY: test cosim check-steps check-fmt analyze synth clean tb_hello tb_nicemon tb_kbd tb_ps2 tb_ps2_nicemon tb_text tb_dbg tb_dbg_host tb_dbg_decode tb_board_io tb_rmii_rx tb_rx_fcs tb_eth_rx_fifo tb_eth_tx_fifo tb_rmii_tx tb_eth tb_eth_tcp tb_eth_tcp_random tb_sd \
+.PHONY: test cosim check-steps check-fmt analyze synth clean tb_hello tb_nicemon tb_kbd tb_ps2 tb_ps2_nicemon tb_text tb_dbg tb_dbg_host tb_dbg_decode tb_board_io tb_rmii_rx tb_rx_fcs tb_eth_rx_fifo tb_eth_tx_fifo tb_rmii_tx tb_eth tb_eth_tcp tb_eth_tcp_random tb_sd tb_i2c \
         synth-nicemon synth-nicemon-norom synth-kbd_m65 synth-kbd_m65_ascii synth-kbd_ps2 \
         synth-kbd_ps2_ascii synth-kbd_m65_toggle synth-kbd_ps2_toggle synth-dbg synth-dbg_host synth-dbg_decode synth-dbg_set synth-text \
         synth-system synth-seg7 synth-rgb_pwm
@@ -94,7 +97,7 @@ SOURCES      = $(SRC_SOURCES) text_synth.vhd sd_card_model.vhd tb_hello.vhd tb_n
 # Each testbench and each synthesis check is a target of its own, so that
 # "make -j test" runs them side by side. They share the work library of
 # $(BUILD), which "analyze" writes first and they only read.
-test: synth tb_hello tb_nicemon tb_kbd tb_ps2 tb_ps2_nicemon tb_text tb_dbg tb_dbg_host tb_dbg_decode tb_board_io tb_rmii_rx tb_rx_fcs tb_eth_rx_fifo tb_eth_tx_fifo tb_rmii_tx tb_eth tb_eth_tcp tb_eth_tcp_random tb_sd check-steps check-fmt
+test: synth tb_hello tb_nicemon tb_kbd tb_ps2 tb_ps2_nicemon tb_text tb_dbg tb_dbg_host tb_dbg_decode tb_board_io tb_rmii_rx tb_rx_fcs tb_eth_rx_fifo tb_eth_tx_fifo tb_rmii_tx tb_eth tb_eth_tcp tb_eth_tcp_random tb_sd tb_i2c check-steps check-fmt
 
 # The column layout of nice_cpu's NICE assembly; nicefmt.py --write fixes it
 check-fmt:
@@ -192,7 +195,7 @@ tb_dbg_decode: analyze
 	  $(GHDL) --elab-run $(GHDLFLAGS) tb_dbg_decode -gG_FILE=decode.txt > tb_dbg_decode.log 2>&1) && \
 	  echo "PASS tb_dbg_decode" || (echo "FAIL tb_dbg_decode"; cat $(BUILD)/tb_dbg_decode.log; exit 1)
 
-tb_kbd tb_ps2 tb_text tb_board_io tb_rmii_rx tb_rx_fcs tb_eth_rx_fifo tb_eth_tx_fifo tb_rmii_tx tb_eth tb_eth_tcp: analyze
+tb_kbd tb_ps2 tb_text tb_board_io tb_rmii_rx tb_rx_fcs tb_eth_rx_fifo tb_eth_tx_fifo tb_rmii_tx tb_eth tb_eth_tcp tb_i2c: analyze
 	@(cd $(BUILD) && $(GHDL) --elab-run $(GHDLFLAGS) $@ > $@.log 2>&1) && \
 	  echo "PASS $@" || (echo "FAIL $@"; cat $(BUILD)/$@.log; exit 1)
 
@@ -242,7 +245,7 @@ synth-text: analyze
 	done
 
 synth-system: analyze
-	@(cd $(BUILD) && $(GHDL) --synth $(GHDLFLAGS) -gG_CLOCK_HZ=90000000 -gG_SCR_ADDR_BITS=13 -gG_BOARD_IO=true -gG_SD_SLOTS=1 -gG_SD_POWER=true system > system_synth.vhd 2> system_synth.log) && \
+	@(cd $(BUILD) && $(GHDL) --synth $(GHDLFLAGS) -gG_CLOCK_HZ=90000000 -gG_SCR_ADDR_BITS=13 -gG_BOARD_IO=true -gG_SD_SLOTS=1 -gG_SD_POWER=true -gG_I2C=true system > system_synth.vhd 2> system_synth.log) && \
 	  echo "PASS synth system" || (echo "FAIL synth system"; cat $(BUILD)/system_synth.log; exit 1)
 
 COSIM_PORT ?= 0

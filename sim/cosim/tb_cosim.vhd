@@ -12,7 +12,10 @@
 -- p_from_board decodes the UART output and hands each byte to cosim.c.
 --
 -- The system has the board's sizes, and no ROM unless G_ROM_FILE is given.
--- It has the fonts of the display (src/video/font.vhd), with no display.
+-- It has the fonts of the display (src/video/font.vhd), with no display,
+-- and the I2C master with a model of the R6's real-time clock on its bus
+-- (i2c_chip_model.vhd), an RV-3032-C7 at 2026-11-11 12:34:56.50, which
+-- does not run; the monitor's cold start reads it (#105).
 -- The clock is 10 MHz and the UART runs at 1 Mbaud, 10 cycles per bit, so
 -- that the bytes come as quickly as the UART takes them. The simulation
 -- runs far slower than real time, but the host's bytes arrive back to
@@ -79,6 +82,12 @@ architecture simulation of tb_cosim is
    signal fnt_wdata : std_logic_vector(15 downto 0);
    signal fnt_rdata : std_logic_vector(15 downto 0);
 
+   -- The I2C bus, with its pull-ups, and the master's outputs
+   signal i2c_scl   : std_logic;
+   signal i2c_sda   : std_logic;
+   signal i2c_scl_o : std_logic;
+   signal i2c_sda_o : std_logic;
+
 begin
 
    p_clk : process
@@ -103,7 +112,8 @@ begin
       generic map (
          G_CLOCK_HZ      => C_CLOCK_HZ,
          G_UART_BAUDRATE => C_BAUDRATE,
-         G_ROM_FILE      => G_ROM_FILE
+         G_ROM_FILE      => G_ROM_FILE,
+         G_I2C           => true
       )
       port map (
          clk_i          => clk,
@@ -129,8 +139,30 @@ begin
          fnt_we_o       => fnt_we,
          fnt_addr_o     => fnt_addr,
          fnt_wdata_o    => fnt_wdata,
-         fnt_rdata_i    => fnt_rdata
+         fnt_rdata_i    => fnt_rdata,
+         i2c_scl_o      => i2c_scl_o,
+         i2c_sda_o      => i2c_sda_o,
+         i2c_scl_i      => to_x01(i2c_scl),
+         i2c_sda_i      => to_x01(i2c_sda)
       ); -- i_nicemon
+
+   i2c_scl <= 'H';
+   i2c_sda <= 'H';
+   i2c_scl <= '0' when i2c_scl_o = '0' else
+              'Z';
+   i2c_sda <= '0' when i2c_sda_o = '0' else
+              'Z';
+
+
+   i_rtc : entity work.i2c_chip_model
+      generic map (
+         G_ADDR => "1010001",
+         G_REGS => X"0000000000000000000000000000000000000000000000002611110312345650"
+      )
+      port map (
+         scl_io => i2c_scl,
+         sda_io => i2c_sda
+      ); -- i_rtc
 
    i_font : entity work.font
       port map (

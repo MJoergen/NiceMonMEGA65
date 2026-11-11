@@ -13,7 +13,8 @@ board exactly as `niceemu`, the emulator in `nice_cpu/emulator`, runs it.
 `README.md` is for users of the core files: on its own, over Ethernet,
 and over the serial port, in that order, the order of their numbers of
 users. `doc/SYSTEM.md` has the address map, the screen,
-the keyboard, the Nexys4DDR's devices, and the SD card slots;
+the keyboard, the Nexys4DDR's devices, the SD card slots, and the I2C
+bus with the MEGA65's real-time clock, which the ROM reads (#105);
 `doc/DEBUG_LINK.md` the link, its control register, the UART's baud
 rate, and the link over TCP; `CONTRIBUTING.md` the tests, the
 formal checks, `make hwtest`, and the badge; `doc/EMULATOR.md` the known
@@ -41,7 +42,7 @@ header is the authoritative address map.
 ## Commands
 
     make                  # lists the targets
-    make -j test          # GHDL: synth checks, tb_hello, tb_nicemon, tb_kbd, tb_ps2, tb_ps2_nicemon, tb_text, tb_dbg, tb_dbg_host, tb_dbg_decode, tb_board_io, tb_rmii_rx, tb_rx_fcs, tb_eth_rx_fifo, tb_eth_tx_fifo, tb_rmii_tx, tb_eth, tb_eth_tcp, tb_eth_tcp_random, tb_sd, check-steps, check-fmt (NICE=multi for the multi-cycle core); then the demo and the monitor in niceemu
+    make -j test          # GHDL: synth checks, tb_hello, tb_nicemon, tb_kbd, tb_ps2, tb_ps2_nicemon, tb_text, tb_dbg, tb_dbg_host, tb_dbg_decode, tb_board_io, tb_rmii_rx, tb_rx_fcs, tb_eth_rx_fifo, tb_eth_tx_fifo, tb_rmii_tx, tb_eth, tb_eth_tcp, tb_eth_tcp_random, tb_sd, tb_i2c, check-steps, check-fmt (NICE=multi for the multi-cycle core); then the demo and the monitor in niceemu
     make -j formal        # SymbiYosys jobs in formal/, each task in a work directory of its own
     make lint             # vsg against doc/CODING_STYLE.md; line-length warnings are tolerated
     make typecheck        # mypy --strict on the Python files that mypy.ini lists
@@ -66,7 +67,7 @@ header is the authoritative address map.
     make sdnbd            # the board's SD card as a disk over NBD, for nbd-client and a mount on Linux; holds the core until Ctrl-C (ETH= or PORT=)
     make sdtest           # sdcard.py and sdnbd.py on niceemu --link with images that mtools made, no board
     make cosim            # the RTL in GHDL, its debug UART on TCP, for the tools' --cosim PORT
-    make cosimtest        # run.py --cosim on make cosim against plain niceemu, no board (minutes)
+    make cosimtest        # run.py --cosim on make cosim against plain niceemu, no board (about an hour)
 
 One testbench: `make -C sim tb_kbd` (likewise `tb_hello`, `tb_nicemon`,
 `tb_ps2`, `tb_text`, `tb_board_io`, `synth-nicemon`, ...). `make -C sim
@@ -114,8 +115,11 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   `eth_regs.vhd` in `devices.vhd`, and the arbiter of the frames to
   send, `eth/eth_arb.vhd`), the SD card controller at `FFFFFFA0`–`AF` (`sd/sd.vhd`,
   with nice_cpu's `sd_regs.vhd`, the engine in SPI mode, `sd/sd_spi.vhd`, and
-  its byte shifter, `sd/sd_spi_byte.vhd`), and `system.vhd`, which every
-  board instantiates.
+  its byte shifter, `sd/sd_spi_byte.vhd`), the I2C master at
+  `FFFFFF97`–`9D` (`i2c.vhd`, in `board_io.vhd`, #105), which does a
+  whole transaction with a chip of the board's bus, the MEGA65's
+  real-time clock or the Nexys4DDR's temperature sensor, and
+  `system.vhd`, which every board instantiates.
   `nice_core.vhd` with one architecture from `src/core/` wraps whichever
   nice_cpu core `core.mk` selects (`NICE=pipeline`, the default, or `multi`).
 - `src/video/`: `text.vhd` shows the screen with a cursor and a display
@@ -131,9 +135,11 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   and `nexys4ddr/` the boards. See `synth/README.md`, with the history of its
   numbers in `synth/HISTORY.md`, and
   `.claude/rules/synth.md` when working there.
-- `sim/`: the GHDL testbenches and their `.nasm` programs, and a model of
-  an SD card, `sd_card_model.vhd`; `sim/cosim/` is
-  the system with its UART on TCP (`tb_cosim.vhd`, `cosim.c`). `formal/`: the
+- `sim/`: the GHDL testbenches and their `.nasm` programs, a model of
+  an SD card, `sd_card_model.vhd`, and of an I2C chip with registers,
+  `i2c_chip_model.vhd`; `sim/cosim/` is
+  the system with its UART on TCP (`tb_cosim.vhd`, `cosim.c`), with a
+  model of the R6's real-time clock on its I2C bus. `formal/`: the
   SymbiYosys wrappers; the checks themselves are `G_FORMAL` blocks in the
   sources. `tools/`: `boardlink.py` (the link: nice_cpu's
   `debugger/nicelink.py`, on the UART or over TCP to `niceemu --link`,
@@ -163,7 +169,8 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   the main loop and the commands, which BASIC (#54) is to replace, with
   `u` in `monitor_dis.nasm`, the sector routines in
   `monitor_sd.nasm`, and the network in `monitor_eth.nasm`), its C code (`fat32.c`,
-  and `clock.c`, the `time` command and the dates of files (#109), in
+  and `clock.c`, the `time` command, the dates of files (#109), and the
+  clock from the real-time clock at the cold start (#105), in
   one wasm module through `nicewasm --ram`, with its
   writable words at `0xFFFFF400`; building the monitor needs clang, and
   its tests mtools, `mkfs.fat`, and `sfdisk`), the routines that

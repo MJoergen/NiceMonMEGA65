@@ -59,7 +59,12 @@ entity top is
       sd_dat3_o      : out std_logic_vector(1 downto 0);
       sd_dat0_i      : in  std_logic_vector(1 downto 0);
       sd_cd_n_i      : in  std_logic_vector(1 downto 0);
-      sd_wp_i        : in  std_logic -- slot 1's
+      sd_wp_i        : in  std_logic; -- slot 1's
+
+      -- The I2C bus of the real-time clock (src/system.vhd), FPGA_SCL and
+      -- FPGA_SDA, open drain
+      i2c_scl_io     : inout std_logic;
+      i2c_sda_io     : inout std_logic
    );
 end entity top;
 
@@ -105,7 +110,9 @@ begin
          sd_dat3_o      => sd_dat3_o,
          sd_dat0_i      => sd_dat0_i,
          sd_cd_n_i      => sd_cd_n_i,
-         sd_wp_i        => sd_wp_i
+         sd_wp_i        => sd_wp_i,
+         i2c_scl_io     => i2c_scl_io,
+         i2c_sda_io     => i2c_sda_io
       ); -- i_mega65
 
    vdac_psave_n_o <= '1';  -- Power on

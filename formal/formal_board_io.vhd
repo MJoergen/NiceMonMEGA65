@@ -1,7 +1,8 @@
 -- The board's devices (src/board_io.vhd), with their properties, for
 -- SymbiYosys. Every input is free, so the solver writes and reads any word,
 -- and presses any button, at any time. G_BOARD_IO is the task's: with the
--- registers, or without them.
+-- registers, or without them; and so is G_I2C, with the I2C master, whose
+-- lines are free too.
 --
 -- RESET
 -- The first cycle is a reset.
@@ -11,7 +12,8 @@ library ieee;
 
 entity formal_board_io is
    generic (
-      G_BOARD_IO : boolean := true
+      G_BOARD_IO : boolean := true;
+      G_I2C      : boolean := false
    );
    port (
       clk_i   : in  std_logic;
@@ -21,7 +23,9 @@ entity formal_board_io is
       addr_i  : in  std_logic_vector(3 downto 0);
       wdata_i : in  std_logic_vector(31 downto 0);
       btn_i   : in  std_logic_vector(4 downto 0);
-      sw_i    : in  std_logic_vector(15 downto 0)
+      sw_i    : in  std_logic_vector(15 downto 0);
+      scl_i   : in  std_logic;
+      sda_i   : in  std_logic
    );
 end entity formal_board_io;
 
@@ -38,6 +42,7 @@ begin
    i_board_io : entity work.board_io
       generic map (
          G_BOARD_IO  => G_BOARD_IO,
+         G_I2C       => G_I2C,
          G_RAM_WORDS => 16#20000#,
          G_FORMAL    => true
       )
@@ -56,7 +61,11 @@ begin
          btn_i       => btn_i,
          sw_i        => sw_i,
          uart_baud_o => open,
-         uart_div_o  => open
+         uart_div_o  => open,
+         i2c_scl_o   => open,
+         i2c_sda_o   => open,
+         i2c_scl_i   => scl_i,
+         i2c_sda_i   => sda_i
       ); -- i_board_io
 
 end architecture synthesis;

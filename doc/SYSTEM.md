@@ -3,7 +3,8 @@
 This is the system that a program sees on the MEGA65 R3 and R6, and on
 the Nexys4DDR: the address map, the screen and the font, the keyboard,
 the Nexys4DDR's devices, the Ethernet station, which every board has,
-with the port for frames, and the SD card slots.
+with the port for frames, the SD card slots, and the I2C bus, with the
+MEGA65's real-time clock.
 [PROGRAMMING.md](PROGRAMMING.md) says how to write a program for it, and
 [EMULATOR.md](EMULATOR.md) lists where it differs from `niceemu`.
 
@@ -177,10 +178,10 @@ core, where only the link has registers.
 | `0xFFFFFF10`–`0xFFFFFF1F` | The timer of [nice_cpu's SYSTEM.md §4](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#4-timer). It counts clock cycles, at 100 MHz on the MEGA65 and 90 MHz on the Nexys4DDR, where the emulator counts steps. |
 | `0xFFFFFF20`–`0xFFFFFF3F` | The math unit of [nice_cpu's SYSTEM.md §2](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#2-math-unit), as in the emulator. |
 | `0xFFFFFF40`–`0xFFFFFF5F` | The performance counters of [nice_cpu's SYSTEM.md §3](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#3-performance-counters). The cycles are those of the board's clock, at 100 MHz on the MEGA65 and 90 MHz on the Nexys4DDR, and the microseconds come from it, so they are real time. The instructions and the event counters count as the emulator's do. A read of a low word by the link takes the snapshot, as the core's does, where `niceemu --link` takes none. |
-| `0xFFFFFF46`–`0xFFFFFF49` | The clock of the time of day of [nice_cpu's SYSTEM.md §10](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#10-clock), within the performance counters, counted from the board's clock. After a reset it is not set until a program sets it: the board does not read the MEGA65's real-time clock yet. Only a reset of the system resets it: a start keeps the time, and it runs while the core is held, paused, or halted. A read of `0xFFFFFF46` by the link takes the snapshot too. |
+| `0xFFFFFF46`–`0xFFFFFF49` | The clock of the time of day of [nice_cpu's SYSTEM.md §10](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#10-clock), within the performance counters, counted from the board's clock. After a reset it is not set, until the ROM's monitor sets it from the MEGA65's real-time clock at its start (see [The I2C bus](#the-i2c-bus)), or a program sets it. It keeps local time, as the real-time clock does. Only a reset of the system resets it: a start keeps the time, and it runs while the core is held, paused, or halted. A read of `0xFFFFFF46` by the link takes the snapshot too. |
 | `0xFFFFFF60`–`0xFFFFFF7F` | The fetch statistics of [MICROARCH.md §8.1](https://github.com/MJoergen/nice_cpu/blob/main/doc/MICROARCH.md#81-fetch-statistics), which the emulator does not have. With the multi-cycle core (`NICE=multi`), only two of them count. |
 | `0xFFFFFF80`–`0xFFFFFF8F` | The screen's registers: the cursor and the display offset (see [The screen](#the-screen)). |
-| `0xFFFFFF90`–`0xFFFFFF9F` | The Nexys4DDR's LEDs, seven-segment display, buttons, and switches (see [The Nexys4DDR's devices](#the-nexys4ddrs-devices)). On the MEGA65 they read 0 and take no write. On every board, `0xFFFFFF9E` reads the words of the RAM, `0x20000` on the MEGA65 and `0x10000` on the Nexys4DDR, and takes no write, and `0xFFFFFF9F` is the UART's baud rate (see [The baud rate](DEBUG_LINK.md#the-baud-rate)). The emulator has memory there, which reads 0 after a clear, so a program takes 0 to mean no limit. |
+| `0xFFFFFF90`–`0xFFFFFF9F` | The Nexys4DDR's LEDs, seven-segment display, buttons, and switches at `0xFFFFFF90`–`96` (see [The Nexys4DDR's devices](#the-nexys4ddrs-devices)). On the MEGA65 they read 0 and take no write. On every board, the I2C master is at `0xFFFFFF97`–`9D` (see [The I2C bus](#the-i2c-bus)), `0xFFFFFF9E` reads the words of the RAM, `0x20000` on the MEGA65 and `0x10000` on the Nexys4DDR, and takes no write, and `0xFFFFFF9F` is the UART's baud rate (see [The baud rate](DEBUG_LINK.md#the-baud-rate)). The emulator has memory there, which reads 0 after a clear, so a program takes 0 to mean no limit. |
 | `0xFFFFFFA0`–`0xFFFFFFAF` | The SD card controller of [nice_cpu's SYSTEM.md §5](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#5-sd-card), with 2 slots on the MEGA65 and 1 on the Nexys4DDR (see [The SD card slots](#the-sd-card-slots)). |
 | `0xFFFFFFB0`–`0xFFFFFFBF` | The network station of [nice_cpu's SYSTEM.md §6](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#6-network-station), on every board: the Ethernet station's addresses, its counts of frames, and the state of the debug link over TCP (see [The Ethernet station](#the-ethernet-station)). |
 | `0xFFFFFFC0`–`0xFFFFFFCF` | The port for Ethernet frames of [nice_cpu's SYSTEM.md §7](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#7-ethernet-frames), on every board: a queue of 4 frames received and a send buffer, through which a program sends and receives frames of its own (see [Ethernet frames](#ethernet-frames)). |
@@ -410,9 +411,8 @@ synchronized to the clock but not debounced. While the on-board debugger
 has the focus ([DEBUGGER.md](DEBUGGER.md#the-nexys4ddr)), the buttons
 are its keys and read 0 here, and the display shows its segments; the
 registers keep their values and show again when the focus is left. The CPU RESET button is not a
-register: it resets the system. The words `0xFFFFFF97` to `9D`
-read 0 and take no write; the keyboard's LEDs may come to
-`0xFFFFFF97`.
+register: it resets the system. The words `0xFFFFFF97` to `9D` are
+the I2C master of every board (see [The I2C bus](#the-i2c-bus)).
 
 ## The Ethernet station
 
@@ -567,3 +567,81 @@ The SD card controller of [nice_cpu's SYSTEM.md §5](https://github.com/MJoergen
   common pin of the socket's switches is not connected to GND. The R3
   build ignores them, so a missing card shows as a failed start-up,
   error 3 or 8. The R3A fixed it, but one core serves both.
+
+## The I2C bus
+
+I2C is a bus of two wires, a clock, SCL, and data, SDA, which connects
+small chips on a board. Each chip has an address of 7 bits. The FPGA is
+the master: it starts each transfer, and the chip at the address
+answers. Every board has an I2C master at `0xFFFFFF97`–`9D` (issue
+#105), on its bus:
+
+| Board | Chips on the bus |
+|---|---|
+| MEGA65 R6 | The real-time clock, an RV-3032-C7 at `0x51`; EEPROMs, and the audio DAC |
+| MEGA65 R3 | The real-time clock, an ISL12020M at `0x6F`, with its RAM at `0x57`; an EEPROM |
+| Nexys4DDR | The temperature sensor, an ADT7420 at `0x4B` |
+
+The **real-time clock** keeps the date and the time with a battery,
+while the board is off. All the MEGA65's cores share it, and the MEGA65
+core and its configure tool set its time, in local time.
+
+**The ROM reads it.** At its start, the monitor in the ROM sets the
+clock of the time of day (see [I/O registers](#io-registers)) from the
+real-time clock, when the clock is not set yet. So after the power-up a
+program finds the clock set, with the time that the MEGA65 core shows.
+The monitor leaves the clock as it is when the real-time clock says
+that it lost its time, as after a flat battery: the RV-3032-C7's flags
+VLF and PORF, and the ISL12020M's flag RTCF. Nothing here ever writes
+the real-time clock, so that the other cores keep their time. The
+Nexys4DDR has no real-time clock, so its clock is not set until a
+program sets it.
+
+A chip's data are in its **registers**, each a byte, which a
+transaction reads or writes. The master does a whole transaction at
+once, of up to 16 bytes:
+
+| Address | Access | What it is |
+|---|---|---|
+| `0xFFFFFF97` | Read, write | The command. Bits 6..0 the chip's address, bit 7 read (1) or write (0), bits 15..8 the register, bits 20..16 the count of bytes, 0 to 16 (more count as 16), and bit 21 "no register". A write starts the transaction. A read returns the last command. |
+| `0xFFFFFF98` | Read only | The status: bit 0 present, always 1, bit 1 busy, bit 2 NACK, and bit 3 timeout. |
+| `0xFFFFFF99`–`9C` | Read, write | The data, 16 bytes, 4 in a word: byte 0 in bits 7..0 of `0xFFFFFF99`, byte 3 in bits 31..24, byte 4 in bits 7..0 of `0xFFFFFF9A`, and so on. |
+| `0xFFFFFF9D` | | Reads 0, and takes no write. |
+
+- **A read** sends the register to the chip, and then takes the count's
+  bytes into the data, from that register on. **A write** sends the
+  register, and then the count's bytes of the data. Most chips move on
+  to the next register after each byte.
+- **"No register"** leaves the register out: a read takes the bytes from
+  where the chip's last transaction left it, and a write sends only the
+  data. A chip whose registers have addresses of two bytes, such as an
+  EEPROM, needs it.
+- **Busy** is 1 from the write of the command until the transaction
+  ends. A command or data written meanwhile is dropped, so a program
+  waits for busy to read 0, before and after a command. A transaction
+  of 16 bytes takes about 2 ms.
+- **NACK** is 1 when no chip answered the address, or a chip refused a
+  byte written. **Timeout** is 1 when a chip held SCL low for longer
+  than 10 ms. Either ends the transaction, and the next command clears
+  them.
+- The bus runs at 100 kHz. A chip may hold SCL low, which slows the
+  transfer down.
+- After a reset of the system the master first frees the bus from a
+  chip that the reset caught in the middle of a transfer, and is busy
+  for up to about 100 µs meanwhile.
+- **In the emulator**, these words are memory, so the status reads 0 at
+  the start: bit 0, present, is 0, and a program finds no I2C master
+  there, as long as it does not write the status itself.
+
+To read the RV-3032-C7's seconds, its register 1, as two BCD digits in
+R1, with the command of a read of 1 byte from register 1 of the chip at
+`0x51`:
+
+    :
+                    AND[M]  R0, @0xFFFFFF98, 2      ; busy?
+            ?!Z     JMP     :-
+                    MOVE    @0xFFFFFF97, 0x000101D1
+    :
+                    AND[M]  R0, @0xFFFFFF98, 2
+            ?!Z     JMP     :-
+                    AND     R1, @0xFFFFFF99, 0xFF

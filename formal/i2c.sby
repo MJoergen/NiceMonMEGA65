@@ -1,0 +1,27 @@
+# The I2C master, src/i2c.vhd (formal_i2c.vhd). "prove" proves the
+# assertions for every cycle by k-induction, and "cover" reaches each cover
+# statement. The depths are in cycles: 8 is the k of the induction, and 80
+# is how far "cover" looks for each statement, as the recovery after reset
+# and a read of a byte with no register take about 70.
+
+[tasks]
+prove
+cover
+
+[options]
+prove: mode prove
+prove: depth 8
+cover: mode cover
+cover: depth 80
+
+[engines]
+smtbmc yices
+
+[script]
+plugin -i ghdl
+ghdl --std=08 -fpsl i2c.vhd formal_i2c.vhd -e formal_i2c
+prep -top formal_i2c
+
+[files]
+../src/i2c.vhd
+formal_i2c.vhd

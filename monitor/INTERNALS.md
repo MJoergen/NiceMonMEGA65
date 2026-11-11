@@ -89,8 +89,10 @@ that runs from a ROM (nice_cpu's translator README, "Code in a ROM"),
 at `-Oz`, which makes it more than a quarter smaller than `-O2`. The Makefile joins
 it after `mon.nasm`, with nice_cpu's `lib.nasm` and `muldiv_mpu.nasm`.
 `fat32.c` is FAT32 (README.md, "Files"), about 9200 words, and
-`clock.c` the `time` command and the dates of FAT's entries, about 700
-words, small rather than general, as its header says.
+`clock.c` the `time` command, the dates of FAT's entries, and the clock
+set from the MEGA65's real-time clock at the cold start, through the I2C
+master (doc/SYSTEM.md, "The I2C bus"), about 900 words, small rather
+than general, as its header says.
 
 - **Calls.** Every function of the C code that is not `static` is
   exported, and the monitor's assembly calls it as `_name`, in the C ABI;
@@ -231,6 +233,13 @@ and `udp` run with `--step-time`, as their timeouts count steps, and
 `time` too, so that its clock starts at 0, not set, and counts the same
 each time. The other tests run with the host's clock, so the files they
 write have the host's date, which no test shows.
+
+`niceemu` has no I2C master: its status word is memory, which reads 0,
+so the cold start of every test finds none, and `time` shows that the
+clock is not set. The reading of the real-time clock itself is tested in
+the simulated system, whose bus has a model of the R6's real-time clock:
+`make cosimtest` runs the monitor's cold start there, and checks the
+clock after it (CONTRIBUTING.md).
 
 The comments above each input in the Makefile say what each keystroke
 tests.

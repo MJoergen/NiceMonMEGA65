@@ -135,6 +135,18 @@ set_false_path -from [get_ports {sd_dat0_i[*] sd_cd_n_i[*] sd_wp_i}]
 set_property IOB TRUE [get_ports {sd_clk_o[*] sd_cmd_o[*] sd_dat3_o[*]}]
 set_property IOB TRUE [get_ports {sd_dat0_i[*] sd_cd_n_i[*] sd_wp_i}]
 
+## The I2C bus of the real-time clock (#105), FPGA_SCL and FPGA_SDA, on the
+## same pins on the R3 and R6 (TE0765-03 and TE0765-06), with pull-ups on
+## the board: 4.7 kOhm on the R3, and 1 kOhm on the R6. The pins are open
+## drain. The bus runs at 100 kHz, and the master counts its timing in
+## cycles of the system clock, so the pins are slow. The registers of their
+## enables and of their inputs are in the I/O tiles (src/i2c.vhd).
+set_property -dict {PACKAGE_PIN A15  IOSTANDARD LVCMOS33} [get_ports {i2c_scl_io}];   # FPGA_SCL
+set_property -dict {PACKAGE_PIN A16  IOSTANDARD LVCMOS33} [get_ports {i2c_sda_io}];   # FPGA_SDA
+set_false_path -to   [get_ports {i2c_scl_io i2c_sda_io}]
+set_false_path -from [get_ports {i2c_scl_io i2c_sda_io}]
+set_property IOB TRUE [get_ports {i2c_scl_io i2c_sda_io}]
+
 ## The registers on the slow pins live in the I/O tiles, so that their
 ## timing does not depend on placement.
 set_property IOB TRUE [get_ports {kb_io0_o kb_io1_o kb_io2_i uart_txd_o uart_rxd_i led_o}]

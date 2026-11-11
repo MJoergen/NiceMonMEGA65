@@ -34,6 +34,10 @@
 --
 -- The microSD slot is the system's SD slot 0, whose power the system
 -- switches with SD_RESET (src/system.vhd).
+--
+-- The I2C bus of the temperature sensor, an ADT7420 at 0x4B, goes to the
+-- I2C master of system.vhd (src/i2c.vhd), open drain: a pin is low while
+-- the master's output is 0, and released while it is 1 (#105).
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -97,7 +101,12 @@ entity top is
       sd_cmd_o     : out std_logic;
       sd_dat3_o    : out std_logic;
       sd_dat0_i    : in  std_logic;
-      sd_cd_n_i    : in  std_logic
+      sd_cd_n_i    : in  std_logic;
+
+      -- The I2C bus of the temperature sensor, TMP_SCL and TMP_SDA, open
+      -- drain
+      i2c_scl_io   : inout std_logic;
+      i2c_sda_io   : inout std_logic
    );
 end entity top;
 
@@ -155,6 +164,13 @@ architecture synthesis of top is
    signal sd_clk  : std_logic_vector(1 downto 0);
    signal sd_cmd  : std_logic_vector(1 downto 0);
    signal sd_dat3 : std_logic_vector(1 downto 0);
+
+   -- The I2C master's outputs: 0 pulls a pin low, 1 releases it
+   signal i2c_scl : std_logic;
+   signal i2c_sda : std_logic;
+   -- The pins' levels
+   signal i2c_scl_in : std_logic;
+   signal i2c_sda_in : std_logic;
 
 begin
 
@@ -275,7 +291,8 @@ begin
          G_BOARD_IO      => true,
          G_TOGGLE_KEY    => "Scroll Lock",
          G_SD_SLOTS      => 1,
-         G_SD_POWER      => true
+         G_SD_POWER      => true,
+         G_I2C           => true
       )
       port map (
          clk_i        => clk,
@@ -306,6 +323,10 @@ begin
          sd_dat0_i    => '1' & sd_dat0_i,
          sd_cd_n_i    => '1' & sd_cd_n_i,
          sd_pwr_n_o   => sd_pwr_n_o,
+         i2c_scl_o    => i2c_scl,
+         i2c_sda_o    => i2c_sda,
+         i2c_scl_i    => i2c_scl_in,
+         i2c_sda_i    => i2c_sda_in,
          vga_clk_i    => vga_clk,
          vga_hs_o     => vga_hs,
          vga_vs_o     => vga_vs,
@@ -318,6 +339,29 @@ begin
    sd_clk_o  <= sd_clk(0);
    sd_cmd_o  <= sd_cmd(0);
    sd_dat3_o <= sd_dat3(0);
+
+   -- The pins are open drain: each buffer drives 0 while the master's
+   -- register, its enable, is 0. The buffers are instantiated with their
+   -- data tied to 0, as an inferred one takes the register for its data
+   -- too, and then the register cannot be in the I/O tile. IOBUF is a
+   -- Xilinx primitive, named as in Xilinx's documentation.
+-- vsg_off
+   i_scl_iobuf : IOBUF
+      port map (
+         I  => '0',
+         T  => i2c_scl,
+         O  => i2c_scl_in,
+         IO => i2c_scl_io
+      ); -- i_scl_iobuf
+
+   i_sda_iobuf : IOBUF
+      port map (
+         I  => '0',
+         T  => i2c_sda,
+         O  => i2c_sda_in,
+         IO => i2c_sda_io
+      ); -- i_sda_iobuf
+-- vsg_on
 
 
    p_vga : process (vga_clk)

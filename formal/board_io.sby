@@ -1,12 +1,15 @@
 # The board's devices, src/board_io.vhd (formal_board_io.vhd). "prove"
 # proves the assertions for every cycle by k-induction, with the registers
-# of G_BOARD_IO, and "none" without them. "cover" reaches each cover
-# statement. The depths are in cycles: 4 for "prove" and "none" is the k of
-# the induction, and 10 for "cover" is how far it looks for each statement.
+# of G_BOARD_IO, "none" without them, and "i2c" with them and the I2C
+# master of G_I2C, whose own properties formal/i2c.sby proves. "cover"
+# reaches each cover statement. The depths are in cycles: 4 for "prove",
+# "none", and "i2c" is the k of the induction, and 10 for "cover" is how
+# far it looks for each statement.
 
 [tasks]
 prove
 none
+i2c
 cover
 
 [options]
@@ -14,6 +17,8 @@ prove: mode prove
 prove: depth 4
 none: mode prove
 none: depth 4
+i2c: mode prove
+i2c: depth 4
 cover: mode cover
 cover: depth 10
 
@@ -22,12 +27,14 @@ smtbmc yices
 
 [script]
 plugin -i ghdl
-prove: ghdl --std=08 -fpsl -gG_BOARD_IO=true uart_pkg.vhd board_io.vhd formal_board_io.vhd -e formal_board_io
-none: ghdl --std=08 -fpsl -gG_BOARD_IO=false uart_pkg.vhd board_io.vhd formal_board_io.vhd -e formal_board_io
-cover: ghdl --std=08 -fpsl -gG_BOARD_IO=true uart_pkg.vhd board_io.vhd formal_board_io.vhd -e formal_board_io
+prove: ghdl --std=08 -fpsl -gG_BOARD_IO=true uart_pkg.vhd i2c.vhd board_io.vhd formal_board_io.vhd -e formal_board_io
+none: ghdl --std=08 -fpsl -gG_BOARD_IO=false uart_pkg.vhd i2c.vhd board_io.vhd formal_board_io.vhd -e formal_board_io
+i2c: ghdl --std=08 -fpsl -gG_BOARD_IO=true -gG_I2C=true uart_pkg.vhd i2c.vhd board_io.vhd formal_board_io.vhd -e formal_board_io
+cover: ghdl --std=08 -fpsl -gG_BOARD_IO=true uart_pkg.vhd i2c.vhd board_io.vhd formal_board_io.vhd -e formal_board_io
 prep -top formal_board_io
 
 [files]
 ../src/uart_pkg.vhd
+../src/i2c.vhd
 ../src/board_io.vhd
 formal_board_io.vhd

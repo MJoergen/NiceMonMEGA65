@@ -186,6 +186,17 @@ set_false_path -to   [get_ports {sd_pwr_n_o sd_clk_o sd_cmd_o sd_dat3_o}]
 set_false_path -from [get_ports {sd_dat0_i sd_cd_n_i}]
 set_property IOB TRUE [get_ports {sd_pwr_n_o sd_clk_o sd_cmd_o sd_dat3_o sd_dat0_i sd_cd_n_i}]
 
+## The I2C bus of the temperature sensor, an ADT7420 at 0x4B (#105), from
+## Digilent's master XDC. The pins are open drain, with the FPGA's pull-ups
+## besides the board's. The bus runs at 100 kHz, and the master counts its
+## timing in cycles of the system clock, so the pins are slow. The registers
+## of their enables and of their inputs are in the I/O tiles (src/i2c.vhd).
+set_property -dict {PACKAGE_PIN C14  IOSTANDARD LVCMOS33 PULLUP TRUE} [get_ports {i2c_scl_io}]; # TMP_SCL
+set_property -dict {PACKAGE_PIN C15  IOSTANDARD LVCMOS33 PULLUP TRUE} [get_ports {i2c_sda_io}]; # TMP_SDA
+set_false_path -to   [get_ports {i2c_scl_io i2c_sda_io}]
+set_false_path -from [get_ports {i2c_scl_io i2c_sda_io}]
+set_property IOB TRUE [get_ports {i2c_scl_io i2c_sda_io}]
+
 ## The UART, the LEDs, the display, the keyboard, the buttons, the switches,
 ## and the reset button are slow, and synchronized or registered in the
 ## design. Their first registers are in the I/O tiles, so that their timing

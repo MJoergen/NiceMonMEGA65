@@ -161,10 +161,10 @@
 --                          for a cycle when one is written, and when they
 --                          are cleared by reset or by the clear of the memory.
 --   0xFFFFFF90-0xFFFFFF9F  The board's devices (src/board_io.vhd): 90-96
---                          with G_BOARD_IO (the Nexys4DDR), and 9E-9F on every
---                          board. Without G_BOARD_IO, and in the words that
---                          are not registers, a read returns 0 and a write
---                          is dropped. Reset clears the writable ones, or
+--                          with G_BOARD_IO (the Nexys4DDR), 97-9D with G_I2C,
+--                          and 9E-9F on every board. Without them, and in
+--                          the words that are not registers, a read
+--                          returns 0 and a write is dropped. Reset clears the writable ones, or
 --                          sets them as 9F says; a start of the core does
 --                          not.
 --     90  The 16 LEDs, bit n for LED n. Read and write.
@@ -178,6 +178,15 @@
 --     95  The five buttons, bit 0 for the center one, then up, left, right,
 --         and down. Read only, synchronized to the clock.
 --     96  The 16 switches, bit n for switch n. Read only, synchronized.
+--     97  The I2C master's command (src/i2c.vhd, #105): bits 6..0 the
+--         chip's address, bit 7 read, bits 15..8 the register, bits
+--         20..16 the count of bytes, up to 16, and bit 21 "no register".
+--         A write starts a transaction, unless one runs. Read and write.
+--     98  Its status: bit 0 present, bit 1 busy, bit 2 NACK, and bit 3
+--         timeout. Read only. In niceemu it is plain memory, which reads
+--         0, no I2C master, as long as nothing writes it.
+--     99-9C  Its data, 16 bytes, byte 0 in bits 7..0 of 99. Read and
+--         write. 9D reads 0.
 --     9E  The words of the RAM, 2^G_RAM_ADDR_BITS: 0x20000 on the MEGA65
 --         and 0x10000 on the Nexys4DDR. Read only. In niceemu it is plain
 --         memory, which reads 0 after the clear, and 0 means no limit.
@@ -361,6 +370,8 @@ entity nicemon is
       -- The board has LEDs, a seven-segment display, buttons, and switches
       -- in 0xFFFFFF90-9F
       G_BOARD_IO         : boolean := false;
+      -- The board has an I2C bus, whose master is at 0xFFFFFF97-9D
+      G_I2C              : boolean := false;
       -- The number of breakpoints of the debug link, 0 to 8 (DEBUG.md §6)
       G_BREAKS           : natural range 0 to C_BREAKS_MAX := 4;
       -- The number of watchpoints of the debug link, 0 to 4 (DEBUG.md §6)
@@ -491,7 +502,13 @@ entity nicemon is
       sd_dat0_i         : in  std_logic_vector(1 downto 0)  := "11";
       sd_cd_n_i         : in  std_logic_vector(1 downto 0)  := "11";
       sd_wp_i           : in  std_logic_vector(1 downto 0)  := "00";
-      sd_pwr_n_o        : out std_logic
+      sd_pwr_n_o        : out std_logic;
+      -- The I2C bus's lines (src/i2c.vhd), with G_I2C: 0 pulls the pin
+      -- low, and 1 releases it
+      i2c_scl_o         : out std_logic;
+      i2c_sda_o         : out std_logic;
+      i2c_scl_i         : in  std_logic                     := '1';
+      i2c_sda_i         : in  std_logic                     := '1'
    );
 end entity nicemon;
 
@@ -1258,6 +1275,7 @@ begin
    i_board_io : entity work.board_io
       generic map (
          G_BOARD_IO      => G_BOARD_IO,
+         G_I2C           => G_I2C,
          G_RAM_WORDS     => 2 ** G_RAM_ADDR_BITS,
          G_CLOCK_HZ      => G_CLOCK_HZ,
          G_UART_BAUDRATE => G_UART_BAUDRATE
@@ -1277,7 +1295,11 @@ begin
          btn_i       => brd_btn_i,
          sw_i        => brd_sw_i,
          uart_baud_o => uart_baud_o,
-         uart_div_o  => uart_div
+         uart_div_o  => uart_div,
+         i2c_scl_o   => i2c_scl_o,
+         i2c_sda_o   => i2c_sda_o,
+         i2c_scl_i   => i2c_scl_i,
+         i2c_sda_i   => i2c_sda_i
       ); -- i_board_io
 
    -- The screen's registers, which take the request served, when it is

@@ -213,9 +213,12 @@ and more.
   each with `niceemu --step-time`.
 - `time()` reads the clock of the time of day
   ([nice_cpu's SYSTEM.md §10](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#10-clock)).
-  On the board the clock holds no time after a reset, and `time()`
-  returns -1 until a program sets it with `nice_clock_set`. In the
-  emulator it is the host's time.
+  On the MEGA65 the ROM's monitor sets the clock from the real-time
+  clock at its start, in local time
+  ([SYSTEM.md](SYSTEM.md#the-i2c-bus)). On the Nexys4DDR, and on a
+  board without the ROM, the clock holds no time after a reset, and
+  `time()` returns -1 until a program sets it with `nice_clock_set`. In
+  the emulator it is the host's time.
 
 **Multiplying and dividing.** The translated code and the runtime
 routines multiply and divide with the math unit, so the program is

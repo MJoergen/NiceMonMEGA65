@@ -31,6 +31,13 @@
 -- microSD slot at the back, and slot 1 the full-size slot underneath,
 -- whose card detect and write protect G_SD_DETECT may leave out, as the R3
 -- needs (#56). The cards' power is always on.
+--
+-- The I2C bus of FPGA_SCL and FPGA_SDA, which the board pulls up, goes to
+-- the I2C master of system.vhd (src/i2c.vhd), open drain: a pin is low
+-- while the master's output is 0, and released while it is 1. Its chips
+-- are the real-time clock, the R3's ISL12020M at 0x6F or the R6's
+-- RV-3032-C7 at 0x51, which the ROM reads at its start (#105), and
+-- EEPROMs and the R6's audio DAC, which nothing uses.
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -93,7 +100,12 @@ entity mega65 is
       sd_dat3_o      : out std_logic_vector(1 downto 0);
       sd_dat0_i      : in  std_logic_vector(1 downto 0);
       sd_cd_n_i      : in  std_logic_vector(1 downto 0);
-      sd_wp_i        : in  std_logic -- slot 1's
+      sd_wp_i        : in  std_logic; -- slot 1's
+
+      -- The I2C bus of the real-time clock (src/system.vhd), FPGA_SCL and
+      -- FPGA_SDA, open drain
+      i2c_scl_io     : inout std_logic;
+      i2c_sda_io     : inout std_logic
    );
 end entity mega65;
 
@@ -115,6 +127,13 @@ architecture synthesis of mega65 is
    signal drive_rgb  : std_logic_vector(23 downto 0);
 
    signal led_reg : std_logic := '0';
+
+   -- The I2C master's outputs: 0 pulls a pin low, 1 releases it
+   signal i2c_scl : std_logic;
+   signal i2c_sda : std_logic;
+   -- The pins' levels
+   signal i2c_scl_in : std_logic;
+   signal i2c_sda_in : std_logic;
 
    constant C_VIDEO : t_video_mode := C_VIDEO_1280X1024;
 
@@ -233,7 +252,8 @@ begin
          G_SCR_ADDR_BITS => 15,
          G_VIDEO         => C_VIDEO,
          G_SD_SLOTS      => 2,
-         G_SD_DETECT     => G_SD_DETECT
+         G_SD_DETECT     => G_SD_DETECT,
+         G_I2C           => true
       )
       port map (
          clk_i        => clk,
@@ -259,6 +279,10 @@ begin
          sd_cd_n_i    => sd_cd_n_i,
          sd_wp_i      => sd_wp_i & '0',
          sd_pwr_n_o   => open,
+         i2c_scl_o    => i2c_scl,
+         i2c_sda_o    => i2c_sda,
+         i2c_scl_i    => i2c_scl_in,
+         i2c_sda_i    => i2c_sda_in,
          vga_clk_i    => vga_clk,
          vga_hs_o     => vga_hs,
          vga_vs_o     => vga_vs,
@@ -267,6 +291,29 @@ begin
          vga_green_o  => vga_green,
          vga_blue_o   => vga_blue
       ); -- i_system
+
+   -- The pins are open drain: each buffer drives 0 while the master's
+   -- register, its enable, is 0. The buffers are instantiated with their
+   -- data tied to 0, as an inferred one takes the register for its data
+   -- too, and then the register cannot be in the I/O tile. IOBUF is a
+   -- Xilinx primitive, named as in Xilinx's documentation.
+-- vsg_off
+   i_scl_iobuf : IOBUF
+      port map (
+         I  => '0',
+         T  => i2c_scl,
+         O  => i2c_scl_in,
+         IO => i2c_scl_io
+      ); -- i_scl_iobuf
+
+   i_sda_iobuf : IOBUF
+      port map (
+         I  => '0',
+         T  => i2c_sda,
+         O  => i2c_sda_in,
+         IO => i2c_sda_io
+      ); -- i_sda_iobuf
+-- vsg_on
 
 
    ---------------------------------------------------------------------------

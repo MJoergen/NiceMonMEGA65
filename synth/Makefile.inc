@@ -60,6 +60,7 @@ SRC += ../../src/ram.vhd
 SRC += ../../src/rom.vhd
 SRC += ../../src/uart_pkg.vhd
 SRC += ../../src/bus_pkg.vhd
+SRC += ../../src/i2c.vhd
 SRC += ../../src/board_io.vhd
 SRC += ../../src/scr_regs.vhd
 SRC += ../../src/sd/sd_spi_byte.vhd
