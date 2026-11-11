@@ -1267,8 +1267,8 @@ def test_i2c(link: Link, board: str, booted: bool) -> None:
         return
     # The R6's RV-3032-C7 has the hundredths, the seconds, and so on from
     # register 0, and its flags at 0x0D; the R3's ISL12020M the seconds
-    # from register 0, and its flags at 7, and its hours in 12-hour mode
-    # without bit 7.
+    # from register 0, its hours with bit 7 set in 24-hour mode, and its
+    # flags at 7.
     status = i2c(link, i2c_read(0x51, 0, 14))
     if status == 1:
         b = i2c_bytes(link, 14)
@@ -1279,7 +1279,7 @@ def test_i2c(link: Link, board: str, booted: bool) -> None:
         status = i2c(link, i2c_read(0x6F, 0, 8))
         b = i2c_bytes(link, 8)
         name, lost = "ISL12020M at 0x6F", b[7] & 1
-        sec, mins, hour, date = b[0], b[1], b[2], b[3:6]
+        sec, mins, hour, date = b[0], b[1], b[2] & 0x3F, b[3:6]
         flags = b[7]
     if not check("I2C: the real-time clock answers", status == 1,
                  f"{name}, status {status:08X}"):
