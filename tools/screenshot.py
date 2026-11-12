@@ -26,7 +26,7 @@ The pictures of doc/images/ are made from the ROM of the release, the
 monitor and the demo behind it, with its tag, and x and CR first, which
 start the demo:
 
-    make -C demo VERSION=V2.0
+    make -C demo VERSION=V2.0.1
     printf 'x\\rHello from the NICE CPU on the MEGA65!\\r' > in.txt
     tools/screenshot.py -i in.txt -o doc/images/demo.png demo/build/rom.bin
 
@@ -39,7 +39,7 @@ doc/images/ethernet.png, the demo's F11, with:
 and doc/images/debugger.png, the typewriter paused under the strip once
 the line of the first in.txt is typed, with:
 
-    tools/screenshot.py -i in.txt -n 35278 --debugger \\
+    tools/screenshot.py -i in.txt -n 35587 --debugger \\
         -o doc/images/debugger.png demo/build/rom.bin
 
 Usage:
