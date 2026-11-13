@@ -76,7 +76,7 @@ DEMO     = $(shell sed -n 's/^DEMO *\.EQU *\(0x[0-9A-Fa-f]*\).*/\1/p' monitor.na
 CHECK_END = $(PYTHON) -c 'import sys; top = int(open(sys.argv[1]).read().split()[-2], 16); \
   end = int(sys.argv[2], 16); top < end or sys.exit(f"{sys.argv[1]} reaches {top:08X}, past DEMO, {end:08X}")'
 
-.PHONY: all test fmt clean FORCE
+.PHONY: all test fmt romsize clean FORCE
 
 all: $(BUILD)/monitor.bin
 
@@ -389,7 +389,7 @@ FAT32_START_BYTES = $(shell echo $$(($(FAT32_START) * 512)))
 # count, and the frames they send are added to their output.
 test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.bin $(BUILD)/hello.bin \
       $(BUILD)/dis.bin $(BUILD)/sd.bin $(BUILD)/arp.bin $(BUILD)/udp.bin $(BUILD)/rom.bin $(BUILD)/fs.bin $(BUILD)/fsw.bin \
-      $(FAT_IMAGES)
+      $(FAT_IMAGES) $(BUILD)/version_test.nasm
 	@test '$(FOLDER_UC)' = NICE || { echo "make test needs FOLDER=NICE, not $(FOLDER)"; exit 1; }
 	@$(PYTHON) test/ring.py $(EMU) $(BUILD)/monitor_test.bin:32768 \
 	  $(BUILD)/monitor_8k.bin:8192 $(BUILD)/monitor_2k.bin:2048
@@ -397,6 +397,7 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	@$(PYTHON) test/dhcp.py $(EMU) $(BUILD)/monitor_test.bin test/dhcp.expected $(BUILD)/dhcp.out
 	@$(PYTHON) test/tftp.py $(EMU) $(BUILD)/monitor_test.bin test/tftp.expected $(BUILD)/tftp.out
 	@$(PYTHON) test/rtc.py $(EMU) $(BUILD)/monitor_test.bin
+	@$(ROMSIZE)
 	@echo 'FFFFFF9E 00020000' > $(BUILD)/ram128k.bin
 	@echo 'FFFFFF9E 00010000' > $(BUILD)/ram64k.bin
 	@printf '$(LOAD_EMU)' > $(BUILD)/load_emu.txt
@@ -490,6 +491,20 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	  if cmp -s test/$$t.expected $(BUILD)/$$t.out; then echo "PASS monitor $$t"; \
 	  else echo "FAIL monitor $$t"; diff test/$$t.expected $(BUILD)/$$t.out; fail=1; fi; \
 	done; exit $$fail
+
+# The table of the monitor's words in INTERNALS.md, "The ROM's words",
+# which make test checks against monitor_test.bin, and make romsize
+# writes. Its sources are those of monitor_test.bin, with the version of
+# the tests in a file of its own.
+ROMSIZE = $(PYTHON) ../tools/romsize.py monitor --bin $(BUILD)/monitor_test.bin \
+            $(addprefix --c ,$(ROM_C)) --doc INTERNALS.md $(SOURCES) $(BUILD)/rom_c.nasm \
+            $(RUNTIME_ROM) $(BUILD)/folder.nasm $(BUILD)/version_test.nasm
+
+$(BUILD)/version_test.nasm: | $(BUILD)
+	@echo "VERSION .ASCII_L 'V9.9'" > $@
+
+romsize: $(BUILD)/monitor_test.bin $(BUILD)/version_test.nasm
+	@$(ROMSIZE) --write
 
 # The layout of the sources, as nice_cpu's nicefmt checks it
 fmt:

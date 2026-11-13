@@ -13,7 +13,7 @@ ARGS   ?=
 LINK    = $(if $(ETH),--eth $(ETH)) $(if $(PORT),--port $(PORT))
 EMU     = nice_cpu/emulator/zig-out/bin/niceemu
 
-.PHONY: help test formal lint typecheck diagrams examples demo monitor r3 r6 nexys4ddr cor bump release load run mon sdcard sdnbd flash hwtest linktest sdtest tftpd tftptest cosim cosimtest clean
+.PHONY: help test formal lint typecheck diagrams romsize examples demo monitor r3 r6 nexys4ddr cor bump release load run mon sdcard sdnbd flash hwtest linktest sdtest tftpd tftptest cosim cosimtest clean
 
 # Every target but these needs the nice_cpu submodule
 ifeq ($(wildcard nice_cpu/hdl/src/nice_pkg.vhd),)
@@ -33,6 +33,8 @@ help:
 	@echo "  make typecheck  mypy --strict on the Python tools and scripts (needs mypy)"
 	@echo "  make diagrams   render the block diagrams, src/*.tex and src/eth/*.tex, to PNG"
 	@echo "                  (needs pdflatex and pdftoppm)"
+	@echo "  make romsize    write the tables of the ROM's words into"
+	@echo "                  monitor/INTERNALS.md, which make test checks"
 	@echo "  make examples   build the C examples to examples/build/*.bin (needs clang)"
 	@echo "  make demo       build the ROM's demo, and the monitor with the demo"
 	@echo "                  behind it, demo/build/rom.bin, the default ROM of the"
@@ -119,6 +121,12 @@ test:
 	$(MAKE) -C sim test
 	$(MAKE) -C demo test
 	$(MAKE) -C monitor test
+
+# The tables of the ROM's words in monitor/INTERNALS.md: the monitor's
+# first, as the demo's table of the ROM takes its words
+romsize:
+	$(MAKE) -C monitor romsize
+	$(MAKE) -C demo romsize
 
 # The formal checks of formal/: each task of each .sby file must pass, as
 # a target of its own, so that "make -j4 formal" runs them side by side. Each

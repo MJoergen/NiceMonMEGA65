@@ -49,6 +49,7 @@ header is the authoritative address map.
     make -j formal        # SymbiYosys jobs in formal/, each task in a work directory of its own
     make lint             # vsg against doc/CODING_STYLE.md; line-length warnings are tolerated
     make typecheck        # mypy --strict on the Python files that mypy.ini lists
+    make romsize          # the tables of the ROM's words in monitor/INTERNALS.md, which make -C monitor test and make -C demo test check
     make diagrams         # src/system.tex and src/eth/eth.tex -> the PNGs of their READMEs (pdflatex)
     make examples         # C examples -> examples/build/*.bin (clang wasm32, lld, llvm)
     make demo             # nice_cpu's demo at 0x8000 -> demo/build/demo.bin, behind the monitor -> demo/build/rom.bin; make -C demo test runs the join in niceemu
@@ -160,7 +161,9 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   Linux, with sdcard.py's sectors), and `sdtest.py`,
   `bump.py`, `release.py`, `linktest.py`, `tftpd.py` (the TFTP server for
   the monitor's `tftp`, with listings, #95) and `tftptest.py`,
-  `cosimtest.py`, `screenshot.py`
+  `cosimtest.py`, `romsize.py` (the tables of the ROM's words in
+  `monitor/INTERNALS.md`, which the tests of the monitor and the demo
+  check), `screenshot.py`
   (a program's screen in niceemu as a PNG). `examples/`: C programs built through
   nice_cpu's wasm translator. `demo/`: nice_cpu's demo (`nice_cpu/demo`,
   since V1.7), built by its Makefile with the board's `text.nasm`, a
@@ -184,7 +187,7 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   niceemu (`test/`, with `cat monitor.bin prog.bin`). `monitor/README.md`
   is the monitor for those who use it and write programs for it, and
   `monitor/INTERNALS.md` the routines with no entries, the scrollback,
-  the C in the ROM, and the build and the tests.
+  the C in the ROM, the ROM's words, and the build and the tests.
 
 ## Rules and pitfalls
 

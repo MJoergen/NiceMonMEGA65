@@ -58,22 +58,24 @@ settle the three open questions of #54.
 
 ## What it runs on
 
-Measured on 2026-11-11, at commit 9f92b1a:
+Measured on 2026-11-11, at commit 9f92b1a. The numbers of today, for
+every source of the monitor, are in
+[monitor/INTERNALS.md](../monitor/INTERNALS.md#the-roms-words).
 
 | What | Words |
 |---|---:|
 | The ROM, `0x0000`–`0x7FFF` | 32768 |
-| The monitor today | 19313 |
-| Of it: `monitor_cmd.nasm`, which BASIC replaces, 2469 of them text | 4070 |
-| Of it: `fat32.c` | 9435 |
-| Of it: `monitor_eth.nasm` | 1856 |
-| Of it: `clock.c` | 1176 |
-| Of it: `monitor_dis.nasm`, the disassembler of `u` | 1079 |
+| The monitor, all its sources | 19313 |
+| The monitor's `monitor_cmd.nasm`, which BASIC replaces, with 2469 words of text | 4070 |
+| The monitor's `fat32.c` | 9435 |
+| The monitor's `monitor_eth.nasm` | 1856 |
+| The monitor's `clock.c` | 1176 |
+| The monitor's `monitor_dis.nasm`, the disassembler of `u` | 1079 |
 | The demo, at `0x6000` | 4978 |
 | Free below the demo | 5263 |
 | Free once the demo is gone | 13455 |
 | The RAM of the ROM's C code, `0xFFFFF400`–`0xFFFFFEFF` | 2816 |
-| Of it: used by `fat32.c` and `clock.c`, with the C stack of 1024 | 1953 |
+| The part of that RAM used by `fat32.c` and `clock.c`, with the C stack of 1024 | 1953 |
 | A program's RAM on the MEGA65, `0x8000`–`0x1EFFF` | 92K |
 | A program's RAM on the Nexys4DDR, `0x8000`–`0xEFFF` | 28K |
 

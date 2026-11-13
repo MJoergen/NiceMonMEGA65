@@ -30,7 +30,7 @@ TEXT     = $(abspath text.nasm)
 # The demo's Makefile, with the board's text, into a directory here
 DEMO_MAKE = $(MAKE) -s --no-print-directory -C $(DEMO) TEXT='$(TEXT)'
 
-.PHONY: all test clean FORCE
+.PHONY: all test romsize clean FORCE
 
 all: $(BUILD)/rom.bin
 
@@ -91,6 +91,18 @@ test: $(BUILD)/rom_test.bin
 	done > $(BUILD)/test.screen; \
 	if cmp -s test.expected $(BUILD)/test.screen; then echo "PASS demo"; \
 	else echo "FAIL demo"; diff test.expected $(BUILD)/test.screen; exit 1; fi
+	@$(ROMSIZE)
+
+# The tables of the demo's words and of the ROM in the monitor's
+# INTERNALS.md, "The ROM's words", which make test checks against the
+# ROM of the tests, and make romsize writes
+DEMO_AT  = $(shell sed -n 's/^DEMO *\.EQU *\(0x[0-9A-Fa-f]*\).*/\1/p' $(MONITOR)/monitor.nasm)
+ROMSIZE  = $(PYTHON) ../tools/romsize.py demo --bin $(BUILD)/test/demo_test.bin \
+             --monitor $(MONITOR)/build/monitor_test.bin --demo-at $(DEMO_AT) \
+             --doc $(MONITOR)/INTERNALS.md $(DEMO)/demo.nasm $(TEXT) $(BUILD)/test/version.nasm
+
+romsize: $(BUILD)/rom_test.bin
+	@$(ROMSIZE) --write
 
 $(BUILD):
 	@mkdir -p $@
