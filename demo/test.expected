@@ -11,9 +11,6 @@ Screen:
 | RETURN new line   DEL delete   cursor keys move   CTRL-L clear   F12 monitor
 |Hello, NiceMonMEGA65!
 Screen:
-|
-|
-|
 |Returned 00000000
 |> v
 |NiceMon V9.9, dispatch table 1.4

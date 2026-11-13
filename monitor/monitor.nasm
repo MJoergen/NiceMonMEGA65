@@ -255,7 +255,8 @@ mon_reset
 ; main, with R1 the status: E cleared, the timer stopped, VBASE 0, the
 ; font base 0, the port for Ethernet frames disabled, the cursor shown and
 ; blinking with the display offset off, a fresh stack, and the status
-; printed, after a new line if the program left the cursor in a row.
+; printed where the program left the cursor's registers, after a new line
+; if that is not column 0.
 mon_exit
                 MOVE    SP, STACK
                 PUSH    R1
@@ -289,7 +290,10 @@ mon_trap
 
 ; exit_restore: for mon_exit and mon_trap, the state as the header of
 ; mon_exit says, but the stack, and a new line if the cursor is not in
-; column 0.
+; column 0. The cursor is taken from its registers, SCR_X and SCR_Y, as
+; a program may have moved it there and not through scr_moveto, such as
+; the demo, which clears the screen and leaves the cursor at the top
+; left. A column past 79 is 79, and a row past 24 is 24. Uses R1.
 exit_restore
                 MOVE    R14, 0          ; E = 0, VBASE = 0; bit 24 stays 1
                 MOVE    @TIMER, 0
@@ -297,6 +301,14 @@ exit_restore
                 MOVE    @ETH_CSR, 0     ; no frames, if the program took them
                 MOVE    @V_UPORT, 0     ; and the UDP endpoint closed
                 MOVE    @SCR_CTL, 0x60  ; the cursor, which a program may hide
+                MOVE    R1, @SCR_X
+                CMP     R1, 80
+        ?!C     MOVE    R1, 79
+                MOVE    @V_COL, R1
+                MOVE    R1, @SCR_Y
+                CMP     R1, 25
+        ?!C     MOVE    R1, 24
+                MOVE    @V_ROW, R1
                 TST     @V_COL
         ?!Z     JMP     _io_crlf        ; which returns to the caller
                 RET

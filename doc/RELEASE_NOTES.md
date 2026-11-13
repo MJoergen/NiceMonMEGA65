@@ -29,7 +29,9 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   ([#129](https://github.com/MJoergen/NiceMonMEGA65/issues/129)). The
   demo is `demo.bin`, a file of the release: copy it into the folder
   `NICE` of an SD card, and type `load demo.bin` and then `r`. F12
-  returns to the monitor as before. The ROM has 13430 words free, where
+  returns to the monitor as before. A program's return now prints its
+  status where the program left the cursor's registers, so at the top
+  after the demo, which clears the screen. The ROM has 13430 words free, where
   it had 5117 below the demo, for the network of #111 and for BASIC.
 - `make demo` builds `demo/build/demo.bin` alone, and the boards'
   targets put the monitor alone in the ROM, `monitor/build/monitor.bin`.

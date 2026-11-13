@@ -136,8 +136,8 @@ a program, `demo.bin`, whose words
 <!-- romsize layout -->
 | Part | Address | Words |
 |---|---|---:|
-| The monitor | `0x0000`–`0x4B89` | 19338 |
-| Free | `0x4B8A`–`0x7FFF` | 13430 |
+| The monitor | `0x0000`–`0x4B99` | 19354 |
+| Free | `0x4B9A`–`0x7FFF` | 13414 |
 <!-- /romsize layout -->
 
 The monitor's words, by the source they come from, in the order
@@ -148,7 +148,7 @@ the Makefile joins them. The column "Text" counts the words of the
 <!-- romsize monitor -->
 | Source | What it is | Words | Text |
 |---|---|---:|---:|
-| `monitor.nasm` | The dispatch table, the HAL, the cold start, and the traps | 696 | 27 |
+| `monitor.nasm` | The dispatch table, the HAL, the cold start, and the traps | 712 | 27 |
 | `monitor_cmd.nasm` | The main loop and the commands | 3949 | 2394 |
 | `monitor_dis.nasm` | The disassembler of `u` | 1079 | 269 |
 | `monitor_sd.nasm` | The sector routines | 390 | 223 |
@@ -165,7 +165,7 @@ the Makefile joins them. The column "Text" counts the words of the
 | nice_cpu's `muldiv_mpu.nasm` | Multiply and divide | 128 | 0 |
 | `build/folder.nasm` | The error of a card without the folder | 27 | 27 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 5 | 5 |
-| In all | | 19338 | 3231 |
+| In all | | 19354 | 3231 |
 <!-- /romsize monitor -->
 
 - The C code's strings are in its initial values, four characters a
