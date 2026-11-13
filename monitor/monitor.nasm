@@ -173,34 +173,36 @@ PAGE            .EQU    24              ; the rows of a Page Up or Page Down
 SCR_MAX         .EQU    0x7FFF          ; the largest display offset
 
 ; The dispatch table (README.md, "The dispatch table"). Entries are only
-; ever added at the end. The comment of each entry is its name in mon.nasm
-; and mon.h. The entries 9 to 15 jump to the C functions fat_mount to
-; fat_delete of fat32.c, which are _fat_mount to _fat_delete here, and
-; not fs_mount to fs_delete: mon.nasm is joined to the monitor too, for
-; monlib.nasm, and its stubs _fs_mount to _fs_delete would clash with
-; them. The routines in assembly have no such clash, as their labels,
-; such as udp_open, have no _ in front of them.
-                JMP     mon_reset       ; 0 at 0x00
-                JMP     mon_exit        ; 1 at 0x02
-                JMP     mon_version     ; 2 at 0x04
-                JMP     mon_putc        ; 3 at 0x06
-                JMP     mon_out         ; 4 at 0x08
-                JMP     scr_cls         ; 5 at 0x0A
-                JMP     scr_moveto      ; 6 at 0x0C
-                JMP     scr_getxy       ; 7 at 0x0E
-                JMP     scr_color       ; 8 at 0x10
-                JMP     _fat_mount      ; 9 at 0x12, fs_mount
-                JMP     _fat_open       ; 10 at 0x14, fs_open
-                JMP     _fat_read       ; 11 at 0x16, fs_read
-                JMP     _fat_readdir    ; 12 at 0x18, fs_readdir
-                JMP     _fat_close      ; 13 at 0x1A, fs_close
-                JMP     _fat_write      ; 14 at 0x1C, fs_write
-                JMP     _fat_delete     ; 15 at 0x1E, fs_delete
-                JMP     udp_open        ; 16 at 0x20
-                JMP     udp_send        ; 17 at 0x22
-                JMP     udp_recv        ; 18 at 0x24
-                JMP     udp_close       ; 19 at 0x26
-                JMP     _fat_readname   ; 20 at 0x28, fs_readname
+; ever added at the end. The comment of each entry is its number, its
+; address, its name in mon.nasm and mon.h where that differs from its
+; label, and the file of the routine. The entries 9 to 15 and 20 jump to
+; the C functions fat_mount to fat_readname of fat32.c, which are
+; _fat_mount to _fat_readname here, and not fs_mount to fs_readname:
+; mon.nasm is joined to the monitor too, for monlib.nasm, and its stubs
+; _fs_mount to _fs_readname would clash with them. The routines in
+; assembly have no such clash, as their labels, such as udp_open, have no
+; _ in front of them.
+                JMP     mon_reset       ; 0 at 0x00, monitor.nasm
+                JMP     mon_exit        ; 1 at 0x02, monitor.nasm
+                JMP     mon_version     ; 2 at 0x04, monitor.nasm
+                JMP     mon_putc        ; 3 at 0x06, monitor.nasm
+                JMP     mon_out         ; 4 at 0x08, monitor.nasm
+                JMP     scr_cls         ; 5 at 0x0A, monitor.nasm
+                JMP     scr_moveto      ; 6 at 0x0C, monitor.nasm
+                JMP     scr_getxy       ; 7 at 0x0E, monitor.nasm
+                JMP     scr_color       ; 8 at 0x10, monitor.nasm
+                JMP     _fat_mount      ; 9 at 0x12, fs_mount, fat32.c
+                JMP     _fat_open       ; 10 at 0x14, fs_open, fat32.c
+                JMP     _fat_read       ; 11 at 0x16, fs_read, fat32.c
+                JMP     _fat_readdir    ; 12 at 0x18, fs_readdir, fat32.c
+                JMP     _fat_close      ; 13 at 0x1A, fs_close, fat32.c
+                JMP     _fat_write      ; 14 at 0x1C, fs_write, fat32.c
+                JMP     _fat_delete     ; 15 at 0x1E, fs_delete, fat32.c
+                JMP     udp_open        ; 16 at 0x20, monitor_eth.nasm
+                JMP     udp_send        ; 17 at 0x22, monitor_eth.nasm
+                JMP     udp_recv        ; 18 at 0x24, monitor_eth.nasm
+                JMP     udp_close       ; 19 at 0x26, monitor_eth.nasm
+                JMP     _fat_readname   ; 20 at 0x28, fs_readname, fat32.c
 
 ; mon_reset: the cold start, entry 0, which reset runs and a program may
 ; call. E is cleared, the timer stopped, VBASE set to 0, the font base
