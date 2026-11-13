@@ -52,8 +52,8 @@ settle the three open questions of #54.
   ([The ROM's room](#the-roms-room)).
 - **`DUMP` and `DIS` stay**: the monitor's `d` and `u`, with the
   disassembler, are statements for good.
-- **V2.0.1 has no BASIC.** Where the stages go is open again, as the
-  milestone V2.0.2 keeps nice_cpu at V2.0, which has no FPU
+- **V2.0.1 has no BASIC.** The stages 1 to 3 go to the milestone
+  V2.2, which pins nice_cpu's tag `V2.2`, the first with the FPU
   ([Releases](#releases)).
 
 ## What it runs on
@@ -628,11 +628,9 @@ that is open when it is done.
 - **V2.0.1 has no BASIC**, as decided: the shell alone is a `READY.`
   that knows no BASIC, and gives a user new names for what the monitor
   does.
-- **The milestone V2.0.2** is a release that keeps nice_cpu at V2.0.
-  It has #54, #60, and #62, and the stages 1 to 3, #112 to #114, and
-  it cannot keep the stages 2 and 3. Where they go is open
-  ([Open questions](#open-questions)). The port and the stages from
-  5 on have no milestone yet.
+- **The milestone V2.2** pins nice_cpu's tag `V2.2`, which has the
+  FPU. It has #54, #60, and #62, and the stages 1 to 3, #112 to #114.
+  The port and the stages from 5 on have no milestone yet.
 - **The stages 1 to 3 ship together**, so that the change of the
   commands comes with a BASIC that runs programs. Stage 4, which ends
   #60, comes with them, or in a release after.
@@ -681,8 +679,7 @@ that is open when it is done.
 7. **`A%`**: gone, or one word of storage for a whole number, pushed
    and read through the FPU's view of a word. An array of flags is
    then half as large, which counts in the Nexys4DDR's 26K words.
-8. **Where the stages go.** The milestone of the stages 2 and 3, now
-   that they need a nice_cpu tag after `V2.1`. Whether stage 1 and
-   the editor's keys are written before the FPU is there. And whether
-   a branch pins a commit of nice_cpu, so that stage 2 starts in
-   `niceemu` before the tag.
+8. **When the stages start.** Whether stage 1 and the editor's keys
+   are written before the FPU is there. And whether a branch pins a
+   commit of nice_cpu, so that stage 2 starts in `niceemu` before the
+   tag.
