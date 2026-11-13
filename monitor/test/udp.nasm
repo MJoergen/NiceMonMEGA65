@@ -6,6 +6,8 @@
 ; which wait for the frames sent, and --step-time. The program stores the
 ; result of each call at UDT_RESULTS, which the test dumps, with the bytes
 ; and the sources that udp_recv wrote; the frames sent are compared too.
+; The identification of the packets starts at 0x1000, so that the frames
+; sent do not change with the steps of the code.
 ;
 ;  0  udp_send before udp_open, -42, not open
 ;  1  udp_recv before udp_open, -42
@@ -19,10 +21,10 @@
 ;  8  udp_send of hi to 255.255.255.255 port 9, 0, with no ARP: frame 3
 ;  9  udp_recv of up to 100 bytes, 6, world! from 10.0.0.2 port 7 at
 ;     UDT_BUF and UDT_SRC, after the frames that are no datagram for it:
-;     the queue's 4 frames, which udp_recv releases
+;     the queue's 4 frames, which the poll of udp_recv releases
 ; 10  udp_send of hi to 255.255.255.255 port 9 again, 0: frame 4
 ; 11  udp_recv of up to 0 bytes, 0, which copies nothing and leaves the
-;     queue as it is, so that the next call gets its datagram
+;     datagram held, so that the next call gets it
 ; 12  udp_recv of up to 2 bytes, 2, ab of the broadcast of 10.0.0.3 port
 ;     9 at UDT_BUF2 and UDT_SRC2, after an ARP request and an empty
 ;     datagram
@@ -49,6 +51,7 @@ UDT_SRC2        .EQU    0x918C          ; and its source
 
 udt_main
                 MOVE    R7, UDT_RESULTS
+                MOVE    @V_IPID, 0x1000
                 MOVE    @E_IP, 0
                 MOVE    R1, 0x0A000002
                 MOVE    R2, 7

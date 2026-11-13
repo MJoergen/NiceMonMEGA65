@@ -28,6 +28,10 @@ UDP_SEND        .EQU    0x22
 UDP_RECV        .EQU    0x24
 UDP_CLOSE       .EQU    0x26
 FS_READNAME     .EQU    0x28
+NET_CONFIG      .EQU    0x2A
+NET_SET         .EQU    0x2C
+NET_DHCP        .EQU    0x2E
+NET_POLL        .EQU    0x30
 
 _mon_reset
                 JMP     MON_RESET
@@ -71,6 +75,14 @@ _udp_close
                 JMP     UDP_CLOSE
 _fs_readname
                 JMP     FS_READNAME
+_net_config
+                JMP     NET_CONFIG
+_net_set
+                JMP     NET_SET
+_net_dhcp
+                JMP     NET_DHCP
+_net_poll
+                JMP     NET_POLL
 _scr_getx
                 JMP     SCR_GETXY
 _scr_gety

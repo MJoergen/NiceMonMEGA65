@@ -13,9 +13,12 @@ the next runs with it, each line waiting for the frames sent before it
 (nice_cpu's SYSTEM.md §7), from the server 10.0.0.2 with the TID 3456:
 - ok: PROG, 40 lines of .bin text in two blocks, with a CR LF line, an
   empty line, a line that is skipped, and a last line with no LF. After
-  the RRQ, a datagram of another host, and DATA 1; after ACK 1, a DATA 2
-  of another TID, which is passed over, and DATA 1 again, which is
-  answered with ACK 1 again; then DATA 2.
+  the RRQ, a datagram of another host, which is passed over, so the RRQ
+  goes again a second later; then DATA 1. After ACK 1, a DATA 2 of
+  another TID, which is passed over, so ACK 1 goes again; then DATA 1
+  again, which is answered with ACK 1 again; then DATA 2. Each comes
+  alone, as the poll holds one datagram for the endpoint, and drops a
+  second that comes with it.
 - lost: no answer to the first RRQ, which is sent again; DATA 1; no
   answer to ACK 1, which is sent again; DATA 2.
 - error: an ERROR 1, File not found, to the RRQ.
@@ -31,8 +34,11 @@ The run args has the input ARGS, with no frames: tftp's arguments that
 are not, tftp with no IP address, and tftp to a server that does not
 answer ARP.
 Each run's console output, up to the halt, and the frames sent, 16 bytes
-a row with the client's port as pp pp, are written to OUT and compared
-with EXPECTED. The script also checks each frame's IPv4 checksum, and
+a row with the client's port as pp pp, and the IPv4 identification and
+checksum as ii ii and cc cc, as they change with the steps of the code,
+are written to OUT and compared with EXPECTED. The script also checks
+each frame's IPv4 checksum, that the identification counts up by one
+from frame to frame, and
 that each TFTP packet comes from the port of the first RRQ, the RRQs to
 port 69, or 6969 in the run port, and the ACKs to the TID. Exits with status 1 when a check fails.
 Only the Python standard library is used.
@@ -60,6 +66,8 @@ LISTING = b"".join(f"{n:<24} {size:>10}\n".encode() for n, size in (
 STEPS = 40_000_000
 TID = 3456
 PORT_AT = 34                             # the client's port in a frame sent
+ID_AT = 18                               # the IPv4 identification in a frame
+SUM_AT = 24                              # and the IPv4 header's checksum
 
 
 def ip(text: str) -> bytes:
@@ -134,7 +142,10 @@ def show(frames: List[bytes]) -> List[str]:
     rows = []
     for n, frame in enumerate(frames):
         rows.append(f"frame {n + 1}, {len(frame)} bytes")
-        text = ["pp" if PORT_AT <= i < PORT_AT + 2 and frame[12:14] == b"\x08\x00"
+        ipv4 = frame[12:14] == b"\x08\x00"
+        text = ["pp" if PORT_AT <= i < PORT_AT + 2 and ipv4
+                else "ii" if ID_AT <= i < ID_AT + 2 and ipv4
+                else "cc" if SUM_AT <= i < SUM_AT + 2 and ipv4
                 else f"{b:02x}" for i, b in enumerate(frame)]
         for at in range(0, len(text), 16):
             rows.append(f"{at:03x}  " + " ".join(text[at:at + 16]))
@@ -166,14 +177,14 @@ def main() -> None:
         first, second = text[:512], text[512:]
         ok_in = "\n".join([
             "1:" + arp_reply(),
-            "# after the RRQ: another host's datagram, and DATA 1",
+            "# after the RRQ: another host's datagram; after the RRQ again: DATA 1",
             "2:" + datagram(port, struct.pack(">HH", 3, 1) + first, src="10.0.0.3"),
-            "2:" + data(port, 1, first),
-            "# after ACK 1: DATA 2 of another TID, and DATA 1 again",
-            "3:" + data(port, 2, b"00009000 DEADBEEF\n", sport=TID + 1),
             "3:" + data(port, 1, first),
-            "# after ACK 1 again: DATA 2",
-            "4:" + data(port, 2, second),
+            "# after ACK 1: DATA 2 of another TID; after ACK 1 again: DATA 1 again",
+            "4:" + data(port, 2, b"00009000 DEADBEEF\n", sport=TID + 1),
+            "5:" + data(port, 1, first),
+            "# after ACK 1 once more: DATA 2",
+            "6:" + data(port, 2, second),
             ""])
         runs.append(("ok", *run(emu, monitor, RUN, ok_in, tmp, "ok")))
         lost_in = "\n".join([
@@ -216,6 +227,10 @@ def main() -> None:
         udp = [f for f in frames if f[12:14] == b"\x08\x00"]
         sums = [checksum(f[14:34]) == 0 for f in udp]
         check(f"tftp {name}: the IPv4 checksums", all(sums))
+        ids = [struct.unpack(">H", f[ID_AT:ID_AT + 2])[0] for f in udp]
+        check(f"tftp {name}: the identification counts up by one",
+              all((b - a) & 0xFFFF == 1 for a, b in zip(ids, ids[1:])))
+        check(f"tftp {name}: DF clear", all(f[20:22] == b"\0\0" for f in udp))
         ports = {struct.unpack(">H", f[PORT_AT:PORT_AT + 2])[0] for f in udp}
         check(f"tftp {name}: one client port, its probe's",
               name == "args" or ports == {port_of.get(name, port)})

@@ -49,8 +49,24 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   first pings and connections may fail for a few seconds. A `ping` of
   the address, repeated until it answers, makes the PC learn the new
   MAC address.
+- The UDP entries hold one datagram for the endpoint, which `udp_recv`
+  returns, and drop a second that comes before it is read
+  ([#111](https://github.com/MJoergen/NiceMonMEGA65/issues/111)). They
+  used to leave the datagrams in the queue. So a datagram never blocks
+  the frames behind it, but a program reads each datagram before the
+  next comes, or loses the next. The monitor's `tftp` sends one packet,
+  and waits for its answer, so it is not affected.
 
 **New.**
+
+- The monitor's `i dhcp` also shows the DNS server, and asks the DHCP
+  server for the address that the board has, if it has one. It writes
+  the address only when the server gives another, so a host's
+  connection over Ethernet survives an `i dhcp` that gets the same
+  address ([#111](https://github.com/MJoergen/NiceMonMEGA65/issues/111)).
+- The ROM's IPv4 packets, of UDP and of DHCP, have the "don't fragment"
+  bit clear and an identification that counts up, so a router on a path
+  with a smaller MTU fragments a datagram instead of dropping it.
 
 - The monitor's `i dhcp` names the board to the DHCP server: the host
   name `nicemon-` and the last three bytes of the MAC address, such as

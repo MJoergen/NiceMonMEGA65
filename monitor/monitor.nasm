@@ -1,6 +1,6 @@
 ; The monitor, the program of the ROM at 0x0000 (README.md). The core boots
 ; from it at reset. It gives the programs at 0x8000 a hardware abstraction
-; layer, the HAL: twenty routines, called through the dispatch table at the
+; layer, the HAL: twenty-four routines, called through the dispatch table at the
 ; start of the ROM, and it has a main loop with a few commands, typed on
 ; the keyboard or sent over the line, and shown on the screen and the line.
 ;
@@ -29,8 +29,10 @@
 ;   routines sd_init, sd_read, and sd_write that fat32.c reads and writes
 ;   through (issue #57, doc/SDCARD.md).
 ; - monitor_eth.nasm: the network, the frame routines, the ARP cache, the
-;   UDP entries 16 to 19, i dhcp, and tftp (issues #83 and #84, README.md,
-;   "The network", and INTERNALS.md, "The frame routines").
+;   demultiplexing of the frames and net_poll, the UDP entries 16 to 19,
+;   the entries 21 to 24 of the IP settings, DHCP, and the poll, i dhcp,
+;   and tftp (issues #83, #84, and #111, README.md, "The network", and
+;   INTERNALS.md, "The frame routines").
 ;
 ; Each has the .EQUs of its devices and its constants, and its texts, but
 ; the variables of all five are here, as one map of the RAM. The commands
@@ -158,6 +160,15 @@ V_TEND          .EQU    0xFFFFF317      ; the bytes of the DATA's block,
 V_TPORT         .EQU    0xFFFFF318      ; the server's port for the RRQ,
 V_TLIST         .EQU    0xFFFFF319      ; not 0 for a listing, a name with * or ?,
 V_TPKT          .EQU    0xFFFFF320      ; and the packet sent, a byte per word, up to TFTP_PKT
+V_DNS           .EQU    0xFFFFF380      ; the DNS server, from i dhcp or net_set, 0 for none
+V_ULEN          .EQU    0xFFFFF381      ; the bytes of the datagram held for the endpoint at V_RXF, 0 for none
+V_NWAIT         .EQU    0xFFFFF382      ; the local UDP port of the ROM's own wait, whose frames net_step copies to V_RXF, 0 for none
+V_NARM          .EQU    0xFFFFF383      ; not 0 while the nearest deadline, V_NDUE, is armed
+V_NDUE          .EQU    0xFFFFF384      ; the nearest deadline, on the fine clock of net_clock
+V_IPID          .EQU    0xFFFFF385      ; the identification of the next IPv4 packet sent, in bits 15..0
+V_DDNS          .EQU    0xFFFFF386      ; for i dhcp: the DNS server of the OFFER or the ACK,
+V_PDNS          .EQU    0xFFFFF387      ; and of the last reply that dhcp_parse took
+V_NHDR          .EQU    0xFFFFF390      ; the first 8 NHDR_CHUNKS words of the frame at the head of the queue, from byte 2
 WASM_RAM        .EQU    0xFFFFF400      ; the words that the ROM's C code writes, from here
 WASM_END        .EQU    0xFFFFFF00      ; up to below here, the I/O page, which the Makefile checks
 
@@ -201,11 +212,17 @@ SCR_MAX         .EQU    0x7FFF          ; the largest display offset
                 JMP     udp_recv        ; 18 at 0x24, monitor_eth.nasm
                 JMP     udp_close       ; 19 at 0x26, monitor_eth.nasm
                 JMP     _fat_readname   ; 20 at 0x28, fs_readname, fat32.c
+                JMP     net_config      ; 21 at 0x2A, monitor_eth.nasm
+                JMP     net_set         ; 22 at 0x2C, monitor_eth.nasm
+                JMP     net_dhcp        ; 23 at 0x2E, monitor_eth.nasm
+                JMP     net_poll        ; 24 at 0x30, monitor_eth.nasm
 
 ; mon_reset: the cold start, entry 0, which reset runs and a program may
 ; call. E is cleared, the timer stopped, VBASE set to 0, the font base
 ; set to 0, so that the screen shows Spleen, and the port for Ethernet
-; frames disabled, as at a return, and the ARP cache emptied. The vectors
+; frames disabled, as at a return, the mask, the gateway, and the DNS
+; server set to none, and the ARP cache emptied. The identification of
+; the IPv4 packets starts from the fine clock, net_clock. The vectors
 ; of lib.nasm are set, and ___wasm_start gives the words of the ROM's C
 ; code their initial values. The clock of the time of day, while it is not
 ; set, is set from the MEGA65's real-time clock, with clock_rtc of clock.c
@@ -215,11 +232,13 @@ mon_reset
                 MOVE    R14, 0          ; E = 0, VBASE = 0; bit 24 stays 1
                 MOVE    @TIMER, 0
                 MOVE    @SCR_FONT, 0
-                MOVE    @ETH_CSR, 0
-                MOVE    @V_UPORT, 0
+                MOVE    SP, STACK
+                CALL    net_close
                 MOVE    @V_MASK, 0
                 MOVE    @V_GW, 0
-                MOVE    SP, STACK
+                MOVE    @V_DNS, 0
+                CALL    net_clock
+                MOVE    @V_IPID, R1
                 MOVE    @___wasm_trap_vector, mon_trap
                 MOVE    @___putc_vector, mon_putc
                 CALL    ___wasm_start
@@ -253,7 +272,7 @@ mon_reset
 
 ; mon_exit: entry 1, and where a program returns to. Back to the main loop,
 ; main, with R1 the status: E cleared, the timer stopped, VBASE 0, the
-; font base 0, the port for Ethernet frames disabled, the cursor shown and
+; font base 0, the network closed, net_close, the cursor shown and
 ; blinking with the display offset off, a fresh stack, and the status
 ; printed where the program left the cursor's registers, after a new line
 ; if that is not column 0.
@@ -298,8 +317,7 @@ exit_restore
                 MOVE    R14, 0          ; E = 0, VBASE = 0; bit 24 stays 1
                 MOVE    @TIMER, 0
                 MOVE    @SCR_FONT, 0    ; Spleen, whatever the program chose
-                MOVE    @ETH_CSR, 0     ; no frames, if the program took them
-                MOVE    @V_UPORT, 0     ; and the UDP endpoint closed
+                CALL    net_close       ; no frames, if the program took them
                 MOVE    @SCR_CTL, 0x60  ; the cursor, which a program may hide
                 MOVE    R1, @SCR_X
                 CMP     R1, 80

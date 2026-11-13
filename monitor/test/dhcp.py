@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Run the monitor's i dhcp in niceemu, against frames of --eth-in.
 
-Usage: test/dhcp.py NICEEMU MONITOR.bin EXPECTED OUT
+Usage: test/dhcp.py NICEEMU MONITOR.bin NETDHCP.bin EXPECTED OUT
 
 The monitor runs with the input i 10.0.0.9, i dhcp, i, and h, and
 --step-time, so that a run takes the same steps each time, and the
@@ -10,7 +10,8 @@ The first run has no frames: the monitor sends DHCP_TRIES DISCOVERs, says
 that no server answered, and keeps 10.0.0.9. The script takes the
 transaction from its first frame, and builds the frames of the next runs
 with it, each line waiting for the frames sent before it (nice_cpu's
-SYSTEM.md §7):
+SYSTEM.md §7). As the address 10.0.0.9 is set, each DISCOVER asks for it
+with option 50.
 - ok: after the DISCOVER, an ARP request of another station, an OFFER of
   another transaction, an OFFER of ours without an address, which is
   passed over, and the OFFER of 192.168.1.1, with its options out of
@@ -18,11 +19,21 @@ SYSTEM.md §7):
   OFFER of a second server, which must change nothing, and the ACK.
 - nak: an OFFER, a NAK of the REQUEST, which starts again from a
   DISCOVER, a second OFFER of another address, and its ACK.
+The runs entry-none and entry run NETDHCP.bin, test/netdhcp.nasm, under
+the monitor, with the input r and h: a program that calls net_dhcp,
+entry 23, with the address 192.168.1.50 set and the UDP endpoint open.
+entry-none has no frames, and net_dhcp returns E_NODHCP; entry has, after
+the DISCOVER, an ARP reply of 192.168.1.1, which is learned while
+net_dhcp waits, and the OFFER of 192.168.1.50, and after the REQUEST its
+ACK; net_dhcp returns 0, and the endpoint keeps the port enabled.
 Each run's console output, up to the halt, the words of NET_IP and
-ETH_CSR, and the frames sent, 16 bytes a row with the transaction as
-xx, are written to OUT and compared with EXPECTED. The script also checks
-that each frame's IPv4 checksum is right, and that each has the
-transaction of the first. Exits with status 1 when a check fails.
+ETH_CSR, or the program's results, and the frames sent, 16 bytes a row
+with the transaction as xx, and the IPv4 identification and checksum as
+ii ii and cc cc, which change with the steps of the code, are written
+to OUT and compared with EXPECTED. The script also checks that each
+frame's IPv4 checksum is right, that the identification counts up by one
+from frame to frame, that DF is clear, and that each frame has the
+transaction of its run's first. Exits with status 1 when a check fails.
 Only the Python standard library is used.
 """
 
@@ -36,9 +47,13 @@ from typing import List, Optional, Tuple
 MAC = bytes.fromhex("024E49434500")      # the station's after reset
 BCAST = b"\xff" * 6
 INPUT = b"i 10.0.0.9\ri dhcp\ri\rh\r"
+INPUT_PROG = b"r\rh\r"
 STEPS = 30_000_000
 DUMPS = ["-d", "0xFFFFFFB0:1", "-d", "0xFFFFFFC0:1"]
+DUMPS_PROG = ["-d", "0x9100:14"]
 XID_AT = 46                              # the transaction's bytes in a frame
+ID_AT = 18                               # the IPv4 identification
+SUM_AT = 24                              # and the IPv4 header's checksum
 
 
 def ip(text: str) -> bytes:
@@ -77,15 +92,23 @@ def arp_request(sender: str, target: str) -> str:
     return frame.hex()
 
 
+def arp_reply(sender: str, target: str) -> str:
+    frame = (MAC + bytes.fromhex("0A0000000001") + b"\x08\x06"
+             + bytes.fromhex("000108000604" "0002") + bytes.fromhex("0A0000000001")
+             + ip(sender) + MAC + ip(target))
+    return frame.hex()
+
+
 def run(emu: str, monitor: str, eth_in: Optional[str], tmp: str,
-        name: str) -> Tuple[List[str], List[bytes]]:
-    """The console output and dumps of a run, and its frames sent."""
+        name: str, prog: bool = False) -> Tuple[List[str], List[bytes]]:
+    """The console output and dumps of a run, and its frames sent; with
+    prog, of the program after the monitor, MONITOR the two joined."""
     inp = os.path.join(tmp, "input")
     with open(inp, "wb") as f:
-        f.write(INPUT)
+        f.write(INPUT_PROG if prog else INPUT)
     out = os.path.join(tmp, name + ".out")
     args = [emu, "-n", str(STEPS), "--step-time", "-i", inp, "--eth-out", out]
-    args += DUMPS
+    args += DUMPS_PROG if prog else DUMPS
     if eth_in is not None:
         path = os.path.join(tmp, name + ".in")
         with open(path, "w") as f:
@@ -113,17 +136,19 @@ def show(frames: List[bytes]) -> List[str]:
     rows = []
     for n, frame in enumerate(frames):
         rows.append(f"frame {n + 1}, {len(frame)} bytes")
-        text = ["xx" if XID_AT <= i < XID_AT + 4 else f"{b:02x}"
-                for i, b in enumerate(frame)]
+        text = ["xx" if XID_AT <= i < XID_AT + 4
+                else "ii" if ID_AT <= i < ID_AT + 2
+                else "cc" if SUM_AT <= i < SUM_AT + 2
+                else f"{b:02x}" for i, b in enumerate(frame)]
         for at in range(0, len(text), 16):
             rows.append(f"{at:03x}  " + " ".join(text[at:at + 16]))
     return rows
 
 
 def main() -> None:
-    if len(sys.argv) != 5:
+    if len(sys.argv) != 6:
         sys.exit(str(__doc__).split("\n\n")[1])
-    emu, monitor, expected, out = sys.argv[1:]
+    emu, monitor, netdhcp, expected, out = sys.argv[1:]
     fails = 0
 
     def check(name: str, ok: bool) -> None:
@@ -162,6 +187,25 @@ def main() -> None:
             "4:" + reply(xid, 5, "192.168.1.51", "192.168.1.1", BCAST, offer),
             ""])
         runs.append(("nak", *run(emu, monitor, nak_in, tmp, "nak")))
+        joined = os.path.join(tmp, "netdhcp.bin")
+        with open(joined, "w") as f:
+            for part in (monitor, netdhcp):
+                with open(part) as g:
+                    f.write(g.read())
+        lines, frames = run(emu, joined, None, tmp, "entry-none", True)
+        runs.append(("entry-none", lines, frames))
+        check("dhcp entry-none: frames sent", len(frames) > 0)
+        if not frames:
+            sys.exit(1)
+        exid = struct.unpack(">I", frames[0][XID_AT:XID_AT + 4])[0]
+        entry_in = "\n".join([
+            "# after the DISCOVER: an ARP reply of 192.168.1.1, and the OFFER",
+            "1:" + arp_reply("192.168.1.1", "192.168.1.50"),
+            "1:" + reply(exid, 2, "192.168.1.50", "192.168.1.1", MAC, offer),
+            "# after the REQUEST: the ACK",
+            "2:" + reply(exid, 5, "192.168.1.50", "192.168.1.1", BCAST, offer),
+            ""])
+        runs.append(("entry", *run(emu, joined, entry_in, tmp, "entry", True)))
 
     for name, lines, frames in runs:
         report.append(f"== {name}")
@@ -169,8 +213,13 @@ def main() -> None:
         report += show(frames)
         sums = [checksum(f[14:34]) == 0 for f in frames if f[12:14] == b"\x08\x00"]
         check(f"dhcp {name}: the IPv4 checksums", all(sums) and len(sums) == len(frames))
+        ids = [struct.unpack(">H", f[ID_AT:ID_AT + 2])[0] for f in frames]
+        check(f"dhcp {name}: the identification counts up by one",
+              all((b - a) & 0xFFFF == 1 for a, b in zip(ids, ids[1:])))
+        check(f"dhcp {name}: DF clear", all(f[20:22] == b"\0\0" for f in frames))
         xids = {struct.unpack(">I", f[XID_AT:XID_AT + 4])[0] for f in frames}
-        check(f"dhcp {name}: one transaction, the first run's", xids == {xid})
+        first = exid if name.startswith("entry") else xid
+        check(f"dhcp {name}: one transaction, the first run's", xids == {first})
     with open(out, "w") as f:
         f.write("\n".join(report) + "\n")
     try:

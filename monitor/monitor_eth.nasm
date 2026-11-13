@@ -2,10 +2,14 @@
 ; header): the frame routines eth_on, eth_recv, and eth_send, the IP
 ; checksum, and the ARP cache of arp_resolve, which are the ROM's own,
 ; with no entries in the dispatch table (issue #83, README.md, "The
-; network"); the UDP endpoint, the entries 16 to 19, udp_open, udp_send,
-; udp_recv, and udp_close; i dhcp, which gets the IP address from a DHCP
-; server; and tftp IP NAME, which reads a .bin file through the endpoint
-; from a TFTP server as load NAME reads one from the card (issue #84).
+; network"); the demultiplexing of the frames that come, and the poll,
+; net_poll, entry 24, which the other entries and the ROM's own waits call
+; (issue #111); the UDP endpoint, the entries 16 to 19, udp_open,
+; udp_send, udp_recv, and udp_close; the IP settings, net_config and
+; net_set, entries 21 and 22; net_dhcp, entry 23, and i dhcp, which get
+; the IP address from a DHCP server; and tftp IP NAME, which reads a .bin
+; file through the endpoint from a TFTP server as load NAME reads one from
+; the card (issue #84).
 ;
 ; The i command, which shows and writes the IP address, is in
 ; monitor_cmd.nasm, and jumps to ip_dhcp for the word dhcp. tftp reads its
@@ -20,7 +24,12 @@ ETH_CHUNK       .EQU    0xFFFFFFC3      ; the 8 words at ETH_BUF, and in bit 8 t
 ETH_BUF         .EQU    0xFFFFFFC8      ; ETH_BUF0 to ETH_BUF7, the words of the chunk
 TIME_HI         .EQU    0xFFFFFF45      ; bits 63..32 of the microseconds, from the snapshot that a read of io.us takes
 ETH_ON          .EQU    0x01            ; the bits of ETH_CSR: enabled,
+ETH_WAITS       .EQU    0x02            ; a frame waits in the queue,
 ETH_BUSY        .EQU    0x04            ; and a frame being sent
+NHDR_CHUNKS     .EQU    2               ; the chunks of a frame that net_frames copies to V_NHDR, its headers, 16 words
+NET_TAKE        .EQU    4               ; the frames that a poll takes at most, the queue's
+FINE_START      .EQU    0xFFC2F700      ; added to the microseconds for the fine clock: 2^32 less 4 seconds
+DHCP_CLIENT     .EQU    68              ; the UDP ports of DHCP's client
 ETH_TXBUF       .EQU    0x100           ; the send buffer, in ETH_CHUNK
 ARP_SLOTS       .EQU    4               ; the entries of the ARP cache
 ARP_AGE         .EQU    60              ; the ticks of arp_tick an entry is kept, about a minute
@@ -43,25 +52,59 @@ E_PORT          .EQU    -41             ; no such port,
 E_UCLOSED       .EQU    -42             ; the endpoint is not open,
 E_ULONG         .EQU    -43             ; a datagram too long,
 E_NOROUTE       .EQU    -44             ; and no answer to ARP from the host or the gateway
+E_NODHCP        .EQU    -45             ; no answer from a DHCP server, of net_dhcp
 TFTP_PORT       .EQU    69              ; the TFTP server's port (RFC 1350)
 TFTP_TRIES      .EQU    5               ; the sends of a packet that tftp waits for an answer to
 TFTP_WAIT       .EQU    1000000         ; the microseconds it waits after each
 TFTP_PKT        .EQU    96              ; the words of V_TPKT
 
-; i dhcp: the IP address from a DHCP server (RFC 2131), through the port
-; for Ethernet frames, which it enables, and disables at the end. It
-; broadcasts a DISCOVER, waits DHCP_WAIT microseconds for an OFFER, then
-; broadcasts a REQUEST of the address offered, from the server that
-; offered it, and waits as long for its ACK; a reply without an address
-; is passed over. A timeout or a NAK starts again from the DISCOVER, up
-; to DHCP_TRIES times, with the same transaction, whose number is the
-; microseconds at the start, XOR the low word of the MAC address. The
-; ACK's address is written to E_IP, which breaks a host's connection over
-; TCP, as a write of i does, and shown, with the mask, the gateway, and
-; the server. Without an ACK, i says so and leaves E_IP alone. The lease
-; is not renewed. R7 counts the tries left.
+; i dhcp: net_dhcp, and the address, the mask, the gateway, the DNS
+; server, and the DHCP server shown, or that no server answered.
 ip_dhcp
-                CALL    eth_on
+                CALL    net_dhcp
+                TST     R1
+        ?N      JMP     :+
+                MOVE    R1, S_IP
+                MOVE    R2, @E_IP
+                CALL    show_ip
+                MOVE    R1, S_MASK
+                MOVE    R2, @V_MASK
+                CALL    show_ip
+                MOVE    R1, S_GW
+                MOVE    R2, @V_GW
+                CALL    show_ip
+                MOVE    R1, S_DNS
+                MOVE    R2, @V_DNS
+                CALL    show_ip
+                MOVE    R1, S_DSRV
+                MOVE    R2, @V_DSRV
+                CALL    show_ip
+                JMP     main
+:
+                MOVE    R1, S_NODHCP
+                CALL    puts_crlf
+                JMP     main
+
+; net_dhcp: entry 23, the IP address from a DHCP server (RFC 2131),
+; through the port for Ethernet frames, which net_on enables, and net_off
+; disables at the end, unless the endpoint is open. It broadcasts a
+; DISCOVER, which asks for the address set, if there is one, waits
+; DHCP_WAIT microseconds for an OFFER, then broadcasts a REQUEST of the
+; address offered, from the server that offered it, and waits as long for
+; its ACK; a reply without an address is passed over. The waits poll, so
+; the other frames go where net_frames takes them. A timeout or a NAK
+; starts again from the DISCOVER, up to DHCP_TRIES times, with the same
+; transaction, whose number is the microseconds at the start, XOR the low
+; word of the MAC address. The ACK's address is written to E_IP only if
+; it is another, which breaks a host's connection over TCP, as a write of
+; i does, and the mask, the gateway, and the DNS server are kept. Without
+; an ACK, E_IP and the rest are left alone. The lease is not renewed.
+; R1 = 0, or E_NODHCP. Uses R1-R6, and R7 across the calls, saved: the
+; tries left.
+net_dhcp
+                PUSH    R7
+                CALL    net_on
+                MOVE    @V_NWAIT, DHCP_CLIENT
                 MOVE    R1, @io.us
                 XOR     @V_XID, R1, @E_MACL
                 MOVE    R7, DHCP_TRIES
@@ -81,28 +124,21 @@ dhcp_try
 :
                 SUB[M]  R7, R7, 1
         ?!Z     JMP     dhcp_try
-                MOVE    @ETH_CSR, 0
-                MOVE    R1, S_NODHCP
-                CALL    puts_crlf
-                JMP     main
+                MOVE    R7, E_NODHCP
+                JMP     :++
 :
-                MOVE    @ETH_CSR, 0
-                MOVE    @E_IP, @V_DIP
+                CMP     @E_IP, @V_DIP
+        ?!Z     MOVE    @E_IP, @V_DIP
                 MOVE    @V_MASK, @V_DMASK
                 MOVE    @V_GW, @V_DGW
-                MOVE    R1, S_IP
-                MOVE    R2, @E_IP
-                CALL    show_ip
-                MOVE    R1, S_MASK
-                MOVE    R2, @V_DMASK
-                CALL    show_ip
-                MOVE    R1, S_GW
-                MOVE    R2, @V_DGW
-                CALL    show_ip
-                MOVE    R1, S_DSRV
-                MOVE    R2, @V_DSRV
-                CALL    show_ip
-                JMP     main
+                MOVE    @V_DNS, @V_DDNS
+                MOVE    R7, 0
+:
+                MOVE    @V_NWAIT, 0
+                CALL    net_off
+                MOVE    R1, R7
+                POP     R7
+                RET
 
 ; The frame routines, the ROM's own, with no entries in the dispatch table
 ; (INTERNALS.md, "The frame routines"). They follow the C ABI, and drive the port for
@@ -235,8 +271,9 @@ rx_long
 ; else from a request, broadcast up to ARP_TRIES times, and the reply,
 ; which goes into the cache. An entry is kept ARP_AGE ticks of arp_tick,
 ; about a minute, and a new one takes the entry of its IP address, or else
-; the next in turn. The port must be enabled. The frames received while
-; arp_resolve waits that are no ARP reply are released unread.
+; the next in turn. The port must be enabled. arp_resolve polls while it
+; waits, with net_step, which learns every ARP reply in place, and takes
+; the other frames where they go.
 
 ; arp_resolve: R1 an IP address, not 0. R1 = 0, R2 the MAC address's first
 ; two bytes, as E_MACH has them, and R3 its last four, as E_MACL has
@@ -260,10 +297,7 @@ arp_look
                 CALL    arp_request
                 MOVE    R9, @io.us      ; when it was sent
 :
-                MOVE    R1, V_RXF
-                CALL    eth_recv
-                TST     R1
-        ?!Z     CALL    arp_take
+                CALL    net_step
                 MOVE    R1, R7
                 CALL    arp_find
                 TST     R1
@@ -306,24 +340,20 @@ arp_find
                 MOVE    R1, 0
                 RET
 
-; arp_take: the frame of R1 bytes at V_RXF learned, if it is an ARP reply,
-; for Ethernet and IPv4, whoever it is to. Uses R1-R6.
+; arp_take: the ARP frame of at least 42 bytes, whose headers are at
+; V_NHDR, learned in place, if it is a reply, for Ethernet and IPv4,
+; whoever it is to. Uses R1-R6.
 arp_take
-                CMP     R1, 42
-        ?C      RET                     ; too short
-                AND     R2, @V_RXF+3, 0xFFFF
-                CMP     R2, 0x0806
+                CMP     @V_NHDR+4, 0x00010800  ; Ethernet, IPv4
         ?!Z     RET
-                CMP     @V_RXF+4, 0x00010800  ; Ethernet, IPv4
+                CMP     @V_NHDR+5, 0x06040002  ; their lengths, and a reply
         ?!Z     RET
-                CMP     @V_RXF+5, 0x06040002  ; their lengths, and a reply
-        ?!Z     RET
-                SHL     R1, @V_RXF+7, 16  ; the sender's IP address
-                SHR     R2, @V_RXF+8, 16
+                SHL     R1, @V_NHDR+7, 16  ; the sender's IP address
+                SHR     R2, @V_NHDR+8, 16
                 OR      R1, R1, R2
-                SHR     R2, @V_RXF+6, 16  ; and its MAC address
-                SHL     R3, @V_RXF+6, 16
-                SHR     R4, @V_RXF+7, 16
+                SHR     R2, @V_NHDR+6, 16  ; and its MAC address
+                SHL     R3, @V_NHDR+6, 16
+                SHR     R4, @V_NHDR+7, 16
                 OR      R3, R3, R4
 ; arp_learn: the IP address R1 at the MAC address R2 and R3 into the
 ; cache, at the time of now. Uses R1-R6.
@@ -377,18 +407,248 @@ arp_request
                 MOVE    R2, 42
                 JMP     eth_send        ; which returns to the caller
 
+; The demultiplexing and the poll (issue #111, INTERNALS.md, "The frame
+; routines"). While the network is on, while the endpoint is open or
+; net_dhcp runs, the ROM alone reads the queue and writes the send
+; buffer. A poll takes the frames that wait, NET_TAKE at most, the
+; queue's 4, and releases each: an ARP reply is learned in place, from its
+; headers at V_NHDR, so it never touches V_RXF; a datagram for the
+; endpoint is copied to V_RXF, where it is held for udp_recv, unless one
+; is held already, and then it is dropped; a datagram to the port of the
+; ROM's own wait, V_NWAIT, such as a DHCP reply, is copied to V_RXF, and
+; the poll stops there, so that the wait parses it; it takes the place of
+; a datagram held, which is lost. Every other frame is released unread.
+; Nothing moves between polls: a program calls net_poll every 100 ms or
+; so (README.md, "The network").
+;
+; The fine clock, net_clock, is the microseconds plus FINE_START, so that
+; it wraps 4 seconds after reset and every run crosses a wrap. A deadline
+; on it is due when the signed difference of the clock and it is not
+; negative. The nearest deadline of all is V_NDUE, which counts only
+; while V_NARM is not 0, so that a stale one is never due.
+
+; net_on: the port for Ethernet frames enabled, with its queue emptied,
+; if it is not enabled, and else left as it is, with the frames that wait.
+; Uses no register.
+net_on
+                AND[M]  R0, @ETH_CSR, ETH_ON
+        ?Z      JMP     eth_on          ; which returns to the caller
+                RET
+
+; net_off: the port disabled, and its queue emptied, unless the endpoint
+; is open, which keeps the network on. Uses no register.
+net_off
+                TST     @V_UPORT
+        ?Z      MOVE    @ETH_CSR, 0
+                RET
+
+; net_close: the network closed, for the cold start, mon_exit, and
+; mon_trap: the endpoint closed, the datagram held forgotten, no wait of
+; the ROM's own, no deadline armed, and the port disabled. Uses no
+; register.
+net_close
+                MOVE    @V_UPORT, 0
+                MOVE    @V_ULEN, 0
+                MOVE    @V_NWAIT, 0
+                MOVE    @V_NARM, 0
+                MOVE    @ETH_CSR, 0
+                RET
+
+; net_clock: R1 = the fine clock, in microseconds. Uses R1.
+net_clock
+                ADD     R1, @io.us, FINE_START
+                RET
+
+; ip_ident: R1 = word 5 of an IPv4 header with the identification
+; V_IPID, which counts up by one for each packet sent, and the flags and
+; the fragment's offset 0, DF clear (RFC 6864). Uses R1.
+ip_ident
+                SHL     R1, @V_IPID, 16
+                ADD     @V_IPID, @V_IPID, 1
+                RET
+
+; net_poll: entry 24. The frames that wait taken, and the deadline that
+; is due done. Never waits. R1 = 0, which is not negative: a later table
+; may give it a meaning. Uses R1-R6.
+net_poll
+                CALL    net_step
+                MOVE    R1, 0
+                RET
+
+; net_step: the poll of net_poll, for the ROM's waits too. R1 = the bytes
+; of the frame for the ROM's own wait that it copied to V_RXF, or 0. Its
+; cost with nothing to do is a read of ETH_CSR, and while a deadline is
+; armed, a read of the clock and a comparison. Uses R1-R6.
+net_step
+                MOVE    R1, 0
+                AND[M]  R0, @ETH_CSR, ETH_WAITS
+        ?!Z     CALL    net_frames
+                TST     @V_NARM
+        ?Z      RET
+                PUSH    R1
+                CALL    net_clock
+                SUB[M]  R0, R1, @V_NDUE
+        ?!N     CALL    net_due
+                POP     R1
+                RET
+
+; net_due: the deadline that is due. Nothing has one yet, so it is
+; disarmed: TCP's timers and the lease's renewal are to come here (issue
+; #111). Uses no register.
+net_due
+                MOVE    @V_NARM, 0
+                RET
+
+; net_frames: the frames of the queue taken, as the header above says, up
+; to NET_TAKE of them, or up to a frame for the ROM's own wait. R1 = the
+; bytes of that frame, copied to V_RXF, or 0. Uses R1-R6, and R7 and R8
+; across the calls, saved: the bytes of the frame, and the frames left.
+net_frames
+                PUSH    R7
+                PUSH    R8
+                MOVE    R8, NET_TAKE
+net_frame
+                MOVE[M] R7, @ETH_RX_LEN
+        ?Z      JMP     net_frames_none
+                MOVE    R2, V_NHDR      ; its headers, chunks 0 and 1
+                MOVE    R3, 0
+:
+                MOVE    @ETH_CHUNK, R3
+                MOVE    R1, ETH_BUF
+:
+                MOVE    @R2++, @R1++
+                CMP     R1, ETH_BUF+8
+        ?!Z     JMP     :-
+                ADD     R3, R3, 1
+                CMP     R3, NHDR_CHUNKS
+        ?!Z     JMP     :--
+                CMP     R7, 42
+        ?C      JMP     net_drop        ; too short for ARP and UDP
+                AND     R1, @V_NHDR+3, 0xFFFF
+                CMP     R1, 0x0806
+        ?Z      JMP     net_arp
+                CMP     R1, 0x0800
+        ?!Z     JMP     net_drop
+                SHR     R1, @V_NHDR+4, 24
+                CMP     R1, 0x45
+        ?!Z     JMP     net_drop        ; not IPv4, or with options
+                AND[M]  R0, @V_NHDR+5, 0x3FFF
+        ?!Z     JMP     net_drop        ; a fragment
+                SHR     R1, @V_NHDR+6, 16
+                AND     R1, R1, 0xFF
+                CMP     R1, 17          ; UDP
+        ?!Z     JMP     net_drop
+; A datagram: for the ROM's own wait, whatever its IP address, as a DHCP
+; server may send to the address it offers
+                AND     R2, @V_NHDR+9, 0xFFFF  ; its port
+                MOVE[M] R1, @V_NWAIT
+        ?Z      JMP     :+
+                CMP     R1, R2
+        ?!Z     JMP     :+
+                MOVE    @V_ULEN, 0      ; the datagram held, lost
+                MOVE    R1, V_RXF
+                CALL    eth_recv
+                JMP     net_frames_end
+; Or for the endpoint: to E_IP or to everyone, to its port, no shorter
+; than its UDP length says, and with 1 to UDP_MAX bytes of data
+:
+                TST     @V_ULEN
+        ?!Z     JMP     net_drop        ; one is held
+                MOVE[M] R1, @V_UPORT
+        ?Z      JMP     net_drop        ; closed
+                CMP     R1, R2
+        ?!Z     JMP     net_drop
+                MOVE    R1, @V_NHDR+8
+                CMP     R1, 0xFFFFFFFF
+        ?Z      JMP     :+
+                CMP     R1, @E_IP
+        ?!Z     JMP     net_drop
+:
+                SHR     R2, @V_NHDR+10, 16  ; the UDP length
+                SUB     R3, R7, 34      ; the bytes after the IP header
+                CMP     R3, R2
+        ?C      JMP     net_drop        ; shorter than that
+                SUB     R1, R2, 9       ; the bytes of data, less 1
+                CMP     R1, UDP_MAX
+        ?!C     JMP     net_drop        ; no data, or too long
+                ADD     R7, R1, 1       ; the bytes of data
+                MOVE    R1, V_RXF
+                CALL    eth_recv
+                MOVE    @V_ULEN, R7     ; held
+                JMP     net_next
+net_arp
+                CALL    arp_take
+net_drop
+                MOVE    @ETH_RX_LEN, 0  ; released
+net_next
+                SUB[M]  R8, R8, 1
+        ?!Z     JMP     net_frame
+net_frames_none
+                MOVE    R1, 0
+net_frames_end
+                POP     R8
+                POP     R7
+                RET
+
+; net_waddr: R1 = the plain address of the word address R1, which is
+; plain, or one in the word window, 0x10000000 + 4 W, of the word W
+; (nice_cpu's SYSTEM.md §9). Uses R1 and R2.
+net_waddr
+                SHR     R2, R1, 28
+                CMP     R2, 1
+        ?Z      AND     R1, R1, 0x0FFFFFFF
+        ?Z      SHR     R1, R1, 2
+                RET
+
+; net_config: entry 21. The IP address, the mask, the gateway, and the
+; DNS server, each 0 for none, written to the 4 words at the word address
+; R1, after a poll. R1 = 0. Uses R1-R6, and R7 across the calls, saved.
+net_config
+                PUSH    R7
+                CALL    net_waddr
+                MOVE    R7, R1
+                CALL    net_step
+                MOVE    @R7, @E_IP
+                MOVE    @1[R7], @V_MASK
+                MOVE    @2[R7], @V_GW
+                MOVE    @3[R7], @V_DNS
+                MOVE    R1, 0
+                POP     R7
+                RET
+
+; net_set: entry 22. The IP address, the mask, the gateway, and the DNS
+; server set from the 4 words at the word address R1, as net_config gives
+; them, after a poll. The IP address is written to E_IP only if it is
+; another, as a write breaks a host's connection over TCP; 0 clears it.
+; R1 = 0. Uses R1-R6, and R7 across the calls, saved.
+net_set
+                PUSH    R7
+                CALL    net_waddr
+                MOVE    R7, R1
+                CALL    net_step
+                CMP     @R7, @E_IP
+        ?!Z     MOVE    @E_IP, @R7
+                MOVE    @V_MASK, @1[R7]
+                MOVE    @V_GW, @2[R7]
+                MOVE    @V_DNS, @3[R7]
+                MOVE    R1, 0
+                POP     R7
+                RET
+
 ; The UDP endpoint, the entries 16 to 19 (README.md, "The network"): one
 ; local port, V_UPORT, 0 while it is closed, which the cold start and
 ; mon_exit close, as they disable the port for Ethernet frames. Datagrams
-; are IPv4, from E_IP, with no options, not fragmented, and with the UDP
-; checksum 0, none, as IPv4 allows. A datagram's data is one byte per
-; word, bits 7..0, as the file entries have it.
+; are IPv4, from E_IP, with no options, DF clear, the identification of
+; ip_ident, and the UDP checksum 0, none, as IPv4 allows. A datagram's
+; data is one byte per word, bits 7..0, as the file entries have it. The
+; poll holds one datagram for the endpoint at V_RXF, V_ULEN bytes, which
+; udp_recv returns.
 
 ; udp_open: the endpoint opened on the local port R1, or with R1 = 0 on a
-; port from 49152 to 65535 that the microsecond counter picks, and the
-; port for Ethernet frames enabled, with its queue emptied. R1 = the
-; port, or E_NOIP without an IP address, or E_PORT for one past 65535.
-; Uses R1.
+; port from 49152 to 65535 that the microsecond counter picks, with no
+; datagram held, and the port for Ethernet frames enabled by net_on, with
+; its queue emptied if it was not enabled. R1 = the port, or E_NOIP
+; without an IP address, or E_PORT for one past 65535. Uses R1.
 udp_open
                 TST     @E_IP
         ?Z      MOVE    R1, E_NOIP
@@ -400,24 +660,26 @@ udp_open
         ?Z      AND     R1, @io.us, 0x3FFF
         ?Z      OR      R1, R1, 0xC000
                 MOVE    @V_UPORT, R1
-                JMP     eth_on          ; which returns to the caller
+                MOVE    @V_ULEN, 0
+                JMP     net_on          ; which returns to the caller
 
-; udp_close: the endpoint closed, and the port for Ethernet frames
-; disabled. R1 = 0.
+; udp_close: the endpoint closed, the datagram held forgotten, and the
+; port for Ethernet frames disabled by net_off. R1 = 0.
 udp_close
                 MOVE    @V_UPORT, 0
-                MOVE    @ETH_CSR, 0
+                MOVE    @V_ULEN, 0
                 MOVE    R1, 0
-                RET
+                JMP     net_off         ; which returns to the caller
 
 ; udp_send: the R4 bytes at R3 sent to the port R2 of the IP address R1,
 ; through the gateway, V_GW, when the mask, V_MASK, puts the address in
 ; another network, and to everyone for 255.255.255.255. R1 = 0, or
 ; E_UCLOSED, E_PORT for a port of 0 or past 65535, E_ULONG for more than
 ; UDP_MAX bytes, or E_NOROUTE when the host or the gateway did not answer
-; ARP. The headers are built at V_UHDR, and copied with the bytes to the
-; send buffer a word at a time. Uses R1-R6, and R7-R10 across the calls,
-; saved: the address, the port, the bytes, and their number.
+; ARP. It polls first. The headers are built at V_UHDR, and copied with
+; the bytes to the send buffer a word at a time. Uses R1-R6, and R7-R10
+; across the calls, saved: the address, the port, the bytes, and their
+; number.
 udp_send
                 TST     @V_UPORT
         ?Z      MOVE    R1, E_UCLOSED
@@ -437,7 +699,9 @@ udp_send
                 MOVE    R8, R2
                 MOVE    R9, R3
                 MOVE    R10, R4
+                CALL    net_step
 ; The next hop's MAC address, in R2 and R3
+                MOVE    R1, R7
                 MOVE    R2, 0xFFFF
                 MOVE    R3, 0xFFFFFFFF
                 CMP     R1, 0xFFFFFFFF
@@ -461,7 +725,8 @@ udp_send
                 OR      @V_UHDR+3, R3, 0x0800
                 ADD     R1, R10, 28
                 OR      @V_UHDR+4, R1, 0x45000000  ; IPv4, a header of 5 words, and the length
-                MOVE    @V_UHDR+5, 0x4000  ; don't fragment
+                CALL    ip_ident
+                MOVE    @V_UHDR+5, R1
                 MOVE    @V_UHDR+6, 0x40110000  ; the TTL 64, UDP
                 MOVE    @V_UHDR+7, @E_IP
                 MOVE    @V_UHDR+8, R7
@@ -516,20 +781,15 @@ udp_noroute
                 POP     R7
                 RET
 
-; udp_recv: the next datagram for the endpoint, of the frames in the
-; queue, copied to the words at R1, R2 bytes at most, a byte per word,
-; and its source's IP address and port to the 2 words at R3, unless R3
-; is 0. R1 = the bytes copied, 0 when no datagram waits, or E_UCLOSED.
-; The frames before it that are no datagram for the endpoint are
-; released unread, and so are empty datagrams. With R2 0 nothing is
-; copied, and the queue is left as it is, so no datagram is lost to a
-; call with no room. Uses R1-R6, and R7-R9 across the calls, saved.
+; udp_recv: after a poll, the datagram held for the endpoint copied to
+; the words at R1, R2 bytes at most, a byte per word, and its source's IP
+; address and port to the 2 words at R3, unless R3 is 0. R1 = the bytes
+; copied, 0 when no datagram is held, or E_UCLOSED. With R2 0 nothing is
+; copied, and the datagram stays held, so none is lost to a call with no
+; room. Uses R1-R6, and R7-R9 across the calls, saved.
 udp_recv
                 TST     @V_UPORT
         ?Z      MOVE    R1, E_UCLOSED
-        ?Z      RET
-                TST     R2
-        ?Z      MOVE    R1, 0           ; no room: the datagram stays
         ?Z      RET
                 PUSH    R7
                 PUSH    R8
@@ -537,7 +797,11 @@ udp_recv
                 MOVE    R7, R1
                 MOVE    R8, R2
                 MOVE    R9, R3
-                CALL    udp_next
+                CALL    net_step
+                MOVE    R1, 0
+                TST     R8
+        ?Z      JMP     udp_recv_end    ; no room: the datagram stays
+                CALL    udp_take
                 CMP     R1, R8
         ?C      MOVE    R8, R1          ; the bytes to copy
                 TST     R1
@@ -548,16 +812,13 @@ udp_recv
                 SHR     @1[R9], @V_RXF+9, 16
 :
                 MOVE    R6, 0           ; the byte
-                MOVE[M] R5, R8
-        ?Z      JMP     :++
 :
                 ADD     R1, R6, 4*UDP_HDR
                 CALL    rx_byte
                 MOVE    @R7++, R1
                 ADD     R6, R6, 1
-                CMP     R6, R5
+                CMP     R6, R8
         ?!Z     JMP     :-
-:
                 MOVE    R1, R8
 udp_recv_end
                 POP     R9
@@ -565,62 +826,32 @@ udp_recv_end
                 POP     R7
                 RET
 
-; udp_next: the next frame of the queue that is a datagram for the
-; endpoint in V_RXF, its data from word UDP_HDR, its source's IP address
-; in word 7, and its port in bits 31..16 of word 9. R1 = its bytes, or 0
-; when the queue has none. The frames before it are released unread:
-; frames that are not IPv4 with a header of 5 words, not UDP, fragments,
-; to another IP address than E_IP and 255.255.255.255, to another port,
-; shorter than their UDP length says, or of no data. Uses R1-R5.
+; udp_next: a poll, and udp_take, for tftp. Uses R1-R6.
 udp_next
-                MOVE    R1, V_RXF
-                CALL    eth_recv
-                TST     R1
-        ?Z      RET                     ; none
-                CMP     R1, 42
-        ?C      JMP     udp_next        ; too short
-                AND     R2, @V_RXF+3, 0xFFFF
-                CMP     R2, 0x0800
-        ?!Z     JMP     udp_next
-                SHR     R2, @V_RXF+4, 24
-                CMP     R2, 0x45
-        ?!Z     JMP     udp_next
-                SHR     R2, @V_RXF+6, 16
-                AND     R2, R2, 0xFF
-                CMP     R2, 17          ; UDP
-        ?!Z     JMP     udp_next
-                AND[M]  R0, @V_RXF+5, 0x3FFF
-        ?!Z     JMP     udp_next        ; a fragment
-                MOVE    R2, @V_RXF+8
-                CMP     R2, 0xFFFFFFFF
-        ?Z      JMP     :+
-                CMP     R2, @E_IP
-        ?!Z     JMP     udp_next
-:
-                AND     R2, @V_RXF+9, 0xFFFF
-                CMP     R2, @V_UPORT
-        ?!Z     JMP     udp_next
-                SHR     R2, @V_RXF+10, 16  ; the UDP length
-                SUB     R3, R1, 34      ; the bytes after the IP header
-                CMP     R3, R2
-        ?C      JMP     udp_next        ; shorter than that
-                SUB     R1, R2, 9       ; the bytes of data, less 1
-                CMP     R1, UDP_MAX
-        ?!C     JMP     udp_next        ; no data, or too long
-                ADD     R1, R1, 1
+                CALL    net_step
+; udp_take: the datagram held for the endpoint, which is held no more:
+; R1 = its bytes, or 0 when none is held. It stays in V_RXF, its data from
+; word UDP_HDR, its source's IP address in word 7, and its port in bits
+; 31..16 of word 9, until the next poll. Uses R1.
+udp_take
+                MOVE    R1, @V_ULEN
+                MOVE    @V_ULEN, 0
                 RET
 
-; The frames of i dhcp (RFC 2131 and RFC 2132): a DISCOVER or a REQUEST,
-; broadcast from 0.0.0.0 port 68 to port 67, with the broadcast flag set,
-; as the station has no address yet, and padded to the 300 bytes of a
-; BOOTP message (RFC 1542). The UDP checksum is 0, none, as IPv4 allows.
+; The frames of net_dhcp (RFC 2131 and RFC 2132): a DISCOVER or a
+; REQUEST, broadcast from 0.0.0.0 port 68 to port 67, with the broadcast
+; flag set, as the station may have no address yet, and padded to the 300
+; bytes of a BOOTP message (RFC 1542). The UDP checksum is 0, none, as
+; IPv4 allows, and the IPv4 header has the identification of ip_ident.
 ; With the 2 bytes before the frame, the fields fall on words: the IP
 ; header at 4, the UDP header at 9, the message at 11, its transaction at
 ; 12, the address offered at 15, the client's MAC address at 18, the
-; magic cookie at 70, and the options from 71, which are written a word at
-; a time: 53, the message type; for a REQUEST, 50, the address asked for,
-; and 54, the server; 55, the options asked for, 1 the mask, 3 the gateway,
-; and 6 the DNS servers. Then a byte at a time: 12, the host name,
+; magic cookie at 70, and the options from 71, which are written a byte
+; at a time: 53, the message type; 50, the address asked for, the one
+; offered for a REQUEST, and for a DISCOVER the station's, E_IP, if it
+; has one, so that the server offers it again; for a REQUEST, 54, the
+; server; 55, the options asked for, 1 the mask, 3 the gateway, and 6 the
+; DNS servers; 12, the host name,
 ; nicemon- and the last three bytes of the MAC address in lower-case hex,
 ; such as nicemon-434506, a valid name for the network's DNS; 60, the
 ; vendor class, NiceMonMEGA65 and the monitor's version, cut at DHCP_SMAX
@@ -631,7 +862,7 @@ udp_next
 ; the address V_DIP from the server V_DSRV, with the transaction V_XID.
 ; Uses R1-R6.
 dhcp_send
-                MOVE    R6, R1
+                MOVE    R5, R1          ; the type
                 MOVE    R1, V_TXF
                 MOVE    R2, DHCP_WORDS
 :
@@ -642,6 +873,8 @@ dhcp_send
                 MOVE    R2, 0x0800
                 CALL    eth_head
                 MOVE    @V_TXF+4, 0x45000000+DHCP_LEN-14  ; IPv4, a header of 5 words, and the length
+                CALL    ip_ident
+                MOVE    @V_TXF+5, R1
                 MOVE    @V_TXF+6, 0x40110000  ; the TTL 64, UDP
                 MOVE    @V_TXF+8, 0xFFFFFFFF  ; to everyone
                 MOVE    @V_TXF+9, 0x00440043  ; from port 68 to 67
@@ -652,27 +885,26 @@ dhcp_send
                 MOVE    @V_TXF+18, @V_TXF+2  ; the MAC address
                 SHL     @V_TXF+19, @E_MACL, 16
                 MOVE    @V_TXF+70, 0x63825363
-                CMP     R6, DHCP_REQUEST
-        ?Z      JMP     :+
-                MOVE    @V_TXF+71, 0x35010137  ; 53 DISCOVER, and 55
-                MOVE    @V_TXF+72, 0x03010306
-                MOVE    R6, 4*73        ; the byte of the next option
-                JMP     dhcp_names
-:
-                MOVE    @V_TXF+71, 0x35010332  ; 53 REQUEST, and 50
-                MOVE    R1, @V_DIP
-                MOVE    R2, @V_DSRV
-                SHR     R3, R1, 8
-                OR      @V_TXF+72, R3, 0x04000000
-                SHL     R3, R1, 24
-                SHR     R4, R2, 24
-                OR      R3, R3, R4
-                OR      @V_TXF+73, R3, 0x00360400  ; and 54
-                SHL     R3, R2, 8
-                OR      @V_TXF+74, R3, 0x37  ; and 55
-                MOVE    @V_TXF+75, 0x03010306
-                MOVE    R6, 4*76
-dhcp_names
+                MOVE    R6, 4*71        ; the byte of the first option
+                MOVE    R1, 53
+                CALL    dhcp_put
+                MOVE    R1, 1
+                CALL    dhcp_put
+                MOVE    R1, R5
+                CALL    dhcp_put
+                MOVE    R4, @E_IP
+                CMP     R5, DHCP_REQUEST
+        ?Z      MOVE    R4, @V_DIP
+                MOVE    R1, 50
+                CALL    dhcp_addr
+                MOVE    R4, 0
+                CMP     R5, DHCP_REQUEST
+        ?Z      MOVE    R4, @V_DSRV
+                MOVE    R1, 54
+                CALL    dhcp_addr
+                MOVE    R4, R6
+                MOVE    R5, D_PARAMS
+                CALL    dhcp_str
                 MOVE    R1, 12          ; the host name
                 CALL    dhcp_code
                 MOVE    R5, S_HOST
@@ -719,6 +951,25 @@ dhcp_put
                 ADD     R6, R6, 1
                 RET
 
+; dhcp_addr: the option R1 of the address R4, 4 bytes, put at R6, unless
+; R4 is 0. Uses R1-R4.
+dhcp_addr
+                TST     R4
+        ?Z      RET
+                PUSH    R5
+                CALL    dhcp_put
+                MOVE    R1, 4
+                CALL    dhcp_put
+                MOVE    R5, 4           ; the bytes left
+:
+                ROL     R4, R4, 8       ; the top byte to the bottom
+                AND     R1, R4, 0xFF
+                CALL    dhcp_put
+                SUB[M]  R5, R5, 1
+        ?!Z     JMP     :-
+                POP     R5
+                RET
+
 ; dhcp_code: the code R1 of an option put at R6, and its length left 0, at
 ; R4. Uses R1-R4.
 dhcp_code
@@ -753,19 +1004,20 @@ dhcp_len
 ; dhcp_wait: the reply of the type R1, DHCP_OFFER or DHCP_ACK, to the
 ; transaction V_XID, within DHCP_WAIT microseconds. R1 = its type, or
 ; DHCP_NAK when an ACK is waited for and a NAK comes, or 0 when none came.
-; The address, the server, the mask, and the gateway of the reply that
-; is waited for are copied to V_DIP, V_DSRV, V_DMASK, and V_DGW. A reply
-; of the type without an address is passed over, so that the station's
-; address is never made 0. The other frames are released unread. Uses
-; R1-R6, and R7 and R8 across the calls, saved.
+; The address, the server, the mask, the gateway, and the DNS server of
+; the reply that is waited for are copied to V_DIP, V_DSRV, V_DMASK,
+; V_DGW, and V_DDNS. A reply of the type without an address is passed
+; over, so that the station's address is never made 0. It polls with
+; net_step, which copies a datagram to port 68 to V_RXF, and takes the
+; other frames where they go. Uses R1-R6, and R7 and R8 across the calls,
+; saved.
 dhcp_wait
                 PUSH    R7
                 PUSH    R8
                 MOVE    R7, R1
                 MOVE    R8, @io.us      ; the start
 dhcp_listen
-                MOVE    R1, V_RXF
-                CALL    eth_recv
+                CALL    net_step
                 TST     R1
         ?Z      JMP     :+
                 CALL    dhcp_parse
@@ -788,6 +1040,7 @@ dhcp_listen
                 MOVE    @V_DSRV, @V_PSRV
                 MOVE    @V_DMASK, @V_PMASK
                 MOVE    @V_DGW, @V_PGW
+                MOVE    @V_DDNS, @V_PDNS
 dhcp_wait_end
                 POP     R8
                 POP     R7
@@ -797,9 +1050,9 @@ dhcp_wait_end
 ; transaction V_XID: an IPv4 packet with a header of 5 words, UDP from port
 ; 67 to 68, a BOOTP reply, and the magic cookie. Its checksums are not
 ; checked, as the FCS was. R1 = the message type of option 53, or 0 when
-; it is no reply of ours or has no type, and V_PIP, V_PSRV, V_PMASK, and
-; V_PGW are its address, and the options 54, 1, and 3, the first address
-; of each, or 0 without them. The options are walked from byte 284 of the
+; it is no reply of ours or has no type, and V_PIP, V_PSRV, V_PMASK,
+; V_PGW, and V_PDNS are its address, and the options 54, 1, 3, and 6, the
+; first address of each, or 0 without them. The options are walked from byte 284 of the
 ; buffer up to 255, or the end of the frame, R8, the byte after its last;
 ; R7 is the option, and R5 the type. Uses R1-R6, and R7 and R8 across the
 ; calls, saved.
@@ -833,6 +1086,7 @@ dhcp_parse
                 MOVE    @V_PSRV, 0
                 MOVE    @V_PMASK, 0
                 MOVE    @V_PGW, 0
+                MOVE    @V_PDNS, 0
                 MOVE    R7, 284
 dhcp_opt
                 CMP     R7, R8
@@ -864,6 +1118,9 @@ dhcp_opt
         ?Z      JMP     :+
                 CMP     R6, 3
         ?Z      MOVE    R6, V_PGW
+        ?Z      JMP     :+
+                CMP     R6, 6
+        ?Z      MOVE    R6, V_PDNS
         ?Z      JMP     :+
                 CMP     R6, 54
         ?!Z     JMP     dhcp_opt
@@ -1163,7 +1420,10 @@ S_VCLASS
                 .ASCII_L 'NiceMonMEGA65 '
 S_MASK          .ASCII_L 'Mask '
 S_GW            .ASCII_L 'Gateway '
+S_DNS           .ASCII_L 'DNS server '
 S_DSRV          .ASCII_L 'DHCP server '
+D_PARAMS
+                .DAT    55, 3, 1, 3, 6, 0  ; option 55: the mask, the gateway, and the DNS servers
 S_FTP           .ASCII_L 'ftp'
 S_OCTET         .ASCII_L 'octet'
 S_STAR          .ASCII_L '*'

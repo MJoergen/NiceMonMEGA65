@@ -2134,12 +2134,13 @@ def test_eth_dhcp(port: str, baud: int, rom: str) -> None:
             return
         dotted = r"(\d+\.\d+\.\d+\.\d+)"
         got = re.search(rf"IP address {dotted}\r\nMask {dotted}\r\n"
-                        rf"Gateway {dotted}\r\nDHCP server {dotted}", said)
+                        rf"Gateway {dotted}\r\nDNS server {dotted}\r\n"
+                        rf"DHCP server {dotted}", said)
         if not check("eth: the monitor's i dhcp gets an address from the "
                      "network's DHCP server", got is not None,
                      repr(said) if got is None else
                      f"{got[1]}, mask {got[2]}, gateway {got[3]}, "
-                     f"server {got[4]}"):
+                     f"DNS server {got[4]}, server {got[5]}"):
             return
         assert got is not None
         addr = got[1]

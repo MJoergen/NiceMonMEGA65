@@ -241,7 +241,7 @@ monitor gives it one:
 | Command | What it does |
 |---|---|
 | `i 192.168.1.65` | Sets the IP address; `i` alone shows it |
-| `i dhcp` | Gets an address from the network's DHCP server, and shows it with the mask, the gateway, and the server |
+| `i dhcp` | Gets an address from the network's DHCP server, and shows it with the mask, the gateway, the DNS server, and the DHCP server |
 | `m 02:4E:49:43:45:01` | Sets the MAC address; `m` alone shows it. A second board on the same network needs one of its own |
 
 The board does not renew a DHCP lease, so the server may give the

@@ -107,6 +107,17 @@ int udp_recv(unsigned buf, unsigned n, unsigned src);
 // The endpoint closed, and the port for Ethernet frames disabled. 0.
 int udp_close(void);
 
+// The IP address from the network's DHCP server, as i dhcp gets it,
+// with the mask, the gateway, and the DNS server, printing nothing. With
+// an address set, it asks for that one. Waits up to 16 seconds. 0, or an
+// error. Entry 23 (issue #111).
+int net_dhcp(void);
+
+// The poll of the network: the frames that wait taken, a datagram for the
+// endpoint held for udp_recv. Never waits. Not negative. A program that
+// uses the network calls it every 100 ms or so. Entry 24 (issue #111).
+int net_poll(void);
+
 // The next entry of a directory, as fs_readdir gives it in the 4 words
 // from buf, and its name in the words from name, one character per word
 // up to a 0 word, 256 words at most: its long name, or else its 8.3 name

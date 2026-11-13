@@ -54,9 +54,36 @@ of [SYSTEM.md §7](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#
   the cold start empties. Else it broadcasts a request, up to 3 times,
   waits a second for each reply, and puts the reply into the cache. An
   entry is kept about a minute, and a new one takes the entry of its
-  address, or else the next in turn. The frames that come while it
-  waits and are no ARP reply are released unread. The port must be
-  enabled. The station answers the requests for its own address itself.
+  address, or else the next in turn. It polls while it waits, as below.
+  The port must be enabled. The station answers the requests for its
+  own address itself.
+- **The poll** (issue #111), `net_step`, which `net_poll` is too, takes
+  the frames that wait, up to the queue's 4, where they go, and releases
+  each. It copies the first 16 words of a frame, its headers, to
+  `0xFFFFF390`, and decides from them. An ARP reply, to anyone, is
+  learned from there, in place, so ARP never touches the buffer of a
+  frame received, `V_RXF` at `0xFFFFF180`. A datagram for the endpoint
+  is copied to `V_RXF`, and held there for `udp_recv`, unless one is
+  held already; then it is dropped. A datagram to the port of the ROM's
+  own wait, 68 while `i dhcp` or `net_dhcp` waits, is copied to `V_RXF`
+  too, in place of a datagram held, which is lost, and the poll stops
+  there, so that the wait parses it. Every other frame is released
+  unread. The UDP entries, `arp_resolve`, and the waits of DHCP poll.
+- **The network is on** while the endpoint is open or `net_dhcp` runs.
+  `net_on` enables the port only if it is disabled, so it does not empty
+  the queue of an open endpoint, and `net_off` disables it only when the
+  endpoint is closed. The cold start, `mon_exit`, and `mon_trap` close
+  it all with `net_close`.
+- **The clocks.** The fine clock, `net_clock`, is the microsecond
+  counter plus `0xFFC2F700`, so that it wraps 4 seconds after reset, and
+  every run crosses a wrap. A deadline on it is due when the signed
+  difference of the clock and the deadline is not negative. The poll
+  checks the nearest deadline only while a flag says it is armed, so a
+  stale one is never due. Nothing arms one yet: TCP and the lease's
+  renewal will. The coarse clock is `arp_tick`, about a second.
+- **The identification** of each IPv4 packet sent, of UDP and of DHCP,
+  counts up by one from the fine clock at the cold start, with the
+  "don't fragment" bit clear (RFC 6864).
 - `i dhcp` and `tftp` (README.md, "The network") use the frame
   routines, and `udp_send` calls `arp_resolve` for the MAC address of a
   datagram's host, or of the gateway. Programs do not call them: they
@@ -136,8 +163,8 @@ a program, `demo.bin`, whose words
 <!-- romsize layout -->
 | Part | Address | Words |
 |---|---|---:|
-| The monitor | `0x0000`–`0x4B99` | 19354 |
-| Free | `0x4B9A`–`0x7FFF` | 13414 |
+| The monitor | `0x0000`–`0x4CF0` | 19697 |
+| Free | `0x4CF1`–`0x7FFF` | 13071 |
 <!-- /romsize layout -->
 
 The monitor's words, by the source they come from, in the order
@@ -148,13 +175,13 @@ the Makefile joins them. The column "Text" counts the words of the
 <!-- romsize monitor -->
 | Source | What it is | Words | Text |
 |---|---|---:|---:|
-| `monitor.nasm` | The dispatch table, the HAL, the cold start, and the traps | 712 | 27 |
+| `monitor.nasm` | The dispatch table, the HAL, the cold start, and the traps | 725 | 27 |
 | `monitor_cmd.nasm` | The main loop and the commands | 3949 | 2394 |
 | `monitor_dis.nasm` | The disassembler of `u` | 1079 | 269 |
 | `monitor_sd.nasm` | The sector routines | 390 | 223 |
-| `monitor_eth.nasm` | The network | 1990 | 286 |
+| `monitor_eth.nasm` | The network | 2312 | 298 |
 | `monlib.nasm` | The routines that programs join | 259 | 0 |
-| `mon.nasm` | The stubs of the entries | 50 | 0 |
+| `mon.nasm` | The stubs of the entries | 58 | 0 |
 | `nicewasm` | `___wasm_start`, which copies the C code's data to the RAM | 85 |  |
 | `fat32.c` | FAT32 | 9102 |  |
 | `clock.c` | The clock and `time` | 1199 |  |
@@ -165,7 +192,7 @@ the Makefile joins them. The column "Text" counts the words of the
 | nice_cpu's `muldiv_mpu.nasm` | Multiply and divide | 128 | 0 |
 | `build/folder.nasm` | The error of a card without the folder | 27 | 27 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 5 | 5 |
-| In all | | 19354 | 3231 |
+| In all | | 19697 | 3243 |
 <!-- /romsize monitor -->
 
 - The C code's strings are in its initial values, four characters a
@@ -245,8 +272,14 @@ needs `FOLDER=NICE`, the default. It runs these steps in order:
    each run takes the same steps. A first run with no server gives the
    transaction's number. Then it builds the OFFER and the ACK, among
    frames that are not for the monitor, an OFFER without an address, and
-   a NAK. It compares the output and the frames sent with
-   `test/dhcp.expected`, and checks the IPv4 checksums.
+   a NAK. Two more runs call `net_dhcp`, entry 23, from
+   `test/netdhcp.nasm`, with the endpoint open: with no server, and with
+   one, and an ARP reply that is learned while it waits. It compares the
+   output and the frames sent with `test/dhcp.expected`, and checks the
+   IPv4 checksums, the identification, which counts up by one, and that
+   DF is clear. The transaction, the identification, and the checksum
+   change with the steps of the code, so the expected file has them as
+   `xx`, `ii`, and `cc`.
 5. **TFTP.** `test/tftp.py` runs `tftp` the same way, against
    `test/tftp.expected`. It covers a file of two blocks among packets of
    other hosts and ports, lost packets, an ERROR, files of 512 and 0
@@ -282,6 +315,7 @@ compared with `test/NAME.expected`:
 | `sd_write` | `test/sd.nasm`, with a card of 4 sectors in slot 0 and none in slot 1 | `sd_init`, `sd_read`, and `sd_write`: the empty slot, a sector read and written, and the sector past the end. The card must then equal the image of `test/sd_image.py --written`. |
 | `arp` | `test/arp.nasm`, with the frames of `test/arp.eth` | `arp_resolve`: a reply after other frames, the cache, no reply, an entry aged out, and the cache filled and gone round. The frames sent are compared too. |
 | `udp` | `test/udp.nasm`, with the frames of `test/udp.eth` | The UDP entries: each error, a datagram sent after ARP, a broadcast, datagrams received among other frames, one cut short, and one sent through the gateway. The frames sent are compared too. |
+| `net` | `test/net.nasm`, with the frames of `test/net.eth` | The poll and the IP settings of issue #111: `net_config` at a word-window address and a plain one, `net_set`, `net_poll`, a datagram held and a second dropped, ARP replies learned in place, so that no request goes, a TCP segment released, and a deadline armed, not due, and due. The frames sent are compared too. |
 | `rom` | `build/rom.bin`: the monitor with `test/rom.c` in its C code, and `test/rom.nasm` | The C code in the ROM: a global's initial value, a static array set to 0, both again after `r 0`, `nice_print`, and a trap, whose address must be the label `_rom_trap`. |
 | `fs` | `test/fs.nasm`, with FAT images in both slots | The file entries, through `mon.nasm`'s stubs: handles, reads across the fragments of a file and at its end, the folder's entries, mounts, each error a program can cause, and `fs_readname`'s long name and 8.3 name in lower case, and a file opened by its long name. |
 | `fsw` | `test/fsw.nasm`, with a copy of the card with partitions, one file read-only, and a write-protected card | The entries that write: a file written in pieces across clusters and read back, truncated, a file of ten clusters, deletions, one of a long name, a folder that grows a cluster, a mount that drops an open file, and each error. |
@@ -297,11 +331,12 @@ compared with `test/NAME.expected`:
 | `reset` | The same | `r 0`, the cold start, and `r` again. |
 | `hello_c` | `test/hello.c`, built with `nicebuild.py --monitor --asm mon.nasm` | A program in C. |
 
-`sd_write`, `arp`, `udp`, and `rom` call the monitor's routines by their
-labels, so they are assembled after the monitor's sources, and only
-their words from `0x8000` are kept. `fs`, `fsw`, `hello`, and `hello_c`
-call the entries through `mon.nasm`'s stubs, as any program does. `arp`
-and `udp` run with `--step-time`, as their timeouts count steps, and
+`sd_write`, `arp`, `udp`, `net`, and `rom` call the monitor's routines
+or reach its variables by their labels, so they are assembled after the
+monitor's sources, and only their words from `0x8000` are kept. `fs`,
+`fsw`, `hello`, and `hello_c` call the entries through `mon.nasm`'s
+stubs, as any program does, and so do `udp` and `net`. `arp`, `udp`, and
+`net` run with `--step-time`, as their timeouts count steps, and
 `time` too, so that its clock starts at 0, not set, and counts the same
 each time. The other tests run with the host's clock, so the files they
 write have the host's date, which no test shows.

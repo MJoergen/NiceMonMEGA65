@@ -223,7 +223,7 @@ offset, so there the history is kept but not shown.
 | `c` | Clears the screen. |
 | `v` | The version of the monitor, and of the dispatch table: `NiceMon V2.0.1, dispatch table 1.4`. |
 | `i [A.B.C.D]` | Shows the Ethernet station's IP address, `IP address 192.168.1.65`, or writes it first: four decimal numbers of 0 to 255 with dots between them, such as `i 192.168.1.65`. Anything but an address or `dhcp` is no address, and `i` says so and writes nothing. It writes `0xFFFFFFB0`, `NET_IP` ([SYSTEM.md](../doc/SYSTEM.md#the-ethernet-station)), so a host connected over TCP loses its connection. In `niceemu` it is a register that keeps what is written. |
-| `i dhcp` | Gets the IP address from the network's DHCP server and writes it, as `i A.B.C.D` does, then shows it, with the mask, the gateway, and the server, a line each (The network below). Without an answer, it prints `No answer from a DHCP server` after about 8 seconds, and leaves the address as it was. |
+| `i dhcp` | Gets the IP address from the network's DHCP server and writes it, as `i A.B.C.D` does, then shows it, with the mask, the gateway, the DNS server, and the DHCP server, a line each (The network below). Without an answer, it prints `No answer from a DHCP server` after about 8 seconds, and leaves the address as it was. |
 | `m [MAC]` | Shows the station's MAC address, `MAC address 02:4E:49:43:45:06`, or writes it first: six bytes of one or two hex digits, in either case, with colons between them, such as `m 02:4E:49:43:45:01`. The first byte must be even, as an odd one makes a group address. Anything else is no address, and `m` says so and writes nothing. It writes `0xFFFFFFB1` and `B2`, so a host connected over TCP loses its connection. Each kind of board has its own after reset: `02:4E:49:43:45:03` on the R3, `02:4E:49:43:45:06` on the R6, and `02:4E:49:43:45:0A` on the Nexys4DDR. Two boards of the same kind on one network need different MAC addresses. In `niceemu` they are registers too, `02:4E:49:43:45:00` after reset. |
 | `time [YYYY-MM-DD HH:MM:SS]` | Shows the clock of the time of day, `2026-11-11 14:30:00`, or sets it first to the date and the time given, two digits for each part but the year, in the years 1970 to 2105, with blanks around them, such as `time 2026-11-11 14:30:00`. The clock keeps local time, as the MEGA65's real-time clock does, and knows no time zones. After a reset of the system it is not set. The monitor's cold start sets it from the MEGA65's real-time clock, unless the real-time clock lost its time ([SYSTEM.md](../doc/SYSTEM.md#the-i2c-bus)), and leaves a clock that is set already. On the MEGA65, `time` with a date and a time in the years 2000 to 2099 sets the real-time clock too, so that later starts, and the MEGA65's other cores, have the time. Until the clock is set, as on the Nexys4DDR, which has no real-time clock, `time` prints `Clock not set`; a program, a host, or `time` sets it. A start of a program keeps it. Anything else is no time, and `time` says so and sets nothing. A clock that a program set past 2106-02-07 shows as `Clock past 2106`. In `niceemu` the clock is the host's time in UTC from the start. |
 | `baud [RATE]` | Shows the UART's baud rate, `Baud rate 230400`, or writes it first: 115200, 230400, 460800, 921600, 1000000, 1500000, or 2000000, in decimal, such as `baud 921600`. Anything else is no rate, and `baud` says so and writes nothing. It writes `0xFFFFFF9F` ([DEBUG_LINK.md](../doc/DEBUG_LINK.md#the-baud-rate)), as the on-board debugger's settings page does. The UART takes the new rate once it has sent nothing for 1 ms, so the answer and the prompt still come at the old rate, and a terminal on the UART then changes to the new one; only a reset brings back 230400. Over Ethernet the rate does not matter. In `niceemu` the word is memory, which reads 0 after a clear. |
@@ -352,9 +352,13 @@ sets serves both.
   for an OFFER, then broadcasts a REQUEST of the address offered and
   waits as long for the ACK (RFC 2131). A timeout or a NAK starts again
   from the DISCOVER, up to 4 times; an OFFER or an ACK without an
-  address is passed over. The ACK's address is written to `NET_IP`,
-  which breaks a host's connection over TCP, as `i A.B.C.D` does, and
-  the port is disabled again. The frames come from 0.0.0.0, to everyone,
+  address is passed over. When the board has an address already, the
+  DISCOVER asks for it, so that the server offers it again. The ACK's
+  address is written to `NET_IP` only when it is another, which breaks a
+  host's connection over TCP, as `i A.B.C.D` does. So `i dhcp` on a board
+  that a host reaches over Ethernet keeps the host's connection when the
+  server gives the same address. Then the port is disabled again. The
+  frames come from 0.0.0.0, to everyone,
   with the broadcast flag set, and ask for the mask, the gateway, and
   the DNS servers. They name the board to the server, as a router's
   list of stations shows it: the host name is `nicemon-` and the last
@@ -365,7 +369,8 @@ sets serves both.
   renewed: a board that runs longer than its lease may have its address
   given to another station.
 - `i dhcp` keeps the mask and the gateway of the ACK, which UDP uses
-  below; `i A.B.C.D` and the cold start set both to none.
+  below, and the first DNS server, which it shows; `i A.B.C.D` and the
+  cold start set the three to none.
 
 The UDP endpoint is the entries 16 to 19 of the dispatch table (above),
 so that a program, such as a game of two boards, or a BASIC interpreter,
@@ -374,21 +379,28 @@ of a datagram is one byte per word, bits 7..0, as the file entries have
 it:
 
 - **One endpoint**, one local port, which `udp_open` opens and enables
-  the port for Ethernet frames, with its queue emptied, and `udp_close`
-  closes, with the port disabled. The cold start and a program's return
-  close it too. Port 0 picks one from 49152 to 65535.
+  the port for Ethernet frames, with its queue emptied if the port was
+  disabled, and `udp_close` closes, with the port disabled. The cold
+  start and a program's return close it too. Port 0 picks one from 49152
+  to 65535.
 - **Sending**: a datagram goes to its address, through the gateway when
   the mask puts the address in another network, and to everyone for
   255.255.255.255, after the ROM's ARP finds the MAC address. It is IPv4
-  with no options, not to be fragmented, and with the UDP checksum 0,
-  none, as IPv4 allows; up to 1472 bytes, which fill a frame.
-- **Receiving** does not wait: `udp_recv` returns the next datagram to
-  the endpoint's port of the station's address or 255.255.255.255, or 0
-  when none waits. The frames before it that are not one are released
-  unread, so a program that also wants other frames drives the port
-  itself. An empty datagram, a fragment, and IP options are passed
-  over. A call with no room, 0 bytes, copies nothing and leaves the
-  queue as it is, so no datagram is lost to it. The queue holds 4 frames
+  with no options, and with the UDP checksum 0, none, as IPv4 allows; up
+  to 1472 bytes, which fill a frame. A router on a path with a smaller
+  MTU may fragment it: the "don't fragment" bit is clear, and each
+  packet has an identification of its own, one more than the one before.
+- **Receiving** does not wait. The ROM polls the queue in every UDP
+  entry, and in its own waits: it takes the frames that wait, up to 4,
+  and holds one datagram to the endpoint's port of the station's
+  address or 255.255.255.255. `udp_recv` returns that datagram, or 0
+  when none is held. The other frames are released unread, so a
+  program that also wants other frames drives the port itself. An empty
+  datagram, a fragment, and IP options are passed over. A datagram that
+  comes while one is held is dropped: a program reads the one held
+  before the next poll, or loses the next. A call with no room, 0 bytes,
+  copies nothing and leaves the datagram held, so no datagram is lost to
+  it. The queue holds 4 frames
   ([nice_cpu's SYSTEM.md §7](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#7-ethernet-frames)), so a program that receives a burst reads it
   soon.
 

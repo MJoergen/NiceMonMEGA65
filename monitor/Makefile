@@ -174,6 +174,14 @@ $(BUILD)/udp.bin: $(BUILD)/monitor_test.bin test/udp.nasm
 	@$(ASM) -o $(BUILD)/udp_full.bin $(BUILD)/udp_all.nasm
 	@grep -v '^0000[0-7]' $(BUILD)/udp_full.bin > $@
 
+# The tests of the network's entries of issue #111: test/net.nasm, the
+# poll, the IP settings, and the datagram held, and test/netdhcp.nasm,
+# net_dhcp, which test/dhcp.py runs, both built as udp.bin is
+$(BUILD)/net.bin $(BUILD)/netdhcp.bin: $(BUILD)/%.bin: $(BUILD)/monitor_test.bin test/%.nasm
+	@cat $(BUILD)/monitor_test_all.nasm test/$*.nasm > $(BUILD)/$*_all.nasm
+	@$(ASM) -o $(BUILD)/$*_full.bin $(BUILD)/$*_all.nasm
+	@grep -v '^0000[0-7]' $(BUILD)/$*_full.bin > $@
+
 # The test of the file entries, test/fs.nasm, at 0x8000, which calls them
 # through the stubs of mon.nasm, as hello.nasm does
 $(BUILD)/fs.bin: test/fs.nasm mon.nasm $(TOOLS) | $(BUILD)
@@ -363,6 +371,9 @@ DUMP_rom      = -d 0x9100:10
 # sources that udp_recv wrote
 DUMP_arp      = -d 0x9100:37
 DUMP_udp      = -d 0x9100:20 -d 0x9180:14
+# For net the results of test/net.nasm's calls, the words of net_config,
+# and the bytes and the sources that udp_recv wrote
+DUMP_net      = -d 0x9100:24 -d 0x9180:8 -d 0x9190:16
 MAX_STEPS = 10000000
 # The first sector of fat32.img's FAT32 partition (test/fat_image.py), and
 # its byte offset, for mtools
@@ -384,15 +395,18 @@ FAT32_START_BYTES = $(shell echo $$(($(FAT32_START) * 512)))
 # test/tftp.py tftp, and test/rtc.py the cold start and time on the words
 # of an I2C master that it sets, as a real-time clock. arp and udp run
 # with --step-time, as their timeouts
-# count, and the frames they send are added to their output.
+# count, and so does net, and the frames they send are added to their
+# output.
 test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.bin $(BUILD)/hello.bin \
-      $(BUILD)/dis.bin $(BUILD)/sd.bin $(BUILD)/arp.bin $(BUILD)/udp.bin $(BUILD)/rom.bin $(BUILD)/fs.bin $(BUILD)/fsw.bin \
+      $(BUILD)/dis.bin $(BUILD)/sd.bin $(BUILD)/arp.bin $(BUILD)/udp.bin $(BUILD)/net.bin \
+      $(BUILD)/netdhcp.bin $(BUILD)/rom.bin $(BUILD)/fs.bin $(BUILD)/fsw.bin \
       $(FAT_IMAGES) $(BUILD)/version_test.nasm
 	@test '$(FOLDER_UC)' = NICE || { echo "make test needs FOLDER=NICE, not $(FOLDER)"; exit 1; }
 	@$(PYTHON) test/ring.py $(EMU) $(BUILD)/monitor_test.bin:32768 \
 	  $(BUILD)/monitor_8k.bin:8192 $(BUILD)/monitor_2k.bin:2048
 	@$(PYTHON) test/dis.py $(EMU) $(BUILD)/monitor_test.bin $(BUILD)/dis.bin
-	@$(PYTHON) test/dhcp.py $(EMU) $(BUILD)/monitor_test.bin test/dhcp.expected $(BUILD)/dhcp.out
+	@$(PYTHON) test/dhcp.py $(EMU) $(BUILD)/monitor_test.bin $(BUILD)/netdhcp.bin \
+	  test/dhcp.expected $(BUILD)/dhcp.out
 	@$(PYTHON) test/tftp.py $(EMU) $(BUILD)/monitor_test.bin test/tftp.expected $(BUILD)/tftp.out
 	@$(PYTHON) test/rtc.py $(EMU) $(BUILD)/monitor_test.bin
 	@$(ROMSIZE)
@@ -418,7 +432,7 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	@$(PYTHON) test/sd_image.py --written $(BUILD)/sd_written.img
 	@{ printf '$(LOAD_HEAD)'; head -n 3 $(BUILD)/hello.bin | awk '{ printf "%s\r\n", $$0 }'; \
 	  tail -n +4 $(BUILD)/hello.bin; printf '$(LOAD_TAIL)'; } > $(BUILD)/load.txt
-	@fail=0; for t in cmds scroll load load_emu load_64k sd_write arp udp rom fs fsw fat fatw fatl fatlw fatbad fat1 fatnone time \
+	@fail=0; for t in cmds scroll load load_emu load_64k sd_write arp udp net rom fs fsw fat fatw fatl fatlw fatbad fat1 fatnone time \
 	           hello reset hello_c; do \
 	  opts=; rom=$(BUILD)/monitor_test.bin; \
 	  case $$t in \
@@ -433,6 +447,8 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	      opts="--step-time --eth-in test/arp.eth --eth-out $(BUILD)/arp.eth.out";; \
 	    udp) prog=$(BUILD)/udp.bin; input=run; dump='$(DUMP_udp)'; \
 	      opts="--step-time --eth-in test/udp.eth --eth-out $(BUILD)/udp.eth.out";; \
+	    net) prog=$(BUILD)/net.bin; input=run; dump='$(DUMP_net)'; \
+	      opts="--step-time --eth-in test/net.eth --eth-out $(BUILD)/net.eth.out";; \
 	    rom) prog=; rom=$(BUILD)/rom.bin; input=rom; dump='$(DUMP_rom)';; \
 	    fs) prog=$(BUILD)/fs.bin; input=run; dump='$(DUMP_fs)'; \
 	      opts="--sd0 $(BUILD)/fat/fat32.img --sd1 $(BUILD)/fat/super.img";; \
@@ -469,7 +485,8 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	    echo "exit $$status"; \
 	    if [ $$t = sd_write ]; then cmp $(BUILD)/sd_written.img $(BUILD)/sd_write.img 2>&1 \
 	      && echo "The image as test/sd_image.py --written makes it"; fi; \
-	    if [ $$t = arp ] || [ $$t = udp ]; then echo "Frames sent:"; cat $(BUILD)/$$t.eth.out; fi; \
+	    if [ $$t = arp ] || [ $$t = udp ] || [ $$t = net ]; then \
+	      echo "Frames sent:"; cat $(BUILD)/$$t.eth.out; fi; \
 	    if [ $$t = fsw ]; then \
 	      $(PYTHON) test/fat_check.py $(BUILD)/fsw0.img --start $(FAT32_START) NEW.TXT HELLO.BIN DROP.TXT; \
 	      cmp $(BUILD)/fat/super.img $(BUILD)/fsw1.img && echo "Slot 1's card as it was"; fi; \
@@ -507,7 +524,7 @@ romsize: $(BUILD)/monitor_test.bin $(BUILD)/version_test.nasm
 # The layout of the sources, as nice_cpu's nicefmt checks it
 fmt:
 	@$(FMT) $(SOURCES) test/hello.nasm test/dis.nasm test/sd.nasm test/arp.nasm test/rom.nasm \
-	  test/fs.nasm test/fsw.nasm test/udp.nasm
+	  test/fs.nasm test/fsw.nasm test/udp.nasm test/net.nasm test/netdhcp.nasm
 
 $(BUILD):
 	@mkdir -p $@
