@@ -11,12 +11,13 @@ be those of the build's .bin, or it fails, so a label never moves a
 word.
 
   romsize.py monitor --bin B --c C [--c C...] --doc D [--write] SOURCES...
-      the monitor's table; SOURCES are the files that the monitor's
-      Makefile joins, in its order, rom_c.nasm among them, and C the
-      files of ROM_C, which split rom_c.nasm's functions
-  romsize.py demo --bin B --monitor M --demo-at A --doc D [--write] SOURCES...
-      the demo's table, and the table of the ROM, with the monitor's
-      .bin M and the address A of the demo's number of words
+      the monitor's table, and the table of the ROM; SOURCES are the
+      files that the monitor's Makefile joins, in its order, rom_c.nasm
+      among them, and C the files of ROM_C, which split rom_c.nasm's
+      functions
+  romsize.py demo --bin B --doc D [--write] SOURCES...
+      the demo's table, of demo.bin, which is not in the ROM (#129), in
+      demo/README.md
 
 Without --write, it compares the tables with those in D, and exits with
 1 when they differ: make -C monitor test and make -C demo test run it
@@ -248,7 +249,15 @@ def monitor_tables(args: argparse.Namespace) -> dict[str, list[str]]:
         for line in open(path):
             marker.line(line)
     parts = marker.measure(args.bin)
-    return {"monitor": table(parts)}
+    monitor_end = max(a for a, _ in words(args.bin)) + 1
+    rom = 0x8000
+    layout = [
+        "| Part | Address | Words |",
+        "|---|---|---:|",
+        f"| The monitor | `0x0000`–`0x{monitor_end - 1:04X}` | {monitor_end} |",
+        f"| Free | `0x{monitor_end:04X}`–`0x{rom - 1:04X}` | {rom - monitor_end} |",
+    ]
+    return {"layout": layout, "monitor": table(parts)}
 
 
 def demo_tables(args: argparse.Namespace) -> dict[str, list[str]]:
@@ -290,26 +299,12 @@ def demo_tables(args: argparse.Namespace) -> dict[str, list[str]]:
         p.words for p in parts if any(p.source.endswith(f"`{c}`") for c in code))
     demo_rows = table(parts) + [
         "",
-        f"The code is {n_code} words, and the texts and tables {span - n_code}.",
+        f"The code is {n_code} words, and the texts and tables {span - n_code}. "
+        f"They are at `0x{first:04X}`–`0x{first + span - 1:04X}`, in {len(demo)} "
+        "lines of `demo.bin`, one for each word but the unused ones, which "
+        "the assembler skips.",
     ]
-    monitor_end = max(a for a, _ in words(args.monitor)) + 1
-    at = int(args.demo_at, 0)
-    demo_end = at + 1 + span
-    rom = 0x8000
-    layout = [
-        "| Part | Address | Words |",
-        "|---|---|---:|",
-        f"| The monitor | `0x0000`–`0x{monitor_end - 1:04X}` | {monitor_end} |",
-        f"| Free | `0x{monitor_end:04X}`–`0x{at - 1:04X}` | {at - monitor_end} |",
-        f"| The demo, with its number of words in front | `0x{at:04X}`–`0x{demo_end - 1:04X}` "
-        f"| {span + 1} |",
-        f"| Free | `0x{demo_end:04X}`–`0x{rom - 1:04X}` | {rom - demo_end} |",
-        "",
-        f"Without the demo, {rom - monitor_end} words are free. The demo's words "
-        f"in the ROM are the {span} of `0x{first:04X}`–`0x{first + span - 1:04X}`, "
-        "after the word with their number.",
-    ]
-    return {"layout": layout, "demo": demo_rows}
+    return {"demo": demo_rows}
 
 
 def update(doc: str, tables: dict[str, list[str]], write: bool) -> bool:
@@ -345,15 +340,11 @@ def main() -> None:
     parser.add_argument("--write", action="store_true", help="write the tables into it")
     parser.add_argument("--c", action="append", default=[],
                         help="a C file of rom_c.nasm, once for each")
-    parser.add_argument("--monitor", help="the monitor's .bin, for the demo's table of the ROM")
-    parser.add_argument("--demo-at", help="the address of the demo in the ROM")
     parser.add_argument("sources", nargs="+")
     args = parser.parse_args()
     if args.image == "monitor":
         tables = monitor_tables(args)
     else:
-        if not args.monitor or not args.demo_at:
-            parser.error("demo needs --monitor and --demo-at")
         tables = demo_tables(args)
     ok = update(args.doc, tables, args.write)
     if ok and not args.write:

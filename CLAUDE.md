@@ -49,12 +49,12 @@ header is the authoritative address map.
     make -j formal        # SymbiYosys jobs in formal/, each task in a work directory of its own
     make lint             # vsg against doc/CODING_STYLE.md; line-length warnings are tolerated
     make typecheck        # mypy --strict on the Python files that mypy.ini lists
-    make romsize          # the tables of the ROM's words in monitor/INTERNALS.md, which make -C monitor test and make -C demo test check
+    make romsize          # the tables of the ROM's words in monitor/INTERNALS.md and the demo's in demo/README.md, which make -C monitor test and make -C demo test check
     make diagrams         # src/system.tex and src/eth/eth.tex -> the PNGs of their READMEs (pdflatex)
     make examples         # C examples -> examples/build/*.bin (clang wasm32, lld, llvm)
-    make demo             # nice_cpu's demo at 0x8000 -> demo/build/demo.bin, behind the monitor -> demo/build/rom.bin; make -C demo test runs the join in niceemu
+    make demo             # nice_cpu's demo at 0x8000 -> demo/build/demo.bin, a release asset, not in the ROM (#129); make -C demo test runs it under the monitor in niceemu
     make monitor [FOLDER=NICE] # the monitor -> monitor/build/monitor.bin, its files in the card's folder FOLDER; make -C monitor test runs it in niceemu
-    make r6 [ROM=f.bin]   # Vivado bitstream, synth/r6/build/top.bit, the monitor and the demo (demo/build/rom.bin) in the ROM unless ROM= (none) or ROM=f.bin; make r3 and make nexys4ddr likewise
+    make r6 [ROM=f.bin]   # Vivado bitstream, synth/r6/build/top.bit, the monitor (monitor/build/monitor.bin) in the ROM unless ROM= (none) or ROM=f.bin; make r3 and make nexys4ddr likewise
     make r6 ROMPATCH=f.bin # the ROM alone into the last build's checkpoint, about a minute (synth/rompatch.tcl, #122); r3, nexys4ddr, and cor likewise
     make cor [ROM=f.bin]  # MEGA65 core files for MEGAFLASH, synth/r{3,6}/build/NiceMonMEGA65-r{3,6}.cor (coretool)
     make load FILE=p.bin  # load and start a program on the board (ETH=IP or PORT=/dev/ttyUSB1, one needed); ARGS=--monitor for one at 0x8000 under the ROM's monitor
@@ -162,15 +162,14 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   `bump.py`, `release.py`, `linktest.py`, `tftpd.py` (the TFTP server for
   the monitor's `tftp`, with listings, #95) and `tftptest.py`,
   `cosimtest.py`, `romsize.py` (the tables of the ROM's words in
-  `monitor/INTERNALS.md`, which the tests of the monitor and the demo
-  check), `screenshot.py`
+  `monitor/INTERNALS.md` and the demo's in `demo/README.md`, which the
+  tests of the monitor and the demo check), `screenshot.py`
   (a program's screen in niceemu as a PNG). `examples/`: C programs built through
   nice_cpu's wasm translator. `demo/`: nice_cpu's demo (`nice_cpu/demo`,
   since V1.7), built by its Makefile with the board's `text.nasm`, a
-  program at 0x8000 that `join.py` puts behind the
-  monitor in the ROM of the boards and the release (`release.py`), where
-  the monitor's `x` copies it to 0x8000 and runs it, for the time being
-  (#65), and `demo_hw.py`, which checks it in the ROM of a programmed board.
+  program at 0x8000, `demo.bin`, which the release ships as an asset of
+  its own and the monitor's `load demo.bin` and `r` run; it left the ROM
+  in V2.1 (#129).
   `monitor/`: the monitor for the ROM in NICE assembly (`monitor.nasm`,
   the dispatch table, the HAL, and the map of its RAM, `monitor_cmd.nasm`,
   the main loop and the commands, which BASIC (#54) is to replace, with

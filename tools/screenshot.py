@@ -22,25 +22,26 @@ rows are laid out as src/dbg/dbg.vhd writes them, in the character ROM,
 as the display draws them. niceemu runs the
 program twice, the second time to read the words at the PC.
 
-The pictures of doc/images/ are made from the ROM of the release, the
-monitor and the demo behind it, with its tag, and x and CR first, which
-start the demo:
+The pictures of doc/images/ are made from the monitor of the release
+and the demo at 0x8000 after it, both with its tag, and r and CR first,
+which start the demo:
 
-    make -C demo VERSION=V2.0.1
-    printf 'x\\rHello from the NICE CPU on the MEGA65!\\r' > in.txt
-    tools/screenshot.py -i in.txt -o doc/images/demo.png demo/build/rom.bin
+    make -C monitor VERSION=V2.1 && make -C demo VERSION=V2.1
+    cat monitor/build/monitor.bin demo/build/demo.bin > rom.bin
+    printf 'r\\rHello from the NICE CPU on the MEGA65!\\r' > in.txt
+    tools/screenshot.py -i in.txt -o doc/images/demo.png rom.bin
 
 doc/images/ethernet.png, the demo's F11, with:
 
-    printf 'x\\r\\033[23~i192.168.1.65\\rm02:4E:49:43:45:00\\r' > in.txt
+    printf 'r\\r\\033[23~i192.168.1.65\\rm02:4E:49:43:45:00\\r' > in.txt
     tools/screenshot.py -i in.txt -n 3000000 -o doc/images/ethernet.png \\
-        demo/build/rom.bin
+        rom.bin
 
 and doc/images/debugger.png, the typewriter paused under the strip once
 the line of the first in.txt is typed, with:
 
-    tools/screenshot.py -i in.txt -n 35587 --debugger \\
-        -o doc/images/debugger.png demo/build/rom.bin
+    tools/screenshot.py -i in.txt -n 20476 --debugger \\
+        -o doc/images/debugger.png rom.bin
 
 Usage:
     tools/screenshot.py [-i FILE] [-n N] [--debugger] [-o FILE.png] FILE.bin

@@ -163,8 +163,6 @@ WASM_END        .EQU    0xFFFFFF00      ; up to below here, the I/O page, which 
 
 PROGRAM         .EQU    0x8000          ; where a program is, above the ROM
 VARS_WORDS      .EQU    0x1000          ; the words from 0xFFFFF000, the variables, which end a program's RAM
-DEMO            .EQU    0x6000          ; the demo's words in the ROM, after their number
-DEMO_MAX        .EQU    PROGRAM-DEMO    ; more words than fit from DEMO + 1 below the RAM
 COLOR           .EQU    0x000FFF00      ; white on black, the color at the cold start
 OUT_LINE        .EQU    1
 OUT_SCREEN      .EQU    2

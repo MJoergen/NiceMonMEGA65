@@ -16,16 +16,14 @@
 ; program at its address, or at 0x8000, as a subroutine, with R1 = the
 ; entry of mon_putc, R2 = 0, R3 = 0, and E = 0 (ABI.md, "Programs under a
 ; monitor"), and at its return goes to mon_exit, which goes back to main.
-; x copies the demo from the ROM to 0x8000 and runs it as r does, for the
-; time being (issue #65). dir lists the folder NICE of an SD card's FAT32
-; file system, load NAME reads a .bin file from it as l reads lines, save
-; NAME ADDR N writes one, and del NAME deletes a file, with fat32.c, the
-; ROM's C code, whose functions are also the entries 9 to 15, fs_mount,
-; fs_open, fs_read, fs_readdir, fs_close, fs_write, and fs_delete (issues
-; #58 and #59). time shows the clock of the time of day, or sets it, with
-; clock.c (issue #109). The commands u, i dhcp, and tftp are in
-; monitor_dis.nasm and monitor_eth.nasm, and use the routines of this
-; file.
+; dir lists the folder NICE of an SD card's FAT32 file system, load NAME
+; reads a .bin file from it as l reads lines, save NAME ADDR N writes one,
+; and del NAME deletes a file, with fat32.c, the ROM's C code, whose
+; functions are also the entries 9 to 15, fs_mount, fs_open, fs_read,
+; fs_readdir, fs_close, fs_write, and fs_delete (issues #58 and #59). time
+; shows the clock of the time of day, or sets it, with clock.c (issue
+; #109). The commands u, i dhcp, and tftp are in monitor_dis.nasm and
+; monitor_eth.nasm, and use the routines of this file.
 
 RAM_WORDS       .EQU    0xFFFFFF9E      ; the words of the RAM, 0 in niceemu, where there is no limit
 UART_BAUD       .EQU    0xFFFFFF9F      ; the UART's baud rate in bit/s, memory in niceemu
@@ -902,43 +900,12 @@ load_row
                 MOVE    @V_ROW, R7
                 JMP     putc_cur
 
-; x: the demo, for the time being (issue #65, README.md). The ROM has its
-; number of words at DEMO, and the words after it, which are copied to
-; 0x8000 and run as r runs a program. A number of 0, or one too big for
-; the ROM, is no demo. The demo, nice_cpu's, clears the screen at its
-; return, and leaves the timer stopped and E clear, but the cursor of
-; V_COL and V_ROW is the monitor's, so scr_cls sets it again before
-; mon_exit. The copy and x go when the demo goes.
-cmd_demo
-                MOVE[M] R1, @DEMO       ; the words left
-        ?Z      JMP     no_demo
-                CMP     R1, DEMO_MAX
-        ?!C     JMP     no_demo
-                MOVE    R2, DEMO+1
-                MOVE    R3, PROGRAM
-:
-                MOVE    @R3++, @R2++
-                SUB[M]  R1, R1, 1
-        ?!Z     JMP     :-
-                MOVE    R1, MON_PUTC    ; as run_at calls a program
-                MOVE    R2, 0
-                MOVE    R3, 0
-                CALL    PROGRAM
-                PUSH    R1              ; the status
-                CALL    scr_cls
-                POP     R1
-                JMP     mon_exit
-no_demo         MOVE    R1, S_NODEMO
-                CALL    puts_crlf
-                JMP     main
-
 ; r [ADDR]: the program at ADDR, 0x8000 without it, called as ABI.md
 ; says, on this stack: the return address is pushed, and the program
 ; returns with RET and its status in R1. A word of 0 at ADDR is no
 ; program: it is NOP, which no start-up code begins with. r 0 is entry 0
 ; of the dispatch table, the cold start. At the program's return, its
-; status goes to mon_exit. run_at is the call, with R7 the address; x
-; calls the demo itself, as run_at calls a program.
+; status goes to mon_exit. run_at is the call, with R7 the address.
 cmd_run
                 MOVE    R1, R2
                 CALL    _io_gethex      ; R1 the address, R2 its digits
@@ -1009,7 +976,6 @@ COMMANDS
                 .DAT    0x74, cmd_t     ; t, for time and tftp
                 .DAT    0x75, cmd_dis   ; u
                 .DAT    0x76, cmd_version  ; v
-                .DAT    0x78, cmd_demo  ; x
                 .DAT    0
 
 S_NAME          .ASCII_L 'NiceMon '
@@ -1023,8 +989,6 @@ S_HALTED
                 .ASCII_L 'Halted'
 S_NOPROG
                 .ASCII_L 'No program at '
-S_NODEMO
-                .ASCII_L 'No demo in the ROM'
 S_IP            .ASCII_L 'IP address '
 S_MAC           .ASCII_L 'MAC address '
 S_BAUD          .ASCII_L 'Baud rate '
@@ -1089,7 +1053,7 @@ E_FS30          .ASCII_L 'the card or the folder is full'
 E_FS31          .ASCII_L 'the file is open'
 E_FS32          .ASCII_L 'the file is read-only'
 
-HELP            .DAT    H_R, H_L, H_LOAD, H_SAVE, H_DEL, H_TFTP, H_TFTPL, H_X, H_D, H_U
+HELP            .DAT    H_R, H_L, H_LOAD, H_SAVE, H_DEL, H_TFTP, H_TFTPL, H_D, H_U
                 .DAT    H_DIR, H_I, H_ID, H_M, H_B, H_T, H_C, H_V, H_H, H_Q, H_P, H_PG, 0
 H_R             .ASCII_L 'r [ADDR]      run the program at ADDR, or at 00008000; r 0 restarts'
 H_L             .ASCII_L 'l             enter lines of ADDR WORD in hex, as a .bin file has them'
@@ -1098,7 +1062,6 @@ H_SAVE          .ASCII_L 'save NAME A N save N words from A, both in hex, as the
 H_DEL           .ASCII_L 'del NAME      delete the file NAME of the SD card'
 H_TFTP          .ASCII_L 'tftp IP NAME  load the .bin file NAME from the TFTP server at IP'
 H_TFTPL         .ASCII_L 'tftp IP [PAT] list the files of tools/tftpd.py at IP, or those of PAT'
-H_X             .ASCII_L 'x             run the demo of the ROM, which F12 leaves'
 H_D             .ASCII_L 'd [ADDR] [N]  show N words from ADDR, in hex, or the next ones'
 H_U             .ASCII_L 'u [ADDR] [N]  disassemble N instructions from ADDR, or the next ones'
 H_DIR           .ASCII_L 'dir [SLOT]    list the files of the SD card in SLOT, or of the card mounted'

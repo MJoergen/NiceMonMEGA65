@@ -19,8 +19,9 @@ The ROM at `0x0000`–`0x7FFF`, which the core boots from, holds:
   table at the start of the ROM. It is not a library: what a program can
   do for itself stays in the program.
 - the monitor's main loop with a few commands.
-- the demo, behind the monitor, which the command `x` runs, for the time
-  being (The demo below).
+
+The rest of the ROM is free. The demo is no longer in it, but a program
+of its own (The demo below).
 
 The monitor's variables are in the RAM at `0xFFFFF000` and up, and its
 stack grows down from there ([SYSTEM.md](../doc/SYSTEM.md#stack-heap-and-variables)).
@@ -63,12 +64,12 @@ tests.
 
 The monitor is in NICE assembly, with FAT32 and the clock in C. The ROM
 is its files in this order, and the words of each are those of the build
-of 2026-11-11:
+of 2026-11-11, less the command `x` and its copy of the demo (#129):
 
 | File | What it is | Words |
 |---|---|---:|
 | `monitor.nasm` | The dispatch table, the HAL, the screen, and the line with its scrollback | 696 |
-| `monitor_cmd.nasm` | The main loop and the commands, which BASIC is to replace | 4070 |
+| `monitor_cmd.nasm` | The main loop and the commands, which BASIC is to replace | 3949 |
 | `monitor_dis.nasm` | The disassembler of `u` | 1079 |
 | `monitor_sd.nasm` | The routines for the SD cards | 390 |
 | `monitor_eth.nasm` | The routines for the network | 1856 |
@@ -78,7 +79,7 @@ of 2026-11-11:
 | `clock.c` | The `time` command, the dates of files, and the real-time clock | 1199 |
 | nice_cpu's `lib.nasm` and `muldiv_mpu.nasm` | The runtime of the C code | 259 |
 | `build/version.nasm` and `build/folder.nasm` | The version and the card's folder, which the Makefile writes | 49 |
-| | All of the monitor, of the 24576 words below the demo at `0x6000` | 19342 |
+| | All of the monitor, of the ROM's 32768 words | 19221 |
 
 `mon.h` has the entries' declarations for C, and is no part of the ROM.
 
@@ -233,7 +234,6 @@ offset, so there the history is kept but not shown.
 | `del NAME` | Deletes the file `NAME` of the card's folder `NICE`, its long name or its 8.3 name, as for `load`, with its long-name entries, if it has them, and prints `Deleted NAME`. |
 | `tftp IP NAME` | Loads the `.bin` file `NAME` from the TFTP server at the IP address `IP`, such as `tftp 192.168.1.10 hello.bin`, as `load` loads one from the card, and prints the same summary (The network below). `IP:PORT` sends the request to `PORT` instead of 69. It needs an IP address, from `i`. Without an answer, it prints `No answer from the TFTP server` after about 5 seconds; an error of the server is shown with its code and its message: `TFTP error 1, File not found`. |
 | `tftp IP [PAT]` | Lists the files of the server `tools/tftpd.py` at `IP` whose names match the pattern `PAT`, with `*` and `?`, such as `tftp 192.168.1.10 *.bin`, a line each with the name and the size; without `PAT`, all of them. Another server answers with an error. |
-| `x` | Runs the demo of the ROM, for the time being (The demo below). Without a demo in the ROM, `x` says so. |
 | `h` | Halts the core, which the reset button, or a host over the link, starts again. The tests end with it. |
 | `?` | Lists the commands, and the keys of the history. |
 
@@ -582,17 +582,11 @@ is faster, as it writes the words into the memory.
 
 ## The demo
 
-The demo is nice_cpu's, and a BASIC interpreter will take its place in
-the ROM. Until then, the ROM of the boards and of the release has the
-demo behind the monitor, and `x` runs it. The demo is a program
-assembled at `0x8000` ([demo/](../demo/README.md)), and `demo/join.py`
-puts it in the ROM at `DEMO`, `0x6000`: the number of its words first,
-then the words. `x` copies them to `0x8000` and runs them as `r` runs a
-program, and the demo's F12 returns. The demo clears the screen before
-it returns, and leaves the cursor at the top left, but the monitor keeps
-a cursor of its own, so `x` calls `scr_cls` after the return, and then
-goes on as at `mon_exit`. A number of 0, as in the ROM of the monitor
-alone and in `niceemu` without the demo, is no demo, and so is one that
-would not fit below `0x8000`. Neither the copy nor the demo has an entry
-in the dispatch table, and both go when the demo goes; `release.py` and
-`demo_hw.py` follow.
+The demo is nice_cpu's, built with the boards' text
+([demo/](../demo/README.md)). It is a program at `0x8000`, `demo.bin`,
+which each release has as a file of its own. Copied into the card's
+folder `NICE`, `load demo.bin` and `r` run it, and its F12 returns to the
+monitor with `Returned 00000000`. `tftp` loads it too, and so does
+`tools/load.py --monitor`. Up to V2.0.1 it was in the ROM, behind the
+monitor, and the command `x` ran it; it left the ROM to make room for
+the network of #111 and for BASIC (#129).

@@ -33,23 +33,21 @@ help:
 	@echo "  make typecheck  mypy --strict on the Python tools and scripts (needs mypy)"
 	@echo "  make diagrams   render the block diagrams, src/*.tex and src/eth/*.tex, to PNG"
 	@echo "                  (needs pdflatex and pdftoppm)"
-	@echo "  make romsize    write the tables of the ROM's words into"
-	@echo "                  monitor/INTERNALS.md, which make test checks"
+	@echo "  make romsize    write the tables of the ROM's and the demo's words into"
+	@echo "                  monitor/INTERNALS.md and demo/README.md, which make test checks"
 	@echo "  make examples   build the C examples to examples/build/*.bin (needs clang)"
-	@echo "  make demo       build the ROM's demo, and the monitor with the demo"
-	@echo "                  behind it, demo/build/rom.bin, the default ROM of the"
-	@echo "                  boards' targets"
+	@echo "  make demo       build the demo, demo/build/demo.bin, a program at 0x8000"
+	@echo "                  under the monitor"
 	@echo "  make monitor [FOLDER=NICE]"
-	@echo "                  build the monitor to monitor/build/monitor.bin, for a"
-	@echo "                  board's target with ROM=monitor/build/monitor.bin; its"
-	@echo "                  files are in the SD card's folder FOLDER, which a"
-	@echo "                  board's target takes too"
+	@echo "                  build the monitor to monitor/build/monitor.bin, the"
+	@echo "                  default ROM of the boards' targets; its files are in the"
+	@echo "                  SD card's folder FOLDER, which a board's target takes too"
 	@echo "  make r3 [ROM=prog.bin]"
 	@echo "                  build the bitstream for the MEGA65 R3 (needs Vivado)"
 	@echo "  make r6 [ROM=prog.bin]"
 	@echo "                  build the bitstream for the MEGA65 R6; the core boots"
-	@echo "                  at reset from the .bin file, the monitor and the demo"
-	@echo "                  by default, and ROM= (empty) leaves it held for the link"
+	@echo "                  at reset from the .bin file, the monitor by default,"
+	@echo "                  and ROM= (empty) leaves it held for the link"
 	@echo "  make nexys4ddr [ROM=prog.bin]"
 	@echo "                  build the bitstream for the Digilent Nexys4DDR, with"
 	@echo "                  the ROM as for r6"
@@ -122,8 +120,8 @@ test:
 	$(MAKE) -C demo test
 	$(MAKE) -C monitor test
 
-# The tables of the ROM's words in monitor/INTERNALS.md: the monitor's
-# first, as the demo's table of the ROM takes its words
+# The tables of the ROM's words in monitor/INTERNALS.md, and of the
+# demo's in demo/README.md
 romsize:
 	$(MAKE) -C monitor romsize
 	$(MAKE) -C demo romsize
@@ -194,41 +192,41 @@ demo:
 monitor:
 	$(MAKE) -C monitor
 
-# The boards' ROM: the monitor with the demo behind it, demo/build/rom.bin,
-# built first, unless ROM is given; ROM= (empty) builds the bitstream
-# without a ROM, whose core waits, held, for the link. The path is made
-# absolute here, for the board's Makefile runs in its own directory. A
-# given ROM=demo/build/rom.bin is not built again, so that the release's
+# The boards' ROM: the monitor, monitor/build/monitor.bin, built first,
+# unless ROM is given; ROM= (empty) builds the bitstream without a ROM,
+# whose core waits, held, for the link. The path is made absolute here,
+# for the board's Makefile runs in its own directory. A given
+# ROM=monitor/build/monitor.bin is not built again, so that the release's
 # ROM keeps its tag (tools/release.py).
 # ROMPATCH=file.bin puts file.bin into the ROM of the board's last build
 # instead, in about a minute (rompatch in synth/Makefile.inc, issue 122).
 ifneq ($(ROMPATCH),)
 BOARD_ROM  = $(abspath $(ROMPATCH))
-BUILD_DEMO = @true
+BUILD_ROM  = @true
 BOARD_GOAL = rompatch
 else ifeq ($(origin ROM),undefined)
-BOARD_ROM  = $(abspath demo/build/rom.bin)
-BUILD_DEMO = $(MAKE) -C demo
+BOARD_ROM  = $(abspath monitor/build/monitor.bin)
+BUILD_ROM  = $(MAKE) -C monitor
 else
 BOARD_ROM  = $(if $(ROM),$(abspath $(ROM)))
-BUILD_DEMO = @true
+BUILD_ROM  = @true
 endif
 
 r3:
-	$(BUILD_DEMO)
+	$(BUILD_ROM)
 	$(MAKE) -C synth/r3 $(BOARD_GOAL) ROM=$(BOARD_ROM)
 
 r6:
-	$(BUILD_DEMO)
+	$(BUILD_ROM)
 	$(MAKE) -C synth/r6 $(BOARD_GOAL) ROM=$(BOARD_ROM)
 
 nexys4ddr:
-	$(BUILD_DEMO)
+	$(BUILD_ROM)
 	$(MAKE) -C synth/nexys4ddr $(BOARD_GOAL) ROM=$(BOARD_ROM)
 
 # The core files of the MEGA65 boards, from their bitstreams (synth/Makefile.inc)
 cor:
-	$(BUILD_DEMO)
+	$(BUILD_ROM)
 	$(MAKE) -C synth/r3 $(BOARD_GOAL) cor ROM=$(BOARD_ROM)
 	$(MAKE) -C synth/r6 $(BOARD_GOAL) cor ROM=$(BOARD_ROM)
 

@@ -25,6 +25,15 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 
 **Upgrade notes.**
 
+- The demo is no longer in the ROM, and the monitor's `x` is gone
+  ([#129](https://github.com/MJoergen/NiceMonMEGA65/issues/129)). The
+  demo is `demo.bin`, a file of the release: copy it into the folder
+  `NICE` of an SD card, and type `load demo.bin` and then `r`. F12
+  returns to the monitor as before. The ROM has 13430 words free, where
+  it had 5117 below the demo, for the network of #111 and for BASIC.
+- `make demo` builds `demo/build/demo.bin` alone, and the boards'
+  targets put the monitor alone in the ROM, `monitor/build/monitor.bin`.
+  `demo/join.py`, `demo/build/rom.bin`, and `demo/demo_hw.py` are gone.
 - Each kind of board has a MAC address of its own after reset:
   `02:4E:49:43:45:03` on the R3, `02:4E:49:43:45:06` on the R6, and
   `02:4E:49:43:45:0A` on the Nexys4DDR, where all three had

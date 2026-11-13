@@ -2,7 +2,7 @@ Screen:
 | NiceMonMEGA65 V9.9                            the 32-bit NICE CPU of B. Ulmann
 | F1 typewriter   F3 key codes   F5 charset   F7 counters   F9 comet   F11 board
 |
-|  This is the demo of the ROM, which the monitor starts with x. What you type
+|  This is the demo, a program that the monitor runs with r. What you type
 |  on the keyboard, or send to the console, appears below the blue bar.
 |
 |  To run your programs, give the board an IP address with i in the monitor,
@@ -11,6 +11,9 @@ Screen:
 | RETURN new line   DEL delete   cursor keys move   CTRL-L clear   F12 monitor
 |Hello, NiceMonMEGA65!
 Screen:
+|
+|
+|
 |Returned 00000000
 |> v
 |NiceMon V9.9, dispatch table 1.4

@@ -2,12 +2,12 @@
 
 [![CI](https://github.com/MJoergen/NiceMonMEGA65/actions/workflows/ci.yml/badge.svg)](https://github.com/MJoergen/NiceMonMEGA65/actions/workflows/ci.yml)
 
-The NICE CPU on the MEGA65, with a monitor and a demo in its ROM, and remote control from a PC
+The NICE CPU on the MEGA65, with a monitor in its ROM, and remote control from a PC
 
 ![The demo's welcome screen](doc/images/demo.png)
 
-The demo in the ROM (see [demo/](demo/README.md)), drawn from the
-emulator by `tools/screenshot.py`.
+The demo (see [demo/](demo/README.md)), a program that comes with each
+release, drawn from the emulator by `tools/screenshot.py`.
 
 This project runs the [NICE CPU](https://github.com/MJoergen/nice_cpu) on
 the [MEGA65](https://mega65.org/) (R3 and R6), a modern FPGA computer in
@@ -61,8 +61,11 @@ There are three ways to use the system:
    on. MEGAFLASH, the MEGA65's core menu, appears. Let it write the core
    file into a free slot of the flash.
 3. Start the system from that slot. The screen shows the monitor's
-   banner and its prompt, `> `. Type `?` and RETURN for the commands, or
-   `x` and RETURN for the demo (see [On its own](#on-its-own)).
+   banner and its prompt, `> `. Type `?` and RETURN for the commands.
+4. For the demo, download `demo.bin` from the same release, and copy it
+   into the folder `NICE` of an SD card (see [The SD cards](#the-sd-cards)).
+   Put the card in the board, and type `load demo.bin` and RETURN, then
+   `r` and RETURN.
 
 ## On its own
 
@@ -78,7 +81,6 @@ prompt, `> `, and takes a command on each line:
 | `r` | Runs the program that was loaded |
 | `save NAME ADDR N` | Saves N words of memory, from ADDR on, to the SD card |
 | `l` | Loads a program that you type or paste, as the lines of its `.bin` file |
-| `x` | Runs the demo |
 
 [monitor/README.md](monitor/README.md#the-commands) has the others,
 such as `d`, which shows memory, and `u`, which disassembles it.
@@ -89,9 +91,10 @@ program has 92K words of RAM on the MEGA65, `0x8000` to `0x1EFFF`, and
 client on the Ethernet port, or a terminal on the serial port
 ([monitor/README.md](monitor/README.md#loading-without-a-host)).
 
-Until a BASIC interpreter takes its place, the ROM also holds a
-[demo](demo/README.md). It shows the version and how to go further, and
-below that it is a typewriter: what you type appears on the screen.
+Each release comes with a [demo](demo/README.md), `demo.bin`, a
+program for the monitor: `load demo.bin` and `r` run it from the card.
+It shows the version and how to go further, and below that it is a
+typewriter: what you type appears on the screen.
 RETURN starts a new line, INST/DEL deletes, the cursor keys move the
 cursor, and CTRL-L clears what you typed. The function keys switch
 between the demos that the second row lists, and F12 (SHIFT and F11)

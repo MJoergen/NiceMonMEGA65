@@ -3,17 +3,22 @@
 The demo shows that the core, the keyboard, and the screen work, on a
 MEGA65 with no computer on its debug UART. It is nice_cpu's demo,
 [nice_cpu/demo](https://github.com/MJoergen/nice_cpu/blob/main/demo/README.md),
-with the text of the boards in `text.nasm`. The ROM of every release has
-the monitor ([monitor/](../monitor/README.md)), which the core boots
-from at power-up, and the demo behind it: the monitor's command `x`
-copies the demo to `0x8000` and runs it there, as `r` runs a program,
-and F12 returns to the monitor. This is for the time being: a BASIC
-interpreter will take its place in the ROM.
+with the text of the boards in `text.nasm`. It is a program at `0x8000`,
+`demo.bin`, which each release has as a file of its own. It is not in
+the ROM (#129). To run it on its own:
+
+1. Copy `demo.bin` into the folder `NICE` of an SD card.
+2. Put the card in the board, and type `load demo.bin` and then `r` in
+   the monitor ([monitor/](../monitor/README.md)).
+3. F12 returns to the monitor.
+
+`tftp IP demo.bin` loads it from a TFTP server instead, and
+`tools/load.py --monitor demo.bin` from a PC.
 
 The demo's source, its documentation, and its tests are in nice_cpu, so a
 change to it reaches the boards only with a tag of nice_cpu
 ([doc/RELEASE.md](../doc/RELEASE.md)). This directory has the board's
-text, the join behind the monitor, and the check on a board.
+text, and the test under the monitor.
 
 ## On the boards
 
@@ -52,50 +57,68 @@ has what each demo shows and how it works. On the boards:
 
 ## Building and testing
 
-    make -C demo                  # build/demo.bin, and build/rom.bin for the ROM
-    make r6                       # the bitstream, with build/rom.bin in its ROM
-    make -C demo test             # the join, in niceemu, compared with test.expected
+    make -C demo                  # build/demo.bin
+    make -C demo test             # under the monitor, in niceemu, compared with test.expected
 
 The Makefile builds the demo with nice_cpu's `demo/Makefile`, with
 `TEXT=` this directory's `text.nasm`, and its output in `build/`. The
 version in the title bar is `git describe --tags --always --dirty` of
 this repository, or `VERSION=` on the command line, which
-`tools/release.py` sets to the tag; the monitor's banner gets the same.
-The demo is assembled from `0x8000` into `build/demo.bin`. `join.py`
-then puts the monitor, `monitor/build/monitor.bin`, and the demo into
-the ROM's image, `build/rom.bin`: at the monitor's `DEMO`, `0x6000`, the
-number of the demo's words, and the words after it, which `x` copies to
-`0x8000`. It fails if the monitor reaches `DEMO`, or the demo does not
-fit the ROM.
+`tools/release.py` sets to the tag. The demo is assembled from `0x8000`
+into `build/demo.bin`.
 
 The test builds the demo with the version `V9.9` into
-`build/test/demo_test.bin`, joins it behind the monitor's test,
-`monitor/build/monitor_test.bin`, into `build/rom_test.bin`, and runs that
-in `niceemu` twice. The first input runs the demo with `x` and types a
-line, so the screen has the board's text, and the second goes back to
-the monitor with F12, and shows its version with `v` and halts it with
-`h`. The screens are in `test.expected`. nice_cpu's own test checks the
-demos themselves, behind a stand-in for a monitor.
-`build/rom_fail.bin` has a demo with a wrong word in the math unit's
-test, which shows how a failure of F11 looks.
+`build/test/demo_test.bin`, puts it after the monitor's test,
+`monitor/build/monitor_test.bin`, into `build/test/monitor_demo.bin`, and
+runs that in `niceemu` twice. The first input runs the demo with `r` and
+types a line, so the screen has the board's text, and the second goes
+back to the monitor with F12, and shows its version with `v` and halts
+it with `h`. The screens are in `test.expected`. nice_cpu's own test
+checks the demos themselves, behind a stand-in for a monitor.
 
-The ROM's image runs in `niceemu` like any program, at address 0:
+The two run in `niceemu` like any program, from address 0:
 
-    niceemu --screen -i demo/build/test1.txt demo/build/rom_test.bin
+    niceemu --screen -i demo/build/test1.txt demo/build/test/monitor_demo.bin
 
 `tools/hwtest.py`, and so `make linktest` and `make cosimtest`, run
-`build/rom_test.bin` with `x` and a few keys through `run.py`, and
-compare its registers and screen with `niceemu`'s, and run F11's
-self-test on the board. They hide the ROM, and run the monitor and the
-demo from the RAM.
+`build/test/monitor_demo.bin` with `r` and a few keys through `run.py`,
+and compare its registers and screen with `niceemu`'s, and run F11's
+self-test on the board.
 
-`demo_hw.py` checks the demo where a release runs it, in the ROM of a
-programmed board:
+## Its words
 
-    demo/demo_hw.py --port /dev/ttyUSB1
+The demo's parts, in the order of the source, each from the label that
+starts it. It is nice_cpu's `demo/demo.nasm`, with this directory's
+`text.nasm` and `build/version.nasm` joined after it. The column "Text"
+counts the words of the `.ASCII_L` strings, one character a word, which
+are part of "Words". `make -C demo test` checks the table, and `make
+romsize` writes it (`tools/romsize.py`).
 
-It boots the core from the ROM, types `x` and CR into the monitor over
-the UART, compares the demo's welcome and the cursor with `niceemu`'s,
-types keys into the demo over the UART, and compares all 2000
-words of the screen and the cursor again. It prints the screen, and leaves
-the demo running.
+<!-- romsize demo -->
+| Source | What it is | Words | Text |
+|---|---|---:|---:|
+| `demo.nasm`, from `0x8000` | The entry, the vector of the timer's interrupt at `0x8041`, and the unused words before it | 66 | 0 |
+| `demo.nasm`, `TYPEW` | F1, the typewriter, with `CELL`, `FILL`, and `PRINT`, which the other demos call too | 216 | 0 |
+| `demo.nasm`, `KCODES` | F3, the key codes | 118 | 0 |
+| `demo.nasm`, `CHARS` | F5, the characters and the colors | 101 | 0 |
+| `demo.nasm`, `COUNTS` | F7, the counters and the prime sieve, with `DEC64`, which F9 and F11 call too | 409 | 0 |
+| `demo.nasm`, `GAME` | F9, the comet | 333 | 0 |
+| `demo.nasm`, `BOARD` | F11, the self-tests and the network's addresses | 812 | 0 |
+| `demo.nasm`, `MONITOR` | F12, the return to the monitor | 24 | 0 |
+| `demo.nasm`, `POLL` | The keys and their escape sequences, the frame of the screen, and the scroll | 216 | 0 |
+| `demo.nasm`, `FKEYS` | The function keys, the menu, the title bar, and the welcome | 186 | 114 |
+| `demo.nasm`, `K_TEXTS` | The texts of F3 | 273 | 257 |
+| `demo.nasm`, `C_TEXTS` | The texts and the colors of F5 | 230 | 196 |
+| `demo.nasm`, `P_TEXTS` | The texts of F7 | 298 | 240 |
+| `demo.nasm`, `G_TEXTS` | The texts and the steps of F9, and the shifts of F11's MAC address | 113 | 96 |
+| `demo.nasm`, `S_TEXTS` | The texts of F11 | 953 | 910 |
+| `demo.nasm`, `MATH` | The script of F11's test of the math unit | 97 | 0 |
+| `demo/text.nasm` | The board's texts: the name, the welcome, the keys, and the note on the clock | 571 | 571 |
+| `build/version.nasm` | The version in the title bar, the tests' `V9.9` | 5 | 5 |
+| In all | | 5021 | 2389 |
+
+The code is 2295 words, and the texts and tables 2726. They are at `0x8000`–`0x939C`, in 4960 lines of `demo.bin`, one for each word but the unused ones, which the assembler skips.
+<!-- /romsize demo -->
+
+The demo changes only with a tag of nice_cpu, but its version and
+`text.nasm` are this repository's.

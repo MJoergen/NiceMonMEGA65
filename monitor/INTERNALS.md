@@ -129,18 +129,15 @@ than general, as its header says.
 ## The ROM's words
 
 The ROM has 32768 words, at `0x0000`–`0x7FFF`. The monitor fills it
-from 0, and the demo sits at `DEMO`, an `.EQU` of `monitor.nasm`
-([demo/](../demo/)):
+from 0, and the rest is free. The demo is no longer in it (#129): it is
+a program, `demo.bin`, whose words
+[demo/README.md](../demo/README.md#its-words) counts.
 
 <!-- romsize layout -->
 | Part | Address | Words |
 |---|---|---:|
-| The monitor | `0x0000`–`0x4C02` | 19459 |
-| Free | `0x4C03`–`0x5FFF` | 5117 |
-| The demo, with its number of words in front | `0x6000`–`0x73A1` | 5026 |
-| Free | `0x73A2`–`0x7FFF` | 3166 |
-
-Without the demo, 13309 words are free. The demo's words in the ROM are the 5025 of `0x8000`–`0x93A0`, after the word with their number.
+| The monitor | `0x0000`–`0x4B89` | 19338 |
+| Free | `0x4B8A`–`0x7FFF` | 13430 |
 <!-- /romsize layout -->
 
 The monitor's words, by the source they come from, in the order
@@ -152,7 +149,7 @@ the Makefile joins them. The column "Text" counts the words of the
 | Source | What it is | Words | Text |
 |---|---|---:|---:|
 | `monitor.nasm` | The dispatch table, the HAL, the cold start, and the traps | 696 | 27 |
-| `monitor_cmd.nasm` | The main loop and the commands | 4070 | 2469 |
+| `monitor_cmd.nasm` | The main loop and the commands | 3949 | 2394 |
 | `monitor_dis.nasm` | The disassembler of `u` | 1079 | 269 |
 | `monitor_sd.nasm` | The sector routines | 390 | 223 |
 | `monitor_eth.nasm` | The network | 1990 | 286 |
@@ -168,7 +165,7 @@ the Makefile joins them. The column "Text" counts the words of the
 | nice_cpu's `muldiv_mpu.nasm` | Multiply and divide | 128 | 0 |
 | `build/folder.nasm` | The error of a card without the folder | 27 | 27 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 5 | 5 |
-| In all | | 19459 | 3306 |
+| In all | | 19338 | 3231 |
 <!-- /romsize monitor -->
 
 - The C code's strings are in its initial values, four characters a
@@ -177,42 +174,6 @@ the Makefile joins them. The column "Text" counts the words of the
   change with every commit. A release's version, such as `V2.1`, has
   as many words.
 
-The demo is not the monitor's, but it shares the ROM, so its words are
-here too. It is nice_cpu's `demo/demo.nasm`, with this repository's
-`demo/text.nasm` and `build/version.nasm` joined after it
-([demo/Makefile](../demo/Makefile)). It is assembled at `0x8000`, where
-it runs, and the monitor's `x` copies it there from the ROM. Its parts,
-in the order of the source, each from the label that starts it:
-
-<!-- romsize demo -->
-| Source | What it is | Words | Text |
-|---|---|---:|---:|
-| `demo.nasm`, from `0x8000` | The entry, the vector of the timer's interrupt at `0x8041`, and the unused words before it | 66 | 0 |
-| `demo.nasm`, `TYPEW` | F1, the typewriter, with `CELL`, `FILL`, and `PRINT`, which the other demos call too | 216 | 0 |
-| `demo.nasm`, `KCODES` | F3, the key codes | 118 | 0 |
-| `demo.nasm`, `CHARS` | F5, the characters and the colors | 101 | 0 |
-| `demo.nasm`, `COUNTS` | F7, the counters and the prime sieve, with `DEC64`, which F9 and F11 call too | 409 | 0 |
-| `demo.nasm`, `GAME` | F9, the comet | 333 | 0 |
-| `demo.nasm`, `BOARD` | F11, the self-tests and the network's addresses | 812 | 0 |
-| `demo.nasm`, `MONITOR` | F12, the return to the monitor | 24 | 0 |
-| `demo.nasm`, `POLL` | The keys and their escape sequences, the frame of the screen, and the scroll | 216 | 0 |
-| `demo.nasm`, `FKEYS` | The function keys, the menu, the title bar, and the welcome | 186 | 114 |
-| `demo.nasm`, `K_TEXTS` | The texts of F3 | 273 | 257 |
-| `demo.nasm`, `C_TEXTS` | The texts and the colors of F5 | 230 | 196 |
-| `demo.nasm`, `P_TEXTS` | The texts of F7 | 298 | 240 |
-| `demo.nasm`, `G_TEXTS` | The texts and the steps of F9, and the shifts of F11's MAC address | 113 | 96 |
-| `demo.nasm`, `S_TEXTS` | The texts of F11 | 953 | 910 |
-| `demo.nasm`, `MATH` | The script of F11's test of the math unit | 97 | 0 |
-| `demo/text.nasm` | The board's texts: the name, the welcome, the keys, and the note on the clock | 575 | 575 |
-| `build/version.nasm` | The version in the title bar, the tests' `V9.9` | 5 | 5 |
-| In all | | 5025 | 2393 |
-
-The code is 2295 words, and the texts and tables 2730.
-<!-- /romsize demo -->
-
-The demo changes only with a tag of nice_cpu, but its version and
-`demo/text.nasm` are this repository's.
-
 ### Keeping the tables
 
 `tools/romsize.py` writes the tables above. It joins the sources as
@@ -220,9 +181,9 @@ the Makefiles do, with a label in front of each part and of each
 `.ASCII_L` string, assembles them with `niceasm.py --symbols`, and
 takes each part's words from the labels' addresses. The words it
 assembles must be those of the build, so a label never moves one.
-`make -C monitor test` checks the monitor's table, and `make -C demo
-test` the demo's and the ROM's. Each fails when a table differs from
-the build. `make romsize` writes the new tables into this file.
+`make -C monitor test` checks the tables of the ROM and the monitor,
+and `make -C demo test` the demo's, in `demo/README.md`. Each fails when
+a table differs from the build. `make romsize` writes the new tables.
 
 ## Building and testing
 

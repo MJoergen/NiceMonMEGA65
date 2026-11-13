@@ -1,7 +1,7 @@
 -- The ROM: 2^G_ADDR_BITS words of 32 bits, in block RAM, with a 64-bit read
 -- port A for the instruction bus and a 32-bit read port B for the data bus.
--- It holds the program that the core boots from (the demo in a release, and
--- later a monitor), at the bottom of the address space, as the ROM of
+-- It holds the program that the core boots from (the monitor in a
+-- release), at the bottom of the address space, as the ROM of
 -- QNICE-FPGA does.
 --
 -- THEORY OF OPERATION

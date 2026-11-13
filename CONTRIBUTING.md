@@ -18,8 +18,9 @@ or, in an existing clone:
 
 - `make test` runs the simulation tests, and the tests of the demo and the
   monitor in `niceemu`. These also check that the tables of the ROM's
-  words in [monitor/INTERNALS.md](monitor/INTERNALS.md#the-roms-words)
-  match the build.
+  words in [monitor/INTERNALS.md](monitor/INTERNALS.md#the-roms-words),
+  and of the demo's in [demo/README.md](demo/README.md#its-words), match
+  the build.
 - `make romsize` writes those tables anew, after a change to the
   monitor or the demo changes their words.
 - `make formal` runs the formal checks (see [The formal
@@ -29,11 +30,12 @@ or, in an existing clone:
   --strict`, as nice_cpu checks its own. `mypy.ini` lists the files.
 - `make examples` builds the C examples.
 - `make demo` builds nice_cpu's demo with the board's text,
-  `demo/build/demo.bin`, a program at `0x8000`, and joins it behind the monitor into `demo/build/rom.bin`,
-  which the boards' targets and the release put in the ROM of the
-  bitstreams and core files. The monitor's `x` runs the demo.
-- `make monitor` builds the monitor alone, `monitor/build/monitor.bin`,
-  for a board's target with `ROM=monitor/build/monitor.bin`. `FOLDER=NAME`
+  `demo/build/demo.bin`, a program at `0x8000` under the monitor, which
+  the release ships as a file of its own. The monitor's `load demo.bin`
+  and `r` run it.
+- `make monitor` builds the monitor, `monitor/build/monitor.bin`, which
+  the boards' targets and the release put in the ROM of the bitstreams
+  and core files. `FOLDER=NAME`
   puts its files in another folder of the SD card than `NICE`, which a
   board's target takes too (see
   [monitor/INTERNALS.md](monitor/INTERNALS.md#building-and-testing)).
@@ -41,7 +43,7 @@ or, in an existing clone:
   `src/eth/README.md` from the `.tex` files beside them (needs pdflatex
   and pdftoppm).
 - `make r3`, `make r6`, and `make nexys4ddr` build the bitstreams, with
-  the monitor and the demo in the ROM, which they build first. With `ROM=file.bin`, the
+  the monitor in the ROM, which they build first. With `ROM=file.bin`, the
   core boots from the file instead, and with `ROM=` the bitstream has no
   ROM, and the core waits, held, for the link (see [Programs in the
   ROM](doc/PROGRAMMING.md#programs-in-the-rom)).
@@ -116,9 +118,9 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
 | [formal/](formal/) | The formal checks, for SymbiYosys. |
 | [synth/](synth/README.md) | The Vivado builds for the MEGA65 R3 and R6 boards, and the Nexys4DDR. |
 | [monitor/](monitor/README.md) | The monitor for the ROM, in NICE assembly: a hardware abstraction layer for programs at `0x8000`, called through a dispatch table, a main loop with a few commands, the file of routines that programs join, the stubs and the header for programs, and its tests in `niceemu`. Its README has the decisions, [INTERNALS.md](monitor/INTERNALS.md) the routines with no entries, the C in the ROM, the ROM's words, and the build and the tests. |
-| [demo/](demo/README.md) | The demo in the ROM of the release, behind the monitor, which runs it with `x`, for the time being: nice_cpu's demo (`nice_cpu/demo`), whose function keys switch between a welcome screen that turns into a typewriter, the key codes, the characters and colors, the counters, a game, and the board, a self-test and the network station's addresses. Here are the board's text, `text.nasm`, the join behind the monitor, `join.py`, and its check on a board, `demo_hw.py`. |
+| [demo/](demo/README.md) | The demo, `demo.bin`, a program under the monitor that the release ships as a file of its own: nice_cpu's demo (`nice_cpu/demo`), whose function keys switch between a welcome screen that turns into a typewriter, the key codes, the characters and colors, the counters, a game, and the board, a self-test and the network station's addresses. Here are the board's text, `text.nasm`, and the test under the monitor. |
 | [examples/](examples/) | Example C programs, and the Makefile that builds them for the MEGA65. |
-| [tools/](tools/) | `boardlink.py`, the debug link of nice_cpu's `debugger/nicelink.py`, over the board's UART or TCP to `niceemu --link`, with the board's Ethernet port and the simulated system of `make cosim`, and the tools that use it: `load.py`, which loads a program into the MEGA65 or Nexys4DDR, `run.py`, which runs a program on the board as `niceemu` runs it, `mon.py`, an interactive shell on the link, nice_cpu's `nicedbg.py` with the board's links, `sdcard.py`, which lists the board's SD card and copies its files to the host, `sdnbd.py`, which serves the card as a block device for a mount on the host, `hwtest.py`, which tests the system on the board, `flash.py`, which writes the Nexys4DDR's flash or a slot of the MEGA65's, `bump.py`, which records the timing of the MEGA65 and the Nexys4DDR for a nice_cpu tag, `release.py`, which builds and publishes a release, `linktest.py`, which checks `run.py` and `mon.py` on `niceemu --link`, `tftpd.py`, a TFTP server for the monitor's `tftp`, with listings, `tftptest.py`, which checks it, `sdtest.py`, which checks `sdcard.py` and `sdnbd.py`, `cosimtest.py`, which checks `run.py` on the simulated system, `romsize.py`, which measures the ROM's words for the tables of `monitor/INTERNALS.md`, and `screenshot.py`, which draws a program's screen in `niceemu` as a PNG picture. |
+| [tools/](tools/) | `boardlink.py`, the debug link of nice_cpu's `debugger/nicelink.py`, over the board's UART or TCP to `niceemu --link`, with the board's Ethernet port and the simulated system of `make cosim`, and the tools that use it: `load.py`, which loads a program into the MEGA65 or Nexys4DDR, `run.py`, which runs a program on the board as `niceemu` runs it, `mon.py`, an interactive shell on the link, nice_cpu's `nicedbg.py` with the board's links, `sdcard.py`, which lists the board's SD card and copies its files to the host, `sdnbd.py`, which serves the card as a block device for a mount on the host, `hwtest.py`, which tests the system on the board, `flash.py`, which writes the Nexys4DDR's flash or a slot of the MEGA65's, `bump.py`, which records the timing of the MEGA65 and the Nexys4DDR for a nice_cpu tag, `release.py`, which builds and publishes a release, `linktest.py`, which checks `run.py` and `mon.py` on `niceemu --link`, `tftpd.py`, a TFTP server for the monitor's `tftp`, with listings, `tftptest.py`, which checks it, `sdtest.py`, which checks `sdcard.py` and `sdnbd.py`, `cosimtest.py`, which checks `run.py` on the simulated system, `romsize.py`, which measures the ROM's words and the demo's for the tables of `monitor/INTERNALS.md` and `demo/README.md`, and `screenshot.py`, which draws a program's screen in `niceemu` as a PNG picture. |
 | [README.md](README.md) | For those who use the core files and write programs for them: on its own, over Ethernet, and over the serial port. |
 | [SYSTEM.md](doc/SYSTEM.md) | The system that programs and the link see: the address map, the screen and the font, the keyboard, the Nexys4DDR's devices, the Ethernet station, and the SD card slots. |
 | [DEBUG_LINK.md](doc/DEBUG_LINK.md) | The debug link: its words, how a host loads, pauses, steps, and stops a program, its versions, the control register, the UART's baud rate, and the link over TCP. |
@@ -133,7 +135,7 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
 | [core.mk](core.mk) | Picks the source files of the core, from `NICE`, for the Makefiles of `sim/` and `synth/`. |
 | [.claude/rules/synth.md](.claude/rules/synth.md) | Notes for Claude Code on the Vivado builds: where Vivado is, how to build, and what to check after a build. |
 | [vsg.yml](vsg.yml) | The configuration of `make lint`, which checks the VHDL against [CODING_STYLE.md](doc/CODING_STYLE.md). |
-| [mypy.ini](mypy.ini) | The configuration of `make typecheck`, `mypy --strict` on the Python files that it lists: `tools/`, `demo/`, `font/`, `sim/gen_decode.py`, and the scripts of `monitor/test/`. |
+| [mypy.ini](mypy.ini) | The configuration of `make typecheck`, `mypy --strict` on the Python files that it lists: `tools/`, `font/`, `sim/gen_decode.py`, and the scripts of `monitor/test/`. |
 | [CLAUDE.md](CLAUDE.md) | Instructions for Claude Code: the commands, the layout, and the pitfalls. |
 | [.github/workflows/ci.yml](.github/workflows/ci.yml) | The CI: `make test` and `make cosimtest` on both cores, with niceemu built for its step counts, `make examples`, the tests of the demo and the monitor, `make linktest`, `make tftptest`, `make sdtest`, `make formal`, `make lint`, and `make typecheck`. It cannot run `make hwtest` or build a bitstream. |
 
@@ -208,7 +210,7 @@ mypy. `.github/workflows/ci.yml` installs them all.
 It prints a `PASS` line for each testbench, and a `FAIL` line with the log
 for one that fails. If one fails, run it alone with `make -C sim <name>`,
 such as `make -C sim tb_kbd`. `make -j test` runs all the tests side by
-side, in the time of `tb_text`, and then runs the demo behind the
+side, in the time of `tb_text`, and then runs the demo under the
 monitor, and the monitor, in `niceemu`. `make
 -C sim test` runs them in turn. `make lint` checks the VHDL against
 [CODING_STYLE.md](doc/CODING_STYLE.md) with vsg.
@@ -810,7 +812,7 @@ they were plugged in, so name the port by the cable's serial number, as in
 A board that is already programmed can be tested with `tools/hwtest.py
 --no-program`, which skips the programming and the whole boot test, the
 `b` notice and the checks of the ROM. A bitstream with a ROM can be
-tested, such as the one of `make r6`, with the monitor and the demo: the
+tested, such as the one of `make r6`, with the monitor: the
 test holds the core and hides the ROM, as `load.py` does, and runs the programs from the
 RAM.
 
@@ -892,7 +894,7 @@ bitstream has one. Then it hides the ROM and uses the link:
   input and with 1536 bytes of input, which checks the larger FIFO and the
   end of the input, the intro's `hello.nasm` with 100 lines of input that
   it halts without reading, the emulator's `reserved.nasm`, which halts
-  on a reserved control word, its `trapsym.nasm` with `--symbols`, the ROM of the monitor and the demo, `demo/build/rom_test.bin`, with `x` and a few keys and its screen, and
+  on a reserved control word, its `trapsym.nasm` with `--symbols`, the monitor with the demo after it, `demo/build/test/monitor_demo.bin`, with `r` and a few keys and its screen, and
   `examples/build/bench.bin` and `bench_win.bin`, but for their cycles,
   whose tables it prints.
   It runs the monitor's `test/hello.nasm` with `run.py --monitor --rom
@@ -911,7 +913,7 @@ bitstream has one. Then it hides the ROM and uses the link:
 With `ETH=IP`, as in `make hwtest PORT=/dev/ttyUSB1 ETH=192.168.1.65`, and the board's
 Ethernet port on this computer's network, it tests the Ethernet station
 after all the other checks, which its failures do not stop. It loads
-the monitor and the demo, and types the monitor's `i`, the IP address,
+the monitor, and types the monitor's `i`, the IP address,
 and CR as console bytes over the UART, as a terminal would, and reads
 the address back in a pause. It pings the address and checks the
 station's counts. It pauses the monitor over the link on TCP and reads the address again, and

@@ -6,7 +6,7 @@
 ; VERSION at column 15, and the others 76, from column 2.
 
 NAME            .ASCII_L 'NiceMonMEGA65'
-T1              .ASCII_L 'This is the demo of the ROM, which the monitor starts with x. What you type'
+T1              .ASCII_L 'This is the demo, a program that the monitor runs with r. What you type'
 T2              .ASCII_L 'on the keyboard, or send to the console, appears below the blue bar.'
 T3              .ASCII_L 'To run your programs, give the board an IP address with i in the monitor,'
 T4              .ASCII_L 'then load and debug them over Ethernet with tools/mon.py --eth. More is at'

@@ -71,9 +71,8 @@ every source of the monitor, are in
 | The monitor's `monitor_eth.nasm` | 1856 |
 | The monitor's `clock.c` | 1176 |
 | The monitor's `monitor_dis.nasm`, the disassembler of `u` | 1079 |
-| The demo, at `0x6000` | 4978 |
-| Free below the demo | 5263 |
-| Free once the demo is gone | 13455 |
+| The demo, which left the ROM in V2.1 (#129) | 4978 |
+| Free without the demo | 13455 |
 | The RAM of the ROM's C code, `0xFFFFF400`–`0xFFFFFEFF` | 2816 |
 | The part of that RAM used by `fat32.c` and `clock.c`, with the C stack of 1024 | 1953 |
 | A program's RAM on the MEGA65, `0x8000`–`0x1EFFF` | 92K |
@@ -153,7 +152,7 @@ hex.
 | `v` | `VER` |
 | `?` | `HELP`, as `?` is `PRINT` |
 | `h` | `HALT`, which the tests end with |
-| `x` | `DEMO`, until the demo leaves the ROM at stage 3 |
+| `x` | None: the demo left the ROM in V2.1, and `x` with it (#129) |
 
 - **`SYS addr`** calls the address as `r` does: R1 the entry of
   `mon_putc`, R2 and R3 0, and E 0 (nice_cpu's ABI.md, "Programs under
@@ -517,7 +516,7 @@ Each has an issue, under #54.
    monitor's command has today. No expressions, no variables, and no
    program yet. The main loop, the table of commands, and their
    parsing leave `monitor_cmd.nasm`. What follows it: `load.py
-   --monitor` types `SYS 0x8000`, and `hwtest.py`, `demo_hw.py`,
+   --monitor` types `SYS 0x8000`, and `hwtest.py`,
    `cosimtest.py`, `sdtest.py`, `tftptest.py`, the monitor's tests,
    the READMEs, `doc/PROGRAMMING.md`, and nice_chess's README take the
    new names. Done when nice_chess loads from a card and over TFTP and
@@ -535,9 +534,8 @@ Each has an issue, under #54.
    `STOP`, `CONT`, `GOTO`, `GOSUB`, `IF` on one line, `FOR`, `REM`,
    `INPUT` of numbers, `GET`, `DIM`, the break key, the statement that
    lowers the top of the memory, and the benchmarks. A program pasted
-   into the line runs, and `LIST` gets it back. The demo leaves the
-   ROM, with `DEMO`, `join.py`, and `demo_hw.py`, as #65 planned, and
-   is a `.bin` file to load. This is the first BASIC worth a release.
+   into the line runs, and `LIST` gets it back. This is the first
+   BASIC worth a release.
 4. **Files**, #60: `SAVE "NAME"`, `LOAD "NAME"`, and `RUN "NAME"`,
    from the card and from TFTP. Then **the port**, #115: the stages 1
    to 4 in assembly, checked against the C code
@@ -587,8 +585,8 @@ of each operator goes, and the formats of the numbers come in from
 stage 6. Stage 6 was 3500 with the float routines.
 
 While BASIC is C, the routines of the monitor's commands stay in
-`monitor_cmd.nasm`, and the ROM has 13455 words free once the demo is
-gone. #111, the network for programs, wants 3500 to 4500 of them. So
+`monitor_cmd.nasm`, and the ROM has 13455 words free without the demo,
+which left it in V2.1 (#129). #111, the network for programs, wants 3500 to 4500 of them. So
 **the whole list does not fit in C**: C fills the ROM at stage 4 or
 5, and the port to assembly is not a matter of speed alone.
 

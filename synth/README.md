@@ -30,8 +30,8 @@ or `make r6` in the top directory, and likewise for `r3` and `nexys4ddr`.
 The bitstream is `synth/r6/build/top.bit`, with timing and utilization
 reports next to it. Built in `synth/r6`, it has no ROM, and its core
 waits, held, for a host on the debug link. `make r6` in the top directory
-builds the monitor and the demo first and puts them in the ROM,
-`demo/build/rom.bin`, unless `ROM=` gives another
+builds the monitor first and puts it in the ROM,
+`monitor/build/monitor.bin`, unless `ROM=` gives another
 file, or none when empty. The monitor has C code, so that needs clang
 too ([monitor/](../monitor/INTERNALS.md#building-and-testing)). With
 
@@ -50,7 +50,7 @@ to it.
 After a build with a ROM, another ROM goes into the same bitstream in
 about a minute, with no synthesis, placement, or routing:
 
-    make r6 ROMPATCH=demo/build/rom.bin
+    make r6 ROMPATCH=monitor/build/monitor.bin
 
 The ROM's words are the initial contents of its 32 block RAMs, and
 timing does not depend on them. So [rompatch.tcl](rompatch.tcl) opens
@@ -58,8 +58,7 @@ the routed checkpoint of the last build, `build/top.dcp`, sets the
 words, and writes `build/top.bit`, which meets timing as the build did.
 It is `make -C synth/r6 rompatch ROM=file.bin` in the board's directory,
 and works likewise for `r3`, `nexys4ddr`, and `cor`. It does not build
-the monitor or the demo, so run `make demo` first after a change of
-either.
+the monitor, so run `make monitor` first after a change of it.
 
 The build keeps a copy of its ROM, `build/rom_ref.bin`. The patch first
 checks that the checkpoint holds that ROM, in the layout that the script

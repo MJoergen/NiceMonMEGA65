@@ -268,7 +268,7 @@ how deep the stack may grow.
 The MEGA65's own keyboard types into the console's input, beside the
 PC, so a program reads it with `getchar`, and the keys give ASCII, as a
 terminal sends it. [SYSTEM.md](SYSTEM.md#the-keyboard) has the table of
-keys. The ROM's [demo](../demo/README.md) uses letters, digits, and
+keys. The [demo](../demo/README.md) uses letters, digits, and
 symbols, RETURN, INST/DEL, TAB, the cursor keys, and CTRL-L in its
 typewriter, the function keys to switch demos, F12 to return to the
 monitor, and I, M, and CTRL-C (RUN/STOP) in its F11, and ignores the

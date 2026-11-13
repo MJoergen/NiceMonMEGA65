@@ -1,9 +1,8 @@
 # Builds the monitor, the program of the ROM (README.md), into
-# build/monitor.bin, for make r6 ROM=monitor/build/monitor.bin, and tests
-# it in niceemu.
+# build/monitor.bin, the boards' ROM (make r6), and tests it in niceemu.
 #
 # make          builds build/monitor.bin, with VERSION in its banner, git
-#               describe of the tree by default
+#               describe of the tree by default; the release gives its tag
 # make test     checks the layout of the sources, and runs the monitor in
 #               niceemu with the inputs below, alone and with the programs
 #               of test/ at 0x8000, and compares the output with
@@ -68,13 +67,12 @@ WASM_END = $(shell sed -n 's/^WASM_END *\.EQU *\(0x[0-9A-Fa-f]*\).*/\1/p' monito
 CHECK_RAM = $(PYTHON) -c 'import re, sys; \
   end = int(re.search(r"^___wasm_ram_end +\.EQU +(0x[0-9A-Fa-f]+)", open(sys.argv[1]).read(), re.M)[1], 16); \
   end <= int(sys.argv[2], 16) or sys.exit(f"{sys.argv[1]}: the C code takes the RAM up to {end:08X}, past WASM_END, {sys.argv[2]}")'
-# The monitor must end below DEMO (monitor.nasm), where join.py puts the
-# demo and x reads its size, in a ROM of the monitor alone too. niceasm
-# writes the words in the order of their addresses, so the last line has
-# the last.
-DEMO     = $(shell sed -n 's/^DEMO *\.EQU *\(0x[0-9A-Fa-f]*\).*/\1/p' monitor.nasm)
+# The monitor must end below PROGRAM (monitor.nasm), 0x8000, the end of
+# the ROM. niceasm writes the words in the order of their addresses, so
+# the last line has the last.
+ROM_END  = $(shell sed -n 's/^PROGRAM *\.EQU *\(0x[0-9A-Fa-f]*\).*/\1/p' monitor.nasm)
 CHECK_END = $(PYTHON) -c 'import sys; top = int(open(sys.argv[1]).read().split()[-2], 16); \
-  end = int(sys.argv[2], 16); top < end or sys.exit(f"{sys.argv[1]} reaches {top:08X}, past DEMO, {end:08X}")'
+  end = int(sys.argv[2], 16); top < end or sys.exit(f"{sys.argv[1]} reaches {top:08X}, past the ROM, {end:08X}")'
 
 .PHONY: all test fmt romsize clean FORCE
 
@@ -85,7 +83,7 @@ $(BUILD)/monitor.bin: $(SOURCES) $(BUILD)/rom_c.nasm $(RUNTIME_ROM) $(BUILD)/ver
 	@cat $(SOURCES) $(BUILD)/rom_c.nasm $(RUNTIME_ROM) $(BUILD)/version.nasm \
 	  $(BUILD)/folder.nasm > $(BUILD)/monitor_all.nasm
 	$(ASM) -o $@ $(BUILD)/monitor_all.nasm
-	@$(CHECK_END) $@ $(DEMO)
+	@$(CHECK_END) $@ $(ROM_END)
 
 # The ROM's C code, and for the test of it, rom, with test/rom.c after
 # ROM_C. The C library is built if it is missing.
@@ -119,7 +117,7 @@ $(BUILD)/monitor_test.bin: $(SOURCES) $(BUILD)/rom_c.nasm $(RUNTIME_ROM) $(BUILD
 	  echo "VERSION .ASCII_L 'V9.9'") \
 	  > $(BUILD)/monitor_test_all.nasm
 	@$(ASM) -o $@ $(BUILD)/monitor_test_all.nasm
-	@$(CHECK_END) $@ $(DEMO)
+	@$(CHECK_END) $@ $(ROM_END)
 
 # The test of the ROM's C code: the monitor of the tests with test/rom.c in
 # its module, and test/rom.nasm after it, which calls its functions by
@@ -205,12 +203,12 @@ $(BUILD)/hello_c.bin: test/hello.c mon.h mon.nasm $(TOOLS) | $(BUILD)
 # The inputs. cmds types each command, with the edits of a line: three DELs
 # that take back abc, a CTRL-C that empties junk, and the cursor key ESC [ A
 # and the function key ESC O P, which are dropped. D is d, and q is no
-# command. x finds no demo in the ROM, r no program, nor r 9000, d 8000 0 only moves
-# the next d to 8000, and d 0 100 shows 256 words, which scrolls the
-# screen. i shows the IP address, 0.0.0.0, and writes 192.168.1.65; four
-# addresses are rejected, with too few numbers, one past 255, an empty
-# one, and a letter after them; and the last, with blanks around it and
-# a leading zero, is written, which the dump of 0xFFFFFFB0 shows. m shows
+# command. r finds no program, nor r 9000, d 8000 0 only moves the next d
+# to 8000, and d 0 100 shows 256 words, which scrolls the screen. i shows
+# the IP address, 0.0.0.0, and writes 192.168.1.65; four addresses are
+# rejected, with too few numbers, one past 255, an empty one, and a
+# letter after them; and the last, with blanks around it and a leading
+# zero, is written, which the dump of 0xFFFFFFB0 shows. m shows
 # the MAC address, 02:4E:49:43:45:00 after niceemu's reset, and writes
 # 02:4E:49:43:45:01; five addresses are rejected, with too few bytes, a
 # byte of three digits, a group address, a blank inside, and a letter
@@ -221,7 +219,7 @@ $(BUILD)/hello_c.bin: test/hello.c mon.h mon.nasm $(TOOLS) | $(BUILD)
 # and too many digits, baudx and b are no commands; and the last, in upper
 # case with blanks around it, is written, which the dump of 0xFFFFFF9F
 # shows. h ends each input. dash's printf, the shell of make on Ubuntu, has no \x.
-CMDS = ?\rv\rd 0 6\rd\rD 10 1\rq\r\r  c\rabc\177\177\177v\rjunk\003v\r\033[A\033OPv\rx\rr\rr 9000\rd 8000 0\rd 8000\rd 0 100\ri\ri 192.168.1.65\ri 1.2.3\ri 256.0.0.1\ri 1..2.3\ri 1.2.3.4x\ri  010.0.0.1 \rm\rm 02:4E:49:43:45:01\rm 2:4e:49:43:45\rm 2:4e:49:43:45:123\rm 3:0:0:0:0:0\rm 2:4e: 49:43:45:1\rm 2:4e:49:43:45:1x\rm  a:b:c:d:e:f \rbaud\rbaud 921600\rbaud 9600\rbaud 9600x\rbaud 1 2\rbaud 123456789\rbaudx\rb\rBAUD  115200 \rh\r
+CMDS = ?\rv\rd 0 6\rd\rD 10 1\rq\r\r  c\rabc\177\177\177v\rjunk\003v\r\033[A\033OPv\rr\rr 9000\rd 8000 0\rd 8000\rd 0 100\ri\ri 192.168.1.65\ri 1.2.3\ri 256.0.0.1\ri 1..2.3\ri 1.2.3.4x\ri  010.0.0.1 \rm\rm 02:4E:49:43:45:01\rm 2:4e:49:43:45\rm 2:4e:49:43:45:123\rm 3:0:0:0:0:0\rm 2:4e: 49:43:45:1\rm 2:4e:49:43:45:1x\rm  a:b:c:d:e:f \rbaud\rbaud 921600\rbaud 9600\rbaud 9600x\rbaud 1 2\rbaud 123456789\rbaudx\rb\rBAUD  115200 \rh\r
 RUN  = r\rh\r
 # reset: r 0, the cold start, which shows the banner again and leaves the
 # RAM from 0x8000 alone, so that r then runs hello.

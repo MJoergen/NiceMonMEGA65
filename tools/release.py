@@ -19,11 +19,11 @@ is for the nice_cpu tag and the submodule's commit and says met, that the
 submodule is at that tag, and that CI passed for the commit. It then
 builds the examples, the monitor and the demo of demo/ with the tag in
 the monitor's banner and the demo's title bar, and the bitstreams of the
-R6, the R3, and the Nexys4DDR, with the two in the ROM and from nothing,
+R6, the R3, and the Nexys4DDR, with the monitor in the ROM and from nothing,
 each with FLOW=timing alone, as their Makefiles have it. Each must meet
 timing. It makes the core files of the R3 and the R6, with the tag as
 their version, which MEGAFLASH shows. Last it runs make hwtest on the R6 bitstream, so a MEGA65 R6
-must be on PORT, and with --eth IP its Ethernet port on this computer's network. It copies the bitstreams, the core files, a zip of the examples, and
+must be on PORT, and with --eth IP its Ethernet port on this computer's network. It copies the bitstreams, the core files, the demo, demo.bin, a zip of the examples, and
 verified.json to build/release/V1.0, with notes.md, the release notes, and
 release.json, the commit they were built from. The notes start with the
 tag's section of doc/RELEASE_NOTES.md, whose heading must have the date,
@@ -71,8 +71,9 @@ COR_BOARDS = ("r3", "r6")
 FLOW = "timing"
 
 # The ROM of every board: the monitor, which the core boots from at
-# power-up, with the demo behind it, which the monitor's x runs (demo/)
-ROM = os.path.join(REPO, "demo", "build", "rom.bin")
+# power-up. The demo is an asset of its own, DEMO (#129).
+ROM = os.path.join(REPO, "monitor", "build", "monitor.bin")
+DEMO = os.path.join(REPO, "demo", "build", "demo.bin")
 
 
 def met(r: Record) -> bool:
@@ -162,8 +163,8 @@ def check_ci(commit: str) -> None:
 
 
 def build(board: str) -> Record:
-    """The board's bitstream, from nothing and with the monitor and the
-    demo in the ROM; returns the reports, which must meet timing."""
+    """The board's bitstream, from nothing and with the monitor in the
+    ROM; returns the reports, which must meet timing."""
     run(["make", "-C", os.path.join("synth", board), "clean"])
     run(["make", board, "NICE=pipeline", "FLOW=" + FLOW, "ROM=" + ROM])
     r = read_reports(os.path.join(REPO, "synth", board, "build"), FLOW)
@@ -200,10 +201,11 @@ def notes(tag: str, v: Record, results: dict[str, Record], body: str) -> str:
         "board revision alone.",
         "",
         "The core files and the bitstreams have the monitor of `monitor/` in",
-        "the ROM, with the demo of `demo/` behind it. At power-up the monitor",
-        "shows its prompt, and its command `x` runs the demo, which shows a",
-        "welcome screen, and then what is typed on the keyboard; F12 goes",
-        "back to the monitor. The debug link still loads and starts a program",
+        "the ROM, which shows its prompt at power-up. `demo.bin` is the demo",
+        "of `demo/`, a program for the monitor: copied into the folder `NICE`",
+        "of an SD card, `load demo.bin` and `r` run it, which shows a welcome",
+        "screen, and then what is typed on the keyboard; F12 goes back to the",
+        "monitor. The debug link still loads and starts a program",
         "(`make load FILE=prog.bin`, see README.md), and hides the ROM to",
         "do so. `examples-%s.zip` has the C examples as `.bin` files." % tag,
         "`doc/EMULATOR.md` lists the known differences from `niceemu`.",
@@ -227,6 +229,7 @@ def stage(tag: str) -> tuple[Record, str, dict[str, Record], str]:
 
     run(["make", "-C", "nice_cpu/emulator", "build"])
     run(["make", "examples"])
+    run(["make", "-C", "monitor", "VERSION=" + tag])
     run(["make", "-C", "demo", "VERSION=" + tag])
     results: dict[str, Record] = {}
     for board, _ in BOARDS:
@@ -253,6 +256,8 @@ def write_stage(tag: str, v: Record, head: str, results: dict[str, Record],
         shutil.copy(os.path.join(REPO, "synth", board, "build", "NiceMonMEGA65-%s.cor" % board),
                     os.path.join(out, name))
         files.append(name)
+    shutil.copy(DEMO, out)
+    files.append(os.path.basename(DEMO))
     zipped = shutil.make_archive(os.path.join(out, "examples-" + tag), "zip",
                                  os.path.join(REPO, "examples", "build"))
     files.append(os.path.basename(zipped))
