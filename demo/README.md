@@ -32,7 +32,8 @@ has what each demo shows and how it works. On the boards:
   the board's, at `0xFFFFFFB0` ([nice_cpu's SYSTEM.md §6](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#6-network-station), and
   [The Ethernet station](../doc/SYSTEM.md#the-ethernet-station)). Its IP
   address is `0.0.0.0` after reset, which answers nothing, and its MAC
-  address `02:4E:49:43:45:00`. So a board with the demo in its ROM can
+  address `02:4E:49:43:45:03` on the R3, `02:4E:49:43:45:06` on the R6,
+  and `02:4E:49:43:45:0A` on the Nexys4DDR. So a board with the demo in its ROM can
   get its address from its own keyboard, or from a terminal on the debug
   UART, with I and M, and then answers pings and serves remote control
   on TCP port 4510, which the row "Debug link, TCP port" shows, with "a

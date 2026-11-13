@@ -25,7 +25,9 @@
 -- the system is: at least 10 ms after the clock starts, which is more than
 -- the PHY needs. It then runs with its reset defaults, and negotiates the
 -- link on its own. Its RMII pins go to system.vhd, to the Ethernet station
--- there (src/eth/eth.vhd).
+-- there (src/eth/eth.vhd), whose MAC address after reset is G_ETH_MAC, of
+-- the board: 02:4E:49:43:45:03 on the R3, and 02:4E:49:43:45:06 on the R6
+-- (#124).
 --
 -- The two SD card slots go to system.vhd in SPI mode: slot 0 is the
 -- microSD slot at the back, and slot 1 the full-size slot underneath,
@@ -53,10 +55,13 @@ entity mega65 is
    generic (
       -- The ROM that the core boots from, a .bin file, or "" for a build without a
       -- ROM, whose core waits for the debug link (see src/nicemon.vhd)
-      G_ROM_FILE  : string                       := "";
+      G_ROM_FILE  : string                        := "";
       -- Bit i is '1' when slot i's card detect and write protect are wired,
       -- which slot 1 of the R3 lacks (src/system.vhd)
-      G_SD_DETECT : std_logic_vector(1 downto 0) := "11"
+      G_SD_DETECT : std_logic_vector(1 downto 0)  := "11";
+      -- The Ethernet station's MAC address after reset, one for each board,
+      -- so that an R3 and an R6 on one network differ (src/system.vhd)
+      G_ETH_MAC   : std_logic_vector(47 downto 0) := X"024E49434506"
    );
    port (
       clk_i          : in  std_logic; -- 100 MHz
@@ -253,6 +258,7 @@ begin
          G_VIDEO         => C_VIDEO,
          G_SD_SLOTS      => 2,
          G_SD_DETECT     => G_SD_DETECT,
+         G_ETH_MAC       => G_ETH_MAC,
          G_I2C           => true
       )
       port map (

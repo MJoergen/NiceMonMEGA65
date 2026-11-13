@@ -426,7 +426,7 @@ IP address and pings to it, and serves the link on TCP port 4510.
 |---|---|---|---|
 | `0xFFFFFFB0` | `NET_IP` | Read, write | The IP address, the first byte in bits 31..24: `0xC0A80141` is 192.168.1.65. 0 after reset, which answers nothing. |
 | `0xFFFFFFB1` | `NET_MAC_HI` | Read, write | The first two bytes of the MAC address, in bits 15..0. Bits 31..16 read 0 and are dropped. |
-| `0xFFFFFFB2` | `NET_MAC_LO` | Read, write | The last four bytes of the MAC address. The address is 02:4E:49:43:45:00 after reset. |
+| `0xFFFFFFB2` | `NET_MAC_LO` | Read, write | The last four bytes of the MAC address. The address after reset is the board's: 02:4E:49:43:45:03 on the R3, 02:4E:49:43:45:06 on the R6, and 02:4E:49:43:45:0A on the Nexys4DDR. |
 | `0xFFFFFFB3` | `NET_RX_GOOD` | Read only | The good frames received, to any address. |
 | `0xFFFFFFB4` | `NET_RX_BAD` | Read only | The bad frames received, and the good ones that were dropped. |
 | `0xFFFFFFB5` | `NET_TX` | Read only | The frames sent: the ARP and ping replies, the TCP segments, and a program's frames. |
@@ -457,8 +457,10 @@ addresses with an echo reply of the same data, up to the 1472 bytes that
 fit in a frame. It answers only whole IPv4 packets without options, and
 no ping to everyone. With the IP address at 0, as after reset, it answers
 nothing, so a board on a network stays silent until a program or the
-link gives it an address. The MAC address is a locally administered one;
-two boards on one network need different ones. On the link, for
+link gives it an address. The MAC address is a locally administered one,
+one for each kind of board, so that an R3, an R6, and a Nexys4DDR on one
+network differ. Two boards of the same kind on one network need
+different ones, which the monitor's `m` sets. On the link, for
 example, with the core paused, as the link reaches only its own
 registers while the core runs:
 

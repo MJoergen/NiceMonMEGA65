@@ -30,7 +30,9 @@
 --
 -- The Ethernet PHY, an SMSC LAN8720A, gets its 50 MHz clock and its reset
 -- from the FPGA, as on the MEGA65 (synth/mega65/mega65.vhd). Its RMII
--- pins go to system.vhd, to the Ethernet station there (src/eth/eth.vhd).
+-- pins go to system.vhd, to the Ethernet station there (src/eth/eth.vhd),
+-- whose MAC address after reset is 02:4E:49:43:45:0A, the Nexys4DDR's, so
+-- that it differs from the MEGA65s' (#124).
 --
 -- The microSD slot is the system's SD slot 0, whose power the system
 -- switches with SD_RESET (src/system.vhd).
@@ -292,6 +294,7 @@ begin
          G_TOGGLE_KEY    => "Scroll Lock",
          G_SD_SLOTS      => 1,
          G_SD_POWER      => true,
+         G_ETH_MAC       => X"024E4943450A",
          G_I2C           => true
       )
       port map (

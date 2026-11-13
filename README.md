@@ -188,7 +188,7 @@ the strip says `BRK n`.
 
 **The settings page** (F5) shows the IP address, the MAC address, the
 TCP port, and the serial port's baud rate, as `192.168.1.65`,
-`02:4E:49:43:45:00`, `4510`, and `230400`. CRSR up and down choose a
+`02:4E:49:43:45:06`, `4510`, and `230400`. CRSR up and down choose a
 setting, and you type the new value as it is shown, or step through the
 baud rates with CRSR left and right; RETURN writes it. The program must
 be paused, halted, or held. A new address breaks a PC's TCP connection,

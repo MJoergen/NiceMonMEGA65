@@ -171,7 +171,7 @@ only.
  Settings of the link
 
  > IP address    192.168.1.65
-   MAC address   02:4E:49:43:45:00
+   MAC address   02:4E:49:43:45:06
    TCP port      4510
    Baud rate     230400
 

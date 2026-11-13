@@ -75,7 +75,8 @@ begin
    i_mega65 : entity work.mega65
       generic map (
          G_ROM_FILE  => G_ROM_FILE,
-         G_SD_DETECT => "11"
+         G_SD_DETECT => "11",
+         G_ETH_MAC   => X"024E49434506"
       )
       port map (
          clk_i          => clk_i,

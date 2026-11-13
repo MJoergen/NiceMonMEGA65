@@ -28,8 +28,9 @@ ARP_TRIES       .EQU    3               ; the requests that arp_resolve sends
 ARP_WAIT        .EQU    1000000         ; the microseconds it waits for a reply to each
 DHCP_TRIES      .EQU    4               ; the DISCOVERs that i dhcp sends
 DHCP_WAIT       .EQU    2000000         ; the microseconds it waits for each reply
-DHCP_LEN        .EQU    342             ; the bytes of its frames: 14 Ethernet, 20 IP, 8 UDP, and 300 DHCP
-DHCP_WORDS      .EQU    86              ; their words, with the 2 bytes before the frame
+DHCP_LEN        .EQU    382             ; the bytes of its frames: 14 Ethernet, 20 IP, 8 UDP, and 340 DHCP
+DHCP_WORDS      .EQU    96              ; their words, with the 2 bytes before the frame, all of V_TXF
+DHCP_SMAX       .EQU    48              ; the bytes of option 60 at most, which the version may cut
 DHCP_DISCOVER   .EQU    1               ; the message types of option 53
 DHCP_OFFER      .EQU    2
 DHCP_REQUEST    .EQU    3
@@ -619,7 +620,12 @@ udp_next
 ; magic cookie at 70, and the options from 71, which are written a word at
 ; a time: 53, the message type; for a REQUEST, 50, the address asked for,
 ; and 54, the server; 55, the options asked for, 1 the mask, 3 the gateway,
-; and 6 the DNS servers; and 255, the end.
+; and 6 the DNS servers. Then a byte at a time: 12, the host name,
+; nicemon- and the last three bytes of the MAC address in lower-case hex,
+; such as nicemon-434506, a valid name for the network's DNS; 60, the
+; vendor class, NiceMonMEGA65 and the monitor's version, cut at DHCP_SMAX
+; bytes; and 255, the end (issue #124). The message is 340 bytes, more
+; than the 300 of BOOTP, so that a long version fits.
 
 ; dhcp_send: a message of the type R1, DHCP_DISCOVER, or DHCP_REQUEST of
 ; the address V_DIP from the server V_DSRV, with the transaction V_XID.
@@ -650,8 +656,8 @@ dhcp_send
         ?Z      JMP     :+
                 MOVE    @V_TXF+71, 0x35010137  ; 53 DISCOVER, and 55
                 MOVE    @V_TXF+72, 0x03010306
-                MOVE    @V_TXF+73, 0xFF000000
-                JMP     dhcp_go
+                MOVE    R6, 4*73        ; the byte of the next option
+                JMP     dhcp_names
 :
                 MOVE    @V_TXF+71, 0x35010332  ; 53 REQUEST, and 50
                 MOVE    R1, @V_DIP
@@ -665,13 +671,84 @@ dhcp_send
                 SHL     R3, R2, 8
                 OR      @V_TXF+74, R3, 0x37  ; and 55
                 MOVE    @V_TXF+75, 0x03010306
-                MOVE    @V_TXF+76, 0xFF000000
+                MOVE    R6, 4*76
+dhcp_names
+                MOVE    R1, 12          ; the host name
+                CALL    dhcp_code
+                MOVE    R5, S_HOST
+                CALL    dhcp_str
+                SHL     R5, @E_MACL, 8  ; the last three bytes, from the top
+:
+                SHR     R1, R5, 28
+                CMP     R1, 10
+        ?!C     ADD     R1, R1, 0x27    ; a to f
+                ADD     R1, R1, 0x30
+                CALL    dhcp_put
+                SHL     R5, R5, 4
+                SUB     R1, R6, R4
+                CMP     R1, 15          ; the length, 8 and 6 digits
+        ?!Z     JMP     :-
+                CALL    dhcp_len
+                MOVE    R1, 60          ; the vendor class
+                CALL    dhcp_code
+                MOVE    R5, S_VCLASS
+                CALL    dhcp_str
+                MOVE    R5, VERSION
+                CALL    dhcp_str
+                CALL    dhcp_len
+                MOVE    R1, 0xFF        ; the end
+                CALL    dhcp_put
 dhcp_go
                 MOVE    R1, V_TXF
                 CALL    ip_csum
                 MOVE    R1, V_TXF
                 MOVE    R2, DHCP_LEN
                 JMP     eth_send        ; which returns to the caller
+
+; dhcp_put: the byte R1 written to byte R6 of V_TXF, which is 0 before,
+; a frame's byte as the send buffer has it, and R6 the next byte. Uses
+; R1-R3.
+dhcp_put
+                SHR     R2, R6, 2
+                ADD     R2, R2, V_TXF
+                AND     R3, R6, 3
+                XOR     R3, R3, 3
+                SHL     R3, R3, 3       ; 24 for the first byte of a word
+                SHL     R1, R1, R3
+                OR      @R2, @R2, R1
+                ADD     R6, R6, 1
+                RET
+
+; dhcp_code: the code R1 of an option put at R6, and its length left 0, at
+; R4. Uses R1-R4.
+dhcp_code
+                CALL    dhcp_put
+                MOVE    R4, R6
+                ADD     R6, R6, 1
+                RET
+
+; dhcp_str: the string at R5, up to its 0, put at R6, as long as the
+; option of the length at R4 has fewer than DHCP_SMAX bytes, so at most
+; DHCP_SMAX. Uses R1-R3, and R5.
+dhcp_str
+                SUB     R1, R6, R4
+                CMP     R1, DHCP_SMAX+1
+        ?!C     RET                     ; full
+                MOVE[M] R1, @R5++
+        ?Z      RET
+                CALL    dhcp_put
+                JMP     dhcp_str
+
+; dhcp_len: the length of the option, from R4 to R6, put at R4.
+; Uses R1-R3, and R5.
+dhcp_len
+                SUB     R1, R6, R4
+                SUB     R1, R1, 1
+                MOVE    R5, R6
+                MOVE    R6, R4
+                CALL    dhcp_put
+                MOVE    R6, R5
+                RET
 
 ; dhcp_wait: the reply of the type R1, DHCP_OFFER or DHCP_ACK, to the
 ; transaction V_XID, within DHCP_WAIT microseconds. R1 = its type, or
@@ -1081,6 +1158,9 @@ tftp_eol
 
 S_NODHCP
                 .ASCII_L 'No answer from a DHCP server'
+S_HOST          .ASCII_L 'nicemon-'
+S_VCLASS
+                .ASCII_L 'NiceMonMEGA65 '
 S_MASK          .ASCII_L 'Mask '
 S_GW            .ASCII_L 'Gateway '
 S_DSRV          .ASCII_L 'DHCP server '

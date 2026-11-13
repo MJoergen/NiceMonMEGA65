@@ -21,6 +21,33 @@ The release candidates pinned these:
 
 nice_cpu's `RC01` and `RC03` have no tag here.
 
+## V2.1
+
+**Upgrade notes.**
+
+- Each kind of board has a MAC address of its own after reset:
+  `02:4E:49:43:45:03` on the R3, `02:4E:49:43:45:06` on the R6, and
+  `02:4E:49:43:45:0A` on the Nexys4DDR, where all three had
+  `02:4E:49:43:45:00`
+  ([#124](https://github.com/MJoergen/NiceMonMEGA65/issues/124)). So an
+  R3, an R6, and a Nexys4DDR on one network no longer clash. A DHCP
+  server sees a new station, and may give it another address than
+  before.
+- A PC remembers the MAC address of an IP address for a while. After a
+  new bitstream, or another board at the same IP address, the PC's
+  first pings and connections may fail for a few seconds. A `ping` of
+  the address, repeated until it answers, makes the PC learn the new
+  MAC address.
+
+**New.**
+
+- The monitor's `i dhcp` names the board to the DHCP server: the host
+  name `nicemon-` and the last three bytes of the MAC address, such as
+  `nicemon-434506`, and the vendor class `NiceMonMEGA65` and the
+  monitor's version. A router that serves DNS then knows the board by
+  that name, such as `ping nicemon-434506`
+  ([monitor/README.md](../monitor/README.md#the-network)).
+
 ## V2.0.1 (2026-11-12)
 
 **Upgrade notes.**
