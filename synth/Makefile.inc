@@ -11,6 +11,9 @@
 # make NICE=multi     builds it with nice_cpu's multi-cycle core instead of
 #                     the pipelined one, which is the default (core.mk)
 # make FLOW=timing    builds it with directives for timing (below)
+# make rompatch ROM=file.bin
+#                     puts file.bin into the ROM of the last build, in
+#                     about a minute (below)
 # make clean          removes the build
 #
 # FLOW = default, the default, runs every step with Vivado's default
@@ -47,7 +50,7 @@ TOP = top
 ROM ?=
 ifneq ($(ROM),)
 ROM_ABS  = $(abspath $(ROM))
-GENERICS = -generic G_ROM_FILE=$(ROM_ABS)
+GENERICS = -generic G_ROM_FILE=$(abspath build/rom_ref.bin)
 endif
 
 NICE_HDL = ../../nice_cpu/hdl/src
@@ -107,10 +110,13 @@ SRC += $(BOARD_SRC)
 XDC = $(BOARD_XDC) $(SYNTH_XDC)
 
 # Batch mode exits nonzero on an error in the script, where Tcl mode drops to
-# a prompt that reads EOF and exits 0. The old bitstream is removed first, so
-# that a failed build leaves none behind.
+# a prompt that reads EOF and exits 0. The old bitstream and checkpoint are
+# removed first, so that a failed build leaves none behind. Synthesis reads
+# the ROM from a copy, build/rom_ref.bin, which stays as the ROM of the
+# checkpoint for rompatch.
 build/$(TOP).bit: build/$(TOP).tcl $(SRC) $(XDC) $(ROM_ABS)
-	rm -f $@
+	rm -f $@ build/$(TOP).dcp build/rom_ref.bin
+	$(if $(ROM_ABS),cp $(ROM_ABS) build/rom_ref.bin)
 	bash -c "source $(VIVADO_DIR)/settings64.sh ; vivado -mode batch -source $< -log build/vivado.log -journal build/vivado.jou"
 
 # The worst path into the core and the worst out of it, from the register
@@ -176,6 +182,29 @@ build/rom.conf: FORCE | build
 
 build:
 	mkdir -p build
+
+# A build for a change of the ROM alone (issue 122): rompatch.tcl puts the
+# words of ROM= into the block RAMs of the routed checkpoint,
+# build/top.dcp, and writes build/top.bit, with no synthesis, placement,
+# or routing. It first checks the checkpoint against build/rom_ref.bin,
+# the ROM it was built with, and writes nothing when they differ. The
+# checkpoint and build/rom_ref.bin stay as they are, the reference of the
+# next patch. A build without a ROM has none to patch, and a source,
+# constraint, or Makefile newer than the checkpoint needs a build from
+# nothing. build/rom.conf then names the new ROM, so that a later make
+# with it does nothing, and one with another ROM builds from nothing.
+# Not for make bump or make release, which build from nothing.
+.PHONY: rompatch
+rompatch:
+	@test -n "$(ROM_ABS)" || (echo "rompatch: give the ROM with ROM=file.bin"; exit 1)
+	@test -f build/$(TOP).dcp -a -f build/rom_ref.bin || (echo "rompatch: no checkpoint with a ROM: build the bitstream with ROM= first"; exit 1)
+	@newer="$$(find $(SRC) $(XDC) $(MAKEFILE_LIST) -maxdepth 0 -newer build/$(TOP).dcp)"; \
+	   test -z "$$newer" || (echo "rompatch: newer than build/$(TOP).dcp, build from nothing:" $$newer; exit 1)
+	bash -c "source $(VIVADO_DIR)/settings64.sh ; vivado -mode batch -nojournal -log build/rompatch.log -source ../rompatch.tcl -tclargs build/$(TOP).dcp build/rom_ref.bin $(ROM_ABS) build/$(TOP).bit"
+	sed "s|^[^ ]* |$(ROM_ABS) |" build/rom.conf > build/rom.conf.new
+	mv build/rom.conf.new build/rom.conf
+	touch build/$(TOP).tcl
+	touch build/$(TOP).bit
 
 .PHONY: clean FORCE
 FORCE:

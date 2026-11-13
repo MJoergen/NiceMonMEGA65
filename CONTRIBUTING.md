@@ -41,6 +41,11 @@ or, in an existing clone:
   core boots from the file instead, and with `ROM=` the bitstream has no
   ROM, and the core waits, held, for the link (see [Programs in the
   ROM](doc/PROGRAMMING.md#programs-in-the-rom)).
+- `make r6 ROMPATCH=file.bin` puts another ROM into the last build's
+  bitstream in about a minute, with no synthesis, placement, or routing,
+  likewise for `r3`, `nexys4ddr`, and `cor`. It is for the builds between
+  releases (see [A change of the ROM
+  alone](synth/README.md#a-change-of-the-rom-alone)).
 - `make cor` builds the MEGA65 core files for MEGAFLASH (see
   [synth/README.md](synth/README.md)).
 - `make load FILE=prog.bin` loads a program into the board and starts it.

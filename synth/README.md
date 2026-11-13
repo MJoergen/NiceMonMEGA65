@@ -45,6 +45,39 @@ beyond the ROM fails the build. `make r6
 ROM=monitor.bin` in the top directory does the same with a path relative
 to it.
 
+### A change of the ROM alone
+
+After a build with a ROM, another ROM goes into the same bitstream in
+about a minute, with no synthesis, placement, or routing:
+
+    make r6 ROMPATCH=demo/build/rom.bin
+
+The ROM's words are the initial contents of its 32 block RAMs, and
+timing does not depend on them. So [rompatch.tcl](rompatch.tcl) opens
+the routed checkpoint of the last build, `build/top.dcp`, sets the
+words, and writes `build/top.bit`, which meets timing as the build did.
+It is `make -C synth/r6 rompatch ROM=file.bin` in the board's directory,
+and works likewise for `r3`, `nexys4ddr`, and `cor`. It does not build
+the monitor or the demo, so run `make demo` first after a change of
+either.
+
+The build keeps a copy of its ROM, `build/rom_ref.bin`. The patch first
+checks that the checkpoint holds that ROM, in the layout that the script
+expects, and it writes nothing when it does not. It also stops, and asks
+for a build from nothing, when:
+
+- the last build has no ROM, for then the core's logic differs;
+- a source, a constraint, or a Makefile is newer than the checkpoint;
+- the block RAMs do not cover every bit of every word of the ROM. When
+  a bit is 0 in every word of the ROM of the build, synthesis makes it
+  a constant and leaves its block RAM out;
+- the new ROM has a word beyond the ROM.
+
+The checkpoint and its copy of the ROM stay as they are, so every
+patch starts from the last build. A later `make r6` with the patched
+ROM does nothing, and one with another ROM builds from nothing. `make
+bump` and `make release` always build from nothing.
+
 `FLOW=default` runs every step of Vivado with its default
 directives, with which the MEGA65 met 100 MHz until nice_cpu V2.0.
 `FLOW=timing` runs them

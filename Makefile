@@ -51,6 +51,10 @@ help:
 	@echo "  make nexys4ddr [ROM=prog.bin]"
 	@echo "                  build the bitstream for the Digilent Nexys4DDR, with"
 	@echo "                  the ROM as for r6"
+	@echo "  make r6 ROMPATCH=prog.bin"
+	@echo "                  put prog.bin into the ROM of the last r6 build, in about"
+	@echo "                  a minute, without synthesis, placement, or routing;"
+	@echo "                  likewise r3, nexys4ddr, and cor"
 	@echo "  make cor [ROM=prog.bin]"
 	@echo "                  build the MEGA65 core files, synth/r3/build/NiceMonMEGA65-r3.cor"
 	@echo "                  and synth/r6/build/NiceMonMEGA65-r6.cor, for MEGAFLASH"
@@ -188,7 +192,13 @@ monitor:
 # absolute here, for the board's Makefile runs in its own directory. A
 # given ROM=demo/build/rom.bin is not built again, so that the release's
 # ROM keeps its tag (tools/release.py).
-ifeq ($(origin ROM),undefined)
+# ROMPATCH=file.bin puts file.bin into the ROM of the board's last build
+# instead, in about a minute (rompatch in synth/Makefile.inc, issue 122).
+ifneq ($(ROMPATCH),)
+BOARD_ROM  = $(abspath $(ROMPATCH))
+BUILD_DEMO = @true
+BOARD_GOAL = rompatch
+else ifeq ($(origin ROM),undefined)
 BOARD_ROM  = $(abspath demo/build/rom.bin)
 BUILD_DEMO = $(MAKE) -C demo
 else
@@ -198,21 +208,21 @@ endif
 
 r3:
 	$(BUILD_DEMO)
-	$(MAKE) -C synth/r3 ROM=$(BOARD_ROM)
+	$(MAKE) -C synth/r3 $(BOARD_GOAL) ROM=$(BOARD_ROM)
 
 r6:
 	$(BUILD_DEMO)
-	$(MAKE) -C synth/r6 ROM=$(BOARD_ROM)
+	$(MAKE) -C synth/r6 $(BOARD_GOAL) ROM=$(BOARD_ROM)
 
 nexys4ddr:
 	$(BUILD_DEMO)
-	$(MAKE) -C synth/nexys4ddr ROM=$(BOARD_ROM)
+	$(MAKE) -C synth/nexys4ddr $(BOARD_GOAL) ROM=$(BOARD_ROM)
 
 # The core files of the MEGA65 boards, from their bitstreams (synth/Makefile.inc)
 cor:
 	$(BUILD_DEMO)
-	$(MAKE) -C synth/r3 cor ROM=$(BOARD_ROM)
-	$(MAKE) -C synth/r6 cor ROM=$(BOARD_ROM)
+	$(MAKE) -C synth/r3 $(BOARD_GOAL) cor ROM=$(BOARD_ROM)
+	$(MAKE) -C synth/r6 $(BOARD_GOAL) cor ROM=$(BOARD_ROM)
 
 # nice_cpu's badges of timing met on the MEGA65 and the Nexys4DDR (tools/bump.py)
 bump:
