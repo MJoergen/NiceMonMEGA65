@@ -216,7 +216,7 @@ WASM_END        .EQU    0xFFFFFF00      ; up to below here, the I/O page, which 
 
 PROGRAM         .EQU    0x8000          ; where a program is, above the ROM
 VARS_WORDS      .EQU    0x1000          ; the words from 0xFFFFF000, the variables, which end a program's RAM
-COLOR           .EQU    0x000FFF00      ; white on black, the color at the cold start
+COLOR           .EQU    MON_FG_WHITE+MON_BG_BLACK  ; the color at the cold start
 OUT_LINE        .EQU    1
 OUT_SCREEN      .EQU    2
 TABLE_VERSION   .EQU    0x00010005      ; what mon_version returns: 1.5
