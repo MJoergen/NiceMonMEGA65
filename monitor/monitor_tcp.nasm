@@ -399,16 +399,16 @@ tcp_recv
                 MOVE    R9, R3
                 CALL    tcp_entry
         ?!Z     JMP     trecv_end
-                MOVE    R1, @CB_RXLEN[R7]
-                CMP     R9, R1
-        ?!C     MOVE    R9, R1
-                TST     R9
+                MOVE[M] R1, @CB_RXLEN[R7]
         ?!Z     JMP     :+
-                MOVE    R1, 0
-                CMP     @CB_STATE[R7], TS_CWAIT
+                CMP     @CB_STATE[R7], TS_CWAIT  ; none wait: 0, or the end
         ?Z      MOVE    R1, E_TEOF
                 JMP     trecv_end
 :
+                CMP     R9, R1
+        ?!C     MOVE    R9, R1
+                MOVE[M] R1, R9
+        ?Z      JMP     trecv_end       ; none asked for
                 SUB     @CB_RXLEN[R7], @CB_RXLEN[R7], R9
                 MOVE    R1, @CB_RXB[R7]
                 MOVE    R2, @CB_RXHEAD[R7]
@@ -1158,7 +1158,8 @@ tcp_fold
 ; tcp_input: for net_frames, the TCP segment of R1 bytes at the head of
 ; the queue, whose headers are at V_NHDR, taken in place, and left there
 ; for net_frames to release. A segment that is not to E_IP, is shorter
-; than its lengths say, or has a bad checksum, is passed over. One that
+; than its lengths say, has an IP length too short for its headers, or
+; has a bad checksum, is passed over. One that
 ; fits a connection, by its addresses and ports, goes to it, as RFC 9293
 ; §3.10.7 says for its state. A SYN without an ACK that fits none goes to
 ; the first handle in LISTEN on its port, and is passed over when the port
@@ -1181,7 +1182,8 @@ tcp_input
                 ADD     R2, R11, 14
                 CMP     R1, R2
         ?C      JMP     tin_end         ; a frame shorter than that
-                SUB     R11, R11, 20    ; the TCP length
+                SUB[M]  R11, R11, 20    ; the TCP length
+        ?C      JMP     tin_end         ; an IP length shorter than its header
                 SHR     R10, @V_NHDR+12, 28
                 SHL     R10, R10, 2     ; the TCP header's bytes
                 CMP     R10, 20

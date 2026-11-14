@@ -1020,7 +1020,8 @@ and its servers, the entries 26 to 31 (issue #111). It has two parts.
   `tools/tcppeer.py`, a small TCP stack of its own at 10.0.0.2. Each
   port of the peer has a script, which does what a real stack cannot be
   made to do. The cases are an echo; a close by either side; a refusal;
-  a RST and a FIN in the middle; a RST, a SYN, and an old ACK during
+  a RST and a FIN in the middle; a read of no bytes while the peer's
+  wait after its FIN; a RST, a SYN, and an old ACK during
   the handshake; a close with bytes not read; an abort during a close;
   no MSS option, and a small MSS and window; a zero window, from either
   side; segments out of order, twice, lost, with a bad checksum, and in
@@ -1047,7 +1048,10 @@ and its servers, the entries 26 to 31 (issue #111). It has two parts.
   checks the SYN's 15 seconds, the 120 seconds of giving up, the 60
   seconds after our FIN, the probes of a zero window out to 60 seconds,
   a connection idle for 4300 seconds, past a wrap of the microseconds,
-  and the SYN-ACK's 15 seconds, after which a handle listens again.
+  and the SYN-ACK's 15 seconds, after which a handle listens again. The
+  last case sends segments whose IP length is too short for their
+  headers, which the monitor must pass over at once: the case has a
+  step limit of its own, which a sum over a wrong length runs into.
 
 `make sdtest` runs `tools/sdtest.py`. It makes images of a card with
 `mkfs.fat`, `sfdisk`, and `mtools`: FAT32 on the whole card, with a

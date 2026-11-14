@@ -182,7 +182,8 @@ tt_main
                 MOVE    @R7++, R1       ; E_TRESET
                 CALL    tt_close
 ; Case E, port 2005: the peer's 100 bytes and its FIN at the open, while
-; 2000 go the other way
+; 2000 go the other way; a tcp_recv of 0 bytes, while the 100 wait after
+; the FIN, gives 0
                 MOVE    R1, 2000
                 MOVE    R2, 9
                 MOVE    R3, 11
@@ -192,9 +193,24 @@ tt_main
                 MOVE    R3, 0x04000800
                 CALL    tt_open
                 CALL    tt_waitopen
-                MOVE    R1, 2000
+                MOVE    R1, R8
+                MOVE    R2, 2000
+                CALL    tt_sendall
+                MOVE    @R7++, R1       ; 2000
+                MOVE    R1, R8
+                MOVE    R2, 3
+                CALL    tt_wait
+                MOVE    @R7++, R1       ; 3, TCP_PEER_CLOSED, with the 100 not read
+                MOVE    R1, R8
+                MOVE    R2, TT_RXB
+                MOVE    R3, 0
+                CALL    _mon_tcp_recv
+                MOVE    @R7++, R1       ; 0, as no byte is asked for, not E_TEOF
+                MOVE    R1, R8
                 MOVE    R2, 4000
-                CALL    tt_echo
+                CALL    tt_recvall
+                MOVE    @R7++, R1       ; 100
+                MOVE    @R7++, R2
                 MOVE    @R7++, R3       ; E_TEOF
                 CALL    tt_close
 ; Case F, port 2006, in TCP_CONNECTING: the peer answers the SYN with a

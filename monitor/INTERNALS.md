@@ -245,8 +245,8 @@ from 0, and the rest is free. The demo is not in it: it is a program,
 <!-- romsize layout -->
 | Part | Address | Words |
 |---|---|---:|
-| The monitor | `0x0000`–`0x5537` | 21816 |
-| Free | `0x5538`–`0x7FFF` | 10952 |
+| The monitor | `0x0000`–`0x5539` | 21818 |
+| Free | `0x553A`–`0x7FFF` | 10950 |
 <!-- /romsize layout -->
 
 The monitor's words, by the source they come from, in the order
@@ -264,7 +264,7 @@ ROM is built:
 | `monitor_dis.nasm` | The disassembler of `u` | 889 | 79 |
 | `monitor_sd.nasm` | The sector routines | 226 | 59 |
 | `monitor_eth.nasm` | The network | 3558 | 158 |
-| `monitor_tcp.nasm` | TCP | 2456 | 0 |
+| `monitor_tcp.nasm` | TCP | 2458 | 0 |
 | `monlib.nasm` | The routines that programs join | 259 | 0 |
 | `mon.nasm` | The stubs of the entries | 72 | 0 |
 | `nicewasm` | `___wasm_start`, which copies the C code's data to the RAM | 85 |  |
@@ -277,7 +277,7 @@ ROM is built:
 | nice_cpu's `muldiv_mpu.nasm` | Multiply and divide | 128 | 0 |
 | `build/folder.nasm` | The error of a card without the folder | 8 | 8 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 21816 | 962 |
+| In all | | 21818 | 962 |
 <!-- /romsize monitor -->
 
 - The C code's strings are in its initial values, also four characters

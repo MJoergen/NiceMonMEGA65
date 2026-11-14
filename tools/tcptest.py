@@ -29,7 +29,7 @@ from typing import Callable, Dict, List, Mapping, Optional, Tuple
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from tcppeer import (ACK, BOARD_IP, FIN, PEER_IP, PEER_MAC, PSH, RST, SYN, Conn,  # noqa: E402
-                     Peer, Script, Segment, arp_reply, ip_frame, is_arp_for_peer,
+                     Peer, Script, Segment, arp_reply, csum, ip_frame, is_arp_for_peer,
                      mss_option, tcp_payload)
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -642,8 +642,10 @@ def checks(r: Results) -> None:
           d.received == SENT[2002][3:13] and not any(s.flags & RST for s in d.log))
 
     # E, the peer's FIN mid-stream
-    r.expect("E: 2000 sent while the peer's 100 and FIN came, then E_TEOF",
-             1, T, 2000, 100, hash31(DATA[2005]), -57, 0, 0)
+    r.expect("E: 2000 sent while the peer's 100 and FIN came: TCP_PEER_CLOSED", 1, T, 2000, 3)
+    r.expect("E: tcp_recv of 0 bytes gives 0 while the 100 wait, not E_TEOF", 0)
+    r.expect("E: the 100 read, then E_TEOF; closed and freed", 100, hash31(DATA[2005]), -57,
+             0, 0)
     e = conn(2005)
     check("E: the peer received the 2000 bytes, and the FIN", e.received == SENT[2005]
           and e.got_fin)
@@ -841,6 +843,15 @@ def listen_setup(peer: Peer) -> None:
 # microsecond is a step and a run counts the same each time
 PEER_ISS = 5_000_000
 PROBES_ANSWERED = 12                    # case 4: the probes that get an ACK
+SHORT = (0, 19, 20)                     # case 7: the IP lengths too short for a TCP header
+STEPS = {7: 100_000_000}                # the step limit of a case, if not 20000000000
+
+
+def with_ip_length(frame: bytes, length: int) -> bytes:
+    """An IPv4 frame with another IP length, and its header's checksum
+    for it."""
+    hdr = frame[14:16] + struct.pack(">H", length) + frame[18:24] + b"\0\0" + frame[26:34]
+    return frame[:14] + hdr[:10] + struct.pack(">H", csum(hdr)) + hdr[12:] + frame[34:]
 
 
 def answers(case: int, frames: List[bytes]) -> List[str]:
@@ -851,6 +862,11 @@ def answers(case: int, frames: List[bytes]) -> List[str]:
     if case == 6:                       # a SYN to the port that listens, as it is enabled
         lines.append("0:" + ip_frame(b"\xff" * 6, BOARD_IP, 6, tcp_payload(
             BOARD_IP, 5555, 2106, PEER_ISS, 0, SYN, 8192, options=mss_option(1460))).hex())
+    if case == 7:                       # ACKs to the port that listens, all but the last too short
+        for n in SHORT + (40,):
+            frame = ip_frame(b"\xff" * 6, BOARD_IP, 6, tcp_payload(
+                BOARD_IP, 5000 + n, 2107, PEER_ISS, 7000 + n, ACK, 8192))
+            lines.append("0:" + with_ip_length(frame, n).hex())
     for i, f in enumerate(frames, 1):
         def reply(frame: bytes) -> None:
             lines.append(f"{i}:{frame.hex()}")
@@ -897,7 +913,8 @@ def timer_case(tmp: str, case: int) -> Tuple[List[int], List[bytes]]:
     for _ in range(40):
         with open(eth_in, "w") as f:
             f.write("".join(line + "\n" for line in lines))
-        res = subprocess.run([NICEEMU, "--step-time", "-n", "20000000000", "-i", inp, "-d",
+        res = subprocess.run([NICEEMU, "--step-time", "-n", str(STEPS.get(case, 20_000_000_000)),
+                              "-i", inp, "-d",
                               f"{RESULTS:#x}:16", "--eth-in", eth_in, "--eth-out", eth_out,
                               image], capture_output=True, timeout=300)
         out = res.stdout.decode("latin-1")
@@ -929,8 +946,10 @@ def timer_case(tmp: str, case: int) -> Tuple[List[int], List[bytes]]:
 def timers(tmp: str) -> None:
     S = 1_000_000
     TO = -55                            # E_TTIMEOUT
-    for case in range(1, 7):
+    for case in range(1, 8):
         r, frames = timer_case(tmp, case)
+        if not r:
+            continue                    # it did not return, which failed a check
         segs = [Segment(f, 0.0) for f in frames if f[12:14] == b"\x08\x00" and f[23] == 6]
         data = [x for x in segs if x.data]
         check(f"timers {case}: every TCP checksum is right", all(x.tcp_ok for x in segs))
@@ -967,6 +986,13 @@ def timers(tmp: str) -> None:
                   "nothing at the close", len(segs) == 4 and
                   all(x.flags == SYN | ACK and x.seq == segs[0].seq and x.ack == PEER_ISS + 1
                       and x.mss() == 1024 for x in segs), f"{segs}")
+        elif case == 7:
+            check("timers 7: segments with an IP length of 0, 19, and 20 are passed over at "
+                  "once: TCP_LISTEN still, after polls of 0.1 seconds that take that",
+                  r[:2] == [0, 5] and 100_000 <= t < 120_000, f"{r}")
+            check("timers 7: the ACK after them got a RST with its number, and they none",
+                  len(segs) == 1 and segs[0].flags == RST and segs[0].seq == 7040
+                  and segs[0].dport == 5040, f"{segs}")
         else:
             check("timers 5: open after 4300 seconds idle, past a wrap of the microseconds; "
                   "10 bytes echoed", r == [0, 2, 2, 10, 10, 2, 0, 0], f"{r}")

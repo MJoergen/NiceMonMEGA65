@@ -33,6 +33,8 @@ tw_main
                 CALL    _mon_net_set
                 CMP     @TW_CASE, 6
         ?Z      JMP     tw_listen
+                CMP     @TW_CASE, 7
+        ?Z      JMP     tw_short
                 MOVE    R1, TW_CB
                 MOVE    R2, TW_PEER
                 ADD     R3, @TW_CASE, 2100
@@ -154,6 +156,30 @@ tw_listen
                 MOVE    @R7++, R1       ; 5, TCP_LISTEN
                 MOVE    @R7++, R2       ; 15 seconds
                 MOVE    R1, R8
+                MOVE    R2, 0
+                CALL    _mon_tcp_close
+                MOVE    @R7++, R1       ; 0
+                JMP     tw_end
+
+; Case 7, port 2107: a handle that listens. As the port is enabled,
+; segments come whose IP length is too short for a TCP header, or for
+; the IP header itself, and after them an ACK, which gets a RST. The
+; state, and the time that 0.1 seconds of polls take; a close
+tw_short
+                MOVE    R8, @io.us
+                MOVE    R1, TW_CB
+                MOVE    R2, 2107
+                MOVE    R3, 0x04000400
+                CALL    _mon_tcp_listen
+                MOVE    @R7++, R1       ; 0
+                MOVE    R1, 100000
+                CALL    tw_sleep
+                MOVE    R1, 0
+                CALL    _mon_tcp_state
+                MOVE    @R7++, R1       ; 5, TCP_LISTEN
+                SUB     R1, @io.us, R8
+                MOVE    @R7++, R1       ; 0.1 seconds, and little more
+                MOVE    R1, 0
                 MOVE    R2, 0
                 CALL    _mon_tcp_close
                 MOVE    @R7++, R1       ; 0
