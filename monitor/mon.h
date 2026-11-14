@@ -40,6 +40,26 @@ int scr_gety(void);
 // old one.
 unsigned scr_color(unsigned color);
 
+// Colors for scr_color: a foreground and a background, added or or-ed,
+// such as MON_FG_YELLOW | MON_BG_BLUE. A color left out is black.
+#define MON_FG_BLACK    0x00000000u
+#define MON_FG_RED      0x000F0000u
+#define MON_FG_GREEN    0x0000F000u
+#define MON_FG_YELLOW   0x000FF000u
+#define MON_FG_BLUE     0x00000F00u
+#define MON_FG_MAGENTA  0x000F0F00u
+#define MON_FG_CYAN     0x0000FF00u
+#define MON_FG_WHITE    0x000FFF00u
+
+#define MON_BG_BLACK    0x00000000u
+#define MON_BG_RED      0xF0000000u
+#define MON_BG_GREEN    0x0F000000u
+#define MON_BG_YELLOW   0xFF000000u
+#define MON_BG_BLUE     0x00F00000u
+#define MON_BG_MAGENTA  0xF0F00000u
+#define MON_BG_CYAN     0x0FF00000u
+#define MON_BG_WHITE    0xFFF00000u
+
 // The files of the SD card's FAT32 file system, from table 1.1, and
 // fs_write and fs_delete from table 1.2 (monitor/README.md, "Files";
 // the errors in doc/PROGRAMMING.md, "The monitor's error codes"). The
@@ -144,12 +164,12 @@ MON_ENTRY(net_set) int net_set(const unsigned cfg[4]);
 MON_ENTRY(dns_lookup) int dns_lookup(const char *name, unsigned *ip);
 
 // TCP, up to 4 connections at once, each with a control block of
-// TCP_CB_WORDS(rx, tx) words in the program's RAM, which is the ROM's from
-// tcp_open or tcp_listen until tcp_state gives TCP_FREE. The ROM moves
-// a connection only when the program calls an entry of the network: a
-// program polls, with net_poll, every 100 ms or so.
-#define TCP_CB_WORDS(rx, tx) (32 + ((rx) + 3) / 4 + ((tx) + 3) / 4)
-#define TCP_SIZES(rx, tx) (((unsigned)(rx) << 16) | (unsigned)(tx))
+// MON_TCP_CB_WORDS(rx, tx) words in the program's RAM, which is the
+// ROM's from tcp_open or tcp_listen until tcp_state gives TCP_FREE. The
+// ROM moves a connection only when the program calls an entry of the
+// network: a program polls, with net_poll, every 100 ms or so.
+#define MON_TCP_CB_WORDS(rx, tx) (32 + ((rx) + 3) / 4 + ((tx) + 3) / 4)
+#define MON_TCP_SIZES(rx, tx) (((unsigned)(rx) << 16) | (unsigned)(tx))
 enum {
     TCP_FREE = 0,       // the handle is free
     TCP_CONNECTING = 1, // the handshake; bytes sent go after it
@@ -166,7 +186,7 @@ enum {
 };
 
 // A connection opened to a port of an IP address, with the rings of
-// TCP_SIZES(rx, tx) bytes, each 64 or more, in the control block cb. Waits
+// MON_TCP_SIZES(rx, tx) bytes, each 64 or more, in the control block cb. Waits
 // up to 3 seconds for ARP, sends the SYN, and does not wait for the
 // answer. A handle, 0 to 3, or an error. Entry 26.
 MON_ENTRY(tcp_open) int tcp_open(unsigned *cb, unsigned ip, unsigned port, unsigned sizes);
@@ -192,7 +212,7 @@ MON_ENTRY(tcp_recv) int tcp_recv(int h, void *buf, unsigned n);
 int tcp_close(int h, int abort);
 
 // A handle that waits in TCP_LISTEN for a peer to connect to port, 1 to
-// 65535 but 4510, with the rings of TCP_SIZES(rx, tx) bytes in the
+// 65535 but 4510, with the rings of MON_TCP_SIZES(rx, tx) bytes in the
 // control block cb. The first SYN takes it, through TCP_CONNECTING, to
 // TCP_OPEN, one connection for each handle; a failed handshake brings it
 // back to TCP_LISTEN. Other handles may listen on the same port. Sends

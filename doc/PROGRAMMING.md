@@ -55,14 +55,15 @@ the monitor:
 
     int main(void)
     {
-        unsigned old = scr_color(0x000FF000);   // yellow on black
+        unsigned old = scr_color(MON_FG_YELLOW | MON_BG_BLACK);
         printf("Hello, world!\n");
         scr_color(old);
         return 0;
     }
 
 `printf` prints through the monitor's `mon_putc`, and `scr_color`,
-declared in `monitor/mon.h`, is one of the monitor's routines. Build
+declared in `monitor/mon.h`, is one of the monitor's routines. Its
+color is a foreground and a background of `mon.h`, or-ed. Build
 it at `0x8000` with `nicebuild.py`, which needs clang (see [C](#c)):
 
     nice_cpu/translator/nicebuild.py --monitor --asm monitor/mon.nasm \
@@ -362,7 +363,7 @@ of `tcp_send`, `tcp_recv`, and `tcp_state` polls, so the loops need no
 
 #define RX 1024
 #define TX 256
-static unsigned cb[TCP_CB_WORDS(RX, TX)];
+static unsigned cb[MON_TCP_CB_WORDS(RX, TX)];
 static const char req[] = "GET / HTTP/1.0\r\nHost: example.com\r\n\r\n";
 
 int main(void)
@@ -377,7 +378,7 @@ int main(void)
         printf("DNS error %d\n", r);
         return 1;
     }
-    int h = tcp_open(cb, ip, 80, TCP_SIZES(RX, TX));
+    int h = tcp_open(cb, ip, 80, MON_TCP_SIZES(RX, TX));
     if (h < 0) {
         printf("TCP error %d\n", h);
         return 1;
@@ -415,8 +416,8 @@ has closed:
 #include <nice.h>
 #include "mon.h"
 
-#define SIZES TCP_SIZES(512, 512)
-static unsigned cb[TCP_CB_WORDS(512, 512)];
+#define SIZES MON_TCP_SIZES(512, 512)
+static unsigned cb[MON_TCP_CB_WORDS(512, 512)];
 
 int main(void)
 {

@@ -50,7 +50,7 @@
 #define FONT_BASE 0xFFFFFF86u
 #define SCR_STATE 0xFFFFFF80u
 
-static unsigned cb[TCP_CB_WORDS(RX, TX)];
+static unsigned cb[MON_TCP_CB_WORDS(RX, TX)];
 static struct cfg cfg;
 static struct weather weather;      // the last one fetched
 static int have_weather;
@@ -478,7 +478,7 @@ static void fetch_start_now(void)
     }
     fmt(buf, sizeof buf, "Fetching from %s...", cfg.host);
     status(C_DIM, buf);
-    r = tcp_open(cb, ip, cfg.port, TCP_SIZES(RX, TX));
+    r = tcp_open(cb, ip, cfg.port, MON_TCP_SIZES(RX, TX));
     if (r < 0) {
         fail(r, micros());
         return;

@@ -143,7 +143,7 @@ offset off, as a program may have hidden the one or used the other.
 | 5 | `0A` | `scr_cls` | Clears the screen in the current color, cursor home, shown and blinking, display offset 0. |
 | 6 | `0C` | `scr_moveto` | R1 the column, R2 the row; a column past 79 is 79, and a row past 24 is 24. |
 | 7 | `0E` | `scr_getxy` | → R1 the column, R2 the row. |
-| 8 | `10` | `scr_color` | R1 the color for later characters, bits 31..8 of a screen word. → R1 the old one. |
+| 8 | `10` | `scr_color` | R1 the color for later characters, bits 31..8 of a screen word. → R1 the old one. In C, `mon.h`'s `MON_FG_` and `MON_BG_` colors, or-ed: `MON_FG_YELLOW \| MON_BG_BLUE`. |
 | 9 | `12` | `fs_mount` | R1 a slot. Mounts its card, and closes the files that were open (Files below). → R1 0, or an error. Table 1.1. |
 | 10 | `14` | `fs_open` | R1 a name, R2 a mode: 0 to read a file of the folder `NICE`, 1 to write one, which is made or truncated (table 1.2), 2 for the folder itself, whose name is empty or `/`. The name is a long name or an 8.3 name, in either case (table 1.4). Mounts a card when none is. → R1 a handle, 0 or 1, or an error. Table 1.1. |
 | 11 | `16` | `fs_read` | R1 a handle of a file, R2 a buffer, R3 a number of bytes. Reads up to that many, one byte per word. → R1 the number read, 0 at the end, or an error. Table 1.1. |
@@ -547,7 +547,7 @@ end in a dot. There is no cache, so a program keeps the address it got.
 
 **A connection** lives in a control block in the program's RAM: 32
 words, then the ring of the bytes received and the ring of the bytes to
-send, packed, so `TCP_CB_WORDS(rx, tx)` of `mon.h` words in all. Its
+send, packed, so `MON_TCP_CB_WORDS(rx, tx)` of `mon.h` words in all. Its
 address in the word window has bits 1..0 clear, or `tcp_open` and
 `tcp_listen` give `E_TSIZE`. The block is the
 ROM's from `tcp_open` or `tcp_listen` until `tcp_state` gives

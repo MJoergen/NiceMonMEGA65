@@ -13,7 +13,7 @@
 #define RX 512
 #define TX 300
 
-static unsigned cb[TCP_CB_WORDS(RX, TX)];
+static unsigned cb[MON_TCP_CB_WORDS(RX, TX)];
 static unsigned char out[1001];
 static unsigned char in[1003];
 
@@ -43,7 +43,7 @@ int main(void)
         return fail(2, 0);
     for (unsigned i = 0; i < 1000; i++)
         out[1 + i] = (unsigned char)(i * 7 + 3);
-    int h = tcp_open(cb, 0x0A000002, 2001, TCP_SIZES(RX, TX));
+    int h = tcp_open(cb, 0x0A000002, 2001, MON_TCP_SIZES(RX, TX));
     if (h < 0)
         return fail(3, h);
     int s = wait_state(h, TCP_OPEN);
@@ -73,7 +73,7 @@ int main(void)
     if (s != TCP_FREE)
         return fail(10, s);
 
-    h = tcp_listen(cb, 3010, TCP_SIZES(RX, TX));
+    h = tcp_listen(cb, 3010, MON_TCP_SIZES(RX, TX));
     if (h < 0)
         return fail(11, h);
     got = 0;
