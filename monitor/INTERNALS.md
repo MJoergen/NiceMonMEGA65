@@ -7,6 +7,20 @@ ROM, the ROM's words, and the build and the tests. A program does not call these
 entries and their addresses change with every build; it calls the
 entries, or drives the registers itself.
 
+- [The sector routines](#the-sector-routines)
+- [The frame routines](#the-frame-routines)
+- [The scrollback](#the-scrollback)
+- [C in the ROM](#c-in-the-rom)
+- [The ROM's words](#the-roms-words)
+  - [Keeping the tables](#keeping-the-tables)
+- [Building and testing](#building-and-testing)
+  - [What the build needs](#what-the-build-needs)
+  - [The build](#the-build)
+  - [The tests](#the-tests)
+  - [The cards of the tests](#the-cards-of-the-tests)
+  - [The expected files](#the-expected-files)
+  - [On a board](#on-a-board)
+
 ## The sector routines
 
 The ROM has three sector routines of its own, with no entries in the
