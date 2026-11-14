@@ -77,18 +77,6 @@ or-ed. Build it at `0x8000` with `nicebuild.py`, which needs clang
     nice_cpu/translator/nicebuild.py --monitor --asm monitor/mon.nasm \
         -I monitor -o hello.bin hello.c
 
-Run it in the emulator, which is built with
-`make -C nice_cpu/emulator build`. The emulator has no ROM, so the
-monitor, built with `make monitor`, is joined in front of the program.
-The input types `r`, which runs the program, and `h`, which halts the
-emulator when the program has returned. The emulator prints the
-console's output, why it stopped, and the registers, and with
-`--screen` the screen:
-
-    cat monitor/build/monitor.bin hello.bin > joined.bin
-    printf 'r\rh\r' > rh.txt
-    nice_cpu/emulator/zig-out/bin/niceemu --screen -i rh.txt joined.bin
-
 On the board, copy `hello.bin` to the folder `NICE` of the SD card,
 and type `load hello.bin` and then `r` at the monitor's prompt. Or load
 and run it from a PC on the board's network (the
@@ -100,6 +88,18 @@ address):
 The greeting is on the board's screen, and the monitor's prompt follows
 it. `tools/mon.py` is a debugger
 ([tools/README.md](../tools/README.md)).
+
+Run it in the emulator, which is built with
+`make -C nice_cpu/emulator build`. The emulator has no ROM, so the
+monitor, built with `make monitor`, is joined in front of the program.
+The input types `r`, which runs the program, and `h`, which halts the
+emulator when the program has returned. The emulator prints the
+console's output, why it stopped, and the registers, and with
+`--screen` the screen:
+
+    cat monitor/build/monitor.bin hello.bin > joined.bin
+    printf 'r\rh\r' > rh.txt
+    nice_cpu/emulator/zig-out/bin/niceemu --screen -i rh.txt joined.bin
 
 ## A first program in NICE assembly
 
@@ -133,7 +133,7 @@ with R1. `_mon_scr_color` is the stub of the monitor's routine in
         nice_cpu/runtime/muldiv_mpu.nasm > hello_all.nasm
     python3 nice_cpu/assembler/niceasm.py -o hello.bin hello_all.nasm
 
-It runs as the C program does, in the emulator and on the board.
+It runs as the C program does, on the board and in the emulator.
 
 ## Three levels
 
