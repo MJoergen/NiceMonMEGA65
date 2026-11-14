@@ -234,9 +234,10 @@ offset, so there the history is kept but not shown.
 | `c` | Clears the screen. |
 | `v` | The version of the monitor, and of the dispatch table: `NiceMon V2.1, dispatch table 1.5`. |
 | `i [A.B.C.D]` | Shows the Ethernet station's IP address, `IP address 192.168.1.65`, or writes it first: four decimal numbers of 0 to 255 with dots between them, such as `i 192.168.1.65`. Anything but an address or `dhcp` is no address, and `i` says so and writes nothing. It writes `0xFFFFFFB0`, `NET_IP` ([SYSTEM.md](../doc/SYSTEM.md#the-ethernet-station)), so a host connected over TCP loses its connection. In `niceemu` it is a register that keeps what is written. |
-| `i dhcp` | Gets the IP address from the network's DHCP server and writes it, as `i A.B.C.D` does, then shows it, with the mask, the gateway, the DNS server, and the DHCP server, a line each (The network below). Without an answer, it prints `No answer from a DHCP server` after about 8 seconds, and leaves the address as it was. |
+| `i dhcp` | Gets the IP address from the network's DHCP server and writes it, as `i A.B.C.D` does, then shows it, with the mask, the gateway, the DNS server, the DHCP server, and the NTP server, if it gives one, a line each (The network below). Without an answer, it prints `No answer from a DHCP server` after about 8 seconds, and leaves the address as it was. |
 | `m [MAC]` | Shows the station's MAC address, `MAC address 02:4E:49:43:45:06`, or writes it first: six bytes of one or two hex digits, in either case, with colons between them, such as `m 02:4E:49:43:45:01`. The first byte must be even, as an odd one makes a group address. Anything else is no address, and `m` says so and writes nothing. It writes `0xFFFFFFB1` and `B2`, so a host connected over TCP loses its connection. Each kind of board has its own after reset: `02:4E:49:43:45:03` on the R3, `02:4E:49:43:45:06` on the R6, and `02:4E:49:43:45:0A` on the Nexys4DDR. Two boards of the same kind on one network need different MAC addresses. In `niceemu` they are registers too, `02:4E:49:43:45:00` after reset. |
 | `time [YYYY-MM-DD HH:MM:SS]` | Shows the clock of the time of day, `2026-11-11 14:30:00`, or sets it first to the date and the time given, two digits for each part but the year, in the years 1970 to 2105, with blanks around them, such as `time 2026-11-11 14:30:00`. The clock keeps local time, as the MEGA65's real-time clock does, and knows no time zones. After a reset of the system it is not set. The monitor's cold start sets it from the MEGA65's real-time clock, unless the real-time clock lost its time ([SYSTEM.md](../doc/SYSTEM.md#the-i2c-bus)), and leaves a clock that is set already. On the MEGA65, `time` with a date and a time in the years 2000 to 2099 sets the real-time clock too, so that later starts, and the MEGA65's other cores, have the time. Until the clock is set, as on the Nexys4DDR, which has no real-time clock, `time` prints `Clock not set`; a program, a host, or `time` sets it. A start of a program keeps it. Anything else is no time, and `time` says so and sets nothing. A clock that a program set past 2106-02-07 shows as `Clock past 2106`. In `niceemu` the clock is the host's time in UTC from the start. |
+| `time ntp [SERVER] [+HH:MM \| -HH:MM]` | Sets the clock from a time server on the network, and on the MEGA65 the real-time clock too, as `time` with a date does, and shows the time it set, the server, and how far the clock was off, such as `Clock set 2026-11-14 12:30:05 from 192.168.1.1, was 7 s behind`. SERVER is a name, such as `pool.ntp.org`, or an IP address. Without it, the server is the NTP server that `i dhcp` got, or else `pool.ntp.org`. A time server gives UTC, and the clock keeps local time, so the offset is local time less UTC, from `-12:00` to `+14:00`, such as `+01:00` for Central European Time and `+02:00` for its summer time; without it the clock is set to UTC. It needs an IP address, and for a name a DNS server, from `i dhcp`. Its errors are a line each: no IP address, no DNS server, no such name, no answer from the DNS server or the time server after 3 tries of 2 seconds, a server that refused, and an answer that is not to be trusted (The network below). |
 | `baud [RATE]` | Shows the UART's baud rate, `Baud rate 230400`, or writes it first: 115200, 230400, 460800, 921600, 1000000, 1500000, or 2000000, in decimal, such as `baud 921600`. Anything else is no rate, and `baud` says so and writes nothing. It writes `0xFFFFFF9F` ([DEBUG_LINK.md](../doc/DEBUG_LINK.md#the-baud-rate)), as the on-board debugger's settings page does. The UART takes the new rate once it has sent nothing for 1 ms, so the answer and the prompt still come at the old rate, and a terminal on the UART then changes to the new one; only a reset brings back 230400. Over Ethernet the rate does not matter. In `niceemu` the word is memory, which reads 0 after a clear. |
 | `l` | Enters words into the RAM from lines of `ADDR WORD` in hex, as a `.bin` file has them (Loading without a host below), up to an empty line, and prints the words written and the lines skipped: `Words loaded: 600, 00008000 to 00008257`. |
 | `dir [SLOT]` | Lists the folder `NICE` of the SD card's FAT32 file system (Files below): `Directory of NICE`, then a row for each file, its name in 24 columns, the long name where it has one or else the 8.3 name, and its size in decimal, and for each directory, its name and `<DIR>`, then `Files: 25, directories: 1`. A name of 24 characters or more has a row of its own, and the size is on the next. With `SLOT` in hex, it mounts the card in it first; without, it lists the card mounted, which the first `dir` or `load` after reset mounts. An error is shown with its number and meaning: `File error 18, FAT16, which is not supported`. |
@@ -384,8 +385,8 @@ sets serves both.
   that a host reaches over Ethernet keeps the host's connection when the
   server gives the same address. Then the port is disabled again. The
   frames come from 0.0.0.0, to everyone,
-  with the broadcast flag set, and ask for the mask, the gateway, and
-  the DNS servers. They name the board to the server, as a router's
+  with the broadcast flag set, and ask for the mask, the gateway, the
+  DNS servers, and the NTP servers. They name the board to the server, as a router's
   list of stations shows it: the host name is `nicemon-` and the last
   three bytes of the MAC address, such as `nicemon-434506`, and the
   vendor class is `NiceMonMEGA65` and the monitor's version, such as
@@ -397,8 +398,22 @@ sets serves both.
   that runs one longer than its lease may have its address given to
   another station.
 - `i dhcp` keeps the mask and the gateway of the ACK, which UDP uses
-  below, and the first DNS server, which it shows; `i A.B.C.D` and the
-  cold start set the three to none, and forget the lease.
+  below, and the first DNS server and the first NTP server, which it
+  shows; `i A.B.C.D` and the cold start set the four to none, and
+  forget the lease, and so does `net_set` for the NTP server.
+- `time ntp` sets the clock from a time server by SNTP (RFC 4330): one
+  query of 48 bytes from a local port of its own to port 123, sent
+  again after 2 seconds, 3 times in all. It takes the answer of mode 4
+  from the server's address and port 123 whose originate timestamp is
+  the query's transmit timestamp. A stratum of 0 is a kiss-o'-death,
+  whose code it shows, such as `The time server refused: RATE`. A leap
+  indicator of 3, a stratum over 15, a transmit timestamp of 0, or a
+  time the clock does not take, is not to be trusted. The clock takes
+  the seconds and the microseconds of the transmit timestamp, plus the
+  offset, with no correction for the delay, which is far below the
+  second that `time` shows. Seconds below 2^31 are of NTP's era 1,
+  from 2036 on (RFC 4330 §3). With no server named, it asks the NTP
+  server of DHCP, or else `pool.ntp.org`, through the DNS server.
 
 The UDP endpoint is the entries 16 to 19 of the dispatch table (above),
 so that a program, such as a game of two boards, or a BASIC interpreter,

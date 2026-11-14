@@ -1,7 +1,8 @@
 // The clock of the time of day for the ROM (issue #109): the monitor's
-// time command, the dates of FAT's entries for fat32.c, and the clock set
+// time command, the dates of FAT's entries for fat32.c, the clock set
 // from the MEGA65's real-time clock at the cold start, which time sets
-// (issue #105). It is
+// (issue #105), and the time of an SNTP answer, which time ntp sets
+// (issue #127). It is
 // part of the ROM's C code (INTERNALS.md, "C in the ROM"), with fat32.c.
 //
 // The clock (nice_cpu's SYSTEM.md §10) counts seconds since 1970-01-01
@@ -37,10 +38,16 @@
 #define RV3032 0x51u
 #define ISL12020M 0x6Fu
 
+#define NTP_UNIX 2208988800u  // the seconds from 1900, NTP's era 0, to 1970
+#define ZONE_MAX 14     // the hours of an offset at most, east, and west
+#define ZONE_MIN 12
 #define YEAR_MIN 1970   // the years that time sets
 #define YEAR_MAX 2105
 #define FAT_MIN 1980    // the first year that FAT's dates hold
 #define BAD 255u        // a byte of the real-time clock that is no two digits
+// A helper with more than one caller stays one function: clang inlines
+// it into each at -Oz, which costs ROM
+#define ONCE __attribute__((noinline))
 
 // The date and the time of the pattern FORM, a # for each digit: the
 // year, the month, the day, the hours, the minutes, and the seconds, in
@@ -63,16 +70,9 @@ static unsigned mlen(unsigned y, unsigned m)
     return mdays[m] + (m == 1 && ylen(y) == 366);
 }
 
-// The clock's time in field and usec. 1, or 0 when the clock is not set,
-// or past 32 bits of seconds.
-static int split(void)
+// The seconds sec since 1970 in field
+static ONCE void fields(unsigned sec)
 {
-    if (!(nice_peek(CLOCK_STATUS) & 1))
-        return 0;
-    usec = nice_peek(CLOCK_USEC);   // and the snapshot of the seconds
-    unsigned sec = nice_peek(CLOCK_SEC_LO);
-    if (nice_peek(CLOCK_SEC_HI))
-        return 0;
     unsigned days = sec / 86400, s = sec % 86400;
     unsigned y = 1970, m = 0;
     while (days >= ylen(y))
@@ -85,7 +85,52 @@ static int split(void)
     field[3] = s / 3600;
     field[4] = s / 60 % 60;
     field[5] = s % 60;
+}
+
+// The clock's time in field and usec, and its seconds in *sec. 1, or 0
+// when the clock is not set, or past 32 bits of seconds.
+static ONCE int split_sec(unsigned *sec)
+{
+    if (!(nice_peek(CLOCK_STATUS) & 1))
+        return 0;
+    usec = nice_peek(CLOCK_USEC);   // and the snapshot of the seconds
+    *sec = nice_peek(CLOCK_SEC_LO);
+    if (nice_peek(CLOCK_SEC_HI))
+        return 0;
+    fields(*sec);
     return 1;
+}
+
+static int split(void)
+{
+    unsigned sec;
+    return split_sec(&sec);
+}
+
+// The number n in decimal
+static void putdec(unsigned n)
+{
+    if (n > 9)
+        putdec(n / 10);
+    nice_putc('0' + n % 10);
+}
+
+// The date and the time in field, as FORM has them. Each field's digits,
+// from the place of its first: 1000 for a field of four digits, 10 for
+// one of two.
+static ONCE void show(void)
+{
+    for (unsigned i = 0, k = 0, w = 1000; form[i]; i++) {
+        if (form[i] != '#') {
+            nice_putc(form[i]);
+            w = 10;
+            continue;
+        }
+        nice_putc('0' + field[k] / w % 10);
+        if (w == 1)
+            k++;
+        w /= 10;
+    }
 }
 
 // FAT's date of the clock's time, and in *t its time in bits 15..0, in
@@ -104,7 +149,7 @@ unsigned clock_fat(unsigned *t)
 // Sets the clock to the date and the time in field, at us microseconds,
 // which sets "set". 0, with nothing set, when they are no date and time
 // of the years YEAR_MIN to YEAR_MAX, or us is a second or more.
-static int set(unsigned us)
+static ONCE int set(unsigned us)
 {
     if (field[0] < YEAR_MIN || field[0] > YEAR_MAX || field[1] - 1 > 11 ||
         field[2] - 1 >= mlen(field[0], field[1] - 1) || field[3] > 23 || field[4] > 59 ||
@@ -168,7 +213,7 @@ static unsigned tobcd(unsigned n)
 // MEGA65 core writes it; the write clears RTCF. Nothing answers on the
 // Nexys4DDR, which has no real-time clock, and nothing is written without
 // an I2C master, as in niceemu, where its words are plain memory.
-static void rtc_write(void)
+static ONCE void rtc_write(void)
 {
     if (field[0] < 2000 || field[0] > 2099 || !(nice_peek(I2C_STATUS) & I2C_PRESENT))
         return;
@@ -239,6 +284,32 @@ void clock_rtc(void)
     set(us);
 }
 
+// The line from p as the pattern f has it, a # for each digit, with its
+// numbers in field, and blanks after it to the end of the line. 1, or 0
+// when it is not.
+static ONCE int parse(unsigned p, const char *f)
+{
+    unsigned n = 0, k = 0;
+    for (; *f; f++, p++) {
+        unsigned c = nice_peek(p);
+        if (*f != '#') {
+            if (c != (unsigned)*f)
+                return 0;
+        } else if (c - '0' > 9) {
+            return 0;
+        } else {
+            n = n * 10 + c - '0';
+            if (f[1] != '#') {
+                field[k++] = n;
+                n = 0;
+            }
+        }
+    }
+    while (nice_peek(p) == ' ')
+        p++;
+    return !nice_peek(p);
+}
+
 // time [YYYY-MM-DD HH:MM:SS]: the line from p, the word after time. With
 // a date and a time as FORM has them, with blanks before and after, the
 // clock is set to them, at 0 microseconds, which sets "set", and so is the
@@ -250,25 +321,7 @@ void clock_cmd(unsigned p)
     while (nice_peek(p) == ' ')
         p++;
     if (nice_peek(p)) {
-        unsigned n = 0, k = 0;
-        for (unsigned i = 0; form[i]; i++, p++) {
-            unsigned c = nice_peek(p);
-            if (form[i] != '#') {
-                if (c != (unsigned)form[i])
-                    goto bad;
-            } else if (c - '0' > 9) {
-                goto bad;
-            } else {
-                n = n * 10 + c - '0';
-                if (form[i + 1] != '#') {
-                    field[k++] = n;
-                    n = 0;
-                }
-            }
-        }
-        while (nice_peek(p) == ' ')
-            p++;
-        if (nice_peek(p) || !set(0))
+        if (!parse(p, form) || !set(0))
             goto bad;
         rtc_write();
     }
@@ -276,22 +329,61 @@ void clock_cmd(unsigned p)
         nice_print(nice_peek(CLOCK_STATUS) & 1 ? "Clock past 2106\r\n" : "Clock not set\r\n");
         return;
     }
-    // Each field's digits, from the place of its first: 1000 for a field
-    // of four digits, 10 for one of two
-    for (unsigned i = 0, k = 0, w = 1000; form[i]; i++) {
-        if (form[i] != '#') {
-            nice_putc(form[i]);
-            w = 10;
-            continue;
-        }
-        nice_putc('0' + field[k] / w % 10);
-        if (w == 1)
-            k++;
-        w /= 10;
-    }
+    show();
     nice_print("\r\n");
     return;
 bad:
     nice_print("time [YYYY-MM-DD HH:MM:SS]: the local date and time, such as "
                "time 2026-11-11 14:30:00\r\n");
+}
+
+// The offset of time ntp, +HH:MM or -HH:MM, local time less UTC, from p,
+// with blanks after it to the end of the line: its seconds, from -12:00
+// to +14:00, or 1, which no offset is, when it is none (issue #127).
+int clock_zone(unsigned p)
+{
+    unsigned sign = nice_peek(p);
+    if ((sign != '+' && sign != '-') || !parse(p + 1, "##:##") || field[1] > 59)
+        return 1;
+    unsigned sec = field[0] * 3600 + field[1] * 60;
+    if (sec > (sign == '+' ? ZONE_MAX : ZONE_MIN) * 3600u)
+        return 1;
+    return sign == '+' ? (int)sec : -(int)sec;
+}
+
+// time ntp: the clock set from the transmit timestamp of an SNTP answer
+// of the server ip, sec seconds since 1900 and their fraction frac, plus
+// zone, the offset in seconds, and the MEGA65's real-time clock with it,
+// as time sets them. A sec below 2^31 is of era 1, from 2036 on (RFC 4330
+// §3), which the 32 bits of the seconds since 1970 take, as do those of
+// era 0 from 1970 on, with the same subtraction. The fraction gives the
+// microseconds: 1000000 / 65536 is 15625 / 1024. Then the time set is
+// shown, the server, and how far the clock was off, in whole seconds,
+// when it was set. 0, or 1 with nothing set when the time is none that
+// the clock takes, before 1970 or after 2105.
+int clock_ntp(unsigned sec, unsigned frac, int zone, unsigned ip)
+{
+    if (sec >= 0x80000000u && sec < NTP_UNIX)
+        return 1;
+    unsigned t = sec - NTP_UNIX + (unsigned)zone, old;
+    int was = split_sec(&old);
+    fields(t);
+    if (!set((frac >> 16) * 15625 >> 10))
+        return 1;
+    rtc_write();
+    nice_print("Clock set ");
+    show();
+    nice_print(" from ");
+    for (int i = 24; i >= 0; i -= 8) {
+        putdec(ip >> i & 0xFF);
+        if (i)
+            nice_putc('.');
+    }
+    if (was) {
+        nice_print(", was ");
+        putdec(t > old ? t - old : old - t);
+        nice_print(t > old ? " s behind" : t < old ? " s ahead" : " s off");
+    }
+    nice_print("\r\n");
+    return 0;
 }

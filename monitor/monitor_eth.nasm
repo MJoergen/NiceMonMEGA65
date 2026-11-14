@@ -5,13 +5,14 @@
 ; network"); the demultiplexing of the frames that come, and the poll,
 ; net_poll, entry 24, which the other entries and the ROM's own waits call
 ; (issue #111); the DHCP exchange in the background, which the cold start
-; begins and getline carries on (issue #126); the UDP endpoint, the entries 16 to 19, udp_open,
-; udp_send, udp_recv, and udp_close; the IP settings, net_config and
-; net_set, entries 21 and 22; net_dhcp, entry 23, and i dhcp, which get
-; the IP address from a DHCP server, and the renewal of its lease in the
-; poll; dns_lookup, entry 25, the IPv4
-; address of a name from the DNS server; and tftp IP NAME, which reads a
-; .bin file through the endpoint from a TFTP server as load NAME reads one
+; begins and getline carries on (issue #126); the UDP endpoint, the
+; entries 16 to 19, udp_open, udp_send, udp_recv, and udp_close; the IP
+; settings, net_config and net_set, entries 21 and 22; net_dhcp, entry
+; 23, and i dhcp, which get the IP address from a DHCP server, and the
+; renewal of its lease in the poll; dns_lookup, entry 25, the IPv4
+; address of a name from the DNS server; time ntp, which sets the clock
+; from a time server (issue #127); and tftp IP NAME, which reads a .bin
+; file through the endpoint from a TFTP server as load NAME reads one
 ; from the card (issue #84).
 ;
 ; The i command, which shows and writes the IP address, is in
@@ -71,13 +72,20 @@ DNS_PORT        .EQU    53              ; the DNS server's UDP port
 DNS_TRIES       .EQU    3               ; the queries that dns_lookup sends
 DNS_WAIT        .EQU    2000000         ; the microseconds it waits after each
 DNS_NAME        .EQU    56              ; the byte of the buffer where a query's name starts, after its 12 bytes of header
+NTP_PORT        .EQU    123             ; the time server's UDP port (RFC 4330)
+NTP_TRIES       .EQU    3               ; the queries that time ntp sends
+NTP_WAIT        .EQU    2000000         ; the microseconds it waits after each
+E_NTPTIME       .EQU    -60             ; the errors of time ntp, which no entry returns: no answer,
+E_NTPBAD        .EQU    -61             ; an answer that is not to be trusted, or a time that the clock does not take,
+E_NTPKOD        .EQU    -62             ; and a kiss-o'-death
 TFTP_PORT       .EQU    69              ; the TFTP server's port (RFC 1350)
 TFTP_TRIES      .EQU    5               ; the sends of a packet that tftp waits for an answer to
 TFTP_WAIT       .EQU    1000000         ; the microseconds it waits after each
 TFTP_PKT        .EQU    96              ; the words of V_TPKT
 
 ; i dhcp: net_dhcp, and the address, the mask, the gateway, the DNS
-; server, and the DHCP server shown, or that no server answered.
+; server, the DHCP server, and the NTP server, if it gave one, shown, or
+; that no server answered.
 ip_dhcp
                 CALL    net_dhcp
                 TST     R1
@@ -97,6 +105,9 @@ ip_dhcp
                 MOVE    R1, S_DSRV
                 MOVE    R2, @V_DSRV
                 CALL    show_ip
+                MOVE    R1, S_NTPSRV
+                MOVE[M] R2, @V_NTP
+        ?!Z     CALL    show_ip
                 JMP     main
 :
                 MOVE    R1, S_NODHCP
@@ -160,7 +171,8 @@ dhcp_try
 ; dhcp_commit: the address of the ACK, V_DIP, written to E_IP if it is
 ; another, which breaks a host's connection over TCP, as a write of i
 ; does, and ends the program's TCP connections in E_TRESET; its mask,
-; gateway, and DNS server kept, and its lease, by lease_take. Uses R1-R6.
+; gateway, DNS server, and NTP server kept, and its lease, by lease_take.
+; Uses R1-R6.
 dhcp_commit
                 CMP     @E_IP, @V_DIP
         ?!Z     MOVE    @E_IP, @V_DIP
@@ -168,6 +180,7 @@ dhcp_commit
                 MOVE    @V_MASK, @V_DMASK
                 MOVE    @V_GW, @V_DGW
                 MOVE    @V_DNS, @V_DDNS
+                MOVE    @V_NTP, @V_DNTP
                 JMP     lease_take      ; which returns to the caller
 
 ; The DHCP exchange in the background (issue #126). After a reset of the
@@ -817,12 +830,12 @@ net_config
 
 ; net_set: entry 22. The IP address, the mask, the gateway, and the DNS
 ; server set from the 4 words at the word address R1, as net_config gives
-; them, after a poll. The IP address is written to E_IP only if it is
-; another, as a write breaks a host's connection over TCP, and ends every
-; TCP connection of the program in E_TRESET; 0 clears it. The lease is
-; forgotten, and not renewed, and the exchange in the background ended.
-; R1 = 0. Uses R1-R6, and R7 across the
-; calls, saved.
+; them, after a poll, and no NTP server kept. The IP address is written
+; to E_IP only if it is another, as a write breaks a host's connection
+; over TCP, and ends every TCP connection of the program in E_TRESET; 0
+; clears it. The lease is forgotten, and not renewed, and the exchange in
+; the background ended. R1 = 0. Uses R1-R6, and R7 across the calls,
+; saved.
 net_set
                 PUSH    R7
                 CALL    net_waddr
@@ -834,6 +847,7 @@ net_set
                 MOVE    @V_MASK, @1[R7]
                 MOVE    @V_GW, @2[R7]
                 MOVE    @V_DNS, @3[R7]
+                MOVE    @V_NTP, 0
                 MOVE    @V_BSTATE, 0
                 CALL    lease_forget
                 MOVE    R1, 0
@@ -1078,8 +1092,8 @@ udp_take
 ; at a time: 53, the message type; 50, the address asked for, the one
 ; offered for a REQUEST, and for a DISCOVER the station's, E_IP, if it
 ; has one, so that the server offers it again; for a REQUEST, 54, the
-; server; 55, the options asked for, 1 the mask, 3 the gateway, and 6 the
-; DNS servers; 12, the host name,
+; server; 55, the options asked for, 1 the mask, 3 the gateway, 6 the
+; DNS servers, and 42 the NTP servers; 12, the host name,
 ; nicemon- and the last three bytes of the MAC address in lower-case hex,
 ; such as nicemon-434506, a valid name for the network's DNS; 60, the
 ; vendor class, NiceMonMEGA65 and the monitor's version, cut at DHCP_SMAX
@@ -1248,10 +1262,10 @@ dhcp_len
 ; dhcp_wait: the reply of the type R1, DHCP_OFFER or DHCP_ACK, to the
 ; transaction V_XID, within DHCP_WAIT microseconds. R1 = its type, or
 ; DHCP_NAK when an ACK is waited for and a NAK comes, or 0 when none came.
-; The address, the server, the mask, the gateway, and the DNS server of
-; the reply that is waited for are copied to V_DIP, V_DSRV, V_DMASK,
-; V_DGW, and V_DDNS. A reply of the type without an address is passed
-; over, so that the station's address is never made 0. It polls with
+; The address, the server, the mask, the gateway, the DNS server, and the
+; NTP server of the reply that is waited for are copied to V_DIP, V_DSRV,
+; V_DMASK, V_DGW, V_DDNS, and V_DNTP. A reply of the type without an
+; address is passed over, so that the station's address is never made 0. It polls with
 ; net_step, which copies a datagram to port 68 to V_RXF, and takes the
 ; other frames where they go. Uses R1-R6, and R7 and R8 across the calls,
 ; saved.
@@ -1286,8 +1300,8 @@ dhcp_wait_end
                 POP     R7
                 RET
 
-; dhcp_keep: the address, the server, the mask, the gateway, and the DNS
-; server of the reply that dhcp_parse took last, V_PIP and the rest,
+; dhcp_keep: the address, the server, the mask, the gateway, the DNS
+; server, and the NTP server of the reply that dhcp_parse took last, V_PIP and the rest,
 ; copied to V_DIP and the rest. Uses no register.
 dhcp_keep
                 MOVE    @V_DIP, @V_PIP
@@ -1295,6 +1309,7 @@ dhcp_keep
                 MOVE    @V_DMASK, @V_PMASK
                 MOVE    @V_DGW, @V_PGW
                 MOVE    @V_DDNS, @V_PDNS
+                MOVE    @V_DNTP, @V_PNTP
                 RET
 
 ; dhcp_parse: the frame of R1 bytes at V_RXF, if it is a DHCP reply to the
@@ -1302,8 +1317,8 @@ dhcp_keep
 ; 67 to 68, a BOOTP reply, and the magic cookie. Its checksums are not
 ; checked, as the FCS was. R1 = the message type of option 53, or 0 when
 ; it is no reply of ours or has no type, and V_PIP, V_PSRV, V_PMASK,
-; V_PGW, and V_PDNS are its address, and the options 54, 1, 3, and 6, the
-; first address of each, V_PLEASE, V_PT1, and V_PT2 the options 51, 58,
+; V_PGW, V_PDNS, and V_PNTP are its address, and the options 54, 1, 3, 6,
+; and 42, the first address of each, V_PLEASE, V_PT1, and V_PT2 the options 51, 58,
 ; and 59, each 0 without them, and V_PMACH and V_PMACL the MAC address
 ; of the frame's source. The options are walked from byte 284 of the
 ; buffer up to 255, or the end of the frame, R8, the byte after its last;
@@ -1340,6 +1355,7 @@ dhcp_parse
                 MOVE    @V_PMASK, 0
                 MOVE    @V_PGW, 0
                 MOVE    @V_PDNS, 0
+                MOVE    @V_PNTP, 0
                 MOVE    @V_PLEASE, 0
                 MOVE    @V_PT1, 0
                 MOVE    @V_PT2, 0
@@ -1390,6 +1406,9 @@ dhcp_opt
         ?Z      JMP     :+
                 CMP     R6, 6
         ?Z      MOVE    R6, V_PDNS
+        ?Z      JMP     :+
+                CMP     R6, 42
+        ?Z      MOVE    R6, V_PNTP
         ?Z      JMP     :+
                 CMP     R6, 54
         ?!Z     JMP     dhcp_opt
@@ -1810,6 +1829,219 @@ dns_skip
                 MOVE[M] R1, 1
                 RET
 
+; time ntp [SERVER] [+HH:MM | -HH:MM]: the clock of the time of day set
+; from a time server by SNTP (RFC 4330), and the MEGA65's real-time clock
+; with it, by clock_ntp of clock.c (issue #127). SERVER is a name, which
+; dns_lookup looks up, or an IP address; without it the server is the NTP
+; server of DHCP's option 42, V_NTP, and without that NTP_POOL. The
+; offset is local time less UTC, which clock_zone of clock.c reads, and
+; +00:00 without it. The query is 48 bytes from a local port of its own,
+; V_NWAIT, to port 123: version 4, mode 3, and the transmit timestamp,
+; which the fine clock and the microseconds make, as the answer's
+; originate timestamp must be the same. It is built in V_TXF as dns_lookup
+; builds its query, and sent again after NTP_WAIT microseconds, NTP_TRIES
+; times in all. ntp_parse takes the answer. There is no correction for
+; the delay, which is far below the second that the clock shows. R7 is
+; the server's name, 0 for none, then the sends left, R8 the offset, R9
+; the server's address, and R10 the time of the send.
+time_ntp
+                MOVE    R7, 0
+                MOVE    R8, 0
+:
+                CMP     @R1, 0x20
+        ?Z      ADD     R1, R1, 1
+        ?Z      JMP     :-
+                TST     @R1
+        ?Z      JMP     ntp_server      ; neither
+                CMP     @R1, 0x2B       ; +
+        ?Z      JMP     ntp_zone
+                CMP     @R1, 0x2D       ; -
+        ?Z      JMP     ntp_zone
+                MOVE    R7, R1          ; the server's name, up to a blank
+:
+                ADD     R1, R1, 1
+                TST     @R1
+        ?Z      JMP     ntp_server
+                CMP     @R1, 0x20
+        ?!Z     JMP     :-
+                MOVE    @R1++, 0        ; the name ends, for dns_lookup
+:
+                CMP     @R1, 0x20
+        ?Z      ADD     R1, R1, 1
+        ?Z      JMP     :-
+                TST     @R1
+        ?Z      JMP     ntp_server
+ntp_zone
+                CALL    _clock_zone
+                CMP     R1, 1
+        ?Z      JMP     ntp_bad
+                MOVE    R8, R1
+; The server's address
+ntp_server
+                MOVE    R1, E_NOIP
+                TST     @E_IP
+        ?Z      JMP     ntp_fail
+                MOVE[M] R9, @V_NTP
+                TST     R7
+        ?!Z     JMP     :+
+                TST     R9
+        ?!Z     JMP     ntp_query       ; DHCP's
+                MOVE    R7, TEXT_B+4*S_POOL
+:
+                MOVE    R1, R7
+                MOVE    R2, V_NTPIP
+                CALL    dns_lookup
+                TST     R1
+        ?!Z     JMP     ntp_fail
+                MOVE    R9, @V_NTPIP
+; The query, from a port of its own, which is not the endpoint's
+ntp_query
+                MOVE    R1, V_TXF
+                MOVE    R2, UDP_HDR+12
+:
+                MOVE    @R1++, 0
+                SUB[M]  R2, R2, 1
+        ?!Z     JMP     :-
+                CALL    net_clock
+                MOVE    @V_TXF+UDP_HDR+10, R1  ; the transmit timestamp
+                XOR     @V_TXF+UDP_HDR+11, @io.us, @E_MACL
+                SHR     R1, R1, 4
+                AND     R1, R1, 0x3FFF
+                OR      R1, R1, 0xC000  ; the port, 49152 to 65535
+                CMP     R1, @V_UPORT
+        ?Z      XOR     R1, R1, 1       ; and not the endpoint's
+                MOVE    R10, R1
+                MOVE    @V_TXF+UDP_HDR, 0x23000000  ; version 4, mode 3
+                MOVE    @V_NWAIT, R10
+                CALL    net_on
+                MOVE    R1, R9
+                CALL    net_hop         ; whose ARP may use the words before UDP_HDR
+                TST     R1
+        ?!Z     MOVE    R1, E_NOROUTE
+        ?!Z     JMP     ntp_off
+                MOVE    R1, V_TXF
+                MOVE    R4, R9
+                SHL     R5, R10, 16
+                OR      R5, R5, NTP_PORT
+                MOVE    R6, 48
+                CALL    udp_head
+                MOVE    R7, NTP_TRIES
+ntp_send
+                CALL    ip_ident
+                MOVE    @V_TXF+5, R1
+                MOVE    R1, V_TXF
+                CALL    ip_csum
+                MOVE    R1, V_TXF
+                MOVE    R2, 90          ; the bytes of the frame
+                CALL    eth_send
+                MOVE    R10, @io.us
+ntp_wait
+                CALL    net_step
+                TST     R1
+        ?Z      JMP     :+
+                CALL    ntp_parse
+                CMP     R1, 1
+        ?!Z     JMP     ntp_off         ; not passed over
+:
+                SUB     R1, @io.us, R10
+                CMP     R1, NTP_WAIT
+        ?C      JMP     ntp_wait
+                SUB[M]  R7, R7, 1
+        ?!Z     JMP     ntp_send
+                MOVE    R1, E_NTPTIME
+ntp_off
+                MOVE    @V_NWAIT, 0
+                CALL    net_off
+                TST     R1
+        ?!Z     JMP     ntp_fail
+                MOVE    R1, @V_RXF+UDP_HDR+10  ; the transmit timestamp
+                MOVE    R2, @V_RXF+UDP_HDR+11
+                MOVE    R3, R8
+                MOVE    R4, R9
+                CALL    _clock_ntp
+                TST     R1
+        ?Z      JMP     main
+                MOVE    R1, E_NTPBAD    ; a time that the clock does not take
+; An error: its line, and for a kiss-o'-death the server's code, the 4
+; characters of the reference ID, with ? for one that does not print
+ntp_fail
+                MOVE    R7, R1
+                MOVE    R2, NTP_ERRORS
+:
+                MOVE    R1, @R2++
+                MOVE    R3, @R2++
+                CMP     R1, R7
+        ?!Z     JMP     :-              ; the list ends with E_NTPKOD
+                MOVE    R1, R3
+                CALL    puts_b
+                CMP     R7, E_NTPKOD
+        ?!Z     JMP     ntp_end
+                MOVE    R7, @V_RXF+UDP_HDR+3
+                MOVE    R8, 4
+:
+                ROL     R7, R7, 8
+                AND     R1, R7, 0xFF
+                SUB     R2, R1, 0x20
+                CMP     R2, 0x5F
+        ?!C     MOVE    R1, 0x3F        ; ?
+                CALL    mon_putc
+                SUB[M]  R8, R8, 1
+        ?!Z     JMP     :-
+ntp_end
+                CALL    _io_crlf
+                JMP     main
+ntp_bad
+                MOVE    R1, S_BADNTP
+                CALL    puts_b_crlf
+                JMP     main
+
+; ntp_parse: the datagram of R1 bytes at V_RXF, to the query's port, if it
+; is the answer of the server R9: from its port 123, with 48 bytes of data
+; at least, mode 4, and the originate timestamp of the query's transmit
+; timestamp. R1 = 1 when it is not, and it is passed over. Else R1 = 0,
+; or E_NTPKOD for a stratum of 0, a kiss-o'-death, or E_NTPBAD for a leap
+; indicator of 3, not synchronized, a stratum over 15, or a transmit
+; timestamp of 0, which is not to be trusted. Uses R1 and R2.
+ntp_parse
+                CMP     R1, 90
+        ?C      JMP     :+              ; too short
+                CMP     @V_RXF+7, R9
+        ?!Z     JMP     :+
+                SHR     R1, @V_RXF+9, 16
+                CMP     R1, NTP_PORT
+        ?!Z     JMP     :+
+                SHR     R1, @V_RXF+10, 16
+                CMP     R1, 56          ; the UDP length
+        ?C      JMP     :+
+                MOVE    R2, @V_RXF+UDP_HDR
+                SHR     R1, R2, 24
+                AND     R1, R1, 7
+                CMP     R1, 4           ; a server's
+        ?!Z     JMP     :+
+                CMP     @V_RXF+UDP_HDR+6, @V_TXF+UDP_HDR+10
+        ?!Z     JMP     :+
+                CMP     @V_RXF+UDP_HDR+7, @V_TXF+UDP_HDR+11
+        ?!Z     JMP     :+
+                SHR     R1, R2, 16
+                AND[M]  R1, R1, 0xFF    ; the stratum
+        ?Z      MOVE    R1, E_NTPKOD
+        ?Z      RET
+                CMP     R1, 16
+        ?!C     JMP     :++
+                SHR     R1, R2, 30
+                CMP     R1, 3           ; not synchronized
+        ?Z      JMP     :++
+                OR[M]   R0, @V_RXF+UDP_HDR+10, @V_RXF+UDP_HDR+11
+        ?Z      JMP     :++
+                MOVE    R1, 0
+                RET
+:
+                MOVE    R1, 1
+                RET
+:
+                MOVE    R1, E_NTPBAD
+                RET
+
 ; tftp IP[:PORT] [NAME]: the .bin file NAME of the TFTP server at IP
 ; (RFC 1350), read in octet mode through the UDP endpoint, which it opens
 ; on a port that udp_open picks, and closes at the end, and its lines
@@ -2100,7 +2332,7 @@ S_DNS           .ASCII_B 'DNS server '
 S_DSRV          .ASCII_B 'DHCP server '
                 .DAT    0
 D_PARAMS
-                .DAT    55, 3, 1, 3, 6, 0  ; option 55: the mask, the gateway, and the DNS servers
+                .DAT    55, 4, 1, 3, 6, 42, 0  ; option 55: the mask, the gateway, the DNS servers, and the NTP servers
 S_FTP           .ASCII_B 'ftp'
 S_OCTET         .ASCII_B 'octet'
 S_STAR          .ASCII_B '*'
@@ -2113,3 +2345,28 @@ S_TFTPERR
 S_NOIP          .ASCII_B 'No IP address; i sets one'
 S_NOROUTE
                 .ASCII_B 'No answer to ARP from the server, or from the gateway'
+S_NTPSRV
+                .ASCII_B 'NTP server '
+S_POOL          .ASCII_B 'pool.ntp.org'
+                .DAT    0
+S_BADNTP
+                .ASCII_B 'time ntp [SERVER] [+HH:MM | -HH:MM], local time less UTC: time ntp +01:00'
+S_NODNS         .ASCII_B 'No DNS server; i dhcp gets one'
+S_DNSTIME
+                .ASCII_B 'No answer from the DNS server'
+S_DNSNAME
+                .ASCII_B 'No such name'
+                .DAT    0
+S_DNSFAIL
+                .ASCII_B 'DNS error'
+S_NONTP         .ASCII_B 'No answer from the time server'
+S_NTPBAD
+                .ASCII_B 'The time server is not to be trusted'
+                .DAT    0
+S_NTPKOD
+                .ASCII_B 'The time server refused: '
+; The errors of time ntp, and their texts, which E_NTPKOD ends
+NTP_ERRORS
+                .DAT    E_NOIP, S_NOIP, E_NOROUTE, S_NOROUTE, E_NODNS, S_NODNS
+                .DAT    E_DNSTIME, S_DNSTIME, E_DNSNAME, S_DNSNAME, E_DNSFAIL, S_DNSFAIL
+                .DAT    E_NTPTIME, S_NONTP, E_NTPBAD, S_NTPBAD, E_NTPKOD, S_NTPKOD

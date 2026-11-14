@@ -183,11 +183,11 @@ that runs from a ROM (nice_cpu's translator README, "Code in a ROM"),
 at `-Oz`, which makes it more than a quarter smaller than `-O2`. The Makefile joins
 it after `mon.nasm`, with nice_cpu's `lib.nasm` and `muldiv_mpu.nasm`.
 `fat32.c` is FAT32 (README.md, "Files"), about 9100 words, and
-`clock.c` the `time` command, the dates of FAT's entries, and the clock
+`clock.c` the `time` command, the dates of FAT's entries, the clock
 set from the MEGA65's real-time clock at the cold start and written by
-`time`, through the I2C master (doc/SYSTEM.md, "The I2C bus"), about
-1200 words, small rather
-than general, as its header says.
+`time`, through the I2C master (doc/SYSTEM.md, "The I2C bus"), and the
+offset and the time of `time ntp` (#127), about 1600 words, small
+rather than general, as its header says.
 
 - **Calls.** Every function of the C code that is not `static` is
   exported, and the monitor's assembly calls it as `_name`, in the C ABI;
@@ -230,38 +230,39 @@ a program, `demo.bin`, whose words
 <!-- romsize layout -->
 | Part | Address | Words |
 |---|---|---:|
-| The monitor | `0x0000`–`0x519B` | 20892 |
-| Free | `0x519C`–`0x7FFF` | 11876 |
+| The monitor | `0x0000`–`0x5537` | 21816 |
+| Free | `0x5538`–`0x7FFF` | 10952 |
 <!-- /romsize layout -->
 
 The monitor's words, by the source they come from, in the order
 the Makefile joins them. The column "Text" counts the words of the
 texts, which are part of "Words". They are packed, four characters a
 word, with `.ASCII_B`, and a `.DAT 0` after a text whose length is a
-multiple of 4 ends it (#131):
+multiple of 4 ends it (#131), which `test/texts.py` checks whenever the
+ROM is built:
 
 <!-- romsize monitor -->
 | Source | What it is | Words | Text |
 |---|---|---:|---:|
-| `monitor.nasm` | The dispatch table, the HAL, the cold start, and the traps | 795 | 9 |
-| `monitor_cmd.nasm` | The main loop and the commands | 2197 | 627 |
+| `monitor.nasm` | The dispatch table, the HAL, the cold start, and the traps | 798 | 9 |
+| `monitor_cmd.nasm` | The main loop and the commands | 2245 | 647 |
 | `monitor_dis.nasm` | The disassembler of `u` | 889 | 79 |
 | `monitor_sd.nasm` | The sector routines | 226 | 59 |
-| `monitor_eth.nasm` | The network | 3095 | 84 |
+| `monitor_eth.nasm` | The network | 3558 | 158 |
 | `monitor_tcp.nasm` | TCP | 2456 | 0 |
 | `monlib.nasm` | The routines that programs join | 259 | 0 |
 | `mon.nasm` | The stubs of the entries | 72 | 0 |
 | `nicewasm` | `___wasm_start`, which copies the C code's data to the RAM | 85 |  |
 | `fat32.c` | FAT32 | 9102 |  |
-| `clock.c` | The clock and `time` | 1199 |  |
+| `clock.c` | The clock and `time` | 1593 |  |
 | nice_cpu's C library | `nice_print` | 53 |  |
 | `nicewasm` | The helpers of the translated code: loads, stores, and traps | 125 |  |
-| `nicewasm` | The initial values of the C code's data: its strings and tables | 70 |  |
+| `nicewasm` | The initial values of the C code's data: its strings and tables | 86 |  |
 | nice_cpu's `lib.nasm` | The runtime of the C code | 131 | 0 |
 | nice_cpu's `muldiv_mpu.nasm` | Multiply and divide | 128 | 0 |
 | `build/folder.nasm` | The error of a card without the folder | 8 | 8 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 20892 | 868 |
+| In all | | 21816 | 962 |
 <!-- /romsize monitor -->
 
 - The C code's strings are in its initial values, also four characters
@@ -368,7 +369,17 @@ needs `FOLDER=NICE`, the default. It runs these steps in order:
    classes, an answer cut short, a second query, the gateway, no answer
    to ARP, and no answer. It compares the output and the frames sent
    with `test/dns.expected`, with the ID and the port as `qq` and `pp`.
-6. **The lease.** `test/lease.py` runs `test/lease.nasm`, which takes
+6. **NTP.** `test/ntp.py` types `time ntp` and `i dhcp` into the
+   monitor with `--step-time`, and learns the frames of each run as
+   `test/dns.py` does. DHCP gives the DNS server and an NTP server in
+   option 42. It covers no IP address, DHCP's server, a server by name
+   and by address, an offset east and west, a time of era 1, datagrams
+   that are passed over, a kiss-o'-death, a leap indicator of 3, a
+   stratum of 16, a time before 1970, no answer, an answer to the
+   second send, no such name, and an offset too large. It compares the
+   output and the frames sent with `test/ntp.expected`, with a query's
+   port as `pp` and its transmit timestamp as `tt`.
+7. **The lease.** `test/lease.py` runs `test/lease.nasm`, which takes
    a lease with `net_dhcp`, opens the endpoint, and polls, under the
    monitor with `--step-time`. It sleeps between its polls with `WAIT`,
    so minutes of the clock take a second, and notes when a frame goes.
@@ -377,12 +388,12 @@ needs `FOLDER=NICE`, the default. It runs these steps in order:
    broadcast from T2, 60 ticks apart, the lease's end, an ACK that
    starts the lease again, an ACK of another address, a NAK, a T1 past
    the housekeeping deadline, and a lease forever.
-7. **TFTP.** `test/tftp.py` runs `tftp` the same way, against
+8. **TFTP.** `test/tftp.py` runs `tftp` the same way, against
    `test/tftp.expected`. It covers a file of two blocks among packets of
    other hosts and ports, lost packets, an ERROR, files of 512 and 0
    bytes, a listing, a port given as `IP:PORT`, bad arguments, and no
    answer to ARP.
-8. **The real-time clock.** `test/rtc.py` starts the monitor on the
+9. **The real-time clock.** `test/rtc.py` starts the monitor on the
    words of an I2C master, which are memory in `niceemu`: a status that
    says that a master is present, and data that are the registers of the
    R6's real-time clock. With `--step-time` the clock is not set, so the
@@ -394,7 +405,7 @@ needs `FOLDER=NICE`, the default. It runs these steps in order:
    and in a year that the chip does not hold. The R3's chip is read only
    when the R6's does not answer, which memory cannot do, so that part
    runs only on an R3.
-9. **The runs.** The monitor runs once for each test below, with its
+10. **The runs.** The monitor runs once for each test below, with its
    keystrokes from an input file that ends with `h`, so that the run
    halts. Some runs add a program at `0x8000`, SD card images, or
    Ethernet frames.

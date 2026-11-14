@@ -31,8 +31,8 @@
 ; - monitor_eth.nasm: the network, the frame routines, the ARP cache, the
 ;   demultiplexing of the frames and net_poll, the UDP entries 16 to 19,
 ;   the entries 21 to 25 of the IP settings, DHCP, the poll, and DNS, i
-;   dhcp, and tftp (issues #83, #84, and #111, README.md, "The network",
-;   and INTERNALS.md, "The frame routines").
+;   dhcp, time ntp, and tftp (issues #83, #84, #111, and #127, README.md,
+;   "The network", and INTERNALS.md, "The frame routines").
 ; - monitor_tcp.nasm: TCP, the entries 26 to 31 of its clients and its
 ;   servers, and their part of the poll (issue #111).
 ;
@@ -44,12 +44,13 @@
 ;
 ; The ROM's texts are packed, four characters a word, with .ASCII_B
 ; (nice_cpu's ISA.md §10.3), and end with a 0 byte: a text whose length is
-; a multiple of 4 has a .DAT 0 after it. puts_b prints one by its word
-; address, through the byte window at TEXT_B (nice_cpu's SYSTEM.md §9),
-; in which _io_puts reads one byte at a time. Code that reads a text by
-; the character takes its address in that window, TEXT_B+4*S_NAME, and
-; the tables of texts hold word addresses, which puts_b takes. Programs
-; keep .ASCII_L, one character a word, which _io_puts prints (issue #131).
+; a multiple of 4 has a .DAT 0 after it, which test/texts.py checks at
+; each build. puts_b prints one by its word address, through the byte
+; window at TEXT_B (nice_cpu's SYSTEM.md §9), in which _io_puts reads one
+; byte at a time. Code that reads a text by the character takes its
+; address in that window, TEXT_B+4*S_NAME, and the tables of texts hold
+; word addresses, which puts_b takes. Programs keep .ASCII_L, one
+; character a word, which _io_puts prints (issue #131).
 ;
 ; mon_putc writes a character to the outputs that V_OUT selects. On the
 ; line, the console at 0xFFFFFF00, every byte goes as it is. On the screen
@@ -206,6 +207,10 @@ V_PMACL         .EQU    0xFFFFF3CD
 V_BSTATE        .EQU    0xFFFFF3CE      ; the DHCP exchange in the background: the reply it waits for, DHCP_OFFER or DHCP_ACK, 0 for none,
 V_BDUE          .EQU    0xFFFFF3CF      ; when it sends the next DISCOVER, on the fine clock of net_clock,
 V_BWAIT         .EQU    0xFFFFF3D0      ; and the microseconds it waits after that one
+V_NTP           .EQU    0xFFFFF3D1      ; the NTP server, the first of DHCP's option 42, 0 for none
+V_DNTP          .EQU    0xFFFFF3D2      ; for i dhcp: the NTP server of the OFFER or the ACK,
+V_PNTP          .EQU    0xFFFFF3D3      ; and of the last reply that dhcp_parse took
+V_NTPIP         .EQU    0xFFFFF3D4      ; for time ntp: the server's IP address, which dns_lookup writes
 WASM_RAM        .EQU    0xFFFFF400      ; the words that the ROM's C code writes, from here
 WASM_END        .EQU    0xFFFFFF00      ; up to below here, the I/O page, which the Makefile checks
 
@@ -285,6 +290,7 @@ mon_reset
                 MOVE    @V_MASK, 0
                 MOVE    @V_GW, 0
                 MOVE    @V_DNS, 0
+                MOVE    @V_NTP, 0
                 MOVE    @V_LEASE, 0
                 CALL    net_clock
                 MOVE    @V_IPID, R1

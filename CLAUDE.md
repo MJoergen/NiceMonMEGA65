@@ -181,7 +181,7 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   `monitor_tcp.nasm`, #111), its C code (`fat32.c`,
   and `clock.c`, the `time` command, the dates of files (#109), and the
   clock from the real-time clock at the cold start, which `time`
-  writes (#105), in
+  writes (#105), and the time of `time ntp` from a time server (#127), in
   one wasm module through `nicewasm --ram`, with its
   writable words at `0xFFFFF400`; building the monitor needs clang, and
   its tests mtools, `mkfs.fat`, and `sfdisk`), the routines that

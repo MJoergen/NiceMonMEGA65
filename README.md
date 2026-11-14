@@ -249,7 +249,7 @@ again, less and less often. The monitor's commands also set an address:
 | Command | What it does |
 |---|---|
 | `i 192.168.1.65` | Sets the IP address; `i` alone shows it |
-| `i dhcp` | Gets an address from the network's DHCP server, and shows it with the mask, the gateway, the DNS server, and the DHCP server |
+| `i dhcp` | Gets an address from the network's DHCP server, and shows it with the mask, the gateway, the DNS server, the DHCP server, and the time server, if the network has one |
 | `m 02:4E:49:43:45:01` | Sets the MAC address; `m` alone shows it. A second board on the same network needs one of its own |
 
 The board renews a DHCP lease while the monitor waits at its prompt,
@@ -274,6 +274,22 @@ such a server: it serves `examples/build`, and `tftp 192.168.1.10
 *.bin` lists its programs
 ([monitor/README.md](monitor/README.md#the-network), which also says
 how to serve without root).
+
+### Setting the clock from the network
+
+Once the board has an address, the monitor's `time ntp +01:00` sets
+its clock from a time server on the internet, `pool.ntp.org`, or from
+the network's own when DHCP names one. A time server gives UTC, the
+time of no time zone, and the clock keeps local time. So the command
+takes the difference, local time less UTC: `+01:00` in Central Europe
+in winter, and `+02:00` in summer. Without it, the clock is set to
+UTC. A server's name or address may come first, as in
+`time ntp 192.168.1.1 +01:00`.
+
+On the MEGA65 the command sets the real-time clock too, so the time
+stays over a power cycle. The Nexys4DDR has no real-time clock, so
+there `time ntp` after each reset is the way to set the clock without a
+PC ([monitor/README.md](monitor/README.md#the-commands)).
 
 ### Talking to a program
 

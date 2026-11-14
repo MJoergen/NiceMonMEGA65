@@ -174,6 +174,7 @@ cmd_ip
                 MOVE    @V_MASK, 0
                 MOVE    @V_GW, 0
                 MOVE    @V_DNS, 0
+                MOVE    @V_NTP, 0
                 MOVE    @V_BSTATE, 0    ; no DHCP in the background
                 CALL    lease_forget
 ip_show         MOVE    R1, S_IP
@@ -943,7 +944,8 @@ cmd_t
 
 ; time [YYYY-MM-DD HH:MM:SS]: the clock of the time of day (nice_cpu's
 ; SYSTEM.md §10), which keeps local time, set first when a date and a time
-; follow, and shown, with clock_cmd of clock.c. R2 points after the t.
+; follow, and shown, with clock_cmd of clock.c. time ntp sets it from a
+; time server, with time_ntp of monitor_eth.nasm. R2 points after the t.
 cmd_time
                 MOVE    R1, R2
                 MOVE    R2, TEXT_B+4*S_IME
@@ -951,9 +953,24 @@ cmd_time
                 TST     R1
         ?Z      JMP     unknown
                 TST     @R1
-        ?Z      JMP     :+              ; time alone
+        ?Z      JMP     :+++            ; time alone
                 CMP     @R1, 0x20
         ?!Z     JMP     unknown         ; timex
+                MOVE    R7, R1
+:
+                CMP     @R1, 0x20
+        ?Z      ADD     R1, R1, 1
+        ?Z      JMP     :-
+                MOVE    R2, TEXT_B+4*S_NTPW
+                CALL    match           ; R1 after ntp, or 0
+                TST     R1
+        ?Z      JMP     :+
+                TST     @R1
+        ?Z      JMP     time_ntp
+                CMP     @R1, 0x20
+        ?Z      JMP     time_ntp
+:
+                MOVE    R1, R7
 :
                 CALL    _clock_cmd
                 JMP     main
@@ -1036,6 +1053,7 @@ S_AVE           .ASCII_B 'ave'
 S_AUD           .ASCII_B 'aud'
 S_EL            .ASCII_B 'el'
 S_IME           .ASCII_B 'ime'
+S_NTPW          .ASCII_B 'ntp'
 S_SAVED         .ASCII_B 'Words saved: '
 S_BADSAVE
                 .ASCII_B 'save NAME ADDR N: a name, and the address and the count in hex'
@@ -1079,7 +1097,7 @@ E_FS31          .ASCII_B 'the file is open'
 E_FS32          .ASCII_B 'the file is read-only'
 
 HELP            .DAT    H_R, H_L, H_LOAD, H_SAVE, H_DEL, H_TFTP, H_TFTPL, H_D, H_U
-                .DAT    H_DIR, H_I, H_ID, H_M, H_B, H_T, H_C, H_V, H_H, H_Q, H_P, H_PG, 0
+                .DAT    H_DIR, H_I, H_ID, H_M, H_B, H_T, H_TN, H_C, H_V, H_H, H_Q, H_P, H_PG, 0
 H_R             .ASCII_B 'r [ADDR]      run the program at ADDR, or at 00008000; r 0 restarts'
 H_L             .ASCII_B 'l             enter lines of ADDR WORD in hex, as a .bin file has them'
 H_LOAD          .ASCII_B 'load NAME     load the .bin file NAME of the SD card, as l loads lines'
@@ -1099,6 +1117,7 @@ H_M             .ASCII_B 'm [MAC]       show the MAC address, or set it, such as
 H_B             .ASCII_B 'baud [RATE]   show the UART baud rate, or set it, such as 921600'
                 .DAT    0
 H_T             .ASCII_B 'time [D T]    show the local time, or set it, such as 2026-11-11 14:30:00'
+H_TN            .ASCII_B 'time ntp [S Z] set it from the time server S, Z local time less UTC, +01:00'
 H_C             .ASCII_B 'c             clear the screen'
 H_V             .ASCII_B 'v             the version'
 H_H             .ASCII_B 'h             halt the core'

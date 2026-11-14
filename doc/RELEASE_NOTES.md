@@ -31,10 +31,11 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   `NICE` of an SD card, and type `load demo.bin` and then `r`. F12
   returns to the monitor as before. A program's return now prints its
   status where the program left the cursor's registers, so at the top
-  after the demo, which clears the screen. With the network of #111 in
-  it, and its texts packed four characters a word
-  ([#131](https://github.com/MJoergen/NiceMonMEGA65/issues/131)), the
-  ROM has 11876 words free, where it had 5117 below the demo, for BASIC.
+  after the demo, which clears the screen. With the network of #111
+  and `time ntp` of #127 in it, and its texts packed four characters a
+  word ([#131](https://github.com/MJoergen/NiceMonMEGA65/issues/131)),
+  the ROM has 10952 words free, where it had 5117 below the demo, for
+  BASIC.
 - `make demo` builds `demo/build/demo.bin` alone, and the boards'
   targets put the monitor alone in the ROM, `monitor/build/monitor.bin`.
   `demo/join.py`, `demo/build/rom.bin`, and `demo/demo_hw.py` are gone.
@@ -99,6 +100,15 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   monitor's version. A router that serves DNS then knows the board by
   that name, such as `ping nicemon-434506`
   ([monitor/README.md](../monitor/README.md#the-network)).
+
+- The monitor's `time ntp +01:00` sets the clock from a time server,
+  and on the MEGA65 the real-time clock too
+  ([#127](https://github.com/MJoergen/NiceMonMEGA65/issues/127)). The
+  offset is local time less UTC. The server is the one that DHCP names,
+  or `pool.ntp.org`, or one given first, such as
+  `time ntp 192.168.1.1 +01:00`. `i dhcp` asks for the NTP server, and
+  shows it when the network has one. On the Nexys4DDR, which has no
+  real-time clock, it sets the clock with no PC.
 
 ## V2.0.1 (2026-11-12)
 

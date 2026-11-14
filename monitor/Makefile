@@ -72,6 +72,8 @@ WASM_END = $(shell sed -n 's/^WASM_END *\.EQU *\(0x[0-9A-Fa-f]*\).*/\1/p' monito
 CHECK_RAM = $(PYTHON) -c 'import re, sys; \
   end = int(re.search(r"^___wasm_ram_end +\.EQU +(0x[0-9A-Fa-f]+)", open(sys.argv[1]).read(), re.M)[1], 16); \
   end <= int(sys.argv[2], 16) or sys.exit(f"{sys.argv[1]}: the C code takes the RAM up to {end:08X}, past WASM_END, {sys.argv[2]}")'
+# Each packed text of the ROM must end with a 0 byte (test/texts.py)
+CHECK_TEXTS = $(PYTHON) test/texts.py $(filter-out monlib.nasm mon.nasm,$(SOURCES))
 # The monitor must end below PROGRAM (monitor.nasm), 0x8000, the end of
 # the ROM. niceasm writes the words in the order of their addresses, so
 # the last line has the last.
@@ -85,6 +87,7 @@ all: $(BUILD)/monitor.bin
 
 $(BUILD)/monitor.bin: $(SOURCES) $(BUILD)/rom_c.nasm $(RUNTIME_ROM) $(BUILD)/version.nasm \
                       $(BUILD)/folder.nasm $(TOOLS)
+	@$(CHECK_TEXTS)
 	@cat $(SOURCES) $(BUILD)/rom_c.nasm $(RUNTIME_ROM) $(BUILD)/version.nasm \
 	  $(BUILD)/folder.nasm > $(BUILD)/monitor_all.nasm
 	$(ASM) -o $@ $(BUILD)/monitor_all.nasm
@@ -118,6 +121,7 @@ $(BUILD)/folder.nasm: FORCE | $(BUILD)
 # with every commit.
 $(BUILD)/monitor_test.bin: $(SOURCES) $(BUILD)/rom_c.nasm $(RUNTIME_ROM) $(BUILD)/folder.nasm \
                            $(TOOLS) | $(BUILD)
+	@$(CHECK_TEXTS)
 	@(cat $(SOURCES) $(BUILD)/rom_c.nasm $(RUNTIME_ROM) $(BUILD)/folder.nasm; \
 	  $(call PACKED,VERSION,V9.9)) \
 	  > $(BUILD)/monitor_test_all.nasm
@@ -410,7 +414,8 @@ FAT32_START_BYTES = $(shell echo $$(($(FAT32_START) * 512)))
 # sizes of the screen's memory of niceemu and the boards first, and
 # test/dis.py the rows of u against nicedis.py and niceasm, and
 # test/dhcp.py runs i dhcp against the frames that it builds, and so
-# does test/dns.py for dns_lookup, and test/lease.py for the lease's
+# does test/dns.py for dns_lookup, and test/ntp.py for time ntp, with
+# i dhcp and DNS before it, and test/lease.py for the lease's
 # renewal, and test/bgdhcp.py the DHCP exchange in the background,
 # and
 # test/tftp.py tftp, and test/rtc.py the cold start and time on the words
@@ -430,6 +435,7 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	  test/dhcp.expected $(BUILD)/dhcp.out
 	@$(PYTHON) test/dns.py $(EMU) $(BUILD)/monitor_test.bin $(BUILD)/dns.bin \
 	  test/dns.expected $(BUILD)/dns.out
+	@$(PYTHON) test/ntp.py $(EMU) $(BUILD)/monitor_test.bin test/ntp.expected $(BUILD)/ntp.out
 	@$(PYTHON) test/lease.py $(EMU) $(BUILD)/monitor_test.bin $(BUILD)/lease.bin
 	@$(PYTHON) test/bgdhcp.py $(EMU) $(BUILD)/monitor_test.bin
 	@$(PYTHON) test/tftp.py $(EMU) $(BUILD)/monitor_test.bin test/tftp.expected $(BUILD)/tftp.out

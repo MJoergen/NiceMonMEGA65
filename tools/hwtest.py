@@ -169,6 +169,11 @@ Checks, in this order:
       for the lease's renewal, and
       which ping answers; when no server answers, the summary names DHCP
       after NOT COVERED instead of failing. The board keeps that address
+    - then the monitor's time ntp, with the offset of the host's local
+      time, sets the clock from the time server of DHCP, or from
+      pool.ntp.org, to the host's local time within 2 seconds (issue
+      #127); when no time server answers, the summary names it after NOT
+      COVERED instead of failing
     Without --eth, the summary names the Ethernet station after NOT
     COVERED.
 
@@ -232,6 +237,12 @@ TCP_BYTES = 16384
 TCP_LISTEN_PORT = 4600                  # where the board listens in the test of tcp_listen
 # The port's status, 0 while it is disabled
 ETH_CSR = 0xFFFFFFC0
+# The longest that the monitor's time ntp takes: ARP and DNS, 3 sends of
+# 2 seconds each, and as many to the time server, and how far its clock
+# may be from the host's, which has NTP too
+NTP_TIME = 20.0
+NTP_SLACK = 2.0
+
 # The longest that the monitor's i dhcp takes: DHCP_TRIES DISCOVERs, and a
 # REQUEST after each, with DHCP_WAIT seconds for each reply (monitor_eth.nasm)
 DHCP_TIME = 4 * 2 * 2.0
@@ -2327,8 +2338,47 @@ def test_eth_dhcp(port: str, baud: int, rom: str) -> None:
               ping.returncode == 0,
               "" if ping.returncode == 0 else
               repr(ping.stdout + ping.stderr))
+        test_eth_ntp(link)
     finally:
         link.close()
+
+
+def test_eth_ntp(link: Link) -> None:
+    """Types the monitor's time ntp over the UART, after i dhcp, with the
+    offset of the host's local time, and the server that the monitor
+    picks: DHCP's, or pool.ntp.org (issue #127). The clock it sets must be
+    the host's local time within NTP_SLACK seconds. No server, no DNS
+    server, or no such name is a gap in the coverage."""
+    now = time.time()
+    gmtoff = time.localtime(now).tm_gmtoff
+    sign, hm = "+" if gmtoff >= 0 else "-", abs(gmtoff) // 60
+    zone = f"{sign}{hm // 60:02d}:{hm % 60:02d}"
+    cmd = f"time ntp {zone}".encode()
+    link.send_console(cmd + b"\r")
+    text = b""
+    end = time.monotonic() + NTP_TIME
+    while time.monotonic() < end:
+        link.poll(0.1)
+        text += link.take_console()
+        if b"> " in text.partition(cmd)[2]:
+            break                      # the prompt after the answer
+    said = text.partition(cmd)[2].decode("latin-1")
+    got = re.search(r"Clock set (\d{4}-\d\d-\d\d \d\d:\d\d:\d\d) from (\S+?)[,\r]", said)
+    if got is None and re.search(r"No answer from the|No DNS server|No such name", said):
+        print(f"  the monitor's time ntp found no time server: {said.split(chr(13))[0]!r}",
+              flush=True)
+        uncovered.append("the monitor's time ntp, as no time server answered")
+        return
+    if not check("eth: the monitor's time ntp sets the clock", got is not None, repr(said)):
+        return
+    assert got is not None
+    # The read of CLOCK_USEC takes the snapshot of the seconds
+    words = paused(link, [CLOCK_USEC, CLOCK_SEC_LO, CLOCK_STATUS])
+    host = time.time() + gmtoff
+    off = 0.0 if words is None else words[1] + words[0] / 1e6 - host
+    check(f"eth: time ntp, from {got[2]}, gives the host's local time "
+          f"within {NTP_SLACK} s", words is not None and words[2] == 1
+          and abs(off) < NTP_SLACK, "no pause" if words is None else f"{off:+.2f} s")
 
 
 def test_eth(port: str, baud: int, eth: str,
