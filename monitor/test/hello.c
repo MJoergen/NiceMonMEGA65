@@ -13,7 +13,7 @@ int main(void)
     unsigned v = mon_version();
     printf("Hello from C at 00008000, table %u.%u\n", v >> 16, v & 0xFFFF);
     scr_moveto(40, scr_gety());
-    unsigned old = scr_color(0x000FF000);
+    unsigned old = scr_color(MON_FG_YELLOW | MON_BG_BLACK);
     printf("at column 40\n");
     scr_color(old);
     mon_out(1);
