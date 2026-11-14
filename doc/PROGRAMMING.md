@@ -168,11 +168,12 @@ math unit, the counters, the timer, the screen, the fonts, the
 keyboard, the network station, the port for Ethernet frames, and the SD
 card controller, as registers. nice_cpu's SYSTEM.md specifies its
 devices, and [SYSTEM.md](SYSTEM.md) here the address map and the
-board's own registers. `niceemu` has all of them, with the differences
-that [EMULATOR.md](EMULATOR.md) lists. Its SD cards are image files,
+board's own registers. A program on its own uses only this level.
+
+The emulator, `niceemu`, has all of them, with the differences that
+[EMULATOR.md](EMULATOR.md) lists. Its SD cards are image files,
 `--sd0 FILE` and `--sd1 FILE`, and its frames come from a file,
-`--eth-in`, or from UDP, `--eth-udp`. A program on its own uses only
-this level.
+`--eth-in`, or from UDP, `--eth-udp`.
 
 **The ROM.** The monitor gives a program at `0x8000` thirty-two routines.
 The program calls them through the dispatch table, a row of jumps at
