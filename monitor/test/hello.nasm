@@ -19,7 +19,7 @@ _main           MOVE    R1, hello.text
                 CALL    _scr_getxy      ; R1 the column, R2 the row
                 MOVE    R1, 40
                 CALL    _scr_moveto
-                MOVE    R1, 0x000FF000  ; yellow on black
+                MOVE    R1, MON_FG_YELLOW+MON_BG_BLACK
                 CALL    _scr_color
                 PUSH    R1              ; the old color
                 MOVE    R1, hello.right

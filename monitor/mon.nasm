@@ -40,6 +40,27 @@ TCP_RECV        .EQU    0x3A
 TCP_CLOSE       .EQU    0x3C
 TCP_LISTEN      .EQU    0x3E
 
+; Colors for scr_color, as in mon.h: a foreground and a background,
+; added, with no blanks, such as MON_FG_YELLOW+MON_BG_BLUE. A color left
+; out is black.
+MON_FG_BLACK    .EQU    0x00000000
+MON_FG_RED      .EQU    0x000F0000
+MON_FG_GREEN    .EQU    0x0000F000
+MON_FG_YELLOW   .EQU    0x000FF000
+MON_FG_BLUE     .EQU    0x00000F00
+MON_FG_MAGENTA  .EQU    0x000F0F00
+MON_FG_CYAN     .EQU    0x0000FF00
+MON_FG_WHITE    .EQU    0x000FFF00
+
+MON_BG_BLACK    .EQU    0x00000000
+MON_BG_RED      .EQU    0xF0000000
+MON_BG_GREEN    .EQU    0x0F000000
+MON_BG_YELLOW   .EQU    0xFF000000
+MON_BG_BLUE     .EQU    0x00F00000
+MON_BG_MAGENTA  .EQU    0xF0F00000
+MON_BG_CYAN     .EQU    0x0FF00000
+MON_BG_WHITE    .EQU    0xFFF00000
+
 _mon_reset
                 JMP     MON_RESET
 _mon_exit
