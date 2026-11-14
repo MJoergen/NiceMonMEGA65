@@ -160,7 +160,7 @@ there in different cases:
 | Level | What it is | Where it is | In `niceemu` |
 |---|---|---|---|
 | 1. The hardware | The CPU and the I/O registers | Always | The same, but for the differences of [EMULATOR.md](EMULATOR.md) |
-| 2. The ROM | The monitor's routines, called through the dispatch table at `0x0000`: a terminal on the screen, the files of the SD card, and UDP | While the ROM is visible: for a program at `0x8000` under the monitor | Only with the monitor joined at 0 |
+| 2. The ROM | The monitor's routines, called through the dispatch table at `0x0000`: a terminal on the screen, the files of the SD card, UDP, DNS, and TCP | While the ROM is visible: for a program at `0x8000` under the monitor | Only with the monitor joined at 0 |
 | 3. The libraries | `monlib.nasm`, nice_cpu's runtime, and its C library | In the program's own image, joined when it is built | The same |
 
 **The hardware.** Every program has the console at `0xFFFFFF00`, the
@@ -174,7 +174,7 @@ that [EMULATOR.md](EMULATOR.md) lists. Its SD cards are image files,
 `--eth-in`, or from UDP, `--eth-udp`. A program on its own uses only
 this level.
 
-**The ROM.** The monitor gives a program at `0x8000` twenty routines.
+**The ROM.** The monitor gives a program at `0x8000` thirty-two routines.
 The program calls them through the dispatch table, a row of jumps at
 fixed addresses at the start of the ROM
 ([monitor/README.md](../monitor/README.md#the-dispatch-table)):
@@ -182,10 +182,14 @@ fixed addresses at the start of the ROM
 - A terminal on the screen, with the cursor, the scrolling, and a copy
   to the PC: `mon_putc`, `mon_out`, `scr_cls`, `scr_moveto`,
   `scr_getxy`, and `scr_color`.
-- The files of the SD card, `fs_mount` to `fs_delete`: they read,
-  write, list, and delete the files of the card's folder `NICE`.
+- The files of the SD card, `fs_mount` to `fs_delete`, and
+  `fs_readname`: they read, write, list, and delete the files of the
+  card's folder `NICE`.
 - A UDP endpoint, `udp_open` to `udp_close`, which sends and receives
   datagrams.
+- The IP settings, `net_config`, `net_set`, `net_dhcp`, and `net_poll`,
+  the names of hosts, `dns_lookup`, and up to four TCP connections,
+  `tcp_open` to `tcp_listen`, as a client or a server.
 - The return to the monitor, and its version.
 
 They are there whenever the ROM is visible, as it is for a program that
