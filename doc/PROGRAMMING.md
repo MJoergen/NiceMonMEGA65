@@ -92,14 +92,14 @@ it. `tools/mon.py` is a debugger
 Run it in the emulator, which is built with
 `make -C nice_cpu/emulator build`. The emulator has no ROM, so the
 monitor, built with `make monitor`, is joined in front of the program.
-The input types `r`, which runs the program, and `h`, which halts the
-emulator when the program has returned. The emulator prints the
-console's output, why it stopped, and the registers, and with
-`--screen` the screen:
+The input, which `-i -` reads from stdin, types `r`, which runs the
+program, and `h`, which halts the emulator when the program has
+returned. The emulator prints the console's output, why it stopped,
+and the registers, and with `--screen` the screen:
 
     cat monitor/build/monitor.bin hello.bin > joined.bin
-    printf 'r\rh\r' > rh.txt
-    nice_cpu/emulator/zig-out/bin/niceemu --screen -i rh.txt joined.bin
+    printf 'r\rh\r' | \
+        nice_cpu/emulator/zig-out/bin/niceemu --screen -i - joined.bin
 
 ## A first program in NICE assembly
 
@@ -224,8 +224,7 @@ as a `.bin` file is address and word pairs:
 
     make monitor
     cat monitor/build/monitor.bin prog.bin > joined.bin
-    printf 'r\rh\r' > rh.txt
-    niceemu -i rh.txt --sd0 card.img joined.bin
+    printf 'r\rh\r' | niceemu -i - --sd0 card.img joined.bin
 
 The input types `r`, which runs the program at `0x8000`, and `h`,
 which halts the core when the program returns, and `--sd0` gives it a
