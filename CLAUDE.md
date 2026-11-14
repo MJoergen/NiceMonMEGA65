@@ -68,6 +68,7 @@ header is the authoritative address map.
     make linktest         # run.py --tcp on niceemu --link against plain niceemu, and mon.py's memory check, no board
     make tftpd [TFTP_DIR=d] [TFTP_PORT=69] # tools/tftpd.py for the monitor's tftp, with listings for tftp IP *.bin
     make tftptest         # tftpd.py, and the monitor's tftp in niceemu --eth-udp against it, no board
+    make tcptest          # the monitor's TCP in niceemu against tools/tcppeer.py, and its timers with --step-time, no board
     make sdcard CMD=ls    # the board's SD card over the link: ls, get NAME [DEST], put SRC [NAME], del NAME (ETH= or PORT=)
     make sdnbd            # the board's SD card as a disk over NBD, for nbd-client and a mount on Linux; holds the core until Ctrl-C (ETH= or PORT=)
     make sdtest           # sdcard.py and sdnbd.py on niceemu --link with images that mtools made, no board
@@ -86,7 +87,7 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
 `nice_cpu/emulator/zig-out/bin/niceemu x.bin`. CI
 (`.github/workflows/ci.yml`, on Ubuntu 24.04) builds niceemu and runs
 `make -C sim -j4 test` and `make cosimtest` on both cores, `make examples`,
-`make -C demo test`, `make -C monitor test`, `make linktest`, `make tftptest`, `make sdtest`, `make -j4 formal`, `make lint`, and `make typecheck`.
+`make -C demo test`, `make -C monitor test`, `make linktest`, `make tftptest`, `make tcptest`, `make sdtest`, `make -j4 formal`, `make lint`, and `make typecheck`.
 
 ## Layout
 
@@ -161,6 +162,8 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   Linux, with sdcard.py's sectors), and `sdtest.py`,
   `bump.py`, `release.py`, `linktest.py`, `tftpd.py` (the TFTP server for
   the monitor's `tftp`, with listings, #95) and `tftptest.py`,
+  `tcptest.py` (the monitor's TCP, against `tcppeer.py`, a scripted
+  peer on niceemu's frames, #111),
   `cosimtest.py`, `romsize.py` (the tables of the ROM's words in
   `monitor/INTERNALS.md` and the demo's in `demo/README.md`, which the
   tests of the monitor and the demo check), `screenshot.py`
@@ -174,7 +177,8 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   the dispatch table, the HAL, and the map of its RAM, `monitor_cmd.nasm`,
   the main loop and the commands, which BASIC (#54) is to replace, with
   `u` in `monitor_dis.nasm`, the sector routines in
-  `monitor_sd.nasm`, and the network in `monitor_eth.nasm`), its C code (`fat32.c`,
+  `monitor_sd.nasm`, the network in `monitor_eth.nasm`, and TCP in
+  `monitor_tcp.nasm`, #111), its C code (`fat32.c`,
   and `clock.c`, the `time` command, the dates of files (#109), and the
   clock from the real-time clock at the cold start, which `time`
   writes (#105), in
@@ -182,7 +186,8 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   writable words at `0xFFFFF400`; building the monitor needs clang, and
   its tests mtools, `mkfs.fat`, and `sfdisk`), the routines that
   programs join (`monlib.nasm`), the stubs and the header through which
-  a program calls the entries (`mon.nasm`, `mon.h`), and its tests in
+  a program calls the entries (`mon.nasm`, `mon.h`, and `mon_c.nasm`,
+  the stubs that turn a C pointer into an address), and its tests in
   niceemu (`test/`, with `cat monitor.bin prog.bin`). `monitor/README.md`
   is the monitor for those who use it and write programs for it, and
   `monitor/INTERNALS.md` the routines with no entries, the scrollback,

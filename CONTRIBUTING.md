@@ -74,6 +74,8 @@ or, in an existing clone:
 - `make tftptest` checks `tools/tftpd.py`, and the monitor's `tftp`
   against it, without a board (see [The tools and
   niceemu](#the-tools-and-niceemu)).
+- `make tcptest` checks the monitor's TCP, and its timers, without a
+  board (see [The tools and niceemu](#the-tools-and-niceemu)).
 - `make sdtest` checks `tools/sdcard.py` on `niceemu --link` with images
   of a card, without a board (see [The tools and
   niceemu](#the-tools-and-niceemu)).
@@ -120,7 +122,7 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
 | [monitor/](monitor/README.md) | The monitor for the ROM, in NICE assembly: a hardware abstraction layer for programs at `0x8000`, called through a dispatch table, a main loop with a few commands, the file of routines that programs join, the stubs and the header for programs, and its tests in `niceemu`. Its README has the decisions, [INTERNALS.md](monitor/INTERNALS.md) the routines with no entries, the C in the ROM, the ROM's words, and the build and the tests. |
 | [demo/](demo/README.md) | The demo, `demo.bin`, a program under the monitor that the release ships as a file of its own: nice_cpu's demo (`nice_cpu/demo`), whose function keys switch between a welcome screen that turns into a typewriter, the key codes, the characters and colors, the counters, a game, and the board, a self-test and the network station's addresses. Here are the board's text, `text.nasm`, and the test under the monitor. |
 | [examples/](examples/) | Example C programs, and the Makefile that builds them for the MEGA65. |
-| [tools/](tools/) | `boardlink.py`, the debug link of nice_cpu's `debugger/nicelink.py`, over the board's UART or TCP to `niceemu --link`, with the board's Ethernet port and the simulated system of `make cosim`, and the tools that use it: `load.py`, which loads a program into the MEGA65 or Nexys4DDR, `run.py`, which runs a program on the board as `niceemu` runs it, `mon.py`, an interactive shell on the link, nice_cpu's `nicedbg.py` with the board's links, `sdcard.py`, which lists the board's SD card and copies its files to the host, `sdnbd.py`, which serves the card as a block device for a mount on the host, `hwtest.py`, which tests the system on the board, `flash.py`, which writes the Nexys4DDR's flash or a slot of the MEGA65's, `bump.py`, which records the timing of the MEGA65 and the Nexys4DDR for a nice_cpu tag, `release.py`, which builds and publishes a release, `linktest.py`, which checks `run.py` and `mon.py` on `niceemu --link`, `tftpd.py`, a TFTP server for the monitor's `tftp`, with listings, `tftptest.py`, which checks it, `sdtest.py`, which checks `sdcard.py` and `sdnbd.py`, `cosimtest.py`, which checks `run.py` on the simulated system, `romsize.py`, which measures the ROM's words and the demo's for the tables of `monitor/INTERNALS.md` and `demo/README.md`, and `screenshot.py`, which draws a program's screen in `niceemu` as a PNG picture. |
+| [tools/](tools/) | `boardlink.py`, the debug link of nice_cpu's `debugger/nicelink.py`, over the board's UART or TCP to `niceemu --link`, with the board's Ethernet port and the simulated system of `make cosim`, and the tools that use it: `load.py`, which loads a program into the MEGA65 or Nexys4DDR, `run.py`, which runs a program on the board as `niceemu` runs it, `mon.py`, an interactive shell on the link, nice_cpu's `nicedbg.py` with the board's links, `sdcard.py`, which lists the board's SD card and copies its files to the host, `sdnbd.py`, which serves the card as a block device for a mount on the host, `hwtest.py`, which tests the system on the board, `flash.py`, which writes the Nexys4DDR's flash or a slot of the MEGA65's, `bump.py`, which records the timing of the MEGA65 and the Nexys4DDR for a nice_cpu tag, `release.py`, which builds and publishes a release, `linktest.py`, which checks `run.py` and `mon.py` on `niceemu --link`, `tftpd.py`, a TFTP server for the monitor's `tftp`, with listings, `tftptest.py`, which checks it, `tcptest.py`, which checks the monitor's TCP against `tcppeer.py`, a scripted peer, `sdtest.py`, which checks `sdcard.py` and `sdnbd.py`, `cosimtest.py`, which checks `run.py` on the simulated system, `romsize.py`, which measures the ROM's words and the demo's for the tables of `monitor/INTERNALS.md` and `demo/README.md`, and `screenshot.py`, which draws a program's screen in `niceemu` as a PNG picture. |
 | [README.md](README.md) | For those who use the core files and write programs for them: on its own, over Ethernet, and over the serial port. |
 | [SYSTEM.md](doc/SYSTEM.md) | The system that programs and the link see: the address map, the screen and the font, the keyboard, the Nexys4DDR's devices, the Ethernet station, and the SD card slots. |
 | [DEBUG_LINK.md](doc/DEBUG_LINK.md) | The debug link: its words, how a host loads, pauses, steps, and stops a program, its versions, the control register, the UART's baud rate, and the link over TCP. |
@@ -137,7 +139,7 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
 | [vsg.yml](vsg.yml) | The configuration of `make lint`, which checks the VHDL against [CODING_STYLE.md](doc/CODING_STYLE.md). |
 | [mypy.ini](mypy.ini) | The configuration of `make typecheck`, `mypy --strict` on the Python files that it lists: `tools/`, `font/`, `sim/gen_decode.py`, and the scripts of `monitor/test/`. |
 | [CLAUDE.md](CLAUDE.md) | Instructions for Claude Code: the commands, the layout, and the pitfalls. |
-| [.github/workflows/ci.yml](.github/workflows/ci.yml) | The CI: `make test` and `make cosimtest` on both cores, with niceemu built for its step counts, `make examples`, the tests of the demo and the monitor, `make linktest`, `make tftptest`, `make sdtest`, `make formal`, `make lint`, and `make typecheck`. It cannot run `make hwtest` or build a bitstream. |
+| [.github/workflows/ci.yml](.github/workflows/ci.yml) | The CI: `make test` and `make cosimtest` on both cores, with niceemu built for its step counts, `make examples`, the tests of the demo and the monitor, `make linktest`, `make tftptest`, `make tcptest`, `make sdtest`, `make formal`, `make lint`, and `make typecheck`. It cannot run `make hwtest` or build a bitstream. |
 
 ### What is in src/
 
@@ -959,6 +961,36 @@ tests in `niceemu` with `--eth-udp`, whose frames go to a bridge in the
 script that answers ARP for 10.0.0.2 and passes its datagrams to
 `tftpd.py`, and checks that `tftp` lists the folder, loads a program,
 and shows an ERROR. It takes about a second.
+
+`make tcptest` runs `tools/tcptest.py`, the test of TCP's clients, the
+entries 26 to 30 (issue #111). It has two parts.
+
+- The first runs `monitor/test/tcp.nasm` under the monitor of the
+  tests in `niceemu` with `--eth-udp`. Its frames go to
+  `tools/tcppeer.py`, a small TCP stack of its own at 10.0.0.2. Each
+  port of the peer has a script, which does what a real stack cannot be
+  made to do. The cases are an echo; a close by either side; a refusal;
+  a RST and a FIN in the middle; a RST, a SYN, and an old ACK during
+  the handshake; a close with bytes not read; an abort during a close;
+  no MSS option, and a small MSS and window; a zero window, from either
+  side; segments out of order, twice, lost, with a bad checksum, and in
+  a burst that the queue cannot hold; four connections and a fifth;
+  the budget of the windows; the wrap of the clock; a new IP address;
+  and the errors of each entry. It checks what the program stores, and
+  every segment that the peer saw. Then it runs `monitor/test/tcp_c.c`,
+  which calls the entries from C through `mon_c.nasm`, and
+  `monitor/test/tcphw.nasm`, the program of `make hwtest`. This part
+  takes about 15 seconds, in real time.
+- The second runs `monitor/test/tcpt.nasm` with `--step-time`, one
+  case a run, and with `--eth-in` and `--eth-out`. A frame of
+  `--eth-in` arrives right after the frame it answers, so the script
+  runs a case again with the answers to the frames that the last run
+  sent, until it needs no new one. The program waits for the timer with
+  `WAIT`, which `niceemu` jumps over, so minutes take a second. It
+  checks the SYN's 15 seconds, the 120 seconds of giving up, the 60
+  seconds after our FIN, the probes of a zero window out to 60 seconds,
+  and a connection idle for 4300 seconds, past a wrap of the
+  microseconds.
 
 `make sdtest` runs `tools/sdtest.py`. It makes images of a card with
 `mkfs.fat`, `sfdisk`, and `mtools`: FAT32 on the whole card, with a

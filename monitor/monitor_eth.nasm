@@ -106,7 +106,8 @@ ip_dhcp
 ; transaction, whose number is the microseconds at the start, XOR the low
 ; word of the MAC address. The ACK's address is written to E_IP only if
 ; it is another, which breaks a host's connection over TCP, as a write of
-; i does, and the mask, the gateway, and the DNS server are kept. Without
+; i does, and ends the program's TCP connections in E_TRESET, and the
+; mask, the gateway, and the DNS server are kept. Without
 ; an ACK, E_IP and the rest are left alone. The lease is not renewed.
 ; R1 = 0, or E_NODHCP. Uses R1-R6, and R7 across the calls, saved: the
 ; tries left.
@@ -138,6 +139,7 @@ dhcp_try
 :
                 CMP     @E_IP, @V_DIP
         ?!Z     MOVE    @E_IP, @V_DIP
+        ?!Z     CALL    tcp_resetall
                 MOVE    @V_MASK, @V_DMASK
                 MOVE    @V_GW, @V_DGW
                 MOVE    @V_DNS, @V_DDNS
@@ -445,17 +447,33 @@ net_on
                 RET
 
 ; net_off: the port disabled, and its queue emptied, unless the endpoint
-; is open, which keeps the network on. Uses no register.
+; is open, a wait of the ROM's own runs, or a TCP handle is taken, which
+; keep the network on. Uses no register.
 net_off
                 TST     @V_UPORT
-        ?Z      MOVE    @ETH_CSR, 0
+        ?!Z     RET
+                TST     @V_NWAIT
+        ?!Z     RET
+                PUSH    R1
+                MOVE    R1, V_TCB
+:
+                TST     @R1
+        ?!Z     JMP     :+              ; a handle
+                ADD     R1, R1, 1
+                CMP     R1, V_TCB+TCP_HANDLES
+        ?!Z     JMP     :-
+                MOVE    @ETH_CSR, 0
+:
+                POP     R1
                 RET
 
 ; net_close: the network closed, for the cold start, mon_exit, and
-; mon_trap: the endpoint closed, the datagram held forgotten, no wait of
-; the ROM's own, no deadline armed, and the port disabled. Uses no
-; register.
+; mon_trap: a RST for each TCP connection, at best effort, and every
+; handle freed, by tcp_close_all, the endpoint closed, the datagram held
+; forgotten, no wait of the ROM's own, no deadline armed, and the port
+; disabled. Uses R1-R6.
 net_close
+                CALL    tcp_close_all
                 MOVE    @V_UPORT, 0
                 MOVE    @V_ULEN, 0
                 MOVE    @V_NWAIT, 0
@@ -492,6 +510,12 @@ net_step
                 MOVE    R1, 0
                 AND[M]  R0, @ETH_CSR, ETH_WAITS
         ?!Z     CALL    net_frames
+                TST     @V_TCWORK
+        ?Z      JMP     :+
+                PUSH    R1
+                CALL    tcp_work
+                POP     R1
+:
                 TST     @V_NARM
         ?Z      RET
                 PUSH    R1
@@ -501,12 +525,11 @@ net_step
                 POP     R1
                 RET
 
-; net_due: the deadline that is due. Nothing has one yet, so it is
-; disarmed: TCP's timers and the lease's renewal are to come here (issue
-; #111). Uses no register.
+; net_due: the deadline that is due: the timeouts of the TCP connections,
+; with tcp_due, which arms the next. The lease's renewal is to come here
+; (issue #111). Uses R1-R6.
 net_due
-                MOVE    @V_NARM, 0
-                RET
+                JMP     tcp_due         ; which returns to the caller
 
 ; net_frames: the frames of the queue taken, as the header above says, up
 ; to NET_TAKE of them, or up to a frame for the ROM's own wait. R1 = the
@@ -545,6 +568,8 @@ net_frame
         ?!Z     JMP     net_drop        ; a fragment
                 SHR     R1, @V_NHDR+6, 16
                 AND     R1, R1, 0xFF
+                CMP     R1, 6           ; TCP
+        ?Z      JMP     net_tcp
                 CMP     R1, 17          ; UDP
         ?!Z     JMP     net_drop
 ; A datagram: for the ROM's own wait, whatever its IP address, as a DHCP
@@ -585,6 +610,10 @@ net_frame
                 CALL    eth_recv
                 MOVE    @V_ULEN, R7     ; held
                 JMP     net_next
+net_tcp
+                MOVE    R1, R7
+                CALL    tcp_input
+                JMP     net_drop
 net_arp
                 CALL    arp_take
 net_drop
@@ -628,8 +657,9 @@ net_config
 ; net_set: entry 22. The IP address, the mask, the gateway, and the DNS
 ; server set from the 4 words at the word address R1, as net_config gives
 ; them, after a poll. The IP address is written to E_IP only if it is
-; another, as a write breaks a host's connection over TCP; 0 clears it.
-; R1 = 0. Uses R1-R6, and R7 across the calls, saved.
+; another, as a write breaks a host's connection over TCP, and ends every
+; TCP connection of the program in E_TRESET; 0 clears it. R1 = 0. Uses
+; R1-R6, and R7 across the calls, saved.
 net_set
                 PUSH    R7
                 CALL    net_waddr
@@ -637,6 +667,7 @@ net_set
                 CALL    net_step
                 CMP     @R7, @E_IP
         ?!Z     MOVE    @E_IP, @R7
+        ?!Z     CALL    tcp_resetall
                 MOVE    @V_MASK, @1[R7]
                 MOVE    @V_GW, @2[R7]
                 MOVE    @V_DNS, @3[R7]
@@ -1280,14 +1311,15 @@ dns_dot
                 MOVE    R1, 1           ; class IN
                 CALL    dhcp_put
                 SUB     R10, R6, 2      ; the bytes of the frame
-; The next hop, and the headers
+; The next hop, and the headers. V_NWAIT keeps the network on through
+; the ARP.
+                MOVE    @V_NWAIT, R9
                 CALL    net_on
                 MOVE    R1, @V_DNS
                 CALL    net_hop         ; whose ARP may use the words before UDP_HDR
                 TST     R1
         ?!Z     MOVE    R1, E_NOROUTE
         ?!Z     JMP     dns_off
-                MOVE    @V_NWAIT, R9
                 MOVE    R1, V_TXF
                 MOVE    R4, @V_DNS
                 SHL     R5, R9, 16

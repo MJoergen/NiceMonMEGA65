@@ -13,7 +13,7 @@ ARGS   ?=
 LINK    = $(if $(ETH),--eth $(ETH)) $(if $(PORT),--port $(PORT))
 EMU     = nice_cpu/emulator/zig-out/bin/niceemu
 
-.PHONY: help test formal lint typecheck diagrams romsize examples demo monitor r3 r6 nexys4ddr cor bump release load run mon sdcard sdnbd flash hwtest linktest sdtest tftpd tftptest cosim cosimtest clean
+.PHONY: help test formal lint typecheck diagrams romsize examples demo monitor r3 r6 nexys4ddr cor bump release load run mon sdcard sdnbd flash hwtest linktest sdtest tftpd tftptest tcptest cosim cosimtest clean
 
 # Every target but these needs the nice_cpu submodule
 ifeq ($(wildcard nice_cpu/hdl/src/nice_pkg.vhd),)
@@ -104,6 +104,8 @@ help:
 	@echo "                  listings for tftp IP *.bin (port 69 needs root)"
 	@echo "  make tftptest   check tools/tftpd.py, and the monitor's tftp in niceemu"
 	@echo "                  against it, without a board"
+	@echo "  make tcptest    check the monitor's TCP in niceemu against tools/tcppeer.py,"
+	@echo "                  and its timers with --step-time, without a board"
 	@echo "  make cosim [COSIM_PORT=4000] [ROM=prog.bin]"
 	@echo "                  run the system in GHDL with its debug UART on a TCP port,"
 	@echo "                  for the tools' --cosim PORT, until it is stopped"
@@ -299,6 +301,11 @@ tftpd:
 tftptest: $(EMU)
 	$(MAKE) -C monitor build/monitor_test.bin
 	$(PYTHON) tools/tftptest.py
+
+tcptest: $(EMU)
+	$(MAKE) -C monitor build/monitor_test.bin build/tcp.bin build/tcpt.bin build/tcp_c.bin \
+	  build/tcphw.bin
+	$(PYTHON) tools/tcptest.py
 
 # The system in GHDL, its debug UART on a TCP port of 127.0.0.1, for the
 # tools' --cosim (sim/Makefile)

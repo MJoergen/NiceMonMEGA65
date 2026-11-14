@@ -31,7 +31,8 @@ NICEWASM = $(PYTHON) $(NICE_CPU)/translator/nicewasm.py
 TOOLS    = $(wildcard $(NICE_CPU)/assembler/*.py) $(wildcard $(NICE_CPU)/translator/*.py)
 LIBC     = $(NICE_CPU)/runtime/libc
 BUILD    = build
-SOURCES  = monitor.nasm monitor_cmd.nasm monitor_dis.nasm monitor_sd.nasm monitor_eth.nasm monlib.nasm mon.nasm
+SOURCES  = monitor.nasm monitor_cmd.nasm monitor_dis.nasm monitor_sd.nasm monitor_eth.nasm monitor_tcp.nasm \
+           monlib.nasm mon.nasm
 # The ROM's C code, and nice_cpu's runtime library that it is joined with
 ROM_C    = fat32.c clock.c
 RUNTIME_ROM = $(RUNTIME)/lib.nasm $(RUNTIME)/muldiv_mpu.nasm
@@ -178,7 +179,7 @@ $(BUILD)/udp.bin: $(BUILD)/monitor_test.bin test/udp.nasm
 # poll, the IP settings, and the datagram held, test/netdhcp.nasm,
 # net_dhcp, which test/dhcp.py runs, and test/dns.nasm, dns_lookup, which
 # test/dns.py runs, all built as udp.bin is
-$(BUILD)/net.bin $(BUILD)/netdhcp.bin $(BUILD)/dns.bin: $(BUILD)/%.bin: $(BUILD)/monitor_test.bin test/%.nasm
+$(BUILD)/net.bin $(BUILD)/netdhcp.bin $(BUILD)/dns.bin $(BUILD)/tcp.bin $(BUILD)/tcpt.bin: $(BUILD)/%.bin: $(BUILD)/monitor_test.bin test/%.nasm
 	@cat $(BUILD)/monitor_test_all.nasm test/$*.nasm > $(BUILD)/$*_all.nasm
 	@$(ASM) -o $(BUILD)/$*_full.bin $(BUILD)/$*_all.nasm
 	@grep -v '^0000[0-7]' $(BUILD)/$*_full.bin > $@
@@ -188,6 +189,12 @@ $(BUILD)/net.bin $(BUILD)/netdhcp.bin $(BUILD)/dns.bin: $(BUILD)/%.bin: $(BUILD)
 $(BUILD)/fs.bin: test/fs.nasm mon.nasm $(TOOLS) | $(BUILD)
 	@cat test/fs.nasm mon.nasm > $(BUILD)/fs_all.nasm
 	@$(ASM) -o $@ $(BUILD)/fs_all.nasm
+
+# The board's test of TCP's clients, test/tcphw.nasm, which
+# tools/hwtest.py runs, built as fs.bin
+$(BUILD)/tcphw.bin: test/tcphw.nasm mon.nasm $(TOOLS) | $(BUILD)
+	@cat test/tcphw.nasm mon.nasm > $(BUILD)/tcphw_all.nasm
+	@$(ASM) -o $@ $(BUILD)/tcphw_all.nasm
 
 # The test of the file entries that write, test/fsw.nasm, built as fs.bin
 $(BUILD)/fsw.bin: test/fsw.nasm mon.nasm $(TOOLS) | $(BUILD)
@@ -208,6 +215,11 @@ $(BUILD)/dis.bin: test/dis.nasm $(TOOLS) | $(BUILD)
 
 $(BUILD)/hello_c.bin: test/hello.c mon.h mon.nasm $(TOOLS) | $(BUILD)
 	@$(NICEBUILD) --monitor --asm mon.nasm -I . -o $@ test/hello.c
+
+# The test of TCP's entries from C, which tools/tcptest.py runs, with the
+# stubs of mon_c.nasm for the pointers of C
+$(BUILD)/tcp_c.bin: test/tcp_c.c mon.h mon.nasm mon_c.nasm $(TOOLS) | $(BUILD)
+	@$(NICEBUILD) --monitor --asm mon.nasm --asm mon_c.nasm -I . -o $@ test/tcp_c.c
 
 # The inputs. cmds types each command, with the edits of a line: three DELs
 # that take back abc, a CTRL-C that empties junk, and the cursor key ESC [ A
@@ -529,7 +541,7 @@ romsize: $(BUILD)/monitor_test.bin $(BUILD)/version_test.nasm
 fmt:
 	@$(FMT) $(SOURCES) test/hello.nasm test/dis.nasm test/sd.nasm test/arp.nasm test/rom.nasm \
 	  test/fs.nasm test/fsw.nasm test/udp.nasm test/net.nasm test/netdhcp.nasm \
-	  test/dns.nasm
+	  test/dns.nasm test/tcp.nasm test/tcpt.nasm test/tcphw.nasm mon_c.nasm
 
 $(BUILD):
 	@mkdir -p $@

@@ -81,8 +81,9 @@ of [SYSTEM.md §7](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#
   every run crosses a wrap. A deadline on it is due when the signed
   difference of the clock and the deadline is not negative. The poll
   checks the nearest deadline only while a flag says it is armed, so a
-  stale one is never due. Nothing arms one yet: TCP and the lease's
-  renewal will. The coarse clock is `arp_tick`, about a second.
+  stale one is never due. TCP's connections arm theirs (below), and
+  the lease's renewal will. The coarse clock is `arp_tick`, about a
+  second.
 - **DNS** (issue #111), `dns_lookup`, entry 25, builds its query in
   `V_TXF` at `0xFFFFF120`, the name packed from byte 56, with one
   question, type A, class IN, and RD set. Its ID, at `0xFFFFF388`, and
@@ -94,6 +95,18 @@ of [SYSTEM.md §7](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#
   the same ID and port. `dns_parse` skips a name up to its 0 byte or its
   first compression pointer, which ends it: the names are never compared,
   so no pointer is followed, and a loop of pointers costs nothing.
+- **TCP** (issue #111), `monitor_tcp.nasm`, entries 26 to 30, keeps
+  each connection in the program's control block: 32 words, a check
+  word first, then the rings, received and sent, packed 4 bytes to a
+  word. `V_TCB` at `0xFFFFF3A0` has the plain address of each handle's
+  block, 0 when it is free. A connection's one deadline, `CB_DUE`, is
+  on the fine clock: the SYN's or a segment's timeout, or the end of
+  FIN-WAIT-2. It is never later than the time to give up, so the
+  connection ends in `E_TTIMEOUT` on time. `tcp_rearm` gives the poll
+  the nearest deadline of all. A segment that wants an ACK sets a flag,
+  and the poll sends one ACK for all of them, by `tcp_work`. The
+  checksum of a segment's data is summed in a pass of its own over the
+  ring, not as the bytes are copied, so the copy stays simple.
 - **The identification** of each IPv4 packet sent, of UDP, DHCP, and
   DNS, counts up by one from the fine clock at the cold start, with the
   "don't fragment" bit clear (RFC 6864).
@@ -176,8 +189,8 @@ a program, `demo.bin`, whose words
 <!-- romsize layout -->
 | Part | Address | Words |
 |---|---|---:|
-| The monitor | `0x0000`–`0x4EB0` | 20145 |
-| Free | `0x4EB1`–`0x7FFF` | 12623 |
+| The monitor | `0x0000`–`0x5784` | 22405 |
+| Free | `0x5785`–`0x7FFF` | 10363 |
 <!-- /romsize layout -->
 
 The monitor's words, by the source they come from, in the order
@@ -188,13 +201,14 @@ the Makefile joins them. The column "Text" counts the words of the
 <!-- romsize monitor -->
 | Source | What it is | Words | Text |
 |---|---|---:|---:|
-| `monitor.nasm` | The dispatch table, the HAL, the cold start, and the traps | 727 | 27 |
+| `monitor.nasm` | The dispatch table, the HAL, the cold start, and the traps | 746 | 27 |
 | `monitor_cmd.nasm` | The main loop and the commands | 3949 | 2394 |
 | `monitor_dis.nasm` | The disassembler of `u` | 1079 | 269 |
 | `monitor_sd.nasm` | The sector routines | 390 | 223 |
-| `monitor_eth.nasm` | The network | 2756 | 298 |
+| `monitor_eth.nasm` | The network | 2804 | 298 |
+| `monitor_tcp.nasm` | TCP | 2183 | 0 |
 | `monlib.nasm` | The routines that programs join | 259 | 0 |
-| `mon.nasm` | The stubs of the entries | 60 | 0 |
+| `mon.nasm` | The stubs of the entries | 70 | 0 |
 | `nicewasm` | `___wasm_start`, which copies the C code's data to the RAM | 85 |  |
 | `fat32.c` | FAT32 | 9102 |  |
 | `clock.c` | The clock and `time` | 1199 |  |
@@ -205,7 +219,7 @@ the Makefile joins them. The column "Text" counts the words of the
 | nice_cpu's `muldiv_mpu.nasm` | Multiply and divide | 128 | 0 |
 | `build/folder.nasm` | The error of a card without the folder | 27 | 27 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 5 | 5 |
-| In all | | 20145 | 3243 |
+| In all | | 22405 | 3243 |
 <!-- /romsize monitor -->
 
 - The C code's strings are in its initial values, four characters a
@@ -409,7 +423,9 @@ out, as they change with the code, except for VBASE, which must be 0
 after every run.
 
 `make tftptest`, in the repository's root, runs the monitor against
-`tools/tftpd.py` (CONTRIBUTING.md).
+`tools/tftpd.py`, and `make tcptest` runs `test/tcp.nasm`,
+`test/tcpt.nasm`, `test/tcp_c.c`, and `test/tcphw.nasm` against
+`tools/tcppeer.py` (CONTRIBUTING.md).
 
 ### On a board
 

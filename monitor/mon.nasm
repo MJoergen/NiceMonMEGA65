@@ -33,6 +33,11 @@ NET_SET         .EQU    0x2C
 NET_DHCP        .EQU    0x2E
 NET_POLL        .EQU    0x30
 DNS_LOOKUP      .EQU    0x32
+TCP_OPEN        .EQU    0x34
+TCP_STATE       .EQU    0x36
+TCP_SEND        .EQU    0x38
+TCP_RECV        .EQU    0x3A
+TCP_CLOSE       .EQU    0x3C
 
 _mon_reset
                 JMP     MON_RESET
@@ -86,6 +91,16 @@ _net_poll
                 JMP     NET_POLL
 _dns_lookup
                 JMP     DNS_LOOKUP
+_tcp_open
+                JMP     TCP_OPEN
+_tcp_state
+                JMP     TCP_STATE
+_tcp_send
+                JMP     TCP_SEND
+_tcp_recv
+                JMP     TCP_RECV
+_tcp_close
+                JMP     TCP_CLOSE
 _scr_getx
                 JMP     SCR_GETXY
 _scr_gety

@@ -65,6 +65,7 @@ jobs:
       - run: make -C monitor test
       - run: make linktest
       - run: make tftptest
+      - run: make tcptest
       - run: make sdtest
 
   lint:

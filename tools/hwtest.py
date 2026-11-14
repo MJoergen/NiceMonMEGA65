@@ -144,6 +144,9 @@ Checks, in this order:
     - programs run with tools/run.py --eth and with niceemu, and their
       output and exit status are compared, as above, and so is the
       monitor's test program, with --monitor
+    - monitor/test/tcphw.nasm, under the monitor of the tests, connects
+      over TCP to a port of this computer, sends 16 KB, which it echoes,
+      compares them, and closes (issue #111)
     - the ROM, loaded at 0, gets the monitor's i dhcp over the UART, and
       gets an address from the network's DHCP server, which the station
       then has, with the port for Ethernet frames disabled again, and
@@ -172,6 +175,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from typing import Callable, TypeVar
 
@@ -206,6 +210,8 @@ SD_SLOT_COUNT = {"mega65": 2, "nexys4ddr": 1}
 # The UDP port that sim/udp.nasm answers on, through the port for Ethernet
 # frames
 UDP_PORT = 4511
+# The bytes that monitor/test/tcphw.nasm sends over TCP, and gets back
+TCP_BYTES = 16384
 # The port's status, 0 while it is disabled
 ETH_CSR = 0xFFFFFFC0
 # The longest that the monitor's i dhcp takes: DHCP_TRIES DISCOVERs, and a
@@ -2108,6 +2114,74 @@ def test_eth_frames(link: Link, udp: str, ip: str) -> None:
     check("eth: the program halts after its answer", wait_halt(link) == 1)
 
 
+def test_eth_tcp(eth: str, ip: str, tmp: str) -> None:
+    """Runs monitor/test/tcphw.nasm with run.py --eth --monitor --rom and
+    the monitor of the tests: the program connects to a socket of this
+    computer, sends TCP_BYTES, which the computer echoes, compares them,
+    closes, and returns 0 once its handle is free (issue #111)."""
+    subprocess.run(["make", "-s", "-C", f"{REPO}/monitor",
+                    "build/monitor_test.bin", "build/tcphw.bin"], check=True)
+    # This computer's address on the board's network
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+        probe.connect((ip, 9))
+        mine = probe.getsockname()[0]
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.bind((mine, 0))
+    server.listen(1)
+    server.settimeout(RUN_TIMEOUT + 10)
+    port = server.getsockname()[1]
+    got = bytearray()
+    eof = [False]
+    error = [""]
+
+    def echo() -> None:
+        try:
+            conn, _ = server.accept()
+        except OSError as e:
+            error[0] = f"no connection: {e}; a firewall may block it"
+            return
+        with conn:
+            conn.settimeout(RUN_TIMEOUT + 10)
+            try:
+                while True:
+                    data = conn.recv(4096)
+                    if not data:
+                        eof[0] = True
+                        break
+                    got.extend(data)
+                    conn.sendall(data)
+            except OSError as e:
+                error[0] = str(e)
+
+    thread = threading.Thread(target=echo, daemon=True)
+    thread.start()
+    prog = os.path.join(tmp, "tcphw_args.bin")
+    with open(prog, "w") as f, open(f"{REPO}/monitor/build/tcphw.bin") as g:
+        f.write(g.read())
+        addr = struct.unpack(">I", socket.inet_aton(mine))[0]
+        f.write(f"00009000 {addr:08X}\n00009001 {port:08X}\n"
+                f"00009002 {TCP_BYTES:08X}\n")
+    halt = os.path.join(tmp, "h.txt")
+    with open(halt, "wb") as hf:
+        hf.write(b"h\r")
+    board = subprocess.run(
+        [sys.executable, f"{REPO}/tools/run.py", "--eth", eth, "--timeout",
+         f"{RUN_TIMEOUT + 20:g}", "--monitor", "--rom",
+         f"{REPO}/monitor/build/monitor_test.bin", "-i", halt, prog],
+        stdin=subprocess.DEVNULL, capture_output=True)
+    thread.join(RUN_TIMEOUT + 20)
+    server.close()
+    want = bytes((7 * i + (i >> 8)) & 0xFF for i in range(TCP_BYTES))
+    ok = b"Returned 00000000" in board.stdout
+    check(f"eth: a program under the monitor connects to {mine}:{port}, "
+          f"and {TCP_BYTES} bytes come back", ok,
+          "" if ok else f"exit {board.returncode}: "
+          f"{board.stdout[-300:]!r} {board.stderr[-300:]!r} {error[0]}")
+    check("eth: this computer received the bytes, then the board's FIN",
+          bytes(got) == want and eof[0],
+          f"{len(got)} bytes, end {eof[0]} {error[0]}")
+
+
 def test_eth_dhcp(port: str, baud: int, rom: str) -> None:
     """Loads the monitor, and types its i dhcp over the UART. When a
     server answers, the address shown must be the station's, the port
@@ -2218,6 +2292,7 @@ def test_eth(port: str, baud: int, eth: str,
             tcp_link.close()
         test_run(["--eth", eth], programs, " over Ethernet")
         test_monitor(["--eth", eth], tmp, True, " over Ethernet", long=True)
+        test_eth_tcp(eth, ip, tmp)
         test_eth_dhcp(port, baud, rom)
     except (LinkError, OSError) as e:
         check(f"eth: {e}", False)

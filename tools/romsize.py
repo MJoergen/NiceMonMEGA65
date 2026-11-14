@@ -44,6 +44,7 @@ MONITOR_PARTS = {
     "monitor_dis.nasm": "The disassembler of `u`",
     "monitor_sd.nasm": "The sector routines",
     "monitor_eth.nasm": "The network",
+    "monitor_tcp.nasm": "TCP",
     "monlib.nasm": "The routines that programs join",
     "mon.nasm": "The stubs of the entries",
     "lib.nasm": "The runtime of the C code",

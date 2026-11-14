@@ -118,6 +118,76 @@ int net_dhcp(void);
 // uses the network calls it every 100 ms or so. Entry 24 (issue #111).
 int net_poll(void);
 
+// The IP settings, DNS, and TCP, from table 1.5 (monitor/README.md, "The
+// network", and "TCP"). These take C pointers: the program joins
+// mon_c.nasm too, with nicebuild.py --monitor --asm mon.nasm --asm
+// mon_c.nasm, whose stubs turn a pointer into the address of the ROM's
+// windows. An error is negative, from -40 (doc/PROGRAMMING.md, "The
+// monitor's error codes").
+#define MON_ENTRY(name) __attribute__((import_name("c_" #name)))
+
+// The IP address, the mask, the gateway, and the DNS server, each 0 for
+// none, written to cfg. 0. Entry 21.
+MON_ENTRY(net_config) int net_config(unsigned cfg[4]);
+
+// The four set from cfg, as net_config gives them, for a network with no
+// DHCP. A new IP address ends every TCP connection in E_TRESET. 0. Entry
+// 22.
+MON_ENTRY(net_set) int net_set(const unsigned cfg[4]);
+
+// The IPv4 address of a name, up to its 0 byte, written to *ip: an
+// address with dots, such as 192.168.1.10, as it is, or else the answer of
+// the DNS server, which takes up to about 9 seconds. 0, or an error. Entry
+// 25.
+MON_ENTRY(dns_lookup) int dns_lookup(const char *name, unsigned *ip);
+
+// TCP, up to 4 connections at once, each with a control block of
+// TCP_CB_WORDS(rx, tx) words in the program's RAM, which is the ROM's from
+// tcp_open until tcp_state gives TCP_FREE. The ROM moves a connection
+// only when the program calls an entry of the network: a program polls,
+// with net_poll, every 100 ms or so.
+#define TCP_CB_WORDS(rx, tx) (32 + ((rx) + 3) / 4 + ((tx) + 3) / 4)
+#define TCP_SIZES(rx, tx) (((unsigned)(rx) << 16) | (unsigned)(tx))
+enum {
+    TCP_FREE = 0,       // the handle is free
+    TCP_CONNECTING = 1, // the handshake; bytes sent go after it
+    TCP_OPEN = 2,       // send and receive
+    TCP_PEER_CLOSED = 3, // receive what is left, then E_TEOF; send; close
+    TCP_CLOSING = 4,    // after tcp_close; the handle frees itself
+};
+enum {
+    E_NOIP = -40, E_PORT = -41, E_UCLOSED = -42, E_ULONG = -43, E_NOROUTE = -44,
+    E_NODHCP = -45, E_NODNS = -46, E_DNSTIME = -47, E_DNSNAME = -48, E_DNSFAIL = -49,
+    E_THANDLE = -50, E_TFULL = -51, E_TSIZE = -52, E_TREFUSED = -53, E_TRESET = -54,
+    E_TTIMEOUT = -55, E_TCLOSED = -56, E_TEOF = -57,
+};
+
+// A connection opened to a port of an IP address, with the rings of
+// TCP_SIZES(rx, tx) bytes, each 64 or more, in the control block cb. Waits
+// up to 3 seconds for ARP, sends the SYN, and does not wait for the
+// answer. A handle, 0 to 3, or an error. Entry 26.
+MON_ENTRY(tcp_open) int tcp_open(unsigned *cb, unsigned ip, unsigned port, unsigned sizes);
+
+// The state of a handle, TCP_FREE to TCP_CLOSING, or the connection's
+// error, or E_THANDLE. A state not known here is one to wait in. Entry 27.
+int tcp_state(int h);
+
+// Up to n bytes from buf taken into the ring to send, and sent as far as
+// the windows let them. The bytes taken, 0 when the ring is full, or an
+// error. Entry 28.
+MON_ENTRY(tcp_send) int tcp_send(int h, const void *buf, unsigned n);
+
+// Up to n of the bytes received copied to buf. The bytes copied, 0 when
+// none wait, E_TEOF when the peer has closed and every byte is read, or
+// an error. Entry 29.
+MON_ENTRY(tcp_recv) int tcp_recv(int h, void *buf, unsigned n);
+
+// A close, abort 0, which sends the bytes that wait, then the FIN, and
+// drops what comes, or an abort, abort 1, which sends a RST. The handle
+// frees itself, or at once for an abort or an error. 0, or E_THANDLE.
+// Entry 30.
+int tcp_close(int h, int abort);
+
 // The next entry of a directory, as fs_readdir gives it in the 4 words
 // from buf, and its name in the words from name, one character per word
 // up to a 0 word, 256 words at most: its long name, or else its 8.3 name

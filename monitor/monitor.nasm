@@ -1,6 +1,6 @@
 ; The monitor, the program of the ROM at 0x0000 (README.md). The core boots
 ; from it at reset. It gives the programs at 0x8000 a hardware abstraction
-; layer, the HAL: twenty-five routines, called through the dispatch table at the
+; layer, the HAL: thirty routines, called through the dispatch table at the
 ; start of the ROM, and it has a main loop with a few commands, typed on
 ; the keyboard or sent over the line, and shown on the screen and the line.
 ;
@@ -17,7 +17,7 @@
 ; the cursor, blinking, takes a fresh stack, prints the status, R1, and
 ; goes back to main.
 ;
-; The monitor is this file and four more, which the Makefile joins after
+; The monitor is this file and five more, which the Makefile joins after
 ; it, in this order, so that the dispatch table is at 0:
 ;
 ; - monitor_cmd.nasm: the main loop and its commands, and the routines and
@@ -30,12 +30,14 @@
 ;   through (issue #57, doc/SDCARD.md).
 ; - monitor_eth.nasm: the network, the frame routines, the ARP cache, the
 ;   demultiplexing of the frames and net_poll, the UDP entries 16 to 19,
-;   the entries 21 to 24 of the IP settings, DHCP, and the poll, i dhcp,
-;   and tftp (issues #83, #84, and #111, README.md, "The network", and
-;   INTERNALS.md, "The frame routines").
+;   the entries 21 to 25 of the IP settings, DHCP, the poll, and DNS, i
+;   dhcp, and tftp (issues #83, #84, and #111, README.md, "The network",
+;   and INTERNALS.md, "The frame routines").
+; - monitor_tcp.nasm: TCP, the entries 26 to 30 of its clients, and their
+;   part of the poll (issue #111).
 ;
 ; Each has the .EQUs of its devices and its constants, and its texts, but
-; the variables of all five are here, as one map of the RAM. The commands
+; the variables of all six are here, as one map of the RAM. The commands
 ; in the other files jump back to main, and the assembler takes a name
 ; before its .EQU or its label, so the files reach each other's names in
 ; either direction.
@@ -169,7 +171,14 @@ V_IPID          .EQU    0xFFFFF385      ; the identification of the next IPv4 pa
 V_DDNS          .EQU    0xFFFFF386      ; for i dhcp: the DNS server of the OFFER or the ACK,
 V_PDNS          .EQU    0xFFFFF387      ; and of the last reply that dhcp_parse took
 V_QID           .EQU    0xFFFFF388      ; the ID of the query of dns_lookup, in bits 15..0; its port is V_NWAIT
+V_TCPORT        .EQU    0xFFFFF389      ; the local port of the last TCP connection opened
+V_TCOPENS       .EQU    0xFFFFF38A      ; the TCP connections opened since the cold start
+V_TCWORK        .EQU    0xFFFFF38B      ; not 0 when a TCP connection may have something to send, for net_step
+V_SDATA         .EQU    0xFFFFF38C      ; the word of the queue's buffer where the data of the segment taken starts
 V_NHDR          .EQU    0xFFFFF390      ; the first 8 NHDR_CHUNKS words of the frame at the head of the queue, from byte 2
+V_TCB           .EQU    0xFFFFF3A0      ; the plain address of each TCP handle's control block, 0 for a free one, and a word of 0 after them
+V_TCR           .EQU    0xFFFFF3A8      ; for a RST to a segment of no connection: words 3 to 7 as a control block has them
+V_TCH           .EQU    0xFFFFF3B0      ; the headers of a TCP segment to send, 15 words, as the send buffer has them
 WASM_RAM        .EQU    0xFFFFF400      ; the words that the ROM's C code writes, from here
 WASM_END        .EQU    0xFFFFFF00      ; up to below here, the I/O page, which the Makefile checks
 
@@ -218,13 +227,20 @@ SCR_MAX         .EQU    0x7FFF          ; the largest display offset
                 JMP     net_dhcp        ; 23 at 0x2E, monitor_eth.nasm
                 JMP     net_poll        ; 24 at 0x30, monitor_eth.nasm
                 JMP     dns_lookup      ; 25 at 0x32, monitor_eth.nasm
+                JMP     tcp_open        ; 26 at 0x34, monitor_tcp.nasm
+                JMP     tcp_state       ; 27 at 0x36, monitor_tcp.nasm
+                JMP     tcp_send        ; 28 at 0x38, monitor_tcp.nasm
+                JMP     tcp_recv        ; 29 at 0x3A, monitor_tcp.nasm
+                JMP     tcp_close       ; 30 at 0x3C, monitor_tcp.nasm
 
 ; mon_reset: the cold start, entry 0, which reset runs and a program may
 ; call. E is cleared, the timer stopped, VBASE set to 0, the font base
 ; set to 0, so that the screen shows Spleen, and the port for Ethernet
-; frames disabled, as at a return, the mask, the gateway, and the DNS
-; server set to none, and the ARP cache emptied. The identification of
-; the IPv4 packets starts from the fine clock, net_clock. The vectors
+; frames disabled, as at a return, after a RST for each TCP connection
+; that a program left open, the mask, the gateway, and the DNS server set
+; to none, and the ARP cache emptied. The identification of the IPv4
+; packets starts from the fine clock, net_clock, and the local ports of
+; TCP from the microseconds, with no connection opened. The vectors
 ; of lib.nasm are set, and ___wasm_start gives the words of the ROM's C
 ; code their initial values. The clock of the time of day, while it is not
 ; set, is set from the MEGA65's real-time clock, with clock_rtc of clock.c
@@ -241,6 +257,9 @@ mon_reset
                 MOVE    @V_DNS, 0
                 CALL    net_clock
                 MOVE    @V_IPID, R1
+                AND     R1, @io.us, 0x3FFF
+                OR      @V_TCPORT, R1, 0xC000
+                MOVE    @V_TCOPENS, 0
                 MOVE    @___wasm_trap_vector, mon_trap
                 MOVE    @___putc_vector, mon_putc
                 CALL    ___wasm_start

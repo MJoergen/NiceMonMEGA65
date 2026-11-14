@@ -2,7 +2,7 @@ NiceMon V9.9
 ? lists the commands
 > dir
 Directory of NICE
-my prog.bin                    13590
+my prog.bin                    13770
 mixed.Bin                         14
 lower.txt                         14
 caf?.txt                          14
@@ -39,16 +39,16 @@ across a cluster.txt              16
 BADSUM~1.TXT                      15
 Files: 34, directories: 0
 > load "my prog.bin"
-Words loaded: 755, 00008000 to 000082F2
+Words loaded: 765, 00008000 to 000082FC
 > r
 Hello from 00008000, table 00010004
 at column 40
 on the line only
 Returned 0000002A
 > load MYPROG~1.BIN
-Words loaded: 755, 00008000 to 000082F2
+Words loaded: 765, 00008000 to 000082FC
 > load "MY PROG.BIN"
-Words loaded: 755, 00008000 to 000082F2
+Words loaded: 765, 00008000 to 000082FC
 > load mixed.bin
 Words loaded: 0
 Lines skipped: 1, first line 1; ADDR WORD in hex, ADDR 00008000 to FFFEFFFF
