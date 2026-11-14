@@ -36,7 +36,10 @@ Programming:
     bridge, and stops unless the chip is that of the bitstream's board: an
     S25FL256S on the R3, and an S25FL512S on the R6 (tools/jtag.py). The
     bitstream names its board by its UserID, or else by its path; when
-    neither tells, the check is skipped with a note. It then programs the
+    neither tells, the check is skipped with a note. The bridge holds the
+    UART's TX low, and programming over it sometimes sends a stray byte
+    before the b notice (#135), so after the check the bitstream goes in
+    once before the port is opened. It then programs the
     FPGA through that cable alone, so with several boards attached it
     programs the board whose UART it tests. openFPGALoader does each step,
     for the MEGA65 and the Nexys4DDR alike. Programming needs Linux, as
@@ -193,7 +196,7 @@ import threading
 import time
 from typing import Callable, Optional, TypeVar
 
-from jtag import check_board
+from jtag import check_board, wait_port
 # The SD controller's registers and its sectors, and FAT32 as the
 # monitor reads it, as tools/sdcard.py has them
 from sdcard import (E_NOFOLDER, FOLDER, SD_BUF, SD_CHUNK, SD_CSR, SD_ERROR,
@@ -357,13 +360,18 @@ def assemble_labels(src: str, out_dir: str) -> tuple[str, dict[str, int]]:
             for addr, name in (line.split() for line in f if line.strip())}
 
 
-def test_boot(link: Link, bit: str, cable: list[str]) -> bool:
-    """Programs the FPGA, and checks the b notice and the ROM. True when
-    the core booted from the ROM."""
+def program(bit: str, cable: list[str]) -> None:
+    """Programs the FPGA with openFPGALoader."""
     r = subprocess.run(["openFPGALoader"] + cable + [bit],
                        capture_output=True, text=True)
     if r.returncode != 0:
         sys.exit(f"hwtest.py: openFPGALoader failed:\n{r.stdout}{r.stderr}")
+
+
+def test_boot(link: Link, bit: str, cable: list[str]) -> bool:
+    """Programs the FPGA, and checks the b notice and the ROM. True when
+    the core booted from the ROM."""
+    program(bit, cable)
     time.sleep(1.0)
     out = console(link, 1.0)
     check("b notice after configuration", link.boots >= 1,
@@ -2441,6 +2449,7 @@ def main() -> None:
         try:
             # Before the port is opened, as openFPGALoader takes the FTDI chip
             cable: list[str] = []
+            primed = False
             if not args.no_program:
                 if not sys.platform.startswith("linux"):
                     sys.exit("hwtest.py: programming needs Linux; program "
@@ -2450,10 +2459,26 @@ def main() -> None:
                 if not args.board:
                     board = "nexys4ddr" if model.startswith("xc7a100") \
                         else "mega65"
+                # The flash check leaves openFPGALoader's bridge in the
+                # FPGA, which holds the UART's TX low. Programming over
+                # it sometimes sends the host a stray byte before the b
+                # notice, and a stray 0xFF makes the notice's ESC an ESC
+                # ESC (#135). So the bitstream goes in once before the
+                # port is opened, and test_boot programs it over itself.
+                # The bytes of the first one may still arrive once the
+                # port is open, and are dropped.
+                primed = model.startswith("xc7a200") and \
+                    not args.no_board_check
+                if primed:
+                    program(args.bit, cable)
+                    wait_port(args.port)
             uart = Serial(args.port, args.baud)
             link = Link(uart)
             opened = True
             try:
+                if primed:
+                    console(link, 1.0)
+                    link.boots = 0
                 booted = False
                 if not args.no_program:
                     booted = test_boot(link, args.bit, cable)

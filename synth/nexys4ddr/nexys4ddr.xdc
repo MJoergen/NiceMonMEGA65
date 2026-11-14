@@ -1,10 +1,12 @@
 ## Constraints of the Digilent Nexys4DDR board. The pins are those of
 ## Digilent's Nexys-4-DDR-Master.xdc (github.com/Digilent/digilent-xdc).
 
+## The TX pin of the UART has a pull-up, so that the line is idle (high)
+## whenever the FPGA does not drive it (#135).
 set_property -dict {PACKAGE_PIN E3   IOSTANDARD LVCMOS33} [get_ports {clk_i}];      # CLK100MHZ
 set_property -dict {PACKAGE_PIN C12  IOSTANDARD LVCMOS33} [get_ports {reset_n_i}];  # CPU_RESETN
 set_property -dict {PACKAGE_PIN C4   IOSTANDARD LVCMOS33} [get_ports {uart_rxd_i}]; # UART_TXD_IN
-set_property -dict {PACKAGE_PIN D4   IOSTANDARD LVCMOS33} [get_ports {uart_txd_o}]; # UART_RXD_OUT
+set_property -dict {PACKAGE_PIN D4   IOSTANDARD LVCMOS33 PULLUP TRUE} [get_ports {uart_txd_o}]; # UART_RXD_OUT
 set_property -dict {PACKAGE_PIN F4   IOSTANDARD LVCMOS33 PULLUP TRUE} [get_ports {ps2_clk_i}];  # PS2_CLK
 set_property -dict {PACKAGE_PIN B2   IOSTANDARD LVCMOS33 PULLUP TRUE} [get_ports {ps2_data_i}]; # PS2_DATA
 

@@ -1,9 +1,12 @@
 ## Pins of the MEGA65 R6 board, as in MiSTer2MEGA65 (M2M/MEGA65-R6.xdc).
 
+## The TX pin of the UART has a pull-up, so that the line is idle (high)
+## whenever the FPGA does not drive it (#135). During configuration, the
+## pull-ups are on only while PUDC_B, the pin of the LED (U22), is low.
 set_property -dict {PACKAGE_PIN V13  IOSTANDARD LVCMOS33} [get_ports {clk_i}];          # CLOCK_FPGA_MRCC
 set_property -dict {PACKAGE_PIN J19  IOSTANDARD LVCMOS33} [get_ports {reset_button_i}]; # RESET
 set_property -dict {PACKAGE_PIN L14  IOSTANDARD LVCMOS33} [get_ports {uart_rxd_i}];     # DBG_UART_RX
-set_property -dict {PACKAGE_PIN L13  IOSTANDARD LVCMOS33} [get_ports {uart_txd_o}];     # DBG_UART_TX
+set_property -dict {PACKAGE_PIN L13  IOSTANDARD LVCMOS33 PULLUP TRUE} [get_ports {uart_txd_o}];     # DBG_UART_TX
 set_property -dict {PACKAGE_PIN U22  IOSTANDARD LVCMOS33} [get_ports {led_o}];          # ULED
 
 ## The button is asynchronous, and clk_rst.vhd synchronizes it to the system

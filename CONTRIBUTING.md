@@ -815,6 +815,10 @@ UserID, which `r3.xdc` and `r6.xdc` set, or else by its path (`synth/r3/`,
 with a note. `ARGS=--no-board-check` skips the check, for a board whose
 flash is not the usual one. When the check fails, the FPGA keeps the
 bridge, and the screen stays blank until the board is programmed.
+The bridge holds the UART's TX pin low, and programming over it
+sometimes sends the host a stray byte before the `b` notice (#135). So
+after the check, `hwtest` programs the board once before it opens the
+port, and the boot test programs it again over itself.
 
 For the R3, give `BIT=synth/r3/build/top.bit`. For the Nexys4DDR, give
 `BIT=synth/nexys4ddr/build/top.bit`. Its UART is usually `/dev/ttyUSB1`
