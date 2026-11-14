@@ -324,7 +324,9 @@ def main() -> None:
             print("release: %s is published" % tag)
             return
         v, head, results, body = stage(tag)
-        run(["make", "hwtest", "BIT=synth/%s/build/top.bit" % args.board, "PORT=" + args.port]
+        # ARGS= keeps release's own ARGS, such as --board r3, from make hwtest
+        run(["make", "hwtest", "BIT=synth/%s/build/top.bit" % args.board, "PORT=" + args.port,
+             "ARGS="]
             + (["ETH=" + args.eth] if args.eth else []))
         out = write_stage(tag, v, head, results, body, args.board)
     except Failed as e:
