@@ -20,55 +20,77 @@ Three documents say what a program sees:
 
 There are two kinds of program:
 
-- A program **on its own** is built at address 0, and has only the
-  hardware. A PC loads it with `tools/load.py`, which hides the ROM, and
-  it runs the same in `niceemu`.
 - A program **under the monitor** is built at `0x8000`, and may call
   the monitor's routines in the ROM, for the screen, the files, and the
   network. The monitor loads it, from the SD card, the network, or a
   paste, and it returns to the monitor (see
   [Programs under the monitor](#programs-under-the-monitor)).
+- A program **on its own** is built at address 0, and has only the
+  hardware. A PC loads it with `tools/load.py`, which hides the ROM, and
+  it runs the same in `niceemu` (see
+  [Programs in the ROM](#programs-in-the-rom)).
+
+## Contents
+
+- [A first program](#a-first-program)
+- [Three levels](#three-levels)
+- [Programs under the monitor](#programs-under-the-monitor)
+- [C](#c)
+- [The memory](#the-memory)
+- [The keyboard](#the-keyboard)
+- [The screen](#the-screen)
+- [The SD card and the network](#the-sd-card-and-the-network)
+- [The monitor's error codes](#the-monitors-error-codes)
+- [Programs in the ROM](#programs-in-the-rom)
 
 ## A first program
 
-This program runs on its own. It writes a greeting to the console,
-which goes to the PC, and to the screen:
+This program runs under the monitor. It writes a greeting in yellow,
+on the screen and on the console, which goes to the PC, and returns to
+the monitor:
 
-    ; hello.nasm: a greeting on the console and on the screen
-    CONSOLE         .EQU    0xFFFFFF00
-    SCREEN          .EQU    0xFFFF0000
-    WHITE           .EQU    0x000FFF00      ; white on black
+    // hello.c: a greeting in yellow, under the monitor
+    #include <stdio.h>
+    #include "mon.h"
 
-                    MOVE    R1, TEXT        ; the address of the next character
-                    MOVE    R3, SCREEN      ; the address of the next screen word
-    LOOP            MOVE[M] R2, @R1++       ; the character, and Z if it is 0
-            ?Z      HALT                    ; the end of the text
-                    MOVE    @CONSOLE, R2    ; to the console
-                    OR      R2, R2, WHITE   ; with its colors
-                    MOVE    @R3++, R2       ; to the screen
-                    JMP     LOOP
+    int main(void)
+    {
+        unsigned old = scr_color(0x000FF000);   // yellow on black
+        printf("Hello, world!\n");
+        scr_color(old);
+        return 0;
+    }
 
-    TEXT            .ASCII_L 'Hello, world!'
+`printf` prints through the monitor's `mon_putc`, and `scr_color`,
+declared in `monitor/mon.h`, is one of the monitor's routines. Build
+it at `0x8000` with `nicebuild.py`, which needs clang (see [C](#c)):
 
-Assemble it, and run it in the emulator, which is built with
-`make -C nice_cpu/emulator build`. The emulator prints the console's
-output, why the program stopped, and the registers, and with `--screen`
-the screen:
+    nice_cpu/translator/nicebuild.py --monitor --asm monitor/mon.nasm \
+        -I monitor -o hello.bin hello.c
 
-    python3 nice_cpu/assembler/niceasm.py -o hello.bin hello.nasm
-    nice_cpu/emulator/zig-out/bin/niceemu --screen hello.bin
+Run it in the emulator, which is built with
+`make -C nice_cpu/emulator build`. The emulator has no ROM, so the
+monitor, built with `make monitor`, is joined in front of the program.
+The input types `r`, which runs the program, and `h`, which halts the
+emulator when the program has returned. The emulator prints the
+console's output, why it stopped, and the registers, and with
+`--screen` the screen:
 
-Then run it on the board, from a PC on its network (the
+    cat monitor/build/monitor.bin hello.bin > joined.bin
+    printf 'r\rh\r' > rh.txt
+    nice_cpu/emulator/zig-out/bin/niceemu --screen -i rh.txt joined.bin
+
+On the board, copy `hello.bin` to the folder `NICE` of the SD card,
+and type `load hello.bin` and then `r` at the monitor's prompt. Or load
+and run it from a PC on the board's network (the
 [README](../README.md#over-ethernet) says how the board gets its
 address):
 
-    tools/run.py --eth 192.168.1.65 hello.bin
+    tools/load.py --eth 192.168.1.65 --monitor hello.bin
 
-`run.py` loads the program, starts it, and prints what `niceemu`
-prints, so the two can be compared. The greeting is at the top of the
-board's screen, and the reset button brings the monitor back.
-`tools/load.py` loads and starts a program without waiting for it, and
-`tools/mon.py` is a debugger ([tools/README.md](../tools/README.md)).
+The greeting is on the board's screen, and the monitor's prompt follows
+it. `tools/mon.py` is a debugger
+([tools/README.md](../tools/README.md)).
 
 ## Three levels
 
