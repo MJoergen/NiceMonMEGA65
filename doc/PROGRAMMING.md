@@ -4,7 +4,7 @@
 
 - [Introduction](#introduction)
 - [A first program in C](#a-first-program-in-c)
-- [A first program in NICE assembly](#a-first-program-in-nice-assembly)
+- [A first stand-alone program in NICE assembly](#a-first-stand-alone-program-in-nice-assembly)
 - [Three levels](#three-levels)
 - [Programs under the monitor](#programs-under-the-monitor)
 - [C](#c)
@@ -101,39 +101,56 @@ and the registers, and with `--screen` the screen:
     printf 'r\rh\r' | \
         nice_cpu/emulator/zig-out/bin/niceemu --screen -i - joined.bin
 
-## A first program in NICE assembly
+## A first stand-alone program in NICE assembly
 
-The same program in NICE assembly calls the monitor's routines itself,
-with the argument and the result in R1:
+A program on its own starts at address 0, with no monitor, and has
+only the hardware. It writes to the screen itself: the screen is memory
+at `0xFFFF0000`, one word for each character, with its code in the low
+byte and its color above it (see [The screen](#the-screen)). This
+program writes a greeting in yellow at the top left, and halts:
 
-    ; hello.nasm: a greeting in yellow, under the monitor
-    _main           MOVE    R1, MON_FG_YELLOW+MON_BG_BLACK
-                    CALL    _mon_scr_color  ; R1 the old color
-                    PUSH    R1
-                    MOVE    R1, hello.text
-                    CALL    _io_puts
-                    CALL    _io_crlf
-                    POP     R1
-                    CALL    _mon_scr_color
-                    MOVE    R1, 0
-                    RET
+    ; hello.nasm: a greeting in yellow, on its own at 0
+                    MOVE    R1, hello.text  ; the next character
+                    MOVE    R2, 0xFFFF0000  ; the top left, in yellow
+    :               MOVE[M] R3, @R1++
+            ?Z      HALT                    ; at the 0 word
+                    OR      @R2++, R3, 0x000FF000
+                    JMP     :-
     hello.text
                     .ASCII_L 'Hello, world!'
 
-The program starts at `_main`, and its `RET` returns to the monitor
-with R1. `_mon_scr_color` is the stub of the monitor's routine in
-`monitor/mon.nasm`, which also names the colors. `_io_puts` and
-`_io_crlf` print a text and a new line, and are in
-`monitor/monlib.nasm`. Build it at `0x8000` with nice_cpu's
-`start_mon.nasm` in front and these files after it (see
-[Programs under the monitor](#programs-under-the-monitor)):
+`@R1++` reads the word that R1 points to, and then adds 1 to R1.
+`MOVE[M]` copies it and sets the Z flag when it is 0, the word that
+`.ASCII_L` puts after the text, and `?Z HALT` then stops the processor.
+`OR` adds the color, and `:` is a label without a name, to which `:-`
+jumps back. The program ends with `HALT`, as there is no monitor to
+return to. Assemble it:
 
-    cat nice_cpu/runtime/start_mon.nasm hello.nasm monitor/monlib.nasm \
-        monitor/mon.nasm nice_cpu/runtime/lib.nasm \
-        nice_cpu/runtime/muldiv_mpu.nasm > hello_all.nasm
-    python3 nice_cpu/assembler/niceasm.py -o hello.bin hello_all.nasm
+    python3 nice_cpu/assembler/niceasm.py -o hello.bin hello.nasm
 
-It runs as the C program does, on the board and in the emulator.
+The monitor loads programs at `0x8000`, not at 0, so it cannot load
+this one. It gets onto the board in one of two ways:
+
+- **From a PC on the board's network.** `tools/load.py` holds the
+  processor, hides the ROM, loads the program at 0, and starts it (the
+  [README](../README.md#over-ethernet) says how the board gets its
+  address):
+
+      tools/load.py --eth 192.168.1.65 hello.bin
+
+  The greeting appears over the monitor's old text, which stays on the
+  screen. The reset button brings the monitor back.
+- **As the ROM of a core of your own.** `make cor ROM=hello.bin` builds
+  the core files with the program in their ROM, and the board runs it
+  whenever it starts that core. It needs Vivado and `coretool`
+  ([README](../README.md#building-your-own-rom)). This program can be in
+  the ROM, as it writes only to the screen (see
+  [Programs in the ROM](#programs-in-the-rom)).
+
+Run it in the emulator, which shows the screen in color with
+`--color`:
+
+    nice_cpu/emulator/zig-out/bin/niceemu --color hello.bin
 
 ## Three levels
 
