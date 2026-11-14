@@ -22,8 +22,8 @@ the monitor's banner and the demo's title bar, and the bitstreams of the
 R6, the R3, and the Nexys4DDR, with the monitor in the ROM and from nothing,
 each with FLOW=timing alone, as their Makefiles have it. Each must meet
 timing. It makes the core files of the R3 and the R6, with the tag as
-their version, which MEGAFLASH shows. Last it runs make hwtest on the R6 bitstream, so a MEGA65 R6
-must be on PORT, and with --eth IP its Ethernet port on this computer's network. It copies the bitstreams, the core files, the demo, demo.bin, the weather display, weather.bin, a zip of the examples, and
+their version, which MEGAFLASH shows. Last it runs make hwtest on the R6
+bitstream, or on the R3's with --board r3, so that MEGA65 must be on PORT, and with --eth IP its Ethernet port on this computer's network. It copies the bitstreams, the core files, the demo, demo.bin, the weather display, weather.bin, a zip of the examples, and
 verified.json to build/release/V1.0, with notes.md, the release notes, and
 release.json, the commit they were built from. The notes start with the
 tag's section of doc/RELEASE_NOTES.md, whose heading must have the date,
@@ -175,7 +175,8 @@ def build(board: str) -> Record:
     return r
 
 
-def notes(tag: str, v: Record, results: dict[str, Record], body: str) -> str:
+def notes(tag: str, v: Record, results: dict[str, Record], body: str,
+          tested: str = "r6") -> str:
     lines = [
         body,
         "",
@@ -192,7 +193,8 @@ def notes(tag: str, v: Record, results: dict[str, Record], body: str) -> str:
                      % (name, r["clock_mhz"], r["flow"], r["wns_ns"]))
     lines += [
         "",
-        "Built with %s, tested on the MEGA65 R6 with `make hwtest`." % v["vivado"],
+        "Built with %s, tested on the %s with `make hwtest`."
+        % (v["vivado"], dict(BOARDS)[tested]),
     ]
     lines += [
         "",
@@ -247,7 +249,7 @@ def stage(tag: str) -> tuple[Record, str, dict[str, Record], str]:
 
 
 def write_stage(tag: str, v: Record, head: str, results: dict[str, Record],
-                body: str) -> str:
+                body: str, tested: str = "r6") -> str:
     out = os.path.join(STAGE, tag)
     shutil.rmtree(out, ignore_errors=True)
     os.makedirs(out)
@@ -270,7 +272,7 @@ def write_stage(tag: str, v: Record, head: str, results: dict[str, Record],
     shutil.copy(os.path.join(REPO, VERIFIED), out)
     files.append(VERIFIED)
     with open(os.path.join(out, NOTES), "w") as f:
-        f.write(notes(tag, v, results, body))
+        f.write(notes(tag, v, results, body, tested))
     with open(os.path.join(out, STAMP), "w") as f:
         json.dump({"tag": tag, "repo_commit": head, "nice_cpu_tag": v["nice_cpu_tag"],
                    "nice_cpu_commit": v["nice_cpu_commit"], "files": files}, f, indent=2)
@@ -303,15 +305,17 @@ def publish(tag: str) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("tag", help="the tag, such as V1.0, or V1.0.1 to keep nice_cpu at V1.0")
-    ap.add_argument("--port", metavar="DEVICE", help="the R6's serial port, such as /dev/ttyUSB1, "
+    ap.add_argument("--board", choices=COR_BOARDS, default="r6",
+                    help="the MEGA65 that make hwtest tests, r6 by default")
+    ap.add_argument("--port", metavar="DEVICE", help="the MEGA65's serial port, such as /dev/ttyUSB1, "
                     "passed to make hwtest; needed unless --publish")
-    ap.add_argument("--eth", metavar="IP", help="also test the R6's Ethernet station, "
+    ap.add_argument("--eth", metavar="IP", help="also test the MEGA65's Ethernet station, "
                     "with the IP address IP on this computer's network")
     ap.add_argument("--publish", action="store_true",
                     help="tag, push, and create the GitHub Release from what is staged")
     args = ap.parse_args()
     if not args.publish and not args.port:
-        ap.error("--port is needed to test the R6, unless --publish")
+        ap.error("--port is needed to test the MEGA65, unless --publish")
     tag = args.tag
 
     try:
@@ -320,9 +324,9 @@ def main() -> None:
             print("release: %s is published" % tag)
             return
         v, head, results, body = stage(tag)
-        run(["make", "hwtest", "BIT=synth/r6/build/top.bit", "PORT=" + args.port]
+        run(["make", "hwtest", "BIT=synth/%s/build/top.bit" % args.board, "PORT=" + args.port]
             + (["ETH=" + args.eth] if args.eth else []))
-        out = write_stage(tag, v, head, results, body)
+        out = write_stage(tag, v, head, results, body, args.board)
     except Failed as e:
         sys.exit("release: %s" % e)
     print("release: %s is staged in %s" % (tag, os.path.relpath(out, REPO)))

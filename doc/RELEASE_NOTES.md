@@ -25,6 +25,19 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 
 **Upgrade notes.**
 
+- nice_cpu is at `V2.1`. Its assembler has `JMPR`, a relative jump,
+  so a program with a label or an `.EQU` name `JMPR`, in any case of
+  letters, no longer assembles until it is renamed. None here had one.
+- The debug link is version 8, and the board sends `b08` at reset. A
+  host of version 7 works unchanged. Version 8 adds the NMI request at
+  `0xFFFFFFD7`, which the board keeps, until a hold drops it, but does
+  not pass to the core, so nicedbg's `nmi` raises no NMI on the board
+  ([#106](https://github.com/MJoergen/NiceMonMEGA65/issues/106)).
+- In the emulator, `0xFFFFFF02` is now `CONSOLE_IRQ`, the console's
+  receive interrupt. On the board it stays a word of RAM, and the
+  console raises no IRQ
+  ([#104](https://github.com/MJoergen/NiceMonMEGA65/issues/104)), so a
+  program that waits for a key with `WAIT` runs in the emulator only.
 - The demo is no longer in the ROM, and the monitor's `x` is gone
   ([#129](https://github.com/MJoergen/NiceMonMEGA65/issues/129)). The
   demo is `demo.bin`, a file of the release: copy it into the folder

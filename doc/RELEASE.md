@@ -56,12 +56,12 @@ and keep their names.
 - `coretool` of [mega65-tools](https://github.com/MEGA65/mega65-tools)
   on the PATH, for the core files.
 - [openFPGALoader](https://github.com/trabucayre/openFPGALoader), and a
-  MEGA65 R6 on its USB cable, for `make hwtest`.
+  MEGA65 R6 or R3 on its USB cable, for `make hwtest`.
 - `gh`, GitHub's command line tool, logged in to an account that may
   push to this repository and create its releases.
 - What `make test` and `make examples` need (see
   [CONTRIBUTING.md](../CONTRIBUTING.md)).
-- For the test of the Ethernet station, the R6's Ethernet port on this
+- For the test of the Ethernet station, the MEGA65's Ethernet port on this
   computer's network, and a free IP address there.
 
 ## What must pass
@@ -79,7 +79,7 @@ and keep their names.
 - `RELEASE_NOTES.md` has a section for the tag, whose heading has the
   date: `## V1.0 (2026-10-28)`.
 - All three bitstreams meet timing.
-- `make hwtest` passes on a MEGA65 R6, with its Ethernet station when
+- `make hwtest` passes on a MEGA65 R6, or an R3, with its Ethernet station when
   `--eth` is given.
 
 ## The steps
@@ -106,6 +106,9 @@ and keep their names.
    build, test, and stage the release:
 
        make release TAG=V1.0 PORT=/dev/ttyUSB1 ARGS="--eth 192.168.1.65"
+
+   With an R3 on the cable instead, add `--board r3` to `ARGS`, and
+   the R3's bitstream is the one tested.
 
    This changes nothing in git. It checks the conditions above, builds
    the examples and the three bitstreams from nothing, each with the

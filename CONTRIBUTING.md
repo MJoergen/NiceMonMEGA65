@@ -997,7 +997,7 @@ server, or with no time server that answers, is named there too.
 Without `ETH`, the summary names the Ethernet station there.
 
 The reset button is not tested: press it with a terminal open, and the
-`b07` notice comes again. Nor is card detect: take a card out, and the
+`b08` notice comes again. Nor is card detect: take a card out, and the
 present bit of `SD_CSR` falls.
 
 ## The tools and niceemu

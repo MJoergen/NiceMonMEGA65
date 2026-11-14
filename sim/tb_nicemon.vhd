@@ -25,14 +25,14 @@
 -- first. A program that halts quickly may send its `h` before the `k` of
 -- the write that started it; wr() keeps it for expect_halt(). The steps:
 --
--- 1. The link's `b07` after reset, and the ROM, which holds G_ROM_FILE: the
+-- 1. The link's `b08` after reset, and the ROM, which holds G_ROM_FILE: the
 --    core boots from it at reset, prints its greeting, and halts. Its stack
 --    is in the RAM, at the top of the memory, for a push to the ROM is lost.
 --    The ROM is at 0, read only, with the RAM above it; bit 3 of the
 --    control register hides it, and shows it again; and the core boots from
 --    it again when it is started with the ROM shown. From then on the ROM
 --    is hidden, as the tools hide it, so the RAM is at 0 as in the
---    emulator. The version register reads 7, and the free space 16, the
+--    emulator. The version register reads 8, and the free space 16, the
 --    whole FIFO. The network station at 0xFFFFFFB0 has its addresses after
 --    reset, IP 0 and MAC 02:4E:49:43:45:00, which a write sets, its counts
 --    at 0, and NET_STATUS with the port and no host; a start keeps the
@@ -178,7 +178,7 @@
 --    quiet, is answered at the old rate, and so is a read until the UART
 --    has sent nothing for 1 ms after the write; then the link answers at
 --    2 Mbaud.
--- 20. A reset while G_ECHO_FILE runs: the link sends `b07` at
+-- 20. A reset while G_ECHO_FILE runs: the link sends `b08` at
 --    G_UART_BAUDRATE, the core boots from the ROM again, and the screen's
 --    and the board's registers, the baud rate, the station's addresses,
 --    and the breakpoints are cleared.
@@ -887,13 +887,13 @@ begin
          report "tb_nicemon: pkt() does not give the packets of DEBUG.md §8"
          severity failure;
 
-      report "tb_nicemon: b07, and the ROM";
-      expect_pkt("b07#C9");
+      report "tb_nicemon: b08, and the ROM";
+      expect_pkt("b08#CA");
       expect_con("Hello from the ROM!" & C_LF);
       expect_halt("01");
       first_v := first_word(G_ROM_FILE);
       check("FFFFFFF0", "00000002");         -- halted, the ROM shown
-      check("FFFFFFF2", "00000007");         -- the version
+      check("FFFFFFF2", "00000008");         -- the version
       check("FFFFFFF3", "00000010");         -- the free space: 16 bytes
       check("FFFFFF9E", "00001000");         -- the RAM's words, 2 ** G_RAM_ADDR_BITS
       wr("FFFFFF9E", "00000001");            -- dropped
@@ -1657,7 +1657,7 @@ begin
       bit_time <= C_BIT_2M;
       wait for 1 us;                         -- for the new bit time to show
       check("FFFFFF9F", "001E8480");         -- at 2 Mbaud
-      check("FFFFFFF2", "00000007");
+      check("FFFFFFF2", "00000008");
 
       report "tb_nicemon: a reset while the core runs";
       wr("FFFFFF81", "00000021");
@@ -1679,7 +1679,7 @@ begin
       rst <= '0';
       -- The core boots from the ROM again, and the UART is back at
       -- G_UART_BAUDRATE
-      expect_pkt("b07#C9");
+      expect_pkt("b08#CA");
       expect_con("Hello from the ROM!" & C_LF);
       expect_halt("01");
       check("FFFFFFF0", "00000002");

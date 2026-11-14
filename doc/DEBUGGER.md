@@ -419,7 +419,7 @@ about 3000 LUTs ([synth/README.md](../synth/README.md#utilization)).
   GHDL, on `nicemon`'s side port, with `sim/host.nasm` and a host on the
   UART: read the version, load a program and read it back, start it,
   read the control register while it runs and get `e02` for the memory,
-  pause, read R0–R15, and step; the UART gets `b07` and the `p` of each
+  pause, read R0–R15, and step; the UART gets `b08` and the `p` of each
   stop, and the console bytes in order; a packet on the UART is answered
   while the adapter reads, and a go on from the UART ends a long read of
   the adapter's with `e02` after the words it got while the core was
