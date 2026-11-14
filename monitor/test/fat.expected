@@ -94,7 +94,7 @@ dir [SLOT]: the slot in hex, such as dir 1
 > LOAD HELLO.BIN
 Words loaded: 767, 00008000 to 000082FE
 > r
-Hello from 00008000, table 00010004
+Hello from 00008000, table 00010005
 at column 40
 on the line only
 Returned 0000002A
@@ -121,7 +121,7 @@ Screen:
 |> LOAD HELLO.BIN
 |Words loaded: 767, 00008000 to 000082FE
 |> r
-|Hello from 00008000, table 00010004
+|Hello from 00008000, table 00010005
 |                                        at column 40
 |Returned 0000002A
 |> h

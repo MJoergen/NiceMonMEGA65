@@ -41,7 +41,7 @@ Files: 34, directories: 0
 > load "my prog.bin"
 Words loaded: 767, 00008000 to 000082FE
 > r
-Hello from 00008000, table 00010004
+Hello from 00008000, table 00010005
 at column 40
 on the line only
 Returned 0000002A

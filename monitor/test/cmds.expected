@@ -23,7 +23,7 @@ h             halt the core
 CRSR up down  scroll back a row, before a command
 PgUp PgDn     a page; on the MEGA65 CTRL and MEGA with CRSR up or down
 > v
-NiceMon V9.9, dispatch table 1.4
+NiceMon V9.9, dispatch table 1.5
 > d 0 6
 00000000 0003D800 00000040 0003D800 000000AD
 00000004 0003D800 0000010D
@@ -43,12 +43,12 @@ Unknown command; ? lists them
 > 
 >   c
 > abc   v
-NiceMon V9.9, dispatch table 1.4
+NiceMon V9.9, dispatch table 1.5
 > junk^C
 > v
-NiceMon V9.9, dispatch table 1.4
+NiceMon V9.9, dispatch table 1.5
 > v
-NiceMon V9.9, dispatch table 1.4
+NiceMon V9.9, dispatch table 1.5
 > r
 No program at 00008000
 > r 9000

@@ -118,11 +118,11 @@ int net_dhcp(void);
 // uses the network calls it every 100 ms or so. Entry 24 (issue #111).
 int net_poll(void);
 
-// The IP settings, DNS, and TCP, from table 1.5 (monitor/README.md, "The
-// network", and "TCP"). These take C pointers: the program joins
-// mon_c.nasm too, with nicebuild.py --monitor --asm mon.nasm --asm
-// mon_c.nasm, whose stubs turn a pointer into the address of the ROM's
-// windows. An error is negative, from -40 (doc/PROGRAMMING.md, "The
+// The IP settings, DNS, and TCP, from table 1.5 (monitor/README.md, "TCP
+// and DNS"). A program checks that mon_version is 0x00010005 or more.
+// These take C pointers: the program joins mon_c.nasm too, with
+// nicebuild.py --monitor --asm mon.nasm --asm mon_c.nasm, whose stubs
+// turn a pointer into the address of the ROM's windows. An error is negative, from -40 (doc/PROGRAMMING.md, "The
 // monitor's error codes").
 #define MON_ENTRY(name) __attribute__((import_name("c_" #name)))
 

@@ -1,7 +1,7 @@
 NiceMon V9.9
 ? lists the commands
 > r
-Hello from 00008000, table 00010004
+Hello from 00008000, table 00010005
 at column 40
 on the line only
 Returned 0000002A
@@ -16,7 +16,7 @@ Screen:
 |NiceMon V9.9
 |? lists the commands
 |> r
-|Hello from 00008000, table 00010004
+|Hello from 00008000, table 00010005
 |                                        at column 40
 |Returned 0000002A
 |> h

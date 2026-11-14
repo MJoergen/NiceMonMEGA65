@@ -1,10 +1,11 @@
 ; The monitor's TCP, which the Makefile joins after monitor_eth.nasm
-; (issue #111, README.md, "TCP", and INTERNALS.md, "TCP"): the entries 26
-; to 31, tcp_open, tcp_state, tcp_send, tcp_recv, tcp_close, and
-; tcp_listen, for up to TCP_HANDLES connections at once, and their part of
-; the poll: tcp_input, which net_frames calls for each segment, tcp_work,
-; which net_step calls when a connection may have something to send, and
-; tcp_timeout, which net_due calls when a connection's deadline is due.
+; (issue #111, README.md, "TCP and DNS", and INTERNALS.md, "The frame
+; routines"): the entries 26 to 31, tcp_open, tcp_state, tcp_send,
+; tcp_recv, tcp_close, and tcp_listen, for up to TCP_HANDLES connections
+; at once, and their part of the poll: tcp_input, which net_frames calls
+; for each segment, tcp_work, which net_step calls when a connection may
+; have something to send, and tcp_timeout, which net_due calls when a
+; connection's deadline is due.
 ;
 ; A connection's state is in its control block, in the program's RAM:
 ; TCP_CB words, then the ring of the bytes received, and the ring of the

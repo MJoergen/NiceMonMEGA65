@@ -303,8 +303,123 @@ same font.
 ## The SD card and the network
 
 Under the monitor, a program reads and writes files with the `fs_*`
-entries, and sends and receives UDP datagrams with the `udp_*` entries
-([monitor/README.md](../monitor/README.md#files)).
+entries, sends and receives UDP datagrams with the `udp_*` entries
+([monitor/README.md](../monitor/README.md#files)), and, from the
+dispatch table 1.5 on, gets its IP settings, looks up names, and opens
+TCP connections with the `net_*`, `dns_lookup`, and `tcp_*` entries
+([monitor/README.md](../monitor/README.md#tcp-and-dns)).
+
+**The network moves only when the program calls it.** A program that
+has a connection, a handle that listens, or the UDP endpoint open calls
+`net_poll`, or another entry of the network, every 100 ms or so. It
+waits for a key in a loop of `nice_pollc` and `net_poll`, never with
+`getchar` or `nice_getc`, which wait and do not poll. The file entries
+do not poll, so it reads or writes a large file in parts, with a poll
+between them.
+
+In C, the entries of the network take C's own pointers. A program
+includes `mon.h`, and is built with the stubs of `mon_c.nasm` too:
+
+    nice_cpu/translator/nicebuild.py --monitor --asm monitor/mon.nasm         --asm monitor/mon_c.nasm -I monitor -o get.bin get.c
+
+A client, which fetches a page over plain HTTP and prints it. Each call
+of `tcp_send`, `tcp_recv`, and `tcp_state` polls, so the loops need no
+`net_poll` of their own:
+
+```c
+// Fetches the page at http://example.com/ and prints it.
+#include <stdio.h>
+#include "mon.h"
+
+#define RX 1024
+#define TX 256
+static unsigned cb[TCP_CB_WORDS(RX, TX)];
+static const char req[] = "GET / HTTP/1.0\r\nHost: example.com\r\n\r\n";
+
+int main(void)
+{
+    if (mon_version() < 0x00010005) {
+        printf("Needs the dispatch table 1.5\n");
+        return 1;
+    }
+    unsigned ip;
+    int r = dns_lookup("example.com", &ip);
+    if (r < 0) {
+        printf("DNS error %d\n", r);
+        return 1;
+    }
+    int h = tcp_open(cb, ip, 80, TCP_SIZES(RX, TX));
+    if (h < 0) {
+        printf("TCP error %d\n", h);
+        return 1;
+    }
+    unsigned sent = 0;
+    char buf[64];
+    for (;;) {                  // each call polls
+        if (sent < sizeof req - 1) {
+            r = tcp_send(h, req + sent, sizeof req - 1 - sent);
+            if (r < 0)
+                break;
+            sent += (unsigned)r;
+        }
+        r = tcp_recv(h, buf, sizeof buf);
+        if (r < 0)
+            break;              // E_TEOF at the end, or an error
+        for (int i = 0; i < r; i++)
+            putchar(buf[i]);
+    }
+    tcp_close(h, 0);
+    while (tcp_state(h) != TCP_FREE)
+        ;                       // tcp_state polls too
+    return r == E_TEOF ? 0 : r;
+}
+```
+
+A server, which listens on port 7, and sends back what a peer sends,
+one peer after another, until a key is pressed. `tcp_recv` gives 0 while
+the handle waits for a peer in `TCP_LISTEN`, and `E_TEOF` once the peer
+has closed:
+
+```c
+// Sends back what a peer sends to port 7, one peer after another, until
+// a key is pressed.
+#include <nice.h>
+#include "mon.h"
+
+#define SIZES TCP_SIZES(512, 512)
+static unsigned cb[TCP_CB_WORDS(512, 512)];
+
+int main(void)
+{
+    char buf[64];
+    unsigned len = 0, done = 0;
+    int h = tcp_listen(cb, 7, SIZES);
+    while (h >= 0 && nice_pollc() < 0) {
+        int r;
+        if (len == 0) {
+            r = tcp_recv(h, buf, sizeof buf);
+            if (r > 0) {
+                len = (unsigned)r;
+                done = 0;
+            }
+        } else {
+            r = tcp_send(h, buf + done, len - done);
+            if (r > 0 && (done += (unsigned)r) == len)
+                len = 0;
+        }
+        if (r < 0) {            // E_TEOF, or the connection's error
+            tcp_close(h, 0);
+            while (tcp_state(h) != TCP_FREE)
+                ;
+            h = tcp_listen(cb, 7, SIZES);
+            len = 0;
+        }
+    }
+    if (h >= 0)
+        tcp_close(h, 1);
+    return 0;
+}
+```
 
 A program on its own has no monitor to call. It drives the hardware
 itself, and a program under the monitor may do so too:
@@ -370,6 +485,30 @@ The UDP entries, `udp_open` to `udp_close`, have their own
 | -42 | The endpoint is not open |
 | -43 | More than 1472 bytes |
 | -44 | No answer to ARP from the host, or from the gateway, or none for a host in another network |
+
+The entries of the IP settings, DNS, and TCP, from `net_config` to
+`tcp_listen`, return those of UDP too, -40, -41, and -44, and their own
+([monitor/README.md](../monitor/README.md#tcp-and-dns)). `mon.h` names
+them all:
+
+| Error | Name | Meaning |
+|---|---|---|
+| -45 | `E_NODHCP` | No answer from a DHCP server |
+| -46 | `E_NODNS` | No DNS server |
+| -47 | `E_DNSTIME` | No answer from the DNS server |
+| -48 | `E_DNSNAME` | No such name, no A record for it, or not a valid name |
+| -49 | `E_DNSFAIL` | The DNS server reported an error, or a truncated answer |
+| -50 | `E_THANDLE` | Not a handle, or a free one |
+| -51 | `E_TFULL` | Every handle is in use: 4 are |
+| -52 | `E_TSIZE` | A ring of fewer than 64 bytes, or a control block not aligned |
+| -53 | `E_TREFUSED` | The peer refused the connection |
+| -54 | `E_TRESET` | The peer reset the connection, or the IP address changed |
+| -55 | `E_TTIMEOUT` | No answer from the peer |
+| -56 | `E_TCLOSED` | The connection is closing, after `tcp_close` |
+| -57 | `E_TEOF` | The peer has closed, and every byte is read |
+
+`E_PORT`, -41, is also a port of `tcp_listen` that is 0, past 65535, or
+4510, the port of remote control.
 
 ## Programs in the ROM
 

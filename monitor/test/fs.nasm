@@ -9,7 +9,7 @@
 ; fs_readdir wrote at FST_ENTRY, and the entry and the names that
 ; fs_readname wrote at FST_ENTRY2, FST_NAME, and FST_NAME2:
 ;
-;  0  mon_version, 0x00010004, table 1.4
+;  0  mon_version, 0x00010005, table 1.5
 ;  1  fs_open of HELLO.BIN, 0, which mounts slot 0
 ;  2  fs_open of frag.bin, in lower case, 1
 ;  3  fs_open of NOFILE with both handles in use, -21, no such file,

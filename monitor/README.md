@@ -137,7 +137,7 @@ offset off, as a program may have hidden the one or used the other.
 |---|---|---|---|
 | 0 | `00` | `mon_reset` | Cold start: E, the timer, VBASE, and the font base cleared, the stack, the variables, the screen, the clock of the time of day from the MEGA65's real-time clock while it is not set, the banner, the main loop. The RAM from `0x8000` is left alone. |
 | 1 | `02` | `mon_exit` | R1 a status. Back to the main loop with a fresh stack, with E, the timer, VBASE, and the font base cleared, the cursor shown and blinking, the display offset off, and the status printed where the program left the cursor, on a new line if that is not column 0; for a program that has not kept the SP of its entry. A program with the runtime's start-up code returns or calls `exit` instead, which lands here too. |
-| 2 | `04` | `mon_version` | → R1 the version of the table, major in bits 31..16, minor in 15..0: `0x00010004`, 1.4. |
+| 2 | `04` | `mon_version` | → R1 the version of the table, major in bits 31..16, minor in 15..0: `0x00010005`, 1.5. |
 | 3 | `06` | `mon_putc` | R1 a character, to the outputs `mon_out` selects. On the screen it goes at the cursor, which moves on, to the next row after the last column; CR moves the cursor to column 0, LF to column 0 of the next row, BS one back, and TAB to the next multiple of 8; the other control codes and `0x7F` do nothing, and `0x80` to `0x9F` go on the screen as any character, blank in Spleen and drawn from the font RAM when a program selected it; past the last row the rows move up by one, by copying, so the rows shown are always the 2000 words at `0xFFFF0000`, as in `niceemu`. On the line every byte goes as it is. |
 | 4 | `08` | `mon_out` | R1 the outputs: bit 0 the line, bit 1 the screen; both at reset. → R1 the old ones. |
 | 5 | `0A` | `scr_cls` | Clears the screen in the current color, cursor home, shown and blinking, display offset 0. |
@@ -156,6 +156,17 @@ offset off, as a program may have hidden the one or used the other.
 | 18 | `24` | `udp_recv` | R1 a buffer, R2 a number of bytes, R3 the address of 2 words, or 0. Does not wait. Copies up to that many bytes of the next datagram, one per word, and its source's IP address and port to the 2 words; with R2 0 copies nothing, and leaves the datagram waiting. → R1 the bytes copied, 0 when none waits, or an error. Table 1.3. |
 | 19 | `26` | `udp_close` | Closes the endpoint, and disables the port for Ethernet frames. → R1 0. Table 1.3. |
 | 20 | `28` | `fs_readname` | R1 a handle of a directory, R2 a buffer of 4 words, R3 a buffer of 256 words. The next entry, as `fs_readdir` gives it, and its name in R3's buffer, one character per word up to a 0 word: its long name, or else its 8.3 name as a name, `HELLO.BIN`, in lower case where the entry says so. A character of a long name outside ASCII is `?`. → R1 1, 0 at the end, or an error. Table 1.4. |
+| 21 | `2A` | `net_config` | R1 the word address of 4 words. Writes the IP address, the mask, the gateway, and the DNS server to them, each 0 for none (TCP and DNS below). → R1 0. Table 1.5. |
+| 22 | `2C` | `net_set` | R1 the word address of 4 words, as `net_config` gives them. Sets the four, for a network with no DHCP, and forgets the lease. A new IP address breaks a host's connection over TCP, as `i A.B.C.D` does, and ends every TCP connection of the program in `E_TRESET`. → R1 0. Table 1.5. |
+| 23 | `2E` | `net_dhcp` | What `i dhcp` does, printing nothing: the address, the mask, the gateway, the DNS server, and the lease. With an address set, it asks for that one. Waits up to 16 seconds. → R1 0, or an error. Table 1.5. |
+| 24 | `30` | `net_poll` | Takes the frames that wait, and sends what is due: ACKs, retransmissions, and the lease's renewal. Never waits. A program that uses the network calls it every 100 ms or so. → R1 not negative, of no meaning yet. Table 1.5. |
+| 25 | `32` | `dns_lookup` | R1 the byte address of a name, up to a 0 byte, R2 the word address of the result. Writes the name's IPv4 address to the word at R2. A name of four decimal numbers with dots is taken as it is. Waits up to about 9 seconds. → R1 0, or an error. Table 1.5. |
+| 26 | `34` | `tcp_open` | R1 the word address of a control block, R2 an IP address, R3 a port, R4 the sizes of the rings in bytes, to receive in bits 31..16 and to send in 15..0, each 64 or more. Opens a connection: waits up to 3 seconds for ARP, sends the SYN, and does not wait for the answer. → R1 a handle, 0 to 3, or an error. Table 1.5. |
+| 27 | `36` | `tcp_state` | R1 a handle. → R1 its state, `TCP_FREE` to `TCP_LISTEN`, or the connection's error. Table 1.5. |
+| 28 | `38` | `tcp_send` | R1 a handle, R2 the byte address of a buffer, R3 a number of bytes. Takes as many as fit into the ring to send, and sends what the windows let go. → R1 the bytes taken, 0 when none fit, or an error. Table 1.5. |
+| 29 | `3A` | `tcp_recv` | R1 a handle, R2 the byte address of a buffer, R3 a number of bytes. Copies up to that many of the bytes received. → R1 the bytes copied, 0 when none wait, `E_TEOF` once the peer has closed and every byte is read, or an error. Table 1.5. |
+| 30 | `3C` | `tcp_close` | R1 a handle, R2 0 to close, or 1 to abort. A close sends the bytes that wait, then the FIN, and the handle frees itself later; an abort sends a RST and frees it at once. → R1 0, or an error. Table 1.5. |
+| 31 | `3E` | `tcp_listen` | R1 the word address of a control block, R2 a local port, 1 to 65535 but 4510, R3 the sizes of the rings, as R4 of `tcp_open`. Makes a handle that waits for a peer to connect to the port. Sends nothing, and does not wait. → R1 a handle, 0 to 3, or an error. Table 1.5. |
 
 By the table's own rule, it has no `mon_getc` or `mon_getc_nb`, as the
 console at `0xFFFFFF00` is the same on every board and in the emulator,
@@ -221,7 +232,7 @@ offset, so there the history is kept but not shown.
 | `d [ADDR] [N]` | Shows `N` words from `ADDR`, 4 to a row with the row's address first, all in hex. Without `ADDR`, the words after the last shown; without `N`, 32 words. |
 | `u [ADDR] [N]` | Disassembles `N` instructions from `ADDR`, a row each: the address, the instruction's 1 to 4 words, and its text, all in hex (The disassembler below). Without `ADDR`, the instructions after the last shown; without `N`, 20. |
 | `c` | Clears the screen. |
-| `v` | The version of the monitor, and of the dispatch table: `NiceMon V2.0.1, dispatch table 1.4`. |
+| `v` | The version of the monitor, and of the dispatch table: `NiceMon V2.1, dispatch table 1.5`. |
 | `i [A.B.C.D]` | Shows the Ethernet station's IP address, `IP address 192.168.1.65`, or writes it first: four decimal numbers of 0 to 255 with dots between them, such as `i 192.168.1.65`. Anything but an address or `dhcp` is no address, and `i` says so and writes nothing. It writes `0xFFFFFFB0`, `NET_IP` ([SYSTEM.md](../doc/SYSTEM.md#the-ethernet-station)), so a host connected over TCP loses its connection. In `niceemu` it is a register that keeps what is written. |
 | `i dhcp` | Gets the IP address from the network's DHCP server and writes it, as `i A.B.C.D` does, then shows it, with the mask, the gateway, the DNS server, and the DHCP server, a line each (The network below). Without an answer, it prints `No answer from a DHCP server` after about 8 seconds, and leaves the address as it was. |
 | `m [MAC]` | Shows the station's MAC address, `MAC address 02:4E:49:43:45:06`, or writes it first: six bytes of one or two hex digits, in either case, with colons between them, such as `m 02:4E:49:43:45:01`. The first byte must be even, as an odd one makes a group address. Anything else is no address, and `m` says so and writes nothing. It writes `0xFFFFFFB1` and `B2`, so a host connected over TCP loses its connection. Each kind of board has its own after reset: `02:4E:49:43:45:03` on the R3, `02:4E:49:43:45:06` on the R6, and `02:4E:49:43:45:0A` on the Nexys4DDR. Two boards of the same kind on one network need different MAC addresses. In `niceemu` they are registers too, `02:4E:49:43:45:00` after reset. |
@@ -328,11 +339,12 @@ address is a word address. An error is negative
 
 ## The network
 
-A program reaches the network through the UDP entries above, or drives
-the port for Ethernet frames at `0xFFFFFFC0` itself, which [nice_cpu's
+A program reaches the network through the entries above, UDP's 16 to
+19 here and the IP settings, DNS, and TCP of 21 to 31 in TCP and DNS
+below, or drives the port for Ethernet frames at `0xFFFFFFC0` itself, which [nice_cpu's
 SYSTEM.md §7](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#7-ethernet-frames) specifies, the same on every board and in `niceemu`. The
 ROM's own frame routines and its ARP cache, which `i dhcp`, `tftp`, and
-the UDP entries use, have no entries in the dispatch table
+the entries use, have no entries in the dispatch table
 ([INTERNALS.md](INTERNALS.md#the-frame-routines)).
 
 The network of programs is separate from remote control (Remote control
@@ -342,7 +354,7 @@ those of its Ethernet station
 answers ARP for that IP address and pings to it, and serves remote
 control on TCP port 4510. Every other frame to the board, UDP to any
 port among them, goes to the port for Ethernet frames while a program
-or the UDP entries have it enabled. The address that `i` or `i dhcp`
+or the entries have it enabled. The address that `i` or `i dhcp`
 sets serves both.
 
 - The cold start and the return of a program, `mon_exit`, disable the
@@ -382,7 +394,8 @@ it:
 
 - **One endpoint**, one local port, which `udp_open` opens and enables
   the port for Ethernet frames, with its queue emptied if the port was
-  disabled, and `udp_close` closes, with the port disabled. The cold
+  disabled, and `udp_close` closes, with the port disabled unless a TCP
+  handle is open. The cold
   start and a program's return close it too. Port 0 picks one from 49152
   to 65535.
 - **Sending**: a datagram goes to its address, through the gateway when
@@ -437,6 +450,130 @@ gives; without either, `make tftpd TFTP_PORT=6969` serves on port
 hello.bin` loads one, with the PC's address, and `:6969` after it for
 the other port. Any other TFTP server, such as `tftpd-hpa`, serves the
 files too, but answers a pattern with an error.
+
+## TCP and DNS
+
+The entries 21 to 31 (table 1.5, issue #111) give a program the IP
+settings, DHCP, DNS, and TCP: up to 4 connections at once, which the
+board opens to a server, or which a peer opens to a port where the
+board listens. A program that needs them checks that `mon_version` is
+`0x00010005` or more at its start, and stops with a message on an
+older monitor. Libraries such as HTTP or JSON are the program's.
+
+**The addresses.** These entries take addresses through the byte
+windows ([SYSTEM.md](../doc/SYSTEM.md#the-byte-windows)), so that a
+buffer of bytes is packed, 4 to a word, as a C program has it:
+
+- A word address, of the 4 words of `net_config` and `net_set`, the
+  result of `dns_lookup`, and a control block, is a plain address, or
+  one of the word window, `0x10000000 + 4*W` for word W.
+- A byte address, of a name and of the buffers of `tcp_send` and
+  `tcp_recv`, is one of the byte window, `0x20000000 + 4*W + b` for
+  byte b of word W, bits 8b+7 to 8b, so a buffer may start at any byte.
+  An assembly program passes `0x20000000 + 4*W` for a buffer at word W.
+- An IP address is a word, its first byte in bits 31..24, as `NET_IP`
+  has it.
+
+A C program declares the entries with `mon.h`, which takes C's own
+pointers, and is built with `nicebuild.py --monitor --asm mon.nasm
+--asm mon_c.nasm`. `mon_c.nasm` has the stubs that turn a pointer into
+an address of the windows, as only assembly knows where the program's
+memory is.
+
+**The poll.** The network moves only when the program calls an entry
+of the network; there are no interrupts. `net_poll` takes the frames
+that wait, and sends the ACKs, the retransmissions, and the lease's
+renewal that are due. The other entries of the network poll too. So:
+
+- A program that has a connection open, a handle listening, or the UDP
+  endpoint open calls `net_poll` every 100 ms or so. Between polls the
+  board answers nothing, and the 4 frames of the queue fill with the
+  peer's copies.
+- It waits for a key in a loop of `nice_pollc` and `net_poll`, never
+  with `getchar` or `nice_getc`, which wait and do not poll.
+- The file entries do not poll, so a program reads or writes a large
+  file in parts, with a poll between them.
+- `net_dhcp`, `dns_lookup`, and the ARP of `tcp_open` and `udp_send`
+  wait, and poll while they wait.
+- A connection that is not polled stalls first, and breaks in the end:
+  the peer's next retransmission may be minutes away, and Linux gives up
+  after about 15 minutes.
+
+**The settings.** `net_config` gives the IP address, the mask, the
+gateway, and the DNS server, and `net_set` sets them, each 0 for none.
+`net_dhcp` gets them from a DHCP server, as `i dhcp` does, with the
+first DNS server of the reply, and keeps the lease. While the network
+is on, the poll renews the lease: from half its time by unicast to the
+server, about every minute, then from 7/8 of it by broadcast, until its end.
+An ACK of another address writes `NET_IP`, which breaks a host's
+connection over TCP. After a NAK, or at the lease's end, the address
+stays, and nothing is renewed.
+
+**DNS.** `dns_lookup` asks the DNS server for the A record of a name,
+one question to port 53, sent again after 2 seconds, 3 times in all. It
+takes the first A record of the answer, past any CNAMEs. A name of four
+decimal numbers with dots, `192.168.1.10`, is taken as it is, with no
+query. A name has labels of 1 to 63 bytes, 253 bytes in all, and may
+end in a dot. There is no cache, so a program keeps the address it got.
+
+**A connection** lives in a control block in the program's RAM: 32
+words, then the ring of the bytes received and the ring of the bytes to
+send, packed, so `TCP_CB_WORDS(rx, tx)` of `mon.h` words in all. Its
+address in the word window has bits 1..0 clear, or `tcp_open` and
+`tcp_listen` give `E_TSIZE`. The block is the
+ROM's from `tcp_open` or `tcp_listen` until `tcp_state` gives
+`TCP_FREE`, and the program does not touch it meanwhile. `tcp_state`
+gives the state:
+
+| State | Value | What it means |
+|---|---|---|
+| `TCP_FREE` | 0 | The handle is free. |
+| `TCP_CONNECTING` | 1 | The handshake. Bytes that `tcp_send` takes go after it. |
+| `TCP_OPEN` | 2 | Bytes go both ways. |
+| `TCP_PEER_CLOSED` | 3 | The peer has closed. The program reads what is left, then gets `E_TEOF`, and may still send. |
+| `TCP_CLOSING` | 4 | After `tcp_close`. The handle frees itself. |
+| `TCP_LISTEN` | 5 | A handle of `tcp_listen`, until a peer connects. |
+| an error | negative | The connection ended, such as `E_TRESET`. `tcp_close` frees the handle. |
+
+- **Opening.** `tcp_open` sends the SYN from a local port of 49152 to
+  65535, 4 times in 15 seconds, then the connection ends in
+  `E_TTIMEOUT`; a RST ends it in `E_TREFUSED`.
+- **Listening.** `tcp_listen` makes a handle in `TCP_LISTEN`. The first
+  SYN to its port takes it, through `TCP_CONNECTING`, to `TCP_OPEN`: one
+  connection for each handle. A program that wants to serve two peers
+  at once listens with two handles on the same port. A SYN that comes
+  while every handle of the port is busy is passed over, and the peer
+  sends it again; a SYN to a port where nothing listens gets a RST. Port
+  4510 is the station's, for remote control, so `tcp_listen` gives
+  `E_PORT` for it.
+- **Sending and receiving** never wait. `tcp_send` takes what fits into
+  the ring, and the poll sends it in segments of up to 1460 bytes, as
+  far as the peer's window and the congestion window let it, and sends
+  it again after a timeout, from 200 ms to 60 s, measured from the
+  round trips. After 120 s with no answer the connection ends in
+  `E_TTIMEOUT`. `tcp_recv` takes from the ring received. Each
+  connection announces a window of at most the free room of its ring,
+  and 4096 bytes divided by the number of connections, so that together
+  they announce about 4096 bytes, as the queue holds only 4 frames.
+- **Closing.** `tcp_close` with 0 ends both directions: the bytes that
+  wait to be read are dropped, and so are those that come later, and
+  `tcp_recv` gives `E_TCLOSED`. The FIN goes after the bytes that wait
+  to be sent, and the handle frees itself once the peer has
+  acknowledged it and sent its own FIN, or 60 s after the
+  acknowledgment, or when the sends give up. With 1 it sends a RST and frees the handle at once. A
+  close of a handle in `TCP_LISTEN`, or of one with an error, frees it
+  at once and sends nothing. There is no TIME-WAIT.
+- **The cold start and a program's return** send a RST for each
+  connection, free every handle, close the endpoint, and disable the
+  port. They trust a control block only by its first word, which the
+  ROM writes, so a block that a new program overwrote is just freed.
+
+The errors are those of UDP, -40 to -44, and -45 to -57
+([doc/PROGRAMMING.md](../doc/PROGRAMMING.md#the-monitors-error-codes)).
+The entries run on the program's stack. The deepest, `tcp_recv`, takes
+24 words of it with the return address, `dns_lookup` 15, and `net_dhcp`
+11, as measured in the tests in `niceemu` on 2026-11-14, within the 32
+words of Programs below.
 
 ## The disassembler
 

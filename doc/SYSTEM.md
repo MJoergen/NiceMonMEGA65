@@ -515,7 +515,13 @@ while the core is paused, held, or halted.
 
 The monitor in the ROM uses the port in its `i dhcp`, which gets the
 station's IP address from a DHCP server, in its `tftp`, which loads a
-file from a TFTP server, and in its UDP entries for programs.
+file from a TFTP server, and in its entries for programs: UDP, DHCP,
+DNS, and TCP, as a client and as a server
+([monitor/](../monitor/README.md#tcp-and-dns)). Its TCP is a stack of
+its own, apart from the station's TCP server of port 4510, which a
+program cannot listen on. While those entries have the network on, the
+ROM alone reads the port's queue and writes its send buffer, so a
+program that uses them does not touch `0xFFFFFFC0`–`CF`.
 It disables the port at its start, at the end of `i dhcp` and `tftp`,
 and when a program returns, so a program that does not enable it sees
 no frame. Its frame routines and ARP cache are its own, with no entries

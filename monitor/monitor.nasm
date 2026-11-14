@@ -201,7 +201,7 @@ VARS_WORDS      .EQU    0x1000          ; the words from 0xFFFFF000, the variabl
 COLOR           .EQU    0x000FFF00      ; white on black, the color at the cold start
 OUT_LINE        .EQU    1
 OUT_SCREEN      .EQU    2
-TABLE_VERSION   .EQU    0x00010004      ; what mon_version returns: 1.4
+TABLE_VERSION   .EQU    0x00010005      ; what mon_version returns: 1.5
 PAGE            .EQU    24              ; the rows of a Page Up or Page Down
 SCR_MAX         .EQU    0x7FFF          ; the largest display offset
 

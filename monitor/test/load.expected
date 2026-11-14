@@ -8,7 +8,7 @@ Lines skipped: 6, first line 2; ADDR WORD in hex, ADDR 00008000 to 0001EFFF
 ADDR WORD in hex on each line, as in a .bin file; an empty line ends
 Words loaded: 0
 > r
-Hello from 00008000, table 00010004
+Hello from 00008000, table 00010005
 at column 40
 on the line only
 Returned 0000002A
@@ -31,7 +31,7 @@ Screen:
 |ADDR WORD in hex on each line, as in a .bin file; an empty line ends
 |Words loaded: 0
 |> r
-|Hello from 00008000, table 00010004
+|Hello from 00008000, table 00010005
 |                                        at column 40
 |Returned 0000002A
 |> d 9000 4

@@ -586,7 +586,8 @@ stage 6. Stage 6 was 3500 with the float routines.
 
 While BASIC is C, the routines of the monitor's commands stay in
 `monitor_cmd.nasm`, and the ROM has 13455 words free without the demo,
-which left it in V2.1 (#129). #111, the network for programs, wants 3500 to 4500 of them. So
+which left it in V2.1 (#129). #111, the network for programs, leaves
+9757 of them (measured 2026-11-14). So
 **the whole list does not fit in C**: C fills the ROM at stage 4 or
 5, and the port to assembly is not a matter of speed alone.
 

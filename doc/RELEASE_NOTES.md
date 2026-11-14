@@ -31,8 +31,9 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   `NICE` of an SD card, and type `load demo.bin` and then `r`. F12
   returns to the monitor as before. A program's return now prints its
   status where the program left the cursor's registers, so at the top
-  after the demo, which clears the screen. The ROM has 13430 words free, where
-  it had 5117 below the demo, for the network of #111 and for BASIC.
+  after the demo, which clears the screen. With the network of #111 in
+  it, the ROM has 9757 words free, where it had 5117 below the demo, for
+  BASIC.
 - `make demo` builds `demo/build/demo.bin` alone, and the boards'
   targets put the monitor alone in the ROM, `monitor/build/monitor.bin`.
   `demo/join.py`, `demo/build/rom.bin`, and `demo/demo_hw.py` are gone.
@@ -57,8 +58,23 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   next comes, or loses the next. The monitor's `tftp` sends one packet,
   and waits for its answer, so it is not affected.
 
+- The dispatch table is 1.5, with 11 entries more, 21 to 31, for the
+  network ([#111](https://github.com/MJoergen/NiceMonMEGA65/issues/111)).
+  A program built for 1.4 runs as before.
+
 **New.**
 
+- Programs under the monitor get the IP settings, DHCP, DNS, and TCP
+  from the ROM ([#111](https://github.com/MJoergen/NiceMonMEGA65/issues/111)):
+  `net_config`, `net_set`, `net_dhcp`, `net_poll`, `dns_lookup`, and up
+  to 4 TCP connections at once, which a program opens to a server with
+  `tcp_open`, or a peer opens to a port where it listens with
+  `tcp_listen`. The network moves when the program polls, every 100 ms
+  or so, and the polls renew the DHCP lease. `mon.h` declares the
+  entries for C, and `monitor/mon_c.nasm` has their stubs.
+  [doc/PROGRAMMING.md](PROGRAMMING.md#the-sd-card-and-the-network) has a
+  client and a server in C, and `make tcptest` tests the entries without a
+  board.
 - The monitor's `i dhcp` also shows the DNS server, and asks the DHCP
   server for the address that the board has, if it has one. It writes
   the address only when the server gives another, so a host's

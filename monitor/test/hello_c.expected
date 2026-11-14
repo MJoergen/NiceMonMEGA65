@@ -1,7 +1,7 @@
 NiceMon V9.9
 ? lists the commands
 > r
-Hello from C at 00008000, table 1.4
+Hello from C at 00008000, table 1.5
 at column 40
 on the line only
 Returned 00000007
@@ -13,7 +13,7 @@ Screen:
 |NiceMon V9.9
 |? lists the commands
 |> r
-|Hello from C at 00008000, table 1.4
+|Hello from C at 00008000, table 1.5
 |                                        at column 40
 |Returned 00000007
 |> h

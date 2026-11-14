@@ -244,10 +244,11 @@ monitor gives it one:
 | `i dhcp` | Gets an address from the network's DHCP server, and shows it with the mask, the gateway, the DNS server, and the DHCP server |
 | `m 02:4E:49:43:45:01` | Sets the MAC address; `m` alone shows it. A second board on the same network needs one of its own |
 
-The board does not renew a DHCP lease, so the server may give the
-address to another computer when the lease ends. A fixed address
-outside the server's range, or one that the server reserves for the MAC
-address, avoids that.
+The board renews a DHCP lease only while a program uses the network,
+so at the monitor's prompt the server may give the address to another
+computer when the lease ends. A fixed address outside the server's
+range, or one that the server reserves for the MAC address, avoids
+that.
 
 The on-board debugger's settings page (F5) sets the addresses too, and
 so does the demo's F11, where I types a new IP address, and M a new MAC
