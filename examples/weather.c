@@ -300,7 +300,7 @@ static void draw_bar(void)
 {
     unsigned c[4];
     char buf[96];
-    net_config(c);
+    mon_net_config(c);
     clear_row(0, C_BAR);
     fmt(buf, sizeof buf, "Weather from %s", cfg.host);
     text(1, 0, C_BAR, buf);
@@ -389,13 +389,13 @@ static int settings(void)
     unsigned n = 0;
     for (unsigned i = 0; i < sizeof name; i++)
         words[i] = (unsigned char)name[i];
-    int h = fs_open(mon_words(words), 0);
+    int h = mon_fs_open(mon_words(words), 0);
     if (h >= 0) {
         int r;
-        while (n < sizeof buf && (r = fs_read(h, mon_words(words), 256)) > 0)
+        while (n < sizeof buf && (r = mon_fs_read(h, mon_words(words), 256)) > 0)
             for (int i = 0; i < r && n < sizeof buf; i++)
                 buf[n++] = (char)words[i];
-        fs_close(h);
+        mon_fs_close(h);
         int bad = cfg_parse(&cfg, buf, n);
         if (bad) {
             char msg[64];
@@ -414,7 +414,7 @@ static int settings(void)
         put(20 + (int)strlen(cfg.place), ROW_PLACE + 1, C_PLACE, '_');
         int c;
         while ((c = nice_pollc()) < 0)
-            net_poll();
+            mon_net_poll();
         unsigned len = (unsigned)strlen(cfg.place);
         if (c == '\r' || c == '\n')
             break;
@@ -451,10 +451,10 @@ static void fetch_start_now(void)
     char buf[96];
     unsigned c[4], ip;
     int r;
-    net_config(c);
+    mon_net_config(c);
     if (c[0] == 0) {
         status(C_DIM, "Asking for an IP address (DHCP)...");
-        r = net_dhcp();
+        r = mon_net_dhcp();
         draw_bar();
         if (r < 0) {
             fail(r, micros());
@@ -463,13 +463,13 @@ static void fetch_start_now(void)
     }
     fmt(buf, sizeof buf, "Looking up %s...", cfg.host);
     status(C_DIM, buf);
-    r = dns_lookup(cfg.host, &ip);
+    r = mon_dns_lookup(cfg.host, &ip);
     if (r == MON_E_NODNS) {
         status(C_DIM, "Asking for a DNS server (DHCP)...");
-        r = net_dhcp();
+        r = mon_net_dhcp();
         draw_bar();
         if (r >= 0)
-            r = dns_lookup(cfg.host, &ip);
+            r = mon_dns_lookup(cfg.host, &ip);
     }
     if (r < 0) {
         fail(r, micros());
@@ -477,7 +477,7 @@ static void fetch_start_now(void)
     }
     fmt(buf, sizeof buf, "Fetching from %s...", cfg.host);
     status(C_DIM, buf);
-    r = tcp_open(cb, ip, cfg.port, MON_TCP_SIZES(RX, TX));
+    r = mon_tcp_open(cb, ip, cfg.port, MON_TCP_SIZES(RX, TX));
     if (r < 0) {
         fail(r, micros());
         return;
@@ -515,9 +515,9 @@ static void fetch_step(unsigned long long now)
 {
     int r;
     if (req_sent < req_n) {
-        r = tcp_send(handle, req + req_sent, req_n - req_sent);
+        r = mon_tcp_send(handle, req + req_sent, req_n - req_sent);
         if (r < 0) {
-            tcp_close(handle, 1);
+            mon_tcp_close(handle, 1);
             fail(r, now);
             return;
         }
@@ -525,17 +525,17 @@ static void fetch_step(unsigned long long now)
     }
     r = 0;
     if (ans_n < sizeof ans)
-        r = tcp_recv(handle, ans + ans_n, sizeof ans - ans_n);
+        r = mon_tcp_recv(handle, ans + ans_n, sizeof ans - ans_n);
     if (r > 0)
         ans_n += (unsigned)r;
     if (r == MON_E_TEOF || ans_n == sizeof ans) {
-        tcp_close(handle, r == MON_E_TEOF ? 0 : 1);
+        mon_tcp_close(handle, r == MON_E_TEOF ? 0 : 1);
         fetch_done(now);
     } else if (r < 0) {
-        tcp_close(handle, 1);
+        mon_tcp_close(handle, 1);
         fail(r, now);
     } else if (now - fetch_start > FETCH_TIMEOUT * 1000000ull) {
-        tcp_close(handle, 1);
+        mon_tcp_close(handle, 1);
         fail(MON_E_TTIMEOUT, now);
     }
 }
@@ -546,7 +546,7 @@ int main(void)
         nice_print("The weather needs the monitor's dispatch table 1.5 or later\n");
         return 1;
     }
-    scr_cls();
+    mon_scr_cls();
     nice_poke(SCR_STATE, nice_peek(SCR_STATE) & ~0x40u);    // no cursor
     font_init();
     cfg_parse(&cfg, "", 0);
@@ -564,7 +564,7 @@ int main(void)
             break;
         if ((c == 'r' || c == 'R') && fstate == F_IDLE)
             next_fetch = now;
-        net_poll();
+        mon_net_poll();
         // The screen once a second, and when the clock or the fetch moved.
         long long s = now_s();
         if (s != shown || now - tick >= 1000000u || fstate != was) {
@@ -584,7 +584,7 @@ int main(void)
             was = -1;                   // a fetch ended: drawn at once
     }
     if (fstate == F_RECV)
-        tcp_close(handle, 1);
-    scr_cls();
+        mon_tcp_close(handle, 1);
+    mon_scr_cls();
     return 0;
 }

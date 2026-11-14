@@ -59,14 +59,16 @@ the monitor:
 
     int main(void)
     {
-        unsigned old = scr_color(MON_FG_YELLOW | MON_BG_BLACK);
+        unsigned old = mon_scr_color(MON_FG_YELLOW | MON_BG_BLACK);
         printf("Hello, world!\n");
-        scr_color(old);
+        mon_scr_color(old);
         return 0;
     }
 
-`printf` prints through the monitor's `mon_putc`, and `scr_color`,
-declared in `monitor/mon.h`, is one of the monitor's routines. Its
+`printf` prints through the monitor's `mon_putc`, and
+`mon_scr_color`, declared in `monitor/mon.h`, is one of the monitor's
+routines, `scr_color` of the dispatch table. Every function of `mon.h`
+starts with `mon_`, so that it clashes with none of the program's. Its
 color is a foreground and a background of `mon.h`, or-ed. Build
 it at `0x8000` with `nicebuild.py`, which needs clang (see [C](#c)):
 
@@ -386,13 +388,13 @@ includes `mon.h`, and is built with the stubs of `mon_c.nasm` too:
 The file and UDP entries take NICE word addresses, one character or
 byte per word, and not C pointers. `mon_words`, a stub of `mon_c.nasm`,
 gives the address of an array of `unsigned` words of the program, so
-`fs_open(mon_words(name), 0)` opens the file whose name is in `name`,
-one character per word up to a 0 word. `examples/weather.c` reads its
+`mon_fs_open(mon_words(name), 0)` opens the file whose name is in
+`name`, one character per word up to a 0 word. `examples/weather.c` reads its
 settings so.
 
 A client, which fetches a page over plain HTTP and prints it. Each call
-of `tcp_send`, `tcp_recv`, and `tcp_state` polls, so the loops need no
-`net_poll` of their own:
+of `mon_tcp_send`, `mon_tcp_recv`, and `mon_tcp_state` polls, so the
+loops need no `mon_net_poll` of their own:
 
 ```c
 // Fetches the page at http://example.com/ and prints it.
@@ -411,12 +413,12 @@ int main(void)
         return 1;
     }
     unsigned ip;
-    int r = dns_lookup("example.com", &ip);
+    int r = mon_dns_lookup("example.com", &ip);
     if (r < 0) {
         printf("DNS error %d\n", r);
         return 1;
     }
-    int h = tcp_open(cb, ip, 80, MON_TCP_SIZES(RX, TX));
+    int h = mon_tcp_open(cb, ip, 80, MON_TCP_SIZES(RX, TX));
     if (h < 0) {
         printf("TCP error %d\n", h);
         return 1;
@@ -425,27 +427,27 @@ int main(void)
     char buf[64];
     for (;;) {                  // each call polls
         if (sent < sizeof req - 1) {
-            r = tcp_send(h, req + sent, sizeof req - 1 - sent);
+            r = mon_tcp_send(h, req + sent, sizeof req - 1 - sent);
             if (r < 0)
                 break;
             sent += (unsigned)r;
         }
-        r = tcp_recv(h, buf, sizeof buf);
+        r = mon_tcp_recv(h, buf, sizeof buf);
         if (r < 0)
             break;              // MON_E_TEOF at the end, or an error
         for (int i = 0; i < r; i++)
             putchar(buf[i]);
     }
-    tcp_close(h, 0);
-    while (tcp_state(h) != MON_TCP_FREE)
-        ;                       // tcp_state polls too
+    mon_tcp_close(h, 0);
+    while (mon_tcp_state(h) != MON_TCP_FREE)
+        ;                       // mon_tcp_state polls too
     return r == MON_E_TEOF ? 0 : r;
 }
 ```
 
 A server, which listens on port 7, and sends back what a peer sends,
-one peer after another, until a key is pressed. `tcp_recv` gives 0 while
-the handle waits for a peer in `MON_TCP_LISTEN`, and `MON_E_TEOF` once the peer
+one peer after another, until a key is pressed. `mon_tcp_recv` gives 0
+while the handle waits for a peer in `MON_TCP_LISTEN`, and `MON_E_TEOF` once the peer
 has closed:
 
 ```c
@@ -461,30 +463,30 @@ int main(void)
 {
     char buf[64];
     unsigned len = 0, done = 0;
-    int h = tcp_listen(cb, 7, SIZES);
+    int h = mon_tcp_listen(cb, 7, SIZES);
     while (h >= 0 && nice_pollc() < 0) {
         int r;
         if (len == 0) {
-            r = tcp_recv(h, buf, sizeof buf);
+            r = mon_tcp_recv(h, buf, sizeof buf);
             if (r > 0) {
                 len = (unsigned)r;
                 done = 0;
             }
         } else {
-            r = tcp_send(h, buf + done, len - done);
+            r = mon_tcp_send(h, buf + done, len - done);
             if (r > 0 && (done += (unsigned)r) == len)
                 len = 0;
         }
         if (r < 0) {            // MON_E_TEOF, or the connection's error
-            tcp_close(h, 0);
-            while (tcp_state(h) != MON_TCP_FREE)
+            mon_tcp_close(h, 0);
+            while (mon_tcp_state(h) != MON_TCP_FREE)
                 ;
-            h = tcp_listen(cb, 7, SIZES);
+            h = mon_tcp_listen(cb, 7, SIZES);
             len = 0;
         }
     }
     if (h >= 0)
-        tcp_close(h, 1);
+        mon_tcp_close(h, 1);
     return 0;
 }
 ```

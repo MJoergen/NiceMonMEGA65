@@ -192,8 +192,8 @@ rather than general, as its header says.
 - **Calls.** Every function of the C code that is not `static` is
   exported, and the monitor's assembly calls it as `_name`, in the C ABI;
   the entries 9 to 15 jump to `fat32.c`'s `fat_mount` to `fat_delete`.
-  Their names in `mon.nasm` and `mon.h` are `fs_mount` to `fs_delete`,
-  as the stubs `_fs_mount` to `_fs_delete` of `mon.nasm`, which the
+  Their names in `mon.nasm` are `fs_mount` to `fs_delete`, and in
+  `mon.h` `mon_fs_mount` to `mon_fs_delete`, as the stubs `_fs_mount` to `_fs_delete` of `mon.nasm`, which the
   monitor joins for `monlib.nasm`, would clash with C functions of those
   names.
   The C code calls the monitor's routines by their labels too: they are

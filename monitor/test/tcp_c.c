@@ -26,7 +26,7 @@ static int wait_state(int h, int want)
 {
     int s = h;
     for (unsigned i = 0; i < 2000000; i++) {
-        s = tcp_state(h);
+        s = mon_tcp_state(h);
         if (s == want || s < 0)
             break;
     }
@@ -37,13 +37,13 @@ int main(void)
 {
     static const unsigned set[4] = {0x0A000009, 0xFFFFFF00, 0, 0};
     unsigned cfg[4];
-    if (net_set(set) != 0)
+    if (mon_net_set(set) != 0)
         return fail(1, 0);
-    if (net_config(cfg) != 0 || cfg[0] != 0x0A000009 || cfg[1] != 0xFFFFFF00)
+    if (mon_net_config(cfg) != 0 || cfg[0] != 0x0A000009 || cfg[1] != 0xFFFFFF00)
         return fail(2, 0);
     for (unsigned i = 0; i < 1000; i++)
         out[1 + i] = (unsigned char)(i * 7 + 3);
-    int h = tcp_open(cb, 0x0A000002, 2001, MON_TCP_SIZES(RX, TX));
+    int h = mon_tcp_open(cb, 0x0A000002, 2001, MON_TCP_SIZES(RX, TX));
     if (h < 0)
         return fail(3, h);
     int s = wait_state(h, MON_TCP_OPEN);
@@ -52,12 +52,12 @@ int main(void)
     unsigned sent = 0, got = 0;
     for (unsigned i = 0; i < 4000000 && got < 1000; i++) {
         if (sent < 1000) {
-            int n = tcp_send(h, out + 1 + sent, 1000 - sent);
+            int n = mon_tcp_send(h, out + 1 + sent, 1000 - sent);
             if (n < 0)
                 return fail(5, n);
             sent += (unsigned)n;
         }
-        int n = tcp_recv(h, in + 3 + got, 1000 - got);
+        int n = mon_tcp_recv(h, in + 3 + got, 1000 - got);
         if (n < 0)
             return fail(6, n);
         got += (unsigned)n;
@@ -67,18 +67,18 @@ int main(void)
     for (unsigned i = 0; i < 1000; i++)
         if (in[3 + i] != out[1 + i])
             return fail(8, 0);
-    if (tcp_close(h, 0) != 0)
+    if (mon_tcp_close(h, 0) != 0)
         return fail(9, 0);
     s = wait_state(h, MON_TCP_FREE);
     if (s != MON_TCP_FREE)
         return fail(10, s);
 
-    h = tcp_listen(cb, 3010, MON_TCP_SIZES(RX, TX));
+    h = mon_tcp_listen(cb, 3010, MON_TCP_SIZES(RX, TX));
     if (h < 0)
         return fail(11, h);
     got = 0;
     for (unsigned i = 0; i < 4000000 && got < 200; i++) {
-        int n = tcp_recv(h, in + 1 + got, 200 - got);
+        int n = mon_tcp_recv(h, in + 1 + got, 200 - got);
         if (n < 0)
             return fail(12, n);
         got += (unsigned)n;
@@ -87,12 +87,12 @@ int main(void)
         return fail(13, 0);
     sent = 0;
     for (unsigned i = 0; i < 4000000 && sent < 200; i++) {
-        int n = tcp_send(h, in + 1 + sent, 200 - sent);
+        int n = mon_tcp_send(h, in + 1 + sent, 200 - sent);
         if (n < 0)
             return fail(14, n);
         sent += (unsigned)n;
     }
-    if (sent != 200 || tcp_close(h, 0) != 0)
+    if (sent != 200 || mon_tcp_close(h, 0) != 0)
         return fail(15, 0);
     s = wait_state(h, MON_TCP_FREE);
     if (s != MON_TCP_FREE)

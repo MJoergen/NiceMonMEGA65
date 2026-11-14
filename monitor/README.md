@@ -118,9 +118,12 @@ The routines follow the C ABI of `nice_cpu/runtime/ABI.md`: arguments in
 R1–R4, the result in R1, R1–R6 changed, and R7–R13 kept. A C program for
 the monitor declares them with `mon.h`, and is joined with the stubs of
 `mon.nasm` (`nicebuild.py --monitor --asm mon.nasm`), as the translator
-makes a call to the `env` import `mon_putc` a call to `_mon_putc`. For
-C, `mon.nasm` also has `_scr_getx` and `_scr_gety`, as `scr_getxy`
-returns two values. Such a program runs only with the ROM visible, as
+makes a call to the `env` import `mon_putc` a call to `_mon_putc`. In
+`mon.h` every function starts with `mon_`, so that it clashes with none
+of the program's: `mon_scr_cls` is the entry `scr_cls`, and its
+`import_name` makes a call of it a call of `_scr_cls`. For C, `mon.nasm`
+also has `_scr_getx` and `_scr_gety`, as `scr_getxy` returns two values,
+which `mon.h` names `mon_scr_getx` and `mon_scr_gety`. Such a program runs only with the ROM visible, as
 every program built at `0x8000` for the monitor does.
 
 VBASE is 0 at reset and stays 0. The monitor has no interrupts of its
@@ -503,8 +506,8 @@ buffer of bytes is packed, 4 to a word, as a C program has it:
 - An IP address is a word, its first byte in bits 31..24, as `NET_IP`
   has it.
 
-A C program declares the entries with `mon.h`, which takes C's own
-pointers, and is built with `nicebuild.py --monitor --asm mon.nasm
+A C program declares the entries with `mon.h`, as `mon_net_config` to
+`mon_tcp_listen`, which take C's own pointers, and is built with `nicebuild.py --monitor --asm mon.nasm
 --asm mon_c.nasm`. `mon_c.nasm` has the stubs that turn a pointer into
 an address of the windows, as only assembly knows where the program's
 memory is.

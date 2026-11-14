@@ -1,12 +1,16 @@
 // The entries of the monitor's ROM for a C program (monitor/README.md, "The
 // dispatch table"). The program is built with nicebuild.py --monitor --asm
-// mon.nasm, whose stubs call the entries: a call to one of these functions
-// is a call to the stub of its name. The program runs at 0x8000, with the
-// ROM visible, as every program for the monitor does. printf and the other
-// output of the C library reach the monitor's outputs through the putc
-// vector, without this header.
+// mon.nasm, whose stubs call the entries. Every function here starts with
+// mon_, so that its name clashes with none of the program's; MON_STUB
+// names the stub of mon.nasm that a call reaches, as the entry's name in
+// the table: a call of mon_scr_cls is a call of _scr_cls. The program
+// runs at 0x8000, with the ROM visible, as every program for the monitor
+// does. printf and the other output of the C library reach the monitor's
+// outputs through the putc vector, without this header.
 #ifndef MON_H
 #define MON_H
+
+#define MON_STUB(name) __attribute__((import_name(#name)))
 
 // Back to the monitor's main loop with a status, on a fresh stack. exit()
 // of the C library returns to the monitor too, with the stack of the entry.
@@ -25,23 +29,23 @@ void mon_putc(int c);
 unsigned mon_out(unsigned outputs);
 
 // The screen blank in the current color, the cursor at the top left.
-void scr_cls(void);
+MON_STUB(scr_cls) void mon_scr_cls(void);
 
 // The cursor to a column, 0 to 79, and a row, 0 to 24.
-void scr_moveto(int col, int row);
+MON_STUB(scr_moveto) void mon_scr_moveto(int col, int row);
 
-// The cursor's column, and its row. scr_getxy of the table gives both at
-// once, in R1 and R2, which C cannot take.
-int scr_getx(void);
-int scr_gety(void);
+// The cursor's column, and its row. The table's scr_getxy gives both at
+// once, in R1 and R2, which C cannot take; mon.nasm has a stub for each.
+MON_STUB(scr_getx) int mon_scr_getx(void);
+MON_STUB(scr_gety) int mon_scr_gety(void);
 
 // The color of the characters put from now on, bits 31..8 of a screen
 // word: the background in 31..20, the foreground in 19..8. Returns the
 // old one.
-unsigned scr_color(unsigned color);
+MON_STUB(scr_color) unsigned mon_scr_color(unsigned color);
 
-// Colors for scr_color: a foreground and a background, added or or-ed,
-// such as MON_FG_YELLOW | MON_BG_BLUE. A color left out is black.
+// Colors for mon_scr_color: a foreground and a background, added or
+// or-ed, such as MON_FG_YELLOW | MON_BG_BLUE. A color left out is black.
 #define MON_FG_BLACK         0x00000000u
 #define MON_FG_RED           0x000F0000u
 #define MON_FG_GREEN         0x0000F000u
@@ -71,50 +75,49 @@ unsigned scr_color(unsigned color);
 #define MON_BG_DARK_BLUE     0x03600000u
 
 // The files of the SD card's FAT32 file system, from table 1.1, and
-// fs_write and fs_delete from table 1.2 (monitor/README.md, "Files";
-// the errors in doc/PROGRAMMING.md, "The monitor's error codes"). The
-// addresses are NICE word addresses, not C pointers: a name is one
-// character per word up to a 0 word, and fs_read and fs_write take one
-// byte per word, so a C program passes the address of an array of
-// unsigned words of its own, which mon_words gives (below), or of words
-// outside its memory, which it reads with nice_peek and writes with
-// nice_poke. An
-// error is negative: -1 to -8 those of the SD controller, and -16 on
-// those of fat32.c.
+// mon_fs_write and mon_fs_delete from table 1.2 (monitor/README.md,
+// "Files"; the errors in doc/PROGRAMMING.md, "The monitor's error codes").
+// The addresses are NICE word addresses, not C pointers: a name is one
+// character per word up to a 0 word, and mon_fs_read and mon_fs_write
+// take one byte per word, so a C program passes the address of an array
+// of unsigned words of its own, which mon_words gives (below), or of
+// words outside its memory, which it reads with nice_peek and writes with
+// nice_poke. An error is negative: -1 to -8 those of the SD controller,
+// and -16 on those of fat32.c.
 
 // The card in a slot mounted, and the files that were open closed. 0, or
 // an error.
-int fs_mount(unsigned slot);
+MON_STUB(fs_mount) int mon_fs_mount(unsigned slot);
 
 // A file of the folder NICE of the card's root directory opened, with
 // mode 0 to read, with mode 1 to write, made or truncated (table 1.2), or
 // with mode 2 the folder itself, whose name is empty or /. The name is
 // its long name, up to 255 characters, or its 8.3 name, in either case
 // (table 1.4). Two may be open at once. A handle, 0 or 1, or an error.
-int fs_open(unsigned name, int mode);
+MON_STUB(fs_open) int mon_fs_open(unsigned name, int mode);
 
 // Up to n bytes of a file read, one per word from buf. The number read, 0
 // at the end, or an error.
-int fs_read(int handle, unsigned buf, unsigned n);
+MON_STUB(fs_read) int mon_fs_read(int handle, unsigned buf, unsigned n);
 
 // The next entry of a directory: in the 4 words from buf, the 11 bytes of
 // the 8.3 name, padded with blanks, and the attributes, 4 bytes to a word
 // from bits 7..0, and the size. 1, 0 at the end, or an error.
-int fs_readdir(int handle, unsigned buf);
+MON_STUB(fs_readdir) int mon_fs_readdir(int handle, unsigned buf);
 
 // A file or directory closed; a file opened to write is finished, its
 // size written. 0, or an error.
-int fs_close(int handle);
+MON_STUB(fs_close) int mon_fs_close(int handle);
 
 // Up to n bytes written to a file opened to write, from bits 7..0 of the
 // words from buf. The number written, fewer when the card is full, or an
 // error. Table 1.2.
-int fs_write(int handle, unsigned buf, unsigned n);
+MON_STUB(fs_write) int mon_fs_write(int handle, unsigned buf, unsigned n);
 
 // A file of the folder NICE deleted, with its long-name entries. 0, or an
 // error.
 // Table 1.2.
-int fs_delete(unsigned name);
+MON_STUB(fs_delete) int mon_fs_delete(unsigned name);
 
 // The UDP endpoint, from table 1.3 (monitor/README.md, "The network"): one
 // local port, and datagrams of bytes one per word, as for the files. An
@@ -123,61 +126,64 @@ int fs_delete(unsigned name);
 
 // The endpoint opened on a local port, or with 0 on one from 49152 to
 // 65535, and the port for Ethernet frames enabled. The port, or an error.
-int udp_open(unsigned port);
+MON_STUB(udp_open) int mon_udp_open(unsigned port);
 
 // n bytes, up to 1472, from bits 7..0 of the words from buf, sent as a
 // datagram to a port of an IP address, through the gateway of i dhcp when
 // the address is in another network. 0, or an error.
-int udp_send(unsigned ip, unsigned port, unsigned buf, unsigned n);
+MON_STUB(udp_send) int mon_udp_send(unsigned ip, unsigned port,
+                                    unsigned buf, unsigned n);
 
 // Up to n bytes of the next datagram copied, one per word from buf, and
 // its source's IP address and port to the 2 words at src, unless src is
 // 0; with n 0 nothing, and the datagram stays. Does not wait. The bytes
 // copied, 0 when none waits, or an error.
-int udp_recv(unsigned buf, unsigned n, unsigned src);
+MON_STUB(udp_recv) int mon_udp_recv(unsigned buf, unsigned n, unsigned src);
 
 // The endpoint closed, and the port for Ethernet frames disabled. 0.
-int udp_close(void);
+MON_STUB(udp_close) int mon_udp_close(void);
 
 // The IP address from the network's DHCP server, as i dhcp gets it,
 // with the mask, the gateway, and the DNS server, printing nothing. With
 // an address set, it asks for that one. Waits up to 16 seconds. 0, or an
 // error. Entry 23 (issue #111).
-int net_dhcp(void);
+MON_STUB(net_dhcp) int mon_net_dhcp(void);
 
 // The poll of the network: the frames that wait taken, a datagram for the
-// endpoint held for udp_recv. Never waits. Not negative. A program that
+// endpoint held for mon_udp_recv. Never waits. Not negative. A program that
 // uses the network calls it every 100 ms or so. Entry 24 (issue #111).
-int net_poll(void);
+MON_STUB(net_poll) int mon_net_poll(void);
 
 // The IP settings, DNS, and TCP, from table 1.5 (monitor/README.md, "TCP
 // and DNS"). A program checks that mon_version is 0x00010005 or more.
 // These take C pointers: the program joins mon_c.nasm too, with
 // nicebuild.py --monitor --asm mon.nasm --asm mon_c.nasm, whose stubs
-// turn a pointer into the address of the ROM's windows. An error is negative, from -40 (doc/PROGRAMMING.md, "The
-// monitor's error codes").
+// turn a pointer into the address of the ROM's windows: MON_ENTRY names
+// the stub of mon_c.nasm, _c_ and the entry's name. An error is negative,
+// from -40 (doc/PROGRAMMING.md, "The monitor's error codes").
 #define MON_ENTRY(name) __attribute__((import_name("c_" #name)))
 
 // The IP address, the mask, the gateway, and the DNS server, each 0 for
 // none, written to cfg. 0. Entry 21.
-MON_ENTRY(net_config) int net_config(unsigned cfg[4]);
+MON_ENTRY(net_config) int mon_net_config(unsigned cfg[4]);
 
-// The four set from cfg, as net_config gives them, for a network with no
-// DHCP. A new IP address ends every TCP connection in MON_E_TRESET. 0. Entry
-// 22.
-MON_ENTRY(net_set) int net_set(const unsigned cfg[4]);
+// The four set from cfg, as mon_net_config gives them, for a network with
+// no DHCP. A new IP address ends every TCP connection in MON_E_TRESET. 0.
+// Entry 22.
+MON_ENTRY(net_set) int mon_net_set(const unsigned cfg[4]);
 
 // The IPv4 address of a name, up to its 0 byte, written to *ip: an
 // address with dots, such as 192.168.1.10, as it is, or else the answer of
 // the DNS server, which takes up to about 9 seconds. 0, or an error. Entry
 // 25.
-MON_ENTRY(dns_lookup) int dns_lookup(const char *name, unsigned *ip);
+MON_ENTRY(dns_lookup) int mon_dns_lookup(const char *name, unsigned *ip);
 
 // TCP, up to 4 connections at once, each with a control block of
 // MON_TCP_CB_WORDS(rx, tx) words in the program's RAM, which is the
-// ROM's from tcp_open or tcp_listen until tcp_state gives MON_TCP_FREE. The
-// ROM moves a connection only when the program calls an entry of the
-// network: a program polls, with net_poll, every 100 ms or so.
+// ROM's from mon_tcp_open or mon_tcp_listen until mon_tcp_state gives
+// MON_TCP_FREE. The ROM moves a connection only when the program calls an
+// entry of the network: a program polls, with mon_net_poll, every 100 ms
+// or so.
 #define MON_TCP_CB_WORDS(rx, tx) (32 + ((rx) + 3) / 4 + ((tx) + 3) / 4)
 #define MON_TCP_SIZES(rx, tx) (((unsigned)(rx) << 16) | (unsigned)(tx))
 enum {
@@ -186,8 +192,8 @@ enum {
     MON_TCP_OPEN = 2,        // send and receive
     MON_TCP_PEER_CLOSED = 3, // receive what is left, then MON_E_TEOF;
                              // send; close
-    MON_TCP_CLOSING = 4,     // after tcp_close; the handle frees itself
-    MON_TCP_LISTEN = 5,      // tcp_listen's, until a peer connects
+    MON_TCP_CLOSING = 4,     // after mon_tcp_close; the handle frees itself
+    MON_TCP_LISTEN = 5,      // mon_tcp_listen's, until a peer connects
 };
 enum {
     MON_E_NOIP = -40, MON_E_PORT = -41, MON_E_UCLOSED = -42,
@@ -202,27 +208,28 @@ enum {
 // MON_TCP_SIZES(rx, tx) bytes, each 64 or more, in the control block cb. Waits
 // up to 3 seconds for ARP, sends the SYN, and does not wait for the
 // answer. A handle, 0 to 3, or an error. Entry 26.
-MON_ENTRY(tcp_open) int tcp_open(unsigned *cb, unsigned ip, unsigned port, unsigned sizes);
+MON_ENTRY(tcp_open) int mon_tcp_open(unsigned *cb, unsigned ip,
+                                     unsigned port, unsigned sizes);
 
 // The state of a handle, MON_TCP_FREE to MON_TCP_LISTEN, or the connection's
 // error, or MON_E_THANDLE. A state not known here is one to wait in. Entry 27.
-int tcp_state(int h);
+MON_STUB(tcp_state) int mon_tcp_state(int h);
 
 // Up to n bytes from buf taken into the ring to send, and sent as far as
 // the windows let them. The bytes taken, 0 when the ring is full, or an
 // error. Entry 28.
-MON_ENTRY(tcp_send) int tcp_send(int h, const void *buf, unsigned n);
+MON_ENTRY(tcp_send) int mon_tcp_send(int h, const void *buf, unsigned n);
 
 // Up to n of the bytes received copied to buf. The bytes copied, 0 when
 // none wait, MON_E_TEOF when the peer has closed and every byte is read, or
 // an error. Entry 29.
-MON_ENTRY(tcp_recv) int tcp_recv(int h, void *buf, unsigned n);
+MON_ENTRY(tcp_recv) int mon_tcp_recv(int h, void *buf, unsigned n);
 
 // A close, abort 0, which sends the bytes that wait, then the FIN, and
 // drops what comes, or an abort, abort 1, which sends a RST. The handle
 // frees itself, or at once for an abort or an error. 0, or MON_E_THANDLE.
 // Entry 30.
-int tcp_close(int h, int abort);
+MON_STUB(tcp_close) int mon_tcp_close(int h, int abort);
 
 // A handle that waits in MON_TCP_LISTEN for a peer to connect to port, 1 to
 // 65535 but 4510, with the rings of MON_TCP_SIZES(rx, tx) bytes in the
@@ -230,21 +237,23 @@ int tcp_close(int h, int abort);
 // MON_TCP_OPEN, one connection for each handle; a failed handshake brings it
 // back to MON_TCP_LISTEN. Other handles may listen on the same port. Sends
 // nothing, and does not wait. A handle, 0 to 3, or an error. Entry 31.
-MON_ENTRY(tcp_listen) int tcp_listen(unsigned *cb, unsigned port, unsigned sizes);
+MON_ENTRY(tcp_listen) int mon_tcp_listen(unsigned *cb, unsigned port,
+                                         unsigned sizes);
 
 // The NICE word address of a C array of words, for the entries above
-// that take one character or byte per word, such as fs_open's name and
-// fs_read's buffer, which the program then reads as plain unsigned
+// that take one character or byte per word, such as mon_fs_open's name
+// and mon_fs_read's buffer, which the program then reads as plain unsigned
 // words. Not an entry of the table: its stub in mon_c.nasm returns the
 // address at once.
 MON_ENTRY(mon_words) unsigned mon_words(const unsigned *p);
 
-// The next entry of a directory, as fs_readdir gives it in the 4 words
-// from buf, and its name in the words from name, one character per word
+// The next entry of a directory, as mon_fs_readdir gives it in the 4
+// words from buf, and its name in the words from name, one character per word
 // up to a 0 word, 256 words at most: its long name, or else its 8.3 name
 // as a name, HELLO.BIN, in lower case where the entry says so. A
 // character of a long name outside ASCII is ?. 1, 0 at the end, or an
 // error. Table 1.4 (monitor/README.md, "Files").
-int fs_readname(int handle, unsigned buf, unsigned name);
+MON_STUB(fs_readname) int mon_fs_readname(int handle, unsigned buf,
+                                          unsigned name);
 
 #endif

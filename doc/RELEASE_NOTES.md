@@ -63,6 +63,11 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 - The dispatch table is 1.5, with 11 entries more, 21 to 31, for the
   network ([#111](https://github.com/MJoergen/NiceMonMEGA65/issues/111)).
   A program built for 1.4 runs as before.
+- Every function of `mon.h` starts with `mon_`, so that it clashes with
+  none of a C program's: `scr_cls` is now `mon_scr_cls`, `fs_open`
+  `mon_fs_open`, and so on. A C program for the monitor renames its
+  calls. Its constants start with `MON_` too, such as `MON_TCP_FREE`.
+  Assembly programs and their stubs in `mon.nasm` keep their names.
 
 **New.**
 
