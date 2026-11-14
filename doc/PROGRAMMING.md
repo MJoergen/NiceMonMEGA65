@@ -1,5 +1,21 @@
 # Writing programs
 
+## Contents
+
+- [Introduction](#introduction)
+- [A first program](#a-first-program)
+- [Three levels](#three-levels)
+- [Programs under the monitor](#programs-under-the-monitor)
+- [C](#c)
+- [The memory](#the-memory)
+- [The keyboard](#the-keyboard)
+- [The screen](#the-screen)
+- [The SD card and the network](#the-sd-card-and-the-network)
+- [The monitor's error codes](#the-monitors-error-codes)
+- [Programs in the ROM](#programs-in-the-rom)
+
+## Introduction
+
 A program is NICE assembly, or C, built on a PC into a `.bin` file,
 which has one line per word, the address and the word in hex. The tools
 are in the nice_cpu submodule: the assembler, `niceasm`, the C
@@ -29,19 +45,6 @@ There are two kinds of program:
   hardware. A PC loads it with `tools/load.py`, which hides the ROM, and
   it runs the same in `niceemu` (see
   [Programs in the ROM](#programs-in-the-rom)).
-
-## Contents
-
-- [A first program](#a-first-program)
-- [Three levels](#three-levels)
-- [Programs under the monitor](#programs-under-the-monitor)
-- [C](#c)
-- [The memory](#the-memory)
-- [The keyboard](#the-keyboard)
-- [The screen](#the-screen)
-- [The SD card and the network](#the-sd-card-and-the-network)
-- [The monitor's error codes](#the-monitors-error-codes)
-- [Programs in the ROM](#programs-in-the-rom)
 
 ## A first program
 
@@ -92,6 +95,38 @@ address):
 The greeting is on the board's screen, and the monitor's prompt follows
 it. `tools/mon.py` is a debugger
 ([tools/README.md](../tools/README.md)).
+
+The same program in NICE assembly calls the monitor's routines itself,
+with the argument and the result in R1:
+
+    ; hello.nasm: a greeting in yellow, under the monitor
+    _main           MOVE    R1, MON_FG_YELLOW+MON_BG_BLACK
+                    CALL    _scr_color      ; R1 the old color
+                    PUSH    R1
+                    MOVE    R1, hello.text
+                    CALL    _io_puts
+                    CALL    _io_crlf
+                    POP     R1
+                    CALL    _scr_color
+                    MOVE    R1, 0
+                    RET
+    hello.text
+                    .ASCII_L 'Hello, world!'
+
+The program starts at `_main`, and its `RET` returns to the monitor
+with R1. `_scr_color` is the stub of the monitor's routine in
+`monitor/mon.nasm`, which also names the colors. `_io_puts` and
+`_io_crlf` print a text and a new line, and are in
+`monitor/monlib.nasm`. Build it at `0x8000` with nice_cpu's
+`start_mon.nasm` in front and these files after it (see
+[Programs under the monitor](#programs-under-the-monitor)):
+
+    cat nice_cpu/runtime/start_mon.nasm hello.nasm monitor/monlib.nasm \
+        monitor/mon.nasm nice_cpu/runtime/lib.nasm \
+        nice_cpu/runtime/muldiv_mpu.nasm > hello_all.nasm
+    python3 nice_cpu/assembler/niceasm.py -o hello.bin hello_all.nasm
+
+It runs as the C program does, in the emulator and on the board.
 
 ## Three levels
 
