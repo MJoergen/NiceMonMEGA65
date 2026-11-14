@@ -206,6 +206,18 @@ in nice_cpu's runtime or C library:
 | `_io_gets` | A line into the buffer at R1, up to R2 characters and a 0 word, edited as The commands says and echoed through `mon_putc`. → R1 the number of characters. `_io_gets.first` is the same, with R3 a first byte already read, for the monitor's own line. |
 | `_io_getc` | → R1 the next byte of the console, which it waits for. The end of the line's input, `0x200`, is no byte, as the keyboard's bytes still come. |
 
+nice_cpu's `libc` is a small C standard library, and its runtime
+README lists every function it has and every one it lacks
+([C library](https://github.com/MJoergen/nice_cpu/blob/main/runtime/README.md#c-library)).
+In short: `stdio.h` with `printf`, `scanf`, `getchar`, and `fgets`, on
+the console only, with no files; `string.h`, `stdlib.h` with `malloc`,
+`strtol`, `strtod`, and `rand`, `math.h` in double and float, `ctype.h`,
+`time.h` with `clock` and `time`, `assert.h`, and `errno.h`; and
+`nice.h`, with the routines of the devices, such as `nice_pollc`,
+`nice_micros`, and `nice_screen_put`. It needs no ROM, and has neither
+the files of the SD card nor the network: a C program reaches those
+through the entries, with `mon.h`.
+
 ## The commands
 
 At the cold start the monitor clears the screen, prints its banner,
