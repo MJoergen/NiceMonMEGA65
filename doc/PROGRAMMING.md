@@ -67,10 +67,12 @@ the monitor:
 
 `printf` prints through the monitor's `mon_putc`, and
 `mon_scr_color`, declared in `monitor/mon.h`, is one of the monitor's
-routines, `scr_color` of the dispatch table. Every function of `mon.h`
-starts with `mon_`, so that it clashes with none of the program's. Its
-color is a foreground and a background of `mon.h`, or-ed. Build
-it at `0x8000` with `nicebuild.py`, which needs clang (see [C](#c)):
+routines, `scr_color` of the
+[dispatch table](../monitor/README.md#the-dispatch-table). Every
+function of `mon.h` starts with `mon_`, so that it clashes with none of
+the program's. Its color is a foreground and a background of `mon.h`,
+or-ed. Build it at `0x8000` with `nicebuild.py`, which needs clang
+(see [C](#c)):
 
     nice_cpu/translator/nicebuild.py --monitor --asm monitor/mon.nasm \
         -I monitor -o hello.bin hello.c
