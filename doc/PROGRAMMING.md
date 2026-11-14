@@ -394,20 +394,20 @@ int main(void)
         }
         r = tcp_recv(h, buf, sizeof buf);
         if (r < 0)
-            break;              // E_TEOF at the end, or an error
+            break;              // MON_E_TEOF at the end, or an error
         for (int i = 0; i < r; i++)
             putchar(buf[i]);
     }
     tcp_close(h, 0);
-    while (tcp_state(h) != TCP_FREE)
+    while (tcp_state(h) != MON_TCP_FREE)
         ;                       // tcp_state polls too
-    return r == E_TEOF ? 0 : r;
+    return r == MON_E_TEOF ? 0 : r;
 }
 ```
 
 A server, which listens on port 7, and sends back what a peer sends,
 one peer after another, until a key is pressed. `tcp_recv` gives 0 while
-the handle waits for a peer in `TCP_LISTEN`, and `E_TEOF` once the peer
+the handle waits for a peer in `MON_TCP_LISTEN`, and `MON_E_TEOF` once the peer
 has closed:
 
 ```c
@@ -437,9 +437,9 @@ int main(void)
             if (r > 0 && (done += (unsigned)r) == len)
                 len = 0;
         }
-        if (r < 0) {            // E_TEOF, or the connection's error
+        if (r < 0) {            // MON_E_TEOF, or the connection's error
             tcp_close(h, 0);
-            while (tcp_state(h) != TCP_FREE)
+            while (tcp_state(h) != MON_TCP_FREE)
                 ;
             h = tcp_listen(cb, 7, SIZES);
             len = 0;
@@ -523,21 +523,21 @@ them all:
 
 | Error | Name | Meaning |
 |---|---|---|
-| -45 | `E_NODHCP` | No answer from a DHCP server |
-| -46 | `E_NODNS` | No DNS server |
-| -47 | `E_DNSTIME` | No answer from the DNS server |
-| -48 | `E_DNSNAME` | No such name, no A record for it, or not a valid name |
-| -49 | `E_DNSFAIL` | The DNS server reported an error, or a truncated answer |
-| -50 | `E_THANDLE` | Not a handle, or a free one |
-| -51 | `E_TFULL` | Every handle is in use: 4 are |
-| -52 | `E_TSIZE` | A ring of fewer than 64 bytes, or a control block not aligned |
-| -53 | `E_TREFUSED` | The peer refused the connection |
-| -54 | `E_TRESET` | The peer reset the connection, or the IP address changed |
-| -55 | `E_TTIMEOUT` | No answer from the peer |
-| -56 | `E_TCLOSED` | The connection is closing, after `tcp_close` |
-| -57 | `E_TEOF` | The peer has closed, and every byte is read |
+| -45 | `MON_E_NODHCP` | No answer from a DHCP server |
+| -46 | `MON_E_NODNS` | No DNS server |
+| -47 | `MON_E_DNSTIME` | No answer from the DNS server |
+| -48 | `MON_E_DNSNAME` | No such name, no A record for it, or not a valid name |
+| -49 | `MON_E_DNSFAIL` | The DNS server reported an error, or a truncated answer |
+| -50 | `MON_E_THANDLE` | Not a handle, or a free one |
+| -51 | `MON_E_TFULL` | Every handle is in use: 4 are |
+| -52 | `MON_E_TSIZE` | A ring of fewer than 64 bytes, or a control block not aligned |
+| -53 | `MON_E_TREFUSED` | The peer refused the connection |
+| -54 | `MON_E_TRESET` | The peer reset the connection, or the IP address changed |
+| -55 | `MON_E_TTIMEOUT` | No answer from the peer |
+| -56 | `MON_E_TCLOSED` | The connection is closing, after `tcp_close` |
+| -57 | `MON_E_TEOF` | The peer has closed, and every byte is read |
 
-`E_PORT`, -41, is also a port of `tcp_listen` that is 0, past 65535, or
+`MON_E_PORT`, -41, is also a port of `tcp_listen` that is 0, past 65535, or
 4510, the port of remote control.
 
 ## Programs in the ROM

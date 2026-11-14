@@ -339,17 +339,17 @@ static void status(unsigned color, const char *s)
 static const char *error_name(int e)
 {
     switch (e) {
-    case E_NOIP: return "no IP address";
-    case E_NOROUTE: return "no answer to ARP from the host or the gateway";
-    case E_NODHCP: return "no answer from a DHCP server";
-    case E_NODNS: return "no DNS server";
-    case E_DNSTIME: return "no answer from the DNS server";
-    case E_DNSNAME: return "no such name";
-    case E_DNSFAIL: return "the DNS server reported an error";
-    case E_TFULL: return "every TCP handle is in use";
-    case E_TREFUSED: return "the server refused the connection";
-    case E_TRESET: return "the server reset the connection";
-    case E_TTIMEOUT: return "no answer from the server";
+    case MON_E_NOIP: return "no IP address";
+    case MON_E_NOROUTE: return "no answer to ARP from the host or the gateway";
+    case MON_E_NODHCP: return "no answer from a DHCP server";
+    case MON_E_NODNS: return "no DNS server";
+    case MON_E_DNSTIME: return "no answer from the DNS server";
+    case MON_E_DNSNAME: return "no such name";
+    case MON_E_DNSFAIL: return "the DNS server reported an error";
+    case MON_E_TFULL: return "every TCP handle is in use";
+    case MON_E_TREFUSED: return "the server refused the connection";
+    case MON_E_TRESET: return "the server reset the connection";
+    case MON_E_TTIMEOUT: return "no answer from the server";
     case W_SHORT: return "the answer was cut short";
     case W_NOHTTP: return "the answer is not HTTP";
     default: return "error";
@@ -465,7 +465,7 @@ static void fetch_start_now(void)
     fmt(buf, sizeof buf, "Looking up %s...", cfg.host);
     status(C_DIM, buf);
     r = dns_lookup(cfg.host, &ip);
-    if (r == E_NODNS) {
+    if (r == MON_E_NODNS) {
         status(C_DIM, "Asking for a DNS server (DHCP)...");
         r = net_dhcp();
         draw_bar();
@@ -529,15 +529,15 @@ static void fetch_step(unsigned long long now)
         r = tcp_recv(handle, ans + ans_n, sizeof ans - ans_n);
     if (r > 0)
         ans_n += (unsigned)r;
-    if (r == E_TEOF || ans_n == sizeof ans) {
-        tcp_close(handle, r == E_TEOF ? 0 : 1);
+    if (r == MON_E_TEOF || ans_n == sizeof ans) {
+        tcp_close(handle, r == MON_E_TEOF ? 0 : 1);
         fetch_done(now);
     } else if (r < 0) {
         tcp_close(handle, 1);
         fail(r, now);
     } else if (now - fetch_start > FETCH_TIMEOUT * 1000000ull) {
         tcp_close(handle, 1);
-        fail(E_TTIMEOUT, now);
+        fail(MON_E_TTIMEOUT, now);
     }
 }
 

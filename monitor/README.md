@@ -157,14 +157,14 @@ offset off, as a program may have hidden the one or used the other.
 | 19 | `26` | `udp_close` | Closes the endpoint, and disables the port for Ethernet frames. → R1 0. Table 1.3. |
 | 20 | `28` | `fs_readname` | R1 a handle of a directory, R2 a buffer of 4 words, R3 a buffer of 256 words. The next entry, as `fs_readdir` gives it, and its name in R3's buffer, one character per word up to a 0 word: its long name, or else its 8.3 name as a name, `HELLO.BIN`, in lower case where the entry says so. A character of a long name outside ASCII is `?`. → R1 1, 0 at the end, or an error. Table 1.4. |
 | 21 | `2A` | `net_config` | R1 the word address of 4 words. Writes the IP address, the mask, the gateway, and the DNS server to them, each 0 for none (TCP and DNS below). → R1 0. Table 1.5. |
-| 22 | `2C` | `net_set` | R1 the word address of 4 words, as `net_config` gives them. Sets the four, for a network with no DHCP, and forgets the lease. A new IP address breaks a host's connection over TCP, as `i A.B.C.D` does, and ends every TCP connection of the program in `E_TRESET`. → R1 0. Table 1.5. |
+| 22 | `2C` | `net_set` | R1 the word address of 4 words, as `net_config` gives them. Sets the four, for a network with no DHCP, and forgets the lease. A new IP address breaks a host's connection over TCP, as `i A.B.C.D` does, and ends every TCP connection of the program in `MON_E_TRESET`. → R1 0. Table 1.5. |
 | 23 | `2E` | `net_dhcp` | What `i dhcp` does, printing nothing: the address, the mask, the gateway, the DNS server, and the lease. With an address set, it asks for that one. Waits up to 16 seconds. → R1 0, or an error. Table 1.5. |
 | 24 | `30` | `net_poll` | Takes the frames that wait, and sends what is due: ACKs, retransmissions, and the lease's renewal. Never waits. A program that uses the network calls it every 100 ms or so. → R1 not negative, of no meaning yet. Table 1.5. |
 | 25 | `32` | `dns_lookup` | R1 the byte address of a name, up to a 0 byte, R2 the word address of the result. Writes the name's IPv4 address to the word at R2. A name of four decimal numbers with dots is taken as it is. Waits up to about 9 seconds. → R1 0, or an error. Table 1.5. |
 | 26 | `34` | `tcp_open` | R1 the word address of a control block, R2 an IP address, R3 a port, R4 the sizes of the rings in bytes, to receive in bits 31..16 and to send in 15..0, each 64 or more. Opens a connection: waits up to 3 seconds for ARP, sends the SYN, and does not wait for the answer. → R1 a handle, 0 to 3, or an error. Table 1.5. |
-| 27 | `36` | `tcp_state` | R1 a handle. → R1 its state, `TCP_FREE` to `TCP_LISTEN`, or the connection's error. Table 1.5. |
+| 27 | `36` | `tcp_state` | R1 a handle. → R1 its state, `MON_TCP_FREE` to `MON_TCP_LISTEN`, or the connection's error. Table 1.5. |
 | 28 | `38` | `tcp_send` | R1 a handle, R2 the byte address of a buffer, R3 a number of bytes. Takes as many as fit into the ring to send, and sends what the windows let go. → R1 the bytes taken, 0 when none fit, or an error. Table 1.5. |
-| 29 | `3A` | `tcp_recv` | R1 a handle, R2 the byte address of a buffer, R3 a number of bytes. Copies up to that many of the bytes received. → R1 the bytes copied, 0 when none wait, `E_TEOF` once the peer has closed and every byte is read, or an error. Table 1.5. |
+| 29 | `3A` | `tcp_recv` | R1 a handle, R2 the byte address of a buffer, R3 a number of bytes. Copies up to that many of the bytes received. → R1 the bytes copied, 0 when none wait, `MON_E_TEOF` once the peer has closed and every byte is read, or an error. Table 1.5. |
 | 30 | `3C` | `tcp_close` | R1 a handle, R2 0 to close, or 1 to abort. A close sends the bytes that wait, then the FIN, and the handle frees itself later; an abort sends a RST and frees it at once. → R1 0, or an error. Table 1.5. |
 | 31 | `3E` | `tcp_listen` | R1 the word address of a control block, R2 a local port, 1 to 65535 but 4510, R3 the sizes of the rings, as R4 of `tcp_open`. Makes a handle that waits for a peer to connect to the port. Sends nothing, and does not wait. → R1 a handle, 0 to 3, or an error. Table 1.5. |
 
@@ -549,48 +549,48 @@ end in a dot. There is no cache, so a program keeps the address it got.
 words, then the ring of the bytes received and the ring of the bytes to
 send, packed, so `MON_TCP_CB_WORDS(rx, tx)` of `mon.h` words in all. Its
 address in the word window has bits 1..0 clear, or `tcp_open` and
-`tcp_listen` give `E_TSIZE`. The block is the
+`tcp_listen` give `MON_E_TSIZE`. The block is the
 ROM's from `tcp_open` or `tcp_listen` until `tcp_state` gives
-`TCP_FREE`, and the program does not touch it meanwhile. `tcp_state`
+`MON_TCP_FREE`, and the program does not touch it meanwhile. `tcp_state`
 gives the state:
 
 | State | Value | What it means |
 |---|---|---|
-| `TCP_FREE` | 0 | The handle is free. |
-| `TCP_CONNECTING` | 1 | The handshake. Bytes that `tcp_send` takes go after it. |
-| `TCP_OPEN` | 2 | Bytes go both ways. |
-| `TCP_PEER_CLOSED` | 3 | The peer has closed. The program reads what is left, then gets `E_TEOF`, and may still send. |
-| `TCP_CLOSING` | 4 | After `tcp_close`. The handle frees itself. |
-| `TCP_LISTEN` | 5 | A handle of `tcp_listen`, until a peer connects. |
-| an error | negative | The connection ended, such as `E_TRESET`. `tcp_close` frees the handle. |
+| `MON_TCP_FREE` | 0 | The handle is free. |
+| `MON_TCP_CONNECTING` | 1 | The handshake. Bytes that `tcp_send` takes go after it. |
+| `MON_TCP_OPEN` | 2 | Bytes go both ways. |
+| `MON_TCP_PEER_CLOSED` | 3 | The peer has closed. The program reads what is left, then gets `MON_E_TEOF`, and may still send. |
+| `MON_TCP_CLOSING` | 4 | After `tcp_close`. The handle frees itself. |
+| `MON_TCP_LISTEN` | 5 | A handle of `tcp_listen`, until a peer connects. |
+| an error | negative | The connection ended, such as `MON_E_TRESET`. `tcp_close` frees the handle. |
 
 - **Opening.** `tcp_open` sends the SYN from a local port of 49152 to
   65535, 4 times in 15 seconds, then the connection ends in
-  `E_TTIMEOUT`; a RST ends it in `E_TREFUSED`.
-- **Listening.** `tcp_listen` makes a handle in `TCP_LISTEN`. The first
-  SYN to its port takes it, through `TCP_CONNECTING`, to `TCP_OPEN`: one
+  `MON_E_TTIMEOUT`; a RST ends it in `MON_E_TREFUSED`.
+- **Listening.** `tcp_listen` makes a handle in `MON_TCP_LISTEN`. The first
+  SYN to its port takes it, through `MON_TCP_CONNECTING`, to `MON_TCP_OPEN`: one
   connection for each handle. A program that wants to serve two peers
   at once listens with two handles on the same port. A SYN that comes
   while every handle of the port is busy is passed over, and the peer
   sends it again; a SYN to a port where nothing listens gets a RST. Port
   4510 is the station's, for remote control, so `tcp_listen` gives
-  `E_PORT` for it.
+  `MON_E_PORT` for it.
 - **Sending and receiving** never wait. `tcp_send` takes what fits into
   the ring, and the poll sends it in segments of up to 1460 bytes, as
   far as the peer's window and the congestion window let it, and sends
   it again after a timeout, from 200 ms to 60 s, measured from the
   round trips. After 120 s with no answer the connection ends in
-  `E_TTIMEOUT`. `tcp_recv` takes from the ring received. Each
+  `MON_E_TTIMEOUT`. `tcp_recv` takes from the ring received. Each
   connection announces a window of at most the free room of its ring,
   and 4096 bytes divided by the number of connections, so that together
   they announce about 4096 bytes, as the queue holds only 4 frames.
 - **Closing.** `tcp_close` with 0 ends both directions: the bytes that
   wait to be read are dropped, and so are those that come later, and
-  `tcp_recv` gives `E_TCLOSED`. The FIN goes after the bytes that wait
+  `tcp_recv` gives `MON_E_TCLOSED`. The FIN goes after the bytes that wait
   to be sent, and the handle frees itself once the peer has
   acknowledged it and sent its own FIN, or 60 s after the
   acknowledgment, or when the sends give up. With 1 it sends a RST and frees the handle at once. A
-  close of a handle in `TCP_LISTEN`, or of one with an error, frees it
+  close of a handle in `MON_TCP_LISTEN`, or of one with an error, frees it
   at once and sends nothing. There is no TIME-WAIT.
 - **The cold start and a program's return** send a RST for each
   connection, free every handle, close the endpoint, and disable the

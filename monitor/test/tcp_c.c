@@ -46,8 +46,8 @@ int main(void)
     int h = tcp_open(cb, 0x0A000002, 2001, MON_TCP_SIZES(RX, TX));
     if (h < 0)
         return fail(3, h);
-    int s = wait_state(h, TCP_OPEN);
-    if (s != TCP_OPEN)
+    int s = wait_state(h, MON_TCP_OPEN);
+    if (s != MON_TCP_OPEN)
         return fail(4, s);
     unsigned sent = 0, got = 0;
     for (unsigned i = 0; i < 4000000 && got < 1000; i++) {
@@ -69,8 +69,8 @@ int main(void)
             return fail(8, 0);
     if (tcp_close(h, 0) != 0)
         return fail(9, 0);
-    s = wait_state(h, TCP_FREE);
-    if (s != TCP_FREE)
+    s = wait_state(h, MON_TCP_FREE);
+    if (s != MON_TCP_FREE)
         return fail(10, s);
 
     h = tcp_listen(cb, 3010, MON_TCP_SIZES(RX, TX));
@@ -94,8 +94,8 @@ int main(void)
     }
     if (sent != 200 || tcp_close(h, 0) != 0)
         return fail(15, 0);
-    s = wait_state(h, TCP_FREE);
-    if (s != TCP_FREE)
+    s = wait_state(h, MON_TCP_FREE);
+    if (s != MON_TCP_FREE)
         return fail(16, s);
     return 0;
 }

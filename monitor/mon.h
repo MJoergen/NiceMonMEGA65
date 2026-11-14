@@ -153,7 +153,7 @@ int net_poll(void);
 MON_ENTRY(net_config) int net_config(unsigned cfg[4]);
 
 // The four set from cfg, as net_config gives them, for a network with no
-// DHCP. A new IP address ends every TCP connection in E_TRESET. 0. Entry
+// DHCP. A new IP address ends every TCP connection in MON_E_TRESET. 0. Entry
 // 22.
 MON_ENTRY(net_set) int net_set(const unsigned cfg[4]);
 
@@ -165,24 +165,27 @@ MON_ENTRY(dns_lookup) int dns_lookup(const char *name, unsigned *ip);
 
 // TCP, up to 4 connections at once, each with a control block of
 // MON_TCP_CB_WORDS(rx, tx) words in the program's RAM, which is the
-// ROM's from tcp_open or tcp_listen until tcp_state gives TCP_FREE. The
+// ROM's from tcp_open or tcp_listen until tcp_state gives MON_TCP_FREE. The
 // ROM moves a connection only when the program calls an entry of the
 // network: a program polls, with net_poll, every 100 ms or so.
 #define MON_TCP_CB_WORDS(rx, tx) (32 + ((rx) + 3) / 4 + ((tx) + 3) / 4)
 #define MON_TCP_SIZES(rx, tx) (((unsigned)(rx) << 16) | (unsigned)(tx))
 enum {
-    TCP_FREE = 0,       // the handle is free
-    TCP_CONNECTING = 1, // the handshake; bytes sent go after it
-    TCP_OPEN = 2,       // send and receive
-    TCP_PEER_CLOSED = 3, // receive what is left, then E_TEOF; send; close
-    TCP_CLOSING = 4,    // after tcp_close; the handle frees itself
-    TCP_LISTEN = 5,     // tcp_listen's, until a peer connects
+    MON_TCP_FREE = 0,        // the handle is free
+    MON_TCP_CONNECTING = 1,  // the handshake; bytes sent go after it
+    MON_TCP_OPEN = 2,        // send and receive
+    MON_TCP_PEER_CLOSED = 3, // receive what is left, then MON_E_TEOF;
+                             // send; close
+    MON_TCP_CLOSING = 4,     // after tcp_close; the handle frees itself
+    MON_TCP_LISTEN = 5,      // tcp_listen's, until a peer connects
 };
 enum {
-    E_NOIP = -40, E_PORT = -41, E_UCLOSED = -42, E_ULONG = -43, E_NOROUTE = -44,
-    E_NODHCP = -45, E_NODNS = -46, E_DNSTIME = -47, E_DNSNAME = -48, E_DNSFAIL = -49,
-    E_THANDLE = -50, E_TFULL = -51, E_TSIZE = -52, E_TREFUSED = -53, E_TRESET = -54,
-    E_TTIMEOUT = -55, E_TCLOSED = -56, E_TEOF = -57,
+    MON_E_NOIP = -40, MON_E_PORT = -41, MON_E_UCLOSED = -42,
+    MON_E_ULONG = -43, MON_E_NOROUTE = -44, MON_E_NODHCP = -45,
+    MON_E_NODNS = -46, MON_E_DNSTIME = -47, MON_E_DNSNAME = -48,
+    MON_E_DNSFAIL = -49, MON_E_THANDLE = -50, MON_E_TFULL = -51,
+    MON_E_TSIZE = -52, MON_E_TREFUSED = -53, MON_E_TRESET = -54,
+    MON_E_TTIMEOUT = -55, MON_E_TCLOSED = -56, MON_E_TEOF = -57,
 };
 
 // A connection opened to a port of an IP address, with the rings of
@@ -191,8 +194,8 @@ enum {
 // answer. A handle, 0 to 3, or an error. Entry 26.
 MON_ENTRY(tcp_open) int tcp_open(unsigned *cb, unsigned ip, unsigned port, unsigned sizes);
 
-// The state of a handle, TCP_FREE to TCP_LISTEN, or the connection's
-// error, or E_THANDLE. A state not known here is one to wait in. Entry 27.
+// The state of a handle, MON_TCP_FREE to MON_TCP_LISTEN, or the connection's
+// error, or MON_E_THANDLE. A state not known here is one to wait in. Entry 27.
 int tcp_state(int h);
 
 // Up to n bytes from buf taken into the ring to send, and sent as far as
@@ -201,21 +204,21 @@ int tcp_state(int h);
 MON_ENTRY(tcp_send) int tcp_send(int h, const void *buf, unsigned n);
 
 // Up to n of the bytes received copied to buf. The bytes copied, 0 when
-// none wait, E_TEOF when the peer has closed and every byte is read, or
+// none wait, MON_E_TEOF when the peer has closed and every byte is read, or
 // an error. Entry 29.
 MON_ENTRY(tcp_recv) int tcp_recv(int h, void *buf, unsigned n);
 
 // A close, abort 0, which sends the bytes that wait, then the FIN, and
 // drops what comes, or an abort, abort 1, which sends a RST. The handle
-// frees itself, or at once for an abort or an error. 0, or E_THANDLE.
+// frees itself, or at once for an abort or an error. 0, or MON_E_THANDLE.
 // Entry 30.
 int tcp_close(int h, int abort);
 
-// A handle that waits in TCP_LISTEN for a peer to connect to port, 1 to
+// A handle that waits in MON_TCP_LISTEN for a peer to connect to port, 1 to
 // 65535 but 4510, with the rings of MON_TCP_SIZES(rx, tx) bytes in the
-// control block cb. The first SYN takes it, through TCP_CONNECTING, to
-// TCP_OPEN, one connection for each handle; a failed handshake brings it
-// back to TCP_LISTEN. Other handles may listen on the same port. Sends
+// control block cb. The first SYN takes it, through MON_TCP_CONNECTING, to
+// MON_TCP_OPEN, one connection for each handle; a failed handshake brings it
+// back to MON_TCP_LISTEN. Other handles may listen on the same port. Sends
 // nothing, and does not wait. A handle, 0 to 3, or an error. Entry 31.
 MON_ENTRY(tcp_listen) int tcp_listen(unsigned *cb, unsigned port, unsigned sizes);
 
