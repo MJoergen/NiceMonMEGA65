@@ -32,6 +32,7 @@ NET_CONFIG      .EQU    0x2A
 NET_SET         .EQU    0x2C
 NET_DHCP        .EQU    0x2E
 NET_POLL        .EQU    0x30
+DNS_LOOKUP      .EQU    0x32
 
 _mon_reset
                 JMP     MON_RESET
@@ -83,6 +84,8 @@ _net_dhcp
                 JMP     NET_DHCP
 _net_poll
                 JMP     NET_POLL
+_dns_lookup
+                JMP     DNS_LOOKUP
 _scr_getx
                 JMP     SCR_GETXY
 _scr_gety

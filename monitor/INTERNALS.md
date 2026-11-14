@@ -65,11 +65,13 @@ of [SYSTEM.md §7](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#
   frame received, `V_RXF` at `0xFFFFF180`. A datagram for the endpoint
   is copied to `V_RXF`, and held there for `udp_recv`, unless one is
   held already; then it is dropped. A datagram to the port of the ROM's
-  own wait, 68 while `i dhcp` or `net_dhcp` waits, is copied to `V_RXF`
-  too, in place of a datagram held, which is lost, and the poll stops
+  own wait, 68 while `i dhcp` or `net_dhcp` waits, or the query's port
+  while `dns_lookup` waits, is copied to `V_RXF` too, in place of a datagram held, which is lost, and the poll stops
   there, so that the wait parses it. Every other frame is released
-  unread. The UDP entries, `arp_resolve`, and the waits of DHCP poll.
-- **The network is on** while the endpoint is open or `net_dhcp` runs.
+  unread. The UDP entries, `arp_resolve`, and the waits of DHCP and DNS
+  poll.
+- **The network is on** while the endpoint is open, or `net_dhcp` or
+  `dns_lookup` runs.
   `net_on` enables the port only if it is disabled, so it does not empty
   the queue of an open endpoint, and `net_off` disables it only when the
   endpoint is closed. The cold start, `mon_exit`, and `mon_trap` close
@@ -81,8 +83,19 @@ of [SYSTEM.md §7](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#
   checks the nearest deadline only while a flag says it is armed, so a
   stale one is never due. Nothing arms one yet: TCP and the lease's
   renewal will. The coarse clock is `arp_tick`, about a second.
-- **The identification** of each IPv4 packet sent, of UDP and of DHCP,
-  counts up by one from the fine clock at the cold start, with the
+- **DNS** (issue #111), `dns_lookup`, entry 25, builds its query in
+  `V_TXF` at `0xFFFFF120`, the name packed from byte 56, with one
+  question, type A, class IN, and RD set. Its ID, at `0xFFFFF388`, and
+  its local port, 49152 to 65535 and not the endpoint's, come from the
+  fine clock. The next hop's ARP, by `net_hop`, as `udp_send` finds it,
+  writes only the first 11 words of `V_TXF`, below the message, so the
+  name is checked and packed before the ARP, and a bad name sends
+  nothing. The query goes again after 2 seconds, 3 times in all, with
+  the same ID and port. `dns_parse` skips a name up to its 0 byte or its
+  first compression pointer, which ends it: the names are never compared,
+  so no pointer is followed, and a loop of pointers costs nothing.
+- **The identification** of each IPv4 packet sent, of UDP, DHCP, and
+  DNS, counts up by one from the fine clock at the cold start, with the
   "don't fragment" bit clear (RFC 6864).
 - `i dhcp` and `tftp` (README.md, "The network") use the frame
   routines, and `udp_send` calls `arp_resolve` for the MAC address of a
@@ -163,8 +176,8 @@ a program, `demo.bin`, whose words
 <!-- romsize layout -->
 | Part | Address | Words |
 |---|---|---:|
-| The monitor | `0x0000`–`0x4CF0` | 19697 |
-| Free | `0x4CF1`–`0x7FFF` | 13071 |
+| The monitor | `0x0000`–`0x4EB0` | 20145 |
+| Free | `0x4EB1`–`0x7FFF` | 12623 |
 <!-- /romsize layout -->
 
 The monitor's words, by the source they come from, in the order
@@ -175,13 +188,13 @@ the Makefile joins them. The column "Text" counts the words of the
 <!-- romsize monitor -->
 | Source | What it is | Words | Text |
 |---|---|---:|---:|
-| `monitor.nasm` | The dispatch table, the HAL, the cold start, and the traps | 725 | 27 |
+| `monitor.nasm` | The dispatch table, the HAL, the cold start, and the traps | 727 | 27 |
 | `monitor_cmd.nasm` | The main loop and the commands | 3949 | 2394 |
 | `monitor_dis.nasm` | The disassembler of `u` | 1079 | 269 |
 | `monitor_sd.nasm` | The sector routines | 390 | 223 |
-| `monitor_eth.nasm` | The network | 2312 | 298 |
+| `monitor_eth.nasm` | The network | 2756 | 298 |
 | `monlib.nasm` | The routines that programs join | 259 | 0 |
-| `mon.nasm` | The stubs of the entries | 58 | 0 |
+| `mon.nasm` | The stubs of the entries | 60 | 0 |
 | `nicewasm` | `___wasm_start`, which copies the C code's data to the RAM | 85 |  |
 | `fat32.c` | FAT32 | 9102 |  |
 | `clock.c` | The clock and `time` | 1199 |  |
@@ -192,7 +205,7 @@ the Makefile joins them. The column "Text" counts the words of the
 | nice_cpu's `muldiv_mpu.nasm` | Multiply and divide | 128 | 0 |
 | `build/folder.nasm` | The error of a card without the folder | 27 | 27 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 5 | 5 |
-| In all | | 19697 | 3243 |
+| In all | | 20145 | 3243 |
 <!-- /romsize monitor -->
 
 - The C code's strings are in its initial values, four characters a
@@ -280,12 +293,25 @@ needs `FOLDER=NICE`, the default. It runs these steps in order:
    DF is clear. The transaction, the identification, and the checksum
    change with the steps of the code, so the expected file has them as
    `xx`, `ii`, and `cc`.
-5. **TFTP.** `test/tftp.py` runs `tftp` the same way, against
+5. **DNS.** `test/dns.py` runs `test/dns.nasm`, which calls
+   `dns_lookup` with its names packed from an odd byte, under the
+   monitor with `--step-time`. A query's ID and port change with the
+   steps of the code, so the script learns them from a run, adds the
+   answer after the frame of the query, and runs again, until every
+   frame that wants an answer has one; a run stops after a million
+   steps, doubled while no new frame comes, so the runs take about 2
+   seconds in all. It covers a dotted address, each error, names too
+   long and with empty labels, datagrams that are passed over, CNAMEs,
+   compression pointers, a loop of them, records of other types and
+   classes, an answer cut short, a second query, the gateway, no answer
+   to ARP, and no answer. It compares the output and the frames sent
+   with `test/dns.expected`, with the ID and the port as `qq` and `pp`.
+6. **TFTP.** `test/tftp.py` runs `tftp` the same way, against
    `test/tftp.expected`. It covers a file of two blocks among packets of
    other hosts and ports, lost packets, an ERROR, files of 512 and 0
    bytes, a listing, a port given as `IP:PORT`, bad arguments, and no
    answer to ARP.
-6. **The real-time clock.** `test/rtc.py` starts the monitor on the
+7. **The real-time clock.** `test/rtc.py` starts the monitor on the
    words of an I2C master, which are memory in `niceemu`: a status that
    says that a master is present, and data that are the registers of the
    R6's real-time clock. With `--step-time` the clock is not set, so the
@@ -297,7 +323,7 @@ needs `FOLDER=NICE`, the default. It runs these steps in order:
    and in a year that the chip does not hold. The R3's chip is read only
    when the R6's does not answer, which memory cannot do, so that part
    runs only on an R3.
-7. **The runs.** The monitor runs once for each test below, with its
+8. **The runs.** The monitor runs once for each test below, with its
    keystrokes from an input file that ends with `h`, so that the run
    halts. Some runs add a program at `0x8000`, SD card images, or
    Ethernet frames.
@@ -343,7 +369,7 @@ write have the host's date, which no test shows.
 
 `niceemu` has no I2C master: its status word is memory, which reads 0,
 so the cold start of every run finds none, and `time` shows that the
-clock is not set. `test/rtc.py` alone sets that memory, as step 6 says.
+clock is not set. `test/rtc.py` alone sets that memory, as step 7 says.
 The I2C bus and the chip are tested in the simulated
 system, whose bus has a model of the R6's real-time clock: `make
 cosimtest` runs the monitor's cold start there, and checks the clock

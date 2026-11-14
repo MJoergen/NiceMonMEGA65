@@ -7,7 +7,7 @@ Words loaded: 2, 00008000 to 00008001
 Words saved: 2, 00008000 to 00008001
 > dir
 Directory of NICE
-HELLO.BIN                      13554
+HELLO.BIN                      13590
 test.bin                          36
 Files: 2, directories: 0
 > load TEST.BIN
@@ -45,13 +45,13 @@ Unknown command; ? lists them
 > de 0
 > dir 1
 Directory of NICE
-HELLO.BIN                      13554
+HELLO.BIN                      13590
 Files: 1, directories: 0
 > save full.bin 8000 100
 File error 30, the card or the folder is full
 > dir
 Directory of NICE
-HELLO.BIN                      13554
+HELLO.BIN                      13590
 full.bin                        1536
 Files: 2, directories: 0
 > del full.bin
@@ -60,7 +60,7 @@ Deleted full.bin
 Words saved: 2, 00008000 to 00008001
 > dir
 Directory of NICE
-HELLO.BIN                      13554
+HELLO.BIN                      13590
 full.bin                          36
 Files: 2, directories: 0
 > h
@@ -70,13 +70,13 @@ Screen:
 |> de 0
 |> dir 1
 |Directory of NICE
-|HELLO.BIN                      13554
+|HELLO.BIN                      13590
 |Files: 1, directories: 0
 |> save full.bin 8000 100
 |File error 30, the card or the folder is full
 |> dir
 |Directory of NICE
-|HELLO.BIN                      13554
+|HELLO.BIN                      13590
 |full.bin                        1536
 |Files: 2, directories: 0
 |> del full.bin
@@ -85,7 +85,7 @@ Screen:
 |Words saved: 2, 00008000 to 00008001
 |> dir
 |Directory of NICE
-|HELLO.BIN                      13554
+|HELLO.BIN                      13590
 |full.bin                          36
 |Files: 2, directories: 0
 |> h

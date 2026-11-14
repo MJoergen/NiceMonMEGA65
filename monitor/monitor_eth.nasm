@@ -7,9 +7,10 @@
 ; (issue #111); the UDP endpoint, the entries 16 to 19, udp_open,
 ; udp_send, udp_recv, and udp_close; the IP settings, net_config and
 ; net_set, entries 21 and 22; net_dhcp, entry 23, and i dhcp, which get
-; the IP address from a DHCP server; and tftp IP NAME, which reads a .bin
-; file through the endpoint from a TFTP server as load NAME reads one from
-; the card (issue #84).
+; the IP address from a DHCP server; dns_lookup, entry 25, the IPv4
+; address of a name from the DNS server; and tftp IP NAME, which reads a
+; .bin file through the endpoint from a TFTP server as load NAME reads one
+; from the card (issue #84).
 ;
 ; The i command, which shows and writes the IP address, is in
 ; monitor_cmd.nasm, and jumps to ip_dhcp for the word dhcp. tftp reads its
@@ -53,6 +54,14 @@ E_UCLOSED       .EQU    -42             ; the endpoint is not open,
 E_ULONG         .EQU    -43             ; a datagram too long,
 E_NOROUTE       .EQU    -44             ; and no answer to ARP from the host or the gateway
 E_NODHCP        .EQU    -45             ; no answer from a DHCP server, of net_dhcp
+E_NODNS         .EQU    -46             ; the errors of dns_lookup: no DNS server,
+E_DNSTIME       .EQU    -47             ; no answer from it,
+E_DNSNAME       .EQU    -48             ; no such name, no A record, or not a valid name,
+E_DNSFAIL       .EQU    -49             ; and an error of the server, or a truncated answer
+DNS_PORT        .EQU    53              ; the DNS server's UDP port
+DNS_TRIES       .EQU    3               ; the queries that dns_lookup sends
+DNS_WAIT        .EQU    2000000         ; the microseconds it waits after each
+DNS_NAME        .EQU    56              ; the byte of the buffer where a query's name starts, after its 12 bytes of header
 TFTP_PORT       .EQU    69              ; the TFTP server's port (RFC 1350)
 TFTP_TRIES      .EQU    5               ; the sends of a packet that tftp waits for an answer to
 TFTP_WAIT       .EQU    1000000         ; the microseconds it waits after each
@@ -408,10 +417,10 @@ arp_request
                 JMP     eth_send        ; which returns to the caller
 
 ; The demultiplexing and the poll (issue #111, INTERNALS.md, "The frame
-; routines"). While the network is on, while the endpoint is open or
-; net_dhcp runs, the ROM alone reads the queue and writes the send
-; buffer. A poll takes the frames that wait, NET_TAKE at most, the
-; queue's 4, and releases each: an ARP reply is learned in place, from its
+; routines"). While the network is on, while the endpoint is open, or
+; net_dhcp or dns_lookup runs, the ROM alone reads the queue and writes
+; the send buffer. A poll takes the frames that wait, NET_TAKE at most,
+; the queue's 4, and releases each: an ARP reply is learned in place, from its
 ; headers at V_NHDR, so it never touches V_RXF; a datagram for the
 ; endpoint is copied to V_RXF, where it is held for udp_recv, unless one
 ; is held already, and then it is dropped; a datagram to the port of the
@@ -700,40 +709,18 @@ udp_send
                 MOVE    R9, R3
                 MOVE    R10, R4
                 CALL    net_step
-; The next hop's MAC address, in R2 and R3
                 MOVE    R1, R7
-                MOVE    R2, 0xFFFF
-                MOVE    R3, 0xFFFFFFFF
-                CMP     R1, 0xFFFFFFFF
-        ?Z      JMP     :++             ; to everyone
-                XOR     R2, R1, @E_IP
-                AND[M]  R0, R2, @V_MASK
-        ?Z      JMP     :+              ; in this network, or no mask
-                MOVE[M] R1, @V_GW
-        ?Z      JMP     udp_noroute
-:
-                CALL    arp_resolve
+                CALL    net_hop
                 TST     R1
         ?!Z     JMP     udp_noroute
-:
-                MOVE    @V_UHDR, R2
-                MOVE    @V_UHDR+1, R3
-                SHL     R3, @E_MACH, 16
-                SHR     R4, @E_MACL, 16
-                OR      @V_UHDR+2, R3, R4
-                SHL     R3, @E_MACL, 16
-                OR      @V_UHDR+3, R3, 0x0800
-                ADD     R1, R10, 28
-                OR      @V_UHDR+4, R1, 0x45000000  ; IPv4, a header of 5 words, and the length
+                MOVE    R1, V_UHDR
+                MOVE    R4, R7
+                SHL     R5, @V_UPORT, 16
+                OR      R5, R5, R8
+                MOVE    R6, R10
+                CALL    udp_head
                 CALL    ip_ident
                 MOVE    @V_UHDR+5, R1
-                MOVE    @V_UHDR+6, 0x40110000  ; the TTL 64, UDP
-                MOVE    @V_UHDR+7, @E_IP
-                MOVE    @V_UHDR+8, R7
-                SHL     R1, @V_UPORT, 16
-                OR      @V_UHDR+9, R1, R8
-                ADD     R1, R10, 8
-                SHL     @V_UHDR+10, R1, 16  ; the UDP length, and checksum 0
                 MOVE    R1, V_UHDR
                 CALL    ip_csum
 :
@@ -779,6 +766,51 @@ udp_noroute
                 POP     R9
                 POP     R8
                 POP     R7
+                RET
+
+; net_hop: the MAC address of the next hop to the IP address R1, not 0:
+; everyone's for 255.255.255.255; the host's, by arp_resolve, when the
+; mask, V_MASK, puts it in this network, or there is no mask; and else
+; the gateway's, V_GW. R1 = 0, and R2 and R3 the MAC address, as E_MACH
+; and E_MACL have it, or R1 not 0 when there is no gateway, or no answer
+; to ARP. Uses R1-R6.
+net_hop
+                MOVE    R2, 0xFFFF
+                MOVE    R3, 0xFFFFFFFF
+                CMP     R1, 0xFFFFFFFF
+        ?Z      MOVE    R1, 0
+        ?Z      RET                     ; to everyone
+                XOR     R2, R1, @E_IP
+                AND[M]  R0, R2, @V_MASK
+        ?Z      JMP     arp_resolve     ; in this network, or no mask
+                MOVE[M] R1, @V_GW
+        ?!Z     JMP     arp_resolve     ; which returns to the caller
+                MOVE    R1, -1
+                RET
+
+; udp_head: the headers of a datagram, its first UDP_HDR words as the
+; send buffer has them, written at R1: to the MAC address R2 and R3, as
+; E_MACH and E_MACL have it, from the station's; IPv4 from E_IP to R4,
+; with no options, TTL 64, DF clear, and the identification and the
+; checksum left for the caller, ip_ident and ip_csum; UDP from the port in
+; bits 31..16 of R5 to the one in bits 15..0, with R6 bytes of data, and
+; the checksum 0, none, as IPv4 allows. Uses R2 and R3.
+udp_head
+                MOVE    @R1, R2
+                MOVE    @1[R1], R3
+                SHL     R2, @E_MACH, 16
+                SHR     R3, @E_MACL, 16
+                OR      @2[R1], R2, R3
+                SHL     R2, @E_MACL, 16
+                OR      @3[R1], R2, 0x0800
+                ADD     R2, R6, 28
+                OR      @4[R1], R2, 0x45000000  ; IPv4, a header of 5 words, and the length
+                MOVE    @6[R1], 0x40110000  ; the TTL 64, UDP
+                MOVE    @7[R1], @E_IP
+                MOVE    @8[R1], R4
+                MOVE    @9[R1], R5
+                ADD     R2, R6, 8
+                SHL     @10[R1], R2, 16  ; the UDP length, and checksum 0
                 RET
 
 ; udp_recv: after a poll, the datagram held for the endpoint copied to
@@ -1137,6 +1169,284 @@ dhcp_parse_end
                 MOVE    R1, R5
                 POP     R8
                 POP     R7
+                RET
+
+; The DNS client (RFC 1035), dns_lookup, entry 25 (issue #111). A query
+; has one question, type A, class IN, with RD set, and goes from a local
+; port of its own, V_NWAIT, to port 53 of the DNS server, V_DNS. It is
+; built in V_TXF as the send buffer has it, the message from word UDP_HDR
+; and the name from byte DNS_NAME, with dhcp_put and dhcp_len, and is sent
+; again after DNS_WAIT microseconds, DNS_TRIES times in all, with the same
+; ID, V_QID. The poll copies a datagram to the port to V_RXF, where
+; dns_parse reads it. No answer is kept: a program keeps the address.
+
+; dns_lookup: entry 25. R1 the byte address of a name, up to a 0 byte, R2
+; the word address of the result, where the name's IPv4 address is
+; written. A name of four decimal numbers with dots, as i takes them, is
+; the address, with no query and no IP address needed. Else the name's
+; labels must have 1 to 63 bytes, 253 in all, with a dot after the last
+; allowed; the query goes to the next hop of net_hop, which may wait for
+; ARP up to 3 seconds, and the answer is waited for up to DNS_WAIT
+; microseconds after each send, polling. The port for Ethernet frames is
+; enabled by net_on, and disabled by net_off at the end, unless the
+; endpoint is open. R1 = 0, or E_NOIP, E_NODNS, E_DNSNAME, E_NOROUTE,
+; E_DNSTIME, E_DNSFAIL, or the E_DNSNAME of an answer. Uses R1-R6, and
+; R7-R10 across the calls, saved: the name, and then the sends left, the
+; result's word, the time of the send, and the bytes of the frame.
+dns_lookup
+                PUSH    R7
+                PUSH    R8
+                PUSH    R9
+                PUSH    R10
+                MOVE    R7, R1
+                MOVE    R1, R2
+                CALL    net_waddr
+                MOVE    R8, R1
+                MOVE    R1, R7
+                CALL    get_ip
+                TST     R2
+        ?Z      JMP     :+
+                TST     @R3
+        ?!Z     JMP     :+              ; a name that starts as an address
+                MOVE    @R8, R1
+                MOVE    R1, 0
+                JMP     dns_end
+:
+                MOVE    R1, E_NOIP
+                TST     @E_IP
+        ?Z      JMP     dns_end
+                MOVE    R1, E_NODNS
+                TST     @V_DNS
+        ?Z      JMP     dns_end
+; The message: the header, and the question
+                MOVE    R1, V_TXF
+                MOVE    R2, DHCP_WORDS
+:
+                MOVE    @R1++, 0
+                SUB[M]  R2, R2, 1
+        ?!Z     JMP     :-
+                CALL    net_clock
+                AND     @V_QID, R1, 0xFFFF
+                SHR     R1, R1, 4
+                AND     R1, R1, 0x3FFF
+                OR      R1, R1, 0xC000  ; the port, 49152 to 65535
+                CMP     R1, @V_UPORT
+        ?Z      XOR     R1, R1, 1       ; and not the endpoint's
+                MOVE    R9, R1
+                SHL     R1, @V_QID, 16
+                OR      @V_TXF+UDP_HDR, R1, 0x0100  ; the ID, a query, RD
+                MOVE    @V_TXF+UDP_HDR+1, 0x00010000  ; one question
+                MOVE    R4, DNS_NAME    ; the length of the label
+                ADD     R6, R4, 1       ; the next byte
+dns_char
+                SUB     R1, R6, DNS_NAME
+                CMP     R1, 256
+        ?!C     JMP     dns_badname     ; too long, which also ends a name with no 0
+                SUB     R1, R6, R4
+                CMP     R1, 65
+        ?!C     JMP     dns_badname     ; a label of 64 bytes
+                MOVE[M] R1, @R7++
+        ?Z      JMP     :+
+                CMP     R1, 0x2E        ; .
+        ?Z      JMP     dns_dot
+                CALL    dhcp_put
+                JMP     dns_char
+dns_dot
+                SUB     R1, R6, R4
+                CMP     R1, 1
+        ?Z      JMP     dns_badname     ; a label of 0 bytes
+                CALL    dhcp_len
+                MOVE    R4, R6
+                ADD     R6, R6, 1
+                JMP     dns_char
+:
+                SUB     R1, R6, R4
+                CMP     R1, 1
+        ?!Z     JMP     :+
+                CMP     R4, DNS_NAME
+        ?Z      JMP     dns_badname     ; no name
+                JMP     :++             ; a dot at the end: the 0 is there
+:
+                CALL    dhcp_len
+                ADD     R6, R6, 1       ; the 0 that ends the name
+:
+                SUB     R1, R6, DNS_NAME
+                CMP     R1, 256
+        ?!C     JMP     dns_badname     ; more than 255 bytes, so 253 with no dots at the ends
+                ADD     R6, R6, 1
+                MOVE    R1, 1           ; type A
+                CALL    dhcp_put
+                ADD     R6, R6, 1
+                MOVE    R1, 1           ; class IN
+                CALL    dhcp_put
+                SUB     R10, R6, 2      ; the bytes of the frame
+; The next hop, and the headers
+                CALL    net_on
+                MOVE    R1, @V_DNS
+                CALL    net_hop         ; whose ARP may use the words before UDP_HDR
+                TST     R1
+        ?!Z     MOVE    R1, E_NOROUTE
+        ?!Z     JMP     dns_off
+                MOVE    @V_NWAIT, R9
+                MOVE    R1, V_TXF
+                MOVE    R4, @V_DNS
+                SHL     R5, R9, 16
+                OR      R5, R5, DNS_PORT
+                SUB     R6, R10, 42
+                CALL    udp_head
+                MOVE    R7, DNS_TRIES
+dns_send
+                CALL    ip_ident
+                MOVE    @V_TXF+5, R1
+                MOVE    R1, V_TXF
+                CALL    ip_csum
+                MOVE    R1, V_TXF
+                MOVE    R2, R10
+                CALL    eth_send
+                MOVE    R9, @io.us
+dns_wait
+                CALL    net_step
+                TST     R1
+        ?Z      JMP     :+
+                CALL    dns_parse
+                CMP     R1, 1
+        ?Z      JMP     :+              ; passed over
+                TST     R1
+        ?Z      MOVE    @R8, R2
+                JMP     dns_off
+:
+                SUB     R1, @io.us, R9
+                CMP     R1, DNS_WAIT
+        ?C      JMP     dns_wait
+                SUB[M]  R7, R7, 1
+        ?!Z     JMP     dns_send
+                MOVE    R1, E_DNSTIME
+dns_off
+                MOVE    @V_NWAIT, 0
+                CALL    net_off
+                JMP     dns_end
+dns_badname
+                MOVE    R1, E_DNSNAME
+dns_end
+                POP     R10
+                POP     R9
+                POP     R8
+                POP     R7
+                RET
+
+; dns_parse: the datagram of R1 bytes at V_RXF, to the query's port, if
+; it is the answer: from the DNS server's address and port 53, with the
+; query's ID, QR set, and one question. R1 = 1 when it is not, and it is
+; passed over. Else R1 = 0, with R2 the address of the first record of
+; the answer section of type A, class IN, and 4 bytes of data, past any
+; CNAMEs, which are not checked against the chain; or E_DNSNAME for RCODE
+; 3, or no such record; or E_DNSFAIL for another RCODE, TC set, or an
+; answer that ends inside a record. A name is skipped up to its 0 byte or
+; its first compression pointer, which ends it, so a loop of pointers is
+; never followed. R5 is the byte of the buffer after the message, by the
+; frame's length and the UDP length, the smaller, R6 the byte read, and
+; R4 the records left. Uses R1-R6, and R7 across the calls, saved.
+dns_parse
+                PUSH    R7
+                ADD     R5, R1, 2
+                MOVE    R1, 1
+                CMP     @V_RXF+7, @V_DNS
+        ?!Z     JMP     dns_parse_end
+                SHR     R2, @V_RXF+9, 16
+                CMP     R2, DNS_PORT
+        ?!Z     JMP     dns_parse_end
+                SHR     R2, @V_RXF+10, 16
+                ADD     R2, R2, 36      ; the end by the UDP length
+                CMP     R2, R5
+        ?C      MOVE    R5, R2
+                CMP     R5, DNS_NAME
+        ?C      JMP     dns_parse_end   ; no header
+                MOVE    R7, @V_RXF+UDP_HDR
+                SHR     R2, R7, 16
+                CMP     R2, @V_QID
+        ?!Z     JMP     dns_parse_end
+                AND[M]  R0, R7, 0x8000  ; QR
+        ?Z      JMP     dns_parse_end
+                SHR     R2, @V_RXF+UDP_HDR+1, 16
+                CMP     R2, 1
+        ?!Z     JMP     dns_parse_end   ; not one question
+                MOVE    R1, E_DNSFAIL
+                AND[M]  R0, R7, 0x0200  ; TC
+        ?!Z     JMP     dns_parse_end
+                AND[M]  R2, R7, 0x000F  ; RCODE
+        ?Z      JMP     :+
+                CMP     R2, 3
+        ?Z      MOVE    R1, E_DNSNAME
+                JMP     dns_parse_end
+:
+                AND     R4, @V_RXF+UDP_HDR+1, 0xFFFF  ; the answers
+                MOVE    R6, DNS_NAME
+                CALL    dns_skip
+        ?!Z     JMP     dns_fail
+                ADD     R6, R6, 4       ; the type and the class
+dns_record
+                MOVE    R1, E_DNSNAME
+                SUB[M]  R4, R4, 1
+        ?C      JMP     dns_parse_end   ; no record of type A
+                CALL    dns_skip
+        ?!Z     JMP     dns_fail
+                ADD     R1, R6, 10
+                CMP     R5, R1
+        ?C      JMP     dns_fail        ; ends in the record's fields
+                MOVE    R1, R6
+                CALL    rx_long
+                MOVE    R7, R1          ; its type and its class
+                ADD     R1, R6, 8
+                CALL    rx_long
+                SHR     R2, R1, 16      ; the bytes of its data
+                ADD     R6, R6, 10
+                ADD     R3, R6, R2      ; the next record
+                CMP     R5, R3
+        ?C      JMP     dns_fail        ; ends in the record's data
+                CMP     R7, 0x00010001  ; A, IN
+        ?!Z     JMP     :+
+                CMP     R2, 4
+        ?Z      JMP     :++
+:
+                MOVE    R6, R3
+                JMP     dns_record
+:
+                MOVE    R1, R6
+                CALL    rx_long
+                MOVE    R2, R1
+                MOVE    R1, 0
+                JMP     dns_parse_end
+dns_fail
+                MOVE    R1, E_DNSFAIL
+dns_parse_end
+                POP     R7
+                RET
+
+; dns_skip: the name at byte R6 of V_RXF skipped, up to R5, the byte after
+; the message. R6 = the byte after it, and Z set; or Z clear when it does
+; not end before R5, or has a label of the types 0x40 or 0x80. Uses R1-R3.
+dns_skip
+                CMP     R6, R5
+        ?!C     JMP     :++             ; at the end
+                MOVE    R1, R6
+                CALL    rx_byte
+                ADD     R6, R6, 1
+                TST     R1
+        ?Z      RET                     ; the 0 that ends it
+                CMP     R1, 0xC0
+        ?C      JMP     :+
+                ADD     R6, R6, 1       ; a pointer, which ends it
+                CMP     R5, R6
+        ?C      JMP     :++
+                TST     R0
+                RET
+:
+                CMP     R1, 0x40
+        ?!C     JMP     :+              ; 0x40 to 0xBF
+                ADD     R6, R6, R1
+                JMP     dns_skip
+:
+                MOVE[M] R1, 1
                 RET
 
 ; tftp IP[:PORT] [NAME]: the .bin file NAME of the TFTP server at IP

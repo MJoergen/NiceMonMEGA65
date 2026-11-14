@@ -2,7 +2,7 @@ NiceMon V9.9
 ? lists the commands
 > dir
 Directory of NICE
-HELLO.BIN                      13554
+HELLO.BIN                      13590
 SUB                            <DIR>
 A long name.txt                   26
 readme.txt                        30
@@ -31,11 +31,11 @@ KEEP.TXT                         512
 Files: 25, directories: 1
 > DIR 1
 Directory of NICE
-HELLO.BIN                      13554
+HELLO.BIN                      13590
 Files: 1, directories: 0
 > dir 0
 Directory of NICE
-HELLO.BIN                      13554
+HELLO.BIN                      13590
 SUB                            <DIR>
 A long name.txt                   26
 readme.txt                        30
@@ -92,7 +92,7 @@ dir [SLOT]: the slot in hex, such as dir 1
 > dir 123456789
 dir [SLOT]: the slot in hex, such as dir 1
 > LOAD HELLO.BIN
-Words loaded: 753, 00008000 to 000082F0
+Words loaded: 755, 00008000 to 000082F2
 > r
 Hello from 00008000, table 00010004
 at column 40
@@ -100,7 +100,7 @@ on the line only
 Returned 0000002A
 > h
 Halted
-fffff11a: 000002f1 00008000 000082f0 00000000 00000000
+fffff11a: 000002f3 00008000 000082f2 00000000 00000000
 Screen:
 |> load toolongname.bin
 |File error 21, no such file
@@ -119,7 +119,7 @@ Screen:
 |> dir 123456789
 |dir [SLOT]: the slot in hex, such as dir 1
 |> LOAD HELLO.BIN
-|Words loaded: 753, 00008000 to 000082F0
+|Words loaded: 755, 00008000 to 000082F2
 |> r
 |Hello from 00008000, table 00010004
 |                                        at column 40

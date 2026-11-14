@@ -1,6 +1,6 @@
 ; The monitor, the program of the ROM at 0x0000 (README.md). The core boots
 ; from it at reset. It gives the programs at 0x8000 a hardware abstraction
-; layer, the HAL: twenty-four routines, called through the dispatch table at the
+; layer, the HAL: twenty-five routines, called through the dispatch table at the
 ; start of the ROM, and it has a main loop with a few commands, typed on
 ; the keyboard or sent over the line, and shown on the screen and the line.
 ;
@@ -168,6 +168,7 @@ V_NDUE          .EQU    0xFFFFF384      ; the nearest deadline, on the fine cloc
 V_IPID          .EQU    0xFFFFF385      ; the identification of the next IPv4 packet sent, in bits 15..0
 V_DDNS          .EQU    0xFFFFF386      ; for i dhcp: the DNS server of the OFFER or the ACK,
 V_PDNS          .EQU    0xFFFFF387      ; and of the last reply that dhcp_parse took
+V_QID           .EQU    0xFFFFF388      ; the ID of the query of dns_lookup, in bits 15..0; its port is V_NWAIT
 V_NHDR          .EQU    0xFFFFF390      ; the first 8 NHDR_CHUNKS words of the frame at the head of the queue, from byte 2
 WASM_RAM        .EQU    0xFFFFF400      ; the words that the ROM's C code writes, from here
 WASM_END        .EQU    0xFFFFFF00      ; up to below here, the I/O page, which the Makefile checks
@@ -216,6 +217,7 @@ SCR_MAX         .EQU    0x7FFF          ; the largest display offset
                 JMP     net_set         ; 22 at 0x2C, monitor_eth.nasm
                 JMP     net_dhcp        ; 23 at 0x2E, monitor_eth.nasm
                 JMP     net_poll        ; 24 at 0x30, monitor_eth.nasm
+                JMP     dns_lookup      ; 25 at 0x32, monitor_eth.nasm
 
 ; mon_reset: the cold start, entry 0, which reset runs and a program may
 ; call. E is cleared, the timer stopped, VBASE set to 0, the font base
