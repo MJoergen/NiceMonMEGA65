@@ -1121,8 +1121,8 @@ begin
       check("FFFF0000", "00000041");         -- the screen
       check("FFFF07CF", "00000042");
       check("00000000", first_v);            -- not overwritten by the screen
-      check("00000110", "00001234");         -- memory at 0xFFFFFF02
-      check("FFFFFF02", "00001234");
+      check("00000110", "00001234");         -- memory at 0xFFFFFF03
+      check("FFFFFF03", "00001234");
       check("00000111", "00000002");         -- the read counter, as the program read it
       check("FFFFFFE0", "00000000");         -- R0
       check("FFFFFFE5", "0000CAFE");         -- R5

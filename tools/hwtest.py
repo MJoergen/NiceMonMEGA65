@@ -717,7 +717,7 @@ def test_readback(link: Link, emu: str) -> None:
         0xFFFFFFF1: 0x00000001,  # halted by HALT
         0xFFFF0000: 0x00000041,  # the screen, column 0 of row 0
         0xFFFF07CF: 0x00000042,  # the screen, column 79 of row 24
-        0xFFFFFF02: 0x00001234,  # memory in the I/O range
+        0xFFFFFF03: 0x00001234,  # memory in the I/O range
         0x00000110: 0x00001234,
         0x00000111: 0x00000002,  # the read counter, as the program read it
         0xFFFFFF01: 0x00000000,  # which the link reads as 0 (DEBUG.md §3)
@@ -1858,7 +1858,7 @@ def comparisons(tmp: str) -> list[tuple[str, list[str], bool]]:
         (hello, [], False),
         (hello, ["-i", lines], False),  # halts with unread input
         # Not 0xFFFFFF00-01, which the link reads as 0 (DEBUG.md §3)
-        (emu, ["-d", "0x110:2", "-d", "0xFFFFFF02:2", "-s"], False),
+        (emu, ["-d", "0x110:2", "-d", "0xFFFFFF03:2", "-s"], False),
         (reserved, [], False),
         (eof, [], True),               # no input: it ends at once
         (eof, ["-i", text], True),
