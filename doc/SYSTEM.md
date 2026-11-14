@@ -514,7 +514,8 @@ of the system. The link reads and writes the port as the core does,
 while the core is paused, held, or halted.
 
 The monitor in the ROM uses the port in its `i dhcp`, which gets the
-station's IP address from a DHCP server, in its `tftp`, which loads a
+station's IP address from a DHCP server, in the same DHCP in the
+background after a reset, while it waits at its prompt, in its `tftp`, which loads a
 file from a TFTP server, and in its entries for programs: UDP, DHCP,
 DNS, and TCP, as a client and as a server
 ([monitor/](../monitor/README.md#tcp-and-dns)). Its TCP is a stack of

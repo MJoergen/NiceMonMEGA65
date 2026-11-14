@@ -407,7 +407,8 @@ FAT32_START_BYTES = $(shell echo $$(($(FAT32_START) * 512)))
 # test/dis.py the rows of u against nicedis.py and niceasm, and
 # test/dhcp.py runs i dhcp against the frames that it builds, and so
 # does test/dns.py for dns_lookup, and test/lease.py for the lease's
-# renewal, and
+# renewal, and test/bgdhcp.py the DHCP exchange in the background,
+# and
 # test/tftp.py tftp, and test/rtc.py the cold start and time on the words
 # of an I2C master that it sets, as a real-time clock. arp and udp run
 # with --step-time, as their timeouts
@@ -426,6 +427,7 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	@$(PYTHON) test/dns.py $(EMU) $(BUILD)/monitor_test.bin $(BUILD)/dns.bin \
 	  test/dns.expected $(BUILD)/dns.out
 	@$(PYTHON) test/lease.py $(EMU) $(BUILD)/monitor_test.bin $(BUILD)/lease.bin
+	@$(PYTHON) test/bgdhcp.py $(EMU) $(BUILD)/monitor_test.bin
 	@$(PYTHON) test/tftp.py $(EMU) $(BUILD)/monitor_test.bin test/tftp.expected $(BUILD)/tftp.out
 	@$(PYTHON) test/rtc.py $(EMU) $(BUILD)/monitor_test.bin
 	@$(ROMSIZE)

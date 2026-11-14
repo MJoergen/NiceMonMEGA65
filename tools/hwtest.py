@@ -137,6 +137,11 @@ Checks, in this order:
     the one under the monitor in the board's ROM.
     With --eth, last of all, the Ethernet station, which no failure above
     or here keeps the other checks from:
+    - the ROM, loaded at 0 with the station's address cleared, gets an
+      address from the network's DHCP server on its own, in the
+      background, and shows it over its prompt, and ping answers there
+      (issue #126); when no server answers, the summary names it after
+      NOT COVERED instead of failing
     - the ROM, loaded at 0, gets the monitor's i, the IP address, and CR
       as console bytes over the UART, as from a terminal, and gives the
       station that address, which a pause reads back
@@ -157,7 +162,8 @@ Checks, in this order:
       compares them, and closes (issue #111)
     - the ROM, loaded at 0, gets the monitor's i dhcp over the UART, and
       gets an address from the network's DHCP server, which the station
-      then has, with the port for Ethernet frames disabled again, and
+      then has, with the port for Ethernet frames enabled at the prompt
+      for the lease's renewal, and
       which ping answers; when no server answers, the summary names DHCP
       after NOT COVERED instead of failing. The board keeps that address
     Without --eth, the summary names the Ethernet station after NOT
@@ -226,6 +232,15 @@ ETH_CSR = 0xFFFFFFC0
 # The longest that the monitor's i dhcp takes: DHCP_TRIES DISCOVERs, and a
 # REQUEST after each, with DHCP_WAIT seconds for each reply (monitor_eth.nasm)
 DHCP_TIME = 4 * 2 * 2.0
+# The longest wait for the monitor's DHCP in the background after its
+# start: its first DISCOVER after 2 seconds, and its second 4 to 5 seconds
+# later (monitor_eth.nasm, BG_FIRST and BG_START), and the replies
+BG_DHCP_TIME = 10.0
+# The line of the address that the monitor's DHCP in the background got,
+# over its prompt, and the prompt again (issue #126). Until the station
+# has an address, the board may print it while a test waits at the
+# monitor's prompt, which niceemu, with no server, never does.
+BG_DHCP = re.compile(rb"\rIP address (\d+\.\d+\.\d+\.\d+) from DHCP\r\n> ")
 
 T = TypeVar("T")
 
@@ -1862,6 +1877,7 @@ def test_run(link_args: list[str],
             for r in (emu, board):
                 r.stdout = re.sub(rb"after \d+ steps", b"after N steps",
                                   r.stdout)
+        board.stdout = BG_DHCP.sub(b"", board.stdout)
         same = (emu.stdout == board.stdout and
                 emu.returncode == board.returncode)
         check(f"run.py {name} as niceemu{via}", same,
@@ -1945,6 +1961,7 @@ def test_monitor(link_args: list[str], tmp: str, in_rom: bool = False,
             for r in (emu, board):
                 r.stdout = re.sub(rb"after \d+ steps", b"after N steps",
                                   r.stdout)
+            board.stdout = BG_DHCP.sub(b"", board.stdout)
             same = (emu.stdout == board.stdout and
                     emu.returncode == board.returncode)
             check(f"run.py --monitor --rom monitor_test.bin "
@@ -2214,11 +2231,48 @@ def test_eth_tcp(eth: str, ip: str, tmp: str, listen: bool = False) -> None:
           f"{len(got)} bytes, end {eof[0]} {error[0]}")
 
 
+def test_eth_bg_dhcp(link: Link, rom: str) -> None:
+    """Clears the station's address, loads the monitor, and waits for the
+    line of the address that its DHCP in the background gets (issue
+    #126). The station must have that address, and ping must reach the
+    board there. No line is a gap in the coverage."""
+    link.control(HOLD)
+    if not check("eth: the station's address cleared for the DHCP in the "
+                 "background", wr(link, NET_IP, 0)):
+        return
+    load(link, rom)
+    text = b""
+    end = time.monotonic() + BG_DHCP_TIME
+    while time.monotonic() < end:
+        link.poll(0.1)
+        text += link.take_console()
+        if BG_DHCP.search(text):
+            break
+    got = BG_DHCP.search(text)
+    if got is None:
+        print("  no DHCP server answered the monitor's DHCP in the "
+              "background", flush=True)
+        uncovered.append("the monitor's DHCP in the background, as no "
+                         "DHCP server answered on the board's network")
+        return
+    addr = got[1].decode()
+    words = paused(link, [NET_IP])
+    want = struct.unpack(">I", socket.inet_aton(addr))[0]
+    check(f"eth: the monitor's DHCP in the background shows {addr}, and "
+          "the station has it", words == [want],
+          "no pause" if words is None else f"{words[0]:08X}")
+    ping = subprocess.run(["ping", "-c", "3", "-W", "2", addr],
+                          capture_output=True, text=True)
+    check(f"eth: ping answered at {addr}, the address of the DHCP in the "
+          "background", ping.returncode == 0,
+          "" if ping.returncode == 0 else repr(ping.stdout + ping.stderr))
+
+
 def test_eth_dhcp(port: str, baud: int, rom: str) -> None:
     """Loads the monitor, and types its i dhcp over the UART. When a
     server answers, the address shown must be the station's, the port
-    for Ethernet frames disabled again, and ping must reach the board
-    there. No answer is a gap in the coverage."""
+    for Ethernet frames enabled for the lease's renewal at the prompt,
+    and ping must reach the board there. No answer is a gap in the coverage."""
     link = Link(Serial(port, baud))
     try:
         load(link, rom)
@@ -2252,8 +2306,11 @@ def test_eth_dhcp(port: str, baud: int, rom: str) -> None:
         addr = got[1]
         words = paused(link, [NET_IP, ETH_CSR])
         want = struct.unpack(">I", socket.inet_aton(addr))[0]
+        # Back at the prompt, the monitor keeps the port enabled to renew
+        # the lease (issue #126); a server's lease that never ends, which
+        # it does not keep, would leave it disabled
         check("eth: the station has the address of i dhcp, and the port is "
-              "disabled", words == [want, 0],
+              "enabled for the lease at the prompt", words == [want, 1],
               "no pause" if words is None else
               f"{words[0]:08X} {words[1]:08X}")
         ping = subprocess.run(["ping", "-c", "3", "-W", "2", addr],
@@ -2281,6 +2338,7 @@ def test_eth(port: str, baud: int, eth: str,
         want = struct.unpack(">I", socket.inet_aton(ip))[0]
         link = Link(Serial(port, baud))
         try:
+            test_eth_bg_dhcp(link, rom)
             counts = test_eth_ip(link, rom, ip)
             if counts is None:
                 return

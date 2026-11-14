@@ -4,7 +4,8 @@
 ; with no entries in the dispatch table (issue #83, README.md, "The
 ; network"); the demultiplexing of the frames that come, and the poll,
 ; net_poll, entry 24, which the other entries and the ROM's own waits call
-; (issue #111); the UDP endpoint, the entries 16 to 19, udp_open,
+; (issue #111); the DHCP exchange in the background, which the cold start
+; begins and getline carries on (issue #126); the UDP endpoint, the entries 16 to 19, udp_open,
 ; udp_send, udp_recv, and udp_close; the IP settings, net_config and
 ; net_set, entries 21 and 22; net_dhcp, entry 23, and i dhcp, which get
 ; the IP address from a DHCP server, and the renewal of its lease in the
@@ -49,6 +50,9 @@ DHCP_ACK        .EQU    5
 DHCP_NAK        .EQU    6
 DHCP_RENEW      .EQU    0x103           ; for dhcp_send: a REQUEST of the lease's renewal, to its server,
 DHCP_REBIND     .EQU    0x203           ; and one broadcast, from T2
+BG_FIRST        .EQU    2000000         ; the microseconds from the cold start to the first DISCOVER in the background,
+BG_START        .EQU    4000000         ; the wait after it, doubled after each DISCOVER,
+BG_MAX          .EQU    64000000        ; up to this, as RFC 2131 §4.1 has it
 LEASE_AGAIN     .EQU    60              ; the ticks of arp_tick between the REQUESTs of a renewal
 LEASE_FAR       .EQU    1024            ; the ticks of the housekeeping deadline at most, 2^30 microseconds
 UDP_HDR         .EQU    11              ; the words of the headers of a datagram, with the 2 bytes before the frame
@@ -115,10 +119,11 @@ ip_dhcp
 ; mask, the gateway, and the DNS server are kept, and the lease, by
 ; lease_take, which net_poll renews. Without an ACK, E_IP and the rest,
 ; and a lease kept, are left alone.
-; R1 = 0, or E_NODHCP. Uses R1-R6, and R7 across the calls, saved: the
-; tries left.
+; It ends the exchange in the background. R1 = 0, or E_NODHCP. Uses R1-R6,
+; and R7 across the calls, saved: the tries left.
 net_dhcp
                 PUSH    R7
+                MOVE    @V_BSTATE, 0
                 CALL    net_on
                 MOVE    @V_NWAIT, DHCP_CLIENT
                 MOVE    R1, @io.us
@@ -143,13 +148,7 @@ dhcp_try
                 MOVE    R7, E_NODHCP
                 JMP     :++
 :
-                CMP     @E_IP, @V_DIP
-        ?!Z     MOVE    @E_IP, @V_DIP
-        ?!Z     CALL    tcp_resetall
-                MOVE    @V_MASK, @V_DMASK
-                MOVE    @V_GW, @V_DGW
-                MOVE    @V_DNS, @V_DDNS
-                CALL    lease_take
+                CALL    dhcp_commit
                 MOVE    R7, 0
 :
                 MOVE    @V_NWAIT, 0
@@ -157,6 +156,124 @@ dhcp_try
                 MOVE    R1, R7
                 POP     R7
                 RET
+
+; dhcp_commit: the address of the ACK, V_DIP, written to E_IP if it is
+; another, which breaks a host's connection over TCP, as a write of i
+; does, and ends the program's TCP connections in E_TRESET; its mask,
+; gateway, and DNS server kept, and its lease, by lease_take. Uses R1-R6.
+dhcp_commit
+                CMP     @E_IP, @V_DIP
+        ?!Z     MOVE    @E_IP, @V_DIP
+        ?!Z     CALL    tcp_resetall
+                MOVE    @V_MASK, @V_DMASK
+                MOVE    @V_GW, @V_DGW
+                MOVE    @V_DNS, @V_DDNS
+                JMP     lease_take      ; which returns to the caller
+
+; The DHCP exchange in the background (issue #126). After a reset of the
+; system the station has no IP address, and the cold start begins an
+; exchange with bg_start. getline carries it on while it waits for the
+; first key of a line, with bg_step, so it costs nothing while a command
+; or a program runs, and nothing without a cable. The first DISCOVER goes
+; BG_FIRST microseconds after the cold start, as the PHY negotiates the
+; link again after a reset; each after it waits twice as long as the one
+; before, from BG_START up to BG_MAX, plus up to a second that the
+; microseconds pick (RFC 2131 §4.1). An OFFER with an address gets a
+; REQUEST, and DHCP_WAIT microseconds for its ACK; without it, or with a
+; NAK, the next DISCOVER goes. The ACK sets the address, as i dhcp does,
+; and bg_show shows it. The exchange ends there, or when the station has
+; an address from elsewhere: i, net_set, net_dhcp, or the link.
+
+; bg_start: the exchange in the background begun, if the station has no
+; IP address, with a transaction of its own. Uses R1 and R2.
+bg_start
+                MOVE    @V_BSTATE, 0
+                TST     @E_IP
+        ?!Z     RET
+                MOVE    R1, @io.us
+                XOR     @V_XID, R1, @E_MACL
+                CALL    net_clock
+                ADD     @V_BDUE, R1, BG_FIRST
+                MOVE    @V_BWAIT, BG_START
+                MOVE    @V_BSTATE, DHCP_OFFER
+                RET
+
+; bg_step: for getline_wait, after a poll, net_step, with R1 the bytes of
+; the frame to port 68 that it copied to V_RXF, or 0: the exchange in the
+; background carried on, if it runs, with the port for Ethernet frames
+; enabled. R1 = 1 when the ACK came and the address is set, or else 0.
+; Uses R1-R6.
+bg_step
+                TST     @V_BSTATE
+        ?Z      JMP     bg_none
+                TST     @E_IP
+        ?!Z     JMP     bg_stop         ; an address from elsewhere
+                TST     R1
+        ?Z      JMP     bg_time
+                CALL    dhcp_parse
+                CMP     R1, DHCP_NAK
+        ?Z      JMP     bg_nak
+                CMP     R1, @V_BSTATE
+        ?!Z     JMP     bg_time         ; not the reply waited for
+                TST     @V_PIP
+        ?Z      JMP     bg_time         ; no address: passed over
+                CALL    dhcp_keep
+                CMP     @V_BSTATE, DHCP_ACK
+        ?Z      JMP     bg_ack
+                MOVE    R1, DHCP_REQUEST  ; an OFFER
+                CALL    dhcp_send
+                MOVE    @V_BSTATE, DHCP_ACK
+                CALL    net_clock
+                ADD     @V_BDUE, R1, DHCP_WAIT
+                JMP     bg_none
+bg_nak
+                CMP     @V_BSTATE, DHCP_ACK
+        ?!Z     JMP     bg_time
+                CALL    net_clock
+                MOVE    @V_BDUE, R1     ; the next DISCOVER at once
+; The next DISCOVER, when it is due
+bg_time
+                CALL    net_clock
+                SUB[M]  R0, R1, @V_BDUE
+        ?N      JMP     bg_none
+                MOVE    @V_BSTATE, DHCP_OFFER
+                MOVE    R1, DHCP_DISCOVER
+                CALL    dhcp_send
+                CALL    net_clock
+                ADD     R1, R1, @V_BWAIT
+                AND     R2, @io.us, 0xFFFFF
+                ADD     @V_BDUE, R1, R2
+                SHL     R1, @V_BWAIT, 1
+                CMP     R1, BG_MAX
+        ?!C     MOVE    R1, BG_MAX
+                MOVE    @V_BWAIT, R1
+                JMP     bg_none
+bg_ack
+                CALL    dhcp_commit
+                MOVE    @V_BSTATE, 0
+                MOVE    R1, 1
+                RET
+bg_stop
+                MOVE    @V_BSTATE, 0
+bg_none
+                MOVE    R1, 0
+                RET
+
+; bg_show: for getline_wait, the address that the exchange in the
+; background got shown, over the prompt, which is on its own in its row,
+; as no key of the line has come, and the prompt again after it. The
+; screen is shown again if the history is. Uses R1-R4.
+bg_show
+                CALL    hist_leave
+                MOVE    R1, 0x0D
+                CALL    mon_putc
+                MOVE    R1, S_IP
+                MOVE    R2, @E_IP
+                CALL    put_ip
+                MOVE    R1, S_BGDHCP
+                CALL    puts_crlf
+                MOVE    R1, S_PROMPT
+                JMP     _io_puts        ; which returns to the caller
 
 ; The frame routines, the ROM's own, with no entries in the dispatch table
 ; (INTERNALS.md, "The frame routines"). They follow the C ABI, and drive the port for
@@ -703,7 +820,8 @@ net_config
 ; them, after a poll. The IP address is written to E_IP only if it is
 ; another, as a write breaks a host's connection over TCP, and ends every
 ; TCP connection of the program in E_TRESET; 0 clears it. The lease is
-; forgotten, and not renewed. R1 = 0. Uses R1-R6, and R7 across the
+; forgotten, and not renewed, and the exchange in the background ended.
+; R1 = 0. Uses R1-R6, and R7 across the
 ; calls, saved.
 net_set
                 PUSH    R7
@@ -716,6 +834,7 @@ net_set
                 MOVE    @V_MASK, @1[R7]
                 MOVE    @V_GW, @2[R7]
                 MOVE    @V_DNS, @3[R7]
+                MOVE    @V_BSTATE, 0
                 CALL    lease_forget
                 MOVE    R1, 0
                 POP     R7
@@ -1161,14 +1280,21 @@ dhcp_listen
 :
                 TST     @V_PIP
         ?Z      JMP     :--             ; no address: passed over
+                CALL    dhcp_keep
+dhcp_wait_end
+                POP     R8
+                POP     R7
+                RET
+
+; dhcp_keep: the address, the server, the mask, the gateway, and the DNS
+; server of the reply that dhcp_parse took last, V_PIP and the rest,
+; copied to V_DIP and the rest. Uses no register.
+dhcp_keep
                 MOVE    @V_DIP, @V_PIP
                 MOVE    @V_DSRV, @V_PSRV
                 MOVE    @V_DMASK, @V_PMASK
                 MOVE    @V_DGW, @V_PGW
                 MOVE    @V_DDNS, @V_PDNS
-dhcp_wait_end
-                POP     R8
-                POP     R7
                 RET
 
 ; dhcp_parse: the frame of R1 bytes at V_RXF, if it is a DHCP reply to the
@@ -1960,6 +2086,8 @@ tftp_eol
 
 S_NODHCP
                 .ASCII_L 'No answer from a DHCP server'
+S_BGDHCP
+                .ASCII_L ' from DHCP'
 S_HOST          .ASCII_L 'nicemon-'
 S_VCLASS
                 .ASCII_L 'NiceMonMEGA65 '

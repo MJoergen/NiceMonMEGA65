@@ -174,6 +174,7 @@ cmd_ip
                 MOVE    @V_MASK, 0
                 MOVE    @V_GW, 0
                 MOVE    @V_DNS, 0
+                MOVE    @V_BSTATE, 0    ; no DHCP in the background
                 CALL    lease_forget
 ip_show         MOVE    R1, S_IP
                 MOVE    R2, @E_IP
@@ -239,8 +240,14 @@ get_ip_bad
                 RET
 
 ; show_ip: the string at R1, the IP address R2 in decimal with dots, and
-; CR LF. Uses R1-R4, and R7 and R8 across the calls, saved.
+; CR LF, with put_ip. Uses R1-R4, and R7 and R8 across the calls, saved.
 show_ip
+                CALL    put_ip
+                JMP     _io_crlf        ; which returns to the caller
+
+; put_ip: the string at R1, and the IP address R2 in decimal with dots.
+; Uses R1-R4, and R7 and R8 across the calls, saved.
+put_ip
                 PUSH    R7
                 PUSH    R8
                 MOVE    R8, R2
@@ -256,7 +263,7 @@ show_ip
                 JMP     :-
 :               POP     R8
                 POP     R7
-                JMP     _io_crlf        ; which returns to the caller
+                RET
 
 ; baud [RATE]: the UART's baud rate (doc/DEBUG_LINK.md, "The baud rate"),
 ; written from a decimal number that is one of the rates of BAUD_RATES,

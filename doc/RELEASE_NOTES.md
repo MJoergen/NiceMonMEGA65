@@ -32,7 +32,7 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   returns to the monitor as before. A program's return now prints its
   status where the program left the cursor's registers, so at the top
   after the demo, which clears the screen. With the network of #111 in
-  it, the ROM has 9757 words free, where it had 5117 below the demo, for
+  it, the ROM has 9502 words free, where it had 5117 below the demo, for
   BASIC.
 - `make demo` builds `demo/build/demo.bin` alone, and the boards'
   targets put the monitor alone in the ROM, `monitor/build/monitor.bin`.
@@ -83,6 +83,14 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 - The ROM's IPv4 packets, of UDP and of DHCP, have the "don't fragment"
   bit clear and an identification that counts up, so a router on a path
   with a smaller MTU fragments a datagram instead of dropping it.
+
+- After a reset, the monitor gets an IP address from DHCP on its own,
+  in the background while it waits at its prompt, and shows it over the
+  prompt: `IP address 192.168.1.253 from DHCP`
+  ([#126](https://github.com/MJoergen/NiceMonMEGA65/issues/126)). With
+  no cable or no server it shows nothing, and asks again, less and less
+  often. The lease is renewed at the prompt too. An address from `i`, a
+  program, or a host ends it.
 
 - The monitor's `i dhcp` names the board to the DHCP server: the host
   name `nicemon-` and the last three bytes of the MAC address, such as

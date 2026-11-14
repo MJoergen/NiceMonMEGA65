@@ -193,6 +193,9 @@ V_PT1           .EQU    0xFFFFF3CA      ; T1 and T2, options 58 and 59, in secon
 V_PT2           .EQU    0xFFFFF3CB
 V_PMACH         .EQU    0xFFFFF3CC      ; and the MAC address that the frame came from
 V_PMACL         .EQU    0xFFFFF3CD
+V_BSTATE        .EQU    0xFFFFF3CE      ; the DHCP exchange in the background: the reply it waits for, DHCP_OFFER or DHCP_ACK, 0 for none,
+V_BDUE          .EQU    0xFFFFF3CF      ; when it sends the next DISCOVER, on the fine clock of net_clock,
+V_BWAIT         .EQU    0xFFFFF3D0      ; and the microseconds it waits after that one
 WASM_RAM        .EQU    0xFFFFF400      ; the words that the ROM's C code writes, from here
 WASM_END        .EQU    0xFFFFFF00      ; up to below here, the I/O page, which the Makefile checks
 
@@ -255,7 +258,9 @@ SCR_MAX         .EQU    0x7FFF          ; the largest display offset
 ; that a program left open, the mask, the gateway, and the DNS server set
 ; to none, the DHCP lease forgotten, and the ARP cache emptied. The identification of the IPv4
 ; packets starts from the fine clock, net_clock, and the local ports of
-; TCP from the microseconds, with no connection opened. The vectors
+; TCP from the microseconds, with no connection opened. Without an IP
+; address, the DHCP exchange in the background starts, with bg_start
+; (issue #126). The vectors
 ; of lib.nasm are set, and ___wasm_start gives the words of the ROM's C
 ; code their initial values. The clock of the time of day, while it is not
 ; set, is set from the MEGA65's real-time clock, with clock_rtc of clock.c
@@ -273,6 +278,7 @@ mon_reset
                 MOVE    @V_LEASE, 0
                 CALL    net_clock
                 MOVE    @V_IPID, R1
+                CALL    bg_start
                 AND     R1, @io.us, 0x3FFF
                 OR      @V_TCPORT, R1, 0xC000
                 MOVE    @V_TCOPENS, 0
@@ -520,11 +526,12 @@ scr_color
 ; them, and any key but those four shows the screen again.
 ; The first key of the line goes on to _io_gets.first. _io_getc.soon uses
 ; only R1 and R2, so R3 keeps the first byte of a sequence's parameter.
+; While it waits for the first key, getline_wait keeps the network going.
 getline
                 PUSH    R1
                 PUSH    R2
 getline_key
-                CALL    _io_getc
+                CALL    getline_wait
                 CMP     R1, 0x1B
         ?!Z     JMP     getline_line
                 CALL    _io_getc.soon
@@ -581,9 +588,36 @@ getline_down
 getline_line
                 MOVE    R3, R1
                 CALL    hist_leave
+                CALL    net_off         ; the network of getline_wait
                 POP     R2
                 POP     R1
                 JMP     _io_gets.first  ; which returns to the caller
+
+; getline_wait: R1 = the next byte of the console, which it waits for, as
+; _io_getc does. While the DHCP exchange in the background runs, or a
+; lease is kept, it enables the port for Ethernet frames, with net_on,
+; and polls, so that the exchange goes on and the lease is renewed
+; (issue #126); the port stays enabled until getline_line disables it.
+; An address that the exchange gets is shown with bg_show. Uses R1-R6.
+getline_wait
+                MOVE    R1, @io.console
+                AND[M]  R0, R1, 0x100
+        ?!Z     AND     R1, R1, 0xFF
+        ?!Z     RET
+                TST     @V_BSTATE
+        ?!Z     JMP     :+
+                TST     @V_LEASE
+        ?Z      JMP     getline_wait    ; nothing to keep going
+:
+                CALL    net_on
+                TST     @V_BSTATE
+        ?!Z     MOVE    @V_NWAIT, DHCP_CLIENT
+                CALL    net_step
+                MOVE    @V_NWAIT, 0
+                CALL    bg_step
+                TST     R1
+        ?!Z     CALL    bg_show
+                JMP     getline_wait
 
 ; hist_up: R3 rows further back, up to the rows kept. The first turns
 ; the ring and keeps SCR_CTL. Uses R1-R6.

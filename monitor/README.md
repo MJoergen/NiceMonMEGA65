@@ -360,6 +360,19 @@ sets serves both.
 - The cold start and the return of a program, `mon_exit`, disable the
   port, so a program that does not use the network sees no frame. A
   program that enables it reads the frames itself.
+- **DHCP in the background** (issue #126). When the board has no IP
+  address at the cold start, as after a reset, the monitor gets one from
+  DHCP on its own. It does so only while it waits for the first key of
+  a line at its prompt, so a command or a program is never slowed by
+  it. The first DISCOVER goes 2 seconds after the cold start, as the
+  Ethernet PHY needs that long to bring the link up after a reset. The
+  next goes 4 seconds later, and each after it twice as late, up to
+  every 64 seconds, plus up to a second more (RFC 2131). The ACK sets
+  the address, as `i dhcp` does, and the monitor shows it over its
+  prompt, `IP address 192.168.1.253 from DHCP`, and then the prompt
+  again. An address from `i`, a program, or a host ends it. A start of
+  the core, such as a host's load, keeps the station's address, so it
+  starts no exchange when the board has one.
 - `i dhcp` enables the port, broadcasts a DISCOVER, and waits 2 seconds
   for an OFFER, then broadcasts a REQUEST of the address offered and
   waits as long for the ACK (RFC 2131). A timeout or a NAK starts again
@@ -378,9 +391,10 @@ sets serves both.
   vendor class is `NiceMonMEGA65` and the monitor's version, such as
   `NiceMonMEGA65 V2.1`. The transaction's number is the microsecond counter
   at the start, XOR the low word of the MAC address. The lease is
-  kept, and a program's polls renew it while the network is on, as
-  `net_poll` has it. Nothing renews it at the prompt, so a board that
-  waits there longer than its lease may have its address given to
+  kept, and renewed while the monitor waits at its prompt, and by a
+  program's polls while the network is on, as `net_poll` has it. A
+  program that does not use the network renews nothing, so a board
+  that runs one longer than its lease may have its address given to
   another station.
 - `i dhcp` keeps the mask and the gateway of the ACK, which UDP uses
   below, and the first DNS server, which it shows; `i A.B.C.D` and the

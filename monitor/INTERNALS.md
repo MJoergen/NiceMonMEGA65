@@ -65,13 +65,16 @@ of [SYSTEM.md §7](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#
   frame received, `V_RXF` at `0xFFFFF180`. A datagram for the endpoint
   is copied to `V_RXF`, and held there for `udp_recv`, unless one is
   held already; then it is dropped. A datagram to the port of the ROM's
-  own wait, 68 while `i dhcp` or `net_dhcp` waits, or the query's port
-  while `dns_lookup` waits, is copied to `V_RXF` too, in place of a datagram held, which is lost, and the poll stops
+  own wait, 68 while `i dhcp` or `net_dhcp` waits, or `getline` while
+  DHCP runs in the background, or the query's port while `dns_lookup`
+  waits, is copied to `V_RXF` too, in place of a datagram held, which is lost, and the poll stops
   there, so that the wait parses it. Every other frame is released
   unread. The UDP entries, `arp_resolve`, and the waits of DHCP and DNS
   poll.
 - **The network is on** while the endpoint is open, or `net_dhcp` or
-  `dns_lookup` runs.
+  `dns_lookup` runs, and while `getline` waits for the first key of a
+  line with DHCP in the background or a lease kept. `getline` disables
+  the port again when the key comes.
   `net_on` enables the port only if it is disabled, so it does not empty
   the queue of an open endpoint, and `net_off` disables it only when the
   endpoint is closed. The cold start, `mon_exit`, and `mon_trap` close
@@ -101,6 +104,18 @@ of [SYSTEM.md §7](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#
   while `net_dhcp` or `dns_lookup` waits goes a tick later, as they use
   `V_TXF`. `net_set`, `i A.B.C.D`, and the cold start forget the
   lease.
+- **DHCP in the background** (issue #126). The cold start begins it
+  with `bg_start` when `NET_IP` is 0, with a transaction of its own.
+  `getline_wait`, while it waits for the first key of a line, enables
+  the port, polls with `V_NWAIT` at 68, and gives the frame to
+  `bg_step`. `V_BSTATE` is the reply that it waits for, an OFFER or an
+  ACK, and `V_BDUE` the time of the next DISCOVER on the fine clock,
+  which waits `V_BWAIT` microseconds after it, doubled each time. It
+  shares `dhcp_send`, `dhcp_parse`, and `dhcp_commit` with `net_dhcp`.
+  An ACK sets the address and keeps the lease, and `bg_show` prints the
+  line over the prompt. `i`, `net_set`, and `net_dhcp` end it, and so
+  does an address that a host writes, as `bg_step` stops when `NET_IP`
+  is not 0.
 - **DNS** (issue #111), `dns_lookup`, entry 25, builds its query in
   `V_TXF` at `0xFFFFF120`, the name packed from byte 56, with one
   question, type A, class IN, and RD set. Its ID, at `0xFFFFF388`, and
@@ -215,8 +230,8 @@ a program, `demo.bin`, whose words
 <!-- romsize layout -->
 | Part | Address | Words |
 |---|---|---:|
-| The monitor | `0x0000`–`0x59E2` | 23011 |
-| Free | `0x59E3`–`0x7FFF` | 9757 |
+| The monitor | `0x0000`–`0x5AE1` | 23266 |
+| Free | `0x5AE2`–`0x7FFF` | 9502 |
 <!-- /romsize layout -->
 
 The monitor's words, by the source they come from, in the order
@@ -227,11 +242,11 @@ the Makefile joins them. The column "Text" counts the words of the
 <!-- romsize monitor -->
 | Source | What it is | Words | Text |
 |---|---|---:|---:|
-| `monitor.nasm` | The dispatch table, the HAL, the cold start, and the traps | 751 | 27 |
-| `monitor_cmd.nasm` | The main loop and the commands | 3956 | 2394 |
+| `monitor.nasm` | The dispatch table, the HAL, the cold start, and the traps | 801 | 27 |
+| `monitor_cmd.nasm` | The main loop and the commands | 3964 | 2394 |
 | `monitor_dis.nasm` | The disassembler of `u` | 1079 | 269 |
 | `monitor_sd.nasm` | The sector routines | 390 | 223 |
-| `monitor_eth.nasm` | The network | 3123 | 298 |
+| `monitor_eth.nasm` | The network | 3320 | 309 |
 | `monitor_tcp.nasm` | TCP | 2456 | 0 |
 | `monlib.nasm` | The routines that programs join | 259 | 0 |
 | `mon.nasm` | The stubs of the entries | 72 | 0 |
@@ -245,7 +260,7 @@ the Makefile joins them. The column "Text" counts the words of the
 | nice_cpu's `muldiv_mpu.nasm` | Multiply and divide | 128 | 0 |
 | `build/folder.nasm` | The error of a card without the folder | 27 | 27 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 5 | 5 |
-| In all | | 23011 | 3243 |
+| In all | | 23266 | 3254 |
 <!-- /romsize monitor -->
 
 - The C code's strings are in its initial values, four characters a
@@ -333,6 +348,10 @@ needs `FOLDER=NICE`, the default. It runs these steps in order:
    DF is clear. The transaction, the identification, and the checksum
    change with the steps of the code, so the expected file has them as
    `xx`, `ii`, and `cc`.
+   `test/bgdhcp.py` runs the monitor with no input, so that `getline`
+   waits and carries DHCP on in the background: the times of the
+   DISCOVERs, an `i` that ends it, an OFFER and an ACK, with the line
+   shown over the prompt and the lease's first REQUEST at T1, and a NAK.
 5. **DNS.** `test/dns.py` runs `test/dns.nasm`, which calls
    `dns_lookup` with its names packed from an odd byte, under the
    monitor with `--step-time`. A query's ID and port change with the
