@@ -3,7 +3,8 @@
 ## Contents
 
 - [Introduction](#introduction)
-- [A first program](#a-first-program)
+- [A first program in C](#a-first-program-in-c)
+- [A first program in NICE assembly](#a-first-program-in-nice-assembly)
 - [Three levels](#three-levels)
 - [Programs under the monitor](#programs-under-the-monitor)
 - [C](#c)
@@ -46,7 +47,7 @@ There are two kinds of program:
   it runs the same in `niceemu` (see
   [Programs in the ROM](#programs-in-the-rom)).
 
-## A first program
+## A first program in C
 
 This program runs under the monitor. It writes a greeting in yellow,
 on the screen and on the console, which goes to the PC, and returns to
@@ -95,6 +96,8 @@ address):
 The greeting is on the board's screen, and the monitor's prompt follows
 it. `tools/mon.py` is a debugger
 ([tools/README.md](../tools/README.md)).
+
+## A first program in NICE assembly
 
 The same program in NICE assembly calls the monitor's routines itself,
 with the argument and the result in R1:
