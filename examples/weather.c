@@ -24,15 +24,14 @@
 #define RX 512
 #define TX 256
 
-// The colors, bits 31..8 of a screen word: the background in 23..12 and
-// the foreground in 11..0 here.
-#define C_TEXT 0x000FFFu
-#define C_DIM 0x000888u
-#define C_BAR 0x036FFFu
-#define C_CLOCK 0x0000DFu
-#define C_PLACE 0x000FE0u
-#define C_OK 0x0008E8u
-#define C_ERR 0x000F66u
+// The colors, bits 31..8 of a screen word, from mon.h
+#define C_TEXT (MON_FG_WHITE | MON_BG_BLACK)
+#define C_DIM (MON_FG_GRAY | MON_BG_BLACK)
+#define C_BAR (MON_FG_WHITE | MON_BG_DARK_BLUE)
+#define C_CLOCK (MON_FG_LIGHT_BLUE | MON_BG_BLACK)
+#define C_PLACE (MON_FG_YELLOW | MON_BG_BLACK)
+#define C_OK (MON_FG_LIGHT_GREEN | MON_BG_BLACK)
+#define C_ERR (MON_FG_LIGHT_RED | MON_BG_BLACK)
 
 #define COLS NICE_SCREEN_COLS
 #define ROW_CLOCK 3             // 4 rows
@@ -122,7 +121,7 @@ static void fmt(char *buf, unsigned size, const char *f, ...)
 static void put(int col, int row, unsigned color, int c)
 {
     if (col >= 0 && col < COLS)
-        nice_screen_put(col, row, (int)(color << 8 | (unsigned char)c));
+        nice_screen_put(col, row, (int)(color | (unsigned char)c));
 }
 
 static void clear_row(int row, unsigned color)

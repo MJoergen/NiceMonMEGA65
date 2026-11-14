@@ -42,23 +42,33 @@ unsigned scr_color(unsigned color);
 
 // Colors for scr_color: a foreground and a background, added or or-ed,
 // such as MON_FG_YELLOW | MON_BG_BLUE. A color left out is black.
-#define MON_FG_BLACK    0x00000000u
-#define MON_FG_RED      0x000F0000u
-#define MON_FG_GREEN    0x0000F000u
-#define MON_FG_YELLOW   0x000FF000u
-#define MON_FG_BLUE     0x00000F00u
-#define MON_FG_MAGENTA  0x000F0F00u
-#define MON_FG_CYAN     0x0000FF00u
-#define MON_FG_WHITE    0x000FFF00u
+#define MON_FG_BLACK         0x00000000u
+#define MON_FG_RED           0x000F0000u
+#define MON_FG_GREEN         0x0000F000u
+#define MON_FG_YELLOW        0x000FF000u
+#define MON_FG_BLUE          0x00000F00u
+#define MON_FG_MAGENTA       0x000F0F00u
+#define MON_FG_CYAN          0x0000FF00u
+#define MON_FG_WHITE         0x000FFF00u
+#define MON_FG_GRAY          0x00088800u
+#define MON_FG_LIGHT_RED     0x000F6600u
+#define MON_FG_LIGHT_GREEN   0x0008E800u
+#define MON_FG_LIGHT_BLUE    0x0000DF00u
+#define MON_FG_DARK_BLUE     0x00003600u
 
-#define MON_BG_BLACK    0x00000000u
-#define MON_BG_RED      0xF0000000u
-#define MON_BG_GREEN    0x0F000000u
-#define MON_BG_YELLOW   0xFF000000u
-#define MON_BG_BLUE     0x00F00000u
-#define MON_BG_MAGENTA  0xF0F00000u
-#define MON_BG_CYAN     0x0FF00000u
-#define MON_BG_WHITE    0xFFF00000u
+#define MON_BG_BLACK         0x00000000u
+#define MON_BG_RED           0xF0000000u
+#define MON_BG_GREEN         0x0F000000u
+#define MON_BG_YELLOW        0xFF000000u
+#define MON_BG_BLUE          0x00F00000u
+#define MON_BG_MAGENTA       0xF0F00000u
+#define MON_BG_CYAN          0x0FF00000u
+#define MON_BG_WHITE         0xFFF00000u
+#define MON_BG_GRAY          0x88800000u
+#define MON_BG_LIGHT_RED     0xF6600000u
+#define MON_BG_LIGHT_GREEN   0x8E800000u
+#define MON_BG_LIGHT_BLUE    0x0DF00000u
+#define MON_BG_DARK_BLUE     0x03600000u
 
 // The files of the SD card's FAT32 file system, from table 1.1, and
 // fs_write and fs_delete from table 1.2 (monitor/README.md, "Files";
