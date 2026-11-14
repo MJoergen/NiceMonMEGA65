@@ -45,8 +45,10 @@ unsigned scr_color(unsigned color);
 // the errors in doc/PROGRAMMING.md, "The monitor's error codes"). The
 // addresses are NICE word addresses, not C pointers: a name is one
 // character per word up to a 0 word, and fs_read and fs_write take one
-// byte per word, so a C program passes the address of words outside its
-// memory, which it reads with nice_peek and writes with nice_poke. An
+// byte per word, so a C program passes the address of an array of
+// unsigned words of its own, which mon_words gives (below), or of words
+// outside its memory, which it reads with nice_peek and writes with
+// nice_poke. An
 // error is negative: -1 to -8 those of the SD controller, and -16 on
 // those of fat32.c.
 
@@ -196,6 +198,13 @@ int tcp_close(int h, int abort);
 // back to TCP_LISTEN. Other handles may listen on the same port. Sends
 // nothing, and does not wait. A handle, 0 to 3, or an error. Entry 31.
 MON_ENTRY(tcp_listen) int tcp_listen(unsigned *cb, unsigned port, unsigned sizes);
+
+// The NICE word address of a C array of words, for the entries above
+// that take one character or byte per word, such as fs_open's name and
+// fs_read's buffer, which the program then reads as plain unsigned
+// words. Not an entry of the table: its stub in mon_c.nasm returns the
+// address at once.
+MON_ENTRY(mon_words) unsigned mon_words(const unsigned *p);
 
 // The next entry of a directory, as fs_readdir gives it in the 4 words
 // from buf, and its name in the words from name, one character per word

@@ -322,6 +322,13 @@ includes `mon.h`, and is built with the stubs of `mon_c.nasm` too:
 
     nice_cpu/translator/nicebuild.py --monitor --asm monitor/mon.nasm         --asm monitor/mon_c.nasm -I monitor -o get.bin get.c
 
+The file and UDP entries take NICE word addresses, one character or
+byte per word, and not C pointers. `mon_words`, a stub of `mon_c.nasm`,
+gives the address of an array of `unsigned` words of the program, so
+`fs_open(mon_words(name), 0)` opens the file whose name is in `name`,
+one character per word up to a 0 word. `examples/weather.c` reads its
+settings so.
+
 A client, which fetches a page over plain HTTP and prints it. Each call
 of `tcp_send`, `tcp_recv`, and `tcp_state` polls, so the loops need no
 `net_poll` of their own:

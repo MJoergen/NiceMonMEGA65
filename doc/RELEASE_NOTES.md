@@ -110,6 +110,18 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   shows it when the network has one. On the Nexys4DDR, which has no
   real-time clock, it sets the clock with no PC.
 
+- `weather.bin`, a file of the release, is a weather display for the
+  monitor: the weather of a place from wttr.in over the Ethernet port,
+  fetched again every 10 minutes, under the date and the time in large
+  digits ([#128](https://github.com/MJoergen/NiceMonMEGA65/issues/128)).
+  Copy it into the folder `NICE` of an SD card, with a file
+  `WEATHER.CFG` that names the place, and type `load weather.bin` and
+  then `r`. [examples/README.md](../examples/README.md) has the
+  settings. Its source, `examples/weather.c`, is an example of the
+  network's entries from C, and `mon_words`, a new stub of
+  `monitor/mon_c.nasm`, gives the file entries the address of a C
+  array.
+
 ## V2.0.1 (2026-11-12)
 
 **Upgrade notes.**

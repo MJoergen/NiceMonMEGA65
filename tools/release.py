@@ -23,7 +23,7 @@ R6, the R3, and the Nexys4DDR, with the monitor in the ROM and from nothing,
 each with FLOW=timing alone, as their Makefiles have it. Each must meet
 timing. It makes the core files of the R3 and the R6, with the tag as
 their version, which MEGAFLASH shows. Last it runs make hwtest on the R6 bitstream, so a MEGA65 R6
-must be on PORT, and with --eth IP its Ethernet port on this computer's network. It copies the bitstreams, the core files, the demo, demo.bin, a zip of the examples, and
+must be on PORT, and with --eth IP its Ethernet port on this computer's network. It copies the bitstreams, the core files, the demo, demo.bin, the weather display, weather.bin, a zip of the examples, and
 verified.json to build/release/V1.0, with notes.md, the release notes, and
 release.json, the commit they were built from. The notes start with the
 tag's section of doc/RELEASE_NOTES.md, whose heading must have the date,
@@ -71,9 +71,11 @@ COR_BOARDS = ("r3", "r6")
 FLOW = "timing"
 
 # The ROM of every board: the monitor, which the core boots from at
-# power-up. The demo is an asset of its own, DEMO (#129).
+# power-up. The demo is an asset of its own, DEMO (#129), and so is the
+# weather display of the examples, WEATHER (#128).
 ROM = os.path.join(REPO, "monitor", "build", "monitor.bin")
 DEMO = os.path.join(REPO, "demo", "build", "demo.bin")
+WEATHER = os.path.join(REPO, "examples", "build", "weather.bin")
 
 
 def met(r: Record) -> bool:
@@ -205,7 +207,10 @@ def notes(tag: str, v: Record, results: dict[str, Record], body: str) -> str:
         "of `demo/`, a program for the monitor: copied into the folder `NICE`",
         "of an SD card, `load demo.bin` and `r` run it, which shows a welcome",
         "screen, and then what is typed on the keyboard; F12 goes back to the",
-        "monitor. The debug link still loads and starts a program",
+        "monitor. `weather.bin` is the weather display of `examples/`, a",
+        "program for the monitor too, with the settings of",
+        "`examples/README.md`: `load weather.bin` and `r` run it.",
+        "The debug link still loads and starts a program",
         "(`make load FILE=prog.bin`, see README.md), and hides the ROM to",
         "do so. `examples-%s.zip` has the C examples as `.bin` files." % tag,
         "`doc/EMULATOR.md` lists the known differences from `niceemu`.",
@@ -256,8 +261,9 @@ def write_stage(tag: str, v: Record, head: str, results: dict[str, Record],
         shutil.copy(os.path.join(REPO, "synth", board, "build", "NiceMonMEGA65-%s.cor" % board),
                     os.path.join(out, name))
         files.append(name)
-    shutil.copy(DEMO, out)
-    files.append(os.path.basename(DEMO))
+    for path in (DEMO, WEATHER):
+        shutil.copy(path, out)
+        files.append(os.path.basename(path))
     zipped = shutil.make_archive(os.path.join(out, "examples-" + tag), "zip",
                                  os.path.join(REPO, "examples", "build"))
     files.append(os.path.basename(zipped))

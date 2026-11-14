@@ -76,6 +76,9 @@ or, in an existing clone:
   niceemu](#the-tools-and-niceemu)).
 - `make tcptest` checks the monitor's TCP, and its timers, without a
   board (see [The tools and niceemu](#the-tools-and-niceemu)).
+- `make weathertest` checks the weather display, `examples/weather.c`,
+  on the host and in `niceemu`, without a board (see [The
+  examples](#the-examples)).
 - `make sdtest` checks `tools/sdcard.py` on `niceemu --link` with images
   of a card, without a board (see [The tools and
   niceemu](#the-tools-and-niceemu)).
@@ -122,7 +125,7 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
 | [monitor/](monitor/README.md) | The monitor for the ROM, in NICE assembly: a hardware abstraction layer for programs at `0x8000`, called through a dispatch table, a main loop with a few commands, the file of routines that programs join, the stubs and the header for programs, and its tests in `niceemu`. Its README has the decisions, [INTERNALS.md](monitor/INTERNALS.md) the routines with no entries, the C in the ROM, the ROM's words, and the build and the tests. |
 | [demo/](demo/README.md) | The demo, `demo.bin`, a program under the monitor that the release ships as a file of its own: nice_cpu's demo (`nice_cpu/demo`), whose function keys switch between a welcome screen that turns into a typewriter, the key codes, the characters and colors, the counters, a game, and the board, a self-test and the network station's addresses. Here are the board's text, `text.nasm`, and the test under the monitor. |
 | [examples/](examples/) | Example C programs, and the Makefile that builds them for the MEGA65. |
-| [tools/](tools/) | `boardlink.py`, the debug link of nice_cpu's `debugger/nicelink.py`, over the board's UART or TCP to `niceemu --link`, with the board's Ethernet port and the simulated system of `make cosim`, and the tools that use it: `load.py`, which loads a program into the MEGA65 or Nexys4DDR, `run.py`, which runs a program on the board as `niceemu` runs it, `mon.py`, an interactive shell on the link, nice_cpu's `nicedbg.py` with the board's links, `sdcard.py`, which lists the board's SD card and copies its files to the host, `sdnbd.py`, which serves the card as a block device for a mount on the host, `hwtest.py`, which tests the system on the board, `flash.py`, which writes the Nexys4DDR's flash or a slot of the MEGA65's, `bump.py`, which records the timing of the MEGA65 and the Nexys4DDR for a nice_cpu tag, `release.py`, which builds and publishes a release, `linktest.py`, which checks `run.py` and `mon.py` on `niceemu --link`, `tftpd.py`, a TFTP server for the monitor's `tftp`, with listings, `tftptest.py`, which checks it, `tcptest.py`, which checks the monitor's TCP against `tcppeer.py`, a scripted peer, `sdtest.py`, which checks `sdcard.py` and `sdnbd.py`, `cosimtest.py`, which checks `run.py` on the simulated system, `romsize.py`, which measures the ROM's words and the demo's for the tables of `monitor/INTERNALS.md` and `demo/README.md`, and `screenshot.py`, which draws a program's screen in `niceemu` as a PNG picture. |
+| [tools/](tools/) | `boardlink.py`, the debug link of nice_cpu's `debugger/nicelink.py`, over the board's UART or TCP to `niceemu --link`, with the board's Ethernet port and the simulated system of `make cosim`, and the tools that use it: `load.py`, which loads a program into the MEGA65 or Nexys4DDR, `run.py`, which runs a program on the board as `niceemu` runs it, `mon.py`, an interactive shell on the link, nice_cpu's `nicedbg.py` with the board's links, `sdcard.py`, which lists the board's SD card and copies its files to the host, `sdnbd.py`, which serves the card as a block device for a mount on the host, `hwtest.py`, which tests the system on the board, `flash.py`, which writes the Nexys4DDR's flash or a slot of the MEGA65's, `bump.py`, which records the timing of the MEGA65 and the Nexys4DDR for a nice_cpu tag, `release.py`, which builds and publishes a release, `linktest.py`, which checks `run.py` and `mon.py` on `niceemu --link`, `tftpd.py`, a TFTP server for the monitor's `tftp`, with listings, `tftptest.py`, which checks it, `tcptest.py`, which checks the monitor's TCP against `tcppeer.py`, a scripted peer, `weathertest.py`, which checks the weather display against it, `sdtest.py`, which checks `sdcard.py` and `sdnbd.py`, `cosimtest.py`, which checks `run.py` on the simulated system, `romsize.py`, which measures the ROM's words and the demo's for the tables of `monitor/INTERNALS.md` and `demo/README.md`, and `screenshot.py`, which draws a program's screen in `niceemu` as a PNG picture. |
 | [README.md](README.md) | For those who use the core files and write programs for them: on its own, over Ethernet, and over the serial port. |
 | [SYSTEM.md](doc/SYSTEM.md) | The system that programs and the link see: the address map, the screen and the font, the keyboard, the Nexys4DDR's devices, the Ethernet station, and the SD card slots. |
 | [DEBUG_LINK.md](doc/DEBUG_LINK.md) | The debug link: its words, how a host loads, pauses, steps, and stops a program, its versions, the control register, the UART's baud rate, and the link over TCP. |
@@ -139,7 +142,7 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
 | [vsg.yml](vsg.yml) | The configuration of `make lint`, which checks the VHDL against [CODING_STYLE.md](doc/CODING_STYLE.md). |
 | [mypy.ini](mypy.ini) | The configuration of `make typecheck`, `mypy --strict` on the Python files that it lists: `tools/`, `font/`, `sim/gen_decode.py`, and the scripts of `monitor/test/`. |
 | [CLAUDE.md](CLAUDE.md) | Instructions for Claude Code: the commands, the layout, and the pitfalls. |
-| [.github/workflows/ci.yml](.github/workflows/ci.yml) | The CI: `make test` and `make cosimtest` on both cores, with niceemu built for its step counts, `make examples`, the tests of the demo and the monitor, `make linktest`, `make tftptest`, `make tcptest`, `make sdtest`, `make formal`, `make lint`, and `make typecheck`. It cannot run `make hwtest` or build a bitstream. |
+| [.github/workflows/ci.yml](.github/workflows/ci.yml) | The CI: `make test` and `make cosimtest` on both cores, with niceemu built for its step counts, `make examples`, the tests of the demo and the monitor, `make linktest`, `make tftptest`, `make tcptest`, `make weathertest`, `make sdtest`, `make formal`, `make lint`, and `make typecheck`. It cannot run `make hwtest` or build a bitstream. |
 
 ### What is in src/
 
@@ -1109,6 +1112,30 @@ it joins the trap report instead: `start_wasm_trap.nasm` at the start and
 memory access out of bounds at 00003dc9` before the core halts. The Makefile
 keeps the plain start, so that `bench.bin` is laid out as in nice_cpu's
 testbench, and its cycles compare with those below.
+
+`make examples` also builds `examples/build/weather.bin`, the weather
+display of [examples/README.md](examples/README.md), with `nicebuild.py
+--monitor`, as a program for the monitor at `0x8000` that calls the
+network's entries from C. `make weathertest` checks it in two parts:
+
+- `make -C examples test` builds `examples/test/weather_test.c` with the
+  host's `cc`, and checks the parse of `weather_parse.c` with the
+  answers of `examples/test/*.http`, two of which wttr.in gave (a good
+  one, and a place it does not know), and the others written by hand:
+  a redirect, lines that end in LF alone, a body shorter than its
+  `Content-Length`, no end of the headers, and a text that is not the
+  weather. It checks the settings, the request, and the UTF-8 too.
+- `tools/weathertest.py` checks first that the program ends 1K words
+  below `0xF000`, so that it fits in the Nexys4DDR's memory with its
+  page of wasm memory. Then it runs the program under the monitor of the
+  tests in `niceemu`, with a card that holds `NICE/WEATHER.CFG` and
+  `tools/tcppeer.py` as the HTTP server at 10.0.0.2. Each case runs to
+  a step limit, and the script reads the screen's words, so that the
+  glyphs of the font RAM are checked too: the weather, a redirect, a
+  status of 500, an answer of another format, a refused connection, a
+  line of the settings not understood, the place typed when there is
+  no file, and ESC and Q back to the monitor. It takes about 20
+  seconds, in real time.
 
 `make examples` also builds `examples/build/bench.bin` from nice_cpu's
 benchmark, `nice_cpu/bench/bench.c`. It runs six phases, each a known

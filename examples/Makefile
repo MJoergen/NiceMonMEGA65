@@ -18,15 +18,27 @@
 # and cycles compare with those of nice_cpu's testbench; bench_win.bin is
 # the same benchmark with them.
 #
-# make          builds build/primes.bin, and build/bench.bin and
-#               build/bench_win.bin from nice_cpu's benchmark,
-#               bench/bench.c, which tools/hwtest.py runs
-# make clean    removes build/
+# weather.bin, the weather display of issue #128, is a program for the
+# monitor at 0x8000, which calls the ROM's entries of the network, so
+# nicebuild.py builds it, with the stubs of monitor/mon.nasm and
+# monitor/mon_c.nasm, as doc/PROGRAMMING.md says, with -Oz, so that it
+# fits below the monitor's variables in the Nexys4DDR's 28K words for a
+# program at 0x8000, with its page of wasm memory. Its text,
+# weather_parse.c, is checked on the host by test/weather_test.c with the
+# answers of test/*.http, and the whole program in niceemu by
+# tools/weathertest.py (make weathertest at the top).
+#
+# make          builds build/primes.bin, build/weather.bin, and
+#               build/bench.bin and build/bench_win.bin from nice_cpu's
+#               benchmark, bench/bench.c, which tools/hwtest.py runs
+# make test     checks weather_parse.c on the host, with cc
+# make clean    removes build/ and test/build/
 #
 # Needs clang with the wasm32 target, wasm-ld and llvm-ar (the lld and llvm
 # packages), and Python 3.
 
 CLANG  ?= clang
+CC     ?= cc
 PYTHON ?= python3
 NICE_CPU = ../nice_cpu
 LIBC    = $(NICE_CPU)/runtime/libc
@@ -51,7 +63,25 @@ WASM_OPTS = $(if $(filter bench,$*),,$(WINDOWS))
 # The programs that call scanf, and so need float.nasm.
 FLOAT_PROGRAMS = primes
 
-all: $(PROGRAMS:%=$(BUILD)/%.bin)
+all: $(PROGRAMS:%=$(BUILD)/%.bin) $(BUILD)/weather.bin
+
+MON      = ../monitor
+NICEBUILD = $(PYTHON) $(NICE_CPU)/translator/nicebuild.py
+WEATHER  = weather.c weather_parse.c
+
+$(BUILD)/weather.bin: $(WEATHER) weather_parse.h $(MON)/mon.h $(MON)/mon.nasm $(MON)/mon_c.nasm \
+                      $(NICEWASM) $(NICEASM) | $(BUILD)
+	$(NICEBUILD) -O z --monitor $(WINDOWS) --asm $(MON)/mon.nasm --asm $(MON)/mon_c.nasm -I $(MON) \
+	  -o $@ $(WEATHER)
+
+# The host's program goes to test/build/, not build/, whose files the
+# release zips (tools/release.py).
+test/build/weather_test: test/weather_test.c weather_parse.c weather_parse.h
+	mkdir -p test/build
+	$(CC) -std=c11 -O2 -Wall -Wextra -Werror -o $@ test/weather_test.c weather_parse.c
+
+test: test/build/weather_test
+	test/build/weather_test test
 
 # The library is built in the submodule, which ignores its build files.
 $(LIBC)/libc.a: FORCE
@@ -82,7 +112,7 @@ $(BUILD):
 	mkdir -p $@
 
 clean:
-	rm -rf $(BUILD)
+	rm -rf $(BUILD) test/build
 
-.PHONY: all clean FORCE
+.PHONY: all test clean FORCE
 .PRECIOUS: $(BUILD)/%.wasm $(BUILD)/%.nasm $(BUILD)/%_full.nasm

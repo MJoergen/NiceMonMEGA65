@@ -1,0 +1,8 @@
+HTTP/1.0 200 OK
+Access-Control-Allow-Origin: *
+Cache-Control: public, max-age=600
+Content-Type: text/plain; charset=utf-8
+Date: Sat, 14 Nov 2026 11:11:03 GMT
+Content-Length: 32
+
+Zürich|Sunny|+4°C|↙5km/h|71%

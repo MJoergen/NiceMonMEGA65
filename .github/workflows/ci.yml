@@ -66,6 +66,7 @@ jobs:
       - run: make linktest
       - run: make tftptest
       - run: make tcptest
+      - run: make weathertest
       - run: make sdtest
 
   lint:

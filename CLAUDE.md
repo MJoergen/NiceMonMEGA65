@@ -69,6 +69,7 @@ header is the authoritative address map.
     make tftpd [TFTP_DIR=d] [TFTP_PORT=69] # tools/tftpd.py for the monitor's tftp, with listings for tftp IP *.bin
     make tftptest         # tftpd.py, and the monitor's tftp in niceemu --eth-udp against it, no board
     make tcptest          # the monitor's TCP in niceemu against tools/tcppeer.py, and its timers with --step-time, no board
+    make weathertest      # examples/weather.c (#128): its parse on the host, and the program in niceemu against tools/tcppeer.py, no board
     make sdcard CMD=ls    # the board's SD card over the link: ls, get NAME [DEST], put SRC [NAME], del NAME (ETH= or PORT=)
     make sdnbd            # the board's SD card as a disk over NBD, for nbd-client and a mount on Linux; holds the core until Ctrl-C (ETH= or PORT=)
     make sdtest           # sdcard.py and sdnbd.py on niceemu --link with images that mtools made, no board
@@ -87,7 +88,7 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
 `nice_cpu/emulator/zig-out/bin/niceemu x.bin`. CI
 (`.github/workflows/ci.yml`, on Ubuntu 24.04) builds niceemu and runs
 `make -C sim -j4 test` and `make cosimtest` on both cores, `make examples`,
-`make -C demo test`, `make -C monitor test`, `make linktest`, `make tftptest`, `make tcptest`, `make sdtest`, `make -j4 formal`, `make lint`, and `make typecheck`.
+`make -C demo test`, `make -C monitor test`, `make linktest`, `make tftptest`, `make tcptest`, `make weathertest`, `make sdtest`, `make -j4 formal`, `make lint`, and `make typecheck`.
 
 ## Layout
 
@@ -163,12 +164,16 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   `bump.py`, `release.py`, `linktest.py`, `tftpd.py` (the TFTP server for
   the monitor's `tftp`, with listings, #95) and `tftptest.py`,
   `tcptest.py` (the monitor's TCP, against `tcppeer.py`, a scripted
-  peer on niceemu's frames, #111),
+  peer on niceemu's frames, #111), `weathertest.py` (the weather
+  display against it, #128),
   `cosimtest.py`, `romsize.py` (the tables of the ROM's words in
   `monitor/INTERNALS.md` and the demo's in `demo/README.md`, which the
   tests of the monitor and the demo check), `screenshot.py`
   (a program's screen in niceemu as a PNG). `examples/`: C programs built through
-  nice_cpu's wasm translator. `demo/`: nice_cpu's demo (`nice_cpu/demo`,
+  nice_cpu's wasm translator, with the weather display of #128,
+  `weather.c`, for the monitor, a release asset of its own as
+  `weather.bin`, whose text, `weather_parse.c`, is tested on the host
+  (`examples/README.md`). `demo/`: nice_cpu's demo (`nice_cpu/demo`,
   since V1.7), built by its Makefile with the board's `text.nasm`, a
   program at 0x8000, `demo.bin`, which the release ships as an asset of
   its own and the monitor's `load demo.bin` and `r` run; it left the ROM

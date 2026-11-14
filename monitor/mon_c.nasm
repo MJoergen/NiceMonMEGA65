@@ -37,3 +37,12 @@ _c_tcp_recv
 _c_tcp_listen
                 ADD     R1, R1, 0x10000000+4*___wasm_memory
                 JMP     TCP_LISTEN
+
+; The NICE word address of a C pointer to words, at a multiple of 4, for
+; the entries that take one character or byte per word, fs_open and
+; fs_read among them: ___wasm_memory + the pointer / 4. No entry of the
+; table: the stub returns at once.
+_c_mon_words
+                SHR     R1, R1, 2
+                ADD     R1, R1, ___wasm_memory
+                RET

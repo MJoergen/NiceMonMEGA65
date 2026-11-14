@@ -40,6 +40,8 @@ and keep their names.
     files for MEGAFLASH, with the version `V1.0`, and the same ROM.
   - `demo.bin`, the demo of `demo/`, a program under the monitor,
     with the tag in its title bar.
+  - `weather.bin`, the weather display of `examples/`, a program under
+    the monitor ([examples/README.md](../examples/README.md)).
   - `examples-V1.0.zip`, the C examples as `.bin` files.
   - `verified.json`, the timing record of the MEGA65 R6 and the
     Nexys4DDR from `make bump`.

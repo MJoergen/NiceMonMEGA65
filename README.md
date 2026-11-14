@@ -101,6 +101,12 @@ between the demos that the second row lists, and F12 (SHIFT and F11)
 goes back to the monitor. The reset button starts the monitor again at
 any time.
 
+Each release also has `weather.bin`, a weather display for the monitor:
+the weather of a place from the Internet, with the date and the time,
+fetched again every 10 minutes. It needs the Ethernet port on a network
+with a DHCP server. [examples/README.md](examples/README.md#the-weather-display)
+says how to choose the place.
+
 The ROM can also hold a program of your own (see
 [Building your own ROM](#building-your-own-rom)).
 
