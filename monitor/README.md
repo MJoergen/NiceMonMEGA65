@@ -94,8 +94,12 @@ not the model.
 Each entry is one `JMP routine`, two words, so entry n is at address
 2n, and entry 0 is the reset. A program calls entry n as it calls any
 routine, `CALL 2n`, through the names that `mon.nasm` gives: an `.EQU`
-for each entry, such as `MON_PUTC`, and a stub for each, such as
-`_mon_putc  JMP MON_PUTC`. Entries are only ever added at the end, never
+for each entry, such as `MON_PUTC` and `SCR_CLS`, and a stub for each,
+such as `_mon_putc  JMP MON_PUTC` and `_mon_scr_cls  JMP SCR_CLS`. Every
+stub starts with `_mon_`, so that it clashes with none of a program's
+labels. The stubs of the entries from `scr_cls` on had no `_mon_` before
+V2.1, and keep those names too, such as `_scr_cls`, for the programs
+that call them. Entries are only ever added at the end, never
 moved or removed, so a program built for one monitor runs on every later
 one.
 
@@ -118,12 +122,10 @@ The routines follow the C ABI of `nice_cpu/runtime/ABI.md`: arguments in
 R1–R4, the result in R1, R1–R6 changed, and R7–R13 kept. A C program for
 the monitor declares them with `mon.h`, and is joined with the stubs of
 `mon.nasm` (`nicebuild.py --monitor --asm mon.nasm`), as the translator
-makes a call to the `env` import `mon_putc` a call to `_mon_putc`. In
-`mon.h` every function starts with `mon_`, so that it clashes with none
-of the program's: `mon_scr_cls` is the entry `scr_cls`, and its
-`import_name` makes a call of it a call of `_scr_cls`. For C, `mon.nasm`
-also has `_scr_getx` and `_scr_gety`, as `scr_getxy` returns two values,
-which `mon.h` names `mon_scr_getx` and `mon_scr_gety`. Such a program runs only with the ROM visible, as
+makes a call to the `env` import `mon_putc` a call to `_mon_putc`, and
+one to `mon_scr_cls`, the entry `scr_cls`, a call to `_mon_scr_cls`. For
+C, `mon.nasm` also has `_mon_scr_getx` and `_mon_scr_gety`, as
+`scr_getxy` returns two values. Such a program runs only with the ROM visible, as
 every program built at `0x8000` for the monitor does.
 
 VBASE is 0 at reset and stays 0. The monitor has no interrupts of its

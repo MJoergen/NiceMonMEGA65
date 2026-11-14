@@ -46,12 +46,12 @@ lt_main
                 AND     R14, R14, 0xFF000000
                 OR      R14, R14, 0x40000092  ; E = 1, VBASE LT_VEC / 256
                 MOVE    R1, LT_SET
-                CALL    _net_set
-                CALL    _net_dhcp
+                CALL    _mon_net_set
+                CALL    _mon_net_dhcp
                 MOVE    @R7++, R1       ; 0
                 MOVE    R10, @io.us     ; the start of the times
                 MOVE    R1, 5000
-                CALL    _udp_open
+                CALL    _mon_udp_open
                 MOVE    @R7++, R1       ; 5000
                 MOVE    @R7++, @V_LEASE  ; 1
                 MOVE    R8, R7          ; the next time noted
@@ -61,7 +61,7 @@ lt_main
                 MOVE    R9, @LT_TIMES[R1]
 :
                 WAIT
-                CALL    _net_poll
+                CALL    _mon_net_poll
                 CMP     @V_IPID, R11
         ?Z      JMP     :+
                 MOVE    R11, @V_IPID
@@ -77,7 +77,7 @@ lt_main
                 MOVE    @R7++, R12
                 MOVE    @R7++, @V_LEASE
                 MOVE    @R7++, @E_IP
-                CALL    _udp_close
+                CALL    _mon_udp_close
                 MOVE    @R7++, R1       ; 0
                 MOVE    @TIMER, 0
                 AND     R14, R14, 0xBF000000  ; E = 0, VBASE 0

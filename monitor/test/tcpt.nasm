@@ -30,14 +30,14 @@ tw_main
                 AND     R14, R14, 0xFF000000
                 OR      R14, R14, 0x40000092  ; E = 1, VBASE TW_VEC / 256
                 MOVE    R1, TW_SET
-                CALL    _net_set
+                CALL    _mon_net_set
                 CMP     @TW_CASE, 6
         ?Z      JMP     tw_listen
                 MOVE    R1, TW_CB
                 MOVE    R2, TW_PEER
                 ADD     R3, @TW_CASE, 2100
                 MOVE    R4, 0x04000400
-                CALL    _tcp_open
+                CALL    _mon_tcp_open
                 MOVE    @R7++, R1
                 MOVE    R8, R1
                 MOVE    R1, @TW_CASE
@@ -65,7 +65,7 @@ tw_data
                 MOVE    R1, R8
                 MOVE    R2, TW_TXB
                 MOVE    R3, 100
-                CALL    _tcp_send
+                CALL    _mon_tcp_send
                 MOVE    @R7++, R1       ; 100
                 MOVE    R1, 99
                 MOVE    R2, 300000000
@@ -80,7 +80,7 @@ tw_fin2
                 CALL    tw_open
                 MOVE    R1, R8
                 MOVE    R2, 0
-                CALL    _tcp_close
+                CALL    _mon_tcp_close
                 MOVE    @R7++, R1       ; 0
                 MOVE    R1, 0
                 MOVE    R2, 300000000
@@ -96,7 +96,7 @@ tw_zero
                 MOVE    R1, R8
                 MOVE    R2, TW_TXB
                 MOVE    R3, 100
-                CALL    _tcp_send
+                CALL    _mon_tcp_send
                 MOVE    @R7++, R1       ; 100
                 MOVE    R1, 99
                 MOVE    R2, 0x7FFFFFFF
@@ -116,22 +116,22 @@ tw_idle
                 CALL    tw_sleep
                 MOVE    @TIMER, TW_TICK
                 MOVE    R1, R8
-                CALL    _tcp_state
+                CALL    _mon_tcp_state
                 MOVE    @R7++, R1       ; 2, TCP_OPEN
                 MOVE    R1, R8
                 MOVE    R2, TW_TXB
                 MOVE    R3, 10
-                CALL    _tcp_send
+                CALL    _mon_tcp_send
                 MOVE    @R7++, R1       ; 10
                 MOVE    R1, 1000000
                 CALL    tw_sleep
                 MOVE    R1, R8
                 MOVE    R2, TW_RXB
                 MOVE    R3, 100
-                CALL    _tcp_recv
+                CALL    _mon_tcp_recv
                 MOVE    @R7++, R1       ; 10
                 MOVE    R1, R8
-                CALL    _tcp_state
+                CALL    _mon_tcp_state
                 MOVE    @R7++, R1       ; 2
                 JMP     tw_close
 
@@ -141,7 +141,7 @@ tw_listen
                 MOVE    R1, TW_CB
                 MOVE    R2, 2106
                 MOVE    R3, 0x04000400
-                CALL    _tcp_listen
+                CALL    _mon_tcp_listen
                 MOVE    @R7++, R1       ; 0
                 MOVE    R8, R1
                 MOVE    R1, 1
@@ -155,13 +155,13 @@ tw_listen
                 MOVE    @R7++, R2       ; 15 seconds
                 MOVE    R1, R8
                 MOVE    R2, 0
-                CALL    _tcp_close
+                CALL    _mon_tcp_close
                 MOVE    @R7++, R1       ; 0
                 JMP     tw_end
 tw_close
                 MOVE    R1, R8
                 MOVE    R2, 1
-                CALL    _tcp_close
+                CALL    _mon_tcp_close
                 MOVE    @R7++, R1       ; 0
 tw_end
                 MOVE    @TIMER, 0
@@ -195,7 +195,7 @@ tw_until
 :
                 WAIT
                 MOVE    R1, R8
-                CALL    _tcp_state
+                CALL    _mon_tcp_state
                 CMP     R1, R9
         ?Z      JMP     :+
                 TST     R1
@@ -219,7 +219,7 @@ tw_sleep
                 MOVE    R10, @io.us
 :
                 WAIT
-                CALL    _net_poll
+                CALL    _mon_net_poll
                 SUB     R1, @io.us, R10
                 CMP     R1, R9
         ?C      JMP     :-

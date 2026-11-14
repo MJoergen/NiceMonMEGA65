@@ -3,8 +3,12 @@
 ; C name, which a program calls as it calls any routine. The entries follow
 ; the C ABI of nice_cpu/runtime/ABI.md. This file is joined after a
 ; program, and nicebuild.py --monitor --asm mon.nasm joins it to a C
-; program, which declares the routines with mon.h. _scr_getx and _scr_gety
-; are for C, which takes one result: the column, or the row, of scr_getxy.
+; program, which declares the routines with mon.h. Every stub starts with
+; _mon_, so that it clashes with none of the program's labels: the entry
+; scr_cls is _mon_scr_cls. The names of the stubs before V2.1, such as
+; _scr_cls, are labels of the same stubs, for the programs that use them.
+; _mon_scr_getx and _mon_scr_gety are for C, which takes one result: the
+; column, or the row, of scr_getxy.
 ; The monitor joins this file too, for the routines of monlib.nasm.
 
 MON_RESET       .EQU    0x00
@@ -81,62 +85,91 @@ _mon_putc
                 JMP     MON_PUTC
 _mon_out
                 JMP     MON_OUT
+_mon_scr_cls
 _scr_cls
                 JMP     SCR_CLS
+_mon_scr_moveto
 _scr_moveto
                 JMP     SCR_MOVETO
+_mon_scr_getxy
 _scr_getxy
                 JMP     SCR_GETXY
+_mon_scr_color
 _scr_color
                 JMP     SCR_COLOR
+_mon_fs_mount
 _fs_mount
                 JMP     FS_MOUNT
+_mon_fs_open
 _fs_open
                 JMP     FS_OPEN
+_mon_fs_read
 _fs_read
                 JMP     FS_READ
+_mon_fs_readdir
 _fs_readdir
                 JMP     FS_READDIR
+_mon_fs_close
 _fs_close
                 JMP     FS_CLOSE
+_mon_fs_write
 _fs_write
                 JMP     FS_WRITE
+_mon_fs_delete
 _fs_delete
                 JMP     FS_DELETE
+_mon_udp_open
 _udp_open
                 JMP     UDP_OPEN
+_mon_udp_send
 _udp_send
                 JMP     UDP_SEND
+_mon_udp_recv
 _udp_recv
                 JMP     UDP_RECV
+_mon_udp_close
 _udp_close
                 JMP     UDP_CLOSE
+_mon_fs_readname
 _fs_readname
                 JMP     FS_READNAME
+_mon_net_config
 _net_config
                 JMP     NET_CONFIG
+_mon_net_set
 _net_set
                 JMP     NET_SET
+_mon_net_dhcp
 _net_dhcp
                 JMP     NET_DHCP
+_mon_net_poll
 _net_poll
                 JMP     NET_POLL
+_mon_dns_lookup
 _dns_lookup
                 JMP     DNS_LOOKUP
+_mon_tcp_open
 _tcp_open
                 JMP     TCP_OPEN
+_mon_tcp_state
 _tcp_state
                 JMP     TCP_STATE
+_mon_tcp_send
 _tcp_send
                 JMP     TCP_SEND
+_mon_tcp_recv
 _tcp_recv
                 JMP     TCP_RECV
+_mon_tcp_close
 _tcp_close
                 JMP     TCP_CLOSE
+_mon_tcp_listen
 _tcp_listen
                 JMP     TCP_LISTEN
+_mon_scr_getx
 _scr_getx
                 JMP     SCR_GETXY
+_mon_scr_gety
 _scr_gety
                 CALL    SCR_GETXY
                 MOVE    R1, R2

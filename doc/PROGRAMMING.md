@@ -106,20 +106,20 @@ with the argument and the result in R1:
 
     ; hello.nasm: a greeting in yellow, under the monitor
     _main           MOVE    R1, MON_FG_YELLOW+MON_BG_BLACK
-                    CALL    _scr_color      ; R1 the old color
+                    CALL    _mon_scr_color  ; R1 the old color
                     PUSH    R1
                     MOVE    R1, hello.text
                     CALL    _io_puts
                     CALL    _io_crlf
                     POP     R1
-                    CALL    _scr_color
+                    CALL    _mon_scr_color
                     MOVE    R1, 0
                     RET
     hello.text
                     .ASCII_L 'Hello, world!'
 
 The program starts at `_main`, and its `RET` returns to the monitor
-with R1. `_scr_color` is the stub of the monitor's routine in
+with R1. `_mon_scr_color` is the stub of the monitor's routine in
 `monitor/mon.nasm`, which also names the colors. `_io_puts` and
 `_io_crlf` print a text and a new line, and are in
 `monitor/monlib.nasm`. Build it at `0x8000` with nice_cpu's

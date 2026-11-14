@@ -229,8 +229,8 @@ SCR_MAX         .EQU    0x7FFF          ; the largest display offset
 ; label, and the file of the routine. The entries 9 to 15 and 20 jump to
 ; the C functions fat_mount to fat_readname of fat32.c, which are
 ; _fat_mount to _fat_readname here, and not fs_mount to fs_readname:
-; mon.nasm is joined to the monitor too, for monlib.nasm, and its stubs
-; _fs_mount to _fs_readname would clash with them. The routines in
+; mon.nasm is joined to the monitor too, for monlib.nasm, and the old
+; names of its stubs, _fs_mount to _fs_readname, would clash with them. The routines in
 ; assembly have no such clash, as their labels, such as udp_open, have no
 ; _ in front of them.
                 JMP     mon_reset       ; 0 at 0x00, monitor.nasm

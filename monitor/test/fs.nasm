@@ -65,67 +65,67 @@ fst_main
                 MOVE    @R7++, R1
                 MOVE    R1, FST_HELLO
                 MOVE    R2, 0
-                CALL    _fs_open
+                CALL    _mon_fs_open
                 MOVE    @R7++, R1
                 MOVE    R1, FST_FRAG
                 MOVE    R2, 0
-                CALL    _fs_open
+                CALL    _mon_fs_open
                 MOVE    @R7++, R1
                 MOVE    R8, R1          ; FRAG.BIN's handle
                 MOVE    R1, FST_NOFILE
                 MOVE    R2, 0
-                CALL    _fs_open
+                CALL    _mon_fs_open
                 MOVE    @R7++, R1
                 MOVE    R1, FST_KEEP
                 MOVE    R2, 0
-                CALL    _fs_open
+                CALL    _mon_fs_open
                 MOVE    @R7++, R1
                 MOVE    R1, R8
                 MOVE    R2, FST_BUF
                 MOVE    R3, 40
-                CALL    _fs_read
+                CALL    _mon_fs_read
                 MOVE    @R7++, R1
                 MOVE    R1, R8
                 MOVE    R2, FST_BUF+40
                 MOVE    R3, 5000
-                CALL    _fs_read
+                CALL    _mon_fs_read
                 MOVE    @R7++, R1
                 ADD     R9, R1, FST_BUF+39  ; the last word written
                 MOVE    R1, R8
                 MOVE    R2, FST_BUF
                 MOVE    R3, 10
-                CALL    _fs_read
+                CALL    _mon_fs_read
                 MOVE    @R7++, R1
                 MOVE    @R7++, @R9
                 MOVE    R1, R8
-                CALL    _fs_close
+                CALL    _mon_fs_close
                 MOVE    @R7++, R1
                 MOVE    R1, R8
-                CALL    _fs_close
+                CALL    _mon_fs_close
                 MOVE    @R7++, R1
 ; The root directory
                 MOVE    R1, FST_ROOT
                 MOVE    R2, 2
-                CALL    _fs_open
+                CALL    _mon_fs_open
                 MOVE    @R7++, R1
                 MOVE    R8, R1          ; the root's handle
                 MOVE    R2, FST_ENTRY
-                CALL    _fs_readdir
+                CALL    _mon_fs_readdir
                 MOVE    @R7++, R1
                 MOVE    R1, R8
                 MOVE    R2, FST_BUF
                 MOVE    R3, 1
-                CALL    _fs_read
+                CALL    _mon_fs_read
                 MOVE    @R7++, R1
                 MOVE    R1, 0
                 MOVE    R2, FST_BUF
-                CALL    _fs_readdir
+                CALL    _mon_fs_readdir
                 MOVE    @R7++, R1
                 MOVE    R9, 0           ; the entries
 :
                 MOVE    R1, R8
                 MOVE    R2, FST_BUF
-                CALL    _fs_readdir
+                CALL    _mon_fs_readdir
                 CMP     R1, 1
         ?!Z     JMP     :+
                 ADD     R9, R9, 1
@@ -134,87 +134,87 @@ fst_main
                 MOVE    @R7++, R9
                 MOVE    @R7++, R1
                 MOVE    R1, R8
-                CALL    _fs_close
+                CALL    _mon_fs_close
                 MOVE    @R7++, R1
 ; Errors of fs_open
                 MOVE    R1, FST_SUB
                 MOVE    R2, 0
-                CALL    _fs_open
+                CALL    _mon_fs_open
                 MOVE    @R7++, R1
                 MOVE    R1, FST_NOFILE
                 MOVE    R2, 0
-                CALL    _fs_open
+                CALL    _mon_fs_open
                 MOVE    @R7++, R1
                 MOVE    R1, FST_LONG
                 MOVE    R2, 0
-                CALL    _fs_open
+                CALL    _mon_fs_open
                 MOVE    @R7++, R1
                 MOVE    R1, FST_DOTS
                 MOVE    R2, 0
-                CALL    _fs_open
+                CALL    _mon_fs_open
                 MOVE    @R7++, R1
                 MOVE    R1, FST_HELLO
                 MOVE    R2, 3
-                CALL    _fs_open
+                CALL    _mon_fs_open
                 MOVE    @R7++, R1
 ; Mounts
                 MOVE    R1, 1
-                CALL    _fs_mount
+                CALL    _mon_fs_mount
                 MOVE    @R7++, R1
                 MOVE    R1, 0
-                CALL    _fs_close
+                CALL    _mon_fs_close
                 MOVE    @R7++, R1
                 MOVE    R1, FST_HELLO
                 MOVE    R2, 0
-                CALL    _fs_open
+                CALL    _mon_fs_open
                 MOVE    @R7++, R1
                 MOVE    R8, R1
                 MOVE    R2, FST_BUF
                 MOVE    R3, 9
-                CALL    _fs_read
+                CALL    _mon_fs_read
                 MOVE    @R7++, R1
                 MOVE    R1, 2
-                CALL    _fs_mount
+                CALL    _mon_fs_mount
                 MOVE    @R7++, R1
                 MOVE    R1, R8
                 MOVE    R2, FST_BUF
                 MOVE    R3, 1
-                CALL    _fs_read
+                CALL    _mon_fs_read
                 MOVE    @R7++, R1
                 MOVE    R1, 0
-                CALL    _fs_mount
+                CALL    _mon_fs_mount
                 MOVE    @R7++, R1
 ; Long names
                 MOVE    R1, FST_ROOT
                 MOVE    R2, 2
-                CALL    _fs_open
+                CALL    _mon_fs_open
                 MOVE    @R7++, R1
                 MOVE    R8, R1          ; the folder's handle
                 MOVE    R2, FST_BUF+64
                 MOVE    R3, FST_NAME
-                CALL    _fs_readname    ; HELLO.BIN
+                CALL    _mon_fs_readname  ; HELLO.BIN
                 MOVE    R1, R8
                 MOVE    R2, FST_BUF+64
                 MOVE    R3, FST_NAME
-                CALL    _fs_readname    ; SUB
+                CALL    _mon_fs_readname  ; SUB
                 MOVE    R1, R8
                 MOVE    R2, FST_ENTRY2
                 MOVE    R3, FST_NAME
-                CALL    _fs_readname    ; A long name.txt
+                CALL    _mon_fs_readname  ; A long name.txt
                 MOVE    @R7++, R1
                 MOVE    R1, R8
                 MOVE    R2, FST_BUF+64
                 MOVE    R3, FST_NAME2
-                CALL    _fs_readname    ; readme.txt
+                CALL    _mon_fs_readname  ; readme.txt
                 MOVE    @R7++, R1
                 MOVE    R1, R8
-                CALL    _fs_close
+                CALL    _mon_fs_close
                 MOVE    @R7++, R1
                 MOVE    R1, FST_LNAME
                 MOVE    R2, 0
-                CALL    _fs_open
+                CALL    _mon_fs_open
                 MOVE    @R7++, R1
-                CALL    _fs_close
+                CALL    _mon_fs_close
                 MOVE    @R7++, R1
                 SUB     R1, R7, FST_RESULTS
                 RET

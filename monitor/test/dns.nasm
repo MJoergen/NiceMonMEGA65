@@ -72,12 +72,12 @@ dtt_main
                 MOVE    R8, DTT_BAD
                 CALL    dtt_list
                 MOVE    R1, 5000
-                CALL    _udp_open
+                CALL    _mon_udp_open
                 MOVE    @R7++, R1
                 MOVE    R1, DTT_EXDOT
                 CALL    dtt_look
                 AND     @R7++, @ETH_CSR, ETH_ON
-                CALL    _udp_close
+                CALL    _mon_udp_close
                 MOVE    @R7++, R1
                 MOVE    R8, DTT_ANSWERS
                 CALL    dtt_list
@@ -102,7 +102,7 @@ dtt_main
 
 ; dtt_set: net_set of the 4 words at R1, and its result stored
 dtt_set
-                CALL    _net_set
+                CALL    _mon_net_set
                 MOVE    @R7++, R1
                 RET
 
@@ -137,7 +137,7 @@ dtt_look2
                 MOVE    @R3, 0
                 MOVE    @DTT_IP, 0xEEEEEEEE
                 MOVE    R1, 0x20000000+4*DTT_NAME+1
-                CALL    _dns_lookup
+                CALL    _mon_dns_lookup
                 MOVE    @R7++, R1
                 MOVE    @R7++, @DTT_IP
                 RET

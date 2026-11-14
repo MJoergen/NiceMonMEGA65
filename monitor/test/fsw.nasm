@@ -86,52 +86,52 @@ fsw_main
 ; NEW.TXT, written in three pieces, and read back
                 MOVE    R1, FSW_NEW
                 MOVE    R2, 1
-                CALL    _fs_open
+                CALL    _mon_fs_open
                 MOVE    @R7++, R1
                 MOVE    R8, R1          ; its handle
                 MOVE    R2, FSW_TEXT
                 MOVE    R3, 600
-                CALL    _fs_write
+                CALL    _mon_fs_write
                 MOVE    @R7++, R1
                 MOVE    R1, R8
                 MOVE    R2, FSW_TEXT+600
                 MOVE    R3, 0
-                CALL    _fs_write
+                CALL    _mon_fs_write
                 MOVE    @R7++, R1
                 MOVE    R1, R8
                 MOVE    R2, FSW_TEXT+600
                 MOVE    R3, 100
-                CALL    _fs_write
+                CALL    _mon_fs_write
                 MOVE    @R7++, R1
                 MOVE    R1, R8
                 MOVE    R2, FSW_READ
                 MOVE    R3, 1
-                CALL    _fs_read
+                CALL    _mon_fs_read
                 MOVE    @R7++, R1
                 MOVE    R1, FSW_NEW
                 MOVE    R2, 0
-                CALL    _fs_open
+                CALL    _mon_fs_open
                 MOVE    @R7++, R1
                 MOVE    R1, FSW_NEWLC
                 MOVE    R2, 1
-                CALL    _fs_open
+                CALL    _mon_fs_open
                 MOVE    @R7++, R1
                 MOVE    R1, R8
-                CALL    _fs_close
+                CALL    _mon_fs_close
                 MOVE    @R7++, R1
                 MOVE    R1, FSW_NEW
                 MOVE    R2, 0
-                CALL    _fs_open
+                CALL    _mon_fs_open
                 MOVE    @R7++, R1
                 MOVE    R8, R1
                 MOVE    R2, FSW_TEXT
                 MOVE    R3, 1
-                CALL    _fs_write
+                CALL    _mon_fs_write
                 MOVE    @R7++, R1
                 MOVE    R1, R8
                 MOVE    R2, FSW_READ
                 MOVE    R3, 1000
-                CALL    _fs_read
+                CALL    _mon_fs_read
                 MOVE    @R7++, R1
                 MOVE    R1, 0           ; the bytes that differ
                 MOVE    R2, 0
@@ -144,30 +144,30 @@ fsw_main
                 MOVE    @R7++, R1
                 MOVE    R1, FSW_NEW
                 MOVE    R2, 1
-                CALL    _fs_open
+                CALL    _mon_fs_open
                 MOVE    @R7++, R1
                 MOVE    R1, FSW_NEW
-                CALL    _fs_delete
+                CALL    _mon_fs_delete
                 MOVE    @R7++, R1
                 MOVE    R1, R8
-                CALL    _fs_close
+                CALL    _mon_fs_close
                 MOVE    @R7++, R1
 ; HELLO.BIN truncated, and BIG.BIN written
                 MOVE    R1, FSW_HELLO
                 MOVE    R2, 1
-                CALL    _fs_open
+                CALL    _mon_fs_open
                 MOVE    @R7++, R1
                 MOVE    R8, R1
                 MOVE    R2, FSW_TEXT
                 MOVE    R3, 50
-                CALL    _fs_write
+                CALL    _mon_fs_write
                 MOVE    @R7++, R1
                 MOVE    R1, R8
-                CALL    _fs_close
+                CALL    _mon_fs_close
                 MOVE    @R7++, R1
                 MOVE    R1, FSW_BIG
                 MOVE    R2, 1
-                CALL    _fs_open
+                CALL    _mon_fs_open
                 MOVE    @R7++, R1
                 MOVE    R8, R1
                 MOVE    R9, 5           ; the writes left
@@ -176,44 +176,44 @@ fsw_main
                 MOVE    R1, R8
                 MOVE    R2, FSW_TEXT
                 MOVE    R3, 1000
-                CALL    _fs_write
+                CALL    _mon_fs_write
                 ADD     R10, R10, R1
                 SUB[M]  R9, R9, 1
         ?!Z     JMP     :-
                 MOVE    @R7++, R10
                 MOVE    R1, R8
-                CALL    _fs_close
+                CALL    _mon_fs_close
                 MOVE    @R7++, R1
 ; Deletions, and their errors
                 MOVE    R1, FSW_LONG
-                CALL    _fs_delete
+                CALL    _mon_fs_delete
                 MOVE    @R7++, R1
                 MOVE    R1, FSW_FILE01
-                CALL    _fs_delete
+                CALL    _mon_fs_delete
                 MOVE    @R7++, R1
                 MOVE    R1, FSW_FILE01
                 MOVE    R2, 0
-                CALL    _fs_open
+                CALL    _mon_fs_open
                 MOVE    @R7++, R1
                 MOVE    R1, FSW_NOFILE
-                CALL    _fs_delete
+                CALL    _mon_fs_delete
                 MOVE    @R7++, R1
                 MOVE    R1, FSW_SUB
-                CALL    _fs_delete
+                CALL    _mon_fs_delete
                 MOVE    @R7++, R1
                 MOVE    R1, FSW_KEEP
-                CALL    _fs_delete
+                CALL    _mon_fs_delete
                 MOVE    @R7++, R1
                 MOVE    R1, FSW_KEEP
                 MOVE    R2, 1
-                CALL    _fs_open
+                CALL    _mon_fs_open
                 MOVE    @R7++, R1
                 MOVE    R1, FSW_TOOLONG
-                CALL    _fs_delete
+                CALL    _mon_fs_delete
                 MOVE    @R7++, R1
                 MOVE    R1, FSW_NEW
                 MOVE    R2, 3
-                CALL    _fs_open
+                CALL    _mon_fs_open
                 MOVE    @R7++, R1
 ; E00.TXT to E23.TXT, empty, the digits of the name in FSW_NAME+1 and +2
                 MOVE    R1, FSW_NAME
@@ -225,10 +225,10 @@ fsw_main
 fsw_e
                 MOVE    R1, FSW_NAME
                 MOVE    R2, 1
-                CALL    _fs_open
+                CALL    _mon_fs_open
                 TST     R1
         ?N      JMP     :+
-                CALL    _fs_close
+                CALL    _mon_fs_close
                 TST     R1
         ?Z      ADD     R9, R9, 1
 :
@@ -244,41 +244,41 @@ fsw_e
 ; A file whose mount is dropped, and the write-protected card
                 MOVE    R1, FSW_DROP
                 MOVE    R2, 1
-                CALL    _fs_open
+                CALL    _mon_fs_open
                 MOVE    @R7++, R1
                 MOVE    R8, R1
                 MOVE    R1, 1
-                CALL    _fs_mount
+                CALL    _mon_fs_mount
                 MOVE    @R7++, R1
                 MOVE    R1, R8
                 MOVE    R2, FSW_TEXT
                 MOVE    R3, 10
-                CALL    _fs_write
+                CALL    _mon_fs_write
                 MOVE    @R7++, R1
                 MOVE    R1, R8
-                CALL    _fs_close
+                CALL    _mon_fs_close
                 MOVE    @R7++, R1
                 MOVE    R1, FSW_W
                 MOVE    R2, 1
-                CALL    _fs_open
+                CALL    _mon_fs_open
                 MOVE    @R7++, R1
                 MOVE    R1, FSW_HELLO
-                CALL    _fs_delete
+                CALL    _mon_fs_delete
                 MOVE    @R7++, R1
                 MOVE    R1, 0
-                CALL    _fs_mount
+                CALL    _mon_fs_mount
                 MOVE    @R7++, R1
                 MOVE    R1, FSW_DROP
                 MOVE    R2, 0
-                CALL    _fs_open
+                CALL    _mon_fs_open
                 MOVE    @R7++, R1
                 MOVE    R8, R1
                 MOVE    R2, FSW_READ
                 MOVE    R3, 10
-                CALL    _fs_read
+                CALL    _mon_fs_read
                 MOVE    @R7++, R1
                 MOVE    R1, R8
-                CALL    _fs_close
+                CALL    _mon_fs_close
                 MOVE    @R7++, R1
                 SUB     R1, R7, FSW_RESULTS
                 RET

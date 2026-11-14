@@ -27,22 +27,22 @@ NDT_RESULTS     .EQU    0x9100
 ndt_main
                 MOVE    R7, NDT_RESULTS
                 MOVE    R1, NDT_SET
-                CALL    _net_set
+                CALL    _mon_net_set
                 MOVE    @R7++, R1
                 MOVE    R1, 5000
-                CALL    _udp_open
+                CALL    _mon_udp_open
                 MOVE    @R7++, R1
-                CALL    _net_dhcp
+                CALL    _mon_net_dhcp
                 MOVE    @R7++, R1
                 AND     @R7++, @ETH_CSR, ETH_ON
                 MOVE    R1, R7
-                CALL    _net_config
+                CALL    _mon_net_config
                 ADD     R7, R7, 4
                 MOVE    @R7++, @V_DSRV
                 MOVE    @R7++, @V_ARP
                 MOVE    @R7++, @V_ARP+1
                 MOVE    @R7++, @V_ARP+2
-                CALL    _udp_close
+                CALL    _mon_udp_close
                 MOVE    @R7++, R1
                 MOVE    @R7++, @ETH_CSR
                 SUB     R1, R7, NDT_RESULTS

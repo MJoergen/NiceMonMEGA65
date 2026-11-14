@@ -67,7 +67,9 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   none of a C program's: `scr_cls` is now `mon_scr_cls`, `fs_open`
   `mon_fs_open`, and so on. A C program for the monitor renames its
   calls. Its constants start with `MON_` too, such as `MON_TCP_FREE`.
-  Assembly programs and their stubs in `mon.nasm` keep their names.
+  The stubs of `mon.nasm` start with `_mon_` likewise, `_mon_scr_cls`
+  and so on, and keep their old names as well, so an assembly program
+  that calls `_scr_cls` builds as before.
 
 **New.**
 

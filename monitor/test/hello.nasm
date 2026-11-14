@@ -16,11 +16,11 @@ _main           MOVE    R1, hello.text
                 CALL    _mon_version
                 CALL    _io_puthex
                 CALL    _io_crlf
-                CALL    _scr_getxy      ; R1 the column, R2 the row
+                CALL    _mon_scr_getxy  ; R1 the column, R2 the row
                 MOVE    R1, 40
-                CALL    _scr_moveto
+                CALL    _mon_scr_moveto
                 MOVE    R1, MON_FG_YELLOW+MON_BG_BLACK
-                CALL    _scr_color
+                CALL    _mon_scr_color
                 PUSH    R1              ; the old color
                 MOVE    R1, hello.right
                 CALL    _io_puts
@@ -31,7 +31,7 @@ _main           MOVE    R1, hello.text
                 MOVE    R1, 3           ; both again
                 CALL    _mon_out
                 POP     R1
-                CALL    _scr_color
+                CALL    _mon_scr_color
                 CALL    _io_crlf
                 MOVE    R1, 1           ; the line only
                 CALL    _mon_out

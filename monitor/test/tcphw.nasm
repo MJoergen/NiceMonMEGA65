@@ -44,12 +44,12 @@ th_main
                 MOVE    R4, 0x08000800
                 TST     R2
         ?Z      JMP     :+
-                CALL    _tcp_open
+                CALL    _mon_tcp_open
                 JMP     :++
 :
                 MOVE    R2, R3          ; listen on the port
                 MOVE    R3, R4
-                CALL    _tcp_listen
+                CALL    _mon_tcp_listen
 :
                 MOVE    R7, 1000
                 TST     R1
@@ -69,7 +69,7 @@ th_loop
                 MOVE    R1, R8
                 ADD     R2, R9, TH_TX
                 SUB     R3, @TH_ARGS+2, R9
-                CALL    _tcp_send
+                CALL    _mon_tcp_send
                 TST     R1
         ?N      JMP     th_fail
                 ADD     R9, R9, R1
@@ -77,7 +77,7 @@ th_loop
                 MOVE    R1, R8
                 ADD     R2, R10, TH_RX
                 SUB     R3, @TH_ARGS+2, R10
-                CALL    _tcp_recv
+                CALL    _mon_tcp_recv
                 TST     R1
         ?N      JMP     th_fail
                 ADD     R10, R10, R1
@@ -107,7 +107,7 @@ th_loop
                 MOVE    R7, 7000
                 MOVE    R1, R8
                 MOVE    R2, 0
-                CALL    _tcp_close
+                CALL    _mon_tcp_close
                 TST     R1
         ?!Z     JMP     th_fail
                 MOVE    R7, 8000
@@ -136,7 +136,7 @@ th_wait
                 MOVE    R10, @TH_US
 :
                 MOVE    R1, R8
-                CALL    _tcp_state
+                CALL    _mon_tcp_state
                 CMP     R1, R9
         ?Z      JMP     :+
                 TST     R1

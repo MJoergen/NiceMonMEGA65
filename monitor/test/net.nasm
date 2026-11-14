@@ -57,77 +57,77 @@ ntt_main
                 CMP     R1, NTT_CFG+8
         ?!Z     JMP     :-
                 MOVE    R1, 0x10000000+4*NTT_CFG
-                CALL    _net_config
+                CALL    _mon_net_config
                 MOVE    @R7++, R1
                 MOVE    R1, NTT_SET
-                CALL    _net_set
+                CALL    _mon_net_set
                 MOVE    @R7++, R1
                 MOVE    R1, NTT_CFG+4
-                CALL    _net_config
+                CALL    _mon_net_config
                 MOVE    @R7++, R1
-                CALL    _net_poll
+                CALL    _mon_net_poll
                 MOVE    @R7++, R1
                 MOVE    R1, 5000
-                CALL    _udp_open
+                CALL    _mon_udp_open
                 MOVE    @R7++, R1
                 MOVE    R1, 0xFFFFFFFF
                 MOVE    R2, 9
                 MOVE    R3, NTT_HI
                 MOVE    R4, 2
-                CALL    _udp_send
+                CALL    _mon_udp_send
                 MOVE    @R7++, R1
 ; The poll, and the datagram held
-                CALL    _net_poll
+                CALL    _mon_net_poll
                 MOVE    @R7++, R1
                 MOVE    @R7++, @V_ULEN
                 MOVE    @R7++, @ETH_RX_LEN
                 MOVE    R1, NTT_BUF
                 MOVE    R2, 100
                 MOVE    R3, NTT_SRC
-                CALL    _udp_recv
+                CALL    _mon_udp_recv
                 MOVE    @R7++, R1
                 MOVE    R1, NTT_BUF
                 MOVE    R2, 100
                 MOVE    R3, 0
-                CALL    _udp_recv
+                CALL    _mon_udp_recv
                 MOVE    @R7++, R1
 ; The ARP replies learned in place
                 MOVE    R1, 0x0A000002
                 MOVE    R2, 7
                 MOVE    R3, NTT_X
                 MOVE    R4, 1
-                CALL    _udp_send
+                CALL    _mon_udp_send
                 MOVE    @R7++, R1
                 MOVE    R1, 0x0A000003
                 MOVE    R2, 7
                 MOVE    R3, NTT_Y
                 MOVE    R4, 1
-                CALL    _udp_send
+                CALL    _mon_udp_send
                 MOVE    @R7++, R1
                 MOVE    R1, NTT_BUF2
                 MOVE    R2, 100
                 MOVE    R3, NTT_SRC2
-                CALL    _udp_recv
+                CALL    _mon_udp_recv
                 MOVE    @R7++, R1
                 MOVE    R1, NTT_BUF2
                 MOVE    R2, 100
                 MOVE    R3, 0
-                CALL    _udp_recv
+                CALL    _mon_udp_recv
                 MOVE    @R7++, R1
 ; The deadline
                 CALL    net_clock
                 ADD     @V_NDUE, R1, 1000000
                 MOVE    @V_NARM, 1
-                CALL    _net_poll
+                CALL    _mon_net_poll
                 MOVE    @R7++, @V_NARM
                 CALL    net_clock
                 SUB     @V_NDUE, R1, 1
-                CALL    _net_poll
+                CALL    _mon_net_poll
                 MOVE    @R7++, @V_NARM
-                CALL    _udp_close
+                CALL    _mon_udp_close
                 MOVE    @R7++, R1
                 MOVE    @R7++, @ETH_CSR
-                CALL    _net_poll
+                CALL    _mon_net_poll
                 MOVE    @R7++, R1
                 SUB     R1, R7, NTT_RESULTS
                 RET

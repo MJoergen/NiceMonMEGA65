@@ -40,10 +40,10 @@ tt_main
                 MOVE    R1, TT_CB0
                 MOVE    R2, 3000
                 MOVE    R3, 0x04000400
-                CALL    _tcp_listen
+                CALL    _mon_tcp_listen
                 MOVE    @R7++, R1       ; E_NOIP
                 MOVE    R1, TT_SET
-                CALL    _net_set
+                CALL    _mon_net_set
                 MOVE    R8, TT_BAD
 :
                 MOVE[M] R1, @R8++
@@ -51,32 +51,32 @@ tt_main
                 MOVE    R2, @R8++
                 MOVE    R3, @R8++
                 MOVE    R4, @R8++
-                CALL    _tcp_open
+                CALL    _mon_tcp_open
                 MOVE    @R7++, R1
                 JMP     :-
 :
                 MOVE    R1, 4
-                CALL    _tcp_state
+                CALL    _mon_tcp_state
                 MOVE    @R7++, R1       ; E_THANDLE
                 MOVE    R1, -1
-                CALL    _tcp_state
+                CALL    _mon_tcp_state
                 MOVE    @R7++, R1       ; E_THANDLE
                 MOVE    R1, 0
-                CALL    _tcp_state
+                CALL    _mon_tcp_state
                 MOVE    @R7++, R1       ; 0, TCP_FREE
                 MOVE    R1, 0
                 MOVE    R2, TT_TXB
                 MOVE    R3, 1
-                CALL    _tcp_send
+                CALL    _mon_tcp_send
                 MOVE    @R7++, R1       ; E_THANDLE
                 MOVE    R1, 1
                 MOVE    R2, TT_RXB
                 MOVE    R3, 1
-                CALL    _tcp_recv
+                CALL    _mon_tcp_recv
                 MOVE    @R7++, R1       ; E_THANDLE
                 MOVE    R1, 3
                 MOVE    R2, 0
-                CALL    _tcp_close
+                CALL    _mon_tcp_close
                 MOVE    @R7++, R1       ; E_THANDLE
 ; Case N, port 2014: a connection opened alone, with a ring of 4096 bytes
 ; to receive, so a window of 4096, which stays open, idle, across the
@@ -106,20 +106,20 @@ tt_main
                 CALL    tt_echo
                 MOVE    R1, R8
                 MOVE    R2, 0
-                CALL    _tcp_close
+                CALL    _mon_tcp_close
                 MOVE    @R7++, R1       ; 0
                 MOVE    R1, R8
-                CALL    _tcp_state
+                CALL    _mon_tcp_state
                 MOVE    @R7++, R1       ; 4, TCP_CLOSING
                 MOVE    R1, R8
                 MOVE    R2, TT_RXB
                 MOVE    R3, 10
-                CALL    _tcp_recv
+                CALL    _mon_tcp_recv
                 MOVE    @R7++, R1       ; E_TCLOSED
                 MOVE    R1, R8
                 MOVE    R2, TT_TXB
                 MOVE    R3, 10
-                CALL    _tcp_send
+                CALL    _mon_tcp_send
                 MOVE    @R7++, R1       ; E_TCLOSED
                 CALL    tt_free
 ; Case B, port 2002, the peer closes first: 3 bytes sent; the peer's 700
@@ -139,7 +139,7 @@ tt_main
                 CALL    tt_echo
                 MOVE    @R7++, R3       ; E_TEOF
                 MOVE    R1, R8
-                CALL    _tcp_state
+                CALL    _mon_tcp_state
                 MOVE    @R7++, R1       ; 3, TCP_PEER_CLOSED
                 MOVE    R1, R8
                 MOVE    R2, 100
@@ -173,12 +173,12 @@ tt_main
                 MOVE    R1, R8
                 MOVE    R2, TT_RXB
                 MOVE    R3, 10
-                CALL    _tcp_recv
+                CALL    _mon_tcp_recv
                 MOVE    @R7++, R1       ; E_TRESET
                 MOVE    R1, R8
                 MOVE    R2, TT_TXB
                 MOVE    R3, 10
-                CALL    _tcp_send
+                CALL    _mon_tcp_send
                 MOVE    @R7++, R1       ; E_TRESET
                 CALL    tt_close
 ; Case E, port 2005: the peer's 100 bytes and its FIN at the open, while
@@ -214,10 +214,10 @@ tt_main
                 MOVE    @R7++, R1       ; about 10
                 MOVE    R1, R8
                 MOVE    R2, 1
-                CALL    _tcp_close
+                CALL    _mon_tcp_close
                 MOVE    @R7++, R1       ; 0
                 MOVE    R1, R8
-                CALL    _tcp_state
+                CALL    _mon_tcp_state
                 MOVE    @R7++, R1       ; 0, TCP_FREE
 ; Case G, port 2007: a close with the peer's 500 bytes not read, which
 ; drops them; the peer's 300 after our FIN, ACKed and dropped, then its
@@ -231,12 +231,12 @@ tt_main
                 CALL    tt_sleep
                 MOVE    R1, R8
                 MOVE    R2, 0
-                CALL    _tcp_close
+                CALL    _mon_tcp_close
                 MOVE    @R7++, R1       ; 0
                 MOVE    R1, R8
                 MOVE    R2, TT_RXB
                 MOVE    R3, 10
-                CALL    _tcp_recv
+                CALL    _mon_tcp_recv
                 MOVE    @R7++, R1       ; E_TCLOSED
                 CALL    tt_free
 ; Case H, port 2008: an abort during a close, whose FIN the peer never
@@ -248,18 +248,18 @@ tt_main
                 CALL    tt_waitopen
                 MOVE    R1, R8
                 MOVE    R2, 0
-                CALL    _tcp_close
+                CALL    _mon_tcp_close
                 MOVE    R1, 200000
                 CALL    tt_sleep
                 MOVE    R1, R8
-                CALL    _tcp_state
+                CALL    _mon_tcp_state
                 MOVE    @R7++, R1       ; 4, TCP_CLOSING
                 MOVE    R1, R8
                 MOVE    R2, 1
-                CALL    _tcp_close
+                CALL    _mon_tcp_close
                 MOVE    @R7++, R1       ; 0
                 MOVE    R1, R8
-                CALL    _tcp_state
+                CALL    _mon_tcp_state
                 MOVE    @R7++, R1       ; 0
 ; Cases I, J, and K, ports 2009 to 2011: 2000 bytes sent to a peer with
 ; no MSS option, to one with an MSS of 100 and a window of 300, and to one
@@ -364,31 +364,31 @@ tt_main
                 MOVE    R1, TT_CB1      ; and a handle that listens, which stays
                 MOVE    R2, 3005
                 MOVE    R3, 0x01000100
-                CALL    _tcp_listen
+                CALL    _mon_tcp_listen
                 MOVE    R10, R1
                 MOVE    @R7++, R1       ; 1
                 MOVE    @TT_SET, 0x0A00000A
                 MOVE    R1, TT_SET
-                CALL    _net_set
+                CALL    _mon_net_set
                 MOVE    R1, R8
-                CALL    _tcp_state
+                CALL    _mon_tcp_state
                 MOVE    @R7++, R1       ; E_TRESET
                 CALL    tt_close
                 MOVE    R1, R10
-                CALL    _tcp_state
+                CALL    _mon_tcp_state
                 MOVE    @R7++, R1       ; 5, TCP_LISTEN
                 MOVE    R1, R10
                 MOVE    R2, 0
-                CALL    _tcp_close
+                CALL    _mon_tcp_close
                 MOVE    @R7++, R1       ; 0
                 MOVE    @TT_SET, 0x0A000009
                 MOVE    R1, TT_SET
-                CALL    _net_set
+                CALL    _mon_net_set
 ; The cases of tcp_listen. The UDP endpoint stays open on TT_SIG through
 ; them, which keeps the network on, and tt_signal tells the peer which
 ; case listens.
                 MOVE    R1, TT_SIG
-                CALL    _udp_open
+                CALL    _mon_udp_open
                 MOVE    @R7++, R1       ; TT_SIG
 ; Case R: the errors of tcp_listen: E_PORT for the ports 0, 65536, and
 ; 4510, the station's, and E_TSIZE for a ring of 63 bytes, and a block not
@@ -399,7 +399,7 @@ tt_main
         ?Z      JMP     :+
                 MOVE    R2, @R8++
                 MOVE    R3, @R8++
-                CALL    _tcp_listen
+                CALL    _mon_tcp_listen
                 MOVE    @R7++, R1
                 JMP     :-
 :
@@ -410,24 +410,24 @@ tt_main
                 MOVE    R3, 0x01000100
                 CALL    tl_listen
                 MOVE    R1, R8
-                CALL    _tcp_state
+                CALL    _mon_tcp_state
                 MOVE    @R7++, R1       ; 5, TCP_LISTEN
                 MOVE    R1, R8
                 MOVE    R2, TT_TXB
                 MOVE    R3, 5
-                CALL    _tcp_send
+                CALL    _mon_tcp_send
                 MOVE    @R7++, R1       ; 5
                 MOVE    R1, R8
                 MOVE    R2, TT_RXB
                 MOVE    R3, 5
-                CALL    _tcp_recv
+                CALL    _mon_tcp_recv
                 MOVE    @R7++, R1       ; 0
                 MOVE    R1, R8
                 MOVE    R2, 0
-                CALL    _tcp_close
+                CALL    _mon_tcp_close
                 MOVE    @R7++, R1       ; 0
                 MOVE    R1, R8
-                CALL    _tcp_state
+                CALL    _mon_tcp_state
                 MOVE    @R7++, R1       ; 0, TCP_FREE
 ; Case T, port 3001: 5 bytes taken while listening, signal 1; the peer
 ; sends an ACK to the port, which gets a RST, and a SYN to port 3099,
@@ -445,14 +445,14 @@ tt_main
                 MOVE    R1, R8
                 MOVE    R2, TT_TXB
                 MOVE    R3, 5
-                CALL    _tcp_send
+                CALL    _mon_tcp_send
                 MOVE    @R7++, R1       ; 5
                 MOVE    R1, 1
                 CALL    tl_signal
                 CALL    tl_waitopen
                 CALL    tl_recveof
                 MOVE    R1, R8
-                CALL    _tcp_state
+                CALL    _mon_tcp_state
                 MOVE    @R7++, R1       ; 3, TCP_PEER_CLOSED
                 CALL    tt_close
 ; Case U, port 3002: the board closes first, after 100 bytes; the peer's
@@ -520,7 +520,7 @@ tt_main
                 CALL    tl_waitopen
                 CALL    tl_recveof
                 CALL    tt_close
-                CALL    _udp_close
+                CALL    _mon_udp_close
                 MOVE    @R7++, @ETH_CSR  ; 0, the port disabled
                 SUB     R1, R7, TT_RES
                 RET
@@ -551,7 +551,7 @@ TL_BAD          .DAT    TT_CB0, 0, 0x01000100
 ; tl_listen: tcp_listen of the block R1 on the port R2, with the sizes R3.
 ; R8 = the handle, which is stored. Uses R1-R6.
 tl_listen
-                CALL    _tcp_listen
+                CALL    _mon_tcp_listen
                 MOVE    R8, R1
                 MOVE    @R7++, R1
                 RET
@@ -564,7 +564,7 @@ tl_signal
                 MOVE    R2, TT_SIG
                 MOVE    R3, TT_SIGW
                 MOVE    R4, 1
-                JMP     _udp_send
+                JMP     _mon_udp_send
 
 ; tl_waitopen: polls R8 with tcp_state until it leaves the handshake and
 ; TCP_LISTEN, or 20 seconds passed, and stores the state: TCP_OPEN, or
@@ -575,7 +575,7 @@ tl_waitopen
                 MOVE    R9, @io.us
 :
                 MOVE    R1, R8
-                CALL    _tcp_state
+                CALL    _mon_tcp_state
                 CMP     R1, 1
         ?Z      JMP     :+
                 CMP     R1, 5
@@ -606,7 +606,7 @@ tt_open
                 MOVE    R4, R3
                 MOVE    R3, R2
                 MOVE    R2, TT_PEER
-                CALL    _tcp_open
+                CALL    _mon_tcp_open
                 MOVE    R8, R1
                 MOVE    @R7++, R1
                 RET
@@ -642,7 +642,7 @@ tt_echo
 tt_close
                 MOVE    R1, R8
                 MOVE    R2, 0
-                CALL    _tcp_close
+                CALL    _mon_tcp_close
                 MOVE    @R7++, R1
 ; tt_free: tt_wait of R8 for TCP_FREE, with the state stored. Uses R1-R6.
 tt_free
@@ -688,7 +688,7 @@ tt_wait
                 MOVE    R10, @io.us
 :
                 MOVE    R1, R8
-                CALL    _tcp_state
+                CALL    _mon_tcp_state
                 CMP     R1, R9
         ?Z      JMP     :+
                 TST     R1
@@ -720,11 +720,11 @@ tt_sendall
                 MOVE    R1, R8
                 ADD     R2, R10, TT_TXB
                 SUB     R3, R9, R10
-                CALL    _tcp_send
+                CALL    _mon_tcp_send
                 TST     R1
         ?N      JMP     :++
                 ADD     R10, R10, R1
-                CALL    _net_poll
+                CALL    _mon_net_poll
                 SUB     R2, @io.us, R11
                 CMP     R2, 20*TT_SEC
         ?C      JMP     :-
@@ -758,7 +758,7 @@ tt_recvall
                 MOVE    R1, R8
                 ADD     R2, R10, TT_RXB
                 SUB     R3, R9, R10
-                CALL    _tcp_recv
+                CALL    _mon_tcp_recv
                 MOVE    R12, R1
                 TST     R1
         ?N      JMP     :+
@@ -802,7 +802,7 @@ tt_sleep
                 MOVE    R8, R1
                 MOVE    R9, @io.us
 :
-                CALL    _net_poll
+                CALL    _mon_net_poll
                 SUB     R1, @io.us, R9
                 CMP     R1, R8
         ?C      JMP     :-
