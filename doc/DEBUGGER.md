@@ -134,7 +134,7 @@ enabled breakpoint white on dark red, or dark red on white under the
 cursor; row 23 the input
 field, its label, `Word:` or `Address:`, and the last message,
 `written`, `not paused` when the link refuses a write while the core
-runs (its `e02`), another error of the link such as `e04`, `no answer`,
+runs (its `e02`), another error of the link such as `e04`,
 or `none free` when `b` finds every breakpoint in use; and row 24
 the keys. The program's cursor is hidden under the page. The page stays
 on when Focus is left, and shows again when Focus comes back.

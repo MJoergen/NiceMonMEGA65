@@ -33,7 +33,7 @@ These words are used here and in the other documents and sources:
 
 ## The line
 
-The MEGA65's debug UART runs at 230400 baud, 8-N-1, as the tools do by
+The board's debug UART runs at 230400 baud, 8-N-1, as the tools do by
 default, and `0xFFFFFF9F` sets another rate (see
 [The baud rate](#the-baud-rate)). The line passes the program's console
 bytes both ways, and between them it carries packets, which start with
@@ -170,16 +170,9 @@ that an interrupt routine returns to.
 
 The link's version is 7, which the board sends as `b07` at reset, and
 which `0xFFFFFFF2` reads. A host written for an older version works
-unchanged. Each version added to the one before:
-
-| Version | What it added |
-|---|---|
-| 2 | The pause, and the notice `p`. |
-| 3 | The step. |
-| 4 | The breakpoints, and the notice `x`. |
-| 5 | A clear ends the halt and the stop. |
-| 6 | The writes of R1–R15. Over TCP, a console byte waits for room in the full input FIFO before it is lost. |
-| 7 | With nice_cpu V2.0: the wait for an interrupt, the state of an interrupt routine, and the watchpoints with the notice `w`. The link's registers start at `0xFFFFFFD0`, where they started at `0xFFFFFFE0`. |
+unchanged.
+[DEBUG.md §9](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEBUG.md#9-versions)
+has the versions, and the rules that a host follows.
 
 ## The control register
 
@@ -211,8 +204,7 @@ The tools write these values:
 The UART runs at 230400 baud after reset, on every board, and
 `0xFFFFFF9F` holds the rate in bit/s, `230400`. It is the highest rate
 that the termios of both Linux and macOS have a constant for, so a host
-of either reaches the board as it is. A core built before `V1.9` runs
-at 2 Mbaud after reset. A write of 115200,
+of either reaches the board as it is. A write of 115200,
 230400, 460800, 921600, 1000000, 1500000, or 2000000 sets it, for the
 core and the link alike, and a write of any other value is dropped. The
 board's USB serial chip makes all of them, and 1 to 2 Mbaud exactly. The
@@ -245,9 +237,11 @@ at a time. The tools take `--eth HOST`, or `--eth HOST:PORT`, for it:
 
 The link reads and writes all memory with no password, so anyone who
 can reach the port can do the same. The IP address is 0 after reset,
-which serves nothing, so a board is reachable only after a program, the
-monitor, or the UART's link gives it an address. Give it one only on a
-network you trust.
+which serves nothing, until a program or the UART's link gives the
+board an address. The ROM's monitor does so on its own, a few seconds
+after a reset, with an address from the network's DHCP server
+([monitor/README.md](../monitor/README.md#the-network)). So plug the
+cable only into a network you trust.
 
 **The connection is the line**, as the UART is:
 

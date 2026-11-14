@@ -55,7 +55,7 @@ There are three ways to use the system:
 1. Download the core file for your board from the latest
    [release](https://github.com/MJoergen/NiceMonMEGA65/releases):
    `nicemon-TAG-r6.cor` for the R6, or `nicemon-TAG-r3.cor` for the R3
-   and R3A, where TAG is the release, such as `V2.0`. A core file holds
+   and R3A, where TAG is the release, such as `V2.1`. A core file holds
    its board revision, so use the one for yours.
 2. Copy it to the SD card, and hold No Scroll while you switch the MEGA65
    on. MEGAFLASH, the MEGA65's core menu, appears. Let it write the core
@@ -218,8 +218,10 @@ the debugger is up. [DEBUGGER.md](doc/DEBUGGER.md) has the design.
 
 Remote control runs over the board's Ethernet port, on TCP port 4510. A
 PC on the network may then load, run, and debug programs, with no JTAG
-cable. Remote control has no password, so give the board an IP address
-only on a network you trust.
+cable. Remote control has no password, and the monitor gets an IP
+address from the network on its own
+([Giving the board an address](#giving-the-board-an-address)), so plug
+the cable only into a network you trust.
 
 ### Setting up the tools
 
@@ -348,9 +350,7 @@ The port runs at 230400 baud, 8-N-1, after reset, which is the tools'
 default on Linux and macOS alike. The monitor's `baud` sets another
 rate, from 115200 to 2 Mbaud, which the tools then take with `--baud`
 ([DEBUG_LINK.md](doc/DEBUG_LINK.md#the-baud-rate)). On Linux, 2 Mbaud
-loads a program about nine times as fast. A core file older than `V1.9`
-runs at 2 Mbaud after reset, so the tools need `--baud 2000000` with
-it.
+loads a program about nine times as fast.
 
 The serial port also gives the board its IP address without the
 keyboard. Pause the monitor, write the address to `0xFFFFFFB0`, the
@@ -556,9 +556,17 @@ Then build the core file with the program as its ROM:
     make cor ROM=prog.bin
 
 That builds the cores of the R3 and the R6, with `prog.bin` in their
-ROM. It needs Vivado and `coretool` (see [synth/](synth/README.md)). The core
-files are `synth/r6/build/NiceMonMEGA65-r6.cor` and
+ROM in place of the monitor. It needs Vivado and `coretool` (see
+[synth/](synth/README.md)). The core files are
+`synth/r6/build/NiceMonMEGA65-r6.cor` and
 `synth/r3/build/NiceMonMEGA65-r3.cor`.
+
+After that build, a change of the program needs no build from nothing:
+
+    make cor ROMPATCH=prog.bin
+
+puts the new `prog.bin` into the cores of the last build, in about a
+minute each ([synth/](synth/README.md#a-change-of-the-rom-alone)).
 
 ## On the Nexys4DDR
 

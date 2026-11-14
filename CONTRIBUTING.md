@@ -59,6 +59,14 @@ or, in an existing clone:
   with the emulator](tools/README.md#comparing-with-the-emulator)).
 - `make mon` opens an interactive shell on the link (see [Using the
   interactive shell](README.md#using-the-interactive-shell)).
+- `make sdcard CMD=ls` lists, copies, writes, and deletes the files of
+  the board's SD card over the link, and `make sdnbd` serves the card
+  as a disk for a mount on Linux (see
+  [sdcard.py](tools/README.md#sdcardpy) and
+  [sdnbd.py](tools/README.md#sdnbdpy)).
+- `make tftpd` serves the files of `examples/build`, or of `TFTP_DIR=`,
+  to the monitor's `tftp` (see
+  [monitor/README.md](monitor/README.md#the-network)).
 - `make hwtest` tests the board (see [Testing the
   board](#testing-the-board)).
 - `make flash` writes a bitstream into the Nexys4DDR's flash, or with
@@ -79,12 +87,14 @@ or, in an existing clone:
 - `make weathertest` checks the weather display, `examples/weather.c`,
   on the host and in `niceemu`, without a board (see [The
   examples](#the-examples)).
-- `make sdtest` checks `tools/sdcard.py` on `niceemu --link` with images
-  of a card, without a board (see [The tools and
-  niceemu](#the-tools-and-niceemu)).
+- `make sdtest` checks `tools/sdcard.py` and `tools/sdnbd.py` on
+  `niceemu --link` with images of a card, without a board (see [The
+  tools and niceemu](#the-tools-and-niceemu)).
 - `make cosim` runs the system in GHDL for the tools, and `make cosimtest`
   checks the tools and the RTL on it, without a board (see [The simulated
   board](#the-simulated-board)).
+- `make clean` removes the build output of the simulations, the formal
+  checks, the examples, and the boards.
 
 `make load`, `make run`, and `make mon` use the board's Ethernet port
 with `ETH=192.168.1.65`, or the serial device with `PORT=/dev/ttyUSB1`,
@@ -125,10 +135,10 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
 | [monitor/](monitor/README.md) | The monitor for the ROM, in NICE assembly: a hardware abstraction layer for programs at `0x8000`, called through a dispatch table, a main loop with a few commands, the file of routines that programs join, the stubs and the header for programs, and its tests in `niceemu`. Its README has the decisions, [INTERNALS.md](monitor/INTERNALS.md) the routines with no entries, the C in the ROM, the ROM's words, and the build and the tests. |
 | [demo/](demo/README.md) | The demo, `demo.bin`, a program under the monitor that the release ships as a file of its own: nice_cpu's demo (`nice_cpu/demo`), whose function keys switch between a welcome screen that turns into a typewriter, the key codes, the characters and colors, the counters, a game, and the board, a self-test and the network station's addresses. Here are the board's text, `text.nasm`, and the test under the monitor. |
 | [examples/](examples/) | Example C programs, and the Makefile that builds them for the MEGA65. |
-| [tools/](tools/) | `boardlink.py`, the debug link of nice_cpu's `debugger/nicelink.py`, over the board's UART or TCP to `niceemu --link`, with the board's Ethernet port and the simulated system of `make cosim`, and the tools that use it: `load.py`, which loads a program into the MEGA65 or Nexys4DDR, `run.py`, which runs a program on the board as `niceemu` runs it, `mon.py`, an interactive shell on the link, nice_cpu's `nicedbg.py` with the board's links, `sdcard.py`, which lists the board's SD card and copies its files to the host, `sdnbd.py`, which serves the card as a block device for a mount on the host, `hwtest.py`, which tests the system on the board, `flash.py`, which writes the Nexys4DDR's flash or a slot of the MEGA65's, `bump.py`, which records the timing of the MEGA65 and the Nexys4DDR for a nice_cpu tag, `release.py`, which builds and publishes a release, `linktest.py`, which checks `run.py` and `mon.py` on `niceemu --link`, `tftpd.py`, a TFTP server for the monitor's `tftp`, with listings, `tftptest.py`, which checks it, `tcptest.py`, which checks the monitor's TCP against `tcppeer.py`, a scripted peer, `weathertest.py`, which checks the weather display against it, `sdtest.py`, which checks `sdcard.py` and `sdnbd.py`, `cosimtest.py`, which checks `run.py` on the simulated system, `romsize.py`, which measures the ROM's words and the demo's for the tables of `monitor/INTERNALS.md` and `demo/README.md`, and `screenshot.py`, which draws a program's screen in `niceemu` as a PNG picture. |
+| [tools/](tools/) | `boardlink.py`, the debug link of nice_cpu's `debugger/nicelink.py`, over the board's UART or TCP to `niceemu --link`, with the board's Ethernet port and the simulated system of `make cosim`, and the tools that use it: `load.py`, which loads a program into the MEGA65 or Nexys4DDR, `run.py`, which runs a program on the board as `niceemu` runs it, `mon.py`, an interactive shell on the link, nice_cpu's `nicedbg.py` with the board's links, `sdcard.py`, which lists the board's SD card and copies its files to the host, `sdnbd.py`, which serves the card as a block device for a mount on the host, `hwtest.py`, which tests the system on the board, `flash.py`, which writes the Nexys4DDR's flash or a slot of the MEGA65's, with `jtag.py`, which finds the JTAG cable of the board's UART and checks the board, for `hwtest.py` too, and `spiflash.py`, which clears the protection of the sectors of the MEGA65's flash, `bump.py`, which records the timing of the MEGA65 and the Nexys4DDR for a nice_cpu tag, `release.py`, which builds and publishes a release, `linktest.py`, which checks `run.py` and `mon.py` on `niceemu --link`, `tftpd.py`, a TFTP server for the monitor's `tftp`, with listings, `tftptest.py`, which checks it, `tcptest.py`, which checks the monitor's TCP against `tcppeer.py`, a scripted peer, `weathertest.py`, which checks the weather display against it, `sdtest.py`, which checks `sdcard.py` and `sdnbd.py`, `cosimtest.py`, which checks `run.py` on the simulated system, `romsize.py`, which measures the ROM's words and the demo's for the tables of `monitor/INTERNALS.md` and `demo/README.md`, and `screenshot.py`, which draws a program's screen in `niceemu` as a PNG picture. |
 | [README.md](README.md) | For those who use the core files and write programs for them: on its own, over Ethernet, and over the serial port. |
 | [SYSTEM.md](doc/SYSTEM.md) | The system that programs and the link see: the address map, the screen and the font, the keyboard, the Nexys4DDR's devices, the Ethernet station, and the SD card slots. |
-| [DEBUG_LINK.md](doc/DEBUG_LINK.md) | The debug link: its words, how a host loads, pauses, steps, and stops a program, its versions, the control register, the UART's baud rate, and the link over TCP. |
+| [DEBUG_LINK.md](doc/DEBUG_LINK.md) | The debug link: its words, how a host loads, pauses, steps, and stops a program, its version, the control register, the UART's baud rate, and the link over TCP. |
 | [EMULATOR.md](doc/EMULATOR.md) | The table of the known differences from the emulator. |
 | [PROGRAMMING.md](doc/PROGRAMMING.md) | How to write and build programs, in NICE assembly and in C, and how they use the screen, the keyboard, the monitor, and the ROM. |
 | [DEBUGGER.md](doc/DEBUGGER.md) | The design note of the on-board debugger: its stages, its tests, and its decisions. |
@@ -890,7 +900,12 @@ bitstream has one. Then it hides the ROM and uses the link:
   on the reads of the word that `READ` reads, and one on its writes in
   the interrupt routine, each with the `w` notice, R15 after the step,
   the address of the step at `0xFFFFFFD6`, and the stop register.
-- It clears the memory, checks the size of the RAM at `0xFFFFFF9E`,
+- It clears the memory, and runs `sim/wait.nasm`, which waits for the
+  timer's interrupt with `WAIT`: bit 6 of the control register shows the
+  wait, also while paused, and when the program is paused in its
+  interrupt routine, bits 7 and 10, `saved_pc`, and `saved_sr` show the
+  state that the routine returns to.
+- It checks the size of the RAM at `0xFFFFFF9E`,
   128K words on the MEGA65 and 64K on the Nexys4DDR, and the top word of
   the RAM, sets each baud rate at `0xFFFFFF9F` and reads the link back
   at it, and returns to `--baud`, reads back what `sim/emu.nasm` leaves after its
@@ -902,7 +917,11 @@ bitstream has one. Then it hides the ROM and uses the link:
   the link, at a low word and at the top word of the RAM, and runs
   `sim/bytewin.nasm`, whose registers, words, and steps must be
   `niceemu`'s.
-- It writes and reads the screen's registers, and the board's registers:
+- It writes and reads the screen's registers, and checks the fonts: the
+  character ROM holds Spleen's `A` and drops a write, the font RAM keeps
+  bits 15..0 of a glyph's words, the font base is kept, and a clear
+  makes the font RAM and the base 0.
+- It writes and reads the board's registers:
   on the Nexys4DDR the LEDs, RGB LEDs, and display, and that the buttons
   and switches take no write, and on the MEGA65 that they read 0 and take
   no write.
@@ -930,24 +949,8 @@ bitstream has one. Then it hides the ROM and uses the link:
   changes fails them. The rest of that screen, the Ethernet station's
   addresses and counts, differs from board to board and is not compared.
 
-With `ETH=IP`, as in `make hwtest PORT=/dev/ttyUSB1 ETH=192.168.1.65`, and the board's
-Ethernet port on this computer's network, it tests the Ethernet station
-after all the other checks, which its failures do not stop. It loads
-the monitor, and types the monitor's `i`, the IP address,
-and CR as console bytes over the UART, as a terminal would, and reads
-the address back in a pause. It pings the address and checks the
-station's counts. It pauses the monitor over the link on TCP and reads the address again, and
-then runs the programs above, and the monitor's, with `run.py --eth`.
-Then `monitor/test/tcphw.nasm`, under the monitor, connects to a socket
-of this computer, which echoes 16 KB; then it listens on port 4600,
-where this computer connects, and the same echo runs. The address must be
-free on the network. If no frame at all reaches the station during the
-ping, the board has no Ethernet connection, or the address is not on
-this computer's network: the rest is not run, and the summary names it
-after NOT COVERED, which does not fail the run. Without `ETH`, the
-summary names the Ethernet station there.
-
-With the core held, it tests the SD card controller at `0xFFFFFFA0`.
+With the core held, after the board's registers, it tests the SD card
+controller at `0xFFFFFFA0`.
 It checks the number of slots, the reserved word, `SD_CHUNK`, and all
 128 words of the buffer, and that a slot the board does not have shows
 no card. Then for each slot with a card, it starts the card with Init,
@@ -966,6 +969,32 @@ tests and types `dir SLOT`, whose rows, or error 29, must be the same;
 a card with no FAT32 is NOT COVERED there.
 On the R3, slot 1 has no card detect, so it is always tried, and fails
 without a card.
+
+With `ETH=IP`, as in `make hwtest PORT=/dev/ttyUSB1 ETH=192.168.1.65`, and the board's
+Ethernet port on this computer's network, it tests the Ethernet station
+after all the other checks, which its failures do not stop. It loads
+the monitor with the station's address cleared, and the monitor must
+get an address from the network's DHCP server on its own, show it over
+its prompt, and answer a ping there. Then it loads
+the monitor again, and types the monitor's `i`, the IP address,
+and CR as console bytes over the UART, as a terminal would, and reads
+the address back in a pause. It pings the address and checks the
+station's counts. It pauses the monitor over the link on TCP and reads the address again.
+`sim/udp.nasm`, loaded over TCP, must answer a UDP datagram to port 4511
+through the port for Ethernet frames. Then it runs the programs above,
+and the monitor's, with `run.py --eth`.
+Then `monitor/test/tcphw.nasm`, under the monitor, connects to a socket
+of this computer, which echoes 16 KB; then it listens on port 4600,
+where this computer connects, and the same echo runs. Last, it types
+the monitor's `i dhcp`, which must give the station an address that a
+ping answers, and `time ntp` with the offset of the host's local time,
+which must set the clock to the host's time within 2 seconds. The address must be
+free on the network. If no frame at all reaches the station during the
+ping, the board has no Ethernet connection, or the address is not on
+this computer's network: the rest is not run, and the summary names it
+after NOT COVERED, which does not fail the run. A network with no DHCP
+server, or with no time server that answers, is named there too.
+Without `ETH`, the summary names the Ethernet station there.
 
 The reset button is not tested: press it with a terminal open, and the
 `b07` notice comes again. Nor is card detect: take a card out, and the

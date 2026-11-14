@@ -1,7 +1,7 @@
 ; The monitor, the program of the ROM at 0x0000 (README.md). The core boots
 ; from it at reset. It gives the programs at 0x8000 a hardware abstraction
-; layer, the HAL: thirty routines, called through the dispatch table at the
-; start of the ROM, and it has a main loop with a few commands, typed on
+; layer, the HAL: thirty-two routines, called through the dispatch table at
+; the start of the ROM, and it has a main loop with a few commands, typed on
 ; the keyboard or sent over the line, and shown on the screen and the line.
 ;
 ; The dispatch table has one JMP routine per entry, two words, so that

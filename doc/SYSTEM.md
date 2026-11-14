@@ -456,8 +456,11 @@ an ARP reply, and each ICMP echo request, a ping, to its MAC and IP
 addresses with an echo reply of the same data, up to the 1472 bytes that
 fit in a frame. It answers only whole IPv4 packets without options, and
 no ping to everyone. With the IP address at 0, as after reset, it answers
-nothing, so a board on a network stays silent until a program or the
-link gives it an address. The MAC address is a locally administered one,
+nothing, until a program or the link gives it an address. The ROM's
+monitor does so on its own after a reset, with an address from the
+network's DHCP server
+([monitor/README.md](../monitor/README.md#the-network)). The MAC address
+is a locally administered one,
 one for each kind of board, so that an R3, an R6, and a Nexys4DDR on one
 network differ. Two boards of the same kind on one network need
 different ones, which the monitor's `m` sets. On the link, for
@@ -472,8 +475,9 @@ registers while the core runs:
 Then `ping 192.168.1.65` from a PC on the network gets its answers, and
 `0xFFFFFFB5` counts the replies, the ARP reply and one for each ping.
 The monitor's `i` shows and sets the IP address from the keyboard or
-the line, and its `m` the MAC address
-([monitor/README.md](../monitor/README.md)). The demo's F11 shows
+the line, `i dhcp` gets it from a DHCP server, and its `m` sets the MAC
+address ([monitor/README.md](../monitor/README.md#the-network)). The
+demo's F11 shows
 the addresses and the counts, and sets the addresses from the keyboard
 ([demo/README.md](../demo/README.md)).
 
@@ -554,8 +558,9 @@ The SD card controller of [nice_cpu's SYSTEM.md §5](https://github.com/MJoergen
 - A command takes time: busy reads 1 until it ends, as on any board of
   [nice_cpu's SYSTEM.md §5](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#5-sd-card), where the emulator ends it at once. A Read
   takes up to about a millisecond, and an Init tens of milliseconds.
-- Every slot has card detect, and the MEGA65's slot 1 also has write
-  protect. A card that is put in or taken out counts after 10 ms, but
+- Every slot but the R3's slot 1 (below) has card detect, and the
+  R6's slot 1 also has write protect. A card that is put in or taken
+  out counts after 10 ms, but
   after a reset the slot shows at once what the pin says, so a card
   that is in is there for the first command.
 - The MEGA65's cards are always powered. The Nexys4DDR switches its
@@ -581,8 +586,8 @@ The SD card controller of [nice_cpu's SYSTEM.md §5](https://github.com/MJoergen
 I2C is a bus of two wires, a clock, SCL, and data, SDA, which connects
 small chips on a board. Each chip has an address of 7 bits. The FPGA is
 the master: it starts each transfer, and the chip at the address
-answers. Every board has an I2C master at `0xFFFFFF97`–`9D` (issue
-#105), on its bus:
+answers. Every board has an I2C master at `0xFFFFFF97`–`9D`, on its
+bus:
 
 | Board | Chips on the bus |
 |---|---|

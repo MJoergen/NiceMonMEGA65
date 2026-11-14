@@ -593,7 +593,7 @@ them all:
 | -49 | `MON_E_DNSFAIL` | The DNS server reported an error, or a truncated answer |
 | -50 | `MON_E_THANDLE` | Not a handle, or a free one |
 | -51 | `MON_E_TFULL` | Every handle is in use: 4 are |
-| -52 | `MON_E_TSIZE` | A ring of fewer than 64 bytes, or a control block not aligned |
+| -52 | `MON_E_TSIZE` | A ring of fewer than 64 bytes, or a control block that is not aligned or lies below `0x8000` |
 | -53 | `MON_E_TREFUSED` | The peer refused the connection |
 | -54 | `MON_E_TRESET` | The peer reset the connection, or the IP address changed |
 | -55 | `MON_E_TTIMEOUT` | No answer from the peer |

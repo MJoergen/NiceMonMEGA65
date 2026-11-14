@@ -205,11 +205,12 @@ rather than general, as its header says.
 
 - **Calls.** Every function of the C code that is not `static` is
   exported, and the monitor's assembly calls it as `_name`, in the C ABI;
-  the entries 9 to 15 jump to `fat32.c`'s `fat_mount` to `fat_delete`.
-  Their names in the table are `fs_mount` to `fs_delete`, and in
-  `mon.h` `mon_fs_mount` to `mon_fs_delete`, as the old names of the
-  stubs of `mon.nasm`, `_fs_mount` to `_fs_delete`, which the monitor
-  joins for `monlib.nasm`, would clash with C functions of those names.
+  the entries 9 to 15 and 20 jump to `fat32.c`'s `fat_mount` to
+  `fat_delete`, and `fat_readname`. Their names in the table are
+  `fs_mount` to `fs_delete`, and `fs_readname`, and in `mon.h`
+  `mon_fs_mount` and so on, as the second names of the stubs of
+  `mon.nasm`, `_fs_mount` and so on, which the monitor joins for
+  `monlib.nasm`, would clash with C functions of those names.
   The C code calls the monitor's routines by their labels too: they are
   undefined in the module, and the assembler finds them, such as
   `_fat_sd_read` and `_fat_sd_write`, which turn the C code's byte
@@ -237,8 +238,8 @@ rather than general, as its header says.
 ## The ROM's words
 
 The ROM has 32768 words, at `0x0000`–`0x7FFF`. The monitor fills it
-from 0, and the rest is free. The demo is no longer in it (#129): it is
-a program, `demo.bin`, whose words
+from 0, and the rest is free. The demo is not in it: it is a program,
+`demo.bin`, whose words
 [demo/README.md](../demo/README.md#its-words) counts.
 
 <!-- romsize layout -->
@@ -317,7 +318,8 @@ include, so the Makefile joins the sources with `cat` and assembles the
 result with `niceasm`. In this order:
 
 1. `monitor.nasm`, `monitor_cmd.nasm`, `monitor_dis.nasm`,
-   `monitor_sd.nasm`, `monitor_eth.nasm`, `monlib.nasm`, and `mon.nasm`.
+   `monitor_sd.nasm`, `monitor_eth.nasm`, `monitor_tcp.nasm`,
+   `monlib.nasm`, and `mon.nasm`.
 2. `build/rom_c.nasm`, the ROM's C code (C in the ROM, above).
 3. nice_cpu's `lib.nasm` and `muldiv_mpu.nasm`.
 4. `build/version.nasm`, which defines `VERSION`, the text of the
@@ -328,8 +330,8 @@ result with `niceasm`. In this order:
 
 `version.nasm` and `folder.nasm` are written only when they change, so
 that the monitor, and a bitstream with it, is not built again for
-nothing. The build fails if the monitor reaches `DEMO`, where the demo
-starts in the ROM.
+nothing. The build fails if the monitor reaches `PROGRAM`, `0x8000`,
+the end of the ROM.
 
 ### The tests
 
@@ -465,7 +467,7 @@ write have the host's date, which no test shows.
 
 `niceemu` has no I2C master: its status word is memory, which reads 0,
 so the cold start of every run finds none, and `time` shows that the
-clock is not set. `test/rtc.py` alone sets that memory, as step 7 says.
+clock is not set. `test/rtc.py` alone sets that memory, as step 9 says.
 The I2C bus and the chip are tested in the simulated
 system, whose bus has a model of the R6's real-time clock: `make
 cosimtest` runs the monitor's cold start there, and checks the clock
@@ -511,7 +513,7 @@ after every run.
 
 ### On a board
 
-`make r6` builds a bitstream that boots the monitor, with the demo
-behind it in the ROM. `make hwtest` loads the same, with the versions of
-the tests, into the RAM, and types `x` for the demo
-([demo/](../demo/README.md), and README.md, "The demo").
+`make r6` builds a bitstream that boots the monitor, alone in the ROM.
+`make hwtest` loads the monitor of the tests into the RAM at 0, with
+the ROM hidden, and with it the demo at `0x8000`, which it runs with
+`r` ([demo/](../demo/README.md), and README.md, "The demo").

@@ -61,7 +61,7 @@ header is the authoritative address map.
     make run FILE=p.bin   # run it and print what niceemu prints, for diffing
     make mon [FILE=p.bin] # interactive shell on the link: memory, pause, step, breakpoints, disassembly, --symbols
     make bump TAG=V1.0    # nice_cpu to the tag, R6 and Nexys4DDR bitstreams, badge-mega65.json, badge-nexys4ddr.json, and verified.json, committed (--push with ARGS)
-    make release TAG=V1.0 # after the bump: gates, three bitstreams, two .cor, hwtest, staged; ARGS=--publish tags and releases (doc/RELEASE.md); TAG=V1.0.1 keeps nice_cpu at V1.0
+    make release TAG=V1.0 # after the bump: gates, three bitstreams, two .cor, hwtest, staged with demo.bin, weather.bin, and the examples' zip; ARGS=--publish tags and releases (doc/RELEASE.md); TAG=V1.0.1 keeps nice_cpu at V1.0
     make hwtest [ETH=IP]  # check the FPGA, program it with openFPGALoader, and test the board (ETH: its Ethernet too)
     make flash [BIT=f.bit] # write the Nexys4DDR's flash (default its top.bit), verify, wait for the start; ARGS=--erase
     make flash COR=f.cor SLOT=1 # write a slot (1-7) of the MEGA65's flash over JTAG, no MEGAFLASH; checks slot 0's revision

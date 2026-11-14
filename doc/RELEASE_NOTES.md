@@ -128,6 +128,43 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   network's entries from C, and `mon_words`, a new stub of
   `monitor/mon_c.nasm`, gives the file entries the address of a C
   array.
+- `mon.h` and `mon.nasm` name the screen's colors, `MON_FG_BLACK` to
+  `MON_FG_WHITE` and `MON_BG_BLACK` to `MON_BG_WHITE`, which a program
+  adds for `scr_color`.
+- [doc/PROGRAMMING.md](PROGRAMMING.md) starts with an introduction and
+  two first programs: one in C for the monitor, and a stand-alone one
+  in NICE assembly, each on the board and in the emulator.
+- `make hwtest` and `make flash COR=f.cor` tell an R3 from an R6, which
+  have the same FPGA, by the flash chip, and stop when the bitstream or
+  the core file is for the other board
+  ([#125](https://github.com/MJoergen/NiceMonMEGA65/issues/125)). The
+  bitstreams of the R3 and the R6 name their board in their UserID.
+  `--no-board-check` skips the check, for a board whose flash is not
+  the usual one.
+- `make r6 ROMPATCH=file.bin` puts another ROM into the last build's
+  bitstream in about a minute, with no synthesis, placement, or
+  routing, and likewise for `r3`, `nexys4ddr`, and `cor`
+  ([#122](https://github.com/MJoergen/NiceMonMEGA65/issues/122),
+  [synth/README.md](../synth/README.md#a-change-of-the-rom-alone)).
+
+**Tests.**
+
+- `make tcptest` runs the network's entries in `niceemu` against
+  `tools/tcppeer.py`, a TCP peer of its own with a script for each
+  port, and their timers with `--step-time`. `make weathertest` runs
+  the weather display against the same peer, and its text on the host.
+- `make hwtest` with `ETH=` checks the address from DHCP after a reset,
+  `time ntp` against the host's clock, and TCP both ways:
+  `monitor/test/tcphw.nasm` connects to this computer and echoes 16 KB,
+  and then listens for it. On a MEGA65 it programs the board twice, as
+  the first time after the check of the flash chip sometimes sends a
+  stray byte before the `b` notice
+  ([#135](https://github.com/MJoergen/NiceMonMEGA65/issues/135)).
+- The words of the ROM and of the demo are in tables, by source, in
+  [monitor/INTERNALS.md](../monitor/INTERNALS.md#the-roms-words) and
+  [demo/README.md](../demo/README.md#its-words), which the tests of the
+  monitor and the demo check against the build, and `make romsize`
+  writes anew.
 
 ## V2.0.1 (2026-11-12)
 

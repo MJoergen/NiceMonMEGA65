@@ -28,7 +28,9 @@ Nexys4DDR, set it after each reset. Without it, the screen shows
 
 ### Running it
 
-1. Copy `examples/build/weather.bin` to the folder `NICE` of the SD card.
+1. Copy `weather.bin` to the folder `NICE` of the SD card. Each release
+   has the file, and `make examples` builds it as
+   `examples/build/weather.bin`.
 2. Write the settings file `WEATHER.CFG` (below) into the same folder,
    or leave it out and type the place at the start.
 3. On the board, at the monitor's prompt, type `load weather.bin` and
@@ -89,7 +91,8 @@ it. The proxy gets the request
 
     GET /PLACE?format=%l|%C|%t|%w|%h HTTP/1.0
 
-and answers with one line of five fields, separated by `|`, as wttr.in
+with `&m` or `&u` after the format when the settings have `units`, and
+answers with one line of five fields, separated by `|`, as wttr.in
 does:
 
     Copenhagen|Partly cloudy|+7°C|↙13km/h|87%

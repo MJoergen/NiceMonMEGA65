@@ -4,8 +4,7 @@ The demo shows that the core, the keyboard, and the screen work, on a
 MEGA65 with no computer on its debug UART. It is nice_cpu's demo,
 [nice_cpu/demo](https://github.com/MJoergen/nice_cpu/blob/main/demo/README.md),
 with the text of the boards in `text.nasm`. It is a program at `0x8000`,
-`demo.bin`, which each release has as a file of its own. It is not in
-the ROM (#129). To run it on its own:
+`demo.bin`, which each release has as a file of its own. To run it:
 
 1. Copy `demo.bin` into the folder `NICE` of an SD card.
 2. Put the card in the board, and type `load demo.bin` and then `r` in
@@ -36,13 +35,14 @@ has what each demo shows and how it works. On the boards:
 - F11's self-test runs on the core, and the network station below it is
   the board's, at `0xFFFFFFB0` ([nice_cpu's SYSTEM.md §6](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#6-network-station), and
   [The Ethernet station](../doc/SYSTEM.md#the-ethernet-station)). Its IP
-  address is `0.0.0.0` after reset, which answers nothing, and its MAC
-  address `02:4E:49:43:45:03` on the R3, `02:4E:49:43:45:06` on the R6,
-  and `02:4E:49:43:45:0A` on the Nexys4DDR. So a board with the demo in its ROM can
-  get its address from its own keyboard, or from a terminal on the debug
-  UART, with I and M, and then answers pings and serves remote control
-  on TCP port 4510, which the row "Debug link, TCP port" shows, with "a
-  host connected" while one is. The counts are the board's frames.
+  address is the one that the monitor got from DHCP or from its `i`, or
+  `0.0.0.0`, which answers nothing, and its MAC address after reset is
+  `02:4E:49:43:45:03` on the R3, `02:4E:49:43:45:06` on the R6, and
+  `02:4E:49:43:45:0A` on the Nexys4DDR. I and M set the two from the
+  board's own keyboard, or from a terminal on the debug UART. With an
+  IP address, the board answers pings and serves remote control on TCP
+  port 4510, which the row "Debug link, TCP port" shows, with "a host
+  connected" while one is. The counts are the board's frames.
 - The demo halts at the end of the input: after a break on the line, as
   when an Ethernet host half-closes its connection. After a break, every
   read of the console returns the end once the bytes before it are read,
@@ -82,8 +82,9 @@ The two run in `niceemu` like any program, from address 0:
 
 `tools/hwtest.py`, and so `make linktest` and `make cosimtest`, run
 `build/test/monitor_demo.bin` with `r` and a few keys through `run.py`,
-and compare its registers and screen with `niceemu`'s, and run F11's
-self-test on the board.
+and compare its registers and screen with `niceemu`'s. `make hwtest`
+and `make linktest` also run F11's self-test, which `make cosimtest`
+leaves out, as the simulation is slow.
 
 ## Its words
 

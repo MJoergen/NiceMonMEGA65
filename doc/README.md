@@ -12,7 +12,8 @@ For those who write programs, or control the board from a PC:
   uses the screen and the keyboard. Start here.
 - [SYSTEM.md](SYSTEM.md) has the address map, the screen and the font,
   the keyboard, the Nexys4DDR's devices, the Ethernet station with the
-  port for frames, and the SD card slots.
+  port for frames, the SD card slots, and the I2C bus with the MEGA65's
+  real-time clock.
 - [DEBUG_LINK.md](DEBUG_LINK.md) has the debug link, which is remote
   control: the words used for it, such as hold, pause, and step, the
   control register, the UART's baud rate, and the link over TCP.
@@ -32,6 +33,9 @@ Design notes, which record how a part came to be as it is:
   BASIC is not yet.
 - [BASIC_SURVEY.md](BASIC_SURVEY.md) is the survey of the BASIC dialects
   behind the interpreter planned for the ROM.
+- [BASIC.md](BASIC.md) is the design note of that interpreter, with its
+  decisions, the room in the ROM, and its stages. None of it is written
+  yet.
 
 For those who change this repository:
 

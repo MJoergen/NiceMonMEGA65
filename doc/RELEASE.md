@@ -94,8 +94,8 @@ and keep their names.
 
 2. Write the tag's section of `RELEASE_NOTES.md`: what a user of the
    bitstreams, the boards, or the tools can see changed since the release
-   before, with upgrade notes first. Replace "(not yet released)" in its
-   heading with the date, such as `## V1.0 (2026-10-28)`. Draw the
+   before, with upgrade notes first. Add the date to its heading, such
+   as `## V1.0 (2026-10-28)`. Draw the
    README's pictures, `doc/images/demo.png`, `ethernet.png`, and
    `debugger.png`, again with the tag, as the docstring of
    `tools/screenshot.py` says. Commit and push.
@@ -153,7 +153,8 @@ The core files have the version `V1.0.1`, which MEGAFLASH shows.
 
       gh release create V1.0 --verify-tag --title V1.0 \
          --notes-file build/release/V1.0/notes.md build/release/V1.0/*.bit \
-         build/release/V1.0/*.cor build/release/V1.0/examples-V1.0.zip \
+         build/release/V1.0/*.cor build/release/V1.0/demo.bin \
+         build/release/V1.0/weather.bin build/release/V1.0/examples-V1.0.zip \
          build/release/V1.0/verified.json
 
 - A release with a bug is not deleted. The fix is a point release here,

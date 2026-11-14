@@ -36,7 +36,9 @@ header of `nicemon.vhd` is the address map, and
   display offset.
 - **BOARD REGS** ([board_io.vhd](board_io.vhd)) are the Nexys4DDR's
   LEDs, display, buttons, and switches, and, on every board, the size of
-  the RAM and the UART's baud rate.
+  the RAM, the UART's baud rate, and the I2C master ([i2c.vhd](i2c.vhd)),
+  which reaches the MEGA65's real-time clock or the Nexys4DDR's
+  temperature sensor.
 - **INPUT FIFO** ([rx_fifo.vhd](rx_fifo.vhd)) holds the console bytes
   that wait for the core: those from the host, which come through the
   link, and those from the keyboard.

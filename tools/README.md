@@ -17,13 +17,17 @@ prints its options with `--help`, and its header says more.
 | `sdnbd.py` | Serves the board's SD card as a block device over NBD, so that Linux mounts it as a folder, all of the card, for the file manager. |
 | `hwtest.py` | Programs the FPGA with openFPGALoader and tests the system on the board. |
 | `flash.py` | Writes a bitstream into the Nexys4DDR's flash, or a core file into a slot of the MEGA65's, from which the board starts. |
+| `jtag.py` | The JTAG cable of the board's UART, and the check that the board is the one a bitstream or core file was built for, which `hwtest.py` and `flash.py` use. |
+| `spiflash.py` | The MEGA65's flash through openFPGALoader's bridge, which `flash.py` uses to clear the protection of its sectors. |
 | `linktest.py` | Checks `run.py` and the link on `niceemu --link` against plain `niceemu`, without a board. |
 | `tftpd.py` | A TFTP server for the monitor's `tftp`, which also lists the files of its folder for a name with `*` or `?`. |
 | `sdtest.py` | Checks `sdcard.py` and `sdnbd.py` on `niceemu --link` with images of a card, without a board. |
 | `tftptest.py` | Checks `tftpd.py`, and the monitor's `tftp` in `niceemu` against it, without a board. |
 | `tcptest.py` | Checks the monitor's TCP in `niceemu` against `tcppeer.py`, and its timers with `--step-time`, without a board. |
 | `tcppeer.py` | A TCP peer of its own on `niceemu`'s frames, with a script for each port, and for each connection it opens to a port where the board listens, for `tcptest.py`. |
+| `weathertest.py` | Checks the weather display, `examples/weather.c`, in `niceemu` against `tcppeer.py`, without a board. |
 | `cosimtest.py` | Checks `run.py` and the RTL on `make cosim` against plain `niceemu`, without a board. |
+| `romsize.py` | Measures the words of the ROM and of the demo, and writes or checks their tables in `monitor/INTERNALS.md` and `demo/README.md`. |
 | `screenshot.py` | Runs a program in `niceemu` and draws its screen as a PNG picture, as the text display shows it, and with `--debugger` the on-board debugger's strip under it. |
 | `bump.py` | Moves nice_cpu to a tag, builds the R6 and Nexys4DDR bitstreams, and writes the badge files and `verified.json`. |
 | `release.py` | Builds, tests, and publishes a release (see [RELEASE.md](../doc/RELEASE.md)). |
@@ -63,8 +67,11 @@ They take `ETH=192.168.1.65` for the Ethernet port, or
 `ARGS="--tcp 4000"` drives `niceemu --link 4000` instead of the board.
 
 The other tools have targets too: `make hwtest` and `make flash` (see
-[hwtest.py](#hwtestpy) and [flash.py](#flashpy)), `make linktest`,
-`make cosim` and `make cosimtest`, `make bump`, and `make release` (see
+[hwtest.py](#hwtestpy) and [flash.py](#flashpy)), `make sdcard` and
+`make sdnbd` (see [sdcard.py](#sdcardpy) and [sdnbd.py](#sdnbdpy)), and
+`make tftpd`, `make linktest`, `make sdtest`, `make tftptest`,
+`make tcptest`, `make weathertest`, `make cosim` and `make cosimtest`,
+`make romsize`, `make bump`, and `make release` (see
 [The other tools](#the-other-tools)).
 
 ## Over Ethernet
@@ -72,9 +79,11 @@ The other tools have targets too: `make hwtest` and `make flash` (see
 The board serves remote control on TCP port 4510 of its Ethernet
 station, once it has an IP address
 ([DEBUG_LINK.md](../doc/DEBUG_LINK.md#the-debug-link-over-tcp)). After reset it
-has none. The monitor's `i` gives it one, `i 192.168.1.65` at the
-prompt, and the demo's F11 does too: I types a new IP address. Then
-use `--eth` with any tool:
+has none, and the monitor gets one from the network's DHCP server on
+its own, and shows it over its prompt
+([README](../README.md#giving-the-board-an-address)). The monitor's `i`
+sets another, `i 192.168.1.65` at the prompt, and the demo's F11 does
+too: I types a new IP address. Then use `--eth` with any tool:
 
     tools/run.py --eth 192.168.1.65 prog.bin
 
@@ -90,16 +99,16 @@ Ethernet, the UART carries no link: its bytes are dropped. A new
 connection from the same host replaces the old one. The tools end their
 connection with a reset, so that the UART has the link again at once;
 after `nc`, the UART has it again when a tool connects from the same
-host, or after a reset of the board. The link has no password, so give
-the board an IP address only on a network you trust.
+host, or after a reset of the board. The link has no password, and the
+monitor gets an IP address from DHCP on its own, so plug the cable
+only into a network you trust.
 
 ## The serial port
 
 The MEGA65's debug UART runs at 230400 baud, 8-N-1, after reset, the
 tools' `--baud` by default, or at the rate written to `0xFFFFFF9F`
 ([doc/DEBUG_LINK.md](../doc/DEBUG_LINK.md#the-baud-rate)), which `--baud` must
-match. A core built before `V1.9` runs at 2 Mbaud after reset, and needs
-`--baud 2000000`. It needs the JTAG cable, whose USB port carries it. It is usually the serial device
+match. It needs the JTAG cable, whose USB port carries it. It is usually the serial device
 `/dev/ttyUSB1`. Give it to the tools with `--port`, or to `make` with
 `PORT=`, and open it in your terminal program. On
 macOS, use the `/dev/cu.*` device, as a `/dev/tty.*` device blocks on
@@ -592,10 +601,20 @@ its own on `niceemu --link`.
   publishes it. `make release TAG=V1.0 PORT=DEVICE` passes the port, and
   `ARGS="--eth IP"` or `ARGS=--publish` the rest
   ([RELEASE.md](../doc/RELEASE.md)).
-- `tools/linktest.py` and `tools/cosimtest.py` take no options. Both
-  need niceemu, and say so when `nice_cpu/emulator/zig-out/bin/niceemu`
-  is missing; `make linktest` and `make cosimtest` build it first
+- `tools/tftpd.py [--dir DIR] [--port PORT]` serves the files of a
+  folder, the current one by default, to the monitor's `tftp`, on port
+  69 or another, with a listing for a name with `*` or `?`.
+  `make tftpd [TFTP_DIR=DIR] [TFTP_PORT=PORT]` serves `examples/build`
+  ([monitor/README.md](../monitor/README.md#the-network)).
+- `tools/linktest.py`, `tools/sdtest.py`, `tools/tftptest.py`,
+  `tools/tcptest.py`, `tools/weathertest.py`, and `tools/cosimtest.py`
+  take no options. They need niceemu, and `make linktest`,
+  `make sdtest`, and so on build it first
   ([CONTRIBUTING.md](../CONTRIBUTING.md#the-tools-and-niceemu)).
+- `tools/romsize.py` is run by `make romsize`, which writes the tables
+  of the ROM's words anew, and by the tests of the monitor and the
+  demo, which check them
+  ([monitor/INTERNALS.md](../monitor/INTERNALS.md#the-roms-words)).
 - `tools/screenshot.py [-i FILE] [-n N] [--debugger] [-o FILE] prog.bin`
   runs the program in niceemu, with the console input of `-i` and at
   most `-n` steps, as niceemu's options, and draws the screen as the
