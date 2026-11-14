@@ -805,6 +805,17 @@ The IDCODE also tells it which board it tests, an xc7a100t being the
 Nexys4DDR; with `--no-program`, the path of the bitstream tells, or
 `--board`.
 
+The R3 and R6 have the same FPGA, so on a MEGA65 it also checks the
+flash chip, which openFPGALoader names when it loads its bridge, a
+bitstream that reads the flash, into the FPGA. The R3 and R3A have an
+S25FL256S, and the R4, R5, and R6 an S25FL512S. It stops unless the chip
+is that of the bitstream's board. The bitstream names its board by its
+UserID, which `r3.xdc` and `r6.xdc` set, or else by its path (`synth/r3/`,
+`nicemon-V2.1-r3.bit`). A bitstream that names neither is programmed
+with a note. `ARGS=--no-board-check` skips the check, for a board whose
+flash is not the usual one. When the check fails, the FPGA keeps the
+bridge, and the screen stays blank until the board is programmed.
+
 For the R3, give `BIT=synth/r3/build/top.bit`. For the Nexys4DDR, give
 `BIT=synth/nexys4ddr/build/top.bit`. Its UART is usually `/dev/ttyUSB1`
 too. With both boards attached, the `ttyUSB` numbers depend on the order

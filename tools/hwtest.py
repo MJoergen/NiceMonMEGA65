@@ -5,7 +5,7 @@ Usage:
     tools/hwtest.py --port DEVICE [--baud 230400]
                     [--bit synth/r6/build/top.bit]
                     [--board mega65|nexys4ddr] [--no-program]
-                    [--eth HOST[:PORT]]
+                    [--no-board-check] [--eth HOST[:PORT]]
 
     Build the bitstream and the examples first, and niceemu
     (make -C nice_cpu/emulator build), or the checks that need it are
@@ -20,6 +20,9 @@ Usage:
     --no-program skips programming and the boot test, the b notice and the
     checks of the ROM, for a board that is already programmed.
 
+    --no-board-check programs a MEGA65 without the check of its flash
+    chip (below), for a board whose flash is not the usual one.
+
     --eth HOST tests the Ethernet station too, with the board's Ethernet
     port on this computer's network: HOST is the IP address the board
     gets, which no other device may have, and PORT the link's TCP port,
@@ -28,12 +31,17 @@ Usage:
 Programming:
     It finds the JTAG cable on the same USB device as the serial port,
     reads the FPGA's IDCODE through it, and stops unless the FPGA is the
-    part the bitstream was built for. It then programs the FPGA through
-    that cable alone, so with several boards attached it programs the
-    board whose UART it tests. openFPGALoader does both, for the MEGA65 and
-    the Nexys4DDR alike. Programming needs Linux, as the JTAG cable is
-    found through /sys; with --no-program the script runs wherever load.py
-    does.
+    part the bitstream was built for. The R3 and R6 have the same part, so
+    on a MEGA65 it also reads the flash chip through openFPGALoader's
+    bridge, and stops unless the chip is that of the bitstream's board: an
+    S25FL256S on the R3, and an S25FL512S on the R6 (tools/jtag.py). The
+    bitstream names its board by its UserID, or else by its path; when
+    neither tells, the check is skipped with a note. It then programs the
+    FPGA through that cable alone, so with several boards attached it
+    programs the board whose UART it tests. openFPGALoader does each step,
+    for the MEGA65 and the Nexys4DDR alike. Programming needs Linux, as
+    the JTAG cable is found through /sys; with --no-program the script
+    runs wherever load.py does.
 
 Checks, in this order:
     - the link's b notice, and the ROM when the bitstream has one
@@ -2342,6 +2350,9 @@ def main() -> None:
     parser.add_argument("--no-program", action="store_true",
                         help="do not program the FPGA, and skip the boot "
                         "test")
+    parser.add_argument("--no-board-check", action="store_true",
+                        help="do not check that a MEGA65's flash chip is "
+                        "that of the bitstream's board")
     parser.add_argument("--eth", metavar="HOST[:PORT]",
                         help="test the Ethernet station too, giving it the "
                         "IP address HOST")
@@ -2376,7 +2387,8 @@ def main() -> None:
                 if not sys.platform.startswith("linux"):
                     sys.exit("hwtest.py: programming needs Linux; program "
                              "the FPGA yourself and give --no-program")
-                cable, args.port, model = check_board(args.port, args.bit)
+                cable, args.port, model = check_board(
+                    args.port, args.bit, not args.no_board_check)
                 if not args.board:
                     board = "nexys4ddr" if model.startswith("xc7a100") \
                         else "mega65"

@@ -402,13 +402,17 @@ JTAG cable on the same USB device:
 
     tools/hwtest.py --port /dev/ttyUSB1 [--baud 230400] [--bit FILE]
                     [--board mega65|nexys4ddr] [--no-program]
-                    [--eth HOST[:PORT]]
+                    [--no-board-check] [--eth HOST[:PORT]]
 
 - `--bit FILE` is the bitstream to program, `synth/r6/build/top.bit` by
   default. The FPGA's IDCODE must be the part the bitstream was built
   for, and tells which board is tested. `--board` names the board
   instead; without either, a path with `nexys4ddr` in it means the
   Nexys4DDR.
+- On a MEGA65, the flash chip must be that of the bitstream's board, an
+  S25FL256S on the R3 and an S25FL512S on the R6, as the R3 and R6 have
+  the same FPGA. The bitstream names its board by its UserID, or else by
+  its path. `--no-board-check` skips that check.
 - `--no-program` skips the programming and the boot test, for a board
   that is already programmed. Programming needs Linux; with
   `--no-program` the script runs wherever `load.py` does.
@@ -439,10 +443,14 @@ the MEGA65 needs pyftdi.
   and waits for the board to start from it.
 - On the MEGA65, `--cor FILE --slot N` writes a core file into slot N of
   the flash, 1 to 7, or 1 to 3 in an R3's flash of 32 MiB, with no
-  MEGAFLASH: it checks that slot 0's core is
-  for the file's board revision, shows what the slot held, clears the
+  MEGAFLASH: it checks that the flash chip and slot 0's core are
+  those of the file's board revision (`--no-board-check` skips the
+  chip), shows what the slot held, clears the
   protection of the slot's sectors, writes, verifies, and loads the slot
   into the FPGA.
+
+`jtag.py` has what both share: it finds the JTAG cable of `--port`,
+checks the FPGA's part, and on a MEGA65 the flash chip.
 
 `make flash PORT=/dev/ttyUSB1 [BIT=FILE]` is the Nexys4DDR's form, with
 `ARGS=--erase` to erase, and `make flash PORT=/dev/ttyUSB1 COR=FILE

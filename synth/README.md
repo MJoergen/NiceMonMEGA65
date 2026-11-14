@@ -104,7 +104,9 @@ and the board then starts the system without a JTAG cable. MEGAFLASH shows
 the name `NiceMon` and the version, the commit (`git describe --always
 --dirty`); set `COR_NAME` or `COR_VERSION` to change them. A core file
 holds its board revision, so flash the R3's on an R3 and the R6's on an
-R6. It needs `coretool`, the Python script `src/tools/coretool` of
+R6. The bitstreams of the R3 and R6 carry their board in their UserID,
+`M65` and the revision, which `r3.xdc` and `r6.xdc` set, so that the
+tools tell them apart. It needs `coretool`, the Python script `src/tools/coretool` of
 [mega65-tools](https://github.com/MEGA65/mega65-tools), on the `PATH` or
 in `CORETOOL`.
 
@@ -112,8 +114,9 @@ in `CORETOOL`.
 core file into slot 1 over the JTAG cable instead, with no key held at
 power on. It takes slots 1 to 7, as slot 0 holds the MEGA65's own core,
 or 1 to 3 on an R3 with a flash of 32 MiB, an S25FL256S.
-It checks the FPGA first, as `make hwtest` does, and stops unless the core
-in slot 0 is for the core file's revision. It shows what the slot held,
+It checks the FPGA first, as `make hwtest` does, and stops unless the
+flash chip, an S25FL256S on the R3 and an S25FL512S on the R4 to R6, and
+the core in slot 0 are those of the core file's revision. It shows what the slot held,
 and clears the protection of the slot's sectors, which openFPGALoader
 leaves set, with pyftdi (`pip install pyftdi`). It then writes and
 verifies the flash, and loads the slot's bitstream into the FPGA over

@@ -7,6 +7,7 @@ Usage:
                    [--bit synth/nexys4ddr/build/top.bit] [--erase]
     tools/flash.py --port DEVICE [--baud 230400]
                    --cor synth/r6/build/NiceMonMEGA65-r6.cor --slot N
+                   [--no-board-check]
 
     The Nexys4DDR's FPGA loads the bitstream from the board's quad SPI
     flash at power on, and when PROG is pressed, if jumper JP1 (MODE) is
@@ -41,8 +42,13 @@ How:
     A bitstream must be for the Nexys4DDR's part. A core file must have
     the header of coretool, for a board revision with the MEGA65's part,
     and fit in a slot. The R3 and R6 have the same part, so the script
-    also reads the header of the core in slot 0 and stops unless it is for
-    the core file's revision. It shows what the slot held before.
+    also stops unless the flash chip, which openFPGALoader names, is that
+    of the core file's revision: an S25FL256S of 32 MiB on the R3 and
+    R3A, and an S25FL512S of 64 MiB on the R4, R5, and R6
+    (tools/jtag.py). --no-board-check skips that, for a board whose flash
+    is not the usual one. It also reads the header of the core in slot 0
+    and stops unless it is for the core file's revision. It shows what
+    the slot held before.
 
     The MEGA65's flash protects each sector with its DYB bit, which
     openFPGALoader does not clear, so its erase fails. Between the reads
@@ -72,7 +78,8 @@ import sys
 import tempfile
 import time
 
-from jtag import bit_part, check_board, check_part, wait_port
+from jtag import FLASH_BOARDS, bit_part, check_board, check_part, \
+    flash_chip, wait_port
 from boardlink import DEFAULT_BAUD, CONTROL, Link, LinkError, Serial
 from spiflash import SpiFlashError, unprotect
 
@@ -98,6 +105,9 @@ HEADER = struct.Struct("<16s32s32s32sB")
 # The board revisions of the MEGA65's part, by coretool's code
 REVISIONS = {0x03: "mega65r3", 0x04: "mega65r4", 0x05: "mega65r5",
              0x06: "mega65r6"}
+# The flash chip of each board revision (tools/jtag.py)
+CHIPS = {0x03: "S25FL256S", 0x04: "S25FL512S", 0x05: "S25FL512S",
+         0x06: "S25FL512S"}
 
 
 def header(data: bytes) -> tuple[str, str, int, str] | None:
@@ -121,8 +131,10 @@ def describe(data: bytes) -> str:
     return "no core header"
 
 
-def dump(loader: list[str], offset: int, size: int) -> bytes:
-    """Reads size bytes of the flash from offset through the bridge. The
+def dump(loader: list[str], offset: int,
+         size: int) -> tuple[bytes, str | None]:
+    """Reads size bytes of the flash from offset through the bridge, and
+    returns them and the flash chip that openFPGALoader names. The
     loader options may skip loading the bridge, and the bridge stays in
     the FPGA afterwards (--skip-reset), for spiflash.py."""
     with tempfile.TemporaryDirectory() as tmp:
@@ -135,7 +147,7 @@ def dump(loader: list[str], offset: int, size: int) -> bytes:
             sys.exit(f"{r.stdout}{r.stderr}flash.py: openFPGALoader could "
                      f"not read the flash")
         with open(out, "rb") as f:
-            return f.read()
+            return f.read(), flash_chip(r.stdout + r.stderr)
 
 
 def control(port: str, baud: int, wait: float) -> int | None:
@@ -195,8 +207,20 @@ def flash_cor(args: argparse.Namespace) -> None:
 
     # The first dump loads the bridge; it stays in the FPGA until the
     # write resets it
-    factory = header(dump(loader, 0, HEADER_SIZE))
+    slot0, chip = dump(loader, 0, HEADER_SIZE)
     loader.append("--skip-load-bridge")
+    if args.no_board_check:
+        print("[NOTE] the flash chip is not checked", flush=True)
+    elif chip != CHIPS[code]:
+        has = f"an {chip}: {FLASH_BOARDS[chip][1]}" \
+            if chip in FLASH_BOARDS else f"no known flash chip ({chip})"
+        sys.exit(f"[FAIL] {args.cor} is for {rev}, which has an "
+                 f"{CHIPS[code]}, but the board has {has}; give the core "
+                 f"file of this board, or --no-board-check if its flash is "
+                 f"not the usual one")
+    else:
+        print(f"[PASS] flash {chip}, as {rev} has", flush=True)
+    factory = header(slot0)
     if factory is None:
         print("[WARN] slot 0 has no core header, so the board's revision is "
               "not known", flush=True)
@@ -209,7 +233,7 @@ def flash_cor(args: argparse.Namespace) -> None:
               flush=True)
     offset = args.slot * SLOT_SIZE
     print(f"slot {args.slot} held "
-          f"{describe(dump(loader, offset, HEADER_SIZE))}", flush=True)
+          f"{describe(dump(loader, offset, HEADER_SIZE)[0])}", flush=True)
 
     # The flash's sectors are protected by their DYBs, which openFPGALoader
     # does not clear (spiflash.py)
@@ -314,6 +338,9 @@ def main() -> None:
                         "instead")
     parser.add_argument("--slot", type=int,
                         help="MEGA65: the slot of the flash, 1 to 7")
+    parser.add_argument("--no-board-check", action="store_true",
+                        help="MEGA65: do not check that the flash chip is "
+                        "that of the core file's revision")
     args = parser.parse_args()
 
     if not sys.platform.startswith("linux"):
