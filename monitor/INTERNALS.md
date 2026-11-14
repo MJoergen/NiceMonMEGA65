@@ -95,7 +95,7 @@ of [SYSTEM.md §7](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#
   the same ID and port. `dns_parse` skips a name up to its 0 byte or its
   first compression pointer, which ends it: the names are never compared,
   so no pointer is followed, and a loop of pointers costs nothing.
-- **TCP** (issue #111), `monitor_tcp.nasm`, entries 26 to 30, keeps
+- **TCP** (issue #111), `monitor_tcp.nasm`, entries 26 to 31, keeps
   each connection in the program's control block: 32 words, a check
   word first, then the rings, received and sent, packed 4 bytes to a
   word. `V_TCB` at `0xFFFFF3A0` has the plain address of each handle's
@@ -107,6 +107,15 @@ of [SYSTEM.md §7](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#
   and the poll sends one ACK for all of them, by `tcp_work`. The
   checksum of a segment's data is summed in a pass of its own over the
   ring, not as the bytes are copied, so the copy stays simple.
+- **Listening.** A handle of `tcp_listen` has the flag `TF_PASSIVE`
+  for its whole life, and waits in the state LISTEN. A SYN that fits no
+  connection goes to the first handle in LISTEN on its port, which
+  takes the peer's address and port, and the MAC address of the frame's
+  source, so no ARP is sent. When the port has handles of `tcp_listen`,
+  but none in LISTEN, the SYN is passed over, with no RST, and the peer
+  sends it again. A failed handshake, by a RST, 15 seconds with no ACK,
+  or a new IP address, goes through `tcp_fail`, which puts a handle in
+  SYN-RECEIVED back in LISTEN, with the bytes that `tcp_send` took.
 - **The identification** of each IPv4 packet sent, of UDP, DHCP, and
   DNS, counts up by one from the fine clock at the cold start, with the
   "don't fragment" bit clear (RFC 6864).
@@ -189,8 +198,8 @@ a program, `demo.bin`, whose words
 <!-- romsize layout -->
 | Part | Address | Words |
 |---|---|---:|
-| The monitor | `0x0000`–`0x5784` | 22405 |
-| Free | `0x5785`–`0x7FFF` | 10363 |
+| The monitor | `0x0000`–`0x5896` | 22679 |
+| Free | `0x5897`–`0x7FFF` | 10089 |
 <!-- /romsize layout -->
 
 The monitor's words, by the source they come from, in the order
@@ -201,14 +210,14 @@ the Makefile joins them. The column "Text" counts the words of the
 <!-- romsize monitor -->
 | Source | What it is | Words | Text |
 |---|---|---:|---:|
-| `monitor.nasm` | The dispatch table, the HAL, the cold start, and the traps | 746 | 27 |
+| `monitor.nasm` | The dispatch table, the HAL, the cold start, and the traps | 748 | 27 |
 | `monitor_cmd.nasm` | The main loop and the commands | 3949 | 2394 |
 | `monitor_dis.nasm` | The disassembler of `u` | 1079 | 269 |
 | `monitor_sd.nasm` | The sector routines | 390 | 223 |
 | `monitor_eth.nasm` | The network | 2804 | 298 |
-| `monitor_tcp.nasm` | TCP | 2183 | 0 |
+| `monitor_tcp.nasm` | TCP | 2453 | 0 |
 | `monlib.nasm` | The routines that programs join | 259 | 0 |
-| `mon.nasm` | The stubs of the entries | 70 | 0 |
+| `mon.nasm` | The stubs of the entries | 72 | 0 |
 | `nicewasm` | `___wasm_start`, which copies the C code's data to the RAM | 85 |  |
 | `fat32.c` | FAT32 | 9102 |  |
 | `clock.c` | The clock and `time` | 1199 |  |
@@ -219,7 +228,7 @@ the Makefile joins them. The column "Text" counts the words of the
 | nice_cpu's `muldiv_mpu.nasm` | Multiply and divide | 128 | 0 |
 | `build/folder.nasm` | The error of a card without the folder | 27 | 27 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 5 | 5 |
-| In all | | 22405 | 3243 |
+| In all | | 22679 | 3243 |
 <!-- /romsize monitor -->
 
 - The C code's strings are in its initial values, four characters a

@@ -177,7 +177,7 @@ import sys
 import tempfile
 import threading
 import time
-from typing import Callable, TypeVar
+from typing import Callable, Optional, TypeVar
 
 from jtag import check_board
 # The SD controller's registers and its sectors, and FAT32 as the
@@ -212,6 +212,7 @@ SD_SLOT_COUNT = {"mega65": 2, "nexys4ddr": 1}
 UDP_PORT = 4511
 # The bytes that monitor/test/tcphw.nasm sends over TCP, and gets back
 TCP_BYTES = 16384
+TCP_LISTEN_PORT = 4600                  # where the board listens in the test of tcp_listen
 # The port's status, 0 while it is disabled
 ETH_CSR = 0xFFFFFFC0
 # The longest that the monitor's i dhcp takes: DHCP_TRIES DISCOVERs, and a
@@ -2114,11 +2115,13 @@ def test_eth_frames(link: Link, udp: str, ip: str) -> None:
     check("eth: the program halts after its answer", wait_halt(link) == 1)
 
 
-def test_eth_tcp(eth: str, ip: str, tmp: str) -> None:
+def test_eth_tcp(eth: str, ip: str, tmp: str, listen: bool = False) -> None:
     """Runs monitor/test/tcphw.nasm with run.py --eth --monitor --rom and
     the monitor of the tests: the program connects to a socket of this
-    computer, sends TCP_BYTES, which the computer echoes, compares them,
-    closes, and returns 0 once its handle is free (issue #111)."""
+    computer, or with listen, listens on TCP_LISTEN_PORT, where this
+    computer connects; then it sends TCP_BYTES, which the computer
+    echoes, compares them, closes, and returns 0 once its handle is free
+    (issue #111)."""
     subprocess.run(["make", "-s", "-C", f"{REPO}/monitor",
                     "build/monitor_test.bin", "build/tcphw.bin"], check=True)
     # This computer's address on the board's network
@@ -2126,19 +2129,36 @@ def test_eth_tcp(eth: str, ip: str, tmp: str) -> None:
         probe.connect((ip, 9))
         mine = probe.getsockname()[0]
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.bind((mine, 0))
-    server.listen(1)
-    server.settimeout(RUN_TIMEOUT + 10)
-    port = server.getsockname()[1]
+    if not listen:
+        server.bind((mine, 0))
+        server.listen(1)
+        server.settimeout(RUN_TIMEOUT + 10)
+    port = TCP_LISTEN_PORT if listen else server.getsockname()[1]
     got = bytearray()
     eof = [False]
     error = [""]
 
+    def accept() -> Optional[socket.socket]:
+        """The connection: the board's to the server, or this computer's
+        to the board, tried again until the board listens."""
+        if not listen:
+            try:
+                return server.accept()[0]
+            except OSError as e:
+                error[0] = f"no connection: {e}; a firewall may block it"
+                return None
+        end = time.monotonic() + RUN_TIMEOUT
+        while time.monotonic() < end:
+            try:
+                return socket.create_connection((ip, port), timeout=2)
+            except OSError as e:
+                error[0] = f"no connection to {ip}:{port}: {e}"
+                time.sleep(0.2)
+        return None
+
     def echo() -> None:
-        try:
-            conn, _ = server.accept()
-        except OSError as e:
-            error[0] = f"no connection: {e}; a firewall may block it"
+        conn = accept()
+        if conn is None:
             return
         with conn:
             conn.settimeout(RUN_TIMEOUT + 10)
@@ -2159,6 +2179,8 @@ def test_eth_tcp(eth: str, ip: str, tmp: str) -> None:
     with open(prog, "w") as f, open(f"{REPO}/monitor/build/tcphw.bin") as g:
         f.write(g.read())
         addr = struct.unpack(">I", socket.inet_aton(mine))[0]
+        if listen:
+            addr = 0
         f.write(f"00009000 {addr:08X}\n00009001 {port:08X}\n"
                 f"00009002 {TCP_BYTES:08X}\n")
     halt = os.path.join(tmp, "h.txt")
@@ -2173,7 +2195,9 @@ def test_eth_tcp(eth: str, ip: str, tmp: str) -> None:
     server.close()
     want = bytes((7 * i + (i >> 8)) & 0xFF for i in range(TCP_BYTES))
     ok = b"Returned 00000000" in board.stdout
-    check(f"eth: a program under the monitor connects to {mine}:{port}, "
+    how = (f"listens on port {port}, {mine} connects" if listen
+           else f"connects to {mine}:{port}")
+    check(f"eth: a program under the monitor {how}, "
           f"and {TCP_BYTES} bytes come back", ok,
           "" if ok else f"exit {board.returncode}: "
           f"{board.stdout[-300:]!r} {board.stderr[-300:]!r} {error[0]}")
@@ -2293,6 +2317,7 @@ def test_eth(port: str, baud: int, eth: str,
         test_run(["--eth", eth], programs, " over Ethernet")
         test_monitor(["--eth", eth], tmp, True, " over Ethernet", long=True)
         test_eth_tcp(eth, ip, tmp)
+        test_eth_tcp(eth, ip, tmp, listen=True)
         test_eth_dhcp(port, baud, rom)
     except (LinkError, OSError) as e:
         check(f"eth: {e}", False)

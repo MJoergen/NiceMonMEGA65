@@ -33,8 +33,8 @@
 ;   the entries 21 to 25 of the IP settings, DHCP, the poll, and DNS, i
 ;   dhcp, and tftp (issues #83, #84, and #111, README.md, "The network",
 ;   and INTERNALS.md, "The frame routines").
-; - monitor_tcp.nasm: TCP, the entries 26 to 30 of its clients, and their
-;   part of the poll (issue #111).
+; - monitor_tcp.nasm: TCP, the entries 26 to 31 of its clients and its
+;   servers, and their part of the poll (issue #111).
 ;
 ; Each has the .EQUs of its devices and its constants, and its texts, but
 ; the variables of all six are here, as one map of the RAM. The commands
@@ -232,6 +232,7 @@ SCR_MAX         .EQU    0x7FFF          ; the largest display offset
                 JMP     tcp_send        ; 28 at 0x38, monitor_tcp.nasm
                 JMP     tcp_recv        ; 29 at 0x3A, monitor_tcp.nasm
                 JMP     tcp_close       ; 30 at 0x3C, monitor_tcp.nasm
+                JMP     tcp_listen      ; 31 at 0x3E, monitor_tcp.nasm
 
 ; mon_reset: the cold start, entry 0, which reset runs and a program may
 ; call. E is cleared, the timer stopped, VBASE set to 0, the font base

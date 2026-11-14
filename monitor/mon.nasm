@@ -38,6 +38,7 @@ TCP_STATE       .EQU    0x36
 TCP_SEND        .EQU    0x38
 TCP_RECV        .EQU    0x3A
 TCP_CLOSE       .EQU    0x3C
+TCP_LISTEN      .EQU    0x3E
 
 _mon_reset
                 JMP     MON_RESET
@@ -101,6 +102,8 @@ _tcp_recv
                 JMP     TCP_RECV
 _tcp_close
                 JMP     TCP_CLOSE
+_tcp_listen
+                JMP     TCP_LISTEN
 _scr_getx
                 JMP     SCR_GETXY
 _scr_gety

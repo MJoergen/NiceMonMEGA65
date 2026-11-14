@@ -1,7 +1,7 @@
 ; The monitor's TCP, which the Makefile joins after monitor_eth.nasm
 ; (issue #111, README.md, "TCP", and INTERNALS.md, "TCP"): the entries 26
-; to 30 of a client, tcp_open, tcp_state, tcp_send, tcp_recv, and
-; tcp_close, for up to TCP_HANDLES connections at once, and their part of
+; to 31, tcp_open, tcp_state, tcp_send, tcp_recv, tcp_close, and
+; tcp_listen, for up to TCP_HANDLES connections at once, and their part of
 ; the poll: tcp_input, which net_frames calls for each segment, tcp_work,
 ; which net_step calls when a connection may have something to send, and
 ; tcp_timeout, which net_due calls when a connection's deadline is due.
@@ -33,6 +33,12 @@
 ; TF_ARM is set, or the end of FIN-WAIT-2, while TF_FW2 is. tcp_rearm puts
 ; the nearest of them in V_NDUE, for net_step. Times are on the fine
 ; clock, net_clock, compared by their signed difference.
+;
+; A handle of tcp_listen, TF_PASSIVE, waits in LISTEN for a SYN to its
+; port, which takes it to SYN-RECEIVED, and with the ACK of its SYN-ACK to
+; ESTABLISHED, as RFC 793's passive open: one connection for each handle.
+; A failed handshake, by a RST, a timeout, or a new IP address, brings it
+; back to LISTEN, with the bytes that tcp_send took.
 
 TCP_CB          .EQU    32              ; the words of a control block before its rings
 TCP_HANDLES     .EQU    4               ; the connections at once
@@ -46,6 +52,7 @@ TCP_RTOMAX      .EQU    60000000        ; and the largest, also of the probes of
 TCP_SYNTIME     .EQU    15000000        ; how long the SYN is sent
 TCP_GIVEUP      .EQU    120000000       ; how long data or a probe is sent with no answer
 TCP_FW2TIME     .EQU    60000000        ; how long FIN-WAIT-2 waits for the peer's FIN
+TCP_LINK        .EQU    4510            ; the station's port, the debug link's, which tcp_listen cannot have
 ; The words of a control block
 CB_CHECK        .EQU    0               ; TCP_CHECK while the ROM has the block
 CB_STATE        .EQU    1               ; the state, TS_, or the error, negative
@@ -80,7 +87,7 @@ CB_TXHEAD       .EQU    29              ; the byte of its first, at CB_SEQ0,
 CB_TXLEN        .EQU    30              ; and its bytes, sent or not
 ; The states, which T_TCPST turns into those of tcp_state. 0 is a handle
 ; that tcp_open has taken while it waits for ARP, which nothing else
-; reads.
+; reads. The states of a connection are 1 to TS_SYNRCVD.
 TS_SYNSENT      .EQU    1               ; SYN-SENT
 TS_ESTAB        .EQU    2               ; ESTABLISHED
 TS_CWAIT        .EQU    3               ; CLOSE-WAIT
@@ -88,6 +95,8 @@ TS_FINW1        .EQU    4               ; FIN-WAIT-1
 TS_FINW2        .EQU    5               ; FIN-WAIT-2
 TS_CLOSING      .EQU    6               ; CLOSING
 TS_LASTACK      .EQU    7               ; LAST-ACK
+TS_SYNRCVD      .EQU    8               ; SYN-RECEIVED
+TS_LISTEN       .EQU    9               ; LISTEN
 ; The flags of a block
 TF_ACK          .EQU    1               ; an ACK is owed
 TF_FIN          .EQU    2               ; closed by tcp_close: the FIN after the ring's bytes
@@ -96,6 +105,7 @@ TF_GIVEUP       .EQU    8               ; CB_GIVEUP counts
 TF_PROBE        .EQU    16              ; the send of a timeout, which takes a zero window as 1
 TF_ARM          .EQU    32              ; the deadline of a send again, or of a probe
 TF_FW2          .EQU    64              ; the deadline of FIN-WAIT-2
+TF_PASSIVE      .EQU    128             ; a handle of tcp_listen, in any state
 ; The flags of a segment
 TH_FIN          .EQU    1
 TH_SYN          .EQU    2
@@ -267,20 +277,14 @@ tlport_slot
                 RET
 
 ; tcp_init: the control block R7 set up for the sizes R1, as tcp_open
-; takes them: the rings empty, the timeout TCP_RTO0, the peer's MSS
-; TCP_MSS0, and the initial sequence number the fine clock plus 64000
-; times the connections opened since the cold start, V_TCOPENS. Uses
-; R1-R4.
+; takes them, by tcp_rings, then tcp_isn. Uses R1-R4.
 tcp_init
-                SHR     @CB_RXSZ[R7], R1, 16
-                AND     @CB_TXSZ[R7], R1, 0xFFFF
-                ADD     R1, R7, TCP_CB
-                SHL     R1, R1, 2
-                ADD     @CB_RXB[R7], R1, 0x20000000
-                MOVE    @CB_RXHEAD[R7], 0
-                MOVE    @CB_RXLEN[R7], 0
-                MOVE    @CB_TXHEAD[R7], 0
-                MOVE    @CB_TXLEN[R7], 0
+                CALL    tcp_rings
+; tcp_isn: the connection R7 set up to start: the timeout TCP_RTO0, the
+; peer's MSS TCP_MSS0, and the initial sequence number the fine clock plus
+; 64000 times the connections opened since the cold start, V_TCOPENS.
+; Uses R1-R4.
+tcp_isn
                 MOVE    @CB_RTO[R7], TCP_RTO0
                 MOVE    @CB_SRTT[R7], 0
                 MOVE    @CB_RTTVAR[R7], 0
@@ -302,6 +306,20 @@ tcp_init
                 MOVE    @CB_NXT[R7], R1
                 MOVE    @CB_MAX[R7], R1
                 ADD     @CB_SEQ0[R7], R1, 1
+                RET
+
+; tcp_rings: the rings of the control block R7 set up, empty, for the
+; sizes R1, as tcp_open takes them. Uses R1.
+tcp_rings
+                SHR     @CB_RXSZ[R7], R1, 16
+                AND     @CB_TXSZ[R7], R1, 0xFFFF
+                ADD     R1, R7, TCP_CB
+                SHL     R1, R1, 2
+                ADD     @CB_RXB[R7], R1, 0x20000000
+                MOVE    @CB_RXHEAD[R7], 0
+                MOVE    @CB_RXLEN[R7], 0
+                MOVE    @CB_TXHEAD[R7], 0
+                MOVE    @CB_TXLEN[R7], 0
                 RET
 
 ; tcp_hcb: R1 = the control block of the handle R1, with Z clear, or 0,
@@ -428,9 +446,10 @@ tcp_entry
 ; poll: a close drops the bytes received that wait, and those that come
 ; later, and puts the FIN after the bytes to send; the connection ends in
 ; the poll, and the handle frees itself. A close of a connection in an
-; error, or of one in SYN-SENT, frees the handle at once. An abort sends a
-; RST, but in SYN-SENT, and frees it at once, also during a close. R1 =
-; 0, or E_THANDLE. Uses R1-R6, and R7 and R8 across the calls, saved.
+; error, or of a handle in SYN-SENT or LISTEN, frees the handle at once,
+; and one in SYN-RECEIVED after a RST. An abort sends a RST, but in
+; SYN-SENT and LISTEN, and frees it at once, also during a close. R1 = 0,
+; or E_THANDLE. Uses R1-R6, and R7 and R8 across the calls, saved.
 tcp_close
                 PUSH    R7
                 PUSH    R8
@@ -444,12 +463,16 @@ tcp_close
         ?Z      JMP     tclose_end
                 MOVE[M] R1, @CB_STATE[R7]
         ?N      JMP     tclose_free     ; an error
+                CMP     R1, TS_LISTEN
+        ?Z      JMP     tclose_free     ; which sends nothing
                 TST     R8
         ?!Z     JMP     tclose_abort
                 AND[M]  R0, @CB_FLAGS[R7], TF_FIN
         ?!Z     JMP     tclose_ok       ; closing already
                 CMP     R1, TS_SYNSENT
         ?Z      JMP     tclose_free
+                CMP     R1, TS_SYNRCVD
+        ?Z      JMP     tclose_abort    ; a RST, and freed
                 CMP     R1, TS_ESTAB
         ?Z      MOVE    @CB_STATE[R7], TS_FINW1
                 CMP     R1, TS_CWAIT
@@ -467,6 +490,58 @@ tclose_ok
                 CALL    tcp_rearm
                 MOVE    R1, 0
 tclose_end
+                POP     R8
+                POP     R7
+                RET
+
+; tcp_listen: entry 31. R1 the word address of a control block, R2 a
+; local port, R3 the sizes of the rings, as R4 of tcp_open. A handle that
+; waits in LISTEN for a peer to connect to the port, which tcp_input's
+; tin_listen takes. Other handles may listen on the same port. Sends
+; nothing, and does not wait. R1 = the handle, 0 to 3, or E_NOIP, E_PORT,
+; for 0, past 65535, or TCP_LINK, E_TSIZE, or E_TFULL. Uses R1-R6, and
+; R7-R10 across the calls, saved: the block, the port, the sizes, and the
+; result.
+tcp_listen
+                PUSH    R7
+                PUSH    R8
+                PUSH    R9
+                PUSH    R10
+                MOVE    R7, R1
+                MOVE    R8, R2
+                MOVE    R9, R3
+                CALL    net_step
+                MOVE    R10, E_NOIP
+                TST     @E_IP
+        ?Z      JMP     tlisten_end
+                MOVE    R10, E_PORT
+                SUB     R1, R8, 1
+                CMP     R1, 0xFFFF
+        ?!C     JMP     tlisten_end     ; 0, or past 65535
+                CMP     R8, TCP_LINK
+        ?Z      JMP     tlisten_end
+                MOVE    R10, E_TSIZE
+                MOVE    R1, R7
+                MOVE    R2, R9
+                CALL    tcp_cbok
+                MOVE    R7, R1
+        ?Z      JMP     tlisten_end
+                MOVE    R10, E_TFULL
+                CALL    tcp_slot
+        ?Z      JMP     tlisten_end
+                MOVE    R10, R1         ; the handle's word of V_TCB
+                MOVE    @CB_LPORT[R7], R8
+                MOVE    R1, R9
+                CALL    tcp_rings
+                CALL    tcp_relisten
+                MOVE    @CB_CHECK[R7], TCP_CHECK
+                MOVE    @R10, R7
+                CALL    net_on
+                SUB     R10, R10, V_TCB  ; the handle
+tlisten_end
+                MOVE    R1, R10
+                POP     R10
+                POP     R9
                 POP     R8
                 POP     R7
                 RET
@@ -489,16 +564,29 @@ tcp_drop
 
 ; tcp_fail: the connection R7 ended in the error R1, which stays until
 ; tcp_close, with no deadline; after tcp_close the handle is freed at once
-; instead. Uses R1.
+; instead, and in SYN-RECEIVED it goes back to LISTEN. Uses R1.
 tcp_fail
                 AND[M]  R0, @CB_FLAGS[R7], TF_FIN
         ?!Z     JMP     tcp_drop
+                CMP     @CB_STATE[R7], TS_SYNRCVD
+        ?Z      JMP     tcp_relisten    ; which returns to the caller
                 MOVE    @CB_STATE[R7], R1
                 AND     @CB_FLAGS[R7], @CB_FLAGS[R7], 0xFFFFFFFF-TF_ARM-TF_FW2
                 RET
 
+; tcp_relisten: the handle of tcp_listen R7 back in LISTEN, after a failed
+; handshake: the peer's address and port, and the deadlines, cleared; the
+; local port, and the bytes that tcp_send took, kept. Uses no register.
+tcp_relisten
+                MOVE    @CB_STATE[R7], TS_LISTEN
+                MOVE    @CB_FLAGS[R7], TF_PASSIVE
+                MOVE    @CB_RIP[R7], 0
+                MOVE    @CB_RPORT[R7], 0
+                RET
+
 ; tcp_resetall: every connection ended in E_TRESET, as the IP address
-; changed, with no RST. Uses R1-R3.
+; changed, with no RST; one in SYN-RECEIVED goes back to LISTEN, as
+; tcp_fail has it, and a handle in LISTEN stays. Uses R1-R3.
 tcp_resetall
                 PUSH    R7
                 MOVE    R2, V_TCB
@@ -507,8 +595,8 @@ tcp_resetall
         ?Z      JMP     :+
                 MOVE    R1, @CB_STATE[R7]
                 SUB     R1, R1, TS_SYNSENT
-                CMP     R1, TS_LASTACK
-        ?!C     JMP     :+              ; neither 1 to 7
+                CMP     R1, TS_SYNRCVD
+        ?!C     JMP     :+              ; no connection
                 MOVE    R1, E_TRESET
                 CALL    tcp_fail
 :
@@ -519,7 +607,7 @@ tcp_resetall
 
 ; tcp_close_all: for net_close, at the cold start, mon_exit, and
 ; mon_trap: a RST at best effort for each connection that has one, and
-; every handle freed. The block of a handle is trusted only if its address
+; every handle freed, with none for a handle in LISTEN. The block of a handle is trusted only if its address
 ; is one that tcp_open takes, and its check word is TCP_CHECK, as a host
 ; may have loaded another program over it. Uses R1-R6, and R7 and R8
 ; across the calls, saved.
@@ -539,8 +627,8 @@ tcp_close_all
                 MOVE    @CB_CHECK[R7], 0
                 MOVE    R1, @CB_STATE[R7]
                 SUB     R1, R1, TS_ESTAB
-                CMP     R1, TS_LASTACK-TS_ESTAB+1
-        ?C      CALL    tcp_rst         ; ESTABLISHED to LAST-ACK
+                CMP     R1, TS_SYNRCVD-TS_ESTAB+1
+        ?C      CALL    tcp_rst         ; ESTABLISHED to SYN-RECEIVED, not LISTEN
 :
                 CMP     R8, V_TCB+TCP_HANDLES+1
         ?!Z     JMP     :--
@@ -690,7 +778,7 @@ tcp_timeout
                 RET
 
 ; tcp_out: what the connection R7 has to send, sent: in SYN-SENT the SYN,
-; unless it is in flight; from ESTABLISHED to LAST-ACK, the bytes of the
+; and in SYN-RECEIVED the SYN-ACK, unless it is in flight; from ESTABLISHED to LAST-ACK, the bytes of the
 ; ring not sent, in segments of up to the peer's MSS, as far as the
 ; smaller of its window and the congestion window lets them go from
 ; SND.UNA, then after tcp_close the FIN; and when none of those went, a
@@ -703,12 +791,16 @@ tcp_out
                 PUSH    R10
                 MOVE    R10, 0
                 MOVE    R1, @CB_STATE[R7]
+                MOVE    R4, TH_SYN
                 CMP     R1, TS_SYNSENT
+        ?Z      JMP     :+
+                MOVE    R4, TH_SYN+TH_ACK
+                CMP     R1, TS_SYNRCVD
         ?!Z     JMP     tout_data
+:
                 CMP     @CB_NXT[R7], @CB_UNA[R7]
         ?!Z     JMP     tout_end        ; the SYN in flight
                 MOVE    R2, @CB_UNA[R7]
-                MOVE    R4, TH_SYN
                 MOVE    R5, 0
                 CALL    tout_seg
                 JMP     tout_end
@@ -803,8 +895,8 @@ tcp_arm
         ?!Z     RET
                 MOVE    R1, @CB_STATE[R7]
                 SUB     R1, R1, TS_SYNSENT
-                CMP     R1, TS_LASTACK
-        ?!C     JMP     tarm_off        ; neither 1 to 7
+                CMP     R1, TS_SYNRCVD
+        ?!C     JMP     tarm_off        ; no connection
                 CMP     @CB_NXT[R7], @CB_UNA[R7]
         ?!Z     JMP     tarm_on         ; in flight
                 SUB     R1, @CB_NXT[R7], @CB_SEQ0[R7]
@@ -888,7 +980,8 @@ tcp_wcalc
         ?!C     MOVE    R2, TCP_MSS
                 RET
 
-; tcp_count: R1 = the connections, the handles in SYN-SENT to LAST-ACK.
+; tcp_count: R1 = the connections, the handles in SYN-SENT to
+; SYN-RECEIVED, and not those in LISTEN.
 ; Uses R1-R3.
 tcp_count
                 MOVE    R1, 0
@@ -898,7 +991,7 @@ tcp_count
         ?Z      JMP     :+
                 MOVE    R3, @CB_STATE[R3]
                 SUB     R3, R3, TS_SYNSENT
-                CMP     R3, TS_LASTACK
+                CMP     R3, TS_SYNRCVD
         ?C      ADD     R1, R1, 1
 :
                 CMP     R2, V_TCB+TCP_HANDLES
@@ -1063,8 +1156,10 @@ tcp_fold
 ; for net_frames to release. A segment that is not to E_IP, is shorter
 ; than its lengths say, or has a bad checksum, is passed over. One that
 ; fits a connection, by its addresses and ports, goes to it, as RFC 9293
-; §3.10.7 says for its state; one that fits none gets a RST, unless it is
-; a RST (§3.10.7.1). R8 is the segment's flags, R9 its sequence number,
+; §3.10.7 says for its state. A SYN without an ACK that fits none goes to
+; the first handle in LISTEN on its port, and is passed over when the port
+; has handles of tcp_listen, but none in LISTEN. Any other segment that
+; fits none gets a RST, unless it is a RST (§3.10.7.1). R8 is the segment's flags, R9 its sequence number,
 ; R10 its bytes of data, R11 the window announced, and R12 the sequence
 ; number less RCV.NXT. Uses R1-R6, and R7-R12 across the calls, saved.
 tcp_input
@@ -1099,13 +1194,18 @@ tcp_input
                 MOVE    R9, @V_NHDR+10
                 CALL    tcp_find
         ?Z      JMP     tin_none
-                CMP     @CB_STATE[R7], TS_SYNSENT
+                MOVE    R1, @CB_STATE[R7]
+                CMP     R1, TS_SYNSENT
         ?Z      JMP     tin_synsent
+                CMP     R1, TS_SYNRCVD
+        ?Z      JMP     tin_synrcvd
 ; ESTABLISHED to LAST-ACK (RFC 9293 §3.10.7.4). A RST in the window ends
-; the connection. A segment with data is acceptable when it starts at
-; RCV.NXT, and there is room, or after tcp_close, which drops its bytes;
-; one without, when it starts in the window, or at RCV.NXT. Else it is
-; answered with an ACK, and passed over.
+; the connection, or brings one in SYN-RECEIVED back to LISTEN. A segment
+; with data is acceptable when it starts at RCV.NXT, and there is room, or
+; after tcp_close, which drops its bytes; one without, when it starts in
+; the window, or at RCV.NXT. Else it is answered with an ACK, and passed
+; over.
+tin_est
                 SUB     R11, @CB_EDGE[R7], @CB_RNXT[R7]
                 SUB     R12, R9, @CB_RNXT[R7]
                 AND[M]  R0, R8, TH_RST
@@ -1220,6 +1320,7 @@ tin_synsent
         ?Z      JMP     tin_noack
                 AND[M]  R0, R8, TH_RST
         ?!Z     JMP     tin_end
+tin_ackrst
                 MOVE    R1, R7
                 MOVE    R2, @V_NHDR+11
                 MOVE    R3, 0
@@ -1251,26 +1352,52 @@ tin_noack
                 MOVE    @CB_STATE[R7], TS_ESTAB
                 OR      @CB_FLAGS[R7], @CB_FLAGS[R7], TF_ACK
                 JMP     tin_work
-; A segment that fits no connection: a RST, unless it is one, to the
-; source of the frame, unless that is 0, a broadcast, or multicast. With
-; an ACK, the RST has its number; else the ACK of the segment.
+; SYN-RECEIVED (RFC 9293 §3.10.7.4): a RST goes to tin_est, which takes
+; one in the window; the SYN again, with the same sequence number, gets
+; the SYN-ACK again, and any other SYN is passed over; the ACK of our SYN
+; opens the connection, and its data and FIN go on in tin_est; any other
+; ACK gets a RST with its number; a segment without an ACK is passed over.
+tin_synrcvd
+                AND[M]  R0, R8, TH_RST
+        ?!Z     JMP     tin_est
+                AND[M]  R0, R8, TH_SYN
+        ?Z      JMP     :+
+                ADD     R1, R9, 1
+                CMP     R1, @CB_RNXT[R7]
+        ?!Z     JMP     tin_end
+                MOVE    @CB_NXT[R7], @CB_UNA[R7]  ; for tcp_out, from tcp_work
+                JMP     tin_work
+:
+                AND[M]  R0, R8, TH_ACK
+        ?Z      JMP     tin_end
+                ADD     R1, @CB_UNA[R7], 1
+                CMP     @V_NHDR+11, R1
+        ?!Z     JMP     tin_ackrst
+                MOVE    @CB_STATE[R7], TS_ESTAB
+                CALL    tcp_acked
+                SHL     @CB_CWND[R7], @CB_MSS[R7], 1
+                JMP     tin_est
+; A segment that fits no connection. A SYN without an ACK goes to the
+; first handle in LISTEN on its port, tin_listen, or is passed over when
+; the port has handles of tcp_listen, but none in LISTEN. Any other gets a
+; RST, unless it is one, to the source of the frame, unless that is 0,
+; ours, a broadcast, or multicast. With an ACK, the RST has its number;
+; else the ACK of the segment.
 tin_none
+                AND     R1, R8, TH_SYN+TH_ACK+TH_RST
+                CMP     R1, TH_SYN
+        ?!Z     JMP     tin_rst
+                AND     R5, @V_NHDR+9, 0xFFFF
+                CALL    tcp_lfind
+        ?!Z     JMP     tin_listen
+                TST     R6
+        ?!Z     JMP     tin_end         ; every handle of the port busy
+tin_rst
                 AND[M]  R0, R8, TH_RST
         ?!Z     JMP     tin_end
-                MOVE    R1, @V_NHDR+7
-                ADD     R2, R1, 1
-                CMP     R2, 2
-        ?C      JMP     tin_end         ; 0 or 255.255.255.255
-                SHR     R2, R1, 28
-                CMP     R2, 14
-        ?!C     JMP     tin_end         ; 224.0.0.0 and up
-                MOVE    @V_TCR+CB_RIP, R1
-                SHR     @V_TCR+CB_RPORT, @V_NHDR+9, 16
-                AND     @V_TCR+CB_LPORT, @V_NHDR+9, 0xFFFF
-                SHR     @V_TCR+CB_MACH, @V_NHDR+2, 16
-                SHL     R1, @V_NHDR+2, 16
-                SHR     R2, @V_NHDR+3, 16
-                OR      @V_TCR+CB_MACL, R1, R2
+                MOVE    R1, V_TCR
+                CALL    tcp_peer
+        ?Z      JMP     tin_end
                 AND[M]  R0, R8, TH_ACK
         ?Z      JMP     :+
                 MOVE    R2, @V_NHDR+11
@@ -1290,6 +1417,26 @@ tin_none
                 MOVE    R5, 0
                 CALL    tcp_emit
                 JMP     tin_end
+; LISTEN (RFC 9293 §3.10.7.2): the SYN taken by the handle R7, with the
+; peer's address, port, and MAC address, so no ARP, its MSS and window,
+; and RCV.NXT past its SYN; its data, if any, is not taken. SYN-RECEIVED
+; then, and tcp_work sends the SYN-ACK, which goes for TCP_SYNTIME.
+tin_listen
+                MOVE    R1, R7
+                CALL    tcp_peer
+        ?Z      JMP     tin_end
+                CALL    tcp_isn
+                ADD     R1, R9, 1
+                MOVE    @CB_RNXT[R7], R1
+                MOVE    @CB_EDGE[R7], R1
+                CALL    tcp_optmss
+                MOVE    @CB_MSS[R7], R1
+                SHL     @CB_CWND[R7], R1, 1
+                AND     @CB_WND[R7], @V_NHDR+12, 0xFFFF
+                MOVE    @CB_STATE[R7], TS_SYNRCVD
+                CALL    net_clock
+                ADD     @CB_GIVEUP[R7], R1, TCP_SYNTIME
+                MOVE    @CB_FLAGS[R7], TF_PASSIVE+TF_GIVEUP
 tin_work
                 MOVE    @V_TCWORK, 1
 tin_end
@@ -1334,7 +1481,7 @@ tcp_rxsum
                 RET
 
 ; tcp_find: R7 = the control block of the connection, in SYN-SENT to
-; LAST-ACK, that the segment at V_NHDR fits by its source's address and
+; SYN-RECEIVED, that the segment at V_NHDR fits by its source's address and
 ; port and its destination port, with Z clear, or 0, with Z set. Uses
 ; R1-R6.
 tcp_find
@@ -1347,7 +1494,7 @@ tfind_next
         ?Z      JMP     tfind_skip
                 MOVE    R1, @CB_STATE[R7]
                 SUB     R1, R1, TS_SYNSENT
-                CMP     R1, TS_LASTACK
+                CMP     R1, TS_SYNRCVD
         ?!C     JMP     tfind_skip
                 CMP     @CB_LPORT[R7], R5
         ?!Z     JMP     tfind_skip
@@ -1361,6 +1508,58 @@ tfind_skip
                 CMP     R2, V_TCB+TCP_HANDLES
         ?!Z     JMP     tfind_next
                 MOVE[M] R7, R0
+                RET
+
+; tcp_lfind: R7 = the first handle in LISTEN on the port R5, with Z
+; clear; or 0, with Z set, and R6 not 0 when the port has handles of
+; tcp_listen in other states. Uses R2, R6, and R7.
+tcp_lfind
+                MOVE    R6, 0
+                MOVE    R2, V_TCB
+tlfind_next
+                MOVE[M] R7, @R2++
+        ?Z      JMP     tlfind_skip
+                AND[M]  R0, @CB_FLAGS[R7], TF_PASSIVE
+        ?Z      JMP     tlfind_skip
+                CMP     @CB_LPORT[R7], R5
+        ?!Z     JMP     tlfind_skip
+                MOVE    R6, 1
+                CMP     @CB_STATE[R7], TS_LISTEN
+        ?!Z     JMP     tlfind_skip
+                MOVE[M] R7, R7
+                RET
+tlfind_skip
+                CMP     R2, V_TCB+TCP_HANDLES
+        ?!Z     JMP     tlfind_next
+                MOVE[M] R7, R0
+                RET
+
+; tcp_peer: the block R1, a control block or V_TCR, given the peer of the
+; segment at V_NHDR: its address, its port, the local port, and the MAC
+; address of the frame's source, with Z clear; or with Z set, and nothing
+; written, when the source address is 0, ours, a broadcast, or multicast.
+; Uses R1-R3.
+tcp_peer
+                MOVE    R2, @V_NHDR+7
+                ADD     R3, R2, 1
+                CMP     R3, 2
+        ?C      JMP     tpeer_no        ; 0 or 255.255.255.255
+                SHR     R3, R2, 28
+                CMP     R3, 14
+        ?!C     JMP     tpeer_no        ; 224.0.0.0 and up
+                CMP     R2, @E_IP
+        ?Z      RET                     ; ours, with Z set
+                MOVE    @CB_RIP[R1], R2
+                SHR     @CB_RPORT[R1], @V_NHDR+9, 16
+                AND     @CB_LPORT[R1], @V_NHDR+9, 0xFFFF
+                SHR     @CB_MACH[R1], @V_NHDR+2, 16
+                SHL     R2, @V_NHDR+2, 16
+                SHR     R3, @V_NHDR+3, 16
+                OR      @CB_MACL[R1], R2, R3
+                MOVE[M] R1, R1          ; not 0, with Z clear
+                RET
+tpeer_no
+                MOVE[M] R1, R0
                 RET
 
 ; tcp_acked: the ACK R1 of new data, up to CB_MAX, taken by the connection
@@ -1547,5 +1746,5 @@ q_byte
 
 ; The states of tcp_state, by the states of a block, and the share of the
 ; window budget, 4096 bytes, of each connection, by their number
-T_TCPST         .DAT    0, 1, 2, 3, 4, 4, 4, 4
+T_TCPST         .DAT    0, 1, 2, 3, 4, 4, 4, 4, 1, 5
 T_SHARE         .DAT    4096, 4096, 2048, 1365, 1024

@@ -919,7 +919,10 @@ the monitor, and types the monitor's `i`, the IP address,
 and CR as console bytes over the UART, as a terminal would, and reads
 the address back in a pause. It pings the address and checks the
 station's counts. It pauses the monitor over the link on TCP and reads the address again, and
-then runs the programs above, and the monitor's, with `run.py --eth`. The address must be
+then runs the programs above, and the monitor's, with `run.py --eth`.
+Then `monitor/test/tcphw.nasm`, under the monitor, connects to a socket
+of this computer, which echoes 16 KB; then it listens on port 4600,
+where this computer connects, and the same echo runs. The address must be
 free on the network. If no frame at all reaches the station during the
 ping, the board has no Ethernet connection, or the address is not on
 this computer's network: the rest is not run, and the summary names it
@@ -962,8 +965,8 @@ script that answers ARP for 10.0.0.2 and passes its datagrams to
 `tftpd.py`, and checks that `tftp` lists the folder, loads a program,
 and shows an ERROR. It takes about a second.
 
-`make tcptest` runs `tools/tcptest.py`, the test of TCP's clients, the
-entries 26 to 30 (issue #111). It has two parts.
+`make tcptest` runs `tools/tcptest.py`, the test of TCP, its clients
+and its servers, the entries 26 to 31 (issue #111). It has two parts.
 
 - The first runs `monitor/test/tcp.nasm` under the monitor of the
   tests in `niceemu` with `--eth-udp`. Its frames go to
@@ -976,11 +979,18 @@ entries 26 to 30 (issue #111). It has two parts.
   side; segments out of order, twice, lost, with a bad checksum, and in
   a burst that the queue cannot hold; four connections and a fifth;
   the budget of the windows; the wrap of the clock; a new IP address;
-  and the errors of each entry. It checks what the program stores, and
-  every segment that the peer saw. Then it runs `monitor/test/tcp_c.c`,
-  which calls the entries from C through `mon_c.nasm`, and
-  `monitor/test/tcphw.nasm`, the program of `make hwtest`. This part
-  takes about 15 seconds, in real time.
+  and the errors of each entry. Then the program listens, and sends
+  the peer a datagram that names the case, so that the peer connects:
+  a close of a handle that listens; data in the ACK that opens, and
+  bytes sent while listening; an ACK to the port, and a SYN to a port
+  where nothing listens; a close by the board first, with the peer's
+  FIN again; two handles on a port, with a third peer passed over until
+  one listens again; and a RST, the SYN again, and a wrong ACK in
+  SYN-RECEIVED. It checks what the program stores, and every segment
+  that the peer saw. Then it runs `monitor/test/tcp_c.c`, which calls
+  the entries from C through `mon_c.nasm`, and
+  `monitor/test/tcphw.nasm`, the program of `make hwtest`, as a client
+  and as a server. This part takes about 15 seconds, in real time.
 - The second runs `monitor/test/tcpt.nasm` with `--step-time`, one
   case a run, and with `--eth-in` and `--eth-out`. A frame of
   `--eth-in` arrives right after the frame it answers, so the script
@@ -989,8 +999,8 @@ entries 26 to 30 (issue #111). It has two parts.
   `WAIT`, which `niceemu` jumps over, so minutes take a second. It
   checks the SYN's 15 seconds, the 120 seconds of giving up, the 60
   seconds after our FIN, the probes of a zero window out to 60 seconds,
-  and a connection idle for 4300 seconds, past a wrap of the
-  microseconds.
+  a connection idle for 4300 seconds, past a wrap of the microseconds,
+  and the SYN-ACK's 15 seconds, after which a handle listens again.
 
 `make sdtest` runs `tools/sdtest.py`. It makes images of a card with
 `mkfs.fat`, `sfdisk`, and `mtools`: FAT32 on the whole card, with a

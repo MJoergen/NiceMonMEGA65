@@ -34,3 +34,6 @@ _c_tcp_send
 _c_tcp_recv
                 ADD     R2, R2, 0x20000000+4*___wasm_memory
                 JMP     TCP_RECV
+_c_tcp_listen
+                ADD     R1, R1, 0x10000000+4*___wasm_memory
+                JMP     TCP_LISTEN

@@ -1,11 +1,12 @@
-; The test of TCP's clients, the entries 26 to 30 (issue #111), which
+; The test of TCP, the entries 26 to 31 (issue #111), which
 ; tools/tcptest.py runs under the monitor of the tests in niceemu with
 ; --eth-udp, against tools/tcppeer.py, the host 10.0.0.2. The Makefile
 ; assembles it after the monitor's sources, as for dns.nasm, so that it
 ; reaches the monitor's names. Each case connects to a port of its own,
 ; whose Script in tcptest.py decides what the peer does, and stores its
 ; results from TT_RES on, which tcptest.py dumps and checks, with what the
-; peer saw.
+; peer saw. In the cases of tcp_listen, from R on, the peer connects to
+; the board, when a datagram from the program says which case listens.
 
                 .ORG    0x8000
 TT_RES          .EQU    0x9100          ; the results, a word each
@@ -20,10 +21,13 @@ TT_TXB          .EQU    0x20000000+4*TT_TX
 TT_RXB          .EQU    0x20000000+4*TT_RX
 TT_PEER         .EQU    0x0A000002      ; tcppeer.py's address
 TT_SEC          .EQU    1000000
+TT_SIG          .EQU    7000            ; the UDP port of the signals, the program's and the peer's
+TT_SIGW         .EQU    0x9000          ; the word of a signal's byte
 
 tt_main
                 MOVE    R7, TT_RES
-; The errors before a connection: no IP address, E_NOIP; then, with
+; The errors before a connection: no IP address, E_NOIP, of tcp_open and
+; tcp_listen; then, with
 ; 10.0.0.9 set, the ports 0 and 65536, E_PORT; a ring of 63 bytes to
 ; receive, and to send, a block at a word-window address that is not
 ; aligned, and one below 0x8000, E_TSIZE; an address that answers no
@@ -33,6 +37,11 @@ tt_main
                 MOVE    R2, 2001
                 MOVE    R3, 0x04000400
                 CALL    tt_open
+                MOVE    R1, TT_CB0
+                MOVE    R2, 3000
+                MOVE    R3, 0x04000400
+                CALL    _tcp_listen
+                MOVE    @R7++, R1       ; E_NOIP
                 MOVE    R1, TT_SET
                 CALL    _net_set
                 MOVE    R8, TT_BAD
@@ -352,6 +361,12 @@ tt_main
                 MOVE    R3, 0x01000100
                 CALL    tt_open
                 CALL    tt_waitopen
+                MOVE    R1, TT_CB1      ; and a handle that listens, which stays
+                MOVE    R2, 3005
+                MOVE    R3, 0x01000100
+                CALL    _tcp_listen
+                MOVE    R10, R1
+                MOVE    @R7++, R1       ; 1
                 MOVE    @TT_SET, 0x0A00000A
                 MOVE    R1, TT_SET
                 CALL    _net_set
@@ -359,9 +374,153 @@ tt_main
                 CALL    _tcp_state
                 MOVE    @R7++, R1       ; E_TRESET
                 CALL    tt_close
+                MOVE    R1, R10
+                CALL    _tcp_state
+                MOVE    @R7++, R1       ; 5, TCP_LISTEN
+                MOVE    R1, R10
+                MOVE    R2, 0
+                CALL    _tcp_close
+                MOVE    @R7++, R1       ; 0
                 MOVE    @TT_SET, 0x0A000009
                 MOVE    R1, TT_SET
                 CALL    _net_set
+; The cases of tcp_listen. The UDP endpoint stays open on TT_SIG through
+; them, which keeps the network on, and tt_signal tells the peer which
+; case listens.
+                MOVE    R1, TT_SIG
+                CALL    _udp_open
+                MOVE    @R7++, R1       ; TT_SIG
+; Case R: the errors of tcp_listen: E_PORT for the ports 0, 65536, and
+; 4510, the station's, and E_TSIZE for a ring of 63 bytes, and a block not
+; aligned
+                MOVE    R8, TL_BAD
+:
+                MOVE[M] R1, @R8++
+        ?Z      JMP     :+
+                MOVE    R2, @R8++
+                MOVE    R3, @R8++
+                CALL    _tcp_listen
+                MOVE    @R7++, R1
+                JMP     :-
+:
+; Case S, port 3000: a handle that listens takes bytes to send, has none
+; to read, and closes at once, with nothing sent
+                MOVE    R1, TT_CB0
+                MOVE    R2, 3000
+                MOVE    R3, 0x01000100
+                CALL    tl_listen
+                MOVE    R1, R8
+                CALL    _tcp_state
+                MOVE    @R7++, R1       ; 5, TCP_LISTEN
+                MOVE    R1, R8
+                MOVE    R2, TT_TXB
+                MOVE    R3, 5
+                CALL    _tcp_send
+                MOVE    @R7++, R1       ; 5
+                MOVE    R1, R8
+                MOVE    R2, TT_RXB
+                MOVE    R3, 5
+                CALL    _tcp_recv
+                MOVE    @R7++, R1       ; 0
+                MOVE    R1, R8
+                MOVE    R2, 0
+                CALL    _tcp_close
+                MOVE    @R7++, R1       ; 0
+                MOVE    R1, R8
+                CALL    _tcp_state
+                MOVE    @R7++, R1       ; 0, TCP_FREE
+; Case T, port 3001: 5 bytes taken while listening, signal 1; the peer
+; sends an ACK to the port, which gets a RST, and a SYN to port 3099,
+; where nothing listens, which gets one too; then it connects, with data
+; in the ACK that opens, 1000 bytes, and its FIN; the 5 bytes go after
+; the handshake
+                MOVE    R1, 5
+                MOVE    R2, 0x41
+                MOVE    R3, 1
+                CALL    tt_fill
+                MOVE    R1, TT_CB0
+                MOVE    R2, 3001
+                MOVE    R3, 0x08000100
+                CALL    tl_listen
+                MOVE    R1, R8
+                MOVE    R2, TT_TXB
+                MOVE    R3, 5
+                CALL    _tcp_send
+                MOVE    @R7++, R1       ; 5
+                MOVE    R1, 1
+                CALL    tl_signal
+                CALL    tl_waitopen
+                CALL    tl_recveof
+                MOVE    R1, R8
+                CALL    _tcp_state
+                MOVE    @R7++, R1       ; 3, TCP_PEER_CLOSED
+                CALL    tt_close
+; Case U, port 3002: the board closes first, after 100 bytes; the peer's
+; FIN again, after the board's last ACK, gets a RST, while the program
+; polls
+                MOVE    R1, TT_CB0
+                MOVE    R2, 3002
+                MOVE    R3, 0x01000100
+                CALL    tl_listen
+                MOVE    R1, 2
+                CALL    tl_signal
+                CALL    tt_waitopen
+                MOVE    R1, 100
+                MOVE    R2, 9
+                MOVE    R3, 1
+                CALL    tt_fill
+                MOVE    R1, R8
+                MOVE    R2, 100
+                CALL    tt_sendall
+                MOVE    @R7++, R1       ; 100
+                CALL    tt_close
+                MOVE    R1, TT_SEC
+                CALL    tt_sleep
+; Case V, port 3003: two handles take two peers; a third peer's SYNs are
+; passed over while both are busy, and taken once the first handle
+; listens again
+                MOVE    R1, TT_CB0
+                MOVE    R2, 3003
+                MOVE    R3, 0x01000100
+                CALL    tl_listen
+                MOVE    R10, R8
+                MOVE    R1, TT_CB1
+                MOVE    R2, 3003
+                MOVE    R3, 0x01000100
+                CALL    tl_listen
+                MOVE    R11, R8
+                MOVE    R1, 3
+                CALL    tl_signal
+                MOVE    R8, R10
+                CALL    tt_waitopen
+                MOVE    R8, R11
+                CALL    tt_waitopen
+                MOVE    R8, R10
+                CALL    tl_recveof      ; the first peer's 10 bytes
+                CALL    tt_close
+                MOVE    R1, TT_CB0
+                MOVE    R2, 3003
+                MOVE    R3, 0x01000100
+                CALL    tl_listen       ; the handle again
+                CALL    tl_waitopen
+                CALL    tl_recveof      ; the third peer's 30
+                CALL    tt_close
+                MOVE    R8, R11
+                CALL    tl_recveof      ; the second's 20
+                CALL    tt_close
+; Case W, port 3004: in SYN-RECEIVED, the SYN again gets the SYN-ACK
+; again, a wrong ACK gets a RST, and a RST brings the handle back to
+; LISTEN, with no error; then another peer connects, and sends 40 bytes
+                MOVE    R1, TT_CB0
+                MOVE    R2, 3004
+                MOVE    R3, 0x04000100
+                CALL    tl_listen
+                MOVE    R1, 4
+                CALL    tl_signal
+                CALL    tl_waitopen
+                CALL    tl_recveof
+                CALL    tt_close
+                CALL    _udp_close
                 MOVE    @R7++, @ETH_CSR  ; 0, the port disabled
                 SUB     R1, R7, TT_RES
                 RET
@@ -379,6 +538,67 @@ TT_BAD          .DAT    TT_CB0, TT_PEER, 0, 0x04000400
                 .DAT    TT_CB0, 0xFFFFFFFF, 2001, 0x04000400
                 .DAT    0
 TT_CBS          .DAT    TT_CB0, TT_CB1, TT_CB2
+
+; The calls of tcp_listen that fail: the block, the port, and the sizes,
+; up to a 0
+TL_BAD          .DAT    TT_CB0, 0, 0x01000100
+                .DAT    TT_CB0, 0x10000, 0x01000100
+                .DAT    TT_CB0, 4510, 0x01000100
+                .DAT    TT_CB0, 3000, 0x003F0100
+                .DAT    0x10000001+4*TT_CB0, 3000, 0x01000100
+                .DAT    0
+
+; tl_listen: tcp_listen of the block R1 on the port R2, with the sizes R3.
+; R8 = the handle, which is stored. Uses R1-R6.
+tl_listen
+                CALL    _tcp_listen
+                MOVE    R8, R1
+                MOVE    @R7++, R1
+                RET
+
+; tl_signal: a datagram of the byte R1 to the peer's port TT_SIG, which
+; starts its side of a case. Uses R1-R6.
+tl_signal
+                MOVE    @TT_SIGW, R1
+                MOVE    R1, TT_PEER
+                MOVE    R2, TT_SIG
+                MOVE    R3, TT_SIGW
+                MOVE    R4, 1
+                JMP     _udp_send
+
+; tl_waitopen: polls R8 with tcp_state until it leaves the handshake and
+; TCP_LISTEN, or 20 seconds passed, and stores the state: TCP_OPEN, or
+; TCP_PEER_CLOSED when the peer's FIN came first. Uses R1-R6, and R9,
+; saved.
+tl_waitopen
+                PUSH    R9
+                MOVE    R9, @io.us
+:
+                MOVE    R1, R8
+                CALL    _tcp_state
+                CMP     R1, 1
+        ?Z      JMP     :+
+                CMP     R1, 5
+        ?!Z     JMP     :++
+:
+                SUB     R2, @io.us, R9
+                CMP     R2, 20*TT_SEC
+        ?C      JMP     :--
+:
+                MOVE    @R7++, R1
+                POP     R9
+                RET
+
+; tl_recveof: tt_recvall of R8 up to 4096 bytes, with the bytes, their
+; hash, and the last result of tcp_recv stored. Uses R1-R6.
+tl_recveof
+                MOVE    R1, R8
+                MOVE    R2, 4096
+                CALL    tt_recvall
+                MOVE    @R7++, R1
+                MOVE    @R7++, R2
+                MOVE    @R7++, R3
+                RET
 
 ; tt_open: tcp_open of the block R1 to the port R2 of tcppeer.py, with the
 ; sizes R3. R8 = the result, which is stored. Uses R1-R6.

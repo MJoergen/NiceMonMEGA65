@@ -143,9 +143,9 @@ MON_ENTRY(dns_lookup) int dns_lookup(const char *name, unsigned *ip);
 
 // TCP, up to 4 connections at once, each with a control block of
 // TCP_CB_WORDS(rx, tx) words in the program's RAM, which is the ROM's from
-// tcp_open until tcp_state gives TCP_FREE. The ROM moves a connection
-// only when the program calls an entry of the network: a program polls,
-// with net_poll, every 100 ms or so.
+// tcp_open or tcp_listen until tcp_state gives TCP_FREE. The ROM moves
+// a connection only when the program calls an entry of the network: a
+// program polls, with net_poll, every 100 ms or so.
 #define TCP_CB_WORDS(rx, tx) (32 + ((rx) + 3) / 4 + ((tx) + 3) / 4)
 #define TCP_SIZES(rx, tx) (((unsigned)(rx) << 16) | (unsigned)(tx))
 enum {
@@ -154,6 +154,7 @@ enum {
     TCP_OPEN = 2,       // send and receive
     TCP_PEER_CLOSED = 3, // receive what is left, then E_TEOF; send; close
     TCP_CLOSING = 4,    // after tcp_close; the handle frees itself
+    TCP_LISTEN = 5,     // tcp_listen's, until a peer connects
 };
 enum {
     E_NOIP = -40, E_PORT = -41, E_UCLOSED = -42, E_ULONG = -43, E_NOROUTE = -44,
@@ -168,7 +169,7 @@ enum {
 // answer. A handle, 0 to 3, or an error. Entry 26.
 MON_ENTRY(tcp_open) int tcp_open(unsigned *cb, unsigned ip, unsigned port, unsigned sizes);
 
-// The state of a handle, TCP_FREE to TCP_CLOSING, or the connection's
+// The state of a handle, TCP_FREE to TCP_LISTEN, or the connection's
 // error, or E_THANDLE. A state not known here is one to wait in. Entry 27.
 int tcp_state(int h);
 
@@ -187,6 +188,14 @@ MON_ENTRY(tcp_recv) int tcp_recv(int h, void *buf, unsigned n);
 // frees itself, or at once for an abort or an error. 0, or E_THANDLE.
 // Entry 30.
 int tcp_close(int h, int abort);
+
+// A handle that waits in TCP_LISTEN for a peer to connect to port, 1 to
+// 65535 but 4510, with the rings of TCP_SIZES(rx, tx) bytes in the
+// control block cb. The first SYN takes it, through TCP_CONNECTING, to
+// TCP_OPEN, one connection for each handle; a failed handshake brings it
+// back to TCP_LISTEN. Other handles may listen on the same port. Sends
+// nothing, and does not wait. A handle, 0 to 3, or an error. Entry 31.
+MON_ENTRY(tcp_listen) int tcp_listen(unsigned *cb, unsigned port, unsigned sizes);
 
 // The next entry of a directory, as fs_readdir gives it in the 4 words
 // from buf, and its name in the words from name, one character per word

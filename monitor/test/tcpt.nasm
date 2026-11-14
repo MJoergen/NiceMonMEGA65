@@ -31,6 +31,8 @@ tw_main
                 OR      R14, R14, 0x40000092  ; E = 1, VBASE TW_VEC / 256
                 MOVE    R1, TW_SET
                 CALL    _net_set
+                CMP     @TW_CASE, 6
+        ?Z      JMP     tw_listen
                 MOVE    R1, TW_CB
                 MOVE    R2, TW_PEER
                 ADD     R3, @TW_CASE, 2100
@@ -131,6 +133,31 @@ tw_idle
                 MOVE    R1, R8
                 CALL    _tcp_state
                 MOVE    @R7++, R1       ; 2
+                JMP     tw_close
+
+; Case 6, port 2106: a handle that listens, whose SYN-ACK the peer never
+; acknowledges; the state, and the time to TCP_LISTEN again; a close
+tw_listen
+                MOVE    R1, TW_CB
+                MOVE    R2, 2106
+                MOVE    R3, 0x04000400
+                CALL    _tcp_listen
+                MOVE    @R7++, R1       ; 0
+                MOVE    R8, R1
+                MOVE    R1, 1
+                MOVE    R2, 10000000
+                CALL    tw_until
+                MOVE    @R7++, R1       ; 1, TCP_CONNECTING
+                MOVE    R1, 5
+                MOVE    R2, 30000000
+                CALL    tw_until
+                MOVE    @R7++, R1       ; 5, TCP_LISTEN
+                MOVE    @R7++, R2       ; 15 seconds
+                MOVE    R1, R8
+                MOVE    R2, 0
+                CALL    _tcp_close
+                MOVE    @R7++, R1       ; 0
+                JMP     tw_end
 tw_close
                 MOVE    R1, R8
                 MOVE    R2, 1

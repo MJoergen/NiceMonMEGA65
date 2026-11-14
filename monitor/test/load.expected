@@ -2,7 +2,7 @@ NiceMon V9.9
 ? lists the commands
 > l
 ADDR WORD in hex on each line, as in a .bin file; an empty line ends
-Words loaded: 769, 00008000 to 0001EFFF
+Words loaded: 771, 00008000 to 0001EFFF
 Lines skipped: 6, first line 2; ADDR WORD in hex, ADDR 00008000 to 0001EFFF
 > l
 ADDR WORD in hex on each line, as in a .bin file; an empty line ends
@@ -25,7 +25,7 @@ Screen:
 |? lists the commands
 |> l
 |ADDR WORD in hex on each line, as in a .bin file; an empty line ends
-|Words loaded: 769, 00008000 to 0001EFFF
+|Words loaded: 771, 00008000 to 0001EFFF
 |Lines skipped: 6, first line 2; ADDR WORD in hex, ADDR 00008000 to 0001EFFF
 |> l
 |ADDR WORD in hex on each line, as in a .bin file; an empty line ends

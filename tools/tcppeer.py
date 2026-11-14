@@ -4,16 +4,19 @@ monitor's TCP (issue #111), in niceemu with --eth-udp and --eth-peer.
 
 It is the host 10.0.0.2 on the board's network: it answers ARP for that
 address, and takes the TCP segments to it. Each port it listens on has a
-Script, which decides what the peer sends: a SYN-ACK with an MSS option
-or none, data, a FIN, a RST, a zero window, segments out of order, and
-the other cases that a real stack cannot be made to do. A connection
+Script, and so has each connection that it opens to a port where the
+board listens, with Peer.connect. The Script decides what the peer
+sends: a SYN or a SYN-ACK with an MSS option or none, data, a FIN, a
+RST, a zero window, segments out of order, and the other cases that a
+real stack cannot be made to do. A connection
 keeps a log of every segment that came from the board, with the time it
 came, so that the checks can read what the board did.
 
-The peer is a small stack, not a full one: it takes data in order only,
-acknowledges every segment with data at once, sends again from SND.UNA
-after RTO seconds with no ACK, and keeps no TIME-WAIT. tools/tcptest.py
-runs it. Only the Python standard library is used.
+It also takes the board's datagrams to it, which a test may watch with
+Peer.on_udp. The peer is a small stack, not a full one: it takes data
+in order only, acknowledges every segment with data at once, sends
+again from SND.UNA after RTO seconds with no ACK, and keeps no
+TIME-WAIT. tools/tcptest.py runs it. Only the Python standard library is used.
 """
 
 import selectors
@@ -25,6 +28,7 @@ from typing import Callable, Dict, List, Optional, Tuple
 
 PEER_IP = bytes([10, 0, 0, 2])
 PEER_MAC = bytes.fromhex("0A0000000002")
+BOARD_IP = bytes([10, 0, 0, 9])         # the board's, which the tests set
 RTO = 0.3                               # the peer's own timeout, in seconds
 
 FIN, SYN, RST, PSH, ACK = 1, 2, 4, 8, 16
@@ -134,9 +138,16 @@ class Script:
 
     mss: Optional[int] = 1460           # the SYN-ACK's option, or None for none
     window = 8192                       # the window that the peer announces
+    syn_retry = 0.3                     # of a connection the peer opens: the SYN again after it
+    data_in_ack = False                 # and the ACK of the board's SYN-ACK left to on_open's data
 
     def on_syn(self, c: "Conn", s: Segment) -> bool:
         """The board's first SYN: True to answer it with the SYN-ACK."""
+        return True
+
+    def on_synack(self, c: "Conn", s: Segment) -> bool:
+        """The board's SYN-ACK to a connection the peer opens: True to
+        take it, and open the connection."""
         return True
 
     def on_open(self, c: "Conn") -> None:
@@ -159,10 +170,13 @@ class Script:
 
 
 class Conn:
-    """A connection of the peer, from the board's SYN on."""
+    """A connection of the peer, from the board's SYN on, or from the
+    peer's own SYN, made by Peer.connect."""
 
     def __init__(self, peer: "Peer", s: Segment, script: Script) -> None:
         self.peer = peer
+        self.syns: List[float] = []      # when the peer sent its SYN, if it opened
+        self.rsts = 0                    # the RSTs that its SYN got
         self.script = script
         self.bport = s.sport             # the board's port
         self.pport = s.dport             # the peer's
@@ -244,6 +258,9 @@ class Conn:
         self.log.append(s)
         if not self.script.on_segment(self, s):
             return
+        if self.state == "SYN-SENT":
+            self.synack(s)
+            return
         if s.flags & RST:
             self.reset = True
             self.state = "CLOSED"
@@ -290,6 +307,54 @@ class Conn:
                 self.ack_now()
         self.push()
 
+    @classmethod
+    def opening(cls, peer: "Peer", bport: int, pport: int, script: Script) -> "Conn":
+        """A connection that the peer opens to the board's port bport from
+        its port pport, in SYN-SENT; tick sends the SYN."""
+        c = cls.__new__(cls)
+        c.peer, c.script, c.syns, c.rsts = peer, script, [], 0
+        c.bport, c.pport = bport, pport
+        c.board_mac, c.board_ip = b"\xff" * 6, BOARD_IP
+        c.log = []
+        c.irs = c.rcv_nxt = 0
+        c.iss = 3_000_000 + 100_000 * len(peer.conns)
+        c.snd_una = c.snd_nxt = c.iss
+        c.out, c.fin_queued, c.fin_sent = b"", False, False
+        c.board_win, c.board_mss = 0, 536
+        c.window = script.window
+        c.received, c.got_fin, c.reset = b"", False, False
+        c.state = "SYN-SENT"
+        c.last_send = c.opened = 0.0
+        return c
+
+    def synack(self, s: Segment) -> None:
+        """In SYN-SENT: the board's SYN-ACK of the peer's SYN opens the
+        connection; a RST is counted, and the SYN goes again."""
+        if s.flags & RST:
+            self.rsts += 1
+            return
+        if s.flags & (SYN | ACK) != SYN | ACK or s.ack != (self.iss + 1) & 0xFFFFFFFF:
+            return
+        if not self.script.on_synack(self, s):
+            return
+        self.board_mac = s.src_mac
+        self.irs = s.seq
+        self.rcv_nxt = (s.seq + 1) & 0xFFFFFFFF
+        self.snd_una = self.snd_nxt = s.ack
+        self.board_win = s.win
+        self.board_mss = s.mss() or 536
+        self.state = "ESTABLISHED"
+        self.opened = time.monotonic()
+        if not self.script.data_in_ack:
+            self.ack_now()
+        self.script.on_open(self)
+
+    def syn(self) -> None:
+        """The peer's SYN, with an MSS option unless the Script has none."""
+        opts = b"" if self.script.mss is None else mss_option(self.script.mss)
+        self.segment(SYN, self.iss, options=opts)
+        self.syns.append(time.monotonic())
+
     def syn_ack(self) -> None:
         opts = b"" if self.script.mss is None else mss_option(self.script.mss)
         self.segment(SYN | ACK, self.iss, options=opts)
@@ -297,6 +362,9 @@ class Conn:
 
     def tick(self, now: float) -> None:
         self.script.on_tick(self, now)
+        if self.state == "SYN-SENT" and (not self.syns
+                                         or now - self.syns[-1] > self.script.syn_retry):
+            self.syn()
         if self.state in ("ESTABLISHED", "CLOSE-WAIT") and self.snd_nxt != self.snd_una \
                 and now - self.last_send > RTO:
             self.last_send = now
@@ -324,6 +392,19 @@ class Peer:
         self.lock = threading.Lock()
         self.stop = False
         self.sent = 0
+        self.next_port = 40000          # of the connections that the peer opens
+        self.udp: List[Tuple[int, bytes]] = []  # the datagrams to it: the port, the data
+        self.on_udp: Optional[Callable[[int, bytes], None]] = None  # called with each
+
+    def connect(self, port: int, script: Script) -> Conn:
+        """A connection opened to the board's port, from a port of its own;
+        the caller holds the lock, as the Scripts' hooks do."""
+        c = Conn.opening(self, port, self.next_port, script)
+        self.next_port += 1
+        self.conns.append(c)
+        self.by_ports[(port, c.pport)] = c
+        c.tick(time.monotonic())
+        return c
 
     @property
     def port(self) -> int:
@@ -369,6 +450,14 @@ class Peer:
             self.arps.append(f[38:42])
             if is_arp_for_peer(f):
                 self.to_emu(arp_reply(f))
+            return
+        if kind == b"\x08\x00" and f[23] == 17 and f[30:34] == PEER_IP:
+            ihl = (f[14] & 15) * 4
+            port, n = struct.unpack(">2xHH", f[14 + ihl:20 + ihl])
+            data = f[22 + ihl:14 + ihl + n]
+            self.udp.append((port, data))
+            if self.on_udp is not None:
+                self.on_udp(port, data)
             return
         if kind != b"\x08\x00" or f[23] != 6 or f[30:34] != PEER_IP:
             return

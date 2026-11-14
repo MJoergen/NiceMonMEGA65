@@ -4,8 +4,10 @@
 // mon_c.nasm. tools/tcptest.py runs it under the monitor of the tests in
 // niceemu, against tools/tcppeer.py, whose port 2001 echoes. It sets
 // 10.0.0.9, reads it back, sends 1000 bytes from an odd address, receives
-// them at another, compares, and closes. It returns 0, or the number of
-// the step that failed, times 1000, less the error.
+// them at another, compares, and closes. Then it listens on port 3010,
+// where the peer connects and sends 200 bytes, which it sends back, and
+// closes. It returns 0, or the number of the step that failed, times
+// 1000, less the error.
 #include "mon.h"
 
 #define RX 512
@@ -70,5 +72,30 @@ int main(void)
     s = wait_state(h, TCP_FREE);
     if (s != TCP_FREE)
         return fail(10, s);
+
+    h = tcp_listen(cb, 3010, TCP_SIZES(RX, TX));
+    if (h < 0)
+        return fail(11, h);
+    got = 0;
+    for (unsigned i = 0; i < 4000000 && got < 200; i++) {
+        int n = tcp_recv(h, in + 1 + got, 200 - got);
+        if (n < 0)
+            return fail(12, n);
+        got += (unsigned)n;
+    }
+    if (got != 200)
+        return fail(13, 0);
+    sent = 0;
+    for (unsigned i = 0; i < 4000000 && sent < 200; i++) {
+        int n = tcp_send(h, in + 1 + sent, 200 - sent);
+        if (n < 0)
+            return fail(14, n);
+        sent += (unsigned)n;
+    }
+    if (sent != 200 || tcp_close(h, 0) != 0)
+        return fail(15, 0);
+    s = wait_state(h, TCP_FREE);
+    if (s != TCP_FREE)
+        return fail(16, s);
     return 0;
 }

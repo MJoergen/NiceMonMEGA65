@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
-"""Check the monitor's TCP clients, without a board (issue #111).
+"""Check the monitor's TCP, its clients and its servers, without a board
+(issue #111).
 
 It runs the monitor of the tests with monitor/build/tcp.bin, the program
 of monitor/test/tcp.nasm, in niceemu with --eth-udp and --eth-peer,
 whose frames go to tools/tcppeer.py, the host 10.0.0.2, and checks the
 results that the program stores, and what the peer saw. Each case of the
 program connects to a port of its own, whose Script here decides what
-the peer does.
+the peer does. In the cases where the program listens, a datagram from
+it names the case, and Listening here connects to it.
 
 It prints a line for each check, and last how many passed, and exits with
 status 1 when one fails. niceemu must be built, with make -C
@@ -23,12 +25,12 @@ import sys
 import tempfile
 import threading
 import time
-from typing import Callable, Dict, List, Mapping, Tuple
+from typing import Callable, Dict, List, Mapping, Optional, Tuple
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from tcppeer import (ACK, FIN, PEER_IP, PEER_MAC, PSH, RST, SYN, Conn, Peer,  # noqa: E402
-                     Script, Segment, arp_reply, ip_frame, is_arp_for_peer, mss_option,
-                     tcp_payload)
+from tcppeer import (ACK, BOARD_IP, FIN, PEER_IP, PEER_MAC, PSH, RST, SYN, Conn,  # noqa: E402
+                     Peer, Script, Segment, arp_reply, ip_frame, is_arp_for_peer,
+                     mss_option, tcp_payload)
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NICEEMU = os.path.join(REPO, "nice_cpu", "emulator", "zig-out", "bin", "niceemu")
@@ -313,6 +315,175 @@ class Budget(Script):
             c.send(DATA[2014])
 
 
+# The listening cases: the data that the peer's connections send
+LDATA = {
+    "T": pattern(1000, 11, 5),
+    "V1": pattern(10, 1, 2),
+    "V2": pattern(20, 2, 3),
+    "V3": pattern(30, 3, 4),
+    "W": pattern(40, 4, 5),
+}
+SIG_PORT = 7000                         # the program's datagrams, which name the case
+
+
+class OneSyn(Script):
+    """A SYN, once, to a port where nothing listens."""
+
+    syn_retry = 1e9
+
+
+class DataInAck(Script):
+    """T: 1000 bytes and the FIN, the first segment the ACK of the
+    SYN-ACK."""
+
+    data_in_ack = True
+
+    def on_open(self, c: Conn) -> None:
+        c.send(LDATA["T"])
+        c.close()
+
+
+class RepeatFin(Script):
+    """U: the peer's FIN after the board's, and 0.2 seconds after the
+    board acknowledged it, the FIN again, as if that ACK were lost."""
+
+    acked_at = 0.0
+    again = False
+
+    def on_tick(self, c: Conn, now: float) -> None:
+        if self.again or not c.fin_sent or c.snd_una != c.snd_nxt:
+            return
+        if not self.acked_at:
+            self.acked_at = now
+        elif now - self.acked_at > 0.2:
+            self.again = True
+            c.segment(ACK | FIN, c.snd_nxt - 1)
+
+
+class Busy(Script):
+    """V: three peers to a port where two handles listen. The first opens
+    the second, the second the third, whose SYN goes every second; the
+    first sends its bytes and FIN 1.5 seconds after the third's first
+    SYN, and the second when the third opens."""
+
+    shared: Dict[str, Conn] = {}
+    third_at = 0.0
+
+    def __init__(self, n: int) -> None:
+        self.n = n
+        self.syn_retry = 1.0 if n == 3 else 0.3
+        self.sent = False
+
+    def on_open(self, c: Conn) -> None:
+        if self.n < 3:
+            nxt = c.peer.connect(3003, Busy(self.n + 1))
+            Busy.shared[f"V{self.n + 1}"] = nxt
+            if self.n == 2:
+                Busy.third_at = time.monotonic()
+        else:
+            c.send(LDATA["V3"])
+            c.close()
+            two = Busy.shared["V2"]
+            two.send(LDATA["V2"])
+            two.close()
+
+    def on_tick(self, c: Conn, now: float) -> None:
+        if self.n == 1 and not self.sent and Busy.third_at and now - Busy.third_at > 1.5:
+            self.sent = True
+            c.send(LDATA["V1"])
+            c.close()
+
+
+class SynRcvd(Script):
+    """W: the board's SYN-ACK answered with the SYN again; the second
+    with an ACK of the wrong number; its RST with a RST in the window;
+    then 0.3 seconds later another peer connects, and sends 40 bytes."""
+
+    def __init__(self) -> None:
+        self.syn_retry = 1e9
+        self.synacks: List[Segment] = []
+        self.rst_at = 0.0
+        self.second: Optional[Conn] = None
+
+    def on_synack(self, c: Conn, s: Segment) -> bool:
+        self.synacks.append(s)
+        if len(self.synacks) == 1:
+            c.segment(SYN, c.iss, options=mss_option(1460))
+        elif len(self.synacks) == 2:
+            c.segment(ACK, c.iss + 1, ack=s.seq + 1000)
+        return False
+
+    def on_tick(self, c: Conn, now: float) -> None:
+        if c.rsts and not self.rst_at:
+            self.rst_at = now
+            c.segment(RST, c.iss + 1)
+        elif self.rst_at and self.second is None and now - self.rst_at > 0.3:
+            self.second = c.peer.connect(3004, Sender(LDATA["W"]))
+
+
+class Sender(Script):
+    """Its bytes and the FIN at the open."""
+
+    def __init__(self, data: bytes) -> None:
+        self.data = data
+
+    def on_open(self, c: Conn) -> None:
+        c.send(self.data)
+        c.close()
+
+
+class Ask(Script):
+    """Its bytes at the open, and its FIN once as many came back."""
+
+    def __init__(self, data: bytes) -> None:
+        self.data = data
+
+    def on_open(self, c: Conn) -> None:
+        c.send(self.data)
+
+    def on_data(self, c: Conn, data: bytes) -> None:
+        if len(c.received) >= len(self.data):
+            c.close()
+
+
+def connect_at_start(port: int, script: Script) -> Callable[[Peer], None]:
+    """A setup of run: the peer connects to the port from the start, its
+    SYN again every 0.3 seconds until the board listens there."""
+    def setup(peer: Peer) -> None:
+        with peer.lock:
+            peer.connect(port, script)
+    return setup
+
+
+class Listening:
+    """The peer's side of the listening cases of tcp.nasm, started by the
+    program's datagrams to SIG_PORT, each the number of a case."""
+
+    def __init__(self, peer: Peer) -> None:
+        self.peer = peer
+        self.conns: Dict[str, Conn] = {}
+        peer.on_udp = self.signal
+        Busy.shared = self.conns
+        Busy.third_at = 0.0
+
+    def signal(self, port: int, data: bytes) -> None:
+        if port != SIG_PORT or len(data) != 1:
+            return
+        case = data[0]
+        p = self.peer
+        if case == 1:
+            p.send_ip(b"\xff" * 6, BOARD_IP, 6,
+                      tcp_payload(BOARD_IP, 41000, 3001, 123, 5555, ACK, 8192))
+            self.conns["T0"] = p.connect(3099, OneSyn())
+            self.conns["T"] = p.connect(3001, DataInAck())
+        elif case == 2:
+            self.conns["U"] = p.connect(3002, RepeatFin())
+        elif case == 3:
+            self.conns["V1"] = p.connect(3003, Busy(1))
+        elif case == 4:
+            self.conns["W"] = p.connect(3004, SynRcvd())
+
+
 SCRIPTS = {
     2001: Echo,
     2002: PeerCloses,
@@ -342,14 +513,17 @@ def free_port() -> int:
 
 
 def run(tmp: str, program: str, scripts: Mapping[int, Callable[[], Script]], keys: str = "r\rh\r",
-        extra: str = "") -> Tuple[List[int], int]:
+        extra: str = "", setup: Optional[Callable[[Peer], None]] = None) -> Tuple[List[int], int]:
     """A program run against a peer with scripts, which becomes PEER, with
-    the monitor's input keys, and the lines of a .bin file extra: the
-    words it stores from RESULTS on, and the value it returns."""
+    the monitor's input keys, the lines of a .bin file extra, and setup
+    called with the peer before it runs: the words it stores from
+    RESULTS on, and the value it returns."""
     peer = Peer()
     for port, script in scripts.items():
         peer.listen(port, script)
     peer.emu_port = free_port()
+    if setup is not None:
+        setup(peer)
     thread = threading.Thread(target=peer.run, daemon=True)
     thread.start()
     image = os.path.join(tmp, "tcp.full.bin")
@@ -419,7 +593,7 @@ def board_data(c: Conn) -> List[Segment]:
 def checks(r: Results) -> None:
     peer = PEER
     T = 2                               # TCP_OPEN
-    r.expect("tcp_open without an IP address gives E_NOIP", E_NOIP)
+    r.expect("tcp_open and tcp_listen without an IP address give E_NOIP", E_NOIP, E_NOIP)
     r.expect("tcp_open gives E_PORT for the ports 0 and 65536", -41, -41)
     r.expect("tcp_open gives E_TSIZE for a ring of 63 bytes, received or sent", -52, -52)
     r.expect("tcp_open gives E_TSIZE for a block not aligned, or below 0x8000", -52, -52)
@@ -562,7 +736,9 @@ def checks(r: Results) -> None:
 
     # N's end, and Q
     r.expect("N: closed and freed", 0, 0)
-    r.expect("Q: a new IP address gives E_TRESET; closed and freed", 0, T, -54, 0, 0)
+    r.expect("Q: a new IP address gives E_TRESET; closed and freed; a handle in LISTEN "
+             "stays, and closes", 0, T, 1, -54, 0, 0, 5, 0)
+    listening(r)
     r.expect("the port is off at the end", 0)
     check("every result read", r.i == len(r.words), f"{r.i} of {len(r.words)}")
 
@@ -577,6 +753,90 @@ def checks(r: Results) -> None:
     check("no segment outside a connection, but RSTs", not stray, f"{stray[:3]}")
 
 
+def listening(r: Results) -> None:
+    """The checks of the listening cases, R to W."""
+    peer = PEER
+    L = LISTEN.conns
+    T, LS, EOF = 2, 5, -57
+    r.expect("the endpoint of the signals opens", SIG_PORT)
+    r.expect("R: tcp_listen gives E_PORT for 0, 65536, and 4510, and E_TSIZE for a ring of "
+             "63 bytes, and a block not aligned", -41, -41, -41, -52, -52)
+    r.expect("S: listens in TCP_LISTEN, takes 5 bytes, has none to read, closes, and frees",
+             0, LS, 5, 0, 0, 0)
+    check("S: nothing sent from port 3000",
+          not any(sg.sport == 3000 for _, f in peer.frames if f[12:14] == b"\x08\x00"
+                  and f[23] == 6 for sg in [Segment(f, 0.0)]))
+    r.expect("T: listens, and takes 5 bytes", 0, 5)
+    opened(r, "T")
+    r.expect("T: the peer's 1000 bytes read to E_TEOF; TCP_PEER_CLOSED; closed and freed",
+             1000, hash31(LDATA["T"]), EOF, 3, 0, 0)
+    t = L["T"]
+    check("T: the SYN-ACK has an MSS of 1460, the least of it and the ring of 2048",
+          t.log[0].flags == SYN | ACK and t.log[0].mss() == 1460, f"{t.log[:1]}")
+    check("T: the 5 bytes taken while listening came after the handshake, then the FIN",
+          t.received == b"ABCDE" and t.got_fin and not t.reset, f"{t.received!r}")
+    rst = [sg for sg in peer.no_conn if sg.dport == 41000]
+    check("T: an ACK to the listening port got a RST with its number",
+          len(rst) == 1 and rst[0].flags == RST and rst[0].seq == 5555, f"{rst}")
+    t0 = L["T0"]
+    check("T: a SYN to port 3099, where nothing listens, got a RST",
+          t0.rsts == 1 and t0.log[0].flags == RST | ACK and t0.log[0].ack == t0.iss + 1,
+          f"{t0.log}")
+    r.expect("U: 100 bytes sent; the board closes first; freed", 0, T, 100, 0, 0)
+    u = L["U"]
+    check("U: the peer received the 100 bytes and the board's FIN",
+          u.received == pattern(100, 9, 1) and u.got_fin)
+    script = u.script
+    assert isinstance(script, RepeatFin)
+    check("U: the peer's FIN again got a RST, at the board's FIN's number plus 1",
+          script.again and u.reset and u.log[-1].flags & RST != 0
+          and u.log[-1].seq == u.rcv_nxt, f"{u.log[-3:]}")
+    r.expect("V: two handles listen on one port, and both open", 0, 1, T, T)
+    r.expect("V: the first's 10 bytes read; closed and freed", 10, hash31(LDATA["V1"]), EOF,
+             0, 0)
+    r.expect("V: the handle listens again", 0)
+    opened(r, "V")
+    r.expect("V: the third's 30 bytes read; closed and freed", 30, hash31(LDATA["V3"]), EOF,
+             0, 0)
+    r.expect("V: the second's 20 bytes read; closed and freed", 20, hash31(LDATA["V2"]), EOF,
+             0, 0)
+    v3 = L["V3"]
+    check("V: the third peer's first SYNs were passed over, with no RST, until a handle "
+          "listened again", len(v3.syns) >= 2 and v3.rsts == 0 and v3.log[0].flags == SYN | ACK
+          and v3.log[0].when > v3.syns[1] - 0.1, f"{len(v3.syns)} SYNs, {v3.rsts} RSTs")
+    check("V: every peer got its FIN", all(L[k].got_fin for k in ("V1", "V2", "V3")))
+    r.expect("W: listens", 0)
+    opened(r, "W: back in LISTEN after a RST in SYN-RECEIVED, then")
+    r.expect("W: the second peer's 40 bytes read; closed and freed", 40, hash31(LDATA["W"]),
+             EOF, 0, 0)
+    w = L["W"]
+    sr = w.script
+    assert isinstance(sr, SynRcvd)
+    rsts = [sg for sg in w.log if sg.flags & RST]
+    check("W: the SYN again got the same SYN-ACK again",
+          len(sr.synacks) == 2 and sr.synacks[0].seq == sr.synacks[1].seq, f"{sr.synacks}")
+    check("W: the wrong ACK got a RST with its number, and nothing came after the peer's RST",
+          len(rsts) == 1 and rsts[0].flags == RST and rsts[0].seq == sr.synacks[0].seq + 1000
+          and w.log[-1] is rsts[0], f"{w.log}")
+    check("W: the second peer opened, and got the FIN", sr.second is not None
+          and sr.second.got_fin)
+
+
+def opened(r: Results, name: str) -> None:
+    """The state after the handshake: TCP_OPEN, or TCP_PEER_CLOSED when
+    the peer's FIN came before the program looked."""
+    state = r.take()
+    check(f"{name}: opens", state in (2, 3), f"state {state}")
+
+
+LISTEN: Listening
+
+
+def listen_setup(peer: Peer) -> None:
+    global LISTEN
+    LISTEN = Listening(peer)
+
+
 # The timers' part: one case a run, with --step-time, so that a
 # microsecond is a step and a run counts the same each time
 PEER_ISS = 5_000_000
@@ -588,6 +848,9 @@ def answers(case: int, frames: List[bytes]) -> List[str]:
     each after the frame it answers."""
     lines: List[str] = []
     probes = 0
+    if case == 6:                       # a SYN to the port that listens, as it is enabled
+        lines.append("0:" + ip_frame(b"\xff" * 6, BOARD_IP, 6, tcp_payload(
+            BOARD_IP, 5555, 2106, PEER_ISS, 0, SYN, 8192, options=mss_option(1460))).hex())
     for i, f in enumerate(frames, 1):
         def reply(frame: bytes) -> None:
             lines.append(f"{i}:{frame.hex()}")
@@ -603,7 +866,7 @@ def answers(case: int, frames: List[bytes]) -> List[str]:
             reply(ip_frame(s.src_mac, s.src_ip, 6, tcp_payload(s.src_ip, s.dport, s.sport, seq,
                                                                ack, flags, win, data, opts)))
         if s.flags & SYN:
-            if case != 1:
+            if case not in (1, 6):
                 seg(SYN | ACK, s.seq + 1, 0 if case == 4 else 8192, opts=mss_option(1460),
                     seq=PEER_ISS)
         elif case == 3 and s.flags & FIN:
@@ -666,7 +929,7 @@ def timer_case(tmp: str, case: int) -> Tuple[List[int], List[bytes]]:
 def timers(tmp: str) -> None:
     S = 1_000_000
     TO = -55                            # E_TTIMEOUT
-    for case in range(1, 6):
+    for case in range(1, 7):
         r, frames = timer_case(tmp, case)
         segs = [Segment(f, 0.0) for f in frames if f[12:14] == b"\x08\x00" and f[23] == 6]
         data = [x for x in segs if x.data]
@@ -697,6 +960,13 @@ def timers(tmp: str) -> None:
             check("timers 4: 14 probes of a byte, at SND.UNA, out to 60 seconds apart",
                   len(data) == PROBES_ANSWERED + 2 and
                   all(len(x.data) == 1 and x.seq == data[0].seq for x in data), f"{data}")
+        elif case == 6:
+            check("timers 6: a SYN-ACK with no ACK: TCP_LISTEN again after 15 seconds",
+                  r[:3] == [0, 1, 5] and 14_950_000 <= t < 15_050_000, f"{r}")
+            check("timers 6: the SYN-ACK, and again after 1, 2, 4, and 8 seconds, and "
+                  "nothing at the close", len(segs) == 4 and
+                  all(x.flags == SYN | ACK and x.seq == segs[0].seq and x.ack == PEER_ISS + 1
+                      and x.mss() == 1024 for x in segs), f"{segs}")
         else:
             check("timers 5: open after 4300 seconds idle, past a wrap of the microseconds; "
                   "10 bytes echoed", r == [0, 2, 2, 10, 10, 2, 0, 0], f"{r}")
@@ -717,13 +987,18 @@ def main() -> None:
             sys.exit(f"tcptest.py: no {path}; {how} builds it")
     with tempfile.TemporaryDirectory() as tmp:
         if "--timers" not in sys.argv[1:]:
-            checks(Results(run(tmp, PROGRAM, SCRIPTS)[0]))
-            _, value = run(tmp, PROGRAM_C, {2001: Echo})
+            checks(Results(run(tmp, PROGRAM, SCRIPTS, setup=listen_setup)[0]))
+            ask = pattern(200, 5, 9)
+            _, value = run(tmp, PROGRAM_C, {2001: Echo}, setup=connect_at_start(3010, Ask(ask)))
             check("tcp_c.c: 1000 bytes echoed through the stubs of mon_c.nasm, from odd "
-                  "addresses", value == 0, f"returned {value}")
+                  "addresses, then 200 on port 3010, where it listens", value == 0,
+                  f"returned {value}")
             c = conn(2001)
             check("tcp_c.c: the peer received them", c.received == bytes(
                 (i * 7 + 3) & 0xFF for i in range(1000)) and c.got_fin)
+            c = next(x for x in PEER.conns if x.bport == 3010)
+            check("tcp_c.c: the peer's 200 bytes came back on port 3010",
+                  c.received == ask and c.got_fin, f"{len(c.received)} bytes, FIN {c.got_fin}")
             n = 20000
             _, value = run(tmp, PROGRAM_HW, {2001: Echo}, "i 10.0.0.9\rr\rh\r",
                            f"00009000 0A000002\n00009001 000007D1\n00009002 {n:08X}\n")
@@ -731,6 +1006,14 @@ def main() -> None:
                   value == 0, f"returned {value}")
             c = conn(2001)
             check("tcphw.nasm: the peer received them", c.received == bytes(
+                (7 * i + (i >> 8)) & 0xFF for i in range(n)) and c.got_fin)
+            _, value = run(tmp, PROGRAM_HW, {}, "i 10.0.0.9\rr\rh\r",
+                           f"00009000 00000000\n00009001 00000BCC\n00009002 {n:08X}\n",
+                           setup=connect_at_start(3020, Echo()))
+            check("tcphw.nasm: 20000 bytes echoed by a peer that connects to port 3020, where "
+                  "it listens", value == 0, f"returned {value}")
+            c = PEER.conns[-1]
+            check("tcphw.nasm: the peer received them, and the FIN", c.received == bytes(
                 (7 * i + (i >> 8)) & 0xFF for i in range(n)) and c.got_fin)
         if "--clients" not in sys.argv[1:]:
             timers(tmp)

@@ -1,9 +1,11 @@
-; The board's test of TCP's clients (issue #111), a program at 0x8000
-; under the ROM's monitor that calls the entries through the stubs of
-; mon.nasm, which the Makefile joins after it. tools/hwtest.py loads it
-; with the words at TH_ARGS, its PC's IP address, the port where the PC
-; listens, and the number of bytes, at most 65536, and runs it with
-; run.py --monitor. The program connects, sends the bytes, byte i being
+; The board's test of TCP (issue #111), a program at 0x8000 under the
+; ROM's monitor that calls the entries through the stubs of mon.nasm,
+; which the Makefile joins after it. tools/hwtest.py loads it with the
+; words at TH_ARGS, its PC's IP address, the port where the PC listens,
+; and the number of bytes, at most 65536, and runs it with run.py
+; --monitor. With the IP address 0, the program listens on the port
+; instead, and the PC connects. The program connects, or waits for the
+; PC, sends the bytes, byte i being
 ; 7 i + i / 256 modulo 256, receives what the PC echoes, compares, closes,
 ; and waits for the handle to free itself. It returns 0, or the step that
 ; failed times 1000, less the error, as test/tcp_c.c does, and keeps R7
@@ -40,7 +42,15 @@ th_main
                 MOVE    R2, @TH_ARGS
                 MOVE    R3, @TH_ARGS+1
                 MOVE    R4, 0x08000800
+                TST     R2
+        ?Z      JMP     :+
                 CALL    _tcp_open
+                JMP     :++
+:
+                MOVE    R2, R3          ; listen on the port
+                MOVE    R3, R4
+                CALL    _tcp_listen
+:
                 MOVE    R7, 1000
                 TST     R1
         ?N      JMP     th_fail
