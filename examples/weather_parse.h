@@ -35,8 +35,14 @@ struct cfg {
 // that is not understood, whose setting is left out.
 int cfg_parse(struct cfg *cfg, const char *text, unsigned n);
 
+// The bytes of the longest request, with its 0: a place of 63 bytes that
+// are all escaped, units, and a server's name of 63 bytes with a port of
+// 5 digits.
+#define REQ_SIZE 348
+
 // The HTTP request for the weather, with a 0 at its end, in buf of size
-// bytes. Returns its length, or 0 when it does not fit.
+// bytes. Returns its length, or 0 when it does not fit. REQ_SIZE bytes
+// hold every request. The Host has the port, unless it is 80.
 unsigned weather_request(const struct cfg *cfg, char *buf, unsigned size);
 
 #define W_TEXT 40     // the bytes of each field, with its 0

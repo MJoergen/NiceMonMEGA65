@@ -1166,8 +1166,9 @@ network's entries from C. `make weathertest` checks it in two parts:
   a step limit, and the script reads the screen's words, so that the
   glyphs of the font RAM are checked too: the weather, a redirect, a
   status of 500, an answer of another format, a refused connection, a
-  line of the settings not understood, the place typed when there is
-  no file, and ESC and Q back to the monitor. It takes about 20
+  line of the settings not understood, a settings file of more than
+  1024 bytes, and one of 1024, the place typed when there is
+  no file, and ESC and Q back to the monitor. It takes about 30
   seconds, in real time.
 
 `make examples` also builds `examples/build/bench.bin` from nice_cpu's

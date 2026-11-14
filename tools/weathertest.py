@@ -241,6 +241,22 @@ def cases(tmp: str) -> None:
           r.row(ROW_CFG) == "WEATHER.CFG: line 5 is not understood"
           and r.row(ROW_PLACE) == "Copenhagen", f"{r.row(ROW_CFG)!r} {r.row(ROW_PLACE)!r}")
 
+    # The program reads 1024 bytes of the file: here the line "place Oslo"
+    # is cut after "place Os", and left out.
+    r = Run(tmp, KEYS, CFG + "#" * (1015 - len(CFG)) + "\nplace Oslo\n", answer("ok.http"))
+    script = r.script
+    assert script is not None
+    check("a file of more than 1024 bytes is said to be cut, and the cut line is left out",
+          r.row(ROW_CFG) == "WEATHER.CFG: only its first 1024 bytes are read"
+          and script.request == REQUEST, f"{r.row(ROW_CFG)!r} {script.request!r}")
+
+    r = Run(tmp, KEYS, "#" * (1023 - len(CFG)) + "\n" + CFG, answer("ok.http"))
+    script = r.script
+    assert script is not None
+    check("a file of 1024 bytes is read whole, to its last line",
+          r.row(ROW_CFG) == "" and script.request == REQUEST,
+          f"{r.row(ROW_CFG)!r} {script.request!r}")
+
     r = Run(tmp, "r\rOsx\x7flo", None, None, steps=20_000_000)
     check("no WEATHER.CFG: the place is asked for, and typed with a DEL",
           "Type the place" in r.row(ROW_PLACE - 1) and r.row(ROW_PLACE + 1) == "Oslo_",

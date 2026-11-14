@@ -148,6 +148,17 @@ unsigned weather_request(const struct cfg *cfg, char *buf, unsigned size)
         return 0;
     if (!put(buf, size, &n, " HTTP/1.0\r\nHost: ") || !put(buf, size, &n, cfg->host))
         return 0;
+    // The port in the Host, as the connection goes to it, unless it is 80
+    if (cfg->port != 80) {
+        char p[8];
+        unsigned i = sizeof p - 1;
+        p[i] = 0;
+        for (unsigned v = cfg->port; v; v /= 10)
+            p[--i] = (char)('0' + v % 10);
+        p[--i] = ':';
+        if (!put(buf, size, &n, p + i))
+            return 0;
+    }
     // curl's user agent, without which wttr.in answers with its page of
     // HTML; and the close, which ends the answer at the end of its body.
     if (!put(buf, size, &n, "\r\nUser-Agent: curl/8\r\nConnection: close\r\n\r\n"))

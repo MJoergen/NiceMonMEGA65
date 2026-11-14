@@ -116,7 +116,7 @@ static void settings(void)
 static void requests(void)
 {
     struct cfg c;
-    char buf[256];
+    char buf[REQ_SIZE];
     cfg_parse(&c, "", 0);
     weather_request(&c, buf, sizeof buf);
     check_str("the request with no place", buf,
@@ -126,10 +126,24 @@ static void requests(void)
     cfg_parse(&c, t, (unsigned)strlen(t));
     unsigned n = weather_request(&c, buf, sizeof buf);
     check_str("the request with a place, units, and a server", buf,
-              "GET /New+York%2F%C3%BC?format=%l|%C|%t|%w|%h&u HTTP/1.0\r\nHost: example.org\r\n"
-              "User-Agent: curl/8\r\nConnection: close\r\n\r\n");
+              "GET /New+York%2F%C3%BC?format=%l|%C|%t|%w|%h&u HTTP/1.0\r\n"
+              "Host: example.org:81\r\nUser-Agent: curl/8\r\nConnection: close\r\n\r\n");
     check("its length", n == strlen(buf));
     check("a buffer too small", weather_request(&c, buf, 40) == 0);
+    cfg_parse(&c, "server example.org:80", 21);
+    weather_request(&c, buf, sizeof buf);
+    check("the port 80 is left out of the Host", strstr(buf, "Host: example.org\r\n") != NULL);
+    // The longest: every byte of the place escaped, and the longest server
+    char longest[200] = "units m\nplace ";
+    memset(longest + strlen(longest), '/', CFG_PLACE - 1);
+    strcat(longest, "\nserver ");
+    memset(longest + strlen(longest), 'h', CFG_HOST - 1);
+    strcat(longest, ":65535");
+    check("the longest settings", cfg_parse(&c, longest, (unsigned)strlen(longest)) == 0 &&
+          strlen(c.place) == CFG_PLACE - 1 && strlen(c.host) == CFG_HOST - 1 && c.port == 65535);
+    n = weather_request(&c, buf, sizeof buf);
+    check("the longest request fills REQ_SIZE", n == REQ_SIZE - 1 && n == strlen(buf));
+    check("and does not fit in a byte less", weather_request(&c, buf, REQ_SIZE - 1) == 0);
 }
 
 static void utf8(void)

@@ -62,7 +62,9 @@ comment. For example:
 | `server NAME[:PORT]` | Another server than `wttr.in`, with port 80 unless one is given. It must answer as wttr.in does (below). |
 
 A line that the program does not understand is shown in red at the
-start, and the other lines still count.
+start, and the other lines still count. The program reads the first
+1024 bytes of the file. When the file is longer, it says so in red, and
+only the whole lines in those bytes count.
 
 ### What the screen shows
 

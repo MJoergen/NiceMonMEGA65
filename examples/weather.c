@@ -60,7 +60,7 @@ enum { F_IDLE, F_RECV };
 static int fstate = F_IDLE;
 static int handle;
 static unsigned long long fetch_start, next_fetch;
-static char req[256];
+static char req[REQ_SIZE];
 static unsigned req_n, req_sent;
 static char ans[2048];
 static unsigned ans_n;
@@ -387,18 +387,31 @@ static int settings(void)
     static const char name[] = "WEATHER.CFG";
     static char buf[1024];
     unsigned n = 0;
+    int more = 0;                       // the file is longer than buf
     for (unsigned i = 0; i < sizeof name; i++)
         words[i] = (unsigned char)name[i];
     int h = mon_fs_open(mon_words(words), 0);
     if (h >= 0) {
         int r;
-        while (n < sizeof buf && (r = mon_fs_read(h, mon_words(words), 256)) > 0)
-            for (int i = 0; i < r && n < sizeof buf; i++)
-                buf[n++] = (char)words[i];
+        while (!more && (r = mon_fs_read(h, mon_words(words), 256)) > 0)
+            for (int i = 0; i < r && !more; i++) {
+                if (n < sizeof buf)
+                    buf[n++] = (char)words[i];
+                else
+                    more = 1;
+            }
         mon_fs_close(h);
+        // Of a file that is longer, the whole lines read count, not the
+        // line that is cut.
+        while (more && n > 0 && buf[n - 1] != '\n')
+            n--;
         int bad = cfg_parse(&cfg, buf, n);
-        if (bad) {
-            char msg[64];
+        char msg[64];
+        if (more) {
+            fmt(msg, sizeof msg, "WEATHER.CFG: only its first %d bytes are read",
+                (int)sizeof buf);
+            center(ROW_CFG, C_ERR, msg);
+        } else if (bad) {
             fmt(msg, sizeof msg, "WEATHER.CFG: line %d is not understood", bad);
             center(ROW_CFG, C_ERR, msg);
         }
