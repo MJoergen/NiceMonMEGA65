@@ -365,12 +365,14 @@ sets serves both.
   three bytes of the MAC address, such as `nicemon-434506`, and the
   vendor class is `NiceMonMEGA65` and the monitor's version, such as
   `NiceMonMEGA65 V2.1`. The transaction's number is the microsecond counter
-  at the start, XOR the low word of the MAC address. The lease is not
-  renewed: a board that runs longer than its lease may have its address
-  given to another station.
+  at the start, XOR the low word of the MAC address. The lease is
+  kept, and a program's polls renew it while the network is on, as
+  `net_poll` has it. Nothing renews it at the prompt, so a board that
+  waits there longer than its lease may have its address given to
+  another station.
 - `i dhcp` keeps the mask and the gateway of the ACK, which UDP uses
   below, and the first DNS server, which it shows; `i A.B.C.D` and the
-  cold start set the three to none.
+  cold start set the three to none, and forget the lease.
 
 The UDP endpoint is the entries 16 to 19 of the dispatch table (above),
 so that a program, such as a game of two boards, or a BASIC interpreter,

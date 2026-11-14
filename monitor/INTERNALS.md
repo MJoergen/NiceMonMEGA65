@@ -82,8 +82,25 @@ of [SYSTEM.md §7](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#
   difference of the clock and the deadline is not negative. The poll
   checks the nearest deadline only while a flag says it is armed, so a
   stale one is never due. TCP's connections arm theirs (below), and
-  the lease's renewal will. The coarse clock is `arp_tick`, about a
-  second.
+  so does the lease. The coarse clock is `arp_tick`, 2^20
+  microseconds, about a second.
+- **The lease** (issue #111). `net_dhcp` and `i dhcp` keep the lease of
+  the ACK: its server, the MAC address that the ACK came from, and T1,
+  T2, and the end, options 58, 59, and 51, on the coarse clock. Without
+  T1 and T2 they are half and 7/8 of the lease. A lease of
+  `0xFFFFFFFF` is not kept. While the network is on, a housekeeping
+  deadline on the fine clock stands for the next REQUEST, at most 2^30
+  microseconds ahead, and the poll checks the coarse clock when it is
+  due. From T1 a REQUEST goes to the server by unicast every 60 ticks,
+  and from T2 it is broadcast, until the end. It comes from the board's
+  address, with it in `ciaddr`, no options 50 and 54, and the broadcast
+  flag clear (RFC 2131 §4.3.2). The poll gives a reply to the lease's
+  transaction to `lease_reply` in `V_RXF`. An ACK starts the lease
+  again, and writes `NET_IP` if its address is another. A NAK, or the
+  end, forgets the lease, and the address stays. A REQUEST that is due
+  while `net_dhcp` or `dns_lookup` waits goes a tick later, as they use
+  `V_TXF`. `net_set`, `i A.B.C.D`, and the cold start forget the
+  lease.
 - **DNS** (issue #111), `dns_lookup`, entry 25, builds its query in
   `V_TXF` at `0xFFFFF120`, the name packed from byte 56, with one
   question, type A, class IN, and RD set. Its ID, at `0xFFFFF388`, and
@@ -198,8 +215,8 @@ a program, `demo.bin`, whose words
 <!-- romsize layout -->
 | Part | Address | Words |
 |---|---|---:|
-| The monitor | `0x0000`–`0x5896` | 22679 |
-| Free | `0x5897`–`0x7FFF` | 10089 |
+| The monitor | `0x0000`–`0x59E2` | 23011 |
+| Free | `0x59E3`–`0x7FFF` | 9757 |
 <!-- /romsize layout -->
 
 The monitor's words, by the source they come from, in the order
@@ -210,12 +227,12 @@ the Makefile joins them. The column "Text" counts the words of the
 <!-- romsize monitor -->
 | Source | What it is | Words | Text |
 |---|---|---:|---:|
-| `monitor.nasm` | The dispatch table, the HAL, the cold start, and the traps | 748 | 27 |
-| `monitor_cmd.nasm` | The main loop and the commands | 3949 | 2394 |
+| `monitor.nasm` | The dispatch table, the HAL, the cold start, and the traps | 751 | 27 |
+| `monitor_cmd.nasm` | The main loop and the commands | 3956 | 2394 |
 | `monitor_dis.nasm` | The disassembler of `u` | 1079 | 269 |
 | `monitor_sd.nasm` | The sector routines | 390 | 223 |
-| `monitor_eth.nasm` | The network | 2804 | 298 |
-| `monitor_tcp.nasm` | TCP | 2453 | 0 |
+| `monitor_eth.nasm` | The network | 3123 | 298 |
+| `monitor_tcp.nasm` | TCP | 2456 | 0 |
 | `monlib.nasm` | The routines that programs join | 259 | 0 |
 | `mon.nasm` | The stubs of the entries | 72 | 0 |
 | `nicewasm` | `___wasm_start`, which copies the C code's data to the RAM | 85 |  |
@@ -228,7 +245,7 @@ the Makefile joins them. The column "Text" counts the words of the
 | nice_cpu's `muldiv_mpu.nasm` | Multiply and divide | 128 | 0 |
 | `build/folder.nasm` | The error of a card without the folder | 27 | 27 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 5 | 5 |
-| In all | | 22679 | 3243 |
+| In all | | 23011 | 3243 |
 <!-- /romsize monitor -->
 
 - The C code's strings are in its initial values, four characters a
@@ -329,12 +346,21 @@ needs `FOLDER=NICE`, the default. It runs these steps in order:
    classes, an answer cut short, a second query, the gateway, no answer
    to ARP, and no answer. It compares the output and the frames sent
    with `test/dns.expected`, with the ID and the port as `qq` and `pp`.
-6. **TFTP.** `test/tftp.py` runs `tftp` the same way, against
+6. **The lease.** `test/lease.py` runs `test/lease.nasm`, which takes
+   a lease with `net_dhcp`, opens the endpoint, and polls, under the
+   monitor with `--step-time`. It sleeps between its polls with `WAIT`,
+   so minutes of the clock take a second, and notes when a frame goes.
+   The script answers the frames of a run, and runs it again, until no
+   new answer is needed. It covers the REQUESTs by unicast from T1 and
+   broadcast from T2, 60 ticks apart, the lease's end, an ACK that
+   starts the lease again, an ACK of another address, a NAK, a T1 past
+   the housekeeping deadline, and a lease forever.
+7. **TFTP.** `test/tftp.py` runs `tftp` the same way, against
    `test/tftp.expected`. It covers a file of two blocks among packets of
    other hosts and ports, lost packets, an ERROR, files of 512 and 0
    bytes, a listing, a port given as `IP:PORT`, bad arguments, and no
    answer to ARP.
-7. **The real-time clock.** `test/rtc.py` starts the monitor on the
+8. **The real-time clock.** `test/rtc.py` starts the monitor on the
    words of an I2C master, which are memory in `niceemu`: a status that
    says that a master is present, and data that are the registers of the
    R6's real-time clock. With `--step-time` the clock is not set, so the
@@ -346,7 +372,7 @@ needs `FOLDER=NICE`, the default. It runs these steps in order:
    and in a year that the chip does not hold. The R3's chip is read only
    when the R6's does not answer, which memory cannot do, so that part
    runs only on an R3.
-8. **The runs.** The monitor runs once for each test below, with its
+9. **The runs.** The monitor runs once for each test below, with its
    keystrokes from an input file that ends with `h`, so that the run
    halts. Some runs add a program at `0x8000`, SD card images, or
    Ethernet frames.

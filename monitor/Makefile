@@ -177,9 +177,10 @@ $(BUILD)/udp.bin: $(BUILD)/monitor_test.bin test/udp.nasm
 
 # The tests of the network's entries of issue #111: test/net.nasm, the
 # poll, the IP settings, and the datagram held, test/netdhcp.nasm,
-# net_dhcp, which test/dhcp.py runs, and test/dns.nasm, dns_lookup, which
-# test/dns.py runs, all built as udp.bin is
-$(BUILD)/net.bin $(BUILD)/netdhcp.bin $(BUILD)/dns.bin $(BUILD)/tcp.bin $(BUILD)/tcpt.bin: $(BUILD)/%.bin: $(BUILD)/monitor_test.bin test/%.nasm
+# net_dhcp, which test/dhcp.py runs, test/dns.nasm, dns_lookup, which
+# test/dns.py runs, and test/lease.nasm, the lease's renewal, which
+# test/lease.py runs, all built as udp.bin is
+$(BUILD)/net.bin $(BUILD)/netdhcp.bin $(BUILD)/dns.bin $(BUILD)/lease.bin $(BUILD)/tcp.bin $(BUILD)/tcpt.bin: $(BUILD)/%.bin: $(BUILD)/monitor_test.bin test/%.nasm
 	@cat $(BUILD)/monitor_test_all.nasm test/$*.nasm > $(BUILD)/$*_all.nasm
 	@$(ASM) -o $(BUILD)/$*_full.bin $(BUILD)/$*_all.nasm
 	@grep -v '^0000[0-7]' $(BUILD)/$*_full.bin > $@
@@ -405,7 +406,8 @@ FAT32_START_BYTES = $(shell echo $$(($(FAT32_START) * 512)))
 # sizes of the screen's memory of niceemu and the boards first, and
 # test/dis.py the rows of u against nicedis.py and niceasm, and
 # test/dhcp.py runs i dhcp against the frames that it builds, and so
-# does test/dns.py for dns_lookup, and
+# does test/dns.py for dns_lookup, and test/lease.py for the lease's
+# renewal, and
 # test/tftp.py tftp, and test/rtc.py the cold start and time on the words
 # of an I2C master that it sets, as a real-time clock. arp and udp run
 # with --step-time, as their timeouts
@@ -413,7 +415,7 @@ FAT32_START_BYTES = $(shell echo $$(($(FAT32_START) * 512)))
 # output.
 test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.bin $(BUILD)/hello.bin \
       $(BUILD)/dis.bin $(BUILD)/sd.bin $(BUILD)/arp.bin $(BUILD)/udp.bin $(BUILD)/net.bin \
-      $(BUILD)/netdhcp.bin $(BUILD)/dns.bin $(BUILD)/rom.bin $(BUILD)/fs.bin $(BUILD)/fsw.bin \
+      $(BUILD)/netdhcp.bin $(BUILD)/dns.bin $(BUILD)/lease.bin $(BUILD)/rom.bin $(BUILD)/fs.bin $(BUILD)/fsw.bin \
       $(FAT_IMAGES) $(BUILD)/version_test.nasm
 	@test '$(FOLDER_UC)' = NICE || { echo "make test needs FOLDER=NICE, not $(FOLDER)"; exit 1; }
 	@$(PYTHON) test/ring.py $(EMU) $(BUILD)/monitor_test.bin:32768 \
@@ -423,6 +425,7 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	  test/dhcp.expected $(BUILD)/dhcp.out
 	@$(PYTHON) test/dns.py $(EMU) $(BUILD)/monitor_test.bin $(BUILD)/dns.bin \
 	  test/dns.expected $(BUILD)/dns.out
+	@$(PYTHON) test/lease.py $(EMU) $(BUILD)/monitor_test.bin $(BUILD)/lease.bin
 	@$(PYTHON) test/tftp.py $(EMU) $(BUILD)/monitor_test.bin test/tftp.expected $(BUILD)/tftp.out
 	@$(PYTHON) test/rtc.py $(EMU) $(BUILD)/monitor_test.bin
 	@$(ROMSIZE)
@@ -541,7 +544,7 @@ romsize: $(BUILD)/monitor_test.bin $(BUILD)/version_test.nasm
 fmt:
 	@$(FMT) $(SOURCES) test/hello.nasm test/dis.nasm test/sd.nasm test/arp.nasm test/rom.nasm \
 	  test/fs.nasm test/fsw.nasm test/udp.nasm test/net.nasm test/netdhcp.nasm \
-	  test/dns.nasm test/tcp.nasm test/tcpt.nasm test/tcphw.nasm mon_c.nasm
+	  test/dns.nasm test/lease.nasm test/tcp.nasm test/tcpt.nasm test/tcphw.nasm mon_c.nasm
 
 $(BUILD):
 	@mkdir -p $@

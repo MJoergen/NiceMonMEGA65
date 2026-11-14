@@ -31,7 +31,8 @@
 ; Each connection has one deadline, CB_DUE: the retransmission of the
 ; SYN, of data, or of the FIN, and the probe of a zero window, while
 ; TF_ARM is set, or the end of FIN-WAIT-2, while TF_FW2 is. tcp_rearm puts
-; the nearest of them in V_NDUE, for net_step. Times are on the fine
+; the nearest of them, and the lease's housekeeping deadline, in V_NDUE,
+; for net_step. Times are on the fine
 ; clock, net_clock, compared by their signed difference.
 ;
 ; A handle of tcp_listen, TF_PASSIVE, waits in LISTEN for a SYN to its
@@ -691,10 +692,12 @@ tcp_work
                 POP     R7
                 JMP     tcp_rearm       ; which returns to the caller
 
-; tcp_rearm: V_NDUE the nearest deadline of all the connections, armed in
-; V_NARM, or V_NARM 0 when none has one. Uses R1-R3.
+; tcp_rearm: V_NDUE the nearest deadline of all the connections and the
+; lease's housekeeping, V_LDUE while V_LARM is armed, armed in V_NARM, or
+; V_NARM 0 when none has one. Uses R1-R3.
 tcp_rearm
-                MOVE    @V_NARM, 0
+                MOVE    @V_NARM, @V_LARM
+                MOVE    @V_NDUE, @V_LDUE
                 MOVE    R2, V_TCB
 trearm_next
                 MOVE[M] R3, @R2++

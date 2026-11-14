@@ -152,7 +152,7 @@ dump_row
 ; case, and shown, in decimal with dots. Without an address it is only
 ; shown. Blanks may come before and after the address, and anything else
 ; makes it no address, which is not written. A written address has no
-; mask and no gateway, which only i dhcp gives.
+; mask, no gateway, no DNS server, and no lease, which only i dhcp gives.
 cmd_ip
                 CMP     @R2, 0x20
         ?Z      ADD     R2, R2, 1
@@ -173,6 +173,8 @@ cmd_ip
                 MOVE    @E_IP, R7
                 MOVE    @V_MASK, 0
                 MOVE    @V_GW, 0
+                MOVE    @V_DNS, 0
+                CALL    lease_forget
 ip_show         MOVE    R1, S_IP
                 MOVE    R2, @E_IP
                 CALL    show_ip

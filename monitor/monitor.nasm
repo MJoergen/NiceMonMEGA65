@@ -179,6 +179,20 @@ V_NHDR          .EQU    0xFFFFF390      ; the first 8 NHDR_CHUNKS words of the f
 V_TCB           .EQU    0xFFFFF3A0      ; the plain address of each TCP handle's control block, 0 for a free one, and a word of 0 after them
 V_TCR           .EQU    0xFFFFF3A8      ; for a RST to a segment of no connection: words 3 to 7 as a control block has them
 V_TCH           .EQU    0xFFFFF3B0      ; the headers of a TCP segment to send, 15 words, as the send buffer has them
+V_LEASE         .EQU    0xFFFFF3C0      ; not 0 while a DHCP lease is kept, which net_poll renews
+V_LARM          .EQU    0xFFFFF3C1      ; not 0 while the lease's housekeeping deadline, V_LDUE, is armed
+V_LDUE          .EQU    0xFFFFF3C2      ; that deadline, on the fine clock of net_clock
+V_LNEXT         .EQU    0xFFFFF3C3      ; the lease's next REQUEST, on the coarse clock of arp_tick,
+V_LT2           .EQU    0xFFFFF3C4      ; its T2, from which the REQUESTs are broadcast,
+V_LEXP          .EQU    0xFFFFF3C5      ; and its end
+V_LSRV          .EQU    0xFFFFF3C6      ; the lease's server, and its MAC address, as E_MACH
+V_LMACH         .EQU    0xFFFFF3C7      ; and E_MACL have it
+V_LMACL         .EQU    0xFFFFF3C8
+V_PLEASE        .EQU    0xFFFFF3C9      ; of the last reply that dhcp_parse took: the lease, option 51,
+V_PT1           .EQU    0xFFFFF3CA      ; T1 and T2, options 58 and 59, in seconds, 0 without them,
+V_PT2           .EQU    0xFFFFF3CB
+V_PMACH         .EQU    0xFFFFF3CC      ; and the MAC address that the frame came from
+V_PMACL         .EQU    0xFFFFF3CD
 WASM_RAM        .EQU    0xFFFFF400      ; the words that the ROM's C code writes, from here
 WASM_END        .EQU    0xFFFFFF00      ; up to below here, the I/O page, which the Makefile checks
 
@@ -239,7 +253,7 @@ SCR_MAX         .EQU    0x7FFF          ; the largest display offset
 ; set to 0, so that the screen shows Spleen, and the port for Ethernet
 ; frames disabled, as at a return, after a RST for each TCP connection
 ; that a program left open, the mask, the gateway, and the DNS server set
-; to none, and the ARP cache emptied. The identification of the IPv4
+; to none, the DHCP lease forgotten, and the ARP cache emptied. The identification of the IPv4
 ; packets starts from the fine clock, net_clock, and the local ports of
 ; TCP from the microseconds, with no connection opened. The vectors
 ; of lib.nasm are set, and ___wasm_start gives the words of the ROM's C
@@ -256,6 +270,7 @@ mon_reset
                 MOVE    @V_MASK, 0
                 MOVE    @V_GW, 0
                 MOVE    @V_DNS, 0
+                MOVE    @V_LEASE, 0
                 CALL    net_clock
                 MOVE    @V_IPID, R1
                 AND     R1, @io.us, 0x3FFF

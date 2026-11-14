@@ -7,7 +7,8 @@
 ; (issue #111); the UDP endpoint, the entries 16 to 19, udp_open,
 ; udp_send, udp_recv, and udp_close; the IP settings, net_config and
 ; net_set, entries 21 and 22; net_dhcp, entry 23, and i dhcp, which get
-; the IP address from a DHCP server; dns_lookup, entry 25, the IPv4
+; the IP address from a DHCP server, and the renewal of its lease in the
+; poll; dns_lookup, entry 25, the IPv4
 ; address of a name from the DNS server; and tftp IP NAME, which reads a
 ; .bin file through the endpoint from a TFTP server as load NAME reads one
 ; from the card (issue #84).
@@ -46,6 +47,10 @@ DHCP_OFFER      .EQU    2
 DHCP_REQUEST    .EQU    3
 DHCP_ACK        .EQU    5
 DHCP_NAK        .EQU    6
+DHCP_RENEW      .EQU    0x103           ; for dhcp_send: a REQUEST of the lease's renewal, to its server,
+DHCP_REBIND     .EQU    0x203           ; and one broadcast, from T2
+LEASE_AGAIN     .EQU    60              ; the ticks of arp_tick between the REQUESTs of a renewal
+LEASE_FAR       .EQU    1024            ; the ticks of the housekeeping deadline at most, 2^30 microseconds
 UDP_HDR         .EQU    11              ; the words of the headers of a datagram, with the 2 bytes before the frame
 UDP_MAX         .EQU    1472            ; the bytes of a datagram's data, at most
 E_NOIP          .EQU    -40             ; the errors of the UDP entries: no IP address,
@@ -107,8 +112,9 @@ ip_dhcp
 ; word of the MAC address. The ACK's address is written to E_IP only if
 ; it is another, which breaks a host's connection over TCP, as a write of
 ; i does, and ends the program's TCP connections in E_TRESET, and the
-; mask, the gateway, and the DNS server are kept. Without
-; an ACK, E_IP and the rest are left alone. The lease is not renewed.
+; mask, the gateway, and the DNS server are kept, and the lease, by
+; lease_take, which net_poll renews. Without an ACK, E_IP and the rest,
+; and a lease kept, are left alone.
 ; R1 = 0, or E_NODHCP. Uses R1-R6, and R7 across the calls, saved: the
 ; tries left.
 net_dhcp
@@ -143,6 +149,7 @@ dhcp_try
                 MOVE    @V_MASK, @V_DMASK
                 MOVE    @V_GW, @V_DGW
                 MOVE    @V_DNS, @V_DDNS
+                CALL    lease_take
                 MOVE    R7, 0
 :
                 MOVE    @V_NWAIT, 0
@@ -428,7 +435,9 @@ arp_request
 ; is held already, and then it is dropped; a datagram to the port of the
 ; ROM's own wait, V_NWAIT, such as a DHCP reply, is copied to V_RXF, and
 ; the poll stops there, so that the wait parses it; it takes the place of
-; a datagram held, which is lost. Every other frame is released unread.
+; a datagram held, which is lost, as does a DHCP reply to the lease's
+; transaction while a lease is kept, which lease_reply takes in V_RXF.
+; Every other frame is released unread.
 ; Nothing moves between polls: a program calls net_poll every 100 ms or
 ; so (README.md, "The network").
 ;
@@ -439,16 +448,28 @@ arp_request
 ; while V_NARM is not 0, so that a stale one is never due.
 
 ; net_on: the port for Ethernet frames enabled, with its queue emptied,
-; if it is not enabled, and else left as it is, with the frames that wait.
-; Uses no register.
+; and the housekeeping deadline of a lease kept armed, if it is not
+; enabled, and else left as it is, with the frames that wait. Uses no
+; register.
 net_on
                 AND[M]  R0, @ETH_CSR, ETH_ON
-        ?Z      JMP     eth_on          ; which returns to the caller
+        ?!Z     RET
+                CALL    eth_on
+                TST     @V_LEASE
+        ?Z      RET
+                PUSH    R1
+                PUSH    R2
+                PUSH    R3
+                CALL    lease_arm
+                POP     R3
+                POP     R2
+                POP     R1
                 RET
 
-; net_off: the port disabled, and its queue emptied, unless the endpoint
-; is open, a wait of the ROM's own runs, or a TCP handle is taken, which
-; keep the network on. Uses no register.
+; net_off: the port disabled, and its queue emptied, with no deadline
+; armed, unless the endpoint is open, a wait of the ROM's own runs, or a
+; TCP handle is taken, which keep the network on. A lease is kept, and
+; renewed when the network is on again. Uses no register.
 net_off
                 TST     @V_UPORT
         ?!Z     RET
@@ -463,6 +484,8 @@ net_off
                 CMP     R1, V_TCB+TCP_HANDLES
         ?!Z     JMP     :-
                 MOVE    @ETH_CSR, 0
+                MOVE    @V_LARM, 0
+                MOVE    @V_NARM, 0      ; as no connection has a deadline
 :
                 POP     R1
                 RET
@@ -471,12 +494,13 @@ net_off
 ; mon_trap: a RST for each TCP connection, at best effort, and every
 ; handle freed, by tcp_close_all, the endpoint closed, the datagram held
 ; forgotten, no wait of the ROM's own, no deadline armed, and the port
-; disabled. Uses R1-R6.
+; disabled. A lease is kept. Uses R1-R6.
 net_close
                 CALL    tcp_close_all
                 MOVE    @V_UPORT, 0
                 MOVE    @V_ULEN, 0
                 MOVE    @V_NWAIT, 0
+                MOVE    @V_LARM, 0
                 MOVE    @V_NARM, 0
                 MOVE    @ETH_CSR, 0
                 RET
@@ -525,10 +549,15 @@ net_step
                 POP     R1
                 RET
 
-; net_due: the deadline that is due: the timeouts of the TCP connections,
-; with tcp_due, which arms the next. The lease's renewal is to come here
-; (issue #111). Uses R1-R6.
+; net_due: the deadline that is due: the lease's housekeeping, with
+; lease_due, and the timeouts of the TCP connections, with tcp_due, which
+; arms the next. Uses R1-R6.
 net_due
+                TST     @V_LARM
+        ?Z      JMP     tcp_due         ; which returns to the caller
+                CALL    net_clock
+                SUB[M]  R0, R1, @V_LDUE
+        ?!N     CALL    lease_due
                 JMP     tcp_due         ; which returns to the caller
 
 ; net_frames: the frames of the queue taken, as the header above says, up
@@ -583,6 +612,15 @@ net_frame
                 MOVE    R1, V_RXF
                 CALL    eth_recv
                 JMP     net_frames_end
+; Or a reply to the lease's renewal: from port 67 to port 68, of the
+; transaction V_XID
+:
+                TST     @V_LEASE
+        ?Z      JMP     :+
+                CMP     @V_NHDR+9, 0x00430044
+        ?!Z     JMP     :+
+                CMP     @V_NHDR+12, @V_XID
+        ?Z      JMP     net_lease
 ; Or for the endpoint: to E_IP or to everyone, to its port, no shorter
 ; than its UDP length says, and with 1 to UDP_MAX bytes of data
 :
@@ -609,6 +647,12 @@ net_frame
                 MOVE    R1, V_RXF
                 CALL    eth_recv
                 MOVE    @V_ULEN, R7     ; held
+                JMP     net_next
+net_lease
+                MOVE    @V_ULEN, 0      ; the datagram held, lost
+                MOVE    R1, V_RXF
+                CALL    eth_recv
+                CALL    lease_reply
                 JMP     net_next
 net_tcp
                 MOVE    R1, R7
@@ -658,8 +702,9 @@ net_config
 ; server set from the 4 words at the word address R1, as net_config gives
 ; them, after a poll. The IP address is written to E_IP only if it is
 ; another, as a write breaks a host's connection over TCP, and ends every
-; TCP connection of the program in E_TRESET; 0 clears it. R1 = 0. Uses
-; R1-R6, and R7 across the calls, saved.
+; TCP connection of the program in E_TRESET; 0 clears it. The lease is
+; forgotten, and not renewed. R1 = 0. Uses R1-R6, and R7 across the
+; calls, saved.
 net_set
                 PUSH    R7
                 CALL    net_waddr
@@ -671,6 +716,7 @@ net_set
                 MOVE    @V_MASK, @1[R7]
                 MOVE    @V_GW, @2[R7]
                 MOVE    @V_DNS, @3[R7]
+                CALL    lease_forget
                 MOVE    R1, 0
                 POP     R7
                 RET
@@ -923,7 +969,10 @@ udp_take
 
 ; dhcp_send: a message of the type R1, DHCP_DISCOVER, or DHCP_REQUEST of
 ; the address V_DIP from the server V_DSRV, with the transaction V_XID.
-; Uses R1-R6.
+; Or a REQUEST of the lease's renewal (RFC 2131 §4.3.2), R1 DHCP_RENEW to
+; its server, V_LSRV, at its MAC address, or DHCP_REBIND to everyone:
+; from E_IP, with E_IP in ciaddr, no options 50 and 54, and the broadcast
+; flag clear. Uses R1-R6.
 dhcp_send
                 MOVE    R5, R1          ; the type
                 MOVE    R1, V_TXF
@@ -953,11 +1002,13 @@ dhcp_send
                 CALL    dhcp_put
                 MOVE    R1, 1
                 CALL    dhcp_put
-                MOVE    R1, R5
+                AND     R1, R5, 0xFF
                 CALL    dhcp_put
                 MOVE    R4, @E_IP
                 CMP     R5, DHCP_REQUEST
         ?Z      MOVE    R4, @V_DIP
+                CMP     R5, DHCP_RENEW
+        ?!C     MOVE    R4, 0           ; a renewal's
                 MOVE    R1, 50
                 CALL    dhcp_addr
                 MOVE    R4, 0
@@ -965,6 +1016,17 @@ dhcp_send
         ?Z      MOVE    R4, @V_DSRV
                 MOVE    R1, 54
                 CALL    dhcp_addr
+                CMP     R5, DHCP_RENEW
+        ?C      JMP     :+
+                MOVE    @V_TXF+7, @E_IP  ; a renewal's: from E_IP,
+                MOVE    @V_TXF+13, 0    ; no broadcast flag,
+                MOVE    @V_TXF+14, @E_IP  ; and ciaddr
+                CMP     R5, DHCP_RENEW
+        ?!Z     JMP     :+
+                MOVE    @V_TXF, @V_LMACH  ; to the server
+                MOVE    @V_TXF+1, @V_LMACL
+                MOVE    @V_TXF+8, @V_LSRV
+:
                 MOVE    R4, R6
                 MOVE    R5, D_PARAMS
                 CALL    dhcp_str
@@ -1115,7 +1177,9 @@ dhcp_wait_end
 ; checked, as the FCS was. R1 = the message type of option 53, or 0 when
 ; it is no reply of ours or has no type, and V_PIP, V_PSRV, V_PMASK,
 ; V_PGW, and V_PDNS are its address, and the options 54, 1, 3, and 6, the
-; first address of each, or 0 without them. The options are walked from byte 284 of the
+; first address of each, V_PLEASE, V_PT1, and V_PT2 the options 51, 58,
+; and 59, each 0 without them, and V_PMACH and V_PMACL the MAC address
+; of the frame's source. The options are walked from byte 284 of the
 ; buffer up to 255, or the end of the frame, R8, the byte after its last;
 ; R7 is the option, and R5 the type. Uses R1-R6, and R7 and R8 across the
 ; calls, saved.
@@ -1150,6 +1214,13 @@ dhcp_parse
                 MOVE    @V_PMASK, 0
                 MOVE    @V_PGW, 0
                 MOVE    @V_PDNS, 0
+                MOVE    @V_PLEASE, 0
+                MOVE    @V_PT1, 0
+                MOVE    @V_PT2, 0
+                SHR     @V_PMACH, @V_RXF+2, 16
+                SHL     R1, @V_RXF+2, 16
+                SHR     R2, @V_RXF+3, 16
+                OR      @V_PMACL, R1, R2
                 MOVE    R7, 284
 dhcp_opt
                 CMP     R7, R8
@@ -1175,7 +1246,16 @@ dhcp_opt
                 CMP     R6, 53
         ?Z      JMP     dhcp_type
                 CMP     R4, 4
-        ?C      JMP     dhcp_opt        ; too short for an address
+        ?C      JMP     dhcp_opt        ; too short for an address or a time
+                CMP     R6, 51
+        ?Z      MOVE    R6, V_PLEASE
+        ?Z      JMP     :+
+                CMP     R6, 58
+        ?Z      MOVE    R6, V_PT1
+        ?Z      JMP     :+
+                CMP     R6, 59
+        ?Z      MOVE    R6, V_PT2
+        ?Z      JMP     :+
                 CMP     R6, 1
         ?Z      MOVE    R6, V_PMASK
         ?Z      JMP     :+
@@ -1201,6 +1281,129 @@ dhcp_parse_end
                 POP     R8
                 POP     R7
                 RET
+
+; The lease (RFC 2131 §4.4.5), which net_dhcp keeps with lease_take, and
+; net_poll renews, only while the network is on: at T1 a REQUEST to its
+; server by unicast, at the MAC address of its ACK's frame, as net_poll
+; sends no ARP, and again every LEASE_AGAIN ticks until T2; from T2
+; broadcast, as often, until the end. Its times are on the coarse clock,
+; arp_tick, as they are hours away. The housekeeping deadline, V_LDUE, on
+; the fine clock, is armed for the next REQUEST, or LEASE_FAR ticks ahead
+; if that is farther, while the network is on, and tcp_rearm takes it
+; into the nearest deadline, V_NDUE. An ACK sets the times again, and
+; writes E_IP if it has another address; a NAK, or the end, forgets the
+; lease, and the address stays. A REQUEST that is due while a wait of the
+; ROM's own uses V_TXF goes a tick later.
+
+; lease_take: the lease of the ACK that dhcp_parse took last kept: its
+; server and its MAC address, and T1, T2, and the end from now, from the
+; options 58, 59, and 51, or half and 7/8 of the lease without the first
+; two; armed while the network is on. A lease of 0xFFFFFFFF, never to be
+; renewed, or none, forgets the lease. Uses R1-R6.
+lease_take
+                MOVE    R4, @V_PLEASE
+                SUB     R1, R4, 1
+                CMP     R1, 0xFFFFFFFE
+        ?!C     JMP     lease_forget    ; 0 or 0xFFFFFFFF
+                MOVE    @V_LSRV, @V_PSRV
+                MOVE    @V_LMACH, @V_PMACH
+                MOVE    @V_LMACL, @V_PMACL
+                CALL    arp_tick
+                MOVE    R5, R1          ; now
+                MOVE    R1, R4
+                CALL    lease_ticks
+                ADD     @V_LEXP, R5, R1
+                MOVE[M] R1, @V_PT2
+        ?Z      SHR     R1, R4, 3
+        ?Z      SUB     R1, R4, R1
+                CALL    lease_ticks
+                ADD     @V_LT2, R5, R1
+                MOVE[M] R1, @V_PT1
+        ?Z      SHR     R1, R4, 1
+                CALL    lease_ticks
+                ADD     @V_LNEXT, R5, R1
+                MOVE    @V_LEASE, 1
+                AND[M]  R0, @ETH_CSR, ETH_ON
+        ?Z      RET
+                JMP     lease_arm       ; which returns to the caller
+
+; lease_ticks: R1 = the R1 seconds in ticks of arp_tick, 2^20
+; microseconds, a little less: R1 less R1/16, plus R1/64. Uses R2.
+lease_ticks
+                SHR     R2, R1, 4
+                SUB     R2, R1, R2
+                SHR     R1, R1, 6
+                ADD     R1, R2, R1
+                RET
+
+; lease_arm: the housekeeping deadline armed for the next REQUEST, or
+; LEASE_FAR ticks ahead if that is farther, and the nearest deadline
+; again, tcp_rearm. Uses R1-R3.
+lease_arm
+                CALL    arp_tick
+                SUB     R3, @V_LNEXT, R1
+                CMP     @V_LNEXT, R1
+        ?C      MOVE    R3, 0           ; past
+                CMP     R3, LEASE_FAR
+        ?!C     MOVE    R3, LEASE_FAR
+                SHL     R3, R3, 20
+                CALL    net_clock
+                ADD     @V_LDUE, R1, R3
+                MOVE    @V_LARM, 1
+                JMP     tcp_rearm       ; which returns to the caller
+
+; lease_due: for net_due, the housekeeping deadline, due: at the end, the
+; lease forgotten; else a REQUEST if one is due, by unicast before T2 and
+; with a server, else broadcast, and the next a LEASE_AGAIN ticks later,
+; at T2 or the end at the latest. Uses R1-R6.
+lease_due
+                CALL    arp_tick
+                CMP     R1, @V_LNEXT
+        ?C      JMP     lease_arm       ; not yet: LEASE_FAR passed
+                CMP     R1, @V_LEXP
+        ?!C     JMP     lease_forget    ; its end
+                TST     @V_NWAIT
+        ?!Z     ADD     @V_LNEXT, R1, 1  ; a wait of the ROM's own uses V_TXF
+        ?!Z     JMP     lease_arm
+                ADD     R5, R1, LEASE_AGAIN
+                MOVE    R6, DHCP_REBIND
+                CMP     R1, @V_LT2
+        ?!C     JMP     :+              ; from T2
+                CMP     R5, @V_LT2
+        ?!C     MOVE    R5, @V_LT2
+                TST     @V_LSRV
+        ?!Z     MOVE    R6, DHCP_RENEW
+:
+                CMP     R5, @V_LEXP
+        ?!C     MOVE    R5, @V_LEXP
+                MOVE    @V_LNEXT, R5
+                MOVE    R1, R6
+                CALL    dhcp_send
+                JMP     lease_arm       ; which returns to the caller
+
+; lease_reply: the DHCP reply of R1 bytes at V_RXF, for a lease kept: an
+; ACK with an address sets the lease's times again, with lease_take, and
+; writes E_IP if the address is another, which ends the TCP connections
+; in E_TRESET; a NAK forgets the lease; anything else is passed over.
+; Uses R1-R6.
+lease_reply
+                CALL    dhcp_parse
+                CMP     R1, DHCP_NAK
+        ?Z      JMP     lease_forget    ; which returns to the caller
+                CMP     R1, DHCP_ACK
+        ?!Z     RET
+                MOVE[M] R1, @V_PIP
+        ?Z      RET                     ; no address
+                CMP     R1, @E_IP
+        ?!Z     MOVE    @E_IP, R1
+        ?!Z     CALL    tcp_resetall
+                JMP     lease_take      ; which returns to the caller
+
+; lease_forget: no lease kept, and no housekeeping deadline. Uses R1-R3.
+lease_forget
+                MOVE    @V_LEASE, 0
+                MOVE    @V_LARM, 0
+                JMP     tcp_rearm       ; which returns to the caller
 
 ; The DNS client (RFC 1035), dns_lookup, entry 25 (issue #111). A query
 ; has one question, type A, class IN, with RD set, and goes from a local
