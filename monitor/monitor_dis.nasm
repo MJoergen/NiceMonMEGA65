@@ -127,12 +127,12 @@ dis_print
                 CMP     R1, 4
         ?Z      JMP     :+
                 MOVE    R1, S_UBLANK
-                CALL    _io_puts
+                CALL    puts_b
                 ADD     R11, R11, 1
                 JMP     :-
 :
                 MOVE    R1, S_UGAP
-                CALL    _io_puts
+                CALL    puts_b
                 JMP     @DIS_KINDS[R10]
 ; Kind 0, an ALU or SHIFT instruction, which is a .DAT if a field that its
 ; mnemonic does not use is not R0
@@ -166,7 +166,7 @@ dis_cmd         MOVE    R1, R9
                 SHR     R1, R9, 21
                 AND     R11, R1, 0x1F
                 MOVE    R1, @U_CTRL[R11]
-                CALL    _io_puts
+                CALL    puts_b
                 CMP     R11, 2
         ?!Z     JMP     dis_end
                 MOVE    R1, 0x20
@@ -178,7 +178,7 @@ dis_cmd         MOVE    R1, R9
 dis_ret         MOVE    R1, R9
                 CALL    u_cond
                 MOVE    R1, S_URET
-                CALL    _io_puts
+                CALL    puts_b
                 JMP     dis_end
 ; Kind 3, CALL, with the operand of the MOVE, the third word, whose
 ; constant is the fourth
@@ -186,7 +186,7 @@ dis_call
                 MOVE    R1, R9
                 CALL    u_cond
                 MOVE    R1, S_UCALL
-                CALL    _io_puts
+                CALL    puts_b
                 ADD     R1, R7, 2
                 SHR     R1, @R1, 7
                 AND     R1, R1, 0x7F
@@ -199,7 +199,7 @@ dis_call
 dis_rsvd
                 CALL    u_dat
                 MOVE    R1, S_URSVD
-                CALL    _io_puts
+                CALL    puts_b
                 JMP     dis_end
 ; Kinds 5 and up, the pseudo-instruction of entry R10 - 5 of U_PSEUDO,
 ; with its fields, from its first, as u_stmt writes them
@@ -211,7 +211,7 @@ dis_pseudo
                 ADD     R2, R2, R1
                 ADD     R11, R2, U_PSEUDO+2  ; the name, the first field, and their number
                 MOVE    R1, @R11++
-                CALL    _io_puts
+                CALL    puts_b
                 MOVE    R10, @R11++
                 ADD[M]  @V_UNOPS, R10, @R11
         ?Z      JMP     dis_end         ; NOP
@@ -236,7 +236,7 @@ u_stmt
                 AND[M]  R0, R9, 0x08000000
         ?!Z     ADD     R1, R1, 16      ; the SHIFT names follow the ALU's
                 MOVE    R1, @U_NAMES[R1]
-                CALL    _io_puts
+                CALL    puts_b
                 AND[M]  R0, R9, 0x06000000
         ?Z      JMP     :+              ; no modifier
                 MOVE    R1, 0x5B        ; [
@@ -264,7 +264,7 @@ u_stmt_op
                 CMP     R10, @V_UNOPS
         ?Z      RET
                 MOVE    R1, S_UCOMMA
-                CALL    _io_puts
+                CALL    puts_b
                 JMP     u_stmt_op
 
 ; u_unused: the fields that the mnemonic does not use and that are not
@@ -272,7 +272,7 @@ u_stmt_op
 ; Uses R1-R6, R10, and R11.
 u_unused
                 MOVE    R1, S_UOPEN
-                CALL    _io_puts
+                CALL    puts_b
                 MOVE    R10, @V_UNOPS
                 MOVE    R11, 0          ; not 0 after the first
 u_unused_f
@@ -283,10 +283,10 @@ u_unused_f
         ?Z      JMP     :+
                 TST     R11
         ?!Z     MOVE    R1, S_UCOMMA
-        ?!Z     CALL    _io_puts
+        ?!Z     CALL    puts_b
                 MOVE    R11, 1
                 MOVE    R1, @U_FIELDS[R10]
-                CALL    _io_puts
+                CALL    puts_b
                 MOVE    R1, @V_UF[R10]
                 MOVE    R2, @V_UC[R10]
                 MOVE    R3, 0
@@ -299,19 +299,19 @@ u_unused_f
 ; comment that says what they would do. Uses R1-R6 and R11.
 u_dat
                 MOVE    R1, S_UDAT
-                CALL    _io_puts
+                CALL    puts_b
                 MOVE    R11, R7
 :
                 MOVE    R1, S_U0X
-                CALL    _io_puts
+                CALL    puts_b
                 MOVE    R1, @R11++
                 MOVE    R2, 8
                 CALL    u_hex
                 CMP     R11, R12
         ?Z      MOVE    R1, S_USEMI
-        ?Z      JMP     _io_puts        ; which returns to the caller
+        ?Z      JMP     puts_b          ; which returns to the caller
                 MOVE    R1, S_UCOMMA
-                CALL    _io_puts
+                CALL    puts_b
                 JMP     :-
 
 ; u_cond: the condition of the instruction word R1 and a blank, or nothing
@@ -327,7 +327,7 @@ u_cond
                 CALL    mon_putc
 :
                 AND     R1, R5, 7
-                MOVE    R1, @S_UFLAGS[R1]
+                MOVE    R1, @TEXT_B+4*S_UFLAGS[R1]
                 CALL    mon_putc
                 MOVE    R1, 0x20
                 JMP     mon_putc        ; which returns to the caller
@@ -358,21 +358,21 @@ u_op
                 AND[M]  R0, R5, 0x80
         ?!Z     JMP     :+
                 MOVE    R1, S_UDEC      ; --Rx
-                CALL    _io_puts
+                CALL    puts_b
 :
                 AND     R1, R5, 0xF
                 CALL    u_reg
                 AND     R4, R5, 0x30
                 CMP     R4, 0x20
         ?Z      MOVE    R1, S_UINC      ; Rx++
-        ?Z      JMP     _io_puts        ; which returns to the caller
+        ?Z      JMP     puts_b          ; which returns to the caller
                 AND[M]  R0, R5, 0x80
         ?Z      RET
                 MOVE    R1, S_UDEC      ; Rx--
-                JMP     _io_puts
+                JMP     puts_b
 u_op_const
                 MOVE    R1, S_U0X
-                CALL    _io_puts
+                CALL    puts_b
                 PUSH    R5
                 MOVE    R1, R6
                 MOVE    R2, 1
@@ -450,62 +450,73 @@ U_PSEUDO
                 .DAT    0x0FFFC07F, 0x02000000, U_TST, 1, 1  ; MOVE[M] R0, s0
                 .DAT    0x0FFFC000, 0x02200000, U_CMP, 1, 2  ; SUB[M] R0, s0, s1
 U_PSEUDOS       .EQU    7
-U_NOP           .ASCII_L 'NOP'
-U_JMP           .ASCII_L 'JMP'
-U_PUSH          .ASCII_L 'PUSH'
-U_POP           .ASCII_L 'POP'
-U_CLR           .ASCII_L 'CLR'
-U_TST           .ASCII_L 'TST'
-U_CMP           .ASCII_L 'CMP'
-U_MOVE          .ASCII_L 'MOVE'
-U_SUB           .ASCII_L 'SUB'
-U_MDBL          .ASCII_L 'MDBL'
-U_ADD           .ASCII_L 'ADD'
-U_DBL           .ASCII_L 'DBL'
-U_DEC           .ASCII_L 'DEC'
-U_NOT           .ASCII_L 'NOT'
-U_NOR           .ASCII_L 'NOR'
-U_IAND          .ASCII_L 'IAND'
-U_NAND          .ASCII_L 'NAND'
-U_XOR           .ASCII_L 'XOR'
-U_IOR           .ASCII_L 'IOR'
-U_XNOR          .ASCII_L 'XNOR'
-U_AND           .ASCII_L 'AND'
-U_ONE           .ASCII_L 'ONE'
-U_OR            .ASCII_L 'OR'
-U_SHL           .ASCII_L 'SHL'
-U_S1            .ASCII_L '0<1'
-U_S2            .ASCII_L '0<C'
-U_S3            .ASCII_L 'C<0'
-U_S4            .ASCII_L 'C<1'
-U_S5            .ASCII_L 'C<C'
-U_ROL           .ASCII_L 'ROL'
-U_BPL           .ASCII_L 'BPL'
-U_SHR           .ASCII_L 'SHR'
-U_S9            .ASCII_L '1>0'
-U_S10           .ASCII_L 'C>0'
-U_S11           .ASCII_L '0>C'
-U_S12           .ASCII_L '1>C'
-U_S13           .ASCII_L 'C>C'
-U_ROR           .ASCII_L 'ROR'
-U_BPR           .ASCII_L 'BPR'
-U_HALT          .ASCII_L 'HALT'
-U_RTI           .ASCII_L 'RTI'
-U_INT           .ASCII_L 'INT'
-U_WAIT          .ASCII_L 'WAIT'
-U_FDEST         .ASCII_L 'dest: '
-U_FS0           .ASCII_L 's0: '
-U_FS1           .ASCII_L 's1: '
+U_NOP           .ASCII_B 'NOP'
+U_JMP           .ASCII_B 'JMP'
+U_PUSH          .ASCII_B 'PUSH'
+                .DAT    0
+U_POP           .ASCII_B 'POP'
+U_CLR           .ASCII_B 'CLR'
+U_TST           .ASCII_B 'TST'
+U_CMP           .ASCII_B 'CMP'
+U_MOVE          .ASCII_B 'MOVE'
+                .DAT    0
+U_SUB           .ASCII_B 'SUB'
+U_MDBL          .ASCII_B 'MDBL'
+                .DAT    0
+U_ADD           .ASCII_B 'ADD'
+U_DBL           .ASCII_B 'DBL'
+U_DEC           .ASCII_B 'DEC'
+U_NOT           .ASCII_B 'NOT'
+U_NOR           .ASCII_B 'NOR'
+U_IAND          .ASCII_B 'IAND'
+                .DAT    0
+U_NAND          .ASCII_B 'NAND'
+                .DAT    0
+U_XOR           .ASCII_B 'XOR'
+U_IOR           .ASCII_B 'IOR'
+U_XNOR          .ASCII_B 'XNOR'
+                .DAT    0
+U_AND           .ASCII_B 'AND'
+U_ONE           .ASCII_B 'ONE'
+U_OR            .ASCII_B 'OR'
+U_SHL           .ASCII_B 'SHL'
+U_S1            .ASCII_B '0<1'
+U_S2            .ASCII_B '0<C'
+U_S3            .ASCII_B 'C<0'
+U_S4            .ASCII_B 'C<1'
+U_S5            .ASCII_B 'C<C'
+U_ROL           .ASCII_B 'ROL'
+U_BPL           .ASCII_B 'BPL'
+U_SHR           .ASCII_B 'SHR'
+U_S9            .ASCII_B '1>0'
+U_S10           .ASCII_B 'C>0'
+U_S11           .ASCII_B '0>C'
+U_S12           .ASCII_B '1>C'
+U_S13           .ASCII_B 'C>C'
+U_ROR           .ASCII_B 'ROR'
+U_BPR           .ASCII_B 'BPR'
+U_HALT          .ASCII_B 'HALT'
+                .DAT    0
+U_RTI           .ASCII_B 'RTI'
+U_INT           .ASCII_B 'INT'
+U_WAIT          .ASCII_B 'WAIT'
+                .DAT    0
+U_FDEST         .ASCII_B 'dest: '
+U_FS0           .ASCII_B 's0: '
+                .DAT    0
+U_FS1           .ASCII_B 's1: '
+                .DAT    0
 S_UFLAGS
-                .ASCII_L '1XCZNVEI'
-S_URET          .ASCII_L 'RET'
-S_UCALL         .ASCII_L 'CALL '
-S_URSVD         .ASCII_L 'reserved control word'
-S_UDAT          .ASCII_L '.DAT '
-S_U0X           .ASCII_L '0x'
-S_USEMI         .ASCII_L ' ; '
-S_UOPEN         .ASCII_L ' ('
-S_UDEC          .ASCII_L '--'
-S_UINC          .ASCII_L '++'
+                .ASCII_B '1XCZNVEI'
+                .DAT    0
+S_URET          .ASCII_B 'RET'
+S_UCALL         .ASCII_B 'CALL '
+S_URSVD         .ASCII_B 'reserved control word'
+S_UDAT          .ASCII_B '.DAT '
+S_U0X           .ASCII_B '0x'
+S_USEMI         .ASCII_B ' ; '
+S_UOPEN         .ASCII_B ' ('
+S_UDEC          .ASCII_B '--'
+S_UINC          .ASCII_B '++'
 S_UBLANK
-                .ASCII_L '         '
+                .ASCII_B '         '

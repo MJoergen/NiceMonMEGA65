@@ -230,23 +230,24 @@ a program, `demo.bin`, whose words
 <!-- romsize layout -->
 | Part | Address | Words |
 |---|---|---:|
-| The monitor | `0x0000`–`0x5AE1` | 23266 |
-| Free | `0x5AE2`–`0x7FFF` | 9502 |
+| The monitor | `0x0000`–`0x519B` | 20892 |
+| Free | `0x519C`–`0x7FFF` | 11876 |
 <!-- /romsize layout -->
 
 The monitor's words, by the source they come from, in the order
 the Makefile joins them. The column "Text" counts the words of the
-`.ASCII_L` strings, one character a word, which are part of
-"Words":
+texts, which are part of "Words". They are packed, four characters a
+word, with `.ASCII_B`, and a `.DAT 0` after a text whose length is a
+multiple of 4 ends it (#131):
 
 <!-- romsize monitor -->
 | Source | What it is | Words | Text |
 |---|---|---:|---:|
-| `monitor.nasm` | The dispatch table, the HAL, the cold start, and the traps | 801 | 27 |
-| `monitor_cmd.nasm` | The main loop and the commands | 3964 | 2394 |
-| `monitor_dis.nasm` | The disassembler of `u` | 1079 | 269 |
-| `monitor_sd.nasm` | The sector routines | 390 | 223 |
-| `monitor_eth.nasm` | The network | 3320 | 309 |
+| `monitor.nasm` | The dispatch table, the HAL, the cold start, and the traps | 795 | 9 |
+| `monitor_cmd.nasm` | The main loop and the commands | 2197 | 627 |
+| `monitor_dis.nasm` | The disassembler of `u` | 889 | 79 |
+| `monitor_sd.nasm` | The sector routines | 226 | 59 |
+| `monitor_eth.nasm` | The network | 3095 | 84 |
 | `monitor_tcp.nasm` | TCP | 2456 | 0 |
 | `monlib.nasm` | The routines that programs join | 259 | 0 |
 | `mon.nasm` | The stubs of the entries | 72 | 0 |
@@ -258,13 +259,15 @@ the Makefile joins them. The column "Text" counts the words of the
 | `nicewasm` | The initial values of the C code's data: its strings and tables | 70 |  |
 | nice_cpu's `lib.nasm` | The runtime of the C code | 131 | 0 |
 | nice_cpu's `muldiv_mpu.nasm` | Multiply and divide | 128 | 0 |
-| `build/folder.nasm` | The error of a card without the folder | 27 | 27 |
-| `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 5 | 5 |
-| In all | | 23266 | 3254 |
+| `build/folder.nasm` | The error of a card without the folder | 8 | 8 |
+| `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
+| In all | | 20892 | 868 |
 <!-- /romsize monitor -->
 
-- The C code's strings are in its initial values, four characters a
-  word, so the column "Text" leaves them out.
+- The C code's strings are in its initial values, also four characters
+  a word, so the column "Text" leaves them out.
+- `build/folder.nasm` and the version always end with a `.DAT 0`, as
+  the Makefile does not count their characters.
 - The version is that of the tests, `V9.9`, so that the tables do not
   change with every commit. A release's version, such as `V2.1`, has
   as many words.
@@ -273,7 +276,7 @@ the Makefile joins them. The column "Text" counts the words of the
 
 `tools/romsize.py` writes the tables above. It joins the sources as
 the Makefiles do, with a label in front of each part and of each
-`.ASCII_L` string, assembles them with `niceasm.py --symbols`, and
+run of texts, assembles them with `niceasm.py --symbols`, and
 takes each part's words from the labels' addresses. The words it
 assembles must be those of the build, so a label never moves one.
 `make -C monitor test` checks the tables of the ROM and the monitor,

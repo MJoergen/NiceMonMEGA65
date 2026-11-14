@@ -42,6 +42,15 @@
 ; before its .EQU or its label, so the files reach each other's names in
 ; either direction.
 ;
+; The ROM's texts are packed, four characters a word, with .ASCII_B
+; (nice_cpu's ISA.md §10.3), and end with a 0 byte: a text whose length is
+; a multiple of 4 has a .DAT 0 after it. puts_b prints one by its word
+; address, through the byte window at TEXT_B (nice_cpu's SYSTEM.md §9),
+; in which _io_puts reads one byte at a time. Code that reads a text by
+; the character takes its address in that window, TEXT_B+4*S_NAME, and
+; the tables of texts hold word addresses, which puts_b takes. Programs
+; keep .ASCII_L, one character a word, which _io_puts prints (issue #131).
+;
 ; mon_putc writes a character to the outputs that V_OUT selects. On the
 ; line, the console at 0xFFFFFF00, every byte goes as it is. On the screen
 ; a character goes at the cursor, which moves on; CR moves the cursor to
@@ -104,6 +113,7 @@ SCR_X           .EQU    0xFFFFFF81      ; the cursor's column
 SCR_Y           .EQU    0xFFFFFF82      ; the cursor's row
 SCR_OFFS        .EQU    0xFFFFFF85      ; the display offset, in words
 SCR_FONT        .EQU    0xFFFFFF86      ; the font base: 0 shows Spleen
+TEXT_B          .EQU    0x20000000      ; the byte window: byte A of the memory at TEXT_B+A
 TIMER           .EQU    0xFFFFFF10      ; the timer's period, 0 to stop it
 E_IP            .EQU    0xFFFFFFB0      ; the network station's IP address, NET_IP, the first byte in bits 31..24
 E_MACH          .EQU    0xFFFFFFB1      ; the first two bytes of its MAC address, in bits 15..0
@@ -324,7 +334,7 @@ mon_exit
                 PUSH    R1
                 CALL    exit_restore
                 MOVE    R1, S_RETURN
-                CALL    _io_puts
+                CALL    puts_b
                 POP     R1
                 CALL    _io_puthex
                 CALL    _io_crlf
@@ -340,11 +350,11 @@ mon_trap
                 MOVE    R8, R2          ; the address
                 CALL    exit_restore
                 MOVE    R1, S_TRAP
-                CALL    _io_puts
+                CALL    puts_b
                 MOVE    R1, R7
                 CALL    _io_putdec
                 MOVE    R1, S_AT
-                CALL    _io_puts
+                CALL    puts_b
                 MOVE    R1, R8
                 CALL    _io_puthex
                 CALL    _io_crlf
@@ -706,15 +716,28 @@ hist_rev
                 SUB     R2, R2, 1
                 JMP     :-
 
-; puts_crlf: the string at R1, and CR LF
+; puts_crlf: the string at R1, one character a word, and CR LF
 puts_crlf
                 CALL    _io_puts
                 JMP     _io_crlf        ; which returns to the caller
 
+; puts_b: the packed text at the word address R1, up to its 0 byte, as
+; _io_puts reads it in the byte window. Uses R1.
+puts_b
+                SHL     R1, R1, 2
+                ADD     R1, R1, TEXT_B
+                JMP     _io_puts        ; which returns to the caller
+
+; puts_b_crlf: the packed text at R1, and CR LF
+puts_b_crlf
+                CALL    puts_b
+                JMP     _io_crlf        ; which returns to the caller
+
 S_RETURN
-                .ASCII_L 'Returned '
-S_TRAP          .ASCII_L 'Trap '
-S_AT            .ASCII_L ' at '
+                .ASCII_B 'Returned '
+S_TRAP          .ASCII_B 'Trap '
+S_AT            .ASCII_B ' at '
+                .DAT    0
 S_UCOMMA
-                .ASCII_L ', '
-S_UGAP          .ASCII_L '  '
+                .ASCII_B ', '
+S_UGAP          .ASCII_B '  '

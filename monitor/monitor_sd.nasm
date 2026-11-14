@@ -39,21 +39,21 @@ _fat_sd_write
 sd_fail
                 SUB     R8, R0, R1      ; the error
                 MOVE    R1, S_SDERR
-                CALL    _io_puts
+                CALL    puts_b
                 MOVE    R1, R8
                 CALL    _io_putdec
                 MOVE    R1, S_INSLOT
-                CALL    _io_puts
+                CALL    puts_b
                 MOVE    R1, R7
                 CALL    _io_putdec
                 MOVE    R1, S_UCOMMA
-                CALL    _io_puts
+                CALL    puts_b
                 SUB     R1, R8, 1
                 CMP     R1, SD_ERRS
         ?!C     JMP     :+              ; an error without a meaning here
                 ADD     R1, R1, SD_ERRORS
                 MOVE    R1, @R1
-                CALL    _io_puts
+                CALL    puts_b
                 CMP     R8, 7
         ?!Z     JMP     :+
                 MOVE    R1, @SD_LAST
@@ -132,18 +132,19 @@ sd_wait
         ?!Z     JMP     sd_wait
                 RET
 
-S_SDERR         .ASCII_L 'SD error '
+S_SDERR         .ASCII_B 'SD error '
 S_INSLOT
-                .ASCII_L ' in slot '
+                .ASCII_B ' in slot '
 ; The meanings of the errors 1 to SD_ERRS of SD_ERROR
 SD_ERRORS
                 .DAT    E_SD1, E_SD2, E_SD3, E_SD4, E_SD5, E_SD6, E_SD7, E_SD8
 SD_ERRS         .EQU    8
-E_SD1           .ASCII_L 'no card'
-E_SD2           .ASCII_L 'the card is not ready'
-E_SD3           .ASCII_L 'timeout, the card did not answer'
-E_SD4           .ASCII_L 'CRC, the data from the card was corrupted'
-E_SD5           .ASCII_L 'the card reported an error'
-E_SD6           .ASCII_L 'the card is write-protected'
-E_SD7           .ASCII_L 'the sector is after the last, '
-E_SD8           .ASCII_L 'Init failed'
+E_SD1           .ASCII_B 'no card'
+E_SD2           .ASCII_B 'the card is not ready'
+E_SD3           .ASCII_B 'timeout, the card did not answer'
+                .DAT    0
+E_SD4           .ASCII_B 'CRC, the data from the card was corrupted'
+E_SD5           .ASCII_B 'the card reported an error'
+E_SD6           .ASCII_B 'the card is write-protected'
+E_SD7           .ASCII_B 'the sector is after the last, '
+E_SD8           .ASCII_B 'Init failed'

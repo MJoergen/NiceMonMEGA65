@@ -5,8 +5,9 @@ The tables of "The ROM's words" in monitor/INTERNALS.md are this
 script's output, between the comments <!-- romsize NAME --> and
 <!-- /romsize NAME -->. The script joins the sources as the Makefile
 does, with a label in front of each part and of each run of .ASCII
-strings, assembles them with niceasm.py --symbols, and takes each
-part's words from the labels' addresses. The words it assembles must
+strings, with the .DAT 0 that ends a packed one, assembles them with
+niceasm.py --symbols, and takes each part's words from the labels'
+addresses. The words it assembles must
 be those of the build's .bin, or it fails, so a label never moves a
 word.
 
@@ -121,7 +122,10 @@ class Marker:
             self.in_run = False
 
     def line(self, line: str) -> None:
-        is_text = re.match(r"^\S*\s+\.ASCII", line) is not None
+        # A .DAT 0 right after a text is its end, the 0 byte of a packed
+        # text whose length is a multiple of 4 (monitor/monitor.nasm)
+        is_text = re.match(r"^\S*\s+\.ASCII", line) is not None or (
+            self.in_run and re.match(r"^\s+\.DAT\s+0\s*(;.*)?$", line) is not None)
         if is_text and not self.in_run:
             self.lines.append(f"ZZT_{self.runs}_{len(self.parts) - 1}\n")
             self.in_run = True

@@ -60,7 +60,11 @@ FOLDER_UC := $(shell echo '$(FOLDER)' | tr a-z A-Z)
 ifneq ($(shell echo '$(FOLDER_UC)' | grep -Ex '[A-Z0-9_-]{1,8}'),$(FOLDER_UC))
 $(error FOLDER=$(FOLDER) is not a folder name of 1 to 8 letters, digits, _, and -)
 endif
-FOLDER_ERROR = E_FS29 .ASCII_L 'no folder $(FOLDER_UC) on the card'
+# A packed text of the ROM, the label $(1) and the text $(2), and a 0 word
+# after it, which ends the text when its length is a multiple of 4
+# (monitor.nasm). The text must not hold a '.
+PACKED = printf "%s .ASCII_B '%s'\n                .DAT    0\n" '$(1)' '$(2)'
+FOLDER_ERROR = $(call PACKED,E_FS29,no folder $(FOLDER_UC) on the card)
 # The words that the ROM's C code writes are in the RAM from WASM_RAM up to
 # below WASM_END (monitor.nasm), and ___wasm_ram_end is the word after them.
 WASM_RAM = $(shell sed -n 's/^WASM_RAM *\.EQU *\(0x[0-9A-Fa-f]*\).*/\1/p' monitor.nasm)
@@ -102,20 +106,20 @@ $(LIBC)/libc.a:
 # Written only when the version changes, so that the monitor is not
 # assembled again, and a bitstream with it not built again, for nothing.
 $(BUILD)/version.nasm: FORCE | $(BUILD)
-	@echo "VERSION .ASCII_L '$(VERSION)'" | cmp -s - $@ || \
-	  echo "VERSION .ASCII_L '$(VERSION)'" > $@
+	@$(call PACKED,VERSION,$(VERSION)) | cmp -s - $@ || \
+	  $(call PACKED,VERSION,$(VERSION)) > $@
 
 # Written only when FOLDER changes, as version.nasm is, and the C code is
 # compiled again then
 $(BUILD)/folder.nasm: FORCE | $(BUILD)
-	@echo "$(FOLDER_ERROR)" | cmp -s - $@ || echo "$(FOLDER_ERROR)" > $@
+	@$(FOLDER_ERROR) | cmp -s - $@ || $(FOLDER_ERROR) > $@
 
 # The test has a version of its own, so that its output does not change
 # with every commit.
 $(BUILD)/monitor_test.bin: $(SOURCES) $(BUILD)/rom_c.nasm $(RUNTIME_ROM) $(BUILD)/folder.nasm \
                            $(TOOLS) | $(BUILD)
 	@(cat $(SOURCES) $(BUILD)/rom_c.nasm $(RUNTIME_ROM) $(BUILD)/folder.nasm; \
-	  echo "VERSION .ASCII_L 'V9.9'") \
+	  $(call PACKED,VERSION,V9.9)) \
 	  > $(BUILD)/monitor_test_all.nasm
 	@$(ASM) -o $@ $(BUILD)/monitor_test_all.nasm
 	@$(CHECK_END) $@ $(ROM_END)
@@ -126,7 +130,7 @@ $(BUILD)/monitor_test.bin: $(SOURCES) $(BUILD)/rom_c.nasm $(RUNTIME_ROM) $(BUILD
 $(BUILD)/rom.bin: $(SOURCES) $(BUILD)/rom_c_test.nasm test/rom.nasm $(RUNTIME_ROM) \
                   $(BUILD)/folder.nasm $(TOOLS) | $(BUILD)
 	@(cat $(SOURCES) $(BUILD)/rom_c_test.nasm $(RUNTIME_ROM) $(BUILD)/folder.nasm; \
-	  echo "VERSION .ASCII_L 'V9.9'"; \
+	  $(call PACKED,VERSION,V9.9); \
 	  cat test/rom.nasm) > $(BUILD)/rom_all.nasm
 	@$(ASM) --symbols $(BUILD)/rom.sym -o $@ $(BUILD)/rom_all.nasm
 
@@ -536,8 +540,8 @@ ROMSIZE = $(PYTHON) ../tools/romsize.py monitor --bin $(BUILD)/monitor_test.bin 
             $(addprefix --c ,$(ROM_C)) --doc INTERNALS.md $(SOURCES) $(BUILD)/rom_c.nasm \
             $(RUNTIME_ROM) $(BUILD)/folder.nasm $(BUILD)/version_test.nasm
 
-$(BUILD)/version_test.nasm: | $(BUILD)
-	@echo "VERSION .ASCII_L 'V9.9'" > $@
+$(BUILD)/version_test.nasm: Makefile | $(BUILD)
+	@$(call PACKED,VERSION,V9.9) > $@
 
 romsize: $(BUILD)/monitor_test.bin $(BUILD)/version_test.nasm
 	@$(ROMSIZE) --write

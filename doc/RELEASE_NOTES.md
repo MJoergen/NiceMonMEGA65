@@ -32,8 +32,9 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   returns to the monitor as before. A program's return now prints its
   status where the program left the cursor's registers, so at the top
   after the demo, which clears the screen. With the network of #111 in
-  it, the ROM has 9502 words free, where it had 5117 below the demo, for
-  BASIC.
+  it, and its texts packed four characters a word
+  ([#131](https://github.com/MJoergen/NiceMonMEGA65/issues/131)), the
+  ROM has 11876 words free, where it had 5117 below the demo, for BASIC.
 - `make demo` builds `demo/build/demo.bin` alone, and the boards'
   targets put the monitor alone in the ROM, `monitor/build/monitor.bin`.
   `demo/join.py`, `demo/build/rom.bin`, and `demo/demo_hw.py` are gone.

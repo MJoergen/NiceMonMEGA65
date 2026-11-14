@@ -94,10 +94,10 @@ These facts bound the design:
 - **One wasm module.** A program has one (WASM.md), so BASIC's C joins
   `fat32.c` and `clock.c` in `ROM_C`, and shares their memory and their
   C stack of 4096 bytes. There is no `malloc`, and no `setjmp`.
-- **The texts of the ROM are one character per word.** The monitor has
-  3250 words of `.ASCII_L` text. Packed four to a word with `.ASCII_B`
-  and read through the byte window, which reaches the ROM, they would
-  be 812.
+- **The texts of the ROM are four characters a word.** The monitor had
+  3250 words of `.ASCII_L` text. #131 packed them with `.ASCII_B`, and
+  the monitor reads them through the byte window, which reaches the
+  ROM: they are 868 words now, with the 0 words that end some.
 - **A word of the memory has 32 bits**, and a double holds every whole
   number up to 2^53. So a screen word with its colors, an IP address,
   and an address in a byte window survive a double, and so does the
@@ -587,7 +587,8 @@ stage 6. Stage 6 was 3500 with the float routines.
 While BASIC is C, the routines of the monitor's commands stay in
 `monitor_cmd.nasm`, and the ROM has 13455 words free without the demo,
 which left it in V2.1 (#129). #111, the network for programs, leaves
-9757 of them (measured 2026-11-14). So
+9757 of them, and #131, the texts packed, 11876 (measured 2026-11-14).
+So
 **the whole list does not fit in C**: C fills the ROM at stage 4 or
 5, and the port to assembly is not a matter of speed alone.
 
@@ -611,9 +612,10 @@ After the port, with `monitor_cmd.nasm` gone:
   that nice_cpu#161 estimates the FPU to save. The second path of
   each operator goes too, and is not counted. It fits, with 1000
   words to spare at its top.
-- **What else gives room**: the texts that stay, packed, about 600
-  words, and FAT32 in assembly, perhaps 5000. BASIC's own keywords and
-  messages are packed from the start.
+- **What else gives room**: FAT32 in assembly, perhaps 5000 words.
+  The texts that stay were packed in #131, after the 15243 above
+  were measured, which gives back about 600 words of them. BASIC's own
+  keywords and messages are packed from the start.
 - **Not a larger ROM.** A second ROM would fit the MEGA65's block RAM
   but not the Nexys4DDR's, and the core's timing margin is small.
 

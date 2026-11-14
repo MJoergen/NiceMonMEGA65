@@ -36,11 +36,11 @@ cmd_start
                 MOVE    @V_NEXT, PROGRAM
                 MOVE    @V_UNEXT, PROGRAM
                 MOVE    R1, S_NAME
-                CALL    _io_puts
+                CALL    puts_b
                 MOVE    R1, VERSION
-                CALL    puts_crlf
+                CALL    puts_b_crlf
                 MOVE    R1, S_HINT
-                CALL    puts_crlf
+                CALL    puts_b_crlf
 
 ; main: the prompt, a line, and its command. SP is fresh for each line, and
 ; a command jumps back here when it is done. The first character of the
@@ -48,7 +48,7 @@ cmd_start
 ; COMMANDS; R2 points after it for the command's arguments.
 main            MOVE    SP, STACK
                 MOVE    R1, S_PROMPT
-                CALL    _io_puts
+                CALL    puts_b
                 MOVE    R1, V_LINE
                 MOVE    R2, LINE_MAX
                 CALL    getline
@@ -68,7 +68,7 @@ main            MOVE    SP, STACK
                 ADD     R3, R3, 1
                 JMP     :-
 unknown         MOVE    R1, S_UNKNOWN
-                CALL    puts_crlf
+                CALL    puts_b_crlf
                 JMP     main
 
 ; ?: the commands, a line each
@@ -84,11 +84,11 @@ cmd_cls         CALL    scr_cls
 ; v: the version of the monitor, and that of the table, major.minor
 cmd_version
                 MOVE    R1, S_NAME
-                CALL    _io_puts
+                CALL    puts_b
                 MOVE    R1, VERSION
-                CALL    _io_puts
+                CALL    puts_b
                 MOVE    R1, S_TABLE
-                CALL    _io_puts
+                CALL    puts_b
                 SHR     R1, TABLE_VERSION, 16
                 CALL    _io_putdec
                 MOVE    R1, 0x2E        ; .
@@ -101,7 +101,7 @@ cmd_version
 ; h: the core halted, until the reset button, or a host starts it
 cmd_halt
                 MOVE    R1, S_HALTED
-                CALL    puts_crlf
+                CALL    puts_b_crlf
                 HALT
 
 ; d [ADDR] [N]: N words from ADDR, in hex, ROW_WORDS to a row, each row
@@ -181,11 +181,11 @@ ip_show         MOVE    R1, S_IP
                 CALL    show_ip
                 JMP     main
 ip_bad          MOVE    R1, S_BADIP
-                CALL    puts_crlf
+                CALL    puts_b_crlf
                 JMP     main
 ; The word after i, which must be dhcp, and blanks after it
 ip_word
-                MOVE    R3, S_DHCPW
+                MOVE    R3, TEXT_B+4*S_DHCPW
 :
                 MOVE[M] R4, @R3++
         ?Z      JMP     :+
@@ -251,7 +251,7 @@ put_ip
                 PUSH    R7
                 PUSH    R8
                 MOVE    R8, R2
-                CALL    _io_puts
+                CALL    puts_b
                 MOVE    R7, 4           ; the bytes left
 :               ROL     R8, R8, 8       ; the top byte to the bottom
                 AND     R1, R8, 0xFF
@@ -276,7 +276,7 @@ put_ip
 ; gathers the rate, and R3 points into the line.
 cmd_baud
                 MOVE    R1, R2
-                MOVE    R2, S_AUD
+                MOVE    R2, TEXT_B+4*S_AUD
                 CALL    match           ; R1 after aud, or 0
                 TST     R1
         ?Z      JMP     unknown
@@ -316,14 +316,14 @@ cmd_baud
                 MOVE    @UART_BAUD, R7
 baud_show
                 MOVE    R1, S_BAUD
-                CALL    _io_puts
+                CALL    puts_b
                 MOVE    R1, @UART_BAUD
                 CALL    _io_putdec
                 CALL    _io_crlf
                 JMP     main
 baud_bad
                 MOVE    R1, S_BADBAUD
-                CALL    puts_crlf
+                CALL    puts_b_crlf
                 JMP     main
 
 ; m [MAC]: the Ethernet station's MAC address (doc/SYSTEM.md, "The
@@ -378,7 +378,7 @@ mac_byte
 ; The bytes go out from the top of R7, and R8 fills R7 from below.
 mac_show
                 MOVE    R1, S_MAC
-                CALL    _io_puts
+                CALL    puts_b
                 AND     R7, @E_MACH, 0xFFFF
                 SHL     R7, R7, 16
                 MOVE    R8, @E_MACL
@@ -403,7 +403,7 @@ mac_show
                 CALL    _io_crlf
                 JMP     main
 mac_bad         MOVE    R1, S_BADMAC
-                CALL    puts_crlf
+                CALL    puts_b_crlf
                 JMP     main
 
 ; mac_digit: bits 3..0 of R1 as a hex digit
@@ -448,7 +448,7 @@ cmd_load
                 CMP     R1, 0x6F        ; o
         ?Z      JMP     cmd_fload
                 MOVE    R1, S_LHINT
-                CALL    puts_crlf
+                CALL    puts_b_crlf
                 MOVE    @V_LOUT, @V_OUT
                 MOVE    @V_OUT, OUT_SCREEN
                 MOVE    @V_LEND, 0x0D   ; as after the CR of the l line
@@ -580,17 +580,17 @@ load_done
                 MOVE    @V_OUT, @V_LOUT
 load_summary
                 MOVE    R1, S_LOADED
-                CALL    _io_puts
+                CALL    puts_b
                 MOVE    R1, R8
                 CALL    _io_putdec
                 TST     R8
         ?Z      JMP     :+
                 MOVE    R1, S_LFROM
-                CALL    _io_puts
+                CALL    puts_b
                 MOVE    R1, R9
                 CALL    _io_puthex
                 MOVE    R1, S_LTO
-                CALL    _io_puts
+                CALL    puts_b
                 MOVE    R1, R10
                 CALL    _io_puthex
 :
@@ -598,15 +598,15 @@ load_summary
                 TST     R12
         ?Z      JMP     main
                 MOVE    R1, S_SKIPPED
-                CALL    _io_puts
+                CALL    puts_b
                 MOVE    R1, R12
                 CALL    _io_putdec
                 MOVE    R1, S_FIRST
-                CALL    _io_puts
+                CALL    puts_b
                 MOVE    R1, @V_LBAD
                 CALL    _io_putdec
                 MOVE    R1, S_LFORM
-                CALL    _io_puts
+                CALL    puts_b
                 SUB     R1, @V_PEND, 1
                 CALL    _io_puthex
                 CALL    _io_crlf
@@ -649,7 +649,7 @@ cmd_dir
                 JMP     main
 :
                 MOVE    R1, S_BADDIR
-                CALL    puts_crlf
+                CALL    puts_b_crlf
                 JMP     main
 
 ; load NAME: the .bin file NAME of the card's folder NICE, read with
@@ -657,7 +657,7 @@ cmd_dir
 ; shows its lines. R2 points after the l.
 cmd_fload
                 MOVE    R1, R2
-                MOVE    R2, S_OAD
+                MOVE    R2, TEXT_B+4*S_OAD
                 CALL    match           ; R1 after oad, or 0
                 TST     R1
         ?Z      JMP     unknown
@@ -696,7 +696,7 @@ cmd_fload
                 JMP     load_summary
 fload_bad
                 MOVE    R1, S_BADLOAD
-                CALL    puts_crlf
+                CALL    puts_b_crlf
                 JMP     main
 
 ; save NAME ADDR N: the N words from ADDR, both in hex, written to the
@@ -705,7 +705,7 @@ fload_bad
 ; those loaded. R2 points after the s.
 cmd_save
                 MOVE    R1, R2
-                MOVE    R2, S_AVE
+                MOVE    R2, TEXT_B+4*S_AVE
                 CALL    match           ; R1 after ave, or 0
                 TST     R1
         ?Z      JMP     unknown
@@ -748,17 +748,17 @@ cmd_save
                 TST     R1
         ?N      JMP     fs_fail
                 MOVE    R1, S_SAVED
-                CALL    _io_puts
+                CALL    puts_b
                 MOVE    R1, R10
                 CALL    _io_putdec
                 TST     R10
         ?Z      JMP     :+
                 MOVE    R1, S_LFROM
-                CALL    _io_puts
+                CALL    puts_b
                 MOVE    R1, R9
                 CALL    _io_puthex
                 MOVE    R1, S_LTO
-                CALL    _io_puts
+                CALL    puts_b
                 ADD     R1, R9, R10
                 SUB     R1, R1, 1
                 CALL    _io_puthex
@@ -767,7 +767,7 @@ cmd_save
                 JMP     main
 save_bad
                 MOVE    R1, S_BADSAVE
-                CALL    puts_crlf
+                CALL    puts_b_crlf
                 JMP     main
 
 ; del NAME: the file NAME of the card's folder deleted, with fat_delete of
@@ -776,7 +776,7 @@ save_bad
 cmd_del
                 MOVE    R7, R2
                 MOVE    R1, R2
-                MOVE    R2, S_EL
+                MOVE    R2, TEXT_B+4*S_EL
                 CALL    match           ; R1 after el, or 0
                 TST     R1
         ?Z      JMP     del_dump
@@ -795,7 +795,7 @@ cmd_del
                 TST     R1
         ?N      JMP     fs_fail
                 MOVE    R1, S_DELETED
-                CALL    _io_puts
+                CALL    puts_b
                 MOVE    R1, R7
                 CALL    puts_crlf
                 JMP     main
@@ -804,7 +804,7 @@ del_dump
                 JMP     dump_args
 del_bad
                 MOVE    R1, S_BADDEL
-                CALL    puts_crlf
+                CALL    puts_b_crlf
                 JMP     main
 
 ; fs_name: the name of a file in the line from R1, after blanks, ended in
@@ -876,7 +876,7 @@ fs_fail
 :
                 SUB     R8, R0, R1      ; the error
                 MOVE    R1, S_FSERR
-                CALL    _io_puts
+                CALL    puts_b
                 MOVE    R1, R8
                 CALL    _io_putdec
                 SUB     R1, R8, FS_ERR0
@@ -885,9 +885,9 @@ fs_fail
                 ADD     R1, R1, FS_ERRORS
                 MOVE    R7, @R1
                 MOVE    R1, S_UCOMMA
-                CALL    _io_puts
+                CALL    puts_b
                 MOVE    R1, R7
-                CALL    _io_puts
+                CALL    puts_b
 :
                 CALL    _io_crlf
                 JMP     main
@@ -929,7 +929,7 @@ run_at          TST     @R7
                 CALL    R7
                 JMP     mon_exit        ; with the status in R1
 no_prog         MOVE    R1, S_NOPROG
-                CALL    _io_puts
+                CALL    puts_b
                 MOVE    R1, R7
                 CALL    _io_puthex
                 CALL    _io_crlf
@@ -946,7 +946,7 @@ cmd_t
 ; follow, and shown, with clock_cmd of clock.c. R2 points after the t.
 cmd_time
                 MOVE    R1, R2
-                MOVE    R2, S_IME
+                MOVE    R2, TEXT_B+4*S_IME
                 CALL    match           ; R1 after ime, or 0
                 TST     R1
         ?Z      JMP     unknown
@@ -966,7 +966,7 @@ puts_lines
 lines           MOVE[M] R1, @R7++
         ?Z      POP     R7
         ?Z      RET
-                CALL    puts_crlf
+                CALL    puts_b_crlf
                 JMP     lines
 
 ; The commands: the letter, and the routine, which main jumps to. A 0 ends
@@ -987,55 +987,63 @@ COMMANDS
                 .DAT    0x76, cmd_version  ; v
                 .DAT    0
 
-S_NAME          .ASCII_L 'NiceMon '
-S_HINT          .ASCII_L '? lists the commands'
+S_NAME          .ASCII_B 'NiceMon '
+                .DAT    0
+S_HINT          .ASCII_B '? lists the commands'
+                .DAT    0
 S_PROMPT
-                .ASCII_L '> '
+                .ASCII_B '> '
 S_UNKNOWN
-                .ASCII_L 'Unknown command; ? lists them'
-S_TABLE         .ASCII_L ', dispatch table '
+                .ASCII_B 'Unknown command; ? lists them'
+S_TABLE         .ASCII_B ', dispatch table '
 S_HALTED
-                .ASCII_L 'Halted'
+                .ASCII_B 'Halted'
 S_NOPROG
-                .ASCII_L 'No program at '
-S_IP            .ASCII_L 'IP address '
-S_MAC           .ASCII_L 'MAC address '
-S_BAUD          .ASCII_L 'Baud rate '
-S_LHINT         .ASCII_L 'ADDR WORD in hex on each line, as in a .bin file; an empty line ends'
+                .ASCII_B 'No program at '
+S_IP            .ASCII_B 'IP address '
+S_MAC           .ASCII_B 'MAC address '
+                .DAT    0
+S_BAUD          .ASCII_B 'Baud rate '
+S_LHINT         .ASCII_B 'ADDR WORD in hex on each line, as in a .bin file; an empty line ends'
+                .DAT    0
 S_LOADED
-                .ASCII_L 'Words loaded: '
-S_LFROM         .ASCII_L ', '
-S_LTO           .ASCII_L ' to '
+                .ASCII_B 'Words loaded: '
+S_LFROM         .ASCII_B ', '
+S_LTO           .ASCII_B ' to '
+                .DAT    0
 S_SKIPPED
-                .ASCII_L 'Lines skipped: '
-S_FIRST         .ASCII_L ', first line '
-S_LFORM         .ASCII_L '; ADDR WORD in hex, ADDR 00008000 to '
-S_BADIP         .ASCII_L 'Not an IP address: four numbers from 0 to 255, with dots between them'
-S_DHCPW         .ASCII_L 'dhcp'
+                .ASCII_B 'Lines skipped: '
+S_FIRST         .ASCII_B ', first line '
+S_LFORM         .ASCII_B '; ADDR WORD in hex, ADDR 00008000 to '
+S_BADIP         .ASCII_B 'Not an IP address: four numbers from 0 to 255, with dots between them'
+S_DHCPW         .ASCII_B 'dhcp'
+                .DAT    0
 S_BADMAC
-                .ASCII_L 'Not a MAC address: six bytes in hex with colons, the first one even'
+                .ASCII_B 'Not a MAC address: six bytes in hex with colons, the first one even'
 S_BADBAUD
-                .ASCII_L 'Not a baud rate: 115200, 230400, 460800, 921600, 1000000, 1500000, or 2000000'
+                .ASCII_B 'Not a baud rate: 115200, 230400, 460800, 921600, 1000000, 1500000, or 2000000'
 ; The rates that UART_BAUD takes, and a 0
 BAUD_RATES
                 .DAT    115200, 230400, 460800, 921600, 1000000, 1500000, 2000000, 0
-S_FSERR         .ASCII_L 'File error '
-S_OAD           .ASCII_L 'oad'
+S_FSERR         .ASCII_B 'File error '
+S_OAD           .ASCII_B 'oad'
 S_BADDIR
-                .ASCII_L 'dir [SLOT]: the slot in hex, such as dir 1'
+                .ASCII_B 'dir [SLOT]: the slot in hex, such as dir 1'
 S_BADLOAD
-                .ASCII_L 'load NAME: the name of a file, such as load hello.bin, or load "my prog.bin"'
-S_AVE           .ASCII_L 'ave'
-S_AUD           .ASCII_L 'aud'
-S_EL            .ASCII_L 'el'
-S_IME           .ASCII_L 'ime'
-S_SAVED         .ASCII_L 'Words saved: '
+                .ASCII_B 'load NAME: the name of a file, such as load hello.bin, or load "my prog.bin"'
+                .DAT    0
+S_AVE           .ASCII_B 'ave'
+S_AUD           .ASCII_B 'aud'
+S_EL            .ASCII_B 'el'
+S_IME           .ASCII_B 'ime'
+S_SAVED         .ASCII_B 'Words saved: '
 S_BADSAVE
-                .ASCII_L 'save NAME ADDR N: a name, and the address and the count in hex'
+                .ASCII_B 'save NAME ADDR N: a name, and the address and the count in hex'
 S_DELETED
-                .ASCII_L 'Deleted '
+                .ASCII_B 'Deleted '
+                .DAT    0
 S_BADDEL
-                .ASCII_L 'del NAME: the name of a file, such as del hello.bin, or del "my prog.bin"'
+                .ASCII_B 'del NAME: the name of a file, such as del hello.bin, or del "my prog.bin"'
 ; The meanings of fat32.c's errors FS_ERR0 to FS_ERR0 + FS_ERRS - 1.
 ; E_FS29 names the folder of the build, so the Makefile writes it, in
 ; build/folder.nasm.
@@ -1045,43 +1053,55 @@ FS_ERRORS
                 .DAT    E_FS30, E_FS31, E_FS32
 FS_ERR0         .EQU    16
 FS_ERRS         .EQU    17
-E_FS16          .ASCII_L 'no FAT32 file system'
-E_FS17          .ASCII_L 'FAT12, which is not supported'
-E_FS18          .ASCII_L 'FAT16, which is not supported'
-E_FS19          .ASCII_L 'exFAT, which is not supported'
-E_FS20          .ASCII_L 'not a valid name'
-E_FS21          .ASCII_L 'no such file'
-E_FS22          .ASCII_L 'a directory'
-E_FS23          .ASCII_L 'too many open files'
-E_FS24          .ASCII_L 'not an open file'
-E_FS25          .ASCII_L 'no such mode'
-E_FS26          .ASCII_L 'the FAT is damaged'
-E_FS27          .ASCII_L 'no such slot'
-E_FS28          .ASCII_L 'the card has changed'
-E_FS30          .ASCII_L 'the card or the folder is full'
-E_FS31          .ASCII_L 'the file is open'
-E_FS32          .ASCII_L 'the file is read-only'
+E_FS16          .ASCII_B 'no FAT32 file system'
+                .DAT    0
+E_FS17          .ASCII_B 'FAT12, which is not supported'
+E_FS18          .ASCII_B 'FAT16, which is not supported'
+E_FS19          .ASCII_B 'exFAT, which is not supported'
+E_FS20          .ASCII_B 'not a valid name'
+                .DAT    0
+E_FS21          .ASCII_B 'no such file'
+                .DAT    0
+E_FS22          .ASCII_B 'a directory'
+E_FS23          .ASCII_B 'too many open files'
+E_FS24          .ASCII_B 'not an open file'
+                .DAT    0
+E_FS25          .ASCII_B 'no such mode'
+                .DAT    0
+E_FS26          .ASCII_B 'the FAT is damaged'
+E_FS27          .ASCII_B 'no such slot'
+                .DAT    0
+E_FS28          .ASCII_B 'the card has changed'
+                .DAT    0
+E_FS30          .ASCII_B 'the card or the folder is full'
+E_FS31          .ASCII_B 'the file is open'
+                .DAT    0
+E_FS32          .ASCII_B 'the file is read-only'
 
 HELP            .DAT    H_R, H_L, H_LOAD, H_SAVE, H_DEL, H_TFTP, H_TFTPL, H_D, H_U
                 .DAT    H_DIR, H_I, H_ID, H_M, H_B, H_T, H_C, H_V, H_H, H_Q, H_P, H_PG, 0
-H_R             .ASCII_L 'r [ADDR]      run the program at ADDR, or at 00008000; r 0 restarts'
-H_L             .ASCII_L 'l             enter lines of ADDR WORD in hex, as a .bin file has them'
-H_LOAD          .ASCII_L 'load NAME     load the .bin file NAME of the SD card, as l loads lines'
-H_SAVE          .ASCII_L 'save NAME A N save N words from A, both in hex, as the .bin file NAME'
-H_DEL           .ASCII_L 'del NAME      delete the file NAME of the SD card'
-H_TFTP          .ASCII_L 'tftp IP NAME  load the .bin file NAME from the TFTP server at IP'
-H_TFTPL         .ASCII_L 'tftp IP [PAT] list the files of tools/tftpd.py at IP, or those of PAT'
-H_D             .ASCII_L 'd [ADDR] [N]  show N words from ADDR, in hex, or the next ones'
-H_U             .ASCII_L 'u [ADDR] [N]  disassemble N instructions from ADDR, or the next ones'
-H_DIR           .ASCII_L 'dir [SLOT]    list the files of the SD card in SLOT, or of the card mounted'
-H_I             .ASCII_L 'i [A.B.C.D]   show the IP address, or set it, such as 192.168.1.65'
-H_ID            .ASCII_L 'i dhcp        get the IP address from a DHCP server'
-H_M             .ASCII_L 'm [MAC]       show the MAC address, or set it, such as 02:4E:49:43:45:01'
-H_B             .ASCII_L 'baud [RATE]   show the UART baud rate, or set it, such as 921600'
-H_T             .ASCII_L 'time [D T]    show the local time, or set it, such as 2026-11-11 14:30:00'
-H_C             .ASCII_L 'c             clear the screen'
-H_V             .ASCII_L 'v             the version'
-H_H             .ASCII_L 'h             halt the core'
-H_Q             .ASCII_L '?             the commands'
-H_P             .ASCII_L 'CRSR up down  scroll back a row, before a command'
-H_PG            .ASCII_L 'PgUp PgDn     a page; on the MEGA65 CTRL and MEGA with CRSR up or down'
+H_R             .ASCII_B 'r [ADDR]      run the program at ADDR, or at 00008000; r 0 restarts'
+H_L             .ASCII_B 'l             enter lines of ADDR WORD in hex, as a .bin file has them'
+H_LOAD          .ASCII_B 'load NAME     load the .bin file NAME of the SD card, as l loads lines'
+H_SAVE          .ASCII_B 'save NAME A N save N words from A, both in hex, as the .bin file NAME'
+H_DEL           .ASCII_B 'del NAME      delete the file NAME of the SD card'
+H_TFTP          .ASCII_B 'tftp IP NAME  load the .bin file NAME from the TFTP server at IP'
+                .DAT    0
+H_TFTPL         .ASCII_B 'tftp IP [PAT] list the files of tools/tftpd.py at IP, or those of PAT'
+H_D             .ASCII_B 'd [ADDR] [N]  show N words from ADDR, in hex, or the next ones'
+H_U             .ASCII_B 'u [ADDR] [N]  disassemble N instructions from ADDR, or the next ones'
+                .DAT    0
+H_DIR           .ASCII_B 'dir [SLOT]    list the files of the SD card in SLOT, or of the card mounted'
+H_I             .ASCII_B 'i [A.B.C.D]   show the IP address, or set it, such as 192.168.1.65'
+H_ID            .ASCII_B 'i dhcp        get the IP address from a DHCP server'
+H_M             .ASCII_B 'm [MAC]       show the MAC address, or set it, such as 02:4E:49:43:45:01'
+                .DAT    0
+H_B             .ASCII_B 'baud [RATE]   show the UART baud rate, or set it, such as 921600'
+                .DAT    0
+H_T             .ASCII_B 'time [D T]    show the local time, or set it, such as 2026-11-11 14:30:00'
+H_C             .ASCII_B 'c             clear the screen'
+H_V             .ASCII_B 'v             the version'
+H_H             .ASCII_B 'h             halt the core'
+H_Q             .ASCII_B '?             the commands'
+H_P             .ASCII_B 'CRSR up down  scroll back a row, before a command'
+H_PG            .ASCII_B 'PgUp PgDn     a page; on the MEGA65 CTRL and MEGA with CRSR up or down'

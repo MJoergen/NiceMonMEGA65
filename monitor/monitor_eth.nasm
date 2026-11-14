@@ -100,7 +100,7 @@ ip_dhcp
                 JMP     main
 :
                 MOVE    R1, S_NODHCP
-                CALL    puts_crlf
+                CALL    puts_b_crlf
                 JMP     main
 
 ; net_dhcp: entry 23, the IP address from a DHCP server (RFC 2131),
@@ -271,9 +271,9 @@ bg_show
                 MOVE    R2, @E_IP
                 CALL    put_ip
                 MOVE    R1, S_BGDHCP
-                CALL    puts_crlf
+                CALL    puts_b_crlf
                 MOVE    R1, S_PROMPT
-                JMP     _io_puts        ; which returns to the caller
+                JMP     puts_b          ; which returns to the caller
 
 ; The frame routines, the ROM's own, with no entries in the dispatch table
 ; (INTERNALS.md, "The frame routines"). They follow the C ABI, and drive the port for
@@ -1151,7 +1151,7 @@ dhcp_send
                 CALL    dhcp_str
                 MOVE    R1, 12          ; the host name
                 CALL    dhcp_code
-                MOVE    R5, S_HOST
+                MOVE    R5, TEXT_B+4*S_HOST
                 CALL    dhcp_str
                 SHL     R5, @E_MACL, 8  ; the last three bytes, from the top
 :
@@ -1167,9 +1167,9 @@ dhcp_send
                 CALL    dhcp_len
                 MOVE    R1, 60          ; the vendor class
                 CALL    dhcp_code
-                MOVE    R5, S_VCLASS
+                MOVE    R5, TEXT_B+4*S_VCLASS
                 CALL    dhcp_str
-                MOVE    R5, VERSION
+                MOVE    R5, TEXT_B+4*VERSION
                 CALL    dhcp_str
                 CALL    dhcp_len
                 MOVE    R1, 0xFF        ; the end
@@ -1826,7 +1826,7 @@ dns_skip
 ; its message. R7 counts the sends left, and R8-R12 are bin_line's.
 cmd_tftp
                 MOVE    R1, R2
-                MOVE    R2, S_FTP
+                MOVE    R2, TEXT_B+4*S_FTP
                 CALL    match           ; R1 after ftp, or 0
                 TST     R1
         ?Z      JMP     unknown
@@ -1867,7 +1867,7 @@ cmd_tftp
         ?Z      JMP     tftp_bad        ; port 0
                 MOVE    @V_TPORT, R4
 tftp_name
-                MOVE    R7, S_STAR
+                MOVE    R7, TEXT_B+4*S_STAR
                 TST     @R3
         ?Z      JMP     :+              ; no name: the listing of *
                 CMP     @R3, 0x20
@@ -1898,7 +1898,7 @@ tftp_name
 :
                 MOVE[M] @R2++, @R7++
         ?!Z     JMP     :-
-                MOVE    R1, S_OCTET
+                MOVE    R1, TEXT_B+4*S_OCTET
 :
                 MOVE[M] @R2++, @R1++
         ?!Z     JMP     :-
@@ -2000,7 +2000,7 @@ tftp_time
         ?!Z     JMP     tftp_send
                 CALL    udp_close
                 MOVE    R1, S_NOTFTP
-                CALL    puts_crlf
+                CALL    puts_b_crlf
                 JMP     main
 ; An ERROR: its code, and its message, up to a 0 or the end of the
 ; datagram, without control codes. R7 is the byte, and R8 the end.
@@ -2009,11 +2009,11 @@ tftp_error
                 ADD     R8, R1, 4*UDP_HDR
                 CALL    udp_close
                 MOVE    R1, S_TFTPERR
-                CALL    _io_puts
+                CALL    puts_b
                 AND     R1, @V_RXF+UDP_HDR, 0xFFFF
                 CALL    _io_putdec
                 MOVE    R1, S_UCOMMA
-                CALL    _io_puts
+                CALL    puts_b
 :
                 CMP     R7, R8
         ?!C     JMP     :+
@@ -2037,11 +2037,11 @@ tftp_fail
                 MOVE    R1, S_NOIP
                 CMP     R7, E_NOIP
         ?!Z     MOVE    R1, S_NOROUTE
-                CALL    puts_crlf
+                CALL    puts_b_crlf
                 JMP     main
 tftp_bad
                 MOVE    R1, S_BADTFTP
-                CALL    puts_crlf
+                CALL    puts_b_crlf
                 JMP     main
 
 ; tftp_char: the byte R1 of a DATA, into the line at V_TLINE, as fat_load
@@ -2085,27 +2085,31 @@ tftp_eol
                 RET
 
 S_NODHCP
-                .ASCII_L 'No answer from a DHCP server'
+                .ASCII_B 'No answer from a DHCP server'
+                .DAT    0
 S_BGDHCP
-                .ASCII_L ' from DHCP'
-S_HOST          .ASCII_L 'nicemon-'
+                .ASCII_B ' from DHCP'
+S_HOST          .ASCII_B 'nicemon-'
+                .DAT    0
 S_VCLASS
-                .ASCII_L 'NiceMonMEGA65 '
-S_MASK          .ASCII_L 'Mask '
-S_GW            .ASCII_L 'Gateway '
-S_DNS           .ASCII_L 'DNS server '
-S_DSRV          .ASCII_L 'DHCP server '
+                .ASCII_B 'NiceMonMEGA65 '
+S_MASK          .ASCII_B 'Mask '
+S_GW            .ASCII_B 'Gateway '
+                .DAT    0
+S_DNS           .ASCII_B 'DNS server '
+S_DSRV          .ASCII_B 'DHCP server '
+                .DAT    0
 D_PARAMS
                 .DAT    55, 3, 1, 3, 6, 0  ; option 55: the mask, the gateway, and the DNS servers
-S_FTP           .ASCII_L 'ftp'
-S_OCTET         .ASCII_L 'octet'
-S_STAR          .ASCII_L '*'
+S_FTP           .ASCII_B 'ftp'
+S_OCTET         .ASCII_B 'octet'
+S_STAR          .ASCII_B '*'
 S_BADTFTP
-                .ASCII_L 'tftp IP[:PORT] [NAME]: tftp 192.168.1.10 hello.bin loads, *.bin lists'
+                .ASCII_B 'tftp IP[:PORT] [NAME]: tftp 192.168.1.10 hello.bin loads, *.bin lists'
 S_NOTFTP
-                .ASCII_L 'No answer from the TFTP server'
+                .ASCII_B 'No answer from the TFTP server'
 S_TFTPERR
-                .ASCII_L 'TFTP error '
-S_NOIP          .ASCII_L 'No IP address; i sets one'
+                .ASCII_B 'TFTP error '
+S_NOIP          .ASCII_B 'No IP address; i sets one'
 S_NOROUTE
-                .ASCII_L 'No answer to ARP from the server, or from the gateway'
+                .ASCII_B 'No answer to ARP from the server, or from the gateway'
