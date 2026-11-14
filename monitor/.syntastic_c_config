@@ -1,0 +1,5 @@
+# Include paths for Syntastic, as monitor/Makefile gives them
+-I../nice_cpu/runtime/libc/include
+-I.
+# nice.h and mon.h use the wasm import attributes, which gcc ignores
+-Wno-attributes
