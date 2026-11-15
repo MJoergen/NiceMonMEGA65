@@ -12,7 +12,7 @@
 --   start   bit 0 goes from 1 to 0: the devices reset, and the core runs
 --   hidden  bit 3 is 1: the ROM is out of the way, and the RAM is at 0
 --   paused  bit 4 is 1: the core stops between instructions
---   notice  a packet the link sends on its own: b07 at reset, h at a halt,
+--   notice  a packet the link sends on its own: b08 at reset, h at a halt,
 --           p at a pause, x at a breakpoint, and o for a lost input byte
 --
 -- THEORY OF OPERATION
@@ -245,7 +245,7 @@
 --                          core, live while it runs and those of the stop
 --                          after a halt or at a pause (DEBUG.md §6), the
 --                          control register, the halt reason (1 to 4
---                          here), the version, 7 (DEBUG.md §6), the free
+--                          here), the version, 8 (DEBUG.md §6), the free
 --                          space of the core's input FIFO, and the
 --                          G_BREAKS breakpoints: their enable
 --                          bits, their number, the stop register, and
@@ -336,7 +336,7 @@
 -- Synchronous. After reset bit 0 of the control register is 1 when
 -- G_CPU_RUN_AT_RESET is false, so the core waits for the host, and 0
 -- otherwise, so the core boots from the ROM, which reset shows: rom_hidden is
--- cleared, or stays 1 in a build without a ROM. The link sends `b07`, and
+-- cleared, or stays 1 in a build without a ROM. The link sends `b08`, and
 -- clears the breakpoints. The
 -- screen's registers, the read counter, and the board's writable registers
 -- (LEDs, RGB levels, and display segments), which the clear keeps, are
