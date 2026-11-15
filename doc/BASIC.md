@@ -24,7 +24,8 @@ the ROM, and the order of the work, with the issue of each stage.
 
 ## Decisions
 
-Made on 2026-11-11, but for the first two, which are of 2026-11-12.
+Made on 2026-11-11, but for the first two, which are of 2026-11-12,
+and the names of the statements, which are of 2026-11-15.
 They replace the 32-bit float in software, and the number that is an
 integer until a fraction appears, of the day before
 ([Numbers](#numbers) has why). The first, the third, and the fourth
@@ -52,6 +53,11 @@ settle the three open questions of #54.
   ([The ROM's room](#the-roms-room)).
 - **`DUMP` and `DIS` stay**: the monitor's `d` and `u`, with the
   disassembler, are statements for good.
+- **The names of the statements** are those of
+  [The main loop](#the-main-loop). `LOAD` picks the kind of file by
+  its name, with no `BLOAD`, and a TFTP server is the second argument
+  of `LOAD`, `RUN`, and `DIR`, with no `TFTP`. The top of BASIC's
+  memory is `HIMEM`.
 - **V2.0.1 has no BASIC.** The stages 1 to 3 go to the milestone
   V2.2, which pins nice_cpu's tag `V2.2`, the first with the FPU
   ([Releases](#releases)).
@@ -123,9 +129,8 @@ reads a line. A line that starts with a number is stored, from stage 3
 on. Any other line runs at once. `mon_exit`, and a trap of the C code,
 come back to `READY.`.
 
-The monitor's commands become these statements. `DUMP` and `DIS` are
-decided, and the other names are a proposal
-([Open questions](#open-questions)). A name is a string in quotes, and
+The monitor's commands become these statements
+([Decisions](#decisions)). A name is a string in quotes, and
 a number is decimal, or hex with `0x`, where the monitor took bare
 hex.
 
@@ -163,13 +168,25 @@ hex.
 - **`LOAD` picks by the name.** A name that ends in `.BIN` is a file of
   address and word pairs, loaded as `load` loads it. Any other name is
   a BASIC program as text, with `.BAS` added when it has no extension
-  (#60), from stage 4 on.
+  (#60), from stage 4 on. So `LOAD "CHESS"` looks for `CHESS.BAS`, and
+  before stage 4 it is an error that asks for a `.BIN` name. There is
+  no `BLOAD`: BASIC 65's loads bytes at an address that it is given,
+  and a `.bin` file has its addresses in it.
+- **`SAVE` picks by its arguments.** `SAVE "NAME", addr, n` writes
+  words as a `.bin` file, with `.BIN` added when the name has no
+  extension, so that `LOAD` reads it back. `SAVE "NAME"` writes the
+  program as text, with `.BAS` added, from stage 4 on.
+- **A TFTP server is the second argument**, a string, of `LOAD`, of
+  `RUN` from stage 4, and of `DIR`, whose number is a slot. There is
+  no `TFTP` statement. `SAVE "NAME", "IP"` is an error, as TFTP here
+  only reads.
 - **A `.bin` file and BASIC share the RAM.** BASIC has its variables
   there from stage 2 on, and its program from stage 3 on, so a `.bin`
   word below the top of BASIC's memory means `NEW` first. A program
   at `0x8000` is started before a variable is made. A routine for a
-  BASIC program to call is loaded above that top, which a statement
-  lowers, as `POKE 55` and `56` do on the C64.
+  BASIC program to call is loaded above that top, which `HIMEM`
+  holds, as BBC BASIC has it: `PRINT HIMEM` reads it, and
+  `HIMEM = 0x9000` lowers it, where the C64 has `POKE 55` and `56`.
 - **nice_chess** is then `LOAD "CHESS.BIN"` and `SYS 0x8000`, where it
   is `load CHESS.BIN` and `r`. `RUN "CHESS.BIN"` does both, from
   stage 4.
@@ -531,8 +548,8 @@ Each has an issue, under #54.
    the words of a C line and the steps of an operation.
 3. **Programs**, #114. The lines, `LIST`, `NEW`, `CLR`, `RUN`, `END`,
    `STOP`, `CONT`, `GOTO`, `GOSUB`, `IF` on one line, `FOR`, `REM`,
-   `INPUT` of numbers, `GET`, `DIM`, the break key, the statement that
-   lowers the top of the memory, and the benchmarks. A program pasted
+   `INPUT` of numbers, `GET`, `DIM`, the break key, `HIMEM`, and the
+   benchmarks. A program pasted
    into the line runs, and `LIST` gets it back. This is the first
    BASIC worth a release.
 4. **Files**, #60: `SAVE "NAME"`, `LOAD "NAME"`, and `RUN "NAME"`,
@@ -657,12 +674,10 @@ that is open when it is done.
    `0.333333333333333` and `0.1 + 0.2` as `0.3`, or fewer, which also
    hides the last digits of `^` and the functions, where their errors
    are.
-2. **The names** of the statements of [The main loop](#the-main-loop),
-   but `DUMP` and `DIS`: `LOAD` by the extension or a `BLOAD` beside
-   it, and TFTP as a second argument of `LOAD` or a `TFTP` of its own.
-   Stage 1 needs them. The statement that lowers the top of the
-   memory, at stage 3, has no name yet, and neither have those of
-   stage 10.
+2. ~~**The names** of the statements of
+   [The main loop](#the-main-loop).~~ Settled on 2026-11-15
+   ([Decisions](#decisions)): `LOAD` by the name, TFTP as its second
+   argument, and `HIMEM`. The names of stage 10 come with it.
 3. **The editor's place**: stage 7, or right after stage 3.
 4. **`PROC` and `FN`** as BBC BASIC writes them, which takes names
    that start with them from the variables, or `SUB` and `FUNCTION`.
