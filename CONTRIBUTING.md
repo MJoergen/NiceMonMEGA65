@@ -537,8 +537,8 @@ set the clock of the time of day to its time. Then the monitor starts
 again, gets `time` with a date and a time, and must write them to the
 model and clear its status (#105).
 It leaves out nice_cpu's benchmark and the demo's self-test, which would
-take too long. It takes about an hour, most of it in the monitor's runs,
-and CI runs it on both cores.
+take too long. CI runs it on both cores, where it takes two to four
+hours on each, most of it in the monitor's runs.
 
 ## The formal checks
 

@@ -113,7 +113,7 @@ help:
 	@echo "                  run the system in GHDL with its debug UART on a TCP port,"
 	@echo "                  for the tools' --cosim PORT, until it is stopped"
 	@echo "  make cosimtest  compare run.py on the simulated system with niceemu,"
-	@echo "                  without a board (minutes)"
+	@echo "                  without a board (hours)"
 	@echo "  FLOW=default|timing  with a board's target picks Vivado's directives"
 	@echo "                  (synth/Makefile.inc)"
 	@echo "  NICE=pipeline|multi  with test, cosim, or a board's target picks nice_cpu's"

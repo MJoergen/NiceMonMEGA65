@@ -74,7 +74,7 @@ header is the authoritative address map.
     make sdnbd            # the board's SD card as a disk over NBD, for nbd-client and a mount on Linux; holds the core until Ctrl-C (ETH= or PORT=)
     make sdtest           # sdcard.py and sdnbd.py on niceemu --link with images that mtools made, no board
     make cosim            # the RTL in GHDL, its debug UART on TCP, for the tools' --cosim PORT
-    make cosimtest        # run.py --cosim on make cosim against plain niceemu, no board (about an hour)
+    make cosimtest        # run.py --cosim on make cosim against plain niceemu, no board (two to four hours on each core in CI)
 
 One testbench: `make -C sim tb_kbd` (likewise `tb_hello`, `tb_nicemon`,
 `tb_ps2`, `tb_text`, `tb_board_io`, `synth-nicemon`, ...). `make -C sim
