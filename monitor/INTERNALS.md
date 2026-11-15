@@ -285,7 +285,7 @@ ROM is built:
 - `build/folder.nasm` and the version always end with a `.DAT 0`, as
   the Makefile does not count their characters.
 - The version is that of the tests, `V9.9`, so that the tables do not
-  change with every commit. A release's version, such as `V2.1`, has
+  change with every commit. A release's version, such as `V2.2`, has
   as many words.
 
 ### Keeping the tables

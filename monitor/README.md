@@ -264,7 +264,7 @@ out. With no match, no card, or a card that fails, TAB does nothing.
 | `d [ADDR] [N]` | Shows `N` words from `ADDR`, 4 to a row with the row's address first, all in hex. Without `ADDR`, the words after the last shown; without `N`, 32 words. |
 | `u [ADDR] [N]` | Disassembles `N` instructions from `ADDR`, a row each: the address, the instruction's 1 to 4 words, and its text, all in hex (The disassembler below). Without `ADDR`, the instructions after the last shown; without `N`, 20. |
 | `c` | Clears the screen. |
-| `v` | The version of the monitor, and of the dispatch table: `NiceMon V2.1, dispatch table 1.5`. |
+| `v` | The version of the monitor, and of the dispatch table: `NiceMon V2.2, dispatch table 1.5`. |
 | `i [A.B.C.D]` | Shows the Ethernet station's IP address, `IP address 192.168.1.65`, or writes it first: four decimal numbers of 0 to 255 with dots between them, such as `i 192.168.1.65`. Anything but an address or `dhcp` is no address, and `i` says so and writes nothing. It writes `0xFFFFFFB0`, `NET_IP` ([SYSTEM.md](../doc/SYSTEM.md#the-ethernet-station)), so a host connected over TCP loses its connection. In `niceemu` it is a register that keeps what is written. |
 | `i dhcp` | Gets the IP address from the network's DHCP server and writes it, as `i A.B.C.D` does, then shows it, with the mask, the gateway, the DNS server, the DHCP server, and the NTP server, if it gives one, a line each (The network below). Without an answer, it prints `No answer from a DHCP server` after about 8 seconds, and leaves the address as it was. |
 | `m [MAC]` | Shows the station's MAC address, `MAC address 02:4E:49:43:45:06`, or writes it first: six bytes of one or two hex digits, in either case, with colons between them, such as `m 02:4E:49:43:45:01`. The first byte must be even, as an odd one makes a group address. Anything else is no address, and `m` says so and writes nothing. It writes `0xFFFFFFB1` and `B2`, so a host connected over TCP loses its connection. Each kind of board has its own after reset: `02:4E:49:43:45:03` on the R3, `02:4E:49:43:45:06` on the R6, and `02:4E:49:43:45:0A` on the Nexys4DDR. Two boards of the same kind on one network need different MAC addresses. In `niceemu` they are registers too, `02:4E:49:43:45:00` after reset. |
@@ -424,7 +424,7 @@ sets serves both.
   list of stations shows it: the host name is `nicemon-` and the last
   three bytes of the MAC address, such as `nicemon-434506`, and the
   vendor class is `NiceMonMEGA65` and the monitor's version, such as
-  `NiceMonMEGA65 V2.1`. The transaction's number is the microsecond counter
+  `NiceMonMEGA65 V2.2`. The transaction's number is the microsecond counter
   at the start, XOR the low word of the MAC address. The lease is
   kept, and renewed while the monitor waits at its prompt, and by a
   program's polls while the network is on, as `net_poll` has it. A
