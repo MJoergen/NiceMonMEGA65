@@ -7,7 +7,7 @@
 ; screen only, and a line on the line only. Before it returns it draws a row of the glyph of
 ; 0x80 in the font RAM and selects that font with the font base, which the
 ; monitor puts back to 0 at the return, while the glyph stays (nice_cpu's
-; SYSTEM.md §1.8), and hides the cursor, which the monitor shows again,
+; DEVICES.md §1.8), and hides the cursor, which the monitor shows again,
 ; blinking, at the return, as nice_chess hides it. It returns 42, with VBASE 0x80 in R14, which the
 ; monitor clears at the return. The test runs it with the input test/run.txt.
 

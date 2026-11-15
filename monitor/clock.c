@@ -5,7 +5,7 @@
 // (issue #127). It is
 // part of the ROM's C code (INTERNALS.md, "C in the ROM"), with fat32.c.
 //
-// The clock (nice_cpu's SYSTEM.md §10) counts seconds since 1970-01-01
+// The clock (nice_cpu's DEVICES.md §10) counts seconds since 1970-01-01
 // 00:00:00, and keeps local time, as the MEGA65's real-time clock does
 // (issue #105, nice_cpu#158): there are no time zones here, so a date and
 // a time convert to the seconds of the clock and back as if they were UTC.

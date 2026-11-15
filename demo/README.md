@@ -33,7 +33,7 @@ has what each demo shows and how it works. On the boards:
 - The counters count the core's cycles at 100 MHz on the MEGA65, and at
   90 MHz on the Nexys4DDR, and the time is real.
 - F11's self-test runs on the core, and the network station below it is
-  the board's, at `0xFFFFFFB0` ([nice_cpu's SYSTEM.md §6](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#6-network-station), and
+  the board's, at `0xFFFFFFB0` ([nice_cpu's DEVICES.md §6](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#6-network-station), and
   [The Ethernet station](../doc/SYSTEM.md#the-ethernet-station)). Its IP
   address is the one that the monitor got from DHCP or from its `i`, or
   `0.0.0.0`, which answers nothing, and its MAC address after reset is

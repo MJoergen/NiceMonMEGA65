@@ -15,11 +15,11 @@ Some words used here come from other documents:
   memory. [DEBUG_LINK.md](DEBUG_LINK.md) has the link, and the words
   hold, start, clear, hide, and pause, which are what the link does to
   the core and the memory.
-- **nice_cpu's SYSTEM.md** is another document than this one:
-  [doc/SYSTEM.md](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md)
-  of nice_cpu, which specifies the devices, and which this system
-  follows. It is always cited with a section number. DEBUG.md, ISA.md,
-  and MICROARCH.md are nice_cpu's too, in `nice_cpu/doc/`.
+- **DEVICES.md** is nice_cpu's
+  [doc/DEVICES.md](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md),
+  which specifies the devices, and which this system follows. It is
+  always cited with a section number. DEBUG.md, ISA.md, and
+  MICROARCH.md are nice_cpu's too, in `nice_cpu/doc/`.
 - **The runtime** is nice_cpu's start-up code and library, which a
   program is built with.
 
@@ -37,8 +37,8 @@ effect and does not write ([DEBUG.md §3](https://github.com/MJoergen/nice_cpu/b
 |---|---|
 | `0x00000000`–`0xFFFFFFFF` | RAM, wherever nothing below is: 128K words on the MEGA65 and 64K on the Nexys4DDR, repeated through the address space (see [Stack, heap, and variables](#stack-heap-and-variables)). `0xFFFFFF9E` reads the number of words. |
 | `0x00000000`–`0x00007FFF` | The ROM, 32K words, in a bitstream built with one, in front of the RAM and repeating with it. The core boots from it at reset, instead of waiting held for a host. A write to it is dropped, and a clear does not touch it. Bit 3 of the control register hides it, and the RAM under it keeps its words meanwhile ([DEBUG_LINK.md](DEBUG_LINK.md#the-control-register)). [PROGRAMMING.md](PROGRAMMING.md#programs-in-the-rom) has what a program in the ROM must do. |
-| `0x10000000`–`0x5FFFFFFF` | The byte windows of [nice_cpu's SYSTEM.md §9](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#9-byte-windows): a word, a byte, or a halfword of the RAM, or of the ROM while it is shown, at a byte address, for the core's data accesses and the link (see [The byte windows](#the-byte-windows)). |
-| `0xFFFE0000`–`0xFFFE1FFF` | The font RAM of [nice_cpu's SYSTEM.md §1.8](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#18-font): 256 glyphs of 32 rows, one word a row, read and written, with bits 31..16 reading 0. It is 0 at power-up and after a clear, and a start keeps it (see [The font](#the-font)). |
+| `0x10000000`–`0x5FFFFFFF` | The byte windows of [nice_cpu's DEVICES.md §9](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#9-byte-windows): a word, a byte, or a halfword of the RAM, or of the ROM while it is shown, at a byte address, for the core's data accesses and the link (see [The byte windows](#the-byte-windows)). |
+| `0xFFFE0000`–`0xFFFE1FFF` | The font RAM of [nice_cpu's DEVICES.md §1.8](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#18-font): 256 glyphs of 32 rows, one word a row, read and written, with bits 31..16 reading 0. It is 0 at power-up and after a clear, and a start keeps it (see [The font](#the-font)). |
 | `0xFFFE2000`–`0xFFFE3FFF` | The character ROM: Spleen, in the layout of the font RAM. A write is dropped. |
 | `0xFFFF0000`–`0xFFFF7FFF` | The screen: 32768 words of memory of their own, the emulator's 80×25 screen and room for scrolling. The 2000 words from the display offset are shown on VGA and HDMI, or VGA only on the Nexys4DDR (see [The screen](#the-screen)), and the link reads them all. |
 | `0xFFFF8000`–`0xFFFFFEFF` | RAM: the top words of the RAM, as it repeats, from `0xFFFF2000` on the Nexys4DDR. The stacks and the monitor's variables are here (see [Stack, heap, and variables](#stack-heap-and-variables)). |
@@ -113,7 +113,7 @@ A C or wasm program built with nicewasm's `--byte-windows`, or
 
 The board decodes only the low 17 bits of a RAM address on the MEGA65,
 and the low 16 on the Nexys4DDR, so the RAM repeats through the address
-space ([nice_cpu's SYSTEM.md §8](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#8-systems-built-on-the-fpga-core), Aliasing). Each word of the RAM has many
+space ([nice_cpu's DEVICES.md §8](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#8-systems-built-on-the-fpga-core), Aliasing). Each word of the RAM has many
 addresses, and a program picks the one that suits it. The top of the
 address space is the top of the RAM: on the MEGA65, `0xFFFFF000` is RAM
 word `0x1F000`, as are `0x0001F000` and `0x0003F000`. Where a device or
@@ -173,18 +173,18 @@ core, where only the link has registers.
 
 | Address | What it is |
 |---|---|
-| `0xFFFFFF00` | The console of [nice_cpu's SYSTEM.md §1.2](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#12-console). Its output goes to the line, the UART or a host over TCP, and its input comes from the line and the keyboard, through the input FIFO (below). A break on the UART, or a host's half-close over TCP, ends the line's input, and a read returns `0x200` once the bytes before it are read, until a start or the next connection ([DEBUG_LINK.md](DEBUG_LINK.md#the-debug-link-over-tcp)). The keyboard's bytes still come ([nice_cpu's SYSTEM.md §8](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#8-systems-built-on-the-fpga-core)). |
-| `0xFFFFFF01` | The read counter of [nice_cpu's SYSTEM.md §1.7](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#17-read-counter), as in the emulator. A start keeps it. |
-| `0xFFFFFF10`–`0xFFFFFF1F` | The timer of [nice_cpu's SYSTEM.md §4](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#4-timer). It counts clock cycles, at 100 MHz on the MEGA65 and 90 MHz on the Nexys4DDR, where the emulator counts steps. |
-| `0xFFFFFF20`–`0xFFFFFF3F` | The math unit of [nice_cpu's SYSTEM.md §2](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#2-math-unit), as in the emulator. |
-| `0xFFFFFF40`–`0xFFFFFF5F` | The performance counters of [nice_cpu's SYSTEM.md §3](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#3-performance-counters). The cycles are those of the board's clock, at 100 MHz on the MEGA65 and 90 MHz on the Nexys4DDR, and the microseconds come from it, so they are real time. The instructions and the event counters count as the emulator's do. A read of a low word by the link takes the snapshot, as the core's does, where `niceemu --link` takes none. |
-| `0xFFFFFF46`–`0xFFFFFF49` | The clock of the time of day of [nice_cpu's SYSTEM.md §10](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#10-clock), within the performance counters, counted from the board's clock. After a reset it is not set, until the ROM's monitor sets it from the MEGA65's real-time clock at its start (see [The I2C bus](#the-i2c-bus)), or a program sets it. It keeps local time, as the real-time clock does. Only a reset of the system resets it: a start keeps the time, and it runs while the core is held, paused, or halted. A read of `0xFFFFFF46` by the link takes the snapshot too. |
+| `0xFFFFFF00` | The console of [nice_cpu's DEVICES.md §1.2](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#12-console). Its output goes to the line, the UART or a host over TCP, and its input comes from the line and the keyboard, through the input FIFO (below). A break on the UART, or a host's half-close over TCP, ends the line's input, and a read returns `0x200` once the bytes before it are read, until a start or the next connection ([DEBUG_LINK.md](DEBUG_LINK.md#the-debug-link-over-tcp)). The keyboard's bytes still come ([nice_cpu's DEVICES.md §8](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#8-systems-built-on-the-fpga-core)). |
+| `0xFFFFFF01` | The read counter of [nice_cpu's DEVICES.md §1.7](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#17-read-counter), as in the emulator. A start keeps it. |
+| `0xFFFFFF10`–`0xFFFFFF1F` | The timer of [nice_cpu's DEVICES.md §4](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#4-timer). It counts clock cycles, at 100 MHz on the MEGA65 and 90 MHz on the Nexys4DDR, where the emulator counts steps. |
+| `0xFFFFFF20`–`0xFFFFFF3F` | The math unit of [nice_cpu's DEVICES.md §2](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#2-math-unit), as in the emulator. |
+| `0xFFFFFF40`–`0xFFFFFF5F` | The performance counters of [nice_cpu's DEVICES.md §3](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#3-performance-counters). The cycles are those of the board's clock, at 100 MHz on the MEGA65 and 90 MHz on the Nexys4DDR, and the microseconds come from it, so they are real time. The instructions and the event counters count as the emulator's do. A read of a low word by the link takes the snapshot, as the core's does, where `niceemu --link` takes none. |
+| `0xFFFFFF46`–`0xFFFFFF49` | The clock of the time of day of [nice_cpu's DEVICES.md §10](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#10-clock), within the performance counters, counted from the board's clock. After a reset it is not set, until the ROM's monitor sets it from the MEGA65's real-time clock at its start (see [The I2C bus](#the-i2c-bus)), or a program sets it. It keeps local time, as the real-time clock does. Only a reset of the system resets it: a start keeps the time, and it runs while the core is held, paused, or halted. A read of `0xFFFFFF46` by the link takes the snapshot too. |
 | `0xFFFFFF60`–`0xFFFFFF7F` | The fetch statistics of [MICROARCH.md §8.1](https://github.com/MJoergen/nice_cpu/blob/main/doc/MICROARCH.md#81-fetch-statistics), which the emulator does not have. With the multi-cycle core (`NICE=multi`), only two of them count. |
 | `0xFFFFFF80`–`0xFFFFFF8F` | The screen's registers: the cursor and the display offset (see [The screen](#the-screen)). |
 | `0xFFFFFF90`–`0xFFFFFF9F` | The Nexys4DDR's LEDs, seven-segment display, buttons, and switches at `0xFFFFFF90`–`96` (see [The Nexys4DDR's devices](#the-nexys4ddrs-devices)). On the MEGA65 they read 0 and take no write. On every board, the I2C master is at `0xFFFFFF97`–`9D` (see [The I2C bus](#the-i2c-bus)), `0xFFFFFF9E` reads the words of the RAM, `0x20000` on the MEGA65 and `0x10000` on the Nexys4DDR, and takes no write, and `0xFFFFFF9F` is the UART's baud rate (see [The baud rate](DEBUG_LINK.md#the-baud-rate)). The emulator has memory there, which reads 0 after a clear, so a program takes 0 to mean no limit. |
-| `0xFFFFFFA0`–`0xFFFFFFAF` | The SD card controller of [nice_cpu's SYSTEM.md §5](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#5-sd-card), with 2 slots on the MEGA65 and 1 on the Nexys4DDR (see [The SD card slots](#the-sd-card-slots)). |
-| `0xFFFFFFB0`–`0xFFFFFFBF` | The network station of [nice_cpu's SYSTEM.md §6](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#6-network-station), on every board: the Ethernet station's addresses, its counts of frames, and the state of the debug link over TCP (see [The Ethernet station](#the-ethernet-station)). |
-| `0xFFFFFFC0`–`0xFFFFFFCF` | The port for Ethernet frames of [nice_cpu's SYSTEM.md §7](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#7-ethernet-frames), on every board: a queue of 4 frames received and a send buffer, through which a program sends and receives frames of its own (see [Ethernet frames](#ethernet-frames)). |
+| `0xFFFFFFA0`–`0xFFFFFFAF` | The SD card controller of [nice_cpu's DEVICES.md §5](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#5-sd-card), with 2 slots on the MEGA65 and 1 on the Nexys4DDR (see [The SD card slots](#the-sd-card-slots)). |
+| `0xFFFFFFB0`–`0xFFFFFFBF` | The network station of [nice_cpu's DEVICES.md §6](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#6-network-station), on every board: the Ethernet station's addresses, its counts of frames, and the state of the debug link over TCP (see [The Ethernet station](#the-ethernet-station)). |
+| `0xFFFFFFC0`–`0xFFFFFFCF` | The port for Ethernet frames of [nice_cpu's DEVICES.md §7](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#7-ethernet-frames), on every board: a queue of 4 frames received and a send buffer, through which a program sends and receives frames of its own (see [Ethernet frames](#ethernet-frames)). |
 | `0xFFFFFFD0`–`0xFFFFFFDF` | The debug registers of [DEBUG.md §6](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEBUG.md#6-the-debug-registers), for the link only, here and below: `saved_pc`, `saved_sr`, 4 watchpoints, and the NMI request at `0xFFFFFFD7`, which the board keeps but does not pass to the core ([#106](https://github.com/MJoergen/NiceMonMEGA65/issues/106)). While a watchpoint is enabled, the pipelined core runs more slowly. A data access of the core here, and below, goes to the RAM. |
 | `0xFFFFFFE0`–`0xFFFFFFEF` | R0–R15 of the core, read live while it runs. The multi-cycle core adds 1 to R15 for each word it fetches, so its live R15 may be the address of a constant word, or of the word after the instruction it carries out. |
 | `0xFFFFFFF0`–`0xFFFFFFFF` | The control register ([DEBUG_LINK.md](DEBUG_LINK.md#the-control-register)), the halt reason, never 5 here, the link's version, 7, the free space of the 2048-byte input FIFO, the stop, and 4 breakpoints at `0xFFFFFFF8`–`FB`. |
@@ -238,7 +238,7 @@ of 16×32 pixels. Under them are the 4 rows of the on-board debugger's
 strip ([DEBUGGER.md](DEBUGGER.md)), black unless it is shown, and the 29
 rows are in the middle of the picture, 48 black lines from its top.
 
-Word `80 * row + column` is one character, as in nice_cpu's SYSTEM.md
+Word `80 * row + column` is one character, as in nice_cpu's DEVICES.md
 §1:
 
 | Bits | What they are |
@@ -271,7 +271,7 @@ QNICE-FPGA, at `0xFF30` there:
 | `0xFFFFFF81` | The cursor's column, 0 to 79. |
 | `0xFFFFFF82` | The cursor's row, 0 to 24. |
 | `0xFFFFFF85` | The display offset, in words, 0 to 32767 (8191 on the Nexys4DDR). It takes effect when bit 10 of the state is set. |
-| `0xFFFFFF86` | The font base of [nice_cpu's SYSTEM.md §1.8](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#18-font), all 32 bits kept and read back: `0xFFFE0000` shows the font RAM, and 0 shows the character ROM, as do the other values, which are reserved (see [The font](#the-font)). |
+| `0xFFFFFF86` | The font base of [nice_cpu's DEVICES.md §1.8](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#18-font), all 32 bits kept and read back: `0xFFFE0000` shows the font RAM, and 0 shows the character ROM, as do the other values, which are reserved (see [The font](#the-font)). |
 
 The words `0xFFFFFF83`, `84`, and `87`–`8F` read 0 and take no write. In
 the emulator these addresses are memory, so a program that writes them runs
@@ -281,14 +281,14 @@ floating-point unit, which the board does not have yet
 the control register, which `load.py` and `run.py` set), set the offset and
 the font base to 0 and turn the cursor off, as at the start of the
 emulator. `niceemu --window` draws the same cursor from these
-words, as [nice_cpu's SYSTEM.md §1](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#1-console-screen-and-read-counter) says, but has no display offset.
+words, as [nice_cpu's DEVICES.md §1](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#1-console-screen-and-read-counter) says, but has no display offset.
 A column or row out of range shows no cursor there, where here only
 bits 6..0 of the column and 4..0 of the row are kept.
 
 ### The font
 
 The characters are drawn from one of two fonts of 256 glyphs, as in
-[nice_cpu's SYSTEM.md §1.8](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#18-font) and `niceemu --window`. The character ROM at
+[nice_cpu's DEVICES.md §1.8](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#18-font) and `niceemu --window`. The character ROM at
 `0xFFFE2000` holds [Spleen](https://github.com/fcambus/spleen) 16×32 with
 the codes of ISO 8859-1, where `0x00`–`0x1F` and `0x7F`–`0x9F` are blank.
 The font RAM at `0xFFFE0000` holds what a program writes. In both, the
@@ -321,7 +321,7 @@ program's font stays in the RAM. The font RAM is 0 at power-up and after
 a clear, and a start keeps it, as it keeps the screen. An instruction
 fetch in `0xFFFE0000`–`0xFFFE3FFF` reads the RAM there, which these
 words alias, and not the fonts, so a program does not run from its font
-([nice_cpu's SYSTEM.md §8](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#8-systems-built-on-the-fpga-core), and [EMULATOR.md](EMULATOR.md)).
+([nice_cpu's DEVICES.md §8](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#8-systems-built-on-the-fpga-core), and [EMULATOR.md](EMULATOR.md)).
 
 The video output comes from MandelbrotMEGA65, which uses the same mode on
 the MEGA65. The HDMI output is DVI, without sound.
@@ -331,7 +331,7 @@ the MEGA65. The HDMI output is DVI, without sound.
 The MEGA65's own keyboard types into the same input as the UART: what
 you type goes to the program while it runs or is paused, and is dropped
 while the core is held in reset or has halted. The keys give ASCII, as a
-terminal sends it. [nice_cpu's SYSTEM.md §1](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#1-console-screen-and-read-counter) defines the bytes of the keys
+terminal sends it. [nice_cpu's DEVICES.md §1](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#1-console-screen-and-read-counter) defines the bytes of the keys
 that every keyboard has, which `niceemu --window` sends too, and the
 MEGA65's keyboard follows it. The table has
 the MEGA65's keys:
@@ -419,7 +419,7 @@ the I2C master of every board (see [The I2C bus](#the-i2c-bus)).
 ## The Ethernet station
 
 `0xFFFFFFB0`–`BF` are on every board, the MEGA65 too. They are the
-network station of [nice_cpu's SYSTEM.md §6](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#6-network-station), here the Ethernet station,
+network station of [nice_cpu's DEVICES.md §6](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#6-network-station), here the Ethernet station,
 which carries the debug link over TCP
 ([DEBUG_LINK.md](DEBUG_LINK.md#the-debug-link-over-tcp)). It answers ARP requests for its
 IP address and pings to it, and serves the link on TCP port 4510.
@@ -486,7 +486,7 @@ the addresses and the counts, and sets the addresses from the keyboard
 ### Ethernet frames
 
 `0xFFFFFFC0`–`CF` are the port for Ethernet frames of [nice_cpu's
-SYSTEM.md §7](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#7-ethernet-frames), on every board. A program sends and receives frames of its
+DEVICES.md §7](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#7-ethernet-frames), on every board. A program sends and receives frames of its
 own through it, for DHCP, DNS, or TFTP, and builds and parses them
 itself. §7 has the registers, the queue of 4 frames received, the send
 buffer, and the window of `ETH_BUF0`–`7` on them.
@@ -536,7 +536,7 @@ for programs ([monitor/](../monitor/README.md#the-network)).
 
 ## The SD card slots
 
-The SD card controller of [nice_cpu's SYSTEM.md §5](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#5-sd-card) is at
+The SD card controller of [nice_cpu's DEVICES.md §5](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#5-sd-card) is at
 `0xFFFFFFA0`–`AF`, with the boards' slots.
 `SD_SLOTS` is 2 on the MEGA65 and 1 on the Nexys4DDR.
 
@@ -558,7 +558,7 @@ The SD card controller of [nice_cpu's SYSTEM.md §5](https://github.com/MJoergen
   timeout: about a second for the start-up, 100 ms for a block to read,
   and 500 ms for a block to be written.
 - A command takes time: busy reads 1 until it ends, as on any board of
-  [nice_cpu's SYSTEM.md §5](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#5-sd-card), where the emulator ends it at once. A Read
+  [nice_cpu's DEVICES.md §5](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#5-sd-card), where the emulator ends it at once. A Read
   takes up to about a millisecond, and an Init tens of milliseconds.
 - Every slot but the R3's slot 1 (below) has card detect, and the
   R6's slot 1 also has write protect. A card that is put in or taken

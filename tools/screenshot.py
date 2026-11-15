@@ -9,7 +9,7 @@ character in 16x32 pixels, and the colors of 4 bits, each component n as
 the byte n * 0x11. The glyphs are those of the font that the font base at
 0xFFFFFF86 selects, the font RAM at 0xFFFE0000 or the character ROM at
 0xFFFE2000, Spleen, as niceemu holds them at the halt (nice_cpu's
-SYSTEM.md section 1.8), so a program's own glyphs show. A cursor that is
+DEVICES.md section 1.8), so a program's own glyphs show. A cursor that is
 shown is drawn on, in the inverted colors, as large as its character or,
 when small, its bottom 4 lines.
 
@@ -70,7 +70,7 @@ ROWS = 25
 W    = 16
 H    = 32
 
-# The fonts (SYSTEM.md section 1.8): the font RAM, the character ROM, each
+# The fonts (DEVICES.md section 1.8): the font RAM, the character ROM, each
 # 256 glyphs of H rows, and the font base, whose value FONT_RAM selects the
 # RAM
 FONT_RAM   = 0xFFFE0000

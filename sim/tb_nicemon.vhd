@@ -10,7 +10,7 @@
 -- for that and FAIL, with the log, for anything else. The step counts that
 -- steps 4, 9, and 11 check are the generics G_HELLO_STEPS, G_EMU_STEPS,
 -- G_RESERVED_STEPS, and G_BYTEWIN_STEPS, which sim/Makefile sets from
--- STEPS_HELLO, STEPS_EMU, STEPS_RESERVED, and STEPS_BYTEWIN. The event counters of SYSTEM.md §3 that
+-- STEPS_HELLO, STEPS_EMU, STEPS_RESERVED, and STEPS_BYTEWIN. The event counters of DEVICES.md §3 that
 -- step 4 checks after hello are G_HELLO_EVENTS, from EVENTS_HELLO. "make
 -- -C sim check-steps" runs the same programs in niceemu and compares its
 -- counts with those.
@@ -66,7 +66,7 @@
 --    FIFO. The FIFO keeps the first 16, and the link drops the 17th and
 --    sends `o`, so a '.' sent after them is echoed right after the 16th.
 -- 7. Use the math unit from the link, and the clock of the time of day
---    (nice_cpu's SYSTEM.md §10): not set after reset; set to 999990
+--    (nice_cpu's DEVICES.md §10): not set after reset; set to 999990
 --    microseconds before a second, it reads the next second 20
 --    microseconds later, the seconds of the snapshot that the read of
 --    CLOCK_USEC took, and "set". The words around it are still the
@@ -108,7 +108,7 @@
 -- 11. Load G_RESERVED_FILE, and run it. It halts on a reserved control
 --    word, which the halt reason and `h02` show, after the steps of niceemu.
 --    Then G_BYTEWIN_FILE, which reads and writes through the byte windows
---    of nice_cpu's SYSTEM.md §9: its registers and the words it wrote are
+--    of nice_cpu's DEVICES.md §9: its registers and the words it wrote are
 --    those of niceemu, after its steps. The link reads a byte and a
 --    signed halfword through the windows, and writes a byte, which leaves
 --    the rest of its word.
@@ -141,7 +141,7 @@
 --    keyboard waits. Then G_FIFO_FILE once more, with a break on the UART
 --    while it runs: the host's bytes after the break are dropped, and the
 --    keys still reach the program, which reads on at 0x200 and echoes
---    them (nice_cpu's SYSTEM.md §8).
+--    them (nice_cpu's DEVICES.md §8).
 -- 16. The link over TCP, with the net_* ports driven as eth/eth_tcp.vhd
 --    drives them: a host connects, and G_FIFO_FILE echoes its bytes over
 --    TCP; its half-close is a break, after which its bytes are dropped;
@@ -952,7 +952,7 @@ begin
       check("FFFFFF42", steps(G_HELLO_STEPS));
       check("FFFFFF43", "00000000");
       -- The event counters count the program's own reads and stores, not
-      -- the link's (SYSTEM.md §3), as niceemu counts them
+      -- the link's (DEVICES.md §3), as niceemu counts them
       check("FFFFFF4A", G_HELLO_EVENTS(1 to 8));
       check("FFFFFF4C", G_HELLO_EVENTS(9 to 16));
       check("FFFFFF4E", G_HELLO_EVENTS(17 to 24));

@@ -1,5 +1,5 @@
 -- The Ethernet station's side of the port for Ethernet frames of
--- nice_cpu's SYSTEM.md §7 (nice_cpu/hdl/src/eth_regs.vhd, in
+-- nice_cpu's DEVICES.md §7 (nice_cpu/hdl/src/eth_regs.vhd, in
 -- src/devices.vhd): it reads the received frames of eth_rx_fifo.vhd beside
 -- the responders, passes each that the station does not serve to the
 -- port's queue, and sends the frames of the port's send buffer through

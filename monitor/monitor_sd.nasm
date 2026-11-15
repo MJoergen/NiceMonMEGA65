@@ -5,7 +5,7 @@
 ; The file commands of monitor_cmd.nasm show the errors of the controller with
 ; sd_fail.
 
-SD_CSR          .EQU    0xFFFFFFA0      ; the SD card's status, and a write starts a command (nice_cpu's SYSTEM.md §5)
+SD_CSR          .EQU    0xFFFFFFA0      ; the SD card's status, and a write starts a command (nice_cpu's DEVICES.md §5)
 SD_LBA          .EQU    0xFFFFFFA1      ; the sector of a Read or Write
 SD_CHUNK        .EQU    0xFFFFFFA2      ; the 8 words of the buffer at SD_BUF
 SD_ERROR        .EQU    0xFFFFFFA3      ; the error of the last command, 0 for none
@@ -64,7 +64,7 @@ sd_fail
 
 ; The sector routines, the ROM's own, with no entries in the dispatch table
 ; (doc/SDCARD.md, "The ROM"). They follow the C ABI, wait for busy before
-; the command and after it, as nice_cpu's SYSTEM.md §5 asks, and return 0,
+; the command and after it, as nice_cpu's DEVICES.md §5 asks, and return 0,
 ; or the negative of SD_ERROR. sd_init selects the slot and starts its card
 ; up; sd_read and sd_write use the slot that is selected, which is the
 ; slot of the last sd_init unless a program has changed it. Their buffer is

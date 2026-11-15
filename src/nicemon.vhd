@@ -4,7 +4,7 @@
 -- a keyboard: a stream of bytes that is input like the UART's.
 --
 -- Words used here (doc/DEBUG_LINK.md has them in full; DEBUG.md, ISA.md,
--- MICROARCH.md, and SYSTEM.md with a section number are nice_cpu's, in
+-- MICROARCH.md, and DEVICES.md are nice_cpu's, in
 -- nice_cpu/doc/):
 --   link    nice_cpu's debug link, a second bus master that a host drives
 --           with packets on the UART
@@ -59,7 +59,7 @@
 --                          control register hides it, so that the RAM is at
 --                          0 as in the emulator, and a build without
 --                          G_ROM_FILE has no ROM.
---   0x10000000-0x5FFFFFFF  The byte windows of SYSTEM.md §9 (src/mem.vhd),
+--   0x10000000-0x5FFFFFFF  The byte windows of DEVICES.md §9 (src/mem.vhd),
 --                          for the data bus and the link: an address A
 --                          reaches word (A >> 2) AND 0x03FFFFFF, the
 --                          word, a byte, or a halfword of it, zero- or
@@ -69,7 +69,7 @@
 --                          ROM that the address aliases. A read through
 --                          windows 2 to 5 takes a cycle more than one of
 --                          the memory, as one of the fonts does.
---   0xFFFE0000-0xFFFE1FFF  The font RAM of SYSTEM.md §1.8: the word at
+--   0xFFFE0000-0xFFFE1FFF  The font RAM of DEVICES.md §1.8: the word at
 --                          0xFFFE0000 + 32 * c + r is row r of the glyph
 --                          of code c, the top row first, in bits 15..0 with
 --                          the leftmost pixel in bit 15. Bits 31..16 read
@@ -81,7 +81,7 @@
 --                          A write to it is dropped. The font base, 86
 --                          below, selects the font that the display shows.
 --                          An instruction fetch in 0xFFFE0000-3FFF reads
---                          the RAM's alias there, not a font (SYSTEM.md §8).
+--                          the RAM's alias there, not a font (DEVICES.md §8).
 --   0xFFFF0000-0xFFFF7FFF  The screen: 2^G_SCR_ADDR_BITS words of memory of
 --                          their own, so that the emulator's 80x25 screen,
 --                          the first 2000, does not land on word 0. The rest
@@ -97,7 +97,7 @@
 --                          they start at 0xFFFF2000. The runtime's stack
 --                          starts at 0xFFFFFF00 and grows down into them,
 --                          and so does the stack of a program in the ROM.
---   0xFFFFFF00             The console of SYSTEM.md §1. A write sends bits
+--   0xFFFFFF00             The console of DEVICES.md §1. A write sends bits
 --                          7..0 to the UART. It waits while the previous
 --                          byte is still waiting to be sent. A read by the
 --                          core takes the oldest byte received from the UART
@@ -113,7 +113,7 @@
 --                          bytes after the break are dropped, and once the
 --                          FIFO is empty a read returns 0x200 (bit 9). The
 --                          keyboard's bytes still go into the FIFO, and a
---                          read returns them (SYSTEM.md §8). A read by the
+--                          read returns them (DEVICES.md §8). A read by the
 --                          link returns 0 and takes nothing, and a write by
 --                          the link is dropped.
 --   0xFFFFFF01             The read counter of the emulator: a read by the
@@ -121,25 +121,25 @@
 --                          last write, and a write sets that number. A read
 --                          by the link returns 0 and does not count, and a
 --                          write by the link is dropped. It is 0 after
---                          reset, and a start keeps it (SYSTEM.md §1).
+--                          reset, and a start keeps it (DEVICES.md §1).
 --   0xFFFFFF10-0xFFFFFF7F  The devices of nice_cpu (src/devices.vhd):
---   0xFFFFFF10-0xFFFFFF1F  The timer of SYSTEM.md §4
+--   0xFFFFFF10-0xFFFFFF1F  The timer of DEVICES.md §4
 --                          (nice_cpu/hdl/src/timer.vhd). It counts clock
 --                          cycles, and its request goes to the core's IRQ.
---   0xFFFFFF20-0xFFFFFF3F  The math unit of SYSTEM.md §2
+--   0xFFFFFF20-0xFFFFFF3F  The math unit of DEVICES.md §2
 --                          (nice_cpu/hdl/src/mpu.vhd).
---   0xFFFFFF40-0xFFFFFF5F  The performance counters of SYSTEM.md §3
+--   0xFFFFFF40-0xFFFFFF5F  The performance counters of DEVICES.md §3
 --                          (nice_cpu/hdl/src/perf.vhd): cycles,
 --                          instructions, and microseconds, the last
 --                          derived from G_CLOCK_HZ, and the event counters
 --                          at 4A-53: data reads, stores, skips, jumps,
 --                          and interrupts, of the core's own requests.
 --                          Within them, at 46-49, the clock of the time of
---                          day of SYSTEM.md §10 (nice_cpu/hdl/src/tod.vhd),
+--                          day of DEVICES.md §10 (nice_cpu/hdl/src/tod.vhd),
 --                          which only rst_i resets (devices.vhd).
 --   0xFFFFFF60-0xFFFFFF7F  The fetch statistics of MICROARCH.md §8.1
 --                          (nice_cpu/hdl/src/fetch_stats.vhd), part of the
---                          performance counters of SYSTEM.md §3. The
+--                          performance counters of DEVICES.md §3. The
 --                          multi-cycle core reports no events to them, so
 --                          only FS_CYCLES and FS_CAUSE + 14, OTHER, count.
 --   0xFFFFFF80-0xFFFFFF8F  The screen's registers (src/scr_regs.vhd),
@@ -151,7 +151,7 @@
 --                          column and row; 85 is the display offset, in
 --                          words: the display shows the 2000 words from it,
 --                          so adding 80 scrolls a line; and 86 is the font
---                          base of SYSTEM.md §1.8: 0xFFFE0000 shows the font
+--                          base of DEVICES.md §1.8: 0xFFFE0000 shows the font
 --                          RAM, and any other value the character ROM.
 --                          Bits 11..4 of the state are kept and read back;
 --                          the other bits, and the words 83, 84, and 87-8F,
@@ -197,7 +197,7 @@
 --         nothing for 1 ms after the write, so the link's `k` to the write
 --         still goes out at the old rate. A start of the core keeps it. Read and write. In
 --         niceemu it is plain memory.
---   0xFFFFFFA0-0xFFFFFFAF  The SD card controller of SYSTEM.md §5
+--   0xFFFFFFA0-0xFFFFFFAF  The SD card controller of DEVICES.md §5
 --                          (src/sd/sd.vhd, in src/devices.vhd), with
 --                          G_SD_SLOTS > 0: the registers and the buffer of
 --                          nice_cpu/hdl/src/sd_regs.vhd, and an engine in
@@ -206,8 +206,8 @@
 --                          runs while the core is held, paused, or halted,
 --                          so the link reaches it then. With G_SD_SLOTS =
 --                          0 there is no controller, and the words are
---                          memory (nice_cpu's SYSTEM.md §8).
---   0xFFFFFFB0-0xFFFFFFBF  The network station of SYSTEM.md §6
+--                          memory (nice_cpu's DEVICES.md §8).
+--   0xFFFFFFB0-0xFFFFFFBF  The network station of DEVICES.md §6
 --                          (nice_cpu/hdl/src/net_regs.vhd, in
 --                          src/devices.vhd): B0 its IP address, eth_ip_o,
 --                          the first byte in bits 31..24, 0 after reset,
@@ -221,7 +221,7 @@
 --                          and G_TCP_PORT in bits 15..0; B7-BF read 0.
 --                          Only the system's reset resets them, not a
 --                          start of the core.
---   0xFFFFFFC0-0xFFFFFFCF  The port for Ethernet frames of SYSTEM.md §7
+--   0xFFFFFFC0-0xFFFFFFCF  The port for Ethernet frames of DEVICES.md §7
 --                          (nice_cpu/hdl/src/eth_regs.vhd, in
 --                          src/devices.vhd): ETH_CSR, ETH_RX_LEN,
 --                          ETH_TX_LEN, ETH_CHUNK, ETH_DROPPED, and the
@@ -559,7 +559,7 @@ architecture synthesis of nicemon is
              addr(7 downto 4) = X"C";                               -- the port for frames
    end function is_io;
 
-   -- Whether an address is in the byte or halfword windows of SYSTEM.md
+   -- Whether an address is in the byte or halfword windows of DEVICES.md
    -- §9, 0x20000000-0x5FFFFFFF, whose reads take a cycle more
    function is_win(addr : std_logic_vector(31 downto 0)) return boolean is
    begin
@@ -790,7 +790,7 @@ architecture synthesis of nicemon is
    -- half-close over TCP: the link's eoi_o, high until the next start or
    -- the next connection over TCP. While it is high, the link forwards none
    -- of the host's bytes, and a read of the console with the FIFO empty
-   -- returns 0x200. The keyboard's bytes still go in (SYSTEM.md §8).
+   -- returns 0x200. The keyboard's bytes still go in (DEVICES.md §8).
    signal link_eoi : std_logic;
 
    -- The core's console output, to the link
@@ -1151,7 +1151,7 @@ begin
 
 
    ---------------------------------------------------------------------------
-   -- The math unit (SYSTEM.md §2), the performance counters (§3), the
+   -- The math unit (DEVICES.md §2), the performance counters (§3), the
    -- fetch statistics, the timer (§4), the SD card controller (§5), the
    -- network station (§6), and the port for Ethernet frames (§7) from
    -- nice_cpu, in src/devices.vhd. They are reset with the system, and all
@@ -1538,7 +1538,7 @@ begin
    -- room for two, so that a byte from the link, which the link sends only
    -- when the free space was not 0 a cycle earlier, finds room. Otherwise it
    -- is taken and dropped: while the core is held or halted. After the end
-   -- of the line's input it still goes in (SYSTEM.md §8).
+   -- of the line's input it still goes in (DEVICES.md §8).
    kbd_room <= '1' when rx_free >= 2 else
                '0';
    kbd_take <= kbd_valid_i and not link_in_valid and

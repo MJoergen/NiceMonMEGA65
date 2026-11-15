@@ -9,7 +9,7 @@ the port of a query come from the clock, so the script learns them from a
 run, and builds the frames of the next: it runs the program, finds the
 first frame sent that it has not seen and that wants an answer, an ARP
 request for 10.0.0.53 or the gateway 10.0.0.1, or a query of a name in
-ANSWERS, and adds the answer, after that frame (nice_cpu's SYSTEM.md §7),
+ANSWERS, and adds the answer, after that frame (nice_cpu's DEVICES.md §7),
 until no such frame is left. As the frames of a run are the first of
 every longer run with the same answers, a run stops after FIRST steps,
 which double whenever it brings no new frame, until the program returns. A query is answered once, at the send that

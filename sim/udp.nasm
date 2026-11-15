@@ -1,5 +1,5 @@
 ; Answer one UDP datagram to port 4511 of the station through the port for
-; Ethernet frames (nice_cpu's SYSTEM.md §7), for tools/hwtest.py, then
+; Ethernet frames (nice_cpu's DEVICES.md §7), for tools/hwtest.py, then
 ; halt. The station's IP address must be set. The program enables the
 ; port and waits for an IPv4 frame without options, to the station's IP
 ; address, of UDP to port 4511, and releases every other frame. It copies

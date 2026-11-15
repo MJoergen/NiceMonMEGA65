@@ -27,10 +27,10 @@ Three documents say what a program sees:
 
 - nice_cpu's [doc/ISA.md](https://github.com/MJoergen/nice_cpu/blob/main/doc/ISA.md) is the
   instruction set.
-- nice_cpu's [doc/SYSTEM.md](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md)
+- nice_cpu's [doc/DEVICES.md](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md)
   specifies the devices: the console, the math unit, the performance
   counters, the timer, and the others. It is cited here as "nice_cpu's
-  SYSTEM.md".
+  DEVICES.md".
 - [SYSTEM.md](SYSTEM.md) here has the address map of the board, with
   its screen, its keyboard, and its memory, which is 128K words on the
   MEGA65 and 64K on the Nexys4DDR, not 2³² as in the emulator.
@@ -166,7 +166,7 @@ there in different cases:
 **The hardware.** Every program has the console at `0xFFFFFF00`, the
 math unit, the counters, the timer, the screen, the fonts, the
 keyboard, the network station, the port for Ethernet frames, and the SD
-card controller, as registers. nice_cpu's SYSTEM.md specifies its
+card controller, as registers. nice_cpu's DEVICES.md specifies its
 devices, and [SYSTEM.md](SYSTEM.md) here the address map and the
 board's own registers. A program on its own uses only this level.
 
@@ -305,7 +305,7 @@ and more.
   are real time; in the emulator they are the host's time, or a step
   each with `niceemu --step-time`.
 - `time()` reads the clock of the time of day
-  ([nice_cpu's SYSTEM.md §10](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#10-clock)).
+  ([nice_cpu's DEVICES.md §10](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#10-clock)).
   On the MEGA65 the ROM's monitor sets the clock from the real-time
   clock at its start, in local time
   ([SYSTEM.md](SYSTEM.md#the-i2c-bus)). On the Nexys4DDR, and on a
@@ -320,7 +320,7 @@ translate with `nicewasm --no-mpu` and use `muldiv_soft.nasm` instead.
 
 **Bytes.** The memory is addressed in words of 32 bits, and C reads and
 writes single bytes. The board has the byte windows of [nice_cpu's
-SYSTEM.md §9](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#9-byte-windows)
+DEVICES.md §9](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#9-byte-windows)
 for that (see [SYSTEM.md](SYSTEM.md#the-byte-windows)), so
 `nicebuild.py --byte-windows` makes each byte or halfword load and
 store of the program one `MOVE`, where it is a few instructions without
@@ -525,12 +525,12 @@ A program on its own has no monitor to call. It drives the hardware
 itself, and a program under the monitor may do so too:
 
 - The SD card controller at `0xFFFFFFA0` reads and writes a sector at a
-  time ([nice_cpu's SYSTEM.md §5](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#5-sd-card), and [SYSTEM.md](SYSTEM.md#the-sd-card-slots)).
+  time ([nice_cpu's DEVICES.md §5](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#5-sd-card), and [SYSTEM.md](SYSTEM.md#the-sd-card-slots)).
   A program under the monitor that drives it calls `fs_mount` before it
   uses the files again.
 - The port for Ethernet frames at `0xFFFFFFC0` receives the frames that
   the board does not answer itself, and sends the program's
-  ([nice_cpu's SYSTEM.md §7](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#7-ethernet-frames), and [SYSTEM.md](SYSTEM.md#ethernet-frames)).
+  ([nice_cpu's DEVICES.md §7](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#7-ethernet-frames), and [SYSTEM.md](SYSTEM.md#ethernet-frames)).
   `sim/udp.nasm` answers a UDP datagram through it.
 
 ## The monitor's error codes
@@ -539,7 +539,7 @@ The entries of the files and the network return a negative number for an
 error. The monitor's file commands print the number with its text, as
 `File error 29, no folder NICE on the card`, or as
 `SD error 1 in slot 0, no card` for an error of the SD controller. The
-SD controller's errors are those of `SD_ERROR` ([nice_cpu's SYSTEM.md §5](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#5-sd-card)), negated:
+SD controller's errors are those of `SD_ERROR` ([nice_cpu's DEVICES.md §5](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#5-sd-card)), negated:
 
 | Error | Meaning |
 |---|---|

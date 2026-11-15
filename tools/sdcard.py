@@ -2,7 +2,7 @@
 """The files on the board's SD card, over the debug link, with no PC slot.
 
 The host reaches the card through the SD controller's registers at
-FFFFFFA0-AF (nice_cpu's SYSTEM.md §5), which the link reaches while the
+FFFFFFA0-AF (nice_cpu's DEVICES.md §5), which the link reaches while the
 core is held, paused, or halted, and reads and writes its FAT32 file
 system itself, as the monitor's monitor/fat32.c does: sector 0 as a
 FAT32 boot sector, or the first partition of type 0x0B or 0x0C of an
@@ -42,7 +42,7 @@ but FSInfo. The date and time of a new entry are the host's.
 
 The core: for ls and get, a running one is paused, and goes on after
 them. While it is paused, by the tool or before, the tool keeps to the
-rules of SYSTEM.md §5 for the card of a paused program: it waits for the
+rules of DEVICES.md §5 for the card of a paused program: it waits for the
 program's command to end, uses only the program's slot, which must be
 ready, does no Init, and restores SD_CHUNK, SD_LBA, and the buffer
 before the program goes on. SD_ERROR and the error bit are the tool's
@@ -85,7 +85,7 @@ from typing import Callable, Iterator
 from boardlink import (CONTROL, HALTED, HOLD, PAUSE, RAM, Link, LinkError,
                        add_arguments, open_link)
 
-# The SD card controller's registers (nice_cpu's SYSTEM.md §5)
+# The SD card controller's registers (nice_cpu's DEVICES.md §5)
 SD_CSR, SD_LBA, SD_CHUNK, SD_ERROR, SD_SELECT, SD_LAST, SD_SLOTS = \
     range(0xFFFFFFA0, 0xFFFFFFA7)
 SD_BUF = 0xFFFFFFA8
@@ -349,7 +349,7 @@ class Card:
                 link.control(self.ctl & RAM)
             if self.restart:
                 # A Write that runs ends before the start, which resets
-                # the controller (SYSTEM.md §5)
+                # the controller (DEVICES.md §5)
                 self.restart = False
                 sd_wait(link, WRITE_WAIT)
                 link.control(self.ctl & RAM)

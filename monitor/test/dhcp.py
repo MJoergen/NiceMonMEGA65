@@ -10,7 +10,7 @@ The first run has no frames: the monitor sends DHCP_TRIES DISCOVERs, says
 that no server answered, and keeps 10.0.0.9. The script takes the
 transaction from its first frame, and builds the frames of the next runs
 with it, each line waiting for the frames sent before it (nice_cpu's
-SYSTEM.md §7). As the address 10.0.0.9 is set, each DISCOVER asks for it
+DEVICES.md §7). As the address 10.0.0.9 is set, each DISCOVER asks for it
 with option 50.
 - ok: after the DISCOVER, an ARP request of another station, an OFFER of
   another transaction, an OFFER of ours without an address, which is

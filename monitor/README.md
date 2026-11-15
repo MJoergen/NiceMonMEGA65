@@ -34,7 +34,7 @@ A program under the monitor sees three levels, which
 those who write programs:
 
 1. **The hardware**: the I/O registers of
-   [doc/SYSTEM.md](../doc/SYSTEM.md) and nice_cpu's SYSTEM.md, the same
+   [doc/SYSTEM.md](../doc/SYSTEM.md) and nice_cpu's DEVICES.md, the same
    in `niceemu` but for the differences of
    [doc/EMULATOR.md](../doc/EMULATOR.md). Every program has them. The
    hardware also has the integrated debugger, on the board's own
@@ -349,7 +349,7 @@ folder itself, so a card is written only where its user made room.
   and at `fs_close`.
 - **Sectors** are not the HAL's: a program that wants them drives the
   SD controller's registers at `0xFFFFFFA0` itself, which are the same
-  on every board and in `niceemu` ([nice_cpu's SYSTEM.md §5](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#5-sd-card)), and calls
+  on every board and in `niceemu` ([nice_cpu's DEVICES.md §5](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#5-sd-card)), and calls
   `fs_mount` before it uses the files again.
 
 The entries 9 to 15 and 20 of the dispatch table (above) are its file
@@ -362,7 +362,7 @@ address is a word address. An error is negative
 A program reaches the network through the entries above, UDP's 16 to
 19 here and the IP settings, DNS, and TCP of 21 to 31 in TCP and DNS
 below, or drives the port for Ethernet frames at `0xFFFFFFC0` itself, which [nice_cpu's
-SYSTEM.md §7](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#7-ethernet-frames) specifies, the same on every board and in `niceemu`. The
+DEVICES.md §7](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#7-ethernet-frames) specifies, the same on every board and in `niceemu`. The
 ROM's own frame routines and its ARP cache, which `i dhcp`, `tftp`, and
 the entries use, have no entries in the dispatch table
 ([INTERNALS.md](INTERNALS.md#the-frame-routines)).
@@ -464,7 +464,7 @@ it:
   before the next poll, or loses the next. A call with no room, 0 bytes,
   copies nothing and leaves the datagram held, so no datagram is lost to
   it. The queue holds 4 frames
-  ([nice_cpu's SYSTEM.md §7](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#7-ethernet-frames)), so a program that receives a burst reads it
+  ([nice_cpu's DEVICES.md §7](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#7-ethernet-frames)), so a program that receives a burst reads it
   soon.
 
 An error of the UDP entries is negative

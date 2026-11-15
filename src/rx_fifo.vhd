@@ -1,5 +1,5 @@
 -- The core's input FIFO: the bytes that the UART and the keyboard send to the
--- console of SYSTEM.md §1, 2^G_ADDR_BITS of them, in block RAM.
+-- console of DEVICES.md §1, 2^G_ADDR_BITS of them, in block RAM.
 --
 -- THEORY OF OPERATION
 -- The FIFO holds the bytes from rd to wr. Each pointer has one bit more than
@@ -7,7 +7,7 @@
 -- wr_data_i with wr_en_i high is written, unless the FIFO is full; then it
 -- is lost. The end of the line's input is not the FIFO's: after a break the
 -- link forwards none of the host's bytes, the keyboard's bytes still go in
--- (SYSTEM.md §8), and nicemon.vhd answers 0x200 from the link's eoi_o once
+-- (DEVICES.md §8), and nicemon.vhd answers 0x200 from the link's eoi_o once
 -- the FIFO is empty.
 --
 -- free_o is the number of bytes that the FIFO can take now, from 0 to

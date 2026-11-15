@@ -1132,7 +1132,7 @@ errors in both. When stdout closes early, as with `run.py ... | head`,
     nice_cpu/assembler/niceasm.py -o primes.bin primes_full.nasm
 
 `--byte-windows` makes each byte or halfword load and store one `MOVE`
-through the byte windows of [nice_cpu's SYSTEM.md §9](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#9-byte-windows), which the board and
+through the byte windows of [nice_cpu's DEVICES.md §9](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#9-byte-windows), which the board and
 `niceemu` have, and `--trust-alignment` takes an access to be aligned as
 its hint says (nice_cpu's translator README). `float.nasm` is the float
 library, which a program that calls `scanf` needs, as `primes.c` does,

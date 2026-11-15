@@ -11,7 +11,7 @@
 # that calls scanf is joined with the float library, float.nasm, too,
 # which the runtime builds.
 #
-# The programs use the byte windows of nice_cpu's SYSTEM.md §9, which the
+# The programs use the byte windows of nice_cpu's DEVICES.md §9, which the
 # board and the emulator have: nicewasm's WINDOWS options make each byte
 # or halfword load and store one MOVE, and take an access to be aligned as
 # its hint says. bench.bin alone is built without them, so that its code

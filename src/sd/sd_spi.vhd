@@ -1,5 +1,5 @@
 -- The protocol engine of the SD card controller in SPI mode (#55): the
--- commands Init, Read, and Write of nice_cpu's SYSTEM.md §5, for the
+-- commands Init, Read, and Write of nice_cpu's DEVICES.md §5, for the
 -- registers and the buffer of nice_cpu/hdl/src/sd_regs.vhd.
 --
 -- THEORY OF OPERATION

@@ -32,7 +32,7 @@
 -- picks the word with one AND-OR of registered bits, not with a chain of
 -- multiplexers.
 --
--- Port B has the byte windows of nice_cpu's SYSTEM.md §9. An address A
+-- Port B has the byte windows of nice_cpu's DEVICES.md §9. An address A
 -- whose top four bits are 1 to 5 reaches the word W = (A >> 2) AND
 -- 0x03FFFFFF, which lies in the RAM, or in the ROM while it is shown, as
 -- a plain address W does, and never in the screen. A write through the
@@ -47,7 +47,7 @@
 -- late for the core's path from the RAM at 100 MHz, so nicemon registers
 -- it and acknowledges a read through windows 2 to 5 a cycle later. Port A does
 -- not decode the windows: a fetch there reads the RAM or the ROM that the
--- address aliases, which SYSTEM.md §9 allows. Every write to the
+-- address aliases, which DEVICES.md §9 allows. Every write to the
 -- screen is also given out on scr_*_o, a cycle late, for a display that
 -- keeps a copy (src/video/text.vhd). The register keeps the core's store
 -- paths short, for the display lies far from the core on the FPGA.
@@ -149,7 +149,7 @@ architecture synthesis of mem is
    -- it is shown, or else the RAM
    type t_mem is (MEM_RAM, MEM_ROM, MEM_SCR);
 
-   -- The byte window of a data address (SYSTEM.md §9), by its top four
+   -- The byte window of a data address (DEVICES.md §9), by its top four
    -- bits, 1 to 5, or none
    type t_win is (WIN_NONE, WIN_WORD, WIN_BYTE, WIN_SBYTE, WIN_HALF, WIN_SHALF);
 

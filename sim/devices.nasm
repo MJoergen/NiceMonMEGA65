@@ -1,4 +1,4 @@
-; Uses the math unit (SYSTEM.md §2), the performance counters (§3), and
+; Uses the math unit (DEVICES.md §2), the performance counters (§3), and
 ; the timer (§4), and leaves the results in memory at RESULT, where
 ; tb_nicemon reads them over the debug link.
 ;

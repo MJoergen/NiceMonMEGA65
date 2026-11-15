@@ -1,4 +1,4 @@
--- The SD card controller of nice_cpu's SYSTEM.md §5 at 0xFFFFFFA0-AF
+-- The SD card controller of nice_cpu's DEVICES.md §5 at 0xFFFFFFA0-AF
 -- (#55): the registers and the buffer of nice_cpu/hdl/src/sd_regs.vhd, the
 -- protocol engine in SPI mode (sd_spi.vhd), and the slots' pins (#56).
 --

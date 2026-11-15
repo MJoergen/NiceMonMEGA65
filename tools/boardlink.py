@@ -55,7 +55,7 @@ DEBUG_FIRST = 0xFFFFFFD0
 # memory there
 BAUD = 0xFFFFFF9F
 BAUDS = (115200, 230400, 460800, 921600, 1000000, 1500000, 2000000)
-# The network station of nice_cpu's SYSTEM.md §6: the IP address, the
+# The network station of nice_cpu's DEVICES.md §6: the IP address, the
 # counts of the good frames received and of those sent, and NET_STATUS,
 # bit 31 for a host connected over TCP and the link's port in bits 15..0
 NET_IP = 0xFFFFFFB0

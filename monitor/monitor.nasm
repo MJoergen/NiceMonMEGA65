@@ -46,7 +46,7 @@
 ; (nice_cpu's ISA.md §10.3), and end with a 0 byte: a text whose length is
 ; a multiple of 4 has a .DAT 0 after it, which test/texts.py checks at
 ; each build. puts_b prints one by its word address, through the byte
-; window at TEXT_B (nice_cpu's SYSTEM.md §9), in which _io_puts reads one
+; window at TEXT_B (nice_cpu's DEVICES.md §9), in which _io_puts reads one
 ; byte at a time. Code that reads a text by the character takes its
 ; address in that window, TEXT_B+4*S_NAME, and the tables of texts hold
 ; word addresses, which puts_b takes. Programs keep .ASCII_L, one
@@ -59,7 +59,7 @@
 ; the next multiple of 8; the other control codes and 0x7F do nothing.
 ; 0x80 to 0x9F go on the screen as any character: they are blank in Spleen,
 ; and show what a program draws for them in the font RAM (nice_cpu's
-; SYSTEM.md §1.8). Past the last column the cursor goes to the next row, and past
+; DEVICES.md §1.8). Past the last column the cursor goes to the next row, and past
 ; the last row the screen's rows move up by one, by copying, which scrolls
 ; in niceemu too, where the display offset is plain memory, and the same
 ; on a board whose screen is smaller. So the rows shown are always the 2000
@@ -310,7 +310,7 @@ mon_reset
                 MOVE    @V_OUT, OUT_LINE+OUT_SCREEN
 ; The size of the screen's memory, from the bits of the display offset
 ; that it keeps, with the offset off, and the rows of history that fit
-; after the 25 of the screen. The math unit divides (nice_cpu's SYSTEM.md
+; after the 25 of the screen. The math unit divides (nice_cpu's DEVICES.md
 ; §2).
                 MOVE    @SCR_CTL, 0
                 MOVE    @SCR_OFFS, 0xFFFFFFFF

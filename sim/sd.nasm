@@ -1,4 +1,4 @@
-; The SD card controller (nice_cpu's SYSTEM.md §5), as nice_cpu's
+; The SD card controller (nice_cpu's DEVICES.md §5), as nice_cpu's
 ; emulator/test/sd.nasm uses it, for tb_nicemon. Slot 0 holds a card of
 ; 1024 sectors, sim/Makefile's sd.img, in which byte o is o mod 251 for o
 ; < 1024, and 0 after; nice_cpu's image has only the 2 sectors, which no

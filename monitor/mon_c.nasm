@@ -2,7 +2,7 @@
 ; (README.md, "The dispatch table", and mon.h). A C pointer is a byte
 ; offset into the wasm module's memory, which starts at the word
 ; ___wasm_memory, so each stub adds the address of that memory in a
-; window of nice_cpu's SYSTEM.md §9 to the pointer and jumps to the entry:
+; window of nice_cpu's DEVICES.md §9 to the pointer and jumps to the entry:
 ; 0x20000000 + 4 ___wasm_memory, of the byte window, to a pointer to
 ; bytes, and 0x10000000 + 4 ___wasm_memory, of the word window, to a
 ; pointer to words. The C code cannot name ___wasm_memory itself, as

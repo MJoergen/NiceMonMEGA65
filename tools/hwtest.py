@@ -86,7 +86,7 @@ Checks, in this order:
       counter and the timer stop there
     - the clock of the time of day, set to the host's local time, counts as
       the host's clock does, over a start too, and is left at that time
-    - the byte windows of nice_cpu's SYSTEM.md §9: the link reads bytes
+    - the byte windows of nice_cpu's DEVICES.md §9: the link reads bytes
       and halfwords through them and writes them, and sim/bytewin.nasm
       leaves the registers and the words that niceemu leaves (issue #90)
     - the screen's registers are written and read
@@ -224,7 +224,7 @@ DEBUG_LINK = f"{REPO}/nice_cpu/hdl/src/debug_link.vhd"
 CLOCK_HZ = {"mega65": 100_000_000, "nexys4ddr": 90_000_000}
 # The words of the RAM, which 0xFFFFFF9E reads
 RAM_WORDS = {"mega65": 0x20000, "nexys4ddr": 0x10000}
-# The SD card controller's registers (nice_cpu's SYSTEM.md §5); A7 is
+# The SD card controller's registers (nice_cpu's DEVICES.md §5); A7 is
 # reserved
 SD_RESERVED = 0xFFFFFFA7
 # The slots of each board (doc/SYSTEM.md)
@@ -685,7 +685,7 @@ def steps(path: str) -> int:
     return int(m.group(1))
 
 
-# The low words of the event counters of SYSTEM.md §3: data reads, stores,
+# The low words of the event counters of DEVICES.md §3: data reads, stores,
 # skips, jumps, and interrupts
 EVENTS = (0xFFFFFF4A, 0xFFFFFF4C, 0xFFFFFF4E, 0xFFFFFF50, 0xFFFFFF52)
 
@@ -1250,7 +1250,7 @@ def test_counters_stop(link: Link) -> None:
           count != 0 and rd(link, 0xFFFFFF11) == count, f"{count:08X}")
 
 
-# The clock of the time of day of nice_cpu's SYSTEM.md section 10
+# The clock of the time of day of nice_cpu's DEVICES.md section 10
 CLOCK_USEC = 0xFFFFFF46
 CLOCK_SEC_LO = 0xFFFFFF47
 CLOCK_SEC_HI = 0xFFFFFF48
@@ -1463,7 +1463,7 @@ def test_screen_registers(link: Link) -> None:
     check("the display offset off again", wr(link, 0xFFFFFF85, 0))
 
 
-# The fonts of nice_cpu's SYSTEM.md section 1.8
+# The fonts of nice_cpu's DEVICES.md section 1.8
 FONT_RAM  = 0xFFFE0000
 FONT_ROM  = 0xFFFE2000
 FONT_BASE = 0xFFFFFF86

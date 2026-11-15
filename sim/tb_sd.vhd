@@ -1,6 +1,6 @@
 -- Tests the SD card controller (src/sd/sd.vhd) on two card models
 -- (sd_card_model.vhd), through its registers, as a program would use them
--- (nice_cpu's SYSTEM.md §5).
+-- (nice_cpu's DEVICES.md §5).
 --
 -- PASS AND FAIL
 -- Each check is an assert with severity failure, which stops GHDL with a

@@ -12,7 +12,7 @@
 -- written there, or 0 after a clear, through port B and port A alike, a
 -- read of the ROM while it is shown returns the ROM's word, a fetch in
 -- the I/O page returns 0, and a clear ends in 16 cycles. The byte windows
--- of nice_cpu's SYSTEM.md §9 reach the model's words too: a write changes
+-- of nice_cpu's DEVICES.md §9 reach the model's words too: a write changes
 -- the byte or the halfword of its window, and a read returns it, zero- or
 -- sign-extended. A word is known when each of its bytes is. k-induction
 -- cannot relate the model's words to the memory's, so "model" proves these
@@ -109,7 +109,7 @@ begin
       type t_where is (W_RAM, W_ROM, W_SCR);
 
       -- The window of a data address, 1 to 5, or 0 for none, and the word
-      -- that it reaches (SYSTEM.md §9)
+      -- that it reaches (DEVICES.md §9)
       function window(addr : std_logic_vector(31 downto 0)) return natural is
       begin
          if addr(31 downto 28) >= 1 and addr(31 downto 28) <= 5 then

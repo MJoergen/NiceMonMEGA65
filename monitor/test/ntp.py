@@ -9,7 +9,7 @@ and the transmit timestamp of each query, come from the clock, so the
 script learns them from a run, and builds the frames of the next, as
 test/dns.py does: it runs the monitor, finds the first frame sent that
 it has not seen and that wants an answer, and adds the answer after that
-frame (nice_cpu's SYSTEM.md §7), until no such frame is left. A run stops
+frame (nice_cpu's DEVICES.md §7), until no such frame is left. A run stops
 after FIRST steps, which double whenever it brings no new frame, until
 the monitor halts.
 

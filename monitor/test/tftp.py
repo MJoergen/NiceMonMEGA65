@@ -10,7 +10,7 @@ h. The first run, none, has only the server's ARP reply: the monitor
 sends the RRQ TFTP_TRIES times and says that the server did not answer.
 The script takes the client's port from its RRQ and builds the frames of
 the next runs with it, each line waiting for the frames sent before it
-(nice_cpu's SYSTEM.md §7), from the server 10.0.0.2 with the TID 3456:
+(nice_cpu's DEVICES.md §7), from the server 10.0.0.2 with the TID 3456:
 - ok: PROG, 40 lines of .bin text in two blocks, with a CR LF line, an
   empty line, a line that is skipped, and a last line with no LF. After
   the RRQ, a datagram of another host, which is passed over, so the RRQ

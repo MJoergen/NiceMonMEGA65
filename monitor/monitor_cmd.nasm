@@ -943,7 +943,7 @@ cmd_t
         ?!Z     JMP     cmd_tftp
 
 ; time [YYYY-MM-DD HH:MM:SS]: the clock of the time of day (nice_cpu's
-; SYSTEM.md §10), which keeps local time, set first when a date and a time
+; DEVICES.md §10), which keeps local time, set first when a date and a time
 ; follow, and shown, with clock_cmd of clock.c. time ntp sets it from a
 ; time server, with time_ntp of monitor_eth.nasm. R2 points after the t.
 cmd_time

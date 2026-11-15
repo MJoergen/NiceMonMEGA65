@@ -112,7 +112,7 @@ These facts bound the design:
   (#104). From a file, as in the tests, a read never finds "no byte":
   it gives the next byte of the file. And in `niceemu --window`, two
   reads that find no byte within 1000 steps put the emulator to sleep
-  (nice_cpu's SYSTEM.md §1.6).
+  (nice_cpu's DEVICES.md §1.6).
 - **The MEGA65's keyboard has no key for insert or clear.** INST/DEL
   gives DEL with SHIFT too, and CLR/HOME gives Home with SHIFT too
   ([SYSTEM.md](SYSTEM.md#the-keyboard)).

@@ -1,4 +1,4 @@
-; The byte windows of nice_cpu's SYSTEM.md §9, as its emulator/test/
+; The byte windows of nice_cpu's DEVICES.md §9, as its emulator/test/
 ; bytewin.nasm tests them, without what differs on a board: the words
 ; above the RAM, which alias it there, and a fetch from a window, which
 ; reads the RAM it aliases. Word 0x200 holds the bytes 01, 7F, FF, and

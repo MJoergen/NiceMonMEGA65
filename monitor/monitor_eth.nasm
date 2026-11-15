@@ -21,7 +21,7 @@
 ; and match. The cold start disables the port and empties the ARP cache.
 ; The variables of all of it are in monitor.nasm, with the others.
 
-ETH_CSR         .EQU    0xFFFFFFC0      ; the port for Ethernet frames: its status, and a write of bit 0 enables it (nice_cpu's SYSTEM.md §7)
+ETH_CSR         .EQU    0xFFFFFFC0      ; the port for Ethernet frames: its status, and a write of bit 0 enables it (nice_cpu's DEVICES.md §7)
 ETH_RX_LEN      .EQU    0xFFFFFFC1      ; the bytes of the frame at the head of the queue, and a write releases it
 ETH_TX_LEN      .EQU    0xFFFFFFC2      ; a write of N sends the first N bytes of the send buffer
 ETH_CHUNK       .EQU    0xFFFFFFC3      ; the 8 words at ETH_BUF, and in bit 8 the buffer: 0 the queue's, 1 the send buffer
@@ -290,10 +290,10 @@ bg_show
 
 ; The frame routines, the ROM's own, with no entries in the dispatch table
 ; (INTERNALS.md, "The frame routines"). They follow the C ABI, and drive the port for
-; Ethernet frames of nice_cpu's SYSTEM.md §7. A frame is in RAM as the
+; Ethernet frames of nice_cpu's DEVICES.md §7. A frame is in RAM as the
 ; port's buffers have it: from byte 2 of its buffer, 4 bytes a word,
 ; big-endian, so that word n of the RAM is word n of the port's buffer,
-; and the words of nice_cpu's SYSTEM.md §7 are where its table says.
+; and the words of nice_cpu's DEVICES.md §7 are where its table says.
 
 ; eth_on: the port enabled, with its queue emptied, so that no frame from
 ; before comes. Uses no register.
@@ -804,7 +804,7 @@ net_frames_end
 
 ; net_waddr: R1 = the plain address of the word address R1, which is
 ; plain, or one in the word window, 0x10000000 + 4 W, of the word W
-; (nice_cpu's SYSTEM.md §9). Uses R1 and R2.
+; (nice_cpu's DEVICES.md §9). Uses R1 and R2.
 net_waddr
                 SHR     R2, R1, 28
                 CMP     R2, 1

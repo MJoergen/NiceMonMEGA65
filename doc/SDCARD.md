@@ -188,7 +188,7 @@ requests of 8 words at `SD_BUF0`, and writes one likewise. The step undo of
   error 1.
 - A slot whose card detect does not work shows "present" as 1 at all times,
   "write-protected" as 0, and "changed" only after reset. A command on it
-  with no card fails with error 3 or 8. [nice_cpu's SYSTEM.md §5](https://github.com/MJoergen/nice_cpu/blob/main/doc/SYSTEM.md#5-sd-card) would say
+  with no card fails with error 3 or 8. [nice_cpu's DEVICES.md §5](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#5-sd-card) would say
   which boards have such a slot.
 - The controller runs while the processor is held, paused, or halted, and
   only reset stops it. So a host can read and write the card while the
@@ -492,7 +492,7 @@ ROM is developed in niceemu and needs no board.
 
 | Part | Status |
 |---|---|
-| The registers in nice_cpu's SYSTEM.md, and `niceemu --sd0/--sd1` | Done |
+| The registers in nice_cpu's DEVICES.md, and `niceemu --sd0/--sd1` | Done |
 | The controller in the RTL, stage 1: SPI mode, the card model, `tb_sd`, and the formal checks | Done in V1.5 |
 | The controller, stage 2: 4-bit SD mode, optional, after a test whether a card leaves SPI mode | Later |
 | The pins on the R3, R6, and Nexys4DDR, and the read-only check in `make hwtest` | Done in V1.5 |

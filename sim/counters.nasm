@@ -1,6 +1,6 @@
 ; Reads through the core's data bus what the other programs leave to the
 ; debug link: the fetch statistics (MICROARCH.md §8.1), the microsecond
-; counter of SYSTEM.md §3, the board's registers, and the fonts of SYSTEM.md
+; counter of DEVICES.md §3, the board's registers, and the fonts of DEVICES.md
 ; §1.8. It leaves the results in memory at RESULT, where tb_nicemon reads
 ; them over the link.
 ;

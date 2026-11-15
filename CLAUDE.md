@@ -201,7 +201,7 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
 ## Rules and pitfalls
 
 - Behavior starts in nice_cpu: its `doc/ISA.md` for the CPU, its
-  `doc/SYSTEM.md` (not this repository's) for the devices, the emulator for the rest. This repository follows them,
+  `doc/DEVICES.md` for the devices, the emulator for the rest. This repository follows them,
   never the reverse. The submodule has its own `CLAUDE.md` and tests.
 - Tags follow nice_cpu's (doc/RELEASE.md): `V1.0` here pins nice_cpu's
   `V1.0`, and `V1.0.1`, `V1.0.2`, and so on are releases that keep the

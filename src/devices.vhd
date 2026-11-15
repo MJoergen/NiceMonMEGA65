@@ -1,5 +1,5 @@
 -- The devices of nice_cpu/hdl/src at 0xFFFFFF10-7F and A0-CF
--- (src/nicemon.vhd): the timer of SYSTEM.md §4 at 10-1F, the math unit
+-- (src/nicemon.vhd): the timer of DEVICES.md §4 at 10-1F, the math unit
 -- (MPU) of §2 at 20-3F, the performance counters of §3 at 40-5F, but for
 -- the clock of the time of day of §10 at 46-49, the fetch
 -- statistics at 60-7F, with G_SD_SLOTS > 0 the SD card controller of §5
@@ -46,12 +46,12 @@
 -- that raises an interrupt, so its request goes straight to the core's IRQ.
 -- The SD card controller's registers are reset when the core starts, but
 -- its engine and its pins only with the system (src/sd/sd.vhd), and it
--- runs while the core is held, paused, or halted (SYSTEM.md §5). The
+-- runs while the core is held, paused, or halted (DEVICES.md §5). The
 -- network station's registers are reset only with the system, not when
 -- the core starts, so that a program finds the addresses that an earlier
--- one set, and a host keeps its connection (SYSTEM.md §6). The port for
+-- one set, and a host keeps its connection (DEVICES.md §6). The port for
 -- Ethernet frames is reset when the core starts, but a frame that is
--- being sent goes on (SYSTEM.md §7). The clock of the time of day is reset
+-- being sent goes on (DEVICES.md §7). The clock of the time of day is reset
 -- only with the system, so that it keeps its time through a start, a
 -- hold, a pause, and a halt (tod.vhd, contract b), and it counts while the
 -- core is held too. It starts at 0, with "set" 0, until a program sets it. Its station is eth/eth.vhd, through
@@ -526,7 +526,7 @@ begin
 
    -- The network station's registers, which only the system's reset
    -- resets. A write of an address while a host is connected, or while a
-   -- reply goes out, breaks it (eth/eth.vhd, contract c), as SYSTEM.md §6
+   -- reply goes out, breaks it (eth/eth.vhd, contract c), as DEVICES.md §6
    -- allows, so wr_o is not needed.
    i_net_regs : entity work.net_regs
       generic map (
