@@ -30,6 +30,11 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   `nicebuild.py` joins the float library that uses it. The screen's
   registers end at `0xFFFFFF87`, where they took `80`–`8F`; only
   `80`–`86` were ever used.
+- A program with floats that `nicebuild.py` builds needs the FPU,
+  which the bitstreams and core files have from this release on. On an
+  older one it computes wrong results and reports nothing.
+  `nicebuild.py --no-fpu` builds it for an older one, with the float
+  library in software, as before.
 - nicewasm's `--library-memory` and `--ram-bytes`, and nicebuild's
   `--ram-bytes`, are gone; `--memory-bytes` replaces them. None of the
   builds here used them.
@@ -41,6 +46,12 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 
 **New.**
 
+- In the monitor, TAB completes the name of a file of the card's folder
+  `NICE`, as Bash does: the rest of the name when one file matches, the
+  start that they share when several do, and a list of them at a TAB
+  that adds nothing
+  ([#137](https://github.com/MJoergen/NiceMonMEGA65/issues/137),
+  [monitor/README.md](../monitor/README.md#the-commands)).
 - `sdcard.py mkdir`, and `make sdcard CMD=mkdir`, make the folder `NICE`
   on a card that has FAT32 but not the folder, with no PC slot
   ([#140](https://github.com/MJoergen/NiceMonMEGA65/issues/140)). The
@@ -54,6 +65,11 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   ([#138](https://github.com/MJoergen/NiceMonMEGA65/issues/138)).
 - `primes.bin` of the examples joins the float library that uses the
   FPU, as `nicebuild.py` does, and is 13712 words, where it was 20267.
+- The monitor empties the FPU's stack and clears its flags at its cold
+  start, when a program returns or calls `mon_exit`, and at a trap of
+  the ROM's C code, so that the next program finds none of the values
+  that the last one left
+  ([#141](https://github.com/MJoergen/NiceMonMEGA65/issues/141)).
 
 **Tests.**
 

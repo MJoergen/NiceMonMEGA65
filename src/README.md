@@ -26,7 +26,8 @@ header of `nicemon.vhd` is the address map, and
   DEVICES.md §9](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#9-byte-windows), with byte enables on the RAM.
 - **DEVICES** ([devices.vhd](devices.vhd)) are nice_cpu's: the timer,
   the math unit, the performance counters, the fetch statistics, the
-  SD card controller ([sd/sd.vhd](sd/sd.vhd)), whose pins go to the
+  floating-point unit (FPU), the SD card controller
+  ([sd/sd.vhd](sd/sd.vhd)), whose pins go to the
   board's slots, the network station's registers, the Ethernet
   station's addresses and its counts of frames, and the port for
   Ethernet frames, whose frames the station receives and sends. The

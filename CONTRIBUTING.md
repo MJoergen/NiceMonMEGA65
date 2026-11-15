@@ -161,12 +161,13 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
   registers, and the debug link.
 - `mem.vhd`, with `ram.vhd` and `rom.vhd`, is the memory.
 - `rx_fifo.vhd` is the core's input FIFO.
-- `devices.vhd` has nice_cpu's devices at `0xFFFFFF10`–`7F`, and the
-  SD card controller, the network station, and the port for Ethernet
-  frames at `0xFFFFFFA0`–`CF`.
+- `devices.vhd` has nice_cpu's devices at `0xFFFFFF10`–`7F`, its
+  floating-point unit, the FPU, at `0xFFFFFF88`–`8F`, and the SD card
+  controller, the network station, and the port for Ethernet frames at
+  `0xFFFFFFA0`–`CF`.
 - `bus_pkg.vhd` has `gate()`, with which `devices.vhd` and `nicemon.vhd`
   pick their read data.
-- `scr_regs.vhd` has the screen's registers at `0xFFFFFF80`–`8F`.
+- `scr_regs.vhd` has the screen's registers at `0xFFFFFF80`–`87`.
 - `board_io.vhd` has the board's registers at `0xFFFFFF90`–`9F`, and
   `uart_pkg.vhd` the UART's baud rates, which it shares with the
   debugger's settings page. `i2c.vhd` is the I2C master at
@@ -460,7 +461,7 @@ Then it loads and runs these programs:
 |---|---|
 | `sim/echo.nasm` | Echoes what it receives. The testbench pauses it: the `p` notice, the memory, R15, and the stopped cycle counter while paused, a write of R5 that the core keeps until its halt, and a byte that waits until it goes on. A write of R5 while it runs gets `e04`. |
 | `sim/fifo.nasm` | The input FIFO, which has 16 bytes there, so that the test of a full FIFO is short. |
-| `sim/devices.nasm` | The math unit, the performance counters, and the timer's interrupts. The testbench also uses the math unit over the link. |
+| `sim/devices.nasm` | The math unit, the performance counters, the FPU, with a `DIV` whose result the program reads while the command runs, so that the reads wait, and the timer's interrupts. The testbench also uses the math unit over the link, and reads the FPU's top value and its status. |
 | `sim/emu.nasm` | The screen, the read counter, memory in the I/O range, and the registers after a halt. The testbench writes and reads the screen's registers. |
 | `reserved.nasm` of the emulator's tests | A halt on a reserved control word, after the testbench has cleared the memory. |
 | `sim/bytewin.nasm` | The byte windows: reads of bytes and halfwords, zero- and sign-extended, writes that change only their byte or halfword, and an indexed operand, as nice_cpu's `bytewin.nasm` checks them, without its words beyond the RAM and its fetch from a window, which alias the RAM here. The testbench reads and writes through the windows over the link. |
@@ -565,7 +566,7 @@ every time, not only the ones a testbench sends.
   sets the generic's, and the bit's cycles that go out are always those
   of the rate it holds. Without the other registers, every word but
   those reads 0.
-- `scr_regs.sby` proves the screen's registers at `0xFFFFFF80`–`8F`,
+- `scr_regs.sby` proves the screen's registers at `0xFFFFFF80`–`87`,
   `src/scr_regs.vhd`: a write sets the register of its word, nothing else
   changes one but a clear or reset, each word reads its register, or 0,
   the display hears of each write, clear, and reset, and the display

@@ -265,7 +265,10 @@ assembles it together with the start-up code and the runtime library.
 
 A program that uses floats computes them on the floating-point unit,
 the FPU, at `0xFFFFFF88`–`8F`, which every board and the emulator have
-([SYSTEM.md](SYSTEM.md#io-registers)).
+([SYSTEM.md](SYSTEM.md#io-registers)). The bitstreams and core files
+before `V2.2` have no FPU: there such a program computes wrong results
+and reports nothing. `nicebuild.py --no-fpu` builds it for them, with
+the float library in software.
 
 You need clang with the wasm32 target, `wasm-ld`, and `llvm-ar` (on
 Debian and Ubuntu, the `clang`, `lld`, and `llvm` packages). The steps

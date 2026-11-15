@@ -72,9 +72,12 @@
 --    CLOCK_USEC took, and "set". The words around it are still the
 --    counters'. A clear of "set" keeps the time.
 -- 8. Hold the core, load G_DEVICES_FILE, and run it. It uses the math unit,
---    the performance counters, and the timer, whose interrupts it counts,
---    and leaves the results in memory, which the link reads back after the
---    core has halted. The link reads and writes the timer too. The start
+--    the performance counters, the floating-point unit (FPU), and the
+--    timer, whose interrupts it counts, and leaves the results in memory,
+--    which the link reads back after the core has halted. It divides on
+--    the FPU and reads the quotient while the command runs, so that the
+--    reads wait, and leaves a square root there: the link reads it and
+--    the FPU's status. The link reads and writes the timer too. The start
 --    kept the clock and its "set", as only a reset of the system resets
 --    it.
 -- 9a. Hold the core, load G_EMU_FILE, and run it. It writes the screen,
