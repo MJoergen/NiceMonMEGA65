@@ -310,7 +310,8 @@ There are two ways to talk to a program on the board from a PC:
   prompt, it takes debug commands and shows the program's output, and
   `send TEXT` sends text to the program. Its `console` command passes
   your keys straight to the program, as a terminal does, until Ctrl-]
-  returns to the prompt.
+  returns to the prompt. There the Enter key is the board's RETURN,
+  which runs the monitor's line.
 - A plain client, such as `nc 192.168.1.65 4510`, is a terminal to the
   program. It sends each line you type to the program, and shows what
   it prints. It has no remote control: it cannot load a program, pause

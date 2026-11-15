@@ -4,7 +4,9 @@
 It starts "niceemu --link 0", which picks a free port, and runs
 hwtest.py's checks of bad packets, the pause, the step, the breakpoints,
 the writes of the registers, and the FPU on it, and mon.py's checks of
-the board's memory, which it adds to nice_cpu's debugger. Then it runs
+the board's memory, which it adds to nice_cpu's debugger, and its
+console in a pseudo-terminal, where the Enter key must run the monitor's
+line. Then it runs
 the programs of hwtest.py's comparison, and nice_cpu's benchmark when
 examples/build/bench.bin and bench_win.bin are built, with run.py --tcp
 on that port and with niceemu alone. Each must print the same and exit
@@ -19,6 +21,8 @@ is used.
 """
 
 import os
+import pty
+import select
 import subprocess
 import sys
 import argparse
@@ -69,6 +73,70 @@ def test_mon(port: str, prog: str, tmp: str) -> None:
     check("mon: a file beyond the RAM, before the link opens",
           r.returncode == 1 and refused in r.stderr and not r.stdout,
           repr(r.stderr))
+
+
+def read_until(fd: int, token: bytes, seconds: float) -> bytes:
+    """What the pseudo-terminal fd gives until token has come, or for
+    seconds."""
+    text = b""
+    end = time.monotonic() + seconds
+    while token not in text and time.monotonic() < end:
+        ready, _, _ = select.select([fd], [], [], 0.1)
+        if ready:
+            try:
+                text += os.read(fd, 4096)
+            except OSError:     # the other end has closed
+                break
+    return text
+
+
+def test_console(port: str) -> None:
+    """mon.py's console in a pseudo-terminal, which treats the keys as a
+    terminal does: it makes the Enter key's CR an LF, which the monitor's
+    line passes over. mon.py must send the CR, the board's RETURN, so
+    that the monitor of the tests, loaded and started here, runs its
+    line, ?, and lists its commands. Ctrl-] must give the prompt back.
+    As in mon(), a run that got no connection is tried again."""
+    subprocess.run(["make", "-s", "-C", f"{REPO}/monitor",
+                    "build/monitor_test.bin"], check=True)
+    end = time.monotonic() + 2
+    while True:
+        master, slave = pty.openpty()
+        proc = subprocess.Popen(
+            [sys.executable, f"{REPO}/tools/mon.py", "--tcp", port,
+             f"{REPO}/monitor/build/monitor_test.bin"],
+            stdin=slave, stdout=slave, stderr=slave)
+        os.close(slave)
+        text = read_until(master, b"dbg> ", 10)
+        if b"dbg> " in text or time.monotonic() > end:
+            break
+        proc.wait()
+        os.close(master)
+        time.sleep(0.05)
+    try:
+        os.write(master, b"go\r")
+        read_until(master, b"dbg> ", 5)
+        os.write(master, b"console\r")
+        text += read_until(master, b"Ctrl-]", 5)
+        os.write(master, b"?\r")
+        help_text = read_until(master, b"run the program", 5)
+        check("mon: the console's Enter key runs the monitor's line",
+              b"run the program" in help_text, repr(text[-200:] + help_text))
+        read_until(master, b"\0", 0.5)   # the rest of the monitor's list
+        os.write(master, b"\x1d")
+        back = read_until(master, b"dbg> ", 5)
+        check("mon: Ctrl-] returns from the console to the prompt",
+              b"dbg> " in back, repr(back[-200:]))
+        os.write(master, b"q\r")
+        try:
+            proc.wait(5)
+        except subprocess.TimeoutExpired:
+            pass
+    finally:
+        if proc.poll() is None:
+            proc.terminate()
+            proc.wait()
+        os.close(master)
 
 
 def test_host(tmp: str) -> None:
@@ -127,6 +195,7 @@ def main() -> None:
             finally:
                 link.close()
             test_mon(port, brk[0], tmp)
+            test_console(port)
             test_run(tcp, comparisons(tmp))
             test_monitor(tcp, tmp)
             test_selftest(tcp, tmp)

@@ -71,6 +71,12 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   that the last one left
   ([#141](https://github.com/MJoergen/NiceMonMEGA65/issues/141)).
 
+**Fixed.**
+
+- In the console of `tools/mon.py`, the Enter key runs the monitor's
+  line. The terminal made its CR an LF, which the monitor passes over,
+  so a typed line never ran.
+
 **Tests.**
 
 - `make hwtest` checks the FPU on the board: over the link, with a

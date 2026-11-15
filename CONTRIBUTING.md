@@ -1111,8 +1111,10 @@ the monitor's with `--monitor --rom`, the demo's self-test, and nice_cpu's bench
 built `examples/build/bench.bin` and `bench_win.bin`, with `tools/linktest.py`. It runs hwtest's
 checks of bad packets, of the pause, of the step, of the breakpoints,
 of the writes of the registers, and of the FPU on `niceemu --link` first, and then
-what `mon.py` adds to nice_cpu's debugger: a load, and the check of the
-board's memory, at a load and before the link opens. nice_cpu's `make
+what `mon.py` adds to nice_cpu's debugger: a load, the check of the
+board's memory, at a load and before the link opens, and the Enter key
+of its console, which must run the monitor's line; that check runs
+`mon.py` in a pseudo-terminal. nice_cpu's `make
 -C debugger test` checks the debugger's commands, and the parsing of
 `--tcp [HOST:]PORT`.
 Last, it runs `hello.nasm` with `run.py --tcp 127.0.0.2:PORT` on
