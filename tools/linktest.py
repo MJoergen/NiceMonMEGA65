@@ -4,9 +4,9 @@
 It starts "niceemu --link 0", which picks a free port, and runs
 hwtest.py's checks of bad packets, the pause, the step, the breakpoints,
 the writes of the registers, and the FPU on it, and mon.py's checks of
-the board's memory, which it adds to nice_cpu's debugger, and its
-console in a pseudo-terminal, where the Enter key must run the monitor's
-line. Then it runs
+the board's memory, which it adds to nice_cpu's debugger, its help, and
+its console in a pseudo-terminal, where the Enter key must run the
+monitor's line. Then it runs
 the programs of hwtest.py's comparison, and nice_cpu's benchmark when
 examples/build/bench.bin and bench_win.bin are built, with run.py --tcp
 on that port and with niceemu alone. Each must print the same and exit
@@ -22,6 +22,7 @@ is used.
 
 import os
 import pty
+import re
 import select
 import subprocess
 import sys
@@ -35,6 +36,7 @@ from hwtest import (NICEEMU, REPO, assemble, assemble_labels, comparisons,
                     test_monitor, test_selftest, test_step, test_break,
                     test_watch, test_write_regs, test_fpu, check, start_emu)
 from boardlink import HOLD, RAM, open_link
+from mon import HELP, commands
 
 
 def mon(port: str, args: list[str],
@@ -58,8 +60,9 @@ def mon(port: str, args: list[str],
 def test_mon(port: str, prog: str, tmp: str) -> None:
     """mon.py, nice_cpu's nicedbg.py with the board's hooks: a load, and
     the board's check of the memory, which refuses a word beyond the
-    MEGA65's RAM, at load and before the link opens. nice_cpu's make -C
-    debugger test checks the debugger's commands."""
+    MEGA65's RAM, at load and before the link opens, and its help, with
+    a line for each command. nice_cpu's make -C debugger test checks the
+    debugger's commands."""
     high = os.path.join(tmp, "high.bin")
     with open(high, "w") as f:
         f.write("0 0\n30000 1\n")
@@ -69,6 +72,22 @@ def test_mon(port: str, prog: str, tmp: str) -> None:
           "the processor is held in reset" in r.stdout, repr(r.stdout))
     check("mon: load beyond the board's RAM", refused in r.stdout,
           repr(r.stdout))
+    # help: a line for each command, which starts with the command, the
+    # first one after the prompt
+    r = mon(port, [], "help\nq\n")
+    lines = [line.removeprefix("dbg> ") for line in r.stdout.splitlines()]
+    missing = [name for name in commands()
+               if not any(re.match(rf"{re.escape(name)}[ (]", line)
+                          for line in lines)]
+    check("mon: help has a line for each command",
+          not missing and "Documented commands" not in r.stdout,
+          f"missing {missing}: {r.stdout!r}")
+    stale = sorted(set(HELP) - set(commands()))
+    check("mon: every line of mon.py's help is of a command", not stale,
+          str(stale))
+    r = mon(port, [], "help s\nq\n")
+    check("mon: help CMD describes one, also by its short name",
+          "step (s) [N]: runs N steps" in r.stdout, repr(r.stdout))
     r = mon(port, [high], "q\n")
     check("mon: a file beyond the RAM, before the link opens",
           r.returncode == 1 and refused in r.stderr and not r.stdout,

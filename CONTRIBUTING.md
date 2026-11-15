@@ -1112,7 +1112,8 @@ built `examples/build/bench.bin` and `bench_win.bin`, with `tools/linktest.py`. 
 checks of bad packets, of the pause, of the step, of the breakpoints,
 of the writes of the registers, and of the FPU on `niceemu --link` first, and then
 what `mon.py` adds to nice_cpu's debugger: a load, the check of the
-board's memory, at a load and before the link opens, and the Enter key
+board's memory, at a load and before the link opens, its `help`, which
+must have a line for each command, and the Enter key
 of its console, which must run the monitor's line; that check runs
 `mon.py` in a pseudo-terminal. nice_cpu's `make
 -C debugger test` checks the debugger's commands, and the parsing of

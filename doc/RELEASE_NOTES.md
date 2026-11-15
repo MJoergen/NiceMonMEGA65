@@ -63,6 +63,9 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 - `weather.bin` shows the wind in m/s, unless `WEATHER.CFG` has
   `units u`, which keeps mph
   ([#138](https://github.com/MJoergen/NiceMonMEGA65/issues/138)).
+- `help` in `tools/mon.py` lists the commands one on a line, each with
+  what it does, where it showed their names alone. `help CMD` describes
+  one in full, as before.
 - `primes.bin` of the examples joins the float library that uses the
   FPU, as `nicebuild.py` does, and is 13712 words, where it was 20267.
 - The monitor empties the FPU's stack and clears its flags at its cold

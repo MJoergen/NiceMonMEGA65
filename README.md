@@ -397,7 +397,7 @@ Numbers are hex. These are the commands used most:
 
 | Command | What it does |
 |---|---|
-| `help`, `help CMD` | Lists the commands, or describes one |
+| `help`, `help CMD` | Lists the commands, one on a line with what it does, or describes one in full |
 | `status` | Prints the state again |
 | `load FILE` | Loads a program at address 0, and leaves the processor held in reset |
 | `go` (`g`), `pause`, `step N` (`s`) | Starts the program or goes on, pauses it, or runs N instructions of it |
