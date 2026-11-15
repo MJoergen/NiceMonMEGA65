@@ -587,6 +587,26 @@ The speed is that of `sdcard.py`: about 115 KB a second reading and
 on the serial port. `make sdtest` checks the server with a client of
 its own on `niceemu --link`.
 
+On the serial port, a mount can take many minutes. The kernel reads
+ahead 128 KB, 256 sectors, for a small read, and the desktop's udev
+reads the card when `nbd-client` connects it. Two settings make it
+faster, and both must come before the mount, as reads that are already
+waiting keep their size and their speed. Here the board's port is
+`ttyUSB1`:
+
+```
+echo 1 | sudo tee /sys/bus/usb-serial/devices/ttyUSB1/latency_timer
+tools/sdnbd.py --port /dev/ttyUSB1 &
+sudo modprobe nbd
+sudo nbd-client -N sd localhost /dev/nbd0
+echo 4 | sudo tee /sys/block/nbd0/queue/read_ahead_kb
+sudo mount -o uid=$(id -u),gid=$(id -g) /dev/nbd0p1 /mnt
+```
+
+The first line sets the FTDI chip's latency timer to 1 ms, as for
+`sdcard.py`, and goes before the server. The fifth makes the
+read-ahead 4 KB, on the disk that `nbd-client` connected.
+
 ## The other tools
 
 - `tools/bump.py TAG [--push]` moves nice_cpu to the tag, builds the R6
