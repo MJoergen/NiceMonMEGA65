@@ -855,9 +855,11 @@ It prints one line for each check, and last how many passed. With the
 pipelined core, all checks pass on both boards, and the Nexys4DDR has
 more of them, for its LEDs, display, buttons, and switches. A check that
 leaves the board in a state in which every later check would fail stops
-the run. Even then the script holds the core with the ROM hidden, and
-prints how many passed. If the link does not answer then, it says so:
-press the reset button.
+the run. Even then the script starts the core from the ROM again, so
+that the board is left with the monitor at its prompt, as the reset
+button leaves it, and prints how many passed. A bitstream without a ROM
+is left with its core held. If the link does not answer then, it says
+so: press the reset button.
 
 ### What it checks
 

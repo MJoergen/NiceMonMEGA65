@@ -191,10 +191,12 @@ Exit status:
 
 Notes:
     A check that leaves the board in a state in which every later check
-    would fail stops the run. Whatever happens, the script ends by holding
-    the core with the ROM hidden (the cleanup says so if the link did not
-    answer), and it prints the summary. Only the Python standard library
-    is used, and openFPGALoader when the FPGA is programmed.
+    would fail stops the run. Whatever happens, the script ends by
+    starting the core from the ROM, shown again, so that the board is left
+    with the monitor at its prompt (the cleanup says so if the link did
+    not answer), and it prints the summary. A bitstream without a ROM is
+    left with its core held. Only the Python standard library is used,
+    and openFPGALoader when the FPGA is programmed.
 """
 
 import argparse
@@ -297,20 +299,30 @@ def require(name: str, ok: bool, detail: str = "") -> None:
 
 
 def cleanup(port: str, baud: int) -> None:
-    """Holds the core with the ROM hidden, which the link does whether a
-    program runs or not. Nothing here may fail the script."""
+    """Starts the core from the ROM, shown again, so that the board ends
+    with the monitor at its prompt, on the screen and on the serial port,
+    as the reset button leaves it. The link holds the core first, which
+    it does whether a program runs or not, and disables the breakpoints
+    and the watchpoints, as a check that stopped early may have left one
+    enabled. A bitstream without a ROM reads its ROM bit as 1 still, and
+    its core stays held, as at power-up. Nothing here may fail the
+    script."""
     try:
         link = Link(Serial(port, baud))
         try:
-            link.control(HOLD | RAM)
-            held = True
+            link.control(HOLD)
+            link.write(BRK_EN, [0])
+            link.write(WCH_EN, [0])
+            if not link.read_word(CONTROL) & RAM:
+                link.control(0)
+            done = True
         finally:
             link.close()
     except (OSError, LinkError, SystemExit):
-        held = False
-    if not held:
-        print("  could not hold the core; press the reset button before a "
-              "run with --no-program", flush=True)
+        done = False
+    if not done:
+        print("  could not start the core from the ROM; press the reset "
+              "button", flush=True)
 
 
 def rd(link: Link, addr: int) -> int:

@@ -78,6 +78,9 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   two of nice_cpu's FPU programs against `niceemu`. `make linktest` and
   `make cosimtest` run the same checks on `niceemu --link` and on the
   RTL in GHDL.
+- `make hwtest` leaves the board with the monitor at its prompt: it
+  ends by starting the core from the ROM, where it left the core held
+  with the ROM hidden, a blank screen that took no key.
 - `make hwtest` with `ETH` passes on the Nexys4DDR. Its TCP program,
   `monitor/test/tcphw.nasm`, kept its buffers above the board's 64K
   words of RAM, where they overwrote the monitor of the test.
