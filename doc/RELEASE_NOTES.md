@@ -52,6 +52,8 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 - `weather.bin` shows the wind in m/s, unless `WEATHER.CFG` has
   `units u`, which keeps mph
   ([#138](https://github.com/MJoergen/NiceMonMEGA65/issues/138)).
+- `primes.bin` of the examples joins the float library that uses the
+  FPU, as `nicebuild.py` does, and is 13712 words, where it was 20267.
 
 **Tests.**
 

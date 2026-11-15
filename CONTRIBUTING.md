@@ -1133,7 +1133,6 @@ errors in both. When stdout closes early, as with `run.py ... | head`,
 `nice_cpu/runtime/README.md`, for `examples/primes.c`:
 
     make -C nice_cpu/runtime/libc libc.a
-    make -C nice_cpu/runtime float.nasm
     clang --target=wasm32 -mbulk-memory -O2 -ffreestanding -nostdlibinc \
         -isystem nice_cpu/runtime/libc/include -nostdlib \
         -Wl,--no-entry -Wl,--export=main -Wl,--stack-first \
@@ -1142,16 +1141,16 @@ errors in both. When stdout closes early, as with `run.py ... | head`,
     nice_cpu/translator/nicewasm.py --byte-windows --trust-alignment \
         -o primes.nasm primes.wasm
     cat nice_cpu/runtime/start_wasm.nasm primes.nasm nice_cpu/runtime/lib.nasm \
-        nice_cpu/runtime/muldiv_mpu.nasm nice_cpu/runtime/float.nasm \
+        nice_cpu/runtime/muldiv_mpu.nasm nice_cpu/runtime/float_fpu.nasm \
         > primes_full.nasm
     nice_cpu/assembler/niceasm.py -o primes.bin primes_full.nasm
 
 `--byte-windows` makes each byte or halfword load and store one `MOVE`
 through the byte windows of [nice_cpu's DEVICES.md §9](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#9-byte-windows), which the board and
 `niceemu` have, and `--trust-alignment` takes an access to be aligned as
-its hint says (nice_cpu's translator README). `float.nasm` is the float
-library, which a program that calls `scanf` needs, as `primes.c` does,
-and `bench.c` does not. With plain `start_wasm.nasm`, a wasm trap, such as an access outside the
+its hint says (nice_cpu's translator README). `float_fpu.nasm` is the float
+library, which computes on the FPU, and which a program that calls `scanf`
+needs, as `primes.c` does, and `bench.c` does not. With plain `start_wasm.nasm`, a wasm trap, such as an access outside the
 linear memory, halts the core without a word, and only `run.py --symbols`
 shows the trap. `nice_cpu/translator/nicebuild.py -o primes.bin
 examples/primes.c` does all of these steps in one command, and by default

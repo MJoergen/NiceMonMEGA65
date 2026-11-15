@@ -8,8 +8,8 @@
 # one page, 16384 words, so the program fits in the 64K words of the
 # Nexys4DDR's memory, the smaller board's. The translated code and the
 # runtime use the math unit, so muldiv_mpu.nasm is joined in. A program
-# that calls scanf is joined with the float library, float.nasm, too,
-# which the runtime builds.
+# that calls scanf is joined with the float library, float_fpu.nasm, too,
+# which computes on the FPU, as nicebuild.py joins it.
 #
 # The programs use the byte windows of nice_cpu's DEVICES.md §9, which the
 # board and the emulator have: nicewasm's WINDOWS options make each byte
@@ -51,7 +51,7 @@ LDFLAGS = -nostdlib -Wl,--no-entry -Wl,--export=main \
 
 RUNTIME = $(NICE_CPU)/runtime/lib.nasm $(NICE_CPU)/runtime/muldiv_mpu.nasm
 START   = $(NICE_CPU)/runtime/start_wasm.nasm
-FLOAT   = $(NICE_CPU)/runtime/float.nasm
+FLOAT   = $(NICE_CPU)/runtime/float_fpu.nasm
 # The tools are prerequisites, so a bump of the submodule rebuilds the files.
 NICEWASM = $(wildcard $(NICE_CPU)/translator/*.py)
 NICEASM  = $(wildcard $(NICE_CPU)/assembler/*.py)
@@ -60,7 +60,7 @@ PROGRAMS = primes bench bench_win
 # nicewasm's options for the byte windows, for every program but bench
 WINDOWS  = --byte-windows --trust-alignment
 WASM_OPTS = $(if $(filter bench,$*),,$(WINDOWS))
-# The programs that call scanf, and so need float.nasm.
+# The programs that call scanf, and so need float_fpu.nasm.
 FLOAT_PROGRAMS = primes
 
 all: $(PROGRAMS:%=$(BUILD)/%.bin) $(BUILD)/weather.bin
@@ -86,9 +86,6 @@ test: test/build/weather_test
 # The library is built in the submodule, which ignores its build files.
 $(LIBC)/libc.a: FORCE
 	$(MAKE) -C $(LIBC) libc.a
-
-$(FLOAT): FORCE
-	$(MAKE) -C $(NICE_CPU)/runtime float.nasm
 
 $(BUILD)/%.wasm: %.c $(LIBC)/libc.a | $(BUILD)
 	$(CLANG) $(CFLAGS) $(LDFLAGS) -o $@ $< $(LIBC)/libc.a
