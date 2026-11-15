@@ -91,8 +91,8 @@ Screen:
 VBASE at the halt 000000
 exit 0
 fsck.fat -n:
-Free cluster summary uninitialized (should be 128990)
-IMAGE: 5 files, 32/129022 clusters
+Free cluster summary uninitialized (should be 128989)
+IMAGE: 5 files, 33/129022 clusters
 Files in NICE: HELLO.BIN old.bin new.bin y1970.bin
 Dates in NICE:
 old      bin        18 2026-01-01   0:00 

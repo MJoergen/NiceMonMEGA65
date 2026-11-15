@@ -547,6 +547,7 @@ scr_color
 ; The first key of the line goes on to _io_gets.first. _io_getc.soon uses
 ; only R1 and R2, so R3 keeps the first byte of a sequence's parameter.
 ; While it waits for the first key, getline_wait keeps the network going.
+; TAB completes a file's name with complete (issue #137).
 getline
                 PUSH    R1
                 PUSH    R2
@@ -611,6 +612,7 @@ getline_line
                 CALL    net_off         ; the network of getline_wait
                 POP     R2
                 POP     R1
+                MOVE    R4, complete    ; the routine of TAB
                 JMP     _io_gets.first  ; which returns to the caller
 
 ; getline_wait: R1 = the next byte of the console, which it waits for, as

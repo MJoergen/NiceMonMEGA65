@@ -137,16 +137,22 @@ _io_getc.soon
 ; number of characters. CR ends the line; DEL and BS delete the character
 ; before the cursor; CTRL-C empties the line; the other control codes, the
 ; bytes 0x80 to 0x9F, and the escape sequences of the cursor and function
-; keys are dropped, and so is an ESC alone. Each character is echoed
-; through mon_putc, and CR as CR LF. Uses R1-R4, and R7-R9 across the
-; calls, saved. _io_gets.first is the same, with R3 a first byte that the
-; caller has read already, which the monitor's line uses.
+; keys are dropped, and so is an ESC alone. Each character is
+; echoed through mon_putc, and CR as CR LF. Uses R1-R4, and R7-R10 across
+; the calls, saved. _io_gets.first is the same, with R3 a first byte that
+; the caller has read already, and R4 the routine of TAB, or 0, which the
+; monitor's line uses: it is called with R1 the first word, R2 the
+; cursor, and R3 the word after the last, as the C ABI calls, and R1 =
+; the new cursor, with what it added echoed.
 _io_gets
                 MOVE    R3, 0x100       ; no byte read
+                MOVE    R4, 0           ; and no routine of TAB
 _io_gets.first
                 PUSH    R7
                 PUSH    R8
                 PUSH    R9
+                PUSH    R10
+                MOVE    R10, R4         ; the routine of TAB
                 MOVE    R7, R1          ; the first word
                 ADD     R8, R1, R2      ; the word after the last
                 MOVE    R9, R1          ; the next free word
@@ -166,6 +172,8 @@ _io_gets.have
         ?Z      JMP     _io_gets.cancel
                 CMP     R1, 0x1B
         ?Z      JMP     _io_gets.esc
+                CMP     R1, 0x09
+        ?Z      JMP     _io_gets.tab
                 CMP     R1, 0x20
         ?C      JMP     _io_gets.next   ; another control code
                 CMP     R1, 0xA0
@@ -193,10 +201,20 @@ _io_gets.end
                 MOVE    @R9, 0
                 CALL    _io_crlf
                 SUB     R1, R9, R7
+                POP     R10
                 POP     R9
                 POP     R8
                 POP     R7
                 RET
+_io_gets.tab
+                TST     R10
+        ?Z      JMP     _io_gets.next
+                MOVE    R1, R7
+                MOVE    R2, R9
+                MOVE    R3, R8
+                CALL    R10
+                MOVE    R9, R1
+                JMP     _io_gets.next
 ; An ESC: with a [ or an O within io.t_esc, a sequence, whose bytes up to
 ; its final one, 0x40 to 0x7E, are dropped; with another byte in time,
 ; that byte stands on its own; with none, nothing.

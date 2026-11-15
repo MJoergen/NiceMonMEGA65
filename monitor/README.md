@@ -207,7 +207,7 @@ in nice_cpu's runtime or C library:
 | `_io_puthex` | R1 in hex, 8 digits. |
 | `_io_putdec` | R1 in decimal, unsigned, with the math unit. |
 | `_io_gethex` | A hex number in the string at R1, after any blanks. → R1 the value, R2 the number of digits, 0 for none, R3 the address after them. |
-| `_io_gets` | A line into the buffer at R1, up to R2 characters and a 0 word, edited as The commands says and echoed through `mon_putc`. → R1 the number of characters. `_io_gets.first` is the same, with R3 a first byte already read, for the monitor's own line. |
+| `_io_gets` | A line into the buffer at R1, up to R2 characters and a 0 word, edited as The commands says and echoed through `mon_putc`. → R1 the number of characters. `_io_gets.first` is the same, with R3 a first byte already read and R4 a routine for TAB or 0, for the monitor's own line; the routine takes R1 the buffer, R2 the cursor, and R3 the word after the last, and returns R1 the new cursor. `_io_gets` drops TAB. |
 | `_io_getc` | → R1 the next byte of the console, which it waits for. The end of the line's input, `0x200`, is no byte, as the keyboard's bytes still come. |
 
 nice_cpu's `libc` is a small C standard library, and its runtime
@@ -246,6 +246,17 @@ the screen again, and goes on to the line. The history has 384 rows on
 the MEGA65 and 77 on the Nexys4DDR. `c` leaves it, as `clear` in a
 terminal does, and the cold start empties it. `niceemu` has no display
 offset, so there the history is kept but not shown.
+
+TAB completes the name of a file of the card's folder `NICE`, as Bash
+does, in the word before the cursor when it is not the command itself
+(issue #137). When one file matches, the rest of its name follows,
+then a blank. A name in quotes gets its closing quote, and a name with
+a blank gets its opening quote too. When several match, the word goes
+on to the start that they all share, and a TAB that adds nothing lists
+them and shows the prompt and the line again. Names match in either
+case, and the word takes the case of the card's name. Directories,
+names outside ASCII, and a name that does not fit the line are left
+out. With no match, no card, or a card that fails, TAB does nothing.
 
 | Command | What it does |
 |---|---|

@@ -587,7 +587,8 @@ While BASIC is C, the routines of the monitor's commands stay in
 `monitor_cmd.nasm`, and the ROM has 13455 words free without the demo,
 which left it in V2.1 (#129). #111, the network for programs, leaves
 9757 of them, #131, the texts packed, 11876, and `time ntp` (#127)
-10952 (measured 2026-11-14).
+10952 (measured 2026-11-14), and TAB's completion of names (#137)
+10167 (measured 2026-11-15).
 So
 **the whole list does not fit in C**: C fills the ROM at stage 4 or
 5, and the port to assembly is not a matter of speed alone.

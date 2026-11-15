@@ -245,8 +245,8 @@ from 0, and the rest is free. The demo is not in it: it is a program,
 <!-- romsize layout -->
 | Part | Address | Words |
 |---|---|---:|
-| The monitor | `0x0000`–`0x553F` | 21824 |
-| Free | `0x5540`–`0x7FFF` | 10944 |
+| The monitor | `0x0000`–`0x5850` | 22609 |
+| Free | `0x5851`–`0x7FFF` | 10159 |
 <!-- /romsize layout -->
 
 The monitor's words, by the source they come from, in the order
@@ -259,16 +259,16 @@ ROM is built:
 <!-- romsize monitor -->
 | Source | What it is | Words | Text |
 |---|---|---:|---:|
-| `monitor.nasm` | The dispatch table, the HAL, the cold start, and the traps | 804 | 9 |
-| `monitor_cmd.nasm` | The main loop and the commands | 2245 | 647 |
+| `monitor.nasm` | The dispatch table, the HAL, the cold start, and the traps | 806 | 9 |
+| `monitor_cmd.nasm` | The main loop and the commands | 2276 | 647 |
 | `monitor_dis.nasm` | The disassembler of `u` | 889 | 79 |
 | `monitor_sd.nasm` | The sector routines | 226 | 59 |
 | `monitor_eth.nasm` | The network | 3558 | 158 |
 | `monitor_tcp.nasm` | TCP | 2458 | 0 |
-| `monlib.nasm` | The routines that programs join | 259 | 0 |
+| `monlib.nasm` | The routines that programs join | 280 | 0 |
 | `mon.nasm` | The stubs of the entries | 72 | 0 |
 | `nicewasm` | `___wasm_start`, which copies the C code's data to the RAM | 85 |  |
-| `fat32.c` | FAT32 | 9102 |  |
+| `fat32.c` | FAT32 | 9833 |  |
 | `clock.c` | The clock and `time` | 1593 |  |
 | nice_cpu's C library | `nice_print` | 53 |  |
 | `nicewasm` | The helpers of the translated code: loads, stores, and traps | 125 |  |
@@ -277,7 +277,7 @@ ROM is built:
 | nice_cpu's `muldiv_mpu.nasm` | Multiply and divide | 128 | 0 |
 | `build/folder.nasm` | The error of a card without the folder | 8 | 8 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 21824 | 962 |
+| In all | | 22609 | 962 |
 <!-- /romsize monitor -->
 
 - The C code's strings are in its initial values, also four characters
@@ -441,12 +441,13 @@ compared with `test/NAME.expected`:
 | `arp` | `test/arp.nasm`, with the frames of `test/arp.eth` | `arp_resolve`: a reply after other frames, the cache, no reply, an entry aged out, and the cache filled and gone round. The frames sent are compared too. |
 | `udp` | `test/udp.nasm`, with the frames of `test/udp.eth` | The UDP entries: each error, a datagram sent after ARP, a broadcast, datagrams received among other frames, one cut short, and one sent through the gateway. The frames sent are compared too. |
 | `net` | `test/net.nasm`, with the frames of `test/net.eth` | The poll and the IP settings of issue #111: `net_config` at a word-window address and a plain one, `net_set`, `net_poll`, a datagram held and a second dropped, ARP replies learned in place, so that no request goes, a TCP segment released, and a deadline armed, not due, and due. The frames sent are compared too. |
-| `rom` | `build/rom.bin`: the monitor with `test/rom.c` in its C code, and `test/rom.nasm` | The C code in the ROM: a global's initial value, a static array set to 0, both again after a cold start, `nice_print`, and a trap, whose address must be the label `_rom_trap`; the FPU's stack and flags that a run leaves, which the trap and the cold start of `r 8100` clear (#141). |
+| `rom` | `build/rom.bin`: the monitor with `test/rom.c` in its C code, and `test/rom.nasm` | The C code in the ROM: a global's initial value, a static array set to 0, both again after `r 0`, `nice_print`, and a trap, whose address must be the label `_rom_trap`. |
 | `fs` | `test/fs.nasm`, with FAT images in both slots | The file entries, through `mon.nasm`'s stubs: handles, reads across the fragments of a file and at its end, the folder's entries, mounts, each error a program can cause, and `fs_readname`'s long name and 8.3 name in lower case, and a file opened by its long name. |
 | `fsw` | `test/fsw.nasm`, with a copy of the card with partitions, one file read-only, and a write-protected card | The entries that write: a file written in pieces across clusters and read back, truncated, a file of ten clusters, deletions, one of a long name, a folder that grows a cluster, a mount that drops an open file, and each error. |
 | `fat` | The monitor, with FAT images in both slots | `dir` and `load`: the fragmented `FRAG.BIN`, a text file, bad arguments, and `HELLO.BIN` loaded and run. |
 | `fatw` | The monitor, with a copy of the card without partitions, and one that a write fills | `save`, `load`, `dir`, and `del`: a program saved and loaded back, a file truncated and deleted, bad arguments, and a full card, error 30, which has room again after `del`. |
 | `fatl` | The monitor, with `lfn.img`, long names that mtools wrote | `dir` and `load` by long names, in quotes and in either case, and by 8.3 names: a long name with a blank, one in mixed case, one of 255 characters, one outside ASCII, an 8.3 name with the lower-case flags, sets of long-name entries across a sector and across a cluster, and one with a wrong checksum, which only its 8.3 name reaches. |
+| `tab` | The monitor, with `lfn.img` | TAB in the line: a unique name with an opening quote, with BS, and in quotes; a shared start, a TAB that lists, and the case of the card's name; nothing in the command, with no match, for a name outside ASCII, for a directory, for a name that does not fit, and with no card. |
 | `fatlw` | The monitor, with a copy of `lfn.img` | `save` of long names: the aliases with no tail, `~1`, and `~3`, by the 8.3 names that mtools left, a name in lower case with byte 12's flags, a truncation by the 8.3 name, names that are not valid, and a long name in the run of entries that two deletions freed; `fsck.fat -n`, `mdir`, and `mtype` check the card. |
 | `fatbad` | The monitor, with a FAT16 card and an exFAT card | `dir` rejects each. |
 | `fat1` | The monitor, with no card in slot 0 | `dir` mounts slot 1. |

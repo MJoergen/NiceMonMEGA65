@@ -846,6 +846,33 @@ fs_quoted
                 MOVE    @R3++, 0
                 RET
 
+; complete: TAB on the line, for _io_gets: R1 the line, R2 the cursor, R3
+; the word after the last, and R1 = the new cursor, with fat_complete of
+; fat32.c (issue #137). When it lists the matches, the prompt and the line
+; are shown again. Uses R1-R6, and R7 and R8 across the calls, saved.
+complete
+                PUSH    R7
+                PUSH    R8
+                MOVE    R7, R1          ; the line
+                MOVE    R8, R2          ; the cursor
+                CALL    _fat_complete
+                TST     R1
+        ?!Z     JMP     complete_end
+                MOVE    R1, S_PROMPT
+                CALL    puts_b
+:
+                CMP     R7, R8
+        ?Z      JMP     :+
+                MOVE    R1, @R7++
+                CALL    _mon_putc
+                JMP     :-
+:
+                MOVE    R1, R8
+complete_end
+                POP     R8
+                POP     R7
+                RET
+
 ; match: Z clear and R1 after the string at R2 when the line at R1 starts
 ; with it, in either case, or R1 = 0. Uses R1-R4.
 match

@@ -332,6 +332,14 @@ FATW = l\r8000 1234ABCD\r8001 5\r\rsave test.bin 8000 2\rdir\rload TEST.BIN\rd 8
 # which is no name; λx.txt by its 8.3 name, _X.TXT; and an empty
 # name in quotes.
 FATL = dir\rload "my prog.bin"\rr\rload MYPROG~1.BIN\rload "MY PROG.BIN"\rload mixed.bin\rload LOWER.TXT\rload "across a sector.txt"\rload "ACROSS A CLUSTER.TXT"\rload "bad sum.txt"\rload badsum~1.txt\rload "my prog.bin\rload caf?.txt\rload _x.txt\rload ""\rh\r
+# tab: lfn.img in slot 0, and TAB (issue #137). my is my prog.bin, in
+# quotes with BS, and "my too; mand is mandelbrot, a second TAB lists
+# the two, and 1 is one; pad2 lists four at once, and pad21 is PAD21.TXT
+# in its case; ACROSS is "across a , which lists two. Nothing: in the
+# command, with no match, for caf?.txt, which is left out, after a
+# directory's . , for n, whose name does not fit the line, and with no
+# card in slot 1. ^C ends a line.
+TAB = load my\t\rload "my\t\rload mand\t\t1\t\rload pad2\t1\t\rlo\t\003load x\t\003load caf\t\003load ACROSS\t\t\003load .\t\003load n\t\003dir 1\rload my\t\003h\r
 # fatlw: a copy of lfn.img in slot 0. l writes two words, and save writes
 # them to new files: mandelbrot.bin, MANDEL~1.BIN, as the MANDEL~1 that
 # is there is a .TXT; mandelbrot3.txt, MANDEL~3.TXT after ~1 and ~2;
@@ -459,13 +467,14 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	@printf '$(FATNONE)' > $(BUILD)/fatnone.txt
 	@printf '$(FATW)' > $(BUILD)/fatw.txt
 	@printf '$(FATL)' > $(BUILD)/fatl.txt
+	@printf '$(TAB)' > $(BUILD)/tab.txt
 	@printf '$(FATLW)' > $(BUILD)/fatlw.txt
 	@printf '$(TIME)' > $(BUILD)/time.txt
 	@$(PYTHON) test/sd_image.py $(BUILD)/sd.img
 	@$(PYTHON) test/sd_image.py --written $(BUILD)/sd_written.img
 	@{ printf '$(LOAD_HEAD)'; head -n 3 $(BUILD)/hello.bin | awk '{ printf "%s\r\n", $$0 }'; \
 	  tail -n +4 $(BUILD)/hello.bin; printf '$(LOAD_TAIL)'; } > $(BUILD)/load.txt
-	@fail=0; for t in cmds scroll load load_emu load_64k sd_write arp udp net rom fs fsw fat fatw fatl fatlw fatbad fat1 fatnone time \
+	@fail=0; for t in cmds scroll load load_emu load_64k sd_write arp udp net rom fs fsw fat fatw fatl tab fatlw fatbad fat1 fatnone time \
 	           hello reset hello_c; do \
 	  opts=; rom=$(BUILD)/monitor_test.bin; \
 	  case $$t in \
@@ -496,6 +505,7 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	      cp $(BUILD)/fat/super.img $(BUILD)/fatw0.img; cp $(BUILD)/fat/full.img $(BUILD)/fatw1.img; \
 	      opts="--sd0 $(BUILD)/fatw0.img --sd1 $(BUILD)/fatw1.img";; \
 	    fatl) prog=; input=fatl; dump=; opts="--sd0 $(BUILD)/fat/lfn.img";; \
+	    tab) prog=; input=tab; dump=; opts="--sd0 $(BUILD)/fat/lfn.img";; \
 	    fatlw) prog=; input=fatlw; dump=; \
 	      cp $(BUILD)/fat/lfn.img $(BUILD)/fatlw0.img; opts="--sd0 $(BUILD)/fatlw0.img";; \
 	    fatbad) prog=; input=fatbad; dump=; \

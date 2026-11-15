@@ -1330,6 +1330,118 @@ int fat_dir(int slot)
     return 0;
 }
 
+// The upper case of the ASCII character c
+static unsigned upper(unsigned c)
+{
+    return c >= 'a' && c <= 'z' ? c - 0x20 : c;
+}
+
+// The character c at the word address at, and on the monitor's outputs
+static void type(unsigned at, unsigned c)
+{
+    nice_poke(at, c);
+    nice_putc((int)c);
+}
+
+// fat_complete: TAB on the monitor's line, from line to the cursor cur,
+// with room up to end (issue #137). The word before the cursor, from the
+// last blank outside quotes, and after an opening quote, is the start of
+// a name. Unless it is the first word, the command, the files of the
+// folder whose names start with it, in either case, are its matches:
+// directories, and names with a ? for a character outside ASCII, are left
+// out. With one match, the rest of its name goes onto the line, then the
+// closing quote of a name in quotes, and a blank; with several, the rest
+// of the start that they share. The start typed takes the case of the
+// first match, and a name with a blank gets an opening quote before it,
+// so that the word is typed again after BS. The new cursor, or
+// 0 when several matches add nothing: then they are listed, a name to a
+// row, and the monitor shows its prompt and the line again. Nothing, the
+// cursor cur, when nothing matches, the line is full, or on an error.
+int fat_complete(unsigned line, unsigned cur, unsigned end)
+{
+    unsigned w = line, q = 0, cmd = 0, k;
+    for (k = line; k < cur; k++) {
+        unsigned c = nice_peek(k);
+        if (c == '"')
+            q = !q;
+        if (c == ' ' && !q) {
+            cmd |= k > w;
+            w = k + 1;
+        }
+    }
+    unsigned p = w + q, plen = cur - p;
+    if (!cmd || plen > NAME_MAX || mounted() < 0)
+        return (int)cur;
+    for (k = 0; k < plen; k++) {
+        unsigned c = nice_peek(p + k);
+        if (c > 0xFF)
+            return (int)cur;
+        want[k] = (unsigned char)c;
+    }
+    // The matches: their number n, and the start that they share, the
+    // first's characters, len of them, in sec
+    unsigned char *best = (unsigned char *)sec;
+    unsigned n = 0, len = 0;
+    for (int list = 0; list < 2; list++) {
+        struct file d;
+        start(&d, vol.dir, K_DIR, 0);
+        unsigned char *e;
+        int r;
+        while ((r = entry(&d, &e)) == 1) {
+            if ((e[11] & 0x10) || !lascii)
+                continue;
+            for (k = 0; k < plen && upper(lname[k]) == upper(want[k]); k++)
+                ;
+            if (k < plen)
+                continue;
+            if (list) {
+                nice_print((const char *)lname);
+                nice_print("\r\n");
+            } else if (n++ == 0) {
+                for (len = 0; lname[len]; len++)
+                    best[len] = lname[len];
+            } else {
+                while (k < len && upper(lname[k]) == upper(best[k]))
+                    k++;
+                len = k;
+            }
+        }
+        if (r < 0 || n == 0)
+            return (int)cur;
+        if (list)
+            return 0;
+        if (n > 1 && len == plen)
+            nice_print("\r\n");
+        else
+            break;
+    }
+    // The new word, from the start typed, from, or from the cursor: an
+    // opening quote when one is needed, the start in the case of the
+    // first match, the rest, and after one match a closing quote and a
+    // blank. What is typed again is first rubbed out with BS.
+    unsigned open = 0, from = cur;
+    for (k = 0; k < len; k++) {
+        open |= best[k] == ' ' && !q;
+        if (open || (k < plen && best[k] != want[k]))
+            from = p;
+    }
+    if (cur + open + (len - plen) + (n == 1) * (1 + (q | open)) > end)
+        return (int)cur;
+    for (k = from; k < cur; k++)
+        nice_putc(8);
+    k = from;
+    if (open)
+        type(k++, '"');
+    for (unsigned i = from - p; i < len; i++)
+        type(k++, best[i]);
+    if (n == 1) {
+        if (q | open)
+            type(k++, '"');
+        type(k++, ' ');
+    }
+    return (int)k;
+}
+
 // fat_load: the lines of the open file h, ADDR WORD in hex, written as
 // the monitor's l writes them, but that an empty line is passed over and
 // the end of the file ends the load. A line is skipped when it is longer
