@@ -13,9 +13,9 @@
 ; The cold start, mon_reset, sets SP to STACK, the variables, and the
 ; screen, and goes to cmd_start, which prints the banner and runs the main
 ; loop, main, of monitor_cmd.nasm. At a program's return, and at
-; mon_exit, the monitor clears E, stops the timer, sets VBASE to 0, shows
-; the cursor, blinking, takes a fresh stack, prints the status, R1, and
-; goes back to main.
+; mon_exit, the monitor clears E, stops the timer, clears the FPU, sets
+; VBASE to 0, shows the cursor, blinking, takes a fresh stack, prints the
+; status, R1, and goes back to main.
 ;
 ; The monitor is this file and five more, which the Makefile joins after
 ; it, in this order, so that the dispatch table is at 0:
@@ -116,6 +116,7 @@ SCR_OFFS        .EQU    0xFFFFFF85      ; the display offset, in words
 SCR_FONT        .EQU    0xFFFFFF86      ; the font base: 0 shows Spleen
 TEXT_B          .EQU    0x20000000      ; the byte window: byte A of the memory at TEXT_B+A
 TIMER           .EQU    0xFFFFFF10      ; the timer's period, 0 to stop it
+FPU_CMD         .EQU    0xFFFFFF8C      ; the FPU's command: 0x101, CLEAR 1, empties its stack and clears its flags
 E_IP            .EQU    0xFFFFFFB0      ; the network station's IP address, NET_IP, the first byte in bits 31..24
 E_MACH          .EQU    0xFFFFFFB1      ; the first two bytes of its MAC address, in bits 15..0
 E_MACL          .EQU    0xFFFFFFB2      ; the last four bytes of its MAC address
@@ -267,9 +268,10 @@ SCR_MAX         .EQU    0x7FFF          ; the largest display offset
                 JMP     tcp_listen      ; 31 at 0x3E, monitor_tcp.nasm
 
 ; mon_reset: the cold start, entry 0, which reset runs and a program may
-; call. E is cleared, the timer stopped, VBASE set to 0, the font base
-; set to 0, so that the screen shows Spleen, and the port for Ethernet
-; frames disabled, as at a return, after a RST for each TCP connection
+; call. E is cleared, the timer stopped, the FPU's stack emptied and its
+; flags cleared (issue #141), VBASE set to 0, the font base set to 0, so
+; that the screen shows Spleen, and the port for Ethernet frames
+; disabled, as at a return, after a RST for each TCP connection
 ; that a program left open, the mask, the gateway, and the DNS server set
 ; to none, the DHCP lease forgotten, and the ARP cache emptied. The identification of the IPv4
 ; packets starts from the fine clock, net_clock, and the local ports of
@@ -284,6 +286,7 @@ SCR_MAX         .EQU    0x7FFF          ; the largest display offset
 mon_reset
                 MOVE    R14, 0          ; E = 0, VBASE = 0; bit 24 stays 1
                 MOVE    @TIMER, 0
+                MOVE    @FPU_CMD, 0x0101  ; CLEAR 1, as a reset of the core does
                 MOVE    @SCR_FONT, 0
                 MOVE    SP, STACK
                 CALL    net_close
@@ -330,11 +333,11 @@ mon_reset
                 JMP     cmd_start       ; monitor_cmd.nasm
 
 ; mon_exit: entry 1, and where a program returns to. Back to the main loop,
-; main, with R1 the status: E cleared, the timer stopped, VBASE 0, the
-; font base 0, the network closed, net_close, the cursor shown and
-; blinking with the display offset off, a fresh stack, and the status
-; printed where the program left the cursor's registers, after a new line
-; if that is not column 0.
+; main, with R1 the status: E cleared, the timer stopped, the FPU's
+; stack empty and its flags clear, VBASE 0, the font base 0, the network
+; closed, net_close, the cursor shown and blinking with the display
+; offset off, a fresh stack, and the status printed where the program left
+; the cursor's registers, after a new line if that is not column 0.
 mon_exit
                 MOVE    SP, STACK
                 PUSH    R1
@@ -375,6 +378,7 @@ mon_trap
 exit_restore
                 MOVE    R14, 0          ; E = 0, VBASE = 0; bit 24 stays 1
                 MOVE    @TIMER, 0
+                MOVE    @FPU_CMD, 0x0101  ; CLEAR 1: no values or flags for the next program
                 MOVE    @SCR_FONT, 0    ; Spleen, whatever the program chose
                 CALL    net_close       ; no frames, if the program took them
                 MOVE    @SCR_CTL, 0x60  ; the cursor, which a program may hide

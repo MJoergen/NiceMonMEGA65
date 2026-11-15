@@ -138,12 +138,14 @@ its own image, and the monitor clears E, stops the timer, and sets VBASE
 back to 0 at every return. It sets the font base back to 0 then too, so
 that the screen shows Spleen, and leaves the font RAM as the program left
 it. It also shows the cursor again, blinking, and turns the display
-offset off, as a program may have hidden the one or used the other.
+offset off, as a program may have hidden the one or used the other. And
+it empties the FPU's stack and clears its flags, so that the next
+program starts with none of the values that this one left there.
 
 | # | Addr | Name | Arguments → result |
 |---|---|---|---|
-| 0 | `00` | `mon_reset` | Cold start: E, the timer, VBASE, and the font base cleared, the stack, the variables, the screen, the clock of the time of day from the MEGA65's real-time clock while it is not set, the banner, the main loop. The RAM from `0x8000` is left alone. |
-| 1 | `02` | `mon_exit` | R1 a status. Back to the main loop with a fresh stack, with E, the timer, VBASE, and the font base cleared, the cursor shown and blinking, the display offset off, and the status printed where the program left the cursor, on a new line if that is not column 0; for a program that has not kept the SP of its entry. A program with the runtime's start-up code returns or calls `exit` instead, which lands here too. |
+| 0 | `00` | `mon_reset` | Cold start: E, the timer, the FPU, VBASE, and the font base cleared, the stack, the variables, the screen, the clock of the time of day from the MEGA65's real-time clock while it is not set, the banner, the main loop. The RAM from `0x8000` is left alone. |
+| 1 | `02` | `mon_exit` | R1 a status. Back to the main loop with a fresh stack, with E, the timer, the FPU, VBASE, and the font base cleared, the cursor shown and blinking, the display offset off, and the status printed where the program left the cursor, on a new line if that is not column 0; for a program that has not kept the SP of its entry. A program with the runtime's start-up code returns or calls `exit` instead, which lands here too. |
 | 2 | `04` | `mon_version` | → R1 the version of the table, major in bits 31..16, minor in 15..0: `0x00010005`, 1.5. |
 | 3 | `06` | `mon_putc` | R1 a character, to the outputs `mon_out` selects. On the screen it goes at the cursor, which moves on, to the next row after the last column; CR moves the cursor to column 0, LF to column 0 of the next row, BS one back, and TAB to the next multiple of 8; the other control codes and `0x7F` do nothing, and `0x80` to `0x9F` go on the screen as any character, blank in Spleen and drawn from the font RAM when a program selected it; past the last row the rows move up by one, by copying, so the rows shown are always the 2000 words at `0xFFFF0000`, as in `niceemu`. On the line every byte goes as it is. |
 | 4 | `08` | `mon_out` | R1 the outputs: bit 0 the line, bit 1 the screen; both at reset. → R1 the old ones. |

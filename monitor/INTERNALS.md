@@ -245,8 +245,8 @@ from 0, and the rest is free. The demo is not in it: it is a program,
 <!-- romsize layout -->
 | Part | Address | Words |
 |---|---|---:|
-| The monitor | `0x0000`–`0x5539` | 21818 |
-| Free | `0x553A`–`0x7FFF` | 10950 |
+| The monitor | `0x0000`–`0x553F` | 21824 |
+| Free | `0x5540`–`0x7FFF` | 10944 |
 <!-- /romsize layout -->
 
 The monitor's words, by the source they come from, in the order
@@ -259,7 +259,7 @@ ROM is built:
 <!-- romsize monitor -->
 | Source | What it is | Words | Text |
 |---|---|---:|---:|
-| `monitor.nasm` | The dispatch table, the HAL, the cold start, and the traps | 798 | 9 |
+| `monitor.nasm` | The dispatch table, the HAL, the cold start, and the traps | 804 | 9 |
 | `monitor_cmd.nasm` | The main loop and the commands | 2245 | 647 |
 | `monitor_dis.nasm` | The disassembler of `u` | 889 | 79 |
 | `monitor_sd.nasm` | The sector routines | 226 | 59 |
@@ -277,7 +277,7 @@ ROM is built:
 | nice_cpu's `muldiv_mpu.nasm` | Multiply and divide | 128 | 0 |
 | `build/folder.nasm` | The error of a card without the folder | 8 | 8 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 21818 | 962 |
+| In all | | 21824 | 962 |
 <!-- /romsize monitor -->
 
 - The C code's strings are in its initial values, also four characters
@@ -441,7 +441,7 @@ compared with `test/NAME.expected`:
 | `arp` | `test/arp.nasm`, with the frames of `test/arp.eth` | `arp_resolve`: a reply after other frames, the cache, no reply, an entry aged out, and the cache filled and gone round. The frames sent are compared too. |
 | `udp` | `test/udp.nasm`, with the frames of `test/udp.eth` | The UDP entries: each error, a datagram sent after ARP, a broadcast, datagrams received among other frames, one cut short, and one sent through the gateway. The frames sent are compared too. |
 | `net` | `test/net.nasm`, with the frames of `test/net.eth` | The poll and the IP settings of issue #111: `net_config` at a word-window address and a plain one, `net_set`, `net_poll`, a datagram held and a second dropped, ARP replies learned in place, so that no request goes, a TCP segment released, and a deadline armed, not due, and due. The frames sent are compared too. |
-| `rom` | `build/rom.bin`: the monitor with `test/rom.c` in its C code, and `test/rom.nasm` | The C code in the ROM: a global's initial value, a static array set to 0, both again after `r 0`, `nice_print`, and a trap, whose address must be the label `_rom_trap`. |
+| `rom` | `build/rom.bin`: the monitor with `test/rom.c` in its C code, and `test/rom.nasm` | The C code in the ROM: a global's initial value, a static array set to 0, both again after a cold start, `nice_print`, and a trap, whose address must be the label `_rom_trap`; the FPU's stack and flags that a run leaves, which the trap and the cold start of `r 8100` clear (#141). |
 | `fs` | `test/fs.nasm`, with FAT images in both slots | The file entries, through `mon.nasm`'s stubs: handles, reads across the fragments of a file and at its end, the folder's entries, mounts, each error a program can cause, and `fs_readname`'s long name and 8.3 name in lower case, and a file opened by its long name. |
 | `fsw` | `test/fsw.nasm`, with a copy of the card with partitions, one file read-only, and a write-protected card | The entries that write: a file written in pieces across clusters and read back, truncated, a file of ten clusters, deletions, one of a long name, a folder that grows a cluster, a mount that drops an open file, and each error. |
 | `fat` | The monitor, with FAT images in both slots | `dir` and `load`: the fragmented `FRAG.BIN`, a text file, bad arguments, and `HELLO.BIN` loaded and run. |

@@ -285,9 +285,10 @@ LOAD_EMU = l\r10000 7\rFFFEFFFF 8\rFFFF0000 1\r\rd 10000 1\rh\r
 # build/ram64k.bin writes to 0xFFFFFF9E: EFFF takes a word, and F000, the
 # monitor's variables, and 1EFFF, past the RAM, do not.
 LOAD_64K = l\rEFFF 1\rF000 2\r1EFFF 3\r\rd EFFF 1\rh\r
-# rom: r runs test/rom.nasm, which traps, twice, then r 0, the cold start,
-# which gives the C code its initial values again, and r once more.
-ROM  = r\rr\rr 0\rr\rh\r
+# rom: r runs test/rom.nasm, which traps, twice, then r 8100, which
+# leaves values on the FPU and jumps to 0, the cold start, which gives
+# the C code its initial values again and clears the FPU, and r once more.
+ROM  = r\rr\rr 8100\rr\rh\r
 # sd_write: r runs test/sd.nasm, which writes sector 2, which the image
 # shows.
 SD_WRITE = r\rh\r
@@ -386,8 +387,9 @@ DUMP_sd_write = -d 0x9100:6
 DUMP_fs       = -d 0x9100:36 -d 0x9180:8 -d 0x9200:45 -d 0x9280:16 -d 0x92A0:11
 DUMP_fsw      = -d 0x9100:42
 DUMP_fat      = -d 0xFFFFF11A:5
-# For rom the number of runs and the results of test/rom.nasm's calls
-DUMP_rom      = -d 0x9100:10
+# For rom the number of runs, the results of test/rom.nasm's calls, the
+# FPU's status at the start of each run, and at the halt
+DUMP_rom      = -d 0x9100:10 -d 0x9110:3 -d 0xFFFFFF8D:1
 # For arp the results of test/arp.nasm's calls, and the cache it copied,
 # and for udp the results of test/udp.nasm's, and the bytes and the
 # sources that udp_recv wrote

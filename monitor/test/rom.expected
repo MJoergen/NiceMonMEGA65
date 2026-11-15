@@ -6,7 +6,7 @@ Trap 1 at _rom_trap
 > r
 Hello from the ROM's C code
 Trap 1 at _rom_trap
-> r 0
+> r 8100
 NiceMon V9.9
 ? lists the commands
 > r
@@ -16,6 +16,8 @@ Trap 1 at _rom_trap
 Halted
 00009100: 00000003 00000007 00000008 00000000 00000009 0000000a 0000000a 00000007
 00009108: 00000008 00000000
+00009110: 00080000 00080000 00080000
+ffffff8d: 00080000
 Screen:
 |NiceMon V9.9
 |? lists the commands
