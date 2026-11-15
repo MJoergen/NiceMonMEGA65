@@ -53,6 +53,14 @@ over and del of a directory and of a read-only file, and del of a
 missing one. A card that fills up keeps what fitted, with error 30, and
 a write-protected card is left as it was, with the controller's error 6.
 
+mkdir, on a copy of nonice.img, after ls has given error 29 with its
+hint: it makes NICE, says so, and says it is there already the next
+time; ls lists it empty, and put writes into it. A file of the root of
+the folder's name, and a name with an extension, are errors; a name in
+lower case makes the folder in upper case. On a card whose root
+cluster of one sector is full, the root grows by a cluster. fsck.fat
+and mdir check both cards afterwards.
+
 On a running core, put holds it, and starts it again from reset, which
 sim/sdhold.nasm shows by reading sector 5 again. Last, the monitor of
 the tests, monitor/build/monitor_test.bin, lists the card with dir, the
@@ -750,6 +758,86 @@ def test_full(tmp: str) -> None:
           got == body[:512 * left], f"{len(got or b'')} bytes")
 
 
+def root_clusters(img: str) -> int:
+    with open(img, "rb") as f:
+        def read(lba: int) -> bytes:
+            f.seek(512 * lba)
+            return f.read(512)
+        vol = Volume(read, need=False)
+        return len(list(vol.clusters(vol.root)))
+
+
+def test_mkdir(imgs: dict[str, str], tmp: str) -> None:
+    print("mkdir on a held core, a copy of nonice.img")
+    img = copy(imgs["nonice"], os.path.join(tmp, "mk.img"))
+    put(img, b"a file\n", "FILE", tmp)
+    emu = Emu(img)
+    try:
+        r = emu.tool("ls")
+        check("ls: error 29 with the hint of mkdir", r.returncode == 1 and
+              "File error 29, no folder NICE on the card; make it with "
+              "the command mkdir" in r.stderr.decode(), text(r))
+        r = emu.tool("mkdir")
+        check("mkdir", r.returncode == 0 and
+              "Made the folder NICE" in r.stdout.decode(), text(r))
+        r = emu.tool("mkdir")
+        check("mkdir again: there already", r.returncode == 0 and
+              "The folder NICE is there already" in r.stdout.decode(),
+              text(r))
+        r = emu.tool("ls")
+        check("ls of the new folder", r.returncode == 0 and
+              r.stdout.decode().splitlines() ==
+              ["Directory of NICE", "Files: 0, directories: 0"], text(r))
+        src = os.path.join(tmp, "src.dat")
+        with open(src, "wb") as f:
+            f.write(FILES["BIG.BIN"])
+        r = emu.tool("put", src, "BIG.BIN")
+        check("put into it", r.returncode == 0, text(r))
+        for args, want in (
+                (("--folder", "FILE", "mkdir"),
+                 "a file of the root has the name FILE"),
+                (("--folder", "A.B", "mkdir"),
+                 "File error 20, not a valid name"),
+                (("--folder", "lower", "ls"),
+                 "File error 29, no folder lower on the card")):
+            r = emu.tool(*args)
+            check(f"{' '.join(args)}: {want}",
+                  r.returncode == 1 and want in r.stderr.decode(), text(r))
+        r = emu.tool("--folder", "lower", "mkdir")
+        check("--folder lower mkdir: the folder LOWER", r.returncode == 0 and
+              "Made the folder LOWER" in r.stdout.decode(), text(r))
+    finally:
+        emu.close()
+    check_card(img, "after mkdir")
+    check("mtype sees NICE/BIG.BIN", mtype(img, "BIG.BIN") == FILES["BIG.BIN"])
+    m = subprocess.run(["mdir", "-b", "-i", img, "::LOWER"],
+                       capture_output=True, text=True)
+    check("mdir sees LOWER, empty", m.returncode == 0 and not m.stdout,
+          m.stdout + m.stderr)
+    print("mkdir in a full root, which grows by a cluster")
+    img = os.path.join(tmp, "root.img")
+    blank(img, 40 * MB)
+    run("mkfs.fat", "-F", "32", "-s", "1", img)
+    run("mmd", "-i", img, *(f"::D{i:02}" for i in range(16)))
+    before = root_clusters(img)
+    emu = Emu(img)
+    try:
+        r = emu.tool("mkdir")
+        check("mkdir", r.returncode == 0, text(r))
+        r = emu.tool("ls")
+        check("ls of the new folder", r.returncode == 0, text(r))
+    finally:
+        emu.close()
+    check_card(img, "after mkdir in a full root")
+    check(f"the root grew from {before} cluster",
+          root_clusters(img) == before + 1, str(root_clusters(img)))
+    m = subprocess.run(["mdir", "-b", "-i", img, "::"], capture_output=True,
+                       text=True)
+    check("mdir sees NICE and the 16 others",
+          len(m.stdout.split()) == 17 and "::/NICE/" in m.stdout.split(),
+          m.stdout)
+
+
 def test_protected(imgs: dict[str, str], tmp: str) -> None:
     img = copy(imgs["super"], os.path.join(tmp, "ro.img"))
     os.chmod(img, 0o444)
@@ -1090,6 +1178,7 @@ def main() -> None:
         test_running(imgs, tmp)
         test_writes(imgs, tmp)
         test_full(tmp)
+        test_mkdir(imgs, tmp)
         test_protected(imgs, tmp)
         test_write_running(imgs, tmp)
         test_monitor(imgs, tmp)

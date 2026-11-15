@@ -119,7 +119,8 @@ program from a card:
 1. On a PC, make the folder `NICE` on the card, and copy the program's
    `.bin` file into it. The monitor never makes the folder, and fails
    on a card without it, as a card may be shared with other cores, each
-   with a folder of its own.
+   with a folder of its own. With no PC slot, `make sdcard CMD=mkdir`
+   makes it over the link, on a card that has FAT32.
 2. Put the card in the board, and type `load NAME` and then `r`.
 
 On the MEGA65, slot 0 is the microSD slot at the back, and slot 1 the
@@ -131,9 +132,10 @@ its microSD slot.
 
 A PC reaches the card by remote control too, with no card reader:
 `make sdcard ETH=192.168.1.65 CMD=ls` lists `NICE`, `CMD="get NAME"`
-copies a file off the card, `CMD="put FILE"` writes one, and
-`CMD="del NAME"` deletes one. After a write, the monitor starts again
-from reset ([tools/README.md](tools/README.md#sdcardpy)). On Linux,
+copies a file off the card, `CMD="put FILE"` writes one,
+`CMD="del NAME"` deletes one, and `CMD=mkdir` makes the folder `NICE`.
+After a write, the monitor starts again from reset
+([tools/README.md](tools/README.md#sdcardpy)). On Linux,
 `make sdnbd ETH=192.168.1.65` serves the whole card as a disk, which
 `nbd-client` connects and the PC mounts as a folder, for the file
 manager, while the core is held

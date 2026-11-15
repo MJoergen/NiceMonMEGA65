@@ -76,7 +76,7 @@ help:
 	@echo "  make mon [FILE=prog.bin] (ETH=IP | PORT=/dev/ttyUSB1)"
 	@echo "                  an interactive shell on the debug link: read and write"
 	@echo "                  memory, pause, step, breakpoints, and the console"
-	@echo "  make sdcard CMD='ls | get NAME [DEST] | put SRC [NAME] | del NAME' (ETH=IP | PORT=/dev/ttyUSB1)"
+	@echo "  make sdcard CMD='ls | get NAME [DEST] | put SRC [NAME] | del NAME | mkdir' (ETH=IP | PORT=/dev/ttyUSB1)"
 	@echo "                  list, copy, write, or delete the files of the folder NICE"
 	@echo "                  of the board's SD card, over the debug link"
 	@echo "  make sdnbd (ETH=IP | PORT=/dev/ttyUSB1) [ARGS='--read-only --slot 1']"

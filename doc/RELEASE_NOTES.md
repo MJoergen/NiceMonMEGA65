@@ -39,6 +39,14 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 - With `niceemu --step-time`, a write to `TIME_SKIP`, `0xFFFFFF5F`,
   skips time. The board ignores the write.
 
+**New.**
+
+- `sdcard.py mkdir`, and `make sdcard CMD=mkdir`, make the folder `NICE`
+  on a card that has FAT32 but not the folder, with no PC slot
+  ([#140](https://github.com/MJoergen/NiceMonMEGA65/issues/140)). The
+  tool's errors for a card without the folder, or without FAT32, say
+  what to do.
+
 **Changes.**
 
 - `weather.bin` shows the wind in m/s, unless `WEATHER.CFG` has

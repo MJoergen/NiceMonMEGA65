@@ -315,7 +315,8 @@ and must be formatted. FAT12 and FAT16 are rejected with a message.
   monitor's build sets another, as a card may be shared by several
   cores on the MEGA65, each with a root folder of its own. A card without
   it is refused, with no fallback to the root, and the ROM never creates
-  it, so writing happens only in a folder that the user made.
+  it, so writing happens only in a folder that the user made, on a PC
+  or with `sdcard.py mkdir` over the link (#140).
 - **Writing**, in an order that a reset at any point leaves no worse than
   lost clusters, which `fsck.fat` frees. A file opened to write gets its
   directory entry at once, empty, with no clusters; an existing file is
@@ -482,8 +483,9 @@ There are no device numbers and no Commodore DOS.
    link while the core is paused, through these registers, and run a FAT
    library on the host, so that a file goes to the card with no PC slot.
    Settled: `tools/sdcard.py`, with its own FAT32 in Python, as
-   the monitor's, and only in its folder. A write resets the core after
-   it, as the ROM keeps the FAT's sector and the mount between commands.
+   the monitor's, and only in its folder, but for `mkdir`, which makes
+   the folder in the root (#140). A write resets the core after it, as
+   the ROM keeps the FAT's sector and the mount between commands.
 
 ## Subtasks
 

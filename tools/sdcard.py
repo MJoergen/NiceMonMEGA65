@@ -13,6 +13,7 @@ that --folder names:
     tools/sdcard.py --eth 192.168.1.65 get HELLO.BIN [DEST]
     tools/sdcard.py --eth 192.168.1.65 put prog.bas [NAME]
     tools/sdcard.py --eth 192.168.1.65 del NAME
+    tools/sdcard.py --eth 192.168.1.65 mkdir
 
 ls prints the rows of the monitor's dir, which shows a file's long name
 where it has one, with its 8.3 name after its size. get takes the 8.3
@@ -27,7 +28,10 @@ truncates it when it is there, by either name. A new file gets
 long-name entries and an 8.3 alias with a tail, MANDEL~1.BIN, as
 fat32.c makes them, unless its name is an 8.3 name in upper case, or in
 lower case in a part. del deletes a file, by either name, with its
-long-name entries.
+long-name entries. mkdir makes the folder in the root of a card that
+has FAT32 but not the folder, which the monitor never makes, and says
+so when it is there already; the folder's name must be an 8.3 name with
+no extension, as NICE is.
 
 The writes keep to fat32.c's order, in which a reset at any point leaves
 the card no worse than with lost clusters, which fsck.fat frees: FSInfo's
@@ -38,7 +42,10 @@ clusters are freed, a new file's first cluster and size put into its
 entry last, a new file's long-name entries written before its 8.3 entry,
 and a deleted file's long-name entries marked before its entry. No
 sector outside the partition is written, nor one below its first FAT
-but FSInfo. The date and time of a new entry are the host's.
+but FSInfo. mkdir takes the folder's cluster, its zeros and its entries
+. and .. written first, before the root's entry of it, so that a reset
+leaves a lost cluster at worst. The date and time of a new entry are
+the host's.
 
 The core: for ls and get, a running one is paused, and goes on after
 them. While it is paused, by the tool or before, the tool keeps to the
@@ -54,20 +61,23 @@ when it is not ready.
 With --hold, ls and get hold a running or paused core too, as put and
 del do, and start it again from reset afterwards, so that they reach
 any slot, as while the core is held, whatever the program had: the
-program is lost. put and del hold a running or paused core first, and
-start it again from reset after the write, as a program such as the monitor keeps a sector
-of the FAT and its mount between commands, which the write makes stale.
+program is lost. put, del, and mkdir hold a running or paused core
+first, and start it again from reset after the write, as a program
+such as the monitor keeps a sector of the FAT and its mount between
+commands, which the write makes stale.
 A program in the middle of a write of its own loses it, as at a reset,
 with lost clusters at worst. A held core stays held.
 
 The tool exits with status 1 and a message on an error, as the monitor's
-"File error N, ..." for one of the file system. Only the Python standard
+"File error N, ..." for one of the file system, with a hint for a card
+with no FAT32 or without the folder. Only the Python standard
 library is used, so this runs on Linux and macOS.
 
 Usage: tools/sdcard.py (--eth HOST[:PORT] | --port DEVICE [--baud 230400]
                        | --tcp [HOST:]PORT | --cosim PORT)
                        [--slot N] [--folder NAME] [--hold]
-                       (ls | get NAME [DEST] | put SRC [NAME] | del NAME)
+                       (ls | get NAME [DEST] | put SRC [NAME] | del NAME
+                        | mkdir)
 """
 
 from __future__ import annotations
@@ -133,6 +143,12 @@ FS_ERRORS = {
 E_NOFS, E_FAT12, E_FAT16, E_EXFAT, E_NAME = 16, 17, 18, 19, 20
 E_NOFILE, E_ISDIR, E_BADFAT, E_SLOT, E_NOFOLDER = 21, 22, 26, 27, 29
 E_FULL, E_RDONLY = 30, 32
+# What to do about a card that the tool cannot use as it is
+FORMAT = "; format the card as FAT32 on a PC"
+HINTS = {
+    E_NOFS: FORMAT, E_FAT12: FORMAT, E_FAT16: FORMAT, E_EXFAT: FORMAT,
+    E_NOFOLDER: "; make it with the command mkdir",
+}
 
 # The monitor's folder on the card unless the build sets another
 FOLDER = "NICE"
@@ -627,15 +643,20 @@ def lfn_text(parts: list[bytes], raw: bytes) -> str | None:
         "utf-16-le", errors="replace")
 
 
+class FolderError(Exception):
+    """The folder cannot be made, as a file of the root has its name."""
+
+
 class Volume:
     """A FAT32 file system on a card, read with read(lba) and written
     with write(lba, data), if given, mounted as fat32.c mounts one, with
-    its folder, and only that folder."""
+    its folder, and only that folder. With need False, a card without the
+    folder mounts too, with dir 0, for mkdir."""
 
     def __init__(self, read: Callable[[int], bytes],
                  folder: str = FOLDER,
                  write: Callable[[int, bytes], None] | None = None,
-                 now: float | None = None) -> None:
+                 now: float | None = None, need: bool = True) -> None:
         self.read = read
         self._write = write
         self.folder = folder
@@ -681,10 +702,14 @@ class Volume:
         root = u32(b, 44)
         if root < 2 or root >= self.top:
             raise FileError(E_BADFAT)
+        self.root = root
         name = folder.upper().ljust(11).encode("latin-1")
         found = [e for e in self.entries(root) if e.raw == name]
+        self.dir = 0
         if not found or not found[0].is_dir:
-            raise FileError(E_NOFOLDER, folder)
+            if need:
+                raise FileError(E_NOFOLDER, folder)
+            return
         self.dir = found[0].first
         if self.dir < 2 or self.dir >= self.top:
             raise FileError(E_BADFAT)
@@ -869,27 +894,32 @@ class Volume:
             c = n
 
     def make(self, raw: bytes, lower: int = 0,
-             lfn: list[bytes] | None = None) -> tuple[int, int]:
-        """A new entry of the 8.3 name raw in the folder, empty, with the
+             lfn: list[bytes] | None = None, parent: int = 0,
+             attr: int = 0x20, first: int = 0) -> tuple[int, int]:
+        """A new entry of the 8.3 name raw in the folder, or in the
+        directory from cluster parent, if given, empty or with the first
+        cluster first, with the attributes attr, archive by default, the
         flags lower in byte 12, and the long-name entries lfn before it,
         in the first run of free entries for all, which may go on into a
-        new cluster of zeros added to the folder. The long-name entries
+        new cluster of zeros added to the directory. The long-name entries
         are written first, then the 8.3 entry, a sector at a time, as
         fat32.c's make writes them. Its sector and offset."""
         date, tod = fat_stamp(self.now)
         e = bytearray(32)
         e[:11] = raw
-        e[11] = 0x20            # archive
+        e[11] = attr
         e[12] = lower
         put16(e, 14, tod)       # created,
         put16(e, 16, date)
         put16(e, 18, date)      # read,
         put16(e, 22, tod)       # and written
         put16(e, 24, date)
+        put16(e, 20, first >> 16)
+        put16(e, 26, first)
         todo = (lfn or []) + [bytes(e)]
         run: list[tuple[int, int]] = []
         pos, last = 0, 0
-        clus = self.dir
+        clus = parent or self.dir
         while len(run) < len(todo):
             for k in range(self.spc):
                 lba = self.first_sector(clus) + k
@@ -1008,6 +1038,47 @@ class Volume:
             raise FileError(E_FULL)
         return done
 
+    def mkdir(self) -> bool:
+        """Makes the folder in the root, unless it is there, and returns
+        whether it made it: a free cluster, its zeros with the entries .
+        and .. written before it is taken, and the root's entry of the
+        folder last, with that cluster, so that a reset at any point
+        leaves no worse than a lost cluster. The name must be an 8.3 name
+        with no extension, as the mount compares the entry's 11 bytes
+        with it."""
+        if self.dir:
+            return False
+        raw = self.folder.upper().ljust(11).encode("latin-1")
+        got = name83(self.folder.upper())
+        if got is None or got[0] != raw:
+            raise FileError(E_NAME)
+        if any(e.raw == raw for e in self.entries(self.root)):
+            raise FolderError(f"a file of the root has the name "
+                              f"{self.folder.upper()}; delete or rename it "
+                              "first")
+        date, tod = fat_stamp(self.now)
+        c = self.search()
+        first = bytearray(512)
+        for at, name, clus in ((0, b".", c), (32, b"..", 0)):
+            first[at:at + 11] = name.ljust(11)
+            first[at + 11] = 0x10
+            put16(first, at + 14, tod)
+            put16(first, at + 16, date)
+            put16(first, at + 18, date)
+            put16(first, at + 20, clus >> 16)
+            put16(first, at + 22, tod)
+            put16(first, at + 24, date)
+            put16(first, at + 26, clus)
+        lba = self.first_sector(c)
+        self.wr(lba, bytes(first))
+        for k in range(1, self.spc):
+            self.wr(lba + k, bytes(512))
+        self.take(0, c)
+        self.make(raw, parent=self.root, attr=0x10, first=c)
+        self.infodone()
+        self.dir = c
+        return True
+
     def delete(self, name: str) -> Entry:
         """Deletes the file of the folder whose long or 8.3 name is name:
         its long-name entries marked free, then its entry, each sector
@@ -1116,6 +1187,9 @@ def main() -> None:
     rm = cmds.add_parser("del", help="delete a file of the folder; holds "
                          "the core, and starts it again")
     rm.add_argument("name", help="its 8.3 name or its long name")
+    cmds.add_parser("mkdir", help="make the folder in the root of the "
+                    "card, unless it is there; holds the core, and starts "
+                    "it again")
     args = parser.parse_args()
     data = b""
     try:
@@ -1133,11 +1207,18 @@ def main() -> None:
         sys.exit(f"sdcard.py: {e}")
     link = open_link(args)
     try:
-        writes = args.cmd in ("put", "del")
+        writes = args.cmd in ("put", "del", "mkdir")
         with Card(link, args.slot, writes, args.hold) as card:
             vol = Volume(card.read, args.folder,
-                         card.write if writes else None)
-            if args.cmd == "ls":
+                         card.write if writes else None,
+                         need=args.cmd != "mkdir")
+            if args.cmd == "mkdir":
+                folder = args.folder.upper()
+                if vol.mkdir():
+                    print(f"Made the folder {folder}")
+                else:
+                    print(f"The folder {folder} is there already")
+            elif args.cmd == "ls":
                 do_ls(vol)
             elif args.cmd == "get":
                 do_get(vol, args.name, args.dest)
@@ -1147,7 +1228,9 @@ def main() -> None:
             else:
                 gone = vol.delete(args.name)
                 print(f"Deleted {gone.name}")
-    except (SdError, FileError, LinkError, OSError) as e:
+    except FileError as e:
+        sys.exit(f"sdcard.py: {e}{HINTS.get(e.code, '')}")
+    except (SdError, FolderError, LinkError, OSError) as e:
         sys.exit(f"sdcard.py: {e}")
     finally:
         link.close()
