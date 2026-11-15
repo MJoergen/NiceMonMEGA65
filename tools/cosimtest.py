@@ -7,7 +7,8 @@ free port of 127.0.0.1. On it, it runs hwtest.py's checks of bad
 packets, except the one of a gap between two bytes, as a gap in real
 time is far shorter in simulated time, and its checks of the pause, the
 step, the breakpoints, and the writes of the registers, against niceemu
---link. Then it runs the programs of hwtest.py's comparison with run.py
+--link, and its check of the FPU. Then it runs the programs of
+hwtest.py's comparison, two of the FPU among them, with run.py
 --cosim on that port and with niceemu alone, and the monitor's test
 program, with run.py --monitor and with the monitor's l. Each must print
 the same and exit with the same status. The monitor's cold start must set
@@ -37,7 +38,7 @@ import hwtest
 from hwtest import (NICEEMU, REPO, assemble, assemble_labels, comparisons,
                     results, test_fit, test_framing, test_monitor, test_pause,
                     test_run, test_step, test_break, test_watch,
-                    test_write_regs)
+                    test_write_regs, test_fpu)
 from boardlink import HOLD, RAM, open_link
 
 # The time of the model of the RV-3032-C7 in sim/cosim/tb_cosim.vhd, as
@@ -147,6 +148,8 @@ def main() -> None:
                 test_watch(link, *brk)
                 test_write_regs(link, *assemble_labels(
                     f"{REPO}/sim/step.nasm", tmp))
+                test_fpu(link, *assemble_labels(
+                    f"{REPO}/sim/fpusum.nasm", tmp))
             finally:
                 link.close()
             test_run(["--cosim", port], comparisons(tmp))

@@ -525,7 +525,7 @@ the request. Only small programs are practical.
 `make cosimtest` starts `make cosim` on a free port. It runs hwtest's
 checks of bad packets on it, but for the gap of 300 ms, which is far
 shorter in simulated time, and its checks of the pause, the step, the
-breakpoints, and the writes of the registers.
+breakpoints, the writes of the registers, and the FPU.
 Then it runs the programs that `make hwtest` compares, and the monitor's
 with `--monitor --rom` and with a short program pasted into `l`, with
 `run.py --cosim` and with `niceemu`, whose output and exit status must
@@ -893,6 +893,17 @@ bitstream has one. Then it hides the ROM and uses the link:
   halt, and then gets `e04` for a write while halted and while held.
   The same sequence runs on `niceemu --link`, and every result must be
   the same.
+- It uses the FPU at `0xFFFFFF88`–`8F` over the link, with the core
+  held: it clears it, divides 1000 by 7, reads the quotient through
+  each register, takes the square root, and leaves two values and the
+  four flags. Then it runs `sim/fpusum.nasm`, which sums a series
+  without end: the status that the program stored at its start is that
+  of an empty stack, as a start resets the FPU. It pauses the program
+  three times, and steps it to the top of its loop, across its accesses
+  of the FPU, where the FPU must hold the sum of the terms that R1
+  counts, and nothing else. A hold while the program runs keeps the
+  FPU's values, and the link clears them. The expected bits are
+  Python's, whose floats are binary64 too, not `niceemu`'s.
 - It steps `sim/step.nasm` to its halt and compares the registers after
   each step with `niceemu --trace`.
 - It runs `sim/break.nasm` to its breakpoints: in a loop, two at one
@@ -935,7 +946,7 @@ bitstream has one. Then it hides the ROM and uses the link:
   input and with 1536 bytes of input, which checks the larger FIFO and the
   end of the input, the intro's `hello.nasm` with 100 lines of input that
   it halts without reading, the emulator's `reserved.nasm`, which halts
-  on a reserved control word, its `trapsym.nasm` with `--symbols`, the monitor with the demo after it, `demo/build/test/monitor_demo.bin`, with `r` and a few keys and its screen, and
+  on a reserved control word, its `trapsym.nasm` with `--symbols`, its `fpustack.nasm`, the FPU's stack and flags, with the FPU's registers read over the link after the halt, and its `fpudec.nasm`, which prints numbers through the FPU's decimal commands, the monitor with the demo after it, `demo/build/test/monitor_demo.bin`, with `r` and a few keys and its screen, and
   `examples/build/bench.bin` and `bench_win.bin`, but for their cycles,
   whose tables it prints.
   It runs the monitor's `test/hello.nasm` with `run.py --monitor --rom
@@ -1096,7 +1107,7 @@ takes about 40 seconds, and CI runs it.
 the monitor's with `--monitor --rom`, the demo's self-test, and nice_cpu's benchmark when `make examples` has
 built `examples/build/bench.bin` and `bench_win.bin`, with `tools/linktest.py`. It runs hwtest's
 checks of bad packets, of the pause, of the step, of the breakpoints,
-and of the writes of the registers on `niceemu --link` first, and then
+of the writes of the registers, and of the FPU on `niceemu --link` first, and then
 what `mon.py` adds to nice_cpu's debugger: a load, and the check of the
 board's memory, at a load and before the link opens. nice_cpu's `make
 -C debugger test` checks the debugger's commands, and the parsing of

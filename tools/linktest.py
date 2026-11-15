@@ -3,12 +3,13 @@
 
 It starts "niceemu --link 0", which picks a free port, and runs
 hwtest.py's checks of bad packets, the pause, the step, the breakpoints,
-and the writes of the registers on it, and mon.py's checks of the
-board's memory, which it adds to nice_cpu's debugger. Then it runs the programs of hwtest.py's
-comparison, and nice_cpu's benchmark when examples/build/bench.bin and
-bench_win.bin are built, with run.py --tcp on that port and with niceemu
-alone. Each must print the same and exit with the same status. The demo's self-test, F11,
-must pass. Last, run.py --tcp HOST:PORT runs hello on "niceemu --link
+the writes of the registers, and the FPU on it, and mon.py's checks of
+the board's memory, which it adds to nice_cpu's debugger. Then it runs
+the programs of hwtest.py's comparison, and nice_cpu's benchmark when
+examples/build/bench.bin and bench_win.bin are built, with run.py --tcp
+on that port and with niceemu alone. Each must print the same and exit
+with the same status. The demo's self-test, F11, must pass. Last,
+run.py --tcp HOST:PORT runs hello on "niceemu --link
 127.0.0.2:0", an address other than 127.0.0.1, as for a niceemu on
 another computer. So it checks run.py, mon.py, boardlink.py, and the
 link of the emulator, as CI does. It prints one line for each check, and last how many passed,
@@ -28,7 +29,7 @@ import hwtest
 from hwtest import (NICEEMU, REPO, assemble, assemble_labels, comparisons,
                     results, test_bench, test_framing, test_pause, test_run,
                     test_monitor, test_selftest, test_step, test_break,
-                    test_watch, test_write_regs, check, start_emu)
+                    test_watch, test_write_regs, test_fpu, check, start_emu)
 from boardlink import HOLD, RAM, open_link
 
 
@@ -121,6 +122,8 @@ def main() -> None:
                 test_watch(link, *brk)
                 test_write_regs(link, *assemble_labels(
                     f"{REPO}/sim/step.nasm", tmp))
+                test_fpu(link, *assemble_labels(
+                    f"{REPO}/sim/fpusum.nasm", tmp))
             finally:
                 link.close()
             test_mon(port, brk[0], tmp)

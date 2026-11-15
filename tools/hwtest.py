@@ -73,6 +73,12 @@ Checks, in this order:
     - sim/step.nasm, paused, takes writes of R0-R15, and goes on from
       them, compared with the same on niceemu --link; a write while
       halted or held is refused
+    - the FPU at 0xFFFFFF88-8F (doc/SYSTEM.md, I/O registers): with the
+      core held, the link clears it, divides, reads the quotient through
+      each register, and takes the square root; a start resets it; and
+      sim/fpusum.nasm, paused three times and stepped to the top of its
+      loop, holds the sum of its series each time, with the bits of
+      Python's floats. A hold keeps the FPU's values (issue #136)
     - the memory is cleared
     - sim/wait.nasm waits for the timer's IRQ, which bit 6 shows, also
       paused, and paused in its interrupt routine, bits 7 and 10,
@@ -120,6 +126,9 @@ Checks, in this order:
       1536 bytes
     - a program that halts at once although 100 lines of input wait for it
     - the emulator's trapsym.nasm and its label file, for --symbols
+    - the emulator's fpustack.nasm, the FPU's stack and flags, with the
+      FPU's registers as the link reads them after the halt, and its
+      fpudec.nasm, which prints numbers through the decimal commands
     - the monitor of the tests with the demo after it,
       demo/build/test/monitor_demo.bin, with r for the demo, and its
       screen
@@ -190,6 +199,7 @@ Notes:
 
 import argparse
 import calendar
+import math
 import os
 import re
 import socket
@@ -1237,6 +1247,142 @@ def test_write_regs(link: Link, prog: str, at: dict[str, int]) -> None:
           f" ({len(got)} and {len(exp)} results)")
 
 
+# The floating-point unit of nice_cpu's DEVICES.md section 11
+FPU_X_LO = 0xFFFFFF88
+FPU_X_HI = 0xFFFFFF89
+FPU_X_S = 0xFFFFFF8A
+FPU_X_W = 0xFFFFFF8B
+FPU_CMD = 0xFFFFFF8C
+FPU_STATUS = 0xFFFFFF8D
+FPU_REL = 0xFFFFFF8E
+# Its commands CLEAR 1, which empties the stack and clears the flags,
+# DIV, and SQRT, and the status of an empty stack with no flag, whose
+# class is that of the canonical NaN
+FPU_CLEAR = 0x101
+FPU_DIV = 0x13
+FPU_SQRT = 0x14
+FPU_EMPTY = 0x00080000
+# The word where sim/fpusum.nasm stores the status that it starts with
+FPU_FIRST = 0x100
+
+
+def double_bits(x: float) -> int:
+    """The 64 bits of a binary64 value."""
+    return int.from_bytes(struct.pack(">d", x), "big")
+
+
+def fpu_status(depth: int, x: float, flags: int = 0) -> int:
+    """FPU_STATUS for the depth, the flags, and a finite X (DEVICES.md
+    §11.2): its class says whether X is negative, zero, whole, and fits a
+    signed 32-bit integer once rounded toward zero."""
+    status = depth | flags << 8
+    if math.copysign(1.0, x) < 0:
+        status |= 1 << 16
+    if x == 0:
+        status |= 1 << 17
+    if x == math.floor(x):
+        status |= 1 << 20
+    if -2**31 <= math.trunc(x) < 2**31:
+        status |= 1 << 21
+    return status
+
+
+def test_fpu(link: Link, prog: str, at: dict[str, int]) -> None:
+    """The floating-point unit at 0xFFFFFF88-8F (doc/SYSTEM.md, I/O
+    registers). With the core held, the link clears it, divides 1000 by
+    7, and reads the quotient through each of its views, then takes the
+    square root, and leaves two values and the four flags. A start resets
+    the FPU, so sim/fpusum.nasm stores the status of an empty stack as it
+    starts. It sums a series without end. The core is paused in it three
+    times, and stepped to the top of its loop, across its accesses of
+    the FPU: there the FPU holds the sum of the terms that R1 counts,
+    and nothing else, with the bits that Python's binary64 arithmetic
+    gives. Last, a hold while it runs keeps the FPU's values, and the
+    link clears them. The expected values are Python's, not niceemu's."""
+    link.control(HOLD | RAM)
+    ok = wr(link, FPU_CMD, FPU_CLEAR)
+    status = rd(link, FPU_STATUS)
+    check("fpu: CLEAR 1 by the link empties it", ok and status == FPU_EMPTY,
+          f"{status:08X}")
+    check("fpu: W 1000, 7, and DIV by the link", wr(link, FPU_X_W, 1000) and
+          wr(link, FPU_X_W, 7) and wr(link, FPU_CMD, FPU_DIV))
+    quotient = 1000 / 7
+    views = {
+        FPU_X_LO: double_bits(quotient) & 0xFFFFFFFF,
+        FPU_X_HI: double_bits(quotient) >> 32,
+        FPU_X_S: int.from_bytes(struct.pack(">f", quotient), "big"),
+        FPU_X_W: 142,
+        FPU_CMD: 0,
+        FPU_STATUS: fpu_status(1, quotient),
+        FPU_REL: 2,                     # no Y: unordered
+        0xFFFFFF8F: 0,
+    }
+    for addr, want in views.items():
+        got = rd(link, addr)
+        check(f"fpu: readback {addr:08X}", got == want,
+              f"got {got:08X}, want {want:08X}")
+    root = math.sqrt(quotient)
+    check("fpu: SQRT by the link", wr(link, FPU_CMD, FPU_SQRT))
+    got = rd(link, FPU_X_LO) | rd(link, FPU_X_HI) << 32
+    check("fpu: the square root", got == double_bits(root),
+          f"got {got:016X}, want {double_bits(root):016X}")
+    # 3 on top of the root, and the flags: for the start to reset
+    check("fpu: W 3 and the four flags", wr(link, FPU_X_W, 3) and
+          wr(link, FPU_STATUS, 0x0F00))
+    got, rel = rd(link, FPU_STATUS), rd(link, FPU_REL)
+    check("fpu: two values, the flags, and Y > X",
+          got == fpu_status(2, 3.0, 0xF) and rel == 1,
+          f"status {got:08X}, want {fpu_status(2, 3.0, 0xF):08X}, "
+          f"FPU_REL {rel:08X}")
+
+    load(link, prog)
+    terms, total = 0, 0.0
+    counts = []
+    for i in range(3):
+        if i:
+            link.control(RAM)
+            time.sleep(0.01)
+        n = link.pauses
+        link.control(PAUSE | RAM)
+        require(f"fpu: pause {i + 1} sends p", wait_pause(link, n))
+        steps = 0
+        while rd(link, REGS + 15) != at["LOOP"] and steps < 12:
+            if link.step(timeout=4 * QUIET) is not None:
+                break
+            steps += 1
+        pc, count = rd(link, REGS + 15), rd(link, REGS + 1)
+        got = rd(link, FPU_X_LO) | rd(link, FPU_X_HI) << 32
+        status = rd(link, FPU_STATUS)
+        if i == 0:
+            first = rd(link, FPU_FIRST)
+            check("fpu: a start resets the FPU", first == FPU_EMPTY,
+                  f"{first:08X}")
+        if count < terms:
+            terms, total = 0, 0.0
+        while terms < count:
+            terms += 1
+            total += (math.sqrt(terms) * terms - 1.0) / terms
+        counts.append(count)
+        check(f"fpu: the sum of {count} terms, after {steps} steps",
+              pc == at["LOOP"] and got == double_bits(total) and
+              status == fpu_status(1, total),
+              f"R15 {pc:08X}, X {got:016X}, want {double_bits(total):016X}, "
+              f"status {status:08X}, want {fpu_status(1, total):08X}")
+    check("fpu: the sum goes on after each pause",
+          counts[0] < counts[1] < counts[2], str(counts))
+    link.control(RAM)
+    time.sleep(0.01)
+    link.control(HOLD | RAM)
+    status = rd(link, FPU_STATUS)
+    check("fpu: a hold keeps the FPU's values",
+          status & 0x1F in (1, 2, 3) and status & 0xF00 == 0,
+          f"{status:08X}")
+    ok = wr(link, FPU_CMD, FPU_CLEAR)
+    status = rd(link, FPU_STATUS)
+    check("fpu: CLEAR 1 by the link after the hold",
+          ok and status == FPU_EMPTY, f"{status:08X}")
+
+
 def test_counters_stop(link: Link) -> None:
     """After a halt the cycle counter and the timer's COUNT do not change."""
     first = rd(link, 0xFFFFFF40)
@@ -1839,6 +1985,8 @@ def comparisons(tmp: str) -> list[tuple[str, list[str], bool]]:
     reserved = assemble(f"{REPO}/nice_cpu/emulator/test/reserved.nasm", tmp)
     eof = assemble(f"{REPO}/sim/eof.nasm", tmp)
     trapsym = assemble(f"{REPO}/nice_cpu/emulator/test/trapsym.nasm", tmp)
+    fpustack = assemble(f"{REPO}/nice_cpu/emulator/test/fpustack.nasm", tmp)
+    fpudec = assemble(f"{REPO}/nice_cpu/emulator/test/fpudec.nasm", tmp)
     # The monitor and the demo, with the version of their tests, loaded at
     # 0 as any program, and the monitor's r and a few keys for the demo
     demo = monitor_demo()
@@ -1864,6 +2012,10 @@ def comparisons(tmp: str) -> list[tuple[str, list[str], bool]]:
         (eof, ["-i", text], True),
         (trapsym, ["--symbols",        # names the halt and the trap
                    f"{REPO}/nice_cpu/emulator/test/trapsym.sym"], False),
+        # The FPU's stack and flags, with its registers as the link reads
+        # them, and its decimal commands, which print numbers
+        (fpustack, ["-d", "0x200:18", "-d", "0xFFFFFF88:8"], False),
+        (fpudec, [], False),
         (demo, ["-i", keys, "-s"], True),
     ]
 
@@ -2494,6 +2646,7 @@ def main() -> None:
         step_at = assemble_labels(f"{REPO}/sim/step.nasm", tmp)
         emu = assemble(f"{REPO}/sim/emu.nasm", tmp)
         bytewin = assemble(f"{REPO}/sim/bytewin.nasm", tmp)
+        fpusum = assemble_labels(f"{REPO}/sim/fpusum.nasm", tmp)
 
         opened = False
         try:
@@ -2542,6 +2695,7 @@ def main() -> None:
                 test_break(link, brk, brk_at)
                 test_watch(link, brk, brk_at)
                 test_write_regs(link, *step_at)
+                test_fpu(link, *fpusum)
                 test_clear(link)
                 test_wait(link, wait, wait_at, board)
                 test_ram_size(link, board)

@@ -53,6 +53,14 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   `units u`, which keeps mph
   ([#138](https://github.com/MJoergen/NiceMonMEGA65/issues/138)).
 
+**Tests.**
+
+- `make hwtest` checks the FPU on the board: over the link, with a
+  program that it pauses and steps across the FPU's commands, and with
+  two of nice_cpu's FPU programs against `niceemu`. `make linktest` and
+  `make cosimtest` run the same checks on `niceemu --link` and on the
+  RTL in GHDL.
+
 ## V2.1 (2026-11-14)
 
 **Upgrade notes.**
