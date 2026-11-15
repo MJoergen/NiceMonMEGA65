@@ -78,6 +78,9 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   two of nice_cpu's FPU programs against `niceemu`. `make linktest` and
   `make cosimtest` run the same checks on `niceemu --link` and on the
   RTL in GHDL.
+- `make hwtest` with `ETH` passes on the Nexys4DDR. Its TCP program,
+  `monitor/test/tcphw.nasm`, kept its buffers above the board's 64K
+  words of RAM, where they overwrote the monitor of the test.
 
 ## V2.1 (2026-11-14)
 

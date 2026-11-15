@@ -2,20 +2,23 @@
 ; ROM's monitor that calls the entries through the stubs of mon.nasm,
 ; which the Makefile joins after it. tools/hwtest.py loads it with the
 ; words at TH_ARGS, its PC's IP address, the port where the PC listens,
-; and the number of bytes, at most 65536, and runs it with run.py
+; and the number of bytes, at most 32768, and runs it with run.py
 ; --monitor. With the IP address 0, the program listens on the port
 ; instead, and the PC connects. The program connects, or waits for the
 ; PC, sends the bytes, byte i being
 ; 7 i + i / 256 modulo 256, receives what the PC echoes, compares, closes,
 ; and waits for the handle to free itself. It returns 0, or the step that
 ; failed times 1000, less the error, as test/tcp_c.c does, and keeps R7
-; to R13, as the C ABI asks.
+; to R13, as the C ABI asks. Its buffers end at 0xE800, below the stack
+; of a board with 64K words of RAM, the Nexys4DDR, where the monitor's
+; variables are at 0xF000 and the words from 0x10000 are those from 0
+; again.
 
                 .ORG    0x8000
 TH_ARGS         .EQU    0x9000          ; the IP address, the port, and the bytes
 TH_CB           .EQU    0xA000          ; the control block, 32 + 512 + 512 words
-TH_TX           .EQU    0x20000000+4*0x10000  ; the bytes to send
-TH_RX           .EQU    0x20000000+4*0x14000  ; the bytes received
+TH_TX           .EQU    0x20000000+4*0xA800  ; the bytes to send, 8192 words
+TH_RX           .EQU    0x20000000+4*0xC800  ; the bytes received, 8192 words
 TH_US           .EQU    0xFFFFFF44      ; the microseconds since reset
 TH_LIMIT        .EQU    20000000        ; the longest a step may take
 
