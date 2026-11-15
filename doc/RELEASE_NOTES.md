@@ -39,6 +39,12 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 - With `niceemu --step-time`, a write to `TIME_SKIP`, `0xFFFFFF5F`,
   skips time. The board ignores the write.
 
+**Changes.**
+
+- `weather.bin` shows the wind in m/s, unless `WEATHER.CFG` has
+  `units u`, which keeps mph
+  ([#138](https://github.com/MJoergen/NiceMonMEGA65/issues/138)).
+
 ## V2.1 (2026-11-14)
 
 **Upgrade notes.**

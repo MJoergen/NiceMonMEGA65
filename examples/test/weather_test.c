@@ -51,7 +51,7 @@ static void answers(const char *dir)
     check_str("ok.http: place", w.place, "Copenhagen");
     check_str("ok.http: condition", w.cond, "Patchy rain nearby");
     check_str("ok.http: temperature, with the degree sign of ISO 8859-1", w.temp, "+8\xB0" "C");
-    char wind[] = {(char)(G_ARROW + 2), '1', '9', 'k', 'm', '/', 'h', 0};
+    char wind[] = {(char)(G_ARROW + 2), '5', 'm', '/', 's', 0};
     check_str("ok.http: wind, with the arrow to the east", w.wind, wind);
     check_str("ok.http: humidity", w.humid, "77%");
 
@@ -120,7 +120,7 @@ static void requests(void)
     cfg_parse(&c, "", 0);
     weather_request(&c, buf, sizeof buf);
     check_str("the request with no place", buf,
-              "GET /?format=%l|%C|%t|%w|%h HTTP/1.0\r\nHost: wttr.in\r\n"
+              "GET /?format=%l|%C|%t|%w|%h&M HTTP/1.0\r\nHost: wttr.in\r\n"
               "User-Agent: curl/8\r\nConnection: close\r\n\r\n");
     const char *t = "place New York/\xC3\xBC\nunits u\nserver example.org:81\n";
     cfg_parse(&c, t, (unsigned)strlen(t));

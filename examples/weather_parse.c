@@ -146,6 +146,9 @@ unsigned weather_request(const struct cfg *cfg, char *buf, unsigned size)
         return 0;
     if (cfg->units && !put(buf, size, &n, cfg->units == 'm' ? "&m" : "&u"))
         return 0;
+    // The wind in m/s (#138), unless the units are those of the USA, mph
+    if (cfg->units != 'u' && !put(buf, size, &n, "&M"))
+        return 0;
     if (!put(buf, size, &n, " HTTP/1.0\r\nHost: ") || !put(buf, size, &n, cfg->host))
         return 0;
     // The port in the Host, as the connection goes to it, unless it is 80

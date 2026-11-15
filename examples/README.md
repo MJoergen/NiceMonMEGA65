@@ -58,7 +58,7 @@ comment. For example:
 | Setting | What it is |
 |---|---|
 | `place NAME` | The place, such as `Copenhagen`, `New York`, or an airport's code, such as `CPH`. Without it, wttr.in guesses the place from the address that the request comes from. |
-| `units m` or `units u` | Metric units (°C and km/h), or those of the USA (°F and mph). Without it, wttr.in chooses by the place. |
+| `units m` or `units u` | Metric units (°C), or those of the USA (°F, and the wind in mph). Without it, wttr.in chooses the temperature's unit by the place. The wind is in m/s, unless the units are `u`. |
 | `server NAME[:PORT]` | Another server than `wttr.in`, with port 80 unless one is given. It must answer as wttr.in does (below). |
 
 A line that the program does not understand is shown in red at the
@@ -94,10 +94,10 @@ it. The proxy gets the request
     GET /PLACE?format=%l|%C|%t|%w|%h HTTP/1.0
 
 with `&m` or `&u` after the format when the settings have `units`, and
-answers with one line of five fields, separated by `|`, as wttr.in
+`&M` for the wind in m/s unless they have `units u`, and answers with one line of five fields, separated by `|`, as wttr.in
 does:
 
-    Copenhagen|Partly cloudy|+7°C|↙13km/h|87%
+    Copenhagen|Partly cloudy|+7°C|↙4m/s|87%
 
 ### Building and testing it
 

@@ -45,7 +45,7 @@ STEPS = 100_000_000
 G_UPPER, G_LOWER, G_FULL, G_ARROW = 0x80, 0x81, 0x82, 0x83
 ARROWS = "←↑→↓↖↗↘↙"
 
-REQUEST = ("GET /Copenhagen?format=%l|%C|%t|%w|%h&m HTTP/1.0\r\nHost: 10.0.0.2\r\n"
+REQUEST = ("GET /Copenhagen?format=%l|%C|%t|%w|%h&m&M HTTP/1.0\r\nHost: 10.0.0.2\r\n"
            "User-Agent: curl/8\r\nConnection: close\r\n\r\n").encode()
 
 passed = 0
@@ -201,7 +201,7 @@ def cases(tmp: str) -> None:
     check("ok.http: the bar shows the IP address", r.rows[0].endswith("IP 10.0.0.9"), r.rows[0])
     check("ok.http: the place", r.row(ROW_PLACE) == "Copenhagen", r.row(ROW_PLACE))
     check("ok.http: the condition", r.row(ROW_COND) == "Patchy rain nearby", r.row(ROW_COND))
-    want = "Temperature +8°C    Wind →19km/h    Humidity 77%"
+    want = "Temperature +8°C    Wind →5m/s    Humidity 77%"
     check("ok.http: the values, with the degree sign and the arrow of the font RAM",
           r.row(ROW_VALUES) == want, r.row(ROW_VALUES))
     check("ok.http: the status", r.row(ROW_STATUS) == "Fetched less than a minute ago",
