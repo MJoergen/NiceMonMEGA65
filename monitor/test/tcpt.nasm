@@ -6,29 +6,25 @@
 ; that the last run sent, until it needs no new one. The Makefile
 ; assembles it after the monitor's sources, as for tcp.nasm.
 ;
-; Between its polls the program waits for the timer's request with WAIT,
-; through a vector table of its own at TW_VEC, which niceemu jumps over
-; at once, so that minutes of the board's time take a second or two.
+; Between its polls the program writes the time to the next poll to
+; TIME_SKIP, which niceemu with --step-time counts at once, so that
+; minutes of the board's time take a second or two. It uses no
+; interrupt. On the board the write does nothing, and the program polls
+; more often.
 
                 .ORG    0x8000
 TW_CASE         .EQU    0x9000          ; the case, which tcptest.py writes
 TW_RES          .EQU    0x9100          ; the results, a word each
-TW_VEC          .EQU    0x9200          ; the vector table, VBASE 0x92
-TW_V            .EQU    0x41            ; the timer's vector
 TW_CB           .EQU    0xA000          ; the control block
 TW_TXB          .EQU    0x20000000+4*0x10000  ; the bytes to send
 TW_RXB          .EQU    0x20000000+4*0x14000  ; the bytes received
 TW_PEER         .EQU    0x0A000002      ; tcppeer.py's address
 TW_TICK         .EQU    10000           ; the period of the polls, 10 ms
-TW_IRQ          .EQU    0xFFFFFF12      ; the timer's vector
+TIME_SKIP       .EQU    0xFFFFFF5F      ; skips the microseconds written
 
 tw_main
                 MOVE    R7, TW_RES
-                MOVE    @TW_VEC+TW_V, tw_isr
-                MOVE    @TW_IRQ, TW_V
-                MOVE    @TIMER, TW_TICK
-                AND     R14, R14, 0xFF000000
-                OR      R14, R14, 0x40000092  ; E = 1, VBASE TW_VEC / 256
+                MOVE    @tw_tick, TW_TICK
                 MOVE    R1, TW_SET
                 CALL    _mon_net_set
                 CMP     @TW_CASE, 6
@@ -111,12 +107,12 @@ tw_zero
 ; of the microseconds, then 10 bytes echoed
 tw_idle
                 CALL    tw_open
-                MOVE    @TIMER, 1000000
+                MOVE    @tw_tick, 1000000
                 MOVE    R1, 2150000000
                 CALL    tw_sleep
                 MOVE    R1, 2150000000
                 CALL    tw_sleep
-                MOVE    @TIMER, TW_TICK
+                MOVE    @tw_tick, TW_TICK
                 MOVE    R1, R8
                 CALL    _mon_tcp_state
                 MOVE    @R7++, R1       ; 2, TCP_OPEN
@@ -190,14 +186,11 @@ tw_close
                 CALL    _mon_tcp_close
                 MOVE    @R7++, R1       ; 0
 tw_end
-                MOVE    @TIMER, 0
-                AND     R14, R14, 0xBF000000  ; E = 0, VBASE 0
                 MOVE    @R7++, @ETH_CSR  ; 0, the port disabled
                 SUB     R1, R7, TW_RES
                 RET
 
-tw_isr
-                RTI
+tw_tick         .DAT    TW_TICK         ; the time between two polls
 
 ; tw_open: tw_until of R8 for TCP_OPEN, within 10 seconds; the state is
 ; stored. Uses R1-R6.
@@ -208,9 +201,10 @@ tw_open
                 MOVE    @R7++, R1
                 RET
 
-; tw_until: polls R8 with tcp_state, waiting between the polls, until
-; its state is R1, or negative, or R2 microseconds passed. R1 = the last
-; state, and R2 the microseconds. Uses R1-R6, and R9-R11, saved.
+; tw_until: polls R8 with tcp_state, skipping @tw_tick between the
+; polls, until its state is R1, or negative, or R2 microseconds passed.
+; R1 = the last state, and R2 the microseconds. Uses R1-R6, and R9-R11,
+; saved.
 tw_until
                 PUSH    R9
                 PUSH    R10
@@ -219,7 +213,7 @@ tw_until
                 MOVE    R10, R2
                 MOVE    R11, @io.us
 :
-                WAIT
+                MOVE    @TIME_SKIP, @tw_tick
                 MOVE    R1, R8
                 CALL    _mon_tcp_state
                 CMP     R1, R9
@@ -236,7 +230,7 @@ tw_until
                 POP     R9
                 RET
 
-; tw_sleep: R1 microseconds, below 2^31, with a poll after each wait. Uses
+; tw_sleep: R1 microseconds, below 2^31, with a poll after each skip. Uses
 ; R1-R6, and R9-R10, saved.
 tw_sleep
                 PUSH    R9
@@ -244,7 +238,7 @@ tw_sleep
                 MOVE    R9, R1
                 MOVE    R10, @io.us
 :
-                WAIT
+                MOVE    @TIME_SKIP, @tw_tick
                 CALL    _mon_net_poll
                 SUB     R1, @io.us, R10
                 CMP     R1, R9

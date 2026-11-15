@@ -397,8 +397,9 @@ needs `FOLDER=NICE`, the default. It runs these steps in order:
    port as `pp` and its transmit timestamp as `tt`.
 7. **The lease.** `test/lease.py` runs `test/lease.nasm`, which takes
    a lease with `net_dhcp`, opens the endpoint, and polls, under the
-   monitor with `--step-time`. It sleeps between its polls with `WAIT`,
-   so minutes of the clock take a second, and notes when a frame goes.
+   monitor with `--step-time`. Between its polls it writes the time to
+   the next one to `TIME_SKIP`, `0xFFFFFF5F`, so minutes of the clock
+   take a second, and notes when a frame goes.
    The script answers the frames of a run, and runs it again, until no
    new answer is needed. It covers the REQUESTs by unicast from T1 and
    broadcast from T2, 60 ticks apart, the lease's end, an ACK that

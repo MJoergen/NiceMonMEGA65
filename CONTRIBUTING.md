@@ -1043,8 +1043,10 @@ and its servers, the entries 26 to 31 (issue #111). It has two parts.
   case a run, and with `--eth-in` and `--eth-out`. A frame of
   `--eth-in` arrives right after the frame it answers, so the script
   runs a case again with the answers to the frames that the last run
-  sent, until it needs no new one. The program waits for the timer with
-  `WAIT`, which `niceemu` jumps over, so minutes take a second. It
+  sent, until it needs no new one. Between its polls the program writes
+  the time to the next one to `TIME_SKIP`, `0xFFFFFF5F`, which `niceemu`
+  with `--step-time` counts at once, so minutes take a second, and no
+  interrupt is needed. It
   checks the SYN's 15 seconds, the 120 seconds of giving up, the 60
   seconds after our FIN, the probes of a zero window out to 60 seconds,
   a connection idle for 4300 seconds, past a wrap of the microseconds,

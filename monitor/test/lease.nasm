@@ -7,8 +7,8 @@
 ;
 ; The program sets 10.0.0.9, takes a lease with net_dhcp, opens the UDP
 ; endpoint, which keeps the network on, and polls for the case's time,
-; waiting for the timer's request with WAIT between the polls, through a
-; vector table of its own at LT_VEC, which niceemu jumps over at once. It
+; writing the time to the next poll to TIME_SKIP between the polls, which
+; niceemu with --step-time counts at once. It uses no interrupt. It
 ; notes the microseconds since net_dhcp returned whenever V_IPID shows
 ; that a frame was sent. Its results, at LT_RES, 16 words:
 ;
@@ -27,10 +27,8 @@
                 .ORG    0x8000
 LT_CASE         .EQU    0x9000          ; the case, which lease.py writes
 LT_RES          .EQU    0x9100          ; the results, a word each
-LT_VEC          .EQU    0x9200          ; the vector table, VBASE 0x92
-LT_V            .EQU    0x41            ; the timer's vector
-LT_IRQ          .EQU    0xFFFFFF12      ; the timer's vector register
 LT_TICK         .EQU    100000          ; the period of the polls, 100 ms
+TIME_SKIP       .EQU    0xFFFFFF5F      ; skips the microseconds written
 LT_SENDS        .EQU    8               ; the times of frames sent noted
 
 lt_main
@@ -40,11 +38,6 @@ lt_main
                 MOVE    @R1++, 0
                 CMP     R1, LT_RES+16
         ?!Z     JMP     :-
-                MOVE    @LT_VEC+LT_V, lt_isr
-                MOVE    @LT_IRQ, LT_V
-                MOVE    @TIMER, LT_TICK
-                AND     R14, R14, 0xFF000000
-                OR      R14, R14, 0x40000092  ; E = 1, VBASE LT_VEC / 256
                 MOVE    R1, LT_SET
                 CALL    _mon_net_set
                 CALL    _mon_net_dhcp
@@ -60,7 +53,7 @@ lt_main
                 SUB     R1, @LT_CASE, 1
                 MOVE    R9, @LT_TIMES[R1]
 :
-                WAIT
+                MOVE    @TIME_SKIP, LT_TICK
                 CALL    _mon_net_poll
                 CMP     @V_IPID, R11
         ?Z      JMP     :+
@@ -79,14 +72,9 @@ lt_main
                 MOVE    @R7++, @E_IP
                 CALL    _mon_udp_close
                 MOVE    @R7++, R1       ; 0
-                MOVE    @TIMER, 0
-                AND     R14, R14, 0xBF000000  ; E = 0, VBASE 0
                 MOVE    @R7++, @ETH_CSR  ; 0
                 SUB     R1, R7, LT_RES
                 RET
-
-lt_isr
-                RTI
 
 ; The microseconds that each case polls for, from net_dhcp's return
 LT_TIMES
