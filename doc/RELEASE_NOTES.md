@@ -21,6 +21,26 @@ The release candidates pinned these:
 
 nice_cpu's `RC01` and `RC03` have no tag here.
 
+## V2.2 (unreleased)
+
+**Upgrade notes.**
+
+- nice_cpu is at `V2.2`. Its emulator has a floating-point unit, the
+  FPU, at `0xFFFFFF88`–`8F`, and `nicebuild.py` joins the float library
+  that uses it. The board does not have the FPU yet
+  ([#136](https://github.com/MJoergen/NiceMonMEGA65/issues/136)): there
+  the words read 0, and a program built for the FPU computes wrong
+  results and reports nothing. Build a C program that uses floats with
+  `nicebuild.py --no-fpu`, which joins the float library in software.
+- nicewasm's `--library-memory` and `--ram-bytes`, and nicebuild's
+  `--ram-bytes`, are gone; `--memory-bytes` replaces them. None of the
+  builds here used them.
+- `niceemu` refuses a program that loads no word at 0, such as one at
+  `0x8000` for the monitor. Run that one with the monitor joined in
+  front, `cat monitor/build/monitor.bin prog.bin`, as before.
+- With `niceemu --step-time`, a write to `TIME_SKIP`, `0xFFFFFF5F`,
+  skips time. The board ignores the write.
+
 ## V2.1 (2026-11-14)
 
 **Upgrade notes.**

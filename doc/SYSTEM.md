@@ -275,7 +275,9 @@ QNICE-FPGA, at `0xFF30` there:
 
 The words `0xFFFFFF83`, `84`, and `87`–`8F` read 0 and take no write. In
 the emulator these addresses are memory, so a program that writes them runs
-there too, without scrolling. Reset, and the clear of the memory (bit 2 of
+there too, without scrolling. The emulator's `88`–`8F` are its
+floating-point unit, which the board does not have yet
+([#136](https://github.com/MJoergen/NiceMonMEGA65/issues/136)). Reset, and the clear of the memory (bit 2 of
 the control register, which `load.py` and `run.py` set), set the offset and
 the font base to 0 and turn the cursor off, as at the start of the
 emulator. `niceemu --window` draws the same cursor from these
