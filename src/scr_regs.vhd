@@ -1,10 +1,10 @@
--- The screen's registers at 0xFFFFFF80-8F (src/nicemon.vhd), numbered as
+-- The screen's registers at 0xFFFFFF80-87 (src/nicemon.vhd), numbered as
 -- QNICE-FPGA's VGA registers at 0xFF30, for a display of the screen
 -- (src/video/text.vhd).
 --
 -- THEORY OF OPERATION
 -- nicemon serves one request in a cycle, the link's or the core's, and
--- gives it here with stb_i when it is to 0xFFFFFF80-8F; addr_i is the word's
+-- gives it here with stb_i when it is to 0xFFFFFF80-87; addr_i is the word's
 -- offset. A write sets the register of its word in the same cycle. rdata_o
 -- is the word at addr_i, combinationally, which nicemon registers for its
 -- acknowledge in the next cycle. The registers, by their offset:
@@ -15,14 +15,14 @@
 --   2  The cursor's row, bits 4..0.
 --   5  The display offset, in words, bits G_SCR_ADDR_BITS - 1..0: the
 --      display shows the 2000 words from it, so adding 80 scrolls a line.
---   6  The font base of nice_cpu's doc/SYSTEM.md §1.8, all 32 bits, as
+--   6  The font base of nice_cpu's doc/DEVICES.md §1.8, all 32 bits, as
 --      QNICE's VGA_FONT_OFFS: 0xFFFE0000 shows the font RAM, and any other
 --      value the character ROM, 0 among them.
 -- The words 3, 4, and 7-F read 0 and take no write.
 --
 -- The registers go out on cur_x_o, cur_y_o, cur_mode_o (bit 0 shown, bit 1
 -- blinking, bit 2 small), offs_o, which is 0 while bit 10 of the state
--- is 0, and fnt_ram_o, which is '1' while the base is 0xFFFE0000. ctl_we_o is '1' for a cycle after any write to 0xFFFFFF80-8F, and
+-- is 0, and fnt_ram_o, which is '1' while the base is 0xFFFE0000. ctl_we_o is '1' for a cycle after any write to 0xFFFFFF80-87, and
 -- after clear_i or reset, which clear the registers, so that the display
 -- takes them.
 --
@@ -49,7 +49,7 @@ entity scr_regs is
       rst_i      : in  std_logic;
       -- The clear of the memory, which clears the registers too
       clear_i    : in  std_logic;
-      -- The request served in this cycle, when it is to 0xFFFFFF80-8F
+      -- The request served in this cycle, when it is to 0xFFFFFF80-87
       stb_i      : in  std_logic;
       we_i       : in  std_logic;
       addr_i     : in  std_logic_vector(3 downto 0);

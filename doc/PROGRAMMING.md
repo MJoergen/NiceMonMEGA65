@@ -263,12 +263,9 @@ assembles it together with the start-up code and the runtime library.
 
     nice_cpu/translator/nicebuild.py -o prog.bin prog.c
 
-A program that uses floats is built with `--no-fpu` too. Without it,
-`nicebuild.py` joins the float library for nice_cpu's floating-point
-unit, which the emulator has and the board does not have yet
-([#136](https://github.com/MJoergen/NiceMonMEGA65/issues/136)), and on
-the board such a program computes wrong results and reports nothing.
-`--no-fpu` joins the float library in software, which runs on both.
+A program that uses floats computes them on the floating-point unit,
+the FPU, at `0xFFFFFF88`–`8F`, which every board and the emulator have
+([SYSTEM.md](SYSTEM.md#io-registers)).
 
 You need clang with the wasm32 target, `wasm-ld`, and `llvm-ar` (on
 Debian and Ubuntu, the `clang`, `lld`, and `llvm` packages). The steps

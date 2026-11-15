@@ -98,9 +98,9 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   `ram.vhd` and `rom.vhd`), the UART (`uart_serdes.vhd`, from cmod-s7),
   which carries the link,
   the core's input FIFO (`rx_fifo.vhd`), nice_cpu's devices at
-  `FFFFFF10`–`7F` (`devices.vhd`), the board's registers at
-  `FFFFFF90`–`9F` (`board_io.vhd`) and the screen's at `FFFFFF80`–`8F`
-  (`scr_regs.vhd`), the gate of their read data (`bus_pkg.vhd`), the
+  `FFFFFF10`–`7F` and its FPU at `88`–`8F` (`devices.vhd`), the board's
+  registers at `FFFFFF90`–`9F` (`board_io.vhd`) and the screen's at
+  `FFFFFF80`–`87` (`scr_regs.vhd`), the gate of their read data (`bus_pkg.vhd`), the
   UART's baud rates (`uart_pkg.vhd`, which
   `board_io.vhd` and the debugger share), the keyboards (`kbd_m65.vhd` and
   `kbd_m65_ascii.vhd` for the MEGA65, `kbd_ps2.vhd` and `kbd_ps2_ascii.vhd` for

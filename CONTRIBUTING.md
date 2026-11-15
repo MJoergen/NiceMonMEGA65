@@ -625,13 +625,15 @@ every time, not only the ones a testbench sends.
   - What a read of the console returns.
   - A read of memory returns the word of `mem.vhd`, one of
     `0xFFFFFF90`–`9F` that of `board_io.vhd`, and one of
-    `0xFFFFFF80`–`8F` that of `scr_regs.vhd`. A read through the byte
+    `0xFFFFFF80`–`87` that of `scr_regs.vhd`. A read through the byte
     windows `0x2…`–`0x5…` returns `mem.vhd`'s byte or halfword a cycle
     later, and the link's is answered also while the core is in
     reset.
 
-  The `link` and `rom` tasks take about 14 minutes each, and the others a
-  few each; `make -j formal` runs all the tasks side by side. CI runs `make -j4
+  The FPU there is `fpu_free.vhd`, as in `devices.sby`. The `link` task
+  takes about 15 minutes, `run`, `rom`, and `sd` 6 to 10 each, and the
+  covers a few seconds;
+  `make -j formal` runs all the tasks side by side. CI runs `make -j4
   formal` on its four processors.
 
 - `eth_tcp_timer.sby` proves the TCP server's retransmission timer,

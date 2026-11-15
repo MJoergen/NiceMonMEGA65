@@ -1,11 +1,16 @@
-; Uses the math unit (DEVICES.md §2), the performance counters (§3), and
-; the timer (§4), and leaves the results in memory at RESULT, where
+; Uses the math unit (DEVICES.md §2), the performance counters (§3), the
+; floating-point unit (§11), and the timer (§4), and leaves the results in
+; memory at RESULT, where
 ; tb_nicemon reads them over the debug link.
 ;
 ; The timer raises IRQ through vector 0xF0 every 200 cycles, and the
 ; interrupt routine counts the requests in R6. The program waits for three,
 ; and then stops the timer. The core runs far more than one instruction in
 ; 200 cycles, so no request is pending when it stops.
+;
+; The FPU divides 1000 by 7. The reads of X_HI and X_LO come while DIV
+; runs, so they stall until it ends, and the read of X_W waits for the
+; unit. SQRT of that is left on the stack, for the link to read.
 MPU_A           .EQU    0xFFFFFF20
 MPU_B           .EQU    0xFFFFFF21
 SMUL_LO         .EQU    0xFFFFFF22
@@ -13,6 +18,10 @@ SDIV_Q          .EQU    0xFFFFFF26
 UDIV_Q          .EQU    0xFFFFFF28
 UDIV_R          .EQU    0xFFFFFF29
 INSTR_LO        .EQU    0xFFFFFF42
+FPU_X_LO        .EQU    0xFFFFFF88
+FPU_X_HI        .EQU    0xFFFFFF89
+FPU_X_W         .EQU    0xFFFFFF8B
+FPU_CMD         .EQU    0xFFFFFF8C
 TIMER_PERIOD    .EQU    0xFFFFFF10
 TIMER_VECTOR    .EQU    0xFFFFFF12
 RESULT          .EQU    0x100
@@ -27,6 +36,14 @@ RESULT          .EQU    0x100
                 MOVE    R1, @INSTR_LO
                 MOVE    R2, @INSTR_LO
                 SUB     @0x104, R2, R1  ; 1: one instruction in between
+
+                MOVE    @FPU_X_W, 1000
+                MOVE    @FPU_X_W, 7
+                MOVE    @FPU_CMD, 0x13  ; DIV
+                MOVE    @0x106, @FPU_X_HI  ; 0x4061DB6D, while DIV runs
+                MOVE    @0x107, @FPU_X_LO  ; 0xB6DB6DB7
+                MOVE    @0x108, @FPU_X_W  ; 142
+                MOVE    @FPU_CMD, 0x14  ; SQRT, 0x4027E7920AF6B214
 
                 MOVE    @TIMER_VECTOR, 0xF0
                 MOVE    @TIMER_PERIOD, 200

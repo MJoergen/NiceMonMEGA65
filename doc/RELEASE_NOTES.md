@@ -25,13 +25,11 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 
 **Upgrade notes.**
 
-- nice_cpu is at `V2.2`. Its emulator has a floating-point unit, the
-  FPU, at `0xFFFFFF88`–`8F`, and `nicebuild.py` joins the float library
-  that uses it. The board does not have the FPU yet
-  ([#136](https://github.com/MJoergen/NiceMonMEGA65/issues/136)): there
-  the words read 0, and a program built for the FPU computes wrong
-  results and reports nothing. Build a C program that uses floats with
-  `nicebuild.py --no-fpu`, which joins the float library in software.
+- nice_cpu is at `V2.2`, with a floating-point unit, the FPU, at
+  `0xFFFFFF88`–`8F`. Every board has it, as the emulator does, and
+  `nicebuild.py` joins the float library that uses it. The screen's
+  registers end at `0xFFFFFF87`, where they took `80`–`8F`; only
+  `80`–`86` were ever used.
 - nicewasm's `--library-memory` and `--ram-bytes`, and nicebuild's
   `--ram-bytes`, are gone; `--memory-bytes` replaces them. None of the
   builds here used them.

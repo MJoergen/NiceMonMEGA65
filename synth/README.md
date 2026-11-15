@@ -283,7 +283,8 @@ flip-flops:
 |---|---|---|---|---|
 | The core (`nice_core`) | 8616 / 3544 | 4881 / 1203 | 8519 / 3340 | 4970 / 1047 |
 | The debug link (`debug_link`) | 2540 / 1456 | 2623 / 1285 | 2570 / 1456 | 2644 / 1285 |
-| The devices (`devices.vhd`): the math unit, the counters, the fetch statistics, the timer, the SD card controller, the network station's registers, and the port for Ethernet frames | 4971 / 3768 | 4269 / 2857 | 5012 / 3743 | 6669 / 3005 |
+| The devices (`devices.vhd`): the math unit, the FPU, the counters, the fetch statistics, the timer, the SD card controller, the network station's registers, and the port for Ethernet frames | 14222 / 6506 | 4269 / 2857 | 14325 / 6534 | 6669 / 3005 |
+| Of which the FPU (nice_cpu's `fpu.vhd`) | 9284 / 2735 | – | 9296 / 2788 | – |
 | The Ethernet station (`eth/eth.vhd`) | 2766 / 2732 | 2763 / 2732 | 2770 / 2755 | 3248 / 2865 |
 | Of which the TCP server (`eth/eth_tcp.vhd`) | 1904 / 1897 | 1902 / 1897 | 1632 / 1920 | 1633 / 1920 |
 | The on-board debugger (`dbg/dbg.vhd`) | 3028 / 2853 | 3026 / 2838 | 3072 / 2942 | 3282 / 2959 |
@@ -291,15 +292,18 @@ flip-flops:
 | The keyboard | 720 / 592 | 720 / 592 | 236 / 89 | 235 / 89 |
 | The HDMI output | 600 / 1207 | 600 / 1207 | – | – |
 | The rest: the UART, the memory's buses, the board's and the screen's registers, and glue | 719 / 552 | 746 / 530 | 733 / 637 | 629 / 631 |
-| Total | 24096 / 16914 | 19767 / 13446 | 23050 / 15140 | 21819 / 12059 |
-| Total, of the FPGA | 18.0 % / 6.3 % | 14.8 % / 5.0 % | 36.4 % / 11.9 % | 34.4 % / 9.5 % |
+| Total | 33626 / 19832 | 19767 / 13446 | 32621 / 18142 | 21819 / 12059 |
+| Total, of the FPGA | 25.1 % / 7.4 % | 14.8 % / 5.0 % | 51.5 % / 14.3 % | 34.4 % / 9.5 % |
 
-The pipelined columns are from the builds of 2026-11-10, with `FLOW=timing`,
-which have the 4 watchpoints of the debug link (issue #99) and the clock
-of the time of day (issue #97); the others are older. The watchpoints
-take about 900 to 1000 LUTs of the core. The
-R3's pipelined build with `FLOW=timing` takes 23484 LUTs and 16435
-flip-flops, 17.6 % and 6.1 % of the FPGA.
+In the pipelined columns, the devices, the FPU, and the totals are from
+the builds of 2026-11-15 with the FPU (issue #136), and the other rows
+from the builds of 2026-11-10, with `FLOW=timing`, which have the 4
+watchpoints of the debug link (issue #99) and the clock of the time of
+day (issue #97); the multi-cycle columns are older and have no FPU. The
+watchpoints take about 900 to 1000 LUTs of the core, and the FPU about
+9300 LUTs, 2700 flip-flops, and 5 DSPs, and no block RAM. The R3's
+pipelined build with `FLOW=timing` takes 33673 LUTs and 19964
+flip-flops, 25.2 % and 7.5 % of the FPGA.
 
 The pipelined core is 6.4 % of the LUTs of the R6's FPGA, and 13.4 % of
 the Nexys4DDR's. The multi-cycle core has about two thirds of its LUTs,
@@ -310,8 +314,8 @@ block RAM (see [Block RAM](#block-ram)), so its devices still have about
 across the boundaries of the modules, so the rows move from build to
 build more than the logic does; the totals are what count.
 
-The math unit and the settings page of the debugger (`dbg/dbg_set.vhd`)
-have the 6 DSPs of the design. The pipelined core uses no block RAM, and
+The FPU, the math unit, and the settings page of the debugger
+(`dbg/dbg_set.vhd`) have the 11 DSPs of the design, 5, 4, and 2. The pipelined core uses no block RAM, and
 the multi-cycle core one RAMB18, which Vivado infers for `src2_count`,
 the register of the shift count.
 
@@ -321,27 +325,29 @@ These are the worst setup and hold slacks, in ns:
 
 | Build | Clock | Setup | Hold |
 |---|---|---|---|
-| R6, pipelined | 100 MHz | 0.057 | 0.080 |
+| R6, pipelined | 100 MHz | 0.076 | 0.036 |
 | R6, `NICE=multi` | 100 MHz | 0.187 | 0.075 |
-| R3, pipelined | 100 MHz | 0.122 | 0.064 |
-| Nexys4DDR, pipelined | 90 MHz | 0.004 | 0.021 |
+| R3, pipelined | 100 MHz | 0.120 | 0.036 |
+| Nexys4DDR, pipelined | 90 MHz | 0.017 | 0.031 |
 | Nexys4DDR, `NICE=multi` | 90 MHz | 0.186 | 0.019 |
 
-The pipelined builds are those of the release V2.0, with `FLOW=timing`;
-the multi-cycle ones are older. The pipelined core meets its clock on
+The pipelined builds are those of 2026-11-15, with the FPU (issue #136)
+and `FLOW=timing`; the multi-cycle ones are older and have no FPU. The pipelined core meets its clock on
 every board with `FLOW=timing` only, and the R6 and the Nexys4DDR with
 little to spare. In the default flow, the R6 misses by about 0.15 ns
 inside the core, in the check of a store into fetched code (issue #107).
 
 The R6's worst path is inside the core, from WRITE's register file to
-PREPARE, and the paths into the core have 0.307 ns since #107. Before
+PREPARE, and the paths into the core have 0.117 ns. Before
 it, the RAM's cascaded block RAMs made the read data of the RAM into
 WRITE's register file the worst path of the R6. The R3's worst path is
 from the core's stores to the RAM's write enable, and so is the
 Nexys4DDR's, whose RAM of 64K words never had the cascade. With
 the watchpoints and the clock, the R6 missed by 0.404 ns while
 `devices.vhd` picked its read data with a chain of multiplexers; it
-picks it with one AND-OR now, as `nicemon.vhd` does. Before that,
+picks it with one AND-OR now, as `nicemon.vhd` does. The FPU's own
+paths, within it, into it, and out of it, keep at least 0.571 ns on the
+R3 and 0.608 ns on the R6. Before that,
 the R6 without the watchpoints missed by 0.112 ns, and without the
 clock met by 0.031 ns, so the clock's word in that chain cost more
 than the watchpoints. `verified.json` records

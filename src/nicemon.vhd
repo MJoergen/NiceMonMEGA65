@@ -142,7 +142,7 @@
 --                          performance counters of DEVICES.md §3. The
 --                          multi-cycle core reports no events to them, so
 --                          only FS_CYCLES and FS_CAUSE + 14, OTHER, count.
---   0xFFFFFF80-0xFFFFFF8F  The screen's registers (src/scr_regs.vhd),
+--   0xFFFFFF80-0xFFFFFF87  The screen's registers (src/scr_regs.vhd),
 --                          numbered as QNICE-FPGA's VGA registers at
 --                          0xFF30, for the display: 80 is the state, with
 --                          bit 6 showing the cursor, bit 5 making it blink,
@@ -154,12 +154,17 @@
 --                          base of DEVICES.md §1.8: 0xFFFE0000 shows the font
 --                          RAM, and any other value the character ROM.
 --                          Bits 11..4 of the state are kept and read back;
---                          the other bits, and the words 83, 84, and 87-8F,
+--                          the other bits, and the words 83, 84, and 87,
 --                          read 0 and take no write. The registers go out on
 --                          scr_cur_*_o, scr_offs_o, and scr_fnt_ram_o,
 --                          with scr_ctl_we_o
 --                          for a cycle when one is written, and when they
 --                          are cleared by reset or by the clear of the memory.
+--   0xFFFFFF88-0xFFFFFF8F  The floating-point unit of DEVICES.md §11
+--                          (nice_cpu/hdl/src/fpu.vhd, in src/devices.vhd),
+--                          a stack of up to 16 binary64 values. A
+--                          request that comes while a command runs stalls
+--                          until it ends. A start of the core resets it.
 --   0xFFFFFF90-0xFFFFFF9F  The board's devices (src/board_io.vhd): 90-96
 --                          with G_BOARD_IO (the Nexys4DDR), 97-9D with G_I2C,
 --                          and 9E-9F on every board. Without them, and in
@@ -395,7 +400,8 @@ entity nicemon is
       -- The ACK of a write that enables the port for Ethernet frames, or
       -- sends a frame, held until eth_sim.vhd has served it
       G_ETH_HOLD_ACK     : boolean                      := false;
-      -- The checks of formal/nicemon.sby; implies G_RAM_ANY of mem
+      -- The checks of formal/nicemon.sby; implies G_RAM_ANY of mem and
+      -- G_FPU_FREE of devices
       G_FORMAL           : boolean := false
    );
    port (
@@ -525,8 +531,8 @@ architecture synthesis of nicemon is
    constant C_SCR_BITS : natural := G_SCR_ADDR_BITS;
    -- The fonts: 0xFFFE0000-3FFF, the RAM and then the ROM
    constant C_FNT_BASE : std_logic_vector(31 downto 14) := X"FFFE" & "00";
-   -- The screen's registers: 0xFFFFFF80-8F
-   constant C_SCR_REGS_BASE : std_logic_vector(31 downto 4) := X"FFFFFF8";
+   -- The screen's registers: 0xFFFFFF80-87
+   constant C_SCR_REGS_BASE : std_logic_vector(31 downto 3) := X"FFFFFF8" & '0';
 
    -- The board's devices: 0xFFFFFF90-9F
    constant C_BRD_BASE : std_logic_vector(31 downto 4) := X"FFFFFF9";
@@ -536,6 +542,7 @@ architecture synthesis of nicemon is
    constant C_MPU_BASE   : std_logic_vector(31 downto 5) := X"FFFFFF" & "001"; -- 0xFFFFFF20-3F
    constant C_PERF_BASE  : std_logic_vector(31 downto 5) := X"FFFFFF" & "010"; -- 0xFFFFFF40-5F
    constant C_FS_BASE    : std_logic_vector(31 downto 5) := X"FFFFFF" & "011"; -- 0xFFFFFF60-7F
+   constant C_FPU_BASE   : std_logic_vector(31 downto 3) := X"FFFFFF8" & '1';  -- 0xFFFFFF88-8F
    constant C_SD_BASE    : std_logic_vector(31 downto 4) := X"FFFFFFA";        -- 0xFFFFFFA0-AF, with G_SD_SLOTS > 0
    constant C_NET_BASE   : std_logic_vector(31 downto 4) := X"FFFFFFB";        -- 0xFFFFFFB0-BF
    constant C_ETH_BASE   : std_logic_vector(31 downto 4) := X"FFFFFFC";        -- 0xFFFFFFC0-CF
@@ -552,7 +559,7 @@ architecture synthesis of nicemon is
       return addr(7 downto 1) = "0000000" or                        -- console, read counter
              addr(7 downto 4) = X"1" or addr(7 downto 5) = "001" or -- timer, MPU
              addr(7 downto 6) = "01" or                             -- perf, fetch statistics
-             addr(7 downto 4) = X"8" or                             -- screen registers
+             addr(7 downto 4) = X"8" or                             -- screen registers, FPU
              addr(7 downto 4) = X"9" or                             -- the board's devices
              (addr(7 downto 4) = X"A" and G_SD_SLOTS > 0) or        -- the SD card
              addr(7 downto 4) = X"B" or                             -- the network station
@@ -577,6 +584,7 @@ architecture synthesis of nicemon is
    begin
       return addr(31 downto 5) = C_MPU_BASE or addr(31 downto 5) = C_PERF_BASE or
              addr(31 downto 4) = C_TIMER_BASE or addr(31 downto 5) = C_FS_BASE or
+             addr(31 downto 3) = C_FPU_BASE or
              (addr(31 downto 4) = C_SD_BASE and G_SD_SLOTS > 0) or
              addr(31 downto 4) = C_NET_BASE or addr(31 downto 4) = C_ETH_BASE;
    end function is_dev;
@@ -1025,7 +1033,7 @@ begin
                rd_io      <= read_count;
                read_count <= read_count + 1;
             end if;
-         elsif addr(31 downto 4) = C_SCR_REGS_BASE then
+         elsif addr(31 downto 3) = C_SCR_REGS_BASE then
             -- The screen's registers, which take a write themselves (sreg_stb)
             if we = '0' then
                rd_io <= sreg_rdata;
@@ -1169,7 +1177,8 @@ begin
          G_SD_HOLD_ACK  => G_SD_HOLD_ACK,
          G_SD_SLOW_HZ   => G_SD_SLOW_HZ,
          G_ETH_HOLD_ACK => G_ETH_HOLD_ACK,
-         G_ETH_MAC      => G_ETH_MAC
+         G_ETH_MAC      => G_ETH_MAC,
+         G_FPU_FREE     => G_FORMAL
       )
       port map (
          clk_i             => clk_i,
@@ -1307,7 +1316,7 @@ begin
    -- link makes no request while it asks for a clear (contract f of
    -- debug_link.vhd), and the core is held, so a clear never meets a
    -- request (f_clr_alone).
-   sreg_stb  <= '1' when bus_take = '1' and bus_addr(31 downto 4) = C_SCR_REGS_BASE else
+   sreg_stb  <= '1' when bus_take = '1' and bus_addr(31 downto 3) = C_SCR_REGS_BASE else
                 '0';
    clr_start <= link_clear and not clr_done and not clearing and not dev_busy;
 

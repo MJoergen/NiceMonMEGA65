@@ -7,7 +7,7 @@
 -- the core has just left reset then. The hold changes only while the
 -- link's request neither comes nor waits, as contract f_hold of
 -- formal/debug_link_formal.vhd says. Each request is to a device's
--- address, 0xFFFFFF10-7F, B0-CF, or, with G_SD_SLOTS > 0, A0-AF.
+-- address, 0xFFFFFF10-7F, 88-8F, B0-CF, or, with G_SD_SLOTS > 0, A0-AF.
 -- G_SD_SLOTS gives the devices the SD card controller, in the boards'
 -- configuration, without G_SD_HOLD_ACK, and its card's pins are free, as
 -- are the network station's counts and status. The port for Ethernet
@@ -64,6 +64,7 @@ architecture synthesis of formal_devices is
    function is_dev(addr : std_logic_vector(7 downto 0)) return boolean is
    begin
       return (addr(7) = '0' and addr(6 downto 4) /= "000") or
+             addr(7 downto 3) = "10001" or
              (addr(7 downto 4) = X"A" and G_SD_SLOTS > 0) or addr(7 downto 4) = X"B" or
              addr(7 downto 4) = X"C";
    end function is_dev;

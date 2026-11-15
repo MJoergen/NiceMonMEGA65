@@ -1,9 +1,10 @@
--- The devices of nice_cpu/hdl/src at 0xFFFFFF10-7F and A0-CF
+-- The devices of nice_cpu/hdl/src at 0xFFFFFF10-7F, 88-8F, and A0-CF
 -- (src/nicemon.vhd): the timer of DEVICES.md §4 at 10-1F, the math unit
 -- (MPU) of §2 at 20-3F, the performance counters of §3 at 40-5F, but for
--- the clock of the time of day of §10 at 46-49, the fetch
--- statistics at 60-7F, with G_SD_SLOTS > 0 the SD card controller of §5
--- at A0-AF (src/sd/sd.vhd), the registers of the network station of §6
+-- the clock of the time of day of §10 at 46-49, the fetch statistics at
+-- 60-7F, the floating-point unit (FPU) of §11 at 88-8F
+-- (nice_cpu/hdl/src/fpu.vhd), with G_SD_SLOTS > 0 the SD card controller
+-- of §5 at A0-AF (src/sd/sd.vhd), the registers of the network station of §6
 -- at B0-BF (nice_cpu/hdl/src/net_regs.vhd), and the port for Ethernet
 -- frames of §7 at C0-CF (nice_cpu/hdl/src/eth_regs.vhd).
 --
@@ -19,13 +20,19 @@
 -- acknowledges it on core_ack_o, with its word on rdata_o. Each device
 -- acknowledges in the cycle after it takes a request, except the MPU, which
 -- takes a read of a result that it computes and then stalls until it
--- acknowledges it, the SD card controller with G_SD_HOLD_ACK, which
--- does so with a write that starts a command, and the port for Ethernet
+-- acknowledges it, the FPU, which registers each request and acknowledges
+-- it two cycles after it takes it at the earliest, later while a command
+-- runs or a read of X_S or X_W waits for its unit, the SD card controller
+-- with G_SD_HOLD_ACK, which does so with a write that starts a command,
+-- and the port for Ethernet
 -- frames with G_ETH_HOLD_ACK, which does so with a write that enables it
 -- or sends a frame, until the simulation's station has served it
 -- (nice_cpu/hdl/sim/eth_sim.vhd). stall_o is their stall,
 -- which holds the core and the link meanwhile, so the core's requests are
--- acknowledged in their order, and at most one is owed (owed_o).
+-- acknowledged in their order, and at most one is owed (owed_o). The FPU
+-- would take a second request before it acknowledges the first, so
+-- fpu_wait, a register, adds to stall_o from the cycle after it takes one
+-- until its acknowledge.
 --
 -- The link's request is latched, and the device's port is driven from the
 -- latch while busy_o is high, until the device acknowledges it on
@@ -94,6 +101,9 @@ entity devices is
       G_ETH_HOLD_ACK : boolean                     := false;
       -- The network station's MAC address after reset
       G_ETH_MAC      : std_logic_vector(47 downto 0) := X"024E49434500";
+      -- The free FPU (formal/fpu_free.vhd) in place of the FPU, for
+      -- formal/nicemon.sby; G_FORMAL implies it
+      G_FPU_FREE     : boolean                      := false;
       -- The properties for formal/devices.sby
       G_FORMAL       : boolean                      := false
    );
@@ -129,7 +139,7 @@ entity devices is
       -- The word of the device that acknowledges
       rdata_o           : out std_logic_vector(31 downto 0);
       -- The link's request waits, the core is owed an acknowledge, and
-      -- the MPU stalls
+      -- a device stalls
       busy_o            : out std_logic;
       owed_o            : out std_logic;
       stall_o           : out std_logic;
@@ -178,7 +188,7 @@ end entity devices;
 
 architecture synthesis of devices is
 
-   type t_dev is (DEV_PERF, DEV_MPU, DEV_TIMER, DEV_FS, DEV_SD, DEV_NET, DEV_ETH, DEV_TOD);
+   type t_dev is (DEV_PERF, DEV_MPU, DEV_TIMER, DEV_FS, DEV_SD, DEV_NET, DEV_ETH, DEV_TOD, DEV_FPU);
 
    -- The device of the low byte of a device's address
    function dev_of(addr : std_logic_vector(7 downto 0)) return t_dev is
@@ -191,6 +201,8 @@ architecture synthesis of devices is
          return DEV_PERF;
       elsif addr(7 downto 5) = "011" then
          return DEV_FS;
+      elsif addr(7 downto 3) = "10001" then
+         return DEV_FPU;
       elsif addr(7 downto 4) = X"A" then
          return DEV_SD;
       elsif addr(7 downto 4) = X"B" then
@@ -211,11 +223,11 @@ architecture synthesis of devices is
    -- devices' words, on the path from a device to the core, which has
    -- little slack (as nicemon.vhd's rd_src)
    signal sel    : t_dev                        := DEV_TIMER;
-   signal sel_oh : std_logic_vector(7 downto 0) := (t_dev'pos(DEV_TIMER) => '1', others => '0');
+   signal sel_oh : std_logic_vector(8 downto 0) := (t_dev'pos(DEV_TIMER) => '1', others => '0');
 
    -- The one-hot bit of a device
    function onehot(dev : t_dev) return std_logic_vector is
-      variable res_v : std_logic_vector(7 downto 0) := (others => '0');
+      variable res_v : std_logic_vector(8 downto 0) := (others => '0');
    begin
       res_v(t_dev'pos(dev)) := '1';
       return res_v;
@@ -276,6 +288,48 @@ architecture synthesis of devices is
    signal tod_ack     : std_logic;
    signal tod_data    : std_logic_vector(31 downto 0);
    signal tod_addr    : std_logic_vector(1 downto 0);
+   signal fpu_stb     : std_logic;
+   signal fpu_stall   : std_logic;
+   signal fpu_ack     : std_logic;
+   signal fpu_data    : std_logic_vector(31 downto 0);
+   -- The FPU has taken a request and not yet acknowledged it
+   signal fpu_wait : std_logic := '0';
+   -- With G_FORMAL, the acknowledges that the free FPU owes
+   signal f_fpu_owed : natural range 0 to 3;
+
+   -- The FPU and the free FPU are components, so that each is needed only
+   -- where its branch of gen_fpu and gen_fpu_free is taken: the FPU in
+   -- synthesis and simulation, and the free FPU in formal/devices.sby.
+   component fpu is
+      port (
+         clk_i      : in  std_logic;
+         rst_i      : in  std_logic;
+         wb_cyc_i   : in  std_logic;
+         wb_stb_i   : in  std_logic;
+         wb_stall_o : out std_logic;
+         wb_ack_o   : out std_logic;
+         wb_we_i    : in  std_logic;
+         wb_addr_i  : in  std_logic_vector(2 downto 0);
+         wb_data_i  : in  std_logic_vector(31 downto 0);
+         wb_data_o  : out std_logic_vector(31 downto 0)
+      );
+   end component fpu;
+
+   component fpu_free is
+      port (
+         clk_i      : in  std_logic;
+         rst_i      : in  std_logic;
+         wb_cyc_i   : in  std_logic;
+         wb_stb_i   : in  std_logic;
+         wb_stall_o : out std_logic;
+         wb_ack_o   : out std_logic;
+         wb_we_i    : in  std_logic;
+         wb_addr_i  : in  std_logic_vector(2 downto 0);
+         wb_data_i  : in  std_logic_vector(31 downto 0);
+         wb_data_o  : out std_logic_vector(31 downto 0);
+         f_owed_o   : out natural range 0 to 3
+      );
+   end component fpu_free;
 
 begin
 
@@ -315,6 +369,17 @@ begin
             owed <= '1';
          elsif io_ack = '1' then
             owed <= '0';
+         end if;
+
+         -- The FPU acknowledges two cycles after it takes a request at
+         -- the earliest, and no request reaches it in between.
+         if fpu_stb = '1' and fpu_stall = '0' then
+            fpu_wait <= '1';
+         elsif fpu_ack = '1' then
+            fpu_wait <= '0';
+         end if;
+         if dev_rst = '1' then
+            fpu_wait <= '0';
          end if;
 
          -- A request of the core in reset is dropped.
@@ -362,6 +427,9 @@ begin
    tod_stb   <= lnk_stb when busy = '1' and lnk_sel = DEV_TOD else
                 core_stb_i when core_sel = DEV_TOD else
                 '0';
+   fpu_stb   <= lnk_stb when busy = '1' and lnk_sel = DEV_FPU else
+                core_stb_i when core_sel = DEV_FPU else
+                '0';
    io_stall  <= mpu_stall when lnk_sel = DEV_MPU else
                 perf_stall when lnk_sel = DEV_PERF else
                 fs_stall when lnk_sel = DEV_FS else
@@ -369,8 +437,10 @@ begin
                 net_stall when lnk_sel = DEV_NET else
                 eth_stall when lnk_sel = DEV_ETH else
                 tod_stall when lnk_sel = DEV_TOD else
+                fpu_stall when lnk_sel = DEV_FPU else
                 timer_stall;
-   io_ack    <= mpu_ack or perf_ack or fs_ack or timer_ack or sd_ack or net_ack or eth_ack or tod_ack;
+   io_ack    <= mpu_ack or perf_ack or fs_ack or timer_ack or sd_ack or net_ack or eth_ack or tod_ack or
+                fpu_ack;
 
    core_ack_o <= owed and io_ack;
    link_ack_o <= busy and io_ack;
@@ -381,10 +451,11 @@ begin
                  gate(sd_data, sel_oh(t_dev'pos(DEV_SD))) or
                  gate(net_data, sel_oh(t_dev'pos(DEV_NET))) or
                  gate(eth_data, sel_oh(t_dev'pos(DEV_ETH))) or
-                 gate(tod_data, sel_oh(t_dev'pos(DEV_TOD)));
+                 gate(tod_data, sel_oh(t_dev'pos(DEV_TOD))) or
+                 gate(fpu_data, sel_oh(t_dev'pos(DEV_FPU)));
    busy_o     <= busy;
    owed_o     <= owed;
-   stall_o    <= mpu_stall or sd_stall or eth_stall;
+   stall_o    <= mpu_stall or sd_stall or eth_stall or fpu_stall or fpu_wait;
 
    i_mpu : entity work.mpu
       port map (
@@ -399,6 +470,51 @@ begin
          wb_data_i  => io_wdata,
          wb_data_o  => mpu_data
       ); -- i_mpu
+
+   -- The FPU, and with G_FPU_FREE or G_FORMAL a free FPU
+   -- (formal/fpu_free.vhd) that does on its port anything that the FPU's
+   -- own proof allows, and says how many acknowledges it owes. Both are
+   -- components, as above.
+-- vsg_off instantiation_034
+
+   gen_fpu : if not (G_FPU_FREE or G_FORMAL) generate
+
+      i_fpu : component fpu
+         port map (
+            clk_i      => clk_i,
+            rst_i      => dev_rst,
+            wb_cyc_i   => io_cyc,
+            wb_stb_i   => fpu_stb,
+            wb_stall_o => fpu_stall,
+            wb_ack_o   => fpu_ack,
+            wb_we_i    => io_we,
+            wb_addr_i  => io_addr(2 downto 0),
+            wb_data_i  => io_wdata,
+            wb_data_o  => fpu_data
+         ); -- i_fpu
+
+   end generate gen_fpu;
+
+   gen_fpu_free : if G_FPU_FREE or G_FORMAL generate
+
+      i_fpu : component fpu_free
+         port map (
+            clk_i      => clk_i,
+            rst_i      => dev_rst,
+            wb_cyc_i   => io_cyc,
+            wb_stb_i   => fpu_stb,
+            wb_stall_o => fpu_stall,
+            wb_ack_o   => fpu_ack,
+            wb_we_i    => io_we,
+            wb_addr_i  => io_addr(2 downto 0),
+            wb_data_i  => io_wdata,
+            wb_data_o  => fpu_data,
+            f_owed_o   => f_fpu_owed
+         ); -- i_fpu
+
+   end generate gen_fpu_free;
+
+-- vsg_on instantiation_034
 
    i_perf : entity work.perf
       generic map (
@@ -590,15 +706,15 @@ begin
 
    gen_formal : if G_FORMAL generate
       -- The stb of each device, by t_dev'pos, and the acknowledge of each
-      signal f_stb : std_logic_vector(7 downto 0);
-      signal f_ack : std_logic_vector(7 downto 0);
+      signal f_stb : std_logic_vector(8 downto 0);
+      signal f_ack : std_logic_vector(8 downto 0);
       -- A device that stalls
       signal f_stall : std_logic;
       -- The core's requests taken and not yet acknowledged, which a hold
       -- drops
       signal f_core_wait : natural range 0 to 3 := 0;
       -- sel, one-hot
-      signal f_onehot : std_logic_vector(7 downto 0);
+      signal f_onehot : std_logic_vector(8 downto 0);
    begin
 
       f_onehot <= onehot(sel);
@@ -617,9 +733,9 @@ begin
          end if;
       end process p_core_wait;
 
-      f_stb   <= tod_stb & eth_stb & net_stb & sd_stb & fs_stb & timer_stb & mpu_stb & perf_stb;
-      f_ack   <= tod_ack & eth_ack & net_ack & sd_ack & fs_ack & timer_ack & mpu_ack & perf_ack;
-      f_stall <= mpu_stall or sd_stall or eth_stall;
+      f_stb   <= fpu_stb & tod_stb & eth_stb & net_stb & sd_stb & fs_stb & timer_stb & mpu_stb & perf_stb;
+      f_ack   <= fpu_ack & tod_ack & eth_ack & net_ack & sd_ack & fs_ack & timer_ack & mpu_ack & perf_ack;
+      f_stall <= mpu_stall or sd_stall or eth_stall or fpu_stall or fpu_wait;
 
       -- psl default clock is rising_edge(clk_i);
 
@@ -631,15 +747,15 @@ begin
       -- psl f_dev_stall : assert always
       --    rst_i = '0' and f_stall = '1' -> busy = '1' or owed = '1' or hold_d = '1';
       -- psl f_one_wait : assert always not (busy = '1' and owed = '1');
-      -- psl f_one_ack : assert always (f_ack and (f_ack - 1)) = "00000000";
+      -- psl f_one_ack : assert always (f_ack and (f_ack - 1)) = "000000000";
 
       -- A request reaches its device, and no other: the core's in the
       -- cycle it is taken, the link's from the latch until the device
       -- takes it, with the request that the link made.
       -- psl f_core_stb : assert always
       --    core_stb_i = '1' -> f_stb(t_dev'pos(dev_of(core_addr_i))) = '1';
-      -- psl f_stb_one : assert always (f_stb and (f_stb - 1)) = "00000000";
-      -- psl f_stb_who : assert always f_stb /= "00000000" -> core_stb_i = '1' or lnk_stb = '1';
+      -- psl f_stb_one : assert always (f_stb and (f_stb - 1)) = "000000000";
+      -- psl f_stb_who : assert always f_stb /= "000000000" -> core_stb_i = '1' or lnk_stb = '1';
       -- psl f_link_latch : assert always
       --    {link_stb_i and not busy and not rst_i} |=>
       --    {busy = '1' and lnk_stb = '1' and lnk_sel = prev(dev_of(link_addr_i)) and
@@ -665,6 +781,17 @@ begin
       -- psl f_sel_oh : assert always sel_oh = f_onehot;
       -- psl f_sel_mpu : assert always
       --    mpu_stall = '1' and (busy = '1' or owed = '1') -> sel = DEV_MPU;
+      -- psl f_sel_fpu : assert always
+      --    (fpu_stall = '1' or fpu_wait = '1') and (busy = '1' or owed = '1') -> sel = DEV_FPU;
+      -- The FPU owes at most one acknowledge, and fpu_wait says so, so
+      -- that no request reaches it while it owes one.
+      -- psl f_fpu_wait : assert always (fpu_wait = '1') = (f_fpu_owed = 1) and f_fpu_owed <= 1;
+      -- psl f_fpu_one : assert always fpu_wait = '1' -> fpu_stb = '0';
+      -- psl f_fpu_alone : assert always
+      --    fpu_wait = '1' -> mpu_stall = '0' and sd_stall = '0' and eth_stall = '0' and
+      --                      (busy = '0' or lnk_sel = DEV_FPU) and (owed = '0' or sel = DEV_FPU);
+      -- psl c_fpu_core : cover {core_stb_i and fpu_stb and not rst_i; true; core_ack_o};
+      -- psl c_fpu_wait : cover {core_stb_i and fpu_stb and not rst_i; fpu_wait[*3]; core_ack_o};
       -- psl f_sel_sd : assert always
       --    sd_stall = '1' and (busy = '1' or owed = '1') -> sel = DEV_SD;
       -- psl f_sel_eth : assert always
@@ -674,7 +801,8 @@ begin
       --    (mpu_ack = '1' and rdata_o = mpu_data) or (perf_ack = '1' and rdata_o = perf_data) or
       --    (fs_ack = '1' and rdata_o = fs_data) or (timer_ack = '1' and rdata_o = timer_data) or
       --    (sd_ack = '1' and rdata_o = sd_data) or (net_ack = '1' and rdata_o = net_data) or
-      --    (eth_ack = '1' and rdata_o = eth_data) or (tod_ack = '1' and rdata_o = tod_data);
+      --    (eth_ack = '1' and rdata_o = eth_data) or (tod_ack = '1' and rdata_o = tod_data) or
+      --    (fpu_ack = '1' and rdata_o = fpu_data);
 
       -- The devices are reset when the core starts.
       -- psl f_start : assert always {hold_i; not hold_i} |-> {dev_rst};

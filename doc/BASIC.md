@@ -104,9 +104,8 @@ These facts bound the design:
   microsecond counter, with its 64 bits, for 285 years. A 32-bit
   float holds whole numbers up to 2^24 only, and they would not
   survive it.
-- **The FPU does not exist yet.** nice_cpu#161 has its decisions and a
-  draft of its registers, of 2026-11-12, and nice_cpu `V2.1` is tagged
-  without it.
+- **The FPU is there.** nice_cpu `V2.2` has it, in the emulator and
+  in `fpu.vhd`, and every board has it since #136.
 - **A console read takes its byte.** Nothing tells that a byte waits
   without taking it, until the console's interrupt of nice_cpu V2.1
   (#104). From a file, as in the tests, a read never finds "no byte":

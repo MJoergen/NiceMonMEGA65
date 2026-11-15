@@ -12,7 +12,10 @@
 # nice_cpu's debug_link.vhd may do, so it makes a request in any cycle,
 # where a real one needs hundreds of cycles of UART bytes for one. Its
 # assumptions are the contracts of debug_link.vhd, which nice_cpu proves
-# in nice_cpu/hdl/formal/debug_link.sby.
+# in nice_cpu/hdl/formal/debug_link.sby. The FPU is fpu_free.vhd, a free
+# FPU that does on its port anything that the FPU's own proof allows, as in
+# devices.sby; nicemon's G_FORMAL selects it. With the real FPU, the "link"
+# task took an hour and a half.
 # The link uses the bus only while the core is held or halted, and a
 # halted core has no bus cycle open, so no link request meets a running core
 # or an outstanding fetch.
@@ -57,13 +60,13 @@ smtbmc yices
 
 [script]
 plugin -i ghdl
-run: ghdl --std=08 -fpsl -gG_CPU_RUN_AT_RESET=true nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd perf.vhd tod.vhd timer.vhd fetch_stats.vhd sd_regs.vhd net_regs.vhd eth_regs.vhd sd_spi_byte.vhd sd_spi.vhd sd.vhd nice_core.vhd nice_core_formal.vhd uart_serdes.vhd debug_link.vhd debug_link_formal.vhd rx_fifo.vhd ram.vhd rom.vhd uart_pkg.vhd bus_pkg.vhd i2c.vhd board_io.vhd scr_regs.vhd devices.vhd mem.vhd nicemon.vhd formal_nicemon.vhd -e formal_nicemon
-link: ghdl --std=08 -fpsl -gG_CPU_RUN_AT_RESET=false nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd perf.vhd tod.vhd timer.vhd fetch_stats.vhd sd_regs.vhd net_regs.vhd eth_regs.vhd sd_spi_byte.vhd sd_spi.vhd sd.vhd nice_core.vhd nice_core_formal.vhd uart_serdes.vhd debug_link.vhd debug_link_formal.vhd rx_fifo.vhd ram.vhd rom.vhd uart_pkg.vhd bus_pkg.vhd i2c.vhd board_io.vhd scr_regs.vhd devices.vhd mem.vhd nicemon.vhd formal_nicemon.vhd -e formal_nicemon
-cover: ghdl --std=08 -fpsl -gG_CPU_RUN_AT_RESET=true nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd perf.vhd tod.vhd timer.vhd fetch_stats.vhd sd_regs.vhd net_regs.vhd eth_regs.vhd sd_spi_byte.vhd sd_spi.vhd sd.vhd nice_core.vhd nice_core_formal.vhd uart_serdes.vhd debug_link.vhd debug_link_formal.vhd rx_fifo.vhd ram.vhd rom.vhd uart_pkg.vhd bus_pkg.vhd i2c.vhd board_io.vhd scr_regs.vhd devices.vhd mem.vhd nicemon.vhd formal_nicemon.vhd -e formal_nicemon
-rom: ghdl --std=08 -fpsl -gG_CPU_RUN_AT_RESET=true -gG_ROM_FILE=rom.bin -gG_BOARD_IO=true nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd perf.vhd tod.vhd timer.vhd fetch_stats.vhd sd_regs.vhd net_regs.vhd eth_regs.vhd sd_spi_byte.vhd sd_spi.vhd sd.vhd nice_core.vhd nice_core_formal.vhd uart_serdes.vhd debug_link.vhd debug_link_formal.vhd rx_fifo.vhd ram.vhd rom.vhd uart_pkg.vhd bus_pkg.vhd i2c.vhd board_io.vhd scr_regs.vhd devices.vhd mem.vhd nicemon.vhd formal_nicemon.vhd -e formal_nicemon
-rom_cover: ghdl --std=08 -fpsl -gG_CPU_RUN_AT_RESET=true -gG_ROM_FILE=rom.bin -gG_BOARD_IO=true nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd perf.vhd tod.vhd timer.vhd fetch_stats.vhd sd_regs.vhd net_regs.vhd eth_regs.vhd sd_spi_byte.vhd sd_spi.vhd sd.vhd nice_core.vhd nice_core_formal.vhd uart_serdes.vhd debug_link.vhd debug_link_formal.vhd rx_fifo.vhd ram.vhd rom.vhd uart_pkg.vhd bus_pkg.vhd i2c.vhd board_io.vhd scr_regs.vhd devices.vhd mem.vhd nicemon.vhd formal_nicemon.vhd -e formal_nicemon
-sd: ghdl --std=08 -fpsl -gG_CPU_RUN_AT_RESET=true -gG_SD_SLOTS=2 nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd perf.vhd tod.vhd timer.vhd fetch_stats.vhd sd_regs.vhd net_regs.vhd eth_regs.vhd sd_spi_byte.vhd sd_spi.vhd sd.vhd nice_core.vhd nice_core_formal.vhd uart_serdes.vhd debug_link.vhd debug_link_formal.vhd rx_fifo.vhd ram.vhd rom.vhd uart_pkg.vhd bus_pkg.vhd i2c.vhd board_io.vhd scr_regs.vhd devices.vhd mem.vhd nicemon.vhd formal_nicemon.vhd -e formal_nicemon
-sd_cover: ghdl --std=08 -fpsl -gG_CPU_RUN_AT_RESET=true -gG_SD_SLOTS=2 nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd perf.vhd tod.vhd timer.vhd fetch_stats.vhd sd_regs.vhd net_regs.vhd eth_regs.vhd sd_spi_byte.vhd sd_spi.vhd sd.vhd nice_core.vhd nice_core_formal.vhd uart_serdes.vhd debug_link.vhd debug_link_formal.vhd rx_fifo.vhd ram.vhd rom.vhd uart_pkg.vhd bus_pkg.vhd i2c.vhd board_io.vhd scr_regs.vhd devices.vhd mem.vhd nicemon.vhd formal_nicemon.vhd -e formal_nicemon
+run: ghdl --std=08 -fpsl -gG_CPU_RUN_AT_RESET=true nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd fpu_free.vhd perf.vhd tod.vhd timer.vhd fetch_stats.vhd sd_regs.vhd net_regs.vhd eth_regs.vhd sd_spi_byte.vhd sd_spi.vhd sd.vhd nice_core.vhd nice_core_formal.vhd uart_serdes.vhd debug_link.vhd debug_link_formal.vhd rx_fifo.vhd ram.vhd rom.vhd uart_pkg.vhd bus_pkg.vhd i2c.vhd board_io.vhd scr_regs.vhd devices.vhd mem.vhd nicemon.vhd formal_nicemon.vhd -e formal_nicemon
+link: ghdl --std=08 -fpsl -gG_CPU_RUN_AT_RESET=false nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd fpu_free.vhd perf.vhd tod.vhd timer.vhd fetch_stats.vhd sd_regs.vhd net_regs.vhd eth_regs.vhd sd_spi_byte.vhd sd_spi.vhd sd.vhd nice_core.vhd nice_core_formal.vhd uart_serdes.vhd debug_link.vhd debug_link_formal.vhd rx_fifo.vhd ram.vhd rom.vhd uart_pkg.vhd bus_pkg.vhd i2c.vhd board_io.vhd scr_regs.vhd devices.vhd mem.vhd nicemon.vhd formal_nicemon.vhd -e formal_nicemon
+cover: ghdl --std=08 -fpsl -gG_CPU_RUN_AT_RESET=true nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd fpu_free.vhd perf.vhd tod.vhd timer.vhd fetch_stats.vhd sd_regs.vhd net_regs.vhd eth_regs.vhd sd_spi_byte.vhd sd_spi.vhd sd.vhd nice_core.vhd nice_core_formal.vhd uart_serdes.vhd debug_link.vhd debug_link_formal.vhd rx_fifo.vhd ram.vhd rom.vhd uart_pkg.vhd bus_pkg.vhd i2c.vhd board_io.vhd scr_regs.vhd devices.vhd mem.vhd nicemon.vhd formal_nicemon.vhd -e formal_nicemon
+rom: ghdl --std=08 -fpsl -gG_CPU_RUN_AT_RESET=true -gG_ROM_FILE=rom.bin -gG_BOARD_IO=true nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd fpu_free.vhd perf.vhd tod.vhd timer.vhd fetch_stats.vhd sd_regs.vhd net_regs.vhd eth_regs.vhd sd_spi_byte.vhd sd_spi.vhd sd.vhd nice_core.vhd nice_core_formal.vhd uart_serdes.vhd debug_link.vhd debug_link_formal.vhd rx_fifo.vhd ram.vhd rom.vhd uart_pkg.vhd bus_pkg.vhd i2c.vhd board_io.vhd scr_regs.vhd devices.vhd mem.vhd nicemon.vhd formal_nicemon.vhd -e formal_nicemon
+rom_cover: ghdl --std=08 -fpsl -gG_CPU_RUN_AT_RESET=true -gG_ROM_FILE=rom.bin -gG_BOARD_IO=true nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd fpu_free.vhd perf.vhd tod.vhd timer.vhd fetch_stats.vhd sd_regs.vhd net_regs.vhd eth_regs.vhd sd_spi_byte.vhd sd_spi.vhd sd.vhd nice_core.vhd nice_core_formal.vhd uart_serdes.vhd debug_link.vhd debug_link_formal.vhd rx_fifo.vhd ram.vhd rom.vhd uart_pkg.vhd bus_pkg.vhd i2c.vhd board_io.vhd scr_regs.vhd devices.vhd mem.vhd nicemon.vhd formal_nicemon.vhd -e formal_nicemon
+sd: ghdl --std=08 -fpsl -gG_CPU_RUN_AT_RESET=true -gG_SD_SLOTS=2 nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd fpu_free.vhd perf.vhd tod.vhd timer.vhd fetch_stats.vhd sd_regs.vhd net_regs.vhd eth_regs.vhd sd_spi_byte.vhd sd_spi.vhd sd.vhd nice_core.vhd nice_core_formal.vhd uart_serdes.vhd debug_link.vhd debug_link_formal.vhd rx_fifo.vhd ram.vhd rom.vhd uart_pkg.vhd bus_pkg.vhd i2c.vhd board_io.vhd scr_regs.vhd devices.vhd mem.vhd nicemon.vhd formal_nicemon.vhd -e formal_nicemon
+sd_cover: ghdl --std=08 -fpsl -gG_CPU_RUN_AT_RESET=true -gG_SD_SLOTS=2 nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd fpu_free.vhd perf.vhd tod.vhd timer.vhd fetch_stats.vhd sd_regs.vhd net_regs.vhd eth_regs.vhd sd_spi_byte.vhd sd_spi.vhd sd.vhd nice_core.vhd nice_core_formal.vhd uart_serdes.vhd debug_link.vhd debug_link_formal.vhd rx_fifo.vhd ram.vhd rom.vhd uart_pkg.vhd bus_pkg.vhd i2c.vhd board_io.vhd scr_regs.vhd devices.vhd mem.vhd nicemon.vhd formal_nicemon.vhd -e formal_nicemon
 prep -top formal_nicemon
 
 [files]
@@ -97,5 +100,6 @@ prep -top formal_nicemon
 ../src/nicemon.vhd
 nice_core_formal.vhd
 debug_link_formal.vhd
+fpu_free.vhd
 formal_nicemon.vhd
 rom.bin

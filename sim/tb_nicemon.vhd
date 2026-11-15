@@ -1101,6 +1101,12 @@ begin
       check("00000103", "FFFFE4A8");         -- -1000 * 7 = -7000
       check("00000104", "00000001");         -- instructions between two reads
       check("00000105", "00000003");         -- interrupts of the timer taken
+      check("00000106", "4061DB6D");         -- 1000.0 / 7.0 in the FPU
+      check("00000107", "B6DB6DB7");
+      check("00000108", "0000008E");         -- as a word, 142
+      check("FFFFFF89", "4027E792");         -- its square root, X, over the link
+      check("FFFFFF88", "0AF6B214");
+      check("FFFFFF8D", "00200001");         -- the status: depth 1, fits
       check("FFFFFF10", "00000000");         -- the timer: stopped,
       check("FFFFFF11", "00000000");
       check("FFFFFF12", "000000F0");         -- with its vector

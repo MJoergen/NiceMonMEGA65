@@ -1,5 +1,7 @@
 # The devices of nice_cpu/hdl/src, src/devices.vhd (formal_devices.vhd),
-# with the real devices, whose own proofs are in nice_cpu/hdl/formal.
+# with the real devices, whose own proofs are in nice_cpu/hdl/formal, but
+# for the FPU, which is fpu_free.vhd, a free FPU with the port that its
+# proof gives it.
 # "prove" proves the assertions for every cycle by k-induction, and
 # "cover" reaches each cover statement. The depths are in cycles: 4 is the
 # k of the induction, and 16 is how far "cover" looks for each statement.
@@ -29,10 +31,10 @@ smtbmc yices
 
 [script]
 plugin -i ghdl
-prove: ghdl --std=08 -fpsl nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd perf.vhd tod.vhd timer.vhd fetch_stats.vhd sd_regs.vhd net_regs.vhd eth_regs.vhd sd_spi_byte.vhd sd_spi.vhd sd.vhd bus_pkg.vhd devices.vhd formal_devices.vhd -e formal_devices
-cover: ghdl --std=08 -fpsl nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd perf.vhd tod.vhd timer.vhd fetch_stats.vhd sd_regs.vhd net_regs.vhd eth_regs.vhd sd_spi_byte.vhd sd_spi.vhd sd.vhd bus_pkg.vhd devices.vhd formal_devices.vhd -e formal_devices
-prove_sd: ghdl --std=08 -fpsl -gG_SD_SLOTS=2 nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd perf.vhd tod.vhd timer.vhd fetch_stats.vhd sd_regs.vhd net_regs.vhd eth_regs.vhd sd_spi_byte.vhd sd_spi.vhd sd.vhd bus_pkg.vhd devices.vhd formal_devices.vhd -e formal_devices
-cover_sd: ghdl --std=08 -fpsl -gG_SD_SLOTS=2 nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd perf.vhd tod.vhd timer.vhd fetch_stats.vhd sd_regs.vhd net_regs.vhd eth_regs.vhd sd_spi_byte.vhd sd_spi.vhd sd.vhd bus_pkg.vhd devices.vhd formal_devices.vhd -e formal_devices
+prove: ghdl --std=08 -fpsl nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd perf.vhd tod.vhd timer.vhd fetch_stats.vhd sd_regs.vhd net_regs.vhd eth_regs.vhd sd_spi_byte.vhd sd_spi.vhd sd.vhd bus_pkg.vhd fpu_free.vhd devices.vhd formal_devices.vhd -e formal_devices
+cover: ghdl --std=08 -fpsl nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd perf.vhd tod.vhd timer.vhd fetch_stats.vhd sd_regs.vhd net_regs.vhd eth_regs.vhd sd_spi_byte.vhd sd_spi.vhd sd.vhd bus_pkg.vhd fpu_free.vhd devices.vhd formal_devices.vhd -e formal_devices
+prove_sd: ghdl --std=08 -fpsl -gG_SD_SLOTS=2 nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd perf.vhd tod.vhd timer.vhd fetch_stats.vhd sd_regs.vhd net_regs.vhd eth_regs.vhd sd_spi_byte.vhd sd_spi.vhd sd.vhd bus_pkg.vhd fpu_free.vhd devices.vhd formal_devices.vhd -e formal_devices
+cover_sd: ghdl --std=08 -fpsl -gG_SD_SLOTS=2 nice_pkg.vhd trace_pkg.vhd pipe_pkg.vhd mpu.vhd perf.vhd tod.vhd timer.vhd fetch_stats.vhd sd_regs.vhd net_regs.vhd eth_regs.vhd sd_spi_byte.vhd sd_spi.vhd sd.vhd bus_pkg.vhd fpu_free.vhd devices.vhd formal_devices.vhd -e formal_devices
 prep -top formal_devices
 
 [files]
@@ -51,5 +53,6 @@ prep -top formal_devices
 ../src/sd/sd_spi.vhd
 ../src/sd/sd.vhd
 ../src/bus_pkg.vhd
+fpu_free.vhd
 ../src/devices.vhd
 formal_devices.vhd
