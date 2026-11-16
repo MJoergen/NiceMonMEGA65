@@ -16,7 +16,7 @@ the ROM, and the order of the work, with the issue of each stage.
 - [The language](#the-language)
 - [The memory](#the-memory)
 - [Inside](#inside)
-- [C, and assembly](#c-and-assembly)
+- [Assembly](#assembly)
 - [Tests](#tests)
 - [Stages](#stages)
 - [The ROM's room](#the-roms-room)
@@ -26,7 +26,9 @@ the ROM, and the order of the work, with the issue of each stage.
 ## Decisions
 
 Made on 2026-11-11, but for the first two, which are of 2026-11-12,
-and the names of the statements, which are of 2026-11-15.
+the names of the statements, which are of 2026-11-15, and NICE
+assembly from stage 2 on and the decisions of stage 2, which are of
+2026-11-16.
 They replace the 32-bit float in software, and the number that is an
 integer until a fraction appears, of the day before
 ([Numbers](#numbers) has why). The first, the third, and the fourth
@@ -34,24 +36,23 @@ settle the three open questions of #54.
 
 - **One kind of number**, the IEEE 754 binary64 value, a double.
   BASIC has no integers of its own, and no second precision.
-- **The numbers are the FPU's**, the floating-point unit that
-  [nice_cpu#161](https://github.com/MJoergen/nice_cpu/issues/161)
-  proposes. The ROM has no float routines, and no fallback in
-  software, so BASIC's numbers wait for the FPU
-  ([The FPU](#the-fpu), [Releases](#releases)).
+- **The numbers are the FPU's**, the floating-point unit of
+  [nice_cpu#161](https://github.com/MJoergen/nice_cpu/issues/161),
+  which nice_cpu `V2.2` has. The ROM has no float routines, and no
+  fallback in software ([The FPU](#the-fpu)).
 - **BASIC is the ROM's main loop.** It replaces `monitor_cmd.nasm`
   whole: the monitor's commands become statements. The dispatch table,
   the HAL, and the programs at `0x8000` stay as they are.
-- **C first**, in the ROM's C code beside `fat32.c`, and NICE assembly
-  later, for speed and for size. The ROM's room decides when
+- **NICE assembly from stage 2 on.** Stage 1, the shell, was written
+  in C, in `basic.c`. Its first step in stage 2 is the port of
+  `basic.c` to assembly, #115, and every stage after it is written
+  in assembly, as C would fill the ROM at stage 3
   ([The ROM's room](#the-roms-room)).
 - **Graphics, sprites, and sound** come much later, with hardware of
   their own. They are not in this design.
 - **The first stage** is only what keeps the board as usable as it is:
   `LOAD` and `SYS`, so that a program such as nice_chess still loads
   and runs, and the monitor's other commands under new names.
-- **The port to assembly is at the end of stage 4**
-  ([The ROM's room](#the-roms-room)).
 - **`DUMP` and `DIS` stay**: the monitor's `d` and `u`, with the
   disassembler, are statements for good.
 - **The names of the statements** are those of
@@ -59,9 +60,12 @@ settle the three open questions of #54.
   its name, with no `BLOAD`, and a TFTP server is the second argument
   of `LOAD`, `RUN`, and `DIR`, with no `TFTP`. The top of BASIC's
   memory is `HIMEM`.
-- **V2.0.1 has no BASIC.** The stages 1 to 3 go to the milestone
-  V2.2, which pins nice_cpu's tag `V2.2`, the first with the FPU
+- **The stages 1 to 3 go to the milestone V2.2.1**, which keeps
+  nice_cpu's tag `V2.2`, the first with the FPU
   ([Releases](#releases)).
+- **Stage 2's numbers** are those of [Numbers](#numbers): `PRINT`
+  with the FPU's 15 digits, `DIV` and `MOD` on words, no `A%`, and
+  names of up to 16 characters, packed.
 
 ## What it runs on
 
@@ -90,17 +94,18 @@ These facts bound the design:
 - **C has no floats in the ROM.** nice_cpu's float library keeps words
   of its own in the image, which is ROM here, so `nicebuild.py --ram`
   refuses a program that uses floats. The library is also 6578 words,
-  for `float` and `double`. So BASIC's C code has no `double`, and the
+  for `float` and `double`. So the ROM's C code has no `double`, and the
   library is no fallback for the FPU.
-- **C costs 6 to 8 words a line.** `fat32.c` is 9435 words from 1162
-  lines of code, 8.1 a line, and `clock.c` 1176 from 197, 6.0, both at
-  `-Oz`.
+- **C costs 6 to 8 words a line**, which is why BASIC is assembly
+  from stage 2 on. `fat32.c` is 9435 words from 1162 lines of code,
+  8.1 a line, and `clock.c` 1176 from 197, 6.0, both at `-Oz`.
 - **C's constants cost RAM too.** With `--ram`, every data segment is
   copied to the RAM at the cold start, the strings and the tables
   among them. 863 words are free there.
-- **One wasm module.** A program has one (WASM.md), so BASIC's C joins
-  `fat32.c` and `clock.c` in `ROM_C`, and shares their memory and their
-  C stack of 4096 bytes. There is no `malloc`, and no `setjmp`.
+- **One wasm module.** A program has one (WASM.md), so the shell's
+  `basic.c` joined `fat32.c` and `clock.c` in `ROM_C`, and shares
+  their memory and their C stack of 4096 bytes. There is no
+  `malloc`, and no `setjmp`.
 - **The texts of the ROM are four characters a word.** The monitor had
   3250 words of `.ASCII_L` text. #131 packed them with `.ASCII_B`, and
   the monitor reads them through the byte window, which reaches the
@@ -210,22 +215,21 @@ a double, IEEE 754 binary64, on the FPU ([The FPU](#the-fpu)).
 - `+`, `-`, `*`, and `/` are the FPU's, each rounded once. So
   `PRINT 1/3` does not print 0, `6/2` is 3, and a large product is a
   number like any other, with 53 bits of it kept.
-- `DIV` and `MOD` divide whole numbers, toward zero, and an operand
-  with a fraction is truncated first. `DIV` is `/` with the fraction
-  dropped, which is the exact quotient of any two words (the proof is
-  in nice_cpu#161).
-- `AND`, `OR`, `XOR`, `NOT`, `<<`, and `>>` work on words. An operand
-  is truncated to a signed 32-bit word, and one that does not fit is
-  an error. The result is a signed word.
+- `AND`, `OR`, `XOR`, `NOT`, `<<`, `>>`, `DIV`, and `MOD` work on
+  words, each one command of the FPU. An operand is truncated to a
+  signed 32-bit word, and one that does not fit is an error. The
+  result is a signed word, but for `DIV` of -2^31 by -1, which is
+  2^31. `DIV` and `MOD` divide toward zero, and `MOD` has the sign of
+  its left operand. `>>` shifts 0 in.
 - A comparison gives -1 or 0.
 - The operators, from the one that binds most: `^`, the signs `-` and
   `+`, then `*`, `/`, `DIV`, and `MOD`, then `+` and `-`, then `<<`
   and `>>`, the comparisons, `NOT`, `AND`, and last `OR` and `XOR`.
   That is V2's order, with each new operator beside its like.
 - A variable is two words, the double. Nothing says what it holds, as
-  it holds one kind. Whether `A%` stays, as one word of storage for a
-  whole number, is open ([Open questions](#open-questions)). `A$` is a
-  string.
+  it holds one kind. There is no `A%`, and a `%` in a name is an
+  error, so that it can come with `DIM` if arrays of whole numbers
+  need it ([Open questions](#open-questions)). `A$` is a string.
 - `ABS`, `SGN`, `INT`, and `SQR` are the FPU's arithmetic, and `INT`
   rounds down. `SIN`, `COS`, `TAN`, `ATN`, `LOG`, `EXP`, and `^` are
   its functions. `^` multiplies when the exponent is whole, so `10^2`
@@ -234,9 +238,18 @@ a double, IEEE 754 binary64, on the FPU ([The FPU](#the-fpu)).
   overflow, and a function of an argument that it does not take are
   errors. A result too small for a double goes to 0 by steps, with no
   error.
-- `PRINT` shows a number with up to 15 significant digits, or fewer.
-  `LIST` and `SAVE` write a constant so that a program saved and
-  loaded is the same program. How many digits each takes is open
+- `PRINT` shows a number with the FPU's `DIGITS 15`, its trailing
+  zeros dropped, as C's `%.15G` does: in fixed notation while the
+  exponent is -5 to 14, with a 0 before the point, and in E notation
+  else, with a sign and at least two digits in the exponent. So
+  `1/3` is `0.333333333333333`, `0.1 + 0.2` is `0.3`, `1E15` is
+  `1E+15`, and `0.00001` is `1E-05`. A negative number has its `-`,
+  and no blank comes before or after a number. A `,` in `PRINT` goes
+  to the next column of 8.
+- A constant is read as at most 16 digits in BCD and an exponent,
+  `FROMBCD` and `SCALE10`. Digits after the 16th round the 16th.
+- `LIST` and `SAVE` write a constant so that a program saved and
+  loaded is the same program. How is open
   ([Open questions](#open-questions)).
 - An address from `0x80000000` on is a negative number: `0xFFFF0000`
   prints as -65536. `HEX$` shows the word. `PEEK` gives a signed word
@@ -258,12 +271,13 @@ operation.
 What it costs: BASIC's numbers wait for the FPU
 ([Releases](#releases)). A number that is computed and printed does
 not read back as the same number, which takes 17 digits. And an array
-of whole numbers has two words for each, unless `A%` stays.
+of whole numbers has two words for each.
 
 ### Names and keywords
 
-- A name is letters and digits, every one significant, in either case,
-  and a keyword is a whole name: `TOTAL` is a variable, though it
+- A name is letters and digits, up to 16 of them, every one
+  significant, in either case, and a keyword is a whole name:
+  `TOTAL` is a variable, though it
   starts with `TO`. So `FORI=1TO10` of V2 needs its blanks here.
 - A name that starts with `PROC` or `FN` and goes on is a procedure or
   a function, as in BBC BASIC, so no variable starts with them.
@@ -308,8 +322,7 @@ The review of 2026-11-12, of nice_cpu#161, changed it again:
 ## The memory
 
 BASIC's own variables are with the monitor's, in the RAM from
-`0xFFFFF000`. Its workspace is the program's RAM, which C reaches as
-words with `nice_peek` and `nice_poke`, each one `MOVE`:
+`0xFFFFF000`. Its workspace is the program's RAM:
 
 | From | What | Grows |
 |---|---|---|
@@ -324,10 +337,21 @@ words with `nice_peek` and `nice_poke`, each one `MOVE`:
   monitor's variables and room for the stack: about 90K words on the
   MEGA65 and 26K on the Nexys4DDR. In `niceemu`, where the word reads
   0, BASIC takes the MEGA65's size.
-- The monitor's variables are 4K words today, and the C code has 863
-  free. BASIC's own state, its line buffers, and the keys typed ahead
-  need more, so `VARS_WORDS` grows, and a program at `0x8000` gets
-  that much less.
+- The monitor's variables are 4K words today. BASIC's own state, its
+  line buffers, and the keys typed ahead need more, so `VARS_WORDS`
+  grows, and a program at `0x8000` gets that much less. The pointer
+  to the end of the names and the variables is one of BASIC's own
+  words there.
+- A name is its length, then its characters packed four to a word,
+  as `.ASCII_B` packs them, in at most 4 words, then the double. A
+  name is found by its length first. Stage 3 keeps the format, and
+  a line then holds the index of the name.
+- A `.bin` file that is loaded clears the variables, as it may write
+  over them. A routine that `SYS` calls keeps them, whether it
+  returns or ends through `mon_exit`, as a routine above `HIMEM`
+  must. So a program at `0x8000` that `SYS` starts may leave the
+  table broken, and the walk of the table stops at its end pointer
+  and at a length above 16, and is never lost in it.
 
 ## Inside
 
@@ -373,13 +397,12 @@ not recurse.
 
 ### Errors
 
-An error must leave the C code from any depth, and C has no `longjmp`
-here. One routine in assembly does it, as `mon_trap` does for a trap:
-it resets SP and the C stack pointer, the module's one mutable global,
-and goes back to the loop of statements. `mon_trap` does not reset the
-C stack pointer today, which matters little for a rare trap, and would
-matter for errors. With no `TRAP`, the loop prints the message and the
-line, drops the frames, and prints `READY.`. With one, the frames
+An error leaves the evaluator from any depth. One routine does it:
+it clears the FPU's stack and its flags, and goes back to the main
+loop, which sets SP again, and the C code's stack pointer, as a trap
+of the C code does since stage 1. With no `TRAP`, the loop prints the
+message, in full text, and the line, drops the frames, and prints
+`READY.`. With one, the frames
 stay, for `RESUME`.
 
 The depth of an expression is counted, and too deep is an error,
@@ -410,18 +433,23 @@ The numbers are on the floating-point unit of
 [nice_cpu#161](https://github.com/MJoergen/nice_cpu/issues/161): a
 stack of 16 doubles, registers that push a value and read the top, a
 command register, sticky flags, and a register that compares the two
-top values. It is a proposal there, with a draft of its registers, so
-this section has what BASIC does with it, and what BASIC needs of it.
-The ROM has no float routines.
+top values. nice_cpu's DEVICES.md §11 has its registers and its
+commands, and this section has what BASIC does with them. The ROM
+has no float routines.
 
 - **Its stack is the stack of an expression.** The evaluator meets
   the operands and the operators in the order that the stack takes
   them: a variable or a constant is pushed, an operator is one
   command, and no value between them leaves the FPU.
-  `A = B + C * SIN(D)` is 13 accesses, each one `MOVE`.
-- **A value leaves the stack** for a store and for `PRINT`, as a word
-  for an index, an address, and an operand of a bit operator, and as
-  the result of a comparison, which is one read.
+  `A = B + C * SIN(D)` is 13 accesses, each one `MOVE`. Every
+  operator and function of stage 2 is one command: `NEG`, `ADD`,
+  `SUB`, `MUL`, `DIV`, `ABS`, `SIGN`, `FLOOR`, `SQRT`, `CMP n`, and
+  the words' `AND`, `OR`, `XOR`, `NOT`, `SHL`, `SHR`, `IDIV`, and
+  `MOD`.
+- **A value leaves the stack** for a store and for `PRINT`, and as a
+  word for an index and an address, through `FPU_X_W`, after bit 21
+  of the status says that it fits. A comparison stays on the stack,
+  as `CMP n` pushes -1 or 0.
 - **The stack is empty between statements.** So an error clears it
   with one command, and a routine that `SYS` calls may use the FPU.
   A call of a `FN` moves the numbers that pend to its frame, and back
@@ -434,29 +462,20 @@ The ROM has no float routines.
 - **`RND`** is BASIC's own: a generator on words, and its word scaled
   to below 1.
 - **The digits** of `PRINT`, `INPUT`, `VAL`, `STR$`, and the constants
-  are the FPU's decimal commands, which give the digits of a number
-  and take them. How many digits come back is open
-  ([Open questions](#open-questions)).
+  are the FPU's decimal commands, `DIGITS 15`, `FROMBCD`, and
+  `SCALE10`, which give the digits of a number and take them.
 - **niceemu computes with the host's doubles**, and the steps of each
   function are part of nice_cpu's specification, so a program prints
   the same digits in `niceemu` and on the board.
 - **No interrupt routine of the ROM uses the FPU**, as BASIC has
   values on its stack through a whole statement.
 
-What BASIC needs of it, each a point of nice_cpu#161 that is not
-settled there:
-
-- A read of the flags that waits for the command before it.
-- A flag for every result that is not finite, of the functions and
-  the decimal commands too.
-- The view of the top as a signed word, and a bit that says that the
-  top fits one, so that `POKE 1E10, 0` and an index out of range are
-  errors.
-- An ABI rule that lets a caller keep values on the stack across a
-  call, as the evaluator's routines call each other by the C ABI with
-  the operands on it.
-- The arithmetic and the decimal commands before the functions, which
-  only stage 6 needs.
+Each need of BASIC that nice_cpu#161 had open is settled in `V2.2`:
+a read of the status waits for the command before it, every result
+that is not finite sets a flag, bit 21 of the status says that the
+top fits a word, a routine keeps 8 values of the stack across a call,
+and the arithmetic and the decimal commands came before the
+functions.
 
 ### The screen editor
 
@@ -477,31 +496,25 @@ The Commodore editor of #54, in assembly, in place of `getline`:
   cursor's moves. A host pastes lines and reads `LIST`, which needs
   neither.
 
-## C, and assembly
+## Assembly
 
-The C code is written so that assembly can take its place a routine
-at a time:
+BASIC is NICE assembly from stage 2 on ([Decisions](#decisions)):
 
+- Stage 2 starts with the port of `basic.c`, the shell of stage 1, to
+  assembly (#115). The tests of stage 1 stay as they are, and the
+  port passes them with the same output.
+- Every routine follows the C ABI, so BASIC calls the ROM's C code,
+  `fat32.c` and `clock.c`, by a label, as the monitor's commands did.
+- The table of keywords and the messages are packed with `.ASCII_B`,
+  and read through the byte window, a quarter of the ROM.
 - The workspace is words, and its formats are those of
-  [Inside](#inside), with nothing of wasm's memory in them. C keeps
-  only BASIC's own state in its memory.
-- Every routine follows the C ABI, as the calls between `fat32.c` and
-  the monitor do, so C calls assembly and assembly calls C by a label.
-- The table of keywords and the messages are in assembly, packed with
-  `.ASCII_B`, and C reads them through the byte window with
-  `nice_peek`. So they take no RAM, and a quarter of the ROM.
-- The editor and the way out of an error are assembly from the start.
-- The C code has no `double`. It writes the FPU's registers with
-  `nice_poke`, as it writes the workspace, so the port keeps every
-  access as it is.
-
-The C code then has a second use. The C version of the stages 1 to 4
-fits the ROM, so it stays as the reference of the tests: they run it
-and the assembly, and compare the output.
+  [Inside](#inside). BASIC's own state is in the monitor's variables,
+  and none of it in the C code's RAM.
 
 A new ROM needs no bitstream to be tried on a board: the tools load a
-monitor at 0 with the ROM hidden, as `make hwtest` does, and #108 is
-to patch a ROM into a bitstream in about a minute.
+monitor at 0 with the ROM hidden, as `make hwtest` does, and
+`make r6 ROMPATCH=f.bin` patches a ROM into the last bitstream in
+about a minute (#122).
 
 ## Tests
 
@@ -545,10 +558,10 @@ Each has an issue, under #54.
    `ABS`, `SGN`, `INT`, and `SQR`, variables with long names, `LET`,
    `PRINT` and `?` with `;`, `,`, `TAB`, and `SPC`, and its format of
    a number, `PEEK`, `POKE`, `:`, and the statements of stage 1 with
-   expressions for their numbers. The errors, with the way out in
-   assembly. Still direct mode only. It needs the FPU's arithmetic
-   and its decimal commands, in `niceemu` at the least. It measures
-   the words of a C line and the steps of an operation.
+   expressions for their numbers. The errors. Still direct mode only.
+   Its first step is the port of `basic.c` to assembly, #115, and
+   the rest is written in assembly. It measures the words of the
+   stage and the steps of an operation.
 3. **Programs**, #114. The lines, `LIST`, `NEW`, `CLR`, `RUN`, `END`,
    `STOP`, `CONT`, `GOTO`, `GOSUB`, `IF` on one line, `FOR`, `REM`,
    `INPUT` of numbers, `GET`, `DIM`, the break key, `HIMEM`, and the
@@ -556,10 +569,7 @@ Each has an issue, under #54.
    into the line runs, and `LIST` gets it back. This is the first
    BASIC worth a release.
 4. **Files**, #60: `SAVE "NAME"`, `LOAD "NAME"`, and `RUN "NAME"`,
-   from the card and from TFTP. Then **the port**, #115: the stages 1
-   to 4 in assembly, checked against the C code
-   ([The ROM's room](#the-roms-room)). The stages from here on are
-   written in assembly.
+   from the card and from TFTP.
 5. **Strings**, #116. `$` variables and arrays, the heap with back
    pointers and its one sweep, the functions of #54 and `HEX$`,
    `INPUT` of strings, `DATA`, `READ`, `RESTORE`, and `TIME$`.
@@ -583,65 +593,46 @@ Each has an issue, under #54.
 
 ## The ROM's room
 
-The words of each stage are guesses, from 7 words a line of C, and
-the measured words replace them as the stages are written:
+The words of each stage are guesses, and the measured words replace
+them as the stages are written. The guesses in assembly share the
+middle of the guess for the whole list, 10500 words, by the guesses
+in C that the note had before 2026-11-16:
 
-| Stage | Words in C, guessed | In all |
+| Stage | Words, guessed | In all |
 |---|---:|---:|
-| 1. The shell, less the main loop it replaces, measured | 961 | 961 |
-| 2. Numbers | 3500 | 4461 |
-| 3. Programs | 5300 | 9761 |
-| 4. Files | 1000 | 10761 |
-| 5. Strings | 4900 | 15661 |
-| 6. Functions | 500 | 16161 |
-| 7. The editor, in assembly, and its statements | 2000 | 18161 |
-| 8. Structure | 3500 | 21661 |
-| 9. Errors | 1000 | 22661 |
-| 10. The machine | 1800 | 24461 |
+| 1. The shell in C, less the main loop it replaces, measured | 961 | 961 |
+| 2. The port of the shell, guessed to save | -700 | 261 |
+| 2. Numbers | 1400 | 1661 |
+| 3. Programs | 2100 | 3761 |
+| 4. Files | 400 | 4161 |
+| 5. Strings | 1900 | 6061 |
+| 6. Functions | 200 | 6261 |
+| 7. The editor and its statements | 2000 | 8261 |
+| 8. Structure | 1400 | 9661 |
+| 9. Errors | 400 | 10061 |
+| 10. The machine | 700 | 10761 |
 
 Stage 1 is `basic.c`, 1510 words, and `basic.nasm`, 624, of which 431
 are its packed texts, the help among them, less 1032 words that left
 `monitor_cmd.nasm` and 141 that left the other files.
 
-Stage 2 keeps the guess that it had for the integers: the second path
-of each operator goes, and the formats of the numbers come in from
-stage 6. Stage 6 was 3500 with the float routines.
+The ROM had 13455 words free without the demo, which left it in V2.1
+(#129). #111, the network for programs, leaves 9757 of them, #131,
+the texts packed, 11876, and `time ntp` (#127) 10952 (measured
+2026-11-14), TAB's completion of names (#137) 10167, and the shell
+of stage 1 (#112) 9206 (both measured 2026-11-15). In C, at 7 words a
+line, the stages 2 and 3 alone were guessed at 8800 words, so C would
+have filled the ROM at stage 3. That is why BASIC is assembly from
+stage 2 on.
 
-While BASIC is C, the routines of the monitor's commands stay in
-`monitor_cmd.nasm`, and the ROM has 13455 words free without the demo,
-which left it in V2.1 (#129). #111, the network for programs, leaves
-9757 of them, #131, the texts packed, 11876, and `time ntp` (#127)
-10952 (measured 2026-11-14), TAB's completion of names (#137)
-10167, and the shell of stage 1 (#112) 9206 (both measured
-2026-11-15).
-So
-**the whole list does not fit in C**: C fills the ROM at stage 4 or
-5, and the port to assembly is not a matter of speed alone.
+In assembly, the whole list is guessed at 9000 to 12000 words, about
+what is free:
 
-**The port is at the end of stage 4**, with the words measured. The
-stages 1 to 4 are ported then, and checked against the C code, and
-the stages from 5 on are written in assembly once. So the table's
-lines from 5 on say what C would have cost, not what is planned.
-
-After the port, with `monitor_cmd.nasm` gone:
-
-| What | Words |
-|---|---:|
-| The ROM | 32768 |
-| What stays: the monitor without `monitor_cmd.nasm`, with `DIS` | 15243 |
-| #111, guessed | 3500 to 4500 |
-| Left for BASIC, with the statements that replace the commands | 13000 to 14000 |
-| BASIC in assembly, the whole list, guessed | 9000 to 12000 |
-
-- The guess for assembly is from Microsoft's 9 KB for the 6502, and a
-  list about twice as long, less the 1000 words of float routines
-  that nice_cpu#161 estimates the FPU to save. The second path of
-  each operator goes too, and is not counted. It fits, with 1000
-  words to spare at its top.
+- The guess is from Microsoft's 9 KB for the 6502, and a list about
+  twice as long, less the 1000 words of float routines that
+  nice_cpu#161 estimates the FPU to save.
 - **What else gives room**: FAT32 in assembly, perhaps 5000 words.
-  The texts that stay were packed in #131, after the 15243 above
-  were measured, which gives back about 600 words of them. BASIC's own
-  keywords and messages are packed from the start.
+  BASIC's keywords and messages are packed from the start.
 - **Not a larger ROM.** A second ROM would fit the MEGA65's block RAM
   but not the Nexys4DDR's, and the core's timing margin is small.
 
@@ -651,37 +642,21 @@ A tag names the nice_cpu tag it pins ([RELEASE.md](RELEASE.md)), so
 the stages have no version of their own: each ships in the release
 that is open when it is done.
 
-- **Every stage from 2 on needs the FPU**, so it needs the nice_cpu
-  tag that has `fpu.vhd`. `V2.1` is tagged without it. Stage 1 needs
-  no FPU, and neither do the keys of the editor of stage 7.
-- **V2.0.1 has no BASIC**, as decided: the shell alone is a `READY.`
-  that knows no BASIC, and gives a user new names for what the monitor
-  does.
-- **The milestone V2.2** pins nice_cpu's tag `V2.2`, which has the
-  FPU. It has #54, #60, and #62, and the stages 1 to 3, #112 to #114.
-  The port and the stages from 5 on have no milestone yet.
+- **Every stage from 2 on needs the FPU**, which nice_cpu `V2.2` has,
+  in `niceemu` and in `fpu.vhd`, and every board has since #136.
+- **The milestone V2.2.1** keeps nice_cpu's tag `V2.2`. It has #54,
+  #60, and #62, and the stages 1 to 3, #112 to #114, with the port
+  of the shell, #115. The stages from 5 on have no milestone yet.
 - **The stages 1 to 3 ship together**, so that the change of the
   commands comes with a BASIC that runs programs. Stage 4, which ends
   #60, comes with them, or in a release after.
-- **niceemu has the FPU before the boards have it**, by the order of
-  nice_cpu#161: its specification, the emulator, and then the VHDL.
-  The submodule pins only tags, so stage 2 starts at the tag, or on a
-  branch that pins a commit.
-- **On the boards** the FPU is one more device of `src/devices.vhd`
-  that stalls. Its read data joins the path into the core, which had
-  0.338 ns of slack on the R6 at V2.0, so each board needs a timing
-  run. Its proposed address, `0xFFFFFF88`–`0xFFFFFF8F`, is among the
-  16 words that `src/scr_regs.vhd` decodes, which are then split. On
-  the Nexys4DDR it must take no block RAM.
-- **#111 and BASIC share the ROM.** #111 is in V2.1, and the table of
+- **#111 and BASIC share the ROM.** #111 is in V2.1, and
   [The ROM's room](#the-roms-room) has its words.
 
 ## Open questions
 
-1. **The digits of `PRINT`**: up to 15, which shows `1/3` as
-   `0.333333333333333` and `0.1 + 0.2` as `0.3`, or fewer, which also
-   hides the last digits of `^` and the functions, where their errors
-   are.
+1. ~~**The digits of `PRINT`**.~~ Settled on 2026-11-16: the FPU's
+   15, as `%.15G` writes them ([Numbers](#numbers)).
 2. ~~**The names** of the statements of
    [The main loop](#the-main-loop).~~ Settled on 2026-11-15
    ([Decisions](#decisions)): `LOAD` by the name, TFTP as its second
@@ -703,10 +678,9 @@ that is open when it is done.
      beside the double, in two or three words more. `LIST` writes the
      digits that were typed, and the FPU need only give the same bits
      each time.
-7. **`A%`**: gone, or one word of storage for a whole number, pushed
+7. **`A%`**: not in stage 2, where `%` in a name is an error. It may
+   come with `DIM`, as one word of storage for a whole number, pushed
    and read through the FPU's view of a word. An array of flags is
    then half as large, which counts in the Nexys4DDR's 26K words.
-8. **When the stages start.** Whether stage 1 and the editor's keys
-   are written before the FPU is there. And whether a branch pins a
-   commit of nice_cpu, so that stage 2 starts in `niceemu` before the
-   tag.
+8. ~~**When the stages start.**~~ Settled: the FPU was there in
+   nice_cpu `V2.2` before stage 2 started.
