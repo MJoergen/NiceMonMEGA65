@@ -223,8 +223,8 @@ from 0, and the rest is free. The demo is not in it: it is a program,
 <!-- romsize layout -->
 | Part | Address | Words |
 |---|---|---:|
-| The monitor | `0x0000`–`0x362A` | 13867 |
-| Free | `0x362B`–`0x7FFF` | 18901 |
+| The monitor | `0x0000`–`0x3628` | 13865 |
+| Free | `0x3629`–`0x7FFF` | 18903 |
 <!-- /romsize layout -->
 
 The monitor's words, by the source they come from, in the order
@@ -242,7 +242,7 @@ ROM is built:
 | `basic.nasm` | BASIC: the main loop, the scanner, the keywords, the messages, and the help | 818 | 440 |
 | `monitor_dis.nasm` | The disassembler of `DIS` | 871 | 79 |
 | `monitor_sd.nasm` | The sector routines | 206 | 59 |
-| `monitor_fat.nasm` | FAT32, `DIR`, `LOAD`, `SAVE`, `DELETE`, and TAB | 3207 | 10 |
+| `monitor_fat.nasm` | FAT32, `DIR`, `LOAD`, `SAVE`, `DELETE`, and TAB | 3205 | 10 |
 | `monitor_eth.nasm` | The network | 3354 | 160 |
 | `monitor_tcp.nasm` | TCP | 2414 | 0 |
 | `monitor_clock.nasm` | The clock and `TIME` | 675 | 44 |
@@ -250,7 +250,7 @@ ROM is built:
 | `mon.nasm` | The stubs of the entries | 72 | 0 |
 | `build/folder.nasm` | The folder's name, and the error of a card without it | 17 | 17 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 13867 | 1038 |
+| In all | | 13865 | 1038 |
 <!-- /romsize monitor -->
 
 - `build/folder.nasm` and the version always end with a `.DAT 0`, as
@@ -489,7 +489,7 @@ The suites of `test/fat_runs.py`, step 10:
 | `fatdrop` | The mount dropped under open files when `SD_SELECT` changes, and `fs_mount` under a file open to write. |
 | `fatchain` | Damaged chains (`chains.img`): a chain cut, a size past the chain, cluster 0, the last cluster, one past it, a bad mark, a loop; their reads, deletes, and a `SAVE` over one. |
 | `fatlfn` | Long names of 13 and 26 characters; damaged entries (`lfnx.img`): 0x05, orphans, a label, a broken set, a name of 256 characters; and deletes of long names across a sector and a cluster. |
-| `fatmount` | `DIR` of 27 cards that are not FAT32 or are damaged (`m_*.img`), each check of the MBR and the boot sector, the bounds of FAT12, FAT16, and FAT32, an empty folder, a folder whose chain breaks, no card, and slots from 2^31. |
+| `fatmount` | `DIR` of 28 cards that are not FAT32 or are damaged (`m_*.img`), each check of the MBR and the boot sector, the bounds of FAT12, FAT16, and FAT32, FATs whose count of entries wraps to 0, an empty folder, a folder whose chain breaks, no card, and slots from 2^31. |
 | `fatgeo` | `SAVE`, `LOAD`, `DIR`, and `DELETE` on clusters of 8 and 64 sectors, and on a card with one FAT. |
 | `fatinfo` | FSInfo: its hint, at the last cluster, free and in use, and 0xFFFFFFFF; no signature; no FSInfo in the boot sector; free entries with their top 4 bits set; and a volume larger than its FATs. |
 | `fatfull` | `fs_write` on a card with 3 free clusters, and a folder of 65536 entries. |
@@ -536,7 +536,7 @@ run with `SOURCE_DATE_EPOCH` and `TZ=UTC`, so that every date is
 The suites of `test/fat_runs.py` have more images, which
 `test/fat_image.py` makes from those with `test/fat_tool.py`, by
 changing bytes: `lines.img`, `tab1.img`, `chains.img`, `lfnx.img`,
-`rows.img`, `bigdir.img`, the 27 `m_*.img` of `fatmount`, the `i_*.img`
+`rows.img`, `bigdir.img`, the 28 `m_*.img` of `fatmount`, the `i_*.img`
 of `fatinfo`, and `spc8.img`, `spc64.img`, and `fat1.img`, which
 `mkfs.fat` makes with those geometries. The comments in
 `test/fat_image.py` say what each holds.

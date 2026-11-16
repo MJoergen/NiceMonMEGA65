@@ -450,12 +450,12 @@ mount_fat
                 CLR     R1
                 RET
 
-; clok: C when the cluster R1 is in the volume, 2 to V_TOP - 1. Uses R2
-; and R3.
+; clok: C when the cluster R1 is in the volume, 2 to V_TOP - 1, so for
+; none when V_TOP is below 2, as a boot sector may make it. Uses no
+; register.
 clok
-                SUB     R2, R1, 2
-                SUB     R3, @V_TOP, 2
-                CMP     R2, R3
+                CMP     1, R1           ; C from 2 on,
+        ?C      CMP     R1, @V_TOP      ; and then C below V_TOP
                 RET
 
 ; cache: the sector R1 into the 128 words at R2, unless the word at R3,

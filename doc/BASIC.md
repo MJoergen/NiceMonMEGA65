@@ -638,7 +638,7 @@ the texts packed, 11876, and `time ntp` (#127) 10952 (measured
 of stage 1 (#112) 9206 (both measured 2026-11-15), the clock in
 assembly (#148) 10157, the shell in assembly (#115) 11482, and FAT32
 in assembly, with the C code's support out of the ROM and an
-immediate 0 read from R0 (#149), 18901 (all measured 2026-11-16). In
+immediate 0 read from R0 (#149), 18903 (all measured 2026-11-16). In
 C, at 7 words a line, the stages 2 and 3 alone were guessed at 8800
 words, so C would have filled the ROM at stage 3. That is why BASIC is
 assembly from stage 2 on.
@@ -649,7 +649,7 @@ fits what is free:
 - The guess is from Microsoft's 9 KB for the 6502, and a list about
   twice as long, less the 1000 words of float routines that
   nice_cpu#161 estimates the FPU to save.
-- **What gave room**: FAT32 in assembly (#149), 7419 words with the
+- **What gave room**: FAT32 in assembly (#149), 7421 words with the
   C code's support. BASIC's keywords and messages are packed from the
   start.
 - **Not a larger ROM.** A second ROM would fit the MEGA65's block RAM

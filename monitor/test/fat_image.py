@@ -459,6 +459,11 @@ def extra(d: str, tmp: str) -> None:
         v.put(at_, fmt, val)
     v = Vol(copy(super_img, at("m_nicecl.img")), write=True)
     v.put(v.entry(b"NICE       ", "/")[0] + 26, "<H", 0)
+    # FATs of 2^25 sectors, whose 2^32 entries wrap to 0, in a volume that
+    # has room for them, so that no cluster is in the volume
+    v = Vol(copy(super_img, at("m_fatwrap.img")), write=True)
+    v.put(36, "<I", 1 << 25)
+    v.put(32, "<I", 32 + 2 * (1 << 25) + 70000)
     # the folder NICE of two clusters, 16 entries each, the second lost
     img = copy(super_img, at("m_baddir.img"))
     for i in range(1, 21):

@@ -45,8 +45,8 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   [#148](https://github.com/MJoergen/NiceMonMEGA65/issues/148), and
   [#149](https://github.com/MJoergen/NiceMonMEGA65/issues/149)): its
   C code, FAT32, the clock, and BASIC's scanner, is NICE assembly now,
-  and does what it did. The monitor is 13867 words, where V2.2's was
-  22609, so 18901 words of the ROM are free, where 10159 were.
+  and does what it did. The monitor is 13865 words, where V2.2's was
+  22609, so 18903 words of the ROM are free, where 10159 were.
   Building the monitor, and a bitstream with it in the ROM, no longer
   needs clang. A program in C is built as before.
 

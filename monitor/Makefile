@@ -172,7 +172,7 @@ FAT_IMAGES = $(addprefix $(BUILD)/fat/,fat32.img super.img fat16.img exfat.img n
                i_bpb0.img i_bpbff.img i_top.img \
                $(addprefix m_,$(addsuffix .img,fat12 fat16 fat12p nopart zero p83 pb nosig \
                  jump bps spc0 spc3 rsvd0 nfats0 fatsz0 fatszbig nodata fat16sz rootent \
-                 c4084 c4085 c65524 c65525 root1 roottop nicecl baddir)))
+                 c4084 c4085 c65524 c65525 root1 roottop nicecl fatwrap baddir)))
 $(FAT_IMAGES) &: test/fat_image.py test/fat_tool.py $(BUILD)/hello.bin
 	@mkdir -p $(BUILD)/fat
 	@$(PYTHON) test/fat_image.py $(BUILD)/hello.bin $(BUILD)/fat

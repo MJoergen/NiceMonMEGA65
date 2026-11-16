@@ -137,7 +137,7 @@ SUITES = {
         "m_spc3.img", "m_rsvd0.img", "m_nfats0.img", "m_fatsz0.img", "m_fatszbig.img",
         "m_nodata.img", "m_fat16sz.img", "m_rootent.img", "m_c4084.img", "m_c4085.img",
         "m_c65524.img", "m_c65525.img", "m_root1.img", "m_roottop.img", "m_nicecl.img",
-        "m_baddir.img")] + [
+        "m_fatwrap.img", "m_baddir.img")] + [
         Run("No card in either slot", None, keys='dir\rdir 0\rload "x.bin"\rhalt\r'),
         Run("DIR with a slot of 2^31 and more is a plain DIR (known oddity B1)",
             "lfn.img", "super.img",

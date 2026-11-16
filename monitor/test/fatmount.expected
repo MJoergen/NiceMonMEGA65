@@ -287,6 +287,17 @@ halt
 Halted
 exit 0
 Slot 0: The card as m_nicecl.img was
+== DIR of m_fatwrap.img
+NiceMon V9.9
+HELP lists the statements
+READY.
+dir
+File error 26, the FAT is damaged
+READY.
+halt
+Halted
+exit 0
+Slot 0: The card as m_fatwrap.img was
 == DIR of m_baddir.img
 NiceMon V9.9
 HELP lists the statements
