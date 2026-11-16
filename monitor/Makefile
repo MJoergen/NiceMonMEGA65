@@ -261,6 +261,27 @@ $(BUILD)/tcp_c.bin: test/tcp_c.c mon.h mon.nasm mon_c.nasm $(TOOLS) | $(BUILD)
 # the last. halt ends each input. dash's printf, the shell of make on
 # Ubuntu, has no \x.
 CMDS = help\rver\rdump 0, 6\rdump\rDUMP 0x10, 1\rq\rloadx\r\r  cls\rabc\177\177\177ver\rjunk\003ver\r\033[A\033OPver\rsys 0x8000\rsys 0x9000\rdump 0x8000, 0\rdump 0x8000\rdump 0, 256\rip\rip "192.168.1.65"\rip "1.2.3"\rip "256.0.0.1"\rip "1..2.3"\rip "1.2.3.4x"\rip "  010.0.0.1 "\rmac\rmac "02:4E:49:43:45:01"\rmac "2:4e:49:43:45"\rmac "2:4e:49:43:45:123"\rmac "3:0:0:0:0:0"\rmac "2:4e: 49:43:45:1"\rmac "2:4e:49:43:45:1x"\rmac "  a:b:c:d:e:f "\rbaud\rbaud 921600\rbaud 9600\rBAUD  115200 \rip 1.2.3.4\rsys\rsys 0x\rdump 12ab\rdump 1,\rbaud 1 2\rver x\rload "a.bin" "1.2.3.4"\rdump 4294967296\rdump 0x100000000\rload "x.txt"\rload "x"\rsave "x", "1.2.3.4"\rHeLp x\rload "x.bin\rdump , 2\rhalt\r
+# basic: the scanner of a line, with no card and no IP address, so that
+# the statements that need them stop at once. A keyword in mixed case and
+# with blanks around it runs; a comma, a character of 0xE9, or another
+# word after it, or a letter, a digit, or an _ glued to it, makes it no
+# statement, or a Syntax error with its lines of HELP, which each
+# statement shows. Numbers: in decimal and hex, with 0X, leading zeros,
+# and the 76 characters of a full line; 0xFFFFFFFF, the largest, and 33
+# bits, which are an Illegal quantity, also with a letter after them;
+# and the numbers that are not. 0x without digits is passed over, so that
+# dump 0x, 1, dis 0x, 1, and baud 0x run with no A, and dir 0x"1.2.3.4"
+# with a server. Strings: an empty one, a name glued to load, a server
+# without a comma, or with no closing quote, and the arguments that are
+# too few or too many for each statement. The dumps of the line after
+# five statements show the 0 at each closing quote, those of a statement
+# that failed too, and the .BIN that save adds to a name without a dot,
+# last in a line of 76 characters. ip "1.2.3.4, with no closing quote,
+# writes the IP address, which the dump of 0xFFFFFFB0 shows.
+BLANKS30 = $(shell printf '%30s' '')
+BLANKS62 = $(shell printf '%62s' '')
+ZEROS72  = $(shell printf '%072d' 32768)
+BASIC = vEr\r   ver   \rver,\rver\351\r\351ver\rsys0x8000\rdumpx\rdum\rdis1\ri\rsys_\r"ver"\r9 ver\rsave x\rdelete x\rdhcp x\rmac x\rtime x\rntp x\rdis x\rcls x\rhalt x\rdir x\rsys 32768\rsys $(ZEROS72)\rSYS 0X8000\rsys 0x08000\rsys 4294967295\rsys 0xFFFFFFFF\rsys 0x0000000ffffffff\rsys 4294967296\rsys 0x100000000\rsys 99999999999x\rsys 0x8000x\rsys 0x0x8000\rsys 1e3\rsys 32768.\rsys -1\rsys "x"\rsys 0xg\rsys 0x8000,\rdump 0x8000, 0\rdump 0x, 1\rdump 0x , 2\rdump 0x 1\rdump 1, 4294967296\rdump 1, 0x\rdis 0x8000, 1\rdis 0x, 1\rdis ,1\rdis 0x8000,\rbaud 0x\rbaud 0x 1\rbaud 4294967296\rbaud 1,\rbaud 0x1C200\rload ""\rload ".bin"\rload"a.BiN"\rload "a.bin",\rload "a.bin" ,"1.2.3.4"\rload "a.bin", "1.2.3.4" x\rload "a.bin", "bad"\rload x\rload "a.bin", "1.2.3.4\rLOAD  \r\rsave "x", "y" z\rsave "x" "y"\rsave "x",\rsave "x", 1\rsave "x", 0x, 1\rsave "x", 1, 99999999999\rsave "x", "y", 99999999999\rsave "abc\rsave "a.b", 0x8000, 1\rdelete "x"\rdelete "x", "y"\rdelete ""\rdir\rdir 0x\rdir 0x"1.2.3.4"\rdir 99999999999"1.2.3.4"\rdir 99999999999\rdir "1.2.3.4", "*.bin"\rdir "bad"\rdir "1.2.3.4",\rdir 1,\rdir 1 "x"\rdir 5\rip ""\rip "1.2.3.4" x\rmac ""\rmac "02:4E:49:43:45:00" x\rtime "bad"\rtime "1" x\rntp "1.2.3.4" x\rntp "1.2.3.4",\rntp "", "bad"\rntp ""\rntp "1.2.3.4", "+01:00"\r$(BLANKS30)save "abc",1,2\rdump 0xFFFFF02E, 16\r$(BLANKS30)load "x" "y"\rdump 0xFFFFF02E, 16\r$(BLANKS30)save "x", "1.2.3.4"\rdump 0xFFFFF02E, 20\r$(BLANKS30)save "a.b", 1, 2\rdump 0xFFFFF02E, 16\r$(BLANKS30)dir "1.2.3.4", "*"\rdump 0xFFFFF02E, 20\r$(BLANKS62)save "abc",1,2\rdump 0xFFFFF04E, 16\rip "1.2.3.4\rhalt\r
 RUN  = sys 0x8000\rhalt\r
 # reset: sys 0, the cold start, which shows the banner again and leaves
 # the RAM from 0x8000 alone, so that sys 0x8000 then runs hello.
@@ -410,6 +431,7 @@ DUMP_clock    = -d 0xFFFFFF46:4
 # the cursor that hello hid, the font base, which the return made 0, and
 # the row of the glyph of 0x80 that hello drew.
 DUMP_cmds    = -d 0xFFFFF000:5 -d 0xFFFFFF80:6 -d 0xFFFFFF9F:1 -d 0xFFFFFFB0:3
+DUMP_basic   = -d 0xFFFFF000:5 -d 0xFFFFFFB0:1
 # For scroll the variables and the screen's registers, and the last four
 # digits of the address that starts a row of the history (the words 4 to
 # 7 of the row): the rows of 86A0 and 869C that Page Up turned to slots 0
@@ -494,6 +516,7 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	@printf '$(LOAD_EMU)' > $(BUILD)/load_emu.txt
 	@printf '$(LOAD_64K)' > $(BUILD)/load_64k.txt
 	@printf '$(CMDS)' > $(BUILD)/cmds.txt
+	@printf '$(BASIC)' > $(BUILD)/basic.txt
 	@printf '$(RUN)' > $(BUILD)/run.txt
 	@printf '$(RESET)' > $(BUILD)/reset.txt
 	@printf '$(SCROLL)' > $(BUILD)/scroll.txt
@@ -516,12 +539,13 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	@$(PYTHON) test/sd_image.py --written $(BUILD)/sd_written.img
 	@{ printf '$(LOAD_HEAD)'; head -n 3 $(BUILD)/hello.bin | awk '{ printf "%s\r\n", $$0 }'; \
 	  tail -n +4 $(BUILD)/hello.bin; printf '$(LOAD_TAIL)'; } > $(BUILD)/load.txt
-	@fail=0; for t in cmds scroll load load_emu load_64k sd_write arp udp net rom fs fsw fat fatw fatl tab fatlw fatbad fat1 fatnone time \
+	@fail=0; for t in cmds basic scroll load load_emu load_64k sd_write arp udp net rom fs fsw fat fatw fatl tab fatlw fatbad fat1 fatnone time \
 	           clock clockpast \
 	           hello reset hello_c; do \
 	  opts=; rom=$(BUILD)/monitor_test.bin; \
 	  case $$t in \
 	    cmds) prog=; input=cmds; dump='$(DUMP_cmds)';; \
+	    basic) prog=; input=basic; dump='$(DUMP_basic)';; \
 	    scroll) prog=; input=scroll; dump='$(DUMP_scroll)';; \
 	    load) prog=$(BUILD)/ram128k.bin; input=load; dump='$(DUMP_load)';; \
 	    load_emu) prog=; input=load_emu; dump='$(DUMP_load_emu)';; \

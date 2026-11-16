@@ -1,0 +1,453 @@
+NiceMon V9.9
+HELP lists the statements
+READY.
+vEr
+NiceMon V9.9, dispatch table 1.5
+READY.
+   ver   
+NiceMon V9.9, dispatch table 1.5
+READY.
+ver,
+Syntax error
+VER                 the version
+READY.
+veré
+Syntax error
+VER                 the version
+READY.
+éver
+Syntax error; HELP lists the statements
+READY.
+sys0x8000
+Syntax error; HELP lists the statements
+READY.
+dumpx
+Syntax error; HELP lists the statements
+READY.
+dum
+Syntax error; HELP lists the statements
+READY.
+dis1
+Syntax error; HELP lists the statements
+READY.
+i
+Syntax error; HELP lists the statements
+READY.
+sys_
+Syntax error
+SYS A               call the program at A, such as SYS 0x8000; SYS 0 restarts
+READY.
+"ver"
+Syntax error; HELP lists the statements
+READY.
+9 ver
+Syntax error; HELP lists the statements
+READY.
+save x
+Syntax error
+SAVE "NAME", A, N   save N words from A as the .bin file NAME
+READY.
+delete x
+Syntax error
+DELETE "NAME"       delete the file NAME of the SD card
+READY.
+dhcp x
+Syntax error
+DHCP                get the IP address from a DHCP server
+READY.
+mac x
+Syntax error
+MAC ["MAC"]         show the MAC address, or set it, "02:4E:49:43:45:01"
+READY.
+time x
+Syntax error
+TIME ["D T"]        show the local time, or set it, "2026-11-11 14:30:00"
+READY.
+ntp x
+Syntax error
+NTP ["S"] [, "Z"]   set it from time server S, Z local time less UTC, "+01:00"
+READY.
+dis x
+Syntax error
+DIS [A] [, N]       disassemble N instructions from A, or the next ones
+READY.
+cls x
+Syntax error
+CLS                 clear the screen
+READY.
+halt x
+Syntax error
+HALT                halt the core
+READY.
+dir x
+Syntax error
+DIR [SLOT]          list the files of the card in SLOT, or of the card mounted
+DIR "IP" [, "PAT"]  list the files of tools/tftpd.py at IP, or those of PAT
+READY.
+sys 32768
+No program at 00008000
+READY.
+sys 000000000000000000000000000000000000000000000000000000000000000000032768
+No program at 00008000
+READY.
+SYS 0X8000
+No program at 00008000
+READY.
+sys 0x08000
+No program at 00008000
+READY.
+sys 4294967295
+No program at FFFFFFFF
+READY.
+sys 0xFFFFFFFF
+No program at FFFFFFFF
+READY.
+sys 0x0000000ffffffff
+No program at FFFFFFFF
+READY.
+sys 4294967296
+Illegal quantity
+READY.
+sys 0x100000000
+Illegal quantity
+READY.
+sys 99999999999x
+Illegal quantity
+READY.
+sys 0x8000x
+Syntax error
+SYS A               call the program at A, such as SYS 0x8000; SYS 0 restarts
+READY.
+sys 0x0x8000
+Syntax error
+SYS A               call the program at A, such as SYS 0x8000; SYS 0 restarts
+READY.
+sys 1e3
+Syntax error
+SYS A               call the program at A, such as SYS 0x8000; SYS 0 restarts
+READY.
+sys 32768.
+Syntax error
+SYS A               call the program at A, such as SYS 0x8000; SYS 0 restarts
+READY.
+sys -1
+Syntax error
+SYS A               call the program at A, such as SYS 0x8000; SYS 0 restarts
+READY.
+sys "x"
+Syntax error
+SYS A               call the program at A, such as SYS 0x8000; SYS 0 restarts
+READY.
+sys 0xg
+Syntax error
+SYS A               call the program at A, such as SYS 0x8000; SYS 0 restarts
+READY.
+sys 0x8000,
+Syntax error
+SYS A               call the program at A, such as SYS 0x8000; SYS 0 restarts
+READY.
+dump 0x8000, 0
+READY.
+dump 0x, 1
+00008000 00000000
+READY.
+dump 0x , 2
+00008001 00000000 00000000
+READY.
+dump 0x 1
+Syntax error
+DUMP [A] [, N]      show N words from A, in hex, or the next ones
+READY.
+dump 1, 4294967296
+Illegal quantity
+READY.
+dump 1, 0x
+Syntax error
+DUMP [A] [, N]      show N words from A, in hex, or the next ones
+READY.
+dis 0x8000, 1
+00008000 00000000                             NOP
+READY.
+dis 0x, 1
+00008001 00000000                             NOP
+READY.
+dis ,1
+00008002 00000000                             NOP
+READY.
+dis 0x8000,
+Syntax error
+DIS [A] [, N]       disassemble N instructions from A, or the next ones
+READY.
+baud 0x
+Baud rate 0
+READY.
+baud 0x 1
+Syntax error
+BAUD [RATE]         show the UART baud rate, or set it, such as 921600
+READY.
+baud 4294967296
+Illegal quantity
+READY.
+baud 1,
+Syntax error
+BAUD [RATE]         show the UART baud rate, or set it, such as 921600
+READY.
+baud 0x1C200
+Baud rate 115200
+READY.
+load ""
+LOAD takes a .BIN file, such as LOAD "HELLO.BIN"
+READY.
+load ".bin"
+SD error 1 in slot 1, no card
+READY.
+load"a.BiN"
+SD error 1 in slot 1, no card
+READY.
+load "a.bin",
+Syntax error
+LOAD                enter lines of ADDR WORD in hex, as a .bin file has them
+LOAD "NAME.BIN"     load the .bin file NAME.BIN of the SD card
+LOAD "N.BIN", "IP"  load the .bin file N.BIN from the TFTP server at IP
+READY.
+load "a.bin" ,"1.2.3.4"
+No IP address; IP or DHCP sets one
+READY.
+load "a.bin", "1.2.3.4" x
+Syntax error
+LOAD                enter lines of ADDR WORD in hex, as a .bin file has them
+LOAD "NAME.BIN"     load the .bin file NAME.BIN of the SD card
+LOAD "N.BIN", "IP"  load the .bin file N.BIN from the TFTP server at IP
+READY.
+load "a.bin", "bad"
+Not a TFTP server: IP[:PORT], such as "192.168.1.10" or "192.168.1.10:6969"
+READY.
+load x
+Syntax error
+LOAD                enter lines of ADDR WORD in hex, as a .bin file has them
+LOAD "NAME.BIN"     load the .bin file NAME.BIN of the SD card
+LOAD "N.BIN", "IP"  load the .bin file N.BIN from the TFTP server at IP
+READY.
+load "a.bin", "1.2.3.4
+No IP address; IP or DHCP sets one
+READY.
+LOAD  
+ADDR WORD in hex on each line, as in a .bin file; an empty line ends
+Words loaded: 0
+READY.
+save "x", "y" z
+Syntax error
+SAVE "NAME", A, N   save N words from A as the .bin file NAME
+READY.
+save "x" "y"
+Syntax error
+SAVE "NAME", A, N   save N words from A as the .bin file NAME
+READY.
+save "x",
+Syntax error
+SAVE "NAME", A, N   save N words from A as the .bin file NAME
+READY.
+save "x", 1
+Syntax error
+SAVE "NAME", A, N   save N words from A as the .bin file NAME
+READY.
+save "x", 0x, 1
+Syntax error
+SAVE "NAME", A, N   save N words from A as the .bin file NAME
+READY.
+save "x", 1, 99999999999
+Illegal quantity
+READY.
+save "x", "y", 99999999999
+Syntax error
+SAVE "NAME", A, N   save N words from A as the .bin file NAME
+READY.
+save "abc
+Syntax error
+SAVE "NAME", A, N   save N words from A as the .bin file NAME
+READY.
+save "a.b", 0x8000, 1
+SD error 1 in slot 1, no card
+READY.
+delete "x"
+SD error 1 in slot 1, no card
+READY.
+delete "x", "y"
+Syntax error
+DELETE "NAME"       delete the file NAME of the SD card
+READY.
+delete ""
+SD error 1 in slot 1, no card
+READY.
+dir
+SD error 1 in slot 1, no card
+READY.
+dir 0x
+Syntax error
+DIR [SLOT]          list the files of the card in SLOT, or of the card mounted
+DIR "IP" [, "PAT"]  list the files of tools/tftpd.py at IP, or those of PAT
+READY.
+dir 0x"1.2.3.4"
+No IP address; IP or DHCP sets one
+READY.
+dir 99999999999"1.2.3.4"
+No IP address; IP or DHCP sets one
+READY.
+dir 99999999999
+Illegal quantity
+READY.
+dir "1.2.3.4", "*.bin"
+No IP address; IP or DHCP sets one
+READY.
+dir "bad"
+Not a TFTP server: IP[:PORT], such as "192.168.1.10" or "192.168.1.10:6969"
+READY.
+dir "1.2.3.4",
+Syntax error
+DIR [SLOT]          list the files of the card in SLOT, or of the card mounted
+DIR "IP" [, "PAT"]  list the files of tools/tftpd.py at IP, or those of PAT
+READY.
+dir 1,
+Syntax error
+DIR [SLOT]          list the files of the card in SLOT, or of the card mounted
+DIR "IP" [, "PAT"]  list the files of tools/tftpd.py at IP, or those of PAT
+READY.
+dir 1 "x"
+Syntax error
+DIR [SLOT]          list the files of the card in SLOT, or of the card mounted
+DIR "IP" [, "PAT"]  list the files of tools/tftpd.py at IP, or those of PAT
+READY.
+dir 5
+File error 27, no such slot
+READY.
+ip ""
+Not an IP address: four numbers from 0 to 255, with dots between them
+READY.
+ip "1.2.3.4" x
+Syntax error
+IP ["A.B.C.D"]      show the IP address, or set it, such as "192.168.1.65"
+READY.
+mac ""
+MAC address 02:4E:49:43:45:00
+READY.
+mac "02:4E:49:43:45:00" x
+Syntax error
+MAC ["MAC"]         show the MAC address, or set it, "02:4E:49:43:45:01"
+READY.
+time "bad"
+Not a date and time: "YYYY-MM-DD HH:MM:SS", such as "2026-11-11 14:30:00"
+READY.
+time "1" x
+Syntax error
+TIME ["D T"]        show the local time, or set it, "2026-11-11 14:30:00"
+READY.
+ntp "1.2.3.4" x
+Syntax error
+NTP ["S"] [, "Z"]   set it from time server S, Z local time less UTC, "+01:00"
+READY.
+ntp "1.2.3.4",
+Syntax error
+NTP ["S"] [, "Z"]   set it from time server S, Z local time less UTC, "+01:00"
+READY.
+ntp "", "bad"
+Not an offset: "+HH:MM" or "-HH:MM", local time less UTC, such as "+01:00"
+READY.
+ntp ""
+No IP address; IP or DHCP sets one
+READY.
+ntp "1.2.3.4", "+01:00"
+No IP address; IP or DHCP sets one
+READY.
+                              save "abc",1,2
+SD error 1 in slot 1, no card
+READY.
+dump 0xFFFFF02E, 16
+FFFFF02E 00000073 00000061 00000076 00000065
+FFFFF032 00000020 00000022 00000061 00000062
+FFFFF036 00000063 0000002E 00000042 00000049
+FFFFF03A 0000004E 00000000 00000000 00000030
+READY.
+                              load "x" "y"
+Syntax error
+LOAD                enter lines of ADDR WORD in hex, as a .bin file has them
+LOAD "NAME.BIN"     load the .bin file NAME.BIN of the SD card
+LOAD "N.BIN", "IP"  load the .bin file N.BIN from the TFTP server at IP
+READY.
+dump 0xFFFFF02E, 16
+FFFFF02E 0000006C 0000006F 00000061 00000064
+FFFFF032 00000020 00000022 00000078 00000000
+FFFFF036 00000020 00000022 00000079 00000022
+FFFFF03A 00000000 00000000 00000000 00000030
+READY.
+                              save "x", "1.2.3.4"
+SAVE writes to the SD card: TFTP only loads
+READY.
+dump 0xFFFFF02E, 20
+FFFFF02E 00000073 00000061 00000076 00000065
+FFFFF032 00000020 00000022 00000078 00000000
+FFFFF036 0000002C 00000020 00000022 00000031
+FFFFF03A 0000002E 00000032 0000002E 00000033
+FFFFF03E 0000002E 00000034 00000000 00000000
+READY.
+                              save "a.b", 1, 2
+SD error 1 in slot 1, no card
+READY.
+dump 0xFFFFF02E, 16
+FFFFF02E 00000073 00000061 00000076 00000065
+FFFFF032 00000020 00000022 00000061 0000002E
+FFFFF036 00000062 00000000 0000002C 00000020
+FFFFF03A 00000031 0000002C 00000020 00000032
+READY.
+                              dir "1.2.3.4", "*"
+No IP address; IP or DHCP sets one
+READY.
+dump 0xFFFFF02E, 20
+FFFFF02E 00000064 00000069 00000072 00000020
+FFFFF032 00000022 00000031 0000002E 00000032
+FFFFF036 0000002E 00000033 0000002E 00000034
+FFFFF03A 00000000 0000002C 00000020 00000022
+FFFFF03E 0000002A 00000000 00000000 00000000
+READY.
+                                                              save "abc",1,2
+SD error 1 in slot 1, no card
+READY.
+dump 0xFFFFF04E, 16
+FFFFF04E 00000073 00000061 00000076 00000065
+FFFFF052 00000020 00000022 00000061 00000062
+FFFFF056 00000063 0000002E 00000042 00000049
+FFFFF05A 0000004E 00000000 00000000 00000000
+READY.
+ip "1.2.3.4
+IP address 1.2.3.4
+READY.
+halt
+Halted
+fffff000: 00000000 00000018 000fff00 00000003 fffff05e
+ffffffb0: 01020304
+Screen:
+|                              dir "1.2.3.4", "*"
+|No IP address; IP or DHCP sets one
+|READY.
+|dump 0xFFFFF02E, 20
+|FFFFF02E 00000064 00000069 00000072 00000020
+|FFFFF032 00000022 00000031 0000002E 00000032
+|FFFFF036 0000002E 00000033 0000002E 00000034
+|FFFFF03A 00000000 0000002C 00000020 00000022
+|FFFFF03E 0000002A 00000000 00000000 00000000
+|READY.
+|                                                              save "abc",1,2
+|SD error 1 in slot 1, no card
+|READY.
+|dump 0xFFFFF04E, 16
+|FFFFF04E 00000073 00000061 00000076 00000065
+|FFFFF052 00000020 00000022 00000061 00000062
+|FFFFF056 00000063 0000002E 00000042 00000049
+|FFFFF05A 0000004E 00000000 00000000 00000000
+|READY.
+|ip "1.2.3.4
+|IP address 1.2.3.4
+|READY.
+|halt
+|Halted
+VBASE at the halt 000000
+exit 0
