@@ -1,6 +1,6 @@
 // BASIC in the ROM (issue #54, doc/BASIC.md), stage 1 (issue #112): the
 // shell. It is part of the ROM's C code (INTERNALS.md, "C in the ROM"),
-// with fat32.c and clock.c. The main loop of basic.nasm reads a line, and
+// with fat32.c. The main loop of basic.nasm reads a line, and
 // basic_line runs it: a keyword, in either case, and its arguments, each
 // a number in decimal, or in hex after 0x, or a string in quotes, with
 // commas between them. The statements are the monitor's commands

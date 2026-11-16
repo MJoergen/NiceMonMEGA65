@@ -47,6 +47,7 @@ MONITOR_PARTS = {
     "monitor_sd.nasm": "The sector routines",
     "monitor_eth.nasm": "The network",
     "monitor_tcp.nasm": "TCP",
+    "monitor_clock.nasm": "The clock and `TIME`",
     "monlib.nasm": "The routines that programs join",
     "mon.nasm": "The stubs of the entries",
     "lib.nasm": "The runtime of the C code",
@@ -57,7 +58,6 @@ MONITOR_PARTS = {
 # The C files of ROM_C, by their names, and what each one is
 C_PARTS = {
     "fat32.c": "FAT32",
-    "clock.c": "The clock and `TIME`",
     "basic.c": "BASIC: the scanner and the statements",
 }
 # The sources that are nice_cpu's

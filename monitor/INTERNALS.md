@@ -190,19 +190,15 @@ rows there, which `DUMP` and `--dump` read.
 ## C in the ROM
 
 Part of the ROM is C, through nice_cpu's wasm translator: the FAT32
-code, the clock's, and BASIC's. The files
-of the Makefile's `ROM_C`, `fat32.c`, `clock.c`, and `basic.c`, are compiled to one wasm
+code, and BASIC's. The files
+of the Makefile's `ROM_C`, `fat32.c` and `basic.c`, are compiled to one wasm
 module, which `nicewasm --ram` translates for code
 that runs from a ROM (nice_cpu's translator README, "Code in a ROM"),
 at `-Oz`, which makes it more than a quarter smaller than `-O2`. The Makefile joins
 it after `mon.nasm`, with nice_cpu's `lib.nasm` and `muldiv_mpu.nasm`.
-`fat32.c` is FAT32 (README.md, "Files"), about 9100 words, and
-`clock.c` the `TIME` statement, the dates of FAT's entries, the clock
-set from the MEGA65's real-time clock at the cold start and written by
-`TIME`, through the I2C master (doc/SYSTEM.md, "The I2C bus"), and the
-offset and the time of `NTP` (#127), about 1600 words, small
-rather than general, as its header says. `basic.c` is BASIC's scanner
-of a line and its statements (README.md, "BASIC"), about 1500 words.
+`fat32.c` is FAT32 (README.md, "Files"), about 9800 words, and
+`basic.c` BASIC's scanner of a line and its statements (README.md,
+"BASIC"), about 1500 words. The clock is assembly, `monitor_clock.nasm`.
 
 - **Calls.** Every function of the C code that is not `static` is
   exported, and the monitor's assembly calls it as `_name`, in the C ABI;
@@ -246,8 +242,8 @@ from 0, and the rest is free. The demo is not in it: it is a program,
 <!-- romsize layout -->
 | Part | Address | Words |
 |---|---|---:|
-| The monitor | `0x0000`–`0x5C11` | 23570 |
-| Free | `0x5C12`–`0x7FFF` | 9198 |
+| The monitor | `0x0000`–`0x5852` | 22611 |
+| Free | `0x5853`–`0x7FFF` | 10157 |
 <!-- /romsize layout -->
 
 The monitor's words, by the source they come from, in the order
@@ -265,22 +261,22 @@ ROM is built:
 | `basic.nasm` | BASIC's main loop, stubs, keywords, messages, and help | 624 | 431 |
 | `monitor_dis.nasm` | The disassembler of `DIS` | 879 | 79 |
 | `monitor_sd.nasm` | The sector routines | 222 | 59 |
-| `monitor_eth.nasm` | The network | 3445 | 160 |
+| `monitor_eth.nasm` | The network | 3437 | 160 |
 | `monitor_tcp.nasm` | TCP | 2458 | 0 |
+| `monitor_clock.nasm` | The clock and `TIME` | 692 | 44 |
 | `monlib.nasm` | The routines that programs join | 280 | 0 |
 | `mon.nasm` | The stubs of the entries | 72 | 0 |
 | `nicewasm` | `___wasm_start`, which copies the C code's data to the RAM | 85 |  |
 | `fat32.c` | FAT32 | 9818 |  |
-| `clock.c` | The clock and `TIME` | 1593 |  |
 | `basic.c` | BASIC: the scanner and the statements | 1510 |  |
 | nice_cpu's C library | `nice_print` | 53 |  |
 | `nicewasm` | The helpers of the translated code: loads, stores, and traps | 125 |  |
-| `nicewasm` | The initial values of the C code's data: its strings and tables | 82 |  |
+| `nicewasm` | The initial values of the C code's data: its strings and tables | 32 |  |
 | nice_cpu's `lib.nasm` | The runtime of the C code | 131 | 0 |
 | nice_cpu's `muldiv_mpu.nasm` | Multiply and divide | 128 | 0 |
 | `build/folder.nasm` | The error of a card without the folder | 8 | 8 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 23570 | 970 |
+| In all | | 22611 | 1014 |
 <!-- /romsize monitor -->
 
 - The C code's strings are in its initial values, also four characters
@@ -322,7 +318,7 @@ result with `niceasm`. In this order:
 
 1. `monitor.nasm`, `monitor_cmd.nasm`, `basic.nasm`, `monitor_dis.nasm`,
    `monitor_sd.nasm`, `monitor_eth.nasm`, `monitor_tcp.nasm`,
-   `monlib.nasm`, and `mon.nasm`.
+   `monitor_clock.nasm`, `monlib.nasm`, and `mon.nasm`.
 2. `build/rom_c.nasm`, the ROM's C code (C in the ROM, above).
 3. nice_cpu's `lib.nasm` and `muldiv_mpu.nasm`.
 4. `build/version.nasm`, which defines `VERSION`, the text of the

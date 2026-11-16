@@ -79,10 +79,10 @@ the words that are free:
 | `monitor_sd.nasm` | The routines for the SD cards |
 | `monitor_eth.nasm` | The routines for the network: the frames, ARP, UDP, DHCP, DNS, TFTP, and NTP |
 | `monitor_tcp.nasm` | TCP |
+| `monitor_clock.nasm` | `TIME`, the dates of files, the real-time clock, and the time of `NTP` |
 | `monlib.nasm` | The routines that programs join, which the statements use too |
 | `mon.nasm` | The stubs through which a program calls the entries |
 | `fat32.c` | FAT32, translated by `nicewasm --ram`, with the data of the module |
-| `clock.c` | `TIME`, the dates of files, and the real-time clock |
 | `basic.c` | BASIC: the scanner of a line, and the statements |
 | nice_cpu's `lib.nasm` and `muldiv_mpu.nasm` | The runtime of the C code |
 | `build/version.nasm` and `build/folder.nasm` | The version and the card's folder, which the Makefile writes |

@@ -1830,11 +1830,13 @@ dns_skip
 ; NTP ["SERVER"] [, "+HH:MM" | "-HH:MM"]: R1 SERVER, or 0 without it or
 ; for an empty one, and R2 the offset, or 0 without it. The clock of the
 ; time of day set from a time server by SNTP (RFC 4330), and the MEGA65's
-; real-time clock with it, by clock_ntp of clock.c (issue #127). SERVER is
+; real-time clock with it, by clock_ntp of monitor_clock.nasm (issue
+; #127), which goes to ntp_bad_time with a time that the clock does not
+; take. SERVER is
 ; a name, which dns_lookup looks up, or an IP address; without it the
 ; server is the NTP server of DHCP's option 42, V_NTP, and without that
-; NTP_POOL. The offset is local time less UTC, which clock_zone of
-; clock.c reads, and +00:00 without it. The query is 48 bytes from a local port of its own,
+; NTP_POOL. The offset is local time less UTC, which clock_zone reads,
+; and +00:00 without it. The query is 48 bytes from a local port of its own,
 ; V_NWAIT, to port 123: version 4, mode 3, and the transmit timestamp,
 ; which the fine clock and the microseconds make, as the answer's
 ; originate timestamp must be the same. It is built in V_TXF as dns_lookup
@@ -1853,9 +1855,8 @@ st_ntp
                 CMP     @R1, 0x20
         ?Z      ADD     R1, R1, 1
         ?Z      JMP     :-
-                CALL    _clock_zone
-                CMP     R1, 1
-        ?Z      JMP     ntp_bad
+                CALL    clock_zone
+        ?!Z     JMP     ntp_bad
                 MOVE    R8, R1
 ; The server's address
 ntp_server
@@ -1937,11 +1938,8 @@ ntp_off
         ?!Z     JMP     ntp_fail
                 MOVE    R1, @V_RXF+UDP_HDR+10  ; the transmit timestamp
                 MOVE    R2, @V_RXF+UDP_HDR+11
-                MOVE    R3, R8
-                MOVE    R4, R9
-                CALL    _clock_ntp
-                TST     R1
-        ?Z      RET
+                JMP     clock_ntp       ; which returns to the caller, or goes to ntp_bad_time
+ntp_bad_time
                 MOVE    R1, E_NTPBAD    ; a time that the clock does not take
 ; An error: its line, and for a kiss-o'-death the server's code, the 4
 ; characters of the reference ID, with ? for one that does not print
@@ -2297,6 +2295,9 @@ S_NTPSRV
                 .ASCII_B 'NTP server '
 S_POOL          .ASCII_B 'pool.ntp.org'
                 .DAT    0
+; The pattern that clock_zone gives clk_parse is in this text, HH:MM from
+; byte 17 up to the quote after it, so a change of the text before it
+; moves it
 S_BADNTP
                 .ASCII_B 'Not an offset: "+HH:MM" or "-HH:MM", local time less UTC, such as "+01:00"'
 S_NODNS         .ASCII_B 'No DNS server; DHCP gets one'

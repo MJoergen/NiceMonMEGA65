@@ -10,7 +10,7 @@
 # make clean    removes build/
 #
 # The assembler has no include, so the monitor is the cat of SOURCES
-# (monitor.nasm, the four files that its header lists, monlib.nasm, and
+# (monitor.nasm, the files that its header lists, monlib.nasm, and
 # mon.nasm), build/rom_c.nasm, nice_cpu's lib.nasm and
 # muldiv_mpu.nasm, build/version.nasm, which defines the label VERSION
 # (monitor.nasm), and build/folder.nasm, the text of the error of a card
@@ -32,9 +32,9 @@ TOOLS    = $(wildcard $(NICE_CPU)/assembler/*.py) $(wildcard $(NICE_CPU)/transla
 LIBC     = $(NICE_CPU)/runtime/libc
 BUILD    = build
 SOURCES  = monitor.nasm monitor_cmd.nasm basic.nasm monitor_dis.nasm monitor_sd.nasm monitor_eth.nasm monitor_tcp.nasm \
-           monlib.nasm mon.nasm
+           monitor_clock.nasm monlib.nasm mon.nasm
 # The ROM's C code, and nice_cpu's runtime library that it is joined with
-ROM_C    = fat32.c clock.c basic.c
+ROM_C    = fat32.c basic.c
 RUNTIME_ROM = $(RUNTIME)/lib.nasm $(RUNTIME)/muldiv_mpu.nasm
 # The options of nicebuild.py --ram (nice_cpu's translator README), but
 # that every function that is not static is exported, for the monitor's

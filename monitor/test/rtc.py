@@ -7,8 +7,8 @@ Usage: test/rtc.py NICEEMU MONITOR.bin
 niceemu has no I2C master: the master's words at 0xFFFFFF97 to 9D are
 memory there. So a .bin file behind the monitor's sets them before the
 start: the status to 1, a master that is present and never busy, and the
-data to the registers 0 to 15 of the R6's RV-3032-C7. To clock.c every
-transaction then ends at once with no error, and its clock_rtc reads
+data to the registers 0 to 15 of the R6's RV-3032-C7. To the monitor
+every transaction then ends at once with no error, and its clock_rtc reads
 those registers at the cold start as the chip's. niceemu runs with
 --step-time, so the clock starts at 0, not set, and counts a microsecond
 a step.

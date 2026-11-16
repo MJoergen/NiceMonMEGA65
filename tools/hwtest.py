@@ -1546,7 +1546,8 @@ def i2c_write(link: Link, chip: int, reg: int, data: list[int],
 
 def rtc_set(link: Link, rv: bool) -> None:
     """Sets the MEGA65's real-time clock to the host's local time, at the
-    start of a second, as BASIC's TIME writes it (monitor/clock.c),
+    start of a second, as BASIC's TIME writes it
+    (monitor/monitor_clock.nasm),
     and checks it: the time read back, and the flags that say that it lost
     its time cleared."""
     at = int(time.time()) + 2

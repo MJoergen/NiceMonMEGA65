@@ -19,7 +19,7 @@
 ; program that SYS called and that returns has the same, but the stack,
 ; and BASIC goes on.
 ;
-; The monitor is this file and six more, which the Makefile joins after
+; The monitor is this file and seven more, which the Makefile joins after
 ; it, in this order, so that the dispatch table is at 0:
 ;
 ; - monitor_cmd.nasm: the routines of BASIC's statements that replace the
@@ -40,9 +40,12 @@
 ;   "The network", and INTERNALS.md, "The frame routines").
 ; - monitor_tcp.nasm: TCP, the entries 26 to 31 of its clients and its
 ;   servers, and their part of the poll (issue #111).
+; - monitor_clock.nasm: the clock of the time of day, TIME, the dates of
+;   FAT's entries, the real-time clock, and the time of NTP (issues #105,
+;   #109, #127, and #148).
 ;
 ; Each has the .EQUs of its devices and its constants, and its texts, but
-; the variables of all seven are here, as one map of the RAM. The
+; the variables of all eight are here, as one map of the RAM. The
 ; assembler takes a name
 ; before its .EQU or its label, so the files reach each other's names in
 ; either direction.
@@ -152,6 +155,9 @@ V_UF            .EQU    0xFFFFF060      ; for DIS: the fields dest, s0, and s1,
 V_UC            .EQU    0xFFFFF063      ; their constant words,
 V_UNOPS         .EQU    0xFFFFF066      ; and the operands of the mnemonic
 V_CSP           .EQU    0xFFFFF067      ; the C code's stack pointer at the cold start, which main sets again
+V_I             .EQU    0xFFFFF068      ; for the clock: the fields of a date and a time to set, and a 7th word,
+V_F             .EQU    0xFFFFF06E      ; the fields of the clock's time, which is the 7th of V_I,
+V_DAYS          .EQU    0xFFFFF074      ; and its days since 1970
 V_ARP           .EQU    0xFFFFF100      ; the ARP cache: ARP_SLOTS entries of an IP address, 0 for none, the MAC address as E_MACH and E_MACL have it, and the time of arp_tick it was learned
 V_ARPNEXT       .EQU    0xFFFFF110      ; the entry that arp_learn takes next, 4 times its number
 V_XID           .EQU    0xFFFFF111      ; for DHCP: the transaction's number,
@@ -289,7 +295,7 @@ SCR_MAX         .EQU    0x7FFF          ; the largest display offset
 ; (issue #126). The vectors
 ; of lib.nasm are set, and ___wasm_start gives the words of the ROM's C
 ; code their initial values. The clock of the time of day, while it is not
-; set, is set from the MEGA65's real-time clock, with clock_rtc of clock.c
+; set, is set from the MEGA65's real-time clock, with clock_rtc
 ; (issue #105). The RAM from 0x8000 is left alone, so that a program a
 ; host has loaded is still there.
 mon_reset
@@ -339,7 +345,7 @@ mon_reset
                 MOVE    @V_HCOUNT, 0
                 MOVE    @V_BACK, 0
                 CALL    scr_cls
-                CALL    _clock_rtc
+                CALL    clock_rtc
                 JMP     bas_start       ; basic.nasm
 
 ; mon_exit: entry 1, and where a program returns to. Back to the main loop,

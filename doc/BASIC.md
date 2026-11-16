@@ -504,7 +504,8 @@ BASIC is NICE assembly from stage 2 on ([Decisions](#decisions)):
   assembly (#115). The tests of stage 1 stay as they are, and the
   port passes them with the same output.
 - Every routine follows the C ABI, so BASIC calls the ROM's C code,
-  `fat32.c` and `clock.c`, by a label, as the monitor's commands did.
+  `fat32.c`, by a label, as the monitor's commands did, and the clock's
+  routines of `monitor_clock.nasm` (#148) by theirs.
 - The table of keywords and the messages are packed with `.ASCII_B`,
   and read through the byte window, a quarter of the ROM.
 - The workspace is words, and its formats are those of

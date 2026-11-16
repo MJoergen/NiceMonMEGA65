@@ -22,10 +22,10 @@
 ; deletes a file, with fat32.c, the ROM's C code, whose functions are
 ; also the entries 9 to 15, fs_mount, fs_open, fs_read, fs_readdir,
 ; fs_close, fs_write, and fs_delete (issues #58 and #59). TIME, the
-; clock of the time of day, is clock_cmd of clock.c, which basic.c calls
-; itself (issue #109). DIS, DHCP, NTP, and LOAD and DIR from a TFTP
-; server are in monitor_dis.nasm and monitor_eth.nasm, and use the
-; routines of this file.
+; clock of the time of day, is clock_cmd of monitor_clock.nasm, which
+; basic.c calls itself (issue #109). DIS, DHCP, NTP, and LOAD and DIR
+; from a TFTP server are in monitor_dis.nasm and monitor_eth.nasm, and use
+; the routines of this file.
 
 RAM_WORDS       .EQU    0xFFFFFF9E      ; the words of the RAM, 0 in niceemu, where there is no limit
 UART_BAUD       .EQU    0xFFFFFF9F      ; the UART's baud rate in bit/s, memory in niceemu

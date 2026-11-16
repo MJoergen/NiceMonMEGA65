@@ -193,7 +193,7 @@ static void put32(unsigned char *p, unsigned v)
 }
 
 // The date and the time of the 8.3 entry at p: from the clock, with
-// clock_fat of clock.c, or the fixed DATE at 00:00:00 while the clock is
+// clock_fat of monitor_clock.nasm, or the fixed DATE at 00:00:00 while the clock is
 // not set. Written always, and created too for a new entry. Read keeps
 // the date of the write, as a read writes nothing.
 unsigned clock_fat(unsigned *t);
