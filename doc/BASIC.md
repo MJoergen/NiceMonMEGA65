@@ -516,9 +516,9 @@ BASIC is NICE assembly from stage 2 on ([Decisions](#decisions)):
 - The scanner's routines take and return their values in registers,
   as each one's comment says, and the statements' routines may use
   every register, as the main loop starts again after each. BASIC
-  calls the ROM's C code, `fat32.c`, in the C ABI, by a label, as the
-  monitor's commands did, and the clock's routines of
-  `monitor_clock.nasm` (#148) by theirs.
+  calls FAT32's routines of `monitor_fat.nasm` (#149), which were the
+  ROM's C code, `fat32.c`, and the clock's routines of
+  `monitor_clock.nasm` (#148), by their labels.
 - The table of keywords, the ops, and the messages are packed with
   `.ASCII_B`, and read through the byte window, a quarter of the ROM.
 - The workspace is words, and its formats are those of

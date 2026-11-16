@@ -34,7 +34,7 @@ paused program's, in its slot, which it must have started up. --hold
 holds it anyway, so that any slot is read. Mount it with -o ro.
 
 The kernel writes in its own order, not in the careful order of
-sdcard.py's and fat32.c's, so a link that breaks while a write is in
+sdcard.py's and monitor_fat.nasm's, so a link that breaks while a write is in
 flight can leave the card's FAT inconsistent: unmount, which writes back
 all that the kernel kept, before the server stops. The writes are made
 when they come, so a flush has nothing to wait for.

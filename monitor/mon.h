@@ -81,7 +81,7 @@ unsigned mon_scr_color(unsigned color);
 // of unsigned words of its own, which mon_words gives (below), or of
 // words outside its memory, which it reads with nice_peek and writes with
 // nice_poke. An error is negative: -1 to -8 those of the SD controller,
-// and -16 on those of fat32.c.
+// and -16 on those of FAT32.
 
 // The card in a slot mounted, and the files that were open closed. 0, or
 // an error.

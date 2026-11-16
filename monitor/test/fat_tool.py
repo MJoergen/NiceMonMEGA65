@@ -21,7 +21,7 @@ diff BASE IMAGE [--mask-times]
 order [--sd0 IMAGE] [--sd1 IMAGE]
     The SD controller's commands of a run, from niceemu -t on stdin: the
     writes to SD_SELECT, SD_LBA, and SD_CSR, as the order of the sector
-    writes of fat32.c's header, which no other test sees. Each write is
+    writes of monitor_fat.nasm's header, which no other test sees. Each write is
     named by the geometry of the card of its slot: FSInfo, FAT1+k for
     sector k of the first FAT, FAT2+k, Cn for cluster n, or Cn+k for its
     sector k, and the sector's number elsewhere; a write to slot 1 has

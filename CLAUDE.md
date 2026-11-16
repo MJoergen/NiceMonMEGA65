@@ -159,7 +159,7 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   `spiflash.py`, the MEGA65's flash through openFPGALoader's bridge with
   pyftdi, which clears the sectors' DYB protection),
   `sdcard.py` (the SD card's files over the link, with FAT32 read and
-  written on the host in fat32.c's order, which hwtest shares, #61),
+  written on the host in the ROM's order, which hwtest shares, #61),
   `sdnbd.py` (the whole card as a block device over NBD, for a mount on
   Linux, with sdcard.py's sectors), and `sdtest.py`,
   `bump.py`, `release.py`, `linktest.py`, `tftpd.py` (the TFTP server for
@@ -185,21 +185,23 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   `basic.nasm`, BASIC's main loop (#54, stage 1 #112), its scanner of
   a line (#115), and its keywords, messages, and help, with
   `DIS` in `monitor_dis.nasm`, the sector routines in
-  `monitor_sd.nasm`, the network in `monitor_eth.nasm`, TCP in
+  `monitor_sd.nasm`, FAT32 in `monitor_fat.nasm` (#149), the network
+  in `monitor_eth.nasm`, TCP in
   `monitor_tcp.nasm`, #111, and the clock in `monitor_clock.nasm`
   (#148): the `TIME` statement, the dates of files (#109), the clock
   from the real-time clock at the cold start, which `TIME` writes
-  (#105), and the time of `NTP` from a time server (#127)), its C
-  code (`fat32.c`, in a wasm module through `nicewasm --ram`, with its
-  writable words at `0xFFFFF400`; building the monitor needs clang, and
-  its tests mtools, `mkfs.fat`, and `sfdisk`), the routines that
+  (#105), and the time of `NTP` from a time server (#127)), with no
+  C code, though its support is left (`ROM_C` is empty; building the
+  monitor needs clang, and its tests mtools, `mkfs.fat`, and
+  `sfdisk`), the routines that
   programs join (`monlib.nasm`), the stubs and the header through which
   a program calls the entries (`mon.nasm`, `mon.h`, and `mon_c.nasm`,
   the stubs that turn a C pointer into an address), and its tests in
   niceemu (`test/`, with `cat monitor.bin prog.bin`). `monitor/README.md`
   is the monitor for those who use it and write programs for it, and
   `monitor/INTERNALS.md` the routines with no entries, the scrollback,
-  the C in the ROM, the ROM's words, and the build and the tests.
+  FAT32, what is left of the C in the ROM, the ROM's words, and the
+  build and the tests.
 
 ## Rules and pitfalls
 

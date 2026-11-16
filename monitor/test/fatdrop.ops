@@ -1,5 +1,5 @@
 ; The program of the suite fatdrop of test/fat_runs.py: the mount
-; dropped under open files, as fat32.c's valid finds the selected slot
+; dropped under open files, as monitor_fat.nasm's valid finds the selected slot
 ; not the mounted one, and fs_mount under a file open to write. Copies of
 ; super.img are in both slots. The format is test/fat_tool.py's, OPS.
 

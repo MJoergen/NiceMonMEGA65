@@ -1,5 +1,5 @@
 ; The clock of the time of day, which the Makefile joins after monitor.nasm
-; (its header): TIME, the dates of FAT's entries for fat32.c, the clock set
+; (its header): TIME, the dates of FAT's entries for monitor_fat.nasm, the clock set
 ; from the MEGA65's real-time clock at the cold start, which TIME sets
 ; (issue #105), and the time of an SNTP answer, which NTP sets (issue
 ; #127). It was clock.c of the ROM's C code until issue #148.
@@ -487,20 +487,6 @@ clk_walk
                 JMP     :-
 CLK_MDAYS
                 .DAT    0x1F1C1F00, 0x1F1E1F1E, 0x1E1F1E1F, 0x0000001F
-
-; The call of fat32.c, by the name that it imports, until it is in
-; assembly too (issue #149), and this block goes. _clock_fat: R1 is a C
-; pointer, a byte address of the C code's memory, at a multiple of 4, so
-; a word of it, which takes R2 of clock_fat.
-_clock_fat
-                PUSH    R7
-                PUSH    R1
-                CALL    clock_fat
-                POP     R3
-                SHR     R3, R3, 2
-                MOVE    @___wasm_memory[R3], R2
-                POP     R7
-                RET
 
 ; The pattern that clock_cmd gives clk_parse is in this text, from byte 22
 ; up to the quote after it, so a change of the text before it moves it

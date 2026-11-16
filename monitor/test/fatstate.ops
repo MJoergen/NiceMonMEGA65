@@ -1,6 +1,7 @@
 ; The program of the suite fatstate of test/fat_runs.py: what the cold
-; start and a program's return keep (fat32.c's state is the C code's
-; memory, which the cold start zeroes and a return leaves alone).
+; start and a program's return keep (FAT32's state is in the monitor's
+; RAM from FAT_RAM, which the cold start clears and a return leaves
+; alone).
 ; The format is test/fat_tool.py's, OPS.
 
 seg                             ; 0x8000: a file opened, and left open

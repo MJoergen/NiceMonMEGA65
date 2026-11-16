@@ -18,8 +18,8 @@
 ; restores what mon_exit restores and shows the status. DIR lists the
 ; folder NICE of an SD card's FAT32 file system, LOAD "NAME.BIN" reads a
 ; .bin file from it as LOAD reads lines, SAVE writes one, and DELETE
-; deletes a file, with fat32.c, the ROM's C code, whose functions are
-; also the entries 9 to 15, fs_mount, fs_open, fs_read, fs_readdir,
+; deletes a file, with monitor_fat.nasm, whose routines are also the
+; entries 9 to 15, fs_mount, fs_open, fs_read, fs_readdir,
 ; fs_close, fs_write, and fs_delete (issues #58 and #59). TIME, the
 ; clock of the time of day, is clock_cmd of monitor_clock.nasm, which
 ; basic.nasm calls itself (issue #109). DIS, DHCP, NTP, and LOAD and DIR
@@ -503,20 +503,20 @@ load_pend
 
 ; DIR [SLOT]: R1 the slot, or 0xFFFFFFFF without it. The folder NICE of
 ; the card in SLOT, mounted first, or of the card mounted, with fat_dir of
-; fat32.c.
+; monitor_fat.nasm.
 st_dir
-                CALL    _fat_dir
+                CALL    fat_dir
                 TST     R1
         ?N      JMP     fs_fail
                 RET
 
 ; LOAD "NAME.BIN": R1 the name. The .bin file NAME.BIN of the card's
-; folder NICE, read with fat_load of fat32.c, which writes its words as
+; folder NICE, read with fat_load of monitor_fat.nasm, which writes its words as
 ; st_lines does, and shown as st_lines shows its lines. basic.nasm has
 ; checked the name's .BIN.
 st_load
                 MOVE    R2, 0           ; to read
-                CALL    _fat_open
+                CALL    fs_open
                 TST     R1
         ?N      JMP     fs_fail
                 MOVE    R8, R1          ; the handle
@@ -524,10 +524,10 @@ st_load
                 MOVE    R1, R8
                 MOVE    R2, @V_PEND
                 MOVE    R3, V_LSTATS
-                CALL    _fat_load
+                CALL    fat_load
                 MOVE    R9, R1
                 MOVE    R1, R8
-                CALL    _fat_close
+                CALL    fs_close
                 MOVE    R1, R9
                 TST     R1
         ?N      JMP     fs_fail
@@ -540,7 +540,7 @@ st_load
 
 ; SAVE "NAME", ADDR, N: R1 the name, R2 ADDR, and R3 N. The N words from
 ; ADDR written to the file NAME of the card's folder, which is made or
-; truncated, as a .bin file, with fat_save of fat32.c, and the words saved
+; truncated, as a .bin file, with fat_save of monitor_fat.nasm, and the words saved
 ; shown as LOAD shows those loaded. basic.nasm has added .BIN to a name
 ; without an extension.
 st_save
@@ -548,16 +548,16 @@ st_save
                 MOVE    R9, R2
                 MOVE    R10, R3
                 MOVE    R2, 1           ; to write
-                CALL    _fat_open
+                CALL    fs_open
                 TST     R1
         ?N      JMP     fs_fail
                 MOVE    R8, R1          ; the handle
                 MOVE    R2, R9
                 MOVE    R3, R10
-                CALL    _fat_save
+                CALL    fat_save
                 MOVE    R11, R1
                 MOVE    R1, R8
-                CALL    _fat_close
+                CALL    fs_close
                 TST     R11
         ?N      MOVE    R1, R11         ; the error of the save, before the close's
                 TST     R1
@@ -581,10 +581,10 @@ st_save
                 JMP     _io_crlf        ; which returns to the caller
 
 ; DELETE "NAME": R1 the name. The file NAME of the card's folder deleted,
-; with fat_delete of fat32.c.
+; with fs_delete of monitor_fat.nasm.
 st_delete
                 MOVE    R7, R1          ; the name
-                CALL    _fat_delete
+                CALL    fs_delete
                 TST     R1
         ?N      JMP     fs_fail
                 MOVE    R1, S_DELETED
@@ -594,14 +594,14 @@ st_delete
 
 ; complete: TAB on the line, for _io_gets: R1 the line, R2 the cursor, R3
 ; the word after the last, and R1 = the new cursor, with fat_complete of
-; fat32.c (issue #137). When it lists the matches, the line is shown
+; monitor_fat.nasm (issue #137). When it lists the matches, the line is shown
 ; again. Uses R1-R6, and R7 and R8 across the calls, saved.
 complete
                 PUSH    R7
                 PUSH    R8
                 MOVE    R7, R1          ; the line
                 MOVE    R8, R2          ; the cursor
-                CALL    _fat_complete
+                CALL    fat_complete
                 TST     R1
         ?!Z     JMP     complete_end
 :
@@ -625,7 +625,7 @@ rest_blank
                 TST     @R3
                 RET
 
-; fs_fail: an error of fat32.c, R1 its negative: one of the SD controller's
+; fs_fail: an error of monitor_fat.nasm, R1 its negative: one of the SD controller's
 ; as sd_fail shows it, with the selected slot, or a file error, its number and
 ; its meaning
 fs_fail
@@ -737,7 +737,7 @@ S_SAVED         .ASCII_B 'Words saved: '
 S_DELETED
                 .ASCII_B 'Deleted '
                 .DAT    0
-; The meanings of fat32.c's errors FS_ERR0 to FS_ERR0 + FS_ERRS - 1.
+; The meanings of monitor_fat.nasm's errors FS_ERR0 to FS_ERR0 + FS_ERRS - 1.
 ; E_FS29 names the folder of the build, so the Makefile writes it, in
 ; build/folder.nasm.
 FS_ERRORS

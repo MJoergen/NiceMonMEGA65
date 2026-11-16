@@ -13,8 +13,9 @@
 # (monitor.nasm, the files that its header lists, monlib.nasm, and
 # mon.nasm), build/rom_c.nasm, nice_cpu's lib.nasm and
 # muldiv_mpu.nasm, build/version.nasm, which defines the label VERSION
-# (monitor.nasm), and build/folder.nasm, the text of the error of a card
-# without the folder FOLDER. build/rom_c.nasm is the ROM's C code, ROM_C, which clang
+# (monitor.nasm), and build/folder.nasm, the folder FOLDER's 8.3 name and
+# texts. build/rom_c.nasm is the ROM's C code, ROM_C, which is empty since
+# FAT32 is assembly (issue #149), but which clang still
 # compiles to one wasm module and nicewasm --ram translates for the ROM
 # (INTERNALS.md, "C in the ROM"), so the monitor needs clang with the wasm32
 # target, wasm-ld, and llvm-ar for the C library.
@@ -31,10 +32,10 @@ NICEWASM = $(PYTHON) $(NICE_CPU)/translator/nicewasm.py
 TOOLS    = $(wildcard $(NICE_CPU)/assembler/*.py) $(wildcard $(NICE_CPU)/translator/*.py)
 LIBC     = $(NICE_CPU)/runtime/libc
 BUILD    = build
-SOURCES  = monitor.nasm monitor_cmd.nasm basic.nasm monitor_dis.nasm monitor_sd.nasm monitor_eth.nasm monitor_tcp.nasm \
+SOURCES  = monitor.nasm monitor_cmd.nasm basic.nasm monitor_dis.nasm monitor_sd.nasm monitor_fat.nasm monitor_eth.nasm monitor_tcp.nasm \
            monitor_clock.nasm monlib.nasm mon.nasm
-# The ROM's C code, and nice_cpu's runtime library that it is joined with
-ROM_C    = fat32.c
+# The ROM's C code, none, and nice_cpu's runtime library that it is joined with
+ROM_C    =
 RUNTIME_ROM = $(RUNTIME)/lib.nasm $(RUNTIME)/muldiv_mpu.nasm
 # The options of nicebuild.py --ram (nice_cpu's translator README), but
 # that every function that is not static is exported, for the monitor's
@@ -46,10 +47,10 @@ ROM_CFLAGS = --target=wasm32 -mbulk-memory -mtail-call -Oz -ffreestanding -fvisi
              -Wl,--export=__heap_base -Wl,-z,stack-size=4096 -DFOLDER='"$(FOLDER_UC)"'
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo unknown)
 # The folder of the card's root directory that holds NiceMon's files
-# (fat32.c, README.md, "Files"): NICE, or with make FOLDER=NAME another
-# 8.3 name of 1 to 8 letters, digits, _, and -, in either case. It reaches
-# the C code as the define FOLDER, and build/folder.nasm as the text of
-# error 29. The tests need NICE. A FOLDER of the environment is passed
+# (monitor_fat.nasm, README.md, "Files"): NICE, or with make FOLDER=NAME
+# another 8.3 name of 1 to 8 letters, digits, _, and -, in either case. It
+# reaches build/folder.nasm as FOLDER_N, its 8.3 name padded with blanks,
+# and in the texts of DIR, S_DIROF, and of error 29. The tests need NICE. A FOLDER of the environment is passed
 # over, as a shell may well export one of that common name for something
 # else; the name counts on the command line, make FOLDER=NAME, alone.
 ifeq ($(origin FOLDER),environment)
@@ -64,7 +65,9 @@ endif
 # after it, which ends the text when its length is a multiple of 4
 # (monitor.nasm). The text must not hold a '.
 PACKED = printf "%s .ASCII_B '%s'\n                .DAT    0\n" '$(1)' '$(2)'
-FOLDER_ERROR = $(call PACKED,E_FS29,no folder $(FOLDER_UC) on the card)
+FOLDER_ERROR = ($(call PACKED,E_FS29,no folder $(FOLDER_UC) on the card); \
+  $(call PACKED,S_DIROF,Directory of $(FOLDER_UC)); \
+  printf "FOLDER_N .ASCII_B '%-11s'\n" '$(FOLDER_UC)')
 # The words that the ROM's C code writes are in the RAM from WASM_RAM up to
 # below WASM_END (monitor.nasm), and ___wasm_ram_end is the word after them.
 WASM_RAM = $(shell sed -n 's/^WASM_RAM *\.EQU *\(0x[0-9A-Fa-f]*\).*/\1/p' monitor.nasm)

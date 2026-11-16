@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """The suites of the monitor's tests of FAT32 that take more than one run
 of niceemu each (Makefile, INTERNALS.md, "The tests"), written before the
-port of fat32.c to assembly (issue #149), so that the port does what the
-C code does. Each suite is a list of runs; each run puts copies of
+port of fat32.c to assembly, monitor_fat.nasm (issue #149), so that the
+port does what the C code did. Each suite is a list of runs; each run puts copies of
 test/fat_image.py's images into the slots, types its input, with the
 program of a file of fs_* calls of test/ (test/fat_tool.py, OPS) at
 0x8000 when it has one, and shows:

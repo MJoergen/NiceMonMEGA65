@@ -45,6 +45,7 @@ MONITOR_PARTS = {
     "basic.nasm": "BASIC: the main loop, the scanner, the keywords, the messages, and the help",
     "monitor_dis.nasm": "The disassembler of `DIS`",
     "monitor_sd.nasm": "The sector routines",
+    "monitor_fat.nasm": "FAT32, `DIR`, `LOAD`, `SAVE`, `DELETE`, and TAB",
     "monitor_eth.nasm": "The network",
     "monitor_tcp.nasm": "TCP",
     "monitor_clock.nasm": "The clock and `TIME`",
@@ -52,12 +53,11 @@ MONITOR_PARTS = {
     "mon.nasm": "The stubs of the entries",
     "lib.nasm": "The runtime of the C code",
     "muldiv_mpu.nasm": "Multiply and divide",
-    "folder.nasm": "The error of a card without the folder",
+    "folder.nasm": "The folder's name, and the error of a card without it",
     "version_test.nasm": "The version in the banner, the tests' `V9.9`",
 }
 # The C files of ROM_C, by their names, and what each one is
-C_PARTS = {
-    "fat32.c": "FAT32",
+C_PARTS: dict[str, str] = {
 }
 # The sources that are nice_cpu's
 NICE_CPU_SOURCES = {"lib.nasm", "muldiv_mpu.nasm", "demo.nasm"}

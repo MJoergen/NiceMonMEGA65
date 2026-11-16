@@ -60,11 +60,11 @@ those who write programs:
 
 The ROM also has routines of its own, which have no entries and which
 programs do not call: the sector routines of the SD cards, the frame
-routines and the ARP cache of the network, and FAT32 in C.
+routines and the ARP cache of the network, and FAT32.
 [INTERNALS.md](INTERNALS.md) describes them, with the build and the
 tests.
 
-The monitor is in NICE assembly, with FAT32 in C. The ROM
+The monitor is in NICE assembly. The ROM
 is its files in this order, and
 [INTERNALS.md](INTERNALS.md#the-roms-words) has the words of each, and
 the words that are free:
@@ -76,12 +76,12 @@ the words that are free:
 | `basic.nasm` | BASIC: the main loop, the scanner of a line, and the keywords, messages, and help |
 | `monitor_dis.nasm` | The disassembler of `DIS` |
 | `monitor_sd.nasm` | The routines for the SD cards |
+| `monitor_fat.nasm` | FAT32, and `DIR`, `LOAD` and `SAVE` of a card, and TAB |
 | `monitor_eth.nasm` | The routines for the network: the frames, ARP, UDP, DHCP, DNS, TFTP, and NTP |
 | `monitor_tcp.nasm` | TCP |
 | `monitor_clock.nasm` | `TIME`, the dates of files, the real-time clock, and the time of `NTP` |
 | `monlib.nasm` | The routines that programs join, which the statements use too |
 | `mon.nasm` | The stubs through which a program calls the entries |
-| `fat32.c` | FAT32, translated by `nicewasm --ram`, with the data of the module |
 | nice_cpu's `lib.nasm` and `muldiv_mpu.nasm` | The runtime of the C code |
 | `build/version.nasm` and `build/folder.nasm` | The version and the card's folder, which the Makefile writes |
 
@@ -309,8 +309,8 @@ with a server loads a program from a server on it.
 ## Files
 
 The ROM reads and writes FAT32
-([doc/SDCARD.md](../doc/SDCARD.md), "The file system") with `fat32.c`,
-the ROM's C code ([INTERNALS.md](INTERNALS.md#c-in-the-rom)).
+([doc/SDCARD.md](../doc/SDCARD.md), "The file system") with
+`monitor_fat.nasm`.
 
 To load a program from a card, make the folder `NICE` in its root on a
 PC, copy the `.bin` file into it, and type `DIR` and `LOAD "NAME.BIN"`
@@ -375,7 +375,7 @@ With no PC slot, `make sdcard CMD=mkdir` makes it over the link
   the free clusters is set to unknown, which `fsck.fat` reports as
   uninitialized, and its hint is kept.
 - **The caches** are one sector of the FAT, and one for each of the two
-  files that may be open at once, in the C code's RAM. The FAT and the
+  files that may be open at once, in the monitor's RAM. The FAT and the
   folder are written through; a file's sector is written when it is full,
   and at `fs_close`.
 - **Sectors** are not the HAL's: a program that wants them drives the
@@ -739,9 +739,9 @@ pseudo-instructions below, which only `DIS` shows:
   ([SYSTEM.md](../doc/SYSTEM.md#io-registers)), which reads 0 in
   `niceemu`, where the memory has no limit. The monitor's routines use
   at most 32 words of the stack when a program calls them. The stack is
-  in use before the program runs: `SYS` takes the top 14 words, from
-  `0x1EFFF` or `0xEFFF` down, through BASIC's C code, and `LOAD`'s own
-  summary reaches 17 words below the top. `LOAD` and
+  in use before the program runs: `SYS` takes the top 2 words, from
+  `0x1EFFF` or `0xEFFF` down, `LOAD` of typed lines reaches 8 words
+  below the top, and `LOAD` from a card 22. `LOAD` and
   `load.py --monitor` take a word there, which is then overwritten, as
   any word in the room the stack needs is.
 - A program runs once per load: the load initializes its static data and

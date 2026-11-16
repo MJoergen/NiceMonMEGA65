@@ -2224,7 +2224,7 @@ tftp_bad
                 JMP     puts_b_crlf     ; which returns to the caller
 
 ; tftp_char: the byte R1 of a DATA, into the line at V_TLINE, as fat_load
-; of fat32.c takes the bytes of a file: CR, LF, or CR LF ends a line,
+; of monitor_fat.nasm takes the bytes of a file: CR, LF, or CR LF ends a line,
 ; which is shown for a listing, or else goes to bin_line, or is counted
 ; and passed over when it is empty;
 ; TAB is a blank, and other control codes and bytes from 0x80 are dropped,

@@ -9,7 +9,8 @@ differs from them, they are right. The ROM's sector routines are
 written too, in V1.7.1, and
 [monitor/INTERNALS.md](../monitor/INTERNALS.md) describes them, and so is
 FAT32's reading, with `dir` and `load`, in V1.9, in C, and its writing,
-with `save` and `del`, in V1.9.1. The host tool `tools/sdcard.py` lists
+with `save` and `del`, in V1.9.1; issue #149 put it into NICE assembly,
+`monitor/monitor_fat.nasm`, with the same behavior. The host tool `tools/sdcard.py` lists
 the card, and reads, writes, and deletes its files from the host, in
 V1.9.1. BASIC is not written yet. Its end is `SAVE`, `LOAD`, and `DIR`
 in the BASIC interpreter planned for the ROM, and on the way it gives
@@ -344,8 +345,8 @@ and must be formatted. FAT12 and FAT16 are rejected with a message.
 - **Safety**: the ROM writes only inside the partition, never the MBR or
   the boot sector, and refuses a card whose FAT32 boot sector does not
   check.
-- **Caches**: one sector of the FAT and one per open file, in the RAM
-  of the ROM's C code, from `0xFFFFF400`. Two files open at once, a
+- **Caches**: one sector of the FAT and one per open file, in the
+  monitor's RAM, from `0xFFFFF980`. Two files open at once, a
   read and a write,
   are enough for BASIC and the monitor. "Changed" in the status drops the
   caches and the mount. The FAT's cache and the directory's are
@@ -478,8 +479,8 @@ There are no device numbers and no Commodore DOS.
 ## Open questions
 
 1. **The language of the FAT32 code**: settled on 2026-11-06, C through
-   the wasm translator, in the ROM with `nicewasm --ram`
-   This decides nothing for the BASIC interpreter.
+   the wasm translator, in the ROM with `nicewasm --ram`; settled again
+   on 2026-11-16, NICE assembly, for the ROM's words (issue #149).
 2. **Writes to the MEGA65's internal card**, which holds its system files:
    settled: only in NiceMon's folder, `/NICE`, on either card, as
    reading is.

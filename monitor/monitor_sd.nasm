@@ -1,7 +1,7 @@
 ; The monitor's SD cards below the file system, which the Makefile joins
 ; after monitor.nasm (its header): the sector routines sd_init, sd_read,
 ; and sd_write, the ROM's own, with no entries in the dispatch table
-; (doc/SDCARD.md, "The ROM"), and the names by which fat32.c calls them.
+; (doc/SDCARD.md, "The ROM"), which monitor_fat.nasm calls.
 ; The file statements of monitor_cmd.nasm show the errors of the controller
 ; with sd_fail.
 
@@ -19,20 +19,6 @@ SD_WR           .EQU    2
 SD_BUSY         .EQU    0x01            ; the bits of its status
 SD_READY        .EQU    0x08
 SD_CHANGED      .EQU    0x10
-
-; The sector routines for fat32.c, by the names that it imports: R2 of
-; fat_sd_read and fat_sd_write is a byte address of the C code's memory,
-; at a multiple of 4, so a word of it
-_fat_sd_init
-                JMP     sd_init
-_fat_sd_read
-                SHR     R2, R2, 2
-                ADD     R2, R2, ___wasm_memory
-                JMP     sd_read
-_fat_sd_write
-                SHR     R2, R2, 2
-                ADD     R2, R2, ___wasm_memory
-                JMP     sd_write
 
 ; An error of the controller, R1 its negative: the number, the slot, and
 ; the meaning, with the last sector after error 7

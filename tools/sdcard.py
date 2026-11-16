@@ -4,7 +4,7 @@
 The host reaches the card through the SD controller's registers at
 FFFFFFA0-AF (nice_cpu's DEVICES.md §5), which the link reaches while the
 core is held, paused, or halted, and reads and writes its FAT32 file
-system itself, as the monitor's monitor/fat32.c does: sector 0 as a
+system itself, as the monitor's monitor/monitor_fat.nasm does: sector 0 as a
 FAT32 boot sector, or the first partition of type 0x0B or 0x0C of an
 MBR, and in it only the folder NICE, the monitor's (#91), or the one
 that --folder names:
@@ -26,14 +26,14 @@ SRC, or stdin for -, as the file NAME, by default SRC's own name, a long
 name of up to 255 characters or an 8.3 name: it makes the file, or
 truncates it when it is there, by either name. A new file gets
 long-name entries and an 8.3 alias with a tail, MANDEL~1.BIN, as
-fat32.c makes them, unless its name is an 8.3 name in upper case, or in
+monitor_fat.nasm makes them, unless its name is an 8.3 name in upper case, or in
 lower case in a part. del deletes a file, by either name, with its
 long-name entries. mkdir makes the folder in the root of a card that
 has FAT32 but not the folder, which the monitor never makes, and says
 so when it is there already; the folder's name must be an 8.3 name with
 no extension, as NICE is.
 
-The writes keep to fat32.c's order, in which a reset at any point leaves
+The writes keep to monitor_fat.nasm's order, in which a reset at any point leaves
 the card no worse than with lost clusters, which fsck.fat frees: FSInfo's
 free count set to unknown before the first change of the FAT, a new
 cluster marked as the end of its chain in every FAT before the one
@@ -115,7 +115,7 @@ PAUSE_WAIT = 2.0
 CACHE_SECTORS = 256
 
 # The controller's errors in SD_ERROR, and the file system's of
-# monitor/fat32.c, with the monitor's texts (monitor/monitor_cmd.nasm, E_FS*)
+# monitor/monitor_fat.nasm, with the monitor's texts (monitor/monitor_cmd.nasm, E_FS*)
 SD_ERRORS = {
     1: "no card",
     2: "the card is not ready",
@@ -156,11 +156,11 @@ FOLDER = "NICE"
 # ends one
 EOC = 0x0FFFFFFF
 END = 0x0FFFFFF8
-# The bytes of a directory at most, as fat32.c's DIR_MAX
+# The bytes of a directory at most, as monitor_fat.nasm's DIR_MAX
 DIR_MAX = 65536 * 32
 # The characters that no name may have, beside those below blank and
-# from 0x7F (fat32.c's bad), and those that a long name may have, but an
-# 8.3 name not (fat32.c's not83)
+# from 0x7F (monitor_fat.nasm's isbad), and those that a long name may have, but an
+# 8.3 name not (monitor_fat.nasm's isu)
 BAD = set('"*/:<>?\\|')
 NOT_83 = set(" +,.;=[]")
 # The characters of a long name at most, and its long-name entries
@@ -168,7 +168,7 @@ NAME_MAX = 255
 LFN_MAX = 20
 # The bytes of a long-name entry that hold its 13 characters, UTF-16
 LFN_AT = (1, 3, 5, 7, 9, 14, 16, 18, 20, 22, 24, 28, 30)
-# The columns of the name in a row of dir, as fat32.c's DIR_NAME
+# The columns of the name in a row of dir, as monitor_fat.nasm's DIR_NAME
 DIR_NAME = 24
 
 
@@ -179,7 +179,7 @@ class SdError(Exception):
 
 class FileError(Exception):
     """An error of the file system, with the number that the monitor's
-    fat32.c gives it, negated."""
+    monitor_fat.nasm gives it, negated."""
 
     def __init__(self, code: int, folder: str = FOLDER) -> None:
         self.code = code
@@ -432,7 +432,7 @@ def put32(b: bytearray, at: int, v: int) -> None:
 
 
 def boot_kind(b: bytes) -> int:
-    """What the sector b is, as fat32.c's kind() says: 0 for a FAT32 boot
+    """What the sector b is, as monitor_fat.nasm's kind says: 0 for a FAT32 boot
     sector, a FileError's code for another file system, and 1 for no boot
     sector, or one without the 55 AA signature. The type is told by the
     count of clusters."""
@@ -460,12 +460,12 @@ def boot_kind(b: bytes) -> int:
 
 
 def bad(c: str) -> bool:
-    """A character that no name may have (fat32.c's bad)."""
+    """A character that no name may have (monitor_fat.nasm's isbad)."""
     return c < " " or c >= "\x7f" or c in BAD
 
 
 def name83(name: str) -> tuple[bytes, int] | None:
-    """The 11 bytes of the 8.3 name name, in upper case, as fat32.c's
+    """The 11 bytes of the 8.3 name name, in upper case, as monitor_fat.nasm's
     name83 makes them: a base of 1 to 8 characters, and an extension of
     1 to 3 after a dot, if any; and the flags of byte 12 for a part in
     lower case, or -1 for a part in mixed case. None when name is no 8.3
@@ -483,14 +483,14 @@ def name83(name: str) -> tuple[bytes, int] | None:
 
 
 def long_ok(name: str) -> bool:
-    """name as the long name of a new file (fat32.c's longok): 1 to 255
+    """name as the long name of a new file (monitor_fat.nasm's longok): 1 to 255
     characters that bad() lets through, not ending in a blank or a dot."""
     return (0 < len(name) <= NAME_MAX and not any(bad(c) for c in name)
             and name[-1] not in " .")
 
 
 def basis(name: str) -> tuple[bytes, bool]:
-    """The basis of name's 8.3 alias, as fat32.c's basis makes it: the
+    """The basis of name's 8.3 alias, as monitor_fat.nasm's basis makes it: the
     base from the characters before the last dot, and the extension from
     those after it, in upper case, without blanks and dots, and with _ for
     +,;=[]; and whether that lost a character, or cut a part, so that the
@@ -582,7 +582,7 @@ class Entry:
 
     @property
     def name(self) -> str:
-        """The name as the monitor shows it, as fat32.c's lname has it:
+        """The name as the monitor shows it, as monitor_fat.nasm's LNAME has it:
         the long name, or else the 8.3 name as a name, each part in lower
         case when byte 12 says so, with ? for a character outside
         ASCII."""
@@ -619,7 +619,7 @@ def lfn_sum(raw: bytes) -> int:
 
 def lfn_text(parts: list[bytes], raw: bytes) -> str | None:
     """The long name of the long-name entries before an entry, in the
-    order on the card, as fat32.c's entry() takes them: those from the
+    order on the card, as monitor_fat.nasm's entry takes them: those from the
     last with bit 6 set in its number, or None when they are not those of
     raw: a wrong checksum, numbers out of sequence, more than LFN_MAX
     entries, or a name that is empty or longer than NAME_MAX."""
@@ -649,7 +649,7 @@ class FolderError(Exception):
 
 class Volume:
     """A FAT32 file system on a card, read with read(lba) and written
-    with write(lba, data), if given, mounted as fat32.c mounts one, with
+    with write(lba, data), if given, mounted as monitor_fat.nasm mounts one, with
     its folder, and only that folder. With need False, a card without the
     folder mounts too, with dir 0, for mkdir."""
 
@@ -695,7 +695,7 @@ class Volume:
         self.fsinfo = base + fsi if 1 <= fsi < u16(b, 14) else 0
         # The cluster to search for a free one from, 0 for FSInfo's;
         # whether FSInfo's free count is unknown, and whether the FAT has
-        # changed since FSInfo was written (fat32.c's vol)
+        # changed since FSInfo was written (monitor_fat.nasm's V_UNKNOWN and V_CHANGED)
         self.hint = 0
         self.unknown = False
         self.changed = False
@@ -742,7 +742,7 @@ class Volume:
 
     def entries(self, first: int) -> Iterator[Entry]:
         """The files and directories of the directory from cluster first,
-        as fat32.c's entry() takes them: not deleted, not long-name
+        as monitor_fat.nasm's entry takes them: not deleted, not long-name
         entries, not the volume label, and not . and .., each with the
         long name of the entries right before it."""
         parts: list[bytes] = []
@@ -812,7 +812,7 @@ class Volume:
             raise FileError(E_BADFAT)
         return bytes(data[:e.size])
 
-    # Writing, in fat32.c's order
+    # Writing, in monitor_fat.nasm's order
 
     def wr(self, lba: int, data: bytes) -> None:
         """A sector written, but none outside the partition, nor below its
@@ -903,7 +903,7 @@ class Volume:
         in the first run of free entries for all, which may go on into a
         new cluster of zeros added to the directory. The long-name entries
         are written first, then the 8.3 entry, a sector at a time, as
-        fat32.c's make writes them. Its sector and offset."""
+        monitor_fat.nasm's make writes them. Its sector and offset."""
         date, tod = fat_stamp(self.now)
         e = bytearray(32)
         e[:11] = raw
@@ -958,7 +958,7 @@ class Volume:
 
     def new_name(self, name: str) -> tuple[bytes, int, list[bytes]]:
         """The 8.3 name of a new file name, the flags of its byte 12, and
-        its long-name entries, as fat32.c's newname makes them: name
+        its long-name entries, as monitor_fat.nasm's newname makes them: name
         itself when it is an 8.3 name in upper case, or in lower case in a
         part, with no long-name entries; or else its basis, with the first
         tail ~1, ~2, and on that no entry of the folder has, when it needs
@@ -1143,7 +1143,7 @@ def do_get(vol: Volume, name: str, dest: str | None) -> None:
 
 def put_name(src: str, name: str | None) -> str:
     """The name that put writes src as, checked before the link opens: an
-    8.3 name, or a long name that fat32.c's longok takes."""
+    8.3 name, or a long name that monitor_fat.nasm's longok takes."""
     if name is None:
         if src == "-":
             raise FileError(E_NAME)

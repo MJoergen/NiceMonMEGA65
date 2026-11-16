@@ -9,7 +9,7 @@ doc/SDCARD.md says, so that the monitor's FAT32 is tested against them:
   that the directories and the files take several clusters. Its root has
   the volume label NICETEST, the folder C64 of another core, a HELLO.BIN
   that is not NiceMon's, which writes DEADBEEF to 8000, and the folder
-  NICE, NiceMon's (fat32.c, #91). NICE has HELLO.BIN, the .bin file
+  NICE, NiceMon's (monitor_fat.nasm, #91). NICE has HELLO.BIN, the .bin file
   given, a subdirectory SUB with a file in it, a file with a long name, a
   file whose 8.3 name is in lower case, 20 files FILE01.TXT to
   FILE20.TXT, which take NICE past its first cluster, two deleted files,

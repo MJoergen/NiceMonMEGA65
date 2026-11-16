@@ -30,8 +30,11 @@
 ; - monitor_dis.nasm: DIS, the disassembler (README.md, "The
 ;   disassembler").
 ; - monitor_sd.nasm: the SD cards below the file system, the sector
-;   routines sd_init, sd_read, and sd_write that fat32.c reads and writes
+;   routines sd_init, sd_read, and sd_write that FAT32 reads and writes
 ;   through (issue #57, doc/SDCARD.md).
+; - monitor_fat.nasm: FAT32, the file entries 9 to 15 and 20, and DIR,
+;   LOAD, SAVE, and TAB of a card (issues #58, #59, and #149,
+;   INTERNALS.md, "FAT32").
 ; - monitor_eth.nasm: the network, the frame routines, the ARP cache, the
 ;   demultiplexing of the frames and net_poll, the UDP entries 16 to 19,
 ;   the entries 21 to 25 of the IP settings, DHCP, the poll, and DNS, and
@@ -93,8 +96,8 @@
 ; no ROM, the monitor is a program at 0 like any other, and cat
 ; monitor.bin prog.bin runs it with a program at 0x8000 (Makefile, test).
 ;
-; The ROM's C code, the files of the Makefile's ROM_C, fat32.c for now,
-; is one wasm module, which nicewasm --ram translates for a ROM and the
+; The ROM's C code, the files of the Makefile's ROM_C, none since FAT32
+; is assembly (issue #149), is one wasm module, which nicewasm --ram translates for a ROM and the
 ; Makefile joins after mon.nasm, with nice_cpu's lib.nasm and
 ; muldiv_mpu.nasm (INTERNALS.md, "C in the ROM"). The words that it writes,
 ; its mutable globals and its memory, with its stack, are in the RAM
@@ -229,7 +232,42 @@ V_DNTP          .EQU    0xFFFFF3D2      ; for DHCP: the NTP server of the OFFER 
 V_PNTP          .EQU    0xFFFFF3D3      ; and of the last reply that dhcp_parse took
 V_NTPIP         .EQU    0xFFFFF3D4      ; for NTP: the server's IP address, which dns_lookup writes
 WASM_RAM        .EQU    0xFFFFF400      ; the words that the ROM's C code writes, from here
-WASM_END        .EQU    0xFFFFFF00      ; up to below here, the I/O page, which the Makefile checks
+WASM_END        .EQU    0xFFFFF980      ; up to below here, FAT_RAM, which the Makefile checks
+; FAT32's state (monitor_fat.nasm), from FAT_RAM up to below the I/O page
+FAT_RAM         .EQU    0xFFFFF980
+V_MOUNTED       .EQU    0xFFFFF980      ; not 0 while a card is mounted, in the slot V_SLOT
+V_EVER          .EQU    0xFFFFF981      ; not 0 once a mount was tried since the cold start
+V_SLOT          .EQU    0xFFFFF982
+V_FAT           .EQU    0xFFFFF983      ; the first sector of the first FAT,
+V_DATA          .EQU    0xFFFFF984      ; the first sector of cluster 2,
+V_BYTES         .EQU    0xFFFFF985      ; the bytes of a cluster, 512 << V_LOG,
+V_LOG           .EQU    0xFFFFF986      ; log2 of the sectors of a cluster,
+V_ROOT          .EQU    0xFFFFF987      ; the first cluster of the root directory,
+V_DIR           .EQU    0xFFFFF988      ; and of the folder FOLDER,
+V_TOP           .EQU    0xFFFFF989      ; the cluster after the last,
+V_NFATS         .EQU    0xFFFFF98A      ; the copies of the FAT,
+V_FATSZ         .EQU    0xFFFFF98B      ; and the sectors of each,
+V_END           .EQU    0xFFFFF98C      ; the sector after the partition,
+V_FSINFO        .EQU    0xFFFFF98D      ; the sector of FSInfo, 0 for none,
+V_HINT          .EQU    0xFFFFF98E      ; the cluster to search for a free one from, 0 for FSInfo's,
+V_UNKNOWN       .EQU    0xFFFFF98F      ; not 0 once FSInfo's free count is unknown since the mount,
+V_CHANGED       .EQU    0xFFFFF990      ; and once the FAT changed since FSInfo was written
+V_FATLBA        .EQU    0xFFFFF991      ; the sector in FATBUF, ~0 for none
+V_FSP           .EQU    0xFFFFF992      ; SP in a file entry, where an error goes back to
+V_LASCII        .EQU    0xFFFFF993      ; 0 when LNAME has a ? for a character outside ASCII
+V_WLEN          .EQU    0xFFFFF994      ; the characters in WANT
+V_BYLONG        .EQU    0xFFFFF995      ; not 0 when find matches long names too
+V_N             .EQU    0xFFFFF996      ; an 8.3 name, 3 words, as an entry's first, 0 for none,
+V_LOWER         .EQU    0xFFFFF999      ; the lower-case flags of its byte 12,
+V_NL            .EQU    0xFFFFF99A      ; and the long-name entries of a new one
+FATBUF          .EQU    0xFFFFF9B0      ; a sector of the FAT, 128 words
+SEC             .EQU    0xFFFFFA30      ; a sector for FSInfo, an entry, or zeros, and TAB's and LOAD's line, 256 words
+LNAME           .EQU    0xFFFFFB30      ; the name of the entry found last, a character a word, up to a 0, 256 words
+WANT            .EQU    0xFFFFFC30      ; the name sought, a character a word, 256 words
+DIRF            .EQU    0xFFFFFD30      ; the folder that lookups, DIR, and TAB read, F_WORDS words,
+FILE0           .EQU    0xFFFFFDBB      ; and the files of handles 0 and 1, to 0xFFFFFED0
+FILE1           .EQU    0xFFFFFE46
+V_T             .EQU    0xFFFFFEE0      ; 24 words for DIR, LOAD, SAVE, and TAB, to 0xFFFFFEF7
 
 PROGRAM         .EQU    0x8000          ; where a program is, above the ROM
 VARS_WORDS      .EQU    0x1000          ; the words from 0xFFFFF000, the variables, which end a program's RAM
@@ -243,13 +281,10 @@ SCR_MAX         .EQU    0x7FFF          ; the largest display offset
 ; The dispatch table (README.md, "The dispatch table"). Entries are only
 ; ever added at the end. The comment of each entry is its number, its
 ; address, its name in mon.nasm and mon.h where that differs from its
-; label, and the file of the routine. The entries 9 to 15 and 20 jump to
-; the C functions fat_mount to fat_readname of fat32.c, which are
-; _fat_mount to _fat_readname here, and not fs_mount to fs_readname:
-; mon.nasm is joined to the monitor too, for monlib.nasm, and the old
-; names of its stubs, _fs_mount to _fs_readname, would clash with them. The routines in
-; assembly have no such clash, as their labels, such as udp_open, have no
-; _ in front of them.
+; label, and the file of the routine. mon.nasm is joined to the monitor
+; too, for monlib.nasm, so the labels of the routines have no _ in front
+; of them, such as udp_open, as the names of its stubs, such as
+; _udp_open, would clash with them.
                 JMP     mon_reset       ; 0 at 0x00, monitor.nasm
                 JMP     mon_exit        ; 1 at 0x02, monitor.nasm
                 JMP     mon_version     ; 2 at 0x04, monitor.nasm
@@ -259,18 +294,18 @@ SCR_MAX         .EQU    0x7FFF          ; the largest display offset
                 JMP     scr_moveto      ; 6 at 0x0C, monitor.nasm
                 JMP     scr_getxy       ; 7 at 0x0E, monitor.nasm
                 JMP     scr_color       ; 8 at 0x10, monitor.nasm
-                JMP     _fat_mount      ; 9 at 0x12, fs_mount, fat32.c
-                JMP     _fat_open       ; 10 at 0x14, fs_open, fat32.c
-                JMP     _fat_read       ; 11 at 0x16, fs_read, fat32.c
-                JMP     _fat_readdir    ; 12 at 0x18, fs_readdir, fat32.c
-                JMP     _fat_close      ; 13 at 0x1A, fs_close, fat32.c
-                JMP     _fat_write      ; 14 at 0x1C, fs_write, fat32.c
-                JMP     _fat_delete     ; 15 at 0x1E, fs_delete, fat32.c
+                JMP     fs_mount        ; 9 at 0x12, monitor_fat.nasm
+                JMP     fs_open         ; 10 at 0x14, monitor_fat.nasm
+                JMP     fs_read         ; 11 at 0x16, monitor_fat.nasm
+                JMP     fs_readdir      ; 12 at 0x18, monitor_fat.nasm
+                JMP     fs_close        ; 13 at 0x1A, monitor_fat.nasm
+                JMP     fs_write        ; 14 at 0x1C, monitor_fat.nasm
+                JMP     fs_delete       ; 15 at 0x1E, monitor_fat.nasm
                 JMP     udp_open        ; 16 at 0x20, monitor_eth.nasm
                 JMP     udp_send        ; 17 at 0x22, monitor_eth.nasm
                 JMP     udp_recv        ; 18 at 0x24, monitor_eth.nasm
                 JMP     udp_close       ; 19 at 0x26, monitor_eth.nasm
-                JMP     _fat_readname   ; 20 at 0x28, fs_readname, fat32.c
+                JMP     fs_readname     ; 20 at 0x28, monitor_fat.nasm
                 JMP     net_config      ; 21 at 0x2A, monitor_eth.nasm
                 JMP     net_set         ; 22 at 0x2C, monitor_eth.nasm
                 JMP     net_dhcp        ; 23 at 0x2E, monitor_eth.nasm
@@ -320,6 +355,7 @@ mon_reset
                 MOVE    @___wasm_trap_vector, mon_trap
                 MOVE    @___putc_vector, mon_putc
                 CALL    ___wasm_start
+                CALL    fat_reset
                 MOVE    @V_CSP, @WASM_RAM  ; the C code's stack pointer, for main
                 MOVE    R1, V_ARP
 :

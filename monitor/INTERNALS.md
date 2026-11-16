@@ -2,13 +2,14 @@
 
 What the ROM has for itself, behind the dispatch table of
 [README.md](README.md): the routines with no entries, which only the
-ROM's statements and its C code call, the scrollback, the C in the
-ROM, the ROM's words, and the build and the tests. A program does not call these routines, as they have no
+ROM's statements call, FAT32, the scrollback, what is left of the C in
+the ROM, the ROM's words, and the build and the tests. A program does not call these routines, as they have no
 entries and their addresses change with every build; it calls the
 entries, or drives the registers itself.
 
 - [The sector routines](#the-sector-routines)
 - [The frame routines](#the-frame-routines)
+- [FAT32](#fat32)
 - [The scrollback](#the-scrollback)
 - [C in the ROM](#c-in-the-rom)
 - [The ROM's words](#the-roms-words)
@@ -187,35 +188,44 @@ its newest row is the last of the memory. In `niceemu` the display
 offset is plain memory, so all its bits are kept: the history has 384
 rows there, which `DUMP` and `--dump` read.
 
+## FAT32
+
+`monitor_fat.nasm` is FAT32 (README.md, "Files"), in NICE assembly. It
+was `fat32.c`, in the ROM's C code, until issue #149, and does what
+that did: the same results and errors of every entry, the same output,
+and the same sectors written in the same order.
+
+- **Entries.** The entries 9 to 15 and 20 of the dispatch table jump to
+  `fs_mount` to `fs_delete`, and `fs_readname`. The statements call
+  `fat_dir`, `fat_load`, `fat_save`, and `fat_complete` (TAB) by their
+  labels. Each sets R6 to its body and goes to `fat_call`, which saves
+  R7-R12 and SP, so the body uses every register.
+- **Errors.** A routine that meets an error jumps to `fat_fail` with
+  the negative error in R1, which takes SP back to that of `fat_call`
+  and returns R1 from the entry. So no routine checks the result of
+  the one it called, and the state is as the error left it.
+- **The RAM.** The state is in the variables from `FAT_RAM`,
+  `0xFFFFF980`, up to below the I/O page (`monitor.nasm`): the mounted
+  volume, the sector of the FAT in `FATBUF`, a sector `SEC`, the names
+  `LNAME` and `WANT`, a character a word, and the folder `DIRF` and the
+  two files, each with its sector. Only the cold start clears it, with
+  `fat_reset`, so a program's return keeps the mount and the open
+  files.
+- **The stack.** The entries run on the caller's stack. The deepest
+  takes 21 words of it with the return address, as measured in the
+  tests in `niceemu`.
+
 ## C in the ROM
 
-Part of the ROM is C, through nice_cpu's wasm translator: the FAT32
-code. The file of the Makefile's `ROM_C`, `fat32.c`, is compiled to a
-wasm module, which `nicewasm --ram` translates for code
-that runs from a ROM (nice_cpu's translator README, "Code in a ROM"),
-at `-Oz`, which makes it more than a quarter smaller than `-O2`. The Makefile joins
-it after `mon.nasm`, with nice_cpu's `lib.nasm` and `muldiv_mpu.nasm`.
-`fat32.c` is FAT32 (README.md, "Files"), about 9800 words. The clock
-is assembly, `monitor_clock.nasm`, and so is BASIC, `basic.nasm`.
+The ROM has no C code since FAT32 is assembly too. What the C code
+needed is still there, for a later change to take out: the Makefile's
+`ROM_C`, empty, whose module `nicewasm --ram` still translates to
+`build/rom_c.nasm`, with `___wasm_start` and 4096 bytes of memory from
+`WASM_RAM`, `0xFFFFF400`, up to below `WASM_END`, `0xFFFFF980`; the
+cold start's call of `___wasm_start`, and `V_CSP`; nice_cpu's
+`lib.nasm` and `muldiv_mpu.nasm`; the vectors; and `mon_trap`. The test
+`rom` puts `test/rom.c` into the C code, and checks them.
 
-- **Calls.** Every function of the C code that is not `static` is
-  exported, and the monitor's assembly calls it as `_name`, in the C ABI;
-  the entries 9 to 15 and 20 jump to `fat32.c`'s `fat_mount` to
-  `fat_delete`, and `fat_readname`. Their names in the table are
-  `fs_mount` to `fs_delete`, and `fs_readname`, and in `mon.h`
-  `mon_fs_mount` and so on, as the second names of the stubs of
-  `mon.nasm`, `_fs_mount` and so on, which the monitor joins for
-  `monlib.nasm`, would clash with C functions of those names.
-  The C code calls the monitor's routines by their labels too: they are
-  undefined in the module, and the assembler finds them, such as
-  `_fat_sd_read` and `_fat_sd_write`, which turn the C code's byte
-  address of a buffer into a word address for `sd_read` and `sd_write`.
-- **The RAM.** The words that the module writes, its mutable globals and
-  its memory, with its stack of 4096 bytes, are in the RAM from
-  `WASM_RAM`, `0xFFFFF400`, up to below `WASM_END`, `0xFFFFFF00`, with the
-  monitor's variables. The Makefile checks `___wasm_ram_end`, the word
-  after them, against `WASM_END`. The module may use no floats and no
-  `malloc`, which `--ram` rejects.
 - **The cold start** calls `___wasm_start`, which copies the initial
   values to the RAM and sets the rest of the module's memory to 0, at
   every start, also after `SYS 0`, which leaves the rest of the RAM alone.
@@ -227,8 +237,7 @@ is assembly, `monitor_clock.nasm`, and so is BASIC, `basic.nasm`.
 - **A trap** of the C code prints `Trap N at ADDR`, with the trap's code
   of nice_cpu's WASM.md in decimal and its address in hex, and goes back
   to the main loop as a program's return does, with the state that
-  `mon_exit` restores. So a trap does not halt the core, also when a
-  program called the C code.
+  `mon_exit` restores.
 
 ## The ROM's words
 
@@ -240,8 +249,8 @@ from 0, and the rest is free. The demo is not in it: it is a program,
 <!-- romsize layout -->
 | Part | Address | Words |
 |---|---|---:|
-| The monitor | `0x0000`–`0x5325` | 21286 |
-| Free | `0x5326`–`0x7FFF` | 11482 |
+| The monitor | `0x0000`–`0x3842` | 14403 |
+| Free | `0x3843`–`0x7FFF` | 18365 |
 <!-- /romsize layout -->
 
 The monitor's words, by the source they come from, in the order
@@ -254,26 +263,24 @@ ROM is built:
 <!-- romsize monitor -->
 | Source | What it is | Words | Text |
 |---|---|---:|---:|
-| `monitor.nasm` | The dispatch table, the HAL, the cold start, and the traps | 811 | 9 |
+| `monitor.nasm` | The dispatch table, the HAL, the cold start, and the traps | 815 | 9 |
 | `monitor_cmd.nasm` | The routines of the statements that were the commands | 1244 | 222 |
 | `basic.nasm` | BASIC: the main loop, the scanner, the keywords, the messages, and the help | 821 | 440 |
 | `monitor_dis.nasm` | The disassembler of `DIS` | 879 | 79 |
-| `monitor_sd.nasm` | The sector routines | 222 | 59 |
+| `monitor_sd.nasm` | The sector routines | 208 | 59 |
+| `monitor_fat.nasm` | FAT32, `DIR`, `LOAD`, `SAVE`, `DELETE`, and TAB | 3207 | 10 |
 | `monitor_eth.nasm` | The network | 3437 | 160 |
 | `monitor_tcp.nasm` | TCP | 2458 | 0 |
-| `monitor_clock.nasm` | The clock and `TIME` | 688 | 44 |
+| `monitor_clock.nasm` | The clock and `TIME` | 675 | 44 |
 | `monlib.nasm` | The routines that programs join | 280 | 0 |
 | `mon.nasm` | The stubs of the entries | 72 | 0 |
-| `nicewasm` | `___wasm_start`, which copies the C code's data to the RAM | 81 |  |
-| `fat32.c` | FAT32 | 9818 |  |
-| nice_cpu's C library | `nice_print` | 53 |  |
-| `nicewasm` | The helpers of the translated code: loads, stores, and traps | 125 |  |
-| `nicewasm` | The initial values of the C code's data: its strings and tables | 28 |  |
+| `nicewasm` | `___wasm_start`, which copies the C code's data to the RAM | 28 |  |
+| `nicewasm` | The initial values of the C code's data: its strings and tables | 1 |  |
 | nice_cpu's `lib.nasm` | The runtime of the C code | 131 | 0 |
 | nice_cpu's `muldiv_mpu.nasm` | Multiply and divide | 128 | 0 |
-| `build/folder.nasm` | The error of a card without the folder | 8 | 8 |
+| `build/folder.nasm` | The folder's name, and the error of a card without it | 17 | 17 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 21286 | 1023 |
+| In all | | 14403 | 1042 |
 <!-- /romsize monitor -->
 
 - The C code's strings are in its initial values, also four characters
@@ -314,15 +321,16 @@ include, so the Makefile joins the sources with `cat` and assembles the
 result with `niceasm`. In this order:
 
 1. `monitor.nasm`, `monitor_cmd.nasm`, `basic.nasm`, `monitor_dis.nasm`,
-   `monitor_sd.nasm`, `monitor_eth.nasm`, `monitor_tcp.nasm`,
-   `monitor_clock.nasm`, `monlib.nasm`, and `mon.nasm`.
-2. `build/rom_c.nasm`, the ROM's C code (C in the ROM, above).
+   `monitor_sd.nasm`, `monitor_fat.nasm`, `monitor_eth.nasm`,
+   `monitor_tcp.nasm`, `monitor_clock.nasm`, `monlib.nasm`, and
+   `mon.nasm`.
+2. `build/rom_c.nasm`, the ROM's C code, empty (C in the ROM, above).
 3. nice_cpu's `lib.nasm` and `muldiv_mpu.nasm`.
 4. `build/version.nasm`, which defines `VERSION`, the text of the
    banner: `git describe` of the tree, or the `VERSION=` of the command
    line.
-5. `build/folder.nasm`, the text of error 29, with the card's folder
-   (README.md, "Files").
+5. `build/folder.nasm`, the card's folder (README.md, "Files"): its
+   name, as an 8.3 name, and in the text of `DIR` and of error 29.
 
 `version.nasm` and `folder.nasm` are written only when they change, so
 that the monitor, and a bitstream with it, is not built again for
@@ -442,7 +450,7 @@ needs `FOLDER=NICE`, the default. It runs these steps in order:
    result. Then it shows what each card holds that its image did not
    (`fat_tool.py diff`, below), and, for some runs, `fsck.fat -n` and
    the order of the sector writes (`fat_tool.py order`). The behavior
-   of the C code that is odd but pinned, until a change of its own fixes
+   of FAT32 that is odd but pinned, until a change of its own fixes
    it, is marked "known oddity" in the titles and the `.ops` files.
    The suites are in the table below the next one.
 11. **The runs.** The monitor runs once for each test below, with its
@@ -580,9 +588,10 @@ from `build/` to `test/`. The `Halted` line and the registers are left
 out, as they change with the code, except for VBASE, which must be 0
 after every run.
 
-A port of `fat32.c` must leave the outputs of the tests of FAT32 as
-they are, the cards and the order of the writes too. What changes with
-no fault is elsewhere: `cmds` shows the addresses of the dispatch
+A change of `monitor_fat.nasm` that is not meant to change its behavior
+must leave the outputs of the tests of FAT32 as they are, the cards
+and the order of the writes too. What changes with no fault is
+elsewhere: `cmds` shows the addresses of the dispatch
 table, and the table of "The ROM's words" changes with the code, which
 `make romsize` writes again. To run one test of the
 loop, run `make test FAT_SUITES=` and read its `build/NAME.out`; to run
@@ -603,7 +612,7 @@ the ROM hidden, and with it the demo at `0x8000`, which it runs with
 `SYS 0x8000` ([demo/](../demo/README.md), and README.md, "The demo").
 
 What `niceemu` cannot show about the SD cards is checked by hand, with
-the monitor in the ROM, after a change to `fat32.c` or its port. Each
+the monitor in the ROM, after a change to `monitor_fat.nasm`. Each
 step needs a card prepared on a PC with a folder `NICE` that holds
 `HELLO.BIN`:
 

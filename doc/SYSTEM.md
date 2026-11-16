@@ -142,7 +142,8 @@ from `0xFFFFF000`. The monitor keeps the top 4K words for itself
 | `0x08000` and up | `0x8000` and up | `0x00008000` and up | The program and the stack: 92K words on the MEGA65, and 28K on the Nexys4DDR. |
 | below `0x1F000` | below `0xF000` | below `0xFFFFF000` | The stack of the monitor and the program, from SP = `0xFFFFF000` down. |
 | `0x1F000`–`0x1F3FF` | `0xF000`–`0xF3FF` | `0xFFFFF000`–`F3FF` | The monitor's variables. |
-| `0x1F400`–`0x1FEFF` | `0xF400`–`0xFEFF` | `0xFFFFF400`–`FEFF` | The words of the monitor's C code, its FAT32, with its own stack ([monitor/INTERNALS.md](../monitor/INTERNALS.md)). |
+| `0x1F400`–`0x1F97F` | `0xF400`–`0xF97F` | `0xFFFFF400`–`F97F` | The words of the monitor's C code, which has none since FAT32 is assembly ([monitor/INTERNALS.md](../monitor/INTERNALS.md)). |
+| `0x1F980`–`0x1FEFF` | `0xF980`–`0xFEFF` | `0xFFFFF980`–`FEFF` | FAT32's state: the volume, the caches of the FAT and of the files, and the names ([monitor/INTERNALS.md](../monitor/INTERNALS.md#fat32)). |
 
 The heap of a C program is in its wasm linear memory, after its static
 data and its C stack, which are there too: `malloc` takes more of the
