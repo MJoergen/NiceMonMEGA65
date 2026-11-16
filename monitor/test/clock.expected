@@ -1,0 +1,73 @@
+NiceMon V9.9
+HELP lists the statements
+READY.
+time
+2026-11-14 12:34:57
+READY.
+load
+ADDR WORD in hex on each line, as in a .bin file; an empty line ends
+Words loaded: 1, 00008000 to 00008000
+READY.
+save "a.bin", 0x8000, 1
+Words saved: 1, 00008000 to 00008000
+READY.
+time "2099-12-31 23:59:58"
+2099-12-31 23:59:58
+READY.
+save "b.bin", 0x8000, 1
+Words saved: 1, 00008000 to 00008000
+READY.
+time "1980-01-01 00:00:01"
+1980-01-01 00:00:01
+READY.
+save "c.bin", 0x8000, 1
+Words saved: 1, 00008000 to 00008000
+READY.
+time "1979-12-31 23:59:59"
+1979-12-31 23:59:59
+READY.
+save "d.bin", 0x8000, 1
+Words saved: 1, 00008000 to 00008000
+READY.
+time "2106-01-01 00:00:00"
+Not a date and time: "YYYY-MM-DD HH:MM:SS", such as "2026-11-11 14:30:00"
+READY.
+halt
+Halted
+ffffff46: 00000000 12cea5ff 00000000 00000001
+Screen:
+|READY.
+|time "2099-12-31 23:59:58"
+|2099-12-31 23:59:58
+|READY.
+|save "b.bin", 0x8000, 1
+|Words saved: 1, 00008000 to 00008000
+|READY.
+|time "1980-01-01 00:00:01"
+|1980-01-01 00:00:01
+|READY.
+|save "c.bin", 0x8000, 1
+|Words saved: 1, 00008000 to 00008000
+|READY.
+|time "1979-12-31 23:59:59"
+|1979-12-31 23:59:59
+|READY.
+|save "d.bin", 0x8000, 1
+|Words saved: 1, 00008000 to 00008000
+|READY.
+|time "2106-01-01 00:00:00"
+|Not a date and time: "YYYY-MM-DD HH:MM:SS", such as "2026-11-11 14:30:00"
+|READY.
+|halt
+|Halted
+VBASE at the halt 000000
+exit 0
+fsck.fat -n:
+Free cluster summary uninitialized (should be 128988)
+IMAGE: 6 files, 34/129022 clusters
+Files in NICE: HELLO.BIN a.bin b.bin c.bin d.bin
+Dates and times in NICE:
+A.BIN        created 2026-11-14 12:34:56 +199/100, written 2026-11-14 12:34:56
+B.BIN        created 2099-12-31 23:59:58 +  0/100, written 2099-12-31 23:59:58
+C.BIN        created 1980-01-01 00:00:00 +100/100, written 1980-01-01 00:00:00
+D.BIN        created 2026-01-01 00:00:00 +  0/100, written 2026-01-01 00:00:00

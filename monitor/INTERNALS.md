@@ -395,7 +395,10 @@ needs `FOLDER=NICE`, the default. It runs these steps in order:
    and by address, an offset east and west, a time of era 1, datagrams
    that are passed over, a kiss-o'-death, a leap indicator of 3, a
    stratum of 16, a time before 1970, no answer, an answer to the
-   second send, no such name, and an offset too large. It compares the
+   second send, no such name, and offsets that are not. It covers the
+   edges of the eras too: the last second of era 0 before 1970, and the
+   last second of era 1 that the clock takes, and the next; the largest
+   offsets east and west, and a clock 0 s off. It compares the
    output and the frames sent with `test/ntp.expected`, with a query's
    port as `pp` and its transmit timestamp as `tt`.
 7. **The lease.** `test/lease.py` runs `test/lease.nasm`, which takes
@@ -422,9 +425,17 @@ needs `FOLDER=NICE`, the default. It runs these steps in order:
    its time, no master, a digit over 9 in each register, and numbers
    that are no date or time. Then it types `TIME` with a date and a
    time, and checks the master's command: left alone without a master,
-   and in a year that the chip does not hold. The R3's chip is read only
-   when the R6's does not answer, which memory cannot do, so that part
-   runs only on an R3.
+   and in a year that the chip does not hold. A cold start with the
+   clock set leaves it alone. The R3's chip is read only when the R6's
+   does not answer, which memory cannot do, so the script then runs
+   `niceemu --link` with `--no-cycle-counter`, so that the clock's words
+   are memory too. A watchpoint stops the core at each command of the
+   master, and the script answers it as the R6's chip, the R3's, or no
+   chip would. It checks the transactions, and the seconds and the
+   microseconds that the cold start writes: the R3's chip in 24-hour and
+   12-hour mode, its flag that says that it lost its time, digits over
+   9, and no chip at all. Then it types `TIME`, and checks each
+   transaction with its data, for each chip.
 10. **The runs.** The monitor runs once for each test below, with its
    keystrokes from an input file that ends with `HALT`, so that the run
    halts. Some runs add a program at `0x8000`, SD card images, or
@@ -455,7 +466,9 @@ compared with `test/NAME.expected`:
 | `fatbad` | The monitor, with a FAT16 card and an exFAT card | `DIR` rejects each. |
 | `fat1` | The monitor, with no card in slot 0 | `DIR` mounts slot 1. |
 | `fatnone` | The monitor, with a card without the folder `NICE`, and one whose `NICE` is a file | `DIR` and `LOAD` fail with error 29. |
-| `time` | The monitor, with `--step-time` and a copy of the card without partitions | `TIME` not set, set, and shown; dates that are not, such as leap days of years without one, fields of one digit, and 2106, and the edges that are, 2000-02-29, 2100-03-01, 2104-02-29, 2^31 seconds, and 2105-12-31; and the dates of `SAVE`, from the clock and while it is not set or before 1980, which `mdir` shows. |
+| `time` | The monitor, with `--step-time` and a copy of the card without partitions | `TIME` not set, set, and shown; dates that are not, such as leap days of years without one, fields of one digit, month 0, day 0, letters, wrong separators, and 2106, and the clock left alone after them; the edges that are, 2000-02-29, 2100-03-01, 2104-02-29, 2^31 seconds, 2105-12-31, the last day of a leap year, and blanks in the quotes; and the dates of `SAVE`, from the clock and while it is not set or before 1980, which `mdir` shows. |
+| `clock` | The monitor, with `--no-cycle-counter`, so that the clock's words are memory, set to a time with 999999 microseconds, and a copy of the card without partitions | The dates and the times of `SAVE` to the hundredths, which `test/fat_check.py --stamps` shows: the most hundredths, 0, the first second of 1980, and the fixed date before it; and the clock's words that `TIME` writes. |
+| `clockpast` | The same, with 2^32 seconds | `TIME` shows that the clock is past 2106, and `SAVE` writes the fixed date. |
 | `hello` | `test/hello.nasm`, under nice_cpu's `start_mon.nasm` | A program in assembly, run with `SYS 0x8000`, that returns to the monitor. |
 | `reset` | The same | `SYS 0`, the cold start, and `SYS 0x8000` again. |
 | `hello_c` | `test/hello.c`, built with `nicebuild.py --monitor --asm mon.nasm` | A program in C. |
@@ -467,8 +480,10 @@ monitor's sources, and only their words from `0x8000` are kept. `fs`,
 stubs, as any program does, and so do `udp` and `net`. `arp`, `udp`, and
 `net` run with `--step-time`, as their timeouts count steps, and
 `time` too, so that its clock starts at 0, not set, and counts the same
-each time. The other tests run with the host's clock, so the files they
-write have the host's date, which no test shows.
+each time. `clock` and `clockpast` run with `--no-cycle-counter`, so
+that their clock stands still. The other tests run with the host's
+clock, so the files they write have the host's date, which no test
+shows.
 
 `niceemu` has no I2C master: its status word is memory, which reads 0,
 so the cold start of every run finds none, and `TIME` shows that the
@@ -501,7 +516,9 @@ mtools, so that the monitor's FAT32 is tested against those tools:
 
 After `fsw` and `fatw`, `test/fat_check.py` checks the cards that were
 written: `fsck.fat -n`, the folder with `mdir`, and the files written
-with `mtype`.
+with `mtype`. After `clock` and `clockpast`, it reads the dates and the
+times of the files written from their entries, as `mdir` shows no
+seconds and no hundredths.
 
 ### The expected files
 

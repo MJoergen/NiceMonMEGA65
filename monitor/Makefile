@@ -378,10 +378,30 @@ FATLW = load\r8000 1234ABCD\r8001 5\r\rsave "mandelbrot.bin", 0x8000, 2\rsave "m
 # 60, second 60, a year of two digits, a month and a day of one digit, no
 # time, a word after it, an hour of three digits, and a time of one
 # digit each; timex and ti are no statements. Then the edges that are
-# taken: 2000-02-29, 2100-03-01, 2104-02-29, the second past 2^31, the
-# last of 2105, and the first of 1970, in upper case with blanks, whose
-# year FAT cannot hold, so save writes y1970.bin with the fixed date.
-TIME = time\rload\r8000 1\r\rsave "old.bin", 0x8000, 1\rtime "2026-11-11 14:30:01"\rtime\rsave "new.bin", 0x8000, 1\rtime "2023-02-29 00:00:00"\rtime "2100-02-29 00:00:00"\rtime "1969-12-31 23:59:59"\rtime "2106-01-01 00:00:00"\rtime "2026-13-01 00:00:00"\rtime "2026-11-31 00:00:00"\rtime "2026-11-11 24:00:00"\rtime "2026-11-11 23:60:00"\rtime "2026-11-11 23:59:60"\rtime "26-11-11 00:00:00"\rtime "2026-1-1 00:00:00"\rtime "2026-11-11"\rtime "2026-11-11 01:02:03 x"\rtime "2026-11-11 001:02:03"\rtime "2026-11-11 1:2:3"\rtimex\rti\rtime "2000-02-29 00:00:00"\rtime "2100-03-01 00:00:00"\rtime "2104-02-29 12:00:00"\rtime "2038-01-19 03:14:08"\rtime "2105-12-31 23:59:59"\rTIME  "1970-01-01 00:00:00" \rsave "y1970.bin", 0x8000, 1\rhalt\r
+# taken: 2000-02-29, 2100-03-01, 2104-02-29, the second past 2^31, and
+# the last of 2105. A date and a time with blanks around them in the
+# quotes is taken; month 0, day 0, a letter for a digit, and the wrong
+# separators are not, and time shows the clock that they left alone. Then
+# 2024-02-29, the last day of 2024, a leap year, 2100-02-28, the last of
+# 2099, and an empty string, which shows the clock. Last the first of
+# 1970, in upper case with blanks, whose year FAT cannot hold, so save
+# writes y1970.bin with the fixed date.
+TIME = time\rload\r8000 1\r\rsave "old.bin", 0x8000, 1\rtime "2026-11-11 14:30:01"\rtime\rsave "new.bin", 0x8000, 1\rtime "2023-02-29 00:00:00"\rtime "2100-02-29 00:00:00"\rtime "1969-12-31 23:59:59"\rtime "2106-01-01 00:00:00"\rtime "2026-13-01 00:00:00"\rtime "2026-11-31 00:00:00"\rtime "2026-11-11 24:00:00"\rtime "2026-11-11 23:60:00"\rtime "2026-11-11 23:59:60"\rtime "26-11-11 00:00:00"\rtime "2026-1-1 00:00:00"\rtime "2026-11-11"\rtime "2026-11-11 01:02:03 x"\rtime "2026-11-11 001:02:03"\rtime "2026-11-11 1:2:3"\rtimex\rti\rtime "2000-02-29 00:00:00"\rtime "2100-03-01 00:00:00"\rtime "2104-02-29 12:00:00"\rtime "2038-01-19 03:14:08"\rtime "2105-12-31 23:59:59"\rtime "  2026-11-11 14:30:01  "\rtime "2026-00-10 00:00:00"\rtime "2026-11-00 00:00:00"\rtime "2O26-11-11 00:00:00"\rtime "2026/11/11 00:00:00"\rtime "2026-11-11T00:00:00"\rtime "2026-11-11 00.00.00"\rtime\rtime "2024-02-29 00:00:00"\rtime "2024-12-31 23:59:59"\rtime "2100-02-28 23:59:59"\rtime "2099-12-31 23:59:59"\rtime ""\rTIME  "1970-01-01 00:00:00" \rsave "y1970.bin", 0x8000, 1\rhalt\r
+# clock: with --no-cycle-counter, so that the clock's words are memory,
+# which build/clock.bin sets: "set", 999999 microseconds, and the seconds
+# of 2026-11-14 12:34:57, which time shows. save writes a.bin at
+# 12:34:56 and 199 hundredths, the most. time sets 2099-12-31 23:59:58,
+# and b.bin gets 0 hundredths; 1980-01-01 00:00:01, the first second
+# that FAT holds, and c.bin gets 100; 1979-12-31 23:59:59, and d.bin
+# gets the fixed date. 2106 is not taken. The clock's words are dumped:
+# the last seconds written, with 0 above them, 0 microseconds, and "set".
+# clockpast: the same with 2^32 seconds, so time shows that the clock is
+# past 2106, and save writes p.bin with the fixed date.
+CLOCK = time\rload\r8000 1\r\rsave "a.bin", 0x8000, 1\rtime "2099-12-31 23:59:58"\rsave "b.bin", 0x8000, 1\rtime "1980-01-01 00:00:01"\rsave "c.bin", 0x8000, 1\rtime "1979-12-31 23:59:59"\rsave "d.bin", 0x8000, 1\rtime "2106-01-01 00:00:00"\rhalt\r
+CLOCKPAST = time\rload\r8000 1\r\rsave "p.bin", 0x8000, 1\rhalt\r
+CLOCK_WORDS = FFFFFF46 000F423F\nFFFFFF47 6AF85571\nFFFFFF48 00000000\nFFFFFF49 00000001\n
+CLOCKPAST_WORDS = FFFFFF46 00000000\nFFFFFF47 00000000\nFFFFFF48 00000001\nFFFFFF49 00000001\n
+DUMP_clock    = -d 0xFFFFFF46:4
 # The words of each test that are dumped with the screen: for cmds the
 # variables, the cursor's registers, and the IP and MAC addresses, and
 # for the programs the text at column 40 of row 5, below the banner,
@@ -446,7 +466,8 @@ FAT32_START_BYTES = $(shell echo $$(($(FAT32_START) * 512)))
 # renewal, and test/bgdhcp.py the DHCP exchange in the background,
 # and
 # test/tftp.py tftp, and test/rtc.py the cold start and time on the words
-# of an I2C master that it sets, as a real-time clock. arp and udp run
+# of an I2C master that it sets, as a real-time clock, and on the chips
+# that it answers for over niceemu --link. arp and udp run
 # with --step-time, as their timeouts
 # count, and so does net, and the frames they send are added to their
 # output.
@@ -487,11 +508,16 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	@printf '$(TAB)' > $(BUILD)/tab.txt
 	@printf '$(FATLW)' > $(BUILD)/fatlw.txt
 	@printf '$(TIME)' > $(BUILD)/time.txt
+	@printf '$(CLOCK)' > $(BUILD)/clock.txt
+	@printf '$(CLOCKPAST)' > $(BUILD)/clockpast.txt
+	@printf '$(CLOCK_WORDS)' > $(BUILD)/clock.bin
+	@printf '$(CLOCKPAST_WORDS)' > $(BUILD)/clockpast.bin
 	@$(PYTHON) test/sd_image.py $(BUILD)/sd.img
 	@$(PYTHON) test/sd_image.py --written $(BUILD)/sd_written.img
 	@{ printf '$(LOAD_HEAD)'; head -n 3 $(BUILD)/hello.bin | awk '{ printf "%s\r\n", $$0 }'; \
 	  tail -n +4 $(BUILD)/hello.bin; printf '$(LOAD_TAIL)'; } > $(BUILD)/load.txt
 	@fail=0; for t in cmds scroll load load_emu load_64k sd_write arp udp net rom fs fsw fat fatw fatl tab fatlw fatbad fat1 fatnone time \
+	           clock clockpast \
 	           hello reset hello_c; do \
 	  opts=; rom=$(BUILD)/monitor_test.bin; \
 	  case $$t in \
@@ -530,6 +556,9 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	    fat1) prog=; input=fat1; dump=; opts="--sd1 $(BUILD)/fat/super.img";; \
 	    time) prog=; input=time; dump=; cp $(BUILD)/fat/super.img $(BUILD)/time0.img; \
 	      opts="--step-time --sd0 $(BUILD)/time0.img";; \
+	    clock|clockpast) prog=$(BUILD)/$$t.bin; input=$$t; dump='$(DUMP_clock)'; \
+	      cp $(BUILD)/fat/super.img $(BUILD)/$${t}0.img; \
+	      opts="--no-cycle-counter --sd0 $(BUILD)/$${t}0.img";; \
 	    fatnone) prog=; input=fatnone; dump=; \
 	      opts="--sd0 $(BUILD)/fat/nonice.img --sd1 $(BUILD)/fat/nicefile.img";; \
 	    hello) prog=$(BUILD)/hello.bin; input=run; dump='$(DUMP_hello)';; \
@@ -556,6 +585,8 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	    if [ $$t = time ]; then \
 	      $(PYTHON) test/fat_check.py $(BUILD)/time0.img; \
 	      echo "Dates in NICE:"; mdir -i $(BUILD)/time0.img ::NICE | grep -E '^(old|new|y1970) '; fi; \
+	    if [ $$t = clock ] || [ $$t = clockpast ]; then \
+	      $(PYTHON) test/fat_check.py $(BUILD)/$${t}0.img --stamps A.BIN B.BIN C.BIN D.BIN P.BIN; fi; \
 	    if [ $$t = fatlw ]; then \
 	      $(PYTHON) test/fat_check.py $(BUILD)/fatlw0.img mandelbrot.bin "a b.bin" \
 	        "a much longer name of a file.bin" mixed.Bin; fi; } \

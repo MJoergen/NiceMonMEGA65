@@ -24,6 +24,12 @@ the monitor halts.
   from another address and port, of mode 3, with another originate
   timestamp, and too short, four at a time, as many as the queue holds.
   10.0.0.128 never answers, and 10.0.0.131 only the second send.
+  10.0.0.132 answers a time of 1969, which era 0 has before 1970;
+  10.0.0.133 the last second of era 1 that is taken, 2^31 - 1, in
+  2104, and 10.0.0.135 the second after it, 2^31, which is taken as one
+  of era 0 before 1970; 10.0.0.134 a time that +14:00 turns into
+  02:00:00 of a day, and 10.0.0.136 one of the same second with -12:00;
+  and 10.0.0.137 1970-01-01 00:00:00, the first second of era 0.
 
 The last run's console output, up to the halt, and the frames sent, 16
 bytes a row with the IPv4 identification and checksum as ii ii and cc
@@ -65,6 +71,17 @@ INPUT = (b'ntp\r'                                # no IP address
          b'ntp "10.0.0.9", "+14:01"\r'           # an offset too large
          b'ntp "", "+01"\r'                      # no offset, and DHCP's server
          b'ntp "10.0.0.9" "+01:00"\r'            # no comma
+         b'ntp "10.0.0.132"\r'                   # 1969, of era 0 before 1970
+         b'ntp "10.0.0.133"\r'                   # the last second of era 1 taken
+         b'ntp "10.0.0.135"\r'                   # and the next, as before 1970
+         b'ntp "10.0.0.134", "+14:00"\r'         # the largest offset east
+         b'ntp "10.0.0.136", " -12:00 "\r'       # and west, and the clock 0 s off
+         b'ntp "10.0.0.137"\r'                   # the first second of era 0 taken
+         b'ntp "10.0.0.9", "-12:01"\r'           # offsets that are not
+         b'ntp "10.0.0.9", "+05:60"\r'
+         b'ntp "10.0.0.9", "+1:00"\r'
+         b'ntp "10.0.0.9", "01:00"\r'
+         b'ntp "10.0.0.9", "+01:00x"\r'
          b'halt\r')
 STEPS = 256_000_000                      # the steps of a run at most
 FIRST = 2_000_000                        # and of the first, doubled while no new frame comes
@@ -140,6 +157,12 @@ SERVERS: Dict[str, Dict[int, Answer]] = {
     "10.0.0.127": {1: stratum16},
     "10.0.0.130": {1: good("1970-01-01 06:00:00")},
     "10.0.0.131": {2: good("2026-11-14 12:00:00")},
+    "10.0.0.132": {1: good("1969-12-31 23:59:59")},
+    "10.0.0.133": {1: good("2104-02-26 09:42:23")},
+    "10.0.0.135": {1: good("2104-02-26 09:42:24")},
+    "10.0.0.134": {1: good("2030-06-01 12:00:00")},
+    "10.0.0.136": {1: good("2030-06-02 14:00:00.500000")},
+    "10.0.0.137": {1: good("1970-01-01 00:00:00")},
 }
 NAMES = {"kod.example.com": "10.0.0.125"}
 

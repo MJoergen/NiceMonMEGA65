@@ -52,6 +52,39 @@ ntp "10.0.0.9" "+01:00"
 Syntax error
 NTP ["S"] [, "Z"]   set it from time server S, Z local time less UTC, "+01:00"
 READY.
+ntp "10.0.0.132"
+The time server is not to be trusted
+READY.
+ntp "10.0.0.133"
+Clock set 2104-02-26 09:42:23 from 10.0.0.133, was 2438806343 s behind
+READY.
+ntp "10.0.0.135"
+The time server is not to be trusted
+READY.
+ntp "10.0.0.134", "+14:00"
+Clock set 2030-06-02 02:00:00 from 10.0.0.134, was 2326866143 s ahead
+READY.
+ntp "10.0.0.136", " -12:00 "
+Clock set 2030-06-02 02:00:00 from 10.0.0.136, was 0 s off
+READY.
+ntp "10.0.0.137"
+Clock set 1970-01-01 00:00:00 from 10.0.0.137, was 1906596000 s ahead
+READY.
+ntp "10.0.0.9", "-12:01"
+Not an offset: "+HH:MM" or "-HH:MM", local time less UTC, such as "+01:00"
+READY.
+ntp "10.0.0.9", "+05:60"
+Not an offset: "+HH:MM" or "-HH:MM", local time less UTC, such as "+01:00"
+READY.
+ntp "10.0.0.9", "+1:00"
+Not an offset: "+HH:MM" or "-HH:MM", local time less UTC, such as "+01:00"
+READY.
+ntp "10.0.0.9", "01:00"
+Not an offset: "+HH:MM" or "-HH:MM", local time less UTC, such as "+01:00"
+READY.
+ntp "10.0.0.9", "+01:00x"
+Not an offset: "+HH:MM" or "-HH:MM", local time less UTC, such as "+01:00"
+READY.
 halt
 Halted
 frame 1, 382 bytes
@@ -237,6 +270,72 @@ frame 26, 90 bytes
 000  0a 00 00 00 00 83 02 4e 49 43 45 00 08 00 45 00
 010  00 4c ii ii 00 00 40 11 cc cc 0a 00 00 09 0a 00
 020  00 83 pp pp 00 7b 00 38 00 00 23 00 00 00 00 00
+030  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+040  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+050  00 00 tt tt tt tt tt tt tt tt
+frame 27, 42 bytes
+000  ff ff ff ff ff ff 02 4e 49 43 45 00 08 06 00 01
+010  08 00 06 04 00 01 02 4e 49 43 45 00 0a 00 00 09
+020  00 00 00 00 00 00 0a 00 00 84
+frame 28, 90 bytes
+000  0a 00 00 00 00 84 02 4e 49 43 45 00 08 00 45 00
+010  00 4c ii ii 00 00 40 11 cc cc 0a 00 00 09 0a 00
+020  00 84 pp pp 00 7b 00 38 00 00 23 00 00 00 00 00
+030  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+040  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+050  00 00 tt tt tt tt tt tt tt tt
+frame 29, 42 bytes
+000  ff ff ff ff ff ff 02 4e 49 43 45 00 08 06 00 01
+010  08 00 06 04 00 01 02 4e 49 43 45 00 0a 00 00 09
+020  00 00 00 00 00 00 0a 00 00 85
+frame 30, 90 bytes
+000  0a 00 00 00 00 85 02 4e 49 43 45 00 08 00 45 00
+010  00 4c ii ii 00 00 40 11 cc cc 0a 00 00 09 0a 00
+020  00 85 pp pp 00 7b 00 38 00 00 23 00 00 00 00 00
+030  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+040  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+050  00 00 tt tt tt tt tt tt tt tt
+frame 31, 42 bytes
+000  ff ff ff ff ff ff 02 4e 49 43 45 00 08 06 00 01
+010  08 00 06 04 00 01 02 4e 49 43 45 00 0a 00 00 09
+020  00 00 00 00 00 00 0a 00 00 87
+frame 32, 90 bytes
+000  0a 00 00 00 00 87 02 4e 49 43 45 00 08 00 45 00
+010  00 4c ii ii 00 00 40 11 cc cc 0a 00 00 09 0a 00
+020  00 87 pp pp 00 7b 00 38 00 00 23 00 00 00 00 00
+030  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+040  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+050  00 00 tt tt tt tt tt tt tt tt
+frame 33, 42 bytes
+000  ff ff ff ff ff ff 02 4e 49 43 45 00 08 06 00 01
+010  08 00 06 04 00 01 02 4e 49 43 45 00 0a 00 00 09
+020  00 00 00 00 00 00 0a 00 00 86
+frame 34, 90 bytes
+000  0a 00 00 00 00 86 02 4e 49 43 45 00 08 00 45 00
+010  00 4c ii ii 00 00 40 11 cc cc 0a 00 00 09 0a 00
+020  00 86 pp pp 00 7b 00 38 00 00 23 00 00 00 00 00
+030  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+040  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+050  00 00 tt tt tt tt tt tt tt tt
+frame 35, 42 bytes
+000  ff ff ff ff ff ff 02 4e 49 43 45 00 08 06 00 01
+010  08 00 06 04 00 01 02 4e 49 43 45 00 0a 00 00 09
+020  00 00 00 00 00 00 0a 00 00 88
+frame 36, 90 bytes
+000  0a 00 00 00 00 88 02 4e 49 43 45 00 08 00 45 00
+010  00 4c ii ii 00 00 40 11 cc cc 0a 00 00 09 0a 00
+020  00 88 pp pp 00 7b 00 38 00 00 23 00 00 00 00 00
+030  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+040  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+050  00 00 tt tt tt tt tt tt tt tt
+frame 37, 42 bytes
+000  ff ff ff ff ff ff 02 4e 49 43 45 00 08 06 00 01
+010  08 00 06 04 00 01 02 4e 49 43 45 00 0a 00 00 09
+020  00 00 00 00 00 00 0a 00 00 89
+frame 38, 90 bytes
+000  0a 00 00 00 00 89 02 4e 49 43 45 00 08 00 45 00
+010  00 4c ii ii 00 00 40 11 cc cc 0a 00 00 09 0a 00
+020  00 89 pp pp 00 7b 00 38 00 00 23 00 00 00 00 00
 030  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
 040  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
 050  00 00 tt tt tt tt tt tt tt tt
