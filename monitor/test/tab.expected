@@ -2,10 +2,10 @@ NiceMon V9.9
 HELP lists the statements
 READY.
 load my"my prog.bin" 
-Words loaded: 788, 00008000 to 00008313
+Words loaded: 782, 00008000 to 0000830D
 READY.
 load "my prog.bin" 
-Words loaded: 788, 00008000 to 00008313
+Words loaded: 782, 00008000 to 0000830D
 READY.
 load mand"mandelbrot
 mandelbrot1.txt

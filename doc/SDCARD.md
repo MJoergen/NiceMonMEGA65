@@ -8,9 +8,9 @@ slots by "The SD card slots" in [SYSTEM.md](SYSTEM.md); where this note
 differs from them, they are right. The ROM's sector routines are
 written too, in V1.7.1, and
 [monitor/INTERNALS.md](../monitor/INTERNALS.md) describes them, and so is
-FAT32's reading, with `dir` and `load`, in V1.9, in C, and its writing,
-with `save` and `del`, in V1.9.1; issue #149 put it into NICE assembly,
-`monitor/monitor_fat.nasm`, with the same behavior. The host tool `tools/sdcard.py` lists
+FAT32's reading, with `dir` and `load`, in V1.9, and its writing, with
+`save` and `del`, in V1.9.1. It is `monitor/monitor_fat.nasm`, in NICE
+assembly since issue #149. The host tool `tools/sdcard.py` lists
 the card, and reads, writes, and deletes its files from the host, in
 V1.9.1. BASIC is not written yet. Its end is `SAVE`, `LOAD`, and `DIR`
 in the BASIC interpreter planned for the ROM, and on the way it gives

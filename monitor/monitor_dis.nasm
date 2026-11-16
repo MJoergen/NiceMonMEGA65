@@ -42,7 +42,7 @@ dis_row
                 SHR     R1, R9, 7
                 AND     @V_UF+1, R1, 0x7F
                 AND     @V_UF+2, R9, 0x7F
-                MOVE    R11, 0
+                CLR     R11
 :
                 AND     R1, @V_UF[R11], 0x30
                 CMP     R1, 0x30
@@ -88,7 +88,7 @@ dis_find
                 ADD     R10, R10, 1
                 CMP     R10, 5+U_PSEUDOS
         ?!Z     JMP     :-
-                MOVE    R10, 0
+                CLR     R10
                 JMP     dis_print
 ; A control instruction, which is reserved with a command past WAIT, a bit
 ; of 20..8 set, or a vector but for INT
@@ -140,7 +140,7 @@ dis_insn
                 AND[M]  R0, R9, 0x08000000
         ?Z      MOVE    R2, @U_NOPS[R1]  ; an ALU instruction's
                 MOVE    @V_UNOPS, R2
-                MOVE    R3, 0
+                CLR     R3
 :
                 CMP     R2, 3
         ?Z      JMP     :+
@@ -189,7 +189,7 @@ dis_call
                 AND     R1, R1, 0x7F
                 ADD     R2, R7, 3
                 MOVE    R2, @R2
-                MOVE    R3, 0
+                CLR     R3
                 CALL    u_op
                 JMP     dis_end
 ; Kind 4, a reserved control word
@@ -249,11 +249,11 @@ u_stmt
 :
                 MOVE    R1, 0x20
                 CALL    mon_putc
-                MOVE    R10, 0
+                CLR     R10
 u_stmt_op
                 MOVE    R1, @V_UF[R10]
                 MOVE    R2, @V_UC[R10]
-                MOVE    R3, 0
+                CLR     R3
                 TST     R10
         ?Z      MOVE    R3, 1           ; the dest
                 CALL    u_op
@@ -271,7 +271,7 @@ u_unused
                 MOVE    R1, S_UOPEN
                 CALL    puts_b
                 MOVE    R10, @V_UNOPS
-                MOVE    R11, 0          ; not 0 after the first
+                CLR     R11             ; not 0 after the first
 u_unused_f
                 CMP     R10, 3
         ?Z      MOVE    R1, 0x29        ; )
@@ -286,7 +286,7 @@ u_unused_f
                 CALL    puts_b
                 MOVE    R1, @V_UF[R10]
                 MOVE    R2, @V_UC[R10]
-                MOVE    R3, 0
+                CLR     R3
                 CALL    u_op
 :
                 ADD     R10, R10, 1

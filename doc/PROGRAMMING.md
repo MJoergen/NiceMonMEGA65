@@ -624,9 +624,8 @@ things:
   and the program starts over, forever.
 - **In C, be built with `nicebuild.py --ram ADDR`.** A C program keeps
   its data in its image, which would be in the ROM too, and `--ram`
-  puts the words it writes in the RAM from `ADDR`, as the monitor's C
-  code is built
-  ([monitor/INTERNALS.md](../monitor/INTERNALS.md#c-in-the-rom)).
+  puts the words it writes in the RAM from `ADDR` (nice_cpu's
+  `translator/README.md`). The monitor itself has no C.
 
 The layout is that of QNICE-FPGA, whose monitor is in the ROM at
 `0x0000`–`0x7FFF` and whose programs load at `0x8000`.

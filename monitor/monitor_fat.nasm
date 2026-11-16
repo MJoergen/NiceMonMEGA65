@@ -2,9 +2,8 @@
 ; header): the file entries fs_mount, fs_open, fs_read, fs_readdir,
 ; fs_close, fs_write, fs_delete, and fs_readname of the dispatch table,
 ; and fat_dir, fat_load, fat_save, and fat_complete for BASIC's DIR, LOAD,
-; SAVE, and the TAB key (issues #58, #59, #91, #102, and #137,
-; doc/SDCARD.md, "The file system"). It was fat32.c of the ROM's C code
-; until issue #149.
+; SAVE, and the TAB key (issues #58, #59, #91, #102, #137, and #149,
+; doc/SDCARD.md, "The file system").
 ;
 ; Names are long names (VFAT) of up to 255 characters, matched in either
 ; case, or 8.3 names. A long name is read from the long-name entries

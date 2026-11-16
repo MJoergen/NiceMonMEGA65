@@ -11,11 +11,9 @@ addresses. The words it assembles must
 be those of the build's .bin, or it fails, so a label never moves a
 word.
 
-  romsize.py monitor --bin B --c C [--c C...] --doc D [--write] SOURCES...
+  romsize.py monitor --bin B --doc D [--write] SOURCES...
       the monitor's table, and the table of the ROM; SOURCES are the
-      files that the monitor's Makefile joins, in its order, rom_c.nasm
-      among them, and C the files of ROM_C, which split rom_c.nasm's
-      functions
+      files that the monitor's Makefile joins, in its order
   romsize.py demo --bin B --doc D [--write] SOURCES...
       the demo's table, of demo.bin, which is not in the ROM (#129), in
       demo/README.md
@@ -40,7 +38,7 @@ NICEASM = os.path.join(REPO, "nice_cpu", "assembler", "niceasm.py")
 
 # The monitor's sources, by their names, and what each one is
 MONITOR_PARTS = {
-    "monitor.nasm": "The dispatch table, the HAL, the cold start, and the traps",
+    "monitor.nasm": "The dispatch table, the HAL, and the cold start",
     "monitor_cmd.nasm": "The routines of the statements that were the commands",
     "basic.nasm": "BASIC: the main loop, the scanner, the keywords, the messages, and the help",
     "monitor_dis.nasm": "The disassembler of `DIS`",
@@ -51,16 +49,11 @@ MONITOR_PARTS = {
     "monitor_clock.nasm": "The clock and `TIME`",
     "monlib.nasm": "The routines that programs join",
     "mon.nasm": "The stubs of the entries",
-    "lib.nasm": "The runtime of the C code",
-    "muldiv_mpu.nasm": "Multiply and divide",
     "folder.nasm": "The folder's name, and the error of a card without it",
     "version_test.nasm": "The version in the banner, the tests' `V9.9`",
 }
-# The C files of ROM_C, by their names, and what each one is
-C_PARTS: dict[str, str] = {
-}
 # The sources that are nice_cpu's
-NICE_CPU_SOURCES = {"lib.nasm", "muldiv_mpu.nasm", "demo.nasm"}
+NICE_CPU_SOURCES = {"demo.nasm"}
 # The demo's parts: the label that starts each, what it is, and whether
 # it is code. The words before the first label are the entry's.
 DEMO_PARTS = [
@@ -93,11 +86,11 @@ DEMO_FILES = {
 
 class Part(NamedTuple):
     """A part of an image: its source, what it is, its words, and how
-    many of them are .ASCII text, or None where text is not counted."""
+    many of them are .ASCII text."""
     source: str
     what: str
     words: int
-    text: int | None
+    text: int
 
 
 class Marker:
@@ -107,14 +100,14 @@ class Marker:
 
     def __init__(self) -> None:
         self.lines: list[str] = []
-        self.parts: list[tuple[str, str, bool]] = []
+        self.parts: list[tuple[str, str]] = []
         self.runs = 0
         self.in_run = False
 
-    def part(self, source: str, what: str, count_text: bool = True) -> None:
+    def part(self, source: str, what: str) -> None:
         self.end_run()
         self.lines.append(f"ZZP_{len(self.parts)}\n")
-        self.parts.append((source, what, count_text))
+        self.parts.append((source, what))
 
     def end_run(self) -> None:
         if self.in_run:
@@ -161,9 +154,8 @@ class Marker:
                 _, run, part = name.split("_")
                 text[int(part)] += labels[f"ZZE_{run}"] - start
         ends = [labels[f"ZZP_{i}"] for i in range(1, len(self.parts))] + [labels["ZZP_END"]]
-        return [Part(source, what, ends[i] - labels[f"ZZP_{i}"],
-                     text[i] if count_text else None)
-                for i, (source, what, count_text) in enumerate(self.parts)]
+        return [Part(source, what, ends[i] - labels[f"ZZP_{i}"], text[i])
+                for i, (source, what) in enumerate(self.parts)]
 
 
 def words(path: str) -> list[tuple[int, int]]:
@@ -183,64 +175,12 @@ def source_name(path: str) -> str:
     return f"`{base}`"
 
 
-def c_functions(path: str) -> set[str]:
-    """The names of the functions that a C file defines, from the lines
-    that start a definition at the first column."""
-    names = set()
-    with open(path) as f:
-        for line in f:
-            m = re.match(r"^(?!return\b)[A-Za-z_][\w \t*]*?\b(\w+)\s*\([^;]*$", line)
-            if m:
-                names.add(m[1])
-    return names
-
-
-def join_rom_c(marker: Marker, path: str, c_files: list[str]) -> None:
-    """rom_c.nasm, split into nicewasm's start, each C file's functions,
-    the C library's, nicewasm's helpers, and the initial values."""
-    defined = {os.path.basename(c): c_functions(c) for c in c_files}
-    marker.part("`nicewasm`", "`___wasm_start`, which copies the C code's data to the RAM",
-                False)
-    current = ""
-    in_functions = False
-    for line in open(path):
-        m = re.match(r"^; Function \d+: (\w+)", line)
-        if m:
-            in_functions = True
-            # The linker keeps the files' functions in the order of the
-            # files, and two files may each have a static function of one
-            # name, so the owner is the first file from the current one on
-            # that defines the name
-            files = list(defined)
-            start = files.index(current) if current in files else 0
-            owner = next((c for c in files[start:] if m[1] in defined[c]), "lib")
-            if owner != current:
-                current = owner
-                if owner == "lib":
-                    marker.part("nice_cpu's C library", "", False)
-                else:
-                    marker.part(f"`{owner}`", C_PARTS[owner], False)
-            if owner == "lib":
-                source, what, count_text = marker.parts[-1]
-                names = what.split(", ") if what else []
-                marker.parts[-1] = (source, ", ".join(names + [f"`{m[1]}`"]), count_text)
-        elif in_functions and re.match(r"^; W\.\w+", line):
-            in_functions = False
-            marker.part("`nicewasm`", "The helpers of the translated code: loads, stores, "
-                        "and traps", False)
-        elif line.startswith("W.init"):
-            marker.part("`nicewasm`", "The initial values of the C code's data: its strings "
-                        "and tables", False)
-        marker.line(line)
-
-
 def table(parts: list[Part]) -> list[str]:
     rows = ["| Source | What it is | Words | Text |", "|---|---|---:|---:|"]
     for p in parts:
-        rows.append(f"| {p.source} | {p.what} | {p.words} | "
-                    f"{'' if p.text is None else p.text} |")
-    total_text = sum(p.text or 0 for p in parts)
-    rows.append(f"| In all | | {sum(p.words for p in parts)} | {total_text} |")
+        rows.append(f"| {p.source} | {p.what} | {p.words} | {p.text} |")
+    rows.append(f"| In all | | {sum(p.words for p in parts)} | "
+                f"{sum(p.text for p in parts)} |")
     return rows
 
 
@@ -248,9 +188,6 @@ def monitor_tables(args: argparse.Namespace) -> dict[str, list[str]]:
     marker = Marker()
     for path in args.sources:
         base = os.path.basename(path)
-        if base == "rom_c.nasm":
-            join_rom_c(marker, path, args.c)
-            continue
         marker.part(source_name(path), MONITOR_PARTS[base])
         for line in open(path):
             marker.line(line)
@@ -344,8 +281,6 @@ def main() -> None:
     parser.add_argument("--bin", required=True, help="the build's .bin, which must match")
     parser.add_argument("--doc", required=True, help="the Markdown file with the tables")
     parser.add_argument("--write", action="store_true", help="write the tables into it")
-    parser.add_argument("--c", action="append", default=[],
-                        help="a C file of rom_c.nasm, once for each")
     parser.add_argument("sources", nargs="+")
     args = parser.parse_args()
     if args.image == "monitor":

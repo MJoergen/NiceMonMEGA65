@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """The suites of the monitor's tests of FAT32 that take more than one run
-of niceemu each (Makefile, INTERNALS.md, "The tests"), written before the
-port of fat32.c to assembly, monitor_fat.nasm (issue #149), so that the
-port does what the C code did. Each suite is a list of runs; each run puts copies of
-test/fat_image.py's images into the slots, types its input, with the
-program of a file of fs_* calls of test/ (test/fat_tool.py, OPS) at
-0x8000 when it has one, and shows:
+of niceemu each (Makefile, INTERNALS.md, "The tests"). They pin what
+monitor_fat.nasm does, card by card and sector by sector, so that a
+change of it shows (issue #149). Each suite is a list of runs; each run
+puts copies of test/fat_image.py's images into the slots, types its
+input, with the program of a file of fs_* calls of test/
+(test/fat_tool.py, OPS) at 0x8000 when it has one, and shows:
 
 - the console output, a CR before an LF left out, another control code
   as ^ and a letter, and a byte from 0x7F as \\xNN, and the exit status;
@@ -22,10 +22,10 @@ and the clock is not set, so that every date written is the fixed one.
 The output of the suite SUITE is compared with test/SUITE.expected, and
 written to BUILD/SUITE.out.
 
-The behavior that is pinned here though it is a known oddity of the C
-code, the possible bugs B1 to B8 of the audit of issue #149, is marked
-"known oddity" in the titles of the runs and the comments of the OPS
-files: a port keeps it until a change of its own fixes it.
+The behavior that is pinned here though it is odd, the possible bugs B1
+to B8 of the audit of issue #149, is marked "known oddity" in the titles
+of the runs and the comments of the OPS files: it stays until a change
+of its own fixes it.
 
 Usage: test/fat_runs.py NICEEMU MONITOR.bin BUILD SUITE...
 """

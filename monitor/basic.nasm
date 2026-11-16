@@ -7,11 +7,9 @@
 ; and monitor_eth.nasm, with the scanner of issue #115.
 ;
 ; The cold start ends at bas_start, which prints the banner and goes to
-; main. main is where BASIC starts again, from the cold start, mon_exit,
-; and mon_trap: it sets SP to STACK, and the C code's stack pointer to
-; V_CSP, so that it leaves the C code from any depth, prints READY., and
-; reads lines. An empty line, or one of blanks only, runs nothing and
-; prints no READY.
+; main. main is where BASIC starts again, from the cold start and
+; mon_exit: it sets SP to STACK, prints READY., and reads lines. An empty
+; line, or one of blanks only, runs nothing and prints no READY.
 ;
 ; The scanner. R8 is the next character of the line, which is a word of
 ; V_LINE, and R9 is not 0 once a number did not fit a word, which makes a
@@ -49,10 +47,9 @@ bas_start
                 MOVE    R1, S_HINT
                 CALL    puts_b_crlf
 
-; main: READY., and the lines, each run with a fresh SP and C stack
-; pointer after each that ran
+; main: READY., and the lines, each run with a fresh SP after each that
+; ran
 main            MOVE    SP, STACK
-                MOVE    @WASM_RAM, @V_CSP
                 MOVE    R1, S_READY
                 CALL    puts_b_crlf
 main_line

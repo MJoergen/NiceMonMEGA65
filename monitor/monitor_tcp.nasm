@@ -161,9 +161,9 @@ tcp_open
                 CALL    tcp_slot
         ?Z      JMP     topen_end
                 MOVE    R11, R1         ; the handle's word of V_TCB
-                MOVE    @CB_CHECK[R7], 0
-                MOVE    @CB_STATE[R7], 0  ; taken, which nothing else reads
-                MOVE    @CB_FLAGS[R7], 0
+                CLR     @CB_CHECK[R7]
+                CLR     @CB_STATE[R7]   ; taken, which nothing else reads
+                CLR     @CB_FLAGS[R7]
                 CALL    tcp_lport
                 MOVE    @CB_LPORT[R7], R1
                 MOVE    @R11, R7        ; taken, so that the network stays on through the ARP
@@ -191,7 +191,7 @@ tcp_open
                 SUB     R11, R11, V_TCB  ; the handle
                 JMP     topen_end
 topen_noroute
-                MOVE    @R11, 0
+                CLR     @R11
                 CALL    net_off
                 MOVE    R11, E_NOROUTE
 topen_end
@@ -288,13 +288,13 @@ tcp_init
 ; Uses R1-R4.
 tcp_isn
                 MOVE    @CB_RTO[R7], TCP_RTO0
-                MOVE    @CB_SRTT[R7], 0
-                MOVE    @CB_RTTVAR[R7], 0
+                CLR     @CB_SRTT[R7]
+                CLR     @CB_RTTVAR[R7]
                 MOVE    @CB_MSS[R7], TCP_MSS0
                 MOVE    @CB_CWND[R7], 2*TCP_MSS0
-                MOVE    @CB_WND[R7], 0
-                MOVE    @CB_RNXT[R7], 0
-                MOVE    @CB_EDGE[R7], 0
+                CLR     @CB_WND[R7]
+                CLR     @CB_RNXT[R7]
+                CLR     @CB_EDGE[R7]
                 MOVE    R2, @V_TCOPENS
                 ADD     @V_TCOPENS, R2, 1
                 SHL     R3, R2, 16
@@ -318,10 +318,10 @@ tcp_rings
                 ADD     R1, R7, TCP_CB
                 SHL     R1, R1, 2
                 ADD     @CB_RXB[R7], R1, 0x20000000
-                MOVE    @CB_RXHEAD[R7], 0
-                MOVE    @CB_RXLEN[R7], 0
-                MOVE    @CB_TXHEAD[R7], 0
-                MOVE    @CB_TXLEN[R7], 0
+                CLR     @CB_RXHEAD[R7]
+                CLR     @CB_RXLEN[R7]
+                CLR     @CB_TXHEAD[R7]
+                CLR     @CB_TXLEN[R7]
                 RET
 
 ; tcp_hcb: R1 = the control block of the handle R1, with Z clear, or 0,
@@ -480,7 +480,7 @@ tcp_close
                 CMP     R1, TS_CWAIT
         ?Z      MOVE    @CB_STATE[R7], TS_LASTACK
                 OR      @CB_FLAGS[R7], @CB_FLAGS[R7], TF_FIN
-                MOVE    @CB_RXLEN[R7], 0  ; the bytes that wait, dropped
+                CLR     @CB_RXLEN[R7]   ; the bytes that wait, dropped
                 CALL    tcp_out
                 JMP     tclose_ok
 tclose_abort
@@ -490,7 +490,7 @@ tclose_free
                 CALL    tcp_drop
 tclose_ok
                 CALL    tcp_rearm
-                MOVE    R1, 0
+                CLR     R1
 tclose_end
                 POP     R8
                 POP     R7
@@ -556,12 +556,12 @@ tcp_drop
                 MOVE    R1, V_TCB
 :
                 CMP     @R1, R7
-        ?Z      MOVE    @R1, 0
+        ?Z      CLR     @R1
                 ADD     R1, R1, 1
                 CMP     R1, V_TCB+TCP_HANDLES
         ?!Z     JMP     :-
-                MOVE    @CB_CHECK[R7], 0
-                MOVE    @CB_FLAGS[R7], 0
+                CLR     @CB_CHECK[R7]
+                CLR     @CB_FLAGS[R7]
                 JMP     net_off         ; which returns to the caller
 
 ; tcp_fail: the connection R7 ended in the error R1, which stays until
@@ -582,8 +582,8 @@ tcp_fail
 tcp_relisten
                 MOVE    @CB_STATE[R7], TS_LISTEN
                 MOVE    @CB_FLAGS[R7], TF_PASSIVE
-                MOVE    @CB_RIP[R7], 0
-                MOVE    @CB_RPORT[R7], 0
+                CLR     @CB_RIP[R7]
+                CLR     @CB_RPORT[R7]
                 RET
 
 ; tcp_resetall: every connection ended in E_TRESET, as the IP address
@@ -607,8 +607,8 @@ tcp_resetall
                 POP     R7
                 JMP     tcp_rearm       ; which returns to the caller
 
-; tcp_close_all: for net_close, at the cold start, mon_exit, and
-; mon_trap: a RST at best effort for each connection that has one, and
+; tcp_close_all: for net_close, at the cold start and mon_exit: a RST at
+; best effort for each connection that has one, and
 ; every handle freed, with none for a handle in LISTEN. The block of a handle is trusted only if its address
 ; is one that tcp_open takes, and its check word is TCP_CHECK, as a host
 ; may have loaded another program over it. Uses R1-R6, and R7 and R8
@@ -619,14 +619,14 @@ tcp_close_all
                 MOVE    R8, V_TCB
 :
                 MOVE    R7, @R8
-                MOVE    @R8++, 0
+                CLR     @R8++
                 CMP     R7, PROGRAM
         ?C      JMP     :+
                 CMP     R7, 0x04000000-TCP_CB
         ?!C     JMP     :+
                 CMP     @CB_CHECK[R7], TCP_CHECK
         ?!Z     JMP     :+
-                MOVE    @CB_CHECK[R7], 0
+                CLR     @CB_CHECK[R7]
                 MOVE    R1, @CB_STATE[R7]
                 SUB     R1, R1, TS_ESTAB
                 CMP     R1, TS_SYNRCVD-TS_ESTAB+1
@@ -634,7 +634,7 @@ tcp_close_all
 :
                 CMP     R8, V_TCB+TCP_HANDLES+1
         ?!Z     JMP     :--
-                MOVE    @V_TCWORK, 0
+                CLR     @V_TCWORK
                 POP     R8
                 POP     R7
                 RET
@@ -660,7 +660,7 @@ tcp_put
                 MOVE    @R6, @R4++
                 ADD     R2, R2, 1
                 CMP     R2, R3
-        ?Z      MOVE    R2, 0
+        ?Z      CLR     R2
                 JMP     :-
 
 ; tcp_get: R5 bytes copied from the ring at the byte address R1, of R3
@@ -673,7 +673,7 @@ tcp_get
                 MOVE    @R4++, @R6
                 ADD     R2, R2, 1
                 CMP     R2, R3
-        ?Z      MOVE    R2, 0
+        ?Z      CLR     R2
                 JMP     tcp_get
 
 ; tcp_work: for net_step, when V_TCWORK says that a connection may have
@@ -682,7 +682,7 @@ tcp_get
 tcp_work
                 PUSH    R7
                 PUSH    R8
-                MOVE    @V_TCWORK, 0
+                CLR     @V_TCWORK
                 MOVE    R8, V_TCB
 :
                 MOVE[M] R7, @R8++
@@ -793,7 +793,7 @@ tcp_out
                 PUSH    R8
                 PUSH    R9
                 PUSH    R10
-                MOVE    R10, 0
+                CLR     R10
                 MOVE    R1, @CB_STATE[R7]
                 MOVE    R4, TH_SYN
                 CMP     R1, TS_SYNSENT
@@ -805,7 +805,7 @@ tcp_out
                 CMP     @CB_NXT[R7], @CB_UNA[R7]
         ?!Z     JMP     tout_end        ; the SYN in flight
                 MOVE    R2, @CB_UNA[R7]
-                MOVE    R5, 0
+                CLR     R5
                 CALL    tout_seg
                 JMP     tout_end
 tout_data
@@ -842,7 +842,7 @@ tout_fin
         ?Z      JMP     tout_ack
                 MOVE    R2, @CB_NXT[R7]
                 MOVE    R4, TH_ACK+TH_FIN
-                MOVE    R5, 0
+                CLR     R5
                 CALL    tout_seg
 tout_ack
                 TST     R10
@@ -856,7 +856,7 @@ tout_ack
 :
                 MOVE    R2, @CB_NXT[R7]
                 MOVE    R4, TH_ACK
-                MOVE    R5, 0
+                CLR     R5
                 CALL    tcp_seg
 tout_end
                 CALL    tcp_arm
@@ -929,7 +929,7 @@ tarm_off
 tcp_rst
                 MOVE    R2, @CB_NXT[R7]
                 MOVE    R4, TH_RST+TH_ACK
-                MOVE    R5, 0
+                CLR     R5
 ; tcp_seg: a segment of the connection R7 sent by tcp_emit, from the
 ; sequence number R2, with the flags R4, TH_, and R5 bytes of the ring
 ; to send; with ACK, the acknowledgment RCV.NXT, which clears TF_ACK. The
@@ -942,7 +942,7 @@ tcp_seg
                 POP     R5
                 POP     R4
                 POP     R2
-                MOVE    R3, 0
+                CLR     R3
                 AND[M]  R0, R4, TH_ACK
         ?!Z     MOVE    R3, @CB_RNXT[R7]
         ?!Z     AND     @CB_FLAGS[R7], @CB_FLAGS[R7], 0xFFFFFFFF-TF_ACK
@@ -962,7 +962,7 @@ tcp_win
         ?!N     MOVE    @CB_EDGE[R7], R1
                 SUB[M]  R1, @CB_EDGE[R7], @CB_RNXT[R7]
         ?N      MOVE    @CB_EDGE[R7], @CB_RNXT[R7]  ; bytes dropped after tcp_close passed it
-        ?N      MOVE    R1, 0
+        ?N      CLR     R1
                 RET
 
 ; tcp_wcalc: R1 = the right edge of the window that the connection R7
@@ -988,7 +988,7 @@ tcp_wcalc
 ; SYN-RECEIVED, and not those in LISTEN.
 ; Uses R1-R3.
 tcp_count
-                MOVE    R1, 0
+                CLR     R1
                 MOVE    R2, V_TCB
 :
                 MOVE[M] R3, @R2++
@@ -1038,7 +1038,7 @@ tcp_emit
                 OR      @V_TCH+14, R1, 0x02040000  ; the MSS, kind 2, 4 bytes
 :
                 OR      @V_TCH+12, R4, R10
-                MOVE    @V_TCH+13, 0
+                CLR     @V_TCH+13
                 MOVE    @V_TCH, @CB_MACH[R7]
                 MOVE    @V_TCH+1, @CB_MACL[R7]
                 SHL     R1, @E_MACH, 16
@@ -1071,7 +1071,7 @@ tcp_emit
 :
                 AND[M]  R0, @ETH_CSR, ETH_BUSY
         ?!Z     JMP     :-              ; as the send buffer takes no write while busy
-                MOVE    R10, 0
+                CLR     R10
 :
                 MOVE    R2, @V_TCH[R10]
                 CALL    tx_word
@@ -1092,7 +1092,7 @@ tcp_emit
                 ADD     R5, R5, R4
                 MOVE    R3, R8
 temit_word
-                MOVE    R2, 0
+                CLR     R2
                 MOVE    R11, 4
 :
                 SHL     R2, R2, 8
@@ -1305,7 +1305,7 @@ tin_fin
                 ADD     @CB_RNXT[R7], @CB_RNXT[R7], 1
                 MOVE    R2, @CB_NXT[R7]
                 MOVE    R4, TH_ACK
-                MOVE    R5, 0
+                CLR     R5
                 CALL    tcp_seg
                 CALL    tcp_drop
                 JMP     tin_work
@@ -1329,9 +1329,9 @@ tin_synsent
 tin_ackrst
                 MOVE    R1, R7
                 MOVE    R2, @V_NHDR+11
-                MOVE    R3, 0
+                CLR     R3
                 MOVE    R4, TH_RST*0x10000
-                MOVE    R5, 0
+                CLR     R5
                 CALL    tcp_emit
                 JMP     tin_end
 tin_noack
@@ -1407,7 +1407,7 @@ tin_rst
                 AND[M]  R0, R8, TH_ACK
         ?Z      JMP     :+
                 MOVE    R2, @V_NHDR+11
-                MOVE    R3, 0
+                CLR     R3
                 MOVE    R4, TH_RST*0x10000
                 JMP     :++
 :
@@ -1416,11 +1416,11 @@ tin_rst
         ?!Z     ADD     R3, R3, 1
                 AND[M]  R0, R8, TH_FIN
         ?!Z     ADD     R3, R3, 1
-                MOVE    R2, 0
+                CLR     R2
                 MOVE    R4, TH_RST*0x10000+TH_ACK*0x10000
 :
                 MOVE    R1, V_TCR
-                MOVE    R5, 0
+                CLR     R5
                 CALL    tcp_emit
                 JMP     tin_end
 ; LISTEN (RFC 9293 §3.10.7.2): the SYN taken by the handle R7, with the
@@ -1520,7 +1520,7 @@ tfind_skip
 ; clear; or 0, with Z set, and R6 not 0 when the port has handles of
 ; tcp_listen in other states. Uses R2, R6, and R7.
 tcp_lfind
-                MOVE    R6, 0
+                CLR     R6
                 MOVE    R2, V_TCB
 tlfind_next
                 MOVE[M] R7, @R2++

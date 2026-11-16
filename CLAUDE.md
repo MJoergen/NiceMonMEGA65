@@ -190,18 +190,17 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   `monitor_tcp.nasm`, #111, and the clock in `monitor_clock.nasm`
   (#148): the `TIME` statement, the dates of files (#109), the clock
   from the real-time clock at the cold start, which `TIME` writes
-  (#105), and the time of `NTP` from a time server (#127)), with no
-  C code, though its support is left (`ROM_C` is empty; building the
-  monitor needs clang, and its tests mtools, `mkfs.fat`, and
-  `sfdisk`), the routines that
+  (#105), and the time of `NTP` from a time server (#127)), all of
+  it assembly, with no C in the ROM (#149; its tests need clang for
+  their programs in C, and mtools, `mkfs.fat`, and `sfdisk`), the
+  routines that
   programs join (`monlib.nasm`), the stubs and the header through which
   a program calls the entries (`mon.nasm`, `mon.h`, and `mon_c.nasm`,
   the stubs that turn a C pointer into an address), and its tests in
   niceemu (`test/`, with `cat monitor.bin prog.bin`). `monitor/README.md`
   is the monitor for those who use it and write programs for it, and
   `monitor/INTERNALS.md` the routines with no entries, the scrollback,
-  FAT32, what is left of the C in the ROM, the ROM's words, and the
-  build and the tests.
+  FAT32, the ROM's words, and the build and the tests.
 
 ## Rules and pitfalls
 

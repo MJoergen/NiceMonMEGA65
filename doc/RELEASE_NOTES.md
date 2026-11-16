@@ -39,7 +39,16 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   `HALT`, and `?` is `HELP`. `HELP` lists them
   ([monitor/README.md](../monitor/README.md#basic)).
 - `tools/load.py --monitor` and `run.py --monitor` type `SYS 0x8000`.
-  A program under the monitor starts with its stack 13 words lower.
+  A program under the monitor starts with its stack 1 word lower.
+- The ROM is assembly only
+  ([#115](https://github.com/MJoergen/NiceMonMEGA65/issues/115),
+  [#148](https://github.com/MJoergen/NiceMonMEGA65/issues/148), and
+  [#149](https://github.com/MJoergen/NiceMonMEGA65/issues/149)): its
+  C code, FAT32, the clock, and BASIC's scanner, is NICE assembly now,
+  and does what it did. The monitor is 13867 words, where V2.2's was
+  22609, so 18901 words of the ROM are free, where 10159 were.
+  Building the monitor, and a bitstream with it in the ROM, no longer
+  needs clang. A program in C is built as before.
 
 **New.**
 

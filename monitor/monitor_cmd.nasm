@@ -107,11 +107,11 @@ st_ip
                 CALL    rest_blank
         ?!Z     JMP     ip_bad
                 MOVE    @E_IP, R7
-                MOVE    @V_MASK, 0
-                MOVE    @V_GW, 0
-                MOVE    @V_DNS, 0
-                MOVE    @V_NTP, 0
-                MOVE    @V_BSTATE, 0    ; no DHCP in the background
+                CLR     @V_MASK
+                CLR     @V_GW
+                CLR     @V_DNS
+                CLR     @V_NTP
+                CLR     @V_BSTATE       ; no DHCP in the background
                 CALL    lease_forget
 ip_show         MOVE    R1, S_IP
                 MOVE    R2, @E_IP
@@ -124,10 +124,10 @@ ip_bad          MOVE    R1, S_BADIP
 ; there is none. Uses R1-R6.
 get_ip
                 MOVE    R3, R1          ; the next character
-                MOVE    R1, 0           ; the address
+                CLR     R1              ; the address
                 MOVE    R6, 4           ; the numbers left
 get_ip_num
-                MOVE    R4, 0           ; the number
+                CLR     R4              ; the number
                 MOVE    R5, R3          ; where it starts
 :
                 SUB     R2, @R3, 0x30
@@ -154,7 +154,7 @@ get_ip_num
                 ADD     R3, R3, 1
                 JMP     get_ip_num
 get_ip_bad
-                MOVE    R2, 0
+                CLR     R2
                 RET
 
 ; show_ip: the string at R1, the IP address R2 in decimal with dots, and
@@ -222,8 +222,8 @@ baud_bad
 st_mac
                 MOVE[M] R2, R1
         ?Z      JMP     mac_show        ; no string
-                MOVE    R7, 0
-                MOVE    R8, 0
+                CLR     R7
+                CLR     R8
                 MOVE    R9, 6
 :
                 CMP     @R2, 0x20
@@ -335,11 +335,11 @@ st_lines
                 MOVE    @V_OUT, OUT_SCREEN
                 MOVE    @V_LEND, 0x0D   ; as after the CR of the LOAD line
                 MOVE    R7, @V_ROW
-                MOVE    R8, 0
+                CLR     R8
                 MOVE    R9, 0xFFFFFFFF
-                MOVE    R10, 0
-                MOVE    R11, 0
-                MOVE    R12, 0
+                CLR     R10
+                CLR     R11
+                CLR     R12
                 CALL    load_pend
 load_line
                 CALL    load_row
@@ -401,7 +401,7 @@ load_esc
 ; The end of a line: an empty one ends the load, and another goes to
 ; bin_line
 load_end
-                MOVE    @R6, 0
+                CLR     @R6
                 CMP     R6, V_LINE
         ?Z      JMP     load_done
                 CALL    bin_line
@@ -515,7 +515,7 @@ st_dir
 ; st_lines does, and shown as st_lines shows its lines. basic.nasm has
 ; checked the name's .BIN.
 st_load
-                MOVE    R2, 0           ; to read
+                CLR     R2              ; to read
                 CALL    fs_open
                 TST     R1
         ?N      JMP     fs_fail
@@ -664,7 +664,7 @@ load_row
                 MOVE    @R1++, R3
                 SUB[M]  R2, R2, 1
         ?!Z     JMP     :-
-                MOVE    @V_COL, 0
+                CLR     @V_COL
                 MOVE    @V_ROW, R7
                 JMP     putc_cur
 
@@ -680,8 +680,8 @@ st_sys
                 TST     @R7
         ?Z      JMP     :+
                 MOVE    R1, MON_PUTC    ; the entry of mon_putc (mon.nasm)
-                MOVE    R2, 0           ; argc
-                MOVE    R3, 0           ; argv
+                CLR     R2              ; argc
+                CLR     R3              ; argv
                 CALL    R7
                 JMP     sys_end         ; with the status in R1
 :

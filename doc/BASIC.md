@@ -91,22 +91,22 @@ every source of the monitor, are in
 
 These facts bound the design:
 
-- **C has no floats in the ROM.** nice_cpu's float library keeps words
+- **C had no floats in the ROM.** nice_cpu's float library keeps words
   of its own in the image, which is ROM here, so `nicebuild.py --ram`
   refuses a program that uses floats. The library is also 6578 words,
-  for `float` and `double`. So the ROM's C code has no `double`, and the
-  library is no fallback for the FPU.
+  for `float` and `double`. So the ROM's C code had no `double`, and
+  the library is no fallback for the FPU.
 - **C costs 6 to 8 words a line**, which is why BASIC is assembly
-  from stage 2 on. `fat32.c` is 9435 words from 1162 lines of code,
+  from stage 2 on. `fat32.c` was 9435 words from 1162 lines of code,
   8.1 a line, and `clock.c` 1176 from 197, 6.0, both at `-Oz`.
-- **C's constants cost RAM too.** With `--ram`, every data segment is
+- **C's constants cost RAM too.** With `--ram`, every data segment was
   copied to the RAM at the cold start, the strings and the tables
-  among them. 863 words are free there.
+  among them. 863 words were free there.
 - **One wasm module.** A program has one (WASM.md), so the shell's
   `basic.c` joined `fat32.c` and `clock.c` in `ROM_C`, and shared
-  their memory and their C stack of 4096 bytes, until #148 and #115
-  took the clock and the shell out of it. There is no
-  `malloc`, and no `setjmp`.
+  their memory and their C stack of 4096 bytes, until #148, #115,
+  and #149 took the clock, the shell, and FAT32 out of it, which left
+  the ROM with no C. There was no `malloc`, and no `setjmp`.
 - **The texts of the ROM are four characters a word.** The monitor had
   3250 words of `.ASCII_L` text. #131 packed them with `.ASCII_B`, and
   the monitor reads them through the byte window, which reaches the
@@ -134,8 +134,7 @@ These facts bound the design:
 The cold start prints the banner, the free words, and `READY.`, and
 reads a line. Stage 1 prints `HELP lists the statements` where the
 free words are to go, as it has no variables yet. A line that starts with a number is stored, from stage 3
-on. Any other line runs at once. `mon_exit`, and a trap of the C code,
-come back to `READY.`.
+on. Any other line runs at once. `mon_exit` comes back to `READY.`.
 
 The monitor's commands become these statements
 ([Decisions](#decisions)). A name is a string in quotes, and
@@ -400,8 +399,7 @@ not recurse.
 
 An error leaves the evaluator from any depth. One routine does it:
 it clears the FPU's stack and its flags, and goes back to the main
-loop, which sets SP again, and the C code's stack pointer, as a trap
-of the C code does since stage 1. With no `TRAP`, the loop prints the
+loop, which sets SP again. With no `TRAP`, the loop prints the
 message, in full text, and the line, drops the frames, and prints
 `READY.`. With one, the frames
 stay, for `RESUME`.
@@ -516,14 +514,12 @@ BASIC is NICE assembly from stage 2 on ([Decisions](#decisions)):
 - The scanner's routines take and return their values in registers,
   as each one's comment says, and the statements' routines may use
   every register, as the main loop starts again after each. BASIC
-  calls FAT32's routines of `monitor_fat.nasm` (#149), which were the
-  ROM's C code, `fat32.c`, and the clock's routines of
-  `monitor_clock.nasm` (#148), by their labels.
+  calls FAT32's routines of `monitor_fat.nasm` (#149) and the clock's
+  routines of `monitor_clock.nasm` (#148) by their labels.
 - The table of keywords, the ops, and the messages are packed with
   `.ASCII_B`, and read through the byte window, a quarter of the ROM.
 - The workspace is words, and its formats are those of
-  [Inside](#inside). BASIC's own state is in the monitor's variables,
-  and none of it in the C code's RAM.
+  [Inside](#inside). BASIC's own state is in the monitor's variables.
 
 A new ROM needs no bitstream to be tried on a board: the tools load a
 monitor at 0 with the ROM hidden, as `make hwtest` does, and
@@ -640,20 +636,22 @@ The ROM had 13455 words free without the demo, which left it in V2.1
 the texts packed, 11876, and `time ntp` (#127) 10952 (measured
 2026-11-14), TAB's completion of names (#137) 10167, and the shell
 of stage 1 (#112) 9206 (both measured 2026-11-15), the clock in
-assembly (#148) 10157, and the shell in assembly (#115) 11482 (both
-measured 2026-11-16). In C, at 7 words a
-line, the stages 2 and 3 alone were guessed at 8800 words, so C would
-have filled the ROM at stage 3. That is why BASIC is assembly from
-stage 2 on.
+assembly (#148) 10157, the shell in assembly (#115) 11482, and FAT32
+in assembly, with the C code's support out of the ROM and an
+immediate 0 read from R0 (#149), 18901 (all measured 2026-11-16). In
+C, at 7 words a line, the stages 2 and 3 alone were guessed at 8800
+words, so C would have filled the ROM at stage 3. That is why BASIC is
+assembly from stage 2 on.
 
-In assembly, the whole list is guessed at 9000 to 12000 words, about
-what is free:
+In assembly, the whole list is guessed at 9000 to 12000 words, which
+fits what is free:
 
 - The guess is from Microsoft's 9 KB for the 6502, and a list about
   twice as long, less the 1000 words of float routines that
   nice_cpu#161 estimates the FPU to save.
-- **What else gives room**: FAT32 in assembly, perhaps 5000 words.
-  BASIC's keywords and messages are packed from the start.
+- **What gave room**: FAT32 in assembly (#149), 7419 words with the
+  C code's support. BASIC's keywords and messages are packed from the
+  start.
 - **Not a larger ROM.** A second ROM would fit the MEGA65's block RAM
   but not the Nexys4DDR's, and the core's timing margin is small.
 

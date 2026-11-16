@@ -3,7 +3,7 @@ HELP lists the statements
 READY.
 dir
 Directory of NICE
-HELLO.BIN                      14184
+HELLO.BIN                      14076
 Files: 1, directories: 0
 READY.
 halt
@@ -14,7 +14,7 @@ Screen:
 |READY.
 |dir
 |Directory of NICE
-|HELLO.BIN                      14184
+|HELLO.BIN                      14076
 |Files: 1, directories: 0
 |READY.
 |halt

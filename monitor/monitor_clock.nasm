@@ -1,8 +1,8 @@
 ; The clock of the time of day, which the Makefile joins after monitor.nasm
-; (its header): TIME, the dates of FAT's entries for monitor_fat.nasm, the clock set
-; from the MEGA65's real-time clock at the cold start, which TIME sets
-; (issue #105), and the time of an SNTP answer, which NTP sets (issue
-; #127). It was clock.c of the ROM's C code until issue #148.
+; (its header): TIME, the dates of FAT's entries for monitor_fat.nasm, the
+; clock set from the MEGA65's real-time clock at the cold start, which
+; TIME sets (issue #105), and the time of an SNTP answer, which NTP sets
+; (issues #127 and #148).
 ;
 ; The clock (nice_cpu's DEVICES.md §10) counts seconds since 1970-01-01
 ; 00:00:00, and keeps local time, as the MEGA65's real-time clock does

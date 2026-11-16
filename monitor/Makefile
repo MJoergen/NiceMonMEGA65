@@ -11,48 +11,32 @@
 #
 # The assembler has no include, so the monitor is the cat of SOURCES
 # (monitor.nasm, the files that its header lists, monlib.nasm, and
-# mon.nasm), build/rom_c.nasm, nice_cpu's lib.nasm and
-# muldiv_mpu.nasm, build/version.nasm, which defines the label VERSION
+# mon.nasm), build/version.nasm, which defines the label VERSION
 # (monitor.nasm), and build/folder.nasm, the folder FOLDER's 8.3 name and
-# texts. build/rom_c.nasm is the ROM's C code, ROM_C, which is empty since
-# FAT32 is assembly (issue #149), but which clang still
-# compiles to one wasm module and nicewasm --ram translates for the ROM
-# (INTERNALS.md, "C in the ROM"), so the monitor needs clang with the wasm32
-# target, wasm-ld, and llvm-ar for the C library.
+# texts. The monitor is assembly only, so it needs Python alone. The
+# tests' programs in C, hello_c.bin and tcp_c.bin, need clang with the
+# wasm32 target, wasm-ld, and llvm-ar, through nicebuild.
 
 PYTHON  ?= python3
-CLANG   ?= clang
 NICE_CPU = ../nice_cpu
 ASM      = $(PYTHON) $(NICE_CPU)/assembler/niceasm.py
 FMT      = $(PYTHON) $(NICE_CPU)/assembler/nicefmt.py
 NICEBUILD = $(PYTHON) $(NICE_CPU)/translator/nicebuild.py
 EMU      = $(NICE_CPU)/emulator/zig-out/bin/niceemu
 RUNTIME  = $(NICE_CPU)/runtime
-NICEWASM = $(PYTHON) $(NICE_CPU)/translator/nicewasm.py
 TOOLS    = $(wildcard $(NICE_CPU)/assembler/*.py) $(wildcard $(NICE_CPU)/translator/*.py)
-LIBC     = $(NICE_CPU)/runtime/libc
 BUILD    = build
 SOURCES  = monitor.nasm monitor_cmd.nasm basic.nasm monitor_dis.nasm monitor_sd.nasm monitor_fat.nasm monitor_eth.nasm monitor_tcp.nasm \
            monitor_clock.nasm monlib.nasm mon.nasm
-# The ROM's C code, none, and nice_cpu's runtime library that it is joined with
-ROM_C    =
-RUNTIME_ROM = $(RUNTIME)/lib.nasm $(RUNTIME)/muldiv_mpu.nasm
-# The options of nicebuild.py --ram (nice_cpu's translator README), but
-# that every function that is not static is exported, for the monitor's
-# assembly, nothing needs a main, and -Oz, which makes the code more than a
-# quarter smaller than -O2. The stack is nicebuild's 4096 bytes.
-ROM_CFLAGS = --target=wasm32 -mbulk-memory -mtail-call -Oz -ffreestanding -fvisibility=default \
-             -nostdlibinc -isystem $(LIBC)/include -nostdlib -Wl,--no-entry \
-             -Wl,--export-dynamic -Wl,--allow-undefined -Wl,--stack-first \
-             -Wl,--export=__heap_base -Wl,-z,stack-size=4096 -DFOLDER='"$(FOLDER_UC)"'
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo unknown)
 # The folder of the card's root directory that holds NiceMon's files
 # (monitor_fat.nasm, README.md, "Files"): NICE, or with make FOLDER=NAME
 # another 8.3 name of 1 to 8 letters, digits, _, and -, in either case. It
 # reaches build/folder.nasm as FOLDER_N, its 8.3 name padded with blanks,
-# and in the texts of DIR, S_DIROF, and of error 29. The tests need NICE. A FOLDER of the environment is passed
-# over, as a shell may well export one of that common name for something
-# else; the name counts on the command line, make FOLDER=NAME, alone.
+# and in the texts of DIR, S_DIROF, and of error 29. The tests need NICE.
+# A FOLDER of the environment is passed over, as a shell may well export
+# one of that common name for something else; the name counts on the
+# command line, make FOLDER=NAME, alone.
 ifeq ($(origin FOLDER),environment)
 FOLDER  := NICE
 endif
@@ -68,13 +52,6 @@ PACKED = printf "%s .ASCII_B '%s'\n                .DAT    0\n" '$(1)' '$(2)'
 FOLDER_ERROR = ($(call PACKED,E_FS29,no folder $(FOLDER_UC) on the card); \
   $(call PACKED,S_DIROF,Directory of $(FOLDER_UC)); \
   printf "FOLDER_N .ASCII_B '%-11s'\n" '$(FOLDER_UC)')
-# The words that the ROM's C code writes are in the RAM from WASM_RAM up to
-# below WASM_END (monitor.nasm), and ___wasm_ram_end is the word after them.
-WASM_RAM = $(shell sed -n 's/^WASM_RAM *\.EQU *\(0x[0-9A-Fa-f]*\).*/\1/p' monitor.nasm)
-WASM_END = $(shell sed -n 's/^WASM_END *\.EQU *\(0x[0-9A-Fa-f]*\).*/\1/p' monitor.nasm)
-CHECK_RAM = $(PYTHON) -c 'import re, sys; \
-  end = int(re.search(r"^___wasm_ram_end +\.EQU +(0x[0-9A-Fa-f]+)", open(sys.argv[1]).read(), re.M)[1], 16); \
-  end <= int(sys.argv[2], 16) or sys.exit(f"{sys.argv[1]}: the C code takes the RAM up to {end:08X}, past WASM_END, {sys.argv[2]}")'
 # Each packed text of the ROM must end with a 0 byte (test/texts.py)
 CHECK_TEXTS = $(PYTHON) test/texts.py $(filter-out monlib.nasm mon.nasm,$(SOURCES))
 # The monitor must end below PROGRAM (monitor.nasm), 0x8000, the end of
@@ -88,26 +65,11 @@ CHECK_END = $(PYTHON) -c 'import sys; top = int(open(sys.argv[1]).read().split()
 
 all: $(BUILD)/monitor.bin
 
-$(BUILD)/monitor.bin: $(SOURCES) $(BUILD)/rom_c.nasm $(RUNTIME_ROM) $(BUILD)/version.nasm \
-                      $(BUILD)/folder.nasm $(TOOLS)
+$(BUILD)/monitor.bin: $(SOURCES) $(BUILD)/version.nasm $(BUILD)/folder.nasm $(TOOLS)
 	@$(CHECK_TEXTS)
-	@cat $(SOURCES) $(BUILD)/rom_c.nasm $(RUNTIME_ROM) $(BUILD)/version.nasm \
-	  $(BUILD)/folder.nasm > $(BUILD)/monitor_all.nasm
+	@cat $(SOURCES) $(BUILD)/version.nasm $(BUILD)/folder.nasm > $(BUILD)/monitor_all.nasm
 	$(ASM) -o $@ $(BUILD)/monitor_all.nasm
 	@$(CHECK_END) $@ $(ROM_END)
-
-# The ROM's C code, and for the test of it, rom, with test/rom.c after
-# ROM_C. The C library is built if it is missing.
-$(BUILD)/rom_c.wasm: $(ROM_C) $(LIBC)/libc.a Makefile $(BUILD)/folder.nasm | $(BUILD)
-	@$(CLANG) $(ROM_CFLAGS) -o $@ $(ROM_C) $(LIBC)/libc.a
-$(BUILD)/rom_c_test.wasm: $(ROM_C) test/rom.c $(LIBC)/libc.a Makefile $(BUILD)/folder.nasm | $(BUILD)
-	@$(CLANG) $(ROM_CFLAGS) -o $@ $(ROM_C) test/rom.c $(LIBC)/libc.a
-$(BUILD)/rom_c.nasm $(BUILD)/rom_c_test.nasm: $(BUILD)/%.nasm: $(BUILD)/%.wasm $(TOOLS) monitor.nasm
-	@$(NICEWASM) --ram $(WASM_RAM) -o $@ $<
-	@$(CHECK_RAM) $@ $(WASM_END)
-
-$(LIBC)/libc.a:
-	@$(MAKE) --no-print-directory -s -C $(LIBC) libc.a
 
 # Written only when the version changes, so that the monitor is not
 # assembled again, and a bitstream with it not built again, for nothing.
@@ -115,31 +77,18 @@ $(BUILD)/version.nasm: FORCE | $(BUILD)
 	@$(call PACKED,VERSION,$(VERSION)) | cmp -s - $@ || \
 	  $(call PACKED,VERSION,$(VERSION)) > $@
 
-# Written only when FOLDER changes, as version.nasm is, and the C code is
-# compiled again then
+# Written only when FOLDER changes, as version.nasm is
 $(BUILD)/folder.nasm: FORCE | $(BUILD)
 	@$(FOLDER_ERROR) | cmp -s - $@ || $(FOLDER_ERROR) > $@
 
 # The test has a version of its own, so that its output does not change
 # with every commit.
-$(BUILD)/monitor_test.bin: $(SOURCES) $(BUILD)/rom_c.nasm $(RUNTIME_ROM) $(BUILD)/folder.nasm \
-                           $(TOOLS) | $(BUILD)
+$(BUILD)/monitor_test.bin: $(SOURCES) $(BUILD)/folder.nasm $(TOOLS) | $(BUILD)
 	@$(CHECK_TEXTS)
-	@(cat $(SOURCES) $(BUILD)/rom_c.nasm $(RUNTIME_ROM) $(BUILD)/folder.nasm; \
-	  $(call PACKED,VERSION,V9.9)) \
+	@(cat $(SOURCES) $(BUILD)/folder.nasm; $(call PACKED,VERSION,V9.9)) \
 	  > $(BUILD)/monitor_test_all.nasm
 	@$(ASM) -o $@ $(BUILD)/monitor_test_all.nasm
 	@$(CHECK_END) $@ $(ROM_END)
-
-# The test of the ROM's C code: the monitor of the tests with test/rom.c in
-# its module, and test/rom.nasm after it, which calls its functions by
-# their labels, in one image, which runs without monitor_test.bin.
-$(BUILD)/rom.bin: $(SOURCES) $(BUILD)/rom_c_test.nasm test/rom.nasm $(RUNTIME_ROM) \
-                  $(BUILD)/folder.nasm $(TOOLS) | $(BUILD)
-	@(cat $(SOURCES) $(BUILD)/rom_c_test.nasm $(RUNTIME_ROM) $(BUILD)/folder.nasm; \
-	  $(call PACKED,VERSION,V9.9); \
-	  cat test/rom.nasm) > $(BUILD)/rom_all.nasm
-	@$(ASM) --symbols $(BUILD)/rom.sym -o $@ $(BUILD)/rom_all.nasm
 
 # The monitors of the ring test, test/ring.py: the monitor of the tests
 # with the size of the screen's memory that the display offset of a board
@@ -158,7 +107,7 @@ $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.bin: $(BUILD)/monitor_%.bin: $(BUILD
 # start-up code for a program under a monitor, and hello.c through
 # nicebuild, which needs clang.
 $(BUILD)/hello.bin: test/hello.nasm monlib.nasm mon.nasm $(RUNTIME)/start_mon.nasm \
-                    $(RUNTIME_ROM) $(TOOLS) | $(BUILD)
+                    $(RUNTIME)/lib.nasm $(RUNTIME)/muldiv_mpu.nasm $(TOOLS) | $(BUILD)
 	@cat $(RUNTIME)/start_mon.nasm test/hello.nasm monlib.nasm mon.nasm $(RUNTIME)/lib.nasm \
 	  $(RUNTIME)/muldiv_mpu.nasm > $(BUILD)/hello_all.nasm
 	@$(ASM) -o $@ $(BUILD)/hello_all.nasm
@@ -231,6 +180,10 @@ $(FAT_IMAGES) &: test/fat_image.py test/fat_tool.py $(BUILD)/hello.bin
 # The words that u disassembles in test/dis.py, at 0x8000, which never run
 $(BUILD)/dis.bin: test/dis.nasm $(TOOLS) | $(BUILD)
 	@$(ASM) -o $@ test/dis.nasm
+
+# The test of the FPU at a program's end, test/fpu.nasm, at 0x8000
+$(BUILD)/fpu.bin: test/fpu.nasm $(TOOLS) | $(BUILD)
+	@$(ASM) -o $@ test/fpu.nasm
 
 $(BUILD)/hello_c.bin: test/hello.c mon.h mon.nasm $(TOOLS) | $(BUILD)
 	@$(NICEBUILD) --monitor --asm mon.nasm -I . -o $@ test/hello.c
@@ -329,11 +282,11 @@ LOAD_EMU = load\r10000 7\rFFFEFFFF 8\rFFFF0000 1\r\rdump 0x10000, 1\rhalt\r
 # build/ram64k.bin writes to 0xFFFFFF9E: EFFF takes a word, and F000, the
 # monitor's variables, and 1EFFF, past the RAM, do not.
 LOAD_64K = load\rEFFF 1\rF000 2\r1EFFF 3\r\rdump 0xEFFF, 1\rhalt\r
-# rom: sys 0x8000 runs test/rom.nasm, which traps, twice, then sys
-# 0x8100, which leaves values on the FPU and jumps to 0, the cold start,
-# which gives the C code its initial values again and clears the FPU, and
-# sys 0x8000 once more.
-ROM  = sys 0x8000\rsys 0x8000\rsys 0x8100\rsys 0x8000\rhalt\r
+# fpu: sys 0x8000 runs test/fpu.nasm three times, which leaves values
+# and flags on the FPU, and returns, leaves through mon_exit, and returns,
+# then sys 0x8100, which leaves them too and jumps to 0, the cold start,
+# and sys 0x8000 once more, which leaves through mon_exit (issue #141).
+FPU  = sys 0x8000\rsys 0x8000\rsys 0x8000\rsys 0x8100\rsys 0x8000\rhalt\r
 # sd_write: sys 0x8000 runs test/sd.nasm, which writes sector 2, which
 # the image shows.
 SD_WRITE = sys 0x8000\rhalt\r
@@ -464,9 +417,9 @@ DUMP_sd_write = -d 0x9100:6
 DUMP_fs       = -d 0x9100:36 -d 0x9180:8 -d 0x9200:45 -d 0x9280:16 -d 0x92A0:11
 DUMP_fsw      = -d 0x9100:42
 DUMP_fat      = -d 0xFFFFF11A:5
-# For rom the number of runs, the results of test/rom.nasm's calls, the
-# FPU's status at the start of each run, and at the halt
-DUMP_rom      = -d 0x9100:10 -d 0x9110:3 -d 0xFFFFFF8D:1
+# For fpu the number of test/fpu.nasm's runs, the FPU's status at the
+# start of each run, and at the halt
+DUMP_fpu      = -d 0x9100:5 -d 0xFFFFFF8D:1
 # For arp the results of test/arp.nasm's calls, and the cache it copied,
 # and for udp the results of test/udp.nasm's, and the bytes and the
 # sources that udp_recv wrote
@@ -488,9 +441,7 @@ FAT32_START_BYTES = $(shell echo $$(($(FAT32_START) * 512)))
 
 # Each test runs the monitor with its input and its program, if any, and
 # compares the console output, the dumps, and the screen with
-# test/NAME.expected. rom runs build/rom.bin in place of the monitor, and
-# the address of its trap, which moves with the monitor's code, is shown
-# as the label it must be, _rom_trap, from niceasm's symbols. The Halted line and the registers are left out, as
+# test/NAME.expected. The Halted line and the registers are left out, as
 # the steps and the registers change with the code, but for VBASE, bits
 # 23-0 of R14, which must be 0, also after hello, which returns with
 # VBASE 0x80, and so tests that a program returns to mon_exit.
@@ -517,7 +468,7 @@ FAT32_START_BYTES = $(shell echo $$(($(FAT32_START) * 512)))
 # (test/fat_tool.py order).
 test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.bin $(BUILD)/hello.bin \
       $(BUILD)/dis.bin $(BUILD)/sd.bin $(BUILD)/arp.bin $(BUILD)/udp.bin $(BUILD)/net.bin \
-      $(BUILD)/netdhcp.bin $(BUILD)/dns.bin $(BUILD)/lease.bin $(BUILD)/rom.bin $(BUILD)/fs.bin $(BUILD)/fsw.bin \
+      $(BUILD)/netdhcp.bin $(BUILD)/dns.bin $(BUILD)/lease.bin $(BUILD)/fpu.bin $(BUILD)/fs.bin $(BUILD)/fsw.bin \
       $(FAT_IMAGES) $(BUILD)/version_test.nasm
 	@test '$(FOLDER_UC)' = NICE || { echo "make test needs FOLDER=NICE, not $(FOLDER)"; exit 1; }
 	@$(PYTHON) test/ring.py $(EMU) $(BUILD)/monitor_test.bin:32768 \
@@ -544,7 +495,7 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	@printf '$(RESET)' > $(BUILD)/reset.txt
 	@printf '$(SCROLL)' > $(BUILD)/scroll.txt
 	@printf '$(SD_WRITE)' > $(BUILD)/sd_write.txt
-	@printf '$(ROM)' > $(BUILD)/rom.txt
+	@printf '$(FPU)' > $(BUILD)/fpu.txt
 	@printf '$(FAT)' > $(BUILD)/fat.txt
 	@printf '$(FATBAD)' > $(BUILD)/fatbad.txt
 	@printf '$(FAT1)' > $(BUILD)/fat1.txt
@@ -567,7 +518,7 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	  if [ -n "$$base0" ]; then cp --sparse=always $$base0 $(BUILD)/$${t}0.img; sd="--sd0 $(BUILD)/$${t}0.img"; fi; \
 	  if [ -n "$$base1" ]; then rm -f $(BUILD)/$${t}1.img; cp --sparse=always $$base1 $(BUILD)/$${t}1.img; \
 	    if [ -n "$$ro1" ]; then chmod a-w $(BUILD)/$${t}1.img; fi; sd="$$sd --sd1 $(BUILD)/$${t}1.img"; fi; }; \
-	for t in cmds basic scroll load load_emu load_64k sd_write arp udp net rom fs fsw fat fatw fatl tab fatlw fatbad fat1 fatnone time \
+	for t in cmds basic scroll load load_emu load_64k sd_write arp udp net fpu fs fsw fat fatw fatl tab fatlw fatbad fat1 fatnone time \
 	           clock clockpast \
 	           hello reset hello_c; do \
 	  opts=; rom=$(BUILD)/monitor_test.bin; base0=; base1=; ro1=; mask=; \
@@ -586,7 +537,7 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	      opts="--step-time --eth-in test/udp.eth --eth-out $(BUILD)/udp.eth.out";; \
 	    net) prog=$(BUILD)/net.bin; input=run; dump='$(DUMP_net)'; \
 	      opts="--step-time --eth-in test/net.eth --eth-out $(BUILD)/net.eth.out";; \
-	    rom) prog=; rom=$(BUILD)/rom.bin; input=rom; dump='$(DUMP_rom)';; \
+	    fpu) prog=$(BUILD)/fpu.bin; input=fpu; dump='$(DUMP_fpu)';; \
 	    fs) prog=$(BUILD)/fs.bin; input=run; dump='$(DUMP_fs)'; \
 	      opts="--sd0 $(BUILD)/fat/fat32.img --sd1 $(BUILD)/fat/super.img";; \
 	    fsw) prog=$(BUILD)/fsw.bin; input=run; dump='$(DUMP_fsw)'; \
@@ -646,9 +597,6 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	      $(EMU) -t -n $(MAX_STEPS) -i $(BUILD)/$$input.txt $$opts $$sd $(BUILD)/$$t.full.bin | \
 	        $(PYTHON) test/fat_tool.py order $${base0:+--sd0 $$base0} $${base1:+--sd1 $$base1}; fi; } \
 	    > $(BUILD)/$$t.out; \
-	  if [ $$t = rom ]; then \
-	    trap=$$(sed -n 's/^\(........\) _rom_trap$$/\1/p' $(BUILD)/rom.sym | tr a-f A-F); \
-	    sed -i "s/ at $$trap/ at _rom_trap/" $(BUILD)/$$t.out; fi; \
 	  if cmp -s test/$$t.expected $(BUILD)/$$t.out; then echo "PASS monitor $$t"; \
 	  else echo "FAIL monitor $$t"; diff test/$$t.expected $(BUILD)/$$t.out; fail=1; fi; \
 	done; exit $$fail
@@ -658,8 +606,7 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 # writes. Its sources are those of monitor_test.bin, with the version of
 # the tests in a file of its own.
 ROMSIZE = $(PYTHON) ../tools/romsize.py monitor --bin $(BUILD)/monitor_test.bin \
-            $(addprefix --c ,$(ROM_C)) --doc INTERNALS.md $(SOURCES) $(BUILD)/rom_c.nasm \
-            $(RUNTIME_ROM) $(BUILD)/folder.nasm $(BUILD)/version_test.nasm
+            --doc INTERNALS.md $(SOURCES) $(BUILD)/folder.nasm $(BUILD)/version_test.nasm
 
 $(BUILD)/version_test.nasm: Makefile | $(BUILD)
 	@$(call PACKED,VERSION,V9.9) > $@
@@ -669,7 +616,7 @@ romsize: $(BUILD)/monitor_test.bin $(BUILD)/version_test.nasm
 
 # The layout of the sources, as nice_cpu's nicefmt checks it
 fmt:
-	@$(FMT) $(SOURCES) test/hello.nasm test/dis.nasm test/sd.nasm test/arp.nasm test/rom.nasm \
+	@$(FMT) $(SOURCES) test/hello.nasm test/dis.nasm test/sd.nasm test/arp.nasm test/fpu.nasm \
 	  test/fs.nasm test/fsw.nasm test/udp.nasm test/net.nasm test/netdhcp.nasm \
 	  test/dns.nasm test/lease.nasm test/tcp.nasm test/tcpt.nasm test/tcphw.nasm mon_c.nasm
 

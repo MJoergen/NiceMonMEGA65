@@ -60,7 +60,7 @@ _io_puthex
 ; R1, and R7 across the calls, saved.
 _io_putdec
                 PUSH    R7
-                MOVE    R7, 0           ; the digits pushed
+                CLR     R7              ; the digits pushed
                 MOVE    @io.mpu_b, 10
 :
                 MOVE    @io.mpu_a, R1
@@ -82,8 +82,8 @@ _io_putdec
 ; last 8. Uses R1-R5.
 _io_gethex
                 MOVE    R3, R1
-                MOVE    R1, 0
-                MOVE    R2, 0
+                CLR     R1
+                CLR     R2
 :
                 CMP     @R3, 0x20
         ?Z      ADD     R3, R3, 1
@@ -129,7 +129,7 @@ _io_getc.soon
         ?!Z     RET
                 CMP     @io.us, R2
         ?N      JMP     :-
-                MOVE[M] R1, 0
+                MOVE[M] R1, R0
                 RET
 
 ; _io_gets: a line into the buffer at R1, up to R2 characters, one per
@@ -146,7 +146,7 @@ _io_getc.soon
 ; the new cursor, with what it added echoed.
 _io_gets
                 MOVE    R3, 0x100       ; no byte read
-                MOVE    R4, 0           ; and no routine of TAB
+                CLR     R4              ; and no routine of TAB
 _io_gets.first
                 PUSH    R7
                 PUSH    R8
@@ -198,7 +198,7 @@ _io_gets.cancel
                 MOVE    R1, _io_gets.cc
                 CALL    _io_puts
 _io_gets.end
-                MOVE    @R9, 0
+                CLR     @R9
                 CALL    _io_crlf
                 SUB     R1, R9, R7
                 POP     R10

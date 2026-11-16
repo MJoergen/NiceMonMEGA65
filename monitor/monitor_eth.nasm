@@ -134,7 +134,7 @@ st_dhcp
 ; and R7 across the calls, saved: the tries left.
 net_dhcp
                 PUSH    R7
-                MOVE    @V_BSTATE, 0
+                CLR     @V_BSTATE
                 CALL    net_on
                 MOVE    @V_NWAIT, DHCP_CLIENT
                 MOVE    R1, @io.us
@@ -160,9 +160,9 @@ dhcp_try
                 JMP     :++
 :
                 CALL    dhcp_commit
-                MOVE    R7, 0
+                CLR     R7
 :
-                MOVE    @V_NWAIT, 0
+                CLR     @V_NWAIT
                 CALL    net_off
                 MOVE    R1, R7
                 POP     R7
@@ -200,7 +200,7 @@ dhcp_commit
 ; bg_start: the exchange in the background begun, if the station has no
 ; IP address, with a transaction of its own. Uses R1 and R2.
 bg_start
-                MOVE    @V_BSTATE, 0
+                CLR     @V_BSTATE
                 TST     @E_IP
         ?!Z     RET
                 MOVE    R1, @io.us
@@ -263,13 +263,13 @@ bg_time
                 JMP     bg_none
 bg_ack
                 CALL    dhcp_commit
-                MOVE    @V_BSTATE, 0
+                CLR     @V_BSTATE
                 MOVE    R1, 1
                 RET
 bg_stop
-                MOVE    @V_BSTATE, 0
+                CLR     @V_BSTATE
 bg_none
-                MOVE    R1, 0
+                CLR     R1
                 RET
 
 ; bg_show: for getline_wait, the address that the exchange in the
@@ -296,7 +296,7 @@ bg_show
 ; eth_on: the port enabled, with its queue emptied, so that no frame from
 ; before comes. Uses no register.
 eth_on
-                MOVE    @ETH_CSR, 0
+                CLR     @ETH_CSR
                 MOVE    @ETH_CSR, ETH_ON
                 RET
 
@@ -305,11 +305,11 @@ eth_on
 ; empty. Uses R1-R5.
 eth_recv
                 MOVE[M] R2, @ETH_RX_LEN
-        ?Z      MOVE    R1, 0
+        ?Z      CLR     R1
         ?Z      RET
                 ADD     R3, R2, 5       ; the words, with the 2 bytes before the frame
                 SHR     R3, R3, 2
-                MOVE    R4, 0           ; the chunk, of the queue's buffer
+                CLR     R4              ; the chunk, of the queue's buffer
 :
                 MOVE    @ETH_CHUNK, R4
                 MOVE    R5, ETH_BUF
@@ -322,7 +322,7 @@ eth_recv
                 ADD     R4, R4, 1
                 JMP     :--
 :
-                MOVE    @ETH_RX_LEN, 0  ; the frame released
+                CLR     @ETH_RX_LEN     ; the frame released
                 MOVE    R1, R2
                 RET
 
@@ -369,7 +369,7 @@ ip_csum
                 AND     @6[R1], @6[R1], 0xFFFF0000
                 ADD     R2, R1, 4
                 MOVE    R3, 5
-                MOVE    R4, 0
+                CLR     R4
 :
                 MOVE    R5, @R2++
                 SHR     R6, R5, 16
@@ -455,7 +455,7 @@ arp_look
 arp_found
                 MOVE    R2, @1[R1]
                 MOVE    R3, @2[R1]
-                MOVE    R1, 0
+                CLR     R1
                 JMP     :+
 arp_none
                 MOVE    R1, -1
@@ -483,7 +483,7 @@ arp_find
                 ADD     R4, R4, 4
                 CMP     R4, V_ARP+4*ARP_SLOTS
         ?!Z     JMP     :--
-                MOVE    R1, 0
+                CLR     R1
                 RET
 
 ; arp_take: the ARP frame of at least 42 bytes, whose headers are at
@@ -547,7 +547,7 @@ arp_request
                 SHR     R4, @E_IP, 16
                 OR      @V_TXF+7, R3, R4  ; and its IP address
                 SHL     @V_TXF+8, @E_IP, 16  ; the target's MAC address, 0
-                MOVE    @V_TXF+9, 0
+                CLR     @V_TXF+9
                 MOVE    @V_TXF+10, R6
                 MOVE    R1, V_TXF
                 MOVE    R2, 42
@@ -611,26 +611,26 @@ net_off
                 ADD     R1, R1, 1
                 CMP     R1, V_TCB+TCP_HANDLES
         ?!Z     JMP     :-
-                MOVE    @ETH_CSR, 0
-                MOVE    @V_LARM, 0
-                MOVE    @V_NARM, 0      ; as no connection has a deadline
+                CLR     @ETH_CSR
+                CLR     @V_LARM
+                CLR     @V_NARM         ; as no connection has a deadline
 :
                 POP     R1
                 RET
 
-; net_close: the network closed, for the cold start, mon_exit, and
-; mon_trap: a RST for each TCP connection, at best effort, and every
+; net_close: the network closed, for the cold start and mon_exit: a RST
+; for each TCP connection, at best effort, and every
 ; handle freed, by tcp_close_all, the endpoint closed, the datagram held
 ; forgotten, no wait of the ROM's own, no deadline armed, and the port
 ; disabled. A lease is kept. Uses R1-R6.
 net_close
                 CALL    tcp_close_all
-                MOVE    @V_UPORT, 0
-                MOVE    @V_ULEN, 0
-                MOVE    @V_NWAIT, 0
-                MOVE    @V_LARM, 0
-                MOVE    @V_NARM, 0
-                MOVE    @ETH_CSR, 0
+                CLR     @V_UPORT
+                CLR     @V_ULEN
+                CLR     @V_NWAIT
+                CLR     @V_LARM
+                CLR     @V_NARM
+                CLR     @ETH_CSR
                 RET
 
 ; net_clock: R1 = the fine clock, in microseconds. Uses R1.
@@ -651,7 +651,7 @@ ip_ident
 ; may give it a meaning. Uses R1-R6.
 net_poll
                 CALL    net_step
-                MOVE    R1, 0
+                CLR     R1
                 RET
 
 ; net_step: the poll of net_poll, for the ROM's waits too. R1 = the bytes
@@ -659,7 +659,7 @@ net_poll
 ; cost with nothing to do is a read of ETH_CSR, and while a deadline is
 ; armed, a read of the clock and a comparison. Uses R1-R6.
 net_step
-                MOVE    R1, 0
+                CLR     R1
                 AND[M]  R0, @ETH_CSR, ETH_WAITS
         ?!Z     CALL    net_frames
                 TST     @V_TCWORK
@@ -700,7 +700,7 @@ net_frame
                 MOVE[M] R7, @ETH_RX_LEN
         ?Z      JMP     net_frames_none
                 MOVE    R2, V_NHDR      ; its headers, chunks 0 and 1
-                MOVE    R3, 0
+                CLR     R3
 :
                 MOVE    @ETH_CHUNK, R3
                 MOVE    R1, ETH_BUF
@@ -736,7 +736,7 @@ net_frame
         ?Z      JMP     :+
                 CMP     R1, R2
         ?!Z     JMP     :+
-                MOVE    @V_ULEN, 0      ; the datagram held, lost
+                CLR     @V_ULEN         ; the datagram held, lost
                 MOVE    R1, V_RXF
                 CALL    eth_recv
                 JMP     net_frames_end
@@ -777,7 +777,7 @@ net_frame
                 MOVE    @V_ULEN, R7     ; held
                 JMP     net_next
 net_lease
-                MOVE    @V_ULEN, 0      ; the datagram held, lost
+                CLR     @V_ULEN         ; the datagram held, lost
                 MOVE    R1, V_RXF
                 CALL    eth_recv
                 CALL    lease_reply
@@ -789,12 +789,12 @@ net_tcp
 net_arp
                 CALL    arp_take
 net_drop
-                MOVE    @ETH_RX_LEN, 0  ; released
+                CLR     @ETH_RX_LEN     ; released
 net_next
                 SUB[M]  R8, R8, 1
         ?!Z     JMP     net_frame
 net_frames_none
-                MOVE    R1, 0
+                CLR     R1
 net_frames_end
                 POP     R8
                 POP     R7
@@ -822,7 +822,7 @@ net_config
                 MOVE    @1[R7], @V_MASK
                 MOVE    @2[R7], @V_GW
                 MOVE    @3[R7], @V_DNS
-                MOVE    R1, 0
+                CLR     R1
                 POP     R7
                 RET
 
@@ -845,10 +845,10 @@ net_set
                 MOVE    @V_MASK, @1[R7]
                 MOVE    @V_GW, @2[R7]
                 MOVE    @V_DNS, @3[R7]
-                MOVE    @V_NTP, 0
-                MOVE    @V_BSTATE, 0
+                CLR     @V_NTP
+                CLR     @V_BSTATE
                 CALL    lease_forget
-                MOVE    R1, 0
+                CLR     R1
                 POP     R7
                 RET
 
@@ -877,15 +877,15 @@ udp_open
         ?Z      AND     R1, @io.us, 0x3FFF
         ?Z      OR      R1, R1, 0xC000
                 MOVE    @V_UPORT, R1
-                MOVE    @V_ULEN, 0
+                CLR     @V_ULEN
                 JMP     net_on          ; which returns to the caller
 
 ; udp_close: the endpoint closed, the datagram held forgotten, and the
 ; port for Ethernet frames disabled by net_off. R1 = 0.
 udp_close
-                MOVE    @V_UPORT, 0
-                MOVE    @V_ULEN, 0
-                MOVE    R1, 0
+                CLR     @V_UPORT
+                CLR     @V_ULEN
+                CLR     R1
                 JMP     net_off         ; which returns to the caller
 
 ; udp_send: the R4 bytes at R3 sent to the port R2 of the IP address R1,
@@ -934,7 +934,7 @@ udp_send
 :
                 AND[M]  R0, @ETH_CSR, ETH_BUSY
         ?!Z     JMP     :-              ; as the send buffer takes no write while busy
-                MOVE    R5, 0           ; the word of the send buffer
+                CLR     R5              ; the word of the send buffer
                 MOVE    R6, R10         ; the bytes left
 udp_word
                 CMP     R5, UDP_HDR
@@ -944,7 +944,7 @@ udp_word
 :
                 TST     R6
         ?Z      JMP     udp_go          ; all written
-                MOVE    R2, 0
+                CLR     R2
                 MOVE    R4, 4
 :
                 SHL     R2, R2, 8
@@ -965,7 +965,7 @@ udp_put
                 JMP     udp_word
 udp_go
                 ADD     @ETH_TX_LEN, R10, 42
-                MOVE    R1, 0
+                CLR     R1
                 JMP     :+
 udp_noroute
                 MOVE    R1, E_NOROUTE
@@ -986,7 +986,7 @@ net_hop
                 MOVE    R2, 0xFFFF
                 MOVE    R3, 0xFFFFFFFF
                 CMP     R1, 0xFFFFFFFF
-        ?Z      MOVE    R1, 0
+        ?Z      CLR     R1
         ?Z      RET                     ; to everyone
                 XOR     R2, R1, @E_IP
                 AND[M]  R0, R2, @V_MASK
@@ -1038,7 +1038,7 @@ udp_recv
                 MOVE    R8, R2
                 MOVE    R9, R3
                 CALL    net_step
-                MOVE    R1, 0
+                CLR     R1
                 TST     R8
         ?Z      JMP     udp_recv_end    ; no room: the datagram stays
                 CALL    udp_take
@@ -1051,7 +1051,7 @@ udp_recv
                 MOVE    @R9, @V_RXF+7
                 SHR     @1[R9], @V_RXF+9, 16
 :
-                MOVE    R6, 0           ; the byte
+                CLR     R6              ; the byte
 :
                 ADD     R1, R6, 4*UDP_HDR
                 CALL    rx_byte
@@ -1075,7 +1075,7 @@ udp_next
 ; 31..16 of word 9, until the next poll. Uses R1.
 udp_take
                 MOVE    R1, @V_ULEN
-                MOVE    @V_ULEN, 0
+                CLR     @V_ULEN
                 RET
 
 ; The frames of net_dhcp (RFC 2131 and RFC 2132): a DISCOVER or a
@@ -1109,7 +1109,7 @@ dhcp_send
                 MOVE    R1, V_TXF
                 MOVE    R2, DHCP_WORDS
 :
-                MOVE    @R1++, 0
+                CLR     @R1++
                 SUB[M]  R2, R2, 1
         ?!Z     JMP     :-
                 MOVE    R1, V_TXF
@@ -1139,10 +1139,10 @@ dhcp_send
                 CMP     R5, DHCP_REQUEST
         ?Z      MOVE    R4, @V_DIP
                 CMP     R5, DHCP_RENEW
-        ?!C     MOVE    R4, 0           ; a renewal's
+        ?!C     CLR     R4              ; a renewal's
                 MOVE    R1, 50
                 CALL    dhcp_addr
-                MOVE    R4, 0
+                CLR     R4
                 CMP     R5, DHCP_REQUEST
         ?Z      MOVE    R4, @V_DSRV
                 MOVE    R1, 54
@@ -1150,7 +1150,7 @@ dhcp_send
                 CMP     R5, DHCP_RENEW
         ?C      JMP     :+
                 MOVE    @V_TXF+7, @E_IP  ; a renewal's: from E_IP,
-                MOVE    @V_TXF+13, 0    ; no broadcast flag,
+                CLR     @V_TXF+13       ; no broadcast flag,
                 MOVE    @V_TXF+14, @E_IP  ; and ciaddr
                 CMP     R5, DHCP_RENEW
         ?!Z     JMP     :+
@@ -1287,7 +1287,7 @@ dhcp_listen
                 SUB     R1, @io.us, R8
                 CMP     R1, DHCP_WAIT
         ?C      JMP     dhcp_listen
-                MOVE    R1, 0
+                CLR     R1
                 JMP     dhcp_wait_end
 :
                 TST     @V_PIP
@@ -1326,7 +1326,7 @@ dhcp_parse
                 PUSH    R7
                 PUSH    R8
                 ADD     R8, R1, 2
-                MOVE    R5, 0
+                CLR     R5
                 CMP     R1, 282         ; up to the cookie
         ?C      JMP     dhcp_parse_end
                 AND     R2, @V_RXF+3, 0xFFFF
@@ -1349,14 +1349,14 @@ dhcp_parse
                 CMP     @V_RXF+70, 0x63825363
         ?!Z     JMP     dhcp_parse_end
                 MOVE    @V_PIP, @V_RXF+15
-                MOVE    @V_PSRV, 0
-                MOVE    @V_PMASK, 0
-                MOVE    @V_PGW, 0
-                MOVE    @V_PDNS, 0
-                MOVE    @V_PNTP, 0
-                MOVE    @V_PLEASE, 0
-                MOVE    @V_PT1, 0
-                MOVE    @V_PT2, 0
+                CLR     @V_PSRV
+                CLR     @V_PMASK
+                CLR     @V_PGW
+                CLR     @V_PDNS
+                CLR     @V_PNTP
+                CLR     @V_PLEASE
+                CLR     @V_PT1
+                CLR     @V_PT2
                 SHR     @V_PMACH, @V_RXF+2, 16
                 SHL     R1, @V_RXF+2, 16
                 SHR     R2, @V_RXF+3, 16
@@ -1486,7 +1486,7 @@ lease_arm
                 CALL    arp_tick
                 SUB     R3, @V_LNEXT, R1
                 CMP     @V_LNEXT, R1
-        ?C      MOVE    R3, 0           ; past
+        ?C      CLR     R3              ; past
                 CMP     R3, LEASE_FAR
         ?!C     MOVE    R3, LEASE_FAR
                 SHL     R3, R3, 20
@@ -1544,8 +1544,8 @@ lease_reply
 
 ; lease_forget: no lease kept, and no housekeeping deadline. Uses R1-R3.
 lease_forget
-                MOVE    @V_LEASE, 0
-                MOVE    @V_LARM, 0
+                CLR     @V_LEASE
+                CLR     @V_LARM
                 JMP     tcp_rearm       ; which returns to the caller
 
 ; The DNS client (RFC 1035), dns_lookup, entry 25 (issue #111). A query
@@ -1586,7 +1586,7 @@ dns_lookup
                 TST     @R3
         ?!Z     JMP     :+              ; a name that starts as an address
                 MOVE    @R8, R1
-                MOVE    R1, 0
+                CLR     R1
                 JMP     dns_end
 :
                 MOVE    R1, E_NOIP
@@ -1599,7 +1599,7 @@ dns_lookup
                 MOVE    R1, V_TXF
                 MOVE    R2, DHCP_WORDS
 :
-                MOVE    @R1++, 0
+                CLR     @R1++
                 SUB[M]  R2, R2, 1
         ?!Z     JMP     :-
                 CALL    net_clock
@@ -1700,7 +1700,7 @@ dns_wait
         ?!Z     JMP     dns_send
                 MOVE    R1, E_DNSTIME
 dns_off
-                MOVE    @V_NWAIT, 0
+                CLR     @V_NWAIT
                 CALL    net_off
                 JMP     dns_end
 dns_badname
@@ -1792,7 +1792,7 @@ dns_record
                 MOVE    R1, R6
                 CALL    rx_long
                 MOVE    R2, R1
-                MOVE    R1, 0
+                CLR     R1
                 JMP     dns_parse_end
 dns_fail
                 MOVE    R1, E_DNSFAIL
@@ -1847,7 +1847,7 @@ dns_skip
 ; the server's address, and R10 the time of the send.
 st_ntp
                 MOVE    R7, R1
-                MOVE    R8, 0
+                CLR     R8
                 TST     R2
         ?Z      JMP     ntp_server      ; no offset
                 MOVE    R1, R2
@@ -1881,7 +1881,7 @@ ntp_query
                 MOVE    R1, V_TXF
                 MOVE    R2, UDP_HDR+12
 :
-                MOVE    @R1++, 0
+                CLR     @R1++
                 SUB[M]  R2, R2, 1
         ?!Z     JMP     :-
                 CALL    net_clock
@@ -1932,7 +1932,7 @@ ntp_wait
         ?!Z     JMP     ntp_send
                 MOVE    R1, E_NTPTIME
 ntp_off
-                MOVE    @V_NWAIT, 0
+                CLR     @V_NWAIT
                 CALL    net_off
                 TST     R1
         ?!Z     JMP     ntp_fail
@@ -2010,7 +2010,7 @@ ntp_parse
         ?Z      JMP     :++
                 OR[M]   R0, @V_RXF+UDP_HDR+10, @V_RXF+UDP_HDR+11
         ?Z      JMP     :++
-                MOVE    R1, 0
+                CLR     R1
                 RET
 :
                 MOVE    R1, 1
@@ -2051,7 +2051,7 @@ st_tftp
                 CMP     @R3, 0x3A       ; :
         ?!Z     JMP     tftp_ip
                 ADD     R3, R3, 1
-                MOVE    R4, 0           ; the port
+                CLR     R4              ; the port
                 MOVE    R5, R3          ; where it starts
 :
                 SUB     R2, @R3, 0x30
@@ -2076,7 +2076,7 @@ tftp_ip
         ?!Z     JMP     tftp_bad        ; more after the address
 ; The RRQ: the opcode 1, the name, a 0, octet, and a 0
                 MOVE    R2, V_TPKT
-                MOVE    @R2++, 0
+                CLR     @R2++
                 MOVE    @R2++, 1
 :
                 MOVE[M] @R2++, @R7++
@@ -2086,20 +2086,20 @@ tftp_ip
                 MOVE[M] @R2++, @R1++
         ?!Z     JMP     :-
                 SUB     @V_TLEN, R2, V_TPKT
-                MOVE    R1, 0
+                CLR     R1
                 CALL    udp_open
                 TST     R1
         ?N      JMP     tftp_fail
-                MOVE    @V_TTID, 0
+                CLR     @V_TTID
                 MOVE    @V_TBLK, 1
-                MOVE    @V_TLAST, 0
+                CLR     @V_TLAST
                 MOVE    @V_TLINE, V_LINE
                 CALL    load_pend
-                MOVE    R8, 0
+                CLR     R8
                 MOVE    R9, 0xFFFFFFFF
-                MOVE    R10, 0
-                MOVE    R11, 0
-                MOVE    R12, 0
+                CLR     R10
+                CLR     R11
+                CLR     R12
 tftp_try
                 MOVE    R7, TFTP_TRIES
 tftp_send
@@ -2144,7 +2144,7 @@ tftp_wait
 :
                 MOVE    @V_TTID, R2
                 SUB     @V_TEND, R1, 4
-                MOVE    R7, 0           ; the byte of the block
+                CLR     R7              ; the byte of the block
 :
                 CMP     R7, @V_TEND
         ?Z      JMP     :+
@@ -2154,7 +2154,7 @@ tftp_wait
                 CALL    tftp_char
                 JMP     :-
 :
-                MOVE    @V_TPKT, 0
+                CLR     @V_TPKT
                 MOVE    @V_TPKT+1, 4
                 MOVE    R1, @V_TBLK
                 SHR     @V_TPKT+2, R1, 8
@@ -2254,7 +2254,7 @@ tftp_char
 tftp_eol
                 MOVE    R6, @V_TLINE
                 MOVE    @V_TLINE, V_LINE
-                MOVE    @R6, 0
+                CLR     @R6
                 MOVE    R1, V_LINE
                 TST     @V_TLIST
         ?!Z     JMP     puts_crlf       ; a line of a listing, shown

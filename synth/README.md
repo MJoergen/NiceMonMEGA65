@@ -32,8 +32,8 @@ reports next to it. Built in `synth/r6`, it has no ROM, and its core
 waits, held, for a host on the debug link. `make r6` in the top directory
 builds the monitor first and puts it in the ROM,
 `monitor/build/monitor.bin`, unless `ROM=` gives another
-file, or none when empty. The monitor has C code, so that needs clang
-too ([monitor/](../monitor/INTERNALS.md#building-and-testing)). With
+file, or none when empty. The monitor is assembly, so that needs
+Python alone ([monitor/](../monitor/INTERNALS.md#building-and-testing)). With
 
     make -C synth/r6 ROM=/path/to/monitor.bin
 

@@ -96,21 +96,9 @@
 ; no ROM, the monitor is a program at 0 like any other, and cat
 ; monitor.bin prog.bin runs it with a program at 0x8000 (Makefile, test).
 ;
-; The ROM's C code, the files of the Makefile's ROM_C, none since FAT32
-; is assembly (issue #149), is one wasm module, which nicewasm --ram translates for a ROM and the
-; Makefile joins after mon.nasm, with nice_cpu's lib.nasm and
-; muldiv_mpu.nasm (INTERNALS.md, "C in the ROM"). The words that it writes,
-; its mutable globals and its memory, with its stack, are in the RAM
-; from WASM_RAM up to below WASM_END, which the Makefile checks against
-; ___wasm_ram_end; ___wasm_start copies their initial values there at
-; every cold start. The two vectors that lib.nasm jumps through are words
-; of the variables, which the cold start sets: ___putc_vector to
-; mon_putc, and ___wasm_trap_vector to mon_trap, which prints the trap
-; and goes back to the main loop as mon_exit does, so that a trap of the
-; C code, or of a program's, does not halt the core. The main loop sets
-; SP to STACK, and the C code's stack pointer, the module's first global
-; at WASM_RAM, to the value that the cold start found there, V_CSP, so
-; that it leaves the C code from any depth.
+; The ROM is assembly only. A program in C brings nice_cpu's runtime
+; library with it, and calls the entries of the dispatch table through
+; the stubs of mon.nasm and mon_c.nasm (README.md, "Programs").
 ;
 ; The routines that the statements share with programs, _io_puts, _io_crlf,
 ; _io_puthex, _io_putdec, _io_gethex, _io_gets, and _io_getc, are in
@@ -157,7 +145,6 @@ LINE_MAX        .EQU    76              ; as the monitor's line had, after a pro
 V_UF            .EQU    0xFFFFF060      ; for DIS: the fields dest, s0, and s1,
 V_UC            .EQU    0xFFFFF063      ; their constant words,
 V_UNOPS         .EQU    0xFFFFF066      ; and the operands of the mnemonic
-V_CSP           .EQU    0xFFFFF067      ; the C code's stack pointer at the cold start, which main sets again
 V_I             .EQU    0xFFFFF068      ; for the clock: the fields of a date and a time to set, and a 7th word,
 V_F             .EQU    0xFFFFF06E      ; the fields of the clock's time, which is the 7th of V_I,
 V_DAYS          .EQU    0xFFFFF074      ; and its days since 1970
@@ -176,8 +163,6 @@ V_PGW           .EQU    0xFFFFF119
 V_LSTATS        .EQU    0xFFFFF11A      ; for LOAD "NAME.BIN": what fat_load gives, 5 words
 V_TXF           .EQU    0xFFFFF120      ; a frame to send, from byte 2, DHCP_WORDS words, as the send buffer has it
 V_RXF           .EQU    0xFFFFF180      ; a frame received, from byte 2, 380 words, as the queue's buffer has it
-___wasm_trap_vector .EQU 0xFFFFF300     ; the routine that a wasm trap jumps to, mon_trap (lib.nasm)
-___putc_vector  .EQU    0xFFFFF301      ; the routine that nice_putc and nice_print jump to, mon_putc
 V_MASK          .EQU    0xFFFFF302      ; the network's mask, from DHCP, 0 for none
 V_GW            .EQU    0xFFFFF303      ; and its gateway, 0 for none
 V_UPORT         .EQU    0xFFFFF304      ; the local port of the UDP endpoint, 0 while it is closed
@@ -231,8 +216,6 @@ V_NTP           .EQU    0xFFFFF3D1      ; the NTP server, the first of DHCP's op
 V_DNTP          .EQU    0xFFFFF3D2      ; for DHCP: the NTP server of the OFFER or the ACK,
 V_PNTP          .EQU    0xFFFFF3D3      ; and of the last reply that dhcp_parse took
 V_NTPIP         .EQU    0xFFFFF3D4      ; for NTP: the server's IP address, which dns_lookup writes
-WASM_RAM        .EQU    0xFFFFF400      ; the words that the ROM's C code writes, from here
-WASM_END        .EQU    0xFFFFF980      ; up to below here, FAT_RAM, which the Makefile checks
 ; FAT32's state (monitor_fat.nasm), from FAT_RAM up to below the I/O page
 FAT_RAM         .EQU    0xFFFFF980
 V_MOUNTED       .EQU    0xFFFFF980      ; not 0 while a card is mounted, in the slot V_SLOT
@@ -328,38 +311,33 @@ SCR_MAX         .EQU    0x7FFF          ; the largest display offset
 ; packets starts from the fine clock, net_clock, and the local ports of
 ; TCP from the microseconds, with no connection opened. Without an IP
 ; address, the DHCP exchange in the background starts, with bg_start
-; (issue #126). The vectors
-; of lib.nasm are set, and ___wasm_start gives the words of the ROM's C
-; code their initial values. The clock of the time of day, while it is not
-; set, is set from the MEGA65's real-time clock, with clock_rtc
+; (issue #126). FAT32's state is cleared, with fat_reset, so that no card
+; is mounted and no file open. The clock of the time of day, while it is
+; not set, is set from the MEGA65's real-time clock, with clock_rtc
 ; (issue #105). The RAM from 0x8000 is left alone, so that a program a
 ; host has loaded is still there.
 mon_reset
-                MOVE    R14, 0          ; E = 0, VBASE = 0; bit 24 stays 1
-                MOVE    @TIMER, 0
+                CLR     R14             ; E = 0, VBASE = 0; bit 24 stays 1
+                CLR     @TIMER
                 MOVE    @FPU_CMD, 0x0101  ; CLEAR 1, as a reset of the core does
-                MOVE    @SCR_FONT, 0
+                CLR     @SCR_FONT
                 MOVE    SP, STACK
                 CALL    net_close
-                MOVE    @V_MASK, 0
-                MOVE    @V_GW, 0
-                MOVE    @V_DNS, 0
-                MOVE    @V_NTP, 0
-                MOVE    @V_LEASE, 0
+                CLR     @V_MASK
+                CLR     @V_GW
+                CLR     @V_DNS
+                CLR     @V_NTP
+                CLR     @V_LEASE
                 CALL    net_clock
                 MOVE    @V_IPID, R1
                 CALL    bg_start
                 AND     R1, @io.us, 0x3FFF
                 OR      @V_TCPORT, R1, 0xC000
-                MOVE    @V_TCOPENS, 0
-                MOVE    @___wasm_trap_vector, mon_trap
-                MOVE    @___putc_vector, mon_putc
-                CALL    ___wasm_start
+                CLR     @V_TCOPENS
                 CALL    fat_reset
-                MOVE    @V_CSP, @WASM_RAM  ; the C code's stack pointer, for main
                 MOVE    R1, V_ARP
 :
-                MOVE    @R1++, 0
+                CLR     @R1++
                 CMP     R1, V_ARP+4*ARP_SLOTS+1  ; and V_ARPNEXT
         ?!Z     JMP     :-
                 MOVE    @V_COLOR, COLOR
@@ -368,19 +346,19 @@ mon_reset
 ; that it keeps, with the offset off, and the rows of history that fit
 ; after the 25 of the screen. The math unit divides (nice_cpu's DEVICES.md
 ; §2).
-                MOVE    @SCR_CTL, 0
+                CLR     @SCR_CTL
                 MOVE    @SCR_OFFS, 0xFFFFFFFF
                 AND     R1, @SCR_OFFS, SCR_MAX
                 ADD     R1, R1, 1
                 MOVE    @V_HSIZE, R1
                 SUB[M]  R1, R1, 2000
-        ?C      MOVE    R1, 0
+        ?C      CLR     R1
                 MOVE    @io.mpu_a, R1
                 MOVE    @io.mpu_b, 80
                 MOVE    @V_HCAP, @io.mpu_udivq
-                MOVE    @V_HHEAD, 0
-                MOVE    @V_HCOUNT, 0
-                MOVE    @V_BACK, 0
+                CLR     @V_HHEAD
+                CLR     @V_HCOUNT
+                CLR     @V_BACK
                 CALL    scr_cls
                 CALL    clock_rtc
                 JMP     bas_start       ; basic.nasm
@@ -397,48 +375,18 @@ mon_exit
                 JMP     main
 
 ; sys_end: for mon_exit, and for SYS at a program's return, with R1 the
-; status: the state restored as for mon_exit, but the stack, and the
-; status printed. Uses R1-R4.
+; status: the state as the header of mon_exit says, but the stack, a new
+; line if the cursor is not in column 0, and the status printed. The
+; cursor is taken from its registers, SCR_X and SCR_Y, as a program may
+; have moved it there and not through scr_moveto, such as the demo, which
+; clears the screen and leaves the cursor at the top left. A column past
+; 79 is 79, and a row past 24 is 24. Uses R1-R6.
 sys_end
                 PUSH    R1
-                CALL    exit_restore
-                MOVE    R1, S_RETURN
-                CALL    puts_b
-                POP     R1
-                CALL    _io_puthex
-                JMP     _io_crlf        ; which returns to the caller
-
-; mon_trap: where a wasm trap of the ROM's C code jumps through
-; ___wasm_trap_vector, with R1 the trap's code and R2 its address
-; (nice_cpu's WASM.md). Back to the main loop as from mon_exit, with
-; "Trap N at ADDR" printed, the code in decimal and the address in hex.
-mon_trap
-                MOVE    SP, STACK
-                MOVE    R7, R1          ; the code
-                MOVE    R8, R2          ; the address
-                CALL    exit_restore
-                MOVE    R1, S_TRAP
-                CALL    puts_b
-                MOVE    R1, R7
-                CALL    _io_putdec
-                MOVE    R1, S_AT
-                CALL    puts_b
-                MOVE    R1, R8
-                CALL    _io_puthex
-                CALL    _io_crlf
-                JMP     main
-
-; exit_restore: for mon_exit and mon_trap, the state as the header of
-; mon_exit says, but the stack, and a new line if the cursor is not in
-; column 0. The cursor is taken from its registers, SCR_X and SCR_Y, as
-; a program may have moved it there and not through scr_moveto, such as
-; the demo, which clears the screen and leaves the cursor at the top
-; left. A column past 79 is 79, and a row past 24 is 24. Uses R1.
-exit_restore
-                MOVE    R14, 0          ; E = 0, VBASE = 0; bit 24 stays 1
-                MOVE    @TIMER, 0
+                CLR     R14             ; E = 0, VBASE = 0; bit 24 stays 1
+                CLR     @TIMER
                 MOVE    @FPU_CMD, 0x0101  ; CLEAR 1: no values or flags for the next program
-                MOVE    @SCR_FONT, 0    ; Spleen, whatever the program chose
+                CLR     @SCR_FONT       ; Spleen, whatever the program chose
                 CALL    net_close       ; no frames, if the program took them
                 MOVE    @SCR_CTL, 0x60  ; the cursor, which a program may hide
                 MOVE    R1, @SCR_X
@@ -450,8 +398,12 @@ exit_restore
         ?!C     MOVE    R1, 24
                 MOVE    @V_ROW, R1
                 TST     @V_COL
-        ?!Z     JMP     _io_crlf        ; which returns to the caller
-                RET
+        ?!Z     CALL    _io_crlf
+                MOVE    R1, S_RETURN
+                CALL    puts_b
+                POP     R1
+                CALL    _io_puthex
+                JMP     _io_crlf        ; which returns to the caller
 
 ; mon_version: entry 2. R1 = the version of the table, the major number in
 ; bits 31..16 and the minor in 15..0.
@@ -486,7 +438,7 @@ mon_putc
         ?!Z     MOVE    @V_COL, R1
         ?!Z     JMP     putc_cur
 ; Column 0 of the next row, with the rows moved up by one after the last
-putc_lf         MOVE    @V_COL, 0
+putc_lf         CLR     @V_COL
                 ADD     R1, @V_ROW, 1
                 CMP     R1, 25
         ?!Z     MOVE    @V_ROW, R1
@@ -533,7 +485,7 @@ putc_cur
                 RET
 putc_ctl
                 CMP     R1, 0x0D
-        ?Z      MOVE    @V_COL, 0
+        ?Z      CLR     @V_COL
         ?Z      JMP     putc_cur
                 CMP     R1, 0x0A
         ?Z      JMP     putc_lf
@@ -561,7 +513,7 @@ mon_out         MOVE    R2, @V_OUT
 ; scr_cls: entry 5. The screen blank in the current color, the cursor at
 ; the top left, shown and blinking, and the display offset 0. Uses R1 and
 ; R3.
-scr_cls         MOVE    @SCR_OFFS, 0
+scr_cls         CLR     @SCR_OFFS
                 MOVE    @SCR_CTL, 0x60
                 OR      R3, @V_COLOR, 0x20
                 MOVE    R1, 2000
@@ -569,8 +521,8 @@ scr_cls         MOVE    @SCR_OFFS, 0
                 DEC[M]  R1, R1
                 MOVE    @SCREEN[R1], R3
         ?!Z     JMP     :-
-                MOVE    @V_COL, 0
-                MOVE    @V_ROW, 0
+                CLR     @V_COL
+                CLR     @V_ROW
                 JMP     putc_cur
 
 ; scr_moveto: entry 6. The cursor to column R1 and row R2. A column past
@@ -694,7 +646,7 @@ getline_wait
                 TST     @V_BSTATE
         ?!Z     MOVE    @V_NWAIT, DHCP_CLIENT
                 CALL    net_step
-                MOVE    @V_NWAIT, 0
+                CLR     @V_NWAIT
                 CALL    bg_step
                 TST     R1
         ?!Z     CALL    bg_show
@@ -740,9 +692,9 @@ hist_down
 hist_leave
                 TST     @V_BACK
         ?Z      RET
-                MOVE    @V_BACK, 0
+                CLR     @V_BACK
                 MOVE    @SCR_CTL, @V_CTL
-                MOVE    @SCR_OFFS, 0
+                CLR     @SCR_OFFS
                 RET
 
 ; hist_turn: the ring turned so that its newest row, at slot V_HHEAD + 1,
@@ -754,7 +706,7 @@ hist_leave
 hist_turn
                 ADD     R1, @V_HHEAD, 1
                 CMP     R1, @V_HCAP
-        ?Z      MOVE    R1, 0
+        ?Z      CLR     R1
                 SUB     @V_HHEAD, @V_HCAP, 1
                 SHL     R2, R1, 6
                 SHL     R5, R1, 4
@@ -806,9 +758,6 @@ puts_b_crlf
 
 S_RETURN
                 .ASCII_B 'Returned '
-S_TRAP          .ASCII_B 'Trap '
-S_AT            .ASCII_B ' at '
-                .DAT    0
 S_UCOMMA
                 .ASCII_B ', '
 S_UGAP          .ASCII_B '  '

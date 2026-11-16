@@ -72,7 +72,7 @@ sd_read
                 CALL    sd_wait
                 MOVE[M] R1, @SD_ERROR
         ?!Z     JMP     sd_neg
-                MOVE    R3, 0           ; the chunk
+                CLR     R3              ; the chunk
 :
                 MOVE    @SD_CHUNK, R3
                 MOVE    R4, SD_BUF
@@ -88,7 +88,7 @@ sd_read
 ; sd_write: the 128 words at R2 to the sector R1. Uses R1-R4.
 sd_write
                 CALL    sd_wait         ; as the buffer takes no write while busy
-                MOVE    R3, 0
+                CLR     R3
 :
                 MOVE    @SD_CHUNK, R3
                 MOVE    R4, SD_BUF

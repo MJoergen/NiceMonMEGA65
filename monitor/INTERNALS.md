@@ -2,16 +2,15 @@
 
 What the ROM has for itself, behind the dispatch table of
 [README.md](README.md): the routines with no entries, which only the
-ROM's statements call, FAT32, the scrollback, what is left of the C in
-the ROM, the ROM's words, and the build and the tests. A program does not call these routines, as they have no
-entries and their addresses change with every build; it calls the
-entries, or drives the registers itself.
+ROM's statements call, FAT32, the scrollback, the ROM's words, and the
+build and the tests. A program does not call these routines, as they
+have no entries and their addresses change with every build; it calls
+the entries, or drives the registers itself.
 
 - [The sector routines](#the-sector-routines)
 - [The frame routines](#the-frame-routines)
 - [FAT32](#fat32)
 - [The scrollback](#the-scrollback)
-- [C in the ROM](#c-in-the-rom)
 - [The ROM's words](#the-roms-words)
   - [Keeping the tables](#keeping-the-tables)
 - [Building and testing](#building-and-testing)
@@ -92,8 +91,8 @@ of [DEVICES.md §7](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.m
   the port again when the key comes.
   `net_on` enables the port only if it is disabled, so it does not empty
   the queue of an open endpoint, and `net_off` disables it only when the
-  endpoint is closed. The cold start, `mon_exit`, and `mon_trap` close
-  it all with `net_close`.
+  endpoint is closed. The cold start and `mon_exit` close it all with
+  `net_close`.
 - **The clocks.** The fine clock, `net_clock`, is the microsecond
   counter plus `0xFFC2F700`, so that it wraps 4 seconds after reset, and
   every run crosses a wrap. A deadline on it is due when the signed
@@ -190,10 +189,9 @@ rows there, which `DUMP` and `--dump` read.
 
 ## FAT32
 
-`monitor_fat.nasm` is FAT32 (README.md, "Files"), in NICE assembly. It
-was `fat32.c`, in the ROM's C code, until issue #149, and does what
-that did: the same results and errors of every entry, the same output,
-and the same sectors written in the same order.
+`monitor_fat.nasm` is FAT32 (README.md, "Files"), in NICE assembly, as
+all of the ROM is. The order of its sector writes is in its header, and
+the tests pin it (The tests, below).
 
 - **Entries.** The entries 9 to 15 and 20 of the dispatch table jump to
   `fs_mount` to `fs_delete`, and `fs_readname`. The statements call
@@ -215,30 +213,6 @@ and the same sectors written in the same order.
   takes 21 words of it with the return address, as measured in the
   tests in `niceemu`.
 
-## C in the ROM
-
-The ROM has no C code since FAT32 is assembly too. What the C code
-needed is still there, for a later change to take out: the Makefile's
-`ROM_C`, empty, whose module `nicewasm --ram` still translates to
-`build/rom_c.nasm`, with `___wasm_start` and 4096 bytes of memory from
-`WASM_RAM`, `0xFFFFF400`, up to below `WASM_END`, `0xFFFFF980`; the
-cold start's call of `___wasm_start`, and `V_CSP`; nice_cpu's
-`lib.nasm` and `muldiv_mpu.nasm`; the vectors; and `mon_trap`. The test
-`rom` puts `test/rom.c` into the C code, and checks them.
-
-- **The cold start** calls `___wasm_start`, which copies the initial
-  values to the RAM and sets the rest of the module's memory to 0, at
-  every start, also after `SYS 0`, which leaves the rest of the RAM alone.
-- **The vectors** that `lib.nasm` jumps through are words of the
-  variables, `0xFFFFF300` and `0xFFFFF301`, which the cold start sets:
-  `___putc_vector` to `mon_putc`, so that `nice_print` prints on the
-  outputs of `mon_out`, and `___wasm_trap_vector` to `mon_trap`. A
-  program at `0x8000` that joins `lib.nasm` has its own vectors.
-- **A trap** of the C code prints `Trap N at ADDR`, with the trap's code
-  of nice_cpu's WASM.md in decimal and its address in hex, and goes back
-  to the main loop as a program's return does, with the state that
-  `mon_exit` restores.
-
 ## The ROM's words
 
 The ROM has 32768 words, at `0x0000`–`0x7FFF`. The monitor fills it
@@ -249,8 +223,8 @@ from 0, and the rest is free. The demo is not in it: it is a program,
 <!-- romsize layout -->
 | Part | Address | Words |
 |---|---|---:|
-| The monitor | `0x0000`–`0x3842` | 14403 |
-| Free | `0x3843`–`0x7FFF` | 18365 |
+| The monitor | `0x0000`–`0x362A` | 13867 |
+| Free | `0x362B`–`0x7FFF` | 18901 |
 <!-- /romsize layout -->
 
 The monitor's words, by the source they come from, in the order
@@ -263,28 +237,22 @@ ROM is built:
 <!-- romsize monitor -->
 | Source | What it is | Words | Text |
 |---|---|---:|---:|
-| `monitor.nasm` | The dispatch table, the HAL, the cold start, and the traps | 815 | 9 |
-| `monitor_cmd.nasm` | The routines of the statements that were the commands | 1244 | 222 |
-| `basic.nasm` | BASIC: the main loop, the scanner, the keywords, the messages, and the help | 821 | 440 |
-| `monitor_dis.nasm` | The disassembler of `DIS` | 879 | 79 |
-| `monitor_sd.nasm` | The sector routines | 208 | 59 |
+| `monitor.nasm` | The dispatch table, the HAL, and the cold start | 732 | 5 |
+| `monitor_cmd.nasm` | The routines of the statements that were the commands | 1225 | 222 |
+| `basic.nasm` | BASIC: the main loop, the scanner, the keywords, the messages, and the help | 818 | 440 |
+| `monitor_dis.nasm` | The disassembler of `DIS` | 871 | 79 |
+| `monitor_sd.nasm` | The sector routines | 206 | 59 |
 | `monitor_fat.nasm` | FAT32, `DIR`, `LOAD`, `SAVE`, `DELETE`, and TAB | 3207 | 10 |
-| `monitor_eth.nasm` | The network | 3437 | 160 |
-| `monitor_tcp.nasm` | TCP | 2458 | 0 |
+| `monitor_eth.nasm` | The network | 3354 | 160 |
+| `monitor_tcp.nasm` | TCP | 2414 | 0 |
 | `monitor_clock.nasm` | The clock and `TIME` | 675 | 44 |
-| `monlib.nasm` | The routines that programs join | 280 | 0 |
+| `monlib.nasm` | The routines that programs join | 274 | 0 |
 | `mon.nasm` | The stubs of the entries | 72 | 0 |
-| `nicewasm` | `___wasm_start`, which copies the C code's data to the RAM | 28 |  |
-| `nicewasm` | The initial values of the C code's data: its strings and tables | 1 |  |
-| nice_cpu's `lib.nasm` | The runtime of the C code | 131 | 0 |
-| nice_cpu's `muldiv_mpu.nasm` | Multiply and divide | 128 | 0 |
 | `build/folder.nasm` | The folder's name, and the error of a card without it | 17 | 17 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 14403 | 1042 |
+| In all | | 13867 | 1038 |
 <!-- /romsize monitor -->
 
-- The C code's strings are in its initial values, also four characters
-  a word, so the column "Text" leaves them out.
 - `build/folder.nasm` and the version always end with a `.DAT 0`, as
   the Makefile does not count their characters.
 - The version is that of the tests, `V9.9`, so that the tables do not
@@ -306,13 +274,14 @@ a table differs from the build. `make romsize` writes the new tables.
 
 ### What the build needs
 
-- **For the monitor:** clang with the wasm32 target, `wasm-ld`, and
-  `llvm-ar`, for the ROM's C code. On Debian and Ubuntu these are the
-  `clang`, `lld`, and `llvm` packages. A bitstream with the monitor in its
-  ROM needs them too.
-- **For the tests:** also `mkfs.fat`, `sfdisk`, and mtools, from the
-  `dosfstools`, `fdisk`, and `mtools` packages, for the images of the SD
-  cards, and nice_cpu's `niceemu`.
+- **For the monitor:** Python 3, for nice_cpu's assembler. The ROM is
+  assembly only, so a bitstream with the monitor in its ROM needs no
+  more.
+- **For the tests:** nice_cpu's `niceemu`; `mkfs.fat`, `sfdisk`, and
+  mtools, from the `dosfstools`, `fdisk`, and `mtools` packages on
+  Debian and Ubuntu, for the images of the SD cards; and clang with the
+  wasm32 target, `wasm-ld`, and `llvm-ar`, from the `clang`, `lld`, and
+  `llvm` packages, for the test programs in C.
 
 ### The build
 
@@ -324,12 +293,10 @@ result with `niceasm`. In this order:
    `monitor_sd.nasm`, `monitor_fat.nasm`, `monitor_eth.nasm`,
    `monitor_tcp.nasm`, `monitor_clock.nasm`, `monlib.nasm`, and
    `mon.nasm`.
-2. `build/rom_c.nasm`, the ROM's C code, empty (C in the ROM, above).
-3. nice_cpu's `lib.nasm` and `muldiv_mpu.nasm`.
-4. `build/version.nasm`, which defines `VERSION`, the text of the
+2. `build/version.nasm`, which defines `VERSION`, the text of the
    banner: `git describe` of the tree, or the `VERSION=` of the command
    line.
-5. `build/folder.nasm`, the card's folder (README.md, "Files"): its
+3. `build/folder.nasm`, the card's folder (README.md, "Files"): its
    name, as an 8.3 name, and in the text of `DIR` and of error 29.
 
 `version.nasm` and `folder.nasm` are written only when they change, so
@@ -473,7 +440,7 @@ compared with `test/NAME.expected`:
 | `arp` | `test/arp.nasm`, with the frames of `test/arp.eth` | `arp_resolve`: a reply after other frames, the cache, no reply, an entry aged out, and the cache filled and gone round. The frames sent are compared too. |
 | `udp` | `test/udp.nasm`, with the frames of `test/udp.eth` | The UDP entries: each error, a datagram sent after ARP, a broadcast, datagrams received among other frames, one cut short, and one sent through the gateway. The frames sent are compared too. |
 | `net` | `test/net.nasm`, with the frames of `test/net.eth` | The poll and the IP settings of issue #111: `net_config` at a word-window address and a plain one, `net_set`, `net_poll`, a datagram held and a second dropped, ARP replies learned in place, so that no request goes, a TCP segment released, and a deadline armed, not due, and due. The frames sent are compared too. |
-| `rom` | `build/rom.bin`: the monitor with `test/rom.c` in its C code, and `test/rom.nasm` | The C code in the ROM: a global's initial value, a static array set to 0, both again after a jump to 0, the cold start, `nice_print`, and a trap, whose address must be the label `_rom_trap`. And the FPU (issue #141): each run leaves 10 values and the four flags on it, and the next one, after the trap or the cold start, finds it empty with no flag. |
+| `fpu` | `test/fpu.nasm` | The FPU at a program's end (issue #141): each run leaves 10 values and the four flags on it, and the next one, after a return, `mon_exit`, or a jump to 0, the cold start, finds it empty with no flag. |
 | `fs` | `test/fs.nasm`, with FAT images in both slots | The file entries, through `mon.nasm`'s stubs: handles, reads across the fragments of a file and at its end, the folder's entries, mounts, each error a program can cause, and `fs_readname`'s long name and 8.3 name in lower case, and a file opened by its long name. |
 | `fsw` | `test/fsw.nasm`, with a copy of the card with partitions, one file read-only, and a write-protected card | The entries that write: a file written in pieces across clusters and read back, truncated, a file of ten clusters, deletions, one of a long name, a folder that grows a cluster, a mount that drops an open file, and each error. |
 | `fat` | The monitor, with FAT images in both slots | `DIR` and `LOAD`: the fragmented `FRAG.BIN`, a text file, bad arguments, and `HELLO.BIN` loaded and run. |
@@ -491,8 +458,8 @@ compared with `test/NAME.expected`:
 | `reset` | The same | `SYS 0`, the cold start, and `SYS 0x8000` again. |
 | `hello_c` | `test/hello.c`, built with `nicebuild.py --monitor --asm mon.nasm` | A program in C. |
 
-`sd_write`, `arp`, `udp`, `net`, and `rom` call the monitor's routines
-or reach its variables by their labels, so they are assembled after the
+`sd_write`, `arp`, `udp`, and `net` call the monitor's routines or
+reach its variables by their labels, so they are assembled after the
 monitor's sources, and only their words from `0x8000` are kept. `fs`,
 `fsw`, `hello`, and `hello_c` call the entries through `mon.nasm`'s
 stubs, as any program does, and so do `udp` and `net`. `arp`, `udp`, and
