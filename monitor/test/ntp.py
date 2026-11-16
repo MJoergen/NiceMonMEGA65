@@ -39,6 +39,15 @@ and compared with EXPECTED. The script also checks each frame's IPv4
 checksum, that the identification counts up by one, that DF is clear,
 that the queries of a command have one port and one timestamp, from
 49152 to 65535, and that each query is version 4, mode 3, of 48 bytes.
+
+NTP writes the MEGA65's real-time clock as TIME does. niceemu has no I2C
+master, and its words are memory there, so the script sets the master's
+status behind the monitor, as test/rtc.py does: a master that is present
+and never busy, on which every transaction ends at once. The command
+that the master has at the halt is then the last that the monitor gave:
+the cold start's read, in a run that sets no time, and the write of the
+chip's status, which ends a write of the time, in the run of INPUT.
+
 Exits with status 1 when a check fails. Only the Python standard library
 is used.
 """
@@ -90,6 +99,10 @@ SUM_AT = 24                              # and the IPv4 header's checksum
 PORT_AT = 34                             # a query's UDP source port
 TS_AT = 82                               # and its transmit timestamp
 NTP_EPOCH = datetime.datetime(1900, 1, 1)
+I2C_CMD = 0xFFFFFF97                     # the I2C master's command, and its status after it
+PRESENT = 1                              # the status of a master that is present and not busy
+RV_READ = 0x000E00D1                     # the cold start's read of the RV-3032-C7
+RV_STATUS = 0x00010D51                   # the last write of a time: 0 to the chip's status
 
 
 def ntp_time(text: str) -> Tuple[int, int]:
@@ -206,19 +219,22 @@ def answers(frame: bytes, sends: Dict[str, int]) -> List[str]:
 
 
 def run(emu: str, monitor: str, eth_in: List[str], tmp: str,
-        steps: int) -> Tuple[List[str], List[bytes]]:
-    """The console output of a run, and its frames sent."""
+        steps: int, keys: bytes = INPUT) -> Tuple[List[str], List[bytes], List[int]]:
+    """The console output of a run that types keys, its frames sent, and
+    the I2C master's command and status at its end."""
     inp = os.path.join(tmp, "input")
     with open(inp, "wb") as f:
-        f.write(INPUT)
+        f.write(keys)
     out = os.path.join(tmp, "ntp.out")
     path = os.path.join(tmp, "ntp.in")
     with open(path, "w") as f:
         f.write("\n".join(eth_in) + "\n")
     args = [emu, "-n", str(steps), "--step-time", "-i", inp, "--eth-out", out,
-            "--eth-in", path, monitor]
+            "--eth-in", path, "-d", f"0x{I2C_CMD:08X}:2", monitor]
     res = subprocess.run(args, capture_output=True)
     text = res.stdout.decode("latin-1").replace("\r", "").split("\n")
+    i2c = [int(w, 16) for line in text if line.startswith(f"{I2C_CMD:08x}:")
+           for w in line.split()[1:]]
     lines: List[str] = []
     for line in text:
         if line.startswith("Halted"):
@@ -227,7 +243,7 @@ def run(emu: str, monitor: str, eth_in: List[str], tmp: str,
         lines.append(line)
     with open(out) as f:
         frames = [bytes.fromhex(line) for line in f if line.strip()]
-    return lines, frames
+    return lines, frames, i2c
 
 
 def show(frames: List[bytes]) -> List[str]:
@@ -264,9 +280,14 @@ def main() -> None:
     eth_in = ["# The answers to the frames sent, built from the runs before"]
     done: Set[int] = set()
     with tempfile.TemporaryDirectory() as tmp:
+        with open(monitor) as f:
+            words = f.read()
+        monitor = os.path.join(tmp, "ntp.bin")
+        with open(monitor, "w") as f:
+            f.write(words + f"{I2C_CMD + 1:08X} {PRESENT:08X}\n")
         steps = FIRST
         while True:
-            lines, frames = run(emu, monitor, eth_in, tmp, steps)
+            lines, frames, i2c = run(emu, monitor, eth_in, tmp, steps)
             sends: Dict[str, int] = {}
             for n, frame in enumerate(frames):
                 more = answers(frame, sends)
@@ -279,6 +300,9 @@ def main() -> None:
                 if any(line.startswith("Halted") for line in lines) or steps >= STEPS:
                     break
                 steps *= 2
+        # The statements before the first that sets a time, and the halt
+        unset = run(emu, monitor, eth_in, tmp, steps,
+                    b"\r".join(INPUT.split(b"\r")[:2] + [b"halt", b""]))[2]
 
     report = lines + show(frames)
     ipv4 = [f for f in frames if f[12:14] == b"\x08\x00"]
@@ -298,6 +322,10 @@ def main() -> None:
           all(len(v) == 1 for v in by_server.values()))
     ports = [struct.unpack(">H", f[PORT_AT:PORT_AT + 2])[0] for f in queries]
     check("ntp: the ports 49152 to 65535", all(49152 <= p <= 65535 for p in ports))
+    check("ntp: the real-time clock only read while no time is set",
+          unset == [RV_READ, PRESENT])
+    check("ntp: the real-time clock written with the time, its status last",
+          i2c == [RV_STATUS, PRESENT])
     with open(out, "w") as f:
         f.write("\n".join(report) + "\n")
     try:

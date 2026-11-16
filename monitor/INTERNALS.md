@@ -393,7 +393,11 @@ needs `FOLDER=NICE`, the default. It runs these steps in order:
    last second of era 1 that the clock takes, and the next; the largest
    offsets east and west, and a clock 0 s off. It compares the
    output and the frames sent with `test/ntp.expected`, with a query's
-   port as `pp` and its transmit timestamp as `tt`.
+   port as `pp` and its transmit timestamp as `tt`. It runs on an I2C
+   master that is present and never busy, as `test/rtc.py` has it, and
+   checks that `NTP` writes the real-time clock: the master's last
+   command is the cold start's read while no time is set, and the write
+   of the chip's status after the times of the run.
 7. **The lease.** `test/lease.py` runs `test/lease.nasm`, which takes
    a lease with `net_dhcp`, opens the endpoint, and polls, under the
    monitor with `--step-time`. Between its polls it writes the time to
