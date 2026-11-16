@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Check the monitor's clock from a real-time clock at the cold start, and
-time's write of one, in niceemu.
+TIME's write of one, in niceemu.
 
 Usage: test/rtc.py NICEEMU MONITOR.bin
 
@@ -14,13 +14,13 @@ those registers at the cold start as the chip's. niceemu runs with
 a step.
 
 For each row of CASES the monitor starts on the registers of the row,
-and time must show the row's date and time, or that the clock is not
+and TIME must show the row's date and time, or that the clock is not
 set: dates and times that the chip can hold, with the bits that are no
 digits set; the chip's two flags that say that it lost its time; no
 master; a digit over 9 in each register, which made the year 2100 or
 2105 once; and numbers that are no date or time.
 
-Then time with a date and a time is typed. Without a master it must
+Then TIME with a date and a time is typed. Without a master it must
 leave the master's words alone. With one, in the years 2000 to 2099, the
 command left is the write of the chip's status, the last of the two, and
 in another year the read of the cold start.
@@ -130,8 +130,8 @@ def run(emu: str, monitor: str, status: int, data: list[int], keys: str,
 
 
 def after(rows: list[str], command: str) -> str:
-    """The row that the monitor printed after the last command typed so."""
-    prompts = [i for i, row in enumerate(rows) if row == "> " + command]
+    """The row that the monitor printed after the last statement typed so."""
+    prompts = [i for i, row in enumerate(rows) if row == command]
     return rows[prompts[-1] + 1] if prompts else "no " + command
 
 
@@ -144,22 +144,22 @@ def main() -> None:
             rows, mem = run(emu, monitor, status, data, "time\r", tmp)
             got = after(rows, "time")
             check(f"cold start, {name}: {want}", got == want, f"got {got}")
-        typed = "time 2027-03-04 05:06:07"
+        typed = 'time "2027-03-04 05:06:07"'
         rows, mem = run(emu, monitor, 0, regs(), typed + "\r", tmp)
         check("time typed without a master: the clock set, and the "
               "master's command left at 0",
-              after(rows, typed) == typed[5:] and mem[:2] == [0, 0],
+              after(rows, typed) == typed[6:-1] and mem[:2] == [0, 0],
               f"got {after(rows, typed)}, {mem}")
         rows, mem = run(emu, monitor, PRESENT, regs(), typed + "\r", tmp)
         check("time typed with a master: the clock set, and the chip's "
               "status written last",
-              after(rows, typed) == typed[5:] and mem[:2] == [WRITE, PRESENT],
+              after(rows, typed) == typed[6:-1] and mem[:2] == [WRITE, PRESENT],
               f"got {after(rows, typed)}, {mem}")
-        typed = "time 2100-03-01 00:00:00"
+        typed = 'time "2100-03-01 00:00:00"'
         rows, mem = run(emu, monitor, PRESENT, regs(), typed + "\r", tmp)
         check("time typed with a master, in 2100: the clock set, and the "
               "chip not written",
-              after(rows, typed) == typed[5:] and mem[:2] == [READ, PRESENT],
+              after(rows, typed) == typed[6:-1] and mem[:2] == [READ, PRESENT],
               f"got {after(rows, typed)}, {mem}")
     sys.exit(1 if failed else 0)
 

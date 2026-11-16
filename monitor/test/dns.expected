@@ -1,8 +1,10 @@
 NiceMon V9.9
-? lists the commands
-> r
+HELP lists the statements
+READY.
+sys 0x8000
 Returned 00000035
-> h
+READY.
+halt
 00009100: 00000000 01020304 ffffffd8 eeeeeeee 00000000 ffffffd2 eeeeeeee 00000000
 00009108: ffffffd0 eeeeeeee ffffffd0 eeeeeeee ffffffd0 eeeeeeee ffffffd0 eeeeeeee
 00009110: ffffffd0 eeeeeeee 00001388 00000000 5db8d822 00000001 00000000 00000000

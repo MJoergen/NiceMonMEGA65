@@ -1,6 +1,7 @@
 NiceMon V9.9
-? lists the commands
-> dir
+HELP lists the statements
+READY.
+dir
 Directory of NICE
 HELLO.BIN                      14184
 SUB                            <DIR>
@@ -29,11 +30,13 @@ FILE20.TXT                        15
 FRAG.BIN                        1944
 KEEP.TXT                         512
 Files: 25, directories: 1
-> DIR 1
+READY.
+DIR 1
 Directory of NICE
 HELLO.BIN                      14184
 Files: 1, directories: 0
-> dir 0
+READY.
+dir 0
 Directory of NICE
 HELLO.BIN                      14184
 SUB                            <DIR>
@@ -62,69 +65,90 @@ FILE20.TXT                        15
 FRAG.BIN                        1944
 KEEP.TXT                         512
 Files: 25, directories: 1
-> load frag.bin
+READY.
+load "frag.bin"
 Words loaded: 108, 00009000 to 0000906B
-> d 9000 4
+READY.
+dump 0x9000, 4
 00009000 00000000 00000001 00000002 00000003
-> d 9068 4
+READY.
+dump 0x9068, 4
 00009068 00000068 00000069 0000006A 0000006B
-> load readme.txt
-Words loaded: 0
-Lines skipped: 2, first line 1; ADDR WORD in hex, ADDR 00008000 to FFFEFFFF
-> load nofile.bin
+READY.
+load "nofile.bin"
 File error 21, no such file
-> load sub
-File error 22, a directory
-> load toolongname.bin
+READY.
+load "sub.bin"
 File error 21, no such file
-> load
-load NAME: the name of a file, such as load hello.bin, or load "my prog.bin"
-> load a b
-load NAME: the name of a file, such as load hello.bin, or load "my prog.bin"
-> loadx
-Unknown command; ? lists them
-> dirx
-Unknown command; ? lists them
-> dir 2
+READY.
+load "toolongname.bin"
+File error 21, no such file
+READY.
+load "readme.txt"
+LOAD takes a .BIN file, such as LOAD "HELLO.BIN"
+READY.
+load frag.bin
+Syntax error
+LOAD                enter lines of ADDR WORD in hex, as a .bin file has them
+LOAD "NAME.BIN"     load the .bin file NAME.BIN of the SD card
+LOAD "N.BIN", "IP"  load the .bin file N.BIN from the TFTP server at IP
+READY.
+load "a.bin" "b.bin"
+Syntax error
+LOAD                enter lines of ADDR WORD in hex, as a .bin file has them
+LOAD "NAME.BIN"     load the .bin file NAME.BIN of the SD card
+LOAD "N.BIN", "IP"  load the .bin file N.BIN from the TFTP server at IP
+READY.
+dirx
+Syntax error; HELP lists the statements
+READY.
+dir 2
 File error 27, no such slot
-> dir 1 2
-dir [SLOT]: the slot in hex, such as dir 1
-> dir 123456789
-dir [SLOT]: the slot in hex, such as dir 1
-> LOAD HELLO.BIN
+READY.
+dir 1 2
+Syntax error
+DIR [SLOT]          list the files of the card in SLOT, or of the card mounted
+DIR "IP" [, "PAT"]  list the files of tools/tftpd.py at IP, or those of PAT
+READY.
+dir 0x123456789
+Illegal quantity
+READY.
+LOAD "HELLO.BIN"
 Words loaded: 788, 00008000 to 00008313
-> r
+READY.
+sys 0x8000
 Hello from 00008000, table 00010005
 at column 40
 on the line only
 Returned 0000002A
-> h
+READY.
+halt
 Halted
 fffff11a: 00000314 00008000 00008313 00000000 00000000
 Screen:
-|> load toolongname.bin
-|File error 21, no such file
-|> load
-|load NAME: the name of a file, such as load hello.bin, or load "my prog.bin"
-|> load a b
-|load NAME: the name of a file, such as load hello.bin, or load "my prog.bin"
-|> loadx
-|Unknown command; ? lists them
-|> dirx
-|Unknown command; ? lists them
-|> dir 2
+|dirx
+|Syntax error; HELP lists the statements
+|READY.
+|dir 2
 |File error 27, no such slot
-|> dir 1 2
-|dir [SLOT]: the slot in hex, such as dir 1
-|> dir 123456789
-|dir [SLOT]: the slot in hex, such as dir 1
-|> LOAD HELLO.BIN
+|READY.
+|dir 1 2
+|Syntax error
+|DIR [SLOT]          list the files of the card in SLOT, or of the card mounted
+|DIR "IP" [, "PAT"]  list the files of tools/tftpd.py at IP, or those of PAT
+|READY.
+|dir 0x123456789
+|Illegal quantity
+|READY.
+|LOAD "HELLO.BIN"
 |Words loaded: 788, 00008000 to 00008313
-|> r
+|READY.
+|sys 0x8000
 |Hello from 00008000, table 00010005
 |                                        at column 40
 |Returned 0000002A
-|> h
+|READY.
+|halt
 |Halted
 VBASE at the halt 000000
 exit 0

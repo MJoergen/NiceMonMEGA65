@@ -6,8 +6,8 @@
 // fat_mount, fat_open, fat_read, fat_readdir, fat_close, fat_write,
 // fat_delete, and fat_readname, which take the arguments of the entries:
 // addresses are NICE word addresses, not C pointers, read and written
-// with nice_peek and nice_poke. fat_load reads a .bin file for the
-// monitor's load command, and fat_save writes one for save.
+// with nice_peek and nice_poke. fat_load reads a .bin file for BASIC's
+// LOAD, and fat_save writes one for SAVE.
 //
 // Names are long names (VFAT, #102) of up to 255 characters, matched in
 // either case, or 8.3 names. A long name is read from the long-name
@@ -1269,7 +1269,7 @@ int fat_delete(unsigned name)
     return infodone();
 }
 
-// fat_dir: the folder FOLDER of the card, for the monitor's dir command:
+// fat_dir: the folder FOLDER of the card, for BASIC's DIR:
 // a row with its name, then a row for each file, its name, the long name
 // or the 8.3 name, in DIR_NAME columns and its size in decimal in 12, and
 // for each directory, its name and <DIR>, then the numbers of both. A
@@ -1343,19 +1343,19 @@ static void type(unsigned at, unsigned c)
     nice_putc((int)c);
 }
 
-// fat_complete: TAB on the monitor's line, from line to the cursor cur,
-// with room up to end (issue #137). The word before the cursor, from the
-// last blank outside quotes, and after an opening quote, is the start of
-// a name. Unless it is the first word, the command, the files of the
+// fat_complete: TAB on BASIC's line, from line to the cursor cur, with
+// room up to end (issue #137). The word before the cursor, from the last
+// blank outside quotes, and after an opening quote, is the start of a
+// name. Unless it is the first word, the statement, the files of the
 // folder whose names start with it, in either case, are its matches:
 // directories, and names with a ? for a character outside ASCII, are left
 // out. With one match, the rest of its name goes onto the line, then the
-// closing quote of a name in quotes, and a blank; with several, the rest
-// of the start that they share. The start typed takes the case of the
-// first match, and a name with a blank gets an opening quote before it,
-// so that the word is typed again after BS. The new cursor, or
-// 0 when several matches add nothing: then they are listed, a name to a
-// row, and the monitor shows its prompt and the line again. Nothing, the
+// closing quote, and a blank; with several, the rest of the start that
+// they share. The start typed takes the case of the first match, and a
+// start that is not in quotes gets an opening quote before it, as BASIC
+// takes a name as a string, so that the word is typed again after BS.
+// The new cursor, or 0 when several matches add nothing: then they are
+// listed, a name to a row, and the line is shown again. Nothing, the
 // cursor cur, when nothing matches, the line is full, or on an error.
 int fat_complete(unsigned line, unsigned cur, unsigned end)
 {
@@ -1416,16 +1416,14 @@ int fat_complete(unsigned line, unsigned cur, unsigned end)
             break;
     }
     // The new word, from the start typed, from, or from the cursor: an
-    // opening quote when one is needed, the start in the case of the
-    // first match, the rest, and after one match a closing quote and a
-    // blank. What is typed again is first rubbed out with BS.
-    unsigned open = 0, from = cur;
-    for (k = 0; k < len; k++) {
-        open |= best[k] == ' ' && !q;
-        if (open || (k < plen && best[k] != want[k]))
+    // opening quote when it has none, the start in the case of the first
+    // match, the rest, and after one match a closing quote and a blank.
+    // What is typed again is first rubbed out with BS.
+    unsigned open = !q, from = open ? p : cur;
+    for (k = 0; k < plen; k++)
+        if (best[k] != want[k])
             from = p;
-    }
-    if (cur + open + (len - plen) + (n == 1) * (1 + (q | open)) > end)
+    if (cur + open + (len - plen) + (n == 1) * 2 > end)
         return (int)cur;
     for (k = from; k < cur; k++)
         nice_putc(8);
@@ -1435,15 +1433,14 @@ int fat_complete(unsigned line, unsigned cur, unsigned end)
     for (unsigned i = from - p; i < len; i++)
         type(k++, best[i]);
     if (n == 1) {
-        if (q | open)
-            type(k++, '"');
+        type(k++, '"');
         type(k++, ' ');
     }
     return (int)k;
 }
 
 // fat_load: the lines of the open file h, ADDR WORD in hex, written as
-// the monitor's l writes them, but that an empty line is passed over and
+// LOAD with no name writes them, but that an empty line is passed over and
 // the end of the file ends the load. A line is skipped when it is longer
 // than LINE_MAX characters, has no address or word of 1 to 8 digits, has
 // more after the word than blanks, or its address is below 0x8000 or not

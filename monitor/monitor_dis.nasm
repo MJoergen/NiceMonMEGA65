@@ -1,5 +1,5 @@
-; The monitor's disassembler, u, which the Makefile joins after
-; monitor.nasm (its header). u disassembles instructions, a row each, in
+; The monitor's disassembler, DIS, which the Makefile joins after
+; monitor.nasm (its header). DIS disassembles instructions, a row each, in
 ; the text of nice_cpu's nicedis.py, with the pairs of a call shown as
 ; CALL, the return as RET, and the words of NOP, JMP, PUSH, POP, CLR, TST,
 ; and CMP as those, the pseudo-instructions of nice_cpu's ISA.md §10.1
@@ -7,12 +7,13 @@
 ; and V_UNOPS, are in monitor.nasm, with the others, and so are the two
 ; texts that it shares with the other commands, S_UCOMMA and S_UGAP.
 
-DIS_ROWS        .EQU    20              ; the instructions that u shows without a count
+DIS_ROWS        .EQU    20              ; the instructions that DIS shows without a count
 
-; u [ADDR] [N]: N instructions from ADDR, disassembled, a row each: the
-; address, the instruction's words, 1 to 4, and its text, as nicedis.py
-; shows it (README.md). Without ADDR, the instructions after the last
-; shown; without N, DIS_ROWS. ADD @--R13, n, R15 and MOVE R15, target,
+; DIS [ADDR] [, N]: R1 ADDR, R2 N, and R3 which of them were given, bit 0
+; for ADDR and bit 1 for N, as for st_dump. N instructions from ADDR,
+; disassembled, a row each: the address, the instruction's words, 1 to
+; 4, and its text, as nicedis.py shows it (README.md). Without ADDR, the
+; instructions after the last shown; without N, DIS_ROWS. ADD @--R13, n, R15 and MOVE R15, target,
 ; with the same condition, no modifier, and n the words of the MOVE, are
 ; one row, CALL target, MOVE R15, @R13++ is RET, and the other
 ; pseudo-instructions of nice_cpu's ISA.md §10.1 are those of U_PSEUDO,
@@ -20,17 +21,13 @@ DIS_ROWS        .EQU    20              ; the instructions that u shows without 
 ; the rows left, R9 is the instruction word, R10 its kind, an index of
 ; DIS_KINDS, and R12 the address after it. The fields are at V_UF, their
 ; constants at V_UC, and the operands of the mnemonic at V_UNOPS.
-cmd_dis
-                MOVE    R1, R2
-                CALL    _io_gethex      ; R1 the address, R2 its digits, R3 after it
-                TST     R2
+st_dis
+                AND[M]  R0, R3, 1
         ?!Z     MOVE    @V_UNEXT, R1
-                MOVE    R1, R3
-                CALL    _io_gethex      ; R1 the count
-                TST     R2
-        ?Z      MOVE    R1, DIS_ROWS
-                MOVE[M] R8, R1
-        ?Z      JMP     main
+                AND[M]  R0, R3, 2
+        ?Z      MOVE    R2, DIS_ROWS
+                MOVE[M] R8, R2
+        ?Z      RET
                 MOVE    R7, @V_UNEXT
 dis_row
                 MOVE    R9, @R7
@@ -224,7 +221,7 @@ dis_end         CALL    _io_crlf
                 SUB[M]  R8, R8, 1
         ?!Z     JMP     dis_row
                 MOVE    @V_UNEXT, R7
-                JMP     main
+                RET
 
 ; u_stmt: the condition, the mnemonic with its modifiers, and the operands
 ; of the ALU or SHIFT instruction R9. Uses R1-R6 and R10.

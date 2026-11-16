@@ -65,11 +65,11 @@ SCREEN_WORDS = 0x2000
 
 # A program under the monitor: where it starts, above the ROM, the words
 # of the monitor's variables at the top of the RAM, at 0xFFFFF000, where
-# the program's RAM ends, and the monitor's command that runs it
-# (monitor/README.md)
+# the program's RAM ends, and the statement of the ROM's BASIC that runs
+# it (monitor/README.md)
 PROGRAM = 0x8000
 MONITOR_WORDS = 0x1000
-RUN_COMMAND = b"r\r"
+RUN_COMMAND = b"SYS 0x8000\r"
 
 
 def in_screen(addr: int) -> bool:
@@ -213,7 +213,7 @@ def main() -> None:
             print("load.py: started the core")
             if args.monitor:
                 link.send_console(RUN_COMMAND)
-                print("load.py: typed r for the monitor")
+                print("load.py: typed SYS 0x8000 for the monitor")
     except LinkError as e:
         fail(str(e))
     link.close()

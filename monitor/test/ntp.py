@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Run the monitor's time ntp in niceemu, against frames of --eth-in.
+"""Run BASIC's NTP in niceemu, against frames of --eth-in.
 
 Usage: test/ntp.py NICEEMU MONITOR.bin EXPECTED OUT
 
-The monitor runs the commands of INPUT with --step-time, so that a run
-takes the same steps each time. The transaction of i dhcp, and the port
+The monitor runs the statements of INPUT with --step-time, so that a run
+takes the same steps each time. The transaction of DHCP, and the port
 and the transmit timestamp of each query, come from the clock, so the
 script learns them from a run, and builds the frames of the next, as
 test/dns.py does: it runs the monitor, finds the first frame sent that
@@ -13,7 +13,7 @@ frame (nice_cpu's DEVICES.md §7), until no such frame is left. A run stops
 after FIRST steps, which double whenever it brings no new frame, until
 the monitor halts.
 
-- i dhcp gets 10.0.0.9, with the mask, the gateway 10.0.0.1, the DNS
+- DHCP gets 10.0.0.9, with the mask, the gateway 10.0.0.1, the DNS
   server 10.0.0.53, and the NTP server 10.0.0.123 of option 42.
 - Each ARP request for 10.0.0.x gets the answer of 0A:00:00:00:00:x.
 - The DNS server answers kod.example.com with 10.0.0.125, and
@@ -50,20 +50,22 @@ import dhcp  # noqa: E402
 import dns  # noqa: E402
 
 MAC = dhcp.MAC
-INPUT = (b"time ntp\r"                       # no IP address
-         b"i dhcp\r"
-         b"time ntp\r"                       # DHCP's server, 10.0.0.123
-         b"time ntp 10.0.0.124 +01:00\r"     # passed over, then era 1
-         b"time\r"
-         b"time ntp kod.example.com\r"
-         b"time ntp 10.0.0.126\r"            # leap indicator 3
-         b"time ntp 10.0.0.127\r"            # stratum 16
-         b"time ntp 10.0.0.128\r"            # no answer
-         b"time ntp nx.example.com\r"
-         b"time ntp 10.0.0.130 -12:00\r"     # before 1970
-         b"time ntp 10.0.0.131 -00:30\r"     # the second send, and the clock ahead
-         b"time ntp 10.0.0.9 +14:01\r"       # an offset too large
-         b"h\r")
+INPUT = (b'ntp\r'                                # no IP address
+         b'dhcp\r'
+         b'ntp\r'                                # DHCP's server, 10.0.0.123
+         b'ntp "10.0.0.124", "+01:00"\r'         # passed over, then era 1
+         b'time\r'
+         b'ntp "kod.example.com"\r'
+         b'ntp "10.0.0.126"\r'                   # leap indicator 3
+         b'ntp "10.0.0.127"\r'                   # stratum 16
+         b'ntp "10.0.0.128"\r'                   # no answer
+         b'ntp "nx.example.com"\r'
+         b'ntp "10.0.0.130", "-12:00"\r'         # before 1970
+         b'ntp "10.0.0.131", "-00:30"\r'         # the second send, and the clock ahead
+         b'ntp "10.0.0.9", "+14:01"\r'           # an offset too large
+         b'ntp "", "+01"\r'                      # no offset, and DHCP's server
+         b'ntp "10.0.0.9" "+01:00"\r'            # no comma
+         b'halt\r')
 STEPS = 256_000_000                      # the steps of a run at most
 FIRST = 2_000_000                        # and of the first, doubled while no new frame comes
 ID_AT = 18                               # the IPv4 identification

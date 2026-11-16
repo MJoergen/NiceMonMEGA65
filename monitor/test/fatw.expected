@@ -1,94 +1,125 @@
 NiceMon V9.9
-? lists the commands
-> l
+HELP lists the statements
+READY.
+load
 ADDR WORD in hex on each line, as in a .bin file; an empty line ends
 Words loaded: 2, 00008000 to 00008001
-> save test.bin 8000 2
+READY.
+save "test", 0x8000, 2
 Words saved: 2, 00008000 to 00008001
-> dir
+READY.
+dir
 Directory of NICE
 HELLO.BIN                      14184
-test.bin                          36
+test.BIN                          36
 Files: 2, directories: 0
-> load TEST.BIN
+READY.
+load "TEST.BIN"
 Words loaded: 2, 00008000 to 00008001
-> d 8000 2
+READY.
+dump 0x8000, 2
 00008000 1234ABCD 00000005
-> save hello.bin 8000 0
+READY.
+save "hello.bin", 0x8000, 0
 Words saved: 0
-> load hello.bin
+READY.
+load "hello.bin"
 Words loaded: 0
-> del test.bin
+READY.
+delete "test.bin"
 Deleted test.bin
-> del test.bin
+READY.
+delete "test.bin"
 File error 21, no such file
-> save
-save NAME ADDR N: a name, and the address and the count in hex
-> save x
-save NAME ADDR N: a name, and the address and the count in hex
-> save x 8000
-save NAME ADDR N: a name, and the address and the count in hex
-> save x 8000 1 2
-save NAME ADDR N: a name, and the address and the count in hex
-> save x 123456789 1
-save NAME ADDR N: a name, and the address and the count in hex
-> savex
-Unknown command; ? lists them
-> SAVE "a:b" 8000 1
+READY.
+save
+Syntax error
+SAVE "NAME", A, N   save N words from A as the .bin file NAME
+READY.
+save "x"
+Syntax error
+SAVE "NAME", A, N   save N words from A as the .bin file NAME
+READY.
+save "x", 0x8000
+Syntax error
+SAVE "NAME", A, N   save N words from A as the .bin file NAME
+READY.
+save "x", 0x8000, 1, 2
+Syntax error
+SAVE "NAME", A, N   save N words from A as the .bin file NAME
+READY.
+save "x", 0x8000, 0x100000000
+Illegal quantity
+READY.
+savex
+Syntax error; HELP lists the statements
+READY.
+SAVE "a:b", 0x8000, 1
 File error 20, not a valid name
-> del
-del NAME: the name of a file, such as del hello.bin, or del "my prog.bin"
-> del a b
-del NAME: the name of a file, such as del hello.bin, or del "my prog.bin"
-> delx
-Unknown command; ? lists them
-> de 0
-> dir 1
+READY.
+delete
+Syntax error
+DELETE "NAME"       delete the file NAME of the SD card
+READY.
+delete "a" "b"
+Syntax error
+DELETE "NAME"       delete the file NAME of the SD card
+READY.
+deletex
+Syntax error; HELP lists the statements
+READY.
+dir 1
 Directory of NICE
 HELLO.BIN                      14184
 Files: 1, directories: 0
-> save full.bin 8000 100
+READY.
+save "full.bin", 0x8000, 256
 File error 30, the card or the folder is full
-> dir
+READY.
+dir
 Directory of NICE
 HELLO.BIN                      14184
 full.bin                        1536
 Files: 2, directories: 0
-> del full.bin
+READY.
+delete "full.bin"
 Deleted full.bin
-> save full.bin 8000 2
+READY.
+save "full.bin", 0x8000, 2
 Words saved: 2, 00008000 to 00008001
-> dir
+READY.
+dir
 Directory of NICE
 HELLO.BIN                      14184
 full.bin                          36
 Files: 2, directories: 0
-> h
+READY.
+halt
 Halted
 Screen:
-|Unknown command; ? lists them
-|> de 0
-|> dir 1
-|Directory of NICE
-|HELLO.BIN                      14184
-|Files: 1, directories: 0
-|> save full.bin 8000 100
+|READY.
+|save "full.bin", 0x8000, 256
 |File error 30, the card or the folder is full
-|> dir
+|READY.
+|dir
 |Directory of NICE
 |HELLO.BIN                      14184
 |full.bin                        1536
 |Files: 2, directories: 0
-|> del full.bin
+|READY.
+|delete "full.bin"
 |Deleted full.bin
-|> save full.bin 8000 2
+|READY.
+|save "full.bin", 0x8000, 2
 |Words saved: 2, 00008000 to 00008001
-|> dir
+|READY.
+|dir
 |Directory of NICE
 |HELLO.BIN                      14184
 |full.bin                          36
 |Files: 2, directories: 0
-|> h
+|READY.
+|halt
 |Halted
 VBASE at the halt 000000
 exit 0

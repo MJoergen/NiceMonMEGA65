@@ -464,7 +464,7 @@ network's DHCP server
 is a locally administered one,
 one for each kind of board, so that an R3, an R6, and a Nexys4DDR on one
 network differ. Two boards of the same kind on one network need
-different ones, which the monitor's `m` sets. On the link, for
+different ones, which BASIC's `MAC` sets. On the link, for
 example, with the core paused, as the link reaches only its own
 registers while the core runs:
 
@@ -475,8 +475,8 @@ registers while the core runs:
 
 Then `ping 192.168.1.65` from a PC on the network gets its answers, and
 `0xFFFFFFB5` counts the replies, the ARP reply and one for each ping.
-The monitor's `i` shows and sets the IP address from the keyboard or
-the line, `i dhcp` gets it from a DHCP server, and its `m` sets the MAC
+BASIC's `IP` shows and sets the IP address from the keyboard or
+the line, `DHCP` gets it from a DHCP server, and its `MAC` sets the MAC
 address ([monitor/README.md](../monitor/README.md#the-network)). The
 demo's F11 shows
 the addresses and the counts, and sets the addresses from the keyboard
@@ -518,17 +518,18 @@ sent goes on. The send buffer keeps its words, and is 0 after a reset
 of the system. The link reads and writes the port as the core does,
 while the core is paused, held, or halted.
 
-The monitor in the ROM uses the port in its `i dhcp`, which gets the
+The monitor in the ROM uses the port in BASIC's `DHCP`, which gets the
 station's IP address from a DHCP server, in the same DHCP in the
-background after a reset, while it waits at its prompt, in its `tftp`, which loads a
-file from a TFTP server, and in its entries for programs: UDP, DHCP,
+background after a reset, while BASIC waits for a line, in `LOAD` and
+`DIR` from a TFTP server, in `NTP`, which asks a time server, and in
+its entries for programs: UDP, DHCP,
 DNS, and TCP, as a client and as a server
 ([monitor/](../monitor/README.md#tcp-and-dns)). Its TCP is a stack of
 its own, apart from the station's TCP server of port 4510, which a
 program cannot listen on. While those entries have the network on, the
 ROM alone reads the port's queue and writes its send buffer, so a
 program that uses them does not touch `0xFFFFFFC0`–`CF`.
-It disables the port at its start, at the end of `i dhcp` and `tftp`,
+It disables the port at its start, at the end of each such statement,
 and when a program returns, so a program that does not enable it sees
 no frame. Its frame routines and ARP cache are its own, with no entries
 for programs ([monitor/](../monitor/README.md#the-network)).
@@ -609,13 +610,13 @@ or a new chip: the RV-3032-C7's flags VLF and PORF, and the ISL12020M's
 flag RTCF. It leaves it too when what the chip holds is no date and
 time, such as a digit over 9.
 
-**`time` writes it.** The monitor's `time` with a date and a time sets
+**`TIME` writes it.** BASIC's `TIME` with a date and a time sets
 the real-time clock too, in the years 2000 to 2099, and clears the flags
-that say that it lost its time. So `time` once sets the clock for every
+that say that it lost its time. So `TIME` once sets the clock for every
 later start, and for the MEGA65's other cores. `make hwtest` sets it to
 the host's local time. A program that sets the clock of the time of day
 leaves the real-time clock as it is. The Nexys4DDR has no real-time
-clock, so its clock is not set until a program or `time` sets it.
+clock, so its clock is not set until a program, `TIME`, or `NTP` sets it.
 
 A chip's data are in its **registers**, each a byte, which a
 transaction reads or writes. The master does a whole transaction at

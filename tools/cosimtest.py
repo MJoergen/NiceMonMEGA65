@@ -10,7 +10,7 @@ step, the breakpoints, and the writes of the registers, against niceemu
 --link, and its check of the FPU. Then it runs the programs of
 hwtest.py's comparison, two of the FPU among them, with run.py
 --cosim on that port and with niceemu alone, and the monitor's test
-program, with run.py --monitor and with the monitor's l. Each must print
+program, with run.py --monitor and with BASIC's LOAD. Each must print
 the same and exit with the same status. The monitor's cold start must set
 the clock of the time of day from the model of the real-time clock on
 the I2C bus of the simulated system (#105). Last, load.py must refuse a word
@@ -44,9 +44,9 @@ from boardlink import HOLD, RAM, open_link
 # The time of the model of the RV-3032-C7 in sim/cosim/tb_cosim.vhd, as
 # the clock counts local time: seconds since 1970 as if it were UTC
 RTC_TIME = calendar.timegm((2026, 11, 11, 12, 34, 56)) + 0.5
-# The monitor's time, and the registers 1 to 7 of the RV-3032-C7 that it
+# BASIC's TIME, and the registers 1 to 7 of the RV-3032-C7 that it
 # writes: the seconds to the year in BCD, with the weekday, 4, Thursday
-RTC_SET = b"time 2027-03-04 05:06:07\r"
+RTC_SET = b'TIME "2027-03-04 05:06:07"\r'
 RTC_REGS = [0x07, 0x06, 0x05, 0x04, 0x04, 0x03, 0x27]
 
 
@@ -80,16 +80,16 @@ def test_rtc(port: str, tmp: str) -> None:
         link.control(RAM)
         text = b""
         end = time.monotonic() + 300
-        while b"> " not in text and time.monotonic() < end:
+        while b"READY.\r\n" not in text and time.monotonic() < end:
             link.poll(0.5)
             text += link.take_console()
         link.send_console(RTC_SET)
         text = b""
-        while b"> " not in text and time.monotonic() < end:
+        while b"READY.\r\n" not in text and time.monotonic() < end:
             link.poll(0.5)
             text += link.take_console()
         link.control(HOLD | RAM)
-        hwtest.check("the monitor's time typed", b"2027-03-04 05:06:" in text,
+        hwtest.check("BASIC's TIME typed", b"2027-03-04 05:06:" in text,
                      repr(text))
         status = hwtest.i2c(link, hwtest.i2c_read(0x51, 1, 13))
         regs = hwtest.i2c_bytes(link, 13)

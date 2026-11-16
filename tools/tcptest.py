@@ -512,7 +512,7 @@ def free_port() -> int:
         return port
 
 
-def run(tmp: str, program: str, scripts: Mapping[int, Callable[[], Script]], keys: str = "r\rh\r",
+def run(tmp: str, program: str, scripts: Mapping[int, Callable[[], Script]], keys: str = "SYS 0x8000\rHALT\r",
         extra: str = "", setup: Optional[Callable[[Peer], None]] = None) -> Tuple[List[int], int]:
     """A program run against a peer with scripts, which becomes PEER, with
     the monitor's input keys, the lines of a .bin file extra, and setup
@@ -904,7 +904,7 @@ def timer_case(tmp: str, case: int) -> Tuple[List[int], List[bytes]]:
         f.write(open(MONITOR).read() + open(TIMERS).read() + f"00009000 {case:08X}\n")
     inp = os.path.join(tmp, "input")
     with open(inp, "w") as f:
-        f.write("r\rh\r")
+        f.write("SYS 0x8000\rHALT\r")
     eth_in = os.path.join(tmp, f"in{case}")
     eth_out = os.path.join(tmp, f"out{case}")
     lines: List[str] = []
@@ -1026,14 +1026,14 @@ def main() -> None:
             check("tcp_c.c: the peer's 200 bytes came back on port 3010",
                   c.received == ask and c.got_fin, f"{len(c.received)} bytes, FIN {c.got_fin}")
             n = 20000
-            _, value = run(tmp, PROGRAM_HW, {2001: Echo}, "i 10.0.0.9\rr\rh\r",
+            _, value = run(tmp, PROGRAM_HW, {2001: Echo}, 'IP "10.0.0.9"\rSYS 0x8000\rHALT\r',
                            f"00009000 0A000002\n00009001 000007D1\n00009002 {n:08X}\n")
-            check("tcphw.nasm, hwtest's program: 20000 bytes echoed after i 10.0.0.9",
+            check("tcphw.nasm, hwtest's program: 20000 bytes echoed after IP \"10.0.0.9\"",
                   value == 0, f"returned {value}")
             c = conn(2001)
             check("tcphw.nasm: the peer received them", c.received == bytes(
                 (7 * i + (i >> 8)) & 0xFF for i in range(n)) and c.got_fin)
-            _, value = run(tmp, PROGRAM_HW, {}, "i 10.0.0.9\rr\rh\r",
+            _, value = run(tmp, PROGRAM_HW, {}, 'IP "10.0.0.9"\rSYS 0x8000\rHALT\r',
                            f"00009000 00000000\n00009001 00000BCC\n00009002 {n:08X}\n",
                            setup=connect_at_start(3020, Echo()))
             check("tcphw.nasm: 20000 bytes echoed by a peer that connects to port 3020, where "

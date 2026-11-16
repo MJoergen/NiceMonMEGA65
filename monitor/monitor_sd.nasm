@@ -2,8 +2,8 @@
 ; after monitor.nasm (its header): the sector routines sd_init, sd_read,
 ; and sd_write, the ROM's own, with no entries in the dispatch table
 ; (doc/SDCARD.md, "The ROM"), and the names by which fat32.c calls them.
-; The file commands of monitor_cmd.nasm show the errors of the controller with
-; sd_fail.
+; The file statements of monitor_cmd.nasm show the errors of the controller
+; with sd_fail.
 
 SD_CSR          .EQU    0xFFFFFFA0      ; the SD card's status, and a write starts a command (nice_cpu's DEVICES.md §5)
 SD_LBA          .EQU    0xFFFFFFA1      ; the sector of a Read or Write
@@ -59,8 +59,7 @@ sd_fail
                 MOVE    R1, @SD_LAST
                 CALL    _io_puthex
 :
-                CALL    _io_crlf
-                JMP     main
+                JMP     _io_crlf        ; which returns to the caller
 
 ; The sector routines, the ROM's own, with no entries in the dispatch table
 ; (doc/SDCARD.md, "The ROM"). They follow the C ABI, wait for busy before

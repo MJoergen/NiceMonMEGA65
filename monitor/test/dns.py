@@ -3,8 +3,8 @@
 
 Usage: test/dns.py NICEEMU MONITOR.bin DNS.bin EXPECTED OUT
 
-DNS.bin, test/dns.nasm, runs under the monitor with the input r and h,
-and --step-time, so that a run takes the same steps each time. The ID and
+DNS.bin, test/dns.nasm, runs under the monitor with the input SYS
+0x8000 and HALT, and --step-time, so that a run takes the same steps each time. The ID and
 the port of a query come from the clock, so the script learns them from a
 run, and builds the frames of the next: it runs the program, finds the
 first frame sent that it has not seen and that wants an answer, an ARP
@@ -37,7 +37,7 @@ import tempfile
 from typing import Callable, Dict, List, Set, Tuple
 
 MAC = bytes.fromhex("024E49434500")      # the station's after reset
-INPUT = b"r\rh\r"
+INPUT = b"sys 0x8000\rhalt\r"
 STEPS = 64_000_000                       # the steps of a run at most
 FIRST = 1_000_000                        # and of the first, doubled while no new frame comes
 DUMPS = ["-d", "0x9100:53"]

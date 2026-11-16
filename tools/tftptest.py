@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check tools/tftpd.py, and the monitor's tftp against it, without a board.
+"""Check tools/tftpd.py, and BASIC's TFTP against it, without a board.
 
 First it starts tftpd.py --port 0 on a folder of test files and checks
 it with a client of its own: files of 0, 511, 512, 513, and 140,000
@@ -17,8 +17,8 @@ niceemu with --eth-udp and --eth-peer, whose frames go to a bridge in
 this script: the bridge answers ARP for the server 10.0.0.2, and passes
 the UDP datagrams to 10.0.0.2 on to tftpd.py on 127.0.0.1, port 69 to
 the server's port, and back, so that niceemu and tftpd.py are on one
-network. The monitor lists the folder, loads a program of 300 lines,
-which d then shows, and gets an ERROR. Its output must have the lines
+network. BASIC lists the folder with DIR, loads a program of 300 lines
+with LOAD, which DUMP then shows, and gets an ERROR. Its output must have the lines
 that the checks name.
 
 It prints a line for each check, and last how many passed, and exits with
@@ -265,8 +265,8 @@ def test_monitor(server_port: int, tmp: str) -> None:
     thread.start()
     inp = os.path.join(tmp, "input")
     with open(inp, "w") as f:
-        f.write("i 10.0.0.9\rtftp 10.0.0.2\rtftp 10.0.0.2 PROG.BIN\rd 9000 4\r"
-                "d 912B 1\rtftp 10.0.0.2 nosuch.bin\rh\r")
+        f.write('IP "10.0.0.9"\rDIR "10.0.0.2"\rLOAD "PROG.BIN", "10.0.0.2"\r'
+                'DUMP 0x9000, 4\rDUMP 0x912B, 1\rLOAD "nosuch.bin", "10.0.0.2"\rHALT\r')
     try:
         res = subprocess.run(
             [NICEEMU, "-i", inp, "--eth-udp", f"127.0.0.1:{bridge.emu_port}",
@@ -281,8 +281,9 @@ def test_monitor(server_port: int, tmp: str) -> None:
     lines = out.split("\n")
     want = [f"{n:<24} {len(FILES[n]):>10}" for n in
             sorted((n for n in FILES if not n.startswith(".")), key=str.lower)]
-    at = lines.index("> tftp 10.0.0.2") + 1 if "> tftp 10.0.0.2" in lines else -1
-    check("monitor: tftp 10.0.0.2 lists the folder",
+    listed = 'DIR "10.0.0.2"'
+    at = lines.index(listed) + 1 if listed in lines else -1
+    check("monitor: DIR \"10.0.0.2\" lists the folder",
           at > 0 and lines[at:at + len(want)] == want, "\n".join(lines[at:at + 9]))
     for line in ("Words loaded: 300, 00009000 to 0000912B",
                  "00009000 00000000 00000003 00000006 00000009",

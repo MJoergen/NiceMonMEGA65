@@ -1,8 +1,10 @@
 NiceMon V9.9
-? lists the commands
-> r
+HELP lists the statements
+READY.
+sys 0x8000
 Returned 00000014
-> h
+READY.
+halt
 Halted
 00009100: ffffffd6 ffffffd6 ffffffd8 ffffffd7 00001388 ffffffd7 ffffffd5 00000000
 00009108: 00000000 00000006 00000000 00000000 00000002 00000000 00000000 00000000
@@ -11,10 +13,12 @@ Halted
 00009188: 0a000002 00000007 00000061 00000062 0a000003 00000009
 Screen:
 |NiceMon V9.9
-|? lists the commands
-|> r
+|HELP lists the statements
+|READY.
+|sys 0x8000
 |Returned 00000014
-|> h
+|READY.
+|halt
 |Halted
 VBASE at the halt 000000
 exit 0

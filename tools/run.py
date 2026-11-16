@@ -37,19 +37,19 @@ Input:
 Under the monitor:
     --monitor runs a program at 0x8000 under the monitor in the ROM, as
     tools/load.py --monitor loads it: the ROM stays visible, the monitor
-    boots cold, and r and CR go to the console before the input. --rom
+    boots cold, and SYS 0x8000 and CR go to the console before the input. --rom
     FILE loads FILE at 0 in place of the ROM, with the ROM hidden, for
     niceemu --link, the simulated system, or a bitstream without a ROM.
     niceemu runs the same with the monitor and the program joined, and
-    the r in the input file:
+    the SYS 0x8000 in the input file:
 
-        diff <(niceemu -i <(printf 'r\\r'; cat in.txt) \\
+        diff <(niceemu -i <(printf 'SYS 0x8000\\r'; cat in.txt) \\
                    <(cat monitor.bin prog.bin)) \\
              <(tools/run.py --monitor --rom monitor.bin -i in.txt prog.bin)
 
-    The output then has the monitor's too: its banner, the r, and the
+    The output then has the monitor's too: its banner, the SYS, and the
     status that the program returns. The monitor reads on at the end of
-    the input, so the run ends when the input ends with the monitor's h,
+    the input, so the run ends when the input ends with BASIC's HALT,
     which halts the core, or at the time limit.
 
 Output:

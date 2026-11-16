@@ -7,11 +7,11 @@ with the text of the boards in `text.nasm`. It is a program at `0x8000`,
 `demo.bin`, which each release has as a file of its own. To run it:
 
 1. Copy `demo.bin` into the folder `NICE` of an SD card.
-2. Put the card in the board, and type `load demo.bin` and then `r` in
-   the monitor ([monitor/](../monitor/README.md)).
-3. F12 returns to the monitor.
+2. Put the card in the board, and type `LOAD "DEMO.BIN"` and then
+   `SYS 0x8000` in the ROM's BASIC ([monitor/](../monitor/README.md)).
+3. F12 returns to BASIC.
 
-`tftp IP demo.bin` loads it from a TFTP server instead, and
+`LOAD "DEMO.BIN", "IP"` loads it from a TFTP server instead, and
 `tools/load.py --monitor demo.bin` from a PC.
 
 The demo's source, its documentation, and its tests are in nice_cpu, so a
@@ -28,14 +28,14 @@ has what each demo shows and how it works. On the boards:
 - The keys are those of the MEGA65's keyboard, or of the Nexys4DDR's
   PS/2 keyboard ([The keyboard](../doc/SYSTEM.md#the-keyboard)). F1, F3,
   F5, and so on need no SHIFT on the MEGA65. F12, SHIFT and F11 on the
-  MEGA65, goes back to the monitor, which clears the screen and prints
+  MEGA65, goes back to BASIC, which clears the screen and prints
   `Returned 00000000`.
 - The counters count the core's cycles at 100 MHz on the MEGA65, and at
   90 MHz on the Nexys4DDR, and the time is real.
 - F11's self-test runs on the core, and the network station below it is
   the board's, at `0xFFFFFFB0` ([nice_cpu's DEVICES.md §6](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#6-network-station), and
   [The Ethernet station](../doc/SYSTEM.md#the-ethernet-station)). Its IP
-  address is the one that the monitor got from DHCP or from its `i`, or
+  address is the one that BASIC got from `DHCP` or from its `IP`, or
   `0.0.0.0`, which answers nothing, and its MAC address after reset is
   `02:4E:49:43:45:03` on the R3, `02:4E:49:43:45:06` on the R6, and
   `02:4E:49:43:45:0A` on the Nexys4DDR. I and M set the two from the
@@ -70,10 +70,10 @@ into `build/demo.bin`.
 The test builds the demo with the version `V9.9` into
 `build/test/demo_test.bin`, puts it after the monitor's test,
 `monitor/build/monitor_test.bin`, into `build/test/monitor_demo.bin`, and
-runs that in `niceemu` twice. The first input runs the demo with `r` and
-types a line, so the screen has the board's text, and the second goes
-back to the monitor with F12, and shows its version with `v` and halts
-it with `h`. The screens are in `test.expected`. nice_cpu's own test
+runs that in `niceemu` twice. The first input runs the demo with
+`SYS 0x8000` and types a line, so the screen has the board's text, and
+the second goes back to BASIC with F12, and shows its version with `VER`
+and halts it with `HALT`. The screens are in `test.expected`. nice_cpu's own test
 checks the demos themselves, behind a stand-in for a monitor.
 
 The two run in `niceemu` like any program, from address 0:
@@ -114,11 +114,11 @@ romsize` writes it (`tools/romsize.py`).
 | `demo.nasm`, `G_TEXTS` | The texts and the steps of F9, and the shifts of F11's MAC address | 113 | 96 |
 | `demo.nasm`, `S_TEXTS` | The texts of F11 | 953 | 910 |
 | `demo.nasm`, `MATH` | The script of F11's test of the math unit | 97 | 0 |
-| `demo/text.nasm` | The board's texts: the name, the welcome, the keys, and the note on the clock | 571 | 571 |
+| `demo/text.nasm` | The board's texts: the name, the welcome, the keys, and the note on the clock | 567 | 567 |
 | `build/version.nasm` | The version in the title bar, the tests' `V9.9` | 5 | 5 |
-| In all | | 5021 | 2389 |
+| In all | | 5017 | 2385 |
 
-The code is 2295 words, and the texts and tables 2726. They are at `0x8000`–`0x939C`, in 4960 lines of `demo.bin`, one for each word but the unused ones, which the assembler skips.
+The code is 2295 words, and the texts and tables 2722. They are at `0x8000`–`0x9398`, in 4956 lines of `demo.bin`, one for each word but the unused ones, which the assembler skips.
 <!-- /romsize demo -->
 
 The demo changes only with a tag of nice_cpu, but its version and

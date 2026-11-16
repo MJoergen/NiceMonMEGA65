@@ -22,7 +22,7 @@ is checked against them:
   write the file under its 8.3 name, here or in the directory given,
   and nowhere else.
 
-On a held core, ls must list what is in NICE as the monitor's dir does,
+On a held core, ls must list what is in NICE as BASIC's DIR does,
 with its long names and sizes, the 8.3 names after them, and the
 counts, and get must give each file's bytes, by its 8.3 name and by its
 long name, in either case, to a file and to stdout. A
@@ -107,7 +107,7 @@ failed = 0
 
 
 def row(name: str, size: int | str) -> str:
-    """A row of the monitor's dir: the name in 24 columns, and the size
+    """A row of BASIC's DIR: the name in 24 columns, and the size
     or <DIR> in 12."""
     return f"{name:<24}{size:>12}"
 
@@ -1089,22 +1089,22 @@ def test_nbd(imgs: dict[str, str], tmp: str) -> None:
 
 
 def prompt(emu_link: Link, wait: float = 2.0) -> None:
-    """Waits for the monitor's first prompt, after its start."""
+    """Waits for BASIC's first READY., after its start."""
     out = b""
     end = time.monotonic() + wait
-    while time.monotonic() < end and not out.endswith(b"> "):
+    while time.monotonic() < end and not out.endswith(b"READY.\r\n"):
         emu_link.poll(0.05)
         out += emu_link.take_console()
 
 
 def console(emu_link: Link, line: str, wait: float = 2.0) -> str:
-    """Types a line into the monitor, and what it printed until its next
-    prompt."""
+    """Types a line into BASIC, and what it printed until its next
+    READY."""
     emu_link.take_console()
     emu_link.send_console(line.encode() + b"\r")
     out = b""
     end = time.monotonic() + wait
-    while time.monotonic() < end and not out.endswith(b"> "):
+    while time.monotonic() < end and not out.endswith(b"READY.\r\n"):
         emu_link.poll(0.05)
         out += emu_link.take_console()
     return out.decode(errors="replace")
@@ -1126,8 +1126,8 @@ def test_monitor(imgs: dict[str, str], tmp: str) -> None:
         try:
             link.control(RAM)
             prompt(link)
-            out = console(link, "dir")
-            check("the monitor's dir", "Files: 5, directories: 1" in out,
+            out = console(link, "DIR")
+            check("BASIC's DIR", "Files: 5, directories: 1" in out,
                   repr(out))
         finally:
             link.close()
@@ -1136,11 +1136,11 @@ def test_monitor(imgs: dict[str, str], tmp: str) -> None:
               "started again" in r.stderr.decode(), text(r))
         link = emu.link()
         try:
-            out = console(link, "dir")
+            out = console(link, "DIR")
             check("the monitor, started again, lists my prog.bin",
                   row("my prog.bin", 28) in out and
                   "Files: 6, directories: 1" in out, repr(out))
-            out = console(link, 'load "my prog.bin"')
+            out = console(link, 'LOAD "my prog.bin"')
             check("and loads it", "Words loaded: 2, 00008000 to 00008001"
                   in out, repr(out))
             pauses = link.pauses
@@ -1158,7 +1158,7 @@ def test_monitor(imgs: dict[str, str], tmp: str) -> None:
         check("del my prog.bin", r.returncode == 0, text(r))
         link = emu.link()
         try:
-            out = console(link, "dir")
+            out = console(link, "DIR")
             check("dir no longer lists it", "prog" not in out and
                   "Files: 5, directories: 1" in out, repr(out))
         finally:

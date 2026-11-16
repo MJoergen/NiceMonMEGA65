@@ -20,8 +20,8 @@ for days, as a display on a desk.
 
 The weather comes from [wttr.in](https://wttr.in), a free weather service,
 over plain HTTP, on the board's Ethernet port. The date and the time come
-from the board's clock, which the monitor's `time ntp` sets. The clock
-keeps local time, so `time ntp +01:00` sets it to Central European Time.
+from the board's clock, which BASIC's `NTP` sets. The clock keeps
+local time, so `NTP "", "+01:00"` sets it to Central European Time.
 On the MEGA65 the clock keeps running when the power is off. On the
 Nexys4DDR, set it after each reset. Without it, the screen shows
 `--:--:--` and says so.
@@ -33,8 +33,8 @@ Nexys4DDR, set it after each reset. Without it, the screen shows
    `examples/build/weather.bin`.
 2. Write the settings file `WEATHER.CFG` (below) into the same folder,
    or leave it out and type the place at the start.
-3. On the board, at the monitor's prompt, type `load weather.bin` and
-   then `r`.
+3. On the board, at BASIC's `READY.`, type `LOAD "WEATHER.BIN"` and
+   then `SYS 0x8000`.
 
 The board needs a network with a DHCP server, the service that hands out
 IP addresses, as most home routers have. When the board has no IP

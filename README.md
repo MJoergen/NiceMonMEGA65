@@ -61,44 +61,49 @@ There are three ways to use the system:
    on. MEGAFLASH, the MEGA65's core menu, appears. Let it write the core
    file into a free slot of the flash.
 3. Start the system from that slot. The screen shows the monitor's
-   banner and its prompt, `> `. Type `?` and RETURN for the commands.
+   banner and BASIC's `READY.`. Type `HELP` and RETURN for the
+   statements.
 4. For the demo, download `demo.bin` from the same release, and copy it
    into the folder `NICE` of an SD card (see [The SD cards](#the-sd-cards)).
-   Put the card in the board, and type `load demo.bin` and RETURN, then
-   `r` and RETURN.
+   Put the card in the board, and type `LOAD "DEMO.BIN"` and RETURN,
+   then `SYS 0x8000` and RETURN.
 
 ## On its own
 
 With nothing connected but a screen, the MEGA65 starts the
-[monitor](monitor/README.md) from the ROM. It shows its version and a
-prompt, `> `, and takes a command on each line:
+[monitor](monitor/README.md) from the ROM. It shows its version and
+`READY.`, and takes a statement of its BASIC on each line. BASIC is
+young: so far it has the monitor's commands, and no variables or
+programs yet ([doc/BASIC.md](doc/BASIC.md)).
 
-| Command | What it does |
+| Statement | What it does |
 |---|---|
-| `?` | Lists the commands |
-| `dir` | Lists the files on the SD card |
-| `load NAME` | Loads a program from the SD card |
-| `r` | Runs the program that was loaded |
-| `save NAME ADDR N` | Saves N words of memory, from ADDR on, to the SD card |
-| `l` | Loads a program that you type or paste, as the lines of its `.bin` file |
+| `HELP` | Lists the statements |
+| `DIR` | Lists the files on the SD card |
+| `LOAD "NAME.BIN"` | Loads a program from the SD card |
+| `SYS 0x8000` | Runs the program that was loaded |
+| `SAVE "NAME", A, N` | Saves N words of memory, from A on, to the SD card |
+| `LOAD` | Loads a program that you type or paste, as the lines of its `.bin` file |
 
-[monitor/README.md](monitor/README.md#the-commands) has the others,
-such as `d`, which shows memory, and `u`, which disassembles it.
+Keywords are in either case, and numbers in decimal, or in hex after
+`0x`. [monitor/README.md](monitor/README.md#basic) has the others, such
+as `DUMP`, which shows memory, and `DIS`, which disassembles it.
 
 The monitor loads a program at address `0x8000`, above the ROM. The
 program has 92K words of RAM on the MEGA65, `0x8000` to `0x1EFFF`, and
-28K on the Nexys4DDR. For `l`, paste the `.bin` file into a plain TCP
+28K on the Nexys4DDR. For `LOAD`, paste the `.bin` file into a plain TCP
 client on the Ethernet port, or a terminal on the serial port
 ([monitor/README.md](monitor/README.md#loading-without-a-host)).
 
 Each release comes with a [demo](demo/README.md), `demo.bin`, a
-program for the monitor: `load demo.bin` and `r` run it from the card.
+program for the monitor: `LOAD "DEMO.BIN"` and `SYS 0x8000` run it
+from the card.
 It shows the version and how to go further, and below that it is a
 typewriter: what you type appears on the screen.
 RETURN starts a new line, INST/DEL deletes, the cursor keys move the
 cursor, and CTRL-L clears what you typed. The function keys switch
 between the demos that the second row lists, and F12 (SHIFT and F11)
-goes back to the monitor. The reset button starts the monitor again at
+goes back to BASIC. The reset button starts the monitor again at
 any time.
 
 Each release also has `weather.bin`, a weather display for the monitor:
@@ -113,7 +118,7 @@ The ROM can also hold a program of your own (see
 ### The SD cards
 
 The monitor reads and writes files on FAT32 cards, in the folder `NICE`
-of the root directory, with `dir`, `load`, `save`, and `del`. To run a
+of the root directory, with `DIR`, `LOAD`, `SAVE`, and `DELETE`. To run a
 program from a card:
 
 1. On a PC, make the folder `NICE` on the card, and copy the program's
@@ -121,7 +126,8 @@ program from a card:
    on a card without it, as a card may be shared with other cores, each
    with a folder of its own. With no PC slot, `make sdcard CMD=mkdir`
    makes it over the link, on a card that has FAT32.
-2. Put the card in the board, and type `load NAME` and then `r`.
+2. Put the card in the board, and type `LOAD "NAME.BIN"` and then
+   `SYS 0x8000`.
 
 On the MEGA65, slot 0 is the microSD slot at the back, and slot 1 the
 full-size slot underneath. The monitor takes the card in slot 0, or
@@ -247,22 +253,22 @@ is built with `make -C nice_cpu/emulator build`, which needs Zig (see
 
 After a reset the board has no IP address. The monitor asks the
 network's DHCP server for one on its own, in the background, while it
-waits at its prompt. When the server answers, a few seconds after the
-reset, the monitor shows the address over its prompt:
+waits for a line. When the server answers, a few seconds after the
+reset, the monitor shows the address after `READY.`:
 
+    READY.
     IP address 192.168.1.253 from DHCP
-    >
 
 Without a cable or a server, nothing is shown, and the monitor asks
-again, less and less often. The monitor's commands also set an address:
+again, less and less often. BASIC's statements also set an address:
 
-| Command | What it does |
+| Statement | What it does |
 |---|---|
-| `i 192.168.1.65` | Sets the IP address; `i` alone shows it |
-| `i dhcp` | Gets an address from the network's DHCP server, and shows it with the mask, the gateway, the DNS server, the DHCP server, and the time server, if the network has one |
-| `m 02:4E:49:43:45:01` | Sets the MAC address; `m` alone shows it. A second board on the same network needs one of its own |
+| `IP "192.168.1.65"` | Sets the IP address; `IP` alone shows it |
+| `DHCP` | Gets an address from the network's DHCP server, and shows it with the mask, the gateway, the DNS server, the DHCP server, and the time server, if the network has one |
+| `MAC "02:4E:49:43:45:01"` | Sets the MAC address; `MAC` alone shows it. A second board on the same network needs one of its own |
 
-The board renews a DHCP lease while the monitor waits at its prompt,
+The board renews a DHCP lease while BASIC waits for a line,
 and while a program uses the network. A program that does not use the
 network renews nothing, so if it runs longer than the lease, the server
 may give the address to another computer. A fixed address outside the
@@ -277,29 +283,28 @@ address:
 
 ### Loading a program from the network
 
-Once the board has an address, the monitor's
-`tftp 192.168.1.10 hello.bin` loads a program from a TFTP server on the
-network, as `load` loads one from the card. `make tftpd` on a PC is
-such a server: it serves `examples/build`, and `tftp 192.168.1.10
-*.bin` lists its programs
+Once the board has an address, `LOAD "HELLO.BIN", "192.168.1.10"`
+loads a program from a TFTP server on the network, as `LOAD` loads one
+from the card. `make tftpd` on a PC is such a server: it serves
+`examples/build`, and `DIR "192.168.1.10", "*.BIN"` lists its programs
 ([monitor/README.md](monitor/README.md#the-network), which also says
 how to serve without root).
 
 ### Setting the clock from the network
 
-Once the board has an address, the monitor's `time ntp +01:00` sets
+Once the board has an address, `NTP "", "+01:00"` sets
 its clock from a time server on the internet, `pool.ntp.org`, or from
 the network's own when DHCP names one. A time server gives UTC, the
-time of no time zone, and the clock keeps local time. So the command
+time of no time zone, and the clock keeps local time. So the statement
 takes the difference, local time less UTC: `+01:00` in Central Europe
 in winter, and `+02:00` in summer. Without it, the clock is set to
-UTC. A server's name or address may come first, as in
-`time ntp 192.168.1.1 +01:00`.
+UTC. A server's name or address comes first, in place of `""`, as in
+`NTP "192.168.1.1", "+01:00"`.
 
-On the MEGA65 the command sets the real-time clock too, so the time
+On the MEGA65 the statement sets the real-time clock too, so the time
 stays over a power cycle. The Nexys4DDR has no real-time clock, so
-there `time ntp` after each reset is the way to set the clock without a
-PC ([monitor/README.md](monitor/README.md#the-commands)).
+there `NTP` after each reset is the way to set the clock without a
+PC ([monitor/README.md](monitor/README.md#basic)).
 
 ### Talking to a program
 
@@ -350,7 +355,7 @@ terminal program, such as `picocom`, the plain client, as
 set them up, see [Setting up the tools](#setting-up-the-tools).
 
 The port runs at 230400 baud, 8-N-1, after reset, which is the tools'
-default on Linux and macOS alike. The monitor's `baud` sets another
+default on Linux and macOS alike. BASIC's `BAUD` sets another
 rate, from 115200 to 2 Mbaud, which the tools then take with `--baud`
 ([DEBUG_LINK.md](doc/DEBUG_LINK.md#the-baud-rate)). On Linux, 2 Mbaud
 loads a program about nine times as fast.
@@ -528,7 +533,7 @@ into `.bin` files, with the tools of this repository (see
 | | A program on its own | A program under the monitor |
 |---|---|---|
 | Built at address | 0 | `0x8000` |
-| Loaded by | `tools/load.py`, which hides the ROM | The monitor's `l`, `load`, or `tftp`, or `tools/load.py --monitor` |
+| Loaded by | `tools/load.py`, which hides the ROM | BASIC's `LOAD`, from the card, a paste, or TFTP, or `tools/load.py --monitor` |
 | It may use | The hardware's registers | Those, and the monitor's routines for the screen, the files, and the network |
 | `printf` prints | To the PC | To the screen and the PC |
 | In `niceemu` | It runs the same | It runs behind the monitor, joined into one file |

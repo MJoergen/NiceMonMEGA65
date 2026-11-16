@@ -1,12 +1,13 @@
 NiceMon V9.9
-? lists the commands
-> dir
+HELP lists the statements
+READY.
+dir
 Directory of NICE
 my prog.bin                    14184
 mixed.Bin                         14
-lower.txt                         14
-caf?.txt                          14
-?x.txt                            12
+lower.bin                         14
+caf?.bin                          14
+?x.bin                            12
 mandelbrot1.txt                   17
 mandelbrot2.txt                   17
 nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn.txt
@@ -21,7 +22,7 @@ PAD07.TXT                         14
 PAD08.TXT                         14
 PAD09.TXT                         14
 PAD10.TXT                         14
-across a sector.txt               15
+across a sector.bin               15
 PAD11.TXT                         14
 PAD12.TXT                         14
 PAD13.TXT                         14
@@ -35,72 +36,87 @@ PAD20.TXT                         14
 PAD21.TXT                         14
 PAD22.TXT                         14
 PAD23.TXT                         14
-across a cluster.txt              16
-BADSUM~1.TXT                      15
+across a cluster.bin              16
+BADSUM~1.BIN                      15
 Files: 34, directories: 0
-> load "my prog.bin"
+READY.
+load "my prog.bin"
 Words loaded: 788, 00008000 to 00008313
-> r
+READY.
+sys 0x8000
 Hello from 00008000, table 00010005
 at column 40
 on the line only
 Returned 0000002A
-> load MYPROG~1.BIN
+READY.
+load "MYPROG~1.BIN"
 Words loaded: 788, 00008000 to 00008313
-> load "MY PROG.BIN"
+READY.
+load "MY PROG.BIN"
 Words loaded: 788, 00008000 to 00008313
-> load mixed.bin
+READY.
+load "mixed.bin"
 Words loaded: 0
 Lines skipped: 1, first line 1; ADDR WORD in hex, ADDR 00008000 to FFFEFFFF
-> load LOWER.TXT
+READY.
+load "LOWER.BIN"
 Words loaded: 0
 Lines skipped: 1, first line 1; ADDR WORD in hex, ADDR 00008000 to FFFEFFFF
-> load "across a sector.txt"
+READY.
+load "across a sector.bin"
 Words loaded: 0
 Lines skipped: 1, first line 1; ADDR WORD in hex, ADDR 00008000 to FFFEFFFF
-> load "ACROSS A CLUSTER.TXT"
+READY.
+load "ACROSS A CLUSTER.BIN"
 Words loaded: 0
 Lines skipped: 1, first line 1; ADDR WORD in hex, ADDR 00008000 to FFFEFFFF
-> load "bad sum.txt"
+READY.
+load "bad sum.bin"
 File error 21, no such file
-> load badsum~1.txt
+READY.
+load "badsum~1.bin"
 Words loaded: 0
 Lines skipped: 1, first line 1; ADDR WORD in hex, ADDR 00008000 to FFFEFFFF
-> load "my prog.bin
-load NAME: the name of a file, such as load hello.bin, or load "my prog.bin"
-> load caf?.txt
+READY.
+load "my prog.bin
+Words loaded: 788, 00008000 to 00008313
+READY.
+load "caf?.bin"
 File error 21, no such file
-> load _x.txt
+READY.
+load "_x.bin"
 Words loaded: 0
 Lines skipped: 1, first line 1; ADDR WORD in hex, ADDR 00008000 to FFFEFFFF
-> load ""
-File error 20, not a valid name
-> h
+READY.
+load "*.bin"
+File error 21, no such file
+READY.
+halt
 Halted
 Screen:
-|Words loaded: 0
 |Lines skipped: 1, first line 1; ADDR WORD in hex, ADDR 00008000 to FFFEFFFF
-|> load "across a sector.txt"
-|Words loaded: 0
-|Lines skipped: 1, first line 1; ADDR WORD in hex, ADDR 00008000 to FFFEFFFF
-|> load "ACROSS A CLUSTER.TXT"
-|Words loaded: 0
-|Lines skipped: 1, first line 1; ADDR WORD in hex, ADDR 00008000 to FFFEFFFF
-|> load "bad sum.txt"
+|READY.
+|load "bad sum.bin"
 |File error 21, no such file
-|> load badsum~1.txt
+|READY.
+|load "badsum~1.bin"
 |Words loaded: 0
 |Lines skipped: 1, first line 1; ADDR WORD in hex, ADDR 00008000 to FFFEFFFF
-|> load "my prog.bin
-|load NAME: the name of a file, such as load hello.bin, or load "my prog.bin"
-|> load caf?.txt
+|READY.
+|load "my prog.bin
+|Words loaded: 788, 00008000 to 00008313
+|READY.
+|load "caf?.bin"
 |File error 21, no such file
-|> load _x.txt
+|READY.
+|load "_x.bin"
 |Words loaded: 0
 |Lines skipped: 1, first line 1; ADDR WORD in hex, ADDR 00008000 to FFFEFFFF
-|> load ""
-|File error 20, not a valid name
-|> h
+|READY.
+|load "*.bin"
+|File error 21, no such file
+|READY.
+|halt
 |Halted
 VBASE at the halt 000000
 exit 0

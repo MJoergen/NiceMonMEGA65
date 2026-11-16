@@ -1,61 +1,65 @@
 NiceMon V9.9
-? lists the commands
-> load my"my prog.bin" 
+HELP lists the statements
+READY.
+load my"my prog.bin" 
 Words loaded: 788, 00008000 to 00008313
-> load "my prog.bin" 
+READY.
+load "my prog.bin" 
 Words loaded: 788, 00008000 to 00008313
-> load mandelbrot
+READY.
+load mand"mandelbrot
 mandelbrot1.txt
 mandelbrot2.txt
-> load mandelbrot1.txt 
-Words loaded: 0
-Lines skipped: 1, first line 1; ADDR WORD in hex, ADDR 00008000 to FFFEFFFF
-> load pad2
+load "mandelbrot1.txt" 
+LOAD takes a .BIN file, such as LOAD "HELLO.BIN"
+READY.
+load pad2
 PAD20.TXT
 PAD21.TXT
 PAD22.TXT
 PAD23.TXT
-> load pad21PAD21.TXT 
-Words loaded: 0
-Lines skipped: 1, first line 1; ADDR WORD in hex, ADDR 00008000 to FFFEFFFF
-> lo^C
-> load x^C
-> load caf^C
-> load ACROSS"across a 
-across a sector.txt
-across a cluster.txt
-> load "across a ^C
-> load .^C
-> load n^C
-> dir 1
+load pad21"PAD21.TXT" 
+LOAD takes a .BIN file, such as LOAD "HELLO.BIN"
+READY.
+lo^C
+load x^C
+load caf^C
+load ACROSS"across a 
+across a sector.bin
+across a cluster.bin
+load "across a ^C
+load .^C
+load n^C
+dir 1
 SD error 1 in slot 1, no card
-> load my^C
-> h
+READY.
+load my^C
+halt
 Halted
 Screen:
-|Words loaded: 0
-|Lines skipped: 1, first line 1; ADDR WORD in hex, ADDR 00008000 to FFFEFFFF
-|> load pad2
+|READY.
+|load pad2
 |PAD20.TXT
 |PAD21.TXT
 |PAD22.TXT
 |PAD23.TXT
-|> load PAD21.TXT
-|Words loaded: 0
-|Lines skipped: 1, first line 1; ADDR WORD in hex, ADDR 00008000 to FFFEFFFF
-|> lo^C
-|> load x^C
-|> load caf^C
-|> load "across a
-|across a sector.txt
-|across a cluster.txt
-|> load "across a ^C
-|> load .^C
-|> load n^C
-|> dir 1
+|load "PAD21.TXT"
+|LOAD takes a .BIN file, such as LOAD "HELLO.BIN"
+|READY.
+|lo^C
+|load x^C
+|load caf^C
+|load "across a
+|across a sector.bin
+|across a cluster.bin
+|load "across a ^C
+|load .^C
+|load n^C
+|dir 1
 |SD error 1 in slot 1, no card
-|> load my^C
-|> h
+|READY.
+|load my^C
+|halt
 |Halted
 VBASE at the halt 000000
 exit 0

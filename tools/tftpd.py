@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""A TFTP server for the monitor's tftp, with listings of its folder.
+"""A TFTP server for BASIC's LOAD and DIR, with listings of its folder.
 
 It serves the regular files of one folder, --dir, and nothing below or
 above it, nor through a symbolic link, to read requests (RFC 1350) in
@@ -29,8 +29,8 @@ starting with a dot, and an empty one; a missing file gets ERROR 1.
 
 Port 69, the default, needs root on Linux, or the capability:
 sudo setcap cap_net_bind_service=+ep $(readlink -f $(which python3)).
-Another port, such as --port 6969, needs none, and the monitor reaches
-it with tftp IP:6969 NAME. --port 0 picks a free port and prints it on
+Another port, such as --port 6969, needs none, and BASIC reaches it
+with LOAD "NAME.BIN", "IP:6969". --port 0 picks a free port and prints it on
 stderr, for tests. A line on stdout reports each transfer. Only the
 Python standard library is used.
 """
@@ -226,7 +226,7 @@ def main() -> None:
         sock.bind((args.addr, args.port))
     except PermissionError:
         sys.exit(f"tftpd.py: port {args.port} needs root, or the capability of "
-                 "the header (--help); or use --port 6969 and tftp IP:6969 NAME")
+                 "the header (--help); or use --port 6969 and LOAD \"NAME.BIN\", \"IP:6969\"")
     port = sock.getsockname()[1]
     print(f"tftpd.py: serving {os.path.abspath(args.dir)} on port {port}",
           file=sys.stderr, flush=True)

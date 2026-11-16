@@ -3,7 +3,7 @@
 - [Hardware abstraction layer](#hardware-abstraction-layer)
   - [The dispatch table](#the-dispatch-table)
   - [The shared routines](#the-shared-routines)
-- [The commands](#the-commands)
+- [BASIC](#basic)
 - [Files](#files)
 - [The network](#the-network)
 - [TCP and DNS](#tcp-and-dns)
@@ -19,7 +19,8 @@ The ROM at `0x0000`–`0x7FFF`, which the core boots from, holds:
   the hardware or the state the monitor keeps, called through a dispatch
   table at the start of the ROM. It is not a library: what a program can
   do for itself stays in the program.
-- the monitor's main loop with a few commands.
+- BASIC, whose stage 1 is the shell with the monitor's commands as
+  statements (BASIC below).
 
 The rest of the ROM is free. The demo is not in the ROM: it is a
 program of its own (The demo below).
@@ -63,7 +64,8 @@ routines and the ARP cache of the network, and FAT32 in C.
 [INTERNALS.md](INTERNALS.md) describes them, with the build and the
 tests.
 
-The monitor is in NICE assembly, with FAT32 and the clock in C. The ROM
+The monitor is in NICE assembly, with FAT32, the clock, and BASIC's
+scanner in C. The ROM
 is its files in this order, and
 [INTERNALS.md](INTERNALS.md#the-roms-words) has the words of each, and
 the words that are free:
@@ -71,15 +73,17 @@ the words that are free:
 | File | What it is |
 |---|---|
 | `monitor.nasm` | The dispatch table, the HAL, the screen, and the line with its scrollback |
-| `monitor_cmd.nasm` | The main loop and the commands, which BASIC is to replace |
-| `monitor_dis.nasm` | The disassembler of `u` |
+| `monitor_cmd.nasm` | The routines of the statements that were the monitor's commands |
+| `basic.nasm` | BASIC's main loop, the stubs through which `basic.c` calls the routines, and its keywords, messages, and help |
+| `monitor_dis.nasm` | The disassembler of `DIS` |
 | `monitor_sd.nasm` | The routines for the SD cards |
 | `monitor_eth.nasm` | The routines for the network: the frames, ARP, UDP, DHCP, DNS, TFTP, and NTP |
 | `monitor_tcp.nasm` | TCP |
-| `monlib.nasm` | The routines that programs join, which the commands use too |
+| `monlib.nasm` | The routines that programs join, which the statements use too |
 | `mon.nasm` | The stubs through which a program calls the entries |
 | `fat32.c` | FAT32, translated by `nicewasm --ram`, with the data of the module |
-| `clock.c` | The `time` command, the dates of files, and the real-time clock |
+| `clock.c` | `TIME`, the dates of files, and the real-time clock |
+| `basic.c` | BASIC: the scanner of a line, and the statements |
 | nice_cpu's `lib.nasm` and `muldiv_mpu.nasm` | The runtime of the C code |
 | `build/version.nasm` and `build/folder.nasm` | The version and the card's folder, which the Makefile writes |
 
@@ -114,7 +118,7 @@ not: a program loads and saves files, not sectors, and one that wants
 sectors drives the registers, which are the same everywhere. Strings,
 memory, number formatting, line editing, and random numbers are not the
 HAL's: assembly programs join `monlib.nasm` (The shared routines below),
-which the monitor's own commands use too, and C programs have nice_cpu's
+which the ROM's own statements use too, and C programs have nice_cpu's
 `libc`. The ROM's routines could not serve C anyway, for a C string is
 bytes packed four to a word in wasm's linear memory
 (`nice_cpu/translator/WASM.md`), and libc must run in `niceemu`, which
@@ -144,8 +148,8 @@ program starts with none of the values that this one left there.
 
 | # | Addr | Name | Arguments → result |
 |---|---|---|---|
-| 0 | `00` | `mon_reset` | Cold start: E, the timer, the FPU, VBASE, and the font base cleared, the stack, the variables, the screen, the clock of the time of day from the MEGA65's real-time clock while it is not set, the banner, the main loop. The RAM from `0x8000` is left alone. |
-| 1 | `02` | `mon_exit` | R1 a status. Back to the main loop with a fresh stack, with E, the timer, the FPU, VBASE, and the font base cleared, the cursor shown and blinking, the display offset off, and the status printed where the program left the cursor, on a new line if that is not column 0; for a program that has not kept the SP of its entry. A program with the runtime's start-up code returns or calls `exit` instead, which lands here too. |
+| 0 | `00` | `mon_reset` | Cold start: E, the timer, the FPU, VBASE, and the font base cleared, the stack, the variables, the screen, the clock of the time of day from the MEGA65's real-time clock while it is not set, the banner, BASIC's main loop. The RAM from `0x8000` is left alone. |
+| 1 | `02` | `mon_exit` | R1 a status. Back to BASIC's main loop with a fresh stack, with E, the timer, the FPU, VBASE, and the font base cleared, the cursor shown and blinking, the display offset off, and the status printed where the program left the cursor, on a new line if that is not column 0; for a program that has not kept the SP of its entry. A program with the runtime's start-up code returns or calls `exit` instead, which lands here too. |
 | 2 | `04` | `mon_version` | → R1 the version of the table, major in bits 31..16, minor in 15..0: `0x00010005`, 1.5. |
 | 3 | `06` | `mon_putc` | R1 a character, to the outputs `mon_out` selects. On the screen it goes at the cursor, which moves on, to the next row after the last column; CR moves the cursor to column 0, LF to column 0 of the next row, BS one back, and TAB to the next multiple of 8; the other control codes and `0x7F` do nothing, and `0x80` to `0x9F` go on the screen as any character, blank in Spleen and drawn from the font RAM when a program selected it; past the last row the rows move up by one, by copying, so the rows shown are always the 2000 words at `0xFFFF0000`, as in `niceemu`. On the line every byte goes as it is. |
 | 4 | `08` | `mon_out` | R1 the outputs: bit 0 the line, bit 1 the screen; both at reset. → R1 the old ones. |
@@ -166,8 +170,8 @@ program starts with none of the values that this one left there.
 | 19 | `26` | `udp_close` | Closes the endpoint, and disables the port for Ethernet frames. → R1 0. Table 1.3. |
 | 20 | `28` | `fs_readname` | R1 a handle of a directory, R2 a buffer of 4 words, R3 a buffer of 256 words. The next entry, as `fs_readdir` gives it, and its name in R3's buffer, one character per word up to a 0 word: its long name, or else its 8.3 name as a name, `HELLO.BIN`, in lower case where the entry says so. A character of a long name outside ASCII is `?`. → R1 1, 0 at the end, or an error. Table 1.4. |
 | 21 | `2A` | `net_config` | R1 the word address of 4 words. Writes the IP address, the mask, the gateway, and the DNS server to them, each 0 for none (TCP and DNS below). → R1 0. Table 1.5. |
-| 22 | `2C` | `net_set` | R1 the word address of 4 words, as `net_config` gives them. Sets the four, for a network with no DHCP, and forgets the lease. A new IP address breaks a host's connection over TCP, as `i A.B.C.D` does, and ends every TCP connection of the program in `MON_E_TRESET`. → R1 0. Table 1.5. |
-| 23 | `2E` | `net_dhcp` | What `i dhcp` does, printing nothing: the address, the mask, the gateway, the DNS server, and the lease. With an address set, it asks for that one. Waits up to 16 seconds. → R1 0, or an error. Table 1.5. |
+| 22 | `2C` | `net_set` | R1 the word address of 4 words, as `net_config` gives them. Sets the four, for a network with no DHCP, and forgets the lease. A new IP address breaks a host's connection over TCP, as `IP "A.B.C.D"` does, and ends every TCP connection of the program in `MON_E_TRESET`. → R1 0. Table 1.5. |
+| 23 | `2E` | `net_dhcp` | What `DHCP` does, printing nothing: the address, the mask, the gateway, the DNS server, and the lease. With an address set, it asks for that one. Waits up to 16 seconds. → R1 0, or an error. Table 1.5. |
 | 24 | `30` | `net_poll` | Takes the frames that wait, and sends what is due: ACKs, retransmissions, and the lease's renewal. Never waits. A program that uses the network calls it every 100 ms or so. → R1 not negative, of no meaning yet. Table 1.5. |
 | 25 | `32` | `dns_lookup` | R1 the byte address of a name, up to a 0 byte, R2 the word address of the result. Writes the name's IPv4 address to the word at R2. A name of four decimal numbers with dots is taken as it is. Waits up to about 9 seconds. → R1 0, or an error. Table 1.5. |
 | 26 | `34` | `tcp_open` | R1 the word address of a control block, R2 an IP address, R3 a port, R4 the sizes of the rings in bytes, to receive in bits 31..16 and to send in 15..0, each 64 or more. Opens a connection: waits up to 3 seconds for ARP, sends the SYN, and does not wait for the answer. → R1 a handle, 0 to 3, or an error. Table 1.5. |
@@ -194,7 +198,7 @@ program is built, with `mon.nasm`, whose stubs its routines call, so
 its routines are in the program's image, and only in a program that
 joins it. They print through `mon_putc`, entry 3, so they need the ROM,
 as the entries do; in `niceemu` the monitor is joined at 0 (The ROM
-above). The monitor joins the file too, for its own commands, but a
+above). The monitor joins the file too, for its own statements, but a
 program does not reach the monitor's copy, which has no entry. A C
 program has nice_cpu's `libc` instead. The routines follow the C
 ABI, and their names start with `_io_`, so that they clash with nothing
@@ -207,7 +211,7 @@ in nice_cpu's runtime or C library:
 | `_io_puthex` | R1 in hex, 8 digits. |
 | `_io_putdec` | R1 in decimal, unsigned, with the math unit. |
 | `_io_gethex` | A hex number in the string at R1, after any blanks. → R1 the value, R2 the number of digits, 0 for none, R3 the address after them. |
-| `_io_gets` | A line into the buffer at R1, up to R2 characters and a 0 word, edited as The commands says and echoed through `mon_putc`. → R1 the number of characters. `_io_gets.first` is the same, with R3 a first byte already read and R4 a routine for TAB or 0, for the monitor's own line; the routine takes R1 the buffer, R2 the cursor, and R3 the word after the last, and returns R1 the new cursor. `_io_gets` drops TAB. |
+| `_io_gets` | A line into the buffer at R1, up to R2 characters and a 0 word, edited as BASIC says and echoed through `mon_putc`. → R1 the number of characters. `_io_gets.first` is the same, with R3 a first byte already read and R4 a routine for TAB or 0, for BASIC's own line; the routine takes R1 the buffer, R2 the cursor, and R3 the word after the last, and returns R1 the new cursor. `_io_gets` drops TAB. |
 | `_io_getc` | → R1 the next byte of the console, which it waits for. The end of the line's input, `0x200`, is no byte, as the keyboard's bytes still come. |
 
 nice_cpu's `libc` is a small C standard library, and its runtime
@@ -222,20 +226,35 @@ the console only, with no files; `string.h`, `stdlib.h` with `malloc`,
 the files of the SD card nor the network: a C program reaches those
 through the entries, with `mon.h`.
 
-## The commands
+## BASIC
 
-At the cold start the monitor clears the screen, prints its banner,
-`NiceMon` and the version, and prints a prompt, `> `, on the screen and
-on the line. It reads a line from the console: the keyboard and the
-line, which the hardware merges. A command is a letter, in either case,
-or `baud`, `dir`, `load`, `save`, `del`, `time`, or `tftp`, and after `d` and
-`u` a hex address and a hex count, each of them optional. DEL and
+The ROM's user interface is BASIC (issue #54,
+[doc/BASIC.md](../doc/BASIC.md)). Stage 1 (issue #112) is the shell:
+the monitor's commands as statements, run one line at a time, with no
+expressions, no variables, and no stored program yet.
+
+At the cold start the ROM clears the screen, prints its banner,
+`NiceMon` and the version, then `HELP lists the statements` and
+`READY.`, on the screen and on the line. It reads a line from the
+console: the keyboard and the line, which the hardware merges. DEL and
 backspace delete the character before the cursor, CTRL-C empties the
-line, and the cursor and function keys, the other control codes, and the
-bytes `0x80` to `0x9F` do nothing. RETURN runs the line. A break on
-the UART, or a host's half-close over Ethernet, ends the line's input
-and not the keyboard's, and the next host to connect over Ethernet can
-type again ([SYSTEM.md](../doc/SYSTEM.md#io-registers), `0xFFFFFF00`).
+line, and the cursor and function keys, the other control codes, and
+the bytes `0x80` to `0x9F` do nothing. RETURN runs the line, and BASIC
+prints `READY.` after it. A line of blanks only runs nothing and gets no
+`READY.`. A break on the UART, or a host's half-close over Ethernet,
+ends the line's input and not the keyboard's, and the next host to
+connect over Ethernet can type again
+([SYSTEM.md](../doc/SYSTEM.md#io-registers), `0xFFFFFF00`).
+
+A statement is a keyword, in either case, and its arguments, with
+commas between them. A keyword is a whole word: `LOADX` is no `LOAD`.
+An argument is a number, in decimal, or in hex after `0x`, such as
+`SYS 0x8000`, or a string in quotes, such as `LOAD "HELLO.BIN"`. A
+string that the line ends without its closing quote ends with the line.
+A line that is no statement prints `Syntax error` and the lines of
+`HELP` of its statement, or `Syntax error; HELP lists the statements`
+when its first word is no keyword. A number that does not fit 32 bits
+prints `Illegal quantity`.
 
 Before the first key of a line, the cursor keys up and down scroll
 back through the rows that left the top of the screen a row at a time,
@@ -243,52 +262,51 @@ and Page Up and Page Down 24 rows at a time. On the MEGA65 Page Up and
 Page Down are CTRL and MEGA with CRSR↑ and CRSR↓, and CRSR↑ and CRSR↓
 are the cursor keys, with MEGA or without. Any other key shows
 the screen again, and goes on to the line. The history has 384 rows on
-the MEGA65 and 77 on the Nexys4DDR. `c` leaves it, as `clear` in a
+the MEGA65 and 77 on the Nexys4DDR. `CLS` leaves it, as `clear` in a
 terminal does, and the cold start empties it. `niceemu` has no display
 offset, so there the history is kept but not shown.
 
 TAB completes the name of a file of the card's folder `NICE`, as Bash
-does, in the word before the cursor when it is not the command itself
-(issue #137). When one file matches, the rest of its name follows,
-then a blank. A name in quotes gets its closing quote, and a name with
-a blank gets its opening quote too. When several match, the word goes
-on to the start that they all share, and a TAB that adds nothing lists
-them and shows the prompt and the line again. Names match in either
-case, and the word takes the case of the card's name. Directories,
-names outside ASCII, and a name that does not fit the line are left
-out. With no match, no card, or a card that fails, TAB does nothing.
+does, in the word before the cursor when it is not the keyword itself
+(issue #137). A name not yet in quotes gets its opening quote. When one
+file matches, the rest of its name follows, then the closing quote and
+a blank. When several match, the word goes on to the start that they
+all share, and a TAB that adds nothing lists them and shows the line
+again. Names match in either case, and the word takes the case of the
+card's name. Directories, names outside ASCII, and a name that does not
+fit the line are left out. With no match, no card, or a card that
+fails, TAB does nothing.
 
-| Command | What it does |
+| Statement | What it does |
 |---|---|
-| `r [ADDR]` | Runs the program at `ADDR` in hex, or at `0x8000` without it (Programs below), and prints its status when it returns: `Returned 0000002A`. A word of 0 at `ADDR` is no program, and `r` says so: `No program at 00008000`. `r 0` runs entry 0 of the dispatch table, the cold start, so it restarts the monitor and leaves the RAM from `0x8000` alone. |
-| `d [ADDR] [N]` | Shows `N` words from `ADDR`, 4 to a row with the row's address first, all in hex. Without `ADDR`, the words after the last shown; without `N`, 32 words. |
-| `u [ADDR] [N]` | Disassembles `N` instructions from `ADDR`, a row each: the address, the instruction's 1 to 4 words, and its text, all in hex (The disassembler below). Without `ADDR`, the instructions after the last shown; without `N`, 20. |
-| `c` | Clears the screen. |
-| `v` | The version of the monitor, and of the dispatch table: `NiceMon V2.2, dispatch table 1.5`. |
-| `i [A.B.C.D]` | Shows the Ethernet station's IP address, `IP address 192.168.1.65`, or writes it first: four decimal numbers of 0 to 255 with dots between them, such as `i 192.168.1.65`. Anything but an address or `dhcp` is no address, and `i` says so and writes nothing. It writes `0xFFFFFFB0`, `NET_IP` ([SYSTEM.md](../doc/SYSTEM.md#the-ethernet-station)), so a host connected over TCP loses its connection. In `niceemu` it is a register that keeps what is written. |
-| `i dhcp` | Gets the IP address from the network's DHCP server and writes it, as `i A.B.C.D` does, then shows it, with the mask, the gateway, the DNS server, the DHCP server, and the NTP server, if it gives one, a line each (The network below). Without an answer, it prints `No answer from a DHCP server` after about 8 seconds, and leaves the address as it was. |
-| `m [MAC]` | Shows the station's MAC address, `MAC address 02:4E:49:43:45:06`, or writes it first: six bytes of one or two hex digits, in either case, with colons between them, such as `m 02:4E:49:43:45:01`. The first byte must be even, as an odd one makes a group address. Anything else is no address, and `m` says so and writes nothing. It writes `0xFFFFFFB1` and `B2`, so a host connected over TCP loses its connection. Each kind of board has its own after reset: `02:4E:49:43:45:03` on the R3, `02:4E:49:43:45:06` on the R6, and `02:4E:49:43:45:0A` on the Nexys4DDR. Two boards of the same kind on one network need different MAC addresses. In `niceemu` they are registers too, `02:4E:49:43:45:00` after reset. |
-| `time [YYYY-MM-DD HH:MM:SS]` | Shows the clock of the time of day, `2026-11-11 14:30:00`, or sets it first to the date and the time given, two digits for each part but the year, in the years 1970 to 2105, with blanks around them, such as `time 2026-11-11 14:30:00`. The clock keeps local time, as the MEGA65's real-time clock does, and knows no time zones. After a reset of the system it is not set. The monitor's cold start sets it from the MEGA65's real-time clock, unless the real-time clock lost its time ([SYSTEM.md](../doc/SYSTEM.md#the-i2c-bus)), and leaves a clock that is set already. On the MEGA65, `time` with a date and a time in the years 2000 to 2099 sets the real-time clock too, so that later starts, and the MEGA65's other cores, have the time. Until the clock is set, as on the Nexys4DDR, which has no real-time clock, `time` prints `Clock not set`; a program, a host, or `time` sets it. A start of a program keeps it. Anything else is no time, and `time` says so and sets nothing. A clock that a program set past 2106-02-07 shows as `Clock past 2106`. In `niceemu` the clock is the host's time in UTC from the start. |
-| `time ntp [SERVER] [+HH:MM \| -HH:MM]` | Sets the clock from a time server on the network, and on the MEGA65 the real-time clock too, as `time` with a date does, and shows the time it set, the server, and how far the clock was off, such as `Clock set 2026-11-14 12:30:05 from 192.168.1.1, was 7 s behind`. SERVER is a name, such as `pool.ntp.org`, or an IP address. Without it, the server is the NTP server that `i dhcp` got, or else `pool.ntp.org`. A time server gives UTC, and the clock keeps local time, so the offset is local time less UTC, from `-12:00` to `+14:00`, such as `+01:00` for Central European Time and `+02:00` for its summer time; without it the clock is set to UTC. It needs an IP address, and for a name a DNS server, from `i dhcp`. Its errors are a line each: no IP address, no answer to ARP from the server or the gateway, no DNS server, no such name, an error of the DNS server, no answer from the DNS server or the time server after 3 tries of 2 seconds, a server that refused, and an answer that is not to be trusted (The network below). |
-| `baud [RATE]` | Shows the UART's baud rate, `Baud rate 230400`, or writes it first: 115200, 230400, 460800, 921600, 1000000, 1500000, or 2000000, in decimal, such as `baud 921600`. Anything else is no rate, and `baud` says so and writes nothing. It writes `0xFFFFFF9F` ([DEBUG_LINK.md](../doc/DEBUG_LINK.md#the-baud-rate)), as the on-board debugger's settings page does. The UART takes the new rate once it has sent nothing for 1 ms, so the answer and the prompt still come at the old rate, and a terminal on the UART then changes to the new one; only a reset brings back 230400. Over Ethernet the rate does not matter. In `niceemu` the word is memory, which reads 0 after a clear. |
-| `l` | Enters words into the RAM from lines of `ADDR WORD` in hex, as a `.bin` file has them (Loading without a host below), up to an empty line, and prints the words written and the lines skipped: `Words loaded: 600, 00008000 to 00008257`. |
-| `dir [SLOT]` | Lists the folder `NICE` of the SD card's FAT32 file system (Files below): `Directory of NICE`, then a row for each file, its name in 24 columns, the long name where it has one or else the 8.3 name, and its size in decimal, and for each directory, its name and `<DIR>`, then `Files: 25, directories: 1`. A name of 24 characters or more has a row of its own, and the size is on the next. With `SLOT` in hex, it mounts the card in it first; without, it lists the card mounted, which the first `dir` or `load` after reset mounts. An error is shown with its number and meaning: `File error 18, FAT16, which is not supported`. |
-| `load NAME` | Loads the `.bin` file `NAME` of the card's folder `NICE` as `l` loads lines, and prints the same summary, so a program copied to the card on a PC loads with no host. Unlike `l`, an empty line is passed over, the end of the file ends the load, and a skipped line is counted from the first line of the file. `NAME` is the long name or the 8.3 name, in either case, in quotes when it has a blank: `load "my prog.bin"`. |
-| `save NAME ADDR N` | Writes `N` words from `ADDR`, both in hex, to the file `NAME` of the card's folder `NICE` as a `.bin` file, a line of `ADDR WORD` in hex for each, and prints `Words saved: 600, 00008000 to 00008257`. `NAME` is as for `load`. It makes the file, or truncates it when it is there, and `load` reads it back. When the card fills up, the file keeps what fitted, and `save` prints error 30. |
-| `del NAME` | Deletes the file `NAME` of the card's folder `NICE`, its long name or its 8.3 name, as for `load`, with its long-name entries, if it has them, and prints `Deleted NAME`. |
-| `tftp IP NAME` | Loads the `.bin` file `NAME` from the TFTP server at the IP address `IP`, such as `tftp 192.168.1.10 hello.bin`, as `load` loads one from the card, and prints the same summary (The network below). `IP:PORT` sends the request to `PORT` instead of 69. It needs an IP address, from `i`. Without an answer, it prints `No answer from the TFTP server` after about 5 seconds; an error of the server is shown with its code and its message: `TFTP error 1, File not found`. |
-| `tftp IP [PAT]` | Lists the files of the server `tools/tftpd.py` at `IP` whose names match the pattern `PAT`, with `*` and `?`, such as `tftp 192.168.1.10 *.bin`, a line each with the name and the size; without `PAT`, all of them. Another server answers with an error. |
-| `h` | Halts the core, which the reset button, or a host over the link, starts again. The tests end with it. |
-| `?` | Lists the commands, and the keys of the history. |
+| `SYS A` | Calls the program at `A` (Programs below), and prints its status when it returns: `Returned 0000002A`. A word of 0 at `A` is no program, and `SYS` says so: `No program at 00008000`. `SYS 0` runs entry 0 of the dispatch table, the cold start, so it restarts BASIC and leaves the RAM from `0x8000` alone. |
+| `DUMP [A] [, N]` | Shows `N` words from `A`, 4 to a row with the row's address first, all in hex. Without `A`, the words after the last shown; without `N`, 32 words. |
+| `DIS [A] [, N]` | Disassembles `N` instructions from `A`, a row each: the address, the instruction's 1 to 4 words, and its text, all in hex (The disassembler below). Without `A`, the instructions after the last shown; without `N`, 20. |
+| `CLS` | Clears the screen. |
+| `VER` | The version of the ROM, and of the dispatch table: `NiceMon V2.2, dispatch table 1.5`. |
+| `IP ["A.B.C.D"]` | Shows the Ethernet station's IP address, `IP address 192.168.1.65`, or writes it first: four decimal numbers of 0 to 255 with dots between them, such as `IP "192.168.1.65"`. Anything else is no address, and `IP` says so and writes nothing. It writes `0xFFFFFFB0`, `NET_IP` ([SYSTEM.md](../doc/SYSTEM.md#the-ethernet-station)), so a host connected over TCP loses its connection. In `niceemu` it is a register that keeps what is written. |
+| `DHCP` | Gets the IP address from the network's DHCP server and writes it, as `IP` does, then shows it, with the mask, the gateway, the DNS server, the DHCP server, and the NTP server, if it gives one, a line each (The network below). Without an answer, it prints `No answer from a DHCP server` after about 8 seconds, and leaves the address as it was. |
+| `MAC ["MAC"]` | Shows the station's MAC address, `MAC address 02:4E:49:43:45:06`, or writes it first: six bytes of one or two hex digits, in either case, with colons between them, such as `MAC "02:4E:49:43:45:01"`. The first byte must be even, as an odd one makes a group address. Anything else is no address, and `MAC` says so and writes nothing. It writes `0xFFFFFFB1` and `B2`, so a host connected over TCP loses its connection. Each kind of board has its own after reset: `02:4E:49:43:45:03` on the R3, `02:4E:49:43:45:06` on the R6, and `02:4E:49:43:45:0A` on the Nexys4DDR. Two boards of the same kind on one network need different MAC addresses. In `niceemu` they are registers too, `02:4E:49:43:45:00` after reset. |
+| `TIME ["YYYY-MM-DD HH:MM:SS"]` | Shows the clock of the time of day, `2026-11-11 14:30:00`, or sets it first to the date and the time given, two digits for each part but the year, in the years 1970 to 2105, such as `TIME "2026-11-11 14:30:00"`. The clock keeps local time, as the MEGA65's real-time clock does, and knows no time zones. After a reset of the system it is not set. The cold start sets it from the MEGA65's real-time clock, unless the real-time clock lost its time ([SYSTEM.md](../doc/SYSTEM.md#the-i2c-bus)), and leaves a clock that is set already. On the MEGA65, `TIME` with a date and a time in the years 2000 to 2099 sets the real-time clock too, so that later starts, and the MEGA65's other cores, have the time. Until the clock is set, as on the Nexys4DDR, which has no real-time clock, `TIME` prints `Clock not set`; a program, a host, `TIME`, or `NTP` sets it. A start of a program keeps it. Anything else is no time, and `TIME` says so and sets nothing. A clock that a program set past 2106-02-07 shows as `Clock past 2106`. In `niceemu` the clock is the host's time in UTC from the start. |
+| `NTP ["SERVER"] [, "+HH:MM"]` | Sets the clock from a time server on the network, and on the MEGA65 the real-time clock too, as `TIME` with a date does, and shows the time it set, the server, and how far the clock was off, such as `Clock set 2026-11-14 12:30:05 from 192.168.1.1, was 7 s behind`. SERVER is a name, such as `"pool.ntp.org"`, or an IP address. Without it, or with `""`, the server is the NTP server that `DHCP` got, or else `pool.ntp.org`. A time server gives UTC, and the clock keeps local time, so the offset is local time less UTC, `"+HH:MM"` or `"-HH:MM"` from `-12:00` to `+14:00`, such as `NTP "", "+01:00"` for Central European Time and `"+02:00"` for its summer time; without it the clock is set to UTC. It needs an IP address, and for a name a DNS server, from `DHCP`. Its errors are a line each: no IP address, no answer to ARP from the server or the gateway, no DNS server, no such name, an error of the DNS server, no answer from the DNS server or the time server after 3 tries of 2 seconds, a server that refused, and an answer that is not to be trusted (The network below). |
+| `BAUD [RATE]` | Shows the UART's baud rate, `Baud rate 230400`, or writes it first: 115200, 230400, 460800, 921600, 1000000, 1500000, or 2000000, such as `BAUD 921600`. Anything else is no rate, and `BAUD` says so and writes nothing. It writes `0xFFFFFF9F` ([DEBUG_LINK.md](../doc/DEBUG_LINK.md#the-baud-rate)), as the on-board debugger's settings page does. The UART takes the new rate once it has sent nothing for 1 ms, so the answer and `READY.` still come at the old rate, and a terminal on the UART then changes to the new one; only a reset brings back 230400. Over Ethernet the rate does not matter. In `niceemu` the word is memory, which reads 0 after a clear. |
+| `LOAD` | Enters words into the RAM from lines of `ADDR WORD` in hex, as a `.bin` file has them (Loading without a host below), up to an empty line, and prints the words written and the lines skipped: `Words loaded: 600, 00008000 to 00008257`. |
+| `DIR [SLOT]` | Lists the folder `NICE` of the SD card's FAT32 file system (Files below): `Directory of NICE`, then a row for each file, its name in 24 columns, the long name where it has one or else the 8.3 name, and its size in decimal, and for each directory, its name and `<DIR>`, then `Files: 25, directories: 1`. A name of 24 characters or more has a row of its own, and the size is on the next. With `SLOT`, it mounts the card in it first; without, it lists the card mounted, which the first `DIR` or `LOAD` after reset mounts. An error is shown with its number and meaning: `File error 18, FAT16, which is not supported`. |
+| `LOAD "NAME.BIN"` | Loads the `.bin` file `NAME.BIN` of the card's folder `NICE` as `LOAD` loads lines, and prints the same summary, so a program copied to the card on a PC loads with no host. Unlike the lines typed, an empty line is passed over, the end of the file ends the load, and a skipped line is counted from the first line of the file. The name is the long name or the 8.3 name, in either case, such as `LOAD "my prog.bin"`. A name that does not end in `.BIN`, in either case, is no program, and `LOAD` says so; other kinds of files are for the later stages of BASIC. |
+| `SAVE "NAME", A, N` | Writes `N` words from `A` to the file `NAME` of the card's folder `NICE` as a `.bin` file, a line of `ADDR WORD` in hex for each, and prints `Words saved: 600, 00008000 to 00008257`. A name with no extension gets `.BIN`: `SAVE "PROG", 0x8000, 600` writes `PROG.BIN`. It makes the file, or truncates it when it is there, and `LOAD` reads it back. When the card fills up, the file keeps what fitted, and `SAVE` prints error 30. SAVE writes only to the card: `SAVE "NAME", "IP"` says so. |
+| `DELETE "NAME"` | Deletes the file `NAME` of the card's folder `NICE`, its long name or its 8.3 name, as for `LOAD`, with its long-name entries, if it has them, and prints `Deleted NAME`. |
+| `LOAD "NAME.BIN", "IP"` | Loads the `.bin` file `NAME.BIN` from the TFTP server at the IP address `IP`, such as `LOAD "HELLO.BIN", "192.168.1.10"`, as `LOAD` loads one from the card, and prints the same summary (The network below). `"IP:PORT"` sends the request to `PORT` instead of 69. It needs an IP address, from `IP` or `DHCP`. Without an answer, it prints `No answer from the TFTP server` after about 5 seconds; an error of the server is shown with its code and its message: `TFTP error 1, File not found`. |
+| `DIR "IP" [, "PAT"]` | Lists the files of the server `tools/tftpd.py` at `IP` whose names match the pattern `PAT`, with `*` and `?`, such as `DIR "192.168.1.10", "*.BIN"`, a line each with the name and the size; without `PAT`, all of them. Another server answers with an error. |
+| `HALT` | Halts the core, which the reset button, or a host over the link, starts again. The tests end with it. |
+| `HELP` | Lists the statements, and the keys of the history. |
 
-Anything else prints `Unknown command; ? lists them`. The debugger has
-pause, step, and inspect, so the monitor adds only `l`, which loads a
-program with no host's tools and no storage, `u`, which reads code
-with no host. `dir` and `load` read programs from
-a card's FAT32 file system, and `save` and `del` write it. `time`
-shows the clock, which the dates of the files come from. `i dhcp`
-gives a board on a network an address with no host, and `tftp` loads a
-program from a server on it.
+The debugger has pause, step, and inspect, so BASIC adds only `LOAD`
+with no name, which loads a program with no host's tools and no
+storage, and `DIS`, which reads code with no host. `DIR` and `LOAD` read
+programs from a card's FAT32 file system, and `SAVE` and `DELETE` write
+it. `TIME` shows the clock, which the dates of the files come from.
+`DHCP` gives a board on a network an address with no host, and `LOAD`
+with a server loads a program from a server on it.
 
 ## Files
 
@@ -297,13 +315,13 @@ The ROM reads and writes FAT32
 the ROM's C code ([INTERNALS.md](INTERNALS.md#c-in-the-rom)).
 
 To load a program from a card, make the folder `NICE` in its root on a
-PC, copy the `.bin` file into it, and type `dir` and `load NAME` on the
-board:
+PC, copy the `.bin` file into it, and type `DIR` and `LOAD "NAME.BIN"`
+on the board:
 
     mkdir /media/card/NICE
     cp build/hello.bin /media/card/NICE/
 
-`save NAME ADDR N` writes a program back, and the ROM never makes the
+`SAVE "NAME", A, N` writes a program back, and the ROM never makes the
 folder itself, so a card is written only where its user made room.
 With no PC slot, `make sdcard CMD=mkdir` makes it over the link
 ([tools/README.md](../tools/README.md#sdcardpy)).
@@ -313,8 +331,8 @@ With no PC slot, `make sdcard CMD=mkdir` makes it over the link
   type `0x0B` or `0x0C` has one. FAT12, FAT16, and exFAT are rejected with
   errors of their own. The type is told by the count of clusters, as
   Microsoft's specification says.
-- **The mount**: `fs_mount` mounts the card in a slot. `fs_open`, `dir`,
-  and `load` mount the slot of the last mount when there is none, or
+- **The mount**: `fs_mount` mounts the card in a slot. `fs_open`, `DIR`,
+  and `LOAD` mount the slot of the last mount when there is none, or
   after reset slot 0, or slot 1 when slot 0 has no card. The mount, and
   the files open, are dropped when the selected slot is no longer the
   mounted one, as after a program selects the other slot, or the card
@@ -352,7 +370,7 @@ With no PC slot, `make sdcard CMD=mkdir` makes it over the link
   deletes a file, with its long name, and no directory. A file open to
   write may not be opened again, a file open at all may not be truncated
   or deleted, and a read-only one is not changed. A file written gets the
-  date and the time of the clock (`time` above), and a new one as its
+  date and the time of the clock (`TIME` above), and a new one as its
   creation too; while the clock is not set, or its year is before 1980
   or after 2106, the date is 2026-01-01 at 00:00.
   FSInfo's count of
@@ -378,8 +396,8 @@ A program reaches the network through the entries above, UDP's 16 to
 19 here and the IP settings, DNS, and TCP of 21 to 31 in TCP and DNS
 below, or drives the port for Ethernet frames at `0xFFFFFFC0` itself, which [nice_cpu's
 DEVICES.md §7](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#7-ethernet-frames) specifies, the same on every board and in `niceemu`. The
-ROM's own frame routines and its ARP cache, which `i dhcp`, `tftp`, and
-the entries use, have no entries in the dispatch table
+ROM's own frame routines and its ARP cache, which `DHCP`, `NTP`, TFTP,
+and the entries use, have no entries in the dispatch table
 ([INTERNALS.md](INTERNALS.md#the-frame-routines)).
 
 The network of programs is separate from remote control (Remote control
@@ -389,7 +407,7 @@ those of its Ethernet station
 answers ARP for that IP address and pings to it, and serves remote
 control on TCP port 4510. Every other frame to the board, UDP to any
 port among them, goes to the port for Ethernet frames while a program
-or the entries have it enabled. The address that `i` or `i dhcp`
+or the entries have it enabled. The address that `IP` or `DHCP`
 sets serves both.
 
 - The cold start and the return of a program, `mon_exit`, disable the
@@ -398,24 +416,24 @@ sets serves both.
 - **DHCP in the background.** When the board has no IP
   address at the cold start, as after a reset, the monitor gets one from
   DHCP on its own. It does so only while it waits for the first key of
-  a line at its prompt, so a command or a program is never slowed by
+  a line after `READY.`, so a statement or a program is never slowed by
   it. The first DISCOVER goes 2 seconds after the cold start, as the
   Ethernet PHY needs that long to bring the link up after a reset. The
   next goes 4 seconds later, and each after it twice as late, up to
   every 64 seconds, plus up to a second more (RFC 2131). The ACK sets
-  the address, as `i dhcp` does, and the monitor shows it over its
-  prompt, `IP address 192.168.1.253 from DHCP`, and then the prompt
-  again. An address from `i`, a program, or a host ends it. A start of
+  the address, as `DHCP` does, and BASIC shows it on the empty line
+  after `READY.`, `IP address 192.168.1.253 from DHCP`. An address from
+  `IP`, a program, or a host ends it. A start of
   the core, such as a host's load, keeps the station's address, so it
   starts no exchange when the board has one.
-- `i dhcp` enables the port, broadcasts a DISCOVER, and waits 2 seconds
+- `DHCP` enables the port, broadcasts a DISCOVER, and waits 2 seconds
   for an OFFER, then broadcasts a REQUEST of the address offered and
   waits as long for the ACK (RFC 2131). A timeout or a NAK starts again
   from the DISCOVER, up to 4 times; an OFFER or an ACK without an
   address is passed over. When the board has an address already, the
   DISCOVER asks for it, so that the server offers it again. The ACK's
   address is written to `NET_IP` only when it is another, which breaks a
-  host's connection over TCP, as `i A.B.C.D` does. So `i dhcp` on a board
+  host's connection over TCP, as `IP "A.B.C.D"` does. So `DHCP` on a board
   that a host reaches over Ethernet keeps the host's connection when the
   server gives the same address. Then the port is disabled again. The
   frames come from 0.0.0.0, to everyone,
@@ -426,16 +444,16 @@ sets serves both.
   vendor class is `NiceMonMEGA65` and the monitor's version, such as
   `NiceMonMEGA65 V2.2`. The transaction's number is the microsecond counter
   at the start, XOR the low word of the MAC address. The lease is
-  kept, and renewed while the monitor waits at its prompt, and by a
+  kept, and renewed while BASIC waits for a line, and by a
   program's polls while the network is on, as `net_poll` has it. A
   program that does not use the network renews nothing, so a board
   that runs one longer than its lease may have its address given to
   another station.
-- `i dhcp` keeps the mask and the gateway of the ACK, which UDP uses
+- `DHCP` keeps the mask and the gateway of the ACK, which UDP uses
   below, and the first DNS server and the first NTP server, which it
-  shows; `i A.B.C.D` and the cold start set the four to none, and
+  shows; `IP "A.B.C.D"` and the cold start set the four to none, and
   forget the lease, and so does `net_set` for the NTP server.
-- `time ntp` sets the clock from a time server by SNTP (RFC 4330): one
+- `NTP` sets the clock from a time server by SNTP (RFC 4330): one
   query of 48 bytes from a local port of its own to port 123, sent
   again after 2 seconds, 3 times in all. It takes the answer of mode 4
   from the server's address and port 123 whose originate timestamp is
@@ -445,7 +463,7 @@ sets serves both.
   time the clock does not take, is not to be trusted. The clock takes
   the seconds and the microseconds of the transmit timestamp, plus the
   offset, with no correction for the delay, which is far below the
-  second that `time` shows. Seconds below 2^31 are of NTP's era 1,
+  second that `TIME` shows. Seconds below 2^31 are of NTP's era 1,
   from 2036 on (RFC 4330 §3). With no server named, it asks the NTP
   server of DHCP, or else `pool.ntp.org`, through the DNS server.
 
@@ -485,7 +503,7 @@ it:
 An error of the UDP entries is negative
 ([doc/PROGRAMMING.md](../doc/PROGRAMMING.md#the-monitors-error-codes)).
 
-`tftp IP NAME` reads a file of a TFTP server (RFC 1350), in octet mode,
+`LOAD "NAME.BIN", "IP"` reads a file of a TFTP server (RFC 1350), in octet mode,
 through the endpoint, which it opens on a port of its own choice and
 closes at the end. The RRQ goes to port 69, or to `PORT` of `IP:PORT`,
 and the server's first DATA
@@ -493,11 +511,11 @@ gives the port that the rest come from; packets of other hosts and
 ports are passed over. Each DATA is answered with its ACK, a DATA of the
 block before with the ACK again, and a block of less than 512 bytes is
 the last. A packet with no answer within a second is sent again, up to
-5 times in all. The lines are taken as `load` takes those of a file, and
-the words written as `l` writes them.
+5 times in all. The lines are taken as `LOAD` takes those of a file, and
+the words written as `LOAD` with no name writes them.
 
-A `NAME` with `*` or `?` is a pattern, and no `NAME` is `*`: the lines
-received are shown instead of loaded. The repository's own server,
+`DIR "IP", "PAT"` asks for the pattern `PAT`, with `*` or `?`, and
+`DIR "IP"` for `*`: the lines received are shown instead of loaded. The repository's own server,
 `tools/tftpd.py`, answers a pattern with a listing of the files of its
 folder that match it, a line each with the name and the size in bytes,
 which no other server does. To serve the examples from a PC:
@@ -508,10 +526,10 @@ It serves `examples/build`, the folder of `make examples`, or with
 `TFTP_DIR=FOLDER` another folder, its regular files and nothing else.
 Port 69 needs root, or the capability that the header of
 `tools/tftpd.py` names; without either, `make tftpd TFTP_PORT=6969` serves on port
-6969. On the board, `i dhcp`, then
-`tftp 192.168.1.10 *.bin` lists the programs, and `tftp 192.168.1.10
-hello.bin` loads one, with the PC's address, and `:6969` after it for
-the other port. Any other TFTP server, such as `tftpd-hpa`, serves the
+6969. On the board, `DHCP`, then `DIR "192.168.1.10", "*.BIN"` lists
+the programs, and `LOAD "HELLO.BIN", "192.168.1.10"` loads one, with the
+PC's address, and `:6969` after it for the other port. Any other TFTP
+server, such as `tftpd-hpa`, serves the
 files too, but answers a pattern with an error.
 
 ## TCP and DNS
@@ -564,7 +582,7 @@ renewal that are due. The other entries of the network poll too. So:
 
 **The settings.** `net_config` gives the IP address, the mask, the
 gateway, and the DNS server, and `net_set` sets them, each 0 for none.
-`net_dhcp` gets them from a DHCP server, as `i dhcp` does, with the
+`net_dhcp` gets them from a DHCP server, as `DHCP` does, with the
 first DNS server of the reply, and keeps the lease. While the network
 is on, the poll renews the lease: from half its time by unicast to the
 server, about every minute, then from 7/8 of it by broadcast, until its end.
@@ -641,11 +659,11 @@ Programs below.
 
 ## The disassembler
 
-`u` shows each instruction as nice_cpu's `assembler/nicedis.py` and
+`DIS` shows each instruction as nice_cpu's `assembler/nicedis.py` and
 `mon.py` do, so the three disassemblers agree, but for the
-pseudo-instructions below, which only `u` shows:
+pseudo-instructions below, which only `DIS` shows:
 
-    > u 8000 5
+    DIS 0x8000, 5
     00008000 0077580f 00000002 0003d800 00008123  CALL 0x8123
     00008004 0003f680                             RET
     00008005 022000b0 00000020                    CMP R1, 0x20
@@ -723,10 +741,11 @@ pseudo-instructions below, which only `u` shows:
   ([SYSTEM.md](../doc/SYSTEM.md#io-registers)), which reads 0 in
   `niceemu`, where the memory has no limit. The monitor's routines use
   at most 32 words of the stack when a program calls them. The stack is
-  in use before the program runs: `r` pushes its return address at the
-  top word, `0x1EFFF` or `0xEFFF`, and `l`'s own summary reaches 13
-  words below it. `l` and `load.py --monitor` take a word there, which
-  is then overwritten, as any word in the room the stack needs is.
+  in use before the program runs: `SYS` takes the top 14 words, from
+  `0x1EFFF` or `0xEFFF` down, through BASIC's C code, and `LOAD`'s own
+  summary reaches 17 words below the top. `LOAD` and
+  `load.py --monitor` take a word there, which is then overwritten, as
+  any word in the room the stack needs is.
 - A program runs once per load: the load initializes its static data and
   its wasm linear memory. A wasm trap halts the core, as in nice_cpu,
   after the trap report's line on the monitor's output; the on-board
@@ -751,11 +770,11 @@ monitor](../tools/README.md#running-a-program-under-the-monitor).
 
 ## Loading without a host
 
-`l` loads a program that is typed on the keyboard, or pasted into a
+`LOAD` with no name loads a program that is typed on the keyboard, or pasted into a
 terminal on the line, with no tools on the host and no storage. It reads
 lines of `ADDR WORD`, two hex numbers of 1 to 8 digits with blanks or
 tabs between them, which is what a `.bin` file has ([nice_cpu's ISA.md
-§10.4](https://github.com/MJoergen/nice_cpu/blob/main/doc/ISA.md#104-object-format)), and writes each word. CR, LF, and CR LF end a line, the `l`
+§10.4](https://github.com/MJoergen/nice_cpu/blob/main/doc/ISA.md#104-object-format)), and writes each word. CR, LF, and CR LF end a line, the `LOAD`
 line itself too. An empty line ends the load, and so does CTRL-C, which
 drops the line it is in; a line of blanks only is passed over, as
 `niceemu` passes it. DEL and backspace delete, and the cursor and
@@ -764,14 +783,14 @@ characters, or one with an address outside a program's RAM, `0x8000` to
 `0x1EFFF` on the MEGA65 and to `0xEFFF` on the Nexys4DDR (Programs
 above), is skipped: the RAM repeats through the address space, so a
 larger address could reach the ROM or the monitor's variables and
-stack. The top of that range is the stack itself, which `r` uses, so a
+stack. The top of that range is the stack itself, which `SYS` uses, so a
 program's words stay below it. A second line for an address writes its
 word over the first's, where `niceemu` rejects the file. In `niceemu`,
 where `0xFFFFFF9E` reads 0, the program's RAM goes up to the screen,
 `0xFFFEFFFF`. Its font RAM at `0xFFFE0000`–`0xFFFE1FFF` keeps
 only bits 15..0 of a word, and its character ROM at
 `0xFFFE2000`–`0xFFFE3FFF` drops one, so a program there does not read
-back as loaded. At the end `l` prints the number of words written, with
+back as loaded. At the end `LOAD` prints the number of words written, with
 the lowest and the highest address, and the number of lines skipped,
 with the first of them and the last address that a line may have:
 
@@ -786,7 +805,7 @@ LF lines and in CR LF lines, were all written, with no byte lost.
 
 Over Ethernet, a paste into a plain client, such as
 `nc 192.168.1.65 4510`, keeps up too. The station takes the host's
-bytes at 100 Mbit/s, faster than `l` reads them, but a byte that finds
+bytes at 100 Mbit/s, faster than `LOAD` reads them, but a byte that finds
 the core's input FIFO of 2048 bytes full waits up to 50 ms for room,
 and TCP holds the host back meanwhile. A byte is lost, with the link's
 `o`, only when the program reads nothing for 50 ms. On the R6, 20600
@@ -800,6 +819,7 @@ is faster, as it writes the words into the memory.
 The demo is nice_cpu's, built with the boards' text
 ([demo/](../demo/README.md)). It is a program at `0x8000`, `demo.bin`,
 which each release has as a file of its own. Copied into the card's
-folder `NICE`, `load demo.bin` and `r` run it, and its F12 returns to the
-monitor with `Returned 00000000`. `tftp` loads it too, and so does
+folder `NICE`, `LOAD "DEMO.BIN"` and `SYS 0x8000` run it, and its F12
+returns to BASIC with `Returned 00000000`. `LOAD` from a TFTP server
+loads it too, and so does
 `tools/load.py --monitor`.

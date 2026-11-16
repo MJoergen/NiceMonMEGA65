@@ -1,4 +1,4 @@
-; The routines that the monitor's commands share with programs (README.md,
+; The routines that the ROM's statements share with programs (README.md,
 ; "The dispatch table"): the console's input, and strings and numbers on
 ; the monitor's outputs. They are not in the dispatch table: this file is
 ; joined after a program, with mon.nasm, whose stubs they call, and the

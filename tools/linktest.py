@@ -111,10 +111,10 @@ def read_until(fd: int, token: bytes, seconds: float) -> bytes:
 
 def test_console(port: str) -> None:
     """mon.py's console in a pseudo-terminal, which treats the keys as a
-    terminal does: it makes the Enter key's CR an LF, which the monitor's
-    line passes over. mon.py must send the CR, the board's RETURN, so
-    that the monitor of the tests, loaded and started here, runs its
-    line, ?, and lists its commands. Ctrl-] must give the prompt back.
+    terminal does: it makes the Enter key's CR an LF, which BASIC's line
+    passes over. mon.py must send the CR, the board's RETURN, so that the
+    monitor of the tests, loaded and started here, runs its line, HELP,
+    and lists its statements. Ctrl-] must give the prompt back.
     As in mon(), a run that got no connection is tried again."""
     subprocess.run(["make", "-s", "-C", f"{REPO}/monitor",
                     "build/monitor_test.bin"], check=True)
@@ -137,11 +137,11 @@ def test_console(port: str) -> None:
         read_until(master, b"dbg> ", 5)
         os.write(master, b"console\r")
         text += read_until(master, b"Ctrl-]", 5)
-        os.write(master, b"?\r")
-        help_text = read_until(master, b"run the program", 5)
-        check("mon: the console's Enter key runs the monitor's line",
-              b"run the program" in help_text, repr(text[-200:] + help_text))
-        read_until(master, b"\0", 0.5)   # the rest of the monitor's list
+        os.write(master, b"HELP\r")
+        help_text = read_until(master, b"call the program", 5)
+        check("mon: the console's Enter key runs BASIC's line",
+              b"call the program" in help_text, repr(text[-200:] + help_text))
+        read_until(master, b"\0", 0.5)   # the rest of HELP's list
         os.write(master, b"\x1d")
         back = read_until(master, b"dbg> ", 5)
         check("mon: Ctrl-] returns from the console to the prompt",

@@ -15,7 +15,7 @@ that --folder names:
     tools/sdcard.py --eth 192.168.1.65 del NAME
     tools/sdcard.py --eth 192.168.1.65 mkdir
 
-ls prints the rows of the monitor's dir, which shows a file's long name
+ls prints the rows of BASIC's DIR, which shows a file's long name
 where it has one, with its 8.3 name after its size. get takes the 8.3
 name or the long name, in
 either case, and writes the file to DEST, by default its name in the
@@ -599,7 +599,7 @@ class Entry:
         return "".join(c if " " <= c < "\x7f" else "?" for c in text)
 
     def rows(self) -> list[str]:
-        """The rows of the monitor's dir: the name in DIR_NAME columns,
+        """The rows of BASIC's DIR: the name in DIR_NAME columns,
         or on a row of its own when it is that long or longer, and the
         size or <DIR> in 12."""
         name = self.name
@@ -771,7 +771,7 @@ class Volume:
         return list(self.entries(self.dir))
 
     def rows(self, listed: list[Entry] | None = None) -> list[str]:
-        """The rows of the monitor's dir, of the listing given or of the
+        """The rows of BASIC's DIR, of the listing given or of the
         folder."""
         if listed is None:
             listed = self.listing()
@@ -1100,7 +1100,7 @@ class Volume:
 
 
 def do_ls(vol: Volume) -> None:
-    """The rows of the monitor's dir, with the 8.3 name after those of a
+    """The rows of BASIC's DIR, with the 8.3 name after those of a
     file whose name is a long name."""
     listed = vol.listing()
     rows = vol.rows(listed)
@@ -1171,7 +1171,7 @@ def main() -> None:
                         help="the folder of the root that the files are in "
                         "(default %(default)s, the monitor's)")
     cmds = parser.add_subparsers(dest="cmd", required=True)
-    cmds.add_parser("ls", help="list the folder, as the monitor's dir does, "
+    cmds.add_parser("ls", help="list the folder, as BASIC's DIR does, "
                     "with the 8.3 names of the long names")
     get = cmds.add_parser("get", help="copy a file of the folder to the host")
     get.add_argument("name", help="its 8.3 name or its long name")

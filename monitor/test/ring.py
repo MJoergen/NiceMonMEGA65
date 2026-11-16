@@ -7,11 +7,11 @@ Usage: test/ring.py NICEEMU MONITOR.bin:WORDS ...
 Each MONITOR.bin is the monitor of the tests, built to take WORDS as the
 size of the screen's memory (Makefile): 32768, as niceemu and the MEGA65
 have it, 8192, as the Nexys4DDR has, and 2048, which leaves no room for
-the history. For each, the monitor runs with d 8000 N, for an N whose
+the history. For each, the monitor runs with DUMP 0x8000, N, for an N whose
 rows fill part of the history and one whose rows go round its ring, and
 with Page Up more times than there are rows back, then the same and
 three Page Downs, then the same and five cursor keys up and two down, a
-row each, then the same and v, which shows the screen again.
+row each, then the same and VER, which shows the screen again.
 niceemu has no display offset, so the rows that a board would show are
 read from the dump of the screen's memory, at the offset the monitor
 set, modulo WORDS. They must be the rows of the console output, which
@@ -106,14 +106,14 @@ def expected(text: list[str], back: int) -> list[str]:
 def test(emu: str, monitor: str, words: int, tmp: str) -> None:
     hcap = max(0, (words - 2000) // COLS)
     for count in COUNTS[words]:
-        base = f"d 8000 {count:X}\r".encode()
+        base = f"dump 0x8000, 0x{count:X}\r".encode()
         ups = PAGE_UP * 20
         downs = ups + PAGE_DOWN * 3
         rows = downs + UP * 5 + DOWN * 2
         stages = [("20 Page Ups", base + ups),
                   ("20 Page Ups and 3 Page Downs", base + downs),
                   ("then 5 ups and 2 downs", base + rows),
-                  ("then v", base + rows + b"v\r")]
+                  ("then VER", base + rows + b"ver\r")]
         want_back = 0
         for i, (name, keys) in enumerate(stages):
             text, mem = run(emu, monitor, words, keys, tmp)
@@ -129,7 +129,7 @@ def test(emu: str, monitor: str, words: int, tmp: str) -> None:
                 want_back = max(0, want_back - 2)
             else:
                 want_back = 0
-            what = f"{words} words, d 8000 {count:X}, {name}"
+            what = f"{words} words, DUMP 0x8000, 0x{count:X}, {name}"
             check(f"{what}: V_HSIZE {words}, V_HCAP {hcap}",
                   (hsize, hcap_got) == (words, hcap),
                   f"got {hsize}, {hcap_got}")

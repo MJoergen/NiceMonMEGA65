@@ -1,9 +1,9 @@
-// The clock of the time of day for the ROM (issue #109): the monitor's
-// time command, the dates of FAT's entries for fat32.c, the clock set
-// from the MEGA65's real-time clock at the cold start, which time sets
-// (issue #105), and the time of an SNTP answer, which time ntp sets
-// (issue #127). It is
-// part of the ROM's C code (INTERNALS.md, "C in the ROM"), with fat32.c.
+// The clock of the time of day for the ROM (issue #109): BASIC's TIME
+// statement, the dates of FAT's entries for fat32.c, the clock set from
+// the MEGA65's real-time clock at the cold start, which TIME sets (issue
+// #105), and the time of an SNTP answer, which NTP sets (issue #127). It
+// is part of the ROM's C code (INTERNALS.md, "C in the ROM"), with
+// fat32.c and basic.c.
 //
 // The clock (nice_cpu's DEVICES.md §10) counts seconds since 1970-01-01
 // 00:00:00, and keeps local time, as the MEGA65's real-time clock does
@@ -12,7 +12,7 @@
 //
 // The code is small rather than general, as it takes ROM that the BASIC
 // of #54 needs too. It reads 32 bits of the seconds, up to 2106-02-07
-// 06:28:15, and time sets the years 1970 to 2105. A date converts by
+// 06:28:15, and TIME sets the years 1970 to 2105. A date converts by
 // counting the days of its years and months in loops, with the leap
 // years of 1970 to 2106: every fourth, but 2100. One pattern, FORM, both
 // parses a date and a time and prints them.
@@ -41,7 +41,7 @@
 #define NTP_UNIX 2208988800u  // the seconds from 1900, NTP's era 0, to 1970
 #define ZONE_MAX 14     // the hours of an offset at most, east, and west
 #define ZONE_MIN 12
-#define YEAR_MIN 1970   // the years that time sets
+#define YEAR_MIN 1970   // the years that TIME sets
 #define YEAR_MAX 2105
 #define FAT_MIN 1980    // the first year that FAT's dates hold
 #define BAD 255u        // a byte of the real-time clock that is no two digits
@@ -239,7 +239,7 @@ static unsigned bcd(unsigned i, unsigned mask)
 }
 
 // The clock from the MEGA65's real-time clock, at the cold start (issue
-// #105), unless it is set already, by a program, by time, or by an earlier
+// #105), unless it is set already, by a program, by TIME, or by an earlier
 // start, or the board has no I2C master, as in niceemu, where the master's
 // status is plain memory, 0. The R6's RV-3032-C7 keeps the hundredths of a
 // second, the seconds, the minutes, the hours, the weekday, the date, the
@@ -310,7 +310,8 @@ static ONCE int parse(unsigned p, const char *f)
     return !nice_peek(p);
 }
 
-// time [YYYY-MM-DD HH:MM:SS]: the line from p, the word after time. With
+// TIME ["YYYY-MM-DD HH:MM:SS"]: the string p, which basic.c gives, or
+// the end of the line without one. With
 // a date and a time as FORM has them, with blanks before and after, the
 // clock is set to them, at 0 microseconds, which sets "set", and so is the
 // MEGA65's real-time clock, in the years 2000 to 2099; anything
@@ -333,12 +334,12 @@ void clock_cmd(unsigned p)
     nice_print("\r\n");
     return;
 bad:
-    nice_print("time [YYYY-MM-DD HH:MM:SS]: the local date and time, such as "
-               "time 2026-11-11 14:30:00\r\n");
+    nice_print("Not a date and time: \"YYYY-MM-DD HH:MM:SS\", such as "
+               "\"2026-11-11 14:30:00\"\r\n");
 }
 
-// The offset of time ntp, +HH:MM or -HH:MM, local time less UTC, from p,
-// with blanks after it to the end of the line: its seconds, from -12:00
+// The offset of NTP, +HH:MM or -HH:MM, local time less UTC, from p,
+// with blanks after it to the end of the string: its seconds, from -12:00
 // to +14:00, or 1, which no offset is, when it is none (issue #127).
 int clock_zone(unsigned p)
 {
@@ -351,10 +352,10 @@ int clock_zone(unsigned p)
     return sign == '+' ? (int)sec : -(int)sec;
 }
 
-// time ntp: the clock set from the transmit timestamp of an SNTP answer
+// NTP: the clock set from the transmit timestamp of an SNTP answer
 // of the server ip, sec seconds since 1900 and their fraction frac, plus
 // zone, the offset in seconds, and the MEGA65's real-time clock with it,
-// as time sets them. A sec below 2^31 is of era 1, from 2036 on (RFC 4330
+// as TIME sets them. A sec below 2^31 is of era 1, from 2036 on (RFC 4330
 // §3), which the 32 bits of the seconds since 1970 take, as do those of
 // era 0 from 1970 on, with the same subtraction. The fraction gives the
 // microseconds: 1000000 / 65536 is 15625 / 1024. Then the time set is

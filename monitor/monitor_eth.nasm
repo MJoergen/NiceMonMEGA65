@@ -8,17 +8,18 @@
 ; begins and getline carries on (issue #126); the UDP endpoint, the
 ; entries 16 to 19, udp_open, udp_send, udp_recv, and udp_close; the IP
 ; settings, net_config and net_set, entries 21 and 22; net_dhcp, entry
-; 23, and i dhcp, which get the IP address from a DHCP server, and the
+; 23, and DHCP, which get the IP address from a DHCP server, and the
 ; renewal of its lease in the poll; dns_lookup, entry 25, the IPv4
-; address of a name from the DNS server; time ntp, which sets the clock
-; from a time server (issue #127); and tftp IP NAME, which reads a .bin
-; file through the endpoint from a TFTP server as load NAME reads one
-; from the card (issue #84).
+; address of a name from the DNS server; NTP, which sets the clock from a
+; time server (issue #127); and LOAD "NAME.BIN", "IP", which reads a .bin
+; file through the endpoint from a TFTP server as LOAD "NAME.BIN" reads
+; one from the card, and DIR "IP", its listing (issue #84).
 ;
-; The i command, which shows and writes the IP address, is in
-; monitor_cmd.nasm, and jumps to ip_dhcp for the word dhcp. tftp reads its
-; lines with l's bin_line, and its names with the file commands' fs_name
-; and match. The cold start disables the port and empties the ARP cache.
+; The statements are routines of the C ABI, as those of monitor_cmd.nasm
+; are, which basic.c calls through basic.nasm. IP, which shows and writes
+; the IP address, is in monitor_cmd.nasm. TFTP reads its lines with
+; bin_line, LOAD's. The cold start disables the port and empties the ARP
+; cache.
 ; The variables of all of it are in monitor.nasm, with the others.
 
 ETH_CSR         .EQU    0xFFFFFFC0      ; the port for Ethernet frames: its status, and a write of bit 0 enables it (nice_cpu's DEVICES.md §7)
@@ -83,10 +84,10 @@ TFTP_TRIES      .EQU    5               ; the sends of a packet that tftp waits 
 TFTP_WAIT       .EQU    1000000         ; the microseconds it waits after each
 TFTP_PKT        .EQU    96              ; the words of V_TPKT
 
-; i dhcp: net_dhcp, and the address, the mask, the gateway, the DNS
+; DHCP: net_dhcp, and the address, the mask, the gateway, the DNS
 ; server, the DHCP server, and the NTP server, if it gave one, shown, or
 ; that no server answered.
-ip_dhcp
+st_dhcp
                 CALL    net_dhcp
                 TST     R1
         ?N      JMP     :+
@@ -108,11 +109,10 @@ ip_dhcp
                 MOVE    R1, S_NTPSRV
                 MOVE[M] R2, @V_NTP
         ?!Z     CALL    show_ip
-                JMP     main
+                RET
 :
                 MOVE    R1, S_NODHCP
-                CALL    puts_b_crlf
-                JMP     main
+                JMP     puts_b_crlf     ; which returns to the caller
 
 ; net_dhcp: entry 23, the IP address from a DHCP server (RFC 2131),
 ; through the port for Ethernet frames, which net_on enables, and net_off
@@ -273,9 +273,9 @@ bg_none
                 RET
 
 ; bg_show: for getline_wait, the address that the exchange in the
-; background got shown, over the prompt, which is on its own in its row,
-; as no key of the line has come, and the prompt again after it. The
-; screen is shown again if the history is. Uses R1-R4.
+; background got shown, at the start of the line, which is empty, as no
+; key of it has come. The screen is shown again if the history is. Uses
+; R1-R4.
 bg_show
                 CALL    hist_leave
                 MOVE    R1, 0x0D
@@ -284,9 +284,7 @@ bg_show
                 MOVE    R2, @E_IP
                 CALL    put_ip
                 MOVE    R1, S_BGDHCP
-                CALL    puts_b_crlf
-                MOVE    R1, S_PROMPT
-                JMP     puts_b          ; which returns to the caller
+                JMP     puts_b_crlf     ; which returns to the caller
 
 ; The frame routines, the ROM's own, with no entries in the dispatch table
 ; (INTERNALS.md, "The frame routines"). They follow the C ABI, and drive the port for
@@ -1829,13 +1827,14 @@ dns_skip
                 MOVE[M] R1, 1
                 RET
 
-; time ntp [SERVER] [+HH:MM | -HH:MM]: the clock of the time of day set
-; from a time server by SNTP (RFC 4330), and the MEGA65's real-time clock
-; with it, by clock_ntp of clock.c (issue #127). SERVER is a name, which
-; dns_lookup looks up, or an IP address; without it the server is the NTP
-; server of DHCP's option 42, V_NTP, and without that NTP_POOL. The
-; offset is local time less UTC, which clock_zone of clock.c reads, and
-; +00:00 without it. The query is 48 bytes from a local port of its own,
+; NTP ["SERVER"] [, "+HH:MM" | "-HH:MM"]: R1 SERVER, or 0 without it or
+; for an empty one, and R2 the offset, or 0 without it. The clock of the
+; time of day set from a time server by SNTP (RFC 4330), and the MEGA65's
+; real-time clock with it, by clock_ntp of clock.c (issue #127). SERVER is
+; a name, which dns_lookup looks up, or an IP address; without it the
+; server is the NTP server of DHCP's option 42, V_NTP, and without that
+; NTP_POOL. The offset is local time less UTC, which clock_zone of
+; clock.c reads, and +00:00 without it. The query is 48 bytes from a local port of its own,
 ; V_NWAIT, to port 123: version 4, mode 3, and the transmit timestamp,
 ; which the fine clock and the microseconds make, as the answer's
 ; originate timestamp must be the same. It is built in V_TXF as dns_lookup
@@ -1844,34 +1843,16 @@ dns_skip
 ; the delay, which is far below the second that the clock shows. R7 is
 ; the server's name, 0 for none, then the sends left, R8 the offset, R9
 ; the server's address, and R10 the time of the send.
-time_ntp
-                MOVE    R7, 0
+st_ntp
+                MOVE    R7, R1
                 MOVE    R8, 0
+                TST     R2
+        ?Z      JMP     ntp_server      ; no offset
+                MOVE    R1, R2
 :
                 CMP     @R1, 0x20
         ?Z      ADD     R1, R1, 1
         ?Z      JMP     :-
-                TST     @R1
-        ?Z      JMP     ntp_server      ; neither
-                CMP     @R1, 0x2B       ; +
-        ?Z      JMP     ntp_zone
-                CMP     @R1, 0x2D       ; -
-        ?Z      JMP     ntp_zone
-                MOVE    R7, R1          ; the server's name, up to a blank
-:
-                ADD     R1, R1, 1
-                TST     @R1
-        ?Z      JMP     ntp_server
-                CMP     @R1, 0x20
-        ?!Z     JMP     :-
-                MOVE    @R1++, 0        ; the name ends, for dns_lookup
-:
-                CMP     @R1, 0x20
-        ?Z      ADD     R1, R1, 1
-        ?Z      JMP     :-
-                TST     @R1
-        ?Z      JMP     ntp_server
-ntp_zone
                 CALL    _clock_zone
                 CMP     R1, 1
         ?Z      JMP     ntp_bad
@@ -1960,7 +1941,7 @@ ntp_off
                 MOVE    R4, R9
                 CALL    _clock_ntp
                 TST     R1
-        ?Z      JMP     main
+        ?Z      RET
                 MOVE    R1, E_NTPBAD    ; a time that the clock does not take
 ; An error: its line, and for a kiss-o'-death the server's code, the 4
 ; characters of the reference ID, with ? for one that does not print
@@ -1988,12 +1969,10 @@ ntp_fail
                 SUB[M]  R8, R8, 1
         ?!Z     JMP     :-
 ntp_end
-                CALL    _io_crlf
-                JMP     main
+                JMP     _io_crlf        ; which returns to the caller
 ntp_bad
                 MOVE    R1, S_BADNTP
-                CALL    puts_b_crlf
-                JMP     main
+                JMP     puts_b_crlf     ; which returns to the caller
 
 ; ntp_parse: the datagram of R1 bytes at V_RXF, to the query's port, if it
 ; is the answer of the server R9: from its port 123, with 48 bytes of data
@@ -2042,30 +2021,26 @@ ntp_parse
                 MOVE    R1, E_NTPBAD
                 RET
 
-; tftp IP[:PORT] [NAME]: the .bin file NAME of the TFTP server at IP
-; (RFC 1350), read in octet mode through the UDP endpoint, which it opens
-; on a port that udp_open picks, and closes at the end, and its lines
-; written as load NAME writes them, with bin_line, and shown as l shows
-; them. A NAME with * or ? is a pattern, which tools/tftpd.py answers with
-; a listing of its files, whose lines are shown instead; no NAME is *.
-; The RRQ goes to PORT, 69 by default, and the server's first DATA gives
-; its TID; the
+; LOAD "NAME.BIN", "IP[:PORT]" and DIR "IP[:PORT]" [, "PAT"]: R1 the
+; string of IP, R2 the name, or 0 for *, and R3 not 0 for a listing, of
+; DIR. The .bin file NAME of the TFTP server at IP (RFC 1350), read in
+; octet mode through the UDP endpoint, which it opens on a port that
+; udp_open picks, and closes at the end, and its lines written as
+; LOAD "NAME.BIN" writes them, with bin_line, and shown as LOAD shows
+; them; or for a listing the lines that tools/tftpd.py answers a
+; pattern, with * or ?, with, which are shown instead. The RRQ goes to
+; PORT, 69 by default, and the server's first DATA gives its TID; the
 ; packets of other hosts and TIDs are passed over. Each DATA of the block
 ; waited for is answered with its ACK, and a DATA of the block before
 ; with the ACK again; a block of less than 512 bytes is the last. A
 ; packet that has no answer within TFTP_WAIT microseconds is sent again,
 ; up to TFTP_TRIES times in all. An ERROR ends the load with its code and
-; its message. R7 counts the sends left, and R8-R12 are bin_line's.
-cmd_tftp
-                MOVE    R1, R2
-                MOVE    R2, TEXT_B+4*S_FTP
-                CALL    match           ; R1 after ftp, or 0
-                TST     R1
-        ?Z      JMP     unknown
-                TST     @R1
-        ?Z      JMP     tftp_bad        ; tftp alone
-                CMP     @R1, 0x20
-        ?!Z     JMP     unknown         ; tftpx
+; its message. R7 is the name, then counts the sends left, and R8-R12
+; are bin_line's.
+st_tftp
+                MOVE[M] R7, R2          ; the name
+        ?Z      MOVE    R7, TEXT_B+4*S_STAR
+                MOVE    @V_TLIST, R3
 :
                 CMP     @R1, 0x20
         ?Z      ADD     R1, R1, 1
@@ -2076,7 +2051,7 @@ cmd_tftp
                 MOVE    @V_TSRV, R1
                 MOVE    @V_TPORT, TFTP_PORT
                 CMP     @R3, 0x3A       ; :
-        ?!Z     JMP     tftp_name
+        ?!Z     JMP     tftp_ip
                 ADD     R3, R3, 1
                 MOVE    R4, 0           ; the port
                 MOVE    R5, R3          ; where it starts
@@ -2098,31 +2073,9 @@ cmd_tftp
                 TST     R4
         ?Z      JMP     tftp_bad        ; port 0
                 MOVE    @V_TPORT, R4
-tftp_name
-                MOVE    R7, TEXT_B+4*S_STAR
-                TST     @R3
-        ?Z      JMP     :+              ; no name: the listing of *
-                CMP     @R3, 0x20
-        ?!Z     JMP     tftp_bad        ; no blank after the address
-                MOVE    R1, R3
-                CALL    fs_name
-                TST     R1
-        ?Z      JMP     :+              ; only blanks
-                MOVE    R7, R1
+tftp_ip
                 CALL    rest_blank
-        ?!Z     JMP     tftp_bad        ; a third word
-:
-                MOVE    @V_TLIST, 0
-                MOVE    R1, R7
-:
-                MOVE[M] R2, @R1++
-        ?Z      JMP     :+
-                CMP     R2, 0x2A        ; *
-        ?Z      MOVE    @V_TLIST, 1
-                CMP     R2, 0x3F        ; ?
-        ?Z      MOVE    @V_TLIST, 1
-                JMP     :-
-:
+        ?!Z     JMP     tftp_bad        ; more after the address
 ; The RRQ: the opcode 1, the name, a 0, octet, and a 0
                 MOVE    R2, V_TPKT
                 MOVE    @R2++, 0
@@ -2222,7 +2175,7 @@ tftp_wait
         ?!Z     CALL    tftp_eol
                 CALL    udp_close
                 TST     @V_TLIST
-        ?!Z     JMP     main            ; a listing, shown
+        ?!Z     RET                     ; a listing, shown
                 JMP     load_summary
 tftp_time
                 SUB     R1, @io.us, @V_TTIME
@@ -2232,8 +2185,7 @@ tftp_time
         ?!Z     JMP     tftp_send
                 CALL    udp_close
                 MOVE    R1, S_NOTFTP
-                CALL    puts_b_crlf
-                JMP     main
+                JMP     puts_b_crlf     ; which returns to the caller
 ; An ERROR: its code, and its message, up to a 0 or the end of the
 ; datagram, without control codes. R7 is the byte, and R8 the end.
 tftp_error
@@ -2260,8 +2212,7 @@ tftp_error
                 CALL    mon_putc
                 JMP     :-
 :
-                CALL    _io_crlf
-                JMP     main
+                JMP     _io_crlf        ; which returns to the caller
 ; An error of udp_open or udp_send: no IP address, or no route
 tftp_fail
                 MOVE    R7, R1
@@ -2269,12 +2220,10 @@ tftp_fail
                 MOVE    R1, S_NOIP
                 CMP     R7, E_NOIP
         ?!Z     MOVE    R1, S_NOROUTE
-                CALL    puts_b_crlf
-                JMP     main
+                JMP     puts_b_crlf     ; which returns to the caller
 tftp_bad
                 MOVE    R1, S_BADTFTP
-                CALL    puts_b_crlf
-                JMP     main
+                JMP     puts_b_crlf     ; which returns to the caller
 
 ; tftp_char: the byte R1 of a DATA, into the line at V_TLINE, as fat_load
 ; of fat32.c takes the bytes of a file: CR, LF, or CR LF ends a line,
@@ -2333,16 +2282,15 @@ S_DSRV          .ASCII_B 'DHCP server '
                 .DAT    0
 D_PARAMS
                 .DAT    55, 4, 1, 3, 6, 42, 0  ; option 55: the mask, the gateway, the DNS servers, and the NTP servers
-S_FTP           .ASCII_B 'ftp'
 S_OCTET         .ASCII_B 'octet'
 S_STAR          .ASCII_B '*'
 S_BADTFTP
-                .ASCII_B 'tftp IP[:PORT] [NAME]: tftp 192.168.1.10 hello.bin loads, *.bin lists'
+                .ASCII_B 'Not a TFTP server: IP[:PORT], such as "192.168.1.10" or "192.168.1.10:6969"'
 S_NOTFTP
                 .ASCII_B 'No answer from the TFTP server'
 S_TFTPERR
                 .ASCII_B 'TFTP error '
-S_NOIP          .ASCII_B 'No IP address; i sets one'
+S_NOIP          .ASCII_B 'No IP address; IP or DHCP sets one'
 S_NOROUTE
                 .ASCII_B 'No answer to ARP from the server, or from the gateway'
 S_NTPSRV
@@ -2350,8 +2298,9 @@ S_NTPSRV
 S_POOL          .ASCII_B 'pool.ntp.org'
                 .DAT    0
 S_BADNTP
-                .ASCII_B 'time ntp [SERVER] [+HH:MM | -HH:MM], local time less UTC: time ntp +01:00'
-S_NODNS         .ASCII_B 'No DNS server; i dhcp gets one'
+                .ASCII_B 'Not an offset: "+HH:MM" or "-HH:MM", local time less UTC, such as "+01:00"'
+S_NODNS         .ASCII_B 'No DNS server; DHCP gets one'
+                .DAT    0
 S_DNSTIME
                 .ASCII_B 'No answer from the DNS server'
 S_DNSNAME

@@ -1,27 +1,37 @@
 NiceMon V9.9
-? lists the commands
-> dir
+HELP lists the statements
+READY.
+dir
 File error 29, no folder NICE on the card
-> load hello.bin
+READY.
+load "hello.bin"
 File error 29, no folder NICE on the card
-> dir 1
+READY.
+dir 1
 File error 29, no folder NICE on the card
-> load hello.bin
+READY.
+load "hello.bin"
 File error 29, no folder NICE on the card
-> h
+READY.
+halt
 Halted
 Screen:
 |NiceMon V9.9
-|? lists the commands
-|> dir
+|HELP lists the statements
+|READY.
+|dir
 |File error 29, no folder NICE on the card
-|> load hello.bin
+|READY.
+|load "hello.bin"
 |File error 29, no folder NICE on the card
-|> dir 1
+|READY.
+|dir 1
 |File error 29, no folder NICE on the card
-|> load hello.bin
+|READY.
+|load "hello.bin"
 |File error 29, no folder NICE on the card
-|> h
+|READY.
+|halt
 |Halted
 VBASE at the halt 000000
 exit 0

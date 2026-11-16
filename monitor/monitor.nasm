@@ -1,8 +1,9 @@
 ; The monitor, the program of the ROM at 0x0000 (README.md). The core boots
 ; from it at reset. It gives the programs at 0x8000 a hardware abstraction
 ; layer, the HAL: thirty-two routines, called through the dispatch table at
-; the start of the ROM, and it has a main loop with a few commands, typed on
-; the keyboard or sent over the line, and shown on the screen and the line.
+; the start of the ROM, and its main loop is BASIC's (issue #54), whose
+; statements are typed on the keyboard or sent over the line, and shown
+; on the screen and the line.
 ;
 ; The dispatch table has one JMP routine per entry, two words, so that
 ; entry n is at address 2n, and entry 0 is the reset. The routines follow
@@ -11,34 +12,38 @@
 ; entry as an .EQU, and a stub that jumps to it.
 ;
 ; The cold start, mon_reset, sets SP to STACK, the variables, and the
-; screen, and goes to cmd_start, which prints the banner and runs the main
-; loop, main, of monitor_cmd.nasm. At a program's return, and at
-; mon_exit, the monitor clears E, stops the timer, clears the FPU, sets
-; VBASE to 0, shows the cursor, blinking, takes a fresh stack, prints the
-; status, R1, and goes back to main.
+; screen, and goes to bas_start, which prints the banner and runs the main
+; loop, main, of basic.nasm. At mon_exit, the monitor clears E, stops the
+; timer, clears the FPU, sets VBASE to 0, shows the cursor, blinking,
+; takes a fresh stack, prints the status, R1, and goes back to main; a
+; program that SYS called and that returns has the same, but the stack,
+; and BASIC goes on.
 ;
-; The monitor is this file and five more, which the Makefile joins after
+; The monitor is this file and six more, which the Makefile joins after
 ; it, in this order, so that the dispatch table is at 0:
 ;
-; - monitor_cmd.nasm: the main loop and its commands, and the routines and
-;   texts that only they use, which the BASIC interpreter of issue #54 is
-;   to replace.
-; - monitor_dis.nasm: u, the disassembler (README.md, "The
+; - monitor_cmd.nasm: the routines of BASIC's statements that replace the
+;   monitor's commands, and the routines and texts that only they use.
+; - basic.nasm: BASIC's assembly, the main loop, the stubs through which
+;   basic.c, BASIC in the ROM's C code, calls the statements, and its
+;   keywords and messages (issue #112, doc/BASIC.md).
+; - monitor_dis.nasm: DIS, the disassembler (README.md, "The
 ;   disassembler").
 ; - monitor_sd.nasm: the SD cards below the file system, the sector
 ;   routines sd_init, sd_read, and sd_write that fat32.c reads and writes
 ;   through (issue #57, doc/SDCARD.md).
 ; - monitor_eth.nasm: the network, the frame routines, the ARP cache, the
 ;   demultiplexing of the frames and net_poll, the UDP entries 16 to 19,
-;   the entries 21 to 25 of the IP settings, DHCP, the poll, and DNS, i
-;   dhcp, time ntp, and tftp (issues #83, #84, #111, and #127, README.md,
+;   the entries 21 to 25 of the IP settings, DHCP, the poll, and DNS, and
+;   the statements DHCP, NTP, and TFTP's LOAD and DIR (issues #83, #84,
+;   #111, and #127, README.md,
 ;   "The network", and INTERNALS.md, "The frame routines").
 ; - monitor_tcp.nasm: TCP, the entries 26 to 31 of its clients and its
 ;   servers, and their part of the poll (issue #111).
 ;
 ; Each has the .EQUs of its devices and its constants, and its texts, but
-; the variables of all six are here, as one map of the RAM. The commands
-; in the other files jump back to main, and the assembler takes a name
+; the variables of all seven are here, as one map of the RAM. The
+; assembler takes a name
 ; before its .EQU or its label, so the files reach each other's names in
 ; either direction.
 ;
@@ -70,7 +75,7 @@
 ; top down. The cold start finds the size of the memory from the display
 ; offset, which keeps only the bits that address it on a board, and all of
 ; them in niceemu, where it is plain memory: 32768 words at most, 384 rows
-; of history, 77 on the Nexys4DDR. At the prompt, before a line is typed,
+; of history, 77 on the Nexys4DDR. Before a line is typed,
 ; the cursor keys up and down, ESC [ A and ESC [ B, show the history a row
 ; further back or forward, and Page Up and Page Down a page, through the
 ; display offset: k rows back is the offset 32768 - 80 k, which wraps to
@@ -96,9 +101,12 @@
 ; of the variables, which the cold start sets: ___putc_vector to
 ; mon_putc, and ___wasm_trap_vector to mon_trap, which prints the trap
 ; and goes back to the main loop as mon_exit does, so that a trap of the
-; C code, or of a program's, does not halt the core.
+; C code, or of a program's, does not halt the core. The main loop sets
+; SP to STACK, and the C code's stack pointer, the module's first global
+; at WASM_RAM, to the value that the cold start found there, V_CSP, so
+; that it leaves the C code from any depth.
 ;
-; The routines that the commands share with programs, _io_puts, _io_crlf,
+; The routines that the statements share with programs, _io_puts, _io_crlf,
 ; _io_puthex, _io_putdec, _io_gethex, _io_gets, and _io_getc, are in
 ; monlib.nasm, which the Makefile joins after the monitor's files, with
 ; mon.nasm and build/version.nasm, which defines VERSION, the string of
@@ -126,26 +134,27 @@ V_COL           .EQU    0xFFFFF000      ; the cursor's column, 0 to 79
 V_ROW           .EQU    0xFFFFF001      ; and its row, 0 to 24
 V_COLOR         .EQU    0xFFFFF002      ; the color of the characters put, bits 31..8
 V_OUT           .EQU    0xFFFFF003      ; the outputs: bit 0 the line, bit 1 the screen
-V_NEXT          .EQU    0xFFFFF004      ; the address that the next d goes on at
+V_NEXT          .EQU    0xFFFFF004      ; the address that the next DUMP goes on at
 V_HSIZE         .EQU    0xFFFFF005      ; the words of the screen's memory
 V_HCAP          .EQU    0xFFFFF006      ; the rows of the history, after the 25 of the screen
 V_HHEAD         .EQU    0xFFFFF007      ; the slot of the next row, slot i at SCREEN + V_HSIZE - 80 (i + 1)
 V_HCOUNT        .EQU    0xFFFFF008      ; the rows kept, up to V_HCAP
 V_BACK          .EQU    0xFFFFF009      ; the rows shown back, 0 for the screen
 V_CTL           .EQU    0xFFFFF00A      ; SCR_CTL while the history is shown
-V_LOUT          .EQU    0xFFFFF00B      ; V_OUT while l reads its lines
-V_LEND          .EQU    0xFFFFF00C      ; the last byte that l read, for the LF of a CR LF
-V_LBAD          .EQU    0xFFFFF00D      ; the number of the first line that l skipped
-V_PEND          .EQU    0xFFFFF00E      ; for l: after a program's RAM, at the variables
-V_UNEXT         .EQU    0xFFFFF00F      ; the address that the next u goes on at
-V_LINE          .EQU    0xFFFFF010      ; the command line, LINE_MAX words, one over for l, and a 0
-LINE_MAX        .EQU    76              ; so that the prompt and the line fit a row
-V_UF            .EQU    0xFFFFF060      ; for u: the fields dest, s0, and s1,
+V_LOUT          .EQU    0xFFFFF00B      ; V_OUT while LOAD reads its lines
+V_LEND          .EQU    0xFFFFF00C      ; the last byte that LOAD read, for the LF of a CR LF
+V_LBAD          .EQU    0xFFFFF00D      ; the number of the first line that LOAD skipped
+V_PEND          .EQU    0xFFFFF00E      ; for LOAD: after a program's RAM, at the variables
+V_UNEXT         .EQU    0xFFFFF00F      ; the address that the next DIS goes on at
+V_LINE          .EQU    0xFFFFF010      ; the line, LINE_MAX words, one over for LOAD, and a 0
+LINE_MAX        .EQU    76              ; as the monitor's line had, after a prompt of 2
+V_UF            .EQU    0xFFFFF060      ; for DIS: the fields dest, s0, and s1,
 V_UC            .EQU    0xFFFFF063      ; their constant words,
 V_UNOPS         .EQU    0xFFFFF066      ; and the operands of the mnemonic
+V_CSP           .EQU    0xFFFFF067      ; the C code's stack pointer at the cold start, which main sets again
 V_ARP           .EQU    0xFFFFF100      ; the ARP cache: ARP_SLOTS entries of an IP address, 0 for none, the MAC address as E_MACH and E_MACL have it, and the time of arp_tick it was learned
 V_ARPNEXT       .EQU    0xFFFFF110      ; the entry that arp_learn takes next, 4 times its number
-V_XID           .EQU    0xFFFFF111      ; for i dhcp: the transaction's number,
+V_XID           .EQU    0xFFFFF111      ; for DHCP: the transaction's number,
 V_DIP           .EQU    0xFFFFF112      ; and the address of the OFFER or the ACK, its server, mask, and gateway,
 V_DSRV          .EQU    0xFFFFF113
 V_DMASK         .EQU    0xFFFFF114
@@ -154,16 +163,16 @@ V_PIP           .EQU    0xFFFFF116      ; and those of the last reply that dhcp_
 V_PSRV          .EQU    0xFFFFF117
 V_PMASK         .EQU    0xFFFFF118
 V_PGW           .EQU    0xFFFFF119
-V_LSTATS        .EQU    0xFFFFF11A      ; for load NAME: what fat_load gives, 5 words
+V_LSTATS        .EQU    0xFFFFF11A      ; for LOAD "NAME.BIN": what fat_load gives, 5 words
 V_TXF           .EQU    0xFFFFF120      ; a frame to send, from byte 2, DHCP_WORDS words, as the send buffer has it
 V_RXF           .EQU    0xFFFFF180      ; a frame received, from byte 2, 380 words, as the queue's buffer has it
 ___wasm_trap_vector .EQU 0xFFFFF300     ; the routine that a wasm trap jumps to, mon_trap (lib.nasm)
 ___putc_vector  .EQU    0xFFFFF301      ; the routine that nice_putc and nice_print jump to, mon_putc
-V_MASK          .EQU    0xFFFFF302      ; the network's mask, from i dhcp, 0 for none
+V_MASK          .EQU    0xFFFFF302      ; the network's mask, from DHCP, 0 for none
 V_GW            .EQU    0xFFFFF303      ; and its gateway, 0 for none
 V_UPORT         .EQU    0xFFFFF304      ; the local port of the UDP endpoint, 0 while it is closed
 V_UHDR          .EQU    0xFFFFF305      ; for udp_send: the headers, UDP_HDR words, as the send buffer has them
-V_TSRV          .EQU    0xFFFFF310      ; for tftp: the server's IP address,
+V_TSRV          .EQU    0xFFFFF310      ; for TFTP: the server's IP address,
 V_TTID          .EQU    0xFFFFF311      ; its port, its TID, 0 before its first DATA,
 V_TBLK          .EQU    0xFFFFF312      ; the block waited for,
 V_TLEN          .EQU    0xFFFFF313      ; the bytes of the packet at V_TPKT,
@@ -172,15 +181,15 @@ V_TLAST         .EQU    0xFFFFF315      ; the byte before, for the LF of a CR LF
 V_TLINE         .EQU    0xFFFFF316      ; the next free word of V_LINE,
 V_TEND          .EQU    0xFFFFF317      ; the bytes of the DATA's block,
 V_TPORT         .EQU    0xFFFFF318      ; the server's port for the RRQ,
-V_TLIST         .EQU    0xFFFFF319      ; not 0 for a listing, a name with * or ?,
+V_TLIST         .EQU    0xFFFFF319      ; not 0 for a listing, of DIR,
 V_TPKT          .EQU    0xFFFFF320      ; and the packet sent, a byte per word, up to TFTP_PKT
-V_DNS           .EQU    0xFFFFF380      ; the DNS server, from i dhcp or net_set, 0 for none
+V_DNS           .EQU    0xFFFFF380      ; the DNS server, from DHCP or net_set, 0 for none
 V_ULEN          .EQU    0xFFFFF381      ; the bytes of the datagram held for the endpoint at V_RXF, 0 for none
 V_NWAIT         .EQU    0xFFFFF382      ; the local UDP port of the ROM's own wait, whose frames net_step copies to V_RXF, 0 for none
 V_NARM          .EQU    0xFFFFF383      ; not 0 while the nearest deadline, V_NDUE, is armed
 V_NDUE          .EQU    0xFFFFF384      ; the nearest deadline, on the fine clock of net_clock
 V_IPID          .EQU    0xFFFFF385      ; the identification of the next IPv4 packet sent, in bits 15..0
-V_DDNS          .EQU    0xFFFFF386      ; for i dhcp: the DNS server of the OFFER or the ACK,
+V_DDNS          .EQU    0xFFFFF386      ; for DHCP: the DNS server of the OFFER or the ACK,
 V_PDNS          .EQU    0xFFFFF387      ; and of the last reply that dhcp_parse took
 V_QID           .EQU    0xFFFFF388      ; the ID of the query of dns_lookup, in bits 15..0; its port is V_NWAIT
 V_TCPORT        .EQU    0xFFFFF389      ; the local port of the last TCP connection opened
@@ -209,9 +218,9 @@ V_BSTATE        .EQU    0xFFFFF3CE      ; the DHCP exchange in the background: t
 V_BDUE          .EQU    0xFFFFF3CF      ; when it sends the next DISCOVER, on the fine clock of net_clock,
 V_BWAIT         .EQU    0xFFFFF3D0      ; and the microseconds it waits after that one
 V_NTP           .EQU    0xFFFFF3D1      ; the NTP server, the first of DHCP's option 42, 0 for none
-V_DNTP          .EQU    0xFFFFF3D2      ; for i dhcp: the NTP server of the OFFER or the ACK,
+V_DNTP          .EQU    0xFFFFF3D2      ; for DHCP: the NTP server of the OFFER or the ACK,
 V_PNTP          .EQU    0xFFFFF3D3      ; and of the last reply that dhcp_parse took
-V_NTPIP         .EQU    0xFFFFF3D4      ; for time ntp: the server's IP address, which dns_lookup writes
+V_NTPIP         .EQU    0xFFFFF3D4      ; for NTP: the server's IP address, which dns_lookup writes
 WASM_RAM        .EQU    0xFFFFF400      ; the words that the ROM's C code writes, from here
 WASM_END        .EQU    0xFFFFFF00      ; up to below here, the I/O page, which the Makefile checks
 
@@ -304,6 +313,7 @@ mon_reset
                 MOVE    @___wasm_trap_vector, mon_trap
                 MOVE    @___putc_vector, mon_putc
                 CALL    ___wasm_start
+                MOVE    @V_CSP, @WASM_RAM  ; the C code's stack pointer, for main
                 MOVE    R1, V_ARP
 :
                 MOVE    @R1++, 0
@@ -330,7 +340,7 @@ mon_reset
                 MOVE    @V_BACK, 0
                 CALL    scr_cls
                 CALL    _clock_rtc
-                JMP     cmd_start       ; monitor_cmd.nasm
+                JMP     bas_start       ; basic.nasm
 
 ; mon_exit: entry 1, and where a program returns to. Back to the main loop,
 ; main, with R1 the status: E cleared, the timer stopped, the FPU's
@@ -340,14 +350,20 @@ mon_reset
 ; the cursor's registers, after a new line if that is not column 0.
 mon_exit
                 MOVE    SP, STACK
+                CALL    sys_end
+                JMP     main
+
+; sys_end: for mon_exit, and for SYS at a program's return, with R1 the
+; status: the state restored as for mon_exit, but the stack, and the
+; status printed. Uses R1-R4.
+sys_end
                 PUSH    R1
                 CALL    exit_restore
                 MOVE    R1, S_RETURN
                 CALL    puts_b
                 POP     R1
                 CALL    _io_puthex
-                CALL    _io_crlf
-                JMP     main
+                JMP     _io_crlf        ; which returns to the caller
 
 ; mon_trap: where a wasm trap of the ROM's C code jumps through
 ; ___wasm_trap_vector, with R1 the trap's code and R2 its address

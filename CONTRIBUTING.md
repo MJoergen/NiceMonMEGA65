@@ -31,8 +31,8 @@ or, in an existing clone:
 - `make examples` builds the C examples.
 - `make demo` builds nice_cpu's demo with the board's text,
   `demo/build/demo.bin`, a program at `0x8000` under the monitor, which
-  the release ships as a file of its own. The monitor's `load demo.bin`
-  and `r` run it.
+  the release ships as a file of its own. BASIC's `LOAD "DEMO.BIN"`
+  and `SYS 0x8000` run it.
 - `make monitor` builds the monitor, `monitor/build/monitor.bin`, which
   the boards' targets and the release put in the ROM of the bitstreams
   and core files. `FOLDER=NAME`
@@ -65,7 +65,7 @@ or, in an existing clone:
   [sdcard.py](tools/README.md#sdcardpy) and
   [sdnbd.py](tools/README.md#sdnbdpy)).
 - `make tftpd` serves the files of `examples/build`, or of `TFTP_DIR=`,
-  to the monitor's `tftp` (see
+  to BASIC's `LOAD` and `DIR` (see
   [monitor/README.md](monitor/README.md#the-network)).
 - `make hwtest` tests the board (see [Testing the
   board](#testing-the-board)).
@@ -79,7 +79,7 @@ or, in an existing clone:
   [RELEASE.md](doc/RELEASE.md)).
 - `make linktest` checks the tools on `niceemu --link`, without a board
   (see [The tools and niceemu](#the-tools-and-niceemu)).
-- `make tftptest` checks `tools/tftpd.py`, and the monitor's `tftp`
+- `make tftptest` checks `tools/tftpd.py`, and BASIC's TFTP
   against it, without a board (see [The tools and
   niceemu](#the-tools-and-niceemu)).
 - `make tcptest` checks the monitor's TCP, and its timers, without a
@@ -135,7 +135,7 @@ The rules that every change follows are in [CLAUDE.md](CLAUDE.md), under
 | [monitor/](monitor/README.md) | The monitor for the ROM, in NICE assembly: a hardware abstraction layer for programs at `0x8000`, called through a dispatch table, a main loop with a few commands, the file of routines that programs join, the stubs and the header for programs, and its tests in `niceemu`. Its README has the decisions, [INTERNALS.md](monitor/INTERNALS.md) the routines with no entries, the C in the ROM, the ROM's words, and the build and the tests. |
 | [demo/](demo/README.md) | The demo, `demo.bin`, a program under the monitor that the release ships as a file of its own: nice_cpu's demo (`nice_cpu/demo`), whose function keys switch between a welcome screen that turns into a typewriter, the key codes, the characters and colors, the counters, a game, and the board, a self-test and the network station's addresses. Here are the board's text, `text.nasm`, and the test under the monitor. |
 | [examples/](examples/) | Example C programs, and the Makefile that builds them for the MEGA65. |
-| [tools/](tools/) | `boardlink.py`, the debug link of nice_cpu's `debugger/nicelink.py`, over the board's UART or TCP to `niceemu --link`, with the board's Ethernet port and the simulated system of `make cosim`, and the tools that use it: `load.py`, which loads a program into the MEGA65 or Nexys4DDR, `run.py`, which runs a program on the board as `niceemu` runs it, `mon.py`, an interactive shell on the link, nice_cpu's `nicedbg.py` with the board's links, `sdcard.py`, which lists the board's SD card and copies its files to the host, `sdnbd.py`, which serves the card as a block device for a mount on the host, `hwtest.py`, which tests the system on the board, `flash.py`, which writes the Nexys4DDR's flash or a slot of the MEGA65's, with `jtag.py`, which finds the JTAG cable of the board's UART and checks the board, for `hwtest.py` too, and `spiflash.py`, which clears the protection of the sectors of the MEGA65's flash, `bump.py`, which records the timing of the MEGA65 and the Nexys4DDR for a nice_cpu tag, `release.py`, which builds and publishes a release, `linktest.py`, which checks `run.py` and `mon.py` on `niceemu --link`, `tftpd.py`, a TFTP server for the monitor's `tftp`, with listings, `tftptest.py`, which checks it, `tcptest.py`, which checks the monitor's TCP against `tcppeer.py`, a scripted peer, `weathertest.py`, which checks the weather display against it, `sdtest.py`, which checks `sdcard.py` and `sdnbd.py`, `cosimtest.py`, which checks `run.py` on the simulated system, `romsize.py`, which measures the ROM's words and the demo's for the tables of `monitor/INTERNALS.md` and `demo/README.md`, and `screenshot.py`, which draws a program's screen in `niceemu` as a PNG picture. |
+| [tools/](tools/) | `boardlink.py`, the debug link of nice_cpu's `debugger/nicelink.py`, over the board's UART or TCP to `niceemu --link`, with the board's Ethernet port and the simulated system of `make cosim`, and the tools that use it: `load.py`, which loads a program into the MEGA65 or Nexys4DDR, `run.py`, which runs a program on the board as `niceemu` runs it, `mon.py`, an interactive shell on the link, nice_cpu's `nicedbg.py` with the board's links, `sdcard.py`, which lists the board's SD card and copies its files to the host, `sdnbd.py`, which serves the card as a block device for a mount on the host, `hwtest.py`, which tests the system on the board, `flash.py`, which writes the Nexys4DDR's flash or a slot of the MEGA65's, with `jtag.py`, which finds the JTAG cable of the board's UART and checks the board, for `hwtest.py` too, and `spiflash.py`, which clears the protection of the sectors of the MEGA65's flash, `bump.py`, which records the timing of the MEGA65 and the Nexys4DDR for a nice_cpu tag, `release.py`, which builds and publishes a release, `linktest.py`, which checks `run.py` and `mon.py` on `niceemu --link`, `tftpd.py`, a TFTP server for BASIC's `LOAD` and `DIR`, with listings, `tftptest.py`, which checks it, `tcptest.py`, which checks the monitor's TCP against `tcppeer.py`, a scripted peer, `weathertest.py`, which checks the weather display against it, `sdtest.py`, which checks `sdcard.py` and `sdnbd.py`, `cosimtest.py`, which checks `run.py` on the simulated system, `romsize.py`, which measures the ROM's words and the demo's for the tables of `monitor/INTERNALS.md` and `demo/README.md`, and `screenshot.py`, which draws a program's screen in `niceemu` as a PNG picture. |
 | [README.md](README.md) | For those who use the core files and write programs for them: on its own, over Ethernet, and over the serial port. |
 | [SYSTEM.md](doc/SYSTEM.md) | The system that programs and the link see: the address map, the screen and the font, the keyboard, the Nexys4DDR's devices, the Ethernet station, and the SD card slots. |
 | [DEBUG_LINK.md](doc/DEBUG_LINK.md) | The debug link: its words, how a host loads, pauses, steps, and stops a program, its version, the control register, the UART's baud rate, and the link over TCP. |
@@ -528,13 +528,13 @@ checks of bad packets on it, but for the gap of 300 ms, which is far
 shorter in simulated time, and its checks of the pause, the step, the
 breakpoints, the writes of the registers, and the FPU.
 Then it runs the programs that `make hwtest` compares, and the monitor's
-with `--monitor --rom` and with a short program pasted into `l`, with
+with `--monitor --rom` and with a short program pasted into `LOAD`, with
 `run.py --cosim` and with `niceemu`, whose output and exit status must
 be the same, and checks that `load.py` refuses a word beyond the
 simulated system's 64K words of RAM. The simulated system's I2C bus has
 a model of the R6's real-time clock, and the monitor's cold start must
 set the clock of the time of day to its time. Then the monitor starts
-again, gets `time` with a date and a time, and must write them to the
+again, gets `TIME` with a date and a time, and must write them to the
 model and clear its status (#105).
 It leaves out nice_cpu's benchmark and the demo's self-test, which would
 take too long. CI runs it on both cores, where it takes two to four
@@ -856,7 +856,7 @@ pipelined core, all checks pass on both boards, and the Nexys4DDR has
 more of them, for its LEDs, display, buttons, and switches. A check that
 leaves the board in a state in which every later check would fail stops
 the run. Even then the script starts the core from the ROM again, so
-that the board is left with the monitor at its prompt, as the reset
+that the board is left with BASIC at `READY.`, as the reset
 button leaves it, and prints how many passed. A bitstream without a ROM
 is left with its core held. If the link does not answer then, it says
 so: press the reset button.
@@ -876,7 +876,7 @@ bitstream has one. Then it hides the ROM and uses the link:
   that it lost its time, which the summary names after NOT COVERED. A
   clock more than five minutes from the host's local time gets a
   WARNING, but does not fail. Then the script sets the real-time clock
-  to the host's local time, as the monitor's `time` does, and reads it
+  to the host's local time, as BASIC's `TIME` does, and reads it
   back, with the flags that say that it lost its time cleared, so the
   next run covers the clock at the ROM's start.
 - It checks that the link drops a packet with a bad checksum, one cut
@@ -949,13 +949,13 @@ bitstream has one. Then it hides the ROM and uses the link:
   input and with 1536 bytes of input, which checks the larger FIFO and the
   end of the input, the intro's `hello.nasm` with 100 lines of input that
   it halts without reading, the emulator's `reserved.nasm`, which halts
-  on a reserved control word, its `trapsym.nasm` with `--symbols`, its `fpustack.nasm`, the FPU's stack and flags, with the FPU's registers read over the link after the halt, and its `fpudec.nasm`, which prints numbers through the FPU's decimal commands, the monitor with the demo after it, `demo/build/test/monitor_demo.bin`, with `r` and a few keys and its screen, and
+  on a reserved control word, its `trapsym.nasm` with `--symbols`, its `fpustack.nasm`, the FPU's stack and flags, with the FPU's registers read over the link after the halt, and its `fpudec.nasm`, which prints numbers through the FPU's decimal commands, the monitor with the demo after it, `demo/build/test/monitor_demo.bin`, with `SYS 0x8000` and a few keys and its screen, and
   `examples/build/bench.bin` and `bench_win.bin`, but for their cycles,
   whose tables it prints.
   It runs the monitor's `test/hello.nasm` with `run.py --monitor --rom
   monitor/build/monitor_test.bin` against `niceemu` on the two joined,
-  pastes the 600 lines of `hello.bin` into the monitor's `l` at the
-  UART's full rate and runs them with `r`, and runs `hello.nasm` with
+  pastes the 600 lines of `hello.bin` into BASIC's `LOAD` at the
+  UART's full rate and runs them with `SYS 0x8000`, and runs `hello.nasm` with
   `run.py --monitor` under the monitor in the board's ROM, which must
   return its status, 42. `load.py` must refuse a word beyond the RAM
   that `0xFFFFFF9E` gives, under the monitor and without it.
@@ -981,7 +981,7 @@ or a GPT, which the check does not know, are named after NOT COVERED.
 For a card with a FAT32 file system, as the monitor finds it, the script
 also lists the folder `NICE` itself from the sectors it reads, or finds
 that the root has none, and, after the primes, loads the monitor of the
-tests and types `dir SLOT`, whose rows, or error 29, must be the same;
+tests and types `DIR SLOT`, whose rows, or error 29, must be the same;
 a card with no FAT32 is NOT COVERED there.
 On the R3, slot 1 has no card detect, so it is always tried, and fails
 without a card.
@@ -990,9 +990,9 @@ With `ETH=IP`, as in `make hwtest PORT=/dev/ttyUSB1 ETH=192.168.1.65`, and the b
 Ethernet port on this computer's network, it tests the Ethernet station
 after all the other checks, which its failures do not stop. It loads
 the monitor with the station's address cleared, and the monitor must
-get an address from the network's DHCP server on its own, show it over
-its prompt, and answer a ping there. Then it loads
-the monitor again, and types the monitor's `i`, the IP address,
+get an address from the network's DHCP server on its own, show it after
+`READY.`, and answer a ping there. Then it loads
+the monitor again, and types BASIC's `IP "A.B.C.D"`
 and CR as console bytes over the UART, as a terminal would, and reads
 the address back in a pause. It pings the address and checks the
 station's counts. It pauses the monitor over the link on TCP and reads the address again.
@@ -1002,8 +1002,8 @@ and the monitor's, with `run.py --eth`.
 Then `monitor/test/tcphw.nasm`, under the monitor, connects to a socket
 of this computer, which echoes 16 KB; then it listens on port 4600,
 where this computer connects, and the same echo runs. Last, it types
-the monitor's `i dhcp`, which must give the station an address that a
-ping answers, and `time ntp` with the offset of the host's local time,
+BASIC's `DHCP`, which must give the station an address that a
+ping answers, and `NTP` with the offset of the host's local time,
 which must set the clock to the host's time within 2 seconds. The address must be
 free on the network. If no frame at all reaches the station during the
 ping, the board has no Ethernet connection, or the address is not on
@@ -1025,7 +1025,7 @@ a lost and a duplicate ACK, a packet of another port, and an ERROR from
 the client, which ends the transfer. Then it runs the monitor of the
 tests in `niceemu` with `--eth-udp`, whose frames go to a bridge in the
 script that answers ARP for 10.0.0.2 and passes its datagrams to
-`tftpd.py`, and checks that `tftp` lists the folder, loads a program,
+`tftpd.py`, and checks that `DIR` lists the folder, `LOAD` loads a program,
 and shows an ERROR. It takes about a second.
 
 `make tcptest` runs `tools/tcptest.py`, the test of TCP, its clients

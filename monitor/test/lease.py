@@ -3,8 +3,8 @@
 
 Usage: test/lease.py NICEEMU MONITOR.bin LEASE.bin
 
-LEASE.bin, test/lease.nasm, runs under the monitor with the input r and
-h, and --step-time, so that a microsecond is a step and a run counts
+LEASE.bin, test/lease.nasm, runs under the monitor with the input SYS
+0x8000 and HALT, and --step-time, so that a microsecond is a step and a run counts
 the same each time. It takes a lease with net_dhcp, opens the UDP
 endpoint, which keeps the network on, and polls for the case's time,
 noting when it sent a frame. Each case is run again with the answers to
@@ -106,7 +106,7 @@ def run_case(emu: str, monitor: str, prog: str, tmp: str,
         f.write(open(monitor).read() + open(prog).read() + f"00009000 {case:08X}\n")
     inp = os.path.join(tmp, "input")
     with open(inp, "w") as f:
-        f.write("r\rh\r")
+        f.write("sys 0x8000\rhalt\r")
     eth_in = os.path.join(tmp, f"in{case}")
     eth_out = os.path.join(tmp, f"out{case}")
     lines: List[str] = []

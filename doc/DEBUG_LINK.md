@@ -224,7 +224,7 @@ Only a reset brings back 230400 baud. A start of the core keeps the
 rate, so a host at another rate still loads and runs programs; the tools
 take its rate with `--baud`. A program that sets a rate the host does
 not expect cuts the host off until the next reset, so a program should
-leave this register to the user, who sets it with the monitor's `baud`,
+leave this register to the user, who sets it with BASIC's `BAUD`,
 or the on-board debugger's settings page. Over TCP the rate does not
 matter, and the line on the UART changes for the next host there. The
 emulator has plain memory at `0xFFFFFF9F`.

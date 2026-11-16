@@ -2,7 +2,8 @@
 
 The design of the BASIC interpreter in the ROM, issue
 [#54](https://github.com/MJoergen/NiceMonMEGA65/issues/54), and the
-stages of the work. **Nothing of it is written yet.**
+stages of the work. **Stage 1, the shell, is written (#112); the rest
+is not.**
 [BASIC_SURVEY.md](BASIC_SURVEY.md) is the survey behind it. #54 lists
 the features and what is left out, and this note does not repeat the
 list. It has the rest: the decisions, the limits of the target, the
@@ -125,7 +126,8 @@ These facts bound the design:
 ## The main loop
 
 The cold start prints the banner, the free words, and `READY.`, and
-reads a line. A line that starts with a number is stored, from stage 3
+reads a line. Stage 1 prints `HELP lists the statements` where the
+free words are to go, as it has no variables yet. A line that starts with a number is stored, from stage 3
 on. Any other line runs at once. `mon_exit`, and a trap of the C code,
 come back to `READY.`.
 
@@ -149,9 +151,10 @@ hex.
 | `i dhcp` | `DHCP` |
 | `m [MAC]` | `MAC ["02:4E:49:43:45:01"]` |
 | `time [D T]` | `TIME ["2026-11-11 14:30:00"]` |
+| `time ntp [S] [Z]` | `NTP ["SERVER"] [, "+HH:MM"]`, `""` for the server of DHCP |
 | `baud [RATE]` | `BAUD [rate]` |
-| `d [ADDR] [N]` | `DUMP addr [, n]` |
-| `u [ADDR] [N]` | `DIS addr [, n]` |
+| `d [ADDR] [N]` | `DUMP [addr] [, n]` |
+| `u [ADDR] [N]` | `DIS [addr] [, n]` |
 | `c` | `CLS` |
 | `v` | `VER` |
 | `?` | `HELP`, as `?` is `PRINT` |
@@ -188,7 +191,7 @@ hex.
   holds, as BBC BASIC has it: `PRINT HIMEM` reads it, and
   `HIMEM = 0x9000` lowers it, where the C64 has `POKE 55` and `56`.
 - **nice_chess** is then `LOAD "CHESS.BIN"` and `SYS 0x8000`, where it
-  is `load CHESS.BIN` and `r`. `RUN "CHESS.BIN"` does both, from
+  was `load CHESS.BIN` and `r`. `RUN "CHESS.BIN"` does both, from
   stage 4.
 
 ## The language
@@ -585,16 +588,20 @@ the measured words replace them as the stages are written:
 
 | Stage | Words in C, guessed | In all |
 |---|---:|---:|
-| 1. The shell, less the main loop it replaces | 1000 | 1000 |
-| 2. Numbers | 3500 | 4500 |
-| 3. Programs | 5300 | 9800 |
-| 4. Files | 1000 | 10800 |
-| 5. Strings | 4900 | 15700 |
-| 6. Functions | 500 | 16200 |
-| 7. The editor, in assembly, and its statements | 2000 | 18200 |
-| 8. Structure | 3500 | 21700 |
-| 9. Errors | 1000 | 22700 |
-| 10. The machine | 1800 | 24500 |
+| 1. The shell, less the main loop it replaces, measured | 961 | 961 |
+| 2. Numbers | 3500 | 4461 |
+| 3. Programs | 5300 | 9761 |
+| 4. Files | 1000 | 10761 |
+| 5. Strings | 4900 | 15661 |
+| 6. Functions | 500 | 16161 |
+| 7. The editor, in assembly, and its statements | 2000 | 18161 |
+| 8. Structure | 3500 | 21661 |
+| 9. Errors | 1000 | 22661 |
+| 10. The machine | 1800 | 24461 |
+
+Stage 1 is `basic.c`, 1510 words, and `basic.nasm`, 624, of which 431
+are its packed texts, the help among them, less 1032 words that left
+`monitor_cmd.nasm` and 141 that left the other files.
 
 Stage 2 keeps the guess that it had for the integers: the second path
 of each operator goes, and the formats of the numbers come in from
@@ -604,8 +611,9 @@ While BASIC is C, the routines of the monitor's commands stay in
 `monitor_cmd.nasm`, and the ROM has 13455 words free without the demo,
 which left it in V2.1 (#129). #111, the network for programs, leaves
 9757 of them, #131, the texts packed, 11876, and `time ntp` (#127)
-10952 (measured 2026-11-14), and TAB's completion of names (#137)
-10167 (measured 2026-11-15).
+10952 (measured 2026-11-14), TAB's completion of names (#137)
+10167, and the shell of stage 1 (#112) 9206 (both measured
+2026-11-15).
 So
 **the whole list does not fit in C**: C fills the ROM at stage 4 or
 5, and the port to assembly is not a matter of speed alone.

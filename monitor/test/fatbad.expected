@@ -1,23 +1,31 @@
 NiceMon V9.9
-? lists the commands
-> dir
+HELP lists the statements
+READY.
+dir
 File error 18, FAT16, which is not supported
-> dir 1
+READY.
+dir 1
 File error 19, exFAT, which is not supported
-> dir 0
+READY.
+dir 0
 File error 18, FAT16, which is not supported
-> h
+READY.
+halt
 Halted
 Screen:
 |NiceMon V9.9
-|? lists the commands
-|> dir
+|HELP lists the statements
+|READY.
+|dir
 |File error 18, FAT16, which is not supported
-|> dir 1
+|READY.
+|dir 1
 |File error 19, exFAT, which is not supported
-|> dir 0
+|READY.
+|dir 0
 |File error 18, FAT16, which is not supported
-|> h
+|READY.
+|halt
 |Halted
 VBASE at the halt 000000
 exit 0

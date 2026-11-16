@@ -418,7 +418,8 @@ program cannot do without it, as for state that the monitor keeps. So:
   A file is opened on the slot of the last `fs_mount`. The first `fs_open`
   after reset mounts slot 0, or slot 1 when slot 0 has no card and the
   board has a slot 1.
-- **The monitor's commands**: `dir`, which shows the long names;
+- **The monitor's commands**, BASIC's `DIR`, `LOAD`, `SAVE`, and
+  `DELETE` since #112: `dir`, which shows the long names;
   `load NAME` reads a program in the
   `.bin` text format, address and word pairs, which is what the tools
   build, so a program goes to the card by a copy on a PC; `save NAME
@@ -446,7 +447,7 @@ There are no device numbers and no Commodore DOS.
   not reach the controller.
 - **The board**: `make hwtest` reads sector 0 of each card that is present
   and checks its `55AA`, and reads the FAT32 boot sector. For a FAT32
-  card, the monitor's `dir` must list the folder `NICE` as the host
+  card, BASIC's `DIR` must list the folder `NICE` as the host
   reads it from the sectors. It never writes, as the card is the
   user's. A slot with no card is NOT COVERED.
 - **The host tool**: `make sdtest` runs `tools/sdcard.py` on `niceemu

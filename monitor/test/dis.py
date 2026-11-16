@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
-"""Check the monitor's u, the disassembler, against nicedis.py and niceasm.
+"""Check BASIC's DIS, the disassembler, against nicedis.py and niceasm.
 
 Usage: test/dis.py NICEEMU MONITOR.bin PROGRAM.bin
 
 PROGRAM.bin is test/dis.nasm, assembled at 0x8000. The monitor runs in
-niceemu with the program behind it and the commands u 8000 1, u and u
-again, which go on after it with DIS_ROWS rows each, u ADDR N for the
-rest, u 8000 0, which only sets the next address, and u. Each row must be the address, the
+niceemu with the program behind it and the statements DIS 0x8000, 1,
+DIS and DIS again, which go on after it with DIS_ROWS rows each, DIS
+ADDR, N for the rest, DIS 0x8000, 0, which only sets the next address,
+and DIS. Each row must be the address, the
 words of the instruction, blanks for the words it does not have, two
 blanks, and its text. The text is nicedis.py's, but for the pairs of
-words that u shows as CALL and RET, and the words that it shows as the
+words that DIS shows as CALL and RET, and the words that it shows as the
 other pseudo-instructions of nice_cpu's ISA.md §10.1, NOP, JMP, PUSH,
 POP, CLR, TST, and CMP, which nicedis.py does not: pseudo() rewrites
 nicedis.py's text for those, in the order of the README. Those rows are
@@ -149,10 +150,10 @@ def main() -> None:
     expected = rows(words)
     k = 1 + 2 * DIS_ROWS    # the rows of the first three commands
     assert len(expected) > k, "test/dis.nasm is too short"
-    cmds = [("u 8000 1", expected[:1]), ("u", expected[1:1 + DIS_ROWS]),
-            ("u", expected[1 + DIS_ROWS:k]),
-            (f"u {expected[k][0]:x} {len(expected) - k:x}", expected[k:]),
-            ("u 8000 0", []), ("u", expected[:DIS_ROWS])]
+    cmds = [("dis 0x8000, 1", expected[:1]), ("dis", expected[1:1 + DIS_ROWS]),
+            ("dis", expected[1 + DIS_ROWS:k]),
+            (f"dis 0x{expected[k][0]:x}, {len(expected) - k}", expected[k:]),
+            ("dis 0x8000, 0", []), ("dis", expected[:DIS_ROWS])]
     fail = 0
     with tempfile.TemporaryDirectory() as tmp:
         full = os.path.join(tmp, "dis.full.bin")
@@ -160,19 +161,21 @@ def main() -> None:
             f.write(open(monitor).read() + open(program).read())
         inp = os.path.join(tmp, "dis.txt")
         with open(inp, "w") as f:
-            f.write("".join(c + "\r" for c, _ in cmds) + "h\r")
+            f.write("".join(c + "\r" for c, _ in cmds) + "halt\r")
         run = subprocess.run([emu, "-n", str(STEPS), "-i", inp, full],
                              capture_output=True, text=True, check=False)
         lines = run.stdout.splitlines()  # text=True has made CR LF a new line
-        got: List[Tuple[str, List[str]]] = []  # each command and the rows after it
+        got: List[Tuple[str, List[str]]] = []  # each statement and the rows after it
         for line in lines:
-            if line.startswith("> "):
-                got.append((line[2:], []))
-            elif got:
+            if line == "halt":
+                break
+            if line in [c for c, _ in cmds]:
+                got.append((line, []))
+            elif got and line != "READY.":
                 got[-1][1].append(line)
         if [c for c, _ in got[:len(cmds)]] != [c for c, _ in cmds]:
             fail = 1
-            print(f"FAIL monitor dis: the commands echoed are {[c for c, _ in got]}")
+            print(f"FAIL monitor dis: the statements echoed are {[c for c, _ in got]}")
         for (c, want), (_, have) in zip(cmds, got):
             want_text = [row_text(r, words) for r in want]
             if have != want_text:

@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""Run the monitor's tftp in niceemu, against frames of --eth-in.
+"""Run BASIC's LOAD and DIR from a TFTP server in niceemu, against
+frames of --eth-in.
 
 Usage: test/tftp.py NICEEMU MONITOR.bin EXPECTED OUT
 
 Each run has --step-time, so that it takes the same steps each time, and
 the port that udp_open picks from the microseconds is the same in each
-run with the input RUN: i 10.0.0.9, tftp 10.0.0.2 prog.bin, d 9000 4, and
-h. The first run, none, has only the server's ARP reply: the monitor
+run with the input RUN: IP "10.0.0.9", LOAD "prog.bin", "10.0.0.2", DUMP
+0x9000, 4, and HALT. The first run, none, has only the server's ARP reply: the monitor
 sends the RRQ TFTP_TRIES times and says that the server did not answer.
 The script takes the client's port from its RRQ and builds the frames of
 the next runs with it, each line waiting for the frames sent before it
@@ -25,14 +26,14 @@ the next runs with it, each line waiting for the frames sent before it
 - exact: a file of 512 bytes, 25 lines ended by CR LF and 37 empty
   lines, whose DATA 2 is empty.
 - empty: an empty file, one empty DATA 1.
-The runs list, with the input LIST, tftp 10.0.0.2 *.bin, and port, with
-PORT, tftp 10.0.0.2:6969 prog.bin, have ports of their own, which a run
+The runs list, with the input LIST, DIR "10.0.0.2", "*.bin", and port,
+with PORT, LOAD "prog.bin", "10.0.0.2:6969", have ports of their own, which a run
 with only the ARP reply gives first: list gets a listing as
 tools/tftpd.py sends it, which is shown, and port gets the first block of
 PROG from the RRQ to port 6969.
-The run args has the input ARGS, with no frames: tftp's arguments that
-are not, tftp with no IP address, and tftp to a server that does not
-answer ARP.
+The run args has the input ARGS, with no frames: the servers that are
+not, the lines that are no statements, LOAD with no IP address, and LOAD
+from a server that does not answer ARP.
 Each run's console output, up to the halt, and the frames sent, 16 bytes
 a row with the client's port as pp pp, and the IPv4 identification and
 checksum as ii ii and cc cc, as they change with the steps of the code,
@@ -53,14 +54,16 @@ from typing import List, Optional, Tuple
 
 MAC = bytes.fromhex("024E49434500")      # the station's after reset
 SERVER_MAC = bytes.fromhex("0A0000000002")
-RUN = b"i 10.0.0.9\rtftp 10.0.0.2 prog.bin\rd 9000 4\rh\r"
-LIST = b"i 10.0.0.9\rtftp 10.0.0.2 *.bin\rh\r"
-PORT = b"i 10.0.0.9\rtftp 10.0.0.2:6969 prog.bin\rd 9000 4\rh\r"
-ARGS = (b"tftp\rtftp x\rtftp 10.0.0.2 a b\rtftp 10.0.0.256 a\r"
-        b"tftp 10.0.0.2x a\rtftp 10.0.0.2: a\rtftp 10.0.0.2:0 a\r"
-        b"tftp 10.0.0.2:65536 a\rtftp 10.0.0.2:6x a\rtftpx\r"
-        b"tftp 10.0.0.2 a.bin\rtftp 10.0.0.2\ri 10.0.0.9\r"
-        b"tftp 10.0.0.3 a.bin\rh\r")
+RUN = b'ip "10.0.0.9"\rload "prog.bin", "10.0.0.2"\rdump 0x9000, 4\rhalt\r'
+LIST = b'ip "10.0.0.9"\rdir "10.0.0.2", "*.bin"\rhalt\r'
+PORT = b'ip "10.0.0.9"\rload "prog.bin", "10.0.0.2:6969"\rdump 0x9000, 4\rhalt\r'
+ARGS = (b'load "a.bin", "x"\rload "a.bin", 10\rdir "10.0.0.2", "a", "b"\r'
+        b'load "a.bin", "10.0.0.256"\rload "a.bin", "10.0.0.2x"\r'
+        b'load "a.bin", "10.0.0.2:"\rload "a.bin", "10.0.0.2:0"\r'
+        b'load "a.bin", "10.0.0.2:65536"\rload "a.bin", "10.0.0.2:6x"\r'
+        b'dir "10.0.0.2" "*"\rload "a.txt", "10.0.0.2"\r'
+        b'load "a.bin", "10.0.0.2"\rdir "10.0.0.2"\rip "10.0.0.9"\r'
+        b'load "a.bin", "10.0.0.3"\rhalt\r')
 LISTING = b"".join(f"{n:<24} {size:>10}\n".encode() for n, size in (
     ("demo.bin", 41022), ("hello.bin", 13374), ("a-long-name-of-a-program.bin", 7)))
 STEPS = 40_000_000

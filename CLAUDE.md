@@ -14,7 +14,7 @@ board exactly as `niceemu`, the emulator in `nice_cpu/emulator`, runs it.
 and over the serial port, in that order, the order of their numbers of
 users. `doc/SYSTEM.md` has the address map, the screen,
 the keyboard, the Nexys4DDR's devices, the SD card slots, and the I2C
-bus with the MEGA65's real-time clock, which the ROM reads and `time`
+bus with the MEGA65's real-time clock, which the ROM reads and `TIME`
 writes (#105);
 `doc/DEBUG_LINK.md` the link, its control register, the UART's baud
 rate, and the link over TCP; `CONTRIBUTING.md` the tests, the
@@ -31,11 +31,11 @@ registers live (issues #52 and #53), and the settings page of the
 link with the UART's baud rate at `0xFFFFFF9F` (issue #75). `doc/BASIC_SURVEY.md` is
 the survey of the BASIC dialects behind the interpreter in the ROM of
 issue #54 (milestone V2.2), and `doc/BASIC.md` its design note, with
-the decisions, the room in the ROM, and the stages, of which none is
-written. `doc/SDCARD.md` is the design of the SD
+the decisions, the room in the ROM, and the stages, of which stage 1,
+the shell (#112), is written. `doc/SDCARD.md` is the design of the SD
 cards' storage, issue #62 and its subtasks, of which the controller, the
 slots, the ROM's sector routines, FAT32's
-reading with `dir` and `load`, and its writing with `save` and `del`
+reading with `DIR` and `LOAD`, and its writing with `SAVE` and `DELETE`
 (#55, #56, #57, #58, and #59) are written. `doc/` also has `CODING_STYLE.md`,
 `RELEASE.md`, and `RELEASE_NOTES.md`; the root keeps only `README.md`,
 `CONTRIBUTING.md`, and this file.
@@ -162,7 +162,7 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   `sdnbd.py` (the whole card as a block device over NBD, for a mount on
   Linux, with sdcard.py's sectors), and `sdtest.py`,
   `bump.py`, `release.py`, `linktest.py`, `tftpd.py` (the TFTP server for
-  the monitor's `tftp`, with listings, #95) and `tftptest.py`,
+  BASIC's `LOAD` and `DIR`, with listings, #95) and `tftptest.py`,
   `tcptest.py` (the monitor's TCP, against `tcppeer.py`, a scripted
   peer on niceemu's frames, #111), `weathertest.py` (the weather
   display against it, #128),
@@ -176,17 +176,20 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   (`examples/README.md`). `demo/`: nice_cpu's demo (`nice_cpu/demo`,
   since V1.7), built by its Makefile with the board's `text.nasm`, a
   program at 0x8000, `demo.bin`, which the release ships as an asset of
-  its own and the monitor's `load demo.bin` and `r` run; it left the ROM
+  its own and BASIC's `LOAD "DEMO.BIN"` and `SYS 0x8000` run; it left the ROM
   in V2.1 (#129).
   `monitor/`: the monitor for the ROM in NICE assembly (`monitor.nasm`,
   the dispatch table, the HAL, and the map of its RAM, `monitor_cmd.nasm`,
-  the main loop and the commands, which BASIC (#54) is to replace, with
-  `u` in `monitor_dis.nasm`, the sector routines in
+  the routines of the statements that were the monitor's commands,
+  `basic.nasm`, BASIC's main loop (#54, stage 1 #112), the stubs to the
+  routines, and its keywords, messages, and help, with
+  `DIS` in `monitor_dis.nasm`, the sector routines in
   `monitor_sd.nasm`, the network in `monitor_eth.nasm`, and TCP in
   `monitor_tcp.nasm`, #111), its C code (`fat32.c`,
-  and `clock.c`, the `time` command, the dates of files (#109), and the
-  clock from the real-time clock at the cold start, which `time`
-  writes (#105), and the time of `time ntp` from a time server (#127), in
+  `clock.c`, the `TIME` statement, the dates of files (#109), and the
+  clock from the real-time clock at the cold start, which `TIME`
+  writes (#105), and the time of `NTP` from a time server (#127), and
+  `basic.c`, BASIC's scanner and statements, in
   one wasm module through `nicewasm --ram`, with its
   writable words at `0xFFFFF400`; building the monitor needs clang, and
   its tests mtools, `mkfs.fat`, and `sfdisk`), the routines that
@@ -237,7 +240,7 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   address. It is the line, as the UART is: no `b` notice at connect, and
   a half-close is a break. While a host is connected, the UART's link
   bytes are dropped. `make hwtest` tests the station last, setting its
-  address by typing the monitor's `i` over the UART. Without `ETH`,
+  address by typing BASIC's `IP` over the UART. Without `ETH`,
   or when no frame reaches the board, it prints NOT COVERED and still
   exits 0, so read the summary after an Ethernet change.
 - The tools take `--tcp PORT` for `niceemu --link PORT` (PORT 0 prints the

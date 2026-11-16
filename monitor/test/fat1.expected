@@ -1,19 +1,23 @@
 NiceMon V9.9
-? lists the commands
-> dir
+HELP lists the statements
+READY.
+dir
 Directory of NICE
 HELLO.BIN                      14184
 Files: 1, directories: 0
-> h
+READY.
+halt
 Halted
 Screen:
 |NiceMon V9.9
-|? lists the commands
-|> dir
+|HELP lists the statements
+|READY.
+|dir
 |Directory of NICE
 |HELLO.BIN                      14184
 |Files: 1, directories: 0
-|> h
+|READY.
+|halt
 |Halted
 VBASE at the halt 000000
 exit 0

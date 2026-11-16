@@ -1,13 +1,17 @@
 == none
 NiceMon V9.9
-? lists the commands
-> i 10.0.0.9
+HELP lists the statements
+READY.
+ip "10.0.0.9"
 IP address 10.0.0.9
-> i dhcp
+READY.
+dhcp
 No answer from a DHCP server
-> i
+READY.
+ip
 IP address 10.0.0.9
-> h
+READY.
+halt
 ffffffb0: 0a000009
 ffffffc0: 00000000
 
@@ -114,18 +118,22 @@ frame 4, 382 bytes
 170  00 00 00 00 00 00 00 00 00 00 00 00 00 00
 == ok
 NiceMon V9.9
-? lists the commands
-> i 10.0.0.9
+HELP lists the statements
+READY.
+ip "10.0.0.9"
 IP address 10.0.0.9
-> i dhcp
+READY.
+dhcp
 IP address 192.168.1.50
 Mask 255.255.255.0
 Gateway 192.168.1.1
 DNS server 192.168.1.3
 DHCP server 192.168.1.1
-> i
+READY.
+ip
 IP address 192.168.1.50
-> h
+READY.
+halt
 ffffffb0: c0a80132
 ffffffc0: 00000000
 
@@ -182,18 +190,22 @@ frame 2, 382 bytes
 170  00 00 00 00 00 00 00 00 00 00 00 00 00 00
 == nak
 NiceMon V9.9
-? lists the commands
-> i 10.0.0.9
+HELP lists the statements
+READY.
+ip "10.0.0.9"
 IP address 10.0.0.9
-> i dhcp
+READY.
+dhcp
 IP address 192.168.1.51
 Mask 255.255.255.0
 Gateway 192.168.1.1
 DNS server 192.168.1.3
 DHCP server 192.168.1.1
-> i
+READY.
+ip
 IP address 192.168.1.51
-> h
+READY.
+halt
 ffffffb0: c0a80133
 ffffffc0: 00000000
 
@@ -300,10 +312,12 @@ frame 4, 382 bytes
 170  00 00 00 00 00 00 00 00 00 00 00 00 00 00
 == entry-none
 NiceMon V9.9
-? lists the commands
-> r
+HELP lists the statements
+READY.
+sys 0x8000
 Returned 0000000E
-> h
+READY.
+halt
 00009100: 00000000 00001388 ffffffd3 00000001 c0a80132 00000000 00000000 00000000
 00009108: 00000000 00000000 00000000 00000000 00000000 00000000
 
@@ -410,10 +424,12 @@ frame 4, 382 bytes
 170  00 00 00 00 00 00 00 00 00 00 00 00 00 00
 == entry
 NiceMon V9.9
-? lists the commands
-> r
+HELP lists the statements
+READY.
+sys 0x8000
 Returned 0000000E
-> h
+READY.
+halt
 00009100: 00000000 00001388 00000000 00000001 c0a80132 ffffff00 c0a80101 c0a80103
 00009108: c0a80101 c0a80101 00000a00 00000001 00000000 00000000
 

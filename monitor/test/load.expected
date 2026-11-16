@@ -1,44 +1,55 @@
 NiceMon V9.9
-? lists the commands
-> l
+HELP lists the statements
+READY.
+load
 ADDR WORD in hex on each line, as in a .bin file; an empty line ends
 Words loaded: 792, 00008000 to 0001EFFF
 Lines skipped: 6, first line 2; ADDR WORD in hex, ADDR 00008000 to 0001EFFF
-> l
+READY.
+load
 ADDR WORD in hex on each line, as in a .bin file; an empty line ends
 Words loaded: 0
-> r
+READY.
+sys 0x8000
 Hello from 00008000, table 00010005
 at column 40
 on the line only
 Returned 0000002A
-> d 9000 4
+READY.
+dump 0x9000, 4
 00009000 00000134 00000000 00000008 00000000
-> d 1EFFF 1
+READY.
+dump 0x1EFFF, 1
 0001EFFF 00000009
-> h
+READY.
+halt
 Halted
-fffff000: 00000000 00000013 000fff00 00000003 0001f000 00008000 00000180 00000000
-fffff008: 00000000 00000000 00000000 00000003 00000003 00000002 0001f000
+fffff000: 00000000 00000018 000fff00 00000003 0001f000 00008000 00000180 0000017f
+fffff008: 00000001 00000000 00000000 00000003 00000003 00000002 0001f000
 Screen:
-|NiceMon V9.9
-|? lists the commands
-|> l
+|HELP lists the statements
+|READY.
+|load
 |ADDR WORD in hex on each line, as in a .bin file; an empty line ends
 |Words loaded: 792, 00008000 to 0001EFFF
 |Lines skipped: 6, first line 2; ADDR WORD in hex, ADDR 00008000 to 0001EFFF
-|> l
+|READY.
+|load
 |ADDR WORD in hex on each line, as in a .bin file; an empty line ends
 |Words loaded: 0
-|> r
+|READY.
+|sys 0x8000
 |Hello from 00008000, table 00010005
 |                                        at column 40
 |Returned 0000002A
-|> d 9000 4
+|READY.
+|dump 0x9000, 4
 |00009000 00000134 00000000 00000008 00000000
-|> d 1EFFF 1
+|READY.
+|dump 0x1EFFF, 1
 |0001EFFF 00000009
-|> h
+|READY.
+|halt
 |Halted
 VBASE at the halt 000000
 exit 0

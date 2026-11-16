@@ -14,10 +14,11 @@ take. The cases:
 - first: 2,200,000 steps: the first DISCOVER.
 - backoff: 40,000,000 steps: four DISCOVERs, 4, 8, and 16 seconds apart
   and up to a second more, so the fourth about 30 seconds in.
-- typed: i 10.0.0.9 typed first, which ends the exchange: no frame.
+- typed: IP "10.0.0.9" typed first, which ends the exchange: no frame.
 - ok: an OFFER after the DISCOVER, and the ACK after the REQUEST, with a
-  lease of 200 seconds and T1 5: the line of the address over the
-  prompt, the prompt again, the address in NET_IP, the port enabled, as
+  lease of 200 seconds and T1 5: the line of the address at the start
+  of the empty line after READY., the address in NET_IP, the port
+  enabled, as
   the lease is kept, and the lease's REQUEST to the server by unicast at
   T1, 5 seconds after the ACK.
 - nak: an OFFER, a NAK of the REQUEST, which sends the next DISCOVER at
@@ -38,7 +39,7 @@ from dhcp import BCAST, MAC, XID_AT, ip, reply
 
 SERVER_MAC = bytes.fromhex("0A0000000001")  # the source of dhcp.py's replies
 DUMPS = ["-d", "0xFFFFFFB0:1", "-d", "0xFFFFFFC0:1"]
-PROMPT = "> "
+READY = "READY.\r\n"
 
 
 def run(emu: str, monitor: str, steps: int, keys: bytes,
@@ -131,9 +132,9 @@ def main() -> None:
         check("backoff: three DISCOVERs in 29 seconds", len(frames) == 3,
               str(len(frames)))
 
-        text, words, frames = run(emu, monitor, 10_000_000, b"i 10.0.0.9\r",
+        text, words, frames = run(emu, monitor, 10_000_000, b'ip "10.0.0.9"\r',
                                   None, tmp, "typed")
-        check("typed: i ends the exchange, no frame", frames == [],
+        check("typed: IP ends the exchange, no frame", frames == [],
               str(len(frames)))
         check("typed: the address typed, and the port disabled",
               words == [0x0A000009, 0], str(words))
@@ -147,8 +148,8 @@ def main() -> None:
             ""])
         text, words, frames = run(emu, monitor, 9_000_000, b"", ok_in, tmp,
                                   "ok")
-        shown = PROMPT + "\rIP address 192.168.1.50 from DHCP\r\n" + PROMPT
-        check("ok: the address shown over the prompt, and the prompt again",
+        shown = READY + "\rIP address 192.168.1.50 from DHCP\r\n"
+        check("ok: the address shown on the empty line after READY.",
               shown in text, repr(text[-120:]))
         check("ok: the address set, and the port enabled for the lease",
               words == [0xC0A80132, 1], str([f"{w:08X}" for w in words]))

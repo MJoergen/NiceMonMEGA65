@@ -1,37 +1,58 @@
 NiceMon V9.9
-? lists the commands
-> time ntp
-No IP address; i sets one
-> i dhcp
+HELP lists the statements
+READY.
+ntp
+No IP address; IP or DHCP sets one
+READY.
+dhcp
 IP address 10.0.0.9
 Mask 255.255.255.0
 Gateway 10.0.0.1
 DNS server 10.0.0.53
 DHCP server 10.0.0.1
 NTP server 10.0.0.123
-> time ntp
+READY.
+ntp
 Clock set 2026-11-14 12:00:00 from 10.0.0.123
-> time ntp 10.0.0.124 +01:00
+READY.
+ntp "10.0.0.124", "+01:00"
 Clock set 2040-01-01 01:00:00 from 10.0.0.124, was 414334798 s behind
-> time
+READY.
+time
 2040-01-01 01:00:00
-> time ntp kod.example.com
+READY.
+ntp "kod.example.com"
 The time server refused: RATE
-> time ntp 10.0.0.126
+READY.
+ntp "10.0.0.126"
 The time server is not to be trusted
-> time ntp 10.0.0.127
+READY.
+ntp "10.0.0.127"
 The time server is not to be trusted
-> time ntp 10.0.0.128
+READY.
+ntp "10.0.0.128"
 No answer from the time server
-> time ntp nx.example.com
+READY.
+ntp "nx.example.com"
 No such name
-> time ntp 10.0.0.130 -12:00
+READY.
+ntp "10.0.0.130", "-12:00"
 The time server is not to be trusted
-> time ntp 10.0.0.131 -00:30
+READY.
+ntp "10.0.0.131", "-00:30"
 Clock set 2026-11-14 11:30:00 from 10.0.0.131, was 414336608 s ahead
-> time ntp 10.0.0.9 +14:01
-time ntp [SERVER] [+HH:MM | -HH:MM], local time less UTC: time ntp +01:00
-> h
+READY.
+ntp "10.0.0.9", "+14:01"
+Not an offset: "+HH:MM" or "-HH:MM", local time less UTC, such as "+01:00"
+READY.
+ntp "", "+01"
+Not an offset: "+HH:MM" or "-HH:MM", local time less UTC, such as "+01:00"
+READY.
+ntp "10.0.0.9" "+01:00"
+Syntax error
+NTP ["S"] [, "Z"]   set it from time server S, Z local time less UTC, "+01:00"
+READY.
+halt
 Halted
 frame 1, 382 bytes
 000  ff ff ff ff ff ff 02 4e 49 43 45 00 08 00 45 00

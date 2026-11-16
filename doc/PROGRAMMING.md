@@ -78,27 +78,27 @@ or-ed. Build it at `0x8000` with `nicebuild.py`, which needs clang
         -I monitor -o hello.bin hello.c
 
 On the board, copy `hello.bin` to the folder `NICE` of the SD card,
-and type `load hello.bin` and then `r` at the monitor's prompt. Or load
+and type `LOAD "HELLO.BIN"` and then `SYS 0x8000` at BASIC's `READY.`. Or load
 and run it from a PC on the board's network (the
 [README](../README.md#over-ethernet) says how the board gets its
 address):
 
     tools/load.py --eth 192.168.1.65 --monitor hello.bin
 
-The greeting is on the board's screen, and the monitor's prompt follows
+The greeting is on the board's screen, and BASIC's `READY.` follows
 it. `tools/mon.py` is a debugger
 ([tools/README.md](../tools/README.md)).
 
 Run it in the emulator, which is built with
 `make -C nice_cpu/emulator build`. The emulator has no ROM, so the
 monitor, built with `make monitor`, is joined in front of the program.
-The input, which `-i -` reads from stdin, types `r`, which runs the
-program, and `h`, which halts the emulator when the program has
+The input, which `-i -` reads from stdin, types `SYS 0x8000`, which
+runs the program, and `HALT`, which halts the emulator when the program has
 returned. The emulator prints the console's output, why it stopped,
 and the registers, and with `--screen` the screen:
 
     cat monitor/build/monitor.bin hello.bin > joined.bin
-    printf 'r\rh\r' | \
+    printf 'SYS 0x8000\rHALT\r' | \
         nice_cpu/emulator/zig-out/bin/niceemu --screen -i - joined.bin
 
 ## A first stand-alone program in NICE assembly
@@ -235,9 +235,9 @@ declares the entries with `monitor/mon.h`, and is built with:
 
 [monitor/README.md](../monitor/README.md#programs) has the details.
 
-**Loading.** On the board, the monitor's `load` reads the `.bin` file
-from the SD card, `tftp` from the network, and `l` from a paste, and
-`r` runs it. From a PC, `tools/load.py --monitor` loads and runs it
+**Loading.** On the board, BASIC's `LOAD "NAME.BIN"` reads the `.bin`
+file from the SD card, `LOAD "NAME.BIN", "IP"` from the network, and
+`LOAD` from a paste, and `SYS 0x8000` runs it. From a PC, `tools/load.py --monitor` loads and runs it
 ([tools/README.md](../tools/README.md#running-a-program-under-the-monitor)).
 
 **In the emulator.** `niceemu` has no ROM. There the monitor is a
@@ -246,10 +246,10 @@ as a `.bin` file is address and word pairs:
 
     make monitor
     cat monitor/build/monitor.bin prog.bin > joined.bin
-    printf 'r\rh\r' | niceemu -i - --sd0 card.img joined.bin
+    printf 'SYS 0x8000\rHALT\r' | niceemu -i - --sd0 card.img joined.bin
 
-The input types `r`, which runs the program at `0x8000`, and `h`,
-which halts the core when the program returns, and `--sd0` gives it a
+The input types `SYS 0x8000`, which runs the program at `0x8000`, and
+`HALT`, which halts the core when the program returns, and `--sd0` gives it a
 card. A program built for the monitor that runs alone in `niceemu`
 jumps into an empty dispatch table.
 

@@ -175,38 +175,39 @@ def lfn(img: str, hello: bytes, tmp: str) -> None:
     """lfn.img: FAT32 on the whole card of 128 MB, with clusters of 2
     sectors, which are enough for FAT32, and
     long names in NICE: my prog.bin, the .bin file given, with a blank in
-    its name; mixed.Bin, whose 8.3 name needs no tail; lower.txt, which
+    its name; mixed.Bin, whose 8.3 name needs no tail; lower.bin, which
     mtools writes as an 8.3 name with the lower-case flags of byte 12;
-    café.txt, an 8.3 name with a character of code page 850; λx.txt, a
+    café.bin, an 8.3 name with a character of code page 850; λx.bin, a
     long name with a character outside ASCII and code page 850;
     mandelbrot1.txt and mandelbrot2.txt, which share their first 6
     letters, MANDEL~1.TXT and MANDEL~2.TXT; a name of 255 characters;
     two names whose long-name entries cross the end of a sector, and of a
-    cluster, after the files PAD01.TXT and on; and bad sum.txt, whose
-    long-name entry has a wrong checksum."""
+    cluster, after the files PAD01.TXT and on; and bad sum.bin, whose
+    long-name entry has a wrong checksum. The files that LOAD reads end
+    with .bin, as LOAD takes no other, though they hold text."""
     blank(img, 128 * MB)
     run("mkfs.fat", "-F", "32", "-s", "2", "-i", "4E494345", img)
     run("mmd", "-i", f"{img}@@0", "::NICE")
     mcopy(img, 0, hello, "NICE/my prog.bin", tmp)
-    for name in ("mixed.Bin", "lower.txt", "caf\u00e9.txt", "\u03bbx.txt",
+    for name in ("mixed.Bin", "lower.bin", "caf\u00e9.bin", "\u03bbx.bin",
                  "mandelbrot1.txt", "mandelbrot2.txt", "n" * 251 + ".txt"):
         mcopy(img, 0, text(name.split(".")[0][:8], 1), "NICE/" + name, tmp)
     pad(img, 0, "NICE", 16, tmp)
-    mcopy(img, 0, text("SECTOR", 1), "NICE/across a sector.txt", tmp)
+    mcopy(img, 0, text("SECTOR", 1), "NICE/across a sector.bin", tmp)
     pad(img, 0, "NICE", 32, tmp)
-    mcopy(img, 0, text("CLUSTER", 1), "NICE/across a cluster.txt", tmp)
+    mcopy(img, 0, text("CLUSTER", 1), "NICE/across a cluster.bin", tmp)
     if len(entries(img, 0, "NICE")) % 32 != 2:
         raise SystemExit(f"{img}: the long name does not cross a cluster")
-    # bad sum.txt's one long-name entry, before its 8.3 entry, with its
+    # bad sum.bin's one long-name entry, before its 8.3 entry, with its
     # checksum off by one, last, as mtools would take the entry for a
     # free one
-    mcopy(img, 0, text("BADSUM", 1), "NICE/bad sum.txt", tmp)
+    mcopy(img, 0, text("BADSUM", 1), "NICE/bad sum.bin", tmp)
     at = entries(img, 0, "NICE")[-2]
     with open(img, "r+b") as f:
         f.seek(at + 11)
         attr, _, check = f.read(3)
         if attr != 0x0F:
-            raise SystemExit(f"{img}: no long-name entry before BADSUM~1.TXT")
+            raise SystemExit(f"{img}: no long-name entry before BADSUM~1.BIN")
         f.seek(at + 13)
         f.write(bytes([check ^ 1]))
 

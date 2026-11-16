@@ -101,9 +101,9 @@ help:
 	@echo "  make sdtest     check tools/sdcard.py and tools/sdnbd.py on niceemu --link"
 	@echo "                  with images of a card, without a board"
 	@echo "  make tftpd [TFTP_DIR=examples/build] [TFTP_PORT=69]"
-	@echo "                  serve the files of TFTP_DIR to the monitor's tftp, with"
-	@echo "                  listings for tftp IP *.bin (port 69 needs root)"
-	@echo "  make tftptest   check tools/tftpd.py, and the monitor's tftp in niceemu"
+	@echo "                  serve the files of TFTP_DIR to BASIC's LOAD and DIR, with"
+	@echo "                  listings for DIR \"IP\", \"*.BIN\" (port 69 needs root)"
+	@echo "  make tftptest   check tools/tftpd.py, and BASIC's TFTP in niceemu"
 	@echo "                  against it, without a board"
 	@echo "  make tcptest    check the monitor's TCP in niceemu against tools/tcppeer.py,"
 	@echo "                  and its timers with --step-time, without a board"
@@ -294,7 +294,7 @@ sdtest: $(EMU)
 	$(MAKE) -C monitor build/monitor_test.bin
 	$(PYTHON) tools/sdtest.py
 
-# The TFTP server for the monitor's tftp (tools/tftpd.py), and its check,
+# The TFTP server for BASIC's LOAD and DIR (tools/tftpd.py), and its check,
 # which runs the monitor in niceemu against it
 TFTP_DIR ?= examples/build
 TFTP_PORT ?= 69

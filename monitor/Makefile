@@ -31,10 +31,10 @@ NICEWASM = $(PYTHON) $(NICE_CPU)/translator/nicewasm.py
 TOOLS    = $(wildcard $(NICE_CPU)/assembler/*.py) $(wildcard $(NICE_CPU)/translator/*.py)
 LIBC     = $(NICE_CPU)/runtime/libc
 BUILD    = build
-SOURCES  = monitor.nasm monitor_cmd.nasm monitor_dis.nasm monitor_sd.nasm monitor_eth.nasm monitor_tcp.nasm \
+SOURCES  = monitor.nasm monitor_cmd.nasm basic.nasm monitor_dis.nasm monitor_sd.nasm monitor_eth.nasm monitor_tcp.nasm \
            monlib.nasm mon.nasm
 # The ROM's C code, and nice_cpu's runtime library that it is joined with
-ROM_C    = fat32.c clock.c
+ROM_C    = fat32.c clock.c basic.c
 RUNTIME_ROM = $(RUNTIME)/lib.nasm $(RUNTIME)/muldiv_mpu.nasm
 # The options of nicebuild.py --ram (nice_cpu's translator README), but
 # that every function that is not static is exported, for the monitor's
@@ -230,37 +230,49 @@ $(BUILD)/hello_c.bin: test/hello.c mon.h mon.nasm $(TOOLS) | $(BUILD)
 $(BUILD)/tcp_c.bin: test/tcp_c.c mon.h mon.nasm mon_c.nasm $(TOOLS) | $(BUILD)
 	@$(NICEBUILD) --monitor --asm mon.nasm --asm mon_c.nasm -I . -o $@ test/tcp_c.c
 
-# The inputs. cmds types each command, with the edits of a line: three DELs
-# that take back abc, a CTRL-C that empties junk, and the cursor key ESC [ A
-# and the function key ESC O P, which are dropped. D is d, and q is no
-# command. r finds no program, nor r 9000, d 8000 0 only moves the next d
-# to 8000, and d 0 100 shows 256 words, which scrolls the screen. i shows
-# the IP address, 0.0.0.0, and writes 192.168.1.65; four addresses are
-# rejected, with too few numbers, one past 255, an empty one, and a
-# letter after them; and the last, with blanks around it and a leading
-# zero, is written, which the dump of 0xFFFFFFB0 shows. m shows
-# the MAC address, 02:4E:49:43:45:00 after niceemu's reset, and writes
-# 02:4E:49:43:45:01; five addresses are rejected, with too few bytes, a
-# byte of three digits, a group address, a blank inside, and a letter
-# after them; and the last, with blanks around it and bytes of one digit
-# in lower case, is written, which the dump of 0xFFFFFFB1-B2 shows. baud
-# shows the rate, 0 in niceemu, and writes 921600; six rates are
-# rejected, one not in the list, a letter after the digits, two numbers,
-# and too many digits, baudx and b are no commands; and the last, in upper
-# case with blanks around it, is written, which the dump of 0xFFFFFF9F
-# shows. h ends each input. dash's printf, the shell of make on Ubuntu, has no \x.
-CMDS = ?\rv\rd 0 6\rd\rD 10 1\rq\r\r  c\rabc\177\177\177v\rjunk\003v\r\033[A\033OPv\rr\rr 9000\rd 8000 0\rd 8000\rd 0 100\ri\ri 192.168.1.65\ri 1.2.3\ri 256.0.0.1\ri 1..2.3\ri 1.2.3.4x\ri  010.0.0.1 \rm\rm 02:4E:49:43:45:01\rm 2:4e:49:43:45\rm 2:4e:49:43:45:123\rm 3:0:0:0:0:0\rm 2:4e: 49:43:45:1\rm 2:4e:49:43:45:1x\rm  a:b:c:d:e:f \rbaud\rbaud 921600\rbaud 9600\rbaud 9600x\rbaud 1 2\rbaud 123456789\rbaudx\rb\rBAUD  115200 \rh\r
-RUN  = r\rh\r
-# reset: r 0, the cold start, which shows the banner again and leaves the
-# RAM from 0x8000 alone, so that r then runs hello.
-RESET = r 0\rr\rh\r
-# scroll: Page Up and Page Down with no history, which do nothing; d 8000
-# 700, the zeros of the empty RAM, 448 rows, which fill the history of 384
-# rows and go round its ring; two Page Ups and a Page Down, which turn the
-# ring and show 24 rows back; and v, which shows the screen again.
-SCROLL = \033[5~\033[6~d 8000 700\r\033[5~\033[5~\033[6~v\rh\r
-# load: l with lines typed and pasted. The l line ends with CR LF, as a
-# terminal may end it, which is no empty line. The first line is typed
+# The inputs, each a line of BASIC's statements (doc/BASIC.md, issue
+# #112). cmds types each statement, and its bad arguments, with the edits
+# of a line: three DELs that take back abc, a CTRL-C that empties junk,
+# and the cursor key ESC [ A and the function key ESC O P, which are
+# dropped. An empty line and one of blanks run nothing and print no
+# READY. DUMP is dump, in either case, q is no statement, and loadx no
+# LOAD. sys finds no program at 0x8000, nor at 0x9000, dump 0x8000, 0
+# only moves the next dump to 0x8000, and dump 0, 256 shows 256 words,
+# which scrolls the screen. ip shows the IP address, 0.0.0.0, and writes
+# 192.168.1.65; four addresses are rejected, with too few numbers, one
+# past 255, an empty one, and a letter after them; and the last, with
+# blanks around it and a leading zero, is written, which the dump of
+# 0xFFFFFFB0 shows. mac shows the MAC address, 02:4E:49:43:45:00 after
+# niceemu's reset, and writes 02:4E:49:43:45:01; five addresses are
+# rejected, with too few bytes, a byte of three digits, a group address,
+# a blank inside, and a letter after them; and the last, with blanks
+# around it and bytes of one digit in lower case, is written, which the
+# dump of 0xFFFFFFB1-B2 shows. baud shows the rate, 0 in niceemu, and
+# writes 921600; 9600 is not in the list, and the last, in upper case
+# with blanks around it, is written, which the dump of 0xFFFFFF9F shows.
+# Then the lines that are no statements, each a Syntax error with the
+# lines of HELP of its statement: an address without its quotes, sys
+# alone, 0x without digits, a number with a letter after it, dump with a
+# comma and no count, two numbers without a comma, a word after ver, and
+# a string after load's that is no IP address. A number of 33 bits, in
+# decimal and in hex, is an Illegal quantity. LOAD takes a .BIN name
+# only, and SAVE no TFTP server, which needs no card; a keyword in mixed
+# case, the closing quote left out, and dump , 2, which goes on from
+# the last. halt ends each input. dash's printf, the shell of make on
+# Ubuntu, has no \x.
+CMDS = help\rver\rdump 0, 6\rdump\rDUMP 0x10, 1\rq\rloadx\r\r  cls\rabc\177\177\177ver\rjunk\003ver\r\033[A\033OPver\rsys 0x8000\rsys 0x9000\rdump 0x8000, 0\rdump 0x8000\rdump 0, 256\rip\rip "192.168.1.65"\rip "1.2.3"\rip "256.0.0.1"\rip "1..2.3"\rip "1.2.3.4x"\rip "  010.0.0.1 "\rmac\rmac "02:4E:49:43:45:01"\rmac "2:4e:49:43:45"\rmac "2:4e:49:43:45:123"\rmac "3:0:0:0:0:0"\rmac "2:4e: 49:43:45:1"\rmac "2:4e:49:43:45:1x"\rmac "  a:b:c:d:e:f "\rbaud\rbaud 921600\rbaud 9600\rBAUD  115200 \rip 1.2.3.4\rsys\rsys 0x\rdump 12ab\rdump 1,\rbaud 1 2\rver x\rload "a.bin" "1.2.3.4"\rdump 4294967296\rdump 0x100000000\rload "x.txt"\rload "x"\rsave "x", "1.2.3.4"\rHeLp x\rload "x.bin\rdump , 2\rhalt\r
+RUN  = sys 0x8000\rhalt\r
+# reset: sys 0, the cold start, which shows the banner again and leaves
+# the RAM from 0x8000 alone, so that sys 0x8000 then runs hello.
+RESET = sys 0\rsys 0x8000\rhalt\r
+# scroll: Page Up and Page Down with no history, which do nothing; dump
+# 0x8000, 0x700, the zeros of the empty RAM, 448 rows, which fill the
+# history of 384 rows and go round its ring; two Page Ups and a Page
+# Down, which turn the ring and show 24 rows back; and ver, which shows
+# the screen again.
+SCROLL = \033[5~\033[6~dump 0x8000, 0x700\r\033[5~\033[5~\033[6~ver\rhalt\r
+# load: LOAD with lines typed and pasted. The LOAD line ends with CR LF,
+# as a terminal may end it, which is no empty line. The first line is typed
 # with edits: a DEL that takes back 2, the cursor key ESC [ A, which is
 # dropped, so it writes 134 at 9000. The RAM has 0x20000 words, as on the
 # MEGA65, which build/ram128k.bin writes to 0xFFFFFF9E, so 1EFFF takes a
@@ -272,88 +284,92 @@ SCROLL = \033[5~\033[6~d 8000 700\r\033[5~\033[5~\033[6~v\rh\r
 # 12345678, which is longer than the 76 of a line, so it writes nothing,
 # not 123456. Then build/hello.bin,
 # its first 3 lines ended by CR LF and the rest by LF, and CR, an empty
-# line, ends the load. A second l is ended by CTRL-C in the middle of a
-# line, which writes nothing. r runs hello, and d shows 9000 to 9003.
+# line, ends the load. A second LOAD is ended by CTRL-C in the middle of
+# a line, which writes nothing. sys 0x8000 runs hello, and dump shows
+# 9000 to 9003.
 BLANKS66  = $(shell printf '%66s' '')
-LOAD_HEAD = l\r\n9000 12\177\033[A34\rzz\r100 5\rFFFFF000 1\r9001 5 6\r1EFFF 9\r1F000 1\r\t9002\t7 \r   \r9002 8\r9003$(BLANKS66)12345678\r
-LOAD_TAIL = \rl\r9001 7\003r\rd 9000 4\rd 1EFFF 1\rh\r
-# load_emu: l where 0xFFFFFF9E reads 0, as in niceemu, so a program's RAM
+LOAD_HEAD = load\r\n9000 12\177\033[A34\rzz\r100 5\rFFFFF000 1\r9001 5 6\r1EFFF 9\r1F000 1\r\t9002\t7 \r   \r9002 8\r9003$(BLANKS66)12345678\r
+LOAD_TAIL = \rload\r9001 7\003sys 0x8000\rdump 0x9000, 4\rdump 0x1EFFF, 1\rhalt\r
+# load_emu: LOAD where 0xFFFFFF9E reads 0, as in niceemu, so a program's RAM
 # goes up to the screen: 10000 and FFFEFFFF take words, and FFFF0000 does
 # not.
-LOAD_EMU = l\r10000 7\rFFFEFFFF 8\rFFFF0000 1\r\rd 10000 1\rh\r
-# load_64k: l with 0x10000 words of RAM, as on the Nexys4DDR, which
+LOAD_EMU = load\r10000 7\rFFFEFFFF 8\rFFFF0000 1\r\rdump 0x10000, 1\rhalt\r
+# load_64k: LOAD with 0x10000 words of RAM, as on the Nexys4DDR, which
 # build/ram64k.bin writes to 0xFFFFFF9E: EFFF takes a word, and F000, the
 # monitor's variables, and 1EFFF, past the RAM, do not.
-LOAD_64K = l\rEFFF 1\rF000 2\r1EFFF 3\r\rd EFFF 1\rh\r
-# rom: r runs test/rom.nasm, which traps, twice, then r 8100, which
-# leaves values on the FPU and jumps to 0, the cold start, which gives
-# the C code its initial values again and clears the FPU, and r once more.
-ROM  = r\rr\rr 8100\rr\rh\r
-# sd_write: r runs test/sd.nasm, which writes sector 2, which the image
-# shows.
-SD_WRITE = r\rh\r
+LOAD_64K = load\rEFFF 1\rF000 2\r1EFFF 3\r\rdump 0xEFFF, 1\rhalt\r
+# rom: sys 0x8000 runs test/rom.nasm, which traps, twice, then sys
+# 0x8100, which leaves values on the FPU and jumps to 0, the cold start,
+# which gives the C code its initial values again and clears the FPU, and
+# sys 0x8000 once more.
+ROM  = sys 0x8000\rsys 0x8000\rsys 0x8100\rsys 0x8000\rhalt\r
+# sd_write: sys 0x8000 runs test/sd.nasm, which writes sector 2, which
+# the image shows.
+SD_WRITE = sys 0x8000\rhalt\r
 # fat: fat32.img of test/fat_image.py in slot 0 and super.img in slot 1.
-# dir mounts slot 0, DIR 1 and dir 0 mount each slot. load frag.bin reads
-# the fragmented FRAG.BIN, whose words d shows, the first and the last
-# four, and load readme.txt a text file, whose 2 lines are skipped. Then
-# a name that is no file, a directory, a long name that is no file, load
-# alone, two names, loadx, dirx, dir 2, which has no slot and changes
-# nothing, and dir with two numbers, or a slot of 9 digits. load
-# HELLO.BIN, r runs it.
-FAT  = dir\rDIR 1\rdir 0\rload frag.bin\rd 9000 4\rd 9068 4\rload readme.txt\rload nofile.bin\rload sub\rload toolongname.bin\rload\rload a b\rloadx\rdirx\rdir 2\rdir 1 2\rdir 123456789\rLOAD HELLO.BIN\rr\rh\r
+# dir mounts slot 0, DIR 1 and dir 0 mount each slot. load "frag.bin"
+# reads the fragmented FRAG.BIN, whose words dump shows, the first and
+# the last four. Then names that are no file: nofile.bin, sub.bin beside
+# the folder SUB, and a long name; readme.txt, which LOAD does not take,
+# load with no quotes, with two names and no comma, dirx, dir 2, which
+# has no slot and changes nothing, dir with two numbers, and a slot of 33
+# bits.
+# load "HELLO.BIN", in upper case, and sys runs it.
+FAT  = dir\rDIR 1\rdir 0\rload "frag.bin"\rdump 0x9000, 4\rdump 0x9068, 4\rload "nofile.bin"\rload "sub.bin"\rload "toolongname.bin"\rload "readme.txt"\rload frag.bin\rload "a.bin" "b.bin"\rdirx\rdir 2\rdir 1 2\rdir 0x123456789\rLOAD "HELLO.BIN"\rsys 0x8000\rhalt\r
 # fatbad: fat16.img in slot 0 and exfat.img in slot 1, which dir rejects
 # with the errors of each, and fat1: no card in slot 0 and super.img in
 # slot 1, which the first dir mounts
-FATBAD = dir\rdir 1\rdir 0\rh\r
-FAT1 = dir\rh\r
+FATBAD = dir\rdir 1\rdir 0\rhalt\r
+FAT1 = dir\rhalt\r
 # fatnone: nonice.img in slot 0, a card without the folder NICE, and
 # nicefile.img in slot 1, whose NICE is a file, which dir and load reject
 # with error 29, and never fall back to the root's HELLO.BIN
-FATNONE = dir\rload hello.bin\rdir 1\rload hello.bin\rh\r
-# fatw: a copy of super.img in slot 0 and of full.img in slot 1. l writes
-# two words, which save writes to test.bin, an 8.3 name in lower case,
-# which dir lists so, and load reads
-# back, and d shows. save of 0 words truncates HELLO.BIN, which load then
-# finds empty. del deletes test.bin, and a second del finds none. Then
-# the arguments that are not: save alone, with a name only, with no
-# count, with a fourth word, and with an address of 9 digits, savex, a
-# name that is not valid, with a colon, del alone, with two names, and delx, and de 0,
-# which is d. On full.img, save of 256 words fills the card with
-# FULL.BIN's first 1536 bytes, which dir shows, and is error 30; del
-# frees them, and a save of 2 words fits.
-FATW = l\r8000 1234ABCD\r8001 5\r\rsave test.bin 8000 2\rdir\rload TEST.BIN\rd 8000 2\rsave hello.bin 8000 0\rload hello.bin\rdel test.bin\rdel test.bin\rsave\rsave x\rsave x 8000\rsave x 8000 1 2\rsave x 123456789 1\rsavex\rSAVE "a:b" 8000 1\rdel\rdel a b\rdelx\rde 0\rdir 1\rsave full.bin 8000 100\rdir\rdel full.bin\rsave full.bin 8000 2\rdir\rh\r
+FATNONE = dir\rload "hello.bin"\rdir 1\rload "hello.bin"\rhalt\r
+# fatw: a copy of super.img in slot 0 and of full.img in slot 1. load
+# writes two words, which save writes to test, an 8.3 name in lower case
+# without an extension, which gets .BIN, which dir lists so, and load
+# reads back, and dump shows. save of 0 words truncates HELLO.BIN, which
+# load then finds empty. delete deletes test.bin, and a second delete
+# finds none. Then the arguments that are not: save alone, with a name
+# only, with no count, with a fourth number, and with a count of 33
+# bits, savex, a name that is not valid, with a colon, delete alone, with
+# two names, and deletex. On full.img, save of 256 words fills the card
+# with FULL.BIN's first 1536 bytes, which dir shows, and is error 30;
+# delete frees them, and a save of 2 words fits.
+FATW = load\r8000 1234ABCD\r8001 5\r\rsave "test", 0x8000, 2\rdir\rload "TEST.BIN"\rdump 0x8000, 2\rsave "hello.bin", 0x8000, 0\rload "hello.bin"\rdelete "test.bin"\rdelete "test.bin"\rsave\rsave "x"\rsave "x", 0x8000\rsave "x", 0x8000, 1, 2\rsave "x", 0x8000, 0x100000000\rsavex\rSAVE "a:b", 0x8000, 1\rdelete\rdelete "a" "b"\rdeletex\rdir 1\rsave "full.bin", 0x8000, 256\rdir\rdelete "full.bin"\rsave "full.bin", 0x8000, 2\rdir\rhalt\r
 # fatl: lfn.img of test/fat_image.py in slot 0, with long names. dir
-# shows them, load reads my prog.bin by its long name in quotes, which r
-# runs, then by its 8.3 name, and by its long name in upper case; the
-# text files mixed.Bin, lower.txt, and those whose long-name entries
-# cross a sector and a cluster, by their names in another case; bad
-# sum.txt, whose long-name entry has a wrong checksum, only by its 8.3
-# name; a name with no closing quote; caf?.txt, as dir shows café.txt,
-# which is no name; λx.txt by its 8.3 name, _X.TXT; and an empty
-# name in quotes.
-FATL = dir\rload "my prog.bin"\rr\rload MYPROG~1.BIN\rload "MY PROG.BIN"\rload mixed.bin\rload LOWER.TXT\rload "across a sector.txt"\rload "ACROSS A CLUSTER.TXT"\rload "bad sum.txt"\rload badsum~1.txt\rload "my prog.bin\rload caf?.txt\rload _x.txt\rload ""\rh\r
-# tab: lfn.img in slot 0, and TAB (issue #137). my is my prog.bin, in
-# quotes with BS, and "my too; mand is mandelbrot, a second TAB lists
-# the two, and 1 is one; pad2 lists four at once, and pad21 is PAD21.TXT
-# in its case; ACROSS is "across a , which lists two. Nothing: in the
-# command, with no match, for caf?.txt, which is left out, after a
-# directory's . , for n, whose name does not fit the line, and with no
-# card in slot 1. ^C ends a line.
-TAB = load my\t\rload "my\t\rload mand\t\t1\t\rload pad2\t1\t\rlo\t\003load x\t\003load caf\t\003load ACROSS\t\t\003load .\t\003load n\t\003dir 1\rload my\t\003h\r
-# fatlw: a copy of lfn.img in slot 0. l writes two words, and save writes
-# them to new files: mandelbrot.bin, MANDEL~1.BIN, as the MANDEL~1 that
-# is there is a .TXT; mandelbrot3.txt, MANDEL~3.TXT after ~1 and ~2;
-# Hello.bin, HELLO.BIN with no tail and a long name; lower.bin, LOWER.BIN
-# with byte 12's flags and no long name; and "a b.bin", AB~1.BIN. A save
-# of MIXED.BIN truncates mixed.Bin, which keeps its name. "a*b" and
-# "end." are no names. del deletes mandelbrot1.txt and mandelbrot2.txt,
-# whose 4 entries in a row take the 4 of a much longer name of a
-# file.bin, and x.bin goes at the end. dir shows them, and load reads
-# two back.
-FATLW = l\r8000 1234ABCD\r8001 5\r\rsave mandelbrot.bin 8000 2\rsave mandelbrot3.txt 8000 2\rsave Hello.bin 8000 2\rsave lower.bin 8000 2\rsave "a b.bin" 8000 2\rsave MIXED.BIN 8000 1\rsave "a*b" 8000 1\rsave "end." 8000 1\rdel mandelbrot1.txt\rdel "mandelbrot2.txt"\rsave "a much longer name of a file.bin" 8000 2\rsave x.bin 8000 2\rdir\rload "A MUCH LONGER NAME OF A FILE.BIN"\rd 8000 2\rload mandel~1.bin\rh\r
+# shows them, load reads my prog.bin by its long name, which sys runs,
+# then by its 8.3 name, and by its long name in upper case; the text
+# files mixed.Bin, lower.bin, and those whose long-name entries cross a
+# sector and a cluster, by their names in another case; bad sum.bin,
+# whose long-name entry has a wrong checksum, only by its 8.3 name; a
+# name with no closing quote, which the line ends; caf?.bin, as dir
+# shows café.bin, which is no file; λx.bin by its 8.3 name, _X.BIN; and
+# *.bin, which is no file either, as a name has no patterns.
+FATL = dir\rload "my prog.bin"\rsys 0x8000\rload "MYPROG~1.BIN"\rload "MY PROG.BIN"\rload "mixed.bin"\rload "LOWER.BIN"\rload "across a sector.bin"\rload "ACROSS A CLUSTER.BIN"\rload "bad sum.bin"\rload "badsum~1.bin"\rload "my prog.bin\rload "caf?.bin"\rload "_x.bin"\rload "*.bin"\rhalt\r
+# tab: lfn.img in slot 0, and TAB (issue #137). my is "my prog.bin",
+# with an opening quote, and in quotes with BS; mand is "mandelbrot, a
+# second TAB lists the two, and 1 is one; pad2 lists four at once, and
+# pad21 is "PAD21.TXT" in its case; ACROSS is "across a , which lists
+# two. Nothing: in the statement, with no match, for caf?.bin, which is
+# left out, after a directory's . , for n, whose name does not fit the
+# line, and with no card in slot 1. ^C ends a line.
+TAB = load my\t\rload "my\t\rload mand\t\t1\t\rload pad2\t1\t\rlo\t\003load x\t\003load caf\t\003load ACROSS\t\t\003load .\t\003load n\t\003dir 1\rload my\t\003halt\r
+# fatlw: a copy of lfn.img in slot 0. load writes two words, and save
+# writes them to new files: mandelbrot.bin, MANDEL~1.BIN, as the
+# MANDEL~1 that is there is a .TXT; mandelbrot3.txt, MANDEL~3.TXT after
+# ~1 and ~2; Hello.bin, HELLO.BIN with no tail and a long name;
+# lower2.bin, LOWER2.BIN with byte 12's flags and no long name; and
+# "a b.bin", AB~1.BIN. A save of MIXED.BIN truncates mixed.Bin, which
+# keeps its name. "a*b" and "end." are no names. delete deletes
+# mandelbrot1.txt and mandelbrot2.txt, whose 4 entries in a row take the
+# 4 of a much longer name of a file.bin, and x.bin goes at the end. dir
+# shows them, and load reads two back.
+FATLW = load\r8000 1234ABCD\r8001 5\r\rsave "mandelbrot.bin", 0x8000, 2\rsave "mandelbrot3.txt", 0x8000, 2\rsave "Hello.bin", 0x8000, 2\rsave "lower2.bin", 0x8000, 2\rsave "a b.bin", 0x8000, 2\rsave "MIXED.BIN", 0x8000, 1\rsave "a*b", 0x8000, 1\rsave "end.", 0x8000, 1\rdelete "mandelbrot1.txt"\rdelete "mandelbrot2.txt"\rsave "a much longer name of a file.bin", 0x8000, 2\rsave "x.bin", 0x8000, 2\rdir\rload "A MUCH LONGER NAME OF A FILE.BIN"\rdump 0x8000, 2\rload "mandel~1.bin"\rhalt\r
 
 # time: with --step-time, so the clock starts at 0, not set, and counts a
-# microsecond a step, and a copy of super.img in slot 0. time shows that
+# microsecond a step, and a copy of super.img in slot 0, each date and
+# time in quotes. time shows that
 # it is not set, and save writes old.bin with the fixed date. time sets
 # 2026-11-11 14:30:01, which time shows, and save writes new.bin with it,
 # at 14:30:00 and 100 hundredths. Fifteen times are rejected: 2023-02-29
@@ -361,31 +377,32 @@ FATLW = l\r8000 1234ABCD\r8001 5\r\rsave mandelbrot.bin 8000 2\rsave mandelbrot3
 # and after the years time sets, month 13, November 31, hour 24, minute
 # 60, second 60, a year of two digits, a month and a day of one digit, no
 # time, a word after it, an hour of three digits, and a time of one
-# digit each; timex and ti are no commands. Then the edges that are
+# digit each; timex and ti are no statements. Then the edges that are
 # taken: 2000-02-29, 2100-03-01, 2104-02-29, the second past 2^31, the
 # last of 2105, and the first of 1970, in upper case with blanks, whose
 # year FAT cannot hold, so save writes y1970.bin with the fixed date.
-TIME = time\rl\r8000 1\r\rsave old.bin 8000 1\rtime 2026-11-11 14:30:01\rtime\rsave new.bin 8000 1\rtime 2023-02-29 00:00:00\rtime 2100-02-29 00:00:00\rtime 1969-12-31 23:59:59\rtime 2106-01-01 00:00:00\rtime 2026-13-01 00:00:00\rtime 2026-11-31 00:00:00\rtime 2026-11-11 24:00:00\rtime 2026-11-11 23:60:00\rtime 2026-11-11 23:59:60\rtime 26-11-11 00:00:00\rtime 2026-1-1 00:00:00\rtime 2026-11-11\rtime 2026-11-11 01:02:03 x\rtime 2026-11-11 001:02:03\rtime 2026-11-11 1:2:3\rtimex\rti\rtime 2000-02-29 00:00:00\rtime 2100-03-01 00:00:00\rtime 2104-02-29 12:00:00\rtime 2038-01-19 03:14:08\rtime 2105-12-31 23:59:59\rTIME  1970-01-01 00:00:00 \rsave y1970.bin 8000 1\rh\r
+TIME = time\rload\r8000 1\r\rsave "old.bin", 0x8000, 1\rtime "2026-11-11 14:30:01"\rtime\rsave "new.bin", 0x8000, 1\rtime "2023-02-29 00:00:00"\rtime "2100-02-29 00:00:00"\rtime "1969-12-31 23:59:59"\rtime "2106-01-01 00:00:00"\rtime "2026-13-01 00:00:00"\rtime "2026-11-31 00:00:00"\rtime "2026-11-11 24:00:00"\rtime "2026-11-11 23:60:00"\rtime "2026-11-11 23:59:60"\rtime "26-11-11 00:00:00"\rtime "2026-1-1 00:00:00"\rtime "2026-11-11"\rtime "2026-11-11 01:02:03 x"\rtime "2026-11-11 001:02:03"\rtime "2026-11-11 1:2:3"\rtimex\rti\rtime "2000-02-29 00:00:00"\rtime "2100-03-01 00:00:00"\rtime "2104-02-29 12:00:00"\rtime "2038-01-19 03:14:08"\rtime "2105-12-31 23:59:59"\rTIME  "1970-01-01 00:00:00" \rsave "y1970.bin", 0x8000, 1\rhalt\r
 # The words of each test that are dumped with the screen: for cmds the
-# variables, the cursor's registers, and the IP and MAC addresses, and for the programs the text at
-# column 40 of row 4, 80 * 4 + 40 = 360 = 0x168, with its color, and for
+# variables, the cursor's registers, and the IP and MAC addresses, and
+# for the programs the text at column 40 of row 5, below the banner,
+# READY., and the SYS line, 80 * 5 + 40 = 440 = 0x1B8, with its color, and for
 # hello the 0x80 after it, the screen's state, in which the return showed
 # the cursor that hello hid, the font base, which the return made 0, and
 # the row of the glyph of 0x80 that hello drew.
 DUMP_cmds    = -d 0xFFFFF000:5 -d 0xFFFFFF80:6 -d 0xFFFFFF9F:1 -d 0xFFFFFFB0:3
 # For scroll the variables and the screen's registers, and the last four
 # digits of the address that starts a row of the history (the words 4 to
-# 7 of the row): the rows of 869C and 8698 that Page Up turned to slots 0
-# and 1, the row of 86A0 in slot 383, the first of the four rows that v
-# and h added at the bottom of the ring, and the oldest, of 80B0, in slot
-# 379.
+# 7 of the row): the rows of 86A0 and 869C that Page Up turned to slots 0
+# and 1, the row of 86A4 in slot 383, the first of the five rows that
+# ver and halt added at the bottom of the ring, and the oldest, of 80B8,
+# in slot 378.
 DUMP_scroll  = -d 0xFFFFF000:11 -d 0xFFFFFF80:6 -d 0xFFFF7FB4:4 -d 0xFFFF7F64:4 \
-               -d 0xFFFF0804:4 -d 0xFFFF0944:4
-DUMP_hello   = -d 0xFFFF0168:13 -d 0xFFFFFF80:1 -d 0xFFFFFF86:1 -d 0xFFFE1000:1
+               -d 0xFFFF0804:4 -d 0xFFFF0994:4
+DUMP_hello   = -d 0xFFFF01B8:13 -d 0xFFFFFF80:1 -d 0xFFFFFF86:1 -d 0xFFFE1000:1
 DUMP_load    = -d 0xFFFFF000:15
 DUMP_load_emu = -d 0xFFFFF00E:1 -d 0xFFFEFFFF:1
 DUMP_load_64k = -d 0xFFFFF00E:1
-DUMP_hello_c = -d 0xFFFF0168:12
+DUMP_hello_c = -d 0xFFFF01B8:12
 # For sd_write the results of test/sd.nasm's calls
 DUMP_sd_write = -d 0x9100:6
 # For fs the results of test/fs.nasm's calls, the entries that fs_readdir

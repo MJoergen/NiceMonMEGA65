@@ -138,7 +138,7 @@ Checks, in this order:
       --monitor and the monitor of the tests from --rom, against niceemu
       on the two joined, also with 448 rows of d that are still coming
       when the input ends, and under the monitor in the board's ROM, if it
-      has one, which must return its status; and the monitor's l, with the
+      has one, which must return its status; and BASIC's LOAD, with the
       600 lines of hello.bin pasted at the UART's full rate, then r
     - load.py refuses a word beyond the RAM that 0xFFFFFF9E gives, under
       the monitor and without it
@@ -151,11 +151,12 @@ Checks, in this order:
     or here keeps the other checks from:
     - the ROM, loaded at 0 with the station's address cleared, gets an
       address from the network's DHCP server on its own, in the
-      background, and shows it over its prompt, and ping answers there
+      background, and shows it on the empty line after READY., and ping
+      answers there
       (issue #126); when no server answers, the summary names it after
       NOT COVERED instead of failing
-    - the ROM, loaded at 0, gets the monitor's i, the IP address, and CR
-      as console bytes over the UART, as from a terminal, and gives the
+    - the ROM, loaded at 0, gets BASIC's IP "A.B.C.D" and CR as console
+      bytes over the UART, as from a terminal, and gives the
       station that address, which a pause reads back
     - ping gets its answers, and the station counts the requests and its
       replies; when no frame at all has come, the board has no Ethernet
@@ -172,17 +173,16 @@ Checks, in this order:
     - monitor/test/tcphw.nasm, under the monitor of the tests, connects
       over TCP to a port of this computer, sends 16 KB, which it echoes,
       compares them, and closes (issue #111)
-    - the ROM, loaded at 0, gets the monitor's i dhcp over the UART, and
-      gets an address from the network's DHCP server, which the station
-      then has, with the port for Ethernet frames enabled at the prompt
-      for the lease's renewal, and
-      which ping answers; when no server answers, the summary names DHCP
+    - the ROM, loaded at 0, gets BASIC's DHCP over the UART, and gets an
+      address from the network's DHCP server, which the station then has,
+      with the port for Ethernet frames enabled at READY. for the lease's
+      renewal, and which ping answers; when no server answers, the summary names DHCP
       after NOT COVERED instead of failing. The board keeps that address
-    - then the monitor's time ntp, with the offset of the host's local
-      time, sets the clock from the time server of DHCP, or from
-      pool.ntp.org, to the host's local time within 2 seconds (issue
-      #127); when no time server answers, the summary names it after NOT
-      COVERED instead of failing
+    - then BASIC's NTP, with the offset of the host's local time, sets
+      the clock from the time server of DHCP, or from pool.ntp.org, to
+      the host's local time within 2 seconds (issue #127); when no time
+      server answers, the summary names it after NOT COVERED instead of
+      failing
     Without --eth, the summary names the Ethernet station after NOT
     COVERED.
 
@@ -193,7 +193,7 @@ Notes:
     A check that leaves the board in a state in which every later check
     would fail stops the run. Whatever happens, the script ends by
     starting the core from the ROM, shown again, so that the board is left
-    with the monitor at its prompt (the cleanup says so if the link did
+    with BASIC at READY. (the cleanup says so if the link did
     not answer), and it prints the summary. A bitstream without a ROM is
     left with its core held. Only the Python standard library is used,
     and openFPGALoader when the FPGA is programmed.
@@ -249,13 +249,13 @@ TCP_BYTES = 16384
 TCP_LISTEN_PORT = 4600                  # where the board listens in the test of tcp_listen
 # The port's status, 0 while it is disabled
 ETH_CSR = 0xFFFFFFC0
-# The longest that the monitor's time ntp takes: ARP and DNS, 3 sends of
+# The longest that BASIC's NTP takes: ARP and DNS, 3 sends of
 # 2 seconds each, and as many to the time server, and how far its clock
 # may be from the host's, which has NTP too
 NTP_TIME = 20.0
 NTP_SLACK = 2.0
 
-# The longest that the monitor's i dhcp takes: DHCP_TRIES DISCOVERs, and a
+# The longest that BASIC's DHCP takes: DHCP_TRIES DISCOVERs, and a
 # REQUEST after each, with DHCP_WAIT seconds for each reply (monitor_eth.nasm)
 DHCP_TIME = 4 * 2 * 2.0
 # The longest wait for the monitor's DHCP in the background after its
@@ -263,10 +263,12 @@ DHCP_TIME = 4 * 2 * 2.0
 # later (monitor_eth.nasm, BG_FIRST and BG_START), and the replies
 BG_DHCP_TIME = 10.0
 # The line of the address that the monitor's DHCP in the background got,
-# over its prompt, and the prompt again (issue #126). Until the station
-# has an address, the board may print it while a test waits at the
-# monitor's prompt, which niceemu, with no server, never does.
-BG_DHCP = re.compile(rb"\rIP address (\d+\.\d+\.\d+\.\d+) from DHCP\r\n> ")
+# on the empty line after BASIC's READY. (issue #126). Until the station
+# has an address, the board may print it while a test waits for a line,
+# which niceemu, with no server, never does.
+BG_DHCP = re.compile(rb"\rIP address (\d+\.\d+\.\d+\.\d+) from DHCP\r\n")
+# What BASIC prints when it waits for the next line
+READY = b"READY.\r\n"
 
 T = TypeVar("T")
 
@@ -300,7 +302,7 @@ def require(name: str, ok: bool, detail: str = "") -> None:
 
 def cleanup(port: str, baud: int) -> None:
     """Starts the core from the ROM, shown again, so that the board ends
-    with the monitor at its prompt, on the screen and on the serial port,
+    with BASIC at READY., on the screen and on the serial port,
     as the reset button leaves it. The link holds the core first, which
     it does whether a program runs or not, and disables the breakpoints
     and the watchpoints, as a check that stopped early may have left one
@@ -1544,7 +1546,7 @@ def i2c_write(link: Link, chip: int, reg: int, data: list[int],
 
 def rtc_set(link: Link, rv: bool) -> None:
     """Sets the MEGA65's real-time clock to the host's local time, at the
-    start of a second, as the monitor's time writes it (monitor/clock.c),
+    start of a second, as BASIC's TIME writes it (monitor/clock.c),
     and checks it: the time read back, and the flags that say that it lost
     its time cleared."""
     at = int(time.time()) + 2
@@ -1584,7 +1586,7 @@ def test_clock(link: Link) -> None:
     """The clock of the time of day: set to the host's local time, as the
     clock keeps local time (issue #109), it is set, and counts one second
     in a second of the host, also over a start, which keeps it. It is
-    left at the host's local time, which the monitor's time shows."""
+    left at the host's local time, which BASIC's TIME shows."""
     now = time.time()
     now += time.localtime(now).tm_gmtoff
     sec = int(now)
@@ -1789,7 +1791,7 @@ class Unread(Exception):
 
 
 def fat32_dir(link: Link, name: str) -> list[str] | None:
-    """The rows of the monitor's dir for the card in the selected slot,
+    """The rows of BASIC's DIR for the card in the selected slot,
     from its folder FOLDER, as tools/sdcard.py reads FAT32 over the link,
     or the monitor's error when the root has no such folder. None when a
     sector cannot be read, and when the card has no FAT32 file system that
@@ -1807,13 +1809,13 @@ def fat32_dir(link: Link, name: str) -> list[str] | None:
     except FileError as e:
         if e.code == E_NOFOLDER:
             return [str(e)]
-        uncovered.append(f"{name}'s files, as the monitor's dir gives {e}")
+        uncovered.append(f"{name}'s files, as BASIC's DIR gives {e}")
         return None
 
 
 def test_sd(link: Link, board: str) -> dict[int, list[str]]:
     """The SD card controller at FFFFFFA0-AF, with the core held, as the
-    header says. It only reads the cards. The rows of the monitor's dir for
+    header says. It only reads the cards. The rows of BASIC's DIR for
     each slot whose card has a FAT32 file system, as test_fat_dir checks
     them."""
     fat: dict[int, list[str]] = {}
@@ -1911,8 +1913,8 @@ def counter(link: Link, lo: int) -> int:
 
 def test_fat_dir(link: Link, fat: dict[int, list[str]]) -> None:
     """The monitor of the tests, loaded and started, lists the folder
-    FOLDER of each card in fat with dir SLOT as the host listed it, or
-    says that the card has none, then halts with h."""
+    FOLDER of each card in fat with DIR SLOT as the host listed it, or
+    says that the card has none, then halts with HALT."""
     if not fat:
         return
     subprocess.run(["make", "-s", "-C", f"{REPO}/monitor",
@@ -1920,28 +1922,28 @@ def test_fat_dir(link: Link, fat: dict[int, list[str]]) -> None:
     load(link, f"{REPO}/monitor/build/monitor_test.bin")
     console(link)                      # the banner
     for slot, want in fat.items():
-        cmd = f"dir {slot}\r".encode()
+        cmd = f"DIR {slot}\r".encode()
         link.send_console(cmd)
         text = b""
         end = time.monotonic() + 30.0
         while time.monotonic() < end:
             link.poll(0.1)
             text += link.take_console()
-            if b"> " in text.partition(cmd)[2]:
-                break                  # the prompt after the listing
-        # The rows after the echo of the command, whose CR the monitor
-        # ends with an LF, up to the prompt
+            if READY in text.partition(cmd)[2]:
+                break                  # READY. after the listing
+        # The rows after the echo of the statement, whose CR BASIC ends
+        # with an LF, up to READY.
         said = text.partition(cmd)[2].decode("latin-1").removeprefix("\n")
-        rows = said.split("\r\n")[:-1]
+        rows = said.partition("READY.\r\n")[0].split("\r\n")[:-1]
         bad = [i for i, (a, b) in enumerate(zip(rows, want)) if a != b]
         what = (f"lists the {len(want) - 2} entries of {FOLDER}"
                 if len(want) > 1 else f"finds no folder {FOLDER}")
-        check(f"SD slot {slot}: the monitor's dir {what} as the host reads the card",
+        check(f"SD slot {slot}: BASIC's DIR {what} as the host reads the card",
               rows == want,
               f"{len(rows)} rows, want {len(want)}"
               + (f"; first difference {rows[bad[0]]!r}, want "
                  f"{want[bad[0]]!r}" if bad else ""))
-    link.send_console(b"h\r")
+    link.send_console(b"HALT\r")
     console(link, 1.0)
 
 
@@ -1970,8 +1972,8 @@ def test_primes(link: Link, primes: str, board: str) -> None:
           micros == cycles // mhz, f"{micros} of {cycles} cycles")
 
 
-# The monitor's command that runs the demo at 0x8000 (demo/)
-DEMO_KEY = b"r\r"
+# BASIC's statement that runs the demo at 0x8000 (demo/)
+DEMO_KEY = b"SYS 0x8000\r"
 
 
 def monitor_demo() -> str:
@@ -2000,7 +2002,7 @@ def comparisons(tmp: str) -> list[tuple[str, list[str], bool]]:
     fpustack = assemble(f"{REPO}/nice_cpu/emulator/test/fpustack.nasm", tmp)
     fpudec = assemble(f"{REPO}/nice_cpu/emulator/test/fpudec.nasm", tmp)
     # The monitor and the demo, with the version of their tests, loaded at
-    # 0 as any program, and the monitor's r and a few keys for the demo
+    # 0 as any program, and BASIC's SYS 0x8000 and a few keys for the demo
     demo = monitor_demo()
     keys = os.path.join(tmp, "keys.txt")
     with open(keys, "wb") as f:
@@ -2076,7 +2078,7 @@ def test_monitor(link_args: list[str], tmp: str, in_rom: bool = False,
     niceemu, on the two joined, with r and h, the commands that run it and
     halt the core, in the input. The two must print the same and exit with
     the same status, but for the steps, as the monitor waits for input in
-    a loop. Then the monitor's l gets the lines of a .bin file pasted,
+    a loop. Then BASIC's LOAD gets the lines of a .bin file pasted,
     with a word of 0 at 0x8000 loaded before, so that the r run.py types
     finds no program, and r runs what l wrote: a program that returns
     0x2A, assembled here, or with long hello.bin itself, 600 lines at the
@@ -2099,15 +2101,15 @@ def test_monitor(link_args: list[str], tmp: str, in_rom: bool = False,
                 f.write(g.read())
     halt = os.path.join(tmp, "h.txt")
     with open(halt, "wb") as f:
-        f.write(b"h\r")
+        f.write(b"HALT\r")
     run_py = [sys.executable, f"{REPO}/tools/run.py"] + link_args + [
         "--timeout", f"{RUN_TIMEOUT:g}", "--monitor"]
     # The keys, the program run.py loads, and what niceemu runs
-    inputs = [("", b"h\r", hello, joined)]
+    inputs = [("", b"HALT\r", hello, joined)]
     if long:
-        inputs.append((" with d 8000 700", b"d 8000 700\rh\r", hello,
-                       joined))
-    # l: the lines of a .bin file, each ended by LF, and an empty line, CR,
+        inputs.append((" with DUMP 0x8000, 0x700", b"DUMP 0x8000, 0x700\rHALT\r",
+                       hello, joined))
+    # LOAD: the lines of a .bin file, each ended by LF, and an empty line, CR,
     # which ends the load. run.py loads a word of 0 at 0x8000, no program,
     # as niceemu has there with the monitor alone.
     none = os.path.join(tmp, "none.bin")
@@ -2125,8 +2127,8 @@ def test_monitor(link_args: list[str], tmp: str, in_rom: bool = False,
         paste = assemble(ret, tmp)
     with open(paste, "rb") as f:
         lines = f.read()
-    inputs.append((f" with l, {os.path.basename(paste)} pasted, and r",
-                   b"l\r" + lines + b"\rr\rh\r", none, monitor))
+    inputs.append((f" with LOAD, {os.path.basename(paste)} pasted, and SYS 0x8000",
+                   b"LOAD\r" + lines + b"\rSYS 0x8000\rHALT\r", none, monitor))
     if os.path.exists(NICEEMU):
         for name, keys, prog, emu_prog in inputs:
             board_in = os.path.join(tmp, "monitor_in.txt")
@@ -2134,7 +2136,7 @@ def test_monitor(link_args: list[str], tmp: str, in_rom: bool = False,
                 f.write(keys)
             emu_in = os.path.join(tmp, "monitor_rin.txt")
             with open(emu_in, "wb") as f:
-                f.write(b"r\r" + keys)
+                f.write(b"SYS 0x8000\r" + keys)
             emu = subprocess.run([NICEEMU, "-i", emu_in, "-s", emu_prog],
                                  stdin=subprocess.DEVNULL, capture_output=True)
             board = subprocess.run(run_py + ["--rom", monitor, "-i", board_in,
@@ -2274,21 +2276,21 @@ def paused(link: Link, addrs: list[int]) -> list[int] | None:
 
 
 def test_eth_ip(link: Link, rom: str, ip: str) -> list[int] | None:
-    """Loads the monitor, and types its i, the IP address, and CR, as
-    console bytes, which i writes to the station. Returns the station's counts of the good frames received and
-    the frames sent, or None if the address did not come."""
+    """Loads the monitor, and types BASIC's IP "A.B.C.D" and CR, as
+    console bytes, which IP writes to the station. Returns the station's
+    counts of the good frames received and the frames sent, or None if the address did not come."""
     want = struct.unpack(">I", socket.inet_aton(ip))[0]
     load(link, rom)
     time.sleep(QUIET)                  # the monitor's banner
     room = link.free()
-    link.send_console(b"i " + ip.encode() + b"\r")
+    link.send_console(b'IP "' + ip.encode() + b'"\r')
     # Until the monitor has taken every key, then the time for the CR
     end = time.monotonic() + 10 * QUIET
     while link.free() < room and time.monotonic() < end:
         link.poll(0.05)
     link.poll(QUIET)
     got = paused(link, [NET_IP, NET_RX_GOOD, NET_TX, NET_STATUS])
-    if not check(f"eth: the monitor's i typed over the UART gives the IP "
+    if not check(f"eth: BASIC's IP typed over the UART gives the IP "
                  f"address {ip}",
                  got is not None and got[0] == want,
                  "no pause" if got is None else f"{got[0]:08X}"):
@@ -2393,7 +2395,7 @@ def test_eth_tcp(eth: str, ip: str, tmp: str, listen: bool = False) -> None:
                 f"00009002 {TCP_BYTES:08X}\n")
     halt = os.path.join(tmp, "h.txt")
     with open(halt, "wb") as hf:
-        hf.write(b"h\r")
+        hf.write(b"HALT\r")
     board = subprocess.run(
         [sys.executable, f"{REPO}/tools/run.py", "--eth", eth, "--timeout",
          f"{RUN_TIMEOUT + 20:g}", "--monitor", "--rom",
@@ -2452,34 +2454,34 @@ def test_eth_bg_dhcp(link: Link, rom: str) -> None:
 
 
 def test_eth_dhcp(port: str, baud: int, rom: str) -> None:
-    """Loads the monitor, and types its i dhcp over the UART. When a
+    """Loads the monitor, and types its DHCP over the UART. When a
     server answers, the address shown must be the station's, the port
-    for Ethernet frames enabled for the lease's renewal at the prompt,
+    for Ethernet frames enabled for the lease's renewal at READY.,
     and ping must reach the board there. No answer is a gap in the coverage."""
     link = Link(Serial(port, baud))
     try:
         load(link, rom)
         console(link)                  # the banner
-        link.send_console(b"i dhcp\r")
+        link.send_console(b"DHCP\r")
         text = b""
         end = time.monotonic() + DHCP_TIME + 10 * QUIET
         while time.monotonic() < end:
             link.poll(0.1)
             text += link.take_console()
-            if b"> " in text.partition(b"i dhcp")[2]:
-                break                  # the prompt after the answer
-        said = text.partition(b"i dhcp")[2].decode("latin-1")
+            if READY in text.partition(b"DHCP\r")[2]:
+                break                  # READY. after the answer
+        said = text.partition(b"DHCP\r")[2].decode("latin-1")
         if "No answer from a DHCP server" in said:
-            print("  no DHCP server answered the monitor's i dhcp",
+            print("  no DHCP server answered BASIC's DHCP",
                   flush=True)
-            uncovered.append("the monitor's i dhcp, as no DHCP server "
+            uncovered.append("BASIC's DHCP, as no DHCP server "
                              "answered on the board's network")
             return
         dotted = r"(\d+\.\d+\.\d+\.\d+)"
         got = re.search(rf"IP address {dotted}\r\nMask {dotted}\r\n"
                         rf"Gateway {dotted}\r\nDNS server {dotted}\r\n"
                         rf"DHCP server {dotted}", said)
-        if not check("eth: the monitor's i dhcp gets an address from the "
+        if not check("eth: BASIC's DHCP gets an address from the "
                      "network's DHCP server", got is not None,
                      repr(said) if got is None else
                      f"{got[1]}, mask {got[2]}, gateway {got[3]}, "
@@ -2489,16 +2491,16 @@ def test_eth_dhcp(port: str, baud: int, rom: str) -> None:
         addr = got[1]
         words = paused(link, [NET_IP, ETH_CSR])
         want = struct.unpack(">I", socket.inet_aton(addr))[0]
-        # Back at the prompt, the monitor keeps the port enabled to renew
+        # Back at READY., the monitor keeps the port enabled to renew
         # the lease (issue #126); a server's lease that never ends, which
         # it does not keep, would leave it disabled
-        check("eth: the station has the address of i dhcp, and the port is "
-              "enabled for the lease at the prompt", words == [want, 1],
+        check("eth: the station has the address of DHCP, and the port is "
+              "enabled for the lease at READY.", words == [want, 1],
               "no pause" if words is None else
               f"{words[0]:08X} {words[1]:08X}")
         ping = subprocess.run(["ping", "-c", "3", "-W", "2", addr],
                               capture_output=True, text=True)
-        check(f"eth: ping answered at {addr}, the address of i dhcp",
+        check(f"eth: ping answered at {addr}, the address of DHCP",
               ping.returncode == 0,
               "" if ping.returncode == 0 else
               repr(ping.stdout + ping.stderr))
@@ -2508,7 +2510,7 @@ def test_eth_dhcp(port: str, baud: int, rom: str) -> None:
 
 
 def test_eth_ntp(link: Link) -> None:
-    """Types the monitor's time ntp over the UART, after i dhcp, with the
+    """Types BASIC's NTP over the UART, after DHCP, with the
     offset of the host's local time, and the server that the monitor
     picks: DHCP's, or pool.ntp.org (issue #127). The clock it sets must be
     the host's local time within NTP_SLACK seconds. No server, no DNS
@@ -2517,30 +2519,30 @@ def test_eth_ntp(link: Link) -> None:
     gmtoff = time.localtime(now).tm_gmtoff
     sign, hm = "+" if gmtoff >= 0 else "-", abs(gmtoff) // 60
     zone = f"{sign}{hm // 60:02d}:{hm % 60:02d}"
-    cmd = f"time ntp {zone}".encode()
+    cmd = f'NTP "", "{zone}"'.encode()
     link.send_console(cmd + b"\r")
     text = b""
     end = time.monotonic() + NTP_TIME
     while time.monotonic() < end:
         link.poll(0.1)
         text += link.take_console()
-        if b"> " in text.partition(cmd)[2]:
-            break                      # the prompt after the answer
+        if READY in text.partition(cmd)[2]:
+            break                      # READY. after the answer
     said = text.partition(cmd)[2].decode("latin-1")
     got = re.search(r"Clock set (\d{4}-\d\d-\d\d \d\d:\d\d:\d\d) from (\S+?)[,\r]", said)
     if got is None and re.search(r"No answer from the|No DNS server|No such name", said):
-        print(f"  the monitor's time ntp found no time server: {said.split(chr(13))[0]!r}",
+        print(f"  BASIC's NTP found no time server: {said.split(chr(13))[0]!r}",
               flush=True)
-        uncovered.append("the monitor's time ntp, as no time server answered")
+        uncovered.append("BASIC's NTP, as no time server answered")
         return
-    if not check("eth: the monitor's time ntp sets the clock", got is not None, repr(said)):
+    if not check("eth: BASIC's NTP sets the clock", got is not None, repr(said)):
         return
     assert got is not None
     # The read of CLOCK_USEC takes the snapshot of the seconds
     words = paused(link, [CLOCK_USEC, CLOCK_SEC_LO, CLOCK_STATUS])
     host = time.time() + gmtoff
     off = 0.0 if words is None else words[1] + words[0] / 1e6 - host
-    check(f"eth: time ntp, from {got[2]}, gives the host's local time "
+    check(f"eth: NTP, from {got[2]}, gives the host's local time "
           f"within {NTP_SLACK} s", words is not None and words[2] == 1
           and abs(off) < NTP_SLACK, "no pause" if words is None else f"{off:+.2f} s")
 
@@ -2548,7 +2550,7 @@ def test_eth_ntp(link: Link) -> None:
 def test_eth(port: str, baud: int, eth: str,
              programs: list[tuple[str, list[str], bool]], rom: str,
              udp: str, tmp: str) -> None:
-    """The Ethernet station, last of all: the monitor's i gives it the IP
+    """The Ethernet station, last of all: BASIC's IP gives it the IP
     address of eth's HOST from keys over the UART, ping gets the answers,
     the link over TCP reaches the monitor, and the programs run over it as
     over the UART. A board that receives no frame at all is not connected,

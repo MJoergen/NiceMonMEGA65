@@ -7,7 +7,7 @@ niceemu, with --eth-udp and --eth-peer, whose frames go to
 tools/tcppeer.py, the host 10.0.0.2, which serves HTTP on port 80 with
 an answer of examples/test/ (the answers of the host's test,
 weather_test.c). The card in slot 0 has NICE/WEATHER.CFG with the server
-10.0.0.2, so no DNS server is needed, and the monitor's i 10.0.0.9 gives
+10.0.0.2, so no DNS server is needed, and BASIC's IP "10.0.0.9" gives
 the address. Each case runs to a step limit, then reads the screen's
 words with --dump, as --screen shows no code above 0x7E, and checks its
 rows, and the request that the peer got. It checks first that the program fits
@@ -171,7 +171,7 @@ def answer(name: str) -> bytes:
 
 
 CFG = "# the peer of the test\nplace Copenhagen\nserver 10.0.0.2\nunits m\n"
-KEYS = "i 10.0.0.9\rr\r"
+KEYS = 'IP "10.0.0.9"\rSYS 0x8000\r'
 ROW_CLOCK, ROW_DATE, ROW_PLACE, ROW_COND, ROW_VALUES = 3, 8, 11, 13, 15
 ROW_STATUS, ROW_ERROR, ROW_CFG, ROW_KEYS = 18, 19, 21, 24
 C_ERR = 0x000F66
@@ -257,15 +257,15 @@ def cases(tmp: str) -> None:
           r.row(ROW_CFG) == "" and script.request == REQUEST,
           f"{r.row(ROW_CFG)!r} {script.request!r}")
 
-    r = Run(tmp, "r\rOsx\x7flo", None, None, steps=20_000_000)
+    r = Run(tmp, "SYS 0x8000\rOsx\x7flo", None, None, steps=20_000_000)
     check("no WEATHER.CFG: the place is asked for, and typed with a DEL",
           "Type the place" in r.row(ROW_PLACE - 1) and r.row(ROW_PLACE + 1) == "Oslo_",
           f"{r.row(ROW_PLACE - 1)!r} {r.row(ROW_PLACE + 1)!r}")
 
-    r = Run(tmp, "r\r\x1bh\r", None, None)
+    r = Run(tmp, "SYS 0x8000\r\x1bHALT\r", None, None)
     check("no WEATHER.CFG: ESC returns to the monitor", "Returned 00000000" in r.out,
           r.out[-400:])
-    r = Run(tmp, KEYS + "qh\r", CFG, answer("ok.http"))
+    r = Run(tmp, KEYS + "qHALT\r", CFG, answer("ok.http"))
     check("Q returns to the monitor", "Returned 00000000" in r.out, r.out[-400:])
 
 

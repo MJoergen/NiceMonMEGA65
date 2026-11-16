@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Run the monitor's i dhcp in niceemu, against frames of --eth-in.
+"""Run BASIC's DHCP in niceemu, against frames of --eth-in.
 
 Usage: test/dhcp.py NICEEMU MONITOR.bin NETDHCP.bin EXPECTED OUT
 
-The monitor runs with the input i 10.0.0.9, i dhcp, i, and h, and
+The monitor runs with the input IP "10.0.0.9", DHCP, IP, and HALT, and
 --step-time, so that a run takes the same steps each time, and the
 microseconds that start the transaction, V_XID, are the same in each run.
 The first run has no frames: the monitor sends DHCP_TRIES DISCOVERs, says
@@ -20,7 +20,7 @@ with option 50.
 - nak: an OFFER, a NAK of the REQUEST, which starts again from a
   DISCOVER, a second OFFER of another address, and its ACK.
 The runs entry-none and entry run NETDHCP.bin, test/netdhcp.nasm, under
-the monitor, with the input r and h: a program that calls net_dhcp,
+the monitor, with the input SYS 0x8000 and HALT: a program that calls net_dhcp,
 entry 23, with the address 192.168.1.50 set and the UDP endpoint open.
 entry-none has no frames, and net_dhcp returns E_NODHCP; entry has, after
 the DISCOVER, an ARP reply of 192.168.1.1, which is learned while
@@ -46,8 +46,8 @@ from typing import List, Optional, Tuple
 
 MAC = bytes.fromhex("024E49434500")      # the station's after reset
 BCAST = b"\xff" * 6
-INPUT = b"i 10.0.0.9\ri dhcp\ri\rh\r"
-INPUT_PROG = b"r\rh\r"
+INPUT = b'ip "10.0.0.9"\rdhcp\rip\rhalt\r'
+INPUT_PROG = b"sys 0x8000\rhalt\r"
 STEPS = 30_000_000
 DUMPS = ["-d", "0xFFFFFFB0:1", "-d", "0xFFFFFFC0:1"]
 DUMPS_PROG = ["-d", "0x9100:14"]

@@ -20,9 +20,9 @@ prints its options with `--help`, and its header says more.
 | `jtag.py` | The JTAG cable of the board's UART, and the check that the board is the one a bitstream or core file was built for, which `hwtest.py` and `flash.py` use. |
 | `spiflash.py` | The MEGA65's flash through openFPGALoader's bridge, which `flash.py` uses to clear the protection of its sectors. |
 | `linktest.py` | Checks `run.py` and the link on `niceemu --link` against plain `niceemu`, without a board. |
-| `tftpd.py` | A TFTP server for the monitor's `tftp`, which also lists the files of its folder for a name with `*` or `?`. |
+| `tftpd.py` | A TFTP server for BASIC's `LOAD` and `DIR`, which also lists the files of its folder for a name with `*` or `?`. |
 | `sdtest.py` | Checks `sdcard.py` and `sdnbd.py` on `niceemu --link` with images of a card, without a board. |
-| `tftptest.py` | Checks `tftpd.py`, and the monitor's `tftp` in `niceemu` against it, without a board. |
+| `tftptest.py` | Checks `tftpd.py`, and BASIC's TFTP in `niceemu` against it, without a board. |
 | `tcptest.py` | Checks the monitor's TCP in `niceemu` against `tcppeer.py`, and its timers with `--step-time`, without a board. |
 | `tcppeer.py` | A TCP peer of its own on `niceemu`'s frames, with a script for each port, and for each connection it opens to a port where the board listens, for `tcptest.py`. |
 | `weathertest.py` | Checks the weather display, `examples/weather.c`, in `niceemu` against `tcppeer.py`, without a board. |
@@ -80,9 +80,9 @@ The board serves remote control on TCP port 4510 of its Ethernet
 station, once it has an IP address
 ([DEBUG_LINK.md](../doc/DEBUG_LINK.md#the-debug-link-over-tcp)). After reset it
 has none, and the monitor gets one from the network's DHCP server on
-its own, and shows it over its prompt
-([README](../README.md#giving-the-board-an-address)). The monitor's `i`
-sets another, `i 192.168.1.65` at the prompt, and the demo's F11 does
+its own, and shows it after BASIC's `READY.`
+([README](../README.md#giving-the-board-an-address)). BASIC's `IP`
+sets another, `IP "192.168.1.65"`, and the demo's F11 does
 too: I types a new IP address. Then use `--eth` with any tool:
 
     tools/run.py --eth 192.168.1.65 prog.bin
@@ -187,8 +187,8 @@ nice_cpu's `start_mon.nasm`, or built with `nicebuild.py --monitor`
 
 `load.py` holds the core and clears the memory with the ROM visible,
 writes the program, and starts the core. The monitor boots cold, which
-leaves the RAM from `0x8000` alone, and `load.py` types `r` and CR, its
-command that runs the program. The program then prints through the
+leaves the RAM from `0x8000` alone, and `load.py` types `SYS 0x8000`
+and CR, BASIC's statement that runs the program. The program then prints through the
 monitor's `mon_putc`, on the screen and the line, and returns to the
 monitor, which prints its status. A program with a word below `0x8000`
 is refused, and so is one with a word at the monitor's variables or
@@ -198,16 +198,16 @@ FILE at 0 in place of the ROM, with the ROM hidden, such as
 `monitor/build/monitor.bin`: for `niceemu --link`, `make cosim`, a
 bitstream without a ROM, or another build of the monitor.
 
-`run.py --monitor` does the same, with `r` and CR before the input, and
-`--rom FILE` too, and prints what `niceemu` prints for the monitor and
-the program joined. The monitor reads on at the end of the input, so
-the input ends with its `h`, which halts the core, as in the monitor's
-tests:
+`run.py --monitor` does the same, with `SYS 0x8000` and CR before the
+input, and `--rom FILE` too, and prints what `niceemu` prints for the
+monitor and the program joined. The monitor reads on at the end of the
+input, so the input ends with BASIC's `HALT`, which halts the core, as
+in the monitor's tests:
 
-    printf 'h\r' > h.txt
+    printf 'HALT\r' > h.txt
     tools/run.py --tcp PORT --monitor --rom monitor/build/monitor_test.bin \
         -i h.txt monitor/build/hello.bin
-    printf 'r\rh\r' > rh.txt
+    printf 'SYS 0x8000\rHALT\r' > rh.txt
     cat monitor/build/monitor_test.bin monitor/build/hello.bin > joined.bin
     niceemu -i rh.txt joined.bin
 
@@ -426,7 +426,7 @@ JTAG cable on the same USB device:
   that is already programmed. Programming needs Linux; with
   `--no-program` the script runs wherever `load.py` does.
 - `--eth HOST` tests the Ethernet station too, after every other check:
-  it gives the board the IP address HOST through the monitor's `i`,
+  it gives the board the IP address HOST through BASIC's `IP`,
   pings it, and runs the programs over TCP. Without `--eth`, or when no
   frame reaches the station, the summary names the station after NOT
   COVERED, and the run still passes.
@@ -473,7 +473,7 @@ writes the card's FAT32 itself, as the monitor does, and only the
 monitor's folder `NICE` (see
 [SYSTEM.md](../doc/SYSTEM.md#the-sd-card-slots)), which it can make:
 
-- `ls` lists the folder as the monitor's `dir` does, with the long names
+- `ls` lists the folder as BASIC's `DIR` does, with the long names
   after the rows.
 - `get NAME [DEST]` copies a file to `DEST`, by default its name in the
   current directory, or with `-` to stdout. The name it writes is the
@@ -481,7 +481,7 @@ monitor's folder `NICE` (see
   card's long name with a path in it writes nowhere else.
 - `put SRC [NAME]` writes the host's file `SRC`, or stdin for `-`, as the
   file `NAME`, by default `SRC`'s own name. It makes the file, or
-  truncates it when it is there, as the monitor's `save` does.
+  truncates it when it is there, as BASIC's `SAVE` does.
 - `del NAME` deletes a file, with its long name, if it has one.
 - `mkdir` makes the folder in the root of a card that has FAT32 but not
   the folder, which the monitor never makes, or says that it is there
@@ -515,10 +515,10 @@ The core can be in any state. `put`, `del`, and `mkdir` hold a running
 or paused core, and start it again from reset after the write, as the
 monitor keeps a sector of the FAT and its mount between commands, which
 the write makes stale. So a program at `0x8000` under the monitor is gone
-afterwards, and the monitor shows its prompt again. A held core stays
+afterwards, and the monitor shows `READY.` again. A held core stays
 held. For `ls` and `get`, a running core is paused for the reads,
 and goes on after them. While it is paused, the tool uses the program's
-card as it is: its slot, which the monitor's `dir` or `load` must have
+card as it is: its slot, which BASIC's `DIR` or `LOAD` must have
 started up, and it puts back `SD_LBA`, `SD_CHUNK`, and the buffer at the
 end. `--slot` of another slot is refused then. While the core is held or
 has halted, the tool takes the slot of `--slot`, or slot 0, or slot 1
@@ -529,7 +529,7 @@ start it again from reset afterwards, as `put` and `del` do, so that
 they read any slot, whatever the program had. Without it, they need the
 program's own card: after a write, the monitor starts again with slot 0
 selected, so with the card in slot 1 an `ls` while it runs needs a
-`dir 1` on the board first, or `--hold`:
+`DIR 1` on the board first, or `--hold`:
 
 ```
 tools/sdcard.py --eth 192.168.1.65 --slot 1 put prog.bas
@@ -632,7 +632,7 @@ read-ahead 4 KB, on the disk that `nbd-client` connected.
   `ARGS="--eth IP"` or `ARGS=--publish` the rest
   ([RELEASE.md](../doc/RELEASE.md)).
 - `tools/tftpd.py [--dir DIR] [--port PORT]` serves the files of a
-  folder, the current one by default, to the monitor's `tftp`, on port
+  folder, the current one by default, to BASIC's `LOAD` and `DIR`, on port
   69 or another, with a listing for a name with `*` or `?`.
   `make tftpd [TFTP_DIR=DIR] [TFTP_PORT=PORT]` serves `examples/build`
   ([monitor/README.md](../monitor/README.md#the-network)).

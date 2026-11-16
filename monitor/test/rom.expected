@@ -1,18 +1,23 @@
 NiceMon V9.9
-? lists the commands
-> r
+HELP lists the statements
+READY.
+sys 0x8000
 Hello from the ROM's C code
 Trap 1 at _rom_trap
-> r
+READY.
+sys 0x8000
 Hello from the ROM's C code
 Trap 1 at _rom_trap
-> r 8100
+READY.
+sys 0x8100
 NiceMon V9.9
-? lists the commands
-> r
+HELP lists the statements
+READY.
+sys 0x8000
 Hello from the ROM's C code
 Trap 1 at _rom_trap
-> h
+READY.
+halt
 Halted
 00009100: 00000003 00000007 00000008 00000000 00000009 0000000a 0000000a 00000007
 00009108: 00000008 00000000
@@ -20,11 +25,13 @@ Halted
 ffffff8d: 00080000
 Screen:
 |NiceMon V9.9
-|? lists the commands
-|> r
+|HELP lists the statements
+|READY.
+|sys 0x8000
 |Hello from the ROM's C code
 |Trap 1 at _rom_trap
-|> h
+|READY.
+|halt
 |Halted
 VBASE at the halt 000000
 exit 0
