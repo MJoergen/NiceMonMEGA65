@@ -1,0 +1,150 @@
+== TAB after a quote, in another case and in the same, of an alias, in words after blanks and strings, and a list longer than the screen
+NiceMon V9.9
+HELP lists the statements
+READY.
+load "MY^H^Hmy prog.bin" ^C
+load "mandelbrot^C
+load _^C
+load MYPROG^C
+load ""^C
+dir "my prog.bin" ^C
+  load my^H^H"my prog.bin" ^C
+ load  "my prog.bin" ^C
+load x"my^C
+load "my prog.bin" my^H^H"my prog.bin" ^C
+load "Mixed.b^H^H^H^H^H^H^Hmixed.Bin" ^C
+load "across a sector.bin" ^C
+load "
+my prog.bin
+mixed.Bin
+lower.bin
+mandelbrot1.txt
+mandelbrot2.txt
+nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn.txt
+PAD01.TXT
+PAD02.TXT
+PAD03.TXT
+PAD04.TXT
+PAD05.TXT
+PAD06.TXT
+PAD07.TXT
+PAD08.TXT
+PAD09.TXT
+PAD10.TXT
+across a sector.bin
+PAD11.TXT
+PAD12.TXT
+PAD13.TXT
+PAD14.TXT
+PAD15.TXT
+PAD16.TXT
+PAD17.TXT
+PAD18.TXT
+PAD19.TXT
+PAD20.TXT
+PAD21.TXT
+PAD22.TXT
+PAD23.TXT
+across a cluster.bin
+BADSUM~1.BIN
+load "^C
+load p^H"PAD^C
+load pad
+PAD01.TXT
+PAD02.TXT
+PAD03.TXT
+PAD04.TXT
+PAD05.TXT
+PAD06.TXT
+PAD07.TXT
+PAD08.TXT
+PAD09.TXT
+PAD10.TXT
+PAD11.TXT
+PAD12.TXT
+PAD13.TXT
+PAD14.TXT
+PAD15.TXT
+PAD16.TXT
+PAD17.TXT
+PAD18.TXT
+PAD19.TXT
+PAD20.TXT
+PAD21.TXT
+PAD22.TXT
+PAD23.TXT
+load pad^C
+halt
+Halted
+exit 0
+Slot 0: The card as lfn.img was
+== TAB with slot 1 mounted by DIR 1: its names, a directory left out, and names that end at the line's end, 76 characters, or past it
+NiceMon V9.9
+HELP lists the statements
+READY.
+dir 1
+Directory of NICE
+HELLO.BIN                      14184
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.bin
+                                   0
+bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.bin
+                                   0
+hdir                           <DIR>
+Files: 3, directories: 1
+READY.
+load h^H"HELLO.BIN" ^C
+load hd^C
+load a^H"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.bin" ^C
+load b^C
+load "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.bin" ^C
+load "b^C
+halt
+Halted
+exit 0
+Slot 0: The card as lfn.img was
+Slot 1: The card as tab1.img was
+== TAB after SAVE and DELETE
+NiceMon V9.9
+HELP lists the statements
+READY.
+load z^C
+save "zebra", 0x8000, 1
+Words saved: 1, 00008000 to 00008000
+READY.
+load z^H"zebra.BIN" ^C
+save "Hz", 0x8000, 1
+Words saved: 1, 00008000 to 00008000
+READY.
+load h
+HELLO.BIN
+Hz.BIN
+load h^C
+delete "zebra.bin"
+Deleted zebra.bin
+READY.
+load z^C
+halt
+Halted
+exit 0
+Slot 0: What the card holds that super.img did not:
+Sectors changed outside the volume: none
+FSInfo free count: 0001F7E0 -> FFFFFFFF
+FSInfo next free: 0000001F -> 00000020
+FAT entries changed: 1
+  33: 00000000 -> 0FFFFFFF
+FAT 2: the same changes
+NICE C3 entry 3:
+  was zeros
+  now "\xe5EBRA   BIN" attr 20 case 08 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 32 size 18
+NICE C3 entry 4:
+  was zeros
+  now long 41 "Hz.BIN\u0000\uffff\uffff\uffff\uffff\uffff\uffff" attr 0F type 00 sum 86 cluster 0000
+NICE C3 entry 5:
+  was zeros
+  now "HZ      BIN" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 33 size 18
+C32, of no file: 18 bytes not 0, SHA-256 c440f3b4c55e0e5c
+NICE/HZ.BIN: 18 bytes, "00008000 00000000\x0a"
+NICE/HZ.BIN: its sector 0 past the size: 494 bytes, zeros
+Sector writes, 17:
+mount 0, C3, FSInfo, FAT1+0, FAT2+0, C32, C3, FSInfo, C3, FAT1+0, FAT2+0,
+C33, C3, FSInfo, C3, FAT1+0, FAT2+0, FSInfo

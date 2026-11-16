@@ -429,7 +429,19 @@ needs `FOLDER=NICE`, the default. It runs these steps in order:
    12-hour mode, its flag that says that it lost its time, digits over
    9, and no chip at all. Then it types `TIME`, and checks each
    transaction with its data, for each chip.
-10. **The runs.** The monitor runs once for each test below, with its
+10. **The suites of FAT32.** `test/fat_runs.py` runs the suites of
+   `FAT_SUITES`, each a few runs of the monitor with `--step-time` on
+   copies of the cards below, and compares each with
+   `test/SUITE.expected`. A run types its input, and may run a program
+   that `test/fat_tool.py` builds from a file of `fs_*` calls,
+   `test/SUITE.ops`: its output has each call with its arguments and its
+   result. Then it shows what each card holds that its image did not
+   (`fat_tool.py diff`, below), and, for some runs, `fsck.fat -n` and
+   the order of the sector writes (`fat_tool.py order`). The behavior
+   of the C code that is odd but pinned, until a change of its own fixes
+   it, is marked "known oddity" in the titles and the `.ops` files.
+   The suites are in the table below the next one.
+11. **The runs.** The monitor runs once for each test below, with its
    keystrokes from an input file that ends with `HALT`, so that the run
    halts. Some runs add a program at `0x8000`, SD card images, or
    Ethernet frames.
@@ -473,11 +485,39 @@ monitor's sources, and only their words from `0x8000` are kept. `fs`,
 `fsw`, `hello`, and `hello_c` call the entries through `mon.nasm`'s
 stubs, as any program does, and so do `udp` and `net`. `arp`, `udp`, and
 `net` run with `--step-time`, as their timeouts count steps, and
-`time` too, so that its clock starts at 0, not set, and counts the same
-each time. `clock` and `clockpast` run with `--no-cycle-counter`, so
-that their clock stands still. The other tests run with the host's
-clock, so the files they write have the host's date, which no test
-shows.
+`fsw`, `fatw`, `fatlw`, and `time` too, so that the clock starts at 0,
+not set, and counts the same each time, and the files they write have
+the fixed date, 2026-01-01 at 00:00:00. `clock` and `clockpast` run with
+`--no-cycle-counter`, so that their clock stands still.
+
+A test that writes to a card, `fsw`, `fatw`, `fatlw`, `time`, `clock`,
+and `clockpast`, runs on a fresh copy of its image, and its output ends
+with what each card holds that the image did not, from `test/fat_tool.py
+diff`, and the order of the sector writes, from a second run with `-t`
+and `test/fat_tool.py order`. The card is so checked byte for byte:
+every byte that differs is shown, decoded, and every other byte is the
+image's. `time` sets the clock, whose seconds count steps, so its diff
+shows the times as `**`. `fsw`'s slot 1 is write-protected, and is
+compared with `cmp`.
+
+The suites of `test/fat_runs.py`, step 10:
+
+| Suite | What it checks |
+|---|---|
+| `fatstate` | What `SYS 0` and a program's return keep: a handle across the cold start, both handles left open, so that `LOAD` and `SAVE` give error 23 while `DIR` and TAB work, the mount of slot 1 forgotten, and `DIR 0`, which mounts again and closes a program's handle. |
+| `fatload` | `LOAD`'s lines (`lines.img`): CR LF, blank lines only, a chain cut after its second cluster, and lines of every kind, and the words of `V_LSTATS`. |
+| `fattab` | TAB: after a quote, in either case, an alias, words after blanks and strings, a list longer than the screen; with slot 1 mounted (`tab1.img`), a directory, and names that end at the line's end or past it; and after `SAVE` and `DELETE` (issue #145). |
+| `fatdrop` | The mount dropped under open files when `SD_SELECT` changes, and `fs_mount` under a file open to write. |
+| `fatchain` | Damaged chains (`chains.img`): a chain cut, a size past the chain, cluster 0, the last cluster, one past it, a bad mark, a loop; their reads, deletes, and a `SAVE` over one. |
+| `fatlfn` | Long names of 13 and 26 characters; damaged entries (`lfnx.img`): 0x05, orphans, a label, a broken set, a name of 256 characters; and deletes of long names across a sector and a cluster. |
+| `fatmount` | `DIR` of 27 cards that are not FAT32 or are damaged (`m_*.img`), each check of the MBR and the boot sector, the bounds of FAT12, FAT16, and FAT32, an empty folder, a folder whose chain breaks, no card, and slots from 2^31. |
+| `fatgeo` | `SAVE`, `LOAD`, `DIR`, and `DELETE` on clusters of 8 and 64 sectors, and on a card with one FAT. |
+| `fatinfo` | FSInfo: its hint, at the last cluster, free and in use, and 0xFFFFFFFF; no signature; no FSInfo in the boot sector; free entries with their top 4 bits set; and a volume larger than its FATs. |
+| `fatfull` | `fs_write` on a card with 3 free clusters, and a folder of 65536 entries. |
+| `fatrows` | `DIR`'s rows: names of 23 to 26 characters, hidden and system files, a directory, and a size of 10 digits. |
+| `fatapi` | The entries' small cases: names and modes, reads of 0 bytes, a file open twice, words above 0xFF written, a directory handle's sector, a directory in mode 1, the order of the errors, and `fs_delete` of a file open to write. |
+
+`make test FAT_SUITES=fatapi` runs one suite; `FAT_SUITES=` none.
 
 `niceemu` has no I2C master: its status word is memory, which reads 0,
 so the cold start of every run finds none, and `TIME` shows that the
@@ -507,6 +547,20 @@ mtools, so that the monitor's FAT32 is tested against those tools:
 - `fat16.img` and `exfat.img`.
 - `full.img`: FAT32 with all free clusters marked bad but three, so
   that a write fills it.
+- `lfn.img`: long names, written by mtools.
+
+The images do not depend on the host's time or its time zone: the tools
+run with `SOURCE_DATE_EPOCH` and `TZ=UTC`, so that every date is
+2025-06-15 12:34:56, and the disk's and the volume's IDs are fixed. So
+`fat_tool.py diff` can show the entries that a test did not write, too.
+
+The suites of `test/fat_runs.py` have more images, which
+`test/fat_image.py` makes from those with `test/fat_tool.py`, by
+changing bytes: `lines.img`, `tab1.img`, `chains.img`, `lfnx.img`,
+`rows.img`, `bigdir.img`, the 27 `m_*.img` of `fatmount`, the `i_*.img`
+of `fatinfo`, and `spc8.img`, `spc64.img`, and `fat1.img`, which
+`mkfs.fat` makes with those geometries. The comments in
+`test/fat_image.py` say what each holds.
 
 After `fsw` and `fatw`, `test/fat_check.py` checks the cards that were
 written: `fsck.fat -n`, the folder with `mdir`, and the files written
@@ -522,6 +576,16 @@ from `build/` to `test/`. The `Halted` line and the registers are left
 out, as they change with the code, except for VBASE, which must be 0
 after every run.
 
+A port of `fat32.c` must leave the outputs of the tests of FAT32 as
+they are, the cards and the order of the writes too. What changes with
+no fault is elsewhere: `cmds` shows the addresses of the dispatch
+table, and the table of "The ROM's words" changes with the code, which
+`make romsize` writes again. To run one test of the
+loop, run `make test FAT_SUITES=` and read its `build/NAME.out`; to run
+one suite, `make test FAT_SUITES=NAME`, whose output is
+`build/NAME.out`. A suite's output is the new expected file as it
+stands: check it, then copy it to `test/NAME.expected`.
+
 `make tftptest`, in the repository's root, runs the monitor against
 `tools/tftpd.py`, and `make tcptest` runs `test/tcp.nasm`,
 `test/tcpt.nasm`, `test/tcp_c.c`, and `test/tcphw.nasm` against
@@ -533,3 +597,40 @@ after every run.
 `make hwtest` loads the monitor of the tests into the RAM at 0, with
 the ROM hidden, and with it the demo at `0x8000`, which it runs with
 `SYS 0x8000` ([demo/](../demo/README.md), and README.md, "The demo").
+
+What `niceemu` cannot show about the SD cards is checked by hand, with
+the monitor in the ROM, after a change to `fat32.c` or its port. Each
+step needs a card prepared on a PC with a folder `NICE` that holds
+`HELLO.BIN`:
+
+1. **A card pulled out and pushed in.** `DIR` lists it. Push another
+   card in, with another `NICE`: `DIR` lists the new card, with no
+   error. Pull it out: `DIR` gives `SD error 1 in slot 0, no card`, on
+   the MEGA65 with slot 1 empty. Push it in: `LOAD "HELLO.BIN"` and
+   `SYS 0x8000` run it.
+2. **A card changed under an open file.** A program opens `HELLO.BIN`,
+   reads 100 bytes, waits for a key, and reads again. Swap the card
+   while it waits: the second read gives -28, a third -24.
+3. **A write-protected card**, by the switch of a full-size card in
+   slot 0 of the MEGA65, or an adapter: `DIR` and `LOAD` work, and
+   `SAVE "X", 0x8000, 1` and `DELETE "HELLO.BIN"` give `SD error 6 in
+   slot 0, the card is write-protected`. The PC finds the card
+   unchanged.
+4. **SDSC and SDHC.** On a card of 2 GB or less and one of 4 to 32 GB:
+   `SAVE "BIG", 0x8000, 4000`, `LOAD "BIG.BIN"`, `DIR`, and `DELETE
+   "BIG.BIN"`. Then `fsck.fat -n` on the PC reports only the free count,
+   as not known. On a card of 32 GB, half full, time a `SAVE`, as the
+   search for a free cluster starts at the hint.
+5. **Slot 1 of the MEGA65.** With no card in slot 0, `DIR` lists slot 1
+   after a reset. With cards in both, `DIR` lists slot 0, `DIR 1` slot 1,
+   `LOAD "` and TAB complete the names of slot 1, and `DIR 0` goes back.
+6. **The Nexys4DDR's one slot.** With no card, `DIR` gives `SD error 1
+   in slot 0, no card`, and `DIR 1` gives `File error 27, no such slot`.
+7. **Cards formatted by Windows and macOS**: `DIR`, `SAVE`, `LOAD`, and
+   `DELETE`, then the PC's check. An exFAT card, as SDXC cards are sold,
+   gives `File error 19, exFAT, which is not supported`.
+8. **A reset during a write.** Reset during `SAVE "BIG", 0x8000, 20000`:
+   `fsck.fat -n` reports at most lost clusters, orphan long-name
+   entries, and the free count.
+9. **A card from a camera or a phone**, with names outside ASCII: `DIR`
+   shows `?` for each such character.

@@ -6,8 +6,8 @@ monitor's writes are checked against dosfstools and mtools. With
 --stamps, the dates and the times of the 8.3 entries in NICE of those
 names follow, as the entries hold them, to the two seconds and the
 hundredths that mdir does not show: the creation's, with its hundredths,
-and the last write's. The other files' are left out, as the images get
-the time of their build.
+and the last write's. The other files' are left out, as they are the
+fixed time of test/fat_image.py, which test/fat_tool.py diff shows.
 
 The FAT32 is at the start of IMAGE, or in its partition from sector
 START when one is given, which is copied out for fsck.fat. fsck.fat's

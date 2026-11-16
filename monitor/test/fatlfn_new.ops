@@ -1,0 +1,20 @@
+; The program of the first run of the suite fatlfn of test/fat_runs.py:
+; long names of 13 and 26 characters, which fill one and two long-name
+; entries with no 0 after them, written and read back. The format is
+; test/fat_tool.py's, OPS.
+
+seg
+open 0, "thirteen.ch13", 1      ; 0: THIRTE~1.CH1 and one long-name entry
+close 0
+open 0, "twentysix_characters.ch_26", 1     ; 0: TWENTY~1.CH_ and two
+close 0
+open 0, "THIRTEEN.CH13", 0      ; 0, by the long name in another case
+close 0
+open 0, "Twentysix_Characters.CH_26", 0     ; 0
+close 0
+open 1, "", 2
+readname 1                      ; HELLO.BIN
+readname 1                      ; thirteen.ch13
+readname 1                      ; twentysix_characters.ch_26
+readname 1                      ; 0, the end
+close 1

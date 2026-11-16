@@ -439,7 +439,13 @@ There are no device numbers and no Commodore DOS.
 - **niceemu**: the monitor's tests run on images made with `mkfs.fat`,
   `sfdisk`, and `mcopy`. After a test writes, `fsck.fat -n` checks the image
   and `mdir` and `mtype` check what is on it. This tests the FAT32 code
-  against a reference, and needs no board.
+  against a reference, and needs no board. Every byte that a test
+  changed on a card is shown and compared, and so is the order of the
+  sector writes. Damaged and odd cards, made by changing the bytes of
+  those images, test the checks of the code
+  ([monitor/INTERNALS.md](../monitor/INTERNALS.md#the-tests)). The steps
+  that need a board, such as a card pulled out, are done by hand
+  ([monitor/INTERNALS.md](../monitor/INTERNALS.md#on-a-board)).
 - **GHDL**: `tb_sd` runs `sd.vhd` against the card model, through every
   command and error. `tb_nicemon` reads and writes a sector through the
   core. `make formal` runs the checks in `sd_spi.vhd`.

@@ -71,3 +71,34 @@ A.BIN        created 2026-11-14 12:34:56 +199/100, written 2026-11-14 12:34:56
 B.BIN        created 2099-12-31 23:59:58 +  0/100, written 2099-12-31 23:59:58
 C.BIN        created 1980-01-01 00:00:00 +100/100, written 1980-01-01 00:00:00
 D.BIN        created 2026-01-01 00:00:00 +  0/100, written 2026-01-01 00:00:00
+What the card holds that super.img did not:
+Sectors changed outside the volume: none
+FSInfo free count: 0001F7E0 -> FFFFFFFF
+FSInfo next free: 0000001F -> 00000024
+FAT entries changed: 4
+  32-35: 00000000 -> 0FFFFFFF
+FAT 2: the same changes
+NICE C3 entry 3:
+  was zeros
+  now "A       BIN" attr 20 case 18 created 2026-11-14 12:34:56 +199 accessed 2026-11-14 written 2026-11-14 12:34:56 cluster 32 size 18
+NICE C3 entry 4:
+  was zeros
+  now "B       BIN" attr 20 case 18 created 2099-12-31 23:59:58 +0 accessed 2099-12-31 written 2099-12-31 23:59:58 cluster 33 size 18
+NICE C3 entry 5:
+  was zeros
+  now "C       BIN" attr 20 case 18 created 1980-01-01 00:00:00 +100 accessed 1980-01-01 written 1980-01-01 00:00:00 cluster 34 size 18
+NICE C3 entry 6:
+  was zeros
+  now "D       BIN" attr 20 case 18 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 35 size 18
+NICE/A.BIN: 18 bytes, "00008000 00000001\x0a"
+NICE/A.BIN: its sector 0 past the size: 494 bytes, zeros
+NICE/B.BIN: 18 bytes, "00008000 00000001\x0a"
+NICE/B.BIN: its sector 0 past the size: 494 bytes, zeros
+NICE/C.BIN: 18 bytes, "00008000 00000001\x0a"
+NICE/C.BIN: its sector 0 past the size: 494 bytes, zeros
+NICE/D.BIN: 18 bytes, "00008000 00000001\x0a"
+NICE/D.BIN: its sector 0 past the size: 494 bytes, zeros
+Sector writes, 25:
+mount 0, C3, FSInfo, FAT1+0, FAT2+0, C32, C3, FSInfo, C3, FAT1+0, FAT2+0,
+C33, C3, FSInfo, C3, FAT1+0, FAT2+0, C34, C3, FSInfo, C3, FAT1+0, FAT2+0,
+C35, C3, FSInfo

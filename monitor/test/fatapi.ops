@@ -1,0 +1,72 @@
+; The program of the suite fatapi of test/fat_runs.py: the file entries'
+; small cases. The first three segments run on super.img, the fourth on
+; fat32.img. The format is test/fat_tool.py's, OPS.
+
+seg                             ; 0x8000: names and modes
+open 0, "", 2                   ; 0: the folder
+close 0                         ; 0
+open 0, "x", 2                  ; -20: mode 2 takes "" or /, nothing else
+open 0, "/x", 2                 ; -20
+open 0, "//", 2                 ; -20
+open 0, "NICE", 2               ; -20
+open 0, "HELLO.BIN", -1         ; -25: the mode is signed
+open 0, "HELLO.BIN", 0x7FFFFFFF ; -25
+open 0, "", 0                   ; -20
+open 0, "", 1                   ; -20
+delete ""                       ; -20
+open 0, "a" * 251 + ".bin", 0   ; -21: 255 characters are a name
+open 0, "a" * 252 + ".bin", 0   ; -20: 256 are not
+open 0, "ĀA", 0            ; -20: a word above 0xFF
+open 0, "\xe9.B", 0             ; -21: a byte from 0x80 is looked up,
+open 0, "\xe9.B", 1             ; -20: but makes no file
+open 0, "a\tb", 1               ; -20: a control code
+open 0, "a ", 1                 ; -20: a final blank
+open 0, "a.", 1                 ; -20: a final dot
+
+seg                             ; 0x8400: reads, and words written
+open 0, "HELLO.BIN", 0          ; 0
+open 1, "hello.bin", 0          ; 1: a file may be open twice to read
+read 1, 0                       ; 0
+read 0, 3                       ; 3, "000"
+read 1, 3                       ; 3, "000", each at its own position
+close 0
+close 1
+open 0, "W.TXT", 1              ; 0
+writew 0, 0x141, 0x242, 0xFFFFFF0A  ; 3: bits 7..0 of each, "AB\n"
+close 0
+open 0, "W.TXT", 0
+read 0, 5                       ; 3, "AB\n"
+close 0
+
+seg                             ; 0x8800: a directory handle's sector
+open 1, "", 2                   ; 0
+readdir 1                       ; 1, HELLO.BIN, and its sector read
+open 0, "LATE.TXT", 1           ; 1, after W.TXT, in the entry that ended the folder
+close 0                         ; 0
+readdir 1                       ; 1, W.TXT, from the handle's sector
+readdir 1                       ; 0: the end that the sector had, though LATE.TXT
+                                ; is there now (known oddity B7)
+close 1
+open 1, "", 2                   ; 0: a new handle reads the sector again
+readdir 1                       ; HELLO.BIN
+readdir 1                       ; W.TXT
+readdir 1                       ; LATE.TXT
+readdir 1                       ; 0
+close 1
+
+seg                             ; 0x8C00, on fat32.img
+open 0, "SUB", 1                ; -22: a directory, in mode 1 too
+open 0, "sub", 0                ; -22
+open 0, "HELLO.BIN", 0          ; 0
+open 1, "FRAG.BIN", 0           ; 1: both handles in use
+open 2, "a:b", 1                ; -20: the name's error before -23,
+open 2, "SUB", 1                ; -22: and the file's,
+open 2, "NOFILE.TXT", 0         ; -21,
+open 2, "HELLO.BIN", 1          ; -31: and that the file is open,
+open 2, "KEEP.TXT", 1           ; -23: then too many, and KEEP.TXT is left as it was
+open 2, "NONE.TXT", 1           ; -23: no entry made
+close 1                         ; 0
+open 1, "NEW.TXT", 1            ; 1
+delete "NEW.TXT"                ; -31: open to write
+close 1                         ; 0
+close 0                         ; 0

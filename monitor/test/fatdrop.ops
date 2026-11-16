@@ -1,0 +1,28 @@
+; The program of the suite fatdrop of test/fat_runs.py: the mount
+; dropped under open files, as fat32.c's valid finds the selected slot
+; not the mounted one, and fs_mount under a file open to write. Copies of
+; super.img are in both slots. The format is test/fat_tool.py's, OPS.
+
+seg
+open 0, "HELLO.BIN", 0          ; 0
+read 0, 4                       ; 4, "0000"
+select 1                        ; SD_SELECT written, as a program may
+read 0, 4                       ; -28: the mount is dropped, and the handles closed
+read 0, 4                       ; -24: so the next call finds none
+open 1, "NEW.TXT", 1            ; 0: mounts slot 0, the last slot, again
+write 1, 0, 10                  ; 10, held in the sector, with a cluster taken
+select 1
+close 1                         ; -28: neither the sector nor the entry is written
+open 1, "NEW.TXT", 0            ; 0: slot 0 mounted again
+read 1, 20                      ; 0: the file is as its open made it, empty
+close 1                         ; 0
+open 0, "HELLO.BIN", 0          ; 0
+select 1
+close 0                         ; 0: a file to read is closed with no error
+open 0, "OPEN.TXT", 1           ; 0: mounts slot 0 again
+write 0, 0, 600                 ; 600: 2 clusters taken, the first sector written
+mount 0                         ; 0, which closes OPEN.TXT unwritten
+close 0                         ; -24
+open 0, "OPEN.TXT", 0           ; 0
+read 0, 4                       ; 0: empty, and its 2 clusters lost
+close 0                         ; 0

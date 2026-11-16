@@ -1,0 +1,181 @@
+== Long names of 13 and 26 characters, which fill their entries
+NiceMon V9.9
+HELP lists the statements
+READY.
+sys 0x8000
+Returned 0000041F
+READY.
+halt
+Halted
+The calls:
+segment 0
+  open 0 "thirteen.ch13" 1 -> 0
+  close 0 -> 0
+  open 0 "twentysix_characters.ch_26" 1 -> 0
+  close 0 -> 0
+  open 0 "THIRTEEN.CH13" 0 -> 0
+  close 0 -> 0
+  open 0 "Twentysix_Characters.CH_26" 0 -> 0
+  close 0 -> 0
+  open 1 "" 2 -> 0
+  readname 1 -> 1 "HELLO   BIN" attr 20 size 14184 name "HELLO.BIN"
+  readname 1 -> 1 "THIRTE~1CH1" attr 20 size 0 name "thirteen.ch13"
+  readname 1 -> 1 "TWENTY~1CH_" attr 20 size 0 name "twentysix_characters.ch_26"
+  readname 1 -> 0
+  close 1 -> 0
+exit 0
+Slot 0: What the card holds that super.img did not:
+Sectors changed outside the volume: none
+FAT entries changed: 0
+FAT 2: the same changes
+NICE C3 entry 3:
+  was zeros
+  now long 41 "thirteen.ch13" attr 0F type 00 sum 42 cluster 0000
+NICE C3 entry 4:
+  was zeros
+  now "THIRTE~1CH1" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 0 size 0
+NICE C3 entry 5:
+  was zeros
+  now long 42 "racters.ch_26" attr 0F type 00 sum CF cluster 0000
+NICE C3 entry 6:
+  was zeros
+  now long 01 "twentysix_cha" attr 0F type 00 sum CF cluster 0000
+NICE C3 entry 7:
+  was zeros
+  now "TWENTY~1CH_" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 0 size 0
+fsck.fat -n:
+IMAGE: 4 files, 30/129022 clusters
+Sector writes, 4:
+mount 0, C3 x4
+== Damaged entries: 0x05 for 0xE5, orphan long-name entries, a label, a broken set, a name of 256 characters, and a byte from 0x80 in an 8.3 name (known oddity B5)
+NiceMon V9.9
+HELP lists the statements
+READY.
+dir
+Directory of NICE
+MIXED.BIN                         14
+lower.bin                         14
+caf?.bin                          14
+?x.bin                            12
+mandelbrot1.txt                   17
+mandelbrot2.txt                   17
+NNNNNN~1.TXT                      17
+?AD01.TXT                         14
+PAD03.TXT                         14
+PAD04.TXT                         14
+PAD05.TXT                         14
+PAD06.TXT                         14
+PAD07.TXT                         14
+PAD08.TXT                         14
+PAD09.TXT                         14
+PAD10.TXT                         14
+across a sector.bin               15
+PAD11.TXT                         14
+PAD12.TXT                         14
+PAD13.TXT                         14
+PAD14.TXT                         14
+PAD15.TXT                         14
+PAD16.TXT                         14
+PAD17.TXT                         14
+PAD18.TXT                         14
+PAD19.TXT                         14
+PAD20.TXT                         14
+PAD21.TXT                         14
+PAD22.TXT                         14
+PAD23.TXT                         14
+across a cluster.bin              16
+BADSUM~1.BIN                      15
+Files: 32, directories: 0
+READY.
+sys 0x8000
+Returned 0000093F
+READY.
+halt
+Halted
+The calls:
+segment 0
+  open 1 "" 2 -> 0
+  readname 1 -> 1 "MIXED   BIN" attr 20 size 14 name "MIXED.BIN"
+  readname 1 -> 1 "LOWER   BIN" attr 20 size 14 name "lower.bin"
+  readname 1 -> 1 "CAF\x90    BIN" attr 20 size 14 name "caf?.bin"
+  readname 1 -> 1 "_X      BIN" attr 20 size 12 name "?x.bin"
+  readname 1 -> 1 "MANDEL~1TXT" attr 20 size 17 name "mandelbrot1.txt"
+  readname 1 -> 1 "MANDEL~2TXT" attr 20 size 17 name "mandelbrot2.txt"
+  readname 1 -> 1 "NNNNNN~1TXT" attr 20 size 17 name "NNNNNN~1.TXT"
+  readname 1 -> 1 "\xe5AD01   TXT" attr 20 size 14 name "?AD01.TXT"
+  readname 1 -> 1 "PAD03   TXT" attr 20 size 14 name "PAD03.TXT"
+  close 1 -> 0
+  open 0 "\u00e5AD01.TXT" 0 -> -21
+  open 0 "CAF\u0090.BIN" 0 -> -21
+  open 0 "caf?.bin" 0 -> -21
+  delete "CAF\u0090.BIN" -> -21
+  open 0 "my prog.bin" 0 -> -21
+  open 0 "MYPROG~1.BIN" 0 -> -21
+  open 0 "PAD02.TXT" 0 -> -21
+  open 0 "mixed.Bin" 0 -> 0
+  close 0 -> 0
+  open 0 "MIXED.BIN" 0 -> 0
+  close 0 -> 0
+  open 0 "nnnnnnnnnnnn..." (256 characters) 0 -> -20
+  open 0 "nnnnnnnnnnnn..." (255 characters) 0 -> -21
+  open 0 "NNNNNN~1.TXT" 0 -> 0
+  close 0 -> 0
+exit 0
+Slot 0: The card as lfnx.img was
+== DELETE of long names across a sector and a cluster, and of an 8.3 name whose long name's checksum is wrong, which leaves it as an orphan (known oddity B2)
+NiceMon V9.9
+HELP lists the statements
+READY.
+delete "badsum~1.bin"
+Deleted badsum~1.bin
+READY.
+delete "across a cluster.bin"
+Deleted across a cluster.bin
+READY.
+delete "ACROSS A SECTOR.BIN"
+Deleted ACROSS A SECTOR.BIN
+READY.
+halt
+Halted
+exit 0
+Slot 0: What the card holds that lfn.img did not:
+Sectors changed outside the volume: none
+FSInfo free count: 0001FBC5 -> FFFFFFFF
+FSInfo next free: 0000003E -> 00000024
+FAT entries changed: 3
+  36: 0FFFFFFF -> 00000000
+  60: 0FFFFFFF -> 00000000
+  62: 0FFFFFFF -> 00000000
+FAT 2: the same changes
+NICE C25+0 entry 15:
+  was long 42 "or.bin\u0000\uffff\uffff\uffff\uffff\uffff\uffff" attr 0F type 00 sum D2 cluster 0000
+  now long E5 "or.bin\u0000\uffff\uffff\uffff\uffff\uffff\uffff" attr 0F type 00 sum D2 cluster 0000
+NICE C25+1 entry 0:
+  was long 01 "across a sect" attr 0F type 00 sum D2 cluster 0000
+  now long E5 "across a sect" attr 0F type 00 sum D2 cluster 0000
+NICE C25+1 entry 1:
+  was "ACROSS~1BIN" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2025-06-15 written 2025-06-15 12:34:56 cluster 36 size 15
+  now "\xe5CROSS~1BIN" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2025-06-15 written 2025-06-15 12:34:56 cluster 36 size 15
+NICE C25+1 entry 15:
+  was long 42 "ter.bin\u0000\uffff\uffff\uffff\uffff\uffff" attr 0F type 00 sum 32 cluster 0000
+  now long E5 "ter.bin\u0000\uffff\uffff\uffff\uffff\uffff" attr 0F type 00 sum 32 cluster 0000
+NICE C61+0 entry 0:
+  was long 01 "across a clus" attr 0F type 00 sum 32 cluster 0000
+  now long E5 "across a clus" attr 0F type 00 sum 32 cluster 0000
+NICE C61+0 entry 1:
+  was "ACROSS~2BIN" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2025-06-15 written 2025-06-15 12:34:56 cluster 60 size 16
+  now "\xe5CROSS~2BIN" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2025-06-15 written 2025-06-15 12:34:56 cluster 60 size 16
+NICE C61+0 entry 3:
+  was "BADSUM~1BIN" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2025-06-15 written 2025-06-15 12:34:56 cluster 62 size 15
+  now "\xe5ADSUM~1BIN" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2025-06-15 written 2025-06-15 12:34:56 cluster 62 size 15
+fsck.fat -n:
+Orphaned long file name part "bad sum.bin"
+  Auto-deleting.
+Free cluster summary uninitialized (should be 129992)
+
+Leaving filesystem unchanged.
+IMAGE: 32 files, 48/130040 clusters
+(exit 1)
+Sector writes, 17:
+mount 0, C61+0, FSInfo, FAT1+0, FAT2+0, FSInfo, C25+1, C61+0 x2, FAT1+0,
+FAT2+0, FSInfo, C25+0, C25+1 x2, FAT1+0, FAT2+0, FSInfo

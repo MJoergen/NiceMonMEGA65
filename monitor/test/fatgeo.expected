@@ -1,0 +1,232 @@
+== SAVE, LOAD, DIR, and DELETE on spc8.img
+NiceMon V9.9
+HELP lists the statements
+READY.
+save "big", 0x8000, 2000
+Words saved: 2000, 00008000 to 000087CF
+READY.
+save "a long name of a file.bin", 0x8000, 3
+Words saved: 3, 00008000 to 00008002
+READY.
+save "two", 0x8000, 2
+Words saved: 2, 00008000 to 00008001
+READY.
+delete "two.bin"
+Deleted two.bin
+READY.
+load "big.bin"
+Words loaded: 2000, 00008000 to 000087CF
+READY.
+load "A LONG NAME OF A FILE.BIN"
+Words loaded: 3, 00008000 to 00008002
+READY.
+dir
+Directory of NICE
+big.BIN                        36000
+a long name of a file.bin
+                                  54
+Files: 2, directories: 0
+READY.
+halt
+Halted
+exit 0
+Slot 0: What the card holds that spc8.img did not:
+Sectors changed outside the volume: none
+FSInfo free count: 00012B61 -> FFFFFFFF
+FSInfo next free: 00000003 -> 0000000E
+FAT entries changed: 10
+  4-12: 00000000 -> each the next, the last 0FFFFFFF
+  13: 00000000 -> 0FFFFFFF
+FAT 2: the same changes
+NICE C3+0 entry 2:
+  was zeros
+  now "BIG     BIN" attr 20 case 08 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 4 size 36000
+NICE C3+0 entry 3:
+  was zeros
+  now long 42 "f a file.bin\u0000" attr 0F type 00 sum F0 cluster 0000
+NICE C3+0 entry 4:
+  was zeros
+  now long 01 "a long name o" attr 0F type 00 sum F0 cluster 0000
+NICE C3+0 entry 5:
+  was zeros
+  now "ALONGN~1BIN" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 13 size 54
+NICE C3+0 entry 6:
+  was zeros
+  now "\xe5WO     BIN" attr 20 case 08 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 14 size 36
+NICE/BIG.BIN: 36000 bytes, SHA-256 9370bf40eac298d6
+NICE/BIG.BIN: its sector 70 past the size: 352 bytes, zeros
+NICE/ALONGN~1.BIN: 54 bytes, "00008000 00000000\x0a00008001 00000000\x0a00008002 00000000\x0a"
+NICE/ALONGN~1.BIN: its sector 0 past the size: 458 bytes, zeros
+C14+0, of no file: 36 bytes not 0, SHA-256 6bd35b93ba8ae935
+fsck.fat -n:
+Free cluster summary uninitialized (should be 76631)
+IMAGE: 3 files, 12/76643 clusters
+Sector writes, 125:
+mount 0, C3+0, FSInfo, FAT1+0, FAT2+0, C4+0, C4+1, C4+2, C4+3, C4+4,
+C4+5, C4+6, C4+7, FAT1+0, FAT2+0, FAT1+0, FAT2+0, C5+0, C5+1, C5+2, C5+3,
+C5+4, C5+5, C5+6, C5+7, FAT1+0, FAT2+0, FAT1+0, FAT2+0, C6+0, C6+1, C6+2,
+C6+3, C6+4, C6+5, C6+6, C6+7, FAT1+0, FAT2+0, FAT1+0, FAT2+0, C7+0, C7+1,
+C7+2, C7+3, C7+4, C7+5, C7+6, C7+7, FAT1+0, FAT2+0, FAT1+0, FAT2+0, C8+0,
+C8+1, C8+2, C8+3, C8+4, C8+5, C8+6, C8+7, FAT1+0, FAT2+0, FAT1+0, FAT2+0,
+C9+0, C9+1, C9+2, C9+3, C9+4, C9+5, C9+6, C9+7, FAT1+0, FAT2+0, FAT1+0,
+FAT2+0, C10+0, C10+1, C10+2, C10+3, C10+4, C10+5, C10+6, C10+7, FAT1+0,
+FAT2+0, FAT1+0, FAT2+0, C11+0, C11+1, C11+2, C11+3, C11+4, C11+5, C11+6,
+C11+7, FAT1+0, FAT2+0, FAT1+0, FAT2+0, C12+0, C12+1, C12+2, C12+3, C12+4,
+C12+5, C12+6, C3+0, FSInfo, C3+0, FAT1+0, FAT2+0, C13+0, C3+0, FSInfo,
+C3+0, FAT1+0, FAT2+0, C14+0, C3+0, FSInfo, C3+0, FAT1+0, FAT2+0, FSInfo
+== SAVE, LOAD, DIR, and DELETE on spc64.img
+NiceMon V9.9
+HELP lists the statements
+READY.
+save "big", 0x8000, 2000
+Words saved: 2000, 00008000 to 000087CF
+READY.
+save "a long name of a file.bin", 0x8000, 3
+Words saved: 3, 00008000 to 00008002
+READY.
+save "two", 0x8000, 2
+Words saved: 2, 00008000 to 00008001
+READY.
+delete "two.bin"
+Deleted two.bin
+READY.
+load "big.bin"
+Words loaded: 2000, 00008000 to 000087CF
+READY.
+load "A LONG NAME OF A FILE.BIN"
+Words loaded: 3, 00008000 to 00008002
+READY.
+dir
+Directory of NICE
+big.BIN                        36000
+a long name of a file.bin
+                                  54
+Files: 2, directories: 0
+READY.
+halt
+Halted
+exit 0
+Slot 0: What the card holds that spc64.img did not:
+Sectors changed outside the volume: none
+FSInfo free count: 0001066A -> FFFFFFFF
+FSInfo next free: 00000003 -> 00000007
+FAT entries changed: 3
+  4-5: 00000000 -> each the next, the last 0FFFFFFF
+  6: 00000000 -> 0FFFFFFF
+FAT 2: the same changes
+NICE C3+0 entry 2:
+  was zeros
+  now "BIG     BIN" attr 20 case 08 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 4 size 36000
+NICE C3+0 entry 3:
+  was zeros
+  now long 42 "f a file.bin\u0000" attr 0F type 00 sum F0 cluster 0000
+NICE C3+0 entry 4:
+  was zeros
+  now long 01 "a long name o" attr 0F type 00 sum F0 cluster 0000
+NICE C3+0 entry 5:
+  was zeros
+  now "ALONGN~1BIN" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 6 size 54
+NICE C3+0 entry 6:
+  was zeros
+  now "\xe5WO     BIN" attr 20 case 08 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 7 size 36
+NICE/BIG.BIN: 36000 bytes, SHA-256 9370bf40eac298d6
+NICE/BIG.BIN: its sector 70 past the size: 352 bytes, zeros
+NICE/ALONGN~1.BIN: 54 bytes, "00008000 00000000\x0a00008001 00000000\x0a00008002 00000000\x0a"
+NICE/ALONGN~1.BIN: its sector 0 past the size: 458 bytes, zeros
+C7+0, of no file: 36 bytes not 0, SHA-256 6bd35b93ba8ae935
+fsck.fat -n:
+Free cluster summary uninitialized (should be 67175)
+IMAGE: 3 files, 5/67180 clusters
+Sector writes, 97:
+mount 0, C3+0, FSInfo, FAT1+0, FAT2+0, C4+0, C4+1, C4+2, C4+3, C4+4,
+C4+5, C4+6, C4+7, C4+8, C4+9, C4+10, C4+11, C4+12, C4+13, C4+14, C4+15,
+C4+16, C4+17, C4+18, C4+19, C4+20, C4+21, C4+22, C4+23, C4+24, C4+25,
+C4+26, C4+27, C4+28, C4+29, C4+30, C4+31, C4+32, C4+33, C4+34, C4+35,
+C4+36, C4+37, C4+38, C4+39, C4+40, C4+41, C4+42, C4+43, C4+44, C4+45,
+C4+46, C4+47, C4+48, C4+49, C4+50, C4+51, C4+52, C4+53, C4+54, C4+55,
+C4+56, C4+57, C4+58, C4+59, C4+60, C4+61, C4+62, C4+63, FAT1+0, FAT2+0,
+FAT1+0, FAT2+0, C5+0, C5+1, C5+2, C5+3, C5+4, C5+5, C5+6, C3+0, FSInfo,
+C3+0, FAT1+0, FAT2+0, C6+0, C3+0, FSInfo, C3+0, FAT1+0, FAT2+0, C7+0,
+C3+0, FSInfo, C3+0, FAT1+0, FAT2+0, FSInfo
+== SAVE, LOAD, DIR, and DELETE on fat1.img
+NiceMon V9.9
+HELP lists the statements
+READY.
+save "big", 0x8000, 2000
+Words saved: 2000, 00008000 to 000087CF
+READY.
+save "a long name of a file.bin", 0x8000, 3
+Words saved: 3, 00008000 to 00008002
+READY.
+save "two", 0x8000, 2
+Words saved: 2, 00008000 to 00008001
+READY.
+delete "two.bin"
+Deleted two.bin
+READY.
+load "big.bin"
+Words loaded: 2000, 00008000 to 000087CF
+READY.
+load "A LONG NAME OF A FILE.BIN"
+Words loaded: 3, 00008000 to 00008002
+READY.
+dir
+Directory of NICE
+big.BIN                        36000
+a long name of a file.bin
+                                  54
+Files: 2, directories: 0
+READY.
+halt
+Halted
+exit 0
+Slot 0: What the card holds that fat1.img did not:
+Sectors changed outside the volume: none
+FSInfo free count: 0001FBE6 -> FFFFFFFF
+FSInfo next free: 00000003 -> 0000004C
+FAT entries changed: 72
+  4-74: 00000000 -> each the next, the last 0FFFFFFF
+  75: 00000000 -> 0FFFFFFF
+NICE C3 entry 2:
+  was zeros
+  now "BIG     BIN" attr 20 case 08 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 4 size 36000
+NICE C3 entry 3:
+  was zeros
+  now long 42 "f a file.bin\u0000" attr 0F type 00 sum F0 cluster 0000
+NICE C3 entry 4:
+  was zeros
+  now long 01 "a long name o" attr 0F type 00 sum F0 cluster 0000
+NICE C3 entry 5:
+  was zeros
+  now "ALONGN~1BIN" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 75 size 54
+NICE C3 entry 6:
+  was zeros
+  now "\xe5WO     BIN" attr 20 case 08 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 76 size 36
+NICE/BIG.BIN: 36000 bytes, SHA-256 9370bf40eac298d6
+NICE/BIG.BIN: its sector 70 past the size: 352 bytes, zeros
+NICE/ALONGN~1.BIN: 54 bytes, "00008000 00000000\x0a00008001 00000000\x0a00008002 00000000\x0a"
+NICE/ALONGN~1.BIN: its sector 0 past the size: 458 bytes, zeros
+C76, of no file: 36 bytes not 0, SHA-256 6bd35b93ba8ae935
+fsck.fat -n:
+Free cluster summary uninitialized (should be 129950)
+IMAGE: 3 files, 74/130024 clusters
+Sector writes, 229:
+mount 0, C3, FSInfo, FAT1+0, C4, FAT1+0 x2, C5, FAT1+0 x2, C6, FAT1+0 x2,
+C7, FAT1+0 x2, C8, FAT1+0 x2, C9, FAT1+0 x2, C10, FAT1+0 x2, C11,
+FAT1+0 x2, C12, FAT1+0 x2, C13, FAT1+0 x2, C14, FAT1+0 x2, C15,
+FAT1+0 x2, C16, FAT1+0 x2, C17, FAT1+0 x2, C18, FAT1+0 x2, C19,
+FAT1+0 x2, C20, FAT1+0 x2, C21, FAT1+0 x2, C22, FAT1+0 x2, C23,
+FAT1+0 x2, C24, FAT1+0 x2, C25, FAT1+0 x2, C26, FAT1+0 x2, C27,
+FAT1+0 x2, C28, FAT1+0 x2, C29, FAT1+0 x2, C30, FAT1+0 x2, C31,
+FAT1+0 x2, C32, FAT1+0 x2, C33, FAT1+0 x2, C34, FAT1+0 x2, C35,
+FAT1+0 x2, C36, FAT1+0 x2, C37, FAT1+0 x2, C38, FAT1+0 x2, C39,
+FAT1+0 x2, C40, FAT1+0 x2, C41, FAT1+0 x2, C42, FAT1+0 x2, C43,
+FAT1+0 x2, C44, FAT1+0 x2, C45, FAT1+0 x2, C46, FAT1+0 x2, C47,
+FAT1+0 x2, C48, FAT1+0 x2, C49, FAT1+0 x2, C50, FAT1+0 x2, C51,
+FAT1+0 x2, C52, FAT1+0 x2, C53, FAT1+0 x2, C54, FAT1+0 x2, C55,
+FAT1+0 x2, C56, FAT1+0 x2, C57, FAT1+0 x2, C58, FAT1+0 x2, C59,
+FAT1+0 x2, C60, FAT1+0 x2, C61, FAT1+0 x2, C62, FAT1+0 x2, C63,
+FAT1+0 x2, C64, FAT1+0 x2, C65, FAT1+0 x2, C66, FAT1+0 x2, C67,
+FAT1+0 x2, C68, FAT1+0 x2, C69, FAT1+0 x2, C70, FAT1+0 x2, C71,
+FAT1+0 x2, C72, FAT1+0 x2, C73, FAT1+0 x2, C74, C3, FSInfo, C3, FAT1+0,
+C75, C3, FSInfo, C3, FAT1+0, C76, C3, FSInfo, C3, FAT1+0, FSInfo

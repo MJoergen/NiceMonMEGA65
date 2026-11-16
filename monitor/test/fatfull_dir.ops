@@ -1,0 +1,14 @@
+; The program of the second run of the suite fatfull of test/fat_runs.py,
+; on bigdir.img of test/fat_image.py: the folder NICE has 65536 entries,
+; F00000.TXT to F65534.TXT and a free one, the last, which is as many as
+; a folder may have. The format is test/fat_tool.py's, OPS.
+
+seg
+open 0, "LAST.TXT", 1           ; 0, in the last entry
+close 0                         ; 0
+open 0, "MORE.TXT", 1           ; -30: the folder does not grow past 65536
+open 0, "long name.txt", 1      ; -30
+delete "F00007.TXT"             ; 0
+open 0, "long name.txt", 1      ; -30: it needs 2 entries in a row
+open 0, "MORE.TXT", 1           ; 0, in F00007.TXT's
+close 0                         ; 0

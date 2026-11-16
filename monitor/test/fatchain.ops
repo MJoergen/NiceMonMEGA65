@@ -1,0 +1,33 @@
+; The program of the suite fatchain of test/fat_runs.py, on chains.img of
+; test/fat_image.py: files of 1500 bytes, 3 clusters of the letters A to
+; Z, with their chains damaged. The format is test/fat_tool.py's, OPS.
+
+seg
+open 0, "CUT.TXT", 0            ; its second cluster free in the FAT
+read 0, 400                     ; 400
+read 0, 400                     ; 400, up to byte 800 of the second cluster
+read 0, 400                     ; -26: the second cluster's link is 0
+close 0
+open 0, "LONG.TXT", 0           ; a size of 3500, past its chain of 1536
+read 0, 1400                    ; 1400
+read 0, 400                     ; -26: 136 bytes copied, but not counted (known oddity B4)
+close 0
+open 0, "ZERO.TXT", 0           ; -26: a size of 10, and cluster 0
+open 0, "EDGE.TXT", 0           ; 0: its cluster the volume's last, 129023
+read 0, 20                      ; 10: the zeros of that cluster
+close 0
+open 0, "HIGH.TXT", 0           ; -26: its cluster 129024, past the volume
+open 0, "BADC.TXT", 0           ; its second cluster's link 0x0FFFFFF7, a bad mark
+read 0, 1000                    ; 1000, the first two clusters
+read 0, 500                     ; -26, 24 bytes copied, but not counted (B4)
+close 0
+open 0, "LOOP.TXT", 0           ; its last cluster linked to its first
+read 0, 1400                    ; 1400
+read 0, 400                     ; 100: the size ends the read
+close 0
+delete "LOOP.TXT"               ; -26: freed up to the first cluster, freed already (known oddity B3)
+open 0, "LOOP.TXT", 0           ; -21: the entry is gone though
+delete "BADC.TXT"               ; 0: a bad mark ends the chain
+delete "CUT.TXT"                ; -26: freed up to the free cluster, its third lost (B3)
+open 0, "ZERO.TXT", 1           ; 0: truncated, with no cluster to free
+close 0                         ; 0

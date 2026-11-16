@@ -1,0 +1,80 @@
+== fs_write on a card with 3 free clusters
+NiceMon V9.9
+HELP lists the statements
+READY.
+sys 0x8000
+Returned 000007E0
+READY.
+halt
+Halted
+The calls:
+segment 0
+  open 0 "A.TXT" 1 -> 0
+  write 0 0 1000 -> 1000
+  write 0 0 1000 -> 536
+  write 0 0 10 -> -30
+  close 0 -> 0
+  open 0 "A.TXT" 0 -> 0
+  read 0 2000 -> 1536 "ABCDEFGHIJKLMNOP...ABCDEFGHIJKLMNOP" SHA-256 73145ad3738b4a37
+  close 0 -> 0
+  open 0 "B.TXT" 1 -> 0
+  write 0 0 1 -> -30
+  close 0 -> 0
+  mount 0 -> 0
+  open 0 "C.TXT" 1 -> 0
+  write 0 0 1 -> -30
+  close 0 -> 0
+exit 0
+Slot 0: What the card holds that full.img did not:
+Sectors changed outside the volume: none
+FSInfo free count: 00000003 -> FFFFFFFF
+FAT entries changed: 3
+  68527-68529: 00000000 -> each the next, the last 0FFFFFFF
+FAT 2: the same changes
+NICE C3 entry 3:
+  was zeros
+  now "A       TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 68527 size 1536
+NICE C3 entry 4:
+  was zeros
+  now "B       TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 0 size 0
+NICE C3 entry 5:
+  was zeros
+  now "C       TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 0 size 0
+NICE/A.TXT: 1536 bytes, SHA-256 73145ad3738b4a37
+fsck.fat -n:
+Free cluster summary uninitialized (should be 0)
+IMAGE: 5 files, 68528/68528 clusters
+Sector writes, 22:
+mount 0, C3, FSInfo, FAT1+535, FAT2+535, C68527, FAT1+535, FAT2+535,
+FAT1+535, FAT2+535, C68528, FAT1+535, FAT2+535, FAT1+535, FAT2+535,
+C68529, C3, FSInfo, C3 x2, mount 0, C3, FSInfo, C3
+== A folder of 65535 entries and one free
+NiceMon V9.9
+HELP lists the statements
+READY.
+sys 0x8000
+Returned 00000009
+READY.
+halt
+Halted
+The calls:
+segment 0
+  open 0 "LAST.TXT" 1 -> 0
+  close 0 -> 0
+  open 0 "MORE.TXT" 1 -> -30
+  open 0 "long name.txt" 1 -> -30
+  delete "F00007.TXT" -> 0
+  open 0 "long name.txt" 1 -> -30
+  open 0 "MORE.TXT" 1 -> 0
+  close 0 -> 0
+exit 0
+Slot 0: What the card holds that bigdir.img did not:
+Sectors changed outside the volume: none
+FAT entries changed: 0
+FAT 2: the same changes
+NICE C3 entry 7:
+  was "F00007  TXT" attr 20 case 00 created 1980-00-00 00:00:00 +0 accessed 1980-00-00 written 1980-00-00 00:00:00 cluster 0 size 0
+  now "MORE    TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 0 size 0
+NICE C5094 entry 15:
+  was zeros
+  now "LAST    TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 0 size 0

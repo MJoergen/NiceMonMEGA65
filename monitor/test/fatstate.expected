@@ -1,0 +1,133 @@
+== A handle across SYS 0, which closes it; both handles in use after a return, so LOAD and SAVE get error 23 and DIR and TAB work; then the program's handles still read
+NiceMon V9.9
+HELP lists the statements
+READY.
+sys 0x8000
+Returned 00000005
+READY.
+sys 0
+NiceMon V9.9
+HELP lists the statements
+READY.
+sys 0x8400
+Returned 0000000B
+READY.
+sys 0x8800
+Returned 0000000E
+READY.
+load "hello.bin"
+File error 23, too many open files
+READY.
+save "x", 0x8000, 1
+File error 23, too many open files
+READY.
+dir
+Directory of NICE
+HELLO.BIN                      14184
+Files: 1, directories: 0
+READY.
+load h^H"HELLO.BIN" ^C
+sys 0x8C00
+Returned 0000001A
+READY.
+halt
+Halted
+The calls:
+segment 0
+  open 0 "HELLO.BIN" 0 -> 0
+  read 0 2 -> 2 "00"
+segment 1
+  read 0 2 -> -24
+  open 1 "HELLO.BIN" 0 -> 0
+  close 1 -> 0
+segment 2
+  open 0 "HELLO.BIN" 0 -> 0
+  open 1 "" 2 -> 1
+segment 3
+  read 0 3 -> 3 "000"
+  readdir 1 -> 1 "HELLO   BIN" attr 20 size 14184
+  close 0 -> 0
+  close 1 -> 0
+exit 0
+Slot 0: The card as super.img was
+== SYS 0 forgets the mount of slot 1: DIR mounts slot 0 again
+NiceMon V9.9
+HELP lists the statements
+READY.
+dir 1
+Directory of NICE
+HELLO.BIN                      14184
+Files: 1, directories: 0
+READY.
+sys 0
+NiceMon V9.9
+HELP lists the statements
+READY.
+dir
+Directory of NICE
+my prog.bin                    14184
+mixed.Bin                         14
+lower.bin                         14
+caf?.bin                          14
+?x.bin                            12
+mandelbrot1.txt                   17
+mandelbrot2.txt                   17
+nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn.txt
+                                  17
+PAD01.TXT                         14
+PAD02.TXT                         14
+PAD03.TXT                         14
+PAD04.TXT                         14
+PAD05.TXT                         14
+PAD06.TXT                         14
+PAD07.TXT                         14
+PAD08.TXT                         14
+PAD09.TXT                         14
+PAD10.TXT                         14
+across a sector.bin               15
+PAD11.TXT                         14
+PAD12.TXT                         14
+PAD13.TXT                         14
+PAD14.TXT                         14
+PAD15.TXT                         14
+PAD16.TXT                         14
+PAD17.TXT                         14
+PAD18.TXT                         14
+PAD19.TXT                         14
+PAD20.TXT                         14
+PAD21.TXT                         14
+PAD22.TXT                         14
+PAD23.TXT                         14
+across a cluster.bin              16
+BADSUM~1.BIN                      15
+Files: 34, directories: 0
+READY.
+halt
+Halted
+exit 0
+Slot 0: The card as lfn.img was
+Slot 1: The card as super.img was
+== DIR 0 mounts the mounted slot again and closes the program's handle
+NiceMon V9.9
+HELP lists the statements
+READY.
+sys 0x9000
+Returned 00000002
+READY.
+dir 0
+Directory of NICE
+HELLO.BIN                      14184
+Files: 1, directories: 0
+READY.
+sys 0x9400
+Returned 00000006
+READY.
+halt
+Halted
+The calls:
+segment 4
+  open 0 "HELLO.BIN" 0 -> 0
+segment 5
+  read 0 2 -> -24
+exit 0
+Slot 0: The card as super.img was

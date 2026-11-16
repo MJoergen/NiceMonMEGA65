@@ -1,0 +1,16 @@
+; The program of the suite fatinfo of test/fat_runs.py: a file of 1500
+; bytes, 3 clusters, whose clusters the sector writes show, and its
+; delete; and the files at the top of i_total.img's clusters. The format
+; is test/fat_tool.py's, OPS.
+
+seg                             ; 0x8000
+open 0, "F.TXT", 1              ; 0
+write 0, 0, 1500                ; 1500
+close 0                         ; 0
+
+seg                             ; 0x8400
+delete "F.TXT"                  ; 0
+
+seg                             ; 0x8800
+open 0, "TOP1.TXT", 0           ; 0: cluster 129151, the last of the FATs
+open 1, "TOP2.TXT", 0           ; -26: 129152, past them, though the volume says more

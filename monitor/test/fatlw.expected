@@ -142,3 +142,88 @@ a much longer name of a file.bin:
 00008001 00000005
 mixed.Bin:
 00008000 1234abcd
+What the card holds that lfn.img did not:
+Sectors changed outside the volume: none
+FSInfo free count: 0001FBC5 -> FFFFFFFF
+FSInfo next free: 0000003E -> 00000018
+FAT entries changed: 5
+  63-67: 00000000 -> 0FFFFFFF
+FAT 2: the same changes
+NICE C3+0 entry 5:
+  was "MIXED   BIN" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2025-06-15 written 2025-06-15 12:34:56 cluster 18 size 14
+  now "MIXED   BIN" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 18 size 18
+NICE C3+0 entry 10:
+  was long 42 "xt\u0000\uffff\uffff\uffff\uffff\uffff\uffff\uffff\uffff\uffff\uffff" attr 0F type 00 sum 8C cluster 0000
+  now long 43 "le.bin\u0000\uffff\uffff\uffff\uffff\uffff\uffff" attr 0F type 00 sum C6 cluster 0000
+NICE C3+0 entry 11:
+  was long 01 "mandelbrot1.t" attr 0F type 00 sum 8C cluster 0000
+  now long 02 " name of a fi" attr 0F type 00 sum C6 cluster 0000
+NICE C3+0 entry 12:
+  was "MANDEL~1TXT" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2025-06-15 written 2025-06-15 12:34:56 cluster 22 size 17
+  now long 01 "a much longer" attr 0F type 00 sum C6 cluster 0000
+NICE C3+0 entry 13:
+  was long 42 "xt\u0000\uffff\uffff\uffff\uffff\uffff\uffff\uffff\uffff\uffff\uffff" attr 0F type 00 sum 6C cluster 0000
+  now "AMUCHL~1BIN" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 22 size 36
+NICE C3+0 entry 14:
+  was long 01 "mandelbrot2.t" attr 0F type 00 sum 6C cluster 0000
+  now "X       BIN" attr 20 case 18 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 23 size 36
+NICE C3+0 entry 15:
+  was "MANDEL~2TXT" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2025-06-15 written 2025-06-15 12:34:56 cluster 23 size 17
+  now "\xe5ANDEL~2TXT" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2025-06-15 written 2025-06-15 12:34:56 cluster 23 size 17
+NICE C61+0 entry 4:
+  was zeros
+  now long 42 "n\u0000\uffff\uffff\uffff\uffff\uffff\uffff\uffff\uffff\uffff\uffff\uffff" attr 0F type 00 sum 7A cluster 0000
+NICE C61+0 entry 5:
+  was zeros
+  now long 01 "mandelbrot.bi" attr 0F type 00 sum 7A cluster 0000
+NICE C61+0 entry 6:
+  was zeros
+  now "MANDEL~1BIN" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 63 size 36
+NICE C61+0 entry 7:
+  was zeros
+  now long 42 "xt\u0000\uffff\uffff\uffff\uffff\uffff\uffff\uffff\uffff\uffff\uffff" attr 0F type 00 sum CC cluster 0000
+NICE C61+0 entry 8:
+  was zeros
+  now long 01 "mandelbrot3.t" attr 0F type 00 sum CC cluster 0000
+NICE C61+0 entry 9:
+  was zeros
+  now "MANDEL~3TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 64 size 36
+NICE C61+0 entry 10:
+  was zeros
+  now long 41 "Hello.bin\u0000\uffff\uffff\uffff" attr 0F type 00 sum DF cluster 0000
+NICE C61+0 entry 11:
+  was zeros
+  now "HELLO   BIN" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 65 size 36
+NICE C61+0 entry 12:
+  was zeros
+  now "LOWER2  BIN" attr 20 case 18 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 66 size 36
+NICE C61+0 entry 13:
+  was zeros
+  now long 41 "a b.bin\u0000\uffff\uffff\uffff\uffff\uffff" attr 0F type 00 sum DA cluster 0000
+NICE C61+0 entry 14:
+  was zeros
+  now "AB~1    BIN" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 67 size 36
+NICE/MIXED.BIN: 18 bytes, "00008000 1234abcd\x0a"
+NICE/MIXED.BIN: its sector 0 past the size: 494 bytes, zeros
+NICE/AMUCHL~1.BIN: 36 bytes, "00008000 1234abcd\x0a00008001 00000005\x0a"
+NICE/AMUCHL~1.BIN: its sector 0 past the size: 476 bytes, zeros
+NICE/X.BIN: 36 bytes, "00008000 1234abcd\x0a00008001 00000005\x0a"
+NICE/X.BIN: its sector 0 past the size: 476 bytes, zeros
+NICE/MANDEL~1.BIN: 36 bytes, "00008000 1234abcd\x0a00008001 00000005\x0a"
+NICE/MANDEL~1.BIN: its sector 0 past the size: 476 bytes, zeros
+NICE/MANDEL~3.TXT: 36 bytes, "00008000 1234abcd\x0a00008001 00000005\x0a"
+NICE/MANDEL~3.TXT: its sector 0 past the size: 476 bytes, zeros
+NICE/HELLO.BIN: 36 bytes, "00008000 1234abcd\x0a00008001 00000005\x0a"
+NICE/HELLO.BIN: its sector 0 past the size: 476 bytes, zeros
+NICE/LOWER2.BIN: 36 bytes, "00008000 1234abcd\x0a00008001 00000005\x0a"
+NICE/LOWER2.BIN: its sector 0 past the size: 476 bytes, zeros
+NICE/AB~1.BIN: 36 bytes, "00008000 1234abcd\x0a00008001 00000005\x0a"
+NICE/AB~1.BIN: its sector 0 past the size: 476 bytes, zeros
+Sector writes, 64:
+mount 0, C61+0, FSInfo, FAT1+0, FAT2+0, C63+0, C61+0, FSInfo, C61+0,
+FAT1+0, FAT2+0, C64+0, C61+0, FSInfo, C61+0, FAT1+0, FAT2+0, C65+0,
+C61+0, FSInfo, C61+0, FAT1+0, FAT2+0, C66+0, C61+0, FSInfo, C61+0,
+FAT1+0, FAT2+0, C67+0, C61+0, FSInfo, C3+0, FAT1+0, FAT2+0, FSInfo,
+FAT1+0, FAT2+0, C18+0, C3+0, FSInfo, C3+0 x3, FAT1+0, FAT2+0, FSInfo,
+C3+0 x3, FAT1+0, FAT2+0, FSInfo, C3+0, FAT1+0, FAT2+0, C22+0, C3+0,
+FSInfo, C3+0, FAT1+0, FAT2+0, C23+0, C3+0, FSInfo

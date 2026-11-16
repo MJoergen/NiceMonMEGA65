@@ -1,0 +1,24 @@
+== DIR of names of 23 to 26 characters, a hidden empty file, a system file, a directory, and a size of 10 digits
+NiceMon V9.9
+HELP lists the statements
+READY.
+dir
+Directory of NICE
+HELLO.BIN                      14184
+EMPTY.TXT                          0
+SYS.TXT                            5
+aaaaaaaaaaaaaaaaaaa.txt           23
+bbbbbbbbbbbbbbbbbbbb.txt
+                                  24
+ccccccccccccccccccccc.txt
+                                  25
+dddddddddddddddddddddd.txt
+                                  26
+a dir                          <DIR>
+HUGE.BIN                  4294967295
+Files: 8, directories: 1
+READY.
+halt
+Halted
+exit 0
+Slot 0: The card as rows.img was

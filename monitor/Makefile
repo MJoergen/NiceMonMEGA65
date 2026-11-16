@@ -211,10 +211,17 @@ $(BUILD)/fsw.bin: test/fsw.nasm mon.nasm $(TOOLS) | $(BUILD)
 	@$(ASM) -o $@ $(BUILD)/fsw_all.nasm
 
 # The FAT images of the tests, from test/fat_image.py, with build/hello.bin
-# as HELLO.BIN. They need mkfs.fat, sfdisk, and mtools.
+# as HELLO.BIN. They need mkfs.fat, sfdisk, and mtools. The second list
+# is the images of the suites of test/fat_runs.py, made from the first.
 FAT_IMAGES = $(addprefix $(BUILD)/fat/,fat32.img super.img fat16.img exfat.img nonice.img \
-                                    nicefile.img full.img lfn.img)
-$(FAT_IMAGES) &: test/fat_image.py $(BUILD)/hello.bin
+                                    nicefile.img full.img lfn.img \
+               lines.img tab1.img chains.img lfnx.img rows.img bigdir.img \
+               spc8.img spc64.img fat1.img i_total.img i_last.img i_wrap.img i_ff.img i_nosig.img \
+               i_bpb0.img i_bpbff.img i_top.img \
+               $(addprefix m_,$(addsuffix .img,fat12 fat16 fat12p nopart zero p83 pb nosig \
+                 jump bps spc0 spc3 rsvd0 nfats0 fatsz0 fatszbig nodata fat16sz rootent \
+                 c4084 c4085 c65524 c65525 root1 roottop nicecl baddir)))
+$(FAT_IMAGES) &: test/fat_image.py test/fat_tool.py $(BUILD)/hello.bin
 	@mkdir -p $(BUILD)/fat
 	@$(PYTHON) test/fat_image.py $(BUILD)/hello.bin $(BUILD)/fat
 
@@ -466,6 +473,11 @@ DUMP_udp      = -d 0x9100:20 -d 0x9180:14
 # and the bytes and the sources that udp_recv wrote
 DUMP_net      = -d 0x9100:24 -d 0x9180:8 -d 0x9190:16
 MAX_STEPS = 10000000
+# The suites of test/fat_runs.py, each of several runs on the cards of
+# test/fat_image.py, compared with test/SUITE.expected: make test
+# FAT_SUITES=fatapi runs one
+FAT_SUITES = fatstate fatload fattab fatdrop fatchain fatlfn fatmount fatgeo fatinfo \
+             fatfull fatrows fatapi
 # The first sector of fat32.img's FAT32 partition (test/fat_image.py), and
 # its byte offset, for mtools
 FAT32_START = 34816
@@ -489,10 +501,17 @@ FAT32_START_BYTES = $(shell echo $$(($(FAT32_START) * 512)))
 # and
 # test/tftp.py tftp, and test/rtc.py the cold start and time on the words
 # of an I2C master that it sets, as a real-time clock, and on the chips
-# that it answers for over niceemu --link. arp and udp run
+# that it answers for over niceemu --link, and test/fat_runs.py the
+# suites of FAT_SUITES. arp and udp run
 # with --step-time, as their timeouts
 # count, and so does net, and the frames they send are added to their
-# output.
+# output. A test that writes to a card has the card's image in base0 or
+# base1, which cards copies for each run; it runs with --step-time, so
+# that the dates it writes are fixed, but for clock and clockpast, which
+# set the clock themselves, and its output has what the card holds that
+# the image did not (test/fat_tool.py diff, the dates masked for time)
+# and the order of its sector writes, from a second run with -t
+# (test/fat_tool.py order).
 test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.bin $(BUILD)/hello.bin \
       $(BUILD)/dis.bin $(BUILD)/sd.bin $(BUILD)/arp.bin $(BUILD)/udp.bin $(BUILD)/net.bin \
       $(BUILD)/netdhcp.bin $(BUILD)/dns.bin $(BUILD)/lease.bin $(BUILD)/rom.bin $(BUILD)/fs.bin $(BUILD)/fsw.bin \
@@ -510,6 +529,7 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	@$(PYTHON) test/bgdhcp.py $(EMU) $(BUILD)/monitor_test.bin
 	@$(PYTHON) test/tftp.py $(EMU) $(BUILD)/monitor_test.bin test/tftp.expected $(BUILD)/tftp.out
 	@$(PYTHON) test/rtc.py $(EMU) $(BUILD)/monitor_test.bin
+	@$(PYTHON) test/fat_runs.py $(EMU) $(BUILD)/monitor_test.bin $(BUILD) $(FAT_SUITES)
 	@$(ROMSIZE)
 	@echo 'FFFFFF9E 00020000' > $(BUILD)/ram128k.bin
 	@echo 'FFFFFF9E 00010000' > $(BUILD)/ram64k.bin
@@ -539,10 +559,15 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	@$(PYTHON) test/sd_image.py --written $(BUILD)/sd_written.img
 	@{ printf '$(LOAD_HEAD)'; head -n 3 $(BUILD)/hello.bin | awk '{ printf "%s\r\n", $$0 }'; \
 	  tail -n +4 $(BUILD)/hello.bin; printf '$(LOAD_TAIL)'; } > $(BUILD)/load.txt
-	@fail=0; for t in cmds basic scroll load load_emu load_64k sd_write arp udp net rom fs fsw fat fatw fatl tab fatlw fatbad fat1 fatnone time \
+	@fail=0; \
+	cards() { sd=; \
+	  if [ -n "$$base0" ]; then cp --sparse=always $$base0 $(BUILD)/$${t}0.img; sd="--sd0 $(BUILD)/$${t}0.img"; fi; \
+	  if [ -n "$$base1" ]; then rm -f $(BUILD)/$${t}1.img; cp --sparse=always $$base1 $(BUILD)/$${t}1.img; \
+	    if [ -n "$$ro1" ]; then chmod a-w $(BUILD)/$${t}1.img; fi; sd="$$sd --sd1 $(BUILD)/$${t}1.img"; fi; }; \
+	for t in cmds basic scroll load load_emu load_64k sd_write arp udp net rom fs fsw fat fatw fatl tab fatlw fatbad fat1 fatnone time \
 	           clock clockpast \
 	           hello reset hello_c; do \
-	  opts=; rom=$(BUILD)/monitor_test.bin; \
+	  opts=; rom=$(BUILD)/monitor_test.bin; base0=; base1=; ro1=; mask=; \
 	  case $$t in \
 	    cmds) prog=; input=cmds; dump='$(DUMP_cmds)';; \
 	    basic) prog=; input=basic; dump='$(DUMP_basic)';; \
@@ -562,27 +587,23 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	    fs) prog=$(BUILD)/fs.bin; input=run; dump='$(DUMP_fs)'; \
 	      opts="--sd0 $(BUILD)/fat/fat32.img --sd1 $(BUILD)/fat/super.img";; \
 	    fsw) prog=$(BUILD)/fsw.bin; input=run; dump='$(DUMP_fsw)'; \
-	      cp $(BUILD)/fat/fat32.img $(BUILD)/fsw0.img; \
-	      mattrib -i $(BUILD)/fsw0.img@@$(FAT32_START_BYTES) +r ::NICE/KEEP.TXT; \
-	      rm -f $(BUILD)/fsw1.img; cp $(BUILD)/fat/super.img $(BUILD)/fsw1.img; chmod a-w $(BUILD)/fsw1.img; \
-	      opts="--sd0 $(BUILD)/fsw0.img --sd1 $(BUILD)/fsw1.img";; \
+	      cp $(BUILD)/fat/fat32.img $(BUILD)/fsw0.base; \
+	      mattrib -i $(BUILD)/fsw0.base@@$(FAT32_START_BYTES) +r ::NICE/KEEP.TXT; \
+	      base0=$(BUILD)/fsw0.base; base1=$(BUILD)/fat/super.img; ro1=1; opts=--step-time;; \
 	    fat) prog=; input=fat; dump='$(DUMP_fat)'; \
 	      opts="--sd0 $(BUILD)/fat/fat32.img --sd1 $(BUILD)/fat/super.img";; \
 	    fatw) prog=; input=fatw; dump=; \
-	      cp $(BUILD)/fat/super.img $(BUILD)/fatw0.img; cp $(BUILD)/fat/full.img $(BUILD)/fatw1.img; \
-	      opts="--sd0 $(BUILD)/fatw0.img --sd1 $(BUILD)/fatw1.img";; \
+	      base0=$(BUILD)/fat/super.img; base1=$(BUILD)/fat/full.img; opts=--step-time;; \
 	    fatl) prog=; input=fatl; dump=; opts="--sd0 $(BUILD)/fat/lfn.img";; \
 	    tab) prog=; input=tab; dump=; opts="--sd0 $(BUILD)/fat/lfn.img";; \
-	    fatlw) prog=; input=fatlw; dump=; \
-	      cp $(BUILD)/fat/lfn.img $(BUILD)/fatlw0.img; opts="--sd0 $(BUILD)/fatlw0.img";; \
+	    fatlw) prog=; input=fatlw; dump=; base0=$(BUILD)/fat/lfn.img; opts=--step-time;; \
 	    fatbad) prog=; input=fatbad; dump=; \
 	      opts="--sd0 $(BUILD)/fat/fat16.img --sd1 $(BUILD)/fat/exfat.img";; \
 	    fat1) prog=; input=fat1; dump=; opts="--sd1 $(BUILD)/fat/super.img";; \
-	    time) prog=; input=time; dump=; cp $(BUILD)/fat/super.img $(BUILD)/time0.img; \
-	      opts="--step-time --sd0 $(BUILD)/time0.img";; \
+	    time) prog=; input=time; dump=; base0=$(BUILD)/fat/super.img; mask=--mask-times; \
+	      opts=--step-time;; \
 	    clock|clockpast) prog=$(BUILD)/$$t.bin; input=$$t; dump='$(DUMP_clock)'; \
-	      cp $(BUILD)/fat/super.img $(BUILD)/$${t}0.img; \
-	      opts="--no-cycle-counter --sd0 $(BUILD)/$${t}0.img";; \
+	      base0=$(BUILD)/fat/super.img; opts=--no-cycle-counter;; \
 	    fatnone) prog=; input=fatnone; dump=; \
 	      opts="--sd0 $(BUILD)/fat/nonice.img --sd1 $(BUILD)/fat/nicefile.img";; \
 	    hello) prog=$(BUILD)/hello.bin; input=run; dump='$(DUMP_hello)';; \
@@ -590,8 +611,9 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	    hello_c) prog=$(BUILD)/hello_c.bin; input=run; dump='$(DUMP_hello_c)'; \
 	      $(MAKE) --no-print-directory $$prog || exit 1;; \
 	  esac; \
+	  cards; \
 	  cat $$rom $$prog > $(BUILD)/$$t.full.bin; \
-	  $(EMU) -s -n $(MAX_STEPS) -i $(BUILD)/$$input.txt $$dump $$opts $(BUILD)/$$t.full.bin \
+	  $(EMU) -s -n $(MAX_STEPS) -i $(BUILD)/$$input.txt $$dump $$opts $$sd $(BUILD)/$$t.full.bin \
 	    > $(BUILD)/$$t.raw; status=$$?; \
 	  { sed -e '/^Halted (HALT)/,/^R12 /d' $(BUILD)/$$t.raw; \
 	    sed -n 's/.* R14 ..\(......\) .*/VBASE at the halt \1/p' $(BUILD)/$$t.raw; \
@@ -613,7 +635,13 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	      $(PYTHON) test/fat_check.py $(BUILD)/$${t}0.img --stamps A.BIN B.BIN C.BIN D.BIN P.BIN; fi; \
 	    if [ $$t = fatlw ]; then \
 	      $(PYTHON) test/fat_check.py $(BUILD)/fatlw0.img mandelbrot.bin "a b.bin" \
-	        "a much longer name of a file.bin" mixed.Bin; fi; } \
+	        "a much longer name of a file.bin" mixed.Bin; fi; \
+	    if [ -n "$$base0" ]; then $(PYTHON) test/fat_tool.py diff $$mask $$base0 $(BUILD)/$${t}0.img; fi; \
+	    if [ -n "$$base1" ] && [ -z "$$ro1" ]; then \
+	      $(PYTHON) test/fat_tool.py diff $$mask $$base1 $(BUILD)/$${t}1.img; fi; \
+	    if [ -n "$$base0$$base1" ]; then cards; \
+	      $(EMU) -t -n $(MAX_STEPS) -i $(BUILD)/$$input.txt $$opts $$sd $(BUILD)/$$t.full.bin | \
+	        $(PYTHON) test/fat_tool.py order $${base0:+--sd0 $$base0} $${base1:+--sd1 $$base1}; fi; } \
 	    > $(BUILD)/$$t.out; \
 	  if [ $$t = rom ]; then \
 	    trap=$$(sed -n 's/^\(........\) _rom_trap$$/\1/p' $(BUILD)/rom.sym | tr a-f A-F); \

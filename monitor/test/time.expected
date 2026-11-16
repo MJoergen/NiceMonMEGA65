@@ -168,3 +168,28 @@ Dates in NICE:
 old      bin        18 2026-01-01   0:00 
 new      bin        18 2026-11-11  14:30 
 y1970    bin        18 2026-01-01   0:00 
+What the card holds that super.img did not:
+Sectors changed outside the volume: none
+FSInfo free count: 0001F7E0 -> FFFFFFFF
+FSInfo next free: 0000001F -> 00000023
+FAT entries changed: 3
+  32-34: 00000000 -> 0FFFFFFF
+FAT 2: the same changes
+NICE C3 entry 3:
+  was zeros
+  now "OLD     BIN" attr 20 case 18 created 2026-01-01 **:**:** +** accessed 2026-01-01 written 2026-01-01 **:**:** cluster 32 size 18
+NICE C3 entry 4:
+  was zeros
+  now "NEW     BIN" attr 20 case 18 created 2026-11-11 **:**:** +** accessed 2026-11-11 written 2026-11-11 **:**:** cluster 33 size 18
+NICE C3 entry 5:
+  was zeros
+  now "Y1970   BIN" attr 20 case 18 created 2026-01-01 **:**:** +** accessed 2026-01-01 written 2026-01-01 **:**:** cluster 34 size 18
+NICE/OLD.BIN: 18 bytes, "00008000 00000001\x0a"
+NICE/OLD.BIN: its sector 0 past the size: 494 bytes, zeros
+NICE/NEW.BIN: 18 bytes, "00008000 00000001\x0a"
+NICE/NEW.BIN: its sector 0 past the size: 494 bytes, zeros
+NICE/Y1970.BIN: 18 bytes, "00008000 00000001\x0a"
+NICE/Y1970.BIN: its sector 0 past the size: 494 bytes, zeros
+Sector writes, 19:
+mount 0, C3, FSInfo, FAT1+0, FAT2+0, C32, C3, FSInfo, C3, FAT1+0, FAT2+0,
+C33, C3, FSInfo, C3, FAT1+0, FAT2+0, C34, C3, FSInfo

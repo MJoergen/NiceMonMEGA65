@@ -46,3 +46,87 @@ HELLO.BIN:
 0123456789012345678901234567890123456789012345678
 DROP.TXT:
 Slot 1's card as it was
+What the card holds that fsw0.base did not:
+Sectors changed outside the volume: none
+FSInfo free count: 0001F7BF -> FFFFFFFF
+FSInfo next free: 00000040 -> 00000014
+FAT entries changed: 23
+  7: 00000008 -> 0FFFFFFF
+  17: 00000012 -> 0FFFFFFF
+  19: 00000014 -> 0FFFFFFF
+  20-34: each the next, the last 0FFFFFFF -> 00000000
+  37: 0FFFFFFF -> 00000000
+  39: 0FFFFFFF -> 00000000
+  48: 0FFFFFFF -> 00000012
+  65-66: 00000000 -> each the next, the last 0FFFFFFF
+FAT 2: the same changes
+NICE C6 entry 2:
+  was "HELLO   BIN" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2025-06-15 written 2025-06-15 12:34:56 cluster 7 size 14184
+  now "HELLO   BIN" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 7 size 50
+NICE C6 entry 4:
+  was long 42 "xt\u0000\uffff\uffff\uffff\uffff\uffff\uffff\uffff\uffff\uffff\uffff" attr 0F type 00 sum 42 cluster 0000
+  now "E00     TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 0 size 0
+NICE C6 entry 5:
+  was long 01 "A long name.t" attr 0F type 00 sum 42 cluster 0000
+  now "E01     TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 0 size 0
+NICE C6 entry 6:
+  was "ALONGN~1TXT" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2025-06-15 written 2025-06-15 12:34:56 cluster 37 size 26
+  now "E02     TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 0 size 0
+NICE C6 entry 8:
+  was "FILE01  TXT" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2025-06-15 written 2025-06-15 12:34:56 cluster 39 size 15
+  now "E03     TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 0 size 0
+NICE C18, new to the directory:
+  entry 0: "E04     TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 0 size 0
+  entry 1: "E05     TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 0 size 0
+  entry 2: "E06     TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 0 size 0
+  entry 3: "E07     TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 0 size 0
+  entry 4: "E08     TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 0 size 0
+  entry 5: "E09     TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 0 size 0
+  entry 6: "E10     TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 0 size 0
+  entry 7: "E11     TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 0 size 0
+  entry 8: "E12     TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 0 size 0
+  entry 9: "E13     TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 0 size 0
+  entry 10: "E14     TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 0 size 0
+  entry 11: "E15     TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 0 size 0
+  entry 12: "E16     TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 0 size 0
+  entry 13: "E17     TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 0 size 0
+  entry 14: "E18     TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 0 size 0
+  entry 15: "E19     TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 0 size 0
+  the other 0 entries zeros
+NICE C19, new to the directory:
+  entry 0: "E20     TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 0 size 0
+  entry 1: "E21     TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 0 size 0
+  entry 2: "E22     TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 0 size 0
+  entry 3: "E23     TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 0 size 0
+  entry 4: "DROP    TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 0 size 0
+  the other 11 entries zeros
+NICE C48 entry 14:
+  was "\xe5AP2    TXT" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2025-06-15 written 2025-06-15 12:34:56 cluster 62 size 512
+  now "NEW     TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 65 size 700
+NICE C48 entry 15:
+  was zeros
+  now "BIG     BIN" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 8 size 5000
+NICE/HELLO.BIN: 50 bytes, "0123456789012345678901234567890123456789012345678\x0a"
+NICE/HELLO.BIN: its sector 0 past the size: 462 bytes, zeros
+NICE/BIG.BIN: 5000 bytes, SHA-256 1f2c429271b53bdd
+NICE/BIG.BIN: its sector 9 past the size: 120 bytes, zeros
+NICE/NEW.TXT: 700 bytes, SHA-256 cf685ab25e54d6c3
+NICE/NEW.TXT: its sector 1 past the size: 324 bytes, zeros
+Sector writes, 199:
+mount 0, C48, FSInfo, FAT1+0, FAT2+0, C65, FAT1+0, FAT2+0, FAT1+0,
+FAT2+0, C66, C48, FSInfo, C6, FAT1+0, FAT2+0, FAT1+0, FAT2+0, FAT1+0,
+FAT2+0, FAT1+0, FAT2+0, FAT1+0, FAT2+0, FAT1+0, FAT2+0, FAT1+0, FAT2+0,
+FAT1+0, FAT2+0, FAT1+0, FAT2+0, FAT1+0, FAT2+0, FAT1+0, FAT2+0, FAT1+0,
+FAT2+0, FAT1+0, FAT2+0, FAT1+0, FAT2+0, FAT1+0, FAT2+0, FAT1+0, FAT2+0,
+FAT1+0, FAT2+0, FAT1+0, FAT2+0, FAT1+0, FAT2+0, FAT1+0, FAT2+0, FAT1+0,
+FAT2+0, FAT1+0, FAT2+0, FAT1+0, FAT2+0, FAT1+0, FAT2+0, FAT1+0, FAT2+0,
+FAT1+0, FAT2+0, FAT1+0, FAT2+0, FAT1+0, FAT2+0, FSInfo, FAT1+0, FAT2+0,
+C7, C6, FSInfo, C48, FAT1+0, FAT2+0, C8, FAT1+0, FAT2+0, FAT1+0, FAT2+0,
+C9, FAT1+0, FAT2+0, FAT1+0, FAT2+0, C10, FAT1+0, FAT2+0, FAT1+0, FAT2+0,
+C11, FAT1+0, FAT2+0, FAT1+0, FAT2+0, C12, FAT1+0, FAT2+0, FAT1+0, FAT2+0,
+C13, FAT1+0, FAT2+0, FAT1+0, FAT2+0, C14, FAT1+0, FAT2+0, FAT1+0, FAT2+0,
+C15, FAT1+0, FAT2+0, FAT1+0, FAT2+0, C16, FAT1+0, FAT2+0, FAT1+0, FAT2+0,
+C17, C48, FSInfo, C6 x3, FAT1+0, FAT2+0, FSInfo, C6, FAT1+0, FAT2+0,
+FSInfo, C6 x8, C18, FAT1+0, FAT2+0, FAT1+0, FAT2+0, C18, FSInfo, C18 x31,
+C19, FAT1+0, FAT2+0, FAT1+0, FAT2+0, C19, FSInfo, C19 x8, mount 1,
+1:C3 x2, mount 0

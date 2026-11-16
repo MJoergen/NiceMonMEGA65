@@ -1,0 +1,20 @@
+; The program of the first run of the suite fatfull of test/fat_runs.py,
+; on full.img of test/fat_image.py, which has 3 free clusters. The format
+; is test/fat_tool.py's, OPS.
+
+seg
+open 0, "A.TXT", 1              ; 0
+write 0, 0, 1000                ; 1000
+write 0, 0, 1000                ; 536: the card is full after 1536
+write 0, 0, 10                  ; -30: nothing written
+close 0                         ; 0
+open 0, "A.TXT", 0              ; 0
+read 0, 2000                    ; 1536
+close 0
+open 0, "B.TXT", 1              ; 0: the entry needs no cluster
+write 0, 0, 1                   ; -30
+close 0                         ; 0
+mount 0                         ; 0, so the next search reads FSInfo's hint
+open 0, "C.TXT", 1              ; 0
+write 0, 0, 1                   ; -30, after FSInfo written by the search (known oddity B8)
+close 0                         ; 0

@@ -1,0 +1,29 @@
+; The program of the suite fatstate of test/fat_runs.py: what the cold
+; start and a program's return keep (fat32.c's state is the C code's
+; memory, which the cold start zeroes and a return leaves alone).
+; The format is test/fat_tool.py's, OPS.
+
+seg                             ; 0x8000: a file opened, and left open
+open 0, "HELLO.BIN", 0          ; 0, the first handle
+read 0, 2                       ; 2, "00"
+
+seg                             ; 0x8400, after SYS 0
+read 0, 2                       ; -24: the cold start closed it
+open 1, "HELLO.BIN", 0          ; 0: so the first handle is free again
+close 1                         ; 0
+
+seg                             ; 0x8800: both handles left open
+open 0, "HELLO.BIN", 0          ; 0
+open 1, "", 2                   ; 1, the folder, which takes a handle too
+
+seg                             ; 0x8C00, after LOAD, SAVE, DIR, and TAB
+read 0, 3                       ; 3, "000", as the file was left
+readdir 1                       ; 1, HELLO.BIN
+close 0                         ; 0
+close 1                         ; 0
+
+seg                             ; 0x9000: a file left open
+open 0, "HELLO.BIN", 0          ; 0
+
+seg                             ; 0x9400, after DIR 0
+read 0, 2                       ; -24: DIR 0 mounted again, which closed it
