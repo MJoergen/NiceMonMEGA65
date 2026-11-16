@@ -24,9 +24,9 @@
 ;
 ; - monitor_cmd.nasm: the routines of BASIC's statements that replace the
 ;   monitor's commands, and the routines and texts that only they use.
-; - basic.nasm: BASIC's assembly, the main loop, the stubs through which
-;   basic.c, BASIC in the ROM's C code, calls the statements, and its
-;   keywords and messages (issue #112, doc/BASIC.md).
+; - basic.nasm: BASIC, the main loop, the scanner of a line, which calls
+;   the statements, and its keywords and messages (issues #112 and #115,
+;   doc/BASIC.md).
 ; - monitor_dis.nasm: DIS, the disassembler (README.md, "The
 ;   disassembler").
 ; - monitor_sd.nasm: the SD cards below the file system, the sector
@@ -158,6 +158,7 @@ V_CSP           .EQU    0xFFFFF067      ; the C code's stack pointer at the cold
 V_I             .EQU    0xFFFFF068      ; for the clock: the fields of a date and a time to set, and a 7th word,
 V_F             .EQU    0xFFFFF06E      ; the fields of the clock's time, which is the 7th of V_I,
 V_DAYS          .EQU    0xFFFFF074      ; and its days since 1970
+V_ARGS          .EQU    0xFFFFF075      ; for BASIC: the values of a statement, 4 words, slots 1, 2, and 4 at V_ARGS, +1, and +3
 V_ARP           .EQU    0xFFFFF100      ; the ARP cache: ARP_SLOTS entries of an IP address, 0 for none, the MAC address as E_MACH and E_MACL have it, and the time of arp_tick it was learned
 V_ARPNEXT       .EQU    0xFFFFF110      ; the entry that arp_learn takes next, 4 times its number
 V_XID           .EQU    0xFFFFF111      ; for DHCP: the transaction's number,

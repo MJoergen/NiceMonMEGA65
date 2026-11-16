@@ -488,14 +488,10 @@ clk_walk
 CLK_MDAYS
                 .DAT    0x1F1C1F00, 0x1F1E1F1E, 0x1E1F1E1F, 0x0000001F
 
-; The calls of the ROM's C code, by the names that it imports, until
-; basic.c (issue #115) and fat32.c (issue #149) are in assembly too, and
-; this block goes. _clock_cmd: R1 is the address of the string. _clock_fat:
-; R1 is a C pointer, a byte address of the C code's memory, at a multiple
-; of 4, so a word of it, which takes R2 of clock_fat.
-_clock_cmd
-                MOVE    R6, clock_cmd
-                JMP     bas_enter
+; The call of fat32.c, by the name that it imports, until it is in
+; assembly too (issue #149), and this block goes. _clock_fat: R1 is a C
+; pointer, a byte address of the C code's memory, at a multiple of 4, so
+; a word of it, which takes R2 of clock_fat.
 _clock_fat
                 PUSH    R7
                 PUSH    R1

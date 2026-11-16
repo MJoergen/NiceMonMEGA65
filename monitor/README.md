@@ -64,8 +64,7 @@ routines and the ARP cache of the network, and FAT32 in C.
 [INTERNALS.md](INTERNALS.md) describes them, with the build and the
 tests.
 
-The monitor is in NICE assembly, with FAT32, the clock, and BASIC's
-scanner in C. The ROM
+The monitor is in NICE assembly, with FAT32 in C. The ROM
 is its files in this order, and
 [INTERNALS.md](INTERNALS.md#the-roms-words) has the words of each, and
 the words that are free:
@@ -74,7 +73,7 @@ the words that are free:
 |---|---|
 | `monitor.nasm` | The dispatch table, the HAL, the screen, and the line with its scrollback |
 | `monitor_cmd.nasm` | The routines of the statements that were the monitor's commands |
-| `basic.nasm` | BASIC's main loop, the stubs through which `basic.c` calls the routines, and its keywords, messages, and help |
+| `basic.nasm` | BASIC: the main loop, the scanner of a line, and the keywords, messages, and help |
 | `monitor_dis.nasm` | The disassembler of `DIS` |
 | `monitor_sd.nasm` | The routines for the SD cards |
 | `monitor_eth.nasm` | The routines for the network: the frames, ARP, UDP, DHCP, DNS, TFTP, and NTP |
@@ -83,7 +82,6 @@ the words that are free:
 | `monlib.nasm` | The routines that programs join, which the statements use too |
 | `mon.nasm` | The stubs through which a program calls the entries |
 | `fat32.c` | FAT32, translated by `nicewasm --ram`, with the data of the module |
-| `basic.c` | BASIC: the scanner of a line, and the statements |
 | nice_cpu's `lib.nasm` and `muldiv_mpu.nasm` | The runtime of the C code |
 | `build/version.nasm` and `build/folder.nasm` | The version and the card's folder, which the Makefile writes |
 

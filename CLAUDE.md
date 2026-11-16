@@ -32,9 +32,10 @@ link with the UART's baud rate at `0xFFFFFF9F` (issue #75). `doc/BASIC_SURVEY.md
 the survey of the BASIC dialects behind the interpreter in the ROM of
 issue #54 (milestone V2.2), and `doc/BASIC.md` its design note, with
 the decisions, the room in the ROM, and the stages, of which stage 1,
-the shell (#112), is written. `doc/SDCARD.md` is the design of the SD
-cards' storage, issue #62 and its subtasks, of which the controller, the
-slots, the ROM's sector routines, FAT32's
+the shell (#112), is written, and ported to assembly (#115).
+`doc/SDCARD.md` is the design of the SD cards' storage, issue #62 and
+its subtasks, of which the controller, the slots, the ROM's sector
+routines, FAT32's
 reading with `DIR` and `LOAD`, and its writing with `SAVE` and `DELETE`
 (#55, #56, #57, #58, and #59) are written. `doc/` also has `CODING_STYLE.md`,
 `RELEASE.md`, and `RELEASE_NOTES.md`; the root keeps only `README.md`,
@@ -181,16 +182,15 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   `monitor/`: the monitor for the ROM in NICE assembly (`monitor.nasm`,
   the dispatch table, the HAL, and the map of its RAM, `monitor_cmd.nasm`,
   the routines of the statements that were the monitor's commands,
-  `basic.nasm`, BASIC's main loop (#54, stage 1 #112), the stubs to the
-  routines, and its keywords, messages, and help, with
+  `basic.nasm`, BASIC's main loop (#54, stage 1 #112), its scanner of
+  a line (#115), and its keywords, messages, and help, with
   `DIS` in `monitor_dis.nasm`, the sector routines in
   `monitor_sd.nasm`, the network in `monitor_eth.nasm`, TCP in
   `monitor_tcp.nasm`, #111, and the clock in `monitor_clock.nasm`
   (#148): the `TIME` statement, the dates of files (#109), the clock
   from the real-time clock at the cold start, which `TIME` writes
   (#105), and the time of `NTP` from a time server (#127)), its C
-  code (`fat32.c` and `basic.c`, BASIC's scanner and statements, in
-  one wasm module through `nicewasm --ram`, with its
+  code (`fat32.c`, in a wasm module through `nicewasm --ram`, with its
   writable words at `0xFFFFF400`; building the monitor needs clang, and
   its tests mtools, `mkfs.fat`, and `sfdisk`), the routines that
   programs join (`monlib.nasm`), the stubs and the header through which

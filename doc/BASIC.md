@@ -44,9 +44,9 @@ settle the three open questions of #54.
   whole: the monitor's commands become statements. The dispatch table,
   the HAL, and the programs at `0x8000` stay as they are.
 - **NICE assembly from stage 2 on.** Stage 1, the shell, was written
-  in C, in `basic.c`. Its first step in stage 2 is the port of
-  `basic.c` to assembly, #115, and every stage after it is written
-  in assembly, as C would fill the ROM at stage 3
+  in C, in `basic.c`. The first step of stage 2 ported it to
+  assembly, #115, and every stage after it is written in assembly,
+  as C would fill the ROM at stage 3
   ([The ROM's room](#the-roms-room)).
 - **Graphics, sprites, and sound** come much later, with hardware of
   their own. They are not in this design.
@@ -103,8 +103,9 @@ These facts bound the design:
   copied to the RAM at the cold start, the strings and the tables
   among them. 863 words are free there.
 - **One wasm module.** A program has one (WASM.md), so the shell's
-  `basic.c` joined `fat32.c` and `clock.c` in `ROM_C`, and shares
-  their memory and their C stack of 4096 bytes. There is no
+  `basic.c` joined `fat32.c` and `clock.c` in `ROM_C`, and shared
+  their memory and their C stack of 4096 bytes, until #148 and #115
+  took the clock and the shell out of it. There is no
   `malloc`, and no `setjmp`.
 - **The texts of the ROM are four characters a word.** The monitor had
   3250 words of `.ASCII_L` text. #131 packed them with `.ASCII_B`, and
@@ -500,14 +501,26 @@ The Commodore editor of #54, in assembly, in place of `getline`:
 
 BASIC is NICE assembly from stage 2 on ([Decisions](#decisions)):
 
-- Stage 2 starts with the port of `basic.c`, the shell of stage 1, to
-  assembly (#115). The tests of stage 1 stay as they are, and the
-  port passes them with the same output.
-- Every routine follows the C ABI, so BASIC calls the ROM's C code,
-  `fat32.c`, by a label, as the monitor's commands did, and the clock's
-  routines of `monitor_clock.nasm` (#148) by theirs.
-- The table of keywords and the messages are packed with `.ASCII_B`,
-  and read through the byte window, a quarter of the ROM.
+- Stage 2 started with the port of `basic.c`, the shell of stage 1,
+  to `basic.nasm` (#115). The tests of stage 1 stayed as they were,
+  with a test of the scanner, `basic`, written before the port, and
+  the port passes them with the same output.
+- The scanner is driven by tables. Each keyword in `OPS` has the
+  offset of its program after it, a string of ops, each a byte: the
+  kind of the item, a number, a string, a comma, or the end, and what
+  follows when it is not there. A statement's routine gets the values
+  in R1-R3, from the slots of `V_ARGS`. A new statement is a keyword,
+  a program, which may share the ops of another, and a halfword in
+  `ACTS`; a new kind of item, such as an expression, is a routine in
+  `KINDS`.
+- The scanner's routines take and return their values in registers,
+  as each one's comment says, and the statements' routines may use
+  every register, as the main loop starts again after each. BASIC
+  calls the ROM's C code, `fat32.c`, in the C ABI, by a label, as the
+  monitor's commands did, and the clock's routines of
+  `monitor_clock.nasm` (#148) by theirs.
+- The table of keywords, the ops, and the messages are packed with
+  `.ASCII_B`, and read through the byte window, a quarter of the ROM.
 - The workspace is words, and its formats are those of
   [Inside](#inside). BASIC's own state is in the monitor's variables,
   and none of it in the C code's RAM.
@@ -543,9 +556,9 @@ Each is a commit that builds and passes the tests, and has a line in
 the table of [The ROM's room](#the-roms-room) with its measured words.
 Each has an issue, under #54.
 
-1. **The shell**, #112. `basic.c` in `ROM_C`: `READY.`, a scanner of
-   keywords, numbers, and strings, and the statements of
-   [The main loop](#the-main-loop), each on the routine that the
+1. **The shell**, #112. `basic.c` in `ROM_C`, since #115 `basic.nasm`:
+   `READY.`, a scanner of keywords, numbers, and strings, and the
+   statements of [The main loop](#the-main-loop), each on the routine that the
    monitor's command has today. No expressions, no variables, and no
    program yet. The main loop, the table of commands, and their
    parsing leave `monitor_cmd.nasm`. What follows it: `load.py
@@ -560,9 +573,9 @@ Each has an issue, under #54.
    `PRINT` and `?` with `;`, `,`, `TAB`, and `SPC`, and its format of
    a number, `PEEK`, `POKE`, `:`, and the statements of stage 1 with
    expressions for their numbers. The errors. Still direct mode only.
-   Its first step is the port of `basic.c` to assembly, #115, and
-   the rest is written in assembly. It measures the words of the
-   stage and the steps of an operation.
+   Its first step is the port of `basic.c` to assembly, #115, which
+   is done, and the rest is written in assembly. It measures the
+   words of the stage and the steps of an operation.
 3. **Programs**, #114. The lines, `LIST`, `NEW`, `CLR`, `RUN`, `END`,
    `STOP`, `CONT`, `GOTO`, `GOSUB`, `IF` on one line, `FOR`, `REM`,
    `INPUT` of numbers, `GET`, `DIM`, the break key, `HIMEM`, and the
@@ -602,26 +615,33 @@ in C that the note had before 2026-11-16:
 | Stage | Words, guessed | In all |
 |---|---:|---:|
 | 1. The shell in C, less the main loop it replaces, measured | 961 | 961 |
-| 2. The port of the shell, guessed to save | -700 | 261 |
-| 2. Numbers | 1400 | 1661 |
-| 3. Programs | 2100 | 3761 |
-| 4. Files | 400 | 4161 |
-| 5. Strings | 1900 | 6061 |
-| 6. Functions | 200 | 6261 |
-| 7. The editor and its statements | 2000 | 8261 |
-| 8. Structure | 1400 | 9661 |
-| 9. Errors | 400 | 10061 |
-| 10. The machine | 700 | 10761 |
+| 2. The port of the shell, measured | -1325 | -364 |
+| 2. Numbers | 1400 | 1036 |
+| 3. Programs | 2100 | 3136 |
+| 4. Files | 400 | 3536 |
+| 5. Strings | 1900 | 5436 |
+| 6. Functions | 200 | 5636 |
+| 7. The editor and its statements | 2000 | 7636 |
+| 8. Structure | 1400 | 9036 |
+| 9. Errors | 400 | 9436 |
+| 10. The machine | 700 | 10136 |
 
-Stage 1 is `basic.c`, 1510 words, and `basic.nasm`, 624, of which 431
-are its packed texts, the help among them, less 1032 words that left
+Stage 1 was `basic.c`, 1510 words, and `basic.nasm`, 624, of which 431
+were its packed texts, the help among them, less 1032 words that left
 `monitor_cmd.nasm` and 141 that left the other files.
+The port of stage 1 to assembly (#115) made `basic.nasm` 821 words, of
+which 440 are its texts, the help, the keywords, and the ops among them.
+With `basic.c` it was 2134. The C code's start and its initial values
+are 8 words shorter, and the clock 4, without the stubs, so the monitor
+went from 22611 words to 21286, 1325 fewer (measured 2026-11-16).
 
 The ROM had 13455 words free without the demo, which left it in V2.1
 (#129). #111, the network for programs, leaves 9757 of them, #131,
 the texts packed, 11876, and `time ntp` (#127) 10952 (measured
 2026-11-14), TAB's completion of names (#137) 10167, and the shell
-of stage 1 (#112) 9206 (both measured 2026-11-15). In C, at 7 words a
+of stage 1 (#112) 9206 (both measured 2026-11-15), the clock in
+assembly (#148) 10157, and the shell in assembly (#115) 11482 (both
+measured 2026-11-16). In C, at 7 words a
 line, the stages 2 and 3 alone were guessed at 8800 words, so C would
 have filled the ROM at stage 3. That is why BASIC is assembly from
 stage 2 on.

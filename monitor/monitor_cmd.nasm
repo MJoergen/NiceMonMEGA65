@@ -1,12 +1,11 @@
 ; The routines of BASIC's statements that replace the monitor's commands
 ; (issue #112, doc/BASIC.md, "The main loop"), which the Makefile joins
-; after monitor.nasm (its header). basic.c scans a line, and calls each
-; through its stub in basic.nasm, with its arguments in R1-R4: the
-; numbers, and the word addresses of the strings, each ended by a 0. The
-; stub keeps R7-R12, as the C ABI asks, so a routine here uses any
-; register but SP, and returns with RET. Its errors are a line it prints.
-; The port of BASIC to NICE assembly (#115) is to replace this file, with
-; basic.c; the variables are in monitor.nasm, with the others.
+; after monitor.nasm (its header). basic.nasm scans a line, and calls
+; each with its arguments in R1-R3: the numbers, and the word addresses of
+; the strings, each ended by a 0. A routine here uses any register but
+; SP, as BASIC's main loop starts again after it, and returns with RET.
+; Its errors are a line it prints. The variables are in monitor.nasm,
+; with the others.
 ;
 ; LOAD with no name, st_lines, writes words into the RAM from lines of
 ; ADDR WORD in hex, as a .bin file has them, typed or pasted, up to an
@@ -23,7 +22,7 @@
 ; also the entries 9 to 15, fs_mount, fs_open, fs_read, fs_readdir,
 ; fs_close, fs_write, and fs_delete (issues #58 and #59). TIME, the
 ; clock of the time of day, is clock_cmd of monitor_clock.nasm, which
-; basic.c calls itself (issue #109). DIS, DHCP, NTP, and LOAD and DIR
+; basic.nasm calls itself (issue #109). DIS, DHCP, NTP, and LOAD and DIR
 ; from a TFTP server are in monitor_dis.nasm and monitor_eth.nasm, and use
 ; the routines of this file.
 
@@ -513,7 +512,7 @@ st_dir
 
 ; LOAD "NAME.BIN": R1 the name. The .bin file NAME.BIN of the card's
 ; folder NICE, read with fat_load of fat32.c, which writes its words as
-; st_lines does, and shown as st_lines shows its lines. basic.c has
+; st_lines does, and shown as st_lines shows its lines. basic.nasm has
 ; checked the name's .BIN.
 st_load
                 MOVE    R2, 0           ; to read
@@ -542,7 +541,7 @@ st_load
 ; SAVE "NAME", ADDR, N: R1 the name, R2 ADDR, and R3 N. The N words from
 ; ADDR written to the file NAME of the card's folder, which is made or
 ; truncated, as a .bin file, with fat_save of fat32.c, and the words saved
-; shown as LOAD shows those loaded. basic.c has added .BIN to a name
+; shown as LOAD shows those loaded. basic.nasm has added .BIN to a name
 ; without an extension.
 st_save
                 MOVE    R7, R1          ; the name

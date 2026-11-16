@@ -15,8 +15,8 @@
 ; file through the endpoint from a TFTP server as LOAD "NAME.BIN" reads
 ; one from the card, and DIR "IP", its listing (issue #84).
 ;
-; The statements are routines of the C ABI, as those of monitor_cmd.nasm
-; are, which basic.c calls through basic.nasm. IP, which shows and writes
+; The statements are routines as those of monitor_cmd.nasm are, which
+; basic.nasm calls with their arguments in R1-R3. IP, which shows and writes
 ; the IP address, is in monitor_cmd.nasm. TFTP reads its lines with
 ; bin_line, LOAD's. The cold start disables the port and empties the ARP
 ; cache.

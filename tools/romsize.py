@@ -42,7 +42,7 @@ NICEASM = os.path.join(REPO, "nice_cpu", "assembler", "niceasm.py")
 MONITOR_PARTS = {
     "monitor.nasm": "The dispatch table, the HAL, the cold start, and the traps",
     "monitor_cmd.nasm": "The routines of the statements that were the commands",
-    "basic.nasm": "BASIC's main loop, stubs, keywords, messages, and help",
+    "basic.nasm": "BASIC: the main loop, the scanner, the keywords, the messages, and the help",
     "monitor_dis.nasm": "The disassembler of `DIS`",
     "monitor_sd.nasm": "The sector routines",
     "monitor_eth.nasm": "The network",
@@ -58,7 +58,6 @@ MONITOR_PARTS = {
 # The C files of ROM_C, by their names, and what each one is
 C_PARTS = {
     "fat32.c": "FAT32",
-    "basic.c": "BASIC: the scanner and the statements",
 }
 # The sources that are nice_cpu's
 NICE_CPU_SOURCES = {"lib.nasm", "muldiv_mpu.nasm", "demo.nasm"}
