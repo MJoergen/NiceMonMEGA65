@@ -501,12 +501,15 @@ it:
 - **Receiving** does not wait. The ROM polls the queue in every UDP
   entry, and in its own waits: it takes the frames that wait, up to 4,
   and holds one datagram to the endpoint's port of the station's
-  address or 255.255.255.255. `udp_recv` returns that datagram, or 0
-  when none is held. The other frames are released unread, so a
-  program that also wants other frames drives the port itself. An empty
-  datagram, a fragment, and IP options are passed over. A datagram that
-  comes while one is held is dropped: a program reads the one held
-  before the next poll, or loses the next. A call with no room, 0 bytes,
+  address or 255.255.255.255. The poll stops at that datagram, so the
+  frames after it wait in the queue. `udp_recv` returns the datagram
+  held, and polls only when none is, so datagrams that come together
+  are read one after another. The other frames are released unread, so
+  a program that also wants other frames drives the port itself. An
+  empty datagram, a fragment, and IP options are passed over. A
+  datagram that a poll of another entry finds while one is held is
+  dropped: a program reads the one held before it calls another UDP
+  entry or `net_poll`, or may lose the next. A call with no room, 0 bytes,
   copies nothing and leaves the datagram held, so no datagram is lost to
   it. The queue holds 4 frames
   ([nice_cpu's DEVICES.md §7](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#7-ethernet-frames)), so a program that receives a burst reads it

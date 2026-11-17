@@ -157,6 +157,10 @@ V_NET           .EQU    0xFFFFF080      ; for IP, DHCP, and NTP: the words of ne
 V_ENT           .EQU    0xFFFFF400      ; for DIR: an entry of fs_readname, 4 words,
 V_NAME          .EQU    0xFFFFF404      ; and its name, 256 words
 V_FBUF          .EQU    0xFFFFF504      ; for LOAD and SAVE: the bytes of fs_read and fs_write, FBUF_BYTES words
+V_TBUF          .EQU    0xFFFFF584      ; for TFTP: a packet that udp_recv copied, TFTP_MAX words,
+V_TSRC          .EQU    0xFFFFF788      ; and its source's IP address and port, 2 words
+V_NTPQ          .EQU    0xFFFFF584      ; for NTP, in V_TBUF: the query, 48 words,
+V_NTPA          .EQU    0xFFFFF5B4      ; and the answer, 48 words
 V_ARP           .EQU    0xFFFFF100      ; the ARP cache: ARP_SLOTS entries of an IP address, 0 for none, the MAC address as E_MACH and E_MACL have it, and the time of arp_tick it was learned
 V_ARPNEXT       .EQU    0xFFFFF110      ; the entry that arp_learn takes next, 4 times its number
 V_XID           .EQU    0xFFFFF111      ; for DHCP: the transaction's number,

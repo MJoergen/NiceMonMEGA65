@@ -20,17 +20,21 @@
 ;  5  udp_send of hi to 255.255.255.255 port 9, 0: frame 1. Then come an
 ;     ARP reply of 10.0.0.2, which no one asked for, the datagrams one and
 ;     two of 10.0.0.2 port 7, and a TCP segment
-;  6  net_poll, 0, which takes the four
+;  6  net_poll, 0, which takes the ARP reply and one, and stops there
 ;  7  the bytes of the datagram held, 3, one
-;  8  ETH_RX_LEN, 0, the queue empty
-;  9  udp_recv of up to 100 bytes, 3, one from 10.0.0.2 port 7
-; 10  udp_recv, 0, as two came while one was held, and was dropped
+;  8  ETH_RX_LEN, 45, the bytes of two, which waits
+;  9  udp_recv of up to 100 bytes, 3, one from 10.0.0.2 port 7, with no
+;     poll, as one is held
+; 10  udp_recv, 3, two, which its poll held, at the same buffer
 ; 11  udp_send of x to 10.0.0.2 port 7, 0, from the ARP reply that the poll
-;     learned in place, with no request: frame 2. Then come the datagram
-;     three, an ARP reply of 10.0.0.3, and the datagram four
-; 12  udp_send of y to 10.0.0.3 port 7, 0, which polls first, and so
-;     learns 10.0.0.3, with no request: frame 3
-; 13  udp_recv, 5, three, held by the poll of udp_send
+;     learned in place, with no request: frame 2, with the TCP segment
+;     taken by its poll. Then come the datagram three, an ARP reply of
+;     10.0.0.3, and the datagram four
+; 12  udp_send of y to 10.0.0.3 port 7, 0, whose poll holds three and
+;     stops there, so that it asks for 10.0.0.3: frame 3, the request,
+;     and frame 4; the polls of its wait take the reply, and drop four,
+;     as three is held
+; 13  udp_recv, 5, three
 ; 14  udp_recv, 0, as four was dropped
 ; 15  V_NARM after a poll with a deadline a second ahead, 1, still armed
 ; 16  V_NARM after a poll with a deadline a microsecond past, 0, done

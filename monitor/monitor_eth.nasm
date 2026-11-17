@@ -83,6 +83,7 @@ TFTP_PORT       .EQU    69              ; the TFTP server's port (RFC 1350)
 TFTP_TRIES      .EQU    5               ; the sends of a packet that tftp waits for an answer to
 TFTP_WAIT       .EQU    1000000         ; the microseconds it waits after each
 TFTP_PKT        .EQU    96              ; the words of V_TPKT
+TFTP_MAX        .EQU    516             ; the bytes of a packet received at most, the words of V_TBUF
 
 ; DHCP: net_dhcp, entry 23, and the address, the mask, the gateway, and
 ; the DNS server of net_config, entry 21, and the DHCP server and the
@@ -694,7 +695,8 @@ net_due
                 JMP     tcp_due         ; which returns to the caller
 
 ; net_frames: the frames of the queue taken, as the header above says, up
-; to NET_TAKE of them, or up to a frame for the ROM's own wait. R1 = the
+; to NET_TAKE of them, or up to a frame for the ROM's own wait or a
+; datagram that the endpoint holds, so the frames after it wait. R1 = the
 ; bytes of that frame, copied to V_RXF, or 0. Uses R1-R6, and R7 and R8
 ; across the calls, saved: the bytes of the frame, and the frames left.
 net_frames
@@ -779,8 +781,8 @@ net_frame
                 ADD     R7, R1, 1       ; the bytes of data
                 MOVE    R1, V_RXF
                 CALL    eth_recv
-                MOVE    @V_ULEN, R7     ; held
-                JMP     net_next
+                MOVE    @V_ULEN, R7     ; held, and the frames after it wait
+                JMP     net_frames_none
 net_lease
                 CLR     @V_ULEN         ; the datagram held, lost
                 MOVE    R1, V_RXF
@@ -1042,9 +1044,10 @@ udp_head
                 SHL     @10[R1], R2, 16  ; the UDP length, and checksum 0
                 RET
 
-; udp_recv: after a poll, the datagram held for the endpoint copied to
-; the words at R1, R2 bytes at most, a byte per word, and its source's IP
-; address and port to the 2 words at R3, unless R3 is 0. R1 = the bytes
+; udp_recv: the datagram held for the endpoint, or after a poll when
+; none is, copied to the words at R1, R2 bytes at most, a byte per word,
+; and its source's IP address and port to the 2 words at R3, unless R3
+; is 0. R1 = the bytes
 ; copied, 0 when no datagram is held, or E_UCLOSED. With R2 0 nothing is
 ; copied, and the datagram stays held, so none is lost to a call with no
 ; room. Uses R1-R6, and R7-R9 across the calls, saved.
@@ -1058,7 +1061,8 @@ udp_recv
                 MOVE    R7, R1
                 MOVE    R8, R2
                 MOVE    R9, R3
-                CALL    net_step
+                TST     @V_ULEN
+        ?Z      CALL    net_step        ; when none is held
                 CLR     R1
                 TST     R8
         ?Z      JMP     udp_recv_end    ; no room: the datagram stays
@@ -1087,9 +1091,6 @@ udp_recv_end
                 POP     R7
                 RET
 
-; udp_next: a poll, and udp_take, for tftp. Uses R1-R6.
-udp_next
-                CALL    net_step
 ; udp_take: the datagram held for the endpoint, which is held no more:
 ; R1 = its bytes, or 0 when none is held. It stays in V_RXF, its data from
 ; word UDP_HDR, its source's IP address in word 7, and its port in bits
@@ -1900,49 +1901,41 @@ ntp_server
                 TST     R1
         ?!Z     JMP     ntp_fail
                 MOVE    R9, @V_NTPIP
-; The query, from a port of its own, which is not the endpoint's
+; The query, from the UDP endpoint, which udp_open, entry 16, opens on
+; a port of its own
 ntp_query
-                MOVE    R1, V_TXF
-                MOVE    R2, UDP_HDR+12
+                MOVE    R1, V_NTPQ
+                MOVE    R2, 48
 :
                 CLR     @R1++
                 SUB[M]  R2, R2, 1
         ?!Z     JMP     :-
-                CALL    net_clock
-                MOVE    @V_TXF+UDP_HDR+10, R1  ; the transmit timestamp
-                XOR     @V_TXF+UDP_HDR+11, @io.us, @E_MACL
-                SHR     R1, R1, 4
-                AND     R1, R1, 0x3FFF
-                OR      R1, R1, 0xC000  ; the port, 49152 to 65535
-                CMP     R1, @V_UPORT
-        ?Z      XOR     R1, R1, 1       ; and not the endpoint's
-                MOVE    R10, R1
-                MOVE    @V_TXF+UDP_HDR, 0x23000000  ; version 4, mode 3
-                MOVE    @V_NWAIT, R10
-                CALL    net_on
-                MOVE    R1, R9
-                CALL    net_hop         ; whose ARP may use the words before UDP_HDR
+                MOVE    @V_NTPQ, 0x23   ; version 4, mode 3
+                ADD     R1, @io.us, FINE_START  ; the transmit timestamp
+                MOVE    R2, V_NTPQ+40
+                CALL    put32
+                XOR     R1, @io.us, @E_MACL
+                MOVE    R2, V_NTPQ+44
+                CALL    put32
+                CLR     R1
+                CALL    UDP_OPEN
                 TST     R1
-        ?!Z     MOVE    R1, E_NOROUTE
-        ?!Z     JMP     ntp_off
-                MOVE    R1, V_TXF
-                MOVE    R4, R9
-                SHL     R5, R10, 16
-                OR      R5, R5, NTP_PORT
-                MOVE    R6, 48
-                CALL    udp_head
+        ?N      JMP     ntp_fail
                 MOVE    R7, NTP_TRIES
 ntp_send
-                CALL    ip_ident
-                MOVE    @V_TXF+5, R1
-                MOVE    R1, V_TXF
-                CALL    ip_csum
-                MOVE    R1, V_TXF
-                MOVE    R2, 90          ; the bytes of the frame
-                CALL    eth_send
+                MOVE    R1, R9
+                MOVE    R2, NTP_PORT
+                MOVE    R3, V_NTPQ
+                MOVE    R4, 48
+                CALL    UDP_SEND
+                TST     R1
+        ?N      JMP     ntp_off         ; E_NOROUTE
                 MOVE    R10, @io.us
 ntp_wait
-                CALL    net_step
+                MOVE    R1, V_NTPA
+                MOVE    R2, 48
+                MOVE    R3, V_TSRC
+                CALL    UDP_RECV
                 TST     R1
         ?Z      JMP     :+
                 CALL    ntp_parse
@@ -1956,12 +1949,17 @@ ntp_wait
         ?!Z     JMP     ntp_send
                 MOVE    R1, E_NTPTIME
 ntp_off
-                CLR     @V_NWAIT
-                CALL    net_off
-                TST     R1
+                MOVE    R7, R1
+                CALL    UDP_CLOSE
+                MOVE[M] R1, R7
         ?!Z     JMP     ntp_fail
-                MOVE    R1, @V_RXF+UDP_HDR+10  ; the transmit timestamp
-                MOVE    R2, @V_RXF+UDP_HDR+11
+                MOVE    R1, V_NTPA+40   ; the transmit timestamp
+                CALL    get32
+                MOVE    R7, R1
+                MOVE    R1, V_NTPA+44
+                CALL    get32
+                MOVE    R2, R1
+                MOVE    R1, R7
                 JMP     clock_ntp       ; which returns to the caller, or goes to ntp_bad_time
 ntp_bad_time
                 MOVE    R1, E_NTPBAD    ; a time that the clock does not take
@@ -1979,7 +1977,9 @@ ntp_fail
                 CALL    puts_b
                 CMP     R7, E_NTPKOD
         ?!Z     JMP     ntp_end
-                MOVE    R7, @V_RXF+UDP_HDR+3
+                MOVE    R1, V_NTPA+12   ; the reference ID
+                CALL    get32
+                MOVE    R7, R1
                 MOVE    R8, 4
 :
                 ROL     R7, R7, 8
@@ -1987,7 +1987,7 @@ ntp_fail
                 SUB     R2, R1, 0x20
                 CMP     R2, 0x5F
         ?!C     MOVE    R1, 0x3F        ; ?
-                CALL    mon_putc
+                CALL    MON_PUTC
                 SUB[M]  R8, R8, 1
         ?!Z     JMP     :-
 ntp_end
@@ -1996,51 +1996,81 @@ ntp_bad
                 MOVE    R1, S_BADNTP
                 JMP     puts_b_crlf     ; which returns to the caller
 
-; ntp_parse: the datagram of R1 bytes at V_RXF, to the query's port, if it
-; is the answer of the server R9: from its port 123, with 48 bytes of data
-; at least, mode 4, and the originate timestamp of the query's transmit
-; timestamp. R1 = 1 when it is not, and it is passed over. Else R1 = 0,
-; or E_NTPKOD for a stratum of 0, a kiss-o'-death, or E_NTPBAD for a leap
-; indicator of 3, not synchronized, a stratum over 15, or a transmit
-; timestamp of 0, which is not to be trusted. Uses R1 and R2.
+; ntp_parse: the datagram of R1 bytes at V_NTPA, from the source at
+; V_TSRC, if it is the answer of the server R9: from its port 123, with
+; 48 bytes of data at least, mode 4, and the originate timestamp of the
+; query's transmit timestamp. R1 = 1 when it is not, and it is passed
+; over. Else R1 = 0, or E_NTPKOD for a stratum of 0, a kiss-o'-death, or
+; E_NTPBAD for a leap indicator of 3, not synchronized, a stratum over
+; 15, or a transmit timestamp of 0, which is not to be trusted. Uses
+; R1-R4.
 ntp_parse
-                CMP     R1, 90
-        ?C      JMP     :+              ; too short
-                CMP     @V_RXF+7, R9
-        ?!Z     JMP     :+
-                SHR     R1, @V_RXF+9, 16
-                CMP     R1, NTP_PORT
-        ?!Z     JMP     :+
-                SHR     R1, @V_RXF+10, 16
-                CMP     R1, 56          ; the UDP length
-        ?C      JMP     :+
-                MOVE    R2, @V_RXF+UDP_HDR
-                SHR     R1, R2, 24
-                AND     R1, R1, 7
+                CMP     R1, 48
+        ?!Z     JMP     ntp_skip        ; too short
+                CMP     @V_TSRC, R9
+        ?!Z     JMP     ntp_skip
+                CMP     @V_TSRC+1, NTP_PORT
+        ?!Z     JMP     ntp_skip
+                MOVE    R2, @V_NTPA     ; the leap indicator, the version, and the mode
+                AND     R1, R2, 7
                 CMP     R1, 4           ; a server's
-        ?!Z     JMP     :+
-                CMP     @V_RXF+UDP_HDR+6, @V_TXF+UDP_HDR+10
-        ?!Z     JMP     :+
-                CMP     @V_RXF+UDP_HDR+7, @V_TXF+UDP_HDR+11
-        ?!Z     JMP     :+
-                SHR     R1, R2, 16
-                AND[M]  R1, R1, 0xFF    ; the stratum
+        ?!Z     JMP     ntp_skip
+                MOVE    R1, V_NTPA+24
+                MOVE    R3, V_NTPQ+40
+                MOVE    R4, 8
+:
+                CMP     @R1++, @R3++
+        ?!Z     JMP     ntp_skip        ; another originate timestamp
+                SUB[M]  R4, R4, 1
+        ?!Z     JMP     :-
+                MOVE[M] R1, @V_NTPA+1   ; the stratum
         ?Z      MOVE    R1, E_NTPKOD
         ?Z      RET
                 CMP     R1, 16
-        ?!C     JMP     :++
-                SHR     R1, R2, 30
+        ?!C     JMP     ntp_untrusted
+                SHR     R1, R2, 6
                 CMP     R1, 3           ; not synchronized
-        ?Z      JMP     :++
-                OR[M]   R0, @V_RXF+UDP_HDR+10, @V_RXF+UDP_HDR+11
-        ?Z      JMP     :++
+        ?Z      JMP     ntp_untrusted
+                MOVE    R1, V_NTPA+40
+                CLR     R3
+                MOVE    R4, 8
+:
+                OR      R3, R3, @R1++
+                SUB[M]  R4, R4, 1
+        ?!Z     JMP     :-
+                TST     R3
+        ?Z      JMP     ntp_untrusted
                 CLR     R1
                 RET
-:
+ntp_skip
                 MOVE    R1, 1
                 RET
-:
+ntp_untrusted
                 MOVE    R1, E_NTPBAD
+                RET
+
+; get32: R1 = the 4 bytes from the word address R1, a byte a word,
+; big-endian. Uses R1-R3.
+get32
+                MOVE    R2, R1
+                CLR     R1
+                MOVE    R3, 4
+:
+                SHL     R1, R1, 8
+                OR      R1, R1, @R2++
+                SUB[M]  R3, R3, 1
+        ?!Z     JMP     :-
+                RET
+
+; put32: R1 as 4 bytes to the words from R2, a byte a word, big-endian.
+; Uses R1-R3.
+put32
+                MOVE    R3, 4
+:
+                ROL     R1, R1, 8
+                AND     @R2++, R1, 0xFF
+                SUB[M]  R3, R3, 1
+        ?!Z     JMP     :-
                 RET
 
 ; LOAD "NAME.BIN", "IP[:PORT]" and DIR "IP[:PORT]" [, "PAT"]: R1 the
@@ -2112,7 +2142,7 @@ tftp_ip
         ?!Z     JMP     :-
                 SUB     @V_TLEN, R2, V_TPKT
                 CLR     R1
-                CALL    udp_open
+                CALL    UDP_OPEN
                 TST     R1
         ?N      JMP     tftp_fail
                 CLR     @V_TTID
@@ -2126,30 +2156,35 @@ tftp_send
         ?Z      MOVE    R2, @V_TPORT
                 MOVE    R3, V_TPKT
                 MOVE    R4, @V_TLEN
-                CALL    udp_send
+                CALL    UDP_SEND
                 TST     R1
         ?N      JMP     tftp_fail
                 MOVE    @V_TTIME, @io.us
 tftp_wait
-                CALL    udp_next
+                MOVE    R1, V_TBUF
+                MOVE    R2, TFTP_MAX
+                MOVE    R3, V_TSRC
+                CALL    UDP_RECV
                 TST     R1
         ?Z      JMP     tftp_time
-                CMP     @V_RXF+7, @V_TSRV
+                CMP     @V_TSRC, @V_TSRV
         ?!Z     JMP     tftp_wait       ; from another host
-                SHR     R2, @V_RXF+9, 16  ; its port
+                MOVE    R2, @V_TSRC+1   ; its port
                 MOVE[M] R3, @V_TTID
         ?Z      JMP     :+
                 CMP     R2, R3
         ?!Z     JMP     tftp_wait       ; from another TID
 :
-                SHR     R3, @V_RXF+UDP_HDR, 16  ; the opcode
+                SHL     R3, @V_TBUF, 8  ; the opcode
+                OR      R3, R3, @V_TBUF+1
                 CMP     R3, 5
         ?Z      JMP     tftp_error
                 CMP     R3, 3
         ?!Z     JMP     tftp_wait       ; no DATA
                 CMP     R1, 4
         ?C      JMP     tftp_wait       ; too short
-                AND     R4, @V_RXF+UDP_HDR, 0xFFFF  ; the block
+                SHL     R4, @V_TBUF+2, 8  ; the block
+                OR      R4, R4, @V_TBUF+3
                 CMP     R4, @V_TBLK
         ?Z      JMP     :+
                 ADD     R4, R4, 1
@@ -2166,8 +2201,7 @@ tftp_wait
 :
                 CMP     R7, @V_TEND
         ?Z      JMP     :+
-                ADD     R1, R7, 4*UDP_HDR+4
-                CALL    rx_byte
+                MOVE    R1, @V_TBUF+4[R7]
                 ADD     R7, R7, 1
                 CALL    bin_char
                 JMP     :-
@@ -2186,9 +2220,9 @@ tftp_wait
                 MOVE    R2, @V_TTID
                 MOVE    R3, V_TPKT
                 MOVE    R4, 4
-                CALL    udp_send
+                CALL    UDP_SEND
                 CALL    bin_last
-                CALL    udp_close
+                CALL    UDP_CLOSE
                 TST     @V_TLIST
         ?!Z     RET                     ; a listing, shown
                 JMP     load_summary
@@ -2198,7 +2232,7 @@ tftp_time
         ?C      JMP     tftp_wait
                 SUB[M]  R7, R7, 1
         ?!Z     JMP     tftp_send
-                CALL    udp_close
+                CALL    UDP_CLOSE
                 CALL    load_part
                 MOVE    R1, S_NOTFTP
                 JMP     puts_b_crlf     ; which returns to the caller
@@ -2206,34 +2240,32 @@ tftp_time
 ; datagram, without control codes. R7 is the byte, and R8 the end.
 tftp_error
                 CALL    load_part
-                MOVE    R7, 4*UDP_HDR+4
-                ADD     R8, R1, 4*UDP_HDR
-                CALL    udp_close
+                MOVE    R7, V_TBUF+4
+                ADD     R8, R1, V_TBUF
+                CALL    UDP_CLOSE
                 MOVE    R1, S_TFTPERR
                 CALL    puts_b
-                AND     R1, @V_RXF+UDP_HDR, 0xFFFF
+                SHL     R1, @V_TBUF+2, 8
+                OR      R1, R1, @V_TBUF+3
                 CALL    _io_putdec
                 MOVE    R1, S_UCOMMA
                 CALL    puts_b
 :
                 CMP     R7, R8
         ?!C     JMP     :+
-                MOVE    R1, R7
-                CALL    rx_byte
-                TST     R1
+                MOVE[M] R1, @R7++
         ?Z      JMP     :+
-                ADD     R7, R7, 1
                 SUB     R2, R1, 0x20
                 CMP     R2, 0x5F
         ?!C     JMP     :-              ; a control code
-                CALL    mon_putc
+                CALL    MON_PUTC
                 JMP     :-
 :
                 JMP     _io_crlf        ; which returns to the caller
 ; An error of udp_open or udp_send: no IP address, or no route
 tftp_fail
                 MOVE    R7, R1
-                CALL    udp_close
+                CALL    UDP_CLOSE
                 CALL    load_part
                 MOVE    R1, S_NOIP
                 CMP     R7, E_NOIP

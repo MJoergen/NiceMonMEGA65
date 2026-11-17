@@ -77,8 +77,10 @@ of [DEVICES.md §7](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.m
   `0xFFFFF390`, and decides from them. An ARP reply, to anyone, is
   learned from there, in place, so ARP never touches the buffer of a
   frame received, `V_RXF` at `0xFFFFF180`. A datagram for the endpoint
-  is copied to `V_RXF`, and held there for `udp_recv`, unless one is
-  held already; then it is dropped. A datagram to the port of the ROM's
+  is copied to `V_RXF`, and held there for `udp_recv`, and the poll
+  stops there, so the frames after it wait; `udp_recv` polls only when
+  none is held. A poll of another entry that finds a datagram for the
+  endpoint while one is held drops it. A datagram to the port of the ROM's
   own wait, 68 while `DHCP` or `net_dhcp` waits, or `getline` while
   DHCP runs in the background, or the query's port while `dns_lookup`
   waits, is copied to `V_RXF` too, in place of a datagram held, which is lost, and the poll stops
@@ -165,8 +167,9 @@ of [DEVICES.md §7](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.m
 - **The identification** of each IPv4 packet sent, of UDP, DHCP, and
   DNS, counts up by one from the fine clock at the cold start, with the
   "don't fragment" bit clear (RFC 6864).
-- `DHCP`, `NTP`, and TFTP (README.md, "The network") use the frame
-  routines, and `udp_send` calls `arp_resolve` for the MAC address of a
+- `DHCP` (README.md, "The network") uses the frame routines, and
+  `NTP` and TFTP the UDP entries, as a program does (#152), with their
+  buffers at `V_TBUF`, which `udp_recv` fills a byte a word. `udp_send` calls `arp_resolve` for the MAC address of a
   datagram's host, or of the gateway. Programs do not call them: they
   have no entries, so their addresses change with every build.
   `test/arp.nasm` calls `arp_resolve` by its label, as `test/sd.nasm`
@@ -231,8 +234,8 @@ from 0, and the rest is free. The demo is not in it: it is a program,
 <!-- romsize layout -->
 | Part | Address | Words |
 |---|---|---:|
-| The monitor | `0x0000`–`0x369E` | 13983 |
-| Free | `0x369F`–`0x7FFF` | 18785 |
+| The monitor | `0x0000`–`0x36A8` | 13993 |
+| Free | `0x36A9`–`0x7FFF` | 18775 |
 <!-- /romsize layout -->
 
 The monitor's words, by the source they come from, in the order
@@ -251,14 +254,14 @@ ROM is built:
 | `monitor_dis.nasm` | The disassembler of `DIS` | 871 | 79 |
 | `monitor_sd.nasm` | The sector routines | 206 | 59 |
 | `monitor_fat.nasm` | FAT32, the file entries, and TAB | 2847 | 0 |
-| `monitor_eth.nasm` | The network | 3338 | 160 |
+| `monitor_eth.nasm` | The network | 3348 | 160 |
 | `monitor_tcp.nasm` | TCP | 2414 | 0 |
 | `monitor_clock.nasm` | The clock and `TIME` | 698 | 44 |
 | `monlib.nasm` | The routines that programs join | 274 | 0 |
 | `mon.nasm` | The stubs of the entries | 82 | 0 |
 | `build/folder.nasm` | The folder's name, and the error of a card without it | 17 | 17 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 13983 | 1038 |
+| In all | | 13993 | 1038 |
 <!-- /romsize monitor -->
 
 - `build/folder.nasm` and the version always end with a `.DAT 0`, as
@@ -448,7 +451,7 @@ compared with `test/NAME.expected`:
 | `sd_write` | `test/sd.nasm`, with a card of 4 sectors in slot 0 and none in slot 1 | `sd_init`, `sd_read`, and `sd_write`: the empty slot, a sector read and written, and the sector past the end. The card must then equal the image of `test/sd_image.py --written`. |
 | `arp` | `test/arp.nasm`, with the frames of `test/arp.eth` | `arp_resolve`: a reply after other frames, the cache, no reply, an entry aged out, and the cache filled and gone round. The frames sent are compared too. |
 | `udp` | `test/udp.nasm`, with the frames of `test/udp.eth` | The UDP entries: each error, a datagram sent after ARP, a broadcast, datagrams received among other frames, one cut short, and one sent through the gateway. The frames sent are compared too. |
-| `net` | `test/net.nasm`, with the frames of `test/net.eth` | The poll and the IP settings of issue #111: `net_config` at a word-window address and a plain one, `net_set`, `net_poll`, a datagram held and a second dropped, ARP replies learned in place, so that no request goes, a TCP segment released, and a deadline armed, not due, and due. The frames sent are compared too. |
+| `net` | `test/net.nasm`, with the frames of `test/net.eth` | The poll and the IP settings of issue #111: `net_config` at a word-window address and a plain one, `net_set`, `net_poll`, a datagram held, at which the poll stops, the next one read by the next `udp_recv`, and one dropped by another entry's poll while one is held, an ARP reply learned in place, so that no request goes, and one that waits behind a datagram held, so that a request goes, a TCP segment released, and a deadline armed, not due, and due. The frames sent are compared too. |
 | `fpu` | `test/fpu.nasm` | The FPU at a program's end (issue #141): each run leaves 10 values and the four flags on it, and the next one, after a return, `mon_exit`, or a jump to 0, the cold start, finds it empty with no flag. |
 | `fs` | `test/fs.nasm`, with FAT images in both slots | The file entries, through `mon.nasm`'s stubs: handles, reads across the fragments of a file and at its end, the folder's entries, mounts, each error a program can cause, and `fs_readname`'s long name and 8.3 name in lower case, and a file opened by its long name. |
 | `fsw` | `test/fsw.nasm`, with a copy of the card with partitions, one file read-only, and a write-protected card | The entries that write: a file written in pieces across clusters and read back, truncated, a file of ten clusters, deletions, one of a long name, a folder that grows a cluster, a mount that drops an open file, and each error. |

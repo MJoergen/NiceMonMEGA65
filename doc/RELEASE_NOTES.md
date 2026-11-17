@@ -56,7 +56,10 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   `fs_open` and `fs_readname`, as a program does, so after a program
   that left both file handles open it says `File error 23, too many
   open files`, as `LOAD` and `SAVE` do; `DIR 0` mounts the card again,
-  which closes them.
+  which closes them. A poll stops at the datagram that the UDP
+  endpoint holds, and `udp_recv` polls only when none is held, so
+  datagrams that come together are no longer lost; `NTP` and TFTP run
+  on the UDP entries.
 
 **Changes.**
 
