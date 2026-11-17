@@ -1,7 +1,8 @@
 -- The screen's registers (src/scr_regs.vhd), with their properties, for
 -- SymbiYosys. Every input is free, so the solver writes and reads any word,
--- and clears the registers, at any time. The screen has 2^11 words, the
--- fewest that nicemon allows; the properties do not depend on the size.
+-- and clears the registers, at any time. The screen has 2^14 words, the
+-- fewest with the chunky mode; the other properties do not depend on the
+-- size.
 --
 -- RESET
 -- The first cycle is a reset.
@@ -33,7 +34,7 @@ begin
 
    i_scr_regs : entity work.scr_regs
       generic map (
-         G_SCR_ADDR_BITS => 11,
+         G_SCR_ADDR_BITS => 14,
          G_FORMAL        => true
       )
       port map (
@@ -49,7 +50,9 @@ begin
          cur_x_o    => open,
          cur_y_o    => open,
          cur_mode_o => open,
-         offs_o     => open
+         offs_o     => open,
+         fnt_ram_o  => open,
+         chunky_o   => open
       ); -- i_scr_regs
 
 end architecture synthesis;

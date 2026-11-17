@@ -152,11 +152,15 @@
 --                          words: the display shows the 2000 words from it,
 --                          so adding 80 scrolls a line; and 86 is the font
 --                          base of DEVICES.md §1.8: 0xFFFE0000 shows the font
---                          RAM, and any other value the character ROM.
+--                          RAM, and any other value the character ROM; and
+--                          87 is the mode word of DEVICES.md §1.10, 1 for
+--                          the chunky mode, which only a screen of 16384
+--                          words or more keeps, and 0 for the text.
 --                          Bits 11..4 of the state are kept and read back;
---                          the other bits, and the words 83, 84, and 87,
+--                          the other bits, and the words 83 and 84,
 --                          read 0 and take no write. The registers go out on
---                          scr_cur_*_o, scr_offs_o, and scr_fnt_ram_o,
+--                          scr_cur_*_o, scr_offs_o, scr_fnt_ram_o, and
+--                          scr_chunky_o,
 --                          with scr_ctl_we_o
 --                          for a cycle when one is written, and when they
 --                          are cleared by reset or by the clear of the memory.
@@ -435,6 +439,8 @@ entity nicemon is
       scr_offs_o        : out std_logic_vector(G_SCR_ADDR_BITS - 1 downto 0);
       -- '1' while the font base, 0xFFFFFF86, selects the font RAM
       scr_fnt_ram_o     : out std_logic;
+      -- '1' while the mode word, 0xFFFFFF87, selects the chunky mode
+      scr_chunky_o      : out std_logic;
       -- The fonts at 0xFFFE0000-3FFF (src/video/font.vhd): the word's offset
       -- from 0xFFFE0000, given in every cycle, a write, and the word read at
       -- the offset of the cycle before. Without a display, the fonts read 0.
@@ -1379,7 +1385,8 @@ begin
          cur_y_o    => scr_cur_y_o,
          cur_mode_o => scr_cur_mode_o,
          offs_o     => scr_offs_o,
-         fnt_ram_o  => scr_fnt_ram_o
+         fnt_ram_o  => scr_fnt_ram_o,
+         chunky_o   => scr_chunky_o
       ); -- i_scr_regs
 
 

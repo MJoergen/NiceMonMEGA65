@@ -116,6 +116,7 @@ SCR_X           .EQU    0xFFFFFF81      ; the cursor's column
 SCR_Y           .EQU    0xFFFFFF82      ; the cursor's row
 SCR_OFFS        .EQU    0xFFFFFF85      ; the display offset, in words
 SCR_FONT        .EQU    0xFFFFFF86      ; the font base: 0 shows Spleen
+SCR_MODE        .EQU    0xFFFFFF87      ; the mode word: 0 shows the text, 1 the chunky mode
 TEXT_B          .EQU    0x20000000      ; the byte window: byte A of the memory at TEXT_B+A
 TIMER           .EQU    0xFFFFFF10      ; the timer's period, 0 to stop it
 FPU_CMD         .EQU    0xFFFFFF8C      ; the FPU's command: 0x101, CLEAR 1, empties its stack and clears its flags
@@ -303,8 +304,8 @@ SCR_MAX         .EQU    0x7FFF          ; the largest display offset
 
 ; mon_reset: the cold start, entry 0, which reset runs and a program may
 ; call. E is cleared, the timer stopped, the FPU's stack emptied and its
-; flags cleared (issue #141), VBASE set to 0, the font base set to 0, so
-; that the screen shows Spleen, and the port for Ethernet frames
+; flags cleared (issue #141), VBASE set to 0, the font base and the mode
+; word set to 0, so that the screen shows text in Spleen, and the port for Ethernet frames
 ; disabled, as at a return, after a RST for each TCP connection
 ; that a program left open, the mask, the gateway, and the DNS server set
 ; to none, the DHCP lease forgotten, and the ARP cache emptied. The identification of the IPv4
@@ -321,6 +322,7 @@ mon_reset
                 CLR     @TIMER
                 MOVE    @FPU_CMD, 0x0101  ; CLEAR 1, as a reset of the core does
                 CLR     @SCR_FONT
+                CLR     @SCR_MODE       ; the text, not the chunky mode
                 MOVE    SP, STACK
                 CALL    net_close
                 CLR     @V_MASK
@@ -365,7 +367,8 @@ mon_reset
 
 ; mon_exit: entry 1, and where a program returns to. Back to the main loop,
 ; main, with R1 the status: E cleared, the timer stopped, the FPU's
-; stack empty and its flags clear, VBASE 0, the font base 0, the network
+; stack empty and its flags clear, VBASE 0, the font base and the mode
+; word 0, the network
 ; closed, net_close, the cursor shown and blinking with the display
 ; offset off, a fresh stack, and the status printed where the program left
 ; the cursor's registers, after a new line if that is not column 0.
@@ -387,6 +390,7 @@ sys_end
                 CLR     @TIMER
                 MOVE    @FPU_CMD, 0x0101  ; CLEAR 1: no values or flags for the next program
                 CLR     @SCR_FONT       ; Spleen, whatever the program chose
+                CLR     @SCR_MODE       ; the text, whatever the program chose
                 CALL    net_close       ; no frames, if the program took them
                 MOVE    @SCR_CTL, 0x60  ; the cursor, which a program may hide
                 MOVE    R1, @SCR_X

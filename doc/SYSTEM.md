@@ -181,7 +181,7 @@ core, where only the link has registers.
 | `0xFFFFFF40`–`0xFFFFFF5F` | The performance counters of [nice_cpu's DEVICES.md §3](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#3-performance-counters). The cycles are those of the board's clock, at 100 MHz on the MEGA65 and 90 MHz on the Nexys4DDR, and the microseconds come from it, so they are real time. The instructions and the event counters count as the emulator's do. A read of a low word by the link takes the snapshot, as the core's does, where `niceemu --link` takes none. |
 | `0xFFFFFF46`–`0xFFFFFF49` | The clock of the time of day of [nice_cpu's DEVICES.md §10](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#10-clock), within the performance counters, counted from the board's clock. After a reset it is not set, until the ROM's monitor sets it from the MEGA65's real-time clock at its start (see [The I2C bus](#the-i2c-bus)), or a program sets it. It keeps local time, as the real-time clock does. Only a reset of the system resets it: a start keeps the time, and it runs while the core is held, paused, or halted. A read of `0xFFFFFF46` by the link takes the snapshot too. |
 | `0xFFFFFF60`–`0xFFFFFF7F` | The fetch statistics of [MICROARCH.md §8.1](https://github.com/MJoergen/nice_cpu/blob/main/doc/MICROARCH.md#81-fetch-statistics), which the emulator does not have. With the multi-cycle core (`NICE=multi`), only two of them count. |
-| `0xFFFFFF80`–`0xFFFFFF87` | The screen's registers: the cursor and the display offset (see [The screen](#the-screen)). |
+| `0xFFFFFF80`–`0xFFFFFF87` | The screen's registers: the cursor, the display offset, the font base, and the mode word (see [The screen](#the-screen)). |
 | `0xFFFFFF88`–`0xFFFFFF8F` | The floating-point unit of [nice_cpu's DEVICES.md §11](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#11-floating-point-unit), as in the emulator: a stack of up to 16 binary64 values, on every board. A command takes cycles, and a request that comes while one runs stalls until it ends. A start of the core resets it. |
 | `0xFFFFFF90`–`0xFFFFFF9F` | The Nexys4DDR's LEDs, seven-segment display, buttons, and switches at `0xFFFFFF90`–`96` (see [The Nexys4DDR's devices](#the-nexys4ddrs-devices)). On the MEGA65 they read 0 and take no write. On every board, the I2C master is at `0xFFFFFF97`–`9D` (see [The I2C bus](#the-i2c-bus)), `0xFFFFFF9E` reads the words of the RAM, `0x20000` on the MEGA65 and `0x10000` on the Nexys4DDR, and takes no write, and `0xFFFFFF9F` is the UART's baud rate (see [The baud rate](DEBUG_LINK.md#the-baud-rate)). The emulator has memory there, which reads 0 after a clear, so a program takes 0 to mean no limit. |
 | `0xFFFFFFA0`–`0xFFFFFFAF` | The SD card controller of [nice_cpu's DEVICES.md §5](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#5-sd-card), with 2 slots on the MEGA65 and 1 on the Nexys4DDR (see [The SD card slots](#the-sd-card-slots)). |
@@ -274,16 +274,33 @@ QNICE-FPGA, at `0xFF30` there:
 | `0xFFFFFF82` | The cursor's row, 0 to 24. |
 | `0xFFFFFF85` | The display offset, in words, 0 to 32767 (8191 on the Nexys4DDR). It takes effect when bit 10 of the state is set. |
 | `0xFFFFFF86` | The font base of [nice_cpu's DEVICES.md §1.8](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#18-font), all 32 bits kept and read back: `0xFFFE0000` shows the font RAM, and 0 shows the character ROM, as do the other values, which are reserved (see [The font](#the-font)). |
+| `0xFFFFFF87` | The mode word of [nice_cpu's DEVICES.md §1.10](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#110-chunky-mode): 0 shows the text, and 1 the chunky mode (see [The chunky mode](#the-chunky-mode)). A write of 1 keeps 1 on the MEGA65, and any other write keeps 0. The Nexys4DDR has no chunky mode, and there the word stays 0. |
 
-The words `0xFFFFFF83`, `84`, and `87` read 0 and take no write. In
+The words `0xFFFFFF83` and `84` read 0 and take no write. In
 the emulator these addresses are memory, so a program that writes them runs
 there too, without scrolling. Reset, and the clear of the memory (bit 2 of
-the control register, which `load.py` and `run.py` set), set the offset and
-the font base to 0 and turn the cursor off, as at the start of the
-emulator. `niceemu --window` draws the same cursor from these
+the control register, which `load.py` and `run.py` set), set the offset,
+the font base, and the mode word to 0 and turn the cursor off, as at the
+start of the emulator. `niceemu --window` draws the same cursor from these
 words, as [nice_cpu's DEVICES.md §1](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#1-console-screen-and-read-counter) says, but has no display offset.
 A column or row out of range shows no cursor there, where here only
 bits 6..0 of the column and 4..0 of the row are kept.
+
+### The chunky mode
+
+In the chunky mode, the program's 25 rows show 160×100 pixels instead
+of the characters, each a square of 8×8 pixels of the picture. Word
+`160 * y + x` from the display offset is the pixel in column `x`, 0 to
+159, and row `y`, 0 to 99, so the 16000 words of a picture fit twice in
+the screen's 32768. The pixel's color is the word's background color,
+bits 31..20, and its other bits are ignored, so a screen of blanks looks
+the same in both modes. The cursor and the font are not shown, and the
+debugger's strip and page are drawn as in the text.
+
+A program writes 1 to `0xFFFFFF87` and reads the word back: 1 means that
+the board has the mode, and 0 that it has not, as on the Nexys4DDR,
+whose 8192 words of the screen hold no picture. `niceemu --window` shows
+the mode too, but without the display offset.
 
 ### The font
 

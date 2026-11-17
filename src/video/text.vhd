@@ -29,6 +29,13 @@
 -- So the display never sees a value half written, and the paths between
 -- the clocks need not be timed.
 --
+-- In the chunky mode of nice_cpu's doc/DEVICES.md §1.10, which chunky_i
+-- selects, the program's 25 rows show 160x100 pixels instead, one word of
+-- the screen each, row by row, from the display offset as the text does.
+-- A pixel is 8x8 pixels of the display, and its color is the background
+-- of its word, bits 31..20; the font and the cursor are not shown. The
+-- debugger's page and strip are drawn over it as over the text.
+--
 -- The overlay is the on-board debugger's (src/dbg/dbg.vhd, doc/DEBUGGER.md):
 -- 29 rows of 80 words, in a memory of its own, 2^12 words written by the
 -- debugger (ovl_*_i) in the system clock domain, and read in the VGA clock
@@ -60,14 +67,16 @@
 -- 0x41, is black on black.
 --
 -- The pixel counters (pix.vhd) give the pixel of stage 0. The pipeline:
---   1: the position in the text, the address of the character, with the
---      display offset, and in the overlay, whether it is the cursor's, and
---      whether the overlay is shown there
+--   1: the position in the text, the address of the character, or of the
+--      pixel in the chunky mode, with the display offset, and in the
+--      overlay, whether it is the cursor's, and whether the overlay is
+--      shown there
 --   2: the word of the character, read from the copy of the screen, and the
 --      word of the overlay
 --   3: the row of the glyph, read from the font, for the word shown, and
---      the colors, swapped for the cursor; the font's address is the code
---      of stage 2's word and the line
+--      the colors, swapped for the cursor, or both the background in the
+--      chunky mode; the font's address is the code of stage 2's word and
+--      the line
 --   4: the color of the pixel, and the outputs
 -- The sync signals and the visible area go through the same stages, so the
 -- outputs all belong to the same pixel. The outputs are registers, with
@@ -75,7 +84,8 @@
 --
 -- RESET
 -- None. The copy of the screen starts as zeros, as the screen does, the
--- display offset is 0, the cursor is off, and the ROM is shown. The overlay
+-- display offset is 0, the cursor is off, the text is shown, not the
+-- chunky mode, and the ROM is shown. The overlay
 -- and the font RAM start as zeros.
 
 library ieee;
@@ -104,6 +114,8 @@ entity text is
       offs_i      : in  std_logic_vector(G_SCR_ADDR_BITS - 1 downto 0);
       -- '1' while the font base selects the font RAM
       fnt_ram_i   : in  std_logic;
+      -- '1' while the mode word selects the chunky mode
+      chunky_i    : in  std_logic;
       -- The bus's port of the fonts (font.vhd), in the system clock domain:
       -- the offset from 0xFFFE0000, a write, and the word read a cycle later
       fnt_we_i    : in  std_logic;
@@ -155,6 +167,7 @@ architecture synthesis of text is
    signal cur_mode_r : std_logic_vector(2 downto 0) := (others => '0');
    signal offs_r     : std_logic_vector(G_SCR_ADDR_BITS - 1 downto 0) := (others => '0');
    signal fnt_ram_r  : std_logic := '0';
+   signal chunky_r   : std_logic := '0';
 
    -- The registers as the display uses them, in the VGA clock domain
    signal ctl_req_s    : std_logic_vector(1 downto 0) := "00";
@@ -164,6 +177,7 @@ architecture synthesis of text is
    signal cur_mode_vga : std_logic_vector(2 downto 0) := (others => '0');
    signal offs_vga     : std_logic_vector(G_SCR_ADDR_BITS - 1 downto 0) := (others => '0');
    signal fnt_ram_vga  : std_logic := '0';
+   signal chunky_vga   : std_logic := '0';
 
    -- The overlay's mode bits, synchronized to the VGA clock
    signal strip_s : std_logic_vector(1 downto 0) := "00";
@@ -185,7 +199,8 @@ architecture synthesis of text is
    -- Stage 1. text_1 is '1' when the pixel is in the text, addr_1 is the
    -- address of its character, ovl_addr_1 that in the overlay, ovl_1 is '1'
    -- when the overlay is shown there, cur_1 is '1' when the character is the
-   -- cursor's, and line_1 and col_1 are its row and column in the glyph.
+   -- cursor's, chunky_1 is '1' when the pixel is the chunky mode's, and
+   -- line_1 and col_1 are its row and column in the glyph.
    signal hs_1       : std_logic := not G_MODE.sync_active;
    signal vs_1       : std_logic := not G_MODE.sync_active;
    signal vis_1      : std_logic := '0';
@@ -194,6 +209,7 @@ architecture synthesis of text is
    signal ovl_addr_1 : std_logic_vector(11 downto 0) := (others => '0');
    signal ovl_1      : std_logic := '0';
    signal cur_1      : std_logic := '0';
+   signal chunky_1   : std_logic := '0';
    signal line_1     : std_logic_vector(4 downto 0) := (others => '0');
    signal col_1      : std_logic_vector(3 downto 0) := (others => '0');
 
@@ -206,6 +222,7 @@ architecture synthesis of text is
    signal ovl_word_2 : std_logic_vector(31 downto 0);
    signal ovl_2      : std_logic := '0';
    signal cur_2      : std_logic := '0';
+   signal chunky_2   : std_logic := '0';
    signal line_2     : std_logic_vector(4 downto 0) := (others => '0');
    signal col_2      : std_logic_vector(3 downto 0) := (others => '0');
 
@@ -235,8 +252,8 @@ begin
       report "The text does not fit in the visible area"
       severity failure;
 
-   assert G_SCR_ADDR_BITS >= 11
-      report "text: the screen must hold its 2000 words"
+   assert G_SCR_ADDR_BITS >= 11 and G_SCR_ADDR_BITS <= 15
+      report "text: the screen must hold its 2000 words, and at most 32768"
       severity failure;
 
 
@@ -309,8 +326,8 @@ begin
    -- takes them and raises the acknowledge, which the system side waits for
    -- before it lowers the request and takes the next write. It is a
    -- four-phase handshake: req rises, ack rises, req falls, ack falls.
-   -- While req is high, cur_x_r, cur_y_r, cur_mode_r, offs_r, and
-   -- fnt_ram_r do not
+   -- While req is high, cur_x_r, cur_y_r, cur_mode_r, offs_r,
+   -- fnt_ram_r, and chunky_r do not
    -- change, because they are loaded only when req and the acknowledge
    -- seen by the system side are both low. So the VGA side reads them
    -- stable, and only the two request and acknowledge bits are
@@ -329,6 +346,7 @@ begin
             cur_mode_r <= cur_mode_i;
             offs_r     <= offs_i;
             fnt_ram_r  <= fnt_ram_i;
+            chunky_r   <= chunky_i;
          elsif ctl_req = '1' and ctl_ack_s(1) = '1' then
             ctl_req <= '0';
          end if;
@@ -348,6 +366,7 @@ begin
             cur_mode_vga <= cur_mode_r;
             offs_vga     <= offs_r;
             fnt_ram_vga  <= fnt_ram_r;
+            chunky_vga   <= chunky_r;
             ctl_ack      <= '1';
          elsif ctl_req_s(1) = '0' then
             ctl_ack <= '0';
@@ -384,6 +403,10 @@ begin
       variable row_v  : std_logic_vector(4 downto 0);
       variable col_v  : std_logic_vector(6 downto 0);
       variable addr_v : std_logic_vector(11 downto 0);
+      variable prow_v : std_logic_vector(6 downto 0);
+      variable pcol_v : std_logic_vector(7 downto 0);
+      variable pix_v  : std_logic_vector(14 downto 0);
+      variable chk_v  : std_logic;
       variable prog_v : std_logic;
       variable word_v : std_logic_vector(31 downto 0);
       variable fg_v   : std_logic_vector(11 downto 0);
@@ -426,13 +449,28 @@ begin
          row_v  := y_v(9 downto 5);
          col_v  := x_v(10 downto 4);
          addr_v := ('0' & row_v & "000000") + ("000" & row_v & "0000") + ("00000" & col_v);
+         -- The chunky mode's pixels are 8x8, so the pixel's row is y / 8
+         -- and its column x / 8, and pixel row * 160 = row * 128 + row * 32.
+         -- In the program's rows pix_v is below 16000.
+         prow_v := y_v(9 downto 3);
+         pcol_v := x_v(10 downto 3);
+         pix_v  := (prow_v & "0000000") + ("00" & prow_v & "00000") + ("0000000" & pcol_v);
+         chk_v  := chunky_vga and prog_v and not page_s(1);
          -- In the program's rows addr_v is below 2000, so 11 bits of it are
-         -- the address in the screen.
-         addr_1     <= offs_vga + addr_v(10 downto 0);
+         -- the address in the screen. A screen too small for the chunky
+         -- mode never selects it (scr_regs.vhd), so the bits of pix_v
+         -- above it do not matter.
+         if chk_v = '1' then
+            addr_1 <= offs_vga + pix_v(G_SCR_ADDR_BITS - 1 downto 0);
+         else
+            addr_1 <= offs_vga + addr_v(10 downto 0);
+         end if;
          ovl_addr_1 <= addr_v;
          ovl_1      <= not prog_v or page_s(1);
+         chunky_1   <= chk_v;
          cur_1      <= '0';
-         if row_v = cur_y_vga and col_v = cur_x_vga and prog_v = '1' and page_s(1) = '0' then
+         if row_v = cur_y_vga and col_v = cur_x_vga and prog_v = '1' and page_s(1) = '0' and
+            chunky_vga = '0' then
             cur_1 <= '1';
          end if;
          line_1 <= y_v(4 downto 0);
@@ -445,6 +483,7 @@ begin
          text_2 <= text_1;
          ovl_2  <= ovl_1;
          cur_2  <= cur_1;
+         chunky_2 <= chunky_1;
          line_2 <= line_1;
          col_2  <= col_1;
 
@@ -466,7 +505,10 @@ begin
                show_v := '0';
             end if;
          end if;
-         if show_v = '1' then
+         if chunky_2 = '1' then
+            fg_3 <= bg_v;
+            bg_3 <= bg_v;
+         elsif show_v = '1' then
             fg_3 <= bg_v;
             bg_3 <= fg_v;
          else

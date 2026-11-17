@@ -35,11 +35,27 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 - In a C program, `getchar`, `fgets`, and `scanf` return a CR as
   `'\n'`, and a CR LF as one `'\n'`.
 
+**New.**
+
+- The MEGA65 has the chunky mode of the screen, 160×100 pixels of one
+  word each, which a write of 1 to the mode word at `0xFFFFFF87`
+  selects, as in the emulator. The Nexys4DDR has only the text: its
+  mode word stays 0, so that a program sees that the mode is missing
+  ([#144](https://github.com/MJoergen/NiceMonMEGA65/issues/144),
+  [SYSTEM.md](SYSTEM.md#the-chunky-mode)).
+
 **Changes.**
 
 - `help` in `tools/mon.py` is nicedbg's own, one line for each command
   as before, and its console is nicedbg's, which passes Enter as CR
   ([#143](https://github.com/MJoergen/NiceMonMEGA65/issues/143)).
+
+**Tests.**
+
+- `make hwtest` checks the mode word: 1 is kept on the MEGA65 and not
+  on the Nexys4DDR, and another value and the clear make it 0. `tb_text`
+  checks a whole frame in the chunky mode, with a display offset that
+  wraps at the end of the screen.
 
 ## V2.2.1 (2026-11-17)
 

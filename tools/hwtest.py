@@ -1624,6 +1624,31 @@ def test_screen_registers(link: Link) -> None:
     check("the display offset off again", wr(link, 0xFFFFFF85, 0))
 
 
+# The mode word of nice_cpu's DEVICES.md section 1.10: 1 is the chunky
+# mode, which the MEGA65 has and the Nexys4DDR, with 8192 words of the
+# screen, has not
+SCR_MODE = 0xFFFFFF87
+
+
+def test_screen_mode(link: Link, board: str) -> None:
+    """The mode word keeps 1 where the board has the chunky mode, and 0
+    for any other value, and the clear makes it 0. The display shows the
+    screen's words as pixels for a moment."""
+    want = 1 if board == "mega65" else 0
+    check(f"W {SCR_MODE:08X} 1", wr(link, SCR_MODE, 1))
+    got = rd(link, SCR_MODE)
+    check(f"the mode word keeps {want} for 1 on the {board}", got == want,
+          f"{got:08X}")
+    check(f"W {SCR_MODE:08X} 1 again", wr(link, SCR_MODE, 1))
+    link.control(HOLD | 4 | RAM)
+    got = rd(link, SCR_MODE)
+    check("the clear makes the mode word 0", got == 0, f"{got:08X}")
+    check(f"W {SCR_MODE:08X} 3", wr(link, SCR_MODE, 3))
+    got = rd(link, SCR_MODE)
+    check("the mode word keeps 0 for a mode that is missing", got == 0,
+          f"{got:08X}")
+
+
 # The fonts of nice_cpu's DEVICES.md section 1.8
 FONT_RAM  = 0xFFFE0000
 FONT_ROM  = 0xFFFE2000
@@ -2720,6 +2745,7 @@ def main() -> None:
                 test_counters_stop(link)
                 test_clock(link)
                 test_screen_registers(link)
+                test_screen_mode(link, board)
                 test_fonts(link)
                 test_board_devices(link, board)
                 fat = test_sd(link, board)

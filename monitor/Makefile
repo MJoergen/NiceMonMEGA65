@@ -286,6 +286,7 @@ LOAD_64K = load\rEFFF 1\rF000 2\r1EFFF 3\r\rdump 0xEFFF, 1\rhalt\r
 # and flags on the FPU, and returns, leaves through mon_exit, and returns,
 # then sys 0x8100, which leaves them too and jumps to 0, the cold start,
 # and sys 0x8000 once more, which leaves through mon_exit (issue #141).
+# Each run leaves the chunky mode selected too (issue #144).
 FPU  = sys 0x8000\rsys 0x8000\rsys 0x8000\rsys 0x8100\rsys 0x8000\rhalt\r
 # sd_write: sys 0x8000 runs test/sd.nasm, which writes sector 2, which
 # the image shows.
@@ -417,9 +418,9 @@ DUMP_sd_write = -d 0x9100:6
 DUMP_fs       = -d 0x9100:36 -d 0x9180:8 -d 0x9200:45 -d 0x9280:16 -d 0x92A0:11
 DUMP_fsw      = -d 0x9100:42
 DUMP_fat      = -d 0xFFFFF11A:5
-# For fpu the number of test/fpu.nasm's runs, the FPU's status at the
-# start of each run, and at the halt
-DUMP_fpu      = -d 0x9100:5 -d 0xFFFFFF8D:1
+# For fpu the number of test/fpu.nasm's runs, the FPU's status and the
+# screen's mode word at the start of each run, and both at the halt
+DUMP_fpu      = -d 0x9100:5 -d 0x9111:4 -d 0xFFFFFF8D:1 -d 0xFFFFFF87:1
 # For arp the results of test/arp.nasm's calls, and the cache it copied,
 # and for udp the results of test/udp.nasm's, and the bytes and the
 # sources that udp_recv wrote

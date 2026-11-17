@@ -26,8 +26,13 @@
 -- the cursor swaps the colors of its character, and the strip's rows are
 -- black. Then it shows the page and the strip, and selects the font RAM
 -- again, and checks the first four rows of text of the third frame: they
--- show the page, in the ROM, with no cursor. It stops there, for each
--- frame takes about half a minute to simulate.
+-- show the page, in the ROM, with no cursor. Last it hides the page and
+-- selects the chunky mode of nice_cpu's DEVICES.md §1.10, with the display
+-- offset at 20000, so that the pixels wrap at the end of the screen, and
+-- checks the whole fourth frame: 160x100 pixels of 8x8, each the
+-- background of its word, no cursor, and the strip under them. p_write
+-- fills the words from 2048 to the end of the screen for it. It stops
+-- there, for each frame takes about half a minute to simulate.
 
 library ieee;
    use ieee.std_logic_1164.all;
@@ -69,6 +74,7 @@ architecture simulation of tb_text is
    signal cur_mode : std_logic_vector(2 downto 0) := (others => '0');
    signal offs     : std_logic_vector(C_SCR_BITS - 1 downto 0) := (others => '0');
    signal fnt_ram  : std_logic := '0';
+   signal chunky   : std_logic := '0';
 
    signal fnt_we    : std_logic := '0';
    signal fnt_addr  : std_logic_vector(13 downto 0) := (others => '0');
@@ -94,7 +100,7 @@ architecture simulation of tb_text is
    -- must have, with the display offset disp and, when cursor is true, the
    -- cursor at (cx, cy), and with the strip and the page of the overlay
    -- shown when shown and paged are true, and the program's rows in the font
-   -- RAM fnt when ram is true
+   -- RAM fnt when ram is true, or in the chunky mode when chunk is true
    function expected(scr    : t_scr;
                      ovl    : t_ovl;
                      fnt    : t_font;
@@ -104,7 +110,8 @@ architecture simulation of tb_text is
                      cursor : boolean;
                      cx, cy : natural;
                      shown  : boolean;
-                     paged  : boolean) return std_logic_vector is
+                     paged  : boolean;
+                     chunk  : boolean) return std_logic_vector is
       -- The program's 25 rows and the strip's 4, centered
       constant C_Y0  : natural := (C_MODE.v_visible - 29 * 32) / 2;
       constant C_X0  : natural := (C_MODE.h_visible - 1280) / 2;
@@ -126,6 +133,12 @@ architecture simulation of tb_text is
       end if;
       if row >= 25 or paged then
          word := ovl(row * 80 + col);
+      elsif chunk then
+         -- A pixel of 8x8, the background of its word, and no cursor
+         word := scr((disp + (y - C_Y0) / 8 * 160 + (x - C_X0) / 8) mod 2 ** C_SCR_BITS);
+         c    := word(31 downto 20);
+         return c(11 downto 8) & c(11 downto 8) & c(7 downto 4) & c(7 downto 4) &
+                c(3 downto 0) & c(3 downto 0);
       else
          word := scr((disp + row * 80 + col) mod 2 ** C_SCR_BITS);
       end if;
@@ -175,6 +188,7 @@ begin
          cur_mode_i  => cur_mode,
          offs_i      => offs,
          fnt_ram_i   => fnt_ram,
+         chunky_i    => chunky,
          fnt_we_i    => fnt_we,
          fnt_addr_i  => fnt_addr,
          fnt_wdata_i => fnt_wdata,
@@ -293,6 +307,11 @@ begin
       for i in 2000 to 2047 loop
          put(i, X"FFFFFF41");
       end loop;
+      -- The rest, for the chunky mode, in colors from the address, with
+      -- a character and a foreground that it must not show
+      for i in 2048 to 2 ** C_SCR_BITS - 1 loop
+         put(i, to_slv((i * 40503) mod 2 ** 12, 12) & X"FFF41");
+      end loop;
       -- The page of the overlay: the 256 codes in other colors
       for i in 0 to 1999 loop
          color_v := to_slv((i * 7919 + 12345) mod 2 ** 24, 24);
@@ -321,7 +340,8 @@ begin
       -- Checks the first n_lines lines of the frame that starts now, with
       -- the display offset disp and, when cursor is true, the cursor at (cx,
       -- cy), and the strip and the page shown when strip_on and page_on are
-      -- true, and the font RAM selected when ram_on is true. With all the visible lines it also checks the vertical sync
+      -- true, and the font RAM selected when ram_on is true, or the chunky
+      -- mode when chunk_on is true. With all the visible lines it also checks the vertical sync
       -- pulse after them, and returns at its end. The picture goes to the
       -- PPM file when ppm_out is true.
       procedure check_frame(n_lines  : natural;
@@ -331,6 +351,7 @@ begin
                             strip_on : boolean;
                             page_on  : boolean;
                             ram_on   : boolean;
+                            chunk_on : boolean;
                             ppm_out  : boolean) is
          variable x, y   : natural;
          variable rgb    : std_logic_vector(23 downto 0);
@@ -346,7 +367,7 @@ begin
             while de = '1' loop
                rgb    := red & green & blue;
                want_v := expected(model, ovl_model, fnt_model, ram_on, x, y, disp, cursor, cx, cy,
-                                  strip_on, page_on);
+                                  strip_on, page_on, chunk_on);
                if y < n_lines and rgb /= want_v then
                   errors := errors + 1;
                   if errors <= 10 then
@@ -416,7 +437,7 @@ begin
          write(l, string'("P3 1280 1024 255"));
          writeline(ppm, l);
       end if;
-      check_frame(C_MODE.v_visible, 0, false, 0, 0, true, false, true, G_PPM_FILE /= "");
+      check_frame(C_MODE.v_visible, 0, false, 0, 0, true, false, true, false, G_PPM_FILE /= "");
       if G_PPM_FILE /= "" then
          file_close(ppm);
       end if;
@@ -435,7 +456,7 @@ begin
       strip    <= '0';
       wait until rising_edge(clk);
       ctl_we <= '0';
-      check_frame(C_MODE.v_visible, 80, true, 5, 3, false, false, false, false);
+      check_frame(C_MODE.v_visible, 80, true, 5, 3, false, false, false, false, false);
 
       -- The page over the program's rows, which hides the cursor, in the
       -- ROM while the font RAM is selected. The first four rows of text
@@ -447,7 +468,20 @@ begin
       ctl_we  <= '1';
       wait until rising_edge(clk);
       ctl_we <= '0';
-      check_frame(48 + 4 * 32, 80, true, 5, 3, true, true, true, false);
+      check_frame(48 + 4 * 32, 80, true, 5, 3, true, true, true, false, false);
+
+      -- The chunky mode, with the cursor still on, which it hides, and the
+      -- strip under the pixels. That frame starts 48 lines before the
+      -- third one would end, so the registers wait for its end first.
+      wait until rising_edge(vga_clk) and vs = C_MODE.sync_active;
+      wait until rising_edge(clk);
+      page   <= '0';
+      offs   <= to_slv(20000, C_SCR_BITS);
+      chunky <= '1';
+      ctl_we <= '1';
+      wait until rising_edge(clk);
+      ctl_we <= '0';
+      check_frame(C_MODE.v_visible, 20000, true, 5, 3, true, false, true, true, false);
 
       running <= false;
       wait;

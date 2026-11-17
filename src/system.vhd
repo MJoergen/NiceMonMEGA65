@@ -189,6 +189,7 @@ architecture synthesis of system is
    signal scr_cur_mode : std_logic_vector(2 downto 0);
    signal scr_offs     : std_logic_vector(G_SCR_ADDR_BITS - 1 downto 0);
    signal scr_fnt_ram  : std_logic;
+   signal scr_chunky   : std_logic;
    -- The bus's port of the fonts, in the system clock domain
    signal fnt_we    : std_logic;
    signal fnt_addr  : std_logic_vector(13 downto 0);
@@ -310,6 +311,7 @@ begin
          scr_cur_mode_o => scr_cur_mode,
          scr_offs_o     => scr_offs,
          scr_fnt_ram_o  => scr_fnt_ram,
+         scr_chunky_o   => scr_chunky,
          fnt_we_o       => fnt_we,
          fnt_addr_o     => fnt_addr,
          fnt_wdata_o    => fnt_wdata,
@@ -477,6 +479,7 @@ begin
          cur_mode_i  => scr_cur_mode,
          offs_i      => scr_offs,
          fnt_ram_i   => scr_fnt_ram,
+         chunky_i    => scr_chunky,
          fnt_we_i    => fnt_we,
          fnt_addr_i  => fnt_addr,
          fnt_wdata_i => fnt_wdata,

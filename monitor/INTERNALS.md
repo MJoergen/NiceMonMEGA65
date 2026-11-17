@@ -231,8 +231,8 @@ from 0, and the rest is free. The demo is not in it: it is a program,
 <!-- romsize layout -->
 | Part | Address | Words |
 |---|---|---:|
-| The monitor | `0x0000`–`0x3654` | 13909 |
-| Free | `0x3655`–`0x7FFF` | 18859 |
+| The monitor | `0x0000`–`0x3658` | 13913 |
+| Free | `0x3659`–`0x7FFF` | 18855 |
 <!-- /romsize layout -->
 
 The monitor's words, by the source they come from, in the order
@@ -245,7 +245,7 @@ ROM is built:
 <!-- romsize monitor -->
 | Source | What it is | Words | Text |
 |---|---|---:|---:|
-| `monitor.nasm` | The dispatch table, the HAL, and the cold start | 732 | 5 |
+| `monitor.nasm` | The dispatch table, the HAL, and the cold start | 736 | 5 |
 | `monitor_cmd.nasm` | The routines of the statements that were the commands | 1225 | 222 |
 | `basic.nasm` | BASIC: the main loop, the scanner, the keywords, the messages, and the help | 818 | 440 |
 | `monitor_dis.nasm` | The disassembler of `DIS` | 871 | 79 |
@@ -258,7 +258,7 @@ ROM is built:
 | `mon.nasm` | The stubs of the entries | 72 | 0 |
 | `build/folder.nasm` | The folder's name, and the error of a card without it | 17 | 17 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 13909 | 1038 |
+| In all | | 13913 | 1038 |
 <!-- /romsize monitor -->
 
 - `build/folder.nasm` and the version always end with a `.DAT 0`, as
