@@ -23,24 +23,24 @@ as the display draws them. niceemu runs the
 program twice, the second time to read the words at the PC.
 
 The pictures of doc/images/ are made from the monitor of the release
-and the demo at 0x8000 after it, both with its tag, and r and CR first,
-which start the demo:
+and the demo at 0x8000 after it, both with its tag, and SYS 0x8000 and
+CR first, which start the demo:
 
-    make -C monitor VERSION=V2.2 && make -C demo VERSION=V2.2
+    make -C monitor VERSION=V2.2.1 && make -C demo VERSION=V2.2.1
     cat monitor/build/monitor.bin demo/build/demo.bin > rom.bin
-    printf 'r\\rHello from the NICE CPU on the MEGA65!\\r' > in.txt
+    printf 'SYS 0x8000\\rHello from the NICE CPU on the MEGA65!\\r' > in.txt
     tools/screenshot.py -i in.txt -o doc/images/demo.png rom.bin
 
 doc/images/ethernet.png, the demo's F11, with:
 
-    printf 'r\\r\\033[23~i192.168.1.65\\rm02:4E:49:43:45:00\\r' > in.txt
+    printf 'SYS 0x8000\\r\\033[23~i192.168.1.65\\rm02:4E:49:43:45:00\\r' > in.txt
     tools/screenshot.py -i in.txt -n 3000000 -o doc/images/ethernet.png \\
         rom.bin
 
 and doc/images/debugger.png, the typewriter paused under the strip once
 the line of the first in.txt is typed, with:
 
-    tools/screenshot.py -i in.txt -n 20572 --debugger \\
+    tools/screenshot.py -i in.txt -n 19320 --debugger \\
         -o doc/images/debugger.png rom.bin
 
 Usage:
