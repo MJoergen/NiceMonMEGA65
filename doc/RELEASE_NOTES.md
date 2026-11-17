@@ -46,6 +46,16 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 
 **Changes.**
 
+- `LOAD` skips a line of a file, from the card or a TFTP server, that
+  has a byte that is not printable ASCII, other than TAB, CR, or LF.
+  Before, such a byte was dropped, but for DEL, so that a damaged line
+  could write another address or word. Blanks after a line's 76
+  characters are dropped in all three kinds of `LOAD`, so a line with
+  many blanks at its end loads, and one with text there is skipped;
+  before, a line of more than 76 blanks from the card hid what came
+  after them
+  ([#151](https://github.com/MJoergen/NiceMonMEGA65/issues/151), L1 and
+  L2).
 - `help` in `tools/mon.py` is nicedbg's own, one line for each command
   as before, and its console is nicedbg's, which passes Enter as CR
   ([#143](https://github.com/MJoergen/NiceMonMEGA65/issues/143)).

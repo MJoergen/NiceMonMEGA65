@@ -376,7 +376,8 @@ def extra(d: str, tmp: str) -> None:
         b"8006 7" + b" " * 70 + b"\n", b"8007 8" + b" " * 71 + b"\n",
         b"8008 9\x01\x80\xff\n", b"8009 A\x7f\n", b"800A B\r", b"800B C\r\n", b"800C D\n", b"\r",
         b"FFFF0000 E\n", b"0x8010 1\n", b"800D  0000000F  \n", b"  800e Bc\n", b"8020 1\x00\x00\n",
-        b"800F 11"]), "NICE/LINES.BIN", tmp)
+        b" " * 100 + b"\n", b" " * 80 + b"8011 5\n", b"8012 6" + b" " * 100 + b"\n",
+        b" " * 72 + b"8013 7\n", b"800F 11"]), "NICE/LINES.BIN", tmp)
     mcopy(img, 0, b"8100 1\r\n8101 2\r\n\r\n8102 3\rbad\n8103 4\n", "NICE/CRLF.BIN", tmp)
     mcopy(img, 0, b"\r\n\n   \n", "NICE/BLANK.BIN", tmp)
     mcopy(img, 0, "".join(f"{0x9000 + i:08X} {i:08X}\n" for i in range(100)).encode(),

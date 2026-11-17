@@ -313,9 +313,11 @@ mac_digit
 ; could reach the ROM or the monitor's variables and stack, which are at
 ; RAM_WORDS - VARS_WORDS and up of the RAM, 0x1F000 on the MEGA65 and
 ; 0xF000 on the Nexys4DDR. V_PEND is that address, or the screen where
-; RAM_WORDS reads 0, as in niceemu. A line of more than LINE_MAX
-; characters is skipped too: LINE_MAX + 1 of them are kept, which tells
-; it from a full line, and the rest dropped. A second line for an address
+; RAM_WORDS reads 0, as in niceemu. A line with more than blanks after
+; its LINE_MAX characters is skipped too: the blanks after LINE_MAX are
+; dropped, and the first key that is no blank is kept as 0x7F, which no
+; line parses, at LINE_MAX, and not shown; a DEL takes it back, and the
+; other keys after it are dropped. A second line for an address
 ; writes its word over the first's, where niceemu rejects the file. The
 ; count of the words written and the lowest and highest address are
 ; shown at the end, and the count of the skipped lines, the number of the
@@ -370,15 +372,23 @@ load_key
         ?C      JMP     load_key        ; another control code
                 CMP     R1, 0x80
         ?!C     JMP     load_key        ; 0x80 and above
-                CMP     R6, V_LINE+LINE_MAX+1
-        ?Z      JMP     load_key        ; the line is over full
+                CMP     R6, V_LINE+LINE_MAX
+        ?!C     JMP     :+              ; the line is full
                 MOVE    @R6++, R1
                 CALL    mon_putc
+                JMP     load_key
+:
+                CMP     R1, 0x20
+        ?Z      JMP     load_key        ; a blank after LINE_MAX, dropped
+                MOVE    R6, V_LINE+LINE_MAX
+                MOVE    @R6++, 0x7F     ; more after LINE_MAX: skipped
                 JMP     load_key
 load_del
                 CMP     R6, V_LINE
         ?Z      JMP     load_key        ; nothing before the cursor
                 SUB     R6, R6, 1
+                CMP     R6, V_LINE+LINE_MAX
+        ?Z      JMP     load_key        ; the 0x7F, which is not shown
                 MOVE    R1, _io_gets.rub
                 CALL    _io_puts
                 JMP     load_key
@@ -407,16 +417,15 @@ load_end
                 CALL    bin_line
                 JMP     load_line
 
-; bin_line: the line at V_LINE, which ends at R6 with a 0, LINE_MAX + 1
-; characters when it was longer, of st_lines and st_tftp: counted in R11, passed
+; bin_line: the line at V_LINE, which ends at R6 with a 0, of st_lines
+; and st_tftp, with 0x7F at LINE_MAX when it had more than blanks after
+; LINE_MAX characters, so that it is skipped: counted in R11, passed
 ; over when it has blanks only, or else parsed, and its word written,
 ; counted in R8, with the lowest and highest address in R9 and R10, or
 ; skipped, counted in R12, with the number of the first in V_LBAD. Uses
 ; R1-R6.
 bin_line
                 ADD     R11, R11, 1
-                CMP     R6, V_LINE+LINE_MAX+1
-        ?Z      JMP     bin_bad         ; longer than LINE_MAX
                 MOVE    R1, V_LINE
                 CALL    _io_gethex      ; R1 the address, R2 its digits, R3 after it
                 TST     R2

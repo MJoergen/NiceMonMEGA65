@@ -18,7 +18,8 @@ this script: the bridge answers ARP for the server 10.0.0.2, and passes
 the UDP datagrams to 10.0.0.2 on to tftpd.py on 127.0.0.1, port 69 to
 the server's port, and back, so that niceemu and tftpd.py are on one
 network. BASIC lists the folder with DIR, loads a program of 300 lines
-with LOAD, which DUMP then shows, and gets an ERROR. Its output must have the lines
+with LOAD, which DUMP then shows, gets an ERROR, and loads a file of
+lines that are skipped, passed over, and loaded. Its output must have the lines
 that the checks name.
 
 It prints a line for each check, and last how many passed, and exits with
@@ -67,6 +68,16 @@ def prog() -> bytes:
     return b"".join(f"{0x9000 + i:08X} {i * 3:08X}\n".encode() for i in range(300))
 
 
+def lines_bin() -> bytes:
+    """Lines of issue #151's L1 and L2: A000, A006, and A007 load, a line
+    of blanks only is passed over, and five are skipped from line 2: a
+    DEL, a NUL, a byte from 0x80, a control code, and text after 80
+    blanks. The 100 blanks after A006's word are dropped."""
+    return b"".join([b"A000 1\n", b"A001 2\x7f\n", b"A002 3\x00\n", b"A003 4\x80\n",
+                     b"A004\x01 5\n", b" " * 100 + b"\n", b" " * 80 + b"A005 6\n",
+                     b"A006 7" + b" " * 100 + b"\n", b"A007 8\r\n"])
+
+
 FILES = {
     "empty.bin": b"",
     "f511.bin": (bytes(range(256)) * 2)[:511],
@@ -74,6 +85,7 @@ FILES = {
     "f513.txt": (bytes(range(256)) * 3)[:513],
     "big.dat": bytes((i * 7) & 0xFF for i in range(140_000)),
     "prog.bin": prog(),
+    "lines.bin": lines_bin(),
     ".hidden": b"secret",
 }
 
@@ -266,7 +278,8 @@ def test_monitor(server_port: int, tmp: str) -> None:
     inp = os.path.join(tmp, "input")
     with open(inp, "w") as f:
         f.write('IP "10.0.0.9"\rDIR "10.0.0.2"\rLOAD "PROG.BIN", "10.0.0.2"\r'
-                'DUMP 0x9000, 4\rDUMP 0x912B, 1\rLOAD "nosuch.bin", "10.0.0.2"\rHALT\r')
+                'DUMP 0x9000, 4\rDUMP 0x912B, 1\rLOAD "nosuch.bin", "10.0.0.2"\r'
+                'LOAD "lines.bin", "10.0.0.2"\rDUMP 0xA000, 8\rHALT\r')
     try:
         res = subprocess.run(
             [NICEEMU, "-i", inp, "--eth-udp", f"127.0.0.1:{bridge.emu_port}",
@@ -288,8 +301,13 @@ def test_monitor(server_port: int, tmp: str) -> None:
     for line in ("Words loaded: 300, 00009000 to 0000912B",
                  "00009000 00000000 00000003 00000006 00000009",
                  "0000912B 00000381",
-                 "TFTP error 1, File not found"):
+                 "TFTP error 1, File not found",
+                 "Words loaded: 3, 0000A000 to 0000A007",
+                 "0000A000 00000001 00000000 00000000 00000000",
+                 "0000A004 00000000 00000000 00000007 00000008"):
         check(f"monitor: {line}", line in lines, out[-600:])
+    check("monitor: LOAD lines.bin skips 5 lines from line 2",
+          any(x.startswith("Lines skipped: 5, first line 2;") for x in lines), out[-600:])
 
 
 def main() -> None:

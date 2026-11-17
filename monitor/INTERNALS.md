@@ -231,8 +231,8 @@ from 0, and the rest is free. The demo is not in it: it is a program,
 <!-- romsize layout -->
 | Part | Address | Words |
 |---|---|---:|
-| The monitor | `0x0000`–`0x3658` | 13913 |
-| Free | `0x3659`–`0x7FFF` | 18855 |
+| The monitor | `0x0000`–`0x3670` | 13937 |
+| Free | `0x3671`–`0x7FFF` | 18831 |
 <!-- /romsize layout -->
 
 The monitor's words, by the source they come from, in the order
@@ -246,19 +246,19 @@ ROM is built:
 | Source | What it is | Words | Text |
 |---|---|---:|---:|
 | `monitor.nasm` | The dispatch table, the HAL, and the cold start | 736 | 5 |
-| `monitor_cmd.nasm` | The routines of the statements that were the commands | 1225 | 222 |
+| `monitor_cmd.nasm` | The routines of the statements that were the commands | 1235 | 222 |
 | `basic.nasm` | BASIC: the main loop, the scanner, the keywords, the messages, and the help | 818 | 440 |
 | `monitor_dis.nasm` | The disassembler of `DIS` | 871 | 79 |
 | `monitor_sd.nasm` | The sector routines | 206 | 59 |
-| `monitor_fat.nasm` | FAT32, `DIR`, `LOAD`, `SAVE`, `DELETE`, and TAB | 3249 | 10 |
-| `monitor_eth.nasm` | The network | 3354 | 160 |
+| `monitor_fat.nasm` | FAT32, `DIR`, `LOAD`, `SAVE`, `DELETE`, and TAB | 3253 | 10 |
+| `monitor_eth.nasm` | The network | 3364 | 160 |
 | `monitor_tcp.nasm` | TCP | 2414 | 0 |
 | `monitor_clock.nasm` | The clock and `TIME` | 675 | 44 |
 | `monlib.nasm` | The routines that programs join | 274 | 0 |
 | `mon.nasm` | The stubs of the entries | 72 | 0 |
 | `build/folder.nasm` | The folder's name, and the error of a card without it | 17 | 17 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 13913 | 1038 |
+| In all | | 13937 | 1038 |
 <!-- /romsize monitor -->
 
 - `build/folder.nasm` and the version always end with a `.DAT 0`, as
@@ -441,7 +441,7 @@ compared with `test/NAME.expected`:
 | `cmds` | The monitor alone | Every statement, its bad arguments, keywords in either case, numbers that do not fit, and the edits of a line. |
 | `basic` | The monitor alone, with no card and no IP address | The scanner of a line: keywords glued to a letter or a digit, the HELP lines of each statement's Syntax error, numbers at their limits, `0x` without digits, strings without a closing quote, too few or too many arguments, and the 0s and the `.BIN` that the scanner writes into the line. |
 | `scroll` | The monitor alone | 448 rows of `DUMP`, which go round the history, and Page Up and Page Down. |
-| `load` | The monitor, with 128K words of RAM, as on the MEGA65 | `LOAD` with `build/hello.bin` pasted: CR LF and LF line ends, tabs, blank lines, skipped lines, a line too long, an address given twice, and CTRL-C. Then `SYS 0x8000` runs it. |
+| `load` | The monitor, with 128K words of RAM, as on the MEGA65 | `LOAD` with `build/hello.bin` pasted: CR LF and LF line ends, tabs, blank lines, skipped lines, a line too long, blanks after a line's 76 characters, a DEL that takes back the key after them, an address given twice, and CTRL-C. Then `SYS 0x8000` runs it. |
 | `load_64k` | The monitor, with 64K words, as on the Nexys4DDR | `LOAD` at the end of that RAM. |
 | `load_emu` | The monitor, with `0xFFFFFF9E` reading 0, as in `niceemu` | `LOAD` up to the screen. |
 | `sd_write` | `test/sd.nasm`, with a card of 4 sectors in slot 0 and none in slot 1 | `sd_init`, `sd_read`, and `sd_write`: the empty slot, a sector read and written, and the sector past the end. The card must then equal the image of `test/sd_image.py --written`. |
@@ -492,7 +492,7 @@ The suites of `test/fat_runs.py`, step 10:
 | Suite | What it checks |
 |---|---|
 | `fatstate` | What `SYS 0` and a program's return keep: a handle across the cold start, both handles left open, so that `LOAD` and `SAVE` give error 23 while `DIR` and TAB work, the mount of slot 1 forgotten, and `DIR 0`, which mounts again and closes a program's handle. |
-| `fatload` | `LOAD`'s lines (`lines.img`): CR LF, blank lines only, a chain cut after its second cluster, and lines of every kind, and the words of `V_LSTATS`. |
+| `fatload` | `LOAD`'s lines (`lines.img`): CR LF, blank lines only, a chain cut after its second cluster, and lines of every kind, with bytes that are not printable ASCII and blanks and text after 76 characters, and the words of `V_LSTATS`. |
 | `fattab` | TAB: after a quote, in either case, an alias, words after blanks and strings, a list longer than the screen; with slot 1 mounted (`tab1.img`), a directory, and names that end at the line's end or past it; and after `SAVE` and `DELETE` (issue #145). |
 | `fatdrop` | The mount dropped under open files when `SD_SELECT` changes, and `fs_mount` under a file open to write. |
 | `fatchain` | Damaged chains (`chains.img`): a chain cut, a size past the chain, cluster 0, the last cluster, one past it, a bad mark, a loop; their reads, deletes, and a `SAVE` over one. |

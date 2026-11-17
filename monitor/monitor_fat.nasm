@@ -2102,11 +2102,15 @@ type
 ; that it may write, and R3 the 5 words of its summary. The lines of the
 ; file, ADDR WORD in hex, written as LOAD with no name writes them, but
 ; that an empty line is passed over and the end of the file ends the
-; load. A line is skipped when it is longer than LINE_MAX characters, has
-; no address or word of 1 to 8 digits, has more after the word than
-; blanks, or its address is below 0x8000 or not below the end. TAB is a
-; blank, CR, LF, or CR LF ends a line, and other control codes and bytes
-; from 0x80 are dropped. The 5 words get the words written, the lowest
+; load. A line is skipped when it has no address or word of 1 to 8
+; digits, has more after the word than blanks, has a byte that is not
+; printable ASCII, has more than blanks after its LINE_MAX characters, or
+; its address is below 0x8000 or not below the end. TAB is a blank, and
+; CR, LF, or CR LF ends a line. A byte that is no character, any other
+; control code, DEL, or one from 0x80, is kept as 0x7F, which no line
+; parses; so is the first character after LINE_MAX that is no blank, at
+; SEC[LINE_MAX], and the blanks after LINE_MAX are dropped, as niceemu
+; ignores them. The 5 words get the words written, the lowest
 ; and the highest address, the lines skipped, and the number of the
 ; first, counted from 1, only at the end; V_T has them until then. R1 =
 ; 0. The line is in SEC, one character a word, R10 long; R7 is the end,
@@ -2140,10 +2144,15 @@ fload_byte
                 CMP     R1, 0x09
         ?Z      MOVE    R1, 0x20
                 SUB     R2, R1, 0x20
-                CMP     R2, 0x60
-        ?!C     JMP     fload_byte
-                CMP     R10, LINE_MAX+1
-        ?!C     JMP     fload_byte
+                CMP     R2, 0x5F
+        ?!C     MOVE    R1, 0x7F        ; no character: the line skipped
+                CMP     R10, LINE_MAX
+        ?C      JMP     fload_put       ; room
+                CMP     R1, 0x20
+        ?Z      JMP     fload_byte      ; a blank after LINE_MAX, dropped
+                MOVE    R10, LINE_MAX
+                MOVE    R1, 0x7F        ; more after LINE_MAX: skipped
+fload_put
                 MOVE    @SEC[R10], R1
                 MOVE    R10++, R10
                 JMP     fload_byte
@@ -2159,8 +2168,6 @@ fload_byte
         ?Z      JMP     :-
                 TST     @R2
         ?Z      JMP     fload_next      ; blanks only
-                CMP     R10, LINE_MAX+1
-        ?!C     JMP     fload_bad
                 MOVE    R1, SEC
                 CALL    _io_gethex
                 SUB     R2, R2, 1

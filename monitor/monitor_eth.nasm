@@ -2227,8 +2227,10 @@ tftp_bad
 ; of monitor_fat.nasm takes the bytes of a file: CR, LF, or CR LF ends a line,
 ; which is shown for a listing, or else goes to bin_line, or is counted
 ; and passed over when it is empty;
-; TAB is a blank, and other control codes and bytes from 0x80 are dropped,
-; and so are the bytes after LINE_MAX + 1. Uses R1-R6.
+; TAB is a blank, and a byte that is no character, any other control code,
+; DEL, or one from 0x80, is kept as 0x7F, so that bin_line skips its line.
+; The blanks after LINE_MAX are dropped, and the first other byte after it
+; is kept as 0x7F at LINE_MAX, and the rest dropped. Uses R1-R6.
 tftp_char
                 MOVE    R2, @V_TLAST
                 MOVE    @V_TLAST, R1
@@ -2243,11 +2245,17 @@ tftp_char
                 CMP     R1, 0x09
         ?Z      MOVE    R1, 0x20
                 SUB     R2, R1, 0x20
-                CMP     R2, 0x60
-        ?!C     RET                     ; another control code, or from 0x80
+                CMP     R2, 0x5F
+        ?!C     MOVE    R1, 0x7F        ; no character: the line skipped
                 MOVE    R6, @V_TLINE
+                CMP     R6, V_LINE+LINE_MAX
+        ?C      JMP     :+              ; room
                 CMP     R6, V_LINE+LINE_MAX+1
-        ?Z      RET                     ; the line is over full
+        ?Z      RET                     ; the 0x7F is there already
+                CMP     R1, 0x20
+        ?Z      RET                     ; a blank after LINE_MAX, dropped
+                MOVE    R1, 0x7F        ; more after LINE_MAX: skipped
+:
                 MOVE    @R6++, R1
                 MOVE    @V_TLINE, R6
                 RET

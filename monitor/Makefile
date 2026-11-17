@@ -266,13 +266,20 @@ SCROLL = \033[5~\033[6~dump 0x8000, 0x700\r\033[5~\033[5~\033[6~ver\rhalt\r
 # skipped: zz, an address in the ROM, one of the monitor's variables, a
 # third number, 1F000, and a line of 78 characters, 9003, 66 blanks, and
 # 12345678, which is longer than the 76 of a line, so it writes nothing,
-# not 123456. Then build/hello.bin,
+# not 123456. Pasted lines after it: one of 100 blanks, which is passed
+# over; 1EFFF A and 90 blanks, which writes A over the 9, as the blanks
+# after the 76 characters are dropped; and 9001, 71 blanks, 3, and z,
+# whose z past the 76 is taken back by a DEL, so it writes 3 at 9001.
+# Then build/hello.bin,
 # its first 3 lines ended by CR LF and the rest by LF, and CR, an empty
 # line, ends the load. A second LOAD is ended by CTRL-C in the middle of
 # a line, which writes nothing. sys 0x8000 runs hello, and dump shows
 # 9000 to 9003.
 BLANKS66  = $(shell printf '%66s' '')
-LOAD_HEAD = load\r\n9000 12\177\033[A34\rzz\r100 5\rFFFFF000 1\r9001 5 6\r1EFFF 9\r1F000 1\r\t9002\t7 \r   \r9002 8\r9003$(BLANKS66)12345678\r
+BLANKS71  = $(shell printf '%71s' '')
+BLANKS90  = $(shell printf '%90s' '')
+BLANKS100 = $(shell printf '%100s' '')
+LOAD_HEAD = load\r\n9000 12\177\033[A34\rzz\r100 5\rFFFFF000 1\r9001 5 6\r1EFFF 9\r1F000 1\r\t9002\t7 \r   \r9002 8\r9003$(BLANKS66)12345678\r$(BLANKS100)\r1EFFF A$(BLANKS90)\r9001$(BLANKS71)3z\177\r
 LOAD_TAIL = \rload\r9001 7\003sys 0x8000\rdump 0x9000, 4\rdump 0x1EFFF, 1\rhalt\r
 # load_emu: LOAD where 0xFFFFFF9E reads 0, as in niceemu, so a program's RAM
 # goes up to the screen: 10000 and FFFEFFFF take words, and FFFF0000 does

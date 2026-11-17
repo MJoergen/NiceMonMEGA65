@@ -1026,7 +1026,9 @@ the client, which ends the transfer. Then it runs the monitor of the
 tests in `niceemu` with `--eth-udp`, whose frames go to a bridge in the
 script that answers ARP for 10.0.0.2 and passes its datagrams to
 `tftpd.py`, and checks that `DIR` lists the folder, `LOAD` loads a program,
-and shows an ERROR. It takes about a second.
+and shows an ERROR, and that `LOAD` skips the lines of a file with a
+byte that is not printable ASCII or with text after 76 characters. It
+takes about a second.
 
 `make tcptest` runs `tools/tcptest.py`, the test of TCP, its clients
 and its servers, the entries 26 to 31 (issue #111). It has two parts.
