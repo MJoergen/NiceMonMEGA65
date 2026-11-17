@@ -201,7 +201,12 @@ the tests pin it (The tests, below).
 - **Errors.** A routine that meets an error jumps to `fat_fail` with
   the negative error in R1, which takes SP back to that of `fat_call`
   and returns R1 from the entry. So no routine checks the result of
-  the one it called, and the state is as the error left it.
+  the one it called, and the state is as the error left it. An error
+  of the SD controller other than 6, write-protected, and 7, a sector
+  after the last, drops the mount and closes the files first (`chk`),
+  as the card's state is not known: on the R3's slot 1, which has no
+  card detect, a swapped card stays "ready" and times out until the
+  next start-up.
 - **The RAM.** The state is in the variables from `FAT_RAM`,
   `0xFFFFF980`, up to below the I/O page (`monitor.nasm`): the mounted
   volume, the sector of the FAT in `FATBUF`, a sector `SEC`, the names
@@ -223,8 +228,8 @@ from 0, and the rest is free. The demo is not in it: it is a program,
 <!-- romsize layout -->
 | Part | Address | Words |
 |---|---|---:|
-| The monitor | `0x0000`–`0x3628` | 13865 |
-| Free | `0x3629`–`0x7FFF` | 18903 |
+| The monitor | `0x0000`–`0x3630` | 13873 |
+| Free | `0x3631`–`0x7FFF` | 18895 |
 <!-- /romsize layout -->
 
 The monitor's words, by the source they come from, in the order
@@ -242,7 +247,7 @@ ROM is built:
 | `basic.nasm` | BASIC: the main loop, the scanner, the keywords, the messages, and the help | 818 | 440 |
 | `monitor_dis.nasm` | The disassembler of `DIS` | 871 | 79 |
 | `monitor_sd.nasm` | The sector routines | 206 | 59 |
-| `monitor_fat.nasm` | FAT32, `DIR`, `LOAD`, `SAVE`, `DELETE`, and TAB | 3205 | 10 |
+| `monitor_fat.nasm` | FAT32, `DIR`, `LOAD`, `SAVE`, `DELETE`, and TAB | 3213 | 10 |
 | `monitor_eth.nasm` | The network | 3354 | 160 |
 | `monitor_tcp.nasm` | TCP | 2414 | 0 |
 | `monitor_clock.nasm` | The clock and `TIME` | 675 | 44 |
@@ -250,7 +255,7 @@ ROM is built:
 | `mon.nasm` | The stubs of the entries | 72 | 0 |
 | `build/folder.nasm` | The folder's name, and the error of a card without it | 17 | 17 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 13865 | 1038 |
+| In all | | 13873 | 1038 |
 <!-- /romsize monitor -->
 
 - `build/folder.nasm` and the version always end with a `.DAT 0`, as

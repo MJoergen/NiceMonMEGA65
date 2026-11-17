@@ -88,7 +88,10 @@ Two limits of the R3, which the R6 does not have:
   switches is not connected to GND, so CD and WP always read 1. M2M says
   that the R3A fixes it, and revision -04 has the fix. One core file serves
   the R3 and the R3A, so the R3's build ignores CD and WP on slot 1, and a
-  missing card shows as a failed Init.
+  missing card shows as a failed Init. A card swapped there is not seen
+  either: the slot stays ready for the card before, which the new one
+  is not, so its first command times out (error 3). The ROM drops its
+  mount on such an error, and the next command starts the card up.
 
 ## The layers
 

@@ -332,8 +332,9 @@ With no PC slot, `make sdcard CMD=mkdir` makes it over the link
   and `LOAD` mount the slot of the last mount when there is none, or
   after reset slot 0, or slot 1 when slot 0 has no card. The mount, and
   the files open, are dropped when the selected slot is no longer the
-  mounted one, as after a program selects the other slot, or the card
-  there is not ready or has changed. A mount of a slot that the system
+  mounted one, as after a program selects the other slot, when the card
+  there is not ready or has changed, and when the card fails a command
+  with an SD error other than 6 and 7. A mount of a slot that the system
   does not have changes nothing.
 - **The folder `NICE`** of the root directory only. A card may be shared by several cores
   on the MEGA65, each with a folder of its own in the root, so NiceMon

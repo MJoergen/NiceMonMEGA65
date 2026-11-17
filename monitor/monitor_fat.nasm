@@ -196,14 +196,22 @@ ld16
 
 ; ini, rd: sd_init of the slot R1, and sd_read of the sector R1 into the
 ; 128 words at R2, which fail with the controller's error. Use R1-R4.
+; chk: an error but 6, write-protected, and 7, a sector after the last,
+; leaves the card in a state that is not known, so it drops the mount, and
+; the next command starts the card up again. The R3's slot 1 has no card
+; detect, so a card put in there is not "changed", and the controller
+; stays "ready" for the card before it, which does not answer (error 3).
 ini
                 CALL    sd_init
                 JMP     chk
 rd
                 CALL    sd_read
 chk
-        ?!Z     JMP     fat_fail
-                RET
+        ?Z      RET
+                CMP     R1, -6
+        ?!Z     CMP     R1, -7
+        ?!Z     CALL    drop
+                JMP     fat_fail
 
 ; fat_reset: no mount, and no file open, at the cold start, and then
 ; drop: no mount, no sector in FATBUF, and the files closed. Use no
