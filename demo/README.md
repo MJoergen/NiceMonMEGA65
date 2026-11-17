@@ -114,6 +114,7 @@ romsize` writes it (`tools/romsize.py`).
 | `demo.nasm`, `G_TEXTS` | The texts and the steps of F9, and the shifts of F11's MAC address | 113 | 96 |
 | `demo.nasm`, `S_TEXTS` | The texts of F11 | 953 | 910 |
 | `demo.nasm`, `MATH` | The script of F11's test of the math unit | 97 | 0 |
+| `colors.nasm` | The names of the colors, which take no words | 0 | 0 |
 | `demo/text.nasm` | The board's texts: the name, the welcome, the keys, and the note on the clock | 567 | 567 |
 | `build/version.nasm` | The version in the title bar, the tests' `V9.9` | 5 | 5 |
 | In all | | 5017 | 2385 |

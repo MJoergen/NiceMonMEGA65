@@ -79,7 +79,7 @@ test: $(BUILD)/test/monitor_demo.bin
 # The table of the demo's words in README.md, "Its words", which make
 # test checks, and make romsize writes
 ROMSIZE  = $(PYTHON) ../tools/romsize.py demo --bin $(BUILD)/test/demo_test.bin \
-             --doc README.md $(DEMO)/demo.nasm $(TEXT) $(BUILD)/test/version.nasm
+             --doc README.md $(DEMO)/demo.nasm $(NICE_CPU)/runtime/colors.nasm $(TEXT) $(BUILD)/test/version.nasm
 
 romsize: $(BUILD)/test/demo_test.bin
 	@$(ROMSIZE) --write

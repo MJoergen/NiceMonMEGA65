@@ -78,6 +78,7 @@ DEMO_PARTS = [
     ("MATH", "The script of F11's test of the math unit", False),
 ]
 DEMO_FILES = {
+    "colors.nasm": "The names of the colors, which take no words",
     "text.nasm": "The board's texts: the name, the welcome, the keys, and "
                  "the note on the clock",
     "version.nasm": "The version in the title bar, the tests' `V9.9`",

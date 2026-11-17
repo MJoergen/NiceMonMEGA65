@@ -21,6 +21,20 @@ The release candidates pinned these:
 
 nice_cpu's `RC01` and `RC03` have no tag here.
 
+## V2.3 (unreleased)
+
+**Upgrade notes.**
+
+- nice_cpu is at `V2.3`. Its FPU computes the functions `SIN` to
+  `HYPOT`, and the functions of `math.h` run on it, with other bits in
+  the last place than before. The float library in software is gone,
+  and so is `nicebuild.py --no-fpu`. A program with floats checks for
+  the FPU at its start, and traps with code 9, "no FPU", on a
+  bitstream or core file before `V2.2`
+  ([#150](https://github.com/MJoergen/NiceMonMEGA65/issues/150)).
+- In a C program, `getchar`, `fgets`, and `scanf` return a CR as
+  `'\n'`, and a CR LF as one `'\n'`.
+
 ## V2.2.1 (2026-11-17)
 
 **Upgrade notes.**
