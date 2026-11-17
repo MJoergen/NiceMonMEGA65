@@ -22,7 +22,7 @@ and the clock is not set, so that every date written is the fixed one.
 The output of the suite SUITE is compared with test/SUITE.expected, and
 written to BUILD/SUITE.out.
 
-The behavior that is pinned here though it is odd, the possible bugs B1
+The behavior that is pinned here though it is odd, the possible bugs B2
 to B8 of the audit of issue #149, is marked "known oddity" in the titles
 of the runs and the comments of the OPS files: it stays until a change
 of its own fixes it.
@@ -139,7 +139,7 @@ SUITES = {
         "m_c65524.img", "m_c65525.img", "m_root1.img", "m_roottop.img", "m_nicecl.img",
         "m_fatwrap.img", "m_baddir.img")] + [
         Run("No card in either slot", None, keys='dir\rdir 0\rload "x.bin"\rhalt\r'),
-        Run("DIR with a slot of 2^31 and more is a plain DIR (known oddity B1)",
+        Run("DIR with a slot of 2^31 and more has no such slot (issue #151, B1)",
             "lfn.img", "super.img",
             keys="dir 1\rdir 2147483648\rdir 4294967295\rdir 2\rhalt\r"),
     ],

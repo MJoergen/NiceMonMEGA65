@@ -215,7 +215,7 @@ baud_bad
 ; or two hex digits, in either case, with colons between them, and shown,
 ; two hex digits a byte with colons. The first byte must be even, as bit
 ; 0 of it marks a group address, which is no station's. Without the
-; string, or with blanks only in it, it is only shown. Blanks may come
+; string it is only shown; an empty one is no address, as for IP. Blanks may come
 ; before and after the address in the string, and anything else makes it
 ; no address, which is not written. R7:R8 gather the address, a byte at a
 ; time, R9 counts the bytes left, and R10 points into the string.
@@ -229,8 +229,6 @@ st_mac
                 CMP     @R2, 0x20
         ?Z      ADD     R2, R2, 1
         ?Z      JMP     :-
-                TST     @R2
-        ?Z      JMP     mac_show        ; no address
                 MOVE    R10, R2
 mac_byte
                 CMP     @R10, 0x20      ; no blank inside the address

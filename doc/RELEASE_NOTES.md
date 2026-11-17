@@ -60,6 +60,14 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   from the card or a TFTP server after it read a line, it prints the
   words loaded and the lines skipped before the error, as those words
   are in the RAM (L4).
+- BASIC's `0x` without digits is no number, so `DUMP 0x, 1`, `DIS 0x,
+  1`, and `BAUD 0x` are a Syntax error, and so is `DIR 0x"1.2.3.4"`;
+  `DIR 99999999999"1.2.3.4"` is an Illegal quantity. Before, they ran
+  as without the number. `MAC ""` says that it is no MAC address, as
+  `IP ""` does, and `DIR` with a slot from 2^31 up says `File error
+  27, no such slot`, where it listed the card mounted
+  ([#151](https://github.com/MJoergen/NiceMonMEGA65/issues/151), S1,
+  S2, S5, and B1).
 - `help` in `tools/mon.py` is nicedbg's own, one line for each command
   as before, and its console is nicedbg's, which passes Enter as CR
   ([#143](https://github.com/MJoergen/NiceMonMEGA65/issues/143)).

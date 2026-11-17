@@ -25,6 +25,10 @@
 ; fails, with OP_SKIP the next op is passed over, and with neither the
 ; next op follows, unless a number did not fit. A statement that fails
 ; prints Syntax error and the lines of HELP that start with its keyword.
+; An item that is not there leaves R8 where it was, so that the next op
+; looks at the same character. The scan goes from the left, and the
+; first item that fails decides: SAVE "X", "Y", 99999999999 is a Syntax
+; error at its second comma, before its number is scanned.
 ;
 ; The values of the items go to the slots at V_ARGS, slot 1 first, and a
 ; comma moves to the next, slot 2, then slot 4: R12 has the slot's
@@ -166,9 +170,11 @@ dval
 
 ; k_number: a number in decimal, or in hex after 0x or 0X, of one digit
 ; or more, with no letter or digit after it, and less than 2^32, else R9
-; is 1. It sets the bit of the slot R12 in R11. 0x without digits leaves
-; R8 after the 0x. Uses R2, R4-R6.
+; is 1. It sets the bit of the slot R12 in R11. A number that is not
+; there, such as 0x without digits, leaves R8 at its start. Uses R2,
+; R4-R6.
 k_number
+                PUSH    R8
                 CLR     R4              ; the number
                 ONE     R6              ; not 0 before the first digit
                 MOVE    R5, 10          ; the base
@@ -194,8 +200,10 @@ k_number
                 JMP     :-
 :
                 XNOR[M] R0, R2, R9      ; Z for no letter or digit, and R9 0
+                POP     R2              ; the start
         ?Z      TST     R6
         ?Z      OR      R11, R11, R12
+        ?!Z     MOVE    R8, R2          ; not there: R8 back at the start
                 MOVE    R1, R4
                 RET
 
@@ -262,10 +270,15 @@ bas_dis
                 MOVE    R3, R11
                 JMP     st_dis
 
-; DIR, DIR SLOT, and DIR "IP" [, "PAT"]
+; DIR, DIR SLOT, and DIR "IP" [, "PAT"]. A SLOT from 2^31 up, which
+; st_dir would take as none, is one that no board has.
 bas_dir
                 TST     R11
-        ?!Z     JMP     st_dir          ; the slot
+        ?Z      JMP     :+
+                TST     R1
+        ?N      MOVE    R1, 0x7FFFFFFF  ; no such slot
+                JMP     st_dir          ; the slot
+:
                 TST     R1
         ?Z      NOT     R1, R0          ; the card mounted
         ?Z      JMP     st_dir

@@ -232,9 +232,12 @@ CMDS = help\rver\rdump 0, 6\rdump\rDUMP 0x10, 1\rq\rloadx\r\r  cls\rabc\177\177\
 # statement shows. Numbers: in decimal and hex, with 0X, leading zeros,
 # and the 76 characters of a full line; 0xFFFFFFFF, the largest, and 33
 # bits, which are an Illegal quantity, also with a letter after them;
-# and the numbers that are not. 0x without digits is passed over, so that
-# dump 0x, 1, dis 0x, 1, and baud 0x run with no A, and dir 0x"1.2.3.4"
-# with a server. Strings: an empty one, a name glued to load, a server
+# and the numbers that are not. 0x without digits is no number, and the
+# scan goes on at its 0, so dump 0x, 1, dis 0x, 1, baud 0x, and
+# dir 0x"1.2.3.4" are a Syntax error, and dir 99999999999"1.2.3.4" an
+# Illegal quantity (issue #151, S1 and S2). save "x", "y", 99999999999
+# is a Syntax error at its second comma, before its number (S3), and
+# mac "" is no MAC address, as ip "" is no IP address (S5). Strings: an empty one, a name glued to load, a server
 # without a comma, or with no closing quote, and the arguments that are
 # too few or too many for each statement. The dumps of the line after
 # five statements show the 0 at each closing quote, those of a statement

@@ -149,10 +149,12 @@ READY.
 dump 0x8000, 0
 READY.
 dump 0x, 1
-00008000 00000000
+Syntax error
+DUMP [A] [, N]      show N words from A, in hex, or the next ones
 READY.
 dump 0x , 2
-00008001 00000000 00000000
+Syntax error
+DUMP [A] [, N]      show N words from A, in hex, or the next ones
 READY.
 dump 0x 1
 Syntax error
@@ -169,17 +171,19 @@ dis 0x8000, 1
 00008000 00000000                             NOP
 READY.
 dis 0x, 1
-00008001 00000000                             NOP
+Syntax error
+DIS [A] [, N]       disassemble N instructions from A, or the next ones
 READY.
 dis ,1
-00008002 00000000                             NOP
+00008001 00000000                             NOP
 READY.
 dis 0x8000,
 Syntax error
 DIS [A] [, N]       disassemble N instructions from A, or the next ones
 READY.
 baud 0x
-Baud rate 0
+Syntax error
+BAUD [RATE]         show the UART baud rate, or set it, such as 921600
 READY.
 baud 0x 1
 Syntax error
@@ -288,10 +292,12 @@ DIR [SLOT]          list the files of the card in SLOT, or of the card mounted
 DIR "IP" [, "PAT"]  list the files of tools/tftpd.py at IP, or those of PAT
 READY.
 dir 0x"1.2.3.4"
-No IP address; IP or DHCP sets one
+Syntax error
+DIR [SLOT]          list the files of the card in SLOT, or of the card mounted
+DIR "IP" [, "PAT"]  list the files of tools/tftpd.py at IP, or those of PAT
 READY.
 dir 99999999999"1.2.3.4"
-No IP address; IP or DHCP sets one
+Illegal quantity
 READY.
 dir 99999999999
 Illegal quantity
@@ -328,7 +334,7 @@ Syntax error
 IP ["A.B.C.D"]      show the IP address, or set it, such as "192.168.1.65"
 READY.
 mac ""
-MAC address 02:4E:49:43:45:00
+Not a MAC address: six bytes in hex with colons, the first one even
 READY.
 mac "02:4E:49:43:45:00" x
 Syntax error

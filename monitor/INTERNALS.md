@@ -231,8 +231,8 @@ from 0, and the rest is free. The demo is not in it: it is a program,
 <!-- romsize layout -->
 | Part | Address | Words |
 |---|---|---:|
-| The monitor | `0x0000`–`0x3606` | 13831 |
-| Free | `0x3607`–`0x7FFF` | 18937 |
+| The monitor | `0x0000`–`0x360B` | 13836 |
+| Free | `0x360C`–`0x7FFF` | 18932 |
 <!-- /romsize layout -->
 
 The monitor's words, by the source they come from, in the order
@@ -246,8 +246,8 @@ ROM is built:
 | Source | What it is | Words | Text |
 |---|---|---:|---:|
 | `monitor.nasm` | The dispatch table, the HAL, and the cold start | 736 | 5 |
-| `monitor_cmd.nasm` | The routines of the statements that were the commands | 1335 | 222 |
-| `basic.nasm` | BASIC: the main loop, the scanner, the keywords, the messages, and the help | 818 | 440 |
+| `monitor_cmd.nasm` | The routines of the statements that were the commands | 1332 | 222 |
+| `basic.nasm` | BASIC: the main loop, the scanner, the keywords, the messages, and the help | 826 | 440 |
 | `monitor_dis.nasm` | The disassembler of `DIS` | 871 | 79 |
 | `monitor_sd.nasm` | The sector routines | 206 | 59 |
 | `monitor_fat.nasm` | FAT32, `DIR`, `LOAD`, `SAVE`, `DELETE`, and TAB | 3111 | 10 |
@@ -258,7 +258,7 @@ ROM is built:
 | `mon.nasm` | The stubs of the entries | 72 | 0 |
 | `build/folder.nasm` | The folder's name, and the error of a card without it | 17 | 17 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 13831 | 1038 |
+| In all | | 13836 | 1038 |
 <!-- /romsize monitor -->
 
 - `build/folder.nasm` and the version always end with a `.DAT 0`, as
@@ -440,7 +440,7 @@ compared with `test/NAME.expected`:
 | Test | What runs | What it checks |
 |---|---|---|
 | `cmds` | The monitor alone | Every statement, its bad arguments, keywords in either case, numbers that do not fit, and the edits of a line. |
-| `basic` | The monitor alone, with no card and no IP address | The scanner of a line: keywords glued to a letter or a digit, the HELP lines of each statement's Syntax error, numbers at their limits, `0x` without digits, strings without a closing quote, too few or too many arguments, and the 0s and the `.BIN` that the scanner writes into the line. |
+| `basic` | The monitor alone, with no card and no IP address | The scanner of a line: keywords glued to a letter or a digit, the HELP lines of each statement's Syntax error, numbers at their limits, `0x` without digits and a number that fails before a string, which are no numbers, strings without a closing quote, too few or too many arguments, and the 0s and the `.BIN` that the scanner writes into the line. |
 | `scroll` | The monitor alone | 448 rows of `DUMP`, which go round the history, and Page Up and Page Down. |
 | `load` | The monitor, with 128K words of RAM, as on the MEGA65 | `LOAD` with `build/hello.bin` pasted: CR LF and LF line ends, tabs, blank lines, skipped lines, a line too long, blanks after a line's 76 characters, a DEL that takes back the key after them, an address given twice, and CTRL-C. Then `SYS 0x8000` runs it. |
 | `load_64k` | The monitor, with 64K words, as on the Nexys4DDR | `LOAD` at the end of that RAM. |
