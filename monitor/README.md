@@ -334,7 +334,10 @@ With no PC slot, `make sdcard CMD=mkdir` makes it over the link
   the files open, are dropped when the selected slot is no longer the
   mounted one, as after a program selects the other slot, when the card
   there is not ready or has changed, and when the card fails a command
-  with an SD error other than 6 and 7. A mount of a slot that the system
+  with an SD error other than 6 and 7. Such an error of an entry that
+  found a mount and no file open runs the entry once more, on a new
+  mount, so a card swapped in the R3's slot 1, which has no card
+  detect, starts up there. A mount of a slot that the system
   does not have changes nothing.
 - **The folder `NICE`** of the root directory only. A card may be shared by several cores
   on the MEGA65, each with a folder of its own in the root, so NiceMon

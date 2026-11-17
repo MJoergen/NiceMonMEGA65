@@ -582,9 +582,9 @@ The SD card controller of [nice_cpu's DEVICES.md §5](https://github.com/MJoerge
 - On the R3, slot 1 has no card detect and no write protect, as the
   common pin of the socket's switches is not connected to GND. The R3
   build ignores them, so a missing card shows as a failed start-up,
-  error 3 or 8. A card put in there in place of another fails the
-  first command, with error 3, and the ROM then starts it up again for
-  the next. The R3A fixed it, but one core serves both.
+  error 3 or 8. A card put in there in place of another does not
+  answer the first read, so the ROM starts it up and repeats the
+  command once. The R3A fixed it, but one core serves both.
 
 ## The I2C bus
 

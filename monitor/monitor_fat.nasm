@@ -127,7 +127,10 @@ fat_load
 fat_save
                 MOVE    R6, save_b
 ; fat_call: the routine at R6 called with R1-R4, and R7-R12 kept. Its
-; return, or fat_fail, gives R1.
+; return, or fat_fail, gives R1. When a mount stood and no file was open,
+; an SD error that drops the mount (chk) runs the routine once more, on a
+; new mount: the card in the R3's slot 1, which has no card detect, may
+; be another than the mount's, and starts up only then.
 fat_call
                 PUSH    R7
                 PUSH    R8
@@ -135,9 +138,36 @@ fat_call
                 PUSH    R10
                 PUSH    R11
                 PUSH    R12
+                OR[M]   R0, @FILE0+F_KIND, @FILE1+F_KIND
+        ?Z      MOVE    R5, @V_MOUNTED  ; the retry allowed, when not 0
+        ?!Z     CLR     R5
+call_again
+                PUSH    R5
+                PUSH    R6
+                PUSH    R1
+                PUSH    R2
+                PUSH    R3
+                PUSH    R4
                 ADD     @--SP, 3, PC    ; the return address, after JMP R6
                 MOVE    @V_FSP, SP
                 JMP     R6
+                MOVE    R5, R1
+                POP     R4
+                POP     R3
+                POP     R2
+                POP     R1
+                POP     R6
+                POP     R8              ; the retry allowed
+                TST     R8
+        ?Z      JMP     :+
+                CMP     R5, -8
+        ?C      JMP     :+              ; not an SD error, -8 to -1
+                CMP     R5, -6
+        ?!Z     CMP     R5, -7
+        ?Z      JMP     :+              ; 6 and 7 keep the mount
+                CLR     R5              ; once
+                JMP     call_again
+:               MOVE    R1, R5
                 POP     R12
                 POP     R11
                 POP     R10

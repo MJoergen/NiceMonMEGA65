@@ -206,7 +206,10 @@ the tests pin it (The tests, below).
   after the last, drops the mount and closes the files first (`chk`),
   as the card's state is not known: on the R3's slot 1, which has no
   card detect, a swapped card stays "ready" and times out until the
-  next start-up.
+  next start-up. `fat_call` then runs the routine once more, with its
+  R1-R4, when a mount stood and no file was open at the start, so the
+  retry mounts again; with a file open, its handle is gone, and the
+  error goes to the caller.
 - **The RAM.** The state is in the variables from `FAT_RAM`,
   `0xFFFFF980`, up to below the I/O page (`monitor.nasm`): the mounted
   volume, the sector of the FAT in `FATBUF`, a sector `SEC`, the names
@@ -215,8 +218,8 @@ the tests pin it (The tests, below).
   `fat_reset`, so a program's return keeps the mount and the open
   files.
 - **The stack.** The entries run on the caller's stack. The deepest
-  takes 21 words of it with the return address, as measured in the
-  tests in `niceemu`.
+  takes 27 words of it with the return address: 21 as measured in the
+  tests in `niceemu`, and the 6 that `fat_call` keeps for a retry.
 
 ## The ROM's words
 
@@ -228,8 +231,8 @@ from 0, and the rest is free. The demo is not in it: it is a program,
 <!-- romsize layout -->
 | Part | Address | Words |
 |---|---|---:|
-| The monitor | `0x0000`–`0x3630` | 13873 |
-| Free | `0x3631`–`0x7FFF` | 18895 |
+| The monitor | `0x0000`–`0x3654` | 13909 |
+| Free | `0x3655`–`0x7FFF` | 18859 |
 <!-- /romsize layout -->
 
 The monitor's words, by the source they come from, in the order
@@ -247,7 +250,7 @@ ROM is built:
 | `basic.nasm` | BASIC: the main loop, the scanner, the keywords, the messages, and the help | 818 | 440 |
 | `monitor_dis.nasm` | The disassembler of `DIS` | 871 | 79 |
 | `monitor_sd.nasm` | The sector routines | 206 | 59 |
-| `monitor_fat.nasm` | FAT32, `DIR`, `LOAD`, `SAVE`, `DELETE`, and TAB | 3213 | 10 |
+| `monitor_fat.nasm` | FAT32, `DIR`, `LOAD`, `SAVE`, `DELETE`, and TAB | 3249 | 10 |
 | `monitor_eth.nasm` | The network | 3354 | 160 |
 | `monitor_tcp.nasm` | TCP | 2414 | 0 |
 | `monitor_clock.nasm` | The clock and `TIME` | 675 | 44 |
@@ -255,7 +258,7 @@ ROM is built:
 | `mon.nasm` | The stubs of the entries | 72 | 0 |
 | `build/folder.nasm` | The folder's name, and the error of a card without it | 17 | 17 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 13873 | 1038 |
+| In all | | 13909 | 1038 |
 <!-- /romsize monitor -->
 
 - `build/folder.nasm` and the version always end with a `.DAT 0`, as
