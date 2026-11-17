@@ -3,7 +3,7 @@ HELP lists the statements
 READY.
 load
 ADDR WORD in hex on each line, as in a .bin file; an empty line ends
-Words loaded: 788, 00008000 to 0001EFFF
+Words loaded: 798, 00008000 to 0001EFFF
 Lines skipped: 6, first line 2; ADDR WORD in hex, ADDR 00008000 to 0001EFFF
 READY.
 load
@@ -11,7 +11,7 @@ ADDR WORD in hex on each line, as in a .bin file; an empty line ends
 Words loaded: 0
 READY.
 sys 0x8000
-Hello from 00008000, table 00010005
+Hello from 00008000, table 00010006
 at column 40
 on the line only
 Returned 0000002A
@@ -25,13 +25,13 @@ READY.
 halt
 Halted
 fffff000: 00000000 00000018 000fff00 00000003 0001f000 00008000 00000180 0000017f
-fffff008: 00000001 00000000 00000000 00000003 00000003 fffff010 0001f000
+fffff008: 00000001 00000000 00000000 00000003 00000003 fffff010 00000000
 Screen:
 |HELP lists the statements
 |READY.
 |load
 |ADDR WORD in hex on each line, as in a .bin file; an empty line ends
-|Words loaded: 788, 00008000 to 0001EFFF
+|Words loaded: 798, 00008000 to 0001EFFF
 |Lines skipped: 6, first line 2; ADDR WORD in hex, ADDR 00008000 to 0001EFFF
 |READY.
 |load
@@ -39,7 +39,7 @@ Screen:
 |Words loaded: 0
 |READY.
 |sys 0x8000
-|Hello from 00008000, table 00010005
+|Hello from 00008000, table 00010006
 |                                        at column 40
 |Returned 0000002A
 |READY.

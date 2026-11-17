@@ -50,14 +50,14 @@ segment 1
   close 0 -> 0
 segment 2
   open 1 "" 2 -> 0
-  readdir 1 -> 1 "HELLO   BIN" attr 20 size 14076
+  readdir 1 -> 1 "HELLO   BIN" attr 20 size 14256
   open 0 "LATE.TXT" 1 -> 1
   close 0 -> 0
   readdir 1 -> 1 "W       TXT" attr 20 size 3
   readdir 1 -> 0
   close 1 -> 0
   open 1 "" 2 -> 0
-  readdir 1 -> 1 "HELLO   BIN" attr 20 size 14076
+  readdir 1 -> 1 "HELLO   BIN" attr 20 size 14256
   readdir 1 -> 1 "W       TXT" attr 20 size 3
   readdir 1 -> 1 "LATE    TXT" attr 20 size 0
   readdir 1 -> 0

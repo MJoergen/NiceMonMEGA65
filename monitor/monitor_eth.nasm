@@ -826,14 +826,29 @@ net_config
                 POP     R7
                 RET
 
+; net_servers: entry 35. The DHCP server of the last DHCP exchange,
+; and the NTP server, the first of DHCP's option 42, each 0 for none,
+; written to the 2 words at the word address R1, after a poll. R1 = 0.
+; Uses R1-R6, and R7 across the calls, saved.
+net_servers
+                PUSH    R7
+                CALL    net_waddr
+                MOVE    R7, R1
+                CALL    net_step
+                MOVE    @R7, @V_DSRV
+                MOVE    @1[R7], @V_NTP
+                CLR     R1
+                POP     R7
+                RET
+
 ; net_set: entry 22. The IP address, the mask, the gateway, and the DNS
-; server set from the 4 words at the word address R1, as net_config gives
-; them, after a poll, and no NTP server kept. The IP address is written
-; to E_IP only if it is another, as a write breaks a host's connection
-; over TCP, and ends every TCP connection of the program in E_TRESET; 0
-; clears it. The lease is forgotten, and not renewed, and the exchange in
-; the background ended. R1 = 0. Uses R1-R6, and R7 across the calls,
-; saved.
+; server set from the 4 words at the word address R1, as net_config
+; gives them, after a poll, and no DHCP server or NTP server kept. The
+; IP address is written to E_IP only if it is another, as a write breaks
+; a host's connection over TCP, and ends every TCP connection of the
+; program in E_TRESET; 0 clears it. The lease is forgotten, and not
+; renewed, and the exchange in the background ended. R1 = 0. Uses R1-R6,
+; and R7 across the calls, saved.
 net_set
                 PUSH    R7
                 CALL    net_waddr
@@ -846,6 +861,7 @@ net_set
                 MOVE    @V_GW, @2[R7]
                 MOVE    @V_DNS, @3[R7]
                 CLR     @V_NTP
+                CLR     @V_DSRV
                 CLR     @V_BSTATE
                 CALL    lease_forget
                 CLR     R1

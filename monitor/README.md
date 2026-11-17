@@ -15,7 +15,7 @@
 
 The ROM at `0x0000`–`0x7FFF`, which the core boots from, holds:
 
-- a hardware abstraction layer, the HAL, of thirty-two routines that reach
+- a hardware abstraction layer, the HAL, of thirty-seven routines that reach
   the hardware or the state the monitor keeps, called through a dispatch
   table at the start of the ROM. It is not a library: what a program can
   do for itself stays in the program.
@@ -147,7 +147,7 @@ program starts with none of the values that this one left there.
 |---|---|---|---|
 | 0 | `00` | `mon_reset` | Cold start: E, the timer, the FPU, VBASE, the font base, and the mode word cleared, the stack, the variables, the screen, the clock of the time of day from the MEGA65's real-time clock while it is not set, the banner, BASIC's main loop. The RAM from `0x8000` is left alone. |
 | 1 | `02` | `mon_exit` | R1 a status. Back to BASIC's main loop with a fresh stack, with E, the timer, the FPU, VBASE, the font base, and the mode word cleared, the cursor shown and blinking, the display offset off, and the status printed where the program left the cursor, on a new line if that is not column 0; for a program that has not kept the SP of its entry. A program with the runtime's start-up code returns or calls `exit` instead, which lands here too. |
-| 2 | `04` | `mon_version` | → R1 the version of the table, major in bits 31..16, minor in 15..0: `0x00010005`, 1.5. |
+| 2 | `04` | `mon_version` | → R1 the version of the table, major in bits 31..16, minor in 15..0: `0x00010006`, 1.6. |
 | 3 | `06` | `mon_putc` | R1 a character, to the outputs `mon_out` selects. On the screen it goes at the cursor, which moves on, to the next row after the last column; CR moves the cursor to column 0, LF to column 0 of the next row, BS one back, and TAB to the next multiple of 8; the other control codes and `0x7F` do nothing, and `0x80` to `0x9F` go on the screen as any character, blank in Spleen and drawn from the font RAM when a program selected it; past the last row the rows move up by one, by copying, so the rows shown are always the 2000 words at `0xFFFF0000`, as in `niceemu`. On the line every byte goes as it is. |
 | 4 | `08` | `mon_out` | R1 the outputs: bit 0 the line, bit 1 the screen; both at reset. → R1 the old ones. |
 | 5 | `0A` | `scr_cls` | Clears the screen in the current color, cursor home, shown and blinking, display offset 0. |
@@ -177,6 +177,11 @@ program starts with none of the values that this one left there.
 | 29 | `3A` | `tcp_recv` | R1 a handle, R2 the byte address of a buffer, R3 a number of bytes. Copies up to that many of the bytes received. → R1 the bytes copied, 0 when none wait, `MON_E_TEOF` once the peer has closed and every byte is read, or an error. Table 1.5. |
 | 30 | `3C` | `tcp_close` | R1 a handle, R2 0 to close, or 1 to abort. A close sends the bytes that wait, then the FIN, and the handle frees itself later; an abort sends a RST and frees it at once. → R1 0, or an error. Table 1.5. |
 | 31 | `3E` | `tcp_listen` | R1 the word address of a control block, R2 a local port, 1 to 65535 but 4510, R3 the sizes of the rings, as R4 of `tcp_open`. Makes a handle that waits for a peer to connect to the port. Sends nothing, and does not wait. → R1 a handle, 0 to 3, or an error. Table 1.5. |
+| 32 | `40` | `con_getline` | R1 the word address of a buffer, R2 a number of characters. Reads a line typed on the console into it, one character a word, up to that many and a 0 word after them, so the buffer has R2 + 1 words: BASIC's line, with its keys (BASIC below), the scrollback's before it, and TAB, which completes the name of a file of the card's folder. While it waits for the first key, it keeps the network going, as BASIC's line does. → R1 the number of characters. Table 1.6. |
+| 33 | `42` | `bin_line` | R1 the word address of a line, one character a word up to a 0 word, R2 the word address of 7 words, which the program clears before the first line of a load. Parses a line of a `.bin` file, `ADDR WORD` in hex, and writes the word, when the address is in a program's RAM, as `LOAD` does (Loading without a host below). The 7 words count: the words written, the lowest and the highest address written, the lines skipped, the number of the first, and the lines, and the last is the end of a program's RAM, which it writes. → R1 1 when the word was written, 0 for a line of blanks only, or -1 when the line was skipped. Table 1.6. |
+| 34 | `44` | `clock_set` | R1 the seconds since 1970, R2 the microseconds. Sets the clock of the time of day, as `TIME` does, and on the MEGA65 the real-time clock too, in the years 2000 to 2099. → R1 0. Table 1.6. |
+| 35 | `46` | `net_servers` | R1 the word address of 2 words. Writes the DHCP server of the last exchange and the NTP server that DHCP gave to them, each 0 for none. → R1 0. Table 1.6. |
+| 36 | `48` | `mon_restore` | The state after a program, for a program that runs another, as `SYS` does: E, the timer, the FPU, VBASE, the font base, and the mode word cleared, the network closed, and the cursor shown and blinking where the program left its registers, with the display offset off. → R1 0. Table 1.6. |
 
 By the table's own rule, it has no `mon_getc` or `mon_getc_nb`, as the
 console at `0xFFFFFF00` is the same on every board and in the emulator,
@@ -283,7 +288,7 @@ fails, TAB does nothing.
 | `DUMP [A] [, N]` | Shows `N` words from `A`, 4 to a row with the row's address first, all in hex. Without `A`, the words after the last shown; without `N`, 32 words. |
 | `DIS [A] [, N]` | Disassembles `N` instructions from `A`, a row each: the address, the instruction's 1 to 4 words, and its text, all in hex (The disassembler below). Without `A`, the instructions after the last shown; without `N`, 20. |
 | `CLS` | Clears the screen. |
-| `VER` | The version of the ROM, and of the dispatch table: `NiceMon V2.3, dispatch table 1.5`. |
+| `VER` | The version of the ROM, and of the dispatch table: `NiceMon V2.3, dispatch table 1.6`. |
 | `IP ["A.B.C.D"]` | Shows the Ethernet station's IP address, `IP address 192.168.1.65`, or writes it first: four decimal numbers of 0 to 255 with dots between them, such as `IP "192.168.1.65"`. Anything else is no address, and `IP` says so and writes nothing. It writes `0xFFFFFFB0`, `NET_IP` ([SYSTEM.md](../doc/SYSTEM.md#the-ethernet-station)), so a host connected over TCP loses its connection. In `niceemu` it is a register that keeps what is written. |
 | `DHCP` | Gets the IP address from the network's DHCP server and writes it, as `IP` does, then shows it, with the mask, the gateway, the DNS server, the DHCP server, and the NTP server, if it gives one, a line each (The network below). Without an answer, it prints `No answer from a DHCP server` after about 8 seconds, and leaves the address as it was. |
 | `MAC ["MAC"]` | Shows the station's MAC address, `MAC address 02:4E:49:43:45:06`, or writes it first: six bytes of one or two hex digits, in either case, with colons between them, such as `MAC "02:4E:49:43:45:01"`. The first byte must be even, as an odd one makes a group address. Anything else, an empty string too, is no address, and `MAC` says so and writes nothing. It writes `0xFFFFFFB1` and `B2`, so a host connected over TCP loses its connection. Each kind of board has its own after reset: `02:4E:49:43:45:03` on the R3, `02:4E:49:43:45:06` on the R6, and `02:4E:49:43:45:0A` on the Nexys4DDR. Two boards of the same kind on one network need different MAC addresses. In `niceemu` they are registers too, `02:4E:49:43:45:00` after reset. |

@@ -151,6 +151,11 @@ $(BUILD)/fs.bin: test/fs.nasm mon.nasm $(TOOLS) | $(BUILD)
 	@cat test/fs.nasm mon.nasm > $(BUILD)/fs_all.nasm
 	@$(ASM) -o $@ $(BUILD)/fs_all.nasm
 
+# The test of the entries of table 1.6, test/hal16.nasm, built as fs.bin
+$(BUILD)/hal16.bin: test/hal16.nasm mon.nasm $(TOOLS) | $(BUILD)
+	@cat test/hal16.nasm mon.nasm > $(BUILD)/hal16_all.nasm
+	@$(ASM) -o $@ $(BUILD)/hal16_all.nasm
+
 # The board's test of TCP's clients, test/tcphw.nasm, which
 # tools/hwtest.py runs, built as fs.bin
 $(BUILD)/tcphw.bin: test/tcphw.nasm mon.nasm $(TOOLS) | $(BUILD)
@@ -249,6 +254,10 @@ BLANKS62 = $(shell printf '%62s' '')
 ZEROS72  = $(shell printf '%072d' 32768)
 BASIC = vEr\r   ver   \rver,\rver\351\r\351ver\rsys0x8000\rdumpx\rdum\rdis1\ri\rsys_\r"ver"\r9 ver\rsave x\rdelete x\rdhcp x\rmac x\rtime x\rntp x\rdis x\rcls x\rhalt x\rdir x\rsys 32768\rsys $(ZEROS72)\rSYS 0X8000\rsys 0x08000\rsys 4294967295\rsys 0xFFFFFFFF\rsys 0x0000000ffffffff\rsys 4294967296\rsys 0x100000000\rsys 99999999999x\rsys 0x8000x\rsys 0x0x8000\rsys 1e3\rsys 32768.\rsys -1\rsys "x"\rsys 0xg\rsys 0x8000,\rdump 0x8000, 0\rdump 0x, 1\rdump 0x , 2\rdump 0x 1\rdump 1, 4294967296\rdump 1, 0x\rdis 0x8000, 1\rdis 0x, 1\rdis ,1\rdis 0x8000,\rbaud 0x\rbaud 0x 1\rbaud 4294967296\rbaud 1,\rbaud 0x1C200\rload ""\rload ".bin"\rload"a.BiN"\rload "a.bin",\rload "a.bin" ,"1.2.3.4"\rload "a.bin", "1.2.3.4" x\rload "a.bin", "bad"\rload x\rload "a.bin", "1.2.3.4\rLOAD  \r\rsave "x", "y" z\rsave "x" "y"\rsave "x",\rsave "x", 1\rsave "x", 0x, 1\rsave "x", 1, 99999999999\rsave "x", "y", 99999999999\rsave "abc\rsave "a.b", 0x8000, 1\rdelete "x"\rdelete "x", "y"\rdelete ""\rdir\rdir 0x\rdir 0x"1.2.3.4"\rdir 99999999999"1.2.3.4"\rdir 99999999999\rdir "1.2.3.4", "*.bin"\rdir "bad"\rdir "1.2.3.4",\rdir 1,\rdir 1 "x"\rdir 5\rip ""\rip "1.2.3.4" x\rmac ""\rmac "02:4E:49:43:45:00" x\rtime "bad"\rtime "1" x\rntp "1.2.3.4" x\rntp "1.2.3.4",\rntp "", "bad"\rntp ""\rntp "1.2.3.4", "+01:00"\r$(BLANKS30)save "abc",1,2\rdump 0xFFFFF02E, 16\r$(BLANKS30)load "x" "y"\rdump 0xFFFFF02E, 16\r$(BLANKS30)save "x", "1.2.3.4"\rdump 0xFFFFF02E, 20\r$(BLANKS30)save "a.b", 1, 2\rdump 0xFFFFF02E, 16\r$(BLANKS30)dir "1.2.3.4", "*"\rdump 0xFFFFF02E, 20\r$(BLANKS62)save "abc",1,2\rdump 0xFFFFF04E, 16\rip "1.2.3.4\rhalt\r
 RUN  = sys 0x8000\rhalt\r
+# hal16: sys 0x8000 runs test/hal16.nasm, whose con_getline reads the
+# line after it: 12, a DEL, 345678x9, of which the 9 does not fit, and a
+# TAB, which completes nothing with no card.
+HAL16 = sys 0x8000\r12\177345678x9\t\rhalt\r
 # reset: sys 0, the cold start, which shows the banner again and leaves
 # the RAM from 0x8000 alone, so that sys 0x8000 then runs hello.
 RESET = sys 0\rsys 0x8000\rhalt\r
@@ -417,8 +426,8 @@ DUMP_scroll  = -d 0xFFFFF000:11 -d 0xFFFFFF80:6 -d 0xFFFF7FB4:4 -d 0xFFFF7F64:4 
                -d 0xFFFF0804:4 -d 0xFFFF0994:4
 DUMP_hello   = -d 0xFFFF01B8:13 -d 0xFFFFFF80:1 -d 0xFFFFFF86:1 -d 0xFFFE1000:1
 DUMP_load    = -d 0xFFFFF000:15
-DUMP_load_emu = -d 0xFFFFF00E:1 -d 0xFFFEFFFF:1
-DUMP_load_64k = -d 0xFFFFF00E:1
+DUMP_load_emu = -d 0xFFFFF07F:1 -d 0xFFFEFFFF:1
+DUMP_load_64k = -d 0xFFFFF07F:1
 DUMP_hello_c = -d 0xFFFF01B8:12
 # For sd_write the results of test/sd.nasm's calls
 DUMP_sd_write = -d 0x9100:6
@@ -428,7 +437,11 @@ DUMP_sd_write = -d 0x9100:6
 # of test/fsw.nasm's, and for fat the numbers of fat_load for load NAME
 DUMP_fs       = -d 0x9100:36 -d 0x9180:8 -d 0x9200:45 -d 0x9280:16 -d 0x92A0:11
 DUMP_fsw      = -d 0x9100:42
-DUMP_fat      = -d 0xFFFFF11A:5
+# For hal16 the results of test/hal16.nasm's calls, the line of
+# con_getline, the counts of bin_line, the servers of net_servers, and the
+# words that bin_line wrote
+DUMP_hal16    = -d 0x9100:16 -d 0x9180:9 -d 0x9190:7 -d 0x9198:2 -d 0x9200:2
+DUMP_fat      = -d 0xFFFFF079:5
 # For fpu the number of test/fpu.nasm's runs, the FPU's status and the
 # screen's mode word at the start of each run, and both at the halt
 DUMP_fpu      = -d 0x9100:5 -d 0x9111:4 -d 0xFFFFFF8D:1 -d 0xFFFFFF87:1
@@ -481,7 +494,7 @@ FAT32_START_BYTES = $(shell echo $$(($(FAT32_START) * 512)))
 test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.bin $(BUILD)/hello.bin \
       $(BUILD)/dis.bin $(BUILD)/sd.bin $(BUILD)/arp.bin $(BUILD)/udp.bin $(BUILD)/net.bin \
       $(BUILD)/netdhcp.bin $(BUILD)/dns.bin $(BUILD)/lease.bin $(BUILD)/fpu.bin $(BUILD)/fs.bin $(BUILD)/fsw.bin \
-      $(FAT_IMAGES) $(BUILD)/version_test.nasm
+      $(BUILD)/hal16.bin $(FAT_IMAGES) $(BUILD)/version_test.nasm
 	@test '$(FOLDER_UC)' = NICE || { echo "make test needs FOLDER=NICE, not $(FOLDER)"; exit 1; }
 	@$(PYTHON) test/ring.py $(EMU) $(BUILD)/monitor_test.bin:32768 \
 	  $(BUILD)/monitor_8k.bin:8192 $(BUILD)/monitor_2k.bin:2048
@@ -504,6 +517,7 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	@printf '$(CMDS)' > $(BUILD)/cmds.txt
 	@printf '$(BASIC)' > $(BUILD)/basic.txt
 	@printf '$(RUN)' > $(BUILD)/run.txt
+	@printf '$(HAL16)' > $(BUILD)/hal16.txt
 	@printf '$(RESET)' > $(BUILD)/reset.txt
 	@printf '$(SCROLL)' > $(BUILD)/scroll.txt
 	@printf '$(SD_WRITE)' > $(BUILD)/sd_write.txt
@@ -530,7 +544,7 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	  if [ -n "$$base0" ]; then cp --sparse=always $$base0 $(BUILD)/$${t}0.img; sd="--sd0 $(BUILD)/$${t}0.img"; fi; \
 	  if [ -n "$$base1" ]; then rm -f $(BUILD)/$${t}1.img; cp --sparse=always $$base1 $(BUILD)/$${t}1.img; \
 	    if [ -n "$$ro1" ]; then chmod a-w $(BUILD)/$${t}1.img; fi; sd="$$sd --sd1 $(BUILD)/$${t}1.img"; fi; }; \
-	for t in cmds basic scroll load load_emu load_64k sd_write arp udp net fpu fs fsw fat fatw fatl tab fatlw fatbad fat1 fatnone time \
+	for t in cmds basic scroll load load_emu load_64k sd_write arp udp net fpu fs fsw hal16 fat fatw fatl tab fatlw fatbad fat1 fatnone time \
 	           clock clockpast \
 	           hello reset hello_c; do \
 	  opts=; rom=$(BUILD)/monitor_test.bin; base0=; base1=; ro1=; mask=; \
@@ -556,6 +570,7 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	      cp $(BUILD)/fat/fat32.img $(BUILD)/fsw0.base; \
 	      mattrib -i $(BUILD)/fsw0.base@@$(FAT32_START_BYTES) +r ::NICE/KEEP.TXT; \
 	      base0=$(BUILD)/fsw0.base; base1=$(BUILD)/fat/super.img; ro1=1; opts=--step-time;; \
+	    hal16) prog=$(BUILD)/hal16.bin; input=hal16; dump='$(DUMP_hal16)'; opts=--step-time;; \
 	    fat) prog=; input=fat; dump='$(DUMP_fat)'; \
 	      opts="--sd0 $(BUILD)/fat/fat32.img --sd1 $(BUILD)/fat/super.img";; \
 	    fatw) prog=; input=fatw; dump=; \
@@ -629,7 +644,7 @@ romsize: $(BUILD)/monitor_test.bin $(BUILD)/version_test.nasm
 # The layout of the sources, as nice_cpu's nicefmt checks it
 fmt:
 	@$(FMT) $(SOURCES) test/hello.nasm test/dis.nasm test/sd.nasm test/arp.nasm test/fpu.nasm \
-	  test/fs.nasm test/fsw.nasm test/udp.nasm test/net.nasm test/netdhcp.nasm \
+	  test/fs.nasm test/fsw.nasm test/hal16.nasm test/udp.nasm test/net.nasm test/netdhcp.nasm \
 	  test/dns.nasm test/lease.nasm test/tcp.nasm test/tcpt.nasm test/tcphw.nasm mon_c.nasm
 
 $(BUILD):

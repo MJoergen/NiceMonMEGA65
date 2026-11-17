@@ -237,6 +237,41 @@ int mon_tcp_close(int h, int abort);
 MON_ENTRY(tcp_listen) int mon_tcp_listen(unsigned *cb, unsigned port,
                                          unsigned sizes);
 
+// The services of table 1.6 (issue #152), which BASIC uses too. A
+// program checks that mon_version is 0x00010006 or more. Those with
+// MON_ENTRY take C pointers, as those of table 1.5 do.
+
+// A line typed on the console into buf, one character a word, up to n
+// characters and a 0 word after them, so buf has n + 1 words: BASIC's
+// line, with the scrollback's keys before it, and TAB, which completes
+// the name of a file of the card's folder. The number of characters.
+// Entry 32.
+MON_ENTRY(con_getline) int mon_con_getline(unsigned *buf, unsigned n);
+
+// A line of a .bin file, one character a word up to a 0 word: ADDR WORD
+// in hex writes WORD at ADDR in a program's RAM. counts, which the
+// program clears before the first line, has the words written, the
+// lowest and highest address, the lines skipped, the number of the
+// first, the lines, and the end of a program's RAM, which it writes. 1
+// when the word was written, 0 for blanks only, -1 when the line was
+// skipped. Entry 33.
+MON_ENTRY(bin_line) int mon_bin_line(const unsigned *line,
+                                     unsigned counts[7]);
+
+// The clock of the time of day set to secs since 1970, in local time,
+// and usecs, and on the MEGA65 its real-time clock, in the years 2000 to
+// 2099. 0. Entry 34.
+int mon_clock_set(unsigned secs, unsigned usecs);
+
+// The DHCP server of the last exchange, and the NTP server that DHCP
+// gave, each 0 for none, written to srv. 0. Entry 35.
+MON_ENTRY(net_servers) int mon_net_servers(unsigned srv[2]);
+
+// The state after a program, for a program that runs another: E, the
+// timer, the FPU, VBASE, the font base, and the mode word cleared, the
+// network closed, and the cursor shown at its registers. 0. Entry 36.
+int mon_restore(void);
+
 // The NICE word address of a C array of words, for the entries above
 // that take one character or byte per word, such as mon_fs_open's name
 // and mon_fs_read's buffer, which the program then reads as plain unsigned

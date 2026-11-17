@@ -11,7 +11,7 @@ dump 0x10000, 1
 READY.
 halt
 Halted
-fffff00e: ffff0000
+fffff07f: ffff0000
 fffeffff: 00000008
 Screen:
 |NiceMon V9.9

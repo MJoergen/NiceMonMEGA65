@@ -297,35 +297,31 @@ mac_digit
         ?!C     ADD     R1, R1, 7       ; A to F
                 JMP     mon_putc        ; which returns to the caller
 
-; LOAD with no name: words into the memory from lines of ADDR WORD, two hex numbers of 1 to
-; 8 digits with blanks between them and around them, as a .bin file has
-; them (nice_cpu's ISA.md §10.4), up to an empty line or CTRL-C, which
+; LOAD with no name: words into the memory from lines of ADDR WORD, two
+; hex numbers of 1 to 8 digits with blanks between them and around them,
+; as a .bin file has them (nice_cpu's ISA.md §10.4), which bin_line,
+; entry 33, parses and writes, up to an empty line or CTRL-C, which
 ; also drops the line it is in. CR, LF, and CR LF end a line, so a
 ; terminal's lines and a file's both serve; V_LEND starts as a CR, so
 ; that the LF of a terminal that ends the LOAD line itself with CR LF is
 ; the LF of that CR LF, not an empty line. A TAB is a blank, as niceemu
 ; takes it. A line of blanks only is passed over, as niceemu passes it,
 ; and counted as a line and not as skipped. A line with anything else, or
-; with ADDR outside a program's RAM, PROGRAM up to V_PEND, is skipped:
-; the RAM of a board repeats every RAM_WORDS words, so an address past it
-; could reach the ROM or the monitor's variables and stack, which are at
-; RAM_WORDS - VARS_WORDS and up of the RAM, 0x1F000 on the MEGA65 and
-; 0xF000 on the Nexys4DDR. V_PEND is that address, or the screen where
-; RAM_WORDS reads 0, as in niceemu. A line with more than blanks after
-; its LINE_MAX characters is skipped too: the blanks after LINE_MAX are
-; dropped, and the first key that is no blank is kept as 0x7F, which no
-; line parses, at LINE_MAX, and not shown; a DEL takes it back, and the
-; other keys after it are dropped. A second line for an address
-; writes its word over the first's, where niceemu rejects the file. The
-; count of the words written and the lowest and highest address are
-; shown at the end, and the count of the skipped lines, the number of the
-; first, and the last address that a line may have. DEL
+; with ADDR outside a program's RAM, is skipped. A line with more than
+; blanks after its LINE_MAX characters is skipped too: the blanks after
+; LINE_MAX are dropped, and the first key that is no blank is kept as
+; 0x7F, which no line parses, at LINE_MAX, and not shown; a DEL takes it
+; back, and the other keys after it are dropped. A second line for an
+; address writes its word over the first's, where niceemu rejects the
+; file. The count of the words written and the lowest and highest
+; address are shown at the end, and the count of the skipped lines, the
+; number of the first, and the last address that a line may have. DEL
 ; and BS delete the character before the cursor; the other control codes,
 ; the bytes from 0x80, and the escape sequences of the cursor and function
 ; keys are dropped. The lines are shown in row R7, which the hint leaves
 ; the cursor in, and only on the screen: each line clears the row, and its
 ; end is not shown, so the screen never scrolls. The counts are
-; bin_line's, and R6 is the next free word of the line.
+; bin_line's, at V_LSTATS, and R6 is the next free word of the line.
 st_lines
                 MOVE    R1, S_LHINT
                 CALL    puts_b_crlf
@@ -405,23 +401,28 @@ load_end
                 CLR     @R6
                 CMP     R6, V_LINE
         ?Z      JMP     load_done
-                CALL    bin_line
+                CALL    bin_call
                 JMP     load_line
 
-; bin_init: the counts of bin_line at V_LSTATS cleared, the lowest
-; address 0xFFFFFFFF, V_LPOS at V_LINE, V_LEND 0, and V_PEND set with
-; load_pend. Uses R1.
+; bin_call: the line at V_LINE to bin_line, entry 33, with the counts at
+; V_LSTATS. Uses R1-R6.
+bin_call
+                MOVE    R1, V_LINE
+                MOVE    R2, V_LSTATS
+                JMP     BIN_LINE        ; which returns to the caller
+
+; bin_init: the 7 counts of bin_line at V_LSTATS cleared, V_LPOS at
+; V_LINE, and V_LEND 0. Uses R1 and R2.
 bin_init
                 MOVE    R1, V_LSTATS
+                MOVE    R2, 7
+:
                 CLR     @R1++
-                NOT     @R1++, R0
-                CLR     @R1++
-                CLR     @R1++
-                CLR     @R1++
-                CLR     @R1++
+                SUB[M]  R2, R2, 1
+        ?!Z     JMP     :-
                 MOVE    @V_LPOS, V_LINE
                 CLR     @V_LEND
-                JMP     load_pend       ; which returns to the caller
+                RET
 
 ; bin_char: the byte R1 of a file, from the card or a TFTP server, into
 ; the line at V_LPOS. CR, LF, or CR LF ends a line, which bin_eol takes.
@@ -474,57 +475,10 @@ bin_eol
                 TST     @V_TLIST
         ?!Z     JMP     puts_crlf       ; a line of a listing, shown
                 CMP     R6, V_LINE
-        ?!Z     JMP     bin_line        ; which returns to the caller
+        ?!Z     JMP     bin_call        ; which returns to the caller
                 ADD     @V_LSTATS+5, @V_LSTATS+5, 1  ; an empty line, passed over
                 RET
 
-; bin_line: the line at V_LINE, which ends at R6 with a 0, of LOAD, with
-; 0x7F at LINE_MAX when it had more than blanks after LINE_MAX
-; characters, so that it is skipped: counted at V_LSTATS+5, passed over
-; when it has blanks only, or else parsed, and its word written, counted
-; at V_LSTATS, with the lowest and highest address at V_LSTATS+1 and +2,
-; or skipped, counted at V_LSTATS+3, with the number of the first at
-; V_LSTATS+4. Uses R1-R6.
-bin_line
-                ADD     @V_LSTATS+5, @V_LSTATS+5, 1
-                MOVE    R1, V_LINE
-                CALL    _io_gethex      ; R1 the address, R2 its digits, R3 after it
-                TST     R2
-        ?!Z     JMP     :+
-                TST     @R3
-        ?Z      RET                     ; blanks only
-:
-                SUB     R4, R2, 1
-                CMP     R4, 8
-        ?!C     JMP     bin_bad         ; no digit, or more than 8
-                CMP     R1, PROGRAM
-        ?C      JMP     bin_bad         ; in the ROM
-                CMP     R1, @V_PEND
-        ?!C     JMP     bin_bad         ; the variables, or past the RAM
-                MOVE    R6, R1
-                MOVE    R1, R3
-                CALL    _io_gethex      ; R1 the word
-                SUB     R4, R2, 1
-                CMP     R4, 8
-        ?!C     JMP     bin_bad
-:
-                CMP     @R3, 0x20
-        ?Z      ADD     R3, R3, 1
-        ?Z      JMP     :-
-                TST     @R3
-        ?!Z     JMP     bin_bad         ; more after the word
-                MOVE    @R6, R1
-                ADD     @V_LSTATS, @V_LSTATS, 1
-                CMP     R6, @V_LSTATS+1
-        ?C      MOVE    @V_LSTATS+1, R6  ; a lower address
-                CMP     @V_LSTATS+2, R6
-        ?C      MOVE    @V_LSTATS+2, R6  ; a higher one
-                RET
-bin_bad
-                TST     @V_LSTATS+3
-        ?Z      MOVE    @V_LSTATS+4, @V_LSTATS+5
-                ADD     @V_LSTATS+3, @V_LSTATS+3, 1
-                RET
 ; The end of the load: the row blank again, the outputs back, the words
 ; written, and the lines skipped
 load_done
@@ -559,7 +513,7 @@ load_summary
                 CALL    _io_putdec
                 MOVE    R1, S_LFORM
                 CALL    puts_b
-                SUB     R1, @V_PEND, 1
+                SUB     R1, @V_LSTATS+6, 1
                 CALL    _io_puthex
                 JMP     _io_crlf        ; which returns to the caller
 
@@ -574,14 +528,6 @@ load_part
                 PUSH    R1
                 CALL    load_summary
                 POP     R1
-                RET
-
-; load_pend: V_PEND, the end of a program's RAM, where the variables
-; start, from the size of the RAM, or the screen in niceemu. Uses R1.
-load_pend
-                MOVE[M] R1, @RAM_WORDS
-        ?Z      MOVE    R1, SCREEN+VARS_WORDS  ; no limit
-                SUB     @V_PEND, R1, VARS_WORDS
                 RET
 
 ; DIR [SLOT]: R1 the slot, or 0xFFFFFFFF without it. The folder NICE of

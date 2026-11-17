@@ -43,6 +43,11 @@ TCP_SEND        .EQU    0x38
 TCP_RECV        .EQU    0x3A
 TCP_CLOSE       .EQU    0x3C
 TCP_LISTEN      .EQU    0x3E
+CON_GETLINE     .EQU    0x40
+BIN_LINE        .EQU    0x42
+CLOCK_SET       .EQU    0x44
+NET_SERVERS     .EQU    0x46
+MON_RESTORE     .EQU    0x48
 
 ; Colors for scr_color, as in mon.h: a foreground and a background,
 ; added, with no blanks, such as MON_FG_YELLOW+MON_BG_BLUE. A color left
@@ -166,6 +171,16 @@ _tcp_close
 _mon_tcp_listen
 _tcp_listen
                 JMP     TCP_LISTEN
+_mon_con_getline
+                JMP     CON_GETLINE
+_mon_bin_line
+                JMP     BIN_LINE
+_mon_clock_set
+                JMP     CLOCK_SET
+_mon_net_servers
+                JMP     NET_SERVERS
+_mon_restore
+                JMP     MON_RESTORE
 _mon_scr_getx
 _scr_getx
                 JMP     SCR_GETXY

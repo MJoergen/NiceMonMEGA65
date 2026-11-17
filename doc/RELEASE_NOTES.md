@@ -43,6 +43,13 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   mode word stays 0, so that a program sees that the mode is missing
   ([#144](https://github.com/MJoergen/NiceMonMEGA65/issues/144),
   [SYSTEM.md](SYSTEM.md#the-chunky-mode)).
+- The dispatch table is 1.6, with 5 entries more, 32 to 36, which BASIC
+  uses and programs may too: `con_getline`, BASIC's line with the
+  scrollback and TAB; `bin_line`, a line of a `.bin` file, as `LOAD`
+  reads it; `clock_set`, the clock with the MEGA65's real-time clock;
+  `net_servers`, the DHCP server and the NTP server; and
+  `mon_restore`, the state after a program
+  ([#152](https://github.com/MJoergen/NiceMonMEGA65/issues/152)).
 
 **Changes.**
 

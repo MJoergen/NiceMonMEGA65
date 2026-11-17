@@ -79,10 +79,10 @@ SUITES = {
     "fatload": [
         Run("LOAD of CR LF, of blank lines only, of a chain cut after its second "
             "cluster, and of lines of every kind", "lines.img",
-            keys='load "crlf.bin"\rdump 0x8100, 4\rdump 0xFFFFF11A, 5\r'
-                 'load "blank.bin"\rdump 0xFFFFF11A, 5\r'
-                 'load "cut.bin"\rdump 0xFFFFF11A, 5\rdump 0x9036, 4\r'
-                 'load "lines.bin"\rdump 0x8000, 0x14\rdump 0x8020, 1\rdump 0xFFFFF11A, 5\r'
+            keys='load "crlf.bin"\rdump 0x8100, 4\rdump 0xFFFFF079, 5\r'
+                 'load "blank.bin"\rdump 0xFFFFF079, 5\r'
+                 'load "cut.bin"\rdump 0xFFFFF079, 5\rdump 0x9036, 4\r'
+                 'load "lines.bin"\rdump 0x8000, 0x14\rdump 0x8020, 1\rdump 0xFFFFF079, 5\r'
                  'halt\r'),
     ],
     # P5: TAB, and the cases of issue #145

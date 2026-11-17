@@ -231,8 +231,8 @@ from 0, and the rest is free. The demo is not in it: it is a program,
 <!-- romsize layout -->
 | Part | Address | Words |
 |---|---|---:|
-| The monitor | `0x0000`–`0x3609` | 13834 |
-| Free | `0x360A`–`0x7FFF` | 18934 |
+| The monitor | `0x0000`–`0x366D` | 13934 |
+| Free | `0x366E`–`0x7FFF` | 18834 |
 <!-- /romsize layout -->
 
 The monitor's words, by the source they come from, in the order
@@ -245,20 +245,20 @@ ROM is built:
 <!-- romsize monitor -->
 | Source | What it is | Words | Text |
 |---|---|---:|---:|
-| `monitor.nasm` | The dispatch table, the HAL, and the cold start | 736 | 5 |
-| `monitor_cmd.nasm` | The routines of the statements that were the commands | 1332 | 222 |
+| `monitor.nasm` | The dispatch table, the HAL, and the cold start | 865 | 5 |
+| `monitor_cmd.nasm` | The routines of the statements that were the commands | 1256 | 222 |
 | `basic.nasm` | BASIC: the main loop, the scanner, the keywords, the messages, and the help | 826 | 440 |
 | `monitor_dis.nasm` | The disassembler of `DIS` | 871 | 79 |
 | `monitor_sd.nasm` | The sector routines | 206 | 59 |
 | `monitor_fat.nasm` | FAT32, `DIR`, `LOAD`, `SAVE`, `DELETE`, and TAB | 3109 | 10 |
-| `monitor_eth.nasm` | The network | 3300 | 160 |
+| `monitor_eth.nasm` | The network | 3320 | 160 |
 | `monitor_tcp.nasm` | TCP | 2414 | 0 |
-| `monitor_clock.nasm` | The clock and `TIME` | 675 | 44 |
+| `monitor_clock.nasm` | The clock and `TIME` | 692 | 44 |
 | `monlib.nasm` | The routines that programs join | 274 | 0 |
-| `mon.nasm` | The stubs of the entries | 72 | 0 |
+| `mon.nasm` | The stubs of the entries | 82 | 0 |
 | `build/folder.nasm` | The folder's name, and the error of a card without it | 17 | 17 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 13834 | 1038 |
+| In all | | 13934 | 1038 |
 <!-- /romsize monitor -->
 
 - `build/folder.nasm` and the version always end with a `.DAT 0`, as
@@ -452,6 +452,7 @@ compared with `test/NAME.expected`:
 | `fpu` | `test/fpu.nasm` | The FPU at a program's end (issue #141): each run leaves 10 values and the four flags on it, and the next one, after a return, `mon_exit`, or a jump to 0, the cold start, finds it empty with no flag. |
 | `fs` | `test/fs.nasm`, with FAT images in both slots | The file entries, through `mon.nasm`'s stubs: handles, reads across the fragments of a file and at its end, the folder's entries, mounts, each error a program can cause, and `fs_readname`'s long name and 8.3 name in lower case, and a file opened by its long name. |
 | `fsw` | `test/fsw.nasm`, with a copy of the card with partitions, one file read-only, and a write-protected card | The entries that write: a file written in pieces across clusters and read back, truncated, a file of ten clusters, deletions, one of a long name, a folder that grows a cluster, a mount that drops an open file, and each error. |
+| `hal16` | `test/hal16.nasm`, with a line typed after `SYS` | The entries of table 1.6, through `mon.nasm`'s stubs: `con_getline` with a DEL, a full line, and TAB with no card, `bin_line`'s results and counts, `clock_set` and the clock it set, `net_servers` with none, and `mon_restore` after a program that stopped the cursor, set the timer, and moved the cursor off the screen. |
 | `fat` | The monitor, with FAT images in both slots | `DIR` and `LOAD`: the fragmented `FRAG.BIN`, a text file, bad arguments, and `HELLO.BIN` loaded and run. |
 | `fatw` | The monitor, with a copy of the card without partitions, and one that a write fills | `SAVE`, `LOAD`, `DIR`, and `DELETE`: a program saved and loaded back, a file truncated and deleted, bad arguments, and a full card, error 30, which has room again after `DELETE`. |
 | `fatl` | The monitor, with `lfn.img`, long names that mtools wrote | `DIR` and `LOAD` by long names, in quotes and in either case, and by 8.3 names: a long name with a blank, one in mixed case, one of 255 characters, one outside ASCII, an 8.3 name with the lower-case flags, sets of long-name entries across a sector and across a cluster, and one with a wrong checksum, which only its 8.3 name reaches. |

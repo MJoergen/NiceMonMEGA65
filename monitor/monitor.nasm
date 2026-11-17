@@ -1,6 +1,6 @@
 ; The monitor, the program of the ROM at 0x0000 (README.md). The core boots
 ; from it at reset. It gives the programs at 0x8000 a hardware abstraction
-; layer, the HAL: thirty-two routines, called through the dispatch table at
+; layer, the HAL: thirty-seven routines, called through the dispatch table at
 ; the start of the ROM, and its main loop is BASIC's (issue #54), whose
 ; statements are typed on the keyboard or sent over the line, and shown
 ; on the screen and the line.
@@ -139,7 +139,6 @@ V_CTL           .EQU    0xFFFFF00A      ; SCR_CTL while the history is shown
 V_LOUT          .EQU    0xFFFFF00B      ; V_OUT while LOAD reads its lines
 V_LEND          .EQU    0xFFFFF00C      ; the last byte that LOAD read, for the LF of a CR LF
 V_LPOS          .EQU    0xFFFFF00D      ; for LOAD from a file: the next free word of V_LINE
-V_PEND          .EQU    0xFFFFF00E      ; for LOAD: after a program's RAM, at the variables
 V_UNEXT         .EQU    0xFFFFF00F      ; the address that the next DIS goes on at
 V_LINE          .EQU    0xFFFFF010      ; the line, LINE_MAX words, one over for LOAD, and a 0
 LINE_MAX        .EQU    76              ; as the monitor's line had, after a prompt of 2
@@ -150,6 +149,7 @@ V_I             .EQU    0xFFFFF068      ; for the clock: the fields of a date an
 V_F             .EQU    0xFFFFF06E      ; the fields of the clock's time, which is the 7th of V_I,
 V_DAYS          .EQU    0xFFFFF074      ; and its days since 1970
 V_ARGS          .EQU    0xFFFFF075      ; for BASIC: the values of a statement, 4 words, slots 1, 2, and 4 at V_ARGS, +1, and +3
+V_LSTATS        .EQU    0xFFFFF079      ; for LOAD: the counts of bin_line, 7 words
 V_ARP           .EQU    0xFFFFF100      ; the ARP cache: ARP_SLOTS entries of an IP address, 0 for none, the MAC address as E_MACH and E_MACL have it, and the time of arp_tick it was learned
 V_ARPNEXT       .EQU    0xFFFFF110      ; the entry that arp_learn takes next, 4 times its number
 V_XID           .EQU    0xFFFFF111      ; for DHCP: the transaction's number,
@@ -161,7 +161,6 @@ V_PIP           .EQU    0xFFFFF116      ; and those of the last reply that dhcp_
 V_PSRV          .EQU    0xFFFFF117
 V_PMASK         .EQU    0xFFFFF118
 V_PGW           .EQU    0xFFFFF119
-V_LSTATS        .EQU    0xFFFFF11A      ; for LOAD: the words written, the lowest and highest address, the lines skipped, the first, and the lines, 6 words
 V_TXF           .EQU    0xFFFFF120      ; a frame to send, from byte 2, DHCP_WORDS words, as the send buffer has it
 V_RXF           .EQU    0xFFFFF180      ; a frame received, from byte 2, 380 words, as the queue's buffer has it
 V_MASK          .EQU    0xFFFFF302      ; the network's mask, from DHCP, 0 for none
@@ -256,7 +255,7 @@ VARS_WORDS      .EQU    0x1000          ; the words from 0xFFFFF000, the variabl
 COLOR           .EQU    MON_FG_WHITE+MON_BG_BLACK  ; the color at the cold start
 OUT_LINE        .EQU    1
 OUT_SCREEN      .EQU    2
-TABLE_VERSION   .EQU    0x00010005      ; what mon_version returns: 1.5
+TABLE_VERSION   .EQU    0x00010006      ; what mon_version returns: 1.6
 PAGE            .EQU    24              ; the rows of a Page Up or Page Down
 SCR_MAX         .EQU    0x7FFF          ; the largest display offset
 
@@ -299,22 +298,28 @@ SCR_MAX         .EQU    0x7FFF          ; the largest display offset
                 JMP     tcp_recv        ; 29 at 0x3A, monitor_tcp.nasm
                 JMP     tcp_close       ; 30 at 0x3C, monitor_tcp.nasm
                 JMP     tcp_listen      ; 31 at 0x3E, monitor_tcp.nasm
+                JMP     con_getline     ; 32 at 0x40, monitor.nasm
+                JMP     bin_line        ; 33 at 0x42, monitor.nasm
+                JMP     clock_set       ; 34 at 0x44, monitor_clock.nasm
+                JMP     net_servers     ; 35 at 0x46, monitor_eth.nasm
+                JMP     mon_restore     ; 36 at 0x48, monitor.nasm
 
 ; mon_reset: the cold start, entry 0, which reset runs and a program may
 ; call. E is cleared, the timer stopped, the FPU's stack emptied and its
 ; flags cleared (issue #141), VBASE set to 0, the font base and the mode
-; word set to 0, so that the screen shows text in Spleen, and the port for Ethernet frames
-; disabled, as at a return, after a RST for each TCP connection
-; that a program left open, the mask, the gateway, and the DNS server set
-; to none, the DHCP lease forgotten, and the ARP cache emptied. The identification of the IPv4
-; packets starts from the fine clock, net_clock, and the local ports of
-; TCP from the microseconds, with no connection opened. Without an IP
-; address, the DHCP exchange in the background starts, with bg_start
-; (issue #126). FAT32's state is cleared, with fat_reset, so that no card
-; is mounted and no file open. The clock of the time of day, while it is
-; not set, is set from the MEGA65's real-time clock, with clock_rtc
-; (issue #105). The RAM from 0x8000 is left alone, so that a program a
-; host has loaded is still there.
+; word set to 0, so that the screen shows text in Spleen, and the port
+; for Ethernet frames disabled, as at a return, after a RST for each TCP
+; connection that a program left open, the mask, the gateway, the DNS
+; server, the DHCP server, and the NTP server set to none, the DHCP
+; lease forgotten, and the ARP cache emptied. The identification of the
+; IPv4 packets starts from the fine clock, net_clock, and the local
+; ports of TCP from the microseconds, with no connection opened. Without
+; an IP address, the DHCP exchange in the background starts, with
+; bg_start (issue #126). FAT32's state is cleared, with fat_reset, so
+; that no card is mounted and no file open. The clock of the time of
+; day, while it is not set, is set from the MEGA65's real-time clock,
+; with clock_rtc (issue #105). The RAM from 0x8000 is left alone, so
+; that a program a host has loaded is still there.
 mon_reset
                 CLR     R14             ; E = 0, VBASE = 0; bit 24 stays 1
                 CLR     @TIMER
@@ -327,6 +332,7 @@ mon_reset
                 CLR     @V_GW
                 CLR     @V_DNS
                 CLR     @V_NTP
+                CLR     @V_DSRV
                 CLR     @V_LEASE
                 CALL    net_clock
                 MOVE    @V_IPID, R1
@@ -376,14 +382,30 @@ mon_exit
                 JMP     main
 
 ; sys_end: for mon_exit, and for SYS at a program's return, with R1 the
-; status: the state as the header of mon_exit says, but the stack, a new
-; line if the cursor is not in column 0, and the status printed. The
-; cursor is taken from its registers, SCR_X and SCR_Y, as a program may
-; have moved it there and not through scr_moveto, such as the demo, which
-; clears the screen and leaves the cursor at the top left. A column past
-; 79 is 79, and a row past 24 is 24. Uses R1-R6.
+; status: the state as the header of mon_exit says, with mon_restore,
+; but the stack, a new line if the cursor is not in column 0, and the
+; status printed. Uses R1-R6.
 sys_end
                 PUSH    R1
+                CALL    mon_restore
+                TST     @V_COL
+        ?!Z     CALL    _io_crlf
+                MOVE    R1, S_RETURN
+                CALL    puts_b
+                POP     R1
+                CALL    _io_puthex
+                JMP     _io_crlf        ; which returns to the caller
+
+; mon_restore: entry 36, the state after a program, for a caller that
+; ran one, as SYS does: E cleared, the timer stopped, the FPU's stack
+; empty and its flags clear, VBASE 0, the font base and the mode word 0,
+; the network closed, net_close, and the cursor shown and blinking with
+; the display offset off, where the program left the cursor's registers.
+; The cursor is taken from its registers, SCR_X and SCR_Y, as a program
+; may have moved it there and not through scr_moveto, such as the demo,
+; which clears the screen and leaves the cursor at the top left. A column
+; past 79 is 79, and a row past 24 is 24. R1 = 0. Uses R1-R6.
+mon_restore
                 CLR     R14             ; E = 0, VBASE = 0; bit 24 stays 1
                 CLR     @TIMER
                 MOVE    @FPU_CMD, 0x0101  ; CLEAR 1: no values or flags for the next program
@@ -399,13 +421,8 @@ sys_end
                 CMP     R1, 25
         ?!C     MOVE    R1, 24
                 MOVE    @V_ROW, R1
-                TST     @V_COL
-        ?!Z     CALL    _io_crlf
-                MOVE    R1, S_RETURN
-                CALL    puts_b
-                POP     R1
-                CALL    _io_puthex
-                JMP     _io_crlf        ; which returns to the caller
+                CLR     R1
+                RET
 
 ; mon_version: entry 2. R1 = the version of the table, the major number in
 ; bits 31..16 and the minor in 15..0.
@@ -560,7 +577,14 @@ scr_color
 ; The first key of the line goes on to _io_gets.first. _io_getc.soon uses
 ; only R1 and R2, so R3 keeps the first byte of a sequence's parameter.
 ; While it waits for the first key, getline_wait keeps the network going.
-; TAB completes a file's name with complete (issue #137).
+; TAB completes a file's name with complete (issue #137). It is entry 32,
+; con_getline, the line that BASIC reads, with R1 the buffer, of R2 + 1
+; words, which may be in the word window, as net_waddr takes it, for C,
+; and R1 = the number of characters, as _io_gets returns it.
+con_getline
+                PUSH    R2
+                CALL    net_waddr
+                POP     R2
 getline
                 PUSH    R1
                 PUSH    R2
@@ -740,6 +764,88 @@ hist_rev
                 MOVE    @R2, R3
                 SUB     R2, R2, 1
                 JMP     :-
+
+; bin_line: entry 33, a line of a .bin file (nice_cpu's ISA.md §10.4):
+; R1 the line, one character a word up to a 0 word, and R2 the word
+; address of its counts, 7 words that the caller clears before the first
+; line of a load; each may be in the word window, as net_waddr takes it,
+; for C. ADDR WORD, two hex numbers of 1 to 8 digits with blanks
+; between them and around them, writes WORD at ADDR, when ADDR is in a
+; program's RAM, from PROGRAM up to the monitor's variables. The RAM of
+; a board repeats every RAM_WORDS words, so an address past it could
+; reach the ROM or the monitor's variables and stack, which are at
+; RAM_WORDS - VARS_WORDS and up of the RAM, 0x1F000 on the MEGA65 and
+; 0xF000 on the Nexys4DDR; where RAM_WORDS reads 0, as in niceemu, the
+; RAM goes up to the screen. A line with anything else is skipped, and a
+; line of blanks only is passed over. A second line for an address writes
+; its word over the first's. The counts: 0 the words written, 1 and 2 the
+; lowest and the highest address written, from the first word, 3 the
+; lines skipped, 4 the number of the first, 5 the lines, this one with
+; them, and 6 the end of a program's RAM, which it writes, after the last
+; address that a line may have. R1 = 1 when the word was written, 0 for
+; a line of blanks only, or -1 when the line was skipped. Uses R1-R6, and
+; R7 and R8 across the calls, saved: the counts and the address.
+bin_line
+                PUSH    R7
+                PUSH    R8
+                PUSH    R1
+                MOVE    R1, R2
+                CALL    net_waddr
+                MOVE    R7, R1
+                POP     R1
+                CALL    net_waddr
+                MOVE[M] R2, @RAM_WORDS
+        ?Z      MOVE    R2, SCREEN+VARS_WORDS  ; no limit
+                SUB     @6[R7], R2, VARS_WORDS
+                ADD     @5[R7], @5[R7], 1
+                CALL    _io_gethex      ; R1 the address, R2 its digits, R3 after it
+                TST     R2
+        ?!Z     JMP     :+
+                TST     @R3
+        ?Z      JMP     bin_blank       ; blanks only
+:
+                SUB     R4, R2, 1
+                CMP     R4, 8
+        ?!C     JMP     bin_bad         ; no digit, or more than 8
+                CMP     R1, PROGRAM
+        ?C      JMP     bin_bad         ; in the ROM
+                CMP     R1, @6[R7]
+        ?!C     JMP     bin_bad         ; the variables, or past the RAM
+                MOVE    R8, R1
+                MOVE    R1, R3
+                CALL    _io_gethex      ; R1 the word
+                SUB     R4, R2, 1
+                CMP     R4, 8
+        ?!C     JMP     bin_bad
+:
+                CMP     @R3, 0x20
+        ?Z      ADD     R3, R3, 1
+        ?Z      JMP     :-
+                TST     @R3
+        ?!Z     JMP     bin_bad         ; more after the word
+                MOVE    @R8, R1
+                MOVE[M] R1, @R7         ; the words written before
+        ?Z      MOVE    @1[R7], R8      ; the first
+        ?Z      MOVE    @2[R7], R8
+                ADD     @R7, R1, 1
+                CMP     R8, @1[R7]
+        ?C      MOVE    @1[R7], R8      ; a lower address
+                CMP     @2[R7], R8
+        ?C      MOVE    @2[R7], R8      ; a higher one
+                ONE     R1
+                JMP     bin_end
+bin_bad
+                TST     @3[R7]
+        ?Z      MOVE    @4[R7], @5[R7]
+                ADD     @3[R7], @3[R7], 1
+                NOT     R1, R0          ; -1
+                JMP     bin_end
+bin_blank
+                CLR     R1
+bin_end
+                POP     R8
+                POP     R7
+                RET
 
 ; puts_crlf: the string at R1, one character a word, and CR LF
 puts_crlf

@@ -37,6 +37,16 @@ _c_tcp_recv
 _c_tcp_listen
                 ADD     R1, R1, 0x10000000+4*___wasm_memory
                 JMP     TCP_LISTEN
+_c_con_getline
+                ADD     R1, R1, 0x10000000+4*___wasm_memory
+                JMP     CON_GETLINE
+_c_bin_line
+                ADD     R1, R1, 0x10000000+4*___wasm_memory
+                ADD     R2, R2, 0x10000000+4*___wasm_memory
+                JMP     BIN_LINE
+_c_net_servers
+                ADD     R1, R1, 0x10000000+4*___wasm_memory
+                JMP     NET_SERVERS
 
 ; The NICE word address of a C pointer to words, at a multiple of 4, for
 ; the entries that take one character or byte per word, fs_open and

@@ -89,6 +89,22 @@ clock_cmd
         ?!Z     MOVE    R1, S_CPAST
                 JMP     puts_b_crlf     ; which returns to the caller
 
+; clock_set: entry 34. The clock set to R1 seconds since 1970-01-01
+; 00:00:00, in local time, and R2 microseconds, which sets "set", as
+; TIME and NTP set it; 1000000 or more sets 999999, as the clock does
+; (nice_cpu's DEVICES.md §10). On the MEGA65, a time in the years 2000 to
+; 2099 sets the real-time clock too, with rtc_write. R1 = 0. Uses R1-R6,
+; and R7 across the calls, saved.
+clock_set
+                PUSH    R7
+                MOVE    R7, R2
+                CALL    clk_put
+                CALL    clk_fields
+                CALL    rtc_write
+                POP     R7
+                CLR     R1
+                RET
+
 ; clock_fat: R1 = FAT's date of the clock's time, and R2 its time in bits
 ; 15..0, in steps of two seconds, and the hundredths of a second over them,
 ; 0 to 199, in bits 23..16, as an entry's creation time has them in byte
