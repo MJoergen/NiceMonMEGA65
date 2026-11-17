@@ -599,11 +599,11 @@ step needs a card prepared on a PC with a folder `NICE` that holds
 2. **A card changed under an open file.** A program opens `HELLO.BIN`,
    reads 100 bytes, waits for a key, and reads again. Swap the card
    while it waits: the second read gives -28, a third -24.
-3. **A write-protected card**, by the switch of a full-size card in
-   slot 0 of the MEGA65, or an adapter: `DIR` and `LOAD` work, and
-   `SAVE "X", 0x8000, 1` and `DELETE "HELLO.BIN"` give `SD error 6 in
-   slot 0, the card is write-protected`. The PC finds the card
-   unchanged.
+3. **A write-protected card**, by the switch of a full-size card, or of
+   an adapter, in slot 1 of an R6, the only slot with write protect (the
+   R3's slot 1 has none): `DIR 1` and `LOAD` work, and `SAVE "X",
+   0x8000, 1` and `DELETE "HELLO.BIN"` give `SD error 6 in slot 1, the
+   card is write-protected`. The PC finds the card unchanged.
 4. **SDSC and SDHC.** On a card of 2 GB or less and one of 4 to 32 GB:
    `SAVE "BIG", 0x8000, 4000`, `LOAD "BIG.BIN"`, `DIR`, and `DELETE
    "BIG.BIN"`. Then `fsck.fat -n` on the PC reports only the free count,
