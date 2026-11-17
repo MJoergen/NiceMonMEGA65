@@ -36,7 +36,8 @@ from hwtest import (NICEEMU, REPO, assemble, assemble_labels, comparisons,
                     test_monitor, test_selftest, test_step, test_break,
                     test_watch, test_write_regs, test_fpu, check, start_emu)
 from boardlink import HOLD, RAM, open_link
-from mon import HELP, commands
+# After boardlink, which puts nice_cpu's debugger/ on the path
+import nicedbg
 
 
 def mon(port: str, args: list[str],
@@ -76,15 +77,15 @@ def test_mon(port: str, prog: str, tmp: str) -> None:
     # first one after the prompt
     r = mon(port, [], "help\nq\n")
     lines = [line.removeprefix("dbg> ") for line in r.stdout.splitlines()]
-    missing = [name for name in commands()
+    # nicedbg's commands, in its order, without EOF, the Ctrl-D that quits
+    names = [name[3:] for name in vars(nicedbg.Debugger)
+             if name.startswith("do_") and name != "do_EOF"]
+    missing = [name for name in names
                if not any(re.match(rf"{re.escape(name)}[ (]", line)
                           for line in lines)]
     check("mon: help has a line for each command",
           not missing and "Documented commands" not in r.stdout,
           f"missing {missing}: {r.stdout!r}")
-    stale = sorted(set(HELP) - set(commands()))
-    check("mon: every line of mon.py's help is of a command", not stale,
-          str(stale))
     r = mon(port, [], "help s\nq\n")
     check("mon: help CMD describes one, also by its short name",
           "step (s) [N]: runs N steps" in r.stdout, repr(r.stdout))

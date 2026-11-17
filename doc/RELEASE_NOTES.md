@@ -35,6 +35,12 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 - In a C program, `getchar`, `fgets`, and `scanf` return a CR as
   `'\n'`, and a CR LF as one `'\n'`.
 
+**Changes.**
+
+- `help` in `tools/mon.py` is nicedbg's own, one line for each command
+  as before, and its console is nicedbg's, which passes Enter as CR
+  ([#143](https://github.com/MJoergen/NiceMonMEGA65/issues/143)).
+
 ## V2.2.1 (2026-11-17)
 
 **Upgrade notes.**
