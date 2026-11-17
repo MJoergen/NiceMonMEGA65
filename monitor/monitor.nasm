@@ -154,6 +154,9 @@ V_DAYS          .EQU    0xFFFFF074      ; and its days since 1970
 V_ARGS          .EQU    0xFFFFF075      ; for BASIC: the values of a statement, 4 words, slots 1, 2, and 4 at V_ARGS, +1, and +3
 V_LSTATS        .EQU    0xFFFFF079      ; for LOAD: the counts of bin_line, 7 words
 V_NET           .EQU    0xFFFFF080      ; for IP, DHCP, and NTP: the words of net_config and net_servers, 6 words
+V_ENT           .EQU    0xFFFFF400      ; for DIR: an entry of fs_readname, 4 words,
+V_NAME          .EQU    0xFFFFF404      ; and its name, 256 words
+V_FBUF          .EQU    0xFFFFF504      ; for LOAD and SAVE: the bytes of fs_read and fs_write, FBUF_BYTES words
 V_ARP           .EQU    0xFFFFF100      ; the ARP cache: ARP_SLOTS entries of an IP address, 0 for none, the MAC address as E_MACH and E_MACL have it, and the time of arp_tick it was learned
 V_ARPNEXT       .EQU    0xFFFFF110      ; the entry that arp_learn takes next, 4 times its number
 V_XID           .EQU    0xFFFFF111      ; for DHCP: the transaction's number,
@@ -249,10 +252,10 @@ FATBUF          .EQU    0xFFFFF9B0      ; a sector of the FAT, 128 words
 SEC             .EQU    0xFFFFFA30      ; a sector for FSInfo, an entry, or zeros, and TAB's and LOAD's line, 256 words
 LNAME           .EQU    0xFFFFFB30      ; the name of the entry found last, a character a word, up to a 0, 256 words
 WANT            .EQU    0xFFFFFC30      ; the name sought, a character a word, 256 words
-DIRF            .EQU    0xFFFFFD30      ; the folder that lookups, DIR, and TAB read, F_WORDS words,
+DIRF            .EQU    0xFFFFFD30      ; the folder that lookups and TAB read, F_WORDS words,
 FILE0           .EQU    0xFFFFFDBB      ; and the files of handles 0 and 1, to 0xFFFFFED0
 FILE1           .EQU    0xFFFFFE46
-V_T             .EQU    0xFFFFFEE0      ; 24 words for DIR, LOAD, SAVE, and TAB, to 0xFFFFFEF7
+V_T             .EQU    0xFFFFFEE0      ; 24 words for TAB, to 0xFFFFFEF7
 
 PROGRAM         .EQU    0x8000          ; where a program is, above the ROM
 VARS_WORDS      .EQU    0x1000          ; the words from 0xFFFFF000, the variables, which end a program's RAM

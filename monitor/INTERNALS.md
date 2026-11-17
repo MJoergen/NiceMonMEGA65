@@ -231,8 +231,8 @@ from 0, and the rest is free. The demo is not in it: it is a program,
 <!-- romsize layout -->
 | Part | Address | Words |
 |---|---|---:|
-| The monitor | `0x0000`–`0x36A2` | 13987 |
-| Free | `0x36A3`–`0x7FFF` | 18781 |
+| The monitor | `0x0000`–`0x369E` | 13983 |
+| Free | `0x369F`–`0x7FFF` | 18785 |
 <!-- /romsize layout -->
 
 The monitor's words, by the source they come from, in the order
@@ -246,11 +246,11 @@ ROM is built:
 | Source | What it is | Words | Text |
 |---|---|---:|---:|
 | `monitor.nasm` | The dispatch table, the HAL, and the cold start | 865 | 2 |
-| `monitor_cmd.nasm` | The routines of the statements that were the commands | 1277 | 225 |
+| `monitor_cmd.nasm` | The routines of the statements that were the commands | 1535 | 235 |
 | `basic.nasm` | BASIC: the main loop, the scanner, the keywords, the messages, and the help | 834 | 440 |
 | `monitor_dis.nasm` | The disassembler of `DIS` | 871 | 79 |
 | `monitor_sd.nasm` | The sector routines | 206 | 59 |
-| `monitor_fat.nasm` | FAT32, `DIR`, `LOAD`, `SAVE`, `DELETE`, and TAB | 3109 | 10 |
+| `monitor_fat.nasm` | FAT32, the file entries, and TAB | 2847 | 0 |
 | `monitor_eth.nasm` | The network | 3338 | 160 |
 | `monitor_tcp.nasm` | TCP | 2414 | 0 |
 | `monitor_clock.nasm` | The clock and `TIME` | 698 | 44 |
@@ -258,7 +258,7 @@ ROM is built:
 | `mon.nasm` | The stubs of the entries | 82 | 0 |
 | `build/folder.nasm` | The folder's name, and the error of a card without it | 17 | 17 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 13987 | 1038 |
+| In all | | 13983 | 1038 |
 <!-- /romsize monitor -->
 
 - `build/folder.nasm` and the version always end with a `.DAT 0`, as
@@ -493,7 +493,7 @@ The suites of `test/fat_runs.py`, step 10:
 
 | Suite | What it checks |
 |---|---|
-| `fatstate` | What `SYS 0` and a program's return keep: a handle across the cold start, both handles left open, so that `LOAD` and `SAVE` give error 23 while `DIR` and TAB work, the mount of slot 1 forgotten, and `DIR 0`, which mounts again and closes a program's handle. |
+| `fatstate` | What `SYS 0` and a program's return keep: a handle across the cold start, both handles left open, so that `LOAD`, `SAVE`, and `DIR` give error 23 while TAB works, the mount of slot 1 forgotten, and `DIR 0`, which mounts again and closes a program's handle. |
 | `fatload` | `LOAD`'s lines (`lines.img`): CR LF, blank lines only, a chain cut after its second cluster, whose summary comes before the error, and lines of every kind, with bytes that are not printable ASCII and blanks and text after 76 characters, and the words of `V_LSTATS`. |
 | `fattab` | TAB: after a quote, in either case, an alias, words after blanks and strings, a list longer than the screen; with slot 1 mounted (`tab1.img`), a directory, and names that end at the line's end or past it; and after `SAVE` and `DELETE` (issue #145). |
 | `fatdrop` | The mount dropped under open files when `SD_SELECT` changes, and `fs_mount` under a file open to write. |

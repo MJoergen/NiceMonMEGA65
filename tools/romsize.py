@@ -43,7 +43,7 @@ MONITOR_PARTS = {
     "basic.nasm": "BASIC: the main loop, the scanner, the keywords, the messages, and the help",
     "monitor_dis.nasm": "The disassembler of `DIS`",
     "monitor_sd.nasm": "The sector routines",
-    "monitor_fat.nasm": "FAT32, `DIR`, `LOAD`, `SAVE`, `DELETE`, and TAB",
+    "monitor_fat.nasm": "FAT32, the file entries, and TAB",
     "monitor_eth.nasm": "The network",
     "monitor_tcp.nasm": "TCP",
     "monitor_clock.nasm": "The clock and `TIME`",

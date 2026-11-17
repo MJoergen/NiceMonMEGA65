@@ -65,7 +65,7 @@ SUITES = {
     # P3: what the cold start and a program's return keep
     "fatstate": [
         Run("A handle across SYS 0, which closes it; both handles in use after a "
-            "return, so LOAD and SAVE get error 23 and DIR and TAB work; then the "
+            "return, so LOAD, SAVE, and DIR get error 23 and TAB works; then the "
             "program's handles still read", "super.img",
             keys='sys 0x8000\rsys 0\rsys 0x8400\rsys 0x8800\rload "hello.bin"\r'
                  'save "x", 0x8000, 1\rdir\rload h\t\003sys 0x8C00\rhalt\r',

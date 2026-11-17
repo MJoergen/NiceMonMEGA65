@@ -1,4 +1,4 @@
-== A handle across SYS 0, which closes it; both handles in use after a return, so LOAD and SAVE get error 23 and DIR and TAB work; then the program's handles still read
+== A handle across SYS 0, which closes it; both handles in use after a return, so LOAD, SAVE, and DIR get error 23 and TAB works; then the program's handles still read
 NiceMon V9.9
 HELP lists the statements
 READY.
@@ -22,9 +22,7 @@ save "x", 0x8000, 1
 File error 23, too many open files
 READY.
 dir
-Directory of NICE
-HELLO.BIN                      14256
-Files: 1, directories: 0
+File error 23, too many open files
 READY.
 load h^H"HELLO.BIN" ^C
 sys 0x8C00

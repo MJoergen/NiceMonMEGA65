@@ -29,6 +29,8 @@
 RAM_WORDS       .EQU    0xFFFFFF9E      ; the words of the RAM, 0 in niceemu, where there is no limit
 UART_BAUD       .EQU    0xFFFFFF9F      ; the UART's baud rate in bit/s, memory in niceemu
 DUMP_WORDS      .EQU    32              ; the words that DUMP shows without a count
+DIR_NAME        .EQU    24              ; DIR's column of the sizes
+FBUF_BYTES      .EQU    128             ; the bytes of a read of LOAD, the words of V_FBUF
 ROW_WORDS       .EQU    4               ; the words of a row of DUMP
 
 ; CLS: scr_cls, entry 5. VER: the version of the monitor, and that of
@@ -536,20 +538,121 @@ load_part
                 POP     R1
                 RET
 
-; DIR [SLOT]: R1 the slot, or 0xFFFFFFFF without it. The folder NICE of
-; the card in SLOT, mounted first, or of the card mounted, with fat_dir of
-; monitor_fat.nasm.
+; DIR [SLOT]: R1 the slot, or one from 2^31 without it. The folder NICE
+; of the card in SLOT, mounted first with fs_mount, entry 9, or of the
+; card mounted, opened with fs_open, entry 10, and read with
+; fs_readname, entry 20: a row with its name, then a row for each file,
+; its name, the long name or the 8.3 name, in DIR_NAME columns and its
+; size in decimal in 12, and for each directory, its name and <DIR>,
+; then the numbers of both. A name of DIR_NAME characters or more has a
+; row of its own. R8 is the folder's handle, and R9 and R10 count the
+; files and the directories.
 st_dir
-                CALL    fat_dir
+                TST     R1
+        ?N      JMP     :+
+                CALL    FS_MOUNT
                 TST     R1
         ?N      JMP     fs_fail
-                RET
+:
+                MOVE    R1, V_ENT
+                CLR     @R1             ; the folder's name, empty
+                MOVE    R2, 2
+                CALL    FS_OPEN
+                TST     R1
+        ?N      JMP     fs_fail
+                MOVE    R8, R1
+                CLR     R9
+                CLR     R10
+                MOVE    R1, S_DIROF
+                CALL    puts_b_crlf
+dir_row
+                MOVE    R1, R8
+                MOVE    R2, V_ENT
+                MOVE    R3, V_NAME
+                CALL    FS_READNAME
+                TST     R1
+        ?N      JMP     fs_close_fail
+        ?Z      JMP     dir_end
+                MOVE    R7, V_NAME
+:               MOVE[M] R1, @R7++
+        ?Z      JMP     :+
+                CALL    MON_PUTC
+                JMP     :-
+:               SUB     R7, R7, V_NAME+1
+                CMP     R7, DIR_NAME
+        ?!C     CLR     R7
+        ?!C     CALL    _io_crlf
+:               CMP     R7, DIR_NAME
+        ?Z      JMP     :+
+                MOVE    R1, 0x20
+                CALL    MON_PUTC
+                MOVE    R7++, R7
+                JMP     :-
+:               SHR     R1, @V_ENT+2, 24  ; the attributes
+                AND[M]  R0, R1, 0x10
+        ?Z      JMP     :+
+                MOVE    R1, S_DIRTAG
+                CALL    puts_b
+                MOVE    R10++, R10
+                JMP     :++
+:               MOVE    R1, @V_ENT+3    ; the size
+                CALL    decimal
+                MOVE    R9++, R9
+:               CALL    _io_crlf
+                JMP     dir_row
+dir_end
+                MOVE    R1, R8
+                CALL    FS_CLOSE
+                MOVE    R1, S_FILES
+                CALL    puts_b
+                MOVE    R1, R9
+                CALL    _io_putdec
+                MOVE    R1, S_DIRS
+                CALL    puts_b
+                MOVE    R1, R10
+                CALL    _io_putdec
+                JMP     _io_crlf        ; which returns to the caller
+
+; fs_close_fail: the handle R8 closed, and the error R1 shown with
+; fs_fail
+fs_close_fail
+                MOVE    R7, R1
+                MOVE    R1, R8
+                CALL    FS_CLOSE
+                MOVE    R1, R7
+                JMP     fs_fail
+
+; decimal: R1 in decimal, unsigned, right-aligned in 12 columns. Uses R1-R6.
+decimal
+                MOVE    R5, R1
+                MOVE    R6, 12
+                MOVE    @io.mpu_b, 10
+:               MOVE    @io.mpu_a, R1
+                SUB     R6, R6, 1
+                MOVE[M] R1, @io.mpu_udivq
+        ?!Z     JMP     :-
+:               TST     R6
+        ?Z      JMP     :+
+                MOVE    R1, 0x20
+                CALL    MON_PUTC
+                SUB     R6, R6, 1
+                JMP     :-
+:               MOVE    R1, R5
+                JMP     _io_putdec
 
 ; LOAD "NAME.BIN": R1 the name. The .bin file NAME.BIN of the card's
-; folder NICE, read with fat_load of monitor_fat.nasm, whose bytes go to
-; bin_char, and shown as st_lines shows its lines; an error after a
-; line shows them before it, with load_part. basic.nasm has checked the
-; name's .BIN.
+; folder NICE, opened with fs_open, entry 10, and read with fs_read,
+; entry 11, FBUF_BYTES bytes at a time into V_FBUF, whose bytes go to
+; bin_char, up to its end, and its last line to bin_last, so that its
+; lines of ADDR WORD are written and counted as LOAD with no name writes
+; them, but that an empty line is passed over, the end of the file ends
+; the load, and a line with a byte that is no character is skipped. They
+; are shown as st_lines shows its lines; an error after a line shows
+; them before it, with load_part, and leaves the words of the lines
+; before it written. The reads start at 0 and a sector has 512 bytes,
+; so an error of a sector or a cluster comes at the start of a read, and
+; no byte before it is lost. basic.nasm has checked the name's .BIN. R8
+; is the handle, R9 the bytes left of a read, and R10 the next.
 st_load
                 CLR     R2              ; to read
                 CALL    FS_OPEN
@@ -558,9 +661,25 @@ st_load
                 MOVE    R8, R1          ; the handle
                 CALL    bin_init
                 CLR     @V_TLIST        ; no listing
+load_read
                 MOVE    R1, R8
-                CALL    fat_load
-                MOVE    R9, R1
+                MOVE    R2, V_FBUF
+                MOVE    R3, FBUF_BYTES
+                CALL    FS_READ
+                MOVE[M] R9, R1
+        ?N      JMP     :++             ; an error
+        ?Z      JMP     :+              ; the end
+                MOVE    R10, V_FBUF
+load_byte
+                MOVE    R1, @R10++
+                CALL    bin_char
+                SUB[M]  R9, R9, 1
+        ?!Z     JMP     load_byte
+                JMP     load_read
+:
+                CALL    bin_last
+                CLR     R9
+:
                 MOVE    R1, R8
                 CALL    FS_CLOSE
                 MOVE    R1, R9
@@ -570,12 +689,15 @@ st_load
                 JMP     fs_fail
 
 ; SAVE "NAME", ADDR, N: R1 the name, R2 ADDR, and R3 N. The N words from
-; ADDR written to the file NAME of the card's folder, which is made or
-; truncated, as a .bin file, with fat_save of monitor_fat.nasm, and the words saved
-; shown as LOAD shows those loaded. basic.nasm has added .BIN to a name
-; without an extension.
+; ADDR written to the file NAME of the card's folder, which fs_open,
+; entry 10, makes or truncates, as a .bin file: lines of ADDR WORD in 8
+; hex digits each, in lower case, ended by LF, as niceasm writes a .bin
+; file, each made in V_FBUF and written with fs_write, entry 14, and
+; the words saved shown as LOAD shows those loaded. A line that does not
+; fit on the card is error 30. basic.nasm has added .BIN to a name
+; without an extension. R8 is the handle, R9 ADDR, R10 N, R11 the
+; result, R12 the next address, and R7 the words left.
 st_save
-                MOVE    R7, R1          ; the name
                 MOVE    R9, R2
                 MOVE    R10, R3
                 MOVE    R2, 1           ; to write
@@ -583,10 +705,32 @@ st_save
                 TST     R1
         ?N      JMP     fs_fail
                 MOVE    R8, R1          ; the handle
-                MOVE    R2, R9
-                MOVE    R3, R10
-                CALL    fat_save
-                MOVE    R11, R1
+                MOVE    R12, R9
+                MOVE    R7, R10
+save_line
+                CLR     R11
+                TST     R7
+        ?Z      JMP     save_end
+                MOVE    R2, V_FBUF
+                MOVE    R1, R12
+                CALL    hex8
+                MOVE    @R2++, 0x20
+                MOVE    R1, @R12
+                CALL    hex8
+                MOVE    @R2++, 0x0A
+                MOVE    R1, R8
+                MOVE    R2, V_FBUF
+                MOVE    R3, 18
+                CALL    FS_WRITE
+                MOVE[M] R11, R1
+        ?N      JMP     save_end
+                CMP     R11, 18
+        ?!Z     MOVE    R11, -30        ; the card is full
+        ?!Z     JMP     save_end
+                MOVE    R12++, R12
+                SUB     R7, R7, 1
+                JMP     save_line
+save_end
                 MOVE    R1, R8
                 CALL    FS_CLOSE
                 TST     R11
@@ -610,6 +754,20 @@ st_save
                 CALL    _io_puthex
 :
                 JMP     _io_crlf        ; which returns to the caller
+
+; hex8: R1 in 8 hex digits in lower case at R2, one a word, which moves
+; on. Uses R1, R3, and R4.
+hex8
+                MOVE    R4, 8
+:               ROL     R1, R1, 4
+                AND     R3, R1, 0xF
+                ADD     R3, R3, 0x30
+                CMP     R3, 0x3A
+        ?!C     ADD     R3, R3, 0x27
+                MOVE    @R2++, R3
+                SUB[M]  R4, R4, 1
+        ?!Z     JMP     :-
+                RET
 
 ; DELETE "NAME": R1 the name. The file NAME of the card's folder deleted,
 ; with fs_delete of monitor_fat.nasm.
@@ -767,6 +925,11 @@ S_BADBAUD
 ; The rates that UART_BAUD takes, and a 0
 BAUD_RATES
                 .DAT    115200, 230400, 460800, 921600, 1000000, 1500000, 2000000, 0
+S_DIRTAG
+                .ASCII_B '       <DIR>'
+                .DAT    0
+S_FILES         .ASCII_B 'Files: '
+S_DIRS          .ASCII_B ', directories: '
 S_FSERR         .ASCII_B 'File error '
 S_SAVED         .ASCII_B 'Words saved: '
 S_DELETED

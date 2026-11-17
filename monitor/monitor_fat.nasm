@@ -1,9 +1,9 @@
 ; FAT32 in the ROM, which the Makefile joins after monitor.nasm (its
 ; header): the file entries fs_mount, fs_open, fs_read, fs_readdir,
 ; fs_close, fs_write, fs_delete, and fs_readname of the dispatch table,
-; and fat_dir, fat_load, fat_save, and fat_complete for BASIC's DIR, LOAD,
-; SAVE, and the TAB key (issues #58, #59, #91, #102, #137, and #149,
-; doc/SDCARD.md, "The file system").
+; and fat_complete for the TAB key of con_getline (issues #58, #59, #91,
+; #102, #137, #149, and #152, doc/SDCARD.md, "The file system"). BASIC's
+; DIR, LOAD, and SAVE are in monitor_cmd.nasm, on the entries.
 ;
 ; Names are long names (VFAT) of up to 255 characters, matched in either
 ; case, or 8.3 names. A long name is read from the long-name entries
@@ -33,8 +33,8 @@
 ;
 ; The state is in the monitor's RAM (monitor.nasm, from FAT_RAM): the
 ; volume's fields, a cache of one sector of the FAT, FATBUF, the two file
-; structures, FILE0 and FILE1, and DIRF, the folder that the lookups,
-; DIR, and TAB read, each with its sector, and SEC, a sector for FSInfo,
+; structures, FILE0 and FILE1, and DIRF, the folder that the lookups
+; and TAB read, each with its sector, and SEC, a sector for FSInfo,
 ; an entry, or a new cluster's zeros. A sector is 128 words, 4 bytes a
 ; word, little-endian, as the SD controller has it. The cold start clears
 ; the mount and the handles, with fat_reset; a program's return keeps
@@ -94,7 +94,6 @@ FAT_END         .EQU    0x0FFFFFF8      ; a FAT entry from here ends a chain
 FAT_EOC         .EQU    0x0FFFFFFF      ; the FAT entry written at the end of a chain
 DIR_MAX         .EQU    65536*32        ; the bytes of a folder at most
 FAT_DATE        .EQU    0x5C21          ; the date of an entry, 2026-01-01, while the clock is not set
-DIR_NAME        .EQU    24              ; DIR's column of the sizes
 
 ; The entries: each runs its routine in fat_call
 fs_mount
@@ -120,13 +119,7 @@ fs_write
 fs_delete
                 MOVE    R6, delete_b
                 JMP     fat_call
-fat_dir         MOVE    R6, dir_b
                 JMP     fat_call
-fat_load
-                MOVE    R6, load_b
-                JMP     fat_call
-fat_save
-                MOVE    R6, save_b
 ; fat_call: the routine at R6 called with R1-R4, and R7-R12 kept. Its
 ; return, or fat_fail, gives R1. When a mount stood and no file was open,
 ; an SD error that drops the mount (chk) runs the routine once more, on a
@@ -1804,128 +1797,6 @@ delete_e
                 CLR     R1
                 RET
 
-; fat_save: R1 the handle of a file open to write, R2 the address, R3 the
-; number of words. The words written as lines of ADDR WORD in 8 hex digits
-; each, in lower case, ended by LF, as niceasm writes a .bin file, each
-; line made in V_T. R1 = 0; fails 30 when the card filled up. R7 is the
-; address, and R8 the words left.
-save_b
-                MOVE    R7, R2
-                MOVE    R8, R3
-                MOVE    R5, K_WRITE
-                CALL    handle
-:               TST     R8
-        ?Z      CLR     R1
-        ?Z      RET
-                MOVE    R2, V_T
-                MOVE    R1, R7
-                CALL    hex8
-                MOVE    @R2++, 0x20
-                MOVE    R1, @R7
-                CALL    hex8
-                MOVE    @R2++, 0x0A
-                MOVE    R2, V_T
-                MOVE    R3, 18
-                CALL    put
-                CMP     R1, 18
-        ?!Z     JMP     fail30
-                MOVE    R7++, R7
-                SUB     R8, R8, 1
-                JMP     :-
-
-; hex8: R1 in 8 hex digits in lower case at R2, one a word, which moves
-; on. Uses R1, R3, and R4.
-hex8
-                MOVE    R4, 8
-:               ROL     R1, R1, 4
-                AND     R3, R1, 0xF
-                ADD     R3, R3, 0x30
-                CMP     R3, 0x3A
-        ?!C     ADD     R3, R3, 0x27
-                MOVE    @R2++, R3
-                SUB[M]  R4, R4, 1
-        ?!Z     JMP     :-
-                RET
-
-; fat_dir: R1 a slot, or one from 2^31 for none. The folder FOLDER of the
-; card, for BASIC's DIR: a row with its name, then a row for each file,
-; its name, the long name or the 8.3 name, in DIR_NAME columns and its
-; size in decimal in 12, and for each directory, its name and <DIR>, then
-; the numbers of both. A name of DIR_NAME characters or more has a row of
-; its own. With a slot, the card in it is mounted first. R1 = 0. V_T and
-; V_T+1 count the files and the directories.
-dir_b
-                MOVE    R6, mount
-                TST     R1
-        ?N      MOVE    R6, mounted
-                CALL    R6
-                MOVE    R12, DIRF
-                CALL    sdir
-                CLR     @V_T
-                CLR     @V_T+1
-                MOVE    R1, S_DIROF
-                CALL    puts_b_crlf
-dir_row
-                CALL    entry
-        ?Z      JMP     dir_end
-                MOVE    R8, LNAME
-:               MOVE[M] R1, @R8++
-        ?Z      JMP     :+
-                CALL    mon_putc
-                JMP     :-
-:               SUB     R8, R8, LNAME+1
-                CMP     R8, DIR_NAME
-        ?!C     CLR     R8
-        ?!C     CALL    _io_crlf
-:               CMP     R8, DIR_NAME
-        ?Z      JMP     :+
-                MOVE    R1, 0x20
-                CALL    mon_putc
-                MOVE    R8++, R8
-                JMP     :-
-:               SHR     R1, @2[R10], 24
-                AND[M]  R0, R1, 0x10
-        ?Z      JMP     :+
-                MOVE    R1, S_DIRTAG
-                CALL    puts_b
-                ADD     @V_T+1, @V_T+1, 1
-                JMP     :++
-:               MOVE    R1, @7[R10]
-                CALL    decimal
-                ADD     @V_T, @V_T, 1
-:               CALL    _io_crlf
-                JMP     dir_row
-dir_end
-                MOVE    R1, S_FILES
-                CALL    puts_b
-                MOVE    R1, @V_T
-                CALL    _io_putdec
-                MOVE    R1, S_DIRS
-                CALL    puts_b
-                MOVE    R1, @V_T+1
-                CALL    _io_putdec
-                CALL    _io_crlf
-                CLR     R1
-                RET
-
-; decimal: R1 in decimal, unsigned, right-aligned in 12 columns. Uses R1-R6.
-decimal
-                MOVE    R5, R1
-                MOVE    R6, 12
-                MOVE    @io.mpu_b, 10
-:               MOVE    @io.mpu_a, R1
-                SUB     R6, R6, 1
-                MOVE[M] R1, @io.mpu_udivq
-        ?!Z     JMP     :-
-:               TST     R6
-        ?Z      JMP     :+
-                MOVE    R1, 0x20
-                CALL    mon_putc
-                SUB     R6, R6, 1
-                JMP     :-
-:               MOVE    R1, R5
-                JMP     _io_putdec
-
 ; fat_complete: R1 the line, R2 the cursor, R3 the end (its header
 ; above). The word before the cursor, from the last blank outside quotes,
 ; and after an opening quote, is the start of a name. Unless it is the
@@ -2101,29 +1972,3 @@ comp_cur
 type
                 MOVE    @R7++, R1
                 JMP     mon_putc
-
-; fat_load: R1 the handle of a file open to read. Its bytes, up to its
-; end, to bin_char, and its last line to bin_last, so that its lines of
-; ADDR WORD are written and counted as LOAD with no name writes them,
-; but that an empty line is passed over, the end of the file ends the
-; load, and a line with a byte that is no character is skipped. R1 = 0.
-; An error leaves the words of the lines before it written, and their
-; counts at V_LSTATS.
-load_b
-                MOVE    R5, K_READ
-                CALL    handle
-:
-                CALL    getc
-        ?!C     JMP     :+              ; the end
-                CALL    bin_char
-                JMP     :-
-:
-                CALL    bin_last
-                CLR     R1
-                RET
-
-S_DIRTAG
-                .ASCII_B '       <DIR>'
-                .DAT    0
-S_FILES         .ASCII_B 'Files: '
-S_DIRS          .ASCII_B ', directories: '

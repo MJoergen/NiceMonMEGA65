@@ -52,7 +52,11 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   ([#152](https://github.com/MJoergen/NiceMonMEGA65/issues/152)).
   `IP "A.B.C.D"` sets the address through `net_set`, so the address
   that the station has already leaves a host's connection over TCP
-  alone; before, every write broke it.
+  alone; before, every write broke it. `DIR` reads the folder through
+  `fs_open` and `fs_readname`, as a program does, so after a program
+  that left both file handles open it says `File error 23, too many
+  open files`, as `LOAD` and `SAVE` do; `DIR 0` mounts the card again,
+  which closes them.
 
 **Changes.**
 
