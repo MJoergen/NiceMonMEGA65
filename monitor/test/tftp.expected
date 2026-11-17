@@ -158,6 +158,37 @@ frame 2, 59 bytes
 010  00 2d ii ii 00 00 40 11 cc cc 0a 00 00 09 0a 00
 020  00 02 pp pp 00 45 00 19 00 00 00 01 70 72 6f 67
 030  2e 62 69 6e 00 6f 63 74 65 74 00
+== half
+NiceMon V9.9
+HELP lists the statements
+READY.
+ip "10.0.0.9"
+IP address 10.0.0.9
+READY.
+load "prog.bin", "10.0.0.2"
+Words loaded: 27, 00009000 to 0000901A
+Lines skipped: 1, first line 21; ADDR WORD in hex, ADDR 00008000 to FFFEFFFF
+TFTP error 2, Access violation
+READY.
+dump 0x9000, 4
+00009000 00000000 01010101 02020202 03030303
+READY.
+halt
+Halted
+exit 0
+frame 1, 42 bytes
+000  ff ff ff ff ff ff 02 4e 49 43 45 00 08 06 00 01
+010  08 00 06 04 00 01 02 4e 49 43 45 00 0a 00 00 09
+020  00 00 00 00 00 00 0a 00 00 02
+frame 2, 59 bytes
+000  0a 00 00 00 00 02 02 4e 49 43 45 00 08 00 45 00
+010  00 2d ii ii 00 00 40 11 cc cc 0a 00 00 09 0a 00
+020  00 02 pp pp 00 45 00 19 00 00 00 01 70 72 6f 67
+030  2e 62 69 6e 00 6f 63 74 65 74 00
+frame 3, 46 bytes
+000  0a 00 00 00 00 02 02 4e 49 43 45 00 08 00 45 00
+010  00 20 ii ii 00 00 40 11 cc cc 0a 00 00 09 0a 00
+020  00 02 pp pp 0d 80 00 0c 00 00 00 04 00 01
 == exact
 NiceMon V9.9
 HELP lists the statements

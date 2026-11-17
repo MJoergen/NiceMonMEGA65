@@ -2033,11 +2033,13 @@ ntp_parse
 ; with the ACK again; a block of less than 512 bytes is the last. A
 ; packet that has no answer within TFTP_WAIT microseconds is sent again,
 ; up to TFTP_TRIES times in all. An ERROR ends the load with its code and
-; its message. R7 is the name, then counts the sends left.
+; its message. An error after a line of the file shows the summary
+; first, with load_part. R7 is the name, then counts the sends left.
 st_tftp
                 MOVE[M] R7, R2          ; the name
         ?Z      MOVE    R7, TEXT_B+4*S_STAR
                 MOVE    @V_TLIST, R3
+                CLR     @V_LSTATS+5     ; no line read, for load_part
 :
                 CMP     @R1, 0x20
         ?Z      ADD     R1, R1, 1
@@ -2173,11 +2175,13 @@ tftp_time
                 SUB[M]  R7, R7, 1
         ?!Z     JMP     tftp_send
                 CALL    udp_close
+                CALL    load_part
                 MOVE    R1, S_NOTFTP
                 JMP     puts_b_crlf     ; which returns to the caller
 ; An ERROR: its code, and its message, up to a 0 or the end of the
 ; datagram, without control codes. R7 is the byte, and R8 the end.
 tftp_error
+                CALL    load_part
                 MOVE    R7, 4*UDP_HDR+4
                 ADD     R8, R1, 4*UDP_HDR
                 CALL    udp_close
@@ -2206,6 +2210,7 @@ tftp_error
 tftp_fail
                 MOVE    R7, R1
                 CALL    udp_close
+                CALL    load_part
                 MOVE    R1, S_NOIP
                 CMP     R7, E_NOIP
         ?!Z     MOVE    R1, S_NOROUTE

@@ -56,7 +56,10 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   after them
   ([#151](https://github.com/MJoergen/NiceMonMEGA65/issues/151), L1 and
   L2). The card's `LOAD` and TFTP's now share one parse of the lines,
-  which saves 137 words in the ROM (L3).
+  which saves 137 words in the ROM (L3). When an error ends a `LOAD`
+  from the card or a TFTP server after it read a line, it prints the
+  words loaded and the lines skipped before the error, as those words
+  are in the RAM (L4).
 - `help` in `tools/mon.py` is nicedbg's own, one line for each command
   as before, and its console is nicedbg's, which passes Enter as CR
   ([#143](https://github.com/MJoergen/NiceMonMEGA65/issues/143)).

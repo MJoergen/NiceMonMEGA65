@@ -565,6 +565,19 @@ load_summary
                 CALL    _io_puthex
                 JMP     _io_crlf        ; which returns to the caller
 
+; load_part: the summary of a LOAD from a file that an error ends, when
+; it read a line, so that the words that it wrote are known, but not for
+; a listing of TFTP; R1 kept, for the error that follows.
+load_part
+                TST     @V_LSTATS+5
+        ?Z      RET
+                TST     @V_TLIST
+        ?!Z     RET
+                PUSH    R1
+                CALL    load_summary
+                POP     R1
+                RET
+
 ; load_pend: V_PEND, the end of a program's RAM, where the variables
 ; start, from the size of the RAM, or the screen in niceemu. Uses R1.
 load_pend
@@ -584,8 +597,9 @@ st_dir
 
 ; LOAD "NAME.BIN": R1 the name. The .bin file NAME.BIN of the card's
 ; folder NICE, read with fat_load of monitor_fat.nasm, whose bytes go to
-; bin_char, and shown as st_lines shows its lines. basic.nasm has
-; checked the name's .BIN.
+; bin_char, and shown as st_lines shows its lines; an error after a
+; line shows them before it, with load_part. basic.nasm has checked the
+; name's .BIN.
 st_load
                 CLR     R2              ; to read
                 CALL    fs_open
@@ -601,8 +615,9 @@ st_load
                 CALL    fs_close
                 MOVE    R1, R9
                 TST     R1
-        ?N      JMP     fs_fail
-                JMP     load_summary
+        ?!N     JMP     load_summary
+                CALL    load_part
+                JMP     fs_fail
 
 ; SAVE "NAME", ADDR, N: R1 the name, R2 ADDR, and R3 N. The N words from
 ; ADDR written to the file NAME of the card's folder, which is made or

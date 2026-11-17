@@ -23,6 +23,9 @@ the next runs with it, each line waiting for the frames sent before it
 - lost: no answer to the first RRQ, which is sent again; DATA 1; no
   answer to ACK 1, which is sent again; DATA 2.
 - error: an ERROR 1, File not found, to the RRQ.
+- half: DATA 1, and an ERROR 2, Access violation, after ACK 1, so the
+  summary of the lines of block 1 comes before the error (issue #151,
+  L4).
 - exact: a file of 512 bytes, 25 lines ended by CR LF and 37 empty
   lines, whose DATA 2 is empty.
 - empty: an empty file, one empty DATA 1.
@@ -201,6 +204,12 @@ def main() -> None:
             "2:" + datagram(port, struct.pack(">HH", 5, 1) + b"File not found\x00"),
             ""])
         runs.append(("error", *run(emu, monitor, RUN, err_in, tmp, "error")))
+        half_in = "\n".join([
+            "1:" + arp_reply(),
+            "2:" + data(port, 1, first),
+            "3:" + datagram(port, struct.pack(">HH", 5, 2) + b"Access violation\x00"),
+            ""])
+        runs.append(("half", *run(emu, monitor, RUN, half_in, tmp, "half")))
         exact = b"".join(f"{0x9000 + i:08X} {i:08X}\r\n".encode() for i in range(25)) + b"\n" * 37
         assert len(exact) == 512
         exact_in = "\n".join([
