@@ -326,23 +326,16 @@ mac_digit
 ; the bytes from 0x80, and the escape sequences of the cursor and function
 ; keys are dropped. The lines are shown in row R7, which the hint leaves
 ; the cursor in, and only on the screen: each line clears the row, and its
-; end is not shown, so the screen never scrolls. R8 counts the words
-; written, R9 and R10 are the lowest and highest address written, R11
-; counts the lines, R12 the lines skipped, and R6 is the next free word of
-; the line.
+; end is not shown, so the screen never scrolls. The counts are
+; bin_line's, and R6 is the next free word of the line.
 st_lines
                 MOVE    R1, S_LHINT
                 CALL    puts_b_crlf
                 MOVE    @V_LOUT, @V_OUT
                 MOVE    @V_OUT, OUT_SCREEN
+                CALL    bin_init
                 MOVE    @V_LEND, 0x0D   ; as after the CR of the LOAD line
                 MOVE    R7, @V_ROW
-                CLR     R8
-                MOVE    R9, 0xFFFFFFFF
-                CLR     R10
-                CLR     R11
-                CLR     R12
-                CALL    load_pend
 load_line
                 CALL    load_row
                 MOVE    R6, V_LINE
@@ -417,15 +410,85 @@ load_end
                 CALL    bin_line
                 JMP     load_line
 
-; bin_line: the line at V_LINE, which ends at R6 with a 0, of st_lines
-; and st_tftp, with 0x7F at LINE_MAX when it had more than blanks after
-; LINE_MAX characters, so that it is skipped: counted in R11, passed
-; over when it has blanks only, or else parsed, and its word written,
-; counted in R8, with the lowest and highest address in R9 and R10, or
-; skipped, counted in R12, with the number of the first in V_LBAD. Uses
-; R1-R6.
+; bin_init: the counts of bin_line at V_LSTATS cleared, the lowest
+; address 0xFFFFFFFF, V_LPOS at V_LINE, V_LEND 0, and V_PEND set with
+; load_pend. Uses R1.
+bin_init
+                MOVE    R1, V_LSTATS
+                CLR     @R1++
+                NOT     @R1++, R0
+                CLR     @R1++
+                CLR     @R1++
+                CLR     @R1++
+                CLR     @R1++
+                MOVE    @V_LPOS, V_LINE
+                CLR     @V_LEND
+                JMP     load_pend       ; which returns to the caller
+
+; bin_char: the byte R1 of a file, from the card or a TFTP server, into
+; the line at V_LPOS. CR, LF, or CR LF ends a line, which bin_eol takes.
+; TAB is a blank, and a byte that is no character, any other control
+; code, DEL, or one from 0x80, is kept as 0x7F, so that bin_line skips
+; its line, as niceemu rejects it. The blanks after LINE_MAX are dropped,
+; as niceemu ignores them, and the first other byte after it is kept as
+; 0x7F at LINE_MAX, and the rest dropped. V_LEND is the byte before.
+; Uses R1-R6.
+bin_char
+                MOVE    R2, @V_LEND
+                MOVE    @V_LEND, R1
+                CMP     R1, 0x0A
+        ?!Z     JMP     :+
+                CMP     R2, 0x0D
+        ?Z      RET                     ; the LF of a CR LF
+                JMP     bin_eol
+:
+                CMP     R1, 0x0D
+        ?Z      JMP     bin_eol
+                CMP     R1, 0x09
+        ?Z      MOVE    R1, 0x20
+                SUB     R2, R1, 0x20
+                CMP     R2, 0x5F
+        ?!C     MOVE    R1, 0x7F        ; no character: the line skipped
+                MOVE    R6, @V_LPOS
+                CMP     R6, V_LINE+LINE_MAX
+        ?C      JMP     :+              ; room
+                CMP     R6, V_LINE+LINE_MAX+1
+        ?Z      RET                     ; the 0x7F is there already
+                CMP     R1, 0x20
+        ?Z      RET                     ; a blank after LINE_MAX, dropped
+                MOVE    R1, 0x7F        ; more after LINE_MAX: skipped
+:
+                MOVE    @R6++, R1
+                MOVE    @V_LPOS, R6
+                RET
+; bin_last: the last line of a file, when it has no end, to bin_eol
+bin_last
+                CMP     @V_LPOS, V_LINE
+        ?Z      RET
+; bin_eol: the line at V_LINE, up to V_LPOS, shown for a listing of
+; TFTP, when V_TLIST is not 0, or else to bin_line, or counted and passed
+; over when it is empty. Uses R1-R6.
+bin_eol
+                MOVE    R6, @V_LPOS
+                MOVE    @V_LPOS, V_LINE
+                CLR     @R6
+                MOVE    R1, V_LINE
+                TST     @V_TLIST
+        ?!Z     JMP     puts_crlf       ; a line of a listing, shown
+                CMP     R6, V_LINE
+        ?!Z     JMP     bin_line        ; which returns to the caller
+                ADD     @V_LSTATS+5, @V_LSTATS+5, 1  ; an empty line, passed over
+                RET
+
+; bin_line: the line at V_LINE, which ends at R6 with a 0, of LOAD, with
+; 0x7F at LINE_MAX when it had more than blanks after LINE_MAX
+; characters, so that it is skipped: counted at V_LSTATS+5, passed over
+; when it has blanks only, or else parsed, and its word written, counted
+; at V_LSTATS, with the lowest and highest address at V_LSTATS+1 and +2,
+; or skipped, counted at V_LSTATS+3, with the number of the first at
+; V_LSTATS+4. Uses R1-R6.
 bin_line
-                ADD     R11, R11, 1
+                ADD     @V_LSTATS+5, @V_LSTATS+5, 1
                 MOVE    R1, V_LINE
                 CALL    _io_gethex      ; R1 the address, R2 its digits, R3 after it
                 TST     R2
@@ -453,16 +516,16 @@ bin_line
                 TST     @R3
         ?!Z     JMP     bin_bad         ; more after the word
                 MOVE    @R6, R1
-                ADD     R8, R8, 1
-                CMP     R6, R9
-        ?C      MOVE    R9, R6          ; a lower address
-                CMP     R10, R6
-        ?C      MOVE    R10, R6         ; a higher one
+                ADD     @V_LSTATS, @V_LSTATS, 1
+                CMP     R6, @V_LSTATS+1
+        ?C      MOVE    @V_LSTATS+1, R6  ; a lower address
+                CMP     @V_LSTATS+2, R6
+        ?C      MOVE    @V_LSTATS+2, R6  ; a higher one
                 RET
 bin_bad
-                ADD     R12, R12, 1
-                CMP     R12, 1
-        ?Z      MOVE    @V_LBAD, R11
+                TST     @V_LSTATS+3
+        ?Z      MOVE    @V_LSTATS+4, @V_LSTATS+5
+                ADD     @V_LSTATS+3, @V_LSTATS+3, 1
                 RET
 ; The end of the load: the row blank again, the outputs back, the words
 ; written, and the lines skipped
@@ -472,29 +535,29 @@ load_done
 load_summary
                 MOVE    R1, S_LOADED
                 CALL    puts_b
-                MOVE    R1, R8
+                MOVE    R1, @V_LSTATS
                 CALL    _io_putdec
-                TST     R8
+                TST     @V_LSTATS
         ?Z      JMP     :+
                 MOVE    R1, S_LFROM
                 CALL    puts_b
-                MOVE    R1, R9
+                MOVE    R1, @V_LSTATS+1
                 CALL    _io_puthex
                 MOVE    R1, S_LTO
                 CALL    puts_b
-                MOVE    R1, R10
+                MOVE    R1, @V_LSTATS+2
                 CALL    _io_puthex
 :
                 CALL    _io_crlf
-                TST     R12
+                TST     @V_LSTATS+3
         ?Z      RET
                 MOVE    R1, S_SKIPPED
                 CALL    puts_b
-                MOVE    R1, R12
+                MOVE    R1, @V_LSTATS+3
                 CALL    _io_putdec
                 MOVE    R1, S_FIRST
                 CALL    puts_b
-                MOVE    R1, @V_LBAD
+                MOVE    R1, @V_LSTATS+4
                 CALL    _io_putdec
                 MOVE    R1, S_LFORM
                 CALL    puts_b
@@ -520,8 +583,8 @@ st_dir
                 RET
 
 ; LOAD "NAME.BIN": R1 the name. The .bin file NAME.BIN of the card's
-; folder NICE, read with fat_load of monitor_fat.nasm, which writes its words as
-; st_lines does, and shown as st_lines shows its lines. basic.nasm has
+; folder NICE, read with fat_load of monitor_fat.nasm, whose bytes go to
+; bin_char, and shown as st_lines shows its lines. basic.nasm has
 ; checked the name's .BIN.
 st_load
                 CLR     R2              ; to read
@@ -529,10 +592,9 @@ st_load
                 TST     R1
         ?N      JMP     fs_fail
                 MOVE    R8, R1          ; the handle
-                CALL    load_pend
+                CALL    bin_init
+                CLR     @V_TLIST        ; no listing
                 MOVE    R1, R8
-                MOVE    R2, @V_PEND
-                MOVE    R3, V_LSTATS
                 CALL    fat_load
                 MOVE    R9, R1
                 MOVE    R1, R8
@@ -540,11 +602,6 @@ st_load
                 MOVE    R1, R9
                 TST     R1
         ?N      JMP     fs_fail
-                MOVE    R8, @V_LSTATS
-                MOVE    R9, @V_LSTATS+1
-                MOVE    R10, @V_LSTATS+2
-                MOVE    R12, @V_LSTATS+3
-                MOVE    @V_LBAD, @V_LSTATS+4
                 JMP     load_summary
 
 ; SAVE "NAME", ADDR, N: R1 the name, R2 ADDR, and R3 N. The N words from

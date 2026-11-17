@@ -55,7 +55,8 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   before, a line of more than 76 blanks from the card hid what came
   after them
   ([#151](https://github.com/MJoergen/NiceMonMEGA65/issues/151), L1 and
-  L2).
+  L2). The card's `LOAD` and TFTP's now share one parse of the lines,
+  which saves 137 words in the ROM (L3).
 - `help` in `tools/mon.py` is nicedbg's own, one line for each command
   as before, and its console is nicedbg's, which passes Enter as CR
   ([#143](https://github.com/MJoergen/NiceMonMEGA65/issues/143)).

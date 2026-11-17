@@ -2098,119 +2098,23 @@ type
                 MOVE    @R7++, R1
                 JMP     mon_putc
 
-; fat_load: R1 the handle of a file open to read, R2 the end of the RAM
-; that it may write, and R3 the 5 words of its summary. The lines of the
-; file, ADDR WORD in hex, written as LOAD with no name writes them, but
-; that an empty line is passed over and the end of the file ends the
-; load. A line is skipped when it has no address or word of 1 to 8
-; digits, has more after the word than blanks, has a byte that is not
-; printable ASCII, has more than blanks after its LINE_MAX characters, or
-; its address is below 0x8000 or not below the end. TAB is a blank, and
-; CR, LF, or CR LF ends a line. A byte that is no character, any other
-; control code, DEL, or one from 0x80, is kept as 0x7F, which no line
-; parses; so is the first character after LINE_MAX that is no blank, at
-; SEC[LINE_MAX], and the blanks after LINE_MAX are dropped, as niceemu
-; ignores them. The 5 words get the words written, the lowest
-; and the highest address, the lines skipped, and the number of the
-; first, counted from 1, only at the end; V_T has them until then. R1 =
-; 0. The line is in SEC, one character a word, R10 long; R7 is the end,
-; R8 the summary, R9 the number of the line, and R11 the last byte.
+; fat_load: R1 the handle of a file open to read. Its bytes, up to its
+; end, to bin_char, and its last line to bin_last, so that its lines of
+; ADDR WORD are written and counted as LOAD with no name writes them,
+; but that an empty line is passed over, the end of the file ends the
+; load, and a line with a byte that is no character is skipped. R1 = 0.
+; An error leaves the words of the lines before it written, and their
+; counts at V_LSTATS.
 load_b
-                MOVE    R7, R2
-                MOVE    R8, R3
                 MOVE    R5, K_READ
                 CALL    handle
-                MOVE    R1, V_T
-                CLR     @R1++
-                NOT     @R1++, R0
-                CLR     @R1++
-                CLR     @R1++
-                CLR     @R1++
-                CLR     R9
-                CLR     R10
-                CLR     R11
-fload_byte
+:
                 CALL    getc
-        ?!C     MOVE    R1, 256         ; the end
-                CMP     R1, 0x0A
-        ?Z      CMP     R11, 0x0D
-        ?Z      CLR     R11
-        ?Z      JMP     fload_byte      ; the LF of a CR LF
-                MOVE    R11, R1
-                CMP     R1, 0x0D
-        ?!Z     CMP     R1, 0x0A
-        ?!Z     CMP     R1, 256
-        ?Z      JMP     :+
-                CMP     R1, 0x09
-        ?Z      MOVE    R1, 0x20
-                SUB     R2, R1, 0x20
-                CMP     R2, 0x5F
-        ?!C     MOVE    R1, 0x7F        ; no character: the line skipped
-                CMP     R10, LINE_MAX
-        ?C      JMP     fload_put       ; room
-                CMP     R1, 0x20
-        ?Z      JMP     fload_byte      ; a blank after LINE_MAX, dropped
-                MOVE    R10, LINE_MAX
-                MOVE    R1, 0x7F        ; more after LINE_MAX: skipped
-fload_put
-                MOVE    @SEC[R10], R1
-                MOVE    R10++, R10
-                JMP     fload_byte
-:               TST     R10
-        ?Z      CMP     R1, 256
-        ?Z      JMP     fload_end
-                PUSH    R1
-                MOVE    R9++, R9
-                CLR     @SEC[R10]
-                MOVE    R2, SEC
-:               CMP     @R2, 0x20
-        ?Z      MOVE    R2++, R2
-        ?Z      JMP     :-
-                TST     @R2
-        ?Z      JMP     fload_next      ; blanks only
-                MOVE    R1, SEC
-                CALL    _io_gethex
-                SUB     R2, R2, 1
-                CMP     R2, 8
-        ?!C     JMP     fload_bad
-                PUSH    R1              ; the address
-                MOVE    R1, R3
-                CALL    _io_gethex
-                POP     R6
-                SUB     R2, R2, 1
-                CMP     R2, 8
-        ?!C     JMP     fload_bad
-:               CMP     @R3, 0x20
-        ?Z      MOVE    R3++, R3
-        ?Z      JMP     :-
-                TST     @R3
-        ?!Z     JMP     fload_bad
-                CMP     R6, PROGRAM
-        ?C      JMP     fload_bad
-                CMP     R6, R7
-        ?!C     JMP     fload_bad
-                MOVE    @R6, R1
-                ADD     @V_T, @V_T, 1
-                CMP     R6, @V_T+1
-        ?C      MOVE    @V_T+1, R6
-                CMP     @V_T+2, R6
-        ?C      MOVE    @V_T+2, R6
-                JMP     fload_next
-fload_bad
-                TST     @V_T+3
-        ?Z      MOVE    @V_T+4, R9
-                ADD     @V_T+3, @V_T+3, 1
-fload_next
-                CLR     R10
-                POP     R1
-                CMP     R1, 256
-        ?!Z     JMP     fload_byte
-fload_end
-                MOVE    R1, V_T
-                MOVE    R2, 5
-:               MOVE    @R8++, @R1++
-                SUB[M]  R2, R2, 1
-        ?!Z     JMP     :-
+        ?!C     JMP     :+              ; the end
+                CALL    bin_char
+                JMP     :-
+:
+                CALL    bin_last
                 CLR     R1
                 RET
 

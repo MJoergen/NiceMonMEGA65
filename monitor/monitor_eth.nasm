@@ -17,8 +17,8 @@
 ;
 ; The statements are routines as those of monitor_cmd.nasm are, which
 ; basic.nasm calls with their arguments in R1-R3. IP, which shows and writes
-; the IP address, is in monitor_cmd.nasm. TFTP reads its lines with
-; bin_line, LOAD's. The cold start disables the port and empties the ARP
+; the IP address, is in monitor_cmd.nasm. TFTP takes its bytes with
+; bin_char of monitor_cmd.nasm, as LOAD from the card does. The cold start disables the port and empties the ARP
 ; cache.
 ; The variables of all of it are in monitor.nasm, with the others.
 
@@ -2024,7 +2024,7 @@ ntp_parse
 ; DIR. The .bin file NAME of the TFTP server at IP (RFC 1350), read in
 ; octet mode through the UDP endpoint, which it opens on a port that
 ; udp_open picks, and closes at the end, and its lines written as
-; LOAD "NAME.BIN" writes them, with bin_line, and shown as LOAD shows
+; LOAD "NAME.BIN" writes them, with bin_char, and shown as LOAD shows
 ; them; or for a listing the lines that tools/tftpd.py answers a
 ; pattern, with * or ?, with, which are shown instead. The RRQ goes to
 ; PORT, 69 by default, and the server's first DATA gives its TID; the
@@ -2033,8 +2033,7 @@ ntp_parse
 ; with the ACK again; a block of less than 512 bytes is the last. A
 ; packet that has no answer within TFTP_WAIT microseconds is sent again,
 ; up to TFTP_TRIES times in all. An ERROR ends the load with its code and
-; its message. R7 is the name, then counts the sends left, and R8-R12
-; are bin_line's.
+; its message. R7 is the name, then counts the sends left.
 st_tftp
                 MOVE[M] R7, R2          ; the name
         ?Z      MOVE    R7, TEXT_B+4*S_STAR
@@ -2092,14 +2091,7 @@ tftp_ip
         ?N      JMP     tftp_fail
                 CLR     @V_TTID
                 MOVE    @V_TBLK, 1
-                CLR     @V_TLAST
-                MOVE    @V_TLINE, V_LINE
-                CALL    load_pend
-                CLR     R8
-                MOVE    R9, 0xFFFFFFFF
-                CLR     R10
-                CLR     R11
-                CLR     R12
+                CALL    bin_init
 tftp_try
                 MOVE    R7, TFTP_TRIES
 tftp_send
@@ -2151,7 +2143,7 @@ tftp_wait
                 ADD     R1, R7, 4*UDP_HDR+4
                 CALL    rx_byte
                 ADD     R7, R7, 1
-                CALL    tftp_char
+                CALL    bin_char
                 JMP     :-
 :
                 CLR     @V_TPKT
@@ -2169,8 +2161,7 @@ tftp_wait
                 MOVE    R3, V_TPKT
                 MOVE    R4, 4
                 CALL    udp_send
-                CMP     @V_TLINE, V_LINE  ; the last line, with no end
-        ?!Z     CALL    tftp_eol
+                CALL    bin_last
                 CALL    udp_close
                 TST     @V_TLIST
         ?!Z     RET                     ; a listing, shown
@@ -2222,54 +2213,6 @@ tftp_fail
 tftp_bad
                 MOVE    R1, S_BADTFTP
                 JMP     puts_b_crlf     ; which returns to the caller
-
-; tftp_char: the byte R1 of a DATA, into the line at V_TLINE, as fat_load
-; of monitor_fat.nasm takes the bytes of a file: CR, LF, or CR LF ends a line,
-; which is shown for a listing, or else goes to bin_line, or is counted
-; and passed over when it is empty;
-; TAB is a blank, and a byte that is no character, any other control code,
-; DEL, or one from 0x80, is kept as 0x7F, so that bin_line skips its line.
-; The blanks after LINE_MAX are dropped, and the first other byte after it
-; is kept as 0x7F at LINE_MAX, and the rest dropped. Uses R1-R6.
-tftp_char
-                MOVE    R2, @V_TLAST
-                MOVE    @V_TLAST, R1
-                CMP     R1, 0x0A
-        ?!Z     JMP     :+
-                CMP     R2, 0x0D
-        ?Z      RET                     ; the LF of a CR LF
-                JMP     tftp_eol
-:
-                CMP     R1, 0x0D
-        ?Z      JMP     tftp_eol
-                CMP     R1, 0x09
-        ?Z      MOVE    R1, 0x20
-                SUB     R2, R1, 0x20
-                CMP     R2, 0x5F
-        ?!C     MOVE    R1, 0x7F        ; no character: the line skipped
-                MOVE    R6, @V_TLINE
-                CMP     R6, V_LINE+LINE_MAX
-        ?C      JMP     :+              ; room
-                CMP     R6, V_LINE+LINE_MAX+1
-        ?Z      RET                     ; the 0x7F is there already
-                CMP     R1, 0x20
-        ?Z      RET                     ; a blank after LINE_MAX, dropped
-                MOVE    R1, 0x7F        ; more after LINE_MAX: skipped
-:
-                MOVE    @R6++, R1
-                MOVE    @V_TLINE, R6
-                RET
-tftp_eol
-                MOVE    R6, @V_TLINE
-                MOVE    @V_TLINE, V_LINE
-                CLR     @R6
-                MOVE    R1, V_LINE
-                TST     @V_TLIST
-        ?!Z     JMP     puts_crlf       ; a line of a listing, shown
-                CMP     R6, V_LINE
-        ?!Z     JMP     bin_line        ; which returns to the caller
-                ADD     R11, R11, 1     ; an empty line, passed over
-                RET
 
 S_NODHCP
                 .ASCII_B 'No answer from a DHCP server'

@@ -231,8 +231,8 @@ from 0, and the rest is free. The demo is not in it: it is a program,
 <!-- romsize layout -->
 | Part | Address | Words |
 |---|---|---:|
-| The monitor | `0x0000`–`0x3670` | 13937 |
-| Free | `0x3671`–`0x7FFF` | 18831 |
+| The monitor | `0x0000`–`0x35E7` | 13800 |
+| Free | `0x35E8`–`0x7FFF` | 18968 |
 <!-- /romsize layout -->
 
 The monitor's words, by the source they come from, in the order
@@ -246,19 +246,19 @@ ROM is built:
 | Source | What it is | Words | Text |
 |---|---|---:|---:|
 | `monitor.nasm` | The dispatch table, the HAL, and the cold start | 736 | 5 |
-| `monitor_cmd.nasm` | The routines of the statements that were the commands | 1235 | 222 |
+| `monitor_cmd.nasm` | The routines of the statements that were the commands | 1318 | 222 |
 | `basic.nasm` | BASIC: the main loop, the scanner, the keywords, the messages, and the help | 818 | 440 |
 | `monitor_dis.nasm` | The disassembler of `DIS` | 871 | 79 |
 | `monitor_sd.nasm` | The sector routines | 206 | 59 |
-| `monitor_fat.nasm` | FAT32, `DIR`, `LOAD`, `SAVE`, `DELETE`, and TAB | 3253 | 10 |
-| `monitor_eth.nasm` | The network | 3364 | 160 |
+| `monitor_fat.nasm` | FAT32, `DIR`, `LOAD`, `SAVE`, `DELETE`, and TAB | 3111 | 10 |
+| `monitor_eth.nasm` | The network | 3286 | 160 |
 | `monitor_tcp.nasm` | TCP | 2414 | 0 |
 | `monitor_clock.nasm` | The clock and `TIME` | 675 | 44 |
 | `monlib.nasm` | The routines that programs join | 274 | 0 |
 | `mon.nasm` | The stubs of the entries | 72 | 0 |
 | `build/folder.nasm` | The folder's name, and the error of a card without it | 17 | 17 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 13937 | 1038 |
+| In all | | 13800 | 1038 |
 <!-- /romsize monitor -->
 
 - `build/folder.nasm` and the version always end with a `.DAT 0`, as

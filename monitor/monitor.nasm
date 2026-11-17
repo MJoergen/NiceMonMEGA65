@@ -138,7 +138,7 @@ V_BACK          .EQU    0xFFFFF009      ; the rows shown back, 0 for the screen
 V_CTL           .EQU    0xFFFFF00A      ; SCR_CTL while the history is shown
 V_LOUT          .EQU    0xFFFFF00B      ; V_OUT while LOAD reads its lines
 V_LEND          .EQU    0xFFFFF00C      ; the last byte that LOAD read, for the LF of a CR LF
-V_LBAD          .EQU    0xFFFFF00D      ; the number of the first line that LOAD skipped
+V_LPOS          .EQU    0xFFFFF00D      ; for LOAD from a file: the next free word of V_LINE
 V_PEND          .EQU    0xFFFFF00E      ; for LOAD: after a program's RAM, at the variables
 V_UNEXT         .EQU    0xFFFFF00F      ; the address that the next DIS goes on at
 V_LINE          .EQU    0xFFFFF010      ; the line, LINE_MAX words, one over for LOAD, and a 0
@@ -161,7 +161,7 @@ V_PIP           .EQU    0xFFFFF116      ; and those of the last reply that dhcp_
 V_PSRV          .EQU    0xFFFFF117
 V_PMASK         .EQU    0xFFFFF118
 V_PGW           .EQU    0xFFFFF119
-V_LSTATS        .EQU    0xFFFFF11A      ; for LOAD "NAME.BIN": what fat_load gives, 5 words
+V_LSTATS        .EQU    0xFFFFF11A      ; for LOAD: the words written, the lowest and highest address, the lines skipped, the first, and the lines, 6 words
 V_TXF           .EQU    0xFFFFF120      ; a frame to send, from byte 2, DHCP_WORDS words, as the send buffer has it
 V_RXF           .EQU    0xFFFFF180      ; a frame received, from byte 2, 380 words, as the queue's buffer has it
 V_MASK          .EQU    0xFFFFF302      ; the network's mask, from DHCP, 0 for none
@@ -173,11 +173,9 @@ V_TTID          .EQU    0xFFFFF311      ; its port, its TID, 0 before its first 
 V_TBLK          .EQU    0xFFFFF312      ; the block waited for,
 V_TLEN          .EQU    0xFFFFF313      ; the bytes of the packet at V_TPKT,
 V_TTIME         .EQU    0xFFFFF314      ; the microseconds when it was sent,
-V_TLAST         .EQU    0xFFFFF315      ; the byte before, for the LF of a CR LF,
-V_TLINE         .EQU    0xFFFFF316      ; the next free word of V_LINE,
 V_TEND          .EQU    0xFFFFF317      ; the bytes of the DATA's block,
 V_TPORT         .EQU    0xFFFFF318      ; the server's port for the RRQ,
-V_TLIST         .EQU    0xFFFFF319      ; not 0 for a listing, of DIR,
+V_TLIST         .EQU    0xFFFFF319      ; not 0 for a listing, of DIR, which bin_eol shows,
 V_TPKT          .EQU    0xFFFFF320      ; and the packet sent, a byte per word, up to TFTP_PKT
 V_DNS           .EQU    0xFFFFF380      ; the DNS server, from DHCP or net_set, 0 for none
 V_ULEN          .EQU    0xFFFFF381      ; the bytes of the datagram held for the endpoint at V_RXF, 0 for none
