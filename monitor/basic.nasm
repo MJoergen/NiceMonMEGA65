@@ -7,8 +7,9 @@
 ; and monitor_eth.nasm, with the scanner of issue #115.
 ;
 ; The cold start ends at bas_start, which prints the banner and goes to
-; main. main is where BASIC starts again, from the cold start and
-; mon_exit: it sets SP to STACK, prints READY., and reads lines. An empty
+; main, and mon_exit at bas_warm, which prints the status and goes to
+; main. main is where BASIC starts again: it sets SP to STACK, prints
+; READY., and reads lines with con_getline, entry 32. An empty
 ; line, or one of blanks only, runs nothing and prints no READY.
 ;
 ; The scanner. R8 is the next character of the line, which is a word of
@@ -39,6 +40,13 @@
 ; any register, as main starts again after each. Slots 1 and 2 are 0
 ; for a statement that has no string or number there.
 
+; bas_warm: where mon_exit goes, with R1 the status of the program that
+; left: the status shown, as SYS shows it, and then the main loop
+bas_warm
+                MOVE    SP, STACK
+                CALL    sys_status
+                JMP     main
+
 ; bas_start: where the cold start goes, at its end: the banner, and DUMP
 ; and DIS at 0x8000, and then the main loop
 bas_start
@@ -59,7 +67,7 @@ main            MOVE    SP, STACK
 main_line
                 MOVE    R1, V_LINE
                 MOVE    R2, LINE_MAX
-                CALL    getline
+                CALL    CON_GETLINE
                 MOVE    R8, V_LINE
 :
                 CMP     @R8, 0x20
@@ -348,7 +356,7 @@ ACTS
                 .DAT    st_sys+65536*bas_load, bas_save+65536*st_delete
                 .DAT    bas_dir+65536*st_ip, st_dhcp+65536*st_mac
                 .DAT    bas_time+65536*bas_ntp, bas_baud+65536*bas_dump
-                .DAT    bas_dis+65536*scr_cls, st_ver+65536*st_help, st_halt
+                .DAT    bas_dis+65536*SCR_CLS, st_ver+65536*st_help, st_halt
 H_ACTS          .EQU    0x40000000+4*ACTS
 ; The routines of the items, by the kind of an op, which bas_op calls
 KINDS

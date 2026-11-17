@@ -50,6 +50,9 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   `net_servers`, the DHCP server and the NTP server; and
   `mon_restore`, the state after a program
   ([#152](https://github.com/MJoergen/NiceMonMEGA65/issues/152)).
+  `IP "A.B.C.D"` sets the address through `net_set`, so the address
+  that the station has already leaves a host's connection over TCP
+  alone; before, every write broke it.
 
 **Changes.**
 

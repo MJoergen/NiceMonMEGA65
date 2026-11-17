@@ -84,30 +84,35 @@ TFTP_TRIES      .EQU    5               ; the sends of a packet that tftp waits 
 TFTP_WAIT       .EQU    1000000         ; the microseconds it waits after each
 TFTP_PKT        .EQU    96              ; the words of V_TPKT
 
-; DHCP: net_dhcp, and the address, the mask, the gateway, the DNS
-; server, the DHCP server, and the NTP server, if it gave one, shown, or
-; that no server answered.
+; DHCP: net_dhcp, entry 23, and the address, the mask, the gateway, and
+; the DNS server of net_config, entry 21, and the DHCP server and the
+; NTP server, if it gave one, of net_servers, entry 35, at V_NET, shown,
+; or that no server answered.
 st_dhcp
-                CALL    net_dhcp
+                CALL    NET_DHCP
                 TST     R1
         ?N      JMP     :+
+                MOVE    R1, V_NET
+                CALL    NET_CONFIG
+                MOVE    R1, V_NET+4
+                CALL    NET_SERVERS
                 MOVE    R1, S_IP
-                MOVE    R2, @E_IP
+                MOVE    R2, @V_NET
                 CALL    show_ip
                 MOVE    R1, S_MASK
-                MOVE    R2, @V_MASK
+                MOVE    R2, @V_NET+1
                 CALL    show_ip
                 MOVE    R1, S_GW
-                MOVE    R2, @V_GW
+                MOVE    R2, @V_NET+2
                 CALL    show_ip
                 MOVE    R1, S_DNS
-                MOVE    R2, @V_DNS
+                MOVE    R2, @V_NET+3
                 CALL    show_ip
                 MOVE    R1, S_DSRV
-                MOVE    R2, @V_DSRV
+                MOVE    R2, @V_NET+4
                 CALL    show_ip
                 MOVE    R1, S_NTPSRV
-                MOVE[M] R2, @V_NTP
+                MOVE[M] R2, @V_NET+5
         ?!Z     CALL    show_ip
                 RET
 :
@@ -1850,7 +1855,8 @@ dns_skip
 ; #127), which goes to ntp_bad_time with a time that the clock does not
 ; take. SERVER is
 ; a name, which dns_lookup looks up, or an IP address; without it the
-; server is the NTP server of DHCP's option 42, V_NTP, and without that
+; server is the NTP server of DHCP's option 42, which net_servers, entry
+; 35, gives, and without that
 ; NTP_POOL. The offset is local time less UTC, which clock_zone reads,
 ; and +00:00 without it. The query is 48 bytes from a local port of its own,
 ; V_NWAIT, to port 123: version 4, mode 3, and the transmit timestamp,
@@ -1879,7 +1885,9 @@ ntp_server
                 MOVE    R1, E_NOIP
                 TST     @E_IP
         ?Z      JMP     ntp_fail
-                MOVE[M] R9, @V_NTP
+                MOVE    R1, V_NET
+                CALL    NET_SERVERS
+                MOVE[M] R9, @V_NET+1
                 TST     R7
         ?!Z     JMP     :+
                 TST     R9

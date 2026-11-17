@@ -14,10 +14,13 @@
 ; The cold start, mon_reset, sets SP to STACK, the variables, and the
 ; screen, and goes to bas_start, which prints the banner and runs the main
 ; loop, main, of basic.nasm. At mon_exit, the monitor clears E, stops the
-; timer, clears the FPU, sets VBASE to 0, shows the cursor, blinking,
-; takes a fresh stack, prints the status, R1, and goes back to main; a
-; program that SYS called and that returns has the same, but the stack,
-; and BASIC goes on.
+; timer, clears the FPU, sets VBASE to 0, and shows the cursor,
+; blinking, with mon_restore, takes a fresh stack, and goes to BASIC's
+; warm start, bas_warm, which prints the status, R1, and goes back to
+; main; a program that SYS called and that returns has the same, but
+; the stack, and BASIC goes on. BASIC calls the monitor through the
+; entries of the dispatch table (issue #152), but for the routines that
+; it has not left yet.
 ;
 ; The monitor is this file and seven more, which the Makefile joins after
 ; it, in this order, so that the dispatch table is at 0:
@@ -150,6 +153,7 @@ V_F             .EQU    0xFFFFF06E      ; the fields of the clock's time, which 
 V_DAYS          .EQU    0xFFFFF074      ; and its days since 1970
 V_ARGS          .EQU    0xFFFFF075      ; for BASIC: the values of a statement, 4 words, slots 1, 2, and 4 at V_ARGS, +1, and +3
 V_LSTATS        .EQU    0xFFFFF079      ; for LOAD: the counts of bin_line, 7 words
+V_NET           .EQU    0xFFFFF080      ; for IP, DHCP, and NTP: the words of net_config and net_servers, 6 words
 V_ARP           .EQU    0xFFFFF100      ; the ARP cache: ARP_SLOTS entries of an IP address, 0 for none, the MAC address as E_MACH and E_MACL have it, and the time of arp_tick it was learned
 V_ARPNEXT       .EQU    0xFFFFF110      ; the entry that arp_learn takes next, 4 times its number
 V_XID           .EQU    0xFFFFF111      ; for DHCP: the transaction's number,
@@ -369,8 +373,8 @@ mon_reset
                 CALL    clock_rtc
                 JMP     bas_start       ; basic.nasm
 
-; mon_exit: entry 1, and where a program returns to. Back to the main loop,
-; main, with R1 the status: E cleared, the timer stopped, the FPU's
+; mon_exit: entry 1, and where a program returns to. Back to BASIC's
+; warm start, bas_warm, with R1 the status, which it prints: E cleared, the timer stopped, the FPU's
 ; stack empty and its flags clear, VBASE 0, the font base and the mode
 ; word 0, the network
 ; closed, net_close, the cursor shown and blinking with the display
@@ -378,23 +382,10 @@ mon_reset
 ; the cursor's registers, after a new line if that is not column 0.
 mon_exit
                 MOVE    SP, STACK
-                CALL    sys_end
-                JMP     main
-
-; sys_end: for mon_exit, and for SYS at a program's return, with R1 the
-; status: the state as the header of mon_exit says, with mon_restore,
-; but the stack, a new line if the cursor is not in column 0, and the
-; status printed. Uses R1-R6.
-sys_end
                 PUSH    R1
                 CALL    mon_restore
-                TST     @V_COL
-        ?!Z     CALL    _io_crlf
-                MOVE    R1, S_RETURN
-                CALL    puts_b
                 POP     R1
-                CALL    _io_puthex
-                JMP     _io_crlf        ; which returns to the caller
+                JMP     bas_warm        ; basic.nasm
 
 ; mon_restore: entry 36, the state after a program, for a caller that
 ; ran one, as SYS does: E cleared, the timer stopped, the FPU's stack
@@ -652,6 +643,31 @@ getline_line
                 MOVE    R4, complete    ; the routine of TAB
                 JMP     _io_gets.first  ; which returns to the caller
 
+; complete: TAB on the line, for _io_gets: R1 the line, R2 the cursor, R3
+; the word after the last, and R1 = the new cursor, with fat_complete of
+; monitor_fat.nasm (issue #137). When it lists the matches, the line is shown
+; again. Uses R1-R6, and R7 and R8 across the calls, saved.
+complete
+                PUSH    R7
+                PUSH    R8
+                MOVE    R7, R1          ; the line
+                MOVE    R8, R2          ; the cursor
+                CALL    fat_complete
+                TST     R1
+        ?!Z     JMP     complete_end
+:
+                CMP     R7, R8
+        ?Z      JMP     :+
+                MOVE    R1, @R7++
+                CALL    _mon_putc
+                JMP     :-
+:
+                MOVE    R1, R8
+complete_end
+                POP     R8
+                POP     R7
+                RET
+
 ; getline_wait: R1 = the next byte of the console, which it waits for, as
 ; _io_getc does. While the DHCP exchange in the background runs, or a
 ; lease is kept, it enables the port for Ethernet frames, with net_on,
@@ -864,8 +880,6 @@ puts_b_crlf
                 CALL    puts_b
                 JMP     _io_crlf        ; which returns to the caller
 
-S_RETURN
-                .ASCII_B 'Returned '
 S_UCOMMA
                 .ASCII_B ', '
 S_UGAP          .ASCII_B '  '

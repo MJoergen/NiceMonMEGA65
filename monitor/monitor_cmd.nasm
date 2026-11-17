@@ -31,8 +31,8 @@ UART_BAUD       .EQU    0xFFFFFF9F      ; the UART's baud rate in bit/s, memory 
 DUMP_WORDS      .EQU    32              ; the words that DUMP shows without a count
 ROW_WORDS       .EQU    4               ; the words of a row of DUMP
 
-; CLS: st_cls is scr_cls. VER: the version of the monitor, and that of
-; the table, major.minor.
+; CLS: scr_cls, entry 5. VER: the version of the monitor, and that of
+; the table, major.minor, from mon_version, entry 2.
 st_ver
                 MOVE    R1, S_NAME
                 CALL    puts_b
@@ -40,11 +40,13 @@ st_ver
                 CALL    puts_b
                 MOVE    R1, S_TABLE
                 CALL    puts_b
-                SHR     R1, TABLE_VERSION, 16
+                CALL    MON_VERSION
+                MOVE    R7, R1
+                SHR     R1, R7, 16
                 CALL    _io_putdec
                 MOVE    R1, 0x2E        ; .
-                CALL    mon_putc
-                AND     R1, TABLE_VERSION, 0xFFFF
+                CALL    MON_PUTC
+                AND     R1, R7, 0xFFFF
                 CALL    _io_putdec
                 JMP     _io_crlf        ; which returns to the caller
 
@@ -73,7 +75,7 @@ dump_row
                 MOVE    R9, ROW_WORDS   ; the words left in the row
 :
                 MOVE    R1, 0x20
-                CALL    mon_putc
+                CALL    MON_PUTC
                 MOVE    R1, @R7++
                 CALL    _io_puthex
                 SUB[M]  R8, R8, 1
@@ -91,8 +93,9 @@ dump_row
 ; decimal numbers of 0 to 255 with dots between them, and shown, in
 ; decimal with dots. Without the string it is only shown. Blanks may come
 ; before and after the address in the string, and anything else makes it
-; no address, which is not written. A written address has no mask, no
-; gateway, no DNS server, and no lease, which only DHCP gives.
+; no address, which is not written. The address is written with
+; net_set, entry 22, with no mask, no gateway, and no DNS server, and so
+; with no lease, which only DHCP gives.
 st_ip
                 TST     R1
         ?Z      JMP     ip_show         ; no address
@@ -106,13 +109,13 @@ st_ip
                 MOVE    R7, R1
                 CALL    rest_blank
         ?!Z     JMP     ip_bad
-                MOVE    @E_IP, R7
-                CLR     @V_MASK
-                CLR     @V_GW
-                CLR     @V_DNS
-                CLR     @V_NTP
-                CLR     @V_BSTATE       ; no DHCP in the background
-                CALL    lease_forget
+                MOVE    R1, V_NET
+                MOVE    @R1++, R7
+                CLR     @R1++
+                CLR     @R1++
+                CLR     @R1
+                MOVE    R1, V_NET
+                CALL    NET_SET
 ip_show         MOVE    R1, S_IP
                 MOVE    R2, @E_IP
                 JMP     show_ip         ; which returns to the caller
@@ -177,7 +180,7 @@ put_ip
                 SUB[M]  R7, R7, 1
         ?Z      JMP     :+
                 MOVE    R1, 0x2E
-                CALL    mon_putc
+                CALL    MON_PUTC
                 JMP     :-
 :               POP     R8
                 POP     R7
@@ -282,7 +285,7 @@ mac_show
                 OR      R7, R7, R4
                 SHL     R8, R8, 8
                 MOVE    R1, 0x3A        ; :
-                CALL    mon_putc
+                CALL    MON_PUTC
                 JMP     :-
 :
                 JMP     _io_crlf        ; which returns to the caller
@@ -295,7 +298,7 @@ mac_digit
                 ADD     R1, R1, 0x30
                 CMP     R1, 0x3A
         ?!C     ADD     R1, R1, 7       ; A to F
-                JMP     mon_putc        ; which returns to the caller
+                JMP     MON_PUTC        ; which returns to the caller
 
 ; LOAD with no name: words into the memory from lines of ADDR WORD, two
 ; hex numbers of 1 to 8 digits with blanks between them and around them,
@@ -325,11 +328,13 @@ mac_digit
 st_lines
                 MOVE    R1, S_LHINT
                 CALL    puts_b_crlf
-                MOVE    @V_LOUT, @V_OUT
-                MOVE    @V_OUT, OUT_SCREEN
+                MOVE    R1, OUT_SCREEN
+                CALL    MON_OUT
+                MOVE    @V_LOUT, R1
                 CALL    bin_init
                 MOVE    @V_LEND, 0x0D   ; as after the CR of the LOAD line
-                MOVE    R7, @V_ROW
+                CALL    SCR_GETXY
+                MOVE    R7, R2          ; the row
 load_line
                 CALL    load_row
                 MOVE    R6, V_LINE
@@ -362,7 +367,7 @@ load_key
                 CMP     R6, V_LINE+LINE_MAX
         ?!C     JMP     :+              ; the line is full
                 MOVE    @R6++, R1
-                CALL    mon_putc
+                CALL    MON_PUTC
                 JMP     load_key
 :
                 CMP     R1, 0x20
@@ -483,7 +488,8 @@ bin_eol
 ; written, and the lines skipped
 load_done
                 CALL    load_row
-                MOVE    @V_OUT, @V_LOUT
+                MOVE    R1, @V_LOUT
+                CALL    MON_OUT
 load_summary
                 MOVE    R1, S_LOADED
                 CALL    puts_b
@@ -546,7 +552,7 @@ st_dir
 ; name's .BIN.
 st_load
                 CLR     R2              ; to read
-                CALL    fs_open
+                CALL    FS_OPEN
                 TST     R1
         ?N      JMP     fs_fail
                 MOVE    R8, R1          ; the handle
@@ -556,7 +562,7 @@ st_load
                 CALL    fat_load
                 MOVE    R9, R1
                 MOVE    R1, R8
-                CALL    fs_close
+                CALL    FS_CLOSE
                 MOVE    R1, R9
                 TST     R1
         ?!N     JMP     load_summary
@@ -573,7 +579,7 @@ st_save
                 MOVE    R9, R2
                 MOVE    R10, R3
                 MOVE    R2, 1           ; to write
-                CALL    fs_open
+                CALL    FS_OPEN
                 TST     R1
         ?N      JMP     fs_fail
                 MOVE    R8, R1          ; the handle
@@ -582,7 +588,7 @@ st_save
                 CALL    fat_save
                 MOVE    R11, R1
                 MOVE    R1, R8
-                CALL    fs_close
+                CALL    FS_CLOSE
                 TST     R11
         ?N      MOVE    R1, R11         ; the error of the save, before the close's
                 TST     R1
@@ -609,38 +615,13 @@ st_save
 ; with fs_delete of monitor_fat.nasm.
 st_delete
                 MOVE    R7, R1          ; the name
-                CALL    fs_delete
+                CALL    FS_DELETE
                 TST     R1
         ?N      JMP     fs_fail
                 MOVE    R1, S_DELETED
                 CALL    puts_b
                 MOVE    R1, R7
                 JMP     puts_crlf       ; which returns to the caller
-
-; complete: TAB on the line, for _io_gets: R1 the line, R2 the cursor, R3
-; the word after the last, and R1 = the new cursor, with fat_complete of
-; monitor_fat.nasm (issue #137). When it lists the matches, the line is shown
-; again. Uses R1-R6, and R7 and R8 across the calls, saved.
-complete
-                PUSH    R7
-                PUSH    R8
-                MOVE    R7, R1          ; the line
-                MOVE    R8, R2          ; the cursor
-                CALL    fat_complete
-                TST     R1
-        ?!Z     JMP     complete_end
-:
-                CMP     R7, R8
-        ?Z      JMP     :+
-                MOVE    R1, @R7++
-                CALL    _mon_putc
-                JMP     :-
-:
-                MOVE    R1, R8
-complete_end
-                POP     R8
-                POP     R7
-                RET
 
 ; rest_blank: Z when the line from R3 has only blanks. Uses R3.
 rest_blank
@@ -676,22 +657,27 @@ fs_fail
 :
                 JMP     _io_crlf        ; which returns to the caller
 
-; load_row: row R7 blank in the current color, and the cursor at its column
-; 0. Uses R1-R3.
+; load_row: row R7 blank in the current color, which scr_color, entry 8,
+; gives, and the cursor at its column 0, with scr_moveto, entry 6. Uses
+; R1-R6.
 load_row
+                CLR     R1
+                CALL    SCR_COLOR
+                MOVE    R3, R1          ; the color, which scr_color uses not
+                CALL    SCR_COLOR       ; back
+                OR      R3, R3, 0x20
                 SHL     R2, R7, 6
                 SHL     R1, R7, 4
                 ADD     R1, R1, R2
                 ADD     R1, R1, SCREEN
-                OR      R3, @V_COLOR, 0x20
                 MOVE    R2, 80
 :
                 MOVE    @R1++, R3
                 SUB[M]  R2, R2, 1
         ?!Z     JMP     :-
-                CLR     @V_COL
-                MOVE    @V_ROW, R7
-                JMP     putc_cur
+                CLR     R1
+                MOVE    R2, R7
+                JMP     SCR_MOVETO      ; which returns to the caller
 
 ; SYS ADDR: R1 ADDR. The program at ADDR called as ABI.md says, on this
 ; stack: the return address is pushed, and the program returns with RET
@@ -716,6 +702,28 @@ st_sys
                 CALL    _io_puthex
                 JMP     _io_crlf        ; which returns to the caller
 
+; sys_end: for SYS at a program's return, with R1 the status: the state
+; after a program, with mon_restore, entry 36, and sys_status. Uses
+; R1-R6.
+sys_end
+                PUSH    R1
+                CALL    MON_RESTORE
+                POP     R1
+; sys_status: the status R1 of a program that returned, or left through
+; mon_exit, which restored the state itself: a new line if the cursor,
+; which scr_getxy gives, is not in column 0, and the status printed.
+; Uses R1-R6.
+sys_status
+                PUSH    R1
+                CALL    SCR_GETXY
+                TST     R1
+        ?!Z     CALL    _io_crlf
+                MOVE    R1, S_RETURN
+                CALL    puts_b
+                POP     R1
+                CALL    _io_puthex
+                JMP     _io_crlf        ; which returns to the caller
+
 ; puts_lines: the strings of the table at R1, each with CR LF after it, up
 ; to a 0 word. Uses R7 across the calls, saved.
 puts_lines
@@ -727,6 +735,8 @@ lines           MOVE[M] R1, @R7++
                 CALL    puts_b_crlf
                 JMP     lines
 
+S_RETURN
+                .ASCII_B 'Returned '
 S_NAME          .ASCII_B 'NiceMon '
                 .DAT    0
 S_TABLE         .ASCII_B ', dispatch table '

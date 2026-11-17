@@ -115,7 +115,7 @@ dis_print
                 CMP     R11, R12
         ?Z      JMP     :+
                 MOVE    R1, 0x20
-                CALL    mon_putc
+                CALL    MON_PUTC
                 MOVE    R1, @R11++
                 MOVE    R2, 8
                 CALL    u_hex
@@ -167,7 +167,7 @@ dis_cmd         MOVE    R1, R9
                 CMP     R11, 2
         ?!Z     JMP     dis_end
                 MOVE    R1, 0x20
-                CALL    mon_putc
+                CALL    MON_PUTC
                 AND     R1, R9, 0xFF
                 CALL    _io_putdec
                 JMP     dis_end
@@ -213,7 +213,7 @@ dis_pseudo
                 ADD[M]  @V_UNOPS, R10, @R11
         ?Z      JMP     dis_end         ; NOP
                 MOVE    R1, 0x20
-                CALL    mon_putc
+                CALL    MON_PUTC
                 CALL    u_stmt_op
 ; The end of the row, and the next instruction
 dis_end         CALL    _io_crlf
@@ -237,18 +237,18 @@ u_stmt
                 AND[M]  R0, R9, 0x06000000
         ?Z      JMP     :+              ; no modifier
                 MOVE    R1, 0x5B        ; [
-                CALL    mon_putc
+                CALL    MON_PUTC
                 AND[M]  R0, R9, 0x04000000
         ?!Z     MOVE    R1, 0x43        ; C
-        ?!Z     CALL    mon_putc
+        ?!Z     CALL    MON_PUTC
                 AND[M]  R0, R9, 0x02000000
         ?!Z     MOVE    R1, 0x4D        ; M
-        ?!Z     CALL    mon_putc
+        ?!Z     CALL    MON_PUTC
                 MOVE    R1, 0x5D        ; ]
-                CALL    mon_putc
+                CALL    MON_PUTC
 :
                 MOVE    R1, 0x20
-                CALL    mon_putc
+                CALL    MON_PUTC
                 CLR     R10
 u_stmt_op
                 MOVE    R1, @V_UF[R10]
@@ -275,7 +275,7 @@ u_unused
 u_unused_f
                 CMP     R10, 3
         ?Z      MOVE    R1, 0x29        ; )
-        ?Z      JMP     mon_putc        ; which returns to the caller
+        ?Z      JMP     MON_PUTC        ; which returns to the caller
                 TST     @V_UF[R10]
         ?Z      JMP     :+
                 TST     R11
@@ -317,17 +317,17 @@ u_cond
                 SHR[M]  R5, R1, 28      ; NEG and SEL
         ?Z      RET
                 MOVE    R1, 0x3F        ; ?
-                CALL    mon_putc
+                CALL    MON_PUTC
                 AND[M]  R0, R5, 8
         ?Z      JMP     :+
                 MOVE    R1, 0x21        ; !
-                CALL    mon_putc
+                CALL    MON_PUTC
 :
                 AND     R1, R5, 7
                 MOVE    R1, @TEXT_B+4*S_UFLAGS[R1]
-                CALL    mon_putc
+                CALL    MON_PUTC
                 MOVE    R1, 0x20
-                JMP     mon_putc        ; which returns to the caller
+                JMP     MON_PUTC        ; which returns to the caller
 
 ; u_op: the operand of the field R1, with its constant R2, in the syntax
 ; of nice_cpu's ISA.md §10.2, as nicedis.py writes it, the constant in
@@ -345,7 +345,7 @@ u_op
                 AND[M]  R0, R5, 0x40
         ?Z      JMP     :+
                 MOVE    R1, 0x40        ; @
-                CALL    mon_putc
+                CALL    MON_PUTC
 :
                 AND     R4, R5, 0x30
                 CMP     R4, 0x30
@@ -378,17 +378,17 @@ u_op_const
         ?Z      RET                     ; R0: the constant alone
                 PUSH    R1
                 MOVE    R1, 0x5B        ; [
-                CALL    mon_putc
+                CALL    MON_PUTC
                 POP     R1
                 CALL    u_reg
                 MOVE    R1, 0x5D        ; ]
-                JMP     mon_putc
+                JMP     MON_PUTC
 
 ; u_reg: R and the number R1 in decimal. Uses R1-R4.
 u_reg
                 PUSH    R1
                 MOVE    R1, 0x52        ; R
-                CALL    mon_putc
+                CALL    MON_PUTC
                 POP     R1
                 JMP     _io_putdec      ; which returns to the caller
 
@@ -411,7 +411,7 @@ u_hex
                 ADD     R1, R1, 0x30
                 CMP     R1, 0x3A
         ?!C     ADD     R1, R1, 0x27    ; a to f
-                CALL    mon_putc
+                CALL    MON_PUTC
                 SUB[M]  R6, R6, 1
         ?!Z     JMP     :-
                 RET

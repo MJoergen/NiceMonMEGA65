@@ -75,11 +75,11 @@ clock_cmd
                 MOVE    R2, TEXT_B+4*S_CBAD+22  ; YYYY-MM-DD HH:MM:SS
                 MOVE    R4, V_I
                 CALL    clk_parse
-        ?Z      CLR     R7
-        ?Z      CALL    clk_valid
-                MOVE    R1, S_CBAD
+        ?Z      CALL    clk_check
+        ?!Z     MOVE    R1, S_CBAD
         ?!Z     JMP     puts_b_crlf     ; which returns to the caller
-                CALL    rtc_write
+                CLR     R2
+                CALL    CLOCK_SET       ; at 0 microseconds
 :               CALL    clk_split
         ?!C     JMP     :+
                 CALL    clk_show
@@ -341,9 +341,10 @@ clock_ntp
                 MOVE    @io.mpu_b, 15625
                 SHR     R7, @CLK_UMUL, 10
                 MOVE    R1, R8
+                MOVE    R2, R7
+                CALL    CLOCK_SET
+                MOVE    R1, R8
                 CALL    clk_fields
-                CALL    clk_put
-                CALL    rtc_write
                 MOVE    R1, S_CSET
                 CALL    puts_b
                 CALL    clk_show
@@ -409,14 +410,22 @@ CLK_SEPS
                 .ASCII_B '-- ::'
 
 ; clk_valid: the clock set to the date and the time at V_I, at R7
-; microseconds, which sets "set", when they are one of the years 1970 to
-; 2105, and clk_put: to the seconds R1 and R7 microseconds. The days of the
-; months walked from 1970 up to the one at V_I+1 of the year at V_I, and
-; the day at V_I+2 less 1, are the days since 1970; with the time they are
-; the seconds, which clk_fields splits into V_F, and the fields must be the
-; same. A year before 1970 walks no month, and splits into 1970. Z when it
-; is set, and R1 = the seconds. Uses R1-R6.
+; microseconds, which sets "set", when clk_check takes them, and clk_put:
+; to the seconds R1 and R7 microseconds. Z when it is set, and R1 = the
+; seconds. Uses R1-R6.
 clk_valid
+                CALL    clk_check
+        ?!Z     RET
+                JMP     clk_put
+
+; clk_check: Z when the date and the time at V_I are one of the years
+; 1970 to 2105, and R1 = their seconds. The days of the months walked
+; from 1970 up to the one at V_I+1 of the year at V_I, and the day at
+; V_I+2 less 1, are the days since 1970; with the time they are the
+; seconds, which clk_fields splits into V_F, and the fields must be the
+; same. A year before 1970 walks no month, and splits into 1970. Uses
+; R1-R6.
+clk_check
                 CMP     2105, @V_I
         ?C      RET                     ; after 2105
                 SHL     R6, @V_I, 4
@@ -432,6 +441,8 @@ clk_valid
         ?!Z     RET
                 CMP     R4, V_F
         ?!Z     JMP     :-
+                RET
+
 clk_put
                 MOVE    @CLOCK_SEC_LO, R1
                 CLR     @CLOCK_SEC_HI
