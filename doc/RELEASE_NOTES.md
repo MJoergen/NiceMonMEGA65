@@ -68,6 +68,16 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   27, no such slot`, where it listed the card mounted
   ([#151](https://github.com/MJoergen/NiceMonMEGA65/issues/151), S1,
   S2, S5, and B1).
+- `DELETE`, and `SAVE` over a file, finish when the file's chain of
+  clusters meets a free cluster, as a damaged chain or one with a loop
+  does. Before, they said `File error 26` after the directory entry was
+  changed already, and `SAVE` left the file empty. A file whose name
+  has a character outside ASCII is reached by its name as `DIR` shows
+  it, with a `?` for that character: `DELETE "caf?.bin"` deletes
+  `café.bin`. Before, a file whose 8.3 name was not ASCII could not be
+  opened, loaded, or deleted at all
+  ([#151](https://github.com/MJoergen/NiceMonMEGA65/issues/151), B3 and
+  B5).
 - `help` in `tools/mon.py` is nicedbg's own, one line for each command
   as before, and its console is nicedbg's, which passes Enter as CR
   ([#143](https://github.com/MJoergen/NiceMonMEGA65/issues/143)).

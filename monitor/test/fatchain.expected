@@ -1,4 +1,4 @@
-== Reads, opens, and deletes of damaged chains; SAVE over a file whose chain meets a free cluster (known oddity B3)
+== Reads, opens, and deletes of damaged chains; SAVE over a file whose chain meets a free cluster, which ends it (issue #151, B3)
 NiceMon V9.9
 HELP lists the statements
 READY.
@@ -6,12 +6,12 @@ sys 0x8000
 Returned 000018CD
 READY.
 save "free.txt", 0x8000, 1
-File error 26, the FAT is damaged
+Words saved: 1, 00008000 to 00008000
 READY.
 dir
 Directory of NICE
 HELLO.BIN                      14076
-FREE.TXT                           0
+FREE.TXT                          18
 LONG.TXT                        3500
 ZERO.TXT                           0
 EDGE.TXT                          10
@@ -44,19 +44,19 @@ segment 0
   read 0 1400 -> 1400 "ABCDEFGHIJKLMNOP...GHIJKLMNOPQRSTUV" SHA-256 256bb90d5243fda5
   read 0 400 -> 100 "WXYZABCDEFGHIJKL...CDEFGHIJKLMNOPQR" SHA-256 4e73958db8acee33
   close 0 -> 0
-  delete "LOOP.TXT" -> -26
+  delete "LOOP.TXT" -> 0
   open 0 "LOOP.TXT" 0 -> -21
   delete "BADC.TXT" -> 0
-  delete "CUT.TXT" -> -26
+  delete "CUT.TXT" -> 0
   open 0 "ZERO.TXT" 1 -> 0
   close 0 -> 0
 exit 0
 Slot 0: What the card holds that chains.img did not:
 Sectors changed outside the volume: none
 FSInfo free count: 0001F7CE -> FFFFFFFF
-FSInfo next free: 00000031 -> 00000020
+FSInfo next free: 00000031 -> 00000021
 FAT entries changed: 7
-  32: 00000021 -> 00000000
+  32: 00000021 -> 0FFFFFFF
   35: 00000024 -> 00000000
   42-44: each the next, the last 0000002A -> 00000000
   45-46: each the next, the last 0FFFFFF7 -> 00000000
@@ -66,7 +66,7 @@ NICE C3 entry 3:
   now "\xe5UT     TXT" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2025-06-15 written 2025-06-15 12:34:56 cluster 32 size 1500
 NICE C3 entry 4:
   was "FREE    TXT" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2025-06-15 written 2025-06-15 12:34:56 cluster 35 size 1500
-  now "FREE    TXT" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2025-06-15 written 2025-06-15 12:34:56 cluster 0 size 0
+  now "FREE    TXT" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 32 size 18
 NICE C3 entry 6:
   was "ZERO    TXT" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2025-06-15 written 2025-06-15 12:34:56 cluster 0 size 10
   now "ZERO    TXT" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 0 size 0
@@ -76,6 +76,8 @@ NICE C3 entry 7:
 NICE C3 entry 8:
   was "BADC    TXT" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2025-06-15 written 2025-06-15 12:34:56 cluster 45 size 1500
   now "\xe5ADC    TXT" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2025-06-15 written 2025-06-15 12:34:56 cluster 45 size 1500
+NICE/FREE.TXT: 18 bytes, "00008000 0001f800\x0a"
+NICE/FREE.TXT: its sector 0 past the size: 494 bytes, zeros
 fsck.fat -n:
 /NICE/LONG.TXT
   File size is 3500 bytes, cluster chain length is 1536 bytes.
@@ -91,12 +93,12 @@ fsck.fat -n:
   File size is 10 bytes, cluster chain length is 0 bytes.
   Truncating file to 0 bytes.
 Reclaimed 3 unused clusters (1536 bytes).
-Free cluster summary uninitialized (should be 128989)
+Free cluster summary uninitialized (should be 128988)
 
 Leaving filesystem unchanged.
-IMAGE: 7 files, 33/129022 clusters
+IMAGE: 7 files, 34/129022 clusters
 (exit 1)
-Sector writes, 23:
-mount 0, C3, FSInfo, FAT1+0, FAT2+0, FAT1+0, FAT2+0, FAT1+0, FAT2+0, C3,
-FAT1+0, FAT2+0, FAT1+0, FAT2+0, FSInfo, C3, FAT1+0, FAT2+0, C3, FSInfo,
-C3 x2, FAT1+0, FAT2+0
+Sector writes, 30:
+mount 0, C3, FSInfo, FAT1+0, FAT2+0, FAT1+0, FAT2+0, FAT1+0, FAT2+0,
+FSInfo, C3, FAT1+0, FAT2+0, FAT1+0, FAT2+0, FSInfo, C3, FAT1+0, FAT2+0,
+FSInfo, C3 x3, FAT1+0, FAT2+0, FSInfo, FAT1+0, FAT2+0, C32, C3, FSInfo

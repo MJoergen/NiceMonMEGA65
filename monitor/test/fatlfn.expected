@@ -47,7 +47,7 @@ fsck.fat -n:
 IMAGE: 4 files, 30/129022 clusters
 Sector writes, 4:
 mount 0, C3 x4
-== Damaged entries: 0x05 for 0xE5, orphan long-name entries, a label, a broken set, a name of 256 characters, and a byte from 0x80 in an 8.3 name (known oddity B5)
+== Damaged entries: 0x05 for 0xE5, orphan long-name entries, a label, a broken set, a name of 256 characters, and a byte from 0x80 in an 8.3 name, reached as DIR shows them (issue #151, B5)
 NiceMon V9.9
 HELP lists the statements
 READY.
@@ -88,7 +88,7 @@ BADSUM~1.BIN                      15
 Files: 32, directories: 0
 READY.
 sys 0x8000
-Returned 0000093F
+Returned 00000946
 READY.
 halt
 Halted
@@ -106,9 +106,16 @@ segment 0
   readname 1 -> 1 "PAD03   TXT" attr 20 size 14 name "PAD03.TXT"
   close 1 -> 0
   open 0 "\u00e5AD01.TXT" 0 -> -21
+  open 0 "?AD01.TXT" 0 -> 0
+  close 0 -> 0
   open 0 "CAF\u0090.BIN" 0 -> -21
-  open 0 "caf?.bin" 0 -> -21
+  open 0 "caf?.bin" 0 -> 0
+  close 0 -> 0
+  open 0 "?X.BIN" 0 -> 0
+  close 0 -> 0
   delete "CAF\u0090.BIN" -> -21
+  delete "caf?.bin" -> 0
+  open 0 "caf?.bin" 0 -> -21
   open 0 "my prog.bin" 0 -> -21
   open 0 "MYPROG~1.BIN" 0 -> -21
   open 0 "PAD02.TXT" 0 -> -21
@@ -121,7 +128,16 @@ segment 0
   open 0 "NNNNNN~1.TXT" 0 -> 0
   close 0 -> 0
 exit 0
-Slot 0: The card as lfnx.img was
+Slot 0: What the card holds that lfnx.img did not:
+Sectors changed outside the volume: none
+FSInfo free count: 0001FBC5 -> FFFFFFFF
+FSInfo next free: 0000003E -> 00000014
+FAT entries changed: 1
+  20: 0FFFFFFF -> 00000000
+FAT 2: the same changes
+NICE C3+0 entry 7:
+  was "CAF\x90    BIN" attr 20 case 18 created 2025-06-15 12:34:56 +0 accessed 2025-06-15 written 2025-06-15 12:34:56 cluster 20 size 14
+  now "\xe5AF\x90    BIN" attr 20 case 18 created 2025-06-15 12:34:56 +0 accessed 2025-06-15 written 2025-06-15 12:34:56 cluster 20 size 14
 == DELETE of long names across a sector and a cluster, and of an 8.3 name whose long name's checksum is wrong, which leaves it as an orphan (known oddity B2)
 NiceMon V9.9
 HELP lists the statements

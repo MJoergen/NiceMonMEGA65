@@ -305,7 +305,8 @@ and must be formatted. FAT12 and FAT16 are rejected with a message.
   the last-entry bit, and the checksum check; a set that does not is
   passed over, and the 8.3 name stands, as Windows and Linux do. The
   lower-case flags of byte 12 are read too. A character outside ASCII is
-  `?`, and such a name is reached by its 8.3 name only. A new file
+  `?`, and such a name is reached as `DIR` shows it, with the `?`, or
+  by an 8.3 name in ASCII. A new file
   whose name is an 8.3 name in upper case, or in lower case in a part,
   which byte 12 keeps, gets no long-name entries; any other gets them,
   with an 8.3 alias as Windows and mtools make it, with a tail `~1`,

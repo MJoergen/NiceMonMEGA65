@@ -112,7 +112,7 @@ SUITES = {
     # P7: damaged chains
     "fatchain": [
         Run("Reads, opens, and deletes of damaged chains; SAVE over a file whose "
-            "chain meets a free cluster (known oddity B3)", "chains.img",
+            "chain meets a free cluster, which ends it (issue #151, B3)", "chains.img",
             keys='sys 0x8000\rsave "free.txt", 0x8000, 1\rdir\rhalt\r',
             ops="fatchain.ops", fsck=True, order=True),
     ],
@@ -122,7 +122,7 @@ SUITES = {
             "super.img", keys=RUN, ops="fatlfn_new.ops", fsck=True, order=True),
         Run("Damaged entries: 0x05 for 0xE5, orphan long-name entries, a label, a "
             "broken set, a name of 256 characters, and a byte from 0x80 in an "
-            "8.3 name (known oddity B5)", "lfnx.img",
+            "8.3 name, reached as DIR shows them (issue #151, B5)", "lfnx.img",
             keys="dir\rsys 0x8000\rhalt\r", ops="fatlfn_bad.ops"),
         Run("DELETE of long names across a sector and a cluster, and of an 8.3 "
             "name whose long name's checksum is wrong, which leaves it as an "

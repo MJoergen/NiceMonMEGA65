@@ -160,7 +160,7 @@ program starts with none of the values that this one left there.
 | 12 | `18` | `fs_readdir` | R1 a handle of a directory, R2 a buffer of 4 words. The next entry: in words 0 to 2 the 11 bytes of its 8.3 name, padded with blanks, and its attributes, as FAT has them, 4 bytes to a word from bits 7..0, and in word 3 its size. → R1 1, 0 at the end, or an error. Table 1.1. |
 | 13 | `1A` | `fs_close` | R1 a handle. Finishes a file opened to write: its last sector, and its size in its directory entry. The handle is closed also after an error. → R1 0, or an error. Table 1.1. |
 | 14 | `1C` | `fs_write` | R1 a handle of a file opened to write, R2 a buffer, R3 a number of bytes, one per word, bits 7..0. → R1 the number written, fewer when the card is full, or an error. Table 1.2. |
-| 15 | `1E` | `fs_delete` | R1 a name, as for `fs_open`. Deletes the file of the folder `NICE`, with its long-name entries. → R1 0, or an error. Table 1.2. |
+| 15 | `1E` | `fs_delete` | R1 a name, as for `fs_open`. Deletes the file of the folder `NICE`, with its long-name entries. A damaged chain that meets a free cluster ends there, so the file is deleted, and the clusters that it had after the break stay taken, which `fsck.fat` reclaims; the truncation of `fs_open` does the same. → R1 0, or an error. Table 1.2. |
 | 16 | `20` | `udp_open` | R1 a local port, or 0 for one of 49152 to 65535. Opens the UDP endpoint, and enables the port for Ethernet frames (The network below). → R1 the port, or an error. Table 1.3. |
 | 17 | `22` | `udp_send` | R1 an IP address, R2 a port, R3 a buffer, R4 a number of bytes, one per word, up to 1472. Sends them as a datagram. → R1 0, or an error. Table 1.3. |
 | 18 | `24` | `udp_recv` | R1 a buffer, R2 a number of bytes, R3 the address of 2 words, or 0. Does not wait. Copies up to that many bytes of the next datagram, one per word, and its source's IP address and port to the 2 words; with R2 0 copies nothing, and leaves the datagram waiting. → R1 the bytes copied, 0 when none waits, or an error. Table 1.3. |
@@ -356,8 +356,11 @@ With no PC slot, `make sdcard CMD=mkdir` makes it over the link
   before a file's 8.3 entry when their numbers and checksum check; a set
   that does not is passed over, and the 8.3 name stands. An 8.3 name
   shows in lower case where its entry says so, as Linux and Windows
-  write `hello.bin`. A character of a long name outside ASCII is `?`,
-  and such a file is reached by its 8.3 name only.
+  write `hello.bin`. A character outside ASCII is `?`, in a long name
+  and in an 8.3 name, and such a file is reached by its name as `DIR`
+  shows it, such as `DELETE "caf?.bin"` for `café.bin`, or by an 8.3
+  name in ASCII. A `?` matches only such a character, and of two names
+  that `DIR` shows alike, the first in the folder is reached.
 - **Writing** (mode 1 of `fs_open`) makes the file, or truncates it. A
   new file whose name is an 8.3 name in upper case, or in lower case in
   either part, gets an 8.3 entry only; any other name gets long-name

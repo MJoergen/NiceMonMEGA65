@@ -14,10 +14,17 @@ readname 1                      ; n...n.txtx of 256 characters: NNNNNN~1.TXT
 readname 1                      ; PAD01.TXT with 0x05: ?AD01.TXT, word 0 with 0xE5
 readname 1                      ; PAD03.TXT, as PAD02.TXT is a label
 close 1
-open 0, "\xe5AD01.TXT", 0      ; -21: no name reaches it (known oddity B5)
-open 0, "CAF\x90.BIN", 0       ; -21: nor café.bin's (B5)
-open 0, "caf?.bin", 0           ; -21
-delete "CAF\x90.BIN"            ; -21 (B5)
+open 0, "\xe5AD01.TXT", 0      ; -21: the byte of the entry is no name,
+open 0, "?AD01.TXT", 0          ; 0: but the name as DIR shows it is (issue #151, B5)
+close 0
+open 0, "CAF\x90.BIN", 0       ; -21: café.bin's 8.3 name, which is not ASCII,
+open 0, "caf?.bin", 0           ; 0: but not its name as DIR shows it (B5)
+close 0
+open 0, "?X.BIN", 0             ; 0: λx.bin, in either case
+close 0
+delete "CAF\x90.BIN"            ; -21
+delete "caf?.bin"               ; 0: café.bin deleted (B5)
+open 0, "caf?.bin", 0           ; -21: and gone
 open 0, "my prog.bin", 0        ; -21: its 8.3 entry deleted, the long name an orphan
 open 0, "MYPROG~1.BIN", 0       ; -21
 open 0, "PAD02.TXT", 0          ; -21: a label is no file

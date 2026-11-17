@@ -339,8 +339,9 @@ FATW = load\r8000 1234ABCD\r8001 5\r\rsave "test", 0x8000, 2\rdir\rload "TEST.BI
 # sector and a cluster, by their names in another case; bad sum.bin,
 # whose long-name entry has a wrong checksum, only by its 8.3 name; a
 # name with no closing quote, which the line ends; caf?.bin, as dir
-# shows café.bin, which is no file; λx.bin by its 8.3 name, _X.BIN; and
-# *.bin, which is no file either, as a name has no patterns.
+# shows café.bin, which reaches it (issue #151, B5); λx.bin by its 8.3
+# name, _X.BIN; and *.bin, which is no file, as a name has no patterns
+# and a ? matches only a character outside ASCII.
 FATL = dir\rload "my prog.bin"\rsys 0x8000\rload "MYPROG~1.BIN"\rload "MY PROG.BIN"\rload "mixed.bin"\rload "LOWER.BIN"\rload "across a sector.bin"\rload "ACROSS A CLUSTER.BIN"\rload "bad sum.bin"\rload "badsum~1.bin"\rload "my prog.bin\rload "caf?.bin"\rload "_x.bin"\rload "*.bin"\rhalt\r
 # tab: lfn.img in slot 0, and TAB (issue #137). my is "my prog.bin",
 # with an opening quote, and in quotes with BS; mand is "mandelbrot, a

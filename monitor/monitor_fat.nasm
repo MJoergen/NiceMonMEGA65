@@ -10,7 +10,8 @@
 ; before an 8.3 entry, when their numbers, their last-entry bit, and their
 ; checksum check; a set that does not is passed over, and the 8.3 name
 ; stands, with the lower-case flags of byte 12. A character outside ASCII
-; is ?, and such a name is reached by its 8.3 name only. A new file whose
+; is ?, and such a name is reached as DIR shows it, with a ? that matches
+; only a ?, or by its 8.3 name when that is ASCII (issue #151, B5). A new file whose
 ; name is not an 8.3 name in upper case, or in lower case in either part,
 ; which byte 12 keeps, gets long-name entries and an 8.3 alias, with a
 ; tail ~1, ~2, and on when the name does not fit, as mtools makes them.
@@ -947,9 +948,10 @@ entry_end
                 RET
 
 ; find: the entry of the folder from the cluster R1 whose 8.3 name is
-; V_N, unless V_N is 0, or, when V_BYLONG is not 0, whose long name is
-; WANT's in either case, at R10 in DIRF's buffer: Z clear; or Z when there
-; is none. R12 = DIRF. Uses R1-R12.
+; V_N, unless V_N is 0, or, when V_BYLONG is not 0, whose name in LNAME,
+; its long name or its 8.3 name as DIR shows them, with a ? for a
+; character outside ASCII, is WANT's in either case, at R10 in DIRF's
+; buffer: Z clear; or Z when there is none. R12 = DIRF. Uses R1-R12.
 find
                 MOVE    R12, DIRF
                 CALL    startd
@@ -966,7 +968,6 @@ find_next
         ?Z      CMP     R1, @V_N+2
         ?Z      JMP     find_yes
                 TST     @V_BYLONG
-        ?!Z     TST     @V_LASCII
         ?Z      JMP     find_next
 ; same: LNAME and WANT the same name, but that a letter matches either case
                 MOVE    R3, LNAME
@@ -1243,17 +1244,20 @@ take
                 MOVE    @V_HINT, R1
                 RET
 
-; release: the chain from the cluster R1 freed, up to its end, or a
-; cluster outside the volume; a free one, as a chain with a loop in it
-; comes back to one, fails 26. The hint goes back to the first freed
-; below it. Uses R1-R6.
+; release: the chain from the cluster R1 freed, up to its end, a
+; cluster outside the volume, or a free one, which a damaged chain meets,
+; and a chain with a loop in it once it comes back, so that DELETE and
+; the truncation of fs_open finish, as their entry is written already
+; (issue #151, B3). The hint goes back to the first freed below it. Uses
+; R1-R6.
 release
                 CALL    clok
         ?!C     RET
                 PUSH    R1
                 CALL    next
                 TST     R1
-        ?Z      JMP     fail26
+        ?Z      POP     R1
+        ?Z      RET                     ; a free cluster: the end
                 MOVE    R2, @SP
                 MOVE    @SP, R1
                 PUSH    R2

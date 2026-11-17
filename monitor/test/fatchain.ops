@@ -25,9 +25,9 @@ open 0, "LOOP.TXT", 0           ; its last cluster linked to its first
 read 0, 1400                    ; 1400
 read 0, 400                     ; 100: the size ends the read
 close 0
-delete "LOOP.TXT"               ; -26: freed up to the first cluster, freed already (known oddity B3)
-open 0, "LOOP.TXT", 0           ; -21: the entry is gone though
+delete "LOOP.TXT"               ; 0: freed up to the first cluster, freed already (issue #151, B3)
+open 0, "LOOP.TXT", 0           ; -21: the entry is gone
 delete "BADC.TXT"               ; 0: a bad mark ends the chain
-delete "CUT.TXT"                ; -26: freed up to the free cluster, its third lost (B3)
+delete "CUT.TXT"                ; 0: freed up to the free cluster, its third lost (B3)
 open 0, "ZERO.TXT", 1           ; 0: truncated, with no cluster to free
 close 0                         ; 0

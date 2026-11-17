@@ -82,7 +82,8 @@ load "my prog.bin
 Words loaded: 782, 00008000 to 0000830D
 READY.
 load "caf?.bin"
-File error 21, no such file
+Words loaded: 0
+Lines skipped: 1, first line 1; ADDR WORD in hex, ADDR 00008000 to FFFEFFFF
 READY.
 load "_x.bin"
 Words loaded: 0
@@ -94,7 +95,6 @@ READY.
 halt
 Halted
 Screen:
-|Lines skipped: 1, first line 1; ADDR WORD in hex, ADDR 00008000 to FFFEFFFF
 |READY.
 |load "bad sum.bin"
 |File error 21, no such file
@@ -107,7 +107,8 @@ Screen:
 |Words loaded: 782, 00008000 to 0000830D
 |READY.
 |load "caf?.bin"
-|File error 21, no such file
+|Words loaded: 0
+|Lines skipped: 1, first line 1; ADDR WORD in hex, ADDR 00008000 to FFFEFFFF
 |READY.
 |load "_x.bin"
 |Words loaded: 0
