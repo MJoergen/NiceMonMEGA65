@@ -58,6 +58,16 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   only `.BIN` names, as other files are for later stages of BASIC.
 - TAB opens the quote of the name it completes.
 
+**Fixed.**
+
+- A card put into the R3's slot 1 in place of another no longer fails
+  every command with SD error 3 until a reset. That slot has no card
+  detect, so the ROM kept the old card's mount. Now an SD error drops
+  the mount, and a file statement with no file open tries once more,
+  which starts the new card up.
+- A FAT32 volume whose FATs leave no cluster in it is refused with
+  error 26. It takes a damaged or a crafted boot sector.
+
 ## V2.2 (2026-11-15)
 
 **Upgrade notes.**
