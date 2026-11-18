@@ -35,6 +35,9 @@ issue #54 (milestone V2.2), and `doc/BASIC.md` its design note, with
 the decisions, the room in the ROM, and the stages, of which stage 1,
 the shell (#112), is written, and ported to assembly (#115), and
 split from the monitor into an image of its own (#152).
+`doc/BASIC_ROM.md` is the design, a draft, of BASIC's image from a
+card's `BASIC*.ROM`, which replaces BASIC's half of the ROM at the
+first cold start (#153).
 `doc/SDCARD.md` is the design of the SD cards' storage, issue #62 and
 its subtasks, of which the controller, the slots, the ROM's sector
 routines, FAT32's
