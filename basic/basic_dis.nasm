@@ -1,11 +1,11 @@
-; The monitor's disassembler, DIS, which the Makefile joins after
-; monitor.nasm (its header). DIS disassembles instructions, a row each, in
+; BASIC's disassembler, DIS, which the Makefile joins after
+; basic_time.nasm (basic.nasm's header). DIS disassembles instructions, a row each, in
 ; the text of nice_cpu's nicedis.py, with the pairs of a call shown as
 ; CALL, the return as RET, and the words of NOP, JMP, PUSH, POP, CLR, TST,
 ; and CMP as those, the pseudo-instructions of nice_cpu's ISA.md §10.1
 ; (README.md, "The disassembler"). Its variables, V_UNEXT, V_UF, V_UC,
-; and V_UNOPS, are in monitor.nasm, with the others, and so are the two
-; texts that it shares with the other commands, S_UCOMMA and S_UGAP.
+; and V_UNOPS, are in basic.nasm, with the others, and so are the two
+; texts that it shares with the other statements, S_UCOMMA and S_UGAP.
 
 DIS_ROWS        .EQU    20              ; the instructions that DIS shows without a count
 

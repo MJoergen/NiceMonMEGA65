@@ -1,11 +1,10 @@
 ; The routines of BASIC's statements that replace the monitor's commands
 ; (issue #112, doc/BASIC.md, "The main loop"), which the Makefile joins
-; after monitor.nasm (its header). basic.nasm scans a line, and calls
+; after basic.nasm (its header). basic.nasm scans a line, and calls
 ; each with its arguments in R1-R3: the numbers, and the word addresses of
 ; the strings, each ended by a 0. A routine here uses any register but
 ; SP, as BASIC's main loop starts again after it, and returns with RET.
-; Its errors are a line it prints. The variables are in monitor.nasm,
-; with the others.
+; Its errors are a line it prints. The variables are in basic.nasm.
 ;
 ; LOAD with no name, st_lines, writes words into the RAM from lines of
 ; ADDR WORD in hex, as a .bin file has them, typed or pasted, up to an
@@ -23,10 +22,9 @@
 ; fs_close, fs_write, and fs_delete (issues #58 and #59). TIME, the
 ; clock of the time of day, is clock_cmd of basic_time.nasm, which
 ; basic.nasm calls itself (issue #109). DIS, DHCP, NTP, and LOAD and DIR
-; from a TFTP server are in monitor_dis.nasm and basic_net.nasm, and use
+; from a TFTP server are in basic_dis.nasm and basic_net.nasm, and use
 ; the routines of this file. All of them reach the monitor through the
-; entries of the dispatch table alone, which test/sides.py checks (issue
-; #152).
+; entries of the dispatch table alone (issue #152).
 
 UART_BAUD       .EQU    0xFFFFFF9F      ; the UART's baud rate in bit/s, memory in niceemu
 DUMP_WORDS      .EQU    32              ; the words that DUMP shows without a count

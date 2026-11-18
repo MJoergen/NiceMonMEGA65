@@ -142,7 +142,7 @@ BASIC the 2K below them (#152,
 |---|---|---|---|
 | `0x08000` and up | `0x8000` and up | `0x00008000` and up | The program and the stack: 90K words on the MEGA65, and 26K on the Nexys4DDR. |
 | below `0x1E800` | below `0xE800` | below `0xFFFFE800` | The stack of BASIC, the monitor, and the program, from SP = `0xFFFFE800` down. |
-| `0x1E800`–`0x1EFFF` | `0xE800`–`0xEFFF` | `0xFFFFE800`–`EFFF` | BASIC's variables ([monitor/basic.nasm](../monitor/basic.nasm)). |
+| `0x1E800`–`0x1EFFF` | `0xE800`–`0xEFFF` | `0xFFFFE800`–`EFFF` | BASIC's variables ([basic/basic.nasm](../basic/basic.nasm)). |
 | `0x1F000`–`0x1F3FF` | `0xF000`–`0xF3FF` | `0xFFFFF000`–`F3FF` | The monitor's variables. |
 | `0x1F400`–`0x1F97F` | `0xF400`–`0xF97F` | `0xFFFFF400`–`F97F` | Kept for the monitor, and not used. |
 | `0x1F980`–`0x1FEFF` | `0xF980`–`0xFEFF` | `0xFFFFF980`–`FEFF` | FAT32's state: the volume, the caches of the FAT and of the files, and the names ([monitor/INTERNALS.md](../monitor/INTERNALS.md#fat32)). |

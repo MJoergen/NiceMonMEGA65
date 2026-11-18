@@ -65,19 +65,19 @@ routines and the ARP cache of the network, and FAT32.
 [INTERNALS.md](INTERNALS.md) describes them, with the build and the
 tests.
 
-The monitor is in NICE assembly. The ROM
-is its files in this order, and
-[INTERNALS.md](INTERNALS.md#the-roms-words) has the words of each, and
-the words that are free:
+The monitor and BASIC are in NICE assembly. The ROM is two images,
+assembled apart (#152): the monitor's at `0x0000`, and BASIC's at
+`0x4000`, from the files of [../basic](../basic). BASIC calls the
+monitor through the entries of the dispatch table alone, as a program
+does, and the monitor jumps to BASIC through two vectors alone, at
+`0x4000`, its cold start, and `0x4002`, its warm start. Neither image
+has a label of the other. The monitor's image is its files in this
+order, and [INTERNALS.md](INTERNALS.md#the-roms-words) has the words of
+each, and the words that are free:
 
 | File | What it is |
 |---|---|
 | `monitor.nasm` | The dispatch table, the HAL, the screen, and the line with its scrollback |
-| `monitor_cmd.nasm` | The routines of the statements that were the monitor's commands, with `DIR`, `LOAD`, and `SAVE` of a card on the file entries |
-| `basic.nasm` | BASIC: the main loop, the scanner of a line, and the keywords, messages, and help |
-| `basic_net.nasm` | BASIC's `DHCP`, `NTP`, and `LOAD` and `DIR` from a TFTP server |
-| `basic_time.nasm` | BASIC's `TIME`, and the clock's side of `NTP` |
-| `monitor_dis.nasm` | The disassembler of `DIS` |
 | `monitor_sd.nasm` | The routines for the SD cards |
 | `monitor_fat.nasm` | FAT32: the file entries, and TAB |
 | `monitor_eth.nasm` | The routines for the network: the frames, ARP, UDP, DHCP, and DNS |
@@ -88,12 +88,21 @@ the words that are free:
 | `mon.nasm` | The stubs through which a program calls the entries |
 | `build/version.nasm` and `build/folder.nasm` | The version and the card's folder, which the Makefile writes |
 
-`mon.h` has the entries' declarations for C, and is no part of the ROM.
+BASIC's image is these files, then its own copies of `common.nasm`,
+`monlib.nasm`, `mon.nasm`, and the version:
 
-The first five files after `monitor.nasm` are BASIC's. BASIC calls the
-monitor through the entries of the dispatch table alone, as a program
-does, and `test/sides.py` checks it whenever the ROM is built (#152).
-Both still share the map of the RAM in `monitor.nasm`.
+| File | What it is |
+|---|---|
+| `../basic/basic.nasm` | The vectors, the main loop, the scanner of a line, the keywords, messages, and help, and the map of BASIC's RAM |
+| `../basic/basic_cmd.nasm` | The routines of the statements that were the monitor's commands, with `DIR`, `LOAD`, and `SAVE` of a card on the file entries |
+| `../basic/basic_net.nasm` | `DHCP`, `NTP`, and `LOAD` and `DIR` from a TFTP server |
+| `../basic/basic_time.nasm` | `TIME`, and the clock's side of `NTP` |
+| `../basic/basic_dis.nasm` | The disassembler of `DIS` |
+| `build/basic_folder.nasm` | The texts with the card's folder, which the Makefile writes |
+
+`mon.h` has the entries' declarations for C, and is no part of the ROM.
+Each image has a RAM of its own: the monitor's at `0xFFFFF000`, and
+BASIC's at `0xFFFFE800`.
 
 `make -C monitor` builds `build/monitor.bin`, and `make -C monitor test`
 runs it in `niceemu` ([INTERNALS.md](INTERNALS.md#building-and-testing)).

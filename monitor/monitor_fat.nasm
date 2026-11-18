@@ -3,7 +3,8 @@
 ; fs_close, fs_write, fs_delete, and fs_readname of the dispatch table,
 ; and fat_complete for the TAB key of con_getline (issues #58, #59, #91,
 ; #102, #137, #149, and #152, doc/SDCARD.md, "The file system"). BASIC's
-; DIR, LOAD, and SAVE are in monitor_cmd.nasm, on the entries.
+; DIR, LOAD, and SAVE are BASIC's, in ../basic/basic_cmd.nasm, on the
+; entries.
 ;
 ; Names are long names (VFAT) of up to 255 characters, matched in either
 ; case, or 8.3 names. A long name is read from the long-name entries

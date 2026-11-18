@@ -2,8 +2,8 @@
 ; after monitor.nasm (its header): the sector routines sd_init, sd_read,
 ; and sd_write, the ROM's own, with no entries in the dispatch table
 ; (doc/SDCARD.md, "The ROM"), which monitor_fat.nasm calls.
-; The file statements of monitor_cmd.nasm show the errors of the controller
-; with sd_fail.
+; BASIC's file statements show the errors of the controller that the
+; file entries return (../basic/basic_cmd.nasm).
 
 SD_CSR          .EQU    0xFFFFFFA0      ; the SD card's status, and a write starts a command (nice_cpu's DEVICES.md §5)
 SD_LBA          .EQU    0xFFFFFFA1      ; the sector of a Read or Write

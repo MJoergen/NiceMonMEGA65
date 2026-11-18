@@ -179,19 +179,25 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   program at 0x8000, `demo.bin`, which the release ships as an asset of
   its own and BASIC's `LOAD "DEMO.BIN"` and `SYS 0x8000` run; it left the ROM
   in V2.1 (#129).
+  The ROM is two images, assembled apart (#152), which
+  `monitor/build/monitor.bin` joins: the monitor's at 0, and BASIC's at
+  `0x4000`, `BASIC_BASE`, whose two vectors, the cold start and the
+  warm start, are all the monitor knows of it. `basic/`: BASIC
+  (`basic.nasm`, the vectors, the main loop (#54, stage 1 #112), its
+  scanner of a line (#115), its keywords, messages, and help, and the
+  map of its RAM, `basic_cmd.nasm`, the routines of the statements
+  that were the monitor's commands, `DHCP`, `NTP`, and TFTP in
+  `basic_net.nasm`, `TIME` in `basic_time.nasm`, and `DIS` in
+  `basic_dis.nasm`), on the entries of the dispatch table alone, as a
+  program is; the monitor's Makefile builds it.
   `monitor/`: the monitor for the ROM in NICE assembly (`monitor.nasm`,
-  the dispatch table, the HAL, and the map of its RAM, `monitor_cmd.nasm`,
-  the routines of the statements that were the monitor's commands,
-  `basic.nasm`, BASIC's main loop (#54, stage 1 #112), its scanner of
-  a line (#115), and its keywords, messages, and help, with `DHCP`,
-  `NTP`, and TFTP in `basic_net.nasm`, `TIME` in `basic_time.nasm`, and
-  `DIS` in `monitor_dis.nasm`, all of BASIC on the entries of the
-  dispatch table alone, which `test/sides.py` checks (#152), the sector
+  the dispatch table, the HAL, and the map of its RAM, the sector
   routines in `monitor_sd.nasm`, FAT32 in `monitor_fat.nasm` (#149),
   the network in `monitor_eth.nasm`, TCP in `monitor_tcp.nasm`, #111,
   the clock in `monitor_clock.nasm` (#148): `clock_set`, the dates of
   files (#109), and the clock from the real-time clock at the cold
-  start (#105), and in `common.nasm` what both sides share), all of
+  start (#105), and in `common.nasm` what both images share, each with
+  a copy of its own, with `BASIC_BASE` and the vectors), all of
   it assembly, with no C in the ROM (#149; its tests need clang for
   their programs in C, and mtools, `mkfs.fat`, and `sfdisk`), the
   routines that

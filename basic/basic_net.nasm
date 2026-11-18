@@ -1,5 +1,5 @@
 ; BASIC's statements of the network, which the Makefile joins after
-; monitor.nasm (its header): DHCP, on net_dhcp, net_config, and
+; basic_cmd.nasm (basic.nasm's header): DHCP, on net_dhcp, net_config, and
 ; net_servers; NTP, which sets the clock from a time server (issue #127),
 ; on dns_lookup, the UDP entries, and clock_set, with clock_zone and
 ; clock_ntp of basic_time.nasm; and LOAD "NAME.BIN", "IP", which reads a
@@ -8,10 +8,10 @@
 ; reach the monitor through the entries of the dispatch table alone
 ; (issue #152).
 ;
-; The statements are routines as those of monitor_cmd.nasm are, which
+; The statements are routines as those of basic_cmd.nasm are, which
 ; basic.nasm calls with their arguments in R1-R3. IP, which shows and
-; writes the IP address, is in monitor_cmd.nasm. TFTP takes its bytes
-; with bin_char of monitor_cmd.nasm, as LOAD from the card does.
+; writes the IP address, is in basic_cmd.nasm. TFTP takes its bytes
+; with bin_char of basic_cmd.nasm, as LOAD from the card does.
 
 NTP_PORT        .EQU    123             ; the time server's UDP port (RFC 4330)
 NTP_TRIES       .EQU    3               ; the queries that NTP sends

@@ -1,5 +1,5 @@
-; What the monitor and BASIC share, which the Makefile joins after
-; monitor.nasm (its header): the addresses of the devices that both use,
+; What the monitor and BASIC share, which the Makefile joins into each
+; of the two images, the monitor's and BASIC's (monitor.nasm's header): the addresses of the devices that both use,
 ; the packed texts of puts_b, the IP addresses of get_ip and put_ip,
 ; rest_blank, and the conversions of a date and a time of the clock
 ; (issue #152). Its routines call the monitor through the entries of the
@@ -10,7 +10,7 @@
 ; day, the hours, the minutes, and the seconds. The conversions work on a
 ; block of CLK_WORDS words of the caller's, whose address is in R8, so
 ; that the monitor and BASIC each have their own in their RAM: V_I of
-; monitor.nasm, and V_BI of basic.nasm. clk_fields splits the seconds of
+; monitor.nasm, and V_BI of ../basic/basic.nasm. clk_fields splits the seconds of
 ; the clock into the fields at CLK_F of the block. A date and a time to
 ; set are read into the fields at CLK_I, and clk_check takes them when
 ; they are one: it converts them to seconds, splits the seconds again,
@@ -28,6 +28,9 @@ VARS_WORDS      .EQU    0x1800          ; the words from STACK, the variables, w
 STACK           .EQU    0xFFFFE800      ; BASIC's, BASIC_WORDS words, where SP starts, down,
 BASIC_WORDS     .EQU    0x800
 MON_RAM         .EQU    0xFFFFF000      ; and the monitor's, to 0xFFFFFEFF, below the devices
+BASIC_BASE      .EQU    0x4000          ; BASIC's image, above the monitor's, to PROGRAM:
+BAS_COLD        .EQU    BASIC_BASE      ; its cold start, where mon_reset goes at its end,
+BAS_WARM        .EQU    BASIC_BASE+2    ; and its warm start, where mon_exit goes, R1 the status
 PROGRAM         .EQU    0x8000          ; where a program is, above the ROM
 RAM_WORDS       .EQU    0xFFFFFF9E      ; the words of the RAM, 0 in niceemu, where there is no limit
 CLOCK_USEC      .EQU    0xFFFFFF46      ; the microseconds, and a read takes a snapshot of the seconds

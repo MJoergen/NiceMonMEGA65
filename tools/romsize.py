@@ -3,17 +3,19 @@
 
 The tables of "The ROM's words" in monitor/INTERNALS.md are this
 script's output, between the comments <!-- romsize NAME --> and
-<!-- /romsize NAME -->. The script joins the sources as the Makefile
-does, with a label in front of each part and of each run of .ASCII
+<!-- /romsize NAME -->. The ROM is two images, assembled apart, the
+monitor's and BASIC's (issue #152), and each has a table. The script
+joins the sources of each as the Makefile does, with a label in front of each part and of each run of .ASCII
 strings, with the .DAT 0 that ends a packed one, assembles them with
 niceasm.py --symbols, and takes each part's words from the labels'
 addresses. The words it assembles must
 be those of the build's .bin, or it fails, so a label never moves a
 word.
 
-  romsize.py monitor --bin B --doc D [--write] SOURCES...
-      the monitor's table, and the table of the ROM; SOURCES are the
-      files that the monitor's Makefile joins, in its order
+  romsize.py rom --doc D [--write] --monitor B SOURCES... --basic B SOURCES...
+      the tables of the monitor and of BASIC, and the table of the ROM;
+      after each option, the image's .bin, then the files that the
+      monitor's Makefile joins into it, in its order
   romsize.py demo --bin B --doc D [--write] SOURCES...
       the demo's table, of demo.bin, which is not in the ROM (#129), in
       demo/README.md
@@ -36,14 +38,15 @@ from typing import NamedTuple
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NICEASM = os.path.join(REPO, "nice_cpu", "assembler", "niceasm.py")
 
-# The monitor's sources, by their names, and what each one is
-MONITOR_PARTS = {
+# The sources of the two images, by their names, and what each one is
+ROM_PARTS = {
     "monitor.nasm": "The dispatch table, the HAL, and the cold start",
-    "monitor_cmd.nasm": "The routines of the statements that were the commands",
-    "basic.nasm": "BASIC: the main loop, the scanner, the keywords, the messages, and the help",
-    "basic_net.nasm": "BASIC's `DHCP`, `NTP`, and TFTP",
-    "basic_time.nasm": "BASIC's `TIME`, and the clock's side of `NTP`",
-    "monitor_dis.nasm": "The disassembler of `DIS`",
+    "basic.nasm": "The vectors, the main loop, the scanner, the keywords, the messages, "
+                  "and the help",
+    "basic_cmd.nasm": "The routines of the statements that were the commands",
+    "basic_net.nasm": "`DHCP`, `NTP`, and TFTP",
+    "basic_time.nasm": "`TIME`, and the clock's side of `NTP`",
+    "basic_dis.nasm": "The disassembler of `DIS`",
     "monitor_sd.nasm": "The sector routines",
     "monitor_fat.nasm": "FAT32, the file entries, and TAB",
     "monitor_eth.nasm": "The network, and its entries",
@@ -52,7 +55,9 @@ MONITOR_PARTS = {
     "common.nasm": "What the monitor and BASIC share: texts, IP addresses, and dates",
     "monlib.nasm": "The routines that programs join",
     "mon.nasm": "The stubs of the entries",
-    "folder.nasm": "The folder's name, and the error of a card without it",
+    "folder.nasm": "The folder's name",
+    "basic_folder.nasm": "The texts with the folder's name: `DIR`'s, and the error of a "
+                         "card without it",
     "version_test.nasm": "The version in the banner, the tests' `V9.9`",
 }
 # The sources that are nice_cpu's
@@ -188,23 +193,38 @@ def table(parts: list[Part]) -> list[str]:
     return rows
 
 
-def monitor_tables(args: argparse.Namespace) -> dict[str, list[str]]:
+def image_table(bin_path: str, sources: list[str]) -> tuple[list[str], int, int]:
+    """The table of an image, and its first address and its end."""
     marker = Marker()
-    for path in args.sources:
-        base = os.path.basename(path)
-        marker.part(source_name(path), MONITOR_PARTS[base])
+    for path in sources:
+        marker.part(source_name(path), ROM_PARTS[os.path.basename(path)])
         for line in open(path):
             marker.line(line)
-    parts = marker.measure(args.bin)
-    monitor_end = max(a for a, _ in words(args.bin)) + 1
+    parts = marker.measure(bin_path)
+    addrs = [a for a, _ in words(bin_path)]
+    first, end = min(addrs), max(addrs) + 1
+    # The first part starts at 0, before its .ORG, BASIC's at 0x4000
+    parts[0] = parts[0]._replace(words=parts[0].words - first)
+    if sum(p.words for p in parts) != end - first:
+        sys.exit(f"romsize.py: the parts of {bin_path} do not add up to its words")
+    return table(parts), first, end
+
+
+def rom_tables(args: argparse.Namespace) -> dict[str, list[str]]:
+    monitor, mon_first, mon_end = image_table(args.monitor[0], args.monitor[1:])
+    basic, bas_first, bas_end = image_table(args.basic[0], args.basic[1:])
     rom = 0x8000
+    if mon_first != 0 or mon_end > bas_first or bas_end > rom:
+        sys.exit("romsize.py: the images overlap, or pass the ROM")
     layout = [
         "| Part | Address | Words |",
         "|---|---|---:|",
-        f"| The monitor | `0x0000`–`0x{monitor_end - 1:04X}` | {monitor_end} |",
-        f"| Free | `0x{monitor_end:04X}`–`0x{rom - 1:04X}` | {rom - monitor_end} |",
+        f"| The monitor | `0x0000`–`0x{mon_end - 1:04X}` | {mon_end} |",
+        f"| Free | `0x{mon_end:04X}`–`0x{bas_first - 1:04X}` | {bas_first - mon_end} |",
+        f"| BASIC | `0x{bas_first:04X}`–`0x{bas_end - 1:04X}` | {bas_end - bas_first} |",
+        f"| Free | `0x{bas_end:04X}`–`0x{rom - 1:04X}` | {rom - bas_end} |",
     ]
-    return {"layout": layout, "monitor": table(parts)}
+    return {"layout": layout, "monitor": monitor, "basic": basic}
 
 
 def demo_tables(args: argparse.Namespace) -> dict[str, list[str]]:
@@ -281,15 +301,24 @@ def update(doc: str, tables: dict[str, list[str]], write: bool) -> bool:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("image", choices=["monitor", "demo"])
-    parser.add_argument("--bin", required=True, help="the build's .bin, which must match")
+    parser.add_argument("image", choices=["rom", "demo"])
+    parser.add_argument("--bin", help="the demo's .bin, which must match")
+    parser.add_argument("--monitor", nargs="+", metavar="FILE",
+                        help="the monitor's .bin, which must match, and its sources")
+    parser.add_argument("--basic", nargs="+", metavar="FILE",
+                        help="BASIC's .bin, which must match, and its sources")
     parser.add_argument("--doc", required=True, help="the Markdown file with the tables")
     parser.add_argument("--write", action="store_true", help="write the tables into it")
-    parser.add_argument("sources", nargs="+")
-    args = parser.parse_args()
-    if args.image == "monitor":
-        tables = monitor_tables(args)
+    parser.add_argument("sources", nargs="*")
+    # The demo's sources follow its options
+    args = parser.parse_intermixed_args()
+    if args.image == "rom":
+        if not args.monitor or len(args.monitor) < 2 or not args.basic or len(args.basic) < 2:
+            parser.error("rom needs --monitor and --basic, each with a .bin and its sources")
+        tables = rom_tables(args)
     else:
+        if not args.bin or not args.sources:
+            parser.error("demo needs --bin and its sources")
         tables = demo_tables(args)
     ok = update(args.doc, tables, args.write)
     if ok and not args.write:

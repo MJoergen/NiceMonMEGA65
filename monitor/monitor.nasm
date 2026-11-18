@@ -12,32 +12,25 @@
 ; entry as an .EQU, and a stub that jumps to it.
 ;
 ; The cold start, mon_reset, sets SP to STACK, the variables, and the
-; screen, and goes to bas_start, which prints the banner and runs the main
-; loop, main, of basic.nasm. At mon_exit, the monitor clears E, stops the
+; screen, and goes to BASIC's cold start, the vector BAS_COLD at
+; BASIC_BASE (common.nasm), which prints the banner and runs BASIC's main
+; loop. At mon_exit, the monitor clears E, stops the
 ; timer, clears the FPU, sets VBASE to 0, and shows the cursor,
 ; blinking, with mon_restore, takes a fresh stack, and goes to BASIC's
-; warm start, bas_warm, which prints the status, R1, and goes back to
-; main; a program that SYS called and that returns has the same, but
-; the stack, and BASIC goes on. BASIC calls the monitor through the
-; entries of the dispatch table (issue #152), but for the routines that
-; it has not left yet.
+; warm start, the vector BAS_WARM, which prints the status, R1, and goes
+; back to its main loop; a program that SYS called and that returns has
+; the same, but the stack, and BASIC goes on.
 ;
-; The monitor is this file and ten more, which the Makefile joins after
-; it, in this order, so that the dispatch table is at 0. The first four
-; are BASIC's, which reaches the monitor through the entries of the
-; dispatch table alone (issue #152), as test/sides.py checks:
+; The ROM is two images, assembled apart (issue #152): the monitor, at
+; 0x0000, and BASIC, at BASIC_BASE, 0x4000, from the files of ../basic/.
+; The Makefile joins the two into build/monitor.bin. BASIC calls the
+; monitor through the entries of the dispatch table alone, as a program
+; does, and the monitor knows of BASIC only its two vectors, so neither
+; reaches a label of the other.
 ;
-; - monitor_cmd.nasm: the routines of BASIC's statements that replace the
-;   monitor's commands, and the routines and texts that only they use.
-; - basic.nasm: BASIC, the main loop, the scanner of a line, which calls
-;   the statements, and its keywords and messages (issues #112 and #115,
-;   doc/BASIC.md).
-; - basic_net.nasm: the statements DHCP, NTP, and TFTP's LOAD and DIR
-;   (issues #84 and #127).
-; - basic_time.nasm: TIME, and the clock's side of NTP (issues #105 and
-;   #127).
-; - monitor_dis.nasm: DIS, the disassembler (README.md, "The
-;   disassembler").
+; The monitor is this file and six more, which the Makefile joins after
+; it, in this order, so that the dispatch table is at 0:
+;
 ; - monitor_sd.nasm: the SD cards below the file system, the sector
 ;   routines sd_init, sd_read, and sd_write that FAT32 reads and writes
 ;   through (issue #57, doc/SDCARD.md).
@@ -53,9 +46,10 @@
 ; - monitor_clock.nasm: the clock of the time of day, clock_set, entry
 ;   34, the dates of FAT's entries, and the real-time clock (issues #105,
 ;   #109, and #148).
-; - common.nasm: what both share, the addresses of the devices that both
-;   use, the packed texts of puts_b, IP addresses, and the conversions of
-;   a date and a time.
+; - common.nasm: what both images share, each with a copy of its own:
+;   the addresses of the devices that both use, BASIC's vectors, the
+;   packed texts of puts_b, IP addresses, and the conversions of a date
+;   and a time.
 ;
 ; Each has the .EQUs of its devices and its constants, and its texts, but
 ; the variables of all of them are here, as one map of the RAM. The
@@ -101,7 +95,7 @@
 ; kept but not shown.
 ;
 ; The monitor's variables are in the RAM at 0xFFFFF000 and up, BASIC's
-; at STACK, 2K words below them (basic.nasm), and the stack grows down
+; at STACK, 2K words below them (../basic/basic.nasm), and the stack grows down
 ; from STACK (common.nasm): a write to the ROM is dropped, so
 ; nothing of the monitor's is written below 0x8000. In niceemu, which has
 ; no ROM, the monitor is a program at 0 like any other, and cat
@@ -113,9 +107,9 @@
 ;
 ; The routines that the statements share with programs, _io_puts, _io_crlf,
 ; _io_puthex, _io_putdec, _io_gethex, _io_gets, and _io_getc, are in
-; monlib.nasm, which the Makefile joins after the monitor's files, with
-; mon.nasm and build/version.nasm, which defines VERSION, the string of
-; the banner.
+; monlib.nasm, which the Makefile joins after the files of each image,
+; with mon.nasm and build/version.nasm, which defines VERSION, the string
+; of the banner and of DHCP's request.
 
 PC              .EQU    R15
 
@@ -347,7 +341,7 @@ mon_reset
                 CLR     @V_BACK
                 CALL    scr_cls
                 CALL    clock_rtc
-                JMP     bas_start       ; basic.nasm
+                JMP     BAS_COLD        ; BASIC's cold start
 
 ; mon_exit: entry 1, and where a program returns to. Back to BASIC's
 ; warm start, bas_warm, with R1 the status, which it prints: E cleared, the timer stopped, the FPU's
@@ -361,7 +355,7 @@ mon_exit
                 PUSH    R1
                 CALL    mon_restore
                 POP     R1
-                JMP     bas_warm        ; basic.nasm
+                JMP     BAS_WARM        ; BASIC's warm start
 
 ; mon_restore: entry 36, the state after a program, for a caller that
 ; ran one, as SYS does: E cleared, the timer stopped, the FPU's stack

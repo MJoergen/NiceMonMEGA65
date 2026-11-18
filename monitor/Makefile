@@ -9,11 +9,19 @@
 #               test/*.expected
 # make clean    removes build/
 #
-# The assembler has no include, so the monitor is the cat of SOURCES
-# (monitor.nasm, the files that its header lists, monlib.nasm, and
-# mon.nasm), build/version.nasm, which defines the label VERSION
-# (monitor.nasm), and build/folder.nasm, the folder FOLDER's 8.3 name and
-# texts. The monitor is assembly only, so it needs Python alone. The
+# The ROM is two images, assembled apart (issue #152): the monitor's at
+# 0, and BASIC's at BASIC_BASE, 0x4000 (common.nasm), from the files of
+# ../basic. build/monitor.bin joins them, and is the ROM that the boards
+# and the tools take. The assembler has no include, so the monitor is the
+# cat of MON_SOURCES (monitor.nasm, the files that its header lists,
+# common.nasm, monlib.nasm, and mon.nasm), build/version.nasm, which
+# defines the label VERSION, and build/folder.nasm, the folder FOLDER's
+# 8.3 name. BASIC is the cat of BAS_SOURCES (../basic/basic.nasm, the
+# files that its header lists, and its copies of common.nasm,
+# monlib.nasm, and mon.nasm), build/version.nasm, and
+# build/basic_folder.nasm, its texts with the folder's name. As neither
+# image has a label of the other, BASIC calls the monitor through the
+# entries alone. The monitor is assembly only, so it needs Python alone. The
 # tests' programs in C, hello_c.bin and tcp_c.bin, need clang with the
 # wasm32 target, wasm-ld, and llvm-ar, through nicebuild.
 
@@ -26,14 +34,20 @@ EMU      = $(NICE_CPU)/emulator/zig-out/bin/niceemu
 RUNTIME  = $(NICE_CPU)/runtime
 TOOLS    = $(wildcard $(NICE_CPU)/assembler/*.py) $(wildcard $(NICE_CPU)/translator/*.py)
 BUILD    = build
-SOURCES  = monitor.nasm monitor_cmd.nasm basic.nasm basic_net.nasm basic_time.nasm monitor_dis.nasm monitor_sd.nasm monitor_fat.nasm monitor_eth.nasm monitor_tcp.nasm \
-           monitor_clock.nasm common.nasm monlib.nasm mon.nasm
+BASDIR   = ../basic
+SHARED   = common.nasm monlib.nasm mon.nasm
+MON_SOURCES = monitor.nasm monitor_sd.nasm monitor_fat.nasm monitor_eth.nasm monitor_tcp.nasm \
+           monitor_clock.nasm $(SHARED)
+BAS_SOURCES = $(addprefix $(BASDIR)/,basic.nasm basic_cmd.nasm basic_net.nasm basic_time.nasm \
+           basic_dis.nasm) $(SHARED)
+SOURCES  = $(MON_SOURCES) $(filter-out $(SHARED),$(BAS_SOURCES))
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo unknown)
 # The folder of the card's root directory that holds NiceMon's files
 # (monitor_fat.nasm, README.md, "Files"): NICE, or with make FOLDER=NAME
 # another 8.3 name of 1 to 8 letters, digits, _, and -, in either case. It
 # reaches build/folder.nasm as FOLDER_N, its 8.3 name padded with blanks,
-# and in the texts of DIR, S_DIROF, and of error 29. The tests need NICE.
+# and build/basic_folder.nasm in the texts of DIR, S_DIROF, and of error
+# 29. The tests need NICE.
 # A FOLDER of the environment is passed over, as a shell may well export
 # one of that common name for something else; the name counts on the
 # command line, make FOLDER=NAME, alone.
@@ -49,30 +63,36 @@ endif
 # after it, which ends the text when its length is a multiple of 4
 # (monitor.nasm). The text must not hold a '.
 PACKED = printf "%s .ASCII_B '%s'\n                .DAT    0\n" '$(1)' '$(2)'
-FOLDER_ERROR = ($(call PACKED,E_FS29,no folder $(FOLDER_UC) on the card); \
-  $(call PACKED,S_DIROF,Directory of $(FOLDER_UC)); \
-  printf "FOLDER_N .ASCII_B '%-11s'\n" '$(FOLDER_UC)')
+FOLDER_NAME = printf "FOLDER_N .ASCII_B '%-11s'\n" '$(FOLDER_UC)'
+FOLDER_TEXTS = ($(call PACKED,E_FS29,no folder $(FOLDER_UC) on the card); \
+  $(call PACKED,S_DIROF,Directory of $(FOLDER_UC)))
 # Each packed text of the ROM must end with a 0 byte (test/texts.py)
 CHECK_TEXTS = $(PYTHON) test/texts.py $(filter-out monlib.nasm mon.nasm,$(SOURCES))
-# BASIC reaches the monitor through the entries alone (test/sides.py, #152)
-CHECK_SIDES = $(PYTHON) test/sides.py
-# The monitor must end below PROGRAM (common.nasm), 0x8000, the end of
-# the ROM. niceasm writes the words in the order of their addresses, so
-# the last line has the last.
-ROM_END  = $(shell sed -n 's/^PROGRAM *\.EQU *\(0x[0-9A-Fa-f]*\).*/\1/p' common.nasm)
+# The monitor must end below BASIC_BASE, and BASIC below PROGRAM, 0x8000,
+# the end of the ROM (common.nasm). niceasm writes the words in the order
+# of their addresses, so the last line has the last.
+EQU_OF   = $(shell sed -n 's/^$(1) *\.EQU *\(0x[0-9A-Fa-f]*\).*/\1/p' common.nasm)
+BAS_BASE = $(call EQU_OF,BASIC_BASE)
+ROM_END  = $(call EQU_OF,PROGRAM)
 CHECK_END = $(PYTHON) -c 'import sys; top = int(open(sys.argv[1]).read().split()[-2], 16); \
-  end = int(sys.argv[2], 16); top < end or sys.exit(f"{sys.argv[1]} reaches {top:08X}, past the ROM, {end:08X}")'
+  end = int(sys.argv[2], 16); top < end or sys.exit(f"{sys.argv[1]} reaches {top:08X}, past its end, {end:08X}")'
+# The two images from their joined sources, $(1) the monitor's and $(2)
+# BASIC's, into $(3), with the monitor's alone in $(3:.bin=_mon.bin) and
+# BASIC's in $(3:.bin=_bas.bin)
+IMAGES   = $(ASM) -o $(3:.bin=_mon.bin) $(1) && $(CHECK_END) $(3:.bin=_mon.bin) $(BAS_BASE) && \
+  $(ASM) -o $(3:.bin=_bas.bin) $(2) && $(CHECK_END) $(3:.bin=_bas.bin) $(ROM_END) && \
+  cat $(3:.bin=_mon.bin) $(3:.bin=_bas.bin) > $(3)
 
 .PHONY: all test fmt romsize clean FORCE
 
 all: $(BUILD)/monitor.bin
 
-$(BUILD)/monitor.bin: $(SOURCES) $(BUILD)/version.nasm $(BUILD)/folder.nasm $(TOOLS)
+$(BUILD)/monitor.bin: $(SOURCES) $(BUILD)/version.nasm $(BUILD)/folder.nasm \
+                      $(BUILD)/basic_folder.nasm $(TOOLS)
 	@$(CHECK_TEXTS)
-	@$(CHECK_SIDES)
-	@cat $(SOURCES) $(BUILD)/version.nasm $(BUILD)/folder.nasm > $(BUILD)/monitor_all.nasm
-	$(ASM) -o $@ $(BUILD)/monitor_all.nasm
-	@$(CHECK_END) $@ $(ROM_END)
+	@cat $(MON_SOURCES) $(BUILD)/version.nasm $(BUILD)/folder.nasm > $(BUILD)/monitor_all.nasm
+	@cat $(BAS_SOURCES) $(BUILD)/version.nasm $(BUILD)/basic_folder.nasm > $(BUILD)/basic_all.nasm
+	@$(call IMAGES,$(BUILD)/monitor_all.nasm,$(BUILD)/basic_all.nasm,$@)
 
 # Written only when the version changes, so that the monitor is not
 # assembled again, and a bitstream with it not built again, for nothing.
@@ -82,17 +102,20 @@ $(BUILD)/version.nasm: FORCE | $(BUILD)
 
 # Written only when FOLDER changes, as version.nasm is
 $(BUILD)/folder.nasm: FORCE | $(BUILD)
-	@$(FOLDER_ERROR) | cmp -s - $@ || $(FOLDER_ERROR) > $@
+	@$(FOLDER_NAME) | cmp -s - $@ || $(FOLDER_NAME) > $@
+
+$(BUILD)/basic_folder.nasm: FORCE | $(BUILD)
+	@$(FOLDER_TEXTS) | cmp -s - $@ || $(FOLDER_TEXTS) > $@
 
 # The test has a version of its own, so that its output does not change
 # with every commit.
-$(BUILD)/monitor_test.bin: $(SOURCES) $(BUILD)/folder.nasm $(TOOLS) | $(BUILD)
+$(BUILD)/monitor_test.bin: $(SOURCES) $(BUILD)/folder.nasm $(BUILD)/basic_folder.nasm \
+                           $(BUILD)/version_test.nasm $(TOOLS) | $(BUILD)
 	@$(CHECK_TEXTS)
-	@$(CHECK_SIDES)
-	@(cat $(SOURCES) $(BUILD)/folder.nasm; $(call PACKED,VERSION,V9.9)) \
-	  > $(BUILD)/monitor_test_all.nasm
-	@$(ASM) -o $@ $(BUILD)/monitor_test_all.nasm
-	@$(CHECK_END) $@ $(ROM_END)
+	@cat $(MON_SOURCES) $(BUILD)/folder.nasm $(BUILD)/version_test.nasm > $(BUILD)/monitor_test_all.nasm
+	@cat $(BAS_SOURCES) $(BUILD)/basic_folder.nasm $(BUILD)/version_test.nasm \
+	  > $(BUILD)/basic_test_all.nasm
+	@$(call IMAGES,$(BUILD)/monitor_test_all.nasm,$(BUILD)/basic_test_all.nasm,$@)
 
 # The monitors of the ring test, test/ring.py: the monitor of the tests
 # with the size of the screen's memory that the display offset of a board
@@ -105,7 +128,8 @@ $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.bin: $(BUILD)/monitor_%.bin: $(BUILD
 	@sed 's/^\( *\)AND  *R1, @SCR_OFFS, SCR_MAX$$/\1MOVE    R1, $(MASK_$*)/' \
 	  $(BUILD)/monitor_test_all.nasm > $(BUILD)/monitor_$*_all.nasm
 	@! cmp -s $(BUILD)/monitor_test_all.nasm $(BUILD)/monitor_$*_all.nasm
-	@$(ASM) -o $@ $(BUILD)/monitor_$*_all.nasm
+	@$(ASM) -o $(BUILD)/monitor_$*_mon.bin $(BUILD)/monitor_$*_all.nasm
+	@cat $(BUILD)/monitor_$*_mon.bin $(BUILD)/monitor_test_bas.bin > $@
 
 # The programs of the tests, at 0x8000: hello.nasm with the runtime's
 # start-up code for a program under a monitor, and hello.c through
@@ -632,12 +656,15 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	  else echo "FAIL monitor $$t"; diff test/$$t.expected $(BUILD)/$$t.out; fail=1; fi; \
 	done; exit $$fail
 
-# The table of the monitor's words in INTERNALS.md, "The ROM's words",
-# which make test checks against monitor_test.bin, and make romsize
-# writes. Its sources are those of monitor_test.bin, with the version of
-# the tests in a file of its own.
-ROMSIZE = $(PYTHON) ../tools/romsize.py monitor --bin $(BUILD)/monitor_test.bin \
-            --doc INTERNALS.md $(SOURCES) $(BUILD)/folder.nasm $(BUILD)/version_test.nasm
+# The tables of the ROM's words in INTERNALS.md, "The ROM's words",
+# which make test checks against the two images of monitor_test.bin, and
+# make romsize writes. Their sources are those of the images, with the
+# version of the tests in a file of its own.
+ROMSIZE = $(PYTHON) ../tools/romsize.py rom --doc INTERNALS.md \
+            --monitor $(BUILD)/monitor_test_mon.bin $(MON_SOURCES) $(BUILD)/folder.nasm \
+              $(BUILD)/version_test.nasm \
+            --basic $(BUILD)/monitor_test_bas.bin $(BAS_SOURCES) $(BUILD)/basic_folder.nasm \
+              $(BUILD)/version_test.nasm
 
 $(BUILD)/version_test.nasm: Makefile | $(BUILD)
 	@$(call PACKED,VERSION,V9.9) > $@

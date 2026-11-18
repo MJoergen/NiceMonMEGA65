@@ -519,7 +519,9 @@ BASIC is NICE assembly from stage 2 on ([Decisions](#decisions)):
   as each one's comment says, and the statements' routines may use
   every register, as the main loop starts again after each. BASIC
   calls the monitor through the entries of the dispatch table alone,
-  as a program does (#152), which `monitor/test/sides.py` checks.
+  as a program does (#152): it is an image of its own at `0x4000`,
+  assembled apart from the monitor's, so it has none of the monitor's
+  labels.
 - The table of keywords, the ops, and the messages are packed with
   `.ASCII_B`, and read through the byte window, a quarter of the ROM.
 - The workspace is words, and its formats are those of

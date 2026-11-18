@@ -1,13 +1,22 @@
-; BASIC's assembly in the ROM (issue #54, doc/BASIC.md), which the
-; Makefile joins after monitor_cmd.nasm: the main loop, the scanner of a
-; line, and BASIC's keywords, messages, and help, packed with .ASCII_B and
-; read through the byte window, so that they take no RAM. Stage 1 (issue
-; #112) is the shell: the monitor's commands as statements, on the
-; routines that the commands had, in monitor_cmd.nasm, monitor_dis.nasm,
-; basic_net.nasm, and basic_time.nasm, with the scanner of issue #115.
+; BASIC in the ROM (issue #54, doc/BASIC.md), an image of its own at
+; BASIC_BASE, 0x4000, assembled apart from the monitor's (issue #152).
+; It calls the monitor through the entries of the dispatch table alone,
+; their .EQUs in ../monitor/mon.nasm, as a program does. The Makefile of
+; ../monitor joins this file first, then basic_cmd.nasm, basic_net.nasm,
+; basic_time.nasm, and basic_dis.nasm, and the monitor's common.nasm,
+; monlib.nasm, and mon.nasm, of which BASIC has copies of its own.
 ;
-; The cold start ends at bas_start, which prints the banner and goes to
-; main, and mon_exit at bas_warm, which prints the status and goes to
+; This file has the main loop, the scanner of a line, and BASIC's
+; keywords, messages, and help, packed with .ASCII_B and read through the
+; byte window, so that they take no RAM. Stage 1 (issue #112) is the
+; shell: the monitor's commands as statements, on the routines that the
+; commands had, in basic_cmd.nasm, basic_dis.nasm, basic_net.nasm, and
+; basic_time.nasm, with the scanner of issue #115.
+;
+; The image starts with two vectors, which the monitor jumps to: at
+; BAS_COLD, the end of its cold start, which goes to bas_start, and at
+; BAS_WARM, mon_exit, which goes to bas_warm. bas_start prints the
+; banner and goes to main, and bas_warm prints the status and goes to
 ; main. main is where BASIC starts again: it sets SP to STACK, prints
 ; READY., and reads lines with con_getline, entry 32. An empty
 ; line, or one of blanks only, runs nothing and prints no READY.
@@ -74,6 +83,12 @@ V_TBUF          .EQU    0xFFFFEAA4      ; for TFTP: a packet that udp_recv copie
 V_TSRC          .EQU    0xFFFFECA8      ; and its source's IP address and port, 2 words, to 0xFFFFECA9
 V_NTPQ          .EQU    0xFFFFEAA4      ; for NTP, in V_TBUF: the query, 48 words,
 V_NTPA          .EQU    0xFFFFEAD4      ; and the answer, 48 words
+
+; The vectors, at BAS_COLD and BAS_WARM (common.nasm), which the monitor
+; jumps to
+                .ORG    BASIC_BASE
+                JMP     bas_start
+                JMP     bas_warm
 
 ; bas_warm: where mon_exit goes, with R1 the status of the program that
 ; left: the status shown, as SYS shows it, and then the main loop
@@ -285,8 +300,8 @@ k_end
                 MOVE    R3, @V_ARGS+3
                 RET
 
-; The routines of the statements that are not those of monitor_cmd.nasm,
-; monitor_dis.nasm, basic_net.nasm, or basic_time.nasm alone
+; The routines of the statements that are not those of basic_cmd.nasm,
+; basic_dis.nasm, basic_net.nasm, or basic_time.nasm alone
 
 ; TIME ["D T"]: clock_cmd with the string, or the end of the line
 bas_time

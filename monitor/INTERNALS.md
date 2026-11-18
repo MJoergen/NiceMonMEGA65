@@ -226,16 +226,19 @@ the tests pin it (The tests, below).
 
 ## The ROM's words
 
-The ROM has 32768 words, at `0x0000`–`0x7FFF`. The monitor fills it
-from 0, and the rest is free. The demo is not in it: it is a program,
+The ROM has 32768 words, at `0x0000`–`0x7FFF`, in two images,
+assembled apart (#152): the monitor's from 0, and BASIC's from
+`0x4000`, `BASIC_BASE` of `common.nasm`. The demo is not in it: it is a program,
 `demo.bin`, whose words
 [demo/README.md](../demo/README.md#its-words) counts.
 
 <!-- romsize layout -->
 | Part | Address | Words |
 |---|---|---:|
-| The monitor | `0x0000`–`0x36B9` | 14010 |
-| Free | `0x36BA`–`0x7FFF` | 18758 |
+| The monitor | `0x0000`–`0x2545` | 9542 |
+| Free | `0x2546`–`0x3FFF` | 6842 |
+| BASIC | `0x4000`–`0x53CA` | 5067 |
+| Free | `0x53CB`–`0x7FFF` | 11317 |
 <!-- /romsize layout -->
 
 The monitor's words, by the source they come from, in the order
@@ -243,19 +246,12 @@ the Makefile joins them. The column "Text" counts the words of the
 texts, which are part of "Words". They are packed, four characters a
 word, with `.ASCII_B`, and a `.DAT 0` after a text whose length is a
 multiple of 4 ends it (#131), which `test/texts.py` checks whenever the
-ROM is built, with `test/sides.py`, which checks that BASIC's files call
-the monitor through the entries alone, and that `common.nasm` uses
-neither side's routines (#152):
+ROM is built:
 
 <!-- romsize monitor -->
 | Source | What it is | Words | Text |
 |---|---|---:|---:|
 | `monitor.nasm` | The dispatch table, the HAL, and the cold start | 845 | 0 |
-| `monitor_cmd.nasm` | The routines of the statements that were the commands | 1567 | 291 |
-| `basic.nasm` | BASIC: the main loop, the scanner, the keywords, the messages, and the help | 834 | 440 |
-| `basic_net.nasm` | BASIC's `DHCP`, `NTP`, and TFTP | 907 | 150 |
-| `basic_time.nasm` | BASIC's `TIME`, and the clock's side of `NTP` | 275 | 44 |
-| `monitor_dis.nasm` | The disassembler of `DIS` | 871 | 79 |
 | `monitor_sd.nasm` | The sector routines | 85 | 0 |
 | `monitor_fat.nasm` | FAT32, the file entries, and TAB | 2847 | 0 |
 | `monitor_eth.nasm` | The network, and its entries | 2440 | 10 |
@@ -264,13 +260,33 @@ neither side's routines (#152):
 | `common.nasm` | What the monitor and BASIC share: texts, IP addresses, and dates | 237 | 5 |
 | `monlib.nasm` | The routines that programs join | 274 | 0 |
 | `mon.nasm` | The stubs of the entries | 82 | 0 |
-| `build/folder.nasm` | The folder's name, and the error of a card without it | 17 | 17 |
+| `build/folder.nasm` | The folder's name | 3 | 3 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 14010 | 1038 |
+| In all | | 9542 | 20 |
 <!-- /romsize monitor -->
 
-- `build/folder.nasm` and the version always end with a `.DAT 0`, as
-  the Makefile does not count their characters.
+BASIC's words, likewise. Its files are in `../basic`, and it has
+copies of its own of `common.nasm`, `monlib.nasm`, `mon.nasm`, and the
+version:
+
+<!-- romsize basic -->
+| Source | What it is | Words | Text |
+|---|---|---:|---:|
+| `basic.nasm` | The vectors, the main loop, the scanner, the keywords, the messages, and the help | 838 | 440 |
+| `basic_cmd.nasm` | The routines of the statements that were the commands | 1567 | 291 |
+| `basic_net.nasm` | `DHCP`, `NTP`, and TFTP | 907 | 150 |
+| `basic_time.nasm` | `TIME`, and the clock's side of `NTP` | 275 | 44 |
+| `basic_dis.nasm` | The disassembler of `DIS` | 871 | 79 |
+| `common.nasm` | What the monitor and BASIC share: texts, IP addresses, and dates | 237 | 5 |
+| `monlib.nasm` | The routines that programs join | 274 | 0 |
+| `mon.nasm` | The stubs of the entries | 82 | 0 |
+| `build/basic_folder.nasm` | The texts with the folder's name: `DIR`'s, and the error of a card without it | 14 | 14 |
+| `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
+| In all | | 5067 | 1025 |
+<!-- /romsize basic -->
+
+- `build/basic_folder.nasm` and the version always end with a `.DAT 0`,
+  as the Makefile does not count their characters.
 - The version is that of the tests, `V9.9`, so that the tables do not
   change with every commit. A release's version, such as `V2.3`, has
   as many words.
@@ -301,26 +317,37 @@ a table differs from the build. `make romsize` writes the new tables.
 
 ### The build
 
-`make -C monitor` writes `build/monitor.bin`. The assembler has no
-include, so the Makefile joins the sources with `cat` and assembles the
-result with `niceasm`. In this order:
+`make -C monitor` writes `build/monitor.bin`, the ROM, which joins two
+images, assembled apart (#152): the monitor's, `build/monitor_mon.bin`,
+at 0, and BASIC's, `build/monitor_bas.bin`, at `0x4000`. The assembler
+has no include, so the Makefile joins the sources of each with `cat`
+and assembles the result with `niceasm`. The monitor's, in this order:
 
-1. `monitor.nasm`, `monitor_cmd.nasm`, `basic.nasm`, `basic_net.nasm`,
-   `basic_time.nasm`, `monitor_dis.nasm`, `monitor_sd.nasm`,
-   `monitor_fat.nasm`, `monitor_eth.nasm`, `monitor_tcp.nasm`,
-   `monitor_clock.nasm`, `common.nasm`, `monlib.nasm`, and `mon.nasm`.
+1. `monitor.nasm`, `monitor_sd.nasm`, `monitor_fat.nasm`,
+   `monitor_eth.nasm`, `monitor_tcp.nasm`, `monitor_clock.nasm`,
+   `common.nasm`, `monlib.nasm`, and `mon.nasm`.
 2. `build/version.nasm`, which defines `VERSION`, the text of the
-   banner: `git describe` of the tree, or the `VERSION=` of the command
-   line.
-3. `build/folder.nasm`, the card's folder (README.md, "Files"): its
-   name, as an 8.3 name, and in the text of `DIR` and of error 29.
+   banner and of DHCP's request: `git describe` of the tree, or the
+   `VERSION=` of the command line.
+3. `build/folder.nasm`, the card's folder (README.md, "Files"), as an
+   8.3 name.
 
-`version.nasm` and `folder.nasm` are written only when they change, so
-that the monitor, and a bitstream with it, is not built again for
-nothing. The build fails if the monitor reaches `PROGRAM`, `0x8000`,
-the end of the ROM, or if `test/sides.py` finds a name of the other
-side in BASIC's files or the monitor's, a routine, a variable, or a
-constant, or one of either side in `common.nasm`. Each side has a RAM
+BASIC's, in this order:
+
+1. `../basic/basic.nasm`, which starts with the two vectors at
+   `0x4000`, `basic_cmd.nasm`, `basic_net.nasm`, `basic_time.nasm`, and
+   `basic_dis.nasm`, then `common.nasm`, `monlib.nasm`, and `mon.nasm`.
+2. `build/version.nasm`.
+3. `build/basic_folder.nasm`, the texts with the folder's name, of `DIR`
+   and of error 29.
+
+The generated files are written only when they change, so that the
+ROM, and a bitstream with it, is not built again for nothing. The build
+fails if the monitor reaches `0x4000`, or BASIC `PROGRAM`, `0x8000`,
+the end of the ROM. Neither image has a label of the other, so a use of
+one in the other fails the assembly: BASIC calls the monitor through the
+entries of `mon.nasm` alone, and the monitor jumps to BASIC through its
+vectors, `BAS_COLD` and `BAS_WARM` of `common.nasm`, alone. Each side has a RAM
 of its own: the monitor's at `0xFFFFF000` (`monitor.nasm`), and
 BASIC's 2K words below it at `0xFFFFE800` (`basic.nasm`), where the
 stack starts (`STACK`, `common.nasm`). The conversions of dates in

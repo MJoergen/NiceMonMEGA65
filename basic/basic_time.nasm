@@ -1,10 +1,10 @@
 ; BASIC's statement TIME, and the clock's side of NTP, which the Makefile
-; joins after monitor.nasm (its header) (issues #105, #127, and #148).
+; joins after basic_net.nasm (basic.nasm's header) (issues #105, #127, and #148).
 ; They read the clock (nice_cpu's DEVICES.md §10) at its registers, as a
 ; program may, and set it with clock_set, entry 34, which sets the
 ; MEGA65's real-time clock too (issue #152). The conversions of a date
 ; and a time, clk_check, clk_split, and clk_fields, are in common.nasm,
-; whose header has the fields at V_I and V_F.
+; whose header has the block of the fields, V_BI here.
 
 NTP_UNIX        .EQU    2208988800      ; the seconds from 1900, NTP's era 0, to 1970
 CLK_2106        .EQU    4291747200      ; the seconds of 2106-01-01 00:00:00
