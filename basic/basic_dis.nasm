@@ -3,7 +3,7 @@
 ; the text of nice_cpu's nicedis.py, with the pairs of a call shown as
 ; CALL, the return as RET, and the words of NOP, JMP, PUSH, POP, CLR, TST,
 ; and CMP as those, the pseudo-instructions of nice_cpu's ISA.md §10.1
-; (README.md, "The disassembler"). Its variables, V_UNEXT, V_UF, V_UC,
+; (README.md, "The disassembler", in this folder). Its variables, V_UNEXT, V_UF, V_UC,
 ; and V_UNOPS, are in basic.nasm, with the others, and so are the two
 ; texts that it shares with the other statements, S_UCOMMA and S_UGAP.
 

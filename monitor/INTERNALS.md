@@ -265,40 +265,23 @@ ROM is built:
 | In all | | 9542 | 20 |
 <!-- /romsize monitor -->
 
-BASIC's words, likewise. Its files are in `../basic`, and it has
-copies of its own of `common.nasm`, `monlib.nasm`, `mon.nasm`, and the
-version:
 
-<!-- romsize basic -->
-| Source | What it is | Words | Text |
-|---|---|---:|---:|
-| `basic.nasm` | The vectors, the main loop, the scanner, the keywords, the messages, and the help | 838 | 440 |
-| `basic_cmd.nasm` | The routines of the statements that were the commands | 1567 | 291 |
-| `basic_net.nasm` | `DHCP`, `NTP`, and TFTP | 907 | 150 |
-| `basic_time.nasm` | `TIME`, and the clock's side of `NTP` | 275 | 44 |
-| `basic_dis.nasm` | The disassembler of `DIS` | 871 | 79 |
-| `common.nasm` | What the monitor and BASIC share: texts, IP addresses, and dates | 237 | 5 |
-| `monlib.nasm` | The routines that programs join | 274 | 0 |
-| `mon.nasm` | The stubs of the entries | 82 | 0 |
-| `build/basic_folder.nasm` | The texts with the folder's name: `DIR`'s, and the error of a card without it | 14 | 14 |
-| `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 5067 | 1025 |
-<!-- /romsize basic -->
-
-- `build/basic_folder.nasm` and the version always end with a `.DAT 0`,
-  as the Makefile does not count their characters.
+- `build/folder.nasm` is the folder's 8.3 name, of 11 characters, and
+  the version always ends with a `.DAT 0`, as the Makefile does not
+  count its characters.
 - The version is that of the tests, `V9.9`, so that the tables do not
   change with every commit. A release's version, such as `V2.3`, has
   as many words.
 
 ### Keeping the tables
 
-`tools/romsize.py` writes the tables above. It joins the sources as
+`tools/romsize.py` writes the tables above, and BASIC's in
+[basic/README.md](../basic/README.md#its-words). It joins the sources as
 the Makefiles do, with a label in front of each part and of each
 run of texts, assembles them with `niceasm.py --symbols`, and
 takes each part's words from the labels' addresses. The words it
 assembles must be those of the build, so a label never moves one.
-`make -C monitor test` checks the tables of the ROM and the monitor,
+`make -C monitor test` checks the tables of the ROM, the monitor, and BASIC,
 and `make -C demo test` the demo's, in `demo/README.md`. Each fails when
 a table differs from the build. `make romsize` writes the new tables.
 

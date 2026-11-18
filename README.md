@@ -86,14 +86,14 @@ programs yet ([doc/BASIC.md](doc/BASIC.md)).
 | `LOAD` | Loads a program that you type or paste, as the lines of its `.bin` file |
 
 Keywords are in either case, and numbers in decimal, or in hex after
-`0x`. [monitor/README.md](monitor/README.md#basic) has the others, such
+`0x`. [basic/README.md](basic/README.md#the-statements) has the others, such
 as `DUMP`, which shows memory, and `DIS`, which disassembles it.
 
 The monitor loads a program at address `0x8000`, above the ROM. The
 program has 90K words of RAM on the MEGA65, `0x8000` to `0x1E7FF`, and
 26K on the Nexys4DDR. For `LOAD`, paste the `.bin` file into a plain TCP
 client on the Ethernet port, or a terminal on the serial port
-([monitor/README.md](monitor/README.md#loading-without-a-host)).
+([basic/README.md](basic/README.md#loading-without-a-host)).
 
 Each release comes with a [demo](demo/README.md), `demo.bin`, a
 program for the monitor: `LOAD "DEMO.BIN"` and `SYS 0x8000` run it
@@ -304,7 +304,7 @@ UTC. A server's name or address comes first, in place of `""`, as in
 On the MEGA65 the statement sets the real-time clock too, so the time
 stays over a power cycle. The Nexys4DDR has no real-time clock, so
 there `NTP` after each reset is the way to set the clock without a
-PC ([monitor/README.md](monitor/README.md#basic)).
+PC ([basic/README.md](basic/README.md#the-statements)).
 
 ### Talking to a program
 

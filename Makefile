@@ -38,7 +38,8 @@ help:
 	@echo "  make diagrams   render the block diagrams, src/*.tex and src/eth/*.tex, to PNG"
 	@echo "                  (needs pdflatex and pdftoppm)"
 	@echo "  make romsize    write the tables of the ROM's and the demo's words into"
-	@echo "                  monitor/INTERNALS.md and demo/README.md, which make test checks"
+	@echo "                  monitor/INTERNALS.md, basic/README.md, and demo/README.md,"
+	@echo "                  which make test checks"
 	@echo "  make examples   build the C examples to examples/build/*.bin (needs clang)"
 	@echo "  make demo       build the demo, demo/build/demo.bin, a program at 0x8000"
 	@echo "                  under the monitor"
@@ -130,8 +131,8 @@ test:
 	$(MAKE) -C monitor test
 	$(MAKE) -C basic test
 
-# The tables of the ROM's words in monitor/INTERNALS.md, and of the
-# demo's in demo/README.md
+# The tables of the ROM's words in monitor/INTERNALS.md and
+# basic/README.md, and of the demo's in demo/README.md
 romsize:
 	$(MAKE) -C monitor romsize
 	$(MAKE) -C demo romsize

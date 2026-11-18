@@ -6,8 +6,9 @@ UART, VGA, a PS/2 keyboard, and its LEDs, seven-segment display, buttons,
 and switches as registers. It has nice_cpu's debug link
 (`nice_cpu/doc/DEBUG.md`, `hdl/src/debug_link.vhd`) on the debug UART, a
 text display on VGA and HDMI, a ROM at address 0 with the monitor, a
-QMON-like hardware abstraction layer for programs at 0x8000 and a few
-commands (`monitor/README.md`; loading from storage is #62), and host
+QMON-like hardware abstraction layer for programs at 0x8000
+(`monitor/README.md`), and BASIC at 0x4000, an image of its own on the
+monitor's entries alone (`basic/README.md`, #152), and host
 tools that load and run programs. The goal is that a program runs on the
 board exactly as `niceemu`, the emulator in `nice_cpu/emulator`, runs it.
 `README.md` is for users of the core files: on its own, over Ethernet,
@@ -32,7 +33,8 @@ link with the UART's baud rate at `0xFFFFFF9F` (issue #75). `doc/BASIC_SURVEY.md
 the survey of the BASIC dialects behind the interpreter in the ROM of
 issue #54 (milestone V2.2), and `doc/BASIC.md` its design note, with
 the decisions, the room in the ROM, and the stages, of which stage 1,
-the shell (#112), is written, and ported to assembly (#115).
+the shell (#112), is written, and ported to assembly (#115), and
+split from the monitor into an image of its own (#152).
 `doc/SDCARD.md` is the design of the SD cards' storage, issue #62 and
 its subtasks, of which the controller, the slots, the ROM's sector
 routines, FAT32's
@@ -50,7 +52,7 @@ header is the authoritative address map.
     make -j formal        # SymbiYosys jobs in formal/, each task in a work directory of its own
     make lint             # vsg against doc/CODING_STYLE.md; line-length warnings are tolerated
     make typecheck        # mypy --strict on the Python files that mypy.ini lists
-    make romsize          # the tables of the ROM's words in monitor/INTERNALS.md and the demo's in demo/README.md, which make -C monitor test and make -C demo test check
+    make romsize          # the tables of the ROM's words in monitor/INTERNALS.md and basic/README.md and the demo's in demo/README.md, which make -C monitor test and make -C demo test check
     make diagrams         # src/system.tex and src/eth/eth.tex -> the PNGs of their READMEs (pdflatex)
     make examples         # C examples -> examples/build/*.bin (clang wasm32, lld, llvm)
     make demo             # nice_cpu's demo at 0x8000 -> demo/build/demo.bin, a release asset, not in the ROM (#129); make -C demo test runs it under the monitor in niceemu
@@ -211,6 +213,8 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   is the monitor for those who use it and write programs for it, and
   `monitor/INTERNALS.md` the routines with no entries, the scrollback,
   FAT32, the ROM's words, and the build and the tests.
+  `basic/README.md` is BASIC for those who use it: its statements,
+  `DIS`, and `LOAD`'s lines, and its build, its tests, and its words.
 
 ## Rules and pitfalls
 

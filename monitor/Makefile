@@ -455,12 +455,12 @@ test: fmt $(ROM_TEST) $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.bin $(BUILD)/h
 	  else echo "FAIL monitor $$t"; diff test/$$t.expected $(BUILD)/$$t.out; fail=1; fi; \
 	done; exit $$fail
 
-# The tables of the ROM's words in INTERNALS.md, "The ROM's words",
-# which make test checks against the two images of ../build/rom_test.bin,
+# The tables of the ROM's words in INTERNALS.md, "The ROM's words", and
+# BASIC's in ../basic/README.md, "Its words", which make test checks against the two images of ../build/rom_test.bin,
 # and make romsize writes. Their sources are those of the images, with
 # the version of the tests in a file of its own.
 BAS_BUILD = $(ROOT)/basic/build
-ROMSIZE = $(PYTHON) ../tools/romsize.py rom --doc INTERNALS.md \
+ROMSIZE = $(PYTHON) ../tools/romsize.py rom --doc INTERNALS.md --basic-doc ../basic/README.md \
             --monitor $(BUILD)/monitor_image_test.bin $(MON_SOURCES) $(BUILD)/folder.nasm \
               $(BUILD)/version_test.nasm \
             --basic $(BAS_BUILD)/basic_image_test.bin $(BAS_SOURCES) $(BAS_BUILD)/basic_folder.nasm \

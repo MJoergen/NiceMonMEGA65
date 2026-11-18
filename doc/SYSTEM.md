@@ -133,7 +133,8 @@ and its data from 0 up, and the runtime's start-up code sets SP to
 | `0x1FF00`–`0x1FFFF` | `0xFF00`–`0xFFFF` | The words behind the I/O page. A program reaches those at `0xFFFFFF02`–`0F` and `D0`–`FF`, where it has no registers. |
 
 A program under the monitor starts at `0x8000`, as the ROM is at
-`0x0000`–`0x7FFF`, and shares the monitor's stack, which grows down
+`0x0000`–`0x7FFF`, with the monitor's image at `0x0000` and BASIC's at
+`0x4000` (#152), and shares the monitor's stack, which grows down
 from `0xFFFFE800`. The monitor keeps the top 4K words for itself, and
 BASIC the 2K below them (#152,
 [monitor/README.md](../monitor/README.md)):

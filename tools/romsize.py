@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Measure the ROM's words, and keep their tables in monitor/INTERNALS.md.
 
-The tables of "The ROM's words" in monitor/INTERNALS.md are this
-script's output, between the comments <!-- romsize NAME --> and
+The tables of "The ROM's words" in monitor/INTERNALS.md, and of "Its
+words" in basic/README.md, are this script's output, between the comments <!-- romsize NAME --> and
 <!-- /romsize NAME -->. The ROM is two images, assembled apart, the
 monitor's and BASIC's (issue #152), and each has a table. The script
 joins the sources of each as the Makefile does, with a label in front of each part and of each run of .ASCII
@@ -12,10 +12,12 @@ addresses. The words it assembles must
 be those of the build's .bin, or it fails, so a label never moves a
 word.
 
-  romsize.py rom --doc D [--write] --monitor B SOURCES... --basic B SOURCES...
-      the tables of the monitor and of BASIC, and the table of the ROM;
-      after each option, the image's .bin, then the files that the
-      monitor's Makefile joins into it, in its order
+  romsize.py rom --doc D --basic-doc E [--write] --monitor B SOURCES...
+          --basic B SOURCES...
+      the table of the ROM and the monitor's, in D, monitor/INTERNALS.md,
+      and BASIC's, in E, basic/README.md; after --monitor and --basic,
+      the image's .bin, then the files that its Makefile joins into it,
+      in that order
   romsize.py demo --bin B --doc D [--write] SOURCES...
       the demo's table, of demo.bin, which is not in the ROM (#129), in
       demo/README.md
@@ -308,19 +310,25 @@ def main() -> None:
     parser.add_argument("--basic", nargs="+", metavar="FILE",
                         help="BASIC's .bin, which must match, and its sources")
     parser.add_argument("--doc", required=True, help="the Markdown file with the tables")
+    parser.add_argument("--basic-doc", help="for rom, the Markdown file with BASIC's table")
     parser.add_argument("--write", action="store_true", help="write the tables into it")
     parser.add_argument("sources", nargs="*")
     # The demo's sources follow its options
     args = parser.parse_intermixed_args()
     if args.image == "rom":
-        if not args.monitor or len(args.monitor) < 2 or not args.basic or len(args.basic) < 2:
-            parser.error("rom needs --monitor and --basic, each with a .bin and its sources")
+        if not args.monitor or len(args.monitor) < 2 or not args.basic or len(args.basic) < 2 \
+                or not args.basic_doc:
+            parser.error("rom needs --basic-doc, and --monitor and --basic, each with a .bin "
+                         "and its sources")
         tables = rom_tables(args)
+        basic = {"basic": tables.pop("basic")}
+        # Both are compared, so that a failure shows every table that differs
+        ok_rom = update(args.doc, tables, args.write)
+        ok = update(args.basic_doc, basic, args.write) and ok_rom
     else:
         if not args.bin or not args.sources:
             parser.error("demo needs --bin and its sources")
-        tables = demo_tables(args)
-    ok = update(args.doc, tables, args.write)
+        ok = update(args.doc, demo_tables(args), args.write)
     if ok and not args.write:
         print(f"PASS romsize {args.image}")
     sys.exit(0 if ok else 1)

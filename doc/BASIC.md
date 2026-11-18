@@ -69,9 +69,12 @@ settle the three open questions of #54.
 
 ## What it runs on
 
-Measured on 2026-11-11, at commit 9f92b1a. The numbers of today, for
-every source of the monitor, are in
-[monitor/INTERNALS.md](../monitor/INTERNALS.md#the-roms-words).
+Measured on 2026-11-11, at commit 9f92b1a, before the ROM was split
+into the monitor's image and BASIC's (#152). The numbers of today, for
+every source, are in
+[monitor/INTERNALS.md](../monitor/INTERNALS.md#the-roms-words) and
+[basic/README.md](../basic/README.md#its-words), and
+[The ROM's room](#the-roms-room) has those of the split.
 
 | What | Words |
 |---|---:|
@@ -482,7 +485,8 @@ functions.
 
 ### The screen editor
 
-The Commodore editor of #54, in assembly, in place of `getline`:
+The Commodore editor of #54, in assembly, in place of the monitor's
+`con_getline`, entry 32:
 
 - The cursor keys move over the screen, and RETURN takes the logical
   line, up to two rows, 160 characters, from the screen.
@@ -525,7 +529,8 @@ BASIC is NICE assembly from stage 2 on ([Decisions](#decisions)):
 - The table of keywords, the ops, and the messages are packed with
   `.ASCII_B`, and read through the byte window, a quarter of the ROM.
 - The workspace is words, and its formats are those of
-  [Inside](#inside). BASIC's own state is in the monitor's variables.
+  [Inside](#inside). BASIC's own state is in its own RAM at
+  `0xFFFFE800` ([The memory](#the-memory)).
 
 A new ROM needs no bitstream to be tried on a board: the tools load a
 monitor at 0 with the ROM hidden, as `make hwtest` does, and
@@ -534,9 +539,10 @@ about a minute (#122).
 
 ## Tests
 
-- `make -C monitor test`, as now: the keys of each test in a file, and
-  the output compared with an expected file that was checked by hand.
-- Programs in `monitor/test/basic/`, a `.bas` file and its output,
+- `make -C basic test`, as now: the keys of each test in a file, and
+  the output compared with an expected file that was checked by hand
+  ([basic/README.md](../basic/README.md#testing)).
+- Programs in `basic/test/`, a `.bas` file and its output,
   typed in as lines, and loaded from an image.
 - The benchmarks, from stage 3: the sieve, and Rugg/Feldman 1 to 7,
   as they are written, with `/`. Stage 6 adds 8, which has `^`,
@@ -648,6 +654,15 @@ immediate 0 read from R0 (#149), 18903 (all measured 2026-11-16). In
 C, at 7 words a line, the stages 2 and 3 alone were guessed at 8800
 words, so C would have filled the ROM at stage 3. That is why BASIC is
 assembly from stage 2 on.
+
+Since #152 the ROM is two images, and BASIC's is `0x4000`–`0x7FFF`,
+16384 words. Stage 1 fills 5067 of them, with its own copies of
+`common.nasm`, `monlib.nasm`, and `mon.nasm`, 593 words, and leaves
+11317 free; the monitor's image is 9542 words, with 6842 free below
+`0x4000` (measured 2026-11-18). The list after stage 1 is guessed at
+10136 words in the table above, which fits, with little to spare.
+The split is one constant, `BASIC_BASE` of `monitor/common.nasm`: at
+`0x3000`, BASIC would have 20480 words, and the monitor 2746 free.
 
 In assembly, the whole list is guessed at 9000 to 12000 words, which
 fits what is free:

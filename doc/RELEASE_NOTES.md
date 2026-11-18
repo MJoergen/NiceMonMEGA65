@@ -137,7 +137,7 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   `DELETE`, `i` is `IP` and `DHCP`, `m` is `MAC`, `time ntp` is `NTP`,
   `d` is `DUMP`, `u` is `DIS`, `c` is `CLS`, `v` is `VER`, `h` is
   `HALT`, and `?` is `HELP`. `HELP` lists them
-  ([monitor/README.md](../monitor/README.md#basic)).
+  ([basic/README.md](../basic/README.md#the-statements)).
 - `tools/load.py --monitor` and `run.py --monitor` type `SYS 0x8000`.
   A program under the monitor starts with its stack 1 word lower.
 - The ROM is assembly only
@@ -198,7 +198,7 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   start that they share when several do, and a list of them at a TAB
   that adds nothing
   ([#137](https://github.com/MJoergen/NiceMonMEGA65/issues/137),
-  [monitor/README.md](../monitor/README.md#basic)).
+  [basic/README.md](../basic/README.md#the-statements)).
 - `sdcard.py mkdir`, and `make sdcard CMD=mkdir`, make the folder `NICE`
   on a card that has FAT32 but not the folder, with no PC slot
   ([#140](https://github.com/MJoergen/NiceMonMEGA65/issues/140)). The
