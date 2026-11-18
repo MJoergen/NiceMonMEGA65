@@ -21,9 +21,10 @@ compared (see
   the same on both, as the tools hide the board's ROM.
 - With the monitor joined at 0, BASIC's half is RAM, which the monitor
   finds open at every cold start. So `SYS 0` loads a card's
-  `BASIC*.ROM` again in the emulator, and zeroes `0x8000`–`0xBFFF`,
-  where a board loads it once after its configuration. An image whose
-  BASIC has the flag "keep", as the tests' has, loads none
+  `BASIC*.ROM` again in the emulator, when `0x8000`–`0xBFFF` is all
+  zeros, with no program there, where a board loads it once after its
+  configuration. An image whose BASIC has the flag "keep", as the
+  tests' has, loads none
   ([BASIC_ROM.md](BASIC_ROM.md#the-cold-start)).
 - The memory is 128K words on the MEGA65 and 64K on the Nexys4DDR, not
   2³². A program, its data, and its stack must fit. `0xFFFFFF9E` reads

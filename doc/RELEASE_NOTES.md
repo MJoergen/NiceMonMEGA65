@@ -79,7 +79,9 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   either slot, the one with the highest version that passes its checks,
   with a line that names it. A file that fails says why, and the next
   one is tried; with none, the bitstream's BASIC runs. Then the cold
-  start locks BASIC's half
+  start locks BASIC's half. A program that a host loaded at `0x8000`
+  before that stays, and the bitstream's BASIC runs it, with no card
+  read
   ([#153](https://github.com/MJoergen/NiceMonMEGA65/issues/153)).
 - The dispatch table is 1.7, with 4 entries more, 37 to 40:
   `mon_build`, the monitor's version; `con_key`, a byte of the console

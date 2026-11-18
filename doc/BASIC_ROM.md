@@ -256,49 +256,67 @@ the monitor's write of a word back to itself changes nothing in
 1. **Is the ROM still open?** The monitor writes the complement of the
    last word, `0x7FFF`, reads it back, and writes the word again. If
    the write did not stick, BASIC has run since the configuration, and
-   the monitor goes to step 8. So `SYS 0`, and a start by the link, do
+   the monitor goes to step 9. So `SYS 0`, and a start by the link, do
    not read the card again.
 2. **Is the BASIC in the ROM to be kept?** If its header has the magic
-   word and "keep", the monitor goes to step 8.
-3. Choose a file ([Choosing the file](#choosing-the-file)). With none,
-   the bitstream's BASIC runs, from step 8.
-4. **The read stages** the file in the program's RAM, the staging
-   area, 16384 words from `0x8000`, which it zeroes first. Each line's
-   address must be in `0x4000`–`0x7FFF`, and above the line's before,
-   and its word goes to that address plus `0x4000`. So the ROM is not
-   touched yet.
-5. **The check** reads the staged header: the magic word, the
+   word and "keep", the monitor goes to step 9.
+3. **Is a program loaded?** The loader stages a file in the program's
+   RAM, the staging area, 16384 words from `0x8000`, which is all
+   zeros after a configuration. If a word of it is not 0, a host has
+   loaded a program while the ROM was open. The monitor then goes to
+   step 9, when the BASIC in the ROM is whole: its header and its
+   checksum fit. So the program stays, and the BASIC in the ROM runs
+   it.
+4. Choose a file ([Choosing the file](#choosing-the-file)). With none,
+   the bitstream's BASIC runs, from step 9.
+5. **The read stages** the file in the staging area, which it zeroes
+   first. Each line's address must be in `0x4000`–`0x7FFF`, and above
+   the line's before, and its word goes to that address plus `0x4000`.
+   So the ROM is not touched yet.
+6. **The check** reads the staged header: the magic word, the
    interface, the length, and the sum over the length must fit. If the
    file is not valid, print why on one line, such as
    `BASIC-V2.3.2.ROM on card 0: bad checksum`, zero the staging area,
    and try the next file.
-6. **The copy** writes the staged words over the length, and zeroes
+7. **The copy** writes the staged words over the length, and zeroes
    the rest of `0x4000`–`0x7FFF` of the ROM. A loop from the RAM to
    the ROM cannot fail as a card can, so the ROM always ends up with a
    whole, checked BASIC.
-7. Zero the staging area. Before the copy, the loader prints
+8. Zero the staging area. Before the copy, the loader prints
    `BASIC-V2.3.2.ROM from card 0`, or, when its version is below that
    of the BASIC that the ROM had,
    `BASIC-V2.3.2.ROM from card 0, older than the core's V2.4`, as the
    copy overwrites the old BASIC's text.
-8. **The lock and the jump.** The monitor writes a word of its own
+9. **The lock and the jump.** The monitor writes a word of its own
    half back to itself, which sets the lock, and goes to `BAS_COLD`.
    Every path ends here, and it is the monitor's one jump to
    `BAS_COLD`.
 
 - **The staging area** is the program's RAM, which is all zeros at the
   first cold start after a configuration, the only one that loads.
-  Step 7 leaves it so, as the configuration did, and as `niceemu`
-  starts. A program that a host loads at `0x8000` before that first
-  cold start would be lost, but the boards boot at configuration on
-  their own, before a host can load one. The RAM is at least 64K
-  words, on the Nexys4DDR, so the area always fits below the stack.
+  Step 8 leaves it so, as the configuration did, and as `niceemu`
+  starts. The RAM is at least 64K words, on the Nexys4DDR, so the area
+  always fits below the stack.
+- **A program that a host loaded** is in the staging area, and step 3
+  leaves it there. The boards boot at configuration on their own, but
+  the first cold start takes seconds with a card, and a host that
+  holds the core before its end finds the ROM still open, also for a
+  later load. The lock follows as always, so the cards' BASIC is not
+  loaded until the next configuration. A hold in the middle of the
+  copy of step 7 leaves a BASIC in the ROM that is not whole: the
+  loader then goes on, over the program, as the board needs a BASIC.
+- **A reset in the middle of a load** leaves words of a file in the
+  staging area, which are no program. `BL_BUSY`, a word of the
+  monitor's RAM, is not 0 from before step 5 until the staging area
+  is zeroed for the last time. A reset keeps the RAM, so the next cold
+  start finds the word, zeroes the staging area, and loads again. A
+  host's clear zeroes the word with the RAM.
 - **A monitor that runs from RAM** finds the ROM open at every cold
   start: in `niceemu`, and where a tool loads a ROM image at 0 with
   the ROM hidden, as `load.py --monitor --rom` and `make hwtest` do.
   There the loader would replace the BASIC that was just loaded with
-  the card's, and zero the program that the host put at `0x8000`.
-  "keep" is for them: the tests' image has it, and the tools set it in
+  the card's, when no program is at `0x8000`. "keep" is for them: the
+  tests' image has it, and the tools set it in
   an image that they load ([The tools](#the-tools)). A release's image
   has it clear, so `niceemu` with a card loads as the board does.
 - **A file that hangs.** A `BASIC*.ROM` that passes the check and
@@ -379,9 +397,9 @@ finds the ROM locked, and runs that image.
   lock's write puts a word back that is there. A
   program's write to the ROM's range differs from the board's already,
   as the ROM is in front of the RAM there ([EMULATOR.md](EMULATOR.md)).
-- So `SYS 0` loads the card's BASIC again in `niceemu`, and zeroes the
-  staging area, where the board finds the ROM locked. That is a new
-  row of EMULATOR.md.
+- So `SYS 0` loads the card's BASIC again in `niceemu`, unless a
+  program is in the staging area, where the board finds the ROM
+  locked. That is a new row of EMULATOR.md.
 - The tests keep `cat rom_test.bin prog.bin`. The tests' image has
   "keep", so no test of today reads a card at its start, and their
   outputs do not change but for the banner.
@@ -395,8 +413,12 @@ finds the ROM locked, and runs that image.
   both slots; slot 1 only; a file older than the ROM's BASIC, with its
   notice; a file with a larger RAM of BASIC's, with `mon_exit`'s SP
   and `bin_line`'s end after it; and `SYS 0` after a load. With
-  "keep", a valid file on the card is not taken. The new entries have
-  a test of their own, as those of table 1.6 have.
+  "keep", a valid file on the card is not taken, nor with a program
+  in the staging area, or a word at its end alone, unless the BASIC in
+  the ROM is not whole. With `BL_BUSY` set, as after a reset in the
+  middle of a load, the staging area is zeroed and the file taken.
+  The new entries have a test of their own, as those of table 1.6
+  have.
 - **In the RTL**: `tb_nicemon` writes the ROM's halves before and after
   a write by the core to the monitor's half, and checks that a fetch
   from BASIC's half does not lock, the lock across a start and a
@@ -489,7 +511,8 @@ is decided ([Decisions](#decisions)):
 
 Made on 2026-11-18. A review of the first design against the code,
 the same day, replaced the second and the fourth, and added those
-from the fifth on.
+from the fifth on. A review of the code, that day too, added the
+tenth.
 
 1. **The names of the releases**: one series of tags, A of
    [Releases](#releases).
@@ -519,6 +542,14 @@ from the fifth on.
    It has this issue, with the eighth decision, and no more. The other
    issues that it had, BASIC's stages 2 and 3 among them, went to
    `V2.3.2`.
+10. **A program that a host loaded stays**, and the cards' BASIC
+    waits for the next configuration
+    ([The cold start](#the-cold-start), step 3). The first design let
+    the loader overwrite it, as the boards boot before a host can
+    load one, which does not hold with a card that takes seconds.
+    The other way was a load by the tools after the cold start,
+    behind a breakpoint at `BAS_COLD`, which keeps the program and
+    the cards' BASIC, but only for these tools.
 
 ## Open questions
 
@@ -555,8 +586,10 @@ One is open:
    with the lock's write; SP and `bin_line`'s end from the header;
    and table 1.7, with the entries 37 to 40, their stubs in `mon.nasm`
    and `mon.h`, and the banner. The tests in `niceemu`, and the whole
-   load in the RTL. Written: `monitor/monitor_basic.nasm` is the loader, 777 words, which keeps
+   load in the RTL. Written: `monitor/monitor_basic.nasm` is the loader, 818 words, which keeps
    no list of the files and lists the folders again for each choice.
+   It leaves a program in the staging area alone, and does a load
+   again that a reset broke off.
    Its reasons are `not a BASIC image`, `for another monitor`,
    `bad header`, `bad address`, `bad line`, `bad checksum`, and
    `card error`. `test/basload.py` and `test/hal17.nasm` are its tests

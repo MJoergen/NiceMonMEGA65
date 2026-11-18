@@ -443,3 +443,107 @@ Screen:
 |halt
 |Halted
 exit 0
+== a program at 0x8000: it stays, and the ROM's BASIC runs it
+NiceMon V9.9, BASIC V9.9
+HELP lists the statements
+READY.
+sys 0x8000
+Returned 1234ABCD
+READY.
+halt
+Halted
+00008000: 00005800 1234abcd 0003d800
+Screen:
+|NiceMon V9.9, BASIC V9.9
+|HELP lists the statements
+|READY.
+|sys 0x8000
+|Returned 1234ABCD
+|READY.
+|halt
+|Halted
+exit 0
+== a word at the end of the staging area: no load either
+NiceMon V9.9, BASIC V9.9
+HELP lists the statements
+READY.
+halt
+Halted
+0000bfff: 00000001
+Screen:
+|NiceMon V9.9, BASIC V9.9
+|HELP lists the statements
+|READY.
+|halt
+|Halted
+exit 0
+== a program, and the ROM's BASIC not whole: the card's, and no program
+BASIC-V10.ROM from card 0
+NiceMon V9.9, BASIC A
+HELP lists the statements
+READY.
+halt
+Halted
+00008000: 00000000 00000000 00000000
+Screen:
+|BASIC-V10.ROM from card 0
+|NiceMon V9.9, BASIC A
+|HELP lists the statements
+|READY.
+|halt
+|Halted
+exit 0
+== the same with no card: the program stays
+NiceMon V9.9, BASIC V9.9
+HELP lists the statements
+READY.
+sys 0x8000
+Returned 1234ABCD
+READY.
+halt
+Halted
+00008000: 00005800 1234abcd 0003d800
+Screen:
+|NiceMon V9.9, BASIC V9.9
+|HELP lists the statements
+|READY.
+|sys 0x8000
+|Returned 1234ABCD
+|READY.
+|halt
+|Halted
+exit 0
+== a load that a reset broke off: again
+BASIC-V10.ROM from card 0
+NiceMon V9.9, BASIC A
+HELP lists the statements
+READY.
+halt
+Halted
+00008000: 00000000
+0000a000: 00000000
+fffff70d: 00000000
+Screen:
+|BASIC-V10.ROM from card 0
+|NiceMon V9.9, BASIC A
+|HELP lists the statements
+|READY.
+|halt
+|Halted
+exit 0
+== the same with no card: the staging area zeroed
+NiceMon V9.9, BASIC V9.9
+HELP lists the statements
+READY.
+halt
+Halted
+00008000: 00000000
+0000a000: 00000000
+fffff70d: 00000000
+Screen:
+|NiceMon V9.9, BASIC V9.9
+|HELP lists the statements
+|READY.
+|halt
+|Halted
+exit 0

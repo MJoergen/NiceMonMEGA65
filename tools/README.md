@@ -224,6 +224,11 @@ gets BASIC's flag "keep", so that its monitor runs that BASIC and does
 not load a card's `BASIC*.ROM` in its place
 ([doc/BASIC_ROM.md](../doc/BASIC_ROM.md)).
 
+A MEGA65 loads a card's `BASIC*.ROM` when it is switched on, which
+takes a few seconds. A program that `--monitor` loads before that has
+ended stays, and the core's own BASIC runs it. The card's BASIC is
+then not loaded until the board is switched off and on again.
+
 ## Loading BASIC into the ROM
 
 BASIC's half of the ROM, `0x4000`–`0x7FFF`, takes the link's writes.

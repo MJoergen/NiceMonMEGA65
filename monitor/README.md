@@ -28,7 +28,9 @@ may put another BASIC into BASIC's half of the ROM: a file whose name
 matches `BASIC*.ROM`, in the folder `NICE` of a card. It takes the one
 with the highest version that passes its checks, and prints its name.
 Then BASIC's half is locked until the next configuration
-([doc/BASIC_ROM.md](../doc/BASIC_ROM.md)).
+([doc/BASIC_ROM.md](../doc/BASIC_ROM.md)). It reads no card when a
+host has already loaded a program at `0x8000`: the program stays, and
+the ROM's own BASIC runs it.
 
 The monitor's variables are in the RAM at `0xFFFFF000` and up, BASIC's
 below them, as many words as its image's header says, 2K words at

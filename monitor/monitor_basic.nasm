@@ -15,20 +15,33 @@
 ; bas_load does nothing when the ROM is locked, which it finds out by
 ; writing the complement of BASIC's last word and reading it back, nor
 ; when the BASIC in the ROM has the flag "keep", as an image that a tool
-; loaded into the RAM has, where the ROM is RAM. Else it lists the
-; folder of slot 0, then of slot 1, and reads the first BAS_H_WORDS
-; lines of each BASIC*.ROM, its header, which bl_check checks: a file
-; whose header does not fit is passed over, with its reason on a line of
-; its own. Of the others it takes the one with the highest version, and
-; of two with the same version the first, slot 0 before slot 1, and in a
-; folder the one that comes first. It reads that file into the program's
-; RAM from PROGRAM, the staging area, BASIC_BASE words higher than each
-; line's address, and checks it there: its lines, its header, and its
-; checksum. Only a file that passes is copied into the ROM, over its
-; length, and the rest of BASIC's half zeroed; else its reason is shown,
-; and the next one is taken, the one with the highest version below
-; it. The staging area is zeroed before each file and after the last,
-; as the RAM is at the configuration, the only cold start that loads.
+; loaded into the RAM has, where the ROM is RAM.
+;
+; Nor does it load over a program. It stages a file in the program's RAM
+; from PROGRAM, the staging area, as many words as BASIC's half, which is
+; all zeros after a configuration. When it is not, a host has loaded a
+; program there while the ROM was still open, and the BASIC in the ROM
+; runs it, when that BASIC is whole, with its header and its checksum
+; right (bl_whole); the cards' BASIC then waits for the next
+; configuration. A load of its own that a reset broke off is not a
+; program: BL_BUSY is not 0 from before the first write to the staging
+; area until that area is zeroed for the last time, and the monitor's RAM
+; keeps it over a reset, which a host's clear does not, so that load
+; starts again, with the staging area zeroed.
+;
+; Else it lists the folder of slot 0, then of slot 1, and reads the first
+; BAS_H_WORDS lines of each BASIC*.ROM, its header, which bl_check
+; checks: a file whose header does not fit is passed over, with its
+; reason on a line of its own. Of the others it takes the one with the
+; highest version, and of two with the same version the first, slot 0
+; before slot 1, and in a folder the one that comes first. It reads that
+; file into the staging area, BASIC_BASE words higher than each line's
+; address, and checks it there: its lines, its header, and its checksum.
+; Only a file that passes is copied into the ROM, over its length, and
+; the rest of BASIC's half zeroed; else its reason is shown, and the next
+; one is taken, the one with the highest version below it. The staging
+; area is zeroed before each file and after the last, as the RAM is at
+; the configuration, the only cold start that loads.
 ;
 ; The order is by a key, the version and the ordinal of the file, its
 ; slot in bits 31..16 and its number in the folder in 15..0: a key is
@@ -62,6 +75,7 @@ BL_FOUND        .EQU    0xFFFFF709      ; not 0 when a file was chosen, whose ke
 BL_BV           .EQU    0xFFFFF70A      ; its version
 BL_BO           .EQU    0xFFFFF70B      ; and its ordinal,
 BL_BSLOT        .EQU    0xFFFFF70C      ; in the slot BL_BSLOT
+BL_BUSY         .EQU    0xFFFFF70D      ; not 0 while the staging area or the ROM has part of a load
 BL_LMAX         .EQU    76              ; the characters of a line, as LOAD's
 BL_BUFN         .EQU    128             ; the bytes of a read
 BL_STAGE        .EQU    PROGRAM-BASIC_BASE  ; a word's offset in the staging area
@@ -99,11 +113,26 @@ bas_load
                 AND[M]  R0, @BAS_H_FLAGS, BAS_KEEP
         ?!Z     JMP     bl_end
 :
+; A load that a reset broke off starts again, over what it left
+                TST     @BL_BUSY
+        ?Z      JMP     :+
+                CALL    bl_zero
+                JMP     bl_load
+; Has a host loaded a program? It stays, with a whole BASIC in the ROM
+:
+                CALL    bl_empty
+        ?Z      JMP     bl_load
+                CLR     R1
+                CALL    bl_whole
+                TST     R1
+        ?Z      JMP     bl_end
+bl_load
                 CLR     @BL_TRIED
 bl_next
                 CALL    bl_choose
                 TST     @BL_FOUND
         ?Z      JMP     bl_done         ; none: the bitstream's BASIC
+                MOVE    @BL_BUSY, 1
                 CALL    bl_stage
                 TST     R1
         ?Z      JMP     bl_ok
@@ -152,6 +181,7 @@ bl_ok
 :
                 CALL    bl_zero
 bl_done
+                CLR     @BL_BUSY        ; the staging area is all zeros
                 CALL    fat_reset       ; no mount, and no file open
 bl_end
                 POP     R12
@@ -352,7 +382,8 @@ ck_header
 ; bl_stage: the file BL_BEST of the slot BL_BSLOT read into the staging
 ; area, zeroed first, and checked there: each line ADDR WORD, ADDR in
 ; BASIC's half and above the line's before, and then the header and the
-; checksum. R1 = 0, or the reason. Uses R1-R6, R8, R10, and R11.
+; checksum, with bl_whole. R1 = 0, or the reason. Uses R1-R6, R8, R10,
+; and R11.
 bl_stage
                 CALL    bl_zero
                 MOVE    R1, @BL_BSLOT
@@ -387,18 +418,7 @@ bs_line
 bs_end
                 CALL    bl_close
                 MOVE    R1, BL_STAGE
-                CALL    bl_check
-                TST     R1
-        ?!Z     RET
-                MOVE    R2, @BL_STAGE+BAS_H_LENGTH
-                MOVE    R3, BL_STAGE+BASIC_BASE
-:
-                ADD     R1, R1, @R3++
-                SUB[M]  R2, R2, 1
-        ?!Z     JMP     :-
-                TST     R1
-        ?!Z     MOVE    R1, BL_E_SUM
-                RET
+                JMP     bl_whole        ; which returns to the caller
 bs_bad_line
                 CALL    bl_close
                 MOVE    R1, BL_E_LINE
@@ -411,6 +431,36 @@ bs_close_read
                 CALL    bl_close
 bs_read
                 MOVE    R1, BL_E_READ
+                RET
+
+; bl_whole: the image whose word BASIC_BASE + i is at R1 + BASIC_BASE + i
+; checked, the staged one with R1 = BL_STAGE, and the BASIC in the ROM
+; with R1 = 0: its header, with bl_check, and its checksum, the sum over
+; its length, which is 0. R1 = 0, or the reason. Uses R1-R4.
+bl_whole
+                MOVE    R4, R1
+                CALL    bl_check
+                TST     R1
+        ?!Z     RET
+                MOVE    R2, @BAS_H_LENGTH[R4]
+                ADD     R3, R4, BASIC_BASE
+:
+                ADD     R1, R1, @R3++
+                SUB[M]  R2, R2, 1
+        ?!Z     JMP     :-
+                TST     R1
+        ?!Z     MOVE    R1, BL_E_SUM
+                RET
+
+; bl_empty: Z when the staging area is all zeros, as the configuration
+; left it, and as bl_zero leaves it. Uses R1.
+bl_empty
+                MOVE    R1, PROGRAM
+:
+                TST     @R1++
+        ?!Z     RET
+                CMP     R1, PROGRAM+PROGRAM-BASIC_BASE
+        ?!Z     JMP     :-
                 RET
 
 ; bl_zero: the staging area, the program's RAM from PROGRAM, as many words

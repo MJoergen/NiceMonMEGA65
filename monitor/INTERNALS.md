@@ -199,12 +199,20 @@ calls before it locks BASIC's half and jumps to BASIC. It keeps no
 list of the files: each choice lists the folders of both slots again,
 and takes the highest key, the version and then the file's place,
 below that of the file that failed. Its state is in the monitor's RAM
-from `0xFFFFF400` to `0xFFFFF70C`, which nothing else uses: a line of
-the file, the bytes of a read, an entry, the header, two names, and
-the keys. It reads a line as `LOAD` does, and parses it with
+from `0xFFFFF400` to `0xFFFFF70D`, which nothing else uses: a line of
+the file, the bytes of a read, an entry, the header, two names, the
+keys, and `BL_BUSY`. It reads a line as `LOAD` does, and parses it with
 `bin_parse`, which `bin_line` shares. The staging area is the
 program's RAM from `0x8000`, 16384 words, zeroed before each file and
 after the last.
+
+The loader does not load over a program. When the staging area is not
+all zeros at its start, a host has loaded a program there while the
+ROM was open: it stays, and the BASIC in the ROM runs it, when that
+BASIC is whole, which `bl_whole` checks, by its header and its
+checksum. `BL_BUSY` is not 0 while the staging area or the ROM has
+part of a load. A reset keeps it, and the loader then zeroes the
+staging area and loads again; a host's clear zeroes it.
 
 ## FAT32
 
@@ -251,8 +259,8 @@ assembled apart (#152): the monitor's from 0, and BASIC's from
 <!-- romsize layout -->
 | Part | Address | Words |
 |---|---|---:|
-| The monitor | `0x0000`–`0x293C` | 10557 |
-| Free | `0x293D`–`0x3FFF` | 5827 |
+| The monitor | `0x0000`–`0x2965` | 10598 |
+| Free | `0x2966`–`0x3FFF` | 5786 |
 | BASIC | `0x4000`–`0x53E9` | 5098 |
 | Free | `0x53EA`–`0x7FFF` | 11286 |
 <!-- /romsize layout -->
@@ -273,13 +281,13 @@ ROM is built:
 | `monitor_eth.nasm` | The network, and its entries | 2440 | 10 |
 | `monitor_tcp.nasm` | TCP | 2414 | 0 |
 | `monitor_clock.nasm` | The clock: `clock_set`, the dates of files, and the real-time clock | 313 | 0 |
-| `monitor_basic.nasm` | The loader of BASIC's image from a card | 777 | 51 |
+| `monitor_basic.nasm` | The loader of BASIC's image from a card | 818 | 51 |
 | `common.nasm` | What the monitor and BASIC share: texts, IP addresses, and dates | 237 | 5 |
 | `monlib.nasm` | The routines that programs join | 274 | 0 |
 | `mon.nasm` | The stubs of the entries | 90 | 0 |
 | `build/folder.nasm` | The folder's name | 3 | 3 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 10557 | 71 |
+| In all | | 10598 | 71 |
 <!-- /romsize monitor -->
 
 
@@ -535,7 +543,11 @@ each reason of a file that fails, three versions, the newest broken,
 all broken, the same version on both slots, a newer one on slot 1,
 slot 1 only, `SYS 0` with and without "keep" in the file, and BASIC's
 RAM at 4K words and 2K words, with `mon_exit`'s stack and `LOAD`'s end
-after each. Its output is compared with `test/basload.expected`.
+after each. Then it runs a program at `0x8000`, and a word at `0xBFFF`
+alone, which keep the ROM's BASIC, the program with a BASIC in the ROM
+that is not whole, with a card and without one, and `BL_BUSY` set with
+words in the staging area, with a card and without one. Its output is
+compared with `test/basload.expected`.
 
 `niceemu` has no I2C master: its status word is memory, which reads 0,
 so the cold start of every run finds none, and `TIME` shows that the

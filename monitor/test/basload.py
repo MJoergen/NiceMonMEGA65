@@ -18,6 +18,11 @@ BUILD/basload.out.
 The ROM in niceemu is RAM, so the loader finds BASIC's half open at
 every cold start: SYS 0 loads again, where a board finds it locked.
 
+Some runs have words in the staging area, 0x8000 to 0xBFFF, at the
+start, as a program that a host loaded while the ROM was open, which
+the loader leaves alone, or, with the loader's BL_BUSY set, as what a
+load leaves that a reset broke off, which it does again.
+
 Usage: test/basload.py NICEEMU ROM_TEST.bin BUILD
 """
 
@@ -119,6 +124,8 @@ class Run(NamedTuple):
     rom_keep: bool = False      # the ROM's BASIC keeps "keep"
     prog: Optional[str] = None  # an assembly program, after the ROM
     dump: str = ""
+    rom_break: bool = False     # the ROM's BASIC has a wrong checksum
+    extra: str = ""             # lines of the .bin file, after the ROM
 
 
 # A program at 0xC000, above the staging area, which mon_exit, entry 1,
@@ -130,6 +137,14 @@ EXIT = """                .ORG    0xC000
 """
 # The RAM's words for bin_line, 128K as on the MEGA65
 RAM128K = "FFFFFF9E 00020000\n"
+# The same program at 0x8000, in the staging area, as a host loads one
+STAY = EXIT.replace("0xC000", "0x8000")
+# The last word of the staging area alone
+LAST = "0000BFFF 00000001\n"
+# What a load leaves that a reset broke off: words of a file in the
+# staging area, and the loader's BL_BUSY, 0xFFFFF70D, not 0
+BROKEN_OFF = "00008000 DEADBEEF\n0000A000 00000001\nFFFFF70D 00000001\n"
+BUSY_DUMP = "-d 0x8000:1 -d 0xA000:1 -d 0xFFFFF70D:1"
 
 
 def card(path: str, files: list[File]) -> None:
@@ -219,14 +234,31 @@ def main() -> None:
         Run("2K words: the same", [File("BASIC-V10.ROM", v(10, 0, "A"))],
             keys="sys 0xC000\rload\r1E7FF 5\r1E800 6\r\rhalt\r",
             prog=EXIT, dump="-d 0xFFFFDFFF:1 -d 0xFFFFE7FF:1 -d 0x1E7FF:2"),
+        Run("a program at 0x8000: it stays, and the ROM's BASIC runs it",
+            [File("BASIC-V10.ROM", v(10, 0, "A"))], keys="sys 0x8000\rhalt\r",
+            prog=STAY, dump="-d 0x8000:3"),
+        Run("a word at the end of the staging area: no load either",
+            [File("BASIC-V10.ROM", v(10, 0, "A"))], extra=LAST, dump="-d 0xBFFF:1"),
+        Run("a program, and the ROM's BASIC not whole: the card's, and no program",
+            [File("BASIC-V10.ROM", v(10, 0, "A"))], prog=STAY, dump="-d 0x8000:3",
+            rom_break=True),
+        Run("the same with no card: the program stays", None, keys="sys 0x8000\rhalt\r",
+            prog=STAY, dump="-d 0x8000:3", rom_break=True),
+        Run("a load that a reset broke off: again",
+            [File("BASIC-V10.ROM", v(10, 0, "A"))], extra=BROKEN_OFF, dump=BUSY_DUMP),
+        Run("the same with no card: the staging area zeroed", None,
+            extra=BROKEN_OFF, dump=BUSY_DUMP),
     ]
 
     out: list[str] = []
     for n, run in enumerate(runs):
         rom = os.path.join(work, f"rom{n}.bin")
+        bas = dict(base if run.rom_keep else rom_bas)
+        if run.rom_break:
+            bas[basic_rom.H_SUM] ^= 1
         with open(rom, "w") as f:
             f.writelines(lines(monitor))
-            f.writelines(lines(base if run.rom_keep else rom_bas))
+            f.writelines(lines(bas))
             if run.prog:
                 src = os.path.join(work, f"prog{n}.nasm")
                 with open(src, "w") as p:
@@ -235,6 +267,7 @@ def main() -> None:
                 with open(src + ".bin") as p:
                     f.write(p.read())
                 f.write(RAM128K)
+            f.write(run.extra)
         args = [emu, "-s", "-n", str(STEPS), "-i", os.path.join(work, f"in{n}.txt")]
         with open(args[-1], "w") as f:
             f.write(run.keys)
