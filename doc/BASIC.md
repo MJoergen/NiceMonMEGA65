@@ -711,8 +711,8 @@ bitstream.
 BASIC's image ([BASIC_ROM.md](BASIC_ROM.md#the-image)). The monitor
 takes SP and the end of a program's RAM from it, 1024 to 8192 words, and the header's
 version of the RAM's layout then covers the monitor's own RAM alone,
-from `0xFFFFF000`. `load.py --monitor` has the two RAMs' size as
-`MONITOR_WORDS`, and is to take BASIC's from the word instead.
+from `0xFFFFF000`. `load.py --monitor` takes BASIC's from the word
+too, and has the monitor's as `MON_VARS`.
 
 The rest of stage 3 is BASIC's own. `HIMEM` works with `bin_line` as
 it is: its counts have the lowest address written, so BASIC knows

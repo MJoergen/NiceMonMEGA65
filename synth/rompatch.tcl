@@ -13,7 +13,7 @@
 # block RAMs of a slice of the bits, here 2 bits of every address, and
 # records the slice and the addresses of each in its properties
 # ram_slice_begin, ram_slice_end, ram_addr_begin, and ram_addr_end. The
-# bank comes from the cell's name (a_odd_reg or a_even_reg). A block RAM
+# bank comes from the cell's name (mem_odd_reg or mem_even_reg). A block RAM
 # of width w holds 256 / w addresses in each of its 128 INIT strings, the
 # lowest address in the lowest bits.
 #

@@ -95,9 +95,9 @@ details of [Open questions](#open-questions) are open.**
   finds it locked and runs the bitstream's BASIC, and `load.py --basic`
   refuses it. Its contents at configuration still come
   from `build/rom.bin`. `synth/rompatch.tcl` finds the ROM's block
-  RAMs by the names `a_even_reg` and `a_odd_reg`, which a memory that
-  is written may not keep, so `make r6 ROMPATCH=` needs a look. The
-  script stops when it does not find the layout that it knows.
+  RAMs by their names, `mem_even_reg_*` and `mem_odd_reg_*`, with the
+  port and without it, and stops when it does not find the layout that
+  it knows.
 - **The write is registered**, and reaches the ROM a cycle late. The
   worst path out of the core has 0.12 ns on the R6 in `V2.3`, and the
   register keeps the ROM's 32 block RAMs off the core's store paths. A
@@ -419,10 +419,10 @@ finds the ROM locked, and runs that image.
   "keep" in a ROM image that they load into the RAM. So the card's
   BASIC does not replace it, the program at `0x8000` stays, and
   `make hwtest` tests the build's BASIC, with the waits that it has.
-- `load.py --monitor` has the end of a program's RAM from
-  `MONITOR_WORDS` now, the monitor's RAM and BASIC's, and
-  `make hwtest` shares it. It takes BASIC's from the header instead,
-  of the file of `--rom`, or over the link.
+- `load.py --monitor` has the end of a program's RAM from the words
+  of the monitor's RAM, `MON_VARS`, and of BASIC's, which it takes
+  from the header, of the file of `--rom`, or over the link.
+  `make hwtest` shares it.
 - `make hwtest` checks that the ROM's BASIC half takes a link's write,
   and that the monitor's half does not, then loads a test image with a
   banner of its own, and checks the banner. With a `BASIC*.ROM` on a

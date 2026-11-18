@@ -23,7 +23,8 @@
 ;
 ; The ROM is two images, assembled apart (issue #152): the monitor, at
 ; 0x0000, and BASIC, at BASIC_BASE, 0x4000, from the files of ../basic/.
-; The Makefile joins the two into build/monitor.bin. BASIC calls the
+; ../rom.mk joins the two into ../build/rom.bin, the ROM, and the images
+; of the tests into ../build/rom_test.bin. BASIC calls the
 ; monitor through the entries of the dispatch table alone, as a program
 ; does, and the monitor knows of BASIC only its two vectors, so neither
 ; reaches a label of the other.
@@ -102,7 +103,7 @@
 ; from STACK (common.nasm): a write to the ROM is dropped, so
 ; nothing of the monitor's is written below 0x8000. In niceemu, which has
 ; no ROM, the monitor is a program at 0 like any other, and cat
-; monitor.bin prog.bin runs it with a program at 0x8000 (Makefile, test).
+; rom_test.bin prog.bin runs it with a program at 0x8000 (Makefile, test).
 ;
 ; The ROM is assembly only. A program in C brings nice_cpu's runtime
 ; library with it, and calls the entries of the dispatch table through
