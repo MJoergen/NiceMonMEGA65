@@ -139,9 +139,9 @@ SUITES = {
         "m_total16.img", "m_psize.img", "m_nicecl.img",
         "m_fatwrap.img", "m_baddir.img")] + [
         Run("No card in either slot", None, keys='dir\rdir 0\rload "x.bin"\rhalt\r'),
-        Run("DIR with a slot of 2^31 and more has no such slot (issue #151, B1)",
-            "lfn.img", "super.img",
-            keys="dir 1\rdir 2147483648\rdir 4294967295\rdir 2\rhalt\r"),
+        Run("DIR with a negative slot has no such slot (issue #151, B1), and one of "
+            "2^31 is an Illegal quantity", "lfn.img", "super.img",
+            keys="dir 1\rdir -1\rdir 0x80000000\rdir 2147483648\rdir 2\rhalt\r"),
     ],
     # P10: other geometries
     "fatgeo": [Run(f"SAVE, LOAD, DIR, and DELETE on {img}", img,

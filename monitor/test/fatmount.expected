@@ -373,7 +373,7 @@ READY.
 halt
 Halted
 exit 0
-== DIR with a slot of 2^31 and more has no such slot (issue #151, B1)
+== DIR with a negative slot has no such slot (issue #151, B1), and one of 2^31 is an Illegal quantity
 NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
@@ -382,11 +382,14 @@ Directory of NICE
 HELLO.BIN                      14400
 Files: 1, directories: 0
 READY.
-dir 2147483648
+dir -1
 File error 27, no such slot
 READY.
-dir 4294967295
+dir 0x80000000
 File error 27, no such slot
+READY.
+dir 2147483648
+Illegal quantity
 READY.
 dir 2
 File error 27, no such slot

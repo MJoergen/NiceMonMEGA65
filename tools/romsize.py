@@ -45,6 +45,8 @@ ROM_PARTS = {
     "monitor.nasm": "The dispatch table, the HAL, and the cold start",
     "basic.nasm": "The vectors, the header, the main loop, the scanner, the keywords, the messages, "
                   "and the help",
+    "basic_expr.nasm": "The numbers: the tokenizer, the expressions, the variables, the errors, "
+                       "`PRINT`, `LET`, and `POKE`",
     "basic_cmd.nasm": "The routines of the statements that were the commands",
     "basic_net.nasm": "`DHCP`, `NTP`, and TFTP",
     "basic_time.nasm": "`TIME`, and the clock's side of `NTP`",

@@ -33,7 +33,7 @@ BAS_ROM  = $(PYTHON) $(BAS_ROM_TOOL)
 SHARED   = $(addprefix $(ROOT)/monitor/,common.nasm monlib.nasm mon.nasm)
 MON_SOURCES = $(addprefix $(ROOT)/monitor/,monitor.nasm monitor_sd.nasm monitor_fat.nasm \
                 monitor_eth.nasm monitor_tcp.nasm monitor_clock.nasm monitor_basic.nasm) $(SHARED)
-BAS_SOURCES = $(addprefix $(ROOT)/basic/,basic.nasm basic_cmd.nasm basic_net.nasm \
+BAS_SOURCES = $(addprefix $(ROOT)/basic/,basic.nasm basic_expr.nasm basic_cmd.nasm basic_net.nasm \
                 basic_time.nasm basic_dis.nasm) $(SHARED)
 
 VERSION ?= $(shell git -C $(ROOT) describe --tags --always --dirty 2>/dev/null || echo unknown)

@@ -34,7 +34,8 @@ the survey of the BASIC dialects behind the interpreter in the ROM of
 issue #54 (milestone V2.2), and `doc/BASIC.md` its design note, with
 the decisions, the room in the ROM, and the stages, of which stage 1,
 the shell (#112), is written, and ported to assembly (#115), and
-split from the monitor into an image of its own (#152).
+split from the monitor into an image of its own (#152), and stage 2,
+the numbers (#113), is written.
 `doc/BASIC_ROM.md` is the design of BASIC's image from a card's
 `BASIC*.ROM`, which replaces BASIC's half of the ROM at the first
 cold start (#153), of which all five stages are written.
@@ -191,7 +192,10 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   of it. `basic/`: BASIC
   (`basic.nasm`, the vectors, the main loop (#54, stage 1 #112), its
   scanner of a line (#115), its keywords, messages, and help, and the
-  map of its RAM, `basic_cmd.nasm`, the routines of the statements
+  map of its RAM, `basic_expr.nasm`, the numbers of stage 2 (#113):
+  the tokenizer of a line, the expressions on the FPU, the variables
+  from `0x8000`, the errors, and `PRINT`, `LET`, and `POKE`,
+  `basic_cmd.nasm`, the routines of the statements
   that were the monitor's commands, `DHCP`, `NTP`, and TFTP in
   `basic_net.nasm`, `TIME` in `basic_time.nasm`, and `DIS` in
   `basic_dis.nasm`), on the entries of the dispatch table alone, as a

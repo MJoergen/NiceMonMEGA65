@@ -1,6 +1,7 @@
 # BASIC
 
 - [The statements](#the-statements)
+- [Numbers](#numbers)
 - [The disassembler](#the-disassembler)
 - [Loading without a host](#loading-without-a-host)
 - [Building](#building)
@@ -17,15 +18,18 @@ from the monitor's at `0x0000` (#152). It calls the monitor through the
 entries of the dispatch table alone, as a program at `0x8000` does, so
 everything that BASIC does, a program can do too. The monitor knows of
 BASIC only its two vectors, at `0x4000`, the cold start, and `0x4002`,
-the warm start, after a program. BASIC's variables are its own 2K words
-at `0xFFFFE800`, below the monitor's, and the stack starts below them.
+the warm start, after a program. BASIC's own state is in 2K words of
+its own at `0xFFFFE800`, below the monitor's, and the stack starts
+below them. The variables of BASIC's programs are in the program's RAM,
+from `0x8000` (Numbers below).
 
 ## The statements
 
 The ROM's user interface is BASIC (issue #54,
 [doc/BASIC.md](../doc/BASIC.md)). Stage 1 (issue #112) is the shell:
-the monitor's commands as statements, run one line at a time, with no
-expressions, no variables, and no stored program yet.
+the monitor's commands as statements. Stage 2 (issue #113) adds the
+numbers: expressions, variables, `PRINT`, `LET`, `POKE`, and `PEEK`.
+The statements run one line at a time, with no stored program yet.
 
 At the cold start the ROM clears the screen, prints its banner,
 `NiceMon` and the version, then `HELP lists the statements` and
@@ -40,18 +44,27 @@ ends the line's input and not the keyboard's, and the next host to
 connect over Ethernet can type again
 ([SYSTEM.md](../doc/SYSTEM.md#io-registers), `0xFFFFFF00`).
 
-A statement is a keyword, in either case, and its arguments, with
-commas between them. A keyword is a whole word: `LOADX` is no `LOAD`.
-An argument is a number, in decimal, or in hex after `0x`, such as
-`SYS 0x8000`, or a string in quotes, such as `LOAD "HELLO.BIN"`. A
-string that the line ends without its closing quote ends with the line.
+A line has one statement or more, with colons between them, such as
+`A = 5: PRINT A * 2`. A statement is a keyword, in either case, and its
+arguments, with commas between them, or an assignment. A keyword is a
+whole name: `LOADX` is no `LOAD`, but a variable. An argument is a
+number, which is an expression (Numbers below), such as `SYS 0x8000`
+or `DUMP A + 4, 2`, or a string in quotes, such as
+`LOAD "HELLO.BIN"`. A string that the line ends without its closing
+quote ends with the line. A number for an address, a count, or a word
+must fit a signed word, -2147483648 to 2147483647, and is rounded
+toward zero, so `SYS 0xFFFF0000` and `SYS -65536` are the same, and
+`SYS 4294901760` is an `Illegal quantity`. An address from
+`0x80000000` up is a negative number.
+
 A line that is no statement prints `Syntax error` and the lines of
 `HELP` of its statement, or `Syntax error; HELP lists the statements`
-when its first word is no keyword. A number that does not fit 32 bits
-prints `Illegal quantity`. The line is scanned from the left, and the
-first error decides: `SYS 99999999999X` is an `Illegal quantity`, and
-`SAVE "X", "Y", 99999999999` a `Syntax error`, as `SAVE` with an IP
-address takes nothing after it. `0x` without digits is no number.
+when it starts with no keyword. The other errors print their message,
+such as `Division by zero`, and the statements after it do not run.
+The line is read from the left, and the first error decides:
+`SAVE "X", "Y", 1/0` is a `Syntax error`, as `SAVE` with an IP address
+takes nothing after it, but `SYS 1/0` is a `Division by zero`. `0x`
+without digits is no number.
 
 Before the first key of a line, the cursor keys up and down scroll
 back through the rows that left the top of the screen a row at a time,
@@ -76,7 +89,7 @@ fails, TAB does nothing.
 
 | Statement | What it does |
 |---|---|
-| `SYS A` | Calls the program at `A` ([Programs](../monitor/README.md#programs)), and prints its status when it returns: `Returned 0000002A`. A word of 0 at `A` is no program, and `SYS` says so: `No program at 00008000`. `SYS 0` runs entry 0 of the dispatch table, the cold start, so it restarts BASIC and leaves the RAM from `0x8000` alone. |
+| `SYS A` | Calls the program at `A` ([Programs](../monitor/README.md#programs)), and prints its status when it returns: `Returned 0000002A`. The variables stay, so a program that wrote over them leaves them broken. A word of 0 at `A` is no program, and `SYS` says so: `No program at 00008000`. `SYS 0` runs entry 0 of the dispatch table, the cold start, so it restarts BASIC and leaves the RAM from `0x8000` alone. |
 | `DUMP [A] [, N]` | Shows `N` words from `A`, 4 to a row with the row's address first, all in hex. Without `A`, the words after the last shown; without `N`, 32 words. |
 | `DIS [A] [, N]` | Disassembles `N` instructions from `A`, a row each: the address, the instruction's 1 to 4 words, and its text, all in hex (The disassembler below). Without `A`, the instructions after the last shown; without `N`, 20. |
 | `CLS` | Clears the screen. |
@@ -87,13 +100,16 @@ fails, TAB does nothing.
 | `TIME ["YYYY-MM-DD HH:MM:SS"]` | Shows the clock of the time of day, `2026-11-11 14:30:00`, or sets it first to the date and the time given, two digits for each part but the year, in the years 1970 to 2105, such as `TIME "2026-11-11 14:30:00"`. The clock keeps local time, as the MEGA65's real-time clock does, and knows no time zones. After a reset of the system it is not set. The cold start sets it from the MEGA65's real-time clock, unless the real-time clock lost its time ([SYSTEM.md](../doc/SYSTEM.md#the-i2c-bus)), and leaves a clock that is set already. On the MEGA65, `TIME` with a date and a time in the years 2000 to 2099 sets the real-time clock too, so that later starts, and the MEGA65's other cores, have the time. Until the clock is set, as on the Nexys4DDR, which has no real-time clock, `TIME` prints `Clock not set`; a program, a host, `TIME`, or `NTP` sets it. A start of a program keeps it. Anything else is no time, and `TIME` says so and sets nothing. A clock that a program set past 2106-02-07 shows as `Clock past 2106`. In `niceemu` the clock is the host's time in UTC from the start. |
 | `NTP ["SERVER"] [, "+HH:MM"]` | Sets the clock from a time server on the network, and on the MEGA65 the real-time clock too, as `TIME` with a date does, and shows the time it set, the server, and how far the clock was off, such as `Clock set 2026-11-14 12:30:05 from 192.168.1.1, was 7 s behind`. SERVER is a name, such as `"pool.ntp.org"`, or an IP address. Without it, or with `""`, the server is the NTP server that `DHCP` got, or else `pool.ntp.org`. A time server gives UTC, and the clock keeps local time, so the offset is local time less UTC, `"+HH:MM"` or `"-HH:MM"` from `-12:00` to `+14:00`, such as `NTP "", "+01:00"` for Central European Time and `"+02:00"` for its summer time; without it the clock is set to UTC. It needs an IP address, and for a name a DNS server, from `DHCP`. Its errors are a line each: no IP address, no answer to ARP from the server or the gateway, no DNS server, no such name, an error of the DNS server, no answer from the DNS server or the time server after 3 tries of 2 seconds, a server that refused, and an answer that is not to be trusted ([The network](../monitor/README.md#the-network)). |
 | `BAUD [RATE]` | Shows the UART's baud rate, `Baud rate 230400`, or writes it first: 115200, 230400, 460800, 921600, 1000000, 1500000, or 2000000, such as `BAUD 921600`. Anything else is no rate, and `BAUD` says so and writes nothing. It writes `0xFFFFFF9F` ([DEBUG_LINK.md](../doc/DEBUG_LINK.md#the-baud-rate)), as the on-board debugger's settings page does. The UART takes the new rate once it has sent nothing for 1 ms, so the answer and `READY.` still come at the old rate, and a terminal on the UART then changes to the new one; only a reset brings back 230400. Over Ethernet the rate does not matter. In `niceemu` the word is memory, which reads 0 after a clear. |
-| `LOAD` | Enters words into the RAM from lines of `ADDR WORD` in hex, as a `.bin` file has them (Loading without a host below), up to an empty line, and prints the words written and the lines skipped: `Words loaded: 600, 00008000 to 00008257`. |
+| `LOAD` | Enters words into the RAM from lines of `ADDR WORD` in hex, as a `.bin` file has them (Loading without a host below), up to an empty line, and prints the words written and the lines skipped: `Words loaded: 600, 00008000 to 00008257`. Every `LOAD` clears the variables, as a program at `0x8000` writes over them, and ends the line. |
 | `DIR [SLOT]` | Lists the folder `NICE` of the SD card's FAT32 file system ([Files](../monitor/README.md#files)): `Directory of NICE`, then a row for each file, its name in 24 columns, the long name where it has one or else the 8.3 name, and its size in decimal, and for each directory, its name and `<DIR>`, then `Files: 25, directories: 1`. A name of 24 characters or more has a row of its own, and the size is on the next. With `SLOT`, it mounts the card in it first, and a slot that the board does not have is `File error 27`; without, it lists the card mounted, which the first `DIR` or `LOAD` after reset mounts. It reads the folder through a handle, as a program does, so after a program that left both handles open it is `File error 23`, as `LOAD` and `SAVE` are; `DIR 0` mounts again, which closes them. An error is shown with its number and meaning: `File error 18, FAT16, which is not supported`. |
 | `LOAD "NAME.BIN"` | Loads the `.bin` file `NAME.BIN` of the card's folder `NICE` as `LOAD` loads lines, and prints the same summary, so a program copied to the card on a PC loads with no host. Unlike the lines typed, an empty line is passed over, the end of the file ends the load, and a skipped line is counted from the first line of the file. A line with a byte that is not printable ASCII, a control code other than TAB, CR, or LF, DEL, or a byte from `0x80`, is skipped, as `niceemu` rejects it, so that no byte is dropped from the middle of a number. An error in the middle of the file, such as `File error 26, the FAT is damaged`, comes after the summary of the lines before it, whose words are in the RAM. The name is the long name or the 8.3 name, in either case, such as `LOAD "my prog.bin"`. A name that does not end in `.BIN`, in either case, is no program, and `LOAD` says so; other kinds of files are for the later stages of BASIC. |
 | `SAVE "NAME", A, N` | Writes `N` words from `A` to the file `NAME` of the card's folder `NICE` as a `.bin` file, a line of `ADDR WORD` in hex for each, and prints `Words saved: 600, 00008000 to 00008257`. A name with no extension gets `.BIN`: `SAVE "PROG", 0x8000, 600` writes `PROG.BIN`. It makes the file, or truncates it when it is there, and `LOAD` reads it back. When the card fills up, the file keeps what fitted, and `SAVE` prints error 30. SAVE writes only to the card: `SAVE "NAME", "IP"` says so. |
 | `DELETE "NAME"` | Deletes the file `NAME` of the card's folder `NICE`, its long name or its 8.3 name, as for `LOAD`, with its long-name entries, if it has them, and prints `Deleted NAME`. |
 | `LOAD "NAME.BIN", "IP"` | Loads the `.bin` file `NAME.BIN` from the TFTP server at the IP address `IP`, such as `LOAD "HELLO.BIN", "192.168.1.10"`, as `LOAD` loads one from the card, and prints the same summary ([The network](../monitor/README.md#the-network)). `"IP:PORT"` sends the request to `PORT` instead of 69. It needs an IP address, from `IP` or `DHCP`. Without an answer, it prints `No answer from the TFTP server` after about 5 seconds; an error of the server is shown with its code and its message: `TFTP error 1, File not found`. |
 | `DIR "IP" [, "PAT"]` | Lists the files of the server `tools/tftpd.py` at `IP` whose names match the pattern `PAT`, with `*` and `?`, such as `DIR "192.168.1.10", "*.BIN"`, a line each with the name and the size; without `PAT`, all of them. Another server answers with an error. |
+| `PRINT [X] [; X] [, X]`, `? ...` | Prints its items, numbers and strings in quotes, such as `PRINT "A ="; A, B`. `;` joins two items, and `,` goes to the next column of 8. `TAB(N)` goes to column `N`, unless the cursor is past it, and `SPC(N)` prints `N` blanks, for an `N` of 0 to 255. Items with nothing between them are joined too. A line ends with CR LF, but for a `;` or a `,` at its end, which leaves the cursor there; `READY.` then starts a row of its own. `?` is `PRINT`. |
+| `[LET] V = X` | Sets the variable `V` to the number `X`, such as `LET TOTAL = TOTAL + 1` or `TOTAL = TOTAL + 1`. |
+| `POKE A, X` | Writes the word `X` to the address `A`, such as `POKE 0x9000, -1`. `PEEK(A)` reads it (Numbers below). |
 | `HALT` | Halts the core, which the reset button, or a host over the link, starts again. The tests end with it. |
 | `HELP` | Lists the statements, and the keys of the history. |
 
@@ -104,6 +120,66 @@ programs from a card's FAT32 file system, and `SAVE` and `DELETE` write
 it. `TIME` shows the clock, which the dates of the files come from.
 `DHCP` gives a board on a network an address with no host, and `LOAD`
 with a server loads a program from a server on it.
+
+## Numbers
+
+A number is a double, IEEE 754 binary64, on nice_cpu's FPU, and BASIC
+has no other kind ([doc/BASIC.md](../doc/BASIC.md#numbers)). A double
+holds every whole number up to 2^53, so an address and a word are
+exact.
+
+- **Constants** are decimal, such as `5`, `-0.25`, `.5`, `5.`, and
+  `1E3`, `1.5E-3`, or `2e+10`, or hex after `0x`, such as `0x1F`,
+  which is a signed word, so `0xFFFFFFFF` is -1. A decimal constant
+  keeps 16 significant digits, and the 17th rounds the 16th. A letter,
+  a digit, or a point right after a constant is a `Syntax error`, and
+  one too large for a double an `Overflow`. A constant too small for
+  one is 0.
+- **The operators**, from the one that binds most: the signs `-` and
+  `+`; `*`, `/`, `DIV`, and `MOD`; `+` and `-`; `<<` and `>>`; the
+  comparisons `=`, `<>`, `<`, `>`, `<=`, and `>=`; `NOT`; `AND`; and
+  `OR` and `XOR`. Those of one level group to the left, and
+  parentheses group as they do in arithmetic. `/` divides as doubles
+  do, so `PRINT 1/3` prints `0.333333333333333`.
+- **The word operators**, `DIV`, `MOD`, `AND`, `OR`, `XOR`, `NOT`,
+  `<<`, and `>>`, take their operands rounded toward zero, and each
+  must fit a signed word, or it is an `Illegal quantity`. `DIV` and
+  `MOD` divide toward zero, and `MOD` has the sign of its left
+  operand. `>>` shifts 0 in, and a shift by 32 or more gives 0.
+- **A comparison** gives -1 when it holds, and 0 when not, so `NOT`,
+  `AND`, and `OR` join comparisons, as in `A > 0 AND A < 10`.
+- **The functions** are `ABS(X)`, `SGN(X)`, -1, 0, or 1, `INT(X)`,
+  rounded down, so `INT(-2.5)` is -3, `SQR(X)`, the square root, and
+  `PEEK(A)`, the word at the address `A`, as a signed word.
+- **A variable** has a name of up to 16 letters and digits, the first
+  a letter, every one significant, in either case, so `Total` and
+  `TOTAL` are one variable. A keyword is no name, but a name may start
+  with one, as `TOTAL` starts with `TO`. A `%` or a `$` after a name
+  is a `Syntax error`, as strings and whole numbers come later. An
+  assignment makes the variable, and one that no assignment made is an
+  `Undefined variable`. A variable is its double and its name, 4 to 7
+  words, from `0x8000` up, where the program's RAM starts, so a
+  program at `0x8000` and the variables share it: `LOAD` clears them.
+  When they reach the stack, an assignment that makes one more is
+  `Out of memory`.
+- **`PRINT`** shows a number as C's `%.15G` does: its first 15
+  significant digits, with the trailing zeros dropped, in fixed
+  notation while the number is from 1E-4 to below 1E15, with a 0
+  before the point, and else in E notation, with a sign and at least
+  two digits in the exponent. So `1/3` is `0.333333333333333`, `0.1 +
+  0.2` is `0.3`, `1E15` is `1E+15`, and `0.00001` is `1E-05`. A
+  negative number has its `-`, -0 is `0`, and no blank comes before or
+  after a number. The digits are the FPU's `DIGITS 15`, which rounds
+  twice, so about one number in a hundred has another last digit than
+  `%.15G` gives it
+  ([nice_cpu#200](https://github.com/MJoergen/nice_cpu/issues/200)).
+
+An expression's errors are `Division by zero`, of `/`, `DIV`, and
+`MOD`; `Overflow`, a result too large for a double; `Illegal
+quantity`, such as `SQR(-1)` or a word operator's operand that does
+not fit; and `Formula too complex`, more than 16 values that wait for
+the FPU, or parentheses and signs nested too deep for the stack. A
+program never sees an infinity or a NaN.
 
 ## The disassembler
 
@@ -214,7 +290,8 @@ is faster, as it writes the words into the memory.
 `build/rom.bin` ([rom.mk](../rom.mk)). Both write the image as a file
 for a card too, `build/basic.rom`
 ([doc/BASIC_ROM.md](../doc/BASIC_ROM.md), #153). The image is the cat of
-`basic.nasm`, `basic_cmd.nasm`, `basic_net.nasm`, `basic_time.nasm`,
+`basic.nasm`, `basic_expr.nasm`, `basic_cmd.nasm`, `basic_net.nasm`,
+`basic_time.nasm`,
 and `basic_dis.nasm`, BASIC's copies of the monitor's `common.nasm`,
 `monlib.nasm`, and `mon.nasm`, the version, and the texts with the
 card's folder. `basic.nasm`'s header says what each file has, and
@@ -261,7 +338,16 @@ the default. It runs these steps in order:
    `nicedis.py`, rewritten by the rules of "The disassembler" above,
    for a pseudo-instruction. It assembles each row again
    and compares the words.
-3. **NTP.** `test/ntp.py` types `NTP` and `DHCP` with `--step-time`,
+3. **The numbers.** `test/print_numbers.py` types `?` with 510
+   numbers from a fixed seed: constants of 1 to 20 significant digits,
+   with a point, an exponent, or neither, from 1E-300 to 1E300; `+`,
+   `-`, `*`, and `/` of two of them, with signs; the word operators on
+   signed words; the comparisons; and the functions. What `PRINT`
+   shows must be Python's double of the number, written with the
+   digits that nice_cpu's model of the FPU,
+   `emulator/test/fpu_model.py`, gives for `DIGITS 15`. It prints how
+   many of them differ from `%.15G` in their last digit.
+4. **NTP.** `test/ntp.py` types `NTP` and `DHCP` with `--step-time`,
    and learns the frames of each run as the monitor's `test/dns.py`
    does, with the frames of DHCP and DNS of the monitor's
    `test/dhcp.py` and `test/dns.py`. DHCP gives the DNS server and an
@@ -280,13 +366,13 @@ the default. It runs these steps in order:
    real-time clock: the master's last command is the cold start's read
    while no time is set, and the write of the chip's status after the
    times of the run.
-4. **TFTP.** `test/tftp.py` runs `LOAD` and `DIR` from a TFTP server
+5. **TFTP.** `test/tftp.py` runs `LOAD` and `DIR` from a TFTP server
    the same way, against `test/tftp.expected`. It covers a file of two
    blocks among packets of other hosts and ports, lost packets, an
    ERROR, an ERROR after the first block, whose summary comes first,
    files of 512 and 0 bytes, a listing, a port given as `"IP:PORT"`,
    bad arguments, and no answer to ARP.
-5. **The runs.** The ROM runs once for each test below, with its
+6. **The runs.** The ROM runs once for each test below, with its
    keystrokes from an input file that ends with `HALT`, so that the run
    halts. Each run's console output, a few memory words, and the screen
    are compared with `test/NAME.expected`:
@@ -294,7 +380,8 @@ the default. It runs these steps in order:
 | Test | What runs | What it checks |
 |---|---|---|
 | `cmds` | The ROM alone | Every statement, its bad arguments, keywords in either case, numbers that do not fit, and the edits of a line. |
-| `basic` | The ROM alone, with no card and no IP address | The scanner of a line: keywords glued to a letter or a digit, the HELP lines of each statement's Syntax error, numbers at their limits, `0x` without digits and a number that fails before a string, which are no numbers, strings without a closing quote, too few or too many arguments, and the 0s and the `.BIN` that the scanner writes into the line. |
+| `basic` | The ROM alone, with no card and no IP address | The scanner of a statement: keywords glued to a letter or a digit, which are names, the HELP lines of each statement's Syntax error, numbers at the limits of a signed word, `0x` without digits, which is no number, a name in a number's place, strings without a closing quote, too few or too many arguments, and the tokens of a line, with the 0 after each string and the `.BIN` that `SAVE` adds to a name. |
+| `expr` | The ROM alone | The numbers: the operators and their order, the word operators, the comparisons, the functions, the constants, `PRINT`'s format and its items, the variables, `LET`, the colons, the errors, the depth of an expression, `PEEK` and `POKE`, a statement with expressions, `LOAD`, which clears the variables, a broken table of variables, and `Out of memory`. |
 | `load` | The ROM, with 128K words of RAM, as on the MEGA65 | `LOAD` with the monitor's `build/hello.bin` pasted: CR LF and LF line ends, tabs, blank lines, skipped lines, a line too long, blanks after a line's 76 characters, a DEL that takes back the key after them, an address given twice, and CTRL-C. Then `SYS 0x8000` runs it. |
 | `load_64k` | The ROM, with 64K words, as on the Nexys4DDR | `LOAD` at the end of that RAM. |
 | `load_emu` | The ROM, with `0xFFFFFF9E` reading 0, as in `niceemu` | `LOAD` up to the screen. |
@@ -330,7 +417,8 @@ table, and `make romsize` writes it again.
 <!-- romsize basic -->
 | Source | What it is | Words | Text |
 |---|---|---:|---:|
-| `basic.nasm` | The vectors, the header, the main loop, the scanner, the keywords, the messages, and the help | 842 | 440 |
+| `basic.nasm` | The vectors, the header, the main loop, the scanner, the keywords, the messages, and the help | 906 | 513 |
+| `basic_expr.nasm` | The numbers: the tokenizer, the expressions, the variables, the errors, `PRINT`, `LET`, and `POKE` | 1319 | 22 |
 | `basic_cmd.nasm` | The routines of the statements that were the commands | 1586 | 294 |
 | `basic_net.nasm` | `DHCP`, `NTP`, and TFTP | 907 | 150 |
 | `basic_time.nasm` | `TIME`, and the clock's side of `NTP` | 275 | 44 |
@@ -340,5 +428,5 @@ table, and `make romsize` writes it again.
 | `mon.nasm` | The stubs of the entries | 90 | 0 |
 | `build/basic_folder.nasm` | The texts with the folder's name: `DIR`'s, and the error of a card without it | 14 | 14 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 5098 | 1028 |
+| In all | | 6481 | 1123 |
 <!-- /romsize basic -->

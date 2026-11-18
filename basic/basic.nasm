@@ -2,52 +2,55 @@
 ; BASIC_BASE, 0x4000, assembled apart from the monitor's (issue #152).
 ; It calls the monitor through the entries of the dispatch table alone,
 ; their .EQUs in ../monitor/mon.nasm, as a program does. The Makefile of
-; ../monitor joins this file first, then basic_cmd.nasm, basic_net.nasm,
-; basic_time.nasm, and basic_dis.nasm, and the monitor's common.nasm,
-; monlib.nasm, and mon.nasm, of which BASIC has copies of its own.
+; ../monitor joins this file first, then basic_expr.nasm,
+; basic_cmd.nasm, basic_net.nasm, basic_time.nasm, and basic_dis.nasm,
+; and the monitor's common.nasm, monlib.nasm, and mon.nasm, of which
+; BASIC has copies of its own.
 ;
-; This file has the main loop, the scanner of a line, and BASIC's
-; keywords, messages, and help, packed with .ASCII_B and read through the
-; byte window, so that they take no RAM. Stage 1 (issue #112) is the
-; shell: the monitor's commands as statements, on the routines that the
-; commands had, in basic_cmd.nasm, basic_dis.nasm, basic_net.nasm, and
-; basic_time.nasm, with the scanner of issue #115.
+; This file has the main loop, the scanner of a statement's items, and
+; BASIC's keywords, messages, and help, packed with .ASCII_B and read
+; through the byte window, so that they take no RAM. Stage 1 (issue #112)
+; is the shell: the monitor's commands as statements, on the routines
+; that the commands had, in basic_cmd.nasm, basic_dis.nasm,
+; basic_net.nasm, and basic_time.nasm, with the scanner of issue #115.
+; Stage 2 (issue #113) has the numbers, in basic_expr.nasm: the
+; tokenizer, the expressions, the variables, the errors, and PRINT, LET,
+; and POKE.
 ;
 ; The image starts with two vectors, which the monitor jumps to: at
 ; BAS_COLD, the end of its cold start, which goes to bas_start, and at
 ; BAS_WARM, mon_exit, which goes to bas_warm. bas_start prints the
 ; banner and goes to main, and bas_warm prints the status and goes to
 ; main. main is where BASIC starts again: it sets SP to STACK, prints
-; READY., and reads lines with con_getline, entry 32. An empty
-; line, or one of blanks only, runs nothing and prints no READY.
+; READY., and reads lines with con_getline, entry 32, which tokenize
+; makes tokens of (basic_expr.nasm). An empty line, or one of blanks
+; only, runs nothing and prints no READY. run runs the statements of the
+; line, with colons between them.
 ;
-; The scanner. R8 is the next character of the line, which is a word of
-; V_LINE, and R9 is not 0 once a number did not fit a word, which makes a
-; statement that fails an Illegal quantity, not a Syntax error. A keyword
-; is matched in either case, and no letter or digit may follow it. The
-; byte after each keyword, below "A", gives its program: the offset of
-; its first op in OPS, plus 0x20. An op is a byte, with the kind of the
-; item in bits 2..1: a number (OP_N), in decimal or in hex after 0x, a
-; string in quotes (OP_S), a comma (OP_C), or the end of the line
-; (OP_E). Blanks before each item are passed over. When the item is
-; there, the next op follows, and the end of the line runs the statement.
-; When it is not there, the op says what follows: with OP_F the statement
-; fails, with OP_SKIP the next op is passed over, and with neither the
-; next op follows, unless a number did not fit. A statement that fails
-; prints Syntax error and the lines of HELP that start with its keyword.
-; An item that is not there leaves R8 where it was, so that the next op
-; looks at the same character. The scan goes from the left, and the
-; first item that fails decides: SAVE "X", "Y", 99999999999 is a Syntax
-; error at its second comma, before its number is scanned.
+; The scanner. R8 is the next token of the statement. A keyword is a
+; whole name, in either case. The byte after each keyword, below "A",
+; gives its program: the offset of its first op in OPS, plus 0x20. An op
+; is a byte, with the kind of the item in bits 2..1: a number (OP_N),
+; which is an expression, a string in quotes (OP_S), a comma (OP_C), or
+; the end of the statement (OP_E). When the item is there, the next op
+; follows, and the end of the statement runs it. When it is not there,
+; the op says what follows: with OP_F the statement fails, with OP_SKIP
+; the next op is passed over, and with neither the next op follows. A
+; statement that fails prints Syntax error and the lines of HELP that
+; start with its keyword, as err does for every Syntax error in a
+; statement. An item that is not there leaves R8 where it was, so that
+; the next op looks at the same token. The scan goes from the left, and
+; the first item that fails decides: SAVE "X", "Y", 1/0 is a Syntax
+; error at its second comma, before its number is computed.
 ;
 ; The values of the items go to the slots at V_ARGS, slot 1 first, and a
 ; comma moves to the next, slot 2, then slot 4: R12 has the slot's
 ; number, and its value is at V_ARGS-1 + R12. R11 has the bits of the
-; slots that got a number. When the line ends, R1, R2, and R3 are slots
-; 1, 2, and 4, and the statement's routine of ACTS runs, with R11 and
-; with R8 at the end of the line, and returns to main. The routines use
-; any register, as main starts again after each. Slots 1 and 2 are 0
-; for a statement that has no string or number there.
+; slots that got a number. When the statement ends, R1, R2, and R3 are
+; slots 1, 2, and 4, and the statement's routine of ACTS runs, with R11
+; and with R8 at the end of the statement, and returns to run_next. The
+; routines use any register, as run_next takes the end from V_TP. Slots
+; 1 and 2 are 0 for a statement that has no string or number there.
 
 ; BASIC's RAM, BASIC_WORDS words from STACK (common.nasm), below the
 ; monitor's, which BASIC reaches through the entries alone (issue #152)
@@ -110,6 +113,7 @@ bas_warm
 ; bas_start: where the cold start goes, at its end: the banner, and DUMP
 ; and DIS at 0x8000, and then the main loop
 bas_start
+                MOVE    @V_VEND, PROGRAM  ; no variables
                 MOVE    @V_NEXT, PROGRAM
                 MOVE    @V_UNEXT, PROGRAM
                 CALL    versions
@@ -117,50 +121,56 @@ bas_start
                 MOVE    R1, S_HINT
                 CALL    puts_b_crlf
 
-; main: READY., and the lines, each run with a fresh SP after each that
-; ran
+; main: READY., on a row of its own, and the lines, each tokenized and
+; run with a fresh SP
 main            MOVE    SP, STACK
+                CALL    SCR_GETXY
+                TST     R1
+        ?!Z     CALL    _io_crlf        ; after PRINT with ; or , at its end
                 MOVE    R1, S_READY
                 CALL    puts_b_crlf
 main_line
                 MOVE    R1, V_LINE
                 MOVE    R2, LINE_MAX
                 CALL    CON_GETLINE
-                MOVE    R8, V_LINE
-:
-                CMP     @R8, 0x20
-        ?Z      MOVE    R8++, R8
-        ?Z      JMP     :-
+                CALL    tokenize
+                MOVE    R8, V_TOK
                 TST     @R8
         ?Z      JMP     main_line       ; blanks only
-                PUSH    main            ; where each statement returns
-                CLR     R9
-                MOVE    @V_ARGS, R0
-                MOVE    @V_ARGS+1, R0
-; The keyword: R7 its first byte, R11 its routine's halfword in ACTS
-                MOVE    R3, TEXT_B+4*OPS+KEYWORDS
-                MOVE    R11, H_ACTS
-:
-                MOVE    R7, R3
-                MOVE    R5, R8
-                CALL    match
-        ?Z      JMP     :+
-                ADD     R11, R11, 2
-                TST     @R3
-        ?!Z     JMP     :-
-                MOVE    R1, S_UNKNOWN
-                JMP     puts_b_crlf     ; which returns to main
-:
-                MOVE    R8, R5
-                PUSH    @R11            ; the routine, which k_end returns to
-                ADD     R10, R4, TEXT_B+4*OPS-0x20
+; run: the statements from R8, with colons between them. A statement is
+; a keyword, or a variable and =. Each returns to run_next, with the end
+; of the statement at V_TP.
+run
+                MOVE    @V_KW, R0
+                MOVE    R1, @R8
+                CMP     R1, T_COLON
+        ?Z      MOVE    R8++, R8
+        ?Z      JMP     run
+                TST     R1
+        ?Z      JMP     main
+                PUSH    run_next
+                SHR     R2, R1, 24
+                CMP     R2, K_VAR
+        ?Z      JMP     st_assign
+                CMP     R2, K_KW
+        ?!Z     JMP     err_unknown
+                MOVE    R8++, R8
+                SHR     R2, R1, 8
+                AND     R2, R2, 0xFF    ; the index of the keyword
+                ADD     @V_KW, R2, 1
+                DBL     R3, R2
+                MOVE    R3, @H_ACTS[R3]  ; its routine
+                CMP     R2, I_PRINT
+        ?!C     JMP     R3              ; PRINT and LET read their own items
+                PUSH    R3              ; the routine, which k_end returns to
+                AND     R1, R1, 0xFF
+                ADD     R10, R1, TEXT_B+4*OPS-0x20
                 CLR     R11
                 ONE     R12
+                MOVE    @V_ARGS, R0
+                MOVE    @V_ARGS+1, R0
 ; The ops, from R10
 bas_op
-                CMP     @R8, 0x20
-        ?Z      MOVE    R8++, R8
-        ?Z      JMP     bas_op
                 MOVE    R3, @R10++
                 AND     R5, R3, 6
                 MOVE    R5, @H_KINDS[R5]
@@ -173,29 +183,11 @@ bas_op
         ?!Z     MOVE    R10++, R10
         ?!Z     JMP     bas_op
                 AND[M]  R0, R3, OP_F
-        ?Z      TST     R9
         ?Z      JMP     bas_op
-; The statement failed: Illegal quantity, or Syntax error and the lines
-; of HELP that start with the keyword at R7 and a blank
-                POP     R0              ; the routine
-                MOVE    R1, S_QUANT
-                TST     R9
-        ?!Z     JMP     puts_b_crlf     ; which returns to main
-                MOVE    R1, S_SYNTAX
-                CALL    puts_b_crlf
-                MOVE    R10, HELP
-:
-                MOVE[M] R12, @R10++
-        ?Z      RET                     ; to main
-                DBL     R5, R12
-                DBL     R5, R5
-                ADD     R5, R5, TEXT_B
-                MOVE    R3, R7
-                CALL    match
-        ?!Z     JMP     :-
-                MOVE    R1, R12
-                CALL    puts_b_crlf
-                JMP     :-
+                JMP     err_syntax      ; with the lines of HELP of the statement
+run_next
+                MOVE    R8, @V_TP
+                JMP     run
 
 ; match: Z when the text at R5 starts with the keyword at R3, in either
 ; case, and no letter or digit follows it. R3 is then after the byte that
@@ -231,78 +223,65 @@ dval
         ?!C     NOT     R2, R0
                 RET
 
-; The items, each called by bas_op with R8 at its first character, after
-; the blanks: Z when it is there, with R1 its value and R8 after it.
+; The items, each called by bas_op with R8 at its token: Z when it is
+; there, with R1 its value and R8 after it.
 
-; k_number: a number in decimal, or in hex after 0x or 0X, of one digit
-; or more, with no letter or digit after it, and less than 2^32, else R9
-; is 1. It sets the bit of the slot R12 in R11. A number that is not
-; there, such as 0x without digits, leaves R8 at its start. Uses R2,
-; R4-R6.
+; k_number: an expression, as a signed word, which sets the bit of the
+; slot R12 in R11. It is not there at the end of the statement, a comma,
+; or a string. Keeps R3 and R10-R12.
 k_number
-                PUSH    R8
-                CLR     R4              ; the number
-                ONE     R6              ; not 0 before the first digit
-                MOVE    R5, 10          ; the base
-                CMP     @R8, 0x30
-        ?!Z     JMP     :+
-                AND     R1, @1[R8], 0xDF
-                CMP     R1, 0x58        ; X
-        ?Z      MOVE    R5, 16
-        ?Z      ADD     R8, R8, 2
-:
-                MOVE    @io.mpu_b, R5
-:
                 MOVE    R1, @R8
-                CALL    dval
-                CMP     R2, R5
-        ?!C     JMP     :+
-                CLR     R6
-                MOVE    @io.mpu_a, R4   ; R4 is R4 * R5 + R2, with R9 1 on a carry
-                ADD[M]  R4, @CLK_UMUL, R2
-                ADD[CM] R0, @CLK_UMUL+1, R0
-        ?!Z     ONE     R9
-                MOVE    R8++, R8
-                JMP     :-
-:
-                XNOR[M] R0, R2, R9      ; Z for no letter or digit, and R9 0
-                POP     R2              ; the start
-        ?Z      TST     R6
-        ?Z      OR      R11, R11, R12
-        ?!Z     MOVE    R8, R2          ; not there: R8 back at the start
-                MOVE    R1, R4
+                TST     R1
+        ?!Z     CMP     R1, T_COLON
+        ?!Z     CMP     R1, T_COMMA
+        ?Z      JMP     k_no
+                SHR     R2, R1, 24
+                CMP     R2, K_STR
+        ?Z      JMP     k_no
+                PUSH    R3
+                PUSH    R10
+                PUSH    R11
+                PUSH    R12
+                CALL    eval_word
+                POP     R12
+                POP     R11
+                POP     R10
+                POP     R3
+                OR      R11, R11, R12
+                CMP     R0, R0          ; Z
+                RET
+k_no
+                CMP     R0, 1           ; not Z
                 RET
 
-; k_string: a string in quotes: R1 its first character. A 0 replaces its
-; closing quote, and a string without one ends with the line. Uses R2.
+; k_string: a string: R1 its first character, and a 0 after its last
 k_string
-                CMP     @R8, 0x22       ; "
+                SHR     R2, @R8, 24
+                CMP     R2, K_STR
         ?!Z     RET
-                MOVE    R8++, R8
-                MOVE    R1, R8
-:
-                MOVE[M] R2, @R8++
-        ?Z      MOVE    R8--, R8
-        ?Z      RET
-                CMP     R2, 0x22
-        ?!Z     JMP     :-
-                MOVE    @--R8, R0
-                MOVE    R8++, R8
+                AND     R2, @R8, 0xFFFFFF
+                ADD     R1, R8, 1
+                ADD     R8, R8, R2
+                ADD     R8, R8, 2
+                CMP     R0, R0          ; Z
                 RET
 
 ; k_comma: a comma, after which the values go to the next slot
 k_comma
-                CMP     @R8, 0x2C       ; ,
+                CMP     @R8, T_COMMA
         ?Z      MOVE    R8++, R8
         ?Z      ADD     R12, R12, R12
                 RET
 
-; k_end: the end of the line, which runs the statement: it returns to the
-; routine, with R1-R3 the slots, instead of to bas_op
+; k_end: the end of the statement, a colon or the end of the line, which
+; runs it: it returns to the routine, with R1-R3 the slots, instead of
+; to bas_op, and the end at V_TP
 k_end
                 TST     @R8
+        ?!Z     CMP     @R8, T_COLON
         ?!Z     RET
                 POP     R0
+                MOVE    @V_TP, R8
                 MOVE    R1, @V_ARGS
                 MOVE    R2, @V_ARGS+1
                 MOVE    R3, @V_ARGS+3
@@ -314,8 +293,9 @@ k_end
 ; TIME ["D T"]: clock_cmd with the string, or the end of the line
 bas_time
                 TST     R1
-        ?Z      MOVE    R1, R8
+        ?Z      MOVE    R1, ZERO        ; an empty string
                 JMP     clock_cmd
+ZERO            .DAT    0
 
 ; NTP ["S"] [, "Z"]: an empty S is none
 bas_ntp
@@ -336,8 +316,8 @@ bas_dis
                 MOVE    R3, R11
                 JMP     st_dis
 
-; DIR, DIR SLOT, and DIR "IP" [, "PAT"]. A SLOT from 2^31 up, which
-; st_dir would take as none, is one that no board has.
+; DIR, DIR SLOT, and DIR "IP" [, "PAT"]. A negative SLOT, which st_dir
+; would take as none, is one that no board has.
 bas_dir
                 TST     R11
         ?Z      JMP     :+
@@ -354,6 +334,8 @@ bas_dir
 ; LOAD, LOAD "NAME.BIN", and LOAD "N.BIN", "IP": the name must end with
 ; .BIN, in either case
 bas_load
+                MOVE    @V_VEND, PROGRAM  ; LOAD clears the variables,
+                MOVE    @SP, main       ; and ends the line
                 TST     R1
         ?Z      JMP     st_lines
                 MOVE    R4, R1
@@ -383,9 +365,10 @@ bas_load
                 JMP     st_tftp
 
 ; SAVE "NAME", A, N, in which a name without a dot gets .BIN, and SAVE
-; "NAME", "IP", which TFTP cannot. The .BIN and its 0 go from the closing
-; quote, over the address and the count, which take four characters at
-; least, so they stay in the line.
+; "NAME", "IP", which TFTP cannot. The .BIN and its 0 go over the 0 of
+; the name's token, and the tokens of the commas, the address, and the
+; count, which take four words at least, so that the statements after it
+; stay.
 bas_save
                 TST     R11
         ?Z      MOVE    R1, S_TFTPSAVE
@@ -414,7 +397,11 @@ ACTS
                 .DAT    st_sys+65536*bas_load, bas_save+65536*st_delete
                 .DAT    bas_dir+65536*st_ip, st_dhcp+65536*st_mac
                 .DAT    bas_time+65536*bas_ntp, bas_baud+65536*bas_dump
-                .DAT    bas_dis+65536*SCR_CLS, st_ver+65536*st_help, st_halt
+                .DAT    bas_dis+65536*SCR_CLS, st_ver+65536*st_help
+                .DAT    st_halt+65536*bas_poke, st_print+65536*st_let
+I_PRINT         .EQU    18              ; the index of PRINT, the first statement without ops,
+I_LET           .EQU    19              ; of LET,
+N_STMT          .EQU    20              ; and of AND, the first keyword that is no statement
 H_ACTS          .EQU    0x40000000+4*ACTS
 ; The routines of the items, by the kind of an op, which bas_op calls
 KINDS
@@ -437,10 +424,15 @@ H_KINDS         .EQU    0x40000000+4*KINDS
 ;  15  SAVE           J L C N H L H N  a string, a comma, and a string
 ;                                      and the end, or a number, a comma,
 ;                                      a number, and the end
+;  19  POKE           H L H N  a number, a comma, a number, and the end
 ;  21  SYS            H N      a number and the end
 ;  23  BAUD           @ N      a number or not, and the end
 ;  25  DUMP, DIS      @ E H N  a number or not, a comma and a number or
 ;                              not, and the end
+;
+; A number is an expression, which must fit a signed word. PRINT and LET
+; read their own items, and their byte is that of the end, 2, as is that
+; of each keyword that is no statement, whose token is in KW_TOK.
 OP_N            .EQU    0
 OP_S            .EQU    2
 OP_C            .EQU    4
@@ -449,7 +441,7 @@ OP_SKIP         .EQU    1
 OP_F            .EQU    8
 KEYWORDS        .EQU    29              ; the first keyword's byte in OPS
 OPS
-                .ASCII_B 'FJNFANJEJNFJEJNJLCNHLHN@N@EHNSYS5LOAD*SAVE/DELETE!DIR#IP DHCP"MAC TIME NTP*BAUD7DUMP9DIS9CLS"VER"HELP"HALT"'
+                .ASCII_B 'FJNFANJEJNFJEJNJLCNHLHN@N@EHNSYS5LOAD*SAVE/DELETE!DIR#IP DHCP"MAC TIME NTP*BAUD7DUMP9DIS9CLS"VER"HELP"HALT"POKE3PRINT"LET"AND"OR"XOR"NOT"DIV"MOD"ABS"SGN"INT"SQR"PEEK"TAB"SPC"'
 
 S_HINT          .ASCII_B 'HELP lists the statements'
 S_READY         .ASCII_B 'READY.'
@@ -472,7 +464,8 @@ S_DOTBIN
 ; The lines of HELP, which a Syntax error also prints, those that start
 ; with the statement's keyword and a blank
 HELP            .DAT    H_SYS, H_L, H_LOAD, H_TFTP, H_SAVE, H_DEL, H_DIR, H_TFTPL, H_D, H_U
-                .DAT    H_I, H_ID, H_M, H_B, H_T, H_TN, H_C, H_V, H_H, H_Q, H_P, H_PG, 0
+                .DAT    H_I, H_ID, H_M, H_B, H_T, H_TN, H_C, H_V, H_H, H_Q, H_PR, H_LET
+                .DAT    H_POKE, H_P, H_PG, 0
 H_SYS           .ASCII_B 'SYS A               call the program at A, such as SYS 0x8000; SYS 0 restarts'
 H_L             .ASCII_B 'LOAD                enter lines of ADDR WORD in hex, as a .bin file has them'
                 .DAT    0
@@ -496,6 +489,9 @@ H_C             .ASCII_B 'CLS                 clear the screen'
 H_V             .ASCII_B 'VER                 the version'
 H_H             .ASCII_B 'HALT                halt the core'
 H_Q             .ASCII_B 'HELP                the statements'
+H_PR            .ASCII_B 'PRINT X; "T", ...   print numbers and strings, ; and , between them; ? is PRINT'
+H_LET           .ASCII_B 'LET V = X           set the variable V to the number X; LET may be left out'
+H_POKE          .ASCII_B 'POKE A, X           write X to the word at A, which PEEK(A) reads'
 H_P             .ASCII_B 'CRSR up down        scroll back a row, before a statement'
 H_PG            .ASCII_B 'PgUp PgDn           a page; on the MEGA65 CTRL and MEGA with CRSR up or down'
                 .DAT    0

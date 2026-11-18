@@ -1,0 +1,266 @@
+NiceMon V9.9, BASIC V9.9
+HELP lists the statements
+READY.
+? 1+2*3, (1+2)*3, 2*3+1, 10-2-3, 100/10/5
+7       9       7       5       2
+READY.
+? -2*3, - 3 + 4, +5, --5, 2*-3
+-6      1       5       5       -6
+READY.
+? 7 DIV 2, -7 DIV 2, 7 MOD -2, -7 MOD 2, 1 << 4, -1 >> 28, 1 << 32
+3       -3      1       -1      16      15      0
+READY.
+? 5 AND 3, 5 OR 3, 5 XOR 3, NOT 0, NOT 5 AND 3
+1       7       6       -1      2
+READY.
+? 1 = 1, 1 <> 1, 1 < 2, 2 <= 1, 3 > 2, 2 >= 3
+-1      0       -1      0       -1      0
+READY.
+? NOT 1 = 2, 1 + 1 = 2 AND 3 < 4, 1 OR 2 XOR 3, 1 << 2 + 1, 2 + 3 < 6
+-1      -1      0       8       -1
+READY.
+? ABS(-2.5), SGN(0), SGN(-0.1), INT(2.9), INT(-2.1), SQR(16)
+2.5     0       -1      2       -3      4
+READY.
+? 0x1F, 0xFFFFFFFF, 0X7fffffff, 1E3, 1.5E-3, .5, 5., 1e+2
+31      -1      2147483647      1000    0.0015  0.5     5       100
+READY.
+? 1/3; 2/3; 1E15; 1E14; 123456789012345678; 0.0001; 0.00001; -1E-100
+0.3333333333333330.6666666666666671E+151000000000000001.23456789012346E+170.00011E-05-1E-100
+READY.
+? -0, 0.1 + 0.2, 4.9E-324, 4.9E-324 / 2, 1.79769313486231E308
+0       0.3     4.94065645841247E-324   0       1.79769313486231E+308
+READY.
+? "A";1;"B", "C"; ""
+A1B     C
+READY.
+? "X";
+X
+READY.
+? 1,
+1       
+READY.
+? "AB";TAB(5);"C";SPC(3);"D"
+AB   C   D
+READY.
+? TAB(0);"E";TAB(1);"F";SPC(0);"G"
+EFG
+READY.
+? SPC(256)
+Illegal quantity
+READY.
+? TAB(-1)
+Illegal quantity
+READY.
+TotalSum = 5: totalsum = totalsum + 1: ? TOTALSUM
+6
+READY.
+a1b2c3d4e5f6g7h8 = 16: ? A1B2C3D4E5F6G7H8
+16
+READY.
+a1b2c3d4e5f6g7h8i = 1
+Syntax error; HELP lists the statements
+READY.
+A% = 1
+Syntax error; HELP lists the statements
+READY.
+A$ = "X"
+Syntax error; HELP lists the statements
+READY.
+LET B = 2: ? B
+2
+READY.
+LET 5 = 2
+Syntax error
+LET V = X           set the variable V to the number X; LET may be left out
+READY.
+LET
+Syntax error
+LET V = X           set the variable V to the number X; LET may be left out
+READY.
+C
+Syntax error; HELP lists the statements
+READY.
+PRINTX
+Syntax error; HELP lists the statements
+READY.
+print = 1
+Syntax error
+PRINT X; "T", ...   print numbers and strings, ; and , between them; ? is PRINT
+READY.
+and = 1
+Syntax error; HELP lists the statements
+READY.
+? D
+Undefined variable
+READY.
+D =
+Syntax error
+LET V = X           set the variable V to the number X; LET may be left out
+READY.
+? D
+Undefined variable
+READY.
+X=1:Y=X+1:?Y
+2
+READY.
+: : ? 1 : : ? 2 :
+1
+2
+READY.
+? 1/0
+Division by zero
+READY.
+? 0/0
+Division by zero
+READY.
+? 5 MOD 0
+Division by zero
+READY.
+? 5 DIV 0
+Division by zero
+READY.
+? 1E308*10
+Overflow
+READY.
+? SQR(-1)
+Illegal quantity
+READY.
+? 1E400
+Overflow
+READY.
+? 2147483648 AND 1
+Illegal quantity
+READY.
+? 1 << -1
+Illegal quantity
+READY.
+? (1
+Syntax error
+PRINT X; "T", ...   print numbers and strings, ; and , between them; ? is PRINT
+READY.
+? 1)
+1
+Syntax error
+PRINT X; "T", ...   print numbers and strings, ; and , between them; ? is PRINT
+READY.
+? 1 +
+Syntax error
+PRINT X; "T", ...   print numbers and strings, ; and , between them; ? is PRINT
+READY.
+? 1..2
+Syntax error
+PRINT X; "T", ...   print numbers and strings, ; and , between them; ? is PRINT
+READY.
+? 1.2.3
+Syntax error
+PRINT X; "T", ...   print numbers and strings, ; and , between them; ? is PRINT
+READY.
+? 1E
+Syntax error
+PRINT X; "T", ...   print numbers and strings, ; and , between them; ? is PRINT
+READY.
+? 0x
+Syntax error
+PRINT X; "T", ...   print numbers and strings, ; and , between them; ? is PRINT
+READY.
+? 0x123456789
+Illegal quantity
+READY.
+? 12ab
+Syntax error
+PRINT X; "T", ...   print numbers and strings, ; and , between them; ? is PRINT
+READY.
+? 1 ^ 2
+Syntax error
+PRINT X; "T", ...   print numbers and strings, ; and , between them; ? is PRINT
+READY.
+? 1 + "A"
+Syntax error
+PRINT X; "T", ...   print numbers and strings, ; and , between them; ? is PRINT
+READY.
+? 1;2;3;4;5;6 / 0
+12345
+Division by zero
+READY.
+?--------------------------------------------------------------------------1
+Formula too complex
+READY.
+?1+(2+(3+(4+(5+(6+(7+(8+(9+(1+(2+(3+(4+(5+(6+(7+(8+(9)))))))))))))))))
+Formula too complex
+READY.
+?1+(2+(3+(4+(5+(6+(7+(8+(9+(1+(2+(3+(4+(5+(6+(7)))))))))))))))
+73
+READY.
+POKE 0x9000, -1: ? PEEK(0x9000), PEEK(0x9000) AND 0xFF
+-1      255
+READY.
+POKE 0x9001, 3.9: ? PEEK(0x9001), PEEK(0x9000 + 1)
+3       3
+READY.
+POKE 4294967040, 0
+Illegal quantity
+READY.
+? PEEK(0xFFFFFF9E)
+0
+READY.
+DUMP 0x9000 + 0, 1 + 1
+00009000 FFFFFFFF 00000003
+READY.
+Q = 0x9000: DUMP Q, 2
+00009000 FFFFFFFF 00000003
+READY.
+A = 1: LOAD "X.BIN": ? A
+SD error 1 in slot 1, no card
+READY.
+? A
+Undefined variable
+READY.
+POKE 0x8002, 99: ? B
+Undefined variable
+READY.
+B = 7: ? B
+7
+READY.
+POKE 0xFFFFFF9E, 0x9C10
+READY.
+E = 1: F = 2: G = 3
+READY.
+H = 4
+Out of memory
+READY.
+? B; E; F; G
+7123
+READY.
+halt
+Halted
+00008000: 00000000 401c0000 00000001 00000042 00000000 3ff00000 00000001 00000045
+00008008: 00000000 40000000 00000001 00000046 00000000 40080000 00000001 00000047
+ffffed51: 00008010
+Screen:
+|A = 1: LOAD "X.BIN": ? A
+|SD error 1 in slot 1, no card
+|READY.
+|? A
+|Undefined variable
+|READY.
+|POKE 0x8002, 99: ? B
+|Undefined variable
+|READY.
+|B = 7: ? B
+|7
+|READY.
+|POKE 0xFFFFFF9E, 0x9C10
+|READY.
+|E = 1: F = 2: G = 3
+|READY.
+|H = 4
+|Out of memory
+|READY.
+|? B; E; F; G
+|7123
+|READY.
+|halt
+|Halted
+VBASE at the halt 000000
+exit 0

@@ -21,6 +21,33 @@ The release candidates pinned these:
 
 nice_cpu's `RC01` and `RC03` have no tag here.
 
+## V2.3.2 (unreleased)
+
+**Upgrade notes.**
+
+- A number in a statement is an expression, and must fit a signed
+  word, -2147483648 to 2147483647. `SYS 4294967040`, `DIR 4294967295`,
+  and the other numbers of 2^31 and more are an `Illegal quantity`,
+  where stage 1 took them as words: write `SYS 0xFFFFFF00` or
+  `SYS -256` instead. A letter or a point right after a number is a
+  `Syntax error`, and `SYS 1E3` and `SYS 32768.` are numbers
+  ([#113](https://github.com/MJoergen/NiceMonMEGA65/issues/113)).
+- A name glued to a keyword, such as `SYS0X8000`, is a variable, and
+  no statement.
+- Every `LOAD` clears BASIC's variables, which start at `0x8000`, and
+  ends its line.
+
+**BASIC.**
+
+- Stage 2, the numbers: expressions on the FPU, with `+`, `-`, `*`,
+  `/`, `DIV`, `MOD`, `<<`, `>>`, the comparisons, `NOT`, `AND`, `OR`,
+  `XOR`, `ABS`, `SGN`, `INT`, `SQR`, and `PEEK`; constants with a
+  fraction or an exponent; variables with names of up to 16 characters,
+  and `LET`; `PRINT` and `?`, with `;`, `,`, `TAB`, and `SPC`; `POKE`;
+  colons between statements; and the errors in full text
+  ([#113](https://github.com/MJoergen/NiceMonMEGA65/issues/113),
+  [basic/README.md](../basic/README.md#numbers)).
+
 ## V2.3.1 (2026-11-19)
 
 **Upgrade notes.**

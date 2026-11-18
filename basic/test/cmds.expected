@@ -22,6 +22,9 @@ CLS                 clear the screen
 VER                 the version
 HALT                halt the core
 HELP                the statements
+PRINT X; "T", ...   print numbers and strings, ; and , between them; ? is PRINT
+LET V = X           set the variable V to the number X; LET may be left out
+POKE A, X           write X to the word at A, which PEEK(A) reads
 CRSR up down        scroll back a row, before a statement
 PgUp PgDn           a page; on the MEGA65 CTRL and MEGA with CRSR up or down
 READY.

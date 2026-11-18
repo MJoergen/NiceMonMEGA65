@@ -2,8 +2,8 @@
 
 The design of the BASIC interpreter in the ROM, issue
 [#54](https://github.com/MJoergen/NiceMonMEGA65/issues/54), and the
-stages of the work. **Stage 1, the shell, is written (#112); the rest
-is not.**
+stages of the work. **Stage 1, the shell, is written (#112), and so
+is stage 2, the numbers (#113); the rest is not.**
 [BASIC_SURVEY.md](BASIC_SURVEY.md) is the survey behind it. #54 lists
 the features and what is left out, and this note does not repeat the
 list. It has the rest: the decisions, the limits of the target, the
@@ -261,7 +261,12 @@ a double, IEEE 754 binary64, on the FPU ([The FPU](#the-fpu)).
   exponent is -4 to 14, with a 0 before the point, and in E notation
   else, with a sign and at least two digits in the exponent. So
   `1/3` is `0.333333333333333`, `0.1 + 0.2` is `0.3`, `1E15` is
-  `1E+15`, and `0.00001` is `1E-05`. A negative number has its `-`,
+  `1E+15`, and `0.00001` is `1E-05`. `DIGITS` rounds twice, the
+  scaled number to a double and that to a whole number, so its last
+  digit differs from that of `%.15G` where the digits after it are
+  near a 5: 5 of the 510 numbers of stage 2's test (measured
+  2026-11-18). BASIC keeps this until `DIGITS` rounds once
+  ([nice_cpu#200](https://github.com/MJoergen/nice_cpu/issues/200)). A negative number has its `-`,
   and no blank comes before or after a number. A `,` in `PRINT` goes
   to the next column of 8.
 - A constant is read as at most 16 digits in BCD and an exponent,
@@ -375,7 +380,11 @@ entries alone (#152). Its workspace is the program's RAM:
   its characters packed four to a word, as `.ASCII_B` packs them, in
   at most 4 words. A name is found by its length first. The token of a
   name holds the variable's offset from `0x8000`, so the double is
-  read with no step over the name. A variable that was never assigned
+  read with no step over the name. In stage 2 a variable is made by an
+  assignment alone, `V =` at the start of a statement or after `LET`,
+  so that a line that only names one, or a typo, does not write over a
+  program at `0x8000`. A name with no variable is an
+  `Undefined variable` when it runs. A variable that was never assigned
   has `0xFFFFFFFF` in the high word of its double, a NaN, which no
   variable holds otherwise, as a program never sees one. Stage 3 keeps
   the format.
@@ -631,9 +640,12 @@ Each has an issue, under #54.
    expressions for their numbers. The errors. Still direct mode only,
    but the line is tokenized as a stored line will be.
    Its first step is the port of `basic.c` to assembly, #115, which
-   is done, and the rest is written in assembly. It measures the
-   words of the stage and the steps of an operation. It needs
-   nothing new of the monitor.
+   is done, and the rest is written in assembly. It needs nothing new
+   of the monitor. It measured 1383 words
+   ([The ROM's room](#the-roms-room)), and in `niceemu` `A = B` takes
+   67 steps, an operator with a variable after it 43, with a small
+   constant 37, and a pair of parentheses 24, so `A = B + C` is about
+   110 (measured 2026-11-18).
 3. **Programs**, #114. The lines, `LIST`, `NEW`, `CLR`, `RUN`, `END`,
    `STOP`, `CONT`, `GOTO`, `GOSUB`, `IF` on one line, `FOR`, `REM`,
    `INPUT` of numbers, `GET`, `DIM`, the break key, `HIMEM`, and the
@@ -763,15 +775,15 @@ in C that the note had before 2026-11-16:
 |---|---:|---:|
 | 1. The shell in C, less the main loop it replaces, measured | 961 | 961 |
 | 2. The port of the shell, measured | -1325 | -364 |
-| 2. Numbers | 1400 | 1036 |
-| 3. Programs | 2100 | 3136 |
-| 4. Files | 400 | 3536 |
-| 5. Strings | 1900 | 5436 |
-| 6. Functions | 200 | 5636 |
-| 7. The editor and its statements | 2000 | 7636 |
-| 8. Structure | 1400 | 9036 |
-| 9. Errors | 400 | 9436 |
-| 10. The machine | 700 | 10136 |
+| 2. Numbers, measured | 1383 | 1019 |
+| 3. Programs | 2100 | 3119 |
+| 4. Files | 400 | 3519 |
+| 5. Strings | 1900 | 5419 |
+| 6. Functions | 200 | 5619 |
+| 7. The editor and its statements | 2000 | 7619 |
+| 8. Structure | 1400 | 9019 |
+| 9. Errors | 400 | 9419 |
+| 10. The machine | 700 | 10119 |
 
 Stage 1 was `basic.c`, 1510 words, and `basic.nasm`, 624, of which 431
 were its packed texts, the help among them, less 1032 words that left
@@ -798,8 +810,10 @@ Since #152 the ROM is two images, and BASIC's is `0x4000`–`0x7FFF`,
 16384 words. Stage 1 fills 5067 of them, with its own copies of
 `common.nasm`, `monlib.nasm`, and `mon.nasm`, 593 words, and leaves
 11317 free; the monitor's image is 9542 words, with 6842 free below
-`0x4000` (measured 2026-11-18). The list after stage 1 is guessed at
-10136 words in the table above, which fits, with little to spare.
+`0x4000` (measured 2026-11-18). Stage 2 fills 1383 words more, 6450,
+and leaves 9934 free (measured 2026-11-18). The list after stage 2 is
+guessed at 9100 words in the table above, which fits, with little to
+spare.
 The split is one constant, `BASIC_BASE` of `monitor/common.nasm`: at
 `0x3000`, BASIC would have 20480 words, and the monitor 2746 free.
 

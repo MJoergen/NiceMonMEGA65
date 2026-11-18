@@ -111,30 +111,55 @@ $(BUILD)/dis.bin: test/dis.nasm $(TOOLS) | $(BUILD)
 # the last. halt ends each input. dash's printf, the shell of make on
 # Ubuntu, has no \x.
 CMDS = help\rver\rdump 0, 6\rdump\rDUMP 0x10, 1\rq\rloadx\r\r  cls\rabc\177\177\177ver\rjunk\003ver\r\033[A\033OPver\rsys 0x8000\rsys 0x9000\rdump 0x8000, 0\rdump 0x8000\rdump 0, 256\rip\rip "192.168.1.65"\rip "1.2.3"\rip "256.0.0.1"\rip "1..2.3"\rip "1.2.3.4x"\rip "  010.0.0.1 "\rmac\rmac "02:4E:49:43:45:01"\rmac "2:4e:49:43:45"\rmac "2:4e:49:43:45:123"\rmac "3:0:0:0:0:0"\rmac "2:4e: 49:43:45:1"\rmac "2:4e:49:43:45:1x"\rmac "  a:b:c:d:e:f "\rbaud\rbaud 921600\rbaud 9600\rBAUD  115200 \rip 1.2.3.4\rsys\rsys 0x\rdump 12ab\rdump 1,\rbaud 1 2\rver x\rload "a.bin" "1.2.3.4"\rdump 4294967296\rdump 0x100000000\rload "x.txt"\rload "x"\rsave "x", "1.2.3.4"\rHeLp x\rload "x.bin\rdump , 2\rhalt\r
-# basic: the scanner of a line, with no card and no IP address, so that
-# the statements that need them stop at once. A keyword in mixed case and
-# with blanks around it runs; a comma, a character of 0xE9, or another
-# word after it, or a letter, a digit, or an _ glued to it, makes it no
-# statement, or a Syntax error with its lines of HELP, which each
-# statement shows. Numbers: in decimal and hex, with 0X, leading zeros,
-# and the 76 characters of a full line; 0xFFFFFFFF, the largest, and 33
-# bits, which are an Illegal quantity, also with a letter after them;
-# and the numbers that are not. 0x without digits is no number, and the
-# scan goes on at its 0, so dump 0x, 1, dis 0x, 1, baud 0x, and
-# dir 0x"1.2.3.4" are a Syntax error, and dir 99999999999"1.2.3.4" an
-# Illegal quantity (issue #151, S1 and S2). save "x", "y", 99999999999
-# is a Syntax error at its second comma, before its number (S3), and
-# mac "" is no MAC address, as ip "" is no IP address (S5). Strings: an empty one, a name glued to load, a server
-# without a comma, or with no closing quote, and the arguments that are
-# too few or too many for each statement. The dumps of the line after
-# five statements show the 0 at each closing quote, those of a statement
-# that failed too, and the .BIN that save adds to a name without a dot,
-# last in a line of 76 characters. ip "1.2.3.4, with no closing quote,
-# writes the IP address, which the dump of 0xFFFFFFB0 shows.
-BLANKS30 = $(shell printf '%30s' '')
-BLANKS62 = $(shell printf '%62s' '')
+# basic: the scanner of a statement, with no card and no IP address, so
+# that the statements that need them stop at once. A keyword in mixed
+# case and with blanks around it runs; a comma, a character of 0xE9, or
+# another word after it, or an _ glued to it, makes it no statement, or a
+# Syntax error with its lines of HELP, which each statement shows; with a
+# letter or a digit glued to it, it is a name, and no statement. Numbers,
+# which are expressions that must fit a signed word: in decimal and hex,
+# with 0X, leading zeros, and the 76 characters of a full line;
+# 0xFFFFFFFF, which is -1, the largest decimal one, 2147483647, and a
+# number of 32 bits and more, which are an Illegal quantity; a letter
+# after a number; and the numbers that are not. 0x without digits is no
+# number, so dump 0x, 1, dis 0x, 1, baud 0x, and dir 0x"1.2.3.4" are a
+# Syntax error, as is dir 99999999999"1.2.3.4", with no comma (issue
+# #151, S1 and S2). save "x", "y", 99999999999 is a Syntax error at its
+# second comma, before its number (S3), and mac "" is no MAC address, as
+# ip "" is no IP address (S5). A name in a number's place, x, is an
+# Undefined variable. Strings: an empty one, a name glued to load, a
+# server without a comma, or with no closing quote, and the arguments
+# that are too few or too many for each statement. The dumps of the
+# tokens after four statements, each with a colon and the dump after it
+# on its line, show the 0 after each string, and the .BIN that save adds
+# to a name without a dot, which leaves the colon and the dump after it.
+# ip "1.2.3.4, with no closing quote, writes the IP address, which the
+# dump of 0xFFFFFFB0 shows.
 ZEROS72  = $(shell printf '%072d' 32768)
-BASIC = vEr\r   ver   \rver,\rver\351\r\351ver\rsys0x8000\rdumpx\rdum\rdis1\ri\rsys_\r"ver"\r9 ver\rsave x\rdelete x\rdhcp x\rmac x\rtime x\rntp x\rdis x\rcls x\rhalt x\rdir x\rsys 32768\rsys $(ZEROS72)\rSYS 0X8000\rsys 0x08000\rsys 4294967295\rsys 0xFFFFFFFF\rsys 0x0000000ffffffff\rsys 4294967296\rsys 0x100000000\rsys 99999999999x\rsys 0x8000x\rsys 0x0x8000\rsys 1e3\rsys 32768.\rsys -1\rsys "x"\rsys 0xg\rsys 0x8000,\rdump 0x8000, 0\rdump 0x, 1\rdump 0x , 2\rdump 0x 1\rdump 1, 4294967296\rdump 1, 0x\rdis 0x8000, 1\rdis 0x, 1\rdis ,1\rdis 0x8000,\rbaud 0x\rbaud 0x 1\rbaud 4294967296\rbaud 1,\rbaud 0x1C200\rload ""\rload ".bin"\rload"a.BiN"\rload "a.bin",\rload "a.bin" ,"1.2.3.4"\rload "a.bin", "1.2.3.4" x\rload "a.bin", "bad"\rload x\rload "a.bin", "1.2.3.4\rLOAD  \r\rsave "x", "y" z\rsave "x" "y"\rsave "x",\rsave "x", 1\rsave "x", 0x, 1\rsave "x", 1, 99999999999\rsave "x", "y", 99999999999\rsave "abc\rsave "a.b", 0x8000, 1\rdelete "x"\rdelete "x", "y"\rdelete ""\rdir\rdir 0x\rdir 0x"1.2.3.4"\rdir 99999999999"1.2.3.4"\rdir 99999999999\rdir "1.2.3.4", "*.bin"\rdir "bad"\rdir "1.2.3.4",\rdir 1,\rdir 1 "x"\rdir 5\rip ""\rip "1.2.3.4" x\rmac ""\rmac "02:4E:49:43:45:00" x\rtime "bad"\rtime "1" x\rntp "1.2.3.4" x\rntp "1.2.3.4",\rntp "", "bad"\rntp ""\rntp "1.2.3.4", "+01:00"\r$(BLANKS30)save "abc",1,2\rdump 0xFFFFE85E, 16\r$(BLANKS30)load "x" "y"\rdump 0xFFFFE85E, 16\r$(BLANKS30)save "x", "1.2.3.4"\rdump 0xFFFFE85E, 20\r$(BLANKS30)save "a.b", 1, 2\rdump 0xFFFFE85E, 16\r$(BLANKS30)dir "1.2.3.4", "*"\rdump 0xFFFFE85E, 20\r$(BLANKS62)save "abc",1,2\rdump 0xFFFFE87E, 16\rip "1.2.3.4\rhalt\r
+BASIC = vEr\r   ver   \rver,\rver\351\r\351ver\rsys0x8000\rdumpx\rdum\rdis1\ri\rsys_\r"ver"\r9 ver\rsave x\rdelete x\rdhcp x\rmac x\rtime x\rntp x\rdis x\rcls x\rhalt x\rdir x\rsys 32768\rsys $(ZEROS72)\rSYS 0X8000\rsys 0x08000\rsys 4294967295\rsys 2147483647\rsys 2147483648\rsys 0xFFFFFFFF\rsys 0x0000000ffffffff\rsys 4294967296\rsys 0x100000000\rsys 99999999999x\rsys 0x8000x\rsys 0x0x8000\rsys 1e3x\rsys 32768.\rsys -1\rsys "x"\rsys 0xg\rsys 0x8000,\rdump 0x8000, 0\rdump 0x, 1\rdump 0x , 2\rdump 0x 1\rdump 1, 4294967296\rdump 1, 0x\rdis 0x8000, 1\rdis 0x, 1\rdis ,1\rdis 0x8000,\rbaud 0x\rbaud 0x 1\rbaud 4294967296\rbaud 1,\rbaud 0x1C200\rload ""\rload ".bin"\rload"a.BiN"\rload "a.bin",\rload "a.bin" ,"1.2.3.4"\rload "a.bin", "1.2.3.4" x\rload "a.bin", "bad"\rload x\rload "a.bin", "1.2.3.4\rLOAD  \r\rsave "x", "y" z\rsave "x" "y"\rsave "x",\rsave "x", 1\rsave "x", 0x, 1\rsave "x", 1, 99999999999\rsave "x", "y", 99999999999\rsave "abc\rsave "a.b", 0x8000, 1\rdelete "x"\rdelete "x", "y"\rdelete ""\rdir\rdir 0x\rdir 0x"1.2.3.4"\rdir 99999999999"1.2.3.4"\rdir 99999999999\rdir "1.2.3.4", "*.bin"\rdir "bad"\rdir "1.2.3.4",\rdir 1,\rdir 1 "x"\rdir 5\rip ""\rip "1.2.3.4" x\rmac ""\rmac "02:4E:49:43:45:00" x\rtime "bad"\rtime "1" x\rntp "1.2.3.4" x\rntp "1.2.3.4",\rntp "", "bad"\rntp ""\rntp "1.2.3.4", "+01:00"\rsave "abc",1,2: dump 0xFFFFECB0, 16\rsave "x", "1.2.3.4": dump 0xFFFFECB0, 16\rsave "a.b", 1, 2: dump 0xFFFFECB0, 16\rdir "1.2.3.4", "*": dump 0xFFFFECB0, 16\rip "1.2.3.4\rhalt\r
+# expr: the numbers of stage 2 (issue #113): the operators and their
+# order, the word operators, the comparisons, the functions, the
+# constants in hex, with a point, and with an exponent, and PRINT's
+# format, with fixed notation from 1E-4 to 1E14 and E notation else, -0
+# as 0, the smallest double, half of it, which goes to 0, and the
+# largest. PRINT's items: ;, which joins them, a comma,
+# to the next column of 8, the CR LF that ; or a comma at the end leaves
+# out, before which READY. starts a row of its own, TAB and SPC, and
+# their counts of 0 to 255. Variables: names in either case, of 16
+# characters, not 17, no % or $, LET and the assignment without it, a
+# keyword that is no name, an undefined one, made by its = alone, and
+# colons. The errors: division by zero by /, DIV, and MOD, an overflow
+# in a computation and in a constant, the Illegal quantity of SQR, of a
+# word operator's operand, and of a shift by -1, and the Syntax errors
+# of expressions and constants, ^ before stage 6, and a string in an
+# expression. A line of 74 signs is too deep for the processor's stack,
+# and 17 operands pending for the FPU's stack, where 16 are not. PEEK
+# and POKE, with a value rounded toward zero and an address of 2^32 -
+# 256, which is no word. DUMP takes expressions. LOAD clears the
+# variables, here with no card, and ends the line. A table with a length
+# of 99 at its start is cut there. Last, RAM_WORDS is set so that there
+# is room for four variables, B, E, F, and G, and H is Out of memory.
+EXPR = ? 1+2*3, (1+2)*3, 2*3+1, 10-2-3, 100/10/5\r? -2*3, - 3 + 4, +5, --5, 2*-3\r? 7 DIV 2, -7 DIV 2, 7 MOD -2, -7 MOD 2, 1 << 4, -1 >> 28, 1 << 32\r? 5 AND 3, 5 OR 3, 5 XOR 3, NOT 0, NOT 5 AND 3\r? 1 = 1, 1 <> 1, 1 < 2, 2 <= 1, 3 > 2, 2 >= 3\r? NOT 1 = 2, 1 + 1 = 2 AND 3 < 4, 1 OR 2 XOR 3, 1 << 2 + 1, 2 + 3 < 6\r? ABS(-2.5), SGN(0), SGN(-0.1), INT(2.9), INT(-2.1), SQR(16)\r? 0x1F, 0xFFFFFFFF, 0X7fffffff, 1E3, 1.5E-3, .5, 5., 1e+2\r? 1/3; 2/3; 1E15; 1E14; 123456789012345678; 0.0001; 0.00001; -1E-100\r? -0, 0.1 + 0.2, 4.9E-324, 4.9E-324 / 2, 1.79769313486231E308\r? "A";1;"B", "C"; ""\r? "X";\r? 1,\r? "AB";TAB(5);"C";SPC(3);"D"\r? TAB(0);"E";TAB(1);"F";SPC(0);"G"\r? SPC(256)\r? TAB(-1)\rTotalSum = 5: totalsum = totalsum + 1: ? TOTALSUM\ra1b2c3d4e5f6g7h8 = 16: ? A1B2C3D4E5F6G7H8\ra1b2c3d4e5f6g7h8i = 1\rA%% = 1\rA$$ = "X"\rLET B = 2: ? B\rLET 5 = 2\rLET\rC\rPRINTX\rprint = 1\rand = 1\r? D\rD =\r? D\rX=1:Y=X+1:?Y\r: : ? 1 : : ? 2 :\r? 1/0\r? 0/0\r? 5 MOD 0\r? 5 DIV 0\r? 1E308*10\r? SQR(-1)\r? 1E400\r? 2147483648 AND 1\r? 1 << -1\r? (1\r? 1)\r? 1 +\r? 1..2\r? 1.2.3\r? 1E\r? 0x\r? 0x123456789\r? 12ab\r? 1 ^ 2\r? 1 + "A"\r? 1;2;3;4;5;6 / 0\r?--------------------------------------------------------------------------1\r?1+(2+(3+(4+(5+(6+(7+(8+(9+(1+(2+(3+(4+(5+(6+(7+(8+(9)))))))))))))))))\r?1+(2+(3+(4+(5+(6+(7+(8+(9+(1+(2+(3+(4+(5+(6+(7)))))))))))))))\rPOKE 0x9000, -1: ? PEEK(0x9000), PEEK(0x9000) AND 0xFF\rPOKE 0x9001, 3.9: ? PEEK(0x9001), PEEK(0x9000 + 1)\rPOKE 4294967040, 0\r? PEEK(0xFFFFFF9E)\rDUMP 0x9000 + 0, 1 + 1\rQ = 0x9000: DUMP Q, 2\rA = 1: LOAD "X.BIN": ? A\r? A\rPOKE 0x8002, 99: ? B\rB = 7: ? B\rPOKE 0xFFFFFF9E, 0x9C10\rE = 1: F = 2: G = 3\rH = 4\r? B; E; F; G\rhalt\r
 # load: LOAD with lines typed and pasted. The LOAD line ends with CR LF,
 # as a terminal may end it, which is no empty line. The first line is typed
 # with edits: a DEL that takes back 2, the cursor key ESC [ A, which is
@@ -193,6 +218,7 @@ TIME = time\rload\r8000 1\r\rsave "old.bin", 0x8000, 1\rtime "2026-11-11 14:30:0
 # variables, the cursor's registers, and the IP and MAC addresses
 DUMP_cmds    = -d 0xFFFFF000:4 -d 0xFFFFE800:2 -d 0xFFFFFF80:6 -d 0xFFFFFF9F:1 -d 0xFFFFFFB0:3
 DUMP_basic   = -d 0xFFFFF000:4 -d 0xFFFFE800:2 -d 0xFFFFFFB0:1
+DUMP_expr    = -d 0x8000:16 -d 0xFFFFED51:1
 DUMP_load    = -d 0xFFFFF000:4 -d 0xFFFFF005:6 -d 0xFFFFE800:5
 DUMP_load_emu = -d 0xFFFFE812:1 -d 0xFFFEFFFF:1
 DUMP_load_64k = -d 0xFFFFE812:1
@@ -218,6 +244,7 @@ test: fmt $(ROM_TEST) $(BUILD)/dis.bin $(MON)/build/hello.bin $(MON)/build/fat/s
 	@if grep -qx '$(BUILD)/basic_image_test.bin: $(HEADER_TEST)' $(BUILD)/header.out; \
 	then echo "PASS basic header"; else echo "FAIL basic header"; cat $(BUILD)/header.out; exit 1; fi
 	@$(PYTHON) test/dis.py $(EMU) $(ROM_TEST) $(BUILD)/dis.bin
+	@$(PYTHON) test/print_numbers.py $(EMU) $(ROM_TEST)
 	@$(PYTHON) test/ntp.py $(EMU) $(ROM_TEST) test/ntp.expected $(BUILD)/ntp.out
 	@$(PYTHON) test/tftp.py $(EMU) $(ROM_TEST) test/tftp.expected $(BUILD)/tftp.out
 	@echo 'FFFFFF9E 00020000' > $(BUILD)/ram128k.bin
@@ -226,15 +253,17 @@ test: fmt $(ROM_TEST) $(BUILD)/dis.bin $(MON)/build/hello.bin $(MON)/build/fat/s
 	@printf '$(LOAD_64K)' > $(BUILD)/load_64k.txt
 	@printf '$(CMDS)' > $(BUILD)/cmds.txt
 	@printf '$(BASIC)' > $(BUILD)/basic.txt
+	@printf '$(EXPR)' > $(BUILD)/expr.txt
 	@printf '$(TIME)' > $(BUILD)/time.txt
 	@{ printf '$(LOAD_HEAD)'; head -n 3 $(MON)/build/hello.bin | awk '{ printf "%s\r\n", $$0 }'; \
 	  tail -n +4 $(MON)/build/hello.bin; printf '$(LOAD_TAIL)'; } > $(BUILD)/load.txt
 	@fail=0; \
-	for t in cmds basic load load_emu load_64k time; do \
+	for t in cmds basic expr load load_emu load_64k time; do \
 	  opts=; sd=; base0=; \
 	  case $$t in \
 	    cmds) prog=; dump='$(DUMP_cmds)';; \
 	    basic) prog=; dump='$(DUMP_basic)';; \
+	    expr) prog=; dump='$(DUMP_expr)';; \
 	    load) prog=$(BUILD)/ram128k.bin; dump='$(DUMP_load)';; \
 	    load_emu) prog=; dump='$(DUMP_load_emu)';; \
 	    load_64k) prog=$(BUILD)/ram64k.bin; dump='$(DUMP_load_64k)';; \
