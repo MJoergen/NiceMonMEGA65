@@ -1,0 +1,126 @@
+NiceMon V9.9, BASIC V9.9
+HELP lists the statements
+READY.
+10 INPUT A, B: PRINT A + B
+RUN
+? 1, 2
+3
+READY.
+RUN
+? 1
+?? 2
+3
+READY.
+RUN
+? 1, 2, 3
+Extra ignored
+3
+READY.
+RUN
+? x
+Redo from start
+? 1..2
+Redo from start
+? 1 2
+Redo from start
+? 3, 4
+7
+READY.
+RUN
+? -1, +2.5
+1.5
+READY.
+RUN
+? 0x10, 1E2
+116
+READY.
+10 INPUT "SUM"; A: ? A
+RUN
+SUM? 5
+5
+READY.
+10 INPUT "A" A
+RUN
+Syntax error in 10
+INPUT ["P";] V, ... the numbers of a line typed into V, ..., after the prompt P
+READY.
+10 INPUT A,
+RUN
+Syntax error in 10
+INPUT ["P";] V, ... the numbers of a line typed into V, ..., after the prompt P
+READY.
+10 INPUT A: ? A
+RUN
+? 
+Break in 10
+READY.
+CONT
+? 7
+7
+READY.
+INPUT Z: ? Z
+? 8
+8
+READY.
+INPUT Y, W: ? Y; W
+? 9,10
+910
+READY.
+GET Q: ? Q
+82
+READY.
+10 GOTO 10
+RUN
+Break in 10
+READY.
+CONT
+Break in 10
+READY.
+? 1
+1
+READY.
+10 FOR I = 1 TO 300: NEXT: GET A: GET B: PRINT A; B
+RUN
+8889
+READY.
+?1
+1
+READY.
+LIST
+Break
+READY.
+? 2
+2
+READY.
+10 FOR I = 1 TO 3000: NEXT
+20 GET A: IF A THEN PRINT A;: GOTO 20
+30 HALT
+RUN
+65666768697071727374757677787980818283848586878889904849505152Halted
+Screen:
+|CONT
+|Break in 10
+|READY.
+|? 1
+|1
+|READY.
+|10 FOR I = 1 TO 300: NEXT: GET A: GET B: PRINT A; B
+|RUN
+|8889
+|READY.
+|?1
+|1
+|READY.
+|LIST
+|Break
+|READY.
+|? 2
+|2
+|READY.
+|10 FOR I = 1 TO 3000: NEXT
+|20 GET A: IF A THEN PRINT A;: GOTO 20
+|30 HALT
+|RUN
+|65666768697071727374757677787980818283848586878889904849505152Halted
+VBASE at the halt 000000
+exit 0

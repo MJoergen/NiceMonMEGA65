@@ -2,6 +2,7 @@
 
 - [The statements](#the-statements)
 - [Numbers](#numbers)
+- [Programs](#programs)
 - [The disassembler](#the-disassembler)
 - [Loading without a host](#loading-without-a-host)
 - [Building](#building)
@@ -20,8 +21,8 @@ everything that BASIC does, a program can do too. The monitor knows of
 BASIC only its two vectors, at `0x4000`, the cold start, and `0x4002`,
 the warm start, after a program. BASIC's own state is in 2K words of
 its own at `0xFFFFE800`, below the monitor's, and the stack starts
-below them. The variables of BASIC's programs are in the program's RAM,
-from `0x8000` (Numbers below).
+below them. BASIC's programs, their variables, and their arrays are in
+the program's RAM, from `0x8000` (Programs below).
 
 ## The statements
 
@@ -29,7 +30,8 @@ The ROM's user interface is BASIC (issue #54,
 [doc/BASIC.md](../doc/BASIC.md)). Stage 1 (issue #112) is the shell:
 the monitor's commands as statements. Stage 2 (issue #113) adds the
 numbers: expressions, variables, `PRINT`, `LET`, `POKE`, and `PEEK`.
-The statements run one line at a time, with no stored program yet.
+Stage 3 (issue #114) adds the programs: lines with numbers, which
+BASIC keeps and runs (Programs below).
 
 At the cold start the ROM clears the screen, prints its banner,
 `NiceMon` and the version, then `HELP lists the statements` and
@@ -37,7 +39,9 @@ At the cold start the ROM clears the screen, prints its banner,
 console: the keyboard and the line, which the hardware merges. DEL and
 backspace delete the character before the cursor, CTRL-C empties the
 line, and the cursor and function keys, the other control codes, and
-the bytes `0x80` to `0x9F` do nothing. RETURN runs the line, and BASIC
+the bytes `0x80` to `0x9F` do nothing. Keys typed while a program
+runs wait for the next line, `INPUT`, or `GET`, up to 31 of them, and
+those after are lost. RETURN runs the line, and BASIC
 prints `READY.` after it. A line of blanks only runs nothing and gets no
 `READY.`. A break on the UART, or a host's half-close over Ethernet,
 ends the line's input and not the keyboard's, and the next host to
@@ -100,7 +104,7 @@ fails, TAB does nothing.
 | `TIME ["YYYY-MM-DD HH:MM:SS"]` | Shows the clock of the time of day, `2026-11-11 14:30:00`, or sets it first to the date and the time given, two digits for each part but the year, in the years 1970 to 2105, such as `TIME "2026-11-11 14:30:00"`. The clock keeps local time, as the MEGA65's real-time clock does, and knows no time zones. After a reset of the system it is not set. The cold start sets it from the MEGA65's real-time clock, unless the real-time clock lost its time ([SYSTEM.md](../doc/SYSTEM.md#the-i2c-bus)), and leaves a clock that is set already. On the MEGA65, `TIME` with a date and a time in the years 2000 to 2099 sets the real-time clock too, so that later starts, and the MEGA65's other cores, have the time. Until the clock is set, as on the Nexys4DDR, which has no real-time clock, `TIME` prints `Clock not set`; a program, a host, `TIME`, or `NTP` sets it. A start of a program keeps it. Anything else is no time, and `TIME` says so and sets nothing. A clock that a program set past 2106-02-07 shows as `Clock past 2106`. In `niceemu` the clock is the host's time in UTC from the start. |
 | `NTP ["SERVER"] [, "+HH:MM"]` | Sets the clock from a time server on the network, and on the MEGA65 the real-time clock too, as `TIME` with a date does, and shows the time it set, the server, and how far the clock was off, such as `Clock set 2026-11-14 12:30:05 from 192.168.1.1, was 7 s behind`. SERVER is a name, such as `"pool.ntp.org"`, or an IP address. Without it, or with `""`, the server is the NTP server that `DHCP` got, or else `pool.ntp.org`. A time server gives UTC, and the clock keeps local time, so the offset is local time less UTC, `"+HH:MM"` or `"-HH:MM"` from `-12:00` to `+14:00`, such as `NTP "", "+01:00"` for Central European Time and `"+02:00"` for its summer time; without it the clock is set to UTC. It needs an IP address, and for a name a DNS server, from `DHCP`. Its errors are a line each: no IP address, no answer to ARP from the server or the gateway, no DNS server, no such name, an error of the DNS server, no answer from the DNS server or the time server after 3 tries of 2 seconds, a server that refused, and an answer that is not to be trusted ([The network](../monitor/README.md#the-network)). |
 | `BAUD [RATE]` | Shows the UART's baud rate, `Baud rate 230400`, or writes it first: 115200, 230400, 460800, 921600, 1000000, 1500000, or 2000000, such as `BAUD 921600`. Anything else is no rate, and `BAUD` says so and writes nothing. It writes `0xFFFFFF9F` ([DEBUG_LINK.md](../doc/DEBUG_LINK.md#the-baud-rate)), as the on-board debugger's settings page does. The UART takes the new rate once it has sent nothing for 1 ms, so the answer and `READY.` still come at the old rate, and a terminal on the UART then changes to the new one; only a reset brings back 230400. Over Ethernet the rate does not matter. In `niceemu` the word is memory, which reads 0 after a clear. |
-| `LOAD` | Enters words into the RAM from lines of `ADDR WORD` in hex, as a `.bin` file has them (Loading without a host below), up to an empty line, and prints the words written and the lines skipped: `Words loaded: 600, 00008000 to 00008257`. Every `LOAD` clears the variables, as a program at `0x8000` writes over them, and ends the line. |
+| `LOAD` | Enters words into the RAM from lines of `ADDR WORD` in hex, as a `.bin` file has them (Loading without a host below), up to an empty line, and prints the words written and the lines skipped: `Words loaded: 600, 00008000 to 00008257`. A `LOAD` that writes a word below `HIMEM` (Programs below) may write over BASIC's program and its variables, so it ends with a `NEW`, and at `READY.`, also in a program. One that writes above `HIMEM` alone keeps them, and the line goes on. One that writes no word ends the line. |
 | `DIR [SLOT]` | Lists the folder `NICE` of the SD card's FAT32 file system ([Files](../monitor/README.md#files)): `Directory of NICE`, then a row for each file, its name in 24 columns, the long name where it has one or else the 8.3 name, and its size in decimal, and for each directory, its name and `<DIR>`, then `Files: 25, directories: 1`. A name of 24 characters or more has a row of its own, and the size is on the next. With `SLOT`, it mounts the card in it first, and a slot that the board does not have is `File error 27`; without, it lists the card mounted, which the first `DIR` or `LOAD` after reset mounts. It reads the folder through a handle, as a program does, so after a program that left both handles open it is `File error 23`, as `LOAD` and `SAVE` are; `DIR 0` mounts again, which closes them. An error is shown with its number and meaning: `File error 18, FAT16, which is not supported`. |
 | `LOAD "NAME.BIN"` | Loads the `.bin` file `NAME.BIN` of the card's folder `NICE` as `LOAD` loads lines, and prints the same summary, so a program copied to the card on a PC loads with no host. Unlike the lines typed, an empty line is passed over, the end of the file ends the load, and a skipped line is counted from the first line of the file. A line with a byte that is not printable ASCII, a control code other than TAB, CR, or LF, DEL, or a byte from `0x80`, is skipped, as `niceemu` rejects it, so that no byte is dropped from the middle of a number. An error in the middle of the file, such as `File error 26, the FAT is damaged`, comes after the summary of the lines before it, whose words are in the RAM. The name is the long name or the 8.3 name, in either case, such as `LOAD "my prog.bin"`. A name that does not end in `.BIN`, in either case, is no program, and `LOAD` says so; other kinds of files are for the later stages of BASIC. |
 | `SAVE "NAME", A, N` | Writes `N` words from `A` to the file `NAME` of the card's folder `NICE` as a `.bin` file, a line of `ADDR WORD` in hex for each, and prints `Words saved: 600, 00008000 to 00008257`. A name with no extension gets `.BIN`: `SAVE "PROG", 0x8000, 600` writes `PROG.BIN`. It makes the file, or truncates it when it is there, and `LOAD` reads it back. When the card fills up, the file keeps what fitted, and `SAVE` prints error 30. SAVE writes only to the card: `SAVE "NAME", "IP"` says so. |
@@ -156,12 +160,13 @@ exact.
   `TOTAL` are one variable. A keyword is no name, but a name may start
   with one, as `TOTAL` starts with `TO`. A `%` or a `$` after a name
   is a `Syntax error`, as strings and whole numbers come later. An
-  assignment makes the variable, and one that no assignment made is an
-  `Undefined variable`. A variable is its double and its name, 4 to 7
-  words, from `0x8000` up, where the program's RAM starts, so a
-  program at `0x8000` and the variables share it: `LOAD` clears them.
-  When they reach the stack, an assignment that makes one more is
-  `Out of memory`.
+  assignment, `INPUT`, and `GET` make the variable in a line typed,
+  and a line of a program makes each of its names. A variable that
+  none of them set is an `Undefined variable`. A variable is its
+  double and its name, 4 to 7 words, after the program's lines (Programs
+  below). When the variables and the arrays reach the frames below
+  `HIMEM`, a variable more is `Out of memory`. `CLR` and `RUN` clear
+  them, and `NEW` drops them.
 - **`PRINT`** shows a number as C's `%.15G` does: its first 15
   significant digits, with the trailing zeros dropped, in fixed
   notation while the number is from 1E-4 to below 1E15, with a 0
@@ -180,6 +185,56 @@ quantity`, such as `SQR(-1)` or a word operator's operand that does
 not fit; and `Formula too complex`, more than 16 values that wait for
 the FPU, or parentheses and signs nested too deep for the stack. A
 program never sees an infinity or a NaN.
+
+## Programs
+
+A line that starts with a number, 0 to 65535, is kept as a line of the
+program, in the order of the numbers, and replaces the line of that
+number; a number alone deletes its line. `LIST` shows the lines, and
+`RUN` runs them, from the first. The line is tokenized as it is
+entered, so a `Syntax error` of a constant or a name comes then, with
+no line kept, and the other errors when the line runs, as `Syntax
+error in 20`, with the number of the line, after which the program
+stops. A program pasted into the line is entered line by line. An edit
+keeps the variables, but `CONT` cannot go on after it.
+
+| Statement | What it does |
+|---|---|
+| `RUN [N]` | Runs the program, from line `N` or from its first, after a `CLR`. |
+| `LIST [N] [- [M]]` | Lists the lines from `N` to `M`: `LIST 100`, `LIST 100-200`, `LIST -200`, and `LIST 100-`. The keywords are in upper case, with a blank between two tokens, but before `)`, `,`, `;`, and `:`, after `(` and a sign, and between a function or an array and its `(`. A constant is shown as `PRINT` shows it, and a hex one in hex. CTRL-C stops it. |
+| `NEW` | Deletes the program and its variables and arrays. |
+| `CLR` | Clears the variables, drops the arrays, and ends the loops and subroutines. |
+| `GOTO N` | Goes on at line `N`. |
+| `GOSUB N`, `RETURN` | Goes on at line `N`, and after the `GOSUB` at `RETURN`. |
+| `IF X THEN S [ELSE T]` | Runs the statements `S` when `X` is not 0, else `T`. A line number after `THEN` or `ELSE` is a `GOTO`, and `IF X GOTO N` is one too. `ELSE` belongs to the last `IF` before it that has none, and the statements after `S` and `T` are theirs, up to the end of the line. |
+| `FOR V = X TO Y [STEP Z]`, `NEXT [V] [, W]` | Runs the statements up to `NEXT` with `V` from `X` to `Y`, by `Z` or by 1. The body runs once at least, as in Microsoft's BASIC. `NEXT` with no name ends the last loop, and `NEXT I, J` two. A `FOR` of a variable that has a loop ends that loop and those after it. |
+| `END`, `STOP` | Ends the program. `STOP` prints `Break in 20`, and `END` nothing. |
+| `CONT` | Goes on after `STOP`, `END`, and the break key, unless the program was edited or an error came since: then it is `Can't continue`. |
+| `REM TEXT` | A remark, the rest of the line, which `LIST` shows as it was typed. |
+| `INPUT ["P";] V [, W]` | Prints `? `, or `P` and `? `, and reads numbers into `V` and `W`, with commas between them. A line that is not numbers is `Redo from start`, and `INPUT` asks again. Too few ask for the rest with `?? `, and too many print `Extra ignored`. A number may have a sign; an expression is not taken. CTRL-C is the break key. |
+| `GET V` | Sets `V` to the code of the next key typed, or 0 when there is none. It does not wait. |
+| `DIM A(N) [, B(N, M)]` | Makes the array `A` of `N + 1` elements, `A(0)` to `A(N)`, and `B` of `N + 1` rows of `M + 1`, each element 0. `A` and `A(` are two names. An array that no `DIM` made is `Undefined array`, a subscript outside or one too many or too few `Bad subscript`, and a second `DIM` `Redimensioned array`. |
+| `HIMEM = A` | Sets the top of BASIC's memory, and does a `CLR`. `HIMEM` in an expression reads it, such as `PRINT HIMEM`. |
+
+CTRL-C is the break key. A program polls it every 64 statements, and
+stops with `Break in 20`, after which `CONT` goes on. `GOTO` and
+`GOSUB` take a line number, which keeps the address of its line once
+it is found, and is no expression. A loop and a subroutine take a
+frame each, 8 and 3 words, of the 512 words below `HIMEM`, so a
+`GOSUB` that never returns is `Out of memory` after 170 of them. The
+errors of the programs are `Undefined line`, `NEXT without FOR`,
+`RETURN without GOSUB`, `Can't continue`, `Undefined array`, `Bad
+subscript`, and `Redimensioned array`.
+
+The program's lines start at `0x8000`, a word for each token and
+constant, and the variables follow them, then the arrays, each element
+a double, and the frames. `HIMEM` is the top of them, by default the
+top of the RAM less the room of BASIC's RAM and its stack, so that a
+routine that `SYS` calls may live above a lower `HIMEM`, as in BBC
+BASIC. A `HIMEM` below the end of the arrays and the frames' room, or
+above the top of the RAM, is `Out of memory`. An empty program writes
+no word at `0x8000`, so after `NEW` a `.bin` program there stays as it
+was.
 
 ## The disassembler
 
@@ -372,7 +427,13 @@ the default. It runs these steps in order:
    ERROR, an ERROR after the first block, whose summary comes first,
    files of 512 and 0 bytes, a listing, a port given as `"IP:PORT"`,
    bad arguments, and no answer to ARP.
-6. **The runs.** The ROM runs once for each test below, with its
+6. **The benchmarks.** `test/bench.py` types Rugg/Feldman's
+   benchmarks 1 to 7 and the sieve, in `bench/`, and checks their
+   output. Their steps, which it prints, are those of the instruction
+   counter, read by `PEEK` before and after `RUN`, less those of an
+   empty program. `make -C basic bench` prints them as the rows of the
+   table in [doc/BASIC.md](../doc/BASIC.md#the-benchmarks).
+7. **The runs.** The ROM runs once for each test below, with its
    keystrokes from an input file that ends with `HALT`, so that the run
    halts. Each run's console output, a few memory words, and the screen
    are compared with `test/NAME.expected`:
@@ -381,7 +442,10 @@ the default. It runs these steps in order:
 |---|---|---|
 | `cmds` | The ROM alone | Every statement, its bad arguments, keywords in either case, numbers that do not fit, and the edits of a line. |
 | `basic` | The ROM alone, with no card and no IP address | The scanner of a statement: keywords glued to a letter or a digit, which are names, the HELP lines of each statement's Syntax error, numbers at the limits of a signed word, `0x` without digits, which is no number, a name in a number's place, strings without a closing quote, too few or too many arguments, and the tokens of a line, with the 0 after each string and the `.BIN` that `SAVE` adds to a name. |
-| `expr` | The ROM alone | The numbers: the operators and their order, the word operators, the comparisons, the functions, the constants, `PRINT`'s format and its items, the variables, `LET`, the colons, the errors, the depth of an expression, `PEEK` and `POKE`, a statement with expressions, `LOAD`, which clears the variables, a broken table of variables, and `Out of memory`. |
+| `expr` | The ROM alone | The numbers: the operators and their order, the word operators, the comparisons, the functions, the constants, `PRINT`'s format and its items, the variables, `LET`, the colons, the errors, the depth of an expression, `PEEK` and `POKE`, a statement with expressions, a `LOAD` that writes no word, a broken table of variables, and `Out of memory`. |
+| `prog` | The ROM alone, with `test/prog.bas` typed | The lines: their entry, edits, and deletion, the numbers at the limits, `LIST` and its blanks, `RUN`, `NEW`, the variables an edit keeps, the tokens in memory, `FOR` with steps, nested, and once, `GOSUB` in loops, `IF` with `ELSE`, nested, `STOP`, `END`, `CONT`, and the errors in a program, with its line's number. |
+| `keys` | The ROM alone | `INPUT` with too few, too many, and bad numbers, a prompt, and CTRL-C; `GET`; the break key in a loop, in `CONT`, and in `LIST`; and the keys typed ahead, of which the ring keeps 31. |
+| `arr` | The ROM alone, with `test/arr.bas` typed | `DIM`, the elements, their errors, `LET`, `INPUT`, and `GET` of an element, `CLR` and an edit with arrays, `HIMEM` read and set, too low and too high, the layout of an array in memory, and `LOAD` below and above `HIMEM`, in a line and in a program. |
 | `load` | The ROM, with 128K words of RAM, as on the MEGA65 | `LOAD` with the monitor's `build/hello.bin` pasted: CR LF and LF line ends, tabs, blank lines, skipped lines, a line too long, blanks after a line's 76 characters, a DEL that takes back the key after them, an address given twice, and CTRL-C. Then `SYS 0x8000` runs it. |
 | `load_64k` | The ROM, with 64K words, as on the Nexys4DDR | `LOAD` at the end of that RAM. |
 | `load_emu` | The ROM, with `0xFFFFFF9E` reading 0, as in `niceemu` | `LOAD` up to the screen. |
@@ -417,9 +481,10 @@ table, and `make romsize` writes it again.
 <!-- romsize basic -->
 | Source | What it is | Words | Text |
 |---|---|---:|---:|
-| `basic.nasm` | The vectors, the header, the main loop, the scanner, the keywords, the messages, and the help | 906 | 513 |
-| `basic_expr.nasm` | The numbers: the tokenizer, the expressions, the variables, the errors, `PRINT`, `LET`, and `POKE` | 1319 | 22 |
-| `basic_cmd.nasm` | The routines of the statements that were the commands | 1586 | 294 |
+| `basic.nasm` | The vectors, the header, the main loop, the scanner, the keywords, the messages, and the help | 1324 | 825 |
+| `basic_expr.nasm` | The numbers: the tokenizer, the expressions, the variables, the errors, `PRINT`, `LET`, and `POKE` | 1500 | 22 |
+| `basic_prog.nasm` | The programs: the lines, `LIST`, `RUN`, the jumps, the loops, the line input, the break key, `INPUT`, `GET`, the arrays, and `HIMEM` | 1942 | 46 |
+| `basic_cmd.nasm` | The routines of the statements that were the commands | 1590 | 294 |
 | `basic_net.nasm` | `DHCP`, `NTP`, and TFTP | 907 | 150 |
 | `basic_time.nasm` | `TIME`, and the clock's side of `NTP` | 275 | 44 |
 | `basic_dis.nasm` | The disassembler of `DIS` | 871 | 79 |
@@ -428,5 +493,5 @@ table, and `make romsize` writes it again.
 | `mon.nasm` | The stubs of the entries | 90 | 0 |
 | `build/basic_folder.nasm` | The texts with the folder's name: `DIR`'s, and the error of a card without it | 14 | 14 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 6481 | 1123 |
+| In all | | 9026 | 1481 |
 <!-- /romsize basic -->

@@ -25,6 +25,24 @@ HELP                the statements
 PRINT X; "T", ...   print numbers and strings, ; and , between them; ? is PRINT
 LET V = X           set the variable V to the number X; LET may be left out
 POKE A, X           write X to the word at A, which PEEK(A) reads
+RUN [N]             run the program, from line N or its first, after CLR
+LIST [N] [- M]      list the lines of the program, those from N to M
+NEW                 delete the program and its variables
+CLR                 clear the variables
+GOTO N              go on at line N
+GOSUB N             go on at line N, and back after it at RETURN
+RETURN              go back after the last GOSUB
+IF X THEN S ELSE T  S when X is not 0, else T; each statements or a line N
+FOR V = A TO B      V from A to B, by 1 or by STEP C after B, up to NEXT
+NEXT [V]            the loop of FOR again, or its end
+END                 end the program
+STOP                stop the program, which CONT goes on with
+CONT                go on after STOP, END, or the break key
+REM TEXT            a remark, the rest of the line
+INPUT ["P";] V, ... the numbers of a line typed into V, ..., after the prompt P
+GET V               V the code of the next key typed, 0 when none, with no wait
+DIM A(N), B(N, M)   the arrays A of N + 1 elements, B of N + 1 rows of M + 1
+HIMEM = A           the top of the program, its variables, and arrays; and CLR
 CRSR up down        scroll back a row, before a statement
 PgUp PgDn           a page; on the MEGA65 CTRL and MEGA with CRSR up or down
 READY.

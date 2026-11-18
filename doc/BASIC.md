@@ -3,7 +3,8 @@
 The design of the BASIC interpreter in the ROM, issue
 [#54](https://github.com/MJoergen/NiceMonMEGA65/issues/54), and the
 stages of the work. **Stage 1, the shell, is written (#112), and so
-is stage 2, the numbers (#113); the rest is not.**
+are stage 2, the numbers (#113), and stage 3, the programs (#114);
+the rest is not.**
 [BASIC_SURVEY.md](BASIC_SURVEY.md) is the survey behind it. #54 lists
 the features and what is left out, and this note does not repeat the
 list. It has the rest: the decisions, the limits of the target, the
@@ -419,7 +420,7 @@ entries alone (#152). Its workspace is the program's RAM:
   MEGA65 and 26K on the Nexys4DDR. In `niceemu`, where the word reads
   0, BASIC takes the MEGA65's size.
 - The variables are 6K words, `MON_VARS` and `BASIC_WORDS`: the
-  monitor's 4K and BASIC's 2K, of which its stage 1 uses 1194, and leaves 854
+  monitor's 4K and BASIC's 2K, of which its stage 3 uses 1585, and leaves 463
   (measured 2026-11-18). BASIC's state,
   its line buffers, and the keys typed ahead go there. Its 4K would
   leave no room for the stack above the RAM that nice_cpu's demo tests
@@ -451,21 +452,27 @@ entries alone (#152). Its workspace is the program's RAM:
   edit moves the table, and the arrays after it, with no change to a
   token. A name in a stored line gets its entry, never assigned, when
   the line is entered, as the line keeps its offset. A direct line
-  makes a variable by an assignment alone, as in stage 2. `CLR` sets
+  makes a variable by an assignment, as in stage 2, and by `INPUT` and
+  `GET`, and an array's entry by `DIM`. `CLR` sets
   every entry to never assigned, and drops the arrays and the frames.
   The names stay until `NEW`, as the lines refer to them.
-- An array's entry has the offset of its data in the place of the
-  double, 0 until `DIM`, and a bit of its length that marks the name
-  as an array's. Its data, after the table, is its dimensions, their
-  bounds, and its doubles, row by row. So `CLR` drops the arrays by
-  setting a pointer and the entries' offsets.
+- An array's entry has the offset of its data from the table's end in
+  the low word of the double, `0xFFFFFFFF` in its high word until
+  `DIM`, as a variable never assigned has, and `0x100` in its length,
+  which marks the name as an array's. Its data, after the table, is
+  its two sizes, the second 0 for one dimension, and its doubles, row
+  by row. A new variable moves the data up, with no change to an
+  offset. So `CLR` drops the arrays by setting a pointer and the
+  entries' high words.
 - The program's end is a pointer in BASIC's own RAM, and an empty
   program writes no word at `0x8000`. So the `NEW` of a `.bin` file's
   load leaves the file's words as they are. A `LOAD` of a `.bin` file
-  in a running program that writes below `HIMEM` ends the program, at
-  `READY.`.
-- A `.bin` file that is loaded clears the variables, as it may write
-  over them. A routine that `SYS` calls keeps them, whether it
+  that writes a word below `HIMEM` may write over the program and its
+  variables, so it ends with a `NEW`, and at `READY.`, also in a
+  running program. Its counts have the lowest address written. A load
+  that writes above `HIMEM` alone keeps them, and the line or the
+  program goes on, and one that writes no word ends the line.
+- A routine that `SYS` calls keeps the variables, whether it
   returns or ends through `mon_exit`, as a routine above `HIMEM`
   must. So a program at `0x8000` that `SYS` starts may leave the
   table broken, and the walk of the table stops at its end pointer
@@ -502,7 +509,10 @@ as #54 says:
   from the table. A name that no line uses any more stays in the table
   until `NEW`.
 - `LIST` writes the keywords in upper case and a blank between tokens,
-  so the blanks of a line as typed are not kept.
+  but before `)`, `,`, `;`, and `:`, after `(` and a sign, and between
+  a function or an array and its `(`, so the blanks of a line as typed
+  are not kept. A minus is a sign when the token before it ends no
+  operand.
 - A stored line is the tokens of stage 2, at most the 160 words of
   `V_TOK`. The tokenizer writes only `V_TOK`, and a line is stored
   after the whole of it is tokenized, so a line that fails leaves the
@@ -554,8 +564,8 @@ that pend, and nested parentheses pend nothing.
 RUN/STOP is CTRL-C, a byte of the console. A running program polls
 the console, and a poll takes its byte:
 
-- A byte that is not CTRL-C goes into a ring of 32 keys typed ahead,
-  which `GET` and `INPUT` read first. When the ring is full, the byte
+- A byte that is not CTRL-C goes into a ring of 32 words, which keeps
+  31 keys typed ahead, and which `GET`, `INPUT`, and the line read first. When the ring is full, the byte
   is dropped, as on the C64.
 - The monitor's `con_getline`, entry 32, reads the console itself, so
   the keys of the ring would not reach it, at `INPUT` or at `READY.`.
@@ -694,7 +704,7 @@ about a minute (#122).
   as they are written, with `/`. Stage 6 adds 8, which has `^`,
   `LOG`, and `SIN`. Their steps in `niceemu` and their seconds on the
   R6 are written down at each stage, so that the four mechanisms of
-  the survey are measured.
+  the survey are measured ([The benchmarks](#the-benchmarks)).
 - The arithmetic has its tests in nice_cpu, with the FPU. BASIC's
   tests have its numbers as text: what `PRINT` shows, and that a
   constant comes back from `LIST`, against Python's doubles on the
@@ -703,6 +713,31 @@ about a minute (#122).
   run (NBS SP 500-70), once the functions and `DATA` are there.
 - `make hwtest`: a program typed on the board's line, run, and listed,
   and a file saved and loaded on a card that the test may write.
+
+### The benchmarks
+
+The programs are in `basic/bench/`, and `make -C basic test` runs them
+and checks their output (`basic/test/bench.py`). A run's steps are
+those of the instruction counter, which `PEEK(0xFFFFFF42)` reads in a
+direct line before `RUN` and in one after it, less the same for an
+empty program, so each program is as it is written. `make -C basic
+bench` prints the rows of steps. Stage 3, in `niceemu` (measured
+2026-11-18):
+
+| Program | Steps |
+|---|---:|
+| Rugg/Feldman 1, an empty `FOR` loop of 1000 | 95930 |
+| 2, `K = K + 1` and `IF` | 281497 |
+| 3, and `A = K / K * K + K - K` | 583437 |
+| 4, `A = K / 2 * 3 + 4 - 5` | 555437 |
+| 5, and a `GOSUB` | 722293 |
+| 6, and a `FOR` loop of 5 | 1396266 |
+| 7, and an array's element in it | 2242057 |
+| The sieve of 8191, 1899 primes | 13682849 |
+
+So a statement takes about 100 to 300 steps: `FOR` and `NEXT` about
+95, `K = K + 1` with its `IF` about 280, and the array's element about
+170. The seconds on the R6 come with `make hwtest`.
 
 ## Stages
 
@@ -741,7 +776,10 @@ Each has an issue, under #54.
    benchmarks, with the language of [Programs](#programs). A program
    pasted into the line runs, and `LIST` gets it back. Its line is read
    by a routine of BASIC's own, on the entries that `V2.3.1` adds for
-   it. This is the first BASIC worth a release.
+   it. This is the first BASIC worth a release. It is written, mostly
+   in `basic/basic_prog.nasm`, and measured 2545 words
+   ([The ROM's room](#the-roms-room)); its benchmarks' steps are in
+   [The benchmarks](#the-benchmarks) (measured 2026-11-18).
 4. **Files**, #60: `SAVE "NAME"`, `LOAD "NAME"`, and `RUN "NAME"`,
    from the card and from TFTP.
 5. **Strings**, #116. `$` variables and arrays, the heap with back
@@ -866,14 +904,14 @@ in C that the note had before 2026-11-16:
 | 1. The shell in C, less the main loop it replaces, measured | 961 | 961 |
 | 2. The port of the shell, measured | -1325 | -364 |
 | 2. Numbers, measured | 1383 | 1019 |
-| 3. Programs | 2100 | 3119 |
-| 4. Files | 400 | 3519 |
-| 5. Strings | 1900 | 5419 |
-| 6. Functions | 200 | 5619 |
-| 7. The editor and its statements | 2000 | 7619 |
-| 8. Structure | 1400 | 9019 |
-| 9. Errors | 400 | 9419 |
-| 10. The machine | 700 | 10119 |
+| 3. Programs, measured | 2545 | 3564 |
+| 4. Files | 400 | 3964 |
+| 5. Strings | 1900 | 5864 |
+| 6. Functions | 200 | 6064 |
+| 7. The editor and its statements | 2000 | 8064 |
+| 8. Structure | 1400 | 9464 |
+| 9. Errors | 400 | 9864 |
+| 10. The machine | 700 | 10564 |
 
 Stage 1 was `basic.c`, 1510 words, and `basic.nasm`, 624, of which 431
 were its packed texts, the help among them, less 1032 words that left
@@ -901,9 +939,10 @@ Since #152 the ROM is two images, and BASIC's is `0x4000`–`0x7FFF`,
 `common.nasm`, `monlib.nasm`, and `mon.nasm`, 593 words, and leaves
 11317 free; the monitor's image is 9542 words, with 6842 free below
 `0x4000` (measured 2026-11-18). Stage 2 fills 1383 words more, 6450,
-and leaves 9934 free (measured 2026-11-18). The list after stage 2 is
-guessed at 9100 words in the table above, which fits, with little to
-spare.
+and leaves 9934 free (measured 2026-11-18). Stage 3 fills 2545 words
+more, 9026, where 2100 were guessed, and leaves 7358 free (measured
+2026-11-18). The list after stage 3 is guessed at 7000 words in the
+table above, which fits, with little to spare.
 The split is one constant, `BASIC_BASE` of `monitor/common.nasm`: at
 `0x3000`, BASIC would have 20480 words, and the monitor 2746 free.
 

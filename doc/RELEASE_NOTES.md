@@ -34,8 +34,13 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   ([#113](https://github.com/MJoergen/NiceMonMEGA65/issues/113)).
 - A name glued to a keyword, such as `SYS0X8000`, is a variable, and
   no statement.
-- Every `LOAD` clears BASIC's variables, which start at `0x8000`, and
-  ends its line.
+- BASIC's program starts at `0x8000`, and its variables and arrays
+  follow it. A `LOAD` of a `.bin` file that writes below `HIMEM`, as
+  one at `0x8000` does, ends with a `NEW`, and at `READY.`; one that
+  writes no word ends its line
+  ([#114](https://github.com/MJoergen/NiceMonMEGA65/issues/114)).
+- `INPUT`, `GET`, `DIM`, `HIMEM`, and the other keywords of stage 3
+  are no names of variables any more.
 
 **BASIC.**
 
@@ -47,6 +52,17 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   colons between statements; and the errors in full text
   ([#113](https://github.com/MJoergen/NiceMonMEGA65/issues/113),
   [basic/README.md](../basic/README.md#numbers)).
+- Stage 3, the programs: lines with numbers, `LIST`, `RUN`, `NEW`,
+  `CLR`, `GOTO`, `GOSUB` and `RETURN`, `IF` with `THEN` and `ELSE`,
+  `FOR` and `NEXT` with `STEP`, `END`, `STOP`, `CONT`, `REM`, `INPUT`
+  of numbers, `GET`, `DIM` with one or two dimensions, `HIMEM`, the
+  break key, CTRL-C, and a ring of the keys typed while a program runs.
+  An error in a program says its line: `Syntax error in 20`
+  ([#114](https://github.com/MJoergen/NiceMonMEGA65/issues/114),
+  [basic/README.md](../basic/README.md#programs)).
+- Rugg/Feldman's benchmarks 1 to 7 and the sieve are in `basic/bench/`,
+  with their steps in `niceemu` in
+  [doc/BASIC.md](BASIC.md#the-benchmarks).
 
 ## V2.3.1 (2026-11-19)
 

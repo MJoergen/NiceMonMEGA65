@@ -1,0 +1,70 @@
+? A(1)
+DIM A(3), B(2, 3)
+? A(0); A(3); B(2, 3)
+A(1) = 5: B(1, 2) = 7: ? A(1); B(1, 2); B(2, 1)
+? A(4)
+? A(-1)
+? B(3, 0)
+? B(0, 4)
+? A(1, 1)
+? B(1)
+DIM A(2)
+A = 9: ? A; A(1)
+? A(1.5)
+DIM C(-1)
+C = 3: DIM D(C): D(C) = 1: ? D(3)
+LET A(2) = A(1) * 2: ? A(2)
+INPUT A(3), B(0, 0)
+4, 6
+? A(3); B(0, 0)
+GET A(0): ? A(0)
+X
+10 DIM P(10): FOR I = 0 TO 10: P(I) = I * I: NEXT
+20 S = 0: FOR I = 0 TO 10: S = S + P(I): NEXT: PRINT S; HIMEM - 1
+30 Q = 1: PRINT P(10); Q
+LIST
+RUN
+? P(2)
+CLR
+? P(2)
+RUN
+40 R = 2
+? P(10)
+RUN
+? HIMEM
+HIMEM = 0x9000
+? HIMEM
+? Q
+HIMEM = 0x8010
+HIMEM = 0x7FFFFFFF
+HIMEM = 0x10000
+DIM Z(30000)
+DIM Z(3000)
+? Z(3000)
+HIMEM =
+HIMEM
+NEW
+DIM E(9, 9): E(9, 9) = 81: F = 1: ? E(9, 9); F
+DUMP 0x8000, 12
+NEW
+10 PRINT "A"
+HIMEM = 0x9000
+LOAD
+9000 5
+
+? PEEK(0x9000)
+LIST
+LOAD
+8100 6
+
+LIST
+10 LOAD: PRINT "ON"
+HIMEM = 0x9000
+RUN
+9001 7
+
+RUN
+8101 8
+
+LIST
+HALT

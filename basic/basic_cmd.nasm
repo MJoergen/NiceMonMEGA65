@@ -480,6 +480,7 @@ load_summary
 ; it read a line, so that the words that it wrote are known, but not for
 ; a listing of TFTP; R1 kept, for the error that follows.
 load_part
+                CALL    load_new
                 TST     @V_LSTATS+5
         ?Z      RET
                 TST     @V_TLIST

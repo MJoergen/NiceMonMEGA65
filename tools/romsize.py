@@ -47,6 +47,8 @@ ROM_PARTS = {
                   "and the help",
     "basic_expr.nasm": "The numbers: the tokenizer, the expressions, the variables, the errors, "
                        "`PRINT`, `LET`, and `POKE`",
+    "basic_prog.nasm": "The programs: the lines, `LIST`, `RUN`, the jumps, the loops, the "
+                       "line input, the break key, `INPUT`, `GET`, the arrays, and `HIMEM`",
     "basic_cmd.nasm": "The routines of the statements that were the commands",
     "basic_net.nasm": "`DHCP`, `NTP`, and TFTP",
     "basic_time.nasm": "`TIME`, and the clock's side of `NTP`",

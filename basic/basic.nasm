@@ -2,7 +2,7 @@
 ; BASIC_BASE, 0x4000, assembled apart from the monitor's (issue #152).
 ; It calls the monitor through the entries of the dispatch table alone,
 ; their .EQUs in ../monitor/mon.nasm, as a program does. The Makefile of
-; ../monitor joins this file first, then basic_expr.nasm,
+; ../monitor joins this file first, then basic_expr.nasm, basic_prog.nasm,
 ; basic_cmd.nasm, basic_net.nasm, basic_time.nasm, and basic_dis.nasm,
 ; and the monitor's common.nasm, monlib.nasm, and mon.nasm, of which
 ; BASIC has copies of its own.
@@ -15,17 +15,19 @@
 ; basic_net.nasm, and basic_time.nasm, with the scanner of issue #115.
 ; Stage 2 (issue #113) has the numbers, in basic_expr.nasm: the
 ; tokenizer, the expressions, the variables, the errors, and PRINT, LET,
-; and POKE.
+; and POKE. Stage 3 (issue #114) has the programs, in basic_prog.nasm.
 ;
 ; The image starts with two vectors, which the monitor jumps to: at
 ; BAS_COLD, the end of its cold start, which goes to bas_start, and at
 ; BAS_WARM, mon_exit, which goes to bas_warm. bas_start prints the
 ; banner and goes to main, and bas_warm prints the status and goes to
 ; main. main is where BASIC starts again: it sets SP to STACK, prints
-; READY., and reads lines with con_getline, entry 32, which tokenize
-; makes tokens of (basic_expr.nasm). An empty line, or one of blanks
+; READY., and reads lines with getline (basic_prog.nasm). A line that starts
+; with a number is stored (basic_prog.nasm), and any other is made tokens
+; by tokenize (basic_expr.nasm) and run. An empty line, or one of blanks
 ; only, runs nothing and prints no READY. run runs the statements of the
-; line, with colons between them.
+; line, with colons between them, and then those of the next line while
+; a program runs.
 ;
 ; The scanner. R8 is the next token of the statement. A keyword is a
 ; whole name, in either case. The byte after each keyword, below "A",
@@ -113,7 +115,11 @@ bas_warm
 ; bas_start: where the cold start goes, at its end: the banner, and DUMP
 ; and DIS at 0x8000, and then the main loop
 bas_start
-                MOVE    @V_VEND, PROGRAM  ; no variables
+                CLR     @V_HIMEM        ; the RAM's top
+                CALL    new_prog        ; no program, and no variables
+                CLR     @V_RHEAD        ; no keys typed ahead
+                CLR     @V_RTAIL
+                MOVE    @V_POLL, POLL_EVERY
                 MOVE    @V_NEXT, PROGRAM
                 MOVE    @V_UNEXT, PROGRAM
                 CALL    versions
@@ -124,22 +130,34 @@ bas_start
 ; main: READY., on a row of its own, and the lines, each tokenized and
 ; run with a fresh SP
 main            MOVE    SP, STACK
+                CLR     @V_CUR          ; direct mode
+                CLR     @V_STORE
+                CLR     @V_REDO
                 CALL    SCR_GETXY
                 TST     R1
         ?!Z     CALL    _io_crlf        ; after PRINT with ; or , at its end
                 MOVE    R1, S_READY
                 CALL    puts_b_crlf
 main_line
-                MOVE    R1, V_LINE
-                MOVE    R2, LINE_MAX
-                CALL    CON_GETLINE
+                CLR     R1              ; CTRL-C empties the line
+                CALL    getline
+                MOVE    R5, V_LINE
+:
+                CMP     @R5, 0x20
+        ?Z      MOVE    R5++, R5
+        ?Z      JMP     :-
+                SUB     R1, @R5, 0x30
+                CMP     R1, 10
+        ?C      JMP     enter_line      ; a number: a line to store
                 CALL    tokenize
                 MOVE    R8, V_TOK
                 TST     @R8
         ?Z      JMP     main_line       ; blanks only
 ; run: the statements from R8, with colons between them. A statement is
 ; a keyword, or a variable and =. Each returns to run_next, with the end
-; of the statement at V_TP.
+; of the statement at V_TP. At the end of a line, the next line of the
+; program runs, while one runs, and an ELSE at a statement's start, after
+; the statements of THEN, ends the line.
 run
                 MOVE    @V_KW, R0
                 MOVE    R1, @R8
@@ -147,10 +165,16 @@ run
         ?Z      MOVE    R8++, R8
         ?Z      JMP     run
                 TST     R1
-        ?Z      JMP     main
+        ?Z      JMP     run_eol
+                CMP     R1, T_ELSE
+        ?Z      JMP     run_else
+                SUB[M]  @V_POLL, @V_POLL, 1
+        ?Z      CALL    poll            ; the break key
+                MOVE    R1, @R8
                 PUSH    run_next
                 SHR     R2, R1, 24
                 CMP     R2, K_VAR
+        ?!Z     CMP     R2, K_ARR
         ?Z      JMP     st_assign
                 CMP     R2, K_KW
         ?!Z     JMP     err_unknown
@@ -188,6 +212,19 @@ bas_op
 run_next
                 MOVE    R8, @V_TP
                 JMP     run
+run_else
+                CALL    tok_skip
+                TST     @R8
+        ?!Z     JMP     run_else
+run_eol
+                MOVE[M] R1, @V_CUR
+        ?Z      JMP     main            ; direct mode
+                ADD     R1, R8, 1       ; the next line
+                CMP     R1, @V_PEND
+        ?!C     JMP     main            ; the program's end
+                MOVE    @V_CUR, R1
+                ADD     R8, R1, 2
+                JMP     run
 
 ; match: Z when the text at R5 starts with the keyword at R3, in either
 ; case, and no letter or digit follows it. R3 is then after the byte that
@@ -209,6 +246,20 @@ match
         ?C      ONE     R6
                 TST     R6
                 RET
+
+; kw_addr: R3 the byte address of the keyword of index R1. Uses R1, R3,
+; and R4.
+kw_addr
+                MOVE    R3, TEXT_B+4*OPS+KEYWORDS
+:
+                TST     R1
+        ?Z      RET
+:
+                MOVE    R4, @R3++
+                CMP     R4, 0x41        ; A
+        ?!C     JMP     :-
+                SUB     R1, R1, 1
+                JMP     :--
 
 ; dval: the character R1 as a digit: R2 0 to 9, or 10 to 35 for a letter
 ; in either case, and C; or R2 0xFFFFFFFF, and no C, for any other
@@ -234,6 +285,7 @@ k_number
                 TST     R1
         ?!Z     CMP     R1, T_COLON
         ?!Z     CMP     R1, T_COMMA
+        ?!Z     CMP     R1, T_ELSE
         ?Z      JMP     k_no
                 SHR     R2, R1, 24
                 CMP     R2, K_STR
@@ -277,8 +329,7 @@ k_comma
 ; runs it: it returns to the routine, with R1-R3 the slots, instead of
 ; to bas_op, and the end at V_TP
 k_end
-                TST     @R8
-        ?!Z     CMP     @R8, T_COLON
+                CALL    at_end
         ?!Z     RET
                 POP     R0
                 MOVE    @V_TP, R8
@@ -332,10 +383,13 @@ bas_dir
                 JMP     st_tftp
 
 ; LOAD, LOAD "NAME.BIN", and LOAD "N.BIN", "IP": the name must end with
-; .BIN, in either case
+; .BIN, in either case. A load that wrote a word below HIMEM, which may
+; be over the program or its variables, ends with NEW, and at READY.,
+; and one that wrote no word ends the line; one that wrote above HIMEM
+; alone goes on.
 bas_load
-                MOVE    @V_VEND, PROGRAM  ; LOAD clears the variables,
-                MOVE    @SP, main       ; and ends the line
+                CLR     @V_LSTATS       ; no word written yet
+                PUSH    load_fin        ; where the load returns
                 TST     R1
         ?Z      JMP     st_lines
                 MOVE    R4, R1
@@ -398,10 +452,26 @@ ACTS
                 .DAT    bas_dir+65536*st_ip, st_dhcp+65536*st_mac
                 .DAT    bas_time+65536*bas_ntp, bas_baud+65536*bas_dump
                 .DAT    bas_dis+65536*SCR_CLS, st_ver+65536*st_help
-                .DAT    st_halt+65536*bas_poke, st_print+65536*st_let
-I_PRINT         .EQU    18              ; the index of PRINT, the first statement without ops,
-I_LET           .EQU    19              ; of LET,
-N_STMT          .EQU    20              ; and of AND, the first keyword that is no statement
+                .DAT    st_halt+65536*bas_poke, st_new+65536*st_clr
+                .DAT    st_end+65536*st_stop, st_cont+65536*st_return
+                .DAT    st_print+65536*st_let, st_run+65536*st_list
+                .DAT    st_goto+65536*st_gosub, st_if+65536*st_for
+                .DAT    st_next+65536*st_rem, st_input+65536*st_get
+                .DAT    st_dim+65536*st_himem
+I_PRINT         .EQU    24              ; the index of PRINT, the first statement without ops,
+I_LET           .EQU    25              ; of LET,
+I_RUN           .EQU    26              ; of RUN,
+I_GOTO          .EQU    28              ; of GOTO,
+I_GOSUB         .EQU    29              ; of GOSUB,
+I_IF            .EQU    30              ; of IF,
+I_FOR           .EQU    31              ; of FOR,
+I_REM           .EQU    33              ; of REM,
+I_INPUT         .EQU    34              ; of INPUT,
+I_GET           .EQU    35              ; of GET,
+I_DIM           .EQU    36              ; of DIM,
+I_HIMEM         .EQU    37              ; of HIMEM, which is also a number,
+T_HIMEM         .EQU    K_KW*K+I_HIMEM*0x100+0x22  ; whose token this is,
+N_STMT          .EQU    38              ; and of AND, the first keyword that is no statement
 H_ACTS          .EQU    0x40000000+4*ACTS
 ; The routines of the items, by the kind of an op, which bas_op calls
 KINDS
@@ -441,7 +511,7 @@ OP_SKIP         .EQU    1
 OP_F            .EQU    8
 KEYWORDS        .EQU    29              ; the first keyword's byte in OPS
 OPS
-                .ASCII_B 'FJNFANJEJNFJEJNJLCNHLHN@N@EHNSYS5LOAD*SAVE/DELETE!DIR#IP DHCP"MAC TIME NTP*BAUD7DUMP9DIS9CLS"VER"HELP"HALT"POKE3PRINT"LET"AND"OR"XOR"NOT"DIV"MOD"ABS"SGN"INT"SQR"PEEK"TAB"SPC"'
+                .ASCII_B 'FJNFANJEJNFJEJNJLCNHLHN@N@EHNSYS5LOAD*SAVE/DELETE!DIR#IP DHCP"MAC TIME NTP*BAUD7DUMP9DIS9CLS"VER"HELP"HALT"POKE3NEW"CLR"END"STOP"CONT"RETURN"PRINT"LET"RUN"LIST"GOTO"GOSUB"IF"FOR"NEXT"REM"INPUT"GET"DIM"HIMEM"AND"OR"XOR"NOT"DIV"MOD"ABS"SGN"INT"SQR"PEEK"TAB"SPC"THEN"ELSE"TO"STEP"'
 
 S_HINT          .ASCII_B 'HELP lists the statements'
 S_READY         .ASCII_B 'READY.'
@@ -465,7 +535,8 @@ S_DOTBIN
 ; with the statement's keyword and a blank
 HELP            .DAT    H_SYS, H_L, H_LOAD, H_TFTP, H_SAVE, H_DEL, H_DIR, H_TFTPL, H_D, H_U
                 .DAT    H_I, H_ID, H_M, H_B, H_T, H_TN, H_C, H_V, H_H, H_Q, H_PR, H_LET
-                .DAT    H_POKE, H_P, H_PG, 0
+                .DAT    H_POKE, H_RUN, H_LIST, H_NEW, H_CLR, H_GOTO, H_GOSUB, H_RET, H_IF
+                .DAT    H_FOR, H_NEXT, H_END, H_STOP, H_CONT, H_REM, H_INPUT, H_GET, H_DIM, H_HIMEM, H_P, H_PG, 0
 H_SYS           .ASCII_B 'SYS A               call the program at A, such as SYS 0x8000; SYS 0 restarts'
 H_L             .ASCII_B 'LOAD                enter lines of ADDR WORD in hex, as a .bin file has them'
                 .DAT    0
@@ -492,6 +563,31 @@ H_Q             .ASCII_B 'HELP                the statements'
 H_PR            .ASCII_B 'PRINT X; "T", ...   print numbers and strings, ; and , between them; ? is PRINT'
 H_LET           .ASCII_B 'LET V = X           set the variable V to the number X; LET may be left out'
 H_POKE          .ASCII_B 'POKE A, X           write X to the word at A, which PEEK(A) reads'
+H_RUN           .ASCII_B 'RUN [N]             run the program, from line N or its first, after CLR'
+                .DAT    0
+H_LIST          .ASCII_B 'LIST [N] [- M]      list the lines of the program, those from N to M'
+                .DAT    0
+H_NEW           .ASCII_B 'NEW                 delete the program and its variables'
+                .DAT    0
+H_CLR           .ASCII_B 'CLR                 clear the variables'
+H_GOTO          .ASCII_B 'GOTO N              go on at line N'
+H_GOSUB         .ASCII_B 'GOSUB N             go on at line N, and back after it at RETURN'
+                .DAT    0
+H_RET           .ASCII_B 'RETURN              go back after the last GOSUB'
+                .DAT    0
+H_IF            .ASCII_B 'IF X THEN S ELSE T  S when X is not 0, else T; each statements or a line N'
+H_FOR           .ASCII_B 'FOR V = A TO B      V from A to B, by 1 or by STEP C after B, up to NEXT'
+                .DAT    0
+H_NEXT          .ASCII_B 'NEXT [V]            the loop of FOR again, or its end'
+H_END           .ASCII_B 'END                 end the program'
+H_STOP          .ASCII_B 'STOP                stop the program, which CONT goes on with'
+H_CONT          .ASCII_B 'CONT                go on after STOP, END, or the break key'
+H_REM           .ASCII_B 'REM TEXT            a remark, the rest of the line'
+H_INPUT         .ASCII_B 'INPUT ["P";] V, ... the numbers of a line typed into V, ..., after the prompt P'
+H_GET           .ASCII_B 'GET V               V the code of the next key typed, 0 when none, with no wait'
+H_DIM           .ASCII_B 'DIM A(N), B(N, M)   the arrays A of N + 1 elements, B of N + 1 rows of M + 1'
+                .DAT    0
+H_HIMEM         .ASCII_B 'HIMEM = A           the top of the program, its variables, and arrays; and CLR'
 H_P             .ASCII_B 'CRSR up down        scroll back a row, before a statement'
 H_PG            .ASCII_B 'PgUp PgDn           a page; on the MEGA65 CTRL and MEGA with CRSR up or down'
                 .DAT    0

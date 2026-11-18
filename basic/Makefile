@@ -37,7 +37,7 @@ MON_TEST = $(MON)/test
 FOLDER_TEXTS = ($(call PACKED,E_FS29,no folder $(FOLDER_UC) on the card); \
   $(call PACKED,S_DIROF,Directory of $(FOLDER_UC)))
 
-.PHONY: all test fmt clean
+.PHONY: all test bench fmt clean
 
 all: $(BUILD)/basic.rom
 
@@ -134,9 +134,10 @@ CMDS = help\rver\rdump 0, 6\rdump\rDUMP 0x10, 1\rq\rloadx\r\r  cls\rabc\177\177\
 # on its line, show the 0 after each string, and the .BIN that save adds
 # to a name without a dot, which leaves the colon and the dump after it.
 # ip "1.2.3.4, with no closing quote, writes the IP address, which the
-# dump of 0xFFFFFFB0 shows.
+# dump of 0xFFFFFFB0 shows. Last, 9 ver is no statement but line 9 of a
+# program, which list shows.
 ZEROS72  = $(shell printf '%072d' 32768)
-BASIC = vEr\r   ver   \rver,\rver\351\r\351ver\rsys0x8000\rdumpx\rdum\rdis1\ri\rsys_\r"ver"\r9 ver\rsave x\rdelete x\rdhcp x\rmac x\rtime x\rntp x\rdis x\rcls x\rhalt x\rdir x\rsys 32768\rsys $(ZEROS72)\rSYS 0X8000\rsys 0x08000\rsys 4294967295\rsys 2147483647\rsys 2147483648\rsys 0xFFFFFFFF\rsys 0x0000000ffffffff\rsys 4294967296\rsys 0x100000000\rsys 99999999999x\rsys 0x8000x\rsys 0x0x8000\rsys 1e3x\rsys 32768.\rsys -1\rsys "x"\rsys 0xg\rsys 0x8000,\rdump 0x8000, 0\rdump 0x, 1\rdump 0x , 2\rdump 0x 1\rdump 1, 4294967296\rdump 1, 0x\rdis 0x8000, 1\rdis 0x, 1\rdis ,1\rdis 0x8000,\rbaud 0x\rbaud 0x 1\rbaud 4294967296\rbaud 1,\rbaud 0x1C200\rload ""\rload ".bin"\rload"a.BiN"\rload "a.bin",\rload "a.bin" ,"1.2.3.4"\rload "a.bin", "1.2.3.4" x\rload "a.bin", "bad"\rload x\rload "a.bin", "1.2.3.4\rLOAD  \r\rsave "x", "y" z\rsave "x" "y"\rsave "x",\rsave "x", 1\rsave "x", 0x, 1\rsave "x", 1, 99999999999\rsave "x", "y", 99999999999\rsave "abc\rsave "a.b", 0x8000, 1\rdelete "x"\rdelete "x", "y"\rdelete ""\rdir\rdir 0x\rdir 0x"1.2.3.4"\rdir 99999999999"1.2.3.4"\rdir 99999999999\rdir "1.2.3.4", "*.bin"\rdir "bad"\rdir "1.2.3.4",\rdir 1,\rdir 1 "x"\rdir 5\rip ""\rip "1.2.3.4" x\rmac ""\rmac "02:4E:49:43:45:00" x\rtime "bad"\rtime "1" x\rntp "1.2.3.4" x\rntp "1.2.3.4",\rntp "", "bad"\rntp ""\rntp "1.2.3.4", "+01:00"\rsave "abc",1,2: dump 0xFFFFECB0, 16\rsave "x", "1.2.3.4": dump 0xFFFFECB0, 16\rsave "a.b", 1, 2: dump 0xFFFFECB0, 16\rdir "1.2.3.4", "*": dump 0xFFFFECB0, 16\rip "1.2.3.4\rhalt\r
+BASIC = vEr\r   ver   \rver,\rver\351\r\351ver\rsys0x8000\rdumpx\rdum\rdis1\ri\rsys_\r"ver"\rsave x\rdelete x\rdhcp x\rmac x\rtime x\rntp x\rdis x\rcls x\rhalt x\rdir x\rsys 32768\rsys $(ZEROS72)\rSYS 0X8000\rsys 0x08000\rsys 4294967295\rsys 2147483647\rsys 2147483648\rsys 0xFFFFFFFF\rsys 0x0000000ffffffff\rsys 4294967296\rsys 0x100000000\rsys 99999999999x\rsys 0x8000x\rsys 0x0x8000\rsys 1e3x\rsys 32768.\rsys -1\rsys "x"\rsys 0xg\rsys 0x8000,\rdump 0x8000, 0\rdump 0x, 1\rdump 0x , 2\rdump 0x 1\rdump 1, 4294967296\rdump 1, 0x\rdis 0x8000, 1\rdis 0x, 1\rdis ,1\rdis 0x8000,\rbaud 0x\rbaud 0x 1\rbaud 4294967296\rbaud 1,\rbaud 0x1C200\rload ""\rload ".bin"\rload"a.BiN"\rload "a.bin",\rload "a.bin" ,"1.2.3.4"\rload "a.bin", "1.2.3.4" x\rload "a.bin", "bad"\rload x\rload "a.bin", "1.2.3.4\rLOAD  \r\rsave "x", "y" z\rsave "x" "y"\rsave "x",\rsave "x", 1\rsave "x", 0x, 1\rsave "x", 1, 99999999999\rsave "x", "y", 99999999999\rsave "abc\rsave "a.b", 0x8000, 1\rdelete "x"\rdelete "x", "y"\rdelete ""\rdir\rdir 0x\rdir 0x"1.2.3.4"\rdir 99999999999"1.2.3.4"\rdir 99999999999\rdir "1.2.3.4", "*.bin"\rdir "bad"\rdir "1.2.3.4",\rdir 1,\rdir 1 "x"\rdir 5\rip ""\rip "1.2.3.4" x\rmac ""\rmac "02:4E:49:43:45:00" x\rtime "bad"\rtime "1" x\rntp "1.2.3.4" x\rntp "1.2.3.4",\rntp "", "bad"\rntp ""\rntp "1.2.3.4", "+01:00"\rsave "abc",1,2: dump 0xFFFFECB0, 16\rsave "x", "1.2.3.4": dump 0xFFFFECB0, 16\rsave "a.b", 1, 2: dump 0xFFFFECB0, 16\rdir "1.2.3.4", "*": dump 0xFFFFECB0, 16\rip "1.2.3.4\r9 ver\rlist\rhalt\r
 # expr: the numbers of stage 2 (issue #113): the operators and their
 # order, the word operators, the comparisons, the functions, the
 # constants in hex, with a point, and with an exponent, and PRINT's
@@ -155,11 +156,46 @@ BASIC = vEr\r   ver   \rver,\rver\351\r\351ver\rsys0x8000\rdumpx\rdum\rdis1\ri\r
 # expression. A line of 74 signs is too deep for the processor's stack,
 # and 17 operands pending for the FPU's stack, where 16 are not. PEEK
 # and POKE, with a value rounded toward zero and an address of 2^32 -
-# 256, which is no word. DUMP takes expressions. LOAD clears the
-# variables, here with no card, and ends the line. A table with a length
-# of 99 at its start is cut there. Last, RAM_WORDS is set so that there
+# 256, which is no word. DUMP takes expressions. A LOAD that writes no
+# word, here with no card, ends the line, and keeps the variables. After
+# a NEW, a table with a length of 99 at its start is cut there. Last, RAM_WORDS is set so that there
 # is room for four variables, B, E, F, and G, and H is Out of memory.
-EXPR = ? 1+2*3, (1+2)*3, 2*3+1, 10-2-3, 100/10/5\r? -2*3, - 3 + 4, +5, --5, 2*-3\r? 7 DIV 2, -7 DIV 2, 7 MOD -2, -7 MOD 2, 1 << 4, -1 >> 28, 1 << 32\r? 5 AND 3, 5 OR 3, 5 XOR 3, NOT 0, NOT 5 AND 3\r? 1 = 1, 1 <> 1, 1 < 2, 2 <= 1, 3 > 2, 2 >= 3\r? NOT 1 = 2, 1 + 1 = 2 AND 3 < 4, 1 OR 2 XOR 3, 1 << 2 + 1, 2 + 3 < 6\r? ABS(-2.5), SGN(0), SGN(-0.1), INT(2.9), INT(-2.1), SQR(16)\r? 0x1F, 0xFFFFFFFF, 0X7fffffff, 1E3, 1.5E-3, .5, 5., 1e+2\r? 1/3; 2/3; 1E15; 1E14; 123456789012345678; 0.0001; 0.00001; -1E-100\r? -0, 0.1 + 0.2, 4.9E-324, 4.9E-324 / 2, 1.79769313486231E308\r? "A";1;"B", "C"; ""\r? "X";\r? 1,\r? "AB";TAB(5);"C";SPC(3);"D"\r? TAB(0);"E";TAB(1);"F";SPC(0);"G"\r? SPC(256)\r? TAB(-1)\rTotalSum = 5: totalsum = totalsum + 1: ? TOTALSUM\ra1b2c3d4e5f6g7h8 = 16: ? A1B2C3D4E5F6G7H8\ra1b2c3d4e5f6g7h8i = 1\rA%% = 1\rA$$ = "X"\rLET B = 2: ? B\rLET 5 = 2\rLET\rC\rPRINTX\rprint = 1\rand = 1\r? D\rD =\r? D\rX=1:Y=X+1:?Y\r: : ? 1 : : ? 2 :\r? 1/0\r? 0/0\r? 5 MOD 0\r? 5 DIV 0\r? 1E308*10\r? SQR(-1)\r? 1E400\r? 2147483648 AND 1\r? 1 << -1\r? (1\r? 1)\r? 1 +\r? 1..2\r? 1.2.3\r? 1E\r? 0x\r? 0x123456789\r? 12ab\r? 1 ^ 2\r? 1 + "A"\r? 1;2;3;4;5;6 / 0\r?--------------------------------------------------------------------------1\r?1+(2+(3+(4+(5+(6+(7+(8+(9+(1+(2+(3+(4+(5+(6+(7+(8+(9)))))))))))))))))\r?1+(2+(3+(4+(5+(6+(7+(8+(9+(1+(2+(3+(4+(5+(6+(7)))))))))))))))\rPOKE 0x9000, -1: ? PEEK(0x9000), PEEK(0x9000) AND 0xFF\rPOKE 0x9001, 3.9: ? PEEK(0x9001), PEEK(0x9000 + 1)\rPOKE 4294967040, 0\r? PEEK(0xFFFFFF9E)\rDUMP 0x9000 + 0, 1 + 1\rQ = 0x9000: DUMP Q, 2\rA = 1: LOAD "X.BIN": ? A\r? A\rPOKE 0x8002, 99: ? B\rB = 7: ? B\rPOKE 0xFFFFFF9E, 0x9C10\rE = 1: F = 2: G = 3\rH = 4\r? B; E; F; G\rhalt\r
+EXPR = ? 1+2*3, (1+2)*3, 2*3+1, 10-2-3, 100/10/5\r? -2*3, - 3 + 4, +5, --5, 2*-3\r? 7 DIV 2, -7 DIV 2, 7 MOD -2, -7 MOD 2, 1 << 4, -1 >> 28, 1 << 32\r? 5 AND 3, 5 OR 3, 5 XOR 3, NOT 0, NOT 5 AND 3\r? 1 = 1, 1 <> 1, 1 < 2, 2 <= 1, 3 > 2, 2 >= 3\r? NOT 1 = 2, 1 + 1 = 2 AND 3 < 4, 1 OR 2 XOR 3, 1 << 2 + 1, 2 + 3 < 6\r? ABS(-2.5), SGN(0), SGN(-0.1), INT(2.9), INT(-2.1), SQR(16)\r? 0x1F, 0xFFFFFFFF, 0X7fffffff, 1E3, 1.5E-3, .5, 5., 1e+2\r? 1/3; 2/3; 1E15; 1E14; 123456789012345678; 0.0001; 0.00001; -1E-100\r? -0, 0.1 + 0.2, 4.9E-324, 4.9E-324 / 2, 1.79769313486231E308\r? "A";1;"B", "C"; ""\r? "X";\r? 1,\r? "AB";TAB(5);"C";SPC(3);"D"\r? TAB(0);"E";TAB(1);"F";SPC(0);"G"\r? SPC(256)\r? TAB(-1)\rTotalSum = 5: totalsum = totalsum + 1: ? TOTALSUM\ra1b2c3d4e5f6g7h8 = 16: ? A1B2C3D4E5F6G7H8\ra1b2c3d4e5f6g7h8i = 1\rA%% = 1\rA$$ = "X"\rLET B = 2: ? B\rLET 5 = 2\rLET\rC\rPRINTX\rprint = 1\rand = 1\r? D\rD =\r? D\rX=1:Y=X+1:?Y\r: : ? 1 : : ? 2 :\r? 1/0\r? 0/0\r? 5 MOD 0\r? 5 DIV 0\r? 1E308*10\r? SQR(-1)\r? 1E400\r? 2147483648 AND 1\r? 1 << -1\r? (1\r? 1)\r? 1 +\r? 1..2\r? 1.2.3\r? 1E\r? 0x\r? 0x123456789\r? 12ab\r? 1 ^ 2\r? 1 + "A"\r? 1;2;3;4;5;6 / 0\r?--------------------------------------------------------------------------1\r?1+(2+(3+(4+(5+(6+(7+(8+(9+(1+(2+(3+(4+(5+(6+(7+(8+(9)))))))))))))))))\r?1+(2+(3+(4+(5+(6+(7+(8+(9+(1+(2+(3+(4+(5+(6+(7)))))))))))))))\rPOKE 0x9000, -1: ? PEEK(0x9000), PEEK(0x9000) AND 0xFF\rPOKE 0x9001, 3.9: ? PEEK(0x9001), PEEK(0x9000 + 1)\rPOKE 4294967040, 0\r? PEEK(0xFFFFFF9E)\rDUMP 0x9000 + 0, 1 + 1\rQ = 0x9000: DUMP Q, 2\rA = 1: LOAD "X.BIN": ? A\r? A\rNEW\rPOKE 0x8002, 99: ? B\rB = 7: ? B\rPOKE 0xFFFFFF9E, 0x9E10\rE = 1: F = 2: G = 3\rH = 4\r? B; E; F; G\rhalt\r
+# prog: the programs of stage 3 (issue #114), test/prog.bas typed line
+# by line, each line ended with CR. Lines entered out of order, replaced,
+# and deleted, a number glued to its statement, lines 0 and 65535, and
+# 65536, which is a Syntax error. An edit keeps the variables, which a
+# line's names get unassigned, and RUN clears. LIST of a range, and of
+# each kind of token: the constants as they were typed, the strings, one
+# without its closing quote, the operators and their blanks, the signs,
+# and REM's text as it is. The format of a line in the dump. FOR with a
+# negative step, one of 0.5, a loop past its limit that runs once, and
+# nested loops, with NEXT J, I, NEXT I that drops J's frame, a FOR that
+# drops the frames after its variable's, GOSUB in a loop, and a RETURN
+# that drops a loop's frame. IF with THEN and ELSE, nested on one line,
+# with line numbers, and with GOTO. STOP, END, and CONT, which an edit
+# and an error end. The errors in a program, with the line's number:
+# Division by zero, Undefined variable, Undefined line, the Out of memory
+# of a GOSUB without end, and a Syntax error, which shows its lines of
+# HELP; and the line numbers that are none: an expression, a fraction,
+# and a number in hex.
+# keys: INPUT, GET, the break key, and the keys typed ahead (issue
+# #114). INPUT of two numbers, with too few, which ask for the rest with
+# ??, too many, which are Extra ignored, a line that is no number, two
+# that the tokenizer refuses or that have no comma between them, each
+# Redo from start, signs, and constants in hex and with an exponent.
+# INPUT with a prompt, and three that are a Syntax error: a prompt with
+# no ;, and a comma with no variable after it. CTRL-C at INPUT is a
+# break, after which CONT runs INPUT again. INPUT and GET in direct mode,
+# which make their variables, and GET, which takes the next byte, here R.
+# A GOTO without end, which the CTRL-C after RUN breaks, and again after
+# CONT. A loop, during which the poll takes the bytes after RUN into the
+# ring, from which GET takes X and Y, and the line after them comes. A
+# CTRL-C breaks LIST. Last, a loop of 3000 statements whose poll takes
+# the 36 bytes after RUN, of which the ring keeps 31 and drops 5; GET
+# shows those kept, until the input ends, and the program halts itself.
+KEYS_ABC = ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789
+KEYS = 10 INPUT A, B: PRINT A + B\rRUN\r1, 2\rRUN\r1\r2\rRUN\r1, 2, 3\rRUN\rx\r1..2\r1 2\r3, 4\rRUN\r-1, +2.5\rRUN\r0x10, 1E2\r10 INPUT "SUM"; A: ? A\rRUN\r5\r10 INPUT "A" A\rRUN\r10 INPUT A,\rRUN\r10 INPUT A: ? A\rRUN\r\003CONT\r7\rINPUT Z: ? Z\r8\rINPUT Y, W: ? Y; W\r9,10\rGET Q: ? Q\rR10 GOTO 10\rRUN\r\003CONT\r\003? 1\r10 FOR I = 1 TO 300: NEXT: GET A: GET B: PRINT A; B\rRUN\rXY?1\rLIST\r\003? 2\r10 FOR I = 1 TO 3000: NEXT\r20 GET A: IF A THEN PRINT A;: GOTO 20\r30 HALT\rRUN\r$(KEYS_ABC)
 # load: LOAD with lines typed and pasted. The LOAD line ends with CR LF,
 # as a terminal may end it, which is no empty line. The first line is typed
 # with edits: a DEL that takes back 2, the cursor key ESC [ A, which is
@@ -186,6 +222,18 @@ BLANKS90  = $(shell printf '%90s' '')
 BLANKS100 = $(shell printf '%100s' '')
 LOAD_HEAD = load\r\n9000 12\177\033[A34\rzz\r100 5\rFFFFF000 1\r9001 5 6\r1E7FF 9\r1E800 1\r\t9002\t7 \r   \r9002 8\r9003$(BLANKS66)12345678\r$(BLANKS100)\r1E7FF A$(BLANKS90)\r9001$(BLANKS71)3z\177\r
 LOAD_TAIL = \rload\r9001 7\003sys 0x8000\rdump 0x9000, 4\rdump 0x1E7FF, 1\rhalt\r
+# arr: the arrays and HIMEM of stage 3 (issue #114), test/arr.bas typed
+# line by line. An array that no DIM made, DIM of one and of two
+# dimensions, each element 0, assignments, and the Bad subscripts of an
+# index outside, below 0, and of one too many and too few. A second DIM,
+# a variable of an array's name, a subscript of 1.5, which is 1, a
+# negative size, a size of a variable, LET, INPUT, and GET of an
+# element. A program with an array, which CLR drops and an edit keeps.
+# HIMEM, read in expressions and set, which does a CLR, and too low,
+# too high, and the arrays that fit below it. The layout of an entry of
+# an array, its data, and a variable after it. Last, LOAD of lines above
+# HIMEM, which keeps the program, and below, which does NEW, then the
+# same in a running program, which goes on, and ends at READY.
 # load_emu: LOAD where 0xFFFFFF9E reads 0, as in niceemu, so a program's RAM
 # goes up to the screen: 10000 and FFFEFFFF take words, and FFFF0000 does
 # not.
@@ -227,24 +275,35 @@ MAX_STEPS = 10000000
 # its length, which changes with the code
 HEADER_TEST = version 9.9.0+0, layout 1, 41 entries, [0-9]* words, RAM 2048 words, flags 1
 
+# The benchmarks (doc/BASIC.md, "Tests"): Rugg/Feldman 1 to 7 and the
+# sieve, as they are written. make bench prints their steps in niceemu
+# as the rows of the table in doc/BASIC.md.
+BENCH = bench/bm1.bas bench/bm2.bas bench/bm3.bas bench/bm4.bas bench/bm5.bas \
+        bench/bm6.bas bench/bm7.bas bench/sieve.bas
+
+bench: $(ROM_TEST)
+	@$(PYTHON) test/bench.py --table $(EMU) $(ROM_TEST) $(BENCH)
+
 # Each test runs the ROM with its input, and compares the console output,
 # the dumps, and the screen with test/NAME.expected. The Halted line and
 # the registers are left out, as the steps and the registers change with
 # the code, but for VBASE, bits 23-0 of R14, which must be 0. test/dis.py
 # checks the rows of DIS against nicedis.py and niceasm first,
 # test/ntp.py NTP, with DHCP and DNS before it, and test/tftp.py TFTP's
-# LOAD and DIR. time writes to a copy of super.img, and runs with
+# LOAD and DIR, and test/bench.py runs the benchmarks of bench/ and
+# checks their output. time writes to a copy of super.img, and runs with
 # --step-time, so that the dates it writes are fixed; its output has what
 # the card holds that the image did not (fat_tool.py diff, the dates
 # masked) and the order of its sector writes, from a second run with -t
 # (fat_tool.py order).
-test: fmt $(ROM_TEST) $(BUILD)/dis.bin $(MON)/build/hello.bin $(MON)/build/fat/super.img
+test: fmt $(ROM_TEST) test/prog.bas test/arr.bas $(BUILD)/dis.bin $(MON)/build/hello.bin $(MON)/build/fat/super.img
 	@test '$(FOLDER_UC)' = NICE || { echo "make test needs FOLDER=NICE, not $(FOLDER)"; exit 1; }
 	@$(BAS_ROM) check $(BUILD)/basic_image_test.bin > $(BUILD)/header.out
 	@if grep -qx '$(BUILD)/basic_image_test.bin: $(HEADER_TEST)' $(BUILD)/header.out; \
 	then echo "PASS basic header"; else echo "FAIL basic header"; cat $(BUILD)/header.out; exit 1; fi
 	@$(PYTHON) test/dis.py $(EMU) $(ROM_TEST) $(BUILD)/dis.bin
 	@$(PYTHON) test/print_numbers.py $(EMU) $(ROM_TEST)
+	@$(PYTHON) test/bench.py $(EMU) $(ROM_TEST) $(BENCH)
 	@$(PYTHON) test/ntp.py $(EMU) $(ROM_TEST) test/ntp.expected $(BUILD)/ntp.out
 	@$(PYTHON) test/tftp.py $(EMU) $(ROM_TEST) test/tftp.expected $(BUILD)/tftp.out
 	@echo 'FFFFFF9E 00020000' > $(BUILD)/ram128k.bin
@@ -255,15 +314,19 @@ test: fmt $(ROM_TEST) $(BUILD)/dis.bin $(MON)/build/hello.bin $(MON)/build/fat/s
 	@printf '$(BASIC)' > $(BUILD)/basic.txt
 	@printf '$(EXPR)' > $(BUILD)/expr.txt
 	@printf '$(TIME)' > $(BUILD)/time.txt
+	@tr '\n' '\r' < test/prog.bas > $(BUILD)/prog.txt
+	@tr '\n' '\r' < test/arr.bas > $(BUILD)/arr.txt
+	@printf '$(KEYS)' > $(BUILD)/keys.txt
 	@{ printf '$(LOAD_HEAD)'; head -n 3 $(MON)/build/hello.bin | awk '{ printf "%s\r\n", $$0 }'; \
 	  tail -n +4 $(MON)/build/hello.bin; printf '$(LOAD_TAIL)'; } > $(BUILD)/load.txt
 	@fail=0; \
-	for t in cmds basic expr load load_emu load_64k time; do \
+	for t in cmds basic expr prog keys arr load load_emu load_64k time; do \
 	  opts=; sd=; base0=; \
 	  case $$t in \
 	    cmds) prog=; dump='$(DUMP_cmds)';; \
 	    basic) prog=; dump='$(DUMP_basic)';; \
 	    expr) prog=; dump='$(DUMP_expr)';; \
+	    prog|keys|arr) prog=; dump=;; \
 	    load) prog=$(BUILD)/ram128k.bin; dump='$(DUMP_load)';; \
 	    load_emu) prog=; dump='$(DUMP_load_emu)';; \
 	    load_64k) prog=$(BUILD)/ram64k.bin; dump='$(DUMP_load_64k)';; \

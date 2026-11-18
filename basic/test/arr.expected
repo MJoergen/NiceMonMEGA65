@@ -1,0 +1,201 @@
+NiceMon V9.9, BASIC V9.9
+HELP lists the statements
+READY.
+? A(1)
+Undefined array
+READY.
+DIM A(3), B(2, 3)
+READY.
+? A(0); A(3); B(2, 3)
+000
+READY.
+A(1) = 5: B(1, 2) = 7: ? A(1); B(1, 2); B(2, 1)
+570
+READY.
+? A(4)
+Bad subscript
+READY.
+? A(-1)
+Bad subscript
+READY.
+? B(3, 0)
+Bad subscript
+READY.
+? B(0, 4)
+Bad subscript
+READY.
+? A(1, 1)
+Bad subscript
+READY.
+? B(1)
+Bad subscript
+READY.
+DIM A(2)
+Redimensioned array
+READY.
+A = 9: ? A; A(1)
+95
+READY.
+? A(1.5)
+5
+READY.
+DIM C(-1)
+Illegal quantity
+READY.
+C = 3: DIM D(C): D(C) = 1: ? D(3)
+1
+READY.
+LET A(2) = A(1) * 2: ? A(2)
+10
+READY.
+INPUT A(3), B(0, 0)
+? 4, 6
+READY.
+? A(3); B(0, 0)
+46
+READY.
+GET A(0): ? A(0)
+88
+READY.
+
+10 DIM P(10): FOR I = 0 TO 10: P(I) = I * I: NEXT
+20 S = 0: FOR I = 0 TO 10: S = S + P(I): NEXT: PRINT S; HIMEM - 1
+30 Q = 1: PRINT P(10); Q
+LIST
+10 DIM P(10): FOR I = 0 TO 10: P(I) = I * I: NEXT
+20 S = 0: FOR I = 0 TO 10: S = S + P(I): NEXT: PRINT S; HIMEM - 1
+30 Q = 1: PRINT P(10); Q
+READY.
+RUN
+385123903
+1001
+READY.
+? P(2)
+4
+READY.
+CLR
+READY.
+? P(2)
+Undefined array
+READY.
+RUN
+385123903
+1001
+READY.
+40 R = 2
+? P(10)
+100
+READY.
+RUN
+385123903
+1001
+READY.
+? HIMEM
+123904
+READY.
+HIMEM = 0x9000
+READY.
+? HIMEM
+36864
+READY.
+? Q
+Undefined variable
+READY.
+HIMEM = 0x8010
+Out of memory
+READY.
+HIMEM = 0x7FFFFFFF
+Out of memory
+READY.
+HIMEM = 0x10000
+READY.
+DIM Z(30000)
+Out of memory
+READY.
+DIM Z(3000)
+READY.
+? Z(3000)
+0
+READY.
+HIMEM =
+Syntax error
+HIMEM = A           the top of the program, its variables, and arrays; and CLR
+READY.
+HIMEM
+Syntax error
+HIMEM = A           the top of the program, its variables, and arrays; and CLR
+READY.
+NEW
+READY.
+DIM E(9, 9): E(9, 9) = 81: F = 1: ? E(9, 9); F
+811
+READY.
+DUMP 0x8000, 12
+00008000 00000000 00000000 00000101 00000045
+00008004 00000000 3FF00000 00000001 00000046
+00008008 0000000A 0000000A 00000000 00000000
+READY.
+NEW
+READY.
+10 PRINT "A"
+HIMEM = 0x9000
+READY.
+LOAD
+ADDR WORD in hex on each line, as in a .bin file; an empty line ends
+Words loaded: 1, 00009000 to 00009000
+READY.
+? PEEK(0x9000)
+5
+READY.
+LIST
+10 PRINT "A"
+READY.
+LOAD
+ADDR WORD in hex on each line, as in a .bin file; an empty line ends
+Words loaded: 1, 00008100 to 00008100
+READY.
+LIST
+READY.
+10 LOAD: PRINT "ON"
+HIMEM = 0x9000
+READY.
+RUN
+ADDR WORD in hex on each line, as in a .bin file; an empty line ends
+Words loaded: 1, 00009001 to 00009001
+ON
+READY.
+RUN
+ADDR WORD in hex on each line, as in a .bin file; an empty line ends
+Words loaded: 1, 00008101 to 00008101
+READY.
+LIST
+READY.
+HALT
+Halted
+Screen:
+|10 PRINT "A"
+|READY.
+|LOAD
+|ADDR WORD in hex on each line, as in a .bin file; an empty line ends
+|Words loaded: 1, 00008100 to 00008100
+|READY.
+|LIST
+|READY.
+|10 LOAD: PRINT "ON"
+|HIMEM = 0x9000
+|READY.
+|RUN
+|ADDR WORD in hex on each line, as in a .bin file; an empty line ends
+|Words loaded: 1, 00009001 to 00009001
+|ON
+|READY.
+|RUN
+|ADDR WORD in hex on each line, as in a .bin file; an empty line ends
+|Words loaded: 1, 00008101 to 00008101
+|READY.
+|LIST
+|READY.
+|HALT
+|Halted
+VBASE at the halt 000000
+exit 0

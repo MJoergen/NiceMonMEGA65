@@ -17,7 +17,7 @@
 ;            value is the digits read by FROMBCD, times 10^(e - 15)
 ;   K_STR    a string: its length n in bits 23..0, its n characters, one
 ;            a word, and a 0
-;   K_VAR    a variable: its offset from PROGRAM in bits 23..0
+;   K_VAR    a variable: its offset from V_PEND in bits 23..0
 ;   K_OP     an operator on two numbers: its precedence in bits 22..16,
 ;            bit 23 for one that divides, and its FPU command in 15..0
 ;   K_PUNCT  ( ) , ; and :, the character in bits 7..0
@@ -26,6 +26,12 @@
 ;   K_KW     a statement: its index in KEYWORDS in bits 15..8, and the
 ;            byte after its keyword, its program of ops, in bits 7..0
 ;   K_PRT    TAB and SPC, which only PRINT takes
+;   K_SEP    THEN, ELSE, TO, and STEP
+;   K_LINE   a line number after GOTO, GOSUB, RUN, THEN, or ELSE, in
+;            bits 23..0, and the address of its line in the word after,
+;            0 until a jump finds it (basic_prog.nasm)
+;   K_REM    the text after REM, as K_STR has it
+;   K_ARR    an array: its entry's offset from V_PEND in bits 23..0
 ;
 ; The line ends with a 0 word, T_END. A name is a keyword only as a
 ; whole name, up to 16 letters and digits.
@@ -33,15 +39,20 @@
 ; A variable is its double, then its name: the name's length, then its
 ; characters in upper case, packed four to a word, as .ASCII_B packs
 ; them. A variable that was never assigned has 0xFFFFFFFF, a NaN, in the
-; high word of its double. The variables go from PROGRAM to V_VEND. The
-; tokenizer makes a variable for a name with = after it at the start of
-; a statement, or after LET. Any other name without a variable is a
-; K_VAR of NO_VAR, an Undefined variable when it runs, so that a line
-; that only reads a name, or has a typo, does not write over a program at
-; PROGRAM. The walk
+; high word of its double. An array's entry has ARRAY in its length, and
+; the offset of its data from V_VEND in the place of the double's low
+; word, and its high word is 0xFFFFFFFF until DIM makes the array
+; (basic_prog.nasm). A name with ( after it is an array's. The variables go from V_PEND, the end of the
+; program, to V_VEND. The tokenizer makes a variable for each name of a
+; line to store (basic_prog.nasm), and in a direct line for a name after
+; GET or INPUT, or a comma of INPUT, and with = after it at the start of
+; a statement, or after LET, FOR, THEN, or ELSE, and an array's name in
+; a direct line after DIM, or a comma of DIM. Any other name without a variable is a K_VAR of NO_VAR, an
+; Undefined variable when it runs, so that a line that only reads a
+; name, or has a typo, does not write over a program at PROGRAM. The walk
 ; of the table stops at V_VEND and at a length of 0 or above 16, where
 ; it cuts the table, so that a program that SYS ran and that wrote over
-; the table never loses it. LOAD clears the table.
+; the table never loses it. LOAD clears the table, and the program.
 ;
 ; The evaluator takes the tokens from R8, and pushes the operands on the
 ; FPU's stack, where an operator is one command. It recurses on the
@@ -91,6 +102,12 @@ K_FN            .EQU    9
 K_NOT           .EQU    10
 K_KW            .EQU    11
 K_PRT           .EQU    12
+K_SEP           .EQU    13
+K_LINE          .EQU    14
+K_REM           .EQU    15
+K_ARR           .EQU    16
+ARRAY           .EQU    0x100           ; in the length of an array's name
+NOT_ARRAY       .EQU    0xFFFFFEFF      ; the length alone
 K               .EQU    0x1000000       ; a kind's unit
 P               .EQU    0x10000         ; a precedence's unit
 P_DIVIDES       .EQU    0x800000        ; an operator that divides
@@ -123,13 +140,18 @@ PREC_SIGN       .EQU    8               ; the signs take what binds more than * 
 T_TAB           .EQU    K_PRT*K
 T_SPC           .EQU    K_PRT*K+1
 T_PRINT         .EQU    K_KW*K+I_PRINT*0x100
+T_THEN          .EQU    K_SEP*K
+T_ELSE          .EQU    K_SEP*K+1
+T_TO            .EQU    K_SEP*K+2
+T_STEP          .EQU    K_SEP*K+3
 
 ; The tokens of the keywords that are no statements, from index N_STMT of
 ; KEYWORDS on
 KW_TOK
                 .DAT    T_AND, T_OR, T_XOR, K_NOT*K+FPU_NOT, T_IDIV, T_MOD
                 .DAT    K_FN*K+0x16, K_FN*K+0x1B, K_FN*K+0x20, K_FN*K+0x14, K_FN*K
-                .DAT    T_TAB, T_SPC
+                .DAT    T_TAB, T_SPC, T_THEN, T_ELSE, T_TO, T_STEP
+KW_TOK_END
 
 ; The characters of one-character tokens, each with its token
 PUNCTS
@@ -137,13 +159,16 @@ PUNCTS
                 .DAT    0x3D, T_EQ, 0x28, T_LPAR, 0x29, T_RPAR, 0x2C, T_COMMA
                 .DAT    0x3B, T_SEMI, 0x3A, T_COLON, 0x3F, T_PRINT, 0
 
-; tokenize: the line at V_LINE as tokens at V_TOK. An error goes to err,
-; with the last statement's keyword before it in V_KW, for its lines of
-; HELP. Uses R1-R12.
+; tokenize: the line at V_LINE as tokens at V_TOK, and R8 at their 0.
+; tokenize_at: the same, from R5; tokenize_to: from R5 to R8. An error
+; goes to err, with the last statement's keyword before it in V_KW, for
+; its lines of HELP. Uses R1-R12.
 tokenize
-                MOVE    @V_KW, R0
                 MOVE    R5, V_LINE
+tokenize_at
                 MOVE    R8, V_TOK
+tokenize_to
+                MOVE    @V_KW, R0
 tok_next
                 MOVE    R1, @R5
                 CMP     R1, 0x20
@@ -252,27 +277,65 @@ tok_name
                 SHL     R1, R11, 8
                 OR      R1, R1, R4
                 OR      @R8++, R1, K_KW*K
-                JMP     tok_next
+                CMP     R11, I_REM
+        ?!Z     JMP     tok_next
+                MOVE    R6, R8          ; REM: the rest of the line as it is
+                MOVE    R8++, R8
+                CLR     R2
+:
+                MOVE[M] R1, @R5++
+        ?Z      JMP     :+
+                MOVE    @R8++, R1
+                MOVE    R2++, R2
+                JMP     :-
+:
+                MOVE    @R8++, R0
+                ADD     @R6, R2, K_REM*K
+                MOVE    @R8, R0
+                RET
 tok_var
                 ADD     R5, R9, R10
                 CMP     @R5, 0x25       ; %
         ?!Z     CMP     @R5, 0x24       ; $
         ?Z      JMP     err_syntax
-                CLR     R11             ; not 0 to make the variable: =
-                MOVE    R1, R5          ; after it, at the start of a statement
+                MOVE    R11, @V_STORE   ; not 0 to make the variable: in a
+                MOVE    R2, @-1[R8]     ; line to store, after GET or INPUT,
+                AND     R3, R2, 0xFFFFFF00  ; or with = after it, at the start
+                CMP     R3, K_KW*K+I_INPUT*0x100  ; of a statement
+        ?!Z     CMP     R3, K_KW*K+I_GET*0x100
+        ?Z      ONE     R11
+                CMP     R2, T_COMMA     ; and after a comma of INPUT
+        ?Z      CMP     @V_KW, I_INPUT+1
+        ?Z      ONE     R11
+                MOVE    R1, R5
 :
                 CMP     @R1, 0x20
         ?Z      MOVE    R1++, R1
         ?Z      JMP     :-
+                CMP     @R1, 0x28       ; (: an array's name
+        ?!Z     JMP     tv_eq
+                OR      R10, R10, ARRAY
+                MOVE    R2, @-1[R8]
+                AND     R3, R2, 0xFFFFFF00
+                CMP     R3, K_KW*K+I_DIM*0x100
+        ?Z      ONE     R11
+                CMP     R2, T_COMMA
+        ?Z      CMP     @V_KW, I_DIM+1
+        ?Z      ONE     R11
+                JMP     :+
+tv_eq
                 CMP     @R1, 0x3D       ; =
         ?!Z     JMP     :+
                 CMP     R8, V_TOK
         ?Z      ONE     R11
                 MOVE    R2, @-1[R8]
                 CMP     R2, T_COLON
+        ?!Z     CMP     R2, T_THEN
+        ?!Z     CMP     R2, T_ELSE
         ?Z      ONE     R11
                 AND     R2, R2, 0xFFFFFF00
                 CMP     R2, K_KW*K+I_LET*0x100
+        ?!Z     CMP     R2, K_KW*K+I_FOR*0x100
         ?Z      ONE     R11
 :
                 MOVE    R2, V_PNAME     ; the name, packed in upper case
@@ -295,24 +358,28 @@ tok_var
                 CMP     R3, R5
         ?!Z     JMP     :-
                 CALL    var_find
-                SUB     R1, R1, PROGRAM
-                OR      @R8++, R1, K_VAR*K
+                SUB     R1, R1, @V_PEND
+                AND[M]  R0, R10, ARRAY
+        ?Z      OR      @R8++, R1, K_VAR*K
+        ?!Z     OR      @R8++, R1, K_ARR*K
                 JMP     tok_next
 
 ; var_find: R1 = the variable of the name at V_PNAME, of length R10,
-; found, or made at V_VEND when R11 is not 0, else PROGRAM + NO_VAR.
-; Uses R1-R4, R6, and R12.
+; with ARRAY for an array's, found, or made at V_VEND when R11 is not 0,
+; else V_PEND + NO_VAR. Uses R1-R4, R6, and R12.
 var_find
-                ADD     R6, R10, 3
+                AND     R6, R10, NOT_ARRAY
+                ADD     R6, R6, 3
                 SHR     R6, R6, 2       ; the name's words
-                MOVE    R1, PROGRAM
+                MOVE    R1, @V_PEND
                 MOVE    R4, @V_VEND
 var_next
                 CMP     R1, R4
         ?!C     JMP     var_new
-                MOVE[M] R2, @2[R1]      ; the length
+                MOVE    R2, @2[R1]      ; the length, and ARRAY
+                AND[M]  R3, R2, NOT_ARRAY
         ?Z      JMP     var_cut
-                CMP     R2, 17
+                CMP     R3, 17
         ?!C     JMP     var_cut
                 CMP     R2, R10
         ?!Z     JMP     var_skip
@@ -326,25 +393,33 @@ var_next
         ?!Z     JMP     :-
                 RET                     ; found
 var_skip
+                AND     R2, R2, NOT_ARRAY
                 ADD     R2, R2, 3
                 SHR     R2, R2, 2
                 ADD     R1, R1, R2
                 ADD     R1, R1, 3
                 JMP     var_next
 var_cut
-                MOVE    @V_VEND, R1     ; a length of 0 or above 16: the table ends here
+                MOVE    @V_VEND, R1     ; a length of 0 or above 16: the table ends here,
+                MOVE    @V_AEND, R1     ; and the arrays go
 var_new
                 TST     R11
-        ?Z      MOVE    R1, PROGRAM+NO_VAR
+        ?Z      ADD     R1, @V_PEND, NO_VAR
         ?Z      RET
-                MOVE[M] R2, @RAM_WORDS
-        ?Z      MOVE    R2, RAM_MEGA65
-                SUB     R2, R2, MON_VARS+BASIC_WORDS+STACK_ROOM  ; the monitor's variables, BASIC's, and the stack
-                ADD     R3, R1, R6
-                ADD     R3, R3, 3       ; the end of the new variable
-                CMP     R2, R3
+                CALL    mem_top
+                ADD     R3, R6, 3       ; the words of the new variable
+                ADD     R4, @V_AEND, R3
+                CMP     R2, R4
         ?C      JMP     err_memory
-                MOVE    @V_VEND, R3
+                MOVE    @V_AEND, R4     ; the arrays move up
+                PUSH    R1
+                PUSH    R5
+                ADD     R2, R1, R3
+                MOVE    @V_VEND, R2
+                SUB     R3, R4, R3
+                CALL    mem_move
+                POP     R5
+                POP     R1
                 MOVE    @R1, R0
                 MOVE    @1[R1], 0xFFFFFFFF  ; not assigned
                 MOVE    @2[R1], R10
@@ -363,6 +438,18 @@ var_new
 ; 16th. R6 is not 0 after the point, R9 after a digit, and R10 after a
 ; point or an exponent, which make the number a K_NUM.
 tok_number
+                CMP     R8, V_TOK
+        ?Z      JMP     :+
+                MOVE    R2, @-1[R8]     ; after GOTO, GOSUB, RUN, THEN, or ELSE
+                CMP     R2, T_THEN      ; a line number
+        ?!Z     CMP     R2, T_ELSE
+        ?Z      JMP     tok_line
+                AND     R2, R2, 0xFFFFFF00
+                CMP     R2, K_KW*K+I_GOTO*0x100
+        ?!Z     CMP     R2, K_KW*K+I_GOSUB*0x100
+        ?!Z     CMP     R2, K_KW*K+I_RUN*0x100
+        ?Z      JMP     tok_line
+:
                 CMP     R1, 0x30
         ?!Z     JMP     :+
                 AND     R2, @1[R5], 0xDF
@@ -519,6 +606,21 @@ tok_digits
                 MOVE    @R8++, R1
                 JMP     tok_next
 
+; A line number, digits only, and no letter, digit, or point after it
+tok_line
+                MOVE    R6, R5
+                CALL    get_lineno
+                CMP     R5, R6
+        ?Z      JMP     err_syntax      ; no digit
+                MOVE    R1, @R5
+                CALL    dval
+        ?C      JMP     err_syntax
+                CMP     R1, 0x2E
+        ?Z      JMP     err_syntax
+                OR      @R8++, R3, K_LINE*K
+                MOVE    @R8++, R0
+                JMP     tok_next
+
 ; A number in hex after 0x or 0X, of at most 8 significant digits
 tok_hex
                 ADD     R5, R5, 2
@@ -625,12 +727,14 @@ expr_op
 primary
                 MOVE    R1, @R8++
                 SHR     R2, R1, 24
+                CMP     R2, K_ARR
+        ?Z      JMP     p_arr
                 CMP     R2, K_PRT
         ?!C     JMP     err_syntax
                 JMP     @PRIMS[R2]
 PRIMS
                 .DAT    err_syntax, p_small, p_word, p_word, p_num, err_syntax, p_var
-                .DAT    p_op, p_punct, p_fn, p_not, err_syntax
+                .DAT    p_op, p_punct, p_fn, p_not, p_kw
 p_small
                 AND     @FPU_X_W, R1, 0xFFFFFF
                 RET
@@ -646,10 +750,22 @@ p_var
                 AND     R1, R1, 0xFFFFFF
                 CMP     R1, NO_VAR
         ?Z      JMP     err_undef
-                CMP     @PROGRAM+1[R1], 0xFFFFFFFF
+                ADD     R1, R1, @V_PEND
+                CMP     @1[R1], 0xFFFFFFFF
         ?Z      JMP     err_undef
-                MOVE    @FPU_X_LO, @PROGRAM[R1]
-                MOVE    @FPU_X_HI, @PROGRAM+1[R1]
+                MOVE    @FPU_X_LO, @R1
+                MOVE    @FPU_X_HI, @1[R1]
+                RET
+p_arr
+                CALL    arr_elem
+                MOVE    @FPU_X_LO, @R1
+                MOVE    @FPU_X_HI, @1[R1]
+                RET
+p_kw
+                CMP     R1, T_HIMEM
+        ?!Z     JMP     err_syntax
+                CALL    himem
+                MOVE    @FPU_X_W, R2
                 RET
 p_op
                 CMP     R1, T_MINUS
@@ -701,36 +817,40 @@ paren_word
                 CALL    eval_word
                 JMP     rpar
 
-; stmt_end: the end of a statement at R8, the end of the line or a colon,
-; where the next statement starts, at V_TP, and the return to run_next
+; stmt_end: the end of a statement at R8, where the next statement
+; starts, at V_TP, and the return to run_next. Uses R1.
 stmt_end
-                TST     @R8
-        ?!Z     CMP     @R8, T_COLON
+                CALL    at_end
         ?!Z     JMP     err_syntax
                 MOVE    @V_TP, R8
                 RET
 
-; LET V = X, and V = X, which run_line goes to with R8 at V
+; at_end: Z when the token at R8, R1, ends a statement: the end of the
+; line, a colon, or ELSE
+at_end
+                MOVE    R1, @R8
+                TST     R1
+        ?!Z     CMP     R1, T_COLON
+        ?!Z     CMP     R1, T_ELSE
+                RET
+
+; LET V = X, and V = X, which run goes to with R8 at V, a variable or an
+; array's element
 st_let
-                SHR     R2, @R8, 24
-                CMP     R2, K_VAR
-        ?!Z     JMP     err_syntax
                 JMP     assign
 st_assign
-                CMP     @1[R8], T_EQ
+                CMP     R2, K_ARR
+        ?!Z     CMP     @1[R8], T_EQ
         ?!Z     JMP     err_unknown
                 MOVE    @V_KW, I_LET+1  ; for the lines of HELP of LET
 assign
-                AND     R1, @R8++, 0xFFFFFF
-                ADD     R1, R1, PROGRAM
+                CALL    lvalue
                 CMP     @R8++, T_EQ
         ?!Z     JMP     err_syntax
                 PUSH    R1
                 CALL    eval_num
                 POP     R1
-                MOVE    @R1, @FPU_X_LO
-                MOVE    @1[R1], @FPU_X_HI
-                MOVE    @FPU_CMD, FPU_DROP
+                CALL    store_var
                 JMP     stmt_end
 
 ; POKE A, X: X to the word at A
@@ -743,9 +863,7 @@ bas_poke
 ; column N, and SPC(N), N blanks. A ; or a comma at the end leaves the
 ; cursor after the last item; else a CR LF ends the line.
 st_print
-                MOVE    R1, @R8
-                TST     R1
-        ?!Z     CMP     R1, T_COLON
+                CALL    at_end
         ?Z      JMP     pr_end
                 CMP     R1, T_SEMI
         ?Z      JMP     pr_next
@@ -770,8 +888,7 @@ pr_comma
         ?!Z     JMP     pr_comma
 pr_next
                 MOVE    R8++, R8
-                TST     @R8
-        ?!Z     CMP     @R8, T_COLON
+                CALL    at_end
         ?Z      JMP     stmt_end
                 JMP     st_print
 pr_str
@@ -821,6 +938,10 @@ put_num
                 MOVE    R10, @FPU_X_LO  ; the digits, R9:R10
                 MOVE    R9, @FPU_X_HI
                 MOVE    @FPU_CMD, FPU_DROP
+; put_bcd: the 16 digits in BCD R9:R10, the first in bits 31..28 of R9,
+; not all 0, with the exponent R7 of the first, as put_num writes them.
+; Uses R1-R7 and R9-R12.
+put_bcd
                 MOVE    R1, R10         ; R11 the digits without the trailing zeros
                 MOVE    R2, R9
                 MOVE    R11, 16
@@ -924,32 +1045,45 @@ err_undef
                 JMP     err
 err_memory
                 MOVE    R1, S_MEMORY
+                JMP     err
+err_line
+                MOVE    R1, S_LINE
+                JMP     err
+err_next
+                MOVE    R1, S_NEXT
+                JMP     err
+err_return
+                MOVE    R1, S_RETNG
+                JMP     err
+err_array
+                MOVE    R1, S_ARRAY
+                JMP     err
+err_subscript
+                MOVE    R1, S_SUBSCR
+                JMP     err
+err_redim
+                MOVE    R1, S_REDIM
+                JMP     err
+err_cont
+                MOVE    R1, S_CONT
 err
                 MOVE    @FPU_CMD, FPU_CLEAR
                 MOVE    SP, STACK
+                MOVE[M] R8, @V_REDO
+        ?!Z     JMP     in_redo         ; in INPUT's line
                 CMP     R1, S_SYNTAX
         ?Z      TST     @V_KW
         ?Z      MOVE    R1, S_UNKNOWN   ; not in a statement
                 MOVE    R7, R1
-                CALL    SCR_GETXY
-                TST     R1
-        ?!Z     CALL    _io_crlf
+                CALL    drop_run        ; no frames, and no CONT
                 MOVE    R1, R7
-                CALL    puts_b_crlf
+                CALL    put_msg         ; with the line's number in a program
                 CMP     R7, S_SYNTAX
         ?!Z     JMP     main
                 MOVE[M] R1, @V_KW
         ?Z      JMP     main
-                MOVE    R3, TEXT_B+4*OPS+KEYWORDS
-:
-                SUB[M]  R1, R1, 1       ; the keyword of index V_KW - 1
-        ?Z      JMP     :++
-:
-                MOVE    R4, @R3++
-                CMP     R4, 0x41
-        ?!C     JMP     :-
-                JMP     :--
-:
+                SUB     R1, R1, 1
+                CALL    kw_addr         ; the statement's keyword
                 MOVE    R7, R3
                 MOVE    R10, HELP
 :

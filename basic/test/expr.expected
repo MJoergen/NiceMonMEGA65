@@ -214,7 +214,9 @@ A = 1: LOAD "X.BIN": ? A
 SD error 1 in slot 1, no card
 READY.
 ? A
-Undefined variable
+1
+READY.
+NEW
 READY.
 POKE 0x8002, 99: ? B
 Undefined variable
@@ -222,7 +224,7 @@ READY.
 B = 7: ? B
 7
 READY.
-POKE 0xFFFFFF9E, 0x9C10
+POKE 0xFFFFFF9E, 0x9E10
 READY.
 E = 1: F = 2: G = 3
 READY.
@@ -238,11 +240,11 @@ Halted
 00008008: 00000000 40000000 00000001 00000046 00000000 40080000 00000001 00000047
 ffffed51: 00008010
 Screen:
-|A = 1: LOAD "X.BIN": ? A
-|SD error 1 in slot 1, no card
 |READY.
 |? A
-|Undefined variable
+|1
+|READY.
+|NEW
 |READY.
 |POKE 0x8002, 99: ? B
 |Undefined variable
@@ -250,7 +252,7 @@ Screen:
 |B = 7: ? B
 |7
 |READY.
-|POKE 0xFFFFFF9E, 0x9C10
+|POKE 0xFFFFFF9E, 0x9E10
 |READY.
 |E = 1: F = 2: G = 3
 |READY.
