@@ -87,17 +87,17 @@ SUITES = {
     # P5: TAB, and the cases of issue #145
     "fattab": [
         Run("TAB after a quote, in another case and in the same, of an alias, in "
-            "words after blanks and strings, and a list longer than the screen",
+            "words after blanks and strings, and a list of 23 names",
             "lfn.img",
             keys='load "MY\t\003load "mand\t\003load _\t\003load MYPROG\t\003load ""\t\003'
                  'dir "my\t\003  load my\t\003 load  "my\t\003load x"my\t\003'
                  'load "my prog.bin" my\t\003load "Mixed.b\t\003load "across a s\t\003'
                  'load "\t\003load p\t\003load pad\t\003halt\r'),
         Run("TAB with slot 1 mounted by DIR 1: its names, a directory left out, "
-            "and names that end at the line's end, 76 characters, or past it",
-            "lfn.img", "tab1.img",
+            "names that end at the line's end, 76 characters, or past it, and a "
+            "list of 30 names, more than the screen's 25 rows", "lfn.img", "tab1.img",
             keys='dir 1\rload h\t\003load hd\t\003load a\t\003load b\t\003load "a\t\003'
-                 'load "b\t\003halt\r'),
+                 'load "b\t\003load r\t\t\003halt\r'),
         Run("TAB after SAVE and DELETE", "super.img",
             keys='load z\t\003save "zebra", 0x8000, 1\rload z\t\003save "Hz", 0x8000, 1\r'
                  'load h\t\003delete "zebra.bin"\rload z\t\003halt\r', order=True),

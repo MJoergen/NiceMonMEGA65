@@ -1,4 +1,4 @@
-== TAB after a quote, in another case and in the same, of an alias, in words after blanks and strings, and a list longer than the screen
+== TAB after a quote, in another case and in the same, of an alias, in words after blanks and strings, and a list of 23 names
 NiceMon V9.9
 HELP lists the statements
 READY.
@@ -78,7 +78,7 @@ halt
 Halted
 exit 0
 Slot 0: The card as lfn.img was
-== TAB with slot 1 mounted by DIR 1: its names, a directory left out, and names that end at the line's end, 76 characters, or past it
+== TAB with slot 1 mounted by DIR 1: its names, a directory left out, names that end at the line's end, 76 characters, or past it, and a list of 30 names, more than the screen's 25 rows
 NiceMon V9.9
 HELP lists the statements
 READY.
@@ -90,7 +90,37 @@ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.bin
 bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.bin
                                    0
 hdir                           <DIR>
-Files: 3, directories: 1
+ROW01.TXT                          0
+ROW02.TXT                          0
+ROW03.TXT                          0
+ROW04.TXT                          0
+ROW05.TXT                          0
+ROW06.TXT                          0
+ROW07.TXT                          0
+ROW08.TXT                          0
+ROW09.TXT                          0
+ROW10.TXT                          0
+ROW11.TXT                          0
+ROW12.TXT                          0
+ROW13.TXT                          0
+ROW14.TXT                          0
+ROW15.TXT                          0
+ROW16.TXT                          0
+ROW17.TXT                          0
+ROW18.TXT                          0
+ROW19.TXT                          0
+ROW20.TXT                          0
+ROW21.TXT                          0
+ROW22.TXT                          0
+ROW23.TXT                          0
+ROW24.TXT                          0
+ROW25.TXT                          0
+ROW26.TXT                          0
+ROW27.TXT                          0
+ROW28.TXT                          0
+ROW29.TXT                          0
+ROW30.TXT                          0
+Files: 33, directories: 1
 READY.
 load h^H"HELLO.BIN" ^C
 load hd^C
@@ -98,6 +128,38 @@ load a^H"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.bin" ^
 load b^C
 load "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.bin" ^C
 load "b^C
+load r^H"ROW
+ROW01.TXT
+ROW02.TXT
+ROW03.TXT
+ROW04.TXT
+ROW05.TXT
+ROW06.TXT
+ROW07.TXT
+ROW08.TXT
+ROW09.TXT
+ROW10.TXT
+ROW11.TXT
+ROW12.TXT
+ROW13.TXT
+ROW14.TXT
+ROW15.TXT
+ROW16.TXT
+ROW17.TXT
+ROW18.TXT
+ROW19.TXT
+ROW20.TXT
+ROW21.TXT
+ROW22.TXT
+ROW23.TXT
+ROW24.TXT
+ROW25.TXT
+ROW26.TXT
+ROW27.TXT
+ROW28.TXT
+ROW29.TXT
+ROW30.TXT
+load "ROW^C
 halt
 Halted
 exit 0

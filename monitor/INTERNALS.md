@@ -493,7 +493,7 @@ The suites of `test/fat_runs.py`, step 7:
 |---|---|
 | `fatstate` | What `SYS 0` and a program's return keep: a handle across the cold start, both handles left open, so that `LOAD`, `SAVE`, and `DIR` give error 23 while TAB works, the mount of slot 1 forgotten, and `DIR 0`, which mounts again and closes a program's handle. |
 | `fatload` | `LOAD`'s lines (`lines.img`): CR LF, blank lines only, a chain cut after its second cluster, whose summary comes before the error, and lines of every kind, with bytes that are not printable ASCII and blanks and text after 76 characters, and the words of `V_LSTATS`. |
-| `fattab` | TAB: after a quote, in either case, an alias, words after blanks and strings, a list longer than the screen; with slot 1 mounted (`tab1.img`), a directory, and names that end at the line's end or past it; and after `SAVE` and `DELETE` (issue #145). |
+| `fattab` | TAB: after a quote, in either case, an alias, words after blanks and strings, a list of 23 names; with slot 1 mounted (`tab1.img`), a directory, names that end at the line's end or past it, and a list of 30 names, more than the screen's 25 rows; and after `SAVE` and `DELETE` (issue #145). |
 | `fatdrop` | The mount dropped under open files when `SD_SELECT` changes, and `fs_mount` under a file open to write. |
 | `fatchain` | Damaged chains (`chains.img`): a chain cut, a size past the chain, cluster 0, the last cluster, one past it, a bad mark, a loop; their reads, deletes, and a `SAVE` over one. |
 | `fatlfn` | Long names of 13 and 26 characters; damaged entries (`lfnx.img`): 0x05, orphans, a label, a broken set, a name of 256 characters; and deletes of long names across a sector and a cluster. |

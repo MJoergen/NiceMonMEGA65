@@ -385,12 +385,14 @@ def extra(d: str, tmp: str) -> None:
     v = Vol(img, write=True)
     _, e = v.entry(b"CUT     BIN")
     v.set(v.chain(cluster(e))[1], 0)
-    # fattab: slot 1's card, with names of 68 and 69 characters, and a
-    # directory
+    # fattab: slot 1's card, with names of 68 and 69 characters, a
+    # directory, and ROW01.TXT to ROW30.TXT, more than the screen's 25 rows
     img = copy(super_img, at("tab1.img"))
     mcopy(img, 0, b"", "NICE/" + "a" * 64 + ".bin", tmp)
     mcopy(img, 0, b"", "NICE/" + "b" * 65 + ".bin", tmp)
     run("mmd", "-i", f"{img}@@0", "::NICE/hdir")
+    for k in range(1, 31):
+        mcopy(img, 0, b"", f"NICE/ROW{k:02}.TXT", tmp)
     # fatchain: damaged chains, files of 1500 bytes, 3 clusters
     img = copy(super_img, at("chains.img"))
     for name in ("CUT", "FREE", "LONG", "ZERO", "LOOP", "BADC", "EDGE", "HIGH"):
