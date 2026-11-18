@@ -251,8 +251,8 @@ assembled apart (#152): the monitor's from 0, and BASIC's from
 <!-- romsize layout -->
 | Part | Address | Words |
 |---|---|---:|
-| The monitor | `0x0000`–`0x293E` | 10559 |
-| Free | `0x293F`–`0x3FFF` | 5825 |
+| The monitor | `0x0000`–`0x293C` | 10557 |
+| Free | `0x293D`–`0x3FFF` | 5827 |
 | BASIC | `0x4000`–`0x53E9` | 5098 |
 | Free | `0x53EA`–`0x7FFF` | 11286 |
 <!-- /romsize layout -->
@@ -269,7 +269,7 @@ ROM is built:
 |---|---|---:|---:|
 | `monitor.nasm` | The dispatch table, the HAL, and the cold start | 1029 | 0 |
 | `monitor_sd.nasm` | The sector routines | 85 | 0 |
-| `monitor_fat.nasm` | FAT32, the file entries, and TAB | 2895 | 0 |
+| `monitor_fat.nasm` | FAT32, the file entries, and TAB | 2893 | 0 |
 | `monitor_eth.nasm` | The network, and its entries | 2440 | 10 |
 | `monitor_tcp.nasm` | TCP | 2414 | 0 |
 | `monitor_clock.nasm` | The clock: `clock_set`, the dates of files, and the real-time clock | 313 | 0 |
@@ -279,7 +279,7 @@ ROM is built:
 | `mon.nasm` | The stubs of the entries | 90 | 0 |
 | `build/folder.nasm` | The folder's name | 3 | 3 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 10559 | 71 |
+| In all | | 10557 | 71 |
 <!-- /romsize monitor -->
 
 

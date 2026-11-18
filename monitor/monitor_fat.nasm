@@ -121,7 +121,6 @@ fs_write
 fs_delete
                 MOVE    R6, delete_b
                 JMP     fat_call
-                JMP     fat_call
 ; fat_call: the routine at R6 called with R1-R4, and R7-R12 kept. Its
 ; return, or fat_fail, gives R1. When a mount stood and no file was open,
 ; an SD error that drops the mount (chk) runs the routine once more, on a
