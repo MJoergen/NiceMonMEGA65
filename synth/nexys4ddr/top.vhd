@@ -287,6 +287,7 @@ begin
       generic map (
          G_CLOCK_HZ      => C_CLOCK_HZ,
          G_ROM_FILE      => G_ROM_FILE,
+         G_ROM_WRITE     => false,
          G_RAM_ADDR_BITS => 16,
          G_SCR_ADDR_BITS => 13,
          G_VIDEO         => C_VIDEO,

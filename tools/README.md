@@ -238,7 +238,9 @@ core, clears the memory, writes the image with "keep" set and zeros
 after it up to `0x7FFF`, reads the half back, and starts the core with
 the ROM shown. The ROM keeps that BASIC until the FPGA is configured
 again, as when the board is switched off. A bitstream without a ROM, or
-one older than V2.3.1, whose ROM takes no writes, is refused.
+one older than V2.3.1, whose ROM takes no writes, is refused, and so is
+the Nexys4DDR's ROM, which takes no writes, as its block RAMs are too
+few.
 
 ## Running a C program
 

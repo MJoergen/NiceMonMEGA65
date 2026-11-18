@@ -4,6 +4,8 @@
 -- (the monitor and BASIC in a release), at the bottom of the address
 -- space, as the ROM of QNICE-FPGA does. src/mem.vhd decides which writes
 -- reach it: those to BASIC's half, until it is locked (issue #153).
+-- With G_WRITE false, port B takes no writes, and the ROM is a ROM to
+-- Vivado, which packs it into fewer block RAMs, as the Nexys4DDR needs.
 --
 -- THEORY OF OPERATION
 -- Port A takes a pair address a and reads the aligned pair of words 2a and
@@ -12,7 +14,7 @@
 -- that bit 0 of its address selects. Each port reads in the cycle after
 -- the address is given, as block RAM does. A write on port B, with a byte
 -- enable for each of b_we_i's bits, goes to the bank of bit 0 of its
--- address; a read on port B in the cycle of a write returns the word
+-- address, with G_WRITE; a read on port B in the cycle of a write returns the word
 -- before it, and port A, at the address that is written, may read either
 -- word. The words at configuration come from G_INIT_FILE,
 -- a .bin file (ISA.md §10.4): one line per word, an 8-digit hex address, a
@@ -33,7 +35,8 @@ library ieee;
 entity rom is
    generic (
       G_ADDR_BITS : natural;
-      G_INIT_FILE : string
+      G_INIT_FILE : string;
+      G_WRITE     : boolean := true
    );
    port (
       clk_i     : in  std_logic;
@@ -80,13 +83,6 @@ architecture synthesis of rom is
       return mem_v;
    end function load;
 
-   signal mem_even : t_mem := load(G_INIT_FILE, '0');
-   signal mem_odd  : t_mem := load(G_INIT_FILE, '1');
-
-   attribute ram_style : string;
-   attribute ram_style of mem_even : signal is "block";
-   attribute ram_style of mem_odd  : signal is "block";
-
    -- The reads of each bank by each port, and the bank that port B reads.
    -- Each read is a register of its own, so that Vivado maps each bank to
    -- block RAM.
@@ -98,47 +94,92 @@ architecture synthesis of rom is
 
 begin
 
-   p_a_even : process (clk_i)
+   gen_write : if G_WRITE generate
+
+      signal mem_even : t_mem := load(G_INIT_FILE, '0');
+      signal mem_odd  : t_mem := load(G_INIT_FILE, '1');
+
+      attribute ram_style : string;
+      attribute ram_style of mem_even : signal is "block";
+      attribute ram_style of mem_odd  : signal is "block";
+
    begin
-      if rising_edge(clk_i) then
-         a_even <= mem_even(to_integer(a_addr_i));
-      end if;
-   end process p_a_even;
 
-   p_a_odd : process (clk_i)
+      p_a_even : process (clk_i)
+      begin
+         if rising_edge(clk_i) then
+            a_even <= mem_even(to_integer(a_addr_i));
+         end if;
+      end process p_a_even;
+
+      p_a_odd : process (clk_i)
+      begin
+         if rising_edge(clk_i) then
+            a_odd <= mem_odd(to_integer(a_addr_i));
+         end if;
+      end process p_a_odd;
+
+      p_b_even : process (clk_i)
+      begin
+         if rising_edge(clk_i) then
+            b_even <= mem_even(to_integer(b_addr_i(G_ADDR_BITS - 1 downto 1)));
+
+            for i in 0 to 3 loop
+               if b_we_i(i) = '1' and b_addr_i(0) = '0' then
+                  mem_even(to_integer(b_addr_i(G_ADDR_BITS - 1 downto 1)))(8 * i + 7 downto 8 * i) <= b_wdata_i(8 * i + 7 downto 8 * i);
+               end if;
+            end loop;
+
+         end if;
+      end process p_b_even;
+
+      p_b_odd : process (clk_i)
+      begin
+         if rising_edge(clk_i) then
+            b_odd <= mem_odd(to_integer(b_addr_i(G_ADDR_BITS - 1 downto 1)));
+
+            for i in 0 to 3 loop
+               if b_we_i(i) = '1' and b_addr_i(0) = '1' then
+                  mem_odd(to_integer(b_addr_i(G_ADDR_BITS - 1 downto 1)))(8 * i + 7 downto 8 * i) <= b_wdata_i(8 * i + 7 downto 8 * i);
+               end if;
+            end loop;
+
+         end if;
+      end process p_b_odd;
+
+   end generate gen_write;
+
+   gen_read_only : if not G_WRITE generate
+
+      constant C_EVEN : t_mem := load(G_INIT_FILE, '0');
+      constant C_ODD  : t_mem := load(G_INIT_FILE, '1');
+
+      signal mem_even : t_mem := C_EVEN;
+      signal mem_odd  : t_mem := C_ODD;
+
+      attribute rom_style : string;
+      attribute rom_style of mem_even : signal is "block";
+      attribute rom_style of mem_odd  : signal is "block";
+
    begin
-      if rising_edge(clk_i) then
-         a_odd <= mem_odd(to_integer(a_addr_i));
-      end if;
-   end process p_a_odd;
 
-   p_b_even : process (clk_i)
-   begin
-      if rising_edge(clk_i) then
-         b_even <= mem_even(to_integer(b_addr_i(G_ADDR_BITS - 1 downto 1)));
+      p_a : process (clk_i)
+      begin
+         if rising_edge(clk_i) then
+            a_even <= mem_even(to_integer(a_addr_i));
+            a_odd  <= mem_odd(to_integer(a_addr_i));
+         end if;
+      end process p_a;
 
-         for i in 0 to 3 loop
-            if b_we_i(i) = '1' and b_addr_i(0) = '0' then
-               mem_even(to_integer(b_addr_i(G_ADDR_BITS - 1 downto 1)))(8 * i + 7 downto 8 * i) <= b_wdata_i(8 * i + 7 downto 8 * i);
-            end if;
-         end loop;
+      p_b : process (clk_i)
+      begin
+         if rising_edge(clk_i) then
+            b_even <= mem_even(to_integer(b_addr_i(G_ADDR_BITS - 1 downto 1)));
+            b_odd  <= mem_odd(to_integer(b_addr_i(G_ADDR_BITS - 1 downto 1)));
+         end if;
+      end process p_b;
 
-      end if;
-   end process p_b_even;
-
-   p_b_odd : process (clk_i)
-   begin
-      if rising_edge(clk_i) then
-         b_odd <= mem_odd(to_integer(b_addr_i(G_ADDR_BITS - 1 downto 1)));
-
-         for i in 0 to 3 loop
-            if b_we_i(i) = '1' and b_addr_i(0) = '1' then
-               mem_odd(to_integer(b_addr_i(G_ADDR_BITS - 1 downto 1)))(8 * i + 7 downto 8 * i) <= b_wdata_i(8 * i + 7 downto 8 * i);
-            end if;
-         end loop;
-
-      end if;
-   end process p_b_odd;
+   end generate gen_read_only;
 
    p_b_sel : process (clk_i)
    begin

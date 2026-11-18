@@ -2160,7 +2160,7 @@ def boot_basic(link: Link, image: dict[int, int]) -> bytes:
 
 
 def test_basic(link: Link, fat: dict[int, Folder], programmed: bool,
-               tmp: str) -> None:
+               tmp: str, board: str) -> None:
     """BASIC's half of the ROM, 0x4000-0x7FFF (issue #153, doc/BASIC_ROM.md,
     "The tools"): it takes a link's write, and the monitor's half does not.
     The BASIC that the monitor started at the configuration is that of the
@@ -2168,7 +2168,10 @@ def test_basic(link: Link, fat: dict[int, Folder], programmed: bool,
     in the banner, or the bitstream's, when no card has one. Then a test
     image, that BASIC with the version text HWT and "keep", goes in with
     load.py's load_basic(), and the banner shows it; then the BASIC found
-    goes back as it was, which the banner shows too."""
+    goes back as it was, which the banner shows too. The Nexys4DDR's ROM
+    takes no writes, as its block RAMs are too few, so there BASIC's half
+    must drop a link's write, and the configuration must load no card's
+    BASIC."""
     link.control(HOLD)
     if link.read_word(CONTROL) & RAM:
         uncovered.append("BASIC's half of the ROM, as the bitstream has none")
@@ -2177,6 +2180,17 @@ def test_basic(link: Link, fat: dict[int, Folder], programmed: bool,
     last = found[-1]
     ok = wr(link, 0x7FFF, last ^ basic_rom.MASK) and rd(link, 0x7FFF) == last ^ basic_rom.MASK
     wr(link, 0x7FFF, last)
+    if board == "nexys4ddr":
+        check("the Nexys4DDR's ROM, read-only, drops a link's write in "
+              "BASIC's half", not ok)
+        if programmed:
+            loaded = boot_load()
+            check("the configuration loaded no card's BASIC, as the ROM "
+                  "is read-only", loaded is None,
+                  "" if loaded is None else f"{loaded[0]} from card {loaded[1]}")
+        uncovered.append("the load of BASIC into the ROM, as the "
+                         "Nexys4DDR's ROM is read-only")
+        return
     if not check("BASIC's half of the ROM takes a link's write", ok,
                  "" if ok else "a bitstream older than V2.3.1"):
         return
@@ -3012,7 +3026,7 @@ def main() -> None:
                 test_fetch_statistics(link)
                 test_primes(link, primes, board)
                 test_fat_dir(link, fat)
-                test_basic(link, fat, not args.no_program, tmp)
+                test_basic(link, fat, not args.no_program, tmp, board)
             finally:
                 link.close()
             serial = ["--port", args.port, "--baud", str(args.baud)]

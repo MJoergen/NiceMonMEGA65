@@ -93,6 +93,9 @@ entity mem is
       -- none when the file name is empty
       G_ROM_FILE      : string  := "";
       G_ROM_ADDR_BITS : natural;
+      -- BASIC's half of the ROM takes writes (issue #153), or none, so
+      -- that the ROM takes fewer block RAMs, as on the Nexys4DDR
+      G_ROM_WRITE     : boolean := true;
       -- Start the RAM with any contents, for formal/nicemon.sby
       G_RAM_ANY       : boolean := false;
       -- The properties for formal/mem.sby; implies G_RAM_ANY
@@ -519,7 +522,8 @@ begin
       i_rom : entity work.rom
          generic map (
             G_ADDR_BITS => G_ROM_ADDR_BITS,
-            G_INIT_FILE => G_ROM_FILE
+            G_INIT_FILE => G_ROM_FILE,
+            G_WRITE     => G_ROM_WRITE
          )
          port map (
             clk_i     => clk_i,

@@ -70,7 +70,9 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 - BASIC's half of the ROM, `0x4000`–`0x7FFF`, takes writes: the link's
   always, with the ROM shown, and the core's until its first write to
   the monitor's half, `0x0000`–`0x3FFF`, which locks it until the FPGA
-  is configured again. A write to the monitor's half is still dropped
+  is configured again. A write to the monitor's half is still dropped.
+  The Nexys4DDR's ROM takes no writes, as its block RAMs are too few,
+  so it runs its bitstream's BASIC
   ([#153](https://github.com/MJoergen/NiceMonMEGA65/issues/153)).
 - At the first cold start after a configuration, the monitor loads
   BASIC from a card: of the files `BASIC*.ROM` in the folder `NICE` of

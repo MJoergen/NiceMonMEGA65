@@ -149,8 +149,9 @@ manager, while the core is held
 
 ### A new BASIC
 
-BASIC is the upper half of the ROM, and a card can bring a newer one,
-with no new core file. Each release has its BASIC as a file of its
+BASIC is the upper half of the ROM, and on the MEGA65 a card can bring
+a newer one, with no new core file. The Nexys4DDR's ROM takes no
+writes, so it always runs its bitstream's BASIC. Each release has its BASIC as a file of its
 own, such as `BASIC-V2.3.1.ROM`. To use it:
 
 1. Copy the file into the folder `NICE` of a card. Older ones may stay

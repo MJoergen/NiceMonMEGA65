@@ -41,8 +41,8 @@ or a release's BASIC-V2.3.1.ROM, which goes into BASIC's half of the ROM,
 not fill zeroed, and is read back. The core is held, the memory
 cleared, and the ROM shown, and the core started, unless --no-run is
 given, so the monitor boots cold with that BASIC. The ROM keeps it until
-the FPGA is configured again. A bitstream older than V2.3.1, whose ROM
-takes no writes, is refused, as is one without a ROM.
+the FPGA is configured again. A ROM that takes no writes, of a bitstream
+older than V2.3.1 or the Nexys4DDR's, is refused, as is no ROM.
 
 Usage: tools/load.py (--eth HOST[:PORT] | --port DEVICE [--baud 230400]
                      | --tcp [HOST:]PORT | --cosim PORT) [--no-run]
@@ -242,7 +242,8 @@ def load_basic(link: Link, image: dict[int, int], keep: bool = True) -> None:
                                        words)))
     if read_half(link) != words:
         fail("BASIC's half of the ROM did not keep the words written: the "
-             "bitstream is older than V2.3.1, whose ROM takes no writes")
+             "ROM takes no writes, as on the Nexys4DDR, or in a bitstream "
+             "older than V2.3.1")
 
 
 def read_half(link: Link) -> list[int]:

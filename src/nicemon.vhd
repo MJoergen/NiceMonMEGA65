@@ -61,7 +61,8 @@
 --                          configured again. A write to BASIC's half goes
 --                          to the ROM when it is the link's, or the core's
 --                          while the lock is open, and is dropped otherwise
---                          (issue #153). Bit 3 of the link's
+--                          (issue #153); with G_ROM_WRITE false, as on the
+--                          Nexys4DDR, every write. Bit 3 of the link's
 --                          control register hides it, so that the RAM is at
 --                          0 as in the emulator, and a build without
 --                          G_ROM_FILE has no ROM.
@@ -381,6 +382,9 @@ entity nicemon is
       -- none when the file name is empty
       G_ROM_FILE         : string  := "";
       G_ROM_ADDR_BITS    : natural := 15;
+      -- BASIC's half of the ROM takes writes until it is locked (issue
+      -- #153), or none: the Nexys4DDR's block RAMs are too few for it
+      G_ROM_WRITE        : boolean := true;
       G_CPU_RUN_AT_RESET : boolean := false;
       -- The board has LEDs, a seven-segment display, buttons, and switches
       -- in 0xFFFFFF90-9F
@@ -1262,6 +1266,7 @@ begin
          G_SCR_ADDR_BITS => C_SCR_BITS,
          G_ROM_FILE      => G_ROM_FILE,
          G_ROM_ADDR_BITS => G_ROM_ADDR_BITS,
+         G_ROM_WRITE     => G_ROM_WRITE,
          G_RAM_ANY       => G_FORMAL
       )
       port map (

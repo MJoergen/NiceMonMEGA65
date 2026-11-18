@@ -1039,6 +1039,9 @@ BASIC that it found into the ROM again, with the version text `HWT` and
 the BASIC found goes back as it was. To cover the load from a card,
 copy `basic/build/basic.rom` to the card as `BASIC-T.ROM` with
 `make sdcard CMD="put basic/build/basic.rom BASIC-T.ROM"` first.
+On the Nexys4DDR, whose ROM takes no writes, BASIC's half must drop the
+link's write, and the configuration must load no card's BASIC; the rest
+is NOT COVERED.
 
 With `ETH=IP`, as in `make hwtest PORT=/dev/ttyUSB1 ETH=192.168.1.65`, and the board's
 Ethernet port on this computer's network, it tests the Ethernet station

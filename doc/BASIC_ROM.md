@@ -88,7 +88,12 @@ details of [Open questions](#open-questions) are open.**
   bus's port. Its two banks are the even and the odd words, so both
   get the write, for the upper half of each, which is BASIC's half of
   the ROM. The block RAM has the port already, as a true dual-port
-  RAM: no block RAM more. Its contents at configuration still come
+  RAM: no block RAM more. The Nexys4DDR, though, has none to spare:
+  with the port, its build needed 277 of the 270 RAMB18 places, as a
+  memory that is written takes 32 RAMB36 where a ROM took about 27. So
+  its ROM is built without the port, `G_ROM_WRITE` false; the loader
+  finds it locked and runs the bitstream's BASIC, and `load.py --basic`
+  refuses it. Its contents at configuration still come
   from `build/rom.bin`. `synth/rompatch.tcl` finds the ROM's block
   RAMs by the names `a_even_reg` and `a_odd_reg`, which a memory that
   is written may not keep, so `make r6 ROMPATCH=` needs a look. The
