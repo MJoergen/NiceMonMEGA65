@@ -321,8 +321,9 @@ The review of 2026-11-12, of nice_cpu#161, changed it again:
 
 ## The memory
 
-BASIC's own variables are with the monitor's, in the RAM from
-`0xFFFFF000`. Its workspace is the program's RAM:
+BASIC's own variables are 2K words of their own at `0xFFFFE800`–`EFFF`,
+below the monitor's at `0xFFFFF000`, which BASIC reaches through the
+entries alone (#152). Its workspace is the program's RAM:
 
 | From | What | Grows |
 |---|---|---|
@@ -331,17 +332,20 @@ BASIC's own variables are with the monitor's, in the RAM from
 | | Free | |
 | below the frames | The strings | Down |
 | below the top | The frames of `FOR`, `GOSUB`, `PROC`, and `LOCAL`, a region of a fixed size | Within it |
-| the top | The stack of the processor, of BASIC and of a routine that `SYS` calls, down from `0xFFFFF000` | Down |
+| the top | The stack of the processor, of BASIC and of a routine that `SYS` calls, down from `0xFFFFE800` | Down |
 
 - The top is the size of the RAM, from `0xFFFFFF9E`, less the
-  monitor's variables and room for the stack: about 90K words on the
+  variables and room for the stack: about 90K words on the
   MEGA65 and 26K on the Nexys4DDR. In `niceemu`, where the word reads
   0, BASIC takes the MEGA65's size.
-- The monitor's variables are 4K words today. BASIC's own state, its
-  line buffers, and the keys typed ahead need more, so `VARS_WORDS`
-  grows, and a program at `0x8000` gets that much less. The pointer
-  to the end of the names and the variables is one of BASIC's own
-  words there.
+- The variables are 6K words, `VARS_WORDS`: the monitor's 4K and
+  BASIC's 2K, of which its stage 1 uses about 1200. BASIC's state,
+  its line buffers, and the keys typed ahead go there. Its 4K would
+  leave no room for the stack above the RAM that nice_cpu's demo tests
+  on the Nexys4DDR, up to `0xDFFF` (nice_cpu#195), so it grows after
+  that is fixed, and a program at `0x8000` then gets that much less.
+  The pointer to the end of the names and the variables is one of
+  BASIC's own words there.
 - A name is its length, then its characters packed four to a word,
   as `.ASCII_B` packs them, in at most 4 words, then the double. A
   name is found by its length first. Stage 3 keeps the format, and

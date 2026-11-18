@@ -213,8 +213,8 @@ the same on the board and in `niceemu`.
 ## Programs under the monitor
 
 The monitor in the ROM runs a program at `0x8000` as a subroutine, and
-the program returns to it. The program has 92K words of RAM on the
-MEGA65 and 28K on the Nexys4DDR (see [The memory](#the-memory)).
+the program returns to it. The program has 90K words of RAM on the
+MEGA65 and 26K on the Nexys4DDR (see [The memory](#the-memory)).
 
 **Building.** Assemble the program at `0x8000`, with nice_cpu's
 `start_mon.nasm` in front, in place of its usual start-up file, and the
@@ -349,9 +349,10 @@ the word with `nice_peek`, work out what fits below the stack, and grow
 the linear memory with `__builtin_wasm_memory_grow` to that, or to the
 cap when the word is 0.
 
-Under the monitor, the monitor's variables at `0xFFFFF000` are the top
-4K words of the RAM, and the stack grows down from them, so a program
-at `0x8000` has 92K words on the MEGA65 and 28K on the Nexys4DDR
+Under the monitor, the variables are the top 6K words of the RAM: the
+monitor's 4K at `0xFFFFF000`, and BASIC's 2K below them at
+`0xFFFFE800`. The stack grows down from them, so a program at `0x8000`
+has 90K words on the MEGA65 and 26K on the Nexys4DDR
 ([monitor/README.md](../monitor/README.md#programs)).
 [SYSTEM.md](SYSTEM.md#stack-heap-and-variables) has the layout, and
 how deep the stack may grow.

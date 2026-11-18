@@ -22,7 +22,7 @@
 # monitor at 0x8000, which calls the ROM's entries of the network, so
 # nicebuild.py builds it, with the stubs of monitor/mon.nasm and
 # monitor/mon_c.nasm, as doc/PROGRAMMING.md says, with -Oz, so that it
-# fits below the monitor's variables in the Nexys4DDR's 28K words for a
+# fits below the variables in the Nexys4DDR's 26K words for a
 # program at 0x8000, with its page of wasm memory. Its text,
 # weather_parse.c, is checked on the host by test/weather_test.c with the
 # answers of test/*.http, and the whole program in niceemu by

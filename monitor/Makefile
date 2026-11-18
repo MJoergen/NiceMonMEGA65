@@ -256,7 +256,7 @@ CMDS = help\rver\rdump 0, 6\rdump\rDUMP 0x10, 1\rq\rloadx\r\r  cls\rabc\177\177\
 BLANKS30 = $(shell printf '%30s' '')
 BLANKS62 = $(shell printf '%62s' '')
 ZEROS72  = $(shell printf '%072d' 32768)
-BASIC = vEr\r   ver   \rver,\rver\351\r\351ver\rsys0x8000\rdumpx\rdum\rdis1\ri\rsys_\r"ver"\r9 ver\rsave x\rdelete x\rdhcp x\rmac x\rtime x\rntp x\rdis x\rcls x\rhalt x\rdir x\rsys 32768\rsys $(ZEROS72)\rSYS 0X8000\rsys 0x08000\rsys 4294967295\rsys 0xFFFFFFFF\rsys 0x0000000ffffffff\rsys 4294967296\rsys 0x100000000\rsys 99999999999x\rsys 0x8000x\rsys 0x0x8000\rsys 1e3\rsys 32768.\rsys -1\rsys "x"\rsys 0xg\rsys 0x8000,\rdump 0x8000, 0\rdump 0x, 1\rdump 0x , 2\rdump 0x 1\rdump 1, 4294967296\rdump 1, 0x\rdis 0x8000, 1\rdis 0x, 1\rdis ,1\rdis 0x8000,\rbaud 0x\rbaud 0x 1\rbaud 4294967296\rbaud 1,\rbaud 0x1C200\rload ""\rload ".bin"\rload"a.BiN"\rload "a.bin",\rload "a.bin" ,"1.2.3.4"\rload "a.bin", "1.2.3.4" x\rload "a.bin", "bad"\rload x\rload "a.bin", "1.2.3.4\rLOAD  \r\rsave "x", "y" z\rsave "x" "y"\rsave "x",\rsave "x", 1\rsave "x", 0x, 1\rsave "x", 1, 99999999999\rsave "x", "y", 99999999999\rsave "abc\rsave "a.b", 0x8000, 1\rdelete "x"\rdelete "x", "y"\rdelete ""\rdir\rdir 0x\rdir 0x"1.2.3.4"\rdir 99999999999"1.2.3.4"\rdir 99999999999\rdir "1.2.3.4", "*.bin"\rdir "bad"\rdir "1.2.3.4",\rdir 1,\rdir 1 "x"\rdir 5\rip ""\rip "1.2.3.4" x\rmac ""\rmac "02:4E:49:43:45:00" x\rtime "bad"\rtime "1" x\rntp "1.2.3.4" x\rntp "1.2.3.4",\rntp "", "bad"\rntp ""\rntp "1.2.3.4", "+01:00"\r$(BLANKS30)save "abc",1,2\rdump 0xFFFFF02E, 16\r$(BLANKS30)load "x" "y"\rdump 0xFFFFF02E, 16\r$(BLANKS30)save "x", "1.2.3.4"\rdump 0xFFFFF02E, 20\r$(BLANKS30)save "a.b", 1, 2\rdump 0xFFFFF02E, 16\r$(BLANKS30)dir "1.2.3.4", "*"\rdump 0xFFFFF02E, 20\r$(BLANKS62)save "abc",1,2\rdump 0xFFFFF04E, 16\rip "1.2.3.4\rhalt\r
+BASIC = vEr\r   ver   \rver,\rver\351\r\351ver\rsys0x8000\rdumpx\rdum\rdis1\ri\rsys_\r"ver"\r9 ver\rsave x\rdelete x\rdhcp x\rmac x\rtime x\rntp x\rdis x\rcls x\rhalt x\rdir x\rsys 32768\rsys $(ZEROS72)\rSYS 0X8000\rsys 0x08000\rsys 4294967295\rsys 0xFFFFFFFF\rsys 0x0000000ffffffff\rsys 4294967296\rsys 0x100000000\rsys 99999999999x\rsys 0x8000x\rsys 0x0x8000\rsys 1e3\rsys 32768.\rsys -1\rsys "x"\rsys 0xg\rsys 0x8000,\rdump 0x8000, 0\rdump 0x, 1\rdump 0x , 2\rdump 0x 1\rdump 1, 4294967296\rdump 1, 0x\rdis 0x8000, 1\rdis 0x, 1\rdis ,1\rdis 0x8000,\rbaud 0x\rbaud 0x 1\rbaud 4294967296\rbaud 1,\rbaud 0x1C200\rload ""\rload ".bin"\rload"a.BiN"\rload "a.bin",\rload "a.bin" ,"1.2.3.4"\rload "a.bin", "1.2.3.4" x\rload "a.bin", "bad"\rload x\rload "a.bin", "1.2.3.4\rLOAD  \r\rsave "x", "y" z\rsave "x" "y"\rsave "x",\rsave "x", 1\rsave "x", 0x, 1\rsave "x", 1, 99999999999\rsave "x", "y", 99999999999\rsave "abc\rsave "a.b", 0x8000, 1\rdelete "x"\rdelete "x", "y"\rdelete ""\rdir\rdir 0x\rdir 0x"1.2.3.4"\rdir 99999999999"1.2.3.4"\rdir 99999999999\rdir "1.2.3.4", "*.bin"\rdir "bad"\rdir "1.2.3.4",\rdir 1,\rdir 1 "x"\rdir 5\rip ""\rip "1.2.3.4" x\rmac ""\rmac "02:4E:49:43:45:00" x\rtime "bad"\rtime "1" x\rntp "1.2.3.4" x\rntp "1.2.3.4",\rntp "", "bad"\rntp ""\rntp "1.2.3.4", "+01:00"\r$(BLANKS30)save "abc",1,2\rdump 0xFFFFE85E, 16\r$(BLANKS30)load "x" "y"\rdump 0xFFFFE85E, 16\r$(BLANKS30)save "x", "1.2.3.4"\rdump 0xFFFFE85E, 20\r$(BLANKS30)save "a.b", 1, 2\rdump 0xFFFFE85E, 16\r$(BLANKS30)dir "1.2.3.4", "*"\rdump 0xFFFFE85E, 20\r$(BLANKS62)save "abc",1,2\rdump 0xFFFFE87E, 16\rip "1.2.3.4\rhalt\r
 RUN  = sys 0x8000\rhalt\r
 # hal16: sys 0x8000 runs test/hal16.nasm, whose con_getline reads the
 # line after it: 12, a DEL, 345678x9, of which the 9 does not fit, and a
@@ -275,15 +275,15 @@ SCROLL = \033[5~\033[6~dump 0x8000, 0x700\r\033[5~\033[5~\033[6~ver\rhalt\r
 # as a terminal may end it, which is no empty line. The first line is typed
 # with edits: a DEL that takes back 2, the cursor key ESC [ A, which is
 # dropped, so it writes 134 at 9000. The RAM has 0x20000 words, as on the
-# MEGA65, which build/ram128k.bin writes to 0xFFFFFF9E, so 1EFFF takes a
-# word and 1F000, the alias of the monitor's variables, does not. A line
+# MEGA65, which build/ram128k.bin writes to 0xFFFFFF9E, so 1E7FF takes a
+# word and 1E800, the alias of the variables, BASIC's first, does not. A line
 # with TABs for blanks writes 7 at 9002, a line of blanks only is passed
 # over, and a second line for 9002 writes 8 over the 7. Six lines are
 # skipped: zz, an address in the ROM, one of the monitor's variables, a
-# third number, 1F000, and a line of 78 characters, 9003, 66 blanks, and
+# third number, 1E800, and a line of 78 characters, 9003, 66 blanks, and
 # 12345678, which is longer than the 76 of a line, so it writes nothing,
 # not 123456. Pasted lines after it: one of 100 blanks, which is passed
-# over; 1EFFF A and 90 blanks, which writes A over the 9, as the blanks
+# over; 1E7FF A and 90 blanks, which writes A over the 9, as the blanks
 # after the 76 characters are dropped; and 9001, 71 blanks, 3, and z,
 # whose z past the 76 is taken back by a DEL, so it writes 3 at 9001.
 # Then build/hello.bin,
@@ -295,16 +295,16 @@ BLANKS66  = $(shell printf '%66s' '')
 BLANKS71  = $(shell printf '%71s' '')
 BLANKS90  = $(shell printf '%90s' '')
 BLANKS100 = $(shell printf '%100s' '')
-LOAD_HEAD = load\r\n9000 12\177\033[A34\rzz\r100 5\rFFFFF000 1\r9001 5 6\r1EFFF 9\r1F000 1\r\t9002\t7 \r   \r9002 8\r9003$(BLANKS66)12345678\r$(BLANKS100)\r1EFFF A$(BLANKS90)\r9001$(BLANKS71)3z\177\r
-LOAD_TAIL = \rload\r9001 7\003sys 0x8000\rdump 0x9000, 4\rdump 0x1EFFF, 1\rhalt\r
+LOAD_HEAD = load\r\n9000 12\177\033[A34\rzz\r100 5\rFFFFF000 1\r9001 5 6\r1E7FF 9\r1E800 1\r\t9002\t7 \r   \r9002 8\r9003$(BLANKS66)12345678\r$(BLANKS100)\r1E7FF A$(BLANKS90)\r9001$(BLANKS71)3z\177\r
+LOAD_TAIL = \rload\r9001 7\003sys 0x8000\rdump 0x9000, 4\rdump 0x1E7FF, 1\rhalt\r
 # load_emu: LOAD where 0xFFFFFF9E reads 0, as in niceemu, so a program's RAM
 # goes up to the screen: 10000 and FFFEFFFF take words, and FFFF0000 does
 # not.
 LOAD_EMU = load\r10000 7\rFFFEFFFF 8\rFFFF0000 1\r\rdump 0x10000, 1\rhalt\r
 # load_64k: LOAD with 0x10000 words of RAM, as on the Nexys4DDR, which
-# build/ram64k.bin writes to 0xFFFFFF9E: EFFF takes a word, and F000, the
-# monitor's variables, and 1EFFF, past the RAM, do not.
-LOAD_64K = load\rEFFF 1\rF000 2\r1EFFF 3\r\rdump 0xEFFF, 1\rhalt\r
+# build/ram64k.bin writes to 0xFFFFFF9E: E7FF takes a word, and E800, the
+# variables, BASIC's first, and 1EFFF, past the RAM, do not.
+LOAD_64K = load\rE7FF 1\rE800 2\r1EFFF 3\r\rdump 0xE7FF, 1\rhalt\r
 # fpu: sys 0x8000 runs test/fpu.nasm three times, which leaves values
 # and flags on the FPU, and returns, leaves through mon_exit, and returns,
 # then sys 0x8100, which leaves them too and jumps to 0, the cold start,
@@ -418,20 +418,20 @@ DUMP_clock    = -d 0xFFFFFF46:4
 # hello the 0x80 after it, the screen's state, in which the return showed
 # the cursor that hello hid, the font base, which the return made 0, and
 # the row of the glyph of 0x80 that hello drew.
-DUMP_cmds    = -d 0xFFFFF000:5 -d 0xFFFFFF80:6 -d 0xFFFFFF9F:1 -d 0xFFFFFFB0:3
-DUMP_basic   = -d 0xFFFFF000:5 -d 0xFFFFFFB0:1
+DUMP_cmds    = -d 0xFFFFF000:4 -d 0xFFFFE800:2 -d 0xFFFFFF80:6 -d 0xFFFFFF9F:1 -d 0xFFFFFFB0:3
+DUMP_basic   = -d 0xFFFFF000:4 -d 0xFFFFE800:2 -d 0xFFFFFFB0:1
 # For scroll the variables and the screen's registers, and the last four
 # digits of the address that starts a row of the history (the words 4 to
 # 7 of the row): the rows of 86A0 and 869C that Page Up turned to slots 0
 # and 1, the row of 86A4 in slot 383, the first of the five rows that
 # ver and halt added at the bottom of the ring, and the oldest, of 80B8,
 # in slot 378.
-DUMP_scroll  = -d 0xFFFFF000:11 -d 0xFFFFFF80:6 -d 0xFFFF7FB4:4 -d 0xFFFF7F64:4 \
+DUMP_scroll  = -d 0xFFFFF000:4 -d 0xFFFFF005:6 -d 0xFFFFFF80:6 -d 0xFFFF7FB4:4 -d 0xFFFF7F64:4 \
                -d 0xFFFF0804:4 -d 0xFFFF0994:4
 DUMP_hello   = -d 0xFFFF01B8:13 -d 0xFFFFFF80:1 -d 0xFFFFFF86:1 -d 0xFFFE1000:1
-DUMP_load    = -d 0xFFFFF000:15
-DUMP_load_emu = -d 0xFFFFF07F:1 -d 0xFFFEFFFF:1
-DUMP_load_64k = -d 0xFFFFF07F:1
+DUMP_load    = -d 0xFFFFF000:4 -d 0xFFFFF005:6 -d 0xFFFFE800:5
+DUMP_load_emu = -d 0xFFFFE812:1 -d 0xFFFEFFFF:1
+DUMP_load_64k = -d 0xFFFFE812:1
 DUMP_hello_c = -d 0xFFFF01B8:12
 # For sd_write the results of test/sd.nasm's calls
 DUMP_sd_write = -d 0x9100:6
@@ -445,7 +445,7 @@ DUMP_fsw      = -d 0x9100:42
 # con_getline, the counts of bin_line, the servers of net_servers, and the
 # words that bin_line wrote
 DUMP_hal16    = -d 0x9100:16 -d 0x9180:9 -d 0x9190:7 -d 0x9198:2 -d 0x9200:2
-DUMP_fat      = -d 0xFFFFF079:5
+DUMP_fat      = -d 0xFFFFE80C:5
 # For fpu the number of test/fpu.nasm's runs, the FPU's status and the
 # screen's mode word at the start of each run, and both at the halt
 DUMP_fpu      = -d 0x9100:5 -d 0x9111:4 -d 0xFFFFFF8D:1 -d 0xFFFFFF87:1

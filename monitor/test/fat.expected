@@ -124,7 +124,7 @@ Returned 0000002A
 READY.
 halt
 Halted
-fffff079: 00000318 00008000 00008317 00000000 00000000
+ffffe80c: 00000318 00008000 00008317 00000000 00000000
 Screen:
 |dirx
 |Syntax error; HELP lists the statements

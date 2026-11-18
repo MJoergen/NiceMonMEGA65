@@ -191,8 +191,9 @@ leaves the RAM from `0x8000` alone, and `load.py` types `SYS 0x8000`
 and CR, BASIC's statement that runs the program. The program then prints through the
 monitor's `mon_putc`, on the screen and the line, and returns to the
 monitor, which prints its status. A program with a word below `0x8000`
-is refused, and so is one with a word at the monitor's variables or
-above, `0x1F000` on the MEGA65 and `0xF000` on the Nexys4DDR, and a
+is refused, and so is one with a word at the variables or above,
+BASIC's and the monitor's, `0x1E800` on the MEGA65 and `0xE800` on the
+Nexys4DDR, and a
 bitstream without a ROM. `--rom FILE` loads
 FILE at 0 in place of the ROM, with the ROM hidden, such as
 `monitor/build/monitor.bin`: for `niceemu --link`, `make cosim`, a

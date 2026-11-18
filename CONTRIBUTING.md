@@ -1181,7 +1181,7 @@ network's entries from C. `make weathertest` checks it in two parts:
   `Content-Length`, no end of the headers, and a text that is not the
   weather. It checks the settings, the request, and the UTF-8 too.
 - `tools/weathertest.py` checks first that the program ends 1K words
-  below `0xF000`, so that it fits in the Nexys4DDR's memory with its
+  below `0xE800`, the variables of the Nexys4DDR, so that it fits in the Nexys4DDR's memory with its
   page of wasm memory. Then it runs the program under the monitor of the
   tests in `niceemu`, with a card that holds `NICE/WEATHER.CFG` and
   `tools/tcppeer.py` as the HTTP server at 10.0.0.2. Each case runs to

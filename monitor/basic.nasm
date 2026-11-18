@@ -40,6 +40,41 @@
 ; any register, as main starts again after each. Slots 1 and 2 are 0
 ; for a statement that has no string or number there.
 
+; BASIC's RAM, BASIC_WORDS words from STACK (common.nasm), below the
+; monitor's, which BASIC reaches through the entries alone (issue #152)
+V_NEXT          .EQU    0xFFFFE800      ; the address that the next DUMP goes on at
+V_UNEXT         .EQU    0xFFFFE801      ; the address that the next DIS goes on at
+V_LOUT          .EQU    0xFFFFE802      ; the outputs of mon_out while LOAD reads its lines
+V_LEND          .EQU    0xFFFFE803      ; the last byte that LOAD read, for the LF of a CR LF
+V_LPOS          .EQU    0xFFFFE804      ; for LOAD from a file: the next free word of V_LINE
+V_TLIST         .EQU    0xFFFFE805      ; not 0 for a listing of TFTP, of DIR, which bin_eol shows
+V_ARGS          .EQU    0xFFFFE808      ; the values of a statement, 4 words, slots 1, 2, and 4 at V_ARGS, +1, and +3
+V_LSTATS        .EQU    0xFFFFE80C      ; for LOAD: the counts of bin_line, 7 words
+V_NET           .EQU    0xFFFFE818      ; for IP, DHCP, and NTP: the words of net_config and net_servers, 6 words
+V_BI            .EQU    0xFFFFE820      ; for the clock, BASIC's block of common.nasm's conversions: the fields of a date and a time to set, and a 7th word,
+V_BF            .EQU    0xFFFFE826      ; the fields of the clock's time, which is the 7th of V_BI, and its days since 1970
+V_UF            .EQU    0xFFFFE830      ; for DIS: the fields dest, s0, and s1,
+V_UC            .EQU    0xFFFFE833      ; their constant words,
+V_UNOPS         .EQU    0xFFFFE836      ; and the operands of the mnemonic
+V_LINE          .EQU    0xFFFFE840      ; the line, LINE_MAX words, one over for LOAD, and a 0
+LINE_MAX        .EQU    76              ; as the monitor's line had, after a prompt of 2
+V_TSRV          .EQU    0xFFFFE8A0      ; for TFTP: the server's IP address,
+V_TTID          .EQU    0xFFFFE8A1      ; its port, its TID, 0 before its first DATA,
+V_TBLK          .EQU    0xFFFFE8A2      ; the block waited for,
+V_TLEN          .EQU    0xFFFFE8A3      ; the bytes of the packet at V_TPKT,
+V_TTIME         .EQU    0xFFFFE8A4      ; the microseconds when it was sent,
+V_TEND          .EQU    0xFFFFE8A5      ; the bytes of the DATA's block,
+V_TPORT         .EQU    0xFFFFE8A6      ; the server's port for the RRQ,
+V_TPKT          .EQU    0xFFFFE8B0      ; and the packet sent, a byte per word, up to TFTP_PKT
+V_NTPIP         .EQU    0xFFFFE910      ; for NTP: the server's IP address, which dns_lookup writes
+V_ENT           .EQU    0xFFFFE920      ; for DIR: an entry of fs_readname, 4 words,
+V_NAME          .EQU    0xFFFFE924      ; and its name, 256 words
+V_FBUF          .EQU    0xFFFFEA24      ; for LOAD and SAVE: the bytes of fs_read and fs_write, FBUF_BYTES words
+V_TBUF          .EQU    0xFFFFEAA4      ; for TFTP: a packet that udp_recv copied, TFTP_MAX words,
+V_TSRC          .EQU    0xFFFFECA8      ; and its source's IP address and port, 2 words, to 0xFFFFECA9
+V_NTPQ          .EQU    0xFFFFEAA4      ; for NTP, in V_TBUF: the query, 48 words,
+V_NTPA          .EQU    0xFFFFEAD4      ; and the answer, 48 words
+
 ; bas_warm: where mon_exit goes, with R1 the status of the program that
 ; left: the status shown, as SYS shows it, and then the main loop
 bas_warm

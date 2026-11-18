@@ -100,8 +100,9 @@
 ; on to the line. niceemu has no display offset, so there the history is
 ; kept but not shown.
 ;
-; The variables are in the RAM at 0xFFFFF000 and up, and the stack grows
-; down from STACK, as the demo's do: a write to the ROM is dropped, so
+; The monitor's variables are in the RAM at 0xFFFFF000 and up, BASIC's
+; at STACK, 2K words below them (basic.nasm), and the stack grows down
+; from STACK (common.nasm): a write to the ROM is dropped, so
 ; nothing of the monitor's is written below 0x8000. In niceemu, which has
 ; no ROM, the monitor is a program at 0 like any other, and cat
 ; monitor.bin prog.bin runs it with a program at 0x8000 (Makefile, test).
@@ -132,35 +133,15 @@ V_COL           .EQU    0xFFFFF000      ; the cursor's column, 0 to 79
 V_ROW           .EQU    0xFFFFF001      ; and its row, 0 to 24
 V_COLOR         .EQU    0xFFFFF002      ; the color of the characters put, bits 31..8
 V_OUT           .EQU    0xFFFFF003      ; the outputs: bit 0 the line, bit 1 the screen
-V_NEXT          .EQU    0xFFFFF004      ; the address that the next DUMP goes on at
 V_HSIZE         .EQU    0xFFFFF005      ; the words of the screen's memory
 V_HCAP          .EQU    0xFFFFF006      ; the rows of the history, after the 25 of the screen
 V_HHEAD         .EQU    0xFFFFF007      ; the slot of the next row, slot i at SCREEN + V_HSIZE - 80 (i + 1)
 V_HCOUNT        .EQU    0xFFFFF008      ; the rows kept, up to V_HCAP
 V_BACK          .EQU    0xFFFFF009      ; the rows shown back, 0 for the screen
 V_CTL           .EQU    0xFFFFF00A      ; SCR_CTL while the history is shown
-V_LOUT          .EQU    0xFFFFF00B      ; V_OUT while LOAD reads its lines
-V_LEND          .EQU    0xFFFFF00C      ; the last byte that LOAD read, for the LF of a CR LF
-V_LPOS          .EQU    0xFFFFF00D      ; for LOAD from a file: the next free word of V_LINE
-V_UNEXT         .EQU    0xFFFFF00F      ; the address that the next DIS goes on at
-V_LINE          .EQU    0xFFFFF010      ; the line, LINE_MAX words, one over for LOAD, and a 0
-LINE_MAX        .EQU    76              ; as the monitor's line had, after a prompt of 2
-V_UF            .EQU    0xFFFFF060      ; for DIS: the fields dest, s0, and s1,
-V_UC            .EQU    0xFFFFF063      ; their constant words,
-V_UNOPS         .EQU    0xFFFFF066      ; and the operands of the mnemonic
-V_I             .EQU    0xFFFFF068      ; for the clock: the fields of a date and a time to set, and a 7th word,
+V_I             .EQU    0xFFFFF068      ; for the clock, the monitor's block of common.nasm's conversions: the fields of a date and a time to set, and a 7th word,
 V_F             .EQU    0xFFFFF06E      ; the fields of the clock's time, which is the 7th of V_I,
 V_DAYS          .EQU    0xFFFFF074      ; and its days since 1970
-V_ARGS          .EQU    0xFFFFF075      ; for BASIC: the values of a statement, 4 words, slots 1, 2, and 4 at V_ARGS, +1, and +3
-V_LSTATS        .EQU    0xFFFFF079      ; for LOAD: the counts of bin_line, 7 words
-V_NET           .EQU    0xFFFFF080      ; for IP, DHCP, and NTP: the words of net_config and net_servers, 6 words
-V_ENT           .EQU    0xFFFFF400      ; for DIR: an entry of fs_readname, 4 words,
-V_NAME          .EQU    0xFFFFF404      ; and its name, 256 words
-V_FBUF          .EQU    0xFFFFF504      ; for LOAD and SAVE: the bytes of fs_read and fs_write, FBUF_BYTES words
-V_TBUF          .EQU    0xFFFFF584      ; for TFTP: a packet that udp_recv copied, TFTP_MAX words,
-V_TSRC          .EQU    0xFFFFF788      ; and its source's IP address and port, 2 words
-V_NTPQ          .EQU    0xFFFFF584      ; for NTP, in V_TBUF: the query, 48 words,
-V_NTPA          .EQU    0xFFFFF5B4      ; and the answer, 48 words
 V_ARP           .EQU    0xFFFFF100      ; the ARP cache: ARP_SLOTS entries of an IP address, 0 for none, the MAC address as E_MACH and E_MACL have it, and the time of arp_tick it was learned
 V_ARPNEXT       .EQU    0xFFFFF110      ; the entry that arp_learn takes next, 4 times its number
 V_XID           .EQU    0xFFFFF111      ; for DHCP: the transaction's number,
@@ -178,15 +159,6 @@ V_MASK          .EQU    0xFFFFF302      ; the network's mask, from DHCP, 0 for n
 V_GW            .EQU    0xFFFFF303      ; and its gateway, 0 for none
 V_UPORT         .EQU    0xFFFFF304      ; the local port of the UDP endpoint, 0 while it is closed
 V_UHDR          .EQU    0xFFFFF305      ; for udp_send: the headers, UDP_HDR words, as the send buffer has them
-V_TSRV          .EQU    0xFFFFF310      ; for TFTP: the server's IP address,
-V_TTID          .EQU    0xFFFFF311      ; its port, its TID, 0 before its first DATA,
-V_TBLK          .EQU    0xFFFFF312      ; the block waited for,
-V_TLEN          .EQU    0xFFFFF313      ; the bytes of the packet at V_TPKT,
-V_TTIME         .EQU    0xFFFFF314      ; the microseconds when it was sent,
-V_TEND          .EQU    0xFFFFF317      ; the bytes of the DATA's block,
-V_TPORT         .EQU    0xFFFFF318      ; the server's port for the RRQ,
-V_TLIST         .EQU    0xFFFFF319      ; not 0 for a listing, of DIR, which bin_eol shows,
-V_TPKT          .EQU    0xFFFFF320      ; and the packet sent, a byte per word, up to TFTP_PKT
 V_DNS           .EQU    0xFFFFF380      ; the DNS server, from DHCP or net_set, 0 for none
 V_ULEN          .EQU    0xFFFFF381      ; the bytes of the datagram held for the endpoint at V_RXF, 0 for none
 V_NWAIT         .EQU    0xFFFFF382      ; the local UDP port of the ROM's own wait, whose frames net_step copies to V_RXF, 0 for none
@@ -224,7 +196,6 @@ V_BWAIT         .EQU    0xFFFFF3D0      ; and the microseconds it waits after th
 V_NTP           .EQU    0xFFFFF3D1      ; the NTP server, the first of DHCP's option 42, 0 for none
 V_DNTP          .EQU    0xFFFFF3D2      ; for DHCP: the NTP server of the OFFER or the ACK,
 V_PNTP          .EQU    0xFFFFF3D3      ; and of the last reply that dhcp_parse took
-V_NTPIP         .EQU    0xFFFFF3D4      ; for NTP: the server's IP address, which dns_lookup writes
 ; FAT32's state (monitor_fat.nasm), from FAT_RAM up to below the I/O page
 FAT_RAM         .EQU    0xFFFFF980
 V_MOUNTED       .EQU    0xFFFFF980      ; not 0 while a card is mounted, in the slot V_SLOT
@@ -261,7 +232,6 @@ FILE0           .EQU    0xFFFFFDBB      ; and the files of handles 0 and 1, to 0
 FILE1           .EQU    0xFFFFFE46
 V_T             .EQU    0xFFFFFEE0      ; 24 words for TAB, to 0xFFFFFEF7
 
-VARS_WORDS      .EQU    0x1000          ; the words from 0xFFFFF000, the variables, which end a program's RAM
 COLOR           .EQU    MON_FG_WHITE+MON_BG_BLACK  ; the color at the cold start
 OUT_LINE        .EQU    1
 OUT_SCREEN      .EQU    2
@@ -796,8 +766,8 @@ hist_rev
 ; program's RAM, from PROGRAM up to the monitor's variables. The RAM of
 ; a board repeats every RAM_WORDS words, so an address past it could
 ; reach the ROM or the monitor's variables and stack, which are at
-; RAM_WORDS - VARS_WORDS and up of the RAM, 0x1F000 on the MEGA65 and
-; 0xF000 on the Nexys4DDR; where RAM_WORDS reads 0, as in niceemu, the
+; RAM_WORDS - VARS_WORDS and up of the RAM, 0x1E800 on the MEGA65 and
+; 0xE800 on the Nexys4DDR; where RAM_WORDS reads 0, as in niceemu, the
 ; RAM goes up to the screen. A line with anything else is skipped, and a
 ; line of blanks only is passed over. A second line for an address writes
 ; its word over the first's. The counts: 0 the words written, 1 and 2 the

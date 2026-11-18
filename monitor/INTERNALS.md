@@ -234,8 +234,8 @@ from 0, and the rest is free. The demo is not in it: it is a program,
 <!-- romsize layout -->
 | Part | Address | Words |
 |---|---|---:|
-| The monitor | `0x0000`–`0x36A7` | 13992 |
-| Free | `0x36A8`–`0x7FFF` | 18776 |
+| The monitor | `0x0000`–`0x36B9` | 14010 |
+| Free | `0x36BA`–`0x7FFF` | 18758 |
 <!-- /romsize layout -->
 
 The monitor's words, by the source they come from, in the order
@@ -254,19 +254,19 @@ neither side's routines (#152):
 | `monitor_cmd.nasm` | The routines of the statements that were the commands | 1567 | 291 |
 | `basic.nasm` | BASIC: the main loop, the scanner, the keywords, the messages, and the help | 834 | 440 |
 | `basic_net.nasm` | BASIC's `DHCP`, `NTP`, and TFTP | 907 | 150 |
-| `basic_time.nasm` | BASIC's `TIME`, and the clock's side of `NTP` | 269 | 44 |
+| `basic_time.nasm` | BASIC's `TIME`, and the clock's side of `NTP` | 275 | 44 |
 | `monitor_dis.nasm` | The disassembler of `DIS` | 871 | 79 |
 | `monitor_sd.nasm` | The sector routines | 85 | 0 |
 | `monitor_fat.nasm` | FAT32, the file entries, and TAB | 2847 | 0 |
 | `monitor_eth.nasm` | The network, and its entries | 2440 | 10 |
 | `monitor_tcp.nasm` | TCP | 2414 | 0 |
-| `monitor_clock.nasm` | The clock: `clock_set`, the dates of files, and the real-time clock | 303 | 0 |
-| `common.nasm` | What the monitor and BASIC share: texts, IP addresses, and dates | 235 | 5 |
+| `monitor_clock.nasm` | The clock: `clock_set`, the dates of files, and the real-time clock | 313 | 0 |
+| `common.nasm` | What the monitor and BASIC share: texts, IP addresses, and dates | 237 | 5 |
 | `monlib.nasm` | The routines that programs join | 274 | 0 |
 | `mon.nasm` | The stubs of the entries | 82 | 0 |
 | `build/folder.nasm` | The folder's name, and the error of a card without it | 17 | 17 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 13992 | 1038 |
+| In all | | 14010 | 1038 |
 <!-- /romsize monitor -->
 
 - `build/folder.nasm` and the version always end with a `.DAT 0`, as
@@ -318,10 +318,14 @@ result with `niceasm`. In this order:
 `version.nasm` and `folder.nasm` are written only when they change, so
 that the monitor, and a bitstream with it, is not built again for
 nothing. The build fails if the monitor reaches `PROGRAM`, `0x8000`,
-the end of the ROM, or if `test/sides.py` finds a call across the
-boundary of BASIC and the monitor that no entry takes. `-v` lists the
-names of the RAM's map and the constants that still cross, which the
-split of the map ends.
+the end of the ROM, or if `test/sides.py` finds a name of the other
+side in BASIC's files or the monitor's, a routine, a variable, or a
+constant, or one of either side in `common.nasm`. Each side has a RAM
+of its own: the monitor's at `0xFFFFF000` (`monitor.nasm`), and
+BASIC's 2K words below it at `0xFFFFE800` (`basic.nasm`), where the
+stack starts (`STACK`, `common.nasm`). The conversions of dates in
+`common.nasm` work on a block of the caller's, whose address is in R8,
+so that each side has its own.
 
 ### The tests
 

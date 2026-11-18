@@ -10,9 +10,9 @@
 ; and waits for the handle to free itself. It returns 0, or the step that
 ; failed times 1000, less the error, as test/tcp_c.c does, and keeps R7
 ; to R13, as the C ABI asks. Its buffers end at 0xE800, below the stack
-; of a board with 64K words of RAM, the Nexys4DDR, where the monitor's
-; variables are at 0xF000 and the words from 0x10000 are those from 0
-; again.
+; of a board with 64K words of RAM, the Nexys4DDR, where the variables
+; are at 0xE800, BASIC's first, and the words from 0x10000 are those from
+; 0 again.
 
                 .ORG    0x8000
 TH_ARGS         .EQU    0x9000          ; the IP address, the port, and the bytes

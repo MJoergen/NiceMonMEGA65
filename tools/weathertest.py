@@ -184,12 +184,13 @@ def again(r: Run, text: str) -> bool:
 
 
 def size() -> None:
-    """The program and its wasm memory must end below the monitor's
-    variables of the Nexys4DDR, the top 4K words of its 64K, with room for
-    the stack under them (doc/PROGRAMMING.md, "The memory")."""
+    """The program and its wasm memory must end below the variables of
+    the Nexys4DDR, the top 6K words of its 64K, the monitor's and BASIC's,
+    with room for the stack under them (doc/PROGRAMMING.md, "The
+    memory")."""
     end = max(int(line.split()[0], 16) for line in open(PROGRAM) if line.strip())
-    check(f"the program ends at {end:#06x}, 1K words below 0xF000 for the Nexys4DDR",
-          end < 0xF000 - 1024)
+    check(f"the program ends at {end:#06x}, 1K words below 0xE800 for the Nexys4DDR",
+          end < 0xE800 - 1024)
 
 
 def cases(tmp: str) -> None:

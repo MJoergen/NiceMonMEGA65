@@ -134,13 +134,15 @@ and its data from 0 up, and the runtime's start-up code sets SP to
 
 A program under the monitor starts at `0x8000`, as the ROM is at
 `0x0000`–`0x7FFF`, and shares the monitor's stack, which grows down
-from `0xFFFFF000`. The monitor keeps the top 4K words for itself
-([monitor/README.md](../monitor/README.md)):
+from `0xFFFFE800`. The monitor keeps the top 4K words for itself, and
+BASIC the 2K below them (#152,
+[monitor/README.md](../monitor/README.md)):
 
 | RAM words, MEGA65 | Nexys4DDR | Address | What |
 |---|---|---|---|
-| `0x08000` and up | `0x8000` and up | `0x00008000` and up | The program and the stack: 92K words on the MEGA65, and 28K on the Nexys4DDR. |
-| below `0x1F000` | below `0xF000` | below `0xFFFFF000` | The stack of the monitor and the program, from SP = `0xFFFFF000` down. |
+| `0x08000` and up | `0x8000` and up | `0x00008000` and up | The program and the stack: 90K words on the MEGA65, and 26K on the Nexys4DDR. |
+| below `0x1E800` | below `0xE800` | below `0xFFFFE800` | The stack of BASIC, the monitor, and the program, from SP = `0xFFFFE800` down. |
+| `0x1E800`–`0x1EFFF` | `0xE800`–`0xEFFF` | `0xFFFFE800`–`EFFF` | BASIC's variables ([monitor/basic.nasm](../monitor/basic.nasm)). |
 | `0x1F000`–`0x1F3FF` | `0xF000`–`0xF3FF` | `0xFFFFF000`–`F3FF` | The monitor's variables. |
 | `0x1F400`–`0x1F97F` | `0xF400`–`0xF97F` | `0xFFFFF400`–`F97F` | Kept for the monitor, and not used. |
 | `0x1F980`–`0x1FEFF` | `0xF980`–`0xFEFF` | `0xFFFFF980`–`FEFF` | FAT32's state: the volume, the caches of the FAT and of the files, and the names ([monitor/INTERNALS.md](../monitor/INTERNALS.md#fat32)). |
@@ -158,7 +160,7 @@ program learns the size of the RAM from `0xFFFFFF9E`
 The stack has a second limit, the screen. On the MEGA65 the addresses
 below `0xFFFF8000` are the screen's, not the RAM's, so a stack from
 `0xFFFFFF00` has `0x7F00` words, nearly 32K, and one under the monitor,
-from `0xFFFFF000`, has 28K. A deeper stack writes into the screen's
+from `0xFFFFE800`, has 26K. A deeper stack writes into the screen's
 memory. On the Nexys4DDR the screen ends at `0xFFFF2000`, so a stack
 from `0xFFFFFF00` has `0xDF00` words, nearly 56K.
 

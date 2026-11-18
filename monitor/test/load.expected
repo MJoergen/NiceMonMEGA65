@@ -3,8 +3,8 @@ HELP lists the statements
 READY.
 load
 ADDR WORD in hex on each line, as in a .bin file; an empty line ends
-Words loaded: 798, 00008000 to 0001EFFF
-Lines skipped: 6, first line 2; ADDR WORD in hex, ADDR 00008000 to 0001EFFF
+Words loaded: 798, 00008000 to 0001E7FF
+Lines skipped: 6, first line 2; ADDR WORD in hex, ADDR 00008000 to 0001E7FF
 READY.
 load
 ADDR WORD in hex on each line, as in a .bin file; an empty line ends
@@ -19,20 +19,21 @@ READY.
 dump 0x9000, 4
 00009000 00000134 00000003 00000008 00000000
 READY.
-dump 0x1EFFF, 1
-0001EFFF 0000000A
+dump 0x1E7FF, 1
+0001E7FF 0000000A
 READY.
 halt
 Halted
-fffff000: 00000000 00000018 000fff00 00000003 0001f000 00008000 00000180 0000017f
-fffff008: 00000001 00000000 00000000 00000003 00000003 fffff010 00000000
+fffff000: 00000000 00000018 000fff00 00000003
+fffff005: 00008000 00000180 0000017f 00000001 00000000 00000000
+ffffe800: 0001e800 00008000 00000003 00000003 ffffe840
 Screen:
 |HELP lists the statements
 |READY.
 |load
 |ADDR WORD in hex on each line, as in a .bin file; an empty line ends
-|Words loaded: 798, 00008000 to 0001EFFF
-|Lines skipped: 6, first line 2; ADDR WORD in hex, ADDR 00008000 to 0001EFFF
+|Words loaded: 798, 00008000 to 0001E7FF
+|Lines skipped: 6, first line 2; ADDR WORD in hex, ADDR 00008000 to 0001E7FF
 |READY.
 |load
 |ADDR WORD in hex on each line, as in a .bin file; an empty line ends
@@ -46,8 +47,8 @@ Screen:
 |dump 0x9000, 4
 |00009000 00000134 00000003 00000008 00000000
 |READY.
-|dump 0x1EFFF, 1
-|0001EFFF 0000000A
+|dump 0x1E7FF, 1
+|0001E7FF 0000000A
 |READY.
 |halt
 |Halted

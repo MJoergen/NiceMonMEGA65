@@ -52,13 +52,17 @@ RTC_ISLCTL      .EQU    0x0001086F      ; 1 byte to its register 8
 ; TIME and NTP set it; 1000000 or more sets 999999, as the clock does
 ; (nice_cpu's DEVICES.md §10). On the MEGA65, a time in the years 2000 to
 ; 2099 sets the real-time clock too, with rtc_write. R1 = 0. Uses R1-R6,
-; and R7 across the calls, saved.
+; and R7 and R8 across the calls, saved: the microseconds, and the
+; monitor's block of the conversions, V_I.
 clock_set
                 PUSH    R7
+                PUSH    R8
                 MOVE    R7, R2
+                MOVE    R8, V_I
                 CALL    clk_put
                 CALL    clk_fields
                 CALL    rtc_write
+                POP     R8
                 POP     R7
                 CLR     R1
                 RET
@@ -67,9 +71,13 @@ clock_set
 ; 15..0, in steps of two seconds, and the hundredths of a second over them,
 ; 0 to 199, in bits 23..16, as an entry's creation time has them in byte
 ; 13. R1 = 0 when the clock is not set, or past 2106, or its year is
-; before 1980, FAT's first. Uses R1-R7.
+; before 1980, FAT's first. Uses R1-R7, and R8 across the call, saved:
+; the monitor's block of the conversions, V_I.
 clock_fat
+                PUSH    R8
+                MOVE    R8, V_I
                 CALL    clk_split
+                POP     R8
                 SUB     R1, @V_F, 1980
         ?C      CMP     R1, 127         ; not before 1980
         ?!C     CLR     R1
@@ -149,6 +157,7 @@ rtc_bytes
                 MOVE    @io.mpu_b, 10000
                 MOVE    R7, @CLK_UMUL
                 ADD     @V_I, @V_I, 2000
+                MOVE    R8, V_I         ; the monitor's block of the conversions
                 JMP     clk_valid       ; which returns to the caller
 
 ; The masks of the bytes of clock_rtc, of the year at V_I to the hundredths
@@ -243,7 +252,7 @@ i2c_wait
                 AND[M]  R0, R2, I2C_FAIL
                 RET
 
-; clk_valid: the clock set to the date and the time at V_I, at R7
+; clk_valid: the clock set to the date and the time at V_I, R8, at R7
 ; microseconds, which sets "set", when clk_check takes them, and clk_put:
 ; to the seconds R1 and R7 microseconds. Z when it is set, and R1 = the
 ; seconds. Uses R1-R6.

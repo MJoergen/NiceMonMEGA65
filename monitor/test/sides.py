@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Check that BASIC reaches the monitor through the dispatch table alone.
 
-Usage: test/sides.py [-v]
+Usage: test/sides.py
 
 The ROM is one assembly, the cat of the Makefile's SOURCES, so every
 file reaches every label. Issue #152 splits it into the monitor and
@@ -11,17 +11,15 @@ are assembled apart, this script keeps the boundary. The files are of
 the monitor (MONITOR), of BASIC (BASIC), or shared (COMMON, with the
 library of programs, LIBRARY), and each name is defined in the file
 where a line starts with it. The script reports, with its file and its
-line, each use of a routine or of data of one side by the other, and
-each use by COMMON of a name of either side, and exits with status 1.
+line, each use of a name of one side by the other, a routine, data, a
+variable of its RAM, or a constant, and each use by COMMON of a name of
+either side, and exits with status 1. Each side has a RAM of its own,
+the monitor's at MON_RAM and BASIC's at STACK (common.nasm).
 VECTORS are the two places in BASIC that the monitor goes to, at the
 cold start and after a program, which become fixed vectors when BASIC
 has an image of its own. A file of SOURCES in none of the lists, or one
 in a list that SOURCES has not, is an error too.
-
-A name defined with .EQU may still cross: the RAM's variables, which
-both sides take from one map in monitor.nasm until the RAM map is split,
-and the monitor's constants. -v lists them. Only the Python standard
-library is used.
+Only the Python standard library is used.
 """
 
 import collections
@@ -48,14 +46,14 @@ def lines(path: str) -> List[str]:
         return f.read().split("\n")
 
 
-def defined(paths: List[str]) -> Dict[str, bool]:
-    """The names that the files define, each with True for an .EQU."""
-    names: Dict[str, bool] = {}
+def defined(paths: List[str]) -> Set[str]:
+    """The names that the files define."""
+    names: Set[str] = set()
     for path in paths:
         for line in lines(path):
             m = NAME.match(line)
             if m:
-                names[m[0]] = bool(re.match(r"\S+\s+\.EQU\b", line))
+                names.add(m[0])
     return names
 
 
@@ -82,22 +80,20 @@ def sources() -> Set[str]:
 
 
 def main() -> None:
-    verbose = sys.argv[1:] == ["-v"]
-    if sys.argv[1:] not in ([], ["-v"]):
+    if sys.argv[1:]:
         sys.exit(str(__doc__).split("\n\n")[1])
     listed = set(MONITOR + BASIC + COMMON + LIBRARY)
     if listed != sources():
         sys.exit(f"sides.py: SOURCES and the lists differ in {' '.join(sorted(listed ^ sources()))}")
     sides = {"monitor": defined(MONITOR), "BASIC": defined(BASIC), "common": defined(COMMON)}
-    library: Set[str] = set(defined(LIBRARY))
+    library = defined(LIBRARY)
     checks = [(MONITOR, "monitor", ["BASIC"]), (BASIC, "BASIC", ["monitor"]),
               (COMMON, "common", ["monitor", "BASIC"])]
     bad = 0
-    equs: Dict[str, Set[str]] = collections.defaultdict(set)
     for paths, own, others in checks:
-        mine = set(sides[own]) | library
+        mine = sides[own] | library
         if own != "common":
-            mine |= set(sides["common"])
+            mine |= sides["common"]
         for path in paths:
             for name, numbers in sorted(used(path).items()):
                 if name in mine or name in VECTORS:
@@ -105,15 +101,9 @@ def main() -> None:
                 for other in others:
                     if name not in sides[other]:
                         continue
-                    if sides[other][name]:
-                        equs[f"{own} uses the {other}'s"].add(name)
-                        continue
                     for n in numbers:
                         print(f"{path}:{n}: {own} uses {name} of the {other}")
                         bad += 1
-    if verbose:
-        for what, names in sorted(equs.items()):
-            print(f"{what} .EQUs: {' '.join(sorted(names))}")
     if bad:
         sys.exit(f"sides.py: {bad} uses across the boundary, which an entry must take")
 

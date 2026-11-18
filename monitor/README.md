@@ -25,8 +25,9 @@ The ROM at `0x0000`–`0x7FFF`, which the core boots from, holds:
 The rest of the ROM is free. The demo is not in the ROM: it is a
 program of its own (The demo below).
 
-The monitor's variables are in the RAM at `0xFFFFF000` and up, and its
-stack grows down from there ([SYSTEM.md](../doc/SYSTEM.md#stack-heap-and-variables)).
+The monitor's variables are in the RAM at `0xFFFFF000` and up, BASIC's
+2K words below them, at `0xFFFFE800`, and the stack grows down from
+there ([SYSTEM.md](../doc/SYSTEM.md#stack-heap-and-variables)).
 
 ## Hardware abstraction layer
 
@@ -759,15 +760,16 @@ pseudo-instructions below, which only `DIS` shows:
   nice_cpu's own tests, does the same.
 - A program may use the RAM from `0x8000` up to, but not including, the
   SP it was called with, and must leave room below that for the stack it
-  shares with the monitor. That is `0x8000`–`0x1EFFF`, 92K words, on the
-  MEGA65, and `0x8000`–`0xEFFF`, 28K words, on the Nexys4DDR, as the
-  monitor's variables are the top 4K words of the RAM. A program learns
+  shares with the monitor. That is `0x8000`–`0x1E7FF`, 90K words, on the
+  MEGA65, and `0x8000`–`0xE7FF`, 26K words, on the Nexys4DDR, as the
+  variables are the top 6K words of the RAM: the monitor's 4K, and
+  BASIC's 2K below them. A program learns
   the size of the RAM from `0xFFFFFF9E`
   ([SYSTEM.md](../doc/SYSTEM.md#io-registers)), which reads 0 in
   `niceemu`, where the memory has no limit. The monitor's routines use
   at most 32 words of the stack when a program calls them. The stack is
   in use before the program runs: `SYS` takes the top 2 words, from
-  `0x1EFFF` or `0xEFFF` down, `LOAD` of typed lines reaches 8 words
+  `0x1E7FF` or `0xE7FF` down, `LOAD` of typed lines reaches 8 words
   below the top, and `LOAD` from a card 22. `LOAD` and
   `load.py --monitor` take a word there, which is then overwritten, as
   any word in the room the stack needs is.
@@ -806,10 +808,9 @@ drops the line it is in; a line of blanks only is passed over, as
 function keys do nothing. A line keeps 76 characters: blanks after them
 are dropped, as `niceemu` ignores them, and anything else after them
 skips the line. A line with anything else, or one with an address
-outside a program's RAM, `0x8000` to `0x1EFFF` on the MEGA65 and to
-`0xEFFF` on the Nexys4DDR (Programs above), is skipped: the RAM repeats through the address space, so a
-larger address could reach the ROM or the monitor's variables and
-stack. The top of that range is the stack itself, which `SYS` uses, so a
+outside a program's RAM, `0x8000` to `0x1E7FF` on the MEGA65 and to
+`0xE7FF` on the Nexys4DDR (Programs above), is skipped: the RAM repeats through the address space, so a
+larger address could reach the ROM, the variables, or the stack. The top of that range is the stack itself, which `SYS` uses, so a
 program's words stay below it. A second line for an address writes its
 word over the first's, where `niceemu` rejects the file. In `niceemu`,
 where `0xFFFFFF9E` reads 0, the program's RAM goes up to the screen,
@@ -821,7 +822,7 @@ the lowest and the highest address, and the number of lines skipped,
 with the first of them and the last address that a line may have:
 
     Words loaded: 601, 00008000 to 00009000
-    Lines skipped: 4, first line 2; ADDR WORD in hex, ADDR 00008000 to 0001EFFF
+    Lines skipped: 4, first line 2; ADDR WORD in hex, ADDR 00008000 to 0001E7FF
 
 The lines are shown in one row of the screen, which each line clears,
 and not on the line, so the screen does not scroll, and a paste over the

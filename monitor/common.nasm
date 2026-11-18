@@ -7,13 +7,16 @@
 ; may take them as they are.
 ;
 ; The fields of a date and a time are six words: the year, the month, the
-; day, the hours, the minutes, and the seconds. clk_fields splits the
-; seconds of the clock into the fields at V_F. A date and a time to set
-; are read into the fields at V_I, and clk_check takes them when they are
-; one: it converts them to seconds, splits the seconds again, and
-; compares, so that a month, a day, or a time out of its range never
-; gives the same fields back. Both conversions walk the months from 1970,
-; with the leap years of 1970 to 2106: every fourth, but 2100.
+; day, the hours, the minutes, and the seconds. The conversions work on a
+; block of CLK_WORDS words of the caller's, whose address is in R8, so
+; that the monitor and BASIC each have their own in their RAM: V_I of
+; monitor.nasm, and V_BI of basic.nasm. clk_fields splits the seconds of
+; the clock into the fields at CLK_F of the block. A date and a time to
+; set are read into the fields at CLK_I, and clk_check takes them when
+; they are one: it converts them to seconds, splits the seconds again,
+; and compares, so that a month, a day, or a time out of its range never
+; gives the same fields back. Both conversions walk the months from
+; 1970, with the leap years of 1970 to 2106: every fourth, but 2100.
 
 SP              .EQU    R13
 SCREEN          .EQU    0xFFFF0000      ; 80 x 25 words, the character in bits 7..0
@@ -21,7 +24,10 @@ TEXT_B          .EQU    0x20000000      ; the byte window: byte A of the memory 
 E_IP            .EQU    0xFFFFFFB0      ; the network station's IP address, NET_IP, the first byte in bits 31..24
 E_MACH          .EQU    0xFFFFFFB1      ; the first two bytes of its MAC address, in bits 15..0
 E_MACL          .EQU    0xFFFFFFB2      ; the last four bytes of its MAC address
-STACK           .EQU    0xFFFFF000      ; SP at the cold start, above the program's RAM
+VARS_WORDS      .EQU    0x1800          ; the words from STACK, the variables, which end a program's RAM:
+STACK           .EQU    0xFFFFE800      ; BASIC's, BASIC_WORDS words, where SP starts, down,
+BASIC_WORDS     .EQU    0x800
+MON_RAM         .EQU    0xFFFFF000      ; and the monitor's, to 0xFFFFFEFF, below the devices
 PROGRAM         .EQU    0x8000          ; where a program is, above the ROM
 RAM_WORDS       .EQU    0xFFFFFF9E      ; the words of the RAM, 0 in niceemu, where there is no limit
 CLOCK_USEC      .EQU    0xFFFFFF46      ; the microseconds, and a read takes a snapshot of the seconds
@@ -29,6 +35,11 @@ CLOCK_SEC_LO    .EQU    0xFFFFFF47      ; the seconds since 1970, bits 31..0
 CLOCK_SEC_HI    .EQU    0xFFFFFF48      ; and bits 63..32
 CLOCK_STATUS    .EQU    0xFFFFFF49      ; bit 0 "set", which a write of CLOCK_USEC sets
 CLK_UMUL        .EQU    0xFFFFFF24      ; the math unit's A * B, bits 31..0, unsigned
+
+CLK_I           .EQU    0               ; a block of the conversions of dates: the fields to set, and a 7th word,
+CLK_F           .EQU    6               ; the fields of a time,
+CLK_DAYS        .EQU    12              ; and its days since 1970
+CLK_WORDS       .EQU    13
 
 SD_SELECT       .EQU    0xFFFFFFA4      ; the selected slot
 SD_LAST         .EQU    0xFFFFFFA5      ; the card's last sector, while it is ready
@@ -120,28 +131,29 @@ rest_blank
                 TST     @R3
                 RET
 
-; clk_check: Z when the date and the time at V_I are one of the years
-; 1970 to 2105, and R1 = their seconds. The days of the months walked
-; from 1970 up to the one at V_I+1 of the year at V_I, and the day at
-; V_I+2 less 1, are the days since 1970; with the time they are the
-; seconds, which clk_fields splits into V_F, and the fields must be the
-; same. A year before 1970 walks no month, and splits into 1970. Uses
-; R1-R6.
+; clk_check: Z when the date and the time at CLK_I of the block R8 are
+; one of the years 1970 to 2105, and R1 = their seconds. The days of the
+; months walked from 1970 up to the one at CLK_I+1 of the year at CLK_I,
+; and the day at CLK_I+2 less 1, are the days since 1970; with the time
+; they are the seconds, which clk_fields splits into CLK_F, and the
+; fields must be the same. A year before 1970 walks no month, and splits
+; into 1970. Uses R1-R6.
 clk_check
-                CMP     2105, @V_I
+                CMP     2105, @CLK_I[R8]
         ?C      RET                     ; after 2105
-                SHL     R6, @V_I, 4
-                ADD     R6, R6, @V_I+1
-                SUB     R3, R0, @V_I+2
+                SHL     R6, @CLK_I[R8], 4
+                ADD     R6, R6, @CLK_I+1[R8]
+                SUB     R3, R0, @CLK_I+2[R8]
                 CALL    clk_walk
                 NOT     R1, R3          ; the days walked, and the day less 1
-                MOVE    R4, V_I+3
+                ADD     R4, R8, CLK_I+3
                 CALL    clk_secs
                 CALL    clk_fields
-                MOVE    R4, V_I
-:               CMP     @R4++, @5[R4]   ; V_I against V_F
+                ADD     R4, R8, CLK_I
+                ADD     R5, R8, CLK_F
+:               CMP     @R4++, @CLK_F-CLK_I-1[R4]  ; CLK_I against CLK_F
         ?!Z     RET
-                CMP     R4, V_F
+                CMP     R4, R5
         ?!Z     JMP     :-
                 RET
 
@@ -158,10 +170,10 @@ clk_secs
 CLK_RADIX
                 .DAT    60, 60, 24
 
-; clk_split: the clock's time at V_F, R1 its seconds, and R7 its
-; microseconds, and C, or C clear when it is not set, or past 32 bits of
-; seconds; uses R1-R7. clk_fields: the seconds R1 at V_F, and their days
-; at V_DAYS, and C; uses R2-R6.
+; clk_split: the clock's time at CLK_F of the block R8, R1 its seconds,
+; and R7 its microseconds, and C, or C clear when it is not set, or past
+; 32 bits of seconds; uses R1-R7. clk_fields: the seconds R1 at CLK_F of
+; the block R8, and their days at CLK_DAYS, and C; uses R2-R6.
 clk_split
                 0>C[M]  R0, @CLOCK_STATUS, 1
         ?!C     RET
@@ -171,20 +183,21 @@ clk_split
         ?!C     RET
 clk_fields
                 MOVE    @io.mpu_a, R1
-                MOVE    R4, V_F+6
+                ADD     R4, R8, CLK_F+6
+                ADD     R5, R8, CLK_F+3
                 MOVE    R2, CLK_RADIX
 :               MOVE    @io.mpu_b, @R2++
                 MOVE    @--R4, @io.mpu_udivr
                 MOVE    @io.mpu_a, @io.mpu_udivq
-                CMP     R4, V_F+3
+                CMP     R4, R5
         ?!Z     JMP     :-
                 MOVE    R3, @io.mpu_a
-                MOVE    @V_DAYS, R3
+                MOVE    @CLK_DAYS[R8], R3
                 NOT     R6, R0
                 CALL    clk_walk
-                SHR     @V_F, R2, 4
-                AND     @V_F+1, R2, 15
-                ADD     @V_F+2, R3, 1
+                SHR     @CLK_F[R8], R2, 4
+                AND     @CLK_F+1[R8], R2, 15
+                ADD     @CLK_F+2[R8], R3, 1
                 RET
 
 ; clk_walk: the months from 1970-01 walked while the days R3 are at least

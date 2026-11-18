@@ -64,11 +64,11 @@ SCREEN_BASE = 0xFFFF0000
 SCREEN_WORDS = 0x2000
 
 # A program under the monitor: where it starts, above the ROM, the words
-# of the monitor's variables at the top of the RAM, at 0xFFFFF000, where
-# the program's RAM ends, and the statement of the ROM's BASIC that runs
+# of the variables at the top of the RAM, the monitor's 4K at 0xFFFFF000
+# and BASIC's 2K below them, where the program's RAM ends, and the statement of the ROM's BASIC that runs
 # it (monitor/README.md)
 PROGRAM = 0x8000
-MONITOR_WORDS = 0x1000
+MONITOR_WORDS = 0x1800
 RUN_COMMAND = b"SYS 0x8000\r"
 
 
@@ -79,8 +79,8 @@ def in_screen(addr: int) -> bool:
 
 def check_fit(link: Link, words: Words, monitor: bool) -> None:
     """Refuses words beyond the board's RAM, which would wrap onto the ROM,
-    the monitor's variables, or the program's own words. Under the
-    monitor, the program's RAM ends at the monitor's variables, and
+    the variables, or the program's own words. Under the monitor, the
+    program's RAM ends at the variables, BASIC's first, and
     monitor_words() has refused the screen. The link must reach RAM_SIZE:
     the core is held. It reads 0 in niceemu, which has no limit, and in
     a bitstream older than the register."""

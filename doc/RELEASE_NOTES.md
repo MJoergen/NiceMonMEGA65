@@ -34,6 +34,12 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   ([#150](https://github.com/MJoergen/NiceMonMEGA65/issues/150)).
 - In a C program, `getchar`, `fgets`, and `scanf` return a CR as
   `'\n'`, and a CR LF as one `'\n'`.
+- A program under the monitor has 2K words less RAM: 90K words on the
+  MEGA65, `0x8000` to `0x1E7FF`, and 26K on the Nexys4DDR, to
+  `0xE7FF`. BASIC has 2K words of variables of its own below the
+  monitor's, at `0xFFFFE800`, where SP starts now, below
+  `0xFFFFF000`. `LOAD` and `load.py --monitor` refuse a word from
+  there up ([#152](https://github.com/MJoergen/NiceMonMEGA65/issues/152)).
 
 **New.**
 

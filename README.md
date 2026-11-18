@@ -90,8 +90,8 @@ Keywords are in either case, and numbers in decimal, or in hex after
 as `DUMP`, which shows memory, and `DIS`, which disassembles it.
 
 The monitor loads a program at address `0x8000`, above the ROM. The
-program has 92K words of RAM on the MEGA65, `0x8000` to `0x1EFFF`, and
-28K on the Nexys4DDR. For `LOAD`, paste the `.bin` file into a plain TCP
+program has 90K words of RAM on the MEGA65, `0x8000` to `0x1E7FF`, and
+26K on the Nexys4DDR. For `LOAD`, paste the `.bin` file into a plain TCP
 client on the Ethernet port, or a terminal on the serial port
 ([monitor/README.md](monitor/README.md#loading-without-a-host)).
 

@@ -15,13 +15,15 @@ CLK_2106        .EQU    4291747200      ; the seconds of 2106-01-01 00:00:00
 ; to them, at 0 microseconds, which sets "set", and so is the MEGA65's
 ; real-time clock, in the years 2000 to 2099; anything else that is not
 ; blank is no time, and sets nothing. Then the clock is shown, or that it
-; is not set, or past 2106. Uses R1-R7.
+; is not set, or past 2106. R8 is BASIC's block of the conversions,
+; V_BI. Uses R1-R8.
 clock_cmd
+                MOVE    R8, V_BI
                 MOVE    R3, R1
                 CALL    rest_blank
         ?Z      JMP     :+              ; only blanks: the clock shown
                 MOVE    R2, TEXT_B+4*S_CBAD+22  ; YYYY-MM-DD HH:MM:SS
-                MOVE    R4, V_I
+                MOVE    R4, V_BI
                 CALL    clk_parse
         ?Z      CALL    clk_check
         ?!Z     MOVE    R1, S_CBAD
@@ -46,19 +48,19 @@ clock_zone
                 MOVE    R3, R1
                 PUSH    @R3++           ; the sign
                 MOVE    R2, TEXT_B+4*S_BADNTP+17  ; HH:MM
-                MOVE    R4, V_I+3
+                MOVE    R4, V_BI+3
                 CALL    clk_parse
                 POP     R5
         ?!Z     RET
-                CLR     @V_I+5
+                CLR     @V_BI+5
                 CLR     R1
-                MOVE    R4, V_I+3
+                MOVE    R4, V_BI+3
                 CALL    clk_secs
                 SUB     R5, R5, 0x2B
                 ROR     R5, R5, 1
                 CMP     1, R5
         ?!C     CMP     @ZONE_MAX[R5], R1
-        ?!C     CMP     59, @V_I+4
+        ?!C     CMP     59, @V_BI+4
         ?C      RET                     ; the sign, the offset, or the minutes
                 TST     R5
         ?!Z     SUB     R1, R0, R1      ; west
@@ -76,26 +78,29 @@ ZONE_MAX
 ; the seconds since 1970 take, as do those of era 0 from 1970 on, with the
 ; same subtraction. The fraction gives the microseconds: 1000000 / 65536
 ; is 15625 / 1024. Then the time set is shown, the server, and how far the
-; clock was off, in whole seconds, when it was set. R8 is the time, R10
-; the text after the seconds, R11 the clock's old seconds, and R12 1 when
-; it was set. Uses R1-R12.
+; clock was off, in whole seconds, when it was set. R12 is the time, R10
+; the microseconds, then the text after the seconds, R11 the clock's old
+; seconds, and the stack 1 when it was set. R8 is BASIC's block of the
+; conversions, V_BI. Uses R1-R12.
 clock_ntp
                 SUB     R1, R1, NTP_UNIX
                 CMP     R1, 0x80000000-NTP_UNIX  ; not of era 0 before 1970
-                ADD     R8, R1, R8
-        ?C      CMP     R8, CLK_2106
+                ADD     R12, R1, R8
+        ?C      CMP     R12, CLK_2106
         ?!C     JMP     ntp_bad_time
                 SHR     R10, R2, 16
-                CALL    clk_split
-                ADD[C]  R12, R0, R0
-                MOVE    R11, R1
                 MOVE    @io.mpu_a, R10
                 MOVE    @io.mpu_b, 15625
-                SHR     R7, @CLK_UMUL, 10
-                MOVE    R1, R8
-                MOVE    R2, R7
+                SHR     R10, @CLK_UMUL, 10
+                MOVE    R8, V_BI
+                CALL    clk_split
+                MOVE    R11, R1
+                ADD[C]  R1, R0, R0
+                PUSH    R1              ; 1 when it was set
+                MOVE    R1, R12
+                MOVE    R2, R10
                 CALL    CLOCK_SET
-                MOVE    R1, R8
+                MOVE    R1, R12
                 CALL    clk_fields
                 MOVE    R1, S_CSET
                 CALL    puts_b
@@ -103,11 +108,12 @@ clock_ntp
                 MOVE    R1, S_CFROM
                 MOVE    R2, R9
                 CALL    put_ip
-                TST     R12
+                POP     R1
+                TST     R1
         ?Z      JMP     _io_crlf        ; which returns to the caller
                 MOVE    R1, S_CWAS
                 CALL    puts_b
-                SUB[M]  R1, R8, R11
+                SUB[M]  R1, R12, R11
                 MOVE    R10, S_CBEHIND
         ?Z      MOVE    R10, S_COFF
         ?C      MOVE    R10, S_CAHEAD
@@ -142,20 +148,20 @@ clk_parse
                 ADD     R6, R6, R1
                 JMP     :--
 
-; clk_show: the date and the time at V_F, as YYYY-MM-DD HH:MM:SS. R5 is the
-; field. Uses R1-R5.
+; clk_show: the date and the time at V_BF, as YYYY-MM-DD HH:MM:SS. R5 is
+; the field. Uses R1-R5.
 clk_show
-                MOVE    R1, @V_F
+                MOVE    R1, @V_BF
                 CALL    _io_putdec
-                MOVE    R5, V_F+1
-:               MOVE    R1, @TEXT_B+4*CLK_SEPS-V_F-1[R5]
+                MOVE    R5, V_BF+1
+:               MOVE    R1, @TEXT_B+4*CLK_SEPS-V_BF-1[R5]
                 CALL    MON_PUTC
                 CMP     @R5, 10
                 MOVE    R1, 0x30
         ?C      CALL    MON_PUTC        ; the tens' 0
                 MOVE    R1, @R5++
                 CALL    _io_putdec
-                CMP     R5, V_F+6
+                CMP     R5, V_BF+6
         ?!Z     JMP     :-
                 RET
 CLK_SEPS

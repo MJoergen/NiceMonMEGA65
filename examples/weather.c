@@ -76,8 +76,8 @@ static unsigned long long micros(void)
 
 // The format f to buf of size bytes, cut to fit, with %s, %d, and %u
 // alone: snprintf would bring in the float formatting of the C library,
-// 5K words, and the program must fit below the monitor's variables in
-// the 28K words of the Nexys4DDR.
+// 5K words, and the program must fit below the variables in the 26K
+// words of the Nexys4DDR.
 static void fmt(char *buf, unsigned size, const char *f, ...)
 {
     va_list ap;
