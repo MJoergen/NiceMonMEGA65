@@ -134,6 +134,11 @@ Checks, in this order:
       with "keep", and the banner shows HWT, and then the BASIC found goes
       back as it was, which the banner shows too. Nothing is written to
       a card
+    - BASIC's programs (#114), on the monitor of the tests: each
+      benchmark of basic/bench/ is typed after a NEW, with the cycle
+      counter read in a line before and one after it, and LIST and RUN
+      print what niceemu prints, but for the cycles. The seconds of each,
+      less those of an empty program, are printed as rows of a table
     - the C example examples/build/primes.bin runs, and after its halt the
       microsecond counter holds the cycle counter's count over the clock
       in MHz
@@ -218,6 +223,7 @@ Notes:
 
 import argparse
 import calendar
+import glob
 import math
 import os
 import re
@@ -2290,6 +2296,83 @@ def rom_test() -> str:
     return f"{REPO}/build/rom_test.bin"
 
 
+def timed(lines: list[str]) -> list[str]:
+    """A program of basic/bench/ with the cycle counter read in it: line 0
+    keeps it in T9, and a line before the first END, or after the last
+    line, prints the cycles since. The cycle counter goes on while BASIC
+    waits for a key, so direct lines around RUN would count the line's
+    trip over the UART too."""
+    nums = [int(ln.split()[0]) for ln in lines]
+    ends = [n for n, ln in zip(nums, lines) if ln.split()[1:] == ["END"]]
+    last = ends[0] - 1 if ends else nums[-1] + 1
+    return (["0 T9 = PEEK(0xFFFFFF40)"] + lines
+            + [f"{last} PRINT PEEK(0xFFFFFF40) - T9"])
+
+
+def rows_after(rows: list[str], cmd: str) -> list[str]:
+    """The rows after the last row cmd, up to READY."""
+    at = len(rows) - 1 - rows[::-1].index(cmd)
+    return rows[at + 1:rows.index("READY.", at)]
+
+
+def test_programs(link: Link, board: str) -> list[tuple[str, float]]:
+    """BASIC's programs (#114) on the monitor of the tests, loaded and
+    started: each benchmark of basic/bench/, with the cycle counter read
+    in it (timed()), is typed after a NEW, as its lines are, and LIST
+    and RUN must print what niceemu prints, but for the cycles. Returns
+    each one's name and seconds, less those of an empty program."""
+    if not os.path.exists(NICEEMU):
+        skipped.append("BASIC's programs against niceemu")
+        return []
+    rom = rom_test()
+    load(link, rom)
+    console_until(link, lambda t: READY in t, 10.0)
+    paths = sorted(glob.glob(f"{REPO}/basic/bench/*.bas"))
+    results = []
+    base = 0
+    for path in [""] + paths:
+        name = os.path.splitext(os.path.basename(path))[0] or "empty"
+        lines = []
+        if path:
+            with open(path) as f:
+                lines = [ln.rstrip("\n") for ln in f if ln.strip()]
+        keys = ["NEW"] + timed(lines or ["1 REM"]) + ["LIST", "RUN"]
+        emu = subprocess.run(
+            [NICEEMU, "-n", "100000000", "-i", "-", rom],
+            input="\r".join(keys + ["HALT"]) + "\r", capture_output=True,
+            text=True, check=False).stdout
+        emu_rows = [r.rstrip("\r") for r in emu.split("\n")]
+        link.take_console()
+        link.send_console("\r".join(keys).encode() + b"\r")
+        text = console_until(
+            link, lambda t: b"RUN\r\n" in t
+            and READY in t.rpartition(b"RUN\r\n")[2], 60.0)
+        text = BG_DHCP.sub(b"", text)
+        rows = text.decode("latin-1").replace("\r", "").split("\n")
+        try:
+            got_list, want_list = (rows_after(r, "LIST")
+                                   for r in (rows, emu_rows))
+            got_run, want_run = (rows_after(r, "RUN")
+                                 for r in (rows, emu_rows))
+        except ValueError:
+            check(f"BASIC's {name}: LIST and RUN end with READY.", False,
+                  repr(text[-200:]))
+            continue
+        cycles = int(got_run[-1]) if got_run and got_run[-1].isdigit() else -1
+        same = got_list == want_list and got_run[:-1] == want_run[:-1]
+        if not path:
+            base = cycles
+            check("BASIC's empty program: LIST and RUN as niceemu", same and
+                  cycles >= 0, f"{got_list} {got_run}")
+            continue
+        secs = (cycles - base) / CLOCK_HZ[board]
+        check(f"BASIC's {name}: typed, LIST and RUN as niceemu", same and
+              cycles >= 0, f"{secs:.4f} s" if same else
+              f"LIST {got_list} RUN {got_run}, want {want_list} {want_run}")
+        results.append((name, secs))
+    return results
+
+
 def comparisons(tmp: str) -> list[tuple[str, list[str], bool]]:
     """The programs that test_run compares, assembled into tmp, with their
     options and input files."""
@@ -3027,6 +3110,8 @@ def main() -> None:
                 test_primes(link, primes, board)
                 test_fat_dir(link, fat)
                 test_basic(link, fat, not args.no_program, tmp, board)
+                for name, secs in test_programs(link, board):
+                    print(f"  | {name} | {secs:.4f} |")
             finally:
                 link.close()
             serial = ["--port", args.port, "--baud", str(args.baud)]

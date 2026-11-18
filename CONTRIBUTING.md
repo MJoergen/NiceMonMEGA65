@@ -1043,6 +1043,13 @@ On the Nexys4DDR, whose ROM takes no writes, BASIC's half must drop the
 link's write, and the configuration must load no card's BASIC; the rest
 is NOT COVERED.
 
+Then it tests BASIC's programs (#114) on the monitor of the tests: it
+types each benchmark of `basic/bench/` after a `NEW`, with a line that
+keeps the cycle counter and one that prints the cycles since, and
+`LIST` and `RUN` must print what niceemu prints, but for the cycles. It
+prints each one's seconds, less those of an empty program, as the rows
+of the table in [doc/BASIC.md](doc/BASIC.md#the-benchmarks).
+
 With `ETH=IP`, as in `make hwtest PORT=/dev/ttyUSB1 ETH=192.168.1.65`, and the board's
 Ethernet port on this computer's network, it tests the Ethernet station
 after all the other checks, which its failures do not stop. It loads

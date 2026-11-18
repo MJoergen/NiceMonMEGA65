@@ -721,23 +721,28 @@ and checks their output (`basic/test/bench.py`). A run's steps are
 those of the instruction counter, which `PEEK(0xFFFFFF42)` reads in a
 direct line before `RUN` and in one after it, less the same for an
 empty program, so each program is as it is written. `make -C basic
-bench` prints the rows of steps. Stage 3, in `niceemu` (measured
-2026-11-18):
+bench` prints the rows of steps. On the board, `make hwtest` types
+each program after a `NEW`, with a line 0 that keeps the cycle counter,
+`PEEK(0xFFFFFF40)`, and a line before its `END`, or after its last, that
+prints the cycles since, as the counter goes on while BASIC waits for a
+key. Less those of an empty program, over 100 MHz, they are the
+seconds. Stage 3, in `niceemu` and on the R6 (measured 2026-11-18):
 
-| Program | Steps |
-|---|---:|
-| Rugg/Feldman 1, an empty `FOR` loop of 1000 | 95930 |
-| 2, `K = K + 1` and `IF` | 281497 |
-| 3, and `A = K / K * K + K - K` | 583437 |
-| 4, `A = K / 2 * 3 + 4 - 5` | 555437 |
-| 5, and a `GOSUB` | 722293 |
-| 6, and a `FOR` loop of 5 | 1396266 |
-| 7, and an array's element in it | 2242057 |
-| The sieve of 8191, 1899 primes | 13682849 |
+| Program | Steps | Seconds on the R6 |
+|---|---:|---:|
+| Rugg/Feldman 1, an empty `FOR` loop of 1000 | 95930 | 0.0033 |
+| 2, `K = K + 1` and `IF` | 281497 | 0.0081 |
+| 3, and `A = K / K * K + K - K` | 583437 | 0.0160 |
+| 4, `A = K / 2 * 3 + 4 - 5` | 555437 | 0.0154 |
+| 5, and a `GOSUB` | 722293 | 0.0194 |
+| 6, and a `FOR` loop of 5 | 1396266 | 0.0390 |
+| 7, and an array's element in it | 2242057 | 0.0642 |
+| The sieve of 8191, 1899 primes | 13682849 | 0.3828 |
 
 So a statement takes about 100 to 300 steps: `FOR` and `NEXT` about
 95, `K = K + 1` with its `IF` about 280, and the array's element about
-170. The seconds on the R6 come with `make hwtest`.
+170. On the R6 a step takes about 2.8 to 3.4 cycles, so a statement
+takes 3 to 10 microseconds, and the sieve 0.38 seconds.
 
 ## Stages
 
