@@ -21,19 +21,10 @@ The release candidates pinned these:
 
 nice_cpu's `RC01` and `RC03` have no tag here.
 
-## V2.3 (2026-11-17)
+## V2.3.1 (unreleased)
 
 **Upgrade notes.**
 
-- nice_cpu is at `V2.3`. Its FPU computes the functions `SIN` to
-  `HYPOT`, and the functions of `math.h` run on it, with other bits in
-  the last place than before. The float library in software is gone,
-  and so is `nicebuild.py --no-fpu`. A program with floats checks for
-  the FPU at its start, and traps with code 9, "no FPU", on a
-  bitstream or core file before `V2.2`
-  ([#150](https://github.com/MJoergen/NiceMonMEGA65/issues/150)).
-- In a C program, `getchar`, `fgets`, and `scanf` return a CR as
-  `'\n'`, and a CR LF as one `'\n'`.
 - A program under the monitor has 2K words less RAM: 90K words on the
   MEGA65, `0x8000` to `0x1E7FF`, and 26K on the Nexys4DDR, to
   `0xE7FF`. BASIC has 2K words of variables of its own below the
@@ -50,12 +41,6 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 
 **New.**
 
-- The MEGA65 has the chunky mode of the screen, 160×100 pixels of one
-  word each, which a write of 1 to the mode word at `0xFFFFFF87`
-  selects, as in the emulator. The Nexys4DDR has only the text: its
-  mode word stays 0, so that a program sees that the mode is missing
-  ([#144](https://github.com/MJoergen/NiceMonMEGA65/issues/144),
-  [SYSTEM.md](SYSTEM.md#the-chunky-mode)).
 - The dispatch table is 1.6, with 5 entries more, 32 to 36, which BASIC
   uses and programs may too: `con_getline`, BASIC's line with the
   scrollback and TAB; `bin_line`, a line of a `.bin` file, as `LOAD`
@@ -123,6 +108,32 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   has a 16-bit total of sectors
   ([#151](https://github.com/MJoergen/NiceMonMEGA65/issues/151), B2, B4,
   B7, B8, and B9).
+
+## V2.3 (2026-11-17)
+
+**Upgrade notes.**
+
+- nice_cpu is at `V2.3`. Its FPU computes the functions `SIN` to
+  `HYPOT`, and the functions of `math.h` run on it, with other bits in
+  the last place than before. The float library in software is gone,
+  and so is `nicebuild.py --no-fpu`. A program with floats checks for
+  the FPU at its start, and traps with code 9, "no FPU", on a
+  bitstream or core file before `V2.2`
+  ([#150](https://github.com/MJoergen/NiceMonMEGA65/issues/150)).
+- In a C program, `getchar`, `fgets`, and `scanf` return a CR as
+  `'\n'`, and a CR LF as one `'\n'`.
+
+**New.**
+
+- The MEGA65 has the chunky mode of the screen, 160×100 pixels of one
+  word each, which a write of 1 to the mode word at `0xFFFFFF87`
+  selects, as in the emulator. The Nexys4DDR has only the text: its
+  mode word stays 0, so that a program sees that the mode is missing
+  ([#144](https://github.com/MJoergen/NiceMonMEGA65/issues/144),
+  [SYSTEM.md](SYSTEM.md#the-chunky-mode)).
+
+**Changes.**
+
 - `help` in `tools/mon.py` is nicedbg's own, one line for each command
   as before, and its console is nicedbg's, which passes Enter as CR
   ([#143](https://github.com/MJoergen/NiceMonMEGA65/issues/143)).
