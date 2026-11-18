@@ -24,7 +24,9 @@
 -- a CSD of version 1 and READ_BL_LEN 10, and G_V1 makes it a card of
 -- version 1, to which CMD8 is illegal. The card has G_SECTORS sectors. The
 -- image file fills the first ones, and the rest read 0 until they are
--- written; writes change the image in memory only.
+-- written; writes change the image in memory only. A sector has memory
+-- only once the file fills it or a write reaches it, so that a card of
+-- FAT32, of 65525 clusters or more, is small for the simulator.
 --
 -- The ports for the tests: crc_err_i corrupts the CRC16 of the blocks the
 -- card sends while it is high, and dead_i makes the card answer nothing.
@@ -60,7 +62,13 @@ end entity sd_card_model;
 architecture simulation of sd_card_model is
 
    type t_bytes is array (natural range <>) of natural range 0 to 255;
-   type t_image is access t_bytes;
+
+   subtype t_sector is t_bytes(0 to 511);
+
+   type t_sector_ptr is access t_sector;
+   type t_sectors is array (natural range <>) of t_sector_ptr;
+   -- The card's sectors, each null while it reads 0
+   type t_image is access t_sectors;
 
    -- The CRC7 of a command, and the CRC16 of a block, after one more byte
    function crc7(crc : std_logic_vector(6 downto 0);
@@ -128,7 +136,7 @@ architecture simulation of sd_card_model is
       variable n_v      : natural := 0;
       variable image_v  : t_image;
    begin
-      image_v := new t_bytes'(0 to G_SECTORS * 512 - 1 => 0);
+      image_v := new t_sectors(0 to G_SECTORS - 1);
       if G_FILE /= "" then
          file_open(status_v, f, G_FILE, read_mode);
          assert status_v = open_ok
@@ -136,8 +144,12 @@ architecture simulation of sd_card_model is
             severity failure;
          while not endfile(f) loop
             read(f, c_v);
-            image_v(n_v) := character'pos(c_v);
-            n_v          := n_v + 1;
+            if n_v mod 512 = 0 then
+               -- Each byte starts as 0, the left of its range
+               image_v(n_v / 512) := new t_sector;
+            end if;
+            image_v(n_v / 512)(n_v mod 512) := character'pos(c_v);
+            n_v                             := n_v + 1;
          end loop;
          file_close(f);
          assert n_v mod 512 = 0
@@ -223,7 +235,11 @@ begin
             if csd_v'length > 0 then
                b_v := csd_v(csd_v'high - 8 * i downto csd_v'high - 8 * i - 7);
             else
-               b_v := to_slv(image_v(base + i), 8);
+               if image_v((base + i) / 512) = null then
+                  b_v := X"00";
+               else
+                  b_v := to_slv(image_v((base + i) / 512)((base + i) mod 512), 8);
+               end if;
             end if;
             crc_v := crc16(crc_v, b_v);
             put(to_integer(b_v));
@@ -364,8 +380,11 @@ begin
                end loop;
                if crc_v = to_slv(wbuf_v(512), 8) &
                   to_slv(wbuf_v(513), 8) then
+                  if image_v(wsec_v) = null then
+                     image_v(wsec_v) := new t_sector;
+                  end if;
                   for i in 0 to 511 loop
-                     image_v(wsec_v * 512 + i) := wbuf_v(i);
+                     image_v(wsec_v)(i) := wbuf_v(i);
                   end loop;
                   put(16#05#);
                   for i in 1 to G_BUSY_BYTES loop

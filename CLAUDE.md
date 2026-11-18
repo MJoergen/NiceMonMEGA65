@@ -51,7 +51,7 @@ header is the authoritative address map.
 ## Commands
 
     make                  # lists the targets
-    make -j test          # GHDL: synth checks, tb_hello, tb_nicemon, tb_kbd, tb_ps2, tb_ps2_nicemon, tb_text, tb_dbg, tb_dbg_host, tb_dbg_decode, tb_board_io, tb_rmii_rx, tb_rx_fcs, tb_eth_rx_fifo, tb_eth_tx_fifo, tb_rmii_tx, tb_eth, tb_eth_tcp, tb_eth_tcp_random, tb_sd, tb_i2c, check-steps, check-fmt (NICE=multi for the multi-cycle core); then the demo, the monitor, and BASIC in niceemu
+    make -j test          # GHDL: synth checks, tb_hello, tb_nicemon, tb_kbd, tb_ps2, tb_ps2_nicemon, tb_text, tb_dbg, tb_dbg_host, tb_dbg_decode, tb_board_io, tb_rmii_rx, tb_rx_fcs, tb_eth_rx_fifo, tb_eth_tx_fifo, tb_rmii_tx, tb_eth, tb_eth_tcp, tb_eth_tcp_random, tb_sd, tb_i2c, tb_basload, check-steps, check-fmt (NICE=multi for the multi-cycle core); then the demo, the monitor, and BASIC in niceemu
     make -j formal        # SymbiYosys jobs in formal/, each task in a work directory of its own
     make lint             # vsg against doc/CODING_STYLE.md; line-length warnings are tolerated
     make typecheck        # mypy --strict on the Python files that mypy.ini lists

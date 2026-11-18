@@ -47,6 +47,11 @@
 #             tb_i2c      the I2C master on three chip models: the two
 #                         real-time clocks of the MEGA65 and the
 #                         Nexys4DDR's temperature sensor.
+#             tb_basload  the load of BASIC's image from a card at the
+#                         cold start (#153): the monitor of the tests'
+#                         ROM, a card of FAT32 with basload.nasm as
+#                         NICE/BASIC-T.ROM, the load, and the lock that
+#                         the second cold start finds.
 #             It also checks that GHDL can synthesize the system, the
 #             keyboards and their toggle detectors, the debugger and its host, the text display (through text_synth.vhd, in
 #             the boards' mode, with 15 and 13 screen address bits), and system.vhd as the Nexys4DDR has it, and the display and RGB LED drivers.
@@ -87,9 +92,9 @@ SRC_SOURCES  = ../src/uart_serdes.vhd ../src/rx_fifo.vhd ../src/ram.vhd ../src/r
                ../src/eth/eth_arp.vhd ../src/eth/eth_icmp.vhd ../src/eth/eth_tcp_rx.vhd ../src/eth/eth_tcp_tx.vhd ../src/eth/eth_tcp_timer.vhd ../src/eth/eth_tcp_buf.vhd ../src/eth/eth_tcp_pick.vhd ../src/eth/eth_tcp.vhd ../src/eth/eth_frames.vhd ../src/eth/eth_tx_fifo.vhd ../src/eth/eth_arb.vhd ../src/eth/rmii_tx.vhd ../src/eth/eth.vhd \
                ../src/system.vhd
 SOURCES      = $(SRC_SOURCES) text_synth.vhd sd_card_model.vhd i2c_chip_model.vhd tb_hello.vhd tb_nicemon.vhd tb_kbd.vhd tb_ps2.vhd tb_ps2_nicemon.vhd tb_text.vhd tb_dbg.vhd tb_dbg_host.vhd tb_dbg_decode.vhd tb_board_io.vhd tb_rmii_rx.vhd tb_rx_fcs.vhd tb_eth_rx_fifo.vhd \
-               tb_eth_tx_fifo.vhd tb_rmii_tx.vhd tb_eth.vhd tb_eth_tcp.vhd tb_sd.vhd tb_i2c.vhd
+               tb_eth_tx_fifo.vhd tb_rmii_tx.vhd tb_eth.vhd tb_eth_tcp.vhd tb_sd.vhd tb_i2c.vhd tb_basload.vhd
 
-.PHONY: test cosim check-steps check-fmt analyze synth clean tb_hello tb_nicemon tb_kbd tb_ps2 tb_ps2_nicemon tb_text tb_dbg tb_dbg_host tb_dbg_decode tb_board_io tb_rmii_rx tb_rx_fcs tb_eth_rx_fifo tb_eth_tx_fifo tb_rmii_tx tb_eth tb_eth_tcp tb_eth_tcp_random tb_sd tb_i2c \
+.PHONY: test cosim check-steps check-fmt analyze synth clean tb_hello tb_nicemon tb_kbd tb_ps2 tb_ps2_nicemon tb_text tb_dbg tb_dbg_host tb_dbg_decode tb_board_io tb_rmii_rx tb_rx_fcs tb_eth_rx_fifo tb_eth_tx_fifo tb_rmii_tx tb_eth tb_eth_tcp tb_eth_tcp_random tb_sd tb_i2c tb_basload \
         synth-nicemon synth-nicemon-norom synth-kbd_m65 synth-kbd_m65_ascii synth-kbd_ps2 \
         synth-kbd_ps2_ascii synth-kbd_m65_toggle synth-kbd_ps2_toggle synth-dbg synth-dbg_host synth-dbg_decode synth-dbg_set synth-text \
         synth-system synth-seg7 synth-rgb_pwm
@@ -97,7 +102,7 @@ SOURCES      = $(SRC_SOURCES) text_synth.vhd sd_card_model.vhd i2c_chip_model.vh
 # Each testbench and each synthesis check is a target of its own, so that
 # "make -j test" runs them side by side. They share the work library of
 # $(BUILD), which "analyze" writes first and they only read.
-test: synth tb_hello tb_nicemon tb_kbd tb_ps2 tb_ps2_nicemon tb_text tb_dbg tb_dbg_host tb_dbg_decode tb_board_io tb_rmii_rx tb_rx_fcs tb_eth_rx_fifo tb_eth_tx_fifo tb_rmii_tx tb_eth tb_eth_tcp tb_eth_tcp_random tb_sd tb_i2c check-steps check-fmt
+test: synth tb_hello tb_nicemon tb_kbd tb_ps2 tb_ps2_nicemon tb_text tb_dbg tb_dbg_host tb_dbg_decode tb_board_io tb_rmii_rx tb_rx_fcs tb_eth_rx_fifo tb_eth_tx_fifo tb_rmii_tx tb_eth tb_eth_tcp tb_eth_tcp_random tb_sd tb_i2c tb_basload check-steps check-fmt
 
 # The column layout of nice_cpu's NICE assembly; nicefmt.py --write fixes it
 check-fmt:
@@ -152,6 +157,30 @@ $(BUILD)/sd.img: | $(BUILD)
 tb_sd: analyze $(BUILD)/sd.img
 	@(cd $(BUILD) && $(GHDL) --elab-run $(GHDLFLAGS) tb_sd -gG_IMAGE_FILE=sd.img > tb_sd.log 2>&1) && \
 	  echo "PASS tb_sd" || (echo "FAIL tb_sd"; cat $(BUILD)/tb_sd.log; exit 1)
+
+# tb_basload's card: FAT32 of BASLOAD_SECTORS sectors of one cluster
+# each, the fewest of a multiple of 1024 that FAT32 takes, with
+# basload.nasm, filled in by basic_rom.py, as NICE/BASIC-T.ROM. The file
+# keeps only the sectors up to the last that is not 0, as the card model
+# reads the rest as 0. Its ROM is the monitor's image of the tests alone.
+BASLOAD_SECTORS = 67584
+BAS_ROM_PY      = $(PYTHON) ../tools/basic_rom.py
+$(BUILD)/basload.img: basload.nasm ../tools/basic_rom.py $(ASM_PY) | $(BUILD)
+	@$(ASM) -o $(BUILD)/basload_asm.bin $<
+	@$(BAS_ROM_PY) fill $(BUILD)/basload_asm.bin $(BUILD)/basload.rom --version V10.0
+	@rm -f $@.new; truncate -s $$(($(BASLOAD_SECTORS) * 512)) $@.new
+	@mkfs.fat -F 32 -s 1 -i 4E494345 $@.new > /dev/null
+	@mmd -i $@.new ::NICE
+	@mcopy -i $@.new $(BUILD)/basload.rom ::NICE/BASIC-T.ROM
+	@$(PYTHON) -c 'import sys; d = open(sys.argv[1], "rb").read(); 	  n = max(i for i in range(len(d) // 512) if any(d[i * 512:i * 512 + 512])) + 1; 	  open(sys.argv[1], "r+b").truncate(n * 512)' $@.new
+	@mv $@.new $@
+
+tb_basload: analyze $(BUILD)/basload.img
+	@$(MAKE) -s --no-print-directory -C ../monitor build/monitor_image_test.bin
+	@cp ../monitor/build/monitor_image_test.bin $(BUILD)/basload_rom.bin
+	@(cd $(BUILD) && $(GHDL) --elab-run $(GHDLFLAGS) tb_basload -gG_ROM_FILE=basload_rom.bin \
+	  -gG_IMAGE_FILE=basload.img -gG_SECTORS=$(BASLOAD_SECTORS) > tb_basload.log 2>&1) && \
+	  echo "PASS tb_basload" || (echo "FAIL tb_basload"; cat $(BUILD)/tb_basload.log; exit 1)
 
 tb_hello: analyze $(BUILD)/hello.bin
 	@(cd $(BUILD) && $(GHDL) --elab-run $(GHDLFLAGS) tb_hello \

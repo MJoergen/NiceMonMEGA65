@@ -441,6 +441,15 @@ The testbenches are these:
   read back, a read with no register, a count over 16, a NACK, a
   command and data written while busy, which are dropped, and a
   timeout, with SCL held low.
+- `sim/tb_basload.vhd` tests the load of BASIC's image from a card at
+  the cold start (#153) at 100 MHz: the monitor's image of the tests in
+  the ROM, with nothing in BASIC's half, and a card of FAT32 with
+  `sim/basload.nasm` as `NICE/BASIC-T.ROM`, a small image with a valid
+  header. The monitor loads it, and runs it, and it starts the monitor
+  again, which must find BASIC's half locked and load nothing. The card
+  model keeps only the sectors that its file or a write fills, so a
+  card of 65525 clusters fits. It takes about 13 ms of simulated time,
+  some 8 minutes, the longest of `make test`.
 - `make -C sim check-steps`, part of `make test`, compares the step counts
   that `tb_nicemon` checks with those of niceemu. It is skipped when niceemu
   is not built.

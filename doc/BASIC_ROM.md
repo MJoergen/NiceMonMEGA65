@@ -4,8 +4,7 @@ The design of issue
 [#153](https://github.com/MJoergen/NiceMonMEGA65/issues/153): at the
 start, the monitor replaces BASIC's half of the ROM with a file from
 the SD card. **This is a draft. Of its [Stages](#stages), the first
-three, the header, the RTL, and the monitor, are written, but for the
-third's whole load in the RTL. The
+three, the header, the RTL, and the monitor, are written. The
 decisions of 2026-11-18 are in [Decisions](#decisions), with those
 that a review against the code changed the same day, and only the
 details of [Open questions](#open-questions) are open.**
@@ -399,9 +398,11 @@ finds the ROM locked, and runs that image.
   `formal/mem.sby` gets the rules of the ROM's writes.
 - **A whole load in the RTL.** A testbench with the real ROM and the
   model of a card (`sim/sd_card_model.vhd`) loads a `BASIC*.ROM` from
-  a FAT32 image, and checks the banner, and that the ROM is locked
-  after the load and not before. `niceemu` sees neither the lock nor a
-  fetch that runs ahead.
+  a FAT32 image, and checks that the ROM is locked after the load and
+  not before. The image is a small one with a valid header, whose cold
+  start prints a line and starts the monitor again, as a real BASIC's
+  5000 lines would take far longer in GHDL. `niceemu` sees neither the
+  lock nor a fetch that runs ahead.
 
 ## The tools
 
@@ -548,13 +549,16 @@ One is open:
    with the lock's write; SP and `bin_line`'s end from the header;
    and table 1.7, with the entries 37 to 40, their stubs in `mon.nasm`
    and `mon.h`, and the banner. The tests in `niceemu`, and the whole
-   load in the RTL. Written but for the whole load in the RTL:
-   `monitor/monitor_basic.nasm` is the loader, 777 words, which keeps
+   load in the RTL. Written: `monitor/monitor_basic.nasm` is the loader, 777 words, which keeps
    no list of the files and lists the folders again for each choice.
    Its reasons are `not a BASIC image`, `for another monitor`,
    `bad header`, `bad address`, `bad line`, `bad checksum`, and
    `card error`. `test/basload.py` and `test/hal17.nasm` are its tests
-   in `niceemu`.
+   in `niceemu`. `sim/tb_basload.vhd` is the whole load in the RTL, of
+   a small image, `sim/basload.nasm`, which starts the monitor again,
+   and checks that the second cold start finds the ROM locked. There a
+   load of that image takes about 10 ms at 100 MHz, nearly all of it
+   the card's reads, and the copy and the zeroing 3 ms more.
 4. **The tools.** `load.py --basic`, "keep" in the images that the
    tools load, `make hwtest`, the README, and `basic/README.md`.
 5. **The release.** `V2.3.1`, with `BASIC-V2.3.1.ROM` as an asset. A
