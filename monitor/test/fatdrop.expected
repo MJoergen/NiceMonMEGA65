@@ -1,5 +1,5 @@
 == SD_SELECT written under open files, and fs_mount under a file open to write
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 sys 0x8000
@@ -7,7 +7,7 @@ Returned 0000003B
 READY.
 dir
 Directory of NICE
-HELLO.BIN                      14256
+HELLO.BIN                      14400
 NEW.TXT                            0
 OPEN.TXT                           0
 Files: 3, directories: 0
@@ -41,10 +41,10 @@ segment 0
 exit 0
 Slot 0: What the card holds that super.img did not:
 Sectors changed outside the volume: none
-FSInfo free count: 0001F7E0 -> FFFFFFFF
+FSInfo free count: 0001F7DF -> FFFFFFFF
 FAT entries changed: 3
-  32: 00000000 -> 0FFFFFFF
-  33-34: 00000000 -> each the next, the last 0FFFFFFF
+  33: 00000000 -> 0FFFFFFF
+  34-35: 00000000 -> each the next, the last 0FFFFFFF
 FAT 2: the same changes
 NICE C3 entry 3:
   was zeros
@@ -52,15 +52,15 @@ NICE C3 entry 3:
 NICE C3 entry 4:
   was zeros
   now "OPEN    TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 0 size 0
-C33, of no file: 512 bytes not 0, SHA-256 cfe56b3d861da872
+C34, of no file: 512 bytes not 0, SHA-256 cfe56b3d861da872
 Slot 1: The card as super.img was
 fsck.fat -n:
 Reclaimed 3 unused clusters (1536 bytes).
-Free cluster summary uninitialized (should be 128992)
+Free cluster summary uninitialized (should be 128991)
 
 Leaving filesystem unchanged.
-IMAGE: 4 files, 30/129022 clusters
+IMAGE: 4 files, 31/129022 clusters
 (exit 1)
 Sector writes, 13:
 mount 0 x2, C3, FSInfo, FAT1+0, FAT2+0, mount 0 x2, C3, FSInfo, FAT1+0,
-FAT2+0, C33, FAT1+0, FAT2+0, FAT1+0, FAT2+0, mount 0
+FAT2+0, C34, FAT1+0, FAT2+0, FAT1+0, FAT2+0, mount 0

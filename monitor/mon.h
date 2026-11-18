@@ -273,6 +273,31 @@ MON_ENTRY(net_servers) int mon_net_servers(unsigned srv[2]);
 // network closed, and the cursor shown at its registers. 0. Entry 36.
 int mon_restore(void);
 
+// The services of table 1.7 (issue #153), for BASIC's own line and its
+// banner. A program checks that mon_version is 0x00010007 or more.
+
+// The word address of the monitor's version, a packed text, four
+// characters a word, such as V2.3.1. Entry 37.
+unsigned mon_build(void);
+
+// The next byte of the console, waited for when bit 0 of flags is 1, or
+// -1 when none waits and bit 0 is 0. Meanwhile it keeps the network going,
+// as con_getline does, and with bit 1 shows an address that DHCP gets,
+// for a caller whose line is empty. Entry 38.
+int mon_con_key(unsigned flags);
+
+// The scrollback: rows further back when rows is above 0, -rows forward
+// when it is below 0, and the screen again when it is 0 or reaches the
+// screen. The rows shown back now, 0 for the screen. Entry 39.
+int mon_scr_back(int rows);
+
+// TAB on a line of words, one character each, with the cursor at cursor
+// and room up to end, the word after the last: completes the name of a
+// file of the card's folder before the cursor, or lists the matches and
+// shows the line again, up to the cursor. The new cursor. Entry 40.
+MON_ENTRY(fs_complete) unsigned *mon_fs_complete(unsigned *line, unsigned *cursor,
+                                                 unsigned *end);
+
 // The NICE word address of a C array of words, for the entries above
 // that take one character or byte per word, such as mon_fs_open's name
 // and mon_fs_read's buffer, which the program then reads as plain unsigned

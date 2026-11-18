@@ -1,5 +1,5 @@
 == A file of 3 clusters from FSInfo's hint
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 sys 0x8000
@@ -15,21 +15,21 @@ segment 0
 exit 0
 Slot 0: What the card holds that super.img did not:
 Sectors changed outside the volume: none
-FSInfo free count: 0001F7E0 -> FFFFFFFF
-FSInfo next free: 0000001F -> 00000023
+FSInfo free count: 0001F7DF -> FFFFFFFF
+FSInfo next free: 00000020 -> 00000024
 FAT entries changed: 3
-  32-34: 00000000 -> each the next, the last 0FFFFFFF
+  33-35: 00000000 -> each the next, the last 0FFFFFFF
 FAT 2: the same changes
 NICE C3 entry 3:
   was zeros
-  now "F       TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 32 size 1500
+  now "F       TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 33 size 1500
 NICE/F.TXT: 1500 bytes, SHA-256 bf99d33fe4fd6e0a
 NICE/F.TXT: its sector 2 past the size: 36 bytes, zeros
 Sector writes, 17:
-mount 0, C3, FSInfo, FAT1+0, FAT2+0, C32, FAT1+0, FAT2+0, FAT1+0, FAT2+0,
-C33, FAT1+0, FAT2+0, FAT1+0, FAT2+0, C34, C3, FSInfo
+mount 0, C3, FSInfo, FAT1+0, FAT2+0, C33, FAT1+0, FAT2+0, FAT1+0, FAT2+0,
+C34, FAT1+0, FAT2+0, FAT1+0, FAT2+0, C35, C3, FSInfo
 == The file, then its delete, which moves the hint back
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 sys 0x8000
@@ -50,22 +50,22 @@ segment 1
 exit 0
 Slot 0: What the card holds that super.img did not:
 Sectors changed outside the volume: none
-FSInfo free count: 0001F7E0 -> FFFFFFFF
-FSInfo next free: 0000001F -> 00000020
+FSInfo free count: 0001F7DF -> FFFFFFFF
+FSInfo next free: 00000020 -> 00000021
 FAT entries changed: 0
 FAT 2: the same changes
 NICE C3 entry 3:
   was zeros
-  now "\xe5       TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 32 size 1500
-C32, of no file: 512 bytes not 0, SHA-256 cfe56b3d861da872
-C33, of no file: 512 bytes not 0, SHA-256 2bc83e4f6dfc007e
-C34, of no file: 476 bytes not 0, SHA-256 2d50898119c1a147
+  now "\xe5       TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 33 size 1500
+C33, of no file: 512 bytes not 0, SHA-256 cfe56b3d861da872
+C34, of no file: 512 bytes not 0, SHA-256 2bc83e4f6dfc007e
+C35, of no file: 476 bytes not 0, SHA-256 2d50898119c1a147
 Sector writes, 25:
-mount 0, C3, FSInfo, FAT1+0, FAT2+0, C32, FAT1+0, FAT2+0, FAT1+0, FAT2+0,
-C33, FAT1+0, FAT2+0, FAT1+0, FAT2+0, C34, C3, FSInfo, C3, FAT1+0, FAT2+0,
+mount 0, C3, FSInfo, FAT1+0, FAT2+0, C33, FAT1+0, FAT2+0, FAT1+0, FAT2+0,
+C34, FAT1+0, FAT2+0, FAT1+0, FAT2+0, C35, C3, FSInfo, C3, FAT1+0, FAT2+0,
 FAT1+0, FAT2+0, FAT1+0, FAT2+0, FSInfo
 == The hint at the last cluster, which is free, so the hint goes round
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 sys 0x8000
@@ -81,11 +81,11 @@ segment 0
 exit 0
 Slot 0: What the card holds that i_last.img did not:
 Sectors changed outside the volume: none
-FSInfo free count: 0001F7E0 -> FFFFFFFF
-FSInfo next free: 0001F7FF -> 00000022
+FSInfo free count: 0001F7DF -> FFFFFFFF
+FSInfo next free: 0001F7FF -> 00000023
 FAT entries changed: 3
-  32-33: 00000000 -> each the next, the last 0FFFFFFF
-  129023: 00000000 -> 00000020
+  33-34: 00000000 -> each the next, the last 0FFFFFFF
+  129023: 00000000 -> 00000021
 FAT 2: the same changes
 NICE C3 entry 3:
   was zeros
@@ -94,10 +94,10 @@ NICE/F.TXT: 1500 bytes, SHA-256 bf99d33fe4fd6e0a
 NICE/F.TXT: its sector 2 past the size: 36 bytes, zeros
 Sector writes, 17:
 mount 0, C3, FSInfo, FAT1+1007, FAT2+1007, C129023, FAT1+0, FAT2+0,
-FAT1+1007, FAT2+1007, C32, FAT1+0, FAT2+0, FAT1+0, FAT2+0, C33, C3,
+FAT1+1007, FAT2+1007, C33, FAT1+0, FAT2+0, FAT1+0, FAT2+0, C34, C3,
 FSInfo
 == The hint at the last cluster, which is in use, so the search goes round
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 sys 0x8000
@@ -113,21 +113,21 @@ segment 0
 exit 0
 Slot 0: What the card holds that i_wrap.img did not:
 Sectors changed outside the volume: none
-FSInfo free count: 0001F7E0 -> FFFFFFFF
-FSInfo next free: 0001F7FF -> 00000023
+FSInfo free count: 0001F7DF -> FFFFFFFF
+FSInfo next free: 0001F7FF -> 00000024
 FAT entries changed: 3
-  32-34: 00000000 -> each the next, the last 0FFFFFFF
+  33-35: 00000000 -> each the next, the last 0FFFFFFF
 FAT 2: the same changes
 NICE C3 entry 3:
   was zeros
-  now "F       TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 32 size 1500
+  now "F       TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 33 size 1500
 NICE/F.TXT: 1500 bytes, SHA-256 bf99d33fe4fd6e0a
 NICE/F.TXT: its sector 2 past the size: 36 bytes, zeros
 Sector writes, 17:
-mount 0, C3, FSInfo, FAT1+0, FAT2+0, C32, FAT1+0, FAT2+0, FAT1+0, FAT2+0,
-C33, FAT1+0, FAT2+0, FAT1+0, FAT2+0, C34, C3, FSInfo
+mount 0, C3, FSInfo, FAT1+0, FAT2+0, C33, FAT1+0, FAT2+0, FAT1+0, FAT2+0,
+C34, FAT1+0, FAT2+0, FAT1+0, FAT2+0, C35, C3, FSInfo
 == The hint 0xFFFFFFFF, which is no cluster
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 sys 0x8000
@@ -143,21 +143,21 @@ segment 0
 exit 0
 Slot 0: What the card holds that i_ff.img did not:
 Sectors changed outside the volume: none
-FSInfo free count: 0001F7E0 -> FFFFFFFF
-FSInfo next free: FFFFFFFF -> 00000023
+FSInfo free count: 0001F7DF -> FFFFFFFF
+FSInfo next free: FFFFFFFF -> 00000024
 FAT entries changed: 3
-  32-34: 00000000 -> each the next, the last 0FFFFFFF
+  33-35: 00000000 -> each the next, the last 0FFFFFFF
 FAT 2: the same changes
 NICE C3 entry 3:
   was zeros
-  now "F       TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 32 size 1500
+  now "F       TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 33 size 1500
 NICE/F.TXT: 1500 bytes, SHA-256 bf99d33fe4fd6e0a
 NICE/F.TXT: its sector 2 past the size: 36 bytes, zeros
 Sector writes, 17:
-mount 0, C3, FSInfo, FAT1+0, FAT2+0, C32, FAT1+0, FAT2+0, FAT1+0, FAT2+0,
-C33, FAT1+0, FAT2+0, FAT1+0, FAT2+0, C34, C3, FSInfo
+mount 0, C3, FSInfo, FAT1+0, FAT2+0, C33, FAT1+0, FAT2+0, FAT1+0, FAT2+0,
+C34, FAT1+0, FAT2+0, FAT1+0, FAT2+0, C35, C3, FSInfo
 == FSInfo without its signature, which is left alone
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 sys 0x8000
@@ -174,18 +174,18 @@ exit 0
 Slot 0: What the card holds that i_nosig.img did not:
 Sectors changed outside the volume: none
 FAT entries changed: 3
-  32-34: 00000000 -> each the next, the last 0FFFFFFF
+  33-35: 00000000 -> each the next, the last 0FFFFFFF
 FAT 2: the same changes
 NICE C3 entry 3:
   was zeros
-  now "F       TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 32 size 1500
+  now "F       TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 33 size 1500
 NICE/F.TXT: 1500 bytes, SHA-256 bf99d33fe4fd6e0a
 NICE/F.TXT: its sector 2 past the size: 36 bytes, zeros
 Sector writes, 15:
-mount 0, C3, FAT1+0, FAT2+0, C32, FAT1+0, FAT2+0, FAT1+0, FAT2+0, C33,
-FAT1+0, FAT2+0, FAT1+0, FAT2+0, C34, C3
+mount 0, C3, FAT1+0, FAT2+0, C33, FAT1+0, FAT2+0, FAT1+0, FAT2+0, C34,
+FAT1+0, FAT2+0, FAT1+0, FAT2+0, C35, C3
 == No FSInfo in the boot sector: 0
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 sys 0x8000
@@ -202,18 +202,18 @@ exit 0
 Slot 0: What the card holds that i_bpb0.img did not:
 Sectors changed outside the volume: none
 FAT entries changed: 3
-  32-34: 00000000 -> each the next, the last 0FFFFFFF
+  33-35: 00000000 -> each the next, the last 0FFFFFFF
 FAT 2: the same changes
 NICE C3 entry 3:
   was zeros
-  now "F       TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 32 size 1500
+  now "F       TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 33 size 1500
 NICE/F.TXT: 1500 bytes, SHA-256 bf99d33fe4fd6e0a
 NICE/F.TXT: its sector 2 past the size: 36 bytes, zeros
 Sector writes, 15:
-mount 0, C3, FAT1+0, FAT2+0, C32, FAT1+0, FAT2+0, FAT1+0, FAT2+0, C33,
-FAT1+0, FAT2+0, FAT1+0, FAT2+0, C34, C3
+mount 0, C3, FAT1+0, FAT2+0, C33, FAT1+0, FAT2+0, FAT1+0, FAT2+0, C34,
+FAT1+0, FAT2+0, FAT1+0, FAT2+0, C35, C3
 == No FSInfo in the boot sector: 0xFFFF, past the reserved sectors
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 sys 0x8000
@@ -230,18 +230,18 @@ exit 0
 Slot 0: What the card holds that i_bpbff.img did not:
 Sectors changed outside the volume: none
 FAT entries changed: 3
-  32-34: 00000000 -> each the next, the last 0FFFFFFF
+  33-35: 00000000 -> each the next, the last 0FFFFFFF
 FAT 2: the same changes
 NICE C3 entry 3:
   was zeros
-  now "F       TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 32 size 1500
+  now "F       TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 33 size 1500
 NICE/F.TXT: 1500 bytes, SHA-256 bf99d33fe4fd6e0a
 NICE/F.TXT: its sector 2 past the size: 36 bytes, zeros
 Sector writes, 15:
-mount 0, C3, FAT1+0, FAT2+0, C32, FAT1+0, FAT2+0, FAT1+0, FAT2+0, C33,
-FAT1+0, FAT2+0, FAT1+0, FAT2+0, C34, C3
+mount 0, C3, FAT1+0, FAT2+0, C33, FAT1+0, FAT2+0, FAT1+0, FAT2+0, C34,
+FAT1+0, FAT2+0, FAT1+0, FAT2+0, C35, C3
 == The free entries 32 to 39 with their top 4 bits set
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 sys 0x8000
@@ -257,8 +257,8 @@ segment 0
 exit 0
 Slot 0: What the card holds that i_top.img did not:
 Sectors changed outside the volume: none
-FSInfo free count: 0001F7E0 -> FFFFFFFF
-FSInfo next free: 0000001F -> 00000023
+FSInfo free count: 0001F7DF -> FFFFFFFF
+FSInfo next free: 00000020 -> 00000023
 FAT entries changed: 3
   32: 10000000 -> 10000021
   33: 10000000 -> 10000022
@@ -273,7 +273,7 @@ Sector writes, 17:
 mount 0, C3, FSInfo, FAT1+0, FAT2+0, C32, FAT1+0, FAT2+0, FAT1+0, FAT2+0,
 C33, FAT1+0, FAT2+0, FAT1+0, FAT2+0, C34, C3, FSInfo
 == The same, the file deleted
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 sys 0x8000
@@ -294,14 +294,14 @@ segment 1
 exit 0
 Slot 0: What the card holds that i_top.img did not:
 Sectors changed outside the volume: none
-FSInfo free count: 0001F7E0 -> FFFFFFFF
-FSInfo next free: 0000001F -> 00000020
+FSInfo free count: 0001F7DF -> FFFFFFFF
 FAT entries changed: 0
 FAT 2: the same changes
 NICE C3 entry 3:
   was zeros
   now "\xe5       TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 32 size 1500
-C32, of no file: 512 bytes not 0, SHA-256 cfe56b3d861da872
+NICE/HELLO.BIN: 14400 bytes, SHA-256 459e2af52fde6642
+NICE/HELLO.BIN: its sector 28 past the size: 448 bytes, "MNOPQRSTUVWXYZABCDEFGHIJKLMNOPQ\x0aSTUVWXYZABCDEFGHIJKLMNOPQRSTUVW\x0aYZABCDEFGHIJKLMNOPQRSTUVWXYZABC\x0aEFGHIJKLMNOPQRSTUVWXYZABCDEFGHI\x0aKLMNOPQRSTUVWXYZABCDEFGHIJKLMNO\x0aQRSTUVWXYZABCDEFGHIJKLMNOPQRSTU\x0aWXYZABCDEFGHIJKLMNOPQRSTUVWXYZA\x0aCDEFGHIJKLMNOPQRSTUVWXYZABCDEFG\x0aIJKLMNOPQRSTUVWXYZABCDEFGHIJKLM\x0aOPQRSTUVWXYZABCDEFGHIJKLMNOPQRS\x0aUVWXYZABCDEFGHIJKLMNOPQRSTUVWXY\x0aABCDEFGHIJKLMNOPQRSTUVWXYZABCDE\x0aGHIJKLMNOPQRSTUVWXYZABCDEFGHIJK\x0aMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQ\x0a"
 C33, of no file: 512 bytes not 0, SHA-256 2bc83e4f6dfc007e
 C34, of no file: 476 bytes not 0, SHA-256 2d50898119c1a147
 Sector writes, 25:
@@ -309,7 +309,7 @@ mount 0, C3, FSInfo, FAT1+0, FAT2+0, C32, FAT1+0, FAT2+0, FAT1+0, FAT2+0,
 C33, FAT1+0, FAT2+0, FAT1+0, FAT2+0, C34, C3, FSInfo, C3, FAT1+0, FAT2+0,
 FAT1+0, FAT2+0, FAT1+0, FAT2+0, FSInfo
 == A volume larger than its FATs: the last cluster that they hold, and the one after it
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 sys 0x8800

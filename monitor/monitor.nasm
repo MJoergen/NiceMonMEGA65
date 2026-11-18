@@ -1,6 +1,6 @@
 ; The monitor, the program of the ROM at 0x0000 (README.md). The core boots
 ; from it at reset. It gives the programs at 0x8000 a hardware abstraction
-; layer, the HAL: thirty-seven routines, called through the dispatch table at
+; layer, the HAL: forty-one routines, called through the dispatch table at
 ; the start of the ROM, and its main loop is BASIC's (issue #54), whose
 ; statements are typed on the keyboard or sent over the line, and shown
 ; on the screen and the line.
@@ -28,7 +28,7 @@
 ; does, and the monitor knows of BASIC only its two vectors, so neither
 ; reaches a label of the other.
 ;
-; The monitor is this file and six more, which the Makefile joins after
+; The monitor is this file and seven more, which the Makefile joins after
 ; it, in this order, so that the dispatch table is at 0:
 ;
 ; - monitor_sd.nasm: the SD cards below the file system, the sector
@@ -46,6 +46,9 @@
 ; - monitor_clock.nasm: the clock of the time of day, clock_set, entry
 ;   34, the dates of FAT's entries, and the real-time clock (issues #105,
 ;   #109, and #148).
+; - monitor_basic.nasm: the loader of BASIC's image from a card, which
+;   the cold start runs before it locks BASIC's half of the ROM (issue
+;   #153, doc/BASIC_ROM.md).
 ; - common.nasm: what both images share, each with a copy of its own:
 ;   the addresses of the devices that both use, BASIC's vectors, the
 ;   packed texts of puts_b, IP addresses, and the conversions of a date
@@ -229,7 +232,7 @@ V_T             .EQU    0xFFFFFEE0      ; 24 words for TAB, to 0xFFFFFEF7
 COLOR           .EQU    MON_FG_WHITE+MON_BG_BLACK  ; the color at the cold start
 OUT_LINE        .EQU    1
 OUT_SCREEN      .EQU    2
-TABLE_VERSION   .EQU    0x00010006      ; what mon_version returns: 1.6
+TABLE_VERSION   .EQU    0x00010007      ; what mon_version returns: 1.7
 PAGE            .EQU    24              ; the rows of a Page Up or Page Down
 SCR_MAX         .EQU    0x7FFF          ; the largest display offset
 
@@ -277,6 +280,10 @@ SCR_MAX         .EQU    0x7FFF          ; the largest display offset
                 JMP     clock_set       ; 34 at 0x44, monitor_clock.nasm
                 JMP     net_servers     ; 35 at 0x46, monitor_eth.nasm
                 JMP     mon_restore     ; 36 at 0x48, monitor.nasm
+                JMP     mon_build       ; 37 at 0x4A, monitor.nasm
+                JMP     con_key         ; 38 at 0x4C, monitor.nasm
+                JMP     scr_back        ; 39 at 0x4E, monitor.nasm
+                JMP     fs_complete     ; 40 at 0x50, monitor.nasm
 
 ; mon_reset: the cold start, entry 0, which reset runs and a program may
 ; call. E is cleared, the timer stopped, the FPU's stack emptied and its
@@ -300,7 +307,11 @@ mon_reset
                 MOVE    @FPU_CMD, 0x0101  ; CLEAR 1, as a reset of the core does
                 CLR     @SCR_FONT
                 CLR     @SCR_MODE       ; the text, not the chunky mode
-                MOVE    SP, STACK
+                MOVE    R6, :+
+                JMP     bas_ram         ; R2 the words of BASIC's RAM
+:
+                MOVE    SP, MON_RAM
+                SUB     SP, SP, R2
                 CALL    net_close
                 CLR     @V_MASK
                 CLR     @V_GW
@@ -341,6 +352,11 @@ mon_reset
                 CLR     @V_BACK
                 CALL    scr_cls
                 CALL    clock_rtc
+                CALL    bas_load        ; BASIC from a card, monitor_basic.nasm
+; The lock of BASIC's half of the ROM, a write of the monitor's own half,
+; which drops it, and BASIC's cold start: the monitor's one jump to it, so
+; that BASIC never runs with its half open (issue #153)
+                MOVE    @0, @0
                 JMP     BAS_COLD        ; BASIC's cold start
 
 ; mon_exit: entry 1, and where a program returns to. Back to BASIC's
@@ -351,7 +367,11 @@ mon_reset
 ; offset off, a fresh stack, and the status printed where the program left
 ; the cursor's registers, after a new line if that is not column 0.
 mon_exit
-                MOVE    SP, STACK
+                MOVE    R6, :+
+                JMP     bas_ram         ; R2 the words of BASIC's RAM
+:
+                MOVE    SP, MON_RAM
+                SUB     SP, SP, R2
                 PUSH    R1
                 CALL    mon_restore
                 POP     R1
@@ -385,10 +405,130 @@ mon_restore
                 CLR     R1
                 RET
 
+; bas_ram: R2 = the words of BASIC's own RAM, below the monitor's at
+; MON_RAM, from the header of the BASIC in the ROM (issue #153,
+; doc/BASIC_ROM.md, "The image"): its word BAS_H_RAM, when the header has
+; the magic word and the word is from BAS_RAM_MIN to BAS_RAM_MAX, and else
+; BASIC_WORDS. It needs no stack, as mon_exit runs it before SP is set: it
+; goes back to the address in R6. Uses R2 and R3.
+bas_ram
+                MOVE    R2, @BAS_H_RAM
+                SUB     R3, R2, BAS_RAM_MIN
+                CMP     R3, BAS_RAM_MAX-BAS_RAM_MIN+1
+        ?!C     MOVE    R2, BASIC_WORDS
+                CMP     @BAS_H_MAGIC, BAS_MAGIC
+        ?!Z     MOVE    R2, BASIC_WORDS
+                JMP     R6
+
 ; mon_version: entry 2. R1 = the version of the table, the major number in
 ; bits 31..16 and the minor in 15..0.
 mon_version
                 MOVE    R1, TABLE_VERSION
+                RET
+
+; mon_build: entry 37. R1 = the word address of the monitor's version, a
+; packed text (.ASCII_B), such as V2.3.1, as BASIC's banner shows it
+; (issue #153).
+mon_build
+                MOVE    R1, VERSION
+                RET
+
+; con_key: entry 38. R1 bit 0: wait for a byte; bit 1: show the address
+; that the DHCP exchange in the background gets, with bg_show, for a
+; caller whose line is empty. R1 = the next byte of the console, or -1
+; when none waits and bit 0 is 0. While it waits, and once without a wait,
+; it keeps the network going as getline_wait does: the exchange in the
+; background, and the lease's renewal. The port for Ethernet frames that
+; it enables stays enabled, so that no frame is lost between two calls;
+; con_getline's end, a program's return, and the cold start disable it.
+; Uses R1-R6, and R7 across the calls, saved: the flags.
+con_key
+                PUSH    R7
+                MOVE    R7, R1
+key_poll
+                MOVE    R1, @io.console
+                AND[M]  R0, R1, 0x100
+        ?!Z     AND     R1, R1, 0xFF
+        ?!Z     JMP     key_end
+                TST     @V_BSTATE
+        ?!Z     JMP     :+
+                TST     @V_LEASE
+        ?Z      JMP     key_none        ; nothing to keep going
+:
+                CALL    net_on
+                TST     @V_BSTATE
+        ?!Z     MOVE    @V_NWAIT, DHCP_CLIENT
+                CALL    net_step
+                CLR     @V_NWAIT
+                CALL    bg_step
+                AND[M]  R0, R7, 2
+        ?Z      CLR     R1
+                TST     R1
+        ?!Z     CALL    bg_show
+key_none
+                AND[M]  R0, R7, 1
+        ?!Z     JMP     key_poll
+                NOT     R1, R0          ; -1: none
+key_end
+                POP     R7
+                RET
+
+; scr_back: entry 39. The scrollback (the header): R1 rows further back
+; when it is above 0, -R1 rows forward when it is below 0, and the screen
+; again when it is 0 or reaches the screen. R1 = the rows shown back now,
+; 0 for the screen. Uses R1-R6.
+scr_back
+                MOVE    R3, R1
+                TST     R1
+        ?Z      JMP     :++
+        ?N      JMP     :+
+                CALL    hist_up
+                JMP     :+++
+:
+                SUB     R3, R0, R3
+                CALL    hist_down
+                JMP     :++
+:
+                CALL    hist_leave
+:
+                MOVE    R1, @V_BACK
+                RET
+
+; fs_complete: entry 40. TAB on a line of the caller's, as con_getline
+; has it (issue #137): R1 the word address of the line, one character a
+; word, R2 that of the cursor in it, and R3 that of the word after the
+; last that the line may take; each may be in the word window, as
+; net_waddr takes it, for C. It completes the name of a file of the
+; card's folder before the cursor, or lists the matches and shows the
+; line again, up to the cursor. R1 = the new cursor, as R2 has it, plain
+; or in the word window. Uses R1-R6, and R7 to R9 across the calls,
+; saved: the line, the end, and the cursor.
+fs_complete
+                PUSH    R7
+                PUSH    R8
+                PUSH    R9
+                PUSH    R2              ; the cursor as given
+                PUSH    R3
+                CALL    net_waddr
+                MOVE    R7, R1          ; the line
+                POP     R1
+                CALL    net_waddr
+                MOVE    R8, R1          ; the end
+                MOVE    R1, @SP
+                CALL    net_waddr
+                MOVE    R9, R1          ; the cursor
+                MOVE    R2, R1
+                MOVE    R1, R7
+                MOVE    R3, R8
+                CALL    complete
+                SUB     R1, R1, R9      ; the words that the cursor moved
+                POP     R2
+                CMP     R2, R9
+        ?!Z     SHL     R1, R1, 2       ; in the word window, 4 a word
+                ADD     R1, R1, R2
+                POP     R9
+                POP     R8
+                POP     R7
                 RET
 
 ; mon_putc: entry 3. R1 a character, bits 7..0, to the outputs of V_OUT:
@@ -759,9 +899,10 @@ hist_rev
 ; between them and around them, writes WORD at ADDR, when ADDR is in a
 ; program's RAM, from PROGRAM up to the monitor's variables. The RAM of
 ; a board repeats every RAM_WORDS words, so an address past it could
-; reach the ROM or the monitor's variables and stack, which are at
-; RAM_WORDS - VARS_WORDS and up of the RAM, 0x1E800 on the MEGA65 and
-; 0xE800 on the Nexys4DDR; where RAM_WORDS reads 0, as in niceemu, the
+; reach the ROM or the variables and the stacks, which are at
+; RAM_WORDS - MON_VARS - BASIC's RAM and up of the RAM, the words of
+; BASIC's header, 0x1E800 on the MEGA65 and 0xE800 on the Nexys4DDR with
+; 2K words of it (bas_ram); where RAM_WORDS reads 0, as in niceemu, the
 ; RAM goes up to the screen. A line with anything else is skipped, and a
 ; line of blanks only is passed over. A second line for an address writes
 ; its word over the first's. The counts: 0 the words written, 1 and 2 the
@@ -780,35 +921,26 @@ bin_line
                 MOVE    R7, R1
                 POP     R1
                 CALL    net_waddr
-                MOVE[M] R2, @RAM_WORDS
-        ?Z      MOVE    R2, SCREEN+VARS_WORDS  ; no limit
-                SUB     @6[R7], R2, VARS_WORDS
-                ADD     @5[R7], @5[R7], 1
-                CALL    _io_gethex      ; R1 the address, R2 its digits, R3 after it
-                TST     R2
-        ?!Z     JMP     :+
-                TST     @R3
-        ?Z      JMP     bin_blank       ; blanks only
-:
-                SUB     R4, R2, 1
-                CMP     R4, 8
-        ?!C     JMP     bin_bad         ; no digit, or more than 8
-                CMP     R1, PROGRAM
-        ?C      JMP     bin_bad         ; in the ROM
-                CMP     R1, @6[R7]
-        ?!C     JMP     bin_bad         ; the variables, or past the RAM
                 MOVE    R8, R1
-                MOVE    R1, R3
-                CALL    _io_gethex      ; R1 the word
-                SUB     R4, R2, 1
-                CMP     R4, 8
-        ?!C     JMP     bin_bad
+                MOVE    R6, :+
+                JMP     bas_ram         ; R2 the words of BASIC's RAM
 :
-                CMP     @R3, 0x20
-        ?Z      ADD     R3, R3, 1
-        ?Z      JMP     :-
-                TST     @R3
-        ?!Z     JMP     bin_bad         ; more after the word
+                ADD     R2, R2, MON_VARS  ; and the monitor's: the variables
+                MOVE[M] R3, @RAM_WORDS
+        ?Z      ADD     R3, R2, SCREEN  ; no limit
+                SUB     @6[R7], R3, R2
+                ADD     @5[R7], @5[R7], 1
+                MOVE    R1, R8
+                CALL    bin_parse
+                TST     R1
+        ?Z      JMP     bin_blank       ; blanks only
+        ?N      JMP     bin_bad
+                CMP     R6, PROGRAM
+        ?C      JMP     bin_bad         ; in the ROM
+                CMP     R6, @6[R7]
+        ?!C     JMP     bin_bad         ; the variables, or past the RAM
+                MOVE    R8, R6
+                MOVE    R1, R2
                 MOVE    @R8, R1
                 MOVE[M] R1, @R7         ; the words written before
         ?Z      MOVE    @1[R7], R8      ; the first
@@ -831,4 +963,42 @@ bin_blank
 bin_end
                 POP     R8
                 POP     R7
+                RET
+
+; bin_parse: the line at R1, one character a word up to a 0 word, as a
+; line of a .bin file: ADDR WORD, two hex numbers of 1 to 8 digits with
+; blanks between them and around them. R1 = 1 with R6 the address and R2
+; the word, 0 for a line of blanks only, or -1 for any other line, which
+; the caller tests. bin_line and the loader of BASIC's image share it.
+; Uses R1-R6.
+bin_parse
+                CALL    _io_gethex      ; R1 the address, R2 its digits, R3 after it
+                TST     R2
+        ?!Z     JMP     :+
+                TST     @R3
+        ?Z      JMP     parse_blank     ; blanks only
+:
+                SUB     R4, R2, 1
+                CMP     R4, 8
+        ?!C     JMP     parse_bad       ; no digit, or more than 8
+                MOVE    R6, R1
+                MOVE    R1, R3
+                CALL    _io_gethex      ; R1 the word
+                SUB     R4, R2, 1
+                CMP     R4, 8
+        ?!C     JMP     parse_bad
+:
+                CMP     @R3, 0x20
+        ?Z      ADD     R3, R3, 1
+        ?Z      JMP     :-
+                TST     @R3
+        ?!Z     JMP     parse_bad       ; more after the word
+                MOVE    R2, R1
+                ONE     R1
+                RET
+parse_blank
+                CLR     R1
+                RET
+parse_bad
+                NOT     R1, R0          ; -1
                 RET

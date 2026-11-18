@@ -350,8 +350,8 @@ entries alone (#152). Its workspace is the program's RAM:
   variables and room for the stack: about 90K words on the
   MEGA65 and 26K on the Nexys4DDR. In `niceemu`, where the word reads
   0, BASIC takes the MEGA65's size.
-- The variables are 6K words, `VARS_WORDS`: the monitor's 4K and
-  BASIC's 2K, of which its stage 1 uses 1194, and leaves 854
+- The variables are 6K words, `MON_VARS` and `BASIC_WORDS`: the
+  monitor's 4K and BASIC's 2K, of which its stage 1 uses 1194, and leaves 854
   (measured 2026-11-18). BASIC's state,
   its line buffers, and the keys typed ahead go there. Its 4K would
   leave no room for the stack above the RAM that nice_cpu's demo tests
@@ -699,9 +699,9 @@ final.
 
 ### Stage 3: the size of BASIC's RAM
 
-The monitor has the size of BASIC's own RAM in three places: `MOVE SP,
-STACK` in `mon_reset` and in `mon_exit`, and `VARS_WORDS` in
-`bin_line`, for the end of a program's RAM. That RAM is to grow from
+Before `V2.3.1`, the monitor had the size of BASIC's own RAM in three
+places: `MOVE SP, STACK` in `mon_reset` and in `mon_exit`, and
+`VARS_WORDS` in `bin_line`, for the end of a program's RAM. That RAM is to grow from
 2K words to 4K ([The memory](#the-memory)). The monitor's pushes at
 `mon_exit` would then land in it, and `bin_line` would write a file's
 words there. So the growth would change the monitor, and need a
@@ -709,7 +709,7 @@ bitstream.
 
 `V2.3.1` puts the words of BASIC's own RAM in a word of the header of
 BASIC's image ([BASIC_ROM.md](BASIC_ROM.md#the-image)). The monitor
-takes SP and the end of a program's RAM from it, and the header's
+takes SP and the end of a program's RAM from it, 1024 to 8192 words, and the header's
 version of the RAM's layout then covers the monitor's own RAM alone,
 from `0xFFFFF000`. `load.py --monitor` has the two RAMs' size as
 `MONITOR_WORDS`, and is to take BASIC's from the word instead.

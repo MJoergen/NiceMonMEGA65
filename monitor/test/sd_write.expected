@@ -1,4 +1,4 @@
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 sys 0x8000
@@ -8,7 +8,7 @@ halt
 Halted
 00009100: ffffffff 00000000 00000000 00000000 fffffff9 fffffff9
 Screen:
-|NiceMon V9.9
+|NiceMon V9.9, BASIC V9.9
 |HELP lists the statements
 |READY.
 |sys 0x8000

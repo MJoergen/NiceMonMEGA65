@@ -1,4 +1,4 @@
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 time
@@ -15,7 +15,7 @@ halt
 Halted
 ffffff46: 00000000 00000000 00000001 00000001
 Screen:
-|NiceMon V9.9
+|NiceMon V9.9, BASIC V9.9
 |HELP lists the statements
 |READY.
 |time
@@ -33,22 +33,22 @@ Screen:
 VBASE at the halt 000000
 exit 0
 fsck.fat -n:
-Free cluster summary uninitialized (should be 128991)
-IMAGE: 3 files, 31/129022 clusters
+Free cluster summary uninitialized (should be 128990)
+IMAGE: 3 files, 32/129022 clusters
 Files in NICE: HELLO.BIN p.bin
 Dates and times in NICE:
 P.BIN        created 2026-01-01 00:00:00 +  0/100, written 2026-01-01 00:00:00
 What the card holds that super.img did not:
 Sectors changed outside the volume: none
-FSInfo free count: 0001F7E0 -> FFFFFFFF
-FSInfo next free: 0000001F -> 00000021
+FSInfo free count: 0001F7DF -> FFFFFFFF
+FSInfo next free: 00000020 -> 00000022
 FAT entries changed: 1
-  32: 00000000 -> 0FFFFFFF
+  33: 00000000 -> 0FFFFFFF
 FAT 2: the same changes
 NICE C3 entry 3:
   was zeros
-  now "P       BIN" attr 20 case 18 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 32 size 18
+  now "P       BIN" attr 20 case 18 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 33 size 18
 NICE/P.BIN: 18 bytes, "00008000 00000001\x0a"
 NICE/P.BIN: its sector 0 past the size: 494 bytes, zeros
 Sector writes, 7:
-mount 0, C3, FSInfo, FAT1+0, FAT2+0, C32, C3, FSInfo
+mount 0, C3, FSInfo, FAT1+0, FAT2+0, C33, C3, FSInfo

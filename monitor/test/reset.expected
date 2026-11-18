@@ -1,12 +1,12 @@
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 sys 0
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 sys 0x8000
-Hello from 00008000, table 00010006
+Hello from 00008000, table 00010007
 at column 40
 on the line only
 Returned 0000002A
@@ -19,11 +19,11 @@ ffffff80: 00000060
 ffffff86: 00000000
 fffe1000: 0000ffff
 Screen:
-|NiceMon V9.9
+|NiceMon V9.9, BASIC V9.9
 |HELP lists the statements
 |READY.
 |sys 0x8000
-|Hello from 00008000, table 00010006
+|Hello from 00008000, table 00010007
 |                                        at column 40
 |Returned 0000002A
 |READY.

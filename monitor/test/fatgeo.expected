@@ -1,5 +1,5 @@
 == SAVE, LOAD, DIR, and DELETE on spc8.img
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 save "big", 0x8000, 2000
@@ -75,7 +75,7 @@ C11+7, FAT1+0, FAT2+0, FAT1+0, FAT2+0, C12+0, C12+1, C12+2, C12+3, C12+4,
 C12+5, C12+6, C3+0, FSInfo, C3+0, FAT1+0, FAT2+0, C13+0, C3+0, FSInfo,
 C3+0, FAT1+0, FAT2+0, C14+0, C3+0, FSInfo, C3+0, FAT1+0, FAT2+0, FSInfo
 == SAVE, LOAD, DIR, and DELETE on spc64.img
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 save "big", 0x8000, 2000
@@ -149,7 +149,7 @@ FAT1+0, FAT2+0, C5+0, C5+1, C5+2, C5+3, C5+4, C5+5, C5+6, C3+0, FSInfo,
 C3+0, FAT1+0, FAT2+0, C6+0, C3+0, FSInfo, C3+0, FAT1+0, FAT2+0, C7+0,
 C3+0, FSInfo, C3+0, FAT1+0, FAT2+0, FSInfo
 == SAVE, LOAD, DIR, and DELETE on fat1.img
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 save "big", 0x8000, 2000

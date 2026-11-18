@@ -1,12 +1,12 @@
 == A handle across SYS 0, which closes it; both handles in use after a return, so LOAD, SAVE, and DIR get error 23 and TAB works; then the program's handles still read
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 sys 0x8000
 Returned 00000005
 READY.
 sys 0
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 sys 0x8400
@@ -43,27 +43,27 @@ segment 2
   open 1 "" 2 -> 1
 segment 3
   read 0 3 -> 3 "000"
-  readdir 1 -> 1 "HELLO   BIN" attr 20 size 14256
+  readdir 1 -> 1 "HELLO   BIN" attr 20 size 14400
   close 0 -> 0
   close 1 -> 0
 exit 0
 Slot 0: The card as super.img was
 == SYS 0 forgets the mount of slot 1: DIR mounts slot 0 again
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 dir 1
 Directory of NICE
-HELLO.BIN                      14256
+HELLO.BIN                      14400
 Files: 1, directories: 0
 READY.
 sys 0
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 dir
 Directory of NICE
-my prog.bin                    14256
+my prog.bin                    14400
 mixed.Bin                         14
 lower.bin                         14
 caf?.bin                          14
@@ -106,7 +106,7 @@ exit 0
 Slot 0: The card as lfn.img was
 Slot 1: The card as super.img was
 == DIR 0 mounts the mounted slot again and closes the program's handle
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 sys 0x9000
@@ -114,7 +114,7 @@ Returned 00000002
 READY.
 dir 0
 Directory of NICE
-HELLO.BIN                      14256
+HELLO.BIN                      14400
 Files: 1, directories: 0
 READY.
 sys 0x9400

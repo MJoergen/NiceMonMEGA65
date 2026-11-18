@@ -91,7 +91,7 @@ V_NTPA          .EQU    0xFFFFEAD4      ; and the answer, 48 words
                 .ORG    BASIC_BASE
                 JMP     bas_start
                 JMP     bas_warm
-                .DAT    0x5341424E      ; 0x4004: the magic word, NBAS in packed ASCII
+                .DAT    BAS_MAGIC       ; 0x4004: the magic word, NBAS in packed ASCII
                 .DAT    65536*MON_LAYOUT+MON_ENTRIES  ; 0x4005: the interface
                 .DAT    0               ; 0x4006: the length in words, from BASIC_BASE
                 .DAT    0               ; 0x4007: the checksum, the sum over the length is 0
@@ -112,10 +112,8 @@ bas_warm
 bas_start
                 MOVE    @V_NEXT, PROGRAM
                 MOVE    @V_UNEXT, PROGRAM
-                MOVE    R1, S_NAME
-                CALL    puts_b
-                MOVE    R1, VERSION
-                CALL    puts_b_crlf
+                CALL    versions
+                CALL    _io_crlf
                 MOVE    R1, S_HINT
                 CALL    puts_b_crlf
 

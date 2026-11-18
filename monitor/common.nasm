@@ -24,14 +24,27 @@ TEXT_B          .EQU    0x20000000      ; the byte window: byte A of the memory 
 E_IP            .EQU    0xFFFFFFB0      ; the network station's IP address, NET_IP, the first byte in bits 31..24
 E_MACH          .EQU    0xFFFFFFB1      ; the first two bytes of its MAC address, in bits 15..0
 E_MACL          .EQU    0xFFFFFFB2      ; the last four bytes of its MAC address
-VARS_WORDS      .EQU    0x1800          ; the words from STACK, the variables, which end a program's RAM:
-STACK           .EQU    0xFFFFE800      ; BASIC's, BASIC_WORDS words, where SP starts, down,
-BASIC_WORDS     .EQU    0x800
-MON_RAM         .EQU    0xFFFFF000      ; and the monitor's, to 0xFFFFFEFF, below the devices
+STACK           .EQU    0xFFFFE800      ; the variables, which end a program's RAM: BASIC's, BASIC_WORDS words, where SP starts, down,
+BASIC_WORDS     .EQU    0x800           ; as this BASIC's header has them, which the monitor takes SP from (bas_ram)
+MON_RAM         .EQU    0xFFFFF000      ; and the monitor's, to 0xFFFFFEFF, below the devices,
+MON_VARS        .EQU    0x1000          ; MON_VARS words, with the I/O page
 MON_LAYOUT      .EQU    1               ; the version of the layout of the monitor's RAM, in BASIC's header
 BASIC_BASE      .EQU    0x4000          ; BASIC's image, above the monitor's, to PROGRAM:
 BAS_COLD        .EQU    BASIC_BASE      ; its cold start, where mon_reset goes at its end,
-BAS_WARM        .EQU    BASIC_BASE+2    ; and its warm start, where mon_exit goes, R1 the status
+BAS_WARM        .EQU    BASIC_BASE+2    ; and its warm start, where mon_exit goes, R1 the status,
+BAS_H_MAGIC     .EQU    BASIC_BASE+4    ; and its header (issue #153, doc/BASIC_ROM.md, "The image"): the magic word,
+BAS_H_IFACE     .EQU    BASIC_BASE+5    ; the interface, MON_LAYOUT in bits 31..16 and the entries it calls in 15..0,
+BAS_H_LENGTH    .EQU    BASIC_BASE+6    ; the words of the image,
+BAS_H_SUM       .EQU    BASIC_BASE+7    ; the checksum, the sum over the length is 0,
+BAS_H_TEXT      .EQU    BASIC_BASE+8    ; the address of the version text,
+BAS_H_VERSION   .EQU    BASIC_BASE+9    ; the version as a number,
+BAS_H_FLAGS     .EQU    BASIC_BASE+10   ; the flags,
+BAS_H_RAM       .EQU    BASIC_BASE+11   ; and the words of BASIC's RAM,
+BAS_H_WORDS     .EQU    12              ; the words of the vectors and the header
+BAS_MAGIC       .EQU    0x5341424E      ; NBAS in packed ASCII
+BAS_KEEP        .EQU    1               ; the flag "keep": the monitor does not replace this BASIC
+BAS_RAM_MIN     .EQU    0x400           ; the words of BASIC's RAM that the monitor takes, from 1K
+BAS_RAM_MAX     .EQU    0x2000          ; to 8K
 PROGRAM         .EQU    0x8000          ; where a program is, above the ROM
 RAM_WORDS       .EQU    0xFFFFFF9E      ; the words of the RAM, 0 in niceemu, where there is no limit
 CLOCK_USEC      .EQU    0xFFFFFF46      ; the microseconds, and a read takes a snapshot of the seconds

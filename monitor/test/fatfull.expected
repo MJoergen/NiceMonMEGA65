@@ -1,5 +1,5 @@
 == fs_write on a card with 3 free clusters
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 sys 0x8000
@@ -49,7 +49,7 @@ mount 0, C3, FSInfo, FAT1+535, FAT2+535, C68527, FAT1+535, FAT2+535,
 FAT1+535, FAT2+535, C68528, FAT1+535, FAT2+535, FAT1+535, FAT2+535,
 C68529, C3, FSInfo, C3 x2, mount 0, C3 x2
 == A folder of 65535 entries and one free
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 sys 0x8000

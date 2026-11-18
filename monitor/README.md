@@ -12,7 +12,7 @@
 
 The ROM at `0x0000`–`0x7FFF`, which the core boots from, holds:
 
-- a hardware abstraction layer, the HAL, of thirty-seven routines that reach
+- a hardware abstraction layer, the HAL, of forty-one routines that reach
   the hardware or the state the monitor keeps, called through a dispatch
   table at the start of the ROM. It is not a library: what a program can
   do for itself stays in the program.
@@ -23,8 +23,16 @@ The ROM at `0x0000`–`0x7FFF`, which the core boots from, holds:
 The rest of the ROM is free. The demo is not in the ROM: it is a
 program of its own (The demo below).
 
+At the first cold start after the FPGA's configuration, the monitor
+may put another BASIC into BASIC's half of the ROM: a file whose name
+matches `BASIC*.ROM`, in the folder `NICE` of a card. It takes the one
+with the highest version that passes its checks, and prints its name.
+Then BASIC's half is locked until the next configuration
+([doc/BASIC_ROM.md](../doc/BASIC_ROM.md)).
+
 The monitor's variables are in the RAM at `0xFFFFF000` and up, BASIC's
-2K words below them, at `0xFFFFE800`, and the stack grows down from
+below them, as many words as its image's header says, 2K words at
+`0xFFFFE800` for the build's BASIC, and the stack grows down from
 there ([SYSTEM.md](../doc/SYSTEM.md#stack-heap-and-variables)).
 
 ## Hardware abstraction layer
@@ -92,7 +100,7 @@ the version.
 
 `mon.h` has the entries' declarations for C, and is no part of the ROM.
 Each image has a RAM of its own: the monitor's at `0xFFFFF000`, and
-BASIC's at `0xFFFFE800`.
+BASIC's below it, at `0xFFFFE800` for 2K words.
 
 `make -C monitor` builds the monitor's image,
 `build/monitor_image.bin`, and `make rom` at the top joins it with
@@ -159,7 +167,7 @@ program starts with none of the values that this one left there.
 |---|---|---|---|
 | 0 | `00` | `mon_reset` | Cold start: E, the timer, the FPU, VBASE, the font base, and the mode word cleared, the stack, the variables, the screen, the clock of the time of day from the MEGA65's real-time clock while it is not set, the banner, BASIC's main loop. The RAM from `0x8000` is left alone. |
 | 1 | `02` | `mon_exit` | R1 a status. Back to BASIC's main loop with a fresh stack, with E, the timer, the FPU, VBASE, the font base, and the mode word cleared, the cursor shown and blinking, the display offset off, and the status printed where the program left the cursor, on a new line if that is not column 0; for a program that has not kept the SP of its entry. A program with the runtime's start-up code returns or calls `exit` instead, which lands here too. |
-| 2 | `04` | `mon_version` | → R1 the version of the table, major in bits 31..16, minor in 15..0: `0x00010006`, 1.6. |
+| 2 | `04` | `mon_version` | → R1 the version of the table, major in bits 31..16, minor in 15..0: `0x00010007`, 1.7. |
 | 3 | `06` | `mon_putc` | R1 a character, to the outputs `mon_out` selects. On the screen it goes at the cursor, which moves on, to the next row after the last column; CR moves the cursor to column 0, LF to column 0 of the next row, BS one back, and TAB to the next multiple of 8; the other control codes and `0x7F` do nothing, and `0x80` to `0x9F` go on the screen as any character, blank in Spleen and drawn from the font RAM when a program selected it; past the last row the rows move up by one, by copying, so the rows shown are always the 2000 words at `0xFFFF0000`, as in `niceemu`. On the line every byte goes as it is. |
 | 4 | `08` | `mon_out` | R1 the outputs: bit 0 the line, bit 1 the screen; both at reset. → R1 the old ones. |
 | 5 | `0A` | `scr_cls` | Clears the screen in the current color, cursor home, shown and blinking, display offset 0. |
@@ -194,6 +202,10 @@ program starts with none of the values that this one left there.
 | 34 | `44` | `clock_set` | R1 the seconds since 1970, R2 the microseconds. Sets the clock of the time of day, as `TIME` does, and on the MEGA65 the real-time clock too, in the years 2000 to 2099. → R1 0. Table 1.6. |
 | 35 | `46` | `net_servers` | R1 the word address of 2 words. Writes the DHCP server of the last exchange and the NTP server that DHCP gave to them, each 0 for none. → R1 0. Table 1.6. |
 | 36 | `48` | `mon_restore` | The state after a program, for a program that runs another, as `SYS` does: E, the timer, the FPU, VBASE, the font base, and the mode word cleared, the network closed, and the cursor shown and blinking where the program left its registers, with the display offset off. → R1 0. Table 1.6. |
+| 37 | `4A` | `mon_build` | → R1 the word address of the monitor's version, a packed text, four characters a word up to a 0 byte, such as `V2.3.1`, for BASIC's banner. Table 1.7. |
+| 38 | `4C` | `con_key` | R1 the flags: bit 0 waits for a key, bit 1 shows an address that DHCP gets meanwhile, as BASIC's empty line does. → R1 the next byte of the console, or -1 when none waits and bit 0 is 0. While it waits, it keeps the network going, as `con_getline` does. Table 1.7. |
+| 39 | `4E` | `scr_back` | R1 a number of rows: the scrollback that many rows further back when it is above 0, forward when below 0, and the screen again when it is 0 or reaches the screen. → R1 the rows shown back now, 0 for the screen. Table 1.7. |
+| 40 | `50` | `fs_complete` | R1 the word address of a line, one character a word, R2 that of the cursor in it, and R3 that of the word after the last that the line may take. TAB on that line, as `con_getline` has it: completes the name of a file of the card's folder before the cursor, or lists the matches and shows the line again, up to the cursor. → R1 the new cursor. Table 1.7. |
 
 By the table's own rule, it has no `mon_getc` or `mon_getc_nb`, as the
 console at `0xFFFFFF00` is the same on every board and in the emulator,

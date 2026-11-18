@@ -54,6 +54,7 @@ ROM_PARTS = {
     "monitor_eth.nasm": "The network, and its entries",
     "monitor_tcp.nasm": "TCP",
     "monitor_clock.nasm": "The clock: `clock_set`, the dates of files, and the real-time clock",
+    "monitor_basic.nasm": "The loader of BASIC's image from a card",
     "common.nasm": "What the monitor and BASIC share: texts, IP addresses, and dates",
     "monlib.nasm": "The routines that programs join",
     "mon.nasm": "The stubs of the entries",

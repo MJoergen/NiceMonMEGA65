@@ -1,5 +1,5 @@
 == LOAD of CR LF, of blank lines only, of a chain cut after its second cluster, and of lines of every kind
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 load "crlf.bin"

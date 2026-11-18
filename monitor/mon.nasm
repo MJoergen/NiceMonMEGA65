@@ -48,7 +48,11 @@ BIN_LINE        .EQU    0x42
 CLOCK_SET       .EQU    0x44
 NET_SERVERS     .EQU    0x46
 MON_RESTORE     .EQU    0x48
-MON_ENTRIES     .EQU    37              ; the number of the entries above, in BASIC's header
+MON_BUILD       .EQU    0x4A
+CON_KEY         .EQU    0x4C
+SCR_BACK        .EQU    0x4E
+FS_COMPLETE     .EQU    0x50
+MON_ENTRIES     .EQU    41              ; the number of the entries above, in BASIC's header
 
 ; The outputs of mon_out, as in mon.h
 MON_OUT_LINE    .EQU    1
@@ -206,6 +210,14 @@ _mon_net_servers
                 JMP     NET_SERVERS
 _mon_restore
                 JMP     MON_RESTORE
+_mon_build
+                JMP     MON_BUILD
+_mon_con_key
+                JMP     CON_KEY
+_mon_scr_back
+                JMP     SCR_BACK
+_mon_fs_complete
+                JMP     FS_COMPLETE
 _mon_scr_getx
 _scr_getx
                 JMP     SCR_GETXY

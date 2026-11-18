@@ -1,4 +1,4 @@
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 load
@@ -13,7 +13,7 @@ halt
 Halted
 ffffe812: 0000e800
 Screen:
-|NiceMon V9.9
+|NiceMon V9.9, BASIC V9.9
 |HELP lists the statements
 |READY.
 |load

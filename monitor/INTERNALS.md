@@ -11,6 +11,7 @@ the entries, or drives the registers itself.
 - [The frame routines](#the-frame-routines)
 - [FAT32](#fat32)
 - [The scrollback](#the-scrollback)
+- [The loader of BASIC](#the-loader-of-basic)
 - [The ROM's words](#the-roms-words)
   - [Keeping the tables](#keeping-the-tables)
 - [Building and testing](#building-and-testing)
@@ -190,6 +191,21 @@ its newest row is the last of the memory. In `niceemu` the display
 offset is plain memory, so all its bits are kept: the history has 384
 rows there, which `DUMP` and `--dump` read.
 
+## The loader of BASIC
+
+`monitor_basic.nasm` is the loader of BASIC's image from a card
+(doc/BASIC_ROM.md, "The cold start"), `bas_load`, which `mon_reset`
+calls before it locks BASIC's half and jumps to BASIC. It keeps no
+list of the files: each choice lists the folders of both slots again,
+and takes the highest key, the version and then the file's place,
+below that of the file that failed. Its state is in the monitor's RAM
+from `0xFFFFF400` to `0xFFFFF70C`, which nothing else uses: a line of
+the file, the bytes of a read, an entry, the header, two names, and
+the keys. It reads a line as `LOAD` does, and parses it with
+`bin_parse`, which `bin_line` shares. The staging area is the
+program's RAM from `0x8000`, 16384 words, zeroed before each file and
+after the last.
+
 ## FAT32
 
 `monitor_fat.nasm` is FAT32 (README.md, "Files"), in NICE assembly, as
@@ -235,10 +251,10 @@ assembled apart (#152): the monitor's from 0, and BASIC's from
 <!-- romsize layout -->
 | Part | Address | Words |
 |---|---|---:|
-| The monitor | `0x0000`–`0x2575` | 9590 |
-| Free | `0x2576`–`0x3FFF` | 6794 |
-| BASIC | `0x4000`–`0x53D2` | 5075 |
-| Free | `0x53D3`–`0x7FFF` | 11309 |
+| The monitor | `0x0000`–`0x293E` | 10559 |
+| Free | `0x293F`–`0x3FFF` | 5825 |
+| BASIC | `0x4000`–`0x53E9` | 5098 |
+| Free | `0x53EA`–`0x7FFF` | 11286 |
 <!-- /romsize layout -->
 
 The monitor's words, by the source they come from, in the order
@@ -251,18 +267,19 @@ ROM is built:
 <!-- romsize monitor -->
 | Source | What it is | Words | Text |
 |---|---|---:|---:|
-| `monitor.nasm` | The dispatch table, the HAL, and the cold start | 845 | 0 |
+| `monitor.nasm` | The dispatch table, the HAL, and the cold start | 1029 | 0 |
 | `monitor_sd.nasm` | The sector routines | 85 | 0 |
 | `monitor_fat.nasm` | FAT32, the file entries, and TAB | 2895 | 0 |
 | `monitor_eth.nasm` | The network, and its entries | 2440 | 10 |
 | `monitor_tcp.nasm` | TCP | 2414 | 0 |
 | `monitor_clock.nasm` | The clock: `clock_set`, the dates of files, and the real-time clock | 313 | 0 |
+| `monitor_basic.nasm` | The loader of BASIC's image from a card | 777 | 51 |
 | `common.nasm` | What the monitor and BASIC share: texts, IP addresses, and dates | 237 | 5 |
 | `monlib.nasm` | The routines that programs join | 274 | 0 |
-| `mon.nasm` | The stubs of the entries | 82 | 0 |
+| `mon.nasm` | The stubs of the entries | 90 | 0 |
 | `build/folder.nasm` | The folder's name | 3 | 3 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 9590 | 20 |
+| In all | | 10559 | 71 |
 <!-- /romsize monitor -->
 
 
@@ -452,6 +469,7 @@ compared with `test/NAME.expected`:
 | `fpu` | `test/fpu.nasm` | The FPU at a program's end (issue #141): each run leaves 10 values and the four flags on it, and the next one, after a return, `mon_exit`, or a jump to 0, the cold start, finds it empty with no flag. |
 | `fs` | `test/fs.nasm`, with FAT images in both slots | The file entries, through `mon.nasm`'s stubs: handles, reads across the fragments of a file and at its end, the folder's entries, mounts, each error a program can cause, and `fs_readname`'s long name and 8.3 name in lower case, and a file opened by its long name. |
 | `fsw` | `test/fsw.nasm`, with a copy of the card with partitions, one file read-only, and a write-protected card | The entries that write: a file written in pieces across clusters and read back, truncated, a file of ten clusters, deletions, one of a long name, a folder that grows a cluster, a mount that drops an open file, and each error. |
+| `hal17` | `test/hal17.nasm`, with `ab` typed after `SYS`, and `super.img` | The entries of table 1.7, through `mon.nasm`'s stubs: `mon_build`'s text, `con_key` with a wait, without, and with no key, `scr_back` back, forward, and past either end after 40 rows, and `fs_complete` on a line, plainly and through the word window, as a C stub calls it. |
 | `hal16` | `test/hal16.nasm`, with a line typed after `SYS` | The entries of table 1.6, through `mon.nasm`'s stubs: `con_getline` with a DEL, a full line, and TAB with no card, `bin_line`'s results and counts, `clock_set` and the clock it set, `net_servers` with none, and `mon_restore` after a program that stopped the cursor, set the timer, and moved the cursor off the screen. |
 | `fat` | The monitor, with FAT images in both slots | `DIR` and `LOAD`: the fragmented `FRAG.BIN`, a text file, bad arguments, and `HELLO.BIN` loaded and run. |
 | `fatw` | The monitor, with a copy of the card without partitions, and one that a write fills | `SAVE`, `LOAD`, `DIR`, and `DELETE`: a program saved and loaded back, a file truncated and deleted, bad arguments, and a full card, error 30, which has room again after `DELETE`. |
@@ -505,6 +523,19 @@ The suites of `test/fat_runs.py`, step 7:
 | `fatapi` | The entries' small cases: names and modes, reads of 0 bytes, a file open twice, words above 0xFF written, a directory handle's sector, a directory in mode 1, the order of the errors, and `fs_delete` of a file open to write. |
 
 `make test FAT_SUITES=fatapi` runs one suite; `FAT_SUITES=` none.
+
+`test/basload.py` tests the loader of BASIC's image from a card,
+`monitor_basic.nasm`, on the ROM of the tests with "keep" cleared, as a
+release's is. Its files are BASIC's image with another version and
+another text of it, so that the banner shows which one runs, made
+valid or broken on purpose, on cards that `mkfs.fat` and mtools make.
+It runs a card with no `BASIC*.ROM`, a newer and an older file, a name
+in lower case with CR LF, TABs, and blank lines, the ROM's "keep",
+each reason of a file that fails, three versions, the newest broken,
+all broken, the same version on both slots, a newer one on slot 1,
+slot 1 only, `SYS 0` with and without "keep" in the file, and BASIC's
+RAM at 4K words and 2K words, with `mon_exit`'s stack and `LOAD`'s end
+after each. Its output is compared with `test/basload.expected`.
 
 `niceemu` has no I2C master: its status word is memory, which reads 0,
 so the cold start of every run finds none, and `TIME` shows that the

@@ -72,6 +72,21 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   the monitor's half, `0x0000`–`0x3FFF`, which locks it until the FPGA
   is configured again. A write to the monitor's half is still dropped
   ([#153](https://github.com/MJoergen/NiceMonMEGA65/issues/153)).
+- At the first cold start after a configuration, the monitor loads
+  BASIC from a card: of the files `BASIC*.ROM` in the folder `NICE` of
+  either slot, the one with the highest version that passes its checks,
+  with a line that names it. A file that fails says why, and the next
+  one is tried; with none, the bitstream's BASIC runs. Then the cold
+  start locks BASIC's half
+  ([#153](https://github.com/MJoergen/NiceMonMEGA65/issues/153)).
+- The dispatch table is 1.7, with 4 entries more, 37 to 40:
+  `mon_build`, the monitor's version; `con_key`, a byte of the console
+  with or without a wait; `scr_back`, the scrollback; and
+  `fs_complete`, TAB on a line of the caller's. The banner and `VER`
+  show the monitor's version and BASIC's, `NiceMon V2.3.1, BASIC
+  V2.3.1`. The size of BASIC's RAM is in its header, from which the
+  monitor takes SP and the end of a program's RAM
+  ([#153](https://github.com/MJoergen/NiceMonMEGA65/issues/153)).
 
 **Changes.**
 

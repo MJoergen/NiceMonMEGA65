@@ -32,13 +32,10 @@ DIR_NAME        .EQU    24              ; DIR's column of the sizes
 FBUF_BYTES      .EQU    128             ; the bytes of a read of LOAD, the words of V_FBUF
 ROW_WORDS       .EQU    4               ; the words of a row of DUMP
 
-; CLS: scr_cls, entry 5. VER: the version of the monitor, and that of
+; CLS: scr_cls, entry 5. VER: the versions of the monitor and BASIC, and that of
 ; the table, major.minor, from mon_version, entry 2.
 st_ver
-                MOVE    R1, S_NAME
-                CALL    puts_b
-                MOVE    R1, VERSION
-                CALL    puts_b
+                CALL    versions
                 MOVE    R1, S_TABLE
                 CALL    puts_b
                 CALL    MON_VERSION
@@ -50,6 +47,19 @@ st_ver
                 AND     R1, R7, 0xFFFF
                 CALL    _io_putdec
                 JMP     _io_crlf        ; which returns to the caller
+
+; versions: the monitor's version, from mon_build, entry 37, and BASIC's,
+; as the banner shows them: NiceMon V2.3.1, BASIC V2.3.2 (issue #153).
+; Uses R1-R6.
+versions
+                MOVE    R1, S_NAME
+                CALL    puts_b
+                CALL    MON_BUILD
+                CALL    puts_b
+                MOVE    R1, S_BASIC
+                CALL    puts_b
+                MOVE    R1, VERSION
+                JMP     puts_b          ; which returns to the caller
 
 ; HALT: the core halted, until the reset button, or a host starts it
 st_halt
@@ -858,6 +868,8 @@ S_RETURN
 S_NAME          .ASCII_B 'NiceMon '
                 .DAT    0
 S_TABLE         .ASCII_B ', dispatch table '
+S_BASIC         .ASCII_B ', BASIC '
+                .DAT    0
 S_HALTED
                 .ASCII_B 'Halted'
 S_NOPROG

@@ -1,4 +1,4 @@
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 dir
@@ -16,7 +16,7 @@ READY.
 halt
 Halted
 Screen:
-|NiceMon V9.9
+|NiceMon V9.9, BASIC V9.9
 |HELP lists the statements
 |READY.
 |dir

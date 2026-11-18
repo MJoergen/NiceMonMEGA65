@@ -9,7 +9,7 @@
 ; bin_line at H16_COUNTS, the words that it wrote at H16_WORDS, and the
 ; servers of net_servers at H16_SRV:
 ;
-;  0  mon_version, 0x00010006, table 1.6
+;  0  mon_version, 0x00010007, table 1.7
 ;  1  con_getline of up to 8 characters, 8: 1345678x, as the DEL took
 ;     back the 2, the 9 did not fit, and TAB with no card added nothing
 ;  2  bin_line of H16_WORDS+1 12345678, 1, written

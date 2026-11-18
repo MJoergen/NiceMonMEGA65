@@ -4,7 +4,8 @@ The design of issue
 [#153](https://github.com/MJoergen/NiceMonMEGA65/issues/153): at the
 start, the monitor replaces BASIC's half of the ROM with a file from
 the SD card. **This is a draft. Of its [Stages](#stages), the first
-two, the header and the RTL, are written, and nothing else. The
+three, the header, the RTL, and the monitor, are written, but for the
+third's whole load in the RTL. The
 decisions of 2026-11-18 are in [Decisions](#decisions), with those
 that a review against the code changed the same day, and only the
 details of [Open questions](#open-questions) are open.**
@@ -270,9 +271,11 @@ the monitor's write of a word back to itself changes nothing in
    the rest of `0x4000`–`0x7FFF` of the ROM. A loop from the RAM to
    the ROM cannot fail as a card can, so the ROM always ends up with a
    whole, checked BASIC.
-7. Zero the staging area, and print `BASIC-V2.3.2.ROM from card 0`,
-   or, when its version is below that of the BASIC that the ROM had,
-   `BASIC-V2.3.2.ROM from card 0, older than the core's V2.4`.
+7. Zero the staging area. Before the copy, the loader prints
+   `BASIC-V2.3.2.ROM from card 0`, or, when its version is below that
+   of the BASIC that the ROM had,
+   `BASIC-V2.3.2.ROM from card 0, older than the core's V2.4`, as the
+   copy overwrites the old BASIC's text.
 8. **The lock and the jump.** The monitor writes a word of its own
    half back to itself, which sets the lock, and goes to `BAS_COLD`.
    Every path ends here, and it is the monitor's one jump to
@@ -331,7 +334,7 @@ dispatch table is 1.7, with four entries more, 41 in all:
 
 | Entry | What it gives | For |
 |---|---|---|
-| 37 | The monitor's version text | The banner and `VER`, with BASIC's own version |
+| `mon_build` | The monitor's version text | The banner and `VER`, with BASIC's own version |
 | `con_key` | A byte of the console, with a wait or without, and the network kept going meanwhile | BASIC's line, `GET`, and the break poll |
 | `scr_back` | The scrollback: some rows back or forward, or the screen again | BASIC's line |
 | `fs_complete` | TAB's completion of a file's name, on a line of the caller's | BASIC's line |
@@ -512,12 +515,15 @@ from the fifth on.
 
 ## Open questions
 
-No question of the design is open. These details are settled as the
-stages are written:
+No question of the design is open. Stage 3 settled two details:
 
-1. **The names** of the entries `con_key`, `scr_back`, and
-   `fs_complete`, and that of entry 37.
-2. **The range of the size of BASIC's RAM** that the loader takes.
+1. **The names** of the entries 37 to 40 are `mon_build`, `con_key`,
+   `scr_back`, and `fs_complete`.
+2. **The size of BASIC's RAM** that the loader takes is 1024 to 8192
+   words (`BAS_RAM_MIN` and `BAS_RAM_MAX` of `monitor/common.nasm`).
+
+One is open:
+
 3. **The time of the cold start** with a card, and with an empty slot
    on the R3, which is to be measured.
 
@@ -542,7 +548,13 @@ stages are written:
    with the lock's write; SP and `bin_line`'s end from the header;
    and table 1.7, with the entries 37 to 40, their stubs in `mon.nasm`
    and `mon.h`, and the banner. The tests in `niceemu`, and the whole
-   load in the RTL.
+   load in the RTL. Written but for the whole load in the RTL:
+   `monitor/monitor_basic.nasm` is the loader, 777 words, which keeps
+   no list of the files and lists the folders again for each choice.
+   Its reasons are `not a BASIC image`, `for another monitor`,
+   `bad header`, `bad address`, `bad line`, `bad checksum`, and
+   `card error`. `test/basload.py` and `test/hal17.nasm` are its tests
+   in `niceemu`.
 4. **The tools.** `load.py --basic`, "keep" in the images that the
    tools load, `make hwtest`, the README, and `basic/README.md`.
 5. **The release.** `V2.3.1`, with `BASIC-V2.3.1.ROM` as an asset. A

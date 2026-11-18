@@ -1,0 +1,445 @@
+== no card: the ROM's BASIC
+NiceMon V9.9, BASIC V9.9
+HELP lists the statements
+READY.
+ver
+NiceMon V9.9, BASIC V9.9, dispatch table 1.7
+READY.
+halt
+Halted
+Screen:
+|NiceMon V9.9, BASIC V9.9
+|HELP lists the statements
+|READY.
+|ver
+|NiceMon V9.9, BASIC V9.9, dispatch table 1.7
+|READY.
+|halt
+|Halted
+exit 0
+== a card with no BASIC*.ROM
+NiceMon V9.9, BASIC V9.9
+HELP lists the statements
+READY.
+halt
+Halted
+Screen:
+|NiceMon V9.9, BASIC V9.9
+|HELP lists the statements
+|READY.
+|halt
+|Halted
+exit 0
+== a newer BASIC: taken
+BASIC-V10.ROM from card 0
+NiceMon V9.9, BASIC A
+HELP lists the statements
+READY.
+ver
+NiceMon V9.9, BASIC A, dispatch table 1.7
+READY.
+halt
+Halted
+Screen:
+|BASIC-V10.ROM from card 0
+|NiceMon V9.9, BASIC A
+|HELP lists the statements
+|READY.
+|ver
+|NiceMon V9.9, BASIC A, dispatch table 1.7
+|READY.
+|halt
+|Halted
+exit 0
+== its name in lower case, with CR LF, TABs, and blank lines
+basic-x.rom from card 0
+NiceMon V9.9, BASIC A
+HELP lists the statements
+READY.
+halt
+Halted
+Screen:
+|basic-x.rom from card 0
+|NiceMon V9.9, BASIC A
+|HELP lists the statements
+|READY.
+|halt
+|Halted
+exit 0
+== an older BASIC: taken, with a notice
+BASIC-V9.8.ROM from card 0, older than the core's V9.9
+NiceMon V9.9, BASIC 9.8
+HELP lists the statements
+READY.
+halt
+Halted
+Screen:
+|BASIC-V9.8.ROM from card 0, older than the core's V9.9
+|NiceMon V9.9, BASIC 9.8
+|HELP lists the statements
+|READY.
+|halt
+|Halted
+exit 0
+== the ROM's BASIC with keep: no load
+NiceMon V9.9, BASIC V9.9
+HELP lists the statements
+READY.
+halt
+Halted
+Screen:
+|NiceMon V9.9, BASIC V9.9
+|HELP lists the statements
+|READY.
+|halt
+|Halted
+exit 0
+== a bad checksum
+BASIC-1.ROM on card 0: bad checksum
+NiceMon V9.9, BASIC V9.9
+HELP lists the statements
+READY.
+halt
+Halted
+Screen:
+|BASIC-1.ROM on card 0: bad checksum
+|NiceMon V9.9, BASIC V9.9
+|HELP lists the statements
+|READY.
+|halt
+|Halted
+exit 0
+== no magic word
+BASIC-2.ROM on card 0: not a BASIC image
+NiceMon V9.9, BASIC V9.9
+HELP lists the statements
+READY.
+halt
+Halted
+Screen:
+|BASIC-2.ROM on card 0: not a BASIC image
+|NiceMon V9.9, BASIC V9.9
+|HELP lists the statements
+|READY.
+|halt
+|Halted
+exit 0
+== a header line out of place
+BASIC-3.ROM on card 0: not a BASIC image
+NiceMon V9.9, BASIC V9.9
+HELP lists the statements
+READY.
+halt
+Halted
+Screen:
+|BASIC-3.ROM on card 0: not a BASIC image
+|NiceMon V9.9, BASIC V9.9
+|HELP lists the statements
+|READY.
+|halt
+|Halted
+exit 0
+== more entries than the table has
+BASIC-4.ROM on card 0: for another monitor
+NiceMon V9.9, BASIC V9.9
+HELP lists the statements
+READY.
+halt
+Halted
+Screen:
+|BASIC-4.ROM on card 0: for another monitor
+|NiceMon V9.9, BASIC V9.9
+|HELP lists the statements
+|READY.
+|halt
+|Halted
+exit 0
+== another layout of the monitor's RAM
+BASIC-5.ROM on card 0: for another monitor
+NiceMon V9.9, BASIC V9.9
+HELP lists the statements
+READY.
+halt
+Halted
+Screen:
+|BASIC-5.ROM on card 0: for another monitor
+|NiceMon V9.9, BASIC V9.9
+|HELP lists the statements
+|READY.
+|halt
+|Halted
+exit 0
+== too much RAM
+BASIC-6.ROM on card 0: bad header
+NiceMon V9.9, BASIC V9.9
+HELP lists the statements
+READY.
+halt
+Halted
+Screen:
+|BASIC-6.ROM on card 0: bad header
+|NiceMon V9.9, BASIC V9.9
+|HELP lists the statements
+|READY.
+|halt
+|Halted
+exit 0
+== an address past BASIC's half
+BASIC-7.ROM on card 0: bad address
+NiceMon V9.9, BASIC V9.9
+HELP lists the statements
+READY.
+halt
+Halted
+Screen:
+|BASIC-7.ROM on card 0: bad address
+|NiceMon V9.9, BASIC V9.9
+|HELP lists the statements
+|READY.
+|halt
+|Halted
+exit 0
+== addresses that fall
+BASIC-8.ROM on card 0: bad address
+NiceMon V9.9, BASIC V9.9
+HELP lists the statements
+READY.
+halt
+Halted
+Screen:
+|BASIC-8.ROM on card 0: bad address
+|NiceMon V9.9, BASIC V9.9
+|HELP lists the statements
+|READY.
+|halt
+|Halted
+exit 0
+== a file cut short
+BASIC-9.ROM on card 0: bad checksum
+NiceMon V9.9, BASIC V9.9
+HELP lists the statements
+READY.
+halt
+Halted
+Screen:
+|BASIC-9.ROM on card 0: bad checksum
+|NiceMon V9.9, BASIC V9.9
+|HELP lists the statements
+|READY.
+|halt
+|Halted
+exit 0
+== a bad line
+BASIC-10.ROM on card 0: bad line
+NiceMon V9.9, BASIC V9.9
+HELP lists the statements
+READY.
+halt
+Halted
+Screen:
+|BASIC-10.ROM on card 0: bad line
+|NiceMon V9.9, BASIC V9.9
+|HELP lists the statements
+|READY.
+|halt
+|Halted
+exit 0
+== three versions: the newest
+BASIC-B.ROM from card 0
+NiceMon V9.9, BASIC A2
+HELP lists the statements
+READY.
+halt
+Halted
+Screen:
+|BASIC-B.ROM from card 0
+|NiceMon V9.9, BASIC A2
+|HELP lists the statements
+|READY.
+|halt
+|Halted
+exit 0
+== the newest broken: the next
+BASIC-B.ROM on card 0: bad checksum
+BASIC-A.ROM from card 0
+NiceMon V9.9, BASIC A1
+HELP lists the statements
+READY.
+halt
+Halted
+Screen:
+|BASIC-B.ROM on card 0: bad checksum
+|BASIC-A.ROM from card 0
+|NiceMon V9.9, BASIC A1
+|HELP lists the statements
+|READY.
+|halt
+|Halted
+exit 0
+== all broken: the ROM's
+BASIC-B.ROM on card 0: bad checksum
+BASIC-A.ROM on card 0: bad checksum
+NiceMon V9.9, BASIC V9.9
+HELP lists the statements
+READY.
+halt
+Halted
+Screen:
+|BASIC-B.ROM on card 0: bad checksum
+|BASIC-A.ROM on card 0: bad checksum
+|NiceMon V9.9, BASIC V9.9
+|HELP lists the statements
+|READY.
+|halt
+|Halted
+exit 0
+== the same version on both slots: slot 0's
+BASIC-S.ROM from card 0
+NiceMon V9.9, BASIC S0
+HELP lists the statements
+READY.
+halt
+Halted
+Screen:
+|BASIC-S.ROM from card 0
+|NiceMon V9.9, BASIC S0
+|HELP lists the statements
+|READY.
+|halt
+|Halted
+exit 0
+== a newer one on slot 1
+BASIC-S.ROM from card 1
+NiceMon V9.9, BASIC S1
+HELP lists the statements
+READY.
+halt
+Halted
+Screen:
+|BASIC-S.ROM from card 1
+|NiceMon V9.9, BASIC S1
+|HELP lists the statements
+|READY.
+|halt
+|Halted
+exit 0
+== slot 1 only
+BASIC-S.ROM from card 1
+NiceMon V9.9, BASIC S1
+HELP lists the statements
+READY.
+halt
+Halted
+Screen:
+|BASIC-S.ROM from card 1
+|NiceMon V9.9, BASIC S1
+|HELP lists the statements
+|READY.
+|halt
+|Halted
+exit 0
+== SYS 0 loads again in niceemu
+BASIC-V10.ROM from card 0
+NiceMon V9.9, BASIC A
+HELP lists the statements
+READY.
+sys 0
+BASIC-V10.ROM from card 0
+NiceMon V9.9, BASIC A
+HELP lists the statements
+READY.
+halt
+Halted
+Screen:
+|BASIC-V10.ROM from card 0
+|NiceMon V9.9, BASIC A
+|HELP lists the statements
+|READY.
+|halt
+|Halted
+exit 0
+== a file with keep: taken, and SYS 0 keeps it
+BASIC-V10.ROM from card 0
+NiceMon V9.9, BASIC A
+HELP lists the statements
+READY.
+sys 0
+NiceMon V9.9, BASIC A
+HELP lists the statements
+READY.
+halt
+Halted
+Screen:
+|NiceMon V9.9, BASIC A
+|HELP lists the statements
+|READY.
+|halt
+|Halted
+exit 0
+== 4K words of BASIC's RAM: mon_exit's stack, and LOAD's end
+BASIC-V10.ROM from card 0
+NiceMon V9.9, BASIC A
+HELP lists the statements
+READY.
+sys 0xC000
+Returned 1234ABCD
+READY.
+load
+ADDR WORD in hex on each line, as in a .bin file; an empty line ends
+Words loaded: 1, 0001DFFF to 0001DFFF
+Lines skipped: 1, first line 2; ADDR WORD in hex, ADDR 00008000 to 0001DFFF
+READY.
+halt
+Halted
+ffffdfff: 1234abcd
+0001dfff: 00000005 00000000
+Screen:
+|BASIC-V10.ROM from card 0
+|NiceMon V9.9, BASIC A
+|HELP lists the statements
+|READY.
+|sys 0xC000
+|Returned 1234ABCD
+|READY.
+|load
+|ADDR WORD in hex on each line, as in a .bin file; an empty line ends
+|Words loaded: 1, 0001DFFF to 0001DFFF
+|Lines skipped: 1, first line 2; ADDR WORD in hex, ADDR 00008000 to 0001DFFF
+|READY.
+|halt
+|Halted
+exit 0
+== 2K words: the same
+BASIC-V10.ROM from card 0
+NiceMon V9.9, BASIC A
+HELP lists the statements
+READY.
+sys 0xC000
+Returned 1234ABCD
+READY.
+load
+ADDR WORD in hex on each line, as in a .bin file; an empty line ends
+Words loaded: 1, 0001E7FF to 0001E7FF
+Lines skipped: 1, first line 2; ADDR WORD in hex, ADDR 00008000 to 0001E7FF
+READY.
+halt
+Halted
+ffffdfff: 00000000
+ffffe7ff: 00004028
+0001e7ff: 00000005 00000000
+Screen:
+|BASIC-V10.ROM from card 0
+|NiceMon V9.9, BASIC A
+|HELP lists the statements
+|READY.
+|sys 0xC000
+|Returned 1234ABCD
+|READY.
+|load
+|ADDR WORD in hex on each line, as in a .bin file; an empty line ends
+|Words loaded: 1, 0001E7FF to 0001E7FF
+|Lines skipped: 1, first line 2; ADDR WORD in hex, ADDR 00008000 to 0001E7FF
+|READY.
+|halt
+|Halted
+exit 0

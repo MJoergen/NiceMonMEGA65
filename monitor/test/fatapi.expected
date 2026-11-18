@@ -1,5 +1,5 @@
 == Names and modes, reads of 0 bytes and of a file open twice, words above 0xFF written, and a directory handle's sector
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 sys 0x8000
@@ -50,7 +50,7 @@ segment 1
   close 0 -> 0
 segment 2
   open 1 "" 2 -> 0
-  readdir 1 -> 1 "HELLO   BIN" attr 20 size 14256
+  readdir 1 -> 1 "HELLO   BIN" attr 20 size 14400
   open 0 "LATE.TXT" 1 -> 1
   close 0 -> 0
   readdir 1 -> 1 "W       TXT" attr 20 size 3
@@ -58,7 +58,7 @@ segment 2
   readdir 1 -> 0
   close 1 -> 0
   open 1 "" 2 -> 0
-  readdir 1 -> 1 "HELLO   BIN" attr 20 size 14256
+  readdir 1 -> 1 "HELLO   BIN" attr 20 size 14400
   readdir 1 -> 1 "W       TXT" attr 20 size 3
   readdir 1 -> 1 "LATE    TXT" attr 20 size 0
   readdir 1 -> 0
@@ -66,26 +66,26 @@ segment 2
 exit 0
 Slot 0: What the card holds that super.img did not:
 Sectors changed outside the volume: none
-FSInfo free count: 0001F7E0 -> FFFFFFFF
-FSInfo next free: 0000001F -> 00000021
+FSInfo free count: 0001F7DF -> FFFFFFFF
+FSInfo next free: 00000020 -> 00000022
 FAT entries changed: 1
-  32: 00000000 -> 0FFFFFFF
+  33: 00000000 -> 0FFFFFFF
 FAT 2: the same changes
 NICE C3 entry 3:
   was zeros
-  now "W       TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 32 size 3
+  now "W       TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 33 size 3
 NICE C3 entry 4:
   was zeros
   now "LATE    TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 0 size 0
 NICE/W.TXT: 3 bytes, "AB\x0a"
 NICE/W.TXT: its sector 0 past the size: 509 bytes, zeros
 fsck.fat -n:
-Free cluster summary uninitialized (should be 128991)
-IMAGE: 4 files, 31/129022 clusters
+Free cluster summary uninitialized (should be 128990)
+IMAGE: 4 files, 32/129022 clusters
 Sector writes, 9:
-mount 0, C3, FSInfo, FAT1+0, FAT2+0, C32, C3, FSInfo, C3 x2
+mount 0, C3, FSInfo, FAT1+0, FAT2+0, C33, C3, FSInfo, C3 x2
 == Mode 1 of a directory, the order of the errors with both handles in use, and fs_delete of a file open to write
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 sys 0x8C00
@@ -115,8 +115,8 @@ Slot 0: What the card holds that fat32.img did not:
 Sectors changed outside the volume: none
 FAT entries changed: 0
 FAT 2: the same changes
-NICE C48 entry 14:
-  was "\xe5AP2    TXT" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2025-06-15 written 2025-06-15 12:34:56 cluster 62 size 512
+NICE C49 entry 14:
+  was "\xe5AP2    TXT" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2025-06-15 written 2025-06-15 12:34:56 cluster 63 size 512
   now "NEW     TXT" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 0 size 0
 Sector writes, 2:
-mount 0, C48 x2
+mount 0, C49 x2

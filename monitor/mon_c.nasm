@@ -47,6 +47,13 @@ _c_bin_line
 _c_net_servers
                 ADD     R1, R1, 0x10000000+4*___wasm_memory
                 JMP     NET_SERVERS
+_c_fs_complete
+                ADD     R1, R1, 0x10000000+4*___wasm_memory
+                ADD     R2, R2, 0x10000000+4*___wasm_memory
+                ADD     R3, R3, 0x10000000+4*___wasm_memory
+                CALL    FS_COMPLETE
+                SUB     R1, R1, 0x10000000+4*___wasm_memory
+                RET
 
 ; The NICE word address of a C pointer to words, at a multiple of 4, for
 ; the entries that take one character or byte per word, fs_open and

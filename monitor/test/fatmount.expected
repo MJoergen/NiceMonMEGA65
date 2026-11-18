@@ -1,5 +1,5 @@
 == DIR of m_fat12.img
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 dir
@@ -10,7 +10,7 @@ Halted
 exit 0
 Slot 0: The card as m_fat12.img was
 == DIR of m_fat16.img
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 dir
@@ -21,7 +21,7 @@ Halted
 exit 0
 Slot 0: The card as m_fat16.img was
 == DIR of m_fat12p.img
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 dir
@@ -32,7 +32,7 @@ Halted
 exit 0
 Slot 0: The card as m_fat12p.img was
 == DIR of m_nopart.img
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 dir
@@ -43,7 +43,7 @@ Halted
 exit 0
 Slot 0: The card as m_nopart.img was
 == DIR of m_zero.img
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 dir
@@ -54,7 +54,7 @@ Halted
 exit 0
 Slot 0: The card as m_zero.img was
 == DIR of m_p83.img
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 dir
@@ -65,7 +65,7 @@ Halted
 exit 0
 Slot 0: The card as m_p83.img was
 == DIR of m_pb.img
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 dir
@@ -77,7 +77,7 @@ Halted
 exit 0
 Slot 0: The card as m_pb.img was
 == DIR of m_nosig.img
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 dir
@@ -88,7 +88,7 @@ Halted
 exit 0
 Slot 0: The card as m_nosig.img was
 == DIR of m_jump.img
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 dir
@@ -99,7 +99,7 @@ Halted
 exit 0
 Slot 0: The card as m_jump.img was
 == DIR of m_bps.img
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 dir
@@ -110,7 +110,7 @@ Halted
 exit 0
 Slot 0: The card as m_bps.img was
 == DIR of m_spc0.img
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 dir
@@ -121,7 +121,7 @@ Halted
 exit 0
 Slot 0: The card as m_spc0.img was
 == DIR of m_spc3.img
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 dir
@@ -132,7 +132,7 @@ Halted
 exit 0
 Slot 0: The card as m_spc3.img was
 == DIR of m_rsvd0.img
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 dir
@@ -143,7 +143,7 @@ Halted
 exit 0
 Slot 0: The card as m_rsvd0.img was
 == DIR of m_nfats0.img
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 dir
@@ -154,7 +154,7 @@ Halted
 exit 0
 Slot 0: The card as m_nfats0.img was
 == DIR of m_fatsz0.img
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 dir
@@ -165,7 +165,7 @@ Halted
 exit 0
 Slot 0: The card as m_fatsz0.img was
 == DIR of m_fatszbig.img
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 dir
@@ -176,7 +176,7 @@ Halted
 exit 0
 Slot 0: The card as m_fatszbig.img was
 == DIR of m_nodata.img
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 dir
@@ -187,7 +187,7 @@ Halted
 exit 0
 Slot 0: The card as m_nodata.img was
 == DIR of m_fat16sz.img
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 dir
@@ -198,7 +198,7 @@ Halted
 exit 0
 Slot 0: The card as m_fat16sz.img was
 == DIR of m_rootent.img
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 dir
@@ -209,7 +209,7 @@ Halted
 exit 0
 Slot 0: The card as m_rootent.img was
 == DIR of m_c4084.img
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 dir
@@ -220,7 +220,7 @@ Halted
 exit 0
 Slot 0: The card as m_c4084.img was
 == DIR of m_c4085.img
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 dir
@@ -231,7 +231,7 @@ Halted
 exit 0
 Slot 0: The card as m_c4085.img was
 == DIR of m_c65524.img
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 dir
@@ -242,12 +242,12 @@ Halted
 exit 0
 Slot 0: The card as m_c65524.img was
 == DIR of m_c65525.img
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 dir
 Directory of NICE
-HELLO.BIN                      14256
+HELLO.BIN                      14400
 Files: 1, directories: 0
 READY.
 halt
@@ -255,7 +255,7 @@ Halted
 exit 0
 Slot 0: The card as m_c65525.img was
 == DIR of m_root1.img
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 dir
@@ -266,7 +266,7 @@ Halted
 exit 0
 Slot 0: The card as m_root1.img was
 == DIR of m_roottop.img
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 dir
@@ -277,7 +277,7 @@ Halted
 exit 0
 Slot 0: The card as m_roottop.img was
 == DIR of m_total.img
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 dir
@@ -288,7 +288,7 @@ Halted
 exit 0
 Slot 0: The card as m_total.img was
 == DIR of m_total16.img
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 dir
@@ -299,7 +299,7 @@ Halted
 exit 0
 Slot 0: The card as m_total16.img was
 == DIR of m_psize.img
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 dir
@@ -310,7 +310,7 @@ Halted
 exit 0
 Slot 0: The card as m_psize.img was
 == DIR of m_nicecl.img
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 dir
@@ -321,7 +321,7 @@ Halted
 exit 0
 Slot 0: The card as m_nicecl.img was
 == DIR of m_fatwrap.img
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 dir
@@ -332,12 +332,12 @@ Halted
 exit 0
 Slot 0: The card as m_fatwrap.img was
 == DIR of m_baddir.img
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 dir
 Directory of NICE
-HELLO.BIN                      14256
+HELLO.BIN                      14400
 F01.TXT                            0
 F02.TXT                            0
 F03.TXT                            0
@@ -358,7 +358,7 @@ Halted
 exit 0
 Slot 0: The card as m_baddir.img was
 == No card in either slot
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 dir
@@ -374,12 +374,12 @@ halt
 Halted
 exit 0
 == DIR with a slot of 2^31 and more has no such slot (issue #151, B1)
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 dir 1
 Directory of NICE
-HELLO.BIN                      14256
+HELLO.BIN                      14400
 Files: 1, directories: 0
 READY.
 dir 2147483648

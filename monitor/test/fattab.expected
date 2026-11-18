@@ -1,5 +1,5 @@
 == TAB after a quote, in another case and in the same, of an alias, in words after blanks and strings, and a list of 23 names
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 load "MY^H^Hmy prog.bin" ^C
@@ -79,12 +79,12 @@ Halted
 exit 0
 Slot 0: The card as lfn.img was
 == TAB with slot 1 mounted by DIR 1: its names, a directory left out, names that end at the line's end, 76 characters, or past it, and a list of 30 names, more than the screen's 25 rows
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 dir 1
 Directory of NICE
-HELLO.BIN                      14256
+HELLO.BIN                      14400
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.bin
                                    0
 bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.bin
@@ -166,7 +166,7 @@ exit 0
 Slot 0: The card as lfn.img was
 Slot 1: The card as tab1.img was
 == TAB after SAVE and DELETE
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 load z^C
@@ -190,23 +190,23 @@ Halted
 exit 0
 Slot 0: What the card holds that super.img did not:
 Sectors changed outside the volume: none
-FSInfo free count: 0001F7E0 -> FFFFFFFF
-FSInfo next free: 0000001F -> 00000020
+FSInfo free count: 0001F7DF -> FFFFFFFF
+FSInfo next free: 00000020 -> 00000021
 FAT entries changed: 1
-  33: 00000000 -> 0FFFFFFF
+  34: 00000000 -> 0FFFFFFF
 FAT 2: the same changes
 NICE C3 entry 3:
   was zeros
-  now "\xe5EBRA   BIN" attr 20 case 08 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 32 size 18
+  now "\xe5EBRA   BIN" attr 20 case 08 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 33 size 18
 NICE C3 entry 4:
   was zeros
   now long 41 "Hz.BIN\u0000\uffff\uffff\uffff\uffff\uffff\uffff" attr 0F type 00 sum 86 cluster 0000
 NICE C3 entry 5:
   was zeros
-  now "HZ      BIN" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 33 size 18
-C32, of no file: 18 bytes not 0, SHA-256 c440f3b4c55e0e5c
+  now "HZ      BIN" attr 20 case 00 created 2026-01-01 00:00:00 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 34 size 18
+C33, of no file: 18 bytes not 0, SHA-256 c440f3b4c55e0e5c
 NICE/HZ.BIN: 18 bytes, "00008000 00000000\x0a"
 NICE/HZ.BIN: its sector 0 past the size: 494 bytes, zeros
 Sector writes, 17:
-mount 0, C3, FSInfo, FAT1+0, FAT2+0, C32, C3, FSInfo, C3, FAT1+0, FAT2+0,
-C33, C3, FSInfo, C3, FAT1+0, FAT2+0, FSInfo
+mount 0, C3, FSInfo, FAT1+0, FAT2+0, C33, C3, FSInfo, C3, FAT1+0, FAT2+0,
+C34, C3, FSInfo, C3, FAT1+0, FAT2+0, FSInfo

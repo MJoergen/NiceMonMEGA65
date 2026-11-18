@@ -1,5 +1,5 @@
 == none
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 ip "10.0.0.9"
@@ -44,7 +44,7 @@ frame 6, 59 bytes
 020  00 02 pp pp 00 45 00 19 00 00 00 01 70 72 6f 67
 030  2e 62 69 6e 00 6f 63 74 65 74 00
 == ok
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 ip "10.0.0.9"
@@ -91,7 +91,7 @@ frame 7, 46 bytes
 010  00 20 ii ii 00 00 40 11 cc cc 0a 00 00 09 0a 00
 020  00 02 pp pp 0d 80 00 0c 00 00 00 04 00 02
 == lost
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 ip "10.0.0.9"
@@ -134,7 +134,7 @@ frame 6, 46 bytes
 010  00 20 ii ii 00 00 40 11 cc cc 0a 00 00 09 0a 00
 020  00 02 pp pp 0d 80 00 0c 00 00 00 04 00 02
 == error
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 ip "10.0.0.9"
@@ -159,7 +159,7 @@ frame 2, 59 bytes
 020  00 02 pp pp 00 45 00 19 00 00 00 01 70 72 6f 67
 030  2e 62 69 6e 00 6f 63 74 65 74 00
 == half
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 ip "10.0.0.9"
@@ -190,7 +190,7 @@ frame 3, 46 bytes
 010  00 20 ii ii 00 00 40 11 cc cc 0a 00 00 09 0a 00
 020  00 02 pp pp 0d 80 00 0c 00 00 00 04 00 01
 == exact
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 ip "10.0.0.9"
@@ -223,7 +223,7 @@ frame 4, 46 bytes
 010  00 20 ii ii 00 00 40 11 cc cc 0a 00 00 09 0a 00
 020  00 02 pp pp 0d 80 00 0c 00 00 00 04 00 02
 == empty
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 ip "10.0.0.9"
@@ -252,7 +252,7 @@ frame 3, 46 bytes
 010  00 20 ii ii 00 00 40 11 cc cc 0a 00 00 09 0a 00
 020  00 02 pp pp 0d 80 00 0c 00 00 00 04 00 01
 == list
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 ip "10.0.0.9"
@@ -280,7 +280,7 @@ frame 3, 46 bytes
 010  00 20 ii ii 00 00 40 11 cc cc 0a 00 00 09 0a 00
 020  00 02 pp pp 0d 80 00 0c 00 00 00 04 00 01
 == port
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 ip "10.0.0.9"
@@ -310,7 +310,7 @@ frame 3, 46 bytes
 010  00 20 ii ii 00 00 40 11 cc cc 0a 00 00 09 0a 00
 020  00 02 pp pp 0d 80 00 0c 00 00 00 04 00 01
 == args
-NiceMon V9.9
+NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 load "a.bin", "x"
