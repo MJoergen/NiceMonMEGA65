@@ -276,6 +276,39 @@ halt
 Halted
 exit 0
 Slot 0: The card as m_roottop.img was
+== DIR of m_total.img
+NiceMon V9.9
+HELP lists the statements
+READY.
+dir
+File error 26, the FAT is damaged
+READY.
+halt
+Halted
+exit 0
+Slot 0: The card as m_total.img was
+== DIR of m_total16.img
+NiceMon V9.9
+HELP lists the statements
+READY.
+dir
+File error 16, no FAT32 file system
+READY.
+halt
+Halted
+exit 0
+Slot 0: The card as m_total16.img was
+== DIR of m_psize.img
+NiceMon V9.9
+HELP lists the statements
+READY.
+dir
+File error 26, the FAT is damaged
+READY.
+halt
+Halted
+exit 0
+Slot 0: The card as m_psize.img was
 == DIR of m_nicecl.img
 NiceMon V9.9
 HELP lists the statements

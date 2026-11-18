@@ -312,8 +312,9 @@ and must be formatted. FAT12 and FAT16 are rejected with a message.
   with an 8.3 alias as Windows and mtools make it, with a tail `~1`,
   `~2`, and on, counted up, when the name does not fit. The entries
   take a run of free slots in a row, which may go on into a new cluster
-  of the folder. Deleting a file also deletes its long-name entries, so
-  that `fsck.fat` finds no orphans.
+  of the folder. Deleting a file also deletes the long-name entries right
+  before its entry, also those whose checksum does not fit it, which are
+  orphans, so that `fsck.fat` finds none.
 - **Directories**: in FAT32 the root directory is a cluster chain like any
   other, so a current directory is one cluster number, and `cd` costs
   little. NiceMon works in its folder of the root, `NICE` unless the
@@ -336,7 +337,8 @@ and must be formatted. FAT12 and FAT16 are rejected with a message.
   clusters. A new cluster is searched from
   FSInfo's next-free hint, as the FAT of a 32 GB card has about four
   million entries, and a deletion moves the hint back to the clusters it
-  freed. Before the first change of the FAT after a mount, FSInfo's free
+  freed. The hint is read with nothing written, so a write to a full
+  card leaves FSInfo alone. Before the first change of the FAT after a mount, FSInfo's free
   count is set to unknown, `0xFFFFFFFF`, which every FAT driver accepts,
   and `fsck.fat` reports as uninitialized. `fat_close` puts the date and
   the time of the clock of the time of day into the entry of a file
@@ -348,7 +350,8 @@ and must be formatted. FAT12 and FAT16 are rejected with a message.
   zeros, written before it is linked, up to 65536 entries.
 - **Safety**: the ROM writes only inside the partition, never the MBR or
   the boot sector, and refuses a card whose FAT32 boot sector does not
-  check.
+  check, also one whose volume is larger than its partition or the card,
+  or has a 16-bit total of sectors.
 - **Caches**: one sector of the FAT and one per open file, in the
   monitor's RAM, from `0xFFFFF980`. Two files open at once, a
   read and a write,

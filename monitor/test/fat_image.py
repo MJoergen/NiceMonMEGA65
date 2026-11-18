@@ -455,9 +455,22 @@ def extra(d: str, tmp: str) -> None:
             ("fat16sz", 22, "<H", 1009), ("rootent", 17, "<H", 16),
             ("c4084", 32, "<I", 2050 + 4084), ("c4085", 32, "<I", 2050 + 4085),
             ("c65524", 32, "<I", 2050 + 65524), ("c65525", 32, "<I", 2050 + 65525),
-            ("root1", 44, "<I", 1), ("roottop", 44, "<I", 129024)):
+            ("root1", 44, "<I", 1), ("roottop", 44, "<I", 129024),
+            ("total", 32, "<I", 131073)):
         v = Vol(copy(super_img, at(f"m_{name}.img")), write=True)
         v.put(at_, fmt, val)
+    # a 16-bit total of 65535, 1 reserved sector, and FATs of 1 sector,
+    # 65532 clusters, which the layout checks pass with, though the 32-bit
+    # total is the volume's (issue #151, B9)
+    v = Vol(copy(super_img, at("m_total16.img")), write=True)
+    v.put(19, "<H", 65535)
+    v.put(14, "<H", 1)
+    v.put(36, "<I", 1)
+    # m_pb.img with its partition one sector shorter than its volume
+    img = copy(at("m_pb.img"), at("m_psize.img"))
+    with open(img, "r+b") as f:
+        f.seek(446 + 12)
+        f.write(struct.pack("<I", 70 * 1024 * 2 - 1))
     v = Vol(copy(super_img, at("m_nicecl.img")), write=True)
     v.put(v.entry(b"NICE       ", "/")[0] + 26, "<H", 0)
     # FATs of 2^25 sectors, whose 2^32 entries wrap to 0, in a volume that
@@ -477,7 +490,8 @@ def extra(d: str, tmp: str) -> None:
     fat32_of(at("fat1.img"), 64, "-s", "1", "-f", "1")
     # fatinfo: FSInfo and the FAT's entries; i_total.img has TOP1.TXT and
     # TOP2.TXT at the clusters 129151 and 129152, the last of its FATs of
-    # 1009 sectors and the one after it
+    # 1009 sectors and the one after it, on a card and a volume of 1024
+    # sectors more, so 130046 clusters
     img = copy(super_img, at("i_total.img"))
     mcopy(img, 0, b"0123456789", "NICE/TOP1.TXT", tmp)
     mcopy(img, 0, b"0123456789", "NICE/TOP2.TXT", tmp)
@@ -491,8 +505,11 @@ def extra(d: str, tmp: str) -> None:
             ("i_last", SECTOR + 492, "<I", 129023), ("i_wrap", SECTOR + 492, "<I", 129023),
             ("i_ff", SECTOR + 492, "<I", 0xFFFFFFFF),
             ("i_nosig", SECTOR, "<I", 0), ("i_bpb0", 48, "<H", 0),
-            ("i_bpbff", 48, "<H", 0xFFFF), ("i_total", 32, "<I", 0xFFFFFF00)):
+            ("i_bpbff", 48, "<H", 0xFFFF), ("i_total", 32, "<I", 131072 + 1024)):
         img = at(f"{name}.img")
+        if name == "i_total":
+            with open(img, "r+b") as f:
+                f.truncate((131072 + 1024) * SECTOR)
         v = Vol(img if name == "i_total" else copy(super_img, img), write=True)
         v.put(at_, fmt, val)
         if name == "i_wrap":

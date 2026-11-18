@@ -52,7 +52,8 @@
 ; fs_close puts the first cluster, the size, and the date into the entry.
 ; A deletion marks the long-name entries, then the entry, then frees the
 ; clusters. A new entry's long-name entries are written before its 8.3
-; entry. A new cluster is searched from FSInfo's next-free hint, and the
+; entry. A new cluster is searched from FSInfo's next-free hint, read
+; with nothing written, and the
 ; first change of the FAT after a mount sets FSInfo's free count to
 ; unknown, 0xFFFFFFFF, before it; the hint is written after each change.
 ; The FAT's cache and the folder's are written through; a file's sector
@@ -366,8 +367,13 @@ kind
                 CMP     R3, 65525
         ?C      MOVE    R1, -18
         ?C      JMP     fat_fail
-                SHR     R2, @FATBUF+5, 16
-                OR[M]   R0, R1, R2      ; FAT16's fields, R1 the root's entries
+; FAT16's fields must be 0: bytes 17 to 20, the root's entries and the
+; 16-bit total, which the layout was checked with when it was not 0, and
+; bytes 22 and 23, the 16-bit FAT size; so the 32-bit total, V_END's, is
+; the one checked (issue #151, B9)
+                SHR     R1, @FATBUF+4, 8
+                AND     R2, @FATBUF+5, 0xFFFF00FF
+                OR[M]   R0, R1, R2
         ?!Z     JMP     fail16
                 RET                     ; Z
 kind_no
@@ -375,7 +381,8 @@ kind_no
                 RET
 
 ; mount: the card in the slot R1 mounted; a slot that the system does not
-; have changes nothing. R1 = 0. Uses R1-R12.
+; have changes nothing. A volume larger than its partition, or than the
+; card, fails 26. R1 = 0. Uses R1-R12.
 mount
                 CMP     R1, @SD_SLOTS
         ?!C     MOVE    R1, -27
@@ -393,14 +400,16 @@ mount
                 MOVE    R2, FATBUF
                 CALL    rd
                 CLR     R10             ; the partition's first sector
+                NOT     R11, R0         ; and its sectors, the card's
                 CALL    kind
         ?Z      JMP     mount_fat
                 SHR     R1, @FATBUF+127, 16
                 CMP     R1, 0xAA55
         ?!Z     JMP     fail16
 ; The first FAT32 partition, or else the first partition, whose boot
-; sector says what it is: R10 and R9. An entry's type is byte 4, and its
-; first sector bytes 8 to 11, at 446 + 16 i.
+; sector says what it is: R10 and R9, and R11 the FAT32 partition's
+; sectors. An entry's type is byte 4, its first sector bytes 8 to 11, and
+; its sectors bytes 12 to 15, at 446 + 16 i.
                 CLR     R9
                 MOVE    R8, FATBUF+112
 :               SHR     R1, @R8, 16
@@ -423,6 +432,10 @@ mount
         ?!Z     JMP     :--
 :               OR[M]   R0, R10, R9
         ?Z      JMP     fail16
+                SUB     R1, R8, 4       ; R10's entry, as R8 went on
+                SHR     R11, @2[R1], 16
+                SHL     R1, @3[R1], 16
+                OR      R11, R11, R1
                 MOVE[M] R1, R10
         ?Z      MOVE    R1, R9
                 MOVE    R2, FATBUF
@@ -445,7 +458,16 @@ mount_fat
         ?!Z     JMP     :-
                 MOVE    @V_DATA, R1
                 MOVE    @V_ROOT, @FATBUF+11
-                ADD     R2, R10, @FATBUF+8
+; The volume's end, the guard of wr, from the 32-bit total, which must
+; fit in the partition and on the card (issue #151, B9)
+                MOVE    R2, @FATBUF+8
+                CMP     R11, R2
+        ?C      JMP     fail26          ; past the partition
+                SUB     R4, @SD_LAST, R10
+                SUB     R5, R2, 1
+                CMP     R4, R5
+        ?C      JMP     fail26          ; past the card
+                ADD     R2, R2, R10
                 MOVE    @V_END, R2
                 SUB     R2, R2, R1
                 SHR     R2, R2, @V_LOG
@@ -1120,24 +1142,51 @@ wr
                 JMP     chk
 
 ; mark: the entry R10 free, 0xE5 in its byte 0, and then wrd: DIRF's
-; sector written. Use R1-R4.
+; sector written, and read again by a folder's handle that holds it, so
+; that a listing sees the entries made and deleted (issue #151, B7). Use
+; R1-R4.
 mark
                 OR      @R10, @R10, 0xFF
                 XOR     @R10, @R10, 0x1A
 wrd
                 MOVE    R1, @DIRF+F_LBA
                 MOVE    R2, DIRF+F_BUF
-                JMP     wr
+                CALL    wr
+                MOVE    R1, @DIRF+F_LBA
+                MOVE    R2, FILE0
+:               CMP     @F_KIND[R2], K_DIR
+        ?Z      CMP     @F_LBA[R2], R1
+        ?Z      NOT     @F_LBA[R2], R0
+                ADD     R2, R2, F_WORDS
+                CMP     R2, FILE0+2*F_WORDS
+        ?!Z     JMP     :-
+                RET
 
 ; info: FSInfo with the free count unknown and the next-free hint V_HINT,
-; which it gives when V_HINT is 0. A sector without FSInfo's signatures is
-; left alone. infodone: info after a change of the FAT. Use R1-R4.
+; which hint gives when V_HINT is 0. A sector without FSInfo's signatures
+; is left alone. infodone: info after a change of the FAT. hint: FSInfo
+; read into SEC, and V_HINT its hint when V_HINT is 0, with nothing
+; written, as search, which may find no free cluster, wants it (issue
+; #151, B8): Z; or Z clear when there is no FSInfo, or it has not its
+; signatures. Use R1-R4.
 infodone
                 TST     @V_CHANGED
         ?Z      RET
 info
+                CALL    hint
+        ?!Z     RET
+                NOT     @SEC+122, R0
+                MOVE    @SEC+123, @V_HINT
+                MOVE    R1, @V_FSINFO
+                MOVE    R2, SEC
+                CALL    wr
+                ONE     @V_UNKNOWN
+                CLR     @V_CHANGED
+                RET
+hint
                 MOVE[M] R1, @V_FSINFO
-        ?Z      RET
+        ?Z      NOT[M]  R0, R0          ; Z clear, X set: none
+        ?X      RET
                 MOVE    R2, SEC
                 CALL    rd
                 CMP     @SEC, 0x41615252
@@ -1146,13 +1195,7 @@ info
         ?!Z     RET
                 TST     @V_HINT
         ?Z      MOVE    @V_HINT, @SEC+123
-                NOT     @SEC+122, R0
-                MOVE    @SEC+123, @V_HINT
-                MOVE    R1, @V_FSINFO
-                MOVE    R2, SEC
-                CALL    wr
-                ONE     @V_UNKNOWN
-                CLR     @V_CHANGED
+                TST     R0              ; Z
                 RET
 
 ; set: the FAT's entry of the cluster R1 set to R2, in every copy of the
@@ -1188,7 +1231,7 @@ set
 ; R1-R6.
 search
                 TST     @V_HINT
-        ?Z      CALL    info            ; for its hint
+        ?Z      CALL    hint
                 MOVE    R1, @V_HINT
                 CALL    clok
                 MOVE    R5, R1
@@ -1593,13 +1636,26 @@ getc
                 RET
 
 ; fs_read: R1 the handle, R2 the buffer, R3 the number of bytes. R1 =
-; the bytes read, one per word.
+; the bytes read, one per word. A chain that ends before the size fails
+; 26, but only at a call that read nothing: the bytes before the break
+; are counted, and the next call fails (issue #151, B4).
 read_b
                 MOVE    R5, K_READ
                 CALL    handle
                 MOVE    R8, R2
                 MOVE    R9, R3
-                CLR     R7
+                CLR     R7              ; the bytes read
+                PUSH    @V_FSP          ; the loop, with its errors caught
+                ADD     @--SP, 4, PC
+                MOVE    @V_FSP, SP
+                JMP     read_loop
+                POP     @V_FSP
+                CMP     R1, -26
+        ?!Z     RET
+                TST     R7
+        ?!Z     MOVE    R1, R7
+                RET
+read_loop
 :               CMP     R7, R9
         ?!C     JMP     :+
                 CALL    getc
@@ -1753,10 +1809,12 @@ put_end
                 MOVE    R1, R11
                 RET
 
-; fs_delete: R1 the name. The file deleted: its long-name entries marked
-; free, then its entry, each sector written as it changes, then its
+; fs_delete: R1 the name. The file deleted: the long-name entries right
+; before its entry marked free, all of them, also those whose checksum
+; does not fit it, which are orphans then, as fsck.fat has it (issue
+; #151, B2), then its entry, each sector written as it changes, then its
 ; clusters freed, then FSInfo. R1 = 0. R7 is the offset of a long-name
-; entry, R8 the entry's, and R9 its checksum.
+; entry, and R8 the entry's.
 delete_b
                 PUSH    R1
                 CALL    mounted
@@ -1770,24 +1828,15 @@ delete_b
                 PUSH    R1              ; the first cluster
                 MOVE    R7, @DIRF+F_LFN
                 SUB     R8, @DIRF+F_POS, 32
-                SHL     R2, R10, 2
-                CALL    sum
-                MOVE    R9, R6
                 TST     R7
-        ?X      JMP     delete_e        ; no long name
+        ?X      JMP     delete_e        ; no long-name entry
 :               CMP     R7, R8
         ?!C     JMP     delete_e
                 MOVE    R1, R7
                 CALL    at
-                SHR     R1, @2[R10], 24
-                CMP     R1, 0x0F
-        ?!Z     JMP     :+
-                SHR     R1, @3[R10], 8
-                AND     R1, R1, 0xFF
-                CMP     R1, R9
-        ?Z      CALL    mark
-:               ADD     R7, R7, 32
-                JMP     :--
+                CALL    mark
+                ADD     R7, R7, 32
+                JMP     :-
 delete_e
                 MOVE    R1, R8
                 CALL    at

@@ -43,9 +43,10 @@ open 1, "", 2                   ; 0
 readdir 1                       ; 1, HELLO.BIN, and its sector read
 open 0, "LATE.TXT", 1           ; 1, after W.TXT, in the entry that ended the folder
 close 0                         ; 0
-readdir 1                       ; 1, W.TXT, from the handle's sector
-readdir 1                       ; 0: the end that the sector had, though LATE.TXT
-                                ; is there now (known oddity B7)
+readdir 1                       ; 1, W.TXT
+readdir 1                       ; 1, LATE.TXT, as the handle read its sector again
+                                ; after the entry was written (issue #151, B7)
+readdir 1                       ; 0
 close 1
 open 1, "", 2                   ; 0: a new handle reads the sector again
 readdir 1                       ; HELLO.BIN

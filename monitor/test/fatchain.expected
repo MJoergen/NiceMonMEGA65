@@ -3,7 +3,7 @@ NiceMon V9.9
 HELP lists the statements
 READY.
 sys 0x8000
-Returned 000018CD
+Returned 00001DE4
 READY.
 save "free.txt", 0x8000, 1
 Words saved: 1, 00008000 to 00008000
@@ -25,10 +25,12 @@ segment 0
   open 0 "CUT.TXT" 0 -> 0
   read 0 400 -> 400 "ABCDEFGHIJKLMNOP...UVWXYZABCDEFGHIJ" SHA-256 ce320e16d124f24a
   read 0 400 -> 400 "KLMNOPQRSTUVWXYZ...EFGHIJKLMNOPQRST" SHA-256 a62192086e73e49c
+  read 0 400 -> 224 "UVWXYZABCDEFGHIJ...UVWXYZABCDEFGHIJ" SHA-256 5aec6c17b19024e4
   read 0 400 -> -26
   close 0 -> 0
   open 0 "LONG.TXT" 0 -> 0
   read 0 1400 -> 1400 "ABCDEFGHIJKLMNOP...GHIJKLMNOPQRSTUV" SHA-256 256bb90d5243fda5
+  read 0 400 -> 136 "WXYZABCDEFGHIJKL...\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00" SHA-256 ee70b37978962562
   read 0 400 -> -26
   close 0 -> 0
   open 0 "ZERO.TXT" 0 -> -26
@@ -38,6 +40,7 @@ segment 0
   open 0 "HIGH.TXT" 0 -> -26
   open 0 "BADC.TXT" 0 -> 0
   read 0 1000 -> 1000 "ABCDEFGHIJKLMNOP...WXYZABCDEFGHIJKL" SHA-256 4437beb0fae1c8e4
+  read 0 500 -> 24 "MNOPQRSTUVWXYZABCDEFGHIJ"
   read 0 500 -> -26
   close 0 -> 0
   open 0 "LOOP.TXT" 0 -> 0

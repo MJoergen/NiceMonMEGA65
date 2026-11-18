@@ -44,10 +44,10 @@ NICE/A.TXT: 1536 bytes, SHA-256 73145ad3738b4a37
 fsck.fat -n:
 Free cluster summary uninitialized (should be 0)
 IMAGE: 5 files, 68528/68528 clusters
-Sector writes, 22:
+Sector writes, 21:
 mount 0, C3, FSInfo, FAT1+535, FAT2+535, C68527, FAT1+535, FAT2+535,
 FAT1+535, FAT2+535, C68528, FAT1+535, FAT2+535, FAT1+535, FAT2+535,
-C68529, C3, FSInfo, C3 x2, mount 0, C3, FSInfo, C3
+C68529, C3, FSInfo, C3 x2, mount 0, C3 x2
 == A folder of 65535 entries and one free
 NiceMon V9.9
 HELP lists the statements

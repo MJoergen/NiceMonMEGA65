@@ -168,11 +168,11 @@ program starts with none of the values that this one left there.
 | 8 | `10` | `scr_color` | R1 the color for later characters, bits 31..8 of a screen word. → R1 the old one. The `MON_FG_` and `MON_BG_` colors of `mon.h` and `mon.nasm`, added: `MON_FG_YELLOW+MON_BG_BLUE`. |
 | 9 | `12` | `fs_mount` | R1 a slot. Mounts its card, and closes the files that were open (Files below). → R1 0, or an error. Table 1.1. |
 | 10 | `14` | `fs_open` | R1 a name, R2 a mode: 0 to read a file of the folder `NICE`, 1 to write one, which is made or truncated (table 1.2), 2 for the folder itself, whose name is empty or `/`. The name is a long name or an 8.3 name, in either case (table 1.4). Mounts a card when none is. → R1 a handle, 0 or 1, or an error. Table 1.1. |
-| 11 | `16` | `fs_read` | R1 a handle of a file, R2 a buffer, R3 a number of bytes. Reads up to that many, one byte per word. → R1 the number read, 0 at the end, or an error. Table 1.1. |
-| 12 | `18` | `fs_readdir` | R1 a handle of a directory, R2 a buffer of 4 words. The next entry: in words 0 to 2 the 11 bytes of its 8.3 name, padded with blanks, and its attributes, as FAT has them, 4 bytes to a word from bits 7..0, and in word 3 its size. → R1 1, 0 at the end, or an error. Table 1.1. |
+| 11 | `16` | `fs_read` | R1 a handle of a file, R2 a buffer, R3 a number of bytes. Reads up to that many, one byte per word. A chain of clusters shorter than the file's size gives the bytes up to its break, and error -26 at the next call. → R1 the number read, 0 at the end, or an error. Table 1.1. |
+| 12 | `18` | `fs_readdir` | R1 a handle of a directory, R2 a buffer of 4 words. The next entry: in words 0 to 2 the 11 bytes of its 8.3 name, padded with blanks, and its attributes, as FAT has them, 4 bytes to a word from bits 7..0, and in word 3 its size. An entry made or deleted while the handle is open is seen when the handle has not passed it. → R1 1, 0 at the end, or an error. Table 1.1. |
 | 13 | `1A` | `fs_close` | R1 a handle. Finishes a file opened to write: its last sector, and its size in its directory entry. The handle is closed also after an error. → R1 0, or an error. Table 1.1. |
 | 14 | `1C` | `fs_write` | R1 a handle of a file opened to write, R2 a buffer, R3 a number of bytes, one per word, bits 7..0. → R1 the number written, fewer when the card is full, or an error. Table 1.2. |
-| 15 | `1E` | `fs_delete` | R1 a name, as for `fs_open`. Deletes the file of the folder `NICE`, with its long-name entries. A damaged chain that meets a free cluster ends there, so the file is deleted, and the clusters that it had after the break stay taken, which `fsck.fat` reclaims; the truncation of `fs_open` does the same. → R1 0, or an error. Table 1.2. |
+| 15 | `1E` | `fs_delete` | R1 a name, as for `fs_open`. Deletes the file of the folder `NICE`, with the long-name entries right before its entry, also those whose checksum does not fit it, which are orphans. A damaged chain that meets a free cluster ends there, so the file is deleted, and the clusters that it had after the break stay taken, which `fsck.fat` reclaims; the truncation of `fs_open` does the same. → R1 0, or an error. Table 1.2. |
 | 16 | `20` | `udp_open` | R1 a local port, or 0 for one of 49152 to 65535. Opens the UDP endpoint, and enables the port for Ethernet frames (The network below). → R1 the port, or an error. Table 1.3. |
 | 17 | `22` | `udp_send` | R1 an IP address, R2 a port, R3 a buffer, R4 a number of bytes, one per word, up to 1472. Sends them as a datagram. → R1 0, or an error. Table 1.3. |
 | 18 | `24` | `udp_recv` | R1 a buffer, R2 a number of bytes, R3 the address of 2 words, or 0. Does not wait. Copies up to that many bytes of the next datagram, one per word, and its source's IP address and port to the 2 words; with R2 0 copies nothing, and leaves the datagram waiting. → R1 the bytes copied, 0 when none waits, or an error. Table 1.3. |
@@ -262,7 +262,9 @@ With no PC slot, `make sdcard CMD=mkdir` makes it over the link
   `mkfs.fat` makes on a whole card, or an MBR whose first partition of
   type `0x0B` or `0x0C` has one. FAT12, FAT16, and exFAT are rejected with
   errors of their own. The type is told by the count of clusters, as
-  Microsoft's specification says.
+  Microsoft's specification says. A volume larger than its partition,
+  or than the card, is error -26, as its end is the guard of every
+  write.
 - **The mount**: `fs_mount` mounts the card in a slot. `fs_open`, `DIR`,
   and `LOAD` mount the slot of the last mount when there is none, or
   after reset slot 0, or slot 1 when slot 0 has no card. The mount, and

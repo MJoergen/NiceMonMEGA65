@@ -138,7 +138,7 @@ FAT 2: the same changes
 NICE C3+0 entry 7:
   was "CAF\x90    BIN" attr 20 case 18 created 2025-06-15 12:34:56 +0 accessed 2025-06-15 written 2025-06-15 12:34:56 cluster 20 size 14
   now "\xe5AF\x90    BIN" attr 20 case 18 created 2025-06-15 12:34:56 +0 accessed 2025-06-15 written 2025-06-15 12:34:56 cluster 20 size 14
-== DELETE of long names across a sector and a cluster, and of an 8.3 name whose long name's checksum is wrong, which leaves it as an orphan (known oddity B2)
+== DELETE of long names across a sector and a cluster, and of an 8.3 name whose long name's checksum is wrong, whose long-name entries go too (issue #151, B2)
 NiceMon V9.9
 HELP lists the statements
 READY.
@@ -181,17 +181,15 @@ NICE C61+0 entry 0:
 NICE C61+0 entry 1:
   was "ACROSS~2BIN" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2025-06-15 written 2025-06-15 12:34:56 cluster 60 size 16
   now "\xe5CROSS~2BIN" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2025-06-15 written 2025-06-15 12:34:56 cluster 60 size 16
+NICE C61+0 entry 2:
+  was long 41 "bad sum.bin\u0000\uffff" attr 0F type 00 sum E3 cluster 0000
+  now long E5 "bad sum.bin\u0000\uffff" attr 0F type 00 sum E3 cluster 0000
 NICE C61+0 entry 3:
   was "BADSUM~1BIN" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2025-06-15 written 2025-06-15 12:34:56 cluster 62 size 15
   now "\xe5ADSUM~1BIN" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2025-06-15 written 2025-06-15 12:34:56 cluster 62 size 15
 fsck.fat -n:
-Orphaned long file name part "bad sum.bin"
-  Auto-deleting.
 Free cluster summary uninitialized (should be 129992)
-
-Leaving filesystem unchanged.
 IMAGE: 32 files, 48/130040 clusters
-(exit 1)
-Sector writes, 17:
-mount 0, C61+0, FSInfo, FAT1+0, FAT2+0, FSInfo, C25+1, C61+0 x2, FAT1+0,
-FAT2+0, FSInfo, C25+0, C25+1 x2, FAT1+0, FAT2+0, FSInfo
+Sector writes, 18:
+mount 0, C61+0 x2, FSInfo, FAT1+0, FAT2+0, FSInfo, C25+1, C61+0 x2,
+FAT1+0, FAT2+0, FSInfo, C25+0, C25+1 x2, FAT1+0, FAT2+0, FSInfo

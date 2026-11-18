@@ -571,7 +571,7 @@ The file entries, `fs_mount` to `fs_delete`, add those of FAT32
 | -23 | Too many open files: two are |
 | -24 | Not an open file, or not one of the right kind |
 | -25 | No such mode |
-| -26 | The FAT is damaged: a cluster outside the volume, or a chain shorter than the file |
+| -26 | The FAT is damaged: a cluster outside the volume, a chain shorter than the file, or a volume larger than its partition or the card |
 | -27 | No such slot |
 | -28 | The card has changed, and the mount was dropped |
 | -29 | No folder `NICE` on the card, or the folder of the build |

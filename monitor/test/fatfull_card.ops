@@ -16,5 +16,5 @@ write 0, 0, 1                   ; -30
 close 0                         ; 0
 mount 0                         ; 0, so the next search reads FSInfo's hint
 open 0, "C.TXT", 1              ; 0
-write 0, 0, 1                   ; -30, after FSInfo written by the search (known oddity B8)
+write 0, 0, 1                   ; -30, and FSInfo not written (issue #151, B8)
 close 0                         ; 0

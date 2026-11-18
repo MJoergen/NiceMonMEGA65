@@ -110,6 +110,19 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   opened, loaded, or deleted at all
   ([#151](https://github.com/MJoergen/NiceMonMEGA65/issues/151), B3 and
   B5).
+- `DELETE` and `fs_delete` delete all the long-name entries right before
+  the file's entry, also those whose checksum does not fit it, which
+  were left as orphans for `fsck.fat`. `fs_read` of a file whose chain
+  of clusters is shorter than its size gives the bytes up to the break,
+  and error -26 at the next call; before, they were in the buffer but
+  not counted. A handle of the folder sees the entries made and deleted
+  while it is open, where it showed its sector as it read it. A write
+  to a full card no longer writes FSInfo. A mount fails with `File error
+  26` when the volume is larger than its partition or the card, as its
+  end guards every write, and with error 16 when a FAT32 boot sector
+  has a 16-bit total of sectors
+  ([#151](https://github.com/MJoergen/NiceMonMEGA65/issues/151), B2, B4,
+  B7, B8, and B9).
 - `help` in `tools/mon.py` is nicedbg's own, one line for each command
   as before, and its console is nicedbg's, which passes Enter as CR
   ([#143](https://github.com/MJoergen/NiceMonMEGA65/issues/143)).

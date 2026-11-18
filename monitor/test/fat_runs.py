@@ -22,10 +22,9 @@ and the clock is not set, so that every date written is the fixed one.
 The output of the suite SUITE is compared with test/SUITE.expected, and
 written to BUILD/SUITE.out.
 
-The behavior that is pinned here though it is odd, the possible bugs B2
-to B8 of the audit of issue #149, is marked "known oddity" in the titles
-of the runs and the comments of the OPS files: it stays until a change
-of its own fixes it.
+The possible bugs of the audit of issue #149, which issue #151 lists as
+B1 to B9, are fixed, and the runs and the comments of the OPS files that
+check them name the issue and the item.
 
 Usage: test/fat_runs.py NICEEMU MONITOR.bin BUILD SUITE...
 """
@@ -125,8 +124,8 @@ SUITES = {
             "8.3 name, reached as DIR shows them (issue #151, B5)", "lfnx.img",
             keys="dir\rsys 0x8000\rhalt\r", ops="fatlfn_bad.ops"),
         Run("DELETE of long names across a sector and a cluster, and of an 8.3 "
-            "name whose long name's checksum is wrong, which leaves it as an "
-            "orphan (known oddity B2)", "lfn.img",
+            "name whose long name's checksum is wrong, whose long-name entries "
+            "go too (issue #151, B2)", "lfn.img",
             keys='delete "badsum~1.bin"\rdelete "across a cluster.bin"\r'
                  'delete "ACROSS A SECTOR.BIN"\rhalt\r', fsck=True, order=True),
     ],
@@ -136,7 +135,8 @@ SUITES = {
         "m_p83.img", "m_pb.img", "m_nosig.img", "m_jump.img", "m_bps.img", "m_spc0.img",
         "m_spc3.img", "m_rsvd0.img", "m_nfats0.img", "m_fatsz0.img", "m_fatszbig.img",
         "m_nodata.img", "m_fat16sz.img", "m_rootent.img", "m_c4084.img", "m_c4085.img",
-        "m_c65524.img", "m_c65525.img", "m_root1.img", "m_roottop.img", "m_nicecl.img",
+        "m_c65524.img", "m_c65525.img", "m_root1.img", "m_roottop.img", "m_total.img",
+        "m_total16.img", "m_psize.img", "m_nicecl.img",
         "m_fatwrap.img", "m_baddir.img")] + [
         Run("No card in either slot", None, keys='dir\rdir 0\rload "x.bin"\rhalt\r'),
         Run("DIR with a slot of 2^31 and more has no such slot (issue #151, B1)",

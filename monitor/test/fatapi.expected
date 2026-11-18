@@ -9,7 +9,7 @@ sys 0x8400
 Returned 0000002D
 READY.
 sys 0x8800
-Returned 00000057
+Returned 0000005C
 READY.
 halt
 Halted
@@ -54,6 +54,7 @@ segment 2
   open 0 "LATE.TXT" 1 -> 1
   close 0 -> 0
   readdir 1 -> 1 "W       TXT" attr 20 size 3
+  readdir 1 -> 1 "LATE    TXT" attr 20 size 0
   readdir 1 -> 0
   close 1 -> 0
   open 1 "" 2 -> 0

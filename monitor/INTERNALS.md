@@ -235,8 +235,8 @@ assembled apart (#152): the monitor's from 0, and BASIC's from
 <!-- romsize layout -->
 | Part | Address | Words |
 |---|---|---:|
-| The monitor | `0x0000`–`0x2545` | 9542 |
-| Free | `0x2546`–`0x3FFF` | 6842 |
+| The monitor | `0x0000`–`0x2575` | 9590 |
+| Free | `0x2576`–`0x3FFF` | 6794 |
 | BASIC | `0x4000`–`0x53CA` | 5067 |
 | Free | `0x53CB`–`0x7FFF` | 11317 |
 <!-- /romsize layout -->
@@ -253,7 +253,7 @@ ROM is built:
 |---|---|---:|---:|
 | `monitor.nasm` | The dispatch table, the HAL, and the cold start | 845 | 0 |
 | `monitor_sd.nasm` | The sector routines | 85 | 0 |
-| `monitor_fat.nasm` | FAT32, the file entries, and TAB | 2847 | 0 |
+| `monitor_fat.nasm` | FAT32, the file entries, and TAB | 2895 | 0 |
 | `monitor_eth.nasm` | The network, and its entries | 2440 | 10 |
 | `monitor_tcp.nasm` | TCP | 2414 | 0 |
 | `monitor_clock.nasm` | The clock: `clock_set`, the dates of files, and the real-time clock | 313 | 0 |
@@ -262,7 +262,7 @@ ROM is built:
 | `mon.nasm` | The stubs of the entries | 82 | 0 |
 | `build/folder.nasm` | The folder's name | 3 | 3 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 9542 | 20 |
+| In all | | 9590 | 20 |
 <!-- /romsize monitor -->
 
 
@@ -430,9 +430,9 @@ steps in order:
    `test/SUITE.ops`: its output has each call with its arguments and its
    result. Then it shows what each card holds that its image did not
    (`fat_tool.py diff`, below), and, for some runs, `fsck.fat -n` and
-   the order of the sector writes (`fat_tool.py order`). The behavior
-   of FAT32 that is odd but pinned, until a change of its own fixes
-   it, is marked "known oddity" in the titles and the `.ops` files.
+   the order of the sector writes (`fat_tool.py order`). The runs that
+   check the fixes of issue #151 name it and the item, B1 to B9, in
+   their titles and the `.ops` files.
    The suites are in the table below the next one.
 8. **The runs.** The monitor runs once for each test below, with its
    keystrokes from an input file that ends with `HALT`, so that the run
