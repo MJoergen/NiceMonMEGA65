@@ -121,6 +121,19 @@ and keep their names.
    step 6 publishes. It takes as long as three Vivado builds. `make clean`
    deletes `build/release/`, so do not run it between steps 4 and 6.
 
+   Then check by hand what hwtest does not, as it writes nothing to
+   a card: `sdcard.py mkdir` on a card with FAT32 and no folder `NICE`
+   (issue #147). With such a card in a slot of the R6 (the
+   bitstream that step 4 left on it):
+
+       make sdcard CMD=mkdir PORT=/dev/ttyUSB1 ARGS="--slot 1"
+
+   It must make the folder, and a second `mkdir` must say that it is
+   there already. Then a `put` to the folder, and BASIC's `DIR 1` on the
+   board must show `DEMO.BIN`:
+
+       make sdcard CMD="put demo/build/demo.bin" PORT=/dev/ttyUSB1 ARGS="--slot 1"
+
 5. Look at `build/release/V1.0/notes.md`. A change to the section goes
    into `RELEASE_NOTES.md`, which means a new commit, so steps 3 and 4 again.
    Only a note for this release alone, such as a known problem of the

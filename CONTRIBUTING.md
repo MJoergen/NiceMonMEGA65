@@ -984,7 +984,16 @@ For a card with a FAT32 file system, as the monitor finds it, the script
 also lists the folder `NICE` itself from the sectors it reads, or finds
 that the root has none, and, after the primes, loads the monitor of the
 tests and types `DIR SLOT`, whose rows, or error 29, must be the same;
-a card with no FAT32 is NOT COVERED there.
+a card with no FAT32 is NOT COVERED there. On a card with `NICE`, TAB
+then completes a name of it: the script types `LOAD "`, the shortest
+start of a name that no other name has, and TAB, and the monitor must
+type the rest of the name, the closing quote, and a blank, before
+Ctrl-C ends the line. A folder with no name of a start of its own is
+NOT COVERED. On such a card, `sdcard.py`'s `mkdir` must also say that
+the folder is there already, and write nothing, which a write function
+that only counts shows. A card without `NICE` is NOT COVERED there, as
+`mkdir` would write to it; that write is a check by hand of a release
+(`doc/RELEASE.md`, step 4).
 On the R3, slot 1 has no card detect, so it is always tried, and fails
 without a card.
 

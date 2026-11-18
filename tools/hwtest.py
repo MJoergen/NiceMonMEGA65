@@ -116,7 +116,12 @@ Checks, in this order:
       GPT, are named after NOT COVERED.
     - for each card with a FAT32 file system, as the monitor finds it: the
       monitor of the tests, with dir SLOT, lists the folder NICE as the
-      host lists it from the sectors read over the link (issue #58)
+      host lists it from the sectors read over the link (issue #58), and
+      TAB after LOAD, a quote, and the start of a name that no other name
+      has, completes it with the closing quote and a blank (issue #147);
+      on a card with NICE, sdcard.py's mkdir finds the folder there
+      already, and writes nothing. A card without NICE, and one with no
+      name of a start of its own, are named after NOT COVERED
     - the C example examples/build/primes.bin runs, and after its halt the
       microsecond counter holds the cycle counter's count over the clock
       in MHz
@@ -211,14 +216,14 @@ import sys
 import tempfile
 import threading
 import time
-from typing import Callable, Optional, TypeVar
+from typing import Callable, NamedTuple, Optional, TypeVar
 
 from jtag import check_board, wait_port
 # The SD controller's registers and its sectors, and FAT32 as the
 # monitor reads it, as tools/sdcard.py has them
 from sdcard import (E_NOFOLDER, FOLDER, SD_BUF, SD_CHUNK, SD_CSR, SD_ERROR,
-                    SD_LAST, SD_LBA, SD_SELECT, SD_SLOTS, FileError, Volume,
-                    read_buffer, sd_command, to_bytes)
+                    SD_LAST, SD_LBA, SD_SELECT, SD_SLOTS, FileError,
+                    FolderError, Volume, read_buffer, sd_command, to_bytes)
 from load import (MAX_RAM_WORDS, MONITOR_WORDS, PROGRAM, RAM_SIZE, load_words,
                   read_bin, start)
 from boardlink import (BAUD, BAUDS, BRK_COUNT, BRK_EN, CONTROL, DEFAULT_BAUD,
@@ -1816,35 +1821,66 @@ class Unread(Exception):
     """A sector that sd_read could not read, which it has reported."""
 
 
-def fat32_dir(link: Link, name: str) -> list[str] | None:
+class Folder(NamedTuple):
+    """What the host reads of a card's folder FOLDER: the rows of BASIC's
+    DIR, and the names of its files that TAB completes, those without a
+    ?, as DIR shows them."""
+    rows: list[str]
+    names: list[str]
+
+
+def fat32_dir(link: Link, name: str) -> Folder | None:
     """The rows of BASIC's DIR for the card in the selected slot,
     from its folder FOLDER, as tools/sdcard.py reads FAT32 over the link,
-    or the monitor's error when the root has no such folder. None when a
+    or the monitor's error when the root has no such folder, and the
+    names of its files. None when a
     sector cannot be read, and when the card has no FAT32 file system that
     the monitor mounts, which is not covered. It is the host's own reading
-    of FAT32, to which the monitor's must come out the same."""
+    of FAT32, to which the monitor's must come out the same. On a card
+    with the folder, sdcard.py's mkdir must find it there already, and
+    return before any write, which a write function that only counts
+    shows (issue #147); a card without it is not covered, as mkdir
+    would write to it."""
     def read(lba: int) -> bytes:
         sector = sd_read(link, name, lba)
         if sector is None:
             raise Unread
         return sector
     try:
-        return Volume(read, FOLDER).rows()
+        vol = Volume(read, FOLDER)
+        listed = vol.listing()
     except Unread:
         return None
     except FileError as e:
         if e.code == E_NOFOLDER:
-            return [str(e)]
+            uncovered.append(f"{name}: sdcard.py mkdir, as the card has no "
+                             f"folder {FOLDER}, and it would write one")
+            return Folder([str(e)], [])
         uncovered.append(f"{name}'s files, as BASIC's DIR gives {e}")
         return None
+    writes: list[int] = []
+    try:
+        made = Volume(read, FOLDER, lambda lba, data: writes.append(lba),
+                      need=False).mkdir()
+        check(f"{name}: sdcard.py mkdir finds the folder {FOLDER} there "
+              "already, and writes nothing",
+              not made and not writes,
+              f"made {made}, sectors written {writes}")
+    except Unread:
+        pass
+    except (FileError, FolderError) as e:
+        check(f"{name}: sdcard.py mkdir finds the folder {FOLDER} there "
+              "already", False, str(e))
+    files = [e.name for e in listed if not e.is_dir and "?" not in e.name]
+    return Folder(vol.rows(listed), files)
 
 
-def test_sd(link: Link, board: str) -> dict[int, list[str]]:
+def test_sd(link: Link, board: str) -> dict[int, Folder]:
     """The SD card controller at FFFFFFA0-AF, with the core held, as the
-    header says. It only reads the cards. The rows of BASIC's DIR for
-    each slot whose card has a FAT32 file system, as test_fat_dir checks
-    them."""
-    fat: dict[int, list[str]] = {}
+    header says. It only reads the cards. The rows of BASIC's DIR and the
+    names of the files for each slot whose card has a FAT32 file system,
+    as test_fat_dir checks them."""
+    fat: dict[int, Folder] = {}
     slots = SD_SLOT_COUNT[board]
     n = rd(link, SD_SLOTS)
     check("SD_SLOTS", n == slots, f"got {n}, want {slots}")
@@ -1899,9 +1935,9 @@ def test_sd(link: Link, board: str) -> dict[int, list[str]]:
             check(f"{name}: sector 0 reads the same again",
                   sd_read(link, name, 0) == first)
             test_sd_fat(link, name, first)
-            rows = fat32_dir(link, name)
-            if rows is not None:
-                fat[slot] = rows
+            folder = fat32_dir(link, name)
+            if folder is not None:
+                fat[slot] = folder
         sd_read(link, name, last)
         link.write(SD_LBA, [last + 1])
         got = sd_command(link, 1, 1.0)
@@ -1937,25 +1973,90 @@ def counter(link: Link, lo: int) -> int:
     return high << 32 | low
 
 
-def test_fat_dir(link: Link, fat: dict[int, list[str]]) -> None:
+def tab_pick(names: list[str]) -> tuple[str, str] | None:
+    """A name for TAB to complete and the start to type, the shortest that
+    no other name shares, in either case, and shorter than the name, so
+    that TAB has something to add; or None. The line must hold LOAD,
+    the name in quotes, and a blank."""
+    best: tuple[str, str] | None = None
+    folded = [n.casefold() for n in names]
+    for name in names:
+        if len(name) > 60:
+            continue
+        for k in range(1, len(name)):
+            start = name[:k].casefold()
+            if sum(f.startswith(start) for f in folded) == 1:
+                if best is None or k < len(best[1]):
+                    best = (name, name[:k])
+                break
+    return best
+
+
+def edited(text: bytes) -> str:
+    """The line that the console's echo leaves, with each BS taking back
+    the character before it."""
+    line: list[str] = []
+    for c in text.decode("latin-1"):
+        if c == "\b":
+            if line:
+                line.pop()
+        elif " " <= c < "\x7f":
+            line.append(c)
+    return "".join(line)
+
+
+def console_until(link: Link, until: Callable[[bytes], bool],
+                  timeout: float) -> bytes:
+    """The console's bytes until until is true of them, or the timeout."""
+    text = b""
+    end = time.monotonic() + timeout
+    while time.monotonic() < end:
+        link.poll(0.1)
+        text += link.take_console()
+        if until(text):
+            break
+    return text
+
+
+def test_tab(link: Link, slot: int, names: list[str]) -> None:
+    """TAB on BASIC's line (issue #137) completes a name of the card that
+    DIR SLOT has just mounted: after LOAD, a quote, and a start that no
+    other name has, the monitor types the rest of the name, the closing
+    quote, and a blank. Ctrl-C ends the line, so that nothing loads. It
+    only reads the card. A folder with no name of a start of its own is
+    not covered."""
+    pick = tab_pick(names)
+    if pick is None:
+        uncovered.append(f"SD slot {slot}: TAB, as no name of {FOLDER} has "
+                         "a start of its own")
+        return
+    name, start = pick
+    typed = f'LOAD "{start}'
+    want = f'LOAD "{name}" '
+    link.send_console(typed.encode() + b"\t")
+    text = console_until(link, lambda t: edited(t).endswith(want), 10.0)
+    got = edited(text.rpartition(b"\n")[2])
+    check(f"SD slot {slot}: TAB completes {typed} to {want}", got == want,
+          f"got {got!r}")
+    link.send_console(b"\x03")
+    console(link, 1.0)
+
+
+def test_fat_dir(link: Link, fat: dict[int, Folder]) -> None:
     """The monitor of the tests, loaded and started, lists the folder
     FOLDER of each card in fat with DIR SLOT as the host listed it, or
-    says that the card has none, then halts with HALT."""
+    says that the card has none, and TAB then completes a name of it,
+    then halts with HALT."""
     if not fat:
         return
     subprocess.run(["make", "-s", "-C", REPO, "build/rom_test.bin"], check=True)
     load(link, f"{REPO}/build/rom_test.bin")
     console(link)                      # the banner
-    for slot, want in fat.items():
+    for slot, folder in fat.items():
+        want = folder.rows
         cmd = f"DIR {slot}\r".encode()
         link.send_console(cmd)
-        text = b""
-        end = time.monotonic() + 30.0
-        while time.monotonic() < end:
-            link.poll(0.1)
-            text += link.take_console()
-            if READY in text.partition(cmd)[2]:
-                break                  # READY. after the listing
+        text = console_until(link, lambda t: READY in t.partition(cmd)[2], 30.0)
         # The rows after the echo of the statement, whose CR BASIC ends
         # with an LF, up to READY.
         said = text.partition(cmd)[2].decode("latin-1").removeprefix("\n")
@@ -1968,6 +2069,8 @@ def test_fat_dir(link: Link, fat: dict[int, list[str]]) -> None:
               f"{len(rows)} rows, want {len(want)}"
               + (f"; first difference {rows[bad[0]]!r}, want "
                  f"{want[bad[0]]!r}" if bad else ""))
+        if len(want) > 1:
+            test_tab(link, slot, folder.names)
     link.send_console(b"HALT\r")
     console(link, 1.0)
 
