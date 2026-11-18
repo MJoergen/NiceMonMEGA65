@@ -43,7 +43,7 @@ NICEASM = os.path.join(REPO, "nice_cpu", "assembler", "niceasm.py")
 # The sources of the two images, by their names, and what each one is
 ROM_PARTS = {
     "monitor.nasm": "The dispatch table, the HAL, and the cold start",
-    "basic.nasm": "The vectors, the main loop, the scanner, the keywords, the messages, "
+    "basic.nasm": "The vectors, the header, the main loop, the scanner, the keywords, the messages, "
                   "and the help",
     "basic_cmd.nasm": "The routines of the statements that were the commands",
     "basic_net.nasm": "`DHCP`, `NTP`, and TFTP",

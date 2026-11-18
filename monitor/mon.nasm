@@ -48,6 +48,7 @@ BIN_LINE        .EQU    0x42
 CLOCK_SET       .EQU    0x44
 NET_SERVERS     .EQU    0x46
 MON_RESTORE     .EQU    0x48
+MON_ENTRIES     .EQU    37              ; the number of the entries above, in BASIC's header
 
 ; The outputs of mon_out, as in mon.h
 MON_OUT_LINE    .EQU    1

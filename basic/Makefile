@@ -39,15 +39,28 @@ FOLDER_TEXTS = ($(call PACKED,E_FS29,no folder $(FOLDER_UC) on the card); \
 
 .PHONY: all test fmt clean
 
-all: $(BUILD)/basic_image.bin
+all: $(BUILD)/basic.rom
 
-# The image, and that of the tests, with the version V9.9
+# The image, and that of the tests, with the version V9.9. The assembler
+# writes build/basic_asm*.bin, and ../tools/basic_rom.py fills in its
+# header (issue #153): the length, the version as a number, the flags,
+# and the checksum. The tests' image has "keep", so that the monitor of
+# the tests, which runs from RAM, keeps it.
+BAS_FILL      = --version '$(VERSION)'
+BAS_FILL_test = --version V9.9 --keep
 $(BUILD)/basic_image.bin $(BUILD)/basic_image_test.bin: $(BUILD)/basic_image%.bin: \
-    $(BAS_SOURCES) $(BUILD)/version%.nasm $(BUILD)/basic_folder.nasm $(ROM_TOOLS) | $(BUILD)
+    $(BAS_SOURCES) $(BUILD)/version%.nasm $(BUILD)/basic_folder.nasm $(ROM_TOOLS) \
+    $(BAS_ROM_TOOL) | $(BUILD)
 	@$(CHECK_TEXTS) $(filter-out $(SHARED),$(BAS_SOURCES))
 	@cat $(BAS_SOURCES) $(BUILD)/basic_folder.nasm $(BUILD)/version$*.nasm > $(BUILD)/basic$*_all.nasm
-	@$(ASM) -o $@ $(BUILD)/basic$*_all.nasm
-	@$(CHECK_END) $@ $(ROM_END)
+	@$(ASM) -o $(BUILD)/basic_asm$*.bin $(BUILD)/basic$*_all.nasm
+	@$(CHECK_END) $(BUILD)/basic_asm$*.bin $(ROM_END)
+	@$(BAS_ROM) fill $(BUILD)/basic_asm$*.bin $@ $(BAS_FILL$*)
+
+# The image as a file for a card, BASIC*.ROM, which a release names after
+# its tag (doc/BASIC_ROM.md)
+$(BUILD)/basic.rom: $(BUILD)/basic_image.bin
+	@cp $< $@
 
 $(BUILD)/version.nasm: FORCE | $(BUILD)
 	@$(call WRITE_NEW,$(VERSION_TEXT),$@)
@@ -184,6 +197,9 @@ DUMP_load    = -d 0xFFFFF000:4 -d 0xFFFFF005:6 -d 0xFFFFE800:5
 DUMP_load_emu = -d 0xFFFFE812:1 -d 0xFFFEFFFF:1
 DUMP_load_64k = -d 0xFFFFE812:1
 MAX_STEPS = 10000000
+# The header of the tests' image, as basic_rom.py check shows it, but for
+# its length, which changes with the code
+HEADER_TEST = version 9.9.0+0, layout 1, 37 entries, [0-9]* words, RAM 2048 words, flags 1
 
 # Each test runs the ROM with its input, and compares the console output,
 # the dumps, and the screen with test/NAME.expected. The Halted line and
@@ -198,6 +214,9 @@ MAX_STEPS = 10000000
 # (fat_tool.py order).
 test: fmt $(ROM_TEST) $(BUILD)/dis.bin $(MON)/build/hello.bin $(MON)/build/fat/super.img
 	@test '$(FOLDER_UC)' = NICE || { echo "make test needs FOLDER=NICE, not $(FOLDER)"; exit 1; }
+	@$(BAS_ROM) check $(BUILD)/basic_image_test.bin > $(BUILD)/header.out
+	@if grep -qx '$(BUILD)/basic_image_test.bin: $(HEADER_TEST)' $(BUILD)/header.out; \
+	then echo "PASS basic header"; else echo "FAIL basic header"; cat $(BUILD)/header.out; exit 1; fi
 	@$(PYTHON) test/dis.py $(EMU) $(ROM_TEST) $(BUILD)/dis.bin
 	@$(PYTHON) test/ntp.py $(EMU) $(ROM_TEST) test/ntp.expected $(BUILD)/ntp.out
 	@$(PYTHON) test/tftp.py $(EMU) $(ROM_TEST) test/tftp.expected $(BUILD)/tftp.out

@@ -9,7 +9,10 @@
 # joins them, and is the ROM of the boards and the tools. The tests take
 # build/rom_test.bin, which joins the images of the tests,
 # monitor_image_test.bin and basic_image_test.bin, with the version V9.9,
-# so that their output does not change with every commit. Neither image
+# so that their output does not change with every commit. BASIC's image
+# has a header after its vectors, which tools/basic_rom.py fills in after
+# assembly (issue #153), and make rom writes it as a file for a card too,
+# basic/build/basic.rom. Neither image
 # has a label of the other: BASIC calls the monitor through the entries
 # of the dispatch table alone, their .EQUs in mon.nasm, as a program does,
 # and the monitor jumps to BASIC through its two vectors alone, BAS_COLD
@@ -24,6 +27,9 @@
 
 ROM_ASM  = $(PYTHON) $(ROOT)/nice_cpu/assembler/niceasm.py
 ROM_TOOLS = $(wildcard $(ROOT)/nice_cpu/assembler/*.py)
+# Fills in and checks the header of BASIC's image (issue #153)
+BAS_ROM_TOOL = $(ROOT)/tools/basic_rom.py
+BAS_ROM  = $(PYTHON) $(BAS_ROM_TOOL)
 SHARED   = $(addprefix $(ROOT)/monitor/,common.nasm monlib.nasm mon.nasm)
 MON_SOURCES = $(addprefix $(ROOT)/monitor/,monitor.nasm monitor_sd.nasm monitor_fat.nasm \
                 monitor_eth.nasm monitor_tcp.nasm monitor_clock.nasm) $(SHARED)
@@ -76,7 +82,7 @@ CHECK_END = $(PYTHON) -c 'import sys; top = int(open(sys.argv[1]).read().split()
 ROM_GOAL := $(.DEFAULT_GOAL)
 $(ROOT)/build/rom.bin $(ROOT)/build/rom_test.bin: $(ROOT)/build/rom%.bin: FORCE
 	@$(MAKE) -s --no-print-directory -C $(ROOT)/monitor build/monitor_image$*.bin
-	@$(MAKE) -s --no-print-directory -C $(ROOT)/basic build/basic_image$*.bin
+	@$(MAKE) -s --no-print-directory -C $(ROOT)/basic build/basic_image$*.bin $(if $*,,build/basic.rom)
 	@mkdir -p $(ROOT)/build
 	@cat $(ROOT)/monitor/build/monitor_image$*.bin $(ROOT)/basic/build/basic_image$*.bin > $@.new
 	@if cmp -s $@.new $@; then rm $@.new; else mv $@.new $@; fi

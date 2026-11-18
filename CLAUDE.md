@@ -59,7 +59,7 @@ header is the authoritative address map.
     make diagrams         # src/system.tex and src/eth/eth.tex -> the PNGs of their READMEs (pdflatex)
     make examples         # C examples -> examples/build/*.bin (clang wasm32, lld, llvm)
     make demo             # nice_cpu's demo at 0x8000 -> demo/build/demo.bin, a release asset, not in the ROM (#129); make -C demo test runs it under the monitor in niceemu
-    make rom [FOLDER=NICE] # the ROM -> build/rom.bin (rom.mk), the monitor's image and BASIC's joined, its files in the card's folder FOLDER; make -C monitor test and make -C basic test run build/rom_test.bin in niceemu
+    make rom [FOLDER=NICE] # the ROM -> build/rom.bin (rom.mk), the monitor's image and BASIC's joined, and BASIC's as a card's file, basic/build/basic.rom, with its header (tools/basic_rom.py, #153), its files in the card's folder FOLDER; make -C monitor test and make -C basic test run build/rom_test.bin in niceemu
     make r6 [ROM=f.bin]   # Vivado bitstream, synth/r6/build/top.bit, the ROM (build/rom.bin) in the ROM unless ROM= (none) or ROM=f.bin; make r3 and make nexys4ddr likewise
     make r6 ROMPATCH=f.bin # the ROM alone into the last build's checkpoint, about a minute (synth/rompatch.tcl, #122); r3, nexys4ddr, and cor likewise
     make cor [ROM=f.bin]  # MEGA65 core files for MEGAFLASH, synth/r{3,6}/build/NiceMonMEGA65-r{3,6}.cor (coretool)

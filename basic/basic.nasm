@@ -85,10 +85,20 @@ V_NTPQ          .EQU    0xFFFFEAA4      ; for NTP, in V_TBUF: the query, 48 word
 V_NTPA          .EQU    0xFFFFEAD4      ; and the answer, 48 words
 
 ; The vectors, at BAS_COLD and BAS_WARM (common.nasm), which the monitor
-; jumps to
+; jumps to, and the header (issue #153, doc/BASIC_ROM.md, "The image").
+; The words that are 0 here, the length, the checksum, the version as a
+; number, and the flags, ../tools/basic_rom.py fills in after assembly.
                 .ORG    BASIC_BASE
                 JMP     bas_start
                 JMP     bas_warm
+                .DAT    0x5341424E      ; 0x4004: the magic word, NBAS in packed ASCII
+                .DAT    65536*MON_LAYOUT+MON_ENTRIES  ; 0x4005: the interface
+                .DAT    0               ; 0x4006: the length in words, from BASIC_BASE
+                .DAT    0               ; 0x4007: the checksum, the sum over the length is 0
+                .DAT    VERSION         ; 0x4008: the version text, as the banner shows it
+                .DAT    0               ; 0x4009: the version as a number
+                .DAT    0               ; 0x400A: the flags, bit 0 "keep"
+                .DAT    BASIC_WORDS     ; 0x400B: the words of BASIC's RAM, from STACK
 
 ; bas_warm: where mon_exit goes, with R1 the status of the program that
 ; left: the status shown, as SYS shows it, and then the main loop

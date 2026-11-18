@@ -28,6 +28,7 @@ VARS_WORDS      .EQU    0x1800          ; the words from STACK, the variables, w
 STACK           .EQU    0xFFFFE800      ; BASIC's, BASIC_WORDS words, where SP starts, down,
 BASIC_WORDS     .EQU    0x800
 MON_RAM         .EQU    0xFFFFF000      ; and the monitor's, to 0xFFFFFEFF, below the devices
+MON_LAYOUT      .EQU    1               ; the version of the layout of the monitor's RAM, in BASIC's header
 BASIC_BASE      .EQU    0x4000          ; BASIC's image, above the monitor's, to PROGRAM:
 BAS_COLD        .EQU    BASIC_BASE      ; its cold start, where mon_reset goes at its end,
 BAS_WARM        .EQU    BASIC_BASE+2    ; and its warm start, where mon_exit goes, R1 the status

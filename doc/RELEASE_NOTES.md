@@ -61,6 +61,13 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   entries, `MON_E_NOIP` to `MON_E_TEOF`, as `mon.h` has them, and both
   have the outputs of `mon_out`, `MON_OUT_LINE` and `MON_OUT_SCREEN`.
 
+- BASIC's image has a header after its two vectors, with its length,
+  a checksum, and its version, and `make rom` writes it as a file for
+  a card too, `basic/build/basic.rom`; `tools/basic_rom.py` fills in
+  the header and checks it. It is the first step of BASIC from a
+  card's file
+  ([#153](https://github.com/MJoergen/NiceMonMEGA65/issues/153)).
+
 **Changes.**
 
 - `LOAD` skips a line of a file, from the card or a TFTP server, that

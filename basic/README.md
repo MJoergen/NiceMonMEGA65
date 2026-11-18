@@ -211,12 +211,24 @@ is faster, as it writes the words into the memory.
 
 `make -C basic` builds BASIC's image, `build/basic_image.bin`, and
 `make rom` at the top joins it with the monitor's into the ROM,
-`build/rom.bin` ([rom.mk](../rom.mk)). The image is the cat of
+`build/rom.bin` ([rom.mk](../rom.mk)). Both write the image as a file
+for a card too, `build/basic.rom`
+([doc/BASIC_ROM.md](../doc/BASIC_ROM.md), #153). The image is the cat of
 `basic.nasm`, `basic_cmd.nasm`, `basic_net.nasm`, `basic_time.nasm`,
 and `basic_dis.nasm`, BASIC's copies of the monitor's `common.nasm`,
 `monlib.nasm`, and `mon.nasm`, the version, and the texts with the
 card's folder. `basic.nasm`'s header says what each file has, and
 "Its words" below has the words of each.
+
+The image starts with its header, after the two vectors: a magic word,
+the interface, the length, a checksum, the address of the version
+text, the version as a number, the flags, and the words of BASIC's
+RAM ([doc/BASIC_ROM.md](../doc/BASIC_ROM.md#the-image)). The assembler
+writes `build/basic_asm.bin`, with 0 for the length, the checksum, the
+version as a number, and the flags, and `../tools/basic_rom.py fill`
+fills them in. The tests' image has the flag "keep", and the version
+`V9.9`, `0x09090000`. `tools/basic_rom.py check FILE` checks an image,
+and prints its header.
 
 ## Testing
 
@@ -306,7 +318,7 @@ table, and `make romsize` writes it again.
 <!-- romsize basic -->
 | Source | What it is | Words | Text |
 |---|---|---:|---:|
-| `basic.nasm` | The vectors, the main loop, the scanner, the keywords, the messages, and the help | 838 | 440 |
+| `basic.nasm` | The vectors, the header, the main loop, the scanner, the keywords, the messages, and the help | 846 | 440 |
 | `basic_cmd.nasm` | The routines of the statements that were the commands | 1567 | 291 |
 | `basic_net.nasm` | `DHCP`, `NTP`, and TFTP | 907 | 150 |
 | `basic_time.nasm` | `TIME`, and the clock's side of `NTP` | 275 | 44 |
@@ -316,5 +328,5 @@ table, and `make romsize` writes it again.
 | `mon.nasm` | The stubs of the entries | 82 | 0 |
 | `build/basic_folder.nasm` | The texts with the folder's name: `DIR`'s, and the error of a card without it | 14 | 14 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 5067 | 1025 |
+| In all | | 5075 | 1025 |
 <!-- /romsize basic -->

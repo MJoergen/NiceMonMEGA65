@@ -3,7 +3,8 @@
 The design of issue
 [#153](https://github.com/MJoergen/NiceMonMEGA65/issues/153): at the
 start, the monitor replaces BASIC's half of the ROM with a file from
-the SD card. **This is a draft. Nothing of it is written. The
+the SD card. **This is a draft. Of its [Stages](#stages), the first,
+the header, is written, and nothing else. The
 decisions of 2026-11-18 are in [Decisions](#decisions), with those
 that a review against the code changed the same day, and only the
 details of [Open questions](#open-questions) are open.**
@@ -44,7 +45,7 @@ details of [Open questions](#open-questions) are open.**
   from `build/rom.bin` at synthesis (`src/rom.vhd`, `src/mem.vhd`). A
   write to it is dropped.
 - Since #152 it holds two images, assembled apart: the monitor's at 0,
-  9590 words, and BASIC's at `BASIC_BASE`, `0x4000`, 5067 words
+  9590 words, and BASIC's at `BASIC_BASE`, `0x4000`, 5075 words
   ([monitor/INTERNALS.md](../monitor/INTERNALS.md#the-roms-words)).
 - The monitor knows only BASIC's two vectors, `BAS_COLD` at `0x4000`
   and `BAS_WARM` at `0x4002`. BASIC calls the monitor only through the
@@ -525,7 +526,8 @@ stages are written:
 1. **The header.** BASIC's image gets the header, with the flags and
    the size of its RAM, the version, and the checksum, and
    `make rom` writes `basic/build/basic.rom`. The tests' image has
-   "keep". Nothing else changes.
+   "keep". Nothing else changes. Written: `tools/basic_rom.py` fills
+   in the header after assembly, and checks an image.
 2. **The RTL.** The ROM's write port, registered, the lock by a store,
    and the new cases of `mem.vhd`, with its input for the link's
    requests, `tb_nicemon`, `formal/mem.sby`, `synth/rompatch.tcl`,
