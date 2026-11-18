@@ -44,8 +44,8 @@ Under the monitor:
     the SYS 0x8000 in the input file:
 
         diff <(niceemu -i <(printf 'SYS 0x8000\\r'; cat in.txt) \\
-                   <(cat monitor.bin prog.bin)) \\
-             <(tools/run.py --monitor --rom monitor.bin -i in.txt prog.bin)
+                   <(cat rom.bin prog.bin)) \\
+             <(tools/run.py --monitor --rom rom.bin -i in.txt prog.bin)
 
     The output then has the monitor's too: its banner, the SYS, and the
     status that the program returns. The monitor reads on at the end of

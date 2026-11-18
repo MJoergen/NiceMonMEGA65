@@ -30,19 +30,19 @@ or `make r6` in the top directory, and likewise for `r3` and `nexys4ddr`.
 The bitstream is `synth/r6/build/top.bit`, with timing and utilization
 reports next to it. Built in `synth/r6`, it has no ROM, and its core
 waits, held, for a host on the debug link. `make r6` in the top directory
-builds the monitor first and puts it in the ROM,
-`monitor/build/monitor.bin`, unless `ROM=` gives another
-file, or none when empty. The monitor is assembly, so that needs
+builds the ROM first, the monitor and BASIC, and puts it in the ROM,
+`build/rom.bin`, unless `ROM=` gives another
+file, or none when empty. The ROM is assembly, so that needs
 Python alone ([monitor/](../monitor/INTERNALS.md#building-and-testing)). With
 
-    make -C synth/r6 ROM=/path/to/monitor.bin
+    make -C synth/r6 ROM=/path/to/rom.bin
 
 the core boots at reset from a ROM of 32K words at address 0 with the words
 of the `.bin` file (`src/rom.vhd`, through `G_ROM_FILE` of `top.vhd`), as
 [PROGRAMMING.md](../doc/PROGRAMMING.md#programs-in-the-rom) describes. Vivado reads the file during
 synthesis, so the bitstream is rebuilt when it changes, and a word
 beyond the ROM fails the build. `make r6
-ROM=monitor.bin` in the top directory does the same with a path relative
+ROM=rom.bin` in the top directory does the same with a path relative
 to it.
 
 ### A change of the ROM alone
@@ -50,7 +50,7 @@ to it.
 After a build with a ROM, another ROM goes into the same bitstream in
 about a minute, with no synthesis, placement, or routing:
 
-    make r6 ROMPATCH=monitor/build/monitor.bin
+    make r6 ROMPATCH=build/rom.bin
 
 The ROM's words are the initial contents of its 32 block RAMs, and
 timing does not depend on them. So [rompatch.tcl](rompatch.tcl) opens
@@ -58,7 +58,7 @@ the routed checkpoint of the last build, `build/top.dcp`, sets the
 words, and writes `build/top.bit`, which meets timing as the build did.
 It is `make -C synth/r6 rompatch ROM=file.bin` in the board's directory,
 and works likewise for `r3`, `nexys4ddr`, and `cor`. It does not build
-the monitor, so run `make monitor` first after a change of it.
+the ROM, so run `make rom` first after a change of it.
 
 The build keeps a copy of its ROM, `build/rom_ref.bin`. The patch first
 checks that the checkpoint holds that ROM, in the layout that the script

@@ -91,13 +91,14 @@ it. `tools/mon.py` is a debugger
 
 Run it in the emulator, which is built with
 `make -C nice_cpu/emulator build`. The emulator has no ROM, so the
-monitor, built with `make monitor`, is joined in front of the program.
+ROM, the monitor and BASIC, built with `make rom`, is joined in front of
+the program.
 The input, which `-i -` reads from stdin, types `SYS 0x8000`, which
 runs the program, and `HALT`, which halts the emulator when the program has
 returned. The emulator prints the console's output, why it stopped,
 and the registers, and with `--screen` the screen:
 
-    cat monitor/build/monitor.bin hello.bin > joined.bin
+    cat build/rom.bin hello.bin > joined.bin
     printf 'SYS 0x8000\rHALT\r' | \
         nice_cpu/emulator/zig-out/bin/niceemu --screen -i - joined.bin
 
@@ -244,8 +245,8 @@ file from the SD card, `LOAD "NAME.BIN", "IP"` from the network, and
 program at 0 like any other, and a program under it is joined after it,
 as a `.bin` file is address and word pairs:
 
-    make monitor
-    cat monitor/build/monitor.bin prog.bin > joined.bin
+    make rom
+    cat build/rom.bin prog.bin > joined.bin
     printf 'SYS 0x8000\rHALT\r' | niceemu -i - --sd0 card.img joined.bin
 
 The input types `SYS 0x8000`, which runs the program at `0x8000`, and

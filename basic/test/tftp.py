@@ -2,7 +2,7 @@
 """Run BASIC's LOAD and DIR from a TFTP server in niceemu, against
 frames of --eth-in.
 
-Usage: test/tftp.py NICEEMU MONITOR.bin EXPECTED OUT
+Usage: test/tftp.py NICEEMU ROM.bin EXPECTED OUT
 
 Each run has --step-time, so that it takes the same steps each time, and
 the port that udp_open picks from the microseconds is the same in each

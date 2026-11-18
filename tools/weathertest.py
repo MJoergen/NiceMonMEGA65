@@ -16,7 +16,7 @@ in the Nexys4DDR's memory.
 It prints a line for each check, and last how many passed, and exits with
 status 1 when one fails. niceemu must be built, with make -C
 nice_cpu/emulator build, and so must the program, with make -C examples,
-and the monitor of the tests, with make -C monitor build/monitor_test.bin.
+and the ROM of the tests, with make build/rom_test.bin.
 mkfs.fat and mtools make the card. Only the Python standard library is
 used.
 """
@@ -34,7 +34,7 @@ from tcppeer import Conn, Peer, Script  # noqa: E402
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NICEEMU = os.path.join(REPO, "nice_cpu", "emulator", "zig-out", "bin", "niceemu")
-MONITOR = os.path.join(REPO, "monitor", "build", "monitor_test.bin")
+MONITOR = os.path.join(REPO, "build", "rom_test.bin")
 PROGRAM = os.path.join(REPO, "examples", "build", "weather.bin")
 ANSWERS = os.path.join(REPO, "examples", "test")
 SCREEN = 0xFFFF0000
@@ -272,7 +272,7 @@ def cases(tmp: str) -> None:
 
 def main() -> None:
     for path, how in ((NICEEMU, "make -C nice_cpu/emulator build"),
-                      (MONITOR, "make -C monitor build/monitor_test.bin"),
+                      (MONITOR, "make build/rom_test.bin"),
                       (PROGRAM, "make -C examples")):
         if not os.path.exists(path):
             sys.exit(f"weathertest.py: no {path}; {how} builds it")

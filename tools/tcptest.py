@@ -12,8 +12,8 @@ it names the case, and Listening here connects to it.
 
 It prints a line for each check, and last how many passed, and exits with
 status 1 when one fails. niceemu must be built, with make -C
-nice_cpu/emulator build, and so must the program, with make -C monitor
-build/tcp.bin. Only the Python standard library is used.
+nice_cpu/emulator build, and so must the ROM of the tests, with make
+build/rom_test.bin, and the program, with make -C monitor build/tcp.bin. Only the Python standard library is used.
 """
 
 import os
@@ -34,7 +34,7 @@ from tcppeer import (ACK, BOARD_IP, FIN, PEER_IP, PEER_MAC, PSH, RST, SYN, Conn,
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NICEEMU = os.path.join(REPO, "nice_cpu", "emulator", "zig-out", "bin", "niceemu")
-MONITOR = os.path.join(REPO, "monitor", "build", "monitor_test.bin")
+MONITOR = os.path.join(REPO, "build", "rom_test.bin")
 PROGRAM = os.path.join(REPO, "monitor", "build", "tcp.bin")
 TIMERS = os.path.join(REPO, "monitor", "build", "tcpt.bin")
 PROGRAM_C = os.path.join(REPO, "monitor", "build", "tcp_c.bin")
@@ -1004,7 +1004,7 @@ def timers(tmp: str) -> None:
 
 def main() -> None:
     for path, how in ((NICEEMU, "make -C nice_cpu/emulator build"),
-                      (MONITOR, "make -C monitor build/monitor_test.bin"),
+                      (MONITOR, "make build/rom_test.bin"),
                       (PROGRAM, "make -C monitor build/tcp.bin"),
                       (TIMERS, "make -C monitor build/tcpt.bin"),
                       (PROGRAM_C, "make -C monitor build/tcp_c.bin"),

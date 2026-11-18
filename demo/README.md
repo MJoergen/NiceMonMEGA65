@@ -68,8 +68,8 @@ this repository, or `VERSION=` on the command line, which
 into `build/demo.bin`.
 
 The test builds the demo with the version `V9.9` into
-`build/test/demo_test.bin`, puts it after the monitor's test,
-`monitor/build/monitor_test.bin`, into `build/test/monitor_demo.bin`, and
+`build/test/demo_test.bin`, puts it after the ROM of the tests, the
+monitor and BASIC, `../build/rom_test.bin`, into `build/test/monitor_demo.bin`, and
 runs that in `niceemu` twice. The first input runs the demo with
 `SYS 0x8000` and types a line, so the screen has the board's text, and
 the second goes back to BASIC with F12, and shows its version with `VER`

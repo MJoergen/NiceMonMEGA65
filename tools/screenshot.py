@@ -22,14 +22,14 @@ rows are laid out as src/dbg/dbg.vhd writes them, in the character ROM,
 as the display draws them. niceemu runs the
 program twice, the second time to read the words at the PC.
 
-The pictures of doc/images/ are made from the monitor of the release
-and the demo at 0x8000 after it, both with its tag, and SYS 0x8000 and
+The pictures of doc/images/ are made from the ROM of the release, the
+monitor and BASIC, and the demo at 0x8000 after it, all with its tag, and SYS 0x8000 and
 CR first, which start the demo:
 
-    make -C monitor VERSION=V2.3 && make -C demo VERSION=V2.3
-    cat monitor/build/monitor.bin demo/build/demo.bin > rom.bin
+    make rom VERSION=V2.3 && make -C demo VERSION=V2.3
+    cat build/rom.bin demo/build/demo.bin > rom_demo.bin
     printf 'SYS 0x8000\\rHello from the NICE CPU on the MEGA65!\\r' > in.txt
-    tools/screenshot.py -i in.txt -o doc/images/demo.png rom.bin
+    tools/screenshot.py -i in.txt -o doc/images/demo.png rom_demo.bin
 
 doc/images/ethernet.png, the demo's F11, with:
 

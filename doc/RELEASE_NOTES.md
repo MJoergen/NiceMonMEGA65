@@ -40,6 +40,13 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   monitor's, at `0xFFFFE800`, where SP starts now, below
   `0xFFFFF000`. `LOAD` and `load.py --monitor` refuse a word from
   there up ([#152](https://github.com/MJoergen/NiceMonMEGA65/issues/152)).
+- The ROM is two images, the monitor's at `0x0000` and BASIC's at
+  `0x4000`, from the new folder `basic/`. `make rom` builds it into
+  `build/rom.bin`, in place of `make monitor` and
+  `monitor/build/monitor.bin`, which is gone: an old copy of that file
+  has no BASIC. Give `ROM=build/rom.bin`, `ROMPATCH=build/rom.bin`, and
+  `--rom build/rom.bin` instead. `make -C basic test` runs BASIC's
+  tests ([#152](https://github.com/MJoergen/NiceMonMEGA65/issues/152)).
 
 **New.**
 

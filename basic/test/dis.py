@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Check BASIC's DIS, the disassembler, against nicedis.py and niceasm.
 
-Usage: test/dis.py NICEEMU MONITOR.bin PROGRAM.bin
+Usage: test/dis.py NICEEMU ROM.bin PROGRAM.bin
 
 PROGRAM.bin is test/dis.nasm, assembled at 0x8000. The monitor runs in
 niceemu with the program behind it and the statements DIS 0x8000, 1,

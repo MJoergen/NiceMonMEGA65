@@ -21,7 +21,6 @@
 PYTHON  ?= python3
 NICE_CPU = ../nice_cpu
 EMU      = $(NICE_CPU)/emulator/zig-out/bin/niceemu
-MONITOR  = ../monitor
 DEMO     = $(NICE_CPU)/demo
 BUILD    = build
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo unknown)
@@ -45,14 +44,15 @@ $(BUILD)/test/demo_test.bin: FORCE | $(BUILD)
 	@$(DEMO_MAKE) BUILD='$(abspath $(BUILD)/test)' VERSION=V9.9 '$(abspath $(BUILD)/test/demo.bin)'
 	@cmp -s $(BUILD)/test/demo.bin $@ || cp $(BUILD)/test/demo.bin $@
 
-# The monitor of the tests, built by the monitor's Makefile
-$(MONITOR)/build/monitor_test.bin: FORCE
-	@$(MAKE) -s --no-print-directory -C $(MONITOR) build/monitor_test.bin
+# The ROM of the tests, the monitor and BASIC, built by the top Makefile
+# (../rom.mk)
+../build/rom_test.bin: FORCE
+	@$(MAKE) -s --no-print-directory -C .. build/rom_test.bin
 
-# The monitor of the tests with the demo at 0x8000 after it, which
-# niceemu runs from 0, and make hwtest loads at 0 too (.bin files are
-# text, so cat joins them)
-$(BUILD)/test/monitor_demo.bin: $(MONITOR)/build/monitor_test.bin $(BUILD)/test/demo_test.bin
+# The ROM of the tests with the demo at 0x8000 after it, which niceemu
+# runs from 0, and make hwtest loads at 0 too (.bin files are text, so
+# cat joins them)
+$(BUILD)/test/monitor_demo.bin: ../build/rom_test.bin $(BUILD)/test/demo_test.bin
 	@cat $^ > $@
 
 # nice_cpu's own test runs the demo, behind its stand-in for a monitor.

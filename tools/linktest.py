@@ -117,14 +117,13 @@ def test_console(port: str) -> None:
     monitor of the tests, loaded and started here, runs its line, HELP,
     and lists its statements. Ctrl-] must give the prompt back.
     As in mon(), a run that got no connection is tried again."""
-    subprocess.run(["make", "-s", "-C", f"{REPO}/monitor",
-                    "build/monitor_test.bin"], check=True)
+    subprocess.run(["make", "-s", "-C", REPO, "build/rom_test.bin"], check=True)
     end = time.monotonic() + 2
     while True:
         master, slave = pty.openpty()
         proc = subprocess.Popen(
             [sys.executable, f"{REPO}/tools/mon.py", "--tcp", port,
-             f"{REPO}/monitor/build/monitor_test.bin"],
+             f"{REPO}/build/rom_test.bin"],
             stdin=slave, stdout=slave, stderr=slave)
         os.close(slave)
         text = read_until(master, b"dbg> ", 10)

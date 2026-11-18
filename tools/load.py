@@ -26,7 +26,7 @@ core is started, so the monitor boots cold, which leaves the RAM from
 0x8000 alone. Then r and CR are typed on the console, the monitor's
 command that runs the program. A bitstream without a ROM, and niceemu,
 have no monitor: --rom FILE loads FILE at 0 in its place, such as
-monitor/build/monitor.bin, with the ROM hidden.
+build/rom.bin, the monitor and BASIC, with the ROM hidden.
 
 Usage: tools/load.py (--eth HOST[:PORT] | --port DEVICE [--baud 230400]
                      | --tcp [HOST:]PORT | --cosim PORT) [--no-run]
@@ -159,7 +159,7 @@ def load_words(link: Link, words: Words, rom: bool = False,
     if link.read_word(CONTROL) & RAM:
         fail("no ROM, so no monitor, as in a bitstream built without "
              "one or in niceemu; --rom FILE loads one, such as "
-             "monitor/build/monitor.bin, in its place")
+             "build/rom.bin, in its place")
     check_fit(link, words, monitor)
     link.write(BRK_EN, [0])
     nicebin.write_words(link, words)
@@ -178,7 +178,7 @@ def add_monitor_arguments(parser: argparse.ArgumentParser) -> None:
                         "in the ROM, which boots and gets r and CR")
     parser.add_argument("--rom", metavar="FILE",
                         help="with --monitor, load FILE at 0 in place of the "
-                        "ROM, such as monitor/build/monitor.bin")
+                        "ROM, such as build/rom.bin")
 
 
 def program_words(parser: argparse.ArgumentParser,

@@ -1943,9 +1943,8 @@ def test_fat_dir(link: Link, fat: dict[int, list[str]]) -> None:
     says that the card has none, then halts with HALT."""
     if not fat:
         return
-    subprocess.run(["make", "-s", "-C", f"{REPO}/monitor",
-                    "build/monitor_test.bin"], check=True)
-    load(link, f"{REPO}/monitor/build/monitor_test.bin")
+    subprocess.run(["make", "-s", "-C", REPO, "build/rom_test.bin"], check=True)
+    load(link, f"{REPO}/build/rom_test.bin")
     console(link)                      # the banner
     for slot, want in fat.items():
         cmd = f"DIR {slot}\r".encode()
@@ -2010,11 +2009,11 @@ def monitor_demo() -> str:
     return f"{REPO}/demo/build/test/monitor_demo.bin"
 
 
-def monitor_test() -> str:
-    """The monitor of the tests alone, built if need be; its path."""
-    subprocess.run(["make", "-s", "-C", f"{REPO}/monitor",
-                    "build/monitor_test.bin"], check=True)
-    return f"{REPO}/monitor/build/monitor_test.bin"
+def rom_test() -> str:
+    """The ROM of the tests, the monitor and BASIC, built if need be; its
+    path."""
+    subprocess.run(["make", "-s", "-C", REPO, "build/rom_test.bin"], check=True)
+    return f"{REPO}/build/rom_test.bin"
 
 
 def comparisons(tmp: str) -> list[tuple[str, list[str], bool]]:
@@ -2116,9 +2115,9 @@ def test_monitor(link_args: list[str], tmp: str, in_rom: bool = False,
     meanwhile (issue #67). The simulation of make cosim is too slow for
     it. link_args are run.py's options for the link, and via names it in
     the checks, as for test_run. The port must be closed meanwhile."""
-    subprocess.run(["make", "-s", "-C", f"{REPO}/monitor",
-                    "build/monitor_test.bin", "build/hello.bin"], check=True)
-    monitor = f"{REPO}/monitor/build/monitor_test.bin"
+    subprocess.run(["make", "-s", "-C", REPO, "build/rom_test.bin"], check=True)
+    subprocess.run(["make", "-s", "-C", f"{REPO}/monitor", "build/hello.bin"], check=True)
+    monitor = f"{REPO}/build/rom_test.bin"
     hello = f"{REPO}/monitor/build/hello.bin"
     joined = os.path.join(tmp, "monitor_hello.bin")
     with open(joined, "w") as f:
@@ -2175,7 +2174,7 @@ def test_monitor(link_args: list[str], tmp: str, in_rom: bool = False,
             board.stdout = BG_DHCP.sub(b"", board.stdout)
             same = (emu.stdout == board.stdout and
                     emu.returncode == board.returncode)
-            check(f"run.py --monitor --rom monitor_test.bin "
+            check(f"run.py --monitor --rom rom_test.bin "
                   f"{os.path.basename(prog)}{name} as niceemu{via}", same,
                   "" if same else
                   f"\n  niceemu (exit {emu.returncode}): "
@@ -2206,9 +2205,8 @@ def test_fit(link_args: list[str], tmp: str, ram: int) -> None:
     than the MEGA65's, as read_bin() refuses one beyond that for every
     board. A refused load leaves the core held and the memory cleared,
     as the next load does."""
-    subprocess.run(["make", "-s", "-C", f"{REPO}/monitor",
-                    "build/monitor_test.bin"], check=True)
-    monitor = f"{REPO}/monitor/build/monitor_test.bin"
+    subprocess.run(["make", "-s", "-C", REPO, "build/rom_test.bin"], check=True)
+    monitor = f"{REPO}/build/rom_test.bin"
     cases = [(ram - MONITOR_WORDS, ["--monitor", "--rom", monitor],
               " under the monitor")]
     if ram < MAX_RAM_WORDS:
@@ -2358,8 +2356,8 @@ def test_eth_tcp(eth: str, ip: str, tmp: str, listen: bool = False) -> None:
     computer connects; then it sends TCP_BYTES, which the computer
     echoes, compares them, closes, and returns 0 once its handle is free
     (issue #111)."""
-    subprocess.run(["make", "-s", "-C", f"{REPO}/monitor",
-                    "build/monitor_test.bin", "build/tcphw.bin"], check=True)
+    subprocess.run(["make", "-s", "-C", REPO, "build/rom_test.bin"], check=True)
+    subprocess.run(["make", "-s", "-C", f"{REPO}/monitor", "build/tcphw.bin"], check=True)
     # This computer's address on the board's network
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
         probe.connect((ip, 9))
@@ -2425,7 +2423,7 @@ def test_eth_tcp(eth: str, ip: str, tmp: str, listen: bool = False) -> None:
     board = subprocess.run(
         [sys.executable, f"{REPO}/tools/run.py", "--eth", eth, "--timeout",
          f"{RUN_TIMEOUT + 20:g}", "--monitor", "--rom",
-         f"{REPO}/monitor/build/monitor_test.bin", "-i", halt, prog],
+         f"{REPO}/build/rom_test.bin", "-i", halt, prog],
         stdin=subprocess.DEVNULL, capture_output=True)
     thread.join(RUN_TIMEOUT + 20)
     server.close()
@@ -2765,7 +2763,7 @@ def main() -> None:
                 uncovered.append("the Ethernet station, without --eth")
             else:
                 test_eth(args.port, args.baud, args.eth, comparisons(tmp),
-                         monitor_test(), assemble(f"{REPO}/sim/udp.nasm", tmp),
+                         rom_test(), assemble(f"{REPO}/sim/udp.nasm", tmp),
                          tmp)
         except LinkError as e:
             print(f"hwtest.py: {e}", file=sys.stderr, flush=True)

@@ -33,9 +33,10 @@ or, in an existing clone:
   `demo/build/demo.bin`, a program at `0x8000` under the monitor, which
   the release ships as a file of its own. BASIC's `LOAD "DEMO.BIN"`
   and `SYS 0x8000` run it.
-- `make monitor` builds the monitor, `monitor/build/monitor.bin`, which
-  the boards' targets and the release put in the ROM of the bitstreams
-  and core files. `FOLDER=NAME`
+- `make rom` builds the ROM, `build/rom.bin`, which joins the images
+  of the monitor and BASIC (`rom.mk`, #152), and which the boards'
+  targets and the release put in the ROM of the bitstreams and core
+  files. `FOLDER=NAME`
   puts its files in another folder of the SD card than `NICE`, which a
   board's target takes too (see
   [monitor/INTERNALS.md](monitor/INTERNALS.md#building-and-testing)).
@@ -953,7 +954,7 @@ bitstream has one. Then it hides the ROM and uses the link:
   `examples/build/bench.bin` and `bench_win.bin`, but for their cycles,
   whose tables it prints.
   It runs the monitor's `test/hello.nasm` with `run.py --monitor --rom
-  monitor/build/monitor_test.bin` against `niceemu` on the two joined,
+  build/rom_test.bin` against `niceemu` on the two joined,
   pastes the 600 lines of `hello.bin` into BASIC's `LOAD` at the
   UART's full rate and runs them with `SYS 0x8000`, and runs `hello.nasm` with
   `run.py --monitor` under the monitor in the board's ROM, which must

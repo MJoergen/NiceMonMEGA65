@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Run BASIC's NTP in niceemu, against frames of --eth-in.
 
-Usage: test/ntp.py NICEEMU MONITOR.bin EXPECTED OUT
+Usage: test/ntp.py NICEEMU ROM.bin EXPECTED OUT
 
 The monitor runs the statements of INPUT with --step-time, so that a run
 takes the same steps each time. The transaction of DHCP, and the port
@@ -60,7 +60,9 @@ import sys
 import tempfile
 from typing import Callable, Dict, List, Set, Tuple
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# The frames of DHCP and DNS, from the monitor's tests of its entries
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..",
+                                "monitor", "test"))
 import dhcp  # noqa: E402
 import dns  # noqa: E402
 

@@ -46,7 +46,7 @@ header is the authoritative address map.
 ## Commands
 
     make                  # lists the targets
-    make -j test          # GHDL: synth checks, tb_hello, tb_nicemon, tb_kbd, tb_ps2, tb_ps2_nicemon, tb_text, tb_dbg, tb_dbg_host, tb_dbg_decode, tb_board_io, tb_rmii_rx, tb_rx_fcs, tb_eth_rx_fifo, tb_eth_tx_fifo, tb_rmii_tx, tb_eth, tb_eth_tcp, tb_eth_tcp_random, tb_sd, tb_i2c, check-steps, check-fmt (NICE=multi for the multi-cycle core); then the demo and the monitor in niceemu
+    make -j test          # GHDL: synth checks, tb_hello, tb_nicemon, tb_kbd, tb_ps2, tb_ps2_nicemon, tb_text, tb_dbg, tb_dbg_host, tb_dbg_decode, tb_board_io, tb_rmii_rx, tb_rx_fcs, tb_eth_rx_fifo, tb_eth_tx_fifo, tb_rmii_tx, tb_eth, tb_eth_tcp, tb_eth_tcp_random, tb_sd, tb_i2c, check-steps, check-fmt (NICE=multi for the multi-cycle core); then the demo, the monitor, and BASIC in niceemu
     make -j formal        # SymbiYosys jobs in formal/, each task in a work directory of its own
     make lint             # vsg against doc/CODING_STYLE.md; line-length warnings are tolerated
     make typecheck        # mypy --strict on the Python files that mypy.ini lists
@@ -54,8 +54,8 @@ header is the authoritative address map.
     make diagrams         # src/system.tex and src/eth/eth.tex -> the PNGs of their READMEs (pdflatex)
     make examples         # C examples -> examples/build/*.bin (clang wasm32, lld, llvm)
     make demo             # nice_cpu's demo at 0x8000 -> demo/build/demo.bin, a release asset, not in the ROM (#129); make -C demo test runs it under the monitor in niceemu
-    make monitor [FOLDER=NICE] # the monitor -> monitor/build/monitor.bin, its files in the card's folder FOLDER; make -C monitor test runs it in niceemu
-    make r6 [ROM=f.bin]   # Vivado bitstream, synth/r6/build/top.bit, the monitor (monitor/build/monitor.bin) in the ROM unless ROM= (none) or ROM=f.bin; make r3 and make nexys4ddr likewise
+    make rom [FOLDER=NICE] # the ROM -> build/rom.bin (rom.mk), the monitor's image and BASIC's joined, its files in the card's folder FOLDER; make -C monitor test and make -C basic test run build/rom_test.bin in niceemu
+    make r6 [ROM=f.bin]   # Vivado bitstream, synth/r6/build/top.bit, the ROM (build/rom.bin) in the ROM unless ROM= (none) or ROM=f.bin; make r3 and make nexys4ddr likewise
     make r6 ROMPATCH=f.bin # the ROM alone into the last build's checkpoint, about a minute (synth/rompatch.tcl, #122); r3, nexys4ddr, and cor likewise
     make cor [ROM=f.bin]  # MEGA65 core files for MEGAFLASH, synth/r{3,6}/build/NiceMonMEGA65-r{3,6}.cor (coretool)
     make load FILE=p.bin  # load and start a program on the board (ETH=IP or PORT=/dev/ttyUSB1, one needed); ARGS=--monitor for one at 0x8000 under the ROM's monitor
@@ -89,7 +89,7 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
 `nice_cpu/emulator/zig-out/bin/niceemu x.bin`. CI
 (`.github/workflows/ci.yml`, on Ubuntu 24.04) builds niceemu and runs
 `make -C sim -j4 test` and `make cosimtest` on both cores, `make examples`,
-`make -C demo test`, `make -C monitor test`, `make linktest`, `make tftptest`, `make tcptest`, `make weathertest`, `make sdtest`, `make -j4 formal`, `make lint`, and `make typecheck`.
+`make -C demo test`, `make -C monitor test`, `make -C basic test`, `make linktest`, `make tftptest`, `make tcptest`, `make weathertest`, `make sdtest`, `make -j4 formal`, `make lint`, and `make typecheck`.
 
 ## Layout
 
@@ -179,17 +179,19 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   program at 0x8000, `demo.bin`, which the release ships as an asset of
   its own and BASIC's `LOAD "DEMO.BIN"` and `SYS 0x8000` run; it left the ROM
   in V2.1 (#129).
-  The ROM is two images, assembled apart (#152), which
-  `monitor/build/monitor.bin` joins: the monitor's at 0, and BASIC's at
-  `0x4000`, `BASIC_BASE`, whose two vectors, the cold start and the
-  warm start, are all the monitor knows of it. `basic/`: BASIC
+  The ROM is two images, assembled apart (#152), which `rom.mk` joins
+  into `build/rom.bin`, and the tests' into `build/rom_test.bin`: the
+  monitor's at 0, and BASIC's at `0x4000`, `BASIC_BASE`, whose two
+  vectors, the cold start and the warm start, are all the monitor knows
+  of it. `basic/`: BASIC
   (`basic.nasm`, the vectors, the main loop (#54, stage 1 #112), its
   scanner of a line (#115), its keywords, messages, and help, and the
   map of its RAM, `basic_cmd.nasm`, the routines of the statements
   that were the monitor's commands, `DHCP`, `NTP`, and TFTP in
   `basic_net.nasm`, `TIME` in `basic_time.nasm`, and `DIS` in
   `basic_dis.nasm`), on the entries of the dispatch table alone, as a
-  program is; the monitor's Makefile builds it.
+  program is, with its tests of the statements in `basic/test/`, and
+  `basic/README.md`, its build and its tests.
   `monitor/`: the monitor for the ROM in NICE assembly (`monitor.nasm`,
   the dispatch table, the HAL, and the map of its RAM, the sector
   routines in `monitor_sd.nasm`, FAT32 in `monitor_fat.nasm` (#149),
@@ -204,7 +206,8 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   programs join (`monlib.nasm`), the stubs and the header through which
   a program calls the entries (`mon.nasm`, `mon.h`, and `mon_c.nasm`,
   the stubs that turn a C pointer into an address), and its tests in
-  niceemu (`test/`, with `cat monitor.bin prog.bin`). `monitor/README.md`
+  niceemu (`test/`, with `cat rom_test.bin prog.bin`), those of FAT32
+  among them, though they type BASIC's statements. `monitor/README.md`
   is the monitor for those who use it and write programs for it, and
   `monitor/INTERNALS.md` the routines with no entries, the scrollback,
   FAT32, the ROM's words, and the build and the tests.

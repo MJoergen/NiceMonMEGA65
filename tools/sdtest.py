@@ -62,16 +62,16 @@ cluster of one sector is full, the root grows by a cluster. fsck.fat
 and mdir check both cards afterwards.
 
 On a running core, put holds it, and starts it again from reset, which
-sim/sdhold.nasm shows by reading sector 5 again. Last, the monitor of
-the tests, monitor/build/monitor_test.bin, lists the card with dir, the
+sim/sdhold.nasm shows by reading sector 5 again. Last, the ROM of the
+tests, build/rom_test.bin, lists the card with dir, the
 tool puts a .bin file with a long name, my prog.bin, and the monitor,
 started again, lists it and loads it by that name; then the tool
 deletes it, and dir no longer lists it.
 
 It prints a line for each check, and last how many passed, and exits with
 status 1 when one fails. niceemu must be built first, with make -C
-nice_cpu/emulator build, and so must the monitor of the tests, with
-make -C monitor build/monitor_test.bin. Only the Python standard library is used, and
+nice_cpu/emulator build, and so must the ROM of the tests, with make
+build/rom_test.bin. Only the Python standard library is used, and
 the tools of dosfstools, util-linux, and mtools.
 """
 
@@ -99,7 +99,7 @@ NICEEMU = os.path.join(REPO, "nice_cpu", "emulator", "zig-out", "bin",
 SDCARD = os.path.join(REPO, "tools", "sdcard.py")
 SDNBD = os.path.join(REPO, "tools", "sdnbd.py")
 HOLD_PROG = os.path.join(REPO, "sim", "sdhold.nasm")
-MONITOR = os.path.join(REPO, "monitor", "build", "monitor_test.bin")
+MONITOR = os.path.join(REPO, "build", "rom_test.bin")
 MB = 1024 * 1024
 
 passed = 0
@@ -1114,7 +1114,7 @@ def test_monitor(imgs: dict[str, str], tmp: str) -> None:
     print("the monitor of the tests, and put and del")
     if not os.path.exists(MONITOR):
         check(f"{MONITOR} is built", False,
-              "make -C monitor build/monitor_test.bin")
+              "make build/rom_test.bin")
         return
     img = copy(imgs["super"], os.path.join(tmp, "mon.img"))
     emu = Emu(img, prog=MONITOR)

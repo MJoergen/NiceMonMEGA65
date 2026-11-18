@@ -196,8 +196,8 @@ BASIC's and the monitor's, `0x1E800` on the MEGA65 and `0xE800` on the
 Nexys4DDR, and a
 bitstream without a ROM. `--rom FILE` loads
 FILE at 0 in place of the ROM, with the ROM hidden, such as
-`monitor/build/monitor.bin`: for `niceemu --link`, `make cosim`, a
-bitstream without a ROM, or another build of the monitor.
+`build/rom.bin`, the monitor and BASIC: for `niceemu --link`, `make
+cosim`, a bitstream without a ROM, or another build of the ROM.
 
 `run.py --monitor` does the same, with `SYS 0x8000` and CR before the
 input, and `--rom FILE` too, and prints what `niceemu` prints for the
@@ -206,10 +206,10 @@ input, so the input ends with BASIC's `HALT`, which halts the core, as
 in the monitor's tests:
 
     printf 'HALT\r' > h.txt
-    tools/run.py --tcp PORT --monitor --rom monitor/build/monitor_test.bin \
+    tools/run.py --tcp PORT --monitor --rom build/rom_test.bin \
         -i h.txt monitor/build/hello.bin
     printf 'SYS 0x8000\rHALT\r' > rh.txt
-    cat monitor/build/monitor_test.bin monitor/build/hello.bin > joined.bin
+    cat build/rom_test.bin monitor/build/hello.bin > joined.bin
     niceemu -i rh.txt joined.bin
 
 `make hwtest`, `make linktest`, and `make cosimtest` compare the two so

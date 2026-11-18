@@ -60,9 +60,10 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y clang lld llvm dosfstools mtools fdisk
       - run: make examples
       - run: make -C nice_cpu/emulator build
-      # nice_cpu's demo under the monitor, and the monitor, on niceemu
+      # nice_cpu's demo under the monitor, the monitor, and BASIC, on niceemu
       - run: make -C demo test
       - run: make -C monitor test
+      - run: make -C basic test
       - run: make linktest
       - run: make tftptest
       - run: make tcptest

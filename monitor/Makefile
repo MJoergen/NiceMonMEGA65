@@ -1,135 +1,74 @@
-# Builds the monitor, the program of the ROM (README.md), into
-# build/monitor.bin, the boards' ROM (make r6), and tests it in niceemu.
+# Builds the monitor's image of the ROM (README.md), and tests the ROM in
+# niceemu.
 #
-# make          builds build/monitor.bin, with VERSION in its banner, git
-#               describe of the tree by default; the release gives its tag
-# make test     checks the layout of the sources, and runs the monitor in
-#               niceemu with the inputs below, alone and with the programs
-#               of test/ at 0x8000, and compares the output with
-#               test/*.expected
+# make          builds build/monitor_image.bin, with VERSION in its banner,
+#               git describe of the tree by default; the release gives its
+#               tag. make build/rom.bin at the top joins it with BASIC's.
+# make test     checks the layout of the sources, and runs the ROM of the
+#               tests, ../build/rom_test.bin, in niceemu with the inputs
+#               below, alone and with the programs of test/ at 0x8000, and
+#               compares the output with test/*.expected
 # make clean    removes build/
 #
-# The ROM is two images, assembled apart (issue #152): the monitor's at
-# 0, and BASIC's at BASIC_BASE, 0x4000 (common.nasm), from the files of
-# ../basic. build/monitor.bin joins them, and is the ROM that the boards
-# and the tools take. The assembler has no include, so the monitor is the
-# cat of MON_SOURCES (monitor.nasm, the files that its header lists,
-# common.nasm, monlib.nasm, and mon.nasm), build/version.nasm, which
-# defines the label VERSION, and build/folder.nasm, the folder FOLDER's
-# 8.3 name. BASIC is the cat of BAS_SOURCES (../basic/basic.nasm, the
-# files that its header lists, and its copies of common.nasm,
-# monlib.nasm, and mon.nasm), build/version.nasm, and
-# build/basic_folder.nasm, its texts with the folder's name. As neither
-# image has a label of the other, BASIC calls the monitor through the
-# entries alone. The monitor is assembly only, so it needs Python alone. The
-# tests' programs in C, hello_c.bin and tcp_c.bin, need clang with the
-# wasm32 target, wasm-ld, and llvm-ar, through nicebuild.
+# ../rom.mk has the ROM: its two images, assembled apart (issue #152),
+# their sources, VERSION, and FOLDER. This image is the cat of
+# MON_SOURCES (monitor.nasm, the files that its header lists,
+# common.nasm, monlib.nasm, and mon.nasm), build/version.nasm, and
+# build/folder.nasm, the folder FOLDER's 8.3 name. The monitor is
+# assembly only, so it needs Python alone. The tests here are those of the
+# monitor's code, the HAL, the line, the cards and FAT32, the network,
+# TCP, and the clock; ../basic/Makefile has those of BASIC's statements.
+# The tests' programs in C, hello_c.bin and tcp_c.bin, need clang with
+# the wasm32 target, wasm-ld, and llvm-ar, through nicebuild.
 
 PYTHON  ?= python3
+ROOT     = ..
+include $(ROOT)/rom.mk
 NICE_CPU = ../nice_cpu
-ASM      = $(PYTHON) $(NICE_CPU)/assembler/niceasm.py
+ASM      = $(ROM_ASM)
 FMT      = $(PYTHON) $(NICE_CPU)/assembler/nicefmt.py
 NICEBUILD = $(PYTHON) $(NICE_CPU)/translator/nicebuild.py
 EMU      = $(NICE_CPU)/emulator/zig-out/bin/niceemu
 RUNTIME  = $(NICE_CPU)/runtime
 TOOLS    = $(wildcard $(NICE_CPU)/assembler/*.py) $(wildcard $(NICE_CPU)/translator/*.py)
 BUILD    = build
-BASDIR   = ../basic
-SHARED   = common.nasm monlib.nasm mon.nasm
-MON_SOURCES = monitor.nasm monitor_sd.nasm monitor_fat.nasm monitor_eth.nasm monitor_tcp.nasm \
-           monitor_clock.nasm $(SHARED)
-BAS_SOURCES = $(addprefix $(BASDIR)/,basic.nasm basic_cmd.nasm basic_net.nasm basic_time.nasm \
-           basic_dis.nasm) $(SHARED)
-SOURCES  = $(MON_SOURCES) $(filter-out $(SHARED),$(BAS_SOURCES))
-VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo unknown)
-# The folder of the card's root directory that holds NiceMon's files
-# (monitor_fat.nasm, README.md, "Files"): NICE, or with make FOLDER=NAME
-# another 8.3 name of 1 to 8 letters, digits, _, and -, in either case. It
-# reaches build/folder.nasm as FOLDER_N, its 8.3 name padded with blanks,
-# and build/basic_folder.nasm in the texts of DIR, S_DIROF, and of error
-# 29. The tests need NICE.
-# A FOLDER of the environment is passed over, as a shell may well export
-# one of that common name for something else; the name counts on the
-# command line, make FOLDER=NAME, alone.
-ifeq ($(origin FOLDER),environment)
-FOLDER  := NICE
-endif
-FOLDER  ?= NICE
-FOLDER_UC := $(shell echo '$(FOLDER)' | tr a-z A-Z)
-ifneq ($(shell echo '$(FOLDER_UC)' | grep -Ex '[A-Z0-9_-]{1,8}'),$(FOLDER_UC))
-$(error FOLDER=$(FOLDER) is not a folder name of 1 to 8 letters, digits, _, and -)
-endif
-# A packed text of the ROM, the label $(1) and the text $(2), and a 0 word
-# after it, which ends the text when its length is a multiple of 4
-# (monitor.nasm). The text must not hold a '.
-PACKED = printf "%s .ASCII_B '%s'\n                .DAT    0\n" '$(1)' '$(2)'
+ROM_TEST = $(ROOT)/build/rom_test.bin
 FOLDER_NAME = printf "FOLDER_N .ASCII_B '%-11s'\n" '$(FOLDER_UC)'
-FOLDER_TEXTS = ($(call PACKED,E_FS29,no folder $(FOLDER_UC) on the card); \
-  $(call PACKED,S_DIROF,Directory of $(FOLDER_UC)))
-# Each packed text of the ROM must end with a 0 byte (test/texts.py)
-CHECK_TEXTS = $(PYTHON) test/texts.py $(filter-out monlib.nasm mon.nasm,$(SOURCES))
-# The monitor must end below BASIC_BASE, and BASIC below PROGRAM, 0x8000,
-# the end of the ROM (common.nasm). niceasm writes the words in the order
-# of their addresses, so the last line has the last.
-EQU_OF   = $(shell sed -n 's/^$(1) *\.EQU *\(0x[0-9A-Fa-f]*\).*/\1/p' common.nasm)
-BAS_BASE = $(call EQU_OF,BASIC_BASE)
-ROM_END  = $(call EQU_OF,PROGRAM)
-CHECK_END = $(PYTHON) -c 'import sys; top = int(open(sys.argv[1]).read().split()[-2], 16); \
-  end = int(sys.argv[2], 16); top < end or sys.exit(f"{sys.argv[1]} reaches {top:08X}, past its end, {end:08X}")'
-# The two images from their joined sources, $(1) the monitor's and $(2)
-# BASIC's, into $(3), with the monitor's alone in $(3:.bin=_mon.bin) and
-# BASIC's in $(3:.bin=_bas.bin)
-IMAGES   = $(ASM) -o $(3:.bin=_mon.bin) $(1) && $(CHECK_END) $(3:.bin=_mon.bin) $(BAS_BASE) && \
-  $(ASM) -o $(3:.bin=_bas.bin) $(2) && $(CHECK_END) $(3:.bin=_bas.bin) $(ROM_END) && \
-  cat $(3:.bin=_mon.bin) $(3:.bin=_bas.bin) > $(3)
 
-.PHONY: all test fmt romsize clean FORCE
+.PHONY: all test fmt romsize clean
 
-all: $(BUILD)/monitor.bin
+all: $(BUILD)/monitor_image.bin
 
-$(BUILD)/monitor.bin: $(SOURCES) $(BUILD)/version.nasm $(BUILD)/folder.nasm \
-                      $(BUILD)/basic_folder.nasm $(TOOLS)
-	@$(CHECK_TEXTS)
-	@cat $(MON_SOURCES) $(BUILD)/version.nasm $(BUILD)/folder.nasm > $(BUILD)/monitor_all.nasm
-	@cat $(BAS_SOURCES) $(BUILD)/version.nasm $(BUILD)/basic_folder.nasm > $(BUILD)/basic_all.nasm
-	@$(call IMAGES,$(BUILD)/monitor_all.nasm,$(BUILD)/basic_all.nasm,$@)
+# The image, and that of the tests, with the version V9.9
+$(BUILD)/monitor_image.bin $(BUILD)/monitor_image_test.bin: $(BUILD)/monitor_image%.bin: \
+    $(MON_SOURCES) $(BUILD)/version%.nasm $(BUILD)/folder.nasm $(ROM_TOOLS) | $(BUILD)
+	@$(CHECK_TEXTS) $(filter-out $(SHARED),$(MON_SOURCES)) $(ROOT)/monitor/common.nasm
+	@cat $(MON_SOURCES) $(BUILD)/folder.nasm $(BUILD)/version$*.nasm > $(BUILD)/monitor$*_all.nasm
+	@$(ASM) -o $@ $(BUILD)/monitor$*_all.nasm
+	@$(CHECK_END) $@ $(BAS_BASE)
 
-# Written only when the version changes, so that the monitor is not
-# assembled again, and a bitstream with it not built again, for nothing.
 $(BUILD)/version.nasm: FORCE | $(BUILD)
-	@$(call PACKED,VERSION,$(VERSION)) | cmp -s - $@ || \
-	  $(call PACKED,VERSION,$(VERSION)) > $@
+	@$(call WRITE_NEW,$(VERSION_TEXT),$@)
 
-# Written only when FOLDER changes, as version.nasm is
+$(BUILD)/version_test.nasm: FORCE | $(BUILD)
+	@$(call WRITE_NEW,$(VERSION_TEST),$@)
+
 $(BUILD)/folder.nasm: FORCE | $(BUILD)
-	@$(FOLDER_NAME) | cmp -s - $@ || $(FOLDER_NAME) > $@
+	@$(call WRITE_NEW,$(FOLDER_NAME),$@)
 
-$(BUILD)/basic_folder.nasm: FORCE | $(BUILD)
-	@$(FOLDER_TEXTS) | cmp -s - $@ || $(FOLDER_TEXTS) > $@
-
-# The test has a version of its own, so that its output does not change
-# with every commit.
-$(BUILD)/monitor_test.bin: $(SOURCES) $(BUILD)/folder.nasm $(BUILD)/basic_folder.nasm \
-                           $(BUILD)/version_test.nasm $(TOOLS) | $(BUILD)
-	@$(CHECK_TEXTS)
-	@cat $(MON_SOURCES) $(BUILD)/folder.nasm $(BUILD)/version_test.nasm > $(BUILD)/monitor_test_all.nasm
-	@cat $(BAS_SOURCES) $(BUILD)/basic_folder.nasm $(BUILD)/version_test.nasm \
-	  > $(BUILD)/basic_test_all.nasm
-	@$(call IMAGES,$(BUILD)/monitor_test_all.nasm,$(BUILD)/basic_test_all.nasm,$@)
-
-# The monitors of the ring test, test/ring.py: the monitor of the tests
-# with the size of the screen's memory that the display offset of a board
-# would give it, 8192 words on the Nexys4DDR and 2048, which has no room
-# for the history, in place of the bits that niceemu keeps, all of them.
-# cmp fails the build if sed changed nothing.
+# The ROMs of the ring test, test/ring.py: the ROM of the tests with the
+# size of the screen's memory that the display offset of a board would
+# give the monitor, 8192 words on the Nexys4DDR and 2048, which has no
+# room for the history, in place of the bits that niceemu keeps, all of
+# them. cmp fails the build if sed changed nothing.
 MASK_8k = 0x1FFF
 MASK_2k = 0x7FF
-$(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.bin: $(BUILD)/monitor_%.bin: $(BUILD)/monitor_test.bin
+$(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.bin: $(BUILD)/monitor_%.bin: $(ROM_TEST)
 	@sed 's/^\( *\)AND  *R1, @SCR_OFFS, SCR_MAX$$/\1MOVE    R1, $(MASK_$*)/' \
 	  $(BUILD)/monitor_test_all.nasm > $(BUILD)/monitor_$*_all.nasm
 	@! cmp -s $(BUILD)/monitor_test_all.nasm $(BUILD)/monitor_$*_all.nasm
-	@$(ASM) -o $(BUILD)/monitor_$*_mon.bin $(BUILD)/monitor_$*_all.nasm
-	@cat $(BUILD)/monitor_$*_mon.bin $(BUILD)/monitor_test_bas.bin > $@
+	@$(ASM) -o $(BUILD)/monitor_$*_image.bin $(BUILD)/monitor_$*_all.nasm
+	@cat $(BUILD)/monitor_$*_image.bin $(ROOT)/basic/build/basic_image_test.bin > $@
 
 # The programs of the tests, at 0x8000: hello.nasm with the runtime's
 # start-up code for a program under a monitor, and hello.c through
@@ -142,23 +81,23 @@ $(BUILD)/hello.bin: test/hello.nasm monlib.nasm mon.nasm $(RUNTIME)/start_mon.na
 
 # The test of the sector routines, test/sd.nasm, which calls them by their
 # labels, so it is assembled after the monitor's sources, and only its words,
-# from 0x8000, are kept: the monitor's are those of monitor_test.bin. The
+# from 0x8000, are kept: the monitor's are those of monitor_image_test.bin. The
 # addresses below 0x8000 start with 0000 and a digit of 0 to 7.
-$(BUILD)/sd.bin: $(BUILD)/monitor_test.bin test/sd.nasm
+$(BUILD)/sd.bin: $(BUILD)/monitor_image_test.bin test/sd.nasm
 	@cat $(BUILD)/monitor_test_all.nasm test/sd.nasm > $(BUILD)/sd_all.nasm
 	@$(ASM) -o $(BUILD)/sd_full.bin $(BUILD)/sd_all.nasm
 	@grep -v '^0000[0-7]' $(BUILD)/sd_full.bin > $@
 
 # The test of the ARP cache, test/arp.nasm, which calls arp_resolve by its
 # label, built as sd.bin is
-$(BUILD)/arp.bin: $(BUILD)/monitor_test.bin test/arp.nasm
+$(BUILD)/arp.bin: $(BUILD)/monitor_image_test.bin test/arp.nasm
 	@cat $(BUILD)/monitor_test_all.nasm test/arp.nasm > $(BUILD)/arp_all.nasm
 	@$(ASM) -o $(BUILD)/arp_full.bin $(BUILD)/arp_all.nasm
 	@grep -v '^0000[0-7]' $(BUILD)/arp_full.bin > $@
 
 # The test of the UDP entries, test/udp.nasm, built as arp.bin is, so that
 # it reaches the monitor's variables by name
-$(BUILD)/udp.bin: $(BUILD)/monitor_test.bin test/udp.nasm
+$(BUILD)/udp.bin: $(BUILD)/monitor_image_test.bin test/udp.nasm
 	@cat $(BUILD)/monitor_test_all.nasm test/udp.nasm > $(BUILD)/udp_all.nasm
 	@$(ASM) -o $(BUILD)/udp_full.bin $(BUILD)/udp_all.nasm
 	@grep -v '^0000[0-7]' $(BUILD)/udp_full.bin > $@
@@ -168,7 +107,7 @@ $(BUILD)/udp.bin: $(BUILD)/monitor_test.bin test/udp.nasm
 # net_dhcp, which test/dhcp.py runs, test/dns.nasm, dns_lookup, which
 # test/dns.py runs, and test/lease.nasm, the lease's renewal, which
 # test/lease.py runs, all built as udp.bin is
-$(BUILD)/net.bin $(BUILD)/netdhcp.bin $(BUILD)/dns.bin $(BUILD)/lease.bin $(BUILD)/tcp.bin $(BUILD)/tcpt.bin: $(BUILD)/%.bin: $(BUILD)/monitor_test.bin test/%.nasm
+$(BUILD)/net.bin $(BUILD)/netdhcp.bin $(BUILD)/dns.bin $(BUILD)/lease.bin $(BUILD)/tcp.bin $(BUILD)/tcpt.bin: $(BUILD)/%.bin: $(BUILD)/monitor_image_test.bin test/%.nasm
 	@cat $(BUILD)/monitor_test_all.nasm test/$*.nasm > $(BUILD)/$*_all.nasm
 	@$(ASM) -o $(BUILD)/$*_full.bin $(BUILD)/$*_all.nasm
 	@grep -v '^0000[0-7]' $(BUILD)/$*_full.bin > $@
@@ -210,10 +149,6 @@ $(FAT_IMAGES) &: test/fat_image.py test/fat_tool.py $(BUILD)/hello.bin
 	@mkdir -p $(BUILD)/fat
 	@$(PYTHON) test/fat_image.py $(BUILD)/hello.bin $(BUILD)/fat
 
-# The words that u disassembles in test/dis.py, at 0x8000, which never run
-$(BUILD)/dis.bin: test/dis.nasm $(TOOLS) | $(BUILD)
-	@$(ASM) -o $@ test/dis.nasm
-
 # The test of the FPU at a program's end, test/fpu.nasm, at 0x8000
 $(BUILD)/fpu.bin: test/fpu.nasm $(TOOLS) | $(BUILD)
 	@$(ASM) -o $@ test/fpu.nasm
@@ -226,61 +161,6 @@ $(BUILD)/hello_c.bin: test/hello.c mon.h mon.nasm $(TOOLS) | $(BUILD)
 $(BUILD)/tcp_c.bin: test/tcp_c.c mon.h mon.nasm mon_c.nasm $(TOOLS) | $(BUILD)
 	@$(NICEBUILD) --monitor --asm mon.nasm --asm mon_c.nasm -I . -o $@ test/tcp_c.c
 
-# The inputs, each a line of BASIC's statements (doc/BASIC.md, issue
-# #112). cmds types each statement, and its bad arguments, with the edits
-# of a line: three DELs that take back abc, a CTRL-C that empties junk,
-# and the cursor key ESC [ A and the function key ESC O P, which are
-# dropped. An empty line and one of blanks run nothing and print no
-# READY. DUMP is dump, in either case, q is no statement, and loadx no
-# LOAD. sys finds no program at 0x8000, nor at 0x9000, dump 0x8000, 0
-# only moves the next dump to 0x8000, and dump 0, 256 shows 256 words,
-# which scrolls the screen. ip shows the IP address, 0.0.0.0, and writes
-# 192.168.1.65; four addresses are rejected, with too few numbers, one
-# past 255, an empty one, and a letter after them; and the last, with
-# blanks around it and a leading zero, is written, which the dump of
-# 0xFFFFFFB0 shows. mac shows the MAC address, 02:4E:49:43:45:00 after
-# niceemu's reset, and writes 02:4E:49:43:45:01; five addresses are
-# rejected, with too few bytes, a byte of three digits, a group address,
-# a blank inside, and a letter after them; and the last, with blanks
-# around it and bytes of one digit in lower case, is written, which the
-# dump of 0xFFFFFFB1-B2 shows. baud shows the rate, 0 in niceemu, and
-# writes 921600; 9600 is not in the list, and the last, in upper case
-# with blanks around it, is written, which the dump of 0xFFFFFF9F shows.
-# Then the lines that are no statements, each a Syntax error with the
-# lines of HELP of its statement: an address without its quotes, sys
-# alone, 0x without digits, a number with a letter after it, dump with a
-# comma and no count, two numbers without a comma, a word after ver, and
-# a string after load's that is no IP address. A number of 33 bits, in
-# decimal and in hex, is an Illegal quantity. LOAD takes a .BIN name
-# only, and SAVE no TFTP server, which needs no card; a keyword in mixed
-# case, the closing quote left out, and dump , 2, which goes on from
-# the last. halt ends each input. dash's printf, the shell of make on
-# Ubuntu, has no \x.
-CMDS = help\rver\rdump 0, 6\rdump\rDUMP 0x10, 1\rq\rloadx\r\r  cls\rabc\177\177\177ver\rjunk\003ver\r\033[A\033OPver\rsys 0x8000\rsys 0x9000\rdump 0x8000, 0\rdump 0x8000\rdump 0, 256\rip\rip "192.168.1.65"\rip "1.2.3"\rip "256.0.0.1"\rip "1..2.3"\rip "1.2.3.4x"\rip "  010.0.0.1 "\rmac\rmac "02:4E:49:43:45:01"\rmac "2:4e:49:43:45"\rmac "2:4e:49:43:45:123"\rmac "3:0:0:0:0:0"\rmac "2:4e: 49:43:45:1"\rmac "2:4e:49:43:45:1x"\rmac "  a:b:c:d:e:f "\rbaud\rbaud 921600\rbaud 9600\rBAUD  115200 \rip 1.2.3.4\rsys\rsys 0x\rdump 12ab\rdump 1,\rbaud 1 2\rver x\rload "a.bin" "1.2.3.4"\rdump 4294967296\rdump 0x100000000\rload "x.txt"\rload "x"\rsave "x", "1.2.3.4"\rHeLp x\rload "x.bin\rdump , 2\rhalt\r
-# basic: the scanner of a line, with no card and no IP address, so that
-# the statements that need them stop at once. A keyword in mixed case and
-# with blanks around it runs; a comma, a character of 0xE9, or another
-# word after it, or a letter, a digit, or an _ glued to it, makes it no
-# statement, or a Syntax error with its lines of HELP, which each
-# statement shows. Numbers: in decimal and hex, with 0X, leading zeros,
-# and the 76 characters of a full line; 0xFFFFFFFF, the largest, and 33
-# bits, which are an Illegal quantity, also with a letter after them;
-# and the numbers that are not. 0x without digits is no number, and the
-# scan goes on at its 0, so dump 0x, 1, dis 0x, 1, baud 0x, and
-# dir 0x"1.2.3.4" are a Syntax error, and dir 99999999999"1.2.3.4" an
-# Illegal quantity (issue #151, S1 and S2). save "x", "y", 99999999999
-# is a Syntax error at its second comma, before its number (S3), and
-# mac "" is no MAC address, as ip "" is no IP address (S5). Strings: an empty one, a name glued to load, a server
-# without a comma, or with no closing quote, and the arguments that are
-# too few or too many for each statement. The dumps of the line after
-# five statements show the 0 at each closing quote, those of a statement
-# that failed too, and the .BIN that save adds to a name without a dot,
-# last in a line of 76 characters. ip "1.2.3.4, with no closing quote,
-# writes the IP address, which the dump of 0xFFFFFFB0 shows.
-BLANKS30 = $(shell printf '%30s' '')
-BLANKS62 = $(shell printf '%62s' '')
-ZEROS72  = $(shell printf '%072d' 32768)
-BASIC = vEr\r   ver   \rver,\rver\351\r\351ver\rsys0x8000\rdumpx\rdum\rdis1\ri\rsys_\r"ver"\r9 ver\rsave x\rdelete x\rdhcp x\rmac x\rtime x\rntp x\rdis x\rcls x\rhalt x\rdir x\rsys 32768\rsys $(ZEROS72)\rSYS 0X8000\rsys 0x08000\rsys 4294967295\rsys 0xFFFFFFFF\rsys 0x0000000ffffffff\rsys 4294967296\rsys 0x100000000\rsys 99999999999x\rsys 0x8000x\rsys 0x0x8000\rsys 1e3\rsys 32768.\rsys -1\rsys "x"\rsys 0xg\rsys 0x8000,\rdump 0x8000, 0\rdump 0x, 1\rdump 0x , 2\rdump 0x 1\rdump 1, 4294967296\rdump 1, 0x\rdis 0x8000, 1\rdis 0x, 1\rdis ,1\rdis 0x8000,\rbaud 0x\rbaud 0x 1\rbaud 4294967296\rbaud 1,\rbaud 0x1C200\rload ""\rload ".bin"\rload"a.BiN"\rload "a.bin",\rload "a.bin" ,"1.2.3.4"\rload "a.bin", "1.2.3.4" x\rload "a.bin", "bad"\rload x\rload "a.bin", "1.2.3.4\rLOAD  \r\rsave "x", "y" z\rsave "x" "y"\rsave "x",\rsave "x", 1\rsave "x", 0x, 1\rsave "x", 1, 99999999999\rsave "x", "y", 99999999999\rsave "abc\rsave "a.b", 0x8000, 1\rdelete "x"\rdelete "x", "y"\rdelete ""\rdir\rdir 0x\rdir 0x"1.2.3.4"\rdir 99999999999"1.2.3.4"\rdir 99999999999\rdir "1.2.3.4", "*.bin"\rdir "bad"\rdir "1.2.3.4",\rdir 1,\rdir 1 "x"\rdir 5\rip ""\rip "1.2.3.4" x\rmac ""\rmac "02:4E:49:43:45:00" x\rtime "bad"\rtime "1" x\rntp "1.2.3.4" x\rntp "1.2.3.4",\rntp "", "bad"\rntp ""\rntp "1.2.3.4", "+01:00"\r$(BLANKS30)save "abc",1,2\rdump 0xFFFFE85E, 16\r$(BLANKS30)load "x" "y"\rdump 0xFFFFE85E, 16\r$(BLANKS30)save "x", "1.2.3.4"\rdump 0xFFFFE85E, 20\r$(BLANKS30)save "a.b", 1, 2\rdump 0xFFFFE85E, 16\r$(BLANKS30)dir "1.2.3.4", "*"\rdump 0xFFFFE85E, 20\r$(BLANKS62)save "abc",1,2\rdump 0xFFFFE87E, 16\rip "1.2.3.4\rhalt\r
 RUN  = sys 0x8000\rhalt\r
 # hal16: sys 0x8000 runs test/hal16.nasm, whose con_getline reads the
 # line after it: 12, a DEL, 345678x9, of which the 9 does not fit, and a
@@ -295,40 +175,6 @@ RESET = sys 0\rsys 0x8000\rhalt\r
 # Down, which turn the ring and show 24 rows back; and ver, which shows
 # the screen again.
 SCROLL = \033[5~\033[6~dump 0x8000, 0x700\r\033[5~\033[5~\033[6~ver\rhalt\r
-# load: LOAD with lines typed and pasted. The LOAD line ends with CR LF,
-# as a terminal may end it, which is no empty line. The first line is typed
-# with edits: a DEL that takes back 2, the cursor key ESC [ A, which is
-# dropped, so it writes 134 at 9000. The RAM has 0x20000 words, as on the
-# MEGA65, which build/ram128k.bin writes to 0xFFFFFF9E, so 1E7FF takes a
-# word and 1E800, the alias of the variables, BASIC's first, does not. A line
-# with TABs for blanks writes 7 at 9002, a line of blanks only is passed
-# over, and a second line for 9002 writes 8 over the 7. Six lines are
-# skipped: zz, an address in the ROM, one of the monitor's variables, a
-# third number, 1E800, and a line of 78 characters, 9003, 66 blanks, and
-# 12345678, which is longer than the 76 of a line, so it writes nothing,
-# not 123456. Pasted lines after it: one of 100 blanks, which is passed
-# over; 1E7FF A and 90 blanks, which writes A over the 9, as the blanks
-# after the 76 characters are dropped; and 9001, 71 blanks, 3, and z,
-# whose z past the 76 is taken back by a DEL, so it writes 3 at 9001.
-# Then build/hello.bin,
-# its first 3 lines ended by CR LF and the rest by LF, and CR, an empty
-# line, ends the load. A second LOAD is ended by CTRL-C in the middle of
-# a line, which writes nothing. sys 0x8000 runs hello, and dump shows
-# 9000 to 9003.
-BLANKS66  = $(shell printf '%66s' '')
-BLANKS71  = $(shell printf '%71s' '')
-BLANKS90  = $(shell printf '%90s' '')
-BLANKS100 = $(shell printf '%100s' '')
-LOAD_HEAD = load\r\n9000 12\177\033[A34\rzz\r100 5\rFFFFF000 1\r9001 5 6\r1E7FF 9\r1E800 1\r\t9002\t7 \r   \r9002 8\r9003$(BLANKS66)12345678\r$(BLANKS100)\r1E7FF A$(BLANKS90)\r9001$(BLANKS71)3z\177\r
-LOAD_TAIL = \rload\r9001 7\003sys 0x8000\rdump 0x9000, 4\rdump 0x1E7FF, 1\rhalt\r
-# load_emu: LOAD where 0xFFFFFF9E reads 0, as in niceemu, so a program's RAM
-# goes up to the screen: 10000 and FFFEFFFF take words, and FFFF0000 does
-# not.
-LOAD_EMU = load\r10000 7\rFFFEFFFF 8\rFFFF0000 1\r\rdump 0x10000, 1\rhalt\r
-# load_64k: LOAD with 0x10000 words of RAM, as on the Nexys4DDR, which
-# build/ram64k.bin writes to 0xFFFFFF9E: E7FF takes a word, and E800, the
-# variables, BASIC's first, and 1EFFF, past the RAM, do not.
-LOAD_64K = load\rE7FF 1\rE800 2\r1EFFF 3\r\rdump 0xE7FF, 1\rhalt\r
 # fpu: sys 0x8000 runs test/fpu.nasm three times, which leaves values
 # and flags on the FPU, and returns, leaves through mon_exit, and returns,
 # then sys 0x8100, which leaves them too and jumps to 0, the cold start,
@@ -400,26 +246,6 @@ TAB = load my\t\rload "my\t\rload mand\t\t1\t\rload pad2\t1\t\rlo\t\003load x\t\
 # shows them, and load reads two back.
 FATLW = load\r8000 1234ABCD\r8001 5\r\rsave "mandelbrot.bin", 0x8000, 2\rsave "mandelbrot3.txt", 0x8000, 2\rsave "Hello.bin", 0x8000, 2\rsave "lower2.bin", 0x8000, 2\rsave "a b.bin", 0x8000, 2\rsave "MIXED.BIN", 0x8000, 1\rsave "a*b", 0x8000, 1\rsave "end.", 0x8000, 1\rdelete "mandelbrot1.txt"\rdelete "mandelbrot2.txt"\rsave "a much longer name of a file.bin", 0x8000, 2\rsave "x.bin", 0x8000, 2\rdir\rload "A MUCH LONGER NAME OF A FILE.BIN"\rdump 0x8000, 2\rload "mandel~1.bin"\rhalt\r
 
-# time: with --step-time, so the clock starts at 0, not set, and counts a
-# microsecond a step, and a copy of super.img in slot 0, each date and
-# time in quotes. time shows that
-# it is not set, and save writes old.bin with the fixed date. time sets
-# 2026-11-11 14:30:01, which time shows, and save writes new.bin with it,
-# at 14:30:00 and 100 hundredths. Fifteen times are rejected: 2023-02-29
-# and 2100-02-29, as those years have no leap day, 1969 and 2106, before
-# and after the years time sets, month 13, November 31, hour 24, minute
-# 60, second 60, a year of two digits, a month and a day of one digit, no
-# time, a word after it, an hour of three digits, and a time of one
-# digit each; timex and ti are no statements. Then the edges that are
-# taken: 2000-02-29, 2100-03-01, 2104-02-29, the second past 2^31, and
-# the last of 2105. A date and a time with blanks around them in the
-# quotes is taken; month 0, day 0, a letter for a digit, and the wrong
-# separators are not, and time shows the clock that they left alone. Then
-# 2024-02-29, the last day of 2024, a leap year, 2100-02-28, the last of
-# 2099, and an empty string, which shows the clock. Last the first of
-# 1970, in upper case with blanks, whose year FAT cannot hold, so save
-# writes y1970.bin with the fixed date.
-TIME = time\rload\r8000 1\r\rsave "old.bin", 0x8000, 1\rtime "2026-11-11 14:30:01"\rtime\rsave "new.bin", 0x8000, 1\rtime "2023-02-29 00:00:00"\rtime "2100-02-29 00:00:00"\rtime "1969-12-31 23:59:59"\rtime "2106-01-01 00:00:00"\rtime "2026-13-01 00:00:00"\rtime "2026-11-31 00:00:00"\rtime "2026-11-11 24:00:00"\rtime "2026-11-11 23:60:00"\rtime "2026-11-11 23:59:60"\rtime "26-11-11 00:00:00"\rtime "2026-1-1 00:00:00"\rtime "2026-11-11"\rtime "2026-11-11 01:02:03 x"\rtime "2026-11-11 001:02:03"\rtime "2026-11-11 1:2:3"\rtimex\rti\rtime "2000-02-29 00:00:00"\rtime "2100-03-01 00:00:00"\rtime "2104-02-29 12:00:00"\rtime "2038-01-19 03:14:08"\rtime "2105-12-31 23:59:59"\rtime "  2026-11-11 14:30:01  "\rtime "2026-00-10 00:00:00"\rtime "2026-11-00 00:00:00"\rtime "2O26-11-11 00:00:00"\rtime "2026/11/11 00:00:00"\rtime "2026-11-11T00:00:00"\rtime "2026-11-11 00.00.00"\rtime\rtime "2024-02-29 00:00:00"\rtime "2024-12-31 23:59:59"\rtime "2100-02-28 23:59:59"\rtime "2099-12-31 23:59:59"\rtime ""\rTIME  "1970-01-01 00:00:00" \rsave "y1970.bin", 0x8000, 1\rhalt\r
 # clock: with --no-cycle-counter, so that the clock's words are memory,
 # which build/clock.bin sets: "set", 999999 microseconds, and the seconds
 # of 2026-11-14 12:34:57, which time shows. save writes a.bin at
@@ -442,8 +268,6 @@ DUMP_clock    = -d 0xFFFFFF46:4
 # hello the 0x80 after it, the screen's state, in which the return showed
 # the cursor that hello hid, the font base, which the return made 0, and
 # the row of the glyph of 0x80 that hello drew.
-DUMP_cmds    = -d 0xFFFFF000:4 -d 0xFFFFE800:2 -d 0xFFFFFF80:6 -d 0xFFFFFF9F:1 -d 0xFFFFFFB0:3
-DUMP_basic   = -d 0xFFFFF000:4 -d 0xFFFFE800:2 -d 0xFFFFFFB0:1
 # For scroll the variables and the screen's registers, and the last four
 # digits of the address that starts a row of the history (the words 4 to
 # 7 of the row): the rows of 86A0 and 869C that Page Up turned to slots 0
@@ -453,9 +277,6 @@ DUMP_basic   = -d 0xFFFFF000:4 -d 0xFFFFE800:2 -d 0xFFFFFFB0:1
 DUMP_scroll  = -d 0xFFFFF000:4 -d 0xFFFFF005:6 -d 0xFFFFFF80:6 -d 0xFFFF7FB4:4 -d 0xFFFF7F64:4 \
                -d 0xFFFF0804:4 -d 0xFFFF0994:4
 DUMP_hello   = -d 0xFFFF01B8:13 -d 0xFFFFFF80:1 -d 0xFFFFFF86:1 -d 0xFFFE1000:1
-DUMP_load    = -d 0xFFFFF000:4 -d 0xFFFFF005:6 -d 0xFFFFE800:5
-DUMP_load_emu = -d 0xFFFFE812:1 -d 0xFFFEFFFF:1
-DUMP_load_64k = -d 0xFFFFE812:1
 DUMP_hello_c = -d 0xFFFF01B8:12
 # For sd_write the results of test/sd.nasm's calls
 DUMP_sd_write = -d 0x9100:6
@@ -519,31 +340,22 @@ FAT32_START_BYTES = $(shell echo $$(($(FAT32_START) * 512)))
 # the image did not (test/fat_tool.py diff, the dates masked for time)
 # and the order of its sector writes, from a second run with -t
 # (test/fat_tool.py order).
-test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.bin $(BUILD)/hello.bin \
-      $(BUILD)/dis.bin $(BUILD)/sd.bin $(BUILD)/arp.bin $(BUILD)/udp.bin $(BUILD)/net.bin \
+test: fmt $(ROM_TEST) $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.bin $(BUILD)/hello.bin \
+      $(BUILD)/sd.bin $(BUILD)/arp.bin $(BUILD)/udp.bin $(BUILD)/net.bin \
       $(BUILD)/netdhcp.bin $(BUILD)/dns.bin $(BUILD)/lease.bin $(BUILD)/fpu.bin $(BUILD)/fs.bin $(BUILD)/fsw.bin \
       $(BUILD)/hal16.bin $(FAT_IMAGES) $(BUILD)/version_test.nasm
 	@test '$(FOLDER_UC)' = NICE || { echo "make test needs FOLDER=NICE, not $(FOLDER)"; exit 1; }
-	@$(PYTHON) test/ring.py $(EMU) $(BUILD)/monitor_test.bin:32768 \
+	@$(PYTHON) test/ring.py $(EMU) $(ROM_TEST):32768 \
 	  $(BUILD)/monitor_8k.bin:8192 $(BUILD)/monitor_2k.bin:2048
-	@$(PYTHON) test/dis.py $(EMU) $(BUILD)/monitor_test.bin $(BUILD)/dis.bin
-	@$(PYTHON) test/dhcp.py $(EMU) $(BUILD)/monitor_test.bin $(BUILD)/netdhcp.bin \
+	@$(PYTHON) test/dhcp.py $(EMU) $(ROM_TEST) $(BUILD)/netdhcp.bin \
 	  test/dhcp.expected $(BUILD)/dhcp.out
-	@$(PYTHON) test/dns.py $(EMU) $(BUILD)/monitor_test.bin $(BUILD)/dns.bin \
+	@$(PYTHON) test/dns.py $(EMU) $(ROM_TEST) $(BUILD)/dns.bin \
 	  test/dns.expected $(BUILD)/dns.out
-	@$(PYTHON) test/ntp.py $(EMU) $(BUILD)/monitor_test.bin test/ntp.expected $(BUILD)/ntp.out
-	@$(PYTHON) test/lease.py $(EMU) $(BUILD)/monitor_test.bin $(BUILD)/lease.bin
-	@$(PYTHON) test/bgdhcp.py $(EMU) $(BUILD)/monitor_test.bin
-	@$(PYTHON) test/tftp.py $(EMU) $(BUILD)/monitor_test.bin test/tftp.expected $(BUILD)/tftp.out
-	@$(PYTHON) test/rtc.py $(EMU) $(BUILD)/monitor_test.bin
-	@$(PYTHON) test/fat_runs.py $(EMU) $(BUILD)/monitor_test.bin $(BUILD) $(FAT_SUITES)
+	@$(PYTHON) test/lease.py $(EMU) $(ROM_TEST) $(BUILD)/lease.bin
+	@$(PYTHON) test/bgdhcp.py $(EMU) $(ROM_TEST)
+	@$(PYTHON) test/rtc.py $(EMU) $(ROM_TEST)
+	@$(PYTHON) test/fat_runs.py $(EMU) $(ROM_TEST) $(BUILD) $(FAT_SUITES)
 	@$(ROMSIZE)
-	@echo 'FFFFFF9E 00020000' > $(BUILD)/ram128k.bin
-	@echo 'FFFFFF9E 00010000' > $(BUILD)/ram64k.bin
-	@printf '$(LOAD_EMU)' > $(BUILD)/load_emu.txt
-	@printf '$(LOAD_64K)' > $(BUILD)/load_64k.txt
-	@printf '$(CMDS)' > $(BUILD)/cmds.txt
-	@printf '$(BASIC)' > $(BUILD)/basic.txt
 	@printf '$(RUN)' > $(BUILD)/run.txt
 	@printf '$(HAL16)' > $(BUILD)/hal16.txt
 	@printf '$(RESET)' > $(BUILD)/reset.txt
@@ -558,31 +370,23 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	@printf '$(FATL)' > $(BUILD)/fatl.txt
 	@printf '$(TAB)' > $(BUILD)/tab.txt
 	@printf '$(FATLW)' > $(BUILD)/fatlw.txt
-	@printf '$(TIME)' > $(BUILD)/time.txt
 	@printf '$(CLOCK)' > $(BUILD)/clock.txt
 	@printf '$(CLOCKPAST)' > $(BUILD)/clockpast.txt
 	@printf '$(CLOCK_WORDS)' > $(BUILD)/clock.bin
 	@printf '$(CLOCKPAST_WORDS)' > $(BUILD)/clockpast.bin
 	@$(PYTHON) test/sd_image.py $(BUILD)/sd.img
 	@$(PYTHON) test/sd_image.py --written $(BUILD)/sd_written.img
-	@{ printf '$(LOAD_HEAD)'; head -n 3 $(BUILD)/hello.bin | awk '{ printf "%s\r\n", $$0 }'; \
-	  tail -n +4 $(BUILD)/hello.bin; printf '$(LOAD_TAIL)'; } > $(BUILD)/load.txt
 	@fail=0; \
 	cards() { sd=; \
 	  if [ -n "$$base0" ]; then cp --sparse=always $$base0 $(BUILD)/$${t}0.img; sd="--sd0 $(BUILD)/$${t}0.img"; fi; \
 	  if [ -n "$$base1" ]; then rm -f $(BUILD)/$${t}1.img; cp --sparse=always $$base1 $(BUILD)/$${t}1.img; \
 	    if [ -n "$$ro1" ]; then chmod a-w $(BUILD)/$${t}1.img; fi; sd="$$sd --sd1 $(BUILD)/$${t}1.img"; fi; }; \
-	for t in cmds basic scroll load load_emu load_64k sd_write arp udp net fpu fs fsw hal16 fat fatw fatl tab fatlw fatbad fat1 fatnone time \
+	for t in scroll sd_write arp udp net fpu fs fsw hal16 fat fatw fatl tab fatlw fatbad fat1 fatnone \
 	           clock clockpast \
 	           hello reset hello_c; do \
-	  opts=; rom=$(BUILD)/monitor_test.bin; base0=; base1=; ro1=; mask=; \
+	  opts=; rom=$(ROM_TEST); base0=; base1=; ro1=; mask=; \
 	  case $$t in \
-	    cmds) prog=; input=cmds; dump='$(DUMP_cmds)';; \
-	    basic) prog=; input=basic; dump='$(DUMP_basic)';; \
 	    scroll) prog=; input=scroll; dump='$(DUMP_scroll)';; \
-	    load) prog=$(BUILD)/ram128k.bin; input=load; dump='$(DUMP_load)';; \
-	    load_emu) prog=; input=load_emu; dump='$(DUMP_load_emu)';; \
-	    load_64k) prog=$(BUILD)/ram64k.bin; input=load_64k; dump='$(DUMP_load_64k)';; \
 	    sd_write) prog=$(BUILD)/sd.bin; input=sd_write; dump='$(DUMP_sd_write)'; \
 	      cp $(BUILD)/sd.img $(BUILD)/sd_write.img; opts="--sd0 $(BUILD)/sd_write.img";; \
 	    arp) prog=$(BUILD)/arp.bin; input=run; dump='$(DUMP_arp)'; \
@@ -609,8 +413,6 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	    fatbad) prog=; input=fatbad; dump=; \
 	      opts="--sd0 $(BUILD)/fat/fat16.img --sd1 $(BUILD)/fat/exfat.img";; \
 	    fat1) prog=; input=fat1; dump=; opts="--sd1 $(BUILD)/fat/super.img";; \
-	    time) prog=; input=time; dump=; base0=$(BUILD)/fat/super.img; mask=--mask-times; \
-	      opts=--step-time;; \
 	    clock|clockpast) prog=$(BUILD)/$$t.bin; input=$$t; dump='$(DUMP_clock)'; \
 	      base0=$(BUILD)/fat/super.img; opts=--no-cycle-counter;; \
 	    fatnone) prog=; input=fatnone; dump=; \
@@ -637,9 +439,6 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	    if [ $$t = fatw ]; then \
 	      $(PYTHON) test/fat_check.py $(BUILD)/fatw0.img HELLO.BIN; \
 	      $(PYTHON) test/fat_check.py $(BUILD)/fatw1.img FULL.BIN; fi; \
-	    if [ $$t = time ]; then \
-	      $(PYTHON) test/fat_check.py $(BUILD)/time0.img; \
-	      echo "Dates in NICE:"; mdir -i $(BUILD)/time0.img ::NICE | grep -E '^(old|new|y1970) '; fi; \
 	    if [ $$t = clock ] || [ $$t = clockpast ]; then \
 	      $(PYTHON) test/fat_check.py $(BUILD)/$${t}0.img --stamps A.BIN B.BIN C.BIN D.BIN P.BIN; fi; \
 	    if [ $$t = fatlw ]; then \
@@ -657,24 +456,23 @@ test: fmt $(BUILD)/monitor_test.bin $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.
 	done; exit $$fail
 
 # The tables of the ROM's words in INTERNALS.md, "The ROM's words",
-# which make test checks against the two images of monitor_test.bin, and
-# make romsize writes. Their sources are those of the images, with the
-# version of the tests in a file of its own.
+# which make test checks against the two images of ../build/rom_test.bin,
+# and make romsize writes. Their sources are those of the images, with
+# the version of the tests in a file of its own.
+BAS_BUILD = $(ROOT)/basic/build
 ROMSIZE = $(PYTHON) ../tools/romsize.py rom --doc INTERNALS.md \
-            --monitor $(BUILD)/monitor_test_mon.bin $(MON_SOURCES) $(BUILD)/folder.nasm \
+            --monitor $(BUILD)/monitor_image_test.bin $(MON_SOURCES) $(BUILD)/folder.nasm \
               $(BUILD)/version_test.nasm \
-            --basic $(BUILD)/monitor_test_bas.bin $(BAS_SOURCES) $(BUILD)/basic_folder.nasm \
-              $(BUILD)/version_test.nasm
+            --basic $(BAS_BUILD)/basic_image_test.bin $(BAS_SOURCES) $(BAS_BUILD)/basic_folder.nasm \
+              $(BAS_BUILD)/version_test.nasm
 
-$(BUILD)/version_test.nasm: Makefile | $(BUILD)
-	@$(call PACKED,VERSION,V9.9) > $@
-
-romsize: $(BUILD)/monitor_test.bin $(BUILD)/version_test.nasm
+romsize: $(ROM_TEST)
 	@$(ROMSIZE) --write
 
-# The layout of the sources, as nice_cpu's nicefmt checks it
+# The layout of the sources, as nice_cpu's nicefmt checks it; BASIC's are
+# checked by ../basic/Makefile
 fmt:
-	@$(FMT) $(SOURCES) test/hello.nasm test/dis.nasm test/sd.nasm test/arp.nasm test/fpu.nasm \
+	@$(FMT) $(MON_SOURCES) test/hello.nasm test/sd.nasm test/arp.nasm test/fpu.nasm \
 	  test/fs.nasm test/fsw.nasm test/hal16.nasm test/udp.nasm test/net.nasm test/netdhcp.nasm \
 	  test/dns.nasm test/lease.nasm test/tcp.nasm test/tcpt.nasm test/tcphw.nasm mon_c.nasm
 

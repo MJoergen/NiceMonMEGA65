@@ -52,7 +52,7 @@ those who write programs:
    below), which are there whenever the ROM is visible. A host that
    loads a program at 0 hides the ROM, and the entries go with it.
    `niceemu` has no ROM: there the monitor is a program at 0 like any
-   other, and `cat monitor.bin prog.bin` runs it with a program at
+   other, and `cat rom.bin prog.bin` runs it with a program at
    `0x8000`, for a `.bin` file is address and word pairs.
 3. **The library**: the routines of `monlib.nasm` (The shared routines
    below), and the stubs of `mon.nasm`, which are joined to a program
@@ -104,8 +104,12 @@ BASIC's image is these files, then its own copies of `common.nasm`,
 Each image has a RAM of its own: the monitor's at `0xFFFFF000`, and
 BASIC's at `0xFFFFE800`.
 
-`make -C monitor` builds `build/monitor.bin`, and `make -C monitor test`
-runs it in `niceemu` ([INTERNALS.md](INTERNALS.md#building-and-testing)).
+`make -C monitor` builds the monitor's image,
+`build/monitor_image.bin`, and `make rom` at the top joins it with
+BASIC's into the ROM, `build/rom.bin`. `make -C monitor test` runs the
+ROM of the tests in `niceemu`, with the tests of the monitor's code,
+and `make -C ../basic test` with those of BASIC's statements
+([INTERNALS.md](INTERNALS.md#building-and-testing)).
 The QNICE monitor (QMON) of
 [QNICE-FPGA](https://github.com/sy2002/QNICE-FPGA) is the inspiration,
 not the model.
@@ -370,7 +374,7 @@ With no PC slot, `make sdcard CMD=mkdir` makes it over the link
   keeps to its own. A mount fails with error -29 when the root has no
   directory of that name, even when it has a file of it, and the root's
   own files are never reached. The folder's name is set when the monitor
-  is built, `make monitor FOLDER=NAME`, an 8.3 name of 1 to 8 letters,
+  is built, `make rom FOLDER=NAME`, an 8.3 name of 1 to 8 letters,
   digits, `_`, and `-`, in either case, which error -29's text names; the
   tests need `NICE`. Deleted entries, `.`, and `..` are passed over.
 - **Names** are long names (VFAT) of up to 255 characters, or 8.3

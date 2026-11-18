@@ -15,7 +15,7 @@ compared (see
 
 - The emulator has no ROM, so it has no monitor and no dispatch table
   at `0x0000` until the monitor is joined there:
-  `cat monitor/build/monitor.bin prog.bin` runs a program at `0x8000`
+  `cat build/rom.bin prog.bin` runs a program at `0x8000`
   under it, with `SYS 0x8000` in the input
   ([PROGRAMMING.md](PROGRAMMING.md#three-levels)). A program at 0 runs
   the same on both, as the tools hide the board's ROM.

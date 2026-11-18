@@ -12,8 +12,12 @@ ARGS   ?=
 # serial device PORT; ARGS may pick --tcp or --cosim instead
 LINK    = $(if $(ETH),--eth $(ETH)) $(if $(PORT),--port $(PORT))
 EMU     = nice_cpu/emulator/zig-out/bin/niceemu
+# The ROM, build/rom.bin, and the tests', build/rom_test.bin, from the
+# images of monitor/ and basic/ (rom.mk)
+ROOT    = .
+include rom.mk
 
-.PHONY: help test formal lint typecheck diagrams romsize examples demo monitor r3 r6 nexys4ddr cor bump release load run mon sdcard sdnbd flash hwtest linktest sdtest tftpd tftptest tcptest weathertest cosim cosimtest clean
+.PHONY: help test formal lint typecheck diagrams romsize examples demo rom r3 r6 nexys4ddr cor bump release load run mon sdcard sdnbd flash hwtest linktest sdtest tftpd tftptest tcptest weathertest cosim cosimtest clean
 
 # Every target but these needs the nice_cpu submodule
 ifeq ($(wildcard nice_cpu/hdl/src/nice_pkg.vhd),)
@@ -25,7 +29,7 @@ endif
 help:
 	@echo "Targets:"
 	@echo "  make test       run the GHDL simulation tests (needs GHDL), and the tests of"
-	@echo "                  the demo and the monitor in niceemu"
+	@echo "                  the demo, the monitor, and BASIC in niceemu"
 	@echo "  make [-j4] formal"
 	@echo "                  run the formal checks (needs Yosys, its GHDL plugin,"
 	@echo "                  SymbiYosys, and Yices)"
@@ -38,10 +42,10 @@ help:
 	@echo "  make examples   build the C examples to examples/build/*.bin (needs clang)"
 	@echo "  make demo       build the demo, demo/build/demo.bin, a program at 0x8000"
 	@echo "                  under the monitor"
-	@echo "  make monitor [FOLDER=NICE]"
-	@echo "                  build the monitor to monitor/build/monitor.bin, the"
-	@echo "                  default ROM of the boards' targets; its files are in the"
-	@echo "                  SD card's folder FOLDER, which a board's target takes too"
+	@echo "  make rom [FOLDER=NICE]"
+	@echo "                  build the ROM, the monitor and BASIC, to build/rom.bin,"
+	@echo "                  the default ROM of the boards' targets; its files are in"
+	@echo "                  the SD card's folder FOLDER, which a board's target takes too"
 	@echo "  make r3 [ROM=prog.bin]"
 	@echo "                  build the bitstream for the MEGA65 R3 (needs Vivado)"
 	@echo "  make r6 [ROM=prog.bin]"
@@ -124,6 +128,7 @@ test:
 	$(MAKE) -C sim test
 	$(MAKE) -C demo test
 	$(MAKE) -C monitor test
+	$(MAKE) -C basic test
 
 # The tables of the ROM's words in monitor/INTERNALS.md, and of the
 # demo's in demo/README.md
@@ -194,14 +199,13 @@ examples:
 demo:
 	$(MAKE) -C demo
 
-monitor:
-	$(MAKE) -C monitor
+rom: build/rom.bin
 
-# The boards' ROM: the monitor, monitor/build/monitor.bin, built first,
+# The boards' ROM: the monitor and BASIC, build/rom.bin, built first,
 # unless ROM is given; ROM= (empty) builds the bitstream without a ROM,
 # whose core waits, held, for the link. The path is made absolute here,
 # for the board's Makefile runs in its own directory. A given
-# ROM=monitor/build/monitor.bin is not built again, so that the release's
+# ROM=build/rom.bin is not built again, so that the release's
 # ROM keeps its tag (tools/release.py).
 # ROMPATCH=file.bin puts file.bin into the ROM of the board's last build
 # instead, in about a minute (rompatch in synth/Makefile.inc, issue 122).
@@ -210,8 +214,8 @@ BOARD_ROM  = $(abspath $(ROMPATCH))
 BUILD_ROM  = @true
 BOARD_GOAL = rompatch
 else ifeq ($(origin ROM),undefined)
-BOARD_ROM  = $(abspath monitor/build/monitor.bin)
-BUILD_ROM  = $(MAKE) -C monitor
+BOARD_ROM  = $(abspath build/rom.bin)
+BUILD_ROM  = $(MAKE) build/rom.bin
 else
 BOARD_ROM  = $(if $(ROM),$(abspath $(ROM)))
 BUILD_ROM  = @true
@@ -290,8 +294,7 @@ linktest: $(EMU)
 	$(PYTHON) tools/linktest.py
 
 # sdcard.py and sdnbd.py on niceemu --link with images of a card, which needs no board
-sdtest: $(EMU)
-	$(MAKE) -C monitor build/monitor_test.bin
+sdtest: $(EMU) build/rom_test.bin
 	$(PYTHON) tools/sdtest.py
 
 # The TFTP server for BASIC's LOAD and DIR (tools/tftpd.py), and its check,
@@ -301,17 +304,15 @@ TFTP_PORT ?= 69
 tftpd:
 	$(PYTHON) tools/tftpd.py --dir $(TFTP_DIR) --port $(TFTP_PORT)
 
-tftptest: $(EMU)
-	$(MAKE) -C monitor build/monitor_test.bin
+tftptest: $(EMU) build/rom_test.bin
 	$(PYTHON) tools/tftptest.py
 
-tcptest: $(EMU)
-	$(MAKE) -C monitor build/monitor_test.bin build/tcp.bin build/tcpt.bin build/tcp_c.bin \
+tcptest: $(EMU) build/rom_test.bin
+	$(MAKE) -C monitor build/tcp.bin build/tcpt.bin build/tcp_c.bin \
 	  build/tcphw.bin
 	$(PYTHON) tools/tcptest.py
 
-weathertest: $(EMU)
-	$(MAKE) -C monitor build/monitor_test.bin
+weathertest: $(EMU) build/rom_test.bin
 	$(MAKE) -C examples build/weather.bin test
 	$(PYTHON) tools/weathertest.py
 
@@ -325,7 +326,7 @@ cosimtest: $(EMU)
 	$(PYTHON) tools/cosimtest.py
 
 clean:
-	rm -rf formal/build build/release
+	rm -rf formal/build build/release build/rom.bin build/rom_test.bin
 	$(MAKE) -C sim clean
 	$(MAKE) -C examples clean
 	$(MAKE) -C synth/r3 clean

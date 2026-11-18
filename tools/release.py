@@ -73,7 +73,7 @@ FLOW = "timing"
 # The ROM of every board: the monitor, which the core boots from at
 # power-up. The demo is an asset of its own, DEMO (#129), and so is the
 # weather display of the examples, WEATHER (#128).
-ROM = os.path.join(REPO, "monitor", "build", "monitor.bin")
+ROM = os.path.join(REPO, "build", "rom.bin")
 DEMO = os.path.join(REPO, "demo", "build", "demo.bin")
 WEATHER = os.path.join(REPO, "examples", "build", "weather.bin")
 
@@ -236,7 +236,7 @@ def stage(tag: str) -> tuple[Record, str, dict[str, Record], str]:
 
     run(["make", "-C", "nice_cpu/emulator", "build"])
     run(["make", "examples"])
-    run(["make", "-C", "monitor", "VERSION=" + tag])
+    run(["make", "rom", "VERSION=" + tag])
     run(["make", "-C", "demo", "VERSION=" + tag])
     results: dict[str, Record] = {}
     for board, _ in BOARDS:

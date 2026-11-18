@@ -183,7 +183,7 @@ words, from the top of the memory down. Before `mon_putc` moves the rows
 up, it copies row 0 into the ring. The cold start finds the size of the
 memory from the display offset, which a board keeps only in the bits
 that address the memory: 32768 words on the MEGA65 and 8192 on the
-Nexys4DDR, so one `monitor.bin` serves every board. `k` rows back is the
+Nexys4DDR, so one ROM serves every board. `k` rows back is the
 display offset `size - 80k`, which wraps to row 0 of the screen, with
 the cursor off. The first key that scrolls back turns the ring so that
 its newest row is the last of the memory. In `niceemu` the display
@@ -317,11 +317,15 @@ a table differs from the build. `make romsize` writes the new tables.
 
 ### The build
 
-`make -C monitor` writes `build/monitor.bin`, the ROM, which joins two
-images, assembled apart (#152): the monitor's, `build/monitor_mon.bin`,
-at 0, and BASIC's, `build/monitor_bas.bin`, at `0x4000`. The assembler
-has no include, so the Makefile joins the sources of each with `cat`
-and assembles the result with `niceasm`. The monitor's, in this order:
+The ROM is two images, assembled apart (#152), which `../rom.mk` joins
+into `build/rom.bin` at the top, with `make rom`: the monitor's,
+`build/monitor_image.bin`, which `make -C monitor` writes, at 0, and
+BASIC's, `../basic/build/basic_image.bin`, which `make -C ../basic`
+writes, at `0x4000`. `rom.mk` has the sources of both, `VERSION`, and
+`FOLDER`, which the top Makefile passes on to the two. The assembler
+has no include, so each Makefile joins the sources of its image with
+`cat` and assembles the result with `niceasm`. The monitor's, in this
+order:
 
 1. `monitor.nasm`, `monitor_sd.nasm`, `monitor_fat.nasm`,
    `monitor_eth.nasm`, `monitor_tcp.nasm`, `monitor_clock.nasm`,
@@ -337,9 +341,9 @@ BASIC's, in this order:
 1. `../basic/basic.nasm`, which starts with the two vectors at
    `0x4000`, `basic_cmd.nasm`, `basic_net.nasm`, `basic_time.nasm`, and
    `basic_dis.nasm`, then `common.nasm`, `monlib.nasm`, and `mon.nasm`.
-2. `build/version.nasm`.
-3. `build/basic_folder.nasm`, the texts with the folder's name, of `DIR`
-   and of error 29.
+2. `../basic/build/version.nasm`.
+3. `../basic/build/basic_folder.nasm`, the texts with the folder's name,
+   of `DIR` and of error 29.
 
 The generated files are written only when they change, so that the
 ROM, and a bitstream with it, is not built again for nothing. The build
@@ -356,10 +360,16 @@ so that each side has its own.
 
 ### The tests
 
-`make -C monitor test` runs everything in `niceemu`, with no board. The
-monitor of the tests, `build/monitor_test.bin`, has the version `V9.9`,
-so that the expected output does not change with every commit. The test
-needs `FOLDER=NICE`, the default. It runs these steps in order:
+`make -C monitor test` runs the tests of the monitor's code in
+`niceemu`, with no board: the HAL, the line, the scrollback, TAB, the
+cards and FAT32, the network, TCP, and the clock. `make -C ../basic
+test` runs those of BASIC's statements ([basic/README.md](../basic/README.md)).
+Both run the ROM of the tests, `../build/rom_test.bin`, which joins the
+images of the tests, with the version `V9.9`, so that the expected
+output does not change with every commit. The tests of FAT32 type
+BASIC's `DIR`, `LOAD`, `SAVE`, and `DELETE`, but they are here, as they
+test FAT32. The test needs `FOLDER=NICE`, the default. It runs these
+steps in order:
 
 1. **The layout.** nice_cpu's `nicefmt` checks the sources and the
    tests' `.nasm` files.
@@ -370,14 +380,7 @@ needs `FOLDER=NICE`, the default. It runs these steps in order:
    the memory, and compares them with the console output. It does this
    with the history partly filled and gone round, and after Page Up, Page
    Down, the cursor keys, and a key that shows the screen again.
-3. **The disassembler.** `test/dis.py` runs `DIS` over `test/dis.nasm`,
-   which has every opcode, operand mode, condition, and modifier, the
-   control instructions, the reserved words, and each pseudo-instruction
-   with its near-misses. It compares each row with the text of
-   `nicedis.py`, rewritten by the rules of README.md, "The disassembler",
-   for a pseudo-instruction. It assembles each row again and compares the
-   words.
-4. **DHCP.** `test/dhcp.py` runs `DHCP` with `--step-time`, so that
+3. **DHCP.** `test/dhcp.py` runs `DHCP` with `--step-time`, so that
    each run takes the same steps. A first run with no server gives the
    transaction's number. Then it builds the OFFER and the ACK, among
    frames that are not for the monitor, an OFFER without an address, and
@@ -393,7 +396,7 @@ needs `FOLDER=NICE`, the default. It runs these steps in order:
    waits and carries DHCP on in the background: the times of the
    DISCOVERs, an `IP` that ends it, an OFFER and an ACK, with the line
    shown after `READY.` and the lease's first REQUEST at T1, and a NAK.
-5. **DNS.** `test/dns.py` runs `test/dns.nasm`, which calls
+4. **DNS.** `test/dns.py` runs `test/dns.nasm`, which calls
    `dns_lookup` with its names packed from an odd byte, under the
    monitor with `--step-time`. A query's ID and port change with the
    steps of the code, so the script learns them from a run, adds the
@@ -406,24 +409,7 @@ needs `FOLDER=NICE`, the default. It runs these steps in order:
    classes, an answer cut short, a second query, the gateway, no answer
    to ARP, and no answer. It compares the output and the frames sent
    with `test/dns.expected`, with the ID and the port as `qq` and `pp`.
-6. **NTP.** `test/ntp.py` types `NTP` and `DHCP` into the
-   monitor with `--step-time`, and learns the frames of each run as
-   `test/dns.py` does. DHCP gives the DNS server and an NTP server in
-   option 42. It covers no IP address, DHCP's server, a server by name
-   and by address, an offset east and west, a time of era 1, datagrams
-   that are passed over, a kiss-o'-death, a leap indicator of 3, a
-   stratum of 16, a time before 1970, no answer, an answer to the
-   second send, no such name, and offsets that are not. It covers the
-   edges of the eras too: the last second of era 0 before 1970, and the
-   last second of era 1 that the clock takes, and the next; the largest
-   offsets east and west, and a clock 0 s off. It compares the
-   output and the frames sent with `test/ntp.expected`, with a query's
-   port as `pp` and its transmit timestamp as `tt`. It runs on an I2C
-   master that is present and never busy, as `test/rtc.py` has it, and
-   checks that `NTP` writes the real-time clock: the master's last
-   command is the cold start's read while no time is set, and the write
-   of the chip's status after the times of the run.
-7. **The lease.** `test/lease.py` runs `test/lease.nasm`, which takes
+5. **The lease.** `test/lease.py` runs `test/lease.nasm`, which takes
    a lease with `net_dhcp`, opens the endpoint, and polls, under the
    monitor with `--step-time`. Between its polls it writes the time to
    the next one to `TIME_SKIP`, `0xFFFFFF5F`, so minutes of the clock
@@ -433,13 +419,7 @@ needs `FOLDER=NICE`, the default. It runs these steps in order:
    broadcast from T2, 60 ticks apart, the lease's end, an ACK that
    starts the lease again, an ACK of another address, a NAK, a T1 past
    the housekeeping deadline, and a lease forever.
-8. **TFTP.** `test/tftp.py` runs `LOAD` and `DIR` from a TFTP server the same way, against
-   `test/tftp.expected`. It covers a file of two blocks among packets of
-   other hosts and ports, lost packets, an ERROR, an ERROR after the
-   first block, whose summary comes first, files of 512 and 0
-   bytes, a listing, a port given as `"IP:PORT"`, bad arguments, and no
-   answer to ARP.
-9. **The real-time clock.** `test/rtc.py` starts the monitor on the
+6. **The real-time clock.** `test/rtc.py` starts the monitor on the
    words of an I2C master, which are memory in `niceemu`: a status that
    says that a master is present, and data that are the registers of the
    R6's real-time clock. With `--step-time` the clock is not set, so the
@@ -459,7 +439,7 @@ needs `FOLDER=NICE`, the default. It runs these steps in order:
    12-hour mode, its flag that says that it lost its time, digits over
    9, and no chip at all. Then it types `TIME`, and checks each
    transaction with its data, for each chip.
-10. **The suites of FAT32.** `test/fat_runs.py` runs the suites of
+7. **The suites of FAT32.** `test/fat_runs.py` runs the suites of
    `FAT_SUITES`, each a few runs of the monitor with `--step-time` on
    copies of the cards below, and compares each with
    `test/SUITE.expected`. A run types its input, and may run a program
@@ -471,7 +451,7 @@ needs `FOLDER=NICE`, the default. It runs these steps in order:
    of FAT32 that is odd but pinned, until a change of its own fixes
    it, is marked "known oddity" in the titles and the `.ops` files.
    The suites are in the table below the next one.
-11. **The runs.** The monitor runs once for each test below, with its
+8. **The runs.** The monitor runs once for each test below, with its
    keystrokes from an input file that ends with `HALT`, so that the run
    halts. Some runs add a program at `0x8000`, SD card images, or
    Ethernet frames.
@@ -481,12 +461,7 @@ compared with `test/NAME.expected`:
 
 | Test | What runs | What it checks |
 |---|---|---|
-| `cmds` | The monitor alone | Every statement, its bad arguments, keywords in either case, numbers that do not fit, and the edits of a line. |
-| `basic` | The monitor alone, with no card and no IP address | The scanner of a line: keywords glued to a letter or a digit, the HELP lines of each statement's Syntax error, numbers at their limits, `0x` without digits and a number that fails before a string, which are no numbers, strings without a closing quote, too few or too many arguments, and the 0s and the `.BIN` that the scanner writes into the line. |
 | `scroll` | The monitor alone | 448 rows of `DUMP`, which go round the history, and Page Up and Page Down. |
-| `load` | The monitor, with 128K words of RAM, as on the MEGA65 | `LOAD` with `build/hello.bin` pasted: CR LF and LF line ends, tabs, blank lines, skipped lines, a line too long, blanks after a line's 76 characters, a DEL that takes back the key after them, an address given twice, and CTRL-C. Then `SYS 0x8000` runs it. |
-| `load_64k` | The monitor, with 64K words, as on the Nexys4DDR | `LOAD` at the end of that RAM. |
-| `load_emu` | The monitor, with `0xFFFFFF9E` reading 0, as in `niceemu` | `LOAD` up to the screen. |
 | `sd_write` | `test/sd.nasm`, with a card of 4 sectors in slot 0 and none in slot 1 | `sd_init`, `sd_read`, and `sd_write`: the empty slot, a sector read and written, and the sector past the end. The card must then equal the image of `test/sd_image.py --written`. |
 | `arp` | `test/arp.nasm`, with the frames of `test/arp.eth` | `arp_resolve`: a reply after other frames, the cache, no reply, an entry aged out, and the cache filled and gone round. The frames sent are compared too. |
 | `udp` | `test/udp.nasm`, with the frames of `test/udp.eth` | The UDP entries: each error, a datagram sent after ARP, a broadcast, datagrams received among other frames, one cut short, and one sent through the gateway. The frames sent are compared too. |
@@ -503,7 +478,6 @@ compared with `test/NAME.expected`:
 | `fatbad` | The monitor, with a FAT16 card and an exFAT card | `DIR` rejects each. |
 | `fat1` | The monitor, with no card in slot 0 | `DIR` mounts slot 1. |
 | `fatnone` | The monitor, with a card without the folder `NICE`, and one whose `NICE` is a file | `DIR` and `LOAD` fail with error 29. |
-| `time` | The monitor, with `--step-time` and a copy of the card without partitions | `TIME` not set, set, and shown; dates that are not, such as leap days of years without one, fields of one digit, month 0, day 0, letters, wrong separators, and 2106, and the clock left alone after them; the edges that are, 2000-02-29, 2100-03-01, 2104-02-29, 2^31 seconds, 2105-12-31, the last day of a leap year, and blanks in the quotes; and the dates of `SAVE`, from the clock and while it is not set or before 1980, which `mdir` shows. |
 | `clock` | The monitor, with `--no-cycle-counter`, so that the clock's words are memory, set to a time with 999999 microseconds, and a copy of the card without partitions | The dates and the times of `SAVE` to the hundredths, which `test/fat_check.py --stamps` shows: the most hundredths, 0, the first second of 1980, and the fixed date before it; and the clock's words that `TIME` writes. |
 | `clockpast` | The same, with 2^32 seconds | `TIME` shows that the clock is past 2106, and `SAVE` writes the fixed date. |
 | `hello` | `test/hello.nasm`, under nice_cpu's `start_mon.nasm` | A program in assembly, run with `SYS 0x8000`, that returns to the monitor. |
@@ -516,22 +490,21 @@ monitor's sources, and only their words from `0x8000` are kept. `fs`,
 `fsw`, `hello`, and `hello_c` call the entries through `mon.nasm`'s
 stubs, as any program does, and so do `udp` and `net`. `arp`, `udp`, and
 `net` run with `--step-time`, as their timeouts count steps, and
-`fsw`, `fatw`, `fatlw`, and `time` too, so that the clock starts at 0,
+`fsw`, `fatw`, and `fatlw` too, so that the clock starts at 0,
 not set, and counts the same each time, and the files they write have
 the fixed date, 2026-01-01 at 00:00:00. `clock` and `clockpast` run with
 `--no-cycle-counter`, so that their clock stands still.
 
-A test that writes to a card, `fsw`, `fatw`, `fatlw`, `time`, `clock`,
-and `clockpast`, runs on a fresh copy of its image, and its output ends
+A test that writes to a card, `fsw`, `fatw`, `fatlw`, `clock`, and
+`clockpast`, runs on a fresh copy of its image, and its output ends
 with what each card holds that the image did not, from `test/fat_tool.py
 diff`, and the order of the sector writes, from a second run with `-t`
 and `test/fat_tool.py order`. The card is so checked byte for byte:
 every byte that differs is shown, decoded, and every other byte is the
-image's. `time` sets the clock, whose seconds count steps, so its diff
-shows the times as `**`. `fsw`'s slot 1 is write-protected, and is
+image's. `fsw`'s slot 1 is write-protected, and is
 compared with `cmp`.
 
-The suites of `test/fat_runs.py`, step 10:
+The suites of `test/fat_runs.py`, step 7:
 
 | Suite | What it checks |
 |---|---|
@@ -552,7 +525,7 @@ The suites of `test/fat_runs.py`, step 10:
 
 `niceemu` has no I2C master: its status word is memory, which reads 0,
 so the cold start of every run finds none, and `TIME` shows that the
-clock is not set. `test/rtc.py` alone sets that memory, as step 9 says.
+clock is not set. `test/rtc.py` alone sets that memory, as step 6 says.
 The I2C bus and the chip are tested in the simulated
 system, whose bus has a model of the R6's real-time clock: `make
 cosimtest` runs the monitor's cold start there, and checks the clock
@@ -610,7 +583,7 @@ after every run.
 A change of `monitor_fat.nasm` that is not meant to change its behavior
 must leave the outputs of the tests of FAT32 as they are, the cards
 and the order of the writes too. What changes with no fault is
-elsewhere: `cmds` shows the addresses of the dispatch
+elsewhere: BASIC's `cmds` shows the addresses of the dispatch
 table, and the table of "The ROM's words" changes with the code, which
 `make romsize` writes again. To run one test of the
 loop, run `make test FAT_SUITES=` and read its `build/NAME.out`; to run

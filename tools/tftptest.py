@@ -12,7 +12,7 @@ ACK, which sends nothing again; a packet from another port, which gets
 ERROR 5 while the transfer goes on; and an ERROR from the client, after
 which nothing comes again.
 
-Then it runs the monitor of the tests, monitor/build/monitor_test.bin, in
+Then it runs the ROM of the tests, build/rom_test.bin, in
 niceemu with --eth-udp and --eth-peer, whose frames go to a bridge in
 this script: the bridge answers ARP for the server 10.0.0.2, and passes
 the UDP datagrams to 10.0.0.2 on to tftpd.py on 127.0.0.1, port 69 to
@@ -24,8 +24,8 @@ that the checks name.
 
 It prints a line for each check, and last how many passed, and exits with
 status 1 when one fails. niceemu must be built, with make -C
-nice_cpu/emulator build, and so must the monitor, with make -C monitor
-build/monitor_test.bin. Only the Python standard library is used.
+nice_cpu/emulator build, and so must the ROM of the tests, with make
+build/rom_test.bin. Only the Python standard library is used.
 """
 
 import os
@@ -40,7 +40,7 @@ from typing import Dict, Tuple
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NICEEMU = os.path.join(REPO, "nice_cpu", "emulator", "zig-out", "bin", "niceemu")
-MONITOR = os.path.join(REPO, "monitor", "build", "monitor_test.bin")
+MONITOR = os.path.join(REPO, "build", "rom_test.bin")
 TFTPD = os.path.join(REPO, "tools", "tftpd.py")
 
 SERVER_IP = bytes([10, 0, 0, 2])
@@ -312,7 +312,7 @@ def test_monitor(server_port: int, tmp: str) -> None:
 
 def main() -> None:
     for path, how in ((NICEEMU, "make -C nice_cpu/emulator build"),
-                      (MONITOR, "make -C monitor build/monitor_test.bin")):
+                      (MONITOR, "make build/rom_test.bin")):
         if not os.path.exists(path):
             sys.exit(f"tftptest.py: no {path}; {how} builds it")
     with tempfile.TemporaryDirectory() as tmp:
