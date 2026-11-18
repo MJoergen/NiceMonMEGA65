@@ -74,17 +74,25 @@ the words that are free:
 | `monitor.nasm` | The dispatch table, the HAL, the screen, and the line with its scrollback |
 | `monitor_cmd.nasm` | The routines of the statements that were the monitor's commands, with `DIR`, `LOAD`, and `SAVE` of a card on the file entries |
 | `basic.nasm` | BASIC: the main loop, the scanner of a line, and the keywords, messages, and help |
+| `basic_net.nasm` | BASIC's `DHCP`, `NTP`, and `LOAD` and `DIR` from a TFTP server |
+| `basic_time.nasm` | BASIC's `TIME`, and the clock's side of `NTP` |
 | `monitor_dis.nasm` | The disassembler of `DIS` |
 | `monitor_sd.nasm` | The routines for the SD cards |
 | `monitor_fat.nasm` | FAT32: the file entries, and TAB |
-| `monitor_eth.nasm` | The routines for the network: the frames, ARP, UDP, DHCP, DNS, TFTP, and NTP |
+| `monitor_eth.nasm` | The routines for the network: the frames, ARP, UDP, DHCP, and DNS |
 | `monitor_tcp.nasm` | TCP |
-| `monitor_clock.nasm` | `TIME`, the dates of files, the real-time clock, and the time of `NTP` |
+| `monitor_clock.nasm` | `clock_set`, the dates of files, and the real-time clock |
+| `common.nasm` | What the monitor and BASIC share: the devices' addresses, the packed texts, IP addresses, and the conversions of dates |
 | `monlib.nasm` | The routines that programs join, which the statements use too |
 | `mon.nasm` | The stubs through which a program calls the entries |
 | `build/version.nasm` and `build/folder.nasm` | The version and the card's folder, which the Makefile writes |
 
 `mon.h` has the entries' declarations for C, and is no part of the ROM.
+
+The first five files after `monitor.nasm` are BASIC's. BASIC calls the
+monitor through the entries of the dispatch table alone, as a program
+does, and `test/sides.py` checks it whenever the ROM is built (#152).
+Both still share the map of the RAM in `monitor.nasm`.
 
 `make -C monitor` builds `build/monitor.bin`, and `make -C monitor test`
 runs it in `niceemu` ([INTERNALS.md](INTERNALS.md#building-and-testing)).

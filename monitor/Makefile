@@ -26,8 +26,8 @@ EMU      = $(NICE_CPU)/emulator/zig-out/bin/niceemu
 RUNTIME  = $(NICE_CPU)/runtime
 TOOLS    = $(wildcard $(NICE_CPU)/assembler/*.py) $(wildcard $(NICE_CPU)/translator/*.py)
 BUILD    = build
-SOURCES  = monitor.nasm monitor_cmd.nasm basic.nasm monitor_dis.nasm monitor_sd.nasm monitor_fat.nasm monitor_eth.nasm monitor_tcp.nasm \
-           monitor_clock.nasm monlib.nasm mon.nasm
+SOURCES  = monitor.nasm monitor_cmd.nasm basic.nasm basic_net.nasm basic_time.nasm monitor_dis.nasm monitor_sd.nasm monitor_fat.nasm monitor_eth.nasm monitor_tcp.nasm \
+           monitor_clock.nasm common.nasm monlib.nasm mon.nasm
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo unknown)
 # The folder of the card's root directory that holds NiceMon's files
 # (monitor_fat.nasm, README.md, "Files"): NICE, or with make FOLDER=NAME
@@ -54,10 +54,12 @@ FOLDER_ERROR = ($(call PACKED,E_FS29,no folder $(FOLDER_UC) on the card); \
   printf "FOLDER_N .ASCII_B '%-11s'\n" '$(FOLDER_UC)')
 # Each packed text of the ROM must end with a 0 byte (test/texts.py)
 CHECK_TEXTS = $(PYTHON) test/texts.py $(filter-out monlib.nasm mon.nasm,$(SOURCES))
-# The monitor must end below PROGRAM (monitor.nasm), 0x8000, the end of
+# BASIC reaches the monitor through the entries alone (test/sides.py, #152)
+CHECK_SIDES = $(PYTHON) test/sides.py
+# The monitor must end below PROGRAM (common.nasm), 0x8000, the end of
 # the ROM. niceasm writes the words in the order of their addresses, so
 # the last line has the last.
-ROM_END  = $(shell sed -n 's/^PROGRAM *\.EQU *\(0x[0-9A-Fa-f]*\).*/\1/p' monitor.nasm)
+ROM_END  = $(shell sed -n 's/^PROGRAM *\.EQU *\(0x[0-9A-Fa-f]*\).*/\1/p' common.nasm)
 CHECK_END = $(PYTHON) -c 'import sys; top = int(open(sys.argv[1]).read().split()[-2], 16); \
   end = int(sys.argv[2], 16); top < end or sys.exit(f"{sys.argv[1]} reaches {top:08X}, past the ROM, {end:08X}")'
 
@@ -67,6 +69,7 @@ all: $(BUILD)/monitor.bin
 
 $(BUILD)/monitor.bin: $(SOURCES) $(BUILD)/version.nasm $(BUILD)/folder.nasm $(TOOLS)
 	@$(CHECK_TEXTS)
+	@$(CHECK_SIDES)
 	@cat $(SOURCES) $(BUILD)/version.nasm $(BUILD)/folder.nasm > $(BUILD)/monitor_all.nasm
 	$(ASM) -o $@ $(BUILD)/monitor_all.nasm
 	@$(CHECK_END) $@ $(ROM_END)
@@ -85,6 +88,7 @@ $(BUILD)/folder.nasm: FORCE | $(BUILD)
 # with every commit.
 $(BUILD)/monitor_test.bin: $(SOURCES) $(BUILD)/folder.nasm $(TOOLS) | $(BUILD)
 	@$(CHECK_TEXTS)
+	@$(CHECK_SIDES)
 	@(cat $(SOURCES) $(BUILD)/folder.nasm; $(call PACKED,VERSION,V9.9)) \
 	  > $(BUILD)/monitor_test_all.nasm
 	@$(ASM) -o $@ $(BUILD)/monitor_test_all.nasm

@@ -4,7 +4,7 @@
 ; read through the byte window, so that they take no RAM. Stage 1 (issue
 ; #112) is the shell: the monitor's commands as statements, on the
 ; routines that the commands had, in monitor_cmd.nasm, monitor_dis.nasm,
-; and monitor_eth.nasm, with the scanner of issue #115.
+; basic_net.nasm, and basic_time.nasm, with the scanner of issue #115.
 ;
 ; The cold start ends at bas_start, which prints the banner and goes to
 ; main, and mon_exit at bas_warm, which prints the status and goes to
@@ -251,7 +251,7 @@ k_end
                 RET
 
 ; The routines of the statements that are not those of monitor_cmd.nasm,
-; monitor_dis.nasm, or monitor_eth.nasm alone
+; monitor_dis.nasm, basic_net.nasm, or basic_time.nasm alone
 
 ; TIME ["D T"]: clock_cmd with the string, or the end of the line
 bas_time

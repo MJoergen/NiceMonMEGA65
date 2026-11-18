@@ -49,6 +49,30 @@ CLOCK_SET       .EQU    0x44
 NET_SERVERS     .EQU    0x46
 MON_RESTORE     .EQU    0x48
 
+; The outputs of mon_out, as in mon.h
+MON_OUT_LINE    .EQU    1
+MON_OUT_SCREEN  .EQU    2
+
+; The errors of the network's entries, as in mon.h
+MON_E_NOIP      .EQU    -40
+MON_E_PORT      .EQU    -41
+MON_E_UCLOSED   .EQU    -42
+MON_E_ULONG     .EQU    -43
+MON_E_NOROUTE   .EQU    -44
+MON_E_NODHCP    .EQU    -45
+MON_E_NODNS     .EQU    -46
+MON_E_DNSTIME   .EQU    -47
+MON_E_DNSNAME   .EQU    -48
+MON_E_DNSFAIL   .EQU    -49
+MON_E_THANDLE   .EQU    -50
+MON_E_TFULL     .EQU    -51
+MON_E_TSIZE     .EQU    -52
+MON_E_TREFUSED  .EQU    -53
+MON_E_TRESET    .EQU    -54
+MON_E_TTIMEOUT  .EQU    -55
+MON_E_TCLOSED   .EQU    -56
+MON_E_TEOF      .EQU    -57
+
 ; Colors for scr_color, as in mon.h: a foreground and a background,
 ; added, with no blanks, such as MON_FG_YELLOW+MON_BG_BLUE. A color left
 ; out is black.

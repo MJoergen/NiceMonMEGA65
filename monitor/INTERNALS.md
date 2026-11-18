@@ -234,8 +234,8 @@ from 0, and the rest is free. The demo is not in it: it is a program,
 <!-- romsize layout -->
 | Part | Address | Words |
 |---|---|---:|
-| The monitor | `0x0000`–`0x36A8` | 13993 |
-| Free | `0x36A9`–`0x7FFF` | 18775 |
+| The monitor | `0x0000`–`0x36A7` | 13992 |
+| Free | `0x36A8`–`0x7FFF` | 18776 |
 <!-- /romsize layout -->
 
 The monitor's words, by the source they come from, in the order
@@ -243,25 +243,30 @@ the Makefile joins them. The column "Text" counts the words of the
 texts, which are part of "Words". They are packed, four characters a
 word, with `.ASCII_B`, and a `.DAT 0` after a text whose length is a
 multiple of 4 ends it (#131), which `test/texts.py` checks whenever the
-ROM is built:
+ROM is built, with `test/sides.py`, which checks that BASIC's files call
+the monitor through the entries alone, and that `common.nasm` uses
+neither side's routines (#152):
 
 <!-- romsize monitor -->
 | Source | What it is | Words | Text |
 |---|---|---:|---:|
-| `monitor.nasm` | The dispatch table, the HAL, and the cold start | 865 | 2 |
-| `monitor_cmd.nasm` | The routines of the statements that were the commands | 1535 | 235 |
+| `monitor.nasm` | The dispatch table, the HAL, and the cold start | 845 | 0 |
+| `monitor_cmd.nasm` | The routines of the statements that were the commands | 1567 | 291 |
 | `basic.nasm` | BASIC: the main loop, the scanner, the keywords, the messages, and the help | 834 | 440 |
+| `basic_net.nasm` | BASIC's `DHCP`, `NTP`, and TFTP | 907 | 150 |
+| `basic_time.nasm` | BASIC's `TIME`, and the clock's side of `NTP` | 269 | 44 |
 | `monitor_dis.nasm` | The disassembler of `DIS` | 871 | 79 |
-| `monitor_sd.nasm` | The sector routines | 206 | 59 |
+| `monitor_sd.nasm` | The sector routines | 85 | 0 |
 | `monitor_fat.nasm` | FAT32, the file entries, and TAB | 2847 | 0 |
-| `monitor_eth.nasm` | The network | 3348 | 160 |
+| `monitor_eth.nasm` | The network, and its entries | 2440 | 10 |
 | `monitor_tcp.nasm` | TCP | 2414 | 0 |
-| `monitor_clock.nasm` | The clock and `TIME` | 698 | 44 |
+| `monitor_clock.nasm` | The clock: `clock_set`, the dates of files, and the real-time clock | 303 | 0 |
+| `common.nasm` | What the monitor and BASIC share: texts, IP addresses, and dates | 235 | 5 |
 | `monlib.nasm` | The routines that programs join | 274 | 0 |
 | `mon.nasm` | The stubs of the entries | 82 | 0 |
 | `build/folder.nasm` | The folder's name, and the error of a card without it | 17 | 17 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 13993 | 1038 |
+| In all | | 13992 | 1038 |
 <!-- /romsize monitor -->
 
 - `build/folder.nasm` and the version always end with a `.DAT 0`, as
@@ -300,10 +305,10 @@ a table differs from the build. `make romsize` writes the new tables.
 include, so the Makefile joins the sources with `cat` and assembles the
 result with `niceasm`. In this order:
 
-1. `monitor.nasm`, `monitor_cmd.nasm`, `basic.nasm`, `monitor_dis.nasm`,
-   `monitor_sd.nasm`, `monitor_fat.nasm`, `monitor_eth.nasm`,
-   `monitor_tcp.nasm`, `monitor_clock.nasm`, `monlib.nasm`, and
-   `mon.nasm`.
+1. `monitor.nasm`, `monitor_cmd.nasm`, `basic.nasm`, `basic_net.nasm`,
+   `basic_time.nasm`, `monitor_dis.nasm`, `monitor_sd.nasm`,
+   `monitor_fat.nasm`, `monitor_eth.nasm`, `monitor_tcp.nasm`,
+   `monitor_clock.nasm`, `common.nasm`, `monlib.nasm`, and `mon.nasm`.
 2. `build/version.nasm`, which defines `VERSION`, the text of the
    banner: `git describe` of the tree, or the `VERSION=` of the command
    line.
@@ -313,7 +318,10 @@ result with `niceasm`. In this order:
 `version.nasm` and `folder.nasm` are written only when they change, so
 that the monitor, and a bitstream with it, is not built again for
 nothing. The build fails if the monitor reaches `PROGRAM`, `0x8000`,
-the end of the ROM.
+the end of the ROM, or if `test/sides.py` finds a call across the
+boundary of BASIC and the monitor that no entry takes. `-v` lists the
+names of the RAM's map and the constants that still cross, which the
+split of the map ends.
 
 ### The tests
 

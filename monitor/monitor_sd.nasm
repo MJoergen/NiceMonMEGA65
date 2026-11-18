@@ -9,8 +9,6 @@ SD_CSR          .EQU    0xFFFFFFA0      ; the SD card's status, and a write star
 SD_LBA          .EQU    0xFFFFFFA1      ; the sector of a Read or Write
 SD_CHUNK        .EQU    0xFFFFFFA2      ; the 8 words of the buffer at SD_BUF
 SD_ERROR        .EQU    0xFFFFFFA3      ; the error of the last command, 0 for none
-SD_SELECT       .EQU    0xFFFFFFA4      ; the selected slot
-SD_LAST         .EQU    0xFFFFFFA5      ; the card's last sector, while it is ready
 SD_SLOTS        .EQU    0xFFFFFFA6      ; the slots of the system
 SD_BUF          .EQU    0xFFFFFFA8      ; SD_BUF0 to SD_BUF7, the words of the chunk
 SD_INIT         .EQU    0               ; the commands of SD_CSR
@@ -19,33 +17,6 @@ SD_WR           .EQU    2
 SD_BUSY         .EQU    0x01            ; the bits of its status
 SD_READY        .EQU    0x08
 SD_CHANGED      .EQU    0x10
-
-; An error of the controller, R1 its negative: the number, the slot, and
-; the meaning, with the last sector after error 7
-sd_fail
-                SUB     R8, R0, R1      ; the error
-                MOVE    R1, S_SDERR
-                CALL    puts_b
-                MOVE    R1, R8
-                CALL    _io_putdec
-                MOVE    R1, S_INSLOT
-                CALL    puts_b
-                MOVE    R1, R7
-                CALL    _io_putdec
-                MOVE    R1, S_UCOMMA
-                CALL    puts_b
-                SUB     R1, R8, 1
-                CMP     R1, SD_ERRS
-        ?!C     JMP     :+              ; an error without a meaning here
-                ADD     R1, R1, SD_ERRORS
-                MOVE    R1, @R1
-                CALL    puts_b
-                CMP     R8, 7
-        ?!Z     JMP     :+
-                MOVE    R1, @SD_LAST
-                CALL    _io_puthex
-:
-                JMP     _io_crlf        ; which returns to the caller
 
 ; The sector routines, the ROM's own, with no entries in the dispatch table
 ; (doc/SDCARD.md, "The ROM"). They follow the C ABI, wait for busy before
@@ -116,20 +87,3 @@ sd_wait
                 AND[M]  R0, @SD_CSR, SD_BUSY
         ?!Z     JMP     sd_wait
                 RET
-
-S_SDERR         .ASCII_B 'SD error '
-S_INSLOT
-                .ASCII_B ' in slot '
-; The meanings of the errors 1 to SD_ERRS of SD_ERROR
-SD_ERRORS
-                .DAT    E_SD1, E_SD2, E_SD3, E_SD4, E_SD5, E_SD6, E_SD7, E_SD8
-SD_ERRS         .EQU    8
-E_SD1           .ASCII_B 'no card'
-E_SD2           .ASCII_B 'the card is not ready'
-E_SD3           .ASCII_B 'timeout, the card did not answer'
-                .DAT    0
-E_SD4           .ASCII_B 'CRC, the data from the card was corrupted'
-E_SD5           .ASCII_B 'the card reported an error'
-E_SD6           .ASCII_B 'the card is write-protected'
-E_SD7           .ASCII_B 'the sector is after the last, '
-E_SD8           .ASCII_B 'Init failed'

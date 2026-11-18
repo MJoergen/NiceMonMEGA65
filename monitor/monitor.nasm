@@ -22,36 +22,43 @@
 ; entries of the dispatch table (issue #152), but for the routines that
 ; it has not left yet.
 ;
-; The monitor is this file and seven more, which the Makefile joins after
-; it, in this order, so that the dispatch table is at 0:
+; The monitor is this file and ten more, which the Makefile joins after
+; it, in this order, so that the dispatch table is at 0. The first four
+; are BASIC's, which reaches the monitor through the entries of the
+; dispatch table alone (issue #152), as test/sides.py checks:
 ;
 ; - monitor_cmd.nasm: the routines of BASIC's statements that replace the
 ;   monitor's commands, and the routines and texts that only they use.
 ; - basic.nasm: BASIC, the main loop, the scanner of a line, which calls
 ;   the statements, and its keywords and messages (issues #112 and #115,
 ;   doc/BASIC.md).
+; - basic_net.nasm: the statements DHCP, NTP, and TFTP's LOAD and DIR
+;   (issues #84 and #127).
+; - basic_time.nasm: TIME, and the clock's side of NTP (issues #105 and
+;   #127).
 ; - monitor_dis.nasm: DIS, the disassembler (README.md, "The
 ;   disassembler").
 ; - monitor_sd.nasm: the SD cards below the file system, the sector
 ;   routines sd_init, sd_read, and sd_write that FAT32 reads and writes
 ;   through (issue #57, doc/SDCARD.md).
-; - monitor_fat.nasm: FAT32, the file entries 9 to 15 and 20, and DIR,
-;   LOAD, SAVE, and TAB of a card (issues #58, #59, and #149,
-;   INTERNALS.md, "FAT32").
+; - monitor_fat.nasm: FAT32, the file entries 9 to 15 and 20, and TAB
+;   of a card (issues #58, #59, and #149, INTERNALS.md, "FAT32").
 ; - monitor_eth.nasm: the network, the frame routines, the ARP cache, the
 ;   demultiplexing of the frames and net_poll, the UDP entries 16 to 19,
-;   the entries 21 to 25 of the IP settings, DHCP, the poll, and DNS, and
-;   the statements DHCP, NTP, and TFTP's LOAD and DIR (issues #83, #84,
-;   #111, and #127, README.md,
-;   "The network", and INTERNALS.md, "The frame routines").
+;   the entries 21 to 25 of the IP settings, DHCP, the poll, and DNS
+;   (issues #83 and #111, README.md, "The network", and INTERNALS.md,
+;   "The frame routines").
 ; - monitor_tcp.nasm: TCP, the entries 26 to 31 of its clients and its
 ;   servers, and their part of the poll (issue #111).
-; - monitor_clock.nasm: the clock of the time of day, TIME, the dates of
-;   FAT's entries, the real-time clock, and the time of NTP (issues #105,
-;   #109, #127, and #148).
+; - monitor_clock.nasm: the clock of the time of day, clock_set, entry
+;   34, the dates of FAT's entries, and the real-time clock (issues #105,
+;   #109, and #148).
+; - common.nasm: what both share, the addresses of the devices that both
+;   use, the packed texts of puts_b, IP addresses, and the conversions of
+;   a date and a time.
 ;
 ; Each has the .EQUs of its devices and its constants, and its texts, but
-; the variables of all eight are here, as one map of the RAM. The
+; the variables of all of them are here, as one map of the RAM. The
 ; assembler takes a name
 ; before its .EQU or its label, so the files reach each other's names in
 ; either direction.
@@ -109,25 +116,18 @@
 ; mon.nasm and build/version.nasm, which defines VERSION, the string of
 ; the banner.
 
-SP              .EQU    R13
 PC              .EQU    R15
 
 CONSOLE         .EQU    0xFFFFFF00      ; a write: a byte to the line
-SCREEN          .EQU    0xFFFF0000      ; 80 x 25 words, the character in bits 7..0
 SCR_CTL         .EQU    0xFFFFFF80      ; bit 6 shows the cursor, bit 5 blinks it
 SCR_X           .EQU    0xFFFFFF81      ; the cursor's column
 SCR_Y           .EQU    0xFFFFFF82      ; the cursor's row
 SCR_OFFS        .EQU    0xFFFFFF85      ; the display offset, in words
 SCR_FONT        .EQU    0xFFFFFF86      ; the font base: 0 shows Spleen
 SCR_MODE        .EQU    0xFFFFFF87      ; the mode word: 0 shows the text, 1 the chunky mode
-TEXT_B          .EQU    0x20000000      ; the byte window: byte A of the memory at TEXT_B+A
 TIMER           .EQU    0xFFFFFF10      ; the timer's period, 0 to stop it
 FPU_CMD         .EQU    0xFFFFFF8C      ; the FPU's command: 0x101, CLEAR 1, empties its stack and clears its flags
-E_IP            .EQU    0xFFFFFFB0      ; the network station's IP address, NET_IP, the first byte in bits 31..24
-E_MACH          .EQU    0xFFFFFFB1      ; the first two bytes of its MAC address, in bits 15..0
-E_MACL          .EQU    0xFFFFFFB2      ; the last four bytes of its MAC address
 
-STACK           .EQU    0xFFFFF000      ; SP at the cold start, above the program's RAM
 V_COL           .EQU    0xFFFFF000      ; the cursor's column, 0 to 79
 V_ROW           .EQU    0xFFFFF001      ; and its row, 0 to 24
 V_COLOR         .EQU    0xFFFFF002      ; the color of the characters put, bits 31..8
@@ -261,7 +261,6 @@ FILE0           .EQU    0xFFFFFDBB      ; and the files of handles 0 and 1, to 0
 FILE1           .EQU    0xFFFFFE46
 V_T             .EQU    0xFFFFFEE0      ; 24 words for TAB, to 0xFFFFFEF7
 
-PROGRAM         .EQU    0x8000          ; where a program is, above the ROM
 VARS_WORDS      .EQU    0x1000          ; the words from 0xFFFFF000, the variables, which end a program's RAM
 COLOR           .EQU    MON_FG_WHITE+MON_BG_BLACK  ; the color at the cold start
 OUT_LINE        .EQU    1
@@ -869,24 +868,3 @@ bin_end
                 POP     R8
                 POP     R7
                 RET
-
-; puts_crlf: the string at R1, one character a word, and CR LF
-puts_crlf
-                CALL    _io_puts
-                JMP     _io_crlf        ; which returns to the caller
-
-; puts_b: the packed text at the word address R1, up to its 0 byte, as
-; _io_puts reads it in the byte window. Uses R1.
-puts_b
-                SHL     R1, R1, 2
-                ADD     R1, R1, TEXT_B
-                JMP     _io_puts        ; which returns to the caller
-
-; puts_b_crlf: the packed text at R1, and CR LF
-puts_b_crlf
-                CALL    puts_b
-                JMP     _io_crlf        ; which returns to the caller
-
-S_UCOMMA
-                .ASCII_B ', '
-S_UGAP          .ASCII_B '  '

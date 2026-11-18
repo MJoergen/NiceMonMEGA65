@@ -21,12 +21,13 @@
 ; deletes a file, with monitor_fat.nasm, whose routines are also the
 ; entries 9 to 15, fs_mount, fs_open, fs_read, fs_readdir,
 ; fs_close, fs_write, and fs_delete (issues #58 and #59). TIME, the
-; clock of the time of day, is clock_cmd of monitor_clock.nasm, which
+; clock of the time of day, is clock_cmd of basic_time.nasm, which
 ; basic.nasm calls itself (issue #109). DIS, DHCP, NTP, and LOAD and DIR
-; from a TFTP server are in monitor_dis.nasm and monitor_eth.nasm, and use
-; the routines of this file.
+; from a TFTP server are in monitor_dis.nasm and basic_net.nasm, and use
+; the routines of this file. All of them reach the monitor through the
+; entries of the dispatch table alone, which test/sides.py checks (issue
+; #152).
 
-RAM_WORDS       .EQU    0xFFFFFF9E      ; the words of the RAM, 0 in niceemu, where there is no limit
 UART_BAUD       .EQU    0xFFFFFF9F      ; the UART's baud rate in bit/s, memory in niceemu
 DUMP_WORDS      .EQU    32              ; the words that DUMP shows without a count
 DIR_NAME        .EQU    24              ; DIR's column of the sizes
@@ -124,69 +125,11 @@ ip_show         MOVE    R1, S_IP
 ip_bad          MOVE    R1, S_BADIP
                 JMP     puts_b_crlf     ; which returns to the caller
 
-; get_ip: the IP address at R1, four decimal numbers of 0 to 255 with dots
-; between them: R1 the address, R2 = 1, and R3 after it, or R2 = 0 when
-; there is none. Uses R1-R6.
-get_ip
-                MOVE    R3, R1          ; the next character
-                CLR     R1              ; the address
-                MOVE    R6, 4           ; the numbers left
-get_ip_num
-                CLR     R4              ; the number
-                MOVE    R5, R3          ; where it starts
-:
-                SUB     R2, @R3, 0x30
-                CMP     R2, 10
-        ?!C     JMP     :+              ; no digit
-                ADD     R4, R4, R4      ; R4 is 10 * R4 + the digit
-                ADD     R2, R2, R4
-                SHL     R4, R4, 2
-                ADD     R4, R4, R2
-                CMP     R4, 256
-        ?!C     JMP     get_ip_bad
-                ADD     R3, R3, 1
-                JMP     :-
-:
-                CMP     R3, R5
-        ?Z      JMP     get_ip_bad      ; a number without digits
-                SHL     R1, R1, 8
-                OR      R1, R1, R4
-                SUB[M]  R6, R6, 1
-        ?Z      MOVE    R2, 1
-        ?Z      RET
-                CMP     @R3, 0x2E       ; .
-        ?!Z     JMP     get_ip_bad
-                ADD     R3, R3, 1
-                JMP     get_ip_num
-get_ip_bad
-                CLR     R2
-                RET
-
 ; show_ip: the string at R1, the IP address R2 in decimal with dots, and
 ; CR LF, with put_ip. Uses R1-R4, and R7 and R8 across the calls, saved.
 show_ip
                 CALL    put_ip
                 JMP     _io_crlf        ; which returns to the caller
-
-; put_ip: the string at R1, and the IP address R2 in decimal with dots.
-; Uses R1-R4, and R7 and R8 across the calls, saved.
-put_ip
-                PUSH    R7
-                PUSH    R8
-                MOVE    R8, R2
-                CALL    puts_b
-                MOVE    R7, 4           ; the bytes left
-:               ROL     R8, R8, 8       ; the top byte to the bottom
-                AND     R1, R8, 0xFF
-                CALL    _io_putdec
-                SUB[M]  R7, R7, 1
-        ?Z      JMP     :+
-                MOVE    R1, 0x2E
-                CALL    MON_PUTC
-                JMP     :-
-:               POP     R8
-                POP     R7
-                RET
 
 ; BAUD [RATE]: R1 RATE, and R2 not 0 when it was given. The UART's baud
 ; rate (doc/DEBUG_LINK.md, "The baud rate"), written when RATE is one of
@@ -330,7 +273,7 @@ mac_digit
 st_lines
                 MOVE    R1, S_LHINT
                 CALL    puts_b_crlf
-                MOVE    R1, OUT_SCREEN
+                MOVE    R1, MON_OUT_SCREEN
                 CALL    MON_OUT
                 MOVE    @V_LOUT, R1
                 CALL    bin_init
@@ -781,13 +724,32 @@ st_delete
                 MOVE    R1, R7
                 JMP     puts_crlf       ; which returns to the caller
 
-; rest_blank: Z when the line from R3 has only blanks. Uses R3.
-rest_blank
-                CMP     @R3, 0x20
-        ?Z      ADD     R3, R3, 1
-        ?Z      JMP     rest_blank
-                TST     @R3
-                RET
+; An error of the controller, R1 its negative: the number, the slot, and
+; the meaning, with the last sector after error 7
+sd_fail
+                SUB     R8, R0, R1      ; the error
+                MOVE    R1, S_SDERR
+                CALL    puts_b
+                MOVE    R1, R8
+                CALL    _io_putdec
+                MOVE    R1, S_INSLOT
+                CALL    puts_b
+                MOVE    R1, R7
+                CALL    _io_putdec
+                MOVE    R1, S_UCOMMA
+                CALL    puts_b
+                SUB     R1, R8, 1
+                CMP     R1, SD_ERRS
+        ?!C     JMP     :+              ; an error without a meaning here
+                ADD     R1, R1, SD_ERRORS
+                MOVE    R1, @R1
+                CALL    puts_b
+                CMP     R8, 7
+        ?!Z     JMP     :+
+                MOVE    R1, @SD_LAST
+                CALL    _io_puthex
+:
+                JMP     _io_crlf        ; which returns to the caller
 
 ; fs_fail: an error of monitor_fat.nasm, R1 its negative: one of the SD controller's
 ; as sd_fail shows it, with the selected slot, or a file error, its number and
@@ -902,7 +864,6 @@ S_HALTED
                 .ASCII_B 'Halted'
 S_NOPROG
                 .ASCII_B 'No program at '
-S_IP            .ASCII_B 'IP address '
 S_MAC           .ASCII_B 'MAC address '
                 .DAT    0
 S_BAUD          .ASCII_B 'Baud rate '
@@ -968,3 +929,19 @@ E_FS30          .ASCII_B 'the card or the folder is full'
 E_FS31          .ASCII_B 'the file is open'
                 .DAT    0
 E_FS32          .ASCII_B 'the file is read-only'
+S_SDERR         .ASCII_B 'SD error '
+S_INSLOT
+                .ASCII_B ' in slot '
+; The meanings of the errors 1 to SD_ERRS of SD_ERROR
+SD_ERRORS
+                .DAT    E_SD1, E_SD2, E_SD3, E_SD4, E_SD5, E_SD6, E_SD7, E_SD8
+SD_ERRS         .EQU    8
+E_SD1           .ASCII_B 'no card'
+E_SD2           .ASCII_B 'the card is not ready'
+E_SD3           .ASCII_B 'timeout, the card did not answer'
+                .DAT    0
+E_SD4           .ASCII_B 'CRC, the data from the card was corrupted'
+E_SD5           .ASCII_B 'the card reported an error'
+E_SD6           .ASCII_B 'the card is write-protected'
+E_SD7           .ASCII_B 'the sector is after the last, '
+E_SD8           .ASCII_B 'Init failed'

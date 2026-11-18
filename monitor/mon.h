@@ -24,6 +24,7 @@ void mon_putc(int c);
 
 // The outputs of mon_putc: bit 0 the line, bit 1 the screen, both at reset.
 // Returns the old ones.
+enum { MON_OUT_LINE = 1, MON_OUT_SCREEN = 2 };
 unsigned mon_out(unsigned outputs);
 
 // The screen blank in the current color, the cursor at the top left.

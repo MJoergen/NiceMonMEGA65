@@ -514,8 +514,8 @@ BASIC is NICE assembly from stage 2 on ([Decisions](#decisions)):
 - The scanner's routines take and return their values in registers,
   as each one's comment says, and the statements' routines may use
   every register, as the main loop starts again after each. BASIC
-  calls FAT32's routines of `monitor_fat.nasm` (#149) and the clock's
-  routines of `monitor_clock.nasm` (#148) by their labels.
+  calls the monitor through the entries of the dispatch table alone,
+  as a program does (#152), which `monitor/test/sides.py` checks.
 - The table of keywords, the ops, and the messages are packed with
   `.ASCII_B`, and read through the byte window, a quarter of the ROM.
 - The workspace is words, and its formats are those of

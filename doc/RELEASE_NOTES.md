@@ -59,7 +59,9 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   which closes them. A poll stops at the datagram that the UDP
   endpoint holds, and `udp_recv` polls only when none is held, so
   datagrams that come together are no longer lost; `NTP` and TFTP run
-  on the UDP entries.
+  on the UDP entries. `mon.nasm` has the errors of the network's
+  entries, `MON_E_NOIP` to `MON_E_TEOF`, as `mon.h` has them, and both
+  have the outputs of `mon_out`, `MON_OUT_LINE` and `MON_OUT_SCREEN`.
 
 **Changes.**
 

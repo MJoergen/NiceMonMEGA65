@@ -183,14 +183,15 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   the dispatch table, the HAL, and the map of its RAM, `monitor_cmd.nasm`,
   the routines of the statements that were the monitor's commands,
   `basic.nasm`, BASIC's main loop (#54, stage 1 #112), its scanner of
-  a line (#115), and its keywords, messages, and help, with
-  `DIS` in `monitor_dis.nasm`, the sector routines in
-  `monitor_sd.nasm`, FAT32 in `monitor_fat.nasm` (#149), the network
-  in `monitor_eth.nasm`, TCP in
-  `monitor_tcp.nasm`, #111, and the clock in `monitor_clock.nasm`
-  (#148): the `TIME` statement, the dates of files (#109), the clock
-  from the real-time clock at the cold start, which `TIME` writes
-  (#105), and the time of `NTP` from a time server (#127)), all of
+  a line (#115), and its keywords, messages, and help, with `DHCP`,
+  `NTP`, and TFTP in `basic_net.nasm`, `TIME` in `basic_time.nasm`, and
+  `DIS` in `monitor_dis.nasm`, all of BASIC on the entries of the
+  dispatch table alone, which `test/sides.py` checks (#152), the sector
+  routines in `monitor_sd.nasm`, FAT32 in `monitor_fat.nasm` (#149),
+  the network in `monitor_eth.nasm`, TCP in `monitor_tcp.nasm`, #111,
+  the clock in `monitor_clock.nasm` (#148): `clock_set`, the dates of
+  files (#109), and the clock from the real-time clock at the cold
+  start (#105), and in `common.nasm` what both sides share), all of
   it assembly, with no C in the ROM (#149; its tests need clang for
   their programs in C, and mtools, `mkfs.fat`, and `sfdisk`), the
   routines that
