@@ -288,8 +288,8 @@ a double. So the integers bought only speed, against a float in
 software. They cost a second path in every operator, an `Overflow`
 that turned an integer into a float, and a `/` that was an error
 until the floats came. On the FPU an add takes a few cycles, by the
-estimate of nice_cpu#161, and stage 2 measures the steps of an
-operation.
+estimate of nice_cpu#161, and in stage 2 an operator with a variable
+after it takes 43 steps in `niceemu` ([Stages](#stages)).
 
 What it costs: BASIC's numbers wait for the FPU
 ([Releases](#releases)). A number that is computed and printed does
