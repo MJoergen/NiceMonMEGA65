@@ -103,7 +103,7 @@ jobs:
           submodules: true
       # The tools of nice_cpu's formal job (nice_cpu/.github/workflows/ci.yml),
       # the OSS CAD Suite of 2026-09-30: Yosys 0.69 with the GHDL plugin,
-      # SymbiYosys, and Yices 2.7.0. Its programs set up their own
+      # SymbiYosys, Yices 2.7.0, and Boolector. Its programs set up their own
       # environment. The digest is the one GitHub gives for the asset.
       # An HTTP error is retried, and then fails with its status, so it
       # is not saved as the archive and reported as a checksum mismatch.

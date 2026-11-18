@@ -1,0 +1,32 @@
+# nice_cpu's FPU, nice_cpu/hdl/src/fpu.vhd with G_FORMAL, against the
+# rules of its port that formal/fpu_free.vhd, its stand-in in devices.sby
+# and nicemon.sby, gives it (formal_fpu_port.vhd, issue #146). "bmc"
+# checks the assertions from the reset to the depth, in cycles; a proof
+# by induction would need the FPU's own count of the requests owed, which
+# is inside fpu.vhd. nice_cpu's own cover of three requests owed is at a
+# depth of 20. "cover" reaches each cover statement.
+
+[tasks]
+bmc
+cover
+
+[options]
+bmc: mode bmc
+bmc: depth 24
+cover: mode cover
+cover: depth 20
+
+[engines]
+smtbmc boolector
+
+[script]
+plugin -i ghdl
+ghdl --std=08 -fpsl fpu_pkg.vhd fpu_seq_pkg.vhd fpu_unit.vhd fpu.vhd formal_fpu_port.vhd -e formal_fpu_port
+prep -top formal_fpu_port
+
+[files]
+../nice_cpu/hdl/src/fpu_pkg.vhd
+../nice_cpu/hdl/src/fpu_seq_pkg.vhd
+../nice_cpu/hdl/src/fpu_unit.vhd
+../nice_cpu/hdl/src/fpu.vhd
+formal_fpu_port.vhd

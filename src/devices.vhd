@@ -792,6 +792,13 @@ begin
       --                      (busy = '0' or lnk_sel = DEV_FPU) and (owed = '0' or sel = DEV_FPU);
       -- psl c_fpu_core : cover {core_stb_i and fpu_stb and not rst_i; true; core_ack_o};
       -- psl c_fpu_wait : cover {core_stb_i and fpu_stb and not rst_i; fpu_wait[*3]; core_ack_o};
+      -- The link's request reaches the FPU at 88-8F from its latch, with
+      -- and without a wait.
+      -- psl c_fpu_link : cover
+      --    {link_stb_i = '1' and rst_i = '0' and dev_of(link_addr_i) = DEV_FPU; fpu_stb; link_ack_o};
+      -- psl c_fpu_link_wait : cover
+      --    {link_stb_i = '1' and rst_i = '0' and dev_of(link_addr_i) = DEV_FPU; fpu_stb; fpu_wait[*3];
+      --     link_ack_o};
       -- psl f_sel_sd : assert always
       --    sd_stall = '1' and (busy = '1' or owed = '1') -> sel = DEV_SD;
       -- psl f_sel_eth : assert always

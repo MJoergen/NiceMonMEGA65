@@ -156,7 +156,7 @@ FORMAL_TASKS = rx_fifo-prove rx_fifo-cover board_io-prove board_io-none board_io
                eth_tcp-prove eth_tcp-cover \
                eth_rx_fifo-prove eth_rx_fifo-cover eth_tx_fifo-prove eth_tx_fifo-cover \
                dbg_host-prove dbg_host-cover sd_spi-prove sd_spi-cover \
-               i2c-prove i2c-cover
+               i2c-prove i2c-cover fpu_port-bmc fpu_port-cover
 
 formal: $(addprefix formal-,$(FORMAL_TASKS))
 

@@ -546,7 +546,7 @@ hours on each, most of it in the monitor's runs.
 
 `make formal` runs the SymbiYosys jobs in `formal/`, and CI runs it too.
 It needs the tools of nice_cpu's formal checks: Yosys with the GHDL plugin,
-SymbiYosys, and the Yices 2 solver. CI installs them as nice_cpu's CI
+SymbiYosys, and the Yices 2 and Boolector solvers. CI installs them as nice_cpu's CI
 does, from the OSS CAD Suite of 2026-09-30 (Yosys 0.69, GHDL 7.0.0-dev
 with its plugin, and Yices 2.7.0): download
 `oss-cad-suite-linux-x64-20260930.tgz` from the suite's releases, unpack
@@ -586,7 +586,18 @@ every time, not only the ones a testbench sends.
   `G_ETH_HOLD_ACK`. The `prove_sd` and `cover_sd` tasks are
   `prove` and `cover` with the SD card controller at `0xFFFFFFA0`–`AF`, in
   the boards' configuration, two slots without `G_SD_HOLD_ACK`, where it
-  never stalls.
+  never stalls. The FPU there is `fpu_free.vhd`, a stand-in that does
+  on its port anything that its header says the FPU may do. The covers
+  reach a request of the core and one of the link at the FPU, each with
+  and without a wait.
+- `fpu_port.sby` checks nice_cpu's real FPU, `fpu.vhd` with `G_FORMAL`,
+  against the stand-in's rules (`formal_fpu_port.vhd`, issue #146): each
+  acknowledge answers a request owed, at most three are owed, STALL is
+  high only while one or more are, and none is acknowledged after a
+  reset. So a bump of nice_cpu whose FPU breaks a rule fails here. Its
+  `bmc` task checks from the reset to 24 cycles; a proof by induction
+  would need the FPU's own count, which is inside `fpu.vhd`. Its `cover`
+  reaches three requests owed, and an acknowledge after STALL.
 - `mem.sby` proves the memory, `src/mem.vhd`, with 16 words of RAM, a ROM
   of 4 words, `formal/rom.bin`, and a screen of 8: a write reaches the
   memory of its address, or of the word its byte window reaches, in the

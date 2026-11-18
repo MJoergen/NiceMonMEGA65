@@ -2,7 +2,8 @@
 -- anything that nice_cpu/hdl/src/fpu.vhd may do, as nice_cpu's
 -- formal/formal_fpu.vhd proves it, so that the proof of src/devices.vhd
 -- spends no time on the FPU's commands. src/devices.vhd instantiates it
--- with G_FORMAL, in place of the FPU.
+-- with G_FORMAL, in place of the FPU. formal/fpu_port.sby checks the real
+-- FPU against these rules (issue #146).
 --
 -- THEORY OF OPERATION
 -- It counts the requests that it accepts and has not acknowledged, and
