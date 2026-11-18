@@ -8,7 +8,8 @@ is not.**
 the features and what is left out, and this note does not repeat the
 list. It has the rest: the decisions, the limits of the target, the
 ROM's main loop, the numbers, the memory, the internals, the room in
-the ROM, and the order of the work, with the issue of each stage.
+the ROM, the order of the work, with the issue of each stage, and
+what the stages need of the monitor.
 
 - [Decisions](#decisions)
 - [What it runs on](#what-it-runs-on)
@@ -19,6 +20,7 @@ the ROM, and the order of the work, with the issue of each stage.
 - [Assembly](#assembly)
 - [Tests](#tests)
 - [Stages](#stages)
+- [What the stages need of the monitor](#what-the-stages-need-of-the-monitor)
 - [The ROM's room](#the-roms-room)
 - [Releases](#releases)
 - [Open questions](#open-questions)
@@ -26,9 +28,9 @@ the ROM, and the order of the work, with the issue of each stage.
 ## Decisions
 
 Made on 2026-11-11, but for the first two, which are of 2026-11-12,
-the names of the statements, which are of 2026-11-15, and NICE
+the names of the statements, which are of 2026-11-15, NICE
 assembly from stage 2 on and the decisions of stage 2, which are of
-2026-11-16.
+2026-11-16, and the last two, which are of 2026-11-18.
 They replace the 32-bit float in software, and the number that is an
 integer until a fraction appears, of the day before
 ([Numbers](#numbers) has why). The first, the third, and the fourth
@@ -60,12 +62,19 @@ settle the three open questions of #54.
   its name, with no `BLOAD`, and a TFTP server is the second argument
   of `LOAD`, `RUN`, and `DIR`, with no `TFTP`. The top of BASIC's
   memory is `HIMEM`.
-- **The stages 1 to 3 go to the milestone V2.2.1**, which keeps
-  nice_cpu's tag `V2.2`, the first with the FPU
-  ([Releases](#releases)).
 - **Stage 2's numbers** are those of [Numbers](#numbers): `PRINT`
   with the FPU's 15 digits, `DIV` and `MOD` on words, no `A%`, and
   names of up to 16 characters, packed.
+- **The stages 2 and 3 go to `V2.3.2`**, a release of BASIC alone.
+  Stage 1 was in `V2.2.1`, and `V2.3.1` comes between, with BASIC's
+  image on a card
+  ([#153](https://github.com/MJoergen/NiceMonMEGA65/issues/153)),
+  after which a new BASIC needs no bitstream
+  ([Releases](#releases)).
+- **What stage 3 needs of the monitor is in `V2.3.1`**: three entries
+  for a line input of BASIC's own, and the size of BASIC's RAM in the
+  header of its image
+  ([What the stages need of the monitor](#what-the-stages-need-of-the-monitor)).
 
 ## What it runs on
 
@@ -342,13 +351,20 @@ entries alone (#152). Its workspace is the program's RAM:
   MEGA65 and 26K on the Nexys4DDR. In `niceemu`, where the word reads
   0, BASIC takes the MEGA65's size.
 - The variables are 6K words, `VARS_WORDS`: the monitor's 4K and
-  BASIC's 2K, of which its stage 1 uses about 1200. BASIC's state,
+  BASIC's 2K, of which its stage 1 uses 1194, and leaves 854
+  (measured 2026-11-18). BASIC's state,
   its line buffers, and the keys typed ahead go there. Its 4K would
   leave no room for the stack above the RAM that nice_cpu's demo tests
   on the Nexys4DDR, up to `0xDFFF` (nice_cpu#195), so it grows after
   that is fixed, and a program at `0x8000` then gets that much less.
   The pointer to the end of the names and the variables is one of
   BASIC's own words there.
+- The monitor has the size of BASIC's RAM too, in SP at `mon_reset`
+  and at `mon_exit`, and in `bin_line`'s end of a program's RAM. So
+  `V2.3.1` puts the size in a word of the header of BASIC's image,
+  which the monitor takes it from, and a later BASIC grows its RAM
+  with no new bitstream
+  ([What the stages need of the monitor](#stage-3-the-size-of-basics-ram)).
 - A name is its length, then its characters packed four to a word,
   as `.ASCII_B` packs them, in at most 4 words, then the double. A
   name is found by its length first. Stage 3 keeps the format, and
@@ -424,9 +440,17 @@ the console, and a poll takes its byte:
 - A byte that is not CTRL-C goes into a ring of keys typed ahead,
   which `GET` and `INPUT` read first. When the ring is full, the byte
   is dropped, as on the C64.
+- The monitor's `con_getline`, entry 32, reads the console itself, so
+  the keys of the ring would not reach it, at `INPUT` or at `READY.`.
+  So from stage 3 on BASIC reads its line with a routine of its own,
+  the ring first and then the console, on three entries that `V2.3.1`
+  adds for it: `con_key`, a byte of the console, `scr_back`, the
+  scrollback, and `fs_complete`, TAB
+  ([What the stages need of the monitor](#stage-3-the-keys-typed-ahead)).
 - The poll is one read every 64 statements, which is more than 1000
   steps apart, so `niceemu --window` does not take the program for a
-  wait loop and sleep.
+  wait loop and sleep. It is `con_key` without a wait, which keeps
+  the network going, as BASIC's wait for a line does.
 - In the tests, the input is a file, and a poll takes the next byte of
   it. So a test program that runs long ends with `HALT` itself, and
   not with keys after `RUN`.
@@ -491,7 +515,12 @@ The Commodore editor of #54, in assembly, in place of the monitor's
 - The cursor keys move over the screen, and RETURN takes the logical
   line, up to two rows, 160 characters, from the screen.
 - A word of 25 bits says which rows go on from the row above.
-  `mon_putc` shifts it when the screen scrolls.
+  `mon_putc` shifts it when the screen scrolls. That changes the
+  monitor, and `V2.3.1` does not have it, so the editor comes in a
+  release with a bitstream
+  ([What the stages need of the monitor](#the-later-stages)).
+- The keys come through `con_key`, the history through `scr_back`,
+  and TAB through `fs_complete`, as the line of stage 3 has them.
 - Typing inserts, and DEL deletes to the left and closes the gap, so
   the editor needs no INST key and has no quote mode.
 - The cursor keys up and down scroll the history today, before the
@@ -583,13 +612,15 @@ Each has an issue, under #54.
    expressions for their numbers. The errors. Still direct mode only.
    Its first step is the port of `basic.c` to assembly, #115, which
    is done, and the rest is written in assembly. It measures the
-   words of the stage and the steps of an operation.
+   words of the stage and the steps of an operation. It needs
+   nothing new of the monitor.
 3. **Programs**, #114. The lines, `LIST`, `NEW`, `CLR`, `RUN`, `END`,
    `STOP`, `CONT`, `GOTO`, `GOSUB`, `IF` on one line, `FOR`, `REM`,
    `INPUT` of numbers, `GET`, `DIM`, the break key, `HIMEM`, and the
    benchmarks. A program pasted
-   into the line runs, and `LIST` gets it back. This is the first
-   BASIC worth a release.
+   into the line runs, and `LIST` gets it back. Its line is read by
+   a routine of BASIC's own, on the entries that `V2.3.1` adds for
+   it. This is the first BASIC worth a release.
 4. **Files**, #60: `SAVE "NAME"`, `LOAD "NAME"`, and `RUN "NAME"`,
    from the card and from TFTP.
 5. **Strings**, #116. `$` variables and arrays, the heap with back
@@ -612,6 +643,94 @@ Each has an issue, under #54.
     (#104) and RESTORE (#110); statements for the network, after
     #111; virtual screens, `FIND`, and `CHANGE`; and graphics,
     sprites, and sound, with their hardware.
+
+## What the stages need of the monitor
+
+With [#153](https://github.com/MJoergen/NiceMonMEGA65/issues/153),
+BASIC's image comes from a card, and a release of BASIC alone has no
+new bitstream ([BASIC_ROM.md](BASIC_ROM.md)). The monitor is then the
+one of the last bitstream. So what a stage needs of the monitor must
+be there before the stage is written, or the stage waits for a
+release with a bitstream. The stages 2 and 3 were checked against the
+monitor on 2026-11-18, for `V2.3.1`, the release with #153. Stage 2
+needs nothing new, and stage 3 has two gaps, which `V2.3.1` closes.
+Neither is written yet.
+
+### Stage 2
+
+- **The FPU** is reached by BASIC itself. The monitor writes it in
+  two places only, the `CLEAR` of `mon_reset` and that of
+  `mon_restore`, which `mon_exit` calls, and it has no interrupt
+  routine. So the values on the FPU's stack stay across `mon_putc`
+  and every other entry, which the later BASICs rely on.
+- **The math unit** is used by the monitor's entries, in the clock,
+  FAT32, and `monlib.nasm`. So BASIC keeps no operand in it across a
+  call of an entry.
+- **`PRINT`** has `mon_putc`, and `scr_getxy` for the column. `PEEK`
+  and `POKE` are BASIC's own.
+- **BASIC's own RAM** has 854 of its 2048 words free, which should do
+  for the stages 2 and 3.
+
+### Stage 3: the keys typed ahead
+
+The ring of
+[The break key and keys typed ahead](#the-break-key-and-keys-typed-ahead)
+is BASIC's, and the monitor's `con_getline`, entry 32, reads the
+console itself (`getline_wait` of `monitor/monitor.nasm`). So the keys
+that the break poll took would be lost at `INPUT` and at `READY.`.
+BASIC cannot read the line itself either: the scrollback's keys and
+TAB's completion are routines of the monitor with no entries,
+`hist_up`, `hist_down`, `hist_leave`, and `complete`.
+
+`V2.3.1` adds three entries over those routines, in table 1.7, after
+entry 37, the monitor's version text (#153):
+
+| Entry | What it gives | Its routine today |
+|---|---|---|
+| `con_key` | A byte of the console, with a wait or without, and the network kept going meanwhile | `getline_wait` |
+| `scr_back` | The scrollback: some rows back or forward, or the screen again | `hist_up`, `hist_down`, and `hist_leave` |
+| `fs_complete` | TAB's completion of a file's name, on a line of the caller's | `complete` |
+
+BASIC then reads its line with a routine of its own, the ring first,
+and `con_getline` stays for the programs. The break poll is `con_key`
+without a wait, so a long `RUN` keeps the network going too, as
+BASIC's wait for a line does today. The names of the entries are not
+final.
+
+### Stage 3: the size of BASIC's RAM
+
+The monitor has the size of BASIC's own RAM in three places: `MOVE SP,
+STACK` in `mon_reset` and in `mon_exit`, and `VARS_WORDS` in
+`bin_line`, for the end of a program's RAM. That RAM is to grow from
+2K words to 4K ([The memory](#the-memory)). The monitor's pushes at
+`mon_exit` would then land in it, and `bin_line` would write a file's
+words there. So the growth would change the monitor, and need a
+bitstream.
+
+`V2.3.1` puts the words of BASIC's own RAM in a word of the header of
+BASIC's image ([BASIC_ROM.md](BASIC_ROM.md#the-image)). The monitor
+takes SP and the end of a program's RAM from it, and the header's
+version of the RAM's layout then covers the monitor's own RAM alone,
+from `0xFFFFF000`. `load.py --monitor` has the two RAMs' size as
+`MONITOR_WORDS`, and is to take BASIC's from the word instead.
+
+The rest of stage 3 is BASIC's own. `HIMEM` works with `bin_line` as
+it is: its counts have the lowest address written, so BASIC knows
+after a load whether a word went below the top.
+
+### The later stages
+
+These were looked at, and not checked as the stages 2 and 3 were:
+
+- **Stage 7, the editor**, changes the monitor as it is designed:
+  `mon_putc` shifts the word of the rows that go on
+  ([The screen editor](#the-screen-editor)). `V2.3.1` does not have
+  that (decided on 2026-11-18), so the editor comes in a release with
+  a bitstream. It uses the three entries above too.
+- **The stages 4 to 6 and 8 to 10** show nothing that they need of
+  the monitor.
+- **The console's interrupt (#104) and RESTORE's NMI (#110)**, of
+  stage 11, change the FPGA, so they need a bitstream in any case.
 
 ## The ROM's room
 
@@ -684,12 +803,20 @@ that is open when it is done.
 
 - **Every stage from 2 on needs the FPU**, which nice_cpu `V2.2` has,
   in `niceemu` and in `fpu.vhd`, and every board has since #136.
-- **The milestone V2.2.1** keeps nice_cpu's tag `V2.2`. It has #54,
-  #60, and #62, and the stages 1 to 3, #112 to #114, with the port
-  of the shell, #115. The stages from 5 on have no milestone yet.
-- **The stages 1 to 3 ship together**, so that the change of the
-  commands comes with a BASIC that runs programs. Stage 4, which ends
-  #60, comes with them, or in a release after.
+- **Stage 1 was in `V2.2.1`**, #112, with the port of the shell,
+  #115.
+- **`V2.3.1` has no stage.** It has BASIC's image on a card (#153),
+  and what stage 3 needs of the monitor
+  ([What the stages need of the monitor](#what-the-stages-need-of-the-monitor)),
+  so that the stages after it need no bitstream.
+- **The stages 2 and 3, #113 and #114, go to `V2.3.2`**, with #54,
+  #60, and #62 (decided on 2026-11-18). Neither changes the monitor,
+  so it can be a release of BASIC alone: `BASIC-V2.3.2.ROM` for the
+  card, with the bitstreams and the core files of `V2.3.1`. Stage 4,
+  which ends #60, comes with them, or in a release after. The stages
+  from 5 on have no milestone yet.
+- **A stage that changes the monitor waits for a release with a
+  bitstream.** Stage 7, the editor, is the first.
 - **#111 and BASIC share the ROM.** #111 is in V2.1, and
   [The ROM's room](#the-roms-room) has its words.
 
@@ -701,7 +828,10 @@ that is open when it is done.
    [The main loop](#the-main-loop).~~ Settled on 2026-11-15
    ([Decisions](#decisions)): `LOAD` by the name, TFTP as its second
    argument, and `HIMEM`. The names of stage 10 come with it.
-3. **The editor's place**: stage 7, or right after stage 3.
+3. **The editor's place**: stage 7, or right after stage 3. Either
+   way it changes `mon_putc`, so it comes in a release with a
+   bitstream
+   ([What the stages need of the monitor](#the-later-stages)).
 4. **`PROC` and `FN`** as BBC BASIC writes them, which takes names
    that start with them from the variables, or `SUB` and `FUNCTION`.
 5. **Reserved names.** A keyword of a later stage, `SPRITE` or
