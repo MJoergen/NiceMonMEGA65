@@ -30,7 +30,7 @@ what the stages need of the monitor.
 Made on 2026-11-11, but for the first two, which are of 2026-11-12,
 the names of the statements, which are of 2026-11-15, NICE
 assembly from stage 2 on and the decisions of stage 2, which are of
-2026-11-16, and the last three, which are of 2026-11-18.
+2026-11-16, and the last four, which are of 2026-11-18.
 They replace the 32-bit float in software, and the number that is an
 integer until a fraction appears, of the day before
 ([Numbers](#numbers) has why). The first, the third, and the fourth
@@ -81,6 +81,12 @@ settle the three open questions of #54.
   constant keeps its digits (open question 6). A variable that was
   never assigned is an error, `Undefined variable`, and `DIV` or `MOD`
   by 0 is `Division by zero`, as `/` is.
+- **Stage 3's programs** are those of [Programs](#programs): a `FOR`
+  loop runs its body at least once, as in V2, an edit of the program
+  keeps the variables, an array is made by `DIM` alone, and `GET A`
+  gives the code of a key, or 0, with no wait. The variables follow
+  the program, and a name's token holds its offset from their start
+  ([The memory](#the-memory)).
 
 ## What it runs on
 
@@ -305,6 +311,57 @@ of whole numbers has two words for each.
 - A name that starts with `PROC` or `FN` and goes on is a procedure or
   a function, as in BBC BASIC, so no variable starts with them.
 
+### Programs
+
+Stage 3's language, decided on 2026-11-18. V2 is the model where
+these do not say otherwise.
+
+- **A line number** is 0 to 65535. A line with a number is stored,
+  or replaces the line of that number, and a bare number deletes its
+  line. A line that the tokenizer refuses is not stored, and its
+  error is shown at once. The other errors come when the line runs:
+  the check of a whole line at its entry, of #54, comes with the
+  editor, stage 7.
+- **An edit keeps the variables.** Their table moves with the end of
+  the program and keeps its values. The frames and `CONT` are
+  dropped, as they hold the addresses of lines. `RUN` and `CLR` clear
+  the values, and `NEW` the names too.
+- **`GOTO` and `GOSUB` take a line number**, as in V2, and not an
+  expression, so that a target is found once and kept. A line that is
+  not there is `Undefined line`.
+- **`IF` on one line**: `IF c THEN 100`, `IF c GOTO 100`, and `IF c
+  THEN` with statements, each with an `ELSE` and a line number or
+  statements after it. A false condition goes on after the `ELSE` of
+  its `IF`, counting the `IF`s between, or at the next line.
+- **A `FOR` loop runs its body at least once**, as in V2 and BBC
+  BASIC: `NEXT` adds the step and compares, so `FOR` searches for
+  nothing. `FOR I = 5 TO 1` runs once, where ECMA-55 runs it no time.
+  A `FOR` of a variable that has a frame drops that frame and those
+  above it. `NEXT` with no name takes the latest loop, and `NEXT I, J`
+  ends two.
+- **An array is made by `DIM` alone.** An array that no `DIM` made is
+  `Undefined array`, where V2 makes one of 11 elements, so a V2
+  listing may need a `DIM` more. An array has one or two dimensions,
+  from 0: `DIM A(10)` has 11 elements, and `DIM B(3, 4)` 20. `A` and
+  `A(` are two names, as in V2. An index outside is `Bad subscript`,
+  and a second `DIM` of an array is `Redimensioned array`.
+- **`GET A`** gives the code of the next key typed ahead, or 0 when
+  there is none, and does not wait, as the C64's `GET` does not.
+  Stage 5 adds `GET A$`.
+- **`INPUT`** prints `? `, or a prompt in quotes first, and reads
+  numbers, with commas between them. A line that is no number is
+  `Redo from start`, and the line is read again. Too few numbers ask
+  for the rest with `?? `, and too many print `Extra ignored`. CTRL-C
+  there is a break.
+- **`STOP` and the break key** print `Break in 20`, and `END` nothing.
+  `CONT` goes on after either, and after `END`, unless the program was
+  edited or an error came since: then it is `Can't continue`.
+- **An error in a program** prints its message and the line's number,
+  `Syntax error in 20`, as in V2, and the frames are dropped.
+- **`HIMEM = n`** does a `CLR`, as the frames are below it. It is
+  `Out of memory` below the end of the arrays and the frames' room,
+  and above the RAM.
+
 ### What changed in the list of #54
 
 The review of 2026-11-11 changed the list of #54 in these places:
@@ -376,18 +433,37 @@ entries alone (#152). Its workspace is the program's RAM:
   which the monitor takes it from, and a later BASIC grows its RAM
   with no new bitstream
   ([What the stages need of the monitor](#stage-3-the-size-of-basics-ram)).
-- A variable is its double, then its name: the name's length, then
-  its characters packed four to a word, as `.ASCII_B` packs them, in
-  at most 4 words. A name is found by its length first. The token of a
-  name holds the variable's offset from `0x8000`, so the double is
-  read with no step over the name. In stage 2 a variable is made by an
-  assignment alone, `V =` at the start of a statement or after `LET`,
+- A variable is its double, then its name: the name's length, then its
+  characters packed four to a word, as `.ASCII_B` packs them, in at most
+  4 words. A name is found by its length first. The token of a name
+  holds the variable's offset from the start of the table, so the double
+  is read with no step over the name. In stage 2 a variable is made by
+  an assignment alone, `V =` at the start of a statement or after `LET`,
   so that a line that only names one, or a typo, does not write over a
-  program at `0x8000`. A name with no variable is an
-  `Undefined variable` when it runs. A variable that was never assigned
-  has `0xFFFFFFFF` in the high word of its double, a NaN, which no
-  variable holds otherwise, as a program never sees one. Stage 3 keeps
-  the format.
+  program at `0x8000`. A name with no variable is an `Undefined
+  variable` when it runs. A variable that was never assigned has
+  `0xFFFFFFFF` in the high word of its double, a NaN, which no variable
+  holds otherwise, as a program never sees one. Stage 3 keeps the
+  format.
+- From stage 3 on, the table starts at the end of the program, and the
+  token of a name holds the variable's offset from the table's start,
+  where stage 2 has it from `0x8000`, its start with no program. So an
+  edit moves the table, and the arrays after it, with no change to a
+  token. A name in a stored line gets its entry, never assigned, when
+  the line is entered, as the line keeps its offset. A direct line
+  makes a variable by an assignment alone, as in stage 2. `CLR` sets
+  every entry to never assigned, and drops the arrays and the frames.
+  The names stay until `NEW`, as the lines refer to them.
+- An array's entry has the offset of its data in the place of the
+  double, 0 until `DIM`, and a bit of its length that marks the name
+  as an array's. Its data, after the table, is its dimensions, their
+  bounds, and its doubles, row by row. So `CLR` drops the arrays by
+  setting a pointer and the entries' offsets.
+- The program's end is a pointer in BASIC's own RAM, and an empty
+  program writes no word at `0x8000`. So the `NEW` of a `.bin` file's
+  load leaves the file's words as they are. A `LOAD` of a `.bin` file
+  in a running program that writes below `HIMEM` ends the program, at
+  `READY.`.
 - A `.bin` file that is loaded clears the variables, as it may write
   over them. A routine that `SYS` calls keeps them, whether it
   returns or ends through `mon_exit`, as a routine above `HIMEM`
@@ -417,23 +493,33 @@ as #54 says:
   them. So `LIST` writes digits that read back as the same double, and
   a constant in hex keeps a kind of its own, for `LIST` to write it in
   hex.
-- A line number after `GOTO`, `GOSUB`, `THEN`, `RESTORE`, `TRAP`, and
-  `RUN` is a token of its own, with a word after it for the address of
-  the line, 0 until the first jump finds it. An edit of the program
-  clears those words in one pass. `RENUMBER` changes the tokens.
+- A line number after `GOTO`, `GOSUB`, `THEN`, `ELSE`, `RESTORE`,
+  `TRAP`, and `RUN` is a token of its own, with a word after it for the
+  address of the line, 0 until the first jump finds it. An edit of the
+  program clears those words in one pass. `RENUMBER` changes the tokens.
 - A name is looked up when the line is entered, not when it runs, so
   a variable in a running program is an offset. `LIST` writes the name
   from the table. A name that no line uses any more stays in the table
   until `NEW`.
 - `LIST` writes the keywords in upper case and a blank between tokens,
   so the blanks of a line as typed are not kept.
+- A stored line is the tokens of stage 2, at most the 160 words of
+  `V_TOK`. The tokenizer writes only `V_TOK`, and a line is stored
+  after the whole of it is tokenized, so a line that fails leaves the
+  program as it was. That settles S4 of #151, as stage 2 reads a
+  string from its token and no longer writes a 0 into the line.
 
 ### Frames
 
 `FOR`, `GOSUB`, `PROC`, and `LOCAL` push frames on one stack of
 BASIC's own, each with a tag. A `FOR` frame has the variable, the
 limit, the step, and the address of the loop's body, so `NEXT` does not
-search. The numbers of an expression are on the FPU's stack
+search. A `GOSUB` frame has the address of the token after it. The
+region of the frames is 512 words below `HIMEM`, where a `FOR` frame
+takes 8 and a `GOSUB` frame 3, and a frame with no room is
+`Out of memory`. A `NEXT` with no `FOR` frame is `NEXT without FOR`,
+and a `RETURN` with no `GOSUB` frame is `RETURN without GOSUB`. The
+numbers of an expression are on the FPU's stack
 ([The FPU](#the-fpu)). Its other temporaries, the strings, are on the
 stack of the frames, above them, and are gone at the end of the
 statement. So an error drops them all by resetting one pointer and
@@ -453,7 +539,10 @@ stay, for `RESUME`.
 The messages of stage 2 are `Syntax error`, `Illegal quantity`,
 `Division by zero`, `Overflow`, `Formula too complex`, `Undefined
 variable`, and `Out of memory`. A string where a number goes is a
-`Syntax error` until stage 5 has strings.
+`Syntax error` until stage 5 has strings. Stage 3 adds
+`Undefined line`, `Undefined array`, `Bad subscript`,
+`Redimensioned array`, `NEXT without FOR`, `RETURN without GOSUB`,
+and `Can't continue` ([Programs](#programs)).
 
 The depth of an expression is counted, and too deep is an error,
 since nothing notices when the processor's stack runs out. The FPU's
@@ -465,7 +554,7 @@ that pend, and nested parentheses pend nothing.
 RUN/STOP is CTRL-C, a byte of the console. A running program polls
 the console, and a poll takes its byte:
 
-- A byte that is not CTRL-C goes into a ring of keys typed ahead,
+- A byte that is not CTRL-C goes into a ring of 32 keys typed ahead,
   which `GET` and `INPUT` read first. When the ring is full, the byte
   is dropped, as on the C64.
 - The monitor's `con_getline`, entry 32, reads the console itself, so
@@ -649,9 +738,9 @@ Each has an issue, under #54.
 3. **Programs**, #114. The lines, `LIST`, `NEW`, `CLR`, `RUN`, `END`,
    `STOP`, `CONT`, `GOTO`, `GOSUB`, `IF` on one line, `FOR`, `REM`,
    `INPUT` of numbers, `GET`, `DIM`, the break key, `HIMEM`, and the
-   benchmarks. A program pasted
-   into the line runs, and `LIST` gets it back. Its line is read by
-   a routine of BASIC's own, on the entries that `V2.3.1` adds for
+   benchmarks, with the language of [Programs](#programs). A program
+   pasted into the line runs, and `LIST` gets it back. Its line is read
+   by a routine of BASIC's own, on the entries that `V2.3.1` adds for
    it. This is the first BASIC worth a release.
 4. **Files**, #60: `SAVE "NAME"`, `LOAD "NAME"`, and `RUN "NAME"`,
    from the card and from TFTP.
@@ -685,8 +774,9 @@ one of the last bitstream. So what a stage needs of the monitor must
 be there before the stage is written, or the stage waits for a
 release with a bitstream. The stages 2 and 3 were checked against the
 monitor on 2026-11-18, for `V2.3.1`, the release with #153. Stage 2
-needs nothing new, and stage 3 has two gaps, which `V2.3.1` closes.
-Neither is written yet.
+needs nothing new, and stage 3 has two gaps, which `V2.3.1` closes:
+the entries 38 to 40, and the size of BASIC's RAM in its header, are
+written.
 
 ### Stage 2
 
