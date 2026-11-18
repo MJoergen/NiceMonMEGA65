@@ -30,7 +30,7 @@ what the stages need of the monitor.
 Made on 2026-11-11, but for the first two, which are of 2026-11-12,
 the names of the statements, which are of 2026-11-15, NICE
 assembly from stage 2 on and the decisions of stage 2, which are of
-2026-11-16, and the last two, which are of 2026-11-18.
+2026-11-16, and the last three, which are of 2026-11-18.
 They replace the 32-bit float in software, and the number that is an
 integer until a fraction appears, of the day before
 ([Numbers](#numbers) has why). The first, the third, and the fourth
@@ -75,6 +75,12 @@ settle the three open questions of #54.
   for a line input of BASIC's own, and the size of BASIC's RAM in the
   header of its image
   ([What the stages need of the monitor](#what-the-stages-need-of-the-monitor)).
+- **Stage 2 tokenizes the line** that it runs, in the format of
+  [Lines and tokens](#lines-and-tokens), so that stage 3 adds the
+  stored lines and `LIST`, and no second evaluator. So the token of a
+  constant keeps its digits (open question 6). A variable that was
+  never assigned is an error, `Undefined variable`, and `DIV` or `MOD`
+  by 0 is `Division by zero`, as `/` is.
 
 ## What it runs on
 
@@ -252,7 +258,7 @@ a double, IEEE 754 binary64, on the FPU ([The FPU](#the-fpu)).
   error.
 - `PRINT` shows a number with the FPU's `DIGITS 15`, its trailing
   zeros dropped, as C's `%.15G` does: in fixed notation while the
-  exponent is -5 to 14, with a 0 before the point, and in E notation
+  exponent is -4 to 14, with a 0 before the point, and in E notation
   else, with a sign and at least two digits in the exponent. So
   `1/3` is `0.333333333333333`, `0.1 + 0.2` is `0.3`, `1E15` is
   `1E+15`, and `0.00001` is `1E-05`. A negative number has its `-`,
@@ -365,10 +371,14 @@ entries alone (#152). Its workspace is the program's RAM:
   which the monitor takes it from, and a later BASIC grows its RAM
   with no new bitstream
   ([What the stages need of the monitor](#stage-3-the-size-of-basics-ram)).
-- A name is its length, then its characters packed four to a word,
-  as `.ASCII_B` packs them, in at most 4 words, then the double. A
-  name is found by its length first. Stage 3 keeps the format, and
-  a line then holds the index of the name.
+- A variable is its double, then its name: the name's length, then
+  its characters packed four to a word, as `.ASCII_B` packs them, in
+  at most 4 words. A name is found by its length first. The token of a
+  name holds the variable's offset from `0x8000`, so the double is
+  read with no step over the name. A variable that was never assigned
+  has `0xFFFFFFFF` in the high word of its double, a NaN, which no
+  variable holds otherwise, as a program never sees one. Stage 3 keeps
+  the format.
 - A `.bin` file that is loaded clears the variables, as it may write
   over them. A routine that `SYS` calls keeps them, whether it
   returns or ends through `mon_exit`, as a routine above `HIMEM`
@@ -389,17 +399,21 @@ as #54 says:
   its number, a small whole number in the token itself, a number that
   fits a signed word in the word after it, any other number as a
   double in the two words after it, a string with its length and its
-  characters after it, one per word, a name with its index in the
-  table of names, and a line number. The three kinds of constant are
+  characters after it, one per word, a name with the offset of its
+  variable, and a line number. The three kinds of constant are
   for the room of a line, and the first two are pushed in one access.
-  Whether a constant with a fraction keeps its decimal digits too is
-  open ([Open questions](#open-questions)).
+  A constant with a fraction or an exponent, or too large for a word,
+  keeps its digits beside the double: up to 16 in BCD and their
+  exponent, as `DIGITS` gives them and `FROMBCD` and `SCALE10` take
+  them. So `LIST` writes digits that read back as the same double, and
+  a constant in hex keeps a kind of its own, for `LIST` to write it in
+  hex.
 - A line number after `GOTO`, `GOSUB`, `THEN`, `RESTORE`, `TRAP`, and
   `RUN` is a token of its own, with a word after it for the address of
   the line, 0 until the first jump finds it. An edit of the program
   clears those words in one pass. `RENUMBER` changes the tokens.
 - A name is looked up when the line is entered, not when it runs, so
-  a variable in a running program is an index. `LIST` writes the name
+  a variable in a running program is an offset. `LIST` writes the name
   from the table. A name that no line uses any more stays in the table
   until `NEW`.
 - `LIST` writes the keywords in upper case and a blank between tokens,
@@ -426,6 +440,11 @@ loop, which sets SP again. With no `TRAP`, the loop prints the
 message, in full text, and the line, drops the frames, and prints
 `READY.`. With one, the frames
 stay, for `RESUME`.
+
+The messages of stage 2 are `Syntax error`, `Illegal quantity`,
+`Division by zero`, `Overflow`, `Formula too complex`, `Undefined
+variable`, and `Out of memory`. A string where a number goes is a
+`Syntax error` until stage 5 has strings.
 
 The depth of an expression is counted, and too deep is an error,
 since nothing notices when the processor's stack runs out. The FPU's
@@ -609,7 +628,8 @@ Each has an issue, under #54.
    `ABS`, `SGN`, `INT`, and `SQR`, variables with long names, `LET`,
    `PRINT` and `?` with `;`, `,`, `TAB`, and `SPC`, and its format of
    a number, `PEEK`, `POKE`, `:`, and the statements of stage 1 with
-   expressions for their numbers. The errors. Still direct mode only.
+   expressions for their numbers. The errors. Still direct mode only,
+   but the line is tokenized as a stored line will be.
    Its first step is the port of `basic.c` to assembly, #115, which
    is done, and the rest is written in assembly. It measures the
    words of the stage and the steps of an operation. It needs
@@ -837,17 +857,10 @@ that is open when it is done.
 5. **Reserved names.** A keyword of a later stage, `SPRITE` or
    `SOUND`, breaks a saved program that has a variable of that name.
    The names could be refused as variables from stage 3 on.
-6. **The digits of a constant**, so that `LIST` gives the program
-   back. There are three ways:
-   - 15 digits, typed and listed. They come back only while each of
-     the FPU's two conversions is within 1.126 ulp, and plain steps
-     of doubles in the FPU do not keep that (nice_cpu#161).
-   - 14 digits, which come back while each conversion is within
-     11 ulp.
-   - The token of a constant with a fraction keeps its decimal digits
-     beside the double, in two or three words more. `LIST` writes the
-     digits that were typed, and the FPU need only give the same bits
-     each time.
+6. ~~**The digits of a constant**, so that `LIST` gives the program
+   back.~~ Settled on 2026-11-18: the token of a constant keeps its
+   digits beside the double ([Lines and tokens](#lines-and-tokens)), as
+   stage 2 tokenizes ([Decisions](#decisions)).
 7. **`A%`**: not in stage 2, where `%` in a name is an error. It may
    come with `DIM`, as one word of storage for a whole number, pushed
    and read through the FPU's view of a word. An array of flags is
