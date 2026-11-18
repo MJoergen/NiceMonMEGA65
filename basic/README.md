@@ -230,6 +230,12 @@ fills them in. The tests' image has the flag "keep", and the version
 `V9.9`, `0x09090000`. `tools/basic_rom.py check FILE` checks an image,
 and prints its header.
 
+To try a build on the board, copy `build/basic.rom` to a card's folder
+as a `BASIC*.ROM` file, which the monitor loads when the board is
+switched on ([README.md](../README.md#a-new-basic)), or put it into the
+ROM at once with `make load FILE=basic/build/basic.rom ETH=IP
+ARGS=--basic` ([tools/README.md](../tools/README.md#loading-basic-into-the-rom)).
+
 ## Testing
 
 `make -C basic test` runs the tests of BASIC's statements in `niceemu`,

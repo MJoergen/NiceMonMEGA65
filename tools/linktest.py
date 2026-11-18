@@ -13,7 +13,11 @@ on that port and with niceemu alone. Each must print the same and exit
 with the same status. The demo's self-test, F11, must pass. Last,
 run.py --tcp HOST:PORT runs hello on "niceemu --link
 127.0.0.2:0", an address other than 127.0.0.1, as for a niceemu on
-another computer. So it checks run.py, mon.py, boardlink.py, and the
+another computer. And with a card in niceemu's slot 0 that has
+NICE/BASIC-T.ROM, BASIC's image of build/rom.bin, which niceemu alone
+loads at the cold start, run.py --tcp loads build/rom.bin with "keep"
+set, so that its monitor loads none; and load.py --basic refuses
+niceemu, which has no ROM (issue #153). So it checks run.py, mon.py, boardlink.py, and the
 link of the emulator, as CI does. It prints one line for each check, and last how many passed,
 and exits with status 1 when one fails. niceemu must be built first,
 with make -C nice_cpu/emulator build. Only the Python standard library
@@ -181,6 +185,55 @@ def test_host(tmp: str) -> None:
     drain.wait()
 
 
+def test_keep(tmp: str) -> None:
+    """The tools' "keep" (doc/BASIC_ROM.md, "The tools"): niceemu alone,
+    with build/rom.bin, whose BASIC has "keep" clear, and a card with a
+    BASIC*.ROM, loads the card's BASIC at the cold start; run.py --tcp
+    loads the same ROM image with "keep" set, so that its monitor loads
+    none. load.py --basic refuses niceemu, which has no ROM."""
+    subprocess.run(["make", "-s", "-C", REPO, "build/rom.bin"], check=True)
+    rom = f"{REPO}/build/rom.bin"
+    card = os.path.join(tmp, "basic_card.img")
+    with open(card, "wb") as f:
+        f.truncate(40 * 1024 * 1024)
+    subprocess.run(["mkfs.fat", "-F", "32", "-s", "1", card], check=True,
+                   stdout=subprocess.DEVNULL)
+    subprocess.run(["mmd", "-i", card, "::NICE"], check=True)
+    subprocess.run(["mcopy", "-i", card, f"{REPO}/basic/build/basic.rom",
+                    "::NICE/BASIC-T.ROM"], check=True)
+    keys = os.path.join(tmp, "halt.txt")
+    with open(keys, "w") as f:
+        f.write("HALT\r")
+    alone = subprocess.run([NICEEMU, "-i", keys, "--sd0", card, rom],
+                           stdin=subprocess.DEVNULL, capture_output=True)
+    ok = b"BASIC-T.ROM from card 0" in alone.stdout
+    check("niceemu alone loads the card's BASIC-T.ROM", ok,
+          "" if ok else repr(alone.stdout[:200]))
+    emu, port = start_emu("127.0.0.1", ["--sd0", card])
+    try:
+        drain = subprocess.Popen(["cat"], stdin=emu.stderr,
+                                 stdout=subprocess.DEVNULL)
+        run = subprocess.run([sys.executable, f"{REPO}/tools/run.py",
+                              "--tcp", port, "-i", keys, rom],
+                             stdin=subprocess.DEVNULL, capture_output=True)
+        ok = b"NiceMon " in run.stdout and b" from card " not in run.stdout
+        check("run.py loads build/rom.bin with \"keep\", and the monitor "
+              "loads no card's BASIC", ok,
+              "" if ok else repr(run.stdout[:200]) + repr(run.stderr[-200:]))
+        load = subprocess.run([sys.executable, f"{REPO}/tools/load.py",
+                               "--tcp", port, "--basic",
+                               f"{REPO}/basic/build/basic.rom"],
+                              stdin=subprocess.DEVNULL, capture_output=True,
+                              text=True)
+        ok = load.returncode != 0 and "no ROM" in load.stderr
+        check("load.py --basic refuses niceemu, which has no ROM", ok,
+              "" if ok else f"exit {load.returncode}: {load.stderr!r}")
+    finally:
+        emu.terminate()
+        emu.wait()
+    drain.wait()
+
+
 def main() -> None:
     argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -231,6 +284,7 @@ def main() -> None:
     drain.wait()
     with tempfile.TemporaryDirectory() as tmp:
         test_host(tmp)
+        test_keep(tmp)
     passed = sum(results)
     print(f"\n{passed}/{len(results)} passed")
     if hwtest.skipped:

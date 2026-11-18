@@ -27,6 +27,10 @@ fills in after assembly:
       checks each image's addresses, header, and checksum, and prints
       its version, length, and flags
 
+tools/load.py and tools/hwtest.py use the functions here: set_keep() for
+an image that a tool loads, ram_words() for the end of a program's RAM,
+and text() for the banner.
+
 Only the Python standard library is used.
 """
 
@@ -40,6 +44,12 @@ MAGIC = 0x5341424E      # NBAS, the first character in the low byte
 H_MAGIC, H_IFACE, H_LENGTH, H_SUM, H_TEXT, H_VERSION, H_FLAGS, H_RAM = range(0x4004, 0x400C)
 FLAG_KEEP = 1
 MASK = 0xFFFFFFFF
+# The words of BASIC's RAM that the monitor takes from the header, and
+# what it takes from an image without the magic word or out of the range
+# (monitor/common.nasm, BAS_RAM_MIN, BAS_RAM_MAX, and BASIC_WORDS)
+RAM_MIN = 0x400
+RAM_MAX = 0x2000
+RAM_DEFAULT = 0x800
 
 
 class ImageError(Exception):
@@ -108,6 +118,42 @@ def fill(image: dict[int, int], version: str, keep: bool) -> None:
     image[H_SUM] = -checksum_of(image, image[H_LENGTH]) & MASK
 
 
+def set_keep(image: dict[int, int], keep: bool = True) -> None:
+    """Sets or clears "keep" in an image with the magic word, and its
+    checksum again over its length; an image without it is left alone."""
+    if image.get(H_MAGIC) != MAGIC:
+        return
+    flags = image.get(H_FLAGS, 0) & ~FLAG_KEEP
+    image[H_FLAGS] = flags | (FLAG_KEEP if keep else 0)
+    image[H_SUM] = 0
+    image[H_SUM] = -checksum_of(image, image.get(H_LENGTH, 0)) & MASK
+
+
+def ram_words(image: dict[int, int]) -> int:
+    """The words of BASIC's RAM, as the monitor takes them from the
+    header (monitor.nasm, bas_ram)."""
+    ram = image.get(H_RAM, 0)
+    if image.get(H_MAGIC) != MAGIC or not RAM_MIN <= ram <= RAM_MAX:
+        return RAM_DEFAULT
+    return ram
+
+
+def text(image: dict[int, int]) -> str:
+    """The version text of the header, a packed text up to a 0 byte,
+    as the banner shows it."""
+    out = ""
+    addr = image.get(H_TEXT, 0)
+    while BASE <= addr < END and len(out) < 64:
+        word = image.get(addr, 0)
+        for i in range(4):
+            c = word >> (8 * i) & 255
+            if not c:
+                return out
+            out += chr(c)
+        addr += 1
+    return out
+
+
 def check(image: dict[int, int]) -> str:
     """Checks the header and the checksum; the version, the length, and
     the flags, for a line of output."""
@@ -120,6 +166,8 @@ def check(image: dict[int, int]) -> str:
         raise ImageError(f"a word at {max(image):04X}, past the length {length}")
     if not BASE + 12 <= image.get(H_TEXT, 0) < BASE + length:
         raise ImageError("the version text's address is outside the image")
+    if not RAM_MIN <= image.get(H_RAM, 0) <= RAM_MAX:
+        raise ImageError(f"the words of BASIC's RAM out of {RAM_MIN} to {RAM_MAX}")
     if checksum_of(image, length):
         raise ImageError("bad checksum")
     v = image.get(H_VERSION, 0)

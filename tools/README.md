@@ -216,6 +216,30 @@ in the monitor's tests:
 with `monitor/test/hello.nasm`, and `make hwtest` also runs it under the
 monitor in the board's ROM, over the UART and Ethernet.
 
+The end of a program's RAM is below the monitor's variables, 4K words,
+and BASIC's RAM below them, as many words as the header of its image
+says: that of the BASIC of `--rom FILE`, or else of the ROM's. A ROM
+image that `load.py` or `run.py` loads at 0, such as `build/rom.bin`,
+gets BASIC's flag "keep", so that its monitor runs that BASIC and does
+not load a card's `BASIC*.ROM` in its place
+([doc/BASIC_ROM.md](../doc/BASIC_ROM.md)).
+
+## Loading BASIC into the ROM
+
+BASIC's half of the ROM, `0x4000`–`0x7FFF`, takes the link's writes.
+`--basic` puts an image of BASIC there, such as `basic/build/basic.rom`
+or a release's `BASIC-V2.3.1.ROM`, and starts the monitor with it:
+
+    tools/load.py --eth 192.168.1.65 --basic BASIC-V2.3.1.ROM
+    make load FILE=basic/build/basic.rom ETH=192.168.1.65 ARGS=--basic
+
+`load.py` checks the image as `tools/basic_rom.py check` does, holds the
+core, clears the memory, writes the image with "keep" set and zeros
+after it up to `0x7FFF`, reads the half back, and starts the core with
+the ROM shown. The ROM keeps that BASIC until the FPGA is configured
+again, as when the board is switched off. A bitstream without a ROM, or
+one older than V2.3.1, whose ROM takes no writes, is refused.
+
 ## Running a C program
 
 Build the C examples (see [PROGRAMMING.md](../doc/PROGRAMMING.md) for what

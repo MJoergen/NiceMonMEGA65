@@ -147,6 +147,32 @@ After a write, the monitor starts again from reset
 manager, while the core is held
 ([tools/README.md](tools/README.md#sdnbdpy)).
 
+### A new BASIC
+
+BASIC is the upper half of the ROM, and a card can bring a newer one,
+with no new core file. Each release has its BASIC as a file of its
+own, such as `BASIC-V2.3.1.ROM`. To use it:
+
+1. Copy the file into the folder `NICE` of a card. Older ones may stay
+   there, as the monitor takes the highest version.
+2. Switch the board off and on. The monitor loads the file and names
+   it, `BASIC-V2.3.1.ROM from card 0`, before the banner, which shows
+   both versions: `NiceMon V2.3.1, BASIC V2.3.1`.
+
+The monitor checks the file first. One that fails, such as a file cut
+short, gets a line that says why, and the next highest version is
+tried; with none, the core's own BASIC runs. A BASIC older than the
+core's runs too, with a note. The monitor loads only after the board
+is switched on: the reset button and `SYS 0` keep the BASIC that runs.
+
+If a BASIC from a card hangs at its start, take the card out and
+switch the board off and on, so that the core's own BASIC runs. Then put
+the card back, and remove the file with `DELETE "BASIC-V2.3.1.ROM"`.
+
+Over the network, `tools/load.py --eth 192.168.1.65 --basic
+BASIC-V2.3.1.ROM` puts a BASIC into the ROM at once, until the board is
+switched off ([tools/README.md](tools/README.md#loading-basic-into-the-rom)).
+
 A program reads and writes files through the monitor's routines
 ([monitor/README.md](monitor/README.md#files)), or drives the SD card
 controller itself, a sector of 512 bytes at a time.

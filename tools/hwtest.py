@@ -47,7 +47,9 @@ Programming:
     runs wherever load.py does.
 
 Checks, in this order:
-    - the link's b notice, and the ROM when the bitstream has one
+    - the link's b notice, and the ROM when the bitstream has one, with
+      the console's bytes up to BASIC's first READY., which may come after
+      the monitor's load of a BASIC*.ROM from a card (issue #153)
     Then, with the ROM hidden, the debug link (nice_cpu/doc/DEBUG.md):
     - the I2C master (doc/SYSTEM.md, The I2C bus): an address that no chip
       has gets a NACK; on the Nexys4DDR the temperature sensor's ID reads
@@ -122,6 +124,16 @@ Checks, in this order:
       on a card with NICE, sdcard.py's mkdir finds the folder there
       already, and writes nothing. A card without NICE, and one with no
       name of a start of its own, are named after NOT COVERED
+    - BASIC's half of the ROM (doc/BASIC_ROM.md, "The tools"): it takes a
+      link's write, and the monitor's half does not. When the monitor
+      loaded a card's BASIC*.ROM at the configuration, its line names it,
+      the ROM holds that file's words, as the host reads them from the
+      card, and the banner shows its version; without one, or with
+      --no-program, that is named after NOT COVERED. Then that BASIC with
+      the version text HWT goes into the ROM with load.py's load_basic(),
+      with "keep", and the banner shows HWT, and then the BASIC found goes
+      back as it was, which the banner shows too. Nothing is written to
+      a card
     - the C example examples/build/primes.bin runs, and after its halt the
       microsecond counter holds the cycle counter's count over the clock
       in MHz
@@ -224,8 +236,9 @@ from jtag import check_board, wait_port
 from sdcard import (E_NOFOLDER, FOLDER, SD_BUF, SD_CHUNK, SD_CSR, SD_ERROR,
                     SD_LAST, SD_LBA, SD_SELECT, SD_SLOTS, FileError,
                     FolderError, Volume, read_buffer, sd_command, to_bytes)
-from load import (MAX_RAM_WORDS, MONITOR_WORDS, PROGRAM, RAM_SIZE, load_words,
-                  read_bin, start)
+import basic_rom
+from load import (MAX_RAM_WORDS, MON_VARS, PROGRAM, RAM_SIZE, basic_image,
+                  load_basic, load_words, read_bin, read_half, start)
 from boardlink import (BAUD, BAUDS, BRK_COUNT, BRK_EN, CONTROL, DEFAULT_BAUD,
                        ETH_PORT,
                        FREE, HOLD, NET_IP, NET_RX_GOOD, NET_STATUS, NET_TX,
@@ -290,6 +303,12 @@ results: list[bool] = []
 skipped: list[str] = []
 # What the run did not test, and why, which the summary names too
 uncovered: list[str] = []
+# The console's bytes after the configuration, up to BASIC's first
+# READY., with the line of the BASIC that the monitor loaded from a card,
+# if any (test_boot), and that file's bytes, which test_sd reads from
+# the card (test_basic)
+boot_text: list[bytes] = []
+boot_file: dict[str, bytes] = {}
 
 
 def check(name: str, ok: bool, detail: str = "") -> bool:
@@ -417,6 +436,10 @@ def test_boot(link: Link, bit: str, cable: list[str]) -> bool:
     check("b notice after configuration", link.boots >= 1,
           f"{link.boots} b notices, console {out!r}")
     c = ctl(link)
+    if c in ("00000002", "00000000") and READY not in out:
+        # The monitor may load BASIC from a card first (#153)
+        out += console_until(link, lambda t: READY in t, 20.0)
+    boot_text.append(out)
     # Without a ROM the core is held and the ROM bit reads 1; with one the
     # core has booted from it, and has halted or still runs.
     check("core held at power-up, or booted from the ROM",
@@ -1118,11 +1141,12 @@ def test_watch(link: Link, prog: str, at: dict[str, int]) -> None:
     link.control(HOLD | RAM)
 
 
-def start_emu(addr: str = "127.0.0.1") -> tuple[subprocess.Popen[bytes], str]:
-    """niceemu --link on a free port of addr, and that port. Its stderr,
-    where it prints the report of each run, is left for the caller to read
-    away."""
-    emu = subprocess.Popen([NICEEMU, "--link", f"{addr}:0"],
+def start_emu(addr: str = "127.0.0.1", options: Optional[list[str]] = None
+              ) -> tuple[subprocess.Popen[bytes], str]:
+    """niceemu --link on a free port of addr, with options, and that port.
+    Its stderr, where it prints the report of each run, is left for the
+    caller to read away."""
+    emu = subprocess.Popen([NICEEMU, "--link", f"{addr}:0"] + (options or []),
                            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
     assert emu.stderr is not None
     first = emu.stderr.readline().decode(errors="replace")
@@ -1875,6 +1899,33 @@ def fat32_dir(link: Link, name: str) -> Folder | None:
     return Folder(vol.rows(listed), files)
 
 
+def boot_load() -> tuple[str, int] | None:
+    """The name and the slot of the BASIC*.ROM that the monitor loaded at
+    the configuration, from its line, NAME from card SLOT, or None."""
+    m = re.search(rb"([^\r\n]+) from card (\d)\r\n",
+                  boot_text[0] if boot_text else b"")
+    if m is None:
+        return None
+    return m.group(1).decode("latin-1"), int(m.group(2))
+
+
+def card_file(link: Link, name: str, file: str) -> bytes | None:
+    """The bytes of file in the folder FOLDER of the card in the selected
+    slot, as tools/sdcard.py reads them over the link, or None."""
+    def read(lba: int) -> bytes:
+        sector = sd_read(link, name, lba)
+        if sector is None:
+            raise Unread
+        return sector
+    try:
+        vol = Volume(read, FOLDER)
+        return vol.contents(vol.find(file))
+    except (Unread, FileError) as e:
+        check(f"{name}: {file}, which the monitor loaded, reads", False,
+              str(e))
+        return None
+
+
 def test_sd(link: Link, board: str) -> dict[int, Folder]:
     """The SD card controller at FFFFFFA0-AF, with the core held, as the
     header says. It only reads the cards. The rows of BASIC's DIR and the
@@ -1938,6 +1989,11 @@ def test_sd(link: Link, board: str) -> dict[int, Folder]:
             folder = fat32_dir(link, name)
             if folder is not None:
                 fat[slot] = folder
+                loaded = boot_load()
+                if loaded is not None and loaded[1] == slot:
+                    data = card_file(link, name, loaded[0])
+                    if data is not None:
+                        boot_file[loaded[0]] = data
         sd_read(link, name, last)
         link.write(SD_LBA, [last + 1])
         got = sd_command(link, 1, 1.0)
@@ -2073,6 +2129,107 @@ def test_fat_dir(link: Link, fat: dict[int, Folder]) -> None:
             test_tab(link, slot, folder.names)
     link.send_console(b"HALT\r")
     console(link, 1.0)
+
+
+def banner_basic(text: bytes) -> str | None:
+    """BASIC's version in the last banner of the console's text,
+    NiceMon V2.3.1, BASIC V2.3.1, or None."""
+    found = re.findall(rb"NiceMon [^\r\n,]+, BASIC ([^\r\n]+)\r\n", text)
+    return found[-1].decode("latin-1") if found else None
+
+
+def image_of(data: bytes, tmp: str) -> dict[int, int] | None:
+    """The words of a BASIC*.ROM file, checked, or None."""
+    path = os.path.join(tmp, "card_basic.rom")
+    with open(path, "wb") as f:
+        f.write(data)
+    try:
+        image = basic_rom.read_image(path)
+        basic_rom.check(image)
+        return image
+    except (basic_rom.ImageError, ValueError):
+        return None
+
+
+def boot_basic(link: Link, image: dict[int, int]) -> bytes:
+    """Starts the core from the ROM, with image in BASIC's half, as
+    load_basic() wrote it, and returns the console's bytes up to READY."""
+    link.take_console()
+    start(link, rom=True)
+    return console_until(link, lambda t: READY in t, 20.0)
+
+
+def test_basic(link: Link, fat: dict[int, Folder], programmed: bool,
+               tmp: str) -> None:
+    """BASIC's half of the ROM, 0x4000-0x7FFF (issue #153, doc/BASIC_ROM.md,
+    "The tools"): it takes a link's write, and the monitor's half does not.
+    The BASIC that the monitor started at the configuration is that of the
+    card's BASIC*.ROM that its line names, word for word, with its version
+    in the banner, or the bitstream's, when no card has one. Then a test
+    image, that BASIC with the version text HWT and "keep", goes in with
+    load.py's load_basic(), and the banner shows it; then the BASIC found
+    goes back as it was, which the banner shows too."""
+    link.control(HOLD)
+    if link.read_word(CONTROL) & RAM:
+        uncovered.append("BASIC's half of the ROM, as the bitstream has none")
+        return
+    found = read_half(link)
+    last = found[-1]
+    ok = wr(link, 0x7FFF, last ^ basic_rom.MASK) and rd(link, 0x7FFF) == last ^ basic_rom.MASK
+    wr(link, 0x7FFF, last)
+    if not check("BASIC's half of the ROM takes a link's write", ok,
+                 "" if ok else "a bitstream older than V2.3.1"):
+        return
+    low = rd(link, 0x3FFF)
+    check("the monitor's half of the ROM drops a link's write",
+          wr(link, 0x3FFF, low ^ basic_rom.MASK) and rd(link, 0x3FFF) == low)
+    image = {basic_rom.BASE + i: w for i, w in enumerate(found) if w}
+    if image.get(basic_rom.H_MAGIC) != basic_rom.MAGIC:
+        check("the BASIC in the ROM has its header", False,
+              f"{image.get(basic_rom.H_MAGIC, 0):08X} at 4004")
+        return
+    text = basic_rom.text(image)
+    # What the configuration started
+    names = [f"{n} on card {slot}" for slot, folder in fat.items()
+             for n in folder.names
+             if re.fullmatch(r"basic.*\.rom", n, re.IGNORECASE)]
+    loaded = boot_load()
+    if not programmed:
+        uncovered.append("the BASIC that the configuration loads, with "
+                         "--no-program")
+    elif loaded is not None:
+        name, slot = loaded
+        data = boot_file.get(name)
+        card = image_of(data, tmp) if data is not None else None
+        check(f"the configuration loaded {name} from card {slot}, word for "
+              "word", card is not None and
+              [card.get(a, 0) for a in range(basic_rom.BASE, basic_rom.END)]
+              == found, "" if card is not None else "the file is not valid")
+        got = banner_basic(boot_text[0])
+        check(f"the banner after it shows BASIC {text}", got == text,
+              f"BASIC {got}")
+    elif names:
+        reasons = re.findall(rb"[^\r\n]+ on card \d: [^\r\n]+",
+                             boot_text[0] if boot_text else b"")
+        uncovered.append("the load of BASIC from a card, as no file of "
+                         + ", ".join(names) + " passed: "
+                         + "; ".join(r.decode("latin-1") for r in reasons))
+    else:
+        uncovered.append("the load of BASIC from a card, as no card has "
+                         "BASIC*.ROM in its folder " + FOLDER)
+    # A test image, then the BASIC found again
+    test = dict(image)
+    test[test[basic_rom.H_TEXT]] = 0x00545748   # HWT
+    load_basic(link, test)
+    said = boot_basic(link, test)
+    check("load_basic(): the banner shows BASIC HWT, with \"keep\"",
+          banner_basic(said) == "HWT" and b" from card " not in said,
+          repr(said[-200:]))
+    link.control(HOLD)
+    load_basic(link, image, keep=False)
+    said = boot_basic(link, image)
+    check(f"BASIC {text}, which the ROM had, back", banner_basic(said) == text,
+          repr(said[-200:]))
 
 
 def test_primes(link: Link, primes: str, board: str) -> None:
@@ -2310,7 +2467,9 @@ def test_fit(link_args: list[str], tmp: str, ram: int) -> None:
     as the next load does."""
     subprocess.run(["make", "-s", "-C", REPO, "build/rom_test.bin"], check=True)
     monitor = f"{REPO}/build/rom_test.bin"
-    cases = [(ram - MONITOR_WORDS, ["--monitor", "--rom", monitor],
+    words = read_bin(monitor)
+    vars_words = MON_VARS + basic_rom.ram_words(basic_image(words))
+    cases = [(ram - vars_words, ["--monitor", "--rom", monitor],
               " under the monitor")]
     if ram < MAX_RAM_WORDS:
         cases.append((ram, [], ""))
@@ -2853,6 +3012,7 @@ def main() -> None:
                 test_fetch_statistics(link)
                 test_primes(link, primes, board)
                 test_fat_dir(link, fat)
+                test_basic(link, fat, not args.no_program, tmp)
             finally:
                 link.close()
             serial = ["--port", args.port, "--baud", str(args.baud)]

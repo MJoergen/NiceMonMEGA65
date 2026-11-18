@@ -26,11 +26,27 @@ core is started, so the monitor boots cold, which leaves the RAM from
 0x8000 alone. Then r and CR are typed on the console, the monitor's
 command that runs the program. A bitstream without a ROM, and niceemu,
 have no monitor: --rom FILE loads FILE at 0 in its place, such as
-build/rom.bin, the monitor and BASIC, with the ROM hidden.
+build/rom.bin, the monitor and BASIC, with the ROM hidden. The
+variables at the top are the monitor's 4K words and BASIC's RAM below
+them, as many words as the header of the BASIC says, that of FILE, or
+else of the ROM's (doc/BASIC_ROM.md).
+
+A ROM image loaded at 0 gets BASIC's flag "keep" set, with its checksum
+again, so that the monitor runs that BASIC and does not replace it with
+a card's BASIC*.ROM, which would also zero the RAM from 0x8000.
+
+With --basic, FILE is an image of BASIC, such as basic/build/basic.rom
+or a release's BASIC-V2.3.1.ROM, which goes into BASIC's half of the ROM,
+0x4000-0x7FFF, with "keep" set and every word of the half that it does
+not fill zeroed, and is read back. The core is held, the memory
+cleared, and the ROM shown, and the core started, unless --no-run is
+given, so the monitor boots cold with that BASIC. The ROM keeps it until
+the FPGA is configured again. A bitstream older than V2.3.1, whose ROM
+takes no writes, is refused, as is one without a ROM.
 
 Usage: tools/load.py (--eth HOST[:PORT] | --port DEVICE [--baud 230400]
                      | --tcp [HOST:]PORT | --cosim PORT) [--no-run]
-                     [--monitor [--rom FILE]] FILE.bin
+                     [--monitor [--rom FILE] | --basic] FILE
 
 One of --eth, --port, --tcp, and --cosim must be given. --port names the
 serial device of the board's debug UART, such as /dev/ttyUSB1. --eth HOST talks to the board over TCP on its Ethernet port, at
@@ -51,6 +67,8 @@ from boardlink import (BRK_EN, CLEAR, CONTROL, HOLD, RAM, Link, LinkError,
 import nicebin
 from nicebin import Words, read_lines
 
+import basic_rom
+
 # The words that a board has: the RAM from 0, 128K words on the MEGA65 and
 # 64K on the Nexys4DDR, and the screen, of which both boards have the
 # first 8K (the MEGA65 has 32K). Any other address would alias a word of
@@ -64,17 +82,46 @@ SCREEN_BASE = 0xFFFF0000
 SCREEN_WORDS = 0x2000
 
 # A program under the monitor: where it starts, above the ROM, the words
-# of the variables at the top of the RAM, the monitor's 4K at 0xFFFFF000
-# and BASIC's 2K below them, where the program's RAM ends, and the statement of the ROM's BASIC that runs
-# it (monitor/README.md)
+# of the monitor's variables at the top of the RAM, at 0xFFFFF000, below
+# which BASIC's RAM is, of the size that BASIC's header gives, and the
+# statement of the ROM's BASIC that runs it (monitor/README.md)
 PROGRAM = 0x8000
-MONITOR_WORDS = 0x1800
+MON_VARS = 0x1000
 RUN_COMMAND = b"SYS 0x8000\r"
 
 
 def in_screen(addr: int) -> bool:
     """Whether addr is in the screen that both boards have."""
     return SCREEN_BASE <= addr < SCREEN_BASE + SCREEN_WORDS
+
+
+def basic_image(words: Words) -> dict[int, int]:
+    """The words of words in BASIC's half of the ROM, by address."""
+    return {a: w for a, w in words if basic_rom.BASE <= a < basic_rom.END}
+
+
+def vars_words(link: Link, words: Words) -> int:
+    """The words of the variables at the top of the RAM under the monitor:
+    the monitor's, and BASIC's RAM, as the header of the BASIC in words
+    says, or else of the BASIC in the ROM, which the link reads with the
+    ROM shown and the core held."""
+    image = basic_image(words)
+    if basic_rom.H_MAGIC not in image:
+        first = basic_rom.H_MAGIC
+        image = dict(zip(range(first, basic_rom.H_RAM + 1),
+                         link.read(first, basic_rom.H_RAM + 1 - first)))
+    return MON_VARS + basic_rom.ram_words(image)
+
+
+def keep_basic(words: Words) -> Words:
+    """words, with "keep" set in the BASIC among them, if any, and its
+    checksum again, so that the monitor does not replace it with a card's
+    (doc/BASIC_ROM.md, "The tools")."""
+    image = basic_image(words)
+    if image.get(basic_rom.H_MAGIC) != basic_rom.MAGIC:
+        return words
+    basic_rom.set_keep(image)
+    return [(a, image.get(a, w)) for a, w in words]
 
 
 def check_fit(link: Link, words: Words, monitor: bool) -> None:
@@ -87,7 +134,7 @@ def check_fit(link: Link, words: Words, monitor: bool) -> None:
     ram = link.read_word(RAM_SIZE)
     if not ram:
         return
-    end = ram - MONITOR_WORDS if monitor else ram
+    end = ram - vars_words(link, words) if monitor else ram
     high = [a for a, _ in words if a >= end and not in_screen(a)]
     if high:
         what = (f"the program's RAM under the monitor, {PROGRAM:x} to "
@@ -150,8 +197,10 @@ def load_words(link: Link, words: Words, rom: bool = False,
     A link of version 3 or older takes the write of the enable bits too, as
     a reserved word. With rom, the ROM stays visible, and a bitstream
     without one, which reads bit 3 as 1, is refused: the clear leaves the
-    ROM alone, so its program boots cold at the start."""
+    ROM alone, so its program boots cold at the start. A BASIC among the
+    words, of a ROM image loaded at 0, gets "keep" (keep_basic)."""
     if not rom:
+        words = keep_basic(words)
         nicebin.load_words(link, words,
                            lambda link, words: check_fit(link, words, monitor))
         return
@@ -163,6 +212,45 @@ def load_words(link: Link, words: Words, rom: bool = False,
     check_fit(link, words, monitor)
     link.write(BRK_EN, [0])
     nicebin.write_words(link, words)
+
+
+def read_basic(path: str) -> dict[int, int]:
+    """An image of BASIC, checked as basic_rom.py check checks it."""
+    try:
+        image = basic_rom.read_image(path)
+        basic_rom.check(image)
+    except (basic_rom.ImageError, ValueError) as e:
+        fail(f"{path}: {e}")
+    return image
+
+
+def load_basic(link: Link, image: dict[int, int], keep: bool = True) -> None:
+    """Holds the core, clears the memory, and writes the image into BASIC's
+    half of the ROM, shown, with "keep" set, or as it is when keep is False,
+    and 0 in every word of the half that it does not fill, and reads the
+    half back. A bitstream without a ROM, or whose ROM takes no writes, is
+    refused. start(link, rom=True) then boots the monitor with it."""
+    image = dict(image)
+    if keep:
+        basic_rom.set_keep(image)
+    link.control(HOLD | CLEAR)
+    if link.read_word(CONTROL) & RAM:
+        fail("no ROM, so no BASIC to replace, as in a bitstream built "
+             "without one or in niceemu")
+    words = [image.get(a, 0) for a in range(basic_rom.BASE, basic_rom.END)]
+    nicebin.write_words(link, list(zip(range(basic_rom.BASE, basic_rom.END),
+                                       words)))
+    if read_half(link) != words:
+        fail("BASIC's half of the ROM did not keep the words written: the "
+             "bitstream is older than V2.3.1, whose ROM takes no writes")
+
+
+def read_half(link: Link) -> list[int]:
+    """The words of BASIC's half of the ROM, shown, with the core held."""
+    out: list[int] = []
+    for a in range(basic_rom.BASE, basic_rom.END, 1024):
+        out += link.read(a, 1024)
+    return out
 
 
 def start(link: Link, rom: bool = False) -> None:
@@ -197,10 +285,30 @@ def main() -> None:
     parser.add_argument("--no-run", action="store_true",
                         help="leave the core held in reset after loading")
     add_monitor_arguments(parser)
+    parser.add_argument("--basic", action="store_true",
+                        help="FILE is an image of BASIC, for BASIC's half "
+                        "of the ROM, with \"keep\" set")
     parser.add_argument("file",
                         help="a .bin file: one 'address word' hex pair per line")
     args = parser.parse_args()
 
+    if args.basic:
+        if args.monitor:
+            parser.error("--basic and --monitor do not go together")
+        image = read_basic(args.file)
+        link = open_link(args)
+        try:
+            load_basic(link, image)
+            print(f"load.py: wrote BASIC {basic_rom.text(image)} from "
+                  f"{args.file} into the ROM, {len(image)} words, with "
+                  f"\"keep\", and read it back")
+            if not args.no_run:
+                start(link, rom=True)
+                print("load.py: started the core, with the ROM")
+        except LinkError as e:
+            fail(str(e))
+        link.close()
+        return
     words = program_words(parser, args)
     in_rom = args.monitor and not args.rom
     link = open_link(args)

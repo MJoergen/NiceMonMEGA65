@@ -1027,6 +1027,19 @@ that only counts shows. A card without `NICE` is NOT COVERED there, as
 On the R3, slot 1 has no card detect, so it is always tried, and fails
 without a card.
 
+Then it tests BASIC's half of the ROM, `0x4000`–`0x7FFF`
+([doc/BASIC_ROM.md](doc/BASIC_ROM.md)): a link's write must stick there,
+and not in the monitor's half. When the monitor loaded a card's
+`BASIC*.ROM` after the configuration, which its line before the banner
+says, the ROM must hold that file's words, as the script reads the file
+from the card, and the banner must show its version. Without such a
+file, or with `--no-program`, that is NOT COVERED. Then it puts the
+BASIC that it found into the ROM again, with the version text `HWT` and
+"keep", as `load.py --basic` does, and the banner must show `HWT`; then
+the BASIC found goes back as it was. To cover the load from a card,
+copy `basic/build/basic.rom` to the card as `BASIC-T.ROM` with
+`make sdcard CMD="put basic/build/basic.rom BASIC-T.ROM"` first.
+
 With `ETH=IP`, as in `make hwtest PORT=/dev/ttyUSB1 ETH=192.168.1.65`, and the board's
 Ethernet port on this computer's network, it tests the Ethernet station
 after all the other checks, which its failures do not stop. It loads

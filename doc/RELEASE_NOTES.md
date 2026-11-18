@@ -87,6 +87,14 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   V2.3.1`. The size of BASIC's RAM is in its header, from which the
   monitor takes SP and the end of a program's RAM
   ([#153](https://github.com/MJoergen/NiceMonMEGA65/issues/153)).
+- `load.py --basic FILE` puts an image of BASIC into the ROM over the
+  link, until the next configuration, and `make load ARGS=--basic`
+  passes it on. `load.py` and `run.py` set "keep" in a ROM image that
+  they load at 0, so that its monitor does not load a card's BASIC in
+  its place, and take the end of a program's RAM from BASIC's header.
+  `make hwtest` checks BASIC's half of the ROM, and the load from a
+  card after the configuration
+  ([#153](https://github.com/MJoergen/NiceMonMEGA65/issues/153)).
 
 **Changes.**
 

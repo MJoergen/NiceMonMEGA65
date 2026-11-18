@@ -4,7 +4,8 @@ The design of issue
 [#153](https://github.com/MJoergen/NiceMonMEGA65/issues/153): at the
 start, the monitor replaces BASIC's half of the ROM with a file from
 the SD card. **This is a draft. Of its [Stages](#stages), the first
-three, the header, the RTL, and the monitor, are written. The
+four, the header, the RTL, the monitor, and the tools, are written,
+but for the tools' run on a board. The
 decisions of 2026-11-18 are in [Decisions](#decisions), with those
 that a review against the code changed the same day, and only the
 details of [Open questions](#open-questions) are open.**
@@ -561,6 +562,12 @@ One is open:
    the card's reads, and the copy and the zeroing 3 ms more.
 4. **The tools.** `load.py --basic`, "keep" in the images that the
    tools load, `make hwtest`, the README, and `basic/README.md`.
+   Written: `load.py --basic` and "keep" in a ROM image that `load.py`
+   or `run.py` loads at 0, and the end of a program's RAM from the
+   header; `make linktest` checks "keep" and the refusal of `--basic`
+   on `niceemu`. `make hwtest` checks BASIC's half, the load after the
+   configuration against the card's file, a test image, and the BASIC
+   found put back. It has not run on a board yet.
 5. **The release.** `V2.3.1`, with `BASIC-V2.3.1.ROM` as an asset. A
    point release of BASIC alone in `release.py` and `doc/RELEASE.md`
    comes with `V2.3.2`.
