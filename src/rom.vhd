@@ -1,15 +1,20 @@
 -- The ROM: 2^G_ADDR_BITS words of 32 bits, in block RAM, with a 64-bit read
--- port A for the instruction bus and a 32-bit read port B for the data bus.
--- It holds the program that the core boots from (the monitor in a
--- release), at the bottom of the address space, as the ROM of
--- QNICE-FPGA does.
+-- port A for the instruction bus and a 32-bit port B for the data bus,
+-- which reads and writes. It holds the program that the core boots from
+-- (the monitor and BASIC in a release), at the bottom of the address
+-- space, as the ROM of QNICE-FPGA does. src/mem.vhd decides which writes
+-- reach it: those to BASIC's half, until it is locked (issue #153).
 --
 -- THEORY OF OPERATION
 -- Port A takes a pair address a and reads the aligned pair of words 2a and
 -- 2a + 1, word 2a in bits 31..0, as src/ram.vhd does. The words are kept
 -- in two banks, the even words and the odd ones, and port B reads the bank
 -- that bit 0 of its address selects. Each port reads in the cycle after
--- the address is given, as block RAM does. The words come from G_INIT_FILE,
+-- the address is given, as block RAM does. A write on port B, with a byte
+-- enable for each of b_we_i's bits, goes to the bank of bit 0 of its
+-- address; a read on port B in the cycle of a write returns the word
+-- before it, and port A, at the address that is written, may read either
+-- word. The words at configuration come from G_INIT_FILE,
 -- a .bin file (ISA.md §10.4): one line per word, an 8-digit hex address, a
 -- space, and the 8-digit hex word.
 -- A word at an address beyond the ROM is an error, so that a monitor that
@@ -31,13 +36,15 @@ entity rom is
       G_INIT_FILE : string
    );
    port (
-      clk_i    : in  std_logic;
+      clk_i     : in  std_logic;
 
-      a_addr_i : in  std_logic_vector(G_ADDR_BITS - 2 downto 0);
-      a_data_o : out std_logic_vector(63 downto 0);
+      a_addr_i  : in  std_logic_vector(G_ADDR_BITS - 2 downto 0);
+      a_data_o  : out std_logic_vector(63 downto 0);
 
-      b_addr_i : in  std_logic_vector(G_ADDR_BITS - 1 downto 0);
-      b_data_o : out std_logic_vector(31 downto 0)
+      b_addr_i  : in  std_logic_vector(G_ADDR_BITS - 1 downto 0);
+      b_we_i    : in  std_logic_vector(3 downto 0);
+      b_wdata_i : in  std_logic_vector(31 downto 0);
+      b_data_o  : out std_logic_vector(31 downto 0)
    );
 end entity rom;
 
@@ -76,9 +83,9 @@ architecture synthesis of rom is
    signal mem_even : t_mem := load(G_INIT_FILE, '0');
    signal mem_odd  : t_mem := load(G_INIT_FILE, '1');
 
-   attribute rom_style : string;
-   attribute rom_style of mem_even : signal is "block";
-   attribute rom_style of mem_odd  : signal is "block";
+   attribute ram_style : string;
+   attribute ram_style of mem_even : signal is "block";
+   attribute ram_style of mem_odd  : signal is "block";
 
    -- The reads of each bank by each port, and the bank that port B reads.
    -- Each read is a register of its own, so that Vivado maps each bank to
@@ -109,6 +116,13 @@ begin
    begin
       if rising_edge(clk_i) then
          b_even <= mem_even(to_integer(b_addr_i(G_ADDR_BITS - 1 downto 1)));
+
+         for i in 0 to 3 loop
+            if b_we_i(i) = '1' and b_addr_i(0) = '0' then
+               mem_even(to_integer(b_addr_i(G_ADDR_BITS - 1 downto 1)))(8 * i + 7 downto 8 * i) <= b_wdata_i(8 * i + 7 downto 8 * i);
+            end if;
+         end loop;
+
       end if;
    end process p_b_even;
 
@@ -116,6 +130,13 @@ begin
    begin
       if rising_edge(clk_i) then
          b_odd <= mem_odd(to_integer(b_addr_i(G_ADDR_BITS - 1 downto 1)));
+
+         for i in 0 to 3 loop
+            if b_we_i(i) = '1' and b_addr_i(0) = '1' then
+               mem_odd(to_integer(b_addr_i(G_ADDR_BITS - 1 downto 1)))(8 * i + 7 downto 8 * i) <= b_wdata_i(8 * i + 7 downto 8 * i);
+            end if;
+         end loop;
+
       end if;
    end process p_b_odd;
 

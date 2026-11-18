@@ -3,8 +3,8 @@
 The design of issue
 [#153](https://github.com/MJoergen/NiceMonMEGA65/issues/153): at the
 start, the monitor replaces BASIC's half of the ROM with a file from
-the SD card. **This is a draft. Of its [Stages](#stages), the first,
-the header, is written, and nothing else. The
+the SD card. **This is a draft. Of its [Stages](#stages), the first
+two, the header and the RTL, are written, and nothing else. The
 decisions of 2026-11-18 are in [Decisions](#decisions), with those
 that a review against the code changed the same day, and only the
 details of [Open questions](#open-questions) are open.**
@@ -532,7 +532,12 @@ stages are written:
    and the new cases of `mem.vhd`, with its input for the link's
    requests, `tb_nicemon`, `formal/mem.sby`, `synth/rompatch.tcl`,
    `doc/SYSTEM.md`, `doc/DEBUG_LINK.md`, `doc/EMULATOR.md`, and a new
-   bitstream with its timing.
+   bitstream with its timing. Written: `mem.vhd`'s `rom_wr_o` tells
+   `nicemon` of a write to the ROM, which then takes no request in the
+   next cycle, whose port B the write has. The R6 met timing with the
+   default flow, +0.146 ns, with 244 RAMB36 as before; the ROM's block
+   RAMs are named `mem_even_reg_*` and `mem_odd_reg_*` now, which
+   `rompatch.tcl` finds, and `make r6 ROMPATCH=` works.
 3. **The monitor.** The loader of [The cold start](#the-cold-start),
    with the lock's write; SP and `bin_line`'s end from the header;
    and table 1.7, with the entries 37 to 40, their stubs in `mon.nasm`

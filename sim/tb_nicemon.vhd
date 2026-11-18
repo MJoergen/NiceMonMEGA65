@@ -30,7 +30,11 @@
 --    is in the RAM, at the top of the memory, for a push to the ROM is lost.
 --    The ROM is at 0, read only, with the RAM above it; bit 3 of the
 --    control register hides it, and shows it again; and the core boots from
---    it again when it is started with the ROM shown. From then on the ROM
+--    it again when it is started with the ROM shown. BASIC's half,
+--    0x400-0x7FF, took the core's write before the core's write to the
+--    monitor's half, the lock, and drops it after (rom.nasm), takes the
+--    link's after it, also through a byte window, and stays locked
+--    through a start and a reset. From then on the ROM
 --    is hidden, as the tools hide it, so the RAM is at 0 as in the
 --    emulator. The version register reads 8, and the free space 16, the
 --    whole FIFO. The network station at 0xFFFFFFB0 has its addresses after
@@ -919,6 +923,18 @@ begin
       check("00000000", first_v);            -- the ROM
       wr("00000000", "12345678");            -- dropped
       check("00000000", first_v);
+      -- BASIC's half, 0x400-0x7FF: the core's write before the lock went
+      -- to the ROM, and read back right behind it, and the one after it
+      -- was dropped (rom.nasm); the link's go to the ROM after the lock,
+      -- also through a byte window
+      check("00000900", "00000001");
+      check("00000901", "5A5A0000");
+      check("000007FF", "00000001");
+      check("000007FE", "5A5A0000");
+      wr("000007FE", "11223344");
+      check("000007FE", "11223344");
+      wr("20001FF9", "000000EE");            -- byte 1 of 0x7FE
+      check("000007FE", "1122EE44");
       check("00000800", "00000000");         -- the RAM above the ROM
       wr("00000800", "12345678");
       check("00000800", "12345678");
@@ -927,12 +943,18 @@ begin
       check("00000000", "00000000");         -- the RAM under the ROM
       wr("00000000", "ABCD1234");
       check("00000000", "ABCD1234");
+      wr("000007FE", "CAFEBABE");            -- the RAM under BASIC's half
+      check("000007FE", "CAFEBABE");
       wr("FFFFFFF0", "00000001");            -- the ROM shown again
       check("00000000", first_v);
+      check("000007FE", "1122EE44");
       wr("FFFFFFF0", "00000000");            -- the core boots from it again
       expect_con("Hello from the ROM!" & C_LF);
       expect_halt("01");
       check("FFFFFFF0", "00000002");
+      check("00000900", "00000001");         -- the lock stays closed after a start:
+      check("00000901", "1122EE44");         -- both of the core's writes were dropped
+      check("000007FF", "00000001");
       check("FFFFFFB0", "C0A80141");         -- the start keeps the station's addresses
       check("FFFFFFB2", "4E494301");
       wr("FFFFFFF0", "00000009");            -- hidden from here on
@@ -1692,6 +1714,8 @@ begin
       expect_con("Hello from the ROM!" & C_LF);
       expect_halt("01");
       check("FFFFFFF0", "00000002");
+      check("000007FF", "00000001");         -- a reset keeps the ROM's lock closed
+      check("00000901", "1122EE44");
       check("FFFFFF81", "00000000");         -- the screen's registers
       check("FFFFFF85", "00000000");
       check("FFFFFF86", "00000000");

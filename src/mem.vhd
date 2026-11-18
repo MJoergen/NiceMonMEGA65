@@ -22,7 +22,18 @@
 -- Port B takes the request that nicemon takes in this cycle, when it is to
 -- memory (stb_i), and its address, which nicemon drives in every cycle.
 -- A write goes to the screen or to the RAM, unless it is to the ROM while
--- the ROM is shown, where it is dropped. A read returns the word of the
+-- the ROM is shown. There it goes to the ROM when it is to BASIC's half,
+-- the upper half of the ROM, by the link (link_i), or by the core while
+-- the lock is open; else it is dropped. A write by the core to the
+-- monitor's half, the lower half, closes the lock, which nothing opens
+-- again but a configuration of the FPGA: not a reset, a start, or a
+-- clear (issue #153, doc/BASIC_ROM.md). A fetch does not close it, as
+-- the core fetches ahead of what it runs. The write to the ROM is
+-- registered, and reaches the ROM's port B in the next cycle, which keeps
+-- the ROM's block RAMs off the core's store paths. rom_wr_o says, in the
+-- cycle of the request, that it is such a write, and nicemon then takes
+-- no request in the next cycle, whose port B the write has. A read
+-- after it returns the word written. A read returns the word of the
 -- memory of its address on rdata_o, in the next cycle. For the core's
 -- path from the RAM, which has the least slack at 100 MHz, the words of
 -- the three memories also come out on their own, on rdata_ram_o,
@@ -59,7 +70,9 @@
 --
 -- With G_FORMAL, it states the properties that formal/mem.sby proves: each
 -- write reaches the memory of its address, and no other, in the bytes of
--- its window, the clear writes
+-- its window, a write reaches the ROM a cycle late, and only BASIC's half,
+-- the lock closes only by the core's write to the monitor's half, and
+-- never opens, the clear writes
 -- 0 to every word, a read returns the word of the memory of its address,
 -- and each fetch is acknowledged once.
 --
@@ -91,6 +104,11 @@ entity mem is
       -- Bit 3 of the link's control register: the ROM is hidden, and the
       -- RAM is at 0
       rom_hidden_i : in  std_logic;
+      -- The request on port B is the link's, not the core's
+      link_i       : in  std_logic;
+      -- The request writes the ROM, in the next cycle, which takes no
+      -- request then
+      rom_wr_o     : out std_logic;
       -- Port A: the core's instruction bus, with the pair address
       core_rst_i   : in  std_logic;
       ibus_cyc_i   : in  std_logic;
@@ -292,9 +310,21 @@ architecture synthesis of mem is
    signal ram_b_wdata : std_logic_vector(31 downto 0);
    signal ram_b_rdata : std_logic_vector(31 downto 0);
 
-   -- The ROM, read at the addresses of the RAM's ports
+   -- The ROM, read at the addresses of the RAM's ports, but for port B in
+   -- the cycle of a write, which has its own
    signal rom_a_data : std_logic_vector(63 downto 0);
    signal rom_b_data : std_logic_vector(31 downto 0);
+   signal rom_b_addr : std_logic_vector(G_ROM_ADDR_BITS - 1 downto 0);
+
+   -- The lock of BASIC's half, which only a configuration opens; the
+   -- request that writes BASIC's half, and the one that closes the lock;
+   -- and the write, a cycle late: the bytes, the address, and the word
+   signal rom_lock  : std_logic := '0';
+   signal rom_wr    : std_logic;
+   signal rom_close : std_logic;
+   signal rom_we    : std_logic_vector(3 downto 0) := "0000";
+   signal rom_waddr : std_logic_vector(G_ROM_ADDR_BITS - 1 downto 0);
+   signal rom_wdata : std_logic_vector(31 downto 0);
 
    -- The screen, like the RAM, written with ram_b_wdata
    signal scr_a_data  : std_logic_vector(63 downto 0);
@@ -413,6 +443,39 @@ begin
       "010" when MEM_ROM,
       "100" when MEM_SCR;
 
+   ---------------------------------------------------------------------------
+   -- The writes to the ROM and the lock
+   ---------------------------------------------------------------------------
+
+   rom_wr    <= '1' when stb_i = '1' and we_i = '1' and clearing = '0' and
+                         mem_of(b_word, rom_hidden_i) = MEM_ROM and
+                         b_word(G_ROM_ADDR_BITS - 1) = '1' and
+                         (link_i = '1' or rom_lock = '0') else
+                '0';
+   rom_close <= '1' when stb_i = '1' and we_i = '1' and clearing = '0' and link_i = '0' and
+                         mem_of(b_word, rom_hidden_i) = MEM_ROM and
+                         b_word(G_ROM_ADDR_BITS - 1) = '0' else
+                '0';
+   rom_wr_o  <= rom_wr;
+
+   p_rom_wr : process (clk_i)
+   begin
+      if rising_edge(clk_i) then
+         rom_we    <= "0000";
+         if rom_wr = '1' then
+            rom_we <= lanes_of(b_win, addr_i(1 downto 0));
+         end if;
+         rom_waddr <= b_word(G_ROM_ADDR_BITS - 1 downto 0);
+         rom_wdata <= lane_data(b_win, wdata_i);
+         if rom_close = '1' then
+            rom_lock <= '1';
+         end if;
+      end if;
+   end process p_rom_wr;
+
+   rom_b_addr <= rom_waddr when rom_we /= "0000" else
+                 ram_b_addr(G_ROM_ADDR_BITS - 1 downto 0);
+
    rdata_ram_o <= ram_b_rdata;
    rdata_rom_o <= rom_b_data;
    rdata_scr_o <= scr_b_rdata;
@@ -459,11 +522,13 @@ begin
             G_INIT_FILE => G_ROM_FILE
          )
          port map (
-            clk_i    => clk_i,
-            a_addr_i => ram_a_addr(G_ROM_ADDR_BITS - 2 downto 0),
-            a_data_o => rom_a_data,
-            b_addr_i => ram_b_addr(G_ROM_ADDR_BITS - 1 downto 0),
-            b_data_o => rom_b_data
+            clk_i     => clk_i,
+            a_addr_i  => ram_a_addr(G_ROM_ADDR_BITS - 2 downto 0),
+            a_data_o  => rom_a_data,
+            b_addr_i  => rom_b_addr,
+            b_we_i    => rom_we,
+            b_wdata_i => rom_wdata,
+            b_data_o  => rom_b_data
          ); -- i_rom
 
    end generate gen_rom;
@@ -507,7 +572,16 @@ begin
       signal f_ifull : std_logic;
       -- The last cycle of a clear
       signal f_last : std_logic;
+      -- What a write of this request would write to the ROM: its bytes,
+      -- and its word in them
+      signal f_lanes : std_logic_vector(3 downto 0);
+      signal f_ldata : std_logic_vector(31 downto 0);
+      signal f_upper : std_logic;
    begin
+
+      f_lanes <= lanes_of(b_win, addr_i(1 downto 0));
+      f_ldata <= lane_data(b_win, wdata_i);
+      f_upper <= b_word(G_ROM_ADDR_BITS - 1);
 
       f_mem   <= mem_of(b_word, rom_hidden_i);
       f_imem  <= mem_of(ibus_word, rom_hidden_i);
@@ -534,6 +608,32 @@ begin
       -- psl f_rom_we : assert always
       --    clearing = '0' and ram_b_we /= 0 ->
       --    rom_hidden_i = '1' or or(ram_b_addr(G_RAM_ADDR_BITS - 1 downto G_ROM_ADDR_BITS)) = '1';
+
+      -- A write reaches the ROM in the cycle after its request, at the word
+      -- and in the bytes of its window, when it is to BASIC's half with the
+      -- ROM shown, and by the link or while the lock is open; else nothing
+      -- reaches the ROM. Port B of the ROM then has the write's address.
+      -- psl f_rom_write : assert always
+      --    {rom_wr} |=>
+      --    {rom_we = prev(f_lanes) and rom_wdata = prev(f_ldata) and
+      --     rom_waddr = prev(b_word(G_ROM_ADDR_BITS - 1 downto 0))};
+      -- psl f_rom_no_write : assert always {not rom_wr} |=> {rom_we = 0};
+      -- psl f_rom_wr : assert always
+      --    rom_wr = '1' <->
+      --    (stb_i = '1' and we_i = '1' and clearing = '0' and f_mem = MEM_ROM and f_upper = '1' and
+      --     (link_i = '1' or rom_lock = '0'));
+      -- psl f_rom_half : assert always rom_we /= 0 -> rom_b_addr(G_ROM_ADDR_BITS - 1) = '1';
+      -- psl f_rom_addr : assert always rom_we /= 0 -> rom_b_addr = rom_waddr;
+
+      -- The lock never opens, and closes only with a write by the core to
+      -- the monitor's half with the ROM shown, which a fetch is not.
+      -- psl f_lock_stays : assert always {rom_lock} |=> {rom_lock};
+      -- psl f_lock_close : assert always {not rom_lock} |=> {rom_lock = prev(rom_close)};
+      -- psl f_rom_close : assert always
+      --    rom_close = '1' <->
+      --    (stb_i = '1' and we_i = '1' and clearing = '0' and link_i = '0' and
+      --     f_mem = MEM_ROM and f_upper = '0');
+      -- psl c_lock : cover {rom_wr and not link_i and not rst_i; true[*]; rom_lock; rom_wr and link_i};
 
       -- The clear writes 0 to both memories at clr_addr, which counts from
       -- 0 through every address, and then ends, with clear_done_o for a

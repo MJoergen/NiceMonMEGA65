@@ -1,16 +1,19 @@
 -- The memory of the NiceMon system (src/mem.vhd), with its properties, for
 -- SymbiYosys. The inputs are free but for what nicemon promises: a clear
 -- starts only while none runs or ends, and meets no request (f_clr_alone
--- of src/nicemon.vhd), and no request is taken while the memory is
--- cleared. The RAM has 16 words, the ROM 4, formal/rom.bin, and the screen
+-- of src/nicemon.vhd), no request is taken while the memory is
+-- cleared, and none in the cycle after a write to the ROM. The RAM has 16 words, the ROM 4, formal/rom.bin, and the screen
 -- 8, so that a clear takes 16 cycles; the properties do not depend on the
 -- sizes. The RAM starts with any words, as in formal/nicemon.sby.
 --
 -- With G_MODEL, it also checks the words read against a model: one word of
 -- the RAM and one of the screen, each at an address that the solver picks,
--- and the words of rom.bin. A read of a model's word returns the word last
--- written there, or 0 after a clear, through port B and port A alike, a
--- read of the ROM while it is shown returns the ROM's word, a fetch in
+-- and the ROM, with the words of rom.bin. A read of a model's word returns
+-- the word last written there, or 0 after a clear, through port B and port
+-- A alike, a read of the ROM while it is shown returns the ROM's word, of
+-- rom.bin in the lower half, and in the upper half, BASIC's, the word last
+-- written there by the link, or by the core before its write to the lower
+-- half, the lock; a fetch in
 -- the I/O page returns 0, and a clear ends in 16 cycles. The byte windows
 -- of nice_cpu's DEVICES.md §9 reach the model's words too: a write changes
 -- the byte or the halfword of its window, and a read returns it, zero- or
@@ -33,6 +36,7 @@ entity formal_mem is
       clk_i        : in  std_logic;
       rst_i        : in  std_logic;
       rom_hidden_i : in  std_logic;
+      link_i       : in  std_logic;
       core_rst_i   : in  std_logic;
       ibus_cyc_i   : in  std_logic;
       ibus_stb_i   : in  std_logic;
@@ -56,6 +60,7 @@ architecture synthesis of formal_mem is
    signal rdata_win  : std_logic_vector(31 downto 0);
    signal clearing   : std_logic;
    signal clear_done : std_logic;
+   signal rom_wr     : std_logic;
 
 begin
 
@@ -65,6 +70,7 @@ begin
    -- psl f_clear_req : assume always
    --    clear_i = '1' -> clearing = '0' and clear_done = '0' and stb_i = '0';
    -- psl f_req : assume always stb_i = '1' -> clearing = '0';
+   -- psl f_rom_wait : assume always {rom_wr} |=> {not stb_i};
 
 
    i_mem : entity work.mem
@@ -79,6 +85,8 @@ begin
          clk_i        => clk_i,
          rst_i        => rst_i,
          rom_hidden_i => rom_hidden_i,
+         link_i       => link_i,
+         rom_wr_o     => rom_wr,
          core_rst_i   => core_rst_i,
          ibus_cyc_i   => ibus_cyc_i,
          ibus_stb_i   => ibus_stb_i,
@@ -104,6 +112,12 @@ begin
       -- The words of rom.bin
       type     t_rom is array (0 to 2 ** C_ROM_BITS - 1) of std_logic_vector(31 downto 0);
       constant C_ROM : t_rom := (X"A0000001", X"B0000002", X"C0000003", X"D0000004");
+
+      -- The ROM's words, and the lock of its upper half, BASIC's, and a
+      -- write to the ROM in the cycle before, which reaches it in this one
+      signal f_rom    : t_rom     := C_ROM;
+      signal f_lock   : std_logic := '0';
+      signal f_rom_wr : std_logic := '0';
 
       -- Where an address lands, decided here apart from mem.vhd
       type t_where is (W_RAM, W_ROM, W_SCR);
@@ -267,6 +281,7 @@ begin
             f_a_io  <= '0';
             f_win_wr <= '0';
             f_win_rd <= '0';
+            f_rom_wr <= rom_wr;
 
             -- A clear makes the words unknown until it ends, and then 0. A
             -- write in the cycle that it ends comes after it.
@@ -328,7 +343,14 @@ begin
                      if we_i = '0' then
                         f_b_chk  <= '1';
                         f_b_word <= read(window(addr_i), addr_i,
-                                         C_ROM(to_integer(word(addr_i)(C_ROM_BITS - 1 downto 0))));
+                                         f_rom(to_integer(word(addr_i)(C_ROM_BITS - 1 downto 0))));
+                     elsif word(addr_i)(C_ROM_BITS - 1) = '0' then
+                        if link_i = '0' then
+                           f_lock <= '1';
+                        end if;
+                     elsif link_i = '1' or f_lock = '0' then
+                        f_rom(to_integer(word(addr_i)(C_ROM_BITS - 1 downto 0))) <= written(window(addr_i), addr_i,
+                                                                                            f_rom(to_integer(word(addr_i)(C_ROM_BITS - 1 downto 0))), wdata_i);
                      end if;
                end case;
 
@@ -355,9 +377,11 @@ begin
                      end if;
 
                   when W_ROM =>
-                     f_a_rom  <= '1';
-                     f_a_pair <= C_ROM(to_integer(f_ibus_word(C_ROM_BITS - 1 downto 1) & '1')) &
-                                 C_ROM(to_integer(f_ibus_word(C_ROM_BITS - 1 downto 0)));
+                     -- A fetch in the cycle that a write reaches the ROM may
+                     -- read either word
+                     f_a_rom  <= not f_rom_wr;
+                     f_a_pair <= f_rom(to_integer(f_ibus_word(C_ROM_BITS - 1 downto 1) & '1')) &
+                                 f_rom(to_integer(f_ibus_word(C_ROM_BITS - 1 downto 0)));
                end case;
 
             end if;
@@ -377,6 +401,11 @@ begin
       -- A byte written to the model's word of the RAM through window 2,
       -- and a checked read of it through window 5 later
       -- psl c_model_win : cover {f_win_wr; f_win_rd[->1]};
+      -- A word of BASIC's half written by the core, the lock, and a read
+      -- of a word that the link wrote there after it
+      -- psl c_model_rom : cover
+      --    {f_lock = '0' and rom_wr = '1' and link_i = '0' and rst_i = '0'; true[*]; f_lock = '1';
+      --     true[*]; rom_wr = '1' and link_i = '1'; true[*]; f_b_chk = '1' and f_lock = '1'};
    end generate gen_model;
 
 end architecture synthesis;

@@ -55,7 +55,13 @@
 --                          (src/rom.vhd), which the core boots from, as
 --                          QNICE-FPGA's monitor is at 0x0000-0x7FFF.
 --                          It is in front of the RAM, and repeats with it. A
---                          write to it is dropped. Bit 3 of the link's
+--                          write to its lower half, the monitor's, is
+--                          dropped; one by the core closes the lock of the
+--                          upper half, BASIC's, until the FPGA is
+--                          configured again. A write to BASIC's half goes
+--                          to the ROM when it is the link's, or the core's
+--                          while the lock is open, and is dropped otherwise
+--                          (issue #153). Bit 3 of the link's
 --                          control register hides it, so that the RAM is at
 --                          0 as in the emulator, and a build without
 --                          G_ROM_FILE has no ROM.
@@ -718,7 +724,8 @@ architecture synthesis of nicemon is
 
    -- A core write to the UART that waits for the byte before it to go
    signal tx_wait : std_logic := '0';
-   -- tx_wait, fnt_rd, or win_rd, as one register for the stall of the buses
+   -- tx_wait, fnt_rd, win_rd, or a write to the ROM in the cycle before, as
+   -- one register for the stall of the buses
    signal bus_wait     : std_logic := '0';
    signal tx_wait_data : std_logic_vector(7 downto 0);
 
@@ -752,6 +759,7 @@ architecture synthesis of nicemon is
    -- The memory (src/mem.vhd): the request served, when it is to memory,
    -- and the word it reads
    signal mem_stb       : std_logic;
+   signal mem_rom_wr    : std_logic;
    signal mem_rdata     : std_logic_vector(31 downto 0);
    signal mem_rdata_win : std_logic_vector(31 downto 0);
    -- The memory that the request on the bus reaches, and the word of each
@@ -1133,7 +1141,8 @@ begin
          fnt_rd   <= fnt_rd_v;
          win_rd   <= win_rd_v;
          late_link <= late_link_v;
-         bus_wait <= tx_wait_v or fnt_rd_v or win_rd_v;
+         -- A write to the ROM has its port B in the next cycle (mem.vhd)
+         bus_wait <= tx_wait_v or fnt_rd_v or win_rd_v or mem_rom_wr;
       end if;
    end process p_dbus;
 
@@ -1259,6 +1268,8 @@ begin
          clk_i        => clk_i,
          rst_i        => rst_i,
          rom_hidden_i => rom_hidden,
+         link_i       => link_owns,
+         rom_wr_o     => mem_rom_wr,
          core_rst_i   => cpu_rst,
          ibus_cyc_i   => ibus_cyc,
          ibus_stb_i   => ibus_stb,

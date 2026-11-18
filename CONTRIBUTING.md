@@ -452,7 +452,12 @@ The testbenches are these:
 
 `tb_nicemon` boots the core from the ROM, and checks that the ROM is read
 only with the RAM above it, and that bit 3 of the control register hides
-it and shows it again. It checks its checksums against the examples of
+it and shows it again. Its ROM, `sim/rom.nasm`, runs a routine from
+BASIC's half, the upper half of the ROM, writes a word there and reads
+it back, writes the monitor's half, which locks BASIC's, and writes
+BASIC's half again, which is dropped. The testbench checks both, that
+the link's writes still reach BASIC's half, also through a byte window,
+and that the lock holds through a start and a reset (#153). It checks its checksums against the examples of
 DEBUG.md, and the board's `b` notice. With the ROM hidden, it loads the
 "Hello" program over the link and runs it. It checks the halt notice, the
 halt reason, and the step count, which must equal niceemu's, and that the
@@ -601,15 +606,20 @@ every time, not only the ones a testbench sends.
 - `mem.sby` proves the memory, `src/mem.vhd`, with 16 words of RAM, a ROM
   of 4 words, `formal/rom.bin`, and a screen of 8: a write reaches the
   memory of its address, or of the word its byte window reaches, in the
-  bytes of its window, and no other, and none while it is to the shown
-  ROM, a clear writes 0 to every word of the RAM and the screen, a read
+  bytes of its window, and no other, and none to the RAM while it is to
+  the shown ROM, a write reaches the ROM a cycle late when it is to the
+  upper half, BASIC's, and is the link's or comes before the lock, and no
+  write reaches the lower half, the lock closes with the core's write to
+  the lower half only, and never opens, a clear writes 0 to every word of
+  the RAM and the screen, a read
   returns the word of the memory of its address, or its window's byte or
   halfword, a fetch in the I/O page returns 0, and each fetch gets one
   ACK. Its `model` task proves, with PDR, that a read of a word of the RAM
   or the screen returns the word last written there, or 0 after a clear,
   on both ports, through the byte windows too, where a write changes only
   its byte or halfword and a read extends it, and a read of the shown ROM
-  returns its word, and a clear ends.
+  returns its word, of `rom.bin` or the word last written to the upper
+  half, and a clear ends.
 - `nicemon.sby` checks the whole system, with 16 words of RAM and
   a free core, `formal/nice_core_formal.vhd`. The free core does anything
   that either of nice_cpu's cores may do on its ports, as nice_cpu's own

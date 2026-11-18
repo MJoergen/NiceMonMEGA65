@@ -67,6 +67,11 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   the header and checks it. It is the first step of BASIC from a
   card's file
   ([#153](https://github.com/MJoergen/NiceMonMEGA65/issues/153)).
+- BASIC's half of the ROM, `0x4000`–`0x7FFF`, takes writes: the link's
+  always, with the ROM shown, and the core's until its first write to
+  the monitor's half, `0x0000`–`0x3FFF`, which locks it until the FPGA
+  is configured again. A write to the monitor's half is still dropped
+  ([#153](https://github.com/MJoergen/NiceMonMEGA65/issues/153)).
 
 **Changes.**
 
