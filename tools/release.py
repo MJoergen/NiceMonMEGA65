@@ -23,7 +23,8 @@ R6, the R3, and the Nexys4DDR, with the monitor in the ROM and from nothing,
 each with FLOW=timing alone, as their Makefiles have it. Each must meet
 timing. It makes the core files of the R3 and the R6, with the tag as
 their version, which MEGAFLASH shows. Last it runs make hwtest on the R6
-bitstream, or on the R3's with --board r3, so that MEGA65 must be on PORT, and with --eth IP its Ethernet port on this computer's network. It copies the bitstreams, the core files, the demo, demo.bin, the weather display, weather.bin, a zip of the examples, and
+bitstream, or on the R3's with --board r3, so that MEGA65 must be on PORT, and with --eth IP its Ethernet port on this computer's network. It copies the bitstreams, the core files, BASIC's image for a card,
+BASIC-V1.0.ROM, the demo, demo.bin, the weather display, weather.bin, a zip of the examples, and
 verified.json to build/release/V1.0, with notes.md, the release notes, and
 release.json, the commit they were built from. The notes start with the
 tag's section of doc/RELEASE_NOTES.md, whose heading must have the date,
@@ -48,6 +49,7 @@ import shutil
 import subprocess
 import sys
 
+import basic_rom
 from bump import (TAG, VERIFIED, Failed, Record, badge, read_reports, run, check_tree,
                   tag_commit)
 
@@ -76,6 +78,9 @@ FLOW = "timing"
 ROM = os.path.join(REPO, "build", "rom.bin")
 DEMO = os.path.join(REPO, "demo", "build", "demo.bin")
 WEATHER = os.path.join(REPO, "examples", "build", "weather.bin")
+# BASIC's image as a card's file (#153), an asset as BASIC-<tag>.ROM, which
+# the monitor of V2.3.1 and later loads from the folder NICE at power-up
+BASIC = os.path.join(REPO, "basic", "build", "basic.rom")
 
 
 def met(r: Record) -> bool:
@@ -205,7 +210,10 @@ def notes(tag: str, v: Record, results: dict[str, Record], body: str,
         "board revision alone.",
         "",
         "The core files and the bitstreams have the monitor of `monitor/` in",
-        "the ROM, whose BASIC shows `READY.` at power-up. `demo.bin` is the",
+        "the ROM, whose BASIC shows `READY.` at power-up. `BASIC-%s.ROM` is" % tag,
+        "that BASIC alone, for a MEGA65 with the core of `V2.3.1` or later:",
+        "copied into the folder `NICE` of an SD card, it runs at power-up in",
+        "place of the core's own BASIC (README.md, \"A new BASIC\"). `demo.bin` is the",
         "demo of `demo/`, a program for the monitor: copied into the folder",
         "`NICE` of an SD card, `LOAD \"DEMO.BIN\"` and `SYS 0x8000` run it, which",
         "shows a welcome screen, and then what is typed on the keyboard; F12",
@@ -224,6 +232,21 @@ def notes(tag: str, v: Record, results: dict[str, Record], body: str,
     return "\n".join(lines) + "\n"
 
 
+def check_basic(tag: str) -> None:
+    """BASIC's image for a card passes its checks, has the tag as its
+    version, and has no flag "keep", which only the tools set."""
+    try:
+        image = basic_rom.read_image(BASIC)
+        basic_rom.check(image)
+    except (OSError, basic_rom.ImageError) as e:
+        raise Failed("%s: %s" % (BASIC, e))
+    if basic_rom.text(image) != tag or \
+            image.get(basic_rom.H_VERSION) != basic_rom.version_number(tag):
+        raise Failed("%s has the version %s, not %s" % (BASIC, basic_rom.text(image), tag))
+    if image.get(basic_rom.H_FLAGS, 0):
+        raise Failed("%s has the flags %d, not 0" % (BASIC, image[basic_rom.H_FLAGS]))
+
+
 def stage(tag: str) -> tuple[Record, str, dict[str, Record], str]:
     nice = nice_tag(tag)
     check_tree()
@@ -237,6 +260,7 @@ def stage(tag: str) -> tuple[Record, str, dict[str, Record], str]:
     run(["make", "-C", "nice_cpu/emulator", "build"])
     run(["make", "examples"])
     run(["make", "rom", "VERSION=" + tag])
+    check_basic(tag)
     run(["make", "-C", "demo", "VERSION=" + tag])
     results: dict[str, Record] = {}
     for board, _ in BOARDS:
@@ -263,6 +287,9 @@ def write_stage(tag: str, v: Record, head: str, results: dict[str, Record],
         shutil.copy(os.path.join(REPO, "synth", board, "build", "NiceMonMEGA65-%s.cor" % board),
                     os.path.join(out, name))
         files.append(name)
+    name = "BASIC-%s.ROM" % tag
+    shutil.copy(BASIC, os.path.join(out, name))
+    files.append(name)
     for path in (DEMO, WEATHER):
         shutil.copy(path, out)
         files.append(os.path.basename(path))

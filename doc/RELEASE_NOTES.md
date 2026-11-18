@@ -97,6 +97,10 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   `make hwtest` checks BASIC's half of the ROM, and the load from a
   card after the configuration
   ([#153](https://github.com/MJoergen/NiceMonMEGA65/issues/153)).
+- A release has BASIC alone as a file of its own, `BASIC-V2.3.1.ROM`,
+  for the folder `NICE` of a card, which the MEGA65's core of this
+  release and later ones run at power-up in place of their own BASIC
+  ([#153](https://github.com/MJoergen/NiceMonMEGA65/issues/153)).
 
 **Changes.**
 

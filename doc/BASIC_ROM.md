@@ -4,8 +4,8 @@ The design of issue
 [#153](https://github.com/MJoergen/NiceMonMEGA65/issues/153): at the
 start, the monitor replaces BASIC's half of the ROM with a file from
 the SD card. **This is a draft. Of its [Stages](#stages), the first
-four, the header, the RTL, the monitor, and the tools, are written,
-but for the tools' run on a board. The
+all five are written, and the tools have run on the R6 and the
+Nexys4DDR; the release of `V2.3.1` is still to be made. The
 decisions of 2026-11-18 are in [Decisions](#decisions), with those
 that a review against the code changed the same day, and only the
 details of [Open questions](#open-questions) are open.**
@@ -572,7 +572,10 @@ One is open:
    header; `make linktest` checks "keep" and the refusal of `--basic`
    on `niceemu`. `make hwtest` checks BASIC's half, the load after the
    configuration against the card's file, a test image, and the BASIC
-   found put back. It has not run on a board yet.
+   found put back, and passed on the R6 and the Nexys4DDR.
 5. **The release.** `V2.3.1`, with `BASIC-V2.3.1.ROM` as an asset. A
    point release of BASIC alone in `release.py` and `doc/RELEASE.md`
-   comes with `V2.3.2`.
+   comes with `V2.3.2`. Written: `release.py` checks BASIC's image
+   for a card, its version the tag and no "keep", and stages it as
+   `BASIC-<tag>.ROM`; `doc/RELEASE.md` lists it. The release itself
+   is not made yet.

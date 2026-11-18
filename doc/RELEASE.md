@@ -38,6 +38,11 @@ and keep their names.
     of `monitor/` in the ROM, which shows the tag in its banner.
   - `nicemon-V1.0-r3.cor` and `nicemon-V1.0-r6.cor`, the MEGA65 core
     files for MEGAFLASH, with the version `V1.0`, and the same ROM.
+  - `BASIC-V1.0.ROM`, BASIC's image alone, as a file for a card: in
+    the folder `NICE`, a MEGA65 with a core of `V2.3.1` or later loads
+    it at power-up, in place of its own BASIC
+    ([BASIC_ROM.md](BASIC_ROM.md)). Its version is the tag, and it has
+    no flag "keep".
   - `demo.bin`, the demo of `demo/`, a program under the monitor,
     with the tag in its title bar.
   - `weather.bin`, the weather display of `examples/`, a program under
@@ -169,7 +174,8 @@ The core files have the version `V1.0.1`, which MEGAFLASH shows.
 
       gh release create V1.0 --verify-tag --title V1.0 \
          --notes-file build/release/V1.0/notes.md build/release/V1.0/*.bit \
-         build/release/V1.0/*.cor build/release/V1.0/demo.bin \
+         build/release/V1.0/*.cor build/release/V1.0/BASIC-V1.0.ROM \
+         build/release/V1.0/demo.bin \
          build/release/V1.0/weather.bin build/release/V1.0/examples-V1.0.zip \
          build/release/V1.0/verified.json
 
