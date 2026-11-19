@@ -398,7 +398,11 @@ bin_init
 ; its line, as niceemu rejects it, and the tokenizer fails it. The blanks
 ; after the line's limit, V_LLIM, are dropped, as niceemu ignores them,
 ; and the first other byte after it is kept as 0x7F at the limit, and
-; the rest dropped. V_LEND is the byte before. Uses R1-R6.
+; the rest dropped. V_LEND is the byte before. A listing of TFTP, when
+; V_TLIST is not 0, is shown and not parsed, so it has no 0x7F, which a
+; terminal on the line may take as a DEL: a byte that is no character is
+; dropped, and the line keeps one character at the limit, LINE_MAX + 1
+; in all, and no more. Uses R1-R6.
 bin_char
                 MOVE    R2, @V_LEND
                 MOVE    @V_LEND, R1
@@ -414,12 +418,18 @@ bin_char
         ?Z      MOVE    R1, 0x20
                 SUB     R2, R1, 0x20
                 CMP     R2, 0x5F
-        ?!C     MOVE    R1, 0x7F        ; no character: the line skipped
+        ?C      JMP     :+              ; a character
+                TST     @V_TLIST
+        ?!Z     RET                     ; none, of a listing: dropped
+                MOVE    R1, 0x7F        ; no character: the line skipped
+:
                 MOVE    R6, @V_LPOS
                 MOVE    R3, @V_LLIM
                 CMP     R6, R3
         ?C      JMP     :+              ; room
-        ?!Z     RET                     ; the 0x7F is there already
+        ?!Z     RET                     ; the limit's word is taken already
+                TST     @V_TLIST
+        ?!Z     JMP     :+              ; a listing: one more, as it is
                 CMP     R1, 0x20
         ?Z      RET                     ; a blank after LINE_MAX, dropped
                 MOVE    R1, 0x7F        ; more after LINE_MAX: skipped

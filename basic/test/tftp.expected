@@ -262,6 +262,9 @@ dir "10.0.0.2", "*.bin"
 demo.bin                      41022
 hello.bin                     13374
 a-long-name-of-a-program.bin          7
+blbr.bin                       12
+ctldel.bin                      3
+a-name-of-70-characters-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.bin 123456
 READY.
 halt
 Halted

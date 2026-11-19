@@ -112,7 +112,7 @@ fails, TAB does nothing.
 | `SAVE "NAME", A, N` | Writes `N` words from `A` to the file `NAME` of the card's folder `NICE` as a `.bin` file, a line of `ADDR WORD` in hex for each, and prints `Words saved: 600, 00008000 to 00008257`. A name with no extension gets `.BIN`: `SAVE "PROG", 0x8000, 600` writes `PROG.BIN`. It makes the file, or truncates it when it is there, and `LOAD` reads it back. When the card fills up, the file keeps what fitted, and `SAVE` prints error 30. SAVE writes only to the card: `SAVE "NAME", "IP"` says so. |
 | `DELETE "NAME"` | Deletes the file `NAME` of the card's folder `NICE`, its long name or its 8.3 name, as for `LOAD`, with its long-name entries, if it has them, and prints `Deleted NAME`. |
 | `LOAD "NAME", "IP"` | Loads the `.bin` file `NAME.BIN`, or the BASIC program `NAME.BAS`, from the TFTP server at the IP address `IP`, such as `LOAD "HELLO.BIN", "192.168.1.10"`, as `LOAD` loads one from the card, and prints the same summary for a `.bin` file ([The network](../monitor/README.md#the-network)). `"IP:PORT"` sends the request to `PORT` instead of 69. It needs an IP address, from `IP` or `DHCP`. Without an answer, it prints `No answer from the TFTP server` after about 5 seconds; an error of the server is shown with its code and its message: `TFTP error 1, File not found`. |
-| `DIR "IP" [, "PAT"]` | Lists the files of the server `tools/tftpd.py` at `IP` whose names match the pattern `PAT`, with `*` and `?`, such as `DIR "192.168.1.10", "*.BIN"`, a line each with the name and the size; without `PAT`, all of them. Another server answers with an error. |
+| `DIR "IP" [, "PAT"]` | Lists the files of the server `tools/tftpd.py` at `IP` whose names match the pattern `PAT`, with `*` and `?`, such as `DIR "192.168.1.10", "*.BIN"`, a line each with the name and the size; without `PAT`, all of them. A byte of a name that is not printable ASCII is left out, and a line shows its first 77 characters. Another server answers with an error. |
 | `PRINT [X] [; X] [, X]`, `? ...` | Prints its items, numbers and strings in quotes, such as `PRINT "A ="; A, B`. `;` joins two items, and `,` goes to the next column of 8. `TAB(N)` goes to column `N`, unless the cursor is past it, and `SPC(N)` prints `N` blanks, for an `N` of 0 to 255. Items with nothing between them are joined too. A line ends with CR LF, but for a `;` or a `,` at its end, which leaves the cursor there; `READY.` then starts a row of its own. `?` is `PRINT`. |
 | `[LET] V = X` | Sets the variable `V` to the number `X`, such as `LET TOTAL = TOTAL + 1` or `TOTAL = TOTAL + 1`. |
 | `POKE A, X` | Writes the word `X` to the address `A`, such as `POKE 0x9000, -1`. `PEEK(A)` reads it (Numbers below). |
@@ -428,7 +428,9 @@ the default. It runs these steps in order:
    the same way, against `test/tftp.expected`. It covers a file of two
    blocks among packets of other hosts and ports, lost packets, an
    ERROR, an ERROR after the first block, whose summary comes first,
-   files of 512 and 0 bytes, a listing, a port given as `"IP:PORT"`,
+   files of 512 and 0 bytes, a listing, with names that have bytes
+   that are not printable ASCII, which are dropped, and a line of more
+   than 77 characters, a port given as `"IP:PORT"`,
    a BASIC program's text, listed and run, one with a line without a
    number, bad arguments, and no answer to ARP.
 6. **The benchmarks.** `test/bench.py` types Rugg/Feldman's
@@ -489,7 +491,7 @@ table, and `make romsize` writes it again.
 | `basic.nasm` | The vectors, the header, the main loop, the scanner, the keywords, the messages, and the help | 1384 | 845 |
 | `basic_expr.nasm` | The numbers: the tokenizer, the expressions, the variables, the errors, `PRINT`, `LET`, and `POKE` | 1550 | 39 |
 | `basic_prog.nasm` | The programs: the lines, `LIST`, `RUN`, the jumps, the loops, the line input, the break key, `INPUT`, `GET`, the arrays, and `HIMEM` | 2041 | 46 |
-| `basic_cmd.nasm` | The routines of the statements that were the commands | 1830 | 294 |
+| `basic_cmd.nasm` | The routines of the statements that were the commands | 1839 | 294 |
 | `basic_net.nasm` | `DHCP`, `NTP`, and TFTP | 917 | 150 |
 | `basic_time.nasm` | `TIME`, and the clock's side of `NTP` | 275 | 44 |
 | `basic_dis.nasm` | The disassembler of `DIS` | 871 | 79 |
@@ -498,5 +500,5 @@ table, and `make romsize` writes it again.
 | `mon.nasm` | The stubs of the entries | 90 | 0 |
 | `build/basic_folder.nasm` | The texts with the folder's name: `DIR`'s, and the error of a card without it | 14 | 14 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 9485 | 1518 |
+| In all | | 9494 | 1518 |
 <!-- /romsize basic -->

@@ -33,7 +33,10 @@ The runs list, with the input LIST, DIR "10.0.0.2", "*.bin", and port,
 with PORT, LOAD "prog.bin", "10.0.0.2:6969", have ports of their own, which a run
 with only the ARP reply gives first: list gets a listing as
 tools/tftpd.py sends it, which is shown, and port gets the first block of
-PROG from the RRQ to port 6969.
+PROG from the RRQ to port 6969. The listing has a name in UTF-8, whose
+bytes from 0x80 are dropped, one with a control code and a DEL, which
+are dropped too, so that no 0x7F goes to a terminal, and a line of 81
+characters, of which 77 are shown.
 The runs bas and basbad, with the inputs BAS and BASBAD, have ports of
 their own too: bas loads a program's text, PROG.BAS, as LOAD "prog",
 "10.0.0.2" asks for it, with lines ended by CR LF, and lists and runs it
@@ -77,7 +80,9 @@ ARGS = (b'load "a.bin", "x"\rload "a.bin", 10\rdir "10.0.0.2", "a", "b"\r'
         b'load "a.bin", "10.0.0.2"\rdir "10.0.0.2"\rip "10.0.0.9"\r'
         b'load "a.bin", "10.0.0.3"\rhalt\r')
 LISTING = b"".join(f"{n:<24} {size:>10}\n".encode() for n, size in (
-    ("demo.bin", 41022), ("hello.bin", 13374), ("a-long-name-of-a-program.bin", 7)))
+    ("demo.bin", 41022), ("hello.bin", 13374), ("a-long-name-of-a-program.bin", 7),
+    ("bl\u00e5b\u00e6r.bin", 12), ("ctl\x01del\x7f.bin", 3),
+    ("a-name-of-70-characters-" + "x" * 42 + ".bin", 1234567890)))
 STEPS = 40_000_000
 TID = 3456
 PORT_AT = 34                             # the client's port in a frame sent

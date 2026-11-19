@@ -81,6 +81,15 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   with their steps in `niceemu` in
   [doc/BASIC.md](BASIC.md#the-benchmarks).
 
+**Fixed.**
+
+- `DIR "IP"` leaves out the bytes of a listing that are not printable
+  ASCII, such as those of a name in UTF-8, and shows the first 77
+  characters of a line, as `V2.3` did, and it leaves out a DEL too. In
+  `V2.3.1` it showed each such byte as `0x7F`, which a terminal on the
+  serial line may take as a DEL, and cut a line after 76 characters
+  with a `0x7F` at its end, as `LOAD` marks a line that it skips.
+
 ## V2.3.1 (2026-11-19)
 
 **Upgrade notes.**

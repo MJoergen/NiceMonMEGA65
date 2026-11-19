@@ -476,7 +476,9 @@ no answer ends a load after a line, the summary of the lines before it
 comes first, as their words are in the RAM.
 
 `DIR "IP", "PAT"` asks for the pattern `PAT`, with `*` or `?`, and
-`DIR "IP"` for `*`: the lines received are shown instead of loaded. The repository's own server,
+`DIR "IP"` for `*`: the lines received are shown instead of loaded,
+each without its bytes that are not printable ASCII, such as those of
+a name in UTF-8, and up to its first 77 characters. The repository's own server,
 `tools/tftpd.py`, answers a pattern with a listing of the files of its
 folder that match it, a line each with the name and the size in bytes,
 which no other server does. To serve the examples from a PC:

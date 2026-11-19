@@ -261,8 +261,8 @@ assembled apart (#152): the monitor's from 0, and BASIC's from
 |---|---|---:|
 | The monitor | `0x0000`–`0x2965` | 10598 |
 | Free | `0x2966`–`0x3FFF` | 5786 |
-| BASIC | `0x4000`–`0x650C` | 9485 |
-| Free | `0x650D`–`0x7FFF` | 6899 |
+| BASIC | `0x4000`–`0x6515` | 9494 |
+| Free | `0x6516`–`0x7FFF` | 6890 |
 <!-- /romsize layout -->
 
 The monitor's words, by the source they come from, in the order
