@@ -292,7 +292,8 @@ DUMP_sd_write = -d 0x9100:6
 # For fs the results of test/fs.nasm's calls, the entries that fs_readdir
 # and fs_readname wrote, the first 45 bytes that fs_read wrote, and the
 # names of fs_readname, for fsw the results
-# of test/fsw.nasm's, and for fat the numbers of fat_load for load NAME
+# of test/fsw.nasm's, and for fat the counts of LOAD "NAME", BASIC's
+# V_LSTATS
 DUMP_fs       = -d 0x9100:36 -d 0x9180:8 -d 0x9200:45 -d 0x9280:16 -d 0x92A0:11
 DUMP_fsw      = -d 0x9100:42
 # For hal16 the results of test/hal16.nasm's calls, the line of

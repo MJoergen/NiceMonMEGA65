@@ -221,10 +221,12 @@ all of the ROM is. The order of its sector writes is in its header, and
 the tests pin it (The tests, below).
 
 - **Entries.** The entries 9 to 15 and 20 of the dispatch table jump to
-  `fs_mount` to `fs_delete`, and `fs_readname`. The statements call
-  `fat_dir`, `fat_load`, `fat_save`, and `fat_complete` (TAB) by their
-  labels. Each sets R6 to its body and goes to `fat_call`, which saves
-  R7-R12 and SP, so the body uses every register.
+  `fs_mount` to `fs_delete`, and `fs_readname`. BASIC's `DIR`, `LOAD`,
+  `SAVE`, and `DELETE` are BASIC's, on these entries, as a program's
+  files are. The monitor's TAB, in `con_getline` and `fs_complete`,
+  entry 40, calls `fat_complete` by its label. Each sets R6 to its
+  body and goes to `fat_call`, which saves R7-R12 and SP, so the body
+  uses every register.
 - **Errors.** A routine that meets an error jumps to `fat_fail` with
   the negative error in R1, which takes SP back to that of `fat_call`
   and returns R1 from the entry. So no routine checks the result of
