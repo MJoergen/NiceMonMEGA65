@@ -397,7 +397,7 @@ sets serves both.
   list of stations shows it: the host name is `nicemon-` and the last
   three bytes of the MAC address, such as `nicemon-434506`, and the
   vendor class is `NiceMonMEGA65` and the monitor's version, such as
-  `NiceMonMEGA65 V2.3`. The transaction's number is the microsecond counter
+  `NiceMonMEGA65 V2.3.1`. The transaction's number is the microsecond counter
   at the start, XOR the low word of the MAC address. The lease is
   kept, and renewed while BASIC waits for a line, and by a
   program's polls while the network is on, as `net_poll` has it. A

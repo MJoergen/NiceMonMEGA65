@@ -3,12 +3,12 @@
 The design of issue
 [#153](https://github.com/MJoergen/NiceMonMEGA65/issues/153): at the
 start, the monitor replaces BASIC's half of the ROM with a file from
-the SD card. **This is a draft. Of its [Stages](#stages), the first
-all five are written, and the tools have run on the R6 and the
-Nexys4DDR; the release of `V2.3.1` is still to be made. The
-decisions of 2026-11-18 are in [Decisions](#decisions), with those
-that a review against the code changed the same day, and only the
-details of [Open questions](#open-questions) are open.**
+the SD card. **All five of its [Stages](#stages) are written, and
+`V2.3.1` is the release with them. The tools have run on the R6 and
+the Nexys4DDR. The decisions of 2026-11-18 are in
+[Decisions](#decisions), with those that a review against the code
+changed the same day, and [Open questions](#open-questions) has what
+is left, the R3.**
 
 - [Goals](#goals)
 - [What there is now](#what-there-is-now)
@@ -303,7 +303,8 @@ the monitor's write of a word back to itself changes nothing in
   always fits below the stack.
 - **A program that a host loaded** is in the staging area, and step 3
   leaves it there. The boards boot at configuration on their own, but
-  the first cold start takes seconds with a card, and a host that
+  the first cold start takes tenths of a second with a card, 0.4 s on
+  the R6 with a card's BASIC, and a host that
   holds the core before its end finds the ROM still open, also for a
   later load. The lock follows as always, so the cards' BASIC is not
   loaded until the next configuration. A hold in the middle of the
@@ -344,8 +345,11 @@ the monitor's write of a word back to itself changes nothing in
   Init can take hundreds of milliseconds, and waits up to a second
   for a card that stays idle (`C_OP_COND_MS` of `src/sd/sd_spi.vhd`),
   and on the R3, whose slot 1 has no card detect, an empty slot costs
-  its timeout. This is to be measured. It happens once for each
-  configuration.
+  its timeout. On the R6, with a file of 5101 words on the card of
+  slot 0 and a card in slot 1, the cold start takes 0.37 to 0.38 s
+  from the link's `b` notice to `READY.`, about 0.3 s of it the read
+  of the file. The R3 with an empty slot is not measured. It happens
+  once for each configuration.
 - **The monitor's words.** The loader shares `bin_line`'s parse of a
   line with a range of its own, and FAT32's open and read. The guess is
   300 to 450 words, of the 6794 free below `0x4000`. The new entries
@@ -550,7 +554,9 @@ tenth.
     waits for the next configuration
     ([The cold start](#the-cold-start), step 3). The first design let
     the loader overwrite it, as the boards boot before a host can
-    load one, which does not hold with a card that takes seconds.
+    load one, which does not hold: with a card's BASIC the cold start
+    takes 0.4 s on the R6, and a host that holds the core in that
+    time finds the ROM open.
     The other way was a load by the tools after the cold start,
     behind a breakpoint at `BAS_COLD`, which keeps the program and
     the cards' BASIC, but only for these tools.
@@ -566,8 +572,10 @@ No question of the design is open. Stage 3 settled two details:
 
 One is open:
 
-3. **The time of the cold start** with a card, and with an empty slot
-   on the R3, which is to be measured.
+3. **The R3.** The loader has not run on an R3. The time of its cold
+   start with an empty slot 1, which has no card detect, is to be
+   measured. On the R6, the cold start with a card's BASIC takes
+   0.4 s.
 
 ## Stages
 
@@ -614,5 +622,5 @@ One is open:
    point release of BASIC alone in `release.py` and `doc/RELEASE.md`
    comes with `V2.3.2`. Written: `release.py` checks BASIC's image
    for a card, its version the tag and no "keep", and stages it as
-   `BASIC-<tag>.ROM`; `doc/RELEASE.md` lists it. The release itself
-   is not made yet.
+   `BASIC-<tag>.ROM`; `doc/RELEASE.md` lists it. `V2.3.1` is the
+   first release with it.

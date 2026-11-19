@@ -26,7 +26,7 @@ The pictures of doc/images/ are made from the ROM of the release, the
 monitor and BASIC, and the demo at 0x8000 after it, all with its tag, and SYS 0x8000 and
 CR first, which start the demo:
 
-    make rom VERSION=V2.3 && make -C demo VERSION=V2.3
+    make rom VERSION=V2.3.1 && make -C demo VERSION=V2.3.1
     cat build/rom.bin demo/build/demo.bin > rom_demo.bin
     printf 'SYS 0x8000\\rHello from the NICE CPU on the MEGA65!\\r' > in.txt
     tools/screenshot.py -i in.txt -o doc/images/demo.png rom_demo.bin
@@ -35,13 +35,13 @@ doc/images/ethernet.png, the demo's F11, with:
 
     printf 'SYS 0x8000\\r\\033[23~i192.168.1.65\\rm02:4E:49:43:45:00\\r' > in.txt
     tools/screenshot.py -i in.txt -n 3000000 -o doc/images/ethernet.png \\
-        rom.bin
+        rom_demo.bin
 
 and doc/images/debugger.png, the typewriter paused under the strip once
 the line of the first in.txt is typed, with:
 
-    tools/screenshot.py -i in.txt -n 19255 --debugger \\
-        -o doc/images/debugger.png rom.bin
+    tools/screenshot.py -i in.txt -n 35162 --debugger \\
+        -o doc/images/debugger.png rom_demo.bin
 
 Usage:
     tools/screenshot.py [-i FILE] [-n N] [--debugger] [-o FILE.png] FILE.bin
