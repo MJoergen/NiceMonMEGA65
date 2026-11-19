@@ -24,8 +24,15 @@ fills in after assembly:
       from V, such as V2.3.1 or V2.3-12-gabcdef0-dirty, "keep" with
       --keep, and then the checksum, written to OUT
   basic_rom.py check FILE...
-      checks each image's addresses, header, and checksum, and prints
-      its version, length, and flags
+      checks each image's lines, addresses, header, and checksum, and
+      prints its version, length, and flags
+
+The check takes a file's lines as the monitor's loader takes them from
+a card (monitor/monitor_basic.nasm), so that a file that passes here is
+not refused there for its lines: each is an address and a word of 1 to
+8 hex digits, of at most 76 characters, and the header's 12 words,
+0x4000 to 0x400B, all have their lines. The loader alone knows whether
+the image's interface is its monitor's.
 
 tools/load.py and tools/hwtest.py use the functions here: set_keep() for
 an image that a tool loads, ram_words() for the end of a program's RAM,
@@ -50,6 +57,12 @@ MASK = 0xFFFFFFFF
 RAM_MIN = 0x400
 RAM_MAX = 0x2000
 RAM_DEFAULT = 0x800
+# A line as the monitor's loader takes it from a card (bl_getline of
+# monitor/monitor_basic.nasm, and bin_parse of monitor/monitor.nasm): an
+# address and a word, each of 1 to 8 hex digits, with blanks or TABs
+# between them and around them, in at most LINE_MAX characters
+LINE = re.compile(r"[ \t]*([0-9A-Fa-f]{1,8})[ \t]+([0-9A-Fa-f]{1,8})[ \t]*")
+LINE_MAX = 76
 
 
 class ImageError(Exception):
@@ -58,24 +71,27 @@ class ImageError(Exception):
 
 def read_image(path: str) -> dict[int, int]:
     """The words of an image, by address, with the rules of a file on a
-    card: addresses in 0x4000-0x7FFF, rising from line to line."""
+    card: each line an address and a word as the loader takes them, and
+    the addresses in 0x4000-0x7FFF, rising from line to line."""
     image: dict[int, int] = {}
     last = -1
     with open(path) as f:
         for number, line in enumerate(f, 1):
-            if not line.strip():
+            line = line.rstrip("\r\n")
+            if not line.strip(" \t"):
                 continue
-            fields = line.split()
-            if len(fields) != 2:
-                raise ImageError(f"{path}:{number}: not an address and a word")
-            addr, word = int(fields[0], 16), int(fields[1], 16)
+            m = LINE.fullmatch(line)
+            if not m:
+                raise ImageError(f"{path}:{number}: not an address and a word, "
+                                 "each of 1 to 8 hex digits")
+            if len(line) > LINE_MAX:
+                raise ImageError(f"{path}:{number}: more than {LINE_MAX} characters")
+            addr, word = int(m[1], 16), int(m[2], 16)
             if not BASE <= addr < END:
                 raise ImageError(f"{path}:{number}: address {addr:08X} outside "
                                  f"{BASE:04X}-{END - 1:04X}")
             if addr <= last:
                 raise ImageError(f"{path}:{number}: address {addr:08X} does not rise")
-            if word > MASK:
-                raise ImageError(f"{path}:{number}: word {word:X} has more than 32 bits")
             image[addr] = word
             last = addr
     return image
@@ -156,9 +172,14 @@ def text(image: dict[int, int]) -> str:
 
 def check(image: dict[int, int]) -> str:
     """Checks the header and the checksum; the version, the length, and
-    the flags, for a line of output."""
+    the flags, for a line of output. The header's words must all be
+    there, also one that is 0: the loader reads them from the file's
+    first lines, each at its address, and takes no file without them."""
     if image.get(H_MAGIC) != MAGIC:
         raise ImageError("no magic word NBAS at 0x4004")
+    for addr in range(BASE, H_RAM + 1):
+        if addr not in image:
+            raise ImageError(f"no line for the header's word at {addr:04X}")
     length = image.get(H_LENGTH, 0)
     if not H_RAM < BASE + length <= END:
         raise ImageError(f"length {length} out of range")

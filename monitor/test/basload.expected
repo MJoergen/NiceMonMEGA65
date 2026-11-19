@@ -244,6 +244,44 @@ Screen:
 |halt
 |Halted
 exit 0
+== no line for a word of the header that is 0
+BASIC-11.ROM on card 0: not a BASIC image
+NiceMon V9.9, BASIC V9.9
+HELP lists the statements
+READY.
+halt
+Halted
+Screen:
+|BASIC-11.ROM on card 0: not a BASIC image
+|NiceMon V9.9, BASIC V9.9
+|HELP lists the statements
+|READY.
+|halt
+|Halted
+exit 0
+== words that Python takes, and a line of 77 characters: the ROM's
+BASIC-P.ROM on card 0: bad line
+BASIC-S.ROM on card 0: bad line
+BASIC-U.ROM on card 0: bad line
+BASIC-N.ROM on card 0: bad line
+BASIC-L.ROM on card 0: bad line
+NiceMon V9.9, BASIC V9.9
+HELP lists the statements
+READY.
+halt
+Halted
+Screen:
+|BASIC-P.ROM on card 0: bad line
+|BASIC-S.ROM on card 0: bad line
+|BASIC-U.ROM on card 0: bad line
+|BASIC-N.ROM on card 0: bad line
+|BASIC-L.ROM on card 0: bad line
+|NiceMon V9.9, BASIC V9.9
+|HELP lists the statements
+|READY.
+|halt
+|Halted
+exit 0
 == three versions: the newest
 BASIC-B.ROM from card 0
 NiceMon V9.9, BASIC A2

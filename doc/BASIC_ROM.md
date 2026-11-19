@@ -189,7 +189,11 @@ the monitor's write of a word back to itself changes nothing in
 - Each is a `.bin` file as every other (nice_cpu's ISA.md §10.4): one
   line of an address and a word for each word. Its addresses must be in
   `0x4000`–`0x7FFF`, and rise from line to line, so the header comes
-  first.
+  first. Each of the header's 12 words, `0x4000` to `0x400B`, must
+  have its line, also one that is 0; after them, a word with no line
+  is 0. A line is an address and a word of 1 to 8 hex digits each,
+  with blanks or TABs around them, in at most 76 characters.
+  `tools/basic_rom.py check` holds a file to the same rules.
 - The extension is not `.BIN`, so that BASIC's `LOAD` does not take
   the file for a program.
 - **The header** follows the two vectors. The bitstream's BASIC has it

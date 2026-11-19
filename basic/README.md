@@ -228,7 +228,13 @@ writes `build/basic_asm.bin`, with 0 for the length, the checksum, the
 version as a number, and the flags, and `../tools/basic_rom.py fill`
 fills them in. The tests' image has the flag "keep", and the version
 `V9.9`, `0x09090000`. `tools/basic_rom.py check FILE` checks an image,
-and prints its header.
+and prints its header. It takes the file's lines as the monitor takes
+them from a card, so a file that passes is not refused there for its
+lines: each is an address and a word of 1 to 8 hex digits, with
+blanks or TABs around them, in at most 76 characters, and the
+header's 12 words, `0x4000` to `0x400B`, each have a line, also one
+that is 0. After the header, a word with no line is 0. Only the
+monitor knows whether the image's interface is its own.
 
 To try a build on the board, copy `build/basic.rom` to a card's folder
 as a `BASIC*.ROM` file, which the monitor loads when the board is

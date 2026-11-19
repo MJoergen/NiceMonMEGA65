@@ -23,6 +23,11 @@ start, as a program that a host loaded while the ROM was open, which
 the loader leaves alone, or, with the loader's BL_BUSY set, as what a
 load leaves that a reset broke off, which it does again.
 
+Before the runs, the host's check of an image, tools/basic_rom.py, which
+load.py --basic, hwtest, and release.py share, gets the same files, whole
+and broken: it must take what the loader takes, and refuse each break, so
+that a file that passes on the host is not refused on the board.
+
 Usage: test/basload.py NICEEMU ROM_TEST.bin BUILD
 """
 
@@ -40,6 +45,7 @@ import basic_rom  # noqa: E402
 ASM = os.path.join(REPO, "nice_cpu", "assembler", "niceasm.py")
 STEPS = 60_000_000
 Image = dict[int, int]
+Break = Callable[[list[str]], list[str]]
 
 
 def text_word(text: str) -> int:
@@ -89,6 +95,13 @@ def out_of_place(ls: list[str]) -> list[str]:
     return ls[:6] + ls[7:]          # no line for 0x4006
 
 
+def no_flags(ls: list[str]) -> list[str]:
+    """No line for 0x400A, the flags, whose word is 0, so the checksum
+    holds."""
+    assert ls[10] == "0000400a 00000000\n"
+    return ls[:10] + ls[11:]
+
+
 def outside(ls: list[str]) -> list[str]:
     return ls + ["00008000 00000001\n"]
 
@@ -105,15 +118,36 @@ def bad_line(ls: list[str]) -> list[str]:
     return ls[:300] + ["zz\n"] + ls[300:]
 
 
+def respell(spell: Callable[[str], str]) -> Break:
+    """A break that writes the word of line 300 another way, with its
+    value kept, so that the checksum holds."""
+    def brk(ls: list[str]) -> list[str]:
+        a, w = ls[300].split()
+        return ls[:300] + [f"{a} {spell(w)}\n"] + ls[301:]
+    return brk
+
+
+# Spellings of a word that Python's int() takes, and the loader does not,
+# and a line of 77 characters, one more than the loader takes
+prefixed = respell(lambda w: "0x" + w)
+signed = respell(lambda w: "+" + w)
+underscored = respell(lambda w: w[:4] + "_" + w[4:])
+nine_digits = respell(lambda w: "0" + w)
+too_long = respell(lambda w: w + " " * 60)
+longest = respell(lambda w: w + " " * 59)
+
+
 def crlf_blank(ls: list[str]) -> list[str]:
-    """CR LF line ends, blank lines, and TABs, which the loader takes."""
-    return ["\r\n"] + [line.replace(" ", "\t").replace("\n", "\r\n\r\n") for line in ls]
+    """CR LF line ends, blank lines, TABs, and a line of 76 characters,
+    the most, which the loader takes."""
+    return ["\r\n"] + [line.replace(" ", "\t").replace("\n", "\r\n\r\n")
+                       for line in longest(ls)]
 
 
 class File(NamedTuple):
     name: str
     image: Image
-    brk: Optional[Callable[[list[str]], list[str]]] = None
+    brk: Optional[Break] = None
 
 
 class Run(NamedTuple):
@@ -163,6 +197,43 @@ def card(path: str, files: list[File]) -> None:
         subprocess.run(["mcopy", "-i", path, src, f"::NICE/{f.name}"], check=True)
 
 
+def host(work: str, image: Image) -> None:
+    """The host's check of the files: None for one that it must take, or
+    a part of the reason that it must give."""
+    cases: list[tuple[str, Optional[Break], Optional[str]]] = [
+        ("the whole file", None, None),
+        ("CR LF, TABs, blank lines, and a line of 76 characters", crlf_blank, None),
+        ("a bad checksum", bad_sum, "bad checksum"),
+        ("no magic word", bad_magic, "no magic word"),
+        ("no line for 0x4006", out_of_place, "no line for the header's word at 4006"),
+        ("no line for 0x400A, whose word is 0", no_flags,
+         "no line for the header's word at 400A"),
+        ("an address past BASIC's half", outside, "outside"),
+        ("addresses that fall", falling, "does not rise"),
+        ("a file cut short", cut_short, "bad checksum"),
+        ("a line that is no address and word", bad_line, "not an address and a word"),
+        ("a word with 0x before it", prefixed, "not an address and a word"),
+        ("a word with a sign", signed, "not an address and a word"),
+        ("a word with an underscore", underscored, "not an address and a word"),
+        ("a word of 9 digits", nine_digits, "not an address and a word"),
+        ("a line of 77 characters", too_long, "more than 76 characters"),
+    ]
+    for n, (title, brk, want) in enumerate(cases):
+        path = os.path.join(work, f"host{n}.rom")
+        ls = lines(image)
+        with open(path, "w", newline="") as f:
+            f.writelines(brk(ls) if brk else ls)
+        got: Optional[str] = None
+        try:
+            basic_rom.check(basic_rom.read_image(path))
+        except (basic_rom.ImageError, ValueError) as e:
+            got = str(e)
+        if (got is None) != (want is None) or (want and got and want not in got):
+            print(f"FAIL monitor basload: basic_rom.py's check of {title}: "
+                  f"{got or 'taken'}, want {want or 'taken'}")
+            sys.exit(1)
+
+
 def main() -> None:
     emu, rom_test, build = sys.argv[1:4]
     work = os.path.join(build, "basload")
@@ -188,6 +259,7 @@ def main() -> None:
           layout: Optional[int] = None) -> Image:
         return variant(base, major << 24 | minor << 16, text, keep, ram, entries, layout)
 
+    host(work, v(10, 0, "A"))
     runs = [
         Run("no card: the ROM's BASIC", None, keys="ver\rhalt\r"),
         Run("a card with no BASIC*.ROM", [File("BASIC.BIN", v(10, 0, "A")),
@@ -210,6 +282,14 @@ def main() -> None:
         Run("addresses that fall", [File("BASIC-8.ROM", v(10, 0, "A"), falling)]),
         Run("a file cut short", [File("BASIC-9.ROM", v(10, 0, "A"), cut_short)]),
         Run("a bad line", [File("BASIC-10.ROM", v(10, 0, "A"), bad_line)]),
+        Run("no line for a word of the header that is 0",
+            [File("BASIC-11.ROM", v(10, 0, "A"), no_flags)]),
+        Run("words that Python takes, and a line of 77 characters: the ROM's",
+            [File("BASIC-P.ROM", v(10, 5, "P"), prefixed),
+             File("BASIC-S.ROM", v(10, 4, "S"), signed),
+             File("BASIC-U.ROM", v(10, 3, "U"), underscored),
+             File("BASIC-N.ROM", v(10, 2, "N"), nine_digits),
+             File("BASIC-L.ROM", v(10, 1, "L"), too_long)]),
         Run("three versions: the newest", [File("BASIC-A.ROM", v(10, 1, "A1")),
                                            File("BASIC-B.ROM", v(10, 2, "A2")),
                                            File("BASIC-C.ROM", v(10, 0, "A0"))]),

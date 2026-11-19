@@ -537,9 +537,16 @@ The suites of `test/fat_runs.py`, step 7:
 release's is. Its files are BASIC's image with another version and
 another text of it, so that the banner shows which one runs, made
 valid or broken on purpose, on cards that `mkfs.fat` and mtools make.
+First the host's check of an image, `tools/basic_rom.py`, gets the
+same files, and must take the whole ones and refuse each broken one,
+so that the tools and the loader agree on a file.
 It runs a card with no `BASIC*.ROM`, a newer and an older file, a name
-in lower case with CR LF, TABs, and blank lines, the ROM's "keep",
-each reason of a file that fails, three versions, the newest broken,
+in lower case with CR LF, TABs, blank lines, and a line of 76
+characters, the ROM's "keep",
+each reason of a file that fails, a file with no line for a word of
+the header that is 0, words written as Python takes them, with `0x`,
+a sign, an underscore, or 9 digits, a line of 77 characters, three
+versions, the newest broken,
 all broken, the same version on both slots, a newer one on slot 1,
 slot 1 only, `SYS 0` with and without "keep" in the file, and BASIC's
 RAM at 4K words and 2K words, with `mon_exit`'s stack and `LOAD`'s end
