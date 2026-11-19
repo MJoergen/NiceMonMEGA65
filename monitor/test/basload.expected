@@ -463,7 +463,7 @@ READY.
 halt
 Halted
 ffffdfff: 00000000
-ffffe7ff: 000040bf
+ffffe7ff: 000040c3
 0001e7ff: 00000005 00000000
 Screen:
 |BASIC-V10.ROM from card 0

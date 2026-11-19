@@ -204,6 +204,7 @@ READY.
 10 RUN 0x10
 Syntax error
 RUN [N]             run the program, from line N or its first, after CLR
+RUN "NAME" [, "IP"] load NAME and run it; NAME.BIN at 0x8000
 READY.
 10 PRINT 1: REM X
 LIST
@@ -218,7 +219,6 @@ READY.
 HALT
 Halted
 Screen:
-|PRINT X; "T", ...   print numbers and strings, ; and , between them; ? is PRINT
 |READY.
 |10 IF 1 THEN 2 X
 |10 GOTO X
@@ -229,6 +229,7 @@ Screen:
 |10 RUN 0x10
 |Syntax error
 |RUN [N]             run the program, from line N or its first, after CLR
+|RUN "NAME" [, "IP"] load NAME and run it; NAME.BIN at 0x8000
 |READY.
 |10 PRINT 1: REM X
 |LIST

@@ -16,6 +16,8 @@
 ; Stage 2 (issue #113) has the numbers, in basic_expr.nasm: the
 ; tokenizer, the expressions, the variables, the errors, and PRINT, LET,
 ; and POKE. Stage 3 (issue #114) has the programs, in basic_prog.nasm.
+; Stage 4 (issue #60) has the programs' texts on a card and from a TFTP
+; server: SAVE "NAME", LOAD "NAME", and RUN "NAME", in basic_cmd.nasm.
 ;
 ; The image starts with two vectors, which the monitor jumps to: at
 ; BAS_COLD, the end of its cold start, which goes to bas_start, and at
@@ -62,6 +64,8 @@ V_LOUT          .EQU    0xFFFFE802      ; the outputs of mon_out while LOAD read
 V_LEND          .EQU    0xFFFFE803      ; the last byte that LOAD read, for the LF of a CR LF
 V_LPOS          .EQU    0xFFFFE804      ; for LOAD from a file: the next free word of V_LINE
 V_TLIST         .EQU    0xFFFFE805      ; not 0 for a listing of TFTP, of DIR, which bin_eol shows
+V_LBAS          .EQU    0xFFFFE806      ; while LOAD reads a program's text: 1 before its first line, 2 after, else 0
+V_OPEN          .EQU    0xFFFFE807      ; the file that LOAD or SAVE has open, its handle plus 1, -1 for TFTP's endpoint, or 0
 V_ARGS          .EQU    0xFFFFE808      ; the values of a statement, 4 words, slots 1, 2, and 4 at V_ARGS, +1, and +3
 V_LSTATS        .EQU    0xFFFFE80C      ; for LOAD: the counts of bin_line, 7 words
 V_NET           .EQU    0xFFFFE818      ; for IP, DHCP, and NTP: the words of net_config and net_servers, 6 words
@@ -83,9 +87,17 @@ V_TPKT          .EQU    0xFFFFE8B0      ; and the packet sent, a byte per word, 
 V_NTPIP         .EQU    0xFFFFE910      ; for NTP: the server's IP address, which dns_lookup writes
 V_ENT           .EQU    0xFFFFE920      ; for DIR: an entry of fs_readname, 4 words,
 V_NAME          .EQU    0xFFFFE924      ; and its name, 256 words
+V_BLINE         .EQU    0xFFFFE924      ; for LOAD and SAVE of a program's text: the name, then a line of the file, in V_NAME
+BLINE_MAX       .EQU    254             ; the characters of that line, with one over and a 0
 V_FBUF          .EQU    0xFFFFEA24      ; for LOAD and SAVE: the bytes of fs_read and fs_write, FBUF_BYTES words
 V_TBUF          .EQU    0xFFFFEAA4      ; for TFTP: a packet that udp_recv copied, TFTP_MAX words,
 V_TSRC          .EQU    0xFFFFECA8      ; and its source's IP address and port, 2 words, to 0xFFFFECA9
+V_LBEG          .EQU    0xFFFFECAA      ; for LOAD from a file: the line, V_LINE or V_BLINE,
+V_LLIM          .EQU    0xFFFFECAB      ; and the word after its last character
+V_SPOS          .EQU    0xFFFFECAC      ; while SAVE writes a program's text: the next free word of V_FBUF, else 0,
+V_SERR          .EQU    0xFFFFECAD      ; and the error of a write, or 0
+V_RUNF          .EQU    0xFFFFECAE      ; not 0 for RUN "NAME", which runs what LOAD loads
+V_TLIM          .EQU    0xFFFFECAF      ; for the tokenizer: the last word of its tokens less 6, which a token starts below
 V_NTPQ          .EQU    0xFFFFEAA4      ; for NTP, in V_TBUF: the query, 48 words,
 V_NTPA          .EQU    0xFFFFEAD4      ; and the answer, 48 words
 
@@ -130,6 +142,7 @@ bas_start
 ; main: READY., on a row of its own, and the lines, each tokenized and
 ; run with a fresh SP
 main            MOVE    SP, STACK
+                CALL    files_end       ; what an error or the break key left open
                 CLR     @V_CUR          ; direct mode
                 CLR     @V_STORE
                 CLR     @V_REDO
@@ -382,12 +395,19 @@ bas_dir
                 ONE     R3
                 JMP     st_tftp
 
-; LOAD, LOAD "NAME.BIN", and LOAD "N.BIN", "IP": the name must end with
-; .BIN, in either case. A load that wrote a word below HIMEM, which may
-; be over the program or its variables, ends with NEW, and at READY.,
-; and one that wrote no word ends the line; one that wrote above HIMEM
-; alone goes on.
+; LOAD, LOAD "NAME", and LOAD "NAME", "IP". A name that ends with .BIN,
+; in either case, is a .bin file. A load that wrote a word below HIMEM,
+; which may be over the program or its variables, ends with NEW, and at
+; READY., and one that wrote no word ends the line; one that wrote above
+; HIMEM alone goes on. Any other name is a program's text, NAME.BAS
+; when NAME has no dot, which is copied to V_BLINE, as the statements
+; after it may go. Its lines are stored as lines typed in, after a NEW
+; at the first (basic_cmd.nasm, bas_eol), so that a file that is not
+; there keeps the program; then READY. RUN "NAME" comes to bas_lrun,
+; with V_RUNF set, and load_fin runs what was loaded.
 bas_load
+                CLR     @V_RUNF
+bas_lrun
                 CLR     @V_LSTATS       ; no word written yet
                 PUSH    load_fin        ; where the load returns
                 TST     R1
@@ -402,14 +422,16 @@ bas_load
                 MOVE    R5, TEXT_B+4*S_DOTBIN
 :
                 MOVE[M] R6, @R5++
-        ?Z      JMP     :++
+        ?Z      JMP     load_go
                 XOR     R6, R6, @R4++
                 AND[M]  R0, R6, 0xDF
         ?Z      JMP     :-
 :
-                MOVE    R1, S_NOTBIN
-                JMP     puts_b_crlf
-:
+                MOVE    R3, TEXT_B+4*S_DOTBAS
+                CALL    name_copy
+                CLR     @V_CUR
+                ONE     @V_LBAS         ; NEW at the first line
+load_go
                 TST     R2
         ?Z      JMP     st_load
                 MOVE    R3, R1          ; st_tftp: the server, the name, 0
@@ -418,27 +440,45 @@ bas_load
                 CLR     R3
                 JMP     st_tftp
 
-; SAVE "NAME", A, N, in which a name without a dot gets .BIN, and SAVE
-; "NAME", "IP", which TFTP cannot. The .BIN and its 0 go over the 0 of
-; the name's token, and the tokens of the commas, the address, and the
-; count, which take four words at least, so that the statements after it
-; stay.
+; name_copy: the name R1 copied to V_BLINE, with the extension at the
+; byte address R3 after it when it has no dot, and R1 = V_BLINE. Keeps
+; R2. Uses R1, R3, R4, and R5.
+name_copy
+                MOVE    R4, V_BLINE
+                CLR     R5              ; no dot
+:
+                MOVE[M] @R4++, @R1++
+        ?Z      JMP     :+
+                CMP     @-1[R4], 0x2E   ; .
+        ?Z      ONE     R5
+                JMP     :-
+:
+                MOVE    R1, V_BLINE
+                TST     R5
+        ?!Z     RET
+                SUB     R4, R4, 1       ; over the 0
+:
+                MOVE[M] @R4++, @R3++
+        ?!Z     JMP     :-
+                RET
+
+; SAVE "NAME", the program's text, with .BAS added when the name has no
+; dot (basic_cmd.nasm, st_text); SAVE "NAME", A, N, the words, with .BIN
+; added; and SAVE "NAME", "IP", which TFTP cannot.
 bas_save
                 TST     R11
-        ?Z      MOVE    R1, S_TFTPSAVE
-        ?Z      JMP     puts_b_crlf
-                MOVE    R4, R1
+        ?!Z     JMP     :+
+                TST     R2
+        ?!Z     MOVE    R1, S_TFTPSAVE
+        ?!Z     JMP     puts_b_crlf
+                MOVE    R3, TEXT_B+4*S_DOTBAS
+                CALL    name_copy
+                JMP     st_text
 :
-                MOVE[M] R5, @R4++
-        ?!Z     CMP     R5, 0x2E        ; .
-        ?!Z     JMP     :-
-                TST     R5
-        ?!Z     JMP     st_save         ; a dot
-                MOVE    R4--, R4
-                MOVE    R5, TEXT_B+4*S_DOTBIN
-:
-                MOVE[M] @R4++, @R5++
-        ?!Z     JMP     :-
+                PUSH    R3              ; N, which name_copy uses
+                MOVE    R3, TEXT_B+4*S_DOTBIN
+                CALL    name_copy
+                POP     R3
                 JMP     st_save
 
 ; HELP: the lines of the statements
@@ -491,13 +531,14 @@ H_KINDS         .EQU    0x40000000+4*KINDS
 ;                                      a string, a comma and a string or
 ;                                      not, and the end
 ;  10  LOAD, NTP      F J E J N        the end, or the strings of DIR
-;  15  SAVE           J L C N H L H N  a string, a comma, and a string
-;                                      and the end, or a number, a comma,
-;                                      a number, and the end
-;  19  POKE           H L H N  a number, a comma, a number, and the end
-;  21  SYS            H N      a number and the end
-;  23  BAUD           @ N      a number or not, and the end
-;  25  DUMP, DIS      @ E H N  a number or not, a comma and a number or
+;  15  SAVE           J F L C N H L H N  a string, and the end, or a
+;                                        comma, and a string and the
+;                                        end, or a number, a comma, a
+;                                        number, and the end
+;  20  POKE           H L H N  a number, a comma, a number, and the end
+;  22  SYS            H N      a number and the end
+;  24  BAUD           @ N      a number or not, and the end
+;  26  DUMP, DIS      @ E H N  a number or not, a comma and a number or
 ;                              not, and the end
 ;
 ; A number is an expression, which must fit a signed word. PRINT and LET
@@ -509,9 +550,9 @@ OP_C            .EQU    4
 OP_E            .EQU    6
 OP_SKIP         .EQU    1
 OP_F            .EQU    8
-KEYWORDS        .EQU    29              ; the first keyword's byte in OPS
+KEYWORDS        .EQU    30              ; the first keyword's byte in OPS
 OPS
-                .ASCII_B 'FJNFANJEJNFJEJNJLCNHLHN@N@EHNSYS5LOAD*SAVE/DELETE!DIR#IP DHCP"MAC TIME NTP*BAUD7DUMP9DIS9CLS"VER"HELP"HALT"POKE3NEW"CLR"END"STOP"CONT"RETURN"PRINT"LET"RUN"LIST"GOTO"GOSUB"IF"FOR"NEXT"REM"INPUT"GET"DIM"HIMEM"AND"OR"XOR"NOT"DIV"MOD"ABS"SGN"INT"SQR"PEEK"TAB"SPC"THEN"ELSE"TO"STEP"'
+                .ASCII_B 'FJNFANJEJNFJEJNJFLCNHLHN@N@EHNSYS6LOAD*SAVE/DELETE!DIR#IP DHCP"MAC TIME NTP*BAUD8DUMP:DIS:CLS"VER"HELP"HALT"POKE4NEW"CLR"END"STOP"CONT"RETURN"PRINT"LET"RUN"LIST"GOTO"GOSUB"IF"FOR"NEXT"REM"INPUT"GET"DIM"HIMEM"AND"OR"XOR"NOT"DIV"MOD"ABS"SGN"INT"SQR"PEEK"TAB"SPC"THEN"ELSE"TO"STEP"'
 
 S_HINT          .ASCII_B 'HELP lists the statements'
 S_READY         .ASCII_B 'READY.'
@@ -522,26 +563,28 @@ S_UNKNOWN
                 .ASCII_B 'Syntax error; HELP lists the statements'
 S_QUANT         .ASCII_B 'Illegal quantity'
                 .DAT    0
-S_NOTBIN
-                .ASCII_B 'LOAD takes a .BIN file, such as LOAD "HELLO.BIN"'
-                .DAT    0
 S_TFTPSAVE
                 .ASCII_B 'SAVE writes to the SD card: TFTP only loads'
 S_DOTBIN
                 .ASCII_B '.BIN'
                 .DAT    0
+S_DOTBAS
+                .ASCII_B '.BAS'
+                .DAT    0
 
 ; The lines of HELP, which a Syntax error also prints, those that start
 ; with the statement's keyword and a blank
-HELP            .DAT    H_SYS, H_L, H_LOAD, H_TFTP, H_SAVE, H_DEL, H_DIR, H_TFTPL, H_D, H_U
+HELP            .DAT    H_SYS, H_L, H_LOAD, H_TFTP, H_SAVET, H_SAVE, H_DEL, H_DIR, H_TFTPL, H_D, H_U
                 .DAT    H_I, H_ID, H_M, H_B, H_T, H_TN, H_C, H_V, H_H, H_Q, H_PR, H_LET
-                .DAT    H_POKE, H_RUN, H_LIST, H_NEW, H_CLR, H_GOTO, H_GOSUB, H_RET, H_IF
+                .DAT    H_POKE, H_RUN, H_RUNF, H_LIST, H_NEW, H_CLR, H_GOTO, H_GOSUB, H_RET, H_IF
                 .DAT    H_FOR, H_NEXT, H_END, H_STOP, H_CONT, H_REM, H_INPUT, H_GET, H_DIM, H_HIMEM, H_P, H_PG, 0
 H_SYS           .ASCII_B 'SYS A               call the program at A, such as SYS 0x8000; SYS 0 restarts'
 H_L             .ASCII_B 'LOAD                enter lines of ADDR WORD in hex, as a .bin file has them'
                 .DAT    0
-H_LOAD          .ASCII_B 'LOAD "NAME.BIN"     load the .bin file NAME.BIN of the SD card'
-H_TFTP          .ASCII_B 'LOAD "N.BIN", "IP"  load the .bin file N.BIN from the TFTP server at IP'
+H_LOAD          .ASCII_B 'LOAD "NAME"         load the program NAME.BAS, or NAME.BIN, from the SD card'
+                .DAT    0
+H_TFTP          .ASCII_B 'LOAD "NAME", "IP"   load it from the TFTP server at IP'
+H_SAVET         .ASCII_B 'SAVE "NAME"         save the program as the text NAME.BAS'
 H_SAVE          .ASCII_B 'SAVE "NAME", A, N   save N words from A as the .bin file NAME'
 H_DEL           .ASCII_B 'DELETE "NAME"       delete the file NAME of the SD card'
 H_DIR           .ASCII_B 'DIR [SLOT]          list the files of the card in SLOT, or of the card mounted'
@@ -564,6 +607,8 @@ H_PR            .ASCII_B 'PRINT X; "T", ...   print numbers and strings, ; and ,
 H_LET           .ASCII_B 'LET V = X           set the variable V to the number X; LET may be left out'
 H_POKE          .ASCII_B 'POKE A, X           write X to the word at A, which PEEK(A) reads'
 H_RUN           .ASCII_B 'RUN [N]             run the program, from line N or its first, after CLR'
+                .DAT    0
+H_RUNF          .ASCII_B 'RUN "NAME" [, "IP"] load NAME and run it; NAME.BIN at 0x8000'
                 .DAT    0
 H_LIST          .ASCII_B 'LIST [N] [- M]      list the lines of the program, those from N to M'
                 .DAT    0

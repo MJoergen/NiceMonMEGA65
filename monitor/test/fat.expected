@@ -85,19 +85,20 @@ load "toolongname.bin"
 File error 21, no such file
 READY.
 load "readme.txt"
-LOAD takes a .BIN file, such as LOAD "HELLO.BIN"
+Line without a number
+README line 0
 READY.
 load frag.bin
 Syntax error
 LOAD                enter lines of ADDR WORD in hex, as a .bin file has them
-LOAD "NAME.BIN"     load the .bin file NAME.BIN of the SD card
-LOAD "N.BIN", "IP"  load the .bin file N.BIN from the TFTP server at IP
+LOAD "NAME"         load the program NAME.BAS, or NAME.BIN, from the SD card
+LOAD "NAME", "IP"   load it from the TFTP server at IP
 READY.
 load "a.bin" "b.bin"
 Syntax error
 LOAD                enter lines of ADDR WORD in hex, as a .bin file has them
-LOAD "NAME.BIN"     load the .bin file NAME.BIN of the SD card
-LOAD "N.BIN", "IP"  load the .bin file N.BIN from the TFTP server at IP
+LOAD "NAME"         load the program NAME.BAS, or NAME.BIN, from the SD card
+LOAD "NAME", "IP"   load it from the TFTP server at IP
 READY.
 dirx
 Syntax error; HELP lists the statements

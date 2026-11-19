@@ -289,7 +289,7 @@ put32
 ; octet mode through the UDP endpoint, which it opens on a port that
 ; udp_open picks, and closes at the end, and its lines written as
 ; LOAD "NAME.BIN" writes them, with bin_char, and shown as LOAD shows
-; them; or for a listing the lines that tools/tftpd.py answers a
+; them, or for a program's text stored by bas_eol (issue #60); or for a listing the lines that tools/tftpd.py answers a
 ; pattern, with * or ?, with, which are shown instead. The RRQ goes to
 ; PORT, 69 by default, and the server's first DATA gives its TID; the
 ; packets of other hosts and TIDs are passed over. Each DATA of the block
@@ -355,6 +355,7 @@ tftp_ip
                 CALL    UDP_OPEN
                 TST     R1
         ?N      JMP     tftp_fail
+                NOT     @V_OPEN, R0     ; for files_end, at an error of a line
                 CLR     @V_TTID
                 MOVE    @V_TBLK, 1
                 CALL    bin_init
@@ -432,6 +433,7 @@ tftp_wait
                 MOVE    R4, 4
                 CALL    UDP_SEND
                 CALL    bin_last
+                CLR     @V_OPEN
                 CALL    UDP_CLOSE
                 TST     @V_TLIST
         ?!Z     RET                     ; a listing, shown
@@ -442,6 +444,7 @@ tftp_time
         ?C      JMP     tftp_wait
                 SUB[M]  R7, R7, 1
         ?!Z     JMP     tftp_send
+                CLR     @V_OPEN
                 CALL    UDP_CLOSE
                 CALL    load_part
                 MOVE    R1, S_NOTFTP
@@ -452,6 +455,7 @@ tftp_error
                 CALL    load_part
                 MOVE    R7, V_TBUF+4
                 ADD     R8, R1, V_TBUF
+                CLR     @V_OPEN
                 CALL    UDP_CLOSE
                 MOVE    R1, S_TFTPERR
                 CALL    puts_b
@@ -475,6 +479,7 @@ tftp_error
 ; An error of udp_open or udp_send: no IP address, or no route
 tftp_fail
                 MOVE    R7, R1
+                CLR     @V_OPEN
                 CALL    UDP_CLOSE
                 CALL    load_part
                 MOVE    R1, S_NOIP

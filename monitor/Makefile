@@ -218,12 +218,12 @@ FATNONE = dir\rload "hello.bin"\rdir 1\rload "hello.bin"\rhalt\r
 # reads back, and dump shows. save of 0 words truncates HELLO.BIN, which
 # load then finds empty. delete deletes test.bin, and a second delete
 # finds none. Then the arguments that are not: save alone, with a name
-# only, with no count, with a fourth number, and with a count of 33
-# bits, savex, a name that is not valid, with a colon, delete alone, with
-# two names, and deletex. On full.img, save of 256 words fills the card
+# and a comma only, with no count, with a fourth number, and with a
+# count of 33 bits, savex, a name that is not valid, with a colon,
+# delete alone, with two names, and deletex. On full.img, save of 256 words fills the card
 # with FULL.BIN's first 1536 bytes, which dir shows, and is error 30;
 # delete frees them, and a save of 2 words fits.
-FATW = load\r8000 1234ABCD\r8001 5\r\rsave "test", 0x8000, 2\rdir\rload "TEST.BIN"\rdump 0x8000, 2\rsave "hello.bin", 0x8000, 0\rload "hello.bin"\rdelete "test.bin"\rdelete "test.bin"\rsave\rsave "x"\rsave "x", 0x8000\rsave "x", 0x8000, 1, 2\rsave "x", 0x8000, 0x100000000\rsavex\rSAVE "a:b", 0x8000, 1\rdelete\rdelete "a" "b"\rdeletex\rdir 1\rsave "full.bin", 0x8000, 256\rdir\rdelete "full.bin"\rsave "full.bin", 0x8000, 2\rdir\rhalt\r
+FATW = load\r8000 1234ABCD\r8001 5\r\rsave "test", 0x8000, 2\rdir\rload "TEST.BIN"\rdump 0x8000, 2\rsave "hello.bin", 0x8000, 0\rload "hello.bin"\rdelete "test.bin"\rdelete "test.bin"\rsave\rsave "x",\rsave "x", 0x8000\rsave "x", 0x8000, 1, 2\rsave "x", 0x8000, 0x100000000\rsavex\rSAVE "a:b", 0x8000, 1\rdelete\rdelete "a" "b"\rdeletex\rdir 1\rsave "full.bin", 0x8000, 256\rdir\rdelete "full.bin"\rsave "full.bin", 0x8000, 2\rdir\rhalt\r
 # fatl: lfn.img of test/fat_image.py in slot 0, with long names. dir
 # shows them, load reads my prog.bin by its long name, which sys runs,
 # then by its 8.3 name, and by its long name in upper case; the text

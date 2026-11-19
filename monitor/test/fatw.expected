@@ -34,18 +34,22 @@ File error 21, no such file
 READY.
 save
 Syntax error
+SAVE "NAME"         save the program as the text NAME.BAS
 SAVE "NAME", A, N   save N words from A as the .bin file NAME
 READY.
-save "x"
+save "x",
 Syntax error
+SAVE "NAME"         save the program as the text NAME.BAS
 SAVE "NAME", A, N   save N words from A as the .bin file NAME
 READY.
 save "x", 0x8000
 Syntax error
+SAVE "NAME"         save the program as the text NAME.BAS
 SAVE "NAME", A, N   save N words from A as the .bin file NAME
 READY.
 save "x", 0x8000, 1, 2
 Syntax error
+SAVE "NAME"         save the program as the text NAME.BAS
 SAVE "NAME", A, N   save N words from A as the .bin file NAME
 READY.
 save "x", 0x8000, 0x100000000

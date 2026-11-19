@@ -461,7 +461,8 @@ it:
 An error of the UDP entries is negative
 ([doc/PROGRAMMING.md](../doc/PROGRAMMING.md#the-monitors-error-codes)).
 
-`LOAD "NAME.BIN", "IP"` reads a file of a TFTP server (RFC 1350), in octet mode,
+`LOAD "NAME.BIN", "IP"` reads a file of a TFTP server (RFC 1350), in octet mode, as
+`LOAD "NAME", "IP"` reads BASIC's program `NAME.BAS`,
 through the endpoint, which it opens on a port of its own choice and
 closes at the end. The RRQ goes to port 69, or to `PORT` of `IP:PORT`,
 and the server's first DATA

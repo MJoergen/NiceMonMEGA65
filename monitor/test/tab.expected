@@ -11,7 +11,8 @@ load mand"mandelbrot
 mandelbrot1.txt
 mandelbrot2.txt
 load "mandelbrot1.txt" 
-LOAD takes a .BIN file, such as LOAD "HELLO.BIN"
+Line without a number
+mandelbr line 0
 READY.
 load pad2
 PAD20.TXT
@@ -19,7 +20,8 @@ PAD21.TXT
 PAD22.TXT
 PAD23.TXT
 load pad21"PAD21.TXT" 
-LOAD takes a .BIN file, such as LOAD "HELLO.BIN"
+Line without a number
+PAD21 line 0
 READY.
 lo^C
 load x^C
@@ -37,14 +39,14 @@ load my^C
 halt
 Halted
 Screen:
-|READY.
 |load pad2
 |PAD20.TXT
 |PAD21.TXT
 |PAD22.TXT
 |PAD23.TXT
 |load "PAD21.TXT"
-|LOAD takes a .BIN file, such as LOAD "HELLO.BIN"
+|Line without a number
+|PAD21 line 0
 |READY.
 |lo^C
 |load x^C

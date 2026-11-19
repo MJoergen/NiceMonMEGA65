@@ -41,6 +41,13 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   ([#114](https://github.com/MJoergen/NiceMonMEGA65/issues/114)).
 - `INPUT`, `GET`, `DIM`, `HIMEM`, and the other keywords of stage 3
   are no names of variables any more.
+- `LOAD "NAME"` with a name that does not end in `.BIN` loads BASIC's
+  program `NAME.BAS`, where it was an error, and `SAVE "NAME"` with no
+  address writes it, where it was a `Syntax error`
+  ([#60](https://github.com/MJoergen/NiceMonMEGA65/issues/60)).
+- The tokens of `SYS`, `POKE`, `BAUD`, `DUMP`, and `DIS` changed. A
+  program keeps its text on a card, so only a dump of the tokens shows
+  it.
 
 **BASIC.**
 
@@ -60,6 +67,16 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   An error in a program says its line: `Syntax error in 20`
   ([#114](https://github.com/MJoergen/NiceMonMEGA65/issues/114),
   [basic/README.md](../basic/README.md#programs)).
+- Stage 4, the files: `SAVE "NAME"` writes the program to the card
+  as text, `NAME.BAS`, and `LOAD "NAME"` reads it back, or a text
+  written on a PC, and stops at the first line that cannot be stored.
+  `RUN "NAME"` loads and runs a program, or a `.bin` file at `0x8000`,
+  so `RUN "CHESS.BIN"` starts nice_chess, and a program may run the
+  next. `LOAD` and `RUN` read from a TFTP server too, with its IP
+  address as their second argument
+  ([#60](https://github.com/MJoergen/NiceMonMEGA65/issues/60),
+  [basic/README.md](../basic/README.md#the-statements)).
+- A line with more tokens than BASIC has room for is `Line too long`.
 - Rugg/Feldman's benchmarks 1 to 7 and the sieve are in `basic/bench/`,
   with their steps in `niceemu` in
   [doc/BASIC.md](BASIC.md#the-benchmarks).

@@ -201,16 +201,16 @@ hex.
 - **`LOAD` picks by the name.** A name that ends in `.BIN` is a file of
   address and word pairs, loaded as `load` loads it. Any other name is
   a BASIC program as text, with `.BAS` added when it has no extension
-  (#60), from stage 4 on. So `LOAD "CHESS"` looks for `CHESS.BAS`, and
-  before stage 4 it is an error that asks for a `.BIN` name. There is
+  (#60), since stage 4. So `LOAD "CHESS"` looks for `CHESS.BAS`, and
+  before stage 4 it was an error that asked for a `.BIN` name. There is
   no `BLOAD`: BASIC 65's loads bytes at an address that it is given,
   and a `.bin` file has its addresses in it.
 - **`SAVE` picks by its arguments.** `SAVE "NAME", addr, n` writes
   words as a `.bin` file, with `.BIN` added when the name has no
   extension, so that `LOAD` reads it back. `SAVE "NAME"` writes the
-  program as text, with `.BAS` added, from stage 4 on.
+  program as text, with `.BAS` added, since stage 4.
 - **A TFTP server is the second argument**, a string, of `LOAD`, of
-  `RUN` from stage 4, and of `DIR`, whose number is a slot. There is
+  `RUN` since stage 4, and of `DIR`, whose number is a slot. There is
   no `TFTP` statement. `SAVE "NAME", "IP"` is an error, as TFTP here
   only reads.
 - **A `.bin` file and BASIC share the RAM.** BASIC has its variables
@@ -221,7 +221,7 @@ hex.
   holds, as BBC BASIC has it: `PRINT HIMEM` reads it, and
   `HIMEM = 0x9000` lowers it, where the C64 has `POKE 55` and `56`.
 - **nice_chess** is then `LOAD "CHESS.BIN"` and `SYS 0x8000`, where it
-  was `load CHESS.BIN` and `r`. `RUN "CHESS.BIN"` does both, from
+  was `load CHESS.BIN` and `r`. `RUN "CHESS.BIN"` does both, since
   stage 4.
 
 ## The language
@@ -421,7 +421,7 @@ entries alone (#152). Its workspace is the program's RAM:
   0, BASIC takes the MEGA65's size.
 - The variables are 6K words, `MON_VARS` and `BASIC_WORDS`: the
   monitor's 4K and BASIC's 2K, of which its stage 3 uses 1585, and leaves 463
-  (measured 2026-11-18). BASIC's state,
+  (measured 2026-11-18), and stage 4 uses 8 words more, and leaves 455. BASIC's state,
   its line buffers, and the keys typed ahead go there. Its 4K would
   leave no room for the stack above the RAM that nice_cpu's demo tests
   on the Nexys4DDR, up to `0xDFFF` (nice_cpu#195), so it grows after
@@ -514,7 +514,8 @@ as #54 says:
   are not kept. A minus is a sign when the token before it ends no
   operand.
 - A stored line is the tokens of stage 2, at most the 160 words of
-  `V_TOK`. The tokenizer writes only `V_TOK`, and a line is stored
+  `V_TOK`. Since stage 4 the tokenizer checks that, as a line of a
+  file may have more, and such a line is `Line too long`. The tokenizer writes only `V_TOK`, and a line is stored
   after the whole of it is tokenized, so a line that fails leaves the
   program as it was. That settles S4 of #151, as stage 2 reads a
   string from its token and no longer writes a 0 into the line.
@@ -786,7 +787,17 @@ Each has an issue, under #54.
    ([The ROM's room](#the-roms-room)); its benchmarks' steps are in
    [The benchmarks](#the-benchmarks) (measured 2026-11-18).
 4. **Files**, #60: `SAVE "NAME"`, `LOAD "NAME"`, and `RUN "NAME"`,
-   from the card and from TFTP.
+   from the card and from TFTP. It is written, mostly in
+   `basic/basic_cmd.nasm`, on the entries that stage 1 has, and
+   measured 459 words ([The ROM's room](#the-roms-room)) (measured
+   2026-11-18). `SAVE` writes `LIST`'s text, each line ended by LF,
+   through a `putc` of BASIC's own, which `LIST` and the numbers of
+   `PRINT` write with. `LOAD` stores each line as `enter_line` does,
+   and does the `NEW` at the first line, so a file that is not there
+   keeps the program. The first line that cannot be stored ends the
+   load, with its error and the line, and the lines before it stay
+   (decided on 2026-11-18). A line of a file has up to 254
+   characters, as `LIST` writes a line longer than it was typed.
 5. **Strings**, #116. `$` variables and arrays, the heap with back
    pointers and its one sweep, the functions of #54 and `HEX$`,
    `INPUT` of strings, `DATA`, `READ`, `RESTORE`, and `TIME$`.
@@ -910,13 +921,13 @@ in C that the note had before 2026-11-16:
 | 2. The port of the shell, measured | -1325 | -364 |
 | 2. Numbers, measured | 1383 | 1019 |
 | 3. Programs, measured | 2545 | 3564 |
-| 4. Files | 400 | 3964 |
-| 5. Strings | 1900 | 5864 |
-| 6. Functions | 200 | 6064 |
-| 7. The editor and its statements | 2000 | 8064 |
-| 8. Structure | 1400 | 9464 |
-| 9. Errors | 400 | 9864 |
-| 10. The machine | 700 | 10564 |
+| 4. Files, measured | 459 | 4023 |
+| 5. Strings | 1900 | 5923 |
+| 6. Functions | 200 | 6123 |
+| 7. The editor and its statements | 2000 | 8123 |
+| 8. Structure | 1400 | 9523 |
+| 9. Errors | 400 | 9923 |
+| 10. The machine | 700 | 10623 |
 
 Stage 1 was `basic.c`, 1510 words, and `basic.nasm`, 624, of which 431
 were its packed texts, the help among them, less 1032 words that left
@@ -946,8 +957,10 @@ Since #152 the ROM is two images, and BASIC's is `0x4000`–`0x7FFF`,
 `0x4000` (measured 2026-11-18). Stage 2 fills 1383 words more, 6450,
 and leaves 9934 free (measured 2026-11-18). Stage 3 fills 2545 words
 more, 9026, where 2100 were guessed, and leaves 7358 free (measured
-2026-11-18). The list after stage 3 is guessed at 7000 words in the
-table above, which fits, with little to spare.
+2026-11-18). Stage 4 fills 459 words more, 9485, where 400 were
+guessed, and leaves 6899 free (measured 2026-11-18). The list after
+stage 4 is guessed at 6600 words in the table above, which fits, with
+little to spare.
 The split is one constant, `BASIC_BASE` of `monitor/common.nasm`: at
 `0x3000`, BASIC would have 20480 words, and the monitor 2746 free.
 
@@ -981,7 +994,8 @@ that is open when it is done.
   #60, and #62 (decided on 2026-11-18). Neither changes the monitor,
   so it can be a release of BASIC alone: `BASIC-V2.3.2.ROM` for the
   card, with the bitstreams and the core files of `V2.3.1`. Stage 4,
-  which ends #60, comes with them, or in a release after. The stages
+  which ends #60, comes with them, and needs nothing new of the
+  monitor either. The stages
   from 5 on have no milestone yet.
 - **A stage that changes the monitor waits for a release with a
   bitstream.** Stage 7, the editor, is the first.

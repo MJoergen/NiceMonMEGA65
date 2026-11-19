@@ -73,8 +73,9 @@ There are three ways to use the system:
 With nothing connected but a screen, the MEGA65 starts the
 [monitor](monitor/README.md) from the ROM. It shows its version and
 `READY.`, and takes a statement of its BASIC on each line. BASIC is
-young: so far it has the monitor's commands, and no variables or
-programs yet ([doc/BASIC.md](doc/BASIC.md)).
+young: so far it has the monitor's commands, numbers, variables, and
+programs, which a card keeps, but no strings yet
+([doc/BASIC.md](doc/BASIC.md)).
 
 | Statement | What it does |
 |---|---|
@@ -82,7 +83,9 @@ programs yet ([doc/BASIC.md](doc/BASIC.md)).
 | `DIR` | Lists the files on the SD card |
 | `LOAD "NAME.BIN"` | Loads a program from the SD card |
 | `SYS 0x8000` | Runs the program that was loaded |
+| `RUN "NAME.BIN"` | Loads a program from the SD card and runs it |
 | `SAVE "NAME", A, N` | Saves N words of memory, from A on, to the SD card |
+| `SAVE "NAME"`, `LOAD "NAME"` | Saves BASIC's program to the SD card as the text `NAME.BAS`, and loads it |
 | `LOAD` | Loads a program that you type or paste, as the lines of its `.bin` file |
 
 Keywords are in either case, and numbers in decimal, or in hex after

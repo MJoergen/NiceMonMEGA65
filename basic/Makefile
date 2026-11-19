@@ -179,6 +179,18 @@ EXPR = ? 1+2*3, (1+2)*3, 2*3+1, 10-2-3, 100/10/5\r? -2*3, - 3 + 4, +5, --5, 2*-3
 # of a GOSUB without end, and a Syntax error, which shows its lines of
 # HELP; and the line numbers that are none: an expression, a fraction,
 # and a number in hex.
+# files: the programs' texts on a card (issue #60), test/files.in typed
+# line by line, on a copy of super.img with the files of
+# test/files_card.py. A program with each kind of token is saved as
+# PROG.BAS, loaded after NEW, listed, and run, and run with RUN "PROG",
+# which clears X. PC.BAS, as a PC writes it, loads and runs. BAD.BAS,
+# LONG.BAS, WIDE.BAS, and HIGH.BAS each end the load at a line, which is
+# shown, with the lines before it kept; NONE.BAS is not there, so LOAD
+# and RUN keep the program. SAVE and LOAD of a name with a dot, T.TXT,
+# and of an empty program, RUN "HELLO.BIN", which calls it at 0x8000,
+# RUN with a number or a word after its name, a program that runs the
+# next, SAVE to TFTP, and a CTRL-C that breaks a SAVE, whose file is
+# closed, and empty, which LOAD then passes over. DIR lists the files.
 # keys: INPUT, GET, the break key, and the keys typed ahead (issue
 # #114). INPUT of two numbers, with too few, which ask for the rest with
 # ??, too many, which are Extra ignored, a line that is no number, two
@@ -296,7 +308,7 @@ bench: $(ROM_TEST)
 # the card holds that the image did not (fat_tool.py diff, the dates
 # masked) and the order of its sector writes, from a second run with -t
 # (fat_tool.py order).
-test: fmt $(ROM_TEST) test/prog.bas test/arr.bas $(BUILD)/dis.bin $(MON)/build/hello.bin $(MON)/build/fat/super.img
+test: fmt $(ROM_TEST) test/prog.bas test/arr.bas test/files.in test/files_card.py $(BUILD)/dis.bin $(MON)/build/hello.bin $(MON)/build/fat/super.img
 	@test '$(FOLDER_UC)' = NICE || { echo "make test needs FOLDER=NICE, not $(FOLDER)"; exit 1; }
 	@$(BAS_ROM) check $(BUILD)/basic_image_test.bin > $(BUILD)/header.out
 	@if grep -qx '$(BUILD)/basic_image_test.bin: $(HEADER_TEST)' $(BUILD)/header.out; \
@@ -316,11 +328,12 @@ test: fmt $(ROM_TEST) test/prog.bas test/arr.bas $(BUILD)/dis.bin $(MON)/build/h
 	@printf '$(TIME)' > $(BUILD)/time.txt
 	@tr '\n' '\r' < test/prog.bas > $(BUILD)/prog.txt
 	@tr '\n' '\r' < test/arr.bas > $(BUILD)/arr.txt
+	@tr '\n' '\r' < test/files.in > $(BUILD)/files.txt
 	@printf '$(KEYS)' > $(BUILD)/keys.txt
 	@{ printf '$(LOAD_HEAD)'; head -n 3 $(MON)/build/hello.bin | awk '{ printf "%s\r\n", $$0 }'; \
 	  tail -n +4 $(MON)/build/hello.bin; printf '$(LOAD_TAIL)'; } > $(BUILD)/load.txt
 	@fail=0; \
-	for t in cmds basic expr prog keys arr load load_emu load_64k time; do \
+	for t in cmds basic expr prog keys arr load load_emu load_64k time files; do \
 	  opts=; sd=; base0=; \
 	  case $$t in \
 	    cmds) prog=; dump='$(DUMP_cmds)';; \
@@ -331,9 +344,11 @@ test: fmt $(ROM_TEST) test/prog.bas test/arr.bas $(BUILD)/dis.bin $(MON)/build/h
 	    load_emu) prog=; dump='$(DUMP_load_emu)';; \
 	    load_64k) prog=$(BUILD)/ram64k.bin; dump='$(DUMP_load_64k)';; \
 	    time) prog=; dump=; base0=$(MON)/build/fat/super.img; opts=--step-time;; \
+	    files) prog=; dump=; base0=$(MON)/build/fat/super.img; opts=--step-time;; \
 	  esac; \
 	  card() { if [ -n "$$base0" ]; then \
-	    cp --sparse=always $$base0 $(BUILD)/$${t}0.img; sd="--sd0 $(BUILD)/$${t}0.img"; fi; }; \
+	    cp --sparse=always $$base0 $(BUILD)/$${t}0.img; sd="--sd0 $(BUILD)/$${t}0.img"; fi; \
+	    if [ $$t = files ]; then $(PYTHON) test/files_card.py $(BUILD)/files0.img; fi; }; \
 	  card; \
 	  cat $(ROM_TEST) $$prog > $(BUILD)/$$t.full.bin; \
 	  $(EMU) -s -n $(MAX_STEPS) -i $(BUILD)/$$t.txt $$dump $$opts $$sd $(BUILD)/$$t.full.bin \
@@ -347,7 +362,11 @@ test: fmt $(ROM_TEST) test/prog.bas test/arr.bas $(BUILD)/dis.bin $(MON)/build/h
 	      $(PYTHON) $(MON_TEST)/fat_tool.py diff --mask-times $$base0 $(BUILD)/time0.img; \
 	      card; \
 	      $(EMU) -t -n $(MAX_STEPS) -i $(BUILD)/$$t.txt $$opts $$sd $(BUILD)/$$t.full.bin | \
-	        $(PYTHON) $(MON_TEST)/fat_tool.py order --sd0 $$base0; fi; } \
+	        $(PYTHON) $(MON_TEST)/fat_tool.py order --sd0 $$base0; fi; \
+	    if [ $$t = files ]; then \
+	      $(PYTHON) $(MON_TEST)/fat_check.py $(BUILD)/files0.img; \
+	      for f in PROG.BAS T.TXT EMPTY.BAS; do echo "$$f:"; \
+	        mtype -i $(BUILD)/files0.img ::NICE/$$f | od -An -c; done; fi; } \
 	    > $(BUILD)/$$t.out; \
 	  if cmp -s test/$$t.expected $(BUILD)/$$t.out; then echo "PASS basic $$t"; \
 	  else echo "FAIL basic $$t"; diff test/$$t.expected $(BUILD)/$$t.out; fail=1; fi; \

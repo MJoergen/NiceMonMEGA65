@@ -160,16 +160,23 @@ PUNCTS
                 .DAT    0x3B, T_SEMI, 0x3A, T_COLON, 0x3F, T_PRINT, 0
 
 ; tokenize: the line at V_LINE as tokens at V_TOK, and R8 at their 0.
-; tokenize_at: the same, from R5; tokenize_to: from R5 to R8. An error
-; goes to err, with the last statement's keyword before it in V_KW, for
-; its lines of HELP. Uses R1-R12.
+; tokenize_at: the same, from R5; tokenize_to: from R5 to R8, with the
+; limit of the tokens at V_TLIM. A token starts below the limit, and a
+; character of a string or of REM goes below it, so that the line's
+; tokens end below the limit plus 6, or else the line is too long, which
+; a line of a file may be. An error goes to err, with the last
+; statement's keyword before it in V_KW, for its lines of HELP. Uses
+; R1-R12.
 tokenize
                 MOVE    R5, V_LINE
 tokenize_at
                 MOVE    R8, V_TOK
+                MOVE    @V_TLIM, V_TOK+TOK_MAX-6
 tokenize_to
                 MOVE    @V_KW, R0
 tok_next
+                CMP     R8, @V_TLIM
+        ?!C     JMP     err_long
                 MOVE    R1, @R5
                 CMP     R1, 0x20
         ?Z      MOVE    R5++, R5
@@ -239,6 +246,8 @@ tok_string
                 MOVE    R5++, R5
                 CMP     R1, 0x22
         ?Z      JMP     :+
+                CMP     R8, @V_TLIM
+        ?!C     JMP     err_long
                 MOVE    @R8++, R1
                 MOVE    R2++, R2
                 JMP     :-
@@ -285,6 +294,8 @@ tok_name
 :
                 MOVE[M] R1, @R5++
         ?Z      JMP     :+
+                CMP     R8, @V_TLIM
+        ?!C     JMP     err_long
                 MOVE    @R8++, R1
                 MOVE    R2++, R2
                 JMP     :-
@@ -928,10 +939,10 @@ put_num
                 AND[M]  R0, R1, FPU_ZERO
         ?!Z     MOVE    @FPU_CMD, FPU_DROP
         ?!Z     MOVE    R1, 0x30
-        ?!Z     JMP     MON_PUTC        ; which returns to the caller
+        ?!Z     JMP     putc            ; which returns to the caller
                 AND[M]  R0, R1, FPU_NEGATIVE
         ?!Z     MOVE    R1, 0x2D        ; -
-        ?!Z     CALL    MON_PUTC
+        ?!Z     CALL    putc
                 MOVE    @FPU_CMD, FPU_DIGITS15
                 MOVE    R7, @FPU_X_W    ; the exponent
                 MOVE    @FPU_CMD, FPU_DROP
@@ -969,15 +980,15 @@ put_bcd
                 JMP     pn_frac
 :
                 MOVE    R1, 0x30        ; 0.
-                CALL    MON_PUTC
+                CALL    putc
                 MOVE    R1, 0x2E
-                CALL    MON_PUTC
+                CALL    putc
                 NOT     R12, R7         ; -e - 1 zeros
 :
                 TST     R12
         ?Z      JMP     :+
                 MOVE    R1, 0x30
-                CALL    MON_PUTC
+                CALL    putc
                 SUB     R12, R12, 1
                 JMP     :-
 :
@@ -989,20 +1000,20 @@ pn_exp
                 SUB[M]  R11, R11, 1
         ?!Z     CALL    pn_frac
                 MOVE    R1, 0x45        ; E
-                CALL    MON_PUTC
+                CALL    putc
                 MOVE    R1, 0x2B        ; +
                 TST     R7
         ?N      MOVE    R1, 0x2D        ; -
         ?N      SUB     R7, R0, R7
-                CALL    MON_PUTC
+                CALL    putc
                 CMP     R7, 10
         ?C      MOVE    R1, 0x30
-        ?C      CALL    MON_PUTC
+        ?C      CALL    putc
                 MOVE    R1, R7
-                JMP     _io_putdec      ; which returns to the caller
+                JMP     putdec          ; which returns to the caller
 pn_frac
                 MOVE    R1, 0x2E        ; the point, and R11 digits
-                CALL    MON_PUTC
+                CALL    putc
                 MOVE    R12, R11
 ; put_digits: the first R12 digits of R9:R10, which move up. Uses R1-R6.
 put_digits
@@ -1015,7 +1026,7 @@ put_digits
                 OR      R9, R9, R2
                 SHL     R10, R10, 4
                 ADD     R1, R1, 0x30
-                CALL    MON_PUTC
+                CALL    putc
                 SUB     R12, R12, 1
                 JMP     :-
 
@@ -1066,6 +1077,15 @@ err_redim
                 JMP     err
 err_cont
                 MOVE    R1, S_CONT
+                JMP     err
+err_long
+                MOVE    R1, S_LONG
+                JMP     err
+err_nonum
+                MOVE    R1, S_NONUM
+                JMP     err
+err_char
+                MOVE    R1, S_CHAR
 err
                 MOVE    @FPU_CMD, FPU_CLEAR
                 MOVE    SP, STACK
@@ -1078,6 +1098,8 @@ err
                 CALL    drop_run        ; no frames, and no CONT
                 MOVE    R1, R7
                 CALL    put_msg         ; with the line's number in a program
+                TST     @V_LBAS
+        ?!Z     CALL    show_bline      ; the line of LOAD's file
                 CMP     R7, S_SYNTAX
         ?!Z     JMP     main
                 MOVE[M] R1, @V_KW
@@ -1110,3 +1132,6 @@ S_COMPLEX
 S_UNDEF         .ASCII_B 'Undefined variable'
 S_MEMORY
                 .ASCII_B 'Out of memory'
+S_LONG          .ASCII_B 'Line too long'
+S_NONUM         .ASCII_B 'Line without a number'
+S_CHAR          .ASCII_B 'A byte that is no character'

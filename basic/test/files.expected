@@ -1,0 +1,203 @@
+NiceMon V9.9, BASIC V9.9
+HELP lists the statements
+READY.
+10 REM STAGE 4: "QUOTES" AND ? STAY
+20 FOR I = 1 TO 3: ? I;: NEXT: PRINT
+30 PRINT "X=";.5;1E20;0x1F;-2; 7 DIV 2
+40 IF I > 3 THEN 60 ELSE GOTO 50
+50 GOSUB 70: END
+60 DIM A(3): A(1) = I: PRINT A(1): GOTO 50
+70 RETURN
+SAVE "PROG"
+READY.
+NEW
+READY.
+LIST
+READY.
+LOAD "PROG"
+READY.
+LIST
+10 REM STAGE 4: "QUOTES" AND ? STAY
+20 FOR I = 1 TO 3: PRINT I;: NEXT: PRINT
+30 PRINT "X="; 0.5; 1E+20; 0x1F; -2; 7 DIV 2
+40 IF I > 3 THEN 60 ELSE GOTO 50
+50 GOSUB 70: END
+60 DIM A(3): A(1) = I: PRINT A(1): GOTO 50
+70 RETURN
+READY.
+RUN
+123
+X=0.51E+2031-23
+4
+READY.
+X = 5
+READY.
+RUN "PROG"
+123
+X=0.51E+2031-23
+4
+READY.
+? X
+Undefined variable
+READY.
+LOAD "pc"
+READY.
+LIST
+10 REM written on a pc
+20 FOR I = 1 TO 3: PRINT I;: NEXT
+30 PRINT "done"
+40 END
+READY.
+RUN
+123done
+READY.
+LOAD "BAD"
+Line without a number
+PRINT "NO NUMBER"
+READY.
+LIST
+10 PRINT "BEFORE"
+READY.
+LOAD "LONG"
+Line too long
+10 ? .5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,.5,
+READY.
+LIST
+5 PRINT "FIRST"
+READY.
+LOAD "WIDE"
+Line too long
+10 REM XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+READY.
+LOAD "HIGH"
+A byte that is no character
+10 PRINT ""
+READY.
+LIST
+5 PRINT "FIRST"
+READY.
+LOAD "NONE"
+File error 21, no such file
+READY.
+LIST
+5 PRINT "FIRST"
+READY.
+RUN "NONE"
+File error 21, no such file
+READY.
+SAVE "T.TXT"
+READY.
+LOAD "T.TXT"
+READY.
+LIST
+5 PRINT "FIRST"
+READY.
+NEW
+READY.
+SAVE "EMPTY"
+READY.
+LOAD "EMPTY"
+READY.
+LIST
+READY.
+RUN "HELLO.BIN"
+Words loaded: 800, 00008000 to 0000831F
+Hello from 00008000, table 00010007
+at column 40
+on the line only
+Returned 0000002A
+READY.
+RUN "PROG", 1
+Syntax error
+RUN [N]             run the program, from line N or its first, after CLR
+RUN "NAME" [, "IP"] load NAME and run it; NAME.BIN at 0x8000
+READY.
+RUN "PROG", "1.2.3.4" X
+Syntax error
+RUN [N]             run the program, from line N or its first, after CLR
+RUN "NAME" [, "IP"] load NAME and run it; NAME.BIN at 0x8000
+READY.
+10 RUN "PC"
+RUN
+123done
+READY.
+SAVE "P", "1.2.3.4"
+SAVE writes to the SD card: TFTP only loads
+READY.
+SAVE "BRK"
+Break
+READY.
+LOAD "BRK"
+READY.
+LIST
+10 REM written on a pc
+20 FOR I = 1 TO 3: PRINT I;: NEXT
+30 PRINT "done"
+40 END
+READY.
+DIR
+Directory of NICE
+HELLO.BIN                      14400
+PC.BAS                            94
+BAD.BAS                           53
+LONG.BAS                         232
+WIDE.BAS                         301
+HIGH.BAS                          13
+PROG.BAS                         225
+T.TXT                             16
+EMPTY.BAS                          0
+BRK.BAS                            0
+Files: 10, directories: 0
+READY.
+HALT
+Halted
+Screen:
+|LOAD "BRK"
+|READY.
+|LIST
+|10 REM written on a pc
+|20 FOR I = 1 TO 3: PRINT I;: NEXT
+|30 PRINT "done"
+|40 END
+|READY.
+|DIR
+|Directory of NICE
+|HELLO.BIN                      14400
+|PC.BAS                            94
+|BAD.BAS                           53
+|LONG.BAS                         232
+|WIDE.BAS                         301
+|HIGH.BAS                          13
+|PROG.BAS                         225
+|T.TXT                             16
+|EMPTY.BAS                          0
+|BRK.BAS                            0
+|Files: 10, directories: 0
+|READY.
+|HALT
+|Halted
+VBASE at the halt 000000
+exit 0
+fsck.fat -n:
+Free cluster summary uninitialized (should be 128984)
+IMAGE: 11 files, 38/129022 clusters
+Files in NICE: HELLO.BIN PC.BAS BAD.BAS LONG.BAS WIDE.BAS HIGH.BAS PROG.BAS T.TXT EMPTY.BAS BRK.BAS
+PROG.BAS:
+   1   0       R   E   M       S   T   A   G   E       4   :    
+   "   Q   U   O   T   E   S   "       A   N   D       ?       S
+   T   A   Y  \n   2   0       F   O   R       I       =       1
+       T   O       3   :       P   R   I   N   T       I   ;   :
+       N   E   X   T   :       P   R   I   N   T  \n   3   0    
+   P   R   I   N   T       "   X   =   "   ;       0   .   5   ;
+       1   E   +   2   0   ;       0   x   1   F   ;       -   2
+   ;       7       D   I   V       2  \n   4   0       I   F    
+   I       >       3       T   H   E   N       6   0       E   L
+   S   E       G   O   T   O       5   0  \n   5   0       G   O
+   S   U   B       7   0   :       E   N   D  \n   6   0       D
+   I   M       A   (   3   )   :       A   (   1   )       =    
+   I   :       P   R   I   N   T       A   (   1   )   :       G
+   O   T   O       5   0  \n   7   0       R   E   T   U   R   N
+  \n
+T.TXT:
+   5       P   R   I   N   T       "   F   I   R   S   T   "  \n
+EMPTY.BAS:

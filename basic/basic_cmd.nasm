@@ -16,8 +16,9 @@
 ; 0, and E = 0 (ABI.md, "Programs under a monitor"), and at its return
 ; restores what mon_exit restores and shows the status. DIR lists the
 ; folder NICE of an SD card's FAT32 file system, LOAD "NAME.BIN" reads a
-; .bin file from it as LOAD reads lines, SAVE writes one, and DELETE
-; deletes a file, with monitor_fat.nasm, whose routines are also the
+; .bin file from it as LOAD reads lines, SAVE writes one, LOAD "NAME"
+; and SAVE "NAME" read and write a program's text (issue #60), and
+; DELETE deletes a file, with monitor_fat.nasm, whose routines are also the
 ; entries 9 to 15, fs_mount, fs_open, fs_read, fs_readdir,
 ; fs_close, fs_write, and fs_delete (issues #58 and #59). TIME, the
 ; clock of the time of day, is clock_cmd of basic_time.nasm, which
@@ -369,8 +370,9 @@ bin_call
                 MOVE    R2, V_LSTATS
                 JMP     BIN_LINE        ; which returns to the caller
 
-; bin_init: the 7 counts of bin_line at V_LSTATS cleared, V_LPOS at
-; V_LINE, and V_LEND 0. Uses R1 and R2.
+; bin_init: the 7 counts of bin_line at V_LSTATS cleared, the line at
+; V_LBEG, V_LINE, or V_BLINE for a program's text, with its limit at
+; V_LLIM, V_LPOS at it, and V_LEND 0. Uses R1 and R2.
 bin_init
                 MOVE    R1, V_LSTATS
                 MOVE    R2, 7
@@ -378,7 +380,14 @@ bin_init
                 CLR     @R1++
                 SUB[M]  R2, R2, 1
         ?!Z     JMP     :-
-                MOVE    @V_LPOS, V_LINE
+                MOVE    R1, V_LINE
+                MOVE    R2, V_LINE+LINE_MAX
+                TST     @V_LBAS
+        ?!Z     MOVE    R1, V_BLINE
+        ?!Z     MOVE    R2, V_BLINE+BLINE_MAX
+                MOVE    @V_LBEG, R1
+                MOVE    @V_LLIM, R2
+                MOVE    @V_LPOS, R1
                 CLR     @V_LEND
                 RET
 
@@ -386,10 +395,10 @@ bin_init
 ; the line at V_LPOS. CR, LF, or CR LF ends a line, which bin_eol takes.
 ; TAB is a blank, and a byte that is no character, any other control
 ; code, DEL, or one from 0x80, is kept as 0x7F, so that bin_line skips
-; its line, as niceemu rejects it. The blanks after LINE_MAX are dropped,
-; as niceemu ignores them, and the first other byte after it is kept as
-; 0x7F at LINE_MAX, and the rest dropped. V_LEND is the byte before.
-; Uses R1-R6.
+; its line, as niceemu rejects it, and the tokenizer fails it. The blanks
+; after the line's limit, V_LLIM, are dropped, as niceemu ignores them,
+; and the first other byte after it is kept as 0x7F at the limit, and
+; the rest dropped. V_LEND is the byte before. Uses R1-R6.
 bin_char
                 MOVE    R2, @V_LEND
                 MOVE    @V_LEND, R1
@@ -407,10 +416,10 @@ bin_char
                 CMP     R2, 0x5F
         ?!C     MOVE    R1, 0x7F        ; no character: the line skipped
                 MOVE    R6, @V_LPOS
-                CMP     R6, V_LINE+LINE_MAX
+                MOVE    R3, @V_LLIM
+                CMP     R6, R3
         ?C      JMP     :+              ; room
-                CMP     R6, V_LINE+LINE_MAX+1
-        ?Z      RET                     ; the 0x7F is there already
+        ?!Z     RET                     ; the 0x7F is there already
                 CMP     R1, 0x20
         ?Z      RET                     ; a blank after LINE_MAX, dropped
                 MOVE    R1, 0x7F        ; more after LINE_MAX: skipped
@@ -420,15 +429,18 @@ bin_char
                 RET
 ; bin_last: the last line of a file, when it has no end, to bin_eol
 bin_last
-                CMP     @V_LPOS, V_LINE
+                CMP     @V_LPOS, @V_LBEG
         ?Z      RET
-; bin_eol: the line at V_LINE, up to V_LPOS, shown for a listing of
-; TFTP, when V_TLIST is not 0, or else to bin_line, or counted and passed
-; over when it is empty. Uses R1-R6.
+; bin_eol: the line at V_LBEG, up to V_LPOS, stored by bas_eol for a
+; program's text, shown for a listing of TFTP, when V_TLIST is not 0, or
+; else to bin_line, or counted and passed over when it is empty. Uses
+; R1-R6, and keeps the others.
 bin_eol
                 MOVE    R6, @V_LPOS
-                MOVE    @V_LPOS, V_LINE
+                MOVE    @V_LPOS, @V_LBEG
                 CLR     @R6
+                TST     @V_LBAS
+        ?!Z     JMP     bas_eol
                 MOVE    R1, V_LINE
                 TST     @V_TLIST
         ?!Z     JMP     puts_crlf       ; a line of a listing, shown
@@ -444,6 +456,8 @@ load_done
                 MOVE    R1, @V_LOUT
                 CALL    MON_OUT
 load_summary
+                TST     @V_LBAS
+        ?!Z     RET                     ; a program's text: no summary
                 MOVE    R1, S_LOADED
                 CALL    puts_b
                 MOVE    R1, @V_LSTATS
@@ -603,14 +617,16 @@ decimal
 ; them before it, with load_part, and leaves the words of the lines
 ; before it written. The reads start at 0 and a sector has 512 bytes,
 ; so an error of a sector or a cluster comes at the start of a read, and
-; no byte before it is lost. basic.nasm has checked the name's .BIN. R8
-; is the handle, R9 the bytes left of a read, and R10 the next.
+; no byte before it is lost. basic.nasm has checked the name's .BIN,
+; or set V_LBAS for a program's text, whose lines bas_eol stores. R8 is
+; the handle, R9 the bytes left of a read, and R10 the next.
 st_load
                 CLR     R2              ; to read
                 CALL    FS_OPEN
                 TST     R1
         ?N      JMP     fs_fail
                 MOVE    R8, R1          ; the handle
+                ADD     @V_OPEN, R1, 1  ; for files_end, at an error of a line
                 CALL    bin_init
                 CLR     @V_TLIST        ; no listing
 load_read
@@ -632,6 +648,7 @@ load_byte
                 CALL    bin_last
                 CLR     R9
 :
+                CLR     @V_OPEN
                 MOVE    R1, R8
                 CALL    FS_CLOSE
                 MOVE    R1, R9
@@ -706,6 +723,174 @@ save_end
                 CALL    _io_puthex
 :
                 JMP     _io_crlf        ; which returns to the caller
+
+; bas_eol: a line of a program's text, at V_BLINE up to R6, from LOAD
+; "NAME" or RUN "NAME". A line of blanks only is passed over, and one that
+; starts with a number is stored, with enter_store (basic_prog.nasm), as
+; a line typed in is, after a NEW at the first. Any other line, one with
+; a 0x7F of bin_char, and one that cannot be stored, is an error, which
+; ends the load: err shows the line after the error, and main closes the
+; file with files_end. The lines before it stay. Keeps R7-R12, which
+; st_load and st_tftp use.
+bas_eol
+                MOVE    R5, V_BLINE
+:
+                MOVE[M] R1, @R5++
+        ?Z      JMP     :+
+                CMP     R1, 0x7F
+        ?!Z     JMP     :-
+                CMP     R5, V_BLINE+BLINE_MAX+1
+        ?Z      JMP     err_long        ; the 0x7F after the limit
+                JMP     err_char
+:
+                MOVE    R5, V_BLINE
+:
+                CMP     @R5, 0x20
+        ?Z      MOVE    R5++, R5
+        ?Z      JMP     :-
+                TST     @R5
+        ?Z      RET                     ; blanks only
+                SUB     R1, @R5, 0x30
+                CMP     R1, 10
+        ?!C     JMP     err_nonum
+                CMP     @V_LBAS, 1
+        ?Z      CALL    new_prog        ; the first line
+                MOVE    @V_LBAS, 2
+                PUSH    R7
+                PUSH    R8
+                PUSH    R9
+                PUSH    R10
+                PUSH    R11
+                PUSH    R12
+                CALL    enter_store
+                POP     R12
+                POP     R11
+                POP     R10
+                POP     R9
+                POP     R8
+                POP     R7
+                RET
+
+; show_bline: the line of a program's text that an error ended LOAD at,
+; at V_BLINE, without its 0x7F, and CR LF. Uses R1-R4, and R7, saved.
+show_bline
+                PUSH    R7
+                MOVE    R7, V_BLINE
+:
+                MOVE[M] R1, @R7++
+        ?Z      JMP     :+
+                CMP     R1, 0x7F
+        ?!Z     CALL    MON_PUTC
+                JMP     :-
+:
+                POP     R7
+                JMP     _io_crlf        ; which returns to the caller
+
+; SAVE "NAME": R1 the name, with .BAS when it had no dot. The program
+; written to the file NAME of the card's folder, which fs_open, entry 10,
+; makes or truncates, as the text that LIST gives, each line ended by LF,
+; as niceasm's .bin files are. LIST writes it with putc, into V_FBUF,
+; which flush writes with fs_write, entry 14. The first error of a write
+; is kept in V_SERR, and shown at the end, after the close; a line that
+; does not fit on the card is error 30. The break key ends the SAVE
+; at its line, and main closes the file with files_end.
+st_text
+                MOVE    R2, 1           ; to write
+                CALL    FS_OPEN
+                TST     R1
+        ?N      JMP     fs_fail
+                ADD     @V_OPEN, R1, 1
+                CLR     @V_SERR
+                MOVE    @V_SPOS, V_FBUF
+                CLR     R10             ; from the first line
+                MOVE    R11, LINE_LAST  ; to the last
+                CALL    list_from
+                CALL    flush
+                CLR     @V_SPOS
+                SUB     R1, @V_OPEN, 1
+                CLR     @V_OPEN
+                CALL    FS_CLOSE
+                MOVE[M] R2, @V_SERR
+        ?!Z     MOVE    R1, R2          ; the error of a write, before the close's
+                TST     R1
+        ?N      JMP     fs_fail
+                RET
+
+; flush: the bytes in V_FBUF up to V_SPOS written to the file of SAVE,
+; unless a write failed before, and V_SPOS at V_FBUF again. A write that
+; fails, or writes fewer bytes, sets V_SERR. Uses R1-R4.
+flush
+                SUB[M]  R3, @V_SPOS, V_FBUF
+        ?Z      RET
+                MOVE    @V_SPOS, V_FBUF
+                TST     @V_SERR
+        ?!Z     RET
+                PUSH    R5
+                PUSH    R6
+                PUSH    R3
+                SUB     R1, @V_OPEN, 1
+                MOVE    R2, V_FBUF
+                CALL    FS_WRITE
+                POP     R3
+                TST     R1
+        ?N      JMP     :+
+                CMP     R1, R3
+        ?Z      JMP     :++
+                MOVE    R1, -30         ; the card is full
+:
+                MOVE    @V_SERR, R1
+:
+                POP     R6
+                POP     R5
+                RET
+
+; putc: the character R1 to mon_putc, entry 3, or into V_FBUF while SAVE
+; writes a program's text, and V_FBUF to the file when it is full. LIST
+; and the numbers of PRINT write with it. Uses R1-R4, as mon_putc does.
+putc
+                MOVE[M] R2, @V_SPOS
+        ?Z      JMP     MON_PUTC
+                MOVE    @R2++, R1
+                MOVE    @V_SPOS, R2
+                CMP     R2, V_FBUF+FBUF_BYTES
+        ?C      RET
+                JMP     flush
+
+; putdec: R1 in decimal, unsigned, with putc, as _io_putdec writes it
+; with mon_putc. Uses R1-R4, and R7 across the calls, saved.
+putdec
+                PUSH    R7
+                CLR     R7              ; the digits pushed
+                MOVE    @io.mpu_b, 10
+:
+                MOVE    @io.mpu_a, R1
+                PUSH    @io.mpu_udivr
+                ADD     R7, R7, 1
+                MOVE[M] R1, @io.mpu_udivq
+        ?!Z     JMP     :-
+:
+                ADD     R1, @R13++, 0x30
+                CALL    putc
+                SUB[M]  R7, R7, 1
+        ?!Z     JMP     :-
+                POP     R7
+                RET
+
+; files_end: the file of LOAD or SAVE, or TFTP's endpoint, that an error
+; or the break key left open, closed, and the load and the save of a
+; program's text ended, for main. The lines that SAVE has in V_FBUF are
+; written first. Uses R1-R6.
+files_end
+                CLR     @V_LBAS
+                TST     @V_SPOS
+        ?!Z     CALL    flush
+                CLR     @V_SPOS
+                MOVE[M] R1, @V_OPEN
+        ?Z      RET
+                CLR     @V_OPEN
+        ?N      JMP     UDP_CLOSE       ; which returns to the caller
+                SUB     R1, R1, 1
+                JMP     FS_CLOSE        ; which returns to the caller
 
 ; hex8: R1 in 8 hex digits in lower case at R2, one a word, which moves
 ; on. Uses R1, R3, and R4.

@@ -240,7 +240,8 @@ declares the entries with `monitor/mon.h`, and is built with:
 
 **Loading.** On the board, BASIC's `LOAD "NAME.BIN"` reads the `.bin`
 file from the SD card, `LOAD "NAME.BIN", "IP"` from the network, and
-`LOAD` from a paste, and `SYS 0x8000` runs it. From a PC, `tools/load.py --monitor` loads and runs it
+`LOAD` from a paste, and `SYS 0x8000` runs it. `RUN "NAME.BIN"` does
+both. From a PC, `tools/load.py --monitor` loads and runs it
 ([tools/README.md](../tools/README.md#running-a-program-under-the-monitor)).
 
 **In the emulator.** `niceemu` has no ROM. There the monitor is a

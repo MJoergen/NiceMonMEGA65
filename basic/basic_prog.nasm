@@ -90,8 +90,11 @@ get_lineno
 
 ; enter_line: the line at R5 that starts with a number, stored, or
 ; replacing the line of that number, or deleting it when nothing
-; follows the number. Then main_line, with no READY.
+; follows the number. Then main_line, with no READY. enter_store: the
+; same, and back to the caller, for LOAD of a program's text. Uses R1-R12.
 enter_line
+                PUSH    main_line       ; where enter_store returns
+enter_store
                 CALL    get_lineno
                 MOVE    @V_LNUM, R3
                 ONE     @V_STORE        ; each name gets its variable
@@ -109,7 +112,6 @@ enter_line
                 CALL    shift
                 POP     R1
 :
-                PUSH    main_line       ; where clear_cache returns
                 CMP     R9, 3
         ?Z      JMP     clear_cache     ; no tokens: the line is deleted
                 CALL    mem_top
@@ -301,15 +303,41 @@ find_for
 
 ; RUN [N]: CLR, and the program from its first line, or from line N
 st_run
+                SHR     R2, @R8, 24
+                CMP     R2, K_STR
+        ?Z      JMP     run_file
                 CALL    clr_vars
                 SHR     R2, @R8, 24
                 CMP     R2, K_LINE
         ?Z      JMP     st_goto
                 CALL    stmt_end
+run_prog
                 MOVE    R1, PROGRAM
                 CMP     R1, @V_PEND
         ?Z      JMP     main            ; no program
                 JMP     go_to
+
+; RUN "NAME" [, "IP"]: LOAD "NAME" [, "IP"] with V_RUNF set, after
+; which load_fin runs the program, or calls a .bin file at 0x8000
+run_file
+                ADD     R1, R8, 1       ; the name
+                CALL    tok_skip
+                CLR     R4              ; no server
+                CMP     @R8, T_COMMA
+        ?!Z     JMP     :+
+                MOVE    R8++, R8
+                SHR     R3, @R8, 24
+                CMP     R3, K_STR
+        ?!Z     JMP     err_syntax
+                ADD     R4, R8, 1       ; the server
+                CALL    tok_skip
+:
+                PUSH    R1
+                CALL    stmt_end
+                POP     R1
+                MOVE    R2, R4
+                ONE     @V_RUNF
+                JMP     bas_lrun
 
 ; GOTO N: the line N
 st_goto
@@ -568,6 +596,8 @@ st_list
         ?Z      MOVE    R8++, R8
 :
                 CALL    stmt_end
+; list_from: the lines from R10 to R11. Uses R1-R12.
+list_from
                 MOVE    R3, R10
                 CALL    find_line
                 MOVE    R9, R1
@@ -579,7 +609,7 @@ list_line
                 MOVE    R8, @V_TP       ; the break key goes on after LIST
                 CALL    poll
                 MOVE    R1, @1[R9]
-                CALL    _io_putdec
+                CALL    putdec
                 CALL    put_blank
                 ADD     R8, R9, 2
                 CLR     R12             ; no blank before the first token
@@ -590,9 +620,16 @@ list_line
                 CALL    list_tok
                 JMP     :-
 :
-                CALL    _io_crlf
+                CALL    list_eol
                 ADD     R9, R9, @R9
                 JMP     list_line
+
+; list_eol: CR LF, or LF alone in a file of SAVE. Uses R1-R4.
+list_eol
+                MOVE    R1, 0x0A
+                TST     @V_SPOS
+        ?!Z     JMP     putc            ; which returns to the caller
+                JMP     _io_crlf
 
 ; list_tok: the token at R8, and R8 after it. R12 is 0 for no blank
 ; before it, 2 for none before a (, and 1 else. Uses R1-R7 and R10.
@@ -648,14 +685,14 @@ lt_dec
         ?Z      MOVE    R1, @R8
                 CMP     R5, K_SMALL
         ?!Z     MOVE    R8++, R8
-                JMP     _io_putdec
+                JMP     putdec
 
 ; A number in hex, with 0x and its digits from the first that is not 0
 lt_hex
                 MOVE    R1, 0x30
-                CALL    MON_PUTC
+                CALL    putc
                 MOVE    R1, 0x78        ; x
-                CALL    MON_PUTC
+                CALL    putc
                 MOVE    R6, @R8++
                 MOVE    R5, 8
 :
@@ -672,7 +709,7 @@ lt_hex
                 ADD     R1, R1, 0x30
                 CMP     R1, 0x3A
         ?!C     ADD     R1, R1, 7       ; A to F
-                CALL    MON_PUTC
+                CALL    putc
                 SUB[M]  R5, R5, 1
         ?!Z     JMP     :-
                 RET
@@ -695,7 +732,7 @@ lt_num
                 JMP     :++
 :
                 MOVE    R1, 0x30
-                CALL    MON_PUTC
+                CALL    putc
 :
                 POP     R12
                 POP     R11
@@ -705,16 +742,20 @@ lt_num
 ; A string, in quotes, and the text of REM, as it is
 lt_str
                 MOVE    R1, 0x22
-                CALL    MON_PUTC
+                CALL    putc
                 CALL    lt_rem
                 MOVE    R1, 0x22
-                JMP     MON_PUTC
+                JMP     putc
 lt_rem
-                MOVE    R1, R8
+                MOVE    R7, R8
                 AND     R2, R6, 0xFFFFFF
                 ADD     R8, R8, R2
                 MOVE    R8++, R8
-                JMP     _io_puts
+:
+                MOVE[M] R1, @R7++
+        ?Z      RET
+                CALL    putc
+                JMP     :-
 
 ; A variable's name, from its entry
 lt_var
@@ -728,13 +769,13 @@ lt_var
                 SUB[M]  R6, R6, 1
         ?N      RET
                 MOVE    R1, @R5++
-                CALL    MON_PUTC
+                CALL    putc
                 JMP     :-
 
 ; ( ) , ; and :
 lt_punct
                 AND     R1, R6, 0xFF
-                JMP     MON_PUTC
+                JMP     putc
 
 ; A keyword: a statement's by its index, and the others' by their place
 ; in KW_TOK; an operator that is no keyword by SYMS
@@ -758,7 +799,7 @@ put_kw
                 MOVE    R1, @R5++
                 CMP     R1, 0x41        ; A
         ?C      RET
-                CALL    MON_PUTC
+                CALL    putc
                 JMP     :-
 lt_sym
                 MOVE    R1, SYMS
@@ -768,7 +809,7 @@ lt_sym
         ?!Z     JMP     :-
 :
                 AND     R1, R5, 0xFF
-                CALL    MON_PUTC
+                CALL    putc
                 SHR[M]  R5, R5, 8
         ?!Z     JMP     :-
                 RET
@@ -842,6 +883,7 @@ in_ask
                 MOVE    R5, V_LINE
                 MOVE    R8, V_ITOK
                 MOVE    @-1[R8], R0     ; no token before the first
+                MOVE    @V_TLIM, V_ITOK+TOK_MAX-6
                 CALL    tokenize_to
                 POP     R11
                 MOVE    R9, V_ITOK
@@ -1104,11 +1146,31 @@ PAGE            .EQU    24              ; the rows of Page Up and Page Down, as 
 ; wrote words above HIMEM alone. load_new: NEW after a load that wrote a
 ; word below HIMEM, and Z; else not Z. Uses R2.
 load_fin
+                TST     @V_LBAS
+        ?!Z     JMP     :++
+                TST     @V_RUNF
+        ?!Z     JMP     :+
                 CALL    load_new
         ?Z      JMP     main
                 TST     @V_LSTATS
         ?Z      JMP     main            ; no word
                 RET
+:
+                CALL    load_new        ; RUN "NAME.BIN"
+                TST     @V_LSTATS
+        ?Z      JMP     main            ; no word
+                CLR     @V_CUR
+                MOVE    R1, PROGRAM     ; SYS 0x8000, and READY.
+                PUSH    main
+                JMP     st_sys
+:
+                CMP     @V_LBAS, 1      ; a program's text: READY. when
+        ?Z      JMP     main            ; it had no line,
+                CLR     @V_LBAS
+                TST     @V_RUNF
+        ?Z      JMP     main            ; and after LOAD,
+                CALL    clr_vars        ; or RUN
+                JMP     run_prog
 load_new
                 TST     @V_LSTATS
         ?Z      JMP     :+
@@ -1279,7 +1341,7 @@ st_himem
 ; put_blank: a blank. Uses R1-R4.
 put_blank
                 MOVE    R1, 0x20
-                JMP     MON_PUTC
+                JMP     putc
 
 ; put_msg: the packed text R1 on a row of its own, with " in N" after it
 ; while a line runs, N its number, and CR LF. Uses R1-R6.

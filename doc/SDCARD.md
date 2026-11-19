@@ -435,12 +435,18 @@ program cannot do without it, as for state that the monitor keeps. So:
 
 ## BASIC
 
-`SAVE "NAME"` writes the program as the text that `LIST` gives, with `.BAS`
-added when the name has no extension. `LOAD "NAME"` reads the file as lines
-typed in, after a `NEW`. `DIR` lists the directory. The text format is the
-one that a host pastes into the console, so a program moves between a PC,
-the console, and the card in one format, as the plan for BASIC wants.
-There are no device numbers and no Commodore DOS.
+Issue #60, stage 4 of BASIC, is written. `SAVE "NAME"` writes the
+program as the text that `LIST` gives, each line ended by LF, with
+`.BAS` added when the name has no dot. `LOAD "NAME"` reads the file as
+lines typed in, after a `NEW` at its first line, and stops at the first
+line that cannot be stored, which it shows. `RUN "NAME"` loads and runs
+it, and `LOAD` and `RUN` take a TFTP server as a second argument. A name
+that ends in `.BIN` is a `.bin` file, as before. `DIR` lists the
+directory. The text format is the one that a host pastes into the
+console, so a program moves between a PC, the console, and the card in
+one format, as the plan for BASIC wants. There are no device numbers
+and no Commodore DOS. [basic/README.md](../basic/README.md#the-statements)
+has the details.
 
 ## Testing
 

@@ -309,6 +309,64 @@ frame 3, 46 bytes
 000  0a 00 00 00 00 02 02 4e 49 43 45 00 08 00 45 00
 010  00 20 ii ii 00 00 40 11 cc cc 0a 00 00 09 0a 00
 020  00 02 pp pp 0d 80 00 0c 00 00 00 04 00 01
+== bas
+NiceMon V9.9, BASIC V9.9
+HELP lists the statements
+READY.
+ip "10.0.0.9"
+IP address 10.0.0.9
+READY.
+load "prog", "10.0.0.2"
+READY.
+list
+10 PRINT "from tftp"
+20 END
+READY.
+run
+from tftp
+READY.
+halt
+Halted
+exit 0
+frame 1, 42 bytes
+000  ff ff ff ff ff ff 02 4e 49 43 45 00 08 06 00 01
+010  08 00 06 04 00 01 02 4e 49 43 45 00 0a 00 00 09
+020  00 00 00 00 00 00 0a 00 00 02
+frame 2, 59 bytes
+000  0a 00 00 00 00 02 02 4e 49 43 45 00 08 00 45 00
+010  00 2d ii ii 00 00 40 11 cc cc 0a 00 00 09 0a 00
+020  00 02 pp pp 00 45 00 19 00 00 00 01 70 72 6f 67
+030  2e 42 41 53 00 6f 63 74 65 74 00
+frame 3, 46 bytes
+000  0a 00 00 00 00 02 02 4e 49 43 45 00 08 00 45 00
+010  00 20 ii ii 00 00 40 11 cc cc 0a 00 00 09 0a 00
+020  00 02 pp pp 0d 80 00 0c 00 00 00 04 00 01
+== basbad
+NiceMon V9.9, BASIC V9.9
+HELP lists the statements
+READY.
+ip "10.0.0.9"
+IP address 10.0.0.9
+READY.
+load "bad", "10.0.0.2"
+Line without a number
+x
+READY.
+list
+10 PRINT "before"
+READY.
+halt
+Halted
+exit 0
+frame 1, 42 bytes
+000  ff ff ff ff ff ff 02 4e 49 43 45 00 08 06 00 01
+010  08 00 06 04 00 01 02 4e 49 43 45 00 0a 00 00 09
+020  00 00 00 00 00 00 0a 00 00 02
+frame 2, 58 bytes
+000  0a 00 00 00 00 02 02 4e 49 43 45 00 08 00 45 00
+010  00 2c ii ii 00 00 40 11 cc cc 0a 00 00 09 0a 00
+020  00 02 pp pp 00 45 00 18 00 00 00 01 62 61 64 2e
+030  42 41 53 00 6f 63 74 65 74 00
 == args
 NiceMon V9.9, BASIC V9.9
 HELP lists the statements
@@ -319,8 +377,8 @@ READY.
 load "a.bin", 10
 Syntax error
 LOAD                enter lines of ADDR WORD in hex, as a .bin file has them
-LOAD "NAME.BIN"     load the .bin file NAME.BIN of the SD card
-LOAD "N.BIN", "IP"  load the .bin file N.BIN from the TFTP server at IP
+LOAD "NAME"         load the program NAME.BAS, or NAME.BIN, from the SD card
+LOAD "NAME", "IP"   load it from the TFTP server at IP
 READY.
 dir "10.0.0.2", "a", "b"
 Syntax error
@@ -351,7 +409,7 @@ DIR [SLOT]          list the files of the card in SLOT, or of the card mounted
 DIR "IP" [, "PAT"]  list the files of tools/tftpd.py at IP, or those of PAT
 READY.
 load "a.txt", "10.0.0.2"
-LOAD takes a .BIN file, such as LOAD "HELLO.BIN"
+No IP address; IP or DHCP sets one
 READY.
 load "a.bin", "10.0.0.2"
 No IP address; IP or DHCP sets one

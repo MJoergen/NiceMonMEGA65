@@ -34,6 +34,11 @@ with PORT, LOAD "prog.bin", "10.0.0.2:6969", have ports of their own, which a ru
 with only the ARP reply gives first: list gets a listing as
 tools/tftpd.py sends it, which is shown, and port gets the first block of
 PROG from the RRQ to port 6969.
+The runs bas and basbad, with the inputs BAS and BASBAD, have ports of
+their own too: bas loads a program's text, PROG.BAS, as LOAD "prog",
+"10.0.0.2" asks for it, with lines ended by CR LF, and lists and runs it
+(issue #60); basbad gets a text whose second line has no number, which
+ends the load there, and shows the line, with the first line loaded.
 The run args has the input ARGS, with no frames: the servers that are
 not, the lines that are no statements, LOAD with no IP address, and LOAD
 from a server that does not answer ARP.
@@ -60,6 +65,10 @@ SERVER_MAC = bytes.fromhex("0A0000000002")
 RUN = b'ip "10.0.0.9"\rload "prog.bin", "10.0.0.2"\rdump 0x9000, 4\rhalt\r'
 LIST = b'ip "10.0.0.9"\rdir "10.0.0.2", "*.bin"\rhalt\r'
 PORT = b'ip "10.0.0.9"\rload "prog.bin", "10.0.0.2:6969"\rdump 0x9000, 4\rhalt\r'
+BAS = b'ip "10.0.0.9"\rload "prog", "10.0.0.2"\rlist\rrun\rhalt\r'
+BASBAD = b'ip "10.0.0.9"\rload "bad", "10.0.0.2"\rlist\rhalt\r'
+BAS_TEXT = b'10 print "from tftp"\r\n20 end\r\n'
+BASBAD_TEXT = b'10 print "before"\nx\n20 print "after"\n'
 ARGS = (b'load "a.bin", "x"\rload "a.bin", 10\rdir "10.0.0.2", "a", "b"\r'
         b'load "a.bin", "10.0.0.256"\rload "a.bin", "10.0.0.2x"\r'
         b'load "a.bin", "10.0.0.2:"\rload "a.bin", "10.0.0.2:0"\r'
@@ -220,7 +229,8 @@ def main() -> None:
         runs.append(("exact", *run(emu, monitor, RUN, exact_in, tmp, "exact")))
         empty_in = "\n".join(["1:" + arp_reply(), "2:" + data(port, 1, b""), ""])
         runs.append(("empty", *run(emu, monitor, RUN, empty_in, tmp, "empty")))
-        for name, inp, payload in (("list", LIST, LISTING), ("port", PORT, first)):
+        for name, inp, payload in (("list", LIST, LISTING), ("port", PORT, first),
+                                   ("bas", BAS, BAS_TEXT), ("basbad", BASBAD, BASBAD_TEXT)):
             _, probe = run(emu, monitor, inp, "1:" + arp_reply() + "\n", tmp, name + "0")
             sent = [f for f in probe if f[12:14] == b"\x08\x00"]
             check(f"tftp {name}: an RRQ sent", len(sent) > 0)
