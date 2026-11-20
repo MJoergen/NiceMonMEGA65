@@ -834,6 +834,7 @@ Each has an issue, under #54.
 7. **The screen editor**, #118, and `AUTO`, `RENUMBER`, and `DELETE`
    of lines. It depends on stage 3 only, and those who use the board
    on its own need it most, so it may come right after stage 3.
+   Written in V2.4, in `basic/basic_edit.nasm`.
 8. **Structure**, #119. `IF`, `ELSE`, and `ENDIF` over lines, `DO` and
    `LOOP` with `WHILE`, `UNTIL`, and `EXIT`, `PROC` and `FN` with
    parameters, `LOCAL`, and recursion, and `ON ... GOTO`. Their
@@ -956,10 +957,14 @@ in C that the note had before 2026-11-16:
 | 4. Files, measured | 459 | 4023 |
 | 5. Strings | 1900 | 5923 |
 | 6. Functions | 200 | 6123 |
-| 7. The editor and its statements | 2000 | 8123 |
-| 8. Structure | 1400 | 9523 |
-| 9. Errors | 400 | 9923 |
-| 10. The machine | 700 | 10623 |
+| 7. The editor and its statements, measured | 1071 | 7194 |
+| 8. Structure | 1400 | 8594 |
+| 9. Errors | 400 | 8994 |
+| 10. The machine | 700 | 9694 |
+
+Stage 7 is BASIC's image 1021 words larger, from 9496 to 10517, with
+the old line input that it replaced, and the monitor's 50 of
+`scr_links` (measured 2026-11-20).
 
 Stage 1 was `basic.c`, 1510 words, and `basic.nasm`, 624, of which 431
 were its packed texts, the help among them, less 1032 words that left

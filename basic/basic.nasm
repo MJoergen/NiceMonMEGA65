@@ -81,6 +81,7 @@ V_EMOV          .EQU    0xFFFFE843      ; not 0 once a key did more than type at
 V_EKEY          .EQU    0xFFFFE844      ; and not 0 once the line's first key came
 V_ETOK          .EQU    0xFFFFE845      ; not 0 while the line typed is tokenized,
 V_EPOS          .EQU    0xFFFFE846      ; and where in V_LINE its error was, for ed_redo, or 0
+V_AUTO          .EQU    0xFFFFE847      ; AUTO's step, or 0 when it is off, after the line V_LNUM
 V_TSRV          .EQU    0xFFFFE8A0      ; for TFTP: the server's IP address,
 V_TTID          .EQU    0xFFFFE8A1      ; its port, its TID, 0 before its first DATA,
 V_TBLK          .EQU    0xFFFFE8A2      ; the block waited for,
@@ -147,7 +148,9 @@ bas_start
 
 ; main: READY., on a row of its own, and the lines, each tokenized and
 ; run with a fresh SP
-main            MOVE    SP, STACK
+main            CLR     @V_AUTO         ; READY. ends AUTO
+main_auto
+                MOVE    SP, STACK
                 CALL    files_end       ; what an error or the break key left open
                 CLR     @V_CUR          ; direct mode
                 CLR     @V_STORE
@@ -156,11 +159,15 @@ main            MOVE    SP, STACK
                 CALL    SCR_GETXY
                 TST     R1
         ?!Z     CALL    _io_crlf        ; after PRINT with ; or , at its end
+                TST     @V_AUTO
+        ?!Z     JMP     main_line       ; AUTO, with no READY.
                 MOVE    R1, S_READY
                 CALL    puts_b_crlf
                 TST     @V_EPOS         ; after an error of the tokenizer,
         ?!Z     CALL    ed_redo         ; the line again, the cursor at the error
 main_line
+                TST     @V_AUTO
+        ?!Z     CALL    auto_put        ; the next line's number
                 CLR     R1              ; CTRL-C empties the line
                 CALL    getline
                 ONE     @V_ETOK         ; an error of the tokenizer shows it again
@@ -169,6 +176,8 @@ main_line
                 CMP     @R5, 0x20
         ?Z      MOVE    R5++, R5
         ?Z      JMP     :-
+                TST     @V_AUTO
+        ?!Z     CALL    auto_end        ; a number alone, or nothing, ends AUTO
                 SUB     R1, @R5, 0x30
                 CMP     R1, 10
         ?C      JMP     enter_line      ; a number: a line to store
@@ -208,6 +217,8 @@ run
                 ADD     @V_KW, R2, 1
                 DBL     R3, R2
                 MOVE    R3, @H_ACTS[R3]  ; its routine
+                CMP     R2, I_DELETE
+        ?Z      CALL    del_kind        ; DELETE of lines, or of a file
                 CMP     R2, I_PRINT
         ?!C     JMP     R3              ; PRINT and LET read their own items
                 PUSH    R3              ; the routine, which k_end returns to
@@ -508,7 +519,8 @@ ACTS
                 .DAT    st_print+65536*st_let, st_run+65536*st_list
                 .DAT    st_goto+65536*st_gosub, st_if+65536*st_for
                 .DAT    st_next+65536*st_rem, st_input+65536*st_get
-                .DAT    st_dim+65536*st_himem
+                .DAT    st_dim+65536*st_himem, st_auto+65536*st_renum
+I_DELETE        .EQU    3               ; the index of DELETE,
 I_PRINT         .EQU    24              ; the index of PRINT, the first statement without ops,
 I_LET           .EQU    25              ; of LET,
 I_RUN           .EQU    26              ; of RUN,
@@ -522,7 +534,7 @@ I_GET           .EQU    35              ; of GET,
 I_DIM           .EQU    36              ; of DIM,
 I_HIMEM         .EQU    37              ; of HIMEM, which is also a number,
 T_HIMEM         .EQU    K_KW*K+I_HIMEM*0x100+0x22  ; whose token this is,
-N_STMT          .EQU    38              ; and of AND, the first keyword that is no statement
+N_STMT          .EQU    40              ; and of AND, the first keyword that is no statement
 H_ACTS          .EQU    0x40000000+4*ACTS
 ; The routines of the items, by the kind of an op, which bas_op calls
 KINDS
@@ -563,7 +575,8 @@ OP_SKIP         .EQU    1
 OP_F            .EQU    8
 KEYWORDS        .EQU    30              ; the first keyword's byte in OPS
 OPS
-                .ASCII_B 'FJNFANJEJNFJEJNJFLCNHLHN@N@EHNSYS6LOAD*SAVE/DELETE!DIR#IP DHCP"MAC TIME NTP*BAUD8DUMP:DIS:CLS"VER"HELP"HALT"POKE4NEW"CLR"END"STOP"CONT"RETURN"PRINT"LET"RUN"LIST"GOTO"GOSUB"IF"FOR"NEXT"REM"INPUT"GET"DIM"HIMEM"AND"OR"XOR"NOT"DIV"MOD"ABS"SGN"INT"SQR"PEEK"TAB"SPC"THEN"ELSE"TO"STEP"'
+                .ASCII_B 'FJNFANJEJNFJEJNJFLCNHLHN@N@EHNSYS6LOAD*SAVE/DELETE!DIR#IP DHCP"MAC TIME NTP*BAUD8DUMP:DIS:CLS"VER"HELP"HALT"POKE4NEW"CLR"END"STOP"CONT"RETURN"PRINT"LET"RUN"LIST"GOTO"GOSUB"IF"FOR"NEXT"REM"INPUT"GET"DIM"HIMEM"AUTO"RENUMBER"AND"OR"XOR"NOT"DIV"MOD"ABS"SGN"INT"SQR"PEEK"TAB"SPC"THEN"ELSE"TO"STEP"'
+                .DAT    0
 
 S_HINT          .ASCII_B 'HELP lists the statements'
 S_READY         .ASCII_B 'READY.'
@@ -585,10 +598,10 @@ S_DOTBAS
 
 ; The lines of HELP, which a Syntax error also prints, those that start
 ; with the statement's keyword and a blank
-HELP            .DAT    H_SYS, H_L, H_LOAD, H_TFTP, H_SAVET, H_SAVE, H_DEL, H_DIR, H_TFTPL, H_D, H_U
+HELP            .DAT    H_SYS, H_L, H_LOAD, H_TFTP, H_SAVET, H_SAVE, H_DEL, H_DELL, H_DIR, H_TFTPL, H_D, H_U
                 .DAT    H_I, H_ID, H_M, H_B, H_T, H_TN, H_C, H_V, H_H, H_Q, H_PR, H_LET
                 .DAT    H_POKE, H_RUN, H_RUNF, H_LIST, H_NEW, H_CLR, H_GOTO, H_GOSUB, H_RET, H_IF
-                .DAT    H_FOR, H_NEXT, H_END, H_STOP, H_CONT, H_REM, H_INPUT, H_GET, H_DIM, H_HIMEM, H_P, H_PG, 0
+                .DAT    H_FOR, H_NEXT, H_END, H_STOP, H_CONT, H_REM, H_INPUT, H_GET, H_DIM, H_HIMEM, H_AUTO, H_REN, H_P, H_PG, 0
 H_SYS           .ASCII_B 'SYS A               call the program at A, such as SYS 0x8000; SYS 0 restarts'
 H_L             .ASCII_B 'LOAD                enter lines of ADDR WORD in hex, as a .bin file has them'
                 .DAT    0
@@ -598,6 +611,8 @@ H_TFTP          .ASCII_B 'LOAD "NAME", "IP"   load it from the TFTP server at IP
 H_SAVET         .ASCII_B 'SAVE "NAME"         save the program as the text NAME.BAS'
 H_SAVE          .ASCII_B 'SAVE "NAME", A, N   save N words from A as the .bin file NAME'
 H_DEL           .ASCII_B 'DELETE "NAME"       delete the file NAME of the SD card'
+H_DELL          .ASCII_B 'DELETE N [- M]      delete the lines from N to M'
+                .DAT    0
 H_DIR           .ASCII_B 'DIR [SLOT]          list the files of the card in SLOT, or of the card mounted'
 H_TFTPL         .ASCII_B 'DIR "IP" [, "PAT"]  list the files of tools/tftpd.py at IP, or those of PAT'
 H_D             .ASCII_B 'DUMP [A] [, N]      show N words from A, in hex, or the next ones'
@@ -644,6 +659,8 @@ H_GET           .ASCII_B 'GET V               V the code of the next key typed, 
 H_DIM           .ASCII_B 'DIM A(N), B(N, M)   the arrays A of N + 1 elements, B of N + 1 rows of M + 1'
                 .DAT    0
 H_HIMEM         .ASCII_B 'HIMEM = A           the top of the program, its variables, and arrays; and CLR'
-H_P             .ASCII_B 'CRSR up down        scroll back a row, before a statement'
-H_PG            .ASCII_B 'PgUp PgDn           a page; on the MEGA65 CTRL and MEGA with CRSR up or down'
+H_AUTO          .ASCII_B 'AUTO [N] [, S]      number the lines typed from N, by S; a number alone ends it'
+H_REN           .ASCII_B 'RENUMBER [N] [, S]  number the lines from N, by S, and the jumps with them'
+H_P             .ASCII_B 'CRSR keys, HOME     move the cursor; RETURN takes the line it is in'
+H_PG            .ASCII_B 'PgUp PgDn           scroll back; on the MEGA65 CTRL and MEGA with CRSR up, down'
                 .DAT    0

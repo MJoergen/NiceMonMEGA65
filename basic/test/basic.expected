@@ -48,6 +48,7 @@ READY.
 delete x
 Syntax error
 DELETE "NAME"       delete the file NAME of the SD card
+DELETE N [- M]      delete the lines from N to M
 READY.
 dhcp x
 Syntax error
@@ -284,6 +285,7 @@ READY.
 delete "x", "y"
 Syntax error
 DELETE "NAME"       delete the file NAME of the SD card
+DELETE N [- M]      delete the lines from N to M
 READY.
 delete ""
 SD error 1 in slot 1, no card

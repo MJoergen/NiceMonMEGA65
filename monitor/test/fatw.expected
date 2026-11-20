@@ -64,10 +64,12 @@ READY.
 delete
 Syntax error
 DELETE "NAME"       delete the file NAME of the SD card
+DELETE N [- M]      delete the lines from N to M
 READY.
 delete "a" "b"
 Syntax error
 DELETE "NAME"       delete the file NAME of the SD card
+DELETE N [- M]      delete the lines from N to M
 READY.
 deletex
 Syntax error; HELP lists the statements

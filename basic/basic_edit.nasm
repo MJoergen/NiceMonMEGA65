@@ -577,3 +577,181 @@ ed_x80
                 RET
 
 GL_CC           .DAT    0x5E, 0x43, 0   ; ^C
+
+; The statements of the editor (issue #118, step 4): DELETE of lines,
+; RENUMBER, and AUTO. Each ends at READY., as NEW does, so that a program
+; that runs one stops there.
+
+; del_kind: for run, DELETE "NAME", a file, keeps its routine, R3; with
+; no string after it, its routine is st_dellines, which reads its own
+; items, as R2 = I_PRINT says. Uses R4.
+del_kind
+                MOVE    R4, @R8
+                SHR     R4, R4, 24
+                CMP     R4, K_STR
+        ?Z      RET
+                MOVE    R3, st_dellines
+                MOVE    R2, I_PRINT
+                RET
+
+; DELETE N [- M], DELETE N -, and DELETE - M: the lines from N to M
+; deleted, the range as LIST takes it, and main. Uses R1-R12.
+st_dellines
+                MOVE    R9, R8
+                CALL    get_range
+                CMP     R8, R9
+        ?Z      JMP     err_syntax      ; no range
+                CALL    stmt_end
+                CALL    drop_run
+                ADD     R3, R11, 1
+                CALL    find_line
+                MOVE    R12, R1         ; the first line after M
+                MOVE    R3, R10
+                CALL    find_line       ; the first line from N
+                CMP     R1, R12
+        ?!C     JMP     main            ; none
+                SUB     R2, R1, R12
+                MOVE    R1, R12
+                CALL    shift
+                CALL    clear_cache
+                JMP     main
+
+; get_ns: [N] [, S] at R8, as RENUMBER and AUTO take them: R10 = N and
+; R11 = S, 10 each when not given, and R8 after them, at the statement's
+; end. An S of 0, or an N past LINE_LAST, is an Illegal quantity. Uses R1
+; and R2.
+get_ns
+                MOVE    R10, 10
+                MOVE    R11, 10
+                MOVE    R1, @R8
+                SHR     R2, R1, 24
+                CMP     R2, K_SMALL
+        ?!Z     JMP     :+
+                AND     R10, R1, 0xFFFFFF
+                MOVE    R8++, R8
+                MOVE    R1, @R8
+:
+                CMP     R1, T_COMMA
+        ?!Z     JMP     :+
+                MOVE    R8++, R8
+                MOVE    R1, @R8
+                SHR     R2, R1, 24
+                CMP     R2, K_SMALL
+        ?!Z     JMP     err_syntax
+                AND     R11, R1, 0xFFFFFF
+                MOVE    R8++, R8
+:
+                CALL    stmt_end
+                TST     R11
+        ?Z      JMP     err_quant
+                CMP     R10, LINE_LAST+1
+        ?!C     JMP     err_quant
+                RET
+
+; RENUMBER [N] [, S]: the lines numbered from N, by S, and the line
+; numbers after GOTO, GOSUB, RUN, THEN, and ELSE with them; a number of
+; no line is kept. When the last number would be past LINE_LAST, nothing
+; changes, and it is an Illegal quantity. Then main. Uses R1-R11.
+st_renum
+                CALL    get_ns
+                CLR     R9              ; the lines
+                MOVE    R1, PROGRAM
+:
+                CMP     R1, @V_PEND
+        ?!C     JMP     :+
+                ADD     R9, R9, 1
+                ADD     R1, R1, @R1
+                JMP     :-
+:
+                MOVE    R1, R10         ; the last number
+:
+                SUB[M]  R9, R9, 1
+        ?C      JMP     :+              ; no line, or the last
+        ?Z      JMP     :+
+                ADD     R1, R1, R11
+                CMP     R1, LINE_LAST+1
+        ?!C     JMP     err_quant
+                JMP     :-
+:
+                CALL    drop_run
+                MOVE    R7, PROGRAM     ; first the line numbers of the jumps,
+rn_line
+                CMP     R7, @V_PEND
+        ?!C     JMP     rn_nums
+                ADD     R8, R7, 2
+rn_tok
+                MOVE[M] R2, @R8
+        ?Z      JMP     rn_next
+                SHR     R2, R2, 24
+                CMP     R2, K_LINE
+        ?!Z     JMP     rn_skip
+                AND     R3, @R8, 0xFFFFFF  ; the line jumped to,
+                MOVE    R1, PROGRAM     ; its new number from its place
+                MOVE    R4, R10
+:
+                CMP     R1, @V_PEND
+        ?!C     JMP     rn_skip         ; no such line: kept
+                CMP     @1[R1], R3
+        ?Z      JMP     :+
+                ADD     R4, R4, R11
+                ADD     R1, R1, @R1
+                JMP     :-
+:
+                OR      @R8, R4, K_LINE*K
+rn_skip
+                CALL    tok_skip
+                JMP     rn_tok
+rn_next
+                ADD     R7, R7, @R7
+                JMP     rn_line
+rn_nums
+                MOVE    R1, PROGRAM     ; then those of the lines
+                MOVE    R4, R10
+:
+                CMP     R1, @V_PEND
+        ?!C     JMP     :+
+                MOVE    @1[R1], R4
+                ADD     R4, R4, R11
+                ADD     R1, R1, @R1
+                JMP     :-
+:
+                CALL    clear_cache
+                JMP     main
+
+; AUTO [N] [, S]: main_line types the number of each line, N first, then
+; the number of the line stored last plus S. A line of a number alone, or
+; of nothing, ends AUTO, and stores and deletes no line, and so does
+; any READY., after a statement, an error, or CTRL-C at the line.
+st_auto
+                CALL    get_ns
+                MOVE    @V_AUTO, R11
+                SUB     @V_LNUM, R10, R11
+                JMP     main_auto
+
+; auto_put: the next line's number and a blank, for AUTO, or AUTO off
+; past LINE_LAST. Uses R1-R7.
+auto_put
+                ADD     R1, @V_LNUM, @V_AUTO
+                CMP     R1, LINE_LAST+1
+        ?!C     CLR     @V_AUTO
+        ?!C     RET
+                CALL    putdec
+                JMP     put_blank
+
+; auto_end: for AUTO, the line at R5 after its blanks: main, with no
+; line stored, when it has nothing after a number, else back. Uses R1
+; and R6.
+auto_end
+                MOVE    R6, R5
+:
+                SUB     R1, @R6, 0x30
+                CMP     R1, 10
+        ?C      MOVE    R6++, R6
+        ?C      JMP     :-
+:
+                CMP     @R6, 0x20
+        ?Z      MOVE    R6++, R6
+        ?Z      JMP     :-
+                TST     @R6
+        ?Z      JMP     main
+                RET

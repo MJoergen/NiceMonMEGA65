@@ -578,6 +578,19 @@ st_rem
 ; and a function's name before its (, and after a sign that is no
 ; operator on two numbers
 st_list
+                CALL    get_range
+                CALL    stmt_end
+; list_from: the lines from R10 to R11. Uses R1-R12.
+list_from
+                MOVE    R3, R10
+                CALL    find_line
+                MOVE    R9, R1
+                JMP     list_line
+
+; get_range: [N] [- [M]] at R8, as LIST and DELETE take it: R10 = N, or
+; 0, and R11 = M, or N when there is no -, or LINE_LAST, and R8 after it.
+; Uses R1 and R2.
+get_range
                 CLR     R10             ; from
                 MOVE    R11, LINE_LAST  ; to
                 MOVE    R1, @R8
@@ -599,12 +612,7 @@ st_list
         ?Z      AND     R11, R1, 0xFFFFFF
         ?Z      MOVE    R8++, R8
 :
-                CALL    stmt_end
-; list_from: the lines from R10 to R11. Uses R1-R12.
-list_from
-                MOVE    R3, R10
-                CALL    find_line
-                MOVE    R9, R1
+                RET
 list_line
                 CMP     R9, @V_PEND
         ?!C     RET

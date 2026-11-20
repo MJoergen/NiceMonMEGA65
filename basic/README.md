@@ -226,6 +226,9 @@ keeps the variables, but `CONT` cannot go on after it.
 | `RUN "NAME" [, "IP"]` | Loads `NAME` as `LOAD "NAME"` does, from the card or from the TFTP server at `IP`, and runs it: a BASIC program as `RUN` runs it, and a `.bin` file as `SYS 0x8000` calls it, so `RUN "CHESS.BIN"` starts nice_chess. A program may load and run the next this way. A file that is not there, or that has no line, runs nothing. |
 | `LIST [N] [- [M]]` | Lists the lines from `N` to `M`: `LIST 100`, `LIST 100-200`, `LIST -200`, and `LIST 100-`. The keywords are in upper case, with a blank between two tokens, but before `)`, `,`, `;`, and `:`, after `(` and a sign, and between a function or an array and its `(`. A constant is shown as `PRINT` shows it, and a hex one in hex. CTRL-C stops it. |
 | `NEW` | Deletes the program and its variables and arrays. |
+| `DELETE N [- M]` | Deletes the lines from `N` to `M`, as `LIST` takes them: `DELETE 100`, `DELETE 100-200`, `DELETE -200`, and `DELETE 100-`. `DELETE` with a string deletes a file instead (Files above). |
+| `RENUMBER [N] [, S]` | Numbers the lines from `N`, by `S`, 10 and 10 when not given, and changes the line numbers after `GOTO`, `GOSUB`, `RUN`, `THEN`, and `ELSE` with them. A number of no line is kept. When the last line would be past 65535, or `S` is 0, it is an `Illegal quantity`, and nothing changes. |
+| `AUTO [N] [, S]` | Types the number of each line before it: `N` first, then that of the line stored last plus `S`, 10 and 10 when not given. A line with nothing after its number ends `AUTO` and deletes no line, and so does CTRL-C, an empty line, a statement typed with no number, and an error. |
 | `CLR` | Clears the variables, drops the arrays, and ends the loops and subroutines. |
 | `GOTO N` | Goes on at line `N`. |
 | `GOSUB N`, `RETURN` | Goes on at line `N`, and after the `GOSUB` at `RETURN`. |
@@ -472,6 +475,7 @@ the default. It runs these steps in order:
 | `expr` | The ROM alone | The numbers: the operators and their order, the word operators, the comparisons, the functions, the constants, `PRINT`'s format and its items, the variables, `LET`, the colons, the errors, the depth of an expression, `PEEK` and `POKE`, a statement with expressions, a `LOAD` that writes no word, a broken table of variables, and `Out of memory`. |
 | `prog` | The ROM alone, with `test/prog.bas` typed | The lines: their entry, edits, and deletion, the numbers at the limits, `LIST` and its blanks, `RUN`, `NEW`, the variables an edit keeps, the tokens in memory, `FOR` with steps, nested, and once, `GOSUB` in loops, `IF` with `ELSE`, nested, `STOP`, `END`, `CONT`, and the errors in a program, with its line's number. |
 | `edit` | The ROM alone | The screen editor: a listed line changed and entered again, a line that grows into the row below, `INPUT`'s answer after its prompt, DEL in the middle and at the prompt, a line of two rows entered from its first row, CTRL-C, and the cursor key down at the last row. The screen at the end is compared too. |
+| `lines` | The ROM alone | `DELETE` of a range, a line, and up to a line, `RENUMBER` with the jumps forward and back, a target that is no line, the overflow and a step of 0, and `AUTO`, ended by a number alone and by CTRL-C. |
 | `redo` | The ROM alone | The check at entry: a line of two rows that the tokenizer refuses is shown again after `READY.`, with the cursor at the error, as the input ends there and no key waits; it runs until the step limit. |
 | `keys` | The ROM alone | `INPUT` with too few, too many, and bad numbers, a prompt, and CTRL-C; `GET`; the break key in a loop, in `CONT`, and in `LIST`; and the keys typed ahead, of which the ring keeps 31. |
 | `arr` | The ROM alone, with `test/arr.bas` typed | `DIM`, the elements, their errors, `LET`, `INPUT`, and `GET` of an element, `CLR` and an edit with arrays, `HIMEM` read and set, too low and too high, the layout of an array in memory, and `LOAD` below and above `HIMEM`, in a line and in a program. |
@@ -511,18 +515,18 @@ table, and `make romsize` writes it again.
 <!-- romsize basic -->
 | Source | What it is | Words | Text |
 |---|---|---:|---:|
-| `basic.nasm` | The vectors, the header, the main loop, the scanner, the keywords, the messages, and the help | 1398 | 845 |
+| `basic.nasm` | The vectors, the header, the main loop, the scanner, the keywords, the messages, and the help | 1485 | 904 |
 | `basic_expr.nasm` | The numbers: the tokenizer, the expressions, the variables, the errors, `PRINT`, `LET`, and `POKE` | 1556 | 39 |
-| `basic_prog.nasm` | The programs: the lines, `LIST`, `RUN`, the jumps, the loops, the break key, `INPUT`, `GET`, the arrays, and `HIMEM` | 1844 | 46 |
+| `basic_prog.nasm` | The programs: the lines, `LIST`, `RUN`, the jumps, the loops, the break key, `INPUT`, `GET`, the arrays, and `HIMEM` | 1851 | 46 |
 | `basic_cmd.nasm` | The routines of the statements that were the commands | 1839 | 294 |
 | `basic_net.nasm` | `DHCP`, `NTP`, and TFTP | 917 | 150 |
 | `basic_time.nasm` | `TIME`, and the clock's side of `NTP` | 275 | 44 |
 | `basic_dis.nasm` | The disassembler of `DIS` | 871 | 79 |
-| `basic_edit.nasm` | The screen editor | 869 | 0 |
+| `basic_edit.nasm` | The screen editor | 1104 | 0 |
 | `common.nasm` | What the monitor and BASIC share: texts, IP addresses, and dates | 237 | 5 |
 | `monlib.nasm` | The routines that programs join | 274 | 0 |
 | `mon.nasm` | The stubs of the entries | 92 | 0 |
 | `build/basic_folder.nasm` | The texts with the folder's name: `DIR`'s, and the error of a card without it | 14 | 14 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 10188 | 1518 |
+| In all | | 10517 | 1577 |
 <!-- /romsize basic -->

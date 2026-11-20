@@ -226,6 +226,16 @@ LT = \033[D
 X10 = XXXXXXXXXX
 Y10 = YYYYYYYYYY
 EDIT = cls\r10 PRINT "HELLO"\r20 PRINT "WORLD"\rLIST\r$(UP)$(UP)$(UP)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)AB\r\r$(DN)RUN\r$(UP)$(UP)$(UP)$(UP)$(UP)$(UP)$(UP)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(Y10)$(Y10)$(Y10)$(Y10)$(Y10)$(Y10)$(Y10)\r$(DN)$(DN)$(DN)$(DN)$(DN)$(DN)LIST\rRUN\rINPUT A: PRINT A * 2\r21\rINPUT B: PRINT B\r13$(LT)\177\rINPUT C: PRINT C\r5\177\1776\rPRINT 12345$(LT)$(LT)\177\rPRINT "$(X10)$(X10)$(X10)$(X10)$(X10)$(X10)$(X10)$(X10)$(X10)"\r$(UP)$(UP)$(UP)$(UP)$(UP)\rjunk\003$(DN)$(DN)$(DN)HALT\r
+# lines: DELETE of lines, RENUMBER, and AUTO (issue #118, step 4). A
+# program whose GOTO, GOSUB, THEN, and GOTO after : jump forward and
+# back, RENUMBER 100, 5 of it, which RUN shows unchanged; DELETE of a
+# range, of one line, and of all up to a number; RENUMBER with no
+# numbers, 10 and 10; RENUMBER past 65535 and with a step of 0, each an
+# Illegal quantity that changes nothing; DELETE with no range, a Syntax
+# error, and DELETE 50-10, which deletes nothing. AUTO 200, 20 types 200
+# and 220, and the line of 240 alone ends it; AUTO, 10 and 10, ends at
+# CTRL-C. A GOTO to a line that is not there keeps its number.
+LINES = 10 PRINT "A"\r20 GOTO 40\r30 PRINT "C"\r40 GOSUB 60: IF 1 THEN 70\r50 END\r60 RETURN\r70 PRINT "Z": GOTO 50\rRENUMBER 100, 5\rLIST\rRUN\rDELETE 105-110\rLIST\rDELETE 130\rDELETE -100\rLIST\rRENUMBER\rLIST\rRENUMBER 65535\rRENUMBER 1, 0\rDELETE\rDELETE 50-10\rLIST\rAUTO 200, 20\rPRINT 1\rPRINT 2\r\rLIST\rNEW\rAUTO\rREM X\r\003LIST\r5 GOTO 999\rRENUMBER 1000\rLIST\rHALT\r
 # redo: the check at entry (issue #118, step 3). A line of two rows
 # that the tokenizer refuses at its @ is not stored, and after READY. it
 # is shown again with the cursor at the @, as no key waits: the input
@@ -359,16 +369,17 @@ test: fmt $(ROM_TEST) test/prog.bas test/arr.bas test/files.in test/files_card.p
 	@printf '$(KEYS)' > $(BUILD)/keys.txt
 	@printf '$(EDIT)' > $(BUILD)/edit.txt
 	@printf '$(REDO)' > $(BUILD)/redo.txt
+	@printf '$(LINES)' > $(BUILD)/lines.txt
 	@{ printf '$(LOAD_HEAD)'; head -n 3 $(MON)/build/hello.bin | awk '{ printf "%s\r\n", $$0 }'; \
 	  tail -n +4 $(MON)/build/hello.bin; printf '$(LOAD_TAIL)'; } > $(BUILD)/load.txt
 	@fail=0; \
-	for t in cmds basic expr prog keys edit redo arr load load_emu load_64k time files; do \
+	for t in cmds basic expr prog keys edit redo lines arr load load_emu load_64k time files; do \
 	  opts=; sd=; base0=; \
 	  case $$t in \
 	    cmds) prog=; dump='$(DUMP_cmds)';; \
 	    basic) prog=; dump='$(DUMP_basic)';; \
 	    expr) prog=; dump='$(DUMP_expr)';; \
-	    prog|keys|edit|arr) prog=; dump=;; \
+	    prog|keys|edit|lines|arr) prog=; dump=;; \
 	    redo) prog=; dump='$(DUMP_redo)';; \
 	    load) prog=$(BUILD)/ram128k.bin; dump='$(DUMP_load)';; \
 	    load_emu) prog=; dump='$(DUMP_load_emu)';; \
