@@ -4,11 +4,10 @@ The tools run on the host, and control the board remotely over its
 Ethernet port or its debug UART, with the debug link of
 [DEBUG.md](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEBUG.md).
 They use only the Python standard library, and run on Linux and macOS, but
-`nicemon.py flash` needs Linux, and pyftdi for the MEGA65. Each one
-prints its options with `--help`, and its header says more.
+`nicemon.py flash` needs Linux, and pyftdi for the MEGA65.
 
-`nicemon.py` is the command that users run, with a subcommand for each
-tool. The link's options go after the subcommand:
+`tools/nicemon.py` is the command that users run, with a subcommand for
+each tool, which has a section of its own below, in this order:
 
     tools/nicemon.py load  --eth 192.168.1.65 [--monitor] prog.bin
     tools/nicemon.py run   --eth 192.168.1.65 prog.bin
@@ -18,43 +17,22 @@ tool. The link's options go after the subcommand:
     tools/nicemon.py flash --port /dev/ttyUSB1 (--bit f.bit | --cor f.cor --flash-slot N)
     tools/nicemon.py tftpd [--dir DIR]
 
-`nicemon.py --help` lists the subcommands, and `nicemon.py SUBCOMMAND
---help` gives a subcommand's options. Each subcommand is a module of
-`tools/`, which the others import as a library, and which `nicemon.py`
-imports only when its subcommand runs, so that only `flash` needs
-pyftdi. The name is that of the project and of `src/nicemon.vhd` too,
-and matches nice_cpu's `nicedbg`, `nicelink`, and `nicebin`.
+- [nicemon.py load](#nicemonpy-load) loads a program into the board and
+  starts it, or an image of BASIC into the ROM.
+- [nicemon.py run](#nicemonpy-run) runs a program on the board and
+  prints what `niceemu` prints, for diffing.
+- [nicemon.py mon](#nicemonpy-mon) is an interactive shell on the link.
+- [nicemon.py sd](#nicemonpy-sd) lists, copies, writes, and deletes
+  the files of the board's SD card.
+- [nicemon.py nbd](#nicemonpy-nbd) serves the board's SD card as a disk
+  of a Linux PC.
+- [nicemon.py flash](#nicemonpy-flash) writes the flash that a board
+  starts from.
+- [nicemon.py tftpd](#nicemonpy-tftpd) serves files to BASIC's `LOAD`
+  and `DIR`.
 
-The old names, `tools/load.py`, `run.py`, `mon.py`, `sdcard.py`,
-`sdnbd.py`, `flash.py`, and `tftpd.py`, still run the matching
-subcommand until V2.5 removes them
-([#156](https://github.com/MJoergen/NiceMonMEGA65/issues/156)). They
-take the options that V2.4.1 renamed by their old names too, with a
-warning that names the new one.
-
-The subcommands look like one command:
-
-- Errors, warnings, and progress go to stderr, each line after
-  `nicemon.py SUBCOMMAND: `. stdout carries only the console and the
-  data that a subcommand prints: `run`'s output, `sd ls`, and
-  `sd get NAME -`, so it can be piped.
-- The exit status is 0 for success, 1 for an error of the board, the
-  link, or a file, 2 for an error of the command line, 130 after
-  Ctrl-C, and 141 when stdout closes early, as with
-  `nicemon.py sd ls | head`. `run` exits with the program's status
-  instead, and with 1 for an error of the command line, as `niceemu`
-  does (see [Comparing with the emulator](#comparing-with-the-emulator)).
-- `nicemon.py SUBCOMMAND --help`, or `nicemon.py help SUBCOMMAND`,
-  gives the usage, a short description, and the options, each text in
-  lower case with its default in parentheses. The link's options are a
-  group of their own, "the link", with the same text in every
-  subcommand. `mon`'s description is nice_cpu's `nicedbg`'s.
-- `nicemon.py --version` prints the tags of this repository and of
-  nice_cpu, from `git describe`, such as
-  `nicemon.py V2.4.1, nice_cpu V2.4`.
-
-`tools/cli.py` has the messages, the exit codes, and the `--listen`
-option that `nbd` and `tftpd` share.
+[hwtest.py](#hwtestpy) tests the board, and [the other
+tools](#the-other-tools) test the tools and build releases.
 
 | Tool | What it does |
 |---|---|
@@ -83,6 +61,47 @@ option that `nbd` and `tftpd` share.
 | `bump.py` | Moves nice_cpu to a tag, builds the R6 and Nexys4DDR bitstreams, and writes the badge files and `verified.json`. |
 | `release.py` | Builds, tests, and publishes a release (see [RELEASE.md](../doc/RELEASE.md)). |
 
+## nicemon.py
+
+`nicemon.py --help` lists the subcommands, and `nicemon.py SUBCOMMAND
+--help`, or `nicemon.py help SUBCOMMAND`, gives a subcommand's usage, a
+short description, and its options. Each subcommand is a module of
+`tools/`, which the others import as a library, and which `nicemon.py`
+imports only when its subcommand runs, so that only `flash` needs
+pyftdi, and whose header says more. The name is that of the project and
+of `src/nicemon.vhd` too, and matches nice_cpu's `nicedbg`, `nicelink`,
+and `nicebin`.
+
+The subcommands look like one command:
+
+- Errors, warnings, and progress go to stderr, each line after
+  `nicemon.py SUBCOMMAND: `. stdout carries only the console and the
+  data that a subcommand prints: `run`'s output, `sd ls`, and
+  `sd get NAME -`, so it can be piped.
+- The exit status is 0 for success, 1 for an error of the board, the
+  link, or a file, 2 for an error of the command line, 130 after
+  Ctrl-C, and 141 when stdout closes early, as with
+  `nicemon.py sd ls | head`. `run` exits with the program's status
+  instead, and with 1 for an error of the command line, as `niceemu`
+  does (see [Exit status](#exit-status)).
+- The help of each subcommand gives each option's text in lower case,
+  with its default in parentheses. The link's options are a group of
+  their own, "the link", with the same text in every subcommand.
+  `mon`'s description is nice_cpu's `nicedbg`'s.
+- `nicemon.py --version` prints the tags of this repository and of
+  nice_cpu, from `git describe`, such as
+  `nicemon.py V2.4.1, nice_cpu V2.4`.
+
+`tools/cli.py` has the messages, the exit codes, and the `--listen`
+option that `nbd` and `tftpd` share.
+
+The old names, `tools/load.py`, `run.py`, `mon.py`, `sdcard.py`,
+`sdnbd.py`, `flash.py`, and `tftpd.py`, still run the matching
+subcommand until V2.5 removes them
+([#156](https://github.com/MJoergen/NiceMonMEGA65/issues/156)). They
+take the options that V2.4.1 renamed by their old names too, with a
+warning that names the new one.
+
 ## The line
 
 The board's line carries the program's console both ways, and the
@@ -94,40 +113,30 @@ same link, so the tools drive the emulator as they drive the board.
 When they connect, the tools read the link's version, and stop on a
 major other than 0, which they do not know ([DEBUG.md §9](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEBUG.md#9-versions)).
 
-`nicemon.py load`, `run`, `mon`, `sd`, and `nbd` take the line as an
-option:
-`--eth 192.168.1.65` for the Ethernet port (see
-[Over Ethernet](#over-ethernet)), `--port` for the serial port (see
-[The serial port](#the-serial-port)), such as `--port /dev/ttyUSB1`, or
-`--tcp` and `--cosim` for `niceemu --link` and `make cosim`, with no
-board (see [Without a board](#without-a-board) and [nicemon.py mon](#nicemonpy-mon)).
-One of them must be given. `nicemon.py flash` and `hwtest.py` take `--port`
-alone, and `hwtest.py`'s `--eth` tests the Ethernet port beside it.
+`load`, `run`, `mon`, `sd`, and `nbd` take the line as an option, shown
+as `(link)` in their usage, one of:
 
-`make` has a target for each tool, which runs `nicemon.py`:
+- `--eth HOST[:PORT]` for the board's Ethernet port (see
+  [Over Ethernet](#over-ethernet)), such as `--eth 192.168.1.65`.
+- `--port DEVICE [--baud N]` for its serial port (see
+  [The serial port](#the-serial-port)), such as `--port /dev/ttyUSB1`.
+- `--tcp [HOST:]PORT` for `niceemu --link` (see
+  [Without a board](#without-a-board)).
+- `--cosim PORT` for the simulated system of `make cosim`, at about 250
+  UART bytes a second.
 
-- `make load FILE=prog.bin` loads a program into the board and starts it.
-- `make run FILE=prog.bin` runs one as `niceemu` runs it (see
-  [Comparing with the emulator](#comparing-with-the-emulator)).
-- `make mon` opens an interactive shell on the link (see
-  [nicemon.py mon](#nicemonpy-mon)).
+`flash` and `hwtest.py` take `--port` alone, and `hwtest.py`'s `--eth`
+tests the Ethernet port beside it.
 
-They take `ETH=192.168.1.65` for the Ethernet port, or
-`PORT=/dev/ttyUSB1` for the serial port, and one of the two. They pass
-`ARGS=` on to the tool: `ARGS=--hold` for `make load`, or
-`ARGS="--input in.txt --dump 0x100:16 --screen --timeout 5"` for
-`make run`.
-`ARGS="--tcp 4000"` drives `niceemu --link 4000` instead of the board.
+`make` has a target for each subcommand, which runs `nicemon.py`:
+`make load`, `make run`, `make mon`, `make sdcard`, `make sdnbd`,
+`make flash`, and `make tftpd`. Those of the line take
+`ETH=192.168.1.65` for the Ethernet port, or `PORT=/dev/ttyUSB1` for
+the serial port, and one of the two. They pass `ARGS=` on to the
+subcommand, and `ARGS="--tcp 4000"` drives `niceemu --link 4000`
+instead of the board. Each section below names its target.
 
-The other tools have targets too: `make hwtest` and `make flash` (see
-[hwtest.py](#hwtestpy) and [nicemon.py flash](#nicemonpy-flash)), `make sdcard` and
-`make sdnbd` (see [nicemon.py sd](#nicemonpy-sd) and [nicemon.py nbd](#nicemonpy-nbd)), and
-`make tftpd`, `make linktest`, `make sdtest`, `make tftptest`,
-`make tcptest`, `make weathertest`, `make cosim` and `make cosimtest`,
-`make romsize`, `make bump`, and `make release` (see
-[The other tools](#the-other-tools)).
-
-## Over Ethernet
+### Over Ethernet
 
 The board serves remote control on TCP port 4510 of its Ethernet
 station, once it has an IP address
@@ -156,7 +165,7 @@ host, or after a reset of the board. The link has no password, and the
 monitor gets an IP address from DHCP on its own, so plug the cable
 only into a network you trust.
 
-## The serial port
+### The serial port
 
 The MEGA65's debug UART runs at 230400 baud, 8-N-1, after reset, the
 tools' `--baud` by default, or at the rate written to `0xFFFFFF9F`
@@ -172,9 +181,9 @@ A terminal program, such as `picocom`, shows the program's console:
 `Ctrl-A Ctrl-\` sends a break, which ends the line's input; the
 keyboard's goes on.
 
-The debug link on the serial port gives it one too, with no key typed.
-The core is paused for the write, as the link reaches only its own
-registers while the core runs:
+The debug link on the serial port gives the board an IP address too,
+with no key typed. The core is paused for the write, as the link
+reaches only its own registers while the core runs:
 
     tools/nicemon.py mon --port /dev/ttyUSB1
     dbg> pause
@@ -182,13 +191,57 @@ registers while the core runs:
     dbg> go
     dbg> q
 
-## Running a program
+### Without a board
 
-A program is assembled with the assembler of the nice_cpu submodule, and
-loaded with `tools/nicemon.py load`, which holds the core, hides the ROM if there
-is one, clears the memory, writes the words with `W` packets, and then
-starts the core. For example, with `sim/echo.nasm`, which echoes what you
-type until a `.`:
+`--tcp PORT` drives `niceemu --link PORT` instead of the board, which
+checks the tools and the link against the plain emulator:
+
+    nice_cpu/emulator/zig-out/bin/niceemu --link 4000 &
+    tools/nicemon.py run --tcp 4000 prog.bin
+
+`--tcp HOST:PORT` reaches a `niceemu` on another computer, which serves
+the link on an address other than 127.0.0.1. An IPv6 HOST goes in
+brackets, as for `niceemu --link`:
+
+    niceemu --link 0.0.0.0:4510 prog.bin       # on emuhost
+    tools/nicemon.py mon --tcp emuhost:4510    # on your own computer
+
+The link has no authentication: anyone who reaches the port can read
+and write the emulator's memory. Serve it beyond 127.0.0.1 only on a
+trusted network. Elsewhere, forward the port over SSH instead:
+
+    ssh -L 4510:127.0.0.1:4510 emuhost 'niceemu --link 4510 prog.bin'
+    tools/nicemon.py mon --tcp 4510
+
+With `--tcp`, the end of the input half-closes the connection, and `--dump`
+cannot reach `0xFFFFFFD0`–`FF`, which are the emulator's memory.
+
+## nicemon.py load
+
+`nicemon.py load` loads a program into the board and starts it. It holds
+the core, hides the ROM if there is one, clears the memory, writes the
+words with `W` packets, and then starts the core. It holds the core
+first, so it also works while a program runs.
+
+    tools/nicemon.py load (link) [--hold] [--monitor [--rom FILE] | --basic] FILE
+
+- `FILE` is a `.bin` file, one line per word, the address and the word
+  in hex.
+- `--hold` loads the program and leaves the core held in reset.
+- `--monitor` runs a program at `0x8000` under the monitor in the ROM,
+  and `--rom FILE` loads FILE at 0 in place of the ROM (see
+  [Running a program under the monitor](#running-a-program-under-the-monitor)).
+- `--basic` loads an image of BASIC into the ROM (see
+  [Loading BASIC into the ROM](#loading-basic-into-the-rom)).
+
+`make load FILE=prog.bin (ETH=IP | PORT=DEVICE)` runs it, with
+`ARGS=--hold`, `ARGS=--monitor`, or `ARGS=--basic`. Ctrl-C during a load
+leaves the core held.
+
+### Running a program
+
+A program is assembled with the assembler of the nice_cpu submodule. For
+example, with `sim/echo.nasm`, which echoes what you type until a `.`:
 
     python3 nice_cpu/assembler/niceasm.py -o echo.bin sim/echo.nasm
     tools/nicemon.py load --eth 192.168.1.65 echo.bin
@@ -202,10 +255,7 @@ held in reset or has halted. To end the line's input, send a break:
 Ctrl-D in `nc -N`, or `Ctrl-A Ctrl-\` in picocom on the serial port,
 after `tools/nicemon.py load --port /dev/ttyUSB1 echo.bin`.
 
-The `.bin` file has one line per word, the address and the word in hex.
-`nicemon.py load --hold` loads the program and leaves the core held in reset.
-`nicemon.py load --tcp PORT` loads it into `niceemu --link PORT` instead of the
-board.
+### The .bin file
 
 `nicemon.py load` takes the lines that `niceemu` takes:
 
@@ -227,9 +277,7 @@ page, where the emulator has a word of its own, so the program would run
 differently. A program can still write the rest of the MEGA65's screen
 when it runs.
 
-`nicemon.py load` holds the core first, so it also works while a program runs.
-
-## Running a program under the monitor
+### Running a program under the monitor
 
 A program for the monitor of the ROM is assembled at `0x8000`, with
 nice_cpu's `start_mon.nasm`, or built with `nicebuild.py --monitor`
@@ -260,7 +308,7 @@ in the monitor's tests:
 
     printf 'HALT\r' > h.txt
     tools/nicemon.py run --tcp PORT --monitor --rom build/rom_test.bin \
-        -i h.txt monitor/build/hello.bin
+        --input h.txt monitor/build/hello.bin
     printf 'SYS 0x8000\rHALT\r' > rh.txt
     cat build/rom_test.bin monitor/build/hello.bin > joined.bin
     niceemu -i rh.txt joined.bin
@@ -282,7 +330,7 @@ takes a few seconds. A program that `--monitor` loads before that has
 ended stays, and the core's own BASIC runs it. The card's BASIC is
 then not loaded until the board is switched off and on again.
 
-## Loading BASIC into the ROM
+### Loading BASIC into the ROM
 
 BASIC's part of the ROM, `0x3000`–`0x7FFF`, takes the link's writes.
 `--basic` puts an image of BASIC there, such as `basic/build/basic.rom`
@@ -300,46 +348,48 @@ one older than V2.3.1, whose ROM takes no writes, is refused, and so is
 the Nexys4DDR's ROM, which takes no writes, as its block RAMs are too
 few.
 
-## Running a C program
+## nicemon.py run
 
-Build the C examples (see [PROGRAMMING.md](../doc/PROGRAMMING.md) for what
-that needs):
+`nicemon.py run` loads a program into cleared memory, as `load` does,
+starts it, sends it its input, and copies its output to stdout. When the
+program halts, it prints what `niceemu` prints: why and after how many
+steps the program halted, and the registers.
 
-    make examples
+    tools/nicemon.py run (link) [--input FILE] [--dump ADDR:N]... [--screen]
+                         [--ide2004] [--symbols FILE] [--timeout SEC]
+                         [--monitor [--rom FILE]] FILE
 
-That builds `examples/build/primes.bin` from `examples/primes.c`, which
-counts primes. Load it with `nicemon.py mon`, start it, and pass the terminal to
-it with `console`, so that its first prompt is not lost:
+- `--input FILE` is the program's input, stdin by default (see
+  [Input](#input)).
+- `--dump ADDR:N`, `--screen`, `--ide2004`, and `--symbols FILE` print
+  memory, the screen, and where the program halted, after the halt (see
+  [Dumps and symbols](#dumps-and-symbols)).
+- `--timeout SEC` gives up after SEC seconds, 60 by default (see
+  [The time limit](#the-time-limit)).
+- `--monitor` and `--rom FILE` run a program under the monitor, as for
+  `load` (see
+  [Running a program under the monitor](#running-a-program-under-the-monitor)).
+- `--no-cycle-counter` is accepted and ignored, as the cycle counter
+  always runs.
 
-    tools/nicemon.py mon --eth 192.168.1.65 examples/build/primes.bin
-    dbg> go
-    dbg> c
+`make run FILE=prog.bin (ETH=IP | PORT=DEVICE)` runs it, with
+`ARGS="--input in.txt --dump 0x100:16 --screen --timeout 5"`, for
+example.
 
-The program asks for a limit, reads it with `scanf`, and counts the primes
-up to it. It asks again until you enter 0, and then halts. The program does
-not echo what you type, so the number shows only after you press Enter:
+### Comparing with the emulator
 
-    Count the primes up to (0 to stop): 1000
-    Primes up to 1000: 168
-    34333 instructions in 55761 cycles
-
-The third line comes from the performance counters, and the numbers are
-from the board with the pipelined core, where the 55761 cycles at 100 MHz
-take about 0.56 ms.
-
-## Comparing with the emulator
-
-`tools/nicemon.py run` loads a program into cleared memory, starts it, sends it
-its input, and copies its output to stdout. When the program halts, it
-prints what `niceemu` prints: why and after how many steps the program
-halted, and the registers. It takes niceemu's `--input`, `--dump`,
-`--screen`, and `--symbols` options by their long names, and
-niceemu's `-2004` as `--ide2004`, so the output of the two can be
-compared:
+`nicemon.py run` takes niceemu's `--input`, `--dump`, `--screen`, and
+`--symbols` options by their long names, and niceemu's `-2004` as
+`--ide2004`, so the output of the two can be compared:
 
     nice_cpu/emulator/zig-out/bin/niceemu --dump 0x110:2 --screen prog.bin > emu.txt
     tools/nicemon.py run --eth 192.168.1.65 --dump 0x110:2 --screen prog.bin > board.txt
     diff emu.txt board.txt
+
+[EMULATOR.md](../doc/EMULATOR.md) has the table of the known differences
+from the emulator.
+
+### Exit status
 
 The exit status is that of `niceemu`:
 
@@ -382,8 +432,6 @@ byte, so the output ends there.
   code and location from R1 and R2, as `niceemu` does.
 - `--ide2004` prints the screen from `0x400`, as `niceemu -2004` does. That
   is plain RAM on the board, not the screen that the display shows.
-- `--no-cycle-counter` is accepted and ignored, as the cycle counter
-  always runs.
 
 ### The time limit
 
@@ -395,31 +443,6 @@ as `niceemu -n` does at its step limit. It prints no registers, no step
 count, and no location for `--symbols`, as a hold leaves the registers
 undefined ([DEBUG.md §6](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEBUG.md#6-the-debug-registers)).
 
-### Without a board
-
-`--tcp PORT` runs the program on `niceemu --link PORT` instead of the
-board, which checks `nicemon.py run` and the link against the plain emulator:
-
-    nice_cpu/emulator/zig-out/bin/niceemu --link 4000 &
-    tools/nicemon.py run --tcp 4000 prog.bin
-
-`--tcp HOST:PORT` reaches a `niceemu` on another computer, which serves
-the link on an address other than 127.0.0.1. An IPv6 HOST goes in
-brackets, as for `niceemu --link`:
-
-    niceemu --link 0.0.0.0:4510 prog.bin       # on emuhost
-    tools/nicemon.py mon --tcp emuhost:4510            # on your own computer
-
-The link has no authentication: anyone who reaches the port can read
-and write the emulator's memory. Serve it beyond 127.0.0.1 only on a
-trusted network. Elsewhere, forward the port over SSH instead:
-
-    ssh -L 4510:127.0.0.1:4510 emuhost 'niceemu --link 4510 prog.bin'
-    tools/nicemon.py mon --tcp 4510
-
-With `--tcp`, the end of the input half-closes the connection, and `--dump`
-cannot reach `0xFFFFFFD0`–`FF`, which are the emulator's memory.
-
 ### Step counts
 
 The step count is the core's instruction counter. The emulator's steps
@@ -428,8 +451,6 @@ program with interrupts has more steps in the emulator. A read of the
 console in the emulator waits for the next byte, but on the board it
 returns 0 while no byte has arrived. So a program that waits for input in
 a loop runs more steps on the board, and its step count differs.
-[EMULATOR.md](../doc/EMULATOR.md) has the table of the known differences from the
-emulator.
 
 ## nicemon.py mon
 
@@ -438,39 +459,24 @@ starts, holds, pauses, and steps the core, sets breakpoints, reads
 and writes the registers and the memory, and disassembles, with one
 short command each. It also passes text to and from the program. The
 README has [a worked example](../README.md#using-the-interactive-shell).
-
 It is nice_cpu's debugger, `nicedbg.py`, with the board's links and a
 check of the board's memory. nice_cpu's
 [debugger/README.md](https://github.com/MJoergen/nice_cpu/blob/main/debugger/README.md#the-commands)
 describes the commands, the notices, and the labels.
 
-### Starting it
+    tools/nicemon.py mon (link) [--symbols FILE] [FILE]
 
-    tools/nicemon.py mon (--eth HOST[:PORT] | --port DEVICE [--baud 230400]
-                 | --tcp [HOST:]PORT | --cosim PORT) [--symbols FILE] [FILE.bin]
-
-- `--eth HOST` talks to the board over its Ethernet port, at its IP
-  address HOST (see [Over Ethernet](#over-ethernet)).
-- `--port DEVICE` names the serial device of the board's debug UART,
-  such as `/dev/ttyUSB1`, and `--baud` its rate, 230400 by default.
-- `--tcp PORT` talks to `niceemu --link PORT` instead of the board, and
-  `--tcp HOST:PORT` to one on another computer (see [Without a
-  board](#without-a-board)).
-- `--cosim PORT` talks to the simulated system of `make cosim`, at
-  about 250 UART bytes a second.
 - `--symbols FILE` reads the labels of a `.sym` file, which
   `niceasm.py --symbols` and `nicebuild.py --symbols` write, as the
   `symbols` command does.
-- `FILE.bin` is optional. It is checked before the link opens, and
-  loaded at the start, as the `load` command does, and the core is left
-  held in reset. Without it, `nicemon.py mon` starts with `status`, and leaves
-  the core as it is.
+- `FILE`, a `.bin` file, is optional. It is checked before the link
+  opens, and loaded at the start, as the `load` command does, and the
+  core is left held in reset. Without it, `nicemon.py mon` starts with
+  `status`, and leaves the core as it is.
 
-`make mon ETH=192.168.1.65` runs it over the Ethernet port, and
-`make mon PORT=/dev/ttyUSB1` on the serial port. One of the four
-options above must be given. It takes `FILE=` and `ARGS=`, for
-example `make mon ARGS="--tcp 4000"`. On the serial port, no other
-program may have the port open while it runs.
+`make mon (ETH=IP | PORT=DEVICE)` runs it, and takes `FILE=` and
+`ARGS=`, for example `make mon ARGS="--tcp 4000"`. On the serial port,
+no other program may have the port open while it runs.
 
 ### On the board
 
@@ -478,7 +484,7 @@ The prompt is `dbg>`, nicedbg's. `help` lists the commands, and `help
 CMD` describes one. Its messages say "the processor", which is the core
 here. Leaving changes nothing on the board: a running program goes on.
 
-- `load FILE`, and a `FILE.bin` at the start, refuse a word that the
+- `load FILE`, and a `FILE` at the start, refuse a word that the
   board has no memory at, as `nicemon.py load` does: one beyond the MEGA65's
   RAM and the screen, or beyond the RAM that `0xFFFFFF9E` reads.
 - The MEGA65 and the Nexys4DDR have 4 breakpoints.
@@ -488,68 +494,32 @@ here. Leaving changes nothing on the board: a running program goes on.
 - Bytes sent while the core is held in reset or has halted are dropped,
   and bytes sent while it is paused wait for it.
 
-## hwtest.py
+### Running a C program
 
-`tools/hwtest.py` programs the FPGA and tests the system on the board,
-which [CONTRIBUTING.md](../CONTRIBUTING.md#testing-the-board) describes
-check by check. It needs the board's debug UART, `--port`, and finds the
-JTAG cable on the same USB device:
+Build the C examples (see [PROGRAMMING.md](../doc/PROGRAMMING.md) for what
+that needs):
 
-    tools/hwtest.py --port /dev/ttyUSB1 [--baud 230400] [--bit FILE]
-                    [--board mega65|nexys4ddr] [--no-program]
-                    [--no-board-check] [--eth HOST[:PORT]]
+    make examples
 
-- `--bit FILE` is the bitstream to program, `synth/r6/build/top.bit` by
-  default. The FPGA's IDCODE must be the part the bitstream was built
-  for, and tells which board is tested. `--board` names the board
-  instead; without either, a path with `nexys4ddr` in it means the
-  Nexys4DDR.
-- On a MEGA65, the flash chip must be that of the bitstream's board, an
-  S25FL256S on the R3 and an S25FL512S on the R6, as the R3 and R6 have
-  the same FPGA. The bitstream names its board by its UserID, or else by
-  its path. `--no-board-check` skips that check.
-- `--no-program` skips the programming and the boot test, for a board
-  that is already programmed. Programming needs Linux; with
-  `--no-program` the script runs wherever `nicemon.py load` does.
-- `--eth HOST` tests the Ethernet station too, after every other check:
-  it gives the board the IP address HOST through BASIC's `IP`,
-  pings it, and runs the programs over TCP. Without `--eth`, or when no
-  frame reaches the station, the summary names the station after NOT
-  COVERED, and the run still passes.
-- It prints a line for each check, and last how many passed, with
-  SKIPPED for the checks that need niceemu when it is missing.
+That builds `examples/build/primes.bin` from `examples/primes.c`, which
+counts primes. Load it with `nicemon.py mon`, start it, and pass the terminal to
+it with `console`, so that its first prompt is not lost:
 
-`make hwtest PORT=/dev/ttyUSB1 [BIT=FILE] [ETH=IP]` builds the examples
-and niceemu first, and runs it.
+    tools/nicemon.py mon --eth 192.168.1.65 examples/build/primes.bin
+    dbg> go
+    dbg> c
 
-## nicemon.py flash
+The program asks for a limit, reads it with `scanf`, and counts the primes
+up to it. It asks again until you enter 0, and then halts. The program does
+not echo what you type, so the number shows only after you press Enter:
 
-`tools/nicemon.py flash` writes the flash that a board starts from, over the
-JTAG cable on the USB device of `--port`, with openFPGALoader, and
-checks the FPGA first, as `hwtest.py` does. It runs on Linux only, and
-the MEGA65 needs pyftdi.
+    Count the primes up to (0 to stop): 1000
+    Primes up to 1000: 168
+    34333 instructions in 55761 cycles
 
-    tools/nicemon.py flash --port /dev/ttyUSB1 [--bit FILE | --erase]
-    tools/nicemon.py flash --port /dev/ttyUSB1 --cor FILE --flash-slot N
-
-- On the Nexys4DDR, `--bit FILE` is the bitstream to write,
-  `synth/nexys4ddr/build/top.bit` by default, and `--erase` erases the
-  flash instead. It refuses a MEGA65's bitstream, verifies the flash,
-  and waits for the board to start from it.
-- On the MEGA65, `--cor FILE --flash-slot N` writes a core file into slot N of
-  the flash, 1 to 7, or 1 to 3 in an R3's flash of 32 MiB, with no
-  MEGAFLASH: it checks that the flash chip and slot 0's core are
-  those of the file's board revision (`--no-board-check` skips the
-  chip), shows what the slot held, clears the
-  protection of the slot's sectors, writes, verifies, and loads the slot
-  into the FPGA.
-
-`jtag.py` has what both share: it finds the JTAG cable of `--port`,
-checks the FPGA's part, and on a MEGA65 the flash chip.
-
-`make flash PORT=/dev/ttyUSB1 [BIT=FILE]` is the Nexys4DDR's form, with
-`ARGS=--erase` to erase, and `make flash PORT=/dev/ttyUSB1 COR=FILE
-SLOT=N` the MEGA65's ([synth/README.md](../synth/README.md#building)).
+The third line comes from the performance counters, and the numbers are
+from the board with the pipelined core, where the 55761 cycles at 100 MHz
+take about 0.56 ms.
 
 ## nicemon.py sd
 
@@ -557,7 +527,9 @@ SLOT=N` the MEGA65's ([synth/README.md](../synth/README.md#building)).
 file goes to the card and comes off it with no PC slot. It reads and
 writes the card's FAT32 itself, as the monitor does, and only the
 monitor's folder `NICE` (see
-[SYSTEM.md](../doc/SYSTEM.md#the-sd-card-slots)), which it can make:
+[SYSTEM.md](../doc/SYSTEM.md#the-sd-card-slots)), which it can make.
+
+    tools/nicemon.py sd (link) [--slot N] [--hold] [--folder NAME] COMMAND
 
 - `ls` lists the folder as BASIC's `DIR` does, with the long names
   after the rows.
@@ -572,8 +544,14 @@ monitor's folder `NICE` (see
 - `mkdir` makes the folder in the root of a card that has FAT32 but not
   the folder, which the monitor never makes, or says that it is there
   already.
-- `format` erases the whole card in the slot of `--slot` and writes a
-  new FAT32 with the folder, as below.
+- `format [--label L] [--force] [--system] [--yes]` erases the whole
+  card in the slot of `--slot` and writes a new FAT32 with the folder
+  (see [Formatting a card](#formatting-a-card)).
+- `--slot N` is the card's slot, `--hold` holds the core for `ls` and
+  `get` (see [The core](#the-core)), and `--folder NAME` names another
+  folder of the root than `NICE`.
+
+`make sdcard CMD=COMMAND (ETH=IP | PORT=DEVICE)` runs it:
 
 ```
 tools/nicemon.py sd --eth 192.168.1.65 ls
@@ -584,15 +562,26 @@ make sdcard ETH=192.168.1.65 CMD=mkdir
 make sdcard ETH=192.168.1.65 CMD="--slot 0 format"
 ```
 
+`ls` and `get NAME -` print to stdout, and the others report on stderr.
+
+### The files
+
 `get` and `del` take the 8.3 name or the long name, in either case.
 `put` writes only 8.3 names, as the monitor does: a host file such as
-`my program.bas` needs a `NAME`, such as `PROG.BAS`. `--folder` names
-another folder of the root, and `--slot` the slot. The folder of
+`my program.bas` needs a `NAME`, such as `PROG.BAS`. The folder of
 `mkdir` must be an 8.3 name with no extension, as `NICE` is.
 
 A card with no FAT32 file system, or with FAT16 or exFAT, must be
 formatted as FAT32 first, with `format` or on a PC; the tool says so. A
 card with FAT32 but no folder gets the hint of `mkdir`.
+
+The writes keep to the order of the monitor's FAT32 code, so that a
+reset at any point leaves the card no worse than with lost clusters,
+which `fsck.fat` frees. `mkdir` writes the folder's cluster before the
+root's entry of it. A new entry has the host's date and time. When
+the card fills up, the file keeps what fitted, and `put` says error 30.
+
+### Formatting a card
 
 `format` needs `--slot`, so that no card is erased by chance. It shows
 the card's size, its partitions, and their labels, and asks you to type
@@ -614,11 +603,7 @@ which takes minutes over Ethernet and much longer over the serial port.
 A format that breaks off leaves a card with no FAT32, as the old MBR is
 cleared first and the new one written last.
 
-The writes keep to the order of the monitor's FAT32 code, so that a
-reset at any point leaves the card no worse than with lost clusters,
-which `fsck.fat` frees. `mkdir` writes the folder's cluster before the
-root's entry of it. A new entry has the host's date and time. When
-the card fills up, the file keeps what fitted, and `put` says error 30.
+### The core
 
 The core can be in any state. `put`, `del`, `mkdir`, and `format` hold a running
 or paused core, and start it again from reset after the write, as the
@@ -645,6 +630,8 @@ tools/nicemon.py sd --eth 192.168.1.65 --slot 1 put prog.bas
 tools/nicemon.py sd --eth 192.168.1.65 --slot 1 --hold get PROG.BAS
 ```
 
+### The speed
+
 A sector takes 16 writes and 16 reads on the link, each a request that
 waits for its answer. On an R6, a file comes at about 115 KB a second
 over Ethernet, and goes at about 80 KB a second, and on the serial port
@@ -664,7 +651,17 @@ a read or write of the card's sectors over the link. `nbd-client`
 connects `/dev/nbd0` to it, and the kernel mounts the card's FAT32 as
 any other, all of it, not only `NICE`, with every folder, long names,
 and renames. It needs the `nbd` module and `nbd-client` (package
-`nbd-client` on Debian and Ubuntu), and root for them and the mount:
+`nbd-client` on Debian and Ubuntu), and root for them and the mount.
+
+    tools/nicemon.py nbd (link) [--slot N] [--read-only] [--hold] [--listen [HOST:]PORT]
+
+- `--slot N` picks the slot, as for `nicemon.py sd`.
+- `--read-only` refuses writes, and pauses the core instead of holding
+  it, and `--hold` holds it all the same (see [The core and the kernel](#the-core-and-the-kernel)).
+- `--listen [HOST:]PORT` moves the server, `127.0.0.1:10809` by
+  default; port 0 picks a free one.
+
+`make sdnbd (ETH=IP | PORT=DEVICE)` runs it:
 
 ```
 tools/nicemon.py nbd --eth 192.168.1.65 &
@@ -680,16 +677,16 @@ kill %1
 `/dev/nbd0p1` is the first partition of a card with an MBR, as the
 MEGA65's cards have; a card that is FAT32 from sector 0 mounts as
 `/dev/nbd0`. A desktop usually mounts the partition itself once
-`nbd-client` has connected it. `make sdnbd ETH=192.168.1.65` runs the
-server, and `--listen HOST:PORT` moves it.
+`nbd-client` has connected it.
+
+### The core and the kernel
 
 The core is held from the start until the server ends, with Ctrl-C,
 which exits with status 130, or SIGTERM, which exits with 0, and
 then starts again from reset, as after `nicemon.py sd put`. The kernel
 keeps the card's FAT and folders in its cache, so a program on the board
 that used the card at the same time would see it stale, and the board
-would see the kernel's. A held core stays held. `--slot` picks the
-slot, as for `nicemon.py sd`.
+would see the kernel's. A held core stays held.
 
 Unmount before the server stops: `umount` writes what the kernel kept.
 The kernel writes in its own order, not in the careful order of
@@ -701,6 +698,8 @@ instead of held, and goes on at the end, as for `nicemon.py sd ls`. The
 card is then the paused program's, in its slot, which it must have
 started up; `--hold` holds the core all the same, to reach any slot.
 Mount it with `-o ro`.
+
+### The speed of a mount
 
 The speed is that of `nicemon.py sd`: about 115 KB a second reading and
 80 KB a second writing over Ethernet on an R6, and a hundred times less
@@ -727,6 +726,97 @@ The first line sets the FTDI chip's latency timer to 1 ms, as for
 `nicemon.py sd`, and goes before the server. The fifth makes the
 read-ahead 4 KB, on the disk that `nbd-client` connected.
 
+## nicemon.py flash
+
+`nicemon.py flash` writes the flash that a board starts from, over the
+JTAG cable on the USB device of `--port`, with openFPGALoader, and
+checks the FPGA first, as `hwtest.py` does. It runs on Linux only, and
+the MEGA65 needs pyftdi.
+
+    tools/nicemon.py flash --port DEVICE [--baud N] [--bit FILE | --erase]
+    tools/nicemon.py flash --port DEVICE [--baud N] --cor FILE --flash-slot N
+                           [--no-board-check]
+
+- `--port DEVICE` is the board's serial port, whose USB device has the
+  JTAG cable too, and `--baud N` the UART's rate, 230400 by default.
+- On the Nexys4DDR, `--bit FILE` is the bitstream to write,
+  `synth/nexys4ddr/build/top.bit` by default, and `--erase` erases the
+  flash instead. It refuses a MEGA65's bitstream, verifies the flash,
+  and waits for the board to start from it.
+- On the MEGA65, `--cor FILE --flash-slot N` writes a core file into slot N of
+  the flash, 1 to 7, or 1 to 3 in an R3's flash of 32 MiB, with no
+  MEGAFLASH: it checks that the flash chip and slot 0's core are
+  those of the file's board revision (`--no-board-check` skips the
+  chip), shows what the slot held, clears the
+  protection of the slot's sectors, writes, verifies, and loads the slot
+  into the FPGA.
+
+`make flash PORT=/dev/ttyUSB1 [BIT=FILE]` is the Nexys4DDR's form, with
+`ARGS=--erase` to erase, and `make flash PORT=/dev/ttyUSB1 COR=FILE
+SLOT=N` the MEGA65's ([synth/README.md](../synth/README.md#building)).
+
+`jtag.py` has what both share: it finds the JTAG cable of `--port`,
+checks the FPGA's part, and on a MEGA65 the flash chip.
+
+## nicemon.py tftpd
+
+`nicemon.py tftpd` serves the files of a folder to BASIC's `LOAD` and
+`DIR` over TFTP, with a listing for a name with `*` or `?`. It uses no
+link, and so takes none of its options.
+
+    tools/nicemon.py tftpd [--dir DIR] [--listen [ADDR:]PORT] [--retry-wait SEC] [--tries N]
+
+- `--dir DIR` is the folder served, the current one by default.
+- `--listen [ADDR:]PORT` is where it listens, `0.0.0.0:69` by default,
+  all of the host's addresses. Port 69 needs root on Linux, or the
+  capability that the header of `tftpd.py` names; another port, such as
+  `--listen 6969`, needs none, and BASIC reaches it with
+  `LOAD "NAME.BIN", "IP:6969"`. Port 0 picks a free one, printed on
+  stderr.
+- `--retry-wait SEC` is the wait for an ACK before a block is sent
+  again, 1 by default, and `--tries N` the sends of a block in all, 5
+  by default.
+
+`make tftpd [TFTP_DIR=DIR] [TFTP_PORT=PORT]` serves `examples/build`
+([monitor/README.md](../monitor/README.md#the-network)). It reports each
+transfer on stderr, and Ctrl-C stops it.
+
+## hwtest.py
+
+`tools/hwtest.py` programs the FPGA and tests the system on the board,
+which [CONTRIBUTING.md](../CONTRIBUTING.md#testing-the-board) describes
+check by check. It is a program of its own, not a subcommand. It needs
+the board's debug UART, `--port`, and finds the JTAG cable on the same
+USB device:
+
+    tools/hwtest.py --port /dev/ttyUSB1 [--baud 230400] [--bit FILE]
+                    [--board mega65|nexys4ddr] [--no-program]
+                    [--no-board-check] [--eth HOST[:PORT]]
+
+- `--bit FILE` is the bitstream to program, `synth/r6/build/top.bit` by
+  default. The FPGA's IDCODE must be the part the bitstream was built
+  for, and tells which board is tested. `--board` names the board
+  instead; without either, a path with `nexys4ddr` in it means the
+  Nexys4DDR.
+- On a MEGA65, the flash chip must be that of the bitstream's board, an
+  S25FL256S on the R3 and an S25FL512S on the R6, as the R3 and R6 have
+  the same FPGA. The bitstream names its board by its UserID, or else by
+  its path. `--no-board-check` skips that check.
+- `--no-program` skips the programming and the boot test, for a board
+  that is already programmed. Programming needs Linux; with
+  `--no-program` the script runs wherever `nicemon.py load` does.
+- `--eth HOST` tests the Ethernet station too, after every other check:
+  it gives the board the IP address HOST through BASIC's `IP`,
+  pings it, and runs the programs over TCP. Without `--eth`, or when no
+  frame reaches the station, the summary names the station after NOT
+  COVERED, and the run still passes.
+- It prints a line for each check, `[PASS]` or `[FAIL]`, and last how
+  many passed, with SKIPPED for the checks that need niceemu when it is
+  missing.
+
+`make hwtest PORT=/dev/ttyUSB1 [BIT=FILE] [ETH=IP]` builds the examples
+and niceemu first, and runs it.
+
 ## The other tools
 
 - `tools/bump.py TAG [--push]` moves nice_cpu to the tag, builds the R6
@@ -741,17 +831,11 @@ read-ahead 4 KB, on the disk that `nbd-client` connected.
   publishes it. `make release TAG=V1.0 PORT=DEVICE` passes the port, and
   `ARGS="--eth IP"` or `ARGS=--publish` the rest
   ([RELEASE.md](../doc/RELEASE.md)).
-- `tools/nicemon.py tftpd [--dir DIR] [--listen [ADDR:]PORT]` serves the
-  files of a folder, the current one by default, to BASIC's `LOAD` and
-  `DIR`, on port 69 or another, with a listing for a name with `*` or
-  `?`. `--retry-wait SEC` is the wait for an ACK before a block is sent
-  again. It reports each transfer on stderr, and Ctrl-C stops it.
-  `make tftpd [TFTP_DIR=DIR] [TFTP_PORT=PORT]` serves `examples/build`
-  ([monitor/README.md](../monitor/README.md#the-network)).
 - `tools/linktest.py`, `tools/sdtest.py`, `tools/tftptest.py`,
   `tools/tcptest.py`, `tools/weathertest.py`, and `tools/cosimtest.py`
   take no options. They need niceemu, and `make linktest`,
-  `make sdtest`, and so on build it first
+  `make sdtest`, `make tftptest`, `make tcptest`, `make weathertest`,
+  and `make cosimtest`, which runs on `make cosim`, build it first
   ([CONTRIBUTING.md](../CONTRIBUTING.md#the-tools-and-niceemu)).
 - `tools/romsize.py` is run by `make romsize`, which writes the tables
   of the ROM's words anew, and by the tests of the monitor and the
