@@ -63,6 +63,30 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 - `nicemon.py --version` prints the tags of the repository and of
   nice_cpu, and `nicemon.py help SUBCOMMAND` a subcommand's help, in
   which the link's options are a group of their own.
+- BASIC's `SAVE "NAME", "IP"` and `BSAVE "NAME", A, N, "IP"` write the
+  program, or the words, to a TFTP server, as `LOAD "NAME", "IP"`
+  reads them, so a board with no card saves to a PC
+  ([#155](https://github.com/MJoergen/NiceMonMEGA65/issues/155),
+  [basic/README.md](../basic/README.md)). `SAVE "NAME", "IP"` was an
+  error. CTRL-C stops `SAVE`, and tells the server to drop the file.
+- `nicemon.py tftpd --write`, and `make tftpd ARGS=--write`, take
+  these files, which replace those of the same name. Without
+  `--write` the server refuses them, as TFTP has no login. A file is
+  written to a temporary name and renamed at the end, so a transfer
+  that fails leaves no half file
+  ([tools/README.md](../tools/README.md#nicemonpy-tftpd)).
+
+**Fixed.**
+
+- `DIR "IP"` that failed, with no IP address or no answer, after a
+  `LOAD` that wrote a word below `HIMEM`, did a `NEW`, and so lost the
+  program typed since.
+
+**Tests.**
+
+- `basic/test/tftp.py` runs the writes against scripted frames, and
+  `make tftptest` against `nicemon.py tftpd --write`, with `curl -T`
+  as a standard client of the server.
 
 ## V2.4 (2026-11-20)
 

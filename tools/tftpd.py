@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""A TFTP server for BASIC's LOAD and DIR, with listings of its folder.
+"""A TFTP server for BASIC's LOAD, DIR, SAVE, and BSAVE, with listings.
 
 It serves the regular files of one folder, --dir, and nothing below or
 above it, nor through a symbolic link, to read requests (RFC 1350) in
@@ -24,8 +24,26 @@ left out. A pattern that matches none gets ERROR 1. No file of the
 systems it runs on has * or ? in its name, so the listing hides none,
 and a standard client gets it as a file too: curl 'tftp://HOST/*'.
 
-Write requests get ERROR 2, and so do names with /, \\, or .., a name
-starting with a dot, and an empty one; a missing file gets ERROR 1.
+Names with /, \\, or .., a name starting with a dot, and an empty one
+get ERROR 2; a missing file gets ERROR 1.
+
+Write requests (WRQ), of BASIC's SAVE "NAME", "IP" and BSAVE "NAME", A,
+N, "IP", get ERROR 2 unless --write allows them, as TFTP has no login:
+anyone who reaches the port may write. With --write, a file is written
+to the folder in octet mode, and in netascii mode as octet, under the
+name of the request, or under that of the one file that has it in
+another case, as the SD card's FAT32 would; a file that is there is
+replaced, as SAVE to the card replaces it. A name with * or ?, and one
+that is there as a directory or a symbolic link, get ERROR 2. The
+blocks go to a temporary file in the folder, whose name starts with a
+dot, so that it is neither served nor listed, and which is renamed to
+the name at the end, so that a transfer that fails leaves no half
+file: an ERROR from the client, such as BASIC's at the break key, or no
+DATA within --tries times --retry-wait seconds, after each of which the
+last ACK is sent again. A DATA of the block before gets its ACK again.
+After the last ACK, the server waits DALLY seconds for that block
+again, whose ACK was lost, and answers it with the ACK again (RFC 1350,
+section 6).
 
 Port 69, the default, needs root on Linux, or the capability:
 sudo setcap cap_net_bind_service=+ep $(readlink -f $(which python3)).
@@ -41,10 +59,12 @@ import argparse
 import fnmatch
 import io
 import os
+import secrets
 import socket
 import struct
 import sys
 import threading
+import time
 from typing import BinaryIO, Optional, Tuple
 
 import cli
@@ -53,6 +73,7 @@ RRQ, WRQ, DATA, ACK, ERROR = 1, 2, 3, 4, 5
 BLOCK = 512
 NAME_WIDTH = 24
 MAX_TRANSFERS = 16
+DALLY = 3.0                             # the seconds the last ACK of a write is kept for
 
 Addr = Tuple[str, int]
 
@@ -113,11 +134,16 @@ def listing(folder: str, pattern: str) -> bytes:
         .encode("utf-8", "replace") for name in names)
 
 
+def check_name(name: str) -> None:
+    """Refused unless name is that of a file in the folder."""
+    if not name or name.startswith(".") or "/" in name or "\\" in name or ".." in name:
+        raise Refused(2, "Only names of files in the folder")
+
+
 def content(folder: str, name: str) -> Tuple[str, BinaryIO]:
     """The name served and the bytes of a request's name, the file open
     to read, or a listing, which the caller closes."""
-    if not name or name.startswith(".") or "/" in name or "\\" in name or ".." in name:
-        raise Refused(2, "Only names of files in the folder")
+    check_name(name)
     if "*" in name or "?" in name:
         return name, io.BytesIO(listing(folder, name))
     if not served(folder, name):
@@ -181,6 +207,117 @@ def wait_ack(sock: socket.socket, client: Addr, block: int) -> bool:
             return True
 
 
+def target(folder: str, name: str) -> str:
+    """The name that a write request's name is written to: itself, or
+    the one file that has it in another case."""
+    check_name(name)
+    if "*" in name or "?" in name:
+        raise Refused(2, "Not a name with * or ?")
+    if not os.path.lexists(os.path.join(folder, name)):
+        same = [n for n in os.listdir(folder)
+                if n.lower() == name.lower() and served(folder, n)]
+        if len(same) == 1:
+            name = same[0]
+    path = os.path.join(folder, name)
+    if os.path.lexists(path) and not served(folder, name):
+        raise Refused(2, "Not a file that may be replaced")
+    return name
+
+
+def receive_file(sock: socket.socket, client: Addr, folder: str, name: str,
+                 timeout: float, tries: int) -> Tuple[int, Optional[str]]:
+    """The blocks of client written to a temporary file of folder, which
+    is renamed to name after the last. The bytes written, and None when
+    the file is there, or the reason the transfer ended before it."""
+    while True:                         # the umask applies, as to any new file
+        temp = os.path.join(folder, f".tftpd-{secrets.token_hex(6)}")
+        try:
+            fd = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o666)
+            break
+        except FileExistsError:
+            continue
+    done = False
+    try:
+        with os.fdopen(fd, "wb") as dst:
+            ack = struct.pack(">HH", ACK, 0)
+            block = written = 0
+            while True:
+                try:
+                    chunk = wait_data(sock, client, (block + 1) & 0xFFFF, ack,
+                                      timeout, tries)
+                except Ended as e:
+                    return written, str(e)
+                if chunk is None:
+                    return written, f"no DATA of block {block + 1}"
+                block += 1
+                dst.write(chunk)
+                written += len(chunk)
+                ack = struct.pack(">HH", ACK, block & 0xFFFF)
+                if len(chunk) < BLOCK:
+                    break
+        os.replace(temp, os.path.join(folder, name))
+        done = True
+        sock.sendto(ack, client)
+        dally(sock, client, block & 0xFFFF, ack)
+        return written, None
+    finally:
+        if not done:
+            os.unlink(temp)
+
+
+def wait_data(sock: socket.socket, client: Addr, block: int, ack: bytes,
+              timeout: float, tries: int) -> Optional[bytes]:
+    """ack sent, and the bytes of the DATA of block from client, sent
+    again after each timeout, up to tries times in all, or None. A DATA
+    of the block before gets ack again. An ERROR from the client raises
+    Ended."""
+    sock.settimeout(timeout)
+    for _ in range(tries):
+        sock.sendto(ack, client)
+        while True:
+            try:
+                packet, addr = sock.recvfrom(BLOCK + 8)
+            except socket.timeout:
+                break
+            if addr != client:
+                sock.sendto(error_packet(5, "Unknown transfer ID"), addr)
+                continue
+            if len(packet) < 4:
+                continue
+            op, n = struct.unpack(">HH", packet[:4])
+            if op == ERROR:
+                text = packet[4:].split(b"\0", 1)[0].decode("latin-1", "replace")
+                raise Ended(f"the client's ERROR {n}, {text}")
+            if op != DATA:
+                continue
+            if n == block:
+                if len(packet) > BLOCK + 4:
+                    sock.sendto(error_packet(4, "A block of more than 512 bytes"), client)
+                    raise Ended("a block of more than 512 bytes")
+                return packet[4:]
+            if n == (block - 1) & 0xFFFF:
+                sock.sendto(ack, client)        # its ACK was lost
+    return None
+
+
+def dally(sock: socket.socket, client: Addr, block: int, ack: bytes) -> None:
+    """ack sent again for each DATA of the last block that comes from
+    client within DALLY seconds, as its ACK was lost."""
+    end = time.monotonic() + DALLY
+    while True:
+        left = end - time.monotonic()
+        if left <= 0:
+            return
+        sock.settimeout(left)
+        try:
+            packet, addr = sock.recvfrom(BLOCK + 8)
+        except socket.timeout:
+            return
+        if (addr == client and len(packet) >= 4
+                and struct.unpack(">HH", packet[:4]) == (DATA, block)):
+            sock.sendto(ack, client)
+
+
 def serve(client: Addr, packet: bytes, args: argparse.Namespace,
           lock: threading.Lock, slots: threading.BoundedSemaphore) -> None:
     """One request, on a socket of its own, in one of the slots."""
@@ -190,14 +327,22 @@ def serve(client: Addr, packet: bytes, args: argparse.Namespace,
             name = "?"
             try:
                 op, name, mode = parse_request(packet)
-                if op == WRQ:
-                    raise Refused(2, "Writing is not supported")
+                if op == WRQ and not args.write:
+                    raise Refused(2, "Writing is not allowed: tftpd --write allows it")
                 if mode not in ("octet", "netascii"):
                     raise Refused(0, f"Mode {mode} is not supported")
-                name, src = content(args.dir, name)
+                if op == WRQ:
+                    name = target(args.dir, name)
+                else:
+                    name, src = content(args.dir, name)
             except Refused as e:
                 sock.sendto(error_packet(e.code, e.message), client)
                 report(lock, client, name, f"error {e.code}, {e.message}")
+                return
+            if op == WRQ:
+                got, reason = receive_file(sock, client, args.dir, name,
+                                           args.retry_wait, args.tries)
+                report(lock, client, name, reason or f"{got} bytes written")
                 return
             with src:
                 sent, reason = send_file(sock, client, src, args.retry_wait, args.tries)
@@ -212,7 +357,8 @@ def report(lock: threading.Lock, client: Addr, name: str, what: str) -> None:
 
 
 DESCRIPTION = ("Serve the files of a folder to BASIC's LOAD and DIR over "
-               "TFTP, with listings.")
+               "TFTP, with listings, and with --write take SAVE's and "
+               "BSAVE's.")
 
 
 def add_options(parser: argparse.ArgumentParser) -> None:
@@ -229,7 +375,12 @@ def add_options(parser: argparse.ArgumentParser) -> None:
                         help="the seconds to wait for an ACK before a block "
                         "is sent again (default 1)")
     parser.add_argument("--tries", type=int, default=5, metavar="N",
-                        help="the sends of a block in all (default 5)")
+                        help="the sends of a block, or of an ACK, in all "
+                        "(default 5)")
+    parser.add_argument("--write", action="store_true",
+                        help="take write requests, of SAVE and BSAVE, which "
+                        "replace a file that is there; TFTP has no login, so "
+                        "anyone who reaches the port may write")
 
 
 def command(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
@@ -246,7 +397,8 @@ def command(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
     except OSError as e:
         cli.fail(f"{args.listen[0]}:{args.listen[1]}: {e}")
     port = sock.getsockname()[1]
-    cli.note(f"serving {os.path.abspath(args.dir)} on port {port}")
+    writes = ", writes allowed," if args.write else ""
+    cli.note(f"serving {os.path.abspath(args.dir)}{writes} on port {port}")
     lock = threading.Lock()
     slots = threading.BoundedSemaphore(MAX_TRANSFERS)
     try:

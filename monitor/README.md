@@ -478,6 +478,17 @@ the words written as `LOAD` with no name writes them. When an ERROR or
 no answer ends a load after a line, the summary of the lines before it
 comes first, as their words are in the RAM.
 
+`SAVE "NAME", "IP"` and `BSAVE "NAME", A, N, "IP"` write a file to the
+server, the bytes that they write to the card (issue #155). The WRQ
+goes to port 69, or to `PORT`, and the server's ACK of block 0 gives the
+port of the rest. The bytes go in DATA blocks of 512, each sent when it
+fills, and the last of less than 512 bytes, which is empty when the
+file is a multiple of 512. Each block is sent again when its ACK does
+not come within a second, up to 5 times in all, and ACKs of other
+blocks, hosts, and ports are passed over. An ERROR of the server, or no
+answer, ends the write, and CTRL-C in `SAVE` sends the server an ERROR,
+so that it drops the file.
+
 `DIR "IP", "PAT"` asks for the pattern `PAT`, with `*` or `?`, and
 `DIR "IP"` for `*`: the lines received are shown instead of loaded,
 each without its bytes that are not printable ASCII, such as those of
@@ -492,7 +503,9 @@ It serves `examples/build`, the folder of `make examples`, or with
 `TFTP_DIR=FOLDER` another folder, its regular files and nothing else.
 Port 69 needs root, or the capability that the header of
 `tools/nicemon.py tftpd` names; without either, `make tftpd TFTP_PORT=6969` serves on port
-6969. On the board, `DHCP`, then `DIR "192.168.1.10", "*.BIN"` lists
+6969. `make tftpd ARGS=--write` takes the files of `SAVE` and `BSAVE`
+too, which replace those of the same name, and anyone who reaches the
+port may write while it runs, as TFTP has no login. On the board, `DHCP`, then `DIR "192.168.1.10", "*.BIN"` lists
 the programs, and `LOAD "HELLO.BIN", "192.168.1.10"` loads one, with the
 PC's address, and `:6969` after it for the other port. Any other TFTP
 server, such as `tftpd-hpa`, serves the

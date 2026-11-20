@@ -61,8 +61,8 @@ settle the three open questions of #54.
   disassembler, are statements for good.
 - **The names of the statements** are those of
   [The main loop](#the-main-loop). `LOAD` picks the kind of file by
-  its name, with no `BLOAD`, and a TFTP server is the second argument
-  of `LOAD`, `RUN`, and `DIR`, with no `TFTP`. The top of BASIC's
+  its name, with no `BLOAD`, and a TFTP server is the last argument
+  of `LOAD`, `RUN`, `DIR`, `SAVE`, and `BSAVE`, with no `TFTP`. The top of BASIC's
   memory is `HIMEM`.
 - **Stage 2's numbers** are those of [Numbers](#numbers): `PRINT`
   with the FPU's 15 digits, `DIV` and `MOD` on words, no `A%`, and
@@ -220,9 +220,11 @@ hex.
   `BSAVE` writes memory. `SAVE "NAME"` writes the program as text, with
   `.BAS` added, since stage 4. Before V2.4 `SAVE "NAME", addr, n`
   wrote the words, and the rename freed `SAVE`'s number for a slot.
-- **A TFTP server is the second argument**, a string, of `LOAD`, of
-  `RUN` since stage 4, and of `DIR`. There is no `TFTP` statement.
-  `SAVE "NAME", "IP"` is an error, as TFTP here only reads.
+- **A TFTP server is the last argument**, a string, of `LOAD`, of
+  `RUN` since stage 4, of `DIR`, and of `SAVE` and `BSAVE` since
+  V2.4.1 (#155), which write to it. There is no `TFTP` statement.
+  `tools/nicemon.py tftpd` takes writes only with `--write`, as TFTP
+  has no login.
 - **A slot is the last argument**, a number, of `DIR`, `LOAD`, `SAVE`,
   `BSAVE`, `DELETE`, and `RUN` of a file, since V2.4. It mounts the
   card in that slot first, and the statements after it use that card,

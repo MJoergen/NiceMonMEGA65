@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Run BASIC's LOAD and DIR from a TFTP server in niceemu, against
-frames of --eth-in.
+"""Run BASIC's LOAD and DIR from a TFTP server, and its SAVE and BSAVE
+to one, in niceemu, against frames of --eth-in.
 
 Usage: test/tftp.py NICEEMU ROM.bin EXPECTED OUT
 
@@ -42,17 +42,40 @@ their own too: bas loads a program's text, PROG.BAS, as LOAD "prog",
 "10.0.0.2" asks for it, with lines ended by CR LF, and lists and runs it
 (issue #60); basbad gets a text whose second line has no number, which
 ends the load there, and shows the line, with the first line loaded.
-The run args has the input ARGS, with no frames: the servers that are
-not, the lines that are no statements, LOAD with no IP address, and LOAD
-from a server that does not answer ARP.
+The runs of the writes (issue #155) have ports of their own too, each
+from a run with only the ARP reply, which is the run wnone: its WRQ
+goes TFTP_TRIES times, and the SAVE says that the server did not
+answer. The text of a program of 4 lines of 128 bytes, each 10 REM and
+120 x, is 512 bytes, and one of 8 such lines 1024. After the WRQ, the
+server's ACK 0, from the TID 3456, comes in each but wnone and wref:
+- w0: BSAVE of 0 words, an empty DATA 1, and its ACK.
+- w512: SAVE of 512 bytes, DATA 1 of 512 bytes, and an empty DATA 2.
+- w1024: SAVE of 1024 bytes. DATA 1 gets no answer, as if it was lost,
+  and is sent again, which an ACK 1 of another TID answers, which is
+  passed over, so DATA 1 goes a third time, and gets its ACK. DATA 2
+  gets an ACK 1 again, which is passed over, so DATA 2 goes again, and
+  gets its ACK; then the empty DATA 3.
+- werr: BSAVE of 300 words, whose DATA 1 gets an ERROR 3, Disk full,
+  which ends it, with no summary.
+- wref: SAVE, whose WRQ gets an ERROR 2, as tools/tftpd.py without
+  --write sends it.
+- wbrk: SAVE of 4 lines and a CTRL-C typed after it, which LIST takes
+  at its first line, so the SAVE ends with Break, and an ERROR 0, Break,
+  goes to the TID, so that the server drops the file.
+The run args has the input ARGS, with no frames: a DIR with no IP
+address after a LOAD of a word below HIMEM, which keeps the program
+typed after it, the servers that are not, the lines that are no
+statements, LOAD and SAVE with no IP address, and LOAD and BSAVE to a
+server that does not answer ARP.
 Each run's console output, up to the halt, and the frames sent, 16 bytes
 a row with the client's port as pp pp, and the IPv4 identification and
 checksum as ii ii and cc cc, as they change with the steps of the code,
 are written to OUT and compared with EXPECTED. The script also checks
 each frame's IPv4 checksum, that the identification counts up by one
 from frame to frame, and
-that each TFTP packet comes from the port of the first RRQ, the RRQs to
-port 69, or 6969 in the run port, and the ACKs to the TID. Exits with status 1 when a check fails.
+that each TFTP packet comes from the port of the first RRQ or WRQ, the RRQs
+and the WRQs to port 69, or 6969 in the run port, and the ACKs, the
+DATA, and the ERRORs to the TID. Exits with status 1 when a check fails.
 Only the Python standard library is used.
 """
 
@@ -72,13 +95,23 @@ BAS = b'ip "10.0.0.9"\rload "prog", "10.0.0.2"\rlist\rrun\rhalt\r'
 BASBAD = b'ip "10.0.0.9"\rload "bad", "10.0.0.2"\rlist\rhalt\r'
 BAS_TEXT = b'10 print "from tftp"\r\n20 end\r\n'
 BASBAD_TEXT = b'10 print "before"\nx\n20 print "after"\n'
-ARGS = (b'load "a.bin", "x"\rload "a.bin", 10\rdir "10.0.0.2", "a", "b"\r'
+ARGS = (b'load\r9000 1\r\r10 print "kept"\rdir "10.0.0.2"\rlist\r'
+        b'load "a.bin", "x"\rload "a.bin", 10\rdir "10.0.0.2", "a", "b"\r'
         b'load "a.bin", "10.0.0.256"\rload "a.bin", "10.0.0.2x"\r'
         b'load "a.bin", "10.0.0.2:"\rload "a.bin", "10.0.0.2:0"\r'
         b'load "a.bin", "10.0.0.2:65536"\rload "a.bin", "10.0.0.2:6x"\r'
         b'dir "10.0.0.2" "*"\rload "a.txt", "10.0.0.2"\r'
-        b'load "a.bin", "10.0.0.2"\rdir "10.0.0.2"\rip "10.0.0.9"\r'
-        b'load "a.bin", "10.0.0.3"\rhalt\r')
+        b'load "a.bin", "10.0.0.2"\rdir "10.0.0.2"\rsave "a", "10.0.0.2"\r'
+        b'ip "10.0.0.9"\rload "a.bin", "10.0.0.3"\r'
+        b'bsave "a", 0x9000, 1, "10.0.0.3"\rhalt\r')
+REM_LINES = b"".join(b"%d rem %s\r" % (10 * (n + 1), b"x" * 120) for n in range(8))
+W0 = b'ip "10.0.0.9"\rbsave "e", 0x9000, 0, "10.0.0.2"\rhalt\r'
+W512 = b'ip "10.0.0.9"\r' + REM_LINES[:4 * 128] + b'save "t512", "10.0.0.2"\rhalt\r'
+W1024 = b'ip "10.0.0.9"\r' + REM_LINES + b'save "t1024", "10.0.0.2"\rhalt\r'
+WERR = b'ip "10.0.0.9"\rbsave "w", 0x9000, 300, "10.0.0.2"\rhalt\r'
+WREF = b'ip "10.0.0.9"\rsave "t", "10.0.0.2"\rhalt\r'
+WBRK = (b'ip "10.0.0.9"\r' + REM_LINES[:4 * 128] + b'save "t", "10.0.0.2"\r\x03'
+        b'halt\r')
 LISTING = b"".join(f"{n:<24} {size:>10}\n".encode() for n, size in (
     ("demo.bin", 41022), ("hello.bin", 13374), ("a-long-name-of-a-program.bin", 7),
     ("bl\u00e5b\u00e6r.bin", 12), ("ctl\x01del\x7f.bin", 3),
@@ -112,6 +145,39 @@ def datagram(port: int, data: bytes, src: str = "10.0.0.2", sport: int = TID) ->
 
 def data(port: int, block: int, payload: bytes, sport: int = TID) -> str:
     return datagram(port, struct.pack(">HH", 3, block) + payload, sport=sport)
+
+
+def ack(port: int, block: int, sport: int = TID) -> str:
+    return datagram(port, struct.pack(">HH", 4, block), sport=sport)
+
+
+def error(port: int, code: int, text: bytes) -> str:
+    return datagram(port, struct.pack(">HH", 5, code) + text + b"\x00")
+
+
+WRITES = (("w0", W0), ("w512", W512), ("w1024", W1024), ("werr", WERR),
+          ("wref", WREF), ("wbrk", WBRK))
+
+
+def write_in(name: str, port: int) -> List[str]:
+    """The lines of --eth-in of the run of a write, but wnone, after the
+    ARP reply, to the client's port."""
+    return {
+        "w0": ["2:" + ack(port, 0), "3:" + ack(port, 1)],
+        "w512": ["2:" + ack(port, 0), "3:" + ack(port, 1), "4:" + ack(port, 2)],
+        "w1024": [
+            "2:" + ack(port, 0),
+            "# DATA 1 is lost; after it again: an ACK 1 of another TID",
+            "4:" + ack(port, 1, sport=TID + 1),
+            "5:" + ack(port, 1),
+            "# after DATA 2: ACK 1 again; after DATA 2 again: ACK 2",
+            "6:" + ack(port, 1),
+            "7:" + ack(port, 2),
+            "8:" + ack(port, 3)],
+        "werr": ["2:" + ack(port, 0), "3:" + error(port, 3, b"Disk full")],
+        "wref": ["2:" + error(port, 2, b"Writing is not allowed: tftpd --write allows it")],
+        "wbrk": ["2:" + ack(port, 0)],
+    }[name]
 
 
 def arp_reply() -> str:
@@ -245,6 +311,20 @@ def main() -> None:
             port_of[name] = at
             eth_in = "\n".join(["1:" + arp_reply(), "2:" + data(at, 1, payload[:500]), ""])
             runs.append((name, *run(emu, monitor, inp, eth_in, tmp, name)))
+        for name, inp in WRITES:
+            _, probe = run(emu, monitor, inp, "1:" + arp_reply() + "\n", tmp, name + "0")
+            sent = [f for f in probe if f[12:14] == b"\x08\x00"]
+            check(f"tftp {name}: a WRQ sent", len(sent) > 0)
+            if not sent:
+                sys.exit(1)
+            port_of[name] = struct.unpack(">H", sent[0][PORT_AT:PORT_AT + 2])[0]
+            if name == "wref":
+                port_of["wnone"] = port_of[name]
+                runs.append(("wnone", *run(emu, monitor, inp, "1:" + arp_reply() + "\n",
+                                           tmp, "wnone")))
+        for name, inp in WRITES:
+            eth_in = "\n".join(["1:" + arp_reply(), *write_in(name, port_of[name]), ""])
+            runs.append((name, *run(emu, monitor, inp, eth_in, tmp, name)))
         runs.append(("args", *run(emu, monitor, ARGS, None, tmp, "args")))
 
     for name, lines, frames in runs:
@@ -263,8 +343,16 @@ def main() -> None:
               name == "args" or ports == {port_of.get(name, port)})
         dst = [struct.unpack(">HH", f[36:38] + f[42:44]) for f in udp]
         rrq = 6969 if name == "port" else 69
-        check(f"tftp {name}: RRQs to port {rrq}, ACKs to the TID",
-              all((d, op) in ((rrq, 1), (TID, 4)) for d, op in dst))
+        if name.startswith("w"):
+            check(f"tftp {name}: WRQs to port 69, DATA and ERRORs to the TID",
+                  all((d, op) in ((69, 2), (TID, 3), (TID, 5)) for d, op in dst))
+            sizes = [len(f) - 46 for f in udp if f[42:44] == b"\x00\x03"]
+            want = {"w0": [0], "w512": [512, 0], "w1024": [512] * 3 + [512] * 2 + [0],
+                    "werr": [512], "wnone": [], "wref": [], "wbrk": []}[name]
+            check(f"tftp {name}: the sizes of the DATA {want}", sizes == want)
+        else:
+            check(f"tftp {name}: RRQs to port {rrq}, ACKs to the TID",
+                  all((d, op) in ((rrq, 1), (TID, 4)) for d, op in dst))
     with open(out, "w") as f:
         f.write("\n".join(report) + "\n")
     try:

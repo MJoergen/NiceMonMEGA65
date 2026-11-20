@@ -2,16 +2,18 @@
 ; basic_cmd.nasm (basic.nasm's header): DHCP, on net_dhcp, net_config, and
 ; net_servers; NTP, which sets the clock from a time server (issue #127),
 ; on dns_lookup, the UDP entries, and clock_set, with clock_zone and
-; clock_ntp of basic_time.nasm; and LOAD "NAME.BIN", "IP", which reads a
+; clock_ntp of basic_time.nasm; LOAD "NAME.BIN", "IP", which reads a
 ; .bin file from a TFTP server on the UDP entries as LOAD "NAME.BIN"
-; reads one from the card, and DIR "IP", its listing (issue #84). They
-; reach the monitor through the entries of the dispatch table alone
-; (issue #152).
+; reads one from the card, and DIR "IP", its listing (issue #84); and
+; SAVE "NAME", "IP" and BSAVE "NAME", A, N, "IP", which write a file to
+; the server (issue #155). They reach the monitor through the entries of
+; the dispatch table alone (issue #152).
 ;
 ; The statements are routines as those of basic_cmd.nasm are, which
 ; basic.nasm calls with their arguments in R1-R3. IP, which shows and
 ; writes the IP address, is in basic_cmd.nasm. TFTP takes its bytes
-; with bin_char of basic_cmd.nasm, as LOAD from the card does.
+; with bin_char of basic_cmd.nasm, as LOAD from the card does, and gets
+; those of a write from flush, as SAVE to the card writes them.
 
 NTP_PORT        .EQU    123             ; the time server's UDP port (RFC 4330)
 NTP_TRIES       .EQU    3               ; the queries that NTP sends
@@ -24,6 +26,8 @@ TFTP_TRIES      .EQU    5               ; the sends of a packet that TFTP waits 
 TFTP_WAIT       .EQU    1000000         ; the microseconds it waits after each
 TFTP_PKT        .EQU    96              ; the words of V_TPKT
 TFTP_MAX        .EQU    516             ; the bytes of a packet received at most, the words of V_TBUF
+E_TNOANS        .EQU    -63             ; the errors of TFTP, which no entry returns: no answer,
+E_TERROR        .EQU    -64             ; and an ERROR of the server
 
 ; DHCP: net_dhcp, entry 23, and the address, the mask, the gateway, and
 ; the DNS server of net_config, entry 21, and the DHCP server and the
@@ -286,8 +290,8 @@ put32
 ; LOAD "NAME.BIN", "IP[:PORT]" and DIR "IP[:PORT]" [, "PAT"]: R1 the
 ; string of IP, R2 the name, or 0 for *, and R3 not 0 for a listing, of
 ; DIR. The .bin file NAME of the TFTP server at IP (RFC 1350), read in
-; octet mode through the UDP endpoint, which it opens on a port that
-; udp_open picks, and closes at the end, and its lines written as
+; octet mode through the UDP endpoint, which tftp_req opens on a port
+; that udp_open picks, and closes at the end, and its lines written as
 ; LOAD "NAME.BIN" writes them, with bin_char, and shown as LOAD shows
 ; them, or for a program's text stored by bas_eol (issue #60); or for a listing the lines that tools/tftpd.py answers a
 ; pattern, with * or ?, with, which are shown instead. The RRQ goes to
@@ -298,65 +302,15 @@ put32
 ; packet that has no answer within TFTP_WAIT microseconds is sent again,
 ; up to TFTP_TRIES times in all. An ERROR ends the load with its code and
 ; its message. An error after a line of the file shows the summary
-; first, with load_part. R7 is the name, then counts the sends left.
+; first, with load_part. R7 counts the sends left.
 st_tftp
                 MOVE[M] R7, R2          ; the name
         ?Z      MOVE    R7, TEXT_B+4*S_STAR
                 MOVE    @V_TLIST, R3
-                CLR     @V_LSTATS+5     ; no line read, for load_part
-:
-                CMP     @R1, 0x20
-        ?Z      ADD     R1, R1, 1
-        ?Z      JMP     :-
-                CALL    get_ip
-                TST     R2
-        ?Z      JMP     tftp_bad
-                MOVE    @V_TSRV, R1
-                MOVE    @V_TPORT, TFTP_PORT
-                CMP     @R3, 0x3A       ; :
-        ?!Z     JMP     tftp_ip
-                ADD     R3, R3, 1
-                CLR     R4              ; the port
-                MOVE    R5, R3          ; where it starts
-:
-                SUB     R2, @R3, 0x30
-                CMP     R2, 10
-        ?!C     JMP     :+              ; no digit
-                ADD     R4, R4, R4      ; R4 is 10 * R4 + the digit
-                ADD     R2, R2, R4
-                SHL     R4, R4, 2
-                ADD     R4, R4, R2
-                CMP     R4, 0x10000
-        ?!C     JMP     tftp_bad
-                ADD     R3, R3, 1
-                JMP     :-
-:
-                CMP     R3, R5
-        ?Z      JMP     tftp_bad        ; a port without digits
-                TST     R4
-        ?Z      JMP     tftp_bad        ; port 0
-                MOVE    @V_TPORT, R4
-tftp_ip
-                CALL    rest_blank
-        ?!Z     JMP     tftp_bad        ; more after the address
-; The RRQ: the opcode 1, the name, a 0, octet, and a 0
-                MOVE    R2, V_TPKT
-                CLR     @R2++
-                MOVE    @R2++, 1
-:
-                MOVE[M] @R2++, @R7++
-        ?!Z     JMP     :-
-                MOVE    R1, TEXT_B+4*S_OCTET
-:
-                MOVE[M] @R2++, @R1++
-        ?!Z     JMP     :-
-                SUB     @V_TLEN, R2, V_TPKT
-                CLR     R1
-                CALL    UDP_OPEN
+                ONE     @V_TOP          ; an RRQ
+                CALL    tftp_req
                 TST     R1
-        ?N      JMP     tftp_fail
-                NOT     @V_OPEN, R0     ; for files_end, at an error of a line
-                CLR     @V_TTID
+        ?!Z     RET                     ; the error, shown
                 MOVE    @V_TBLK, 1
                 CALL    bin_init
 tftp_try
@@ -369,7 +323,7 @@ tftp_send
                 MOVE    R4, @V_TLEN
                 CALL    UDP_SEND
                 TST     R1
-        ?N      JMP     tftp_fail
+        ?N      JMP     tftp_end
                 MOVE    @V_TTIME, @io.us
 tftp_wait
                 MOVE    R1, V_TBUF
@@ -444,26 +398,123 @@ tftp_time
         ?C      JMP     tftp_wait
                 SUB[M]  R7, R7, 1
         ?!Z     JMP     tftp_send
-                CLR     @V_OPEN
-                CALL    UDP_CLOSE
-                CALL    load_part
-                MOVE    R1, S_NOTFTP
-                JMP     puts_b_crlf     ; which returns to the caller
-; An ERROR: its code, and its message, up to a 0 or the end of the
-; datagram, without control codes. R7 is the byte, and R8 the end.
+                MOVE    R1, E_TNOANS
+                JMP     tftp_end
 tftp_error
-                CALL    load_part
-                MOVE    R7, V_TBUF+4
-                ADD     R8, R1, V_TBUF
+                MOVE    @V_TEND, R1     ; its bytes
+                MOVE    R1, E_TERROR
+                JMP     tftp_end
+
+; tftp_req: the request V_TOP, an RRQ or a WRQ, of the name at R7 to the
+; TFTP server of the string R1, IP[:PORT], with PORT 69 by default, made
+; in octet mode, of V_TLEN bytes, in V_TPKT for an RRQ and in V_TBUF for
+; a WRQ, which receives into V_TPKT, and the endpoint opened, with no TID
+; yet. R1 0, or not 0 when the string is no server or the endpoint does
+; not open, with the error shown. Uses R1-R8.
+tftp_req
+                CLR     @V_LSTATS       ; no word loaded yet,
+                CLR     @V_LSTATS+5     ; and no line read, for load_part
+:
+                CMP     @R1, 0x20
+        ?Z      ADD     R1, R1, 1
+        ?Z      JMP     :-
+                CALL    get_ip
+                TST     R2
+        ?Z      JMP     tftp_bad
+                MOVE    @V_TSRV, R1
+                MOVE    @V_TPORT, TFTP_PORT
+                CMP     @R3, 0x3A       ; :
+        ?!Z     JMP     tftp_ip
+                ADD     R3, R3, 1
+                CLR     R4              ; the port
+                MOVE    R5, R3          ; where it starts
+:
+                SUB     R2, @R3, 0x30
+                CMP     R2, 10
+        ?!C     JMP     :+              ; no digit
+                ADD     R4, R4, R4      ; R4 is 10 * R4 + the digit
+                ADD     R2, R2, R4
+                SHL     R4, R4, 2
+                ADD     R4, R4, R2
+                CMP     R4, 0x10000
+        ?!C     JMP     tftp_bad
+                ADD     R3, R3, 1
+                JMP     :-
+:
+                CMP     R3, R5
+        ?Z      JMP     tftp_bad        ; a port without digits
+                TST     R4
+        ?Z      JMP     tftp_bad        ; port 0
+                MOVE    @V_TPORT, R4
+tftp_ip
+                CALL    rest_blank
+        ?!Z     JMP     tftp_bad        ; more after the address
+; The request: the opcode, the name, a 0, octet, and a 0
+                MOVE    R2, V_TPKT
+                CMP     @V_TOP, 1
+        ?!Z     MOVE    R2, V_TBUF
+                MOVE    R8, R2          ; its start
+                CLR     @R2++
+                MOVE    @R2++, @V_TOP
+:
+                MOVE[M] @R2++, @R7++
+        ?!Z     JMP     :-
+                MOVE    R1, TEXT_B+4*S_OCTET
+:
+                MOVE[M] @R2++, @R1++
+        ?!Z     JMP     :-
+                SUB     @V_TLEN, R2, R8
+                CLR     R1
+                CALL    UDP_OPEN
+                TST     R1
+        ?N      JMP     tftp_end
+                NOT     @V_OPEN, R0     ; for files_end, at an error of a line
+                CLR     @V_TTID
+                CLR     R1
+                RET
+tftp_bad
+                MOVE    R1, S_BADTFTP
+tftp_say
+                CALL    puts_b_crlf
+                ONE     R1
+                RET
+
+; tftp_end: the end of a transfer that failed with the error R1:
+; E_TNOANS, no answer; E_TERROR, an ERROR of V_TEND bytes, in V_TBUF
+; for an RRQ and in V_TPKT for a WRQ, shown with its code and its
+; message, up to a 0 or its end, without control codes; or an error of
+; udp_open or udp_send, no IP address or no route. The endpoint closed,
+; the summary of a load's lines first, with load_part, and the error
+; shown. R1 not 0. Uses R1-R8.
+tftp_end
+                PUSH    R1
                 CLR     @V_OPEN
                 CALL    UDP_CLOSE
+                POP     R1
+                CALL    load_part
+                CMP     R1, E_TERROR
+        ?Z      JMP     :+
+                MOVE    R2, R1
+                MOVE    R1, S_NOTFTP
+                CMP     R2, E_TNOANS
+        ?Z      JMP     tftp_say
+                MOVE    R1, S_NOIP
+                CMP     R2, MON_E_NOIP
+        ?!Z     MOVE    R1, S_NOROUTE
+                JMP     tftp_say
+:
+                MOVE    R7, V_TBUF      ; the ERROR
+                CMP     @V_TOP, 1
+        ?!Z     MOVE    R7, V_TPKT
+                ADD     R8, R7, @V_TEND
                 MOVE    R1, S_TFTPERR
                 CALL    puts_b
-                SHL     R1, @V_TBUF+2, 8
-                OR      R1, R1, @V_TBUF+3
+                SHL     R1, @2[R7], 8
+                OR      R1, R1, @3[R7]
                 CALL    _io_putdec
                 MOVE    R1, S_UCOMMA
                 CALL    puts_b
+                ADD     R7, R7, 4
 :
                 CMP     R7, R8
         ?!C     JMP     :+
@@ -475,20 +526,188 @@ tftp_error
                 CALL    MON_PUTC
                 JMP     :-
 :
-                JMP     _io_crlf        ; which returns to the caller
-; An error of udp_open or udp_send: no IP address, or no route
-tftp_fail
+                CALL    _io_crlf
+                ONE     R1
+                RET
+
+; The write of SAVE "NAME", "IP" and BSAVE "NAME", A, N, "IP" (issue
+; #155), which out_file of basic_cmd.nasm drives: tput_open sends the
+; WRQ, flush gives its bytes to tput_bytes, which sends each DATA block
+; of 512 bytes as it fills, in V_TBUF, and tput_close sends the last,
+; of less than 512 bytes, which may be empty. The server's ACK 0 gives
+; its TID; the packets of other hosts and TIDs are passed over, and so
+; are the ACKs of other blocks. A packet that has no ACK within
+; TFTP_WAIT microseconds is sent again, up to TFTP_TRIES times in all.
+; The first error, an ERROR of the server, no answer, or one of
+; udp_send, is kept in V_SERR, and the rest of the bytes are dropped;
+; tput_close shows it. While the bytes go, V_OPEN is -2, and files_end
+; ends a write that the break key stopped with tput_abort.
+
+; tput_open: R1 the name, and R2 the string of the server, IP[:PORT].
+; The WRQ sent with tftp_req, and its ACK 0 waited for. R1 0, with
+; V_OPEN -2, or not 0, with the error shown. Keeps R9-R12.
+tput_open
+                PUSH    R7
+                PUSH    R8
                 MOVE    R7, R1
+                MOVE    R1, R2
+                MOVE    @V_TOP, 2       ; a WRQ
+                CALL    tftp_req
+                TST     R1
+        ?!Z     JMP     :+              ; the error, shown
+                CLR     @V_TBLK         ; the ACK of block 0
+                CALL    tput_xfer
+                TST     R1
+        ?!Z     CALL    tftp_end        ; which leaves R1 not 0
+                TST     R1
+        ?Z      MOVE    @V_OPEN, 0xFFFFFFFE
+                MOVE    @V_TBLK, 1
+                CLR     @V_TEND
+:
+                POP     R8
+                POP     R7
+                RET
+
+; tput_xfer: the V_TLEN bytes of V_TBUF sent to the server, and the ACK
+; of the block V_TBLK waited for, whose port is the TID. R1 0, or the
+; error: E_TNOANS, E_TERROR with the ERROR's bytes in V_TEND, or an
+; error of udp_send. Uses R1-R7.
+tput_xfer
+                MOVE    R7, TFTP_TRIES
+tput_send
+                MOVE    R1, @V_TSRV
+                MOVE[M] R2, @V_TTID
+        ?Z      MOVE    R2, @V_TPORT
+                MOVE    R3, V_TBUF
+                MOVE    R4, @V_TLEN
+                CALL    UDP_SEND
+                TST     R1
+        ?N      RET
+                MOVE    @V_TTIME, @io.us
+tput_wait
+                MOVE    R1, V_TPKT
+                MOVE    R2, TFTP_PKT
+                MOVE    R3, V_TSRC
+                CALL    UDP_RECV
+                TST     R1
+        ?Z      JMP     tput_time
+        ?N      JMP     tput_time
+                CMP     @V_TSRC, @V_TSRV
+        ?!Z     JMP     tput_wait       ; from another host
+                MOVE    R2, @V_TSRC+1   ; its port
+                MOVE[M] R3, @V_TTID
+        ?Z      JMP     :+
+                CMP     R2, R3
+        ?!Z     JMP     tput_wait       ; from another TID
+:
+                CMP     R1, 4
+        ?C      JMP     tput_wait       ; too short
+                SHL     R3, @V_TPKT, 8  ; the opcode
+                OR      R3, R3, @V_TPKT+1
+                CMP     R3, 5
+        ?Z      MOVE    @V_TEND, R1     ; its bytes
+        ?Z      MOVE    R1, E_TERROR
+        ?Z      RET
+                CMP     R3, 4
+        ?!Z     JMP     tput_wait       ; no ACK
+                SHL     R4, @V_TPKT+2, 8  ; the block
+                OR      R4, R4, @V_TPKT+3
+                CMP     R4, @V_TBLK
+        ?!Z     JMP     tput_wait       ; an ACK of another block
+                MOVE    @V_TTID, R2
+                CLR     R1
+                RET
+tput_time
+                SUB     R1, @io.us, @V_TTIME
+                CMP     R1, TFTP_WAIT
+        ?C      JMP     tput_wait
+                SUB[M]  R7, R7, 1
+        ?!Z     JMP     tput_send
+                MOVE    R1, E_TNOANS
+                RET
+
+; tput_block: the V_TEND bytes at V_TBUF+4 sent as the DATA of the block
+; V_TBLK, with tput_xfer, and then V_TBLK the next block, with no bytes.
+; R1 0, or the error of tput_xfer. Uses R1-R7.
+tput_block
+                CLR     @V_TBUF
+                MOVE    @V_TBUF+1, 3
+                MOVE    R1, @V_TBLK
+                SHR     @V_TBUF+2, R1, 8
+                AND     @V_TBUF+3, R1, 0xFF
+                ADD     @V_TLEN, @V_TEND, 4
+                CALL    tput_xfer
+                TST     R1
+        ?!Z     RET
+                ADD     R2, @V_TBLK, 1
+                AND     @V_TBLK, R2, 0xFFFF
+                CLR     @V_TEND
+                RET
+
+; tput_bytes: the R3 bytes from V_FBUF, for flush, added to the block at
+; V_TBUF+4, which is sent with tput_block each time it has 512, up to
+; the first error, which goes to V_SERR. Uses R1-R4, as flush does.
+tput_bytes
+                PUSH    R5
+                PUSH    R6
+                PUSH    R7
+                MOVE    R5, V_FBUF
+                ADD     R6, R5, R3      ; the end
+:
+                CMP     R5, R6
+        ?Z      JMP     :+
+                MOVE    R1, @V_TEND
+                MOVE    @V_TBUF+4[R1], @R5++
+                ADD     R1, R1, 1
+                MOVE    @V_TEND, R1
+                CMP     R1, 512
+        ?!Z     JMP     :-
+                PUSH    R5
+                PUSH    R6
+                CALL    tput_block
+                POP     R6
+                POP     R5
+                MOVE    @V_SERR, R1
+                TST     R1
+        ?Z      JMP     :-
+:
+                POP     R7
+                POP     R6
+                POP     R5
+                RET
+
+; tput_close: the end of a write: the last block sent, unless an error
+; came before, and the endpoint closed. R1 0, or not 0 with the error
+; shown, V_SERR's or the last block's.
+tput_close
+                MOVE[M] R1, @V_SERR
+        ?Z      CALL    tput_block
+                TST     R1
+        ?!Z     JMP     tftp_end        ; which returns to the caller
                 CLR     @V_OPEN
                 CALL    UDP_CLOSE
-                CALL    load_part
-                MOVE    R1, S_NOIP
-                CMP     R7, MON_E_NOIP
-        ?!Z     MOVE    R1, S_NOROUTE
-                JMP     puts_b_crlf     ; which returns to the caller
-tftp_bad
-                MOVE    R1, S_BADTFTP
-                JMP     puts_b_crlf     ; which returns to the caller
+                CLR     R1
+                RET
+
+; tput_abort: an ERROR 0, Break, to the server of a write that the break
+; key stopped, so that it drops the file, and the endpoint closed, for
+; files_end. Uses R1-R6.
+tput_abort
+                MOVE    R2, V_TPKT
+                CLR     @R2++
+                MOVE    @R2++, 5
+                CLR     @R2++
+                CLR     @R2++
+                MOVE    R1, TEXT_B+4*S_BREAK
+:
+                MOVE[M] @R2++, @R1++
+        ?!Z     JMP     :-
+                SUB     R4, R2, V_TPKT
+                MOVE    R1, @V_TSRV
+                MOVE    R2, @V_TTID
+                MOVE    R3, V_TPKT
+                CALL    UDP_SEND
+                JMP     UDP_CLOSE       ; which returns to the caller
 
 S_NODHCP
                 .ASCII_B 'No answer from a DHCP server'

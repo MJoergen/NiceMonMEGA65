@@ -12,15 +12,33 @@ ACK, which sends nothing again; a packet from another port, which gets
 ERROR 5 while the transfer goes on; and an ERROR from the client, after
 which nothing comes again.
 
+Then it starts a second server, with --write, on a folder of its own
+with the same files, and writes to it (issue #155): files of 0, 511,
+512, 513, and 140,000 bytes; a file that is there, which is replaced,
+and one that is there in another case, whose name is kept; names
+outside the folder, with * or ?, of a directory, and a mode other than
+octet, each with its ERROR; a lost DATA, after which the ACK comes
+again, a DATA sent twice, whose ACK comes again, and the last DATA sent
+again after its ACK, as when that ACK is lost, which is answered too; a
+packet from another port, which gets ERROR 5; an ERROR from the client,
+and a client that stops, after which no file is there, neither the
+name nor a temporary file. curl -T writes a file too, when curl has
+TFTP.
+
 Then it runs the ROM of the tests, build/rom_test.bin, in
 niceemu with --eth-udp and --eth-peer, whose frames go to a bridge in
 this script: the bridge answers ARP for the server 10.0.0.2, and passes
 the UDP datagrams to 10.0.0.2 on to tftpd.py on 127.0.0.1, port 69 to
 the server's port, and back, so that niceemu and tftpd.py are on one
-network. BASIC lists the folder with DIR, loads a program of 300 lines
-with LOAD, which DUMP then shows, gets an ERROR, and loads a file of
-lines that are skipped, passed over, and loaded. Its output must have the lines
-that the checks name.
+network. BASIC lists the folder of the server with --write with DIR,
+loads a program of 300 lines with LOAD, which DUMP then shows, gets an
+ERROR, and loads a file of lines that are skipped, passed over, and
+loaded. Then it saves a program of two lines with SAVE, and 300, 256,
+and 0 words with BSAVE, which are files of 5400, 4608, and 0 bytes,
+the second of 9 full blocks, and the last of none, and loads the
+program back; and SAVE to the server without --write gets its ERROR.
+Its output must have the lines that the checks name, and the files
+must be on the host.
 
 It prints a line for each check, and last how many passed, and exits with
 status 1 when one fails. niceemu must be built, with make -C
@@ -36,7 +54,7 @@ import subprocess
 import sys
 import tempfile
 import threading
-from typing import Dict, Tuple
+from typing import Dict, List, Optional, Tuple
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NICEEMU = os.path.join(REPO, "nice_cpu", "emulator", "zig-out", "bin", "niceemu")
@@ -95,6 +113,7 @@ def request(op: int, name: str, mode: str = "octet") -> bytes:
 
 
 Result = Tuple[str, bytes, int]         # "data" or "error", the bytes or message, the code
+Addr = Tuple[str, int]
 
 
 def get(port: int, name: str, mode: str = "octet", op: int = 1) -> Result:
@@ -198,6 +217,150 @@ def test_abort(port: int) -> None:
             check("tftpd an ERROR from the client: nothing more", True)
 
 
+def put(port: int, name: str, content: bytes, mode: str = "octet") -> Result:
+    """content written to tftpd.py at port as name: ("data", b"", 0), or
+    an ERROR."""
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        sock.settimeout(5)
+        sock.sendto(request(2, name, mode), ("127.0.0.1", port))
+        res, addr = expect_ack(sock, 0)
+        if res is not None:
+            return res
+        for n in range(len(content) // 512 + 1):
+            sock.sendto(struct.pack(">HH", 3, (n + 1) & 0xFFFF)
+                        + content[512 * n:512 * (n + 1)], addr)
+            res, _ = expect_ack(sock, (n + 1) & 0xFFFF)
+            if res is not None:
+                return res
+        return "data", b"", 0
+
+
+def expect_ack(sock: socket.socket, block: int) -> Tuple[Optional[Result], Addr]:
+    """None and the server's address when the ACK of block comes, which
+    passes over others; or an ERROR."""
+    while True:
+        packet, addr = sock.recvfrom(1024)
+        op, n = struct.unpack(">HH", packet[:4])
+        if op == 5:
+            return ("error", packet[4:].rstrip(b"\0"), n), addr
+        if op == 4 and n == block:
+            return None, addr
+
+
+def temps(folder: str) -> List[str]:
+    return [n for n in os.listdir(folder) if n.startswith(".tftpd-")]
+
+
+def test_write(port: int, folder: str) -> None:
+    """The writes of tftpd.py --write to folder, whose files are FILES."""
+    for size in (0, 511, 512, 513, 140_000):
+        content = bytes((i * 5 + size) & 0xFF for i in range(size))
+        name = f"put{size}.bin"
+        res = put(port, name, content)
+        with open(os.path.join(folder, name), "rb") as f:
+            got = f.read()
+        check(f"tftpd --write {name}, {size} bytes", res == ("data", b"", 0) and got == content,
+              str(res)[:80])
+    res = put(port, "f512.bin", b"replaced\n")
+    with open(os.path.join(folder, "f512.bin"), "rb") as f:
+        check("tftpd --write f512.bin, which is there: replaced", f.read() == b"replaced\n",
+              str(res))
+    res = put(port, "PROG.BIN", b"00009000 00000001\n")
+    with open(os.path.join(folder, "prog.bin"), "rb") as f:
+        check("tftpd --write PROG.BIN: prog.bin replaced, with its name",
+              f.read() == b"00009000 00000001\n" and "PROG.BIN" not in os.listdir(folder),
+              str(res))
+    os.mkdir(os.path.join(folder, "sub"))
+    for name, mode, code in (("a/b", "octet", 2), (".x", "octet", 2), ("", "octet", 2),
+                             ("../x.bin", "octet", 2), ("*.bin", "octet", 2),
+                             ("a?.bin", "octet", 2), ("sub", "octet", 2),
+                             ("x.bin", "mail", 0)):
+        res = put(port, name, b"x", mode)
+        check(f"tftpd --write WRQ {name!r} {mode}: ERROR {code}",
+              res[0] == "error" and res[2] == code, str(res))
+    check("tftpd --write the refused names: no file",
+          not os.path.exists(os.path.join(folder, "x.bin"))
+          and not os.path.exists(os.path.join(os.path.dirname(folder), "x.bin")))
+    test_write_lost(port, folder)
+    test_write_end(port, folder)
+
+
+def test_write_lost(port: int, folder: str) -> None:
+    """A lost DATA, a DATA twice, a lost last ACK, and another TID."""
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock, \
+            socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as other:
+        sock.settimeout(5)
+        other.settimeout(5)
+        sock.sendto(request(2, "lost.bin"), ("127.0.0.1", port))
+        packet, addr = sock.recvfrom(1024)
+        first = packet
+        packet, addr2 = sock.recvfrom(1024)   # no DATA 1: ACK 0 again
+        check("tftpd --write a lost DATA: the ACK again",
+              packet == first == struct.pack(">HH", 4, 0) and addr2 == addr)
+        block1, block2 = bytes(range(256)) * 2, b"the end\n"
+        sock.sendto(struct.pack(">HH", 3, 1) + block1, addr)
+        packet, _ = sock.recvfrom(1024)
+        sock.sendto(struct.pack(">HH", 3, 1) + block1, addr)
+        packet, _ = sock.recvfrom(1024)
+        check("tftpd --write DATA 1 twice: ACK 1 again", packet == struct.pack(">HH", 4, 1))
+        other.sendto(struct.pack(">HH", 3, 2) + b"other\n", addr)
+        packet, _ = other.recvfrom(1024)
+        check("tftpd --write another TID: ERROR 5", struct.unpack(">HH", packet[:4]) == (5, 5))
+        sock.sendto(struct.pack(">HH", 3, 2) + block2, addr)
+        packet, _ = sock.recvfrom(1024)
+        sock.sendto(struct.pack(">HH", 3, 2) + block2, addr)  # as if ACK 2 was lost
+        packet2, _ = sock.recvfrom(1024)
+        check("tftpd --write the last DATA again: ACK 2 again",
+              packet == packet2 == struct.pack(">HH", 4, 2))
+    with open(os.path.join(folder, "lost.bin"), "rb") as f:
+        check("tftpd --write lost.bin, after the losses", f.read() == block1 + block2)
+
+
+def test_write_end(port: int, folder: str) -> None:
+    """An ERROR from the client, and a client that stops: no file."""
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        sock.settimeout(5)
+        sock.sendto(request(2, "abort.bin"), ("127.0.0.1", port))
+        packet, addr = sock.recvfrom(1024)
+        sock.sendto(struct.pack(">HH", 3, 1) + bytes(512), addr)
+        packet, _ = sock.recvfrom(1024)
+        sock.sendto(struct.pack(">HH", 5, 0) + b"Break\0", addr)
+        sock.sendto(request(2, "stop.bin"), ("127.0.0.1", port))
+        acks = 0
+        sock.settimeout(3 * TIMEOUT)
+        try:
+            while True:
+                packet, _ = sock.recvfrom(1024)
+                acks += packet == struct.pack(">HH", 4, 0)
+        except socket.timeout:
+            pass
+    check("tftpd --write a client that stops: ACK 0 sent 5 times", acks == 5, str(acks))
+    check("tftpd --write an ERROR from the client, and a client that stops: no file",
+          not os.path.exists(os.path.join(folder, "abort.bin"))
+          and not os.path.exists(os.path.join(folder, "stop.bin")) and not temps(folder),
+          str(os.listdir(folder)))
+
+
+def test_curl(port: int, folder: str, tmp: str) -> None:
+    """curl -T, a standard client, when it has TFTP."""
+    try:
+        res = subprocess.run(["curl", "-V"], capture_output=True, text=True)
+    except OSError:
+        res = None
+    if res is None or " tftp" not in res.stdout:
+        print("[SKIP] tftpd --write curl -T: no curl with TFTP")
+        return
+    src = os.path.join(tmp, "curl.bin")
+    content = bytes((i * 11) & 0xFF for i in range(1300))
+    with open(src, "wb") as f:
+        f.write(content)
+    res = subprocess.run(["curl", "-sS", "-T", src, f"tftp://127.0.0.1:{port}/curl.bin"],
+                         capture_output=True, text=True)
+    with open(os.path.join(folder, "curl.bin"), "rb") as f:
+        check("tftpd --write curl -T curl.bin, 1300 bytes",
+              res.returncode == 0 and f.read() == content, res.stderr)
+
+
 # The bridge between niceemu's frames and the host's UDP
 def checksum(header: bytes) -> int:
     total: int = sum(struct.unpack(f">{len(header) // 2}H", header))
@@ -270,7 +433,8 @@ def free_port() -> int:
         return port
 
 
-def test_monitor(server_port: int, tmp: str) -> None:
+def test_monitor(server_port: int, folder: str, readonly: str, ro_port: int,
+                 tmp: str) -> None:
     bridge = Bridge(server_port)
     bridge.emu_port = free_port()
     thread = threading.Thread(target=bridge.run, daemon=True)
@@ -279,7 +443,12 @@ def test_monitor(server_port: int, tmp: str) -> None:
     with open(inp, "w") as f:
         f.write('IP "10.0.0.9"\rDIR "10.0.0.2"\rLOAD "PROG.BIN", "10.0.0.2"\r'
                 'DUMP 0x9000, 4\rDUMP 0x912B, 1\rLOAD "nosuch.bin", "10.0.0.2"\r'
-                'LOAD "lines.bin", "10.0.0.2"\rDUMP 0xA000, 8\rHALT\r')
+                'LOAD "lines.bin", "10.0.0.2"\rDUMP 0xA000, 8\rNEW\r'
+                '10 PRINT "SAVED"\r20 END\rSAVE "hi", "10.0.0.2"\r'
+                'BSAVE "words", 0x9000, 300, "10.0.0.2"\r'
+                'BSAVE "w256", 0x9000, 256, "10.0.0.2"\rBSAVE "w0", 0x9000, 0, "10.0.0.2"\r'
+                f'SAVE "ro", "10.0.0.2:{ro_port}"\rNEW\rLOAD "hi", "10.0.0.2"\rLIST\r'
+                'HALT\r')
     try:
         res = subprocess.run(
             [NICEEMU, "-i", inp, "--eth-udp", f"127.0.0.1:{bridge.emu_port}",
@@ -304,10 +473,39 @@ def test_monitor(server_port: int, tmp: str) -> None:
                  "TFTP error 1, File not found",
                  "Words loaded: 3, 0000A000 to 0000A007",
                  "0000A000 00000001 00000000 00000000 00000000",
-                 "0000A004 00000000 00000000 00000007 00000008"):
+                 "0000A004 00000000 00000000 00000007 00000008",
+                 "Words saved: 300, 00009000 to 0000912B",
+                 "Words saved: 256, 00009000 to 000090FF",
+                 "Words saved: 0",
+                 "TFTP error 2, Writing is not allowed: tftpd --write allows it",
+                 '10 PRINT "SAVED"',
+                 "20 END"):
         check(f"monitor: {line}", line in lines, out[-600:])
+    words = b"".join(f"{0x9000 + i:08x} {i * 3:08x}\n".encode() for i in range(300))
+    for name, content in (("hi.BAS", b'10 PRINT "SAVED"\n20 END\n'), ("words.BIN", words),
+                          ("w256.BIN", words[:256 * 18]), ("w0.BIN", b"")):
+        path = os.path.join(folder, name)
+        got = open(path, "rb").read() if os.path.exists(path) else None
+        check(f"monitor: SAVE and BSAVE {name}, {len(content)} bytes, on the host",
+              got == content, str(got)[:80])
+    check("monitor: SAVE to the server without --write: no file",
+          not any(n.lower().startswith("ro.") for n in os.listdir(readonly)))
     check("monitor: LOAD lines.bin skips 5 lines from line 2",
           any(x.startswith("Lines skipped: 5, first line 2;") for x in lines), out[-600:])
+
+
+def start(servers: List["subprocess.Popen[str]"], folder: str, *opts: str) -> int:
+    """tftpd.py on folder, added to servers: its port."""
+    server = subprocess.Popen(
+        [*TFTPD, "--dir", folder, "--listen", "127.0.0.1:0",
+         "--retry-wait", str(TIMEOUT), *opts],
+        stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+    servers.append(server)
+    assert server.stderr is not None
+    line = server.stderr.readline()
+    # The reports of the transfers, which would fill the pipe
+    threading.Thread(target=server.stderr.read, daemon=True).start()
+    return int(line.split()[-1])
 
 
 def main() -> None:
@@ -330,21 +528,23 @@ def main() -> None:
             linked = True
         except (OSError, NotImplementedError):
             pass
-        server = subprocess.Popen(
-            [*TFTPD, "--dir", folder, "--listen", "127.0.0.1:0",
-             "--retry-wait", str(TIMEOUT)],
-            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+        wfolder = os.path.join(tmp, "wsrv")
+        os.mkdir(wfolder)
+        for name, content in FILES.items():
+            with open(os.path.join(wfolder, name), "wb") as f:
+                f.write(content)
+        servers: List["subprocess.Popen[str]"] = []
         try:
-            assert server.stderr is not None
-            line = server.stderr.readline()
-            port = int(line.split()[-1])
-            # The reports of the transfers, which would fill the pipe
-            threading.Thread(target=server.stderr.read, daemon=True).start()
+            port = start(servers, folder)
+            wport = start(servers, wfolder, "--write")
             test_server(port)
-            test_monitor(port, tmp)
+            test_monitor(wport, wfolder, folder, port, tmp)
+            test_write(wport, wfolder)
+            test_curl(wport, wfolder, tmp)
         finally:
-            server.terminate()
-            server.wait()
+            for server in servers:
+                server.terminate()
+                server.wait()
     print(f"{passed} of {passed + failed} checks passed")
     sys.exit(1 if failed else 0)
 

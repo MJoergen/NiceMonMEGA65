@@ -43,6 +43,7 @@ READY.
 save x
 Syntax error
 SAVE "NAME" [, S]   save the program as the text NAME.BAS
+SAVE "NAME", "IP"   save it to the TFTP server at IP (tools/tftpd.py --write)
 READY.
 delete x
 Syntax error
@@ -242,14 +243,17 @@ READY.
 save "x", "y" z
 Syntax error
 SAVE "NAME" [, S]   save the program as the text NAME.BAS
+SAVE "NAME", "IP"   save it to the TFTP server at IP (tools/tftpd.py --write)
 READY.
 save "x" "y"
 Syntax error
 SAVE "NAME" [, S]   save the program as the text NAME.BAS
+SAVE "NAME", "IP"   save it to the TFTP server at IP (tools/tftpd.py --write)
 READY.
 save "x",
 Syntax error
 SAVE "NAME" [, S]   save the program as the text NAME.BAS
+SAVE "NAME", "IP"   save it to the TFTP server at IP (tools/tftpd.py --write)
 READY.
 save "x", 1
 SD error 1 in slot 1, no card
@@ -257,6 +261,7 @@ READY.
 bsave "x", 0x, 1
 Syntax error
 BSAVE "NAME", A, N [, S]  save N words from A as the .bin file NAME
+BSAVE "NAME", A, N, "IP"  save the words to the TFTP server at IP
 READY.
 bsave "x", 1, 99999999999
 Illegal quantity
@@ -264,6 +269,20 @@ READY.
 save "x", "y", 99999999999
 Syntax error
 SAVE "NAME" [, S]   save the program as the text NAME.BAS
+SAVE "NAME", "IP"   save it to the TFTP server at IP (tools/tftpd.py --write)
+READY.
+bsave "x", 1, 2, "1.2.3.4"
+No IP address; IP or DHCP sets one
+READY.
+bsave "x", 1, 2, "y" z
+Syntax error
+BSAVE "NAME", A, N [, S]  save N words from A as the .bin file NAME
+BSAVE "NAME", A, N, "IP"  save the words to the TFTP server at IP
+READY.
+bsave "x", 1, 2, "y",
+Syntax error
+BSAVE "NAME", A, N [, S]  save N words from A as the .bin file NAME
+BSAVE "NAME", A, N, "IP"  save the words to the TFTP server at IP
 READY.
 save "abc
 SD error 1 in slot 1, no card
@@ -371,7 +390,7 @@ FFFFECB8 0800002C 01000002 0800003A 0B000C25
 FFFFECBC 03000000 FFFFECB0 0800002C 01000010
 READY.
 save "x", "1.2.3.4": dump 0xFFFFECB0, 16
-SAVE writes to the SD card: TFTP only loads
+No IP address; IP or DHCP sets one
 FFFFECB0 0B000236 05000001 00000078 00000000
 FFFFECB4 0800002C 05000007 00000031 0000002E
 FFFFECB8 00000032 0000002E 00000033 0000002E

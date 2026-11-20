@@ -45,7 +45,7 @@ tools](#the-other-tools) test the tools and build releases.
 | `sdcard.py` | `nicemon.py sd`: lists, copies, writes, and deletes the files of the folder `NICE` on the board's SD card, with no PC slot, and makes the folder. |
 | `sdnbd.py` | `nicemon.py nbd`: serves the board's SD card as a block device over NBD, so that Linux mounts it as a folder, all of the card, for the file manager. |
 | `flash.py` | `nicemon.py flash`: writes a bitstream into the Nexys4DDR's flash, or a core file into a slot of the MEGA65's, from which the board starts. |
-| `tftpd.py` | `nicemon.py tftpd`: a TFTP server for BASIC's `LOAD` and `DIR`, which also lists the files of its folder for a name with `*` or `?`. |
+| `tftpd.py` | `nicemon.py tftpd`: a TFTP server for BASIC's `LOAD` and `DIR`, which also lists the files of its folder for a name with `*` or `?`, and with `--write` for its `SAVE` and `BSAVE`. |
 | `hwtest.py` | Programs the FPGA with openFPGALoader and tests the system on the board. |
 | `jtag.py` | The JTAG cable of the board's UART, and the check that the board is the one a bitstream or core file was built for, which `hwtest.py` and `flash.py` use. |
 | `spiflash.py` | The MEGA65's flash through openFPGALoader's bridge, which `flash.py` uses to clear the protection of its sectors. |
@@ -761,10 +761,11 @@ checks the FPGA's part, and on a MEGA65 the flash chip.
 ## nicemon.py tftpd
 
 `nicemon.py tftpd` serves the files of a folder to BASIC's `LOAD` and
-`DIR` over TFTP, with a listing for a name with `*` or `?`. It uses no
-link, and so takes none of its options.
+`DIR` over TFTP, with a listing for a name with `*` or `?`, and with
+`--write` takes the files of its `SAVE` and `BSAVE`. It uses no link,
+and so takes none of its options.
 
-    tools/nicemon.py tftpd [--dir DIR] [--listen [ADDR:]PORT] [--retry-wait SEC] [--tries N]
+    tools/nicemon.py tftpd [--dir DIR] [--listen [ADDR:]PORT] [--retry-wait SEC] [--tries N] [--write]
 
 - `--dir DIR` is the folder served, the current one by default.
 - `--listen [ADDR:]PORT` is where it listens, `0.0.0.0:69` by default,
@@ -775,9 +776,19 @@ link, and so takes none of its options.
   stderr.
 - `--retry-wait SEC` is the wait for an ACK before a block is sent
   again, 1 by default, and `--tries N` the sends of a block in all, 5
-  by default.
+  by default. A write waits as long for each DATA, and sends its ACK
+  again meanwhile.
+- `--write` takes write requests, which it refuses with ERROR 2
+  without it. A file goes into the folder under the name of the
+  request, or under that of the one file that has the name in another
+  case, and replaces a file that is there, as `SAVE` to the card does.
+  A name with `*` or `?`, or that of a directory or a symbolic link, is
+  refused. The blocks go to a temporary file, whose name starts with a
+  dot, which is renamed at the end, so that a transfer that fails, such
+  as one that BASIC's CTRL-C stops, leaves no half file. TFTP has no
+  login: anyone who reaches the port may write to the folder.
 
-`make tftpd [TFTP_DIR=DIR] [TFTP_PORT=PORT]` serves `examples/build`
+`make tftpd [TFTP_DIR=DIR] [TFTP_PORT=PORT] [ARGS=--write]` serves `examples/build`
 ([monitor/README.md](../monitor/README.md#the-network)). It reports each
 transfer on stderr, and Ctrl-C stops it.
 

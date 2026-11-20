@@ -66,7 +66,8 @@ or, in an existing clone:
   [nicemon.py sd](tools/README.md#nicemonpy-sd) and
   [nicemon.py nbd](tools/README.md#nicemonpy-nbd)).
 - `make tftpd` serves the files of `examples/build`, or of `TFTP_DIR=`,
-  to BASIC's `LOAD` and `DIR` (see
+  to BASIC's `LOAD` and `DIR`, and with `ARGS=--write` takes those of
+  its `SAVE` and `BSAVE` (see
   [monitor/README.md](monitor/README.md#the-network)).
 - `make hwtest` tests the board (see [Testing the
   board](#testing-the-board)).
@@ -1093,13 +1094,20 @@ present bit of `SD_CSR` falls.
 with a client of its own: files of 0 to 140,000 bytes, a name in
 another case, listings, the errors, a symbolic link out of the folder,
 a lost and a duplicate ACK, a packet of another port, and an ERROR from
-the client, which ends the transfer. Then it runs the monitor of the
-tests in `niceemu` with `--eth-udp`, whose frames go to a bridge in the
-script that answers ARP for 10.0.0.2 and passes its datagrams to
-`nicemon.py tftpd`, and checks that `DIR` lists the folder, `LOAD` loads a program,
-and shows an ERROR, and that `LOAD` skips the lines of a file with a
-byte that is not printable ASCII or with text after 76 characters. It
-takes about a second.
+the client, which ends the transfer. A second server, with `--write`,
+takes files of 0 to 140,000 bytes, replaces one, refuses names and a
+mode, and gets a lost DATA, a DATA twice, a lost last ACK, a packet of
+another port, an ERROR from the client, and a client that stops,
+after which no file is there; `curl -T` writes a file too, when curl
+has TFTP. Then it runs the monitor of the tests in `niceemu` with
+`--eth-udp`, whose frames go to a bridge in the script that answers
+ARP for 10.0.0.2 and passes its datagrams to the server with
+`--write`, and checks that `DIR` lists the folder, `LOAD` loads a
+program, and shows an ERROR, and that `LOAD` skips the lines of a file
+with a byte that is not printable ASCII or with text after 76
+characters. `SAVE` and `BSAVE` then write files that the script finds
+on the host, and `SAVE` to the server without `--write` gets its
+ERROR. It takes about four seconds.
 
 `make tcptest` runs `tools/tcptest.py`, the test of TCP, its clients
 and its servers, the entries 26 to 31 (issue #111). It has two parts.

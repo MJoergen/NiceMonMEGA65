@@ -325,7 +325,11 @@ loads a program from a TFTP server on the network, as `LOAD` loads one
 from the card. `make tftpd` on a PC is such a server: it serves
 `examples/build`, and `DIR "192.168.1.10", "*.BIN"` lists its programs
 ([monitor/README.md](monitor/README.md#the-network), which also says
-how to serve without root).
+how to serve without root). `make tftpd ARGS=--write` also takes
+files from the board: `SAVE "CHESS", "192.168.1.10"` writes the
+program to the PC, and `BSAVE "DATA", 0x9000, 100, "192.168.1.10"`
+writes words. TFTP has no login, so anyone who reaches the port may
+write to the folder while `--write` is on.
 
 ### Setting the clock from the network
 

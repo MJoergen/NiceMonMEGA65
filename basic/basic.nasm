@@ -56,7 +56,7 @@
 ; R4 are slots 1, 2, 4, and 8, and the statement's routine of ACTS runs, with R11
 ; and with R8 at the end of the statement, and returns to run_next. The
 ; routines use any register, as run_next takes the end from V_TP. Slots
-; 1 and 2 are 0 for a statement that has no string or number there.
+; 1, 2, and 8 are 0 for a statement that has no string or number there.
 
 ; BASIC's RAM, BASIC_WORDS words from STACK (common.nasm), below the
 ; monitor's, which BASIC reaches through the entries alone (issue #152)
@@ -67,7 +67,7 @@ V_LEND          .EQU    0xFFFFE803      ; the last byte that LOAD read, for the 
 V_LPOS          .EQU    0xFFFFE804      ; for LOAD from a file: the next free word of V_LINE
 V_TLIST         .EQU    0xFFFFE805      ; not 0 for a listing of TFTP, of DIR, which bin_eol shows
 V_LBAS          .EQU    0xFFFFE806      ; while LOAD reads a program's text: 1 before its first line, 2 after, else 0
-V_OPEN          .EQU    0xFFFFE807      ; the file that LOAD or SAVE has open, its handle plus 1, -1 for TFTP's endpoint, or 0
+V_OPEN          .EQU    0xFFFFE807      ; the file that LOAD or SAVE has open, its handle plus 1, -1 for TFTP's endpoint, -2 for that of a write, or 0
 V_ARGS          .EQU    0xFFFFE808      ; the values of a statement, 8 words, slots 1, 2, 4, and 8 at V_ARGS, +1, +3, and +7
 V_LSTATS        .EQU    0xFFFFE810      ; for LOAD: the counts of bin_line, 7 words
 V_NET           .EQU    0xFFFFE818      ; for IP, DHCP, and NTP: the words of net_config and net_servers, 6 words
@@ -89,16 +89,17 @@ V_TTID          .EQU    0xFFFFE8A1      ; its port, its TID, 0 before its first 
 V_TBLK          .EQU    0xFFFFE8A2      ; the block waited for,
 V_TLEN          .EQU    0xFFFFE8A3      ; the bytes of the packet at V_TPKT,
 V_TTIME         .EQU    0xFFFFE8A4      ; the microseconds when it was sent,
-V_TEND          .EQU    0xFFFFE8A5      ; the bytes of the DATA's block,
-V_TPORT         .EQU    0xFFFFE8A6      ; the server's port for the RRQ,
-V_TPKT          .EQU    0xFFFFE8B0      ; and the packet sent, a byte per word, up to TFTP_PKT
+V_TEND          .EQU    0xFFFFE8A5      ; the bytes of the DATA's block, or of an ERROR,
+V_TPORT         .EQU    0xFFFFE8A6      ; the server's port for the RRQ or the WRQ,
+V_TOP           .EQU    0xFFFFE8A7      ; the request's opcode, 1 for an RRQ or 2 for a WRQ,
+V_TPKT          .EQU    0xFFFFE8B0      ; and the packet sent, a byte per word, up to TFTP_PKT, or in a write the one received
 V_NTPIP         .EQU    0xFFFFE910      ; for NTP: the server's IP address, which dns_lookup writes
 V_ENT           .EQU    0xFFFFE920      ; for DIR: an entry of fs_readname, 4 words,
 V_NAME          .EQU    0xFFFFE924      ; and its name, 256 words
 V_BLINE         .EQU    0xFFFFE924      ; for LOAD and SAVE of a program's text: the name, then a line of the file, in V_NAME
 BLINE_MAX       .EQU    254             ; the characters of that line, with one over and a 0
 V_FBUF          .EQU    0xFFFFEA24      ; for LOAD and SAVE: the bytes of fs_read and fs_write, FBUF_BYTES words
-V_TBUF          .EQU    0xFFFFEAA4      ; for TFTP: a packet that udp_recv copied, TFTP_MAX words,
+V_TBUF          .EQU    0xFFFFEAA4      ; for TFTP: a packet that udp_recv copied, or in a write the one sent, TFTP_MAX words,
 V_TSRC          .EQU    0xFFFFECA8      ; and its source's IP address and port, 2 words, to 0xFFFFECA9
 V_LBEG          .EQU    0xFFFFECAA      ; for LOAD from a file: the line, V_LINE or V_BLINE,
 V_LLIM          .EQU    0xFFFFECAB      ; and the word after its last character
@@ -237,6 +238,7 @@ run
                 ONE     R12
                 MOVE    @V_ARGS, R0
                 MOVE    @V_ARGS+1, R0
+                MOVE    @V_ARGS+7, R0
 ; The ops, from R10
 bas_op
                 MOVE    R3, @R10++
@@ -554,21 +556,16 @@ name_copy
         ?!Z     JMP     :-
                 RET
 
-; SAVE "NAME" [, SLOT], the program's text, with .BAS added when the
-; name has no dot (basic_cmd.nasm, st_text), with the card in SLOT
-; mounted first; and SAVE "NAME", "IP", which TFTP cannot.
+; SAVE "NAME" [, SLOT] and SAVE "NAME", "IP", the program's text, with
+; .BAS added when the name has no dot (basic_cmd.nasm, st_text), to the
+; card, with the card in SLOT mounted first, or to the TFTP server at IP
+; (issue #155)
 bas_save
-                TST     R11
-        ?!Z     JMP     :+
-                TST     R2
-        ?!Z     MOVE    R1, S_TFTPSAVE
-        ?!Z     JMP     puts_b_crlf
-:
                 MOVE    R3, TEXT_B+4*S_DOTBAS
                 CALL    name_copy
                 TST     R11
-        ?Z      JMP     st_text
-                CALL    name_slot
+        ?Z      JMP     st_text         ; R2 the server, or 0
+                CALL    name_slot       ; R2 0 when it mounts
         ?!N     JMP     st_text
                 JMP     fs_fail
 
@@ -584,24 +581,26 @@ name_slot
         ?N      MOVE    R1, R2
                 RET
 
-; BSAVE "NAME", A, N [, SLOT]: the words, with .BIN added when the name
-; has no dot (basic_cmd.nasm, st_save), with the card in SLOT mounted
-; first
+; BSAVE "NAME", A, N [, SLOT] and BSAVE "NAME", A, N, "IP": the words,
+; with .BIN added when the name has no dot (basic_cmd.nasm, st_save), to
+; the card, with the card in SLOT mounted first, or to the TFTP server at
+; IP (issue #155)
 bas_bsave
-                PUSH    R4              ; SLOT and N, which name_copy uses
+                PUSH    R4              ; SLOT or IP, and N, which name_copy uses
                 PUSH    R3
                 MOVE    R3, TEXT_B+4*S_DOTBIN
                 CALL    name_copy
                 POP     R3
                 POP     R4
                 AND[M]  R0, R11, 8
-        ?Z      JMP     st_save
+        ?Z      JMP     st_save         ; R4 the server, or 0
                 PUSH    R2              ; A
                 PUSH    R3              ; N
                 MOVE    R2, R4
                 CALL    name_slot       ; whose flags POP keeps
                 POP     R3
                 POP     R2
+                CLR     R4              ; to the card, which keeps the flags too
         ?!N     JMP     st_save
                 JMP     fs_fail
 
@@ -691,10 +690,11 @@ H_KINDS         .EQU    0x40000000+4*KINDS
 ;  22  SAVE, DELETE   J F L C N H N    a string, and the end, or a
 ;                                      comma, and a string or a number,
 ;                                      and the end
-;  29  BSAVE          J L H L H F L H N  a string, a comma, a number, a
-;                                        comma, a number, and the end,
-;                                        or a comma, a number, and the
-;                                        end
+;  29  BSAVE          J L H L H F L C N H N  a string, a comma, a number,
+;                                            a comma, a number, and the
+;                                            end, or a comma, and a
+;                                            string or a number, and the
+;                                            end
 ;
 ; A number is an expression, which must fit a signed word. PRINT and LET
 ; read their own items, and their byte is that of the end, 2, as is that
@@ -705,9 +705,9 @@ OP_C            .EQU    4
 OP_E            .EQU    6
 OP_SKIP         .EQU    1
 OP_F            .EQU    8
-KEYWORDS        .EQU    38              ; the first keyword's byte in OPS
+KEYWORDS        .EQU    40              ; the first keyword's byte in OPS
 OPS
-                .ASCII_B 'FJN@N@EHNHLHNFANFJEJNFJFLCNHNJLHLHFLHNSYS+LOAD5SAVE6BSAVE=DELETE6DIR-IP DHCP"MAC TIME NTP0BAUD#DUMP%DIS%CLS"VER"HELP"HALT"POKE)NEW"CLR"END"STOP"CONT"RETURN"PRINT"LET"RUN"LIST"GOTO"GOSUB"IF"FOR"NEXT"REM"INPUT"GET"DIM"HIMEM"AUTO"RENUMBER"DATA"READ"RESTORE"DEF"ON"DO"LOOP"EXIT"ENDIF"ENDPROC"LOCAL"AND"OR"XOR"NOT"DIV"MOD"ABS"SGN"INT"SQR"PEEK"SIN"COS"TAN"ASIN"ACOS"ATAN"LOG"LOG2"LOG10"EXP"RND"PI"TAB"SPC"THEN"ELSE"TO"STEP"WHILE"UNTIL"LEN"ASC"VAL"INSTR"CHR$"STR$"HEX$"LEFT$"MID$"RIGHT$"TIME$"'
+                .ASCII_B 'FJN@N@EHNHLHNFANFJEJNFJFLCNHNJLHLHFLCNHNSYS+LOAD5SAVE6BSAVE=DELETE6DIR-IP DHCP"MAC TIME NTP0BAUD#DUMP%DIS%CLS"VER"HELP"HALT"POKE)NEW"CLR"END"STOP"CONT"RETURN"PRINT"LET"RUN"LIST"GOTO"GOSUB"IF"FOR"NEXT"REM"INPUT"GET"DIM"HIMEM"AUTO"RENUMBER"DATA"READ"RESTORE"DEF"ON"DO"LOOP"EXIT"ENDIF"ENDPROC"LOCAL"AND"OR"XOR"NOT"DIV"MOD"ABS"SGN"INT"SQR"PEEK"SIN"COS"TAN"ASIN"ACOS"ATAN"LOG"LOG2"LOG10"EXP"RND"PI"TAB"SPC"THEN"ELSE"TO"STEP"WHILE"UNTIL"LEN"ASC"VAL"INSTR"CHR$"STR$"HEX$"LEFT$"MID$"RIGHT$"TIME$"'
                 .DAT    0
 
 S_HINT          .ASCII_B 'HELP lists the statements'
@@ -719,8 +719,6 @@ S_UNKNOWN
                 .ASCII_B 'Syntax error; HELP lists the statements'
 S_QUANT         .ASCII_B 'Illegal quantity'
                 .DAT    0
-S_TFTPSAVE
-                .ASCII_B 'SAVE writes to the SD card: TFTP only loads'
 S_DOTBIN
                 .ASCII_B '.BIN'
                 .DAT    0
@@ -730,7 +728,7 @@ S_DOTBAS
 
 ; The lines of HELP, which a Syntax error also prints, those that start
 ; with the statement's keyword and a blank
-HELP            .DAT    H_SYS, H_L, H_LOAD, H_TFTP, H_SAVET, H_SAVE, H_DEL, H_DELL, H_DIR, H_TFTPL, H_SLOT, H_D, H_U
+HELP            .DAT    H_SYS, H_L, H_LOAD, H_TFTP, H_SAVET, H_SAVE, H_TFTPS, H_TFTPB, H_DEL, H_DELL, H_DIR, H_TFTPL, H_SLOT, H_D, H_U
                 .DAT    H_I, H_ID, H_M, H_B, H_T, H_TN, H_C, H_V, H_H, H_Q, H_PR, H_LET
                 .DAT    H_POKE, H_RUN, H_RUNF, H_RUNT, H_LIST, H_NEW, H_CLR, H_GOTO, H_GOSUB, H_RET, H_IF
                 .DAT    H_FOR, H_NEXT, H_END, H_STOP, H_CONT, H_REM, H_INPUT, H_GET, H_DIM, H_HIMEM, H_AUTO, H_REN
@@ -744,6 +742,8 @@ H_LOAD          .ASCII_B 'LOAD "NAME" [, S]   load the program NAME.BAS, or NAME
 H_TFTP          .ASCII_B 'LOAD "NAME", "IP"   load it from the TFTP server at IP'
 H_SAVET         .ASCII_B 'SAVE "NAME" [, S]   save the program as the text NAME.BAS'
 H_SAVE          .ASCII_B 'BSAVE "NAME", A, N [, S]  save N words from A as the .bin file NAME'
+H_TFTPS         .ASCII_B 'SAVE "NAME", "IP"   save it to the TFTP server at IP (tools/tftpd.py --write)'
+H_TFTPB         .ASCII_B 'BSAVE "NAME", A, N, "IP"  save the words to the TFTP server at IP'
 H_DEL           .ASCII_B 'DELETE "NAME" [, S] delete the file NAME of the SD card'
 H_DELL          .ASCII_B 'DELETE N [- M]      delete the lines from N to M'
                 .DAT    0

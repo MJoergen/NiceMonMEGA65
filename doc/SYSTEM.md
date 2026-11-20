@@ -543,7 +543,7 @@ while the core is paused, held, or halted.
 The monitor in the ROM uses the port in BASIC's `DHCP`, which gets the
 station's IP address from a DHCP server, in the same DHCP in the
 background after a reset, while BASIC waits for a line, in `LOAD` and
-`DIR` from a TFTP server, in `NTP`, which asks a time server, and in
+`DIR` from a TFTP server and `SAVE` and `BSAVE` to one, in `NTP`, which asks a time server, and in
 its entries for programs: UDP, DHCP,
 DNS, and TCP, as a client and as a server
 ([monitor/](../monitor/README.md#tcp-and-dns)). Its TCP is a stack of

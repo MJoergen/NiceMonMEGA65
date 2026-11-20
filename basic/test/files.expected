@@ -148,7 +148,7 @@ RUN
 123done
 READY.
 SAVE "P", "1.2.3.4"
-SAVE writes to the SD card: TFTP only loads
+No IP address; IP or DHCP sets one
 READY.
 SAVE "BRK"
 Break

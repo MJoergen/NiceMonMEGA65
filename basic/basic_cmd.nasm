@@ -672,55 +672,22 @@ load_byte
                 CALL    load_part
                 JMP     fs_fail
 
-; SAVE "NAME", ADDR, N: R1 the name, R2 ADDR, and R3 N. The N words from
-; ADDR written to the file NAME of the card's folder, which fs_open,
-; entry 10, makes or truncates, as a .bin file: lines of ADDR WORD in 8
-; hex digits each, in lower case, ended by LF, as niceasm writes a .bin
-; file, each made in V_FBUF and written with fs_write, entry 14, and
-; the words saved shown as LOAD shows those loaded. A line that does not
-; fit on the card is error 30. basic.nasm has added .BIN to a name
-; without an extension. R8 is the handle, R9 ADDR, R10 N, R11 the
-; result, R12 the next address, and R7 the words left.
+; BSAVE "NAME", ADDR, N [, "IP"]: R1 the name, R2 ADDR, R3 N, and R4 the
+; string of the TFTP server, or 0. The N words from ADDR written with
+; out_file, to the file NAME of the card's folder or to the server, as a
+; .bin file: lines of ADDR WORD in 8 hex digits each, in lower case,
+; ended by LF, as niceasm writes a .bin file, and the words saved shown
+; as LOAD shows those loaded. When the card fills up, the file keeps
+; what fitted, and the error is 30. basic.nasm has added .BIN to a name
+; without an extension. R9 is ADDR and R10 N.
 st_save
                 MOVE    R9, R2
                 MOVE    R10, R3
-                MOVE    R2, 1           ; to write
-                CALL    FS_OPEN
+                MOVE    R2, R4
+                MOVE    R12, save_lines
+                CALL    out_file
                 TST     R1
-        ?N      JMP     fs_fail
-                MOVE    R8, R1          ; the handle
-                MOVE    R12, R9
-                MOVE    R7, R10
-save_line
-                CLR     R11
-                TST     R7
-        ?Z      JMP     save_end
-                MOVE    R2, V_FBUF
-                MOVE    R1, R12
-                CALL    hex8
-                MOVE    @R2++, 0x20
-                MOVE    R1, @R12
-                CALL    hex8
-                MOVE    @R2++, 0x0A
-                MOVE    R1, R8
-                MOVE    R2, V_FBUF
-                MOVE    R3, 18
-                CALL    FS_WRITE
-                MOVE[M] R11, R1
-        ?N      JMP     save_end
-                CMP     R11, 18
-        ?!Z     MOVE    R11, -30        ; the card is full
-        ?!Z     JMP     save_end
-                MOVE    R12++, R12
-                SUB     R7, R7, 1
-                JMP     save_line
-save_end
-                MOVE    R1, R8
-                CALL    FS_CLOSE
-                TST     R11
-        ?N      MOVE    R1, R11         ; the error of the save, before the close's
-                TST     R1
-        ?N      JMP     fs_fail
+        ?!Z     RET                     ; the error, shown
                 MOVE    R1, S_SAVED
                 CALL    puts_b
                 MOVE    R1, R10
@@ -738,6 +705,32 @@ save_end
                 CALL    _io_puthex
 :
                 JMP     _io_crlf        ; which returns to the caller
+
+; save_lines: the lines of st_save, the words R10 from R9, 18 bytes each,
+; into V_FBUF from V_SPOS, which flush writes when another line would
+; not fit there, up to the first error of a write. Keeps R9 and R10.
+; Uses R1-R7 and R12.
+save_lines
+                MOVE    R12, R9
+                MOVE    R7, R10
+:
+                TST     R7
+        ?Z      RET
+                MOVE    R2, @V_SPOS
+                MOVE    R1, R12
+                CALL    hex8
+                MOVE    @R2++, 0x20
+                MOVE    R1, @R12
+                CALL    hex8
+                MOVE    @R2++, 0x0A
+                MOVE    @V_SPOS, R2
+                MOVE    R12++, R12
+                SUB     R7, R7, 1
+                CMP     R2, V_FBUF+FBUF_BYTES-17
+        ?!C     CALL    flush           ; no room for 18 bytes more
+                TST     @V_SERR
+        ?Z      JMP     :-
+                RET
 
 ; bas_eol: a line of a program's text, at V_BLINE up to R6, from LOAD
 ; "NAME" or RUN "NAME". A line of blanks only is passed over, and one that
@@ -801,45 +794,76 @@ show_bline
                 POP     R7
                 JMP     _io_crlf        ; which returns to the caller
 
-; SAVE "NAME": R1 the name, with .BAS when it had no dot. The program
-; written to the file NAME of the card's folder, which fs_open, entry 10,
-; makes or truncates, as the text that LIST gives, each line ended by LF,
-; as niceasm's .bin files are. LIST writes it with putc, into V_FBUF,
-; which flush writes with fs_write, entry 14. The first error of a write
-; is kept in V_SERR, and shown at the end, after the close; a line that
-; does not fit on the card is error 30. The break key ends the SAVE
-; at its line, and main closes the file with files_end.
+; SAVE "NAME" [, "IP"]: R1 the name, with .BAS when it had no dot, and
+; R2 the string of the TFTP server, or 0. The program written with
+; out_file, to the file NAME of the card's folder or to the server, as
+; the text that LIST gives, each line ended by LF, as niceasm's .bin
+; files are. The break key ends the SAVE at its line, and main closes
+; the file with files_end.
 st_text
+                MOVE    R12, text_lines
+                JMP     out_file        ; which returns to the caller
+text_lines
+                CLR     R10             ; from the first line
+                MOVE    R11, LINE_LAST  ; to the last
+                JMP     list_from       ; which returns to the caller
+
+; out_file: R1 the name, and R2 the string of a TFTP server, or 0. The
+; bytes that the routine R12 writes with putc, or into V_FBUF from V_SPOS
+; and with flush, written to the file R1 of the card's folder, which
+; fs_open, entry 10, makes or truncates, or with R2 to the server, with
+; tput_open and tput_close of basic_net.nasm (issue #155). V_FBUF goes to
+; the file with flush, when it is full, and at the end. The first error
+; of a write is kept in V_SERR, and shown at the end, after the close; a
+; write that does not fit on the card is error 30. R1 0 when all was
+; written, else not 0, with the error shown. The routine keeps R9 and R10
+; for the caller, as out_file does.
+out_file
+                TST     R2
+        ?!Z     JMP     :+
                 MOVE    R2, 1           ; to write
                 CALL    FS_OPEN
                 TST     R1
-        ?N      JMP     fs_fail
+        ?N      JMP     out_fail
                 ADD     @V_OPEN, R1, 1
+                JMP     :++
+:
+                CALL    tput_open
+                TST     R1
+        ?!Z     RET                     ; the error, shown
+:
                 CLR     @V_SERR
                 MOVE    @V_SPOS, V_FBUF
-                CLR     R10             ; from the first line
-                MOVE    R11, LINE_LAST  ; to the last
-                CALL    list_from
+                CALL    R12
                 CALL    flush
                 CLR     @V_SPOS
+                TST     @V_OPEN
+        ?N      JMP     tput_close      ; which returns to the caller
                 SUB     R1, @V_OPEN, 1
                 CLR     @V_OPEN
                 CALL    FS_CLOSE
                 MOVE[M] R2, @V_SERR
         ?!Z     MOVE    R1, R2          ; the error of a write, before the close's
                 TST     R1
-        ?N      JMP     fs_fail
+        ?!N     CLR     R1
+        ?!N     RET
+out_fail
+                CALL    fs_fail
+                ONE     R1
                 RET
 
 ; flush: the bytes in V_FBUF up to V_SPOS written to the file of SAVE,
-; unless a write failed before, and V_SPOS at V_FBUF again. A write that
-; fails, or writes fewer bytes, sets V_SERR. Uses R1-R4.
+; or to its TFTP server with tput_bytes, unless a write failed before,
+; and V_SPOS at V_FBUF again. A write that fails, or writes fewer bytes,
+; sets V_SERR. Uses R1-R4.
 flush
                 SUB[M]  R3, @V_SPOS, V_FBUF
         ?Z      RET
                 MOVE    @V_SPOS, V_FBUF
                 TST     @V_SERR
         ?!Z     RET
+                TST     @V_OPEN
+        ?N      JMP     tput_bytes      ; which returns to the caller
                 PUSH    R5
                 PUSH    R6
                 PUSH    R3
@@ -894,15 +918,21 @@ putdec
 ; files_end: the file of LOAD or SAVE, or TFTP's endpoint, that an error
 ; or the break key left open, closed, and the load and the save of a
 ; program's text ended, for main. The lines that SAVE has in V_FBUF are
-; written first. Uses R1-R6.
+; written first to the card, and dropped for a TFTP server, which gets an
+; ERROR instead, with tput_abort, so that it drops the file. Uses R1-R6.
 files_end
                 CLR     @V_LBAS
+                CMP     @V_OPEN, 0xFFFFFFFE
+        ?Z      CLR     @V_SPOS         ; a write of TFTP
                 TST     @V_SPOS
         ?!Z     CALL    flush
                 CLR     @V_SPOS
                 MOVE[M] R1, @V_OPEN
         ?Z      RET
                 CLR     @V_OPEN
+                CMP     R1, 0xFFFFFFFE
+        ?Z      JMP     tput_abort      ; which returns to the caller
+                TST     R1
         ?N      JMP     UDP_CLOSE       ; which returns to the caller
                 SUB     R1, R1, 1
                 JMP     FS_CLOSE        ; which returns to the caller

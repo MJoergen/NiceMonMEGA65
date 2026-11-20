@@ -109,9 +109,10 @@ help:
 	@echo "  make ecma55     run the ECMA-55 conformance suite on BASIC in niceemu, and"
 	@echo "                  compare each program's outcome with basic/test/ecma55.expected;"
 	@echo "                  fetches bas55 2.0's programs the first time"
-	@echo "  make tftpd [TFTP_DIR=examples/build] [TFTP_PORT=69]"
+	@echo "  make tftpd [TFTP_DIR=examples/build] [TFTP_PORT=69] [ARGS=--write]"
 	@echo "                  serve the files of TFTP_DIR to BASIC's LOAD and DIR, with"
-	@echo "                  listings for DIR \"IP\", \"*.BIN\" (port 69 needs root)"
+	@echo "                  listings for DIR \"IP\", \"*.BIN\" (port 69 needs root);"
+	@echo "                  ARGS=--write takes SAVE's and BSAVE's files too"
 	@echo "  make tftptest   check tools/nicemon.py tftpd, and BASIC's TFTP in niceemu"
 	@echo "                  against it, without a board"
 	@echo "  make tcptest    check the monitor's TCP in niceemu against tools/tcppeer.py,"
@@ -302,12 +303,13 @@ linktest: $(EMU)
 sdtest: $(EMU) build/rom_test.bin
 	$(PYTHON) tools/sdtest.py
 
-# The TFTP server for BASIC's LOAD and DIR (tools/nicemon.py tftpd), and its check,
-# which runs the monitor in niceemu against it
+# The TFTP server for BASIC's LOAD and DIR, and with ARGS=--write for its
+# SAVE and BSAVE (tools/nicemon.py tftpd), and its check, which runs the
+# monitor in niceemu against it
 TFTP_DIR ?= examples/build
 TFTP_PORT ?= 69
 tftpd:
-	$(PYTHON) tools/nicemon.py tftpd --dir $(TFTP_DIR) --listen $(TFTP_PORT)
+	$(PYTHON) tools/nicemon.py tftpd --dir $(TFTP_DIR) --listen $(TFTP_PORT) $(ARGS)
 
 tftptest: $(EMU) build/rom_test.bin
 	$(PYTHON) tools/tftptest.py

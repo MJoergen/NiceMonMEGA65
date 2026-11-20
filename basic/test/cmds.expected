@@ -8,6 +8,8 @@ LOAD "NAME" [, S]   load the program NAME.BAS, or NAME.BIN, from the SD card
 LOAD "NAME", "IP"   load it from the TFTP server at IP
 SAVE "NAME" [, S]   save the program as the text NAME.BAS
 BSAVE "NAME", A, N [, S]  save N words from A as the .bin file NAME
+SAVE "NAME", "IP"   save it to the TFTP server at IP (tools/tftpd.py --write)
+BSAVE "NAME", A, N, "IP"  save the words to the TFTP server at IP
 DELETE "NAME" [, S] delete the file NAME of the SD card
 DELETE N [- M]      delete the lines from N to M
 DIR [S]             list the files of the card in slot S, or of the one mounted
@@ -293,8 +295,11 @@ READY.
 load "x"
 SD error 1 in slot 1, no card
 READY.
-save "x", "1.2.3.4"
-SAVE writes to the SD card: TFTP only loads
+save "x", "1.2.3"
+Not a TFTP server: IP[:PORT], such as "192.168.1.10" or "192.168.1.10:6969"
+READY.
+bsave "x", 0, 1, "1.2.3:"
+Not a TFTP server: IP[:PORT], such as "192.168.1.10" or "192.168.1.10:6969"
 READY.
 HeLp x
 Syntax error
@@ -314,17 +319,17 @@ ffffff80: 00000060 00000000 00000018 00000000 00000000 00000000
 ffffff9f: 0001c200
 ffffffb0: 0a000001 00000a0b 0c0d0e0f
 Screen:
-|dump 0x100000000
-|Illegal quantity
-|READY.
 |load "x.txt"
 |SD error 1 in slot 1, no card
 |READY.
 |load "x"
 |SD error 1 in slot 1, no card
 |READY.
-|save "x", "1.2.3.4"
-|SAVE writes to the SD card: TFTP only loads
+|save "x", "1.2.3"
+|Not a TFTP server: IP[:PORT], such as "192.168.1.10" or "192.168.1.10:6969"
+|READY.
+|bsave "x", 0, 1, "1.2.3:"
+|Not a TFTP server: IP[:PORT], such as "192.168.1.10" or "192.168.1.10:6969"
 |READY.
 |HeLp x
 |Syntax error

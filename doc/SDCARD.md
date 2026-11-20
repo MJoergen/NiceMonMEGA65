@@ -445,7 +445,8 @@ program as the text that `LIST` gives, each line ended by LF, with
 `.BAS` added when the name has no dot. `LOAD "NAME"` reads the file as
 lines typed in, after a `NEW` at its first line, and stops at the first
 line that cannot be stored, which it shows. `RUN "NAME"` loads and runs
-it, and `LOAD` and `RUN` take a TFTP server as a second argument. A name
+it, and `LOAD` and `RUN` take a TFTP server as a second argument, and
+since V2.4.1 `SAVE` too (#155). A name
 that ends in `.BIN` is a `.bin` file, as before. `DIR` lists the
 directory. The text format is the one that a host pastes into the
 console, so a program moves between a PC, the console, and the card in

@@ -77,7 +77,7 @@ header is the authoritative address map.
     make flash [BIT=f.bit] # write the Nexys4DDR's flash (default its top.bit), verify, wait for the start; ARGS=--erase
     make flash COR=f.cor SLOT=1 # write a slot (1-7, --flash-slot) of the MEGA65's flash over JTAG, no MEGAFLASH; checks slot 0's revision
     make linktest         # nicemon.py run --tcp on niceemu --link against plain niceemu, and mon's memory check, no board
-    make tftpd [TFTP_DIR=d] [TFTP_PORT=69] # tools/nicemon.py tftpd for the monitor's tftp, with listings for tftp IP *.bin
+    make tftpd [TFTP_DIR=d] [TFTP_PORT=69] # tools/nicemon.py tftpd for BASIC's LOAD and DIR, with listings for DIR "IP", "*.BIN"; ARGS=--write for SAVE and BSAVE (#155)
     make tftptest         # nicemon.py tftpd, and the monitor's tftp in niceemu --eth-udp against it, no board
     make tcptest          # the monitor's TCP in niceemu against tools/tcppeer.py, and its timers with --step-time, no board
     make weathertest      # examples/weather.c (#128): its parse on the host, and the program in niceemu against tools/tcppeer.py, no board
@@ -179,7 +179,8 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   `sdnbd.py` (the whole card as a block device over NBD, for a mount on
   Linux, with sdcard.py's sectors), and `sdtest.py`,
   `bump.py`, `release.py`, `linktest.py`, `tftpd.py` (the TFTP server for
-  BASIC's `LOAD` and `DIR`, with listings, #95) and `tftptest.py`,
+  BASIC's `LOAD` and `DIR`, with listings, #95, and with `--write` for
+  its `SAVE` and `BSAVE`, #155) and `tftptest.py`,
   `tcptest.py` (the monitor's TCP, against `tcppeer.py`, a scripted
   peer on niceemu's frames, #111), `weathertest.py` (the weather
   display against it, #128),
