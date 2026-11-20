@@ -230,9 +230,16 @@ def transmit(conn: socket.socket, disk: Disk) -> None:
 
 
 def serve(server: socket.socket, disk: Disk) -> None:
-    """One connection after another, until the server is stopped."""
+    """One connection after another, until the server is stopped. A
+    signal that comes just before accept() blocks would wait for the next
+    connection, so accept() waits a second at a time, and Python runs the
+    handler of SIGTERM or Ctrl-C in between."""
+    server.settimeout(1.0)
     while True:
-        conn, peer = server.accept()
+        try:
+            conn, peer = server.accept()
+        except TimeoutError:
+            continue
         print(f"sdnbd.py: {peer[0]}:{peer[1]} connected", file=sys.stderr)
         with conn:
             conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)

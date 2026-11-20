@@ -987,12 +987,16 @@ def start_nbd(emu: Emu, *args: str) -> tuple[subprocess.Popen[bytes], int]:
 
 
 def stop_nbd(proc: subprocess.Popen[bytes]) -> str:
-    """Stops sdnbd.py, as Ctrl-C does: what it printed after its start."""
+    """Stops sdnbd.py, as Ctrl-C does: what it printed after its start,
+    or a note that it did not stop within 10 seconds."""
     proc.send_signal(signal.SIGTERM)
-    assert proc.stderr is not None
-    err = proc.stderr.read().decode(errors="replace")
-    proc.wait()
-    return err
+    try:
+        _, err = proc.communicate(timeout=10)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.communicate()
+        return "sdnbd.py did not stop within 10 seconds of SIGTERM"
+    return err.decode(errors="replace")
 
 
 def test_nbd(imgs: dict[str, str], tmp: str) -> None:
