@@ -175,7 +175,7 @@ hex.
 | `tftp IP NAME` | `LOAD "NAME", "IP"`, or `"IP:PORT"` |
 | `tftp IP [PAT]` | `DIR "IP" [, "PAT"]` |
 | `dir [SLOT]` | `DIR [slot]` |
-| `save NAME ADDR N` | `SAVE "NAME", addr, n` |
+| `save NAME ADDR N` | `BSAVE "NAME", addr, n`, `SAVE` before V2.4 |
 | `del NAME` | `DELETE "NAME"`, as BASIC 65 has it beside `DELETE` of lines |
 | `i [A.B.C.D]` | `IP ["A.B.C.D"]` |
 | `i dhcp` | `DHCP` |
@@ -205,14 +205,20 @@ hex.
   before stage 4 it was an error that asked for a `.BIN` name. There is
   no `BLOAD`: BASIC 65's loads bytes at an address that it is given,
   and a `.bin` file has its addresses in it.
-- **`SAVE` picks by its arguments.** `SAVE "NAME", addr, n` writes
-  words as a `.bin` file, with `.BIN` added when the name has no
-  extension, so that `LOAD` reads it back. `SAVE "NAME"` writes the
-  program as text, with `.BAS` added, since stage 4.
+- **`BSAVE` writes words, and `SAVE` the program.** `BSAVE "NAME",
+  addr, n` writes words as a `.bin` file, with `.BIN` added when the
+  name has no extension, so that `LOAD` reads it back, as BASIC 65's
+  `BSAVE` writes memory. `SAVE "NAME"` writes the program as text, with
+  `.BAS` added, since stage 4. Before V2.4 `SAVE "NAME", addr, n`
+  wrote the words, and the rename freed `SAVE`'s number for a slot.
 - **A TFTP server is the second argument**, a string, of `LOAD`, of
-  `RUN` since stage 4, and of `DIR`, whose number is a slot. There is
-  no `TFTP` statement. `SAVE "NAME", "IP"` is an error, as TFTP here
-  only reads.
+  `RUN` since stage 4, and of `DIR`. There is no `TFTP` statement.
+  `SAVE "NAME", "IP"` is an error, as TFTP here only reads.
+- **A slot is the last argument**, a number, of `DIR`, `LOAD`, `SAVE`,
+  `BSAVE`, `DELETE`, and `RUN` of a file, since V2.4. It mounts the
+  card in that slot first, and the statements after it use that card,
+  as the monitor mounts the slot of the last mount. The string or the
+  number tells a server from a slot.
 - **A `.bin` file and BASIC share the RAM.** BASIC has its variables
   there from stage 2 on, and its program from stage 3 on, so a `.bin`
   word below the top of BASIC's memory means `NEW` first. A program

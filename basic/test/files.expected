@@ -108,14 +108,37 @@ on the line only
 Returned 0000002A
 READY.
 RUN "PROG", 1
+SD error 1 in slot 1, no card
+READY.
+LOAD "PROG", 0
+READY.
+SAVE "S", 0
+READY.
+BSAVE "W", 0x8000, 2, 0
+Words saved: 2, 00008000 to 00008001
+READY.
+BSAVE "W", 0x8000, 2, 5
+File error 27, no such slot
+READY.
+LOAD "W.BIN", 2
+File error 27, no such slot
+READY.
+DELETE "W.BIN", "1.2.3.4"
 Syntax error
-RUN [N]             run the program, from line N or its first, after CLR
-RUN "NAME" [, "IP"] load NAME and run it; NAME.BIN at 0x8000
+DELETE "NAME" [, S] delete the file NAME of the SD card
+DELETE N [- M]      delete the lines from N to M
+READY.
+DELETE "W.BIN", 0
+Deleted W.BIN
+READY.
+DELETE "S.BAS", 0
+Deleted S.BAS
 READY.
 RUN "PROG", "1.2.3.4" X
 Syntax error
 RUN [N]             run the program, from line N or its first, after CLR
-RUN "NAME" [, "IP"] load NAME and run it; NAME.BIN at 0x8000
+RUN "NAME" [, S]    load NAME and run it; NAME.BIN at 0x8000
+RUN "NAME", "IP"    load NAME from the TFTP server at IP and run it
 READY.
 10 RUN "PC"
 RUN

@@ -48,10 +48,10 @@
 ; error at its second comma, before its number is computed.
 ;
 ; The values of the items go to the slots at V_ARGS, slot 1 first, and a
-; comma moves to the next, slot 2, then slot 4: R12 has the slot's
-; number, and its value is at V_ARGS-1 + R12. R11 has the bits of the
-; slots that got a number. When the statement ends, R1, R2, and R3 are
-; slots 1, 2, and 4, and the statement's routine of ACTS runs, with R11
+; comma moves to the next, slot 2, then slot 4, then slot 8: R12 has the
+; slot's number, and its value is at V_ARGS-1 + R12. R11 has the bits of
+; the slots that got a number. When the statement ends, R1, R2, R3, and
+; R4 are slots 1, 2, 4, and 8, and the statement's routine of ACTS runs, with R11
 ; and with R8 at the end of the statement, and returns to run_next. The
 ; routines use any register, as run_next takes the end from V_TP. Slots
 ; 1 and 2 are 0 for a statement that has no string or number there.
@@ -66,8 +66,8 @@ V_LPOS          .EQU    0xFFFFE804      ; for LOAD from a file: the next free wo
 V_TLIST         .EQU    0xFFFFE805      ; not 0 for a listing of TFTP, of DIR, which bin_eol shows
 V_LBAS          .EQU    0xFFFFE806      ; while LOAD reads a program's text: 1 before its first line, 2 after, else 0
 V_OPEN          .EQU    0xFFFFE807      ; the file that LOAD or SAVE has open, its handle plus 1, -1 for TFTP's endpoint, or 0
-V_ARGS          .EQU    0xFFFFE808      ; the values of a statement, 4 words, slots 1, 2, and 4 at V_ARGS, +1, and +3
-V_LSTATS        .EQU    0xFFFFE80C      ; for LOAD: the counts of bin_line, 7 words
+V_ARGS          .EQU    0xFFFFE808      ; the values of a statement, 8 words, slots 1, 2, 4, and 8 at V_ARGS, +1, +3, and +7
+V_LSTATS        .EQU    0xFFFFE810      ; for LOAD: the counts of bin_line, 7 words
 V_NET           .EQU    0xFFFFE818      ; for IP, DHCP, and NTP: the words of net_config and net_servers, 6 words
 V_BI            .EQU    0xFFFFE820      ; for the clock, BASIC's block of common.nasm's conversions: the fields of a date and a time to set, and a 7th word,
 V_BF            .EQU    0xFFFFE826      ; the fields of the clock's time, which is the 7th of V_BI, and its days since 1970
@@ -371,6 +371,7 @@ k_end
                 MOVE    R1, @V_ARGS
                 MOVE    R2, @V_ARGS+1
                 MOVE    R3, @V_ARGS+3
+                MOVE    R4, @V_ARGS+7
                 RET
 
 ; The routines of the statements that are not those of basic_cmd.nasm,
@@ -417,7 +418,7 @@ bas_dir
                 ONE     R3
                 JMP     st_tftp
 
-; LOAD, LOAD "NAME", and LOAD "NAME", "IP". A name that ends with .BIN,
+; LOAD, LOAD "NAME", LOAD "NAME", SLOT, and LOAD "NAME", "IP". A name that ends with .BIN,
 ; in either case, is a .bin file. A load that wrote a word below HIMEM,
 ; which may be over the program or its variables, ends with NEW, and at
 ; READY., and one that wrote no word ends the line; one that wrote above
@@ -425,7 +426,8 @@ bas_dir
 ; when NAME has no dot, which is copied to V_BLINE, as the statements
 ; after it may go. Its lines are stored as lines typed in, after a NEW
 ; at the first (basic_cmd.nasm, bas_eol), so that a file that is not
-; there keeps the program; then READY. RUN "NAME" comes to bas_lrun,
+; there keeps the program; then READY. With SLOT, a number, the card in
+; it is mounted first, with slot_mount. RUN "NAME" comes to bas_lrun,
 ; with V_RUNF set, and load_fin runs what was loaded.
 bas_load
                 CLR     @V_RUNF
@@ -454,6 +456,8 @@ bas_lrun
                 CLR     @V_CUR
                 ONE     @V_LBAS         ; NEW at the first line
 load_go
+                AND[M]  R0, R11, 2
+        ?!Z     JMP     :+              ; SLOT
                 TST     R2
         ?Z      JMP     st_load
                 MOVE    R3, R1          ; st_tftp: the server, the name, 0
@@ -461,6 +465,18 @@ load_go
                 MOVE    R2, R3
                 CLR     R3
                 JMP     st_tftp
+:
+                CALL    name_slot
+        ?!N     JMP     st_load
+                JMP     fs_fail
+
+; slot_mount: the card in the slot R1 mounted with fs_mount, entry 9, as
+; DIR SLOT does: R1 0, or the error. A negative slot, which fs_mount
+; would take as none, is one that no board has.
+slot_mount
+                TST     R1
+        ?N      MOVE    R1, 0x7FFFFFFF  ; no such slot
+                JMP     FS_MOUNT        ; which returns to the caller
 
 ; name_copy: the name R1 copied to V_BLINE, with the extension at the
 ; byte address R3 after it when it has no dot, and R1 = V_BLINE. Keeps
@@ -484,24 +500,70 @@ name_copy
         ?!Z     JMP     :-
                 RET
 
-; SAVE "NAME", the program's text, with .BAS added when the name has no
-; dot (basic_cmd.nasm, st_text); SAVE "NAME", A, N, the words, with .BIN
-; added; and SAVE "NAME", "IP", which TFTP cannot.
+; SAVE "NAME" [, SLOT], the program's text, with .BAS added when the
+; name has no dot (basic_cmd.nasm, st_text), with the card in SLOT
+; mounted first; and SAVE "NAME", "IP", which TFTP cannot.
 bas_save
                 TST     R11
         ?!Z     JMP     :+
                 TST     R2
         ?!Z     MOVE    R1, S_TFTPSAVE
         ?!Z     JMP     puts_b_crlf
+:
                 MOVE    R3, TEXT_B+4*S_DOTBAS
                 CALL    name_copy
-                JMP     st_text
-:
-                PUSH    R3              ; N, which name_copy uses
+                TST     R11
+        ?Z      JMP     st_text
+                CALL    name_slot
+        ?!N     JMP     st_text
+                JMP     fs_fail
+
+; name_slot: the card in the slot R2 mounted with slot_mount, with R1,
+; the name, kept: N and R1 the error when it fails. Uses R1-R12.
+name_slot
+                PUSH    R1
+                MOVE    R1, R2
+                CALL    slot_mount
+                MOVE    R2, R1
+                POP     R1
+                TST     R2
+        ?N      MOVE    R1, R2
+                RET
+
+; BSAVE "NAME", A, N [, SLOT]: the words, with .BIN added when the name
+; has no dot (basic_cmd.nasm, st_save), with the card in SLOT mounted
+; first
+bas_bsave
+                PUSH    R4              ; SLOT and N, which name_copy uses
+                PUSH    R3
                 MOVE    R3, TEXT_B+4*S_DOTBIN
                 CALL    name_copy
                 POP     R3
-                JMP     st_save
+                POP     R4
+                AND[M]  R0, R11, 8
+        ?Z      JMP     st_save
+                PUSH    R2              ; A
+                PUSH    R3              ; N
+                MOVE    R2, R4
+                CALL    name_slot       ; whose flags POP keeps
+                POP     R3
+                POP     R2
+        ?!N     JMP     st_save
+                JMP     fs_fail
+
+; DELETE "NAME" [, SLOT]: st_delete, with the card in SLOT mounted
+; first. It shares SAVE's ops, so a string after the comma is a Syntax
+; error here.
+bas_delete
+                TST     R11
+        ?!Z     JMP     :+
+                TST     R2
+        ?!Z     JMP     err_syntax      ; a string
+                JMP     st_delete
+:
+                CALL    name_slot
+        ?!N     JMP     st_delete
+                JMP     fs_fail
 
 ; HELP: the lines of the statements
 st_help         MOVE    R1, HELP
@@ -510,31 +572,32 @@ st_help         MOVE    R1, HELP
 ; The routines of the statements, a halfword each, in the order of
 ; KEYWORDS, which the halfword window reads
 ACTS
-                .DAT    st_sys+65536*bas_load, bas_save+65536*st_delete
-                .DAT    bas_dir+65536*st_ip, st_dhcp+65536*st_mac
-                .DAT    bas_time+65536*bas_ntp, bas_baud+65536*bas_dump
-                .DAT    bas_dis+65536*SCR_CLS, st_ver+65536*st_help
-                .DAT    st_halt+65536*bas_poke, st_new+65536*st_clr
-                .DAT    st_end+65536*st_stop, st_cont+65536*st_return
-                .DAT    st_print+65536*st_let, st_run+65536*st_list
-                .DAT    st_goto+65536*st_gosub, st_if+65536*st_for
-                .DAT    st_next+65536*st_rem, st_input+65536*st_get
-                .DAT    st_dim+65536*st_himem, st_auto+65536*st_renum
-I_DELETE        .EQU    3               ; the index of DELETE,
-I_PRINT         .EQU    24              ; the index of PRINT, the first statement without ops,
-I_LET           .EQU    25              ; of LET,
-I_RUN           .EQU    26              ; of RUN,
-I_GOTO          .EQU    28              ; of GOTO,
-I_GOSUB         .EQU    29              ; of GOSUB,
-I_IF            .EQU    30              ; of IF,
-I_FOR           .EQU    31              ; of FOR,
-I_REM           .EQU    33              ; of REM,
-I_INPUT         .EQU    34              ; of INPUT,
-I_GET           .EQU    35              ; of GET,
-I_DIM           .EQU    36              ; of DIM,
-I_HIMEM         .EQU    37              ; of HIMEM, which is also a number,
+                .DAT    st_sys+65536*bas_load, bas_save+65536*bas_bsave
+                .DAT    bas_delete+65536*bas_dir, st_ip+65536*st_dhcp
+                .DAT    st_mac+65536*bas_time, bas_ntp+65536*bas_baud
+                .DAT    bas_dump+65536*bas_dis, SCR_CLS+65536*st_ver
+                .DAT    st_help+65536*st_halt, bas_poke+65536*st_new
+                .DAT    st_clr+65536*st_end, st_stop+65536*st_cont
+                .DAT    st_return+65536*st_print, st_let+65536*st_run
+                .DAT    st_list+65536*st_goto, st_gosub+65536*st_if
+                .DAT    st_for+65536*st_next, st_rem+65536*st_input
+                .DAT    st_get+65536*st_dim, st_himem+65536*st_auto
+                .DAT    st_renum
+I_DELETE        .EQU    4               ; the index of DELETE,
+I_PRINT         .EQU    25              ; the index of PRINT, the first statement without ops,
+I_LET           .EQU    26              ; of LET,
+I_RUN           .EQU    27              ; of RUN,
+I_GOTO          .EQU    29              ; of GOTO,
+I_GOSUB         .EQU    30              ; of GOSUB,
+I_IF            .EQU    31              ; of IF,
+I_FOR           .EQU    32              ; of FOR,
+I_REM           .EQU    34              ; of REM,
+I_INPUT         .EQU    35              ; of INPUT,
+I_GET           .EQU    36              ; of GET,
+I_DIM           .EQU    37              ; of DIM,
+I_HIMEM         .EQU    38              ; of HIMEM, which is also a number,
 T_HIMEM         .EQU    K_KW*K+I_HIMEM*0x100+0x22  ; whose token this is,
-N_STMT          .EQU    40              ; and of AND, the first keyword that is no statement
+N_STMT          .EQU    41              ; and of AND, the first keyword that is no statement
 H_ACTS          .EQU    0x40000000+4*ACTS
 ; The routines of the items, by the kind of an op, which bas_op calls
 KINDS
@@ -548,21 +611,24 @@ H_KINDS         .EQU    0x40000000+4*KINDS
 ; 0x20 gives:
 ;
 ;   0  IP, MAC, TIME  F J N    the end, or a string and the end
-;   1  DELETE         J N      a string and the end
 ;   2  DHCP, CLS, VER, HELP, HALT   N   the end
-;   3  DIR            F A N J E J N    the end, a number and the end, or
-;                                      a string, a comma and a string or
-;                                      not, and the end
-;  10  LOAD, NTP      F J E J N        the end, or the strings of DIR
-;  15  SAVE           J F L C N H L H N  a string, and the end, or a
-;                                        comma, and a string and the
-;                                        end, or a number, a comma, a
-;                                        number, and the end
-;  20  POKE           H L H N  a number, a comma, a number, and the end
-;  22  SYS            H N      a number and the end
-;  24  BAUD           @ N      a number or not, and the end
-;  26  DUMP, DIS      @ E H N  a number or not, a comma and a number or
+;   3  BAUD           @ N      a number or not, and the end
+;   5  DUMP, DIS      @ E H N  a number or not, a comma and a number or
 ;                              not, and the end
+;   9  POKE           H L H N  a number, a comma, a number, and the end
+;  11  SYS            H N      a number and the end
+;  13  DIR            F A N F J E J N  the end, a number and the end, or
+;                                      the ops of NTP
+;  16  NTP            F J E J N        the end, or a string, a comma and
+;                                      a string or not, and the end
+;  21  LOAD           F J F L C N H N  the end, or the ops of SAVE
+;  22  SAVE, DELETE   J F L C N H N    a string, and the end, or a
+;                                      comma, and a string or a number,
+;                                      and the end
+;  29  BSAVE          J L H L H F L H N  a string, a comma, a number, a
+;                                        comma, a number, and the end,
+;                                        or a comma, a number, and the
+;                                        end
 ;
 ; A number is an expression, which must fit a signed word. PRINT and LET
 ; read their own items, and their byte is that of the end, 2, as is that
@@ -573,9 +639,9 @@ OP_C            .EQU    4
 OP_E            .EQU    6
 OP_SKIP         .EQU    1
 OP_F            .EQU    8
-KEYWORDS        .EQU    30              ; the first keyword's byte in OPS
+KEYWORDS        .EQU    38              ; the first keyword's byte in OPS
 OPS
-                .ASCII_B 'FJNFANJEJNFJEJNJFLCNHLHN@N@EHNSYS6LOAD*SAVE/DELETE!DIR#IP DHCP"MAC TIME NTP*BAUD8DUMP:DIS:CLS"VER"HELP"HALT"POKE4NEW"CLR"END"STOP"CONT"RETURN"PRINT"LET"RUN"LIST"GOTO"GOSUB"IF"FOR"NEXT"REM"INPUT"GET"DIM"HIMEM"AUTO"RENUMBER"AND"OR"XOR"NOT"DIV"MOD"ABS"SGN"INT"SQR"PEEK"TAB"SPC"THEN"ELSE"TO"STEP"'
+                .ASCII_B 'FJN@N@EHNHLHNFANFJEJNFJFLCNHNJLHLHFLHNSYS+LOAD5SAVE6BSAVE=DELETE6DIR-IP DHCP"MAC TIME NTP0BAUD#DUMP%DIS%CLS"VER"HELP"HALT"POKE)NEW"CLR"END"STOP"CONT"RETURN"PRINT"LET"RUN"LIST"GOTO"GOSUB"IF"FOR"NEXT"REM"INPUT"GET"DIM"HIMEM"AUTO"RENUMBER"AND"OR"XOR"NOT"DIV"MOD"ABS"SGN"INT"SQR"PEEK"TAB"SPC"THEN"ELSE"TO"STEP"'
                 .DAT    0
 
 S_HINT          .ASCII_B 'HELP lists the statements'
@@ -598,22 +664,23 @@ S_DOTBAS
 
 ; The lines of HELP, which a Syntax error also prints, those that start
 ; with the statement's keyword and a blank
-HELP            .DAT    H_SYS, H_L, H_LOAD, H_TFTP, H_SAVET, H_SAVE, H_DEL, H_DELL, H_DIR, H_TFTPL, H_D, H_U
+HELP            .DAT    H_SYS, H_L, H_LOAD, H_TFTP, H_SAVET, H_SAVE, H_DEL, H_DELL, H_DIR, H_TFTPL, H_SLOT, H_D, H_U
                 .DAT    H_I, H_ID, H_M, H_B, H_T, H_TN, H_C, H_V, H_H, H_Q, H_PR, H_LET
-                .DAT    H_POKE, H_RUN, H_RUNF, H_LIST, H_NEW, H_CLR, H_GOTO, H_GOSUB, H_RET, H_IF
+                .DAT    H_POKE, H_RUN, H_RUNF, H_RUNT, H_LIST, H_NEW, H_CLR, H_GOTO, H_GOSUB, H_RET, H_IF
                 .DAT    H_FOR, H_NEXT, H_END, H_STOP, H_CONT, H_REM, H_INPUT, H_GET, H_DIM, H_HIMEM, H_AUTO, H_REN, H_P, H_PG, 0
 H_SYS           .ASCII_B 'SYS A               call the program at A, such as SYS 0x8000; SYS 0 restarts'
 H_L             .ASCII_B 'LOAD                enter lines of ADDR WORD in hex, as a .bin file has them'
                 .DAT    0
-H_LOAD          .ASCII_B 'LOAD "NAME"         load the program NAME.BAS, or NAME.BIN, from the SD card'
+H_LOAD          .ASCII_B 'LOAD "NAME" [, S]   load the program NAME.BAS, or NAME.BIN, from the SD card'
                 .DAT    0
 H_TFTP          .ASCII_B 'LOAD "NAME", "IP"   load it from the TFTP server at IP'
-H_SAVET         .ASCII_B 'SAVE "NAME"         save the program as the text NAME.BAS'
-H_SAVE          .ASCII_B 'SAVE "NAME", A, N   save N words from A as the .bin file NAME'
-H_DEL           .ASCII_B 'DELETE "NAME"       delete the file NAME of the SD card'
+H_SAVET         .ASCII_B 'SAVE "NAME" [, S]   save the program as the text NAME.BAS'
+H_SAVE          .ASCII_B 'BSAVE "NAME", A, N [, S]  save N words from A as the .bin file NAME'
+H_DEL           .ASCII_B 'DELETE "NAME" [, S] delete the file NAME of the SD card'
 H_DELL          .ASCII_B 'DELETE N [- M]      delete the lines from N to M'
                 .DAT    0
-H_DIR           .ASCII_B 'DIR [SLOT]          list the files of the card in SLOT, or of the card mounted'
+H_DIR           .ASCII_B 'DIR [S]             list the files of the card in slot S, or of the one mounted'
+H_SLOT          .ASCII_B '  S, a slot, mounts its card first, for the statements after it too'
 H_TFTPL         .ASCII_B 'DIR "IP" [, "PAT"]  list the files of tools/tftpd.py at IP, or those of PAT'
 H_D             .ASCII_B 'DUMP [A] [, N]      show N words from A, in hex, or the next ones'
 H_U             .ASCII_B 'DIS [A] [, N]       disassemble N instructions from A, or the next ones'
@@ -634,8 +701,9 @@ H_LET           .ASCII_B 'LET V = X           set the variable V to the number X
 H_POKE          .ASCII_B 'POKE A, X           write X to the word at A, which PEEK(A) reads'
 H_RUN           .ASCII_B 'RUN [N]             run the program, from line N or its first, after CLR'
                 .DAT    0
-H_RUNF          .ASCII_B 'RUN "NAME" [, "IP"] load NAME and run it; NAME.BIN at 0x8000'
+H_RUNF          .ASCII_B 'RUN "NAME" [, S]    load NAME and run it; NAME.BIN at 0x8000'
                 .DAT    0
+H_RUNT          .ASCII_B 'RUN "NAME", "IP"    load NAME from the TFTP server at IP and run it'
 H_LIST          .ASCII_B 'LIST [N] [- M]      list the lines of the program, those from N to M'
                 .DAT    0
 H_NEW           .ASCII_B 'NEW                 delete the program and its variables'

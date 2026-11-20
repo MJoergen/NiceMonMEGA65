@@ -378,14 +378,11 @@ load "a.bin", "x"
 Not a TFTP server: IP[:PORT], such as "192.168.1.10" or "192.168.1.10:6969"
 READY.
 load "a.bin", 10
-Syntax error
-LOAD                enter lines of ADDR WORD in hex, as a .bin file has them
-LOAD "NAME"         load the program NAME.BAS, or NAME.BIN, from the SD card
-LOAD "NAME", "IP"   load it from the TFTP server at IP
+File error 27, no such slot
 READY.
 dir "10.0.0.2", "a", "b"
 Syntax error
-DIR [SLOT]          list the files of the card in SLOT, or of the card mounted
+DIR [S]             list the files of the card in slot S, or of the one mounted
 DIR "IP" [, "PAT"]  list the files of tools/tftpd.py at IP, or those of PAT
 READY.
 load "a.bin", "10.0.0.256"
@@ -408,7 +405,7 @@ Not a TFTP server: IP[:PORT], such as "192.168.1.10" or "192.168.1.10:6969"
 READY.
 dir "10.0.0.2" "*"
 Syntax error
-DIR [SLOT]          list the files of the card in SLOT, or of the card mounted
+DIR [S]             list the files of the card in slot S, or of the one mounted
 DIR "IP" [, "PAT"]  list the files of tools/tftpd.py at IP, or those of PAT
 READY.
 load "a.txt", "10.0.0.2"

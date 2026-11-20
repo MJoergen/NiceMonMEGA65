@@ -5,7 +5,7 @@ load
 ADDR WORD in hex on each line, as in a .bin file; an empty line ends
 Words loaded: 2, 00008000 to 00008001
 READY.
-save "test", 0x8000, 2
+bsave "test", 0x8000, 2
 Words saved: 2, 00008000 to 00008001
 READY.
 dir
@@ -20,7 +20,7 @@ READY.
 dump 0x8000, 2
 00008000 1234ABCD 00000005
 READY.
-save "hello.bin", 0x8000, 0
+bsave "hello.bin", 0x8000, 0
 Words saved: 0
 READY.
 load "hello.bin"
@@ -34,41 +34,35 @@ File error 21, no such file
 READY.
 save
 Syntax error
-SAVE "NAME"         save the program as the text NAME.BAS
-SAVE "NAME", A, N   save N words from A as the .bin file NAME
+SAVE "NAME" [, S]   save the program as the text NAME.BAS
 READY.
 save "x",
 Syntax error
-SAVE "NAME"         save the program as the text NAME.BAS
-SAVE "NAME", A, N   save N words from A as the .bin file NAME
+SAVE "NAME" [, S]   save the program as the text NAME.BAS
 READY.
 save "x", 0x8000
-Syntax error
-SAVE "NAME"         save the program as the text NAME.BAS
-SAVE "NAME", A, N   save N words from A as the .bin file NAME
+File error 27, no such slot
 READY.
-save "x", 0x8000, 1, 2
-Syntax error
-SAVE "NAME"         save the program as the text NAME.BAS
-SAVE "NAME", A, N   save N words from A as the .bin file NAME
+bsave "x", 0x8000, 1, 2
+File error 27, no such slot
 READY.
-save "x", 0x8000, 0x100000000
+bsave "x", 0x8000, 0x100000000
 Illegal quantity
 READY.
 savex
 Syntax error; HELP lists the statements
 READY.
-SAVE "a:b", 0x8000, 1
+BSAVE "a:b", 0x8000, 1
 File error 20, not a valid name
 READY.
 delete
 Syntax error
-DELETE "NAME"       delete the file NAME of the SD card
+DELETE "NAME" [, S] delete the file NAME of the SD card
 DELETE N [- M]      delete the lines from N to M
 READY.
 delete "a" "b"
 Syntax error
-DELETE "NAME"       delete the file NAME of the SD card
+DELETE "NAME" [, S] delete the file NAME of the SD card
 DELETE N [- M]      delete the lines from N to M
 READY.
 deletex
@@ -79,7 +73,7 @@ Directory of NICE in slot 1
 HELLO.BIN                      14436
 Files: 1, directories: 0
 READY.
-save "full.bin", 0x8000, 256
+bsave "full.bin", 0x8000, 256
 File error 30, the card or the folder is full
 READY.
 dir
@@ -91,7 +85,7 @@ READY.
 delete "full.bin"
 Deleted full.bin
 READY.
-save "full.bin", 0x8000, 2
+bsave "full.bin", 0x8000, 2
 Words saved: 2, 00008000 to 00008001
 READY.
 dir
@@ -104,7 +98,7 @@ halt
 Halted
 Screen:
 |READY.
-|save "full.bin", 0x8000, 256
+|bsave "full.bin", 0x8000, 256
 |File error 30, the card or the folder is full
 |READY.
 |dir
@@ -116,7 +110,7 @@ Screen:
 |delete "full.bin"
 |Deleted full.bin
 |READY.
-|save "full.bin", 0x8000, 2
+|bsave "full.bin", 0x8000, 2
 |Words saved: 2, 00008000 to 00008001
 |READY.
 |dir

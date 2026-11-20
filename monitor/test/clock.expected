@@ -8,25 +8,25 @@ load
 ADDR WORD in hex on each line, as in a .bin file; an empty line ends
 Words loaded: 1, 00008000 to 00008000
 READY.
-save "a.bin", 0x8000, 1
+bsave "a.bin", 0x8000, 1
 Words saved: 1, 00008000 to 00008000
 READY.
 time "2099-12-31 23:59:58"
 2099-12-31 23:59:58
 READY.
-save "b.bin", 0x8000, 1
+bsave "b.bin", 0x8000, 1
 Words saved: 1, 00008000 to 00008000
 READY.
 time "1980-01-01 00:00:01"
 1980-01-01 00:00:01
 READY.
-save "c.bin", 0x8000, 1
+bsave "c.bin", 0x8000, 1
 Words saved: 1, 00008000 to 00008000
 READY.
 time "1979-12-31 23:59:59"
 1979-12-31 23:59:59
 READY.
-save "d.bin", 0x8000, 1
+bsave "d.bin", 0x8000, 1
 Words saved: 1, 00008000 to 00008000
 READY.
 time "2106-01-01 00:00:00"
@@ -40,19 +40,19 @@ Screen:
 |time "2099-12-31 23:59:58"
 |2099-12-31 23:59:58
 |READY.
-|save "b.bin", 0x8000, 1
+|bsave "b.bin", 0x8000, 1
 |Words saved: 1, 00008000 to 00008000
 |READY.
 |time "1980-01-01 00:00:01"
 |1980-01-01 00:00:01
 |READY.
-|save "c.bin", 0x8000, 1
+|bsave "c.bin", 0x8000, 1
 |Words saved: 1, 00008000 to 00008000
 |READY.
 |time "1979-12-31 23:59:59"
 |1979-12-31 23:59:59
 |READY.
-|save "d.bin", 0x8000, 1
+|bsave "d.bin", 0x8000, 1
 |Words saved: 1, 00008000 to 00008000
 |READY.
 |time "2106-01-01 00:00:00"

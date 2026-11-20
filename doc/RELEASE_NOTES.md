@@ -39,6 +39,13 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   ([doc/BASIC_ROM.md](BASIC_ROM.md#basics-part-from-0x3000)).
 - The demo's F11 tests the RAM from `0xB000` to `0xCFFF`, where it
   tested up to `0xDFFF`, and its screen says so.
+- `SAVE "NAME", A, N`, which wrote words as a `.bin` file, is now
+  `BSAVE "NAME", A, N`, and the old form is a `Syntax error`.
+  `SAVE "NAME"` still writes the program as text.
+- A number after the name of `LOAD`, `SAVE`, and `RUN` is a slot,
+  where it was a `Syntax error`.
+- The tokens of the statements from `BSAVE` on changed. A program
+  keeps its text on a card, so only a dump of the tokens shows it.
 
 **New.**
 
@@ -65,6 +72,12 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   it wraps, ends, and scrolls the rows, for BASIC's screen editor
   ([#118](https://github.com/MJoergen/NiceMonMEGA65/issues/118),
   [monitor/README.md](../monitor/README.md#the-dispatch-table)).
+- `DIR` shows the slot of the card that it lists:
+  `Directory of NICE in slot 0`.
+- `LOAD "NAME", SLOT`, `SAVE "NAME", SLOT`, `BSAVE "NAME", A, N, SLOT`,
+  `DELETE "NAME", SLOT`, and `RUN "NAME", SLOT` mount the card in
+  `SLOT` first, as `DIR SLOT` does, and the statements after them use
+  that card.
 
 ## V2.3.2 (2026-11-19)
 

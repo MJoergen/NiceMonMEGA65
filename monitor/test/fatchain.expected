@@ -5,7 +5,7 @@ READY.
 sys 0x8000
 Returned 00001DE4
 READY.
-save "free.txt", 0x8000, 1
+bsave "free.txt", 0x8000, 1
 Words saved: 1, 00008000 to 00008000
 READY.
 dir

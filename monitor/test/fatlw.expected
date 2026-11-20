@@ -5,28 +5,28 @@ load
 ADDR WORD in hex on each line, as in a .bin file; an empty line ends
 Words loaded: 2, 00008000 to 00008001
 READY.
-save "mandelbrot.bin", 0x8000, 2
+bsave "mandelbrot.bin", 0x8000, 2
 Words saved: 2, 00008000 to 00008001
 READY.
-save "mandelbrot3.txt", 0x8000, 2
+bsave "mandelbrot3.txt", 0x8000, 2
 Words saved: 2, 00008000 to 00008001
 READY.
-save "Hello.bin", 0x8000, 2
+bsave "Hello.bin", 0x8000, 2
 Words saved: 2, 00008000 to 00008001
 READY.
-save "lower2.bin", 0x8000, 2
+bsave "lower2.bin", 0x8000, 2
 Words saved: 2, 00008000 to 00008001
 READY.
-save "a b.bin", 0x8000, 2
+bsave "a b.bin", 0x8000, 2
 Words saved: 2, 00008000 to 00008001
 READY.
-save "MIXED.BIN", 0x8000, 1
+bsave "MIXED.BIN", 0x8000, 1
 Words saved: 1, 00008000 to 00008000
 READY.
-save "a*b", 0x8000, 1
+bsave "a*b", 0x8000, 1
 File error 20, not a valid name
 READY.
-save "end.", 0x8000, 1
+bsave "end.", 0x8000, 1
 File error 20, not a valid name
 READY.
 delete "mandelbrot1.txt"
@@ -35,10 +35,10 @@ READY.
 delete "mandelbrot2.txt"
 Deleted mandelbrot2.txt
 READY.
-save "a much longer name of a file.bin", 0x8000, 2
+bsave "a much longer name of a file.bin", 0x8000, 2
 Words saved: 2, 00008000 to 00008001
 READY.
-save "x.bin", 0x8000, 2
+bsave "x.bin", 0x8000, 2
 Words saved: 2, 00008000 to 00008001
 READY.
 dir

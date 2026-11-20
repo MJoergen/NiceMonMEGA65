@@ -58,7 +58,7 @@ class Run(NamedTuple):
 
 
 RUN = "sys 0x8000\rhalt\r"
-LOAD_WORDS = 'save "{}", 0x8000, {}\r'
+LOAD_WORDS = 'bsave "{}", 0x8000, {}\r'
 
 SUITES = {
     # P3: what the cold start and a program's return keep
@@ -67,7 +67,7 @@ SUITES = {
             "return, so LOAD, SAVE, and DIR get error 23 and TAB works; then the "
             "program's handles still read", "super.img",
             keys='sys 0x8000\rsys 0\rsys 0x8400\rsys 0x8800\rload "hello.bin"\r'
-                 'save "x", 0x8000, 1\rdir\rload h\t\003sys 0x8C00\rhalt\r',
+                 'bsave "x", 0x8000, 1\rdir\rload h\t\003sys 0x8C00\rhalt\r',
             ops="fatstate.ops"),
         Run("SYS 0 forgets the mount of slot 1: DIR mounts slot 0 again",
             "lfn.img", "super.img", keys="dir 1\rsys 0\rdir\rhalt\r"),
@@ -78,10 +78,10 @@ SUITES = {
     "fatload": [
         Run("LOAD of CR LF, of blank lines only, of a chain cut after its second "
             "cluster, and of lines of every kind", "lines.img",
-            keys='load "crlf.bin"\rdump 0x8100, 4\rdump 0xFFFFE80C, 5\r'
-                 'load "blank.bin"\rdump 0xFFFFE80C, 5\r'
-                 'load "cut.bin"\rdump 0xFFFFE80C, 5\rdump 0x9036, 4\r'
-                 'load "lines.bin"\rdump 0x8000, 0x14\rdump 0x8020, 1\rdump 0xFFFFE80C, 5\r'
+            keys='load "crlf.bin"\rdump 0x8100, 4\rdump 0xFFFFE810, 5\r'
+                 'load "blank.bin"\rdump 0xFFFFE810, 5\r'
+                 'load "cut.bin"\rdump 0xFFFFE810, 5\rdump 0x9036, 4\r'
+                 'load "lines.bin"\rdump 0x8000, 0x14\rdump 0x8020, 1\rdump 0xFFFFE810, 5\r'
                  'halt\r'),
     ],
     # P5: TAB, and the cases of issue #145
@@ -99,7 +99,7 @@ SUITES = {
             keys='dir 1\rload h\t\003load hd\t\003load a\t\003load b\t\003load "a\t\003'
                  'load "b\t\003load r\t\t\003halt\r'),
         Run("TAB after SAVE and DELETE", "super.img",
-            keys='load z\t\003save "zebra", 0x8000, 1\rload z\t\003save "Hz", 0x8000, 1\r'
+            keys='load z\t\003bsave "zebra", 0x8000, 1\rload z\t\003bsave "Hz", 0x8000, 1\r'
                  'load h\t\003delete "zebra.bin"\rload z\t\003halt\r', order=True),
     ],
     # P6: a mount dropped under open files
@@ -112,7 +112,7 @@ SUITES = {
     "fatchain": [
         Run("Reads, opens, and deletes of damaged chains; SAVE over a file whose "
             "chain meets a free cluster, which ends it (issue #151, B3)", "chains.img",
-            keys='sys 0x8000\rsave "free.txt", 0x8000, 1\rdir\rhalt\r',
+            keys='sys 0x8000\rbsave "free.txt", 0x8000, 1\rdir\rhalt\r',
             ops="fatchain.ops", fsck=True, order=True),
     ],
     # P8: long names on the card
@@ -145,8 +145,8 @@ SUITES = {
     ],
     # P10: other geometries
     "fatgeo": [Run(f"SAVE, LOAD, DIR, and DELETE on {img}", img,
-                   keys='save "big", 0x8000, 2000\rsave "a long name of a file.bin", 0x8000, 3\r'
-                        'save "two", 0x8000, 2\rdelete "two.bin"\rload "big.bin"\r'
+                   keys='bsave "big", 0x8000, 2000\rbsave "a long name of a file.bin", 0x8000, 3\r'
+                        'bsave "two", 0x8000, 2\rdelete "two.bin"\rload "big.bin"\r'
                         'load "A LONG NAME OF A FILE.BIN"\rdir\rhalt\r',
                    fsck=True, order=True)
                for img in ("spc8.img", "spc64.img", "fat1.img")],

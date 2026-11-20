@@ -321,23 +321,37 @@ run_prog
         ?Z      JMP     main            ; no program
                 JMP     go_to
 
-; RUN "NAME" [, "IP"]: LOAD "NAME" [, "IP"] with V_RUNF set, after
-; which load_fin runs the program, or calls a .bin file at 0x8000
+; RUN "NAME" [, "IP"] and RUN "NAME", SLOT: LOAD "NAME" [, "IP"] or
+; LOAD "NAME", SLOT with V_RUNF set, after which load_fin runs the
+; program, or calls a .bin file at 0x8000. R11 has bit 2 for a SLOT, as
+; bas_op leaves it for LOAD.
 run_file
                 ADD     R1, R8, 1       ; the name
                 CALL    tok_skip
                 CLR     R4              ; no server
+                CLR     R11             ; and no slot
                 CMP     @R8, T_COMMA
-        ?!Z     JMP     :+
+        ?!Z     JMP     :++
                 MOVE    R8++, R8
                 SHR     R3, @R8, 24
                 CMP     R3, K_STR
-        ?!Z     JMP     err_syntax
+        ?!Z     JMP     :+
                 ADD     R4, R8, 1       ; the server
                 CALL    tok_skip
+                JMP     :++
 :
                 PUSH    R1
+                CALL    eval_word       ; the slot
+                MOVE    R4, R1
+                POP     R1
+                MOVE    R11, 2
+:
+                PUSH    R1
+                PUSH    R4
+                PUSH    R11
                 CALL    stmt_end
+                POP     R11
+                POP     R4
                 POP     R1
                 MOVE    R2, R4
                 ONE     @V_RUNF

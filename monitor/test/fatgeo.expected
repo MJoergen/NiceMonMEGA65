@@ -2,13 +2,13 @@
 NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
-save "big", 0x8000, 2000
+bsave "big", 0x8000, 2000
 Words saved: 2000, 00008000 to 000087CF
 READY.
-save "a long name of a file.bin", 0x8000, 3
+bsave "a long name of a file.bin", 0x8000, 3
 Words saved: 3, 00008000 to 00008002
 READY.
-save "two", 0x8000, 2
+bsave "two", 0x8000, 2
 Words saved: 2, 00008000 to 00008001
 READY.
 delete "two.bin"
@@ -78,13 +78,13 @@ C3+0, FAT1+0, FAT2+0, C14+0, C3+0, FSInfo, C3+0, FAT1+0, FAT2+0, FSInfo
 NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
-save "big", 0x8000, 2000
+bsave "big", 0x8000, 2000
 Words saved: 2000, 00008000 to 000087CF
 READY.
-save "a long name of a file.bin", 0x8000, 3
+bsave "a long name of a file.bin", 0x8000, 3
 Words saved: 3, 00008000 to 00008002
 READY.
-save "two", 0x8000, 2
+bsave "two", 0x8000, 2
 Words saved: 2, 00008000 to 00008001
 READY.
 delete "two.bin"
@@ -152,13 +152,13 @@ C3+0, FSInfo, C3+0, FAT1+0, FAT2+0, FSInfo
 NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
-save "big", 0x8000, 2000
+bsave "big", 0x8000, 2000
 Words saved: 2000, 00008000 to 000087CF
 READY.
-save "a long name of a file.bin", 0x8000, 3
+bsave "a long name of a file.bin", 0x8000, 3
 Words saved: 3, 00008000 to 00008002
 READY.
-save "two", 0x8000, 2
+bsave "two", 0x8000, 2
 Words saved: 2, 00008000 to 00008001
 READY.
 delete "two.bin"

@@ -18,7 +18,7 @@ READY.
 load "hello.bin"
 File error 23, too many open files
 READY.
-save "x", 0x8000, 1
+bsave "x", 0x8000, 1
 File error 23, too many open files
 READY.
 dir

@@ -263,8 +263,8 @@ assembled apart (#152): the monitor's from 0, and BASIC's from
 |---|---|---:|
 | The monitor | `0x0000`–`0x2997` | 10648 |
 | Free | `0x2998`–`0x2FFF` | 1640 |
-| BASIC | `0x3000`–`0x5924` | 10533 |
-| Free | `0x5925`–`0x7FFF` | 9947 |
+| BASIC | `0x3000`–`0x59A6` | 10663 |
+| Free | `0x59A7`–`0x7FFF` | 9817 |
 <!-- /romsize layout -->
 
 The monitor's words, by the source they come from, in the order
@@ -654,11 +654,11 @@ step needs a card prepared on a PC with a folder `NICE` that holds
    while it waits: the second read gives -28, a third -24.
 3. **A write-protected card**, by the switch of a full-size card, or of
    an adapter, in slot 1 of an R6, the only slot with write protect (the
-   R3's slot 1 has none): `DIR 1` and `LOAD` work, and `SAVE "X",
+   R3's slot 1 has none): `DIR 1` and `LOAD` work, and `BSAVE "X",
    0x8000, 1` and `DELETE "HELLO.BIN"` give `SD error 6 in slot 1, the
    card is write-protected`. The PC finds the card unchanged.
 4. **SDSC and SDHC.** On a card of 2 GB or less and one of 4 to 32 GB:
-   `SAVE "BIG", 0x8000, 4000`, `LOAD "BIG.BIN"`, `DIR`, and `DELETE
+   `BSAVE "BIG", 0x8000, 4000`, `LOAD "BIG.BIN"`, `DIR`, and `DELETE
    "BIG.BIN"`. Then `fsck.fat -n` on the PC reports only the free count,
    as not known. On a card of 32 GB, half full, time a `SAVE`, as the
    search for a free cluster starts at the hint.
@@ -670,7 +670,7 @@ step needs a card prepared on a PC with a folder `NICE` that holds
 7. **Cards formatted by Windows and macOS**: `DIR`, `SAVE`, `LOAD`, and
    `DELETE`, then the PC's check. An exFAT card, as SDXC cards are sold,
    gives `File error 19, exFAT, which is not supported`.
-8. **A reset during a write.** Reset during `SAVE "BIG", 0x8000, 20000`:
+8. **A reset during a write.** Reset during `BSAVE "BIG", 0x8000, 20000`:
    `fsck.fat -n` reports at most lost clusters, orphan long-name
    entries, and the free count.
 9. **A card from a camera or a phone**, with names outside ASCII: `DIR`

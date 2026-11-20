@@ -230,7 +230,7 @@ FATNONE = dir\rload "hello.bin"\rdir 1\rload "hello.bin"\rhalt\r
 # delete alone, with two names, and deletex. On full.img, save of 256 words fills the card
 # with FULL.BIN's first 1536 bytes, which dir shows, and is error 30;
 # delete frees them, and a save of 2 words fits.
-FATW = load\r8000 1234ABCD\r8001 5\r\rsave "test", 0x8000, 2\rdir\rload "TEST.BIN"\rdump 0x8000, 2\rsave "hello.bin", 0x8000, 0\rload "hello.bin"\rdelete "test.bin"\rdelete "test.bin"\rsave\rsave "x",\rsave "x", 0x8000\rsave "x", 0x8000, 1, 2\rsave "x", 0x8000, 0x100000000\rsavex\rSAVE "a:b", 0x8000, 1\rdelete\rdelete "a" "b"\rdeletex\rdir 1\rsave "full.bin", 0x8000, 256\rdir\rdelete "full.bin"\rsave "full.bin", 0x8000, 2\rdir\rhalt\r
+FATW = load\r8000 1234ABCD\r8001 5\r\rbsave "test", 0x8000, 2\rdir\rload "TEST.BIN"\rdump 0x8000, 2\rbsave "hello.bin", 0x8000, 0\rload "hello.bin"\rdelete "test.bin"\rdelete "test.bin"\rsave\rsave "x",\rsave "x", 0x8000\rbsave "x", 0x8000, 1, 2\rbsave "x", 0x8000, 0x100000000\rsavex\rBSAVE "a:b", 0x8000, 1\rdelete\rdelete "a" "b"\rdeletex\rdir 1\rbsave "full.bin", 0x8000, 256\rdir\rdelete "full.bin"\rbsave "full.bin", 0x8000, 2\rdir\rhalt\r
 # fatl: lfn.img of test/fat_image.py in slot 0, with long names. dir
 # shows them, load reads my prog.bin by its long name, which sys runs,
 # then by its 8.3 name, and by its long name in upper case; the text
@@ -260,7 +260,7 @@ TAB = load my\t\rload "my\t\rload mand\t\t1\t\rload pad2\t1\t\rlo\t\003load x\t\
 # mandelbrot1.txt and mandelbrot2.txt, whose 4 entries in a row take the
 # 4 of a much longer name of a file.bin, and x.bin goes at the end. dir
 # shows them, and load reads two back.
-FATLW = load\r8000 1234ABCD\r8001 5\r\rsave "mandelbrot.bin", 0x8000, 2\rsave "mandelbrot3.txt", 0x8000, 2\rsave "Hello.bin", 0x8000, 2\rsave "lower2.bin", 0x8000, 2\rsave "a b.bin", 0x8000, 2\rsave "MIXED.BIN", 0x8000, 1\rsave "a*b", 0x8000, 1\rsave "end.", 0x8000, 1\rdelete "mandelbrot1.txt"\rdelete "mandelbrot2.txt"\rsave "a much longer name of a file.bin", 0x8000, 2\rsave "x.bin", 0x8000, 2\rdir\rload "A MUCH LONGER NAME OF A FILE.BIN"\rdump 0x8000, 2\rload "mandel~1.bin"\rhalt\r
+FATLW = load\r8000 1234ABCD\r8001 5\r\rbsave "mandelbrot.bin", 0x8000, 2\rbsave "mandelbrot3.txt", 0x8000, 2\rbsave "Hello.bin", 0x8000, 2\rbsave "lower2.bin", 0x8000, 2\rbsave "a b.bin", 0x8000, 2\rbsave "MIXED.BIN", 0x8000, 1\rbsave "a*b", 0x8000, 1\rbsave "end.", 0x8000, 1\rdelete "mandelbrot1.txt"\rdelete "mandelbrot2.txt"\rbsave "a much longer name of a file.bin", 0x8000, 2\rbsave "x.bin", 0x8000, 2\rdir\rload "A MUCH LONGER NAME OF A FILE.BIN"\rdump 0x8000, 2\rload "mandel~1.bin"\rhalt\r
 
 # clock: with --no-cycle-counter, so that the clock's words are memory,
 # which build/clock.bin sets: "set", 999999 microseconds, and the seconds
@@ -272,8 +272,8 @@ FATLW = load\r8000 1234ABCD\r8001 5\r\rsave "mandelbrot.bin", 0x8000, 2\rsave "m
 # the last seconds written, with 0 above them, 0 microseconds, and "set".
 # clockpast: the same with 2^32 seconds, so time shows that the clock is
 # past 2106, and save writes p.bin with the fixed date.
-CLOCK = time\rload\r8000 1\r\rsave "a.bin", 0x8000, 1\rtime "2099-12-31 23:59:58"\rsave "b.bin", 0x8000, 1\rtime "1980-01-01 00:00:01"\rsave "c.bin", 0x8000, 1\rtime "1979-12-31 23:59:59"\rsave "d.bin", 0x8000, 1\rtime "2106-01-01 00:00:00"\rhalt\r
-CLOCKPAST = time\rload\r8000 1\r\rsave "p.bin", 0x8000, 1\rhalt\r
+CLOCK = time\rload\r8000 1\r\rbsave "a.bin", 0x8000, 1\rtime "2099-12-31 23:59:58"\rbsave "b.bin", 0x8000, 1\rtime "1980-01-01 00:00:01"\rbsave "c.bin", 0x8000, 1\rtime "1979-12-31 23:59:59"\rbsave "d.bin", 0x8000, 1\rtime "2106-01-01 00:00:00"\rhalt\r
+CLOCKPAST = time\rload\r8000 1\r\rbsave "p.bin", 0x8000, 1\rhalt\r
 CLOCK_WORDS = FFFFFF46 000F423F\nFFFFFF47 6AF85571\nFFFFFF48 00000000\nFFFFFF49 00000001\n
 CLOCKPAST_WORDS = FFFFFF46 00000000\nFFFFFF47 00000000\nFFFFFF48 00000001\nFFFFFF49 00000001\n
 DUMP_clock    = -d 0xFFFFFF46:4
@@ -311,7 +311,7 @@ DUMP_hal16    = -d 0x9100:16 -d 0x9180:9 -d 0x9190:7 -d 0x9198:2 -d 0x9200:2
 DUMP_hal17    = -d 0x9100:13 -d 0x9180:18 -d 0x91A0:18
 # For hal18 its results
 DUMP_hal18    = -d 0x9100:12
-DUMP_fat      = -d 0xFFFFE80C:5
+DUMP_fat      = -d 0xFFFFE810:5
 # For fpu the number of test/fpu.nasm's runs, the FPU's status and the
 # screen's mode word at the start of each run, and both at the halt
 DUMP_fpu      = -d 0x9100:5 -d 0x9111:4 -d 0xFFFFFF8D:1 -d 0xFFFFFF87:1

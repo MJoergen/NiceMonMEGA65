@@ -84,7 +84,7 @@ programs, which a card keeps, but no strings yet
 | `LOAD "NAME.BIN"` | Loads a program from the SD card |
 | `SYS 0x8000` | Runs the program that was loaded |
 | `RUN "NAME.BIN"` | Loads a program from the SD card and runs it |
-| `SAVE "NAME", A, N` | Saves N words of memory, from A on, to the SD card |
+| `BSAVE "NAME", A, N` | Saves N words of memory, from A on, to the SD card |
 | `SAVE "NAME"`, `LOAD "NAME"` | Saves BASIC's program to the SD card as the text `NAME.BAS`, and loads it |
 | `LOAD` | Loads a program that you type or paste, as the lines of its `.bin` file |
 

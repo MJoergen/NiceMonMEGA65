@@ -268,7 +268,7 @@ on the board:
     mkdir /media/card/NICE
     cp build/hello.bin /media/card/NICE/
 
-`SAVE "NAME", A, N` writes a program back, and the ROM never makes the
+`BSAVE "NAME", A, N` writes a program back, and the ROM never makes the
 folder itself, so a card is written only where its user made room.
 With no PC slot, `make sdcard CMD=mkdir` makes it over the link
 ([tools/README.md](../tools/README.md#sdcardpy)).

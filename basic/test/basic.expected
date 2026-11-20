@@ -42,12 +42,11 @@ Syntax error; HELP lists the statements
 READY.
 save x
 Syntax error
-SAVE "NAME"         save the program as the text NAME.BAS
-SAVE "NAME", A, N   save N words from A as the .bin file NAME
+SAVE "NAME" [, S]   save the program as the text NAME.BAS
 READY.
 delete x
 Syntax error
-DELETE "NAME"       delete the file NAME of the SD card
+DELETE "NAME" [, S] delete the file NAME of the SD card
 DELETE N [- M]      delete the lines from N to M
 READY.
 dhcp x
@@ -212,7 +211,7 @@ READY.
 load "a.bin",
 Syntax error
 LOAD                enter lines of ADDR WORD in hex, as a .bin file has them
-LOAD "NAME"         load the program NAME.BAS, or NAME.BIN, from the SD card
+LOAD "NAME" [, S]   load the program NAME.BAS, or NAME.BIN, from the SD card
 LOAD "NAME", "IP"   load it from the TFTP server at IP
 READY.
 load "a.bin" ,"1.2.3.4"
@@ -221,7 +220,7 @@ READY.
 load "a.bin", "1.2.3.4" x
 Syntax error
 LOAD                enter lines of ADDR WORD in hex, as a .bin file has them
-LOAD "NAME"         load the program NAME.BAS, or NAME.BIN, from the SD card
+LOAD "NAME" [, S]   load the program NAME.BAS, or NAME.BIN, from the SD card
 LOAD "NAME", "IP"   load it from the TFTP server at IP
 READY.
 load "a.bin", "bad"
@@ -230,7 +229,7 @@ READY.
 load x
 Syntax error
 LOAD                enter lines of ADDR WORD in hex, as a .bin file has them
-LOAD "NAME"         load the program NAME.BAS, or NAME.BIN, from the SD card
+LOAD "NAME" [, S]   load the program NAME.BAS, or NAME.BIN, from the SD card
 LOAD "NAME", "IP"   load it from the TFTP server at IP
 READY.
 load "a.bin", "1.2.3.4
@@ -242,41 +241,34 @@ Words loaded: 0
 READY.
 save "x", "y" z
 Syntax error
-SAVE "NAME"         save the program as the text NAME.BAS
-SAVE "NAME", A, N   save N words from A as the .bin file NAME
+SAVE "NAME" [, S]   save the program as the text NAME.BAS
 READY.
 save "x" "y"
 Syntax error
-SAVE "NAME"         save the program as the text NAME.BAS
-SAVE "NAME", A, N   save N words from A as the .bin file NAME
+SAVE "NAME" [, S]   save the program as the text NAME.BAS
 READY.
 save "x",
 Syntax error
-SAVE "NAME"         save the program as the text NAME.BAS
-SAVE "NAME", A, N   save N words from A as the .bin file NAME
+SAVE "NAME" [, S]   save the program as the text NAME.BAS
 READY.
 save "x", 1
-Syntax error
-SAVE "NAME"         save the program as the text NAME.BAS
-SAVE "NAME", A, N   save N words from A as the .bin file NAME
+SD error 1 in slot 1, no card
 READY.
-save "x", 0x, 1
+bsave "x", 0x, 1
 Syntax error
-SAVE "NAME"         save the program as the text NAME.BAS
-SAVE "NAME", A, N   save N words from A as the .bin file NAME
+BSAVE "NAME", A, N [, S]  save N words from A as the .bin file NAME
 READY.
-save "x", 1, 99999999999
+bsave "x", 1, 99999999999
 Illegal quantity
 READY.
 save "x", "y", 99999999999
 Syntax error
-SAVE "NAME"         save the program as the text NAME.BAS
-SAVE "NAME", A, N   save N words from A as the .bin file NAME
+SAVE "NAME" [, S]   save the program as the text NAME.BAS
 READY.
 save "abc
 SD error 1 in slot 1, no card
 READY.
-save "a.b", 0x8000, 1
+bsave "a.b", 0x8000, 1
 SD error 1 in slot 1, no card
 READY.
 delete "x"
@@ -284,7 +276,7 @@ SD error 1 in slot 1, no card
 READY.
 delete "x", "y"
 Syntax error
-DELETE "NAME"       delete the file NAME of the SD card
+DELETE "NAME" [, S] delete the file NAME of the SD card
 DELETE N [- M]      delete the lines from N to M
 READY.
 delete ""
@@ -295,12 +287,12 @@ SD error 1 in slot 1, no card
 READY.
 dir 0x
 Syntax error
-DIR [SLOT]          list the files of the card in SLOT, or of the card mounted
+DIR [S]             list the files of the card in slot S, or of the one mounted
 DIR "IP" [, "PAT"]  list the files of tools/tftpd.py at IP, or those of PAT
 READY.
 dir 0x"1.2.3.4"
 Syntax error
-DIR [SLOT]          list the files of the card in SLOT, or of the card mounted
+DIR [S]             list the files of the card in slot S, or of the one mounted
 DIR "IP" [, "PAT"]  list the files of tools/tftpd.py at IP, or those of PAT
 READY.
 dir 99999999999"1.2.3.4"
@@ -317,17 +309,17 @@ Not a TFTP server: IP[:PORT], such as "192.168.1.10" or "192.168.1.10:6969"
 READY.
 dir "1.2.3.4",
 Syntax error
-DIR [SLOT]          list the files of the card in SLOT, or of the card mounted
+DIR [S]             list the files of the card in slot S, or of the one mounted
 DIR "IP" [, "PAT"]  list the files of tools/tftpd.py at IP, or those of PAT
 READY.
 dir 1,
 Syntax error
-DIR [SLOT]          list the files of the card in SLOT, or of the card mounted
+DIR [S]             list the files of the card in slot S, or of the one mounted
 DIR "IP" [, "PAT"]  list the files of tools/tftpd.py at IP, or those of PAT
 READY.
 dir 1 "x"
 Syntax error
-DIR [SLOT]          list the files of the card in SLOT, or of the card mounted
+DIR [S]             list the files of the card in slot S, or of the one mounted
 DIR "IP" [, "PAT"]  list the files of tools/tftpd.py at IP, or those of PAT
 READY.
 dir 5
@@ -371,33 +363,33 @@ READY.
 ntp "1.2.3.4", "+01:00"
 No IP address; IP or DHCP sets one
 READY.
-save "abc",1,2: dump 0xFFFFECB0, 16
+bsave "abc",1,2: dump 0xFFFFECB0, 16
 SD error 1 in slot 1, no card
-FFFFECB0 0B00022F 05000003 00000061 00000062
+FFFFECB0 0B00033D 05000003 00000061 00000062
 FFFFECB4 00000063 00000000 0800002C 01000001
-FFFFECB8 0800002C 01000002 0800003A 0B000B3A
+FFFFECB8 0800002C 01000002 0800003A 0B000C25
 FFFFECBC 03000000 FFFFECB0 0800002C 01000010
 READY.
 save "x", "1.2.3.4": dump 0xFFFFECB0, 16
 SAVE writes to the SD card: TFTP only loads
-FFFFECB0 0B00022F 05000001 00000078 00000000
+FFFFECB0 0B000236 05000001 00000078 00000000
 FFFFECB4 0800002C 05000007 00000031 0000002E
 FFFFECB8 00000032 0000002E 00000033 0000002E
-FFFFECBC 00000034 00000000 0800003A 0B000B3A
+FFFFECBC 00000034 00000000 0800003A 0B000C25
 READY.
-save "a.b", 1, 2: dump 0xFFFFECB0, 16
+bsave "a.b", 1, 2: dump 0xFFFFECB0, 16
 SD error 1 in slot 1, no card
-FFFFECB0 0B00022F 05000003 00000061 0000002E
+FFFFECB0 0B00033D 05000003 00000061 0000002E
 FFFFECB4 00000062 00000000 0800002C 01000001
-FFFFECB8 0800002C 01000002 0800003A 0B000B3A
+FFFFECB8 0800002C 01000002 0800003A 0B000C25
 FFFFECBC 03000000 FFFFECB0 0800002C 01000010
 READY.
 dir "1.2.3.4", "*": dump 0xFFFFECB0, 16
 No IP address; IP or DHCP sets one
-FFFFECB0 0B000423 05000007 00000031 0000002E
+FFFFECB0 0B00052D 05000007 00000031 0000002E
 FFFFECB4 00000032 0000002E 00000033 0000002E
 FFFFECB8 00000034 00000000 0800002C 05000001
-FFFFECBC 0000002A 00000000 0800003A 0B000B3A
+FFFFECBC 0000002A 00000000 0800003A 0B000C25
 READY.
 ip "1.2.3.4
 IP address 1.2.3.4
@@ -413,19 +405,19 @@ ffffe800: ffffecc0 00008002
 ffffffb0: 01020304
 Screen:
 |READY.
-|save "a.b", 1, 2: dump 0xFFFFECB0, 16
+|bsave "a.b", 1, 2: dump 0xFFFFECB0, 16
 |SD error 1 in slot 1, no card
-|FFFFECB0 0B00022F 05000003 00000061 0000002E
+|FFFFECB0 0B00033D 05000003 00000061 0000002E
 |FFFFECB4 00000062 00000000 0800002C 01000001
-|FFFFECB8 0800002C 01000002 0800003A 0B000B3A
+|FFFFECB8 0800002C 01000002 0800003A 0B000C25
 |FFFFECBC 03000000 FFFFECB0 0800002C 01000010
 |READY.
 |dir "1.2.3.4", "*": dump 0xFFFFECB0, 16
 |No IP address; IP or DHCP sets one
-|FFFFECB0 0B000423 05000007 00000031 0000002E
+|FFFFECB0 0B00052D 05000007 00000031 0000002E
 |FFFFECB4 00000032 0000002E 00000033 0000002E
 |FFFFECB8 00000034 00000000 0800002C 05000001
-|FFFFECBC 0000002A 00000000 0800003A 0B000B3A
+|FFFFECBC 0000002A 00000000 0800003A 0B000C25
 |READY.
 |ip "1.2.3.4
 |IP address 1.2.3.4
