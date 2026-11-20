@@ -21,6 +21,19 @@ The release candidates pinned these:
 
 nice_cpu's `RC01` and `RC03` have no tag here.
 
+## V2.4 (unreleased)
+
+**Upgrade notes.**
+
+- nice_cpu is at `V2.4`. Its FPU's `DIGITS` rounds once, so `PRINT`
+  writes the digits of C's `%.15G`, where about one number in a
+  hundred had another last digit
+  ([#154](https://github.com/MJoergen/NiceMonMEGA65/issues/154),
+  [nice_cpu#200](https://github.com/MJoergen/nice_cpu/issues/200)).
+  `-41610939429.7131` was `-41610939429.713`.
+- The demo's F11 tests the RAM from `0xB000` to `0xCFFF`, where it
+  tested up to `0xDFFF`, and its screen says so.
+
 ## V2.3.2 (2026-11-19)
 
 **Upgrade notes.**

@@ -176,10 +176,7 @@ exact.
   two digits in the exponent. So `1/3` is `0.333333333333333`, `0.1 +
   0.2` is `0.3`, `1E15` is `1E+15`, and `0.00001` is `1E-05`. A
   negative number has its `-`, -0 is `0`, and no blank comes before or
-  after a number. The digits are the FPU's `DIGITS 15`, which rounds
-  twice, so about one number in a hundred has another last digit than
-  `%.15G` gives it
-  ([nice_cpu#200](https://github.com/MJoergen/nice_cpu/issues/200)).
+  after a number.
 
 An expression's errors are `Division by zero`, of `/`, `DIV`, and
 `MOD`; `Overflow`, a result too large for a double; `Illegal
@@ -396,15 +393,16 @@ the default. It runs these steps in order:
    `nicedis.py`, rewritten by the rules of "The disassembler" above,
    for a pseudo-instruction. It assembles each row again
    and compares the words.
-3. **The numbers.** `test/print_numbers.py` types `?` with 510
-   numbers from a fixed seed: constants of 1 to 20 significant digits,
-   with a point, an exponent, or neither, from 1E-300 to 1E300; `+`,
-   `-`, `*`, and `/` of two of them, with signs; the word operators on
-   signed words; the comparisons; and the functions. What `PRINT`
-   shows must be Python's double of the number, written with the
-   digits that nice_cpu's model of the FPU,
-   `emulator/test/fpu_model.py`, gives for `DIGITS 15`. It prints how
-   many of them differ from `%.15G` in their last digit.
+3. **The numbers.** `test/print_numbers.py` types `?` with 515
+   numbers: 510 from a fixed seed, constants of 1 to 20 significant
+   digits, with a point, an exponent, or neither, from 1E-300 to
+   1E300; `+`, `-`, `*`, and `/` of two of them, with signs; the word
+   operators on signed words; the comparisons; and the functions. Five
+   more are fixed, those whose last digit was wrong while the FPU's
+   `DIGITS` rounded twice
+   ([nice_cpu#200](https://github.com/MJoergen/nice_cpu/issues/200)).
+   What `PRINT` shows must be Python's double of the number, as
+   `%.15G` writes it, digit for digit.
 4. **NTP.** `test/ntp.py` types `NTP` and `DHCP` with `--step-time`,
    and learns the frames of each run as the monitor's `test/dns.py`
    does, with the frames of DHCP and DNS of the monitor's

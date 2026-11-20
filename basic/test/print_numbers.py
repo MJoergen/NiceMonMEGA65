@@ -4,14 +4,14 @@
 Usage: test/print_numbers.py NICEEMU ROM.bin
 
 The ROM runs in niceemu with a line ? X for each case, and the line that
-PRINT writes must be Python's double of X, written with the digits of
-the FPU's DIGITS 15 as C's %.15G writes its own, with -0 as 0
-(doc/BASIC.md, "Numbers"). nice_cpu's model of the FPU,
-emulator/test/fpu_model.py, gives the digits. DIGITS rounds twice, the
-scaled value to a double and then that to a whole number, so its last
-digit may differ from that of %.15G, which rounds once, and the count of
-those cases is printed. The cases, from a fixed seed:
+PRINT writes must be Python's double of X, written as C's %.15G
+writes it, with -0 as 0 (doc/BASIC.md, "Numbers"). The FPU's DIGITS 15
+rounds once, as %.15G does (nice_cpu#200), so every digit must be the
+same. The cases, five fixed
+and the rest from a fixed seed:
 
+- the five numbers of nice_cpu#200's table, whose last digit DIGITS got
+  wrong when it rounded twice, kept whatever the seed and the ranges;
 - constants of 1 to 15 significant digits, with a point, an exponent,
   or neither, which PRINT gives back as their digits, so that each
   conversion is checked (nice_cpu's DEVICES.md 11.3, "15 digits come
@@ -27,45 +27,31 @@ library is used.
 """
 
 import math
-import os
 import random
-import struct
 import subprocess
 import sys
 import tempfile
 from typing import Callable, List, Tuple
 
-MODEL = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..",
-                     "nice_cpu", "emulator", "test")
-sys.path.insert(0, MODEL)
-import fpu_model  # noqa: E402
-
 SEED = 113
 STEPS = 50_000_000
 Case = Tuple[str, float]
+
+# nice_cpu#200's five numbers, as the seed gave them: 0x447797CC23985DB1,
+# 0xC2236069184B6D15, 0xC28E24F057F2473E, 0xBD5B8F411CF57545, and
+# 0xC3A5BA823BE42EFE.
+FIXED: List[Case] = [
+    ("1006972011 * 6915199480000", 1006972011 * 6915199480000.0),
+    ("-2.004651e-2 + -(4.1610939429693e10)", -2.004651e-2 + -4.1610939429693e10),
+    ("-4143000000000 - -(6.07109495099155e3)", -4143000000000.0 - -6.07109495099155e3),
+    ("3.8537896643634E-4 / -(984000000)", 3.8537896643634E-4 / -984000000.0),
+    ("823599000 * -(950527510.48)", 823599000.0 * -950527510.48),
+]
 
 
 def fmt(x: float) -> str:
     """x as %.15G writes it, with -0 as 0."""
     return "0" if x == 0 else "%.15G" % x
-
-
-def fmt_fpu(x: float) -> str:
-    """x as PRINT shows it: the digits of the FPU's DIGITS 15, by nice_cpu's
-    model of it, written as %.15G writes its own digits, with -0 as 0."""
-    if x == 0:
-        return "0"
-    d, e = fpu_model.digits(struct.unpack("<Q", struct.pack("<d", x))[0], 15)
-    digs = str(d).rstrip("0")
-    sign = "-" if x < 0 else ""
-    if -4 <= e < 15:
-        if e < 0:
-            return sign + "0." + "0" * (-e - 1) + digs
-        whole = digs[:e + 1].ljust(e + 1, "0")
-        frac = digs[e + 1:]
-        return sign + whole + ("." + frac if frac else "")
-    mant = digs[0] + ("." + digs[1:] if len(digs) > 1 else "")
-    return f"{sign}{mant}E{'-' if e < 0 else '+'}{abs(e):02d}"
 
 
 def digits(r: random.Random, n: int) -> str:
@@ -110,7 +96,7 @@ def round16(text: str) -> float:
 
 def cases() -> List[Case]:
     r = random.Random(SEED)
-    out: List[Case] = []
+    out: List[Case] = list(FIXED)
     for _ in range(150):
         c = constant(r, 1, 15, -300, 300)
         out.append((c, float(c)))
@@ -183,17 +169,13 @@ def main() -> None:
         if line.startswith("?"):
             shown[line[1:]] = out[i + 1]
     bad = 0
-    other = 0
     for text, val in todo:
-        want = fmt_fpu(val)
+        want = fmt(val)
         got = shown.get(text)
         if got != want:
             print(f"FAIL numbers: ?{text} shows {got!r}, not {want!r}")
             bad += 1
-        elif got != fmt(val):
-            other += 1
-    print(f"{'FAIL' if bad else 'PASS'} basic numbers: {len(todo) - bad} of {len(todo)}, "
-          f"{other} of them with another last digit than %.15G")
+    print(f"{'FAIL' if bad else 'PASS'} basic numbers: {len(todo) - bad} of {len(todo)}")
     sys.exit(1 if bad else 0)
 
 

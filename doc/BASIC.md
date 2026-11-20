@@ -268,13 +268,12 @@ a double, IEEE 754 binary64, on the FPU ([The FPU](#the-fpu)).
   exponent is -4 to 14, with a 0 before the point, and in E notation
   else, with a sign and at least two digits in the exponent. So
   `1/3` is `0.333333333333333`, `0.1 + 0.2` is `0.3`, `1E15` is
-  `1E+15`, and `0.00001` is `1E-05`. `DIGITS` rounds twice, the
-  scaled number to a double and that to a whole number, so its last
-  digit differs from that of `%.15G` where the digits after it are
-  near a 5: 5 of the 510 numbers of stage 2's test (measured
-  2026-11-18). BASIC keeps this until `DIGITS` rounds once
-  ([nice_cpu#200](https://github.com/MJoergen/nice_cpu/issues/200)). A negative number has its `-`,
-  and no blank comes before or after a number. A `,` in `PRINT` goes
+  `1E+15`, and `0.00001` is `1E-05`. `DIGITS` rounds once, from
+  nice_cpu's `V2.4` on, so the digits are those of `%.15G`
+  ([nice_cpu#200](https://github.com/MJoergen/nice_cpu/issues/200),
+  [#154](https://github.com/MJoergen/NiceMonMEGA65/issues/154)). A
+  negative number has its `-`, and no blank comes before or after a
+  number. A `,` in `PRINT` goes
   to the next column of 8.
 - A constant is read as at most 16 digits in BCD and an exponent,
   `FROMBCD` and `SCALE10`. Digits after the 16th round the 16th.
@@ -423,9 +422,10 @@ entries alone (#152). Its workspace is the program's RAM:
   monitor's 4K and BASIC's 2K, of which its stage 3 uses 1585, and leaves 463
   (measured 2026-11-18), and stage 4 uses 8 words more, and leaves 455. BASIC's state,
   its line buffers, and the keys typed ahead go there. Its 4K would
-  leave no room for the stack above the RAM that nice_cpu's demo tests
-  on the Nexys4DDR, up to `0xDFFF` (nice_cpu#195), so it grows after
-  that is fixed, and a program at `0x8000` then gets that much less.
+  leave no room for the stack above the RAM that nice_cpu's demo
+  tested on the Nexys4DDR, up to `0xDFFF`. From nice_cpu's `V2.4` on,
+  the demo tests up to `0xCFFF` (nice_cpu#195), so BASIC's RAM can
+  grow, and a program at `0x8000` then gets that much less.
   The pointer to the end of the names and the variables is one of
   BASIC's own words there.
 - The monitor has the size of BASIC's RAM too, in SP at `mon_reset`
