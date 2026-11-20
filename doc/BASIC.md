@@ -290,8 +290,10 @@ a double, IEEE 754 binary64, on the FPU ([The FPU](#the-fpu)).
 - A program never sees an infinity or a NaN: a division by zero, an
   overflow, and a function of an argument that it does not take are
   errors. The FPU flags `LOG(0)` and 0 to a negative power as a
-  division by zero, a pole, so they are `Division by zero`. A result too small for a double goes to 0 by steps, with no
-  error.
+  division by zero, a pole, so they are `Division by zero`, as `1/0`
+  is, though the C64 says `ILLEGAL QUANTITY` for `LOG(0)` (decided
+  2026-11-20: one rule, the FPU's, for every pole). A result too
+  small for a double goes to 0 by steps, with no error.
 - `PRINT` shows a number with the FPU's `DIGITS 15`, its trailing
   zeros dropped, as C's `%.15G` does: in fixed notation while the
   exponent is -4 to 14, with a 0 before the point, and in E notation
