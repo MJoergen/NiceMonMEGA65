@@ -91,6 +91,11 @@ or, in an existing clone:
 - `make sdtest` checks `tools/sdcard.py` and `tools/sdnbd.py` on
   `niceemu --link` with images of a card, without a board (see [The
   tools and niceemu](#the-tools-and-niceemu)).
+- `make ecma55` runs the ECMA-55 conformance suite on BASIC in
+  `niceemu`, and compares each program's outcome with
+  `basic/test/ecma55.expected`. It fetches bas55's programs the first
+  time, so CI does not run it (see
+  [basic/README.md](basic/README.md#testing)).
 - `make cosim` runs the system in GHDL for the tools, and `make cosimtest`
   checks the tools and the RTL on it, without a board (see [The simulated
   board](#the-simulated-board)).

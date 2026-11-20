@@ -556,6 +556,18 @@ the default. It runs these steps in order:
    counter, read by `PEEK` before and after `RUN`, less those of an
    empty program. `make -C basic bench` prints them as the rows of the
    table in [doc/BASIC.md](../doc/BASIC.md#the-benchmarks).
+
+`make -C basic ecma55`, or `make ecma55` at the top, runs the ECMA-55
+conformance suite, NBS SP 500-70, apart from `make test`, as it needs
+the network once. `test/ecma55.py` fetches bas55 2.0's 208 programs
+into `build/ecma55` the first time, and checks the tarball's SHA-256.
+It types each program after a `NEW`, runs it, and writes one line of
+`build/ecma55.out` for it: `same`, when the output is bas55's but for
+blanks and the digits of numbers, `differs`, `failed`, when it printed
+its own `TEST FAILED`, `error:` and BASIC's error, `refused:` and a
+line that BASIC did not take, or `noend`, when it waits for `INPUT`,
+with `; bas55 stops` after it when bas55 reports an error. It compares
+the lines with `test/ecma55.expected`, and prints those that changed.
 8. **The runs.** The ROM runs once for each test below, with its
    keystrokes from an input file that ends with `HALT`, so that the run
    halts. Each run's console output, a few memory words, and the screen

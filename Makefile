@@ -17,7 +17,7 @@ EMU     = nice_cpu/emulator/zig-out/bin/niceemu
 ROOT    = .
 include rom.mk
 
-.PHONY: help test formal lint typecheck diagrams romsize examples demo rom r3 r6 nexys4ddr cor bump release load run mon sdcard sdnbd flash hwtest linktest sdtest tftpd tftptest tcptest weathertest cosim cosimtest clean
+.PHONY: help test formal lint typecheck diagrams romsize examples demo rom r3 r6 nexys4ddr cor bump release load run mon sdcard sdnbd flash hwtest linktest sdtest ecma55 tftpd tftptest tcptest weathertest cosim cosimtest clean
 
 # Every target but these needs the nice_cpu submodule
 ifeq ($(wildcard nice_cpu/hdl/src/nice_pkg.vhd),)
@@ -106,6 +106,9 @@ help:
 	@echo "                  mon.py's check of the memory, without a board"
 	@echo "  make sdtest     check tools/sdcard.py and tools/sdnbd.py on niceemu --link"
 	@echo "                  with images of a card, without a board"
+	@echo "  make ecma55     run the ECMA-55 conformance suite on BASIC in niceemu, and"
+	@echo "                  compare each program's outcome with basic/test/ecma55.expected;"
+	@echo "                  fetches bas55 2.0's programs the first time"
 	@echo "  make tftpd [TFTP_DIR=examples/build] [TFTP_PORT=69]"
 	@echo "                  serve the files of TFTP_DIR to BASIC's LOAD and DIR, with"
 	@echo "                  listings for DIR \"IP\", \"*.BIN\" (port 69 needs root)"
@@ -313,6 +316,10 @@ tcptest: $(EMU) build/rom_test.bin
 	$(MAKE) -C monitor build/tcp.bin build/tcpt.bin build/tcp_c.bin \
 	  build/tcphw.bin
 	$(PYTHON) tools/tcptest.py
+
+# The ECMA-55 conformance suite on BASIC in niceemu (basic/Makefile)
+ecma55: $(EMU) build/rom_test.bin
+	$(MAKE) -C basic ecma55
 
 weathertest: $(EMU) build/rom_test.bin
 	$(MAKE) -C examples build/weather.bin test

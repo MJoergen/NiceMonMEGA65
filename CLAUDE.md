@@ -83,6 +83,7 @@ header is the authoritative address map.
     make sdcard CMD=ls    # the board's SD card over the link: ls, get NAME [DEST], put SRC [NAME], del NAME, mkdir, --slot N format (ETH= or PORT=)
     make sdnbd            # the board's SD card as a disk over NBD, for nbd-client and a mount on Linux; holds the core until Ctrl-C (ETH= or PORT=)
     make sdtest           # sdcard.py and sdnbd.py on niceemu --link with images that mtools made, no board
+    make ecma55           # the ECMA-55 suite (bas55 2.0's programs, fetched once) on BASIC in niceemu, against basic/test/ecma55.expected
     make cosim            # the RTL in GHDL, its debug UART on TCP, for the tools' --cosim PORT
     make cosimtest        # run.py --cosim on make cosim against plain niceemu, no board (two to four hours on each core in CI)
 
@@ -210,7 +211,8 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   `basic_edit.nasm`, and the strings of stage 5 (#116), with
   `DATA`, `READ`, and `TIME$`, in `basic_str.nasm`), on the entries of the dispatch table alone, as a
   program is, with its tests of the statements in `basic/test/`, its
-  benchmarks in `basic/bench/`, and
+  benchmarks in `basic/bench/`, the ECMA-55 suite's runner,
+  `basic/test/ecma55.py`, and
   `basic/README.md`, its build and its tests.
   `monitor/`: the monitor for the ROM in NICE assembly (`monitor.nasm`,
   the dispatch table, the HAL, and the map of its RAM, the sector

@@ -37,7 +37,7 @@ MON_TEST = $(MON)/test
 FOLDER_TEXTS = ($(call PACKED,E_FS29,no folder $(FOLDER_UC) on the card); \
   $(call PACKED,S_DIROF,Directory of $(FOLDER_UC)))
 
-.PHONY: all test bench fmt clean
+.PHONY: all test bench ecma55 fmt clean
 
 all: $(BUILD)/basic.rom
 
@@ -377,6 +377,14 @@ BENCH = bench/bm1.bas bench/bm2.bas bench/bm3.bas bench/bm4.bas bench/bm5.bas \
 
 bench: $(ROM_TEST)
 	@$(PYTHON) test/bench.py --table $(EMU) $(ROM_TEST) $(BENCH)
+
+# The ECMA-55 conformance suite, NBS SP 500-70 (doc/BASIC.md, "Tests"):
+# bas55 2.0's 208 programs, fetched into $(BUILD)/ecma55 the first time,
+# each typed and run, and its outcome compared with test/ecma55.expected.
+# It needs the network once, so make test does not run it.
+ecma55: $(ROM_TEST)
+	@$(PYTHON) test/ecma55.py $(EMU) $(ROM_TEST) $(BUILD)/ecma55 test/ecma55.expected \
+	  $(BUILD)/ecma55.out
 
 # Each test runs the ROM with its input, and compares the console output,
 # the dumps, and the screen with test/NAME.expected. The Halted line and

@@ -868,8 +868,9 @@ about a minute (#122).
   strings longer than ECMA-55's 18 characters, empty items of `DATA`,
   and characters that ECMA-55 does not allow in an item without
   quotes. The run found one bug of stage 5, a number in quotes that
-  `READ` took, which is fixed. The suite is not in the repository and
-  has no target of its own yet.
+  `READ` took, which is fixed. `make ecma55` runs the suite, and
+  compares each program's outcome with `basic/test/ecma55.expected`
+  ([basic/README.md](../basic/README.md#testing)).
 - The functions against Python's doubles on the host, bit for bit:
   `basic/test/functions.py` writes an argument's bits with `POKE`
   and reads the result's with `PEEK`, which must be within the 1 ulp
