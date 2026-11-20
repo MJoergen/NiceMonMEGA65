@@ -638,27 +638,51 @@ functions.
 ### The screen editor
 
 The Commodore editor of #54, in assembly, in place of the monitor's
-`con_getline`, entry 32:
+`con_getline`, entry 32. The points below were settled on 2026-11-20.
 
 - The cursor keys move over the screen, and RETURN takes the logical
-  line, up to two rows, 160 characters, from the screen.
-- A word of 25 bits says which rows go on from the row above.
-  `mon_putc` shifts it when the screen scrolls. That changes the
-  monitor, and `V2.3.1` does not have it, so the editor comes in a
-  release with a bitstream
+  line from the screen: up to four rows, of which it takes at most
+  254 characters, as `LOAD` does. Two rows would not do, as `LIST`
+  writes `?` as `PRINT`, so a line typed at 160 characters may list
+  longer, and could not be entered again.
+- A word of 25 bits says which rows go on from the row above. The
+  monitor keeps it, as `mon_putc` changes it:
+  - Past column 79, `mon_putc` sets the bit of the next row, so the
+    text that `PRINT` wraps is a logical line too, as on the C64.
+  - A LF clears the bit of the next row, and `scr_cls` clears the
+    word.
+  - When the screen scrolls, the word shifts with it.
+
+  BASIC reads and writes the word through a new entry, `scr_links`,
+  as #152 has BASIC on the entries alone. That changes the monitor,
+  and `V2.3.1` does not have it, so the editor comes in a release
+  with a bitstream
   ([What the stages need of the monitor](#the-later-stages)).
 - The keys come through `con_key`, the history through `scr_back`,
   and TAB through `fs_complete`, as the line of stage 3 has them.
 - Typing inserts, and DEL deletes to the left and closes the gap, so
-  the editor needs no INST key and has no quote mode.
+  the editor needs no INST key and has no quote mode. When a line
+  grows into the next row and that row holds a line of its own, the
+  editor inserts a blank row there and moves the rows below down,
+  with their bits, as the C64 does.
 - The cursor keys up and down scroll the history today, before the
   first key of a line. The editor takes them, and the history keeps
   Page Up and Page Down.
-- A line is checked when it is entered, and the cursor is put at the
-  error, as #54 says.
-- A host on the line sees what the screen is given, but not the
-  cursor's moves. A host pastes lines and reads `LIST`, which needs
-  neither.
+- A line is checked when it is entered, as far as the tokenizer
+  checks it. On an error the line is not stored, and the cursor goes
+  back to the line on the screen, at the column where the tokenizer
+  stopped. The errors that only a parse of the statement finds stay
+  errors at `RUN`, until stage 9.
+- `DELETE` takes a string, a file, or a range of lines, such as
+  `DELETE 10-50`, so the two share the keyword.
+- `RENUMBER` changes the targets that are numbers in the line, which
+  all of them are but those of `GOTO` and `GOSUB` of an expression.
+  It leaves those, and the README says so.
+- A host on the line sees what is typed at the end of a line, as
+  today. After a move of the cursor, RETURN sends the line it takes,
+  and the redraws go to the screen alone, so that a host's transcript
+  stays readable. A host pastes lines and reads `LIST`, which needs
+  none of the editor.
 
 ## Assembly
 
@@ -899,7 +923,8 @@ after a load whether a word went below the top.
 These were looked at, and not checked as the stages 2 and 3 were:
 
 - **Stage 7, the editor**, changes the monitor as it is designed:
-  `mon_putc` shifts the word of the rows that go on
+  `mon_putc` and `scr_cls` keep the word of the rows that go on, and
+  the entry `scr_links` gives it to BASIC
   ([The screen editor](#the-screen-editor)). `V2.3.1` does not have
   that (decided on 2026-11-18), so the editor comes in a release with
   a bitstream, `V2.4` (decided on 2026-11-20). It uses the three
