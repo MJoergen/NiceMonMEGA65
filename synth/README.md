@@ -325,24 +325,31 @@ These are the worst setup and hold slacks, in ns:
 
 | Build | Clock | Setup | Hold |
 |---|---|---|---|
-| R6, pipelined | 100 MHz | 0.076 | 0.036 |
+| R6, pipelined | 100 MHz | 0.100 | 0.046 |
 | R6, `NICE=multi` | 100 MHz | 0.187 | 0.075 |
-| R3, pipelined | 100 MHz | 0.120 | 0.036 |
-| Nexys4DDR, pipelined | 90 MHz | 0.017 | 0.031 |
+| R3, pipelined | 100 MHz | 0.178 | 0.048 |
+| Nexys4DDR, pipelined | 90 MHz | 0.077 | 0.022 |
 | Nexys4DDR, `NICE=multi` | 90 MHz | 0.186 | 0.019 |
 
-The pipelined builds are those of 2026-11-15, with the FPU (issue #136)
-and `FLOW=timing`; the multi-cycle ones are older and have no FPU. The pipelined core meets its clock on
+The pipelined builds are those of 2026-11-20, with nice_cpu V2.4,
+BASIC's part of the ROM from `0x3000`, and `FLOW=timing`; the
+multi-cycle ones are older and have no FPU. The pipelined core meets its clock on
 every board with `FLOW=timing` only, and the R6 and the Nexys4DDR with
 little to spare. In the default flow, the R6 misses by about 0.15 ns
 inside the core, in the check of a store into fetched code (issue #107).
 
-The R6's worst path is inside the core, from WRITE's register file to
-PREPARE, and the paths into the core have 0.117 ns. Before
-it, the RAM's cascaded block RAMs made the read data of the RAM into
+The R6's worst path is out of the core, from FETCH's request to the
+RAM's enable, and the paths into the core have 0.335 ns. Before
+issue #107, the RAM's cascaded block RAMs made the read data of the RAM into
 WRITE's register file the worst path of the R6. The R3's worst path is
-from the core's stores to the RAM's write enable, and so is the
-Nexys4DDR's, whose RAM of 64K words never had the cascade. With
+from the core's stores to the timer's register of the interrupt
+vector, and its paths into the core have 0.428 ns. The Nexys4DDR's
+worst path is inside the core, in FETCH; its paths out of the core
+have 0.151 ns, to that register of the timer too, and those into it
+0.234 ns. A write to BASIC's part of the ROM, which only the MEGA65
+has, is far from the limit: the paths to the ROM's write enables and
+to its lock have at least 2.098 ns on the R6 and 2.306 ns on the R3,
+with the part's start a comparison of the address with `G_ROM_BASIC`. With
 the watchpoints and the clock, the R6 missed by 0.404 ns while
 `devices.vhd` picked its read data with a chain of multiplexers; it
 picks it with one AND-OR now, as `nicemon.vhd` does. The FPU's own
