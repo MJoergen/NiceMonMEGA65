@@ -1,34 +1,34 @@
 {
-  "nice_cpu_tag": "V2.3",
-  "nice_cpu_commit": "9b5d9486a4f4ddea72848f3b5df5634088aea37b",
-  "repo_commit": "5e2a6981b7864ca7ce994ec32c8b1020db5d06b5",
+  "nice_cpu_tag": "V2.4",
+  "nice_cpu_commit": "292fb414c74916b9e1ae6c5f4bb3fa9191e7810c",
+  "repo_commit": "68c7a64dfa48f6c252bd7120efc0ae01de45711d",
   "vivado": "Vivado v2025.1",
   "board": "MEGA65 R6",
   "part": "xc7a200tfbg484-2",
   "clock_mhz": 100.0,
   "flow": "timing",
   "met": true,
-  "wns_ns": 0.116,
+  "wns_ns": 0.353,
   "tns_ns": 0.0,
-  "whs_ns": 0.086,
+  "whs_ns": 0.04,
   "ths_ns": 0.0,
   "wpws_ns": 0.259,
   "tpws_ns": 0.0,
   "core_in": {
-    "slack_ns": 0.181,
-    "from": "i_mega65/i_system/i_nicemon/i_devices/gen_sd.i_sd/i_sd_regs/gen_lanes[1].lane_ram_reg/CLKARDCLK",
-    "to": "i_mega65/i_system/i_nicemon/i_core/i_core/i_pipe_write/w_r_reg[regs][15][12]/D"
+    "slack_ns": 0.496,
+    "from": "i_mega65/i_system/i_nicemon/i_devices/gen_sd.i_sd/i_sd_regs/gen_lanes[3].lane_ram_reg/CLKARDCLK",
+    "to": "i_mega65/i_system/i_nicemon/i_core/i_core/i_pipe_write/w_r_reg[regs][12][26]/D"
   },
   "core_out": {
-    "slack_ns": 0.12,
-    "from": "i_mega65/i_system/i_nicemon/i_core/i_core/i_pipe_dbus/tag_cnt_r_reg[2]/C",
-    "to": "i_mega65/i_system/i_nicemon/i_devices/i_timer/count_r_reg[22]/D"
+    "slack_ns": 0.353,
+    "from": "i_mega65/i_system/i_nicemon/i_core/i_core/i_pipe_write/w_r_reg[mode][1]/C",
+    "to": "i_mega65/i_system/i_nicemon/i_devices/i_perf/count_r_reg[6][60]/CE"
   },
   "attempts": [
     {
       "flow": "timing",
-      "wns_ns": 0.116,
-      "whs_ns": 0.086,
+      "wns_ns": 0.353,
+      "whs_ns": 0.04,
       "wpws_ns": 0.259,
       "met": true
     }
@@ -38,33 +38,40 @@
     "board": "Nexys4DDR",
     "part": "xc7a100tcsg324-1",
     "clock_mhz": 90.0,
-    "flow": "default",
+    "flow": "timing",
     "met": true,
-    "wns_ns": 0.026,
+    "wns_ns": 0.072,
     "tns_ns": 0.0,
-    "whs_ns": 0.028,
+    "whs_ns": 0.02,
     "ths_ns": 0.0,
     "wpws_ns": 3.0,
     "tpws_ns": 0.0,
     "core_in": {
-      "slack_ns": 0.335,
-      "from": "i_system/i_nicemon/i_mem/i_ram/mem_odd_reg_3_0_3/CLKARDCLK",
-      "to": "i_system/i_nicemon/i_core/i_core/i_pipe_write/w_r_reg[regs][14][25]/D"
+      "slack_ns": 0.162,
+      "from": "i_system/i_nicemon/i_mem/i_ram/mem_odd_reg_3_0_5/CLKARDCLK",
+      "to": "i_system/i_nicemon/i_core/i_core/i_pipe_write/w_r_reg[regs][14][27]/D"
     },
     "core_out": {
-      "slack_ns": 0.159,
-      "from": "i_system/i_nicemon/i_core/i_core/i_pipe_dbus/st_valid_r_reg/C",
-      "to": "i_system/i_nicemon/i_mem/i_ram/mem_even_reg_0_0_3/WEA[0]"
+      "slack_ns": 0.088,
+      "from": "i_system/i_nicemon/i_core/i_core/i_pipe_fetch/pending_r_reg[2]/C",
+      "to": "i_system/i_nicemon/i_mem/i_ram/mem_odd_reg_1_0_4/WEA[0]"
     },
     "attempts": [
       {
         "flow": "default",
-        "wns_ns": 0.026,
-        "whs_ns": 0.028,
+        "wns_ns": -0.537,
+        "whs_ns": 0.024,
+        "wpws_ns": 3.0,
+        "met": false
+      },
+      {
+        "flow": "timing",
+        "wns_ns": 0.072,
+        "whs_ns": 0.02,
         "wpws_ns": 3.0,
         "met": true
       }
     ]
   },
-  "date": "2026-11-17"
+  "date": "2026-11-20"
 }
