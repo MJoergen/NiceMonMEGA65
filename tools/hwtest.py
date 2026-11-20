@@ -184,6 +184,12 @@ Checks, in this order:
       replies; when no frame at all has come, the board has no Ethernet
       connection, and the summary names the rest after NOT COVERED
       instead of failing
+    - BASIC's SAVE "HWTEST", "IP:PORT", typed over the UART, writes a
+      program of more than 512 bytes to nicemon.py tftpd --write on this
+      computer, whose file must be the program's text, and LOAD reads it
+      back, which LIST must show; BSAVE writes 300 words that a pause
+      wrote, whose file must be their lines, and LOAD reads them back
+      over the words cleared, which a pause must read (issue #155)
     - the link over TCP to that address pauses the monitor and reads the
       address, while the monitor still has it
     - sim/udp.nasm, loaded over TCP, answers a UDP datagram to port 4511
@@ -273,6 +279,14 @@ UDP_PORT = 4511
 # The bytes that monitor/test/tcphw.nasm sends over TCP, and gets back
 TCP_BYTES = 16384
 TCP_LISTEN_PORT = 4600                  # where the board listens in the test of tcp_listen
+# The test of BASIC's SAVE and BSAVE to a TFTP server (issue #155): the
+# lines of the program, of more than 512 bytes in all, so that the file
+# has two blocks, the words of BSAVE at TFTP_ADDR, and the longest that a
+# statement of them takes: ARP and 5 sends of a second for each block
+TFTP_LINES = 10
+TFTP_ADDR = 0x9000
+TFTP_WORDS = 300
+TFTP_TIME = 30.0
 # The port's status, 0 while it is disabled
 ETH_CSR = 0xFFFFFFC0
 # The longest that BASIC's NTP takes: ARP and DNS, 3 sends of
@@ -2695,6 +2709,110 @@ def test_eth_ip(link: Link, rom: str, ip: str) -> list[int] | None:
     return got[1:3]
 
 
+def paused_write(link: Link, addr: int, words: list[int]) -> bool:
+    """words written at addr in a pause of the running core, which then
+    goes on; False if the pause did not come or the link refused."""
+    n = link.pauses
+    link.control(PAUSE | RAM)
+    if not wait_pause(link, n):
+        return False
+    ok = wr_words(link, addr, words)
+    link.control(RAM)
+    return ok
+
+
+def paused_read(link: Link, addr: int, n: int) -> list[int] | None:
+    """n words from addr, read in a pause of the running core, which then
+    goes on; None if the pause did not come."""
+    count = link.pauses
+    link.control(PAUSE | RAM)
+    if not wait_pause(link, count):
+        return None
+    words = link.read(addr, n)
+    link.control(RAM)
+    return words
+
+
+def basic_says(link: Link, cmd: str, timeout: float) -> str:
+    """cmd typed over the UART, and the console's text after its echo up
+    to READY., or the timeout."""
+    text = cmd.encode()
+    link.send_console(text + b"\r")
+    got = console_until(link, lambda t: READY in t.partition(text)[2], timeout)
+    return got.partition(text)[2].decode("latin-1")
+
+
+def test_eth_tftp(link: Link, ip: str, tmp: str) -> None:
+    """BASIC's SAVE and BSAVE to nicemon.py tftpd --write on this
+    computer, typed over the UART into the monitor at READY. with the
+    address ip, and LOAD of their files back (issue #155)."""
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+        probe.connect((ip, 9))
+        mine = probe.getsockname()[0]
+    folder = os.path.join(tmp, "tftp")
+    os.makedirs(folder, exist_ok=True)
+    server = subprocess.Popen(
+        [*NICEMON, "tftpd", "--dir", folder, "--listen", f"{mine}:0", "--write"],
+        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE, text=True)
+    try:
+        assert server.stderr is not None
+        port = int(server.stderr.readline().split()[-1])
+        # The reports of the transfers, which would fill the pipe
+        threading.Thread(target=server.stderr.read, daemon=True).start()
+        srv = f'"{mine}:{port}"'
+        hint = f"; a firewall of this computer may block UDP from {ip}"
+        lines = [f"{10 * (n + 1)} REM {n} NICEMON {'X' * 50}" for n in range(TFTP_LINES)]
+        basic_says(link, "NEW", TFTP_TIME)
+        for line in lines:
+            text = line.encode()
+            link.send_console(text + b"\r")
+            console_until(link, lambda t: text + b"\r\n" in t, 5.0)
+        said = basic_says(link, f'SAVE "HWTEST", {srv}', TFTP_TIME)
+        path = os.path.join(folder, "HWTEST.BAS")
+        got = open(path, "rb").read() if os.path.exists(path) else None
+        want = "".join(f"{line}\n" for line in lines).encode()
+        check(f"eth: BASIC's SAVE writes a program of {len(want)} bytes to "
+              f"nicemon.py tftpd --write at {mine}", got == want,
+              f"{said!r}{hint}" if got is None else f"{got[:80]!r}")
+        basic_says(link, "NEW", TFTP_TIME)
+        said = basic_says(link, f'LOAD "HWTEST", {srv}', TFTP_TIME)
+        listed = basic_says(link, "LIST", TFTP_TIME)
+        rows = [r for r in listed.split("\r\n") if r]
+        check("eth: LOAD reads the program back from the server, and LIST "
+              "shows it", rows[:len(lines)] == lines and READY.decode().strip() in rows,
+              f"{said!r} {listed[-200:]!r}")
+        basic_says(link, "NEW", TFTP_TIME)
+        words = [(0x9E3779B9 * (i + 1)) & 0xFFFFFFFF for i in range(TFTP_WORDS)]
+        if not check("eth: a pause writes the words for BSAVE",
+                     paused_write(link, TFTP_ADDR, words)):
+            return
+        last = TFTP_ADDR + TFTP_WORDS - 1
+        said = basic_says(link, f'BSAVE "HWWORDS", {TFTP_ADDR:#x}, {TFTP_WORDS}, {srv}',
+                          TFTP_TIME)
+        path = os.path.join(folder, "HWWORDS.BIN")
+        got = open(path, "rb").read() if os.path.exists(path) else None
+        want = "".join(f"{TFTP_ADDR + i:08x} {w:08x}\n"
+                       for i, w in enumerate(words)).encode()
+        summary = f"{TFTP_WORDS}, {TFTP_ADDR:08X} to {last:08X}"
+        check(f"eth: BASIC's BSAVE writes {TFTP_WORDS} words, {len(want)} "
+              "bytes, to the server",
+              got == want and f"Words saved: {summary}" in said,
+              f"{said!r}{hint}" if got is None else f"{said!r} {got[:80]!r}")
+        if not check("eth: a pause clears the words",
+                     paused_write(link, TFTP_ADDR, [0] * TFTP_WORDS)):
+            return
+        said = basic_says(link, f'LOAD "HWWORDS.BIN", {srv}', TFTP_TIME)
+        back = paused_read(link, TFTP_ADDR, TFTP_WORDS)
+        check("eth: LOAD reads the words back from the server, which a "
+              "pause reads", f"Words loaded: {summary}" in said and back == words,
+              f"{said!r}" + ("" if back is None else
+                             f", {sum(a != b for a, b in zip(back, words))} words differ"))
+    finally:
+        server.terminate()
+        server.wait()
+
+
 def test_eth_frames(link: Link, udp: str, ip: str) -> None:
     """Loads sim/udp.nasm, which answers one UDP datagram to UDP_PORT
     through the port for Ethernet frames, sends it one, up to three times
@@ -2983,6 +3101,7 @@ def test_eth(port: str, baud: int, eth: str,
             # MAC
             check("eth: the replies counted", replies >= 3, str(replies))
             check("eth: the requests counted", frames >= 3, str(frames))
+            test_eth_tftp(link, ip, tmp)
         finally:
             link.close()
         # The UART's link bytes are dropped while this connection is open

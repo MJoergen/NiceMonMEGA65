@@ -1067,7 +1067,14 @@ get an address from the network's DHCP server on its own, show it after
 the monitor again, and types BASIC's `IP "A.B.C.D"`
 and CR as console bytes over the UART, as a terminal would, and reads
 the address back in a pause. It pings the address and checks the
-station's counts. It pauses the monitor over the link on TCP and reads the address again.
+station's counts. Then it starts `nicemon.py tftpd --write` on this
+computer, and types BASIC's `SAVE "HWTEST", "IP:PORT"` of a program of
+10 lines, 681 bytes, whose file must be the program's text, and `LOAD`
+reads it back, which `LIST` must show. `BSAVE` writes 300 words that a
+pause wrote at `0x9000`, whose file must be their lines, and `LOAD`
+reads them back over the words cleared, which a pause reads (#155).
+A firewall of this computer that blocks UDP from the board fails these
+checks. It pauses the monitor over the link on TCP and reads the address again.
 `sim/udp.nasm`, loaded over TCP, must answer a UDP datagram to port 4511
 through the port for Ethernet frames. Then it runs the programs above,
 and the monitor's, with `nicemon.py run --eth`.

@@ -87,6 +87,9 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 - `basic/test/tftp.py` runs the writes against scripted frames, and
   `make tftptest` against `nicemon.py tftpd --write`, with `curl -T`
   as a standard client of the server.
+- `make hwtest ETH=IP` saves a program and words with `SAVE` and
+  `BSAVE` to `nicemon.py tftpd --write` on this computer, and loads
+  them back.
 
 ## V2.4 (2026-11-20)
 
