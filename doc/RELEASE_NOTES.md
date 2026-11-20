@@ -46,9 +46,19 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   where it was a `Syntax error`.
 - The tokens of the statements from `BSAVE` on changed. A program
   keeps its text on a card, so only a dump of the tokens shows it.
+- `SIN`, `COS`, `TAN`, `ASIN`, `ACOS`, `ATAN`, `LOG`, `LOG2`, `LOG10`,
+  `EXP`, `RND`, and `PI` are keywords, so a program with a variable of
+  one of these names is a `Syntax error` at that line.
 
 **New.**
 
+- BASIC has the functions `SIN`, `COS`, `TAN`, `ASIN`, `ACOS`,
+  `ATAN`, `LOG`, `LOG2`, `LOG10`, and `EXP`, the power `^`, `PI`, and
+  `RND`, on the FPU's functions of nice_cpu's `V2.4`
+  ([#117](https://github.com/MJoergen/NiceMonMEGA65/issues/117),
+  [basic/README.md](../basic/README.md#numbers)). Each is within 1 ulp
+  and gives the same bits on the board as in `niceemu`. `RND(-1)`
+  repeats its numbers, and `RND(0)` takes them from the cycle counter.
 - `sdcard.py format`, and `make sdcard CMD="--slot N format"`, erase
   the card in a slot and write a new FAT32 with the folder `NICE`, with
   no PC slot ([#142](https://github.com/MJoergen/NiceMonMEGA65/issues/142)).

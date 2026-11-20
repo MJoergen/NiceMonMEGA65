@@ -1,6 +1,7 @@
 ; BASIC's numbers (stage 2, issue #113, doc/BASIC.md): the tokenizer of a
-; line, the evaluator of an expression on the FPU, the variables, the
-; errors, and PRINT, LET, and POKE. basic.nasm's main loop tokenizes each
+; line, the evaluator of an expression on the FPU, with the functions of
+; stage 6 (issue #117), the variables, the errors, and PRINT, LET, and
+; POKE. basic.nasm's main loop tokenizes each
 ; line into V_TOK and runs its statements from there, as stage 3 runs a
 ; stored line.
 ;
@@ -21,7 +22,8 @@
 ;   K_OP     an operator on two numbers: its precedence in bits 22..16,
 ;            bit 23 for one that divides, and its FPU command in 15..0
 ;   K_PUNCT  ( ) , ; and :, the character in bits 7..0
-;   K_FN     ABS, SGN, INT, SQR, and PEEK: the FPU command, 0 for PEEK
+;   K_FN     a function: its FPU command, 0 for PEEK, 0x800000 for RND,
+;            and CONST 3 for PI, which takes no argument
 ;   K_NOT    NOT, with its FPU command
 ;   K_KW     a statement: its index in KEYWORDS in bits 15..8, and the
 ;            byte after its keyword, its program of ops, in bits 7..0
@@ -73,7 +75,11 @@ FPU_NEG         .EQU    0x15            ; NEG,
 FPU_NOT         .EQU    0x63            ; NOT,
 FPU_SCALE10     .EQU    0x39            ; SCALE10,
 FPU_DIGITS15    .EQU    0x0F3A          ; DIGITS 15,
-FPU_FROMBCD     .EQU    0x3B            ; and FROMBCD
+FPU_FROMBCD     .EQU    0x3B            ; FROMBCD,
+FPU_SUB         .EQU    0x11            ; SUB,
+FPU_PI          .EQU    0x0330          ; and CONST 3, pi
+CYCLE_LO        .EQU    0xFFFFFF40      ; the cycle counter, bits 31..0
+RND_SEED        .EQU    0x2545F491      ; RND's word at a cold start
 FPU_ZERO        .EQU    0x20000         ; the class of X: zero,
 FPU_NEGATIVE    .EQU    0x10000         ; negative,
 FPU_FITS        .EQU    0x200000        ; and fits a word
@@ -137,6 +143,9 @@ T_DIV           .EQU    K_OP*K+P_DIVIDES+7*P+0x13
 T_IDIV          .EQU    K_OP*K+P_DIVIDES+7*P+0x66
 T_MOD           .EQU    K_OP*K+P_DIVIDES+7*P+0x67
 PREC_SIGN       .EQU    8               ; the signs take what binds more than * and /
+T_POW           .EQU    K_OP*K+9*P+0x4E  ; POW, which binds more than the signs
+T_RND           .EQU    K_FN*K+0x800000
+T_PI            .EQU    K_FN*K+FPU_PI
 T_TAB           .EQU    K_PRT*K
 T_SPC           .EQU    K_PRT*K+1
 T_PRINT         .EQU    K_KW*K+I_PRINT*0x100
@@ -150,6 +159,9 @@ T_STEP          .EQU    K_SEP*K+3
 KW_TOK
                 .DAT    T_AND, T_OR, T_XOR, K_NOT*K+FPU_NOT, T_IDIV, T_MOD
                 .DAT    K_FN*K+0x16, K_FN*K+0x1B, K_FN*K+0x20, K_FN*K+0x14, K_FN*K
+                .DAT    K_FN*K+0x40, K_FN*K+0x41, K_FN*K+0x42, K_FN*K+0x43, K_FN*K+0x44
+                .DAT    K_FN*K+0x45, K_FN*K+0x48, K_FN*K+0x49, K_FN*K+0x4A, K_FN*K+0x4C
+                .DAT    T_RND, T_PI
                 .DAT    T_TAB, T_SPC, T_THEN, T_ELSE, T_TO, T_STEP
 KW_TOK_END
 
@@ -157,7 +169,7 @@ KW_TOK_END
 PUNCTS
                 .DAT    0x2B, T_PLUS, 0x2D, T_MINUS, 0x2A, T_MUL, 0x2F, T_DIV
                 .DAT    0x3D, T_EQ, 0x28, T_LPAR, 0x29, T_RPAR, 0x2C, T_COMMA
-                .DAT    0x3B, T_SEMI, 0x3A, T_COLON, 0x3F, T_PRINT, 0
+                .DAT    0x3B, T_SEMI, 0x3A, T_COLON, 0x3F, T_PRINT, 0x5E, T_POW, 0
 
 ; tokenize: the line at V_LINE as tokens at V_TOK, and R8 at their 0.
 ; tokenize_at: the same, from R5; tokenize_to: from R5 to R8, with the
@@ -799,14 +811,53 @@ rpar
         ?!Z     JMP     err_syntax
                 RET
 p_fn
+                CMP     R1, T_PI
+        ?Z      MOVE    @FPU_CMD, FPU_PI
+        ?Z      RET
                 PUSH    R1
                 CALL    paren
                 POP     R1
+                CMP     R1, T_RND
+        ?Z      JMP     rnd
                 AND[M]  R1, R1, 0xFFFF
         ?!Z     MOVE    @FPU_CMD, R1
         ?!Z     RET
                 CALL    x_word          ; PEEK
                 MOVE    @FPU_X_W, @R1
+                RET
+
+; rnd: RND(X), with X on the FPU's stack. X < 0 seeds the generator with
+; X's bits, so that the same X gives the same numbers after it, and X = 0
+; with the cycle counter; X > 0 leaves it. Then the generator's next
+; word R, a xorshift of 32 bits, as the double 1.R in binary, less 1, so
+; that 0 <= RND < 1 with 32 bits.
+rnd
+                MOVE    R1, @FPU_STATUS
+                XOR     R2, @FPU_X_LO, @FPU_X_HI
+                MOVE    @FPU_CMD, FPU_DROP
+                AND[M]  R0, R1, FPU_ZERO
+        ?!Z     MOVE    R2, @CYCLE_LO
+        ?!Z     JMP     :+
+                AND[M]  R0, R1, FPU_NEGATIVE
+        ?Z      JMP     :++
+:
+                TST     R2
+        ?Z      MOVE    R2, RND_SEED    ; a word of 0 stays 0
+                MOVE    @V_RND, R2
+:
+                MOVE    R2, @V_RND
+                SHL     R3, R2, 13
+                XOR     R2, R2, R3
+                SHR     R3, R2, 17
+                XOR     R2, R2, R3
+                SHL     R3, R2, 5
+                XOR     R2, R2, R3
+                MOVE    @V_RND, R2
+                SHL     @FPU_X_LO, R2, 20  ; a push
+                SHR     R2, R2, 12
+                OR      @FPU_X_HI, R2, 0x3FF00000
+                MOVE    @FPU_X_W, 1
+                MOVE    @FPU_CMD, FPU_SUB
                 RET
 p_not
                 MOVE    R9, PREC_NOT

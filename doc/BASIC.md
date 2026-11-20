@@ -31,7 +31,8 @@ what the stages need of the monitor.
 Made on 2026-11-11, but for the first two, which are of 2026-11-12,
 the names of the statements, which are of 2026-11-15, NICE
 assembly from stage 2 on and the decisions of stage 2, which are of
-2026-11-16, and the last four, which are of 2026-11-18.
+2026-11-16, the four after them, which are of 2026-11-18, and the
+last, which is of 2026-11-20.
 They replace the 32-bit float in software, and the number that is an
 integer until a fraction appears, of the day before
 ([Numbers](#numbers) has why). The first, the third, and the fourth
@@ -88,6 +89,14 @@ settle the three open questions of #54.
   gives the code of a key, or 0, with no wait. The variables follow
   the program, and a name's token holds its offset from their start
   ([The memory](#the-memory)).
+- **Stage 6's functions** are those of [Numbers](#numbers): the FPU's
+  `SIN`, `COS`, `TAN`, `ASIN`, `ACOS`, `ATAN`, `LOG`, `LOG2`,
+  `LOG10`, and `EXP`, and `PI`, where #117 had only V2's, with `ATN`.
+  The inverse functions are named `ASIN`, `ACOS`, and `ATAN`, so there
+  is no `ATN`. `RND` takes its argument as Microsoft's BASIC does, and
+  starts from the same word at each cold start. `^` groups to the
+  left. The ECMA-55 suite, whose programs need `DATA` and strings,
+  waits for stage 5.
 
 ## What it runs on
 
@@ -262,12 +271,26 @@ a double, IEEE 754 binary64, on the FPU ([The FPU](#the-fpu)).
   error, so that it can come with `DIM` if arrays of whole numbers
   need it ([Open questions](#open-questions)). `A$` is a string.
 - `ABS`, `SGN`, `INT`, and `SQR` are the FPU's arithmetic, and `INT`
-  rounds down. `SIN`, `COS`, `TAN`, `ATN`, `LOG`, `EXP`, and `^` are
-  its functions. `^` multiplies when the exponent is whole, so `10^2`
-  is 100 and `(-2)^3` is -8.
+  rounds down. `SIN`, `COS`, `TAN`, `ASIN`, `ACOS`, `ATAN`, `LOG`,
+  `LOG2`, `LOG10`, `EXP`, and `^` are its functions, each one
+  command, and `PI` is its constant. `LOG` is the natural logarithm,
+  as in V2. `^` multiplies when the exponent is whole, so `10^2` is
+  100 and `(-2)^3` is -8, and groups to the left, so `2^3^2` is 64,
+  as in V2, BBC BASIC, and ECMA-55.
+- `SIN`, `COS`, and `TAN` take an argument up to 2^20 · π/2, about
+  1.6 million, as the FPU reduces it by π/2 only that far
+  ([nice_cpu#185](https://github.com/MJoergen/nice_cpu/issues/185)).
+  Beyond it they are an `Illegal quantity`.
+- `RND(X)` is Microsoft's: a positive `X` gives the next number, a
+  negative one seeds the generator with its bits first, so the numbers
+  after `RND(-1)` are the same each time, and 0 seeds it with the
+  cycle counter. The generator starts from the same word at each cold
+  start, as the C64's does, so a test in `niceemu` and a run on the
+  board give the same numbers.
 - A program never sees an infinity or a NaN: a division by zero, an
   overflow, and a function of an argument that it does not take are
-  errors. A result too small for a double goes to 0 by steps, with no
+  errors. The FPU flags `LOG(0)` and 0 to a negative power as a
+  division by zero, a pole, so they are `Division by zero`. A result too small for a double goes to 0 by steps, with no
   error.
 - `PRINT` shows a number with the FPU's `DIGITS 15`, its trailing
   zeros dropped, as C's `%.15G` does: in fixed notation while the
@@ -624,8 +647,10 @@ has no float routines.
   `Illegal quantity`, and division by zero and overflow are errors of
   their own. The stack-fault flag, when more than 16 values pend, is
   `Formula too complex`.
-- **`RND`** is BASIC's own: a generator on words, and its word scaled
-  to below 1.
+- **`RND`** is BASIC's own: a xorshift of 32 bits, whose word R
+  is the double 1.R in binary, written as its two words and pushed,
+  less 1, which is exact. So `RND` has 32 random bits, from 0 to below
+  1, with no division.
 - **The digits** of `PRINT`, `INPUT`, `VAL`, `STR$`, and the constants
   are the FPU's decimal commands, `DIGITS 15`, `FROMBCD`, and
   `SCALE10`, which give the digits of a number and take them.
@@ -745,7 +770,12 @@ about a minute (#122).
   constant comes back from `LIST`, against Python's doubles on the
   host.
 - The programs of the ECMA-55 conformance suite that the language can
-  run (NBS SP 500-70), once the functions and `DATA` are there.
+  run (NBS SP 500-70), from stage 5 on, as they need `DATA` and
+  strings (decided on 2026-11-20).
+- The functions against Python's doubles on the host, bit for bit:
+  `basic/test/functions.py` writes an argument's bits with `POKE`
+  and reads the result's with `PEEK`, which must be within the 1 ulp
+  that nice_cpu's specification gives each function.
 - `make hwtest`: a program typed on the board's line, run, and listed,
   and a file saved and loaded on a card that the test may write.
 
@@ -778,6 +808,14 @@ So a statement takes about 100 to 300 steps: `FOR` and `NEXT` about
 95, `K = K + 1` with its `IF` about 280, and the array's element about
 170. On the R6 a step takes about 2.8 to 3.4 cycles, so a statement
 takes 3 to 10 microseconds, and the sieve 0.38 seconds.
+
+Stage 6 adds Rugg/Feldman 8, `bench/bm8.bas`, the loop of 2 with
+`K^2`, `LOG(K)`, and `SIN(K)`: 719321 steps in `niceemu` (measured
+2026-11-20), about 145 more for each of the three statements than
+for `K = K + 1`. A function is one step in `niceemu`, but up to some
+3000 cycles of the FPU on the board (nice_cpu's DEVICES.md §11.5), so
+its seconds on the R6 count more than its steps say. They are
+measured with stage 6's first `make hwtest` on a board.
 
 ## Stages
 
@@ -835,9 +873,11 @@ Each has an issue, under #54.
 5. **Strings**, #116. `$` variables and arrays, the heap with back
    pointers and its one sweep, the functions of #54 and `HEX$`,
    `INPUT` of strings, `DATA`, `READ`, `RESTORE`, and `TIME$`.
-6. **Functions**, #117. `SIN`, `COS`, `TAN`, `ATN`, `LOG`, `EXP`, and
-   `^`, each a command of the FPU, and `RND`. It is small, and it
-   needs the FPU's functions, which may come after its arithmetic.
+6. **Functions**, #117. `SIN`, `COS`, `TAN`, `ASIN`, `ACOS`, `ATAN`,
+   `LOG`, `LOG2`, `LOG10`, `EXP`, and `^`, each a command of the FPU,
+   `PI`, and `RND`. It is small, and it needs the FPU's functions,
+   which came in nice_cpu's `V2.4`. Written in V2.4, in
+   `basic/basic_expr.nasm`.
 7. **The screen editor**, #118, and `AUTO`, `RENUMBER`, and `DELETE`
    of lines. It depends on stage 3 only, and those who use the board
    on its own need it most, so it may come right after stage 3.
@@ -962,15 +1002,17 @@ in C that the note had before 2026-11-16:
 | 3. Programs, measured | 2545 | 3564 |
 | 4. Files, measured | 459 | 4023 |
 | 5. Strings | 1900 | 5923 |
-| 6. Functions | 200 | 6123 |
-| 7. The editor and its statements, measured | 1071 | 7194 |
-| 8. Structure | 1400 | 8594 |
-| 9. Errors | 400 | 8994 |
-| 10. The machine | 700 | 9694 |
+| 6. Functions, measured | 113 | 6036 |
+| 7. The editor and its statements, measured | 1071 | 7107 |
+| 8. Structure | 1400 | 8507 |
+| 9. Errors | 400 | 8907 |
+| 10. The machine | 700 | 9607 |
 
 Stage 7 is BASIC's image 1021 words larger, from 9496 to 10517, with
 the old line input that it replaced, and the monitor's 50 of
-`scr_links` (measured 2026-11-20).
+`scr_links` (measured 2026-11-20). Stage 6 is 113 words more, from
+10663 to 10776, of which 13 are the keywords' text, and leaves 9704
+free (measured 2026-11-20).
 
 Stage 1 was `basic.c`, 1510 words, and `basic.nasm`, 624, of which 431
 were its packed texts, the help among them, less 1032 words that left

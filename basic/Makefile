@@ -153,15 +153,30 @@ BASIC = vEr\r   ver   \rver,\rver\351\r\351ver\rsys0x8000\rdumpx\rdum\rdis1\ri\r
 # colons. The errors: division by zero by /, DIV, and MOD, an overflow
 # in a computation and in a constant, the Illegal quantity of SQR, of a
 # word operator's operand, and of a shift by -1, and the Syntax errors
-# of expressions and constants, ^ before stage 6, and a string in an
-# expression. A line of 74 signs is too deep for the processor's stack,
+# of expressions and constants, and a string in an expression. A line of 74 signs is too deep for the processor's stack,
 # and 17 operands pending for the FPU's stack, where 16 are not. PEEK
 # and POKE, with a value rounded toward zero and an address of 2^32 -
 # 256, which is no word. DUMP takes expressions. A LOAD that writes no
 # word, here with no card, ends the line, and keeps the variables. After
 # a NEW, a table with a length of 99 at its start is cut there. Last, RAM_WORDS is set so that there
 # is room for four variables, B, E, F, and G, and H is Out of memory.
-EXPR = ? 1+2*3, (1+2)*3, 2*3+1, 10-2-3, 100/10/5\r? -2*3, - 3 + 4, +5, --5, 2*-3\r? 7 DIV 2, -7 DIV 2, 7 MOD -2, -7 MOD 2, 1 << 4, -1 >> 28, 1 << 32\r? 5 AND 3, 5 OR 3, 5 XOR 3, NOT 0, NOT 5 AND 3\r? 1 = 1, 1 <> 1, 1 < 2, 2 <= 1, 3 > 2, 2 >= 3\r? NOT 1 = 2, 1 + 1 = 2 AND 3 < 4, 1 OR 2 XOR 3, 1 << 2 + 1, 2 + 3 < 6\r? ABS(-2.5), SGN(0), SGN(-0.1), INT(2.9), INT(-2.1), SQR(16)\r? 0x1F, 0xFFFFFFFF, 0X7fffffff, 1E3, 1.5E-3, .5, 5., 1e+2\r? 1/3; 2/3; 1E15; 1E14; 123456789012345678; 0.0001; 0.00001; -1E-100\r? -0, 0.1 + 0.2, 4.9E-324, 4.9E-324 / 2, 1.79769313486231E308\r? "A";1;"B", "C"; ""\r? "X";\r? 1,\r? "AB";TAB(5);"C";SPC(3);"D"\r? TAB(0);"E";TAB(1);"F";SPC(0);"G"\r? SPC(256)\r? TAB(-1)\rTotalSum = 5: totalsum = totalsum + 1: ? TOTALSUM\ra1b2c3d4e5f6g7h8 = 16: ? A1B2C3D4E5F6G7H8\ra1b2c3d4e5f6g7h8i = 1\rA%% = 1\rA$$ = "X"\rLET B = 2: ? B\rLET 5 = 2\rLET\rC\rPRINTX\rprint = 1\rand = 1\r? D\rD =\r? D\rX=1:Y=X+1:?Y\r: : ? 1 : : ? 2 :\r? 1/0\r? 0/0\r? 5 MOD 0\r? 5 DIV 0\r? 1E308*10\r? SQR(-1)\r? 1E400\r? 2147483648 AND 1\r? 1 << -1\r? (1\r? 1)\r? 1 +\r? 1..2\r? 1.2.3\r? 1E\r? 0x\r? 0x123456789\r? 12ab\r? 1 ^ 2\r? 1 + "A"\r? 1;2;3;4;5;6 / 0\r?--------------------------------------------------------------------------1\r?1+(2+(3+(4+(5+(6+(7+(8+(9+(1+(2+(3+(4+(5+(6+(7+(8+(9)))))))))))))))))\r?1+(2+(3+(4+(5+(6+(7+(8+(9+(1+(2+(3+(4+(5+(6+(7)))))))))))))))\rPOKE 0x9000, -1: ? PEEK(0x9000), PEEK(0x9000) AND 0xFF\rPOKE 0x9001, 3.9: ? PEEK(0x9001), PEEK(0x9000 + 1)\rPOKE 4294967040, 0\r? PEEK(0xFFFFFF9E)\rDUMP 0x9000 + 0, 1 + 1\rQ = 0x9000: DUMP Q, 2\rA = 1: LOAD "X.BIN": ? A\r? A\rNEW\rPOKE 0x8002, 99: ? B\rB = 7: ? B\rPOKE 0xFFFFFF9E, 0x9E10\rE = 1: F = 2: G = 3\rH = 4\r? B; E; F; G\rhalt\r
+EXPR = ? 1+2*3, (1+2)*3, 2*3+1, 10-2-3, 100/10/5\r? -2*3, - 3 + 4, +5, --5, 2*-3\r? 7 DIV 2, -7 DIV 2, 7 MOD -2, -7 MOD 2, 1 << 4, -1 >> 28, 1 << 32\r? 5 AND 3, 5 OR 3, 5 XOR 3, NOT 0, NOT 5 AND 3\r? 1 = 1, 1 <> 1, 1 < 2, 2 <= 1, 3 > 2, 2 >= 3\r? NOT 1 = 2, 1 + 1 = 2 AND 3 < 4, 1 OR 2 XOR 3, 1 << 2 + 1, 2 + 3 < 6\r? ABS(-2.5), SGN(0), SGN(-0.1), INT(2.9), INT(-2.1), SQR(16)\r? 0x1F, 0xFFFFFFFF, 0X7fffffff, 1E3, 1.5E-3, .5, 5., 1e+2\r? 1/3; 2/3; 1E15; 1E14; 123456789012345678; 0.0001; 0.00001; -1E-100\r? -0, 0.1 + 0.2, 4.9E-324, 4.9E-324 / 2, 1.79769313486231E308\r? "A";1;"B", "C"; ""\r? "X";\r? 1,\r? "AB";TAB(5);"C";SPC(3);"D"\r? TAB(0);"E";TAB(1);"F";SPC(0);"G"\r? SPC(256)\r? TAB(-1)\rTotalSum = 5: totalsum = totalsum + 1: ? TOTALSUM\ra1b2c3d4e5f6g7h8 = 16: ? A1B2C3D4E5F6G7H8\ra1b2c3d4e5f6g7h8i = 1\rA%% = 1\rA$$ = "X"\rLET B = 2: ? B\rLET 5 = 2\rLET\rC\rPRINTX\rprint = 1\rand = 1\r? D\rD =\r? D\rX=1:Y=X+1:?Y\r: : ? 1 : : ? 2 :\r? 1/0\r? 0/0\r? 5 MOD 0\r? 5 DIV 0\r? 1E308*10\r? SQR(-1)\r? 1E400\r? 2147483648 AND 1\r? 1 << -1\r? (1\r? 1)\r? 1 +\r? 1..2\r? 1.2.3\r? 1E\r? 0x\r? 0x123456789\r? 12ab\r? 1 + "A"\r? 1;2;3;4;5;6 / 0\r?--------------------------------------------------------------------------1\r?1+(2+(3+(4+(5+(6+(7+(8+(9+(1+(2+(3+(4+(5+(6+(7+(8+(9)))))))))))))))))\r?1+(2+(3+(4+(5+(6+(7+(8+(9+(1+(2+(3+(4+(5+(6+(7)))))))))))))))\rPOKE 0x9000, -1: ? PEEK(0x9000), PEEK(0x9000) AND 0xFF\rPOKE 0x9001, 3.9: ? PEEK(0x9001), PEEK(0x9000 + 1)\rPOKE 4294967040, 0\r? PEEK(0xFFFFFF9E)\rDUMP 0x9000 + 0, 1 + 1\rQ = 0x9000: DUMP Q, 2\rA = 1: LOAD "X.BIN": ? A\r? A\rNEW\rPOKE 0x8002, 99: ? B\rB = 7: ? B\rPOKE 0xFFFFFF9E, 0x9E10\rE = 1: F = 2: G = 3\rH = 4\r? B; E; F; G\rhalt\r
+# funcs: the functions of stage 6 (issue #117), whose values
+# test/functions.py checks bit for bit. Each function, in upper and in
+# lower case, and PI. ^ binds more than the signs and groups to the
+# left, so -2 ^ 2 is -4 and 2 ^ 3 ^ 2 is 64, and 0 ^ 0 is 1. RND is
+# from 0 to below 1, RND of the same negative number gives the same
+# numbers after it, and the sum of 1000 is about 500. Names that start
+# as LOG2 does, or that end in digits, are variables. LIST of a line
+# with each function, and of the keywords after LOG10 in the table,
+# which a byte below A ends only before a letter. The errors: the Illegal
+# quantity of an argument that a function does not take, SIN of more than
+# 2^20 * PI / 2, and a negative number to a fraction; the Division by
+# zero of LOG(0) and of 0 ^ -1; the Overflow of EXP and ^; EXP(-1000),
+# which is 0; and the Syntax errors of a function without (, PI with
+# one, RND alone, ^ without its operand, and a function's name as a
+# variable.
+FUNCS = ? SIN(0), COS(0), TAN(0), ATAN(1) * 4, PI\r? ASIN(1), ACOS(-1), LOG(EXP(2)), LOG2(1024), LOG10(0.001), EXP(0)\r? log10(100), Log2(0.5), sin(pi), cos(Pi / 3), atan(-1E300)\r? 2 ^ 10, -2 ^ 2, (-2) ^ 3, 2 ^ 3 ^ 2, 2 ^ -1, 2 * 3 ^ 2, 4 ^ 0.5, 0 ^ 0\r? RND(1) >= 0 AND RND(1) < 1, RND(0) < 1, RND(5) >= 0\rA = RND(-7): B = RND(1): C = RND(-7): D = RND(1): ? A = C AND B = D, A <> B\rS = 0: FOR I = 1 TO 1000: S = S + RND(1): NEXT: ? INT(S)\rLOG2X = 3: LOG1 = 4: SIN1 = 5: ? LOG2X + LOG1 + SIN1\r10 A = SIN(PI / 2) + COS(1) * TAN(1) - ATAN(1) ^ 2 + ASIN(0.5) / ACOS(0.5)\r20 B = LOG(2) + LOG2(2) + LOG10(2) - EXP(2) * RND(1) - PI -1 + 2 ^ -A\r30 PRINT TAB(2); SPC(1): IF A THEN 40 ELSE 40\r40 FOR I = 1 TO 2 STEP 1: NEXT\rLIST\rRUN\r? LOG(-1)\r? ASIN(1.5)\r? ACOS(-2)\r? SIN(1E7)\r? TAN(-2E6)\r? (-8) ^ (1 / 3)\r? LOG(0)\r? 0 ^ -1\r? EXP(710)\r? 10 ^ 400\r? EXP(-1000)\r? SIN 1\rA = PI(1)\r? RND\r? 2 ^\rSIN = 1\rLOG10 = 1\rPI = 3\rhalt\r
 # prog: the programs of stage 3 (issue #114), test/prog.bas typed line
 # by line, each line ended with CR. Lines entered out of order, replaced,
 # and deleted, a number glued to its statement, lines 0 and 65535, and
@@ -323,10 +338,10 @@ MAX_STEPS = 10000000
 HEADER_TEST = version 9.9.0+0, layout 1, 42 entries, [0-9]* words, RAM 2048 words, flags 1
 
 # The benchmarks (doc/BASIC.md, "Tests"): Rugg/Feldman 1 to 7 and the
-# sieve, as they are written. make bench prints their steps in niceemu
+# sieve, as they are written, and since stage 6 Rugg/Feldman 8. make bench prints their steps in niceemu
 # as the rows of the table in doc/BASIC.md.
 BENCH = bench/bm1.bas bench/bm2.bas bench/bm3.bas bench/bm4.bas bench/bm5.bas \
-        bench/bm6.bas bench/bm7.bas bench/sieve.bas
+        bench/bm6.bas bench/bm7.bas bench/bm8.bas bench/sieve.bas
 
 bench: $(ROM_TEST)
 	@$(PYTHON) test/bench.py --table $(EMU) $(ROM_TEST) $(BENCH)
@@ -352,6 +367,7 @@ test: fmt $(ROM_TEST) test/prog.bas test/arr.bas test/files.in test/files_card.p
 	then echo "PASS basic header"; else echo "FAIL basic header"; cat $(BUILD)/header.out; exit 1; fi
 	@$(PYTHON) test/dis.py $(EMU) $(ROM_TEST) $(BUILD)/dis.bin
 	@$(PYTHON) test/print_numbers.py $(EMU) $(ROM_TEST)
+	@$(PYTHON) test/functions.py $(EMU) $(ROM_TEST)
 	@$(PYTHON) test/bench.py $(EMU) $(ROM_TEST) $(BENCH)
 	@$(PYTHON) test/ntp.py $(EMU) $(ROM_TEST) test/ntp.expected $(BUILD)/ntp.out
 	@$(PYTHON) test/tftp.py $(EMU) $(ROM_TEST) test/tftp.expected $(BUILD)/tftp.out
@@ -362,6 +378,7 @@ test: fmt $(ROM_TEST) test/prog.bas test/arr.bas test/files.in test/files_card.p
 	@printf '$(CMDS)' > $(BUILD)/cmds.txt
 	@printf '$(BASIC)' > $(BUILD)/basic.txt
 	@printf '$(EXPR)' > $(BUILD)/expr.txt
+	@printf '$(FUNCS)' > $(BUILD)/funcs.txt
 	@printf '$(TIME)' > $(BUILD)/time.txt
 	@tr '\n' '\r' < test/prog.bas > $(BUILD)/prog.txt
 	@tr '\n' '\r' < test/arr.bas > $(BUILD)/arr.txt
@@ -373,13 +390,13 @@ test: fmt $(ROM_TEST) test/prog.bas test/arr.bas test/files.in test/files_card.p
 	@{ printf '$(LOAD_HEAD)'; head -n 3 $(MON)/build/hello.bin | awk '{ printf "%s\r\n", $$0 }'; \
 	  tail -n +4 $(MON)/build/hello.bin; printf '$(LOAD_TAIL)'; } > $(BUILD)/load.txt
 	@fail=0; \
-	for t in cmds basic expr prog keys edit redo lines arr load load_emu load_64k time files; do \
+	for t in cmds basic expr funcs prog keys edit redo lines arr load load_emu load_64k time files; do \
 	  opts=; sd=; base0=; \
 	  case $$t in \
 	    cmds) prog=; dump='$(DUMP_cmds)';; \
 	    basic) prog=; dump='$(DUMP_basic)';; \
 	    expr) prog=; dump='$(DUMP_expr)';; \
-	    prog|keys|edit|lines|arr) prog=; dump=;; \
+	    funcs|prog|keys|edit|lines|arr) prog=; dump=;; \
 	    redo) prog=; dump='$(DUMP_redo)';; \
 	    load) prog=$(BUILD)/ram128k.bin; dump='$(DUMP_load)';; \
 	    load_emu) prog=; dump='$(DUMP_load_emu)';; \

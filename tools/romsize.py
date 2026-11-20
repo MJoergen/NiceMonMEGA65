@@ -45,8 +45,8 @@ ROM_PARTS = {
     "monitor.nasm": "The dispatch table, the HAL, and the cold start",
     "basic.nasm": "The vectors, the header, the main loop, the scanner, the keywords, the messages, "
                   "and the help",
-    "basic_expr.nasm": "The numbers: the tokenizer, the expressions, the variables, the errors, "
-                       "`PRINT`, `LET`, and `POKE`",
+    "basic_expr.nasm": "The numbers: the tokenizer, the expressions, the functions, the "
+                       "variables, the errors, `PRINT`, `LET`, and `POKE`",
     "basic_prog.nasm": "The programs: the lines, `LIST`, `RUN`, the jumps, the loops, the "
                        "break key, `INPUT`, `GET`, the arrays, and `HIMEM`",
     "basic_cmd.nasm": "The routines of the statements that were the commands",

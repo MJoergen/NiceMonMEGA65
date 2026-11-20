@@ -134,6 +134,7 @@ bas_warm
 ; and DIS at 0x8000, and then the main loop
 bas_start
                 CLR     @V_HIMEM        ; the RAM's top
+                MOVE    @V_RND, RND_SEED  ; the same numbers of RND at each cold start
                 CALL    new_prog        ; no program, and no variables
                 CLR     @V_RHEAD        ; no keys typed ahead
                 CLR     @V_EPOS         ; no line to show again
@@ -269,10 +270,11 @@ match
                 CLR     R6
 :
                 MOVE    R4, @R3++
-                CMP     R4, 0x41        ; A
+                CALL    kw_ends
         ?C      JMP     :+
                 AND     R1, @R5++, 0xDF  ; in upper case, for a letter
-                CMP     R1, R4
+                AND     R2, R4, 0xDF    ; and a digit as the text's
+                CMP     R1, R2
         ?!Z     ONE     R6
                 JMP     :-
 :
@@ -282,8 +284,7 @@ match
                 TST     R6
                 RET
 
-; kw_addr: R3 the byte address of the keyword of index R1. Uses R1, R3,
-; and R4.
+; kw_addr: R3 the byte address of the keyword of index R1. Uses R1-R4.
 kw_addr
                 MOVE    R3, TEXT_B+4*OPS+KEYWORDS
 :
@@ -291,10 +292,21 @@ kw_addr
         ?Z      RET
 :
                 MOVE    R4, @R3++
-                CMP     R4, 0x41        ; A
+                CALL    kw_ends
         ?!C     JMP     :-
                 SUB     R1, R1, 1
                 JMP     :--
+
+; kw_ends: C when R4, the byte of a keyword before R3, ends it: a byte
+; below A with a letter after it, the next keyword's first, or the 0
+; after the last. A byte below A with another after it is a digit of the
+; keyword, as in LOG10. Uses R2.
+kw_ends
+                CMP     R4, 0x41        ; A
+        ?!C     RET                     ; a letter
+                SUB     R2, @R3, 1
+                CMP     0x3F, R2        ; the byte after is 0 or from A
+                RET
 
 ; dval: the character R1 as a digit: R2 0 to 9, or 10 to 35 for a letter
 ; in either case, and C; or R2 0xFFFFFFFF, and no C, for any other
@@ -605,7 +617,9 @@ KINDS
 H_KINDS         .EQU    0x40000000+4*KINDS
 
 ; The ops, a letter each, and the keywords, each in upper case and the
-; byte of its program after it. The bits of an op: 0x40, so that it is a
+; byte of its program after it. A keyword may end in digits, as LOG10
+; does, since a byte below A ends it only with a letter or the 0 after it
+; (kw_ends). The bits of an op: 0x40, so that it is a
 ; letter; the kind in bits 2..1, OP_N, OP_S, OP_C, or OP_E; OP_SKIP, and
 ; OP_F. The programs, at the offset in OPS that a keyword's byte less
 ; 0x20 gives:
@@ -641,7 +655,7 @@ OP_SKIP         .EQU    1
 OP_F            .EQU    8
 KEYWORDS        .EQU    38              ; the first keyword's byte in OPS
 OPS
-                .ASCII_B 'FJN@N@EHNHLHNFANFJEJNFJFLCNHNJLHLHFLHNSYS+LOAD5SAVE6BSAVE=DELETE6DIR-IP DHCP"MAC TIME NTP0BAUD#DUMP%DIS%CLS"VER"HELP"HALT"POKE)NEW"CLR"END"STOP"CONT"RETURN"PRINT"LET"RUN"LIST"GOTO"GOSUB"IF"FOR"NEXT"REM"INPUT"GET"DIM"HIMEM"AUTO"RENUMBER"AND"OR"XOR"NOT"DIV"MOD"ABS"SGN"INT"SQR"PEEK"TAB"SPC"THEN"ELSE"TO"STEP"'
+                .ASCII_B 'FJN@N@EHNHLHNFANFJEJNFJFLCNHNJLHLHFLHNSYS+LOAD5SAVE6BSAVE=DELETE6DIR-IP DHCP"MAC TIME NTP0BAUD#DUMP%DIS%CLS"VER"HELP"HALT"POKE)NEW"CLR"END"STOP"CONT"RETURN"PRINT"LET"RUN"LIST"GOTO"GOSUB"IF"FOR"NEXT"REM"INPUT"GET"DIM"HIMEM"AUTO"RENUMBER"AND"OR"XOR"NOT"DIV"MOD"ABS"SGN"INT"SQR"PEEK"SIN"COS"TAN"ASIN"ACOS"ATAN"LOG"LOG2"LOG10"EXP"RND"PI"TAB"SPC"THEN"ELSE"TO"STEP"'
                 .DAT    0
 
 S_HINT          .ASCII_B 'HELP lists the statements'

@@ -164,12 +164,16 @@ exact.
   a digit, or a point right after a constant is a `Syntax error`, and
   one too large for a double an `Overflow`. A constant too small for
   one is 0.
-- **The operators**, from the one that binds most: the signs `-` and
-  `+`; `*`, `/`, `DIV`, and `MOD`; `+` and `-`; `<<` and `>>`; the
-  comparisons `=`, `<>`, `<`, `>`, `<=`, and `>=`; `NOT`; `AND`; and
-  `OR` and `XOR`. Those of one level group to the left, and
-  parentheses group as they do in arithmetic. `/` divides as doubles
-  do, so `PRINT 1/3` prints `0.333333333333333`.
+- **The operators**, from the one that binds most: `^`, the power;
+  the signs `-` and `+`; `*`, `/`, `DIV`, and `MOD`; `+` and `-`; `<<`
+  and `>>`; the comparisons `=`, `<>`, `<`, `>`, `<=`, and `>=`; `NOT`;
+  `AND`; and `OR` and `XOR`. Those of one level group to the left, and
+  parentheses group as they do in arithmetic. So `-2^2` is -4, and
+  `2^3^2` is 64. `/` divides as doubles do, so `PRINT 1/3` prints
+  `0.333333333333333`.
+- **`^`** multiplies when the power is a whole number, so `10^2` is
+  100 and `(-2)^3` is -8. A negative number to a power that is not
+  whole is an `Illegal quantity`, and `0^0` is 1.
 - **The word operators**, `DIV`, `MOD`, `AND`, `OR`, `XOR`, `NOT`,
   `<<`, and `>>`, take their operands rounded toward zero, and each
   must fit a signed word, or it is an `Illegal quantity`. `DIV` and
@@ -179,7 +183,19 @@ exact.
   `AND`, and `OR` join comparisons, as in `A > 0 AND A < 10`.
 - **The functions** are `ABS(X)`, `SGN(X)`, -1, 0, or 1, `INT(X)`,
   rounded down, so `INT(-2.5)` is -3, `SQR(X)`, the square root, and
-  `PEEK(A)`, the word at the address `A`, as a signed word.
+  `PEEK(A)`, the word at the address `A`, as a signed word. Then the
+  FPU's: `SIN(X)`, `COS(X)`, and `TAN(X)` of `X` in radians, up to
+  about 1.6 million, 2^20 times π/2; `ASIN(X)` and `ACOS(X)` of `X`
+  from -1 to 1, and `ATAN(X)`; `LOG(X)`, the natural logarithm, and
+  `LOG2(X)` and `LOG10(X)`; and `EXP(X)`, e to the power `X`. Each is
+  within 1 unit of the last place of the double, and gives the same
+  bits on the board as in `niceemu`. `PI` is π, with no parentheses.
+- **`RND(X)`** is a random number from 0 to below 1, with 32 random
+  bits. `RND` of a positive `X` gives the next number. A negative `X`
+  starts the numbers again from `X`, so `RND(-1)` and the numbers after
+  it are the same each time, and `RND(0)` starts them from the cycle
+  counter, so they differ from run to run. After a cold start they are
+  the same each time.
 - **A variable** has a name of up to 16 letters and digits, the first
   a letter, every one significant, in either case, so `Total` and
   `TOTAL` are one variable. A keyword is no name, but a name may start
@@ -202,9 +218,11 @@ exact.
   after a number.
 
 An expression's errors are `Division by zero`, of `/`, `DIV`, and
-`MOD`; `Overflow`, a result too large for a double; `Illegal
-quantity`, such as `SQR(-1)` or a word operator's operand that does
-not fit; and `Formula too complex`, more than 16 values that wait for
+`MOD`, `LOG(0)`, and 0 to a negative power; `Overflow`, a result too
+large for a double, such as `EXP(710)`; `Illegal quantity`, a number
+that a function does not take, such as `SQR(-1)`, `LOG(-1)`,
+`ASIN(2)`, `SIN(1E7)`, or a word operator's operand that does not
+fit; and `Formula too complex`, more than 16 values that wait for
 the FPU, or parentheses and signs nested too deep for the stack. A
 program never sees an infinity or a NaN.
 
@@ -434,7 +452,16 @@ the default. It runs these steps in order:
    ([nice_cpu#200](https://github.com/MJoergen/nice_cpu/issues/200)).
    What `PRINT` shows must be Python's double of the number, as
    `%.15G` writes it, digit for digit.
-4. **NTP.** `test/ntp.py` types `NTP` and `DHCP` with `--step-time`,
+4. **The functions.** `test/functions.py` writes the bits of `X`, and
+   of `Y`, with `POKE`, computes `A = SIN(X)` or `A = X^Y`, and reads
+   `A`'s two words with `PEEK`, for 431 cases from a fixed seed: each
+   function, of numbers in the range it takes, and `^` of positive
+   numbers, of negative ones to whole powers, and whole powers, which
+   are exact. Each must be within 1 ulp of Python's, as nice_cpu's
+   FPU is within 1 ulp of the exact value. `PI` must be Python's
+   `math.pi`, and `RND` the numbers of a model of its generator, bit
+   for bit, after the cold start and after a negative argument.
+5. **NTP.** `test/ntp.py` types `NTP` and `DHCP` with `--step-time`,
    and learns the frames of each run as the monitor's `test/dns.py`
    does, with the frames of DHCP and DNS of the monitor's
    `test/dhcp.py` and `test/dns.py`. DHCP gives the DNS server and an
@@ -453,7 +480,7 @@ the default. It runs these steps in order:
    real-time clock: the master's last command is the cold start's read
    while no time is set, and the write of the chip's status after the
    times of the run.
-5. **TFTP.** `test/tftp.py` runs `LOAD` and `DIR` from a TFTP server
+6. **TFTP.** `test/tftp.py` runs `LOAD` and `DIR` from a TFTP server
    the same way, against `test/tftp.expected`. It covers a file of two
    blocks among packets of other hosts and ports, lost packets, an
    ERROR, an ERROR after the first block, whose summary comes first,
@@ -462,13 +489,13 @@ the default. It runs these steps in order:
    than 77 characters, a port given as `"IP:PORT"`,
    a BASIC program's text, listed and run, one with a line without a
    number, bad arguments, and no answer to ARP.
-6. **The benchmarks.** `test/bench.py` types Rugg/Feldman's
-   benchmarks 1 to 7 and the sieve, in `bench/`, and checks their
+7. **The benchmarks.** `test/bench.py` types Rugg/Feldman's
+   benchmarks 1 to 8 and the sieve, in `bench/`, and checks their
    output. Their steps, which it prints, are those of the instruction
    counter, read by `PEEK` before and after `RUN`, less those of an
    empty program. `make -C basic bench` prints them as the rows of the
    table in [doc/BASIC.md](../doc/BASIC.md#the-benchmarks).
-7. **The runs.** The ROM runs once for each test below, with its
+8. **The runs.** The ROM runs once for each test below, with its
    keystrokes from an input file that ends with `HALT`, so that the run
    halts. Each run's console output, a few memory words, and the screen
    are compared with `test/NAME.expected`:
@@ -478,6 +505,7 @@ the default. It runs these steps in order:
 | `cmds` | The ROM alone | Every statement, its bad arguments, keywords in either case, numbers that do not fit, and the edits of a line. |
 | `basic` | The ROM alone, with no card and no IP address | The scanner of a statement: keywords glued to a letter or a digit, which are names, the HELP lines of each statement's Syntax error, numbers at the limits of a signed word, `0x` without digits, which is no number, a name in a number's place, strings without a closing quote, too few or too many arguments, and the tokens of a line, with the 0 after each string, which `SAVE` leaves as they were. |
 | `expr` | The ROM alone | The numbers: the operators and their order, the word operators, the comparisons, the functions, the constants, `PRINT`'s format and its items, the variables, `LET`, the colons, the errors, the depth of an expression, `PEEK` and `POKE`, a statement with expressions, a `LOAD` that writes no word, a broken table of variables, and `Out of memory`. |
+| `funcs` | The ROM alone | The functions: their values, in either case, `PI`, the order of `^` and the signs, `RND`'s range and its numbers again after a negative argument, names that start with a function's, `LIST` of each function and of the keywords after them, and the errors of an argument a function does not take, `LOG(0)`, an overflow, and a function without its parentheses. |
 | `prog` | The ROM alone, with `test/prog.bas` typed | The lines: their entry, edits, and deletion, the numbers at the limits, `LIST` and its blanks, `RUN`, `NEW`, the variables an edit keeps, the tokens in memory, `FOR` with steps, nested, and once, `GOSUB` in loops, `IF` with `ELSE`, nested, `STOP`, `END`, `CONT`, and the errors in a program, with its line's number. |
 | `edit` | The ROM alone | The screen editor: a listed line changed and entered again, a line that grows into the row below, `INPUT`'s answer after its prompt, DEL in the middle and at the prompt, a line of two rows entered from its first row, CTRL-C, and the cursor key down at the last row. The screen at the end is compared too. |
 | `lines` | The ROM alone | `DELETE` of a range, a line, and up to a line, `RENUMBER` with the jumps forward and back, a target that is no line, the overflow and a step of 0, and `AUTO`, ended by a number alone and by CTRL-C. |
@@ -520,9 +548,9 @@ table, and `make romsize` writes it again.
 <!-- romsize basic -->
 | Source | What it is | Words | Text |
 |---|---|---:|---:|
-| `basic.nasm` | The vectors, the header, the main loop, the scanner, the keywords, the messages, and the help | 1599 | 943 |
-| `basic_expr.nasm` | The numbers: the tokenizer, the expressions, the variables, the errors, `PRINT`, `LET`, and `POKE` | 1556 | 39 |
-| `basic_prog.nasm` | The programs: the lines, `LIST`, `RUN`, the jumps, the loops, the break key, `INPUT`, `GET`, the arrays, and `HIMEM` | 1867 | 46 |
+| `basic.nasm` | The vectors, the header, the main loop, the scanner, the keywords, the messages, and the help | 1629 | 956 |
+| `basic_expr.nasm` | The numbers: the tokenizer, the expressions, the functions, the variables, the errors, `PRINT`, `LET`, and `POKE` | 1631 | 39 |
+| `basic_prog.nasm` | The programs: the lines, `LIST`, `RUN`, the jumps, the loops, the break key, `INPUT`, `GET`, the arrays, and `HIMEM` | 1875 | 46 |
 | `basic_cmd.nasm` | The routines of the statements that were the commands | 1855 | 294 |
 | `basic_net.nasm` | `DHCP`, `NTP`, and TFTP | 917 | 150 |
 | `basic_time.nasm` | `TIME`, and the clock's side of `NTP` | 275 | 44 |
@@ -533,5 +561,5 @@ table, and `make romsize` writes it again.
 | `mon.nasm` | The stubs of the entries | 92 | 0 |
 | `build/basic_folder.nasm` | The texts with the folder's name: `DIR`'s, and the error of a card without it | 14 | 14 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 10663 | 1616 |
+| In all | | 10776 | 1629 |
 <!-- /romsize basic -->

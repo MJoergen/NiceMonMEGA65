@@ -171,10 +171,6 @@ READY.
 Syntax error
 PRINT X; "T", ...   print numbers and strings, ; and , between them; ? is PRINT
 READY.
-? 1 ^ 2
-Syntax error
-PRINT X; "T", ...   print numbers and strings, ; and , between them; ? is PRINT
-READY.
 ? 1 + "A"
 Syntax error
 PRINT X; "T", ...   print numbers and strings, ; and , between them; ? is PRINT

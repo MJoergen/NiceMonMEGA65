@@ -53,6 +53,7 @@ V_POLL          .EQU    0xFFFFED63      ; the statements until the next poll
 V_REDO          .EQU    0xFFFFED64      ; the token after INPUT while INPUT reads, else 0
 V_RING          .EQU    0xFFFFED70      ; the ring, RING words
 V_AEND          .EQU    0xFFFFED65      ; the end of the arrays' data
+V_RND           .EQU    0xFFFFED66      ; the word of RND's generator, never 0
 V_ITOK          .EQU    0xFFFFED91      ; the tokens of INPUT's line, TOK_MAX words, after a 0
 V_LINE          .EQU    0xFFFFEE40      ; the line, EDIT_MAX words and a 0, or LINE_MAX, one over for LOAD, and a 0
 EDIT_MAX        .EQU    254             ; the characters of the screen editor's line, as LOAD's of a program
@@ -689,6 +690,7 @@ lt_go
                 MOVE    R1, @V_LPREV    ; a sign, unless after an operand
                 CMP     R1, T_RPAR
         ?!Z     CMP     R1, T_HIMEM
+        ?!Z     CMP     R1, T_PI
         ?Z      JMP     :+
                 SHR     R1, R1, 24
                 SHR     R1, OPERANDS, R1
@@ -822,9 +824,11 @@ put_kw
                 CALL    kw_addr
                 MOVE    R5, R3
 :
-                MOVE    R1, @R5++
-                CMP     R1, 0x41        ; A
+                MOVE    R4, @R5++
+                MOVE    R3, R5
+                CALL    kw_ends
         ?C      RET
+                MOVE    R1, R4
                 CALL    putc
                 JMP     :-
 lt_sym
@@ -843,7 +847,7 @@ lt_sym
 SYMS
                 .DAT    T_PLUS, 0x2B, T_MINUS, 0x2D, T_MUL, 0x2A, T_DIV, 0x2F, T_EQ, 0x3D
                 .DAT    T_NE, 0x3E3C, T_LT, 0x3C, T_GT, 0x3E, T_LE, 0x3D3C, T_GE, 0x3D3E
-                .DAT    T_SHL, 0x3C3C, T_SHR, 0x3E3E
+                .DAT    T_SHL, 0x3C3C, T_SHR, 0x3E3E, T_POW, 0x5E
 
 ; GET V: V the code of the next key typed ahead, or 0 when there is none,
 ; with no wait
