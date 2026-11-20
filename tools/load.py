@@ -226,9 +226,9 @@ def read_basic(path: str) -> dict[int, int]:
 
 def load_basic(link: Link, image: dict[int, int], keep: bool = True) -> None:
     """Holds the core, clears the memory, and writes the image into BASIC's
-    half of the ROM, shown, with "keep" set, or as it is when keep is False,
-    and 0 in every word of the half that it does not fill, and reads the
-    half back. A bitstream without a ROM, or whose ROM takes no writes, is
+    part of the ROM, shown, with "keep" set, or as it is when keep is False,
+    and 0 in every word of the part that it does not fill, and reads the
+    part back. A bitstream without a ROM, or whose ROM takes no writes, is
     refused. start(link, rom=True) then boots the monitor with it."""
     image = dict(image)
     if keep:

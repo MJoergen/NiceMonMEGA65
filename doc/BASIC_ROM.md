@@ -48,10 +48,12 @@ is left, the R3. V2.4 moves BASIC's part from `0x4000` to `0x3000`
   from `build/rom.bin` at synthesis (`src/rom.vhd`, `src/mem.vhd`). A
   write to it is dropped.
 - Since #152 it holds two images, assembled apart: the monitor's at 0,
-  9590 words, and BASIC's at `BASIC_BASE`, `0x4000`, 5075 words
-  ([monitor/INTERNALS.md](../monitor/INTERNALS.md#the-roms-words)).
-- The monitor knows only BASIC's two vectors, `BAS_COLD` at `0x4000`
-  and `BAS_WARM` at `0x4002`. BASIC calls the monitor only through the
+  and BASIC's at `BASIC_BASE`, `0x3000` since V2.4. In V2.3, with
+  BASIC at `0x4000`, they had 9590 and 5075 words;
+  [monitor/INTERNALS.md](../monitor/INTERNALS.md#the-roms-words) has
+  what they have now.
+- The monitor knows only BASIC's two vectors, `BAS_COLD` at `0x3000`
+  and `BAS_WARM` at `0x3002`. BASIC calls the monitor only through the
   entries of the dispatch table, as a program does: table 1.6, with
   37 entries. Both share the
   layout of the RAM at the top, `STACK`, `BASIC_WORDS`, and `MON_RAM`
@@ -150,7 +152,7 @@ The control register at `0xFFFFFFF0` is the link's, in nice_cpu's
 
 The lock above needs no register at all. A host has the link's own
 path to the ROM ([Over the link](#over-the-link)). Two hide bits, one
-for each half of the ROM, would be a change of nice_cpu's link for
+for each part of the ROM, would be a change of nice_cpu's link for
 later, if ever ([Not included](#not-included)).
 
 ## Why not the first fetch
@@ -357,7 +359,8 @@ the monitor's write of a word back to itself changes nothing in
   once for each configuration.
 - **The monitor's words.** The loader shares `bin_line`'s parse of a
   line with a range of its own, and FAT32's open and read. The guess is
-  300 to 450 words, of the 6794 free below `0x4000`. The new entries
+  300 to 450 words, of the 6794 that V2.3 had free below `0x4000`,
+  where BASIC started then. The new entries
   are on routines that there are.
 
 ## The monitor for later BASICs
@@ -529,7 +532,7 @@ would not fit in the 6890 words that were free
   yet. It needs a loader in the RTL, or a small loader in the ROM that
   copies itself to the RAM first. The header and the checks here would
   serve it too.
-- **A hide bit for each half of the ROM.** It would let a host hide
+- **A hide bit for each part of the ROM.** It would let a host hide
   BASIC's part alone, or the monitor's. It is a change of the control
   register, so of nice_cpu's link, DEBUG.md, and a nice_cpu release.
 - **BOOTP and TFTP at the start.** TFTP is in BASIC now, not in the

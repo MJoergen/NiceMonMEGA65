@@ -1040,8 +1040,9 @@ C, at 7 words a line, the stages 2 and 3 alone were guessed at 8800
 words, so C would have filled the ROM at stage 3. That is why BASIC is
 assembly from stage 2 on.
 
-Since #152 the ROM is two images, and BASIC's is `0x4000`–`0x7FFF`,
-16384 words. Stage 1 fills 5067 of them, with its own copies of
+Since #152 the ROM is two images. Up to V2.3.1 BASIC's was
+`0x4000`–`0x7FFF`, 16384 words, and the figures of the stages 1 to 4
+are of that layout. Stage 1 fills 5067 of them, with its own copies of
 `common.nasm`, `monlib.nasm`, and `mon.nasm`, 593 words, and leaves
 11317 free; the monitor's image is 9542 words, with 6842 free below
 `0x4000` (measured 2026-11-18). Stage 2 fills 1383 words more, 6450,

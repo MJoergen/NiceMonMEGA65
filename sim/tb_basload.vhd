@@ -13,8 +13,8 @@
 -- FAT32, whose first sectors are G_IMAGE_FILE, with NICE/BASIC-T.ROM,
 -- sim/basload.nasm; slot 1 is empty. The loader finds the ROM open, takes
 -- the file, and copies it into BASIC's part, and the cold start locks the
--- half and runs it. Its cold start prints T1, and jumps to 0, the
--- monitor's cold start again. That one must find the half locked, and
+-- part and runs it. Its cold start prints T1, and jumps to 0, the
+-- monitor's cold start again. That one must find the part locked, and
 -- run the same image with no load, which prints T2 and halts. p_uart
 -- collects the console's bytes from the UART. The checks, once the core
 -- has halted:
