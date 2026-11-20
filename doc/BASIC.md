@@ -814,8 +814,9 @@ Stage 6 adds Rugg/Feldman 8, `bench/bm8.bas`, the loop of 2 with
 2026-11-20), about 145 more for each of the three statements than
 for `K = K + 1`. A function is one step in `niceemu`, but up to some
 3000 cycles of the FPU on the board (nice_cpu's DEVICES.md §11.5), so
-its seconds on the R6 count more than its steps say. They are
-measured with stage 6's first `make hwtest` on a board.
+its seconds on the R6 count more than its steps say: 0.0392 on the
+R6 (measured 2026-11-20), twice those of Rugg/Feldman 5 of about as
+many steps, so the three functions take some 650 cycles each.
 
 ## Stages
 
