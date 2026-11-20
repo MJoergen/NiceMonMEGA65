@@ -378,8 +378,10 @@ sets serves both.
   next goes 4 seconds later, and each after it twice as late, up to
   every 64 seconds, plus up to a second more (RFC 2131). The ACK sets
   the address, as `DHCP` does, and BASIC shows it on the empty line
-  after `READY.`, `IP address 192.168.1.253 from DHCP`. An address from
-  `IP`, a program, or a host ends it. A start of
+  after `READY.`, `IP address 192.168.1.253 from DHCP`. A line that has
+  text already, such as the number that `AUTO` types or the prompt of
+  `INPUT`, is left as it is: the address is set, and `IP` shows it. An
+  address from `IP`, a program, or a host ends it. A start of
   the core, such as a host's load, keeps the station's address, so it
   starts no exchange when the board has one.
 - `DHCP` enables the port, broadcasts a DISCOVER, and waits 2 seconds

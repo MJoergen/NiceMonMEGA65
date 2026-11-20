@@ -130,7 +130,9 @@ of [DEVICES.md §7](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.m
   which waits `V_BWAIT` microseconds after it, doubled each time. It
   shares `dhcp_send`, `dhcp_parse`, and `dhcp_commit` with `net_dhcp`.
   An ACK sets the address and keeps the lease, and `bg_show` prints the
-  line on the empty line after `READY.`. `IP`, `net_set`, and `net_dhcp` end it, and so
+  line on the empty line after `READY.`, from the start of the cursor's
+  row, so BASIC's line asks for it, with bit 1 of `con_key`'s flags,
+  only while the cursor's line has no text. `IP`, `net_set`, and `net_dhcp` end it, and so
   does an address that a host writes, as `bg_step` stops when `NET_IP`
   is not 0.
 - **DNS** (issue #111), `dns_lookup`, entry 25, builds its query in
@@ -263,8 +265,8 @@ assembled apart (#152): the monitor's from 0, and BASIC's from
 |---|---|---:|
 | The monitor | `0x0000`–`0x2997` | 10648 |
 | Free | `0x2998`–`0x2FFF` | 1640 |
-| BASIC | `0x3000`–`0x5A1E` | 10783 |
-| Free | `0x5A1F`–`0x7FFF` | 9697 |
+| BASIC | `0x3000`–`0x5A27` | 10792 |
+| Free | `0x5A28`–`0x7FFF` | 9688 |
 <!-- /romsize layout -->
 
 The monitor's words, by the source they come from, in the order

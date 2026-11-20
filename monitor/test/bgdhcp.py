@@ -21,6 +21,10 @@ take. The cases:
   enabled, as
   the lease is kept, and the lease's REQUEST to the server by unicast at
   T1, 5 seconds after the ACK.
+- auto: AUTO typed first, so that the ACK comes while the line has its
+  number, 10, and no key yet: the address is set, and no line of it is
+  shown, as it would go over the number, and the line typed after it
+  would be no line of the program.
 - nak: an OFFER, a NAK of the REQUEST, which sends the next DISCOVER at
   once, and an OFFER and an ACK of another address.
 Each DISCOVER and REQUEST is checked: broadcast, from 0.0.0.0, with the
@@ -163,6 +167,15 @@ def main() -> None:
                   "192.168.1.50",
                   f[:6] == SERVER_MAC and f[26:30] == ip("192.168.1.50")
                   and f[30:34] == ip("192.168.1.1"))
+
+        text, words, frames = run(emu, monitor, 9_000_000, b"AUTO\r", ok_in,
+                                  tmp, "auto")
+        check("auto: the address set while the line has AUTO's number",
+              words == [0xC0A80132, 1], str([f"{w:08X}" for w in words]))
+        check("auto: no line of the address over the number",
+              "from DHCP" not in text
+              and text.split("Stopped at")[0].endswith("AUTO\r\n10 "),
+              repr(text[:200]))
 
         nak_in = "\n".join([
             "1:" + reply(xid, 2, "192.168.1.50", "192.168.1.1"),

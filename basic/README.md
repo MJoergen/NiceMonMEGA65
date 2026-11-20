@@ -559,11 +559,11 @@ table, and `make romsize` writes it again.
 | `basic_net.nasm` | `DHCP`, `NTP`, and TFTP | 917 | 150 |
 | `basic_time.nasm` | `TIME`, and the clock's side of `NTP` | 275 | 44 |
 | `basic_dis.nasm` | The disassembler of `DIS` | 871 | 79 |
-| `basic_edit.nasm` | The screen editor | 1111 | 0 |
+| `basic_edit.nasm` | The screen editor | 1120 | 0 |
 | `common.nasm` | What the monitor and BASIC share: texts, IP addresses, and dates | 237 | 5 |
 | `monlib.nasm` | The routines that programs join | 274 | 0 |
 | `mon.nasm` | The stubs of the entries | 92 | 0 |
 | `build/basic_folder.nasm` | The texts with the folder's name: `DIR`'s, and the error of a card without it | 14 | 14 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 10783 | 1629 |
+| In all | | 10792 | 1629 |
 <!-- /romsize basic -->

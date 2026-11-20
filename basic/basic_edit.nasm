@@ -26,7 +26,11 @@ SCR_LAST        .EQU    0xFFFF0780      ; the screen's row 24, the last
 ; another sequence, or alone, is dropped. A key typed at the end of the
 ; line's text goes to the line as well, as before; after any other key,
 ; or when the line had text after the cursor at the first key, the line
-; is sent again at RETURN, and only the screen shows the moves.
+; is sent again at RETURN, and only the screen shows the moves. While it
+; waits for the first key, the address that DHCP gets in the background
+; is shown, but only in a line with no text: not after AUTO's number,
+; INPUT's prompt, or the line that ed_redo shows again, nor on a row with
+; text from before, which it would go over.
 ; Uses R1-R10.
 getline
                 MOVE    R10, R1         ; INPUT's
@@ -38,9 +42,15 @@ getline
                 MOVE    @V_ECOL, R1
                 CALL    SCR_COLOR
 gl_key
-                MOVE    R1, 1           ; wait,
                 TST     @V_EKEY
-        ?Z      MOVE    R1, 3           ; and show what DHCP gets before a key
+        ?!Z     JMP     :+
+                CALL    ed_ext          ; before the line's first key, and with
+                MOVE    R1, 3           ; no text in the line: wait, and show
+                TST     R6              ; what DHCP gets, which goes over the
+        ?Z      JMP     :++             ; line from its start (con_key)
+:
+                MOVE    R1, 1           ; wait
+:
                 CALL    key
                 TST     @V_EKEY
         ?!Z     JMP     gl_have
