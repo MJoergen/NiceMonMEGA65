@@ -39,7 +39,7 @@ and keep their names.
   - `nicemon-V1.0-r3.cor` and `nicemon-V1.0-r6.cor`, the MEGA65 core
     files for MEGAFLASH, with the version `V1.0`, and the same ROM.
   - `BASIC-V1.0.ROM`, BASIC's image alone, as a file for a card: in
-    the folder `NICE`, a MEGA65 with a core of `V2.3.1` or later loads
+    the folder `NICE`, a MEGA65 with a core of `V2.4` or later loads
     it at power-up, in place of its own BASIC
     ([BASIC_ROM.md](BASIC_ROM.md)). Its version is the tag, and it has
     no flag "keep".

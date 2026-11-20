@@ -55,7 +55,7 @@ There are three ways to use the system:
 1. Download the core file for your board from the latest
    [release](https://github.com/MJoergen/NiceMonMEGA65/releases):
    `nicemon-TAG-r6.cor` for the R6, or `nicemon-TAG-r3.cor` for the R3
-   and R3A, where TAG is the release, such as `V2.3.1`. A core file holds
+   and R3A, where TAG is the release, such as `V2.4`. A core file holds
    its board revision, so use the one for yours.
 2. Copy it to the SD card, and hold No Scroll while you switch the MEGA65
    on. MEGAFLASH, the MEGA65's core menu, appears. Let it write the core
@@ -162,13 +162,13 @@ only the cores of its own layout of the ROM: the files before V2.4
 fit the cores before V2.4, and those from V2.4 on fit the cores from
 V2.4 on. The monitor passes over a file that does not fit, and runs
 the BASIC of its core. Each release has its BASIC as a file of its
-own, such as `BASIC-V2.3.1.ROM`. To use it:
+own, such as `BASIC-V2.4.ROM`. To use it:
 
 1. Copy the file into the folder `NICE` of a card. Older ones may stay
    there, as the monitor takes the highest version.
 2. Switch the board off and on. The monitor loads the file and names
-   it, `BASIC-V2.3.1.ROM from card 0`, before the banner, which shows
-   both versions: `NiceMon V2.3.1, BASIC V2.3.1`.
+   it, `BASIC-V2.4.ROM from card 0`, before the banner, which shows
+   both versions: `NiceMon V2.4, BASIC V2.4`.
 
 The monitor checks the file first. One that fails, such as a file cut
 short, gets a line that says why, and the next highest version is
@@ -178,10 +178,10 @@ is switched on: the reset button and `SYS 0` keep the BASIC that runs.
 
 If a BASIC from a card hangs at its start, take the card out and
 switch the board off and on, so that the core's own BASIC runs. Then put
-the card back, and remove the file with `DELETE "BASIC-V2.3.1.ROM"`.
+the card back, and remove the file with `DELETE "BASIC-V2.4.ROM"`.
 
 Over the network, `tools/load.py --eth 192.168.1.65 --basic
-BASIC-V2.3.1.ROM` puts a BASIC into the ROM at once, until the board is
+BASIC-V2.4.ROM` puts a BASIC into the ROM at once, until the board is
 switched off ([tools/README.md](tools/README.md#loading-basic-into-the-rom)).
 
 A program reads and writes files through the monitor's routines

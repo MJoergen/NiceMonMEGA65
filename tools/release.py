@@ -79,7 +79,7 @@ ROM = os.path.join(REPO, "build", "rom.bin")
 DEMO = os.path.join(REPO, "demo", "build", "demo.bin")
 WEATHER = os.path.join(REPO, "examples", "build", "weather.bin")
 # BASIC's image as a card's file (#153), an asset as BASIC-<tag>.ROM, which
-# the monitor of V2.3.1 and later loads from the folder NICE at power-up
+# the monitor of V2.4 and later loads from the folder NICE at power-up
 BASIC = os.path.join(REPO, "basic", "build", "basic.rom")
 
 
@@ -211,7 +211,7 @@ def notes(tag: str, v: Record, results: dict[str, Record], body: str,
         "",
         "The core files and the bitstreams have the monitor of `monitor/` in",
         "the ROM, whose BASIC shows `READY.` at power-up. `BASIC-%s.ROM` is" % tag,
-        "that BASIC alone, for a MEGA65 with the core of `V2.3.1` or later:",
+        "that BASIC alone, for a MEGA65 with the core of `V2.4` or later:",
         "copied into the folder `NICE` of an SD card, it runs at power-up in",
         "place of the core's own BASIC (README.md, \"A new BASIC\"). `demo.bin` is the",
         "demo of `demo/`, a program for the monitor: copied into the folder",

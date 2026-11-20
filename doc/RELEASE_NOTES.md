@@ -21,7 +21,7 @@ The release candidates pinned these:
 
 nice_cpu's `RC01` and `RC03` have no tag here.
 
-## V2.4 (unreleased)
+## V2.4 (2026-11-20)
 
 **Upgrade notes.**
 

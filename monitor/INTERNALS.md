@@ -299,7 +299,7 @@ ROM is built:
   the version always ends with a `.DAT 0`, as the Makefile does not
   count its characters.
 - The version is that of the tests, `V9.9`, so that the tables do not
-  change with every commit. A release's version, such as `V2.3`, has
+  change with every commit. A release's version, such as `V2.4`, has
   as many words.
 
 ### Keeping the tables
