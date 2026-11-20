@@ -338,6 +338,8 @@ def main() -> None:
             assert server.stderr is not None
             line = server.stderr.readline()
             port = int(line.split()[-1])
+            # The reports of the transfers, which would fill the pipe
+            threading.Thread(target=server.stderr.read, daemon=True).start()
             test_server(port)
             test_monitor(port, tmp)
         finally:

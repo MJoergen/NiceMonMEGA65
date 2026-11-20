@@ -34,6 +34,7 @@ ADBUS0 to ADBUS3. pyftdi takes the interface from the kernel's driver as
 openFPGALoader does.
 """
 
+import os
 import sys
 import time
 
@@ -96,8 +97,9 @@ class Jtag:
         try:
             from pyftdi.ftdi import Ftdi
         except ImportError:
-            sys.exit("spiflash.py: clearing the protection of the MEGA65's "
-                     "flash needs pyftdi; pip install pyftdi")
+            sys.exit(f"{os.path.basename(sys.argv[0])}: clearing the "
+                     "protection of the MEGA65's flash needs pyftdi; pip "
+                     "install pyftdi")
         self.ftdi = Ftdi()
         self.ftdi.open_mpsse_from_url(f"ftdi://ftdi:2232:{serial}/1",
                                       direction=DIRECTION, initial=INITIAL,

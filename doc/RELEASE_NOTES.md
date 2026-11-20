@@ -49,6 +49,20 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   `sdnbd.py`, `flash.py`, and `tftpd.py`, still run and call
   `nicemon.py`. They take the old options too, with a warning that
   names the new one. V2.5 removes them.
+- The subcommands print their errors, warnings, and progress on
+  stderr, after `nicemon.py SUBCOMMAND: `, so stdout carries only the
+  console and the data: `load`'s progress, `sd`'s `put`, `del`,
+  `mkdir`, and `format` reports, and `tftpd`'s transfers among them.
+  `flash` reports without `[PASS]` and `[FAIL]`. The exit status is
+  1 for an error, 2 for one of the command line, 130 after Ctrl-C, and
+  141 when stdout closes early; `run` keeps the program's status
+  ([tools/README.md](../tools/README.md)).
+
+**New.**
+
+- `nicemon.py --version` prints the tags of the repository and of
+  nice_cpu, and `nicemon.py help SUBCOMMAND` a subcommand's help, in
+  which the link's options are a group of their own.
 
 ## V2.4 (2026-11-20)
 

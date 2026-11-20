@@ -23,9 +23,22 @@ import subprocess
 import sys
 import tempfile
 import time
+from typing import Callable, Optional
 
 # The name of the tool, for its messages
 PROG = os.path.basename(sys.argv[0])
+
+
+def hwtest_report(ok: Optional[bool], text: str) -> None:
+    """A line of a check in hwtest's form: [PASS], [FAIL], or with ok
+    None, [NOTE]."""
+    tag = "NOTE" if ok is None else "PASS" if ok else "FAIL"
+    print(f"[{tag}] {text}", flush=True)
+
+
+# How the checks here report: hwtest's form, unless the tool sets its own
+# (nicemon.py flash does)
+report: Callable[[Optional[bool], str], None] = hwtest_report
 
 # The openFPGALoader cables to try: ft2232 for the MEGA65's JTAG adapter,
 # digilent for the Nexys4DDR. Each answers on its own board only.
@@ -97,8 +110,8 @@ def check_flash(port: str, loader: list[str], part: str, bit: str) -> None:
     runs with openFPGALoader's bridge."""
     board = bit_board(bit)
     if board is None:
-        print(f"[NOTE] neither the header nor the path of {bit} names an "
-              f"R3 or R6, so the board revision is not checked", flush=True)
+        report(None, f"neither the header nor the path of {bit} names an "
+               f"R3 or R6, so the board revision is not checked")
         return
     chip = read_flash_chip(loader, part)
     wait_port(port)
@@ -108,9 +121,8 @@ def check_flash(port: str, loader: list[str], part: str, bit: str) -> None:
                  f"known; give --no-board-check to program it anyway")
     has, which = FLASH_BOARDS[chip]
     ok = has == board
-    print(f"[{'PASS' if ok else 'FAIL'}] flash {chip} on {port}: "
-          f"{which}, {os.path.basename(bit)} for the {board.upper()}",
-          flush=True)
+    report(ok, f"flash {chip} on {port}: {which}, "
+           f"{os.path.basename(bit)} for the {board.upper()}")
     if not ok:
         sys.exit(f"{PROG}: {bit} is for the {board.upper()}, but the board "
                  f"on {port} has an {chip}: {which}; give the bitstream "
@@ -186,8 +198,8 @@ def check_part(port: str, part: str,
     port = stable_port(port)
     cable, model = fpga_model(serial)
     ok = f"xc{part}".startswith(model)
-    print(f"[{'PASS' if ok else 'FAIL'}] FPGA {model} on {port} (JTAG "
-          f"{serial}), {os.path.basename(file)} for {part}", flush=True)
+    report(ok, f"FPGA {model} on {port} (JTAG {serial}), "
+           f"{os.path.basename(file)} for {part}")
     if not ok:
         sys.exit(f"{PROG}: {file} is for {part}, but the FPGA on {port} is "
                  f"{model}; give the file for this board, or the --port of "

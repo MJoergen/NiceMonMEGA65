@@ -118,6 +118,7 @@ from boardlink import (DEBUG_FIRST, FULL_WAIT, HALT_REASON, HOLD, RAM, REGS,
                        read_words)
 # After boardlink, which puts nice_cpu's debugger/ on the path
 from nicebin import Symbols
+import cli
 
 INSTR_LO = 0xFFFFFF42
 INSTR_HI = 0xFFFFFF43
@@ -313,7 +314,7 @@ def report_timeout(link: Link, timeout: float, dumps: list[tuple[int, int]],
     lines = [f"Stopped at the time limit after {timeout:g} s"]
     lines += dump_lines(link, dumps, screen, screen_base)
     print("\n".join(lines), flush=True)
-    print("run.py: the core is held in reset", file=sys.stderr)
+    cli.note("the core is held in reset")
     return 3
 
 
@@ -368,7 +369,8 @@ def add_options(parser: argparse.ArgumentParser) -> None:
     """The options of nicemon.py run, for a parser of the class Parser."""
     add_arguments(parser)
     parser.add_argument("--input", default="-", metavar="FILE",
-                        help="read the console's input from FILE, not stdin")
+                        help="read the console's input from FILE (default "
+                        "-, stdin)")
     parser.add_argument("--dump", type=dump_option, action="append",
                         default=[], metavar="ADDR:N",
                         help="after halting, print N memory words from ADDR; "
@@ -405,7 +407,7 @@ def command(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
         # the status of SIGPIPE, as niceemu does, and keep Python from
         # writing to the pipe again at exit
         os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
-        sys.exit(141)
+        sys.exit(cli.EXIT_PIPE)
 
 
 def run_program(parser: argparse.ArgumentParser,
@@ -425,16 +427,17 @@ def run_program(parser: argparse.ArgumentParser,
                          RUN_COMMAND if args.monitor else b"")
         except KeyboardInterrupt:
             link.control(HOLD | (0 if in_rom else RAM))
-            print("\nrun.py: interrupted; the core is held in reset", file=sys.stderr)
-            sys.exit(130)
+            print(file=sys.stderr)
+            cli.note("interrupted; the core is held in reset")
+            sys.exit(cli.EXIT_INTERRUPT)
         if halted:
             status = report(link, args.dump, args.screen, screen_base, symbols)
         else:
             status = report_timeout(link, args.timeout, args.dump, args.screen,
                                     screen_base, 0 if in_rom else RAM)
         if link.overflows:
-            print(f"run.py: the program's input buffer overflowed "
-                  f"{link.overflows} times", file=sys.stderr)
+            cli.warn(f"the program's input buffer overflowed "
+                     f"{link.overflows} times")
     except LinkError as e:
         fail(str(e))
     link.close()

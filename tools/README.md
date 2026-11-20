@@ -27,12 +27,39 @@ and matches nice_cpu's `nicedbg`, `nicelink`, and `nicebin`.
 
 The old names, `tools/load.py`, `run.py`, `mon.py`, `sdcard.py`,
 `sdnbd.py`, `flash.py`, and `tftpd.py`, still run the matching
-subcommand, with the same options, until V2.5 removes them
-([#156](https://github.com/MJoergen/NiceMonMEGA65/issues/156)).
+subcommand until V2.5 removes them
+([#156](https://github.com/MJoergen/NiceMonMEGA65/issues/156)). They
+take the options that V2.4.1 renamed by their old names too, with a
+warning that names the new one.
+
+The subcommands look like one command:
+
+- Errors, warnings, and progress go to stderr, each line after
+  `nicemon.py SUBCOMMAND: `. stdout carries only the console and the
+  data that a subcommand prints: `run`'s output, `sd ls`, and
+  `sd get NAME -`, so it can be piped.
+- The exit status is 0 for success, 1 for an error of the board, the
+  link, or a file, 2 for an error of the command line, 130 after
+  Ctrl-C, and 141 when stdout closes early, as with
+  `nicemon.py sd ls | head`. `run` exits with the program's status
+  instead, and with 1 for an error of the command line, as `niceemu`
+  does (see [Comparing with the emulator](#comparing-with-the-emulator)).
+- `nicemon.py SUBCOMMAND --help`, or `nicemon.py help SUBCOMMAND`,
+  gives the usage, a short description, and the options, each text in
+  lower case with its default in parentheses. The link's options are a
+  group of their own, "the link", with the same text in every
+  subcommand. `mon`'s description is nice_cpu's `nicedbg`'s.
+- `nicemon.py --version` prints the tags of this repository and of
+  nice_cpu, from `git describe`, such as
+  `nicemon.py V2.4.1, nice_cpu V2.4`.
+
+`tools/cli.py` has the messages, the exit codes, and the `--listen`
+option that `nbd` and `tftpd` share.
 
 | Tool | What it does |
 |---|---|
 | `nicemon.py` | The front end, with the subcommands below. |
+| `cli.py` | The messages and exit codes that the subcommands share. |
 | `boardlink.py` | The debug link, which the other tools use: nice_cpu's `debugger/nicelink.py`, over TCP to `niceemu --link` and on the UART, with the board's own links over TCP to its Ethernet port and to `make cosim`. |
 | `load.py` | `nicemon.py load`: loads a `.bin` file into cleared memory and starts it, or with `--hold` leaves the core held in reset. With `--monitor`, it runs a program at `0x8000` under the monitor in the ROM. |
 | `run.py` | `nicemon.py run`: runs a program on the board and prints what `niceemu` prints, for diffing, also one under the monitor with `--monitor`. |
@@ -656,7 +683,8 @@ MEGA65's cards have; a card that is FAT32 from sector 0 mounts as
 `nbd-client` has connected it. `make sdnbd ETH=192.168.1.65` runs the
 server, and `--listen HOST:PORT` moves it.
 
-The core is held from the start until the server ends, with Ctrl-C, and
+The core is held from the start until the server ends, with Ctrl-C,
+which exits with status 130, or SIGTERM, which exits with 0, and
 then starts again from reset, as after `nicemon.py sd put`. The kernel
 keeps the card's FAT and folders in its cache, so a program on the board
 that used the card at the same time would see it stale, and the board
@@ -717,7 +745,7 @@ read-ahead 4 KB, on the disk that `nbd-client` connected.
   files of a folder, the current one by default, to BASIC's `LOAD` and
   `DIR`, on port 69 or another, with a listing for a name with `*` or
   `?`. `--retry-wait SEC` is the wait for an ACK before a block is sent
-  again.
+  again. It reports each transfer on stderr, and Ctrl-C stops it.
   `make tftpd [TFTP_DIR=DIR] [TFTP_PORT=PORT]` serves `examples/build`
   ([monitor/README.md](../monitor/README.md#the-network)).
 - `tools/linktest.py`, `tools/sdtest.py`, `tools/tftptest.py`,

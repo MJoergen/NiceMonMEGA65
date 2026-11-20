@@ -32,7 +32,8 @@ sudo setcap cap_net_bind_service=+ep $(readlink -f $(which python3)).
 Another port, such as --listen 6969, needs none, and BASIC reaches it
 with LOAD "NAME.BIN", "IP:6969". --listen ADDR:PORT listens on one
 address of the host's only. Port 0 picks a free port and prints it on
-stderr, for tests. A line on stdout reports each transfer. Only the
+stderr, for tests. A line on stderr reports each transfer. Ctrl-C
+stops the server, with exit status 130. Only the
 Python standard library is used.
 """
 
@@ -45,6 +46,8 @@ import struct
 import sys
 import threading
 from typing import BinaryIO, Optional, Tuple
+
+import cli
 
 RRQ, WRQ, DATA, ACK, ERROR = 1, 2, 3, 4, 5
 BLOCK = 512
@@ -205,25 +208,19 @@ def serve(client: Addr, packet: bytes, args: argparse.Namespace,
 
 def report(lock: threading.Lock, client: Addr, name: str, what: str) -> None:
     with lock:
-        print(f"{client[0]}:{client[1]} {name}: {what}", flush=True)
+        cli.note(f"{client[0]}:{client[1]} {name}: {what}")
 
 
-DESCRIPTION = __doc__.splitlines()[0]
-
-
-def listen_spec(spec: str) -> Tuple[str, int]:
-    """The address and the port of --listen [ADDR:]PORT; no ADDR is all
-    of the host's addresses."""
-    host, _, port = spec.rpartition(":")
-    if not port.isdigit() or int(port) > 65535:
-        raise argparse.ArgumentTypeError(f"{spec} is not [ADDR:]PORT")
-    return host or "0.0.0.0", int(port)
+DESCRIPTION = ("Serve the files of a folder to BASIC's LOAD and DIR over "
+               "TFTP, with listings.")
 
 
 def add_options(parser: argparse.ArgumentParser) -> None:
     """The options of nicemon.py tftpd."""
-    parser.add_argument("--dir", default=".", help="the folder served (default .)")
-    parser.add_argument("--listen", type=listen_spec, default="0.0.0.0:69",
+    parser.add_argument("--dir", default=".", metavar="DIR",
+                        help="the folder served (default .)")
+    parser.add_argument("--listen", type=cli.listen_type("0.0.0.0"),
+                        default="0.0.0.0:69",
                         metavar="[ADDR:]PORT",
                         help="where the server listens (default %(default)s, "
                         "all addresses; port 0 picks one, printed on stderr)")
@@ -231,23 +228,25 @@ def add_options(parser: argparse.ArgumentParser) -> None:
                         metavar="SEC",
                         help="the seconds to wait for an ACK before a block "
                         "is sent again (default 1)")
-    parser.add_argument("--tries", type=int, default=5,
+    parser.add_argument("--tries", type=int, default=5, metavar="N",
                         help="the sends of a block in all (default 5)")
 
 
 def command(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
     """nicemon.py tftpd, on the options of add_options."""
     if not os.path.isdir(args.dir):
-        sys.exit(f"tftpd.py: no folder {args.dir}")
+        cli.fail(f"no folder {args.dir}")
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         sock.bind(args.listen)
     except PermissionError:
-        sys.exit(f"tftpd.py: port {args.listen[1]} needs root, or the capability of "
-                 "the header (--help); or use --listen 6969 and LOAD \"NAME.BIN\", \"IP:6969\"")
+        cli.fail(f"port {args.listen[1]} needs root, or the capability of "
+                 "the header of tools/tftpd.py; or use --listen 6969 and "
+                 "LOAD \"NAME.BIN\", \"IP:6969\"")
+    except OSError as e:
+        cli.fail(f"{args.listen[0]}:{args.listen[1]}: {e}")
     port = sock.getsockname()[1]
-    print(f"tftpd.py: serving {os.path.abspath(args.dir)} on port {port}",
-          file=sys.stderr, flush=True)
+    cli.note(f"serving {os.path.abspath(args.dir)} on port {port}")
     lock = threading.Lock()
     slots = threading.BoundedSemaphore(MAX_TRANSFERS)
     try:
@@ -259,8 +258,8 @@ def command(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
                 continue
             threading.Thread(target=serve, args=(client, packet, args, lock, slots),
                              daemon=True).start()
-    except KeyboardInterrupt:
-        pass
+    finally:
+        sock.close()
 
 
 if __name__ == "__main__":

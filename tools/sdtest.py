@@ -615,11 +615,11 @@ def test_writes(imgs: dict[str, str], tmp: str) -> None:
             r = emu.tool("put", src, name)
             check(f"put {name}: {len(body)} bytes",
                   r.returncode == 0 and
-                  f"{name}: {len(body)} bytes written" in r.stdout.decode(),
+                  f"{name}: {len(body)} bytes written" in r.stderr.decode(),
                   text(r))
         r = emu.tool("del", "a long FILE name.dat")
         check("del by the long name", r.returncode == 0 and
-              "Deleted A long file name.dat" in r.stdout.decode(), text(r))
+              "deleted A long file name.dat" in r.stderr.decode(), text(r))
         r = emu.tool("del", "frag.bin")
         check("del FRAG.BIN", r.returncode == 0, text(r))
     finally:
@@ -793,10 +793,10 @@ def test_mkdir(imgs: dict[str, str], tmp: str) -> None:
               "the command mkdir" in r.stderr.decode(), text(r))
         r = emu.tool("mkdir")
         check("mkdir", r.returncode == 0 and
-              "Made the folder NICE" in r.stdout.decode(), text(r))
+              "made the folder NICE" in r.stderr.decode(), text(r))
         r = emu.tool("mkdir")
         check("mkdir again: there already", r.returncode == 0 and
-              "The folder NICE is there already" in r.stdout.decode(),
+              "the folder NICE is there already" in r.stderr.decode(),
               text(r))
         r = emu.tool("ls")
         check("ls of the new folder", r.returncode == 0 and
@@ -819,7 +819,7 @@ def test_mkdir(imgs: dict[str, str], tmp: str) -> None:
                   r.returncode == 1 and want in r.stderr.decode(), text(r))
         r = emu.tool("--folder", "lower", "mkdir")
         check("--folder lower mkdir: the folder LOWER", r.returncode == 0 and
-              "Made the folder LOWER" in r.stdout.decode(), text(r))
+              "made the folder LOWER" in r.stderr.decode(), text(r))
     finally:
         emu.close()
     check_card(img, "after mkdir")
@@ -912,12 +912,13 @@ def test_format(imgs: dict[str, str], tmp: str) -> None:
     emu = Emu(img)
     try:
         r = emu.tool("format", "--yes")
-        check("format without --slot: an error", r.returncode == 1 and
+        check("format without --slot: an error of the command line",
+              r.returncode == 2 and
               "format needs --slot" in r.stderr.decode(), text(r))
         r = emu.tool("--slot", "0", "format", typed=b"1\n")
         check("format with the wrong slot typed: not confirmed",
               r.returncode == 1 and "not confirmed" in r.stderr.decode() and
-              "nothing: sector 0 is blank" in r.stdout.decode(), text(r))
+              "nothing: sector 0 is blank" in r.stderr.decode(), text(r))
         r = emu.tool("--slot", "0", "format")
         check("format with nothing typed: not confirmed",
               r.returncode == 1 and "not confirmed" in r.stderr.decode(),
@@ -925,7 +926,7 @@ def test_format(imgs: dict[str, str], tmp: str) -> None:
         unchanged(img, before, "after no confirmation")
         r = emu.tool("--slot", "0", "format", typed=b"0\n")
         check("format with the slot typed", r.returncode == 0 and
-              "Formatted: FAT32 with the folder NICE" in r.stdout.decode(),
+              "formatted: FAT32 with the folder NICE" in r.stderr.decode(),
               text(r))
         r = emu.tool("ls")
         check("ls of the new card", r.returncode == 0 and
@@ -944,8 +945,8 @@ def test_format(imgs: dict[str, str], tmp: str) -> None:
         r = emu.tool("--slot", "0", "format", "--yes")
         check("format without --force: refused", r.returncode == 1 and
               "give --force" in r.stderr.decode() and
-              "partition 1: type 0x0c, FAT32" in r.stdout.decode() and
-              "label NICE" in r.stdout.decode(), text(r))
+              "partition 1: type 0x0c, FAT32" in r.stderr.decode() and
+              "label NICE" in r.stderr.decode(), text(r))
         unchanged(img, before, "after the refusal")
         r = emu.tool("--slot", "0", "format", "--force", "--yes")
         check("format --force", r.returncode == 0, text(r))
@@ -970,7 +971,7 @@ def test_format(imgs: dict[str, str], tmp: str) -> None:
         try:
             r = emu.tool("--slot", "0", "format", "--force", "--yes")
             check(f"format --force of {name}", r.returncode == 0 and
-                  show in r.stdout.decode(), text(r))
+                  show in r.stderr.decode(), text(r))
         finally:
             emu.close()
         check_format(img, tmp, f"the card that had {name}")
@@ -1009,7 +1010,7 @@ def test_format(imgs: dict[str, str], tmp: str) -> None:
         check("a card with the MEGA65's system partition",
               r.returncode == 1 and "MEGA65's SD card utility" in
               r.stderr.decode() and "type 0x41, the MEGA65's system "
-              "partition" in r.stdout.decode(), text(r))
+              "partition" in r.stderr.decode(), text(r))
         unchanged(img, before, "after the refusal")
         r = emu.tool("--slot", "0", "format", "--force", "--system", "--yes")
         check("and with --system", r.returncode == 0, text(r))

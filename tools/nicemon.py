@@ -30,17 +30,30 @@ subcommand, for one release (issue #156). It takes the options that
 one: load's --no-run, which is --hold, run's -i, -d, -s, and -2004,
 which are --input, --dump, --screen, and --ide2004, flash's --slot,
 which is --flash-slot, and tftpd's --addr and --port, which are
---listen [ADDR:]PORT, and --timeout, which is --retry-wait. The name is nice_cpu's, as
-nicedbg, nicelink, and nicebin are, and is also the project's and that
-of src/nicemon.vhd.
+--listen [ADDR:]PORT, and --timeout, which is --retry-wait. The name is
+nice_cpu's, as nicedbg, nicelink, and nicebin are, and is also the
+project's and that of src/nicemon.vhd.
+
+The subcommands look like one command: their errors, warnings, and
+progress go to stderr after "nicemon.py SUBCOMMAND: ", and stdout carries
+only the console and the data, with one set of exit codes, 1 for an
+error, 2 for one of the command line, 130 after Ctrl-C, and 141 when
+stdout closes early (cli.py). "nicemon.py help SUBCOMMAND" is
+"nicemon.py SUBCOMMAND --help", and "nicemon.py --version" prints the
+tags of this repository and of nice_cpu, from git describe.
 """
 
 import argparse
 import importlib
+import os
+import subprocess
 import sys
 from typing import NamedTuple, Sequence
 
-PROG = "nicemon.py"
+import cli
+from cli import PROG
+
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 class Subcommand(NamedTuple):
@@ -123,40 +136,80 @@ def old_name(name: str, argv: Sequence[str]) -> None:
     main([name, *old_options(name, argv)])
 
 
+def describe(path: str) -> str:
+    """git describe of the checkout at path: its tag, and the commits
+    after it, or "unknown" without git."""
+    try:
+        r = subprocess.run(["git", "-C", path, "describe", "--tags",
+                            "--dirty"], capture_output=True, text=True,
+                           timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return "unknown"
+    return r.stdout.strip() if r.returncode == 0 else "unknown"
+
+
+def version() -> str:
+    """What --version prints: the tags of NiceMonMEGA65 and nice_cpu."""
+    return (f"{PROG} {describe(REPO)}, nice_cpu "
+            f"{describe(os.path.join(REPO, 'nice_cpu'))}")
+
+
 def top_parser() -> argparse.ArgumentParser:
-    """The parser of nicemon.py with no subcommand, for its help and its
-    errors."""
+    """The parser of nicemon.py with no subcommand, for its help, its
+    version, and its errors."""
     width = max(len(name) for name in SUBCOMMANDS)
     lines = [f"  {name:{width}}  {sub.help}"
              for name, sub in SUBCOMMANDS.items()]
     parser = argparse.ArgumentParser(
-        prog=PROG, usage=f"{PROG} [-h] SUBCOMMAND [OPTIONS ...]",
+        prog=PROG, usage=f"{PROG} [-h] [--version] SUBCOMMAND [OPTIONS ...]",
         description=(__doc__ or "").splitlines()[0],
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="subcommands:\n" + "\n".join(lines) + "\n\n"
-        f"'{PROG} SUBCOMMAND --help' lists a subcommand's options.")
+        f"'{PROG} SUBCOMMAND --help' or '{PROG} help SUBCOMMAND' lists a "
+        "subcommand's options.")
+    parser.add_argument("--version", action="version", version=version(),
+                        help="print the tags of this repository and of "
+                        "nice_cpu, and exit")
     parser.add_argument("subcommand", metavar="SUBCOMMAND",
-                        choices=SUBCOMMANDS)
+                        choices=[*SUBCOMMANDS, "help"])
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> None:
-    """Runs the subcommand that argv, sys.argv[1:] by default, starts with."""
+    """Runs the subcommand that argv, sys.argv[1:] by default, starts with,
+    with the exit codes of cli.py."""
     argv = list(sys.argv[1:] if argv is None else argv)
+    if argv[:1] == ["help"]:
+        argv = argv[1:2] + ["--help"] if argv[1:] else ["--help"]
     if not argv or argv[0] not in SUBCOMMANDS:
-        # Help, or an error with the usage, exit status 2
+        # Help, the version, or an error with the usage, exit status 2
         top_parser().parse_args(argv)
-        return
+        top_parser().error("give a SUBCOMMAND")
     name, rest = argv[0], argv[1:]
+    cli.start(name)
+    try:
+        run(name, rest)
+    except KeyboardInterrupt:
+        print(file=sys.stderr)
+        cli.note("interrupted")
+        sys.exit(cli.EXIT_INTERRUPT)
+    except BrokenPipeError:
+        # stdout closed early, as by "nicemon.py sd ls | head": exit
+        # quietly, and keep Python from writing to the pipe again at exit
+        os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+        sys.exit(cli.EXIT_PIPE)
+
+
+def run(name: str, argv: list[str]) -> None:
+    """Imports the module of subcommand name, and runs it on argv."""
     module = importlib.import_module(SUBCOMMANDS[name].module)
     if name == "mon":
-        module.main(rest)
+        module.main(argv)
         return
     parser_class = getattr(module, "PARSER", argparse.ArgumentParser)
-    parser = parser_class(prog=f"{PROG} {name}",
-                          description=module.DESCRIPTION)
+    parser = parser_class(prog=cli.command, description=module.DESCRIPTION)
     module.add_options(parser)
-    module.command(parser, parser.parse_args(rest))
+    module.command(parser, parser.parse_args(argv))
 
 
 if __name__ == "__main__":

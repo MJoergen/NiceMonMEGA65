@@ -82,6 +82,8 @@ from jtag import FLASH_BOARDS, bit_part, check_board, check_part, \
     flash_chip, wait_port
 from boardlink import DEFAULT_BAUD, CONTROL, Link, LinkError, Serial
 from spiflash import SpiFlashError, unprotect
+import cli
+import jtag
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # The Nexys4DDR's part, which openFPGALoader needs for its bridge, as the
@@ -144,8 +146,8 @@ def dump(loader: list[str], offset: int,
                                      "--file-size", str(size), out],
                            capture_output=True, text=True)
         if r.returncode != 0 or not os.path.exists(out):
-            sys.exit(f"{r.stdout}{r.stderr}flash.py: openFPGALoader could "
-                     f"not read the flash")
+            sys.stderr.write(r.stdout + r.stderr)
+            cli.fail("openFPGALoader could not read the flash")
         with open(out, "rb") as f:
             return f.read(), flash_chip(r.stdout + r.stderr)
 
@@ -177,31 +179,27 @@ def started(value: int) -> str:
 def warn_no_rom(value: int, build: str) -> None:
     """Warns that a board without a ROM shows nothing when it starts."""
     if value & 9 == 9:
-        print(f"[WARN] the bitstream has no ROM, so the core waits, held, "
-              f"for the link, and the screen stays empty at power on; "
-              f"'make {build}' builds it with the monitor", flush=True)
+        cli.warn(f"the bitstream has no ROM, so the core waits, held, for "
+                 f"the link, and the screen stays empty at power on; "
+                 f"'make {build}' builds it with the monitor")
 
 
 def flash_cor(args: argparse.Namespace) -> None:
     """Writes the core file into its slot of the MEGA65's flash."""
-    if not 0 < args.flash_slot < SLOTS:
-        sys.exit(f"flash.py: give --flash-slot 1 to {SLOTS - 1}; slot 0 holds the "
-                 f"MEGA65's own core")
     if not os.path.exists(args.cor):
-        sys.exit(f"flash.py: {args.cor} is missing; run 'make cor', or give "
-                 f"--cor")
+        cli.fail(f"{args.cor} is missing; run 'make cor', or give --cor")
     with open(args.cor, "rb") as f:
         data = f.read()
     cor = header(data)
     if cor is None:
-        sys.exit(f"flash.py: {args.cor} is not a core file of coretool")
+        cli.fail(f"{args.cor} is not a core file of coretool")
     name, version, code, rev = cor
     if code not in REVISIONS:
-        sys.exit(f"flash.py: {args.cor} is for {rev} (code {code:02X}), "
-                 f"not a MEGA65 with the part {MEGA65_PART}")
+        cli.fail(f"{args.cor} is for {rev} (code {code:02X}), not a MEGA65 "
+                 f"with the part {MEGA65_PART}")
     if len(data) > SLOT_SIZE:
-        sys.exit(f"flash.py: {args.cor} has {len(data)} bytes, more than "
-                 f"a slot's {SLOT_SIZE}")
+        cli.fail(f"{args.cor} has {len(data)} bytes, more than a slot's "
+                 f"{SLOT_SIZE}")
     cable, port, _ = check_part(args.port, MEGA65_PART, args.cor)
     loader = ["openFPGALoader"] + cable + ["--fpga-part", f"xc{MEGA65_PART}"]
 
@@ -210,30 +208,29 @@ def flash_cor(args: argparse.Namespace) -> None:
     slot0, chip = dump(loader, 0, HEADER_SIZE)
     loader.append("--skip-load-bridge")
     if args.no_board_check:
-        print("[NOTE] the flash chip is not checked", flush=True)
+        cli.note("the flash chip is not checked")
     elif chip != CHIPS[code]:
         has = f"an {chip}: {FLASH_BOARDS[chip][1]}" \
             if chip in FLASH_BOARDS else f"no known flash chip ({chip})"
-        sys.exit(f"[FAIL] {args.cor} is for {rev}, which has an "
+        cli.fail(f"{args.cor} is for {rev}, which has an "
                  f"{CHIPS[code]}, but the board has {has}; give the core "
                  f"file of this board, or --no-board-check if its flash is "
                  f"not the usual one")
     else:
-        print(f"[PASS] flash {chip}, as {rev} has", flush=True)
+        cli.note(f"flash {chip}, as {rev} has")
     factory = header(slot0)
     if factory is None:
-        print("[WARN] slot 0 has no core header, so the board's revision is "
-              "not known", flush=True)
+        cli.warn("slot 0 has no core header, so the board's revision is "
+                 "not known")
     elif factory[2] != code:
-        sys.exit(f"[FAIL] slot 0 holds a core for {factory[3]}, and "
+        cli.fail(f"slot 0 holds a core for {factory[3]}, and "
                  f"{args.cor} is for {rev}; give the core file of this "
                  f"board")
     else:
-        print(f"[PASS] slot 0 holds {factory[0]} {factory[1]} for {rev}",
-              flush=True)
+        cli.note(f"slot 0 holds {factory[0]} {factory[1]} for {rev}")
     offset = args.flash_slot * SLOT_SIZE
-    print(f"slot {args.flash_slot} held "
-          f"{describe(dump(loader, offset, HEADER_SIZE)[0])}", flush=True)
+    cli.note(f"slot {args.flash_slot} held "
+             f"{describe(dump(loader, offset, HEADER_SIZE)[0])}")
 
     # The flash's sectors are protected by their DYBs, which openFPGALoader
     # does not clear (spiflash.py)
@@ -241,17 +238,17 @@ def flash_cor(args: argparse.Namespace) -> None:
         cleared = unprotect(cable[cable.index("--ftdi-serial") + 1], offset,
                             len(data))
     except SpiFlashError as e:
-        sys.exit(f"[FAIL] {e}")
-    print(f"[PASS] slot {args.flash_slot} unprotected ({cleared} of its sectors "
-          f"had their DYB set)", flush=True)
+        cli.fail(str(e))
+    cli.note(f"slot {args.flash_slot} unprotected ({cleared} of its "
+             f"sectors had their DYB set)")
 
     r = subprocess.run(loader + ["--write-flash", "--skip-reset", "--verify",
                                  "--file-type", "bin", "--offset", hex(offset),
                                  args.cor])
     if r.returncode != 0:
-        sys.exit("flash.py: openFPGALoader failed")
-    print(f"[PASS] {name} {version} written into slot {args.flash_slot} and "
-          f"verified", flush=True)
+        cli.fail("openFPGALoader failed")
+    cli.note(f"{name} {version} written into slot {args.flash_slot} and "
+             f"verified")
 
     # Slot 0's core may start another slot on its own at power on, and an
     # IPROG through JTAG leaves the FPGA empty, so the script loads the
@@ -263,25 +260,25 @@ def flash_cor(args: argparse.Namespace) -> None:
             f.write(data[HEADER_SIZE:])
         r = subprocess.run(["openFPGALoader"] + cable + [bit])
     if r.returncode != 0:
-        sys.exit("flash.py: openFPGALoader could not load the slot's "
-                 "bitstream")
+        cli.fail("openFPGALoader could not load the slot's bitstream")
     wait_port(port, BOOT_WAIT)
     value = control(port, args.baud, BOOT_WAIT)
     if value is None:
-        sys.exit(f"[FAIL] the link does not answer: the bitstream of slot "
+        cli.fail(f"the link does not answer: the bitstream of slot "
                  f"{args.flash_slot} does not start the system")
-    print(f"[PASS] the bitstream of slot {args.flash_slot} runs, {started(value)}; "
-          f"hold No Scroll at power on to start the slot", flush=True)
+    cli.note(f"the bitstream of slot {args.flash_slot} runs, "
+             f"{started(value)}; hold No Scroll at power on to start the "
+             f"slot")
     warn_no_rom(value, "cor")
 
 
 def flash_bit(args: argparse.Namespace) -> None:
     """Writes the bitstream into the Nexys4DDR's flash, or erases it."""
     if not os.path.exists(args.bit):
-        sys.exit(f"flash.py: {args.bit} is missing; run 'make nexys4ddr', "
-                 f"or give --bit")
+        cli.fail(f"{args.bit} is missing; run 'make nexys4ddr', or give "
+                 f"--bit")
     if bit_part(args.bit) != PART:
-        sys.exit(f"flash.py: {args.bit} is for {bit_part(args.bit)}, not the "
+        cli.fail(f"{args.bit} is for {bit_part(args.bit)}, not the "
                  f"Nexys4DDR's {PART}; a MEGA65 takes a core file with "
                  f"--cor")
     cable, port, _ = check_board(args.port, args.bit)
@@ -290,15 +287,14 @@ def flash_bit(args: argparse.Namespace) -> None:
     if args.erase:
         r = subprocess.run(loader + ["--bulk-erase"])
         if r.returncode != 0:
-            sys.exit("flash.py: openFPGALoader failed")
-        print("[PASS] flash erased; the FPGA stays empty at power on",
-              flush=True)
+            cli.fail("openFPGALoader failed")
+        cli.note("flash erased; the FPGA stays empty at power on")
         return
 
     r = subprocess.run(loader + ["--write-flash", "--verify", args.bit])
     if r.returncode != 0:
-        sys.exit("flash.py: openFPGALoader failed")
-    print("[PASS] flash written and verified", flush=True)
+        cli.fail("openFPGALoader failed")
+    cli.note("flash written and verified")
     # openFPGALoader has made the FPGA load itself from the flash. The
     # board's USB device starts anew when openFPGALoader lets it go, so its
     # b notice comes before the port can be opened. The link answers
@@ -307,11 +303,9 @@ def flash_bit(args: argparse.Namespace) -> None:
     wait_port(port, BOOT_WAIT)
     value = control(port, args.baud, 0)
     if value is None:
-        sys.exit("[FAIL] the link does not answer: the board did not start "
-                 "from the flash; set jumper JP1 (MODE) to QSPI, and press "
-                 "PROG")
-    print(f"[PASS] the board started from the flash, {started(value)}",
-          flush=True)
+        cli.fail("the link does not answer: the board did not start from "
+                 "the flash; set jumper JP1 (MODE) to QSPI, and press PROG")
+    cli.note(f"the board started from the flash, {started(value)}")
     warn_no_rom(value, "nexys4ddr")
 
 
@@ -323,19 +317,22 @@ DESCRIPTION = " ".join(__doc__.split("\n\n")[0].split())
 
 def add_options(parser: argparse.ArgumentParser) -> None:
     """The options of nicemon.py flash."""
-    parser.add_argument("--port", required=True, metavar="DEVICE",
-                        help="the serial device of the board's debug UART, "
-                        "such as /dev/ttyUSB1")
-    parser.add_argument("--baud", type=int, default=DEFAULT_BAUD,
-                        help="the UART's baud rate (default %(default)s)")
-    parser.add_argument("--bit", default=DEFAULT_BIT,
+    link = parser.add_argument_group(
+        "the link", "the board's serial port, whose USB device has the "
+        "JTAG cable too")
+    link.add_argument("--port", required=True, metavar="DEVICE",
+                      help="the serial device of the board's debug UART, "
+                      "such as /dev/ttyUSB1")
+    link.add_argument("--baud", type=int, default=DEFAULT_BAUD,
+                      help="the UART's baud rate (default %(default)s)")
+    parser.add_argument("--bit", default=DEFAULT_BIT, metavar="FILE",
                         help="Nexys4DDR: the bitstream to write (default "
                         f"{os.path.relpath(DEFAULT_BIT, REPO)} in the "
                         "repository)")
     parser.add_argument("--erase", action="store_true",
                         help="Nexys4DDR: erase the flash instead of "
                         "writing it")
-    parser.add_argument("--cor",
+    parser.add_argument("--cor", metavar="FILE",
                         help="MEGA65: a core file to write into --flash-slot "
                         "instead")
     parser.add_argument("--flash-slot", type=int, metavar="N",
@@ -347,21 +344,32 @@ def add_options(parser: argparse.ArgumentParser) -> None:
 
 def command(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
     """nicemon.py flash, on the options of add_options."""
-
-    if not sys.platform.startswith("linux"):
-        sys.exit("flash.py: finding the JTAG cable needs Linux; write the "
-                 "flash with openFPGALoader -b nexys_a7_100 -f BIT")
     if args.cor is not None:
         if args.erase:
-            sys.exit("flash.py: --erase is for the Nexys4DDR; the MEGA65's "
-                     "flash holds its own core in slot 0")
+            parser.error("--erase is for the Nexys4DDR; the MEGA65's flash "
+                         "holds its own core in slot 0")
         if args.flash_slot is None:
-            sys.exit("flash.py: give the slot with --flash-slot, 1 to 7")
-        flash_cor(args)
+            parser.error("give the slot with --flash-slot, 1 to 7")
+        if not 0 < args.flash_slot < SLOTS:
+            parser.error(f"give --flash-slot 1 to {SLOTS - 1}; slot 0 holds "
+                         "the MEGA65's own core")
     elif args.flash_slot is not None:
-        sys.exit("flash.py: --flash-slot goes with --cor")
+        parser.error("--flash-slot goes with --cor")
+    if not sys.platform.startswith("linux"):
+        cli.fail("finding the JTAG cable needs Linux; write the flash with "
+                 "openFPGALoader -b nexys_a7_100 -f BIT")
+    jtag.report = report
+    if args.cor is not None:
+        flash_cor(args)
     else:
         flash_bit(args)
+
+
+def report(ok: bool | None, text: str) -> None:
+    """jtag.py's checks, in nicemon.py's form; a failed one is followed by
+    jtag.py's error."""
+    if ok is not False:
+        cli.note(text)
 
 
 if __name__ == "__main__":

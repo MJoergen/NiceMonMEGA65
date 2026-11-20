@@ -69,6 +69,7 @@ import nicebin
 from nicebin import Words, read_lines
 
 import basic_rom
+import cli
 
 # The words that a board has: the RAM from 0, 128K words on the MEGA65 and
 # 64K on the Nexys4DDR, and the screen, of which both boards have the
@@ -291,8 +292,8 @@ def add_options(parser: argparse.ArgumentParser) -> None:
                         help="leave the core held in reset after loading")
     add_monitor_arguments(parser)
     parser.add_argument("--basic", action="store_true",
-                        help="FILE is an image of BASIC, for BASIC's part "
-                        "of the ROM, with \"keep\" set")
+                        help="the file is an image of BASIC, for BASIC's "
+                        "part of the ROM, with \"keep\" set")
     parser.add_argument("file",
                         help="a .bin file: one 'address word' hex pair per line")
 
@@ -306,12 +307,12 @@ def command(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
         link = open_link(args)
         try:
             load_basic(link, image)
-            print(f"load.py: wrote BASIC {basic_rom.text(image)} from "
-                  f"{args.file} into the ROM, {len(image)} words, with "
-                  f"\"keep\", and read it back")
+            cli.note(f"wrote BASIC {basic_rom.text(image)} from "
+                     f"{args.file} into the ROM, {len(image)} words, with "
+                     f"\"keep\", and read it back")
             if not args.hold:
                 start(link, rom=True)
-                print("load.py: started the core, with the ROM")
+                cli.note("started the core, with the ROM")
         except LinkError as e:
             fail(str(e))
         link.close()
@@ -321,14 +322,14 @@ def command(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
     link = open_link(args)
     try:
         load_words(link, words, rom=in_rom, monitor=args.monitor)
-        print(f"load.py: loaded {len(words)} words from {args.file}"
-              + (f" and {args.rom}" if args.rom else ""))
+        cli.note(f"loaded {len(words)} words from {args.file}"
+                 + (f" and {args.rom}" if args.rom else ""))
         if not args.hold:
             start(link, rom=in_rom)
-            print("load.py: started the core")
+            cli.note("started the core")
             if args.monitor:
                 link.send_console(RUN_COMMAND)
-                print("load.py: typed SYS 0x8000 for the monitor")
+                cli.note("typed SYS 0x8000 for the monitor")
     except LinkError as e:
         fail(str(e))
     link.close()

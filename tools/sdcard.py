@@ -114,6 +114,7 @@ from typing import Callable, Iterator
 
 from boardlink import (CONTROL, HALTED, HOLD, PAUSE, RAM, Link, LinkError,
                        add_arguments, open_link)
+import cli
 
 # The SD card controller's registers (nice_cpu's DEVICES.md §5)
 SD_CSR, SD_LBA, SD_CHUNK, SD_ERROR, SD_SELECT, SD_LAST, SD_SLOTS = \
@@ -391,8 +392,7 @@ class Card:
                 sd_wait(link, WRITE_WAIT)
                 link.control(self.ctl & RAM)
                 sys.stdout.flush()
-                print("sdcard.py: the core was started again from reset",
-                      file=sys.stderr)
+                cli.note("the core was started again from reset")
 
     def _keep(self, lba: int, data: bytes) -> None:
         """data as the sector lba's, the last used, and the oldest let go
@@ -1199,7 +1199,7 @@ def do_get(vol: Volume, name: str, dest: str | None) -> None:
         dest = os.path.join(dest, host_name(e))
     with open(dest, "wb") as f:
         f.write(data)
-    print(f"{e.short}: {len(data)} bytes to {dest}")
+    cli.note(f"{e.short}: {len(data)} bytes to {dest}")
 
 
 def put_name(src: str, name: str | None) -> str:
@@ -1471,11 +1471,11 @@ def do_format(card: Card, folder: str, label: str, force: bool,
     if card.protected():
         raise SdError(f"the card in slot {card.slot} is write-protected; "
                       "slide its switch away from LOCK first")
-    print(f"The card in slot {card.slot}: {size_text(total)}, "
-          f"{total} sectors")
+    cli.note(f"the card in slot {card.slot}: {size_text(total)}, "
+             f"{total} sectors")
     sector0 = card.read(0)
     for row in describe(card.read, card.last):
-        print(row)
+        print(row, file=sys.stderr)
     lay = layout(total)
     if lay is None:
         raise SdError("the card is too small for FAT32, which needs "
@@ -1490,17 +1490,18 @@ def do_format(card: Card, folder: str, label: str, force: bool,
         raise SdError("the card has been formatted, or holds data, and "
                       "format would erase all of it; give --force to erase "
                       "it all the same")
-    print(f"It becomes FAT32 of {lay.clusters} clusters of "
-          f"{lay.spc * 512} bytes, from sector {lay.base}, with the label "
-          f"{label.upper()} and the folder {folder.upper()}.")
+    cli.note(f"it becomes FAT32 of {lay.clusters} clusters of "
+             f"{lay.spc * 512} bytes, from sector {lay.base}, with the label "
+             f"{label.upper()} and the folder {folder.upper()}")
     zeros = NFATS * (lay.fatsz - 1) + 2 * (lay.spc - 1)
     if serial_port and zeros > 2000:
-        print(f"It writes {zeros + 10} sectors; over the serial port that "
-              "takes long, and --eth is much faster.")
+        cli.note(f"it writes {zeros + 10} sectors; over the serial port "
+                 "that takes long, and --eth is much faster")
     if not yes:
+        cli.note(f"all of the card in slot {card.slot} is erased; type the "
+                 "slot's number to go on: ", end="")
         try:
-            typed = input(f"All of the card in slot {card.slot} is erased. "
-                          "Type the slot's number to go on: ")
+            typed = input()
         except EOFError:
             typed = ""
         if typed.strip() != str(card.slot):
@@ -1534,9 +1535,9 @@ def do_format(card: Card, folder: str, label: str, force: bool,
     card.write(lay.base, sec["boot"])
     card.write(0, sec["mbr"])
     vol = Volume(card.read, folder)
-    print(f"Formatted: FAT32 with the folder {folder.upper()}, "
-          f"{lay.clusters * lay.spc * 512 // 10 ** 6} MB free"
-          if vol.dir else "Formatted, but the folder is missing")
+    cli.note(f"formatted: FAT32 with the folder {folder.upper()}, "
+             f"{lay.clusters * lay.spc * 512 // 10 ** 6} MB free"
+             if vol.dir else "formatted, but the folder is missing")
 
 
 DESCRIPTION = ("List, copy, write, and delete the files of the folder NICE "
@@ -1546,7 +1547,7 @@ DESCRIPTION = ("List, copy, write, and delete the files of the folder NICE "
 def add_options(parser: argparse.ArgumentParser) -> None:
     """The options of nicemon.py sd, with its own subcommands."""
     add_arguments(parser)
-    parser.add_argument("--slot", type=int,
+    parser.add_argument("--slot", type=int, metavar="N",
                         help="the slot of the card, while the core is held "
                         "or has halted, with --hold, and for put and del "
                         "(default 0, or 1 when 0 has no card); a paused "
@@ -1555,10 +1556,11 @@ def add_options(parser: argparse.ArgumentParser) -> None:
                         help="for ls and get: hold a running or paused core, "
                         "and start it again from reset afterwards, as put "
                         "and del do, so that any slot can be read")
-    parser.add_argument("--folder", default=FOLDER,
+    parser.add_argument("--folder", default=FOLDER, metavar="NAME",
                         help="the folder of the root that the files are in "
                         "(default %(default)s, the monitor's)")
-    cmds = parser.add_subparsers(dest="cmd", required=True)
+    cmds = parser.add_subparsers(dest="cmd", required=True, metavar="COMMAND",
+                                 title="commands")
     cmds.add_parser("ls", help="list the folder, as BASIC's DIR does, "
                     "with the 8.3 names of the long names")
     get = cmds.add_parser("get", help="copy a file of the folder to the host")
@@ -1581,7 +1583,7 @@ def add_options(parser: argparse.ArgumentParser) -> None:
     fmt = cmds.add_parser("format", help="erase the whole card of --slot, "
                           "and write a new FAT32 with the folder; holds the "
                           "core, and starts it again")
-    fmt.add_argument("--label", default=FOLDER,
+    fmt.add_argument("--label", default=FOLDER, metavar="LABEL",
                      help="the volume's label (default %(default)s)")
     fmt.add_argument("--force", action="store_true",
                      help="erase a card that has been formatted")
@@ -1604,20 +1606,17 @@ def command(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
                 with open(args.src, "rb") as f:
                     data = f.read()
     except FileError as e:
-        sys.exit(f"sdcard.py: {e}; give the name on the card, such as "
-                 "put SRC prog.bas")
+        cli.fail(f"{e}; give the name on the card, such as put SRC prog.bas")
     except OSError as e:
-        sys.exit(f"sdcard.py: {e}")
+        cli.fail(str(e))
     if args.cmd == "format":
         if args.slot is None:
-            sys.exit("sdcard.py: format needs --slot, the slot of the card "
-                     "to erase, such as --slot 1 format")
+            parser.error("format needs --slot, the slot of the card to "
+                         "erase, such as --slot 1 format")
         try:
             check_names(args.folder, args.label)
-        except FileError as e:
-            sys.exit(f"sdcard.py: {e}")
-        except SdError as e:
-            sys.exit(f"sdcard.py: {e}")
+        except (FileError, SdError) as e:
+            cli.fail(str(e))
     link = open_link(args)
     try:
         writes = args.cmd in ("put", "del", "mkdir", "format")
@@ -1633,23 +1632,23 @@ def command(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
             if args.cmd == "mkdir":
                 folder = args.folder.upper()
                 if vol.mkdir():
-                    print(f"Made the folder {folder}")
+                    cli.note(f"made the folder {folder}")
                 else:
-                    print(f"The folder {folder} is there already")
+                    cli.note(f"the folder {folder} is there already")
             elif args.cmd == "ls":
                 do_ls(vol)
             elif args.cmd == "get":
                 do_get(vol, args.name, args.dest)
             elif args.cmd == "put":
                 n = vol.put(name, data)
-                print(f"{name}: {n} bytes written")
+                cli.note(f"{name}: {n} bytes written")
             else:
                 gone = vol.delete(args.name)
-                print(f"Deleted {gone.name}")
+                cli.note(f"deleted {gone.name}")
     except FileError as e:
-        sys.exit(f"sdcard.py: {e}{HINTS.get(e.code, '')}")
+        cli.fail(f"{e}{HINTS.get(e.code, '')}")
     except (SdError, FolderError, LinkError, OSError) as e:
-        sys.exit(f"sdcard.py: {e}")
+        cli.fail(str(e))
     finally:
         link.close()
 

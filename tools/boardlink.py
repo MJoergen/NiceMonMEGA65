@@ -24,6 +24,7 @@ import os
 import socket
 import struct
 import sys
+from typing import cast
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__))), "nice_cpu", "debugger"))
@@ -132,8 +133,12 @@ def add_arguments(parser: argparse.ArgumentParser
     and --port and --baud for the board's debug UART, with --eth for its
     Ethernet port, and --cosim for make -C sim cosim. One of --eth, --port,
     --tcp, and --cosim must be given. --baud is 230400 by default, the
-    board's rate after reset."""
-    line = nicelink.add_arguments(parser)
+    board's rate after reset. They are a group of their own in the help,
+    "the link", the same in every subcommand of nicemon.py."""
+    group = parser.add_argument_group(
+        "the link", "one of --eth, --port, --tcp, and --cosim")
+    # An argument group takes the parser's calls that nicelink makes
+    line = nicelink.add_arguments(cast(argparse.ArgumentParser, group))
     line.add_argument("--eth", metavar="HOST[:PORT]",
                       help="talk to the board over TCP on its Ethernet "
                       "port, at HOST, a name or an IPv4 address (default "

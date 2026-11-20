@@ -59,6 +59,7 @@ import sys
 from types import FrameType
 
 from boardlink import LinkError, add_arguments, open_link
+import cli
 from sdcard import Card, FileError, SdError
 
 # The handshake (proto.md, "Fixed newstyle negotiation")
@@ -222,7 +223,7 @@ def transmit(conn: socket.socket, disk: Disk) -> None:
                     else:
                         disk.write(offset, data)
                 except (SdError, LinkError, OSError) as e:
-                    print(f"sdnbd.py: {e}", file=sys.stderr)
+                    cli.warn(str(e))
                     error, out = EIO, b""
         elif kind != CMD_FLUSH:
             error = EINVAL
@@ -240,7 +241,7 @@ def serve(server: socket.socket, disk: Disk) -> None:
             conn, peer = server.accept()
         except TimeoutError:
             continue
-        print(f"sdnbd.py: {peer[0]}:{peer[1]} connected", file=sys.stderr)
+        cli.note(f"{peer[0]}:{peer[1]} connected")
         with conn:
             conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
             try:
@@ -248,26 +249,26 @@ def serve(server: socket.socket, disk: Disk) -> None:
                     transmit(conn, disk)
             except (Closed, ConnectionError):
                 pass
-        print(f"sdnbd.py: {peer[0]}:{peer[1]} disconnected",
-              file=sys.stderr)
+        cli.note(f"{peer[0]}:{peer[1]} disconnected")
 
 
-def listen_on(spec: str) -> socket.socket:
-    host, _, port = spec.rpartition(":")
-    if not port.isdigit():
-        sys.exit(f"sdnbd.py: {spec} is not [HOST:]PORT")
+def listen_on(where: tuple[str, int]) -> socket.socket:
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     try:
-        server.bind((host or "127.0.0.1", int(port)))
+        server.bind(where)
     except OSError as e:
-        sys.exit(f"sdnbd.py: {spec}: {e}")
+        cli.fail(f"{where[0]}:{where[1]}: {e}")
     server.listen(1)
     return server
 
 
+class Stopped(Exception):
+    """SIGTERM, which stops the server as Ctrl-C does, but exits 0."""
+
+
 def stop(signum: int, frame: FrameType | None) -> None:
-    raise KeyboardInterrupt()
+    raise Stopped()
 
 
 DESCRIPTION = ("Serve the board's SD card over NBD, for nbd-client and a "
@@ -277,7 +278,7 @@ DESCRIPTION = ("Serve the board's SD card over NBD, for nbd-client and a "
 def add_options(parser: argparse.ArgumentParser) -> None:
     """The options of nicemon.py nbd."""
     add_arguments(parser)
-    parser.add_argument("--slot", type=int,
+    parser.add_argument("--slot", type=int, metavar="N",
                         help="the slot of the card (default 0, or 1 when 0 "
                         "has no card); with --read-only and no --hold, a "
                         "paused program's slot")
@@ -288,6 +289,7 @@ def add_options(parser: argparse.ArgumentParser) -> None:
                         help="with --read-only: hold the core all the same, "
                         "and start it again from reset at the end")
     parser.add_argument("--listen", default=f"127.0.0.1:{NBD_PORT}",
+                        type=cli.listen_type("127.0.0.1"),
                         metavar="[HOST:]PORT",
                         help="where the server listens (default "
                         "%(default)s; port 0 picks a free one)")
@@ -298,25 +300,30 @@ def command(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
     server = listen_on(args.listen)
     signal.signal(signal.SIGTERM, stop)
     link = open_link(args)
+    interrupted = False
     try:
         writable = not args.read_only
         with Card(link, args.slot, writable, args.hold) as card:
             disk = Disk(card, writable)
             host, port = server.getsockname()
-            print(f"sdnbd.py: slot {card.slot}, {disk.size // SECTOR} "
-                  f"sectors, {'read-only' if not writable else 'writable'}, "
-                  f"on {host}:{port}", file=sys.stderr)
-            print(f"sdnbd.py: sudo nbd-client -N sd {host} {port} "
-                  "/dev/nbd0", file=sys.stderr, flush=True)
+            cli.note(f"slot {card.slot}, {disk.size // SECTOR} sectors, "
+                     f"{'read-only' if not writable else 'writable'}, "
+                     f"on {host}:{port}")
+            cli.note(f"sudo nbd-client -N sd {host} {port} /dev/nbd0")
             try:
                 serve(server, disk)
             except KeyboardInterrupt:
-                print("sdnbd.py: stopped", file=sys.stderr)
+                interrupted = True
+                cli.note("stopped")
+            except Stopped:
+                cli.note("stopped")
     except (SdError, FileError, LinkError, OSError) as e:
-        sys.exit(f"sdnbd.py: {e}")
+        cli.fail(str(e))
     finally:
         server.close()
         link.close()
+    if interrupted:
+        sys.exit(cli.EXIT_INTERRUPT)
 
 
 if __name__ == "__main__":
