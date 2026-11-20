@@ -267,7 +267,7 @@ keeps the variables, but `CONT` cannot go on after it.
 | `END`, `STOP` | Ends the program. `STOP` prints `Break in 20`, and `END` nothing. |
 | `CONT` | Goes on after `STOP`, `END`, and the break key, unless the program was edited or an error came since: then it is `Can't continue`. |
 | `REM TEXT` | A remark, the rest of the line, which `LIST` shows as it was typed. |
-| `INPUT ["P";] V [, W$]` | Prints `? `, or `P` and `? `, and reads a number into `V` and a string into `W$`, with commas between them. A string is the text up to a comma or the end, without the blanks around it, or one in quotes, which may have commas. A line that has no number where one goes, or text after a closing quote, is `Redo from start`, and `INPUT` asks again. Too few ask for the rest with `?? `, and too many print `Extra ignored`. A number may have a sign; an expression is not taken. CTRL-C is the break key. |
+| `INPUT ["P";] V [, W$]` | Prints `? `, or `P` and `? `, and reads a number into `V` and a string into `W$`, with commas between them. A string is the text up to a comma or the end, without the blanks around it, or one in quotes, which may have commas. A line that has no number where one goes, a number in quotes, or text after a closing quote, is `Redo from start`, and `INPUT` asks again. Too few ask for the rest with `?? `, and too many print `Extra ignored`. A number may have a sign; an expression is not taken. CTRL-C is the break key. |
 | `GET V`, `GET V$` | Sets `V` to the code of the next key typed, or 0 when there is none, and `V$` to the key, or `""`. It does not wait. |
 | `DIM A(N) [, B(N, M)]` | Makes the array `A` of `N + 1` elements, `A(0)` to `A(N)`, and `B` of `N + 1` rows of `M + 1`, each element 0. `DIM A$(N)` makes an array of strings, each element `""`. `A` and `A(` are two names. An array that no `DIM` made is `Undefined array`, a subscript outside or one too many or too few `Bad subscript`, and a second `DIM` `Redimensioned array`. |
 | `HIMEM = A` | Sets the top of BASIC's memory, and does a `CLR`. `A` is from the end of the variables plus 512 words up to the default, as below; outside them it is `Out of memory`. `HIMEM` in an expression reads it, such as `PRINT HIMEM`. |
@@ -330,7 +330,7 @@ A position below 1 and a negative count are an `Illegal quantity`.
 | Statement | What it does |
 |---|---|
 | `DATA 1, "A,B", TEXT` | Items that `READ` reads: numbers, strings in quotes, and strings without, without the blanks around them, with commas between them, up to the end of the line or a `:`. `LIST` shows them as they were typed. A `DATA` that runs does nothing. |
-| `READ V, W$` | Reads the next items of the `DATA` of the program into `V` and `W$`, in the order of the lines. A string read into a number is a `Syntax error`, and past the last item it is `Out of data`. |
+| `READ V, W$` | Reads the next items of the `DATA` of the program into `V` and `W$`, in the order of the lines. A string read into a number, also one in quotes such as `"7"`, is a `Syntax error`, and past the last item it is `Out of data`. |
 | `RESTORE [N]` | Makes `READ` read from the first `DATA` again, or from that of line `N` on. `RUN` and `CLR` do so too. |
 
 The characters of a string are one to a word, as on the screen. A
@@ -619,11 +619,11 @@ table, and `make romsize` writes it again.
 | `basic_time.nasm` | `TIME`, and the clock's side of `NTP` | 289 | 44 |
 | `basic_dis.nasm` | The disassembler of `DIS` | 871 | 79 |
 | `basic_edit.nasm` | The screen editor | 1122 | 0 |
-| `basic_str.nasm` | The strings: the heap, its sweep, the functions of strings, `DATA`, `READ`, and `TIME$` | 1529 | 11 |
+| `basic_str.nasm` | The strings: the heap, its sweep, the functions of strings, `DATA`, `READ`, and `TIME$` | 1534 | 11 |
 | `common.nasm` | What the monitor and BASIC share: texts, IP addresses, and dates | 237 | 5 |
 | `monlib.nasm` | The routines that programs join | 274 | 0 |
 | `mon.nasm` | The stubs of the entries | 92 | 0 |
 | `build/basic_folder.nasm` | The texts with the folder's name: `DIR`'s, and the error of a card without it | 14 | 14 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 12554 | 1728 |
+| In all | | 12559 | 1728 |
 <!-- /romsize basic -->

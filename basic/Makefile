@@ -321,12 +321,13 @@ LOAD_TAIL = \rload\r9001 7\003sys 0x8000\rdump 0x9000, 4\rdump 0x1E7FF, 1\rhalt\
 # which keeps a string, and CLR, which drops it. READ of numbers and
 # strings from DATA, with a quoted comma, blanks around the items, a
 # colon after a DATA, and empty items; RESTORE of a line and of the
-# first; a string read into a number, a Syntax error; Out of data; and
-# LIST of each new token. INPUT of strings, with blanks around them, one
-# in quotes with a comma, and text after a quote, which is Redo from
-# start. Last, a program that fills a heap made small by HIMEM again
-# and again, so that the sweep runs, with an array of strings, and with
-# strings that grow to 201 characters, joined with parts of themselves.
+# first; a string read into a number, and one in quotes, a Syntax
+# error; Out of data; and LIST of each new token. INPUT of strings,
+# with blanks around them, one in quotes with a comma, and text after a
+# quote and a number in quotes, which are Redo from start. Last, a
+# program that fills a heap made small by HIMEM again and again, so
+# that the sweep runs, with an array of strings, and with strings that
+# grow to 201 characters, joined with parts of themselves.
 # load_emu: LOAD where 0xFFFFFF9E reads 0, as in niceemu, so a program's RAM
 # goes up to the screen: 10000 and FFFEFFFF take words, and FFFF0000 does
 # not.

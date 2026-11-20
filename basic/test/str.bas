@@ -54,6 +54,7 @@ NEW
 LIST
 RUN
 RUN 70
+RESTORE 60: READ Z: PRINT Z: READ Z
 NEW
 10 INPUT "NAME"; N$, M: PRINT "["; N$; "]"; M
 20 INPUT N$: PRINT N$
@@ -62,6 +63,7 @@ RUN
 "B, C"
 RUN
 "D" X, 1
+D, "2"
 D, 2
 E
 NEW

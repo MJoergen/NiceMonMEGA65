@@ -159,6 +159,11 @@ RUN 70
 24-11
 Out of data in 110
 READY.
+RESTORE 60: READ Z: PRINT Z: READ Z
+1
+Syntax error
+READ V, W$, ...     V and W$ the next items of DATA
+READY.
 NEW
 READY.
 10 INPUT "NAME"; N$, M: PRINT "["; N$; "]"; M
@@ -171,6 +176,8 @@ B, C
 READY.
 RUN
 NAME? "D" X, 1
+Redo from start
+NAME? D, "2"
 Redo from start
 NAME? D, 2
 [D]2

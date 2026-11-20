@@ -944,13 +944,16 @@ get_str
 
 ; item: the item of INPUT's line or of a DATA's text at R5, up to a comma
 ; or the end: R6 its first character and R7 the word after its last, and
-; R5 at the comma or the 0 after it, and Z. The blanks around an item are
-; not its, and an item in quotes is what is between them, which may have
-; commas, after which only blanks may come: else not Z. Uses R1 and R5-R7.
+; R5 at the comma or the 0 after it, R4 1 for an item in quotes, else 0,
+; and Z. The blanks around an item are not its, and an item in quotes is
+; what is between them, which may have commas, after which only blanks
+; may come: else not Z. Uses R1 and R4-R7.
 item
+                CLR     R4
+item_b
                 CMP     @R5, 0x20
         ?Z      MOVE    R5++, R5
-        ?Z      JMP     item
+        ?Z      JMP     item_b
                 CMP     @R5, 0x22
         ?Z      JMP     it_quote
                 MOVE    R6, R5
@@ -971,6 +974,7 @@ item
                 SUB     R7, R7, 1
                 JMP     :-
 it_quote
+                ONE     R4
                 MOVE    R5++, R5
                 MOVE    R6, R5
 :
@@ -996,10 +1000,11 @@ it_ok
                 CMP     R0, R0          ; Z
                 RET
 
-; get_item: the item R6 to R7 into the variable or the element at R11, a
-; number's or a string's, and R11 after it and its subscripts, and Z; or
-; not Z, with nothing stored, when the variable takes a number and the
-; item is none. Keeps R5. Uses R1-R12.
+; get_item: the item R6 to R7, in quotes when R4 is 1, into the variable
+; or the element at R11, a number's or a string's, and R11 after it and
+; its subscripts, and Z; or not Z, with nothing stored, when the variable
+; takes a number and the item is none, or is in quotes. Keeps R5. Uses
+; R1-R12.
 get_item
                 PUSH    R5
                 MOVE    R1, R6
@@ -1015,6 +1020,8 @@ get_item
                 CALL    store_str
                 JMP     gi_ok
 :
+                TST     R4
+        ?!Z     JMP     gi_no           ; a string in quotes
                 PUSH    R7
                 CALL    str_num
                 POP     R7

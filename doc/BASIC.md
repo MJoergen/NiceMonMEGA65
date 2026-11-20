@@ -855,7 +855,21 @@ about a minute (#122).
   host.
 - The programs of the ECMA-55 conformance suite that the language can
   run (NBS SP 500-70), from stage 5 on, as they need `DATA` and
-  strings (decided on 2026-11-20).
+  strings (decided on 2026-11-20). The first run, of the 208 programs
+  that bas55 2.0 ships, typed into `niceemu` after stage 5 (measured
+  2026-11-20): 22 print what bas55 prints, but for blanks and the
+  digits of a number, and 21 more differ only in the format of
+  numbers and where a line wraps. 83 that test an error stop with one
+  of BASIC's. The rest need what BASIC does not have: `ON ... GOTO`
+  (8), `OPTION BASE` (4), `DEF FN` (4), `GO TO` with a blank (3),
+  `RANDOMIZE` (2), and an array without `DIM` (12). A `FOR` loop that
+  runs no time runs once (4, P044 and P047 to P049), as in Microsoft's
+  BASIC. 19 tests of errors run on where bas55 stops, among them
+  strings longer than ECMA-55's 18 characters, empty items of `DATA`,
+  and characters that ECMA-55 does not allow in an item without
+  quotes. The run found one bug of stage 5, a number in quotes that
+  `READ` took, which is fixed. The suite is not in the repository and
+  has no target of its own yet.
 - The functions against Python's doubles on the host, bit for bit:
   `basic/test/functions.py` writes an argument's bits with `POKE`
   and reads the result's with `PEEK`, which must be within the 1 ulp
@@ -905,7 +919,8 @@ many steps, so the three functions take some 650 cycles each.
 Stage 5 adds `bench/str.bas`, 5000 assignments of `STR$(I)` and 26
 letters to the elements of an array of 100 strings, 32 words a
 block, which fill the heap of about 90K words until the sweep runs: 4446696 steps in `niceemu`,
-about 890 for each (measured 2026-11-20). It leaves the others as
+about 890 for each, and 0.1248 seconds on the R6 (both measured
+2026-11-20). It leaves the others as
 they were, but for some 90 steps of each program's `PRINT "S"` and
 `PRINT "E"`, as a string now goes through the stack of strings, and
 `tok_skip` takes its words by a table, so a skip is two steps shorter:
