@@ -133,7 +133,7 @@ enter_store
                 MOVE    @R1++, @R2++
                 SUB[M]  R4, R4, 1
         ?!Z     JMP     :-
-; clear_cache: the addresses of the lines of the K_LINE tokens cleared,
+; clear_cache: the addresses of the lines of the K_LINE and K_BLK tokens cleared,
 ; and those of the functions' DEFs (basic_struct.nasm),
 ; after an edit. Uses R1-R3 and R8.
 clear_cache
@@ -147,6 +147,7 @@ cc_line
         ?Z      JMP     :+
                 SHR     R2, R2, 24
                 CMP     R2, K_LINE
+        ?!Z     CMP     R2, K_BLK
         ?Z      MOVE    @1[R8], R0
                 CALL    tok_skip
                 JMP     :-
@@ -217,7 +218,7 @@ ts_4
 TOK_SKIPS
                 .DAT    ts_0, ts_0, ts_1, ts_1, ts_4, ts_text, ts_0, ts_0, ts_0
                 .DAT    ts_0, ts_0, ts_0, ts_0, ts_0, ts_1, ts_text, ts_0, ts_0
-                .DAT    ts_0, ts_0, ts_0, ts_text, ts_0, ts_0
+                .DAT    ts_0, ts_0, ts_0, ts_text, ts_0, ts_0, ts_1
 
 ; himem: R2 the top of BASIC's memory, HIMEM, or that of the RAM, less
 ; the variables and the stack's room. mem_top: R2 the top of the
@@ -433,6 +434,8 @@ st_if
                 CMP     R2, T_THEN
         ?Z      MOVE    R8++, R8
         ?Z      JMP     :+
+                CMP     R2, T_BTHEN
+        ?Z      JMP     if_block
                 AND     R2, R2, 0xFFFFFF00
                 CMP     R2, K_KW*K+I_GOTO*0x100
         ?!Z     JMP     err_syntax
@@ -718,7 +721,7 @@ OPERANDS        .EQU    2+4+8+16+32+64+0x4000+0x20000+0x400000+0x800000
 LIST_KINDS
                 .DAT    0, lt_dec, lt_dec, lt_hex, lt_num, lt_str, lt_var, lt_kw, lt_punct
                 .DAT    lt_kw, lt_kw, lt_kwi, lt_kw, lt_kw, lt_dec, lt_rem, lt_var
-                .DAT    lt_var, lt_var, lt_kw, lt_kw, lt_rem, lt_var, lt_var
+                .DAT    lt_var, lt_var, lt_kw, lt_kw, lt_rem, lt_var, lt_var, lt_blk
 
 ; A whole number: K_SMALL's and K_LINE's in the token, which K_LINE's
 ; line follows, and K_WORD's in the word after it
@@ -826,6 +829,13 @@ lt_punct
                 AND     R1, R6, 0xFF
                 JMP     putc
 
+; A block's THEN or ELSE, as the THEN or ELSE of one line, without its
+; word
+lt_blk
+                MOVE    R8++, R8
+                AND     R6, R6, 1
+                OR      R6, R6, K_SEP*K
+                JMP     lt_kw
 ; A keyword: a statement's by its index, and the others' by their place
 ; in KW_TOK; an operator that is no keyword by SYMS
 lt_kwi

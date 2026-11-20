@@ -440,8 +440,9 @@ Stage 5 (#116) has strings, as V2 has them, written in
 
 ### Structure
 
-Of stage 8 (#119), `ON` and the functions of `DEF FN` on one line are
-written, in `basic/basic_struct.nasm` (decided on 2026-11-20):
+Of stage 8 (#119), `ON`, the functions of `DEF FN` on one line, `DO`
+and `LOOP`, and the block `IF` are written, in
+`basic/basic_struct.nasm` (decided on 2026-11-20):
 
 - **`ON X GOTO N, M, ...`** and **`ON X GOSUB N, M, ...`** go to the
   line of the X-th number, as `GOTO` and `GOSUB` go to it. X is rounded
@@ -471,6 +472,33 @@ written, in `basic/basic_struct.nasm` (decided on 2026-11-20):
   count of arguments that is not that of the parameters is a `Syntax
   error`, and a string's parameter or argument is a `Type mismatch`.
   An error is reported in the line of the call.
+- **`DO` and `LOOP`** run the statements between them again, with
+  `WHILE X` or `UNTIL X` after either, or after none, which loops until
+  an `EXIT`, a `GOTO` out of it, or a `RETURN`. A `DO` pushes a frame
+  of `FOR`'s 8 words: the token after the `DO`, its line, and the
+  token after the `LOOP` and its line, which the first `LOOP` that
+  runs keeps. A `DO` whose test fails before that finds its `LOOP` in
+  the program, counting the `DO`s and `LOOP`s between, and `Missing
+  LOOP` when there is none. A `DO` and its `LOOP` may be in one line or
+  in many, nested, and with `FOR` loops inside. A `DO` that runs again,
+  after a `GOTO` back to it, drops its old frame and those after it,
+  as a `FOR` of the same variable does.
+- **`EXIT`** goes on after the `LOOP` of the latest `DO`, without it and
+  the `FOR` loops inside it, so `EXIT` in a `FOR` loop in a `DO` leaves
+  both. A `LOOP` or an `EXIT` with no `DO` frame after the last
+  `GOSUB`'s is `LOOP without DO` or `EXIT without DO`, as `NEXT`
+  without its `FOR` is.
+- **The block `IF`**: an `IF` whose `THEN` ends its line runs the lines
+  after it when X is not 0, up to an `ELSE` that starts a line, which
+  goes on at the `ENDIF`'s line. When X is 0, it goes on after that
+  `ELSE`, or at the line of the `ENDIF`, which starts its line. Blocks
+  nest, and a one-line `IF` inside one is as before. The tokenizer marks
+  a `THEN` at the end of a line and an `ELSE` at its start, each with a
+  word after it, where the first run keeps the line it finds, so the
+  scan runs once, as a `GOTO`'s line is found once. An edit clears those
+  words, as it clears `GOTO`'s. A block with no `ENDIF` is `Missing
+  ENDIF`. An `IF ... THEN` with nothing after it did nothing before;
+  now it starts a block. In a direct line it runs nothing after.
 - **Later in stage 8**: `DEF FN` over lines, with `LOCAL` and `=`, the
   parameters of strings, and `PROC`, on the frames.
 
@@ -662,7 +690,9 @@ as #54 says:
 `FOR`, `GOSUB`, `PROC`, and `LOCAL` push frames on one stack of
 BASIC's own, each with a tag. A `FOR` frame has the variable, the
 limit, the step, and the address of the loop's body, so `NEXT` does not
-search. A `GOSUB` frame has the address of the token after it. The
+search. A `GOSUB` frame has the address of the token after it, and a
+`DO` frame, as large as a `FOR` frame, that of its `DO` and its
+`LOOP` ([Structure](#structure)). The
 region of the frames is 512 words below `HIMEM`, where a `FOR` frame
 takes 8 and a `GOSUB` frame 3, and a frame with no room is
 `Out of memory`. A `NEXT` with no `FOR` frame is `NEXT without FOR`,
@@ -692,7 +722,8 @@ long`, and `Out of data`. Stage 3 adds
 `Undefined line`, `Undefined array`, `Bad subscript`,
 `Redimensioned array`, `NEXT without FOR`, `RETURN without GOSUB`,
 and `Can't continue` ([Programs](#programs)), and stage 8 `Undefined
-function` ([Structure](#structure)).
+function`, `LOOP without DO`, `EXIT without DO`, `Missing LOOP`, and
+`Missing ENDIF` ([Structure](#structure)).
 
 The depth of an expression is counted, and too deep is an error,
 since nothing notices when the processor's stack runs out. The FPU's
@@ -1040,7 +1071,8 @@ Each has an issue, under #54.
 8. **Structure**, #119. Of it, `ON ... GOTO`, `ON ... GOSUB`, and
    `DEF FN` on one line are written, in `basic/basic_struct.nasm`,
    with the language of [Structure](#structure), and measured 403
-   words (measured 2026-11-20). `IF`, `ELSE`, and `ENDIF` over lines, `DO` and
+   words, and `DO`, `LOOP`, `EXIT`, and the block `IF` 524 more
+   (measured 2026-11-20). `IF`, `ELSE`, and `ENDIF` over lines, `DO` and
    `LOOP` with `WHILE`, `UNTIL`, and `EXIT`, `PROC` and `FN` with
    parameters, `LOCAL`, and recursion, and `ON ... GOTO`. Their
    targets are found once and kept, as a `GOTO`'s line is.
@@ -1175,7 +1207,10 @@ to 12538, where 1900 were guessed, of which 88 are the keywords' and
 the help's text, and leaves 7942 free (measured 2026-11-20). Of
 stage 8, `ON` and `DEF FN` on one line are 403 words more, from 12543
 to 12946, of which 44 are the keywords', the help's, and the message's
-text, and leave 7534 free (measured 2026-11-20).
+text, and leave 7534 free (measured 2026-11-20). `DO`, `LOOP`, `EXIT`,
+and the block `IF` are 524 words more, to 13470, of which 114 are the
+keywords', the help's, and the messages' text, and leave 7010 free
+(measured 2026-11-20).
 
 Stage 1 was `basic.c`, 1510 words, and `basic.nasm`, 624, of which 431
 were its packed texts, the help among them, less 1032 words that left

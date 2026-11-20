@@ -45,6 +45,9 @@
 ;            or a colon that is not in quotes
 ;   K_UFN    a function of DEF FN, as K_VAR (basic_struct.nasm)
 ;   K_SFNU   a function of DEF FN that gives a string, FNNAME$, as K_VAR
+;   K_BLK    a THEN that ends its line, T_BTHEN, or an ELSE that starts
+;            it, T_BELSE, of a block IF, and the line where the block
+;            goes on in the word after, 0 until a run finds it
 ;
 ; The line ends with a 0 word, T_END. A name is a keyword only as a
 ; whole name, up to 16 letters and digits.
@@ -106,6 +109,8 @@ TOK_MAX         .EQU    160             ; which V_TLIM holds a line to: the edit
 V_TP            .EQU    0xFFFFED50      ; the next statement's token
 V_VEND          .EQU    0xFFFFED51      ; the end of the variables
 V_KW            .EQU    0xFFFFED52      ; the statement's index in KEYWORDS plus 1, or 0
+V_TBEG          .EQU    0xFFFFED53      ; for the tokenizer: the first token,
+V_TTHEN         .EQU    0xFFFFED67      ; and the word after the last THEN, or 0
 V_PNAME         .EQU    0xFFFFED54      ; a name, packed, 4 words
 
 NO_VAR          .EQU    0xFFFFFF        ; the offset of a name that has no variable
@@ -132,6 +137,7 @@ K_SNUM          .EQU    20
 K_DATA          .EQU    21
 K_UFN           .EQU    22
 K_SFNU          .EQU    23
+K_BLK           .EQU    24
 ARRAY           .EQU    0x100           ; in the length of an array's name,
 STRING          .EQU    0x200           ; and of a string's
 NAME_LEN        .EQU    0xFF            ; the length alone
@@ -174,6 +180,10 @@ T_THEN          .EQU    K_SEP*K
 T_ELSE          .EQU    K_SEP*K+1
 T_TO            .EQU    K_SEP*K+2
 T_STEP          .EQU    K_SEP*K+3
+T_WHILE         .EQU    K_SEP*K+4
+T_UNTIL         .EQU    K_SEP*K+5
+T_BTHEN         .EQU    K_BLK*K
+T_BELSE         .EQU    K_BLK*K+1
 
 ; The tokens of the keywords that are no statements, from index N_STMT of
 ; KEYWORDS on
@@ -183,7 +193,7 @@ KW_TOK
                 .DAT    K_FN*K+0x40, K_FN*K+0x41, K_FN*K+0x42, K_FN*K+0x43, K_FN*K+0x44
                 .DAT    K_FN*K+0x45, K_FN*K+0x48, K_FN*K+0x49, K_FN*K+0x4A, K_FN*K+0x4C
                 .DAT    T_RND, T_PI
-                .DAT    T_TAB, T_SPC, T_THEN, T_ELSE, T_TO, T_STEP
+                .DAT    T_TAB, T_SPC, T_THEN, T_ELSE, T_TO, T_STEP, T_WHILE, T_UNTIL
                 .DAT    K_SNUM*K, K_SNUM*K+1, K_SNUM*K+2, K_SNUM*K+3
                 .DAT    K_SFN*K, K_SFN*K+1, K_SFN*K+2, K_SFN*K+3, K_SFN*K+4, K_SFN*K+5, T_TIMES
 KW_TOK_END
@@ -210,6 +220,8 @@ tokenize_at
                 MOVE    @V_TLIM, V_TOK+TOK_MAX-6
 tokenize_to
                 MOVE    @V_KW, R0
+                MOVE    @V_TBEG, R8
+                MOVE    @V_TTHEN, R0
 tok_next
                 CMP     R8, @V_TLIM
         ?!C     JMP     err_long
@@ -218,8 +230,7 @@ tok_next
         ?Z      MOVE    R5++, R5
         ?Z      JMP     tok_next
                 TST     R1
-        ?Z      MOVE    @R8, R0
-        ?Z      RET
+        ?Z      JMP     tok_end
                 SUB     R2, R1, 0x30
                 CMP     R2, 10
         ?C      JMP     tok_number
@@ -270,6 +281,17 @@ tok_more
         ?!Z     MOVE    R5++, R5
                 JMP     tok_put
 
+; The end of the line: its 0, and a THEN before it a block's, T_BTHEN,
+; with its word
+tok_end
+                CMP     R8, @V_TTHEN
+        ?!Z     JMP     :+
+                MOVE    @-1[R8], T_BTHEN
+                MOVE    @R8++, R0
+:
+                MOVE    @R8, R0
+                RET
+
 ; A string in quotes, one without its closing quote ending with the line
 tok_string
                 MOVE    R5++, R5
@@ -316,8 +338,7 @@ tok_name
                 JMP     tok_var
 :
                 CMP     R11, N_STMT
-        ?!C     MOVE    @R8++, @KW_TOK-N_STMT[R11]
-        ?!C     JMP     tok_next
+        ?!C     JMP     tok_kwtok
                 ADD     @V_KW, R11, 1
                 SHL     R1, R11, 8
                 OR      R1, R1, R4
@@ -342,6 +363,20 @@ tok_name
                 ADD     @R6, R2, K_REM*K
                 MOVE    @R8, R0
                 RET
+; A keyword that is no statement, its token from KW_TOK, and an ELSE
+; that starts the line a block's, T_BELSE, with its word
+tok_kwtok
+                MOVE    R1, @KW_TOK-N_STMT[R11]
+                CMP     R1, T_ELSE
+        ?Z      CMP     R8, @V_TBEG
+        ?!Z     JMP     :+
+                MOVE    @R8++, T_BELSE
+                MOVE    R1, R0          ; its word
+:
+                MOVE    @R8++, R1
+                CMP     R1, T_THEN
+        ?Z      MOVE    @V_TTHEN, R8
+                JMP     tok_next
 tok_data
                 MOVE    R6, R8          ; DATA: the text up to the end or a colon
                 MOVE    R8++, R8

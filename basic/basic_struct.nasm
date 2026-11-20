@@ -1,6 +1,20 @@
 ; BASIC's structure (stage 8, issue #119, doc/BASIC.md, "Structure"), of
-; which this has ON ... GOTO and ON ... GOSUB, and the functions of DEF
-; FN on one line.
+; which this has ON ... GOTO and ON ... GOSUB, the functions of DEF FN on
+; one line, DO and LOOP with WHILE and UNTIL, and EXIT, and IF, ELSE,
+; and ENDIF over lines.
+;
+; A DO frame is DO_TAG, the token after DO, where its WHILE or UNTIL is,
+; DO's line, and the token after the LOOP statement that matches it and
+; its line, 0 until a LOOP went back to the DO. It is FOR_WORDS words,
+; as the walks of the frames pass over a frame that is not GOSUB's by
+; FOR_WORDS. A LOOP drops the FOR frames after its DO's, and a DO that
+; runs again, after a GOTO, drops its own frame and those after it.
+;
+; A block IF is an IF whose THEN ends its line, which the tokenizer
+; makes T_BTHEN, and the ELSE of a block starts its line, T_BELSE, and so
+; does its ENDIF. Each of T_BTHEN and T_BELSE has a word after it, the
+; line where the block goes on, its ELSE's or its ENDIF's, 0 until the
+; first run finds it; an edit clears it, as it clears K_LINE's.
 ;
 ; ON's lines are K_LINE tokens, as GOTO's are, so they keep the address
 ; of their line once found, and RENUMBER changes them.
@@ -18,6 +32,7 @@
 ; may call itself, as deep as an expression may nest.
 
 FUNC            .EQU    0x400           ; in the length of a function's name
+DO_TAG          .EQU    0x44000000      ; D, a DO frame's
 
 ; ON X GOTO N, M, ... and ON X GOSUB N, M, ...: the line of the X-th
 ; number, X rounded toward zero, as GOTO and GOSUB go to it. An X of 0,
@@ -227,8 +242,273 @@ fn_forget
                 ADD     R1, R1, 3
                 JMP     :-
 
+; DO [WHILE X | UNTIL X]: a DO frame, and the statements after it while X
+; is not 0, or until it is not 0; else on after the LOOP that matches
+st_do
+                CALL    himem           ; this DO's frame, from a GOTO
+                MOVE    R1, @V_FP       ; back to it, and those after it
+:
+                CMP     R1, R2
+        ?!C     JMP     :++
+                AND     R3, @R1, 0xFF000000
+                CMP     R3, GOSUB_TAG
+        ?Z      JMP     :++
+                CMP     R3, DO_TAG
+        ?Z      CMP     @1[R1], R8
+        ?Z      JMP     :+
+                ADD     R1, R1, FOR_WORDS
+                JMP     :-
+:
+                ADD     @V_FP, R1, FOR_WORDS
+:
+                MOVE    R1, FOR_WORDS
+                CALL    frame_new
+                MOVE    @R1, DO_TAG
+                MOVE    @1[R1], R8
+                MOVE    @2[R1], @V_CUR
+                MOVE    @3[R1], R0
+; do_test: the WHILE or UNTIL at R8 of the DO of the frame R1, whose line
+; V_CUR is: the statements after the DO when it holds, else those after
+; the LOOP, without the frame
+do_test
+                PUSH    R1
+                CALL    cond
+                PUSH    R3
+                CALL    stmt_end
+                POP     R3
+                POP     R1
+                TST     R3
+        ?!Z     RET
+; do_leave: the frame R1 and those after it gone, and on after its LOOP
+do_leave
+                ADD     @V_FP, R1, FOR_WORDS
+                MOVE[M] R2, @3[R1]
+        ?Z      JMP     :+
+                MOVE    @V_CUR, @4[R1]
+                MOVE    @V_TP, R2
+                RET
+:
+                MOVE    R8, @1[R1]
+                MOVE    R10, @2[R1]
+                CALL    scan_loop
+                MOVE    @V_CUR, R10
+                MOVE    @V_TP, R8
+                RET
+
+; LOOP [WHILE X | UNTIL X]: back to the latest DO, and its test, while X
+; is not 0, or until it is not 0; else on after the LOOP, without the DO
+; frame. A LOOP with no DO frame after the last GOSUB's is LOOP without
+; DO.
+st_loop
+                CALL    find_do
+        ?Z      JMP     err_loop
+                PUSH    R1
+                CALL    cond
+                PUSH    R3
+                CALL    stmt_end
+                POP     R3
+                POP     R1
+                TST     R3
+        ?Z      ADD     @V_FP, R1, FOR_WORDS
+        ?Z      RET
+                MOVE    @3[R1], R8
+                MOVE    @4[R1], @V_CUR
+                MOVE    @V_FP, R1       ; the FOR frames after it go
+                MOVE    @V_CUR, @2[R1]
+                MOVE    R8, @1[R1]
+                JMP     do_test
+
+; EXIT: on after the LOOP of the latest DO, without its frame and those
+; after it; EXIT without DO when there is none
+st_exit
+                CALL    stmt_end
+                CALL    find_do
+        ?Z      JMP     err_exit
+                JMP     do_leave
+
+; find_do: R1 the latest DO frame, with FOR frames alone after it, and
+; not Z; or Z when there is none. Uses R2 and R3.
+find_do
+                CALL    himem
+                MOVE    R1, @V_FP
+:
+                CMP     R1, R2
+        ?!C     JMP     :+
+                AND     R3, @R1, 0xFF000000
+                CMP     R3, DO_TAG
+        ?Z      JMP     :++
+                CMP     R3, FOR_TAG
+        ?!Z     JMP     :+
+                ADD     R1, R1, FOR_WORDS
+                JMP     :-
+:
+                CMP     R0, R0          ; Z
+                RET
+:
+                CMP     R0, 1           ; not Z
+                RET
+
+; cond: the WHILE X or UNTIL X at R8, and R8 after it: R3 1 when the
+; loop goes on, as X is not 0 after WHILE, or 0 after UNTIL, else 0;
+; and 1 without either. Uses R1-R7 and R9.
+cond
+                ONE     R3
+                MOVE    R1, @R8
+                CMP     R1, T_WHILE
+        ?!Z     CMP     R1, T_UNTIL
+        ?!Z     RET
+                MOVE    R8++, R8
+                PUSH    R1
+                CALL    eval_num
+                POP     R1
+                MOVE    R2, @FPU_STATUS
+                MOVE    @FPU_CMD, FPU_DROP
+                CLR     R3
+                AND[M]  R0, R2, FPU_ZERO
+        ?Z      ONE     R3              ; X is not 0
+                CMP     R1, T_UNTIL
+        ?Z      XOR     R3, R3, 1
+                RET
+
+; scan_loop: R8 after the LOOP statement that matches a DO, and R10 its
+; line, from R8 after that DO in the line R10, or 0 for a direct line,
+; counting the DOs and LOOPs between; Missing LOOP when there is none.
+; Uses R1-R4.
+scan_loop
+                CLR     R4              ; the depth
+sl_tok
+                MOVE[M] R2, @R8
+        ?!Z     JMP     :+
+                TST     R10             ; the end of the line
+        ?Z      JMP     err_noloop
+                ADD     R10, R10, @R10
+                CMP     R10, @V_PEND
+        ?!C     JMP     err_noloop
+                ADD     R8, R10, 2
+                JMP     sl_tok
+:
+                AND     R2, R2, 0xFFFFFF00
+                CMP     R2, K_KW*K+I_DO*0x100
+        ?Z      ADD     R4, R4, 1
+                CMP     R2, K_KW*K+I_LOOP*0x100
+        ?!Z     JMP     :+
+                SUB[M]  R4, R4, 1
+        ?N      JMP     sl_found
+:
+                CALL    tok_skip
+                JMP     sl_tok
+sl_found
+                MOVE    R8++, R8        ; LOOP's WHILE or UNTIL, passed over
+:
+                CALL    at_end
+        ?Z      RET
+                CALL    tok_skip
+                JMP     :-
+
+; if_block: for IF, a block, with R8 at its T_BTHEN and R1 the FPU's
+; status of its X: the next line when X is not 0, else the statements
+; after the ELSE that matches, or its ENDIF's line, which it finds once
+; and keeps in the word after T_BTHEN. In a direct line, no line follows.
+if_block
+                ADD     R8, R8, 2       ; the end of the line
+                MOVE    @V_TP, R8
+                AND[M]  R0, R1, FPU_ZERO
+        ?Z      RET
+                MOVE[M] R3, @V_CUR
+        ?Z      RET
+                MOVE[M] R1, @-1[R8]
+        ?!Z     JMP     :+
+                ADD     R1, R3, @R3     ; from the next line
+                ONE     R9              ; to an ELSE or an ENDIF
+                CALL    blk_scan
+                MOVE    @-1[R8], R1
+:
+                MOVE    @V_CUR, R1
+                CMP     @2[R1], T_BELSE
+        ?Z      ADD     @V_TP, R1, 4    ; after ELSE and its word
+        ?!Z     ADD     @V_TP, R1, 2
+                RET
+
+; blk_else: a block's ELSE, with R8 at its T_BELSE, which the statements
+; before it reach: on at its ENDIF's line, which it finds once and keeps
+; in the word after T_BELSE
+blk_else
+                MOVE[M] R3, @V_CUR
+        ?Z      JMP     err_unknown     ; a direct line
+                MOVE[M] R1, @1[R8]
+        ?!Z     JMP     go_to
+                ADD     R1, R3, @R3
+                CLR     R9              ; to the ENDIF
+                CALL    blk_scan
+                MOVE    @1[R8], R1
+                JMP     go_to
+
+; ENDIF: the end of a block IF, where it goes on
+st_endif
+                JMP     stmt_end
+
+; blk_scan: R1 the line of the ELSE that matches a block IF, when R9 is
+; not 0, or of its ENDIF, from the line R1 on, counting the block IFs
+; and ENDIFs between; Missing ENDIF when there is none. Keeps R8. Uses
+; R1-R5.
+blk_scan
+                PUSH    R8
+                CLR     R4              ; the depth
+bs_line
+                CMP     R1, @V_PEND
+        ?!C     JMP     err_endif
+                MOVE    R2, @2[R1]      ; the line's first token
+                CMP     R2, T_BELSE
+        ?!Z     JMP     bs_endif
+                TST     R4
+        ?!Z     JMP     bs_last
+                TST     R9
+        ?!Z     JMP     bs_found
+                JMP     bs_last
+bs_endif
+                AND     R2, R2, 0xFFFFFF00
+                CMP     R2, K_KW*K+I_ENDIF*0x100
+        ?!Z     JMP     bs_last
+                SUB[M]  R4, R4, 1
+        ?N      JMP     bs_found
+bs_last
+                ADD     R8, R1, 2       ; its last token
+                MOVE    R5, R8
+:
+                MOVE[M] R2, @R8
+        ?Z      JMP     :+
+                MOVE    R5, R8
+                CALL    tok_skip
+                JMP     :-
+:
+                CMP     @R5, T_BTHEN
+        ?Z      ADD     R4, R4, 1
+                ADD     R1, R1, @R1
+                JMP     bs_line
+bs_found
+                POP     R8
+                RET
+
 err_fn
                 MOVE    R1, S_FN
                 JMP     err
+err_loop
+                MOVE    R1, S_LOOP
+                JMP     err
+err_exit
+                MOVE    R1, S_EXIT
+                JMP     err
+err_noloop
+                MOVE    R1, S_NOLOOP
+                JMP     err
+err_endif
+                MOVE    R1, S_ENDIF
+                JMP     err
 
 S_FN            .ASCII_B 'Undefined function'
+S_LOOP          .ASCII_B 'LOOP without DO'
+S_EXIT          .ASCII_B 'EXIT without DO'
+S_NOLOOP
+                .ASCII_B 'Missing LOOP'
+                .DAT    0
+S_ENDIF         .ASCII_B 'Missing ENDIF'

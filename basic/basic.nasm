@@ -252,11 +252,13 @@ run_next
                 MOVE    R8, @V_TP
                 JMP     run
 ; run_other: a statement that is no keyword's and no number's assignment:
-; a string's, or TIME$ =
+; a string's, a block's ELSE, or TIME$ =
 run_other
                 CMP     R2, K_SVAR
         ?!Z     CMP     R2, K_SARR
         ?Z      JMP     st_sassign
+                CMP     R1, T_BELSE
+        ?Z      JMP     blk_else
                 CMP     R1, T_TIMES
         ?Z      JMP     st_timeset
                 JMP     err_unknown
@@ -620,7 +622,8 @@ ACTS
                 .DAT    st_for+65536*st_next, st_rem+65536*st_input
                 .DAT    st_get+65536*st_dim, st_himem+65536*st_auto
                 .DAT    st_renum+65536*st_data, st_read+65536*st_restore
-                .DAT    st_def+65536*st_on
+                .DAT    st_def+65536*st_on, st_do+65536*st_loop
+                .DAT    st_exit+65536*st_endif
 I_DELETE        .EQU    4               ; the index of DELETE,
 I_PRINT         .EQU    25              ; the index of PRINT, the first statement without ops,
 I_LET           .EQU    26              ; of LET,
@@ -640,7 +643,10 @@ I_READ          .EQU    42              ; of READ,
 I_RESTORE       .EQU    43              ; of RESTORE,
 I_DEF           .EQU    44              ; of DEF,
 I_ON            .EQU    45              ; of ON,
-N_STMT          .EQU    46              ; and of AND, the first keyword that is no statement
+I_DO            .EQU    46              ; of DO,
+I_LOOP          .EQU    47              ; of LOOP,
+I_ENDIF         .EQU    49              ; of ENDIF,
+N_STMT          .EQU    50              ; and of AND, the first keyword that is no statement
 H_ACTS          .EQU    0x40000000+4*ACTS
 ; The routines of the items, by the kind of an op, which bas_op calls
 KINDS
@@ -686,7 +692,7 @@ OP_SKIP         .EQU    1
 OP_F            .EQU    8
 KEYWORDS        .EQU    38              ; the first keyword's byte in OPS
 OPS
-                .ASCII_B 'FJN@N@EHNHLHNFANFJEJNFJFLCNHNJLHLHFLHNSYS+LOAD5SAVE6BSAVE=DELETE6DIR-IP DHCP"MAC TIME NTP0BAUD#DUMP%DIS%CLS"VER"HELP"HALT"POKE)NEW"CLR"END"STOP"CONT"RETURN"PRINT"LET"RUN"LIST"GOTO"GOSUB"IF"FOR"NEXT"REM"INPUT"GET"DIM"HIMEM"AUTO"RENUMBER"DATA"READ"RESTORE"DEF"ON"AND"OR"XOR"NOT"DIV"MOD"ABS"SGN"INT"SQR"PEEK"SIN"COS"TAN"ASIN"ACOS"ATAN"LOG"LOG2"LOG10"EXP"RND"PI"TAB"SPC"THEN"ELSE"TO"STEP"LEN"ASC"VAL"INSTR"CHR$"STR$"HEX$"LEFT$"MID$"RIGHT$"TIME$"'
+                .ASCII_B 'FJN@N@EHNHLHNFANFJEJNFJFLCNHNJLHLHFLHNSYS+LOAD5SAVE6BSAVE=DELETE6DIR-IP DHCP"MAC TIME NTP0BAUD#DUMP%DIS%CLS"VER"HELP"HALT"POKE)NEW"CLR"END"STOP"CONT"RETURN"PRINT"LET"RUN"LIST"GOTO"GOSUB"IF"FOR"NEXT"REM"INPUT"GET"DIM"HIMEM"AUTO"RENUMBER"DATA"READ"RESTORE"DEF"ON"DO"LOOP"EXIT"ENDIF"AND"OR"XOR"NOT"DIV"MOD"ABS"SGN"INT"SQR"PEEK"SIN"COS"TAN"ASIN"ACOS"ATAN"LOG"LOG2"LOG10"EXP"RND"PI"TAB"SPC"THEN"ELSE"TO"STEP"WHILE"UNTIL"LEN"ASC"VAL"INSTR"CHR$"STR$"HEX$"LEFT$"MID$"RIGHT$"TIME$"'
                 .DAT    0
 
 S_HINT          .ASCII_B 'HELP lists the statements'
@@ -713,7 +719,8 @@ HELP            .DAT    H_SYS, H_L, H_LOAD, H_TFTP, H_SAVET, H_SAVE, H_DEL, H_DE
                 .DAT    H_I, H_ID, H_M, H_B, H_T, H_TN, H_C, H_V, H_H, H_Q, H_PR, H_LET
                 .DAT    H_POKE, H_RUN, H_RUNF, H_RUNT, H_LIST, H_NEW, H_CLR, H_GOTO, H_GOSUB, H_RET, H_IF
                 .DAT    H_FOR, H_NEXT, H_END, H_STOP, H_CONT, H_REM, H_INPUT, H_GET, H_DIM, H_HIMEM, H_AUTO, H_REN
-                .DAT    H_DATA, H_READ, H_REST, H_STR, H_ON, H_DEF, H_P, H_PG, 0
+                .DAT    H_DATA, H_READ, H_REST, H_STR, H_ON, H_DEF, H_DO, H_LOOP, H_EXIT
+                .DAT    H_BIF, H_ELSE, H_P, H_PG, 0
 H_SYS           .ASCII_B 'SYS A               call the program at A, such as SYS 0x8000; SYS 0 restarts'
 H_L             .ASCII_B 'LOAD                enter lines of ADDR WORD in hex, as a .bin file has them'
                 .DAT    0
@@ -782,6 +789,14 @@ H_STR           .ASCII_B 'A$ + B$             LEN ASC VAL INSTR CHR$ STR$ HEX$ L
                 .DAT    0
 H_ON            .ASCII_B 'ON X GOTO N, M, ... go on at the line of the X-th number, or GOSUB it'
 H_DEF           .ASCII_B 'DEF FNA(X) = E      the function FNA of X, as FNA(2); FNA$ gives a string'
+H_DO            .ASCII_B 'DO [WHILE X]        the statements up to LOOP while X, or DO UNTIL X'
+                .DAT    0
+H_LOOP          .ASCII_B 'LOOP [UNTIL X]      back to DO, until X, or LOOP WHILE X'
+                .DAT    0
+H_EXIT          .ASCII_B 'EXIT                on after the LOOP of the latest DO'
+H_BIF           .ASCII_B 'IF X THEN           the lines up to ELSE or ENDIF when X, with THEN last'
+                .DAT    0
+H_ELSE          .ASCII_B 'ELSE ... ENDIF      the lines up to ENDIF when not, each first in its line'
 H_P             .ASCII_B 'CRSR keys, HOME     move the cursor; RETURN takes the line it is in'
 H_PG            .ASCII_B 'PgUp PgDn           scroll back; on the MEGA65 CTRL and MEGA with CRSR up, down'
                 .DAT    0

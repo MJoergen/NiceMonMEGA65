@@ -56,6 +56,11 @@ RESTORE [N]         READ from the first DATA again, or from line N
 A$ + B$             LEN ASC VAL INSTR CHR$ STR$ HEX$ LEFT$ MID$ RIGHT$ TIME$
 ON X GOTO N, M, ... go on at the line of the X-th number, or GOSUB it
 DEF FNA(X) = E      the function FNA of X, as FNA(2); FNA$ gives a string
+DO [WHILE X]        the statements up to LOOP while X, or DO UNTIL X
+LOOP [UNTIL X]      back to DO, until X, or LOOP WHILE X
+EXIT                on after the LOOP of the latest DO
+IF X THEN           the lines up to ELSE or ENDIF when X, with THEN last
+ELSE ... ENDIF      the lines up to ENDIF when not, each first in its line
 CRSR keys, HOME     move the cursor; RETURN takes the line it is in
 PgUp PgDn           scroll back; on the MEGA65 CTRL and MEGA with CRSR up, down
 READY.

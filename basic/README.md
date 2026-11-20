@@ -32,8 +32,9 @@ the monitor's commands as statements. Stage 2 (issue #113) adds the
 numbers: expressions, variables, `PRINT`, `LET`, `POKE`, and `PEEK`.
 Stage 3 (issue #114) adds the programs: lines with numbers, which
 BASIC keeps and runs (Programs below), stage 5 (issue #116) the
-strings (Strings below), and stage 8 (issue #119) `ON` and the
-functions of `DEF FN` (Programs below).
+strings (Strings below), and stage 8 (issue #119) `ON`, the
+functions of `DEF FN`, `DO` and `LOOP`, and the block `IF` (Programs
+below).
 
 At the cold start the ROM clears the screen, prints its banner,
 `NiceMon` and the version, then `HELP lists the statements` and
@@ -264,6 +265,8 @@ keeps the variables, but `CONT` cannot go on after it.
 | `GOTO N` | Goes on at line `N`. |
 | `GOSUB N`, `RETURN` | Goes on at line `N`, and after the `GOSUB` at `RETURN`. |
 | `IF X THEN S [ELSE T]` | Runs the statements `S` when `X` is not 0, else `T`. A line number after `THEN` or `ELSE` is a `GOTO`, and `IF X GOTO N` is one too. `ELSE` belongs to the last `IF` before it that has none, and the statements after `S` and `T` are theirs, up to the end of the line. |
+| `IF X THEN`, `ELSE`, `ENDIF` | A block over lines: an `IF` whose `THEN` ends its line runs the lines after it when `X` is not 0, up to an `ELSE` at the start of a line, and else the lines after that `ELSE`, up to an `ENDIF` at the start of a line. `ELSE` may be left out, and blocks nest. A block with no `ENDIF` is `Missing ENDIF`. |
+| `DO [WHILE X]`, `LOOP [UNTIL X]`, `EXIT` | Runs the statements between `DO` and `LOOP` again, while `X` is not 0 after `WHILE`, or until it is after `UNTIL`, which either may have, or until `EXIT`, which goes on after the `LOOP` of the latest `DO`. With no `WHILE` or `UNTIL` it loops until an `EXIT`. A `DO` whose `WHILE` fails at once goes on after its `LOOP`, and `Missing LOOP` when there is none. `EXIT` in a `FOR` loop in a `DO` leaves both. |
 | `FOR V = X TO Y [STEP Z]`, `NEXT [V] [, W]` | Runs the statements up to `NEXT` with `V` from `X` to `Y`, by `Z` or by 1. The body runs once at least, as in Microsoft's BASIC. `NEXT` with no name ends the last loop, and `NEXT I, J` two. A `FOR` of a variable that has a loop ends that loop and those after it. |
 | `END`, `STOP` | Ends the program. `STOP` prints `Break in 20`, and `END` nothing. |
 | `CONT` | Goes on after `STOP`, `END`, and the break key, unless the program was edited or an error came since: then it is `Can't continue`. |
@@ -279,10 +282,11 @@ CTRL-C is the break key. A program polls it every 64 statements, and
 stops with `Break in 20`, after which `CONT` goes on. `GOTO` and
 `GOSUB` take a line number, which keeps the address of its line once
 it is found, and is no expression. A loop and a subroutine take a
-frame each, 8 and 3 words, of the 512 words below `HIMEM`, so a
+frame each, 8 and 3 words, and a `DO` 8, of the 512 words below `HIMEM`, so a
 `GOSUB` that never returns is `Out of memory` after 170 of them. The
 errors of the programs are `Undefined line`, `NEXT without FOR`,
-`RETURN without GOSUB`, `Can't continue`, `Undefined array`, `Bad
+`RETURN without GOSUB`, `LOOP without DO`, `EXIT without DO`, `Missing
+LOOP`, `Missing ENDIF`, `Can't continue`, `Undefined array`, `Bad
 subscript`, and `Redimensioned array`.
 
 The program's lines start at `0x8000`, a word for each token and
@@ -588,7 +592,7 @@ the lines with `test/ecma55.expected`, and prints those that changed.
 | `lines` | The ROM alone | `DELETE` of a range, a line, and up to a line, `RENUMBER` with the jumps forward and back, a target that is no line, the overflow and a step of 0, and `AUTO`, ended by a number alone and by CTRL-C. |
 | `redo` | The ROM alone | The check at entry: a line of two rows that the tokenizer refuses is shown again after `READY.`, with the cursor at the error, as the input ends there and no key waits; it runs until the step limit. |
 | `keys` | The ROM alone | `INPUT` with too few, too many, and bad numbers, a prompt, and CTRL-C; `GET`; the break key in a loop, in `CONT`, and in `LIST`; and the keys typed ahead, of which the ring keeps 31. |
-| `struct` | The ROM alone, with `test/struct.bas` typed | `DEF FN` with no, one, and two parameters, of a string, calling others and defined after its call, with its parameters kept; `ON ... GOTO` and `ON ... GOSUB` with each line, 0, past the list, a fraction, and after `THEN`; their errors and those of a `DEF`, `CLR` and an edit before a call, `LIST`, and `RENUMBER` of `ON`'s lists. |
+| `struct` | The ROM alone, with `test/struct.bas` typed | `DEF FN` with no, one, and two parameters, of a string, calling others and defined after its call, with its parameters kept; `ON ... GOTO` and `ON ... GOSUB` with each line, 0, past the list, a fraction, and after `THEN`; their errors and those of a `DEF`, `CLR` and an edit before a call, `LIST`, and `RENUMBER` of `ON`'s lists; `DO` and `LOOP` with `WHILE` and `UNTIL` at either end, on one line and over lines, nested, with `FOR` inside, `EXIT`, a `GOTO` back to a `DO`, and a `RETURN` out of one; block `IF`s nested, with and without `ELSE`, a number like `THEN`'s token before one, and their errors, `LIST`, and `RENUMBER`. |
 | `str` | The ROM, with `--step-time` and `test/str.bas` typed | The strings: variables, `+`, each function and the edges of its arguments, the comparisons, alone and in `IF`, the errors, arrays of strings, `IP` with a string expression, `TIME$`, `GET`, `READ`, `DATA`, and `RESTORE`, with a quoted comma and empty items, `LIST` of their tokens, `INPUT` of strings, and a program that fills a small heap until it is swept, again and again. |
 | `arr` | The ROM alone, with `test/arr.bas` typed | `DIM`, the elements, their errors, `LET`, `INPUT`, and `GET` of an element, `CLR` and an edit with arrays, `HIMEM` read and set, too low and too high, and below the arrays, which its `CLR` frees, the layout of an array in memory, and `LOAD` below and above `HIMEM`, in a line and in a program. |
 | `load` | The ROM, with 128K words of RAM, as on the MEGA65 | `LOAD` with the monitor's `build/hello.bin` pasted: CR LF and LF line ends, tabs, blank lines, skipped lines, a line too long, blanks after a line's 76 characters, a DEL that takes back the key after them, an address given twice, and CTRL-C. Then `SYS 0x8000` runs it. |
@@ -627,20 +631,20 @@ table, and `make romsize` writes it again.
 <!-- romsize basic -->
 | Source | What it is | Words | Text |
 |---|---|---:|---:|
-| `basic.nasm` | The vectors, the header, the main loop, the scanner, the keywords, the messages, and the help | 1800 | 1083 |
-| `basic_expr.nasm` | The numbers: the tokenizer, the expressions, the functions, the variables, the errors, `PRINT`, `LET`, and `POKE` | 1772 | 39 |
-| `basic_prog.nasm` | The programs: the lines, `LIST`, `RUN`, the jumps, the loops, the break key, `INPUT`, `GET`, the arrays, and `HIMEM` | 1880 | 46 |
+| `basic.nasm` | The vectors, the header, the main loop, the scanner, the keywords, the messages, and the help | 1903 | 1175 |
+| `basic_expr.nasm` | The numbers: the tokenizer, the expressions, the functions, the variables, the errors, `PRINT`, `LET`, and `POKE` | 1804 | 39 |
+| `basic_prog.nasm` | The programs: the lines, `LIST`, `RUN`, the jumps, the loops, the break key, `INPUT`, `GET`, the arrays, and `HIMEM` | 1895 | 46 |
 | `basic_cmd.nasm` | The routines of the statements that were the commands | 1855 | 294 |
 | `basic_net.nasm` | `DHCP`, `NTP`, and TFTP | 917 | 150 |
 | `basic_time.nasm` | `TIME`, and the clock's side of `NTP` | 289 | 44 |
 | `basic_dis.nasm` | The disassembler of `DIS` | 871 | 79 |
 | `basic_edit.nasm` | The screen editor | 1122 | 0 |
 | `basic_str.nasm` | The strings: the heap, its sweep, the functions of strings, `DATA`, `READ`, and `TIME$` | 1538 | 11 |
-| `basic_struct.nasm` | The structure: `ON ... GOTO`, `ON ... GOSUB`, and `DEF FN` | 299 | 5 |
+| `basic_struct.nasm` | The structure: `ON ... GOTO`, `ON ... GOSUB`, `DEF FN`, `DO`, `LOOP`, `EXIT`, and the block `IF` | 673 | 21 |
 | `common.nasm` | What the monitor and BASIC share: texts, IP addresses, and dates | 237 | 5 |
 | `monlib.nasm` | The routines that programs join | 274 | 0 |
 | `mon.nasm` | The stubs of the entries | 92 | 0 |
 | `build/basic_folder.nasm` | The texts with the folder's name: `DIR`'s, and the error of a card without it | 14 | 14 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 12962 | 1772 |
+| In all | | 13486 | 1880 |
 <!-- /romsize basic -->
