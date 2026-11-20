@@ -588,8 +588,9 @@ the console, and a poll takes its byte:
 - In the tests, the input is a file, and a poll takes the next byte of
   it. So a test program that runs long ends with `HALT` itself, and
   not with keys after `RUN`.
-- Later, the console's interrupt (#104) can replace the poll, and the
-  RESTORE key's NMI (#110) can stop a machine program.
+- The poll stays: nice_cpu V3.0 has no interrupts, so neither the
+  console's interrupt (#104) nor the RESTORE key's NMI (#110) will
+  come, and a machine program stops only by its own poll.
 
 ### The FPU
 
@@ -848,9 +849,8 @@ Each has an issue, under #54.
 9. **Errors**, #120. `TRAP`, `RESUME`, `ER`, `EL`, and `ERR$`.
 10. **The machine**, #121. `TI`, `SLEEP`, the colors, the cursor, and
     the display offset.
-11. Later, in no order: the console's interrupt for the break key
-    (#104) and RESTORE (#110); statements for the network, after
-    #111; virtual screens, `FIND`, and `CHANGE`; and graphics,
+11. Later, in no order: statements for the network, after #111;
+    virtual screens, `FIND`, and `CHANGE`; and graphics,
     sprites, and sound, with their hardware.
 
 ## What the stages need of the monitor
