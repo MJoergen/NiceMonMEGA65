@@ -1221,8 +1221,9 @@ dim_size
                 RET
 
 ; HIMEM = A: the top of BASIC's memory A, and a CLR. An A below the end
-; of the arrays and the room of the frames, or above the RAM's top, is
-; Out of memory.
+; of the variables and the room of the frames, or above the default
+; HIMEM, is Out of memory. The arrays do not count, as the CLR frees
+; them.
 st_himem
                 CMP     @R8++, T_EQ
         ?!Z     JMP     err_syntax
@@ -1235,9 +1236,9 @@ st_himem
                 MOVE    @V_HIMEM, R11
                 CMP     R2, R10
         ?C      JMP     err_memory      ; above it
-                ADD     R2, @V_AEND, FRAMES
+                ADD     R2, @V_VEND, FRAMES
                 CMP     R10, R2
-        ?C      JMP     err_memory      ; below the arrays and the frames
+        ?C      JMP     err_memory      ; below the variables and the frames
                 MOVE    @V_HIMEM, R10
                 JMP     clr_vars        ; which returns to run_next
 

@@ -240,7 +240,7 @@ keeps the variables, but `CONT` cannot go on after it.
 | `INPUT ["P";] V [, W]` | Prints `? `, or `P` and `? `, and reads numbers into `V` and `W`, with commas between them. A line that is not numbers is `Redo from start`, and `INPUT` asks again. Too few ask for the rest with `?? `, and too many print `Extra ignored`. A number may have a sign; an expression is not taken. CTRL-C is the break key. |
 | `GET V` | Sets `V` to the code of the next key typed, or 0 when there is none. It does not wait. |
 | `DIM A(N) [, B(N, M)]` | Makes the array `A` of `N + 1` elements, `A(0)` to `A(N)`, and `B` of `N + 1` rows of `M + 1`, each element 0. `A` and `A(` are two names. An array that no `DIM` made is `Undefined array`, a subscript outside or one too many or too few `Bad subscript`, and a second `DIM` `Redimensioned array`. |
-| `HIMEM = A` | Sets the top of BASIC's memory, and does a `CLR`. `HIMEM` in an expression reads it, such as `PRINT HIMEM`. |
+| `HIMEM = A` | Sets the top of BASIC's memory, and does a `CLR`. `A` is from the end of the variables plus 512 words up to the default, as below; outside them it is `Out of memory`. `HIMEM` in an expression reads it, such as `PRINT HIMEM`. |
 
 CTRL-C is the break key. A program polls it every 64 statements, and
 stops with `Break in 20`, after which `CONT` goes on. `GOTO` and
@@ -257,8 +257,13 @@ constant, and the variables follow them, then the arrays, each element
 a double, and the frames. `HIMEM` is the top of them, by default the
 top of the RAM less the room of BASIC's RAM and its stack, so that a
 routine that `SYS` calls may live above a lower `HIMEM`, as in BBC
-BASIC. A `HIMEM` below the end of the arrays and the frames' room, or
-above the top of the RAM, is `Out of memory`. An empty program writes
+BASIC. `HIMEM = A` takes an `A` from the end of the variables plus the
+frames' 512 words up to that default, 123904 (`0x1E400`) on the
+MEGA65's 128K words of RAM, and 58368 (`0xE400`) on the Nexys4DDR's
+64K. An `A` outside them, a negative one too, is `Out of memory`, and
+`HIMEM` stays. The arrays do not count, as its `CLR` frees them, so a
+`HIMEM` may go below them. A lower `HIMEM` may be raised again, but not
+above the default. An empty program writes
 no word at `0x8000`, so after `NEW` a `.bin` program there stays as it
 was.
 
@@ -478,7 +483,7 @@ the default. It runs these steps in order:
 | `lines` | The ROM alone | `DELETE` of a range, a line, and up to a line, `RENUMBER` with the jumps forward and back, a target that is no line, the overflow and a step of 0, and `AUTO`, ended by a number alone and by CTRL-C. |
 | `redo` | The ROM alone | The check at entry: a line of two rows that the tokenizer refuses is shown again after `READY.`, with the cursor at the error, as the input ends there and no key waits; it runs until the step limit. |
 | `keys` | The ROM alone | `INPUT` with too few, too many, and bad numbers, a prompt, and CTRL-C; `GET`; the break key in a loop, in `CONT`, and in `LIST`; and the keys typed ahead, of which the ring keeps 31. |
-| `arr` | The ROM alone, with `test/arr.bas` typed | `DIM`, the elements, their errors, `LET`, `INPUT`, and `GET` of an element, `CLR` and an edit with arrays, `HIMEM` read and set, too low and too high, the layout of an array in memory, and `LOAD` below and above `HIMEM`, in a line and in a program. |
+| `arr` | The ROM alone, with `test/arr.bas` typed | `DIM`, the elements, their errors, `LET`, `INPUT`, and `GET` of an element, `CLR` and an edit with arrays, `HIMEM` read and set, too low and too high, and below the arrays, which its `CLR` frees, the layout of an array in memory, and `LOAD` below and above `HIMEM`, in a line and in a program. |
 | `load` | The ROM, with 128K words of RAM, as on the MEGA65 | `LOAD` with the monitor's `build/hello.bin` pasted: CR LF and LF line ends, tabs, blank lines, skipped lines, a line too long, blanks after a line's 76 characters, a DEL that takes back the key after them, an address given twice, and CTRL-C. Then `SYS 0x8000` runs it. |
 | `load_64k` | The ROM, with 64K words, as on the Nexys4DDR | `LOAD` at the end of that RAM. |
 | `load_emu` | The ROM, with `0xFFFFFF9E` reading 0, as in `niceemu` | `LOAD` up to the screen. |

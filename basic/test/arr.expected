@@ -117,6 +117,13 @@ READY.
 ? Z(3000)
 0
 READY.
+HIMEM = 0x9000
+READY.
+? Z(3000)
+Undefined array
+READY.
+HIMEM = 0x10000
+READY.
 HIMEM =
 Syntax error
 HIMEM = A           the top of the program, its variables, and arrays; and CLR
