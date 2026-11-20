@@ -2115,7 +2115,9 @@ def test_fat_dir(link: Link, fat: dict[int, Folder]) -> None:
     load(link, f"{REPO}/build/rom_test.bin")
     console(link)                      # the banner
     for slot, folder in fat.items():
-        want = folder.rows
+        # DIR's header names the slot, which the host's rows do not
+        want = folder.rows[:1] if len(folder.rows) == 1 else (
+            [f"{folder.rows[0]} in slot {slot}"] + folder.rows[1:])
         cmd = f"DIR {slot}\r".encode()
         link.send_console(cmd)
         text = console_until(link, lambda t: READY in t.partition(cmd)[2], 30.0)
