@@ -176,7 +176,7 @@ The emulator, `niceemu`, has all of them, with the differences that
 `--sd0 FILE` and `--sd1 FILE`, and its frames come from a file,
 `--eth-in`, or from UDP, `--eth-udp`.
 
-**The ROM.** The monitor gives a program at `0x8000` forty-one routines.
+**The ROM.** The monitor gives a program at `0x8000` forty-two routines.
 The program calls them through the dispatch table, a row of jumps at
 fixed addresses at the start of the ROM
 ([monitor/README.md](../monitor/README.md#the-dispatch-table)). BASIC,

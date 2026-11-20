@@ -891,6 +891,9 @@ entry 37, the monitor's version text (#153):
 | `scr_back` | The scrollback: some rows back or forward, or the screen again | `hist_up`, `hist_down`, and `hist_leave` |
 | `fs_complete` | TAB's completion of a file's name, on a line of the caller's | `complete` |
 
+`V2.4` adds entry 41, `scr_links`, in table 1.8, for the editor of
+stage 7 ([The screen editor](#the-screen-editor)).
+
 BASIC then reads its line with a routine of its own, the ring first,
 and `con_getline` stays for the programs. The break poll is `con_key`
 without a wait, so a long `RUN` keeps the network going too, as

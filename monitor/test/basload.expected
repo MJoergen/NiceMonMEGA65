@@ -3,7 +3,7 @@ NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 ver
-NiceMon V9.9, BASIC V9.9, dispatch table 1.7
+NiceMon V9.9, BASIC V9.9, dispatch table 1.8
 READY.
 halt
 Halted
@@ -12,7 +12,7 @@ Screen:
 |HELP lists the statements
 |READY.
 |ver
-|NiceMon V9.9, BASIC V9.9, dispatch table 1.7
+|NiceMon V9.9, BASIC V9.9, dispatch table 1.8
 |READY.
 |halt
 |Halted
@@ -36,7 +36,7 @@ NiceMon V9.9, BASIC A
 HELP lists the statements
 READY.
 ver
-NiceMon V9.9, BASIC A, dispatch table 1.7
+NiceMon V9.9, BASIC A, dispatch table 1.8
 READY.
 halt
 Halted
@@ -46,7 +46,7 @@ Screen:
 |HELP lists the statements
 |READY.
 |ver
-|NiceMon V9.9, BASIC A, dispatch table 1.7
+|NiceMon V9.9, BASIC A, dispatch table 1.8
 |READY.
 |halt
 |Halted

@@ -49,6 +49,11 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   write-protected card, one that is not blank without `--force`, and
   the MEGA65's card with its system partition without `--system`
   ([tools/README.md](../tools/README.md#sdcardpy)).
+- The dispatch table is 1.8, with entry 41, `scr_links`: the rows of
+  the screen that go on from the row above, which `mon_putc` keeps as
+  it wraps, ends, and scrolls the rows, for BASIC's screen editor
+  ([#118](https://github.com/MJoergen/NiceMonMEGA65/issues/118),
+  [monitor/README.md](../monitor/README.md#the-dispatch-table)).
 
 ## V2.3.2 (2026-11-19)
 

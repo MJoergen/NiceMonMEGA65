@@ -507,7 +507,7 @@ would not fit in the 6890 words that were free
 ([BASIC.md](BASIC.md#the-roms-room)).
 
 - BASIC's part has 20480 words, `0x3000`–`0x7FFF`, and the monitor's
-  12288, of which it uses 10598.
+  12288, of which it uses 10648.
 - The boundary is the generic `G_ROM_BASIC` of `src/mem.vhd` and
   `src/nicemon.vhd`, a comparison of the ROM's address with a
   constant, where it was address bit 14. So the move needs a

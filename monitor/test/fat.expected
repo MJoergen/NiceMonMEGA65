@@ -3,7 +3,7 @@ HELP lists the statements
 READY.
 dir
 Directory of NICE
-HELLO.BIN                      14400
+HELLO.BIN                      14436
 SUB                            <DIR>
 A long name.txt                   26
 readme.txt                        30
@@ -33,12 +33,12 @@ Files: 25, directories: 1
 READY.
 DIR 1
 Directory of NICE
-HELLO.BIN                      14400
+HELLO.BIN                      14436
 Files: 1, directories: 0
 READY.
 dir 0
 Directory of NICE
-HELLO.BIN                      14400
+HELLO.BIN                      14436
 SUB                            <DIR>
 A long name.txt                   26
 readme.txt                        30
@@ -115,17 +115,17 @@ dir 0x123456789
 Illegal quantity
 READY.
 LOAD "HELLO.BIN"
-Words loaded: 800, 00008000 to 0000831F
+Words loaded: 802, 00008000 to 00008321
 READY.
 sys 0x8000
-Hello from 00008000, table 00010007
+Hello from 00008000, table 00010008
 at column 40
 on the line only
 Returned 0000002A
 READY.
 halt
 Halted
-ffffe80c: 00000320 00008000 0000831f 00000000 00000000
+ffffe80c: 00000322 00008000 00008321 00000000 00000000
 Screen:
 |dirx
 |Syntax error; HELP lists the statements
@@ -142,10 +142,10 @@ Screen:
 |Illegal quantity
 |READY.
 |LOAD "HELLO.BIN"
-|Words loaded: 800, 00008000 to 0000831F
+|Words loaded: 802, 00008000 to 00008321
 |READY.
 |sys 0x8000
-|Hello from 00008000, table 00010007
+|Hello from 00008000, table 00010008
 |                                        at column 40
 |Returned 0000002A
 |READY.

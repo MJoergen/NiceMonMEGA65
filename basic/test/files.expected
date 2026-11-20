@@ -101,8 +101,8 @@ READY.
 LIST
 READY.
 RUN "HELLO.BIN"
-Words loaded: 800, 00008000 to 0000831F
-Hello from 00008000, table 00010007
+Words loaded: 802, 00008000 to 00008321
+Hello from 00008000, table 00010008
 at column 40
 on the line only
 Returned 0000002A
@@ -137,7 +137,7 @@ LIST
 READY.
 DIR
 Directory of NICE
-HELLO.BIN                      14400
+HELLO.BIN                      14436
 PC.BAS                            94
 BAD.BAS                           53
 LONG.BAS                         232
@@ -162,7 +162,7 @@ Screen:
 |READY.
 |DIR
 |Directory of NICE
-|HELLO.BIN                      14400
+|HELLO.BIN                      14436
 |PC.BAS                            94
 |BAD.BAS                           53
 |LONG.BAS                         232

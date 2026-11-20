@@ -128,6 +128,11 @@ $(BUILD)/hal17.bin: test/hal17.nasm mon.nasm $(TOOLS) | $(BUILD)
 	@cat test/hal17.nasm mon.nasm > $(BUILD)/hal17_all.nasm
 	@$(ASM) -o $@ $(BUILD)/hal17_all.nasm
 
+# The test of the entry of table 1.8, test/hal18.nasm, built the same
+$(BUILD)/hal18.bin: test/hal18.nasm mon.nasm $(TOOLS) | $(BUILD)
+	@cat test/hal18.nasm mon.nasm > $(BUILD)/hal18_all.nasm
+	@$(ASM) -o $@ $(BUILD)/hal18_all.nasm
+
 # The board's test of TCP's clients, test/tcphw.nasm, which
 # tools/hwtest.py runs, built as fs.bin
 $(BUILD)/tcphw.bin: test/tcphw.nasm mon.nasm $(TOOLS) | $(BUILD)
@@ -175,6 +180,8 @@ HAL16 = sys 0x8000\r12\177345678x9\t\rhalt\r
 # hal17: sys 0x8000 runs test/hal17.nasm, whose con_key reads a and b,
 # and finds no key after them; the program halts the core itself.
 HAL17 = sys 0x8000\rab
+# hal18: sys 0x8000 runs test/hal18.nasm, which halts the core itself.
+HAL18 = sys 0x8000\r
 # reset: sys 0, the cold start, which shows the banner again and leaves
 # the RAM from 0x8000 alone, so that sys 0x8000 then runs hello.
 RESET = sys 0\rsys 0x8000\rhalt\r
@@ -302,6 +309,8 @@ DUMP_fsw      = -d 0x9100:42
 DUMP_hal16    = -d 0x9100:16 -d 0x9180:9 -d 0x9190:7 -d 0x9198:2 -d 0x9200:2
 # For hal17 its results, and the two lines that fs_complete completed
 DUMP_hal17    = -d 0x9100:13 -d 0x9180:18 -d 0x91A0:18
+# For hal18 its results
+DUMP_hal18    = -d 0x9100:12
 DUMP_fat      = -d 0xFFFFE80C:5
 # For fpu the number of test/fpu.nasm's runs, the FPU's status and the
 # screen's mode word at the start of each run, and both at the halt
@@ -355,7 +364,7 @@ FAT32_START_BYTES = $(shell echo $$(($(FAT32_START) * 512)))
 test: fmt $(ROM_TEST) $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.bin $(BUILD)/hello.bin \
       $(BUILD)/sd.bin $(BUILD)/arp.bin $(BUILD)/udp.bin $(BUILD)/net.bin \
       $(BUILD)/netdhcp.bin $(BUILD)/dns.bin $(BUILD)/lease.bin $(BUILD)/fpu.bin $(BUILD)/fs.bin $(BUILD)/fsw.bin \
-      $(BUILD)/hal16.bin $(BUILD)/hal17.bin $(FAT_IMAGES) $(BUILD)/version_test.nasm
+      $(BUILD)/hal16.bin $(BUILD)/hal17.bin $(BUILD)/hal18.bin $(FAT_IMAGES) $(BUILD)/version_test.nasm
 	@test '$(FOLDER_UC)' = NICE || { echo "make test needs FOLDER=NICE, not $(FOLDER)"; exit 1; }
 	@$(PYTHON) test/ring.py $(EMU) $(ROM_TEST):32768 \
 	  $(BUILD)/monitor_8k.bin:8192 $(BUILD)/monitor_2k.bin:2048
@@ -372,6 +381,7 @@ test: fmt $(ROM_TEST) $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.bin $(BUILD)/h
 	@printf '$(RUN)' > $(BUILD)/run.txt
 	@printf '$(HAL16)' > $(BUILD)/hal16.txt
 	@printf '$(HAL17)' > $(BUILD)/hal17.txt
+	@printf '$(HAL18)' > $(BUILD)/hal18.txt
 	@printf '$(RESET)' > $(BUILD)/reset.txt
 	@printf '$(SCROLL)' > $(BUILD)/scroll.txt
 	@printf '$(SD_WRITE)' > $(BUILD)/sd_write.txt
@@ -395,7 +405,7 @@ test: fmt $(ROM_TEST) $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.bin $(BUILD)/h
 	  if [ -n "$$base0" ]; then cp --sparse=always $$base0 $(BUILD)/$${t}0.img; sd="--sd0 $(BUILD)/$${t}0.img"; fi; \
 	  if [ -n "$$base1" ]; then rm -f $(BUILD)/$${t}1.img; cp --sparse=always $$base1 $(BUILD)/$${t}1.img; \
 	    if [ -n "$$ro1" ]; then chmod a-w $(BUILD)/$${t}1.img; fi; sd="$$sd --sd1 $(BUILD)/$${t}1.img"; fi; }; \
-	for t in scroll sd_write arp udp net fpu fs fsw hal16 hal17 fat fatw fatl tab fatlw fatbad fat1 fatnone \
+	for t in scroll sd_write arp udp net fpu fs fsw hal16 hal17 hal18 fat fatw fatl tab fatlw fatbad fat1 fatnone \
 	           clock clockpast \
 	           hello reset hello_c; do \
 	  opts=; rom=$(ROM_TEST); base0=; base1=; ro1=; mask=; \
@@ -419,6 +429,7 @@ test: fmt $(ROM_TEST) $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.bin $(BUILD)/h
 	    hal16) prog=$(BUILD)/hal16.bin; input=hal16; dump='$(DUMP_hal16)'; opts=--step-time;; \
 	    hal17) prog=$(BUILD)/hal17.bin; input=hal17; dump='$(DUMP_hal17)'; \
 	      base0=$(BUILD)/fat/super.img; opts=--step-time;; \
+	    hal18) prog=$(BUILD)/hal18.bin; input=hal18; dump='$(DUMP_hal18)';; \
 	    fat) prog=; input=fat; dump='$(DUMP_fat)'; \
 	      opts="--sd0 $(BUILD)/fat/fat32.img --sd1 $(BUILD)/fat/super.img";; \
 	    fatw) prog=; input=fatw; dump=; \
@@ -489,7 +500,7 @@ romsize: $(ROM_TEST)
 # checked by ../basic/Makefile
 fmt:
 	@$(FMT) $(MON_SOURCES) test/hello.nasm test/sd.nasm test/arp.nasm test/fpu.nasm \
-	  test/fs.nasm test/fsw.nasm test/hal16.nasm test/hal17.nasm test/udp.nasm test/net.nasm test/netdhcp.nasm \
+	  test/fs.nasm test/fsw.nasm test/hal16.nasm test/hal17.nasm test/hal18.nasm test/udp.nasm test/net.nasm test/netdhcp.nasm \
 	  test/dns.nasm test/lease.nasm test/tcp.nasm test/tcpt.nasm test/tcphw.nasm mon_c.nasm
 
 $(BUILD):

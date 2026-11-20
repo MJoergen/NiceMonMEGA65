@@ -18,7 +18,7 @@ segment 0
   open 0 "Twentysix_Characters.CH_26" 0 -> 0
   close 0 -> 0
   open 1 "" 2 -> 0
-  readname 1 -> 1 "HELLO   BIN" attr 20 size 14400 name "HELLO.BIN"
+  readname 1 -> 1 "HELLO   BIN" attr 20 size 14436 name "HELLO.BIN"
   readname 1 -> 1 "THIRTE~1CH1" attr 20 size 0 name "thirteen.ch13"
   readname 1 -> 1 "TWENTY~1CH_" attr 20 size 0 name "twentysix_characters.ch_26"
   readname 1 -> 0

@@ -452,7 +452,7 @@ dump 0x8000, 0x700
 000086FC 00000000 00000000 00000000 00000000
 READY.
 ver
-NiceMon V9.9, BASIC V9.9, dispatch table 1.7
+NiceMon V9.9, BASIC V9.9, dispatch table 1.8
 READY.
 halt
 Halted
@@ -484,7 +484,7 @@ Screen:
 |000086FC 00000000 00000000 00000000 00000000
 |READY.
 |ver
-|NiceMon V9.9, BASIC V9.9, dispatch table 1.7
+|NiceMon V9.9, BASIC V9.9, dispatch table 1.8
 |READY.
 |halt
 |Halted

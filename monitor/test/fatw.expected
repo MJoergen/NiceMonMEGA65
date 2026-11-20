@@ -10,7 +10,7 @@ Words saved: 2, 00008000 to 00008001
 READY.
 dir
 Directory of NICE
-HELLO.BIN                      14400
+HELLO.BIN                      14436
 test.BIN                          36
 Files: 2, directories: 0
 READY.
@@ -74,7 +74,7 @@ Syntax error; HELP lists the statements
 READY.
 dir 1
 Directory of NICE
-HELLO.BIN                      14400
+HELLO.BIN                      14436
 Files: 1, directories: 0
 READY.
 save "full.bin", 0x8000, 256
@@ -82,7 +82,7 @@ File error 30, the card or the folder is full
 READY.
 dir
 Directory of NICE
-HELLO.BIN                      14400
+HELLO.BIN                      14436
 full.bin                        1536
 Files: 2, directories: 0
 READY.
@@ -94,7 +94,7 @@ Words saved: 2, 00008000 to 00008001
 READY.
 dir
 Directory of NICE
-HELLO.BIN                      14400
+HELLO.BIN                      14436
 full.bin                          36
 Files: 2, directories: 0
 READY.
@@ -107,7 +107,7 @@ Screen:
 |READY.
 |dir
 |Directory of NICE
-|HELLO.BIN                      14400
+|HELLO.BIN                      14436
 |full.bin                        1536
 |Files: 2, directories: 0
 |READY.
@@ -119,7 +119,7 @@ Screen:
 |READY.
 |dir
 |Directory of NICE
-|HELLO.BIN                      14400
+|HELLO.BIN                      14436
 |full.bin                          36
 |Files: 2, directories: 0
 |READY.
@@ -147,7 +147,7 @@ FAT entries changed: 29
   4-32: each the next, the last 0FFFFFFF -> 00000000
 FAT 2: the same changes
 NICE C3 entry 2:
-  was "HELLO   BIN" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2025-06-15 written 2025-06-15 12:34:56 cluster 4 size 14400
+  was "HELLO   BIN" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2025-06-15 written 2025-06-15 12:34:56 cluster 4 size 14436
   now "HELLO   BIN" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 0 size 0
 NICE C3 entry 3:
   was zeros

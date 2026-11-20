@@ -1,6 +1,6 @@
 ; The monitor, the program of the ROM at 0x0000 (README.md). The core boots
 ; from it at reset. It gives the programs at 0x8000 a hardware abstraction
-; layer, the HAL: forty-one routines, called through the dispatch table at
+; layer, the HAL: forty-two routines, called through the dispatch table at
 ; the start of the ROM, and its main loop is BASIC's (issue #54), whose
 ; statements are typed on the keyboard or sent over the line, and shown
 ; on the screen and the line.
@@ -131,6 +131,7 @@ V_COL           .EQU    0xFFFFF000      ; the cursor's column, 0 to 79
 V_ROW           .EQU    0xFFFFF001      ; and its row, 0 to 24
 V_COLOR         .EQU    0xFFFFF002      ; the color of the characters put, bits 31..8
 V_OUT           .EQU    0xFFFFF003      ; the outputs: bit 0 the line, bit 1 the screen
+V_LINKS         .EQU    0xFFFFF004      ; the rows that go on from the row above, bit r for row r (scr_links)
 V_HSIZE         .EQU    0xFFFFF005      ; the words of the screen's memory
 V_HCAP          .EQU    0xFFFFF006      ; the rows of the history, after the 25 of the screen
 V_HHEAD         .EQU    0xFFFFF007      ; the slot of the next row, slot i at SCREEN + V_HSIZE - 80 (i + 1)
@@ -233,7 +234,7 @@ V_T             .EQU    0xFFFFFEE0      ; 24 words for TAB, to 0xFFFFFEF7
 COLOR           .EQU    MON_FG_WHITE+MON_BG_BLACK  ; the color at the cold start
 OUT_LINE        .EQU    1
 OUT_SCREEN      .EQU    2
-TABLE_VERSION   .EQU    0x00010007      ; what mon_version returns: 1.7
+TABLE_VERSION   .EQU    0x00010008      ; what mon_version returns: 1.8
 PAGE            .EQU    24              ; the rows of a Page Up or Page Down
 SCR_MAX         .EQU    0x7FFF          ; the largest display offset
 
@@ -285,6 +286,7 @@ SCR_MAX         .EQU    0x7FFF          ; the largest display offset
                 JMP     con_key         ; 38 at 0x4C, monitor.nasm
                 JMP     scr_back        ; 39 at 0x4E, monitor.nasm
                 JMP     fs_complete     ; 40 at 0x50, monitor.nasm
+                JMP     scr_links       ; 41 at 0x52, monitor.nasm
 
 ; mon_reset: the cold start, entry 0, which reset runs and a program may
 ; call. E is cleared, the timer stopped, the FPU's stack emptied and its
@@ -495,6 +497,19 @@ scr_back
                 MOVE    R1, @V_BACK
                 RET
 
+; scr_links: entry 41. The rows of the screen that go on from the row
+; above, bit r for row r, 1 to 24 (doc/BASIC.md, "The screen editor"):
+; mon_putc sets a row's bit when it wraps to it past the last column,
+; clears it at a LF, and shifts the word when the screen scrolls, and
+; scr_cls clears it. R1 the new word, or -1 to keep it; bit 0 and the
+; bits from 25 are dropped. R1 = the old word. Uses R2.
+scr_links
+                MOVE    R2, @V_LINKS
+                CMP     R1, -1
+        ?!Z     AND     @V_LINKS, R1, 0x1FFFFFE
+                MOVE    R1, R2
+                RET
+
 ; fs_complete: entry 40. TAB on a line of the caller's, as con_getline
 ; has it (issue #137): R1 the word address of the line, one character a
 ; word, R2 that of the cursor in it, and R3 that of the word after the
@@ -558,12 +573,31 @@ mon_putc
                 CMP     R1, 80
         ?!Z     MOVE    @V_COL, R1
         ?!Z     JMP     putc_cur
-; Column 0 of the next row, with the rows moved up by one after the last
-putc_lf         CLR     @V_COL
+; Past the last column, the next row goes on from this one: its bit of
+; V_LINKS set (scr_links)
+putc_wrap
+                CALL    putc_next
+                MOVE    R1, @V_ROW
+                MOVE    R2, 1
+                SHL     R2, R2, R1
+                OR      @V_LINKS, @V_LINKS, R2
+                JMP     putc_cur
+; LF: the next row starts a line of its own, its bit of V_LINKS cleared
+putc_lf         CALL    putc_next
+                MOVE    R1, @V_ROW
+                MOVE    R2, 1
+                SHL     R2, R2, R1
+                NOT     R2, R2
+                AND     @V_LINKS, @V_LINKS, R2
+                JMP     putc_cur
+; putc_next: column 0 of the next row, with the rows moved up by one
+; after the last, and V_LINKS with them. Uses R1-R4.
+putc_next
+                CLR     @V_COL
                 ADD     R1, @V_ROW, 1
                 CMP     R1, 25
         ?!Z     MOVE    @V_ROW, R1
-        ?!Z     JMP     putc_cur
+        ?!Z     RET
 ; Row 0 into the history, at slot V_HHEAD, which moves down the ring, when
 ; the memory has room for one
                 TST     @V_HCAP
@@ -587,6 +621,8 @@ putc_lf         CLR     @V_COL
                 CMP     @V_HCAP, R1
         ?!C     MOVE    @V_HCOUNT, R1
 putc_scroll
+                SHR     R1, @V_LINKS, 1  ; row 0, which went, takes row 1's bit: none
+                AND     @V_LINKS, R1, 0x1FFFFFE
                 MOVE    R2, SCREEN
                 MOVE    R3, SCREEN+80
                 MOVE    R4, 1920        ; rows 1 to 24 to rows 0 to 23
@@ -599,6 +635,7 @@ putc_scroll
                 MOVE    @R2++, R3
                 SUB[M]  R4, R4, 1
         ?!Z     JMP     :-
+                RET
 ; The cursor's registers from the variables
 putc_cur
                 MOVE    @SCR_X, @V_COL
@@ -617,7 +654,7 @@ putc_ctl
                 OR      R1, @V_COL, 7   ; TAB: the next multiple of 8
                 ADD     R1, R1, 1
                 CMP     R1, 80
-        ?!C     JMP     putc_lf         ; past the last column
+        ?!C     JMP     putc_wrap       ; past the last column
                 MOVE    @V_COL, R1
                 JMP     putc_cur
 :               MOVE[M] R1, @V_COL
@@ -644,6 +681,7 @@ scr_cls         CLR     @SCR_OFFS
         ?!Z     JMP     :-
                 CLR     @V_COL
                 CLR     @V_ROW
+                CLR     @V_LINKS
                 JMP     putc_cur
 
 ; scr_moveto: entry 6. The cursor to column R1 and row R2. A column past

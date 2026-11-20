@@ -298,6 +298,16 @@ int mon_scr_back(int rows);
 MON_ENTRY(fs_complete) unsigned *mon_fs_complete(unsigned *line, unsigned *cursor,
                                                  unsigned *end);
 
+// The service of table 1.8, for BASIC's screen editor. A program checks
+// that mon_version is 0x00010008 or more.
+
+// The rows of the screen that go on from the row above, bit r for row r,
+// 1 to 24: mon_putc sets a row's bit when it wraps to it past the last
+// column, clears it at a LF, and shifts the word when the screen
+// scrolls, and scr_cls clears it. links the new word, or -1 to keep it.
+// The old word. Entry 41.
+unsigned mon_scr_links(unsigned links);
+
 // The NICE word address of a C array of words, for the entries above
 // that take one character or byte per word, such as mon_fs_open's name
 // and mon_fs_read's buffer, which the program then reads as plain unsigned

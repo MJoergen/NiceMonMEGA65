@@ -261,10 +261,10 @@ assembled apart (#152): the monitor's from 0, and BASIC's from
 <!-- romsize layout -->
 | Part | Address | Words |
 |---|---|---:|
-| The monitor | `0x0000`–`0x2965` | 10598 |
-| Free | `0x2966`–`0x2FFF` | 1690 |
-| BASIC | `0x3000`–`0x5515` | 9494 |
-| Free | `0x5516`–`0x7FFF` | 10986 |
+| The monitor | `0x0000`–`0x2997` | 10648 |
+| Free | `0x2998`–`0x2FFF` | 1640 |
+| BASIC | `0x3000`–`0x5517` | 9496 |
+| Free | `0x5518`–`0x7FFF` | 10984 |
 <!-- /romsize layout -->
 
 The monitor's words, by the source they come from, in the order
@@ -277,7 +277,7 @@ ROM is built:
 <!-- romsize monitor -->
 | Source | What it is | Words | Text |
 |---|---|---:|---:|
-| `monitor.nasm` | The dispatch table, the HAL, and the cold start | 1029 | 0 |
+| `monitor.nasm` | The dispatch table, the HAL, and the cold start | 1077 | 0 |
 | `monitor_sd.nasm` | The sector routines | 85 | 0 |
 | `monitor_fat.nasm` | FAT32, the file entries, and TAB | 2893 | 0 |
 | `monitor_eth.nasm` | The network, and its entries | 2440 | 10 |
@@ -286,10 +286,10 @@ ROM is built:
 | `monitor_basic.nasm` | The loader of BASIC's image from a card | 818 | 51 |
 | `common.nasm` | What the monitor and BASIC share: texts, IP addresses, and dates | 237 | 5 |
 | `monlib.nasm` | The routines that programs join | 274 | 0 |
-| `mon.nasm` | The stubs of the entries | 90 | 0 |
+| `mon.nasm` | The stubs of the entries | 92 | 0 |
 | `build/folder.nasm` | The folder's name | 3 | 3 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 10598 | 71 |
+| In all | | 10648 | 71 |
 <!-- /romsize monitor -->
 
 
@@ -480,6 +480,7 @@ compared with `test/NAME.expected`:
 | `fs` | `test/fs.nasm`, with FAT images in both slots | The file entries, through `mon.nasm`'s stubs: handles, reads across the fragments of a file and at its end, the folder's entries, mounts, each error a program can cause, and `fs_readname`'s long name and 8.3 name in lower case, and a file opened by its long name. |
 | `fsw` | `test/fsw.nasm`, with a copy of the card with partitions, one file read-only, and a write-protected card | The entries that write: a file written in pieces across clusters and read back, truncated, a file of ten clusters, deletions, one of a long name, a folder that grows a cluster, a mount that drops an open file, and each error. |
 | `hal17` | `test/hal17.nasm`, with `ab` typed after `SYS`, and `super.img` | The entries of table 1.7, through `mon.nasm`'s stubs: `mon_build`'s text, `con_key` with a wait, without, and with no key, `scr_back` back, forward, and past either end after 40 rows, and `fs_complete` on a line, plainly and through the word window, as a C stub calls it. |
+| `hal18` | `test/hal18.nasm` | The entry of table 1.8, `scr_links`, through `mon.nasm`'s stub: the word after `scr_cls`, after a wrap, a CR LF, a wrap and a LF at the last row, which scroll, and a TAB at its last column, and the bits that a write drops. |
 | `hal16` | `test/hal16.nasm`, with a line typed after `SYS` | The entries of table 1.6, through `mon.nasm`'s stubs: `con_getline` with a DEL, a full line, and TAB with no card, `bin_line`'s results and counts, `clock_set` and the clock it set, `net_servers` with none, and `mon_restore` after a program that stopped the cursor, set the timer, and moved the cursor off the screen. |
 | `fat` | The monitor, with FAT images in both slots | `DIR` and `LOAD`: the fragmented `FRAG.BIN`, a text file, bad arguments, and `HELLO.BIN` loaded and run. |
 | `fatw` | The monitor, with a copy of the card without partitions, and one that a write fills | `SAVE`, `LOAD`, `DIR`, and `DELETE`: a program saved and loaded back, a file truncated and deleted, bad arguments, and a full card, error 30, which has room again after `DELETE`. |

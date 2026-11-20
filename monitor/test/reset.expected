@@ -6,7 +6,7 @@ NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 sys 0x8000
-Hello from 00008000, table 00010007
+Hello from 00008000, table 00010008
 at column 40
 on the line only
 Returned 0000002A
@@ -23,7 +23,7 @@ Screen:
 |HELP lists the statements
 |READY.
 |sys 0x8000
-|Hello from 00008000, table 00010007
+|Hello from 00008000, table 00010008
 |                                        at column 40
 |Returned 0000002A
 |READY.

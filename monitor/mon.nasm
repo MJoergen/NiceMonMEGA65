@@ -52,7 +52,8 @@ MON_BUILD       .EQU    0x4A
 CON_KEY         .EQU    0x4C
 SCR_BACK        .EQU    0x4E
 FS_COMPLETE     .EQU    0x50
-MON_ENTRIES     .EQU    41              ; the number of the entries above, in BASIC's header
+SCR_LINKS       .EQU    0x52
+MON_ENTRIES     .EQU    42              ; the number of the entries above, in BASIC's header
 
 ; The outputs of mon_out, as in mon.h
 MON_OUT_LINE    .EQU    1
@@ -218,6 +219,8 @@ _mon_scr_back
                 JMP     SCR_BACK
 _mon_fs_complete
                 JMP     FS_COMPLETE
+_mon_scr_links
+                JMP     SCR_LINKS
 _mon_scr_getx
 _scr_getx
                 JMP     SCR_GETXY

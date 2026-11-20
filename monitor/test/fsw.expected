@@ -6,7 +6,7 @@ Returned 0000002A
 READY.
 halt
 Halted
-00009100: 00010007 00000000 00000258 00000000 00000064 ffffffe8 ffffffe1 ffffffe1
+00009100: 00010008 00000000 00000258 00000000 00000064 ffffffe8 ffffffe1 ffffffe1
 00009108: 00000000 00000000 ffffffe8 000002bc 00000000 ffffffe1 ffffffe1 00000000
 00009110: 00000000 00000032 00000000 00000000 00001388 00000000 00000000 00000000
 00009118: ffffffeb ffffffeb ffffffea ffffffe0 ffffffe0 ffffffeb ffffffe7 00000018
@@ -61,7 +61,7 @@ FAT entries changed: 24
   66-67: 00000000 -> each the next, the last 0FFFFFFF
 FAT 2: the same changes
 NICE C6 entry 2:
-  was "HELLO   BIN" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2025-06-15 written 2025-06-15 12:34:56 cluster 7 size 14400
+  was "HELLO   BIN" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2025-06-15 written 2025-06-15 12:34:56 cluster 7 size 14436
   now "HELLO   BIN" attr 20 case 00 created 2025-06-15 12:34:56 +0 accessed 2026-01-01 written 2026-01-01 00:00:00 cluster 7 size 50
 NICE C6 entry 4:
   was long 42 "xt\u0000\uffff\uffff\uffff\uffff\uffff\uffff\uffff\uffff\uffff\uffff" attr 0F type 00 sum 42 cluster 0000
