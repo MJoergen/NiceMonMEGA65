@@ -14,7 +14,9 @@ SCR_LAST        .EQU    0xFFFF0780      ; the screen's row 24, the last
 ; getline: the line of BASIC at V_LINE, up to EDIT_MAX characters and a
 ; 0, from the screen, with the keys typed ahead first. RETURN takes the
 ; logical line of the cursor, from the position where the first key came
-; when it is that line, as after INPUT's prompt, else from its start.
+; when it is that line, as after INPUT's prompt, else from its start. A
+; line of more than EDIT_MAX characters, as LIST may show one, is a Line
+; too long, err_long, as it is for LOAD, and is not taken shortened.
 ; The cursor keys and HOME, ESC [ H, move the cursor, and the cursor key
 ; down scrolls at the last row; DEL and BS delete to the left within the
 ; line; TAB completes the name of a file of the card (fs_complete) at
@@ -198,7 +200,8 @@ gl_tab
                 JMP     gl_key
 ; RETURN: the logical line from its start, or from where the first key
 ; came, to V_LINE; again to the line, after a move, from the line's
-; first row; and the cursor to the row after the line's last
+; first row; and the cursor to the row after the line's last. Then, when
+; the line had more than EDIT_MAX characters, a Line too long.
 gl_end
                 CALL    ed_ext
                 CALL    ed_floor
@@ -222,7 +225,10 @@ gl_end
                 POP     R2
                 CLR     R1
                 CALL    SCR_MOVETO      ; the line's last row
-                JMP     _io_crlf        ; which returns to the caller
+                CALL    _io_crlf
+                TST     R5              ; the characters that ed_copy left out
+        ?!Z     JMP     err_long
+                RET
 ; An ESC: with [ or O within io.t_esc a sequence, else the byte after it
 ; on its own, or nothing. ESC [ A to D move the cursor, ESC [ H to the
 ; top left, and ESC [ 5 ~ and 6 ~ show the scrollback; the bytes of any
@@ -439,14 +445,16 @@ ed_floor
 
 ; ed_copy: the text of the line from row R3, from position R9 to R6, but
 ; at most EDIT_MAX characters, to V_LINE, with a 0 after it. R1 = the
-; word of the 0. Uses R1, R2, and R5.
+; word of the 0, and R5 = the characters after EDIT_MAX, which it left
+; out, 0 for a line that fits. Uses R1, R2, and R5.
 ed_copy
                 MOVE    R1, R3
                 CALL    ed_row
                 ADD     R2, R1, R9
                 MOVE    R1, V_LINE
                 SUB[M]  R5, R6, R9      ; the characters
-        ?C      JMP     :++             ; none
+        ?C      CLR     R5              ; none
+        ?C      JMP     :++
         ?Z      JMP     :++
 :
                 CMP     R1, V_LINE+EDIT_MAX

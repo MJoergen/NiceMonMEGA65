@@ -78,9 +78,12 @@ cursor is in, wherever the cursor is in it, so a line that `LIST`
 showed can be changed and entered again: the cursor up to it, the
 change, and RETURN. A line goes on into the rows below it, up to four,
 and takes up to 254 characters; a line that `PRINT` or `LIST` wraps is
-one line too. When a line grows into a row that holds other text, that
-row and those below it move down. At `INPUT` the answer starts after
-the prompt. There is no INST key and no quote mode.
+one line too. A key typed into a line of 254 characters does nothing.
+`LIST` may show a line with more, as it writes `?` as `PRINT` and adds
+blanks: RETURN on such a line is `Line too long`, and the line stays
+as it was stored. When a line grows into a row that holds other text,
+that row and those below it move down. At `INPUT` the answer starts
+after the prompt. There is no INST key and no quote mode.
 
 A line that the tokenizer refuses, such as `10 PRINT 1 @ 2`, is not
 stored. After the error and `READY.`, the line is shown again with the
@@ -508,6 +511,7 @@ the default. It runs these steps in order:
 | `funcs` | The ROM alone | The functions: their values, in either case, `PI`, the order of `^` and the signs, `RND`'s range and its numbers again after a negative argument, names that start with a function's, `LIST` of each function and of the keywords after them, and the errors of an argument a function does not take, `LOG(0)`, an overflow, and a function without its parentheses. |
 | `prog` | The ROM alone, with `test/prog.bas` typed | The lines: their entry, edits, and deletion, the numbers at the limits, `LIST` and its blanks, `RUN`, `NEW`, the variables an edit keeps, the tokens in memory, `FOR` with steps, nested, and once, `GOSUB` in loops, `IF` with `ELSE`, nested, `STOP`, `END`, `CONT`, and the errors in a program, with its line's number. |
 | `edit` | The ROM alone | The screen editor: a listed line changed and entered again, a line that grows into the row below, `INPUT`'s answer after its prompt, DEL in the middle and at the prompt, a line of two rows entered from its first row, CTRL-C, and the cursor key down at the last row. The screen at the end is compared too. |
+| `long` | The ROM alone | The editor's limit: a listed line of 254 characters, changed at its last character and entered again, and one of 255, which is `Line too long` and stays as it was. |
 | `lines` | The ROM alone | `DELETE` of a range, a line, and up to a line, `RENUMBER` with the jumps forward and back, a target that is no line, the overflow and a step of 0, and `AUTO`, ended by a number alone and by CTRL-C. |
 | `redo` | The ROM alone | The check at entry: a line of two rows that the tokenizer refuses is shown again after `READY.`, with the cursor at the error, as the input ends there and no key waits; it runs until the step limit. |
 | `keys` | The ROM alone | `INPUT` with too few, too many, and bad numbers, a prompt, and CTRL-C; `GET`; the break key in a loop, in `CONT`, and in `LIST`; and the keys typed ahead, of which the ring keeps 31. |
@@ -555,11 +559,11 @@ table, and `make romsize` writes it again.
 | `basic_net.nasm` | `DHCP`, `NTP`, and TFTP | 917 | 150 |
 | `basic_time.nasm` | `TIME`, and the clock's side of `NTP` | 275 | 44 |
 | `basic_dis.nasm` | The disassembler of `DIS` | 871 | 79 |
-| `basic_edit.nasm` | The screen editor | 1104 | 0 |
+| `basic_edit.nasm` | The screen editor | 1111 | 0 |
 | `common.nasm` | What the monitor and BASIC share: texts, IP addresses, and dates | 237 | 5 |
 | `monlib.nasm` | The routines that programs join | 274 | 0 |
 | `mon.nasm` | The stubs of the entries | 92 | 0 |
 | `build/basic_folder.nasm` | The texts with the folder's name: `DIR`'s, and the error of a card without it | 14 | 14 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 10776 | 1629 |
+| In all | | 10783 | 1629 |
 <!-- /romsize basic -->

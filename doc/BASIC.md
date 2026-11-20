@@ -678,7 +678,9 @@ The Commodore editor of #54, in assembly, in place of the monitor's
   line from the screen: up to four rows, of which it takes at most
   254 characters, as `LOAD` does. Two rows would not do, as `LIST`
   writes `?` as `PRINT`, so a line typed at 160 characters may list
-  longer, and could not be entered again.
+  longer, and could not be entered again. A line that lists with more
+  than 254 characters is `Line too long` at RETURN, as it is for
+  `LOAD`, and is not entered shortened.
 - A word of 25 bits says which rows go on from the row above. The
   monitor keeps it, as `mon_putc` changes it:
   - Past column 79, `mon_putc` sets the bit of the next row, so the

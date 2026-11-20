@@ -251,6 +251,15 @@ EDIT = cls\r10 PRINT "HELLO"\r20 PRINT "WORLD"\rLIST\r$(UP)$(UP)$(UP)$(RT)$(RT)$
 # and 220, and the line of 240 alone ends it; AUTO, 10 and 10, ends at
 # CTRL-C. A GOTO to a line that is not there keeps its number.
 LINES = 10 PRINT "A"\r20 GOTO 40\r30 PRINT "C"\r40 GOSUB 60: IF 1 THEN 70\r50 END\r60 RETURN\r70 PRINT "Z": GOTO 50\rRENUMBER 100, 5\rLIST\rRUN\rDELETE 105-110\rLIST\rDELETE 130\rDELETE -100\rLIST\rRENUMBER\rLIST\rRENUMBER 65535\rRENUMBER 1, 0\rDELETE\rDELETE 50-10\rLIST\rAUTO 200, 20\rPRINT 1\rPRINT 2\r\rLIST\rNEW\rAUTO\rREM X\r\003LIST\r5 GOTO 999\rRENUMBER 1000\rLIST\rHALT\r
+# long: the editor's limit of 254 characters. Lines 100 and 1000, each
+# 28 times ?1, which LIST writes as PRINT 1, so that line 100 lists with
+# 254 characters and line 1000 with 255. LIST 100, the cursor up to the
+# end of its text, a DEL, and 2 for the last 1: RETURN stores the line,
+# all 254 characters of it. LIST 1000, the cursor up into it, and RETURN:
+# a Line too long, which stores nothing, as the last LIST shows.
+Q28 = ?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1:?1
+RT14 = $(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)
+LONG = cls\r100 $(Q28)\r1000 $(Q28)\rLIST 100\r$(UP)$(UP)$(RT14)\1772\r$(DN)LIST 1000\r$(UP)$(UP)$(UP)\r$(DN)LIST\rHALT\r
 # redo: the check at entry (issue #118, step 3). A line of two rows
 # that the tokenizer refuses at its @ is not stored, and after READY. it
 # is shown again with the cursor at the @, as no key waits: the input
@@ -385,18 +394,19 @@ test: fmt $(ROM_TEST) test/prog.bas test/arr.bas test/files.in test/files_card.p
 	@tr '\n' '\r' < test/files.in > $(BUILD)/files.txt
 	@printf '$(KEYS)' > $(BUILD)/keys.txt
 	@printf '$(EDIT)' > $(BUILD)/edit.txt
+	@printf '$(LONG)' > $(BUILD)/long.txt
 	@printf '$(REDO)' > $(BUILD)/redo.txt
 	@printf '$(LINES)' > $(BUILD)/lines.txt
 	@{ printf '$(LOAD_HEAD)'; head -n 3 $(MON)/build/hello.bin | awk '{ printf "%s\r\n", $$0 }'; \
 	  tail -n +4 $(MON)/build/hello.bin; printf '$(LOAD_TAIL)'; } > $(BUILD)/load.txt
 	@fail=0; \
-	for t in cmds basic expr funcs prog keys edit redo lines arr load load_emu load_64k time files; do \
+	for t in cmds basic expr funcs prog keys edit long redo lines arr load load_emu load_64k time files; do \
 	  opts=; sd=; base0=; \
 	  case $$t in \
 	    cmds) prog=; dump='$(DUMP_cmds)';; \
 	    basic) prog=; dump='$(DUMP_basic)';; \
 	    expr) prog=; dump='$(DUMP_expr)';; \
-	    funcs|prog|keys|edit|lines|arr) prog=; dump=;; \
+	    funcs|prog|keys|edit|long|lines|arr) prog=; dump=;; \
 	    redo) prog=; dump='$(DUMP_redo)';; \
 	    load) prog=$(BUILD)/ram128k.bin; dump='$(DUMP_load)';; \
 	    load_emu) prog=; dump='$(DUMP_load_emu)';; \
