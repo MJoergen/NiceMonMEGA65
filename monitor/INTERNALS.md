@@ -263,8 +263,8 @@ assembled apart (#152): the monitor's from 0, and BASIC's from
 |---|---|---:|
 | The monitor | `0x0000`–`0x2997` | 10648 |
 | Free | `0x2998`–`0x2FFF` | 1640 |
-| BASIC | `0x3000`–`0x5517` | 9496 |
-| Free | `0x5518`–`0x7FFF` | 10984 |
+| BASIC | `0x3000`–`0x5778` | 10105 |
+| Free | `0x5779`–`0x7FFF` | 10375 |
 <!-- /romsize layout -->
 
 The monitor's words, by the source they come from, in the order
@@ -389,7 +389,7 @@ steps in order:
    for it. For each, it reads the rows a board would show from a dump of
    the memory, and compares them with the console output. It does this
    with the history partly filled and gone round, and after Page Up, Page
-   Down, the cursor keys, and a key that shows the screen again.
+   Down, and a key that shows the screen again.
 3. **DHCP.** `test/dhcp.py` runs `DHCP` with `--step-time`, so that
    each run takes the same steps. A first run with no server gives the
    transaction's number. Then it builds the OFFER and the ACK, among

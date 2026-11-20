@@ -36,13 +36,12 @@ BASIC keeps and runs (Programs below).
 At the cold start the ROM clears the screen, prints its banner,
 `NiceMon` and the version, then `HELP lists the statements` and
 `READY.`, on the screen and on the line. It reads a line from the
-console: the keyboard and the line, which the hardware merges. DEL and
-backspace delete the character before the cursor, CTRL-C empties the
-line, and the cursor and function keys, the other control codes, and
-the bytes `0x80` to `0x9F` do nothing. Keys typed while a program
-runs wait for the next line, `INPUT`, or `GET`, up to 31 of them, and
-those after are lost. RETURN runs the line, and BASIC
-prints `READY.` after it. A line of blanks only runs nothing and gets no
+console: the keyboard and the line, which the hardware merges, with
+the screen editor below. CTRL-C empties the line, and the function
+keys, the other control codes, and the bytes `0x80` to `0x9F` do
+nothing. Keys typed while a program runs wait for the next line,
+`INPUT`, or `GET`, up to 31 of them, and those after are lost. RETURN
+runs the line, and BASIC prints `READY.` after it. A line of blanks only runs nothing and gets no
 `READY.`. A break on the UART, or a host's half-close over Ethernet,
 ends the line's input and not the keyboard's, and the next host to
 connect over Ethernet can type again
@@ -70,12 +69,28 @@ The line is read from the left, and the first error decides:
 takes nothing after it, but `SYS 1/0` is a `Division by zero`. `0x`
 without digits is no number.
 
-Before the first key of a line, the cursor keys up and down scroll
-back through the rows that left the top of the screen a row at a time,
-and Page Up and Page Down 24 rows at a time. On the MEGA65 Page Up and
-Page Down are CTRL and MEGA with CRSR↑ and CRSR↓, and CRSR↑ and CRSR↓
-are the cursor keys, with MEGA or without. Any other key shows
-the screen again, and goes on to the line. The history has 384 rows on
+The screen editor works as the C64's (issue #118). The cursor keys
+move the cursor over the whole screen, and HOME moves it to the top
+left. The cursor key down at the last row scrolls the screen. A key
+inserts its character at the cursor, and DEL and backspace delete the
+character before it, and close the gap. RETURN takes the line that the
+cursor is in, wherever the cursor is in it, so a line that `LIST`
+showed can be changed and entered again: the cursor up to it, the
+change, and RETURN. A line goes on into the rows below it, up to four,
+and takes up to 254 characters; a line that `PRINT` or `LIST` wraps is
+one line too. When a line grows into a row that holds other text, that
+row and those below it move down. At `INPUT` the answer starts after
+the prompt. There is no INST key and no quote mode.
+
+A terminal on the line sees what is typed at the end of a line, as
+before. After a move of the cursor, or a RETURN on a line that was on
+the screen already, it gets the whole line again, after a CR, as BASIC
+takes it.
+
+Page Up and Page Down scroll back through the rows that left the top
+of the screen, 24 rows at a time. On the MEGA65 Page Up and Page Down
+are CTRL and MEGA with CRSR↑ and CRSR↓. Any other key shows the
+screen again, and goes on to the line. The history has 384 rows on
 the MEGA65 and 77 on the Nexys4DDR. `CLS` leaves it, as `clear` in a
 terminal does, and the cold start empties it. `niceemu` has no display
 offset, so there the history is kept but not shown.
@@ -448,6 +463,7 @@ the default. It runs these steps in order:
 | `basic` | The ROM alone, with no card and no IP address | The scanner of a statement: keywords glued to a letter or a digit, which are names, the HELP lines of each statement's Syntax error, numbers at the limits of a signed word, `0x` without digits, which is no number, a name in a number's place, strings without a closing quote, too few or too many arguments, and the tokens of a line, with the 0 after each string, which `SAVE` leaves as they were. |
 | `expr` | The ROM alone | The numbers: the operators and their order, the word operators, the comparisons, the functions, the constants, `PRINT`'s format and its items, the variables, `LET`, the colons, the errors, the depth of an expression, `PEEK` and `POKE`, a statement with expressions, a `LOAD` that writes no word, a broken table of variables, and `Out of memory`. |
 | `prog` | The ROM alone, with `test/prog.bas` typed | The lines: their entry, edits, and deletion, the numbers at the limits, `LIST` and its blanks, `RUN`, `NEW`, the variables an edit keeps, the tokens in memory, `FOR` with steps, nested, and once, `GOSUB` in loops, `IF` with `ELSE`, nested, `STOP`, `END`, `CONT`, and the errors in a program, with its line's number. |
+| `edit` | The ROM alone | The screen editor: a listed line changed and entered again, a line that grows into the row below, `INPUT`'s answer after its prompt, DEL in the middle and at the prompt, a line of two rows entered from its first row, CTRL-C, and the cursor key down at the last row. The screen at the end is compared too. |
 | `keys` | The ROM alone | `INPUT` with too few, too many, and bad numbers, a prompt, and CTRL-C; `GET`; the break key in a loop, in `CONT`, and in `LIST`; and the keys typed ahead, of which the ring keeps 31. |
 | `arr` | The ROM alone, with `test/arr.bas` typed | `DIM`, the elements, their errors, `LET`, `INPUT`, and `GET` of an element, `CLR` and an edit with arrays, `HIMEM` read and set, too low and too high, the layout of an array in memory, and `LOAD` below and above `HIMEM`, in a line and in a program. |
 | `load` | The ROM, with 128K words of RAM, as on the MEGA65 | `LOAD` with the monitor's `build/hello.bin` pasted: CR LF and LF line ends, tabs, blank lines, skipped lines, a line too long, blanks after a line's 76 characters, a DEL that takes back the key after them, an address given twice, and CTRL-C. Then `SYS 0x8000` runs it. |
@@ -488,15 +504,16 @@ table, and `make romsize` writes it again.
 |---|---|---:|---:|
 | `basic.nasm` | The vectors, the header, the main loop, the scanner, the keywords, the messages, and the help | 1384 | 845 |
 | `basic_expr.nasm` | The numbers: the tokenizer, the expressions, the variables, the errors, `PRINT`, `LET`, and `POKE` | 1550 | 39 |
-| `basic_prog.nasm` | The programs: the lines, `LIST`, `RUN`, the jumps, the loops, the line input, the break key, `INPUT`, `GET`, the arrays, and `HIMEM` | 2041 | 46 |
+| `basic_prog.nasm` | The programs: the lines, `LIST`, `RUN`, the jumps, the loops, the break key, `INPUT`, `GET`, the arrays, and `HIMEM` | 1842 | 46 |
 | `basic_cmd.nasm` | The routines of the statements that were the commands | 1839 | 294 |
 | `basic_net.nasm` | `DHCP`, `NTP`, and TFTP | 917 | 150 |
 | `basic_time.nasm` | `TIME`, and the clock's side of `NTP` | 275 | 44 |
 | `basic_dis.nasm` | The disassembler of `DIS` | 871 | 79 |
+| `basic_edit.nasm` | The screen editor | 808 | 0 |
 | `common.nasm` | What the monitor and BASIC share: texts, IP addresses, and dates | 237 | 5 |
 | `monlib.nasm` | The routines that programs join | 274 | 0 |
 | `mon.nasm` | The stubs of the entries | 92 | 0 |
 | `build/basic_folder.nasm` | The texts with the folder's name: `DIR`'s, and the error of a card without it | 14 | 14 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 9496 | 1518 |
+| In all | | 10105 | 1518 |
 <!-- /romsize basic -->

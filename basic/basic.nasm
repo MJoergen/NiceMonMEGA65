@@ -3,8 +3,8 @@
 ; It calls the monitor through the entries of the dispatch table alone,
 ; their .EQUs in ../monitor/mon.nasm, as a program does. The Makefile of
 ; ../monitor joins this file first, then basic_expr.nasm, basic_prog.nasm,
-; basic_cmd.nasm, basic_net.nasm, basic_time.nasm, and basic_dis.nasm,
-; and the monitor's common.nasm, monlib.nasm, and mon.nasm, of which
+; basic_cmd.nasm, basic_net.nasm, basic_time.nasm, basic_dis.nasm, and
+; basic_edit.nasm, and the monitor's common.nasm, monlib.nasm, and mon.nasm, of which
 ; BASIC has copies of its own.
 ;
 ; This file has the main loop, the scanner of a statement's items, and
@@ -74,8 +74,11 @@ V_BF            .EQU    0xFFFFE826      ; the fields of the clock's time, which 
 V_UF            .EQU    0xFFFFE830      ; for DIS: the fields dest, s0, and s1,
 V_UC            .EQU    0xFFFFE833      ; their constant words,
 V_UNOPS         .EQU    0xFFFFE836      ; and the operands of the mnemonic
-V_LINE          .EQU    0xFFFFE840      ; the line, LINE_MAX words, one over for LOAD, and a 0
-LINE_MAX        .EQU    76              ; as the monitor's line had, after a prompt of 2
+V_ECOL          .EQU    0xFFFFE840      ; for the screen editor: the color of the characters typed,
+V_ESR           .EQU    0xFFFFE841      ; the row where the line's first key came, less the rows scrolled since,
+V_ESC           .EQU    0xFFFFE842      ; and its column,
+V_EMOV          .EQU    0xFFFFE843      ; not 0 once a key did more than type at the end of the text,
+V_EKEY          .EQU    0xFFFFE844      ; and not 0 once the line's first key came
 V_TSRV          .EQU    0xFFFFE8A0      ; for TFTP: the server's IP address,
 V_TTID          .EQU    0xFFFFE8A1      ; its port, its TID, 0 before its first DATA,
 V_TBLK          .EQU    0xFFFFE8A2      ; the block waited for,

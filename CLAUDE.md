@@ -202,8 +202,9 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   `basic_cmd.nasm`, the routines of the statements
   that were the monitor's commands, and `SAVE` and `LOAD` of a
   program's text (#60), `DHCP`, `NTP`, and TFTP in
-  `basic_net.nasm`, `TIME` in `basic_time.nasm`, and `DIS` in
-  `basic_dis.nasm`), on the entries of the dispatch table alone, as a
+  `basic_net.nasm`, `TIME` in `basic_time.nasm`, `DIS` in
+  `basic_dis.nasm`, and the screen editor of stage 7 (#118) in
+  `basic_edit.nasm`), on the entries of the dispatch table alone, as a
   program is, with its tests of the statements in `basic/test/`, its
   benchmarks in `basic/bench/`, and
   `basic/README.md`, its build and its tests.

@@ -49,6 +49,13 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   write-protected card, one that is not blank without `--force`, and
   the MEGA65's card with its system partition without `--system`
   ([tools/README.md](../tools/README.md#sdcardpy)).
+- BASIC has a screen editor, as the C64's: the cursor keys move over
+  the screen, typing inserts, DEL closes the gap, and RETURN takes the
+  line the cursor is in, of up to four rows and 254 characters, so a
+  listed line can be changed and entered again
+  ([#118](https://github.com/MJoergen/NiceMonMEGA65/issues/118),
+  [basic/README.md](../basic/README.md)). The cursor keys up and down
+  no longer scroll back; Page Up and Page Down still do.
 - The dispatch table is 1.8, with entry 41, `scr_links`: the rows of
   the screen that go on from the row above, which `mon_putc` keeps as
   it wraps, ends, and scrolls the rows, for BASIC's screen editor

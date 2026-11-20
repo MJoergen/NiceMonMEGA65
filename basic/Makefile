@@ -83,8 +83,9 @@ $(BUILD)/dis.bin: test/dis.nasm $(TOOLS) | $(BUILD)
 # The inputs, each a line of BASIC's statements (doc/BASIC.md, issue
 # #112). cmds types each statement, and its bad arguments, with the edits
 # of a line: three DELs that take back abc, a CTRL-C that empties junk,
-# and the cursor key ESC [ A and the function key ESC O P, which are
-# dropped. An empty line and one of blanks run nothing and print no
+# the cursor keys up and down, ESC [ A and ESC [ B, which move the
+# cursor to READY. and back, so the line is sent again at its RETURN,
+# and the function key ESC O P, which is dropped. An empty line and one of blanks run nothing and print no
 # READY. DUMP is dump, in either case, q is no statement, and loadx no
 # LOAD. sys finds no program at 0x8000, nor at 0x9000, dump 0x8000, 0
 # only moves the next dump to 0x8000, and dump 0, 256 shows 256 words,
@@ -110,7 +111,7 @@ $(BUILD)/dis.bin: test/dis.nasm $(TOOLS) | $(BUILD)
 # case, the closing quote left out, and dump , 2, which goes on from
 # the last. halt ends each input. dash's printf, the shell of make on
 # Ubuntu, has no \x.
-CMDS = help\rver\rdump 0, 6\rdump\rDUMP 0x10, 1\rq\rloadx\r\r  cls\rabc\177\177\177ver\rjunk\003ver\r\033[A\033OPver\rsys 0x8000\rsys 0x9000\rdump 0x8000, 0\rdump 0x8000\rdump 0, 256\rip\rip "192.168.1.65"\rip "1.2.3"\rip "256.0.0.1"\rip "1..2.3"\rip "1.2.3.4x"\rip "  010.0.0.1 "\rmac\rmac "02:4E:49:43:45:01"\rmac "2:4e:49:43:45"\rmac "2:4e:49:43:45:123"\rmac "3:0:0:0:0:0"\rmac "2:4e: 49:43:45:1"\rmac "2:4e:49:43:45:1x"\rmac "  a:b:c:d:e:f "\rbaud\rbaud 921600\rbaud 9600\rBAUD  115200 \rip 1.2.3.4\rsys\rsys 0x\rdump 12ab\rdump 1,\rbaud 1 2\rver x\rload "a.bin" "1.2.3.4"\rdump 4294967296\rdump 0x100000000\rload "x.txt"\rload "x"\rsave "x", "1.2.3.4"\rHeLp x\rload "x.bin\rdump , 2\rhalt\r
+CMDS = help\rver\rdump 0, 6\rdump\rDUMP 0x10, 1\rq\rloadx\r\r  cls\rabc\177\177\177ver\rjunk\003ver\r\033[A\033[B\033OPver\rsys 0x8000\rsys 0x9000\rdump 0x8000, 0\rdump 0x8000\rdump 0, 256\rip\rip "192.168.1.65"\rip "1.2.3"\rip "256.0.0.1"\rip "1..2.3"\rip "1.2.3.4x"\rip "  010.0.0.1 "\rmac\rmac "02:4E:49:43:45:01"\rmac "2:4e:49:43:45"\rmac "2:4e:49:43:45:123"\rmac "3:0:0:0:0:0"\rmac "2:4e: 49:43:45:1"\rmac "2:4e:49:43:45:1x"\rmac "  a:b:c:d:e:f "\rbaud\rbaud 921600\rbaud 9600\rBAUD  115200 \rip 1.2.3.4\rsys\rsys 0x\rdump 12ab\rdump 1,\rbaud 1 2\rver x\rload "a.bin" "1.2.3.4"\rdump 4294967296\rdump 0x100000000\rload "x.txt"\rload "x"\rsave "x", "1.2.3.4"\rHeLp x\rload "x.bin\rdump , 2\rhalt\r
 # basic: the scanner of a statement, with no card and no IP address, so
 # that the statements that need them stop at once. A keyword in mixed
 # case and with blanks around it runs; a comma, a character of 0xE9, or
@@ -208,6 +209,23 @@ EXPR = ? 1+2*3, (1+2)*3, 2*3+1, 10-2-3, 100/10/5\r? -2*3, - 3 + 4, +5, --5, 2*-3
 # shows those kept, until the input ends, and the program halts itself.
 KEYS_ABC = ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789
 KEYS = 10 INPUT A, B: PRINT A + B\rRUN\r1, 2\rRUN\r1\r2\rRUN\r1, 2, 3\rRUN\rx\r1..2\r1 2\r3, 4\rRUN\r-1, +2.5\rRUN\r0x10, 1E2\r10 INPUT "SUM"; A: ? A\rRUN\r5\r10 INPUT "A" A\rRUN\r10 INPUT A,\rRUN\r10 INPUT A: ? A\rRUN\r\003CONT\r7\rINPUT Z: ? Z\r8\rINPUT Y, W: ? Y; W\r9,10\rGET Q: ? Q\rR10 GOTO 10\rRUN\r\003CONT\r\003? 1\r10 FOR I = 1 TO 300: NEXT: GET A: GET B: PRINT A; B\rRUN\rXY?1\rLIST\r\003? 2\r10 FOR I = 1 TO 3000: NEXT\r20 GET A: IF A THEN PRINT A;: GOTO 20\r30 HALT\rRUN\r$(KEYS_ABC)
+# edit: the screen editor (issue #118). Two lines, LIST, and the cursor
+# keys up to the first and right into its text, where AB is inserted;
+# RETURN stores it, and RETURN again the next, whose line is unchanged;
+# down to an empty row, and RUN. Then 70 Y typed into the first line,
+# which grows into a second row, so the rows below move down; LIST and
+# RUN. INPUT takes the answer after its prompt: 21; 13 with a DEL left
+# of the 3; and 5, two DELs, of which the second is at the prompt and
+# does nothing, and 6. A DEL in the middle of PRINT 12345. A line of
+# two rows, entered again from its first row with RETURN. CTRL-C, and
+# the cursor key down at the last row, which scrolls.
+UP = \033[A
+DN = \033[B
+RT = \033[C
+LT = \033[D
+X10 = XXXXXXXXXX
+Y10 = YYYYYYYYYY
+EDIT = cls\r10 PRINT "HELLO"\r20 PRINT "WORLD"\rLIST\r$(UP)$(UP)$(UP)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)AB\r\r$(DN)RUN\r$(UP)$(UP)$(UP)$(UP)$(UP)$(UP)$(UP)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(Y10)$(Y10)$(Y10)$(Y10)$(Y10)$(Y10)$(Y10)\r$(DN)$(DN)$(DN)$(DN)$(DN)$(DN)LIST\rRUN\rINPUT A: PRINT A * 2\r21\rINPUT B: PRINT B\r13$(LT)\177\rINPUT C: PRINT C\r5\177\1776\rPRINT 12345$(LT)$(LT)\177\rPRINT "$(X10)$(X10)$(X10)$(X10)$(X10)$(X10)$(X10)$(X10)$(X10)"\r$(UP)$(UP)$(UP)$(UP)$(UP)\rjunk\003$(DN)$(DN)$(DN)HALT\r
 # load: LOAD with lines typed and pasted. The LOAD line ends with CR LF,
 # as a terminal may end it, which is no empty line. The first line is typed
 # with edits: a DEL that takes back 2, the cursor key ESC [ A, which is
@@ -330,16 +348,17 @@ test: fmt $(ROM_TEST) test/prog.bas test/arr.bas test/files.in test/files_card.p
 	@tr '\n' '\r' < test/arr.bas > $(BUILD)/arr.txt
 	@tr '\n' '\r' < test/files.in > $(BUILD)/files.txt
 	@printf '$(KEYS)' > $(BUILD)/keys.txt
+	@printf '$(EDIT)' > $(BUILD)/edit.txt
 	@{ printf '$(LOAD_HEAD)'; head -n 3 $(MON)/build/hello.bin | awk '{ printf "%s\r\n", $$0 }'; \
 	  tail -n +4 $(MON)/build/hello.bin; printf '$(LOAD_TAIL)'; } > $(BUILD)/load.txt
 	@fail=0; \
-	for t in cmds basic expr prog keys arr load load_emu load_64k time files; do \
+	for t in cmds basic expr prog keys edit arr load load_emu load_64k time files; do \
 	  opts=; sd=; base0=; \
 	  case $$t in \
 	    cmds) prog=; dump='$(DUMP_cmds)';; \
 	    basic) prog=; dump='$(DUMP_basic)';; \
 	    expr) prog=; dump='$(DUMP_expr)';; \
-	    prog|keys|arr) prog=; dump=;; \
+	    prog|keys|edit|arr) prog=; dump=;; \
 	    load) prog=$(BUILD)/ram128k.bin; dump='$(DUMP_load)';; \
 	    load_emu) prog=; dump='$(DUMP_load_emu)';; \
 	    load_64k) prog=$(BUILD)/ram64k.bin; dump='$(DUMP_load_64k)';; \

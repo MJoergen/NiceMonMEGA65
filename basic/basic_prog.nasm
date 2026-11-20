@@ -54,6 +54,9 @@ V_REDO          .EQU    0xFFFFED64      ; the token after INPUT while INPUT read
 V_RING          .EQU    0xFFFFED70      ; the ring, RING words
 V_AEND          .EQU    0xFFFFED65      ; the end of the arrays' data
 V_ITOK          .EQU    0xFFFFED91      ; the tokens of INPUT's line, TOK_MAX words, after a 0
+V_LINE          .EQU    0xFFFFEE40      ; the line, EDIT_MAX words and a 0, or LINE_MAX, one over for LOAD, and a 0
+EDIT_MAX        .EQU    254             ; the characters of the screen editor's line, as LOAD's of a program
+LINE_MAX        .EQU    76              ; the characters of a line of a .bin file that LOAD takes
 
 FRAMES          .EQU    0x200           ; the words of the frames
 LINE_LAST       .EQU    65535           ; the largest line number
@@ -1016,131 +1019,6 @@ key_soon
         ?!Z     JMP     key_ring
                 JMP     _io_getc.soon
 
-; getline: the line of BASIC at V_LINE, up to LINE_MAX characters and a
-; 0, as con_getline reads it, but with the keys typed ahead first:
-; RETURN ends it, DEL and BS take back a character, TAB completes the
-; name of a file of the card (fs_complete), and CTRL-C empties the line,
-; or is a break at INPUT when R1 is not 0. Before the line's first
-; character, the cursor keys up and down scroll back a row or forward,
-; and Page Up and Page Down a page (scr_back), until another key; an
-; ESC with another sequence, or alone, is dropped. Uses R1-R10.
-getline
-                MOVE    R10, R1         ; INPUT's
-                MOVE    R9, V_LINE      ; the cursor
-                CLR     R7              ; the rows shown back
-gl_key
-                MOVE    R1, 3           ; wait, and show what DHCP gets
-                CMP     R9, V_LINE
-        ?!Z     ONE     R1              ; on an empty line
-                CALL    key
-gl_have
-                CMP     R1, 0x1B
-        ?Z      JMP     gl_esc
-                PUSH    R1
-                CALL    gl_leave
-                POP     R1
-                CMP     R1, 0x0D
-        ?Z      JMP     gl_end
-                CMP     R1, 0x7F
-        ?!Z     CMP     R1, 0x08
-        ?Z      JMP     gl_del
-                CMP     R1, 0x03
-        ?Z      JMP     gl_cc
-                CMP     R1, 0x09
-        ?Z      JMP     gl_tab
-                CMP     R1, 0x20
-        ?C      JMP     gl_key          ; another control code
-                CMP     R1, 0xA0
-        ?!C     JMP     :+              ; 0xA0 and above
-                CMP     R1, 0x80
-        ?!C     JMP     gl_key          ; 0x80 to 0x9F
-:
-                CMP     R9, V_LINE+LINE_MAX
-        ?Z      JMP     gl_key          ; the line is full
-                MOVE    @R9++, R1
-                CALL    MON_PUTC
-                JMP     gl_key
-gl_del
-                CMP     R9, V_LINE
-        ?Z      JMP     gl_key
-                SUB     R9, R9, 1
-                MOVE    R1, GL_RUB
-                CALL    _io_puts
-                JMP     gl_key
-gl_cc
-                TST     R10
-        ?!Z     JMP     in_break
-                MOVE    R9, V_LINE
-                MOVE    R1, GL_CC
-                CALL    _io_puts
-gl_end
-                CLR     @R9
-                JMP     _io_crlf        ; which returns to the caller
-gl_tab
-                MOVE    R1, V_LINE
-                MOVE    R2, R9
-                MOVE    R3, V_LINE+LINE_MAX
-                CALL    FS_COMPLETE
-                MOVE    R9, R1
-                JMP     gl_key
-; An ESC: with [ or O within io.t_esc a sequence, else the byte after it
-; on its own, or nothing. ESC [ A and B, and ESC [ 5 ~ and 6 ~, scroll
-; on an empty line, and the bytes of any other sequence, up to its final
-; byte, are dropped.
-gl_esc
-                CALL    key_soon
-        ?Z      JMP     gl_drop
-                CMP     R1, 0x4F        ; O: one more byte
-        ?Z      JMP     gl_ss3
-                CMP     R1, 0x5B        ; [
-        ?!Z     JMP     gl_have
-                CALL    key_soon
-        ?Z      JMP     gl_drop
-                MOVE    R8, R1
-                CMP     R1, 0x41        ; A
-        ?Z      ONE     R1
-        ?Z      JMP     gl_back
-                CMP     R1, 0x42        ; B
-        ?Z      NOT     R1, R0
-        ?Z      JMP     gl_back
-:
-                CMP     R1, 0x40
-        ?!C     JMP     :+              ; the final byte
-                CALL    key_soon
-        ?Z      JMP     gl_drop
-                JMP     :-
-:
-                CMP     R1, 0x7E        ; ~, after 5 or 6
-        ?!Z     JMP     gl_drop
-                CMP     R8, 0x35        ; 5
-        ?Z      MOVE    R1, PAGE
-        ?Z      JMP     gl_back
-                CMP     R8, 0x36        ; 6
-        ?Z      MOVE    R1, -PAGE
-        ?Z      JMP     gl_back
-                JMP     gl_drop
-gl_ss3
-                CALL    key_soon
-gl_drop
-                CALL    gl_leave
-                JMP     gl_key
-; R1 rows back, or -R1 forward, on an empty line
-gl_back
-                CMP     R9, V_LINE
-        ?!Z     JMP     gl_key
-                CALL    SCR_BACK
-                MOVE    R7, R1
-                JMP     gl_key
-; gl_leave: the screen again, after the rows shown back. Uses R1-R6.
-gl_leave
-                TST     R7
-        ?Z      RET
-                CLR     R1
-                CLR     R7
-                JMP     SCR_BACK
-GL_RUB          .DAT    8, 0x20, 8, 0   ; BS, a blank, BS
-GL_CC           .DAT    0x5E, 0x43, 0   ; ^C
-PAGE            .EQU    24              ; the rows of Page Up and Page Down, as the monitor's
 
 ; load_fin: the end of a LOAD: main, and the line ends, unless the load
 ; wrote words above HIMEM alone. load_new: NEW after a load that wrote a

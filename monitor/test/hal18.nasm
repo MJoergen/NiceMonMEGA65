@@ -70,6 +70,10 @@ h18_main
                 CALL    _mon_scr_links
                 CALL    _mon_scr_cls
                 CALL    h18_links
+                MOVE    R1, 0x0D        ; the halt's line on a row of its own
+                CALL    _mon_putc
+                MOVE    R1, 0x0A
+                CALL    _mon_putc
                 SUB     R1, R7, H18_RESULTS
                 HALT
 

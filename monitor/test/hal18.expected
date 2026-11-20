@@ -4,11 +4,7 @@ READY.
 sys 0x8000
 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-	Halted (HALT) after 48160 steps, PC=00008083
-R0  00000000 R1  0000000c R2  00000000 R3  000fff20
-R4  00000000 R5  00003143 R6  ffffe846 R7  0000910c
-R8  00000000 R9  00000000 R10 2000c7cc R11 00000001
-R12 00000001 R13 ffffe7fe R14 09000000 R15 00008083
+	
 00009100: 00010008 00000000 00000002 00000002 0000000a 0000000a 01800000 00c00000
 00009108: 01600000 01600000 00000000 00000000
 Screen:
