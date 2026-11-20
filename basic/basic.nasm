@@ -154,6 +154,11 @@ bas_start
 main            CLR     @V_AUTO         ; READY. ends AUTO
 main_auto
                 MOVE    SP, STACK
+                CMP     @V_SBASE, STACK
+        ?!Z     CALL    drop_run        ; in a FN over lines: no frames, no CONT
+                MOVE    @V_SBASE, STACK
+                MOVE    @V_ELIM, STACK-EXPR_ROOM
+                CLR     @V_SSB
                 CALL    files_end       ; what an error or the break key left open
                 CLR     @V_CUR          ; direct mode
                 CLR     @V_SSP          ; no strings
@@ -252,13 +257,17 @@ run_next
                 MOVE    R8, @V_TP
                 JMP     run
 ; run_other: a statement that is no keyword's and no number's assignment:
-; a string's, a block's ELSE, or TIME$ =
+; a string's, a block's ELSE, PROCNAME, = of a FN, or TIME$ =
 run_other
                 CMP     R2, K_SVAR
         ?!Z     CMP     R2, K_SARR
         ?Z      JMP     st_sassign
                 CMP     R1, T_BELSE
         ?Z      JMP     blk_else
+                CMP     R2, K_UFN
+        ?Z      JMP     st_proc
+                CMP     R1, T_EQ
+        ?Z      JMP     st_fnret
                 CMP     R1, T_TIMES
         ?Z      JMP     st_timeset
                 JMP     err_unknown
@@ -271,10 +280,16 @@ run_eol
         ?Z      JMP     main            ; direct mode
                 ADD     R1, R8, 1       ; the next line
                 CMP     R1, @V_PEND
-        ?!C     JMP     main            ; the program's end
+        ?!C     JMP     run_end         ; the program's end
                 MOVE    @V_CUR, R1
                 ADD     R8, R1, 2
                 JMP     run
+
+; run_end: the program's end, which is FN without = in a FN over lines
+run_end
+                CMP     @V_SBASE, STACK
+        ?!Z     JMP     err_noeq
+                JMP     main
 
 ; match: Z when the text at R5 starts with the keyword at R3, in either
 ; case, and no letter, digit, or $ follows it. R3 is then after the byte that
@@ -623,7 +638,7 @@ ACTS
                 .DAT    st_get+65536*st_dim, st_himem+65536*st_auto
                 .DAT    st_renum+65536*st_data, st_read+65536*st_restore
                 .DAT    st_def+65536*st_on, st_do+65536*st_loop
-                .DAT    st_exit+65536*st_endif
+                .DAT    st_exit+65536*st_endif, st_endproc+65536*st_local
 I_DELETE        .EQU    4               ; the index of DELETE,
 I_PRINT         .EQU    25              ; the index of PRINT, the first statement without ops,
 I_LET           .EQU    26              ; of LET,
@@ -646,7 +661,7 @@ I_ON            .EQU    45              ; of ON,
 I_DO            .EQU    46              ; of DO,
 I_LOOP          .EQU    47              ; of LOOP,
 I_ENDIF         .EQU    49              ; of ENDIF,
-N_STMT          .EQU    50              ; and of AND, the first keyword that is no statement
+N_STMT          .EQU    52              ; and of AND, the first keyword that is no statement
 H_ACTS          .EQU    0x40000000+4*ACTS
 ; The routines of the items, by the kind of an op, which bas_op calls
 KINDS
@@ -692,7 +707,7 @@ OP_SKIP         .EQU    1
 OP_F            .EQU    8
 KEYWORDS        .EQU    38              ; the first keyword's byte in OPS
 OPS
-                .ASCII_B 'FJN@N@EHNHLHNFANFJEJNFJFLCNHNJLHLHFLHNSYS+LOAD5SAVE6BSAVE=DELETE6DIR-IP DHCP"MAC TIME NTP0BAUD#DUMP%DIS%CLS"VER"HELP"HALT"POKE)NEW"CLR"END"STOP"CONT"RETURN"PRINT"LET"RUN"LIST"GOTO"GOSUB"IF"FOR"NEXT"REM"INPUT"GET"DIM"HIMEM"AUTO"RENUMBER"DATA"READ"RESTORE"DEF"ON"DO"LOOP"EXIT"ENDIF"AND"OR"XOR"NOT"DIV"MOD"ABS"SGN"INT"SQR"PEEK"SIN"COS"TAN"ASIN"ACOS"ATAN"LOG"LOG2"LOG10"EXP"RND"PI"TAB"SPC"THEN"ELSE"TO"STEP"WHILE"UNTIL"LEN"ASC"VAL"INSTR"CHR$"STR$"HEX$"LEFT$"MID$"RIGHT$"TIME$"'
+                .ASCII_B 'FJN@N@EHNHLHNFANFJEJNFJFLCNHNJLHLHFLHNSYS+LOAD5SAVE6BSAVE=DELETE6DIR-IP DHCP"MAC TIME NTP0BAUD#DUMP%DIS%CLS"VER"HELP"HALT"POKE)NEW"CLR"END"STOP"CONT"RETURN"PRINT"LET"RUN"LIST"GOTO"GOSUB"IF"FOR"NEXT"REM"INPUT"GET"DIM"HIMEM"AUTO"RENUMBER"DATA"READ"RESTORE"DEF"ON"DO"LOOP"EXIT"ENDIF"ENDPROC"LOCAL"AND"OR"XOR"NOT"DIV"MOD"ABS"SGN"INT"SQR"PEEK"SIN"COS"TAN"ASIN"ACOS"ATAN"LOG"LOG2"LOG10"EXP"RND"PI"TAB"SPC"THEN"ELSE"TO"STEP"WHILE"UNTIL"LEN"ASC"VAL"INSTR"CHR$"STR$"HEX$"LEFT$"MID$"RIGHT$"TIME$"'
                 .DAT    0
 
 S_HINT          .ASCII_B 'HELP lists the statements'
@@ -720,7 +735,7 @@ HELP            .DAT    H_SYS, H_L, H_LOAD, H_TFTP, H_SAVET, H_SAVE, H_DEL, H_DE
                 .DAT    H_POKE, H_RUN, H_RUNF, H_RUNT, H_LIST, H_NEW, H_CLR, H_GOTO, H_GOSUB, H_RET, H_IF
                 .DAT    H_FOR, H_NEXT, H_END, H_STOP, H_CONT, H_REM, H_INPUT, H_GET, H_DIM, H_HIMEM, H_AUTO, H_REN
                 .DAT    H_DATA, H_READ, H_REST, H_STR, H_ON, H_DEF, H_DO, H_LOOP, H_EXIT
-                .DAT    H_BIF, H_ELSE, H_P, H_PG, 0
+                .DAT    H_BIF, H_ELSE, H_PROC, H_FNL, H_LOCAL, H_P, H_PG, 0
 H_SYS           .ASCII_B 'SYS A               call the program at A, such as SYS 0x8000; SYS 0 restarts'
 H_L             .ASCII_B 'LOAD                enter lines of ADDR WORD in hex, as a .bin file has them'
                 .DAT    0
@@ -797,6 +812,10 @@ H_EXIT          .ASCII_B 'EXIT                on after the LOOP of the latest DO
 H_BIF           .ASCII_B 'IF X THEN           the lines up to ELSE or ENDIF when X, with THEN last'
                 .DAT    0
 H_ELSE          .ASCII_B 'ELSE ... ENDIF      the lines up to ENDIF when not, each first in its line'
+H_PROC          .ASCII_B 'DEF PROCA(X)        the lines up to ENDPROC, run by PROCA(2)'
+                .DAT    0
+H_FNL           .ASCII_B 'DEF FNA(X)          the lines up to = E, whose E is the value of FNA(2)'
+H_LOCAL         .ASCII_B 'LOCAL X, Y$         X 0 and Y$ empty in a PROC or FN, until it ends'
 H_P             .ASCII_B 'CRSR keys, HOME     move the cursor; RETURN takes the line it is in'
 H_PG            .ASCII_B 'PgUp PgDn           scroll back; on the MEGA65 CTRL and MEGA with CRSR up, down'
                 .DAT    0

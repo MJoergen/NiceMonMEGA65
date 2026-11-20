@@ -156,7 +156,7 @@ P155 error: Syntax error in 290; bas55 stops
 P156 error: Syntax error in 290; bas55 stops
 P157 differs; bas55 stops
 P158 error: Type mismatch in 340; bas55 stops
-P159 error: Type mismatch in 340; bas55 stops
+P159 differs; bas55 stops
 P160 differs; bas55 stops
 P161 error: Formula too complex in 290; bas55 stops
 P162 differs; bas55 stops

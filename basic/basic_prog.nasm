@@ -22,13 +22,16 @@
 ; the end of the program it goes back to main. A statement that jumps
 ; sets V_CUR and V_TP, where run_next goes on.
 ;
-; The frames of FOR and GOSUB are in a region of FRAMES words below the
-; top of BASIC's memory, himem, and grow down from it, V_FP the last.
-; The top of the arrays is FRAMES words below himem. A GOSUB frame is
-; GOSUB_TAG, the token after its statement, and its line. A FOR frame is
-; FOR_TAG with the FPU's command that compares the variable with the
-; limit, the variable's offset, the limit, the step, the token after the
-; FOR statement, the body's start, and its line.
+; The frames of FOR, GOSUB, DO, PROC, FN, and LOCAL are in a region of
+; FRAMES words below the top of BASIC's memory, himem, and grow down from
+; it, V_FP the last. The top of the arrays is FRAMES words below himem. A
+; frame's first word has its kind in bits 31..24, a letter, and its words
+; in bits 23..16, SIZE1 each, so that a walk passes over any frame. A
+; GOSUB frame is GOSUB_TAG, the token after its statement, and its line.
+; A FOR frame is FOR_TAG with the FPU's command that compares the
+; variable with the limit, the variable's offset, the limit, the step,
+; the token after the FOR statement, the body's start, and its line.
+; basic_struct.nasm has the others.
 ;
 ; The break key is CTRL-C, a byte of the console. run polls the console
 ; every POLL_EVERY statements, and LIST at each line, with con_key and no
@@ -54,6 +57,9 @@ V_REDO          .EQU    0xFFFFED64      ; the token after INPUT while INPUT read
 V_RING          .EQU    0xFFFFED70      ; the ring, RING words
 V_AEND          .EQU    0xFFFFED65      ; the end of the arrays' data
 V_RND           .EQU    0xFFFFED66      ; the word of RND's generator, never 0
+V_SBASE         .EQU    0xFFFFED68      ; SP where the statements run, STACK but in a FN over lines,
+V_ELIM          .EQU    0xFFFFED69      ; the SP below which an expression is too deep,
+V_SSB           .EQU    0xFFFFED6A      ; and the strings' stack's entries below them
 V_ITOK          .EQU    0xFFFFED91      ; the tokens of INPUT's line, TOK_MAX words, after a 0
 V_LINE          .EQU    0xFFFFEE40      ; the line, EDIT_MAX words and a 0, or LINE_MAX, one over for LOAD, and a 0
 EDIT_MAX        .EQU    254             ; the characters of the screen editor's line, as LOAD's of a program
@@ -61,6 +67,7 @@ LINE_MAX        .EQU    76              ; the characters of a line of a .bin fil
 
 FRAMES          .EQU    0x200           ; the words of the frames
 LINE_LAST       .EQU    65535           ; the largest line number
+SIZE1           .EQU    0x10000         ; a word of a frame, in its first word
 GOSUB_TAG       .EQU    0x47000000      ; G
 GOSUB_WORDS     .EQU    3
 FOR_TAG         .EQU    0x46000000      ; F, with the FPU's command in bits 15..0
@@ -398,25 +405,28 @@ st_gosub
                 CALL    stmt_end
                 MOVE    R1, GOSUB_WORDS
                 CALL    frame_new
-                MOVE    @R1, GOSUB_TAG
+                MOVE    @R1, GOSUB_TAG+GOSUB_WORDS*SIZE1
                 MOVE    @1[R1], R8
                 MOVE    @2[R1], @V_CUR
                 SUB     R8, R8, 2
                 JMP     go_line
 
-; RETURN: back after the last GOSUB, whose frame goes, with the FOR
-; frames after it
+; RETURN: back after the last GOSUB, whose frame goes, with the frames
+; after it, each LOCAL's variables set back; RETURN without GOSUB when
+; there is none after the last PROC's or FN's
 st_return
                 CALL    himem
                 MOVE    R1, @V_FP
-:
                 CMP     R1, R2
         ?!C     JMP     err_return
                 AND     R3, @R1, 0xFF000000
                 CMP     R3, GOSUB_TAG
-        ?Z      JMP     :+
-                ADD     R1, R1, FOR_WORDS
-                JMP     :-
+        ?Z      JMP     :+              ; the last frame
+                MOVE    R3, 0x47        ; G
+                MOVE    R4, 0x14000     ; not past a PROC's or a FN's
+                CALL    frame_find
+        ?Z      JMP     err_return
+                CALL    unwind          ; the frames after it
 :
                 MOVE    @V_TP, @1[R1]
                 MOVE    @V_CUR, @2[R1]
@@ -501,9 +511,9 @@ st_for
         ?!Z     ADD     @V_FP, R1, FOR_WORDS
                 MOVE    R1, FOR_WORDS
                 CALL    frame_new
-                MOVE    R2, FOR_TAG+CMD_LE
+                MOVE    R2, FOR_TAG+FOR_WORDS*SIZE1+CMD_LE
                 AND[M]  R0, @FPU_STATUS, FPU_NEGATIVE
-        ?!Z     MOVE    R2, FOR_TAG+CMD_GE
+        ?!Z     MOVE    R2, FOR_TAG+FOR_WORDS*SIZE1+CMD_GE
                 MOVE    @R1, R2
                 MOVE    @1[R1], R10
                 MOVE    @4[R1], @FPU_X_LO
@@ -991,11 +1001,11 @@ in_arr
                 JMP     in_vnext
 ; in_redo: Redo from start, and INPUT again
 in_redo
+                MOVE    SP, @V_SBASE    ; that of a FN over lines too
                 MOVE    @FPU_CMD, FPU_CLEAR
-                CLR     @V_SSP
+                MOVE    @V_SSP, @V_SSB
                 MOVE    R1, S_REDO
                 CALL    puts_b_crlf
-                MOVE    SP, STACK
                 MOVE    R8, @V_REDO
                 PUSH    run_next
                 JMP     st_input

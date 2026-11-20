@@ -342,10 +342,26 @@ LOAD_TAIL = \rload\r9001 7\003sys 0x8000\rdump 0x9000, 4\rdump 0x1E7FF, 1\rhalt\
 # ON with no line, with a variable for a line, without GOTO, and of a
 # line that is not; a comma that is no ON's list, which keeps its
 # numbers; DEF without FN; and DEFs that are not right: a string's
-# parameter, a function that calls itself with no end, a number for a
+# parameter with no argument, a function that calls itself with no end, a number for a
 # string, no expression, and a statement after one, of which the line's
 # second statement does not run. CLR and an edit, after which a call
 # finds its DEF again, LIST of the tokens, and RENUMBER of ON's lists.
+# Then DO and LOOP with WHILE and UNTIL at either end, on one line and
+# over lines, nested, with FOR inside, EXIT, a GOTO back to a DO, and a
+# RETURN out of one; block IFs nested, with and without ELSE, after a
+# number like THEN's token; their errors, LIST, and RENUMBER.
+# proc: PROC, FN over lines, and LOCAL (issue #119), test/proc.bas typed
+# line by line. A PROC with a number's and a string's parameter and
+# LOCALs, the program's variables of their names kept; FNs over lines
+# that call themselves, with LOCALs and a FOR loop, and one on one line
+# with IF and ELSE; FNs in expressions with numbers and strings that
+# pend; a PROC that calls itself, ENDPROC in IF, and a GOSUB in a PROC;
+# strings that frames keep over sweeps of a heap that HIMEM makes small.
+# Then the errors: ENDPROC, =, and LOCAL with no PROC or FN, an
+# Undefined procedure and function, too few arguments, and a string for
+# a number; a FN with no =, after which CONT cannot go on; ENDPROC in a
+# GOSUB of a PROC, and = in a PROC; a PROC and a GOSUB in a FN, and = in
+# its GOSUB; and a FN that calls itself 30 deep, and 31.
 # load_emu: LOAD where 0xFFFFFF9E reads 0, as in niceemu, so a program's RAM
 # goes up to the screen: 10000 and FFFEFFFF take words, and FFFF0000 does
 # not.
@@ -418,7 +434,7 @@ ecma55: $(ROM_TEST)
 # the card holds that the image did not (fat_tool.py diff, the dates
 # masked) and the order of its sector writes, from a second run with -t
 # (fat_tool.py order).
-test: fmt $(ROM_TEST) test/prog.bas test/arr.bas test/str.bas test/struct.bas test/files.in test/files_card.py $(BUILD)/dis.bin $(MON)/build/hello.bin $(MON)/build/fat/super.img
+test: fmt $(ROM_TEST) test/prog.bas test/arr.bas test/str.bas test/struct.bas test/proc.bas test/files.in test/files_card.py $(BUILD)/dis.bin $(MON)/build/hello.bin $(MON)/build/fat/super.img
 	@test '$(FOLDER_UC)' = NICE || { echo "make test needs FOLDER=NICE, not $(FOLDER)"; exit 1; }
 	@$(BAS_ROM) check $(BUILD)/basic_image_test.bin > $(BUILD)/header.out
 	@if grep -qx '$(BUILD)/basic_image_test.bin: $(HEADER_TEST)' $(BUILD)/header.out; \
@@ -442,6 +458,7 @@ test: fmt $(ROM_TEST) test/prog.bas test/arr.bas test/str.bas test/struct.bas te
 	@tr '\n' '\r' < test/arr.bas > $(BUILD)/arr.txt
 	@tr '\n' '\r' < test/str.bas > $(BUILD)/str.txt
 	@tr '\n' '\r' < test/struct.bas > $(BUILD)/struct.txt
+	@tr '\n' '\r' < test/proc.bas > $(BUILD)/proc.txt
 	@tr '\n' '\r' < test/files.in > $(BUILD)/files.txt
 	@printf '$(KEYS)' > $(BUILD)/keys.txt
 	@printf '$(EDIT)' > $(BUILD)/edit.txt
@@ -451,13 +468,13 @@ test: fmt $(ROM_TEST) test/prog.bas test/arr.bas test/str.bas test/struct.bas te
 	@{ printf '$(LOAD_HEAD)'; head -n 3 $(MON)/build/hello.bin | awk '{ printf "%s\r\n", $$0 }'; \
 	  tail -n +4 $(MON)/build/hello.bin; printf '$(LOAD_TAIL)'; } > $(BUILD)/load.txt
 	@fail=0; \
-	for t in cmds basic expr funcs prog keys edit long redo lines arr str struct load load_emu load_64k time files; do \
+	for t in cmds basic expr funcs prog keys edit long redo lines arr str struct proc load load_emu load_64k time files; do \
 	  opts=; sd=; base0=; \
 	  case $$t in \
 	    cmds) prog=; dump='$(DUMP_cmds)';; \
 	    basic) prog=; dump='$(DUMP_basic)';; \
 	    expr) prog=; dump='$(DUMP_expr)';; \
-	    funcs|prog|keys|edit|long|lines|arr|struct) prog=; dump=;; \
+	    funcs|prog|keys|edit|long|lines|arr|struct|proc) prog=; dump=;; \
 	    str) prog=; dump=; opts=--step-time;; \
 	    redo) prog=; dump='$(DUMP_redo)';; \
 	    load) prog=$(BUILD)/ram128k.bin; dump='$(DUMP_load)';; \

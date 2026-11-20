@@ -1,14 +1,13 @@
-; BASIC's structure (stage 8, issue #119, doc/BASIC.md, "Structure"), of
-; which this has ON ... GOTO and ON ... GOSUB, the functions of DEF FN on
-; one line, DO and LOOP with WHILE and UNTIL, and EXIT, and IF, ELSE,
-; and ENDIF over lines.
+; BASIC's structure (stage 8, issue #119, doc/BASIC.md, "Structure"): ON
+; ... GOTO and ON ... GOSUB, DEF FN, DEF PROC, ENDPROC, LOCAL, DO and
+; LOOP with WHILE and UNTIL, and EXIT, and IF, ELSE, and ENDIF over
+; lines.
 ;
 ; A DO frame is DO_TAG, the token after DO, where its WHILE or UNTIL is,
 ; DO's line, and the token after the LOOP statement that matches it and
-; its line, 0 until a LOOP went back to the DO. It is FOR_WORDS words,
-; as the walks of the frames pass over a frame that is not GOSUB's by
-; FOR_WORDS. A LOOP drops the FOR frames after its DO's, and a DO that
-; runs again, after a GOTO, drops its own frame and those after it.
+; its line, 0 until a LOOP went back to the DO, FOR_WORDS words in all. A
+; LOOP drops the FOR frames after its DO's, and a DO that runs again,
+; after a GOTO, drops its own frame and the FOR and DO frames after it.
 ;
 ; A block IF is an IF whose THEN ends its line, which the tokenizer
 ; makes T_BTHEN, and the ELSE of a block starts its line, T_BELSE, and so
@@ -19,20 +18,47 @@
 ; ON's lines are K_LINE tokens, as GOTO's are, so they keep the address
 ; of their line once found, and RENUMBER changes them.
 ;
-; A name that starts with FN and goes on is a function's, a K_UFN token,
-; or a K_SFNU token with $, whose entry in the table of the variables
-; has FUNC in its length. The entry has the address of the token after
-; the name in its DEF in the place of the double's low word, and 0 in
-; its high word, once a call found the DEF in the program; until then
-; its high word is 0xFFFFFFFF, as CLR, RUN, and an edit set it again. A
-; function's parameters are numbers' variables, and its arguments
-; numbers, one for each. A call keeps the parameters' values on the
-; processor's stack while the function's expression runs with the
-; arguments in them, and sets them again after it, so that a function
-; may call itself, as deep as an expression may nest.
+; A name that starts with FN or PROC and goes on is a function's or a
+; procedure's, a K_UFN token, or a K_SFNU token with $, whose entry in
+; the table of the variables has FUNC in its length. The entry has the
+; address of the token after the name in its DEF in the place of the
+; double's low word, and the DEF's line in its high word, once a call
+; found the DEF in the program; until then its high word is 0xFFFFFFFF,
+; as CLR, RUN, and an edit set it again.
+;
+; A call evaluates an argument for each parameter, a number on the FPU's
+; stack or a string on the strings' stack, and then pushes an L frame,
+; LOCAL_TAG's, with the parameters' values, which then hold the
+; arguments. LOCAL pushes one as well. An L frame has three words for
+; each variable: its offset, with bit 31 for a string's, and its two
+; words. The block of a string that the frame keeps is the frame's, its
+; back word TAG_FRAME and the offset of the two words from V_STOP, so
+; the sweep keeps it. unwind sets the variables again, each block their
+; variable's again, when ENDPROC, =, or RETURN drops the frame.
+;
+; A procedure's call pushes a PROC frame before the L frame, PROC_TAG,
+; the token after the call, and its line, where ENDPROC goes on. A
+; function on one line evaluates the X of its DEF's = X with the
+; parameters set. A function over lines runs its lines from after its
+; DEF's parameters, up to the statement = X, as statements of their own,
+; in a loop of run on the processor's stack of its call, below V_SBASE.
+; Its FN frame, after the L frame, has the old V_SBASE, V_CUR, and V_SSB,
+; the function's kind, and the numbers that pended on the FPU's stack at
+; the call, their count, and theirs, the top last. = X drops the frames
+; after it, puts the numbers back below X, and returns from the call
+; with SP at V_SBASE. A function may call itself while SP is FN_ROOM
+; words below STACK at most, which leaves an expression EXPR_ROOM words
+; below that, and the frames room. The FN frame stops a RETURN, an
+; ENDPROC, and an EXIT, as the PROC frame stops a RETURN and an =.
 
 FUNC            .EQU    0x400           ; in the length of a function's name
 DO_TAG          .EQU    0x44000000      ; D, a DO frame's
+LOCAL_TAG       .EQU    0x4C000000      ; L, an L frame's
+FN_TAG          .EQU    0x4E000000      ; N, a FN frame's,
+FN_WORDS        .EQU    6               ; and its words, and 2 for each number
+PROC_TAG        .EQU    0x50000000      ; P, a PROC frame's,
+PROC_WORDS      .EQU    3               ; and its words
+FN_ROOM         .EQU    0x200           ; the words of the processor's stack that FNs may take
 
 ; ON X GOTO N, M, ... and ON X GOSUB N, M, ...: the line of the X-th
 ; number, X rounded toward zero, as GOTO and GOSUB go to it. An X of 0,
@@ -65,7 +91,7 @@ st_on
         ?!Z     JMP     :+
                 MOVE    R1, GOSUB_WORDS
                 CALL    frame_new
-                MOVE    @R1, GOSUB_TAG
+                MOVE    @R1, GOSUB_TAG+GOSUB_WORDS*SIZE1
                 MOVE    @1[R1], R8
                 MOVE    @2[R1], @V_CUR
 :
@@ -91,83 +117,132 @@ st_def
 
 ; p_ufn: for primary, FNNAME[(X, ...)], with R1 its token and R8 after
 ; it, its value on the FPU's stack. s_ufn: for sprimary, FNNAME$[(X,
-; ...)], its string on the strings' stack. A function that no DEF of the
-; program has is Undefined function, a count of arguments that is not
-; that of the parameters a Syntax error, and a string's parameter a Type
-; mismatch. Keeps R10-R12. Uses R1-R9.
+; ...)], its string on the strings' stack. Keeps R10-R12. Uses R1-R9.
 p_ufn
 s_ufn
                 PUSH    R10
                 PUSH    R11
                 PUSH    R12
-                MOVE    R10, R1         ; the token
-                AND     R1, R1, 0xFFFFFF
-                CMP     R1, NO_VAR
-        ?Z      JMP     err_fn
-                ADD     R11, R1, @V_PEND  ; the entry
-                CMP     @1[R11], 0xFFFFFFFF
-        ?Z      CALL    fn_find
-                PUSH    @R11            ; the DEF's tokens after its name
-                CLR     R12             ; the arguments, on the FPU's stack
-                CMP     @R8, T_LPAR
-        ?!Z     JMP     fc_params
-                MOVE    R8++, R8
-:
-                PUSH    R12
-                CALL    eval_num
-                POP     R12
-                MOVE    R12++, R12
-                MOVE    R1, @R8++
-                CMP     R1, T_COMMA
-        ?Z      JMP     :-
-                CMP     R1, T_RPAR
-        ?!Z     JMP     err_syntax
-fc_params
-                POP     R10
-                SHR     R7, @-1[R10], 24  ; the kind, K_UFN or K_SFNU
-                PUSH    R8              ; the caller's tokens
-                CLR     R11             ; the parameters, each its address and its value
-                CMP     @R10, T_LPAR
-        ?!Z     JMP     fc_bind
-                MOVE    R10++, R10
-:
-                MOVE    R1, @R10++
                 SHR     R2, R1, 24
-                CMP     R2, K_SVAR
-        ?Z      JMP     err_type
-                CMP     R2, K_VAR
-        ?!Z     JMP     err_syntax
-                AND     R1, R1, 0xFFFFFF
-                ADD     R1, R1, @V_PEND
-                PUSH    R1
-                PUSH    @R1
-                PUSH    @1[R1]
-                MOVE    R11++, R11
-                MOVE    R1, @R10++
-                CMP     R1, T_COMMA
-        ?Z      JMP     :-
-                CMP     R1, T_RPAR
-        ?!Z     JMP     err_syntax
-fc_bind
-                CMP     R11, R12
-        ?!Z     JMP     err_syntax
-                ADD     R2, SP, 2       ; the last parameter's address
-                MOVE    R3, R11
+                PUSH    R2              ; the kind, K_UFN or K_SFNU
+                MOVE    R9, S_FN
+                CALL    fn_args
+                PUSH    R8
+                CMP     @R10, T_EQ
+        ?!Z     JMP     fc_body
+                ADD     R8, R10, 1      ; DEF FNNAME(...) = X
+                ADD     R1, SP, 1
+                MOVE    R1, @R1
+                CALL    fn_eq
+fc_end
+                MOVE    R1, @V_FP       ; the parameters' frame, gone
+                CALL    frame_end
+                CALL    unwind
+                POP     R8
+                POP     R2
+                POP     R12
+                POP     R11
+                POP     R10
+                RET
+; fc_body: a function over lines: a FN frame, with the numbers that pend
+; on the FPU's stack, and its lines from R10, the DEF's line R11, up to
+; its =, which returns from fn_body
+fc_body
+                CMP     SP, STACK-FN_ROOM
+        ?C      JMP     err_complex
+                AND     R4, @FPU_STATUS, 0x1F  ; the numbers that pend
+                DBL     R5, R4
+                ADD     R5, R5, FN_WORDS
+                MOVE    R1, R5
+                CALL    frame_new
+                SHL     R5, R5, 16
+                OR      R5, R5, FN_TAG
+                MOVE    @R1, R5
+                MOVE    @1[R1], @V_SBASE
+                MOVE    @2[R1], @V_CUR
+                MOVE    @3[R1], @V_SSB
+                ADD     R2, SP, 1
+                MOVE    @4[R1], @R2     ; the kind
+                MOVE    @5[R1], R4
+                DBL     R3, R4
+                ADD     R3, R3, R1
+                ADD     R3, R3, FN_WORDS
 :
-                SUB[M]  R3, R3, 1       ; the last argument, on top, into it
+                SUB[M]  R4, R4, 1
         ?N      JMP     :+
-                MOVE    R1, @R2
-                MOVE    @R1, @FPU_X_LO
-                MOVE    @1[R1], @FPU_X_HI
+                SUB     R3, R3, 2
+                MOVE    @R3, @FPU_X_LO
+                MOVE    @1[R3], @FPU_X_HI
                 MOVE    @FPU_CMD, FPU_DROP
-                ADD     R2, R2, 3
                 JMP     :-
 :
-                CMP     @R10++, T_EQ
-        ?!Z     JMP     err_syntax
+                MOVE    @V_SSB, @V_SSP
+                MOVE    @V_CUR, R11
                 MOVE    R8, R10
-                PUSH    R11
-                CMP     R7, K_SFNU
+                CALL    fn_body
+                JMP     fc_end
+fn_body
+                MOVE    @V_SBASE, SP
+                SUB     R1, SP, EXPR_ROOM
+                MOVE    @V_ELIM, R1
+                JMP     run
+
+; = X: the value of the FN over lines that runs, X, back to the
+; expression that called it, without the frames after its FN frame, each
+; LOCAL's variables set again; = without FN when no FN frame comes before
+; a PROC frame
+st_fnret
+                MOVE    R3, 0x4E        ; N
+                MOVE    R4, 0x10000     ; not past a PROC's
+                CALL    frame_find
+        ?Z      JMP     err_fnret
+                PUSH    R1
+                MOVE    R8++, R8
+                MOVE    R1, @4[R1]      ; the kind
+                CALL    fn_eq
+                POP     R1
+                CALL    unwind
+                MOVE    @V_CUR, @2[R1]
+                MOVE    @V_SSB, @3[R1]
+                MOVE    R9, @V_SBASE    ; the call's SP
+                MOVE    R2, @1[R1]
+                MOVE    @V_SBASE, R2
+                SUB     R2, R2, EXPR_ROOM
+                MOVE    @V_ELIM, R2
+                CALL    frame_end
+                MOVE    @V_FP, R1
+                SUB     R1, R1, R2      ; the FN frame again
+                CMP     @4[R1], K_SFNU
+        ?Z      JMP     :+
+                MOVE    R6, @FPU_X_LO   ; the value
+                MOVE    R7, @FPU_X_HI
+                MOVE    @FPU_CMD, FPU_DROP
+:
+                MOVE    R4, @5[R1]      ; the numbers that pended
+                ADD     R5, R1, FN_WORDS
+:
+                SUB[M]  R4, R4, 1
+        ?N      JMP     :+
+                MOVE    @FPU_X_LO, @R5++
+                MOVE    @FPU_X_HI, @R5++
+                JMP     :-
+:
+                CMP     @4[R1], K_SFNU
+        ?Z      JMP     :+
+                MOVE    @FPU_X_LO, R6
+                MOVE    @FPU_X_HI, R7
+:
+                MOVE    SP, R9
+                RET
+
+; fn_eq: a function's value, the X at R8 of = X, for the kind R1: a
+; number on the FPU's stack for K_UFN, else a string on the strings'
+; stack, in a block of its own, as the frames may set again a variable
+; whose string it is; a Syntax error unless the statement ends after X.
+; Uses R1-R12.
+fn_eq
+                PUSH    R1
+                CMP     R1, K_SFNU
         ?Z      JMP     :+
                 CALL    eval_num
                 JMP     :++
@@ -176,32 +251,303 @@ fc_bind
 :
                 CALL    at_end
         ?!Z     JMP     err_syntax
-                POP     R11
-:
-                SUB[M]  R11, R11, 1     ; the parameters' values again
-        ?N      JMP     :+
-                POP     R3
-                POP     R2
                 POP     R1
-                MOVE    @R1, R2
-                MOVE    @1[R1], R3
-                JMP     :-
-:
-                POP     R8
-                POP     R12
-                POP     R11
-                POP     R10
+                CMP     R1, K_SFNU
+        ?Z      JMP     s_own
                 RET
 
-; fn_find: the DEF of the function of the token R10 in the program, whose
-; tokens after the name go into the entry R11, with 0 in its high word;
-; Undefined function when there is none. Keeps R8. Uses R1-R3.
+; fn_args: a call of the function or the procedure of the token R1, with
+; its arguments at R8: its DEF, found once, an argument for each of its
+; parameters, a number's or a string's, evaluated, and an L frame with
+; the parameters' values, which then hold the arguments. R8 after the
+; call, R10 after the DEF's parameters, and R11 the DEF's line. The
+; message R9 when no DEF has it, Undefined function or procedure, and a
+; Syntax error when the arguments do not match the parameters. Uses
+; R1-R12.
+fn_args
+                MOVE    R10, R1
+                AND     R1, R1, 0xFFFFFF
+                CMP     R1, NO_VAR
+        ?Z      MOVE    R1, R9
+        ?Z      JMP     err
+                ADD     R11, R1, @V_PEND  ; the entry
+                CMP     @1[R11], 0xFFFFFFFF
+        ?Z      CALL    fn_find
+                PUSH    R11
+                MOVE    R10, @R11       ; the DEF's tokens after its name
+                CLR     R12             ; the parameters
+                CMP     @R10, T_LPAR
+        ?!Z     JMP     fa_frame
+                CMP     @R8++, T_LPAR
+        ?!Z     JMP     err_syntax
+fa_arg
+                MOVE    R10++, R10      ; past ( or ,
+                SHR     R2, @R10, 24
+                PUSH    R10
+                PUSH    R12
+                CMP     R2, K_SVAR
+        ?Z      JMP     :+
+                CMP     R2, K_VAR
+        ?!Z     JMP     err_syntax
+                CALL    eval_num
+                JMP     :++
+:
+                CALL    sexpr
+:
+                POP     R12
+                POP     R10
+                MOVE    R12++, R12
+                MOVE    R10++, R10      ; the , or ) after the parameter
+                MOVE    R1, @R8++       ; and after the argument
+                CMP     R1, @R10
+        ?!Z     JMP     err_syntax
+                CMP     R1, T_COMMA
+        ?Z      JMP     fa_arg
+                CMP     R1, T_RPAR
+        ?!Z     JMP     err_syntax
+                MOVE    R10++, R10
+fa_frame
+                PUSH    R8
+                PUSH    R10
+                ADD     R1, R12, R12    ; the L frame, 3 words a parameter
+                ADD     R1, R1, R12
+                ADD     R1, R1, 1
+                MOVE    R9, R1
+                CALL    frame_new
+                SHL     R9, R9, 16
+                OR      R9, R9, LOCAL_TAG
+                MOVE    @R1, R9
+                ADD     R2, SP, 2       ; the parameters again
+                MOVE    R10, @R2
+                MOVE    R10, @R10
+                ADD     R10, R10, 1     ; past (
+                ADD     R1, R1, 1
+                MOVE    R6, R12
+:
+                SUB[M]  R6, R6, 1
+        ?N      JMP     fa_bind
+                MOVE    R2, @R10
+                ADD     R10, R10, 2     ; and its , or )
+                CALL    save_var
+                ADD     R1, R1, 3
+                JMP     :-
+fa_bind
+                MOVE    R10, R1         ; the arguments into them, the last first
+:
+                SUB[M]  R12, R12, 1
+        ?N      JMP     :++
+                SUB     R10, R10, 3
+                MOVE    R2, @R10
+                AND     R1, R2, 0xFFFFFF
+                ADD     R1, R1, @V_PEND
+                TST     R2
+        ?N      JMP     :+
+                MOVE    @R1, @FPU_X_LO
+                MOVE    @1[R1], @FPU_X_HI
+                MOVE    @FPU_CMD, FPU_DROP
+                JMP     :-
+:
+                CALL    store_str
+                JMP     :--
+:
+                POP     R10
+                POP     R8
+                POP     R11
+                MOVE    R11, @1[R11]    ; the DEF's line
+                RET
+
+; save_var: the variable of the token R2, K_VAR or K_SVAR, into the three
+; words at R1 of an L frame, and the variable 0, or empty; the block of
+; its string the frame's. Uses R3-R5.
+save_var
+                AND     R3, R2, 0xFFFFFF
+                ADD     R4, R3, @V_PEND
+                MOVE    @1[R1], @R4
+                MOVE    @2[R1], @1[R4]
+                MOVE    @R4, R0
+                MOVE    @1[R4], R0
+                SHR     R5, R2, 24
+                CMP     R5, K_SVAR
+        ?!Z     JMP     :+
+                OR      R3, R3, 0x80000000
+                MOVE    @R1, R3
+                MOVE[M] R3, @2[R1]      ; the length
+        ?Z      RET
+                CMP     R3, 0xFFFFFFFF
+        ?Z      RET
+                ADD     R3, R3, @1[R1]  ; the block's length word
+                SUB     R5, R1, @V_STOP
+                ADD     R5, R5, 1
+                OR      R5, R5, TAG_FRAME
+                MOVE    @1[R3], R5
+                RET
+:
+                MOVE    @R1, R3
+                RET
+
+; unwind: the frames from V_FP up to R1 gone, each L frame's variables
+; set again, and their strings' blocks theirs, and V_FP R1. Keeps R1.
+; Uses R2-R7.
+unwind
+                MOVE    R2, @V_FP
+uw_frame
+                CMP     R2, R1
+        ?!C     JMP     uw_done
+                SHR     R3, @R2, 16
+                AND     R3, R3, 0xFF
+                ADD     R7, R2, R3      ; the next frame
+                SHR     R3, @R2, 24
+                CMP     R3, 0x4C        ; L
+        ?!Z     JMP     uw_next
+                ADD     R2, R2, 1
+uw_var
+                CMP     R2, R7
+        ?!C     JMP     uw_next
+                MOVE    R3, @R2
+                AND     R4, R3, 0xFFFFFF
+                ADD     R5, R4, @V_PEND
+                MOVE    @R5, @1[R2]
+                MOVE    @1[R5], @2[R2]
+                TST     R3
+        ?!N     JMP     :+
+                MOVE[M] R6, @2[R2]      ; a string's length
+        ?Z      JMP     :+
+                CMP     R6, 0xFFFFFFFF
+        ?Z      JMP     :+
+                ADD     R6, R6, @1[R2]
+                MOVE    @1[R6], R4      ; the variable's block again
+:
+                ADD     R2, R2, 3
+                JMP     uw_var
+uw_next
+                MOVE    R2, R7
+                JMP     uw_frame
+uw_done
+                MOVE    @V_FP, R1
+                RET
+
+; frame_end: R1 after the frame R1. Uses R2.
+frame_end
+                SHR     R2, @R1, 16
+                AND     R2, R2, 0xFF
+                ADD     R1, R1, R2
+                RET
+
+; frame_find: R1 the latest frame of the kind R3, a letter, and not Z;
+; or Z when there is none, with R1 at R2, himem, or when a frame of a
+; kind in the mask R4 comes first, a bit for each letter from 0x40, with
+; R1 at it. Uses R5.
+frame_find
+                CALL    himem
+                MOVE    R1, @V_FP
+:
+                CMP     R1, R2
+        ?!C     JMP     :+
+                SHR     R5, @R1, 24
+                CMP     R5, R3
+        ?Z      JMP     :++
+                SUB     R5, R5, 0x40
+                SHR     R5, R4, R5
+                AND[M]  R0, R5, 1
+        ?!Z     JMP     :+
+                SHR     R5, @R1, 16
+                AND     R5, R5, 0xFF
+                ADD     R1, R1, R5
+                JMP     :-
+:
+                CMP     R0, R0          ; Z
+                RET
+:
+                CMP     R0, 1           ; not Z
+                RET
+
+; PROCNAME[(X, ...)]: the lines of DEF PROCNAME from after its
+; parameters, which hold the arguments, up to ENDPROC, which goes on
+; after the call
+st_proc
+                MOVE    R1, PROC_WORDS
+                CALL    frame_new
+                MOVE    @R1, PROC_TAG+PROC_WORDS*SIZE1
+                MOVE    @2[R1], @V_CUR
+                PUSH    R1
+                MOVE    R1, @R8++
+                MOVE    R9, S_PROC
+                CALL    fn_args
+                CALL    stmt_end
+                POP     R1
+                MOVE    @1[R1], R8
+                MOVE    @V_CUR, R11
+                MOVE    @V_TP, R10
+                RET
+
+; ENDPROC: on after the call of the latest PROC, without its frame and
+; those after it, each LOCAL's variables set again; ENDPROC without PROC
+; when there is none after the last FN frame
+st_endproc
+                CALL    stmt_end
+                MOVE    R3, 0x50        ; P
+                MOVE    R4, 0x4000      ; not past a FN's
+                CALL    frame_find
+        ?Z      JMP     err_endproc
+                CALL    unwind
+                MOVE    @V_TP, @1[R1]
+                MOVE    @V_CUR, @2[R1]
+                ADD     @V_FP, R1, PROC_WORDS
+                RET
+
+; LOCAL V [, W$ ...]: the variables' values kept in an L frame, until the
+; ENDPROC or the = of the PROC or FN that runs, and V 0 and W$ empty;
+; LOCAL without PROC when neither runs
+st_local
+                MOVE    R3, 0x50        ; P
+                MOVE    R4, 0x4000      ; or N
+                CALL    frame_find
+        ?Z      CMP     R1, R2
+        ?Z      JMP     err_local
+                MOVE    R6, R8          ; the variables, counted
+                CLR     R7
+:
+                MOVE    R1, @R6++
+                SHR     R2, R1, 24
+                CMP     R2, K_VAR
+        ?!Z     CMP     R2, K_SVAR
+        ?!Z     JMP     err_syntax
+                AND     R1, R1, 0xFFFFFF
+                CMP     R1, NO_VAR
+        ?Z      JMP     err_syntax
+                ADD     R7, R7, 3
+                CMP     @R6, T_COMMA
+        ?Z      MOVE    R6++, R6
+        ?Z      JMP     :-
+                ADD     R1, R7, 1
+                MOVE    R6, R1
+                CALL    frame_new
+                SHL     R6, R6, 16
+                OR      R6, R6, LOCAL_TAG
+                MOVE    @R1, R6
+                MOVE    R1++, R1
+:
+                MOVE    R2, @R8++
+                CALL    save_var
+                ADD     R1, R1, 3
+                CMP     @R8, T_COMMA
+        ?Z      MOVE    R8++, R8
+        ?Z      JMP     :-
+                JMP     stmt_end
+
+; fn_find: the DEF of the function or procedure of the token R10 in the
+; program, whose tokens after the name go into the entry R11, and its
+; line into its high word; the message R9 when there is none. Keeps R8.
+; Uses R1-R3.
 fn_find
                 PUSH    R8
                 MOVE    R1, PROGRAM
 ff_line
                 CMP     R1, @V_PEND
-        ?!C     JMP     err_fn
+        ?C      JMP     :+
+                MOVE    R1, R9
+                JMP     err
+:
                 ADD     R8, R1, 2
 ff_tok
                 MOVE[M] R2, @R8
@@ -217,7 +563,7 @@ ff_next
                 JMP     ff_line
 ff_found
                 ADD     @R11, R8, 2
-                MOVE    @1[R11], R0
+                MOVE    @1[R11], R1
                 POP     R8
                 RET
 
@@ -251,11 +597,12 @@ st_do
                 CMP     R1, R2
         ?!C     JMP     :++
                 AND     R3, @R1, 0xFF000000
-                CMP     R3, GOSUB_TAG
-        ?Z      JMP     :++
                 CMP     R3, DO_TAG
         ?Z      CMP     @1[R1], R8
         ?Z      JMP     :+
+                CMP     R3, DO_TAG
+        ?!Z     CMP     R3, FOR_TAG
+        ?!Z     JMP     :++
                 ADD     R1, R1, FOR_WORDS
                 JMP     :-
 :
@@ -263,7 +610,7 @@ st_do
 :
                 MOVE    R1, FOR_WORDS
                 CALL    frame_new
-                MOVE    @R1, DO_TAG
+                MOVE    @R1, DO_TAG+FOR_WORDS*SIZE1
                 MOVE    @1[R1], R8
                 MOVE    @2[R1], @V_CUR
                 MOVE    @3[R1], R0
@@ -489,8 +836,17 @@ bs_found
                 POP     R8
                 RET
 
-err_fn
-                MOVE    R1, S_FN
+err_fnret
+                MOVE    R1, S_FNRET
+                JMP     err
+err_noeq
+                MOVE    R1, S_NOEQ
+                JMP     err
+err_endproc
+                MOVE    R1, S_ENDPROC
+                JMP     err
+err_local
+                MOVE    R1, S_LOCAL
                 JMP     err
 err_loop
                 MOVE    R1, S_LOOP
@@ -506,6 +862,15 @@ err_endif
                 JMP     err
 
 S_FN            .ASCII_B 'Undefined function'
+S_PROC          .ASCII_B 'Undefined procedure'
+S_FNRET         .ASCII_B '= without FN'
+                .DAT    0
+S_NOEQ          .ASCII_B 'FN without ='
+                .DAT    0
+S_ENDPROC
+                .ASCII_B 'ENDPROC without PROC'
+                .DAT    0
+S_LOCAL         .ASCII_B 'LOCAL without PROC'
 S_LOOP          .ASCII_B 'LOOP without DO'
 S_EXIT          .ASCII_B 'EXIT without DO'
 S_NOLOOP

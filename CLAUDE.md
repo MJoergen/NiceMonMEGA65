@@ -38,8 +38,8 @@ split from the monitor into an image of its own (#152), stage 2,
 the numbers (#113), is written, and so are stage 3, the programs
 (#114), with its benchmarks, stage 4, the files (#60), stage 5, the
 strings (#116), stage 6, the functions (#117), and stage 7, the
-screen editor (#118), and of stage 8 (#119), `ON` and `DEF FN` on one
-line, `DO`, `LOOP`, and `EXIT`, and the block `IF`.
+screen editor (#118), and stage 8, the structure (#119), with `ON`,
+`DEF FN`, `DEF PROC`, `LOCAL`, `DO` and `LOOP`, and the block `IF`.
 `doc/BASIC_ROM.md` is the design of BASIC's image from a card's
 `BASIC*.ROM`, which replaces BASIC's part of the ROM at the first
 cold start (#153), of which all five stages are written.
@@ -211,8 +211,8 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   `basic_dis.nasm`, and the screen editor of stage 7 (#118) in
   `basic_edit.nasm`, and the strings of stage 5 (#116), with
   `DATA`, `READ`, and `TIME$`, in `basic_str.nasm`, and `ON`,
-  `DEF FN`, `DO` and `LOOP`, and the block `IF` of stage 8 (#119) in
-  `basic_struct.nasm`), on the entries of the dispatch table alone, as a
+  `DEF FN`, `DEF PROC`, `LOCAL`, `DO` and `LOOP`, and the block `IF`
+  of stage 8 (#119) in `basic_struct.nasm`), on the entries of the dispatch table alone, as a
   program is, with its tests of the statements in `basic/test/`, its
   benchmarks in `basic/bench/`, the ECMA-55 suite's runner,
   `basic/test/ecma55.py`, and

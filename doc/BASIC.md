@@ -440,9 +440,9 @@ Stage 5 (#116) has strings, as V2 has them, written in
 
 ### Structure
 
-Of stage 8 (#119), `ON`, the functions of `DEF FN` on one line, `DO`
-and `LOOP`, and the block `IF` are written, in
-`basic/basic_struct.nasm` (decided on 2026-11-20):
+Stage 8 (#119) is written, in `basic/basic_struct.nasm` (decided on
+2026-11-20): `ON`, the functions and procedures of `DEF FN` and `DEF
+PROC`, with `LOCAL`, `DO` and `LOOP`, and the block `IF`.
 
 - **`ON X GOTO N, M, ...`** and **`ON X GOSUB N, M, ...`** go to the
   line of the X-th number, as `GOTO` and `GOSUB` go to it. X is rounded
@@ -457,21 +457,54 @@ and `LOOP`, and the block `IF` are written, in
   function's, never a variable's. `FNA$` gives a string. A function
   may have no parameters, `DEF FNP = 3.14`, and then no parentheses at
   its call. The first call finds the `DEF` in the program, the first
-  of them, and keeps its address; `CLR`, `RUN`, and an edit find it
-  again. So a call may come before its `DEF` in the program. A `DEF`
-  that runs passes over the rest of its line, as `REM` does, so it
-  works only in a program's line.
-- **The parameters** are numbers' variables, and the arguments
-  numbers, as many as the parameters. A call keeps the parameters'
-  values on the processor's stack while the expression runs, and sets
-  them again after it, so the other variables are the program's, and
-  a function may call others, and itself, as deep as an expression
-  nests: past that it is `Formula too complex`. An error inside a
-  function leaves its parameters as the call set them.
-- **The errors**: a function with no `DEF` is `Undefined function`, a
-  count of arguments that is not that of the parameters is a `Syntax
-  error`, and a string's parameter or argument is a `Type mismatch`.
-  An error is reported in the line of the call.
+  of them, and keeps its address and its line; `CLR`, `RUN`, and an
+  edit find it again. So a call may come before its `DEF` in the
+  program. A `DEF` that runs passes over the rest of its line, as `REM`
+  does, so it works only in a program's line.
+- **A function over lines** is a `DEF FNA(X)` with no `=` after its
+  parameters. Its call runs the statements after them, on that line and
+  the next, up to a statement `= E`, which ends the call with the value
+  E. So `IF N < 2 THEN = 1` returns early. The statements run inside the
+  expression of the call, which stays on the processor's stack, and the
+  numbers that pend in it move to the function's frame, and back with
+  its value, so that the function has the FPU's whole stack. The
+  program's end in a function is `FN without =`, and `END`, `STOP`, or
+  the break key there ends the call, after which `CONT` cannot go on.
+  A function calls itself up to 30 deep, as the call of a function over
+  lines may start while 512 words of the processor's stack are taken at
+  most; past it, it is `Formula too complex`.
+- **`DEF PROCA(X, Y$)`** defines a procedure, a statement of its own,
+  which `PROCA(1, "S")` calls. It runs the statements after the
+  parameters up to `ENDPROC`, which goes on after the call. A procedure
+  is on the frames alone, not on the processor's stack, so it calls
+  itself as deep as the frames have room, 73 deep for one with a
+  parameter.
+- **The parameters** are variables of numbers or of strings, and the
+  arguments, as many, of their kinds. A call evaluates all the
+  arguments, then keeps the parameters' values in a frame, and sets the
+  parameters to the arguments; `ENDPROC` and `=` set them again, so the
+  other variables are the program's. A string that a frame keeps is
+  still the variable's block of the heap, which the frame owns while it
+  is there, so the sweep moves it, with no copy. An error inside a
+  function or a procedure leaves its parameters as the call set them.
+  So does a `GOTO` out of one.
+- **`LOCAL X, Y$`**, in a procedure or a function, keeps the variables'
+  values in a frame, as the parameters' are, and sets them to 0 and to
+  an empty string, until the `ENDPROC` or the `=`. A `FOR` or a `DO`
+  must not start before a `LOCAL` that is inside it, as the frame of
+  `LOCAL` hides the loop's from its `NEXT`, `LOOP`, or `EXIT`.
+- **The frames bound each other**: `RETURN` finds no `GOSUB` past a
+  procedure's or a function's frame, `ENDPROC` no procedure past a
+  function's, and `=` no function past a procedure's. A `GOSUB` inside
+  a procedure, whose subroutine ends with `ENDPROC`, is dropped, as are
+  the loops inside it.
+- **The errors**: a function or a procedure with no `DEF` is
+  `Undefined function` or `Undefined procedure`, and arguments that
+  are not as many as the parameters are a `Syntax error`, and one of
+  the other kind a `Type mismatch`. `ENDPROC`, `=`, and `LOCAL` where
+  no procedure or function runs are `ENDPROC without PROC`, `= without
+  FN`, and `LOCAL without PROC`. An error in an argument is reported
+  in the line of the call.
 - **`DO` and `LOOP`** run the statements between them again, with
   `WHILE X` or `UNTIL X` after either, or after none, which loops until
   an `EXIT`, a `GOTO` out of it, or a `RETURN`. A `DO` pushes a frame
@@ -499,8 +532,6 @@ and `LOOP`, and the block `IF` are written, in
   words, as it clears `GOTO`'s. A block with no `ENDIF` is `Missing
   ENDIF`. An `IF ... THEN` with nothing after it did nothing before;
   now it starts a block. In a direct line it runs nothing after.
-- **Later in stage 8**: `DEF FN` over lines, with `LOCAL` and `=`, the
-  parameters of strings, and `PROC`, on the frames.
 
 ### What changed in the list of #54
 
@@ -687,14 +718,19 @@ as #54 says:
 
 ### Frames
 
-`FOR`, `GOSUB`, `PROC`, and `LOCAL` push frames on one stack of
-BASIC's own, each with a tag. A `FOR` frame has the variable, the
+`FOR`, `GOSUB`, `DO`, `PROC`, `FN`, and `LOCAL` push frames on one
+stack of BASIC's own, each with a tag, its kind and its size. A `FOR`
+frame has the variable, the
 limit, the step, and the address of the loop's body, so `NEXT` does not
 search. A `GOSUB` frame has the address of the token after it, and a
 `DO` frame, as large as a `FOR` frame, that of its `DO` and its
-`LOOP` ([Structure](#structure)). The
+`LOOP` ([Structure](#structure)). A `PROC` frame has the token after
+the call. An L frame has the values of the variables of a `LOCAL` or
+of a call's parameters, three words for each, and a `FN` frame, of a
+function over lines, the numbers that pended at its call. The
 region of the frames is 512 words below `HIMEM`, where a `FOR` frame
-takes 8 and a `GOSUB` frame 3, and a frame with no room is
+takes 8, a `GOSUB` frame 3, and a call of a procedure with one
+parameter 7, and a frame with no room is
 `Out of memory`. A `NEXT` with no `FOR` frame is `NEXT without FOR`,
 and a `RETURN` with no `GOSUB` frame is `RETURN without GOSUB`. The
 numbers of an expression are on the FPU's stack
@@ -703,7 +739,9 @@ stack of the frames, above them, and are gone at the end of the
 statement. So an error drops them all by resetting one pointer and
 clearing the FPU's stack. `PROC` recursion is on the
 frames, not on the processor's stack, as the loop of statements does
-not recurse.
+not recurse. A `FN` over lines does: its call runs a loop of
+statements below its expression on the processor's stack, which `=`
+returns from ([Structure](#structure)).
 
 ### Errors
 
@@ -722,8 +760,10 @@ long`, and `Out of data`. Stage 3 adds
 `Undefined line`, `Undefined array`, `Bad subscript`,
 `Redimensioned array`, `NEXT without FOR`, `RETURN without GOSUB`,
 and `Can't continue` ([Programs](#programs)), and stage 8 `Undefined
-function`, `LOOP without DO`, `EXIT without DO`, `Missing LOOP`, and
-`Missing ENDIF` ([Structure](#structure)).
+function`, `Undefined procedure`, `ENDPROC without PROC`, `= without
+FN`, `FN without =`, `LOCAL without PROC`, `LOOP without DO`, `EXIT
+without DO`, `Missing LOOP`, and `Missing ENDIF`
+([Structure](#structure)).
 
 The depth of an expression is counted, and too deep is an error,
 since nothing notices when the processor's stack runs out. The FPU's
@@ -1068,14 +1108,15 @@ Each has an issue, under #54.
    of lines. It depends on stage 3 only, and those who use the board
    on its own need it most, so it may come right after stage 3.
    Written in V2.4, in `basic/basic_edit.nasm`.
-8. **Structure**, #119. Of it, `ON ... GOTO`, `ON ... GOSUB`, and
-   `DEF FN` on one line are written, in `basic/basic_struct.nasm`,
-   with the language of [Structure](#structure), and measured 403
-   words, and `DO`, `LOOP`, `EXIT`, and the block `IF` 524 more
-   (measured 2026-11-20). `IF`, `ELSE`, and `ENDIF` over lines, `DO` and
+8. **Structure**, #119. `IF`, `ELSE`, and `ENDIF` over lines, `DO` and
    `LOOP` with `WHILE`, `UNTIL`, and `EXIT`, `PROC` and `FN` with
    parameters, `LOCAL`, and recursion, and `ON ... GOTO`. Their
-   targets are found once and kept, as a `GOTO`'s line is.
+   targets are found once and kept, as a `GOTO`'s line is. Written in
+   V2.4.1, in `basic/basic_struct.nasm`, with the language of
+   [Structure](#structure): `ON` and `DEF FN` on one line in 403
+   words, `DO`, `LOOP`, `EXIT`, and the block `IF` in 524 more, and
+   `PROC`, `FN` over lines, and `LOCAL` in 699 more (measured
+   2026-11-20).
 9. **Errors**, #120. `TRAP`, `RESUME`, `ER`, `EL`, and `ERR$`.
 10. **The machine**, #121. `TI`, `SLEEP`, the colors, the cursor, and
     the display offset.
@@ -1210,7 +1251,9 @@ to 12946, of which 44 are the keywords', the help's, and the message's
 text, and leave 7534 free (measured 2026-11-20). `DO`, `LOOP`, `EXIT`,
 and the block `IF` are 524 words more, to 13470, of which 114 are the
 keywords', the help's, and the messages' text, and leave 7010 free
-(measured 2026-11-20).
+(measured 2026-11-20). `PROC`, `FN` over lines, and `LOCAL` are 699
+words more, to 14169, of which about 90 are the keywords', the help's,
+and the messages' text, and leave 6311 free (measured 2026-11-20).
 
 Stage 1 was `basic.c`, 1510 words, and `basic.nasm`, 624, of which 431
 were its packed texts, the help among them, less 1032 words that left

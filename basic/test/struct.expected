@@ -122,6 +122,8 @@ READY.
 DEF X = 1
 Syntax error
 DEF FNA(X) = E      the function FNA of X, as FNA(2); FNA$ gives a string
+DEF PROCA(X)        the lines up to ENDPROC, run by PROCA(2)
+DEF FNA(X)          the lines up to = E, whose E is the value of FNA(2)
 READY.
 165 DEF FNS$ = "S" + FNH$(FNA(2))
 RUN 150
@@ -129,7 +131,8 @@ S<00000005>
 READY.
 165 DEF FNS$(A$) = A$
 RUN 150
-Type mismatch in 160
+Syntax error in 160
+PRINT X; "T", ...   print numbers and strings, ; and , between them; ? is PRINT
 READY.
 165 DEF FNS$ = FNS$
 RUN 150

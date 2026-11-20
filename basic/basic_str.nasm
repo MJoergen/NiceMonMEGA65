@@ -15,7 +15,9 @@
 ; grow up to it. A block in it is the characters, then the length, then
 ; the back word, which says whose the block is: the offset of a variable
 ; from V_PEND, TAG_ARR and the offset of an array's element from V_VEND,
-; or TAG_SLOT and a slot of the strings' stack. A block is live when its
+; TAG_SLOT and a slot of the strings' stack, or TAG_FRAME and the offset
+; from V_STOP of a variable's two words that an L frame keeps, for LOCAL
+; and the parameters (basic_struct.nasm). A block is live when its
 ; owner holds its address and its length, or when its slot is on the
 ; strings' stack and holds an address in it. Nothing frees a block: an
 ; assignment that replaces a string leaves its old block dead, and so
@@ -59,7 +61,8 @@ SSTK_N          .EQU    16              ; the entries of the strings' stack
 SARG_MAX        .EQU    80              ; the characters of a statement's string
 NUMC_MAX        .EQU    143             ; the characters that str_num looks at
 TAG_ARR         .EQU    0x40000000      ; in a back word: an array's element,
-TAG_SLOT        .EQU    0x80000000      ; or a slot of the strings' stack
+TAG_SLOT        .EQU    0x80000000      ; or a slot of the strings' stack,
+TAG_FRAME       .EQU    0xC0000000      ; or an L frame's variable, from V_STOP
 STR_KINDS       .EQU    0x8E0020        ; the kinds of the tokens that start a string, a bit each
 T_TIMES         .EQU    K_SFN*K+6       ; TIME$
 
@@ -256,12 +259,13 @@ gc_live
                 AND     R10, R6, 0x3FFFFFFF
                 CMP     R9, 2
         ?Z      JMP     gl_slot
-        ?!C     JMP     gl_no
+        ?!C     JMP     gl_frame
                 TST     R9
         ?Z      ADD     R7, R10, @V_PEND
         ?Z      MOVE    R11, @V_VEND
         ?!Z     ADD     R7, R10, @V_VEND
         ?!Z     MOVE    R11, @V_AEND
+gl_owner
                 ADD     R9, R7, 1
                 CMP     R9, R11
         ?!C     JMP     gl_no           ; past the table, or the arrays
@@ -282,6 +286,13 @@ gl_slot
 gl_no
                 CMP     R0, 1           ; not Z
                 RET
+gl_frame
+                ADD     R7, R10, @V_STOP  ; in a frame that is there
+                CMP     R7, @V_FP
+        ?C      JMP     gl_no
+                MOVE    R11, FRAMES
+                ADD     R11, R11, @V_STOP
+                JMP     gl_owner
 
 ; store_str: the string on top to the descriptor at R1, a variable's or
 ; an element's, and off the stack: the block of a new string whose whole
@@ -323,11 +334,37 @@ ss_copy
                 POP     R7
                 JMP     ss_set
 
+; s_own: the string on top in a block of its own slot: a copy, unless it
+; is one, or is empty, or is not in the heap. Uses R1-R7.
+s_own
+                CALL    s_top
+                TST     R2
+        ?Z      RET
+                CMP     R1, @V_SBOT
+        ?C      RET
+                CMP     R1, @V_STOP
+        ?!C     RET
+                SUB     R5, @V_SSP, 1
+                OR      R5, R5, TAG_SLOT
+                ADD     R4, R1, R2      ; the length's word, if the whole of a block
+                CMP     @R4, R2
+        ?Z      CMP     @1[R4], R5
+        ?Z      RET
+                MOVE    R1, R2
+                MOVE    R2, R5
+                CALL    salloc
+                MOVE    R4, R1
+                PUSH    R1
+                CALL    s_top           ; again, as the sweep may have moved it
+                CALL    s_copy
+                POP     @R3
+                RET
+
 ; The expressions. sexpr: a string from R8, on the strings' stack: an
 ; operand, and + and another, which joins them, as often as it comes.
 ; Uses R1-R7 and R9.
 sexpr
-                CMP     SP, STACK-EXPR_ROOM
+                CMP     SP, @V_ELIM
         ?C      JMP     err_complex
                 CALL    sprimary
 :

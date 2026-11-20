@@ -417,6 +417,19 @@ tok_var
         ?Z      CMP     R1, 0x4E        ; N
         ?Z      OR      R10, R10, FUNC
 :
+                AND     R1, R10, NAME_LEN  ; PROC and more: a procedure's
+                CMP     R1, 5
+        ?C      JMP     tv_store
+                AND     R1, @R9, 0xDF
+                CMP     R1, 0x50        ; P
+        ?Z      AND     R1, @1[R9], 0xDF
+        ?Z      CMP     R1, 0x52        ; R
+        ?Z      AND     R1, @2[R9], 0xDF
+        ?Z      CMP     R1, 0x4F        ; O
+        ?Z      AND     R1, @3[R9], 0xDF
+        ?Z      CMP     R1, 0x43        ; C
+        ?Z      OR      R10, R10, FUNC
+tv_store
                 MOVE    R11, @V_STORE   ; not 0 to make the variable: in a
                 MOVE    R2, @-1[R8]     ; line to store, after GET, INPUT, or
                 AND     R3, R2, 0xFFFFFF00  ; READ, or with = after it, at the
@@ -837,7 +850,7 @@ check_flags
 ; with an operand of its precedence plus 1, so that they group to the
 ; left. expr_more: the operators alone, after an operand on the stack.
 expr
-                CMP     SP, STACK-EXPR_ROOM
+                CMP     SP, @V_ELIM
         ?C      JMP     err_complex
                 PUSH    R9
                 CALL    primary
