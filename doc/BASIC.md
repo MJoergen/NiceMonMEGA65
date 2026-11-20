@@ -669,10 +669,13 @@ The Commodore editor of #54, in assembly, in place of the monitor's
   first key of a line. The editor takes them, and the history keeps
   Page Up and Page Down.
 - A line is checked when it is entered, as far as the tokenizer
-  checks it. On an error the line is not stored, and the cursor goes
-  back to the line on the screen, at the column where the tokenizer
-  stopped. The errors that only a parse of the statement finds stay
-  errors at `RUN`, until stage 9.
+  checks it. On an error the line is not stored, and after `READY.`
+  it is shown again, with the cursor at the column where the tokenizer
+  stopped. Only when no key waits, as when a person types: the lines
+  that a host pastes come one after the other, and the next would go
+  into the one shown (found while writing it, 2026-11-20). The errors
+  that only a parse of the statement finds stay errors at `RUN`, until
+  stage 9.
 - `DELETE` takes a string, a file, or a range of lines, such as
   `DELETE 10-50`, so the two share the keyword.
 - `RENUMBER` changes the targets that are numbers in the line, which

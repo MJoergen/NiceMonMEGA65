@@ -1087,6 +1087,9 @@ err_nonum
 err_char
                 MOVE    R1, S_CHAR
 err
+                TST     @V_ETOK         ; in the line typed: where, for ed_redo
+        ?!Z     MOVE    @V_EPOS, R5
+                CLR     @V_ETOK
                 MOVE    @FPU_CMD, FPU_CLEAR
                 MOVE    SP, STACK
                 MOVE[M] R8, @V_REDO

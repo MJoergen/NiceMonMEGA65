@@ -103,6 +103,7 @@ enter_store
                 ONE     @V_STORE        ; each name gets its variable
                 CALL    tokenize_at
                 CLR     @V_STORE
+                CLR     @V_ETOK
                 ADD     R9, R8, 3
                 SUB     R9, R9, V_TOK   ; the words of the new line
                 CALL    drop_run
@@ -989,6 +990,8 @@ poll
         ?N      RET                     ; none
                 CMP     R1, 3           ; CTRL-C
         ?Z      JMP     brk
+; ring_put: R1 into the ring, or dropped when it is full. Uses R2 and R3.
+ring_put
                 MOVE    R3, @V_RHEAD
                 ADD     R2, R3, 1
                 AND     R2, R2, RING-1

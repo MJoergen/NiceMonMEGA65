@@ -55,7 +55,9 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   listed line can be changed and entered again
   ([#118](https://github.com/MJoergen/NiceMonMEGA65/issues/118),
   [basic/README.md](../basic/README.md)). The cursor keys up and down
-  no longer scroll back; Page Up and Page Down still do.
+  no longer scroll back; Page Up and Page Down still do. A line that
+  the tokenizer refuses is shown again after the error, with the
+  cursor at it, when no key waits.
 - The dispatch table is 1.8, with entry 41, `scr_links`: the rows of
   the screen that go on from the row above, which `mon_putc` keeps as
   it wraps, ends, and scrolls the rows, for BASIC's screen editor

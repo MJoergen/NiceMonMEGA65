@@ -226,6 +226,13 @@ LT = \033[D
 X10 = XXXXXXXXXX
 Y10 = YYYYYYYYYY
 EDIT = cls\r10 PRINT "HELLO"\r20 PRINT "WORLD"\rLIST\r$(UP)$(UP)$(UP)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)AB\r\r$(DN)RUN\r$(UP)$(UP)$(UP)$(UP)$(UP)$(UP)$(UP)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(RT)$(Y10)$(Y10)$(Y10)$(Y10)$(Y10)$(Y10)$(Y10)\r$(DN)$(DN)$(DN)$(DN)$(DN)$(DN)LIST\rRUN\rINPUT A: PRINT A * 2\r21\rINPUT B: PRINT B\r13$(LT)\177\rINPUT C: PRINT C\r5\177\1776\rPRINT 12345$(LT)$(LT)\177\rPRINT "$(X10)$(X10)$(X10)$(X10)$(X10)$(X10)$(X10)$(X10)$(X10)"\r$(UP)$(UP)$(UP)$(UP)$(UP)\rjunk\003$(DN)$(DN)$(DN)HALT\r
+# redo: the check at entry (issue #118, step 3). A line of two rows
+# that the tokenizer refuses at its @ is not stored, and after READY. it
+# is shown again with the cursor at the @, as no key waits: the input
+# ends there, and BASIC waits for a key until the step limit. The dump
+# is the cursor's column and row.
+REDO = 10 PRINT 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1 @ 2\r
+DUMP_redo = -d 0xFFFFFF81:2
 # load: LOAD with lines typed and pasted. The LOAD line ends with CR LF,
 # as a terminal may end it, which is no empty line. The first line is typed
 # with edits: a DEL that takes back 2, the cursor key ESC [ A, which is
@@ -317,7 +324,9 @@ bench: $(ROM_TEST)
 # Each test runs the ROM with its input, and compares the console output,
 # the dumps, and the screen with test/NAME.expected. The Halted line and
 # the registers are left out, as the steps and the registers change with
-# the code, but for VBASE, bits 23-0 of R14, which must be 0. test/dis.py
+# the code, and so are those of a stop at the step limit, of which its
+# words stay, but for VBASE, bits 23-0 of R14, which must be 0.
+# test/dis.py
 # checks the rows of DIS against nicedis.py and niceasm first,
 # test/ntp.py NTP, with DHCP and DNS before it, and test/tftp.py TFTP's
 # LOAD and DIR, and test/bench.py runs the benchmarks of bench/ and
@@ -349,16 +358,18 @@ test: fmt $(ROM_TEST) test/prog.bas test/arr.bas test/files.in test/files_card.p
 	@tr '\n' '\r' < test/files.in > $(BUILD)/files.txt
 	@printf '$(KEYS)' > $(BUILD)/keys.txt
 	@printf '$(EDIT)' > $(BUILD)/edit.txt
+	@printf '$(REDO)' > $(BUILD)/redo.txt
 	@{ printf '$(LOAD_HEAD)'; head -n 3 $(MON)/build/hello.bin | awk '{ printf "%s\r\n", $$0 }'; \
 	  tail -n +4 $(MON)/build/hello.bin; printf '$(LOAD_TAIL)'; } > $(BUILD)/load.txt
 	@fail=0; \
-	for t in cmds basic expr prog keys edit arr load load_emu load_64k time files; do \
+	for t in cmds basic expr prog keys edit redo arr load load_emu load_64k time files; do \
 	  opts=; sd=; base0=; \
 	  case $$t in \
 	    cmds) prog=; dump='$(DUMP_cmds)';; \
 	    basic) prog=; dump='$(DUMP_basic)';; \
 	    expr) prog=; dump='$(DUMP_expr)';; \
 	    prog|keys|edit|arr) prog=; dump=;; \
+	    redo) prog=; dump='$(DUMP_redo)';; \
 	    load) prog=$(BUILD)/ram128k.bin; dump='$(DUMP_load)';; \
 	    load_emu) prog=; dump='$(DUMP_load_emu)';; \
 	    load_64k) prog=$(BUILD)/ram64k.bin; dump='$(DUMP_load_64k)';; \
@@ -372,7 +383,9 @@ test: fmt $(ROM_TEST) test/prog.bas test/arr.bas test/files.in test/files_card.p
 	  cat $(ROM_TEST) $$prog > $(BUILD)/$$t.full.bin; \
 	  $(EMU) -s -n $(MAX_STEPS) -i $(BUILD)/$$t.txt $$dump $$opts $$sd $(BUILD)/$$t.full.bin \
 	    > $(BUILD)/$$t.raw; status=$$?; \
-	  { sed -e '/^Halted (HALT)/,/^R12 /d' $(BUILD)/$$t.raw; \
+	  { sed -e '/^Halted (HALT)/,/^R12 /d' \
+	      -e '/Stopped at the step limit/,/^R12 /{/Stopped/!d;s/Stopped at the step limit.*/Stopped at the step limit/;}' \
+	      $(BUILD)/$$t.raw; \
 	    sed -n 's/.* R14 ..\(......\) .*/VBASE at the halt \1/p' $(BUILD)/$$t.raw; \
 	    echo "exit $$status"; \
 	    if [ $$t = time ]; then \

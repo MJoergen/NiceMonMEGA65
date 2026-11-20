@@ -1,0 +1,22 @@
+NiceMon V9.9, BASIC V9.9
+HELP lists the statements
+READY.
+10 PRINT 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1 @ 2
+Syntax error
+PRINT X; "T", ...   print numbers and strings, ; and , between them; ? is PRINT
+READY.
+10 PRINT 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1 @ 2Stopped at the step limit
+ffffff81: 0000000b 00000009
+Screen:
+|NiceMon V9.9, BASIC V9.9
+|HELP lists the statements
+|READY.
+|10 PRINT 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1
+|+1+1+1+1+1 @ 2
+|Syntax error
+|PRINT X; "T", ...   print numbers and strings, ; and , between them; ? is PRINT
+|READY.
+|10 PRINT 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1
+|+1+1+1+1+1 @ 2
+VBASE at the halt 000000
+exit 3

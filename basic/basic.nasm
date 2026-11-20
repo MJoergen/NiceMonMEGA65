@@ -79,6 +79,8 @@ V_ESR           .EQU    0xFFFFE841      ; the row where the line's first key cam
 V_ESC           .EQU    0xFFFFE842      ; and its column,
 V_EMOV          .EQU    0xFFFFE843      ; not 0 once a key did more than type at the end of the text,
 V_EKEY          .EQU    0xFFFFE844      ; and not 0 once the line's first key came
+V_ETOK          .EQU    0xFFFFE845      ; not 0 while the line typed is tokenized,
+V_EPOS          .EQU    0xFFFFE846      ; and where in V_LINE its error was, for ed_redo, or 0
 V_TSRV          .EQU    0xFFFFE8A0      ; for TFTP: the server's IP address,
 V_TTID          .EQU    0xFFFFE8A1      ; its port, its TID, 0 before its first DATA,
 V_TBLK          .EQU    0xFFFFE8A2      ; the block waited for,
@@ -133,6 +135,7 @@ bas_start
                 CLR     @V_HIMEM        ; the RAM's top
                 CALL    new_prog        ; no program, and no variables
                 CLR     @V_RHEAD        ; no keys typed ahead
+                CLR     @V_EPOS         ; no line to show again
                 CLR     @V_RTAIL
                 MOVE    @V_POLL, POLL_EVERY
                 MOVE    @V_NEXT, PROGRAM
@@ -148,15 +151,19 @@ main            MOVE    SP, STACK
                 CALL    files_end       ; what an error or the break key left open
                 CLR     @V_CUR          ; direct mode
                 CLR     @V_STORE
+                CLR     @V_ETOK
                 CLR     @V_REDO
                 CALL    SCR_GETXY
                 TST     R1
         ?!Z     CALL    _io_crlf        ; after PRINT with ; or , at its end
                 MOVE    R1, S_READY
                 CALL    puts_b_crlf
+                TST     @V_EPOS         ; after an error of the tokenizer,
+        ?!Z     CALL    ed_redo         ; the line again, the cursor at the error
 main_line
                 CLR     R1              ; CTRL-C empties the line
                 CALL    getline
+                ONE     @V_ETOK         ; an error of the tokenizer shows it again
                 MOVE    R5, V_LINE
 :
                 CMP     @R5, 0x20
@@ -166,6 +173,7 @@ main_line
                 CMP     R1, 10
         ?C      JMP     enter_line      ; a number: a line to store
                 CALL    tokenize
+                CLR     @V_ETOK
                 MOVE    R8, V_TOK
                 TST     @R8
         ?Z      JMP     main_line       ; blanks only

@@ -329,6 +329,49 @@ gl_leave
                 CLR     R7
                 JMP     SCR_BACK
 
+; ed_redo: the check at entry (issue #118, step 3): after an error of
+; the tokenizer in the line typed, which stores no line, the line again
+; after READY., on the screen and the line, with the cursor at the error
+; for the fix, at the word of V_LINE where the tokenizer stopped, which
+; err kept in V_EPOS. Only when no key waits, in the ring or at the
+; console, as a person types: the lines that a host pastes come one
+; after the other, and the next would go into this one. A key that
+; waits goes into the ring. Uses R1-R8.
+ed_redo
+                MOVE    R2, @V_RTAIL
+                CMP     R2, @V_RHEAD
+        ?!Z     JMP     :++             ; keys typed ahead
+                CLR     R1
+                CALL    CON_KEY
+                TST     R1
+        ?N      JMP     :+              ; none
+                CALL    ring_put
+                JMP     :++
+:
+                SUB     R8, @V_EPOS, V_LINE  ; the error's position
+                CMP     R8, EDIT_MAX+1
+        ?C      JMP     :++
+:
+                CLR     @V_EPOS
+                RET
+:
+                CLR     @V_EPOS
+                MOVE    R7, V_LINE
+:
+                MOVE[M] R1, @R7++
+        ?Z      JMP     :+
+                CALL    MON_PUTC
+                JMP     :-
+:
+                SUB     R7, R7, V_LINE+1  ; the characters
+                CALL    SCR_GETXY
+                CALL    ed_x80
+                ADD     R1, R1, R2
+                SUB     R1, R1, R7      ; the line's start, 80 a row from row 0,
+                ADD     R1, R1, R8      ; and its error
+                CLR     R3
+                JMP     ed_to
+
 ; ed_ext: the logical line of the cursor's row, from scr_links: R3 its
 ; first row, R4 its last, R5 the cursor's position in it, and R6 the end
 ; of its text, the position after its last character that is no blank,
@@ -377,9 +420,13 @@ ed_ext
                 RET
 
 ; ed_floor: R9 the position in the line of the rows R3 to R4 where the
-; first key came, when it came in that line, else 0. Uses R1 and R2.
+; first key came, in INPUT's line, R10 not 0, when it came in that line,
+; else 0, as a line typed for the main loop starts at its row's start.
+; Uses R1 and R2.
 ed_floor
                 CLR     R9
+                TST     R10
+        ?Z      RET                     ; not INPUT's line
                 MOVE    R1, @V_ESR
                 CMP     R1, R3
         ?C      RET                     ; above the line, or none
