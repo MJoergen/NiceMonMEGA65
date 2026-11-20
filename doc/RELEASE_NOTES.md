@@ -47,8 +47,9 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 - The tokens of the statements from `BSAVE` on changed. A program
   keeps its text on a card, so only a dump of the tokens shows it.
 - `SIN`, `COS`, `TAN`, `ASIN`, `ACOS`, `ATAN`, `LOG`, `LOG2`, `LOG10`,
-  `EXP`, `RND`, and `PI` are keywords, so a program with a variable of
-  one of these names is a `Syntax error` at that line.
+  `EXP`, `RND`, `PI`, `BSAVE`, `AUTO`, and `RENUMBER` are keywords, so
+  a program with a variable of one of these names is a `Syntax error`
+  at that line.
 
 **New.**
 
