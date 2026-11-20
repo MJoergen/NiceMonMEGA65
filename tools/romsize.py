@@ -56,6 +56,7 @@ ROM_PARTS = {
     "basic_edit.nasm": "The screen editor",
     "basic_str.nasm": "The strings: the heap, its sweep, the functions of strings, `DATA`, "
                       "`READ`, and `TIME$`",
+    "basic_struct.nasm": "The structure: `ON ... GOTO`, `ON ... GOSUB`, and `DEF FN`",
     "monitor_sd.nasm": "The sector routines",
     "monitor_fat.nasm": "FAT32, the file entries, and TAB",
     "monitor_eth.nasm": "The network, and its entries",

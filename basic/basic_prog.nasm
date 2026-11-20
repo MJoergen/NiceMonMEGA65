@@ -134,12 +134,13 @@ enter_store
                 SUB[M]  R4, R4, 1
         ?!Z     JMP     :-
 ; clear_cache: the addresses of the lines of the K_LINE tokens cleared,
+; and those of the functions' DEFs (basic_struct.nasm),
 ; after an edit. Uses R1-R3 and R8.
 clear_cache
                 MOVE    R1, PROGRAM
 cc_line
                 CMP     R1, @V_PEND
-        ?!C     RET
+        ?!C     JMP     fn_forget       ; and the DEFs of the functions
                 ADD     R8, R1, 2
 :
                 MOVE[M] R2, @R8
@@ -216,7 +217,7 @@ ts_4
 TOK_SKIPS
                 .DAT    ts_0, ts_0, ts_1, ts_1, ts_4, ts_text, ts_0, ts_0, ts_0
                 .DAT    ts_0, ts_0, ts_0, ts_0, ts_0, ts_1, ts_text, ts_0, ts_0
-                .DAT    ts_0, ts_0, ts_0, ts_text
+                .DAT    ts_0, ts_0, ts_0, ts_text, ts_0, ts_0
 
 ; himem: R2 the top of BASIC's memory, HIMEM, or that of the RAM, less
 ; the variables and the stack's room. mem_top: R2 the top of the
@@ -693,6 +694,8 @@ lt_go
         ?!Z     CMP     R5, K_SARR
         ?!Z     CMP     R5, K_SFN
         ?!Z     CMP     R5, K_SNUM
+        ?!Z     CMP     R5, K_UFN
+        ?!Z     CMP     R5, K_SFNU
         ?Z      MOVE    R12, 2
                 CMP     R6, T_MINUS
         ?!Z     CMP     R6, T_PLUS
@@ -711,11 +714,11 @@ lt_go
                 MOVE    @V_LPREV, R6
                 JMP     @LIST_KINDS[R5]
 ; The kinds of the tokens that end an operand, a bit each
-OPERANDS        .EQU    2+4+8+16+32+64+0x4000+0x20000
+OPERANDS        .EQU    2+4+8+16+32+64+0x4000+0x20000+0x400000+0x800000
 LIST_KINDS
                 .DAT    0, lt_dec, lt_dec, lt_hex, lt_num, lt_str, lt_var, lt_kw, lt_punct
                 .DAT    lt_kw, lt_kw, lt_kwi, lt_kw, lt_kw, lt_dec, lt_rem, lt_var
-                .DAT    lt_var, lt_var, lt_kw, lt_kw, lt_rem
+                .DAT    lt_var, lt_var, lt_kw, lt_kw, lt_rem, lt_var, lt_var
 
 ; A whole number: K_SMALL's and K_LINE's in the token, which K_LINE's
 ; line follows, and K_WORD's in the word after it

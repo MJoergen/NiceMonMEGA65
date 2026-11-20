@@ -1,0 +1,218 @@
+NiceMon V9.9, BASIC V9.9
+HELP lists the statements
+READY.
+10 DEF FNA(X) = X * X + 1
+20 DEF FNP = 3.5
+30 DEF FNH$(X) = "<" + HEX$(X) + ">"
+40 DEF FNM(A, B) = A * 10 + B
+50 DEF FNB(X) = FNA(X) + FNC(X)
+60 X = 7: A = 1: B = 2: C$ = "C"
+70 PRINT FNA(3); FNP; FNH$(255); FNM(4, 2); FNB(2); X; A; B
+80 PRINT FNM(FNA(1), FNA(2)); LEN(FNH$(1)); FNH$(16) + FNH$(17)
+90 IF FNA(2) = 5 AND FNH$(0) < "<1" THEN PRINT "YES"
+100 DEF FNC(Y) = Y + X
+110 FOR I = -1 TO 5: GOSUB 200: NEXT
+120 FOR I = 1 TO 4: ON I GOSUB 300, 310, 320: PRINT ";";: NEXT: PRINT
+130 ON 2.9 GOTO 140, 150
+140 PRINT "NOT HERE"
+150 IF 1 THEN ON 1 GOTO 160 ELSE PRINT "NOT HERE"
+160 PRINT FNS$
+170 END
+200 ON I + 1 GOTO 210, 220, 230: PRINT "N"; I: RETURN
+210 PRINT "A": RETURN
+220 PRINT "B": RETURN
+230 PRINT "C": RETURN
+300 PRINT "S1";: RETURN
+310 PRINT "S2";: RETURN
+320 PRINT "S3";: RETURN
+LIST
+10 DEF FNA(X) = X * X + 1
+20 DEF FNP = 3.5
+30 DEF FNH$(X) = "<" + HEX$(X) + ">"
+40 DEF FNM(A, B) = A * 10 + B
+50 DEF FNB(X) = FNA(X) + FNC(X)
+60 X = 7: A = 1: B = 2: C$ = "C"
+70 PRINT FNA(3); FNP; FNH$(255); FNM(4, 2); FNB(2); X; A; B
+80 PRINT FNM(FNA(1), FNA(2)); LEN(FNH$(1)); FNH$(16) + FNH$(17)
+90 IF FNA(2) = 5 AND FNH$(0) < "<1" THEN PRINT "YES"
+100 DEF FNC(Y) = Y + X
+110 FOR I = -1 TO 5: GOSUB 200: NEXT
+120 FOR I = 1 TO 4: ON I GOSUB 300, 310, 320: PRINT ";";: NEXT: PRINT
+130 ON 2.9 GOTO 140, 150
+140 PRINT "NOT HERE"
+150 IF 1 THEN ON 1 GOTO 160 ELSE PRINT "NOT HERE"
+160 PRINT FNS$
+170 END
+200 ON I + 1 GOTO 210, 220, 230: PRINT "N"; I: RETURN
+210 PRINT "A": RETURN
+220 PRINT "B": RETURN
+230 PRINT "C": RETURN
+300 PRINT "S1";: RETURN
+310 PRINT "S2";: RETURN
+320 PRINT "S3";: RETURN
+READY.
+RUN
+103.5<000000FF>429712
+2510<00000010><00000011>
+YES
+N-1
+A
+B
+C
+N3
+N4
+N5
+S1;S2;S3;;
+Undefined function in 160
+READY.
+? FNA(4); FNB(1)
+174
+READY.
+? FNZ(1)
+Undefined function
+READY.
+? FNA(1, 2)
+Syntax error
+PRINT X; "T", ...   print numbers and strings, ; and , between them; ? is PRINT
+READY.
+? FNA
+Syntax error
+PRINT X; "T", ...   print numbers and strings, ; and , between them; ? is PRINT
+READY.
+? FNM(1)
+Syntax error
+PRINT X; "T", ...   print numbers and strings, ; and , between them; ? is PRINT
+READY.
+? FNA("X")
+Type mismatch
+READY.
+? FNH$(1) + 1
+Type mismatch
+READY.
+? 1 + FNH$(1)
+Type mismatch
+READY.
+FNA = 1
+Syntax error; HELP lists the statements
+READY.
+X = FNA(2): ? X
+5
+READY.
+ON -1 GOTO 10
+Illegal quantity
+READY.
+ON 1 GOTO
+Syntax error
+ON X GOTO N, M, ... go on at the line of the X-th number, or GOSUB it
+READY.
+ON 1 GOSUB 10, X
+Syntax error
+ON X GOTO N, M, ... go on at the line of the X-th number, or GOSUB it
+READY.
+ON 1 PRINT 10
+Syntax error
+ON X GOTO N, M, ... go on at the line of the X-th number, or GOSUB it
+READY.
+ON 1 GOTO 999
+Undefined line
+READY.
+PRINT 10, 20
+10      20
+READY.
+DEF X = 1
+Syntax error
+DEF FNA(X) = E      the function FNA of X, as FNA(2); FNA$ gives a string
+READY.
+165 DEF FNS$ = "S" + FNH$(FNA(2))
+RUN 150
+S<00000005>
+READY.
+165 DEF FNS$(A$) = A$
+RUN 150
+Type mismatch in 160
+READY.
+165 DEF FNS$ = FNS$
+RUN 150
+Formula too complex in 160
+READY.
+165 DEF FNS$ = 5
+RUN 150
+Type mismatch in 160
+READY.
+165 DEF FNS$ =
+RUN 150
+Type mismatch in 160
+READY.
+165 DEF FNS$ = "1": PRINT "NOT HERE"
+RUN 150
+1
+READY.
+CLR
+READY.
+? FNP
+3.5
+READY.
+15 REM A LINE BEFORE FNP'S, WHICH MOVES IT
+? FNP
+3.5
+READY.
+RENUMBER 1000, 10
+READY.
+LIST 1080-1130
+1080 PRINT FNM(FNA(1), FNA(2)); LEN(FNH$(1)); FNH$(16) + FNH$(17)
+1090 IF FNA(2) = 5 AND FNH$(0) < "<1" THEN PRINT "YES"
+1100 DEF FNC(Y) = Y + X
+1110 FOR I = -1 TO 5: GOSUB 1190: NEXT
+1120 FOR I = 1 TO 4: ON I GOSUB 1230, 1240, 1250: PRINT ";";: NEXT: PRINT
+1130 ON 2.9 GOTO 1140, 1150
+READY.
+LIST 1150-1190
+1150 IF 1 THEN ON 1 GOTO 1160 ELSE PRINT "NOT HERE"
+1160 PRINT FNS$
+1170 DEF FNS$ = "1": PRINT "NOT HERE"
+1180 END
+1190 ON I + 1 GOTO 1200, 1210, 1220: PRINT "N"; I: RETURN
+READY.
+RUN
+103.5<000000FF>429712
+2510<00000010><00000011>
+YES
+N-1
+A
+B
+C
+N3
+N4
+N5
+S1;S2;S3;;
+1
+READY.
+HALT
+Halted
+Screen:
+|READY.
+|LIST 1150-1190
+|1150 IF 1 THEN ON 1 GOTO 1160 ELSE PRINT "NOT HERE"
+|1160 PRINT FNS$
+|1170 DEF FNS$ = "1": PRINT "NOT HERE"
+|1180 END
+|1190 ON I + 1 GOTO 1200, 1210, 1220: PRINT "N"; I: RETURN
+|READY.
+|RUN
+|103.5<000000FF>429712
+|2510<00000010><00000011>
+|YES
+|N-1
+|A
+|B
+|C
+|N3
+|N4
+|N5
+|S1;S2;S3;;
+|1
+|READY.
+|HALT
+|Halted
+VBASE at the halt 000000
+exit 0

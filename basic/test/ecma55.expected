@@ -24,7 +24,7 @@ P023 error: Undefined variable in 200
 P024 same
 P025 differs
 P026 same
-P027 error: Syntax error; HELP lists the statements in 250
+P027 error: Syntax error; HELP lists the statements in 5945
 P028 error: Division by zero in 220
 P029 error: Overflow in 260
 P030 refused: 360 LET A=3E99999: Overflow
@@ -85,12 +85,12 @@ P084 noend; bas55 stops
 P085 error: Undefined array in 1610
 P086 error: RETURN without GOSUB in 320; bas55 stops
 P087 error: Undefined line in 230; bas55 stops
-P088 error: Syntax error; HELP lists the statements in 150
-P089 error: Syntax error; HELP lists the statements in 180; bas55 stops
-P090 error: Syntax error; HELP lists the statements in 180; bas55 stops
-P091 error: Syntax error; HELP lists the statements in 250; bas55 stops
+P088 failed
+P089 failed; bas55 stops
+P090 failed; bas55 stops
+P091 error: Undefined line in 250; bas55 stops
 P092 differs
-P093 error: Syntax error; HELP lists the statements in 310
+P093 same
 P094 error: Undefined array in 160
 P095 differs
 P096 same
@@ -106,7 +106,7 @@ P105 differs; bas55 stops
 P106 error: Syntax error in 270; bas55 stops
 P107 noend
 P108 noend
-P109 error: Syntax error; HELP lists the statements in 700
+P109 noend
 P110 error: Undefined array in 250
 P111 noend
 P112 error: Undefined array in 270
@@ -148,27 +148,27 @@ P147 error: Syntax error in 250; bas55 stops
 P148 error: Syntax error in 250; bas55 stops
 P149 error: Syntax error in 250; bas55 stops
 P150 error: Undefined array in 340; bas55 stops
-P151 error: Syntax error; HELP lists the statements in 120
-P152 error: Syntax error; HELP lists the statements in 110
-P153 error: Syntax error; HELP lists the statements in 225; bas55 stops
-P154 error: Syntax error; HELP lists the statements in 225; bas55 stops
-P155 error: Syntax error; HELP lists the statements in 250; bas55 stops
-P156 error: Syntax error; HELP lists the statements in 250; bas55 stops
-P157 error: Syntax error; HELP lists the statements in 260; bas55 stops
-P158 error: Syntax error; HELP lists the statements in 250; bas55 stops
-P159 error: Syntax error; HELP lists the statements in 250; bas55 stops
-P160 error: Syntax error; HELP lists the statements in 220; bas55 stops
-P161 error: Syntax error; HELP lists the statements in 250; bas55 stops
-P162 error: Undefined array in 290; bas55 stops
-P163 error: Undefined array in 210; bas55 stops
+P151 same
+P152 same
+P153 error: Syntax error in 250; bas55 stops
+P154 error: Syntax error in 250; bas55 stops
+P155 error: Syntax error in 290; bas55 stops
+P156 error: Syntax error in 290; bas55 stops
+P157 differs; bas55 stops
+P158 error: Type mismatch in 340; bas55 stops
+P159 error: Type mismatch in 340; bas55 stops
+P160 differs; bas55 stops
+P161 error: Formula too complex in 290; bas55 stops
+P162 differs; bas55 stops
+P163 error: Undefined function in 210; bas55 stops
 P164 error: Syntax error in 270
-P165 error: Syntax error; HELP lists the statements in 110
-P166 error: Syntax error; HELP lists the statements in 140
-P167 error: Syntax error; HELP lists the statements in 260
+P165 error: Undefined array in 155
+P166 error: Undefined array in 170
+P167 error: Division by zero in 320
 P168 error: Undefined array in 300; bas55 stops
 P169 error: Undefined array in 1284
 P170 error: Undefined array in 180; bas55 stops
-P171 error: Syntax error; HELP lists the statements in 170; bas55 stops
+P171 error: Illegal quantity in 270; bas55 stops
 P172 error: Illegal quantity in 200; bas55 stops
 P173 error: Illegal quantity in 230; bas55 stops
 P174 error: Overflow in 310
@@ -176,9 +176,9 @@ P175 differs
 P176 error: Illegal quantity in 230; bas55 stops
 P177 error: Division by zero in 290
 P178 same
-P179 error: Syntax error; HELP lists the statements in 210; bas55 stops
-P180 error: Syntax error; HELP lists the statements in 250; bas55 stops
-P181 error: Syntax error; HELP lists the statements in 300; bas55 stops
+P179 error: Division by zero in 210; bas55 stops
+P180 error: Division by zero in 250; bas55 stops
+P181 failed; bas55 stops
 P182 error: Illegal quantity in 190; bas55 stops
 P183 error: Undefined array in 360
 P184 differs
@@ -195,7 +195,7 @@ P194 error: Syntax error in 260; bas55 stops
 P195 error: Syntax error in 260; bas55 stops
 P196 same
 P197 differs; bas55 stops
-P198 error: Syntax error; HELP lists the statements in 230; bas55 stops
+P198 differs; bas55 stops
 P199 differs; bas55 stops
 P200 differs; bas55 stops
 P201 refused: PRINT "PROGRAM FILE 201: ERROR - STATEME: PROGRAM FILE 201: ERROR - STATEMENTS WIT; bas55 stops
@@ -203,6 +203,6 @@ P202 differs; bas55 stops
 P203 noend
 P204 differs; bas55 stops
 P205 differs; bas55 stops
-P206 error: Syntax error; HELP lists the statements in 4020; bas55 stops
+P206 differs; bas55 stops
 P207 error: Type mismatch in 270; bas55 stops
 P208 error: Type mismatch in 270; bas55 stops

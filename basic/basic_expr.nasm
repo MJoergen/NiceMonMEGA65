@@ -43,6 +43,8 @@
 ;            SNUMS: LEN, ASC, VAL, and INSTR
 ;   K_DATA   the text of DATA, as K_STR has it, up to the end of the line
 ;            or a colon that is not in quotes
+;   K_UFN    a function of DEF FN, as K_VAR (basic_struct.nasm)
+;   K_SFNU   a function of DEF FN that gives a string, FNNAME$, as K_VAR
 ;
 ; The line ends with a 0 word, T_END. A name is a keyword only as a
 ; whole name, up to 16 letters and digits.
@@ -128,6 +130,8 @@ K_SARR          .EQU    18
 K_SFN           .EQU    19
 K_SNUM          .EQU    20
 K_DATA          .EQU    21
+K_UFN           .EQU    22
+K_SFNU          .EQU    23
 ARRAY           .EQU    0x100           ; in the length of an array's name,
 STRING          .EQU    0x200           ; and of a string's
 NAME_LEN        .EQU    0xFF            ; the length alone
@@ -369,6 +373,15 @@ tok_var
         ?Z      ONE     R7
                 CMP     @R5, 0x25       ; %
         ?Z      JMP     err_syntax
+                AND     R1, R10, NAME_LEN  ; FN and more: a function's name
+                CMP     R1, 3
+        ?C      JMP     :+
+                AND     R1, @R9, 0xDF
+                CMP     R1, 0x46        ; F
+        ?Z      AND     R1, @1[R9], 0xDF
+        ?Z      CMP     R1, 0x4E        ; N
+        ?Z      OR      R10, R10, FUNC
+:
                 MOVE    R11, @V_STORE   ; not 0 to make the variable: in a
                 MOVE    R2, @-1[R8]     ; line to store, after GET, INPUT, or
                 AND     R3, R2, 0xFFFFFF00  ; READ, or with = after it, at the
@@ -387,6 +400,8 @@ tok_var
                 CMP     @R1, 0x20
         ?Z      MOVE    R1++, R1
         ?Z      JMP     :-
+                AND[M]  R0, R10, FUNC
+        ?!Z     JMP     tv_name
                 CMP     @R1, 0x28       ; (: an array's name
         ?!Z     JMP     tv_eq
                 OR      R10, R10, ARRAY
@@ -413,6 +428,7 @@ tv_eq
         ?!Z     CMP     R2, K_KW*K+I_FOR*0x100
         ?Z      ONE     R11
 :
+tv_name
                 MOVE    R2, V_PNAME     ; the name, packed in upper case
                 MOVE    @R2, R0
                 MOVE    @1[R2], R0
@@ -438,9 +454,9 @@ tv_eq
                 SHR     R2, R10, 8
                 OR      @R8++, R1, @VAR_KINDS[R2]
                 JMP     tok_next
-; The kinds of a name's token, by its bits ARRAY and STRING
+; The kinds of a name's token, by its bits ARRAY, STRING, and FUNC
 VAR_KINDS
-                .DAT    K_VAR*K, K_ARR*K, K_SVAR*K, K_SARR*K
+                .DAT    K_VAR*K, K_ARR*K, K_SVAR*K, K_SARR*K, K_UFN*K, 0, K_SFNU*K
 
 ; var_find: R1 = the variable of the name at V_PNAME, of length R10,
 ; with ARRAY for an array's and STRING for a string's, found, or made at
@@ -524,6 +540,15 @@ tok_number
                 CMP     R2, T_THEN      ; THEN, or ELSE a line number
         ?!Z     CMP     R2, T_ELSE
         ?Z      JMP     tok_line
+                CMP     R2, T_COMMA     ; and after a comma that a line
+        ?!Z     JMP     tn_kw           ; number has before it, in ON's list
+                MOVE[M] R2, @-2[R8]
+        ?!Z     JMP     :+
+                SHR     R2, @-3[R8], 24
+                CMP     R2, K_LINE
+        ?Z      JMP     tok_line
+                JMP     :+
+tn_kw
                 AND     R2, R2, 0xFFFFFF00
                 CMP     R2, K_KW*K+I_GOTO*0x100
         ?!Z     CMP     R2, K_KW*K+I_GOSUB*0x100
@@ -819,10 +844,15 @@ primary
 PRIMS
                 .DAT    err_syntax, p_small, p_word, p_word, p_num, p_scmp, p_var
                 .DAT    p_op, p_punct, p_fn, p_not, p_kw
-; p_more: a string, compared with another, or a function of strings
+; p_more: a string, compared with another, a function of strings, or one
+; of DEF FN
 p_more
                 CMP     R2, K_SNUM
         ?Z      JMP     p_snum
+                CMP     R2, K_UFN
+        ?Z      JMP     p_ufn
+                CMP     R2, K_SFNU
+        ?Z      JMP     p_scmp
                 SUB     R3, R2, K_SVAR
                 CMP     R3, 3
         ?C      JMP     p_scmp          ; K_SVAR, K_SARR, and K_SFN

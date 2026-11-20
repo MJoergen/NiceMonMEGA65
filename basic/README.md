@@ -31,8 +31,9 @@ The ROM's user interface is BASIC (issue #54,
 the monitor's commands as statements. Stage 2 (issue #113) adds the
 numbers: expressions, variables, `PRINT`, `LET`, `POKE`, and `PEEK`.
 Stage 3 (issue #114) adds the programs: lines with numbers, which
-BASIC keeps and runs (Programs below), and stage 5 (issue #116) the
-strings (Strings below).
+BASIC keeps and runs (Programs below), stage 5 (issue #116) the
+strings (Strings below), and stage 8 (issue #119) `ON` and the
+functions of `DEF FN` (Programs below).
 
 At the cold start the ROM clears the screen, prints its banner,
 `NiceMon` and the version, then `HELP lists the statements` and
@@ -270,6 +271,8 @@ keeps the variables, but `CONT` cannot go on after it.
 | `INPUT ["P";] V [, W$]` | Prints `? `, or `P` and `? `, and reads a number into `V` and a string into `W$`, with commas between them. A string is the text up to a comma or the end, without the blanks around it, or one in quotes, which may have commas. A line that has no number where one goes, a number in quotes, or text after a closing quote, is `Redo from start`, and `INPUT` asks again. Too few ask for the rest with `?? `, and too many print `Extra ignored`. A number may have a sign; an expression is not taken. CTRL-C is the break key. |
 | `GET V`, `GET V$` | Sets `V` to the code of the next key typed, or 0 when there is none, and `V$` to the key, or `""`. It does not wait. |
 | `DIM A(N) [, B(N, M)]` | Makes the array `A` of `N + 1` elements, `A(0)` to `A(N)`, and `B` of `N + 1` rows of `M + 1`, each element 0. `DIM A$(N)` makes an array of strings, each element `""`. `A` and `A(` are two names. An array that no `DIM` made is `Undefined array`, a subscript outside or one too many or too few `Bad subscript`, and a second `DIM` `Redimensioned array`. |
+| `ON X GOTO N, M`, `ON X GOSUB N, M` | Goes to the line of the X-th number, as `GOTO` and `GOSUB` do: `ON 2 GOTO 100, 200` goes to 200. `X` is rounded toward zero. An `X` of 0 or past the list goes on after the statement, and below 0 it is an `Illegal quantity`. A `GOSUB` comes back after the statement. |
+| `DEF FNA(X, Y) = E` | Defines the function `FNA` of the parameters `X` and `Y`, with the value of the expression `E`, which `FNA(1, 2)` gives, `E` with `X` 1 and `Y` 2. `DEF FNP = 3.14` has no parameters, and `FNP` calls it. `DEF FNA$(X) = ...` gives a string. The parameters are numbers' variables, which have their own values again after the call, and the other variables are the program's. A name that starts with `FN` is a function's, and a call finds its `DEF` anywhere in the program; with none it is an `Undefined function`, and with another count of arguments a `Syntax error`. A `DEF` that runs does nothing, as `REM`. A function may call others, and itself as deep as an expression nests. |
 | `HIMEM = A` | Sets the top of BASIC's memory, and does a `CLR`. `A` is from the end of the variables plus 512 words up to the default, as below; outside them it is `Out of memory`. `HIMEM` in an expression reads it, such as `PRINT HIMEM`. |
 
 CTRL-C is the break key. A program polls it every 64 statements, and
@@ -585,6 +588,7 @@ the lines with `test/ecma55.expected`, and prints those that changed.
 | `lines` | The ROM alone | `DELETE` of a range, a line, and up to a line, `RENUMBER` with the jumps forward and back, a target that is no line, the overflow and a step of 0, and `AUTO`, ended by a number alone and by CTRL-C. |
 | `redo` | The ROM alone | The check at entry: a line of two rows that the tokenizer refuses is shown again after `READY.`, with the cursor at the error, as the input ends there and no key waits; it runs until the step limit. |
 | `keys` | The ROM alone | `INPUT` with too few, too many, and bad numbers, a prompt, and CTRL-C; `GET`; the break key in a loop, in `CONT`, and in `LIST`; and the keys typed ahead, of which the ring keeps 31. |
+| `struct` | The ROM alone, with `test/struct.bas` typed | `DEF FN` with no, one, and two parameters, of a string, calling others and defined after its call, with its parameters kept; `ON ... GOTO` and `ON ... GOSUB` with each line, 0, past the list, a fraction, and after `THEN`; their errors and those of a `DEF`, `CLR` and an edit before a call, `LIST`, and `RENUMBER` of `ON`'s lists. |
 | `str` | The ROM, with `--step-time` and `test/str.bas` typed | The strings: variables, `+`, each function and the edges of its arguments, the comparisons, alone and in `IF`, the errors, arrays of strings, `IP` with a string expression, `TIME$`, `GET`, `READ`, `DATA`, and `RESTORE`, with a quoted comma and empty items, `LIST` of their tokens, `INPUT` of strings, and a program that fills a small heap until it is swept, again and again. |
 | `arr` | The ROM alone, with `test/arr.bas` typed | `DIM`, the elements, their errors, `LET`, `INPUT`, and `GET` of an element, `CLR` and an edit with arrays, `HIMEM` read and set, too low and too high, and below the arrays, which its `CLR` frees, the layout of an array in memory, and `LOAD` below and above `HIMEM`, in a line and in a program. |
 | `load` | The ROM, with 128K words of RAM, as on the MEGA65 | `LOAD` with the monitor's `build/hello.bin` pasted: CR LF and LF line ends, tabs, blank lines, skipped lines, a line too long, blanks after a line's 76 characters, a DEL that takes back the key after them, an address given twice, and CTRL-C. Then `SYS 0x8000` runs it. |
@@ -623,19 +627,20 @@ table, and `make romsize` writes it again.
 <!-- romsize basic -->
 | Source | What it is | Words | Text |
 |---|---|---:|---:|
-| `basic.nasm` | The vectors, the header, the main loop, the scanner, the keywords, the messages, and the help | 1758 | 1044 |
-| `basic_expr.nasm` | The numbers: the tokenizer, the expressions, the functions, the variables, the errors, `PRINT`, `LET`, and `POKE` | 1723 | 39 |
-| `basic_prog.nasm` | The programs: the lines, `LIST`, `RUN`, the jumps, the loops, the break key, `INPUT`, `GET`, the arrays, and `HIMEM` | 1871 | 46 |
+| `basic.nasm` | The vectors, the header, the main loop, the scanner, the keywords, the messages, and the help | 1800 | 1083 |
+| `basic_expr.nasm` | The numbers: the tokenizer, the expressions, the functions, the variables, the errors, `PRINT`, `LET`, and `POKE` | 1772 | 39 |
+| `basic_prog.nasm` | The programs: the lines, `LIST`, `RUN`, the jumps, the loops, the break key, `INPUT`, `GET`, the arrays, and `HIMEM` | 1880 | 46 |
 | `basic_cmd.nasm` | The routines of the statements that were the commands | 1855 | 294 |
 | `basic_net.nasm` | `DHCP`, `NTP`, and TFTP | 917 | 150 |
 | `basic_time.nasm` | `TIME`, and the clock's side of `NTP` | 289 | 44 |
 | `basic_dis.nasm` | The disassembler of `DIS` | 871 | 79 |
 | `basic_edit.nasm` | The screen editor | 1122 | 0 |
-| `basic_str.nasm` | The strings: the heap, its sweep, the functions of strings, `DATA`, `READ`, and `TIME$` | 1534 | 11 |
+| `basic_str.nasm` | The strings: the heap, its sweep, the functions of strings, `DATA`, `READ`, and `TIME$` | 1538 | 11 |
+| `basic_struct.nasm` | The structure: `ON ... GOTO`, `ON ... GOSUB`, and `DEF FN` | 299 | 5 |
 | `common.nasm` | What the monitor and BASIC share: texts, IP addresses, and dates | 237 | 5 |
 | `monlib.nasm` | The routines that programs join | 274 | 0 |
 | `mon.nasm` | The stubs of the entries | 92 | 0 |
 | `build/basic_folder.nasm` | The texts with the folder's name: `DIR`'s, and the error of a card without it | 14 | 14 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 12559 | 1728 |
+| In all | | 12962 | 1772 |
 <!-- /romsize basic -->

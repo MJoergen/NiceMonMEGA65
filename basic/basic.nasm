@@ -620,6 +620,7 @@ ACTS
                 .DAT    st_for+65536*st_next, st_rem+65536*st_input
                 .DAT    st_get+65536*st_dim, st_himem+65536*st_auto
                 .DAT    st_renum+65536*st_data, st_read+65536*st_restore
+                .DAT    st_def+65536*st_on
 I_DELETE        .EQU    4               ; the index of DELETE,
 I_PRINT         .EQU    25              ; the index of PRINT, the first statement without ops,
 I_LET           .EQU    26              ; of LET,
@@ -637,7 +638,9 @@ T_HIMEM         .EQU    K_KW*K+I_HIMEM*0x100+0x22  ; whose token this is,
 I_DATA          .EQU    41              ; of DATA,
 I_READ          .EQU    42              ; of READ,
 I_RESTORE       .EQU    43              ; of RESTORE,
-N_STMT          .EQU    44              ; and of AND, the first keyword that is no statement
+I_DEF           .EQU    44              ; of DEF,
+I_ON            .EQU    45              ; of ON,
+N_STMT          .EQU    46              ; and of AND, the first keyword that is no statement
 H_ACTS          .EQU    0x40000000+4*ACTS
 ; The routines of the items, by the kind of an op, which bas_op calls
 KINDS
@@ -683,7 +686,7 @@ OP_SKIP         .EQU    1
 OP_F            .EQU    8
 KEYWORDS        .EQU    38              ; the first keyword's byte in OPS
 OPS
-                .ASCII_B 'FJN@N@EHNHLHNFANFJEJNFJFLCNHNJLHLHFLHNSYS+LOAD5SAVE6BSAVE=DELETE6DIR-IP DHCP"MAC TIME NTP0BAUD#DUMP%DIS%CLS"VER"HELP"HALT"POKE)NEW"CLR"END"STOP"CONT"RETURN"PRINT"LET"RUN"LIST"GOTO"GOSUB"IF"FOR"NEXT"REM"INPUT"GET"DIM"HIMEM"AUTO"RENUMBER"DATA"READ"RESTORE"AND"OR"XOR"NOT"DIV"MOD"ABS"SGN"INT"SQR"PEEK"SIN"COS"TAN"ASIN"ACOS"ATAN"LOG"LOG2"LOG10"EXP"RND"PI"TAB"SPC"THEN"ELSE"TO"STEP"LEN"ASC"VAL"INSTR"CHR$"STR$"HEX$"LEFT$"MID$"RIGHT$"TIME$"'
+                .ASCII_B 'FJN@N@EHNHLHNFANFJEJNFJFLCNHNJLHLHFLHNSYS+LOAD5SAVE6BSAVE=DELETE6DIR-IP DHCP"MAC TIME NTP0BAUD#DUMP%DIS%CLS"VER"HELP"HALT"POKE)NEW"CLR"END"STOP"CONT"RETURN"PRINT"LET"RUN"LIST"GOTO"GOSUB"IF"FOR"NEXT"REM"INPUT"GET"DIM"HIMEM"AUTO"RENUMBER"DATA"READ"RESTORE"DEF"ON"AND"OR"XOR"NOT"DIV"MOD"ABS"SGN"INT"SQR"PEEK"SIN"COS"TAN"ASIN"ACOS"ATAN"LOG"LOG2"LOG10"EXP"RND"PI"TAB"SPC"THEN"ELSE"TO"STEP"LEN"ASC"VAL"INSTR"CHR$"STR$"HEX$"LEFT$"MID$"RIGHT$"TIME$"'
                 .DAT    0
 
 S_HINT          .ASCII_B 'HELP lists the statements'
@@ -710,7 +713,7 @@ HELP            .DAT    H_SYS, H_L, H_LOAD, H_TFTP, H_SAVET, H_SAVE, H_DEL, H_DE
                 .DAT    H_I, H_ID, H_M, H_B, H_T, H_TN, H_C, H_V, H_H, H_Q, H_PR, H_LET
                 .DAT    H_POKE, H_RUN, H_RUNF, H_RUNT, H_LIST, H_NEW, H_CLR, H_GOTO, H_GOSUB, H_RET, H_IF
                 .DAT    H_FOR, H_NEXT, H_END, H_STOP, H_CONT, H_REM, H_INPUT, H_GET, H_DIM, H_HIMEM, H_AUTO, H_REN
-                .DAT    H_DATA, H_READ, H_REST, H_STR, H_P, H_PG, 0
+                .DAT    H_DATA, H_READ, H_REST, H_STR, H_ON, H_DEF, H_P, H_PG, 0
 H_SYS           .ASCII_B 'SYS A               call the program at A, such as SYS 0x8000; SYS 0 restarts'
 H_L             .ASCII_B 'LOAD                enter lines of ADDR WORD in hex, as a .bin file has them'
                 .DAT    0
@@ -777,6 +780,8 @@ H_READ          .ASCII_B 'READ V, W$, ...     V and W$ the next items of DATA'
 H_REST          .ASCII_B 'RESTORE [N]         READ from the first DATA again, or from line N'
 H_STR           .ASCII_B 'A$ + B$             LEN ASC VAL INSTR CHR$ STR$ HEX$ LEFT$ MID$ RIGHT$ TIME$'
                 .DAT    0
+H_ON            .ASCII_B 'ON X GOTO N, M, ... go on at the line of the X-th number, or GOSUB it'
+H_DEF           .ASCII_B 'DEF FNA(X) = E      the function FNA of X, as FNA(2); FNA$ gives a string'
 H_P             .ASCII_B 'CRSR keys, HOME     move the cursor; RETURN takes the line it is in'
 H_PG            .ASCII_B 'PgUp PgDn           scroll back; on the MEGA65 CTRL and MEGA with CRSR up, down'
                 .DAT    0

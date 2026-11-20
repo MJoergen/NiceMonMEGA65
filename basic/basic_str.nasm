@@ -60,11 +60,12 @@ SARG_MAX        .EQU    80              ; the characters of a statement's string
 NUMC_MAX        .EQU    143             ; the characters that str_num looks at
 TAG_ARR         .EQU    0x40000000      ; in a back word: an array's element,
 TAG_SLOT        .EQU    0x80000000      ; or a slot of the strings' stack
-STR_KINDS       .EQU    0xE0020         ; the kinds of the tokens that start a string, a bit each
+STR_KINDS       .EQU    0x8E0020        ; the kinds of the tokens that start a string, a bit each
 T_TIMES         .EQU    K_SFN*K+6       ; TIME$
 
 ; is_str: not Z when the token R1 starts a string: a string in quotes, a
-; string variable or array, or a function of strings. Uses R2.
+; string variable or array, or a function of strings, FNNAME$ among them.
+; Uses R2.
 is_str
                 SHR     R2, R1, 24
                 SHR     R2, STR_KINDS, R2
@@ -351,6 +352,8 @@ sprimary
                 CMP     R2, K_SFN
         ?Z      AND     R1, R1, 0xFF
         ?Z      JMP     @SFNS[R1]
+                CMP     R2, K_SFNU
+        ?Z      JMP     s_ufn
                 CMP     R1, T_LPAR
         ?!Z     JMP     err_type
                 CALL    sexpr

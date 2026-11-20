@@ -438,6 +438,42 @@ Stage 5 (#116) has strings, as V2 has them, written in
   take a name or an address in quotes: `LOAD A$`, `IP "10.0." + B$`.
   It may have 80 characters.
 
+### Structure
+
+Of stage 8 (#119), `ON` and the functions of `DEF FN` on one line are
+written, in `basic/basic_struct.nasm` (decided on 2026-11-20):
+
+- **`ON X GOTO N, M, ...`** and **`ON X GOSUB N, M, ...`** go to the
+  line of the X-th number, as `GOTO` and `GOSUB` go to it. X is rounded
+  toward zero, as every word of an argument is, where ECMA-55 rounds
+  it to the nearest. An X of 0, or past the list, goes on after the
+  statement, as in V2, where ECMA-55 has an error, and one below 0 is
+  `Illegal quantity`. The numbers are line numbers' tokens, so they
+  keep the address of their line once found, and `RENUMBER` changes
+  them. A `GOSUB` comes back after the whole statement.
+- **`DEF FNA(X, Y) = E`** defines a function, which `FNA(1, 2)` calls,
+  as in BBC BASIC, so a name that starts with `FN` and goes on is a
+  function's, never a variable's. `FNA$` gives a string. A function
+  may have no parameters, `DEF FNP = 3.14`, and then no parentheses at
+  its call. The first call finds the `DEF` in the program, the first
+  of them, and keeps its address; `CLR`, `RUN`, and an edit find it
+  again. So a call may come before its `DEF` in the program. A `DEF`
+  that runs passes over the rest of its line, as `REM` does, so it
+  works only in a program's line.
+- **The parameters** are numbers' variables, and the arguments
+  numbers, as many as the parameters. A call keeps the parameters'
+  values on the processor's stack while the expression runs, and sets
+  them again after it, so the other variables are the program's, and
+  a function may call others, and itself, as deep as an expression
+  nests: past that it is `Formula too complex`. An error inside a
+  function leaves its parameters as the call set them.
+- **The errors**: a function with no `DEF` is `Undefined function`, a
+  count of arguments that is not that of the parameters is a `Syntax
+  error`, and a string's parameter or argument is a `Type mismatch`.
+  An error is reported in the line of the call.
+- **Later in stage 8**: `DEF FN` over lines, with `LOCAL` and `=`, the
+  parameters of strings, and `PROC`, on the frames.
+
 ### What changed in the list of #54
 
 The review of 2026-11-11 changed the list of #54 in these places:
@@ -655,7 +691,8 @@ variable`, and `Out of memory`. A string where a number goes was a
 long`, and `Out of data`. Stage 3 adds
 `Undefined line`, `Undefined array`, `Bad subscript`,
 `Redimensioned array`, `NEXT without FOR`, `RETURN without GOSUB`,
-and `Can't continue` ([Programs](#programs)).
+and `Can't continue` ([Programs](#programs)), and stage 8 `Undefined
+function` ([Structure](#structure)).
 
 The depth of an expression is counted, and too deep is an error,
 since nothing notices when the processor's stack runs out. The FPU's
@@ -868,7 +905,10 @@ about a minute (#122).
   strings longer than ECMA-55's 18 characters, empty items of `DATA`,
   and characters that ECMA-55 does not allow in an item without
   quotes. The run found one bug of stage 5, a number in quotes that
-  `READ` took, which is fixed. `make ecma55` runs the suite, and
+  `READ` took, which is fixed. With `ON` and `DEF FN` (measured
+  2026-11-20), 25 programs print what bas55 prints. P088 and P181 fail
+  as `ON` rounds toward zero, and P089 and P090 as `ON` past its list
+  goes on. `make ecma55` runs the suite, and
   compares each program's outcome with `basic/test/ecma55.expected`
   ([basic/README.md](../basic/README.md#testing)).
 - The functions against Python's doubles on the host, bit for bit:
@@ -997,7 +1037,10 @@ Each has an issue, under #54.
    of lines. It depends on stage 3 only, and those who use the board
    on its own need it most, so it may come right after stage 3.
    Written in V2.4, in `basic/basic_edit.nasm`.
-8. **Structure**, #119. `IF`, `ELSE`, and `ENDIF` over lines, `DO` and
+8. **Structure**, #119. Of it, `ON ... GOTO`, `ON ... GOSUB`, and
+   `DEF FN` on one line are written, in `basic/basic_struct.nasm`,
+   with the language of [Structure](#structure), and measured 403
+   words (measured 2026-11-20). `IF`, `ELSE`, and `ENDIF` over lines, `DO` and
    `LOOP` with `WHILE`, `UNTIL`, and `EXIT`, `PROC` and `FN` with
    parameters, `LOCAL`, and recursion, and `ON ... GOTO`. Their
    targets are found once and kept, as a `GOTO`'s line is.
@@ -1129,7 +1172,10 @@ the old line input that it replaced, and the monitor's 50 of
 10663 to 10776, of which 13 are the keywords' text, and leaves 9704
 free (measured 2026-11-20). Stage 5 is 1762 words more, from 10776
 to 12538, where 1900 were guessed, of which 88 are the keywords' and
-the help's text, and leaves 7942 free (measured 2026-11-20).
+the help's text, and leaves 7942 free (measured 2026-11-20). Of
+stage 8, `ON` and `DEF FN` on one line are 403 words more, from 12543
+to 12946, of which 44 are the keywords', the help's, and the message's
+text, and leave 7534 free (measured 2026-11-20).
 
 Stage 1 was `basic.c`, 1510 words, and `basic.nasm`, 624, of which 431
 were its packed texts, the help among them, less 1032 words that left

@@ -328,6 +328,24 @@ LOAD_TAIL = \rload\r9001 7\003sys 0x8000\rdump 0x9000, 4\rdump 0x1E7FF, 1\rhalt\
 # program that fills a heap made small by HIMEM again and again, so
 # that the sweep runs, with an array of strings, and with strings that
 # grow to 201 characters, joined with parts of themselves.
+# struct: the structure of stage 8 that is written (issue #119),
+# test/struct.bas typed line by line. DEF FN with a parameter, with none,
+# with two, of a string, and one that calls others, one of them defined
+# after it, the parameters set again after the call and the other
+# variables kept, functions in the arguments of others, in IF, and with
+# the operators of strings. ON ... GOTO with each line, 0, and past the
+# list, and in a subroutine; ON ... GOSUB, back after the statement; a
+# number with a fraction, rounded toward zero; and ON after THEN. Then
+# the errors: an Undefined function, too many and too few arguments, a
+# string for a number, a string's function where a number goes and a
+# number where a string goes, an assignment to a function, ON below 0,
+# ON with no line, with a variable for a line, without GOTO, and of a
+# line that is not; a comma that is no ON's list, which keeps its
+# numbers; DEF without FN; and DEFs that are not right: a string's
+# parameter, a function that calls itself with no end, a number for a
+# string, no expression, and a statement after one, of which the line's
+# second statement does not run. CLR and an edit, after which a call
+# finds its DEF again, LIST of the tokens, and RENUMBER of ON's lists.
 # load_emu: LOAD where 0xFFFFFF9E reads 0, as in niceemu, so a program's RAM
 # goes up to the screen: 10000 and FFFEFFFF take words, and FFFF0000 does
 # not.
@@ -400,7 +418,7 @@ ecma55: $(ROM_TEST)
 # the card holds that the image did not (fat_tool.py diff, the dates
 # masked) and the order of its sector writes, from a second run with -t
 # (fat_tool.py order).
-test: fmt $(ROM_TEST) test/prog.bas test/arr.bas test/str.bas test/files.in test/files_card.py $(BUILD)/dis.bin $(MON)/build/hello.bin $(MON)/build/fat/super.img
+test: fmt $(ROM_TEST) test/prog.bas test/arr.bas test/str.bas test/struct.bas test/files.in test/files_card.py $(BUILD)/dis.bin $(MON)/build/hello.bin $(MON)/build/fat/super.img
 	@test '$(FOLDER_UC)' = NICE || { echo "make test needs FOLDER=NICE, not $(FOLDER)"; exit 1; }
 	@$(BAS_ROM) check $(BUILD)/basic_image_test.bin > $(BUILD)/header.out
 	@if grep -qx '$(BUILD)/basic_image_test.bin: $(HEADER_TEST)' $(BUILD)/header.out; \
@@ -423,6 +441,7 @@ test: fmt $(ROM_TEST) test/prog.bas test/arr.bas test/str.bas test/files.in test
 	@tr '\n' '\r' < test/prog.bas > $(BUILD)/prog.txt
 	@tr '\n' '\r' < test/arr.bas > $(BUILD)/arr.txt
 	@tr '\n' '\r' < test/str.bas > $(BUILD)/str.txt
+	@tr '\n' '\r' < test/struct.bas > $(BUILD)/struct.txt
 	@tr '\n' '\r' < test/files.in > $(BUILD)/files.txt
 	@printf '$(KEYS)' > $(BUILD)/keys.txt
 	@printf '$(EDIT)' > $(BUILD)/edit.txt
@@ -432,13 +451,13 @@ test: fmt $(ROM_TEST) test/prog.bas test/arr.bas test/str.bas test/files.in test
 	@{ printf '$(LOAD_HEAD)'; head -n 3 $(MON)/build/hello.bin | awk '{ printf "%s\r\n", $$0 }'; \
 	  tail -n +4 $(MON)/build/hello.bin; printf '$(LOAD_TAIL)'; } > $(BUILD)/load.txt
 	@fail=0; \
-	for t in cmds basic expr funcs prog keys edit long redo lines arr str load load_emu load_64k time files; do \
+	for t in cmds basic expr funcs prog keys edit long redo lines arr str struct load load_emu load_64k time files; do \
 	  opts=; sd=; base0=; \
 	  case $$t in \
 	    cmds) prog=; dump='$(DUMP_cmds)';; \
 	    basic) prog=; dump='$(DUMP_basic)';; \
 	    expr) prog=; dump='$(DUMP_expr)';; \
-	    funcs|prog|keys|edit|long|lines|arr) prog=; dump=;; \
+	    funcs|prog|keys|edit|long|lines|arr|struct) prog=; dump=;; \
 	    str) prog=; dump=; opts=--step-time;; \
 	    redo) prog=; dump='$(DUMP_redo)';; \
 	    load) prog=$(BUILD)/ram128k.bin; dump='$(DUMP_load)';; \
