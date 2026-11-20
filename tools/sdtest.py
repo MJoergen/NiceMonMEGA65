@@ -108,8 +108,9 @@ from sdcard import (SD_CHUNK, SD_LBA, Volume, lfn_sum, read_buffer,
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NICEEMU = os.path.join(REPO, "nice_cpu", "emulator", "zig-out", "bin",
                        "niceemu")
-SDCARD = os.path.join(REPO, "tools", "sdcard.py")
-SDNBD = os.path.join(REPO, "tools", "sdnbd.py")
+NICEMON = os.path.join(REPO, "tools", "nicemon.py")
+SDCARD = [sys.executable, NICEMON, "sd"]
+SDNBD = [sys.executable, NICEMON, "nbd"]
 HOLD_PROG = os.path.join(REPO, "sim", "sdhold.nasm")
 MONITOR = os.path.join(REPO, "build", "rom_test.bin")
 MB = 1024 * 1024
@@ -285,7 +286,7 @@ class Emu:
         stdin."""
         end = time.monotonic() + 2
         while True:
-            r = subprocess.run([sys.executable, SDCARD, "--tcp", self.port,
+            r = subprocess.run([*SDCARD, "--tcp", self.port,
                                 *args], capture_output=True, timeout=60,
                                cwd=cwd, input=typed)
             err = r.stderr.decode(errors="replace")
@@ -1036,7 +1037,7 @@ def test_format(imgs: dict[str, str], tmp: str) -> None:
     finally:
         emu.close()
     unchanged(img, bytes(40 * MB), "after the refusal")
-    r = subprocess.run([sys.executable, SDCARD, "--tcp", "1", "--slot", "0",
+    r = subprocess.run([*SDCARD, "--tcp", "1", "--slot", "0",
                         "format", "--label", "A:B"], capture_output=True)
     check("a label that is not valid",
           r.returncode == 1 and b"not valid" in r.stderr, text(r))
@@ -1158,7 +1159,7 @@ def start_nbd(emu: Emu, *args: str) -> tuple[subprocess.Popen[bytes], int]:
     close, so a start that got no connection is tried again for a while."""
     end = time.monotonic() + 2
     while True:
-        proc = subprocess.Popen([sys.executable, SDNBD, "--tcp", emu.port,
+        proc = subprocess.Popen([*SDNBD, "--tcp", emu.port,
                                  "--listen", "127.0.0.1:0", *args],
                                 stderr=subprocess.PIPE)
         assert proc.stderr is not None

@@ -127,7 +127,7 @@ and keep their names.
    deletes `build/release/`, so do not run it between steps 4 and 6.
 
    Then check by hand what hwtest does not, as it writes nothing to
-   a card: `sdcard.py mkdir` on a card with FAT32 and no folder `NICE`
+   a card: `nicemon.py sd mkdir` on a card with FAT32 and no folder `NICE`
    (issue #147). With such a card in a slot of the R6 (the
    bitstream that step 4 left on it):
 

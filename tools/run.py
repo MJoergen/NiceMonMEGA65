@@ -8,13 +8,13 @@ comes after its last byte, and this prints what niceemu prints after a
 halt: why and after how many steps the program halted, the registers, and
 the --dump and --screen output. So the output of the two can be compared:
 
-    diff <(niceemu -i in.txt prog.bin) <(tools/run.py -i in.txt prog.bin)
+    diff <(niceemu -i in.txt prog.bin) <(tools/nicemon.py run -i in.txt prog.bin)
 
 Usage:
-    tools/run.py (--eth HOST[:PORT] | --port DEVICE [--baud 230400]
-                 | --tcp [HOST:]PORT | --cosim PORT) [-i FILE] [-d ADDR:N]... [-s] [-2004]
-                 [--symbols FILE] [--timeout SEC] [--monitor [--rom FILE]]
-                 FILE.bin
+    tools/nicemon.py run (--eth HOST[:PORT] | --port DEVICE [--baud 230400]
+                         | --tcp [HOST:]PORT | --cosim PORT) [-i FILE] [-d ADDR:N]... [-s] [-2004]
+                         [--symbols FILE] [--timeout SEC] [--monitor [--rom FILE]]
+                         FILE.bin
 
     One of --eth, --port, --tcp, and --cosim must be given. --eth HOST
     runs it on the board over its Ethernet port, and --port DEVICE on its
@@ -36,7 +36,7 @@ Input:
 
 Under the monitor:
     --monitor runs a program at 0x8000 under the monitor in the ROM, as
-    tools/load.py --monitor loads it: the ROM stays visible, the monitor
+    nicemon.py load --monitor loads it: the ROM stays visible, the monitor
     boots cold, and SYS 0x8000 and CR go to the console before the input. --rom
     FILE loads FILE at 0 in place of the ROM, with the ROM hidden, for
     niceemu --link, the simulated system, or a bitstream without a ROM.
@@ -45,7 +45,7 @@ Under the monitor:
 
         diff <(niceemu -i <(printf 'SYS 0x8000\\r'; cat in.txt) \\
                    <(cat rom.bin prog.bin)) \\
-             <(tools/run.py --monitor --rom rom.bin -i in.txt prog.bin)
+             <(tools/nicemon.py run --monitor --rom rom.bin -i in.txt prog.bin)
 
     The output then has the monitor's too: its banner, the SYS, and the
     status that the program returns. The monitor reads on at the end of
@@ -357,8 +357,12 @@ class Parser(argparse.ArgumentParser):
         return super().parse_args(args, namespace)
 
 
-def main() -> None:
-    parser = Parser(description=__doc__.splitlines()[0])
+DESCRIPTION = __doc__.splitlines()[0]
+PARSER = Parser
+
+
+def add_options(parser: argparse.ArgumentParser) -> None:
+    """The options of nicemon.py run, for a parser of the class Parser."""
     add_arguments(parser)
     parser.add_argument("-i", "--input", default="-",
                         help="read the console's input from FILE, not stdin")
@@ -387,8 +391,23 @@ def main() -> None:
     add_monitor_arguments(parser)
     parser.add_argument("file",
                         help="a .bin file: one 'address word' hex pair per line")
-    args = parser.parse_args()
 
+
+def command(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
+    """nicemon.py run, on the options of add_options."""
+    try:
+        run_program(parser, args)
+    except BrokenPipeError:
+        # stdout closed early, as by "nicemon.py run ... | head": exit quietly with
+        # the status of SIGPIPE, as niceemu does, and keep Python from
+        # writing to the pipe again at exit
+        os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+        sys.exit(141)
+
+
+def run_program(parser: argparse.ArgumentParser,
+                args: argparse.Namespace) -> None:
+    """Loads and runs args.file, and exits with its status."""
     words = program_words(parser, args)
     in_rom = args.monitor and not args.rom
     symbols = Symbols(args.symbols) if args.symbols else None
@@ -420,11 +439,6 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except BrokenPipeError:
-        # stdout closed early, as by "run.py ... | head": exit quietly with
-        # the status of SIGPIPE, as niceemu does, and keep Python from
-        # writing to the pipe again at exit
-        os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
-        sys.exit(141)
+    # The old name, kept for one release (issue #156)
+    import nicemon
+    nicemon.main(["run", *sys.argv[1:]])

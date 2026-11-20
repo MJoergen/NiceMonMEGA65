@@ -9,12 +9,12 @@ FAT32 boot sector, or the first partition of type 0x0B or 0x0C of an
 MBR, and in it only the folder NICE, the monitor's (#91), or the one
 that --folder names:
 
-    tools/sdcard.py --eth 192.168.1.65 ls
-    tools/sdcard.py --eth 192.168.1.65 get HELLO.BIN [DEST]
-    tools/sdcard.py --eth 192.168.1.65 put prog.bas [NAME]
-    tools/sdcard.py --eth 192.168.1.65 del NAME
-    tools/sdcard.py --eth 192.168.1.65 mkdir
-    tools/sdcard.py --eth 192.168.1.65 --slot 0 format
+    tools/nicemon.py sd --eth 192.168.1.65 ls
+    tools/nicemon.py sd --eth 192.168.1.65 get HELLO.BIN [DEST]
+    tools/nicemon.py sd --eth 192.168.1.65 put prog.bas [NAME]
+    tools/nicemon.py sd --eth 192.168.1.65 del NAME
+    tools/nicemon.py sd --eth 192.168.1.65 mkdir
+    tools/nicemon.py sd --eth 192.168.1.65 --slot 0 format
 
 ls prints the rows of BASIC's DIR, which shows a file's long name
 where it has one, with its 8.3 name after its size. get takes the 8.3
@@ -92,12 +92,12 @@ The tool exits with status 1 and a message on an error, as the monitor's
 with no FAT32 or without the folder. Only the Python standard
 library is used, so this runs on Linux and macOS.
 
-Usage: tools/sdcard.py (--eth HOST[:PORT] | --port DEVICE [--baud 230400]
-                       | --tcp [HOST:]PORT | --cosim PORT)
-                       [--slot N] [--folder NAME] [--hold]
-                       (ls | get NAME [DEST] | put SRC [NAME] | del NAME
-                        | mkdir | format [--label L] [--force]
-                          [--system] [--yes])
+Usage: tools/nicemon.py sd (--eth HOST[:PORT] | --port DEVICE [--baud 230400]
+                           | --tcp [HOST:]PORT | --cosim PORT)
+                           [--slot N] [--folder NAME] [--hold]
+                           (ls | get NAME [DEST] | put SRC [NAME] | del NAME
+                            | mkdir | format [--label L] [--force]
+                              [--system] [--yes])
 """
 
 from __future__ import annotations
@@ -1539,10 +1539,12 @@ def do_format(card: Card, folder: str, label: str, force: bool,
           if vol.dir else "Formatted, but the folder is missing")
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="List, copy, write, and delete the files of the folder "
-        "NICE on the board's SD card, over the debug link.")
+DESCRIPTION = ("List, copy, write, and delete the files of the folder NICE "
+               "on the board's SD card, over the debug link.")
+
+
+def add_options(parser: argparse.ArgumentParser) -> None:
+    """The options of nicemon.py sd, with its own subcommands."""
     add_arguments(parser)
     parser.add_argument("--slot", type=int,
                         help="the slot of the card, while the core is held "
@@ -1588,7 +1590,10 @@ def main() -> None:
                      "too")
     fmt.add_argument("--yes", action="store_true",
                      help="ask for no typed confirmation")
-    args = parser.parse_args()
+
+
+def command(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
+    """nicemon.py sd, on the options of add_options."""
     data = b""
     try:
         if args.cmd == "put":
@@ -1650,4 +1655,6 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    # The old name, kept for one release (issue #156)
+    import nicemon
+    nicemon.main(["sd", *sys.argv[1:]])

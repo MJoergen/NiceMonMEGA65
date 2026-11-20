@@ -35,10 +35,11 @@ import tempfile
 import time
 
 import hwtest
-from hwtest import (NICEEMU, REPO, assemble, assemble_labels, comparisons,
-                    results, test_bench, test_framing, test_pause, test_run,
-                    test_monitor, test_selftest, test_step, test_break,
-                    test_watch, test_write_regs, test_fpu, check, start_emu)
+from hwtest import (NICEEMU, NICEMON, REPO, assemble, assemble_labels,
+                    comparisons, results, test_bench, test_framing,
+                    test_pause, test_run, test_monitor, test_selftest,
+                    test_step, test_break, test_watch, test_write_regs,
+                    test_fpu, check, start_emu)
 from boardlink import HOLD, RAM, open_link
 # After boardlink, which puts nice_cpu's debugger/ on the path
 import nicedbg
@@ -52,8 +53,8 @@ def mon(port: str, args: list[str],
     while."""
     end = time.monotonic() + 2
     while True:
-        r = subprocess.run([sys.executable, f"{REPO}/tools/mon.py", "--tcp",
-                            port] + args, input=script, capture_output=True,
+        r = subprocess.run([*NICEMON, "mon", "--tcp", port] + args,
+                           input=script, capture_output=True,
                            text=True, timeout=30)
         if (r.returncode == 0 or "no b notice" not in r.stderr and
                 "closed the connection" not in r.stderr or
@@ -126,7 +127,7 @@ def test_console(port: str) -> None:
     while True:
         master, slave = pty.openpty()
         proc = subprocess.Popen(
-            [sys.executable, f"{REPO}/tools/mon.py", "--tcp", port,
+            [*NICEMON, "mon", "--tcp", port,
              f"{REPO}/build/rom_test.bin"],
             stdin=slave, stdout=slave, stderr=slave)
         os.close(slave)
@@ -190,7 +191,10 @@ def test_keep(tmp: str) -> None:
     with build/rom.bin, whose BASIC has "keep" clear, and a card with a
     BASIC*.ROM, loads the card's BASIC at the cold start; run.py --tcp
     loads the same ROM image with "keep" set, so that its monitor loads
-    none. load.py --basic refuses niceemu, which has no ROM."""
+    none. load.py --basic refuses niceemu, which has no ROM. These two
+    run by the old names, tools/run.py and tools/load.py, the wrappers
+    of nicemon.py run and load, which are kept for one release (issue
+    #156), so that the wrappers stay tested while they exist."""
     subprocess.run(["make", "-s", "-C", REPO, "build/rom.bin"], check=True)
     rom = f"{REPO}/build/rom.bin"
     card = os.path.join(tmp, "basic_card.img")

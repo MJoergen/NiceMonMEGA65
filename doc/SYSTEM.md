@@ -283,7 +283,7 @@ QNICE-FPGA, at `0xFF30` there:
 The words `0xFFFFFF83` and `84` read 0 and take no write. In
 the emulator these addresses are memory, so a program that writes them runs
 there too, without scrolling. Reset, and the clear of the memory (bit 2 of
-the control register, which `load.py` and `run.py` set), set the offset,
+the control register, which `nicemon.py load` and `nicemon.py run` set), set the offset,
 the font base, and the mode word to 0 and turn the cursor off, as at the
 start of the emulator. `niceemu --window` draws the same cursor from these
 words, as [nice_cpu's DEVICES.md §1](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.md#1-console-screen-and-read-counter) says, but has no display offset.

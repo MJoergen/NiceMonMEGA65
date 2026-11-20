@@ -207,8 +207,11 @@ def report(lock: threading.Lock, client: Addr, name: str, what: str) -> None:
         print(f"{client[0]}:{client[1]} {name}: {what}", flush=True)
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+DESCRIPTION = __doc__.splitlines()[0]
+
+
+def add_options(parser: argparse.ArgumentParser) -> None:
+    """The options of nicemon.py tftpd."""
     parser.add_argument("--dir", default=".", help="the folder served (default .)")
     parser.add_argument("--addr", default="0.0.0.0",
                         help="the address to listen on (default all)")
@@ -218,7 +221,10 @@ def main() -> None:
                         help="the seconds to wait for an ACK (default 1)")
     parser.add_argument("--tries", type=int, default=5,
                         help="the sends of a block in all (default 5)")
-    args = parser.parse_args()
+
+
+def command(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
+    """nicemon.py tftpd, on the options of add_options."""
     if not os.path.isdir(args.dir):
         sys.exit(f"tftpd.py: no folder {args.dir}")
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -246,4 +252,6 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    # The old name, kept for one release (issue #156)
+    import nicemon
+    nicemon.main(["tftpd", *sys.argv[1:]])

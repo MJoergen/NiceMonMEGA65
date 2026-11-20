@@ -9,7 +9,7 @@ controller's registers at FFFFFFA0-AF, with sdcard.py's Card. Linux's
 nbd-client connects /dev/nbd0 to it, and the kernel's own vfat mounts
 the card's FAT32, every folder of it, as a folder of the host:
 
-    tools/sdnbd.py --eth 192.168.1.65 &
+    tools/nicemon.py nbd --eth 192.168.1.65 &
     sudo modprobe nbd
     sudo nbd-client -N sd localhost /dev/nbd0
     sudo mount -o uid=$(id -u),gid=$(id -g) /dev/nbd0p1 /mnt
@@ -43,10 +43,10 @@ On an R6, the card reads at about 115 KB a second over Ethernet and
 writes at about 80 KB a second; over the serial port it is a hundred
 times slower. Only the Python standard library is used.
 
-Usage: tools/sdnbd.py (--eth HOST[:PORT] | --port DEVICE [--baud 230400]
-                      | --tcp [HOST:]PORT | --cosim PORT)
-                      [--slot N] [--read-only] [--hold]
-                      [--listen [HOST:]PORT]
+Usage: tools/nicemon.py nbd (--eth HOST[:PORT] | --port DEVICE [--baud 230400]
+                            | --tcp [HOST:]PORT | --cosim PORT)
+                            [--slot N] [--read-only] [--hold]
+                            [--listen [HOST:]PORT]
 """
 
 from __future__ import annotations
@@ -270,10 +270,12 @@ def stop(signum: int, frame: FrameType | None) -> None:
     raise KeyboardInterrupt()
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Serve the board's SD card over NBD, for nbd-client and "
-        "a mount of its file system on the host.")
+DESCRIPTION = ("Serve the board's SD card over NBD, for nbd-client and a "
+               "mount of its file system on the host.")
+
+
+def add_options(parser: argparse.ArgumentParser) -> None:
+    """The options of nicemon.py nbd."""
     add_arguments(parser)
     parser.add_argument("--slot", type=int,
                         help="the slot of the card (default 0, or 1 when 0 "
@@ -289,7 +291,10 @@ def main() -> None:
                         metavar="[HOST:]PORT",
                         help="where the server listens (default "
                         "%(default)s; port 0 picks a free one)")
-    args = parser.parse_args()
+
+
+def command(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
+    """nicemon.py nbd, on the options of add_options."""
     server = listen_on(args.listen)
     signal.signal(signal.SIGTERM, stop)
     link = open_link(args)
@@ -315,4 +320,6 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    # The old name, kept for one release (issue #156)
+    import nicemon
+    nicemon.main(["nbd", *sys.argv[1:]])

@@ -14,8 +14,8 @@ loader that refuses a word that the board has no memory at, as
 tools/load.py does. A FILE is checked before the link opens, and loaded
 at the start, with the processor held.
 
-Usage: tools/mon.py (--eth HOST[:PORT] | --port DEVICE [--baud 230400]
-                    | --tcp [HOST:]PORT | --cosim PORT) [--symbols FILE] [FILE.bin]
+Usage: tools/nicemon.py mon (--eth HOST[:PORT] | --port DEVICE [--baud 230400]
+                            | --tcp [HOST:]PORT | --cosim PORT) [--symbols FILE] [FILE.bin]
 
 Only the Python standard library is used, so this runs on Linux and macOS.
 """
@@ -36,10 +36,13 @@ def load(link: Link, path: str) -> int:
     return len(words)
 
 
-def main() -> None:
-    nicedbg.main(add_link_arguments=add_arguments, open_link=open_link,
+def main(argv: list[str]) -> None:
+    """nicemon.py mon: nicedbg parses argv itself (issue #156)."""
+    nicedbg.main(argv, add_link_arguments=add_arguments, open_link=open_link,
                  load=load, check_file=read_bin)
 
 
 if __name__ == "__main__":
-    main()
+    # The old name, kept for one release (issue #156)
+    import nicemon
+    nicemon.main(["mon", *sys.argv[1:]])

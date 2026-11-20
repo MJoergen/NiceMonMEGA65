@@ -631,7 +631,7 @@ one suite, `make test FAT_SUITES=NAME`, whose output is
 stands: check it, then copy it to `test/NAME.expected`.
 
 `make tftptest`, in the repository's root, runs the monitor against
-`tools/tftpd.py`, and `make tcptest` runs `test/tcp.nasm`,
+`tools/nicemon.py tftpd`, and `make tcptest` runs `test/tcp.nasm`,
 `test/tcpt.nasm`, `test/tcp_c.c`, and `test/tcphw.nasm` against
 `tools/tcppeer.py` (CONTRIBUTING.md).
 

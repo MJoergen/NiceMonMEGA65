@@ -41,7 +41,7 @@ from typing import Dict, Tuple
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NICEEMU = os.path.join(REPO, "nice_cpu", "emulator", "zig-out", "bin", "niceemu")
 MONITOR = os.path.join(REPO, "build", "rom_test.bin")
-TFTPD = os.path.join(REPO, "tools", "tftpd.py")
+TFTPD = [sys.executable, os.path.join(REPO, "tools", "nicemon.py"), "tftpd"]
 
 SERVER_IP = bytes([10, 0, 0, 2])
 SERVER_MAC = bytes.fromhex("0A0000000002")
@@ -331,7 +331,7 @@ def main() -> None:
         except (OSError, NotImplementedError):
             pass
         server = subprocess.Popen(
-            [sys.executable, TFTPD, "--dir", folder, "--port", "0",
+            [*TFTPD, "--dir", folder, "--port", "0",
              "--addr", "127.0.0.1", "--timeout", str(TIMEOUT)],
             stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
         try:

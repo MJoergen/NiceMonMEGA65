@@ -147,11 +147,11 @@ copies a file off the card, `CMD="put FILE"` writes one,
 `CMD="del NAME"` deletes one, `CMD=mkdir` makes the folder `NICE`, and
 `CMD="--slot N format"` erases the card and writes a new FAT32.
 After a write, the monitor starts again from reset
-([tools/README.md](tools/README.md#sdcardpy)). On Linux,
+([tools/README.md](tools/README.md#nicemonpy-sd)). On Linux,
 `make sdnbd ETH=192.168.1.65` serves the whole card as a disk, which
 `nbd-client` connects and the PC mounts as a folder, for the file
 manager, while the core is held
-([tools/README.md](tools/README.md#sdnbdpy)).
+([tools/README.md](tools/README.md#nicemonpy-nbd)).
 
 ### A new BASIC
 
@@ -180,7 +180,7 @@ If a BASIC from a card hangs at its start, take the card out and
 switch the board off and on, so that the core's own BASIC runs. Then put
 the card back, and remove the file with `DELETE "BASIC-V2.4.ROM"`.
 
-Over the network, `tools/load.py --eth 192.168.1.65 --basic
+Over the network, `tools/nicemon.py load --eth 192.168.1.65 --basic
 BASIC-V2.4.ROM` puts a BASIC into the ROM at once, until the board is
 switched off ([tools/README.md](tools/README.md#loading-basic-into-the-rom)).
 
@@ -347,7 +347,7 @@ PC ([basic/README.md](basic/README.md#the-statements)).
 
 There are two ways to talk to a program on the board from a PC:
 
-- `tools/mon.py --eth 192.168.1.65` is an interactive shell (see
+- `tools/nicemon.py mon --eth 192.168.1.65` is an interactive shell (see
   [Using the interactive shell](#using-the-interactive-shell)). At its
   prompt, it takes debug commands and shows the program's output, and
   `send TEXT` sends text to the program. Its `console` command passes
@@ -362,7 +362,7 @@ There are two ways to talk to a program on the board from a PC:
 
 The other tools take `--eth 192.168.1.65` too
 ([tools/README.md](tools/README.md#over-ethernet)).
-`tools/load.py --eth 192.168.1.65 prog.bin` loads a program and starts
+`tools/nicemon.py load --eth 192.168.1.65 prog.bin` loads a program and starts
 it, and [SYSTEM.md](doc/SYSTEM.md#the-ethernet-station) describes the
 Ethernet station.
 
@@ -379,14 +379,14 @@ Ctrl-C ends `nc`. The program then reads the end of its input from the
 PC, though the keyboard still types, until the program is started again
 or a PC connects again. The board also keeps the closed connection, so
 the serial port stays cut off until a tool connects from the same PC,
-such as `tools/mon.py --eth 192.168.1.65`, or the board is reset. The
+such as `tools/nicemon.py mon --eth 192.168.1.65`, or the board is reset. The
 tools end their connections so that the serial port is back at once.
 
 ## Over the serial port
 
 Remote control runs over the MEGA65's serial port too, its debug UART.
 It needs the JTAG cable, whose USB port carries it.
-`tools/mon.py --port /dev/ttyUSB1` is then the interactive shell, and a
+`tools/nicemon.py mon --port /dev/ttyUSB1` is then the interactive shell, and a
 terminal program, such as `picocom`, the plain client, as
 [over Ethernet](#over-ethernet). The other tools take `--port` too. To
 set them up, see [Setting up the tools](#setting-up-the-tools).
@@ -401,7 +401,7 @@ The serial port also gives the board its IP address without the
 keyboard. Pause the monitor, write the address to `0xFFFFFFB0`, the
 first byte in bits 31..24, here 192.168.1.65, and go on:
 
-    tools/mon.py --port /dev/ttyUSB1
+    tools/nicemon.py mon --port /dev/ttyUSB1
     dbg> pause
     dbg> w FFFFFFB0 C0A80141
     dbg> go
@@ -409,18 +409,18 @@ first byte in bits 31..24, here 192.168.1.65, and go on:
 
 ## Using the interactive shell
 
-`tools/mon.py` takes the connection to the board as an option, as the
+`tools/nicemon.py mon` takes the connection to the board as an option, as the
 other tools do: `--eth` for the Ethernet port, or `--port` for the
 serial port. One of the two must be given:
 
-    tools/mon.py --eth 192.168.1.65
-    tools/mon.py --port /dev/ttyUSB1
+    tools/nicemon.py mon --eth 192.168.1.65
+    tools/nicemon.py mon --port /dev/ttyUSB1
 
 The shell is the same either way. It starts by printing the state of
 the processor:
 
 <pre>
-$ <b>tools/mon.py --eth 192.168.1.65</b>
+$ <b>tools/nicemon.py mon --eth 192.168.1.65</b>
 halted: HALT, ROM hidden, control 0000000a, link version 0.8, input free 2048
 PC=0000000f
 interrupts: none
@@ -455,7 +455,7 @@ The program's output and the link's messages, such as
 `[paused, PC=...]`, are shown as they arrive. The shell is nice_cpu's
 debugger, with the prompt `dbg>`, and its
 [debugger/README.md](https://github.com/MJoergen/nice_cpu/blob/main/debugger/README.md#the-commands)
-describes every command; [tools/README.md](tools/README.md#monpy) has
+describes every command; [tools/README.md](tools/README.md#nicemonpy-mon) has
 what the board adds.
 
 ### A worked example
@@ -474,7 +474,7 @@ their addresses:
     C   ?!Z  JMP     LOOP
     E        HALT
 
-Assemble it, and start `mon.py`. The state shown here is that after an
+Assemble it, and start `nicemon.py mon`. The state shown here is that after an
 earlier program halted. Load the program, and the processor is held in
 reset, with the program in memory. The control register then reads
 `00000009`: bit 0 holds the processor, and bit 3 hides the ROM
@@ -482,7 +482,7 @@ reset, with the program in memory. The control register then reads
 
 <pre>
 $ <b>python3 nice_cpu/assembler/niceasm.py -o echo.bin sim/echo.nasm</b>
-$ <b>tools/mon.py --eth 192.168.1.65</b>
+$ <b>tools/nicemon.py mon --eth 192.168.1.65</b>
 halted: HALT, ROM hidden, control 0000000a, link version 0.8, input free 2048
 PC=0000000f
 interrupts: none
@@ -570,7 +570,7 @@ into `.bin` files, with the tools of this repository (see
 | | A program on its own | A program under the monitor |
 |---|---|---|
 | Built at address | 0 | `0x8000` |
-| Loaded by | `tools/load.py`, which hides the ROM | BASIC's `LOAD`, from the card, a paste, or TFTP, or `tools/load.py --monitor` |
+| Loaded by | `tools/nicemon.py load`, which hides the ROM | BASIC's `LOAD`, from the card, a paste, or TFTP, or `tools/nicemon.py load --monitor` |
 | It may use | The hardware's registers | Those, and the monitor's routines for the screen, the files, and the network |
 | `printf` prints | To the PC | To the screen and the PC |
 | In `niceemu` | It runs the same | It runs behind the monitor, joined into one file |
@@ -578,7 +578,7 @@ into `.bin` files, with the tools of this repository (see
 [PROGRAMMING.md](doc/PROGRAMMING.md) has how to write, build, and run
 both, the C library, and the memory limits, and
 [tools/README.md](tools/README.md#running-a-program-under-the-monitor)
-has `load.py --monitor`.
+has `nicemon.py load --monitor`.
 
 ### Building your own ROM
 

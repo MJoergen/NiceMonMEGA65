@@ -1,4 +1,4 @@
-# Builds the example C programs into .bin files for tools/load.py.
+# Builds the example C programs into .bin files for tools/nicemon.py load.
 #
 # C goes through WebAssembly: clang compiles it to a wasm module, linked
 # with the C library of nice_cpu (nice_cpu/runtime/libc), nicewasm

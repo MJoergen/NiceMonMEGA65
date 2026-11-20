@@ -12,7 +12,7 @@ with the text of the boards in `text.nasm`. It is a program at `0x8000`,
 3. F12 returns to BASIC.
 
 `LOAD "DEMO.BIN", "IP"` loads it from a TFTP server instead, and
-`tools/load.py --monitor demo.bin` from a PC.
+`tools/nicemon.py load --monitor demo.bin` from a PC.
 
 The demo's source, its documentation, and its tests are in nice_cpu, so a
 change to it reaches the boards only with a tag of nice_cpu

@@ -104,7 +104,7 @@ help:
 	@echo "                  and start it"
 	@echo "  make linktest   compare run.py on niceemu --link with niceemu, and check"
 	@echo "                  mon.py's check of the memory, without a board"
-	@echo "  make sdtest     check tools/sdcard.py and tools/sdnbd.py on niceemu --link"
+	@echo "  make sdtest     check tools/nicemon.py sd and tools/nicemon.py nbd on niceemu --link"
 	@echo "                  with images of a card, without a board"
 	@echo "  make ecma55     run the ECMA-55 conformance suite on BASIC in niceemu, and"
 	@echo "                  compare each program's outcome with basic/test/ecma55.expected;"
@@ -112,7 +112,7 @@ help:
 	@echo "  make tftpd [TFTP_DIR=examples/build] [TFTP_PORT=69]"
 	@echo "                  serve the files of TFTP_DIR to BASIC's LOAD and DIR, with"
 	@echo "                  listings for DIR \"IP\", \"*.BIN\" (port 69 needs root)"
-	@echo "  make tftptest   check tools/tftpd.py, and BASIC's TFTP in niceemu"
+	@echo "  make tftptest   check tools/nicemon.py tftpd, and BASIC's TFTP in niceemu"
 	@echo "                  against it, without a board"
 	@echo "  make tcptest    check the monitor's TCP in niceemu against tools/tcppeer.py,"
 	@echo "                  and its timers with --step-time, without a board"
@@ -256,30 +256,30 @@ release:
 
 load:
 	@test -n "$(FILE)" || (echo "Give the program with FILE=prog.bin"; exit 1)
-	$(PYTHON) tools/load.py $(LINK) $(ARGS) $(FILE)
+	$(PYTHON) tools/nicemon.py load $(LINK) $(ARGS) $(FILE)
 
 run:
 	@test -n "$(FILE)" || (echo "Give the program with FILE=prog.bin"; exit 1)
-	$(PYTHON) tools/run.py $(LINK) $(ARGS) $(FILE)
+	$(PYTHON) tools/nicemon.py run $(LINK) $(ARGS) $(FILE)
 
 mon:
-	$(PYTHON) tools/mon.py $(LINK) $(ARGS) $(FILE)
+	$(PYTHON) tools/nicemon.py mon $(LINK) $(ARGS) $(FILE)
 
-# The files of the board's SD card over the link (tools/sdcard.py)
+# The files of the board's SD card over the link (tools/nicemon.py sd)
 sdcard:
 	@test -n "$(CMD)" || (echo "Give the command with CMD=ls, CMD='get NAME', CMD='put SRC', or CMD='del NAME'"; exit 1)
-	$(PYTHON) tools/sdcard.py $(LINK) $(ARGS) $(CMD)
+	$(PYTHON) tools/nicemon.py sd $(LINK) $(ARGS) $(CMD)
 
 # The board's SD card as a block device of the host, for nbd-client and a
-# mount (tools/sdnbd.py), until Ctrl-C
+# mount (tools/nicemon.py nbd), until Ctrl-C
 sdnbd:
-	$(PYTHON) tools/sdnbd.py $(LINK) $(ARGS)
+	$(PYTHON) tools/nicemon.py nbd $(LINK) $(ARGS)
 
 # The flash of the Nexys4DDR, or with COR and SLOT a slot of the MEGA65's
-# (tools/flash.py); BIT on the command line overrides the default.
+# (tools/nicemon.py flash); BIT on the command line overrides the default.
 flash:
 	@test -n "$(PORT)" || (echo "Give the board's serial port with PORT=/dev/ttyUSB1"; exit 1)
-	$(PYTHON) tools/flash.py --port $(PORT) $(if $(COR),--cor $(COR) $(if $(SLOT),--slot $(SLOT)),--bit $(if $(filter command line,$(origin BIT)),$(BIT),synth/nexys4ddr/build/top.bit)) $(ARGS)
+	$(PYTHON) tools/nicemon.py flash --port $(PORT) $(if $(COR),--cor $(COR) $(if $(SLOT),--slot $(SLOT)),--bit $(if $(filter command line,$(origin BIT)),$(BIT),synth/nexys4ddr/build/top.bit)) $(ARGS)
 
 BIT ?= synth/r6/build/top.bit
 
@@ -302,12 +302,12 @@ linktest: $(EMU)
 sdtest: $(EMU) build/rom_test.bin
 	$(PYTHON) tools/sdtest.py
 
-# The TFTP server for BASIC's LOAD and DIR (tools/tftpd.py), and its check,
+# The TFTP server for BASIC's LOAD and DIR (tools/nicemon.py tftpd), and its check,
 # which runs the monitor in niceemu against it
 TFTP_DIR ?= examples/build
 TFTP_PORT ?= 69
 tftpd:
-	$(PYTHON) tools/tftpd.py --dir $(TFTP_DIR) --port $(TFTP_PORT)
+	$(PYTHON) tools/nicemon.py tftpd --dir $(TFTP_DIR) --port $(TFTP_PORT)
 
 tftptest: $(EMU) build/rom_test.bin
 	$(PYTHON) tools/tftptest.py

@@ -43,7 +43,7 @@ There are two kinds of program:
   paste, and it returns to the monitor (see
   [Programs under the monitor](#programs-under-the-monitor)).
 - A program **on its own** is built at address 0, and has only the
-  hardware. A PC loads it with `tools/load.py`, which hides the ROM, and
+  hardware. A PC loads it with `tools/nicemon.py load`, which hides the ROM, and
   it runs the same in `niceemu` (see
   [Programs in the ROM](#programs-in-the-rom)).
 
@@ -83,10 +83,10 @@ and run it from a PC on the board's network (the
 [README](../README.md#over-ethernet) says how the board gets its
 address):
 
-    tools/load.py --eth 192.168.1.65 --monitor hello.bin
+    tools/nicemon.py load --eth 192.168.1.65 --monitor hello.bin
 
 The greeting is on the board's screen, and BASIC's `READY.` follows
-it. `tools/mon.py` is a debugger
+it. `tools/nicemon.py mon` is a debugger
 ([tools/README.md](../tools/README.md)).
 
 Run it in the emulator, which is built with
@@ -132,12 +132,12 @@ return to. Assemble it:
 The monitor loads programs at `0x8000`, not at 0, so it cannot load
 this one. It gets onto the board in one of two ways:
 
-- **From a PC on the board's network.** `tools/load.py` holds the
+- **From a PC on the board's network.** `tools/nicemon.py load` holds the
   processor, hides the ROM, loads the program at 0, and starts it (the
   [README](../README.md#over-ethernet) says how the board gets its
   address):
 
-      tools/load.py --eth 192.168.1.65 hello.bin
+      tools/nicemon.py load --eth 192.168.1.65 hello.bin
 
   The greeting appears over the monitor's old text, which stays on the
   screen. The reset button brings the monitor back.
@@ -197,7 +197,7 @@ them alone, so a program can do all that BASIC does (#152):
 - The return to the monitor, and its version.
 
 They are there whenever the ROM is visible, as it is for a program that
-the monitor runs. They are not there for a program at 0, as `load.py`
+the monitor runs. They are not there for a program at 0, as `nicemon.py load`
 without `--monitor` hides the ROM. The ROM has other routines, such as
 the SD card's sectors and the ARP cache, which have no entries, and
 which a program does not call
@@ -241,7 +241,7 @@ declares the entries with `monitor/mon.h`, and is built with:
 **Loading.** On the board, BASIC's `LOAD "NAME.BIN"` reads the `.bin`
 file from the SD card, `LOAD "NAME.BIN", "IP"` from the network, and
 `LOAD` from a paste, and `SYS 0x8000` runs it. `RUN "NAME.BIN"` does
-both. From a PC, `tools/load.py --monitor` loads and runs it
+both. From a PC, `tools/nicemon.py load --monitor` loads and runs it
 ([tools/README.md](../tools/README.md#running-a-program-under-the-monitor)).
 
 **In the emulator.** `niceemu` has no ROM. There the monitor is a

@@ -3,11 +3,11 @@
 Nexys4DDR's, or a core file into a slot of the MEGA65's.
 
 Usage:
-    tools/flash.py --port DEVICE [--baud 230400]
-                   [--bit synth/nexys4ddr/build/top.bit] [--erase]
-    tools/flash.py --port DEVICE [--baud 230400]
-                   --cor synth/r6/build/NiceMonMEGA65-r6.cor --slot N
-                   [--no-board-check]
+    tools/nicemon.py flash --port DEVICE [--baud 230400]
+                           [--bit synth/nexys4ddr/build/top.bit] [--erase]
+    tools/nicemon.py flash --port DEVICE [--baud 230400]
+                           --cor synth/r6/build/NiceMonMEGA65-r6.cor --slot N
+                           [--no-board-check]
 
     The Nexys4DDR's FPGA loads the bitstream from the board's quad SPI
     flash at power on, and when PROG is pressed, if jumper JP1 (MODE) is
@@ -318,9 +318,11 @@ def flash_bit(args: argparse.Namespace) -> None:
 DEFAULT_BIT = f"{REPO}/synth/nexys4ddr/build/top.bit"
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(
-        description=" ".join(__doc__.split("\n\n")[0].split()))
+DESCRIPTION = " ".join(__doc__.split("\n\n")[0].split())
+
+
+def add_options(parser: argparse.ArgumentParser) -> None:
+    """The options of nicemon.py flash."""
     parser.add_argument("--port", required=True, metavar="DEVICE",
                         help="the serial device of the board's debug UART, "
                         "such as /dev/ttyUSB1")
@@ -341,7 +343,10 @@ def main() -> None:
     parser.add_argument("--no-board-check", action="store_true",
                         help="MEGA65: do not check that the flash chip is "
                         "that of the core file's revision")
-    args = parser.parse_args()
+
+
+def command(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
+    """nicemon.py flash, on the options of add_options."""
 
     if not sys.platform.startswith("linux"):
         sys.exit("flash.py: finding the JTAG cable needs Linux; write the "
@@ -360,4 +365,6 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    # The old name, kept for one release (issue #156)
+    import nicemon
+    nicemon.main(["flash", *sys.argv[1:]])

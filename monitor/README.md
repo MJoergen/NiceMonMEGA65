@@ -271,7 +271,7 @@ on the board:
 `BSAVE "NAME", A, N` writes a program back, and the ROM never makes the
 folder itself, so a card is written only where its user made room.
 With no PC slot, `make sdcard CMD=mkdir` makes it over the link
-([tools/README.md](../tools/README.md#sdcardpy)).
+([tools/README.md](../tools/README.md#nicemonpy-sd)).
 
 - **The card** is FAT32 when its sector 0 is a FAT32 boot sector, as
   `mkfs.fat` makes on a whole card, or an MBR whose first partition of
@@ -482,7 +482,7 @@ comes first, as their words are in the RAM.
 `DIR "IP"` for `*`: the lines received are shown instead of loaded,
 each without its bytes that are not printable ASCII, such as those of
 a name in UTF-8, and up to its first 77 characters. The repository's own server,
-`tools/tftpd.py`, answers a pattern with a listing of the files of its
+`tools/nicemon.py tftpd`, answers a pattern with a listing of the files of its
 folder that match it, a line each with the name and the size in bytes,
 which no other server does. To serve the examples from a PC:
 
@@ -491,7 +491,7 @@ which no other server does. To serve the examples from a PC:
 It serves `examples/build`, the folder of `make examples`, or with
 `TFTP_DIR=FOLDER` another folder, its regular files and nothing else.
 Port 69 needs root, or the capability that the header of
-`tools/tftpd.py` names; without either, `make tftpd TFTP_PORT=6969` serves on port
+`tools/nicemon.py tftpd` names; without either, `make tftpd TFTP_PORT=6969` serves on port
 6969. On the board, `DHCP`, then `DIR "192.168.1.10", "*.BIN"` lists
 the programs, and `LOAD "HELLO.BIN", "192.168.1.10"` loads one, with the
 PC's address, and `:6969` after it for the other port. Any other TFTP
@@ -655,7 +655,7 @@ Programs below.
   in use before the program runs: `SYS` takes the top 2 words, from
   `0x1E7FF` or `0xE7FF` down, `LOAD` of typed lines reaches 8 words
   below the top, and `LOAD` from a card 22. `LOAD` and
-  `load.py --monitor` take a word there, which is then overwritten, as
+  `nicemon.py load --monitor` take a word there, which is then overwritten, as
   any word in the room the stack needs is.
 - A program runs once per load: the load initializes its static data and
   its wasm linear memory. A wasm trap halts the core, as in nice_cpu,
@@ -671,10 +671,10 @@ pauses, and steps the core, and reads and writes the memory. While the
 monitor runs, the link reaches only its debug registers, so the tools
 hold the core first. They also hide the ROM, so that a program at 0 runs
 as in the emulator, and the reset button boots the monitor again. With
-`--monitor`, `load.py` and `run.py` keep the ROM, load a program at
+`--monitor`, `nicemon.py load` and `nicemon.py run` keep the ROM, load a program at
 `0x8000`, and run it under the monitor:
 
-    tools/load.py --eth 192.168.1.65 --monitor prog.bin
+    tools/nicemon.py load --eth 192.168.1.65 --monitor prog.bin
 
 The tools' README has the details, in [Running a program under the
 monitor](../tools/README.md#running-a-program-under-the-monitor).
@@ -687,4 +687,4 @@ which each release has as a file of its own. Copied into the card's
 folder `NICE`, `LOAD "DEMO.BIN"` and `SYS 0x8000` run it, and its F12
 returns to BASIC with `Returned 00000000`. `LOAD` from a TFTP server
 loads it too, and so does
-`tools/load.py --monitor`.
+`tools/nicemon.py load --monitor`.

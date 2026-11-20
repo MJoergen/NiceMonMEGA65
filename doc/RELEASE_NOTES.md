@@ -21,6 +21,21 @@ The release candidates pinned these:
 
 nice_cpu's `RC01` and `RC03` have no tag here.
 
+## V2.4.1 (unreleased)
+
+**Upgrade notes.**
+
+- The host tools are one command, `tools/nicemon.py`, with a
+  subcommand for each: `load`, `run`, `mon`, `sd`, `nbd`, `flash`, and
+  `tftpd` ([#156](https://github.com/MJoergen/NiceMonMEGA65/issues/156),
+  [tools/README.md](../tools/README.md)). The options after the
+  subcommand are those of the old script, so a command line changes in
+  its first word: `tools/load.py --eth IP prog.bin` is
+  `tools/nicemon.py load --eth IP prog.bin`. The old names,
+  `load.py`, `run.py`, `mon.py`, `sdcard.py`, `sdnbd.py`, `flash.py`,
+  and `tftpd.py`, still run, and call `nicemon.py`; V2.5 removes them.
+  The `make` targets keep their names.
+
 ## V2.4 (2026-11-20)
 
 **Upgrade notes.**
@@ -60,13 +75,13 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   [basic/README.md](../basic/README.md#numbers)). Each is within 1 ulp
   and gives the same bits on the board as in `niceemu`. `RND(-1)`
   repeats its numbers, and `RND(0)` takes them from the cycle counter.
-- `sdcard.py format`, and `make sdcard CMD="--slot N format"`, erase
+- `nicemon.py sd format`, and `make sdcard CMD="--slot N format"`, erase
   the card in a slot and write a new FAT32 with the folder `NICE`, with
   no PC slot ([#142](https://github.com/MJoergen/NiceMonMEGA65/issues/142)).
   It asks for the slot's number to be typed, and refuses a
   write-protected card, one that is not blank without `--force`, and
   the MEGA65's card with its system partition without `--system`
-  ([tools/README.md](../tools/README.md#sdcardpy)).
+  ([tools/README.md](../tools/README.md#nicemonpy-sd)).
 - BASIC has a screen editor, as the C64's: the cursor keys move over
   the screen, typing inserts, DEL closes the gap, and RETURN takes the
   line the cursor is in, of up to four rows and 254 characters, so a
@@ -649,7 +664,7 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   the link as a disk of Linux's network block device, which
   `nbd-client` connects and the PC mounts as a folder, all of the card,
   for the file manager. The core is held meanwhile, and starts again
-  from reset at the end ([tools/README.md](../tools/README.md#sdnbdpy)).
+  from reset at the end ([tools/README.md](../tools/README.md#nicemonpy-nbd)).
 - `tools/sdcard.py` lists, reads, writes, and deletes files by their
   long names, as the monitor does.
 - `make flash COR=f.cor SLOT=N` writes an R3 whose flash is an

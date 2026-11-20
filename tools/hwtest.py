@@ -254,6 +254,8 @@ from boardlink import (BAUD, BAUDS, BRK_COUNT, BRK_EN, CONTROL, DEFAULT_BAUD,
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NICEEMU = f"{REPO}/nice_cpu/emulator/zig-out/bin/niceemu"
+# The tools' front end, as the programs run and load with it (issue #156)
+NICEMON = [sys.executable, f"{REPO}/tools/nicemon.py"]
 # The debug link of the pinned nice_cpu, which the bitstream is built from
 DEBUG_LINK = f"{REPO}/nice_cpu/hdl/src/debug_link.vhd"
 # The clock of each board, which sets the rate of the microsecond counter
@@ -2443,7 +2445,7 @@ def test_run(link_args: list[str],
                         [os.path.basename(o) for o in options])
         emu = subprocess.run([NICEEMU] + options + [path],
                              stdin=subprocess.DEVNULL, capture_output=True)
-        board = subprocess.run([sys.executable, f"{REPO}/tools/run.py"] +
+        board = subprocess.run([*NICEMON, "run"] +
                                link_args + ["--timeout", f"{RUN_TIMEOUT:g}"] +
                                options + [path],
                                stdin=subprocess.DEVNULL, capture_output=True)
@@ -2491,7 +2493,7 @@ def test_monitor(link_args: list[str], tmp: str, in_rom: bool = False,
     halt = os.path.join(tmp, "h.txt")
     with open(halt, "wb") as f:
         f.write(b"HALT\r")
-    run_py = [sys.executable, f"{REPO}/tools/run.py"] + link_args + [
+    run_py = [*NICEMON, "run"] + link_args + [
         "--timeout", f"{RUN_TIMEOUT:g}", "--monitor"]
     # The keys, the program run.py loads, and what niceemu runs
     inputs = [("", b"HALT\r", hello, joined)]
@@ -2581,7 +2583,7 @@ def test_fit(link_args: list[str], tmp: str, ram: int) -> None:
         beyond = os.path.join(tmp, "beyond.bin")
         with open(beyond, "w") as f:
             f.write(f"{addr:08x} 00000001\n")
-        r = subprocess.run([sys.executable, f"{REPO}/tools/load.py"] +
+        r = subprocess.run([*NICEMON, "load"] +
                            link_args + ["--no-run"] + options + [beyond],
                            stdin=subprocess.DEVNULL, capture_output=True,
                            text=True)
@@ -2603,7 +2605,7 @@ def test_selftest(link_args: list[str], tmp: str) -> None:
     keys = os.path.join(tmp, "f11.txt")
     with open(keys, "wb") as f:
         f.write(DEMO_KEY + b"\x1b[23~")
-    board = subprocess.run([sys.executable, f"{REPO}/tools/run.py"] +
+    board = subprocess.run([*NICEMON, "run"] +
                            link_args + ["--timeout", f"{RUN_TIMEOUT:g}", "-s",
                                         "-i", keys, rom],
                            stdin=subprocess.DEVNULL, capture_output=True)
@@ -2634,7 +2636,7 @@ def test_bench(link_args: list[str], bench: str) -> None:
     print(f"  {name}:")
     emu = subprocess.run([NICEEMU, bench], stdin=subprocess.DEVNULL,
                          capture_output=True)
-    board = subprocess.run([sys.executable, f"{REPO}/tools/run.py"] +
+    board = subprocess.run([*NICEMON, "run"] +
                            link_args + ["--timeout", "10", bench],
                            stdin=subprocess.DEVNULL, capture_output=True)
     for line in board.stdout.decode(errors="replace").splitlines():
@@ -2787,7 +2789,7 @@ def test_eth_tcp(eth: str, ip: str, tmp: str, listen: bool = False) -> None:
     with open(halt, "wb") as hf:
         hf.write(b"HALT\r")
     board = subprocess.run(
-        [sys.executable, f"{REPO}/tools/run.py", "--eth", eth, "--timeout",
+        [*NICEMON, "run", "--eth", eth, "--timeout",
          f"{RUN_TIMEOUT + 20:g}", "--monitor", "--rom",
          f"{REPO}/build/rom_test.bin", "-i", halt, prog],
         stdin=subprocess.DEVNULL, capture_output=True)

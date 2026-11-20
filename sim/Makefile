@@ -60,7 +60,7 @@
 #             tb_kbd runs just that one.
 # make cosim  runs the system with its debug UART on a TCP port of
 #             127.0.0.1, cosim/tb_cosim.vhd, until it is stopped, for the
-#             tools: tools/run.py --cosim N. It prints "cosim: port N".
+#             tools: tools/nicemon.py run --cosim N. It prints "cosim: port N".
 #             COSIM_PORT=N picks the port, any free one by default, and
 #             ROM=f.bin gives the system a ROM.
 # make clean  removes build/.

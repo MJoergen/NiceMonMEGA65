@@ -44,9 +44,9 @@ given, so the monitor boots cold with that BASIC. The ROM keeps it until
 the FPGA is configured again. A ROM that takes no writes, of a bitstream
 older than V2.3.1 or the Nexys4DDR's, is refused, as is no ROM.
 
-Usage: tools/load.py (--eth HOST[:PORT] | --port DEVICE [--baud 230400]
-                     | --tcp [HOST:]PORT | --cosim PORT) [--no-run]
-                     [--monitor [--rom FILE] | --basic] FILE
+Usage: tools/nicemon.py load (--eth HOST[:PORT] | --port DEVICE [--baud 230400]
+                             | --tcp [HOST:]PORT | --cosim PORT) [--no-run]
+                             [--monitor [--rom FILE] | --basic] FILE
 
 One of --eth, --port, --tcp, and --cosim must be given. --port names the
 serial device of the board's debug UART, such as /dev/ttyUSB1. --eth HOST talks to the board over TCP on its Ethernet port, at
@@ -60,6 +60,7 @@ and nice_cpu's debugger/nicebin.py reads the files and writes the words.
 """
 
 import argparse
+import sys
 
 from boardlink import (BRK_EN, CLEAR, CONTROL, HOLD, RAM, Link, LinkError,
                        add_arguments, fail, open_link)
@@ -280,8 +281,11 @@ def program_words(parser: argparse.ArgumentParser,
     return read_bin(args.file)
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+DESCRIPTION = __doc__.splitlines()[0]
+
+
+def add_options(parser: argparse.ArgumentParser) -> None:
+    """The options of nicemon.py load."""
     add_arguments(parser)
     parser.add_argument("--no-run", action="store_true",
                         help="leave the core held in reset after loading")
@@ -291,8 +295,10 @@ def main() -> None:
                         "of the ROM, with \"keep\" set")
     parser.add_argument("file",
                         help="a .bin file: one 'address word' hex pair per line")
-    args = parser.parse_args()
 
+
+def command(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
+    """nicemon.py load, on the options of add_options."""
     if args.basic:
         if args.monitor:
             parser.error("--basic and --monitor do not go together")
@@ -329,4 +335,6 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    # The old name, kept for one release (issue #156)
+    import nicemon
+    nicemon.main(["load", *sys.argv[1:]])

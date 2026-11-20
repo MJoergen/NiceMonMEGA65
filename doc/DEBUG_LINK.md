@@ -99,7 +99,7 @@ loads a program with two writes to the control register at
 3. `0x00000008` starts the core, with the ROM still hidden.
 
 A start without bit 3 shows the ROM again, which boots instead of the
-program. `tools/load.py` does all of this (see
+program. `tools/nicemon.py load` does all of this (see
 [The control register](#the-control-register)).
 
 With the ROM shown, the link's writes to BASIC's part of the ROM,
@@ -158,7 +158,7 @@ is 1. While a watchpoint is enabled, the pipelined core runs more
 slowly.
 
 Both take a write at any time, and a start keeps them: only a reset
-clears them. So `tools/load.py` and `tools/run.py` disable them before
+clears them. So `tools/nicemon.py load` and `tools/nicemon.py run` disable them before
 they load a program.
 [DEBUG.md §6](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEBUG.md#6-the-debug-registers)
 has the rules of both.
@@ -241,7 +241,7 @@ The Ethernet station ([SYSTEM.md](SYSTEM.md#the-ethernet-station))
 serves the debug link on TCP port 4510 of its IP address, to one host
 at a time. The tools take `--eth HOST`, or `--eth HOST:PORT`, for it:
 
-    python3 tools/run.py --eth 192.168.1.65 prog.bin
+    python3 tools/nicemon.py run --eth 192.168.1.65 prog.bin
     make mon ETH=192.168.1.65
 
 The link reads and writes all memory with no password, so anyone who

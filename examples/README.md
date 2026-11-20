@@ -8,7 +8,7 @@ reaches the board.
 
 | Program | What it does |
 |---|---|
-| `primes.bin` | Asks for a limit, counts the primes up to it, and prints how many cycles and instructions that took, until it reads 0. It runs on its own, from address 0, loaded by `tools/load.py`. |
+| `primes.bin` | Asks for a limit, counts the primes up to it, and prints how many cycles and instructions that took, until it reads 0. It runs on its own, from address 0, loaded by `tools/nicemon.py load`. |
 | `bench.bin`, `bench_win.bin` | nice_cpu's benchmark, which `make hwtest` runs (CONTRIBUTING.md, "The examples"). |
 | `weather.bin` | A weather display on the screen, below. It runs under the monitor. |
 
