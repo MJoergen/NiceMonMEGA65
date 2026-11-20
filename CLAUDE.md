@@ -78,7 +78,7 @@ header is the authoritative address map.
     make tftptest         # tftpd.py, and the monitor's tftp in niceemu --eth-udp against it, no board
     make tcptest          # the monitor's TCP in niceemu against tools/tcppeer.py, and its timers with --step-time, no board
     make weathertest      # examples/weather.c (#128): its parse on the host, and the program in niceemu against tools/tcppeer.py, no board
-    make sdcard CMD=ls    # the board's SD card over the link: ls, get NAME [DEST], put SRC [NAME], del NAME, mkdir (ETH= or PORT=)
+    make sdcard CMD=ls    # the board's SD card over the link: ls, get NAME [DEST], put SRC [NAME], del NAME, mkdir, --slot N format (ETH= or PORT=)
     make sdnbd            # the board's SD card as a disk over NBD, for nbd-client and a mount on Linux; holds the core until Ctrl-C (ETH= or PORT=)
     make sdtest           # sdcard.py and sdnbd.py on niceemu --link with images that mtools made, no board
     make cosim            # the RTL in GHDL, its debug UART on TCP, for the tools' --cosim PORT

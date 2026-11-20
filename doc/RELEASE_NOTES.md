@@ -34,6 +34,16 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 - The demo's F11 tests the RAM from `0xB000` to `0xCFFF`, where it
   tested up to `0xDFFF`, and its screen says so.
 
+**New.**
+
+- `sdcard.py format`, and `make sdcard CMD="--slot N format"`, erase
+  the card in a slot and write a new FAT32 with the folder `NICE`, with
+  no PC slot ([#142](https://github.com/MJoergen/NiceMonMEGA65/issues/142)).
+  It asks for the slot's number to be typed, and refuses a
+  write-protected card, one that is not blank without `--force`, and
+  the MEGA65's card with its system partition without `--system`
+  ([tools/README.md](../tools/README.md#sdcardpy)).
+
 ## V2.3.2 (2026-11-19)
 
 **Upgrade notes.**

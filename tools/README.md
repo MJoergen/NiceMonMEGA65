@@ -518,6 +518,8 @@ monitor's folder `NICE` (see
 - `mkdir` makes the folder in the root of a card that has FAT32 but not
   the folder, which the monitor never makes, or says that it is there
   already.
+- `format` erases the whole card in the slot of `--slot` and writes a
+  new FAT32 with the folder, as below.
 
 ```
 tools/sdcard.py --eth 192.168.1.65 ls
@@ -525,6 +527,7 @@ tools/sdcard.py --eth 192.168.1.65 get HELLO.BIN
 tools/sdcard.py --eth 192.168.1.65 put prog.bas
 make sdcard ETH=192.168.1.65 CMD="del PROG.BAS"
 make sdcard ETH=192.168.1.65 CMD=mkdir
+make sdcard ETH=192.168.1.65 CMD="--slot 0 format"
 ```
 
 `get` and `del` take the 8.3 name or the long name, in either case.
@@ -534,8 +537,28 @@ another folder of the root, and `--slot` the slot. The folder of
 `mkdir` must be an 8.3 name with no extension, as `NICE` is.
 
 A card with no FAT32 file system, or with FAT16 or exFAT, must be
-formatted as FAT32 on a PC first; the tool says so. A card with FAT32
-but no folder gets the hint of `mkdir`.
+formatted as FAT32 first, with `format` or on a PC; the tool says so. A
+card with FAT32 but no folder gets the hint of `mkdir`.
+
+`format` needs `--slot`, so that no card is erased by chance. It shows
+the card's size, its partitions, and their labels, and asks you to type
+the slot's number; `--yes` skips that. It refuses:
+
+- a write-protected card;
+- a card that is not blank, unless `--force` is given. A blank card has
+  only zeros, or only ones, in its first sector;
+- a card with the MEGA65's system partition, of type `0x41`, unless
+  `--system` is given too. That is the card in slot 1 of a MEGA65, which
+  the MEGA65's own SD card utility formats with its system files;
+- a card too small for FAT32, under about 37 MB.
+
+It writes the card as cards are sold: one partition of type `0x0C`
+from sector 8192 to the end, two FATs, Microsoft's cluster size for the
+card's size, the folder `NICE`, and the label `NICE`, or that of
+`--label`. A card of most sizes needs about 30000 sectors written,
+which takes minutes over Ethernet and much longer over the serial port.
+A format that breaks off leaves a card with no FAT32, as the old MBR is
+cleared first and the new one written last.
 
 The writes keep to the order of the monitor's FAT32 code, so that a
 reset at any point leaves the card no worse than with lost clusters,
@@ -543,7 +566,7 @@ which `fsck.fat` frees. `mkdir` writes the folder's cluster before the
 root's entry of it. A new entry has the host's date and time. When
 the card fills up, the file keeps what fitted, and `put` says error 30.
 
-The core can be in any state. `put`, `del`, and `mkdir` hold a running
+The core can be in any state. `put`, `del`, `mkdir`, and `format` hold a running
 or paused core, and start it again from reset after the write, as the
 monitor keeps a sector of the FAT and its mount between commands, which
 the write makes stale. So a program at `0x8000` under the monitor is gone

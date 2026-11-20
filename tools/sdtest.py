@@ -61,6 +61,18 @@ lower case makes the folder in upper case. On a card whose root
 cluster of one sector is full, the root grows by a cluster. fsck.fat
 and mdir check both cards afterwards.
 
+format, on a blank image, after the wrong slot typed and none, which
+leave it as it was: one partition of type 0x0C from sector 8192 that
+fsck.fat finds nothing in, with the folder NICE and the label that
+mdir sees, which ls lists and put writes into; then again, refused
+without --force, and with it, which loses the file. With --force, it
+formats an image with FAT16 in a partition and one with FAT32 on the
+whole card, and while the monitor runs, which lists the new card with
+DIR after its start from reset. It refuses, and leaves the image as it
+was, a card with the MEGA65's system partition of type 0x41 unless
+--system is given, one too small for 65525 clusters, and a
+write-protected one, and a label that is not valid before the link.
+
 On a running core, put holds it, and starts it again from reset, which
 sim/sdhold.nasm shows by reading sector 5 again. Last, the ROM of the
 tests, build/rom_test.bin, lists the card with dir, the
@@ -265,16 +277,17 @@ class Emu:
             sys.exit(f"sdtest.py: niceemu --link printed {first!r}")
         self.port = m.group(1)
 
-    def tool(self, *args: str,
-             cwd: str | None = None) -> subprocess.CompletedProcess[bytes]:
+    def tool(self, *args: str, cwd: str | None = None,
+             typed: bytes = b"") -> subprocess.CompletedProcess[bytes]:
         """sdcard.py --tcp on the port with args, in cwd if given. niceemu
         refuses a new host until it has seen the last one close, so a run
-        that got no connection is tried again for a while."""
+        that got no connection is tried again for a while. typed is its
+        stdin."""
         end = time.monotonic() + 2
         while True:
             r = subprocess.run([sys.executable, SDCARD, "--tcp", self.port,
                                 *args], capture_output=True, timeout=60,
-                               cwd=cwd)
+                               cwd=cwd, input=typed)
             err = r.stderr.decode(errors="replace")
             if (r.returncode == 0 or "no b notice" not in err and
                     "closed the connection" not in err or
@@ -855,6 +868,180 @@ def test_protected(imgs: dict[str, str], tmp: str) -> None:
         check("and the card is as it was", f.read() == before)
 
 
+def partition(img: str, tmp: str) -> str:
+    """The first partition of img, from sector 8192, as a file of its
+    own, for fsck.fat, which takes no offset."""
+    part = os.path.join(tmp, "part.img")
+    with open(img, "rb") as f, open(part, "wb") as g:
+        f.seek(8192 * 512)
+        g.write(f.read())
+    return part
+
+
+def check_format(img: str, tmp: str, what: str, files: int = 0) -> None:
+    """A card that format wrote: the MBR's one partition, FAT32 that
+    fsck.fat finds nothing in, and the folder NICE, with files files,
+    that mdir sees, with the label."""
+    r = subprocess.run(["sfdisk", "-d", img], capture_output=True,
+                       text=True)
+    parts = [line for line in r.stdout.splitlines() if "start=" in line]
+    size = os.path.getsize(img) // 512 - 8192
+    check(f"{what}: one partition of type 0x0C from sector 8192",
+          len(parts) == 1 and re.search(
+              rf"start=\s*8192, size=\s*{size}, type=c\b", parts[0])
+          is not None, r.stdout)
+    check_card(partition(img, tmp), what)
+    m = subprocess.run(["mdir", "-i", f"{img}@@4M", "::NICE"],
+                       capture_output=True, text=True)
+    check(f"{what}: mdir sees NICE, with {files} files, and the label",
+          m.returncode == 0 and "Volume in drive : is NICE" in m.stdout
+          and f"{2 + files} files" in m.stdout, m.stdout + m.stderr)
+
+
+def unchanged(img: str, before: bytes, what: str) -> None:
+    with open(img, "rb") as f:
+        check(f"{what}: the card is as it was", f.read() == before)
+
+
+def test_format(imgs: dict[str, str], tmp: str) -> None:
+    print("format of a blank card")
+    img = os.path.join(tmp, "fmt.img")
+    blank(img, 40 * MB)
+    before = bytes(40 * MB)
+    emu = Emu(img)
+    try:
+        r = emu.tool("format", "--yes")
+        check("format without --slot: an error", r.returncode == 1 and
+              "format needs --slot" in r.stderr.decode(), text(r))
+        r = emu.tool("--slot", "0", "format", typed=b"1\n")
+        check("format with the wrong slot typed: not confirmed",
+              r.returncode == 1 and "not confirmed" in r.stderr.decode() and
+              "nothing: sector 0 is blank" in r.stdout.decode(), text(r))
+        r = emu.tool("--slot", "0", "format")
+        check("format with nothing typed: not confirmed",
+              r.returncode == 1 and "not confirmed" in r.stderr.decode(),
+              text(r))
+        unchanged(img, before, "after no confirmation")
+        r = emu.tool("--slot", "0", "format", typed=b"0\n")
+        check("format with the slot typed", r.returncode == 0 and
+              "Formatted: FAT32 with the folder NICE" in r.stdout.decode(),
+              text(r))
+        r = emu.tool("ls")
+        check("ls of the new card", r.returncode == 0 and
+              r.stdout.decode().splitlines() ==
+              ["Directory of NICE", "Files: 0, directories: 0"], text(r))
+        r = emu.tool("put", HOLD_PROG, "HOLD.NASM")
+        check("put on the new card", r.returncode == 0, text(r))
+    finally:
+        emu.close()
+    check_format(img, tmp, "the blank card, after put", 1)
+    print("format of a card that has been formatted")
+    with open(img, "rb") as f:
+        before = f.read()
+    emu = Emu(img)
+    try:
+        r = emu.tool("--slot", "0", "format", "--yes")
+        check("format without --force: refused", r.returncode == 1 and
+              "give --force" in r.stderr.decode() and
+              "partition 1: type 0x0c, FAT32" in r.stdout.decode() and
+              "label NICE" in r.stdout.decode(), text(r))
+        unchanged(img, before, "after the refusal")
+        r = emu.tool("--slot", "0", "format", "--force", "--yes")
+        check("format --force", r.returncode == 0, text(r))
+    finally:
+        emu.close()
+    check_format(img, tmp, "the card formatted again")
+    check("the file put before is gone", mtype(img, "HOLD.NASM") is None)
+    print("format of cards with other file systems, and of the monitor's")
+    for name, setup, show in (
+            ("FAT16", ("sfdisk", "2048,,6"), "type 0x06, FAT16"),
+            ("FAT32 on the whole card", ("mkfs", ""),
+             "FAT32 on the whole card, label FMTTEST")):
+        img = os.path.join(tmp, "other.img")
+        blank(img, 64 * MB)
+        if setup[0] == "sfdisk":
+            sfdisk(img, setup[1])
+            run("mkfs.fat", "-F", "16", "--offset", "2048", img,
+                str((64 * MB - MB) // 1024))
+        else:
+            run("mkfs.fat", "-F", "32", "-n", "FMTTEST", img)
+        emu = Emu(img)
+        try:
+            r = emu.tool("--slot", "0", "format", "--force", "--yes")
+            check(f"format --force of {name}", r.returncode == 0 and
+                  show in r.stdout.decode(), text(r))
+        finally:
+            emu.close()
+        check_format(img, tmp, f"the card that had {name}")
+    img = os.path.join(tmp, "mon.img")
+    blank(img, 64 * MB)
+    emu = Emu(img, prog=MONITOR)
+    try:
+        link = emu.link()
+        try:
+            link.control(RAM)
+            prompt(link)
+        finally:
+            link.close()
+        r = emu.tool("--slot", "0", "format", "--yes")
+        check("format while the monitor runs", r.returncode == 0 and
+              "started again" in r.stderr.decode(), text(r))
+        link = emu.link()
+        try:
+            prompt(link)
+            out = console(link, "DIR")
+            check("the monitor's DIR of the new card",
+                  "Files: 0, directories: 0" in out, repr(out))
+        finally:
+            link.close()
+    finally:
+        emu.close()
+    print("format refused")
+    img = os.path.join(tmp, "m65.img")
+    blank(img, 64 * MB)
+    sfdisk(img, "2048,32768,c\n34816,,41")
+    with open(img, "rb") as f:
+        before = f.read()
+    emu = Emu(img)
+    try:
+        r = emu.tool("--slot", "0", "format", "--force", "--yes")
+        check("a card with the MEGA65's system partition",
+              r.returncode == 1 and "MEGA65's SD card utility" in
+              r.stderr.decode() and "type 0x41, the MEGA65's system "
+              "partition" in r.stdout.decode(), text(r))
+        unchanged(img, before, "after the refusal")
+        r = emu.tool("--slot", "0", "format", "--force", "--system", "--yes")
+        check("and with --system", r.returncode == 0, text(r))
+    finally:
+        emu.close()
+    check_format(img, tmp, "the MEGA65's card")
+    img = os.path.join(tmp, "small.img")
+    blank(img, 36 * MB)
+    emu = Emu(img)
+    try:
+        r = emu.tool("--slot", "0", "format", "--yes")
+        check("a card too small for 65525 clusters", r.returncode == 1 and
+              "too small for FAT32" in r.stderr.decode(), text(r))
+    finally:
+        emu.close()
+    unchanged(img, bytes(36 * MB), "after the refusal")
+    img = os.path.join(tmp, "wp.img")
+    blank(img, 40 * MB)
+    os.chmod(img, 0o444)
+    emu = Emu(img)
+    try:
+        r = emu.tool("--slot", "0", "format", "--yes")
+        check("a write-protected card", r.returncode == 1 and
+              "write-protected" in r.stderr.decode(), text(r))
+    finally:
+        emu.close()
+    unchanged(img, bytes(40 * MB), "after the refusal")
+    r = subprocess.run([sys.executable, SDCARD, "--tcp", "1", "--slot", "0",
+                        "format", "--label", "A:B"], capture_output=True)
+    check("a label that is not valid",
+          r.returncode == 1 and b"not valid" in r.stderr, text(r))
+
+
 def test_write_running(imgs: dict[str, str], tmp: str) -> None:
     print("put on a running core, sim/sdhold.nasm")
     img = copy(imgs["super"], os.path.join(tmp, "run.img"))
@@ -1184,6 +1371,7 @@ def main() -> None:
         test_full(tmp)
         test_mkdir(imgs, tmp)
         test_protected(imgs, tmp)
+        test_format(imgs, tmp)
         test_write_running(imgs, tmp)
         test_monitor(imgs, tmp)
         test_nbd(imgs, tmp)

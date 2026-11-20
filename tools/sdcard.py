@@ -14,6 +14,7 @@ that --folder names:
     tools/sdcard.py --eth 192.168.1.65 put prog.bas [NAME]
     tools/sdcard.py --eth 192.168.1.65 del NAME
     tools/sdcard.py --eth 192.168.1.65 mkdir
+    tools/sdcard.py --eth 192.168.1.65 --slot 0 format
 
 ls prints the rows of BASIC's DIR, which shows a file's long name
 where it has one, with its 8.3 name after its size. get takes the 8.3
@@ -32,6 +33,24 @@ long-name entries. mkdir makes the folder in the root of a card that
 has FAT32 but not the folder, which the monitor never makes, and says
 so when it is there already; the folder's name must be an 8.3 name with
 no extension, as NICE is.
+
+format erases the whole card in the slot of --slot, which it needs,
+and writes a new FAT32, as cards are sold: an MBR with one partition
+of type 0x0C from sector 8192 to the end, two FATs, Microsoft's cluster
+size for the size, the reserved sectors grown so that cluster 2 starts
+on a boundary of 4 MB, the root at cluster 2 with the label, NICE by
+default or --label's, and the folder at cluster 3. It shows the card's
+size and what is on it first, and asks for the slot's number to be
+typed, which --yes skips. It refuses a write-protected card, one too
+small for 65525 clusters, one that is not blank, whose sector 0 is not
+all zeros or all ones, without --force, and one with the MEGA65's
+system partition, of type 0x41, without --system. It zeros the old MBR
+and a GPT's header first, then writes the FATs, the root and the
+folder, FSInfo, and the copies of the boot sector and FSInfo, and the
+boot sector and the MBR last, so that a format that breaks off leaves a
+card with no FAT32 rather than a broken one. The FATs' zeros, about
+30000 sectors on most cards, go with the buffer loaded once and only
+the sector's address and the Write sent for each.
 
 The writes keep to monitor_fat.nasm's order, in which a reset at any point leaves
 the card no worse than with lost clusters, which fsck.fat frees: FSInfo's
@@ -64,7 +83,7 @@ any slot, as while the core is held, whatever the program had: the
 program is lost. put, del, and mkdir hold a running or paused core
 first, and start it again from reset after the write, as a program
 such as the monitor keeps a sector of the FAT and its mount between
-commands, which the write makes stale.
+commands, which the write makes stale. format does so too.
 A program in the middle of a write of its own loses it, as at a reset,
 with lost clusters at worst. A held core stays held.
 
@@ -77,7 +96,8 @@ Usage: tools/sdcard.py (--eth HOST[:PORT] | --port DEVICE [--baud 230400]
                        | --tcp [HOST:]PORT | --cosim PORT)
                        [--slot N] [--folder NAME] [--hold]
                        (ls | get NAME [DEST] | put SRC [NAME] | del NAME
-                        | mkdir)
+                        | mkdir | format [--label L] [--force]
+                          [--system] [--yes])
 """
 
 from __future__ import annotations
@@ -144,7 +164,7 @@ E_NOFS, E_FAT12, E_FAT16, E_EXFAT, E_NAME = 16, 17, 18, 19, 20
 E_NOFILE, E_ISDIR, E_BADFAT, E_SLOT, E_NOFOLDER = 21, 22, 26, 27, 29
 E_FULL, E_RDONLY = 30, 32
 # What to do about a card that the tool cannot use as it is
-FORMAT = "; format the card as FAT32 on a PC"
+FORMAT = "; format it with the command format, or as FAT32 on a PC"
 HINTS = {
     E_NOFS: FORMAT, E_FAT12: FORMAT, E_FAT16: FORMAT, E_EXFAT: FORMAT,
     E_NOFOLDER: "; make it with the command mkdir",
@@ -197,12 +217,13 @@ def sd_command(link: Link, cmd: int,
 
 def sd_wait(link: Link, timeout: float) -> tuple[int, int] | None:
     """Waits for busy to be 0: the status and SD_ERROR then, or None after
-    the timeout."""
+    the timeout. SD_ERROR is read only when the error bit is 1, as it is 0
+    otherwise (DEVICES.md §5), which saves a round trip of the link."""
     end = time.monotonic() + timeout
     while True:
         csr = link.read_word(SD_CSR)
         if csr & BUSY == 0:
-            return csr, link.read_word(SD_ERROR)
+            return csr, link.read_word(SD_ERROR) if csr & ERROR else 0
         if time.monotonic() > end:
             return None
 
@@ -369,6 +390,7 @@ class Card:
                 self.restart = False
                 sd_wait(link, WRITE_WAIT)
                 link.control(self.ctl & RAM)
+                sys.stdout.flush()
                 print("sdcard.py: the core was started again from reset",
                       file=sys.stderr)
 
@@ -413,6 +435,31 @@ class Card:
             raise SdError(f"Write of sector {lba:#x} in slot {self.slot}: "
                           f"{sd_said(done)}")
         self._keep(lba, bytes(data))
+
+    def protected(self) -> bool:
+        """Whether the card's write-protect switch is set."""
+        return bool(self.link.read_word(SD_CSR) & PROTECTED)
+
+    def zero(self, first: int, count: int,
+             progress: Callable[[int], None] | None = None) -> None:
+        """Writes zeros to the count sectors from first, with the buffer
+        loaded once and only SD_LBA and the Write sent for each sector,
+        and progress called with the sectors written so far."""
+        if not self.writes:
+            raise SdError("a write in a session for reads")
+        if count and first + count - 1 > self.last:
+            raise SdError(f"sector {first + count - 1:#x} is after the "
+                          f"card's last, {self.last:#x}")
+        write_buffer(self.link, [0] * 128)
+        for lba in range(first, first + count):
+            self.cache.pop(lba, None)
+            self.link.write(SD_LBA, [lba])
+            done = sd_command(self.link, WRITE, WRITE_WAIT)
+            if done is None or done[1]:
+                raise SdError(f"Write of sector {lba:#x} in slot "
+                              f"{self.slot}: {sd_said(done)}")
+            if progress is not None:
+                progress(lba - first + 1)
 
 
 def u16(b: bytes | bytearray, at: int) -> int:
@@ -551,6 +598,31 @@ def fat_stamp(t: float) -> tuple[int, int]:
     lt = time.localtime(t)
     date = (max(lt.tm_year - 1980, 0) << 9) | (lt.tm_mon << 5) | lt.tm_mday
     return date, (lt.tm_hour << 11) | (lt.tm_min << 5) | (lt.tm_sec // 2)
+
+
+def dir_entry(raw: bytes, attr: int, clus: int, now: float) -> bytes:
+    """A directory's entry of the 11 bytes raw, with the attributes attr,
+    the first cluster clus, and the local time now as its creation, its
+    last access, and its last write."""
+    date, tod = fat_stamp(now)
+    e = bytearray(32)
+    e[0:11] = raw
+    e[11] = attr
+    put16(e, 14, tod)
+    put16(e, 16, date)
+    put16(e, 18, date)
+    put16(e, 20, clus >> 16)
+    put16(e, 22, tod)
+    put16(e, 24, date)
+    put16(e, 26, clus)
+    return bytes(e)
+
+
+def dot_entries(c: int, parent: int, now: float) -> bytes:
+    """The entries . and .. of a new directory at cluster c, whose
+    parent's first cluster is parent, or 0 for the root."""
+    return (dir_entry(b".".ljust(11), 0x10, c, now) +
+            dir_entry(b"..".ljust(11), 0x10, parent, now))
 
 
 @dataclass
@@ -1056,21 +1128,10 @@ class Volume:
             raise FolderError(f"a file of the root has the name "
                               f"{self.folder.upper()}; delete or rename it "
                               "first")
-        date, tod = fat_stamp(self.now)
         c = self.search()
-        first = bytearray(512)
-        for at, name, clus in ((0, b".", c), (32, b"..", 0)):
-            first[at:at + 11] = name.ljust(11)
-            first[at + 11] = 0x10
-            put16(first, at + 14, tod)
-            put16(first, at + 16, date)
-            put16(first, at + 18, date)
-            put16(first, at + 20, clus >> 16)
-            put16(first, at + 22, tod)
-            put16(first, at + 24, date)
-            put16(first, at + 26, clus)
+        first = dot_entries(c, 0, self.now).ljust(512, b"\0")
         lba = self.first_sector(c)
-        self.wr(lba, bytes(first))
+        self.wr(lba, first)
         for k in range(1, self.spc):
             self.wr(lba + k, bytes(512))
         self.take(0, c)
@@ -1153,6 +1214,331 @@ def put_name(src: str, name: str | None) -> str:
     return name
 
 
+# The format: the first sector of the partition, as cards are sold, the
+# alignment of the first cluster, 4 MB, the reserved sectors at least,
+# and where in them the boot sector's copy and FSInfo's are
+PART_START = 8192
+ALIGN = 8192
+RSVD_MIN = 32
+BACKUP = 6
+FSINFO = 1
+NFATS = 2
+# The fewest clusters of a FAT32, below which a FAT is FAT16
+MIN_CLUSTERS = 65525
+# The partition types, for the table that format shows; 0x41 is the
+# MEGA65's system partition, on the card in slot 1
+SYSTEM = 0x41
+PART_TYPES = {
+    0x01: "FAT12", 0x04: "FAT16", 0x06: "FAT16", 0x07: "NTFS or exFAT",
+    0x0B: "FAT32", 0x0C: "FAT32", 0x0E: "FAT16", 0x0F: "extended",
+    SYSTEM: "the MEGA65's system partition", 0x82: "Linux swap",
+    0x83: "Linux", 0xEE: "GPT",
+}
+
+
+def cluster_sectors(sectors: int) -> int:
+    """The sectors of a cluster of a FAT32 of sectors sectors, from
+    Microsoft's table (fatgen103), or 0 for one too small."""
+    for top, spc in ((66600, 0), (532480, 1), (16777216, 8),
+                     (33554432, 16), (67108864, 32)):
+        if sectors <= top:
+            return spc
+    return 64
+
+
+@dataclass
+class Layout:
+    """Where a format puts a FAT32 of a card of total sectors: its
+    partition from base, of size sectors, with rsvd reserved sectors,
+    FATs of fatsz sectors, clusters of spc sectors, and clusters of them,
+    the root at cluster 2 and the folder at 3."""
+    total: int
+    base: int
+    size: int
+    spc: int
+    rsvd: int
+    fatsz: int
+    clusters: int
+
+    @property
+    def fat(self) -> int:
+        return self.base + self.rsvd
+
+    @property
+    def data(self) -> int:
+        return self.fat + NFATS * self.fatsz
+
+    def cluster(self, c: int) -> int:
+        return self.data + (c - 2) * self.spc
+
+
+def layout(total: int) -> Layout | None:
+    """The layout of a format of a card of total sectors, or None for a
+    card too small for a FAT32: the partition from sector 8192 to the
+    end, Microsoft's cluster size and size of the FAT, and the reserved
+    sectors grown so that cluster 2 starts on a boundary of 4 MB, unless
+    that leaves too few clusters."""
+    size = total - PART_START
+    spc = cluster_sectors(size)
+    if spc == 0:
+        return None
+    # fatgen103's size of the FAT, which may be a little large
+    per = (256 * spc + NFATS) // 2
+    fatsz = (size - RSVD_MIN + per - 1) // per
+    for rsvd in (RSVD_MIN + (-(PART_START + RSVD_MIN + NFATS * fatsz))
+                 % ALIGN, RSVD_MIN):
+        clusters = (size - rsvd - NFATS * fatsz) // spc
+        if clusters >= MIN_CLUSTERS and rsvd <= 0xFFFF:
+            return Layout(total, PART_START, size, spc, rsvd, fatsz,
+                          min(clusters, fatsz * 128 - 2))
+    return None
+
+
+def chs(lba: int) -> bytes:
+    """The 3 bytes of an MBR's cylinder, head, and sector of lba, with 255
+    heads and 63 sectors, or the largest for one beyond them."""
+    c, rest = divmod(lba, 255 * 63)
+    h, sec = divmod(rest, 63)
+    if c > 1023:
+        c, h, sec = 1023, 254, 62
+    return bytes((h, (sec + 1) | ((c >> 2) & 0xC0), c & 0xFF))
+
+
+def format_sectors(lay: Layout, label: str, folder: str, serial: int,
+                   now: float) -> dict[str, bytes]:
+    """The sectors of a format that are not all zeros: the MBR, the boot
+    sector, FSInfo, the first sector of a FAT, the root's, with the
+    volume's label and the folder, and the folder's, with . and .."""
+    raw_label = label.upper().ljust(11).encode("latin-1")
+    mbr = bytearray(512)
+    put32(mbr, 440, serial)
+    e = 446
+    mbr[e + 1:e + 4] = chs(lay.base)
+    mbr[e + 4] = 0x0C
+    mbr[e + 5:e + 8] = chs(lay.base + lay.size - 1)
+    put32(mbr, e + 8, lay.base)
+    put32(mbr, e + 12, lay.size)
+    mbr[510:512] = b"\x55\xaa"
+    boot = bytearray(512)
+    boot[0:3] = b"\xeb\x58\x90"
+    boot[3:11] = b"NICEMON "
+    put16(boot, 11, 512)
+    boot[13] = lay.spc
+    put16(boot, 14, lay.rsvd)
+    boot[16] = NFATS
+    boot[21] = 0xF8
+    put16(boot, 24, 63)
+    put16(boot, 26, 255)
+    put32(boot, 28, lay.base)
+    put32(boot, 32, lay.size)
+    put32(boot, 36, lay.fatsz)
+    put32(boot, 44, 2)
+    put16(boot, 48, FSINFO)
+    put16(boot, 50, BACKUP)
+    boot[64] = 0x80
+    boot[66] = 0x29
+    put32(boot, 67, serial)
+    boot[71:82] = raw_label
+    boot[82:90] = b"FAT32   "
+    boot[510:512] = b"\x55\xaa"
+    info = bytearray(512)
+    put32(info, 0, 0x41615252)
+    put32(info, 484, 0x61417272)
+    put32(info, 488, lay.clusters - 2)
+    put32(info, 492, 4)
+    put32(info, 508, 0xAA550000)
+    fat = bytearray(512)
+    for c, v in enumerate((0x0FFFFFF8, EOC, EOC, EOC)):
+        put32(fat, 4 * c, v)
+    root = (dir_entry(raw_label, 0x08, 0, now) +
+            dir_entry(folder.upper().ljust(11).encode("latin-1"), 0x10, 3,
+                      now))
+    return {"mbr": bytes(mbr), "boot": bytes(boot), "info": bytes(info),
+            "fat": bytes(fat), "root": root.ljust(512, b"\0"),
+            "folder": dot_entries(3, 0, now).ljust(512, b"\0")}
+
+
+def size_text(sectors: int) -> str:
+    """A size in sectors as cards are sold, in decimal megabytes or
+    gigabytes."""
+    n = sectors * 512
+    if n >= 10 ** 9:
+        return f"{n / 10 ** 9:.1f} GB"
+    return f"{n / 10 ** 6:.0f} MB"
+
+
+def fat_label(b: bytes) -> str | None:
+    """The label of the boot sector b of a FAT, or None for none."""
+    k = boot_kind(b)
+    if k == 0:
+        at = 71
+    elif k in (E_FAT12, E_FAT16):
+        at = 43
+    else:
+        return None
+    if b[at - 5] != 0x29:
+        return None
+    return b[at:at + 11].decode("latin-1").rstrip()
+
+
+def describe(read: Callable[[int], bytes], last: int) -> list[str]:
+    """What is on the card, for the lines that format shows before it asks:
+    its partitions, with their types, sizes, and FAT labels, or the file
+    system on the whole card."""
+    b = read(0)
+    if all(x == 0 for x in b) or all(x == 0xFF for x in b):
+        return ["  nothing: sector 0 is blank"]
+    k = boot_kind(b)
+    if k != 1:
+        name = {0: "FAT32", E_FAT12: "FAT12", E_FAT16: "FAT16",
+                E_EXFAT: "exFAT"}.get(k, "a file system")
+        label = fat_label(b)
+        return [f"  {name} on the whole card" +
+                (f", label {label}" if label else "")]
+    if b[510:512] != b"\x55\xaa":
+        return ["  no partition table, and no file system that is known"]
+    rows = []
+    for i in range(4):
+        p = b[446 + 16 * i:462 + 16 * i]
+        if not p[4]:
+            continue
+        start, count = u32(p, 8), u32(p, 12)
+        row = (f"  partition {i + 1}: type {p[4]:#04x}, "
+               f"{PART_TYPES.get(p[4], 'unknown')}, {size_text(count)} "
+               f"from sector {start}")
+        if p[4] != 0xEE and 0 < start <= last:
+            label = fat_label(read(start))
+            if label:
+                row += f", label {label}"
+        rows.append(row)
+    return rows or ["  an MBR with no partitions"]
+
+
+def system_partition(b: bytes) -> bool:
+    """Whether sector 0, b, is an MBR with the MEGA65's system
+    partition."""
+    return b[510:512] == b"\x55\xaa" and boot_kind(b) == 1 and any(
+        b[446 + 16 * i + 4] == SYSTEM for i in range(4))
+
+
+class Progress:
+    """A line on stderr with the sectors written of a total, and the time
+    left, at most a few times a second."""
+
+    def __init__(self, total: int) -> None:
+        self.total = total
+        self.start = time.monotonic()
+        self.shown = 0.0
+        self.done = 0
+
+    def __call__(self, n: int) -> None:
+        self.done = n
+        now = time.monotonic()
+        if now - self.shown < 0.5 and n < self.total:
+            return
+        self.shown = now
+        left = (now - self.start) / n * (self.total - n)
+        print(f"\r  {n} of {self.total} sectors, "
+              f"{100 * n // self.total}%, {left / 60:.0f} min left  ",
+              end="", file=sys.stderr, flush=True)
+        if n == self.total:
+            print(file=sys.stderr)
+
+
+def check_names(folder: str, label: str) -> None:
+    """The folder's name, an 8.3 name with no extension, and the label, of
+    up to 11 characters of an 8.3 name, or blanks, checked before
+    format."""
+    raw = folder.upper().ljust(11).encode("latin-1")
+    got = name83(folder.upper())
+    if got is None or got[0] != raw:
+        raise FileError(E_NAME)
+    if (len(label) > 11 or not label.strip() or
+            any(bad(c) or c in NOT_83 - {" "} for c in label)):
+        raise SdError(f"the label {label!r} is not valid: up to 11 "
+                      "characters, of those of an 8.3 name, or blanks")
+
+
+def do_format(card: Card, folder: str, label: str, force: bool,
+              system: bool, yes: bool, serial_port: bool) -> None:
+    """Writes a new FAT32 to the whole card, with the folder, after the
+    checks and the typed confirmation. The old MBR goes first, then the
+    FATs, the root and the folder, FSInfo and the copies, the boot sector,
+    and the MBR last, so that a format that breaks off leaves a card with
+    no FAT32 rather than a broken one."""
+    check_names(folder, label)
+    total = card.last + 1
+    if card.protected():
+        raise SdError(f"the card in slot {card.slot} is write-protected; "
+                      "slide its switch away from LOCK first")
+    print(f"The card in slot {card.slot}: {size_text(total)}, "
+          f"{total} sectors")
+    sector0 = card.read(0)
+    for row in describe(card.read, card.last):
+        print(row)
+    lay = layout(total)
+    if lay is None:
+        raise SdError("the card is too small for FAT32, which needs "
+                      f"{MIN_CLUSTERS} clusters")
+    if system_partition(sector0) and not system:
+        raise SdError(
+            "the card has the MEGA65's system partition, which holds its "
+            "own files; use the MEGA65's SD card utility on it, or give "
+            "--system to erase it all the same")
+    blank = all(x == 0 for x in sector0) or all(x == 0xFF for x in sector0)
+    if not blank and not force:
+        raise SdError("the card has been formatted, or holds data, and "
+                      "format would erase all of it; give --force to erase "
+                      "it all the same")
+    print(f"It becomes FAT32 of {lay.clusters} clusters of "
+          f"{lay.spc * 512} bytes, from sector {lay.base}, with the label "
+          f"{label.upper()} and the folder {folder.upper()}.")
+    zeros = NFATS * (lay.fatsz - 1) + 2 * (lay.spc - 1)
+    if serial_port and zeros > 2000:
+        print(f"It writes {zeros + 10} sectors; over the serial port that "
+              "takes long, and --eth is much faster.")
+    if not yes:
+        try:
+            typed = input(f"All of the card in slot {card.slot} is erased. "
+                          "Type the slot's number to go on: ")
+        except EOFError:
+            typed = ""
+        if typed.strip() != str(card.slot):
+            raise SdError("not confirmed; the card is as it was")
+    sec = format_sectors(lay, label, folder, int(time.time()) & 0xFFFFFFFF,
+                         time.time())
+    zero = bytes(512)
+    # The old MBR or boot sector, and a GPT's header, so that a break
+    # leaves no file system and no partitions
+    card.write(0, zero)
+    card.write(1, zero)
+    sys.stdout.flush()
+    progress = Progress(zeros)
+    done = 0
+
+    def step(n: int) -> None:
+        progress(done + n)
+
+    for k in range(NFATS):
+        first = lay.fat + k * lay.fatsz
+        card.write(first, sec["fat"])
+        card.zero(first + 1, lay.fatsz - 1, step)
+        done += lay.fatsz - 1
+    for c, what in ((2, "root"), (3, "folder")):
+        card.write(lay.cluster(c), sec[what])
+        card.zero(lay.cluster(c) + 1, lay.spc - 1, step)
+        done += lay.spc - 1
+    card.write(lay.base + FSINFO, sec["info"])
+    card.write(lay.base + BACKUP + FSINFO, sec["info"])
+    card.write(lay.base + BACKUP, sec["boot"])
+    card.write(lay.base, sec["boot"])
+    card.write(0, sec["mbr"])
+    vol = Volume(card.read, folder)
+    print(f"Formatted: FAT32 with the folder {folder.upper()}, "
+          f"{lay.clusters * lay.spc * 512 // 10 ** 6} MB free"
+          if vol.dir else "Formatted, but the folder is missing")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="List, copy, write, and delete the files of the folder "
@@ -1190,6 +1576,18 @@ def main() -> None:
     cmds.add_parser("mkdir", help="make the folder in the root of the "
                     "card, unless it is there; holds the core, and starts "
                     "it again")
+    fmt = cmds.add_parser("format", help="erase the whole card of --slot, "
+                          "and write a new FAT32 with the folder; holds the "
+                          "core, and starts it again")
+    fmt.add_argument("--label", default=FOLDER,
+                     help="the volume's label (default %(default)s)")
+    fmt.add_argument("--force", action="store_true",
+                     help="erase a card that has been formatted")
+    fmt.add_argument("--system", action="store_true",
+                     help="erase a card with the MEGA65's system partition "
+                     "too")
+    fmt.add_argument("--yes", action="store_true",
+                     help="ask for no typed confirmation")
     args = parser.parse_args()
     data = b""
     try:
@@ -1205,10 +1603,25 @@ def main() -> None:
                  "put SRC prog.bas")
     except OSError as e:
         sys.exit(f"sdcard.py: {e}")
+    if args.cmd == "format":
+        if args.slot is None:
+            sys.exit("sdcard.py: format needs --slot, the slot of the card "
+                     "to erase, such as --slot 1 format")
+        try:
+            check_names(args.folder, args.label)
+        except FileError as e:
+            sys.exit(f"sdcard.py: {e}")
+        except SdError as e:
+            sys.exit(f"sdcard.py: {e}")
     link = open_link(args)
     try:
-        writes = args.cmd in ("put", "del", "mkdir")
+        writes = args.cmd in ("put", "del", "mkdir", "format")
         with Card(link, args.slot, writes, args.hold) as card:
+            if args.cmd == "format":
+                do_format(card, args.folder, args.label, args.force,
+                          args.system, args.yes,
+                          getattr(args, "port", None) is not None)
+                return
             vol = Volume(card.read, args.folder,
                          card.write if writes else None,
                          need=args.cmd != "mkdir")

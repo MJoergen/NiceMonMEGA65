@@ -322,7 +322,8 @@ and must be formatted. FAT12 and FAT16 are rejected with a message.
   cores on the MEGA65, each with a root folder of its own. A card without
   it is refused, with no fallback to the root, and the ROM never creates
   it, so writing happens only in a folder that the user made, on a PC
-  or with `sdcard.py mkdir` over the link (#140).
+  or with `sdcard.py mkdir` over the link (#140), or that
+  `sdcard.py format` made with the file system (#142).
 - **Writing**, in an order that a reset at any point leaves no worse than
   lost clusters, which `fsck.fat` frees. A file opened to write gets its
   directory entry at once, empty, with no clusters; an existing file is
@@ -351,7 +352,11 @@ and must be formatted. FAT12 and FAT16 are rejected with a message.
 - **Safety**: the ROM writes only inside the partition, never the MBR or
   the boot sector, and refuses a card whose FAT32 boot sector does not
   check, also one whose volume is larger than its partition or the card,
-  or has a 16-bit total of sectors.
+  or has a 16-bit total of sectors. Only the host's `sdcard.py format`
+  writes the MBR and the boot sector (#142): it needs the slot named,
+  a typed confirmation, `--force` for a card that is not blank, and
+  `--system` for one with the MEGA65's system partition, of type
+  `0x41`, and refuses a write-protected card.
 - **Caches**: one sector of the FAT and one per open file, in the
   monitor's RAM, from `0xFFFFF980`. Two files open at once, a
   read and a write,
@@ -505,7 +510,8 @@ has the details.
    library on the host, so that a file goes to the card with no PC slot.
    Settled: `tools/sdcard.py`, with its own FAT32 in Python, as
    the monitor's, and only in its folder, but for `mkdir`, which makes
-   the folder in the root (#140). A write resets the core after it, as
+   the folder in the root (#140), and `format`, which writes a new
+   FAT32 to the whole card (#142). A write resets the core after it, as
    the ROM keeps the FAT's sector and the mount between commands.
 
 ## Subtasks
