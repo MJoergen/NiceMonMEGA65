@@ -9,7 +9,7 @@ that matches one file. The options of RFC 2347 are ignored, as the RFC
 allows, so blocks are 512 bytes. The block number goes round from 65535
 to 0, as most clients expect. Each transfer has a socket of its own,
 its TID, and a thread, and reads the file a block at a time as it sends
-it: a block with no ACK within --timeout seconds is sent again, up to
+it: a block with no ACK within --retry-wait seconds is sent again, up to
 --tries times in all, an ERROR from the client ends the transfer, as
 RFC 1350 says, and a packet from another TID is answered with ERROR 5
 and passed over. At most MAX_TRANSFERS, 16, run at once, so that a
@@ -29,8 +29,9 @@ starting with a dot, and an empty one; a missing file gets ERROR 1.
 
 Port 69, the default, needs root on Linux, or the capability:
 sudo setcap cap_net_bind_service=+ep $(readlink -f $(which python3)).
-Another port, such as --port 6969, needs none, and BASIC reaches it
-with LOAD "NAME.BIN", "IP:6969". --port 0 picks a free port and prints it on
+Another port, such as --listen 6969, needs none, and BASIC reaches it
+with LOAD "NAME.BIN", "IP:6969". --listen ADDR:PORT listens on one
+address of the host's only. Port 0 picks a free port and prints it on
 stderr, for tests. A line on stdout reports each transfer. Only the
 Python standard library is used.
 """
@@ -182,7 +183,7 @@ def serve(client: Addr, packet: bytes, args: argparse.Namespace,
     """One request, on a socket of its own, in one of the slots."""
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-            sock.bind((args.addr, 0))
+            sock.bind((args.listen[0], 0))
             name = "?"
             try:
                 op, name, mode = parse_request(packet)
@@ -196,7 +197,7 @@ def serve(client: Addr, packet: bytes, args: argparse.Namespace,
                 report(lock, client, name, f"error {e.code}, {e.message}")
                 return
             with src:
-                sent, reason = send_file(sock, client, src, args.timeout, args.tries)
+                sent, reason = send_file(sock, client, src, args.retry_wait, args.tries)
             report(lock, client, name, reason or f"{sent} bytes")
     finally:
         slots.release()
@@ -210,15 +211,26 @@ def report(lock: threading.Lock, client: Addr, name: str, what: str) -> None:
 DESCRIPTION = __doc__.splitlines()[0]
 
 
+def listen_spec(spec: str) -> Tuple[str, int]:
+    """The address and the port of --listen [ADDR:]PORT; no ADDR is all
+    of the host's addresses."""
+    host, _, port = spec.rpartition(":")
+    if not port.isdigit() or int(port) > 65535:
+        raise argparse.ArgumentTypeError(f"{spec} is not [ADDR:]PORT")
+    return host or "0.0.0.0", int(port)
+
+
 def add_options(parser: argparse.ArgumentParser) -> None:
     """The options of nicemon.py tftpd."""
     parser.add_argument("--dir", default=".", help="the folder served (default .)")
-    parser.add_argument("--addr", default="0.0.0.0",
-                        help="the address to listen on (default all)")
-    parser.add_argument("--port", type=int, default=69,
-                        help="the port, 69 by default; 0 picks one, printed on stderr")
-    parser.add_argument("--timeout", type=float, default=1.0,
-                        help="the seconds to wait for an ACK (default 1)")
+    parser.add_argument("--listen", type=listen_spec, default="0.0.0.0:69",
+                        metavar="[ADDR:]PORT",
+                        help="where the server listens (default %(default)s, "
+                        "all addresses; port 0 picks one, printed on stderr)")
+    parser.add_argument("--retry-wait", type=float, default=1.0,
+                        metavar="SEC",
+                        help="the seconds to wait for an ACK before a block "
+                        "is sent again (default 1)")
     parser.add_argument("--tries", type=int, default=5,
                         help="the sends of a block in all (default 5)")
 
@@ -229,10 +241,10 @@ def command(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
         sys.exit(f"tftpd.py: no folder {args.dir}")
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
-        sock.bind((args.addr, args.port))
+        sock.bind(args.listen)
     except PermissionError:
-        sys.exit(f"tftpd.py: port {args.port} needs root, or the capability of "
-                 "the header (--help); or use --port 6969 and LOAD \"NAME.BIN\", \"IP:6969\"")
+        sys.exit(f"tftpd.py: port {args.listen[1]} needs root, or the capability of "
+                 "the header (--help); or use --listen 6969 and LOAD \"NAME.BIN\", \"IP:6969\"")
     port = sock.getsockname()[1]
     print(f"tftpd.py: serving {os.path.abspath(args.dir)} on port {port}",
           file=sys.stderr, flush=True)
@@ -254,4 +266,4 @@ def command(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
 if __name__ == "__main__":
     # The old name, kept for one release (issue #156)
     import nicemon
-    nicemon.main(["tftpd", *sys.argv[1:]])
+    nicemon.old_name("tftpd", sys.argv[1:])

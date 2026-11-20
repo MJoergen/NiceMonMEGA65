@@ -6,7 +6,7 @@ so that the RAM is at 0, and the memory is cleared to 0, as the
 emulator's is at the start. The breakpoints are disabled, as a
 connection to the emulator does, for the board keeps them until a reset.
 Then the words of the file are written with W packets of the debug link
-(nice_cpu/doc/DEBUG.md), and the core is started unless --no-run is
+(nice_cpu/doc/DEBUG.md), and the core is started unless --hold is
 given. The ROM stays hidden until the reset button is pressed, which
 boots the ROM's program again.
 
@@ -39,13 +39,13 @@ With --basic, FILE is an image of BASIC, such as basic/build/basic.rom
 or a release's BASIC-V2.3.1.ROM, which goes into BASIC's part of the ROM,
 0x3000-0x7FFF, with "keep" set and every word of the part that it does
 not fill zeroed, and is read back. The core is held, the memory
-cleared, and the ROM shown, and the core started, unless --no-run is
+cleared, and the ROM shown, and the core started, unless --hold is
 given, so the monitor boots cold with that BASIC. The ROM keeps it until
 the FPGA is configured again. A ROM that takes no writes, of a bitstream
 older than V2.3.1 or the Nexys4DDR's, is refused, as is no ROM.
 
 Usage: tools/nicemon.py load (--eth HOST[:PORT] | --port DEVICE [--baud 230400]
-                             | --tcp [HOST:]PORT | --cosim PORT) [--no-run]
+                             | --tcp [HOST:]PORT | --cosim PORT) [--hold]
                              [--monitor [--rom FILE] | --basic] FILE
 
 One of --eth, --port, --tcp, and --cosim must be given. --port names the
@@ -287,7 +287,7 @@ DESCRIPTION = __doc__.splitlines()[0]
 def add_options(parser: argparse.ArgumentParser) -> None:
     """The options of nicemon.py load."""
     add_arguments(parser)
-    parser.add_argument("--no-run", action="store_true",
+    parser.add_argument("--hold", action="store_true",
                         help="leave the core held in reset after loading")
     add_monitor_arguments(parser)
     parser.add_argument("--basic", action="store_true",
@@ -309,7 +309,7 @@ def command(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
             print(f"load.py: wrote BASIC {basic_rom.text(image)} from "
                   f"{args.file} into the ROM, {len(image)} words, with "
                   f"\"keep\", and read it back")
-            if not args.no_run:
+            if not args.hold:
                 start(link, rom=True)
                 print("load.py: started the core, with the ROM")
         except LinkError as e:
@@ -323,7 +323,7 @@ def command(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
         load_words(link, words, rom=in_rom, monitor=args.monitor)
         print(f"load.py: loaded {len(words)} words from {args.file}"
               + (f" and {args.rom}" if args.rom else ""))
-        if not args.no_run:
+        if not args.hold:
             start(link, rom=in_rom)
             print("load.py: started the core")
             if args.monitor:
@@ -337,4 +337,4 @@ def command(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
 if __name__ == "__main__":
     # The old name, kept for one release (issue #156)
     import nicemon
-    nicemon.main(["load", *sys.argv[1:]])
+    nicemon.old_name("load", sys.argv[1:])

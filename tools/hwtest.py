@@ -2409,19 +2409,21 @@ def comparisons(tmp: str) -> list[tuple[str, list[str], bool]]:
         f.writelines(f"line {i}\n" for i in range(100))
     return [
         (hello, [], False),
-        (hello, ["-i", lines], False),  # halts with unread input
+        (hello, ["--input", lines], False),  # halts with unread input
         # Not 0xFFFFFF00-01, which the link reads as 0 (DEBUG.md §3)
-        (emu, ["-d", "0x110:2", "-d", "0xFFFFFF03:2", "-s"], False),
+        (emu, ["--dump", "0x110:2", "--dump", "0xFFFFFF03:2",
+              "--screen"], False),
         (reserved, [], False),
         (eof, [], True),               # no input: it ends at once
-        (eof, ["-i", text], True),
+        (eof, ["--input", text], True),
         (trapsym, ["--symbols",        # names the halt and the trap
                    f"{REPO}/nice_cpu/emulator/test/trapsym.sym"], False),
         # The FPU's stack and flags, with its registers as the link reads
         # them, and its decimal commands, which print numbers
-        (fpustack, ["-d", "0x200:18", "-d", "0xFFFFFF88:8"], False),
+        (fpustack, ["--dump", "0x200:18", "--dump", "0xFFFFFF88:8"],
+         False),
         (fpudec, [], False),
-        (demo, ["-i", keys, "-s"], True),
+        (demo, ["--input", keys, "--screen"], True),
     ]
 
 
@@ -2530,8 +2532,8 @@ def test_monitor(link_args: list[str], tmp: str, in_rom: bool = False,
                 f.write(b"SYS 0x8000\r" + keys)
             emu = subprocess.run([NICEEMU, "-i", emu_in, "-s", emu_prog],
                                  stdin=subprocess.DEVNULL, capture_output=True)
-            board = subprocess.run(run_py + ["--rom", monitor, "-i", board_in,
-                                             "-s", prog],
+            board = subprocess.run(run_py + ["--rom", monitor, "--input",
+                                             board_in, "--screen", prog],
                                    stdin=subprocess.DEVNULL,
                                    capture_output=True)
             for r in (emu, board):
@@ -2550,7 +2552,7 @@ def test_monitor(link_args: list[str], tmp: str, in_rom: bool = False,
         skipped.append("run.py --monitor as niceemu")
     if not in_rom:
         return
-    board = subprocess.run(run_py + ["-i", halt, hello],
+    board = subprocess.run(run_py + ["--input", halt, hello],
                            stdin=subprocess.DEVNULL, capture_output=True)
     if b"no ROM" in board.stderr:
         uncovered.append("run.py --monitor under the ROM's monitor, as the "
@@ -2584,7 +2586,7 @@ def test_fit(link_args: list[str], tmp: str, ram: int) -> None:
         with open(beyond, "w") as f:
             f.write(f"{addr:08x} 00000001\n")
         r = subprocess.run([*NICEMON, "load"] +
-                           link_args + ["--no-run"] + options + [beyond],
+                           link_args + ["--hold"] + options + [beyond],
                            stdin=subprocess.DEVNULL, capture_output=True,
                            text=True)
         ok = r.returncode != 0 and "beyond" in r.stderr
@@ -2606,8 +2608,8 @@ def test_selftest(link_args: list[str], tmp: str) -> None:
     with open(keys, "wb") as f:
         f.write(DEMO_KEY + b"\x1b[23~")
     board = subprocess.run([*NICEMON, "run"] +
-                           link_args + ["--timeout", f"{RUN_TIMEOUT:g}", "-s",
-                                        "-i", keys, rom],
+                           link_args + ["--timeout", f"{RUN_TIMEOUT:g}",
+                                        "--screen", "--input", keys, rom],
                            stdin=subprocess.DEVNULL, capture_output=True)
     rows = [line[1:] for line in
             board.stdout.decode(errors="replace").splitlines()
@@ -2791,7 +2793,7 @@ def test_eth_tcp(eth: str, ip: str, tmp: str, listen: bool = False) -> None:
     board = subprocess.run(
         [*NICEMON, "run", "--eth", eth, "--timeout",
          f"{RUN_TIMEOUT + 20:g}", "--monitor", "--rom",
-         f"{REPO}/build/rom_test.bin", "-i", halt, prog],
+         f"{REPO}/build/rom_test.bin", "--input", halt, prog],
         stdin=subprocess.DEVNULL, capture_output=True)
     thread.join(RUN_TIMEOUT + 20)
     server.close()

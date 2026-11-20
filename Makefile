@@ -72,12 +72,12 @@ help:
 	@echo "                  build, test, and stage a release in build/release (V1.0.1"
 	@echo "                  keeps nice_cpu at V1.0); with"
 	@echo "                  --publish, tag it and create the GitHub Release (doc/RELEASE.md)"
-	@echo "  make load FILE=prog.bin (ETH=IP | PORT=/dev/ttyUSB1) [ARGS=--no-run]"
+	@echo "  make load FILE=prog.bin (ETH=IP | PORT=/dev/ttyUSB1) [ARGS=--hold]"
 	@echo "                  load a program into the board (MEGA65 or Nexys4DDR) and"
 	@echo "                  start it; ARGS=--monitor runs one at 0x8000 under the"
 	@echo "                  monitor in the ROM, and ARGS=--basic puts an image of"
 	@echo "                  BASIC, such as basic/build/basic.rom, into the ROM"
-	@echo "  make run FILE=prog.bin (ETH=IP | PORT=/dev/ttyUSB1) [ARGS='-i in.txt -d 0x100:16 -s --timeout 5']"
+	@echo "  make run FILE=prog.bin (ETH=IP | PORT=/dev/ttyUSB1) [ARGS='--input in.txt --dump 0x100:16 --screen --timeout 5']"
 	@echo "                  run a program on the board, and print what niceemu prints"
 	@echo "  make mon [FILE=prog.bin] (ETH=IP | PORT=/dev/ttyUSB1)"
 	@echo "                  an interactive shell on the debug link: read and write"
@@ -279,7 +279,7 @@ sdnbd:
 # (tools/nicemon.py flash); BIT on the command line overrides the default.
 flash:
 	@test -n "$(PORT)" || (echo "Give the board's serial port with PORT=/dev/ttyUSB1"; exit 1)
-	$(PYTHON) tools/nicemon.py flash --port $(PORT) $(if $(COR),--cor $(COR) $(if $(SLOT),--slot $(SLOT)),--bit $(if $(filter command line,$(origin BIT)),$(BIT),synth/nexys4ddr/build/top.bit)) $(ARGS)
+	$(PYTHON) tools/nicemon.py flash --port $(PORT) $(if $(COR),--cor $(COR) $(if $(SLOT),--flash-slot $(SLOT)),--bit $(if $(filter command line,$(origin BIT)),$(BIT),synth/nexys4ddr/build/top.bit)) $(ARGS)
 
 BIT ?= synth/r6/build/top.bit
 
@@ -307,7 +307,7 @@ sdtest: $(EMU) build/rom_test.bin
 TFTP_DIR ?= examples/build
 TFTP_PORT ?= 69
 tftpd:
-	$(PYTHON) tools/nicemon.py tftpd --dir $(TFTP_DIR) --port $(TFTP_PORT)
+	$(PYTHON) tools/nicemon.py tftpd --dir $(TFTP_DIR) --listen $(TFTP_PORT)
 
 tftptest: $(EMU) build/rom_test.bin
 	$(PYTHON) tools/tftptest.py

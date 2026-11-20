@@ -6,7 +6,7 @@ Usage:
     tools/nicemon.py flash --port DEVICE [--baud 230400]
                            [--bit synth/nexys4ddr/build/top.bit] [--erase]
     tools/nicemon.py flash --port DEVICE [--baud 230400]
-                           --cor synth/r6/build/NiceMonMEGA65-r6.cor --slot N
+                           --cor synth/r6/build/NiceMonMEGA65-r6.cor --flash-slot N
                            [--no-board-check]
 
     The Nexys4DDR's FPGA loads the bitstream from the board's quad SPI
@@ -21,9 +21,9 @@ Usage:
     at power on until it is programmed over JTAG. It is for the Nexys4DDR
     only.
 
-    --cor writes a MEGA65 core file (make cor) into slot N of the MEGA65's
-    flash, 1 to 7, or 1 to 3 in an R3's flash of 32 MiB, which
-    spiflash.py checks, as MEGAFLASH does, but over the JTAG cable, with no key
+    --cor writes a MEGA65 core file (make cor) into the slot of
+    --flash-slot N of the MEGA65's flash, 1 to 7, or 1 to 3 in an R3's
+    flash of 32 MiB, which spiflash.py checks, as MEGAFLASH does, but over the JTAG cable, with no key
     held at power on. Slot 0 holds the MEGA65's own core, which the board
     starts at power on and which MEGAFLASH runs in, so the script refuses
     it.
@@ -184,8 +184,8 @@ def warn_no_rom(value: int, build: str) -> None:
 
 def flash_cor(args: argparse.Namespace) -> None:
     """Writes the core file into its slot of the MEGA65's flash."""
-    if not 0 < args.slot < SLOTS:
-        sys.exit(f"flash.py: give --slot 1 to {SLOTS - 1}; slot 0 holds the "
+    if not 0 < args.flash_slot < SLOTS:
+        sys.exit(f"flash.py: give --flash-slot 1 to {SLOTS - 1}; slot 0 holds the "
                  f"MEGA65's own core")
     if not os.path.exists(args.cor):
         sys.exit(f"flash.py: {args.cor} is missing; run 'make cor', or give "
@@ -231,8 +231,8 @@ def flash_cor(args: argparse.Namespace) -> None:
     else:
         print(f"[PASS] slot 0 holds {factory[0]} {factory[1]} for {rev}",
               flush=True)
-    offset = args.slot * SLOT_SIZE
-    print(f"slot {args.slot} held "
+    offset = args.flash_slot * SLOT_SIZE
+    print(f"slot {args.flash_slot} held "
           f"{describe(dump(loader, offset, HEADER_SIZE)[0])}", flush=True)
 
     # The flash's sectors are protected by their DYBs, which openFPGALoader
@@ -242,7 +242,7 @@ def flash_cor(args: argparse.Namespace) -> None:
                             len(data))
     except SpiFlashError as e:
         sys.exit(f"[FAIL] {e}")
-    print(f"[PASS] slot {args.slot} unprotected ({cleared} of its sectors "
+    print(f"[PASS] slot {args.flash_slot} unprotected ({cleared} of its sectors "
           f"had their DYB set)", flush=True)
 
     r = subprocess.run(loader + ["--write-flash", "--skip-reset", "--verify",
@@ -250,7 +250,7 @@ def flash_cor(args: argparse.Namespace) -> None:
                                  args.cor])
     if r.returncode != 0:
         sys.exit("flash.py: openFPGALoader failed")
-    print(f"[PASS] {name} {version} written into slot {args.slot} and "
+    print(f"[PASS] {name} {version} written into slot {args.flash_slot} and "
           f"verified", flush=True)
 
     # Slot 0's core may start another slot on its own at power on, and an
@@ -269,8 +269,8 @@ def flash_cor(args: argparse.Namespace) -> None:
     value = control(port, args.baud, BOOT_WAIT)
     if value is None:
         sys.exit(f"[FAIL] the link does not answer: the bitstream of slot "
-                 f"{args.slot} does not start the system")
-    print(f"[PASS] the bitstream of slot {args.slot} runs, {started(value)}; "
+                 f"{args.flash_slot} does not start the system")
+    print(f"[PASS] the bitstream of slot {args.flash_slot} runs, {started(value)}; "
           f"hold No Scroll at power on to start the slot", flush=True)
     warn_no_rom(value, "cor")
 
@@ -336,9 +336,9 @@ def add_options(parser: argparse.ArgumentParser) -> None:
                         help="Nexys4DDR: erase the flash instead of "
                         "writing it")
     parser.add_argument("--cor",
-                        help="MEGA65: a core file to write into --slot "
+                        help="MEGA65: a core file to write into --flash-slot "
                         "instead")
-    parser.add_argument("--slot", type=int,
+    parser.add_argument("--flash-slot", type=int, metavar="N",
                         help="MEGA65: the slot of the flash, 1 to 7")
     parser.add_argument("--no-board-check", action="store_true",
                         help="MEGA65: do not check that the flash chip is "
@@ -355,11 +355,11 @@ def command(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
         if args.erase:
             sys.exit("flash.py: --erase is for the Nexys4DDR; the MEGA65's "
                      "flash holds its own core in slot 0")
-        if args.slot is None:
-            sys.exit("flash.py: give the slot with --slot, 1 to 7")
+        if args.flash_slot is None:
+            sys.exit("flash.py: give the slot with --flash-slot, 1 to 7")
         flash_cor(args)
-    elif args.slot is not None:
-        sys.exit("flash.py: --slot goes with --cor")
+    elif args.flash_slot is not None:
+        sys.exit("flash.py: --flash-slot goes with --cor")
     else:
         flash_bit(args)
 
@@ -367,4 +367,4 @@ def command(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
 if __name__ == "__main__":
     # The old name, kept for one release (issue #156)
     import nicemon
-    nicemon.main(["flash", *sys.argv[1:]])
+    nicemon.old_name("flash", sys.argv[1:])

@@ -194,7 +194,8 @@ def test_keep(tmp: str) -> None:
     none. load.py --basic refuses niceemu, which has no ROM. These two
     run by the old names, tools/run.py and tools/load.py, the wrappers
     of nicemon.py run and load, which are kept for one release (issue
-    #156), so that the wrappers stay tested while they exist."""
+    #156), so that the wrappers stay tested while they exist, and run.py
+    takes run's old -i, with a warning, which nicemon.py run refuses."""
     subprocess.run(["make", "-s", "-C", REPO, "build/rom.bin"], check=True)
     rom = f"{REPO}/build/rom.bin"
     card = os.path.join(tmp, "basic_card.img")
@@ -224,6 +225,15 @@ def test_keep(tmp: str) -> None:
         check("run.py loads build/rom.bin with \"keep\", and the monitor "
               "loads no card's BASIC", ok,
               "" if ok else repr(run.stdout[:200]) + repr(run.stderr[-200:]))
+        ok = b"run.py: warning: -i is --input of nicemon.py run" in run.stderr
+        check("run.py takes -i, with a warning that names --input", ok,
+              "" if ok else repr(run.stderr[-200:]))
+        new = subprocess.run([*NICEMON, "run", "--tcp", port, "-i", keys,
+                              rom], stdin=subprocess.DEVNULL,
+                             capture_output=True, text=True)
+        ok = new.returncode == 1 and "unknown option '-i'" in new.stderr
+        check("nicemon.py run refuses -i, which is --input", ok,
+              "" if ok else f"exit {new.returncode}: {new.stderr!r}")
         load = subprocess.run([sys.executable, f"{REPO}/tools/load.py",
                                "--tcp", port, "--basic",
                                f"{REPO}/basic/build/basic.rom"],

@@ -15,7 +15,7 @@ tool. The link's options go after the subcommand:
     tools/nicemon.py mon   --eth 192.168.1.65 [prog.bin]
     tools/nicemon.py sd    --eth 192.168.1.65 ls
     tools/nicemon.py nbd   --eth 192.168.1.65
-    tools/nicemon.py flash --port /dev/ttyUSB1 (--bit f.bit | --cor f.cor --slot N)
+    tools/nicemon.py flash --port /dev/ttyUSB1 (--bit f.bit | --cor f.cor --flash-slot N)
     tools/nicemon.py tftpd [--dir DIR]
 
 `nicemon.py --help` lists the subcommands, and `nicemon.py SUBCOMMAND
@@ -34,7 +34,7 @@ subcommand, with the same options, until V2.5 removes them
 |---|---|
 | `nicemon.py` | The front end, with the subcommands below. |
 | `boardlink.py` | The debug link, which the other tools use: nice_cpu's `debugger/nicelink.py`, over TCP to `niceemu --link` and on the UART, with the board's own links over TCP to its Ethernet port and to `make cosim`. |
-| `load.py` | `nicemon.py load`: loads a `.bin` file into cleared memory and starts it, or with `--no-run` leaves the core held in reset. With `--monitor`, it runs a program at `0x8000` under the monitor in the ROM. |
+| `load.py` | `nicemon.py load`: loads a `.bin` file into cleared memory and starts it, or with `--hold` leaves the core held in reset. With `--monitor`, it runs a program at `0x8000` under the monitor in the ROM. |
 | `run.py` | `nicemon.py run`: runs a program on the board and prints what `niceemu` prints, for diffing, also one under the monitor with `--monitor`. |
 | `mon.py` | `nicemon.py mon`: an interactive shell on the link: memory, registers, pause, step, breakpoints, and the console. It is nice_cpu's `debugger/nicedbg.py` with the board's links. |
 | `sdcard.py` | `nicemon.py sd`: lists, copies, writes, and deletes the files of the folder `NICE` on the board's SD card, with no PC slot, and makes the folder. |
@@ -87,8 +87,9 @@ alone, and `hwtest.py`'s `--eth` tests the Ethernet port beside it.
 
 They take `ETH=192.168.1.65` for the Ethernet port, or
 `PORT=/dev/ttyUSB1` for the serial port, and one of the two. They pass
-`ARGS=` on to the tool: `ARGS=--no-run` for `make load`, or
-`ARGS="-i in.txt -d 0x100:16 -s --timeout 5"` for `make run`.
+`ARGS=` on to the tool: `ARGS=--hold` for `make load`, or
+`ARGS="--input in.txt --dump 0x100:16 --screen --timeout 5"` for
+`make run`.
 `ARGS="--tcp 4000"` drives `niceemu --link 4000` instead of the board.
 
 The other tools have targets too: `make hwtest` and `make flash` (see
@@ -175,7 +176,7 @@ Ctrl-D in `nc -N`, or `Ctrl-A Ctrl-\` in picocom on the serial port,
 after `tools/nicemon.py load --port /dev/ttyUSB1 echo.bin`.
 
 The `.bin` file has one line per word, the address and the word in hex.
-`nicemon.py load --no-run` loads the program and leaves the core held in reset.
+`nicemon.py load --hold` loads the program and leaves the core held in reset.
 `nicemon.py load --tcp PORT` loads it into `niceemu --link PORT` instead of the
 board.
 
@@ -304,12 +305,13 @@ take about 0.56 ms.
 `tools/nicemon.py run` loads a program into cleared memory, starts it, sends it
 its input, and copies its output to stdout. When the program halts, it
 prints what `niceemu` prints: why and after how many steps the program
-halted, and the registers. It takes niceemu's `-i`, `-d`, `-s`, and
-`--symbols` options, the long forms `--input`, `--dump`, and `--screen`
-among them, so the output of the two can be compared:
+halted, and the registers. It takes niceemu's `--input`, `--dump`,
+`--screen`, and `--symbols` options by their long names, and
+niceemu's `-2004` as `--ide2004`, so the output of the two can be
+compared:
 
-    nice_cpu/emulator/zig-out/bin/niceemu -d 0x110:2 -s prog.bin > emu.txt
-    tools/nicemon.py run --eth 192.168.1.65 -d 0x110:2 -s prog.bin > board.txt
+    nice_cpu/emulator/zig-out/bin/niceemu --dump 0x110:2 --screen prog.bin > emu.txt
+    tools/nicemon.py run --eth 192.168.1.65 --dump 0x110:2 --screen prog.bin > board.txt
     diff emu.txt board.txt
 
 The exit status is that of `niceemu`:
@@ -323,7 +325,7 @@ The exit status is that of `niceemu`:
 
 ### Input
 
-Its input is stdin, or the file of `-i`. On a terminal, Ctrl-D ends the
+Its input is stdin, or the file of `--input`. On a terminal, Ctrl-D ends the
 input. Before each part of at most 256 bytes, `nicemon.py run` reads the free
 space of the core's input FIFO, and sends no more than that, so no byte
 is lost, however far the program falls behind. At the end of the input,
@@ -336,7 +338,7 @@ byte, so the output ends there.
 
 ### Dumps and symbols
 
-- `-d ADDR:N` takes numbers as `niceemu` does, up to 32 bits, with no sign
+- `--dump ADDR:N` takes numbers as `niceemu` does, up to 32 bits, with no sign
   or underscore, but N is at most 131072 words.
 - The words at `0xFFFFFFD0` to `0xFFFFFFFF` are read through their RAM
   alias, `0x0001FFD0` to `0x0001FFFF` on the MEGA65 and `0x0000FFD0` to
@@ -344,14 +346,14 @@ byte, so the output ends there.
   there. The link reads the console and the read counter,
   `0xFFFFFF00` and `01`, as 0.
 - The memory is 128K words on the MEGA65 and 64K on the Nexys4DDR,
-  repeated through the address space, so `-d` beyond them shows the same
+  repeated through the address space, so `--dump` beyond them shows the same
   words again.
 - `--symbols FILE` reads the labels that `niceasm.py --symbols` writes.
   After a halt other than `HALT`, it prints where the program was, `At
   label+0x1f`, if the file has any labels. After a halt at
   `___wasm_trap`, the default wasm trap handler, it prints the trap's
   code and location from R1 and R2, as `niceemu` does.
-- `-2004` prints the screen from `0x400`, as `niceemu -2004` does. That
+- `--ide2004` prints the screen from `0x400`, as `niceemu -2004` does. That
   is plain RAM on the board, not the screen that the display shows.
 - `--no-cycle-counter` is accepted and ignored, as the cycle counter
   always runs.
@@ -388,7 +390,7 @@ trusted network. Elsewhere, forward the port over SSH instead:
     ssh -L 4510:127.0.0.1:4510 emuhost 'niceemu --link 4510 prog.bin'
     tools/nicemon.py mon --tcp 4510
 
-With `--tcp`, the end of the input half-closes the connection, and `-d`
+With `--tcp`, the end of the input half-closes the connection, and `--dump`
 cannot reach `0xFFFFFFD0`–`FF`, which are the emulator's memory.
 
 ### Step counts
@@ -501,13 +503,13 @@ checks the FPGA first, as `hwtest.py` does. It runs on Linux only, and
 the MEGA65 needs pyftdi.
 
     tools/nicemon.py flash --port /dev/ttyUSB1 [--bit FILE | --erase]
-    tools/nicemon.py flash --port /dev/ttyUSB1 --cor FILE --slot N
+    tools/nicemon.py flash --port /dev/ttyUSB1 --cor FILE --flash-slot N
 
 - On the Nexys4DDR, `--bit FILE` is the bitstream to write,
   `synth/nexys4ddr/build/top.bit` by default, and `--erase` erases the
   flash instead. It refuses a MEGA65's bitstream, verifies the flash,
   and waits for the board to start from it.
-- On the MEGA65, `--cor FILE --slot N` writes a core file into slot N of
+- On the MEGA65, `--cor FILE --flash-slot N` writes a core file into slot N of
   the flash, 1 to 7, or 1 to 3 in an R3's flash of 32 MiB, with no
   MEGAFLASH: it checks that the flash chip and slot 0's core are
   those of the file's board revision (`--no-board-check` skips the
@@ -711,9 +713,11 @@ read-ahead 4 KB, on the disk that `nbd-client` connected.
   publishes it. `make release TAG=V1.0 PORT=DEVICE` passes the port, and
   `ARGS="--eth IP"` or `ARGS=--publish` the rest
   ([RELEASE.md](../doc/RELEASE.md)).
-- `tools/nicemon.py tftpd [--dir DIR] [--port PORT]` serves the files of a
-  folder, the current one by default, to BASIC's `LOAD` and `DIR`, on port
-  69 or another, with a listing for a name with `*` or `?`.
+- `tools/nicemon.py tftpd [--dir DIR] [--listen [ADDR:]PORT]` serves the
+  files of a folder, the current one by default, to BASIC's `LOAD` and
+  `DIR`, on port 69 or another, with a listing for a name with `*` or
+  `?`. `--retry-wait SEC` is the wait for an ACK before a block is sent
+  again.
   `make tftpd [TFTP_DIR=DIR] [TFTP_PORT=PORT]` serves `examples/build`
   ([monitor/README.md](../monitor/README.md#the-network)).
 - `tools/linktest.py`, `tools/sdtest.py`, `tools/tftptest.py`,

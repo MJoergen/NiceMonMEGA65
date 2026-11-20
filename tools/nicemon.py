@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """One front end for the board's host tools, with a subcommand for each.
 
-    tools/nicemon.py load  (link) [--no-run] [--monitor [--rom FILE] | --basic] FILE
-    tools/nicemon.py run   (link) [-i FILE] [-d ADDR:N]... [-s] ... FILE
+    tools/nicemon.py load  (link) [--hold] [--monitor [--rom FILE] | --basic] FILE
+    tools/nicemon.py run   (link) [--input FILE] [--dump ADDR:N]... [--screen] ... FILE
     tools/nicemon.py mon   (link) [--symbols FILE] [FILE]
     tools/nicemon.py sd    (link) [--slot N] ... (ls | get | put | del | mkdir | format)
     tools/nicemon.py nbd   (link) [--slot N] [--read-only] [--hold] [--listen ...]
-    tools/nicemon.py flash --port DEVICE (--bit FILE [--erase] | --cor FILE --slot N)
-    tools/nicemon.py tftpd [--dir DIR] [--addr ADDR] [--port PORT] ...
+    tools/nicemon.py flash --port DEVICE (--bit FILE [--erase] | --cor FILE --flash-slot N)
+    tools/nicemon.py tftpd [--dir DIR] [--listen [ADDR:]PORT] [--retry-wait SEC] ...
 
 (link) is one of --eth HOST[:PORT], --port DEVICE [--baud N], --tcp
 [HOST:]PORT, and --cosim PORT, the link's options of boardlink.py, which
@@ -24,8 +24,13 @@ when its subcommand runs, so that flash's pyftdi, through spiflash.py,
 is needed only there, and the others run on Linux and macOS with the
 Python standard library alone.
 
-The old names, tools/load.py and the others, call this with their
-subcommand, for one release (issue #156). The name is nice_cpu's, as
+The old names, tools/load.py and the others, call old_name() with their
+subcommand, for one release (issue #156). It takes the options that
+#156 renamed by their old names too, with a warning that names the new
+one: load's --no-run, which is --hold, run's -i, -d, -s, and -2004,
+which are --input, --dump, --screen, and --ide2004, flash's --slot,
+which is --flash-slot, and tftpd's --addr and --port, which are
+--listen [ADDR:]PORT, and --timeout, which is --retry-wait. The name is nice_cpu's, as
 nicedbg, nicelink, and nicebin are, and is also the project's and that
 of src/nicemon.vhd.
 """
@@ -57,6 +62,65 @@ SUBCOMMANDS = {
                         "starts"),
     "tftpd": Subcommand("tftpd", "a TFTP server for BASIC's LOAD and DIR"),
 }
+
+
+# The options that #156 renamed, which the old names still take: the new
+# name, and whether the option takes a value
+RENAMED = {
+    "load": {"--no-run": ("--hold", False)},
+    "run": {"-i": ("--input", True), "-d": ("--dump", True),
+            "-s": ("--screen", False), "-2004": ("--ide2004", False)},
+    "flash": {"--slot": ("--flash-slot", True)},
+    "tftpd": {"--timeout": ("--retry-wait", True),
+              "--addr": ("--listen", True), "--port": ("--listen", True)},
+}
+
+
+def old_options(name: str, argv: Sequence[str]) -> list[str]:
+    """argv of the old name of subcommand name, with the options that #156
+    renamed given their new names, and a warning on stderr for each.
+    tftpd's --addr ADDR and --port PORT become one --listen ADDR:PORT."""
+    script = f"{SUBCOMMANDS[name].module}.py"
+    renamed = RENAMED.get(name, {})
+    out: list[str] = []
+    listen = {"--addr": "0.0.0.0", "--port": "69"}
+    merge = False
+    i = 0
+    while i < len(argv):
+        arg = argv[i]
+        if arg == "--":
+            out += argv[i:]
+            break
+        old, eq, value = (arg.partition("=") if arg.startswith("--")
+                          else (arg, "", ""))
+        if old not in renamed:
+            out.append(arg)
+            i += 1
+            continue
+        new, takes = renamed[old]
+        form = "--listen [ADDR:]PORT" if new == "--listen" else new
+        print(f"{script}: warning: {old} is {form} of {PROG} {name}; "
+              f"V2.5 removes {script} and {old}", file=sys.stderr)
+        if takes and not eq and i + 1 < len(argv):
+            value = argv[i + 1]
+            i += 1
+        i += 1
+        if new == "--listen":
+            listen[old] = value
+            merge = True
+        elif takes:
+            out += [new, value]
+        else:
+            out.append(new)
+    if merge:
+        out[:0] = ["--listen", f"{listen['--addr']}:{listen['--port']}"]
+    return out
+
+
+def old_name(name: str, argv: Sequence[str]) -> None:
+    """Runs subcommand name for its old name, tools/load.py and the others,
+    with the options that #156 renamed taken by their old names too."""
+    main([name, *old_options(name, argv)])
 
 
 def top_parser() -> argparse.ArgumentParser:

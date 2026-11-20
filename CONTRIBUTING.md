@@ -105,8 +105,8 @@ or, in an existing clone:
 `make load`, `make run`, and `make mon` use the board's Ethernet port
 with `ETH=192.168.1.65`, or the serial device with `PORT=/dev/ttyUSB1`,
 and need one of the two, unless `ARGS=` picks the line, as below. They
-pass `ARGS=` on to the tool, for example `ARGS=--no-run` or
-`ARGS="-i in.txt -d 0:10 -s --timeout 5"`.
+pass `ARGS=` on to the tool, for example `ARGS=--hold` or
+`ARGS="--input in.txt --dump 0:10 --screen --timeout 5"`.
 `ARGS="--tcp 4000"` drives `niceemu --link 4000` instead of the board, and
 `ARGS="--cosim 4000"` the simulated system of `make cosim COSIM_PORT=4000`.
 The bitstream targets take `FLOW=default` or `FLOW=timing`, the directives
@@ -1196,7 +1196,8 @@ Last, it runs `hello.nasm` with `nicemon.py run --tcp 127.0.0.2:PORT` on
 computer; 127.0.0.2 is loopback on Linux, and elsewhere the check is
 skipped. Its check of "keep" runs `tools/run.py` and `tools/load.py`,
 the old names that call `nicemon.py run` and `load` until V2.5, so that
-they stay tested while they exist. CI runs it.
+they stay tested while they exist; `run.py` must take run's old `-i`
+with a warning, which `nicemon.py run` must refuse. CI runs it.
 
 `nicemon.py run` matches `niceemu` in the details too. It accepts
 `--no-cycle-counter` and ignores it, as the cycle counter always runs. A
@@ -1204,8 +1205,10 @@ missing or unreadable input file, `.bin` file, or serial device stops
 `nicemon.py run` with a message before it touches the core, and so does an input
 file that is a directory. A usage error, such as an unknown option, exits
 with status 1, as in `niceemu`. Each option must stand alone, with its value
-as the next argument, so `--sym`, `--dump=1:2`, `-d1:2`, and `-sd` are
-errors in both. When stdout closes early, as with `nicemon.py run ... | head`,
+as the next argument, so `--sym` and `--dump=1:2` are errors in both.
+Its options are niceemu's long ones, and niceemu's `-2004` is
+`--ide2004`, so `-i`, `-d`, and `-s` are errors in `nicemon.py run`;
+the old name, `run.py`, still takes them with a warning until V2.5. When stdout closes early, as with `nicemon.py run ... | head`,
 `nicemon.py run` exits quietly with status 141, as `niceemu` does.
 
 ## The examples

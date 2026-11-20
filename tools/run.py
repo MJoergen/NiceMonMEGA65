@@ -8,11 +8,13 @@ comes after its last byte, and this prints what niceemu prints after a
 halt: why and after how many steps the program halted, the registers, and
 the --dump and --screen output. So the output of the two can be compared:
 
-    diff <(niceemu -i in.txt prog.bin) <(tools/nicemon.py run -i in.txt prog.bin)
+    diff <(niceemu -i in.txt prog.bin) \\
+         <(tools/nicemon.py run --input in.txt prog.bin)
 
 Usage:
     tools/nicemon.py run (--eth HOST[:PORT] | --port DEVICE [--baud 230400]
-                         | --tcp [HOST:]PORT | --cosim PORT) [-i FILE] [-d ADDR:N]... [-s] [-2004]
+                         | --tcp [HOST:]PORT | --cosim PORT) [--input FILE] [--dump ADDR:N]...
+                         [--screen] [--ide2004]
                          [--symbols FILE] [--timeout SEC] [--monitor [--rom FILE]]
                          FILE.bin
 
@@ -25,7 +27,7 @@ Usage:
     which checks the RTL too.
 
 Input:
-    The input is stdin, or the file of -i. It goes out as fast as the
+    The input is stdin, or the file of --input. It goes out as fast as the
     program's input buffer takes it: before each part, the free-space
     register says how many bytes it has room for, so none is lost. At the
     end of the input, a break on the UART, or a half-close of the TCP
@@ -45,7 +47,8 @@ Under the monitor:
 
         diff <(niceemu -i <(printf 'SYS 0x8000\\r'; cat in.txt) \\
                    <(cat rom.bin prog.bin)) \\
-             <(tools/nicemon.py run --monitor --rom rom.bin -i in.txt prog.bin)
+             <(tools/nicemon.py run --monitor --rom rom.bin --input in.txt \\
+                   prog.bin)
 
     The output then has the monitor's too: its banner, the SYS, and the
     status that the program returns. The monitor reads on at the end of
@@ -54,7 +57,7 @@ Under the monitor:
 
 Output:
     After a halt, the lines of niceemu: the reason and the step count, the
-    registers, and the --dump and --screen output. -2004 prints the screen
+    registers, and the --dump and --screen output. --ide2004 prints the screen
     from 0x400, as niceemu does, which is plain memory on the board, not
     the screen that the board shows. The memory has 128K words on the
     MEGA65 and 64K on the Nexys4DDR, repeated through the address space,
@@ -350,7 +353,7 @@ class Parser(argparse.ArgumentParser):
             if arg in options:
                 i += 2 if options[arg] else 1
                 continue
-            # Not "--dump=1:2", "-d1:2", "-sd", or "--", as argparse takes
+            # Not "--dump=1:2", "--sym", or "--", as argparse takes
             if len(arg) > 1 and arg.startswith("-"):
                 self.error(f"unknown option '{arg}'")
             i += 1
@@ -364,15 +367,15 @@ PARSER = Parser
 def add_options(parser: argparse.ArgumentParser) -> None:
     """The options of nicemon.py run, for a parser of the class Parser."""
     add_arguments(parser)
-    parser.add_argument("-i", "--input", default="-",
+    parser.add_argument("--input", default="-", metavar="FILE",
                         help="read the console's input from FILE, not stdin")
-    parser.add_argument("-d", "--dump", type=dump_option, action="append",
+    parser.add_argument("--dump", type=dump_option, action="append",
                         default=[], metavar="ADDR:N",
                         help="after halting, print N memory words from ADDR; "
                         "decimal, or hex after 0x, up to %d words" % MAX_DUMP)
-    parser.add_argument("-s", "--screen", action="store_true",
+    parser.add_argument("--screen", action="store_true",
                         help="after halting, print the 80x25 character screen")
-    parser.add_argument("-2004", dest="ide2004", action="store_true",
+    parser.add_argument("--ide2004", action="store_true",
                         help="like niceemu -2004: the screen is at 0x400, "
                         "plain memory on the board")
     parser.add_argument("--no-cycle-counter", action="store_true",
@@ -441,4 +444,4 @@ def run_program(parser: argparse.ArgumentParser,
 if __name__ == "__main__":
     # The old name, kept for one release (issue #156)
     import nicemon
-    nicemon.main(["run", *sys.argv[1:]])
+    nicemon.old_name("run", sys.argv[1:])

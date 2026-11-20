@@ -28,13 +28,27 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 - The host tools are one command, `tools/nicemon.py`, with a
   subcommand for each: `load`, `run`, `mon`, `sd`, `nbd`, `flash`, and
   `tftpd` ([#156](https://github.com/MJoergen/NiceMonMEGA65/issues/156),
-  [tools/README.md](../tools/README.md)). The options after the
-  subcommand are those of the old script, so a command line changes in
-  its first word: `tools/load.py --eth IP prog.bin` is
-  `tools/nicemon.py load --eth IP prog.bin`. The old names,
-  `load.py`, `run.py`, `mon.py`, `sdcard.py`, `sdnbd.py`, `flash.py`,
-  and `tftpd.py`, still run, and call `nicemon.py`; V2.5 removes them.
-  The `make` targets keep their names.
+  [tools/README.md](../tools/README.md)). The link's options go after
+  the subcommand: `tools/load.py --eth IP prog.bin` is
+  `tools/nicemon.py load --eth IP prog.bin`. The `make` targets keep
+  their names.
+- Each option has one meaning in all subcommands, and each idea one
+  name, so these options are renamed:
+
+  | Old | New |
+  |---|---|
+  | `load.py --no-run` | `nicemon.py load --hold` |
+  | `run.py -i`, `-d`, `-s` | `nicemon.py run --input`, `--dump`, `--screen` |
+  | `run.py -2004` | `nicemon.py run --ide2004` |
+  | `flash.py --slot N` | `nicemon.py flash --flash-slot N` |
+  | `tftpd.py --addr A --port P` | `nicemon.py tftpd --listen A:P` |
+  | `tftpd.py --timeout` | `nicemon.py tftpd --retry-wait` |
+
+  `make flash SLOT=N` and `make tftpd TFTP_PORT=P` are as they were.
+- The old names, `load.py`, `run.py`, `mon.py`, `sdcard.py`,
+  `sdnbd.py`, `flash.py`, and `tftpd.py`, still run and call
+  `nicemon.py`. They take the old options too, with a warning that
+  names the new one. V2.5 removes them.
 
 ## V2.4 (2026-11-20)
 

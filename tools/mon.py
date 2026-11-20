@@ -45,4 +45,4 @@ def main(argv: list[str]) -> None:
 if __name__ == "__main__":
     # The old name, kept for one release (issue #156)
     import nicemon
-    nicemon.main(["mon", *sys.argv[1:]])
+    nicemon.old_name("mon", sys.argv[1:])

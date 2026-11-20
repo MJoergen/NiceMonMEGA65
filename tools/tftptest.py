@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Check tools/tftpd.py, and BASIC's TFTP against it, without a board.
 
-First it starts tftpd.py --port 0 on a folder of test files and checks
+First it starts nicemon.py tftpd --listen 127.0.0.1:0 on a folder of test files and checks
 it with a client of its own: files of 0, 511, 512, 513, and 140,000
 bytes, more than 255 blocks; a name in another case; the listing of *
 and of *.BIN; a pattern that matches none, a missing file, names outside
@@ -331,8 +331,8 @@ def main() -> None:
         except (OSError, NotImplementedError):
             pass
         server = subprocess.Popen(
-            [*TFTPD, "--dir", folder, "--port", "0",
-             "--addr", "127.0.0.1", "--timeout", str(TIMEOUT)],
+            [*TFTPD, "--dir", folder, "--listen", "127.0.0.1:0",
+             "--retry-wait", str(TIMEOUT)],
             stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
         try:
             assert server.stderr is not None

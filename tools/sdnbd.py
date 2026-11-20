@@ -322,4 +322,4 @@ def command(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
 if __name__ == "__main__":
     # The old name, kept for one release (issue #156)
     import nicemon
-    nicemon.main(["nbd", *sys.argv[1:]])
+    nicemon.old_name("nbd", sys.argv[1:])
