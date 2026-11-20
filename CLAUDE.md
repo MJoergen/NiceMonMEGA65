@@ -36,8 +36,9 @@ the decisions, the room in the ROM, and the stages, of which stage 1,
 the shell (#112), is written, and ported to assembly (#115), and
 split from the monitor into an image of its own (#152), stage 2,
 the numbers (#113), is written, and so are stage 3, the programs
-(#114), with its benchmarks, stage 4, the files (#60), stage 6, the
-functions (#117), and stage 7, the screen editor (#118).
+(#114), with its benchmarks, stage 4, the files (#60), stage 5, the
+strings (#116), stage 6, the functions (#117), and stage 7, the
+screen editor (#118).
 `doc/BASIC_ROM.md` is the design of BASIC's image from a card's
 `BASIC*.ROM`, which replaces BASIC's part of the ROM at the first
 cold start (#153), of which all five stages are written.
@@ -206,7 +207,8 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   program's text (#60), `DHCP`, `NTP`, and TFTP in
   `basic_net.nasm`, `TIME` in `basic_time.nasm`, `DIS` in
   `basic_dis.nasm`, and the screen editor of stage 7 (#118) in
-  `basic_edit.nasm`), on the entries of the dispatch table alone, as a
+  `basic_edit.nasm`, and the strings of stage 5 (#116), with
+  `DATA`, `READ`, and `TIME$`, in `basic_str.nasm`), on the entries of the dispatch table alone, as a
   program is, with its tests of the statements in `basic/test/`, its
   benchmarks in `basic/bench/`, and
   `basic/README.md`, its build and its tests.

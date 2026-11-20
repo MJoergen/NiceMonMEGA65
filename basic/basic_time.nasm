@@ -22,14 +22,9 @@ clock_cmd
                 MOVE    R3, R1
                 CALL    rest_blank
         ?Z      JMP     :+              ; only blanks: the clock shown
-                MOVE    R2, TEXT_B+4*S_CBAD+22  ; YYYY-MM-DD HH:MM:SS
-                MOVE    R4, V_BI
-                CALL    clk_parse
-        ?Z      CALL    clk_check
+                CALL    clock_put
         ?!Z     MOVE    R1, S_CBAD
         ?!Z     JMP     puts_b_crlf     ; which returns to the caller
-                CLR     R2
-                CALL    CLOCK_SET       ; at 0 microseconds
 :               CALL    clk_split
         ?!C     JMP     :+
                 CALL    clk_show
@@ -38,6 +33,24 @@ clock_cmd
                 AND[M]  R0, @CLOCK_STATUS, 1
         ?!Z     MOVE    R1, S_CPAST
                 JMP     puts_b_crlf     ; which returns to the caller
+
+; clock_put: the clock set to the date and the time of the string R1,
+; as clock_cmd sets it, and Z; or not Z, and the clock as it was, when
+; the string has no date and time that the clock takes, for TIME and
+; TIME$ (basic_str.nasm). R8 is V_BI. Uses R1-R8.
+clock_put
+                MOVE    R8, V_BI
+                MOVE    R3, R1
+                CALL    rest_blank      ; the blanks before it
+                MOVE    R2, TEXT_B+4*S_CBAD+22  ; YYYY-MM-DD HH:MM:SS
+                MOVE    R4, V_BI
+                CALL    clk_parse
+        ?Z      CALL    clk_check
+        ?!Z     RET
+                CLR     R2
+                CALL    CLOCK_SET       ; at 0 microseconds
+                CMP     R0, R0          ; Z
+                RET
 
 ; clock_zone: the offset of NTP, +HH:MM or -HH:MM, local time less UTC,
 ; from R1, with blanks after it to the end of the string (issue #127).
@@ -148,19 +161,19 @@ clk_parse
                 ADD     R6, R6, R1
                 JMP     :--
 
-; clk_show: the date and the time at V_BF, as YYYY-MM-DD HH:MM:SS. R5 is
-; the field. Uses R1-R5.
+; clk_show: the date and the time at V_BF, as YYYY-MM-DD HH:MM:SS, with
+; putc, so that TIME$ takes them too. R5 is the field. Uses R1-R5.
 clk_show
                 MOVE    R1, @V_BF
-                CALL    _io_putdec
+                CALL    putdec
                 MOVE    R5, V_BF+1
 :               MOVE    R1, @TEXT_B+4*CLK_SEPS-V_BF-1[R5]
-                CALL    MON_PUTC
+                CALL    putc
                 CMP     @R5, 10
                 MOVE    R1, 0x30
-        ?C      CALL    MON_PUTC        ; the tens' 0
+        ?C      CALL    putc            ; the tens' 0
                 MOVE    R1, @R5++
-                CALL    _io_putdec
+                CALL    putdec
                 CMP     R5, V_BF+6
         ?!Z     JMP     :-
                 RET

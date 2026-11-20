@@ -119,10 +119,8 @@ enter_store
 :
                 CMP     R9, 3
         ?Z      JMP     clear_cache     ; no tokens: the line is deleted
-                CALL    mem_top
                 ADD     R3, @V_AEND, R9
-                CMP     R2, R3
-        ?C      JMP     err_memory
+                CALL    room
                 PUSH    R1
                 MOVE    R2, R9
                 CALL    shift
@@ -198,23 +196,27 @@ mm_down
                 SUB     R4, R4, 1
                 JMP     mm_down
 
-; tok_skip: R8 after the token at R8 and the words that its kind has.
-; Uses R2 and R3.
+; tok_skip: R8 after the token at R8 and the words that its kind has,
+; by the kind: a number's words, or a string's, REM's, or DATA's text
+; and its 0. Uses R2 and R3.
 tok_skip
                 MOVE    R2, @R8++
                 SHR     R3, R2, 24
-                CMP     R3, K_STR
-        ?!Z     CMP     R3, K_REM
-        ?Z      JMP     :+
-                ADD     R8, R8, @TOK_EXTRA[R3]
-                RET
-:
+                JMP     @TOK_SKIPS[R3]
+ts_text
                 AND     R2, R2, 0xFFFFFF
                 ADD     R8, R8, R2
+ts_1
                 MOVE    R8++, R8        ; and its 0
+ts_0
                 RET
-TOK_EXTRA
-                .DAT    0, 0, 1, 1, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0
+ts_4
+                ADD     R8, R8, 4
+                RET
+TOK_SKIPS
+                .DAT    ts_0, ts_0, ts_1, ts_1, ts_4, ts_text, ts_0, ts_0, ts_0
+                .DAT    ts_0, ts_0, ts_0, ts_0, ts_0, ts_1, ts_text, ts_0, ts_0
+                .DAT    ts_0, ts_0, ts_0, ts_text
 
 ; himem: R2 the top of BASIC's memory, HIMEM, or that of the RAM, less
 ; the variables and the stack's room. mem_top: R2 the top of the
@@ -231,29 +233,33 @@ mem_top
                 SUB     R2, R2, FRAMES
                 RET
 
-; drop_run: no frames, and no CONT. Uses R2.
+; drop_run: no frames, no CONT, and READ from the first DATA. Uses R2.
 drop_run
                 CALL    himem
                 MOVE    @V_FP, R2
                 CLR     @V_CONTL
+                CLR     @V_DPTR
+                CLR     @V_DTOK
                 RET
 
-; new_prog: no program, no variables, and no arrays. Uses R2.
+; new_prog: no program, no variables, no arrays, and no strings. Uses R2.
 new_prog
                 MOVE    @V_PEND, PROGRAM
                 MOVE    @V_VEND, PROGRAM
                 MOVE    @V_AEND, PROGRAM
+                CALL    heap_reset
                 JMP     drop_run
 
-; clr_vars: every variable not assigned, every array not made, and no
-; frames and no CONT. A length of 0 or above 16 cuts the table there, as
-; var_find does. Uses R1 and R2.
+; clr_vars: every variable not assigned, every array not made, no
+; strings, and no frames and no CONT. A length of 0 or above 16 cuts the
+; table there, as var_find does. Uses R1 and R2.
 clr_vars
+                CALL    heap_reset
                 MOVE    R1, @V_PEND
 :
                 CMP     R1, @V_VEND
         ?!C     JMP     :++
-                AND[M]  R2, @2[R1], NOT_ARRAY
+                AND[M]  R2, @2[R1], NAME_LEN
         ?Z      JMP     :+
                 CMP     R2, 17
         ?!C     JMP     :+
@@ -675,6 +681,7 @@ list_tok
         ?!Z     CMP     R6, T_SEMI
         ?!Z     CMP     R6, T_COLON
         ?!Z     CMP     R5, K_REM
+        ?!Z     CMP     R5, K_DATA
         ?!Z     CALL    put_blank
 lt_go
                 ONE     R12
@@ -683,6 +690,9 @@ lt_go
                 CMP     R5, K_FN
         ?!Z     CMP     R5, K_PRT
         ?!Z     CMP     R5, K_ARR
+        ?!Z     CMP     R5, K_SARR
+        ?!Z     CMP     R5, K_SFN
+        ?!Z     CMP     R5, K_SNUM
         ?Z      MOVE    R12, 2
                 CMP     R6, T_MINUS
         ?!Z     CMP     R6, T_PLUS
@@ -691,6 +701,7 @@ lt_go
                 CMP     R1, T_RPAR
         ?!Z     CMP     R1, T_HIMEM
         ?!Z     CMP     R1, T_PI
+        ?!Z     CMP     R1, T_TIMES
         ?Z      JMP     :+
                 SHR     R1, R1, 24
                 SHR     R1, OPERANDS, R1
@@ -700,10 +711,11 @@ lt_go
                 MOVE    @V_LPREV, R6
                 JMP     @LIST_KINDS[R5]
 ; The kinds of the tokens that end an operand, a bit each
-OPERANDS        .EQU    2+4+8+16+32+64+0x4000
+OPERANDS        .EQU    2+4+8+16+32+64+0x4000+0x20000
 LIST_KINDS
                 .DAT    0, lt_dec, lt_dec, lt_hex, lt_num, lt_str, lt_var, lt_kw, lt_punct
                 .DAT    lt_kw, lt_kw, lt_kwi, lt_kw, lt_kw, lt_dec, lt_rem, lt_var
+                .DAT    lt_var, lt_var, lt_kw, lt_kw, lt_rem
 
 ; A whole number: K_SMALL's and K_LINE's in the token, which K_LINE's
 ; line follows, and K_WORD's in the word after it
@@ -767,7 +779,7 @@ lt_num
                 POP     R9
                 RET
 
-; A string, in quotes, and the text of REM, as it is
+; A string, in quotes, and the text of REM and of DATA, as it is
 lt_str
                 MOVE    R1, 0x22
                 CALL    putc
@@ -785,20 +797,26 @@ lt_rem
                 CALL    putc
                 JMP     :-
 
-; A variable's name, from its entry
+; A variable's name, from its entry, and a $ after a string's
 lt_var
                 AND     R1, R6, 0xFFFFFF
                 ADD     R5, R1, @V_PEND
-                AND     R6, @2[R5], NOT_ARRAY  ; its length
+                MOVE    R7, @2[R5]
+                AND     R6, R7, NAME_LEN  ; its length
                 ADD     R5, R5, 3
                 SHL     R5, R5, 2
                 ADD     R5, R5, TEXT_B
 :
                 SUB[M]  R6, R6, 1
-        ?N      RET
+        ?N      JMP     :+
                 MOVE    R1, @R5++
                 CALL    putc
                 JMP     :-
+:
+                AND[M]  R0, R7, STRING
+        ?Z      RET
+                MOVE    R1, 0x24        ; $
+                JMP     putc
 
 ; ( ) , ; and :
 lt_punct
@@ -850,8 +868,12 @@ SYMS
                 .DAT    T_SHL, 0x3C3C, T_SHR, 0x3E3E, T_POW, 0x5E
 
 ; GET V: V the code of the next key typed ahead, or 0 when there is none,
-; with no wait
+; with no wait; GET V$ in basic_str.nasm, get_str
 st_get
+                SHR     R2, @R8, 24
+                CMP     R2, K_SVAR
+        ?!Z     CMP     R2, K_SARR
+        ?Z      JMP     get_str
                 CALL    lvalue
                 PUSH    R1
                 CALL    stmt_end
@@ -868,13 +890,14 @@ store_var
                 MOVE    @FPU_CMD, FPU_DROP
                 RET
 
-; INPUT ["PROMPT";] V [, W ...]: the prompt and ? , and a line of
-; numbers, each with a sign or not, with commas between them, one for
-; each variable. A line that has no such number where one goes is Redo
-; from start, and INPUT starts again, as it does after an error of the
-; tokenizer, which err sends here while V_REDO is not 0. Too few numbers
-; ask for the rest with ?? , and too many are Extra ignored. CTRL-C is a
-; break, after which CONT runs INPUT again.
+; INPUT ["PROMPT";] V [, W$ ...]: the prompt and ? , and a line of items,
+; with commas between them, one for each variable: a number, with a sign
+; or not, for a number's, and any text, or one in quotes, for a
+; string's (basic_str.nasm, item and get_item). A line that has no number
+; where one goes is Redo from start, and INPUT starts again, as it does
+; after an error of the tokenizer, which err sends here while V_REDO is
+; not 0. Too few items ask for the rest with ?? , and too many are Extra
+; ignored. CTRL-C is a break, after which CONT runs INPUT again.
 st_input
                 MOVE    @V_REDO, R8
                 MOVE    R1, @R8
@@ -893,8 +916,10 @@ st_input
 :
                 SHR     R2, @R8, 24
                 CMP     R2, K_ARR
+        ?!Z     CMP     R2, K_SARR
         ?Z      JMP     in_arr
                 CMP     R2, K_VAR
+        ?!Z     CMP     R2, K_SVAR
         ?!Z     JMP     in_syntax
                 MOVE    R8++, R8
 in_vnext
@@ -909,54 +934,24 @@ in_ask
                 CALL    puts_b
                 ONE     R1              ; CTRL-C is a break
                 CALL    getline
-                PUSH    R11
                 MOVE    R5, V_LINE
-                MOVE    R8, V_ITOK
-                MOVE    @-1[R8], R0     ; no token before the first
-                MOVE    @V_TLIM, V_ITOK+TOK_MAX-6
-                CALL    tokenize_to
-                POP     R11
-                MOVE    R9, V_ITOK
 in_var
-                TST     @R9
+                TST     @R5
         ?Z      MOVE    R1, S_QQ        ; too few
         ?Z      JMP     in_ask
-                CLR     R6              ; the sign
-                CMP     @R9, T_PLUS
-        ?Z      MOVE    R9++, R9
-                CMP     @R9, T_MINUS
-        ?Z      ONE     R6
-        ?Z      MOVE    R9++, R9
-                SHR     R2, @R9, 24
-                SUB     R2, R2, K_SMALL
-                CMP     R2, K_NUM-K_SMALL+1
-        ?!C     JMP     in_redo         ; no number
-                MOVE    R8, R9
-                CALL    primary
-                MOVE    R9, R8
-                TST     R6
-        ?!Z     MOVE    @FPU_CMD, FPU_NEG
-                PUSH    R9
-                MOVE    R8, R11
-                CALL    lvalue
-                MOVE    R11, R8
-                CALL    store_var
-                POP     R9
-                MOVE    R1, @R9
+                CALL    item
+        ?!Z     JMP     in_redo
+                CALL    get_item
+        ?!Z     JMP     in_redo         ; no number
+                MOVE    R1, @R5         ; the comma after the item, or the end
                 CMP     @R11, T_COMMA
         ?!Z     JMP     :+
                 MOVE    R11++, R11      ; more variables
-                CMP     R1, T_COMMA
-        ?Z      MOVE    R9++, R9
-        ?Z      JMP     in_var
                 TST     R1
-        ?Z      JMP     in_var
-                JMP     in_redo
+        ?!Z     MOVE    R5++, R5
+                JMP     in_var
 :
-                TST     R1              ; the last variable
-        ?!Z     CMP     R1, T_COMMA
-        ?!Z     JMP     in_redo
-                CLR     @V_REDO
+                CLR     @V_REDO         ; the last variable
                 TST     R1
         ?Z      RET
                 MOVE    R1, S_EXTRA
@@ -984,6 +979,7 @@ in_arr
 ; in_redo: Redo from start, and INPUT again
 in_redo
                 MOVE    @FPU_CMD, FPU_CLEAR
+                CLR     @V_SSP
                 MOVE    R1, S_REDO
                 CALL    puts_b_crlf
                 MOVE    SP, STACK
@@ -1092,7 +1088,8 @@ load_new
                 RET
 
 ; lvalue: R1 the address of the variable, or of the array's element, at
-; R8, and R8 after it. Uses R1-R12.
+; R8, and R8 after it; lvalue_s (basic_str.nasm) is a string's. Uses
+; R1-R12.
 lvalue
                 MOVE    R1, @R8++
                 SHR     R2, R1, 24
@@ -1154,7 +1151,8 @@ arr_elem
                 RET
 
 ; DIM A(N) [, B(N, M) ...]: the arrays, A of N + 1 elements, and B of
-; N + 1 rows of M + 1, each element 0. An array's data is its two sizes,
+; N + 1 rows of M + 1, each element 0, which is an empty string for an
+; array of strings. An array's data is its two sizes,
 ; the second 0 for one dimension, and its doubles, row by row. A second
 ; DIM of an array is Redimensioned array, and a negative N or M an
 ; Illegal quantity.
@@ -1162,6 +1160,7 @@ st_dim
                 MOVE    R1, @R8++
                 SHR     R2, R1, 24
                 CMP     R2, K_ARR
+        ?!Z     CMP     R2, K_SARR
         ?!Z     JMP     err_syntax
                 AND     R1, R1, 0xFFFFFF
                 ADD     R1, R1, @V_PEND
@@ -1193,12 +1192,10 @@ st_dim
                 AND[M]  R0, R7, 0xE0000000
         ?!Z     JMP     err_memory
                 DBL     R7, R7          ; their words
-                CALL    mem_top
-                MOVE    R3, @V_AEND
-                SUB     R2, R2, R3      ; the room
                 ADD     R1, R7, 2
-                CMP     R1, R2
-        ?!C     JMP     err_memory
+                ADD     R3, @V_AEND, R1
+                CALL    room
+                MOVE    R3, @V_AEND
                 MOVE    @R3++, R4
                 MOVE    @R3++, R5
                 SUB     @R6, R3, @V_VEND

@@ -606,8 +606,9 @@ GL_CC           .DAT    0x5E, 0x43, 0   ; ^C
 del_kind
                 MOVE    R4, @R8
                 SHR     R4, R4, 24
-                CMP     R4, K_STR
-        ?Z      RET
+                SHR     R4, STR_KINDS, R4
+                AND[M]  R0, R4, 1
+        ?!Z     RET                     ; a string
                 MOVE    R3, st_dellines
                 MOVE    R2, I_PRINT
                 RET

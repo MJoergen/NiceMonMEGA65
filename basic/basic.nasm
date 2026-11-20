@@ -3,9 +3,9 @@
 ; It calls the monitor through the entries of the dispatch table alone,
 ; their .EQUs in ../monitor/mon.nasm, as a program does. The Makefile of
 ; ../monitor joins this file first, then basic_expr.nasm, basic_prog.nasm,
-; basic_cmd.nasm, basic_net.nasm, basic_time.nasm, basic_dis.nasm, and
-; basic_edit.nasm, and the monitor's common.nasm, monlib.nasm, and mon.nasm, of which
-; BASIC has copies of its own.
+; basic_cmd.nasm, basic_net.nasm, basic_time.nasm, basic_dis.nasm,
+; basic_edit.nasm, and basic_str.nasm, and the monitor's common.nasm,
+; monlib.nasm, and mon.nasm, of which BASIC has copies of its own.
 ;
 ; This file has the main loop, the scanner of a statement's items, and
 ; BASIC's keywords, messages, and help, packed with .ASCII_B and read
@@ -18,6 +18,7 @@
 ; and POKE. Stage 3 (issue #114) has the programs, in basic_prog.nasm.
 ; Stage 4 (issue #60) has the programs' texts on a card and from a TFTP
 ; server: SAVE "NAME", LOAD "NAME", and RUN "NAME", in basic_cmd.nasm.
+; Stage 5 (issue #116) has the strings, DATA, and READ, in basic_str.nasm.
 ;
 ; The image starts with two vectors, which the monitor jumps to: at
 ; BAS_COLD, the end of its cold start, which goes to bas_start, and at
@@ -36,7 +37,8 @@
 ; gives its program: the offset of its first op in OPS, plus 0x20. An op
 ; is a byte, with the kind of the item in bits 2..1: a number (OP_N),
 ; which is an expression, a string in quotes (OP_S), a comma (OP_C), or
-; the end of the statement (OP_E). When the item is there, the next op
+; the end of the statement (OP_E). A string is a string expression, and
+; a number one that does not start as a string does. When the item is there, the next op
 ; follows, and the end of the statement runs it. When it is not there,
 ; the op says what follows: with OP_F the statement fails, with OP_SKIP
 ; the next op is passed over, and with neither the next op follows. A
@@ -154,6 +156,7 @@ main_auto
                 MOVE    SP, STACK
                 CALL    files_end       ; what an error or the break key left open
                 CLR     @V_CUR          ; direct mode
+                CLR     @V_SSP          ; no strings
                 CLR     @V_STORE
                 CLR     @V_ETOK
                 CLR     @V_REDO
@@ -211,7 +214,7 @@ run
         ?!Z     CMP     R2, K_ARR
         ?Z      JMP     st_assign
                 CMP     R2, K_KW
-        ?!Z     JMP     err_unknown
+        ?!Z     JMP     run_other
                 MOVE    R8++, R8
                 SHR     R2, R1, 8
                 AND     R2, R2, 0xFF    ; the index of the keyword
@@ -248,6 +251,15 @@ bas_op
 run_next
                 MOVE    R8, @V_TP
                 JMP     run
+; run_other: a statement that is no keyword's and no number's assignment:
+; a string's, or TIME$ =
+run_other
+                CMP     R2, K_SVAR
+        ?!Z     CMP     R2, K_SARR
+        ?Z      JMP     st_sassign
+                CMP     R1, T_TIMES
+        ?Z      JMP     st_timeset
+                JMP     err_unknown
 run_else
                 CALL    tok_skip
                 TST     @R8
@@ -263,7 +275,7 @@ run_eol
                 JMP     run
 
 ; match: Z when the text at R5 starts with the keyword at R3, in either
-; case, and no letter or digit follows it. R3 is then after the byte that
+; case, and no letter, digit, or $ follows it. R3 is then after the byte that
 ; ends the keyword, R4 that byte, and R5 after the keyword's length in
 ; the text. Uses R1, R2, and R6.
 match
@@ -281,6 +293,8 @@ match
                 MOVE    R1, @R5
                 CALL    dval
         ?C      ONE     R6
+                CMP     R1, 0x24        ; $: a name goes on, as TIME$ does
+        ?Z      ONE     R6
                 TST     R6
                 RET
 
@@ -326,7 +340,7 @@ dval
 
 ; k_number: an expression, as a signed word, which sets the bit of the
 ; slot R12 in R11. It is not there at the end of the statement, a comma,
-; or a string. Keeps R3 and R10-R12.
+; or a string's start. Keeps R3 and R10-R12.
 k_number
                 MOVE    R1, @R8
                 TST     R1
@@ -334,9 +348,8 @@ k_number
         ?!Z     CMP     R1, T_COMMA
         ?!Z     CMP     R1, T_ELSE
         ?Z      JMP     k_no
-                SHR     R2, R1, 24
-                CMP     R2, K_STR
-        ?Z      JMP     k_no
+                CALL    is_str
+        ?!Z     JMP     k_no
                 PUSH    R3
                 PUSH    R10
                 PUSH    R11
@@ -353,15 +366,27 @@ k_no
                 CMP     R0, 1           ; not Z
                 RET
 
-; k_string: a string: R1 its first character, and a 0 after its last
+; k_string: a string: R1 its first character, and a 0 after its last.
+; A string in quotes alone is that of its token, and any other string
+; expression is copied to a buffer of the slot's (basic_str.nasm,
+; k_str_expr). Keeps R3 and R10-R12.
 k_string
-                SHR     R2, @R8, 24
+                MOVE    R1, @R8
+                CALL    is_str
+        ?Z      JMP     k_no
+                SHR     R2, R1, 24
                 CMP     R2, K_STR
-        ?!Z     RET
-                AND     R2, @R8, 0xFFFFFF
+        ?!Z     JMP     :+
+                AND     R2, R1, 0xFFFFFF
+                ADD     R2, R8, R2
+                CMP     @2[R2], T_PLUS
+        ?Z      JMP     :+
                 ADD     R1, R8, 1
-                ADD     R8, R8, R2
-                ADD     R8, R8, 2
+                ADD     R8, R2, 2
+                CMP     R0, R0          ; Z
+                RET
+:
+                CALL    k_str_expr
                 CMP     R0, R0          ; Z
                 RET
 
@@ -594,7 +619,7 @@ ACTS
                 .DAT    st_list+65536*st_goto, st_gosub+65536*st_if
                 .DAT    st_for+65536*st_next, st_rem+65536*st_input
                 .DAT    st_get+65536*st_dim, st_himem+65536*st_auto
-                .DAT    st_renum
+                .DAT    st_renum+65536*st_data, st_read+65536*st_restore
 I_DELETE        .EQU    4               ; the index of DELETE,
 I_PRINT         .EQU    25              ; the index of PRINT, the first statement without ops,
 I_LET           .EQU    26              ; of LET,
@@ -609,7 +634,10 @@ I_GET           .EQU    36              ; of GET,
 I_DIM           .EQU    37              ; of DIM,
 I_HIMEM         .EQU    38              ; of HIMEM, which is also a number,
 T_HIMEM         .EQU    K_KW*K+I_HIMEM*0x100+0x22  ; whose token this is,
-N_STMT          .EQU    41              ; and of AND, the first keyword that is no statement
+I_DATA          .EQU    41              ; of DATA,
+I_READ          .EQU    42              ; of READ,
+I_RESTORE       .EQU    43              ; of RESTORE,
+N_STMT          .EQU    44              ; and of AND, the first keyword that is no statement
 H_ACTS          .EQU    0x40000000+4*ACTS
 ; The routines of the items, by the kind of an op, which bas_op calls
 KINDS
@@ -655,7 +683,7 @@ OP_SKIP         .EQU    1
 OP_F            .EQU    8
 KEYWORDS        .EQU    38              ; the first keyword's byte in OPS
 OPS
-                .ASCII_B 'FJN@N@EHNHLHNFANFJEJNFJFLCNHNJLHLHFLHNSYS+LOAD5SAVE6BSAVE=DELETE6DIR-IP DHCP"MAC TIME NTP0BAUD#DUMP%DIS%CLS"VER"HELP"HALT"POKE)NEW"CLR"END"STOP"CONT"RETURN"PRINT"LET"RUN"LIST"GOTO"GOSUB"IF"FOR"NEXT"REM"INPUT"GET"DIM"HIMEM"AUTO"RENUMBER"AND"OR"XOR"NOT"DIV"MOD"ABS"SGN"INT"SQR"PEEK"SIN"COS"TAN"ASIN"ACOS"ATAN"LOG"LOG2"LOG10"EXP"RND"PI"TAB"SPC"THEN"ELSE"TO"STEP"'
+                .ASCII_B 'FJN@N@EHNHLHNFANFJEJNFJFLCNHNJLHLHFLHNSYS+LOAD5SAVE6BSAVE=DELETE6DIR-IP DHCP"MAC TIME NTP0BAUD#DUMP%DIS%CLS"VER"HELP"HALT"POKE)NEW"CLR"END"STOP"CONT"RETURN"PRINT"LET"RUN"LIST"GOTO"GOSUB"IF"FOR"NEXT"REM"INPUT"GET"DIM"HIMEM"AUTO"RENUMBER"DATA"READ"RESTORE"AND"OR"XOR"NOT"DIV"MOD"ABS"SGN"INT"SQR"PEEK"SIN"COS"TAN"ASIN"ACOS"ATAN"LOG"LOG2"LOG10"EXP"RND"PI"TAB"SPC"THEN"ELSE"TO"STEP"LEN"ASC"VAL"INSTR"CHR$"STR$"HEX$"LEFT$"MID$"RIGHT$"TIME$"'
                 .DAT    0
 
 S_HINT          .ASCII_B 'HELP lists the statements'
@@ -681,7 +709,8 @@ S_DOTBAS
 HELP            .DAT    H_SYS, H_L, H_LOAD, H_TFTP, H_SAVET, H_SAVE, H_DEL, H_DELL, H_DIR, H_TFTPL, H_SLOT, H_D, H_U
                 .DAT    H_I, H_ID, H_M, H_B, H_T, H_TN, H_C, H_V, H_H, H_Q, H_PR, H_LET
                 .DAT    H_POKE, H_RUN, H_RUNF, H_RUNT, H_LIST, H_NEW, H_CLR, H_GOTO, H_GOSUB, H_RET, H_IF
-                .DAT    H_FOR, H_NEXT, H_END, H_STOP, H_CONT, H_REM, H_INPUT, H_GET, H_DIM, H_HIMEM, H_AUTO, H_REN, H_P, H_PG, 0
+                .DAT    H_FOR, H_NEXT, H_END, H_STOP, H_CONT, H_REM, H_INPUT, H_GET, H_DIM, H_HIMEM, H_AUTO, H_REN
+                .DAT    H_DATA, H_READ, H_REST, H_STR, H_P, H_PG, 0
 H_SYS           .ASCII_B 'SYS A               call the program at A, such as SYS 0x8000; SYS 0 restarts'
 H_L             .ASCII_B 'LOAD                enter lines of ADDR WORD in hex, as a .bin file has them'
                 .DAT    0
@@ -711,7 +740,7 @@ H_V             .ASCII_B 'VER                 the version'
 H_H             .ASCII_B 'HALT                halt the core'
 H_Q             .ASCII_B 'HELP                the statements'
 H_PR            .ASCII_B 'PRINT X; "T", ...   print numbers and strings, ; and , between them; ? is PRINT'
-H_LET           .ASCII_B 'LET V = X           set the variable V to the number X; LET may be left out'
+H_LET           .ASCII_B 'LET V = X           set the variable V, or V$ to a string; LET may be left out'
 H_POKE          .ASCII_B 'POKE A, X           write X to the word at A, which PEEK(A) reads'
 H_RUN           .ASCII_B 'RUN [N]             run the program, from line N or its first, after CLR'
                 .DAT    0
@@ -736,13 +765,18 @@ H_END           .ASCII_B 'END                 end the program'
 H_STOP          .ASCII_B 'STOP                stop the program, which CONT goes on with'
 H_CONT          .ASCII_B 'CONT                go on after STOP, END, or the break key'
 H_REM           .ASCII_B 'REM TEXT            a remark, the rest of the line'
-H_INPUT         .ASCII_B 'INPUT ["P";] V, ... the numbers of a line typed into V, ..., after the prompt P'
-H_GET           .ASCII_B 'GET V               V the code of the next key typed, 0 when none, with no wait'
-H_DIM           .ASCII_B 'DIM A(N), B(N, M)   the arrays A of N + 1 elements, B of N + 1 rows of M + 1'
+H_INPUT         .ASCII_B 'INPUT ["P";] V, ... the items of a line typed into V, ..., after the prompt P'
+H_GET           .ASCII_B 'GET V               V the code of the next key typed, 0 when none; V$ the key'
+H_DIM           .ASCII_B 'DIM A(N), B$(N, M)  the arrays A of N + 1 elements, B$ of N + 1 rows of M + 1'
                 .DAT    0
 H_HIMEM         .ASCII_B 'HIMEM = A           the top of the program, its variables, and arrays; and CLR'
 H_AUTO          .ASCII_B 'AUTO [N] [, S]      number the lines typed from N, by S; a number alone ends it'
 H_REN           .ASCII_B 'RENUMBER [N] [, S]  number the lines from N, by S, and the jumps with them'
+H_DATA          .ASCII_B 'DATA 1, "A,B", C    the items that READ reads, numbers and strings'
+H_READ          .ASCII_B 'READ V, W$, ...     V and W$ the next items of DATA'
+H_REST          .ASCII_B 'RESTORE [N]         READ from the first DATA again, or from line N'
+H_STR           .ASCII_B 'A$ + B$             LEN ASC VAL INSTR CHR$ STR$ HEX$ LEFT$ MID$ RIGHT$ TIME$'
+                .DAT    0
 H_P             .ASCII_B 'CRSR keys, HOME     move the cursor; RETURN takes the line it is in'
 H_PG            .ASCII_B 'PgUp PgDn           scroll back; on the MEGA65 CTRL and MEGA with CRSR up, down'
                 .DAT    0

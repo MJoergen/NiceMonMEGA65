@@ -31,7 +31,8 @@ The ROM's user interface is BASIC (issue #54,
 the monitor's commands as statements. Stage 2 (issue #113) adds the
 numbers: expressions, variables, `PRINT`, `LET`, `POKE`, and `PEEK`.
 Stage 3 (issue #114) adds the programs: lines with numbers, which
-BASIC keeps and runs (Programs below).
+BASIC keeps and runs (Programs below), and stage 5 (issue #116) the
+strings (Strings below).
 
 At the cold start the ROM clears the screen, prints its banner,
 `NiceMon` and the version, then `HELP lists the statements` and
@@ -52,8 +53,9 @@ A line has one statement or more, with colons between them, such as
 arguments, with commas between them, or an assignment. A keyword is a
 whole name: `LOADX` is no `LOAD`, but a variable. An argument is a
 number, which is an expression (Numbers below), such as `SYS 0x8000`
-or `DUMP A + 4, 2`, or a string in quotes, such as
-`LOAD "HELLO.BIN"`. A string that the line ends without its closing
+or `DUMP A + 4, 2`, or a string, which is a string expression of up
+to 80 characters (Strings below), such as `LOAD "HELLO.BIN"` or
+`LOAD N$ + ".BIN"`. A string that the line ends without its closing
 quote ends with the line. A number for an address, a count, or a word
 must fit a signed word, -2147483648 to 2147483647, and is rounded
 toward zero, so `SYS 0xFFFF0000` and `SYS -65536` are the same, and
@@ -208,8 +210,9 @@ exact.
 - **A variable** has a name of up to 16 letters and digits, the first
   a letter, every one significant, in either case, so `Total` and
   `TOTAL` are one variable. A keyword is no name, but a name may start
-  with one, as `TOTAL` starts with `TO`. A `%` or a `$` after a name
-  is a `Syntax error`, as strings and whole numbers come later. An
+  with one, as `TOTAL` starts with `TO`. A `$` after a name makes a
+  string's name (Strings below), and a `%` is a `Syntax error`, as
+  whole numbers come later. An
   assignment, `INPUT`, and `GET` make the variable in a line typed,
   and a line of a program makes each of its names. A variable that
   none of them set is an `Undefined variable`. A variable is its
@@ -264,9 +267,9 @@ keeps the variables, but `CONT` cannot go on after it.
 | `END`, `STOP` | Ends the program. `STOP` prints `Break in 20`, and `END` nothing. |
 | `CONT` | Goes on after `STOP`, `END`, and the break key, unless the program was edited or an error came since: then it is `Can't continue`. |
 | `REM TEXT` | A remark, the rest of the line, which `LIST` shows as it was typed. |
-| `INPUT ["P";] V [, W]` | Prints `? `, or `P` and `? `, and reads numbers into `V` and `W`, with commas between them. A line that is not numbers is `Redo from start`, and `INPUT` asks again. Too few ask for the rest with `?? `, and too many print `Extra ignored`. A number may have a sign; an expression is not taken. CTRL-C is the break key. |
-| `GET V` | Sets `V` to the code of the next key typed, or 0 when there is none. It does not wait. |
-| `DIM A(N) [, B(N, M)]` | Makes the array `A` of `N + 1` elements, `A(0)` to `A(N)`, and `B` of `N + 1` rows of `M + 1`, each element 0. `A` and `A(` are two names. An array that no `DIM` made is `Undefined array`, a subscript outside or one too many or too few `Bad subscript`, and a second `DIM` `Redimensioned array`. |
+| `INPUT ["P";] V [, W$]` | Prints `? `, or `P` and `? `, and reads a number into `V` and a string into `W$`, with commas between them. A string is the text up to a comma or the end, without the blanks around it, or one in quotes, which may have commas. A line that has no number where one goes, or text after a closing quote, is `Redo from start`, and `INPUT` asks again. Too few ask for the rest with `?? `, and too many print `Extra ignored`. A number may have a sign; an expression is not taken. CTRL-C is the break key. |
+| `GET V`, `GET V$` | Sets `V` to the code of the next key typed, or 0 when there is none, and `V$` to the key, or `""`. It does not wait. |
+| `DIM A(N) [, B(N, M)]` | Makes the array `A` of `N + 1` elements, `A(0)` to `A(N)`, and `B` of `N + 1` rows of `M + 1`, each element 0. `DIM A$(N)` makes an array of strings, each element `""`. `A` and `A(` are two names. An array that no `DIM` made is `Undefined array`, a subscript outside or one too many or too few `Bad subscript`, and a second `DIM` `Redimensioned array`. |
 | `HIMEM = A` | Sets the top of BASIC's memory, and does a `CLR`. `A` is from the end of the variables plus 512 words up to the default, as below; outside them it is `Out of memory`. `HIMEM` in an expression reads it, such as `PRINT HIMEM`. |
 
 CTRL-C is the break key. A program polls it every 64 statements, and
@@ -293,6 +296,54 @@ MEGA65's 128K words of RAM, and 58368 (`0xE400`) on the Nexys4DDR's
 above the default. An empty program writes
 no word at `0x8000`, so after `NEW` a `.bin` program there stays as it
 was.
+
+## Strings
+
+A string has 0 to 255 characters, bytes from 0 to 255, such as
+`"HELLO"`. A name with `$` after it, `A$`, is a string variable, and
+`A$(I)` an element of an array of strings, so `A`, `A$`, `A(`, and
+`A$(` are four names. `A$ = "X"` and `LET A$ = "X"` assign one, and
+`PRINT` prints one as it is.
+
+`+` joins two strings, and `=`, `<>`, `<`, `<=`, `>`, and `>=` compare
+them, byte by byte, a string before a longer one that it starts, and
+give -1 or 0, as with numbers, so `IF A$ = "Y" AND N > 0 THEN ...`
+works. A comparison of strings starts with a string, not with a `(`.
+A string where a number goes, or a number where a string goes, is a
+`Type mismatch`, longer than 255 characters `String too long`.
+
+| Function | What it gives |
+|---|---|
+| `LEN(A$)` | The number of characters of `A$`. |
+| `ASC(A$)` | The code of the first character of `A$`. `ASC("")` is an `Illegal quantity`. |
+| `VAL(A$)` | The number at the start of `A$`, after blanks, as `INPUT` reads it, such as `VAL("0x1F")` and `VAL("-3E2X")`, or 0 when there is none. |
+| `INSTR(A$, B$ [, N])` | The position of the first `B$` in `A$`, from 1, or 0 when there is none, looked for from position `N` or 1. An empty `B$` is found at `N`. |
+| `CHR$(N)` | The character of code `N`, from 0 to 255. |
+| `STR$(X)` | The number `X` as `PRINT` shows it, such as `0.333333333333333`. |
+| `HEX$(X)` | The word `X` as 8 hex digits in upper case, such as `000000FF`. |
+| `LEFT$(A$, N)`, `RIGHT$(A$, N)` | The first and the last `N` characters of `A$`, or all of them when it has fewer. |
+| `MID$(A$, N [, M])` | `M` characters of `A$` from position `N`, from 1, or all of them from `N` on. A position past the end gives `""`. |
+| `TIME$` | The clock's date and time, as `YYYY-MM-DD HH:MM:SS`, or `""` when it is not set. `TIME$ = A$` sets the clock, as `TIME` does, and a string that it does not take is an `Illegal quantity`. |
+
+A position below 1 and a negative count are an `Illegal quantity`.
+
+| Statement | What it does |
+|---|---|
+| `DATA 1, "A,B", TEXT` | Items that `READ` reads: numbers, strings in quotes, and strings without, without the blanks around them, with commas between them, up to the end of the line or a `:`. `LIST` shows them as they were typed. A `DATA` that runs does nothing. |
+| `READ V, W$` | Reads the next items of the `DATA` of the program into `V` and `W$`, in the order of the lines. A string read into a number is a `Syntax error`, and past the last item it is `Out of data`. |
+| `RESTORE [N]` | Makes `READ` read from the first `DATA` again, or from that of line `N` on. `RUN` and `CLR` do so too. |
+
+The characters of a string are one to a word, as on the screen. A
+string in quotes stays in its line, and `LEFT$`, `MID$`, and `RIGHT$`
+point into their string, but a new string, of `+`, `CHR$`, `STR$`,
+`HEX$`, `TIME$`, `INPUT`, `READ`, and `GET`, takes a block of the heap
+below the frames: its characters and 2 words. An assignment that
+replaces a string leaves its old block unused. When a new block does
+not fit above the arrays, BASIC moves the blocks in use up over those
+that are not, once, and the rest is `Out of memory`. So a program
+never runs out of room for strings while its strings in use fit.
+`CLR`, `RUN`, `NEW`, and `HIMEM` drop the strings, and an edit keeps
+them, as it keeps the variables.
 
 ## The disassembler
 
@@ -499,7 +550,8 @@ the default. It runs these steps in order:
    a BASIC program's text, listed and run, one with a line without a
    number, bad arguments, and no answer to ARP.
 7. **The benchmarks.** `test/bench.py` types Rugg/Feldman's
-   benchmarks 1 to 8 and the sieve, in `bench/`, and checks their
+   benchmarks 1 to 8, the sieve, and `str.bas`, which fills the heap
+   with strings until it is swept, in `bench/`, and checks their
    output. Their steps, which it prints, are those of the instruction
    counter, read by `PEEK` before and after `RUN`, less those of an
    empty program. `make -C basic bench` prints them as the rows of the
@@ -521,6 +573,7 @@ the default. It runs these steps in order:
 | `lines` | The ROM alone | `DELETE` of a range, a line, and up to a line, `RENUMBER` with the jumps forward and back, a target that is no line, the overflow and a step of 0, and `AUTO`, ended by a number alone and by CTRL-C. |
 | `redo` | The ROM alone | The check at entry: a line of two rows that the tokenizer refuses is shown again after `READY.`, with the cursor at the error, as the input ends there and no key waits; it runs until the step limit. |
 | `keys` | The ROM alone | `INPUT` with too few, too many, and bad numbers, a prompt, and CTRL-C; `GET`; the break key in a loop, in `CONT`, and in `LIST`; and the keys typed ahead, of which the ring keeps 31. |
+| `str` | The ROM, with `--step-time` and `test/str.bas` typed | The strings: variables, `+`, each function and the edges of its arguments, the comparisons, alone and in `IF`, the errors, arrays of strings, `IP` with a string expression, `TIME$`, `GET`, `READ`, `DATA`, and `RESTORE`, with a quoted comma and empty items, `LIST` of their tokens, `INPUT` of strings, and a program that fills a small heap until it is swept, again and again. |
 | `arr` | The ROM alone, with `test/arr.bas` typed | `DIM`, the elements, their errors, `LET`, `INPUT`, and `GET` of an element, `CLR` and an edit with arrays, `HIMEM` read and set, too low and too high, and below the arrays, which its `CLR` frees, the layout of an array in memory, and `LOAD` below and above `HIMEM`, in a line and in a program. |
 | `load` | The ROM, with 128K words of RAM, as on the MEGA65 | `LOAD` with the monitor's `build/hello.bin` pasted: CR LF and LF line ends, tabs, blank lines, skipped lines, a line too long, blanks after a line's 76 characters, a DEL that takes back the key after them, an address given twice, and CTRL-C. Then `SYS 0x8000` runs it. |
 | `load_64k` | The ROM, with 64K words, as on the Nexys4DDR | `LOAD` at the end of that RAM. |
@@ -558,18 +611,19 @@ table, and `make romsize` writes it again.
 <!-- romsize basic -->
 | Source | What it is | Words | Text |
 |---|---|---:|---:|
-| `basic.nasm` | The vectors, the header, the main loop, the scanner, the keywords, the messages, and the help | 1629 | 956 |
-| `basic_expr.nasm` | The numbers: the tokenizer, the expressions, the functions, the variables, the errors, `PRINT`, `LET`, and `POKE` | 1631 | 39 |
-| `basic_prog.nasm` | The programs: the lines, `LIST`, `RUN`, the jumps, the loops, the break key, `INPUT`, `GET`, the arrays, and `HIMEM` | 1875 | 46 |
+| `basic.nasm` | The vectors, the header, the main loop, the scanner, the keywords, the messages, and the help | 1758 | 1044 |
+| `basic_expr.nasm` | The numbers: the tokenizer, the expressions, the functions, the variables, the errors, `PRINT`, `LET`, and `POKE` | 1723 | 39 |
+| `basic_prog.nasm` | The programs: the lines, `LIST`, `RUN`, the jumps, the loops, the break key, `INPUT`, `GET`, the arrays, and `HIMEM` | 1871 | 46 |
 | `basic_cmd.nasm` | The routines of the statements that were the commands | 1855 | 294 |
 | `basic_net.nasm` | `DHCP`, `NTP`, and TFTP | 917 | 150 |
-| `basic_time.nasm` | `TIME`, and the clock's side of `NTP` | 275 | 44 |
+| `basic_time.nasm` | `TIME`, and the clock's side of `NTP` | 289 | 44 |
 | `basic_dis.nasm` | The disassembler of `DIS` | 871 | 79 |
-| `basic_edit.nasm` | The screen editor | 1120 | 0 |
+| `basic_edit.nasm` | The screen editor | 1122 | 0 |
+| `basic_str.nasm` | The strings: the heap, its sweep, the functions of strings, `DATA`, `READ`, and `TIME$` | 1529 | 11 |
 | `common.nasm` | What the monitor and BASIC share: texts, IP addresses, and dates | 237 | 5 |
 | `monlib.nasm` | The routines that programs join | 274 | 0 |
 | `mon.nasm` | The stubs of the entries | 92 | 0 |
 | `build/basic_folder.nasm` | The texts with the folder's name: `DIR`'s, and the error of a card without it | 14 | 14 |
 | `build/version_test.nasm` | The version in the banner, the tests' `V9.9` | 2 | 2 |
-| In all | | 10792 | 1629 |
+| In all | | 12554 | 1728 |
 <!-- /romsize basic -->

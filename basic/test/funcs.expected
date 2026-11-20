@@ -77,7 +77,7 @@ PRINT X; "T", ...   print numbers and strings, ; and , between them; ? is PRINT
 READY.
 A = PI(1)
 Syntax error
-LET V = X           set the variable V to the number X; LET may be left out
+LET V = X           set the variable V, or V$ to a string; LET may be left out
 READY.
 ? RND
 Syntax error
@@ -102,7 +102,7 @@ Screen:
 |READY.
 |A = PI(1)
 |Syntax error
-|LET V = X           set the variable V to the number X; LET may be left out
+|LET V = X           set the variable V, or V$ to a string; LET may be left out
 |READY.
 |? RND
 |Syntax error

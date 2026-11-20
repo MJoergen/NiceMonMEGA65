@@ -34,20 +34,31 @@
 ;            0 until a jump finds it (basic_prog.nasm)
 ;   K_REM    the text after REM, as K_STR has it
 ;   K_ARR    an array: its entry's offset from V_PEND in bits 23..0
+;   K_SVAR   a string variable, as K_VAR
+;   K_SARR   an array of strings, as K_ARR
+;   K_SFN    a function that gives a string, its index in SFNS
+;            (basic_str.nasm) in bits 7..0: CHR$, STR$, HEX$, LEFT$, MID$,
+;            RIGHT$, and TIME$
+;   K_SNUM   a function of strings that gives a number, its index in
+;            SNUMS: LEN, ASC, VAL, and INSTR
+;   K_DATA   the text of DATA, as K_STR has it, up to the end of the line
+;            or a colon that is not in quotes
 ;
 ; The line ends with a 0 word, T_END. A name is a keyword only as a
 ; whole name, up to 16 letters and digits.
 ;
-; A variable is its double, then its name: the name's length, then its
-; characters in upper case, packed four to a word, as .ASCII_B packs
-; them. A variable that was never assigned has 0xFFFFFFFF, a NaN, in the
+; A variable is its double, then its name: the name's length, with
+; STRING for a string's, then its characters in upper case, packed four
+; to a word, as .ASCII_B packs them. A string variable has its string's
+; address and length in the place of the double (basic_str.nasm). A
+; variable that was never assigned has 0xFFFFFFFF, a NaN, in the
 ; high word of its double. An array's entry has ARRAY in its length, and
 ; the offset of its data from V_VEND in the place of the double's low
 ; word, and its high word is 0xFFFFFFFF until DIM makes the array
 ; (basic_prog.nasm). A name with ( after it is an array's. The variables go from V_PEND, the end of the
 ; program, to V_VEND. The tokenizer makes a variable for each name of a
 ; line to store (basic_prog.nasm), and in a direct line for a name after
-; GET or INPUT, or a comma of INPUT, and with = after it at the start of
+; GET, INPUT, or READ, or a comma of INPUT or READ, and with = after it at the start of
 ; a statement, or after LET, FOR, THEN, or ELSE, and an array's name in
 ; a direct line after DIM, or a comma of DIM. Any other name without a variable is a K_VAR of NO_VAR, an
 ; Undefined variable when it runs, so that a line that only reads a
@@ -112,8 +123,14 @@ K_SEP           .EQU    13
 K_LINE          .EQU    14
 K_REM           .EQU    15
 K_ARR           .EQU    16
-ARRAY           .EQU    0x100           ; in the length of an array's name
-NOT_ARRAY       .EQU    0xFFFFFEFF      ; the length alone
+K_SVAR          .EQU    17
+K_SARR          .EQU    18
+K_SFN           .EQU    19
+K_SNUM          .EQU    20
+K_DATA          .EQU    21
+ARRAY           .EQU    0x100           ; in the length of an array's name,
+STRING          .EQU    0x200           ; and of a string's
+NAME_LEN        .EQU    0xFF            ; the length alone
 K               .EQU    0x1000000       ; a kind's unit
 P               .EQU    0x10000         ; a precedence's unit
 P_DIVIDES       .EQU    0x800000        ; an operator that divides
@@ -163,6 +180,8 @@ KW_TOK
                 .DAT    K_FN*K+0x45, K_FN*K+0x48, K_FN*K+0x49, K_FN*K+0x4A, K_FN*K+0x4C
                 .DAT    T_RND, T_PI
                 .DAT    T_TAB, T_SPC, T_THEN, T_ELSE, T_TO, T_STEP
+                .DAT    K_SNUM*K, K_SNUM*K+1, K_SNUM*K+2, K_SNUM*K+3
+                .DAT    K_SFN*K, K_SFN*K+1, K_SFN*K+2, K_SFN*K+3, K_SFN*K+4, K_SFN*K+5, T_TIMES
 KW_TOK_END
 
 ; The characters of one-character tokens, each with its token
@@ -299,6 +318,8 @@ tok_name
                 SHL     R1, R11, 8
                 OR      R1, R1, R4
                 OR      @R8++, R1, K_KW*K
+                CMP     R11, I_DATA
+        ?Z      JMP     tok_data
                 CMP     R11, I_REM
         ?!Z     JMP     tok_next
                 MOVE    R6, R8          ; REM: the rest of the line as it is
@@ -317,21 +338,51 @@ tok_name
                 ADD     @R6, R2, K_REM*K
                 MOVE    @R8, R0
                 RET
+tok_data
+                MOVE    R6, R8          ; DATA: the text up to the end or a colon
+                MOVE    R8++, R8
+                CLR     R2
+                CLR     R3              ; 1 in quotes
+:
+                MOVE[M] R1, @R5
+        ?Z      JMP     :+
+                CMP     R1, 0x22
+        ?Z      XOR     R3, R3, 1
+                CMP     R1, 0x3A        ; :
+        ?Z      TST     R3
+        ?Z      JMP     :+
+                CMP     R8, @V_TLIM
+        ?!C     JMP     err_long
+                MOVE    @R8++, R1
+                MOVE    R5++, R5
+                MOVE    R2++, R2
+                JMP     :-
+:
+                MOVE    @R8++, R0
+                ADD     @R6, R2, K_DATA*K
+                JMP     tok_next
 tok_var
                 ADD     R5, R9, R10
+                CLR     R7              ; 1 after a $, a string's name
+                CMP     @R5, 0x24       ; $
+        ?Z      OR      R10, R10, STRING
+        ?Z      ONE     R7
                 CMP     @R5, 0x25       ; %
-        ?!Z     CMP     @R5, 0x24       ; $
         ?Z      JMP     err_syntax
                 MOVE    R11, @V_STORE   ; not 0 to make the variable: in a
-                MOVE    R2, @-1[R8]     ; line to store, after GET or INPUT,
-                AND     R3, R2, 0xFFFFFF00  ; or with = after it, at the start
-                CMP     R3, K_KW*K+I_INPUT*0x100  ; of a statement
+                MOVE    R2, @-1[R8]     ; line to store, after GET, INPUT, or
+                AND     R3, R2, 0xFFFFFF00  ; READ, or with = after it, at the
+                CMP     R3, K_KW*K+I_INPUT*0x100  ; start of a statement
         ?!Z     CMP     R3, K_KW*K+I_GET*0x100
+        ?!Z     CMP     R3, K_KW*K+I_READ*0x100
         ?Z      ONE     R11
-                CMP     R2, T_COMMA     ; and after a comma of INPUT
-        ?Z      CMP     @V_KW, I_INPUT+1
+                CMP     R2, T_COMMA     ; and after a comma of INPUT or READ
+        ?!Z     JMP     :+
+                CMP     @V_KW, I_INPUT+1
+        ?!Z     CMP     @V_KW, I_READ+1
         ?Z      ONE     R11
-                MOVE    R1, R5
+:
+                ADD     R1, R5, R7
 :
                 CMP     @R1, 0x20
         ?Z      MOVE    R1++, R1
@@ -382,17 +433,21 @@ tv_eq
                 CMP     R3, R5
         ?!Z     JMP     :-
                 CALL    var_find
+                ADD     R5, R5, R7      ; after the $
                 SUB     R1, R1, @V_PEND
-                AND[M]  R0, R10, ARRAY
-        ?Z      OR      @R8++, R1, K_VAR*K
-        ?!Z     OR      @R8++, R1, K_ARR*K
+                SHR     R2, R10, 8
+                OR      @R8++, R1, @VAR_KINDS[R2]
                 JMP     tok_next
+; The kinds of a name's token, by its bits ARRAY and STRING
+VAR_KINDS
+                .DAT    K_VAR*K, K_ARR*K, K_SVAR*K, K_SARR*K
 
 ; var_find: R1 = the variable of the name at V_PNAME, of length R10,
-; with ARRAY for an array's, found, or made at V_VEND when R11 is not 0,
-; else V_PEND + NO_VAR. Uses R1-R4, R6, and R12.
+; with ARRAY for an array's and STRING for a string's, found, or made at
+; V_VEND when R11 is not 0, else V_PEND + NO_VAR. Uses R1-R4, R6, and
+; R12.
 var_find
-                AND     R6, R10, NOT_ARRAY
+                AND     R6, R10, NAME_LEN
                 ADD     R6, R6, 3
                 SHR     R6, R6, 2       ; the name's words
                 MOVE    R1, @V_PEND
@@ -400,8 +455,8 @@ var_find
 var_next
                 CMP     R1, R4
         ?!C     JMP     var_new
-                MOVE    R2, @2[R1]      ; the length, and ARRAY
-                AND[M]  R3, R2, NOT_ARRAY
+                MOVE    R2, @2[R1]      ; the length, ARRAY, and STRING
+                AND[M]  R3, R2, NAME_LEN
         ?Z      JMP     var_cut
                 CMP     R3, 17
         ?!C     JMP     var_cut
@@ -417,7 +472,7 @@ var_next
         ?!Z     JMP     :-
                 RET                     ; found
 var_skip
-                AND     R2, R2, NOT_ARRAY
+                AND     R2, R2, NAME_LEN
                 ADD     R2, R2, 3
                 SHR     R2, R2, 2
                 ADD     R1, R1, R2
@@ -430,11 +485,12 @@ var_new
                 TST     R11
         ?Z      ADD     R1, @V_PEND, NO_VAR
         ?Z      RET
-                CALL    mem_top
                 ADD     R3, R6, 3       ; the words of the new variable
                 ADD     R4, @V_AEND, R3
-                CMP     R2, R4
-        ?C      JMP     err_memory
+                PUSH    R3
+                MOVE    R3, R4
+                CALL    room
+                POP     R3
                 MOVE    @V_AEND, R4     ; the arrays move up
                 PUSH    R1
                 PUSH    R5
@@ -464,14 +520,15 @@ var_new
 tok_number
                 CMP     R8, V_TOK
         ?Z      JMP     :+
-                MOVE    R2, @-1[R8]     ; after GOTO, GOSUB, RUN, THEN, or ELSE
-                CMP     R2, T_THEN      ; a line number
+                MOVE    R2, @-1[R8]     ; after GOTO, GOSUB, RUN, RESTORE,
+                CMP     R2, T_THEN      ; THEN, or ELSE a line number
         ?!Z     CMP     R2, T_ELSE
         ?Z      JMP     tok_line
                 AND     R2, R2, 0xFFFFFF00
                 CMP     R2, K_KW*K+I_GOTO*0x100
         ?!Z     CMP     R2, K_KW*K+I_GOSUB*0x100
         ?!Z     CMP     R2, K_KW*K+I_RUN*0x100
+        ?!Z     CMP     R2, K_KW*K+I_RESTORE*0x100
         ?Z      JMP     tok_line
 :
                 CMP     R1, 0x30
@@ -718,7 +775,7 @@ check_flags
 
 ; expr: an operand, then the operators of precedence R9 and more, each
 ; with an operand of its precedence plus 1, so that they group to the
-; left
+; left. expr_more: the operators alone, after an operand on the stack.
 expr
                 CMP     SP, STACK-EXPR_ROOM
         ?C      JMP     err_complex
@@ -746,6 +803,9 @@ expr_op
 :
                 POP     R9
                 RET
+expr_more
+                PUSH    R9
+                JMP     expr_op
 
 ; primary: an operand, by the kind of its token
 primary
@@ -754,11 +814,19 @@ primary
                 CMP     R2, K_ARR
         ?Z      JMP     p_arr
                 CMP     R2, K_PRT
-        ?!C     JMP     err_syntax
+        ?!C     JMP     p_more
                 JMP     @PRIMS[R2]
 PRIMS
-                .DAT    err_syntax, p_small, p_word, p_word, p_num, err_syntax, p_var
+                .DAT    err_syntax, p_small, p_word, p_word, p_num, p_scmp, p_var
                 .DAT    p_op, p_punct, p_fn, p_not, p_kw
+; p_more: a string, compared with another, or a function of strings
+p_more
+                CMP     R2, K_SNUM
+        ?Z      JMP     p_snum
+                SUB     R3, R2, K_SVAR
+                CMP     R3, 3
+        ?C      JMP     p_scmp          ; K_SVAR, K_SARR, and K_SFN
+                JMP     err_syntax
 p_small
                 AND     @FPU_X_W, R1, 0xFFFFFF
                 RET
@@ -900,6 +968,10 @@ at_end
 ; LET V = X, and V = X, which run goes to with R8 at V, a variable or an
 ; array's element
 st_let
+                SHR     R2, @R8, 24
+                CMP     R2, K_SVAR
+        ?!Z     CMP     R2, K_SARR
+        ?Z      JMP     assign_str
                 JMP     assign
 st_assign
                 CMP     R2, K_ARR
@@ -921,7 +993,8 @@ bas_poke
                 MOVE    @R1, R2
                 RET
 
-; PRINT and ?: the items, strings and numbers, with ; between them, or a
+; PRINT and ?: the items, strings and numbers, each an expression of
+; either (eval_any), with ; between them, or a
 ; comma, which goes to the next column of 8, and TAB(N), which goes to
 ; column N, and SPC(N), N blanks. A ; or a comma at the end leaves the
 ; cursor after the last item; else a CR LF ends the line.
@@ -933,11 +1006,10 @@ st_print
                 CMP     R1, T_COMMA
         ?Z      JMP     pr_comma
                 SHR     R2, R1, 24
-                CMP     R2, K_STR
-        ?Z      JMP     pr_str
                 CMP     R2, K_PRT
         ?Z      JMP     pr_tab
-                CALL    eval_num
+                CALL    eval_any
+        ?Z      JMP     pr_str
                 CALL    put_num
                 JMP     st_print
 pr_end
@@ -955,12 +1027,16 @@ pr_next
         ?Z      JMP     stmt_end
                 JMP     st_print
 pr_str
-                ADD     R1, R8, 1
-                AND     R2, @R8, 0xFFFFFF
-                ADD     R8, R8, R2
-                ADD     R8, R8, 2
-                CALL    _io_puts
-                JMP     st_print
+                CALL    s_top
+                SUB     @V_SSP, @V_SSP, 1
+                MOVE    R5, R1
+                MOVE    R6, R2
+:
+                SUB[M]  R6, R6, 1
+        ?N      JMP     st_print
+                MOVE    R1, @R5++
+                CALL    putc
+                JMP     :-
 pr_tab
                 MOVE    R8++, R8
                 PUSH    R1
@@ -1143,6 +1219,7 @@ err
         ?!Z     MOVE    @V_EPOS, R5
                 CLR     @V_ETOK
                 MOVE    @FPU_CMD, FPU_CLEAR
+                CLR     @V_SSP
                 MOVE    SP, STACK
                 MOVE[M] R8, @V_REDO
         ?!Z     JMP     in_redo         ; in INPUT's line

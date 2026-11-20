@@ -96,7 +96,7 @@ settle the three open questions of #54.
   is no `ATN`. `RND` takes its argument as Microsoft's BASIC does, and
   starts from the same word at each cold start. `^` groups to the
   left. The ECMA-55 suite, whose programs need `DATA` and strings,
-  waits for stage 5.
+  waited for stage 5, which has them, and is still to be run.
 
 ## What it runs on
 
@@ -378,9 +378,10 @@ these do not say otherwise.
   and a second `DIM` of an array is `Redimensioned array`.
 - **`GET A`** gives the code of the next key typed ahead, or 0 when
   there is none, and does not wait, as the C64's `GET` does not.
-  Stage 5 adds `GET A$`.
+  Stage 5 adds `GET A$`, the key as a string, or `""`.
 - **`INPUT`** prints `? `, or a prompt in quotes first, and reads
-  numbers, with commas between them. A line that is no number is
+  numbers, with commas between them, and from stage 5 strings
+  ([Strings](#strings)). A line that is no number is
   `Redo from start`, and the line is read again. Too few numbers ask
   for the rest with `?? `, and too many print `Extra ignored`. CTRL-C
   there is a break.
@@ -392,6 +393,50 @@ these do not say otherwise.
 - **`HIMEM = n`** does a `CLR`, as the frames are below it. It is
   `Out of memory` below the end of the arrays and the frames' room,
   and above the RAM.
+
+### Strings
+
+Stage 5 (#116) has strings, as V2 has them, written in
+`basic/basic_str.nasm` (decided on 2026-11-20):
+
+- **A name with `$`**, `A$`, is a string variable, and `A$(` an array
+  of strings, from `DIM A$(N)`, its elements empty. `A`, `A$`, `A(`,
+  and `A$(` are four names. A string never assigned is an `Undefined
+  variable`, as a number is.
+- **A string** has 0 to 255 characters, bytes from 0 to 255. Longer is
+  `String too long`.
+- **The operators**: `+` joins two strings, and `=`, `<>`, `<`, `<=`,
+  `>`, and `>=` compare them by their bytes, a shorter string first
+  when it starts the other, and give -1 or 0, as the comparisons of
+  numbers do. So `IF A$ = "Y" AND N > 0` works. A string where a
+  number goes, or a number where a string goes, is `Type mismatch`.
+  A comparison of strings starts with a string, not with `(`.
+- **The functions**: `LEN`, `ASC`, `VAL`, and `INSTR(A$, B$ [, N])`
+  give numbers, and `CHR$`, `STR$`, `HEX$`, `LEFT$`, `MID$(A$, N
+  [, M])`, `RIGHT$`, and `TIME$` strings. `STR$` is the text that
+  `PRINT` shows, without its blanks, `HEX$` 8 digits in upper case,
+  and `VAL` the number at the start of the string, after blanks, or 0.
+  `INSTR` gives the position from 1, or 0, and finds an empty string
+  at its start. A count past the end is the end; a position below 1,
+  a negative count, `ASC("")`, and `CHR$` outside 0 to 255 are
+  `Illegal quantity`.
+- **`TIME$`** is `YYYY-MM-DD HH:MM:SS`, or `""` when the clock is not
+  set, and `TIME$ = A$` sets the clock as `TIME` does. A string it
+  does not take is `Illegal quantity`.
+- **`INPUT`** reads a string as it is typed, without the blanks around
+  it, up to a comma or the end, or one in quotes, with commas in it.
+  Text after the closing quote is `Redo from start`. `GET A$` gives
+  the key typed ahead, or `""`.
+- **`DATA`** holds items as they are typed, numbers and strings, with
+  commas between them, up to the end of the line or a colon outside
+  quotes. `READ` reads them in order into variables, as `INPUT` reads
+  a line, and a string's item into a number is a `Syntax error`.
+  `RESTORE` reads from the first `DATA` again, and `RESTORE N` from
+  the line `N` on. Past the last item is `Out of data`, and `RUN` and
+  `CLR` start from the first.
+- **The statements of stage 1** take a string expression where they
+  take a name or an address in quotes: `LOAD A$`, `IP "10.0." + B$`.
+  It may have 80 characters.
 
 ### What changed in the list of #54
 
@@ -503,6 +548,27 @@ entries alone (#152). Its workspace is the program's RAM:
   running program. Its counts have the lowest address written. A load
   that writes above `HIMEM` alone keeps them, and the line or the
   program goes on, and one that writes no word ends the line.
+- From stage 5 on, a string variable, or an element of an array of
+  strings, holds the string's descriptor in its double: the address of
+  its first character, one a word, as the screen's cells are, and its
+  length, or
+  `0xFFFFFFFF` while it was never assigned. A literal's characters
+  stay in the line, and `LEFT$`, `MID$`, and `RIGHT$` point into their
+  string, with no copy. Any other string is a block of the heap: its
+  characters, its length, and a back word, which names its owner, a
+  variable by its offset, an element of an array by its offset with
+  `0x40000000`, or an entry of the stack of strings while an expression
+  runs, with `0x80000000`.
+- The heap grows down from the frames to the end of the arrays. A block
+  is never freed. When the room runs out, one sweep goes down the heap
+  from the top and moves each live block up, where a block is live
+  when its owner still points to it, and sets the owner's address
+  again. So the sweep takes time in the number of blocks, and needs no
+  room of its own. Then `Out of memory` if the room is still too
+  small. An assignment keeps a new block of an expression as the
+  variable's, and copies any other string. `CLR`, `RUN`, `NEW`, and
+  `HIMEM` empty the heap. An edit keeps it, as it keeps the
+  variables.
 - A routine that `SYS` calls keeps the variables, whether it
   returns or ends through `mon_exit`, as a routine above `HIMEM`
   must. So a program at `0x8000` that `SYS` starts may leave the
@@ -584,8 +650,9 @@ stay, for `RESUME`.
 
 The messages of stage 2 are `Syntax error`, `Illegal quantity`,
 `Division by zero`, `Overflow`, `Formula too complex`, `Undefined
-variable`, and `Out of memory`. A string where a number goes is a
-`Syntax error` until stage 5 has strings. Stage 3 adds
+variable`, and `Out of memory`. A string where a number goes was a
+`Syntax error` until stage 5, which adds `Type mismatch`, `String too
+long`, and `Out of data`. Stage 3 adds
 `Undefined line`, `Undefined array`, `Bad subscript`,
 `Redimensioned array`, `NEXT without FOR`, `RETURN without GOSUB`,
 and `Can't continue` ([Programs](#programs)).
@@ -835,6 +902,15 @@ its seconds on the R6 count more than its steps say: 0.0392 on the
 R6 (measured 2026-11-20), twice those of Rugg/Feldman 5 of about as
 many steps, so the three functions take some 650 cycles each.
 
+Stage 5 adds `bench/str.bas`, 5000 assignments of `STR$(I)` and 26
+letters to the elements of an array of 100 strings, 32 words a
+block, which fill the heap of about 90K words until the sweep runs: 4446696 steps in `niceemu`,
+about 890 for each (measured 2026-11-20). It leaves the others as
+they were, but for some 90 steps of each program's `PRINT "S"` and
+`PRINT "E"`, as a string now goes through the stack of strings, and
+`tok_skip` takes its words by a table, so a skip is two steps shorter:
+the sieve is 13818577 steps, Rugg/Feldman 7 2270159, and 8 719407.
+
 ## Stages
 
 Each is a commit that builds and passes the tests, and has a line in
@@ -890,7 +966,12 @@ Each has an issue, under #54.
    characters, as `LIST` writes a line longer than it was typed.
 5. **Strings**, #116. `$` variables and arrays, the heap with back
    pointers and its one sweep, the functions of #54 and `HEX$`,
-   `INPUT` of strings, `DATA`, `READ`, `RESTORE`, and `TIME$`.
+   `INPUT` of strings, `DATA`, `READ`, `RESTORE`, and `TIME$`. It is
+   written, mostly in `basic/basic_str.nasm`, with the language of
+   [Strings](#strings), and measured 1762 words
+   ([The ROM's room](#the-roms-room)) (measured 2026-11-20). Its
+   test, `basic/test/str.bas`, fills a small heap until the sweep
+   runs, and its benchmark is in [The benchmarks](#the-benchmarks).
 6. **Functions**, #117. `SIN`, `COS`, `TAN`, `ASIN`, `ACOS`, `ATAN`,
    `LOG`, `LOG2`, `LOG10`, `EXP`, and `^`, each a command of the FPU,
    `PI`, and `RND`. It is small, and it needs the FPU's functions,
@@ -1019,18 +1100,20 @@ in C that the note had before 2026-11-16:
 | 2. Numbers, measured | 1383 | 1019 |
 | 3. Programs, measured | 2545 | 3564 |
 | 4. Files, measured | 459 | 4023 |
-| 5. Strings | 1900 | 5923 |
-| 6. Functions, measured | 113 | 6036 |
-| 7. The editor and its statements, measured | 1071 | 7107 |
-| 8. Structure | 1400 | 8507 |
-| 9. Errors | 400 | 8907 |
-| 10. The machine | 700 | 9607 |
+| 5. Strings, measured | 1762 | 5785 |
+| 6. Functions, measured | 113 | 5898 |
+| 7. The editor and its statements, measured | 1071 | 6969 |
+| 8. Structure | 1400 | 8369 |
+| 9. Errors | 400 | 8769 |
+| 10. The machine | 700 | 9469 |
 
 Stage 7 is BASIC's image 1021 words larger, from 9496 to 10517, with
 the old line input that it replaced, and the monitor's 50 of
 `scr_links` (measured 2026-11-20). Stage 6 is 113 words more, from
 10663 to 10776, of which 13 are the keywords' text, and leaves 9704
-free (measured 2026-11-20).
+free (measured 2026-11-20). Stage 5 is 1762 words more, from 10776
+to 12538, where 1900 were guessed, of which 88 are the keywords' and
+the help's text, and leaves 7942 free (measured 2026-11-20).
 
 Stage 1 was `basic.c`, 1510 words, and `basic.nasm`, 624, of which 431
 were its packed texts, the help among them, less 1032 words that left

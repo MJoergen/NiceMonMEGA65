@@ -26,7 +26,7 @@ VER                 the version
 HALT                halt the core
 HELP                the statements
 PRINT X; "T", ...   print numbers and strings, ; and , between them; ? is PRINT
-LET V = X           set the variable V to the number X; LET may be left out
+LET V = X           set the variable V, or V$ to a string; LET may be left out
 POKE A, X           write X to the word at A, which PEEK(A) reads
 RUN [N]             run the program, from line N or its first, after CLR
 RUN "NAME" [, S]    load NAME and run it; NAME.BIN at 0x8000
@@ -44,12 +44,16 @@ END                 end the program
 STOP                stop the program, which CONT goes on with
 CONT                go on after STOP, END, or the break key
 REM TEXT            a remark, the rest of the line
-INPUT ["P";] V, ... the numbers of a line typed into V, ..., after the prompt P
-GET V               V the code of the next key typed, 0 when none, with no wait
-DIM A(N), B(N, M)   the arrays A of N + 1 elements, B of N + 1 rows of M + 1
+INPUT ["P";] V, ... the items of a line typed into V, ..., after the prompt P
+GET V               V the code of the next key typed, 0 when none; V$ the key
+DIM A(N), B$(N, M)  the arrays A of N + 1 elements, B$ of N + 1 rows of M + 1
 HIMEM = A           the top of the program, its variables, and arrays; and CLR
 AUTO [N] [, S]      number the lines typed from N, by S; a number alone ends it
 RENUMBER [N] [, S]  number the lines from N, by S, and the jumps with them
+DATA 1, "A,B", C    the items that READ reads, numbers and strings
+READ V, W$, ...     V and W$ the next items of DATA
+RESTORE [N]         READ from the first DATA again, or from line N
+A$ + B$             LEN ASC VAL INSTR CHR$ STR$ HEX$ LEFT$ MID$ RIGHT$ TIME$
 CRSR keys, HOME     move the cursor; RETURN takes the line it is in
 PgUp PgDn           scroll back; on the MEGA65 CTRL and MEGA with CRSR up, down
 READY.

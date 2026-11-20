@@ -54,6 +54,8 @@ ROM_PARTS = {
     "basic_time.nasm": "`TIME`, and the clock's side of `NTP`",
     "basic_dis.nasm": "The disassembler of `DIS`",
     "basic_edit.nasm": "The screen editor",
+    "basic_str.nasm": "The strings: the heap, its sweep, the functions of strings, `DATA`, "
+                      "`READ`, and `TIME$`",
     "monitor_sd.nasm": "The sector routines",
     "monitor_fat.nasm": "FAT32, the file entries, and TAB",
     "monitor_eth.nasm": "The network, and its entries",

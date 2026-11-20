@@ -65,18 +65,17 @@ A% = 1
 Syntax error; HELP lists the statements
 READY.
 A$ = "X"
-Syntax error; HELP lists the statements
 READY.
 LET B = 2: ? B
 2
 READY.
 LET 5 = 2
 Syntax error
-LET V = X           set the variable V to the number X; LET may be left out
+LET V = X           set the variable V, or V$ to a string; LET may be left out
 READY.
 LET
 Syntax error
-LET V = X           set the variable V to the number X; LET may be left out
+LET V = X           set the variable V, or V$ to a string; LET may be left out
 READY.
 C
 Syntax error; HELP lists the statements
@@ -96,7 +95,7 @@ Undefined variable
 READY.
 D =
 Syntax error
-LET V = X           set the variable V to the number X; LET may be left out
+LET V = X           set the variable V, or V$ to a string; LET may be left out
 READY.
 ? D
 Undefined variable
@@ -172,8 +171,7 @@ Syntax error
 PRINT X; "T", ...   print numbers and strings, ; and , between them; ? is PRINT
 READY.
 ? 1 + "A"
-Syntax error
-PRINT X; "T", ...   print numbers and strings, ; and , between them; ? is PRINT
+Type mismatch
 READY.
 ? 1;2;3;4;5;6 / 0
 12345

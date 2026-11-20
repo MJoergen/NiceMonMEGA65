@@ -148,12 +148,12 @@ BASIC = vEr\r   ver   \rver,\rver\351\r\351ver\rsys0x8000\rdumpx\rdum\rdis1\ri\r
 # to the next column of 8, the CR LF that ; or a comma at the end leaves
 # out, before which READY. starts a row of its own, TAB and SPC, and
 # their counts of 0 to 255. Variables: names in either case, of 16
-# characters, not 17, no % or $, LET and the assignment without it, a
+# characters, not 17, no %, and A$, a string, LET and the assignment without it, a
 # keyword that is no name, an undefined one, made by its = alone, and
 # colons. The errors: division by zero by /, DIV, and MOD, an overflow
 # in a computation and in a constant, the Illegal quantity of SQR, of a
 # word operator's operand, and of a shift by -1, and the Syntax errors
-# of expressions and constants, and a string in an expression. A line of 74 signs is too deep for the processor's stack,
+# of expressions and constants, and the Type mismatch of a string in an expression. A line of 74 signs is too deep for the processor's stack,
 # and 17 operands pending for the FPU's stack, where 16 are not. PEEK
 # and POKE, with a value rounded toward zero and an address of 2^32 -
 # 256, which is no word. DUMP takes expressions. A LOAD that writes no
@@ -305,6 +305,28 @@ LOAD_TAIL = \rload\r9001 7\003sys 0x8000\rdump 0x9000, 4\rdump 0x1E7FF, 1\rhalt\
 # an array, its data, and a variable after it. Last, LOAD of lines above
 # HIMEM, which keeps the program, and below, which does NEW, then the
 # same in a running program, which goes on, and ends at READY.
+# str: the strings of stage 5 (issue #116), test/str.bas typed line by
+# line, with --step-time, so that TIME$ is the same in each run. String
+# variables, +, and each function, with the edges of their arguments:
+# a part of 0 characters, past the end, VAL of a text with no number, of
+# hex, and with a blank after its sign, and INSTR of an empty string.
+# The comparisons, alone and in IF with AND, NOT of one, and one in ( )
+# as a number. A string in ( ) at the start of an expression is a
+# number's (, so a Type mismatch. The Type mismatches of a number where
+# a string goes and of a string where a number goes, the Undefined
+# variable of a string never assigned, the Illegal quantities of the
+# functions, and String too long past 255 characters. Arrays of strings,
+# empty after DIM. IP with a string expression and with a variable,
+# TIME$ set and read, and set to no time, GET of a key, and an edit,
+# which keeps a string, and CLR, which drops it. READ of numbers and
+# strings from DATA, with a quoted comma, blanks around the items, a
+# colon after a DATA, and empty items; RESTORE of a line and of the
+# first; a string read into a number, a Syntax error; Out of data; and
+# LIST of each new token. INPUT of strings, with blanks around them, one
+# in quotes with a comma, and text after a quote, which is Redo from
+# start. Last, a program that fills a heap made small by HIMEM again
+# and again, so that the sweep runs, with an array of strings, and with
+# strings that grow to 201 characters, joined with parts of themselves.
 # load_emu: LOAD where 0xFFFFFF9E reads 0, as in niceemu, so a program's RAM
 # goes up to the screen: 10000 and FFFEFFFF take words, and FFFF0000 does
 # not.
@@ -350,7 +372,7 @@ HEADER_TEST = version 9.9.0+0, layout 1, 42 entries, [0-9]* words, RAM 2048 word
 # sieve, as they are written, and since stage 6 Rugg/Feldman 8. make bench prints their steps in niceemu
 # as the rows of the table in doc/BASIC.md.
 BENCH = bench/bm1.bas bench/bm2.bas bench/bm3.bas bench/bm4.bas bench/bm5.bas \
-        bench/bm6.bas bench/bm7.bas bench/bm8.bas bench/sieve.bas
+        bench/bm6.bas bench/bm7.bas bench/bm8.bas bench/sieve.bas bench/str.bas
 
 bench: $(ROM_TEST)
 	@$(PYTHON) test/bench.py --table $(EMU) $(ROM_TEST) $(BENCH)
@@ -369,7 +391,7 @@ bench: $(ROM_TEST)
 # the card holds that the image did not (fat_tool.py diff, the dates
 # masked) and the order of its sector writes, from a second run with -t
 # (fat_tool.py order).
-test: fmt $(ROM_TEST) test/prog.bas test/arr.bas test/files.in test/files_card.py $(BUILD)/dis.bin $(MON)/build/hello.bin $(MON)/build/fat/super.img
+test: fmt $(ROM_TEST) test/prog.bas test/arr.bas test/str.bas test/files.in test/files_card.py $(BUILD)/dis.bin $(MON)/build/hello.bin $(MON)/build/fat/super.img
 	@test '$(FOLDER_UC)' = NICE || { echo "make test needs FOLDER=NICE, not $(FOLDER)"; exit 1; }
 	@$(BAS_ROM) check $(BUILD)/basic_image_test.bin > $(BUILD)/header.out
 	@if grep -qx '$(BUILD)/basic_image_test.bin: $(HEADER_TEST)' $(BUILD)/header.out; \
@@ -391,6 +413,7 @@ test: fmt $(ROM_TEST) test/prog.bas test/arr.bas test/files.in test/files_card.p
 	@printf '$(TIME)' > $(BUILD)/time.txt
 	@tr '\n' '\r' < test/prog.bas > $(BUILD)/prog.txt
 	@tr '\n' '\r' < test/arr.bas > $(BUILD)/arr.txt
+	@tr '\n' '\r' < test/str.bas > $(BUILD)/str.txt
 	@tr '\n' '\r' < test/files.in > $(BUILD)/files.txt
 	@printf '$(KEYS)' > $(BUILD)/keys.txt
 	@printf '$(EDIT)' > $(BUILD)/edit.txt
@@ -400,13 +423,14 @@ test: fmt $(ROM_TEST) test/prog.bas test/arr.bas test/files.in test/files_card.p
 	@{ printf '$(LOAD_HEAD)'; head -n 3 $(MON)/build/hello.bin | awk '{ printf "%s\r\n", $$0 }'; \
 	  tail -n +4 $(MON)/build/hello.bin; printf '$(LOAD_TAIL)'; } > $(BUILD)/load.txt
 	@fail=0; \
-	for t in cmds basic expr funcs prog keys edit long redo lines arr load load_emu load_64k time files; do \
+	for t in cmds basic expr funcs prog keys edit long redo lines arr str load load_emu load_64k time files; do \
 	  opts=; sd=; base0=; \
 	  case $$t in \
 	    cmds) prog=; dump='$(DUMP_cmds)';; \
 	    basic) prog=; dump='$(DUMP_basic)';; \
 	    expr) prog=; dump='$(DUMP_expr)';; \
 	    funcs|prog|keys|edit|long|lines|arr) prog=; dump=;; \
+	    str) prog=; dump=; opts=--step-time;; \
 	    redo) prog=; dump='$(DUMP_redo)';; \
 	    load) prog=$(BUILD)/ram128k.bin; dump='$(DUMP_load)';; \
 	    load_emu) prog=; dump='$(DUMP_load_emu)';; \
