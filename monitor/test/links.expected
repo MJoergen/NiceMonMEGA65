@@ -1,0 +1,45 @@
+NiceMon V9.9, BASIC V9.9
+HELP lists the statements
+READY.
+sys 0x8000
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+Returned 00000000
+READY.
+dump 0xFFFFF004, 1
+FFFFF004 00000020
+READY.
+sys 0x8020
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxReturned 00000000
+READY.
+dump 0xFFFFF004, 1
+FFFFF004 00000000
+READY.
+halt
+Halted
+Screen:
+|sys 0x8000
+|xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+|x
+|Returned 00000000
+|READY.
+|dump 0xFFFFF004, 1
+|FFFFF004 00000020
+|READY.
+|sys 0x8020
+|xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+|x
+|
+|
+|
+|
+|
+|
+|Returned 00000000
+|READY.
+|dump 0xFFFFF004, 1
+|FFFFF004 00000000
+|READY.
+|halt
+|Halted
+VBASE at the halt 000000
+exit 0

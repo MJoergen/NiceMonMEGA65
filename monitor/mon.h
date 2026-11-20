@@ -303,9 +303,11 @@ MON_ENTRY(fs_complete) unsigned *mon_fs_complete(unsigned *line, unsigned *curso
 
 // The rows of the screen that go on from the row above, bit r for row r,
 // 1 to 24: mon_putc sets a row's bit when it wraps to it past the last
-// column, clears it at a LF, and shifts the word when the screen
-// scrolls, and scr_cls clears it. links the new word, or -1 to keep it.
-// The old word. Entry 41.
+// column, clears it at a LF and when the row is written again from its
+// column 0, and shifts the word when the screen scrolls; scr_cls clears
+// it, and so does the end of a program that moved the cursor through
+// its registers. links the new word, or -1 to keep it. The old word.
+// Entry 41.
 unsigned mon_scr_links(unsigned links);
 
 // The NICE word address of a C array of words, for the entries above

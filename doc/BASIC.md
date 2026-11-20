@@ -687,6 +687,14 @@ The Commodore editor of #54, in assembly, in place of the monitor's
     text that `PRINT` wraps is a logical line too, as on the C64.
   - A LF clears the bit of the next row, and `scr_cls` clears the
     word.
+  - A character at column 0 of a row clears the row's bit, unless
+    the cursor came there by the wrap: a row that a program writes
+    again from its start, after `scr_moveto` or a CR, is a line of
+    its own.
+  - The end of a program that moved the cursor through its registers,
+    and so wrote the screen itself, clears the word, in `mon_restore`.
+    One that used the monitor's cursor keeps it, so that a line that
+    `LIST` wrapped above is still one line after `SYS`.
   - When the screen scrolls, the word shifts with it.
 
   BASIC reads and writes the word through a new entry, `scr_links`,
