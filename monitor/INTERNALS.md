@@ -195,7 +195,7 @@ rows there, which `DUMP` and `--dump` read.
 
 `monitor_basic.nasm` is the loader of BASIC's image from a card
 (doc/BASIC_ROM.md, "The cold start"), `bas_load`, which `mon_reset`
-calls before it locks BASIC's half and jumps to BASIC. It keeps no
+calls before it locks BASIC's part and jumps to BASIC. It keeps no
 list of the files: each choice lists the folders of both slots again,
 and takes the highest key, the version and then the file's place,
 below that of the file that failed. Its state is in the monitor's RAM
@@ -203,7 +203,7 @@ from `0xFFFFF400` to `0xFFFFF70D`, which nothing else uses: a line of
 the file, the bytes of a read, an entry, the header, two names, the
 keys, and `BL_BUSY`. It reads a line as `LOAD` does, and parses it with
 `bin_parse`, which `bin_line` shares. The staging area is the
-program's RAM from `0x8000`, 16384 words, zeroed before each file and
+program's RAM from `0x8000`, 20480 words, as many as BASIC's part, zeroed before each file and
 after the last.
 
 The loader does not load over a program. When the staging area is not
@@ -254,7 +254,7 @@ the tests pin it (The tests, below).
 
 The ROM has 32768 words, at `0x0000`–`0x7FFF`, in two images,
 assembled apart (#152): the monitor's from 0, and BASIC's from
-`0x4000`, `BASIC_BASE` of `common.nasm`. The demo is not in it: it is a program,
+`0x3000`, `BASIC_BASE` of `common.nasm`. The demo is not in it: it is a program,
 `demo.bin`, whose words
 [demo/README.md](../demo/README.md#its-words) counts.
 
@@ -262,9 +262,9 @@ assembled apart (#152): the monitor's from 0, and BASIC's from
 | Part | Address | Words |
 |---|---|---:|
 | The monitor | `0x0000`–`0x2965` | 10598 |
-| Free | `0x2966`–`0x3FFF` | 5786 |
-| BASIC | `0x4000`–`0x6515` | 9494 |
-| Free | `0x6516`–`0x7FFF` | 6890 |
+| Free | `0x2966`–`0x2FFF` | 1690 |
+| BASIC | `0x3000`–`0x5515` | 9494 |
+| Free | `0x5516`–`0x7FFF` | 10986 |
 <!-- /romsize layout -->
 
 The monitor's words, by the source they come from, in the order
@@ -331,7 +331,7 @@ The ROM is two images, assembled apart (#152), which `../rom.mk` joins
 into `build/rom.bin` at the top, with `make rom`: the monitor's,
 `build/monitor_image.bin`, which `make -C monitor` writes, at 0, and
 BASIC's, `../basic/build/basic_image.bin`, which `make -C ../basic`
-writes, at `0x4000`. `rom.mk` has the sources of both, `VERSION`, and
+writes, at `0x3000`. `rom.mk` has the sources of both, `VERSION`, and
 `FOLDER`, which the top Makefile passes on to the two. The assembler
 has no include, so each Makefile joins the sources of its image with
 `cat` and assembles the result with `niceasm`. The monitor's, in this
@@ -349,7 +349,7 @@ order:
 BASIC's, in this order:
 
 1. `../basic/basic.nasm`, which starts with the two vectors at
-   `0x4000`, `basic_cmd.nasm`, `basic_net.nasm`, `basic_time.nasm`, and
+   `0x3000`, `basic_cmd.nasm`, `basic_net.nasm`, `basic_time.nasm`, and
    `basic_dis.nasm`, then `common.nasm`, `monlib.nasm`, and `mon.nasm`.
 2. `../basic/build/version.nasm`.
 3. `../basic/build/basic_folder.nasm`, the texts with the folder's name,
@@ -357,7 +357,7 @@ BASIC's, in this order:
 
 The generated files are written only when they change, so that the
 ROM, and a bitstream with it, is not built again for nothing. The build
-fails if the monitor reaches `0x4000`, or BASIC `PROGRAM`, `0x8000`,
+fails if the monitor reaches `0x3000`, or BASIC `PROGRAM`, `0x8000`,
 the end of the ROM. Neither image has a label of the other, so a use of
 one in the other fails the assembly: BASIC calls the monitor through the
 entries of `mon.nasm` alone, and the monitor jumps to BASIC through its

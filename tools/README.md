@@ -231,7 +231,7 @@ then not loaded until the board is switched off and on again.
 
 ## Loading BASIC into the ROM
 
-BASIC's half of the ROM, `0x4000`–`0x7FFF`, takes the link's writes.
+BASIC's part of the ROM, `0x3000`–`0x7FFF`, takes the link's writes.
 `--basic` puts an image of BASIC there, such as `basic/build/basic.rom`
 or a release's `BASIC-V2.3.1.ROM`, and starts the monitor with it:
 
@@ -240,7 +240,7 @@ or a release's `BASIC-V2.3.1.ROM`, and starts the monitor with it:
 
 `load.py` checks the image as `tools/basic_rom.py check` does, holds the
 core, clears the memory, writes the image with "keep" set and zeros
-after it up to `0x7FFF`, reads the half back, and starts the core with
+after it up to `0x7FFF`, reads the part back, and starts the core with
 the ROM shown. The ROM keeps that BASIC until the FPGA is configured
 again, as when the board is switched off. A bitstream without a ROM, or
 one older than V2.3.1, whose ROM takes no writes, is refused, and so is

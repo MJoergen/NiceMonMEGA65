@@ -4,8 +4,8 @@
 ; in the ROM on the board, where a push is dropped and the return address
 ; reads back as 0, so that program restarts forever.
 ;
-; The ROM of tb_nicemon has 2K words, so BASIC's half, which takes the
-; core's writes until the lock (issue #153), is 0x400-0x7FF. PUTS runs
+; The ROM of tb_nicemon has 2K words, so BASIC's part, which takes the
+; core's writes until the lock (issue #153), is 0x300-0x7FF. PUTS runs
 ; from there, so a fetch from it, which does not close the lock, comes
 ; first. Then the program adds 1 to the word at 0x7FF, and reads it back
 ; right behind the write, to RESULT; writes word 0 back to itself, which
@@ -21,7 +21,7 @@ RESULT          .EQU    0x900           ; in the RAM above the ROM
                 MOVE    R1, TEXT        ; the argument: the string's address
                 CALL    PUTS            ; push the return address and jump
                 MOVE    @CONSOLE, 10    ; a newline
-                MOVE    R2, @0x7FF      ; BASIC's half takes the write
+                MOVE    R2, @0x7FF      ; BASIC's part takes the write
                 ADD     R2, R2, 1
                 MOVE    @0x7FF, R2
                 MOVE    @RESULT, @0x7FF
@@ -35,7 +35,7 @@ RESULT          .EQU    0x900           ; in the RAM above the ROM
 TEXT            .ASCII_L 'Hello from the ROM!'
 
 ; PUTS prints the string at R1. The string ends with a 0 word.
-                .ORG    0x400
+                .ORG    0x300
 PUTS            MOVE[M] R2, @R1++       ; next character, and set Z if it is 0
         ?Z      RET                     ; at the end: return
                 MOVE    @CONSOLE, R2    ; print the character

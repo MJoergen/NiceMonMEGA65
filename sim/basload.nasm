@@ -4,22 +4,22 @@
 ; start that counts its runs at T_COUNT, above the staging area, which
 ; the cold start leaves alone, and prints T and the count. The first run
 ; jumps to 0, the monitor's cold start again, which must find BASIC's
-; half of the ROM locked and so load nothing; the second halts.
+; part of the ROM locked and so load nothing; the second halts.
 
-                .ORG    0x4000
-T_COUNT         .EQU    0xC000
+                .ORG    0x3000
+T_COUNT         .EQU    0xE000
 MON_PUTC        .EQU    0x06            ; entry 3
 
-                JMP     t_cold          ; 0x4000, the cold start
-                JMP     t_cold          ; 0x4002, the warm start
-                .DAT    0x5341424E      ; 0x4004, NBAS
-                .DAT    0x00010025      ; 0x4005, layout 1, 37 entries
-                .DAT    0               ; 0x4006, the length
-                .DAT    0               ; 0x4007, the checksum
-                .DAT    T_TEXT          ; 0x4008, the version's text
-                .DAT    0               ; 0x4009, the version
-                .DAT    0               ; 0x400A, the flags
-                .DAT    2048            ; 0x400B, the words of BASIC's RAM
+                JMP     t_cold          ; 0x3000, the cold start
+                JMP     t_cold          ; 0x3002, the warm start
+                .DAT    0x5341424E      ; 0x3004, NBAS
+                .DAT    0x00010025      ; 0x3005, layout 1, 37 entries
+                .DAT    0               ; 0x3006, the length
+                .DAT    0               ; 0x3007, the checksum
+                .DAT    T_TEXT          ; 0x3008, the version's text
+                .DAT    0               ; 0x3009, the version
+                .DAT    0               ; 0x300A, the flags
+                .DAT    2048            ; 0x300B, the words of BASIC's RAM
 
 t_cold
                 ADD     R7, @T_COUNT, 1

@@ -15,10 +15,10 @@ the Halted line and the registers left out, and the words that the run
 dumps, are compared with test/basload.expected, and written to
 BUILD/basload.out.
 
-The ROM in niceemu is RAM, so the loader finds BASIC's half open at
+The ROM in niceemu is RAM, so the loader finds BASIC's part open at
 every cold start: SYS 0 loads again, where a board finds it locked.
 
-Some runs have words in the staging area, 0x8000 to 0xBFFF, at the
+Some runs have words in the staging area, 0x8000 to 0xCFFF, at the
 start, as a program that a host loaded while the ROM was open, which
 the loader leaves alone, or, with the loader's BL_BUSY set, as what a
 load leaves that a reset broke off, which it does again.
@@ -88,17 +88,17 @@ def bad_sum(ls: list[str]) -> list[str]:
 
 
 def bad_magic(ls: list[str]) -> list[str]:
-    return ls[:4] + ["00004004 12345678\n"] + ls[5:]
+    return ls[:4] + [f"{basic_rom.H_MAGIC:08x} 12345678\n"] + ls[5:]
 
 
 def out_of_place(ls: list[str]) -> list[str]:
-    return ls[:6] + ls[7:]          # no line for 0x4006
+    return ls[:6] + ls[7:]          # no line for the length, BASE+6
 
 
 def no_flags(ls: list[str]) -> list[str]:
-    """No line for 0x400A, the flags, whose word is 0, so the checksum
+    """No line for BASE+10, the flags, whose word is 0, so the checksum
     holds."""
-    assert ls[10] == "0000400a 00000000\n"
+    assert ls[10] == f"{basic_rom.H_FLAGS:08x} 00000000\n"
     return ls[:10] + ls[11:]
 
 
@@ -112,6 +112,15 @@ def falling(ls: list[str]) -> list[str]:
 
 def cut_short(ls: list[str]) -> list[str]:
     return ls[:-100]
+
+
+def old_base(ls: list[str]) -> list[str]:
+    """The layout of the ROM before V2.4, with BASIC at 0x4000."""
+    out = []
+    for line in ls:
+        addr, word = line.split()
+        out.append(f"{int(addr, 16) + 0x4000 - basic_rom.BASE:08x} {word}\n")
+    return out
 
 
 def bad_line(ls: list[str]) -> list[str]:
@@ -162,19 +171,19 @@ class Run(NamedTuple):
     extra: str = ""             # lines of the .bin file, after the ROM
 
 
-# A program at 0xC000, above the staging area, which mon_exit, entry 1,
+# A program at 0xD000, above the staging area, 0x8000-0xCFFF, which mon_exit, entry 1,
 # leaves with R1 a word that it pushes at the top of its stack, below
 # BASIC's RAM: at 0xFFFFDFFF for 4K words of it, and 0xFFFFE7FF for 2K.
-EXIT = """                .ORG    0xC000
+EXIT = """                .ORG    0xD000
                 MOVE    R1, 0x1234ABCD
                 JMP     2
 """
 # The RAM's words for bin_line, 128K as on the MEGA65
 RAM128K = "FFFFFF9E 00020000\n"
 # The same program at 0x8000, in the staging area, as a host loads one
-STAY = EXIT.replace("0xC000", "0x8000")
+STAY = EXIT.replace("0xD000", "0x8000")
 # The last word of the staging area alone
-LAST = "0000BFFF 00000001\n"
+LAST = "0000CFFF 00000001\n"
 # What a load leaves that a reset broke off: words of a file in the
 # staging area, and the loader's BL_BUSY, 0xFFFFF70D, not 0
 BROKEN_OFF = "00008000 DEADBEEF\n0000A000 00000001\nFFFFF70D 00000001\n"
@@ -205,10 +214,10 @@ def host(work: str, image: Image) -> None:
         ("CR LF, TABs, blank lines, and a line of 76 characters", crlf_blank, None),
         ("a bad checksum", bad_sum, "bad checksum"),
         ("no magic word", bad_magic, "no magic word"),
-        ("no line for 0x4006", out_of_place, "no line for the header's word at 4006"),
-        ("no line for 0x400A, whose word is 0", no_flags,
-         "no line for the header's word at 400A"),
-        ("an address past BASIC's half", outside, "outside"),
+        ("no line for BASE+6", out_of_place, f"no line for the header's word at {basic_rom.H_LENGTH:04X}"),
+        ("no line for BASE+10, whose word is 0", no_flags,
+         f"no line for the header's word at {basic_rom.H_FLAGS:04X}"),
+        ("an address past BASIC's part", outside, "outside"),
         ("addresses that fall", falling, "does not rise"),
         ("a file cut short", cut_short, "bad checksum"),
         ("a line that is no address and word", bad_line, "not an address and a word"),
@@ -278,10 +287,12 @@ def main() -> None:
         Run("another layout of the monitor's RAM",
             [File("BASIC-5.ROM", v(10, 0, "A", layout=2))]),
         Run("too much RAM", [File("BASIC-6.ROM", v(10, 0, "A", ram=0x4000))]),
-        Run("an address past BASIC's half", [File("BASIC-7.ROM", v(10, 0, "A"), outside)]),
+        Run("an address past BASIC's part", [File("BASIC-7.ROM", v(10, 0, "A"), outside)]),
         Run("addresses that fall", [File("BASIC-8.ROM", v(10, 0, "A"), falling)]),
         Run("a file cut short", [File("BASIC-9.ROM", v(10, 0, "A"), cut_short)]),
         Run("a bad line", [File("BASIC-10.ROM", v(10, 0, "A"), bad_line)]),
+        Run("a file of the cores before V2.4, at 0x4000",
+            [File("BASIC-OLD.ROM", v(10, 0, "A"), old_base)]),
         Run("no line for a word of the header that is 0",
             [File("BASIC-11.ROM", v(10, 0, "A"), no_flags)]),
         Run("words that Python takes, and a line of 77 characters: the ROM's",
@@ -309,16 +320,16 @@ def main() -> None:
             [File("BASIC-V10.ROM", v(10, 0, "A", keep=True))], keys="sys 0\rhalt\r"),
         Run("4K words of BASIC's RAM: mon_exit's stack, and LOAD's end",
             [File("BASIC-V10.ROM", v(10, 0, "A", ram=0x1000))],
-            keys="sys 0xC000\rload\r1DFFF 5\r1E000 6\r\rhalt\r",
+            keys="sys 0xD000\rload\r1DFFF 5\r1E000 6\r\rhalt\r",
             prog=EXIT, dump="-d 0xFFFFDFFF:1 -d 0x1DFFF:2"),
         Run("2K words: the same", [File("BASIC-V10.ROM", v(10, 0, "A"))],
-            keys="sys 0xC000\rload\r1E7FF 5\r1E800 6\r\rhalt\r",
+            keys="sys 0xD000\rload\r1E7FF 5\r1E800 6\r\rhalt\r",
             prog=EXIT, dump="-d 0xFFFFDFFF:1 -d 0xFFFFE7FF:1 -d 0x1E7FF:2"),
         Run("a program at 0x8000: it stays, and the ROM's BASIC runs it",
             [File("BASIC-V10.ROM", v(10, 0, "A"))], keys="sys 0x8000\rhalt\r",
             prog=STAY, dump="-d 0x8000:3"),
         Run("a word at the end of the staging area: no load either",
-            [File("BASIC-V10.ROM", v(10, 0, "A"))], extra=LAST, dump="-d 0xBFFF:1"),
+            [File("BASIC-V10.ROM", v(10, 0, "A"))], extra=LAST, dump="-d 0xCFFF:1"),
         Run("a program, and the ROM's BASIC not whole: the card's, and no program",
             [File("BASIC-V10.ROM", v(10, 0, "A"))], prog=STAY, dump="-d 0x8000:3",
             rom_break=True),

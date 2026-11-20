@@ -22,10 +22,10 @@
 -- Port B takes the request that nicemon takes in this cycle, when it is to
 -- memory (stb_i), and its address, which nicemon drives in every cycle.
 -- A write goes to the screen or to the RAM, unless it is to the ROM while
--- the ROM is shown. There it goes to the ROM when it is to BASIC's half,
--- the upper half of the ROM, by the link (link_i), or by the core while
--- the lock is open; else it is dropped. A write by the core to the
--- monitor's half, the lower half, closes the lock, which nothing opens
+-- the ROM is shown. There it goes to the ROM when it is to BASIC's part,
+-- the words of the ROM from G_ROM_BASIC up, by the link (link_i), or by
+-- the core while the lock is open; else it is dropped. A write by the
+-- core to the monitor's part, the words below, closes the lock, which nothing opens
 -- again but a configuration of the FPGA: not a reset, a start, or a
 -- clear (issue #153, doc/BASIC_ROM.md). A fetch does not close it, as
 -- the core fetches ahead of what it runs. The write to the ROM is
@@ -70,8 +70,8 @@
 --
 -- With G_FORMAL, it states the properties that formal/mem.sby proves: each
 -- write reaches the memory of its address, and no other, in the bytes of
--- its window, a write reaches the ROM a cycle late, and only BASIC's half,
--- the lock closes only by the core's write to the monitor's half, and
+-- its window, a write reaches the ROM a cycle late, and only BASIC's part,
+-- the lock closes only by the core's write to the monitor's part, and
 -- never opens, the clear writes
 -- 0 to every word, a read returns the word of the memory of its address,
 -- and each fetch is acknowledged once.
@@ -93,9 +93,12 @@ entity mem is
       -- none when the file name is empty
       G_ROM_FILE      : string  := "";
       G_ROM_ADDR_BITS : natural;
-      -- BASIC's half of the ROM takes writes (issue #153), or none, so
+      -- BASIC's part of the ROM takes writes (issue #153), or none, so
       -- that the ROM takes fewer block RAMs, as on the Nexys4DDR
       G_ROM_WRITE     : boolean := true;
+      -- The first word of BASIC's part, below 2^G_ROM_ADDR_BITS: BASIC_BASE
+      -- of monitor/common.nasm
+      G_ROM_BASIC     : natural;
       -- Start the RAM with any contents, for formal/nicemon.sby
       G_RAM_ANY       : boolean := false;
       -- The properties for formal/mem.sby; implies G_RAM_ANY
@@ -165,6 +168,31 @@ architecture synthesis of mem is
    begin
       return or(addr(G_RAM_ADDR_BITS - 1 downto G_ROM_ADDR_BITS)) = '0';
    end function in_rom;
+
+   -- G_ROM_BASIC as an address of the ROM, without numeric_std_unsigned's
+   -- to_slv, which CI's GHDL cannot synthesize
+   function rom_basic return std_logic_vector is
+      variable res_v : std_logic_vector(G_ROM_ADDR_BITS - 1 downto 0);
+      variable n_v   : natural := G_ROM_BASIC;
+   begin
+      for i in 0 to G_ROM_ADDR_BITS - 1 loop
+         if n_v mod 2 = 1 then
+            res_v(i) := '1';
+         else
+            res_v(i) := '0';
+         end if;
+         n_v := n_v / 2;
+      end loop;
+      return res_v;
+   end function rom_basic;
+
+   constant C_ROM_BASIC : std_logic_vector(G_ROM_ADDR_BITS - 1 downto 0) := rom_basic;
+
+   -- Whether a word address of the ROM is in BASIC's part
+   function in_basic(addr : std_logic_vector(31 downto 0)) return boolean is
+   begin
+      return addr(G_ROM_ADDR_BITS - 1 downto 0) >= C_ROM_BASIC;
+   end function in_basic;
 
    -- The memory that a memory address lands in: the screen, the ROM while
    -- it is shown, or else the RAM
@@ -319,8 +347,8 @@ architecture synthesis of mem is
    signal rom_b_data : std_logic_vector(31 downto 0);
    signal rom_b_addr : std_logic_vector(G_ROM_ADDR_BITS - 1 downto 0);
 
-   -- The lock of BASIC's half, which only a configuration opens; the
-   -- request that writes BASIC's half, and the one that closes the lock;
+   -- The lock of BASIC's part, which only a configuration opens; the
+   -- request that writes BASIC's part, and the one that closes the lock;
    -- and the write, a cycle late: the bytes, the address, and the word
    signal rom_lock  : std_logic := '0';
    signal rom_wr    : std_logic;
@@ -339,6 +367,10 @@ begin
 
    assert G_ROM_ADDR_BITS < G_RAM_ADDR_BITS
       report "mem: the ROM must leave room for RAM above it"
+      severity failure;
+
+   assert G_ROM_BASIC > 0 and G_ROM_BASIC < 2 ** G_ROM_ADDR_BITS
+      report "mem: BASIC's part must lie inside the ROM, above the monitor's"
       severity failure;
 
    assert C_SCR_BITS <= 16
@@ -452,12 +484,12 @@ begin
 
    rom_wr    <= '1' when stb_i = '1' and we_i = '1' and clearing = '0' and
                          mem_of(b_word, rom_hidden_i) = MEM_ROM and
-                         b_word(G_ROM_ADDR_BITS - 1) = '1' and
+                         in_basic(b_word) and
                          (link_i = '1' or rom_lock = '0') else
                 '0';
    rom_close <= '1' when stb_i = '1' and we_i = '1' and clearing = '0' and link_i = '0' and
                          mem_of(b_word, rom_hidden_i) = MEM_ROM and
-                         b_word(G_ROM_ADDR_BITS - 1) = '0' else
+                         not in_basic(b_word) else
                 '0';
    rom_wr_o  <= rom_wr;
 
@@ -585,7 +617,7 @@ begin
 
       f_lanes <= lanes_of(b_win, addr_i(1 downto 0));
       f_ldata <= lane_data(b_win, wdata_i);
-      f_upper <= b_word(G_ROM_ADDR_BITS - 1);
+      f_upper <= '1' when in_basic(b_word) else '0';
 
       f_mem   <= mem_of(b_word, rom_hidden_i);
       f_imem  <= mem_of(ibus_word, rom_hidden_i);
@@ -614,7 +646,7 @@ begin
       --    rom_hidden_i = '1' or or(ram_b_addr(G_RAM_ADDR_BITS - 1 downto G_ROM_ADDR_BITS)) = '1';
 
       -- A write reaches the ROM in the cycle after its request, at the word
-      -- and in the bytes of its window, when it is to BASIC's half with the
+      -- and in the bytes of its window, when it is to BASIC's part with the
       -- ROM shown, and by the link or while the lock is open; else nothing
       -- reaches the ROM. Port B of the ROM then has the write's address.
       -- psl f_rom_write : assert always
@@ -626,11 +658,11 @@ begin
       --    rom_wr = '1' <->
       --    (stb_i = '1' and we_i = '1' and clearing = '0' and f_mem = MEM_ROM and f_upper = '1' and
       --     (link_i = '1' or rom_lock = '0'));
-      -- psl f_rom_half : assert always rom_we /= 0 -> rom_b_addr(G_ROM_ADDR_BITS - 1) = '1';
+      -- psl f_rom_part : assert always rom_we /= 0 -> rom_b_addr >= C_ROM_BASIC;
       -- psl f_rom_addr : assert always rom_we /= 0 -> rom_b_addr = rom_waddr;
 
       -- The lock never opens, and closes only with a write by the core to
-      -- the monitor's half with the ROM shown, which a fetch is not.
+      -- the monitor's part with the ROM shown, which a fetch is not.
       -- psl f_lock_stays : assert always {rom_lock} |=> {rom_lock};
       -- psl f_lock_close : assert always {not rom_lock} |=> {rom_lock = prev(rom_close)};
       -- psl f_rom_close : assert always

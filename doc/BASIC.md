@@ -680,7 +680,7 @@ BASIC is NICE assembly from stage 2 on ([Decisions](#decisions)):
   as each one's comment says, and the statements' routines may use
   every register, as the main loop starts again after each. BASIC
   calls the monitor through the entries of the dispatch table alone,
-  as a program does (#152): it is an image of its own at `0x4000`,
+  as a program does (#152): it is an image of its own at `0x3000`,
   assembled apart from the monitor's, so it has none of the monitor's
   labels.
 - The table of keywords, the ops, and the messages are packed with
@@ -902,7 +902,8 @@ These were looked at, and not checked as the stages 2 and 3 were:
   `mon_putc` shifts the word of the rows that go on
   ([The screen editor](#the-screen-editor)). `V2.3.1` does not have
   that (decided on 2026-11-18), so the editor comes in a release with
-  a bitstream. It uses the three entries above too.
+  a bitstream, `V2.4` (decided on 2026-11-20). It uses the three
+  entries above too.
 - **The stages 4 to 6 and 8 to 10** show nothing that they need of
   the monitor.
 - **The console's interrupt (#104) and RESTORE's NMI (#110)**, of
@@ -961,8 +962,13 @@ more, 9026, where 2100 were guessed, and leaves 7358 free (measured
 guessed, and leaves 6899 free (measured 2026-11-18). The list after
 stage 4 is guessed at 6600 words in the table above, which fits, with
 little to spare.
-The split is one constant, `BASIC_BASE` of `monitor/common.nasm`: at
-`0x3000`, BASIC would have 20480 words, and the monitor 2746 free.
+The split is one constant, `BASIC_BASE` of `monitor/common.nasm`, and
+`G_ROM_BASIC` of `src/nicemon.vhd` for the FPGA. As the stages 3 and
+4 came in 15 to 21% above their guesses, V2.4 moves it to `0x3000`
+(decided on 2026-11-20): BASIC's image has 20480 words, with 10986
+free after stage 4, and the monitor 1690 free (measured 2026-11-20).
+That changes the FPGA, so it needs a release with a bitstream
+([BASIC_ROM.md](BASIC_ROM.md#basics-part-from-0x3000)).
 
 In assembly, the whole list is guessed at 9000 to 12000 words, which
 fits what is free:
@@ -995,8 +1001,18 @@ that is open when it is done.
   so it can be a release of BASIC alone: `BASIC-V2.3.2.ROM` for the
   card, with the bitstreams and the core files of `V2.3.1`. Stage 4,
   which ends #60, comes with them, and needs nothing new of the
-  monitor either. The stages
-  from 5 on have no milestone yet.
+  monitor either.
+- **`V2.4` has the stages 6 and 7**, #117 and #118, and `BASIC_BASE`
+  at `0x3000` (decided on 2026-11-20). The editor changes `mon_putc`,
+  and the move changes the FPGA, and `V2.4` has a bitstream in any
+  case, as it bumps nice_cpu. Stage 6 is small, and the FPU's
+  functions that it needs are in nice_cpu's `V2.4`.
+- **The stages 5, 8, 9, and 10**, #116, #119, #120, and #121, go to
+  `V2.4.1` for now (decided on 2026-11-20). None of them changes the
+  monitor, so it can be a release of BASIC alone, on the bitstreams of
+  `V2.4`. Stage 8 comes after stage 5, for an `FN` of a string, and
+  stage 9 after stage 8, as `RESUME` keeps the frames that stage 8
+  adds.
 - **A stage that changes the monitor waits for a release with a
   bitstream.** Stage 7, the editor, is the first.
 - **#111 and BASIC share the ROM.** #111 is in V2.1, and
@@ -1010,12 +1026,12 @@ that is open when it is done.
    [The main loop](#the-main-loop).~~ Settled on 2026-11-15
    ([Decisions](#decisions)): `LOAD` by the name, TFTP as its second
    argument, and `HIMEM`. The names of stage 10 come with it.
-3. **The editor's place**: stage 7, or right after stage 3. Either
-   way it changes `mon_putc`, so it comes in a release with a
-   bitstream
-   ([What the stages need of the monitor](#the-later-stages)).
-4. **`PROC` and `FN`** as BBC BASIC writes them, which takes names
-   that start with them from the variables, or `SUB` and `FUNCTION`.
+3. ~~**The editor's place**.~~ Settled on 2026-11-20: stage 7 goes
+   to `V2.4`, before stage 5, as it changes `mon_putc` and `V2.4` has
+   a bitstream ([Releases](#releases)).
+4. ~~**`PROC` and `FN`**.~~ Settled on 2026-11-20: as BBC BASIC
+   writes them, `DEF PROCname` and `PROCname`, `DEF FNname` and
+   `FNname`, so a variable's name cannot start with `PROC` or `FN`.
 5. **Reserved names.** A keyword of a later stage, `SPRITE` or
    `SOUND`, breaks a saved program that has a variable of that name.
    The names could be refused as variables from stage 3 on.

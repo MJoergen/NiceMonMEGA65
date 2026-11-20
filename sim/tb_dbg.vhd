@@ -272,6 +272,7 @@ begin
          G_RX_FIFO_BITS     => 4,
          G_ROM_FILE         => G_ROM_FILE,
          G_ROM_ADDR_BITS    => 11,
+         G_ROM_BASIC        => 16#300#,
          G_CPU_RUN_AT_RESET => true
       )
       port map (

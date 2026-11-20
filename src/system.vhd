@@ -82,7 +82,7 @@ entity system is
       G_CLOCK_HZ      : natural;
       -- The ROM that the core boots from, a .bin file, or "" for a build without one
       G_ROM_FILE      : string       := "";
-      -- BASIC's half of the ROM takes writes (issue #153), or none, as on
+      -- BASIC's part of the ROM takes writes (issue #153), or none, as on
       -- the Nexys4DDR, whose block RAMs are too few for it
       G_ROM_WRITE     : boolean      := true;
       -- The RAM has 2^G_RAM_ADDR_BITS words, 128K on the MEGA65 and 64K on

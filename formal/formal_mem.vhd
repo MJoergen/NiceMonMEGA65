@@ -11,9 +11,9 @@
 -- and the ROM, with the words of rom.bin. A read of a model's word returns
 -- the word last written there, or 0 after a clear, through port B and port
 -- A alike, a read of the ROM while it is shown returns the ROM's word, of
--- rom.bin in the lower half, and in the upper half, BASIC's, the word last
--- written there by the link, or by the core before its write to the lower
--- half, the lock; a fetch in
+-- rom.bin in the monitor's part, words 0 to 2, and in BASIC's part, word
+-- 3, the word last written there by the link, or by the core before its
+-- write to the monitor's part, the lock; a fetch in
 -- the I/O page returns 0, and a clear ends in 16 cycles. The byte windows
 -- of nice_cpu's DEVICES.md §9 reach the model's words too: a write changes
 -- the byte or the halfword of its window, and a read returns it, zero- or
@@ -54,6 +54,9 @@ architecture synthesis of formal_mem is
    constant C_RAM_BITS : natural := 4;
    constant C_SCR_BITS : natural := 3;
    constant C_ROM_BITS : natural := 2;
+   -- BASIC's part of the ROM, from word 3, which no single address bit
+   -- marks, as BASIC_BASE does not on the boards
+   constant C_ROM_BASIC : natural := 3;
 
    signal ibus_data  : std_logic_vector(63 downto 0);
    signal rdata      : std_logic_vector(31 downto 0);
@@ -79,6 +82,7 @@ begin
          G_SCR_ADDR_BITS => C_SCR_BITS,
          G_ROM_FILE      => "rom.bin",
          G_ROM_ADDR_BITS => C_ROM_BITS,
+         G_ROM_BASIC     => C_ROM_BASIC,
          G_FORMAL        => true
       )
       port map (
@@ -113,7 +117,7 @@ begin
       type     t_rom is array (0 to 2 ** C_ROM_BITS - 1) of std_logic_vector(31 downto 0);
       constant C_ROM : t_rom := (X"A0000001", X"B0000002", X"C0000003", X"D0000004");
 
-      -- The ROM's words, and the lock of its upper half, BASIC's, and a
+      -- The ROM's words, and the lock of BASIC's part, and a
       -- write to the ROM in the cycle before, which reaches it in this one
       signal f_rom    : t_rom     := C_ROM;
       signal f_lock   : std_logic := '0';
@@ -344,7 +348,7 @@ begin
                         f_b_chk  <= '1';
                         f_b_word <= read(window(addr_i), addr_i,
                                          f_rom(to_integer(word(addr_i)(C_ROM_BITS - 1 downto 0))));
-                     elsif word(addr_i)(C_ROM_BITS - 1) = '0' then
+                     elsif to_integer(word(addr_i)(C_ROM_BITS - 1 downto 0)) < C_ROM_BASIC then
                         if link_i = '0' then
                            f_lock <= '1';
                         end if;
@@ -401,7 +405,7 @@ begin
       -- A byte written to the model's word of the RAM through window 2,
       -- and a checked read of it through window 5 later
       -- psl c_model_win : cover {f_win_wr; f_win_rd[->1]};
-      -- A word of BASIC's half written by the core, the lock, and a read
+      -- A word of BASIC's part written by the core, the lock, and a read
       -- of a word that the link wrote there after it
       -- psl c_model_rom : cover
       --    {f_lock = '0' and rom_wr = '1' and link_i = '0' and rst_i = '0'; true[*]; f_lock = '1';

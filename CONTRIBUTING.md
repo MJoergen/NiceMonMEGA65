@@ -443,10 +443,10 @@ The testbenches are these:
   timeout, with SCL held low.
 - `sim/tb_basload.vhd` tests the load of BASIC's image from a card at
   the cold start (#153) at 100 MHz: the monitor's image of the tests in
-  the ROM, with nothing in BASIC's half, and a card of FAT32 with
+  the ROM, with nothing in BASIC's part, and a card of FAT32 with
   `sim/basload.nasm` as `NICE/BASIC-T.ROM`, a small image with a valid
   header. The monitor loads it, and runs it, and it starts the monitor
-  again, which must find BASIC's half locked and load nothing. The card
+  again, which must find BASIC's part locked and load nothing. The card
   model keeps only the sectors that its file or a write fills, so a
   card of 65525 clusters fits. It takes about 13 ms of simulated time,
   some 8 minutes, the longest of `make test`.
@@ -462,10 +462,12 @@ The testbenches are these:
 `tb_nicemon` boots the core from the ROM, and checks that the ROM is read
 only with the RAM above it, and that bit 3 of the control register hides
 it and shows it again. Its ROM, `sim/rom.nasm`, runs a routine from
-BASIC's half, the upper half of the ROM, writes a word there and reads
-it back, writes the monitor's half, which locks BASIC's, and writes
-BASIC's half again, which is dropped. The testbench checks both, that
-the link's writes still reach BASIC's half, also through a byte window,
+BASIC's part, `0x300`–`0x7FF` of its 2K words, writes a word there and reads
+it back, writes the monitor's part, which locks BASIC's, and writes
+BASIC's part again, which is dropped. The testbench checks both, that
+the link's writes still reach BASIC's part, also through a byte window,
+that the first word of BASIC's part takes the link's write and the
+last of the monitor's drops it,
 and that the lock holds through a start and a reset (#153). It checks its checksums against the examples of
 DEBUG.md, and the board's `b` notice. With the ROM hidden, it loads the
 "Hello" program over the link and runs it. It checks the halt notice, the
@@ -617,9 +619,9 @@ every time, not only the ones a testbench sends.
   memory of its address, or of the word its byte window reaches, in the
   bytes of its window, and no other, and none to the RAM while it is to
   the shown ROM, a write reaches the ROM a cycle late when it is to the
-  upper half, BASIC's, and is the link's or comes before the lock, and no
-  write reaches the lower half, the lock closes with the core's write to
-  the lower half only, and never opens, a clear writes 0 to every word of
+  part of BASIC, word 3, and is the link's or comes before the lock, and no
+  write reaches the monitor's part, words 0 to 2, the lock closes with the core's write to
+  the monitor's part only, and never opens, a clear writes 0 to every word of
   the RAM and the screen, a read
   returns the word of the memory of its address, or its window's byte or
   halfword, a fetch in the I/O page returns 0, and each fetch gets one
@@ -1027,9 +1029,9 @@ that only counts shows. A card without `NICE` is NOT COVERED there, as
 On the R3, slot 1 has no card detect, so it is always tried, and fails
 without a card.
 
-Then it tests BASIC's half of the ROM, `0x4000`–`0x7FFF`
-([doc/BASIC_ROM.md](doc/BASIC_ROM.md)): a link's write must stick there,
-and not in the monitor's half. When the monitor loaded a card's
+Then it tests BASIC's part of the ROM, `0x3000`–`0x7FFF`
+([doc/BASIC_ROM.md](doc/BASIC_ROM.md)): a link's write must stick at
+its first word and its last, and not at the monitor's last, `0x2FFF`. When the monitor loaded a card's
 `BASIC*.ROM` after the configuration, which its line before the banner
 says, the ROM must hold that file's words, as the script reads the file
 from the card, and the banner must show its version. Without such a
@@ -1039,7 +1041,7 @@ BASIC that it found into the ROM again, with the version text `HWT` and
 the BASIC found goes back as it was. To cover the load from a card,
 copy `basic/build/basic.rom` to the card as `BASIC-T.ROM` with
 `make sdcard CMD="put basic/build/basic.rom BASIC-T.ROM"` first.
-On the Nexys4DDR, whose ROM takes no writes, BASIC's half must drop the
+On the Nexys4DDR, whose ROM takes no writes, BASIC's part must drop the
 link's write, and the configuration must load no card's BASIC; the rest
 is NOT COVERED.
 

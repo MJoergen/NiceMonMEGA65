@@ -3,7 +3,7 @@
 -- which reads and writes. It holds the program that the core boots from
 -- (the monitor and BASIC in a release), at the bottom of the address
 -- space, as the ROM of QNICE-FPGA does. src/mem.vhd decides which writes
--- reach it: those to BASIC's half, until it is locked (issue #153).
+-- reach it: those to BASIC's part, until it is locked (issue #153).
 -- With G_WRITE false, port B takes no writes, and the ROM is a ROM to
 -- Vivado, which packs it into fewer block RAMs, as the Nexys4DDR needs.
 --

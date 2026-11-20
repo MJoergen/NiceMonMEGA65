@@ -8,11 +8,11 @@
 --
 -- THEORY OF OPERATION
 -- The system has the MEGA65's RAM and ROM, the ROM with the monitor's
--- image of the tests, G_ROM_FILE, and nothing in BASIC's half, and the
+-- image of the tests, G_ROM_FILE, and nothing in BASIC's part, and the
 -- core runs from reset. Slot 0 holds an SDHC card, G_SECTORS sectors of
 -- FAT32, whose first sectors are G_IMAGE_FILE, with NICE/BASIC-T.ROM,
 -- sim/basload.nasm; slot 1 is empty. The loader finds the ROM open, takes
--- the file, and copies it into BASIC's half, and the cold start locks the
+-- the file, and copies it into BASIC's part, and the cold start locks the
 -- half and runs it. Its cold start prints T1, and jumps to 0, the
 -- monitor's cold start again. That one must find the half locked, and
 -- run the same image with no load, which prints T2 and halts. p_uart

@@ -55,10 +55,11 @@
 --                          (src/rom.vhd), which the core boots from, as
 --                          QNICE-FPGA's monitor is at 0x0000-0x7FFF.
 --                          It is in front of the RAM, and repeats with it. A
---                          write to its lower half, the monitor's, is
---                          dropped; one by the core closes the lock of the
---                          upper half, BASIC's, until the FPGA is
---                          configured again. A write to BASIC's half goes
+--                          write to its lower part, the monitor's, below
+--                          G_ROM_BASIC, 0x3000, is dropped; one by the
+--                          core closes the lock of the upper part,
+--                          BASIC's, until the FPGA is configured again. A
+--                          write to BASIC's part goes
 --                          to the ROM when it is the link's, or the core's
 --                          while the lock is open, and is dropped otherwise
 --                          (issue #153); with G_ROM_WRITE false, as on the
@@ -382,9 +383,12 @@ entity nicemon is
       -- none when the file name is empty
       G_ROM_FILE         : string  := "";
       G_ROM_ADDR_BITS    : natural := 15;
-      -- BASIC's half of the ROM takes writes until it is locked (issue
+      -- BASIC's part of the ROM takes writes until it is locked (issue
       -- #153), or none: the Nexys4DDR's block RAMs are too few for it
       G_ROM_WRITE        : boolean := true;
+      -- The first word of BASIC's part of the ROM: BASIC_BASE of
+      -- monitor/common.nasm
+      G_ROM_BASIC        : natural := 16#3000#;
       G_CPU_RUN_AT_RESET : boolean := false;
       -- The board has LEDs, a seven-segment display, buttons, and switches
       -- in 0xFFFFFF90-9F
@@ -1267,6 +1271,7 @@ begin
          G_ROM_FILE      => G_ROM_FILE,
          G_ROM_ADDR_BITS => G_ROM_ADDR_BITS,
          G_ROM_WRITE     => G_ROM_WRITE,
+         G_ROM_BASIC     => G_ROM_BASIC,
          G_RAM_ANY       => G_FORMAL
       )
       port map (

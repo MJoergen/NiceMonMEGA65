@@ -15,7 +15,7 @@
 # the files that its header lists, and its copies of the monitor's
 # common.nasm, monlib.nasm, and mon.nasm), build/version.nasm, and
 # build/basic_folder.nasm, its texts with the folder FOLDER's name. It
-# starts at BASIC_BASE, 0x4000, with the two vectors that the monitor
+# starts at BASIC_BASE, 0x3000, with the two vectors that the monitor
 # jumps to. The tests here are those of BASIC's statements, their
 # scanner, LOAD's lines, TIME, DIS, NTP, and TFTP; ../monitor/Makefile
 # has those of the monitor's code, and builds what these tests share

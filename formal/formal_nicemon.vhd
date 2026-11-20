@@ -84,6 +84,7 @@ begin
          G_RX_FIFO_BITS     => 2,
          G_ROM_FILE         => G_ROM_FILE,
          G_ROM_ADDR_BITS    => 2,
+         G_ROM_BASIC        => 2,
          G_CPU_RUN_AT_RESET => G_CPU_RUN_AT_RESET,
          G_BOARD_IO         => G_BOARD_IO,
          G_SD_SLOTS         => G_SD_SLOTS,

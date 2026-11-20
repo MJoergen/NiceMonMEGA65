@@ -124,8 +124,8 @@ Checks, in this order:
       on a card with NICE, sdcard.py's mkdir finds the folder there
       already, and writes nothing. A card without NICE, and one with no
       name of a start of its own, are named after NOT COVERED
-    - BASIC's half of the ROM (doc/BASIC_ROM.md, "The tools"): it takes a
-      link's write, and the monitor's half does not. When the monitor
+    - BASIC's part of the ROM (doc/BASIC_ROM.md, "The tools"): it takes a
+      link's write, and the monitor's part does not. When the monitor
       loaded a card's BASIC*.ROM at the configuration, its line names it,
       the ROM holds that file's words, as the host reads them from the
       card, and the banner shows its version; without one, or with
@@ -244,7 +244,7 @@ from sdcard import (E_NOFOLDER, FOLDER, SD_BUF, SD_CHUNK, SD_CSR, SD_ERROR,
                     FolderError, Volume, read_buffer, sd_command, to_bytes)
 import basic_rom
 from load import (MAX_RAM_WORDS, MON_VARS, PROGRAM, RAM_SIZE, basic_image,
-                  load_basic, load_words, read_bin, read_half, start)
+                  load_basic, load_words, read_bin, read_part, start)
 from boardlink import (BAUD, BAUDS, BRK_COUNT, BRK_EN, CONTROL, DEFAULT_BAUD,
                        ETH_PORT,
                        FREE, HOLD, NET_IP, NET_RX_GOOD, NET_STATUS, NET_TX,
@@ -2158,7 +2158,7 @@ def image_of(data: bytes, tmp: str) -> dict[int, int] | None:
 
 
 def boot_basic(link: Link, image: dict[int, int]) -> bytes:
-    """Starts the core from the ROM, with image in BASIC's half, as
+    """Starts the core from the ROM, with image in BASIC's part, as
     load_basic() wrote it, and returns the console's bytes up to READY."""
     link.take_console()
     start(link, rom=True)
@@ -2167,28 +2167,28 @@ def boot_basic(link: Link, image: dict[int, int]) -> bytes:
 
 def test_basic(link: Link, fat: dict[int, Folder], programmed: bool,
                tmp: str, board: str) -> None:
-    """BASIC's half of the ROM, 0x4000-0x7FFF (issue #153, doc/BASIC_ROM.md,
-    "The tools"): it takes a link's write, and the monitor's half does not.
+    """BASIC's part of the ROM, 0x3000-0x7FFF (issue #153, doc/BASIC_ROM.md,
+    "The tools"): it takes a link's write, and the monitor's part does not.
     The BASIC that the monitor started at the configuration is that of the
     card's BASIC*.ROM that its line names, word for word, with its version
     in the banner, or the bitstream's, when no card has one. Then a test
     image, that BASIC with the version text HWT and "keep", goes in with
     load.py's load_basic(), and the banner shows it; then the BASIC found
     goes back as it was, which the banner shows too. The Nexys4DDR's ROM
-    takes no writes, as its block RAMs are too few, so there BASIC's half
+    takes no writes, as its block RAMs are too few, so there BASIC's part
     must drop a link's write, and the configuration must load no card's
     BASIC."""
     link.control(HOLD)
     if link.read_word(CONTROL) & RAM:
-        uncovered.append("BASIC's half of the ROM, as the bitstream has none")
+        uncovered.append("BASIC's part of the ROM, as the bitstream has none")
         return
-    found = read_half(link)
+    found = read_part(link)
     last = found[-1]
     ok = wr(link, 0x7FFF, last ^ basic_rom.MASK) and rd(link, 0x7FFF) == last ^ basic_rom.MASK
     wr(link, 0x7FFF, last)
     if board == "nexys4ddr":
         check("the Nexys4DDR's ROM, read-only, drops a link's write in "
-              "BASIC's half", not ok)
+              "BASIC's part", not ok)
         if programmed:
             loaded = boot_load()
             check("the configuration loaded no card's BASIC, as the ROM "
@@ -2197,16 +2197,21 @@ def test_basic(link: Link, fat: dict[int, Folder], programmed: bool,
         uncovered.append("the load of BASIC into the ROM, as the "
                          "Nexys4DDR's ROM is read-only")
         return
-    if not check("BASIC's half of the ROM takes a link's write", ok,
+    if not check("BASIC's part of the ROM takes a link's write", ok,
                  "" if ok else "a bitstream older than V2.3.1"):
         return
-    low = rd(link, 0x3FFF)
-    check("the monitor's half of the ROM drops a link's write",
-          wr(link, 0x3FFF, low ^ basic_rom.MASK) and rd(link, 0x3FFF) == low)
+    low = rd(link, basic_rom.BASE - 1)
+    check("the monitor's part of the ROM drops a link's write",
+          wr(link, basic_rom.BASE - 1, low ^ basic_rom.MASK) and rd(link, basic_rom.BASE - 1) == low)
+    first = found[0]
+    check("the first word of BASIC's part takes a link's write",
+          wr(link, basic_rom.BASE, first ^ basic_rom.MASK) and
+          rd(link, basic_rom.BASE) == first ^ basic_rom.MASK)
+    wr(link, basic_rom.BASE, first)
     image = {basic_rom.BASE + i: w for i, w in enumerate(found) if w}
     if image.get(basic_rom.H_MAGIC) != basic_rom.MAGIC:
         check("the BASIC in the ROM has its header", False,
-              f"{image.get(basic_rom.H_MAGIC, 0):08X} at 4004")
+              f"{image.get(basic_rom.H_MAGIC, 0):08X} at {basic_rom.H_MAGIC:04X}")
         return
     text = basic_rom.text(image)
     # What the configuration started

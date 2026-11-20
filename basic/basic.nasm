@@ -1,5 +1,5 @@
 ; BASIC in the ROM (issue #54, doc/BASIC.md), an image of its own at
-; BASIC_BASE, 0x4000, assembled apart from the monitor's (issue #152).
+; BASIC_BASE, 0x3000, assembled apart from the monitor's (issue #152).
 ; It calls the monitor through the entries of the dispatch table alone,
 ; their .EQUs in ../monitor/mon.nasm, as a program does. The Makefile of
 ; ../monitor joins this file first, then basic_expr.nasm, basic_prog.nasm,
@@ -108,14 +108,14 @@ V_NTPA          .EQU    0xFFFFEAD4      ; and the answer, 48 words
                 .ORG    BASIC_BASE
                 JMP     bas_start
                 JMP     bas_warm
-                .DAT    BAS_MAGIC       ; 0x4004: the magic word, NBAS in packed ASCII
-                .DAT    65536*MON_LAYOUT+MON_ENTRIES  ; 0x4005: the interface
-                .DAT    0               ; 0x4006: the length in words, from BASIC_BASE
-                .DAT    0               ; 0x4007: the checksum, the sum over the length is 0
-                .DAT    VERSION         ; 0x4008: the version text, as the banner shows it
-                .DAT    0               ; 0x4009: the version as a number
-                .DAT    0               ; 0x400A: the flags, bit 0 "keep"
-                .DAT    BASIC_WORDS     ; 0x400B: the words of BASIC's RAM, from STACK
+                .DAT    BAS_MAGIC       ; +4: the magic word, NBAS in packed ASCII
+                .DAT    65536*MON_LAYOUT+MON_ENTRIES  ; +5: the interface
+                .DAT    0               ; +6: the length in words, from BASIC_BASE
+                .DAT    0               ; +7: the checksum, the sum over the length is 0
+                .DAT    VERSION         ; +8: the version text, as the banner shows it
+                .DAT    0               ; +9: the version as a number
+                .DAT    0               ; +10: the flags, bit 0 "keep"
+                .DAT    BASIC_WORDS     ; +11: the words of BASIC's RAM, from STACK
 
 ; bas_warm: where mon_exit goes, with R1 the status of the program that
 ; left: the status shown, as SYS shows it, and then the main loop

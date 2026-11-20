@@ -22,7 +22,7 @@
 ; the same, but the stack, and BASIC goes on.
 ;
 ; The ROM is two images, assembled apart (issue #152): the monitor, at
-; 0x0000, and BASIC, at BASIC_BASE, 0x4000, from the files of ../basic/.
+; 0x0000, and BASIC, at BASIC_BASE, 0x3000, from the files of ../basic/.
 ; ../rom.mk joins the two into ../build/rom.bin, the ROM, and the images
 ; of the tests into ../build/rom_test.bin. BASIC calls the
 ; monitor through the entries of the dispatch table alone, as a program
@@ -48,7 +48,7 @@
 ;   34, the dates of FAT's entries, and the real-time clock (issues #105,
 ;   #109, and #148).
 ; - monitor_basic.nasm: the loader of BASIC's image from a card, which
-;   the cold start runs before it locks BASIC's half of the ROM (issue
+;   the cold start runs before it locks BASIC's part of the ROM (issue
 ;   #153, doc/BASIC_ROM.md).
 ; - common.nasm: what both images share, each with a copy of its own:
 ;   the addresses of the devices that both use, BASIC's vectors, the
@@ -354,9 +354,9 @@ mon_reset
                 CALL    scr_cls
                 CALL    clock_rtc
                 CALL    bas_load        ; BASIC from a card, monitor_basic.nasm
-; The lock of BASIC's half of the ROM, a write of the monitor's own half,
+; The lock of BASIC's part of the ROM, a write of the monitor's own part,
 ; which drops it, and BASIC's cold start: the monitor's one jump to it, so
-; that BASIC never runs with its half open (issue #153)
+; that BASIC never runs with its part open (issue #153)
                 MOVE    @0, @0
                 JMP     BAS_COLD        ; BASIC's cold start
 

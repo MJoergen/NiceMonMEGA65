@@ -36,8 +36,8 @@ again, so that the monitor runs that BASIC and does not replace it with
 a card's BASIC*.ROM, which would also zero the RAM from 0x8000.
 
 With --basic, FILE is an image of BASIC, such as basic/build/basic.rom
-or a release's BASIC-V2.3.1.ROM, which goes into BASIC's half of the ROM,
-0x4000-0x7FFF, with "keep" set and every word of the half that it does
+or a release's BASIC-V2.3.1.ROM, which goes into BASIC's part of the ROM,
+0x3000-0x7FFF, with "keep" set and every word of the part that it does
 not fill zeroed, and is read back. The core is held, the memory
 cleared, and the ROM shown, and the core started, unless --no-run is
 given, so the monitor boots cold with that BASIC. The ROM keeps it until
@@ -96,7 +96,7 @@ def in_screen(addr: int) -> bool:
 
 
 def basic_image(words: Words) -> dict[int, int]:
-    """The words of words in BASIC's half of the ROM, by address."""
+    """The words of words in BASIC's part of the ROM, by address."""
     return {a: w for a, w in words if basic_rom.BASE <= a < basic_rom.END}
 
 
@@ -240,14 +240,14 @@ def load_basic(link: Link, image: dict[int, int], keep: bool = True) -> None:
     words = [image.get(a, 0) for a in range(basic_rom.BASE, basic_rom.END)]
     nicebin.write_words(link, list(zip(range(basic_rom.BASE, basic_rom.END),
                                        words)))
-    if read_half(link) != words:
-        fail("BASIC's half of the ROM did not keep the words written: the "
+    if read_part(link) != words:
+        fail("BASIC's part of the ROM did not keep the words written: the "
              "ROM takes no writes, as on the Nexys4DDR, or in a bitstream "
              "older than V2.3.1")
 
 
-def read_half(link: Link) -> list[int]:
-    """The words of BASIC's half of the ROM, shown, with the core held."""
+def read_part(link: Link) -> list[int]:
+    """The words of BASIC's part of the ROM, shown, with the core held."""
     out: list[int] = []
     for a in range(basic_rom.BASE, basic_rom.END, 1024):
         out += link.read(a, 1024)
@@ -287,7 +287,7 @@ def main() -> None:
                         help="leave the core held in reset after loading")
     add_monitor_arguments(parser)
     parser.add_argument("--basic", action="store_true",
-                        help="FILE is an image of BASIC, for BASIC's half "
+                        help="FILE is an image of BASIC, for BASIC's part "
                         "of the ROM, with \"keep\" set")
     parser.add_argument("file",
                         help="a .bin file: one 'address word' hex pair per line")

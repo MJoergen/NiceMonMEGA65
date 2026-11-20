@@ -30,9 +30,9 @@
 --    is in the RAM, at the top of the memory, for a push to the ROM is lost.
 --    The ROM is at 0, read only, with the RAM above it; bit 3 of the
 --    control register hides it, and shows it again; and the core boots from
---    it again when it is started with the ROM shown. BASIC's half,
---    0x400-0x7FF, took the core's write before the core's write to the
---    monitor's half, the lock, and drops it after (rom.nasm), takes the
+--    it again when it is started with the ROM shown. BASIC's part,
+--    0x300-0x7FF, which no single address bit marks, took the core's write before the core's write to the
+--    monitor's part, the lock, and drops it after (rom.nasm), takes the
 --    link's after it, also through a byte window, and stays locked
 --    through a start and a reset. From then on the ROM
 --    is hidden, as the tools hide it, so the RAM is at 0 as in the
@@ -380,6 +380,7 @@ begin
          G_RX_FIFO_BITS     => 4,
          G_ROM_FILE         => G_ROM_FILE,
          G_ROM_ADDR_BITS    => 11,
+         G_ROM_BASIC        => 16#300#,
          G_CPU_RUN_AT_RESET => true,
          G_BOARD_IO         => true,
          G_LINK_WAIT_US     => C_LINK_WAIT_US,
@@ -874,6 +875,7 @@ begin
       end function first_word;
 
       variable first_v : string(1 to 8);
+      variable word_v  : std_logic_vector(31 downto 0);
       variable high_v  : string(1 to 128);
 
    begin
@@ -923,7 +925,7 @@ begin
       check("00000000", first_v);            -- the ROM
       wr("00000000", "12345678");            -- dropped
       check("00000000", first_v);
-      -- BASIC's half, 0x400-0x7FF: the core's write before the lock went
+      -- BASIC's part, 0x300-0x7FF: the core's write before the lock went
       -- to the ROM, and read back right behind it, and the one after it
       -- was dropped (rom.nasm); the link's go to the ROM after the lock,
       -- also through a byte window
@@ -935,6 +937,13 @@ begin
       check("000007FE", "11223344");
       wr("20001FF9", "000000EE");            -- byte 1 of 0x7FE
       check("000007FE", "1122EE44");
+      read_word("00000300", word_v);         -- PUTS, the first word of BASIC's part,
+      wr("00000300", "22222222");            -- takes the link's write
+      check("00000300", "22222222");
+      wr("00000300", to_hstring(word_v));
+      check("000002FF", "00000000");         -- the last word of the monitor's part
+      wr("000002FF", "11111111");            -- drops it
+      check("000002FF", "00000000");
       check("00000800", "00000000");         -- the RAM above the ROM
       wr("00000800", "12345678");
       check("00000800", "12345678");
@@ -943,7 +952,7 @@ begin
       check("00000000", "00000000");         -- the RAM under the ROM
       wr("00000000", "ABCD1234");
       check("00000000", "ABCD1234");
-      wr("000007FE", "CAFEBABE");            -- the RAM under BASIC's half
+      wr("000007FE", "CAFEBABE");            -- the RAM under BASIC's part
       check("000007FE", "CAFEBABE");
       wr("FFFFFFF0", "00000001");            -- the ROM shown again
       check("00000000", first_v);

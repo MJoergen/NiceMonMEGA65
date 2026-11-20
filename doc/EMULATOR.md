@@ -19,9 +19,9 @@ compared (see
   under it, with `SYS 0x8000` in the input
   ([PROGRAMMING.md](PROGRAMMING.md#three-levels)). A program at 0 runs
   the same on both, as the tools hide the board's ROM.
-- With the monitor joined at 0, BASIC's half is RAM, which the monitor
+- With the monitor joined at 0, BASIC's part is RAM, which the monitor
   finds open at every cold start. So `SYS 0` loads a card's
-  `BASIC*.ROM` again in the emulator, when `0x8000`–`0xBFFF` is all
+  `BASIC*.ROM` again in the emulator, when `0x8000`–`0xCFFF` is all
   zeros, with no program there, where a board loads it once after its
   configuration. An image whose BASIC has the flag "keep", as the
   tests' has, loads none

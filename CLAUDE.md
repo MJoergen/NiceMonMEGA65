@@ -7,7 +7,7 @@ and switches as registers. It has nice_cpu's debug link
 (`nice_cpu/doc/DEBUG.md`, `hdl/src/debug_link.vhd`) on the debug UART, a
 text display on VGA and HDMI, a ROM at address 0 with the monitor, a
 QMON-like hardware abstraction layer for programs at 0x8000
-(`monitor/README.md`), and BASIC at 0x4000, an image of its own on the
+(`monitor/README.md`), and BASIC at 0x3000, an image of its own on the
 monitor's entries alone (`basic/README.md`, #152), and host
 tools that load and run programs. The goal is that a program runs on the
 board exactly as `niceemu`, the emulator in `nice_cpu/emulator`, runs it.
@@ -38,7 +38,7 @@ split from the monitor into an image of its own (#152), stage 2,
 the numbers (#113), is written, and so are stage 3, the programs
 (#114), with its benchmarks, and stage 4, the files (#60).
 `doc/BASIC_ROM.md` is the design of BASIC's image from a card's
-`BASIC*.ROM`, which replaces BASIC's half of the ROM at the first
+`BASIC*.ROM`, which replaces BASIC's part of the ROM at the first
 cold start (#153), of which all five stages are written.
 `doc/SDCARD.md` is the design of the SD cards' storage, issue #62 and
 its subtasks, of which the controller, the slots, the ROM's sector
@@ -188,7 +188,7 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   in V2.1 (#129).
   The ROM is two images, assembled apart (#152), which `rom.mk` joins
   into `build/rom.bin`, and the tests' into `build/rom_test.bin`: the
-  monitor's at 0, and BASIC's at `0x4000`, `BASIC_BASE`, whose two
+  monitor's at 0, and BASIC's at `0x3000`, `BASIC_BASE`, whose two
   vectors, the cold start and the warm start, are all the monitor knows
   of it. `basic/`: BASIC
   (`basic.nasm`, the vectors, the main loop (#54, stage 1 #112), its

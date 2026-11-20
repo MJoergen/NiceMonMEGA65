@@ -31,6 +31,12 @@ nice_cpu's `RC01` and `RC03` have no tag here.
   ([#154](https://github.com/MJoergen/NiceMonMEGA65/issues/154),
   [nice_cpu#200](https://github.com/MJoergen/nice_cpu/issues/200)).
   `-41610939429.7131` was `-41610939429.713`.
+- BASIC starts at `0x3000` in the ROM, where it started at `0x4000`,
+  so that it has room for its next stages. A card's `BASIC*.ROM` from
+  before V2.4 does not fit this core, nor a V2.4 file an older core:
+  the monitor passes over it, "not a BASIC image", and runs the core's
+  own BASIC. The link's writes reach the ROM from `0x3000` on
+  ([doc/BASIC_ROM.md](BASIC_ROM.md#basics-part-from-0x3000)).
 - The demo's F11 tests the RAM from `0xB000` to `0xCFFF`, where it
   tested up to `0xDFFF`, and its screen says so.
 

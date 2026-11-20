@@ -17,17 +17,17 @@ The ROM at `0x0000`–`0x7FFF`, which the core boots from, holds:
   table at the start of the ROM. It is not a library: what a program can
   do for itself stays in the program.
 - BASIC, whose stage 1 is the shell with the monitor's commands as
-  statements, an image of its own at `0x4000`, which
+  statements, an image of its own at `0x3000`, which
   [basic/README.md](../basic/README.md) describes.
 
 The rest of the ROM is free. The demo is not in the ROM: it is a
 program of its own (The demo below).
 
 At the first cold start after the FPGA's configuration, the monitor
-may put another BASIC into BASIC's half of the ROM: a file whose name
+may put another BASIC into BASIC's part of the ROM, `0x3000`–`0x7FFF`: a file whose name
 matches `BASIC*.ROM`, in the folder `NICE` of a card. It takes the one
 with the highest version that passes its checks, and prints its name.
-Then BASIC's half is locked until the next configuration
+Then BASIC's part is locked until the next configuration
 ([doc/BASIC_ROM.md](../doc/BASIC_ROM.md)). It reads no card when a
 host has already loaded a program at `0x8000`: the program stays, and
 the ROM's own BASIC runs it.
@@ -75,10 +75,10 @@ tests.
 
 The monitor and BASIC are in NICE assembly. The ROM is two images,
 assembled apart (#152): the monitor's at `0x0000`, and BASIC's at
-`0x4000`, from the files of [../basic](../basic). BASIC calls the
+`0x3000`, from the files of [../basic](../basic). BASIC calls the
 monitor through the entries of the dispatch table alone, as a program
 does, and the monitor jumps to BASIC through two vectors alone, at
-`0x4000`, its cold start, and `0x4002`, its warm start. Neither image
+`0x3000`, its cold start, and `0x3002`, its warm start. Neither image
 has a label of the other. The monitor's image is its files in this
 order, and [INTERNALS.md](INTERNALS.md#the-roms-words) has the words of
 each, and the words that are free:

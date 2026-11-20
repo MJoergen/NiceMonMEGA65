@@ -184,7 +184,7 @@ Screen:
 |halt
 |Halted
 exit 0
-== an address past BASIC's half
+== an address past BASIC's part
 BASIC-7.ROM on card 0: bad address
 NiceMon V9.9, BASIC V9.9
 HELP lists the statements
@@ -238,6 +238,21 @@ halt
 Halted
 Screen:
 |BASIC-10.ROM on card 0: bad line
+|NiceMon V9.9, BASIC V9.9
+|HELP lists the statements
+|READY.
+|halt
+|Halted
+exit 0
+== a file of the cores before V2.4, at 0x4000
+BASIC-OLD.ROM on card 0: not a BASIC image
+NiceMon V9.9, BASIC V9.9
+HELP lists the statements
+READY.
+halt
+Halted
+Screen:
+|BASIC-OLD.ROM on card 0: not a BASIC image
 |NiceMon V9.9, BASIC V9.9
 |HELP lists the statements
 |READY.
@@ -419,7 +434,7 @@ BASIC-V10.ROM from card 0
 NiceMon V9.9, BASIC A
 HELP lists the statements
 READY.
-sys 0xC000
+sys 0xD000
 Returned 1234ABCD
 READY.
 load
@@ -436,7 +451,7 @@ Screen:
 |NiceMon V9.9, BASIC A
 |HELP lists the statements
 |READY.
-|sys 0xC000
+|sys 0xD000
 |Returned 1234ABCD
 |READY.
 |load
@@ -452,7 +467,7 @@ BASIC-V10.ROM from card 0
 NiceMon V9.9, BASIC A
 HELP lists the statements
 READY.
-sys 0xC000
+sys 0xD000
 Returned 1234ABCD
 READY.
 load
@@ -463,14 +478,14 @@ READY.
 halt
 Halted
 ffffdfff: 00000000
-ffffe7ff: 000040c3
+ffffe7ff: 000030c3
 0001e7ff: 00000005 00000000
 Screen:
 |BASIC-V10.ROM from card 0
 |NiceMon V9.9, BASIC A
 |HELP lists the statements
 |READY.
-|sys 0xC000
+|sys 0xD000
 |Returned 1234ABCD
 |READY.
 |load
@@ -507,7 +522,7 @@ HELP lists the statements
 READY.
 halt
 Halted
-0000bfff: 00000001
+0000cfff: 00000001
 Screen:
 |NiceMon V9.9, BASIC V9.9
 |HELP lists the statements

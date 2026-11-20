@@ -4,7 +4,7 @@
 #
 # The ROM is two images, assembled apart (issue #152): the monitor's at
 # 0, which monitor/Makefile builds into monitor/build/monitor_image.bin,
-# and BASIC's at BASIC_BASE, 0x4000 (monitor/common.nasm), which
+# and BASIC's at BASIC_BASE, 0x3000 (monitor/common.nasm), which
 # basic/Makefile builds into basic/build/basic_image.bin. build/rom.bin
 # joins them, and is the ROM of the boards and the tools. The tests take
 # build/rom_test.bin, which joins the images of the tests,

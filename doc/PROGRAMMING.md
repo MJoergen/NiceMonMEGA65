@@ -180,7 +180,7 @@ The emulator, `niceemu`, has all of them, with the differences that
 The program calls them through the dispatch table, a row of jumps at
 fixed addresses at the start of the ROM
 ([monitor/README.md](../monitor/README.md#the-dispatch-table)). BASIC,
-an image of its own in the ROM at `0x4000`, calls the monitor through
+an image of its own in the ROM at `0x3000`, calls the monitor through
 them alone, so a program can do all that BASIC does (#152):
 
 - A terminal on the screen, with the cursor, the scrolling, and a copy
@@ -637,5 +637,5 @@ The layout is that of QNICE-FPGA, whose monitor is in the ROM at
 [`sim/rom.nasm`](../sim/rom.nasm) is a small example, a greeting, and
 the boards' ROM, `build/rom.bin`, is a larger one: two images,
 assembled apart, the monitor's at `0x0000`
-([monitor/](../monitor/README.md)) and BASIC's at `0x4000`
+([monitor/](../monitor/README.md)) and BASIC's at `0x3000`
 ([basic/](../basic/README.md)), which `rom.mk` joins.

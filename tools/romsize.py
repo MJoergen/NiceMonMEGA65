@@ -210,7 +210,7 @@ def image_table(bin_path: str, sources: list[str]) -> tuple[list[str], int, int]
     parts = marker.measure(bin_path)
     addrs = [a for a, _ in words(bin_path)]
     first, end = min(addrs), max(addrs) + 1
-    # The first part starts at 0, before its .ORG, BASIC's at 0x4000
+    # The first part starts at 0, before its .ORG, BASIC's at BASIC_BASE
     parts[0] = parts[0]._replace(words=parts[0].words - first)
     if sum(p.words for p in parts) != end - first:
         sys.exit(f"romsize.py: the parts of {bin_path} do not add up to its words")

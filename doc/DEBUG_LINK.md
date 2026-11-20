@@ -102,10 +102,10 @@ A start without bit 3 shows the ROM again, which boots instead of the
 program. `tools/load.py` does all of this (see
 [The control register](#the-control-register)).
 
-With the ROM shown, the link's writes to BASIC's half of the ROM,
-`0x4000`–`0x7FFF`, go to the ROM, also after the core has locked it
+With the ROM shown, the link's writes to BASIC's part of the ROM,
+`0x3000`–`0x7FFF`, go to the ROM, also after the core has locked it
 ([SYSTEM.md](SYSTEM.md#address-map), #153), and those to the
-monitor's half, `0x0000`–`0x3FFF`, are dropped. So a host can put a
+monitor's part, `0x0000`–`0x2FFF`, are dropped. So a host can put a
 BASIC of its own into the ROM, and start the core with the ROM shown.
 
 The clear also ends the halt and the stop of the program that it wipes.

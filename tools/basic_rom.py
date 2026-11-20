@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 """Fill in and check the header of BASIC's image (issue #153).
 
-BASIC's image is a .bin file at 0x4000-0x7FFF (nice_cpu's ISA.md
-section 10.4), whose header follows its two vectors (doc/BASIC_ROM.md,
-"The image"):
+BASIC's image is a .bin file at BASE-0x7FFF (nice_cpu's ISA.md
+section 10.4), where BASE is BASIC_BASE of monitor/common.nasm, 0x3000.
+Its header follows its two vectors (doc/BASIC_ROM.md, "The image"):
 
-  0x4004  the magic word, NBAS in packed ASCII
-  0x4005  the interface: the version of the layout of the monitor's RAM
+  BASE+4  the magic word, NBAS in packed ASCII
+  BASE+5  the interface: the version of the layout of the monitor's RAM
           in bits 31..16, and the entries that the image calls in 15..0
-  0x4006  the length in words, from 0x4000
-  0x4007  the checksum: the sum of the words over the length is 0
-  0x4008  the address of the version text
-  0x4009  the version as a number: major, minor, patch, and commits
-  0x400A  the flags: bit 0 is "keep"
-  0x400B  the words of BASIC's own RAM
+  BASE+6  the length in words, from BASE
+  BASE+7  the checksum: the sum of the words over the length is 0
+  BASE+8  the address of the version text
+  BASE+9  the version as a number: major, minor, patch, and commits
+  BASE+10 the flags: bit 0 is "keep"
+  BASE+11 the words of BASIC's own RAM
 
 The assembler writes the magic word, the interface, the address of the
 text, and the words of the RAM, and 0 for the others, which this script
@@ -31,7 +31,7 @@ The check takes a file's lines as the monitor's loader takes them from
 a card (monitor/monitor_basic.nasm), so that a file that passes here is
 not refused there for its lines: each is an address and a word of 1 to
 8 hex digits, of at most 76 characters, and the header's 12 words,
-0x4000 to 0x400B, all have their lines. The loader alone knows whether
+BASE to BASE+11, all have their lines. The loader alone knows whether
 the image's interface is its monitor's.
 
 tools/load.py and tools/hwtest.py use the functions here: set_keep() for
@@ -42,13 +42,28 @@ Only the Python standard library is used.
 """
 
 import argparse
+import os
 import re
 import sys
 
-BASE = 0x4000
-END = 0x8000
+
+def _equ(name: str) -> int:
+    """A constant of monitor/common.nasm, which both images share, so
+    that the ROM's split is one constant (doc/BASIC.md, "The ROM's
+    room")."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "monitor", "common.nasm")
+    with open(path) as f:
+        for line in f:
+            m = re.match(rf"{name}\s+\.EQU\s+(0x[0-9A-Fa-f]+)", line)
+            if m:
+                return int(m[1], 16)
+    raise SystemExit(f"basic_rom.py: no {name} in {path}")
+
+
+BASE = _equ("BASIC_BASE")
+END = _equ("PROGRAM")
 MAGIC = 0x5341424E      # NBAS, the first character in the low byte
-H_MAGIC, H_IFACE, H_LENGTH, H_SUM, H_TEXT, H_VERSION, H_FLAGS, H_RAM = range(0x4004, 0x400C)
+H_MAGIC, H_IFACE, H_LENGTH, H_SUM, H_TEXT, H_VERSION, H_FLAGS, H_RAM = range(BASE + 4, BASE + 12)
 FLAG_KEEP = 1
 MASK = 0xFFFFFFFF
 # The words of BASIC's RAM that the monitor takes from the header, and
@@ -72,7 +87,7 @@ class ImageError(Exception):
 def read_image(path: str) -> dict[int, int]:
     """The words of an image, by address, with the rules of a file on a
     card: each line an address and a word as the loader takes them, and
-    the addresses in 0x4000-0x7FFF, rising from line to line."""
+    the addresses in BASE-0x7FFF, rising from line to line."""
     image: dict[int, int] = {}
     last = -1
     with open(path) as f:
@@ -123,7 +138,7 @@ def checksum_of(image: dict[int, int], length: int) -> int:
 
 def fill(image: dict[int, int], version: str, keep: bool) -> None:
     if image.get(H_MAGIC) != MAGIC:
-        raise ImageError("no magic word NBAS at 0x4004")
+        raise ImageError(f"no magic word NBAS at {H_MAGIC:#06x}")
     for addr in (H_LENGTH, H_SUM, H_VERSION, H_FLAGS):
         if image.get(addr, 0):
             raise ImageError(f"the header's word at {addr:04X} is not 0 before it is filled")
@@ -176,7 +191,7 @@ def check(image: dict[int, int]) -> str:
     there, also one that is 0: the loader reads them from the file's
     first lines, each at its address, and takes no file without them."""
     if image.get(H_MAGIC) != MAGIC:
-        raise ImageError("no magic word NBAS at 0x4004")
+        raise ImageError(f"no magic word NBAS at {H_MAGIC:#06x}")
     for addr in range(BASE, H_RAM + 1):
         if addr not in image:
             raise ImageError(f"no line for the header's word at {addr:04X}")

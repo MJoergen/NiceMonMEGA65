@@ -3,13 +3,13 @@
 ; mon_reset calls bas_load at its end, before the lock and the jump to
 ; BASIC's cold start.
 ;
-; BASIC's half of the ROM, BASIC_BASE to PROGRAM - 1, takes the core's
+; BASIC's part of the ROM, BASIC_BASE to PROGRAM - 1, takes the core's
 ; writes from the FPGA's configuration until the core writes to the
-; monitor's half, which mon_reset does right before BAS_COLD (src/mem.vhd).
+; monitor's part, which mon_reset does right before BAS_COLD (src/mem.vhd).
 ; So the first cold start after a configuration may put another BASIC
 ; there: a file of the card's folder whose name matches BASIC*.ROM, in
 ; either case, such as BASIC-V2.3.2.ROM, a .bin file whose addresses are
-; in BASIC's half and rise from line to line, with the header of
+; in BASIC's part and rise from line to line, with the header of
 ; common.nasm's BAS_H_ words.
 ;
 ; bas_load does nothing when the ROM is locked, which it finds out by
@@ -18,7 +18,7 @@
 ; loaded into the RAM has, where the ROM is RAM.
 ;
 ; Nor does it load over a program. It stages a file in the program's RAM
-; from PROGRAM, the staging area, as many words as BASIC's half, which is
+; from PROGRAM, the staging area, as many words as BASIC's part, which is
 ; all zeros after a configuration. When it is not, a host has loaded a
 ; program there while the ROM was still open, and the BASIC in the ROM
 ; runs it, when that BASIC is whole, with its header and its checksum
@@ -38,7 +38,7 @@
 ; file into the staging area, BASIC_BASE words higher than each line's
 ; address, and checks it there: its lines, its header, and its checksum.
 ; Only a file that passes is copied into the ROM, over its length, and
-; the rest of BASIC's half zeroed; else its reason is shown, and the next
+; the rest of BASIC's part zeroed; else its reason is shown, and the next
 ; one is taken, the one with the highest version below it. The staging
 ; area is zeroed before each file and after the last, as the RAM is at
 ; the configuration, the only cold start that loads.
@@ -79,13 +79,13 @@ BL_BUSY         .EQU    0xFFFFF70D      ; not 0 while the staging area or the RO
 BL_LMAX         .EQU    76              ; the characters of a line, as LOAD's
 BL_BUFN         .EQU    128             ; the bytes of a read
 BL_STAGE        .EQU    PROGRAM-BASIC_BASE  ; a word's offset in the staging area
-BAS_LAST        .EQU    PROGRAM-1       ; the last word of BASIC's half
+BAS_LAST        .EQU    PROGRAM-1       ; the last word of BASIC's part
 
 ; The reasons of a file that is not taken
 BL_E_IMAGE      .EQU    1               ; no header: no magic word, or its lines out of place
 BL_E_IFACE      .EQU    2               ; for another monitor
 BL_E_HEADER     .EQU    3               ; the length, the text, or the RAM out of range
-BL_E_ADDR       .EQU    4               ; an address out of BASIC's half, or not above the one before
+BL_E_ADDR       .EQU    4               ; an address out of BASIC's part, or not above the one before
 BL_E_LINE       .EQU    5               ; a line that is not ADDR WORD
 BL_E_SUM        .EQU    6               ; the checksum
 BL_E_READ       .EQU    7               ; an error of the card
@@ -150,7 +150,7 @@ bl_next
                 JMP     bl_next
 ; The file passed: its line, with the notice when its version is below
 ; that of the BASIC in the ROM, whose text goes with the copy, then the
-; copy, and the rest of BASIC's half zeroed
+; copy, and the rest of BASIC's part zeroed
 bl_ok
                 MOVE    R1, S_BL_FROM
                 MOVE    R2, BL_BEST
@@ -359,7 +359,7 @@ bl_check
                 MOVE    R2, @BAS_H_LENGTH[R1]
                 SUB     R3, R2, BAS_H_WORDS
                 CMP     R3, PROGRAM-BASIC_BASE-BAS_H_WORDS+1
-        ?!C     JMP     ck_header       ; shorter than the header, or longer than BASIC's half
+        ?!C     JMP     ck_header       ; shorter than the header, or longer than BASIC's part
                 SUB     R3, @BAS_H_TEXT[R1], BASIC_BASE+BAS_H_WORDS
                 SUB     R2, R2, BAS_H_WORDS
                 CMP     R3, R2
@@ -381,7 +381,7 @@ ck_header
 
 ; bl_stage: the file BL_BEST of the slot BL_BSLOT read into the staging
 ; area, zeroed first, and checked there: each line ADDR WORD, ADDR in
-; BASIC's half and above the line's before, and then the header and the
+; BASIC's part and above the line's before, and then the header and the
 ; checksum, with bl_whole. R1 = 0, or the reason. Uses R1-R6, R8, R10,
 ; and R11.
 bl_stage
@@ -411,7 +411,7 @@ bs_line
                 CMP     R8, R6
         ?!C     JMP     bs_bad_addr     ; not above the one before
                 CMP     R6, PROGRAM
-        ?!C     JMP     bs_bad_addr     ; past BASIC's half
+        ?!C     JMP     bs_bad_addr     ; past BASIC's part
                 MOVE    R8, R6
                 MOVE    @BL_STAGE[R6], R2
                 JMP     bs_line
@@ -464,7 +464,7 @@ bl_empty
                 RET
 
 ; bl_zero: the staging area, the program's RAM from PROGRAM, as many words
-; as BASIC's half, zeroed. Uses R1.
+; as BASIC's part, zeroed. Uses R1.
 bl_zero
                 MOVE    R1, PROGRAM
 :

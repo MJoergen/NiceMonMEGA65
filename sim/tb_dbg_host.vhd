@@ -147,7 +147,8 @@ begin
          G_RAM_ADDR_BITS => 12,
          G_SCR_ADDR_BITS => 11,
          G_RX_FIFO_BITS  => 4,
-         G_ROM_ADDR_BITS => 11
+         G_ROM_ADDR_BITS => 11,
+         G_ROM_BASIC     => 16#300#
       )
       port map (
          clk_i       => clk,

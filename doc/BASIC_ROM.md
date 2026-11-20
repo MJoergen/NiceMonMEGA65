@@ -2,13 +2,14 @@
 
 The design of issue
 [#153](https://github.com/MJoergen/NiceMonMEGA65/issues/153): at the
-start, the monitor replaces BASIC's half of the ROM with a file from
+start, the monitor replaces BASIC's part of the ROM with a file from
 the SD card. **All five of its [Stages](#stages) are written, and
 `V2.3.1` is the release with them. The tools have run on the R6 and
 the Nexys4DDR. The decisions of 2026-11-18 are in
 [Decisions](#decisions), with those that a review against the code
 changed the same day, and [Open questions](#open-questions) has what
-is left, the R3.**
+is left, the R3. V2.4 moves BASIC's part from `0x4000` to `0x3000`
+([BASIC's part from 0x3000](#basics-part-from-0x3000)).**
 
 - [Goals](#goals)
 - [What there is now](#what-there-is-now)
@@ -23,6 +24,7 @@ is left, the R3.**
 - [The emulator and the tests](#the-emulator-and-the-tests)
 - [The tools](#the-tools)
 - [Releases](#releases)
+- [BASIC's part from 0x3000](#basics-part-from-0x3000)
 - [Not included](#not-included)
 - [Decisions](#decisions)
 - [Open questions](#open-questions)
@@ -62,7 +64,7 @@ is left, the R3.**
 
 ## The proposal in short
 
-- BASIC's half of the ROM, `0x4000`–`0x7FFF`, takes the core's writes
+- BASIC's part of the ROM, `0x3000`–`0x7FFF`, takes the core's writes
   from the FPGA's configuration until the monitor locks it, right
   before BASIC first runs. Then it is locked until the FPGA is
   configured again.
@@ -86,7 +88,7 @@ is left, the R3.**
 
 - **A write port.** `src/rom.vhd` gets a write on port B, the data
   bus's port. Its two banks are the even and the odd words, so both
-  get the write, for the upper half of each, which is BASIC's half of
+  get the write, for the upper part of each, which is BASIC's part of
   the ROM. The block RAM has the port already, as a true dual-port
   RAM: no block RAM more. The Nexys4DDR, though, has none to spare:
   with the port, its build needed 277 of the 270 RAMB18 places, as a
@@ -105,29 +107,32 @@ is left, the R3.**
   probe of [The cold start](#the-cold-start).
 - **The lock.** A flag, 0 at configuration, that nothing resets: not
   the system's reset, not a start of the core, not a clear. A write by
-  the core to the monitor's half, `0x0000`–`0x3FFF`, with the ROM
+  the core to the monitor's part, `0x0000`–`0x2FFF`, with the ROM
   shown, sets it. The write itself is dropped, as now. The monitor
   makes that write right before it goes to BASIC
   ([The cold start](#the-cold-start)). A write through a byte window
-  that reaches the monitor's half sets it too. A fetch sets nothing
+  that reaches the monitor's part sets it too. A fetch sets nothing
   ([Why not the first fetch](#why-not-the-first-fetch)).
-- **The core's writes to BASIC's half.** While the flag is 0 and the
-  ROM is shown, a write by the core to `0x4000`–`0x7FFF` goes to the
+- **The core's writes to BASIC's part.** While the flag is 0 and the
+  ROM is shown, a write by the core to `0x3000`–`0x7FFF` goes to the
   ROM. Once it is 1, the write is dropped, as now.
-- **The link's writes** to `0x4000`–`0x7FFF` with the ROM shown go to
+- **The link's writes** to `0x3000`–`0x7FFF` with the ROM shown go to
   the ROM, whatever the flag says ([Over the link](#over-the-link)).
-  A link's write to the monitor's half is dropped, as now, and does
+  A link's write to the monitor's part is dropped, as now, and does
   not set the flag.
   With the ROM hidden, they go to the RAM, as now, so the tools are
   unchanged: they hide the ROM before they load.
 - **The RAM under the ROM** is untouched, and reached as now, with the
   ROM hidden.
 - **In `src/mem.vhd`**, a write to the ROM's range today is dropped.
-  It then reaches the ROM's port B, unless it is to the monitor's half,
+  It then reaches the ROM's port B, unless it is to the monitor's part,
   or by the core with the flag set. `mem.vhd` does not know today
   whether a request is the link's or the core's, so it gets an input
-  for that from `nicemon.vhd`. BASIC's half is the upper half of the
-  ROM by `G_ROM_ADDR_BITS`, as the ROM of `tb_nicemon` has 2K words.
+  for that from `nicemon.vhd`. BASIC's part starts at the generic
+  `G_ROM_BASIC`, `BASIC_BASE`, `0x3000` on the boards, and `0x300` in
+  the ROM of `tb_nicemon`, which has 2K words. It was the upper half,
+  from `0x4000`, until V2.4
+  ([BASIC's part from 0x3000](#basics-part-from-0x3000)).
   The slack is small on every board, so the timing is to be checked
   after the change.
 
@@ -151,7 +156,7 @@ later, if ever ([Not included](#not-included)).
 ## Why not the first fetch
 
 The first design set the lock at the first instruction fetch from
-BASIC's half, the monitor's `JMP BAS_COLD`. That does not hold on the
+BASIC's part, the monitor's `JMP BAS_COLD`. That does not hold on the
 pipelined core:
 
 - **Fetches run ahead.** nice_cpu's ISA.md §8.2 lets a core fetch for
@@ -163,7 +168,7 @@ pipelined core:
   never runs, and `niceemu` halts after 5 steps. The core still
   fetches `0x4000`–`0x4006`.
 - **Today's ROM would be safe by its layout alone.** Its only jumps
-  into BASIC's half are `JMP BAS_COLD` and `JMP BAS_WARM`, each
+  into BASIC's part are `JMP BAS_COLD` and `JMP BAS_WARM`, each
   reached only past a `CALL`, whose jump DECODE takes itself, so no
   wrong path runs into them. A loader with a `JMP BAS_COLD` a few instructions after a
   `RET`, a taken conditional jump, or the back edge of the copy's loop
@@ -188,8 +193,8 @@ the monitor's write of a word back to itself changes nothing in
   beside the old ones, which need not be deleted.
 - Each is a `.bin` file as every other (nice_cpu's ISA.md §10.4): one
   line of an address and a word for each word. Its addresses must be in
-  `0x4000`–`0x7FFF`, and rise from line to line, so the header comes
-  first. Each of the header's 12 words, `0x4000` to `0x400B`, must
+  `0x3000`–`0x7FFF`, and rise from line to line, so the header comes
+  first. Each of the header's 12 words, `0x3000` to `0x300B`, must
   have its line, also one that is 0; after them, a word with no line
   is 0. A line is an address and a word of 1 to 8 hex digits each,
   with blanks or TABs around them, in at most 76 characters.
@@ -201,23 +206,23 @@ the monitor's write of a word back to itself changes nothing in
 
 | Address | What it holds |
 |---|---|
-| `0x4000` | `JMP` to the cold start, two words, as now |
-| `0x4002` | `JMP` to the warm start, two words, as now |
-| `0x4004` | The magic word, `NBAS` in packed ASCII |
-| `0x4005` | The interface: in bits 31..16 the version of the layout of the monitor's RAM, and in bits 15..0 the number of entries of the dispatch table that the image calls |
-| `0x4006` | The image's length in words, from `0x4000`, at most 16384 |
-| `0x4007` | The checksum: the 32-bit sum of the image's words, starting from `0x4000`, over the length at `0x4006`, this one included, is 0 |
-| `0x4008` | The address of the image's version, a packed text, as the banner shows it |
-| `0x4009` | The version as a number, which orders the files: the tag's major, minor, and patch numbers in bits 31..24, 23..16, and 15..8, and the commits since the tag, as `git describe` counts them, in bits 7..0, at most 255. `V2.3.2` is `0x02030200`, and the tests' `V9.9` is `0x09090000` |
-| `0x400A` | The flags: bit 0 is "keep", and the others are 0 |
-| `0x400B` | The words of BASIC's own RAM, below the monitor's at `0xFFFFF000`: 2048 now |
+| `0x3000` | `JMP` to the cold start, two words, as now |
+| `0x3002` | `JMP` to the warm start, two words, as now |
+| `0x3004` | The magic word, `NBAS` in packed ASCII |
+| `0x3005` | The interface: in bits 31..16 the version of the layout of the monitor's RAM, and in bits 15..0 the number of entries of the dispatch table that the image calls |
+| `0x3006` | The image's length in words, from `0x3000`, at most 20480 |
+| `0x3007` | The checksum: the 32-bit sum of the image's words, starting from `0x3000`, over the length at `0x3006`, this one included, is 0 |
+| `0x3008` | The address of the image's version, a packed text, as the banner shows it |
+| `0x3009` | The version as a number, which orders the files: the tag's major, minor, and patch numbers in bits 31..24, 23..16, and 15..8, and the commits since the tag, as `git describe` counts them, in bits 7..0, at most 255. `V2.3.2` is `0x02030200`, and the tests' `V9.9` is `0x09090000` |
+| `0x300A` | The flags: bit 0 is "keep", and the others are 0 |
+| `0x300B` | The words of BASIC's own RAM, below the monitor's at `0xFFFFF000`: 2048 now |
 
 - **The interface.** The monitor takes an image whose RAM layout version
   is its own, and whose number of dispatch entries is at most its own,
   41 in `V2.3.1`. A new entry of the monitor then keeps older images
   running. The layout is that of the monitor's own RAM, from
   `0xFFFFF000`, alone, and a change of it refuses the older images.
-- **BASIC's RAM.** Its size is the image's own, the word at `0x400B`.
+- **BASIC's RAM.** Its size is the image's own, the word at `0x300B`.
   The monitor has it in three places today: SP at `mon_reset` and at
   `mon_exit`, and the end of a program's RAM in `bin_line`. It then
   takes them from the header of the BASIC that is in the ROM, or 2048
@@ -238,7 +243,7 @@ the monitor's write of a word back to itself changes nothing in
 ### Choosing the file
 
 - The loader lists the folder of slot 0, then of slot 1, and reads the
-  header of each `BASIC*.ROM`: its first twelve lines, up to `0x400B`.
+  header of each `BASIC*.ROM`: its first twelve lines, up to `0x300B`.
 - A file whose header has a wrong magic word, an interface that does
   not fit, a size of BASIC's RAM out of its range, or an address out
   of place is passed over, with its reason on one line.
@@ -265,7 +270,7 @@ the monitor's write of a word back to itself changes nothing in
 2. **Is the BASIC in the ROM to be kept?** If its header has the magic
    word and "keep", the monitor goes to step 9.
 3. **Is a program loaded?** The loader stages a file in the program's
-   RAM, the staging area, 16384 words from `0x8000`, which is all
+   RAM, the staging area, 20480 words from `0x8000`, which is all
    zeros after a configuration. If a word of it is not 0, a host has
    loaded a program while the ROM was open. The monitor then goes to
    step 9, when the BASIC in the ROM is whole: its header and its
@@ -274,8 +279,8 @@ the monitor's write of a word back to itself changes nothing in
 4. Choose a file ([Choosing the file](#choosing-the-file)). With none,
    the bitstream's BASIC runs, from step 9.
 5. **The read stages** the file in the staging area, which it zeroes
-   first. Each line's address must be in `0x4000`–`0x7FFF`, and above
-   the line's before, and its word goes to that address plus `0x4000`.
+   first. Each line's address must be in `0x3000`–`0x7FFF`, and above
+   the line's before, and its word goes to that address plus `0x5000`.
    So the ROM is not touched yet.
 6. **The check** reads the staged header: the magic word, the
    interface, the length, and the sum over the length must fit. If the
@@ -283,7 +288,7 @@ the monitor's write of a word back to itself changes nothing in
    `BASIC-V2.3.2.ROM on card 0: bad checksum`, zero the staging area,
    and try the next file.
 7. **The copy** writes the staged words over the length, and zeroes
-   the rest of `0x4000`–`0x7FFF` of the ROM. A loop from the RAM to
+   the rest of `0x3000`–`0x7FFF` of the ROM. A loop from the RAM to
    the ROM cannot fail as a card can, so the ROM always ends up with a
    whole, checked BASIC.
 8. Zero the staging area. Before the copy, the loader prints
@@ -292,7 +297,7 @@ the monitor's write of a word back to itself changes nothing in
    `BASIC-V2.3.2.ROM from card 0, older than the core's V2.4`, as the
    copy overwrites the old BASIC's text.
 9. **The lock and the jump.** The monitor writes a word of its own
-   half back to itself, which sets the lock, and goes to `BAS_COLD`.
+   part back to itself, which sets the lock, and goes to `BAS_COLD`.
    Every path ends here, and it is the monitor's one jump to
    `BAS_COLD`.
 
@@ -384,7 +389,7 @@ dispatch table is 1.7, with four entries more, 41 in all:
 
 A host can put a BASIC into the ROM over the link, on the UART or over
 Ethernet, also after the lock: it holds the core, writes the image to
-`0x4000`–`0x7FFF` with the ROM shown, and starts the core. The monitor
+`0x3000`–`0x7FFF` with the ROM shown, and starts the core. The monitor
 finds the ROM locked, and runs that image.
 
 - This is the network load that #153 asks for, with the tools that
@@ -399,7 +404,7 @@ finds the ROM locked, and runs that image.
 
 ## The emulator and the tests
 
-- `niceemu` has no ROM, so `0x4000`–`0x7FFF` is RAM there, and a write
+- `niceemu` has no ROM, so `0x3000`–`0x7FFF` is RAM there, and a write
   always goes through. The monitor's probe of step 1 finds it open
   every time, and the loader works there as it does on the board. The
   lock's write puts a word back that is there. A
@@ -428,8 +433,8 @@ finds the ROM locked, and runs that image.
   The new entries have a test of their own, as those of table 1.6
   have.
 - **In the RTL**: `tb_nicemon` writes the ROM's halves before and after
-  a write by the core to the monitor's half, and checks that a fetch
-  from BASIC's half does not lock, the lock across a start and a
+  a write by the core to the monitor's part, and checks that a fetch
+  from BASIC's part does not lock, the lock across a start and a
   clear, the link's writes, and a read right behind a write.
   `formal/mem.sby` gets the rules of the ROM's writes.
 - **A whole load in the RTL.** A testbench with the real ROM and the
@@ -453,8 +458,8 @@ finds the ROM locked, and runs that image.
   of the monitor's RAM, `MON_VARS`, and of BASIC's, which it takes
   from the header, of the file of `--rom`, or over the link.
   `make hwtest` shares it.
-- `make hwtest` checks that the ROM's BASIC half takes a link's write,
-  and that the monitor's half does not, then loads a test image with a
+- `make hwtest` checks that the ROM's BASIC part takes a link's write,
+  and that the monitor's part does not, then loads a test image with a
   banner of its own, and checks the banner. With a `BASIC*.ROM` on a
   card of the board, it checks the banner after the configuration
   against the file, and without one that is NOT COVERED. It still
@@ -493,6 +498,31 @@ is decided ([Decisions](#decisions)):
   statements. A split would need those files in a form both
   repositories pin.
 
+## BASIC's part from 0x3000
+
+V2.4 moves `BASIC_BASE` from `0x4000` to `0x3000` (decided on
+2026-11-20). The stages 5 to 10 of BASIC were guessed at 6600 words,
+and the stages 3 and 4 came in 15 to 21% above their guesses, so they
+would not fit in the 6890 words that were free
+([BASIC.md](BASIC.md#the-roms-room)).
+
+- BASIC's part has 20480 words, `0x3000`–`0x7FFF`, and the monitor's
+  12288, of which it uses 10598.
+- The boundary is the generic `G_ROM_BASIC` of `src/mem.vhd` and
+  `src/nicemon.vhd`, a comparison of the ROM's address with a
+  constant, where it was address bit 14. So the move needs a
+  bitstream.
+- The staging area grows with BASIC's part, to 20480 words, from
+  `0x8000` to `0xCFFF`.
+- A file from before V2.4 has its header at `0x4000`. A monitor from
+  V2.4 on passes over it, as its lines are out of place, and so does
+  an older monitor with a file from V2.4 on. Each core then runs its
+  bitstream's BASIC, or a file of its own layout. The interface word
+  stays, as the layout of the monitor's RAM does not change.
+- `tools/basic_rom.py` takes `BASIC_BASE` and `PROGRAM` from
+  `monitor/common.nasm`. So the split is that constant for the
+  assembly and the tools, and `G_ROM_BASIC` for the FPGA.
+
 ## Not included
 
 - **The monitor from a card.** #153 calls it nice to have, with no use
@@ -500,7 +530,7 @@ is decided ([Decisions](#decisions)):
   copies itself to the RAM first. The header and the checks here would
   serve it too.
 - **A hide bit for each half of the ROM.** It would let a host hide
-  BASIC's half alone, or the monitor's. It is a change of the control
+  BASIC's part alone, or the monitor's. It is a change of the control
   register, so of nice_cpu's link, DEBUG.md, and a nice_cpu release.
 - **BOOTP and TFTP at the start.** TFTP is in BASIC now, not in the
   monitor (`basic/basic_net.nasm`), so the monitor would need a client
@@ -524,10 +554,10 @@ tenth.
 
 1. **The names of the releases**: one series of tags, A of
    [Releases](#releases).
-2. **What locks the ROM**: a write by the core to the monitor's half,
+2. **What locks the ROM**: a write by the core to the monitor's part,
    which the monitor makes right before BASIC. It needs no register
    and no change of nice_cpu. The first design had the first fetch
-   from BASIC's half
+   from BASIC's part
    ([Why not the first fetch](#why-not-the-first-fetch)). The other
    way was a bit that the core sets, at an address of its own, of
    nice_cpu's reserved `0xFFFFFF03`–`0F`.
@@ -615,7 +645,7 @@ One is open:
    Written: `load.py --basic` and "keep" in a ROM image that `load.py`
    or `run.py` loads at 0, and the end of a program's RAM from the
    header; `make linktest` checks "keep" and the refusal of `--basic`
-   on `niceemu`. `make hwtest` checks BASIC's half, the load after the
+   on `niceemu`. `make hwtest` checks BASIC's part, the load after the
    configuration against the card's file, a test image, and the BASIC
    found put back, and passed on the R6 and the Nexys4DDR.
 5. **The release.** `V2.3.1`, with `BASIC-V2.3.1.ROM` as an asset. A

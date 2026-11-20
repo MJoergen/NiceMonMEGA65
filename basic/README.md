@@ -14,11 +14,11 @@ design, with the stages to come, is in [doc/BASIC.md](../doc/BASIC.md),
 and the monitor that it runs on, with the files, the network, and the
 programs at `0x8000`, in [monitor/README.md](../monitor/README.md).
 
-BASIC is an image of its own in the ROM, at `0x4000`, assembled apart
+BASIC is an image of its own in the ROM, at `0x3000`, assembled apart
 from the monitor's at `0x0000` (#152). It calls the monitor through the
 entries of the dispatch table alone, as a program at `0x8000` does, so
 everything that BASIC does, a program can do too. The monitor knows of
-BASIC only its two vectors, at `0x4000`, the cold start, and `0x4002`,
+BASIC only its two vectors, at `0x3000`, the cold start, and `0x3002`,
 the warm start, after a program. BASIC's own state is in 2K words of
 its own at `0xFFFFE800`, below the monitor's, and the stack starts
 below them. BASIC's programs, their variables, and their arrays are in
@@ -364,7 +364,7 @@ and prints its header. It takes the file's lines as the monitor takes
 them from a card, so a file that passes is not refused there for its
 lines: each is an address and a word of 1 to 8 hex digits, with
 blanks or TABs around them, in at most 76 characters, and the
-header's 12 words, `0x4000` to `0x400B`, each have a line, also one
+header's 12 words, `0x3000` to `0x300B`, each have a line, also one
 that is 0. After the header, a word with no line is 0. Only the
 monitor knows whether the image's interface is its own.
 
@@ -473,7 +473,7 @@ dispatch table, which change with the monitor's code.
 
 ## Its words
 
-BASIC's image is at `0x4000`–`0x7FFF`, 16384 words, of which the
+BASIC's image is at `0x3000`–`0x7FFF`, 20480 words, of which the
 table of the ROM in [monitor/INTERNALS.md](../monitor/INTERNALS.md#the-roms-words)
 has those in use and those free. These are its words, by the source
 they come from, in the order that the Makefile joins them. The column
