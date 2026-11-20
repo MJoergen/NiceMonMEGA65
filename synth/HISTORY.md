@@ -94,6 +94,11 @@ The sizes, from the same builds:
 - **#136.** The R6 has 33626 LUTs, and the Nexys4DDR 32621, 51.5 % of
   its FPGA. The FPU takes about 9300 LUTs, 2700 flip-flops, and 5 DSPs,
   and no block RAM.
+- **V2.4.** The R6 has 250.5 block RAMs and 34128 LUTs, and the
+  Nexys4DDR 134 of its 135 and 34459 LUTs. The FPU's functions, of
+  nice_cpu V2.3, brought the table of their constants, one block RAM,
+  and the steps of their microcode, which Vivado puts into four block
+  RAMs and a RAMB18 on the MEGA65 and into LUTs on the Nexys4DDR.
 
 ## What the builds taught
 

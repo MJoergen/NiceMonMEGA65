@@ -190,9 +190,9 @@ board differs from the MEGA65 in three ways:
 - Its FPGA has 135 block RAMs of 36 Kbit, where the MEGA65's has 365. The
   RAM and the ROM are the same as on the MEGA65, and take 96 of them, but
   the screen is 8K words, not 32K, so that it and its copy in `text.vhd`
-  take 16, not 64. With the fonts, the debugger's overlay, the UART's
-  FIFO, and the Ethernet station's 2.5, that is 127 of 135 with the
-  ROM. 8K words are still more than three screens of 80×25 for
+  take 16, not 64. With the fonts, the debugger's overlay, and the
+  smaller memories of the table of [Block RAM](#block-ram), that is 134
+  of 135 with the ROM. 8K words are still more than three screens of 80×25 for
   scrolling.
 - Its FPGA is speed grade -1, where the MEGA65's is -2, so the system clock
   is 90 MHz, not 100 MHz; at 100 MHz the pipelined core misses timing by a
@@ -301,7 +301,9 @@ from the builds of 2026-11-10, with `FLOW=timing`, which have the 4
 watchpoints of the debug link (issue #99) and the clock of the time of
 day (issue #97); the multi-cycle columns are older and have no FPU. The
 watchpoints take about 900 to 1000 LUTs of the core, and the FPU about
-9300 LUTs, 2700 flip-flops, and 5 DSPs, and no block RAM. The R3's
+9300 LUTs, 2700 flip-flops, and 5 DSPs, in those builds, which were
+before its functions and their block RAMs (see
+[Block RAM](#block-ram)). The R3's
 pipelined build with `FLOW=timing` takes 33673 LUTs and 19964
 flip-flops, 25.2 % and 7.5 % of the FPGA.
 
@@ -394,8 +396,9 @@ The block RAMs, of 36 Kbit, are these:
 | The port for Ethernet frames (nice_cpu's `eth_regs.vhd`): the queue of frames received, 2K words, and the send buffer, 512 words | 3 | 3 |
 | The SD card controller's buffer (nice_cpu's `sd_regs.vhd`), four RAMB18 | 2 | 2 |
 | The debugger's page (`mem_ram` in `dbg/dbg.vhd`), 256 words, one RAMB18 | 0.5 | 0.5 |
-| Total without the ROM, pipelined | 213 of 365 | 101 of 135 |
-| Total with the ROM, pipelined | 245 | 133 |
+| The FPU's functions (nice_cpu's `fpu.vhd`): the table of their constants, 256 words of 64 bits, and the steps of their microcode, which Vivado puts into four block RAMs and a RAMB18 on the MEGA65 and into LUTs on the Nexys4DDR | 5.5 | 1 |
+| Total without the ROM, pipelined | 218.5 of 365 | 102 of 135 |
+| Total with the ROM, pipelined | 250.5 | 134 |
 
 The copy of the screen keeps all 32 bits, as the display reads the
 character and both 12-bit colors, so it takes as many block RAMs as the
@@ -410,6 +413,7 @@ and with the five memories of the last four rows above, about 2500 LUTs, of whic
 #103). The local memories have the attribute. The two in nice_cpu's
 `eth_regs.vhd` and `sd_regs.vhd` get `RAM_STYLE` from
 `nexys4ddr/nexys4ddr_synth.xdc`, which only synthesis reads, as its
-cells' names change in synthesis. That left 2 of the 135 free and gained
-the Nexys4DDR 0.009 ns of setup slack; its worst path into the core now
-starts at the SD card controller's buffer, with 0.176 ns to spare.
+cells' names change in synthesis. That left 2 of the 135 free, of
+which the FPU's table of constants has taken one since, and gained
+the Nexys4DDR 0.009 ns of setup slack; its worst path into the core
+then started at the SD card controller's buffer, with 0.176 ns to spare.
