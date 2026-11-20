@@ -81,7 +81,13 @@ and takes up to 254 characters; a line that `PRINT` or `LIST` wraps is
 one line too. A key typed into a line of 254 characters does nothing.
 `LIST` may show a line with more, as it writes `?` as `PRINT` and adds
 blanks: RETURN on such a line is `Line too long`, and the line stays
-as it was stored. When a line grows into a row that holds other text,
+as it was stored. A shorter line is `Line too long` as well when it
+has too many tokens. BASIC keeps a line as tokens, 160 words of them
+at most: a word for each keyword, name, operator, and whole number
+up to 16777215, two to five for another number, and one for each
+character of a string or of `REM`'s text. So a line of short tokens
+with no blanks, such as `A=1+1+1+1`, is too long from 154 characters.
+When a line grows into a row that holds other text,
 that row and those below it move down. At `INPUT` the answer starts
 after the prompt. There is no INST key and no quote mode.
 

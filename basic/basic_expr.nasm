@@ -89,7 +89,7 @@ STACK_ROOM      .EQU    0x400           ; the words of the stack below the varia
 RAM_MEGA65      .EQU    0x20000         ; the words of the RAM where RAM_WORDS reads 0
 
 V_TOK           .EQU    0xFFFFECB0      ; the tokens of the line, TOK_MAX words
-TOK_MAX         .EQU    160             ; two a character and a 0, for the 76 of a line
+TOK_MAX         .EQU    160             ; which V_TLIM holds a line to: the editor's EDIT_MAX characters, or a file's line, may make more, a Line too long
 V_TP            .EQU    0xFFFFED50      ; the next statement's token
 V_VEND          .EQU    0xFFFFED51      ; the end of the variables
 V_KW            .EQU    0xFFFFED52      ; the statement's index in KEYWORDS plus 1, or 0
@@ -176,7 +176,8 @@ PUNCTS
 ; limit of the tokens at V_TLIM. A token starts below the limit, and a
 ; character of a string or of REM goes below it, so that the line's
 ; tokens end below the limit plus 6, or else the line is too long, which
-; a line of a file may be. An error goes to err, with the last
+; a line of a file may be, and one of the editor, whose EDIT_MAX
+; characters may make a token each. An error goes to err, with the last
 ; statement's keyword before it in V_KW, for its lines of HELP. Uses
 ; R1-R12.
 tokenize

@@ -546,7 +546,11 @@ as #54 says:
   operand.
 - A stored line is the tokens of stage 2, at most the 160 words of
   `V_TOK`. Since stage 4 the tokenizer checks that, as a line of a
-  file may have more, and such a line is `Line too long`. The tokenizer writes only `V_TOK`, and a line is stored
+  file may have more, and such a line is `Line too long`. Since stage
+  7 a line typed may have more too, as the editor takes 254
+  characters, where 160 words were sized for the 76 of the line
+  before it: `A=1+1+1`, a token a character, is refused from 154
+  characters. The tokenizer writes only `V_TOK`, and a line is stored
   after the whole of it is tokenized, so a line that fails leaves the
   program as it was. That settles S4 of #151, as stage 2 reads a
   string from its token and no longer writes a 0 into the line.
@@ -680,7 +684,8 @@ The Commodore editor of #54, in assembly, in place of the monitor's
   writes `?` as `PRINT`, so a line typed at 160 characters may list
   longer, and could not be entered again. A line that lists with more
   than 254 characters is `Line too long` at RETURN, as it is for
-  `LOAD`, and is not entered shortened.
+  `LOAD`, and is not entered shortened. The tokenizer may refuse a
+  line with fewer, as its tokens must fit the 160 words of `V_TOK`.
 - A word of 25 bits says which rows go on from the row above. The
   monitor keeps it, as `mon_putc` changes it:
   - Past column 79, `mon_putc` sets the bit of the next row, so the
