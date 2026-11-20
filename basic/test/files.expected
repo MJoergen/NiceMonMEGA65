@@ -85,6 +85,9 @@ READY.
 RUN "NONE"
 File error 21, no such file
 READY.
+LIST
+5 PRINT "FIRST"
+READY.
 SAVE "T.TXT"
 READY.
 LOAD "T.TXT"
