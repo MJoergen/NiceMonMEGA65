@@ -2,7 +2,7 @@ NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 dir
-Directory of NICE
+Directory of NICE in slot 0
 HELLO.BIN                      14436
 SUB                            <DIR>
 A long name.txt                   26
@@ -32,12 +32,12 @@ KEEP.TXT                         512
 Files: 25, directories: 1
 READY.
 DIR 1
-Directory of NICE
+Directory of NICE in slot 1
 HELLO.BIN                      14436
 Files: 1, directories: 0
 READY.
 dir 0
-Directory of NICE
+Directory of NICE in slot 0
 HELLO.BIN                      14436
 SUB                            <DIR>
 A long name.txt                   26

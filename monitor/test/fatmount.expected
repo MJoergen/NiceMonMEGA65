@@ -69,7 +69,7 @@ NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 dir
-Directory of NICE
+Directory of NICE in slot 0
 Files: 0, directories: 0
 READY.
 halt
@@ -246,7 +246,7 @@ NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 dir
-Directory of NICE
+Directory of NICE in slot 0
 HELLO.BIN                      14436
 Files: 1, directories: 0
 READY.
@@ -336,7 +336,7 @@ NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 dir
-Directory of NICE
+Directory of NICE in slot 0
 HELLO.BIN                      14436
 F01.TXT                            0
 F02.TXT                            0
@@ -378,7 +378,7 @@ NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 dir 1
-Directory of NICE
+Directory of NICE in slot 1
 HELLO.BIN                      14436
 Files: 1, directories: 0
 READY.

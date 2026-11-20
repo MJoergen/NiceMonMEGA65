@@ -3,7 +3,7 @@ NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 dir
-Directory of NICE
+Directory of NICE in slot 0
 HELLO.BIN                      14436
 EMPTY.TXT                          0
 SYS.TXT                            5

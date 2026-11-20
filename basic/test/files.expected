@@ -136,7 +136,7 @@ LIST
 40 END
 READY.
 DIR
-Directory of NICE
+Directory of NICE in slot 0
 HELLO.BIN                      14436
 PC.BAS                            94
 BAD.BAS                           53
@@ -161,7 +161,7 @@ Screen:
 |40 END
 |READY.
 |DIR
-|Directory of NICE
+|Directory of NICE in slot 0
 |HELLO.BIN                      14436
 |PC.BAS                            94
 |BAD.BAS                           53

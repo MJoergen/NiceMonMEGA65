@@ -9,7 +9,7 @@ save "test", 0x8000, 2
 Words saved: 2, 00008000 to 00008001
 READY.
 dir
-Directory of NICE
+Directory of NICE in slot 0
 HELLO.BIN                      14436
 test.BIN                          36
 Files: 2, directories: 0
@@ -75,7 +75,7 @@ deletex
 Syntax error; HELP lists the statements
 READY.
 dir 1
-Directory of NICE
+Directory of NICE in slot 1
 HELLO.BIN                      14436
 Files: 1, directories: 0
 READY.
@@ -83,7 +83,7 @@ save "full.bin", 0x8000, 256
 File error 30, the card or the folder is full
 READY.
 dir
-Directory of NICE
+Directory of NICE in slot 1
 HELLO.BIN                      14436
 full.bin                        1536
 Files: 2, directories: 0
@@ -95,7 +95,7 @@ save "full.bin", 0x8000, 2
 Words saved: 2, 00008000 to 00008001
 READY.
 dir
-Directory of NICE
+Directory of NICE in slot 1
 HELLO.BIN                      14436
 full.bin                          36
 Files: 2, directories: 0
@@ -108,7 +108,7 @@ Screen:
 |File error 30, the card or the folder is full
 |READY.
 |dir
-|Directory of NICE
+|Directory of NICE in slot 1
 |HELLO.BIN                      14436
 |full.bin                        1536
 |Files: 2, directories: 0
@@ -120,7 +120,7 @@ Screen:
 |Words saved: 2, 00008000 to 00008001
 |READY.
 |dir
-|Directory of NICE
+|Directory of NICE in slot 1
 |HELLO.BIN                      14436
 |full.bin                          36
 |Files: 2, directories: 0

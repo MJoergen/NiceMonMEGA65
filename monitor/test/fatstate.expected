@@ -53,7 +53,7 @@ NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 dir 1
-Directory of NICE
+Directory of NICE in slot 1
 HELLO.BIN                      14436
 Files: 1, directories: 0
 READY.
@@ -62,7 +62,7 @@ NiceMon V9.9, BASIC V9.9
 HELP lists the statements
 READY.
 dir
-Directory of NICE
+Directory of NICE in slot 0
 my prog.bin                    14436
 mixed.Bin                         14
 lower.bin                         14
@@ -113,7 +113,7 @@ sys 0x9000
 Returned 00000002
 READY.
 dir 0
-Directory of NICE
+Directory of NICE in slot 0
 HELLO.BIN                      14436
 Files: 1, directories: 0
 READY.

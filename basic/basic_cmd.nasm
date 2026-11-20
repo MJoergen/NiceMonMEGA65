@@ -517,7 +517,7 @@ load_part
 ; DIR [SLOT]: R1 the slot, or one from 2^31 without it. The folder NICE
 ; of the card in SLOT, mounted first with fs_mount, entry 9, or of the
 ; card mounted, opened with fs_open, entry 10, and read with
-; fs_readname, entry 20: a row with its name, then a row for each file,
+; fs_readname, entry 20: a row with its name and the slot, then a row for each file,
 ; its name, the long name or the 8.3 name, in DIR_NAME columns and its
 ; size in decimal in 12, and for each directory, its name and <DIR>,
 ; then the numbers of both. A name of DIR_NAME characters or more has a
@@ -540,7 +540,12 @@ st_dir
                 CLR     R9
                 CLR     R10
                 MOVE    R1, S_DIROF
-                CALL    puts_b_crlf
+                CALL    puts_b
+                MOVE    R1, S_INSLOT
+                CALL    puts_b
+                MOVE    R1, @SD_SELECT  ; the mounted slot, as a mount is
+                CALL    _io_putdec      ; dropped when another is selected
+                CALL    _io_crlf
 dir_row
                 MOVE    R1, R8
                 MOVE    R2, V_ENT

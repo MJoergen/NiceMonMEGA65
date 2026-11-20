@@ -9,7 +9,7 @@ save "free.txt", 0x8000, 1
 Words saved: 1, 00008000 to 00008000
 READY.
 dir
-Directory of NICE
+Directory of NICE in slot 0
 HELLO.BIN                      14436
 FREE.TXT                          18
 LONG.TXT                        3500

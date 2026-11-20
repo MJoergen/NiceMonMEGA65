@@ -21,7 +21,7 @@ load "A LONG NAME OF A FILE.BIN"
 Words loaded: 3, 00008000 to 00008002
 READY.
 dir
-Directory of NICE
+Directory of NICE in slot 0
 big.BIN                        36000
 a long name of a file.bin
                                   54
@@ -97,7 +97,7 @@ load "A LONG NAME OF A FILE.BIN"
 Words loaded: 3, 00008000 to 00008002
 READY.
 dir
-Directory of NICE
+Directory of NICE in slot 0
 big.BIN                        36000
 a long name of a file.bin
                                   54
@@ -171,7 +171,7 @@ load "A LONG NAME OF A FILE.BIN"
 Words loaded: 3, 00008000 to 00008002
 READY.
 dir
-Directory of NICE
+Directory of NICE in slot 0
 big.BIN                        36000
 a long name of a file.bin
                                   54

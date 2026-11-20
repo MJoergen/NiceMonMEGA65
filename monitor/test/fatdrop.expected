@@ -6,7 +6,7 @@ sys 0x8000
 Returned 0000003B
 READY.
 dir
-Directory of NICE
+Directory of NICE in slot 0
 HELLO.BIN                      14436
 NEW.TXT                            0
 OPEN.TXT                           0
