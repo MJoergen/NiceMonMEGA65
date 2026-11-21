@@ -2157,7 +2157,7 @@ def test_fat_dir(link: Link, fat: dict[int, Folder]) -> None:
 
 def banner_basic(text: bytes) -> str | None:
     """BASIC's version in the last banner of the console's text,
-    NiceMon V2.3.1, BASIC V2.3.1, or None."""
+    NiceMon V2.4, BASIC V2.4, or None."""
     found = re.findall(rb"NiceMon [^\r\n,]+, BASIC ([^\r\n]+)\r\n", text)
     return found[-1].decode("latin-1") if found else None
 

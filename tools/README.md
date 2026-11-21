@@ -334,9 +334,9 @@ then not loaded until the board is switched off and on again.
 
 BASIC's part of the ROM, `0x3000`–`0x7FFF`, takes the link's writes.
 `--basic` puts an image of BASIC there, such as `basic/build/basic.rom`
-or a release's `BASIC-V2.3.1.ROM`, and starts the monitor with it:
+or a release's `BASIC-V2.4.ROM`, and starts the monitor with it:
 
-    tools/nicemon.py load --eth 192.168.1.65 --basic BASIC-V2.3.1.ROM
+    tools/nicemon.py load --eth 192.168.1.65 --basic BASIC-V2.4.ROM
     make load FILE=basic/build/basic.rom ETH=192.168.1.65 ARGS=--basic
 
 `nicemon.py load` checks the image as `tools/basic_rom.py check` does, holds the

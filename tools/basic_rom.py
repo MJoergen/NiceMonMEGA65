@@ -21,7 +21,7 @@ fills in after assembly:
 
   basic_rom.py fill IN OUT --version V [--keep]
       the length, from the last address of IN, the version as a number,
-      from V, such as V2.3.1 or V2.3-12-gabcdef0-dirty, "keep" with
+      from V, such as V2.4 or V2.4-12-gabcdef0-dirty, "keep" with
       --keep, and then the checksum, written to OUT
   basic_rom.py check FILE...
       checks each image's lines, addresses, header, and checksum, and
@@ -119,7 +119,7 @@ def write_image(path: str, image: dict[int, int]) -> None:
 
 
 def version_number(text: str) -> int:
-    """V2.3.2 as 0x02030200, and the commits since the tag, as git describe
+    """V2.4 as 0x02040000, and the commits since the tag, as git describe
     counts them, in bits 7..0, at most 255. A version that is not a tag's,
     such as a bare hash, is 0."""
     m = re.fullmatch(r"V(\d+)\.(\d+)(?:\.(\d+))?(?:-(\d+)-g[0-9a-f]+)?(?:-dirty)?", text)
@@ -219,7 +219,7 @@ def main() -> None:
     p_fill = sub.add_parser("fill", help="fill in the header after assembly")
     p_fill.add_argument("input")
     p_fill.add_argument("output")
-    p_fill.add_argument("--version", required=True, help="the version, such as V2.3.1")
+    p_fill.add_argument("--version", required=True, help="the version, such as V2.4")
     p_fill.add_argument("--keep", action="store_true", help='set the flag "keep"')
     p_check = sub.add_parser("check", help="check images")
     p_check.add_argument("files", nargs="+")

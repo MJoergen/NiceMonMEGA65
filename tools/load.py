@@ -36,7 +36,7 @@ again, so that the monitor runs that BASIC and does not replace it with
 a card's BASIC*.ROM, which would also zero the RAM from 0x8000.
 
 With --basic, FILE is an image of BASIC, such as basic/build/basic.rom
-or a release's BASIC-V2.3.1.ROM, which goes into BASIC's part of the ROM,
+or a release's BASIC-V2.4.ROM, which goes into BASIC's part of the ROM,
 0x3000-0x7FFF, with "keep" set and every word of the part that it does
 not fill zeroed, and is read back. The core is held, the memory
 cleared, and the ROM shown, and the core started, unless --hold is
