@@ -284,7 +284,7 @@ architecture simulation of tb_nicemon is
    signal scr_cur_x    : std_logic_vector(6 downto 0);
    signal scr_cur_y    : std_logic_vector(4 downto 0);
    signal scr_cur_mode : std_logic_vector(2 downto 0);
-   signal scr_offs     : std_logic_vector(10 downto 0);
+   signal scr_offs     : std_logic_vector(11 downto 0);
    signal scr_fnt_ram  : std_logic;
 
    -- The fonts, as the display holds them (src/video/font.vhd)
@@ -376,7 +376,7 @@ begin
          G_CLOCK_HZ         => C_CLOCK_HZ,
          G_UART_BAUDRATE    => C_BAUDRATE,
          G_RAM_ADDR_BITS    => 12,
-         G_SCR_ADDR_BITS    => 11,
+         G_SCR_ADDR_BITS    => 12,
          G_RX_FIFO_BITS     => 4,
          G_ROM_FILE         => G_ROM_FILE,
          G_ROM_ADDR_BITS    => 11,

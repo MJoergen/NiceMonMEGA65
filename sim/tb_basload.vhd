@@ -92,7 +92,7 @@ begin
          G_CLOCK_HZ         => C_CLOCK_HZ,
          G_UART_BAUDRATE    => C_BAUDRATE,
          G_RAM_ADDR_BITS    => 16,
-         G_SCR_ADDR_BITS    => 11,
+         G_SCR_ADDR_BITS    => 12,
          G_ROM_FILE         => G_ROM_FILE,
          G_CPU_RUN_AT_RESET => true,
          G_SD_SLOTS         => 2,

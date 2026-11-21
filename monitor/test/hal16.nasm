@@ -26,7 +26,7 @@
 ; 12  the timer after it, 0
 ; 13  the screen's control word after it, 0x60
 ; 14  scr_getxy after it, the column, 79
-; 15  and the row, 24
+; 15  and the row, 27
 ;
 ; The counts are 2 words written, from H16_WORDS to H16_WORDS+1, 2 lines
 ; skipped, the first the third, 5 lines, and the end of a program's RAM,

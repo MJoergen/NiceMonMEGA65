@@ -79,16 +79,13 @@ state.
 
 ## The display
 
-The text display (`src/video/text.vhd`) shows 25 rows of 80 characters
-of 16x32 pixels, 1280x800 pixels in the 1280x1024 frame that both boards
-use, centered: 112 black lines above and below. The debugger adds 4 rows
-under the text, and the 29 rows are centered instead: 48 black lines, the
-program's 25 rows, the strip's 4, and 48 black lines. So the program's
-picture moves up 64 lines, in every state, and nothing jumps when the
-strip appears. `C_Y0` becomes `(v_visible - 29 * 32) / 2`, and the
-assert that the text fits counts 29 rows.
+The text display (`src/video/text.vhd`) shows 28 rows of 80 characters
+of 16x32 pixels, 1280x896 pixels at the top of the 1280x1024 frame that
+both boards use. The debugger adds 4 rows under the text, so the 32 rows
+fill the frame, with no black lines around them, and nothing moves when
+the strip appears. The assert that the text fits counts 32 rows (#157).
 
-The strip, rows 25 to 28, is black in Off. In Strip and Focus it is white
+The strip, rows 28 to 31, is black in Off. In Strip and Focus it is white
 on dark blue, `0x004` and `0xFFF`:
 
 ```
@@ -98,12 +95,12 @@ on dark blue, `0x004` and `0xFFF`:
  F1 step F3 pause/go F4 restart F5 link F11 page F12 keep strip: off
 ```
 
-- Rows 25 and 26: R0–R15 in hex, as the link returns them ([DEBUG.md
+- Rows 28 and 29: R0–R15 in hex, as the link returns them ([DEBUG.md
   §6](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEBUG.md#6-the-debug-registers)): live while the core runs, as `niceemu --link` returns them, and
   the stop's values while it is paused or has halted. While it is held
   they are dimmed: the link keeps the values of the last stop then,
   which may be another program's.
-- Row 27: the core's state, `RUNNING`, `WAITING` while it waits for an
+- Row 30: the core's state, `RUNNING`, `WAITING` while it waits for an
   interrupt after `WAIT` (bit 6 of the control register, link version
   7), `PAUSED`, `PAUSED W` while it is paused in a wait, `BRK n` at
   breakpoint n, `WCH n` after a step that hit watchpoint n, which only a
@@ -121,21 +118,21 @@ on dark blue, `0x004` and `0xFFF`:
   memory is out of reach ([DEBUG.md §3](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEBUG.md#3-requests-and-answers)), so the row shows the state and
   the PC, dashes for the word, and no decode; while the core is held,
   dashes for the PC too.
-- Row 28: the keys, and the sticky setting, `keep strip: off` or `on`.
+- Row 31: the keys, and the sticky setting, `keep strip: off` or `on`.
   In Strip, where the keys are the program's, it says so, and names the
   toggle key: `The keys are the program's.  MEGA+HELP for the debugger`.
 
-The page replaces the program's 25 rows while it is up, in Focus only:
+The page replaces the program's 28 rows while it is up, in Focus only:
 row 0 has the window's address, the cursor's, and the addresses of
 breakpoints 0 to 3, in that order, dashes for one that is not enabled;
-rows 1 to 22 the memory from the window's address, a row's address and
+rows 1 to 25 the memory from the window's address, a row's address and
 its 8 words, the cursor's word in swapped colors, and a word at an
 enabled breakpoint white on dark red, or dark red on white under the
-cursor; row 23 the input
+cursor; row 26 the input
 field, its label, `Word:` or `Address:`, and the last message,
 `written`, `not paused` when the link refuses a write while the core
 runs (its `e02`), another error of the link such as `e04`,
-or `none free` when `b` finds every breakpoint in use; and row 24
+or `none free` when `b` finds every breakpoint in use; and row 27
 the keys. The program's cursor is hidden under the page. The page stays
 on when Focus is left, and shows again when Focus comes back.
 
@@ -148,7 +145,7 @@ on when Focus is left, and shows again when Focus comes back.
  CRSR PgUp PgDn Home move  0-f type  RETURN write  a address  b break  ESC back
 ```
 
-The words are read, all 176 in one request, when the page is shown and
+The words are read, all 200 in one request, when the page is shown and
 the core is stopped: paused, halted, or held. They are read again after
 a stop, a write, and a move of the window, and while the core runs they
 are dimmed. A move of the window shows
@@ -160,9 +157,9 @@ The settings page (stage 10) takes the
 page's place in Focus, and F11 and F5 switch between the two. Row 0
 has its title; rows 2 to 5 the IP address, the MAC address, the TCP
 port, and the baud rate, from column 17, in their usual notation; rows
-7 to 9 a note on what a write does; row 23 the field, its label, `IP:`,
+7 to 9 a note on what a write does; row 26 the field, its label, `IP:`,
 `MAC:`, or `Baud:`, and the last message, `written`, `not paused`, or `bad
-value`; and row 24 the keys. The setting chosen has a `>` before it and
+value`; and row 27 the keys. The setting chosen has a `>` before it and
 its colors swapped, the field's cursor blinks where the next character
 goes, and the TCP port, the generic `G_PORT` of `src/eth/`, is shown
 only.
@@ -237,7 +234,7 @@ On the page:
 | Key | Action |
 |---|---|
 | Cursor keys | Move the cursor; past the top or bottom row the window scrolls a row |
-| Page Up, Page Down | Move the window 22 rows, a page |
+| Page Up, Page Down | Move the window 25 rows, a page |
 | Home | Move the cursor to the window's first word |
 | `0`–`9`, `a`–`f`, `A`–`F` | Shift a hex digit into the input field; the last 8 count |
 | DEL | Remove the last digit; on an empty field, leave the address |
@@ -271,7 +268,7 @@ and Page Down, which makes MEGA a modifier in `kbd_m65_ascii.vhd`. Programs get 
 ## The Nexys4DDR
 
 The debugger is the same on the Nexys4DDR: the board uses the 1280x1024
-mode too, so the 29 rows and the overlay are as above, and its keyboard
+mode too, so the 32 rows and the overlay are as above, and its keyboard
 sends the same bytes. The board differs in its toggle key, its inputs
 and outputs, and its room.
 
@@ -367,7 +364,7 @@ removed both the hex and the cut-off host.
   port, `ovl_we_o`, `ovl_addr_o`, and `ovl_data_o`, with `strip_o` and
   `page_o`; `focus_o`, for the keyboard mux; and, with `G_BOARD_IO`, the
   five buttons in and the display's 64 segment bits out. A generic names
-  the toggle key for row 28.
+  the toggle key for row 31.
 - `src/dbg/dbg_host.vhd`: the adapter to the side port (written). A
   request in, with valid and ready: a read of a count of words from an
   address, or a write of one word, as the debugger writes one register
@@ -375,8 +372,8 @@ removed both the hex and the cut-off host.
   and the end of the request, with the link's code `02` when it refused
   a word; and the side port out, `side_*`.
 - `src/dbg/dbg_decode.vhd` (written): the instruction word and its
-  constant words in, the text of row 27 out, a character a cycle.
-- `src/video/text.vhd`: the 29 rows, the overlay memory, and its ports:
+  constant words in, the text of row 30 out, a character a cycle.
+- `src/video/text.vhd`: the 32 rows, the overlay memory, and its ports:
   `ovl_we_i`, `ovl_addr_i`, `ovl_data_i`, `strip_i`, and `page_i`.
 - `src/nicemon.vhd`: the link's side port as `dbg_*`, and the core's
   `paused_o` and `halted_o` (written).
@@ -435,7 +432,7 @@ about 3000 LUTs ([synth/README.md](../synth/README.md#utilization)).
   while the core runs; F3 pausing, s, F3 going on, the halt, r, F7 and
   F9 doing nothing, h, with the registers dimmed, and g, p, and F3 on a
   held core, with the
-  decode of row 27 at each stop; F12, F4, and Strip,
+  decode of row 30 at each stop; F12, F4, and Strip,
   a step of its own that is not caught, the catch of a halt in Strip,
   and no catch from Off; and the page: the ROM's words, the cursor keys,
   Home, Page Up and Down, a move during a read, `a`, a write read back,
@@ -509,7 +506,7 @@ Each a commit that builds and passes the tests:
 6. **The breakpoints** (done). `b`, the header's list, the colored
    words, and `BRK n`.
 7. **The Nexys4DDR's buttons and display** in Focus (done).
-8. **The decode** of row 27, `dbg_decode.vhd` (done).
+8. **The decode** of row 30, `dbg_decode.vhd` (done).
 9. **nice_cpu V1.2** (done, and tested on the R6). The registers are
    live while the core runs, and the
    strip dims them only while the core is held; and the debugger moved
@@ -546,7 +543,7 @@ Made on 2026-10-30, with the reasons:
   output on the board, whichever host drives it.
 - **Four rows, not seven.** Seven rows with the breakpoints, a console
   tail, and a status row were crowded. The breakpoints are on the page,
-  the state is in row 27, and the console tail waits for a page of its
+  the state is in row 30, and the console tail waits for a page of its
   own.
 - **The text moves up 64 lines, permanently.** So nothing jumps when the
   strip appears, and program plus strip stay centered.

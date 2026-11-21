@@ -200,6 +200,9 @@ READY.
 HALT
 Halted
 Screen:
+|Redo from start
+|NAME? D, "2"
+|Redo from start
 |NAME? D, 2
 |[D]2
 |? E

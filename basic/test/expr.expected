@@ -235,6 +235,9 @@ Halted
 ffffed51: 00008010
 Screen:
 |READY.
+|A = 1: LOAD "X.BIN": ? A
+|SD error 1 in slot 1, no card
+|READY.
 |? A
 |1
 |READY.

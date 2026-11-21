@@ -181,7 +181,7 @@ of [DEVICES.md §7](https://github.com/MJoergen/nice_cpu/blob/main/doc/DEVICES.m
 
 ## The scrollback
 
-The history is a ring of rows in the screen's memory past its 2000
+The history is a ring of rows in the screen's memory past its 2240
 words, from the top of the memory down. Before `mon_putc` moves the rows
 up, it copies row 0 into the ring. The cold start finds the size of the
 memory from the display offset, which a board keeps only in the bits
@@ -190,7 +190,7 @@ Nexys4DDR, so one ROM serves every board. `k` rows back is the
 display offset `size - 80k`, which wraps to row 0 of the screen, with
 the cursor off. The first key that scrolls back turns the ring so that
 its newest row is the last of the memory. In `niceemu` the display
-offset is plain memory, so all its bits are kept: the history has 384
+offset is plain memory, so all its bits are kept: the history has 381
 rows there, which `DUMP` and `--dump` read.
 
 ## The loader of BASIC
@@ -389,8 +389,8 @@ steps in order:
    tests' `.nasm` files.
 2. **The scrollback.** `test/ring.py` checks the ring of the history at
    three sizes of the screen's memory: 32768 words, as in `niceemu` and
-   on the MEGA65, 8192, as on the Nexys4DDR, and 2048, which has no room
-   for it. For each, it reads the rows a board would show from a dump of
+   on the MEGA65, 8192, as on the Nexys4DDR, and 4096, the fewest that
+   a board can have, with room for 23 rows. For each, it reads the rows a board would show from a dump of
    the memory, and compares them with the console output. It does this
    with the history partly filled and gone round, and after Page Up, Page
    Down, and a key that shows the screen again.
@@ -527,7 +527,7 @@ The suites of `test/fat_runs.py`, step 7:
 |---|---|
 | `fatstate` | What `SYS 0` and a program's return keep: a handle across the cold start, both handles left open, so that `LOAD`, `SAVE`, and `DIR` give error 23 while TAB works, the mount of slot 1 forgotten, and `DIR 0`, which mounts again and closes a program's handle. |
 | `fatload` | `LOAD`'s lines (`lines.img`): CR LF, blank lines only, a chain cut after its second cluster, whose summary comes before the error, and lines of every kind, with bytes that are not printable ASCII and blanks and text after 76 characters, and the words of `V_LSTATS`. |
-| `fattab` | TAB: after a quote, in either case, an alias, words after blanks and strings, a list of 23 names; with slot 1 mounted (`tab1.img`), a directory, names that end at the line's end or past it, and a list of 30 names, more than the screen's 25 rows; and after `SAVE` and `DELETE` (issue #145). |
+| `fattab` | TAB: after a quote, in either case, an alias, words after blanks and strings, a list of 23 names; with slot 1 mounted (`tab1.img`), a directory, names that end at the line's end or past it, and a list of 30 names, more than the screen's 28 rows; and after `SAVE` and `DELETE` (issue #145). |
 | `fatdrop` | The mount dropped under open files when `SD_SELECT` changes, and `fs_mount` under a file open to write. |
 | `fatchain` | Damaged chains (`chains.img`): a chain cut, a size past the chain, cluster 0, the last cluster, one past it, a bad mark, a loop; their reads, deletes, and a `SAVE` over one. |
 | `fatlfn` | Long names of 13 and 26 characters; damaged entries (`lfnx.img`): 0x05, orphans, a label, a broken set, a name of 256 characters; and deletes of long names across a sector and a cluster. |

@@ -127,6 +127,9 @@ halt
 Halted
 ffffe810: 00000322 00008000 00008321 00000000 00000000
 Screen:
+|LOAD "NAME" [, S]   load the program NAME.BAS, or NAME.BIN, from the SD card
+|LOAD "NAME", "IP"   load it from the TFTP server at IP
+|READY.
 |dirx
 |Syntax error; HELP lists the statements
 |READY.

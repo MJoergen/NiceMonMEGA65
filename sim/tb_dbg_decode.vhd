@@ -1,4 +1,4 @@
--- Tests the decode of row 27 (src/dbg/dbg_decode.vhd) against nicedis: the
+-- Tests the decode of row 30 (src/dbg/dbg_decode.vhd) against nicedis: the
 -- cases of sim/gen_decode.py, instruction words of every class, condition,
 -- modifier, and mode, with their constant words, and the text that
 -- nicedis writes for each.

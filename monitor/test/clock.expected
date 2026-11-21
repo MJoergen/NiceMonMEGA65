@@ -37,6 +37,9 @@ Halted
 ffffff46: 00000000 12cea5ff 00000000 00000001
 Screen:
 |READY.
+|bsave "a.bin", 0x8000, 1
+|Words saved: 1, 00008000 to 00008000
+|READY.
 |time "2099-12-31 23:59:58"
 |2099-12-31 23:59:58
 |READY.

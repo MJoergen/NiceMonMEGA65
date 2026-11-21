@@ -27,7 +27,7 @@ debugger, mon.py in the FPGA with the MEGA65's keyboard and a strip on
 the screen, of which stages 1 to 10 are written, the overlay, its host
 of the link, the live strip with the core's keys, Strip with the
 catch, the page of memory, the breakpoints, the Nexys4DDR's buttons
-and display, the decode of row 27, the link's side port with the
+and display, the decode of row 30, the link's side port with the
 registers live (issues #52 and #53), and the settings page of the
 link with the UART's baud rate at `0xFFFFFF9F` (issue #75). `doc/BASIC_SURVEY.md` is
 the survey of the BASIC dialects behind the interpreter in the ROM of
@@ -325,7 +325,7 @@ nice_cpu/assembler/niceasm.py -o x.bin x.nasm` and run with
   of it; grep the Vivado log for `Synth 8-6849` after changing one.
 - Every registered board pin carries `IOB TRUE` in the board's XDC, with a
   plain register in front of the pin and no logic between them.
-- `tb_nicemon` uses small sizes (RAM 4K, ROM 2K, screen 2K words, FIFO 16
+- `tb_nicemon` uses small sizes (RAM 4K, ROM 2K, screen 4K words, FIFO 16
   bytes) and a fast UART, so addresses and limits there differ from the board.
   The fonts live in the display, so a testbench of `nicemon` without
   `text.vhd` instantiates `font.vhd` itself (`tb_nicemon`, `tb_cosim`), or

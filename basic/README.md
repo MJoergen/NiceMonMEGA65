@@ -120,10 +120,10 @@ the screen already, it gets the whole line again, after a CR, as BASIC
 takes it.
 
 Page Up and Page Down scroll back through the rows that left the top
-of the screen, 24 rows at a time. On the MEGA65 Page Up and Page Down
+of the screen, 27 rows at a time. On the MEGA65 Page Up and Page Down
 are CTRL and MEGA with CRSR↑ and CRSR↓. Any other key shows the
-screen again, and goes on to the line. The history has 384 rows on
-the MEGA65 and 77 on the Nexys4DDR. `CLS` leaves it, as `clear` in a
+screen again, and goes on to the line. The history has 381 rows on
+the MEGA65 and 74 on the Nexys4DDR. `CLS` leaves it, as `clear` in a
 terminal does, and the cold start empties it. `niceemu` has no display
 offset, so there the history is kept but not shown.
 
@@ -463,7 +463,7 @@ names are those of BASIC 65, the MEGA65's own BASIC.
 | `FOREGROUND R, G, B` | The same, with the color given as its red, green, and blue, each 0 to 15, so that any of 4096 colors is possible: `FOREGROUND 15, 8, 0` is orange. |
 | `BACKGROUND N`, `BACKGROUND R, G, B` | Sets the background of the characters that are printed from now on, as `FOREGROUND` does. |
 | `CURSOR ON`, `CURSOR OFF` | Shows the cursor, or hides it. |
-| `CURSOR C, R [, S]` | Moves the cursor to column `C` and row `R`, both from 0, so that the next `PRINT` prints there. `CURSOR ON, C, R` and `CURSOR OFF, C, R` show or hide it too. A column past 79 is 79, and a row past 24 is 24. `S` is the cursor's style: 0 solid, 1 blinking, and 2 and 3 the same, but small. |
+| `CURSOR C, R [, S]` | Moves the cursor to column `C` and row `R`, both from 0, so that the next `PRINT` prints there. `CURSOR ON, C, R` and `CURSOR OFF, C, R` show or hide it too. A column past 79 is 79, and a row past 27 is 27. `S` is the cursor's style: 0 solid, 1 blinking, and 2 and 3 the same, but small. |
 | `RCURSOR C, R` | Sets the variables `C` and `R` to the cursor's column and row. |
 | `SLEEP S` | Waits `S` seconds, such as `SLEEP 0.5`. CTRL-C stops it, and `CONT` goes on after it. |
 
@@ -550,7 +550,7 @@ pseudo-instructions below, which only `DIS` shows:
   `SUB[M]` with a dest that is not R0. A field that the `MOVE` does not
   use and that is not R0 makes a `.DAT`, as before. `niceasm` assembles
   each back to the same word. nicedis.py and `nicemon.py mon`, and the
-  debugger's decode of row 27, show the plain instructions.
+  debugger's decode of row 30, show the plain instructions.
 - An instruction of 4 words, with constants in all three fields, has a
   text longer than the 34 columns left, and goes on in the next row of
   the screen.

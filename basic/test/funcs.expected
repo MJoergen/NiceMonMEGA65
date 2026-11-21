@@ -99,6 +99,9 @@ READY.
 halt
 Halted
 Screen:
+|? SIN 1
+|Syntax error
+|PRINT X; "T", ...   print numbers and strings, ; and , between them; ? is PRINT
 |READY.
 |A = PI(1)
 |Syntax error

@@ -383,7 +383,7 @@ rest.
 ## The screen
 
 The screen at `0xFFFF0000` is shown on the VGA and HDMI connectors, as 80
-columns and 25 rows of characters. Word `80 * row + column` is one
+columns and 28 rows of characters. Word `80 * row + column` is one
 character: its code, ISO 8859-1, in bits 7..0, and its color above, the
 background in bits 31..20 and the foreground in bits 19..8, each 4 bits of
 red, green, and blue. So `0x000FFF41` is a white `A` on black, and `0x41`

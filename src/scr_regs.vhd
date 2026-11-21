@@ -14,14 +14,14 @@
 --   1  The cursor's column, bits 6..0.
 --   2  The cursor's row, bits 4..0.
 --   5  The display offset, in words, bits G_SCR_ADDR_BITS - 1..0: the
---      display shows the 2000 words from it, so adding 80 scrolls a line.
+--      display shows the 2240 words from it, so adding 80 scrolls a line.
 --   6  The font base of nice_cpu's doc/DEVICES.md §1.8, all 32 bits, as
 --      QNICE's VGA_FONT_OFFS: 0xFFFE0000 shows the font RAM, and any other
 --      value the character ROM, 0 among them.
 --   7  The mode word of nice_cpu's doc/DEVICES.md §1.10: 0 is the text,
---      and 1 the chunky mode, 160x100 pixels of one word each. A write of
---      1 keeps 1 where the screen holds the 16000 words of the mode,
---      G_SCR_ADDR_BITS 14 or more, and any other write keeps 0, so a
+--      and 1 the chunky mode, 160x112 pixels of one word each. A write of
+--      1 keeps 1 where the screen holds the 17920 words of the mode,
+--      G_SCR_ADDR_BITS 15 or more, and any other write keeps 0, so a
 --      program that writes 1 and reads 0 knows that the mode is missing.
 -- The words 3, 4, and 8-F read 0 and take no write.
 --
@@ -86,8 +86,8 @@ architecture synthesis of scr_regs is
    -- The font base that shows the font RAM
    constant C_FONT_RAM : std_logic_vector(31 downto 0) := X"FFFE0000";
 
-   -- The chunky mode needs 160 * 100 = 16000 words of the screen
-   constant C_CHUNKY : boolean := G_SCR_ADDR_BITS >= 14;
+   -- The chunky mode needs 160 * 112 = 17920 words of the screen
+   constant C_CHUNKY : boolean := G_SCR_ADDR_BITS >= 15;
 
 begin
 

@@ -53,13 +53,13 @@ architecture synthesis of formal_nicemon is
    signal kbd_ready    : std_logic;
    signal running      : std_logic;
    signal scr_we       : std_logic;
-   signal scr_addr     : std_logic_vector(10 downto 0);
+   signal scr_addr     : std_logic_vector(11 downto 0);
    signal scr_data     : std_logic_vector(31 downto 0);
    signal scr_ctl_we   : std_logic;
    signal scr_cur_x    : std_logic_vector(6 downto 0);
    signal scr_cur_y    : std_logic_vector(4 downto 0);
    signal scr_cur_mode : std_logic_vector(2 downto 0);
-   signal scr_offs     : std_logic_vector(10 downto 0);
+   signal scr_offs     : std_logic_vector(11 downto 0);
    signal brd_led      : std_logic_vector(15 downto 0);
    signal brd_rgb0     : std_logic_vector(11 downto 0);
    signal brd_rgb1     : std_logic_vector(11 downto 0);
@@ -80,7 +80,7 @@ begin
          G_CLOCK_HZ         => 2_000_000,
          G_UART_BAUDRATE    => 1_000_000,
          G_RAM_ADDR_BITS    => 4,
-         G_SCR_ADDR_BITS    => 11,
+         G_SCR_ADDR_BITS    => 12,
          G_RX_FIFO_BITS     => 2,
          G_ROM_FILE         => G_ROM_FILE,
          G_ROM_ADDR_BITS    => 2,

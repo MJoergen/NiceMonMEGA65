@@ -225,7 +225,9 @@ the monitor's write of a word back to itself changes nothing in
   is its own, and whose number of dispatch entries is at most its own,
   41 in `V2.3.1`. A new entry of the monitor then keeps older images
   running. The layout is that of the monitor's own RAM, from
-  `0xFFFFF000`, alone, and a change of it refuses the older images.
+  `0xFFFFF000`, and the screen's rows, and a change of either refuses
+  the older images: version 2 has the 28 rows of #157, where version
+  1 had 25.
 - **BASIC's RAM.** Its size is the image's own, the word at `0x300B`.
   The monitor has it in three places today: SP at `mon_reset` and at
   `mon_exit`, and the end of a program's RAM in `bin_line`. It then

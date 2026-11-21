@@ -81,8 +81,8 @@
 ; DEVICES.md §1.8). Past the last column the cursor goes to the next row, and past
 ; the last row the screen's rows move up by one, by copying, which scrolls
 ; in niceemu too, where the display offset is plain memory, and the same
-; on a board whose screen is smaller. So the rows shown are always the 2000
-; words at SCREEN, as in niceemu.
+; on a board whose screen is smaller. So the rows shown are always the
+; SCR_WORDS words at SCREEN, as in niceemu.
 ;
 ; The scrollback: the row that leaves the top of the screen is copied into
 ; the history, a ring of rows in the rest of the screen's memory, from its
@@ -128,12 +128,12 @@ TIMER           .EQU    0xFFFFFF10      ; the timer's period, 0 to stop it
 FPU_CMD         .EQU    0xFFFFFF8C      ; the FPU's command: 0x101, CLEAR 1, empties its stack and clears its flags
 
 V_COL           .EQU    0xFFFFF000      ; the cursor's column, 0 to 79
-V_ROW           .EQU    0xFFFFF001      ; and its row, 0 to 24
+V_ROW           .EQU    0xFFFFF001      ; and its row, 0 to ROWS-1
 V_COLOR         .EQU    0xFFFFF002      ; the color of the characters put, bits 31..8
 V_OUT           .EQU    0xFFFFF003      ; the outputs: bit 0 the line, bit 1 the screen
 V_LINKS         .EQU    0xFFFFF004      ; the rows that go on from the row above, bit r for row r (scr_links)
 V_HSIZE         .EQU    0xFFFFF005      ; the words of the screen's memory
-V_HCAP          .EQU    0xFFFFF006      ; the rows of the history, after the 25 of the screen
+V_HCAP          .EQU    0xFFFFF006      ; the rows of the history, after the ROWS of the screen
 V_HHEAD         .EQU    0xFFFFF007      ; the slot of the next row, slot i at SCREEN + V_HSIZE - 80 (i + 1)
 V_HCOUNT        .EQU    0xFFFFF008      ; the rows kept, up to V_HCAP
 V_BACK          .EQU    0xFFFFF009      ; the rows shown back, 0 for the screen
@@ -236,7 +236,8 @@ COLOR           .EQU    MON_FG_WHITE+MON_BG_BLACK  ; the color at the cold start
 OUT_LINE        .EQU    1
 OUT_SCREEN      .EQU    2
 TABLE_VERSION   .EQU    0x00010008      ; what mon_version returns: 1.8
-PAGE            .EQU    24              ; the rows of a Page Up or Page Down
+PAGE            .EQU    ROWS-1          ; the rows of a Page Up or Page Down
+LINKS           .EQU    0x0FFFFFFE      ; scr_links's bits, 1 to ROWS-1
 SCR_MAX         .EQU    0x7FFF          ; the largest display offset
 
 ; The dispatch table (README.md, "The dispatch table"). Entries are only
@@ -339,14 +340,14 @@ mon_reset
                 MOVE    @V_OUT, OUT_LINE+OUT_SCREEN
 ; The size of the screen's memory, from the bits of the display offset
 ; that it keeps, with the offset off, and the rows of history that fit
-; after the 25 of the screen. The math unit divides (nice_cpu's DEVICES.md
+; after the ROWS of the screen. The math unit divides (nice_cpu's DEVICES.md
 ; §2).
                 CLR     @SCR_CTL
                 MOVE    @SCR_OFFS, 0xFFFFFFFF
                 AND     R1, @SCR_OFFS, SCR_MAX
                 ADD     R1, R1, 1
                 MOVE    @V_HSIZE, R1
-                SUB[M]  R1, R1, 2000
+                SUB[M]  R1, R1, SCR_WORDS
         ?C      CLR     R1
                 MOVE    @io.mpu_a, R1
                 MOVE    @io.mpu_b, 80
@@ -389,7 +390,7 @@ mon_exit
 ; The cursor is taken from its registers, SCR_X and SCR_Y, as a program
 ; may have moved it there and not through scr_moveto, such as the demo,
 ; which clears the screen and leaves the cursor at the top left. A column
-; past 79 is 79, and a row past 24 is 24. A program that left the cursor
+; past 79 is 79, and a row past ROWS-1 is ROWS-1. A program that left the cursor
 ; elsewhere than mon_putc and scr_moveto have it wrote the screen itself,
 ; so the rows that go on from the row above, V_LINKS, are no longer known,
 ; and are cleared (scr_links). A wrap that left the cursor at a row's
@@ -408,8 +409,8 @@ mon_restore
                 CMP     R1, 80
         ?!C     MOVE    R1, 79
                 MOVE    R2, @SCR_Y
-                CMP     R2, 25
-        ?!C     MOVE    R2, 24
+                CMP     R2, ROWS
+        ?!C     MOVE    R2, ROWS-1
                 CMP     R1, @V_COL      ; a cursor that the program moved itself
         ?Z      CMP     R2, @V_ROW
         ?!Z     CLR     @V_LINKS
@@ -509,7 +510,7 @@ scr_back
                 RET
 
 ; scr_links: entry 41. The rows of the screen that go on from the row
-; above, bit r for row r, 1 to 24 (doc/BASIC.md, "The screen editor"):
+; above, bit r for row r, 1 to ROWS-1 (doc/BASIC.md, "The screen editor"):
 ; mon_putc sets a row's bit when it wraps to it past the last column,
 ; clears it at a LF, and when a character goes to the row's column 0 and
 ; the cursor did not come there by that wrap, as after scr_moveto or a
@@ -517,12 +518,12 @@ scr_back
 ; so does mon_restore after a program that moved the cursor itself.
 ; scr_moveto and the end of a program forget the wrap, also when the
 ; cursor is still where the wrap left it. R1
-; the new word, or -1 to keep it; bit 0 and the bits from 25 are dropped.
+; the new word, or -1 to keep it; bit 0 and the bits from ROWS are dropped.
 ; R1 = the old word. Uses R2.
 scr_links
                 MOVE    R2, @V_LINKS
                 CMP     R1, -1
-        ?!Z     AND     @V_LINKS, R1, 0x1FFFFFE
+        ?!Z     AND     @V_LINKS, R1, LINKS
                 MOVE    R1, R2
                 RET
 
@@ -631,7 +632,7 @@ putc_lf         CALL    putc_next
 putc_next
                 CLR     @V_COL
                 ADD     R1, @V_ROW, 1
-                CMP     R1, 25
+                CMP     R1, ROWS
         ?!Z     MOVE    @V_ROW, R1
         ?!Z     RET
 ; Row 0 into the history, at slot V_HHEAD, which moves down the ring, when
@@ -658,15 +659,15 @@ putc_next
         ?!C     MOVE    @V_HCOUNT, R1
 putc_scroll
                 SHR     R1, @V_LINKS, 1  ; row 0, which went, takes row 1's bit: none
-                AND     @V_LINKS, R1, 0x1FFFFFE
+                AND     @V_LINKS, R1, LINKS
                 MOVE    R2, SCREEN
                 MOVE    R3, SCREEN+80
-                MOVE    R4, 1920        ; rows 1 to 24 to rows 0 to 23
+                MOVE    R4, SCR_WORDS-80  ; rows 1 to ROWS-1 to rows 0 to ROWS-2
 :               MOVE    @R2++, @R3++
                 SUB[M]  R4, R4, 1
         ?!Z     JMP     :-
                 OR      R3, @V_COLOR, 0x20
-                MOVE    R4, 80          ; row 24 blank
+                MOVE    R4, 80          ; the last row blank
 :
                 MOVE    @R2++, R3
                 SUB[M]  R4, R4, 1
@@ -710,7 +711,7 @@ mon_out         MOVE    R2, @V_OUT
 scr_cls         CLR     @SCR_OFFS
                 MOVE    @SCR_CTL, 0x60
                 OR      R3, @V_COLOR, 0x20
-                MOVE    R1, 2000
+                MOVE    R1, SCR_WORDS
 :
                 DEC[M]  R1, R1
                 MOVE    @SCREEN[R1], R3
@@ -722,14 +723,14 @@ scr_cls         CLR     @SCR_OFFS
                 JMP     putc_cur
 
 ; scr_moveto: entry 6. The cursor to column R1 and row R2. A column past
-; 79 is 79, and a row past 24 is 24. A character put at column 0 after it
+; 79 is 79, and a row past ROWS-1 is ROWS-1. A character put at column 0 after it
 ; starts a line of its own (putc_line), also where a wrap left the cursor
 ; before, as V_WRAP is cleared.
 scr_moveto
                 CMP     R1, 80
         ?!C     MOVE    R1, 79
-                CMP     R2, 25
-        ?!C     MOVE    R2, 24
+                CMP     R2, ROWS
+        ?!C     MOVE    R2, ROWS-1
                 MOVE    @V_COL, R1
                 MOVE    @V_ROW, R2
                 CLR     @V_WRAP

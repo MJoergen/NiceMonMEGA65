@@ -91,8 +91,8 @@
 --                          An instruction fetch in 0xFFFE0000-3FFF reads
 --                          the RAM's alias there, not a font (DEVICES.md §8).
 --   0xFFFF0000-0xFFFF7FFF  The screen: 2^G_SCR_ADDR_BITS words of memory of
---                          their own, so that the emulator's 80x25 screen,
---                          the first 2000, does not land on word 0. The rest
+--                          their own, so that the emulator's 80x28 screen,
+--                          the first 2240, does not land on word 0. The rest
 --                          is for scrolling, through the display offset
 --                          below. Every write to it is also given out on
 --                          scr_*_o, for a display that keeps a copy
@@ -157,7 +157,7 @@
 --                          bit 4 making it small, and bit 10 enabling the
 --                          display offset; 81 and 82 are the cursor's
 --                          column and row; 85 is the display offset, in
---                          words: the display shows the 2000 words from it,
+--                          words: the display shows the 2240 words from it,
 --                          so adding 80 scrolls a line; and 86 is the font
 --                          base of DEVICES.md §1.8: 0xFFFE0000 shows the font
 --                          RAM, and any other value the character ROM; and
@@ -547,7 +547,7 @@ architecture synthesis of nicemon is
    constant C_UART_DATA  : std_logic_vector(31 downto 0) := X"FFFFFF00";
    constant C_READ_COUNT : std_logic_vector(31 downto 0) := X"FFFFFF01";
    -- The screen: 0xFFFF0000 and the 2^G_SCR_ADDR_BITS words from it, of
-   -- which the emulator's screen is the first 2000
+   -- which the emulator's screen is the first 2240
    constant C_SCR_BITS : natural := G_SCR_ADDR_BITS;
    -- The fonts: 0xFFFE0000-3FFF, the RAM and then the ROM
    constant C_FNT_BASE : std_logic_vector(31 downto 14) := X"FFFE" & "00";
@@ -839,8 +839,8 @@ architecture synthesis of nicemon is
 
 begin
 
-   assert C_SCR_BITS >= 11 and C_SCR_BITS <= 15
-      report "nicemon: the screen must hold its 2000 words, below the I/O registers"
+   assert C_SCR_BITS >= 12 and C_SCR_BITS <= 15
+      report "nicemon: the screen must hold its 2240 words, below the I/O registers"
       severity failure;
 
    assert G_RX_FIFO_BITS <= 15

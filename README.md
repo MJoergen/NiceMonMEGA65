@@ -13,7 +13,7 @@ This project runs the [NICE CPU](https://github.com/MJoergen/nice_cpu) on
 the [MEGA65](https://mega65.org/) (R3 and R6), a modern FPGA computer in
 the form of a Commodore 65. NICE is a 32-bit CPU with its own instruction
 set, assembler, C toolchain, and emulator, `niceemu`. On the MEGA65, the
-system shows a screen of 80×25 characters on HDMI and VGA, and reads the
+system shows a screen of 80×28 characters on HDMI and VGA, and reads the
 keyboard. A program written in NICE assembly
 ([ISA.md](https://github.com/MJoergen/nice_cpu/blob/main/doc/ISA.md)),
 or in C, runs on the board as it runs in `niceemu`. The system also

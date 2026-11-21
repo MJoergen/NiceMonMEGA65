@@ -24,6 +24,9 @@ halt
 Halted
 Screen:
 |READY.
+|dump 0xFFFFF004, 1
+|FFFFF004 00000020
+|READY.
 |sys 0x8020
 |xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 |x

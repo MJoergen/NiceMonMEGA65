@@ -2,7 +2,7 @@
 -- doc/DEBUGGER.md, with the system under it: the strip it draws into the
 -- overlay, the toggle, the core's keys over the debug link, the sticky
 -- setting, the catch, the page, the breakpoints, the Nexys4DDR's buttons
--- and display, the decode of row 27, and the settings page.
+-- and display, the decode of row 30, and the settings page.
 --
 -- PASS AND FAIL
 -- Each check is an assert with severity failure, which stops GHDL with a
@@ -14,7 +14,7 @@
 -- through the link's side port, as system.vhd wires it, and p_ovl counts
 -- its requests. p_ovl is also the overlay of text.vhd:
 -- it takes the debugger's writes into a model, and counts those outside
--- its 29 rows, which must be none. p_main types keys, as bytes of the
+-- its 32 rows, which must be none. p_main types keys, as bytes of the
 -- keyboard, and waits for the strip's text. The debugger's G_CLOCK_HZ is
 -- small, so that it refreshes every 3000 cycles and samples the buttons
 -- every 900. It has G_BOARD_IO, and seg_text reads its display. The steps:
@@ -35,7 +35,7 @@
 --    and Z among the flags. F3, F7, and F9 do nothing then.
 -- 7. r restarts, h holds: HELD, with the registers dimmed and no PC.
 --    Then g, p, and F3 do nothing, as they would start the held core.
--- 8. F12 sets the sticky setting, which row 28 shows. F4 restarts, F3
+-- 8. F12 sets the sticky setting, which row 31 shows. F4 restarts, F3
 --    pauses, and s steps, and the toggle comes before the step ends: the
 --    debugger is in Strip, still reading the core but without the
 --    keyboard, and the stop it caused itself does not take it back to
@@ -122,13 +122,13 @@ architecture simulation of tb_dbg is
 
    type t_rom is array (0 to 255) of std_logic_vector(31 downto 0);
 
-   -- The strip, rows 25 to 28 of the overlay
-   constant C_FIRST : natural := 25 * 80;
-   constant C_LAST  : natural := 29 * 80 - 1;
+   -- The strip, rows 28 to 31 of the overlay
+   constant C_FIRST : natural := 28 * 80;
+   constant C_LAST  : natural := 32 * 80 - 1;
 
    constant C_DASHES : string := "-------- -------- -------- -------- -------- -------- -------- -------- ";
    constant C_KEYS   : string := " F1 step F3 pause/go F4 restart F5 link F11 page F12 keep strip: ";
-   constant C_ROW28  : string := C_KEYS & "off" & (1 to 80 - C_KEYS'length - 3 => ' ');
+   constant C_ROW31  : string := C_KEYS & "off" & (1 to 80 - C_KEYS'length - 3 => ' ');
    constant C_STRIP  : string := " The keys are the program's.  MEGA+HELP for the debugger";
    constant C_COLOR  : std_logic_vector(23 downto 0) := X"004FFF";
    constant C_DIM    : std_logic_vector(23 downto 0) := X"004888";
@@ -211,7 +211,7 @@ architecture simulation of tb_dbg is
       return res_v;
    end function seg_text;
 
-   -- The decode of row 27 at an address of dbg.nasm, as nicedis writes it
+   -- The decode of row 30 at an address of dbg.nasm, as nicedis writes it
    function decode(a : natural) return string is
       variable res_v : string(1 to 34) := (others => ' ');
 
@@ -268,7 +268,7 @@ begin
       generic map (
          G_CLOCK_HZ         => C_CLOCK_HZ,
          G_RAM_ADDR_BITS    => 12,
-         G_SCR_ADDR_BITS    => 11,
+         G_SCR_ADDR_BITS    => 12,
          G_RX_FIFO_BITS     => 4,
          G_ROM_FILE         => G_ROM_FILE,
          G_ROM_ADDR_BITS    => 11,
@@ -447,14 +447,14 @@ begin
          return row_text(ovl, r);
       end function row;
 
-      -- The state and the PC of row 27
-      procedure expect_row27(state : string; what : string) is
+      -- The state and the PC of row 30
+      procedure expect_row30(state : string; what : string) is
       begin
-         wait_text(27, 1, state);
-         assert row(27)(2 to 1 + state'length) = state
-            report "tb_dbg: " & what & ": row 27 is '" & row(27) & "'"
+         wait_text(30, 1, state);
+         assert row(30)(2 to 1 + state'length) = state
+            report "tb_dbg: " & what & ": row 30 is '" & row(30) & "'"
             severity failure;
-      end procedure expect_row27;
+      end procedure expect_row30;
 
       -- The color of the hex digits of R1
       procedure expect_color(c : std_logic_vector(23 downto 0); what : string) is
@@ -471,52 +471,52 @@ begin
          variable r1_v  : string(1 to 8);
          variable end_v : time;
       begin
-         wait_text(27, 1, "RUNNING");
+         wait_text(30, 1, "RUNNING");
          end_v := now + C_TIMEOUT;
          loop
-            exit when row(25)(18) /= '-' and ovl(C_FIRST + 17)(31 downto 8) = C_COLOR and ovl_we = '0';
+            exit when row(28)(18) /= '-' and ovl(C_FIRST + 17)(31 downto 8) = C_COLOR and ovl_we = '0';
             assert now < end_v
-               report "tb_dbg: " & what & ": R1 is '" & row(25)(18 to 25) & "' in " &
+               report "tb_dbg: " & what & ": R1 is '" & row(28)(18 to 25) & "' in " &
                       to_hstring(ovl(C_FIRST + 17)(31 downto 8)) & " while the core runs"
                severity failure;
             wait until rising_edge(clk);
          end loop;
-         r1_v := row(25)(18 to 25);
+         r1_v := row(28)(18 to 25);
          loop
-            exit when row(25)(18 to 25) /= r1_v and row(25)(18) /= '-' and ovl_we = '0';
+            exit when row(28)(18 to 25) /= r1_v and row(28)(18) /= '-' and ovl_we = '0';
             assert now < end_v
                report "tb_dbg: " & what & ": R1 stays " & r1_v & " while the core runs"
                severity failure;
             wait until rising_edge(clk);
          end loop;
-         assert row(27)(11 to 17) = "0000000" and row(27)(18) >= '0' and row(27)(18) <= '8'
-            report "tb_dbg: " & what & ": the PC is '" & row(27)(11 to 18) & "' while the core runs"
+         assert row(30)(11 to 17) = "0000000" and row(30)(18) >= '0' and row(30)(18) <= '8'
+            report "tb_dbg: " & what & ": the PC is '" & row(30)(11 to 18) & "' while the core runs"
             severity failure;
-         assert row(27)(21 to 28) = "--------"
-            report "tb_dbg: " & what & ": the word at the PC is '" & row(27)(21 to 28) & "' while the core runs"
+         assert row(30)(21 to 28) = "--------"
+            report "tb_dbg: " & what & ": the word at the PC is '" & row(30)(21 to 28) & "' while the core runs"
             severity failure;
          assert seg_text(seg)(1 to 7) = "0000000"
             report "tb_dbg: " & what & ": the display shows " & seg_text(seg) & " while the core runs"
             severity failure;
       end procedure expect_live;
 
-      -- At a stop: R15 is the PC of row 27, and the word at the PC the ROM's
+      -- At a stop: R15 is the PC of row 30, and the word at the PC the ROM's
       procedure expect_stop(what : string) is
       begin
          loop
-            exit when row(27)(11) /= '-' and row(27)(21) /= '-' and row(27)(47) /= ' ' and ovl_we = '0';
+            exit when row(30)(11) /= '-' and row(30)(21) /= '-' and row(30)(47) /= ' ' and ovl_we = '0';
             wait until rising_edge(clk);
          end loop;
          cycles(400);
-         pc_v := hex_word(row(27)(11 to 18));
-         assert row(26)(72 to 79) = row(27)(11 to 18)
-            report "tb_dbg: " & what & ": R15 is " & row(26)(72 to 79) & ", the PC " & row(27)(11 to 18)
+         pc_v := hex_word(row(30)(11 to 18));
+         assert row(29)(72 to 79) = row(30)(11 to 18)
+            report "tb_dbg: " & what & ": R15 is " & row(29)(72 to 79) & ", the PC " & row(30)(11 to 18)
             severity failure;
-         assert hex_word(row(27)(21 to 28)) = rom_v(to_integer(pc_v(7 downto 0)))
-            report "tb_dbg: " & what & ": the word at the PC is " & row(27)(21 to 28)
+         assert hex_word(row(30)(21 to 28)) = rom_v(to_integer(pc_v(7 downto 0)))
+            report "tb_dbg: " & what & ": the word at the PC is " & row(30)(21 to 28)
             severity failure;
-         assert row(27)(47 to 80) = decode(to_integer(pc_v(7 downto 0)))
-            report "tb_dbg: " & what & ": the decode at " & to_hstring(pc_v) & " is '" & row(27)(47 to 80) & "'"
+         assert row(30)(47 to 80) = decode(to_integer(pc_v(7 downto 0)))
+            report "tb_dbg: " & what & ": the decode at " & to_hstring(pc_v) & " is '" & row(30)(47 to 80) & "'"
             severity failure;
          expect_color(C_COLOR, what);
       end procedure expect_stop;
@@ -578,15 +578,15 @@ begin
          report "tb_dbg: " & integer'image(writes) & " writes to the overlay, " &
                 integer'image(stray) & " outside the strip"
          severity failure;
-      assert row(25) = " R0-7   " & C_DASHES and row(26) = " R8-15  " & C_DASHES
-         report "tb_dbg: rows 25 and 26 are '" & row(25) & "' and '" & row(26) & "'"
+      assert row(28) = " R0-7   " & C_DASHES and row(29) = " R8-15  " & C_DASHES
+         report "tb_dbg: rows 28 and 29 are '" & row(28) & "' and '" & row(29) & "'"
          severity failure;
-      assert row(27)(1 to 43) = " NO LINK  --------  --------  . . . . . . ." and
-             row(27)(44 to 80) = (44 to 80 => ' ')
-         report "tb_dbg: row 27 is '" & row(27) & "'"
+      assert row(30)(1 to 43) = " NO LINK  --------  --------  . . . . . . ." and
+             row(30)(44 to 80) = (44 to 80 => ' ')
+         report "tb_dbg: row 30 is '" & row(30) & "'"
          severity failure;
-      assert row(28) = C_ROW28
-         report "tb_dbg: row 28 is '" & row(28) & "'"
+      assert row(31) = C_ROW31
+         report "tb_dbg: row 31 is '" & row(31) & "'"
          severity failure;
       expect_color(C_DIM, "after reset");
       assert ovl(C_FIRST + 1)(31 downto 8) = C_COLOR
@@ -601,15 +601,15 @@ begin
          report "tb_dbg: G_WAIT. the state of a wait for an interrupt";
          pulse;
          expect('1', '0', '1', "after the toggle");
-         expect_row27("WAITING ", "in a wait");
+         expect_row30("WAITING ", "in a wait");
          key(C_ESC & "OR");
-         expect_row27("PAUSED W ", "after F3 in a wait");
+         expect_row30("PAUSED W ", "after F3 in a wait");
          expect_stop("after F3 in a wait");
          assert pc_v = 1
             report "tb_dbg: the PC is " & to_hstring(pc_v) & " in a wait, not the HALT after the WAIT"
             severity failure;
          key(C_ESC & "OR");
-         expect_row27("WAITING ", "after F3 again in a wait");
+         expect_row30("WAITING ", "after F3 again in a wait");
          report "tb_dbg: G_WAIT done";
          stop(0);
       end if;
@@ -618,14 +618,14 @@ begin
          report "tb_dbg: G_WATCH. the state at a watchpoint";
          pulse;
          expect('1', '0', '1', "after the toggle");
-         expect_row27("RUNNING ", "before the watchpoint");
+         expect_row30("RUNNING ", "before the watchpoint");
          key(C_ESC & "OR");
-         expect_row27("PAUSED   ", "after F3");
+         expect_row30("PAUSED   ", "after F3");
          key("m");
          key("affffffd4" & C_CR);
          wait_text(0, 0, " Window FFFFFFD4  Cursor FFFFFFD4 ");
          key("4" & C_CR);
-         wait_text(23, 20, "written   ");
+         wait_text(26, 20, "written   ");
          wait_text(1, 0, "FFFFFFD4 00000004 00000004 ");
          for i in 1 to 5 loop
             key(C_ESC & "[C");
@@ -634,11 +634,11 @@ begin
          key("800" & C_CR);
          wait_text(1, 0, "FFFFFFD4 00000004 00000004 00000000 00000000 00000000 00000800 ");
          key("g");
-         expect_row27("WCH 1    00000003", "at watchpoint 1");
+         expect_row30("WCH 1    00000003", "at watchpoint 1");
          key("s");
-         expect_row27("PAUSED   00000002", "after s at watchpoint 1");
+         expect_row30("PAUSED   00000002", "after s at watchpoint 1");
          key("g");
-         expect_row27("WCH 1    00000003", "at watchpoint 1 again");
+         expect_row30("WCH 1    00000003", "at watchpoint 1 again");
          report "tb_dbg: G_WATCH done";
          stop(0);
       end if;
@@ -654,7 +654,7 @@ begin
 
       report "tb_dbg: 3. F3 pauses";
       key(C_ESC & "OR");
-      expect_row27("PAUSED ", "after F3");
+      expect_row30("PAUSED ", "after F3");
       expect_stop("after F3");
       assert pc_v >= 2 and pc_v <= 6
          report "tb_dbg: the PC is " & to_hstring(pc_v) & " at a pause"
@@ -663,11 +663,11 @@ begin
       report "tb_dbg: 4. s steps";
       key("s");
       loop
-         exit when ovl_we = '0' and row(27)(11) /= '-' and hex_word(row(27)(11 to 18)) /= pc_v;
+         exit when ovl_we = '0' and row(30)(11) /= '-' and hex_word(row(30)(11 to 18)) /= pc_v;
          wait until rising_edge(clk);
       end loop;
       expect_stop("after s");
-      expect_row27("PAUSED ", "after s");
+      expect_row30("PAUSED ", "after s");
       assert pc_v = 2 or pc_v = 4 or pc_v = 6
          report "tb_dbg: the PC is " & to_hstring(pc_v) & " after a step"
          severity failure;
@@ -677,13 +677,13 @@ begin
       expect_live("after the second F3");
 
       report "tb_dbg: 6. the halt";
-      expect_row27("HALTED 1", "after the halt");
+      expect_row30("HALTED 1", "after the halt");
       expect_stop("after the halt");
-      assert pc_v = 9 and row(25)(18 to 25) = "00000800"
-         report "tb_dbg: the PC is " & to_hstring(pc_v) & " and R1 " & row(25)(18 to 25) & " at the halt"
+      assert pc_v = 9 and row(28)(18 to 25) = "00000800"
+         report "tb_dbg: the PC is " & to_hstring(pc_v) & " and R1 " & row(28)(18 to 25) & " at the halt"
          severity failure;
-      assert row(27)(31 to 43) = ". . Z . . . ."
-         report "tb_dbg: the flags are '" & row(27)(31 to 43) & "' at the halt"
+      assert row(30)(31 to 43) = ". . Z . . . ."
+         report "tb_dbg: the flags are '" & row(30)(31 to 43) & "' at the halt"
          severity failure;
       key(C_ESC & "OR");
       cycles(10000);
@@ -691,13 +691,13 @@ begin
       cycles(10000);
       key(C_ESC & "[20~");
       cycles(10000);
-      expect_row27("HALTED 1", "after F3, F7, and F9 at the halt");
+      expect_row30("HALTED 1", "after F3, F7, and F9 at the halt");
 
       report "tb_dbg: 7. r restarts, h holds, and g, p, and F3 do not start";
       key("r");
-      expect_row27("RUNNING", "after r");
+      expect_row30("RUNNING", "after r");
       key("h");
-      expect_row27("HELD     --------", "after h");
+      expect_row30("HELD     --------", "after h");
       expect_color(C_DIM, "while held");
       key("g");
       cycles(10000);
@@ -705,42 +705,42 @@ begin
       cycles(10000);
       key(C_ESC & "OR");
       cycles(10000);
-      expect_row27("HELD", "after g, p, and F3");
+      expect_row30("HELD", "after g, p, and F3");
 
       report "tb_dbg: 8. F12, and a step of the debugger's own in Strip";
       key(C_ESC & "[24~");
-      wait_text(28, 0, C_KEYS & "on ");
+      wait_text(31, 0, C_KEYS & "on ");
       key(C_ESC & "OS");
-      expect_row27("RUNNING", "after F4");
+      expect_row30("RUNNING", "after F4");
       key(C_ESC & "OR");
-      expect_row27("PAUSED ", "after F3");
+      expect_row30("PAUSED ", "after F3");
       expect_stop("after F3");
       key("s");
       pulse;
       expect('1', '0', '0', "in Strip");
-      wait_text(28, 0, C_STRIP);
+      wait_text(31, 0, C_STRIP);
       n_v := reqs;
       cycles(20000);
       assert reqs > n_v
          report "tb_dbg: the debugger stopped asking the link in Strip"
          severity failure;
       expect('1', '0', '0', "after the step in Strip");
-      expect_row27("PAUSED ", "after the step in Strip");
+      expect_row30("PAUSED ", "after the step in Strip");
 
       report "tb_dbg: 9. the catch of a halt in Strip";
       pulse;
       expect('1', '0', '1', "back in Focus");
       key("g");
-      expect_row27("RUNNING", "after g");
+      expect_row30("RUNNING", "after g");
       pulse;
       expect('1', '0', '0', "in Strip again");
       wait until focus = '1' for C_TIMEOUT;
       expect('1', '0', '1', "after the halt in Strip");
-      expect_row27("HALTED 1", "after the catch");
+      expect_row30("HALTED 1", "after the catch");
 
       report "tb_dbg: 10. F12 again, and the toggle leaves for Off";
       key(C_ESC & "[24~");
-      wait_text(28, 0, C_ROW28);
+      wait_text(31, 0, C_ROW31);
       pulse;
       expect('0', '0', '0', "after the toggle to Off");
       cycles(2000);
@@ -761,8 +761,8 @@ begin
       cycles(400);
       expect('0', '0', '0', "after the reset");
       assert writes - base_v >= C_LAST - C_FIRST + 1 and stray = 0 and
-             row(27)(1 to 8) = " NO LINK" and row(25) = " R0-7   " & C_DASHES and row(28) = C_ROW28
-         report "tb_dbg: the strip is not drawn again after the reset: '" & row(27) & "'"
+             row(30)(1 to 8) = " NO LINK" and row(28) = " R0-7   " & C_DASHES and row(31) = C_ROW31
+         report "tb_dbg: the strip is not drawn again after the reset: '" & row(30) & "'"
          severity failure;
       wait for C_TIMEOUT;
       expect('0', '0', '0', "after the halt in Off");
@@ -773,15 +773,15 @@ begin
       report "tb_dbg: 12. F11 shows the page";
       pulse;
       expect('1', '0', '1', "in Focus for the page");
-      expect_row27("HALTED 1", "before the page");
+      expect_row30("HALTED 1", "before the page");
       key(C_ESC & "[23~");
       cycles(4);
       expect('1', '1', '1', "with the page");
       wait_text(0, 0, " Window 00000000  Cursor 00000000 ");
       expect_rom_row(1, 0, "the first row");
-      expect_rom_row(22, 21 * 8, "the last row");
-      assert row(23)(1 to 20) = " Word:    " & C_NONE & "  " and row(24)(1 to C_PKEYS'length) = C_PKEYS
-         report "tb_dbg: rows 23 and 24 are '" & row(23) & "' and '" & row(24) & "'"
+      expect_rom_row(25, 24 * 8, "the last row");
+      assert row(26)(1 to 20) = " Word:    " & C_NONE & "  " and row(27)(1 to C_PKEYS'length) = C_PKEYS
+         report "tb_dbg: rows 26 and 27 are '" & row(26) & "' and '" & row(27) & "'"
          severity failure;
       expect_word_color(1, 0, C_CURSOR, "the cursor");
       expect_word_color(1, 1, C_COLOR, "after the cursor");
@@ -801,8 +801,8 @@ begin
       wait_text(0, 0, " Window FFFFFFF8  Cursor 00000000 ");
       expect_word_color(2, 0, C_CURSOR, "after down");
       key(C_ESC & "[6~");
-      wait_text(0, 0, " Window 000000A8  Cursor 000000B0 ");
-      expect_rom_row(2, 16#B0#, "after Page Down");
+      wait_text(0, 0, " Window 000000C0  Cursor 000000C8 ");
+      expect_rom_row(2, 16#C8#, "after Page Down");
       -- Page Up, and Page Down again while the window at FFFFFFF8 is read,
       -- at its 25th word: that read, of the ROM's words, is not shown
       key(C_ESC & "[5~");
@@ -812,37 +812,37 @@ begin
          report "tb_dbg: the window at FFFFFFF8 is not read"
          severity failure;
       key(C_ESC & "[6~");
-      wait_text(0, 0, " Window 000000A8  Cursor 000000B0 ");
-      expect_rom_row(2, 16#B0#, "after a Page Down during a read");
+      wait_text(0, 0, " Window 000000C0  Cursor 000000C8 ");
+      expect_rom_row(2, 16#C8#, "after a Page Down during a read");
       key(C_ESC & "[5~");
       wait_text(0, 0, " Window FFFFFFF8  Cursor 00000000 ");
 
       report "tb_dbg: 14. a moves the window";
       key("a");
-      wait_text(23, 0, " Address: " & C_NONE);
+      wait_text(26, 0, " Address: " & C_NONE);
       key("ffff0010");
-      wait_text(23, 0, " Address: FFFF0010");
+      wait_text(26, 0, " Address: FFFF0010");
       key("" & C_CR);
       wait_text(0, 0, " Window FFFF0010  Cursor FFFF0010 ");
       wait_text(1, 0, "FFFF0010 00000000 00000000");
-      assert row(23)(1 to 18) = " Word:    " & C_NONE
-         report "tb_dbg: the field is '" & row(23) & "' after RETURN"
+      assert row(26)(1 to 18) = " Word:    " & C_NONE
+         report "tb_dbg: the field is '" & row(26) & "' after RETURN"
          severity failure;
 
       report "tb_dbg: 15. a word's write, DEL, and ESC";
       key("9");
-      wait_text(23, 0, " Word:    9_______");
+      wait_text(26, 0, " Word:    9_______");
       key("" & C_DEL);
-      wait_text(23, 0, " Word:    " & C_NONE);
+      wait_text(26, 0, " Word:    " & C_NONE);
       key(C_ESC & "[C");
       wait_text(0, 0, " Window FFFF0010  Cursor FFFF0011 ");
       key("12345678" & C_CR);
-      wait_text(23, 20, "written   ");
+      wait_text(26, 20, "written   ");
       wait_text(1, 0, "FFFF0010 00000000 12345678 00000000");
       key("1a");
-      wait_text(23, 0, " Word:    1A______");
+      wait_text(26, 0, " Word:    1A______");
       key("" & C_ESC);
-      wait_text(23, 0, " Word:    " & C_NONE);
+      wait_text(26, 0, " Word:    " & C_NONE);
       expect('1', '1', '1', "after an ESC with digits");
       key("" & C_ESC);
       wait until page = '0' for C_TIMEOUT;
@@ -851,15 +851,15 @@ begin
       report "tb_dbg: 16. m, and the page while the core runs";
       key("m");
       wait_text(1, 0, "FFFF0010 00000000 12345678 00000000");
-      assert row(23)(21 to 30) = "          "
-         report "tb_dbg: the message stays: '" & row(23) & "'"
+      assert row(26)(21 to 30) = "          "
+         report "tb_dbg: the message stays: '" & row(26) & "'"
          severity failure;
       key("r");
-      expect_row27("RUNNING", "after r with the page");
+      expect_row30("RUNNING", "after r with the page");
       expect_word_color(1, 2, C_DIM, "while the core runs");
       key("1" & C_CR);
-      wait_text(23, 20, "not paused");
-      expect_row27("HALTED 1", "after the run with the page");
+      wait_text(26, 20, "not paused");
+      expect_row30("HALTED 1", "after the run with the page");
       wait_text(1, 0, "FFFF0010 00000000 12345678 00000000");
       expect_word_color(1, 2, C_COLOR, "after the halt");
       expect_word_color(1, 1, C_CURSOR, "after the halt");
@@ -879,9 +879,9 @@ begin
       expect_word_color(1, 2, C_BREAK, "a breakpoint");
       expect_word_color(1, 3, C_CURSOR, "after a breakpoint");
       key("r");
-      expect_row27("BRK 0    00000002", "at breakpoint 0");
-      assert row(25)(18 to 25) = "00000000"
-         report "tb_dbg: R1 is " & row(25)(18 to 25) & " at breakpoint 0"
+      expect_row30("BRK 0    00000002", "at breakpoint 0");
+      assert row(28)(18 to 25) = "00000000"
+         report "tb_dbg: R1 is " & row(28)(18 to 25) & " at breakpoint 0"
          severity failure;
 
       report "tb_dbg: 18. b clears a breakpoint, and g goes on to the next";
@@ -892,7 +892,7 @@ begin
       expect_word_color(1, 2, C_CURSOR, "a breakpoint cleared");
       expect_word_color(1, 4, C_BREAK, "breakpoint 1");
       key("g");
-      expect_row27("BRK 1    00000004", "at breakpoint 1");
+      expect_row30("BRK 1    00000004", "at breakpoint 1");
 
       report "tb_dbg: 19. the lowest free breakpoint, and none free";
       for i in 1 to 4 loop
@@ -905,11 +905,11 @@ begin
       key(C_ESC & "[C" & "b");
       wait_text(0, 0, " Window 00000000  Cursor 00000008  Breaks 00000006 00000004 00000007 00000008");
       key(C_ESC & "[C" & "b");
-      wait_text(23, 20, "none free ");
+      wait_text(26, 20, "none free ");
       key("1b");
-      wait_text(23, 0, " Word:    1B______");
+      wait_text(26, 0, " Word:    1B______");
       key("" & C_ESC);
-      wait_text(23, 0, " Word:    " & C_NONE);
+      wait_text(26, 0, " Word:    " & C_NONE);
       assert row(0)(36 to 77) = "Breaks 00000006 00000004 00000007 00000008"
          report "tb_dbg: the header is '" & row(0) & "' after b as a digit"
          severity failure;
@@ -922,11 +922,11 @@ begin
       press(2, true);
       expect_seg("00000006", "after BTNL");
       cycles(10000);
-      assert row(27)(11 to 18) = "00000006"
-         report "tb_dbg: row 27 is '" & row(27) & "' after a bouncing BTNL"
+      assert row(30)(11 to 18) = "00000006"
+         report "tb_dbg: row 30 is '" & row(30) & "' after a bouncing BTNL"
          severity failure;
       press(3);
-      expect_row27("BRK 1    00000004", "after BTNR");
+      expect_row30("BRK 1    00000004", "after BTNR");
       expect_seg("00000004", "after BTNR");
       press(0);
       expect('0', '0', '0', "after BTNC");
@@ -935,7 +935,7 @@ begin
       pulse;
       expect('1', '1', '1', "back in Focus after the buttons in Off");
       cycles(10000);
-      expect_row27("BRK 1    00000004", "after the buttons in Off");
+      expect_row30("BRK 1    00000004", "after the buttons in Off");
 
       report "tb_dbg: 21. the settings page";
       key("n");
@@ -946,60 +946,60 @@ begin
       wait_text(4, 0, "   TCP port      4510                ");
       wait_text(5, 0, "   Baud rate     115200              ");
       wait_text(9, 0, "   nothing sent, a host on it must follow, and a reset sets it back to 230400.");
-      wait_text(23, 0, " IP:      _________________  ");
+      wait_text(26, 0, " IP:      _________________  ");
       assert ovl(2 * 80 + 17)(31 downto 8) = C_CURSOR and ovl(3 * 80 + 17)(31 downto 8) = C_COLOR
          report "tb_dbg: the IP address is not the setting chosen"
          severity failure;
       key("192.168.1.65" & C_CR);
       wait_text(2, 0, " > IP address    192.168.1.65        ");
-      wait_text(23, 0, " IP:      _________________  written   ");
+      wait_text(26, 0, " IP:      _________________  written   ");
       assert set_ip = X"C0A80141"
          report "tb_dbg: the IP address is " & to_hstring(set_ip)
          severity failure;
       key("1.2.3" & C_CR);
-      wait_text(23, 0, " IP:      1.2.3____________  bad value ");
+      wait_text(26, 0, " IP:      1.2.3____________  bad value ");
       key("." & C_DEL & ".256" & C_CR);
-      wait_text(23, 0, " IP:      1.2.3.256________  bad value ");
+      wait_text(26, 0, " IP:      1.2.3.256________  bad value ");
       key("" & C_ESC);
-      wait_text(23, 0, " IP:      _________________  bad value ");
+      wait_text(26, 0, " IP:      _________________  bad value ");
       key(C_ESC & "[B");
-      wait_text(23, 0, " MAC:     _________________            ");
+      wait_text(26, 0, " MAC:     _________________            ");
       wait_text(2, 0, "   IP address");
       wait_text(3, 0, " > MAC address");
       key("2:4e:49:43:45:7" & C_CR);
       wait_text(3, 0, " > MAC address   02:4E:49:43:45:07   ");
-      wait_text(23, 0, " MAC:     _________________  written   ");
+      wait_text(26, 0, " MAC:     _________________  written   ");
       assert set_mac = X"024E49434507"
          report "tb_dbg: the MAC address is " & to_hstring(set_mac)
          severity failure;
       key("2:4e:49:43:45" & C_CR);
-      wait_text(23, 0, " MAC:     2:4E:49:43:45____  bad value ");
+      wait_text(26, 0, " MAC:     2:4E:49:43:45____  bad value ");
       key(C_ESC & C_ESC & "[B");
       wait_text(5, 0, " > Baud rate     115200 ");
-      wait_text(23, 0, " Baud:    _________________            ");
+      wait_text(26, 0, " Baud:    _________________            ");
       key(C_ESC & "[C");
-      wait_text(23, 0, " Baud:    115200___________ ");
+      wait_text(26, 0, " Baud:    115200___________ ");
       key(C_ESC & "[C" & C_ESC & "[C" & C_ESC & "[D");
-      wait_text(23, 0, " Baud:    230400___________ ");
+      wait_text(26, 0, " Baud:    230400___________ ");
       key("" & C_CR);
       wait_text(5, 0, " > Baud rate     230400              ");
-      wait_text(23, 0, " Baud:    _________________  written   ");
+      wait_text(26, 0, " Baud:    _________________  written   ");
       assert set_baud = X"00038400"
          report "tb_dbg: the baud rate is " & to_hstring(set_baud)
          severity failure;
       key("1234" & C_CR);
-      wait_text(23, 0, " Baud:    1234_____________  bad value ");
+      wait_text(26, 0, " Baud:    1234_____________  bad value ");
       -- The cursor blinks where the next character goes
       for i in 1 to 2 loop
-         wait until ovl(23 * 80 + 14)(31 downto 8) = C_CURSOR for C_TIMEOUT;
-         assert ovl(23 * 80 + 14)(31 downto 8) = C_CURSOR
+         wait until ovl(26 * 80 + 14)(31 downto 8) = C_CURSOR for C_TIMEOUT;
+         assert ovl(26 * 80 + 14)(31 downto 8) = C_CURSOR
             report "tb_dbg: the field's cursor does not show"
             severity failure;
-         assert ovl(23 * 80 + 13)(31 downto 8) = C_COLOR and ovl(23 * 80 + 15)(31 downto 8) = C_COLOR
+         assert ovl(26 * 80 + 13)(31 downto 8) = C_COLOR and ovl(26 * 80 + 15)(31 downto 8) = C_COLOR
             report "tb_dbg: the field's cursor is not after the 4"
             severity failure;
-         wait until ovl(23 * 80 + 14)(31 downto 8) = C_COLOR for C_TIMEOUT;
-         assert ovl(23 * 80 + 14)(31 downto 8) = C_COLOR
+         wait until ovl(26 * 80 + 14)(31 downto 8) = C_COLOR for C_TIMEOUT;
+         assert ovl(26 * 80 + 14)(31 downto 8) = C_COLOR
             report "tb_dbg: the field's cursor does not blink"
             severity failure;
       end loop;

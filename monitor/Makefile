@@ -29,14 +29,6 @@ ASM      = $(ROM_ASM)
 FMT      = $(PYTHON) $(NICE_CPU)/assembler/nicefmt.py
 NICEBUILD = $(PYTHON) $(NICE_CPU)/translator/nicebuild.py
 EMU      = $(NICE_CPU)/emulator/zig-out/bin/niceemu
-# niceemu prints a screen of 28 rows (nice_cpu#203), and the board has
-# 25 until #157; the rows after them are the ROM's room for scrolling.
-# SCREEN25 keeps rows 0 to 24 and drops their trailing blank rows, as
-# niceemu drops those of its 28.
-SCREEN25 = awk '/^Screen:/ {n = 0; b = 0} \
-  !/^\|/ {b = 0} \
-  /^\|/ {if (++n > 25) next; if ($$0 == "|") {b++; next}} \
-  {while (b > 0) {print "|"; b--}; print}'
 RUNTIME  = $(NICE_CPU)/runtime
 TOOLS    = $(wildcard $(NICE_CPU)/assembler/*.py) $(wildcard $(NICE_CPU)/translator/*.py)
 BUILD    = build
@@ -66,12 +58,12 @@ $(BUILD)/folder.nasm: FORCE | $(BUILD)
 
 # The ROMs of the ring test, test/ring.py: the ROM of the tests with the
 # size of the screen's memory that the display offset of a board would
-# give the monitor, 8192 words on the Nexys4DDR and 2048, which has no
-# room for the history, in place of the bits that niceemu keeps, all of
+# give the monitor, 8192 words on the Nexys4DDR and 4096, the fewest a
+# board can have for the 2240 of the screen, in place of the bits that niceemu keeps, all of
 # them. cmp fails the build if sed changed nothing.
 MASK_8k = 0x1FFF
-MASK_2k = 0x7FF
-$(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.bin: $(BUILD)/monitor_%.bin: $(ROM_TEST)
+MASK_4k = 0xFFF
+$(BUILD)/monitor_8k.bin $(BUILD)/monitor_4k.bin: $(BUILD)/monitor_%.bin: $(ROM_TEST)
 	@sed 's/^\( *\)AND  *R1, @SCR_OFFS, SCR_MAX$$/\1MOVE    R1, $(MASK_$*)/' \
 	  $(BUILD)/monitor_test_all.nasm > $(BUILD)/monitor_$*_all.nasm
 	@! cmp -s $(BUILD)/monitor_test_all.nasm $(BUILD)/monitor_$*_all.nasm
@@ -308,12 +300,12 @@ DUMP_clock    = -d 0xFFFFFF46:4
 # the row of the glyph of 0x80 that hello drew.
 # For scroll the variables and the screen's registers, and the last four
 # digits of the address that starts a row of the history (the words 4 to
-# 7 of the row): the rows of 86A0 and 869C that Page Up turned to slots 0
-# and 1, the row of 86A4 in slot 383, the first of the five rows that
+# 7 of the row): the rows of 8694 and 8690 that Page Up turned to slots 0
+# and 1, the row of 8698 in slot 380, the first of the five rows that
 # ver and halt added at the bottom of the ring, and the oldest, of 80B8,
-# in slot 378.
+# in slot 375.
 DUMP_scroll  = -d 0xFFFFF000:4 -d 0xFFFFF005:6 -d 0xFFFFFF80:6 -d 0xFFFF7FB4:4 -d 0xFFFF7F64:4 \
-               -d 0xFFFF0804:4 -d 0xFFFF0994:4
+               -d 0xFFFF08F4:4 -d 0xFFFF0A84:4
 DUMP_hello   = -d 0xFFFF01B8:13 -d 0xFFFFFF80:1 -d 0xFFFFFF86:1 -d 0xFFFE1000:1
 DUMP_hello_c = -d 0xFFFF01B8:12
 # For sd_write the results of test/sd.nasm's calls
@@ -383,14 +375,14 @@ FAT32_START_BYTES = $(shell echo $$(($(FAT32_START) * 512)))
 # the image did not (test/fat_tool.py diff, the dates masked for time)
 # and the order of its sector writes, from a second run with -t
 # (test/fat_tool.py order).
-test: fmt $(ROM_TEST) $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.bin $(BUILD)/hello.bin \
+test: fmt $(ROM_TEST) $(BUILD)/monitor_8k.bin $(BUILD)/monitor_4k.bin $(BUILD)/hello.bin \
       $(BUILD)/sd.bin $(BUILD)/arp.bin $(BUILD)/udp.bin $(BUILD)/net.bin \
       $(BUILD)/netdhcp.bin $(BUILD)/dns.bin $(BUILD)/lease.bin $(BUILD)/fpu.bin $(BUILD)/fs.bin $(BUILD)/fsw.bin \
       $(BUILD)/hal16.bin $(BUILD)/hal17.bin $(BUILD)/hal18.bin $(BUILD)/links.bin $(FAT_IMAGES) \
       $(BUILD)/version_test.nasm
 	@test '$(FOLDER_UC)' = NICE || { echo "make test needs FOLDER=NICE, not $(FOLDER)"; exit 1; }
 	@$(PYTHON) test/ring.py $(EMU) $(ROM_TEST):32768 \
-	  $(BUILD)/monitor_8k.bin:8192 $(BUILD)/monitor_2k.bin:2048
+	  $(BUILD)/monitor_8k.bin:8192 $(BUILD)/monitor_4k.bin:4096
 	@$(PYTHON) test/dhcp.py $(EMU) $(ROM_TEST) $(BUILD)/netdhcp.bin \
 	  test/dhcp.expected $(BUILD)/dhcp.out
 	@$(PYTHON) test/dns.py $(EMU) $(ROM_TEST) $(BUILD)/dns.bin \
@@ -478,7 +470,7 @@ test: fmt $(ROM_TEST) $(BUILD)/monitor_8k.bin $(BUILD)/monitor_2k.bin $(BUILD)/h
 	  cat $$rom $$prog > $(BUILD)/$$t.full.bin; \
 	  $(EMU) -s -n $(MAX_STEPS) -i $(BUILD)/$$input.txt $$dump $$opts $$sd $(BUILD)/$$t.full.bin \
 	    > $(BUILD)/$$t.raw; status=$$?; \
-	  { $(SCREEN25) $(BUILD)/$$t.raw | sed -e '/^Halted (HALT)/,/^R12 /d'; \
+	  { sed -e '/^Halted (HALT)/,/^R12 /d' $(BUILD)/$$t.raw; \
 	    sed -n 's/.* R14 ..\(......\) .*/VBASE at the halt \1/p' $(BUILD)/$$t.raw; \
 	    echo "exit $$status"; \
 	    if [ $$t = sd_write ]; then cmp $(BUILD)/sd_written.img $(BUILD)/sd_write.img 2>&1 \

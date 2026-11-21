@@ -19,7 +19,9 @@
 ; 1970, with the leap years of 1970 to 2106: every fourth, but 2100.
 
 SP              .EQU    R13
-SCREEN          .EQU    0xFFFF0000      ; 80 x 25 words, the character in bits 7..0
+SCREEN          .EQU    0xFFFF0000      ; 80 x ROWS words, the character in bits 7..0
+ROWS            .EQU    28              ; the screen's rows, as nice_cpu's NICE_SCREEN_ROWS
+SCR_WORDS       .EQU    80*ROWS         ; the screen's words, from SCREEN
 TEXT_B          .EQU    0x20000000      ; the byte window: byte A of the memory at TEXT_B+A
 E_IP            .EQU    0xFFFFFFB0      ; the network station's IP address, NET_IP, the first byte in bits 31..24
 E_MACH          .EQU    0xFFFFFFB1      ; the first two bytes of its MAC address, in bits 15..0
@@ -28,7 +30,7 @@ STACK           .EQU    0xFFFFE800      ; the variables, which end a program's R
 BASIC_WORDS     .EQU    0x800           ; as this BASIC's header has them, which the monitor takes SP from (bas_ram)
 MON_RAM         .EQU    0xFFFFF000      ; and the monitor's, to 0xFFFFFEFF, below the devices,
 MON_VARS        .EQU    0x1000          ; MON_VARS words, with the I/O page
-MON_LAYOUT      .EQU    1               ; the version of the layout of the monitor's RAM, in BASIC's header
+MON_LAYOUT      .EQU    2               ; the version of the layout of the monitor's RAM and of the screen's ROWS, in BASIC's header
 BASIC_BASE      .EQU    0x3000          ; BASIC's image, above the monitor's, to PROGRAM:
 BAS_COLD        .EQU    BASIC_BASE      ; its cold start, where mon_reset goes at its end,
 BAS_WARM        .EQU    BASIC_BASE+2    ; and its warm start, where mon_exit goes, R1 the status,

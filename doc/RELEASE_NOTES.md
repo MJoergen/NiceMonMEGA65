@@ -25,16 +25,24 @@ nice_cpu's `RC01` and `RC03` have no tag here.
 
 **Upgrade notes.**
 
-- nice_cpu is at `V2.5`. Its emulator's screen has 80×28 characters,
-  or 160×112 pixels in the chunky mode, where the board's has 80×25
-  and 160×100 until
-  [#157](https://github.com/MJoergen/NiceMonMEGA65/issues/157)
-  ([nice_cpu#203](https://github.com/MJoergen/nice_cpu/issues/203),
-  [EMULATOR.md](EMULATOR.md)). `nice_screen_clear` of nice_cpu's
-  runtime blanks 2240 words, and on the board the 240 after the
-  screen's 2000 are part of the monitor's scrollback, which no row
-  shows, so a C program that calls it blanks three of the
-  scrollback's rows.
+- nice_cpu is at `V2.5`, and the screen has 80×28 characters, where
+  it had 80×25, as in its emulator
+  ([#157](https://github.com/MJoergen/NiceMonMEGA65/issues/157),
+  [nice_cpu#203](https://github.com/MJoergen/nice_cpu/issues/203)).
+  With the debugger's strip under them, the 32 rows fill the
+  1280×1024 picture, with no black lines above and below. The cursor's
+  row goes to 27, and so do `CURSOR` and `scr_moveto`, and the chunky
+  mode has 160×112 pixels, where it had 160×100.
+- The scrollback has 381 rows on the MEGA65 and 74 on the
+  Nexys4DDR, where it had 384 and 77, and Page Up and Page Down move
+  27 rows.
+- A `BASIC*.ROM` on a card from before this release is refused, `for
+  another monitor`, as its screen editor counts 25 rows: the version
+  of the layout in its header is now 2
+  ([BASIC_ROM.md](BASIC_ROM.md#the-image)).
+- The debugger's page shows 25 rows of memory, where it showed 22, and
+  Page Up and Page Down move its window 200 words. The strip is rows 28
+  to 31.
 
 ## V2.4.1 (2026-11-21)
 

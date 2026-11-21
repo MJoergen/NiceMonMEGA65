@@ -127,7 +127,8 @@ INPUT_CHUNK = 256   # the most bytes of input sent at once
 SCREEN = 0xFFFF0000
 SCREEN_2004 = 0x400  # where niceemu -2004 has the screen, as the 2004 IDE
 SCREEN_WIDTH = 80
-SCREEN_HEIGHT = 25
+SCREEN_HEIGHT = 28
+SCREEN_HEIGHT_2004 = 25  # the rows of niceemu -2004, as the 2004 IDE
 
 # The halt reasons of the register at 0xFFFFFFF1, as the emulator describes
 # them
@@ -264,11 +265,13 @@ def dump_lines(link: Link, dumps: list[tuple[int, int]], screen: bool,
             lines.append(f"{(addr + i) & 0xFFFFFFFF:08x}:" +
                          "".join(f" {w:08x}" for w in words[i:i + 8]))
     if screen:
-        words = link.read(screen_base, SCREEN_WIDTH * SCREEN_HEIGHT)
+        height = (SCREEN_HEIGHT_2004 if screen_base == SCREEN_2004
+                  else SCREEN_HEIGHT)
+        words = link.read(screen_base, SCREEN_WIDTH * height)
         chars = "".join(chr(w & 0xFF) if 0x20 < w & 0xFF < 0x7F else " "
                         for w in words)
         rows = [chars[y * SCREEN_WIDTH:(y + 1) * SCREEN_WIDTH].rstrip()
-                for y in range(SCREEN_HEIGHT)]
+                for y in range(height)]
         while rows and not rows[-1]:
             rows.pop()
         lines.append("Screen:")
@@ -376,7 +379,8 @@ def add_options(parser: argparse.ArgumentParser) -> None:
                         help="after halting, print N memory words from ADDR; "
                         "decimal, or hex after 0x, up to %d words" % MAX_DUMP)
     parser.add_argument("--screen", action="store_true",
-                        help="after halting, print the 80x25 character screen")
+                        help="after halting, print the 80x28 character screen, "
+                        "or 80x25 with --ide2004")
     parser.add_argument("--ide2004", action="store_true",
                         help="like niceemu -2004: the screen is at 0x400, "
                         "plain memory on the board")

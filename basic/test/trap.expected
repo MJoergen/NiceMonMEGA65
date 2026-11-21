@@ -216,6 +216,9 @@ READY.
 HALT
 Halted
 Screen:
+|5 N = 0
+|10 TRAP 100
+|20 N = N + 1: IF N > 3 THEN END
 |30 A = 1 / 0
 |100 PRINT "TRAPPED"; N: GOTO 10
 |RUN
