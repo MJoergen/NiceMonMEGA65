@@ -18,8 +18,8 @@ Each subcommand is a module of tools/, which stays a library that the
 others import: load.py, run.py, mon.py, sdcard.py, sdnbd.py, flash.py,
 and tftpd.py. A module gives its options to the parser that this front
 end builds, with add_options(parser), and runs on the parsed options,
-with command(parser, args); mon.py passes its arguments on to nice_cpu's
-debugger/nicedbg.py, which parses them itself. A module is imported only
+with command(parser, args); mon.py gives nice_cpu's debugger/nicedbg.py
+its options and runs it on the parsed ones. A module is imported only
 when its subcommand runs, so that flash's pyftdi, through spiflash.py,
 is needed only there, and the others run on Linux and macOS with the
 Python standard library alone.
@@ -203,9 +203,6 @@ def main(argv: Sequence[str] | None = None) -> None:
 def run(name: str, argv: list[str]) -> None:
     """Imports the module of subcommand name, and runs it on argv."""
     module = importlib.import_module(SUBCOMMANDS[name].module)
-    if name == "mon":
-        module.main(argv)
-        return
     parser_class = getattr(module, "PARSER", argparse.ArgumentParser)
     parser = parser_class(prog=cli.command, description=module.DESCRIPTION)
     module.add_options(parser)

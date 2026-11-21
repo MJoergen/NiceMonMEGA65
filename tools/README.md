@@ -87,7 +87,6 @@ The subcommands look like one command:
 - The help of each subcommand gives each option's text in lower case,
   with its default in parentheses. The link's options are a group of
   their own, "the link", with the same text in every subcommand.
-  `mon`'s description is nice_cpu's `nicedbg`'s.
 - `nicemon.py --version` prints the tags of this repository and of
   nice_cpu, from `git describe`, such as
   `nicemon.py V2.4.1, nice_cpu V2.4`.
